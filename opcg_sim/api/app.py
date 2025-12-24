@@ -8,7 +8,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://ba88476d.opcg-sim-frontend.pages.dev"],
+    allow_origins=["https://opcg-sim-frontend.pages.dev"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
