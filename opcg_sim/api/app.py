@@ -4,14 +4,14 @@ from typing import Any, Dict
 import uuid
 from fastapi.middleware.cors import CORSMiddleware
 
+app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://ba88476d.opcg-sim-frontend.pages.dev"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app = FastAPI()
 
 # 超簡易インメモリ（本番では永続化や設計見直し）
 GAMES: Dict[str, Dict[str, Any]] = {}
