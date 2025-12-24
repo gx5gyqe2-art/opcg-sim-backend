@@ -2,6 +2,14 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Any, Dict
 import uuid
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://ba88476d.opcg-sim-frontend.pages.dev"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app = FastAPI()
 
@@ -12,7 +20,6 @@ GAMES: Dict[str, Dict[str, Any]] = {}
 class CreateReq(BaseModel):
     # 仕様に合わせて後で増やす（deck等）
     pass
-
 
 @app.get("/health")
 def health():
