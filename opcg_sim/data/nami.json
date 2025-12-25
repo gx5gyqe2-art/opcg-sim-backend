@@ -1,0 +1,73 @@
+{
+  "leader": {
+    "number": "OP11-041",
+    "name": "ナミ"
+  },
+  "cards": [
+    {
+      "number": "OP06-106",
+      "name": "光月日和",
+      "count": 4
+    },
+    {
+      "number": "PRB02-016",
+      "name": "お玉",
+      "count": 2
+    },
+    {
+      "number": "P-096",
+      "name": "少女",
+      "count": 4
+    },
+    {
+      "number": "OP12-051",
+      "name": "ヒナ",
+      "count": 4
+    },
+    {
+      "number": "OP06-047",
+      "name": "プリン",
+      "count": 4
+    },
+    {
+      "number": "OP07-116",
+      "name": "焔裂き",
+      "count": 3
+    },
+    {
+      "number": "OP04-056",
+      "name": "ゴムゴムの業火拳銃",
+      "count": 3
+    },
+    {
+      "number": "OP06-104",
+      "name": "菊之丞",
+      "count": 4
+    },
+    {
+      "number": "PRB02-008",
+      "name": "マルコ",
+      "count": 4
+    },
+    {
+      "number": "EB03-053",
+      "name": "ナミ(5c)",
+      "count": 4
+    },
+    {
+      "number": "OP08-047",
+      "name": "ジョズ",
+      "count": 3
+    },
+    {
+      "number": "EB03-055",
+      "name": "ニコ・ロビン",
+      "count": 4
+    },
+    {
+      "number": "OP13-042",
+      "name": "エドワード・ニューゲート",
+      "count": 4
+    }
+  ]
+}

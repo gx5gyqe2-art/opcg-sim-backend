@@ -1,0 +1,1531 @@
+2025-12-20 14:48:15,947 [INFO] main.py:38 - --- Simulation Start ---
+2025-12-20 14:48:16,792 [INFO] gamestate.py:93 - [GM] === Game Start ===
+2025-12-20 14:48:16,792 [INFO] gamestate.py:93 - [GM] First Player: Imu_User
+2025-12-20 14:48:16,792 [INFO] gamestate.py:93 - [GM] Phase: REFRESH
+2025-12-20 14:48:16,793 [INFO] gamestate.py:93 - [GM] Reset turn status for Nami_User
+2025-12-20 14:48:16,793 [INFO] gamestate.py:93 - [GM] Phase: DRAW
+2025-12-20 14:48:16,793 [INFO] gamestate.py:93 - [GM] Skipping Draw (Turn 1)
+2025-12-20 14:48:16,793 [INFO] gamestate.py:93 - [GM] Phase: DON
+2025-12-20 14:48:16,793 [INFO] gamestate.py:93 - [GM] Phase: MAIN
+2025-12-20 14:48:16,793 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 1 State - Imu_User ---
+{
+  "name": "Imu_User",
+  "life": 4,
+  "hand_count": 5,
+  "hand_names": [
+    "シャルリア宮",
+    "シェパード・十・ピーター聖",
+    "五老星",
+    "トップマン・ウォーキュリー聖",
+    "チャルロス聖"
+  ],
+  "field": [],
+  "don_active": 1,
+  "don_rested": 0
+}
+-----------------------
+2025-12-20 14:48:16,793 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 1 State - Nami_User ---
+{
+  "name": "Nami_User",
+  "life": 4,
+  "hand_count": 5,
+  "hand_names": [
+    "少女",
+    "光月日和",
+    "ニコ・ロビン",
+    "マルコ",
+    "エドワード・ニューゲート"
+  ],
+  "field": [],
+  "don_active": 0,
+  "don_rested": 0
+}
+-----------------------
+2025-12-20 14:48:16,794 [INFO] main.py:97 - --- Turn 1 Main Phase: Imu_User ---
+2025-12-20 14:48:16,794 [INFO] main.py:117 - Play: シャルリア宮 (Cost: 1)
+2025-12-20 14:48:16,794 [INFO] gamestate.py:93 - [GM] Imu_User played シャルリア宮.
+2025-12-20 14:48:16,794 [DEBUG] gamestate.py:573 - Starting resolution for ability of シャルリア宮
+2025-12-20 14:48:16,794 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for シャルリア宮 ---
+{
+  "trigger": "登場時",
+  "costs": [],
+  "actions": [
+    {
+      "type": 13,
+      "subject": "SELF",
+      "target": null,
+      "condition": null,
+      "value": 3,
+      "source_zone": "DECK",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": []
+    },
+    {
+      "type": 14,
+      "subject": "SELF",
+      "target": {
+        "zone": "TEMP",
+        "player": "SELF",
+        "card_type": [],
+        "traits": [
+          "天竜人"
+        ],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "、「シャルリア宮」以外の特徴《天竜人》を持つカード1枚までを公開し、手札に加える"
+      },
+      "condition": null,
+      "value": 0,
+      "source_zone": "ANY",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": []
+    },
+    {
+      "type": 8,
+      "subject": "SELF",
+      "target": {
+        "zone": "TEMP",
+        "player": "SELF",
+        "card_type": [],
+        "traits": [
+          "天竜人"
+        ],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "、「シャルリア宮」以外の特徴《天竜人》を持つカード1枚までを公開し、手札に加える"
+      },
+      "condition": null,
+      "value": 0,
+      "source_zone": "TEMP",
+      "dest_zone": "HAND",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": [
+        {
+          "type": 11,
+          "subject": "SELF",
+          "target": {
+            "zone": "HAND",
+            "player": "SELF",
+            "card_type": [],
+            "traits": [],
+            "attributes": [],
+            "colors": [],
+            "names": [],
+            "cost_min": null,
+            "cost_max": null,
+            "power_min": null,
+            "power_max": null,
+            "is_rest": null,
+            "count": 1,
+            "select_mode": "REMAINING",
+            "raw_text": "残りをトラッシュに置き、自分の手札1枚を捨てる"
+          },
+          "condition": null,
+          "value": 0,
+          "source_zone": "ANY",
+          "dest_zone": "TRASH",
+          "dest_position": "BOTTOM",
+          "details": "",
+          "then_actions": []
+        }
+      ]
+    }
+  ],
+  "raw_text": "『登場時』自分のデッキの上から3枚を見て、「シャルリア宮」以外の特徴《天竜人》を持つカード1枚までを公開し、手札に加える。その後、残りをトラッシュに置き、自分の手札1枚を捨てる。"
+}
+-----------------------
+2025-12-20 14:48:16,794 [INFO] gamestate.py:93 - [GM] Look (3): ['イーザンバロン・V・ナス寿郎聖', 'ミョスガルド聖', '“五老星”ここに!!!']
+2025-12-20 14:48:16,795 [INFO] gamestate.py:93 - [GM] Bounce/Add: イーザンバロン・V・ナス寿郎聖 -> Hand
+2025-12-20 14:48:16,795 [INFO] gamestate.py:93 - [GM] ... Resolving 'Then' Actions ...
+2025-12-20 14:48:16,795 [INFO] gamestate.py:93 - [GM] Discard: ミョスガルド聖
+2025-12-20 14:48:16,795 [INFO] gamestate.py:93 - [GM] Discard: “五老星”ここに!!!
+2025-12-20 14:48:16,795 [INFO] main.py:156 - Attack Declaration: イム -> ナミ
+2025-12-20 14:48:16,795 [INFO] gamestate.py:93 - [GM] Attack Declaration: イム attacks ナミ!
+2025-12-20 14:48:16,795 [INFO] gamestate.py:93 - [GM] No Block declared.
+2025-12-20 14:48:16,795 [INFO] gamestate.py:93 - [GM] Damage Calc: Attacker 5000 vs Target 5000
+2025-12-20 14:48:16,795 [INFO] gamestate.py:93 - [GM] Attack Successful!
+2025-12-20 14:48:16,796 [INFO] gamestate.py:93 - [GM] Nami_User took 少女 from Life to Hand.
+2025-12-20 14:48:16,796 [INFO] gamestate.py:93 - [GM] --- Attack Sequence End ---
+2025-12-20 14:48:16,796 [INFO] gamestate.py:93 - [GM] Phase: END
+2025-12-20 14:48:16,796 [INFO] gamestate.py:93 - [GM] --- Turn 2 Start: Nami_User's Turn ---
+2025-12-20 14:48:16,796 [INFO] gamestate.py:93 - [GM] Phase: REFRESH
+2025-12-20 14:48:16,796 [INFO] gamestate.py:93 - [GM] Reset turn status for Imu_User
+2025-12-20 14:48:16,796 [INFO] gamestate.py:93 - [GM] Phase: DRAW
+2025-12-20 14:48:16,796 [INFO] gamestate.py:93 - [GM] Nami_User drew a card.
+2025-12-20 14:48:16,796 [INFO] gamestate.py:93 - [GM] Phase: DON
+2025-12-20 14:48:16,796 [INFO] gamestate.py:93 - [GM] Phase: MAIN
+2025-12-20 14:48:16,796 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 2 State - Imu_User ---
+{
+  "name": "Imu_User",
+  "life": 4,
+  "hand_count": 5,
+  "hand_names": [
+    "シェパード・十・ピーター聖",
+    "五老星",
+    "トップマン・ウォーキュリー聖",
+    "チャルロス聖",
+    "イーザンバロン・V・ナス寿郎聖"
+  ],
+  "field": [
+    "シャルリア宮"
+  ],
+  "don_active": 0,
+  "don_rested": 1
+}
+-----------------------
+2025-12-20 14:48:16,796 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 2 State - Nami_User ---
+{
+  "name": "Nami_User",
+  "life": 3,
+  "hand_count": 7,
+  "hand_names": [
+    "少女",
+    "光月日和",
+    "ニコ・ロビン",
+    "マルコ",
+    "エドワード・ニューゲート",
+    "少女",
+    "菊之丞"
+  ],
+  "field": [],
+  "don_active": 2,
+  "don_rested": 0
+}
+-----------------------
+2025-12-20 14:48:16,797 [INFO] main.py:97 - --- Turn 2 Main Phase: Nami_User ---
+2025-12-20 14:48:16,797 [INFO] main.py:117 - Play: 少女 (Cost: 2)
+2025-12-20 14:48:16,797 [INFO] gamestate.py:93 - [GM] Nami_User played 少女.
+2025-12-20 14:48:16,797 [DEBUG] gamestate.py:573 - Starting resolution for ability of 少女
+2025-12-20 14:48:16,797 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for 少女 ---
+{
+  "trigger": "登場時",
+  "costs": [],
+  "actions": [
+    {
+      "type": 10,
+      "subject": "SELF",
+      "target": null,
+      "condition": null,
+      "value": 1,
+      "source_zone": "ANY",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": []
+    },
+    {
+      "type": 11,
+      "subject": "SELF",
+      "target": {
+        "zone": "HAND",
+        "player": "SELF",
+        "card_type": [],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "自分の手札1枚を捨てる"
+      },
+      "condition": null,
+      "value": 0,
+      "source_zone": "ANY",
+      "dest_zone": "TRASH",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": []
+    }
+  ],
+  "raw_text": "『登場時』カード1枚を引き、自分の手札1枚を捨てる。"
+}
+-----------------------
+2025-12-20 14:48:16,797 [INFO] gamestate.py:93 - [GM] Nami_User drew a card.
+2025-12-20 14:48:16,797 [INFO] gamestate.py:93 - [GM] Discard: 光月日和
+2025-12-20 14:48:16,799 [INFO] main.py:156 - Attack Declaration: ナミ -> イム
+2025-12-20 14:48:16,799 [INFO] gamestate.py:93 - [GM] Attack Declaration: ナミ attacks イム!
+2025-12-20 14:48:16,799 [INFO] gamestate.py:93 - [GM] --- Trigger: On Attack (ナミ) ---
+2025-12-20 14:48:16,799 [DEBUG] gamestate.py:573 - Starting resolution for ability of ナミ
+2025-12-20 14:48:16,800 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for ナミ ---
+{
+  "trigger": "アタック時",
+  "costs": [
+    {
+      "type": 11,
+      "subject": "SELF",
+      "target": {
+        "zone": "HAND",
+        "player": "SELF",
+        "card_type": [],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "『ドン×1』『ターン1回』自分の手札1枚を捨てることができる"
+      },
+      "condition": null,
+      "value": 0,
+      "source_zone": "ANY",
+      "dest_zone": "TRASH",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": []
+    }
+  ],
+  "actions": [
+    {
+      "type": 19,
+      "subject": "SELF",
+      "target": {
+        "zone": "FIELD",
+        "player": "SELF",
+        "card_type": [
+          "LEADER"
+        ],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "このリーダーは、このターン中、"
+      },
+      "condition": null,
+      "value": 2000,
+      "source_zone": "ANY",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "このリーダーは、このターン中、パワー+2000",
+      "then_actions": []
+    }
+  ],
+  "raw_text": "『ドン×1』『相手のアタック時』『ターン1回』自分の手札1枚を捨てることができる:このリーダーは、このターン中、パワー+2000。"
+}
+-----------------------
+2025-12-20 14:48:16,800 [INFO] gamestate.py:93 - [GM] --- Paying Costs for ナミ ---
+2025-12-20 14:48:16,800 [INFO] gamestate.py:93 - [GM] Discard: ニコ・ロビン
+2025-12-20 14:48:16,800 [INFO] gamestate.py:93 - [GM] Buff: ナミ +2000 BP
+2025-12-20 14:48:16,800 [INFO] gamestate.py:93 - [GM] No Block declared.
+2025-12-20 14:48:16,800 [INFO] gamestate.py:93 - [GM] Damage Calc: Attacker 7000 vs Target 5000
+2025-12-20 14:48:16,800 [INFO] gamestate.py:93 - [GM] Attack Successful!
+2025-12-20 14:48:16,800 [INFO] gamestate.py:93 - [GM] Imu_User took 世界の均衡など...永遠には保てぬのだ from Life to Hand.
+2025-12-20 14:48:16,800 [INFO] gamestate.py:93 - [GM] --- Attack Sequence End ---
+2025-12-20 14:48:16,800 [INFO] gamestate.py:93 - [GM] Phase: END
+2025-12-20 14:48:16,800 [INFO] gamestate.py:93 - [GM] --- Turn 3 Start: Imu_User's Turn ---
+2025-12-20 14:48:16,800 [INFO] gamestate.py:93 - [GM] Phase: REFRESH
+2025-12-20 14:48:16,801 [INFO] gamestate.py:93 - [GM] Reset turn status for Nami_User
+2025-12-20 14:48:16,801 [INFO] gamestate.py:93 - [GM] Phase: DRAW
+2025-12-20 14:48:16,801 [INFO] gamestate.py:93 - [GM] Imu_User drew a card.
+2025-12-20 14:48:16,801 [INFO] gamestate.py:93 - [GM] Phase: DON
+2025-12-20 14:48:16,801 [INFO] gamestate.py:93 - [GM] Phase: MAIN
+2025-12-20 14:48:16,801 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 3 State - Imu_User ---
+{
+  "name": "Imu_User",
+  "life": 3,
+  "hand_count": 7,
+  "hand_names": [
+    "シェパード・十・ピーター聖",
+    "五老星",
+    "トップマン・ウォーキュリー聖",
+    "チャルロス聖",
+    "イーザンバロン・V・ナス寿郎聖",
+    "世界の均衡など...永遠には保てぬのだ",
+    "チャルロス聖"
+  ],
+  "field": [
+    "シャルリア宮"
+  ],
+  "don_active": 3,
+  "don_rested": 0
+}
+-----------------------
+2025-12-20 14:48:16,801 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 3 State - Nami_User ---
+{
+  "name": "Nami_User",
+  "life": 3,
+  "hand_count": 5,
+  "hand_names": [
+    "マルコ",
+    "エドワード・ニューゲート",
+    "少女",
+    "菊之丞",
+    "マルコ"
+  ],
+  "field": [
+    "少女"
+  ],
+  "don_active": 0,
+  "don_rested": 2
+}
+-----------------------
+2025-12-20 14:48:16,801 [INFO] main.py:97 - --- Turn 3 Main Phase: Imu_User ---
+2025-12-20 14:48:16,801 [INFO] main.py:117 - Play: チャルロス聖 (Cost: 2)
+2025-12-20 14:48:16,801 [INFO] gamestate.py:93 - [GM] Imu_User played チャルロス聖.
+2025-12-20 14:48:16,801 [DEBUG] gamestate.py:573 - Starting resolution for ability of チャルロス聖
+2025-12-20 14:48:16,801 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for チャルロス聖 ---
+{
+  "trigger": "登場時",
+  "costs": [],
+  "actions": [
+    {
+      "type": 8,
+      "subject": "SELF",
+      "target": {
+        "zone": "DECK",
+        "player": "SELF",
+        "card_type": [],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "自分のデッキの上から1枚"
+      },
+      "condition": null,
+      "value": 1,
+      "source_zone": "DECK",
+      "dest_zone": "TRASH",
+      "dest_position": "TOP",
+      "details": "自分のデッキの上から1枚をトラッシュに置く",
+      "then_actions": []
+    }
+  ],
+  "raw_text": "『登場時』自分のデッキの上から1枚をトラッシュに置く。"
+}
+-----------------------
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] Trash: 元々...ないではないか...
+2025-12-20 14:48:16,802 [INFO] main.py:156 - Attack Declaration: イム -> ナミ
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] Attack Declaration: イム attacks ナミ!
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] No Block declared.
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] Damage Calc: Attacker 5000 vs Target 5000
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] Attack Successful!
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] Nami_User took ナミ from Life to Hand.
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] --- Attack Sequence End ---
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] Phase: END
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] --- Turn 4 Start: Nami_User's Turn ---
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] Phase: REFRESH
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] Reset turn status for Imu_User
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] Phase: DRAW
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] Nami_User drew a card.
+2025-12-20 14:48:16,802 [INFO] gamestate.py:93 - [GM] Phase: DON
+2025-12-20 14:48:16,803 [INFO] gamestate.py:93 - [GM] Phase: MAIN
+2025-12-20 14:48:16,803 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 4 State - Imu_User ---
+{
+  "name": "Imu_User",
+  "life": 3,
+  "hand_count": 6,
+  "hand_names": [
+    "シェパード・十・ピーター聖",
+    "五老星",
+    "トップマン・ウォーキュリー聖",
+    "イーザンバロン・V・ナス寿郎聖",
+    "世界の均衡など...永遠には保てぬのだ",
+    "チャルロス聖"
+  ],
+  "field": [
+    "シャルリア宮",
+    "チャルロス聖"
+  ],
+  "don_active": 1,
+  "don_rested": 2
+}
+-----------------------
+2025-12-20 14:48:16,803 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 4 State - Nami_User ---
+{
+  "name": "Nami_User",
+  "life": 2,
+  "hand_count": 7,
+  "hand_names": [
+    "マルコ",
+    "エドワード・ニューゲート",
+    "少女",
+    "菊之丞",
+    "マルコ",
+    "ナミ",
+    "少女"
+  ],
+  "field": [
+    "少女"
+  ],
+  "don_active": 4,
+  "don_rested": 0
+}
+-----------------------
+2025-12-20 14:48:16,803 [INFO] main.py:97 - --- Turn 4 Main Phase: Nami_User ---
+2025-12-20 14:48:16,803 [INFO] main.py:117 - Play: 菊之丞 (Cost: 4)
+2025-12-20 14:48:16,803 [INFO] gamestate.py:93 - [GM] Nami_User played 菊之丞.
+2025-12-20 14:48:16,803 [INFO] main.py:156 - Attack Declaration: ナミ -> イム
+2025-12-20 14:48:16,803 [INFO] gamestate.py:93 - [GM] Attack Declaration: ナミ attacks イム!
+2025-12-20 14:48:16,803 [INFO] gamestate.py:93 - [GM] --- Trigger: On Attack (ナミ) ---
+2025-12-20 14:48:16,804 [DEBUG] gamestate.py:573 - Starting resolution for ability of ナミ
+2025-12-20 14:48:16,804 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for ナミ ---
+{
+  "trigger": "アタック時",
+  "costs": [
+    {
+      "type": 11,
+      "subject": "SELF",
+      "target": {
+        "zone": "HAND",
+        "player": "SELF",
+        "card_type": [],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "『ドン×1』『ターン1回』自分の手札1枚を捨てることができる"
+      },
+      "condition": null,
+      "value": 0,
+      "source_zone": "ANY",
+      "dest_zone": "TRASH",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": []
+    }
+  ],
+  "actions": [
+    {
+      "type": 19,
+      "subject": "SELF",
+      "target": {
+        "zone": "FIELD",
+        "player": "SELF",
+        "card_type": [
+          "LEADER"
+        ],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "このリーダーは、このターン中、"
+      },
+      "condition": null,
+      "value": 2000,
+      "source_zone": "ANY",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "このリーダーは、このターン中、パワー+2000",
+      "then_actions": []
+    }
+  ],
+  "raw_text": "『ドン×1』『相手のアタック時』『ターン1回』自分の手札1枚を捨てることができる:このリーダーは、このターン中、パワー+2000。"
+}
+-----------------------
+2025-12-20 14:48:16,804 [INFO] gamestate.py:93 - [GM] --- Paying Costs for ナミ ---
+2025-12-20 14:48:16,804 [INFO] gamestate.py:93 - [GM] Discard: マルコ
+2025-12-20 14:48:16,804 [INFO] gamestate.py:93 - [GM] Buff: ナミ +2000 BP
+2025-12-20 14:48:16,804 [INFO] gamestate.py:93 - [GM] No Block declared.
+2025-12-20 14:48:16,804 [INFO] gamestate.py:93 - [GM] Damage Calc: Attacker 7000 vs Target 5000
+2025-12-20 14:48:16,805 [INFO] gamestate.py:93 - [GM] Attack Successful!
+2025-12-20 14:48:16,805 [INFO] gamestate.py:93 - [GM] Imu_User took ジェイガルシア・サターン聖 from Life to Hand.
+2025-12-20 14:48:16,805 [INFO] gamestate.py:93 - [GM] --- Attack Sequence End ---
+2025-12-20 14:48:16,805 [INFO] gamestate.py:93 - [GM] Phase: END
+2025-12-20 14:48:16,805 [INFO] gamestate.py:93 - [GM] --- Turn 5 Start: Imu_User's Turn ---
+2025-12-20 14:48:16,805 [INFO] gamestate.py:93 - [GM] Phase: REFRESH
+2025-12-20 14:48:16,805 [INFO] gamestate.py:93 - [GM] Reset turn status for Nami_User
+2025-12-20 14:48:16,806 [INFO] gamestate.py:93 - [GM] Phase: DRAW
+2025-12-20 14:48:16,806 [INFO] gamestate.py:93 - [GM] Imu_User drew a card.
+2025-12-20 14:48:16,806 [INFO] gamestate.py:93 - [GM] Phase: DON
+2025-12-20 14:48:16,806 [INFO] gamestate.py:93 - [GM] Phase: MAIN
+2025-12-20 14:48:16,806 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 5 State - Imu_User ---
+{
+  "name": "Imu_User",
+  "life": 2,
+  "hand_count": 8,
+  "hand_names": [
+    "シェパード・十・ピーター聖",
+    "五老星",
+    "トップマン・ウォーキュリー聖",
+    "イーザンバロン・V・ナス寿郎聖",
+    "世界の均衡など...永遠には保てぬのだ",
+    "チャルロス聖",
+    "ジェイガルシア・サターン聖",
+    "世界の均衡など...永遠には保てぬのだ"
+  ],
+  "field": [
+    "シャルリア宮",
+    "チャルロス聖"
+  ],
+  "don_active": 5,
+  "don_rested": 0
+}
+-----------------------
+2025-12-20 14:48:16,806 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 5 State - Nami_User ---
+{
+  "name": "Nami_User",
+  "life": 2,
+  "hand_count": 5,
+  "hand_names": [
+    "エドワード・ニューゲート",
+    "少女",
+    "マルコ",
+    "ナミ",
+    "少女"
+  ],
+  "field": [
+    "少女",
+    "菊之丞"
+  ],
+  "don_active": 0,
+  "don_rested": 4
+}
+-----------------------
+2025-12-20 14:48:16,806 [INFO] main.py:97 - --- Turn 5 Main Phase: Imu_User ---
+2025-12-20 14:48:16,806 [INFO] main.py:117 - Play: 世界の均衡など...永遠には保てぬのだ (Cost: 1)
+2025-12-20 14:48:16,806 [INFO] gamestate.py:93 - [GM] Imu_User played Event: 世界の均衡など...永遠には保てぬのだ
+2025-12-20 14:48:16,806 [DEBUG] gamestate.py:573 - Starting resolution for ability of 世界の均衡など...永遠には保てぬのだ
+2025-12-20 14:48:16,806 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for 世界の均衡など...永遠には保てぬのだ ---
+{
+  "trigger": "起動メイン",
+  "costs": [
+    {
+      "type": 24,
+      "subject": "SELF",
+      "target": {
+        "zone": "COST_AREA",
+        "player": "SELF",
+        "card_type": [],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": false,
+        "count": 5,
+        "select_mode": "CHOOSE",
+        "raw_text": ""
+      },
+      "condition": null,
+      "value": 5,
+      "source_zone": "ANY",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": []
+    }
+  ],
+  "actions": [
+    {
+      "type": 1,
+      "subject": "SELF",
+      "target": {
+        "zone": "FIELD",
+        "player": "OPPONENT",
+        "card_type": [
+          "CHARACTER"
+        ],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": 6,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "相手の元々のコスト6以下のキャラ1枚まで"
+      },
+      "condition": {
+        "type": 4,
+        "target": {
+          "zone": "FIELD",
+          "player": "SELF",
+          "card_type": [
+            "CHARACTER"
+          ],
+          "traits": [
+            "天竜人"
+          ],
+          "attributes": [],
+          "colors": [],
+          "names": [],
+          "cost_min": null,
+          "cost_max": null,
+          "power_min": null,
+          "power_max": null,
+          "is_rest": null,
+          "count": 1,
+          "select_mode": "CHOOSE",
+          "raw_text": "自分の場のキャラが、特徴《天竜人》を持つキャラのみの場合"
+        },
+        "operator": ">=",
+        "value": 1,
+        "raw_text": "自分の場のキャラが、特徴《天竜人》を持つキャラのみの場合"
+      },
+      "value": 6,
+      "source_zone": "FIELD",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "相手の元々のコスト6以下のキャラ1枚までを、KOする",
+      "then_actions": []
+    }
+  ],
+  "raw_text": "『メイン』自分のドン5枚をレストにできる:自分の場のキャラが、特徴《天竜人》を持つキャラのみの場合、相手の元々のコスト6以下のキャラ1枚までを、KOする。"
+}
+-----------------------
+2025-12-20 14:48:16,807 [INFO] gamestate.py:93 - [GM] Process Skipped: Insufficient cost for 世界の均衡など...永遠には保てぬのだ
+2025-12-20 14:48:16,807 [INFO] gamestate.py:93 - [GM] Played Event: 世界の均衡など...永遠には保てぬのだ -> Trash
+2025-12-20 14:48:16,807 [INFO] main.py:156 - Attack Declaration: イム -> ナミ
+2025-12-20 14:48:16,807 [INFO] main.py:184 - (Auto) Counter with: ['少女']
+2025-12-20 14:48:16,807 [INFO] gamestate.py:93 - [GM] --- Processing Counter Step for Nami_User ---
+2025-12-20 14:48:16,807 [INFO] gamestate.py:93 - [GM] Counter Applied: 少女 (+1000 Power)
+2025-12-20 14:48:16,807 [INFO] gamestate.py:93 - [GM] --- Counter Step End. Target New Power: 6000 ---
+2025-12-20 14:48:16,807 [INFO] gamestate.py:93 - [GM] Attack Declaration: イム attacks ナミ!
+2025-12-20 14:48:16,807 [INFO] gamestate.py:93 - [GM] No Block declared.
+2025-12-20 14:48:16,807 [INFO] gamestate.py:93 - [GM] Damage Calc: Attacker 5000 vs Target 6000
+2025-12-20 14:48:16,807 [INFO] gamestate.py:93 - [GM] Attack Failed (Guarded or Insufficient Power).
+2025-12-20 14:48:16,807 [INFO] gamestate.py:93 - [GM] --- Attack Sequence End ---
+2025-12-20 14:48:16,808 [INFO] gamestate.py:93 - [GM] Phase: END
+2025-12-20 14:48:16,808 [INFO] gamestate.py:93 - [GM] --- Turn 6 Start: Nami_User's Turn ---
+2025-12-20 14:48:16,808 [INFO] gamestate.py:93 - [GM] Phase: REFRESH
+2025-12-20 14:48:16,808 [INFO] gamestate.py:93 - [GM] Reset turn status for Imu_User
+2025-12-20 14:48:16,808 [INFO] gamestate.py:93 - [GM] Phase: DRAW
+2025-12-20 14:48:16,808 [INFO] gamestate.py:93 - [GM] Nami_User drew a card.
+2025-12-20 14:48:16,808 [INFO] gamestate.py:93 - [GM] Phase: DON
+2025-12-20 14:48:16,808 [INFO] gamestate.py:93 - [GM] Phase: MAIN
+2025-12-20 14:48:16,808 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 6 State - Imu_User ---
+{
+  "name": "Imu_User",
+  "life": 2,
+  "hand_count": 7,
+  "hand_names": [
+    "シェパード・十・ピーター聖",
+    "五老星",
+    "トップマン・ウォーキュリー聖",
+    "イーザンバロン・V・ナス寿郎聖",
+    "世界の均衡など...永遠には保てぬのだ",
+    "チャルロス聖",
+    "ジェイガルシア・サターン聖"
+  ],
+  "field": [
+    "シャルリア宮",
+    "チャルロス聖"
+  ],
+  "don_active": 4,
+  "don_rested": 1
+}
+-----------------------
+2025-12-20 14:48:16,808 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 6 State - Nami_User ---
+{
+  "name": "Nami_User",
+  "life": 2,
+  "hand_count": 5,
+  "hand_names": [
+    "エドワード・ニューゲート",
+    "マルコ",
+    "ナミ",
+    "少女",
+    "ジョズ"
+  ],
+  "field": [
+    "少女",
+    "菊之丞"
+  ],
+  "don_active": 6,
+  "don_rested": 0
+}
+-----------------------
+2025-12-20 14:48:16,808 [INFO] main.py:97 - --- Turn 6 Main Phase: Nami_User ---
+2025-12-20 14:48:16,808 [INFO] main.py:117 - Play: ジョズ (Cost: 6)
+2025-12-20 14:48:16,808 [INFO] gamestate.py:93 - [GM] Nami_User played ジョズ.
+2025-12-20 14:48:16,808 [DEBUG] gamestate.py:573 - Starting resolution for ability of ジョズ
+2025-12-20 14:48:16,808 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for ジョズ ---
+{
+  "trigger": "登場時",
+  "costs": [
+    {
+      "type": 8,
+      "subject": "SELF",
+      "target": {
+        "zone": "FIELD",
+        "player": "SELF",
+        "card_type": [
+          "CHARACTER"
+        ],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "このキャラ以外の自分のキャラ1枚"
+      },
+      "condition": null,
+      "value": 1,
+      "source_zone": "FIELD",
+      "dest_zone": "HAND",
+      "dest_position": "BOTTOM",
+      "details": "このキャラ以外の自分のキャラ1枚を持ち主の手札に戻すことができる",
+      "then_actions": []
+    }
+  ],
+  "actions": [
+    {
+      "type": 8,
+      "subject": "SELF",
+      "target": {
+        "zone": "FIELD",
+        "player": "SELF",
+        "card_type": [
+          "CHARACTER"
+        ],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": 6,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "コスト6以下のキャラ1枚まで"
+      },
+      "condition": null,
+      "value": 6,
+      "source_zone": "FIELD",
+      "dest_zone": "HAND",
+      "dest_position": "BOTTOM",
+      "details": "コスト6以下のキャラ1枚までを、持ち主の手札に戻す",
+      "then_actions": []
+    }
+  ],
+  "raw_text": "『登場時』このキャラ以外の自分のキャラ1枚を持ち主の手札に戻すことができる:コスト6以下のキャラ1枚までを、持ち主の手札に戻す。"
+}
+-----------------------
+2025-12-20 14:48:16,809 [INFO] gamestate.py:93 - [GM] Process Skipped: Insufficient cost for ジョズ
+2025-12-20 14:48:16,809 [INFO] main.py:156 - Attack Declaration: ナミ -> イム
+2025-12-20 14:48:16,809 [INFO] gamestate.py:93 - [GM] Attack Declaration: ナミ attacks イム!
+2025-12-20 14:48:16,809 [INFO] gamestate.py:93 - [GM] --- Trigger: On Attack (ナミ) ---
+2025-12-20 14:48:16,809 [DEBUG] gamestate.py:573 - Starting resolution for ability of ナミ
+2025-12-20 14:48:16,809 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for ナミ ---
+{
+  "trigger": "アタック時",
+  "costs": [
+    {
+      "type": 11,
+      "subject": "SELF",
+      "target": {
+        "zone": "HAND",
+        "player": "SELF",
+        "card_type": [],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "『ドン×1』『ターン1回』自分の手札1枚を捨てることができる"
+      },
+      "condition": null,
+      "value": 0,
+      "source_zone": "ANY",
+      "dest_zone": "TRASH",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": []
+    }
+  ],
+  "actions": [
+    {
+      "type": 19,
+      "subject": "SELF",
+      "target": {
+        "zone": "FIELD",
+        "player": "SELF",
+        "card_type": [
+          "LEADER"
+        ],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "このリーダーは、このターン中、"
+      },
+      "condition": null,
+      "value": 2000,
+      "source_zone": "ANY",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "このリーダーは、このターン中、パワー+2000",
+      "then_actions": []
+    }
+  ],
+  "raw_text": "『ドン×1』『相手のアタック時』『ターン1回』自分の手札1枚を捨てることができる:このリーダーは、このターン中、パワー+2000。"
+}
+-----------------------
+2025-12-20 14:48:16,809 [INFO] gamestate.py:93 - [GM] --- Paying Costs for ナミ ---
+2025-12-20 14:48:16,809 [INFO] gamestate.py:93 - [GM] Discard: エドワード・ニューゲート
+2025-12-20 14:48:16,809 [INFO] gamestate.py:93 - [GM] Buff: ナミ +2000 BP
+2025-12-20 14:48:16,809 [INFO] gamestate.py:93 - [GM] No Block declared.
+2025-12-20 14:48:16,809 [INFO] gamestate.py:93 - [GM] Damage Calc: Attacker 7000 vs Target 5000
+2025-12-20 14:48:16,809 [INFO] gamestate.py:93 - [GM] Attack Successful!
+2025-12-20 14:48:16,810 [INFO] gamestate.py:93 - [GM] Imu_User took 世界の均衡など...永遠には保てぬのだ from Life to Hand.
+2025-12-20 14:48:16,810 [INFO] gamestate.py:93 - [GM] --- Attack Sequence End ---
+2025-12-20 14:48:16,810 [INFO] gamestate.py:93 - [GM] Phase: END
+2025-12-20 14:48:16,810 [INFO] gamestate.py:93 - [GM] --- Turn 7 Start: Imu_User's Turn ---
+2025-12-20 14:48:16,810 [INFO] gamestate.py:93 - [GM] Phase: REFRESH
+2025-12-20 14:48:16,810 [INFO] gamestate.py:93 - [GM] Reset turn status for Nami_User
+2025-12-20 14:48:16,810 [INFO] gamestate.py:93 - [GM] Phase: DRAW
+2025-12-20 14:48:16,810 [INFO] gamestate.py:93 - [GM] Imu_User drew a card.
+2025-12-20 14:48:16,810 [INFO] gamestate.py:93 - [GM] Phase: DON
+2025-12-20 14:48:16,810 [INFO] gamestate.py:93 - [GM] Phase: MAIN
+2025-12-20 14:48:16,810 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 7 State - Imu_User ---
+{
+  "name": "Imu_User",
+  "life": 1,
+  "hand_count": 9,
+  "hand_names": [
+    "シェパード・十・ピーター聖",
+    "五老星",
+    "トップマン・ウォーキュリー聖",
+    "イーザンバロン・V・ナス寿郎聖",
+    "世界の均衡など...永遠には保てぬのだ",
+    "チャルロス聖",
+    "ジェイガルシア・サターン聖",
+    "世界の均衡など...永遠には保てぬのだ",
+    "元々...ないではないか..."
+  ],
+  "field": [
+    "シャルリア宮",
+    "チャルロス聖"
+  ],
+  "don_active": 7,
+  "don_rested": 0
+}
+-----------------------
+2025-12-20 14:48:16,810 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 7 State - Nami_User ---
+{
+  "name": "Nami_User",
+  "life": 2,
+  "hand_count": 3,
+  "hand_names": [
+    "マルコ",
+    "ナミ",
+    "少女"
+  ],
+  "field": [
+    "少女",
+    "菊之丞",
+    "ジョズ"
+  ],
+  "don_active": 0,
+  "don_rested": 6
+}
+-----------------------
+2025-12-20 14:48:16,810 [INFO] main.py:97 - --- Turn 7 Main Phase: Imu_User ---
+2025-12-20 14:48:16,810 [INFO] main.py:117 - Play: イーザンバロン・V・ナス寿郎聖 (Cost: 6)
+2025-12-20 14:48:16,811 [INFO] gamestate.py:93 - [GM] Imu_User played イーザンバロン・V・ナス寿郎聖.
+2025-12-20 14:48:16,811 [INFO] main.py:156 - Attack Declaration: イム -> ナミ
+2025-12-20 14:48:16,811 [INFO] main.py:184 - (Auto) Counter with: ['少女', 'ナミ']
+2025-12-20 14:48:16,811 [INFO] gamestate.py:93 - [GM] --- Processing Counter Step for Nami_User ---
+2025-12-20 14:48:16,811 [INFO] gamestate.py:93 - [GM] Counter Applied: 少女 (+1000 Power)
+2025-12-20 14:48:16,811 [INFO] gamestate.py:93 - [GM] Counter Applied: ナミ (+1000 Power)
+2025-12-20 14:48:16,811 [INFO] gamestate.py:93 - [GM] --- Counter Step End. Target New Power: 7000 ---
+2025-12-20 14:48:16,811 [INFO] gamestate.py:93 - [GM] Attack Declaration: イム attacks ナミ!
+2025-12-20 14:48:16,811 [INFO] gamestate.py:93 - [GM] No Block declared.
+2025-12-20 14:48:16,811 [INFO] gamestate.py:93 - [GM] Damage Calc: Attacker 5000 vs Target 7000
+2025-12-20 14:48:16,812 [INFO] gamestate.py:93 - [GM] Attack Failed (Guarded or Insufficient Power).
+2025-12-20 14:48:16,812 [INFO] gamestate.py:93 - [GM] --- Attack Sequence End ---
+2025-12-20 14:48:16,812 [INFO] gamestate.py:93 - [GM] Phase: END
+2025-12-20 14:48:16,812 [INFO] gamestate.py:93 - [GM] --- Turn 8 Start: Nami_User's Turn ---
+2025-12-20 14:48:16,812 [INFO] gamestate.py:93 - [GM] Phase: REFRESH
+2025-12-20 14:48:16,812 [INFO] gamestate.py:93 - [GM] Reset turn status for Imu_User
+2025-12-20 14:48:16,812 [INFO] gamestate.py:93 - [GM] Phase: DRAW
+2025-12-20 14:48:16,812 [INFO] gamestate.py:93 - [GM] Nami_User drew a card.
+2025-12-20 14:48:16,812 [INFO] gamestate.py:93 - [GM] Phase: DON
+2025-12-20 14:48:16,812 [INFO] gamestate.py:93 - [GM] Phase: MAIN
+2025-12-20 14:48:16,812 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 8 State - Imu_User ---
+{
+  "name": "Imu_User",
+  "life": 1,
+  "hand_count": 8,
+  "hand_names": [
+    "シェパード・十・ピーター聖",
+    "五老星",
+    "トップマン・ウォーキュリー聖",
+    "世界の均衡など...永遠には保てぬのだ",
+    "チャルロス聖",
+    "ジェイガルシア・サターン聖",
+    "世界の均衡など...永遠には保てぬのだ",
+    "元々...ないではないか..."
+  ],
+  "field": [
+    "シャルリア宮",
+    "チャルロス聖",
+    "イーザンバロン・V・ナス寿郎聖"
+  ],
+  "don_active": 1,
+  "don_rested": 6
+}
+-----------------------
+2025-12-20 14:48:16,812 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 8 State - Nami_User ---
+{
+  "name": "Nami_User",
+  "life": 2,
+  "hand_count": 2,
+  "hand_names": [
+    "マルコ",
+    "ゴムゴムの業火拳銃"
+  ],
+  "field": [
+    "少女",
+    "菊之丞",
+    "ジョズ"
+  ],
+  "don_active": 8,
+  "don_rested": 0
+}
+-----------------------
+2025-12-20 14:48:16,813 [INFO] main.py:97 - --- Turn 8 Main Phase: Nami_User ---
+2025-12-20 14:48:16,813 [INFO] main.py:117 - Play: マルコ (Cost: 4)
+2025-12-20 14:48:16,813 [INFO] gamestate.py:93 - [GM] Nami_User played マルコ.
+2025-12-20 14:48:16,813 [INFO] main.py:156 - Attack Declaration: ナミ -> イム
+2025-12-20 14:48:16,813 [INFO] main.py:165 - BLOCK: チャルロス聖 blocks!
+2025-12-20 14:48:16,813 [INFO] main.py:184 - (Auto) Counter with: ['シェパード・十・ピーター聖', 'トップマン・ウォーキュリー聖', '世界の均衡など...永遠には保てぬのだ']
+2025-12-20 14:48:16,813 [INFO] gamestate.py:93 - [GM] --- Processing Counter Step for Imu_User ---
+2025-12-20 14:48:16,813 [INFO] gamestate.py:93 - [GM] Counter Applied: シェパード・十・ピーター聖 (+2000 Power)
+2025-12-20 14:48:16,813 [INFO] gamestate.py:93 - [GM] Counter Applied: トップマン・ウォーキュリー聖 (+1000 Power)
+2025-12-20 14:48:16,813 [INFO] gamestate.py:93 - [GM] Paid Cost 1 for Event Counter: 世界の均衡など...永遠には保てぬのだ
+2025-12-20 14:48:16,813 [INFO] gamestate.py:93 - [GM] Activating Counter Effect: 世界の均衡など...永遠には保てぬのだ
+2025-12-20 14:48:16,813 [DEBUG] gamestate.py:573 - Starting resolution for ability of 世界の均衡など...永遠には保てぬのだ
+2025-12-20 14:48:16,813 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for 世界の均衡など...永遠には保てぬのだ ---
+{
+  "trigger": "カウンター",
+  "costs": [],
+  "actions": [
+    {
+      "type": 19,
+      "subject": "SELF",
+      "target": {
+        "zone": "FIELD",
+        "player": "SELF",
+        "card_type": [
+          "LEADER"
+        ],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "自分のリーダー"
+      },
+      "condition": null,
+      "value": 3000,
+      "source_zone": "ANY",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "自分のリーダーを、このバトル中、パワー+3000",
+      "then_actions": []
+    }
+  ],
+  "raw_text": "『カウンター』自分のリーダーを、このバトル中、パワー+3000。"
+}
+-----------------------
+2025-12-20 14:48:16,814 [INFO] gamestate.py:93 - [GM] Buff: イム +3000 BP
+2025-12-20 14:48:16,814 [INFO] gamestate.py:93 - [GM] --- Counter Step End. Target New Power: 3000 ---
+2025-12-20 14:48:16,814 [INFO] gamestate.py:93 - [GM] Attack Declaration: ナミ attacks イム!
+2025-12-20 14:48:16,814 [INFO] gamestate.py:93 - [GM] --- Trigger: On Attack (ナミ) ---
+2025-12-20 14:48:16,814 [DEBUG] gamestate.py:573 - Starting resolution for ability of ナミ
+2025-12-20 14:48:16,814 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for ナミ ---
+{
+  "trigger": "アタック時",
+  "costs": [
+    {
+      "type": 11,
+      "subject": "SELF",
+      "target": {
+        "zone": "HAND",
+        "player": "SELF",
+        "card_type": [],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "『ドン×1』『ターン1回』自分の手札1枚を捨てることができる"
+      },
+      "condition": null,
+      "value": 0,
+      "source_zone": "ANY",
+      "dest_zone": "TRASH",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": []
+    }
+  ],
+  "actions": [
+    {
+      "type": 19,
+      "subject": "SELF",
+      "target": {
+        "zone": "FIELD",
+        "player": "SELF",
+        "card_type": [
+          "LEADER"
+        ],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "このリーダーは、このターン中、"
+      },
+      "condition": null,
+      "value": 2000,
+      "source_zone": "ANY",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "このリーダーは、このターン中、パワー+2000",
+      "then_actions": []
+    }
+  ],
+  "raw_text": "『ドン×1』『相手のアタック時』『ターン1回』自分の手札1枚を捨てることができる:このリーダーは、このターン中、パワー+2000。"
+}
+-----------------------
+2025-12-20 14:48:16,814 [INFO] gamestate.py:93 - [GM] --- Paying Costs for ナミ ---
+2025-12-20 14:48:16,814 [INFO] gamestate.py:93 - [GM] Discard: ゴムゴムの業火拳銃
+2025-12-20 14:48:16,814 [INFO] gamestate.py:93 - [GM] Buff: ナミ +2000 BP
+2025-12-20 14:48:16,814 [INFO] gamestate.py:93 - [GM] BLOCK DECLARED: チャルロス聖 intercepts the attack!
+2025-12-20 14:48:16,814 [INFO] gamestate.py:93 - [GM] No On Block effects for チャルロス聖
+2025-12-20 14:48:16,814 [INFO] gamestate.py:93 - [GM] Target switched to Blocker: チャルロス聖
+2025-12-20 14:48:16,814 [INFO] gamestate.py:93 - [GM] Damage Calc: Attacker 7000 vs Target 3000
+2025-12-20 14:48:16,815 [INFO] gamestate.py:93 - [GM] Attack Successful!
+2025-12-20 14:48:16,815 [INFO] gamestate.py:93 - [GM] チャルロス聖 is KO'd.
+2025-12-20 14:48:16,815 [INFO] gamestate.py:93 - [GM] --- Attack Sequence End ---
+2025-12-20 14:48:16,815 [INFO] gamestate.py:93 - [GM] Phase: END
+2025-12-20 14:48:16,815 [INFO] gamestate.py:93 - [GM] --- Turn 9 Start: Imu_User's Turn ---
+2025-12-20 14:48:16,815 [INFO] gamestate.py:93 - [GM] Phase: REFRESH
+2025-12-20 14:48:16,815 [INFO] gamestate.py:93 - [GM] Reset turn status for Nami_User
+2025-12-20 14:48:16,815 [INFO] gamestate.py:93 - [GM] Phase: DRAW
+2025-12-20 14:48:16,815 [INFO] gamestate.py:93 - [GM] Imu_User drew a card.
+2025-12-20 14:48:16,815 [INFO] gamestate.py:93 - [GM] Phase: DON
+2025-12-20 14:48:16,815 [INFO] gamestate.py:93 - [GM] Phase: MAIN
+2025-12-20 14:48:16,815 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 9 State - Imu_User ---
+{
+  "name": "Imu_User",
+  "life": 1,
+  "hand_count": 6,
+  "hand_names": [
+    "五老星",
+    "世界の均衡など...永遠には保てぬのだ",
+    "チャルロス聖",
+    "ジェイガルシア・サターン聖",
+    "元々...ないではないか...",
+    "シャルリア宮"
+  ],
+  "field": [
+    "シャルリア宮",
+    "イーザンバロン・V・ナス寿郎聖"
+  ],
+  "don_active": 9,
+  "don_rested": 0
+}
+-----------------------
+2025-12-20 14:48:16,816 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 9 State - Nami_User ---
+{
+  "name": "Nami_User",
+  "life": 2,
+  "hand_count": 0,
+  "hand_names": [],
+  "field": [
+    "少女",
+    "菊之丞",
+    "ジョズ",
+    "マルコ"
+  ],
+  "don_active": 4,
+  "don_rested": 4
+}
+-----------------------
+2025-12-20 14:48:16,816 [INFO] main.py:97 - --- Turn 9 Main Phase: Imu_User ---
+2025-12-20 14:48:16,816 [INFO] main.py:132 - Activate Ability: イム
+2025-12-20 14:48:16,816 [INFO] gamestate.py:93 - [GM] Activate Main: イム uses ability (Index 1).
+2025-12-20 14:48:16,816 [DEBUG] gamestate.py:573 - Starting resolution for ability of イム
+2025-12-20 14:48:16,816 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for イム ---
+{
+  "trigger": "起動メイン",
+  "costs": [
+    {
+      "type": 8,
+      "subject": "SELF",
+      "target": {
+        "zone": "FIELD",
+        "player": "SELF",
+        "card_type": [],
+        "traits": [
+          "天竜人"
+        ],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "『ターン1回』自分の、特徴《天竜人》"
+      },
+      "condition": null,
+      "value": 1,
+      "source_zone": "FIELD",
+      "dest_zone": "TRASH",
+      "dest_position": "BOTTOM",
+      "details": "『ターン1回』自分の、特徴《天竜人》を持つキャラか、手札1枚をトラッシュに置くことができる",
+      "then_actions": []
+    }
+  ],
+  "actions": [
+    {
+      "type": 10,
+      "subject": "SELF",
+      "target": null,
+      "condition": null,
+      "value": 1,
+      "source_zone": "ANY",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": []
+    }
+  ],
+  "raw_text": "『起動メイン』『ターン1回』自分の、特徴《天竜人》を持つキャラか、手札1枚をトラッシュに置くことができる:カード1枚を引く。"
+}
+-----------------------
+2025-12-20 14:48:16,816 [INFO] gamestate.py:93 - [GM] --- Paying Costs for イム ---
+2025-12-20 14:48:16,816 [INFO] gamestate.py:93 - [GM] Trash: シャルリア宮
+2025-12-20 14:48:16,816 [INFO] gamestate.py:93 - [GM] Imu_User drew a card.
+2025-12-20 14:48:16,816 [INFO] main.py:156 - Attack Declaration: イム -> ナミ
+2025-12-20 14:48:16,816 [INFO] gamestate.py:93 - [GM] Attack Declaration: イム attacks ナミ!
+2025-12-20 14:48:16,816 [INFO] gamestate.py:93 - [GM] No Block declared.
+2025-12-20 14:48:16,816 [INFO] gamestate.py:93 - [GM] Damage Calc: Attacker 5000 vs Target 5000
+2025-12-20 14:48:16,816 [INFO] gamestate.py:93 - [GM] Attack Successful!
+2025-12-20 14:48:16,816 [INFO] gamestate.py:93 - [GM] Nami_User took ヒナ from Life to Hand.
+2025-12-20 14:48:16,816 [INFO] gamestate.py:93 - [GM] --- Attack Sequence End ---
+2025-12-20 14:48:16,817 [INFO] gamestate.py:93 - [GM] Phase: END
+2025-12-20 14:48:16,817 [INFO] gamestate.py:93 - [GM] --- Turn 10 Start: Nami_User's Turn ---
+2025-12-20 14:48:16,817 [INFO] gamestate.py:93 - [GM] Phase: REFRESH
+2025-12-20 14:48:16,817 [INFO] gamestate.py:93 - [GM] Reset turn status for Imu_User
+2025-12-20 14:48:16,817 [INFO] gamestate.py:93 - [GM] Phase: DRAW
+2025-12-20 14:48:16,817 [INFO] gamestate.py:93 - [GM] Nami_User drew a card.
+2025-12-20 14:48:16,817 [INFO] gamestate.py:93 - [GM] Phase: DON
+2025-12-20 14:48:16,817 [INFO] gamestate.py:93 - [GM] Phase: MAIN
+2025-12-20 14:48:16,817 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 10 State - Imu_User ---
+{
+  "name": "Imu_User",
+  "life": 1,
+  "hand_count": 7,
+  "hand_names": [
+    "五老星",
+    "世界の均衡など...永遠には保てぬのだ",
+    "チャルロス聖",
+    "ジェイガルシア・サターン聖",
+    "元々...ないではないか...",
+    "シャルリア宮",
+    "ジェイガルシア・サターン聖"
+  ],
+  "field": [
+    "イーザンバロン・V・ナス寿郎聖"
+  ],
+  "don_active": 9,
+  "don_rested": 0
+}
+-----------------------
+2025-12-20 14:48:16,817 [DEBUG] logger_config.py:74 - --- [DUMP] Turn 10 State - Nami_User ---
+{
+  "name": "Nami_User",
+  "life": 1,
+  "hand_count": 2,
+  "hand_names": [
+    "ヒナ",
+    "シャーロット・プリン"
+  ],
+  "field": [
+    "少女",
+    "菊之丞",
+    "ジョズ",
+    "マルコ"
+  ],
+  "don_active": 10,
+  "don_rested": 0
+}
+-----------------------
+2025-12-20 14:48:16,817 [INFO] main.py:97 - --- Turn 10 Main Phase: Nami_User ---
+2025-12-20 14:48:16,817 [INFO] main.py:117 - Play: シャーロット・プリン (Cost: 4)
+2025-12-20 14:48:16,818 [INFO] gamestate.py:93 - [GM] Nami_User played シャーロット・プリン.
+2025-12-20 14:48:16,818 [DEBUG] gamestate.py:573 - Starting resolution for ability of シャーロット・プリン
+2025-12-20 14:48:16,818 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for シャーロット・プリン ---
+{
+  "trigger": "登場時",
+  "costs": [],
+  "actions": [
+    {
+      "type": 15,
+      "subject": "OPPONENT",
+      "target": {
+        "zone": "DECK",
+        "player": "OPPONENT",
+        "card_type": [],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": ""
+      },
+      "condition": null,
+      "value": 0,
+      "source_zone": "ANY",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": []
+    },
+    {
+      "type": 8,
+      "subject": "OPPONENT",
+      "target": {
+        "zone": "HAND",
+        "player": "SELF",
+        "card_type": [],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": -1,
+        "select_mode": "ALL",
+        "raw_text": "自身の手札すべて"
+      },
+      "condition": null,
+      "value": 0,
+      "source_zone": "HAND",
+      "dest_zone": "DECK",
+      "dest_position": "BOTTOM",
+      "details": "自身の手札すべてをデッキに戻しシャッフルする",
+      "then_actions": [
+        {
+          "type": 10,
+          "subject": "OPPONENT",
+          "target": null,
+          "condition": null,
+          "value": 5,
+          "source_zone": "ANY",
+          "dest_zone": "ANY",
+          "dest_position": "BOTTOM",
+          "details": "",
+          "then_actions": []
+        }
+      ]
+    }
+  ],
+  "raw_text": "『登場時』相手は自身の手札すべてをデッキに戻しシャッフルする。その後、相手はカード5枚を引く。"
+}
+-----------------------
+2025-12-20 14:48:16,818 [INFO] gamestate.py:93 - [GM] Return to Deck: 五老星 -> Deck (BOTTOM)
+2025-12-20 14:48:16,818 [INFO] gamestate.py:93 - [GM] Return to Deck: 世界の均衡など...永遠には保てぬのだ -> Deck (BOTTOM)
+2025-12-20 14:48:16,818 [INFO] gamestate.py:93 - [GM] Return to Deck: チャルロス聖 -> Deck (BOTTOM)
+2025-12-20 14:48:16,818 [INFO] gamestate.py:93 - [GM] Return to Deck: ジェイガルシア・サターン聖 -> Deck (BOTTOM)
+2025-12-20 14:48:16,820 [INFO] gamestate.py:93 - [GM] Return to Deck: 元々...ないではないか... -> Deck (BOTTOM)
+2025-12-20 14:48:16,820 [INFO] gamestate.py:93 - [GM] Return to Deck: シャルリア宮 -> Deck (BOTTOM)
+2025-12-20 14:48:16,820 [INFO] gamestate.py:93 - [GM] Return to Deck: ジェイガルシア・サターン聖 -> Deck (BOTTOM)
+2025-12-20 14:48:16,820 [INFO] gamestate.py:93 - [GM] ... Resolving 'Then' Actions ...
+2025-12-20 14:48:16,820 [INFO] gamestate.py:93 - [GM] Imu_User drew a card.
+2025-12-20 14:48:16,820 [INFO] gamestate.py:93 - [GM] Imu_User drew a card.
+2025-12-20 14:48:16,820 [INFO] gamestate.py:93 - [GM] Imu_User drew a card.
+2025-12-20 14:48:16,820 [INFO] gamestate.py:93 - [GM] Imu_User drew a card.
+2025-12-20 14:48:16,820 [INFO] gamestate.py:93 - [GM] Imu_User drew a card.
+2025-12-20 14:48:16,821 [INFO] main.py:156 - Attack Declaration: ナミ -> イム
+2025-12-20 14:48:16,821 [INFO] gamestate.py:93 - [GM] Attack Declaration: ナミ attacks イム!
+2025-12-20 14:48:16,821 [INFO] gamestate.py:93 - [GM] --- Trigger: On Attack (ナミ) ---
+2025-12-20 14:48:16,821 [DEBUG] gamestate.py:573 - Starting resolution for ability of ナミ
+2025-12-20 14:48:16,821 [DEBUG] logger_config.py:74 - --- [DUMP] Resolving Ability for ナミ ---
+{
+  "trigger": "アタック時",
+  "costs": [
+    {
+      "type": 11,
+      "subject": "SELF",
+      "target": {
+        "zone": "HAND",
+        "player": "SELF",
+        "card_type": [],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "『ドン×1』『ターン1回』自分の手札1枚を捨てることができる"
+      },
+      "condition": null,
+      "value": 0,
+      "source_zone": "ANY",
+      "dest_zone": "TRASH",
+      "dest_position": "BOTTOM",
+      "details": "",
+      "then_actions": []
+    }
+  ],
+  "actions": [
+    {
+      "type": 19,
+      "subject": "SELF",
+      "target": {
+        "zone": "FIELD",
+        "player": "SELF",
+        "card_type": [
+          "LEADER"
+        ],
+        "traits": [],
+        "attributes": [],
+        "colors": [],
+        "names": [],
+        "cost_min": null,
+        "cost_max": null,
+        "power_min": null,
+        "power_max": null,
+        "is_rest": null,
+        "count": 1,
+        "select_mode": "CHOOSE",
+        "raw_text": "このリーダーは、このターン中、"
+      },
+      "condition": null,
+      "value": 2000,
+      "source_zone": "ANY",
+      "dest_zone": "ANY",
+      "dest_position": "BOTTOM",
+      "details": "このリーダーは、このターン中、パワー+2000",
+      "then_actions": []
+    }
+  ],
+  "raw_text": "『ドン×1』『相手のアタック時』『ターン1回』自分の手札1枚を捨てることができる:このリーダーは、このターン中、パワー+2000。"
+}
+-----------------------
+2025-12-20 14:48:16,822 [INFO] gamestate.py:93 - [GM] --- Paying Costs for ナミ ---
+2025-12-20 14:48:16,822 [INFO] gamestate.py:93 - [GM] Discard: ヒナ
+2025-12-20 14:48:16,822 [INFO] gamestate.py:93 - [GM] Buff: ナミ +2000 BP
+2025-12-20 14:48:16,822 [INFO] gamestate.py:93 - [GM] No Block declared.
+2025-12-20 14:48:16,822 [INFO] gamestate.py:93 - [GM] Damage Calc: Attacker 7000 vs Target 5000
+2025-12-20 14:48:16,822 [INFO] gamestate.py:93 - [GM] Attack Successful!
+2025-12-20 14:48:16,822 [INFO] gamestate.py:93 - [GM] Imu_User took シェパード・十・ピーター聖 from Life to Hand.
+2025-12-20 14:48:16,822 [INFO] gamestate.py:93 - [GM] --- Attack Sequence End ---
+2025-12-20 14:48:16,822 [INFO] main.py:197 - !!! GAME SET: Winner Nami_User !!!
+2025-12-20 14:48:16,822 [INFO] main.py:206 - --- Simulation Finished ---

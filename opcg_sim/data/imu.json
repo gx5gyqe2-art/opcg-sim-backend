@@ -1,0 +1,78 @@
+{
+  "leader": {
+    "number": "OP13-079",
+    "name": "イム"
+  },
+  "cards": [
+    {
+      "number": "OP13-086",
+      "name": "シャルリア宮",
+      "count": 4
+    },
+    {
+      "number": "OP13-087",
+      "name": "チャルロス聖",
+      "count": 4
+    },
+    {
+      "number": "OP13-092",
+      "name": "ミョスガルド聖",
+      "count": 4
+    },
+    {
+      "number": "OP13-089",
+      "name": "ウォーキュリー聖",
+      "count": 4
+    },
+    {
+      "number": "OP13-096",
+      "name": "“五老星”ここに！！！",
+      "count": 4
+    },
+    {
+      "number": "OP13-083",
+      "name": "サターン聖",
+      "count": 4
+    },
+    {
+      "number": "OP13-080",
+      "name": "ナス寿郎聖",
+      "count": 4
+    },
+    {
+      "number": "OP13-091",
+      "name": "マーズ聖",
+      "count": 4
+    },
+    {
+      "number": "OP13-084",
+      "name": "ピーター聖",
+      "count": 4
+    },
+    {
+      "number": "OP13-082",
+      "name": "五老星(10c)",
+      "count": 4
+    },
+    {
+      "number": "OP05-097",
+      "name": "聖地マリージョア",
+      "count": 1
+    },
+    {
+      "number": "OP13-099",
+      "name": "虚の玉座",
+      "count": 1
+    },
+    {
+      "number": "OP13-097",
+      "name": "世界の均衡",
+      "count": 3
+    },
+    {
+      "number": "OP13-098",
+      "name": "元々ない",
+      "count": 3
+    }
+  ]
+}
