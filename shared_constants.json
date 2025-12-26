@@ -4,27 +4,6 @@
     "P2": "p2"
   },
   "API_ROOT_KEYS": {
-    "GAME_STATE": "game_state"
-  },
-  "CARD_PROPERTIES": {
-    "UUID": "uuid",
-    "CARD_ID": "card_id",
-    "NAME": "name",
-    "POWER": "power",
-    "COST": "cost",
-    "ATTRIBUTE": "attribute",
-    "TRAITS": "traits",
-    "TEXT": "text",
-    "TYPE": "type",
-    "IS_REST": "is_rest",
-    "IS_FACE_UP": "is_face_up",
-    "ATTACHED_DON": "attached_don",
-    "OWNER_ID": "owner_id",
-    "KEYWORDS": "keywords"
-  },   
-  
-  {
-  "API_ROOT_KEYS": {
     "GAME_STATE": "game_state",
     "SUCCESS": "success"
   },
@@ -39,10 +18,21 @@
     "INITIAL_LIFE_COUNT": 5
   },
   "CARD_PROPERTIES": {
+    "UUID": "uuid",
+    "CARD_ID": "card_id",
+    "NAME": "name",
+    "POWER": "power",
+    "COST": "cost",
+    "ATTRIBUTE": "attribute",
+    "TRAITS": "traits",
+    "TEXT": "text",
+    "TYPE": "type",
     "TYPE_LEADER": "LEADER",
-    "TYPE_CHARACTER": "CHARACTER"
+    "TYPE_CHARACTER": "CHARACTER",
+    "IS_REST": "is_rest",
+    "IS_FACE_UP": "is_face_up",
+    "ATTACHED_DON": "attached_don",
+    "OWNER_ID": "owner_id",
+    "KEYWORDS": "keywords"
   }
-}
-
-  
 }
