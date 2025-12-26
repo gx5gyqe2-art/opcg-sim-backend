@@ -8,7 +8,7 @@ import logging
 from .enums import CardType, Attribute, Color
 from .effects import Ability, ActionType
 
-# --- 共通定数のロード ---
+# --- 共通定数のロード ---
 logger = logging.getLogger("opcg_sim")
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONST_PATH = os.path.join(BASE_DIR, "..", "shared_constants.json")
@@ -17,9 +17,16 @@ try:
     with open(CONST_PATH, "r", encoding="utf-8") as f:
         CONST = json.load(f)
 except Exception as e:
-    logger.error(f"Failed to load shared_constants.json in models.py: {e}")
-    # フォールバック (値は小文字)
-    CONST = {"CARD_PROPERTIES": {"UUID": "uuid", "NAME": "name", "POWER": "power", "ATTACHED_DON": "attached_don", "IS_REST": "is_rest", "OWNER_ID": "owner_id"}}
+    logger.error(f"Failed to load constants in models.py: {e}")
+    # フォールバック ( shared_constants.json が無い場合の最小限の定義)
+    CONST = {
+        "CARD_PROPERTIES": {
+            "UUID": "uuid", "CARD_ID": "card_id", "NAME": "name", "POWER": "power",
+            "COST": "cost", "ATTRIBUTE": "attribute", "TRAITS": "traits",
+            "TEXT": "text", "TYPE": "type", "IS_REST": "is_rest",
+            "IS_FACE_UP": "is_face_up", "ATTACHED_DON": "attached_don", "OWNER_ID": "owner_id"
+        }
+    }
 
 @dataclass(frozen=True)
 class CardMaster:
@@ -117,10 +124,10 @@ class CardInstance:
         self._refresh_keywords()
 
     def to_dict(self):
-        """API v1.4 適合: 定数ファイルのマッピングを使用して小文字キーを保証"""
+        """API v1.4 適合: shared_constants.json に定義された全プロパティを保証"""
         props = CONST.get('CARD_PROPERTIES', {})
         
-        # 定数ファイルから物理キー名を取得し、辞書を構築
+        # 定数ファイルのマッピングを使用して小文字キーを動的に生成
         return {
             props.get('UUID', 'uuid'): self.uuid,
             props.get('CARD_ID', 'card_id'): self.master.card_id,

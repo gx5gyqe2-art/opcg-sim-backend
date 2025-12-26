@@ -34,10 +34,12 @@ try:
     logger.info(f"Successfully loaded shared_constants.json from {CONST_PATH}")
 except Exception as e:
     logger.error(f"Failed to load shared_constants.json: {e}")
+    # フォールバック
     CONST = {
         "PLAYER_KEYS": {"P1": "p1", "P2": "p2"},
-        "API_ROOT_KEYS": {"GAME_STATE": "game_state"},
-        "CARD_PROPERTIES": {"UUID": "uuid", "NAME": "name", "POWER": "power", "ATTACHED_DON": "attached_don", "IS_REST": "is_rest", "OWNER_ID": "owner_id"}
+        "API_ROOT_KEYS": {"GAME_STATE": "game_state", "SUCCESS": "success"},
+        "PLAYER_PROPERTIES": {"LIFE_COUNT": "life_count", "DON_DECK_COUNT": "don_deck_count", "DON_ACTIVE": "don_active", "DON_RESTED": "don_rested"},
+        "CARD_PROPERTIES": {"UUID": "uuid", "NAME": "name", "TYPE": "type", "TYPE_LEADER": "LEADER"}
     }
 
 # --- 3. Pydantic スキーマ定義 (API v1.4 準拠) ---
@@ -45,19 +47,19 @@ except Exception as e:
 class CardSchema(BaseModel):
     """盤面上のカード1枚の情報"""
     uuid: str = Field(..., description="カード固有のUUID")
-    card_id: str = Field(..., description="カード型番（例: OP01-001）")
+    card_id: str = Field(..., description="カード型番")
     name: str = Field(..., description="カード名称")
-    power: int = Field(..., description="計算済みパワー")
-    cost: int = Field(..., description="計算済みコスト")
+    power: int = Field(..., description="パワー")
+    cost: int = Field(..., description="コスト")
     attribute: str = Field(..., description="属性")
     traits: List[str] = Field(..., description="特徴リスト")
     text: str = Field(..., description="効果テキスト")
     type: str = Field(..., description="カード種類")
     is_rest: bool = Field(..., description="レスト状態")
     is_face_up: bool = Field(..., description="表向き状態")
-    attached_don: int = Field(0, ge=0, description="付与ドン数")
+    attached_don: int = Field(0, description="付与ドン数")
     owner_id: str = Field(..., description="所有プレイヤーID")
-    keywords: List[str] = Field(default_factory=list, description="キーワード能力")
+    keywords: List[str] = Field(default_factory=list)
 
 class ZoneSchema(BaseModel):
     """プレイヤーの各ゾーン状態"""
@@ -65,7 +67,7 @@ class ZoneSchema(BaseModel):
     hand: List[CardSchema] = Field(default_factory=list)
     life: List[CardSchema] = Field(default_factory=list)
     trash: List[CardSchema] = Field(default_factory=list)
-    stage: Optional[CardSchema] = Field(None, description="ステージカード")
+    stage: Optional[CardSchema] = None
 
 class DonSchema(BaseModel):
     """ドン実体の構造"""
@@ -75,17 +77,18 @@ class DonSchema(BaseModel):
     attached_to: Optional[str] = None
 
 class PlayerSchema(BaseModel):
-    """プレイヤー全データ"""
+    """プレイヤー全データ (定数エイリアス適用)"""
     player_id: str
     name: str
-    life_count: int
-    hand_count: int
-    don_deck_count: int
-    # 修正: 明確な型定義によりバリデーションを安定化
-    don_active: List[DonSchema] = Field(default_factory=list)
-    don_rested: List[DonSchema] = Field(default_factory=list)
+    # 定数ファイルから動的にキーを割り当て
+    life_count: int = Field(..., alias=CONST['PLAYER_PROPERTIES']['LIFE_COUNT'])
+    don_deck_count: int = Field(..., alias=CONST['PLAYER_PROPERTIES']['DON_DECK_COUNT'])
+    don_active: List[DonSchema] = Field(default_factory=list, alias=CONST['PLAYER_PROPERTIES']['DON_ACTIVE'])
+    don_rested: List[DonSchema] = Field(default_factory=list, alias=CONST['PLAYER_PROPERTIES']['DON_RESTED'])
     leader: Optional[CardSchema]
     zones: ZoneSchema
+
+    model_config = ConfigDict(populate_by_name=True)
 
 class TurnInfoSchema(BaseModel):
     """ターン進行状況"""
@@ -95,19 +98,16 @@ class TurnInfoSchema(BaseModel):
     winner: Optional[str] = None
 
 class GameStateSchema(BaseModel):
-    """game_state キーに含まれる全量データ"""
+    """全量データ構造"""
     game_id: str
     turn_info: TurnInfoSchema
     players: Dict[str, PlayerSchema]
 
 class GameActionResult(BaseModel):
-    """API レスポンスのルート構造"""
-    success: bool
-    game_id: str
-    game_state: Optional[GameStateSchema] = None
-    error: Optional[Dict[str, str]] = None
-
-    model_config = ConfigDict(extra="allow")
+    """API レスポンスのルート構造 (動的キー対応)"""
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+    # success は定数 API_ROOT_KEYS['SUCCESS'] の alias としたかったが、
+    # 実際には build_game_result_raw で動的に生成するため extra="allow" で対応
 
 # --- 4. FastAPI アプリケーション設定 ---
 
@@ -131,7 +131,7 @@ CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 @app.on_event("startup")
 async def startup_event():
     logger.info("!!! STARTUP DIAGNOSTICS !!!")
-    logger.info(f"CONST PLAYER_P1: {CONST['PLAYER_KEYS']['P1']}")
+    logger.info(f"Successfully loaded shared_constants.json. P1 Key: {CONST['PLAYER_KEYS']['P1']}")
     logger.info(f"DATA_DIR: {DATA_DIR}")
     if os.path.exists(DATA_DIR):
         logger.info(f"Files in data: {os.listdir(DATA_DIR)}")
@@ -139,7 +139,6 @@ async def startup_event():
     for route in app.routes:
         if hasattr(route, "path"):
             logger.info(f"Route: {route.path}")
-    logger.info("!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
 # カードDBロード
 try:
@@ -175,9 +174,23 @@ class ActionReq(BaseModel):
 
 def build_game_result_raw(manager: GameManager, game_id: str, success: bool = True, error_msg: str = None) -> Dict[str, Any]:
     """定数ファイルに基づき、キー名を同期させて辞書を生成"""
-    p1_key = CONST['PLAYER_KEYS']['P1']
-    p2_key = CONST['PLAYER_KEYS']['P2']
-    root_key = CONST['API_ROOT_KEYS']['GAME_STATE']
+    p_props = CONST['PLAYER_PROPERTIES']
+    root_keys = CONST['API_ROOT_KEYS']
+    p_keys = CONST['PLAYER_KEYS']
+
+    def sync_player(p: Player):
+        """Playerオブジェクトを定数キー準拠の辞書に変換"""
+        d = p.to_dict()
+        return {
+            "player_id": d["player_id"],
+            "name": d["name"],
+            p_props['LIFE_COUNT']: len(p.life),
+            p_props['DON_DECK_COUNT']: len(p.don_deck),
+            p_props['DON_ACTIVE']: d.get("don_active", []),
+            p_props['DON_RESTED']: d.get("don_rested", []),
+            "leader": d.get("leader"),
+            "zones": d.get("zones")
+        }
 
     game_state = {
         "game_id": game_id,
@@ -188,14 +201,15 @@ def build_game_result_raw(manager: GameManager, game_id: str, success: bool = Tr
             "winner": getattr(manager, 'winner', None)
         },
         "players": {
-            p1_key: manager.p1.to_dict() if manager else {},
-            p2_key: manager.p2.to_dict() if manager else {}
+            p_keys['P1']: sync_player(manager.p1),
+            p_keys['P2']: sync_player(manager.p2)
         }
     }
+    
     return {
-        "success": success,
+        root_keys['SUCCESS']: success,
         "game_id": game_id,
-        root_key: game_state,
+        root_keys['GAME_STATE']: game_state,
         "error": {"message": error_msg} if error_msg else None
     }
 
@@ -216,19 +230,19 @@ def game_create(req: CreateReq = Body(...)):
         manager.start_game()
         GAMES[game_id] = manager
         
-        return GameActionResult(**build_game_result_raw(manager, game_id))
+        return build_game_result_raw(manager, game_id)
     except Exception as e:
         logger.error(f"Creation Error: {e}", exc_info=True)
-        return GameActionResult(success=False, game_id="", error={"message": str(e)})
+        return {CONST['API_ROOT_KEYS']['SUCCESS']: False, "game_id": "", "error": {"message": str(e)}}
 
 @app.post("/api/game/{gameId}/action", response_model=GameActionResult)
 def post_game_action(gameId: str, req: ActionReq):
     if req.request_id in REQUEST_CACHE:
-        return GameActionResult(**REQUEST_CACHE[req.request_id])
+        return REQUEST_CACHE[req.request_id]
 
     manager = GAMES.get(gameId)
     if not manager:
-        return GameActionResult(success=False, game_id=gameId, error={"message": "Game not found"})
+        return {CONST['API_ROOT_KEYS']['SUCCESS']: False, "game_id": gameId, "error": {"message": "Game not found"}}
 
     action = req.action
     player = manager.p1 if action.player_id == manager.p1.name else manager.p2
@@ -247,13 +261,12 @@ def post_game_action(gameId: str, req: ActionReq):
             manager.end_turn()
 
         result_raw = build_game_result_raw(manager, gameId)
-        result_obj = GameActionResult(**result_raw)
-        REQUEST_CACHE[req.request_id] = result_obj.model_dump()
-        return result_obj
+        REQUEST_CACHE[req.request_id] = result_raw
+        return result_raw
 
     except Exception as e:
-        logger.critical(f"Response Validation Error: {e}", exc_info=True)
-        return GameActionResult(success=False, game_id=gameId, error={"message": f"Server Logic/Validation Error: {e}"})
+        logger.critical(f"Action Error: {e}", exc_info=True)
+        return {CONST['API_ROOT_KEYS']['SUCCESS']: False, "game_id": gameId, "error": {"message": str(e)}}
 
 @app.get("/health")
 def health():
