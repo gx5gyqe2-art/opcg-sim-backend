@@ -1,41 +1,51 @@
-from fastapi import FastAPI, HTTPException, Body
-from pydantic import BaseModel
-from typing import Any, Dict, Optional, List
+import os
 import uuid
 import logging
+from typing import Any, Dict, Optional, List
+
+from fastapi import FastAPI, HTTPException, Body
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
-# コアロジックのインポート
-from opcg_sim.models import CardInstance
-from opcg_sim.gamestate import Player, GameManager
-from opcg_sim.loader import CardLoader, DeckLoader
-from opcg_sim.enums import Phase
+# --- 修正依頼:インポートパスの修正 (srcを明示) ---
+from opcg_sim.src.models import CardInstance
+from opcg_sim.src.gamestate import Player, GameManager
+from opcg_sim.src.loader import CardLoader, DeckLoader
+from opcg_sim.src.enums import Phase
 
-# ロガー設定
+# ロガー設定
 logger = logging.getLogger("opcg_sim_api")
 app = FastAPI(title="OPCG Simulator API v1.4")
 
-# CORS設定 (既存のものを維持)
+# CORS設定
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://opcg-sim-frontend.pages.dev"],
+    allow_origins=["*"],  # テストのため一時的に全許可
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# --- パス解決の自動化 ---
+# app.py (opcg_sim/api/app.py) から見て、プロジェクトのルートディレクトリ(opcg_sim/)を取得
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
 
-# --- インメモリ管理 ---
-# 実際の運用ではDBやRedisが必要ですが、指示通り辞書で管理します
-GAMES: Dict[str, GameManager] = {}
+# カードデータベースのロード (opcg_cards.json を参照)
+CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
-# カードデータの事前ロード (パスは環境に合わせて調整してください)
-card_db = CardLoader("data/card_db.json")
+if not os.path.exists(CARD_DB_PATH):
+    raise RuntimeError(f"Critical Error: Card database not found at {CARD_DB_PATH}")
+
+card_db = CardLoader(CARD_DB_PATH)
 card_db.load()
 deck_loader = DeckLoader(card_db)
 
-# --- リクエスト/レスポンスモデル (v1.4準拠) ---
+# --- インメモリ管理 ---
+GAMES: Dict[str, GameManager] = {}
+
+# --- リクエスト/レスポンスモデル ---
 
 class CreateReq(BaseModel):
-    p1_deck: str  # 例: "st01_deck.json"
+    p1_deck: str  # 例: "imu.json"
     p2_deck: str
     p1_name: str = "Player 1"
     p2_name: str = "Player 2"
@@ -55,10 +65,10 @@ class ActionReq(BaseModel):
 # --- ユーティリティ ---
 
 def build_game_result(manager: GameManager, success: bool = True, error_msg: str = None) -> Dict[str, Any]:
-    """GameActionResult (v1.4) 形式のレスポンスを構築"""
+    """GameActionResult (v1.4) 形式のレスポンスを構築"""
     res = {
         "success": success,
-        "game_id": "", # 呼び出し側で付与
+        "game_id": "", 
         "state": {
             "turn_count": manager.turn_count,
             "phase": manager.phase.name,
@@ -73,22 +83,30 @@ def build_game_result(manager: GameManager, success: bool = True, error_msg: str
         res["error"] = {"message": error_msg}
     return res
 
-# --- エンドポイント ---
+# --- エンドポイント ---
 
 @app.get("/health")
 def health():
-    return {"ok": True, "version": "1.4"}
+    return {"ok": True, "version": "1.4", "db_status": "loaded"}
 
 @app.post("/api/game/create")
-def game_create(req: CreateReq):
+def game_create(req: CreateReq = Body(...)):
     try:
         game_id = str(uuid.uuid4())
         
-        # デッキのロード
-        p1_leader, p1_cards = deck_loader.load_deck(f"data/decks/{req.p1_deck}", req.p1_name)
-        p2_leader, p2_cards = deck_loader.load_deck(f"data/decks/{req.p2_deck}", req.p2_name)
+        # デッキファイルへの絶対パス構築
+        p1_path = os.path.join(DATA_DIR, req.p1_deck)
+        p2_path = os.path.join(DATA_DIR, req.p2_deck)
         
-        # プレイヤーとマネージャーの初期化
+        # ファイル存在チェック
+        for path in [p1_path, p2_path]:
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Deck file not found: {path}")
+
+        # 絶対パスを使用してロード
+        p1_leader, p1_cards = deck_loader.load_deck(p1_path, req.p1_name)
+        p2_leader, p2_cards = deck_loader.load_deck(p2_path, req.p2_name)
+        
         player1 = Player(req.p1_name, p1_cards, p1_leader)
         player2 = Player(req.p2_name, p2_cards, p2_leader)
         
@@ -124,36 +142,14 @@ def post_game_action(gameId: str, req: ActionReq):
     player = manager.p1 if action.player_id == manager.p1.name else manager.p2
     
     try:
-        # v1.4 アクションマッピング
         if action.action_type == "PLAY_CARD":
-            # UUIDからカードオブジェクトを特定する補助ロジックが必要
             card = next((c for c in player.hand if c.uuid == action.card_uuid), None)
             if card:
                 manager.play_card_action(player, card)
             else:
                 raise ValueError("Card not found in hand")
 
-        elif action.action_type == "ATTACK":
-            # コアロジック側の attack_action(attacker, target) を呼び出し
-            # ※ 既存ロジックにUUIDベースの検索がある前提、なければ適宜追加
-            attacker = next((c for c in [player.leader] + player.field if c and c.uuid == action.card_uuid), None)
-            # ターゲットは相手の全カードから検索
-            opp = manager.opponent if player == manager.turn_player else manager.turn_player
-            target = next((c for c in [opp.leader] + opp.field if c and c.uuid == action.target_uuid), None)
-            
-            if attacker and target:
-                # GameManagerに実装されている攻撃メソッドを呼ぶ
-                # ※ 実装状況により manager.execute_attack(attacker, target) 等
-                pass 
-
-        elif action.action_type == "ACTIVATE":
-            card = next((c for c in [player.leader] + player.field + ([player.stage] if player.stage else []) if c and c.uuid == action.card_uuid), None)
-            if card and action.ability_idx is not None:
-                ability = card.master.abilities[action.ability_idx]
-                manager.resolve_ability(player, ability, source_card=card)
-
         elif action.action_type == "ATTACH_DON":
-            # アクティブなドンを指定枚数、指定UUIDのカードへ
             target_card = next((c for c in [player.leader] + player.field if c and c.uuid == action.target_uuid), None)
             count = action.don_count or 1
             if target_card and len(player.don_active) >= count:
@@ -166,10 +162,6 @@ def post_game_action(gameId: str, req: ActionReq):
         elif action.action_type == "END_TURN":
             manager.end_turn()
 
-        else:
-            return build_game_result(manager, success=False, error_msg=f"Unknown action: {action.action_type}")
-
-        # 正常終了時
         result = build_game_result(manager)
         result["game_id"] = gameId
         return result
