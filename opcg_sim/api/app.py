@@ -6,111 +6,85 @@ import json
 import time
 from typing import Any, Dict, Optional, List
 
-from fastapi import FastAPI, Body, Request, HTTPException
+from fastapi import FastAPI, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-# --- 1. インポートパスの安定化 ---
+# インポートパス解決
 current_api_dir = os.path.dirname(os.path.abspath(__file__))
 if current_api_dir not in sys.path:
     sys.path.append(current_api_dir)
 
 try:
-    from schemas import GameStateSchema, GameActionResultSchema
+    from schemas import GameStateSchema
 except ImportError:
-    from .schemas import GameStateSchema, GameActionResultSchema
+    from .schemas import GameStateSchema
 
-# ログ用コンポーネントのインポート
 from opcg_sim.src.logger_config import session_id_ctx, log_event
 from opcg_sim.src.gamestate import Player, GameManager
 from opcg_sim.src.loader import CardLoader, DeckLoader
 
-# --- 2. 設定と定数のロード ---
+# 設定ロード
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, force=True)
-logger = logging.getLogger("opcg_sim_api")
 
 def get_const():
-    # shared_constants.json は opcg_sim と同階層なので、apiから見て ../../
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared_constants.json")
     if os.path.exists(p):
         with open(p, "r", encoding="utf-8") as f: return json.load(f)
     return {}
 CONST = get_const()
 
-BASE_DIR = os.path.dirname(current_api_dir)
-DATA_DIR = os.path.join(BASE_DIR, "data")
-CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
-
-# --- 3. 内部ロジック ---
-
-def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool = True, error_msg: str = None) -> Dict[str, Any]:
-    """盤面データは検証し、それ以外は柔軟に構築して返す"""
-    raw_game_state = {
-        "game_id": game_id,
-        "turn_info": {
-            "turn_count": manager.turn_count if manager else 0,
-            "current_phase": manager.phase.name if manager else "N/A",
-            "active_player_id": manager.turn_player.name if manager else "N/A"
-        },
-        "players": {
-            "p1": manager.p1.to_dict() if manager else {},
-            "p2": manager.p2.to_dict() if manager else {}
-        }
-    }
-
-    try:
-        # GameState部分のみ schemas.py で型チェック
-        validated_state = GameStateSchema(**raw_game_state).model_dump(by_alias=True)
-    except Exception as e:
-        log_event("ERROR", "api.validation", f"Validation Error: {e}")
-        validated_state = raw_game_state 
-
-    return {
-        "success": success,
-        "game_id": game_id,
-        "game_state": validated_state,
-        "error": {"message": error_msg} if error_msg else None
-    }
-
-# --- 4. API定義 ---
-
-app = FastAPI(title="OPCG Simulator API v1.4")
+app = FastAPI(title="OPCG Simulator API v1.5")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# --- 5. ログ Middleware ---
+# --- Middleware (sessionIdの抽出と伝播) ---
 
 @app.middleware("http")
 async def trace_logging_middleware(request: Request, call_next):
-    """リクエスト毎に sessionId を管理し、自動ログを出力する"""
-    # X-Session-ID ヘッダーまたはクエリから取得。なければ生成。
+    # 1. 抽出
     s_id = request.headers.get("X-Session-ID") or request.query_params.get("sessionId")
     if not s_id:
         s_id = f"gen-{uuid.uuid4().hex[:8]}"
     
-    # ContextVarをセット
+    # 2. セット
     token = session_id_ctx.set(s_id)
-    start_time = time.time()
     
-    # 開始ログ
-    log_event("INFO", "api.inbound", f"{request.method} {request.url.path}")
+    # 静的ファイルやヘルスチェック以外のリクエストを開始ログに記録
+    if not request.url.path.endswith(("/health", "/favicon.ico")):
+        log_event("INFO", "api.inbound", f"{request.method} {request.url.path}")
     
     try:
         response = await call_next(request)
-        # sessionIdをヘッダーで返却して同期
         response.headers["X-Session-ID"] = s_id
-        
-        duration = round((time.time() - start_time) * 1000, 2)
-        log_event("INFO", "api.outbound", "Success", payload={
-            "status": response.status_code,
-            "duration_ms": duration
-        })
         return response
-        
-    except Exception as e:
-        log_event("ERROR", "api.error", str(e), payload={"type": type(e).__name__})
-        raise e
     finally:
-        # コンテキストのクリーンアップ
         session_id_ctx.reset(token)
+
+# --- 新設: フロントエンドログ受信エンドポイント ---
+
+@app.post("/api/log")
+async def receive_frontend_log(data: Dict[str, Any] = Body(...)):
+    """
+    iPhone等から送られたログをBEの基盤で出力する。
+    JSONキーは shared_constants.json の定義に従うことを想定。
+    """
+    # FEから送られてきたsessionIdがある場合は一時的に上書きして出力
+    s_id = data.get("sessionId") or session_id_ctx.get()
+    token = session_id_ctx.set(s_id)
+    
+    try:
+        log_event(
+            level_key=data.get("level", "info"),
+            action=data.get("action", "client.log"),
+            msg=data.get("msg", ""),
+            player=data.get("player", "system"),
+            payload=data.get("payload"),
+            source="FE" # 送信元を FE として明示
+        )
+        return {"status": "ok"}
+    finally:
+        session_id_ctx.reset(token)
+
+# --- 既存の /api/game/create 等は維持 ---
 
 # --- 6. エンドポイント ---
 
