@@ -10,53 +10,18 @@ from opcg_sim.src.gamestate import Player, GameManager
 from opcg_sim.src.loader import CardLoader, DeckLoader
 from opcg_sim.src.enums import Phase
 
-# --- 1. 詳細ログ設定 (Cloud Runの標準出力に完全統合) ---
+# --- 1. 詳細ログ設定 ---
 logging.basicConfig(
     stream=sys.stdout,
     level=logging.DEBUG,
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    force=True
 )
 logger = logging.getLogger("opcg_sim_api")
 
 app = FastAPI(title="OPCG Simulator API v1.4")
 
-# --- 2. 起動時の環境・パス一覧出力 (ファイル不在の特定) ---
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
-
-@app.on_event("startup")
-async def startup_event():
-    logger.info("=== System Startup Logging ===")
-    logger.info(f"BASE_DIR: {BASE_DIR}")
-    logger.info(f"DATA_DIR: {DATA_DIR}")
-    logger.info(f"CARD_DB_PATH: {CARD_DB_PATH}")
-    
-    # dataディレクトリ内のファイルをリストアップ
-    if os.path.exists(DATA_DIR):
-        logger.info(f"Files in DATA_DIR: {os.listdir(DATA_DIR)}")
-    else:
-        logger.error(f"CRITICAL: DATA_DIR does not exist at {DATA_DIR}")
-
-    # ルーティング一覧の表示 (404対策)
-    logger.info("--- Valid Routes ---")
-    for route in app.routes:
-        methods = ", ".join(route.methods) if hasattr(route, "methods") else "N/A"
-        logger.info(f"Route: {route.path} [{methods}]")
-    logger.info("==============================")
-
-# --- 3. 全リクエストの履歴ログ (ミドルウェア) ---
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    logger.debug(f"Request: {request.method} {request.url}")
-    try:
-        response = await call_next(request)
-        logger.debug(f"Response status: {response.status_code}")
-        return response
-    except Exception as e:
-        logger.error(f"Request failed: {str(e)}", exc_info=True)
-        raise
-
+# CORS設定
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -64,19 +29,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 冪等性キャッシュ
-REQUEST_CACHE: Dict[str, Dict[str, Any]] = {}
+# --- 2. パス解決とデータロード ---
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
-# カードデータのロード（起動時エラーを防ぐためtry-except）
+# インメモリ管理
+REQUEST_CACHE: Dict[str, Dict[str, Any]] = {}
+GAMES: Dict[str, GameManager] = {}
+
+# 起動時の診断
+@app.on_event("startup")
+async def startup_event():
+    logger.info("!!! STARTUP DIAGNOSTICS !!!")
+    logger.info(f"DATA_DIR: {DATA_DIR}")
+    if os.path.exists(DATA_DIR):
+        logger.info(f"Files in data: {os.listdir(DATA_DIR)}")
+    
+    logger.info("--- REGISTERED ROUTES ---")
+    for route in app.routes:
+        if hasattr(route, "path"):
+            logger.info(f"Route: {route.path}")
+    logger.info("!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
 try:
     card_db = CardLoader(CARD_DB_PATH)
     card_db.load()
     deck_loader = DeckLoader(card_db)
     logger.info("Card database loaded successfully.")
 except Exception as e:
-    logger.error(f"Failed to load card database at {CARD_DB_PATH}: {e}")
+    logger.error(f"Failed to load DB: {e}")
 
-GAMES: Dict[str, GameManager] = {}
+# --- 3. モデル定義 ---
+class CreateReq(BaseModel):
+    p1_deck: str
+    p2_deck: str
+    p1_name: str = "Player 1"
+    p2_name: str = "Player 2"
 
 class ActionDetail(BaseModel):
     action_type: str
@@ -89,41 +78,87 @@ class ActionReq(BaseModel):
     request_id: str
     action: ActionDetail
 
+# --- 4. 共通レスポンスビルド ---
 def build_game_result(manager: GameManager, game_id: str, success: bool = True, error_msg: str = None) -> Dict[str, Any]:
     return {
         "success": success,
         "game_id": game_id,
         "state": {
             "turn_info": {
-                "turn_count": manager.turn_count,
-                "current_phase": manager.phase.name,
-                "active_player_id": manager.turn_player.name,
+                "turn_count": manager.turn_count if manager else 0,
+                "current_phase": manager.phase.name if manager else "N/A",
+                "active_player_id": manager.turn_player.name if manager else "N/A",
                 "winner": None
             },
             "players": {
-                manager.p1.name: manager.p1.to_dict(),
-                manager.p2.name: manager.p2.to_dict()
+                manager.p1.name: manager.p1.to_dict() if manager else {},
+                manager.p2.name: manager.p2.to_dict() if manager else {}
             }
         },
         "error": {"message": error_msg} if error_msg else None
     }
 
-@app.post("/api/game/{gameId}/action")
-def post_game_action(gameId: str, req: ActionReq):
-    if req.request_id in REQUEST_CACHE:
-        return REQUEST_CACHE[req.request_id]
+# --- 5. エンドポイント実装 ---
 
+@app.get("/health")
+def health():
+    return {"ok": True, "version": "1.4"}
+
+@app.post("/api/game/create")
+def game_create(req: CreateReq = Body(...)):
+    try:
+        game_id = str(uuid.uuid4())
+        p1_path = os.path.join(DATA_DIR, req.p1_deck)
+        p2_path = os.path.join(DATA_DIR, req.p2_deck)
+        
+        p1_leader, p1_cards = deck_loader.load_deck(p1_path, req.p1_name)
+        p2_leader, p2_cards = deck_loader.load_deck(p2_path, req.p2_name)
+        
+        player1 = Player(req.p1_name, p1_cards, p1_leader)
+        player2 = Player(req.p2_name, p2_cards, p2_leader)
+        
+        manager = GameManager(player1, player2)
+        manager.start_game()
+        
+        GAMES[game_id] = manager
+        return build_game_result(manager, game_id)
+    except Exception as e:
+        logger.error(f"Creation Error: {e}", exc_info=True)
+        return {"success": False, "error": {"message": str(e)}}
+
+@app.get("/api/game/{gameId}/state")
+def get_game_state(gameId: str):
     manager = GAMES.get(gameId)
     if not manager:
-        logger.warning(f"Game not found: {gameId}")
-        return build_game_result(None, gameId, success=False, error_msg="Game not found")
+        raise HTTPException(status_code=404, detail="Game not found")
+    return build_game_result(manager, gameId)
 
-    # アクション処理ロジック (省略せず既存のものを維持)
+@app.post("/api/game/{gameId}/action")
+def post_game_action(gameId: str, req: ActionReq):
+    if req.request_id in REQUEST_CACHE: return REQUEST_CACHE[req.request_id]
+
+    manager = GAMES.get(gameId)
+    if not manager: return build_game_result(None, gameId, success=False, error_msg="Game not found")
+
+    action = req.action
+    player = manager.p1 if action.player_id == manager.p1.name else manager.p2
+    
     try:
-        # ... (アクション処理) ...
+        if action.action_type == "ATTACK":
+            attacker = next((c for c in [player.leader] + player.field if c and c.uuid == action.card_uuid), None)
+            if attacker: attacker.is_rest = True
+        elif action.action_type == "ATTACH_DON":
+            target = next((c for c in [player.leader] + player.field if c and c.uuid == action.target_uuid), None)
+            if target: target.attached_don += (action.don_count or 1)
+        elif action.action_type == "PLAY_CARD":
+            card = next((c for c in player.hand if c.uuid == action.card_uuid), None)
+            if card: manager.play_card_action(player, card)
+        elif action.action_type == "END_TURN":
+            manager.end_turn()
+
         result = build_game_result(manager, gameId)
         REQUEST_CACHE[req.request_id] = result
         return result
     except Exception as e:
-        logger.error(f"Action error: {e}", exc_info=True)
+        logger.error(f"Action Error: {e}", exc_info=True)
         return build_game_result(manager, gameId, success=False, error_msg=str(e))
