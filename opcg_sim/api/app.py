@@ -1,6 +1,6 @@
-import os, uuid, logging
+import os, uuid, logging, sys
 from typing import Any, Dict, Optional, List
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,8 +9,46 @@ from opcg_sim.src.gamestate import Player, GameManager
 from opcg_sim.src.loader import CardLoader, DeckLoader
 from opcg_sim.src.enums import Phase
 
+# --- 1. 詳細ログ設定 (標準出力へ流し Cloud Run ログビューアと統合) ---
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+)
 logger = logging.getLogger("opcg_sim_api")
+
 app = FastAPI(title="OPCG Simulator API v1.4")
+
+# --- 2. リクエスト履歴の可視化ミドルウェア ---
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    # すべてのリクエスト（URL、メソッド、ヘッダーの一部）を記録
+    logger.debug(f"Incoming Request: {request.method} {request.url}")
+    logger.debug(f"Headers: {dict(request.headers)}")
+    try:
+        response = await call_next(request)
+        logger.debug(f"Response status: {response.status_code}")
+        return response
+    except Exception as e:
+        # エラー発生時に詳細なトレースバックを出力
+        logger.error(f"Request Error: {str(e)}", exc_info=True)
+        raise
+
+# --- 3. 起動時のパス一覧出力 (404原因特定用) ---
+@app.on_event("startup")
+async def startup_event():
+    logger.info("=== Valid API Routes ===")
+    for route in app.routes:
+        methods = ", ".join(route.methods) if hasattr(route, "methods") else "N/A"
+        logger.info(f"Route: {route.path} [{methods}]")
+    logger.info("==========================")
+    
+    # データディレクトリの状態確認
+    logger.info(f"Checking DATA_DIR: {DATA_DIR}")
+    if os.path.exists(DATA_DIR):
+        logger.info(f"Files in data: {os.listdir(DATA_DIR)}")
+    else:
+        logger.warning(f"DATA_DIR NOT FOUND: {DATA_DIR}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,9 +64,14 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
-card_db = CardLoader(CARD_DB_PATH)
-card_db.load()
-deck_loader = DeckLoader(card_db)
+# 初期ロード
+try:
+    card_db = CardLoader(CARD_DB_PATH)
+    card_db.load()
+    deck_loader = DeckLoader(card_db)
+except Exception as e:
+    logger.error(f"Failed to load card database: {e}")
+
 GAMES: Dict[str, GameManager] = {}
 
 class ActionDetail(BaseModel):
@@ -44,12 +87,10 @@ class ActionReq(BaseModel):
     action: ActionDetail
 
 def build_game_result(manager: GameManager, game_id: str, success: bool = True, error_msg: str = None) -> Dict[str, Any]:
-    """レスポンス構造の完全同期"""
     res = {
         "success": success,
         "game_id": game_id,
         "state": {
-            # turn_infoの階層化
             "turn_info": {
                 "turn_count": manager.turn_count,
                 "current_phase": manager.phase.name,
@@ -67,7 +108,6 @@ def build_game_result(manager: GameManager, game_id: str, success: bool = True, 
 
 @app.post("/api/game/{gameId}/action")
 def post_game_action(gameId: str, req: ActionReq):
-    # 1. 重複排除チェック
     if req.request_id in REQUEST_CACHE:
         return REQUEST_CACHE[req.request_id]
 
@@ -76,13 +116,11 @@ def post_game_action(gameId: str, req: ActionReq):
 
     action = req.action
     player = manager.p1 if action.player_id == manager.p1.name else manager.p2
-    opp = manager.p2 if action.player_id == manager.p1.name else manager.p1
     
     try:
-        # 3. アクション処理の統合
         if action.action_type == "ATTACK":
             attacker = next((c for c in [player.leader] + player.field if c and c.uuid == action.card_uuid), None)
-            if attacker: attacker.is_rest = True # レスト更新
+            if attacker: attacker.is_rest = True
 
         elif action.action_type == "ATTACH_DON":
             target = next((c for c in [player.leader] + player.field if c and c.uuid == action.target_uuid), None)
@@ -90,25 +128,22 @@ def post_game_action(gameId: str, req: ActionReq):
             if target and len(player.don_active) >= count:
                 for _ in range(count):
                     player.don_active.pop(0)
-                    target.attached_don += 1 # ドン加算
+                    target.attached_don += 1
 
         elif action.action_type == "PLAY_CARD":
             card = next((c for c in player.hand if c.uuid == action.card_uuid), None)
             if card:
-                manager.play_card_action(player, card) # zonesへの移動
-                card.attached_don = 0 # 初期化
+                manager.play_card_action(player, card)
+                card.attached_don = 0
 
         elif action.action_type == "END_TURN":
             manager.end_turn()
 
         result = build_game_result(manager, gameId)
-        # 4. キャッシュ保存
         REQUEST_CACHE[req.request_id] = result
         if len(REQUEST_CACHE) > 500: REQUEST_CACHE.pop(next(iter(REQUEST_CACHE)))
         return result
 
     except Exception as e:
-        logger.error(f"Action error: {e}")
+        logger.error(f"Action processing error: {e}", exc_info=True)
         return build_game_result(manager, gameId, success=False, error_msg=str(e))
-
-# (create_game 等は既存の絶対パス解決を維持)
