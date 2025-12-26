@@ -1,0 +1,34 @@
+{
+  "VERSION": "1.4",
+  "API_ROOT_KEYS": {
+    "GAME_STATE": "game_state",
+    "STATE_BACKUP": "state",
+    "SUCCESS": "success",
+    "GAME_ID": "game_id"
+  },
+  "PLAYER_KEYS": {
+    "P1": "Player 1",
+    "P2": "Player 2"
+  },
+  "CARD_PROPERTIES": {
+    "UUID": "uuid",
+    "NAME": "name",
+    "POWER": "power",
+    "ATTACHED_DON": "attached_don",
+    "IS_REST": "is_rest",
+    "OWNER_ID": "owner_id"
+  },
+  "ZONES": {
+    "FIELD": "field",
+    "HAND": "hand",
+    "LIFE": "life",
+    "TRASH": "trash",
+    "STAGE": "stage"
+  },
+  "ACTION_TYPES": {
+    "PLAY": "PLAY_CARD",
+    "ATTACK": "ATTACK",
+    "ATTACH_DON": "ATTACH_DON",
+    "END_TURN": "END_TURN"
+  }
+}

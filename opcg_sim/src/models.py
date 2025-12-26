@@ -1,13 +1,30 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Any, Set, Dict
 import uuid
+import os
+import json
+import logging
 
 from .enums import CardType, Attribute, Color
 from .effects import Ability, ActionType
 
+# --- 共通定数のロード ---
+logger = logging.getLogger("opcg_sim")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONST_PATH = os.path.join(BASE_DIR, "..", "shared_constants.json")
+
+try:
+    with open(CONST_PATH, "r", encoding="utf-8") as f:
+        CONST = json.load(f)
+except Exception as e:
+    logger.error(f"Failed to load shared_constants.json in models.py: {e}")
+    CONST = {"CARD_PROPERTIES": ["uuid", "card_id", "name", "power", "cost", "attribute", "traits", "text", "type", "is_rest", "is_face_up", "attached_don", "owner_id"]}
+
 @dataclass(frozen=True)
 class CardMaster:
-    """JSONから読み込まれた静的なカードデータ (Immutable/Flyweight)"""
+    """
+    JSONから読み込まれた静的なカードデータ (Immutable/Flyweight)
+    """
     card_id: str
     name: str
     type: CardType
@@ -25,16 +42,20 @@ class CardMaster:
 
 @dataclass
 class CardInstance:
-    """ゲーム盤面上のカードの実体 (Mutable)"""
+    """
+    ゲーム盤面上のカードの実体 (Mutable)
+    """
     master: CardMaster
     owner_id: str
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
     
+    # 基本ステータス
     is_rest: bool = False
     is_newly_played: bool = False
     attached_don: int = 0
     is_face_up: bool = False
     
+    # 変動ステータス
     power_buff: int = 0
     cost_buff: int = 0
     base_power_override: Optional[int] = None
@@ -42,8 +63,10 @@ class CardInstance:
     current_keywords: Set[str] = field(default_factory=set)
     flags: Set[str] = field(default_factory=set)
     
+    # 無効化関連
     negated: bool = False
     ability_disabled: bool = False
+
     ability_used_this_turn: Dict[int, int] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -51,24 +74,24 @@ class CardInstance:
             self.uuid = str(uuid.uuid4())
         self._refresh_keywords()
 
-    @property
-    def name(self): return self.master.name
-
     def _refresh_keywords(self):
         if self.ability_disabled:
             self.current_keywords = set()
             return
         self.current_keywords = self.master.keywords.copy()
         for ability in self.master.abilities:
-            if not hasattr(ability, 'actions'): continue
+            if not hasattr(ability, 'actions'):
+                continue
             for action in ability.actions:
                 if action.type == ActionType.KEYWORD:
                     keyword_val = getattr(action, 'details', None)
-                    if keyword_val: self.current_keywords.add(keyword_val)
+                    if keyword_val:
+                        self.current_keywords.add(keyword_val)
 
     def get_power(self, is_my_turn: bool) -> int:
-        """現在のパワーを計算"""
-        if self.master.type not in [CardType.LEADER, CardType.CHARACTER]: return 0
+        """現在のパワーを計算"""
+        if self.master.type not in [CardType.LEADER, CardType.CHARACTER]:
+            return 0
         base = self.base_power_override if self.base_power_override is not None else self.master.power
         buff = self.power_buff
         don_power = (self.attached_don * 1000) if is_my_turn else 0
@@ -76,6 +99,7 @@ class CardInstance:
 
     @property
     def current_cost(self) -> int:
+        """現在のコストを計算"""
         result = self.master.cost + self.cost_buff
         return max(0, result)
 
@@ -92,23 +116,37 @@ class CardInstance:
         self._refresh_keywords()
 
     def to_dict(self):
-        """UI描画と詳細表示に必須となるパラメータを網羅"""
-        return {
+        """API v1.4 適合: shared_constants.json に定義された全プロパティを保証"""
+        
+        # すべての候補データを生成
+        full_data = {
             "uuid": self.uuid,
             "card_id": self.master.card_id,
             "owner_id": self.owner_id,
             "name": self.master.name,
+            "power": self.get_power(is_my_turn=True),
             "cost": self.current_cost,
-            "attribute": self.master.attribute.value, #
-            "traits": list(self.master.traits),        #
-            "text": self.master.effect_text,           #
-            "type": self.master.type.value,            #
-            "power": self.get_power(is_my_turn=True),  #
+            "attribute": self.master.attribute.value,
+            "traits": list(self.master.traits),
+            "text": self.master.effect_text,
+            "type": self.master.type.value,
             "is_rest": self.is_rest,
             "is_face_up": self.is_face_up,
-            "attached_don": self.attached_don,         # デフォルト 0
-            "keywords": list(self.current_keywords)
+            "attached_don": self.attached_don,
+            "keywords": list(self.current_keywords),
+            "is_newly_played": self.is_newly_played
         }
+
+        # CONST['CARD_PROPERTIES'] に定義されているキーのみを抽出
+        result = {}
+        for prop in CONST.get('CARD_PROPERTIES', []):
+            if prop in full_data:
+                result[prop] = full_data[prop]
+            else:
+                logger.warning(f"Property {prop} missing in CardInstance, setting default.")
+                result[prop] = None
+        
+        return result
 
 @dataclass
 class DonInstance:
@@ -118,6 +156,7 @@ class DonInstance:
     attached_to: Optional[str] = None
 
     def to_dict(self):
+        """API v1.4 適合: ドン実体のシリアライズ"""
         return {
             "uuid": self.uuid,
             "owner_id": self.owner_id,
