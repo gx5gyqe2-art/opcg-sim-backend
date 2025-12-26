@@ -9,7 +9,7 @@ from fastapi import FastAPI, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 # 外部化されたスキーマをインポート
-from .schemas import GameActionResultSchema
+from schemas import GameActionResultSchema
 from opcg_sim.src.gamestate import Player, GameManager
 from opcg_sim.src.loader import CardLoader, DeckLoader
 
