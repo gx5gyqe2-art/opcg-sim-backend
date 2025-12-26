@@ -21,5 +21,28 @@
     "ATTACHED_DON": "attached_don",
     "OWNER_ID": "owner_id",
     "KEYWORDS": "keywords"
+  },   
+  
+  {
+  "API_ROOT_KEYS": {
+    "GAME_STATE": "game_state",
+    "SUCCESS": "success"
+  },
+  "PLAYER_PROPERTIES": {
+    "DON_DECK_COUNT": "don_deck_count",
+    "DON_ACTIVE": "don_active",
+    "DON_RESTED": "don_rested",
+    "LIFE_COUNT": "life_count"
+  },
+  "GAME_CONFIG": {
+    "INITIAL_DON_COUNT": 10,
+    "INITIAL_LIFE_COUNT": 5
+  },
+  "CARD_PROPERTIES": {
+    "TYPE_LEADER": "LEADER",
+    "TYPE_CHARACTER": "CHARACTER"
   }
+}
+
+  
 }
