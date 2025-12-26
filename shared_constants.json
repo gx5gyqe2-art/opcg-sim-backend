@@ -23,6 +23,7 @@
     "NAME": "name",
     "POWER": "power",
     "COST": "cost",
+    "COUNTER": "counter",
     "ATTRIBUTE": "attribute",
     "TRAITS": "traits",
     "TEXT": "text",

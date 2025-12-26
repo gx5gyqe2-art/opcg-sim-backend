@@ -17,21 +17,26 @@ try:
     with open(CONST_PATH, "r", encoding="utf-8") as f:
         CONST = json.load(f)
 except Exception as e:
-    logger.error(f"Failed to load constants in models.py: {e}")
-    # フォールバック ( shared_constants.json が無い場合の最小限の定義)
+    logger.error(f"Failed to load shared_constants.json in models.py: {e}")
+    # フォールバック (物理キー名は小文字)
     CONST = {
         "CARD_PROPERTIES": {
-            "UUID": "uuid", "CARD_ID": "card_id", "NAME": "name", "POWER": "power",
-            "COST": "cost", "ATTRIBUTE": "attribute", "TRAITS": "traits",
-            "TEXT": "text", "TYPE": "type", "IS_REST": "is_rest",
-            "IS_FACE_UP": "is_face_up", "ATTACHED_DON": "attached_don", "OWNER_ID": "owner_id"
+            "UUID": "uuid", 
+            "CARD_ID": "card_id",
+            "NAME": "name", 
+            "POWER": "power", 
+            "COUNTER": "counter",
+            "ATTRIBUTE": "attribute",
+            "ATTACHED_DON": "attached_don", 
+            "IS_REST": "is_rest", 
+            "OWNER_ID": "owner_id"
         }
     }
 
 @dataclass(frozen=True)
 class CardMaster:
     """
-    JSONから読み込まれた静的なカードデータ (Immutable/Flyweight)
+    JSONから読み込まれた静的なカードデータ (Immutable/Flyweight)
     """
     card_id: str
     name: str
@@ -51,7 +56,7 @@ class CardMaster:
 @dataclass
 class CardInstance:
     """
-    ゲーム盤面上のカードの実体 (Mutable)
+    ゲーム盤面上のカードの実体 (Mutable)
     """
     master: CardMaster
     owner_id: str
@@ -97,7 +102,7 @@ class CardInstance:
                         self.current_keywords.add(keyword_val)
 
     def get_power(self, is_my_turn: bool) -> int:
-        """現在のパワーを計算"""
+        """現在のパワーを計算"""
         if self.master.type not in [CardType.LEADER, CardType.CHARACTER]:
             return 0
         base = self.base_power_override if self.base_power_override is not None else self.master.power
@@ -124,17 +129,20 @@ class CardInstance:
         self._refresh_keywords()
 
     def to_dict(self):
-        """API v1.4 適合: shared_constants.json に定義された全プロパティを保証"""
+        """API v1.4 適合: shared_constants.json に基づくカウンター値と属性の返却"""
         props = CONST.get('CARD_PROPERTIES', {})
         
-        # 定数ファイルのマッピングを使用して小文字キーを動的に生成
+        # 共通定数ファイルで定義されたキー名を使用して辞書を構築
         return {
             props.get('UUID', 'uuid'): self.uuid,
             props.get('CARD_ID', 'card_id'): self.master.card_id,
             props.get('NAME', 'name'): self.master.name,
             props.get('POWER', 'power'): self.get_power(is_my_turn=True),
-            props.get('COST', 'cost'): self.current_cost,
+            # カウンター値を定数キーで返却
+            props.get('COUNTER', 'counter'): self.master.counter,
+            # 属性を定数キーで返却
             props.get('ATTRIBUTE', 'attribute'): self.master.attribute.value,
+            props.get('COST', 'cost'): self.current_cost,
             props.get('TRAITS', 'traits'): list(self.master.traits),
             props.get('TEXT', 'text'): self.master.effect_text,
             props.get('TYPE', 'type'): self.master.type.value,
@@ -153,7 +161,7 @@ class DonInstance:
     attached_to: Optional[str] = None
 
     def to_dict(self):
-        """API v1.4 適合: ドン実体のシリアライズ"""
+        """API v1.4 適合: ドン実体のシリアライズ"""
         return {
             "uuid": self.uuid,
             "owner_id": self.owner_id,
