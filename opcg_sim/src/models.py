@@ -7,9 +7,7 @@ from .effects import Ability, ActionType
 
 @dataclass(frozen=True)
 class CardMaster:
-    """
-    JSONから読み込まれた静的なカードデータ (Immutable/Flyweight)
-    """
+    """JSONから読み込まれた静的なカードデータ (Immutable/Flyweight)"""
     card_id: str
     name: str
     type: CardType
@@ -27,20 +25,16 @@ class CardMaster:
 
 @dataclass
 class CardInstance:
-    """
-    ゲーム盤面上のカードの実体 (Mutable)
-    """
+    """ゲーム盤面上のカードの実体 (Mutable)"""
     master: CardMaster
     owner_id: str
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
     
-    # 基本ステータス
     is_rest: bool = False
     is_newly_played: bool = False
     attached_don: int = 0
     is_face_up: bool = False
     
-    # 変動ステータス
     power_buff: int = 0
     cost_buff: int = 0
     base_power_override: Optional[int] = None
@@ -48,10 +42,8 @@ class CardInstance:
     current_keywords: Set[str] = field(default_factory=set)
     flags: Set[str] = field(default_factory=set)
     
-    # 無効化関連
     negated: bool = False
     ability_disabled: bool = False
-
     ability_used_this_turn: Dict[int, int] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -59,24 +51,24 @@ class CardInstance:
             self.uuid = str(uuid.uuid4())
         self._refresh_keywords()
 
+    @property
+    def name(self): return self.master.name
+
     def _refresh_keywords(self):
         if self.ability_disabled:
             self.current_keywords = set()
             return
         self.current_keywords = self.master.keywords.copy()
         for ability in self.master.abilities:
-            if not hasattr(ability, 'actions'):
-                continue
+            if not hasattr(ability, 'actions'): continue
             for action in ability.actions:
                 if action.type == ActionType.KEYWORD:
                     keyword_val = getattr(action, 'details', None)
-                    if keyword_val:
-                        self.current_keywords.add(keyword_val)
+                    if keyword_val: self.current_keywords.add(keyword_val)
 
     def get_power(self, is_my_turn: bool) -> int:
-        """現在のパワーを計算"""
-        if self.master.type not in [CardType.LEADER, CardType.CHARACTER]:
-            return 0
+        """現在のパワーを計算"""
+        if self.master.type not in [CardType.LEADER, CardType.CHARACTER]: return 0
         base = self.base_power_override if self.base_power_override is not None else self.master.power
         buff = self.power_buff
         don_power = (self.attached_don * 1000) if is_my_turn else 0
@@ -84,7 +76,6 @@ class CardInstance:
 
     @property
     def current_cost(self) -> int:
-        """現在のコストを計算"""
         result = self.master.cost + self.cost_buff
         return max(0, result)
 
@@ -101,20 +92,22 @@ class CardInstance:
         self._refresh_keywords()
 
     def to_dict(self):
-        """API v1.4 適合: スネークケース辞書"""
+        """UI描画と詳細表示に必須となるパラメータを網羅"""
         return {
             "uuid": self.uuid,
             "card_id": self.master.card_id,
             "owner_id": self.owner_id,
-            "name": self.name,
+            "name": self.master.name,
+            "cost": self.current_cost,
+            "attribute": self.master.attribute.value, #
+            "traits": list(self.master.traits),        #
+            "text": self.master.effect_text,           #
+            "type": self.master.type.value,            #
+            "power": self.get_power(is_my_turn=True),  #
             "is_rest": self.is_rest,
             "is_face_up": self.is_face_up,
-            "keywords": list(self.current_keywords),
-            "traits": list(self.master.traits),
-            "power": self.get_power(is_my_turn=True),
-            "cost": self.current_cost,
-            "attached_don": self.attached_don,
-            "type": self.master.type.value
+            "attached_don": self.attached_don,         # デフォルト 0
+            "keywords": list(self.current_keywords)
         }
 
 @dataclass
@@ -125,7 +118,6 @@ class DonInstance:
     attached_to: Optional[str] = None
 
     def to_dict(self):
-        """API v1.4 適合: ドン実体のシリアライズ"""
         return {
             "uuid": self.uuid,
             "owner_id": self.owner_id,
