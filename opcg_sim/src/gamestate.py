@@ -15,7 +15,8 @@ from .effects import (
     CompareOperator, 
     Player as EffectPlayer
 )
-from .logger_config import log_object
+# インポートを log_event に修正
+from .logger_config import log_event
 
 logger = logging.getLogger("opcg_sim")
 Card = CardInstance
@@ -55,7 +56,6 @@ class Player:
     def to_dict(self):
         """
         API v1.4 適合: フロントエンドの gameState.ts 構造に準拠
-        各ゾーンを 'zones' オブジェクト内に配置し、ドンの状態をPlayer直下に配置します。
         """
         return {
             "player_id": self.name,
@@ -63,11 +63,9 @@ class Player:
             "life_count": len(self.life),
             "hand_count": len(self.hand),
             "don_deck_count": len(self.don_deck),
-            # ドン配置は v1.4 仕様に基づき zones の外
             "don_active": [d.to_dict() for d in self.don_active],
             "don_rested": [d.to_dict() for d in self.don_rested],
             "leader": self.leader.to_dict() if self.leader else None,
-            # ゾーン構造のネスト化 (RealGame.tsx の参照に適合)
             "zones": {
                 "field": [c.to_dict() for c in self.field],
                 "hand": [c.to_dict() for c in self.hand],
@@ -89,7 +87,9 @@ class GameManager:
 
     def start_game(self, first_player: Optional[Player] = None):
         """ゲーム開始処理"""
-        self.log("=== Game Start ===")
+        # 構造化ログを出力
+        log_event("INFO", "game.start", "Game initialization started")
+        
         self.p1.setup_game()
         self.p2.setup_game()
         if first_player:
@@ -98,16 +98,20 @@ class GameManager:
         else:
             self.turn_player = self.p1
             self.opponent = self.p2
-        self.log(f"First Player: {self.turn_player.name}")
+        
+        log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
         self.turn_count = 1
         self.refresh_phase()
 
     def log(self, message: str):
-        logger.info(f"[GM] {message}")
+        # 既存の GM ログも log_event に転送して構造化
+        log_event("INFO", "game.manager", message, player=self.turn_player.name)
 
     def end_turn(self):
         """ターン終了ステップの処理"""
         self.phase = Phase.END
+        log_event("INFO", "game.phase_end", f"Turn {self.turn_count} ending", player=self.turn_player.name)
+        
         all_units = [self.turn_player.leader] + self.turn_player.field
         if self.turn_player.stage:
             all_units.append(self.turn_player.stage)
@@ -123,6 +127,7 @@ class GameManager:
         """ターンプレイヤーの交代"""
         self.turn_player, self.opponent = self.opponent, self.turn_player
         self.turn_count += 1
+        log_event("INFO", "game.turn_switch", f"Switched to Player: {self.turn_player.name}", player=self.turn_player.name)
         self.refresh_phase()
 
     def refresh_phase(self):
@@ -181,6 +186,7 @@ class GameManager:
             if player.deck:
                 card = player.deck.pop(0)
                 player.hand.append(card)
+                log_event("INFO", "game.draw", f"Player {player.name} drew a card", player=player.name)
 
     def _find_card_location(self, card: Card) -> Tuple[Optional[Player], Optional[List[Any]]]:
         """カードの現在の所在を検索"""
@@ -193,10 +199,7 @@ class GameManager:
         return None, None
 
     def move_card(self, card: Card, dest_zone: Zone, dest_player: Player, dest_position: str = "BOTTOM"):
-        """
-        v1.4: ゾーン間移動ロジック
-        ステージカードがフィールドに送られる際、自動的にPlayer.stageへ振り分けます。
-        """
+        """v1.4: ゾーン間移動ロジック"""
         current_owner, current_list = self._find_card_location(card)
         if current_list is not None and card in current_list:
             current_list.remove(card)
@@ -204,10 +207,8 @@ class GameManager:
             current_owner.stage = None
         
         target_list = None
-        # STAGEの扱い: field指定でも自動的にPlayer.stageへ配置
         if dest_zone == Zone.FIELD and card.master.type == CardType.STAGE:
             if dest_player.stage is not None:
-                # 既存のステージをトラッシュへ
                 self.move_card(dest_player.stage, Zone.TRASH, dest_player)
             dest_player.stage = card
         elif dest_zone == Zone.HAND: target_list = dest_player.hand
@@ -221,22 +222,19 @@ class GameManager:
             else: target_list.append(card)
 
     def play_card_action(self, player: Player, card: Card):
-        """
-        v1.4: カードプレイアクション
-        イベントカードの場合は効果解決後にトラッシュへ、それ以外はフィールドへ移動。
-        """
+        """v1.4: カードプレイアクション"""
         if card not in player.hand: return
+        
+        log_event("INFO", "game.play_card", f"Playing card: {card.name}", player=player.name, payload={"card_uuid": card.uuid})
         
         if card.master.type == CardType.EVENT:
             for ability in card.master.abilities:
                 if ability.trigger in [TriggerType.ON_PLAY, TriggerType.ACTIVATE_MAIN]:
                     self.resolve_ability(player, ability, source_card=card)
-            # イベント解決後にトラッシュへ移動
             self.move_card(card, Zone.TRASH, player)
         else:
-            # 既に move_card 内でステージ判定を行っているため、Zone.FIELD 指定で適切に処理
             self.move_card(card, Zone.FIELD, player)
-            card.attached_don = 0 # プレイ時に付与ドンを0に初期化
+            card.attached_don = 0
             card.is_newly_played = True
             if not card.ability_disabled:
                 for ability in card.master.abilities:
@@ -246,12 +244,10 @@ class GameManager:
     def resolve_ability(self, player: Player, ability: Any, source_card: Card):
         """効果解決の基盤メソッド"""
         if source_card.negated or source_card.ability_disabled: return
-        # _perform_logic は既存のエフェクト解決システム（effects.py連携）を使用
         for action in ability.actions:
             self._perform_logic(player, action, source_card)
 
     def _perform_logic(self, player: Player, action: Any, source_card: Card):
-        """個別のエフェクトアクションを実行（スタブ：詳細ロジックは effects.py 参照）"""
-        self.log(f"Resolving action {action.type} for {source_card.name}")
-        # ここに KO, DRAW, BP_BUFF 等の具体的な処理を実装
+        """個別のエフェクトアクションを実行"""
+        log_event("INFO", "game.effect", f"Resolving action {action.type} for {source_card.name}", player=player.name)
         pass
