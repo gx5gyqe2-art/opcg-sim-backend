@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Body, Request
 from pydantic import BaseModel, Field, ConfigDict
 from fastapi.middleware.cors import CORSMiddleware
 
-# srcを明示したインポート
+# srcを明示したインポート
 from opcg_sim.src.models import CardInstance
 from opcg_sim.src.gamestate import Player, GameManager
 from opcg_sim.src.loader import CardLoader, DeckLoader
@@ -37,7 +37,7 @@ except Exception as e:
     CONST = {
         "PLAYER_KEYS": {"P1": "p1", "P2": "p2"},
         "API_ROOT_KEYS": {"GAME_STATE": "game_state"},
-        "CARD_PROPERTIES": ["uuid", "card_id", "name", "power", "cost", "attribute", "traits", "text", "type", "is_rest", "is_face_up", "attached_don", "owner_id"]
+        "CARD_PROPERTIES": {"UUID": "uuid", "NAME": "name", "POWER": "power", "ATTACHED_DON": "attached_don", "IS_REST": "is_rest", "OWNER_ID": "owner_id"}
     }
 
 # --- 3. Pydantic スキーマ定義 (API v1.4 準拠) ---
@@ -67,6 +67,13 @@ class ZoneSchema(BaseModel):
     trash: List[CardSchema] = Field(default_factory=list)
     stage: Optional[CardSchema] = Field(None, description="ステージカード")
 
+class DonSchema(BaseModel):
+    """ドン実体の構造"""
+    uuid: str
+    owner_id: str
+    is_rest: bool
+    attached_to: Optional[str] = None
+
 class PlayerSchema(BaseModel):
     """プレイヤー全データ"""
     player_id: str
@@ -74,8 +81,9 @@ class PlayerSchema(BaseModel):
     life_count: int
     hand_count: int
     don_deck_count: int
-    don_active: List[Any] = Field(default_factory=list)
-    don_rested: List[Any] = Field(default_factory=list)
+    # 修正: 明確な型定義によりバリデーションを安定化
+    don_active: List[DonSchema] = Field(default_factory=list)
+    don_rested: List[DonSchema] = Field(default_factory=list)
     leader: Optional[CardSchema]
     zones: ZoneSchema
 
@@ -99,7 +107,6 @@ class GameActionResult(BaseModel):
     game_state: Optional[GameStateSchema] = None
     error: Optional[Dict[str, str]] = None
 
-    # 動的なキー名に対応するための設定 (game_state という固定キー名以外を許容する場合に必要)
     model_config = ConfigDict(extra="allow")
 
 # --- 4. FastAPI アプリケーション設定 ---

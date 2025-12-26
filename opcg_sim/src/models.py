@@ -8,7 +8,7 @@ import logging
 from .enums import CardType, Attribute, Color
 from .effects import Ability, ActionType
 
-# --- 共通定数のロード ---
+# --- 共通定数のロード ---
 logger = logging.getLogger("opcg_sim")
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONST_PATH = os.path.join(BASE_DIR, "..", "shared_constants.json")
@@ -18,7 +18,8 @@ try:
         CONST = json.load(f)
 except Exception as e:
     logger.error(f"Failed to load shared_constants.json in models.py: {e}")
-    CONST = {"CARD_PROPERTIES": ["uuid", "card_id", "name", "power", "cost", "attribute", "traits", "text", "type", "is_rest", "is_face_up", "attached_don", "owner_id"]}
+    # フォールバック (値は小文字)
+    CONST = {"CARD_PROPERTIES": {"UUID": "uuid", "NAME": "name", "POWER": "power", "ATTACHED_DON": "attached_don", "IS_REST": "is_rest", "OWNER_ID": "owner_id"}}
 
 @dataclass(frozen=True)
 class CardMaster:
@@ -116,37 +117,26 @@ class CardInstance:
         self._refresh_keywords()
 
     def to_dict(self):
-        """API v1.4 適合: shared_constants.json に定義された全プロパティを保証"""
+        """API v1.4 適合: 定数ファイルのマッピングを使用して小文字キーを保証"""
+        props = CONST.get('CARD_PROPERTIES', {})
         
-        # すべての候補データを生成
-        full_data = {
-            "uuid": self.uuid,
-            "card_id": self.master.card_id,
-            "owner_id": self.owner_id,
-            "name": self.master.name,
-            "power": self.get_power(is_my_turn=True),
-            "cost": self.current_cost,
-            "attribute": self.master.attribute.value,
-            "traits": list(self.master.traits),
-            "text": self.master.effect_text,
-            "type": self.master.type.value,
-            "is_rest": self.is_rest,
-            "is_face_up": self.is_face_up,
-            "attached_don": self.attached_don,
-            "keywords": list(self.current_keywords),
-            "is_newly_played": self.is_newly_played
+        # 定数ファイルから物理キー名を取得し、辞書を構築
+        return {
+            props.get('UUID', 'uuid'): self.uuid,
+            props.get('CARD_ID', 'card_id'): self.master.card_id,
+            props.get('NAME', 'name'): self.master.name,
+            props.get('POWER', 'power'): self.get_power(is_my_turn=True),
+            props.get('COST', 'cost'): self.current_cost,
+            props.get('ATTRIBUTE', 'attribute'): self.master.attribute.value,
+            props.get('TRAITS', 'traits'): list(self.master.traits),
+            props.get('TEXT', 'text'): self.master.effect_text,
+            props.get('TYPE', 'type'): self.master.type.value,
+            props.get('IS_REST', 'is_rest'): self.is_rest,
+            props.get('IS_FACE_UP', 'is_face_up'): self.is_face_up,
+            props.get('ATTACHED_DON', 'attached_don'): self.attached_don,
+            props.get('OWNER_ID', 'owner_id'): self.owner_id,
+            props.get('KEYWORDS', 'keywords'): list(self.current_keywords)
         }
-
-        # CONST['CARD_PROPERTIES'] に定義されているキーのみを抽出
-        result = {}
-        for prop in CONST.get('CARD_PROPERTIES', []):
-            if prop in full_data:
-                result[prop] = full_data[prop]
-            else:
-                logger.warning(f"Property {prop} missing in CardInstance, setting default.")
-                result[prop] = None
-        
-        return result
 
 @dataclass
 class DonInstance:
