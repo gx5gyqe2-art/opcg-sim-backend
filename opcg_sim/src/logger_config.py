@@ -4,6 +4,7 @@ import sys
 import urllib.request
 import urllib.parse
 import urllib.error
+import uuid
 from datetime import datetime
 from contextvars import ContextVar
 from typing import Any, Optional, List
@@ -46,31 +47,41 @@ BUFFER_LOCK = threading.Lock()
 FLUSH_INTERVAL = 3 
 
 def post_to_slack_as_file(text: str):
-    """ログをファイルとしてSlackにアップロードする"""
+    """ログをファイルとしてSlackにアップロードする (Multipart対応版)"""
     if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID:
         return
     
     try:
-        # files.upload APIを使用
         url = "https://slack.com/api/files.upload"
+        boundary = uuid.uuid4().hex
         
-        # マルチパート形式ではなく、シンプルなURLエンコード形式で送信
-        params = {
-            "channels": SLACK_CHANNEL_ID,
-            "content": text,
-            "filename": f"log_{datetime.now().strftime('%H%M%S')}.json",
-            "filetype": "json",
-            "title": f"Game Logs {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        }
+        # ファイル内容とパラメータを構築
+        filename = f"log_{datetime.now().strftime('%H%M%S')}.json"
         
-        data = urllib.parse.urlencode(params).encode("utf-8")
-        req = urllib.request.Request(url, data=data, method="POST")
+        parts = []
+        # Token
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="token"\r\n\r\n{SLACK_BOT_TOKEN}\r\n')
+        # Channels
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="channels"\r\n\r\n{SLACK_CHANNEL_ID}\r\n')
+        # Filename
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="filename"\r\n\r\n{filename}\r\n')
+        # Content (ここがログ本体)
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="content"\r\n\r\n{text}\r\n')
+        # 終端
+        parts.append(f'--{boundary}--\r\n')
+        
+        body = "".join(parts).encode('utf-8')
+        
+        req = urllib.request.Request(url, data=body, method="POST")
+        req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+        # Authorizationヘッダーも併用（確実性のため）
         req.add_header("Authorization", f"Bearer {SLACK_BOT_TOKEN}")
-        req.add_header("Content-Type", "application/x-www-form-urlencoded")
         
+        # タイムアウト10秒。SSL検証エラー回避などは行わず標準設定で送る
         with urllib.request.urlopen(req, timeout=10.0) as response:
             res_body = json.loads(response.read().decode("utf-8"))
             if not res_body.get("ok"):
+                # 失敗時はCloud Loggingに出力して原因を特定可能にする
                 print(f"DEBUG: Slack API Error: {res_body.get('error')}")
     except Exception as e:
         print(f"DEBUG: Slack Upload Exception: {e}")
@@ -87,7 +98,6 @@ def slack_buffer_worker():
                 LOG_BUFFER.clear()
         
         if lines_to_send:
-            # ログを結合。ファイル化するため文字数制限は緩和
             combined_text = "\n---\n".join(lines_to_send)
             post_to_slack_as_file(combined_text)
 
@@ -96,7 +106,7 @@ if SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
     threading.Thread(target=slack_buffer_worker, daemon=True).start()
 
 def post_log_to_slack(log_data: dict):
-    """ログをバッファに追加。Payloadは全文維持。"""
+    """ログをバッファに追加"""
     if not SLACK_BOT_TOKEN:
         return
 
@@ -117,7 +127,6 @@ def post_log_to_slack(log_data: dict):
         if msg: log_entry += f"\n{msg}"
         
         if payload:
-            # ファイルにするため、ここではtruncateせず全文入れる
             p_str = json.dumps(payload, indent=2, ensure_ascii=False)
             log_entry += f"\n{p_str}"
 
@@ -140,6 +149,9 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
     if payload is not None:
         log_data[K["PAYLOAD"]] = payload
 
+    # 1. 標準出力 (Cloud Logging)
     print(json.dumps(log_data, ensure_ascii=False))
     sys.stdout.flush()
+
+    # 2. Slack転送
     post_log_to_slack(log_data)
