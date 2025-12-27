@@ -3,19 +3,9 @@ import random
 import unicodedata
 import re
 import logging
-
-# 移動後のパスに合わせて修正
 from ..models.models import CardInstance, CardMaster, DonInstance
-from ..models.enums import CardType, Attribute, Color, Phase
-from .effects import (
-    ActionType, 
-    Zone, 
-    TargetQuery, 
-    TriggerType, 
-    ConditionType, 
-    CompareOperator, 
-    Player as EffectPlayer
-)
+from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, Player
+from .effect_types import ActuinType, TargetQuery
 from ..utils.logger_config import log_event
 
 logger = logging.getLogger("opcg_sim")
