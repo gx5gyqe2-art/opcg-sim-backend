@@ -133,3 +133,46 @@ class ConditionType(Enum):
     LEADER_NAME = auto()
     LEADER_TRAIT = auto()
     NONE = auto()
+
+class ParserKeyword(str, Enum):
+    """テキスト解析用キーワード"""
+    DON = "ドン"
+    COST = "コスト"
+    POWER = "パワー"
+    TRASH = "トラッシュ"
+    HAND = "手札"
+    FIELD = "場"
+    LIFE = "ライフ"
+    LEADER = "リーダー"
+    CHARACTER = "キャラ"
+    STAGE = "ステージ"
+    EVENT = "イベント"
+    
+    # トリガー・条件関連
+    ON_PLAY = "登場時"
+    ACTIVATE_MAIN = "起動メイン"
+    WHEN_ATTACKING = "アタック時"
+    ON_KO = "KO時"
+    MY_TURN = "自分のターン中"
+    OPPONENT_TURN = "相手のターン中"
+    
+    # アクション・操作関連
+    DRAW = "カードを引く"
+    PLAY = "登場させる"
+    KO = "KOする"
+    REST = "レストにする"
+    ACTIVE = "アクティブにする"
+    LOOK = "見て"
+    REVEAL = "公開し"
+    ADD_TO_HAND = "手札に加える"
+    DISCARD = "捨てる"
+    PLACE_BOTTOM = "デッキの下に置く"
+    
+    # 特殊キーワード
+    REMAINING = "残り"
+    EACH_OTHER = "お互い"
+    OWNER = "持ち主"
+    OPPONENT = "相手"
+    SELF = "自分"
+    THIS_CARD = "このキャラ"
+    SELF_REF = "自身"
