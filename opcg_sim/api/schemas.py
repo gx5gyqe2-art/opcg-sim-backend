@@ -1,22 +1,17 @@
 import os
 import json
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
-# --- 共通定数のロード (ディレクトリ構成 root/shared_constants.json に最適化) ---
+
+# --- 共通定数のロード ---
 def load_shared_constants():
-    # schemas.py の場所 (/app/opcg_sim/api/schemas.py)
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    
     candidates = [
-        # root/shared_constants.json (画像に基づいた正確な位置)
         os.path.join(current_dir, "..", "..", "shared_constants.json"),
-        # 予備1: opcg_sim/shared_constants.json
         os.path.join(current_dir, "..", "shared_constants.json"),
-        # 予備2: Dockerルート
         "/app/shared_constants.json"
     ]
-    
     for path in candidates:
         if os.path.exists(path):
             try:
@@ -27,6 +22,13 @@ def load_shared_constants():
     return {}
 
 CONST = load_shared_constants()
+
+# --- 逆引き用マップの作成 (enums.py の定義に基づく) ---
+# 日本語名から Enum の名前 (英語) へのマッピング
+from opcg_sim.src.models.enums import CardType, Attribute
+
+TYPE_MAP = {e.value: e.name for e in CardType}
+ATTR_MAP = {e.value: e.name for e in Attribute}
 
 class CardSchema(BaseModel):
     """カードの厳格な型定義と自由な拡張性を両立"""
@@ -44,15 +46,28 @@ class CardSchema(BaseModel):
     attached_don: int = 0
     owner_id: str
 
+    @field_validator('type', mode='before')
+    @classmethod
+    def convert_type_to_eng(cls, v: str) -> str:
+        """日本語のタイプを英語定数に変換 (例: 'キャラクター' -> 'CHARACTER')"""
+        return TYPE_MAP.get(v, v)
+
+    @field_validator('attribute', mode='before')
+    @classmethod
+    def convert_attribute_to_eng(cls, v: str) -> str:
+        """日本語の属性を英語定数に変換 (例: '斬' -> 'SLASH')"""
+        return ATTR_MAP.get(v, v)
+
 class ZoneSchema(BaseModel):
-    """ゾーン情報の構造定義"""
+    # ... (変更なし)
     model_config = ConfigDict(extra='allow')
-    # default_factory に修正済み
     field: List[CardSchema] = Field(default_factory=list)
     hand: List[CardSchema] = Field(default_factory=list)
     life: List[CardSchema] = Field(default_factory=list)
     trash: List[CardSchema] = Field(default_factory=list)
     stage: Optional[CardSchema] = None
+
+# ... (PlayerSchema 以降は変更なし)
 
 class PlayerSchema(BaseModel):
     """プレイヤー情報のバリデーション"""
