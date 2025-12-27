@@ -4,9 +4,8 @@ import uuid
 import os
 import json
 import logging
-
 from .enums import CardType, Color, Attribute, ActionType, Phase, Player
-from ..core.effects import Ability
+from ..core.effect_types import Ability
 
 # --- 共通定数のロード ---
 logger = logging.getLogger("opcg_sim")

@@ -3,10 +3,9 @@ import unicodedata
 import re
 import logging
 from typing import List, Dict, Any, Optional, Tuple
-
-# 一つ上の階層 (src/) に戻ってから各フォルダを参照するように修正
 from ..models.models import CardMaster, CardInstance
-from ..core.effects.parser import Effect, Ability, TriggerType
+from ..core.effects.parser import Effect, TriggerType
+from ..core.effect_types import Ability
 from ..models.enums import CardType, Attribute, Color
 
 # ログ設定
