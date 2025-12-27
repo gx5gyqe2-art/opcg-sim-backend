@@ -1,6 +1,6 @@
 import re
 import logging
-from ...effect_types  import TargetQuery, _nfc
+from ...models.effect_types  import TargetQuery, _nfc
 from ...models.enums import Player, Zone
 
 logger = logging.getLogger("opcg_sim")
