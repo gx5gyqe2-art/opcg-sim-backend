@@ -5,12 +5,14 @@ import os
 import json
 import logging
 
-# 同一階層の enums.py と、別階層の core/effects.py を参照するように修正
+# 修正：整理後の階層に合わせてインポートパスを修正し、Abilityを追加
 from .enums import CardType, Color, Attribute
-from ..core.effects import Effect
+from ..core.effects import Effect, Ability
 
 # --- 共通定数のロード ---
 logger = logging.getLogger("opcg_sim")
+
+# 修正：src/models/ から見た shared_constants.json の位置 (2階層上) を指定
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONST_PATH = os.path.join(BASE_DIR, "..", "shared_constants.json")
 
