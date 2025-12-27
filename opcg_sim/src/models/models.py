@@ -5,13 +5,11 @@ import os
 import json
 import logging
 
-from .enums import CardType, Color, Attribute
-from ..core.effects import Effect, Ability, ActionType
+from .enums import CardType, Color, Attribute, ActionType, Phase, Player
+from ..core.effects import Effect, Ability
 
 # --- 共通定数のロード ---
 logger = logging.getLogger("opcg_sim")
-
-# 修正：src/models/ から見た shared_constants.json の位置 (2階層上) を指定
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONST_PATH = os.path.join(BASE_DIR, "..", "shared_constants.json")
 

@@ -1,122 +1,27 @@
 from __future__ import annotations
 import re
 import unicodedata
-from enum import Enum, auto
 from dataclasses import dataclass, field
 from typing import List, Optional, Any
 
-# ==========================================
-#  フェーズ 1: Enum & Data Models
-# ==========================================
-
-# 修正：整理後の階層に合わせてインポートパスを修正
-try:
-    from ..models.enums import Phase
-except ImportError:
-    from opcg_sim.src.models.enums import Phase
+# 役割：enums.py の定義を使って、テキストを「意味」に変換する。
+from ..models.enums import (
+    Phase, Player, Zone, ActionType, TriggerType, 
+    CompareOperator, ConditionType
+)
 
 def _nfc(text: str) -> str:
     """文字列をNFC正規化し、Mac/iOS特有の濁点分離(NFD)問題を解消する"""
     if not text: return ""
     return unicodedata.normalize('NFC', text)
 
-class Player(Enum):
-    SELF = "SELF"
-    OPPONENT = "OPPONENT"
-    OWNER = "OWNER"
-    ALL = "ALL"
-
-class Zone(Enum):
-    FIELD = "FIELD"
-    HAND = "HAND"
-    DECK = "DECK"
-    TRASH = "TRASH"
-    LIFE = "LIFE"
-    DON_DECK = "DON_DECK"
-    COST_AREA = "COST_AREA" # コストエリア(ドン!!置き場)
-    TEMP = "TEMP" # 効果処理中の保留領域
-    ANY = "ANY"
-
-class ActionType(Enum):
-    # --- Battle / State ---
-    KO = auto()
-    REST = auto()
-    ACTIVE = auto()
-    FREEZE = auto() # 次のリフレッシュでアクティブにならない
-    LOCK = auto()   # アタックブロック禁止
-    DISABLE_ABILITY = auto() # 効果無効・発動禁止
-    GRANT_EFFECT = auto() # 効果耐性や特殊状態の付与
-
-    # --- Card Movement ---
-    MOVE_CARD = auto()  # 移動全般
-    DECK_BOTTOM = auto() # デッキ下へ送る
-    DRAW = auto()
-    DISCARD = auto()    # 手札破棄
-    TRASH_FROM_DECK = auto() # デッキトップ破棄
-    LOOK = auto()       # デッキ確認
-    REVEAL = auto()     # 公開
-    SHUFFLE = auto()    # デッキシャッフル
-    PLAY_CARD = auto()  # 登場させる
-
-    # --- Life ---
-    LIFE_RECOVER = auto() # ライフ回復
-    FACE_UP_LIFE = auto() # ライフを表向きにする
-
-    # --- Power / Cost ---
-    BP_BUFF = auto()    # パワー増減
-    SET_BASE_POWER = auto() # パワーを固定値にする
-    COST_BUFF = auto()  # コスト増減
-    COST_CHANGE = auto() # コスト軽減(永続効果など)
-
-    # --- Don!! ---
-    ATTACH_DON = auto() # ドン!!付与
-    REST_DON = auto()   # コストとしてドン!!をレストにする
-    RAMP_DON = auto()   # ドン!!追加
-    RETURN_DON = auto() # ドン!!を戻す
-
-    # --- Other ---
-    NEGATE_EFFECT = auto() # 効果そのものを無効にする
-    SWAP_POWER = auto()    # パワー交換
-    KEYWORD = auto()
-    OTHER = auto()
-
-class TriggerType(Enum):
-    ON_PLAY = _nfc("登場時")
-    ON_ATTACK = _nfc("アタック時")
-    ON_BLOCK = _nfc("ブロック時")
-    ON_KO = _nfc("KO時")
-    ACTIVATE_MAIN = _nfc("起動メイン")
-    TURN_END = _nfc("ターン終了時") 
-    OPP_TURN_END = _nfc("相手のターン終了時")
-    ON_OPP_ATTACK = _nfc("相手のアタック時")
-    TRIGGER = _nfc("トリガー")
-    COUNTER = _nfc("カウンター")
-    RULE = _nfc("ルール") 
-    PASSIVE = _nfc("常時")
-    UNKNOWN = _nfc("不明")
-
-class CompareOperator(Enum):
-    EQ = "=="
-    NEQ = "!="
-    GT = ">"
-    LT = "<"
-    GE = ">="
-    LE = "<="
-    HAS = "HAS"
-
-class ConditionType(Enum):
-    LIFE_COUNT = auto()
-    HAND_COUNT = auto()
-    TRASH_COUNT = auto()
-    FIELD_COUNT = auto()
-    HAS_TRAIT = auto()
-    HAS_ATTRIBUTE = auto()
-    HAS_UNIT = auto()
-    IS_RESTED = auto()
-    DON_COUNT = auto()
-    LEADER_NAME = auto()
-    LEADER_TRAIT = auto()
-    NONE = auto()
+# --- 以下の Enum 定義群は削除 ---
+# class Player(Enum): ... 
+# class Zone(Enum): ...
+# class ActionType(Enum): ...
+# class TriggerType(Enum): ...
+# class CompareOperator(Enum): ...
+# class ConditionType(Enum): ...
 
 @dataclass
 class TargetQuery:
