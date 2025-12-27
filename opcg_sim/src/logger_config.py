@@ -5,7 +5,9 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 from contextvars import ContextVar
-from typing import Any, Optional
+from typing import Any, Optional, List
+import threading
+import time
 
 # セッションID保持用
 session_id_ctx: ContextVar[str] = ContextVar("session_id", default="sys-init")
@@ -35,18 +37,58 @@ K = LC.get('KEYS', {
     "PAYLOAD": "payload"
 })
 
-# --- Slack 転送設定 ---
+# --- Slack バッファリング設定 ---
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
+LOG_BUFFER: List[str] = []
+BUFFER_LOCK = threading.Lock()
+FLUSH_INTERVAL = 3  # 何秒ごとにSlackへ送信するか
+
+def post_to_slack_raw(text: str):
+    """実際にSlack WebhookへPOSTする低レベル関数"""
+    if not SLACK_WEBHOOK_URL or not text:
+        return
+    try:
+        body = json.dumps({"text": text}).encode("utf-8")
+        req = urllib.request.Request(
+            SLACK_WEBHOOK_URL, data=body,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=5.0):
+            pass
+    except:
+        pass
+
+def slack_buffer_worker():
+    """バックグラウンドでバッファを監視して送信するスレッド"""
+    global LOG_BUFFER
+    while True:
+        time.sleep(FLUSH_INTERVAL)
+        lines_to_send = []
+        with BUFFER_LOCK:
+            if LOG_BUFFER:
+                lines_to_send = LOG_BUFFER[:]
+                LOG_BUFFER.clear()
+        
+        if lines_to_send:
+            # 1投稿にまとめて送信
+            combined_text = "\n---\n".join(lines_to_send)
+            # Slackのメッセージ制限（約3万文字）を超えないよう調整
+            if len(combined_text) > 30000:
+                combined_text = combined_text[:30000] + "\n...(Too many logs, truncated)"
+            post_to_slack_raw(combined_text)
+
+# 送信スレッドの開始
+if SLACK_WEBHOOK_URL:
+    threading.Thread(target=slack_buffer_worker, daemon=True).start()
 
 def post_log_to_slack(log_data: dict):
     """
-    Slack Webhookへログを転送する。例外は完全に握りつぶす。
+    ログをバッファに追加する。実際の送信は別スレッドが行う。
     """
     if not SLACK_WEBHOOK_URL:
         return
 
     try:
-        # キー名は CONST['LOG_CONFIG']['KEYS'] に準拠
         timestamp = log_data.get(K["TIME"], "N/A")
         source = log_data.get(K["SOURCE"], "N/A")
         level = log_data.get(K["LEVEL"], "info").upper()
@@ -60,29 +102,26 @@ def post_log_to_slack(log_data: dict):
         if player:
             header += f"[{player}]"
         
-        text = f"{header}\n*{action}*"
+        log_entry = f"{header}\n*{action}*"
         if msg:
-            text += f"\n{msg}"
+            log_entry += f"\n{msg}"
         
         if payload:
             p_str = json.dumps(payload, indent=2, ensure_ascii=False)
+            # 個別ログも2000文字で制限
             if len(p_str) > 2000:
                 p_str = p_str[:2000] + "\n...(truncated)"
-            text += f"\n```\n{p_str}\n```"
+            log_entry += f"\n```\n{p_str}\n```"
 
-        body = json.dumps({"text": text}).encode("utf-8")
-        req = urllib.request.Request(
-            SLACK_WEBHOOK_URL, data=body,
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=2.0):
-            pass
+        # バッファに追加
+        with BUFFER_LOCK:
+            LOG_BUFFER.append(log_entry)
     except:
         pass
 
 def log_event(level_key: str, action: str, msg: str, player: str = "system", payload: Optional[Any] = None, source: str = "BE"):
     """
-    構造化ログを標準出力に出力し、Slackにも転送する。
+    構造化ログを標準出力に出力し、Slackバッファに追加する。
     """
     now = datetime.now().strftime("%H:%M:%S")
     
@@ -103,5 +142,5 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
     print(json.dumps(log_data, ensure_ascii=False))
     sys.stdout.flush()
 
-    # 2. Slack転送 (追加)
+    # 2. Slackバッファへ（追加）
     post_log_to_slack(log_data)
