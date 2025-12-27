@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import urllib.request
+import urllib.parse
 import urllib.error
 from datetime import datetime
 from contextvars import ContextVar
@@ -37,27 +38,42 @@ K = LC.get('KEYS', {
     "PAYLOAD": "payload"
 })
 
-# --- Slack バッファリング設定 ---
-SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
+# --- Slack 設定 ---
+SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
+SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 LOG_BUFFER: List[str] = []
 BUFFER_LOCK = threading.Lock()
 FLUSH_INTERVAL = 3 
-MAX_SLACK_MESSAGE_SIZE = 20000  # Slackの制限より余裕を持たせたサイズ
 
-def post_to_slack_raw(text: str):
-    """実際にSlack WebhookへPOSTする低レベル関数"""
-    if not SLACK_WEBHOOK_URL or not text:
+def post_to_slack_as_file(text: str):
+    """ログをファイルとしてSlackにアップロードする"""
+    if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID:
         return
+    
     try:
-        body = json.dumps({"text": text}).encode("utf-8")
-        req = urllib.request.Request(
-            SLACK_WEBHOOK_URL, data=body,
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=5.0):
-            pass
-    except:
-        pass
+        # files.upload APIを使用
+        url = "https://slack.com/api/files.upload"
+        
+        # マルチパート形式ではなく、シンプルなURLエンコード形式で送信
+        params = {
+            "channels": SLACK_CHANNEL_ID,
+            "content": text,
+            "filename": f"log_{datetime.now().strftime('%H%M%S')}.json",
+            "filetype": "json",
+            "title": f"Game Logs {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        }
+        
+        data = urllib.parse.urlencode(params).encode("utf-8")
+        req = urllib.request.Request(url, data=data, method="POST")
+        req.add_header("Authorization", f"Bearer {SLACK_BOT_TOKEN}")
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+        
+        with urllib.request.urlopen(req, timeout=10.0) as response:
+            res_body = json.loads(response.read().decode("utf-8"))
+            if not res_body.get("ok"):
+                print(f"DEBUG: Slack API Error: {res_body.get('error')}")
+    except Exception as e:
+        print(f"DEBUG: Slack Upload Exception: {e}")
 
 def slack_buffer_worker():
     """バックグラウンドでバッファを監視して送信するスレッド"""
@@ -71,28 +87,17 @@ def slack_buffer_worker():
                 LOG_BUFFER.clear()
         
         if lines_to_send:
-            current_chunk = []
-            current_size = 0
-            
-            for line in lines_to_send:
-                # 1つのメッセージが大きくなりすぎないよう分割して送信
-                if current_size + len(line) > MAX_SLACK_MESSAGE_SIZE:
-                    post_to_slack_raw("\n---\n".join(current_chunk))
-                    current_chunk = []
-                    current_size = 0
-                
-                current_chunk.append(line)
-                current_size += len(line)
-            
-            if current_chunk:
-                post_to_slack_raw("\n---\n".join(current_chunk))
+            # ログを結合。ファイル化するため文字数制限は緩和
+            combined_text = "\n---\n".join(lines_to_send)
+            post_to_slack_as_file(combined_text)
 
-if SLACK_WEBHOOK_URL:
+# 送信スレッドの開始
+if SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
     threading.Thread(target=slack_buffer_worker, daemon=True).start()
 
 def post_log_to_slack(log_data: dict):
-    """ログをバッファに追加。Payloadをより厳しく制限。"""
-    if not SLACK_WEBHOOK_URL:
+    """ログをバッファに追加。Payloadは全文維持。"""
+    if not SLACK_BOT_TOKEN:
         return
 
     try:
@@ -108,16 +113,13 @@ def post_log_to_slack(log_data: dict):
         header = f"[{timestamp}][{source}][{level}][sid={session_id}]"
         if player: header += f"[{player}]"
         
-        log_entry = f"{header}\n*{action}*"
+        log_entry = f"{header}\n{action}"
         if msg: log_entry += f"\n{msg}"
         
         if payload:
-            # Payloadのダンプ。非常に大きい可能性があるため制限を厳しく
+            # ファイルにするため、ここではtruncateせず全文入れる
             p_str = json.dumps(payload, indent=2, ensure_ascii=False)
-            # iPhoneでのコピーしやすさを考えつつ、1,000文字でカット
-            if len(p_str) > 1000:
-                p_str = p_str[:1000] + "\n...(Payload too large, truncated at 1000 chars)"
-            log_entry += f"\n```\n{p_str}\n```"
+            log_entry += f"\n{p_str}"
 
         with BUFFER_LOCK:
             LOG_BUFFER.append(log_entry)
