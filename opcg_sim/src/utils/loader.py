@@ -4,10 +4,17 @@ import re
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 
-# モジュール構造を前提としたインポート
+# 修正前 (フラットな構造を想定)
+# from models import CardMaster, CardInstance
+# from effects import Effect, Ability, TriggerType
+# from enums import CardType, Attribute, Color
+
+# 修正後 (整理後の階層に合わせる)
 from .models import CardMaster, CardInstance
 from .effects import Effect, Ability, TriggerType
 from .enums import CardType, Attribute, Color
+
+
 
 # ログ設定
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')

@@ -5,8 +5,9 @@ import os
 import json
 import logging
 
-from .enums import CardType, Attribute, Color
-from .effects import Ability, ActionType
+# 同一階層の enums.py と、別階層の core/effects.py を参照するように修正
+from .enums import CardType, Color, Attribute
+from ..core.effects import Effect
 
 # --- 共通定数のロード ---
 logger = logging.getLogger("opcg_sim")

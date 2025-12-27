@@ -4,8 +4,9 @@ import unicodedata
 import re
 import logging
 
-from .models import CardInstance, CardMaster, DonInstance
-from .enums import CardType, Attribute, Color, Phase
+# 移動後のパスに合わせて修正
+from ..models.models import CardInstance, CardMaster, DonInstance
+from ..models.enums import CardType, Attribute, Color, Phase
 from .effects import (
     ActionType, 
     Zone, 
@@ -15,8 +16,7 @@ from .effects import (
     CompareOperator, 
     Player as EffectPlayer
 )
-# インポートを log_event に修正
-from .logger_config import log_event
+from ..utils.logger_config import log_event
 
 logger = logging.getLogger("opcg_sim")
 Card = CardInstance
@@ -54,9 +54,7 @@ class Player:
                 self.hand.append(self.deck.pop(0))
 
     def to_dict(self):
-        """
-        API v1.4 適合: フロントエンドの gameState.ts 構造に準拠
-        """
+        """API v1.4 適合: フロントエンドの gameState.ts 構造に準拠"""
         return {
             "player_id": self.name,
             "name": self.name,
@@ -87,7 +85,6 @@ class GameManager:
 
     def start_game(self, first_player: Optional[Player] = None):
         """ゲーム開始処理"""
-        # 構造化ログを出力
         log_event("INFO", "game.start", "Game initialization started")
         
         self.p1.setup_game()
@@ -104,7 +101,6 @@ class GameManager:
         self.refresh_phase()
 
     def log(self, message: str):
-        # 既存の GM ログも log_event に転送して構造化
         log_event("INFO", "game.manager", message, player=self.turn_player.name)
 
     def end_turn(self):

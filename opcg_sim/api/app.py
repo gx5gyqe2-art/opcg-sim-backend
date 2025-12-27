@@ -19,9 +19,10 @@ try:
 except ImportError:
     from .schemas import GameStateSchema
 
-from opcg_sim.src.logger_config import session_id_ctx, log_event
-from opcg_sim.src.gamestate import Player, GameManager
-from opcg_sim.src.loader import CardLoader, DeckLoader
+# 整理後のディレクトリに合わせて修正
+from opcg_sim.src.utils.logger_config import session_id_ctx, log_event
+from opcg_sim.src.core.gamestate import Player, GameManager
+from opcg_sim.src.utils.loader import CardLoader, DeckLoader
 
 # --- 2. ログとディレクトリの設定 ---
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, force=True)
@@ -89,7 +90,6 @@ async def receive_frontend_log(data: Dict[str, Any] = Body(...)):
     s_id = data.get("sessionId") or session_id_ctx.get()
     token = session_id_ctx.set(s_id)
     try:
-        # この log_event 呼び出しにより、標準出力へのJSON出力と Slack転送が両方実行されます
         log_event(
             level_key=data.get("level", "info"),
             action=data.get("action", "client.log"),

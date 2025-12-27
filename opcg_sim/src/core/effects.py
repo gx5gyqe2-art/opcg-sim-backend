@@ -9,6 +9,12 @@ from typing import List, Optional, Any
 #  フェーズ 1: Enum & Data Models
 # ==========================================
 
+# 修正：整理後の階層に合わせてインポートパスを修正
+try:
+    from ..models.enums import Phase
+except ImportError:
+    from opcg_sim.src.models.enums import Phase
+
 def _nfc(text: str) -> str:
     """文字列をNFC正規化し、Mac/iOS特有の濁点分離(NFD)問題を解消する"""
     if not text: return ""
@@ -453,7 +459,6 @@ class Effect:
             if _nfc("アクティブ") in text: pos = "ACTIVE"
             actions.append(EffectAction(ActionType.RAMP_DON, subject, value=val, dest_position=pos))
             return actions
-
         # RETURN_DON
         if _nfc("ドン") in text and (_nfc("戻す") in text or "−" in text or "-" in text):
              val = self._extract_int(text)
@@ -631,7 +636,6 @@ class Effect:
                 target_part = _nfc("このキャラ")
 
         target = self._parse_target(target_part, subject)
-        
         dest_zone = Zone.ANY
         dest_pos = "BOTTOM"
         
@@ -809,3 +813,5 @@ class Effect:
                 tq.count = 1
         
         return tq
+
+    
