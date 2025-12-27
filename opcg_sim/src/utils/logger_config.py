@@ -106,19 +106,30 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
     }
     if payload is not None: log_data[K["PAYLOAD"]] = payload
 
-    log_json_str = json.dumps(log_data, ensure_ascii=False)
-    
-    # 標準出力 (Cloud Logging用)
-    print(log_json_str)
-    sys.stdout.flush()
+    try:
+        # JSON変換を試みる
+        log_json_str = json.dumps(log_data, ensure_ascii=False)
+        
+        # 標準出力 (Cloud Logging用)
+        print(log_json_str)
+        sys.stdout.flush()
+    except (TypeError, ValueError) as e:
+        # シリアライズエラー時のフォールバック。メッセージを書き換えてペイロードなしで出力。
+        error_msg = f"LOG_SERIALIZATION_ERROR: {str(e)}"
+        fallback_data = {**log_data, K["MESSAGE"]: error_msg, K["PAYLOAD"]: None}
+        print(json.dumps(fallback_data, ensure_ascii=False))
+        sys.stdout.flush()
 
     # --- GCS保存：日付を冒頭にしたフラットな時系列構成 ---
     # フォーマット: YYYYMMDD_HHMMSS_ffffff_SESSIONID_ACTION.json
     time_prefix = now.strftime("%Y%m%d_%H%M%S_%f")
     filename = f"{time_prefix}_{sid}_{action}.json"
     
-    json_bytes = json.dumps(log_data, ensure_ascii=False, indent=2).encode('utf-8')
-    upload_to_gcs(filename, json_bytes)
+    try:
+        json_bytes = json.dumps(log_data, ensure_ascii=False, indent=2).encode('utf-8')
+        upload_to_gcs(filename, json_bytes)
+    except:
+        pass # GCS保存失敗は標準出力ログを優先するため無視
 
     if not SLACK_BOT_TOKEN: return
 
