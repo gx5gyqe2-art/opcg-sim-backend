@@ -5,9 +5,8 @@ import os
 import json
 import logging
 
-# 修正：整理後の階層に合わせてインポートパスを修正し、Abilityを追加
 from .enums import CardType, Color, Attribute
-from ..core.effects import Effect, Ability
+from ..core.effects import Effect, Ability, ActionType
 
 # --- 共通定数のロード ---
 logger = logging.getLogger("opcg_sim")
