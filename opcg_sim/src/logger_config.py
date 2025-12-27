@@ -41,7 +41,8 @@ K = LC.get('KEYS', {
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
 LOG_BUFFER: List[str] = []
 BUFFER_LOCK = threading.Lock()
-FLUSH_INTERVAL = 3  # 何秒ごとにSlackへ送信するか
+FLUSH_INTERVAL = 3 
+MAX_SLACK_MESSAGE_SIZE = 20000  # Slackの制限より余裕を持たせたサイズ
 
 def post_to_slack_raw(text: str):
     """実際にSlack WebhookへPOSTする低レベル関数"""
@@ -70,21 +71,27 @@ def slack_buffer_worker():
                 LOG_BUFFER.clear()
         
         if lines_to_send:
-            # 1投稿にまとめて送信
-            combined_text = "\n---\n".join(lines_to_send)
-            # Slackのメッセージ制限（約3万文字）を超えないよう調整
-            if len(combined_text) > 30000:
-                combined_text = combined_text[:30000] + "\n...(Too many logs, truncated)"
-            post_to_slack_raw(combined_text)
+            current_chunk = []
+            current_size = 0
+            
+            for line in lines_to_send:
+                # 1つのメッセージが大きくなりすぎないよう分割して送信
+                if current_size + len(line) > MAX_SLACK_MESSAGE_SIZE:
+                    post_to_slack_raw("\n---\n".join(current_chunk))
+                    current_chunk = []
+                    current_size = 0
+                
+                current_chunk.append(line)
+                current_size += len(line)
+            
+            if current_chunk:
+                post_to_slack_raw("\n---\n".join(current_chunk))
 
-# 送信スレッドの開始
 if SLACK_WEBHOOK_URL:
     threading.Thread(target=slack_buffer_worker, daemon=True).start()
 
 def post_log_to_slack(log_data: dict):
-    """
-    ログをバッファに追加する。実際の送信は別スレッドが行う。
-    """
+    """ログをバッファに追加。Payloadをより厳しく制限。"""
     if not SLACK_WEBHOOK_URL:
         return
 
@@ -99,32 +106,26 @@ def post_log_to_slack(log_data: dict):
         payload = log_data.get(K["PAYLOAD"])
 
         header = f"[{timestamp}][{source}][{level}][sid={session_id}]"
-        if player:
-            header += f"[{player}]"
+        if player: header += f"[{player}]"
         
         log_entry = f"{header}\n*{action}*"
-        if msg:
-            log_entry += f"\n{msg}"
+        if msg: log_entry += f"\n{msg}"
         
         if payload:
+            # Payloadのダンプ。非常に大きい可能性があるため制限を厳しく
             p_str = json.dumps(payload, indent=2, ensure_ascii=False)
-            # 個別ログも2000文字で制限
-            if len(p_str) > 2000:
-                p_str = p_str[:2000] + "\n...(truncated)"
+            # iPhoneでのコピーしやすさを考えつつ、1,000文字でカット
+            if len(p_str) > 1000:
+                p_str = p_str[:1000] + "\n...(Payload too large, truncated at 1000 chars)"
             log_entry += f"\n```\n{p_str}\n```"
 
-        # バッファに追加
         with BUFFER_LOCK:
             LOG_BUFFER.append(log_entry)
     except:
         pass
 
 def log_event(level_key: str, action: str, msg: str, player: str = "system", payload: Optional[Any] = None, source: str = "BE"):
-    """
-    構造化ログを標準出力に出力し、Slackバッファに追加する。
-    """
     now = datetime.now().strftime("%H:%M:%S")
-    
     log_data = {
         K["TIME"]: now,
         K["SOURCE"]: source,
@@ -134,13 +135,9 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
         K["ACTION"]: action,
         K["MESSAGE"]: msg
     }
-    
     if payload is not None:
         log_data[K["PAYLOAD"]] = payload
 
-    # 1. 標準出力 (Cloud Logging)
     print(json.dumps(log_data, ensure_ascii=False))
     sys.stdout.flush()
-
-    # 2. Slackバッファへ（追加）
     post_log_to_slack(log_data)
