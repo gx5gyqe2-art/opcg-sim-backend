@@ -42,7 +42,7 @@ SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME")
 
 def get_gcp_access_token():
-    """Cloud Runの権限を使用してGCS操作用トークンを取得"""
+    """Cloud Runの権限を使用してGCP操作用トークンを取得"""
     try:
         url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
         req = urllib.request.Request(url)
@@ -52,22 +52,17 @@ def get_gcp_access_token():
     except: return None
 
 def upload_gamestate_only(log_data: dict, session_id: str):
-    """マルチパートアップロードで文字化けとフォルダ分けの問題を確実に解決する"""
+    """2段階アップロードで特殊文字による400エラーを回避し、文字化けも防ぐ"""
     token = get_gcp_access_token()
     if not token or not BUCKET_NAME: return None
     
     seq = seq_num_ctx.get() + 1
     seq_num_ctx.set(seq)
     
-    # セッションIDが不明な場合は今日の日付をフォルダ名にする
-    folder_name = session_id if (session_id and session_id != "unknown") else datetime.now().strftime("%Y%m%d")
+    # フォルダ分け：sessionIdがunknownなら日付にする
+    folder = session_id if (session_id and session_id != "unknown") else datetime.now().strftime("%Y%m%d")
     action = log_data.get(K["ACTION"], "unknown")
-    filename = f"{folder_name}/{seq:03d}_{action}.json"
-    
-    # 確実にメタデータを付与するマルチパート方式
-    # パスに含まれるスラッシュを維持しつつエンコード
-    safe_filename = urllib.parse.quote(filename)
-    url = f"https://storage.googleapis.com/upload/storage/v1/b/{BUCKET_NAME}/o?uploadType=multipart&name={safe_filename}"
+    filename = f"{folder}/{seq:03d}_{action}.json"
     
     try:
         payload = log_data.get(K["PAYLOAD"], {})
@@ -77,27 +72,29 @@ def upload_gamestate_only(log_data: dict, session_id: str):
             "game_state": payload.get("game_state") if isinstance(payload, dict) else None
         }
         
-        # 本文の作成
-        json_content = json.dumps(gs_entry, ensure_ascii=False, indent=2).encode('utf-8')
-        boundary = b"log_boundary_parts"
-        
-        # メタデータ（ContentTypeをUTF-8で固定するための設定）
-        metadata = json.dumps({"contentType": "application/json; charset=utf-8"}).encode('utf-8')
-        
-        # ボディをバイナリで正確に組み立て（引用符エラーを回避）
-        body = b"".join([
-            b"--", boundary, b"\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n",
-            metadata, b"\r\n--", boundary, b"\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n",
-            json_content, b"\r\n--", boundary, b"--\r\n"
-        ])
+        # ensure_ascii=Falseで日本語を維持したバイナリデータ
+        json_bytes = json.dumps(gs_entry, ensure_ascii=False, indent=2).encode('utf-8')
 
-        req = urllib.request.Request(url, data=body, method="POST")
-        req.add_header("Authorization", f"Bearer {token}")
-        req.add_header("Content-Type", f"multipart/related; boundary={boundary.decode()}")
+        # 手順1: ファイル本体をアップロード (Media upload)
+        # 400エラーを防ぐため最もシンプルな形式を使用
+        encoded_name = urllib.parse.quote(filename)
+        upload_url = f"https://storage.googleapis.com/upload/storage/v1/b/{BUCKET_NAME}/o?uploadType=media&name={encoded_name}"
         
-        with urllib.request.urlopen(req, timeout=10.0):
-            # 直接閲覧用URL
+        up_req = urllib.request.Request(upload_url, data=json_bytes, method="POST")
+        up_req.add_header("Authorization", f"Bearer {token}")
+        up_req.add_header("Content-Type", "application/json")
+        with urllib.request.urlopen(up_req, timeout=10.0): pass
+
+        # 手順2: メタデータを更新 (PATCH) して日本語表示（charset=utf-8）を確定させる
+        meta_url = f"https://storage.googleapis.com/storage/v1/b/{BUCKET_NAME}/o/{encoded_name}"
+        meta_data = json.dumps({"contentType": "application/json; charset=utf-8"}).encode('utf-8')
+        
+        patch_req = urllib.request.Request(meta_url, data=meta_data, method="PATCH")
+        patch_req.add_header("Authorization", f"Bearer {token}")
+        patch_req.add_header("Content-Type", "application/json")
+        with urllib.request.urlopen(patch_req, timeout=5.0):
             return f"https://storage.googleapis.com/{BUCKET_NAME}/{filename}"
+            
     except Exception as e:
         print(f"DEBUG: GCS Upload Error: {e}")
         return None
@@ -107,9 +104,7 @@ def post_to_slack(text_json: str, gcs_url: Optional[str] = None):
     if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID: return
     try:
         url = "https://slack.com/api/chat.postMessage"
-        
         if gcs_url:
-            # URLから情報を復元
             path_parts = gcs_url.split('/')
             folder = path_parts[-2]
             file_base = path_parts[-1]
@@ -128,40 +123,35 @@ def post_to_slack(text_json: str, gcs_url: Optional[str] = None):
     except: pass
 
 def log_event(level_key: str, action: str, msg: str, player: str = "system", payload: Optional[Any] = None, source: str = "BE"):
-    # 1. セッションIDの決定
-    session_id = "unknown"
-    # 引数のpayloadにsessionIdが含まれていればそれを最優先する
+    # payload内のsessionIdを抽出
+    sid = "unknown"
     if isinstance(payload, dict) and K["SESSION"] in payload:
-        session_id = payload[K["SESSION"]]
+        sid = payload[K["SESSION"]]
     elif session_id_ctx.get() != "sys-init":
-        session_id = session_id_ctx.get()
+        sid = session_id_ctx.get()
 
     log_data = {
         K["TIME"]: datetime.now().strftime("%H:%M:%S"),
         K["SOURCE"]: source,
         K["LEVEL"]: level_key.lower(),
-        K["SESSION"]: session_id,
+        K["SESSION"]: sid,
         K["PLAYER"]: player,
         K["ACTION"]: action,
         K["MESSAGE"]: msg
     }
     if payload is not None: log_data[K["PAYLOAD"]] = payload
 
-    log_json_str = json.dumps(log_data, ensure_ascii=False)
+    log_json = json.dumps(log_data, ensure_ascii=False)
     
-    # Cloud Logging用
-    print(log_json_str)
+    # 1. 標準出力
+    print(log_json)
     sys.stdout.flush()
 
     if not SLACK_BOT_TOKEN: return
 
-    # 2. game_stateが含まれているか判定
-    has_gs = False
+    # 2. game_stateが含まれている場合のみGCSへ
     if isinstance(payload, dict) and "game_state" in payload:
-        has_gs = True
-
-    if has_gs:
-        gcs_url = upload_gamestate_only(log_data, session_id)
-        post_to_slack(log_json_str, gcs_url=gcs_url)
+        gcs_url = upload_gamestate_only(log_data, sid)
+        post_to_slack(log_json, gcs_url=gcs_url)
     else:
-        post_to_slack(log_json_str)
+        post_to_slack(log_json)
