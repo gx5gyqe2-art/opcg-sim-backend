@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import urllib.request
+import urllib.parse
 import urllib.error
 from datetime import datetime
 from contextvars import ContextVar
@@ -51,7 +52,7 @@ def get_gcp_access_token():
     except: return None
 
 def upload_gamestate_only(log_data: dict, session_id: str):
-    """game_stateをGCSへ保存（マルチパート方式でContent-Typeを確実にUTF-8に固定）"""
+    """game_stateをGCSへ保存（2ステップ方式で確実にUTF-8保存）"""
     token = get_gcp_access_token()
     if not token or not BUCKET_NAME: return None
     
@@ -61,8 +62,8 @@ def upload_gamestate_only(log_data: dict, session_id: str):
     action = log_data.get(K["ACTION"], "unknown")
     filename = f"{session_id}/{seq:03d}_{action}.json"
     
-    # マルチパートアップロード用URL
-    url = f"https://storage.googleapis.com/upload/storage/v1/b/{BUCKET_NAME}/o?uploadType=multipart&name={filename}"
+    # 1. コンテンツのアップロード
+    upload_url = f"https://storage.googleapis.com/upload/storage/v1/b/{BUCKET_NAME}/o?uploadType=media&name={filename}"
     
     try:
         payload = log_data.get(K["PAYLOAD"], {})
@@ -72,31 +73,30 @@ def upload_gamestate_only(log_data: dict, session_id: str):
             "game_state": payload.get("game_state") if isinstance(payload, dict) else None
         }
         
-        json_content = json.dumps(gs_entry, ensure_ascii=False, indent=2).encode('utf-8')
-        
-        # マルチパートのデリミタ
-        boundary = "log_boundary_separator"
-        
-        # メタデータ（ContentTypeの指定）
-        metadata = {
-            "contentType": "application/json; charset=utf-8"
-        }
-        
-        # リクエストボディの組み立て
-        body = (
-            f"--{boundary}\r\n"
-            f"Content-Type: application/json; charset=UTF-8\r\n\r\n"
-            f"{json.dumps(metadata)}\r\n"
-            f"--{boundary}\r\n"
-            f"Content-Type: application/json; charset=UTF-8\r\n\r\n"
-        ).encode('utf-8') + json_content + f"\r\n--{boundary}--\r\n".encode('utf-8')
+        # ensure_ascii=Falseで日本語を維持
+        json_bytes = json.dumps(gs_entry, ensure_ascii=False, indent=2).encode('utf-8')
 
-        req = urllib.request.Request(url, data=body, method="POST")
+        # ファイル本体をアップロード
+        req = urllib.request.Request(upload_url, data=json_bytes, method="POST")
         req.add_header("Authorization", f"Bearer {token}")
-        req.add_header("Content-Type", f"multipart/related; boundary={boundary}")
+        req.add_header("Content-Type", "application/json")
         
         with urllib.request.urlopen(req, timeout=10.0):
+            pass
+        
+        # 2. メタデータの更新（PATCHリクエストで確実にcharsetを付与）
+        # ファイル名をURLエンコードして指定
+        encoded_filename = urllib.parse.quote(filename, safe='')
+        patch_url = f"https://storage.googleapis.com/storage/v1/b/{BUCKET_NAME}/o/{encoded_filename}"
+        patch_data = json.dumps({"contentType": "application/json; charset=utf-8"}).encode('utf-8')
+        
+        patch_req = urllib.request.Request(patch_url, data=patch_data, method="PATCH")
+        patch_req.add_header("Authorization", f"Bearer {token}")
+        patch_req.add_header("Content-Type", "application/json")
+        
+        with urllib.request.urlopen(patch_req, timeout=5.0):
             return f"https://storage.googleapis.com/{BUCKET_NAME}/{filename}"
+            
     except Exception as e:
         print(f"DEBUG: GCS Upload Error: {e}")
         return None
@@ -113,6 +113,7 @@ def post_to_slack(text_json: str, gcs_url: Optional[str] = None):
             console_url = f"https://console.cloud.google.com/storage/browser/{BUCKET_NAME}/{session_id}"
             display_text = f"📊 **GameState Saved ({seq:03d})**\n🔗 [This State]({gcs_url}) | 📂 [Session Folder]({console_url})"
         else:
+            # 3500文字で切ってコードブロックとして投稿
             display_text = f"```json\n{text_json[:3500]}\n```"
 
         payload = {"channel": SLACK_CHANNEL_ID, "text": display_text}
@@ -136,16 +137,19 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
     if payload is not None: log_data[K["PAYLOAD"]] = payload
 
     log_json_str = json.dumps(log_data, ensure_ascii=False)
+    
+    # 1. 標準出力
     print(log_json_str)
     sys.stdout.flush()
 
     if not SLACK_BOT_TOKEN: return
 
-    # game_stateがある場合のみGCS保存
+    # Payload内に game_state キーがあるか判定
     has_gs = False
     if isinstance(payload, dict) and "game_state" in payload:
         has_gs = True
 
+    # 2. Slack / GCS 転送
     if has_gs:
         gcs_url = upload_gamestate_only(log_data, session_id)
         post_to_slack(log_json_str, gcs_url=gcs_url)
