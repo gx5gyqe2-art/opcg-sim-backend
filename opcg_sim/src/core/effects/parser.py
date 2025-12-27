@@ -3,10 +3,8 @@ import re
 import unicodedata
 from typing import List, Optional, Any
 from ..effects import Ability, EffectAction, TargetQuery, Condition, _nfc
-from ...models.enums import (
-    Phase, Player, Zone, ActionType, TriggerType, 
-    CompareOperator, ConditionType
-)
+from ...models.enums import (Phase, Player, Zone, ActionType, TriggerType, CompareOperator, ConditionType)
+from .matcher import parse_target
 
 class Effect:
     def __init__(self, raw_text: str):
@@ -214,7 +212,7 @@ class Effect:
         # 2. リーダー特徴判定
         if _nfc("リーダー") in text and _nfc("特徴") in text:
             cond.type = ConditionType.LEADER_TRAIT
-            tgt = self._parse_target(text)
+            tgt = parse_target(text)
             if tgt.traits: cond.value = tgt.traits[0]
             return cond
 
@@ -244,7 +242,7 @@ class Effect:
         # 4. 場に特定キャラがいるか
         if _nfc("場") in text or _nfc("キャラ") in text:
             cond.type = ConditionType.FIELD_COUNT
-            cond.target = self._parse_target(text)
+            cond.target = parse_target(text)
             cond.operator = CompareOperator.GE
             cond.value = 1
             return cond
@@ -276,7 +274,7 @@ class Effect:
             val = self._extract_int(text)
             if val == 0 and _nfc("枚") in text: val = 1
             
-            target = self._parse_target(tgt_part, subject)
+            target = parse_target(tgt_part, subject)
             detail = "REST" if is_rest else "ACTIVE"
             actions.append(EffectAction(ActionType.ATTACH_DON, subject, target, value=val, details=detail))
             return actions
@@ -324,7 +322,7 @@ class Effect:
                      actions.append(EffectAction(ActionType.LIFE_RECOVER, subject, value=val))
                 else:
                      # デッキから特定のカードをライフへ
-                     target = self._parse_target(text, subject)
+                     target = parse_target(text, subject)
                      target.zone = Zone.DECK
                      actions.append(EffectAction(ActionType.MOVE_CARD, subject, target, source_zone=Zone.DECK, dest_zone=Zone.LIFE, dest_position="TOP"))
                 return actions
@@ -337,7 +335,7 @@ class Effect:
             pos = "TOP"
             if _nfc("下") in text: pos = "BOTTOM"
             
-            target = self._parse_target(text, subject)
+            target = parse_target(text, subject)
             target.zone = src
             actions.append(EffectAction(ActionType.MOVE_CARD, subject, target, source_zone=src, dest_zone=Zone.LIFE, dest_position=pos))
             return actions
@@ -347,7 +345,7 @@ class Effect:
         # SET_BASE_POWER
         if _nfc("パワー") in text and _nfc("にする") in text:
             val = self._extract_int(text)
-            target = self._parse_target(text.split(_nfc("パワー"))[0], subject)
+            target = parse_target(text.split(_nfc("パワー"))[0], subject)
             actions.append(EffectAction(ActionType.SET_BASE_POWER, subject, target, value=val, details=text))
             return actions
 
@@ -355,7 +353,7 @@ class Effect:
         if _nfc("支払うコスト") in text and _nfc("なる") in text:
             val = self._extract_int(text)
             if _nfc("少なく") in text: val = -val
-            target = self._parse_target(text, subject)
+            target = parse_target(text, subject)
             actions.append(EffectAction(ActionType.COST_CHANGE, subject, target, value=val, details=text))
             return actions
 
@@ -371,7 +369,7 @@ class Effect:
                  if _nfc("を") in target_part:
                      target_part = target_part.rsplit(_nfc("を"), 1)[0]
                  
-                 target = self._parse_target(target_part, subject)
+                 target =     parse_target(target_part, subject)
                  actions.append(EffectAction(ActionType.BP_BUFF, subject, target, value=val, details=text))
                  return actions
 
@@ -384,35 +382,35 @@ class Effect:
                  if op in ['-', '−', 'ー', '–']: val = -val
                  
                  target_part = text.split(_nfc("コスト"))[0]
-                 target = self._parse_target(target_part, subject)
+                 target = parse_target(target_part, subject)
                  actions.append(EffectAction(ActionType.COST_BUFF, subject, target, value=val, details=text))
                  return actions
 
         # GRANT_EFFECT
         if _nfc("場を離れない") in text:
-            target = self._parse_target(text.split(_nfc("は"))[0], subject)
+            target = parse_target(text.split(_nfc("は"))[0], subject)
             actions.append(EffectAction(ActionType.GRANT_EFFECT, subject, target, details="CANNOT_LEAVE"))
             return actions
         if _nfc("KOされない") in text:
-            target = self._parse_target(text.split(_nfc("は"))[0], subject)
+            target = parse_target(text.split(_nfc("は"))[0], subject)
             actions.append(EffectAction(ActionType.GRANT_EFFECT, subject, target, details="CANNOT_KO"))
             return actions
 
         # DISABLE ABILITY
         if _nfc("発動できない") in text:
             target_text = text.split(_nfc("は"))[0]
-            target = self._parse_target(target_text, subject)
+            target = parse_target(target_text, subject)
             actions.append(EffectAction(ActionType.DISABLE_ABILITY, subject, target, details=text))
             return actions
 
         # LOCK / NEGATE
         if _nfc("できない") in text and _nfc("発動") not in text:
-            target = self._parse_target(text.split(_nfc("は"))[0], subject)
+            target = parse_target(text.split(_nfc("は"))[0], subject)
             actions.append(EffectAction(ActionType.LOCK, subject, target, details=text))
             return actions
         
         if _nfc("無効") in text:
-            target = self._parse_target(text.split(_nfc("を"))[0], subject)
+            target = parse_target(text.split(_nfc("を"))[0], subject)
             actions.append(EffectAction(ActionType.NEGATE_EFFECT, subject, target))
             return actions
 
@@ -428,7 +426,7 @@ class Effect:
         if _nfc("捨てる") in text and _nfc("手札") in text:
             val = self._extract_int(text)
             if val == 0: val = 1
-            target = self._parse_target(text, subject)
+            target = parse_target(text, subject)
             target.zone = Zone.HAND
             target.count = val
             actions.append(EffectAction(ActionType.DISCARD, subject, target, dest_zone=Zone.TRASH))
@@ -440,7 +438,7 @@ class Effect:
             if _nfc("トラッシュ") in text: src = Zone.TRASH
             elif _nfc("デッキ") in text: src = Zone.DECK
             
-            target = self._parse_target(text, subject)
+            target = parse_target(text, subject)
             target.zone = src
             pos = "ACTIVE"
             if _nfc("レスト") in text: pos = "REST"
@@ -472,7 +470,7 @@ class Effect:
             elif _nfc("自身") in text and _nfc("自身の") not in text:
                 target_part = _nfc("このキャラ")
 
-        target = self._parse_target(target_part, subject)
+        target = parse_target(target_part, subject)
         dest_zone = Zone.ANY
         dest_pos = "BOTTOM"
         
@@ -520,15 +518,13 @@ class Effect:
         if act_type == ActionType.LOOK:
             actions.append(EffectAction(ActionType.LOOK, subject, value=val, source_zone=Zone.DECK))
             if _nfc("公開") in text:
-                 # [修正] "X枚を見て" の部分が _parse_target に渡ると数値を誤認するため、
-                 # "見て" より後ろのテキストのみを解析対象とする
                  search_text = text
                  if _nfc("見て") in text:
                      parts = text.split(_nfc("見て"), 1)
                      if len(parts) > 1:
                          search_text = parts[1]
                  
-                 search_tgt = self._parse_target(search_text, subject)
+                 search_tgt = parse_target(search_text, subject)
                  search_tgt.zone = Zone.TEMP
                  actions.append(EffectAction(ActionType.REVEAL, subject, target=search_tgt))
                  if _nfc("加える") in text:

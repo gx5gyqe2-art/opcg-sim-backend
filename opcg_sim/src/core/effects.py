@@ -9,7 +9,6 @@ from ..models.enums import (
 )
 
 def _nfc(text: str) -> str:
-    """文字列をNFC正規化し、Mac/iOS特有の濁点分離(NFD)問題を解消する"""
     if not text: return ""
     return unicodedata.normalize('NFC', text)
 
