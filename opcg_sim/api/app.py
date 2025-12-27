@@ -44,6 +44,14 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 # --- 4. 共通ロジック ---
 def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool = True, error_msg: str = None) -> Dict[str, Any]:
+    # shared_constants.json からキーを取得
+    player_keys = CONST.get('PLAYER_KEYS', {})
+    api_root_keys = CONST.get('API_ROOT_KEYS', {})
+    
+    # 定数に基づいたプレイヤーIDの取得
+    p1_key = player_keys.get('P1', 'p1')
+    p2_key = player_keys.get('P2', 'p2')
+
     raw_game_state = {
         "game_id": game_id,
         "turn_info": {
@@ -52,22 +60,24 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
             "active_player_id": manager.turn_player.name if manager else "N/A"
         },
         "players": {
-            "p1": manager.p1.to_dict() if manager else {},
-            "p2": manager.p2.to_dict() if manager else {}
+            p1_key: manager.p1.to_dict() if manager else {},
+            p2_key: manager.p2.to_dict() if manager else {}
         }
     }
+    
     try:
         validated_state = GameStateSchema(**raw_game_state).model_dump(by_alias=True)
     except Exception as e:
         log_event("ERROR", "api.validation", f"Validation Error: {e}")
         validated_state = raw_game_state 
+
+    # APIレスポンスのルートキーを shared_constants.json の定義に合わせる
     return {
-        "success": success,
+        api_root_keys.get('SUCCESS', 'success'): success,
         "game_id": game_id,
-        "game_state": validated_state,
+        api_root_keys.get('GAME_STATE', 'game_state'): validated_state,
         "error": {"message": error_msg} if error_msg else None
     }
-
 # --- 5. Middleware ---
 @app.middleware("http")
 async def trace_logging_middleware(request: Request, call_next):
