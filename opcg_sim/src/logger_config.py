@@ -4,6 +4,7 @@ import sys
 import urllib.request
 import urllib.parse
 import urllib.error
+import uuid
 from datetime import datetime
 from contextvars import ContextVar
 from typing import Any, Optional
@@ -39,49 +40,72 @@ K = LC.get('KEYS', {
 # --- Slack 設定 ---
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
+# 分岐のしきい値（文字数）。Slackの表示制限を考慮し3000文字に設定
+SIZE_THRESHOLD = 3000
 
-def post_to_slack_as_codeblock(text: str):
-    """
-    deprecatedになったfiles.uploadの代わりに、chat.postMessageで送信。
-    巨大なJSONはコードブロック( ```json ... ``` )として投稿します。
-    """
-    if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID:
-        return
-    
+def post_to_slack_as_message(text: str):
+    """小さいログを通常のチャットメッセージとして送信"""
     try:
         url = "https://slack.com/api/chat.postMessage"
-        
-        # 文字数制限対策: Slackの1投稿は約4万文字まで。
-        # 万が一超える場合は、末尾をカットして構造を維持。
-        if len(text) > 38000:
-            text = text[:38000] + "\n... (truncated)"
-
         payload = {
             "channel": SLACK_CHANNEL_ID,
             "text": f"```json\n{text}\n```"
         }
-        
         body = json.dumps(payload).encode('utf-8')
         req = urllib.request.Request(url, data=body, method="POST")
         req.add_header("Content-Type", "application/json; charset=utf-8")
         req.add_header("Authorization", f"Bearer {SLACK_BOT_TOKEN}")
-        
-        with urllib.request.urlopen(req, timeout=15.0) as response:
-            res_body = json.loads(response.read().decode("utf-8"))
-            if not res_body.get("ok"):
-                print(f"DEBUG: Slack API Error: {res_body.get('error')}")
-            else:
-                print(f"DEBUG: Slack Message Sent Successfully")
+        with urllib.request.urlopen(req, timeout=10.0):
+            pass
     except Exception as e:
-        print(f"DEBUG: Slack Post Exception: {e}")
-    sys.stdout.flush()
+        print(f"DEBUG: Slack Message Exception: {e}")
+
+def post_to_slack_as_file_v2(text: str):
+    """
+    巨大なログをSlack V2 APIでファイルとしてアップロード。
+    1. アップロードURL取得 -> 2. ファイル書き込み -> 3. 完了通知 の3ステップ。
+    """
+    try:
+        filename = f"log_{datetime.now().strftime('%H%M%S')}.json"
+        content_bytes = text.encode('utf-8')
+        
+        # Step 1: アップロード用URLの取得
+        req1 = urllib.request.Request(
+            f"https://slack.com/api/files.getUploadExternal?filename={filename}&length={len(content_bytes)}",
+            method="GET"
+        )
+        req1.add_header("Authorization", f"Bearer {SLACK_BOT_TOKEN}")
+        with urllib.request.urlopen(req1) as res1:
+            data1 = json.loads(res1.read().decode())
+            if not data1.get("ok"): return
+            upload_url = data1["upload_url"]
+            file_id = data1["file_id"]
+
+        # Step 2: 取得したURLへバイナリデータを送信
+        req2 = urllib.request.Request(upload_url, data=content_bytes, method="POST")
+        with urllib.request.urlopen(req2):
+            pass
+
+        # Step 3: アップロード完了を通知してチャンネルに紐付け
+        completion_payload = {
+            "files": [{"id": file_id, "title": filename}],
+            "channel_id": SLACK_CHANNEL_ID
+        }
+        req3 = urllib.request.Request(
+            "https://slack.com/api/files.completeUploadExternal",
+            data=json.dumps(completion_payload).encode('utf-8'),
+            method="POST"
+        )
+        req3.add_header("Authorization", f"Bearer {SLACK_BOT_TOKEN}")
+        req3.add_header("Content-Type", "application/json; charset=utf-8")
+        with urllib.request.urlopen(req3):
+            print(f"DEBUG: Large Log Uploaded as File: {file_id}")
+            
+    except Exception as e:
+        print(f"DEBUG: Slack V2 Upload Exception: {e}")
 
 def log_event(level_key: str, action: str, msg: str, player: str = "system", payload: Optional[Any] = None, source: str = "BE"):
-    """
-    構造化ログを出力し、Slackへ即座に転送する。
-    """
     now = datetime.now().strftime("%H:%M:%S")
-    
     log_data = {
         K["TIME"]: now,
         K["SOURCE"]: source,
@@ -91,15 +115,22 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
         K["ACTION"]: action,
         K["MESSAGE"]: msg
     }
-    
     if payload is not None:
         log_data[K["PAYLOAD"]] = payload
 
-    # 1. 標準出力 (Cloud Logging)
-    log_json = json.dumps(log_data, ensure_ascii=False)
+    log_json = json.dumps(log_data, ensure_ascii=False, indent=2)
+    
+    # 1. 標準出力
     print(log_json)
     sys.stdout.flush()
 
-    # 2. Slack転送 (同期実行)
-    # Payloadがある場合やエラーログの場合のみ送る設定も可能ですが、現状は全件送信
-    post_to_slack_as_codeblock(log_json)
+    # 2. Slack転送（サイズによって処理を分岐）
+    if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID:
+        return
+
+    if len(log_json) > SIZE_THRESHOLD:
+        # 巨大な場合はファイルとしてアップロード
+        post_to_slack_as_file_v2(log_json)
+    else:
+        # 小さい場合はチャットメッセージとして送信
+        post_to_slack_as_message(log_json)
