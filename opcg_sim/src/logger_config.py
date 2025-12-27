@@ -1,6 +1,8 @@
 import json
 import os
 import sys
+import urllib.request
+import urllib.error
 from datetime import datetime
 from contextvars import ContextVar
 from typing import Any, Optional
@@ -33,16 +35,60 @@ K = LC.get('KEYS', {
     "PAYLOAD": "payload"
 })
 
+# --- Slack 転送設定 ---
+SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
+
+def post_log_to_slack(log_data: dict):
+    """
+    Slack Webhookへログを転送する。例外は完全に握りつぶす。
+    """
+    if not SLACK_WEBHOOK_URL:
+        return
+
+    try:
+        # キー名は CONST['LOG_CONFIG']['KEYS'] に準拠
+        timestamp = log_data.get(K["TIME"], "N/A")
+        source = log_data.get(K["SOURCE"], "N/A")
+        level = log_data.get(K["LEVEL"], "info").upper()
+        session_id = log_data.get(K["SESSION"], "unknown")
+        player = log_data.get(K["PLAYER"], "")
+        action = log_data.get(K["ACTION"], "no-action")
+        msg = log_data.get(K["MESSAGE"], "")
+        payload = log_data.get(K["PAYLOAD"])
+
+        header = f"[{timestamp}][{source}][{level}][sid={session_id}]"
+        if player:
+            header += f"[{player}]"
+        
+        text = f"{header}\n*{action}*"
+        if msg:
+            text += f"\n{msg}"
+        
+        if payload:
+            p_str = json.dumps(payload, indent=2, ensure_ascii=False)
+            if len(p_str) > 2000:
+                p_str = p_str[:2000] + "\n...(truncated)"
+            text += f"\n```\n{p_str}\n```"
+
+        body = json.dumps({"text": text}).encode("utf-8")
+        req = urllib.request.Request(
+            SLACK_WEBHOOK_URL, data=body,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=2.0):
+            pass
+    except:
+        pass
+
 def log_event(level_key: str, action: str, msg: str, player: str = "system", payload: Optional[Any] = None, source: str = "BE"):
     """
-    構造化ログを標準出力に出力する。source引数でFE/BEを切り替え可能。
+    構造化ログを標準出力に出力し、Slackにも転送する。
     """
     now = datetime.now().strftime("%H:%M:%S")
     
-    # 物理キー名に基づいたログ構築
     log_data = {
         K["TIME"]: now,
-        K["SOURCE"]: source, # FEからのログの場合は "FE" が入る
+        K["SOURCE"]: source,
         K["LEVEL"]: level_key.lower(),
         K["SESSION"]: session_id_ctx.get(),
         K["PLAYER"]: player,
@@ -53,5 +99,9 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
     if payload is not None:
         log_data[K["PAYLOAD"]] = payload
 
+    # 1. 標準出力 (Cloud Logging)
     print(json.dumps(log_data, ensure_ascii=False))
     sys.stdout.flush()
+
+    # 2. Slack転送 (追加)
+    post_log_to_slack(log_data)

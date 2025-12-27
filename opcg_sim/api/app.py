@@ -35,7 +35,6 @@ CONST = get_const()
 
 BASE_DIR = os.path.dirname(current_api_dir)
 DATA_DIR = os.path.join(BASE_DIR, "data")
-# 定義順序を修正: CardLoader 呼び出しより前に定義
 CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
 # --- 3. API初期化 ---
@@ -90,6 +89,7 @@ async def receive_frontend_log(data: Dict[str, Any] = Body(...)):
     s_id = data.get("sessionId") or session_id_ctx.get()
     token = session_id_ctx.set(s_id)
     try:
+        # この log_event 呼び出しにより、標準出力へのJSON出力と Slack転送が両方実行されます
         log_event(
             level_key=data.get("level", "info"),
             action=data.get("action", "client.log"),
@@ -103,7 +103,7 @@ async def receive_frontend_log(data: Dict[str, Any] = Body(...)):
         session_id_ctx.reset(token)
 
 GAMES: Dict[str, GameManager] = {}
-card_db = CardLoader(CARD_DB_PATH) # ここで CARD_DB_PATH が必要
+card_db = CardLoader(CARD_DB_PATH)
 card_db.load()
 deck_loader = DeckLoader(card_db)
 
