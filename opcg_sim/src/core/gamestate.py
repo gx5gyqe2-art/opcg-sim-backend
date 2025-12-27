@@ -246,4 +246,7 @@ class GameManager:
     def _perform_logic(self, player: Player, action: Any, source_card: Card):
         """個別のエフェクトアクションを実行"""
         log_event("INFO", "game.effect", f"Resolving action {action.type} for {source_card.name}", player=player.name)
-        pass
+        # 外部化した resolver に処理を委譲
+        from .effects.resolver import execute_action
+        execute_action(self, player, action, source_card)
+
