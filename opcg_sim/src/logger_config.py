@@ -4,7 +4,6 @@ import sys
 import urllib.request
 import urllib.parse
 import urllib.error
-import uuid
 from datetime import datetime
 from contextvars import ContextVar
 from typing import Any, Optional
@@ -41,42 +40,40 @@ K = LC.get('KEYS', {
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 
-def post_to_slack_as_file(text: str):
+def post_to_slack_as_codeblock(text: str):
     """
-    ログをファイルとしてSlackにアップロードする (同期送信版)
-    Cloud Runの制約を回避するため、リクエスト処理中にその場でアップロードを行います。
+    deprecatedになったfiles.uploadの代わりに、chat.postMessageで送信。
+    巨大なJSONはコードブロック( ```json ... ``` )として投稿します。
     """
     if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID:
         return
     
     try:
-        url = "https://slack.com/api/files.upload"
-        boundary = uuid.uuid4().hex
-        filename = f"log_{datetime.now().strftime('%H%M%S')}.json"
+        url = "https://slack.com/api/chat.postMessage"
         
-        # Multipart形式の構築
-        parts = []
-        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="token"\r\n\r\n{SLACK_BOT_TOKEN}\r\n')
-        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="channels"\r\n\r\n{SLACK_CHANNEL_ID}\r\n')
-        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="filename"\r\n\r\n{filename}\r\n')
-        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="content"\r\n\r\n{text}\r\n')
-        parts.append(f'--{boundary}--\r\n')
+        # 文字数制限対策: Slackの1投稿は約4万文字まで。
+        # 万が一超える場合は、末尾をカットして構造を維持。
+        if len(text) > 38000:
+            text = text[:38000] + "\n... (truncated)"
+
+        payload = {
+            "channel": SLACK_CHANNEL_ID,
+            "text": f"```json\n{text}\n```"
+        }
         
-        body = "".join(parts).encode('utf-8')
-        
+        body = json.dumps(payload).encode('utf-8')
         req = urllib.request.Request(url, data=body, method="POST")
-        req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+        req.add_header("Content-Type", "application/json; charset=utf-8")
         req.add_header("Authorization", f"Bearer {SLACK_BOT_TOKEN}")
         
-        # 送信が完了するまで待機（タイムアウト15秒）
         with urllib.request.urlopen(req, timeout=15.0) as response:
             res_body = json.loads(response.read().decode("utf-8"))
             if not res_body.get("ok"):
                 print(f"DEBUG: Slack API Error: {res_body.get('error')}")
             else:
-                print(f"DEBUG: Slack Upload Success")
+                print(f"DEBUG: Slack Message Sent Successfully")
     except Exception as e:
-        print(f"DEBUG: Slack Upload Exception: {e}")
+        print(f"DEBUG: Slack Post Exception: {e}")
     sys.stdout.flush()
 
 def log_event(level_key: str, action: str, msg: str, player: str = "system", payload: Optional[Any] = None, source: str = "BE"):
@@ -104,4 +101,5 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
     sys.stdout.flush()
 
     # 2. Slack転送 (同期実行)
-    post_to_slack_as_file(log_json)
+    # Payloadがある場合やエラーログの場合のみ送る設定も可能ですが、現状は全件送信
+    post_to_slack_as_codeblock(log_json)
