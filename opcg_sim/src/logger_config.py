@@ -41,7 +41,7 @@ SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME")
 
 def get_gcp_access_token():
-    """Cloud Runの権限を使用してGCS操作用トークンを取得"""
+    """Cloud Runの権限を使用してGCP操作用トークンを取得"""
     try:
         url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
         req = urllib.request.Request(url)
@@ -51,7 +51,7 @@ def get_gcp_access_token():
     except: return None
 
 def upload_gamestate_only(log_data: dict, session_id: str):
-    """game_stateを含むログを新規ファイルとしてGCSへ保存（読み込みなし）"""
+    """game_stateを含むログを新規ファイルとしてGCSへ保存（文字化け対策済み）"""
     token = get_gcp_access_token()
     if not token or not BUCKET_NAME: return None
     
@@ -66,27 +66,28 @@ def upload_gamestate_only(log_data: dict, session_id: str):
     
     try:
         payload = log_data.get(K["PAYLOAD"], {})
-        # 保存するデータ構造をシンプルに定義
         gs_entry = {
             "timestamp": log_data.get(K["TIME"]),
             "action": action,
             "game_state": payload.get("game_state") if isinstance(payload, dict) else None
         }
         
+        # ensure_ascii=False で日本語を維持し、UTF-8でエンコード
         body = json.dumps(gs_entry, ensure_ascii=False, indent=2).encode('utf-8')
+        
         req = urllib.request.Request(media_url, data=body, method="POST")
         req.add_header("Authorization", f"Bearer {token}")
-        req.add_header("Content-Type", "application/json")
+        # 重要: charset=utf-8 を追加することでブラウザが日本語として解釈できるようにする
+        req.add_header("Content-Type", "application/json; charset=utf-8")
         
         with urllib.request.urlopen(req, timeout=10.0):
-            # 直接閲覧用URL
             return f"https://storage.googleapis.com/{BUCKET_NAME}/{filename}"
     except Exception as e:
         print(f"DEBUG: GCS Upload Error: {e}")
         return None
 
 def post_to_slack(text_json: str, gcs_url: Optional[str] = None):
-    """Slackへ投稿。GCS URLがある場合はリンク形式で表示。"""
+    """Slackへ投稿"""
     if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID: return
     try:
         url = "https://slack.com/api/chat.postMessage"
@@ -94,11 +95,9 @@ def post_to_slack(text_json: str, gcs_url: Optional[str] = None):
         if gcs_url:
             session_id = session_id_ctx.get()
             seq = seq_num_ctx.get()
-            # フォルダ全体へのコンソールURLも付記
             console_url = f"https://console.cloud.google.com/storage/browser/{BUCKET_NAME}/{session_id}"
             display_text = f"📊 **GameState Saved ({seq:03d})**\n🔗 [This State]({gcs_url}) | 📂 [Session Folder]({console_url})"
         else:
-            # game_stateを含まない通常のログ
             display_text = f"```json\n{text_json[:3500]}\n```"
 
         payload = {"channel": SLACK_CHANNEL_ID, "text": display_text}
@@ -122,23 +121,18 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
     if payload is not None: log_data[K["PAYLOAD"]] = payload
 
     log_json_str = json.dumps(log_data, ensure_ascii=False)
-    
-    # 1. 標準出力 (Cloud Logging用)
     print(log_json_str)
     sys.stdout.flush()
 
     if not SLACK_BOT_TOKEN: return
 
-    # 2. Slack / GCS 転送
     # Payload内に game_state キーがあるか判定
     has_gs = False
     if isinstance(payload, dict) and "game_state" in payload:
         has_gs = True
 
     if has_gs:
-        # GameStateがある場合はGCSに新規保存してリンクを送る
         gcs_url = upload_gamestate_only(log_data, session_id)
         post_to_slack(log_json_str, gcs_url=gcs_url)
     else:
-        # それ以外はSlackに直接テキストを送る
         post_to_slack(log_json_str)
