@@ -35,5 +35,17 @@
     "ATTACHED_DON": "attached_don",
     "OWNER_ID": "owner_id",
     "KEYWORDS": "keywords"
+  },
+  "LOG_CONFIG": {
+    "KEYS": {
+      "TIME": "timestamp",
+      "SOURCE": "source",
+      "LEVEL": "level",
+      "SESSION": "sessionId",
+      "PLAYER": "player",
+      "ACTION": "action",
+      "MESSAGE": "msg",
+      "PAYLOAD": "payload"
+    }
   }
 }
