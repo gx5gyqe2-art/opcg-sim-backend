@@ -2,7 +2,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from typing import List, Optional, Any
-from ..effect_types import Ability, EffectAction, TargetQuery, Condition, _nfc
+from ...effect_types import Ability, EffectAction, TargetQuery, Condition, _nfc
 from ...models.enums import (Phase, Player, Zone, ActionType, TriggerType, CompareOperator, ConditionType)
 from .matcher import parse_target
 

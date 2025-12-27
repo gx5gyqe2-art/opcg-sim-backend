@@ -5,7 +5,7 @@ import logging
 from typing import List, Dict, Any, Optional, Tuple
 from ..models.models import CardMaster, CardInstance
 from ..core.effects.parser import Effect
-from ..core.effect_types import Ability
+from ..models.effect_types import Ability
 from ..models.enums import CardType, Attribute, Color, TriggerType
 
 # ログ設定
