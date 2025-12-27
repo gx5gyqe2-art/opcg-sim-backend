@@ -4,8 +4,8 @@ import unicodedata
 import re
 import logging
 from ..models.models import CardInstance, CardMaster, DonInstance
-from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, Player
-from .effect_types import ActuinType, TargetQuery
+from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, Player, ActionType
+from .effect_types import TargetQuery
 from ..utils.logger_config import log_event
 
 logger = logging.getLogger("opcg_sim")
