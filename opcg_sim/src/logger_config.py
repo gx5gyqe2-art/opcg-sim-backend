@@ -8,11 +8,11 @@ from datetime import datetime
 from contextvars import ContextVar
 from typing import Any, Optional
 
-# セッションIDと連番を保持
+# セッションIDを保持（ファイル名に使用）
 session_id_ctx: ContextVar[str] = ContextVar("session_id", default="sys-init")
-seq_num_ctx: ContextVar[int] = ContextVar("seq_num", default=0)
 
 def load_shared_constants():
+    """rootから定数をロード"""
     current_dir = os.path.dirname(os.path.abspath(__file__))
     path = os.path.abspath(os.path.join(current_dir, "..", "..", "shared_constants.json"))
     if os.path.exists(path):
@@ -24,13 +24,24 @@ def load_shared_constants():
 
 CONST = load_shared_constants()
 LC = CONST.get('LOG_CONFIG', {})
-K = LC.get('KEYS', {"TIME": "timestamp", "SOURCE": "source", "LEVEL": "level", "SESSION": "sessionId", "PLAYER": "player", "ACTION": "action", "MESSAGE": "msg", "PAYLOAD": "payload"})
+K = LC.get('KEYS', {
+    "TIME": "timestamp",
+    "SOURCE": "source",
+    "LEVEL": "level",
+    "SESSION": "sessionId",
+    "PLAYER": "player",
+    "ACTION": "action",
+    "MESSAGE": "msg",
+    "PAYLOAD": "payload"
+})
 
+# --- Slack & GCS 設定 ---
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME")
 
 def get_gcp_access_token():
+    """Cloud Runの権限を使用してGCP操作用トークンを取得"""
     try:
         url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
         req = urllib.request.Request(url)
@@ -50,20 +61,20 @@ def upload_to_gcs(filename: str, content_bytes: bytes):
     try:
         req = urllib.request.Request(url, data=content_bytes, method="POST")
         req.add_header("Authorization", f"Bearer {token}")
+        # charsetを指定してブラウザでの文字化けを防止
         req.add_header("Content-Type", "application/json; charset=utf-8")
         with urllib.request.urlopen(req, timeout=10.0):
             return True
     except:
         return False
 
-def post_to_slack(text_json: str, gcs_url: Optional[str] = None, folder: str = ""):
+def post_to_slack(text_json: str, gcs_url: Optional[str] = None):
+    """Slackへ投稿"""
     if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID: return
     try:
         url = "https://slack.com/api/chat.postMessage"
-        # Slackには「今回のログ」と「フォルダ全体」へのリンクを表示
         if gcs_url:
-            seq = gcs_url.split('/')[-1].split('_')[0]
-            display_text = f"📊 **Saved ({seq})**\n🔗 [State]({gcs_url}) | 📂 [Full Session Folder](https://console.cloud.google.com/storage/browser/{BUCKET_NAME}/{folder})"
+            display_text = f"📊 **Log Saved**\n🔗 [View JSON]({gcs_url}) | 📂 [GCS Root](https://console.cloud.google.com/storage/browser/{BUCKET_NAME})"
         else:
             display_text = f"```json\n{text_json[:3000]}\n```"
 
@@ -75,15 +86,17 @@ def post_to_slack(text_json: str, gcs_url: Optional[str] = None, folder: str = "
     except: pass
 
 def log_event(level_key: str, action: str, msg: str, player: str = "system", payload: Optional[Any] = None, source: str = "BE"):
-    # sessionIdの決定
+    now = datetime.now()
+    
+    # セッションIDの決定
     sid = "unknown"
     if isinstance(payload, dict) and K["SESSION"] in payload:
         sid = payload[K["SESSION"]]
     elif session_id_ctx.get() != "sys-init":
         sid = session_id_ctx.get()
-
+    
     log_data = {
-        K["TIME"]: datetime.now().strftime("%H:%M:%S"),
+        K["TIME"]: now.strftime("%H:%M:%S"),
         K["SOURCE"]: source,
         K["LEVEL"]: level_key.lower(),
         K["SESSION"]: sid,
@@ -94,30 +107,24 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
     if payload is not None: log_data[K["PAYLOAD"]] = payload
 
     log_json_str = json.dumps(log_data, ensure_ascii=False)
+    
+    # 標準出力 (Cloud Logging用)
     print(log_json_str)
     sys.stdout.flush()
 
-    # --- GCS保存処理 ---
-    # メッセージごとに連番を付与
-    seq = seq_num_ctx.get() + 1
-    seq_num_ctx.set(seq)
+    # --- GCS保存：日付を冒頭にしたフラットな時系列構成 ---
+    # フォーマット: YYYYMMDD_HHMMSS_ffffff_SESSIONID_ACTION.json
+    time_prefix = now.strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"{time_prefix}_{sid}_{action}.json"
     
-    # フォルダ分け：sessionIdがunknownなら日付にする
-    folder = sid if (sid and sid != "unknown") else datetime.now().strftime("%Y%m%d")
-    filename = f"{folder}/{seq:03d}_{action}.json"
-    
-    # 全てのログをGCSに保存（読み込みなし）
     json_bytes = json.dumps(log_data, ensure_ascii=False, indent=2).encode('utf-8')
     upload_to_gcs(filename, json_bytes)
 
     if not SLACK_BOT_TOKEN: return
 
-    # game_stateがある場合、または重要なアクションのみリンク付きでSlack通知
-    # （Slackがリンクだらけになるのを防ぎたい場合は、ここで has_gs 条件などを入れる）
-    is_important = isinstance(payload, dict) and "game_state" in payload
-    
-    if is_important:
+    # game_stateがある場合のみSlackにリンクを表示
+    if isinstance(payload, dict) and "game_state" in payload:
         gcs_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{filename}"
-        post_to_slack(log_json_str, gcs_url=gcs_url, folder=folder)
+        post_to_slack(log_json_str, gcs_url=gcs_url)
     else:
         post_to_slack(log_json_str)
