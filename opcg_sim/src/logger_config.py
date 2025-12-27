@@ -7,7 +7,9 @@ import urllib.error
 import uuid
 from datetime import datetime
 from contextvars import ContextVar
-from typing import Any, Optional
+from typing import Any, Optional, List
+import threading
+import time
 
 # セッションID保持用
 session_id_ctx: ContextVar[str] = ContextVar("session_id", default="sys-init")
@@ -41,11 +43,17 @@ K = LC.get('KEYS', {
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 
+# 【追加：環境変数確認ログ】デプロイ直後に標準出力へ書き出します
+print(f"DEBUG_ENV: TOKEN_EXISTS={bool(SLACK_BOT_TOKEN)}")
+print(f"DEBUG_ENV: CHANNEL_ID={SLACK_CHANNEL_ID}")
+sys.stdout.flush()
+
+LOG_BUFFER: List[str] = []
+BUFFER_LOCK = threading.Lock()
+FLUSH_INTERVAL = 3 
+
 def post_to_slack_as_file(text: str):
-    """
-    ログをファイルとしてSlackにアップロードする (同期送信版)
-    Cloud Runのインスタンス休止前に確実に完了させるため、別スレッドは使用しません。
-    """
+    """ログをファイルとしてSlackにアップロードする (Multipart対応版)"""
     if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID:
         return
     
@@ -54,7 +62,6 @@ def post_to_slack_as_file(text: str):
         boundary = uuid.uuid4().hex
         filename = f"log_{datetime.now().strftime('%H%M%S')}.json"
         
-        # Multipart形式の構築 (urllibのみで実装)
         parts = []
         parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="token"\r\n\r\n{SLACK_BOT_TOKEN}\r\n')
         parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="channels"\r\n\r\n{SLACK_CHANNEL_ID}\r\n')
@@ -63,23 +70,68 @@ def post_to_slack_as_file(text: str):
         parts.append(f'--{boundary}--\r\n')
         
         body = "".join(parts).encode('utf-8')
+        
         req = urllib.request.Request(url, data=body, method="POST")
         req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+        req.add_header("Authorization", f"Bearer {SLACK_BOT_TOKEN}")
         
-        # タイムアウト15秒。リクエスト処理中にアップロードを完了させます。
-        with urllib.request.urlopen(req, timeout=15.0) as response:
+        with urllib.request.urlopen(req, timeout=10.0) as response:
             res_body = json.loads(response.read().decode("utf-8"))
             if not res_body.get("ok"):
                 print(f"DEBUG: Slack API Error: {res_body.get('error')}")
     except Exception as e:
         print(f"DEBUG: Slack Upload Exception: {e}")
 
+def slack_buffer_worker():
+    """バックグラウンドでバッファを監視して送信するスレッド"""
+    global LOG_BUFFER
+    while True:
+        time.sleep(FLUSH_INTERVAL)
+        lines_to_send = []
+        with BUFFER_LOCK:
+            if LOG_BUFFER:
+                lines_to_send = LOG_BUFFER[:]
+                LOG_BUFFER.clear()
+        
+        if lines_to_send:
+            combined_text = "\n---\n".join(lines_to_send)
+            post_to_slack_as_file(combined_text)
+
+if SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
+    threading.Thread(target=slack_buffer_worker, daemon=True).start()
+
+def post_log_to_slack(log_data: dict):
+    """ログをバッファに追加"""
+    if not SLACK_BOT_TOKEN:
+        return
+
+    try:
+        timestamp = log_data.get(K["TIME"], "N/A")
+        source = log_data.get(K["SOURCE"], "N/A")
+        level = log_data.get(K["LEVEL"], "info").upper()
+        session_id = log_data.get(K["SESSION"], "unknown")
+        player = log_data.get(K["PLAYER"], "")
+        action = log_data.get(K["ACTION"], "no-action")
+        msg = log_data.get(K["MESSAGE"], "")
+        payload = log_data.get(K["PAYLOAD"])
+
+        header = f"[{timestamp}][{source}][{level}][sid={session_id}]"
+        if player: header += f"[{player}]"
+        
+        log_entry = f"{header}\n{action}"
+        if msg: log_entry += f"\n{msg}"
+        
+        if payload:
+            p_str = json.dumps(payload, indent=2, ensure_ascii=False)
+            log_entry += f"\n{p_str}"
+
+        with BUFFER_LOCK:
+            LOG_BUFFER.append(log_entry)
+    except:
+        pass
+
 def log_event(level_key: str, action: str, msg: str, player: str = "system", payload: Optional[Any] = None, source: str = "BE"):
-    """
-    構造化ログを標準出力に出力し、Slackにも即座に転送する。
-    """
     now = datetime.now().strftime("%H:%M:%S")
-    
     log_data = {
         K["TIME"]: now,
         K["SOURCE"]: source,
@@ -89,15 +141,9 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
         K["ACTION"]: action,
         K["MESSAGE"]: msg
     }
-    
     if payload is not None:
         log_data[K["PAYLOAD"]] = payload
 
-    # 1. 標準出力 (Cloud Logging)
-    log_json = json.dumps(log_data, ensure_ascii=False)
-    print(log_json)
+    print(json.dumps(log_data, ensure_ascii=False))
     sys.stdout.flush()
-
-    # 2. Slack転送 (バッファせず同期的に実行)
-    # これによりCloud Runが停止する前にアップロードが完了します。
-    post_to_slack_as_file(log_json)
+    post_log_to_slack(log_data)
