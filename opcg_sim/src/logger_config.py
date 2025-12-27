@@ -51,18 +51,18 @@ def get_gcp_access_token():
     except: return None
 
 def upload_gamestate_only(log_data: dict, session_id: str):
-    """game_stateを含むログを新規ファイルとしてGCSへ保存（文字化け対策済み）"""
+    """game_stateをGCSへ保存（マルチパート方式でContent-Typeを確実にUTF-8に固定）"""
     token = get_gcp_access_token()
     if not token or not BUCKET_NAME: return None
     
-    # 連番を更新
     seq = seq_num_ctx.get() + 1
     seq_num_ctx.set(seq)
     
     action = log_data.get(K["ACTION"], "unknown")
-    # GCS上のパス: {sessionId}/{連番:03d}_{action}.json
     filename = f"{session_id}/{seq:03d}_{action}.json"
-    media_url = f"https://storage.googleapis.com/upload/storage/v1/b/{BUCKET_NAME}/o?uploadType=media&name={filename}"
+    
+    # マルチパートアップロード用URL
+    url = f"https://storage.googleapis.com/upload/storage/v1/b/{BUCKET_NAME}/o?uploadType=multipart&name={filename}"
     
     try:
         payload = log_data.get(K["PAYLOAD"], {})
@@ -72,13 +72,28 @@ def upload_gamestate_only(log_data: dict, session_id: str):
             "game_state": payload.get("game_state") if isinstance(payload, dict) else None
         }
         
-        # ensure_ascii=False で日本語を維持し、UTF-8でエンコード
-        body = json.dumps(gs_entry, ensure_ascii=False, indent=2).encode('utf-8')
+        json_content = json.dumps(gs_entry, ensure_ascii=False, indent=2).encode('utf-8')
         
-        req = urllib.request.Request(media_url, data=body, method="POST")
+        # マルチパートのデリミタ
+        boundary = "log_boundary_separator"
+        
+        # メタデータ（ContentTypeの指定）
+        metadata = {
+            "contentType": "application/json; charset=utf-8"
+        }
+        
+        # リクエストボディの組み立て
+        body = (
+            f"--{boundary}\r\n"
+            f"Content-Type: application/json; charset=UTF-8\r\n\r\n"
+            f"{json.dumps(metadata)}\r\n"
+            f"--{boundary}\r\n"
+            f"Content-Type: application/json; charset=UTF-8\r\n\r\n"
+        ).encode('utf-8') + json_content + f"\r\n--{boundary}--\r\n".encode('utf-8')
+
+        req = urllib.request.Request(url, data=body, method="POST")
         req.add_header("Authorization", f"Bearer {token}")
-        # 重要: charset=utf-8 を追加することでブラウザが日本語として解釈できるようにする
-        req.add_header("Content-Type", "application/json; charset=utf-8")
+        req.add_header("Content-Type", f"multipart/related; boundary={boundary}")
         
         with urllib.request.urlopen(req, timeout=10.0):
             return f"https://storage.googleapis.com/{BUCKET_NAME}/{filename}"
@@ -126,7 +141,7 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
 
     if not SLACK_BOT_TOKEN: return
 
-    # Payload内に game_state キーがあるか判定
+    # game_stateがある場合のみGCS保存
     has_gs = False
     if isinstance(payload, dict) and "game_state" in payload:
         has_gs = True
