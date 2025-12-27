@@ -6,7 +6,7 @@ import json
 import logging
 
 from .enums import CardType, Color, Attribute, ActionType, Phase, Player
-from ..core.effect.parser import Effect, Ability
+from ..core.effects.parser import Effect, Ability
 
 # --- 共通定数のロード ---
 logger = logging.getLogger("opcg_sim")
