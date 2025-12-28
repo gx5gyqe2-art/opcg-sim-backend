@@ -9,7 +9,6 @@ from typing import Any, Dict, Optional, List
 from fastapi import FastAPI, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-# --- 1. インポートパス解決 ---
 current_api_dir = os.path.dirname(os.path.abspath(__file__))
 if current_api_dir not in sys.path:
     sys.path.append(current_api_dir)
@@ -19,12 +18,10 @@ try:
 except ImportError:
     from .schemas import GameStateSchema
 
-# 整理後のディレクトリに合わせて修正
 from opcg_sim.src.utils.logger_config import session_id_ctx, log_event
 from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.utils.loader import CardLoader, DeckLoader
 
-# --- 2. ログとディレクトリの設定 ---
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, force=True)
 
 def get_const():
@@ -38,17 +35,19 @@ BASE_DIR = os.path.dirname(current_api_dir)
 DATA_DIR = os.path.join(BASE_DIR, "data")
 CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
-# --- 3. API初期化 ---
 app = FastAPI(title="OPCG Simulator API v1.5")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
-# --- 4. 共通ロジック ---
 def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool = True, error_msg: str = None) -> Dict[str, Any]:
-    # shared_constants.json からキーを取得
     player_keys = CONST.get('PLAYER_KEYS', {})
     api_root_keys = CONST.get('API_ROOT_KEYS', {})
     
-    # 定数に基づいたプレイヤーIDの取得
     p1_key = player_keys.get('P1', 'p1')
     p2_key = player_keys.get('P2', 'p2')
 
@@ -71,14 +70,13 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
         log_event("ERROR", "api.validation", f"Validation Error: {e}")
         validated_state = raw_game_state 
 
-    # APIレスポンスのルートキーを shared_constants.json の定義に合わせる
     return {
         api_root_keys.get('SUCCESS', 'success'): success,
         "game_id": game_id,
         api_root_keys.get('GAME_STATE', 'game_state'): validated_state,
         "error": {"message": error_msg} if error_msg else None
     }
-# --- 5. Middleware ---
+
 @app.middleware("http")
 async def trace_logging_middleware(request: Request, call_next):
     s_id = request.headers.get("X-Session-ID") or request.query_params.get("sessionId")
@@ -94,7 +92,15 @@ async def trace_logging_middleware(request: Request, call_next):
     finally:
         session_id_ctx.reset(token)
 
-# --- 6. エンドポイント ---
+GAMES: Dict[str, GameManager] = {}
+card_db = CardLoader(CARD_DB_PATH)
+card_db.load()
+deck_loader = DeckLoader(card_db)
+
+@app.options("/api/log")
+async def options_log():
+    return {"status": "ok"}
+
 @app.post("/api/log")
 async def receive_frontend_log(data: Dict[str, Any] = Body(...)):
     s_id = data.get("sessionId") or session_id_ctx.get()
@@ -111,11 +117,6 @@ async def receive_frontend_log(data: Dict[str, Any] = Body(...)):
         return {"status": "ok"}
     finally:
         session_id_ctx.reset(token)
-
-GAMES: Dict[str, GameManager] = {}
-card_db = CardLoader(CARD_DB_PATH)
-card_db.load()
-deck_loader = DeckLoader(card_db)
 
 @app.post("/api/game/create")
 async def game_create(req: Any = Body(...)):
