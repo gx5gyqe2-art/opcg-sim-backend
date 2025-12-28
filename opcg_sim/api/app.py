@@ -164,13 +164,65 @@ async def game_action(req: Dict[str, Any] = Body(...)):
     action_type = req.get("action")
     player_id = req.get("player_id")
     payload = req.get("payload", {})
+    card_uuid = payload.get("uuid")
 
     log_event("INFO", f"game.action.{action_type}", f"Player {player_id} action: {action_type}", 
               player=player_id, payload=req)
 
     try:
-        success = True
-        return build_game_result_hybrid(manager, game_id, success=success)
+        current_player = manager.p1 if player_id == manager.p1.name else manager.p2
+        
+        if action_type == "PLAY":
+            target_card = next((c for c in current_player.hand if c.uuid == card_uuid), None)
+            if target_card:
+                manager.play_card_action(current_player, target_card)
+            else:
+                raise ValueError("対象のカードが手札にありません。")
+
+        elif action_type == "TURN_END":
+            manager.end_turn()
+
+        elif action_type == "ATTACK":
+            target_card = None
+            if current_player.leader and current_player.leader.uuid == card_uuid:
+                target_card = current_player.leader
+            else:
+                target_card = next((c for c in current_player.field if c.uuid == card_uuid), None)
+            
+            if target_card:
+                target_card.is_rest = True
+            else:
+                raise ValueError("アタック可能なカードが見つかりません。")
+
+        elif action_type == "ATTACH_DON":
+            target_card = None
+            if current_player.leader and current_player.leader.uuid == card_uuid:
+                target_card = current_player.leader
+            else:
+                target_card = next((c for c in current_player.field if c.uuid == card_uuid), None)
+
+            if target_card and current_player.don_active:
+                don = current_player.don_active.pop(0)
+                don.attached_to = target_card.uuid
+                current_player.don_attached_cards.append(don)
+                target_card.attached_don += 1
+            else:
+                raise ValueError("ドン!!を付与できません。")
+
+        elif action_type == "ACTIVATE_MAIN":
+            target_card = next((c for c in current_player.field if c.uuid == card_uuid), None)
+            if not target_card and current_player.leader and current_player.leader.uuid == card_uuid:
+                target_card = current_player.leader
+            
+            if target_card:
+                from opcg_sim.src.models.enums import TriggerType
+                for ability in target_card.master.abilities:
+                    if ability.trigger == TriggerType.ACTIVATE_MAIN:
+                        manager.resolve_ability(current_player, ability, source_card=target_card)
+            else:
+                raise ValueError("効果を発動できるカードが見つかりません。")
+
+        return build_game_result_hybrid(manager, game_id, success=True)
     except Exception as e:
         log_event("ERROR", "game.action_fail", str(e), player=player_id)
         return build_game_result_hybrid(
