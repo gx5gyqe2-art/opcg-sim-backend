@@ -91,9 +91,9 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
         sid = session_id_ctx.get()
     
     log_data = {
-        K["TIME"]: now.strftime("%H:%M:%S"),
+        K["TIME"]: now.isoformat(),
         K["SOURCE"]: source,
-        K["LEVEL"]: level_key.lower(),
+        K["LEVEL"]: level_key.upper(),
         K["SESSION"]: sid,
         K["PLAYER"]: player,
         K["ACTION"]: action,
@@ -103,13 +103,13 @@ def log_event(level_key: str, action: str, msg: str, player: str = "system", pay
 
     try:
         log_json_str = json.dumps(log_data, ensure_ascii=False)
-        print(log_json_str)
+        sys.stdout.write(log_json_str + "\n")
         sys.stdout.flush()
     except (TypeError, ValueError) as e:
         error_msg = f"LOG_SERIALIZATION_ERROR: {str(e)}"
         fallback_data = {**log_data, K["MESSAGE"]: error_msg, K["PAYLOAD"]: None}
         log_json_str = json.dumps(fallback_data, ensure_ascii=False)
-        print(log_json_str)
+        sys.stdout.write(log_json_str + "\n")
         sys.stdout.flush()
 
     time_prefix = now.strftime("%Y%m%d_%H%M%S_%f")
