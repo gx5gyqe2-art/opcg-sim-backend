@@ -5,7 +5,8 @@
   },
   "API_ROOT_KEYS": {
     "GAME_STATE": "game_state",
-    "SUCCESS": "success"
+    "SUCCESS": "success",
+    "ERROR": "error"
   },
   "PLAYER_PROPERTIES": {
     "DON_DECK_COUNT": "don_deck_count",
@@ -47,5 +48,31 @@
       "MESSAGE": "msg",
       "PAYLOAD": "payload"
     }
+  },
+  "c_to_s_interface": {
+    "PLAYER_KEYS": {
+      "P1": "p1",
+      "P2": "p2"
+    },
+    "GAME_ACTIONS": {
+      "TYPES": {
+        "PLAY": "PLAY",
+        "ATTACK": "ATTACK",
+        "ACTIVATE_MAIN": "ACTIVATE_MAIN",
+        "ATTACH_DON": "ATTACH_DON",
+        "TURN_END": "TURN_END"
+      }
+    }
+  },
+  "ERROR_PROPERTIES": {
+    "CODE": "code",
+    "MESSAGE": "message"
+  },
+  "ERROR_CODES": {
+    "GAME_NOT_FOUND": "GAME_NOT_FOUND",
+    "INVALID_ACTION": "INVALID_ACTION",
+    "NOT_YOUR_TURN": "NOT_YOUR_TURN",
+    "INSUFFICIENT_COST": "INSUFFICIENT_COST",
+    "INVALID_TARGET": "INVALID_TARGET"
   }
 }

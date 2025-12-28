@@ -3,7 +3,6 @@ import uuid
 import logging
 import sys
 import json
-import time
 from typing import Any, Dict, Optional, List
 
 from fastapi import FastAPI, Body, Request
@@ -36,17 +35,12 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
 app = FastAPI(title="OPCG Simulator API v1.5")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool = True, error_msg: str = None) -> Dict[str, Any]:
+def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool = True, error_code: str = None, error_msg: str = None) -> Dict[str, Any]:
     player_keys = CONST.get('PLAYER_KEYS', {})
     api_root_keys = CONST.get('API_ROOT_KEYS', {})
+    error_props = CONST.get('ERROR_PROPERTIES', {})
     
     p1_key = player_keys.get('P1', 'p1')
     p2_key = player_keys.get('P2', 'p2')
@@ -64,17 +58,26 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
         }
     }
     
-    try:
-        validated_state = GameStateSchema(**raw_game_state).model_dump(by_alias=True)
-    except Exception as e:
-        log_event("ERROR", "api.validation", f"Validation Error: {e}")
-        validated_state = raw_game_state 
+    validated_state = None
+    if success:
+        try:
+            validated_state = GameStateSchema(**raw_game_state).model_dump(by_alias=True)
+        except Exception as e:
+            log_event("ERROR", "api.validation", f"Validation Error: {e}")
+            validated_state = raw_game_state 
+
+    error_obj = None
+    if not success:
+        error_obj = {
+            error_props.get('CODE', 'code'): error_code,
+            error_props.get('MESSAGE', 'message'): error_msg
+        }
 
     return {
         api_root_keys.get('SUCCESS', 'success'): success,
         "game_id": game_id,
         api_root_keys.get('GAME_STATE', 'game_state'): validated_state,
-        "error": {"message": error_msg} if error_msg else None
+        api_root_keys.get('ERROR', 'error'): error_obj
     }
 
 @app.middleware("http")
@@ -92,15 +95,6 @@ async def trace_logging_middleware(request: Request, call_next):
     finally:
         session_id_ctx.reset(token)
 
-GAMES: Dict[str, GameManager] = {}
-card_db = CardLoader(CARD_DB_PATH)
-card_db.load()
-deck_loader = DeckLoader(card_db)
-
-@app.options("/api/log")
-async def options_log():
-    return {"status": "ok"}
-
 @app.post("/api/log")
 async def receive_frontend_log(data: Dict[str, Any] = Body(...)):
     s_id = data.get("sessionId") or session_id_ctx.get()
@@ -117,6 +111,11 @@ async def receive_frontend_log(data: Dict[str, Any] = Body(...)):
         return {"status": "ok"}
     finally:
         session_id_ctx.reset(token)
+
+GAMES: Dict[str, GameManager] = {}
+card_db = CardLoader(CARD_DB_PATH)
+card_db.load()
+deck_loader = DeckLoader(card_db)
 
 @app.post("/api/game/create")
 async def game_create(req: Any = Body(...)):
@@ -136,6 +135,37 @@ async def game_create(req: Any = Body(...)):
     except Exception as e:
         log_event("ERROR", "game.create_fail", str(e))
         return {"success": False, "game_id": "", "error": {"message": str(e)}}
+
+@app.post("/api/game/action")
+async def game_action(req: Dict[str, Any] = Body(...)):
+    game_id = req.get("game_id")
+    manager = GAMES.get(game_id)
+    error_codes = CONST.get('ERROR_CODES', {})
+    
+    if not manager:
+        return build_game_result_hybrid(
+            None, game_id, success=False, 
+            error_code=error_codes.get('GAME_NOT_FOUND', 'GAME_NOT_FOUND'),
+            error_msg="指定されたゲームが見つかりません。"
+        )
+
+    action_type = req.get("action")
+    player_id = req.get("player_id")
+    payload = req.get("payload", {})
+
+    log_event("INFO", f"game.action.{action_type}", f"Player {player_id} action: {action_type}", 
+              player=player_id, payload=req)
+
+    try:
+        success = True
+        return build_game_result_hybrid(manager, game_id, success=success)
+    except Exception as e:
+        log_event("ERROR", "game.action_fail", str(e), player=player_id)
+        return build_game_result_hybrid(
+            manager, game_id, success=False, 
+            error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'),
+            error_msg=str(e)
+        )
 
 @app.get("/health")
 async def health():
