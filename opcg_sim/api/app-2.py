@@ -166,8 +166,10 @@ async def game_action(req: Dict[str, Any] = Body(...)):
     payload = req.get("payload", {})
     card_uuid = payload.get("uuid")
 
+    log_event("INFO", f"game.action.{action_type}", f"Player {player_id} action: {action_type}", 
+              player=player_id, payload=req)
+
     try:
-        from opcg_sim.src.models.enums import TriggerType
         current_player = manager.p1 if player_id == manager.p1.name else manager.p2
         
         if action_type == "PLAY":
@@ -176,41 +178,51 @@ async def game_action(req: Dict[str, Any] = Body(...)):
                 manager.play_card_action(current_player, target_card)
             else:
                 raise ValueError("対象のカードが手札にありません。")
-        
+
         elif action_type == "TURN_END":
             manager.end_turn()
 
-        else:
-            search_list = []
-            if current_player.leader: search_list.append(current_player.leader)
-            if current_player.stage: search_list.append(current_player.stage)
-            search_list.extend(current_player.field)
+        elif action_type == "ATTACK":
+            target_card = None
+            if current_player.leader and current_player.leader.uuid == card_uuid:
+                target_card = current_player.leader
+            else:
+                target_card = next((c for c in current_player.field if c.uuid == card_uuid), None)
             
-            target_card = next((c for c in search_list if c.uuid == card_uuid), None)
-
-            if not target_card:
-                raise ValueError("指定されたカードが盤面に見つかりません。")
-
-            if action_type == "ATTACK":
+            if target_card:
                 target_card.is_rest = True
-                log_event("INFO", "game.action.ATTACK", f"{player_id} attacked with {target_card.master.name}", player=player_id)
+            else:
+                raise ValueError("アタック可能なカードが見つかりません。")
+
+        elif action_type == "ATTACH_DON":
+            target_card = None
+            if current_player.leader and current_player.leader.uuid == card_uuid:
+                target_card = current_player.leader
+            else:
+                target_card = next((c for c in current_player.field if c.uuid == card_uuid), None)
+
+            if target_card and current_player.don_active:
+                don = current_player.don_active.pop(0)
+                don.attached_to = target_card.uuid
+                current_player.don_attached_cards.append(don)
+                target_card.attached_don += 1
+            else:
+                raise ValueError("ドン!!を付与できません。")
+
+        elif action_type == "ACTIVATE_MAIN":
+            target_card = next((c for c in current_player.field if c.uuid == card_uuid), None)
+            if not target_card and current_player.leader and current_player.leader.uuid == card_uuid:
+                target_card = current_player.leader
             
-            elif action_type == "ATTACH_DON":
-                if current_player.don_active:
-                    don = current_player.don_active.pop(0)
-                    don.attached_to = target_card.uuid
-                    current_player.don_attached_cards.append(don)
-                    target_card.attached_don += 1
-                else:
-                    raise ValueError("アクティブなドン!!が不足しています。")
-            
-            elif action_type == "ACTIVATE_MAIN":
+            if target_card:
+                from opcg_sim.src.models.enums import TriggerType
                 for ability in target_card.master.abilities:
                     if ability.trigger == TriggerType.ACTIVATE_MAIN:
                         manager.resolve_ability(current_player, ability, source_card=target_card)
+            else:
+                raise ValueError("効果を発動できるカードが見つかりません。")
 
         return build_game_result_hybrid(manager, game_id, success=True)
-
     except Exception as e:
         log_event("ERROR", "game.action_fail", str(e), player=player_id)
         return build_game_result_hybrid(
