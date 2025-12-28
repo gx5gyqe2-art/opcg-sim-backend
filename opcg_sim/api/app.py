@@ -95,6 +95,10 @@ async def trace_logging_middleware(request: Request, call_next):
     finally:
         session_id_ctx.reset(token)
 
+@app.options("/api/log")
+async def options_log():
+    return {"status": "ok"}
+
 @app.post("/api/log")
 async def receive_frontend_log(data: Dict[str, Any] = Body(...)):
     s_id = data.get("sessionId") or session_id_ctx.get()
@@ -117,6 +121,10 @@ card_db = CardLoader(CARD_DB_PATH)
 card_db.load()
 deck_loader = DeckLoader(card_db)
 
+@app.options("/api/game/create")
+async def options_game_create():
+    return {"status": "ok"}
+
 @app.post("/api/game/create")
 async def game_create(req: Any = Body(...)):
     try:
@@ -135,6 +143,10 @@ async def game_create(req: Any = Body(...)):
     except Exception as e:
         log_event("ERROR", "game.create_fail", str(e))
         return {"success": False, "game_id": "", "error": {"message": str(e)}}
+
+@app.options("/api/game/action")
+async def options_game_action():
+    return {"status": "ok"}
 
 @app.post("/api/game/action")
 async def game_action(req: Dict[str, Any] = Body(...)):
