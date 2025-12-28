@@ -1,8 +1,8 @@
 import os
 import uuid
-import logging
 import sys
 import json
+import traceback
 from typing import Any, Dict, Optional, List
 
 from fastapi import FastAPI, Body, Request
@@ -20,8 +20,6 @@ except ImportError:
 from opcg_sim.src.utils.logger_config import session_id_ctx, log_event
 from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.utils.loader import CardLoader, DeckLoader
-
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, force=True)
 
 def get_const():
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared_constants.json")
@@ -64,7 +62,7 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
         try:
             validated_state = GameStateSchema(**raw_game_state).model_dump(by_alias=True)
         except Exception as e:
-            log_event("ERROR", "api.validation", f"Validation Error: {e}")
+            log_event(level_key="ERROR", action="api.validation", msg=f"Validation Error: {e}")
             validated_state = raw_game_state 
 
     error_obj = None
@@ -88,7 +86,7 @@ async def trace_logging_middleware(request: Request, call_next):
         s_id = f"gen-{uuid.uuid4().hex[:8]}"
     token = session_id_ctx.set(s_id)
     if not request.url.path.endswith(("/health", "/favicon.ico")):
-        log_event("INFO", "api.inbound", f"{request.method} {request.url.path}")
+        log_event(level_key="INFO", action="api.inbound", msg=f"{request.method} {request.url.path}")
     try:
         response = await call_next(request)
         response.headers["X-Session-ID"] = s_id
@@ -130,7 +128,7 @@ async def options_game_create():
 async def game_create(req: Any = Body(...)):
     try:
         game_id = str(uuid.uuid4())
-        log_event("INFO", "game.create", f"Creating game: {game_id}", payload=req)
+        log_event(level_key="INFO", action="game.create", msg=f"Creating game: {game_id}", payload=req)
         p1_path = os.path.join(DATA_DIR, req.get("p1_deck", ""))
         p2_path = os.path.join(DATA_DIR, req.get("p2_deck", ""))
         p1_leader, p1_cards = deck_loader.load_deck(p1_path, req.get("p1_name", "P1"))
@@ -142,7 +140,7 @@ async def game_create(req: Any = Body(...)):
         GAMES[game_id] = manager
         return build_game_result_hybrid(manager, game_id)
     except Exception as e:
-        log_event("ERROR", "game.create_fail", str(e))
+        log_event(level_key="ERROR", action="game.create_fail", msg=traceback.format_exc())
         return {"success": False, "game_id": "", "error": {"message": str(e)}}
 
 @app.options("/api/game/action")
@@ -222,7 +220,13 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         return build_game_result_hybrid(manager, game_id, success=True)
 
     except Exception as e:
-        log_event("ERROR", "game.action_fail", str(e), player=player_id)
+        log_event(
+            level_key="ERROR",
+            action="game.action_fail",
+            msg=traceback.format_exc(),
+            player=player_id,
+            payload=req
+        )
         return build_game_result_hybrid(
             manager, game_id, success=False, 
             error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'),
