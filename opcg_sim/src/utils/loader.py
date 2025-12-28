@@ -102,30 +102,28 @@ class CardLoader:
     def __init__(self, json_path: str):
         self.json_path = json_path
         self.cards: Dict[str, CardMaster] = {}
-        self.raw_db: List[Dict[str, Any]] = []
+        self.raw_db: Dict[str, Dict[str, Any]] = {}
 
     def load(self) -> None:
         data = RawDataLoader.load_json(self.json_path)
-        self.raw_db = data if isinstance(data, list) else []
+        raw_list = data if isinstance(data, list) else []
+        for item in raw_list:
+            card_id = DataCleaner.normalize_text(item.get("number", item.get("Number", "")))
+            if card_id:
+                self.raw_db[card_id] = item
         log_event(level_key="INFO", action="loader.db_initialized", msg=f"Database initialized with {len(self.raw_db)} entries.")
 
     def get_card(self, card_id: str) -> Optional[CardMaster]:
         if card_id in self.cards:
             return self.cards[card_id]
 
-        target_raw = None
-        for item in self.raw_db:
-            normalized_item = {DataCleaner.normalize_text(k): v for k, v in item.items()}
-            item_id = DataCleaner.normalize_text(normalized_item.get("number", normalized_item.get("Number", "")))
-            if item_id == card_id:
-                target_raw = normalized_item
-                break
-
-        if not target_raw:
+        raw_data = self.raw_db.get(card_id)
+        if not raw_data:
             log_event(level_key="ERROR", action="loader.card_not_found", msg=f"Card ID not found in database: {card_id}")
             return None
 
-        master = self._create_card_master(target_raw)
+        normalized_raw = {DataCleaner.normalize_text(k): v for k, v in raw_data.items()}
+        master = self._create_card_master(normalized_raw)
         if master:
             self.cards[card_id] = master
         return master
