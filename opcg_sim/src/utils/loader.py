@@ -68,7 +68,7 @@ class DataCleaner:
                     ability.trigger = TriggerType.TRIGGER
             return abilities
         except Exception as e:
-            log_event(level_key="ERROR", action="loader.parse_abilities_error", msg=f"Error parsing abilities text: '{s_text[:20]}...' -> {e}")
+            log_event(level_key="DEBUG", action="loader.parse_abilities_error", msg=f"Error parsing abilities text: '{s_text[:20]}...' -> {e}")
             return []
 
     @staticmethod
@@ -102,37 +102,35 @@ class CardLoader:
     def __init__(self, json_path: str):
         self.json_path = json_path
         self.cards: Dict[str, CardMaster] = {}
+        self.raw_db: List[Dict[str, Any]] = []
 
     def load(self) -> None:
-        raw_data = RawDataLoader.load_json(self.json_path)
-        raw_list = raw_data if isinstance(raw_data, list) else []
-        success_count = 0
-        for i, raw_item in enumerate(raw_list):
-            normalized_item = {}
-            for k, v in raw_item.items():
-                norm_k = DataCleaner.normalize_text(k)
-                normalized_item[norm_k] = v
-
-            if i == 0:
-                log_event(level_key="INFO", action="loader.debug_keys", msg=f"First Card Keys: {list(normalized_item.keys())}")
-
-            try:
-                card = self._create_card_master(normalized_item, debug=(i==0))
-                if card:
-                    self.cards[card.card_id] = card
-                    success_count += 1
-            except Exception as e:
-                log_event(level_key="WARNING", action="loader.skip_card", msg=f"Skipping card index {i} due to error: {e}")
-        
-        log_event(level_key="INFO", action="loader.load_complete", msg=f"Loaded {success_count} cards successfully.")
+        data = RawDataLoader.load_json(self.json_path)
+        self.raw_db = data if isinstance(data, list) else []
+        log_event(level_key="INFO", action="loader.db_initialized", msg=f"Database initialized with {len(self.raw_db)} entries.")
 
     def get_card(self, card_id: str) -> Optional[CardMaster]:
-        card = self.cards.get(card_id)
-        if not card:
-            log_event(level_key="ERROR", action="loader.card_not_found", msg=f"Card ID not found in database: {card_id}", player="system")
-        return card
+        if card_id in self.cards:
+            return self.cards[card_id]
 
-    def _create_card_master(self, raw: Dict[str, Any], debug: bool = False) -> Optional[CardMaster]:
+        target_raw = None
+        for item in self.raw_db:
+            normalized_item = {DataCleaner.normalize_text(k): v for k, v in item.items()}
+            item_id = DataCleaner.normalize_text(normalized_item.get("number", normalized_item.get("Number", "")))
+            if item_id == card_id:
+                target_raw = normalized_item
+                break
+
+        if not target_raw:
+            log_event(level_key="ERROR", action="loader.card_not_found", msg=f"Card ID not found in database: {card_id}")
+            return None
+
+        master = self._create_card_master(target_raw)
+        if master:
+            self.cards[card_id] = master
+        return master
+
+    def _create_card_master(self, raw: Dict[str, Any]) -> Optional[CardMaster]:
         def get_val(target_keys: List[str], default=None):
             for k in target_keys:
                 norm_key = DataCleaner.normalize_text(k)
@@ -160,10 +158,7 @@ class CardLoader:
         trigger_text = DataCleaner.normalize_text(get_val([_nfc("効果(トリガー)"), _nfc("トリガー"), "Trigger", "trigger"]))
         main_abilities = DataCleaner.parse_abilities(effect_text, is_trigger=False)
         trigger_abilities = DataCleaner.parse_abilities(trigger_text, is_trigger=True)
-        combined_abilities = main_abilities + trigger_abilities
-
-        if debug:
-            log_event(level_key="INFO", action="loader.debug_card", msg=f"Card: {name} ({card_id}), Type: {c_type}, Color: {color}, Abilities: {len(combined_abilities)}")
+        combined_abilities = tuple(main_abilities + trigger_abilities)
 
         return CardMaster(
             card_id=card_id,

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, Any, Set, Dict
+from typing import List, Optional, Any, Set, Dict, Tuple
 import uuid
 import os
 import json
@@ -44,7 +44,7 @@ class CardMaster:
     trigger_text: str
     life: int
     keywords: Set[str] = field(default_factory=set)
-    abilities: List[Ability] = field(default_factory=list)
+    abilities: Tuple[Ability, ...] = field(default_factory=tuple)
 
 @dataclass
 class CardInstance:
