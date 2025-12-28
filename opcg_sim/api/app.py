@@ -50,7 +50,8 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
         "turn_info": {
             "turn_count": manager.turn_count if manager else 0,
             "current_phase": manager.phase.name if manager else "N/A",
-            "active_player_id": manager.turn_player.name if manager else "N/A"
+            "active_player_id": manager.turn_player.name if manager else "N/A",
+            "winner": manager.winner if manager else None
         },
         "players": {
             p1_key: manager.p1.to_dict() if manager else {},
@@ -165,14 +166,17 @@ async def game_action(req: Dict[str, Any] = Body(...)):
     player_id = req.get("player_id")
     payload = req.get("payload", {})
     card_uuid = payload.get("uuid")
+    target_uuid = payload.get("target_uuid")
 
     try:
         from opcg_sim.src.models.enums import TriggerType
         current_player = manager.p1 if player_id == manager.p1.name else manager.p2
+        opponent = manager.p2 if current_player == manager.p1 else manager.p1
         
         if action_type == "PLAY":
             target_card = next((c for c in current_player.hand if c.uuid == card_uuid), None)
             if target_card:
+                manager.pay_cost(current_player, target_card.master.cost)
                 manager.play_card_action(current_player, target_card)
             else:
                 raise ValueError("対象のカードが手札にありません。")
@@ -192,8 +196,14 @@ async def game_action(req: Dict[str, Any] = Body(...)):
                 raise ValueError("指定されたカードが盤面に見つかりません。")
 
             if action_type == "ATTACK":
-                target_card.is_rest = True
-                log_event("INFO", "game.action.ATTACK", f"{player_id} attacked with {target_card.master.name}", player=player_id)
+                opponent_units = [opponent.leader] + opponent.field
+                if opponent.stage: opponent_units.append(opponent.stage)
+                attack_target = next((c for c in opponent_units if c.uuid == target_uuid), None)
+                
+                if not attack_target:
+                    raise ValueError("攻撃対象が見つかりません。")
+                
+                manager.resolve_attack(target_card, attack_target)
             
             elif action_type == "ATTACH_DON":
                 if current_player.don_active:
