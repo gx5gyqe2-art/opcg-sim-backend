@@ -62,7 +62,7 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
         try:
             validated_state = GameStateSchema(**raw_game_state).model_dump(by_alias=True)
         except Exception as e:
-            log_event(level_key="ERROR", action="api.validation", msg=f"Validation Error: {e}")
+            log_event(level_key="ERROR", action="api.validation", msg=f"Validation Error: {e}", player="system")
             validated_state = raw_game_state 
 
     error_obj = None
@@ -86,11 +86,10 @@ async def trace_logging_middleware(request: Request, call_next):
         s_id = f"gen-{uuid.uuid4().hex[:8]}"
     token = session_id_ctx.set(s_id)
     if not request.url.path.endswith(("/health", "/favicon.ico")):
-        log_event(level_key="INFO", action="api.inbound", msg=f"{request.method} {request.url.path}")
+        log_event(level_key="INFO", action="api.inbound", msg=f"{request.method} {request.url.path}", player="system")
     try:
-        token_ctx = session_id_ctx.get()
         response = await call_next(request)
-        response.headers["X-Session-ID"] = token_ctx
+        response.headers["X-Session-ID"] = s_id
         return response
     finally:
         session_id_ctx.reset(token)
@@ -129,7 +128,7 @@ async def options_game_create():
 async def game_create(req: Any = Body(...)):
     try:
         game_id = str(uuid.uuid4())
-        log_event(level_key="INFO", action="game.create", msg=f"Creating game: {game_id}", payload=req)
+        log_event(level_key="INFO", action="game.create", msg=f"Creating game: {game_id}", payload=req, player="system")
         p1_path = os.path.join(DATA_DIR, req.get("p1_deck", ""))
         p2_path = os.path.join(DATA_DIR, req.get("p2_deck", ""))
         p1_leader, p1_cards = deck_loader.load_deck(p1_path, req.get("p1_name", "P1"))
@@ -141,7 +140,7 @@ async def game_create(req: Any = Body(...)):
         GAMES[game_id] = manager
         return build_game_result_hybrid(manager, game_id)
     except Exception as e:
-        log_event(level_key="ERROR", action="game.create_fail", msg=traceback.format_exc())
+        log_event(level_key="ERROR", action="game.create_fail", msg=traceback.format_exc(), player="system")
         return {"success": False, "game_id": "", "error": {"message": str(e)}}
 
 @app.options("/api/game/action")
@@ -151,7 +150,7 @@ async def options_game_action():
 @app.post("/api/game/action")
 async def game_action(req: Dict[str, Any] = Body(...)):
     action_type = req.get("action")
-    player_id = req.get("player_id")
+    player_id = req.get("player_id", "system")
     log_event("DEBUG", "api.action_received", f"Action: {action_type}", player=player_id, payload=req)
 
     game_id = req.get("game_id")

@@ -129,7 +129,7 @@ class CardLoader:
     def get_card(self, card_id: str) -> Optional[CardMaster]:
         card = self.cards.get(card_id)
         if not card:
-            log_event(level_key="ERROR", action="loader.card_not_found", msg=f"Card ID not found in database: {card_id}")
+            log_event(level_key="ERROR", action="loader.card_not_found", msg=f"Card ID not found in database: {card_id}", player="system")
         return card
 
     def _create_card_master(self, raw: Dict[str, Any], debug: bool = False) -> Optional[CardMaster]:
@@ -193,7 +193,7 @@ class DeckLoader:
         elif isinstance(data, dict):
             deck_data = data
         else:
-            log_event(level_key="ERROR", action="loader.invalid_deck", msg=f"Invalid deck format in {file_path}")
+            log_event(level_key="ERROR", action="loader.invalid_deck", msg=f"Invalid deck format in {file_path}", player="system")
             return None, []
 
         leader_instance = None

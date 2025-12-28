@@ -2,6 +2,7 @@ from typing import List, Optional, Dict, Any, Tuple, Set
 import random
 import unicodedata
 import re
+import traceback
 from ..models.models import CardInstance, CardMaster, DonInstance
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, Player, ActionType
 from ..models.effect_types import TargetQuery
@@ -207,7 +208,7 @@ class GameManager:
         attacker_pwr = attacker.get_power(is_my_turn)
         target_pwr = target.get_power(is_target_turn)
         
-        log_event("DEBUG", "game.resolve_attack_pre", f"Attacker: {attacker.master.name}({attacker_pwr}) vs Target: {target.master.name}({target_pwr})", player=attacker_owner.name)
+        log_event("DEBUG", "game.resolve_attack_pre", f"Attacker: {attacker.master.name}({attacker_pwr}) vs Target: {target.master.name}({target_pwr})", player=attacker_owner.name if attacker_owner else "system")
         
         attacker.is_rest = True
         
@@ -216,7 +217,7 @@ class GameManager:
                 life_card = target_owner.life.pop(0)
                 self.move_card(life_card, Zone.HAND, target_owner)
             else:
-                self.winner = attacker_owner.name
+                self.winner = attacker_owner.name if attacker_owner else None
         else:
             if attacker_pwr >= target_pwr:
                 self.move_card(target, Zone.TRASH, target_owner)
