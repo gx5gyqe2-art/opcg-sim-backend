@@ -2,13 +2,11 @@ from typing import List, Optional, Dict, Any, Tuple, Set
 import random
 import unicodedata
 import re
-import logging
 from ..models.models import CardInstance, CardMaster, DonInstance
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, Player, ActionType
 from ..models.effect_types import TargetQuery
 from ..utils.logger_config import log_event
 
-logger = logging.getLogger("opcg_sim")
 Card = CardInstance
 
 def _nfc(text: str) -> str:
@@ -85,9 +83,6 @@ class GameManager:
         log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
         self.turn_count = 1
         self.refresh_phase()
-
-    def log(self, message: str):
-        log_event("INFO", "game.manager", message, player=self.turn_player.name)
 
     def end_turn(self):
         self.phase = Phase.END
@@ -195,6 +190,7 @@ class GameManager:
             else: target_list.append(card)
 
     def pay_cost(self, player: Player, cost: int):
+        log_event("DEBUG", "game.pay_cost_pre", f"Active Don: {len(player.don_active)}, Cost required: {cost}", player=player.name)
         if len(player.don_active) < cost:
             raise ValueError("ドン!!が不足しています。")
         for _ in range(cost):
@@ -202,9 +198,18 @@ class GameManager:
             player.don_rested.append(don)
 
     def resolve_attack(self, attacker: Card, target: Card):
-        attacker.is_rest = True
         attacker_owner, _ = self._find_card_location(attacker)
         target_owner, _ = self._find_card_location(target)
+        
+        is_my_turn = (attacker_owner == self.turn_player)
+        is_target_turn = (target_owner == self.turn_player)
+        
+        attacker_pwr = attacker.get_power(is_my_turn)
+        target_pwr = target.get_power(is_target_turn)
+        
+        log_event("DEBUG", "game.resolve_attack_pre", f"Attacker: {attacker.master.name}({attacker_pwr}) vs Target: {target.master.name}({target_pwr})", player=attacker_owner.name)
+        
+        attacker.is_rest = True
         
         if target == target_owner.leader:
             if target_owner.life:
@@ -213,7 +218,7 @@ class GameManager:
             else:
                 self.winner = attacker_owner.name
         else:
-            if attacker.power >= target.power:
+            if attacker_pwr >= target_pwr:
                 self.move_card(target, Zone.TRASH, target_owner)
         
         self.check_victory()
@@ -227,7 +232,7 @@ class GameManager:
     def play_card_action(self, player: Player, card: Card):
         if card not in player.hand: return
         
-        log_event("INFO", "game.play_card", f"Playing card: {card.name}", player=player.name, payload={"card_uuid": card.uuid})
+        log_event("INFO", "game.play_card", f"Playing card: {card.master.name}", player=player.name, payload={"card_uuid": card.uuid})
         
         if card.master.type == CardType.EVENT:
             for ability in card.master.abilities:
@@ -249,6 +254,6 @@ class GameManager:
             self._perform_logic(player, action, source_card)
 
     def _perform_logic(self, player: Player, action: Any, source_card: Card):
-        log_event("INFO", "game.effect", f"Resolving action {action.type} for {source_card.name}", player=player.name)
+        log_event("INFO", "game.effect", f"Resolving action {action.type} for {source_card.master.name}", player=player.name)
         from .effects.resolver import execute_action
         execute_action(self, player, action, source_card)

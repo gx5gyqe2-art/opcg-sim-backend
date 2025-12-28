@@ -14,7 +14,7 @@ def _nfc(text: str) -> str:
 class RawDataLoader:
     @staticmethod
     def load_json(file_path: str) -> Any:
-        log_event(level_key="INFO", action="loader.load_json", msg=f"Loading JSON from {file_path}...")
+        log_event(level_key="DEBUG", action="loader.load_json", msg=f"Loading JSON from {file_path}...")
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -127,7 +127,10 @@ class CardLoader:
         log_event(level_key="INFO", action="loader.load_complete", msg=f"Loaded {success_count} cards successfully.")
 
     def get_card(self, card_id: str) -> Optional[CardMaster]:
-        return self.cards.get(card_id)
+        card = self.cards.get(card_id)
+        if not card:
+            log_event(level_key="ERROR", action="loader.card_not_found", msg=f"Card ID not found in database: {card_id}")
+        return card
 
     def _create_card_master(self, raw: Dict[str, Any], debug: bool = False) -> Optional[CardMaster]:
         def get_val(target_keys: List[str], default=None):
@@ -200,8 +203,6 @@ class DeckLoader:
                 leader_master = self.card_loader.get_card(leader_id)
                 if leader_master:
                     leader_instance = CardInstance(leader_master, owner_id)
-                else:
-                    log_event(level_key="WARNING", action="loader.leader_not_found", msg=f"Leader card not found in DB: {leader_id}")
 
         deck_list: List[CardInstance] = []
         if "cards" in deck_data:
@@ -212,8 +213,6 @@ class DeckLoader:
                 if master:
                     for _ in range(count):
                         deck_list.append(CardInstance(master, owner_id))
-                else:
-                    log_event(level_key="WARNING", action="loader.card_not_found", msg=f"Deck card not found in DB: {card_id}")
 
         log_event(level_key="INFO", action="loader.deck_load_success", msg=f"Loaded Deck: Leader={leader_instance.master.name if leader_instance else 'None'}, Deck Size={len(deck_list)}", player=owner_id)
         return leader_instance, deck_list

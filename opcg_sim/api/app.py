@@ -88,8 +88,9 @@ async def trace_logging_middleware(request: Request, call_next):
     if not request.url.path.endswith(("/health", "/favicon.ico")):
         log_event(level_key="INFO", action="api.inbound", msg=f"{request.method} {request.url.path}")
     try:
+        token_ctx = session_id_ctx.get()
         response = await call_next(request)
-        response.headers["X-Session-ID"] = s_id
+        response.headers["X-Session-ID"] = token_ctx
         return response
     finally:
         session_id_ctx.reset(token)
@@ -149,6 +150,10 @@ async def options_game_action():
 
 @app.post("/api/game/action")
 async def game_action(req: Dict[str, Any] = Body(...)):
+    action_type = req.get("action")
+    player_id = req.get("player_id")
+    log_event("DEBUG", "api.action_received", f"Action: {action_type}", player=player_id, payload=req)
+
     game_id = req.get("game_id")
     manager = GAMES.get(game_id)
     error_codes = CONST.get('ERROR_CODES', {})
@@ -160,8 +165,6 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             error_msg="指定されたゲームが見つかりません。"
         )
 
-    action_type = req.get("action")
-    player_id = req.get("player_id")
     payload = req.get("payload", {})
     card_uuid = payload.get("uuid")
     target_uuid = payload.get("target_uuid")
