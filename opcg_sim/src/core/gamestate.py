@@ -40,7 +40,17 @@ class Player:
             if self.deck:
                 self.hand.append(self.deck.pop(0))
 
-    def to_dict(self):
+    def to_dict(self, is_owner: bool = True):
+        log_event("DEBUG", "gamestate.to_dict", f"Serializing player state for {self.name}", player=self.name)
+        
+        leader_dict = self.leader.to_dict() if self.leader else None
+        if leader_dict:
+            leader_dict["is_face_up"] = True
+
+        stage_dict = self.stage.to_dict() if self.stage else None
+        if stage_dict:
+            stage_dict["is_face_up"] = True
+
         return {
             "player_id": self.name,
             "name": self.name,
@@ -49,15 +59,20 @@ class Player:
             "don_deck_count": len(self.don_deck),
             "don_active": [d.to_dict() for d in self.don_active],
             "don_rested": [d.to_dict() for d in self.don_rested],
-            "leader": self.leader.to_dict() if self.leader else None,
+            "leader": leader_dict,
             "zones": {
-                "field": [c.to_dict() for c in self.field],
-                "hand": [c.to_dict() for c in self.hand],
-                "life": [c.to_dict() for c in self.life],
-                "trash": [c.to_dict() for c in self.trash],
-                "stage": self.stage.to_dict() if self.stage else None
+                "field": [self._format_card(c, True) for c in self.field],
+                "hand": [self._format_card(c, is_owner) for c in self.hand],
+                "life": [self._format_card(c, False) for c in self.life],
+                "trash": [self._format_card(c, True) for c in self.trash],
+                "stage": stage_dict
             }
         }
+
+    def _format_card(self, card: Card, face_up: bool) -> dict:
+        d = card.to_dict()
+        d["is_face_up"] = face_up
+        return d
 
 class GameManager:
     def __init__(self, player1: Player, player2: Player):
