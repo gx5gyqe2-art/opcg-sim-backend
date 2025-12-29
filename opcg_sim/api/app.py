@@ -47,12 +47,15 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
     if manager:
         active_pid = p1_key if manager.turn_player == manager.p1 else p2_key
 
-    log_event(
-        level_key="DEBUG",
+    log_event("DEBUG", 
+        "api.active_id_check", 
+        f"Logic check: manager.turn_player.name={manager.turn_player.name}, p1.name={manager.p1.name}, result_id={active_pid}", 
+        player="system")
+    log_event(level_key="DEBUG",
         action="api.build_state",
         msg=f"Turn Info: count={manager.turn_count if manager else 0}, active_pid={active_pid}",
-        player="system"
-    )
+        player="system")
+
 
     raw_game_state = {
         "game_id": game_id,
