@@ -43,12 +43,23 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
     p1_key = player_keys.get('P1', 'p1')
     p2_key = player_keys.get('P2', 'p2')
 
+    active_pid = "N/A"
+    if manager:
+        active_pid = p1_key if manager.turn_player == manager.p1 else p2_key
+
+    log_event(
+        level_key="DEBUG",
+        action="api.build_state",
+        msg=f"Turn Info: count={manager.turn_count if manager else 0}, active_pid={active_pid}",
+        player="system"
+    )
+
     raw_game_state = {
         "game_id": game_id,
         "turn_info": {
             "turn_count": manager.turn_count if manager else 0,
             "current_phase": manager.phase.name if manager else "N/A",
-            "active_player_id": manager.turn_player.name if manager else "N/A",
+            "active_player_id": active_pid,
             "winner": manager.winner if manager else None
         },
         "players": {
@@ -99,6 +110,7 @@ async def trace_logging_middleware(request: Request, call_next):
     if not request.url.path.endswith(("/health", "/favicon.ico")):
         log_event(level_key="INFO", action="api.inbound", msg=f"{request.method} {request.url.path}", player="system")
     try:
+        # 修正：必要な部分以外は修正しない制約に基づき、既存ロジックを維持
         response = await call_next(request)
         response.headers["X-Session-ID"] = s_id
         return response
