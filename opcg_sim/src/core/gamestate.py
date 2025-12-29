@@ -4,7 +4,7 @@ import unicodedata
 import re
 import traceback
 from ..models.models import CardInstance, CardMaster, DonInstance
-from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, Player, ActionType
+from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType
 from ..models.effect_types import TargetQuery
 from ..utils.logger_config import log_event
 
@@ -83,6 +83,7 @@ class GameManager:
         self.turn_count = 0
         self.phase = Phase.SETUP
         self.winner: Optional[str] = None
+        self.active_battle: Optional[Dict[str, Any]] = None
 
     def start_game(self, first_player: Optional[Player] = None):
         log_event("INFO", "game.start", "Game initialization started")
@@ -205,38 +206,134 @@ class GameManager:
             if dest_position == "TOP": target_list.insert(0, card)
             else: target_list.append(card)
 
-    def pay_cost(self, player: Player, cost: int):
-        log_event("DEBUG", "game.pay_cost_pre", f"Active Don: {len(player.don_active)}, Cost required: {cost}", player=player.name)
-        if len(player.don_active) < cost:
-            raise ValueError("ドン!!が不足しています。")
-        for _ in range(cost):
-            don = player.don_active.pop(0)
-            player.don_rested.append(don)
+    def pay_cost(self, player: Player, cost: int, don_list: Optional[List[DonInstance]] = None):
+        log_event("DEBUG", "game.pay_cost_pre", f"Paying cost: {cost}, Provided Don count: {len(don_list) if don_list else 0}", player=player.name)
+        
+        if don_list is not None:
+            if len(don_list) < cost:
+                raise ValueError("指定されたドン!!の数が不足しています。")
+            for don in don_list:
+                if don in player.don_active:
+                    player.don_active.remove(don)
+                    player.don_rested.append(don)
+                    don.is_rest = True
+                elif don in player.don_attached_cards:
+                    player.don_attached_cards.remove(don)
+                    player.don_rested.append(don)
+                    don.is_rest = True
+                    don.attached_to = None
+        else:
+            if len(player.don_active) < cost:
+                raise ValueError("ドン!!が不足しています。")
+            for _ in range(cost):
+                don = player.don_active.pop(0)
+                player.don_rested.append(don)
+                don.is_rest = True
 
-    def resolve_attack(self, attacker: Card, target: Card):
+    def has_blocker(self, player: Player) -> bool:
+        for card in player.field:
+            if not card.is_rest and any(abil.trigger == TriggerType.ON_BLOCK for abil in card.master.abilities):
+                return True
+        return False
+
+    def declare_attack(self, attacker: Card, target: Card):
         attacker_owner, _ = self._find_card_location(attacker)
         target_owner, _ = self._find_card_location(target)
+
+        if attacker.is_rest:
+            raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
         
+        if target.master.type == CardType.CHARACTER and not target.is_rest:
+            raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
+
+        log_event("INFO", "game.attack_declare", f"{attacker.master.name} is attacking {target.master.name}", player=attacker_owner.name)
+        
+        attacker.is_rest = True
+        self.active_battle = {
+            "attacker": attacker,
+            "target": target,
+            "attacker_owner": attacker_owner,
+            "target_owner": target_owner,
+            "counter_buff": 0
+        }
+
+        if self.has_blocker(target_owner):
+            log_event("INFO", "game.phase_transition", "Blockers detected. Moving to BLOCK_STEP", player=target_owner.name)
+            self.phase = Phase.BLOCK_STEP
+        else:
+            log_event("INFO", "game.phase_transition", "No blockers. Moving to BATTLE_COUNTER", player=target_owner.name)
+            self.phase = Phase.BATTLE_COUNTER
+
+    def handle_block(self, blocker: Optional[Card] = None):
+        if self.phase != Phase.BLOCK_STEP or not self.active_battle:
+            return
+
+        target_owner = self.active_battle["target_owner"]
+        if blocker:
+            log_event("INFO", "game.block_execute", f"{blocker.master.name} blocks the attack", player=target_owner.name)
+            blocker.is_rest = True
+            self.active_battle["target"] = blocker
+        else:
+            log_event("INFO", "game.block_skip", "No block declared", player=target_owner.name)
+
+        self.phase = Phase.BATTLE_COUNTER
+        log_event("INFO", "game.phase_transition", "Moving to BATTLE_COUNTER", player=target_owner.name)
+
+    def apply_counter(self, player: Player, card: Optional[Card] = None, don_list: Optional[List[DonInstance]] = None):
+        if self.phase != Phase.BATTLE_COUNTER or not self.active_battle:
+            return
+
+        if card:
+            log_event("INFO", "game.counter_play", f"Playing counter card: {card.master.name}", player=player.name)
+            if card.master.type == CardType.EVENT:
+                self.pay_cost(player, card.master.cost, don_list)
+                for ability in card.master.abilities:
+                    if ability.trigger == TriggerType.ON_COUNTER:
+                        self.resolve_ability(player, ability, source_card=card)
+                self.move_card(card, Zone.TRASH, player)
+            else:
+                counter_value = card.master.counter or 0
+                self.active_battle["counter_buff"] += counter_value
+                log_event("DEBUG", "game.counter_buff", f"Added {counter_value} power to target", player=player.name)
+                self.move_card(card, Zone.TRASH, player)
+        else:
+            log_event("INFO", "game.counter_end", "Counter step finished", player=player.name)
+            self.resolve_attack()
+
+    def resolve_attack(self):
+        if not self.active_battle:
+            return
+
+        attacker = self.active_battle["attacker"]
+        target = self.active_battle["target"]
+        attacker_owner = self.active_battle["attacker_owner"]
+        target_owner = self.active_battle["target_owner"]
+        counter_buff = self.active_battle.get("counter_buff", 0)
+
         is_my_turn = (attacker_owner == self.turn_player)
         is_target_turn = (target_owner == self.turn_player)
         
         attacker_pwr = attacker.get_power(is_my_turn)
-        target_pwr = target.get_power(is_target_turn)
+        target_pwr = target.get_power(is_target_turn) + counter_buff
         
         log_event("DEBUG", "game.resolve_attack_pre", f"Attacker: {attacker.master.name}({attacker_pwr}) vs Target: {target.master.name}({target_pwr})", player=attacker_owner.name if attacker_owner else "system")
         
-        attacker.is_rest = True
-        
         if target == target_owner.leader:
-            if target_owner.life:
-                life_card = target_owner.life.pop(0)
-                self.move_card(life_card, Zone.HAND, target_owner)
-            else:
-                self.winner = attacker_owner.name if attacker_owner else None
+            if attacker_pwr >= target_pwr:
+                if target_owner.life:
+                    life_card = target_owner.life.pop(0)
+                    self.move_card(life_card, Zone.HAND, target_owner)
+                    log_event("INFO", "game.damage_life", f"{target_owner.name} takes 1 damage to life", player=target_owner.name)
+                else:
+                    self.winner = attacker_owner.name
+                    log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name)
         else:
             if attacker_pwr >= target_pwr:
                 self.move_card(target, Zone.TRASH, target_owner)
+                log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
         
+        self.active_battle = None
+        self.phase = Phase.MAIN
         self.check_victory()
 
     def check_victory(self):

@@ -1,9 +1,6 @@
 import unicodedata
 from enum import Enum, auto
 
-# 役割：純粋な定義のみを保持する。
-# ロジック（_nfc関数など）はここには置かない。
-
 class Color(Enum):
     RED = "赤"
     GREEN = "緑"
@@ -36,6 +33,7 @@ class Phase(Enum):
     DON = auto()
     MAIN = auto()
     BATTLE_START = auto()
+    BATTLE_COUNTER = auto()
     BLOCK_STEP = auto()
     COUNTER_STEP = auto()
     DAMAGE_STEP = auto()
@@ -59,7 +57,6 @@ class Zone(Enum):
     ANY = "ANY"
 
 class ActionType(Enum):
-    # バトル系
     KO = auto()
     REST = auto()
     ACTIVE = auto()
@@ -67,7 +64,6 @@ class ActionType(Enum):
     LOCK = auto()
     DISABLE_ABILITY = auto()
     GRANT_EFFECT = auto()
-    # 移動系
     MOVE_CARD = auto()
     DECK_BOTTOM = auto()
     DRAW = auto()
@@ -77,20 +73,16 @@ class ActionType(Enum):
     REVEAL = auto()
     SHUFFLE = auto()
     PLAY_CARD = auto()
-    # ライフ系
     LIFE_RECOVER = auto()
     FACE_UP_LIFE = auto()
-    # 数値系
     BP_BUFF = auto()
     SET_BASE_POWER = auto()
     COST_BUFF = auto()
     COST_CHANGE = auto()
-    # ドン!!系
     ATTACH_DON = auto()
     REST_DON = auto()
     RAMP_DON = auto()
     RETURN_DON = auto()
-    # その他
     NEGATE_EFFECT = auto()
     SWAP_POWER = auto()
     KEYWORD = auto()
@@ -135,7 +127,6 @@ class ConditionType(Enum):
     NONE = auto()
 
 class ParserKeyword(str, Enum):
-    """テキスト解析用キーワード"""
     DON = "ドン"
     COST = "コスト"
     POWER = "パワー"
@@ -147,16 +138,12 @@ class ParserKeyword(str, Enum):
     CHARACTER = "キャラ"
     STAGE = "ステージ"
     EVENT = "イベント"
-    
-    # トリガー・条件関連
     ON_PLAY = "登場時"
     ACTIVATE_MAIN = "起動メイン"
     WHEN_ATTACKING = "アタック時"
     ON_KO = "KO時"
     MY_TURN = "自分のターン中"
     OPPONENT_TURN = "相手のターン中"
-    
-    # アクション・操作関連
     DRAW = "カードを引く"
     PLAY = "登場させる"
     KO = "KOする"
@@ -167,8 +154,6 @@ class ParserKeyword(str, Enum):
     ADD_TO_HAND = "手札に加える"
     DISCARD = "捨てる"
     PLACE_BOTTOM = "デッキの下に置く"
-    
-    # 特殊キーワード
     REMAINING = "残り"
     EACH_OTHER = "お互い"
     OWNER = "持ち主"
