@@ -5,7 +5,7 @@ import re
 import traceback
 from ..models.models import CardInstance, CardMaster, DonInstance
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType
-from ..models.effect_types import TargetQuery
+from ..models.effect_types import TargetQuery, Ability
 from ..utils.logger_config import log_event
 
 Card = CardInstance
@@ -89,37 +89,53 @@ class GameManager:
         request = None
         if self.phase == Phase.BLOCK_STEP and self.active_battle:
             target_owner = self.active_battle["target_owner"]
-            blockers = [c.uuid for c in target_owner.field if not c.is_rest and any(abil.trigger == TriggerType.ON_BLOCK for abil in c.master.abilities)]
+            blockers = [c.uuid for c in target_owner.field if not c.is_rest and "ブロッカー" in c.current_keywords]
             request = {
                 "player_id": target_owner.name,
                 "action": "SELECT_BLOCKER",
-                "selectable_uuids": blockers
+                "selectable_uuids": blockers,
+                "can_skip": True
             }
         elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
             target_owner = self.active_battle["target_owner"]
-            counters = [c.uuid for c in target_owner.hand if c.master.counter > 0 or (c.master.type == CardType.EVENT and any(abil.trigger == TriggerType.ON_COUNTER for abil in c.master.abilities))]
+            counters = [
+                c.uuid for c in target_owner.hand 
+                if (c.master.counter and c.master.counter > 0) or 
+                (c.master.type == CardType.EVENT and any(abil.trigger == TriggerType.COUNTER for abil in c.master.abilities))
+            ]
             request = {
                 "player_id": target_owner.name,
                 "action": "SELECT_COUNTER",
-                "selectable_uuids": counters
+                "selectable_uuids": counters,
+                "can_skip": True
             }
         elif self.phase == Phase.MAIN:
             request = {
                 "player_id": self.turn_player.name,
                 "action": "MAIN_ACTION",
-                "selectable_uuids": [c.uuid for c in self.turn_player.hand] + [c.uuid for c in self.turn_player.field if not c.is_rest]
+                "selectable_uuids": [c.uuid for c in self.turn_player.hand] + [c.uuid for c in self.turn_player.field if not c.is_rest],
+                "can_skip": True
             }
         
         if request:
-            log_event("DEBUG", "game.pending_request", f"Pending request for {request['player_id']}: {request['action']}", player=request['player_id'])
+            log_event("DEBUG", "game.pending_request", f"Generated request: {request['action']} for {request['player_id']}", player=request['player_id'])
         return request
 
-    def _validate_action(self, player: Player, action_name: str):
+    def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
-        if not pending or pending["player_id"] != player.name or pending["action"] != action_name:
-            error_msg = f"Invalid action. Expected {pending['action'] if pending else 'None'} by {pending['player_id'] if pending else 'None'}"
-            log_event("ERROR", "game.invalid_action", error_msg, player=player.name)
-            raise ValueError(error_msg)
+        if not pending:
+            log_event("ERROR", "game.validation_fail", "No pending request found", player=player.name)
+            raise ValueError("現在実行可能なアクションはありません。")
+        
+        if pending["player_id"] != player.name:
+            error_msg = f"Wait for {pending['player_id']}'s action"
+            log_event("ERROR", "game.validation_fail", error_msg, player=player.name)
+            raise ValueError(f"現在は {pending['player_id']} のターン/フェイズです。")
+            
+        if pending["action"] != action_type:
+            error_msg = f"Invalid action type. Expected: {pending['action']}, Got: {action_type}"
+            log_event("ERROR", "game.validation_fail", error_msg, player=player.name)
+            raise ValueError(f"不適切なアクションです。期待されているアクション: {pending['action']}")
 
     def start_game(self, first_player: Optional[Player] = None):
         log_event("INFO", "game.start", "Game initialization started")
@@ -269,7 +285,7 @@ class GameManager:
 
     def has_blocker(self, player: Player) -> bool:
         for card in player.field:
-            if not card.is_rest and any(abil.trigger == TriggerType.ON_BLOCK for abil in card.master.abilities):
+            if not card.is_rest and "ブロッカー" in card.current_keywords:
                 return True
         return False
 
@@ -331,7 +347,7 @@ class GameManager:
             if counter_card.master.type == CardType.EVENT:
                 self.pay_cost(player, counter_card.master.cost, don_list)
                 for ability in counter_card.master.abilities:
-                    if ability.trigger == TriggerType.ON_COUNTER:
+                    if ability.trigger == TriggerType.COUNTER:
                         self.resolve_ability(player, ability, source_card=counter_card)
                 self.move_card(counter_card, Zone.TRASH, player)
             else:
