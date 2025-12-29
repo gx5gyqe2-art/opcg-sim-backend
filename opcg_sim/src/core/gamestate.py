@@ -182,14 +182,13 @@ class GameManager:
         self.switch_turn()
 
     def switch_turn(self):
-def switch_turn(self):
-    log_event("DEBUG", "game.turn_switch_start", f"Before switch: turn_player={self.turn_player.name}, count={self.turn_count}", player="system")
-    
-    self.turn_player, self.opponent = self.opponent, self.turn_player
-    self.turn_count += 1
-    
-    log_event("INFO", "game.turn_switch_end", f"After switch: turn_player={self.turn_player.name}, count={self.turn_count}", player="system")
-    self.refresh_phase()
+        log_event("DEBUG", "game.turn_switch_start", f"Before switch: turn_player={self.turn_player.name}, count={self.turn_count}", player="system")
+        
+        self.turn_player, self.opponent = self.opponent, self.turn_player
+        self.turn_count += 1
+        
+        log_event("INFO", "game.turn_switch_end", f"After switch: turn_player={self.turn_player.name}, count={self.turn_count}", player="system")
+        self.refresh_phase()
 
 
     def refresh_phase(self):
