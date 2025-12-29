@@ -142,9 +142,12 @@ class GameManager:
             raise ValueError(f"現在は {pending['player_id']} のターン/フェイズです。")
             
         if pending["action"] != action_type:
+            if pending["action"] in ["SELECT_COUNTER", "SELECT_BLOCKER"] and action_type == "PASS":
+                return True
             error_msg = f"Invalid action type. Expected: {pending['action']}, Got: {action_type}. Phase: {self.phase.name}"
             log_event("ERROR", "game.validation_fail", error_msg, player=player.name)
             raise ValueError(f"不適切なアクションです。期待されているアクション: {pending['action']}")
+        return True
 
     def start_game(self, first_player: Optional[Player] = None):
         log_event("INFO", "game.start", "Game initialization started")
