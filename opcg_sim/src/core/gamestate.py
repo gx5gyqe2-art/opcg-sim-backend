@@ -85,6 +85,42 @@ class GameManager:
         self.winner: Optional[str] = None
         self.active_battle: Optional[Dict[str, Any]] = None
 
+    def get_pending_request(self) -> Optional[Dict[str, Any]]:
+        request = None
+        if self.phase == Phase.BLOCK_STEP and self.active_battle:
+            target_owner = self.active_battle["target_owner"]
+            blockers = [c.uuid for c in target_owner.field if not c.is_rest and any(abil.trigger == TriggerType.ON_BLOCK for abil in c.master.abilities)]
+            request = {
+                "player_id": target_owner.name,
+                "action": "SELECT_BLOCKER",
+                "selectable_uuids": blockers
+            }
+        elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
+            target_owner = self.active_battle["target_owner"]
+            counters = [c.uuid for c in target_owner.hand if c.master.counter > 0 or (c.master.type == CardType.EVENT and any(abil.trigger == TriggerType.ON_COUNTER for abil in c.master.abilities))]
+            request = {
+                "player_id": target_owner.name,
+                "action": "SELECT_COUNTER",
+                "selectable_uuids": counters
+            }
+        elif self.phase == Phase.MAIN:
+            request = {
+                "player_id": self.turn_player.name,
+                "action": "MAIN_ACTION",
+                "selectable_uuids": [c.uuid for c in self.turn_player.hand] + [c.uuid for c in self.turn_player.field if not c.is_rest]
+            }
+        
+        if request:
+            log_event("DEBUG", "game.pending_request", f"Pending request for {request['player_id']}: {request['action']}", player=request['player_id'])
+        return request
+
+    def _validate_action(self, player: Player, action_name: str):
+        pending = self.get_pending_request()
+        if not pending or pending["player_id"] != player.name or pending["action"] != action_name:
+            error_msg = f"Invalid action. Expected {pending['action'] if pending else 'None'} by {pending['player_id'] if pending else 'None'}"
+            log_event("ERROR", "game.invalid_action", error_msg, player=player.name)
+            raise ValueError(error_msg)
+
     def start_game(self, first_player: Optional[Player] = None):
         log_event("INFO", "game.start", "Game initialization started")
         
@@ -102,6 +138,7 @@ class GameManager:
         self.refresh_phase()
 
     def end_turn(self):
+        self._validate_action(self.turn_player, "MAIN_ACTION")
         self.phase = Phase.END
         log_event("INFO", "game.phase_end", f"Turn {self.turn_count} ending", player=self.turn_player.name)
         
@@ -239,6 +276,8 @@ class GameManager:
     def declare_attack(self, attacker: Card, target: Card):
         attacker_owner, _ = self._find_card_location(attacker)
         target_owner, _ = self._find_card_location(target)
+        
+        self._validate_action(attacker_owner, "MAIN_ACTION")
 
         if attacker.is_rest:
             raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
@@ -265,10 +304,12 @@ class GameManager:
             self.phase = Phase.BATTLE_COUNTER
 
     def handle_block(self, blocker: Optional[Card] = None):
-        if self.phase != Phase.BLOCK_STEP or not self.active_battle:
+        if not self.active_battle:
             return
-
+            
         target_owner = self.active_battle["target_owner"]
+        self._validate_action(target_owner, "SELECT_BLOCKER")
+
         if blocker:
             log_event("INFO", "game.block_execute", f"{blocker.master.name} blocks the attack", player=target_owner.name)
             blocker.is_rest = True
@@ -277,25 +318,27 @@ class GameManager:
             log_event("INFO", "game.block_skip", "No block declared", player=target_owner.name)
 
         self.phase = Phase.BATTLE_COUNTER
-        log_event("INFO", "game.phase_transition", "Moving to BATTLE_COUNTER", player=target_owner.name)
+        log_event("INFO", "game.phase_transition", f"Moving to {self.phase.name}", player=target_owner.name)
 
-    def apply_counter(self, player: Player, card: Optional[Card] = None, don_list: Optional[List[DonInstance]] = None):
-        if self.phase != Phase.BATTLE_COUNTER or not self.active_battle:
+    def apply_counter(self, player: Player, counter_card: Optional[Card] = None, don_list: Optional[List[DonInstance]] = None):
+        if not self.active_battle:
             return
 
-        if card:
-            log_event("INFO", "game.counter_play", f"Playing counter card: {card.master.name}", player=player.name)
-            if card.master.type == CardType.EVENT:
-                self.pay_cost(player, card.master.cost, don_list)
-                for ability in card.master.abilities:
+        self._validate_action(player, "SELECT_COUNTER")
+
+        if counter_card:
+            log_event("INFO", "game.counter_play", f"Playing counter card: {counter_card.master.name}", player=player.name)
+            if counter_card.master.type == CardType.EVENT:
+                self.pay_cost(player, counter_card.master.cost, don_list)
+                for ability in counter_card.master.abilities:
                     if ability.trigger == TriggerType.ON_COUNTER:
-                        self.resolve_ability(player, ability, source_card=card)
-                self.move_card(card, Zone.TRASH, player)
+                        self.resolve_ability(player, ability, source_card=counter_card)
+                self.move_card(counter_card, Zone.TRASH, player)
             else:
-                counter_value = card.master.counter or 0
+                counter_value = counter_card.master.counter or 0
                 self.active_battle["counter_buff"] += counter_value
-                log_event("DEBUG", "game.counter_buff", f"Added {counter_value} power to target", player=player.name)
-                self.move_card(card, Zone.TRASH, player)
+                log_event("INFO", "game.counter_apply", f"Added {counter_value} power to target", player=player.name)
+                self.move_card(counter_card, Zone.TRASH, player)
         else:
             log_event("INFO", "game.counter_end", "Counter step finished", player=player.name)
             self.resolve_attack()
@@ -332,6 +375,7 @@ class GameManager:
                 self.move_card(target, Zone.TRASH, target_owner)
                 log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
         
+        target.reset_turn_status()
         self.active_battle = None
         self.phase = Phase.MAIN
         self.check_victory()
@@ -344,6 +388,7 @@ class GameManager:
 
     def play_card_action(self, player: Player, card: Card):
         if card not in player.hand: return
+        self._validate_action(player, "MAIN_ACTION")
         
         log_event("INFO", "game.play_card", f"Playing card: {card.master.name}", player=player.name, payload={"card_uuid": card.uuid})
         
