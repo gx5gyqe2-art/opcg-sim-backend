@@ -7,14 +7,22 @@ from .enums import CardType, Color, Attribute, ActionType, Phase, Player
 from .effect_types import Ability
 from ..utils.logger_config import log_event
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONST_PATH = os.path.join(BASE_DIR, "..", "shared_constants.json")
+def load_shared_constants():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.abspath(os.path.join(current_dir, "..", "..", "..", "shared_constants.json"))
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            log_event("ERROR", "models.const_load_fail", f"Error: {e}")
+    else:
+        log_event("WARNING", "models.const_not_found", f"Path: {path}")
+    return {}
 
-try:
-    with open(CONST_PATH, "r", encoding="utf-8") as f:
-        CONST = json.load(f)
-except Exception as e:
-    log_event(level_key="ERROR", action="models.const_load_fail", msg=f"Failed to load shared_constants.json in models.py: {e}")
+CONST = load_shared_constants()
+
+if not CONST:
     CONST = {
         "CARD_PROPERTIES": {
             "UUID": "uuid", 
@@ -28,6 +36,7 @@ except Exception as e:
             "OWNER_ID": "owner_id"
         }
     }
+
 
 @dataclass(frozen=True)
 class CardMaster:
