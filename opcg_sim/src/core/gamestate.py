@@ -86,6 +86,10 @@ class GameManager:
         self.active_battle: Optional[Dict[str, Any]] = None
 
     def get_pending_request(self) -> Optional[Dict[str, Any]]:
+        if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
+            log_event("ERROR", "game.pending_request_error", f"Active battle missing in phase: {self.phase.name}")
+            self.phase = Phase.MAIN
+
         request = None
         if self.phase == Phase.BLOCK_STEP and self.active_battle:
             target_owner = self.active_battle["target_owner"]
@@ -119,21 +123,23 @@ class GameManager:
         
         if request:
             log_event("DEBUG", "game.pending_request", f"Generated request: {request['action']} for {request['player_id']}", player=request['player_id'])
+        else:
+            log_event("WARNING", "game.pending_request_none", f"No request generated for phase: {self.phase.name}")
         return request
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
         if not pending:
-            log_event("ERROR", "game.validation_fail", "No pending request found", player=player.name)
+            log_event("ERROR", "game.validation_fail", f"No pending request. Current Phase: {self.phase.name}, Turn Player: {self.turn_player.name}", player=player.name)
             raise ValueError("現在実行可能なアクションはありません。")
         
         if pending["player_id"] != player.name:
-            error_msg = f"Wait for {pending['player_id']}'s action"
+            error_msg = f"Wait for {pending['player_id']}'s action. Current Phase: {self.phase.name}"
             log_event("ERROR", "game.validation_fail", error_msg, player=player.name)
             raise ValueError(f"現在は {pending['player_id']} のターン/フェイズです。")
             
         if pending["action"] != action_type:
-            error_msg = f"Invalid action type. Expected: {pending['action']}, Got: {action_type}"
+            error_msg = f"Invalid action type. Expected: {pending['action']}, Got: {action_type}. Phase: {self.phase.name}"
             log_event("ERROR", "game.validation_fail", error_msg, player=player.name)
             raise ValueError(f"不適切なアクションです。期待されているアクション: {pending['action']}")
 
@@ -304,6 +310,7 @@ class GameManager:
         log_event("INFO", "game.attack_declare", f"{attacker.master.name} is attacking {target.master.name}", player=attacker_owner.name)
         
         attacker.is_rest = True
+        
         self.active_battle = {
             "attacker": attacker,
             "target": target,
@@ -311,13 +318,15 @@ class GameManager:
             "target_owner": target_owner,
             "counter_buff": 0
         }
+        
+        log_event("DEBUG", "game.attack_state", f"Battle initialized. Attacker: {attacker.uuid}, Target: {target.uuid}", player=attacker_owner.name)
 
         if self.has_blocker(target_owner):
-            log_event("INFO", "game.phase_transition", "Blockers detected. Moving to BLOCK_STEP", player=target_owner.name)
             self.phase = Phase.BLOCK_STEP
+            log_event("INFO", "game.phase_transition", f"Blockers detected. Moving to {self.phase.name}", player=target_owner.name)
         else:
-            log_event("INFO", "game.phase_transition", "No blockers. Moving to BATTLE_COUNTER", player=target_owner.name)
             self.phase = Phase.BATTLE_COUNTER
+            log_event("INFO", "game.phase_transition", f"No blockers. Moving to {self.phase.name}", player=target_owner.name)
 
     def handle_block(self, blocker: Optional[Card] = None):
         if not self.active_battle:
@@ -431,3 +440,4 @@ class GameManager:
         log_event("INFO", "game.effect", f"Resolving action {action.type} for {source_card.master.name}", player=player.name)
         from .effects.resolver import execute_action
         execute_action(self, player, action, source_card)
+
