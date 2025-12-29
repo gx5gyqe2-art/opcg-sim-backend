@@ -12,7 +12,8 @@ session_id_ctx: ContextVar[str] = ContextVar("session_id", default="sys-init")
 
 def load_shared_constants():
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.abspath(os.path.join(current_dir, "..", "..", "shared_constants.json"))
+    # logger_config.py(utils) -> src -> opcg_sim -> root と3段階遡る
+    path = os.path.abspath(os.path.join(current_dir, "..", "..", "..", "shared_constants.json"))
     if os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
