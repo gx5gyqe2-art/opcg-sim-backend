@@ -161,3 +161,9 @@ class ParserKeyword(str, Enum):
     SELF = "自分"
     THIS_CARD = "このキャラ"
     SELF_REF = "自身"
+
+ 
+class PendingMessage(str, Enum):
+    MAIN_ACTION = "メインアクションを選択してください"
+    SELECT_BLOCKER = "ブロッカーを選択してください"
+    SELECT_COUNTER = "カウンターカードを選択してください"

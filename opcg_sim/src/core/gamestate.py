@@ -4,7 +4,7 @@ import unicodedata
 import re
 import traceback
 from ..models.models import CardInstance, CardMaster, DonInstance
-from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType
+from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
 from ..models.effect_types import TargetQuery, Ability
 from ..utils.logger_config import log_event
 
@@ -97,6 +97,7 @@ class GameManager:
             request = {
                 "player_id": target_owner.name,
                 "action": "SELECT_BLOCKER",
+                "message": PendingMessage.SELECT_BLOCKER.value,
                 "selectable_uuids": blockers,
                 "can_skip": True
             }
@@ -110,6 +111,7 @@ class GameManager:
             request = {
                 "player_id": target_owner.name,
                 "action": "SELECT_COUNTER",
+                "message": PendingMessage.SELECT_COUNTER.value,
                 "selectable_uuids": counters,
                 "can_skip": True
             }
@@ -117,6 +119,7 @@ class GameManager:
             request = {
                 "player_id": self.turn_player.name,
                 "action": "MAIN_ACTION",
+                "message": PendingMessage.MAIN_ACTION.value,
                 "selectable_uuids": [c.uuid for c in self.turn_player.hand] + [c.uuid for c in self.turn_player.field if not c.is_rest],
                 "can_skip": True
             }
@@ -440,4 +443,3 @@ class GameManager:
         log_event("INFO", "game.effect", f"Resolving action {action.type} for {source_card.master.name}", player=player.name)
         from .effects.resolver import execute_action
         execute_action(self, player, action, source_card)
-
