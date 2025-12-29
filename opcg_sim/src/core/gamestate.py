@@ -352,24 +352,25 @@ class GameManager:
         if not self.active_battle:
             return
 
+        if counter_card is None:
+            log_event("INFO", "game.counter_pass", "Player passed counter step", player=player.name)
+            self.resolve_attack()
+            return
+
         self._validate_action(player, "SELECT_COUNTER")
 
-        if counter_card:
-            log_event("INFO", "game.counter_play", f"Playing counter card: {counter_card.master.name}", player=player.name)
-            if counter_card.master.type == CardType.EVENT:
-                self.pay_cost(player, counter_card.master.cost, don_list)
-                for ability in counter_card.master.abilities:
-                    if ability.trigger == TriggerType.COUNTER:
-                        self.resolve_ability(player, ability, source_card=counter_card)
-                self.move_card(counter_card, Zone.TRASH, player)
-            else:
-                counter_value = counter_card.master.counter or 0
-                self.active_battle["counter_buff"] += counter_value
-                log_event("INFO", "game.counter_apply", f"Added {counter_value} power to target", player=player.name)
-                self.move_card(counter_card, Zone.TRASH, player)
+        log_event("INFO", "game.counter_play", f"Playing counter card: {counter_card.master.name}", player=player.name)
+        if counter_card.master.type == CardType.EVENT:
+            self.pay_cost(player, counter_card.master.cost, don_list)
+            for ability in counter_card.master.abilities:
+                if ability.trigger == TriggerType.COUNTER:
+                    self.resolve_ability(player, ability, source_card=counter_card)
+            self.move_card(counter_card, Zone.TRASH, player)
         else:
-            log_event("INFO", "game.counter_end", "Counter step finished", player=player.name)
-            self.resolve_attack()
+            counter_value = counter_card.master.counter or 0
+            self.active_battle["counter_buff"] += counter_value
+            log_event("INFO", "game.counter_apply", f"Added {counter_value} power to target", player=player.name)
+            self.move_card(counter_card, Zone.TRASH, player)
 
     def resolve_attack(self):
         if not self.active_battle:

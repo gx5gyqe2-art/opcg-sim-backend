@@ -12,6 +12,7 @@ session_id_ctx: ContextVar[str] = ContextVar("session_id", default="sys-init")
 
 def load_shared_constants():
     current_dir = os.path.dirname(os.path.abspath(__file__))
+    # logger_config.py(utils) -> src -> opcg_sim -> root と3段階遡る
     path = os.path.abspath(os.path.join(current_dir, "..", "..", "..", "shared_constants.json"))
     if os.path.exists(path):
         try:
@@ -41,83 +42,55 @@ SLACK_CHANNEL_DEBUG = os.environ.get("SLACK_CHANNEL_DEBUG")
 BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME")
 
 def get_gcp_access_token():
-    url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
-    req = urllib.request.Request(url)
-    req.add_header("Metadata-Flavor", "Google")
     try:
-        with urllib.request.urlopen(req) as res:
-            data = json.loads(res.read().decode())
-            return data.get("access_token")
-    except:
-        return None
+        url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
+        req = urllib.request.Request(url)
+        req.add_header("Metadata-Flavor", "Google")
+        with urllib.request.urlopen(req, timeout=5.0) as res:
+            return json.loads(res.read().decode())["access_token"]
+    except: return None
 
-def upload_to_gcs(filename: str, content: bytes):
+def upload_to_gcs(filename: str, content_bytes: bytes):
     token = get_gcp_access_token()
-    if not token or not BUCKET_NAME: return
+    if not token or not BUCKET_NAME: return False
     
-    url = f"https://storage.googleapis.com/upload/storage/v1/b/{BUCKET_NAME}/o?uploadType=media&name={filename}"
-    req = urllib.request.Request(url, data=content, method="POST")
-    req.add_header("Authorization", f"Bearer {token}")
-    req.add_header("Content-Type", "application/json")
+    encoded_name = urllib.parse.quote(filename)
+    url = f"https://storage.googleapis.com/upload/storage/v1/b/{BUCKET_NAME}/o?uploadType=media&name={encoded_name}"
+    
     try:
-        with urllib.request.urlopen(req) as res:
-            pass
+        req = urllib.request.Request(url, data=content_bytes, method="POST")
+        req.add_header("Authorization", f"Bearer {token}")
+        req.add_header("Content-Type", "application/json; charset=utf-8")
+        with urllib.request.urlopen(req, timeout=10.0):
+            return True
     except:
-        pass
+        return False
 
-def post_to_slack(text: str, channel: str, gcs_url: Optional[str] = None):
-    if not SLACK_BOT_TOKEN or not channel: return
-    
-    url = "https://slack.com/api/chat.postMessage"
-    
-    if gcs_url:
-        blocks = [
-            {
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": f"Large log uploaded to GCS:\n{text[:1000]}"}
-            },
-            {
-                "type": "actions",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {"type": "plain_text", "text": "View Full JSON"},
-                        "url": gcs_url
-                    }
-                ]
-            }
-        ]
-        payload = {"channel": channel, "blocks": blocks}
-    else:
-        payload = {"channel": channel, "text": f"```\n{text[:3000]}\n```"}
-        
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method="POST")
-    req.add_header("Authorization", f"Bearer {SLACK_BOT_TOKEN}")
-    req.add_header("Content-Type", "application/json")
+def post_to_slack(text_json: str, channel_id: str, gcs_url: Optional[str] = None):
+    if not SLACK_BOT_TOKEN or not channel_id: return
     try:
-        with urllib.request.urlopen(req) as res:
-            pass
-    except:
-        pass
+        url = "https://slack.com/api/chat.postMessage"
+        if gcs_url:
+            display_text = f"📊 **Log Saved**\n🔗 [View JSON]({gcs_url}) | 📂 [GCS Root](https://console.cloud.google.com/storage/browser/{BUCKET_NAME})"
+        else:
+            display_text = f"```json\n{text_json[:3000]}\n```"
 
-def log_event(
-    level_key: str,
-    action: str,
-    msg: str,
-    player: str = "system",
-    payload: Any = None,
-    source: str = "BE"
-):
+        payload = {"channel": channel_id, "text": display_text}
+        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), method="POST")
+        req.add_header("Content-Type", "application/json; charset=utf-8")
+        req.add_header("Authorization", f"Bearer {SLACK_BOT_TOKEN}")
+        with urllib.request.urlopen(req, timeout=10.0): pass
+    except: pass
+
+def log_event(level_key: str, action: str, msg: str, player: str = "system", payload: Optional[Any] = None, source: str = "BE"):
     now = datetime.now()
-    sid = session_id_ctx.get()
     
+    sid = "unknown"
     if isinstance(payload, dict) and K["SESSION"] in payload:
         sid = payload[K["SESSION"]]
-    elif sid == "sys-init":
-        sid = f"gen-{os.urandom(4).hex()}"
-        session_id_ctx.set(sid)
-
+    elif session_id_ctx.get() != "sys-init":
+        sid = session_id_ctx.get()
+    
     log_data = {
         K["TIME"]: now.isoformat(),
         K["SOURCE"]: source,
@@ -125,9 +98,9 @@ def log_event(
         K["SESSION"]: sid,
         K["PLAYER"]: player,
         K["ACTION"]: action,
-        K["MESSAGE"]: msg,
-        K["PAYLOAD"]: payload
+        K["MESSAGE"]: msg
     }
+    if payload is not None: log_data[K["PAYLOAD"]] = payload
 
     try:
         log_json_str = json.dumps(log_data, ensure_ascii=False)

@@ -272,6 +272,9 @@ async def game_battle(req: BattleActionRequest):
         is_valid = manager._validate_action(player, action_type)
         log_event("DEBUG", "api.battle_validation", f"Validation: {is_valid}", player=player_id)
         
+        if not is_valid and action_type != battle_types.get('PASS'):
+            raise ValueError("不正なアクション、またはフェイズ外のアクションです。")
+
         if action_type == battle_types.get('SELECT_BLOCKER'):
             blocker = next((c for c in player.field if c.uuid == card_uuid), None)
             manager.handle_block(blocker)
@@ -281,6 +284,7 @@ async def game_battle(req: BattleActionRequest):
             manager.apply_counter(player, counter_card)
             
         elif action_type == battle_types.get('PASS'):
+            log_event("INFO", "game.battle_pass", "Player passed battle phase action", player=player_id)
             manager.apply_counter(player, None)
 
         return build_game_result_hybrid(manager, game_id, success=True)
