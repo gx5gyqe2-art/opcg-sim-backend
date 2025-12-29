@@ -13,9 +13,9 @@ if current_api_dir not in sys.path:
     sys.path.append(current_api_dir)
 
 try:
-    from schemas import GameStateSchema
+    from schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
 except ImportError:
-    from .schemas import GameStateSchema
+    from .schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
 
 from opcg_sim.src.utils.logger_config import session_id_ctx, log_event
 from opcg_sim.src.core.gamestate import Player, GameManager
@@ -65,6 +65,16 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
             log_event(level_key="ERROR", action="api.validation", msg=f"Validation Error: {e}", player="system")
             validated_state = raw_game_state 
 
+    pending_req_data = None
+    if manager and success:
+        pending_obj = manager.get_pending_request()
+        if pending_obj:
+            try:
+                pending_req_data = PendingRequestSchema(**pending_obj).model_dump(by_alias=True)
+            except Exception as e:
+                log_event(level_key="ERROR", action="api.pending_validation", msg=f"Pending Validation Error: {e}", player="system")
+                pending_req_data = pending_obj
+
     error_obj = None
     if not success:
         error_obj = {
@@ -76,6 +86,7 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
         api_root_keys.get('SUCCESS', 'success'): success,
         "game_id": game_id,
         api_root_keys.get('GAME_STATE', 'game_state'): validated_state,
+        api_root_keys.get('PENDING_REQUEST', 'pending_request'): pending_req_data,
         api_root_keys.get('ERROR', 'error'): error_obj
     }
 
@@ -203,7 +214,8 @@ async def game_action(req: Dict[str, Any] = Body(...)):
                 if not attack_target:
                     raise ValueError("攻撃対象が見つかりません。")
                 
-                manager.resolve_attack(target_card, attack_target)
+                manager.declare_attack(target_card, attack_target)
+
             
             elif action_type == "ATTACH_DON":
                 if current_player.don_active:
@@ -234,6 +246,48 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'),
             error_msg=str(e)
         )
+
+@app.options("/api/game/battle")
+async def options_game_battle():
+    return {"status": "ok"}
+
+@app.post("/api/game/battle")
+async def game_battle(req: BattleActionRequest):
+    game_id = req.game_id
+    player_id = req.player_id
+    action_type = req.action_type
+    card_uuid = req.card_uuid
+    
+    manager = GAMES.get(game_id)
+    error_codes = CONST.get('ERROR_CODES', {})
+    battle_types = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+
+    if not manager:
+        log_event("ERROR", "api.battle_action", f"Game not found: {game_id}", player=player_id)
+        return build_game_result_hybrid(None, game_id, success=False, error_code=error_codes.get('GAME_NOT_FOUND', 'GAME_NOT_FOUND'), error_msg="Game not found")
+
+    player = manager.p1 if player_id == manager.p1.name else manager.p2
+
+    try:
+        is_valid = manager._validate_action(player, action_type)
+        log_event("DEBUG", "api.battle_validation", f"Validation: {is_valid}", player=player_id)
+        
+        if action_type == battle_types.get('SELECT_BLOCKER'):
+            blocker = next((c for c in player.field if c.uuid == card_uuid), None)
+            manager.handle_block(blocker)
+        
+        elif action_type == battle_types.get('SELECT_COUNTER'):
+            counter_card = next((c for c in player.hand if c.uuid == card_uuid), None)
+            manager.apply_counter(player, counter_card)
+            
+        elif action_type == battle_types.get('PASS'):
+            manager.apply_counter(player, None)
+
+        return build_game_result_hybrid(manager, game_id, success=True)
+
+    except Exception as e:
+        log_event("ERROR", "game.battle_fail", traceback.format_exc(), player=player_id)
+        return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
 
 @app.get("/health")
 async def health():

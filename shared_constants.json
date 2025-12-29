@@ -5,8 +5,10 @@
   },
   "API_ROOT_KEYS": {
     "GAME_STATE": "game_state",
+    "PENDING_REQUEST": "pending_request",
     "SUCCESS": "success",
-    "ERROR": "error"
+    "ERROR": "error",
+    "GAME_ID": "game_id"
   },
   "PLAYER_PROPERTIES": {
     "DON_DECK_COUNT": "don_deck_count",
@@ -62,7 +64,21 @@
         "ATTACH_DON": "ATTACH_DON",
         "TURN_END": "TURN_END"
       }
+    },
+    "BATTLE_ACTIONS": {
+      "TYPES": {
+        "SELECT_BLOCKER": "SELECT_BLOCKER",
+        "SELECT_COUNTER": "SELECT_COUNTER",
+        "PASS": "PASS"
+      }
     }
+  },
+  "PENDING_REQUEST_PROPERTIES": {
+    "PLAYER_ID": "player_id",
+    "ACTION": "action",
+    "SELECTABLE_UUIDS": "selectable_uuids",
+    "CAN_SKIP": "can_skip",
+    "MESSAGE": "message"
   },
   "ERROR_PROPERTIES": {
     "CODE": "code",
@@ -73,6 +89,7 @@
     "INVALID_ACTION": "INVALID_ACTION",
     "NOT_YOUR_TURN": "NOT_YOUR_TURN",
     "INSUFFICIENT_COST": "INSUFFICIENT_COST",
-    "INVALID_TARGET": "INVALID_TARGET"
+    "INVALID_TARGET": "INVALID_TARGET",
+    "INVALID_PHASE": "INVALID_PHASE"
   }
 }

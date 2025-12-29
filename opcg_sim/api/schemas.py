@@ -79,10 +79,25 @@ class GameStateSchema(BaseModel):
     turn_info: Dict[str, Any]
     players: Dict[str, PlayerSchema]
 
+class PendingRequestSchema(BaseModel):
+    model_config = ConfigDict(extra='allow', populate_by_name=True)
+    player_id: str = Field(..., alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('PLAYER_ID', 'player_id'))
+    action: str = Field(..., alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('ACTION', 'action'))
+    selectable_uuids: List[str] = Field(default_factory=list, alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('SELECTABLE_UUIDS', 'selectable_uuids'))
+    can_skip: bool = Field(False, alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('CAN_SKIP', 'can_skip'))
+    message: Optional[str] = Field(None, alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('MESSAGE', 'message'))
+
 class GameActionResultSchema(BaseModel):
     model_config = ConfigDict(extra='allow', populate_by_name=True)
 
     success: bool = Field(..., alias=CONST.get('API_ROOT_KEYS', {}).get('SUCCESS', 'success'))
     game_id: str
     game_state: Optional[GameStateSchema] = Field(None, alias=CONST.get('API_ROOT_KEYS', {}).get('GAME_STATE', 'game_state'))
+    pending_request: Optional[PendingRequestSchema] = Field(None, alias=CONST.get('API_ROOT_KEYS', {}).get('PENDING_REQUEST', 'pending_request'))
     error: Optional[Dict[str, str]] = None
+
+class BattleActionRequest(BaseModel):
+    game_id: str
+    player_id: str
+    action_type: str
+    card_uuid: Optional[str] = None
