@@ -192,40 +192,62 @@ async def game_action(req: Dict[str, Any] = Body(...)):
 
     payload = req.get("payload", {})
     card_uuid = payload.get("uuid")
-    target_uuid = payload.get("target_uuid")
+    target_ids = payload.get("target_ids", [])
+    target_uuid = target_ids[0] if isinstance(target_ids, list) and len(target_ids) > 0 else payload.get("target_uuid")
 
     try:
         from opcg_sim.src.models.enums import TriggerType
-            current_player = manager.p1 if player_id == manager.p1.name else manager.p2
-            potential_attackers = []
-            if current_player.leader: potential_attackers.append(current_player.leader)
-            potential_attackers.extend(current_player.field)
-            target_card = next((c for c in potential_attackers if c.uuid == card_uuid), None)
+        current_player = manager.p1 if player_id == manager.p1.name else manager.p2
+        opponent = manager.p2 if current_player == manager.p1 else manager.p1
+        potential_attackers = []
+        if current_player.leader: potential_attackers.append(current_player.leader)
+        potential_attackers.extend(current_player.field)
+        target_card = next((c for c in potential_attackers if c.uuid == card_uuid), None)
 
+        if action_type == "PLAY":
+            target_card_in_hand = next((c for c in current_player.hand if c.uuid == card_uuid), None)
+            if target_card_in_hand:
+                manager.pay_cost(current_player, target_card_in_hand.master.cost)
+                manager.play_card_action(current_player, target_card_in_hand)
+            else:
+                raise ValueError("対象のカードが手札にありません。")
+        
+        elif action_type == "TURN_END":
+            manager.end_turn()
+
+        elif action_type == "ATTACK":
             if not target_card:
-                raise ValueError(f"指定されたカード {card_uuid} が盤面に見つかりません。")
-
-            if action_type == "ATTACK":
-                log_event("DEBUG", "api.attack_final_check", 
-                          f"Ready to attack. Card: {target_card.master.name}, is_rest: {target_card.is_rest}", 
-                          player=player_id)
-                
-                manager.declare_attack(target_card, attack_target)
-
-            elif action_type == "ATTACH_DON":
-
-                if current_player.don_active:
-                    don = current_player.don_active.pop(0)
-                    don.attached_to = target_card.uuid
-                    current_player.don_attached_cards.append(don)
-                    target_card.attached_don += 1
-                else:
-                    raise ValueError("アクティブなドン!!が不足しています。")
+                raise ValueError("攻撃側のカードが盤面に見つかりません。")
+            opponent_units = [opponent.leader] + opponent.field
+            if opponent.stage: opponent_units.append(opponent.stage)
+            attack_target = next((c for c in opponent_units if c.uuid == target_uuid), None)
             
-            elif action_type == "ACTIVATE_MAIN":
-                for ability in target_card.master.abilities:
-                    if ability.trigger == TriggerType.ACTIVATE_MAIN:
-                        manager.resolve_ability(current_player, ability, source_card=target_card)
+            if not attack_target:
+                raise ValueError("攻撃対象が見つかりません。")
+
+            log_event("DEBUG", "api.attack_final_check", 
+                      f"Ready to attack. Card: {target_card.master.name}, is_rest: {target_card.is_rest}", 
+                      player=player_id)
+            
+            manager.declare_attack(target_card, attack_target)
+            
+        elif action_type == "ATTACH_DON":
+            if not target_card:
+                raise ValueError("ドン!!を付与する対象のカードが見つかりません。")
+            if current_player.don_active:
+                don = current_player.don_active.pop(0)
+                don.attached_to = target_card.uuid
+                current_player.don_attached_cards.append(don)
+                target_card.attached_don += 1
+            else:
+                raise ValueError("アクティブなドン!!が不足しています。")
+        
+        elif action_type == "ACTIVATE_MAIN":
+            if not target_card:
+                raise ValueError("効果を発動するカードが見つかりません。")
+            for ability in target_card.master.abilities:
+                if ability.trigger == TriggerType.ACTIVATE_MAIN:
+                    manager.resolve_ability(current_player, ability, source_card=target_card)
 
         return build_game_result_hybrid(manager, game_id, success=True)
 
