@@ -124,7 +124,7 @@ class GameManager:
                 "player_id": self.turn_player.name,
                 "action": "MAIN_ACTION",
                 "message": PendingMessage.MAIN_ACTION.value,
-                "selectable_uuids": [c.uuid for c in self.turn_player.hand] + [c.uuid for c in self.turn_player.field if not c.is_rest],
+                "selectable_uuids": selectable,
                 "can_skip": True
             }
         if request:

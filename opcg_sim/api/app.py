@@ -175,7 +175,7 @@ async def options_game_action():
 
 @app.post("/api/game/action")
 async def game_action(req: Dict[str, Any] = Body(...)):
-    action_type = req.get("action")
+    action_type = req.get("action") or req.get("type")
     player_id = req.get("player_id", "system")
     log_event("DEBUG", "api.action_received", f"Action: {action_type}", player=player_id, payload=req)
 
@@ -190,8 +190,8 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             error_msg="指定されたゲームが見つかりません。"
         )
 
-    payload = req.get("payload", {})
-    card_uuid = payload.get("uuid")
+    payload = req.get("payload") or req.get("full_payload") or {}
+    card_uuid = payload.get("uuid") or payload.get("card_id")
     target_ids = payload.get("target_ids", [])
     target_uuid = target_ids[0] if isinstance(target_ids, list) and len(target_ids) > 0 else payload.get("target_uuid")
 
@@ -203,6 +203,8 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         if current_player.leader: potential_attackers.append(current_player.leader)
         potential_attackers.extend(current_player.field)
         target_card = next((c for c in potential_attackers if c.uuid == card_uuid), None)
+        if card_uuid == target_uuid:
+            raise ValueError("自分自身を攻撃対象に選択することはできません。")
 
         if action_type == "PLAY":
             target_card_in_hand = next((c for c in current_player.hand if c.uuid == card_uuid), None)
@@ -215,15 +217,16 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         elif action_type == "TURN_END":
             manager.end_turn()
 
-        elif action_type == "ATTACK":
-            # 1. まず防御側を特定
-            opponent_units = [opponent.leader] + opponent.field
-            if opponent.stage: opponent_units.append(opponent.stage)
+        elif action_type == CONST.get('c_to_s_interface', {}).get('MAIN_ACTIONS', {}).get('TYPES', {}).get('ATTACK') or \
+             action_type == CONST.get('c_to_s_interface', {}).get('MAIN_ACTIONS', {}).get('TYPES', {}).get('ATTACK_CONFIRM'):
+            opponent_player = manager.p2 if player_id == manager.p1.name else manager.p1
+            opponent_units = [opponent_player.leader] + opponent_player.field
+            if opponent_player.stage: opponent_units.append(opponent_player.stage)
             attack_target = next((c for c in opponent_units if c.uuid == target_uuid), None)
+
             
             if not attack_target:
                 raise ValueError("攻撃対象が見つかりません。")
-            target_card = next((c for c in potential_attackers if c.uuid == card_uuid), None)
             log_event("INFO", "api.attack_execute", f"Attacking: {target_card.master.name} -> {attack_target.master.name}", player=player_id)
             manager.declare_attack(target_card, attack_target)
             
