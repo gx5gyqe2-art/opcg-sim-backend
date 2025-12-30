@@ -216,6 +216,12 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             manager.end_turn()
 
         elif action_type == "ATTACK":
+            pending = manager.get_pending_request()
+            log_event("DEBUG", "api.attack_validation_check", 
+                      f"Is card in selectable_uuids: {card_uuid in pending.get('selectable_uuids', [])}", 
+                      player=player_id, 
+                      payload={"allowed": pending.get('selectable_uuids', [])})
+
             if not target_card:
                 raise ValueError("攻撃側のカードが盤面に見つかりません。")
             opponent_units = [opponent.leader] + opponent.field
