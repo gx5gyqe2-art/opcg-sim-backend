@@ -216,27 +216,15 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             manager.end_turn()
 
         elif action_type == "ATTACK":
-            log_event("DEBUG", "api.attack_trace_1_start", f"Start identification - Card: {target_card.master.name if target_card else 'None'}, is_rest: {target_card.is_rest if target_card else 'N/A'}", player=player_id)
-
-            pending = manager.get_pending_request()
-            log_event("DEBUG", "api.attack_validation_check", 
-                      f"Is card in selectable_uuids: {card_uuid in pending.get('selectable_uuids', [])}", 
-                      player=player_id, 
-                      payload={"allowed": pending.get('selectable_uuids', [])})
-
-            if not target_card:
-                raise ValueError("攻撃側のカードが盤面に見つかりません。")
+            # 1. まず防御側を特定
             opponent_units = [opponent.leader] + opponent.field
             if opponent.stage: opponent_units.append(opponent.stage)
             attack_target = next((c for c in opponent_units if c.uuid == target_uuid), None)
-            log_event("DEBUG", "api.attack_trace_2_mid", f"Mid process - Attacker: {target_card.master.name if target_card else 'None'}, is_rest: {target_card.is_rest if target_card else 'N/A'}", player=player_id)
+            
             if not attack_target:
                 raise ValueError("攻撃対象が見つかりません。")
-            log_event("DEBUG", "api.attack_trace_3_final", f"Final check before manager - Card: {target_card.master.name if target_card else 'None'}, is_rest: {target_card.is_rest if target_card else 'N/A'}", player=player_id)
-            log_event("DEBUG", "api.attack_final_check", 
-                      f"Ready to attack. Card: {target_card.master.name}, is_rest: {target_card.is_rest}", 
-                      player=player_id)
-            
+            target_card = next((c for c in potential_attackers if c.uuid == card_uuid), None)
+            log_event("INFO", "api.attack_execute", f"Attacking: {target_card.master.name} -> {attack_target.master.name}", player=player_id)
             manager.declare_attack(target_card, attack_target)
             
         elif action_type == "ATTACH_DON":
