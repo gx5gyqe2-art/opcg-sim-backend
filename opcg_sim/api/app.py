@@ -212,8 +212,6 @@ async def game_action(req: Dict[str, Any] = Body(...)):
                 
                 manager.declare_attack(target_card, attack_target)
 
-
-            
             elif action_type == "ATTACH_DON":
 
                 if current_player.don_active:
@@ -246,6 +244,7 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         )
 
 @app.options("/api/game/battle")
+
 async def options_game_battle():
     return {"status": "ok"}
 
