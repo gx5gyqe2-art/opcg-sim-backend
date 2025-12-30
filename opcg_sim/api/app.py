@@ -217,8 +217,8 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         elif action_type == "TURN_END":
             manager.end_turn()
 
-        elif action_type == CONST.get('c_to_s_interface', {}).get('MAIN_ACTIONS', {}).get('TYPES', {}).get('ATTACK') or \
-             action_type == CONST.get('c_to_s_interface', {}).get('MAIN_ACTIONS', {}).get('TYPES', {}).get('ATTACK_CONFIRM'):
+        elif action_type == CONST.get('c_to_s_interface', {}).get('GAME_ACTIONS', {}).get('TYPES', {}).get('ATTACK') or \
+             action_type == CONST.get('c_to_s_interface', {}).get('GAME_ACTIONS', {}).get('TYPES', {}).get('ATTACK_CONFIRM'):
             opponent_player = manager.p2 if player_id == manager.p1.name else manager.p1
             opponent_units = [opponent_player.leader] + opponent_player.field
             if opponent_player.stage: opponent_units.append(opponent_player.stage)
