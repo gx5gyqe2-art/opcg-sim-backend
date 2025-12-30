@@ -116,6 +116,10 @@ class GameManager:
                 "can_skip": True
             }
         elif self.phase == Phase.MAIN:
+            selectable = [c.uuid for c in self.turn_player.hand]
+            selectable += [c.uuid for c in self.turn_player.field if not c.is_rest]
+            if self.turn_player.leader and not self.turn_player.leader.is_rest:
+                selectable.append(self.turn_player.leader.uuid)
             request = {
                 "player_id": self.turn_player.name,
                 "action": "MAIN_ACTION",
@@ -123,7 +127,6 @@ class GameManager:
                 "selectable_uuids": [c.uuid for c in self.turn_player.hand] + [c.uuid for c in self.turn_player.field if not c.is_rest],
                 "can_skip": True
             }
-        
         if request:
             log_event("DEBUG", "game.pending_request", f"Generated request: {request['action']} for {request['player_id']}", player=request['player_id'])
         else:
