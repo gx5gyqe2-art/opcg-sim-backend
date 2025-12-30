@@ -222,18 +222,21 @@ async def game_action(req: Dict[str, Any] = Body(...)):
                 raise ValueError("指定されたカードが盤面に見つかりません。")
 
             if action_type == "ATTACK":
-                opponent_units = [opponent.leader] + opponent.field
-                if opponent.stage: opponent_units.append(opponent.stage)
-                
-                target_ids = payload.get("target_ids", [])
-                target_uuid = target_ids[0] if isinstance(target_ids, list) and len(target_ids) > 0 else payload.get("target_uuid")
-                
-                attack_target = next((c for c in opponent_units if c.uuid == target_uuid), None)
 
+                log_event("DEBUG", "api.attack_search", f"Attacking. Attacker: {card_uuid}, Target: {target_uuid}, Opponent: {opponent.name}", player=player_id)
+
+                all_possible_targets = []
+                for p in [manager.p1, manager.p2]:
+                    all_possible_targets.extend([p.leader] + p.field + ([p.stage] if p.stage else []))
+                
+                attack_target = next((c for c in all_possible_targets if c.uuid == target_uuid), None)
+                
                 if not attack_target:
-                    raise ValueError("攻撃対象が見つかりません。")
+                    log_event("ERROR", "api.attack_fail", f"Target UUID {target_uuid} not found in any player's field/leader", player=player_id)
+                    raise ValueError(f"攻撃対象 {target_uuid} が見つかりません。")
                 
                 manager.declare_attack(target_card, attack_target)
+
             
             elif action_type == "ATTACH_DON":
 
