@@ -222,8 +222,10 @@ async def game_action(req: Dict[str, Any] = Body(...)):
                 raise ValueError("指定されたカードが盤面に見つかりません。")
 
             if action_type == "ATTACK":
+                log_event("DEBUG", "api.attack_check", 
+                          f"Attacker: {target_card.master.name}, is_rest: {target_card.is_rest}", 
+                          player=player_id)
 
-                log_event("DEBUG", "api.attack_search", f"Attacking. Attacker: {card_uuid}, Target: {target_uuid}, Opponent: {opponent.name}", player=player_id)
 
                 all_possible_targets = []
                 for p in [manager.p1, manager.p2]:
