@@ -196,48 +196,22 @@ async def game_action(req: Dict[str, Any] = Body(...)):
 
     try:
         from opcg_sim.src.models.enums import TriggerType
-        current_player = manager.p1 if player_id == manager.p1.name else manager.p2
-        opponent = manager.p2 if current_player == manager.p1 else manager.p1
-        
-        if action_type == "PLAY":
-            target_card = next((c for c in current_player.hand if c.uuid == card_uuid), None)
-            if target_card:
-                manager.pay_cost(current_player, target_card.master.cost)
-                manager.play_card_action(current_player, target_card)
-            else:
-                raise ValueError("対象のカードが手札にありません。")
-                
-        elif action_type == "TURN_END":
-            manager.end_turn()
-
-        else:
-            search_list = []
-            if current_player.leader: search_list.append(current_player.leader)
-            if current_player.stage: search_list.append(current_player.stage)
-            search_list.extend(current_player.field)
-            
-            target_card = next((c for c in search_list if c.uuid == card_uuid), None)
+            current_player = manager.p1 if player_id == manager.p1.name else manager.p2
+            potential_attackers = []
+            if current_player.leader: potential_attackers.append(current_player.leader)
+            potential_attackers.extend(current_player.field)
+            target_card = next((c for c in potential_attackers if c.uuid == card_uuid), None)
 
             if not target_card:
-                raise ValueError("指定されたカードが盤面に見つかりません。")
+                raise ValueError(f"指定されたカード {card_uuid} が盤面に見つかりません。")
 
             if action_type == "ATTACK":
-                log_event("DEBUG", "api.attack_check", 
-                          f"Attacker: {target_card.master.name}, is_rest: {target_card.is_rest}", 
+                log_event("DEBUG", "api.attack_final_check", 
+                          f"Ready to attack. Card: {target_card.master.name}, is_rest: {target_card.is_rest}", 
                           player=player_id)
-
-
-                all_possible_targets = []
-                for p in [manager.p1, manager.p2]:
-                    all_possible_targets.extend([p.leader] + p.field + ([p.stage] if p.stage else []))
-                
-                attack_target = next((c for c in all_possible_targets if c.uuid == target_uuid), None)
-                
-                if not attack_target:
-                    log_event("ERROR", "api.attack_fail", f"Target UUID {target_uuid} not found in any player's field/leader", player=player_id)
-                    raise ValueError(f"攻撃対象 {target_uuid} が見つかりません。")
                 
                 manager.declare_attack(target_card, attack_target)
+
 
             
             elif action_type == "ATTACH_DON":
