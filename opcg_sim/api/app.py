@@ -206,7 +206,7 @@ async def game_action(req: Dict[str, Any] = Body(...)):
                 manager.play_card_action(current_player, target_card)
             else:
                 raise ValueError("対象のカードが手札にありません。")
-        
+                
         elif action_type == "TURN_END":
             manager.end_turn()
 
@@ -224,15 +224,19 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             if action_type == "ATTACK":
                 opponent_units = [opponent.leader] + opponent.field
                 if opponent.stage: opponent_units.append(opponent.stage)
-                attack_target = next((c for c in opponent_units if c.uuid == target_uuid), None)
                 
+                target_ids = payload.get("target_ids", [])
+                target_uuid = target_ids[0] if isinstance(target_ids, list) and len(target_ids) > 0 else payload.get("target_uuid")
+                
+                attack_target = next((c for c in opponent_units if c.uuid == target_uuid), None)
+
                 if not attack_target:
                     raise ValueError("攻撃対象が見つかりません。")
                 
                 manager.declare_attack(target_card, attack_target)
-
             
             elif action_type == "ATTACH_DON":
+
                 if current_player.don_active:
                     don = current_player.don_active.pop(0)
                     don.attached_to = target_card.uuid
