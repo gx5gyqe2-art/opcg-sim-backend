@@ -93,7 +93,21 @@ class GameManager:
         request = None
         if self.phase == Phase.BLOCK_STEP and self.active_battle:
             target_owner = self.active_battle["target_owner"]
-            blockers = [c.uuid for c in target_owner.field if not c.is_rest and "ブロッカー" in c.current_keywords]
+            blockers = []
+            for c in target_owner.field:
+                is_active = not c.is_rest
+                has_keyword = "ブロッカー" in c.current_keywords
+                log_event("DEBUG", "game.block_calc", 
+                          f"Card: {c.master.name}, Active: {is_active}, Keywords: {c.current_keywords}, Match: {has_keyword}", 
+                          player=target_owner.name)
+                
+                if is_active and has_keyword:
+                    blockers.append(c.uuid)
+
+            log_event("DEBUG", "game.block_step_info", 
+                      f"TargetPlayer: {target_owner.name}, FoundBlockers: {len(blockers)}", 
+                      player=target_owner.name)
+
             request = {
                 "player_id": target_owner.name,
                 "action": "SELECT_BLOCKER",
@@ -101,6 +115,7 @@ class GameManager:
                 "selectable_uuids": blockers,
                 "can_skip": True
             }
+
         elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
             target_owner = self.active_battle["target_owner"]
             counters = [
@@ -304,7 +319,7 @@ class GameManager:
 
     def has_blocker(self, player: Player) -> bool:
         for card in player.field:
-            if not card.is_rest and "ブロッカー" in card.current_keywords:
+            if not card.is_rest and "ブロッカー" in card.current_keywords:
                 return True
         return False
 
