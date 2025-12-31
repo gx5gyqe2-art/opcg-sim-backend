@@ -87,11 +87,6 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
             log_event("DEBUG", "api.validated_state_check", 
                       f"Validated active_battle: {validated_state.get('active_battle')}", 
                       player="system")
-
-    validated_state = None
-    if success:
-        try:
-            validated_state = GameStateSchema(**raw_game_state).model_dump(by_alias=True)
         except Exception as e:
             log_event(level_key="ERROR", action="api.validation", msg=f"Validation Error: {e}", player="system")
             validated_state = raw_game_state 
