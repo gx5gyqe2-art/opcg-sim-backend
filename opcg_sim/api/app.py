@@ -56,7 +56,6 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
         msg=f"Turn Info: count={manager.turn_count if manager else 0}, active_pid={active_pid}",
         player="system")
 
-
     battle_props = CONST.get('BATTLE_PROPERTIES', {})
     raw_game_state = {
         "game_id": game_id,
@@ -125,7 +124,6 @@ async def trace_logging_middleware(request: Request, call_next):
     if not request.url.path.endswith(("/health", "/favicon.ico")):
         log_event(level_key="INFO", action="api.inbound", msg=f"{request.method} {request.url.path}", player="system")
     try:
-        # 修正：必要な部分以外は修正しない制約に基づき、既存ロジックを維持
         response = await call_next(request)
         response.headers["X-Session-ID"] = s_id
         return response
@@ -211,12 +209,12 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         from opcg_sim.src.models.enums import TriggerType
         current_player = manager.p1 if player_id == manager.p1.name else manager.p2
         opponent = manager.p2 if current_player == manager.p1 else manager.p1
-        potential_attackers = []
-        if current_player.leader: potential_attackers.append(current_player.leader)
-        potential_attackers.extend(current_player.field)
-        target_card = next((c for c in potential_attackers if c.uuid == card_uuid), None)
-        if card_uuid == target_uuid:
-            raise ValueError("自分自身を攻撃対象に選択することはできません。")
+        
+        potential_cards = []
+        if current_player.leader: potential_cards.append(current_player.leader)
+        potential_cards.extend(current_player.field)
+        
+        operating_card = next((c for c in potential_cards if c.uuid == card_uuid), None)
 
         if action_type == "PLAY":
             target_card_in_hand = next((c for c in current_player.hand if c.uuid == card_uuid), None)
@@ -231,34 +229,40 @@ async def game_action(req: Dict[str, Any] = Body(...)):
 
         elif action_type == CONST.get('c_to_s_interface', {}).get('GAME_ACTIONS', {}).get('TYPES', {}).get('ATTACK') or \
              action_type == CONST.get('c_to_s_interface', {}).get('GAME_ACTIONS', {}).get('TYPES', {}).get('ATTACK_CONFIRM'):
-            opponent_player = manager.p2 if player_id == manager.p1.name else manager.p1
-            opponent_units = [opponent_player.leader] + opponent_player.field
-            if opponent_player.stage: opponent_units.append(opponent_player.stage)
+            
+            if card_uuid == target_uuid:
+                raise ValueError("自分自身を攻撃対象に選択することはできません。")
+            
+            if not operating_card:
+                raise ValueError("アタックするカードが見つかりません。")
+
+            opponent_units = [opponent.leader] + opponent.field
+            if opponent.stage: opponent_units.append(opponent.stage)
             attack_target = next((c for c in opponent_units if c.uuid == target_uuid), None)
 
-            
             if not attack_target:
                 raise ValueError("攻撃対象が見つかりません。")
-            log_event("INFO", "api.attack_execute", f"Attacking: {target_card.master.name} -> {attack_target.master.name}", player=player_id)
-            manager.declare_attack(target_card, attack_target)
+            
+            log_event("INFO", "api.attack_execute", f"Attacking: {operating_card.master.name} -> {attack_target.master.name}", player=player_id)
+            manager.declare_attack(operating_card, attack_target)
             
         elif action_type == "ATTACH_DON":
-            if not target_card:
+            if not operating_card:
                 raise ValueError("ドン!!を付与する対象のカードが見つかりません。")
             if current_player.don_active:
                 don = current_player.don_active.pop(0)
-                don.attached_to = target_card.uuid
+                don.attached_to = operating_card.uuid
                 current_player.don_attached_cards.append(don)
-                target_card.attached_don += 1
+                operating_card.attached_don += 1
             else:
                 raise ValueError("アクティブなドン!!が不足しています。")
         
         elif action_type == "ACTIVATE_MAIN":
-            if not target_card:
+            if not operating_card:
                 raise ValueError("効果を発動するカードが見つかりません。")
-            for ability in target_card.master.abilities:
+            for ability in operating_card.master.abilities:
                 if ability.trigger == TriggerType.ACTIVATE_MAIN:
-                    manager.resolve_ability(current_player, ability, source_card=target_card)
+                    manager.resolve_ability(current_player, ability, source_card=operating_card)
 
         return build_game_result_hybrid(manager, game_id, success=True)
 
@@ -277,7 +281,6 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         )
 
 @app.options("/api/game/battle")
-
 async def options_game_battle():
     return {"status": "ok"}
 
