@@ -3,7 +3,7 @@ import random
 import unicodedata
 import re
 import traceback
-from ..models.models import CardInstance, CardMaster, DonInstance
+from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
 from ..models.effect_types import TargetQuery, Ability
 from ..utils.logger_config import log_event
@@ -43,6 +43,8 @@ class Player:
     def to_dict(self, is_owner: bool = True):
         log_event("DEBUG", "gamestate.to_dict", f"Serializing player state for {self.name}", player=self.name)
         
+        player_props = CONST.get('PLAYER_PROPERTIES', {})
+
         leader_dict = self.leader.to_dict() if self.leader else None
         if leader_dict:
             leader_dict["is_face_up"] = True
@@ -54,11 +56,11 @@ class Player:
         return {
             "player_id": self.name,
             "name": self.name,
-            "life_count": len(self.life),
+            player_props.get("LIFE_COUNT", "life_count"): len(self.life),
             "hand_count": len(self.hand),
-            "don_deck_count": len(self.don_deck),
-            "don_active": [d.to_dict() for d in self.don_active],
-            "don_rested": [d.to_dict() for d in self.don_rested],
+            player_props.get("DON_DECK_COUNT", "don_deck_count"): len(self.don_deck),
+            player_props.get("DON_ACTIVE", "don_active"): [d.to_dict() for d in self.don_active],
+            player_props.get("DON_RESTED", "don_rested"): [d.to_dict() for d in self.don_rested],
             "leader": leader_dict,
             "zones": {
                 "field": [self._format_card(c, True) for c in self.field],
@@ -86,6 +88,18 @@ class GameManager:
         self.active_battle: Optional[Dict[str, Any]] = None
 
     def get_pending_request(self) -> Optional[Dict[str, Any]]:
+        pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
+        battle_actions = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+        
+        KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
+        KEY_ACTION = pending_props.get('ACTION', 'action')
+        KEY_MSG = pending_props.get('MESSAGE', 'message')
+        KEY_UUIDS = pending_props.get('SELECTABLE_UUIDS', 'selectable_uuids')
+        KEY_SKIP = pending_props.get('CAN_SKIP', 'can_skip')
+
+        ACT_BLOCKER = battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
+        ACT_COUNTER = battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER')
+
         if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
             log_event("ERROR", "game.pending_request_error", f"Active battle missing in phase: {self.phase.name}")
             self.phase = Phase.MAIN
@@ -109,11 +123,11 @@ class GameManager:
                       player=target_owner.name)
 
             request = {
-                "player_id": target_owner.name,
-                "action": "SELECT_BLOCKER",
-                "message": PendingMessage.SELECT_BLOCKER.value,
-                "selectable_uuids": blockers,
-                "can_skip": True
+                KEY_PID: target_owner.name,
+                KEY_ACTION: ACT_BLOCKER,
+                KEY_MSG: PendingMessage.SELECT_BLOCKER.value,
+                KEY_UUIDS: blockers,
+                KEY_SKIP: True
             }
 
         elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
@@ -124,11 +138,11 @@ class GameManager:
                 (c.master.type == CardType.EVENT and any(abil.trigger == TriggerType.COUNTER for abil in c.master.abilities))
             ]
             request = {
-                "player_id": target_owner.name,
-                "action": "SELECT_COUNTER",
-                "message": PendingMessage.SELECT_COUNTER.value,
-                "selectable_uuids": counters,
-                "can_skip": True
+                KEY_PID: target_owner.name,
+                KEY_ACTION: ACT_COUNTER,
+                KEY_MSG: PendingMessage.SELECT_COUNTER.value,
+                KEY_UUIDS: counters,
+                KEY_SKIP: True
             }
         elif self.phase == Phase.MAIN:
             selectable = [c.uuid for c in self.turn_player.hand]
@@ -136,35 +150,45 @@ class GameManager:
             if self.turn_player.leader and not self.turn_player.leader.is_rest:
                 selectable.append(self.turn_player.leader.uuid)
             request = {
-                "player_id": self.turn_player.name,
-                "action": "MAIN_ACTION",
-                "message": PendingMessage.MAIN_ACTION.value,
-                "selectable_uuids": selectable,
-                "can_skip": True
+                KEY_PID: self.turn_player.name,
+                KEY_ACTION: "MAIN_ACTION",
+                KEY_MSG: PendingMessage.MAIN_ACTION.value,
+                KEY_UUIDS: selectable,
+                KEY_SKIP: True
             }
         if request:
-            log_event("DEBUG", "game.pending_request", f"Generated request: {request['action']} for {request['player_id']}", player=request['player_id'])
+            log_event("DEBUG", "game.pending_request", f"Generated request: {request[KEY_ACTION]} for {request[KEY_PID]}", player=request[KEY_PID])
         else:
             log_event("WARNING", "game.pending_request_none", f"No request generated for phase: {self.phase.name}")
         return request
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
+        
+        pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
+        KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
+        KEY_ACTION = pending_props.get('ACTION', 'action')
+        
+        battle_actions = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+        ACT_BLOCKER = battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
+        ACT_COUNTER = battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER')
+        ACT_PASS = battle_actions.get('PASS', 'PASS')
+
         if not pending:
             log_event("ERROR", "game.validation_fail", f"No pending request. Current Phase: {self.phase.name}, Turn Player: {self.turn_player.name}", player=player.name)
             raise ValueError("現在実行可能なアクションはありません。")
         
-        if pending["player_id"] != player.name:
-            error_msg = f"Wait for {pending['player_id']}'s action. Current Phase: {self.phase.name}"
+        if pending[KEY_PID] != player.name:
+            error_msg = f"Wait for {pending[KEY_PID]}'s action. Current Phase: {self.phase.name}"
             log_event("ERROR", "game.validation_fail", error_msg, player=player.name)
-            raise ValueError(f"現在は {pending['player_id']} のターン/フェイズです。")
+            raise ValueError(f"現在は {pending[KEY_PID]} のターン/フェイズです。")
             
-        if pending["action"] != action_type:
-            if pending["action"] in ["SELECT_COUNTER", "SELECT_BLOCKER"] and action_type == "PASS":
+        if pending[KEY_ACTION] != action_type:
+            if pending[KEY_ACTION] in [ACT_COUNTER, ACT_BLOCKER] and action_type == ACT_PASS:
                 return True
-            error_msg = f"Invalid action type. Expected: {pending['action']}, Got: {action_type}. Phase: {self.phase.name}"
+            error_msg = f"Invalid action type. Expected: {pending[KEY_ACTION]}, Got: {action_type}. Phase: {self.phase.name}"
             log_event("ERROR", "game.validation_fail", error_msg, player=player.name)
-            raise ValueError(f"不適切なアクションです。期待されているアクション: {pending['action']}")
+            raise ValueError(f"不適切なアクションです。期待されているアクション: {pending[KEY_ACTION]}")
         return True
 
     def start_game(self, first_player: Optional[Player] = None):

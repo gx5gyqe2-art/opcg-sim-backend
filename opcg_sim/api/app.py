@@ -207,6 +207,12 @@ async def game_action(req: Dict[str, Any] = Body(...)):
 
     try:
         from opcg_sim.src.models.enums import TriggerType
+        
+        # --- 定数取得 ---
+        c_to_s = CONST.get('c_to_s_interface', {})
+        game_actions = c_to_s.get('GAME_ACTIONS', {}).get('TYPES', {})
+        # ----------------
+        
         current_player = manager.p1 if player_id == manager.p1.name else manager.p2
         opponent = manager.p2 if current_player == manager.p1 else manager.p1
         
@@ -216,7 +222,8 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         
         operating_card = next((c for c in potential_cards if c.uuid == card_uuid), None)
 
-        if action_type == "PLAY":
+        # PLAY
+        if action_type == game_actions.get('PLAY', 'PLAY'):
             target_card_in_hand = next((c for c in current_player.hand if c.uuid == card_uuid), None)
             if target_card_in_hand:
                 manager.pay_cost(current_player, target_card_in_hand.master.cost)
@@ -224,11 +231,13 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             else:
                 raise ValueError("対象のカードが手札にありません。")
         
-        elif action_type == "TURN_END":
+        # TURN_END
+        elif action_type == game_actions.get('TURN_END', 'TURN_END'):
             manager.end_turn()
 
-        elif action_type == CONST.get('c_to_s_interface', {}).get('GAME_ACTIONS', {}).get('TYPES', {}).get('ATTACK') or \
-             action_type == CONST.get('c_to_s_interface', {}).get('GAME_ACTIONS', {}).get('TYPES', {}).get('ATTACK_CONFIRM'):
+        # ATTACK / ATTACK_CONFIRM
+        elif action_type == game_actions.get('ATTACK', 'ATTACK') or \
+             action_type == game_actions.get('ATTACK_CONFIRM', 'ATTACK_CONFIRM'):
             
             if card_uuid == target_uuid:
                 raise ValueError("自分自身を攻撃対象に選択することはできません。")
@@ -246,7 +255,8 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             log_event("INFO", "api.attack_execute", f"Attacking: {operating_card.master.name} -> {attack_target.master.name}", player=player_id)
             manager.declare_attack(operating_card, attack_target)
             
-        elif action_type == "ATTACH_DON":
+        # ATTACH_DON
+        elif action_type == game_actions.get('ATTACH_DON', 'ATTACH_DON'):
             if not operating_card:
                 raise ValueError("ドン!!を付与する対象のカードが見つかりません。")
             if current_player.don_active:
@@ -257,7 +267,8 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             else:
                 raise ValueError("アクティブなドン!!が不足しています。")
         
-        elif action_type == "ACTIVATE_MAIN":
+        # ACTIVATE_MAIN
+        elif action_type == game_actions.get('ACTIVATE_MAIN', 'ACTIVATE_MAIN'):
             if not operating_card:
                 raise ValueError("効果を発動するカードが見つかりません。")
             for ability in operating_card.master.abilities:
@@ -293,7 +304,10 @@ async def game_battle(req: BattleActionRequest):
     
     manager = GAMES.get(game_id)
     error_codes = CONST.get('ERROR_CODES', {})
+    
+    # --- 定数取得 ---
     battle_types = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+    # ----------------
 
     if not manager:
         log_event("ERROR", "api.battle_action", f"Game not found: {game_id}", player=player_id)
@@ -306,20 +320,20 @@ async def game_battle(req: BattleActionRequest):
         try:
             is_valid = manager._validate_action(player, action_type)
         except Exception as ve:
-            if action_type != "PASS":
+            if action_type != battle_types.get('PASS', 'PASS'):
                 raise ve
 
         log_event("DEBUG", "api.battle_validation", f"Validation: {is_valid}", player=player_id)
         
-        if action_type == battle_types.get('SELECT_BLOCKER'):
+        if action_type == battle_types.get('SELECT_BLOCKER', 'SELECT_BLOCKER'):
             blocker = next((c for c in player.field if c.uuid == card_uuid), None)
             manager.handle_block(blocker)
         
-        elif action_type == battle_types.get('SELECT_COUNTER'):
+        elif action_type == battle_types.get('SELECT_COUNTER', 'SELECT_COUNTER'):
             counter_card = next((c for c in player.hand if c.uuid == card_uuid), None)
             manager.apply_counter(player, counter_card)
             
-        elif action_type == "PASS":
+        elif action_type == battle_types.get('PASS', 'PASS'):
             manager.apply_counter(player, None)
 
         return build_game_result_hybrid(manager, game_id, success=True)
