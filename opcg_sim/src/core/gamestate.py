@@ -318,9 +318,6 @@ class GameManager:
                 don.is_rest = True
 
     def has_blocker(self, player: Player) -> bool:
-        for card in player.field:
-            if not card.is_rest and "ブロッカー" in card.current_keywords:
-                return True
         return False
 
     def declare_attack(self, attacker: Card, target: Card):
