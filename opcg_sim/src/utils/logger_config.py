@@ -7,8 +7,12 @@ import urllib.error
 from datetime import datetime
 from contextvars import ContextVar
 from typing import Any, Optional
+from concurrent.futures import ThreadPoolExecutor # 追加
 
 session_id_ctx: ContextVar[str] = ContextVar("session_id", default="sys-init")
+
+# 非同期実行用のスレッドプールを作成（最大3スレッドで裏方処理）
+_executor = ThreadPoolExecutor(max_workers=3)
 
 def load_shared_constants():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -129,6 +133,7 @@ def log_event(
         K["PAYLOAD"]: payload
     }
 
+    # 1. 標準出力への書き込み（これはCloud Runの基本ログとして重要なので同期的に行う）
     try:
         log_json_str = json.dumps(log_data, ensure_ascii=False)
         sys.stdout.write(log_json_str + "\n")
@@ -140,12 +145,15 @@ def log_event(
         sys.stdout.write(log_json_str + "\n")
         sys.stdout.flush()
 
+    # 2. GCSアップロードとSlack通知を「バックグラウンド実行」に変更
+    # これにより、APIのレスポンス待ち時間に影響を与えなくなります
     time_prefix = now.strftime("%Y%m%d_%H%M%S_%f")
     filename = f"{time_prefix}_{sid}_{action}.json"
     
     try:
         json_bytes = json.dumps(log_data, ensure_ascii=False, indent=2).encode('utf-8')
-        upload_to_gcs(filename, json_bytes)
+        # 非同期実行: GCSアップロード
+        _executor.submit(upload_to_gcs, filename, json_bytes)
     except:
         pass
 
@@ -164,8 +172,9 @@ def log_event(
     if lv != "ERROR":
         slack_msg = slack_msg.replace("<!here>", "").replace("<!channel>", "")
 
+    gcs_url = None
     if isinstance(payload, dict) and "game_state" in payload:
         gcs_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{filename}"
-        post_to_slack(slack_msg, target_channel, gcs_url=gcs_url)
-    else:
-        post_to_slack(slack_msg, target_channel)
+    
+    # 非同期実行: Slack通知
+    _executor.submit(post_to_slack, slack_msg, target_channel, gcs_url)
