@@ -12,13 +12,13 @@ def _nfc(text: str) -> str:
     return unicodedata.normalize('NFC', text)
 
 class RawDataLoader:
+    # ... (既存メソッド load_json は変更なし) ...
     @staticmethod
     def load_json(file_path: str) -> Any:
         log_event(level_key="DEBUG", action="loader.load_json", msg=f"Loading JSON from {file_path}...")
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data
+                return json.load(f)
         except FileNotFoundError:
             log_event(level_key="ERROR", action="loader.file_not_found", msg=f"File not found: {file_path}")
             return []
@@ -27,45 +27,36 @@ class RawDataLoader:
             return []
 
 class DataCleaner:
+    # ... (normalize_text, parse_int, parse_traits, parse_abilities, map_color, map_card_type, map_attribute は変更なし) ...
     @staticmethod
     def normalize_text(text: Any) -> str:
-        if text is None:
-            return ""
+        if text is None: return ""
         return unicodedata.normalize('NFKC', str(text)).strip()
 
     @staticmethod
     def parse_int(value: Any, default: int = 0) -> int:
-        if isinstance(value, int):
-            return value
-        
+        if isinstance(value, int): return value
         s_val = DataCleaner.normalize_text(value)
         if not s_val or s_val.lower() in ["nan", "-", "null", "none", _nfc("なし"), "n/a"]:
             return default
-            
         nums = re.findall(r'-?\d+', s_val)
-        if nums:
-            return int(nums[0])
-        return default
+        return int(nums[0]) if nums else default
 
     @staticmethod
     def parse_traits(value: Any) -> List[str]:
         s_val = DataCleaner.normalize_text(value)
-        if not s_val:
-            return []
+        if not s_val: return []
         return [t.strip() for t in s_val.split('/') if t.strip()]
 
     @staticmethod
     def parse_abilities(text: str, is_trigger: bool = False) -> List[Ability]:
         s_text = DataCleaner.normalize_text(text)
-        if not s_text or s_text in [_nfc("なし"), "None", ""]:
-            return []
-        
+        if not s_text or s_text in [_nfc("なし"), "None", ""]: return []
         try:
             effect_parser = Effect(s_text)
             abilities = effect_parser.abilities
             if is_trigger:
-                for ability in abilities:
-                    ability.trigger = TriggerType.TRIGGER
+                for ability in abilities: ability.trigger = TriggerType.TRIGGER
             return abilities
         except Exception as e:
             log_event(level_key="DEBUG", action="loader.parse_abilities_error", msg=f"Error parsing abilities text: '{s_text[:20]}...' -> {e}")
@@ -75,8 +66,7 @@ class DataCleaner:
     def map_color(value: str) -> Color:
         clean_str = DataCleaner.normalize_text(value)
         for c in Color:
-            if DataCleaner.normalize_text(str(c.value)) in clean_str or \
-               DataCleaner.normalize_text(c.name) in clean_str.upper():
+            if DataCleaner.normalize_text(str(c.value)) in clean_str or DataCleaner.normalize_text(c.name) in clean_str.upper():
                 return c
         return Color.UNKNOWN
 
@@ -84,8 +74,7 @@ class DataCleaner:
     def map_card_type(type_str: str) -> CardType:
         clean_str = DataCleaner.normalize_text(type_str)
         for t in CardType:
-            if DataCleaner.normalize_text(str(t.value)) in clean_str or \
-               DataCleaner.normalize_text(t.name) in clean_str.upper():
+            if DataCleaner.normalize_text(str(t.value)) in clean_str or DataCleaner.normalize_text(t.name) in clean_str.upper():
                 return t
         return CardType.UNKNOWN
 
@@ -93,12 +82,27 @@ class DataCleaner:
     def map_attribute(attr_str: str) -> Attribute:
         clean_str = DataCleaner.normalize_text(attr_str)
         for a in Attribute:
-            if DataCleaner.normalize_text(str(a.value)) in clean_str or \
-               DataCleaner.normalize_text(a.name) in clean_str.upper():
+            if DataCleaner.normalize_text(str(a.value)) in clean_str or DataCleaner.normalize_text(a.name) in clean_str.upper():
                 return a
         return Attribute.NONE
 
 class CardLoader:
+    # --- DBのカラム名マッピング定義 ---
+    DB_MAPPING = {
+        "ID": ["number", "Number", _nfc("品番"), _nfc("型番"), "id"],
+        "NAME": ["name", "Name", _nfc("名前"), _nfc("カード名")],
+        "TYPE": [_nfc("種類"), "Type", "type"],
+        "ATTRIBUTE": [_nfc("属性"), "Attribute", "attribute"],
+        "COLOR": [_nfc("色"), "Color", "color"],
+        "COST": [_nfc("コスト"), "Cost", "cost"],
+        "POWER": [_nfc("パワー"), "Power", "power"],
+        "COUNTER": [_nfc("カウンター"), "Counter", "counter"],
+        "LIFE": [_nfc("ライフ"), "Life", "life"],
+        "TRAITS": [_nfc("特徴"), "Traits", "traits"],
+        "TEXT": [_nfc("効果(テキスト)"), _nfc("テキスト"), "Text", "text"],
+        "TRIGGER": [_nfc("効果(トリガー)"), _nfc("トリガー"), "Trigger", "trigger"]
+    }
+
     def __init__(self, json_path: str):
         self.json_path = json_path
         self.cards: Dict[str, CardMaster] = {}
@@ -135,25 +139,29 @@ class CardLoader:
                 if norm_key in raw:
                     return raw[norm_key]
             return default
+        
+        # マッピング定数を使用
+        M = self.DB_MAPPING
 
-        card_id = DataCleaner.normalize_text(get_val(["number", "Number", _nfc("品番"), _nfc("型番"), "id"], "N/A"))
+        card_id = DataCleaner.normalize_text(get_val(M["ID"], "N/A"))
         if not card_id or card_id == "N/A" or "dummy" in card_id.lower():
             return None
 
-        name = DataCleaner.normalize_text(get_val(["name", "Name", _nfc("名前"), _nfc("カード名")]))
-        type_val = get_val([_nfc("種類"), "Type", "type"])
+        name = DataCleaner.normalize_text(get_val(M["NAME"]))
+        type_val = get_val(M["TYPE"])
         c_type = DataCleaner.map_card_type(type_val) if type_val else CardType.UNKNOWN
-        attr_val = get_val([_nfc("属性"), "Attribute", "attribute"])
+        attr_val = get_val(M["ATTRIBUTE"])
         attribute = DataCleaner.map_attribute(attr_val) if attr_val else Attribute.NONE
-        color_val = get_val([_nfc("色"), "Color", "color"])
+        color_val = get_val(M["COLOR"])
         color = DataCleaner.map_color(color_val) if color_val else Color.UNKNOWN
-        cost = DataCleaner.parse_int(get_val([_nfc("コスト"), "Cost", "cost"]))
-        power = DataCleaner.parse_int(get_val([_nfc("パワー"), "Power", "power"]))
-        counter = DataCleaner.parse_int(get_val([_nfc("カウンター"), "Counter", "counter"]))
-        life = DataCleaner.parse_int(get_val([_nfc("ライフ"), "Life", "life"]))
-        traits = DataCleaner.parse_traits(get_val([_nfc("特徴"), "Traits", "traits"]))
-        effect_text = DataCleaner.normalize_text(get_val([_nfc("効果(テキスト)"), _nfc("テキスト"), "Text", "text"]))
-        trigger_text = DataCleaner.normalize_text(get_val([_nfc("効果(トリガー)"), _nfc("トリガー"), "Trigger", "trigger"]))
+        cost = DataCleaner.parse_int(get_val(M["COST"]))
+        power = DataCleaner.parse_int(get_val(M["POWER"]))
+        counter = DataCleaner.parse_int(get_val(M["COUNTER"]))
+        life = DataCleaner.parse_int(get_val(M["LIFE"]))
+        traits = DataCleaner.parse_traits(get_val(M["TRAITS"]))
+        effect_text = DataCleaner.normalize_text(get_val(M["TEXT"]))
+        trigger_text = DataCleaner.normalize_text(get_val(M["TRIGGER"]))
+        
         main_abilities = DataCleaner.parse_abilities(effect_text, is_trigger=False)
         trigger_abilities = DataCleaner.parse_abilities(trigger_text, is_trigger=True)
         combined_abilities = tuple(main_abilities + trigger_abilities)
@@ -175,6 +183,7 @@ class CardLoader:
         )
 
 class DeckLoader:
+    # ... (DeckLoader は特に変更なし) ...
     def __init__(self, card_loader: CardLoader):
         self.card_loader = card_loader
 

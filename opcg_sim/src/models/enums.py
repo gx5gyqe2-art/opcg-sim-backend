@@ -161,9 +161,23 @@ class ParserKeyword(str, Enum):
     SELF = "自分"
     THIS_CARD = "このキャラ"
     SELF_REF = "自身"
+    # --- 追加分 ---
+    EXCEPT = "以外の"
+    TRAIT = "特徴"
+    ATTRIBUTE = "属性"
+    COUNT_SUFFIX = "枚"
+    ABOVE = "以上"
+    BELOW = "以下"
+    SET_TO = "にする"
+    IF_COND = "場合"
+    SUBJECT_GA = "が" # "が" (NFC正規化に注意)
+    ALL = "全て"
+    ALL_HIRAGANA = "すべて"
+    DECK = "デッキ"
+    COST_AREA = "コストエリア" # ドン置き場用
 
- 
 class PendingMessage(str, Enum):
     MAIN_ACTION = "メインアクションを選択してください"
     SELECT_BLOCKER = "ブロッカーを選択してください"
     SELECT_COUNTER = "カウンターカードを選択してください"
+
