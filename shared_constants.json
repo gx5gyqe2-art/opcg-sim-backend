@@ -91,5 +91,11 @@
     "INSUFFICIENT_COST": "INSUFFICIENT_COST",
     "INVALID_TARGET": "INVALID_TARGET",
     "INVALID_PHASE": "INVALID_PHASE"
+  }, 
+  "BATTLE_PROPERTIES": {
+    "ACTIVE_BATTLE": "active_battle",
+    "ATTACKER_UUID": "attacker_uuid",
+    "TARGET_UUID": "target_uuid",
+    "COUNTER_BUFF": "counter_buff"
   }
 }

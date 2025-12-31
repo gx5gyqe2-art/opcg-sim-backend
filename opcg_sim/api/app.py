@@ -57,6 +57,7 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
         player="system")
 
 
+    battle_props = CONST.get('BATTLE_PROPERTIES', {})
     raw_game_state = {
         "game_id": game_id,
         "turn_info": {
@@ -68,9 +69,13 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
         "players": {
             p1_key: manager.p1.to_dict() if manager else {},
             p2_key: manager.p2.to_dict() if manager else {}
-        }
+        },
+        battle_props.get('ACTIVE_BATTLE', 'active_battle'): {
+            battle_props.get('ATTACKER_UUID', 'attacker_uuid'): manager.active_battle["attacker"].uuid,
+            battle_props.get('TARGET_UUID', 'target_uuid'): manager.active_battle["target"].uuid,
+            battle_props.get('COUNTER_BUFF', 'counter_buff'): manager.active_battle.get("counter_buff", 0)
+        } if manager and manager.active_battle else None
     }
-    
     validated_state = None
     if success:
         try:

@@ -73,11 +73,18 @@ class PlayerSchema(BaseModel):
     leader: Optional[CardSchema] = None
     zones: ZoneSchema
 
+class BattleStateSchema(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    attacker_uuid: str = Field(..., alias=CONST.get('BATTLE_PROPERTIES', {}).get('ATTACKER_UUID', 'attacker_uuid'))
+    target_uuid: str = Field(..., alias=CONST.get('BATTLE_PROPERTIES', {}).get('TARGET_UUID', 'target_uuid'))
+    counter_buff: int = Field(0, alias=CONST.get('BATTLE_PROPERTIES', {}).get('COUNTER_BUFF', 'counter_buff'))
+
 class GameStateSchema(BaseModel):
     model_config = ConfigDict(extra='allow')
     game_id: str
     turn_info: Dict[str, Any]
     players: Dict[str, PlayerSchema]
+    active_battle: Optional[BattleStateSchema] = Field(None, alias=CONST.get('BATTLE_PROPERTIES', {}).get('ACTIVE_BATTLE', 'active_battle'))
 
 class PendingRequestSchema(BaseModel):
     model_config = ConfigDict(extra='allow', populate_by_name=True)
