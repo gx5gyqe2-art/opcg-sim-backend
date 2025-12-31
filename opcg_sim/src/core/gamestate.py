@@ -352,6 +352,10 @@ class GameManager:
         else:
             self.phase = Phase.BATTLE_COUNTER
             log_event("INFO", "game.phase_transition", f"No blockers. Moving to {self.phase.name}", player=target_owner.name)
+        log_event("DEBUG", "game.attack_transition_check", 
+                  f"Target: {target.master.name}, HasBlocker: {self.has_blocker(target_owner)}, FinalPhase: {self.phase.name}", 
+                  player=attacker_owner.name)
+ 
 
     def handle_block(self, blocker: Optional[Card] = None):
         if not self.active_battle:

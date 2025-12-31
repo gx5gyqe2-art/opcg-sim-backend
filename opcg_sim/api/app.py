@@ -76,6 +76,18 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
             battle_props.get('COUNTER_BUFF', 'counter_buff'): manager.active_battle.get("counter_buff", 0)
         } if manager and manager.active_battle else None
     }
+    log_event("DEBUG", "api.raw_state_check", 
+              f"Raw State active_battle: {raw_game_state.get('active_battle')}", 
+              player="system")
+    
+    validated_state = None
+    if success:
+        try:
+            validated_state = GameStateSchema(**raw_game_state).model_dump(by_alias=True)
+            log_event("DEBUG", "api.validated_state_check", 
+                      f"Validated active_battle: {validated_state.get('active_battle')}", 
+                      player="system")
+
     validated_state = None
     if success:
         try:

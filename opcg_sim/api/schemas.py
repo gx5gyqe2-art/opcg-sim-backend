@@ -85,6 +85,11 @@ class GameStateSchema(BaseModel):
     turn_info: Dict[str, Any]
     players: Dict[str, PlayerSchema]
     active_battle: Optional[BattleStateSchema] = Field(None, alias=CONST.get('BATTLE_PROPERTIES', {}).get('ACTIVE_BATTLE', 'active_battle'))
+    @field_validator('active_battle', mode='before')
+    @classmethod
+    def log_battle_input(cls, v):
+        log_event("DEBUG", "schema.battle_input", f"Input to active_battle: {v}", player="system")
+        return v
 
 class PendingRequestSchema(BaseModel):
     model_config = ConfigDict(extra='allow', populate_by_name=True)
