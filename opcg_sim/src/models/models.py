@@ -23,6 +23,7 @@ def load_shared_constants():
 CONST = load_shared_constants()
 
 if not CONST:
+    # フォールバック
     CONST = {
         "CARD_PROPERTIES": {
             "UUID": "uuid", 
@@ -145,9 +146,10 @@ class DonInstance:
     attached_to: Optional[str] = None
 
     def to_dict(self):
+        props = CONST.get('CARD_PROPERTIES', {})
         return {
-            "uuid": self.uuid,
-            "owner_id": self.owner_id,
-            "is_rest": self.is_rest,
-            "attached_to": self.attached_to
+            props.get('UUID', 'uuid'): self.uuid,
+            props.get('OWNER_ID', 'owner_id'): self.owner_id,
+            props.get('IS_REST', 'is_rest'): self.is_rest,
+            "attached_to": self.attached_to # ※これは専用プロパティのためベタ書き維持、または新規定数定義を推奨
         }

@@ -30,17 +30,18 @@ ATTR_MAP = {e.value: e.name for e in Attribute}
 class CardSchema(BaseModel):
     model_config = ConfigDict(extra='allow', populate_by_name=True)
 
-    uuid: str
-    name: str
-    power: int = Field(0, ge=0)
-    cost: int = Field(0, ge=0)
-    type: str
-    attribute: str
-    counter: int = 0
-    is_rest: bool = False
-    is_face_up: bool = True
-    attached_don: int = 0
-    owner_id: str
+    # CARD_PROPERTIES を使用してエイリアス定義
+    uuid: str = Field(..., alias=CONST.get('CARD_PROPERTIES', {}).get('UUID', 'uuid'))
+    name: str = Field(..., alias=CONST.get('CARD_PROPERTIES', {}).get('NAME', 'name'))
+    power: int = Field(0, ge=0, alias=CONST.get('CARD_PROPERTIES', {}).get('POWER', 'power'))
+    cost: int = Field(0, ge=0, alias=CONST.get('CARD_PROPERTIES', {}).get('COST', 'cost'))
+    type: str = Field(..., alias=CONST.get('CARD_PROPERTIES', {}).get('TYPE', 'type'))
+    attribute: str = Field(..., alias=CONST.get('CARD_PROPERTIES', {}).get('ATTRIBUTE', 'attribute'))
+    counter: int = Field(0, alias=CONST.get('CARD_PROPERTIES', {}).get('COUNTER', 'counter'))
+    is_rest: bool = Field(False, alias=CONST.get('CARD_PROPERTIES', {}).get('IS_REST', 'is_rest'))
+    is_face_up: bool = Field(True, alias=CONST.get('CARD_PROPERTIES', {}).get('IS_FACE_UP', 'is_face_up'))
+    attached_don: int = Field(0, alias=CONST.get('CARD_PROPERTIES', {}).get('ATTACHED_DON', 'attached_don'))
+    owner_id: str = Field(..., alias=CONST.get('CARD_PROPERTIES', {}).get('OWNER_ID', 'owner_id'))
 
     @field_validator('type', mode='before')
     @classmethod
@@ -109,6 +110,9 @@ class GameActionResultSchema(BaseModel):
     error: Optional[Dict[str, str]] = None
 
 class BattleActionRequest(BaseModel):
+    # 名前によるpopulateを許可（フロントエンドがエイリアス名で送ってくる可能性があるため）
+    model_config = ConfigDict(extra='allow', populate_by_name=True)
+    
     game_id: str
     player_id: str
     action_type: str
