@@ -63,7 +63,8 @@
         "ATTACK_CONFIRM":  "ATTACK_CONFIRM",
         "ACTIVATE_MAIN": "ACTIVATE_MAIN",
         "ATTACH_DON": "ATTACH_DON",
-        "TURN_END": "TURN_END"
+        "TURN_END": "TURN_END",
+        "SELECT_TARGET": "SELECT_TARGET"
       }
     },
     "BATTLE_ACTIONS": {
