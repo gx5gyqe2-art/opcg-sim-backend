@@ -86,6 +86,24 @@ class GameManager:
         self.phase = Phase.SETUP
         self.winner: Optional[str] = None
         self.active_battle: Optional[Dict[str, Any]] = None
+        self.active_interaction: Optional[Dict[str, Any]] = None
+
+    def _find_card_by_uuid(self, uuid: str) -> Optional[CardInstance]:
+        all_players = [self.p1, self.p2]
+        for p in all_players:
+            candidates = []
+            if p.leader: candidates.append(p.leader)
+            if p.stage: candidates.append(p.stage)
+            candidates.extend(p.hand)
+            candidates.extend(p.field)
+            candidates.extend(p.trash)
+            candidates.extend(p.life)
+            candidates.extend(p.deck)
+            
+            for c in candidates:
+                if c.uuid == uuid:
+                    return c
+        return None
 
     def get_pending_request(self) -> Optional[Dict[str, Any]]:
         pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
@@ -96,9 +114,25 @@ class GameManager:
         KEY_MSG = pending_props.get('MESSAGE', 'message')
         KEY_UUIDS = pending_props.get('SELECTABLE_UUIDS', 'selectable_uuids')
         KEY_SKIP = pending_props.get('CAN_SKIP', 'can_skip')
+        KEY_CANDIDATES = pending_props.get('CANDIDATES', 'candidates')
+        KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
+        KEY_OPTIONS = pending_props.get('OPTIONS', 'options')
 
         ACT_BLOCKER = battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
         ACT_COUNTER = battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER')
+
+        if self.active_interaction:
+            req = {
+                KEY_PID: self.active_interaction.get("player_id"),
+                KEY_ACTION: self.active_interaction.get("action_type"),
+                KEY_MSG: self.active_interaction.get("message", "選択してください"),
+                KEY_UUIDS: self.active_interaction.get("selectable_uuids", []),
+                KEY_SKIP: self.active_interaction.get("can_skip", False),
+                KEY_CANDIDATES: [c.to_dict() for c in self.active_interaction.get("candidates", [])],
+                KEY_CONSTRAINTS: self.active_interaction.get("constraints"),
+                KEY_OPTIONS: self.active_interaction.get("options")
+            }
+            return req
 
         if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
             log_event("ERROR", "game.pending_request_error", f"Active battle missing in phase: {self.phase.name}")
@@ -111,16 +145,8 @@ class GameManager:
             for c in target_owner.field:
                 is_active = not c.is_rest
                 has_keyword = "ブロッカー" in c.current_keywords
-                log_event("DEBUG", "game.block_calc", 
-                          f"Card: {c.master.name}, Active: {is_active}, Keywords: {c.current_keywords}, Match: {has_keyword}", 
-                          player=target_owner.name)
-                
                 if is_active and has_keyword:
                     blockers.append(c.uuid)
-
-            log_event("DEBUG", "game.block_step_info", 
-                      f"TargetPlayer: {target_owner.name}, FoundBlockers: {len(blockers)}", 
-                      player=target_owner.name)
 
             request = {
                 KEY_PID: target_owner.name,
@@ -156,11 +182,63 @@ class GameManager:
                 KEY_UUIDS: selectable,
                 KEY_SKIP: True
             }
-        if request:
-            log_event("DEBUG", "game.pending_request", f"Generated request: {request[KEY_ACTION]} for {request[KEY_PID]}", player=request[KEY_PID])
-        else:
-            log_event("WARNING", "game.pending_request_none", f"No request generated for phase: {self.phase.name}")
         return request
+
+    def resolve_interaction(self, player: Player, payload: Dict[str, Any]):
+        if not self.active_interaction:
+            log_event("WARNING", "game.resolve_interaction", "No active interaction found", player=player.name)
+            return
+
+        continuation = self.active_interaction.get("continuation")
+        if not continuation:
+            self.active_interaction = None
+            return
+
+        # 保存していた情報を復元
+        action = continuation["action"]
+        source_uuid = continuation["source_card_uuid"]
+        remaining_ability_actions = continuation.get("remaining_ability_actions", []) # ▼ 追加: 残りのアクションリストを取得
+        
+        source_card = self._find_card_by_uuid(source_uuid)
+        
+        if not source_card:
+            log_event("ERROR", "game.resolve_interaction", f"Source card not found: {source_uuid}", player=player.name)
+            self.active_interaction = None
+            return
+
+        # 選択結果をコンテキストに詰める
+        context = {
+            "selected_uuids": payload.get("selected_uuids", [])
+        }
+        
+        # インタラクション状態を一度解除
+        self.active_interaction = None
+
+        # Resolver を再開
+        from .effects.resolver import execute_action
+        log_event("INFO", "game.resume_effect", f"Resuming effect for {source_card.name}", player=player.name)
+        
+        # 1. 中断していたアクションを実行
+        success = execute_action(self, player, action, source_card, effect_context=context)
+        
+        # 2. 成功したら、残りのアクション（Abilityの続き）を実行
+        #    ※ もし再開したアクション内で再度中断が発生していたら、success=False になるためスキップ
+        if success and remaining_ability_actions:
+            for i, next_action in enumerate(remaining_ability_actions):
+                # 既に別のインタラクションで中断されている場合はループを抜ける
+                if self.active_interaction:
+                    # この場合、新しいactive_interactionにさらに残りのアクションを引き継ぐ必要がある
+                    if "continuation" in self.active_interaction:
+                        self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i+1:]
+                    break
+                
+                next_success = self._perform_logic(player, next_action, source_card)
+                if not next_success:
+                    # 中断発生: 残りのアクションを保存
+                    if self.active_interaction and "continuation" in self.active_interaction:
+                        self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i+1:]
+                    break
+
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
@@ -173,21 +251,21 @@ class GameManager:
         ACT_BLOCKER = battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
         ACT_COUNTER = battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER')
         ACT_PASS = battle_actions.get('PASS', 'PASS')
+        
+        RESOLVE_SELECTION = CONST.get('c_to_s_interface', {}).get('GAME_ACTIONS', {}).get('TYPES', {}).get('RESOLVE_EFFECT_SELECTION', 'RESOLVE_EFFECT_SELECTION')
 
         if not pending:
-            log_event("ERROR", "game.validation_fail", f"No pending request. Current Phase: {self.phase.name}, Turn Player: {self.turn_player.name}", player=player.name)
             raise ValueError("現在実行可能なアクションはありません。")
         
         if pending[KEY_PID] != player.name:
-            error_msg = f"Wait for {pending[KEY_PID]}'s action. Current Phase: {self.phase.name}"
-            log_event("ERROR", "game.validation_fail", error_msg, player=player.name)
             raise ValueError(f"現在は {pending[KEY_PID]} のターン/フェイズです。")
             
         if pending[KEY_ACTION] != action_type:
             if pending[KEY_ACTION] in [ACT_COUNTER, ACT_BLOCKER] and action_type == ACT_PASS:
                 return True
-            error_msg = f"Invalid action type. Expected: {pending[KEY_ACTION]}, Got: {action_type}. Phase: {self.phase.name}"
-            log_event("ERROR", "game.validation_fail", error_msg, player=player.name)
+            if self.active_interaction and action_type == RESOLVE_SELECTION:
+                return True
+
             raise ValueError(f"不適切なアクションです。期待されているアクション: {pending[KEY_ACTION]}")
         return True
 
@@ -231,7 +309,6 @@ class GameManager:
         
         log_event("INFO", "game.turn_switch_end", f"After switch: turn_player={self.turn_player.name}, count={self.turn_count}", player="system")
         self.refresh_phase()
-
 
     def refresh_phase(self):
         self._reset_player_status(self.opponent)
@@ -485,12 +562,26 @@ class GameManager:
                     if ability.trigger == TriggerType.ON_PLAY:
                         self.resolve_ability(player, ability, source_card=card)
 
-    def resolve_ability(self, player: Player, ability: Any, source_card: Card):
+    def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
-        for action in ability.actions:
-            self._perform_logic(player, action, source_card)
+        
+        # ▼ 修正: アクションのループ処理（残りのアクションを保存・中断対応）
+        for i, action in enumerate(ability.actions):
+            if self.active_interaction:
+                log_event("INFO", "game.ability_suspend", "Ability execution suspended for interaction", player=player.name)
+                # 既に中断中なら、このアクション以降を保存して終了
+                if "continuation" in self.active_interaction:
+                     self.active_interaction["continuation"]["remaining_ability_actions"] = ability.actions[i:]
+                break
+                
+            success = self._perform_logic(player, action, source_card)
+            if not success:
+                # 中断発生: 残りのアクションを保存
+                if self.active_interaction and "continuation" in self.active_interaction:
+                     self.active_interaction["continuation"]["remaining_ability_actions"] = ability.actions[i+1:]
+                break
 
-    def _perform_logic(self, player: Player, action: Any, source_card: Card):
+    def _perform_logic(self, player: Player, action: Any, source_card: CardInstance) -> bool:
         log_event("INFO", "game.effect", f"Resolving action {action.type} for {source_card.master.name}", player=player.name)
         from .effects.resolver import execute_action
-        execute_action(self, player, action, source_card)
+        return execute_action(self, player, action, source_card)

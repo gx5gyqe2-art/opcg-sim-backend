@@ -64,7 +64,8 @@
         "ACTIVATE_MAIN": "ACTIVATE_MAIN",
         "ATTACH_DON": "ATTACH_DON",
         "TURN_END": "TURN_END",
-        "SELECT_TARGET": "SELECT_TARGET"
+        "SELECT_TARGET": "SELECT_TARGET",
+        "RESOLVE_EFFECT_SELECTION": "RESOLVE_EFFECT_SELECTION"
       }
     },
     "BATTLE_ACTIONS": {
@@ -73,6 +74,12 @@
         "SELECT_COUNTER": "SELECT_COUNTER",
         "PASS": "PASS"
       }
+    },
+    "PENDING_ACTION_TYPES": {
+      "SEARCH_AND_SELECT": "SEARCH_AND_SELECT",
+      "ORDER_CARDS": "ORDER_CARDS",
+      "SELECT_RESOURCE": "SELECT_RESOURCE",
+      "CONFIRM_DECISION": "CONFIRM_DECISION"
     }
   },
   "PENDING_REQUEST_PROPERTIES": {
@@ -80,7 +87,10 @@
     "ACTION": "action",
     "SELECTABLE_UUIDS": "selectable_uuids",
     "CAN_SKIP": "can_skip",
-    "MESSAGE": "message"
+    "MESSAGE": "message",
+    "CANDIDATES": "candidates",
+    "CONSTRAINTS": "constraints",
+    "OPTIONS": "options"
   },
   "ERROR_PROPERTIES": {
     "CODE": "code",

@@ -36,6 +36,7 @@ app = FastAPI(title="OPCG Simulator API v1.5")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool = True, error_code: str = None, error_msg: str = None) -> Dict[str, Any]:
+    # ... (既存コードと同じ) ...
     player_keys = CONST.get('PLAYER_KEYS', {})
     api_root_keys = CONST.get('API_ROOT_KEYS', {})
     error_props = CONST.get('ERROR_PROPERTIES', {})
@@ -47,14 +48,8 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
     if manager:
         active_pid = p1_key if manager.turn_player == manager.p1 else p2_key
 
-    log_event("DEBUG", 
-        "api.active_id_check", 
-        f"Logic check: manager.turn_player.name={manager.turn_player.name}, p1.name={manager.p1.name}, result_id={active_pid}", 
-        player="system")
-    log_event(level_key="DEBUG",
-        action="api.build_state",
-        msg=f"Turn Info: count={manager.turn_count if manager else 0}, active_pid={active_pid}",
-        player="system")
+    log_event("DEBUG", "api.active_id_check", f"Logic check: manager.turn_player.name={manager.turn_player.name}, p1.name={manager.p1.name}, result_id={active_pid}", player="system")
+    log_event(level_key="DEBUG", action="api.build_state", msg=f"Turn Info: count={manager.turn_count if manager else 0}, active_pid={active_pid}", player="system")
 
     battle_props = CONST.get('BATTLE_PROPERTIES', {})
     raw_game_state = {
@@ -75,17 +70,11 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
             battle_props.get('COUNTER_BUFF', 'counter_buff'): manager.active_battle.get("counter_buff", 0)
         } if manager and manager.active_battle else None
     }
-    log_event("DEBUG", "api.raw_state_check", 
-              f"Raw State active_battle: {raw_game_state.get('active_battle')}", 
-              player="system")
     
     validated_state = None
     if success:
         try:
             validated_state = GameStateSchema(**raw_game_state).model_dump(by_alias=True)
-            log_event("DEBUG", "api.validated_state_check", 
-                      f"Validated active_battle: {validated_state.get('active_battle')}", 
-                      player="system")
         except Exception as e:
             log_event(level_key="ERROR", action="api.validation", msg=f"Validation Error: {e}", player="system")
             validated_state = raw_game_state 
@@ -115,6 +104,7 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
         api_root_keys.get('ERROR', 'error'): error_obj
     }
 
+# ... (middleware, logging, game creation endpoints は変更なし) ...
 @app.middleware("http")
 async def trace_logging_middleware(request: Request, call_next):
     s_id = request.headers.get("X-Session-ID") or request.query_params.get("sessionId")
@@ -222,7 +212,6 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         
         operating_card = next((c for c in potential_cards if c.uuid == card_uuid), None)
 
-        # PLAY
         if action_type == game_actions.get('PLAY', 'PLAY'):
             target_card_in_hand = next((c for c in current_player.hand if c.uuid == card_uuid), None)
             if target_card_in_hand:
@@ -231,11 +220,9 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             else:
                 raise ValueError("対象のカードが手札にありません。")
         
-        # TURN_END
         elif action_type == game_actions.get('TURN_END', 'TURN_END'):
             manager.end_turn()
 
-        # ATTACK / ATTACK_CONFIRM
         elif action_type == game_actions.get('ATTACK', 'ATTACK') or \
              action_type == game_actions.get('ATTACK_CONFIRM', 'ATTACK_CONFIRM'):
             
@@ -255,7 +242,6 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             log_event("INFO", "api.attack_execute", f"Attacking: {operating_card.master.name} -> {attack_target.master.name}", player=player_id)
             manager.declare_attack(operating_card, attack_target)
             
-        # ATTACH_DON
         elif action_type == game_actions.get('ATTACH_DON', 'ATTACH_DON'):
             if not operating_card:
                 raise ValueError("ドン!!を付与する対象のカードが見つかりません。")
@@ -267,13 +253,16 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             else:
                 raise ValueError("アクティブなドン!!が不足しています。")
         
-        # ACTIVATE_MAIN
         elif action_type == game_actions.get('ACTIVATE_MAIN', 'ACTIVATE_MAIN'):
             if not operating_card:
                 raise ValueError("効果を発動するカードが見つかりません。")
             for ability in operating_card.master.abilities:
                 if ability.trigger == TriggerType.ACTIVATE_MAIN:
                     manager.resolve_ability(current_player, ability, source_card=operating_card)
+
+        # ▼ 追加: 効果選択の結果受信
+        elif action_type == game_actions.get('RESOLVE_EFFECT_SELECTION', 'RESOLVE_EFFECT_SELECTION'):
+            manager.resolve_interaction(current_player, payload)
 
         return build_game_result_hybrid(manager, game_id, success=True)
 
@@ -291,6 +280,7 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             error_msg=str(e)
         )
 
+# ... (options_game_battle, game_battle, health endpoints は変更なし) ...
 @app.options("/api/game/battle")
 async def options_game_battle():
     return {"status": "ok"}
@@ -305,9 +295,7 @@ async def game_battle(req: BattleActionRequest):
     manager = GAMES.get(game_id)
     error_codes = CONST.get('ERROR_CODES', {})
     
-    # --- 定数取得 ---
     battle_types = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
-    # ----------------
 
     if not manager:
         log_event("ERROR", "api.battle_action", f"Game not found: {game_id}", player=player_id)

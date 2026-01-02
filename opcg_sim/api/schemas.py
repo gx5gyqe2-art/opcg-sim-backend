@@ -100,6 +100,11 @@ class PendingRequestSchema(BaseModel):
     can_skip: bool = Field(False, alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('CAN_SKIP', 'can_skip'))
     message: Optional[str] = Field(None, alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('MESSAGE', 'message'))
 
+    # ▼ 追加フィールド
+    candidates: Optional[List[CardSchema]] = Field(None, alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('CANDIDATES', 'candidates'))
+    constraints: Optional[Dict[str, Any]] = Field(None, alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('CONSTRAINTS', 'constraints'))
+    options: Optional[List[Dict[str, Any]]] = Field(None, alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('OPTIONS', 'options'))
+
 class GameActionResultSchema(BaseModel):
     model_config = ConfigDict(extra='allow', populate_by_name=True)
 
