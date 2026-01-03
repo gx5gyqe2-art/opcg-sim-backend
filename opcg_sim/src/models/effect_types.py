@@ -21,14 +21,11 @@ class TargetQuery:
     attributes: List[str] = field(default_factory=list)
     colors: List[str] = field(default_factory=list)
     names: List[str] = field(default_factory=list)
-    
     cost_min: Optional[int] = None
     cost_max: Optional[int] = None
     power_min: Optional[int] = None
     power_max: Optional[int] = None
-    
     is_rest: Optional[bool] = None
-    
     count: int = 1
     select_mode: str = "CHOOSE"
     raw_text: str = ""
@@ -60,5 +57,3 @@ class Ability:
     costs: List[EffectAction] = field(default_factory=list)
     actions: List[EffectAction] = field(default_factory=list)
     raw_text: str = ""
-
-
