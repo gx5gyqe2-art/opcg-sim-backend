@@ -87,6 +87,8 @@ class GameManager:
         self.winner: Optional[str] = None
         self.active_battle: Optional[Dict[str, Any]] = None
         self.active_interaction: Optional[Dict[str, Any]] = None
+        self.last_effect_error: Optional[str] = None
+
 
     def _find_card_by_uuid(self, uuid: str) -> Optional[CardInstance]:
         all_players = [self.p1, self.p2]
@@ -134,6 +136,17 @@ class GameManager:
                 KEY_OPTIONS: self.active_interaction.get("options")
             }
             return req
+
+        if self.last_effect_error:
+            error_msg = self.last_effect_error
+            self.last_effect_error = None
+            return {
+                KEY_PID: self.turn_player.name,
+                KEY_ACTION: "EFFECT_ERROR_NOTIFY",
+                KEY_MSG: error_msg,
+                KEY_SKIP: True
+            }
+
 
         if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
             log_event("ERROR", "game.pending_request_error", f"Active battle missing in phase: {self.phase.name}")

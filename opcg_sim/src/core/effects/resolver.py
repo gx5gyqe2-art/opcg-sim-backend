@@ -90,11 +90,12 @@ def execute_action(
     from .matcher import get_target_cards
     if effect_context is None: effect_context = {}
 
-    if not check_condition(game_manager, player, action.condition, source_card, effect_context):
-        return True
+    try:
+        if not check_condition(game_manager, player, action.condition, source_card, effect_context):
+            return True
 
-    targets = []
-    selected_uuids = effect_context.get("selected_uuids")
+        targets = []
+        selected_uuids = effect_context.get("selected_uuids")
 
     if action.target:
         if action.target.select_mode == "REFERENCE":
@@ -142,7 +143,13 @@ def execute_action(
 
     action_success = self_execute(game_manager, player, action, targets, source_card=source_card, effect_context=effect_context)
     
+    if not action_success:
+        msg = f"効果の解決に失敗しました: {action.raw_text}"
+        log_event("WARNING", "resolver.action_fail", msg, player=player.name)
+        game_manager.last_effect_error = msg
+
     effect_context["last_action_success"] = action_success
+
 
     if action.then_actions:
         for sub in action.then_actions:
@@ -150,6 +157,13 @@ def execute_action(
                 return False
                 
     return True
+    
+    except Exception as e:
+        import traceback
+        log_event("ERROR", "resolver.exception", f"効果処理エラー: {str(e)}", player=player.name, payload={"trace": traceback.format_exc()})
+        game_manager.last_effect_error = f"効果の処理中にエラーが発生しました: {source_card.master.name}"
+        return False
+
 
 def self_execute(game_manager, player, action, targets, source_card=None, effect_context=None) -> bool:
     if effect_context is None: effect_context = {}
