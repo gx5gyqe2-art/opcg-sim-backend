@@ -21,13 +21,17 @@ class Effect:
         replacements = {
             '[': '『', ']': '』', '<': '《', '>': '》', 
             '(': '(', ')': ')', '【': '『', '】': '』',
-            ':': ':', '。': '。', '、': '、'
+            '：': ':', '。': '。', '、': '、',
+            '−': '-', '‒': '-', '–': '-',
+            '＋': '+', '➕': '+',
+            '／': '/',
         }
         for k, v in replacements.items():
             text = text.replace(k, v)
         text = re.sub(r'\s+', '', text)
-        text = re.sub(r'ドン!!', 'ドン', text)
-        text = re.sub(r'DON!!', 'ドン', text)
+        # ドン!!の正規化
+        text = re.sub(r'ドン!!', 'ドン', text)
+        text = re.sub(r'DON!!', 'ドン', text)
         return text
 
     def _parse(self):
@@ -37,34 +41,29 @@ class Effect:
         for part in parts:
             trigger = self._detect_trigger(part)
             body_text = re.sub(r'『[^』]+』', '', part)
-            
             costs = []
             actions = []
-            
             if ':' in body_text:
                 cost_text, effect_text = body_text.split(':', 1)
                 costs = self._parse_recursive(cost_text, is_cost=True)
                 actions = self._parse_recursive(effect_text)
             else:
                 actions = self._parse_recursive(body_text)
-            
-            if actions or costs or trigger != TriggerType.UNKNOWN:
+            if actions or costs:
                 self.abilities.append(Ability(trigger=trigger, costs=costs, actions=actions, raw_text=part))
 
     def _detect_trigger(self, text: str) -> TriggerType:
         if '『登場時』' in text: return TriggerType.ON_PLAY
         if '『起動メイン』' in text: return TriggerType.ACTIVATE_MAIN
         if '『アタック時』' in text: return TriggerType.ON_ATTACK
-        if '『ブロック時』' in text: return TriggerType.ON_BLOCK
+        if '『ブロック時』' in text: return TriggerType.ON_BLOCK
         if '『KO時』' in text: return TriggerType.ON_KO
         if '『ターン終了時』' in text: return TriggerType.TURN_END
         if '『相手のターン終了時』' in text: return TriggerType.OPP_TURN_END
         if '『自分のターン中』' in text: return TriggerType.PASSIVE
         if '『相手のターン中』' in text: return TriggerType.PASSIVE
         if '『カウンター』' in text: return TriggerType.COUNTER
-        if '『トリガー』' in text: return TriggerType.TRIGGER
-        if '『ルール』' in text: return TriggerType.RULE
-        if '時、' in text: return TriggerType.TRIGGER 
+        if '『トリガー』' in text: return TriggerType.TRIGGER
         return TriggerType.UNKNOWN
 
     def _parse_recursive(self, text: str, is_cost: bool = False) -> List[EffectAction]:
@@ -77,14 +76,7 @@ class Effect:
             parts = re.split(r'その後、|、その後', sentence)
             for part in parts:
                 current_actions = self._parse_logic_block(part, is_cost)
-                
-                is_optional = 'できる' in part
-                
                 for act in current_actions:
-                    if is_optional:
-                        if act.details is None: act.details = {}
-                        act.details['optional'] = True
-
                     if last_action:
                         last_action.then_actions.append(act)
                     else:
@@ -98,14 +90,11 @@ class Effect:
         return self._get_deepest_action(action.then_actions[-1])
 
     def _parse_logic_block(self, text: str, is_cost: bool) -> List[EffectAction]:
-        match = re.search(r'^(.+?)(場合|なら|することで|につき)、(.+)$', text)
+        match = re.search(r'^(.+?)(場合|なら|することで)、(.+)$', text)
         if match:
-            condition_text = match.group(1)
-            result_text = match.group(3)
-            
+            condition_text, _, result_text = match.groups()
             condition = self._parse_condition(condition_text)
             then_actions = self._parse_recursive(result_text, is_cost)
-            
             return [EffectAction(
                 type=ActionType.OTHER,
                 condition=condition,
@@ -115,142 +104,188 @@ class Effect:
         return self._parse_atomic_action(text, is_cost)
 
     def _parse_atomic_action(self, text: str, is_cost: bool) -> List[EffectAction]:
-        if '見て' in text:
+        # Look系は別メソッドへ
+        if '見て' in text or '公開' in text:
             return self._handle_look_action(text)
 
-        target = None
-        if 'ドン' in text and '追加' in text:
-            target = None
-        elif any(kw in text for kw in ['それ', 'そのカード', 'そのキャラ']):
-            target = TargetQuery(select_mode="REFERENCE", raw_text="last_target")
-            target.tag = "last_target"
-        else:
-            target = parse_target(text)
-            if any(kw in text for kw in ['選び', '対象とし', 'にする']):
-                target.tag = "last_target"
-
+        # 1. 先にアクションタイプと数値を確定
         act_type = self._detect_action_type(text)
         val = self._extract_number(text)
+
+        # 2. ターゲット解析の実行判断
+        target = None
+        # ターゲット不要なアクションのリスト
+        NO_TARGET_ACTIONS = [
+            ActionType.DRAW, 
+            ActionType.RAMP_DON, 
+            ActionType.SHUFFLE, 
+            ActionType.LIFE_RECOVER
+        ]
         
+        if act_type not in NO_TARGET_ACTIONS:
+            # 指示語の判定
+            if any(kw in text for kw in ['それ', 'そのカード', 'そのキャラ']):
+                target = TargetQuery(select_mode="REFERENCE", raw_text="last_target")
+                # 参照先タグのデフォルト設定（必要に応じて）
+                if not target.tag: target.tag = "last_target"
+            else:
+                target = parse_target(text)
+                # 選択アクションならタグ付け
+                if any(kw in text for kw in ['選び', '対象とし']):
+                    target.tag = "last_target"
+
+        # 3. Action生成
         return [EffectAction(
             type=act_type,
             target=target,
             value=val,
-            source_zone=target.zone if target else Zone.ANY,
-            dest_zone=Zone.ANY,
             raw_text=text
         )]
 
     def _detect_action_type(self, text: str) -> ActionType:
+        # 1. ドン加速
+        if 'ドン' in text and '追加' in text: return ActionType.RAMP_DON
+        
+        # 2. ドロー
         if '引く' in text: return ActionType.DRAW
-        if 'ドン' in text and '追加' in text: return ActionType.RAMP_DON
+        
+        # 3. 登場
         if '登場' in text: return ActionType.PLAY_CARD
+        
+        # 4. KO
         if 'KO' in text: return ActionType.KO
+        
+        # 5. バウンス / 回収
         if '手札' in text and ('戻す' in text or '加える' in text): return ActionType.MOVE_TO_HAND
-        if ('手札' in text and '捨てる' in text) or ('トラッシュ' in text and '置く' in text) or 'トラッシュ' in text or '捨てる' in text: return ActionType.TRASH
-        if 'ライフ' in text and '加える' in text: return ActionType.LIFE_RECOVER
         
-        if 'パワー' in text:
-            if 'する' in text and not any(k in text for k in ['+', '-', '＋', '−', 'プラス', 'マイナス']): return ActionType.SET_BASE_POWER
-            return ActionType.BUFF
-        if 'コスト' in text and ('+' in text or '-' in text): return ActionType.COST_BUFF
+        # 6. トラッシュ送り / ハンデス / コスト
+        if 'トラッシュ' in text or '捨てる' in text: return ActionType.TRASH
         
-        if 'アタックできない' in text: return ActionType.LOCK
-        if '無効' in text: return ActionType.NEGATE_EFFECT
+        # 7. デッキ下送り
+        if 'デッキ' in text and '下' in text: return ActionType.DECK_BOTTOM
+        
+        # 8. パワー増減 (バフ/デバフ)
+        # "する" は "3000にする" 等の固定化もあり得るが、変動も含むためBUFFとする
+        if 'パワー' in text: return ActionType.BUFF
+        
+        # 9. レスト / アクティブ
         if 'レスト' in text: return ActionType.REST
-        if 'アクティブ' in text: return ActionType.ACTIVE
+        if 'アクティブ' in text: return ActionType.ACTIVE
         
-        if '得る' in text: return ActionType.GRANT_EFFECT
-        
-        if 'ドン' in text:
-            if '付与' in text or '付ける' in text: return ActionType.ATTACH_DON
-            if 'レスト' in text: return ActionType.REST_DON
-            if 'アクティブ' in text: return ActionType.ACTIVE_DON
-            if 'デッキ' in text: return ActionType.RETURN_DON
-
-        if 'デッキ' in text:
-            if '下' in text: return ActionType.DECK_BOTTOM
-            if '上' in text: return ActionType.DECK_TOP
-            if '順番' in text or '並び替え' in text: return ActionType.SHUFFLE
-
         return ActionType.OTHER
 
     def _extract_number(self, text: str) -> int:
-        nums = re.findall(r'(\d+)', text)
-        val = int(nums[0]) if nums else 0
-        if '-' in text or '−' in text or 'ダウン' in text:
-            val = -val
-        return val
+        # マイナス記号(半角/全角/特殊文字) + 数字 を検索
+        match = re.search(r'([-\u2212\u2010\u2011\u2012\u2013\u2014\u2015\uff0d]?)(\d+)', text)
+        if match:
+            sign = match.group(1)
+            num = int(match.group(2))
+            return -num if sign else num
+        return 0
 
     def _parse_condition(self, text: str) -> Optional[Condition]:
         type_ = ConditionType.NONE
+        op = CompareOperator.EQ
         
         if 'ライフ' in text: type_ = ConditionType.LIFE_COUNT
+        elif 'ドン' in text: type_ = ConditionType.DON_COUNT
         elif '手札' in text: type_ = ConditionType.HAND_COUNT
         elif 'トラッシュ' in text: type_ = ConditionType.TRASH_COUNT
-        elif 'ドン' in text: type_ = ConditionType.DON_COUNT
-        elif '場' in text or 'キャラ' in text: type_ = ConditionType.FIELD_COUNT
-        elif 'リーダー' in text and '特徴' not in text: type_ = ConditionType.LEADER_NAME
         elif '特徴' in text: type_ = ConditionType.HAS_TRAIT
-        elif '速攻' in text or 'ブロッカー' in text: type_ = ConditionType.HAS_UNIT
-        
-        target = None
-        if type_ in [ConditionType.HAS_TRAIT, ConditionType.FIELD_COUNT, ConditionType.HAS_UNIT]:
-            target = parse_target(text)
+        elif 'リーダー' in text: type_ = ConditionType.LEADER_NAME
+        elif 'キャラ' in text or '持つ' in text: type_ = ConditionType.HAS_UNIT
 
+        # ターゲット指定がある条件の場合 (例: 「特徴《XXX》を持つキャラがいる場合」)
+        target_in_condition = None
+        if type_ in [ConditionType.HAS_TRAIT, ConditionType.HAS_UNIT]:
+             target_in_condition = parse_target(text)
+
+        # 数値比較
+        val = 0
         nums = re.findall(r'(\d+)', text)
-        val = int(nums[0]) if nums else 0
+        if nums: val = int(nums[0])
         
-        str_val = val
-        if type_ == ConditionType.LEADER_NAME:
-            m = re.search(r'「([^」]+)」', text)
-            if m: str_val = m.group(1)
-        elif type_ == ConditionType.HAS_TRAIT:
-            m = re.search(r'《([^》]+)》', text)
-            if m: str_val = m.group(1)
-
-        op = CompareOperator.EQ
         if '以上' in text: op = CompareOperator.GE
         elif '以下' in text: op = CompareOperator.LE
-        elif '含む' in text or type_ in [ConditionType.HAS_TRAIT, ConditionType.LEADER_NAME]: op = CompareOperator.HAS
         
-        return Condition(type=type_, operator=op, value=str_val, target=target, raw_text=text)
+        # 文字列条件 (特徴名、リーダー名など)
+        str_val = ""
+        m_name = re.search(r'[「『]([^」』]+)[」』]', text)
+        if m_name: 
+            str_val = m_name.group(1)
+            if type_ == ConditionType.NONE: type_ = ConditionType.LEADER_NAME # 仮
+        
+        # 特徴抽出
+        m_trait = re.search(r'[《<]([^》>]+)[》>]', text)
+        if m_trait:
+            str_val = m_trait.group(1)
+            type_ = ConditionType.HAS_TRAIT
+            op = CompareOperator.HAS
+
+        if type_ == ConditionType.LEADER_NAME: 
+            val = str_val
+            op = CompareOperator.EQ
+        elif type_ == ConditionType.HAS_TRAIT:
+            val = str_val
+            op = CompareOperator.HAS
+
+        return Condition(
+            type=type_, 
+            operator=op, 
+            value=val, 
+            target=target_in_condition,
+            raw_text=text
+        )
 
     def _handle_look_action(self, text: str) -> List[EffectAction]:
         val = self._extract_number(text)
         if val <= 0: val = 1
         
-        actions = []
-        actions.append(EffectAction(
+        # 1. デッキ操作
+        look = EffectAction(
             type=ActionType.LOOK, 
             value=val, 
             source_zone=Zone.DECK, 
             dest_zone=Zone.TEMP, 
-            raw_text=f"デッキの上から{val}枚を見る"
-        ))
+            raw_text=f"デッキの上から{val}枚を見る"
+        )
         
+        # 2. 移動・選択 (加える/公開)
         if '加える' in text or '公開' in text:
-            target = parse_target(text)
-            target.zone = Zone.TEMP
-            target.tag = "last_target"
+            # ターゲット解析 (条件付きターゲットなど)
+            # サーチ系のターゲットは常に「選択式」かつ「タグ付け」する
+            move_target = parse_target(text)
+            move_target.zone = Zone.TEMP
+            move_target.tag = "last_target"
             
-            actions.append(EffectAction(
+            # 手札に加える
+            move = EffectAction(
                 type=ActionType.MOVE_TO_HAND, 
-                target=target, 
+                target=move_target, 
                 source_zone=Zone.TEMP, 
-                dest_zone=Zone.HAND, 
+                dest_zone=Zone.HAND,
                 raw_text="選択して手札に加える"
-            ))
+            )
+            look.then_actions.append(move)
             
+        # 3. 残り処理 (デッキ下へ)
         if '残り' in text or '下' in text:
-            rem_target = TargetQuery(zone=Zone.TEMP, select_mode="ALL")
-            actions.append(EffectAction(
+            # 残りすべて
+            rem_target = TargetQuery(zone=Zone.TEMP, select_mode="ALL", player=Player.SELF)
+            bottom = EffectAction(
                 type=ActionType.DECK_BOTTOM, 
                 target=rem_target, 
                 source_zone=Zone.TEMP, 
                 dest_zone=Zone.DECK, 
                 dest_position="BOTTOM",
-                raw_text="残りをデッキの下に置く"
-            ))
-            
-        return actions
+                raw_text="残りをデッキの下に置く"
+            )
+            # MOVEの後に実行されるようにする (兄弟関係ではなく、MOVEの子にするか、LOOKの子として順序保証するか)
+            # 現在のResolverは then_actions を順次実行するので、LOOKの子として追加でOK
+            # ただしMOVEがある場合はMOVEの後にしたいなら、MOVEのthen_actionsに入れるべき
+            if look.then_actions:
+                look.then_actions[-1].then_actions.append(bottom)
+            else:
+                look.then_actions.append(bottom)
+
+        return [look]
