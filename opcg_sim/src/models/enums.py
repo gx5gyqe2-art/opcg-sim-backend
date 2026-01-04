@@ -90,11 +90,12 @@ class ActionType(Enum):
     COST_CHANGE = auto()
     GRANT_KEYWORD = auto()
     ATTACK_DISABLE = auto()
+    EXECUTE_MAIN_EFFECT = auto()
+    VICTORY = auto()
+    RULE_PROCESSING = auto()
     
-    # ▼ 追加定義
-    EXECUTE_MAIN_EFFECT = auto() # 他の効果を発動する
-    VICTORY = auto()             # 特殊勝利
-    RULE_PROCESSING = auto()     # ルール定義（デッキ構築ルールや名称変更など）
+    # ▼ 追加: 行動制限（発動できない、加えられない等）
+    RESTRICTION = auto()
 
     OTHER = auto()
     

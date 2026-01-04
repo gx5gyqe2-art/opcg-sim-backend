@@ -140,8 +140,12 @@ class Effect:
         )]
 
     def _detect_action_type(self, text: str) -> ActionType:
-        # ▼ 追加ロジック
-        if '効果を発動する' in text:
+        # 1. 制限・禁止系
+        if 'できない' in text or '不可' in text or '加えられない' in text:
+             return ActionType.RESTRICTION
+
+        # 2. 効果の発動 (イベント含む)
+        if '発動する' in text and ('効果' in text or 'イベント' in text):
             return ActionType.EXECUTE_MAIN_EFFECT
 
         if '勝利する' in text and 'ゲーム' in text:
@@ -158,11 +162,13 @@ class Effect:
         if '無効' in text:
             return ActionType.NEGATE_EFFECT
             
+        # 3. ライフ操作 (手札に加えるも含むように緩和)
         if 'ライフ' in text:
-            if '加える' in text and '手札' not in text: return ActionType.LIFE_MANIPULATE
+            if '加える' in text: return ActionType.LIFE_MANIPULATE
             if '置く' in text or '向き' in text: return ActionType.LIFE_MANIPULATE
 
-        if 'コスト' in text and ('-' in text or '下げる' in text):
+        # 4. コスト操作 (加算も含む)
+        if 'コスト' in text and ('-' in text or '下げる' in text or '+' in text or '上げる' in text):
              return ActionType.COST_CHANGE
         
         if '得る' in text:
@@ -190,11 +196,14 @@ class Effect:
         return ActionType.OTHER
 
     def _extract_number(self, text: str) -> int:
-        match = re.search(r'([-\u2212\u2010\u2011\u2012\u2013\u2014\u2015\uff0d]?)(\d+)', text)
+        match = re.search(r'([-\u2212\u2010\u2011\u2012\u2013\u2014\u2015\uff0d+]?)(\d+)', text)
         if match:
             sign = match.group(1)
             num = int(match.group(2))
-            return -num if sign else num
+            if sign in ['-', '\u2212', '\u2010', '\u2011', '\u2012', '\u2013', '\u2014', '\u2015', '\uff0d']:
+                return -num
+            # +の場合や符号なしはそのまま正の数
+            return num
         return 0
 
     def _parse_condition(self, text: str) -> Optional[Condition]:
