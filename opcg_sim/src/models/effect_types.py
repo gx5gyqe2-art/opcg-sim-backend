@@ -2,7 +2,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass, field
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from ..models.enums import (
     Phase, Player, Zone, ActionType, TriggerType, 
     CompareOperator, ConditionType
@@ -21,13 +21,17 @@ class TargetQuery:
     attributes: List[str] = field(default_factory=list)
     colors: List[str] = field(default_factory=list)
     names: List[str] = field(default_factory=list)
+    
     cost_min: Optional[int] = None
     cost_max: Optional[int] = None
     power_min: Optional[int] = None
     power_max: Optional[int] = None
+    
     is_rest: Optional[bool] = None
+    
     count: int = 1
-    select_mode: str = "CHOOSE"
+    select_mode: str = "CHOOSE" # CHOOSE, ALL, RANDOM, SOURCE, REFERENCE, REMAINING
+    tag: Optional[str] = None # ▼ 追加: 指示語解決用のID
     raw_text: str = ""
 
 @dataclass
@@ -48,8 +52,9 @@ class EffectAction:
     source_zone: Zone = Zone.ANY
     dest_zone: Zone = Zone.ANY
     dest_position: str = "BOTTOM"
-    details: str = ""
+    details: Optional[Dict[str, Any]] = None # str -> Optional[Dict] に変更推奨（互換性のため）
     then_actions: List[EffectAction] = field(default_factory=list)
+    raw_text: str = ""
 
 @dataclass
 class Ability:

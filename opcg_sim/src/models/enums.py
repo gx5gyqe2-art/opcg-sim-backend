@@ -57,6 +57,7 @@ class Zone(Enum):
     ANY = "ANY"
 
 class ActionType(Enum):
+    # 既存定義
     KO = auto()
     REST = auto()
     ACTIVE = auto()
@@ -87,6 +88,13 @@ class ActionType(Enum):
     SWAP_POWER = auto()
     KEYWORD = auto()
     OTHER = auto()
+    
+    # ▼ Parser互換用に追加
+    MOVE_TO_HAND = auto() # MOVE_CARDのエイリアス的扱い
+    TRASH = auto()        # DISCARD/TRASH_FROM_DECKの汎用版
+    BUFF = auto()         # BP_BUFFのエイリアス
+    ACTIVE_DON = auto()   # ドンをアクティブにする
+    DECK_TOP = auto()     # デッキトップ操作
 
 class TriggerType(Enum):
     ON_PLAY = "登場時"
@@ -124,6 +132,7 @@ class ConditionType(Enum):
     DON_COUNT = auto()
     LEADER_NAME = auto()
     LEADER_TRAIT = auto()
+    OTHER = auto() # 追加
     NONE = auto()
 
 class ParserKeyword(str, Enum):
@@ -161,7 +170,6 @@ class ParserKeyword(str, Enum):
     SELF = "自分"
     THIS_CARD = "このキャラ"
     SELF_REF = "自身"
-    # --- 追加分 ---
     EXCEPT = "以外の"
     TRAIT = "特徴"
     ATTRIBUTE = "属性"
@@ -170,14 +178,13 @@ class ParserKeyword(str, Enum):
     BELOW = "以下"
     SET_TO = "にする"
     IF_COND = "場合"
-    SUBJECT_GA = "が" # "が" (NFC正規化に注意)
+    SUBJECT_GA = "が" 
     ALL = "全て"
     ALL_HIRAGANA = "すべて"
     DECK = "デッキ"
-    COST_AREA = "コストエリア" # ドン置き場用
+    COST_AREA = "コストエリア"
 
 class PendingMessage(str, Enum):
     MAIN_ACTION = "メインアクションを選択してください"
     SELECT_BLOCKER = "ブロッカーを選択してください"
     SELECT_COUNTER = "カウンターカードを選択してください"
-
