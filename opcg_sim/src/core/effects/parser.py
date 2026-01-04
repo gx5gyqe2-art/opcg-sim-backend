@@ -157,6 +157,9 @@ class Effect:
 
         if 'ダメージ' in text and ('与え' in text or '受ける' in text):
             return ActionType.DEAL_DAMAGE
+            
+        if 'アクティブにならない' in text:
+            return ActionType.FREEZE
 
         if '代わりに' in text: return ActionType.REPLACE_EFFECT
         if '選ぶ' in text and ('つ' in text or 'から' in text): return ActionType.SELECT_OPTION
