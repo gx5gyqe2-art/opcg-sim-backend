@@ -57,7 +57,6 @@ class Zone(Enum):
     ANY = "ANY"
 
 class ActionType(Enum):
-    # 既存定義
     KO = auto()
     REST = auto()
     ACTIVE = auto()
@@ -79,7 +78,6 @@ class ActionType(Enum):
     BP_BUFF = auto()
     SET_BASE_POWER = auto()
     COST_BUFF = auto()
-    # COST_CHANGE = auto() # 重複を避けるため下の新規定義を使用
     ATTACH_DON = auto()
     REST_DON = auto()
     RAMP_DON = auto()
@@ -88,19 +86,18 @@ class ActionType(Enum):
     SWAP_POWER = auto()
     KEYWORD = auto()
     
-    # ▼ 追加定義
-    LIFE_MANIPULATE = auto() # ライフ操作（回復、表向きなど）
-    COST_CHANGE = auto()     # コスト増減
-    GRANT_KEYWORD = auto()   # キーワード能力付与（速攻など）
+    LIFE_MANIPULATE = auto()
+    COST_CHANGE = auto()
+    GRANT_KEYWORD = auto()
+    ATTACK_DISABLE = auto()
     
     OTHER = auto()
     
-    # ▼ Parser互換用
-    MOVE_TO_HAND = auto() # MOVE_CARDのエイリアス的扱い
-    TRASH = auto()        # DISCARD/TRASH_FROM_DECKの汎用版
-    BUFF = auto()         # BP_BUFFのエイリアス
-    ACTIVE_DON = auto()   # ドンをアクティブにする
-    DECK_TOP = auto()     # デッキトップ操作
+    MOVE_TO_HAND = auto()
+    TRASH = auto()
+    BUFF = auto()
+    ACTIVE_DON = auto()
+    DECK_TOP = auto()
 
 class TriggerType(Enum):
     ON_PLAY = "登場時"
@@ -138,7 +135,7 @@ class ConditionType(Enum):
     DON_COUNT = auto()
     LEADER_NAME = auto()
     LEADER_TRAIT = auto()
-    OTHER = auto() # 追加
+    OTHER = auto()
     NONE = auto()
 
 class ParserKeyword(str, Enum):

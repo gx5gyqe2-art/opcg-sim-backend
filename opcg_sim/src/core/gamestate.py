@@ -99,7 +99,6 @@ class GameManager:
             candidates.extend(p.trash)
             candidates.extend(p.life)
             candidates.extend(p.deck)
-            # ▼ 追加: temp_zone も検索対象に含める
             candidates.extend(p.temp_zone)
             
             for c in candidates:
@@ -208,10 +207,8 @@ class GameManager:
             self.active_interaction = None
             return
 
-        # 選択結果をセット
         effect_context["selected_uuids"] = payload.get("selected_uuids", [])
         
-        # インタラクション状態を一度解除
         self.active_interaction = None
 
         from .effects.resolver import execute_action
@@ -220,22 +217,16 @@ class GameManager:
         except:
             log_event("INFO", "game.resume_effect", "Resuming effect", player=player.name)
         
-        # 1. 中断していたアクションを実行
         success = execute_action(self, player, action, source_card, effect_context=effect_context)
         
-        # 2. 成功したら、残りのアクション（Abilityの続き）を実行
         if success and remaining_ability_actions:
             for i, next_act in enumerate(remaining_ability_actions):
-                # 既に別のインタラクションで中断されている場合はループを抜ける
                 if self.active_interaction:
-                    # この場合、新しいactive_interactionにさらに残りのアクションを引き継ぐ
                     if "continuation" in self.active_interaction:
                         self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i:]
                     break
                 
-                # 次のアクションを実行
                 if not self._perform_logic(player, next_act, source_card):
-                    # 中断発生: 残りのアクションを保存
                     if self.active_interaction and "continuation" in self.active_interaction:
                         self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i+1:]
                     break
@@ -428,6 +419,9 @@ class GameManager:
         
         self._validate_action(attacker_owner, "MAIN_ACTION")
 
+        if "ATTACK_DISABLE" in attacker.flags:
+            raise ValueError("このカードは効果によりアタックできません。")
+
         if attacker.is_rest:
             raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
         
@@ -566,18 +560,15 @@ class GameManager:
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
         
-        # ▼ 修正: アクションのループ処理（残りのアクションを保存・中断対応）
         for i, action in enumerate(ability.actions):
             if self.active_interaction:
                 log_event("INFO", "game.ability_suspend", "Ability execution suspended for interaction", player=player.name)
-                # 既に中断中なら、このアクション以降を保存して終了
                 if "continuation" in self.active_interaction:
                      self.active_interaction["continuation"]["remaining_ability_actions"] = ability.actions[i:]
                 break
                 
             success = self._perform_logic(player, action, source_card)
             if not success:
-                # 中断発生: 残りのアクションを保存
                 if self.active_interaction and "continuation" in self.active_interaction:
                      self.active_interaction["continuation"]["remaining_ability_actions"] = ability.actions[i+1:]
                 break

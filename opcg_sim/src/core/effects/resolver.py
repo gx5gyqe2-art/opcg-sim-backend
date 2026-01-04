@@ -167,36 +167,28 @@ def self_execute(game_manager, player, action, targets):
             player.don_attached_cards.append(don)
             target_card.attached_don += 1
             
-    # ▼ 追加実装: コスト操作
     elif action.type == ActionType.COST_CHANGE:
         for t in targets:
             t.cost_buff += action.value
             log_event("INFO", "effect.cost_change", f"{t.master.name} cost buffed by {action.value}", player=player.name)
 
-    # ▼ 追加実装: ライフ操作
     elif action.type == ActionType.LIFE_MANIPULATE:
         txt = action.raw_text
         
-        # 1. ライフ回復 (デッキの上からライフに加える)
         if 'ライフ' in txt and ('加える' in txt or '置く' in txt) and '手札' not in txt:
-            # ソースが指定されていなければデッキトップとみなす
             source_list = player.deck
-            # もしターゲット指定があればそれを使う（例：トラッシュから加える）
             if targets:
-                # ターゲットカードをそれぞれの場所から移動
                 for t in targets:
                     owner, current_zone = game_manager._find_card_location(t)
                     if owner:
                         game_manager.move_card(t, Zone.LIFE, owner, dest_position="TOP")
                         log_event("INFO", "effect.life_recover", f"Added {t.master.name} to Life", player=player.name)
             else:
-                # デッキトップから1枚
                 if source_list:
                     card = source_list.pop(0)
                     player.life.append(card)
                     log_event("INFO", "effect.life_recover", "Recovered 1 Life from Deck", player=player.name)
 
-        # 2. ライフの操作 (表向き/裏向き)
         elif '向き' in txt:
             target_lives = targets if targets else player.life
             for card in target_lives:
@@ -204,9 +196,7 @@ def self_execute(game_manager, player, action, targets):
                 elif '裏' in txt: card.is_face_up = False
                 log_event("INFO", "effect.life_face", f"Life {card.uuid} face changed", player=player.name)
 
-    # ▼ 追加実装: 能力付与
     elif action.type == ActionType.GRANT_KEYWORD:
-        # 生テキストからキーワードを推測
         keywords = {
             "速攻": "速攻",
             "ブロッカー": "ブロッカー",
@@ -225,3 +215,13 @@ def self_execute(game_manager, player, action, targets):
             for t in targets:
                 t.current_keywords.add(found_kw)
                 log_event("INFO", "effect.grant_keyword", f"Granted [{found_kw}] to {t.master.name}", player=player.name)
+
+    elif action.type == ActionType.ATTACK_DISABLE:
+        for t in targets:
+            t.flags.add("ATTACK_DISABLE")
+            log_event("INFO", "effect.attack_disable", f"{t.master.name} cannot attack", player=player.name)
+
+    elif action.type == ActionType.NEGATE_EFFECT:
+        for t in targets:
+            t.negated = True
+            log_event("INFO", "effect.negate", f"{t.master.name} effects negated", player=player.name)
