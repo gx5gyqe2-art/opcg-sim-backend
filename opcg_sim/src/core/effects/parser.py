@@ -26,7 +26,6 @@ class Effect:
         for k, v in replacements.items():
             text = text.replace(k, v)
         text = re.sub(r'\s+', '', text)
-        # ドン!!の正規化
         text = re.sub(r'ドン!!', 'ドン', text)
         text = re.sub(r'DON!!', 'ドン', text)
         return text
@@ -49,8 +48,6 @@ class Effect:
             else:
                 actions = self._parse_recursive(body_text)
             
-            # アクションが空でもトリガーがあれば解析成功とみなす(パッシブ効果などのため)
-            # ただし、ActionType.OTHER であっても中身があればOK
             if actions or costs or trigger != TriggerType.UNKNOWN:
                 self.abilities.append(Ability(trigger=trigger, costs=costs, actions=actions, raw_text=part))
 
@@ -67,7 +64,6 @@ class Effect:
         if '『カウンター』' in text: return TriggerType.COUNTER
         if '『トリガー』' in text: return TriggerType.TRIGGER
         if '『ルール』' in text: return TriggerType.RULE
-        # トリガー表記がないが条件付きの効果の場合
         if '時、' in text: return TriggerType.TRIGGER 
         return TriggerType.UNKNOWN
 
@@ -78,12 +74,10 @@ class Effect:
         last_action = None
 
         for sentence in sentences:
-            # 接続詞での分割
             parts = re.split(r'その後、|、その後', sentence)
             for part in parts:
                 current_actions = self._parse_logic_block(part, is_cost)
                 
-                # 任意の処理(できる)の判定
                 is_optional = 'できる' in part
                 
                 for act in current_actions:
@@ -104,7 +98,6 @@ class Effect:
         return self._get_deepest_action(action.then_actions[-1])
 
     def _parse_logic_block(self, text: str, is_cost: bool) -> List[EffectAction]:
-        # 条件パターンの検出
         match = re.search(r'^(.+?)(場合|なら|することで|につき)、(.+)$', text)
         if match:
             condition_text = match.group(1)
@@ -122,18 +115,17 @@ class Effect:
         return self._parse_atomic_action(text, is_cost)
 
     def _parse_atomic_action(self, text: str, is_cost: bool) -> List[EffectAction]:
-        # 特殊アクション: サーチ
         if '見て' in text:
             return self._handle_look_action(text)
 
-        # ターゲット解析
         target = None
-        if any(kw in text for kw in ['それ', 'そのカード', 'そのキャラ']):
+        if 'ドン' in text and '追加' in text:
+            target = None
+        elif any(kw in text for kw in ['それ', 'そのカード', 'そのキャラ']):
             target = TargetQuery(select_mode="REFERENCE", raw_text="last_target")
-            target.tag = "last_target" # 参照時もタグ維持
+            target.tag = "last_target"
         else:
             target = parse_target(text)
-            # 対象選択の文脈ならタグを付与
             if any(kw in text for kw in ['選び', '対象とし', 'にする']):
                 target.tag = "last_target"
 
@@ -145,46 +137,41 @@ class Effect:
             target=target,
             value=val,
             source_zone=target.zone if target else Zone.ANY,
-            dest_zone=Zone.ANY, # 必要に応じて補完
+            dest_zone=Zone.ANY,
             raw_text=text
         )]
 
     def _detect_action_type(self, text: str) -> ActionType:
-        # 基本アクション
         if '引く' in text: return ActionType.DRAW
+        if 'ドン' in text and '追加' in text: return ActionType.RAMP_DON
         if '登場' in text: return ActionType.PLAY_CARD
         if 'KO' in text: return ActionType.KO
         if '手札' in text and ('戻す' in text or '加える' in text): return ActionType.MOVE_TO_HAND
-        if 'トラッシュ' in text or '捨てる' in text: return ActionType.TRASH
+        if ('手札' in text and '捨てる' in text) or ('トラッシュ' in text and '置く' in text) or 'トラッシュ' in text or '捨てる' in text: return ActionType.TRASH
         if 'ライフ' in text and '加える' in text: return ActionType.LIFE_RECOVER
         
-        # バフ・デバフ
         if 'パワー' in text:
-            if 'する' in text and ('+' not in text and '-' not in text): return ActionType.SET_BASE_POWER
-            return ActionType.BP_BUFF
+            if 'する' in text and not any(k in text for k in ['+', '-', '＋', '−', 'プラス', 'マイナス']): return ActionType.SET_BASE_POWER
+            return ActionType.BUFF
         if 'コスト' in text and ('+' in text or '-' in text): return ActionType.COST_BUFF
         
-        # 状態異常・ロック
         if 'アタックできない' in text: return ActionType.LOCK
         if '無効' in text: return ActionType.NEGATE_EFFECT
         if 'レスト' in text: return ActionType.REST
         if 'アクティブ' in text: return ActionType.ACTIVE
         
-        # キーワード能力付与
         if '得る' in text: return ActionType.GRANT_EFFECT
         
-        # ドン操作
         if 'ドン' in text:
             if '付与' in text or '付ける' in text: return ActionType.ATTACH_DON
             if 'レスト' in text: return ActionType.REST_DON
             if 'アクティブ' in text: return ActionType.ACTIVE_DON
             if 'デッキ' in text: return ActionType.RETURN_DON
 
-        # デッキ・並び替え
         if 'デッキ' in text:
             if '下' in text: return ActionType.DECK_BOTTOM
             if '上' in text: return ActionType.DECK_TOP
-            if '順番' in text or '並び替え' in text: return ActionType.SHUFFLE # 仮: 実際は並び替えアクション
+            if '順番' in text or '並び替え' in text: return ActionType.SHUFFLE
 
         return ActionType.OTHER
 
@@ -205,7 +192,7 @@ class Effect:
         elif '場' in text or 'キャラ' in text: type_ = ConditionType.FIELD_COUNT
         elif 'リーダー' in text and '特徴' not in text: type_ = ConditionType.LEADER_NAME
         elif '特徴' in text: type_ = ConditionType.HAS_TRAIT
-        elif '速攻' in text or 'ブロッカー' in text: type_ = ConditionType.HAS_UNIT # キーワード持ちがいるか
+        elif '速攻' in text or 'ブロッカー' in text: type_ = ConditionType.HAS_UNIT
         
         target = None
         if type_ in [ConditionType.HAS_TRAIT, ConditionType.FIELD_COUNT, ConditionType.HAS_UNIT]:
@@ -214,7 +201,6 @@ class Effect:
         nums = re.findall(r'(\d+)', text)
         val = int(nums[0]) if nums else 0
         
-        # 文字列条件(リーダー名、特徴名)の抽出
         str_val = val
         if type_ == ConditionType.LEADER_NAME:
             m = re.search(r'「([^」]+)」', text)
@@ -232,10 +218,9 @@ class Effect:
 
     def _handle_look_action(self, text: str) -> List[EffectAction]:
         val = self._extract_number(text)
-        if val <= 0: val = 1 # デフォルト1枚
+        if val <= 0: val = 1
         
         actions = []
-        # 1. 見る
         actions.append(EffectAction(
             type=ActionType.LOOK, 
             value=val, 
@@ -244,11 +229,9 @@ class Effect:
             raw_text=f"デッキの上から{val}枚を見る"
         ))
         
-        # 2. 公開/手札に加え
         if '加える' in text or '公開' in text:
-            # ターゲット解析 (例: 特徴《海軍》を持つカード1枚)
             target = parse_target(text)
-            target.zone = Zone.TEMP # サーチ結果から
+            target.zone = Zone.TEMP
             target.tag = "last_target"
             
             actions.append(EffectAction(
@@ -259,7 +242,6 @@ class Effect:
                 raw_text="選択して手札に加える"
             ))
             
-        # 3. 残り
         if '残り' in text or '下' in text:
             rem_target = TargetQuery(zone=Zone.TEMP, select_mode="ALL")
             actions.append(EffectAction(
