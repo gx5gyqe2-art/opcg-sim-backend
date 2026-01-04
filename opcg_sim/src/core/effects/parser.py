@@ -127,16 +127,15 @@ class Effect:
             ActionType.PASSIVE_EFFECT
         ]
         
-        # ★ Step 2 修正: 計算式や受動的条件が含まれる場合はターゲット検索をしない
-        # 「〜につき」「〜時」「できない」「されない」
-        is_calculation_or_rule = any(kw in text for kw in ["につき", "時", "できない", "されない", "得る"])
+        # ★ Step 3 修正: 「いる」を追加
+        # 「〜につき」「〜時」「できない」「されない」「得る」「いる」
+        is_calculation_or_rule = any(kw in text for kw in ["につき", "時", "できない", "されない", "得る", "いる"])
         
         if act_type not in NO_TARGET_ACTIONS and not is_calculation_or_rule:
             if any(kw in text for kw in ['それ', 'そのカード', 'そのキャラ']):
                 target = TargetQuery(select_mode="REFERENCE", raw_text="last_target")
                 if not target.tag: target.tag = "last_target"
             else:
-                # デフォルトターゲットの判定（KOなどは相手対象）
                 default_p = Player.SELF
                 if act_type in [ActionType.KO, ActionType.DEAL_DAMAGE, ActionType.REST, ActionType.ATTACK_DISABLE]:
                     if "自分" not in text:
@@ -147,12 +146,6 @@ class Effect:
                 if any(kw in text for kw in ['選び', '対象とし']):
                     target.tag = "last_target"
         
-        # 「につき」がある場合はターゲット無しのBUFFとして扱う等の調整
-        if "につき" in text and act_type == ActionType.BUFF:
-             # Matcherを動かさないようにターゲットはNoneのままにする
-             # (リゾルバー側でCondition等を見て計算する必要があるが、まずは誤検知を防ぐ)
-             pass
-
         return [EffectAction(
             type=act_type,
             target=target,
