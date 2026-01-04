@@ -118,7 +118,9 @@ class Effect:
             ActionType.DRAW, 
             ActionType.RAMP_DON, 
             ActionType.SHUFFLE, 
-            ActionType.LIFE_RECOVER
+            ActionType.LIFE_RECOVER,
+            ActionType.VICTORY,
+            ActionType.RULE_PROCESSING
         ]
         
         if act_type not in NO_TARGET_ACTIONS:
@@ -138,6 +140,18 @@ class Effect:
         )]
 
     def _detect_action_type(self, text: str) -> ActionType:
+        # ▼ 追加ロジック
+        if '効果を発動する' in text:
+            return ActionType.EXECUTE_MAIN_EFFECT
+
+        if '勝利する' in text and 'ゲーム' in text:
+            return ActionType.VICTORY
+        if '勝利する' in text and '敗北' in text:
+            return ActionType.VICTORY
+
+        if 'としても扱う' in text or '何枚でも' in text:
+            return ActionType.RULE_PROCESSING
+
         if 'アタック' in text and ('できない' in text or '不可' in text):
             return ActionType.ATTACK_DISABLE
             

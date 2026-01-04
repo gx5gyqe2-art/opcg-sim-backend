@@ -1,5 +1,5 @@
 from typing import Optional, List, Any, Dict
-from ...models.enums import ActionType, Zone, ConditionType, CompareOperator
+from ...models.enums import ActionType, Zone, ConditionType, CompareOperator, TriggerType
 from ...models.effect_types import EffectAction, Condition
 from ...utils.logger_config import log_event
 
@@ -106,7 +106,7 @@ def execute_action(
     if targets and action.target and action.target.tag == "last_target":
         effect_context["last_target_uuid"] = targets[0].uuid
 
-    self_execute(game_manager, player, action, targets)
+    self_execute(game_manager, player, action, targets, source_card=source_card)
 
     if action.then_actions:
         for sub in action.then_actions:
@@ -115,7 +115,7 @@ def execute_action(
                 
     return True
 
-def self_execute(game_manager, player, action, targets):
+def self_execute(game_manager, player, action, targets, source_card=None):
     if action.type == ActionType.DRAW:
         game_manager.draw_card(player, action.value)
     elif action.type == ActionType.RAMP_DON:
@@ -225,3 +225,20 @@ def self_execute(game_manager, player, action, targets):
         for t in targets:
             t.negated = True
             log_event("INFO", "effect.negate", f"{t.master.name} effects negated", player=player.name)
+
+    elif action.type == ActionType.EXECUTE_MAIN_EFFECT:
+        # source_card（この効果を発動しているカード自身）のメイン効果を実行
+        if source_card and source_card.master.abilities:
+             # トリガー/カウンター以外のアビリティを探す
+             target_ability = next((a for a in source_card.master.abilities if a.trigger not in [TriggerType.TRIGGER, TriggerType.COUNTER]), None)
+             
+             if target_ability:
+                 log_event("INFO", "effect.execute_main", f"Executing nested ability of {source_card.master.name}", player=player.name)
+                 game_manager.resolve_ability(player, target_ability, source_card)
+
+    elif action.type == ActionType.VICTORY:
+        game_manager.winner = player.name
+        log_event("INFO", "game.victory_special", f"{player.name} wins by effect!", player=player.name)
+
+    elif action.type == ActionType.RULE_PROCESSING:
+        log_event("INFO", "effect.rule", f"Static rule processed: {action.raw_text}", player=player.name)
