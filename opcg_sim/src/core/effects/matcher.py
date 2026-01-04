@@ -2,8 +2,9 @@ import re
 import logging
 from ...models.effect_types  import TargetQuery, _nfc
 from ...models.enums import Player, Zone, ParserKeyword
+from ...utils.logger_config import log_event  # 追加: 既存ロガーのインポート
 
-logger = logging.getLogger("opcg_sim")
+# logger = logging.getLogger("opcg_sim") # 既存ロガーを使用するため標準ロガーは削除/無効化
 
 def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQuery:
     tq = TargetQuery(raw_text=tgt_text, player=default_player)
@@ -141,6 +142,28 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         if query.is_rest is not None and card.is_rest != query.is_rest: continue
         
         results.append(card)
+
+    # ▼ 追加: 対象が見つからなかった場合のログ出力
+    if not results:
+        # select_mode が ALL や REMAINING の場合は0件でも正常な場合が多いが、
+        # 通常のCHOOSEモードで0件の場合は「対象不在」の可能性が高いため警告を出す
+        log_level = "WARNING"
+        if query.select_mode in ["ALL", "REMAINING"] or query.is_up_to:
+            log_level = "INFO" # 「まで」や「全て」の場合は0件でも正常ケースとしてINFOに留める
+        
+        log_event(
+            level_key=log_level,
+            action="matcher.no_target",
+            msg=f"No targets found for query: {query.raw_text}",
+            player="system",
+            payload={
+                "query_raw": query.raw_text,
+                "zone": query.zone.name,
+                "target_player": query.player.name,
+                "candidates_scanned": len(candidates)
+            }
+        )
+    # ▲ 追加ここまで
 
     if query.count == -1 or query.select_mode in ["ALL", "REMAINING"]:
         return results
