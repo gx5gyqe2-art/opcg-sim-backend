@@ -103,9 +103,9 @@ class ActionType(Enum):
     PREVENT_LEAVE = auto()
     REPLACE_EFFECT = auto()
     
-    # ▼ 追加: 最終完遂用
-    MOVE_ATTACHED_DON = auto() # 付与されているドンの移動
-    MODIFY_DON_PHASE = auto()  # ドンフェイズの処理変更
+    MOVE_ATTACHED_DON = auto()
+    MODIFY_DON_PHASE = auto()
+    REDIRECT_ATTACK = auto()
 
     OTHER = auto()
     

@@ -123,7 +123,7 @@ class Effect:
             ActionType.RULE_PROCESSING,
             ActionType.SELECT_OPTION,
             ActionType.REPLACE_EFFECT,
-            ActionType.MODIFY_DON_PHASE # 追加
+            ActionType.MODIFY_DON_PHASE
         ]
         
         if act_type not in NO_TARGET_ACTIONS:
@@ -143,19 +143,21 @@ class Effect:
         )]
 
     def _detect_action_type(self, text: str) -> ActionType:
-        # 1. 付与されているドンの移動 (最優先)
+        if 'アタック' in text and '対象' in text and '変更' in text:
+            return ActionType.REDIRECT_ATTACK
+
+        if 'ドン' in text and '戻す' in text and 'ドンデッキ' in text:
+            return ActionType.RETURN_DON
+        
         if '付与されているドン' in text and '付与する' in text:
             return ActionType.MOVE_ATTACHED_DON
 
-        # 2. ドンフェイズ操作
         if 'ドンフェイズ' in text:
             return ActionType.MODIFY_DON_PHASE
 
-        # 3. ダメージ (条件緩和: '与えてもよい'なども含むため '与え' まで短縮)
         if 'ダメージ' in text and ('与え' in text or '受ける' in text):
             return ActionType.DEAL_DAMAGE
 
-        # --- 以下既存 ---
         if '代わりに' in text: return ActionType.REPLACE_EFFECT
         if '選ぶ' in text and ('つ' in text or 'から' in text): return ActionType.SELECT_OPTION
         if 'シャッフル' in text: return ActionType.SHUFFLE

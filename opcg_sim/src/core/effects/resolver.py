@@ -285,16 +285,11 @@ def self_execute(game_manager, player, action, targets, source_card=None):
     elif action.type == ActionType.REPLACE_EFFECT:
         log_event("INFO", "effect.replace", f"Replacement Effect: {action.raw_text}", player=player.name)
 
-    # ▼ 追加: 付与されているドンの移動
     elif action.type == ActionType.MOVE_ATTACHED_DON:
-        # 自分(source)またはターゲットについているドンを探す
-        # 簡易実装: source_cardにドンがついていればそれを移動
         don_source = source_card if source_card and source_card.attached_don > 0 else None
         
-        # ターゲットに指定されたキャラへ移動
         if don_source and targets:
             target_card = targets[0]
-            # ドンを1枚探して付け替える
             moving_don = next((d for d in player.don_attached_cards if d.attached_to == don_source.uuid), None)
             
             if moving_don:
@@ -303,6 +298,41 @@ def self_execute(game_manager, player, action, targets, source_card=None):
                 target_card.attached_don += 1
                 log_event("INFO", "effect.move_don", f"Moved Don from {don_source.master.name} to {target_card.master.name}", player=player.name)
 
-    # ▼ 追加: ドンフェイズ操作 (ログのみ)
     elif action.type == ActionType.MODIFY_DON_PHASE:
         log_event("INFO", "effect.modify_don_phase", f"Don Phase Modified: {action.raw_text}", player=player.name)
+
+    elif action.type == ActionType.REDIRECT_ATTACK:
+        if game_manager.active_battle and targets:
+            new_target = targets[0]
+            game_manager.active_battle["target"] = new_target
+            log_event("INFO", "effect.redirect", f"Attack target changed to {new_target.master.name}", player=player.name)
+
+    elif action.type == ActionType.RETURN_DON:
+        target_player = game_manager.opponent if "相手" in action.raw_text else player
+        count = action.value if action.value > 0 else 1
+        
+        returned_count = 0
+        
+        while returned_count < count and target_player.don_active:
+            don = target_player.don_active.pop()
+            target_player.don_deck.append(don)
+            returned_count += 1
+            
+        while returned_count < count and target_player.don_rested:
+            don = target_player.don_rested.pop()
+            target_player.don_deck.append(don)
+            returned_count += 1
+            
+        if returned_count < count and target_player.don_attached_cards:
+            while returned_count < count and target_player.don_attached_cards:
+                don = target_player.don_attached_cards.pop()
+                if don.attached_to:
+                    attached_card = game_manager._find_card_by_uuid(don.attached_to)
+                    if attached_card:
+                        attached_card.attached_don = max(0, attached_card.attached_don - 1)
+                
+                don.attached_to = None
+                target_player.don_deck.append(don)
+                returned_count += 1
+
+        log_event("INFO", "effect.return_don", f"{target_player.name} returned {returned_count} Don to deck", player=player.name)
