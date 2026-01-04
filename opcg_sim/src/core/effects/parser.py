@@ -120,7 +120,8 @@ class Effect:
             ActionType.SHUFFLE, 
             ActionType.LIFE_RECOVER,
             ActionType.VICTORY,
-            ActionType.RULE_PROCESSING
+            ActionType.RULE_PROCESSING,
+            ActionType.SELECT_OPTION
         ]
         
         if act_type not in NO_TARGET_ACTIONS:
@@ -140,20 +141,33 @@ class Effect:
         )]
 
     def _detect_action_type(self, text: str) -> ActionType:
-        # 1. 制限・禁止系
+        # 1. 選択肢
+        if '選ぶ' in text and ('つ' in text or 'から' in text):
+            return ActionType.SELECT_OPTION
+
+        # 2. ダメージ
+        if 'ダメージ' in text and ('与える' in text or '受ける' in text):
+            return ActionType.DEAL_DAMAGE
+
+        # 3. コスト固定
+        if 'コスト' in text and 'にする' in text:
+            return ActionType.SET_COST
+
+        # 4. デッキトップ操作
+        if 'デッキ' in text and '上' in text and ('置く' in text or '戻す' in text or '加える' in text):
+            return ActionType.DECK_TOP
+
+        # --- 以下既存 ---
         if 'できない' in text or '不可' in text or '加えられない' in text:
              return ActionType.RESTRICTION
 
-        # 2. 効果の発動 (イベント含む)
         if '発動する' in text and ('効果' in text or 'イベント' in text):
             return ActionType.EXECUTE_MAIN_EFFECT
 
-        if '勝利する' in text and 'ゲーム' in text:
-            return ActionType.VICTORY
-        if '勝利する' in text and '敗北' in text:
+        if '勝利する' in text and ('ゲーム' in text or '敗北' in text):
             return ActionType.VICTORY
 
-        if 'としても扱う' in text or '何枚でも' in text:
+        if 'としても扱う' in text or '何枚でも' in text or 'カウンター' in text:
             return ActionType.RULE_PROCESSING
 
         if 'アタック' in text and ('できない' in text or '不可' in text):
@@ -162,12 +176,10 @@ class Effect:
         if '無効' in text:
             return ActionType.NEGATE_EFFECT
             
-        # 3. ライフ操作 (手札に加えるも含むように緩和)
         if 'ライフ' in text:
             if '加える' in text: return ActionType.LIFE_MANIPULATE
             if '置く' in text or '向き' in text: return ActionType.LIFE_MANIPULATE
 
-        # 4. コスト操作 (加算も含む)
         if 'コスト' in text and ('-' in text or '下げる' in text or '+' in text or '上げる' in text):
              return ActionType.COST_CHANGE
         
@@ -202,7 +214,6 @@ class Effect:
             num = int(match.group(2))
             if sign in ['-', '\u2212', '\u2010', '\u2011', '\u2012', '\u2013', '\u2014', '\u2015', '\uff0d']:
                 return -num
-            # +の場合や符号なしはそのまま正の数
             return num
         return 0
 

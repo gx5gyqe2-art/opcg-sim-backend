@@ -174,8 +174,6 @@ def self_execute(game_manager, player, action, targets, source_card=None):
 
     elif action.type == ActionType.LIFE_MANIPULATE:
         txt = action.raw_text
-        
-        # 1. ライフを手札に加える (新規対応)
         if '手札' in txt and '加える' in txt:
             if targets:
                 for t in targets:
@@ -183,8 +181,6 @@ def self_execute(game_manager, player, action, targets, source_card=None):
                     if owner and current_zone == owner.life:
                         game_manager.move_card(t, Zone.HAND, owner)
                         log_event("INFO", "effect.life_to_hand", f"Moved {t.master.name} from Life to Hand", player=player.name)
-
-        # 2. ライフ回復
         elif ('加える' in txt or '置く' in txt) and '手札' not in txt:
             source_list = player.deck
             if targets:
@@ -198,8 +194,6 @@ def self_execute(game_manager, player, action, targets, source_card=None):
                     card = source_list.pop(0)
                     player.life.append(card)
                     log_event("INFO", "effect.life_recover", "Recovered 1 Life from Deck", player=player.name)
-
-        # 3. ライフ操作
         elif '向き' in txt:
             target_lives = targets if targets else player.life
             for card in target_lives:
@@ -221,7 +215,6 @@ def self_execute(game_manager, player, action, targets, source_card=None):
             if k in action.raw_text:
                 found_kw = v
                 break
-        
         if found_kw:
             for t in targets:
                 t.current_keywords.add(found_kw)
@@ -238,13 +231,10 @@ def self_execute(game_manager, player, action, targets, source_card=None):
             log_event("INFO", "effect.negate", f"{t.master.name} effects negated", player=player.name)
 
     elif action.type == ActionType.EXECUTE_MAIN_EFFECT:
-        # ターゲット指定があればそれを、なければ自分自身を
         exec_targets = targets if targets else [source_card] if source_card else []
-        
         for t in exec_targets:
              if not t or not t.master.abilities: continue
              target_ability = next((a for a in t.master.abilities if a.trigger not in [TriggerType.TRIGGER, TriggerType.COUNTER]), None)
-             
              if target_ability:
                  log_event("INFO", "effect.execute_main", f"Executing nested ability of {t.master.name}", player=player.name)
                  game_manager.resolve_ability(player, target_ability, source_card=t)
@@ -258,3 +248,28 @@ def self_execute(game_manager, player, action, targets, source_card=None):
 
     elif action.type == ActionType.RESTRICTION:
         log_event("INFO", "effect.restriction", f"Restriction applied: {action.raw_text}", player=player.name)
+
+    # ▼ 追加: デッキトップ操作
+    elif action.type == ActionType.DECK_TOP:
+        for t in targets:
+            owner, _ = game_manager._find_card_location(t)
+            if owner:
+                game_manager.move_card(t, Zone.DECK, owner, dest_position="TOP")
+                log_event("INFO", "effect.deck_top", f"Moved {t.master.name} to Deck Top", player=player.name)
+
+    # ▼ 追加: ダメージ処理 (1点ダメージ=ライフを1枚手札へ)
+    elif action.type == ActionType.DEAL_DAMAGE:
+        # 対象が自分か相手かを判定 (デフォルトは相手)
+        target_p = player if '自分' in action.raw_text or '受ける' in action.raw_text else game_manager.opponent
+        if target_p.life:
+            life_card = target_p.life.pop(0)
+            target_p.hand.append(life_card)
+            log_event("INFO", "effect.damage", f"{target_p.name} took 1 damage from effect", player=player.name)
+
+    # ▼ 追加: 選択肢 (ログのみ)
+    elif action.type == ActionType.SELECT_OPTION:
+        log_event("INFO", "effect.select_option", "Option selection required (Logic pending)", player=player.name)
+
+    # ▼ 追加: コスト固定 (ログのみ)
+    elif action.type == ActionType.SET_COST:
+        log_event("INFO", "effect.set_cost", f"Cost set request: {action.raw_text}", player=player.name)

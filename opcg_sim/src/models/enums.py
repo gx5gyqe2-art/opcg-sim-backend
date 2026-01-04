@@ -93,9 +93,14 @@ class ActionType(Enum):
     EXECUTE_MAIN_EFFECT = auto()
     VICTORY = auto()
     RULE_PROCESSING = auto()
-    
-    # ▼ 追加: 行動制限（発動できない、加えられない等）
     RESTRICTION = auto()
+    
+    # ▼ 追加: Deep Dive対応
+    DECK_TOP = auto()       # デッキトップ操作
+    SET_COST = auto()       # コスト固定(0にする等)
+    DEAL_DAMAGE = auto()    # ダメージ処理
+    SELECT_OPTION = auto()  # 選択肢
+    PASSIVE_EFFECT = auto() # 常在効果など
 
     OTHER = auto()
     
@@ -103,7 +108,6 @@ class ActionType(Enum):
     TRASH = auto()
     BUFF = auto()
     ACTIVE_DON = auto()
-    DECK_TOP = auto()
 
 class TriggerType(Enum):
     ON_PLAY = "登場時"

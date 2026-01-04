@@ -4,7 +4,7 @@ import json
 import re
 from collections import defaultdict
 
-# --- パス設定 ---
+# --- パス設定 ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = current_dir
 if "opcg_sim" not in sys.path:
@@ -19,7 +19,6 @@ except ImportError as e:
     sys.exit(1)
 
 def load_cards():
-    """カードDBの読み込み"""
     candidates = [
         os.path.join(current_dir, "opcg_sim", "data", "opcg_cards.json"),
         os.path.join(current_dir, "data", "opcg_cards.json"),
@@ -33,67 +32,76 @@ def load_cards():
     return []
 
 def find_pattern_b_actions(actions, found_list):
-    """ActionType.OTHER かつ then_actions 無しを抽出"""
     for act in actions:
         if act.type == ActionType.OTHER and not act.then_actions:
             found_list.append(act.raw_text)
         if act.then_actions:
             find_pattern_b_actions(act.then_actions, found_list)
 
-def classify_detailed(text):
+def classify_deep_dive(text):
     """
-    未分類テキストを詳細にカテゴライズする
+    UNCATEGORIZED (OTHER) として残ったものをさらに深掘り分類する
     """
-    if not text: return "UNKNOWN"
+    if not text: return "EMPTY"
     
-    # 1. ルール・特殊処理系
-    if "カード名" in text and "扱う" in text:
-        return "RULE: NAME_CHANGE (名称変更)"
-    if "デッキ" in text and "何枚でも" in text:
-        return "RULE: DECK_BUILD (デッキ構築)"
-    if "勝利する" in text:
-        return "RULE: VICTORY (特殊勝利)"
-    
-    # 2. バトル・耐性系
-    if "ブロックされない" in text:
-        return "BATTLE: UNBLOCKABLE (ブロック不可)"
+    # 1. 発動制限・行動制限 (RESTRICTION系)
+    # Parserの検知漏れの可能性が高い
+    if "発動できない" in text:
+        return "RESTRICTION: ACTIVATION (発動禁止)"
+    if "アタックできない" in text:
+        return "RESTRICTION: ATTACK (アタック禁止)"
+    if "ブロックできない" in text or "ブロックされない" in text:
+        return "RESTRICTION: BLOCK (ブロック禁止/不可)"
+    if "加えられない" in text:
+        return "RESTRICTION: ADD_TO_HAND (手札回収禁止)"
+
+    # 2. コスト操作 (COST_CHANGE系)
+    # "+" などの記号ゆらぎや、"コストXになる" などの固定化
+    if "コスト" in text:
+        if "+" in text or "＋" in text:
+            return "COST: INCREASE (コスト加算)"
+        if "なる" in text:
+            return "COST: SET (コスト固定)"
+        return "COST: OTHER (その他コスト関連)"
+
+    # 3. パワー操作 (BUFF/DEBUFF系)
+    # 複雑な条件でParserが漏らしたケース
+    if "パワー" in text:
+        if "なる" in text:
+            return "POWER: SET (パワー固定)"
+        if "倍" in text:
+            return "POWER: MULTIPLY (パワー倍増)"
+        return "POWER: OTHER (その他パワー関連)"
+
+    # 4. バトル・耐性
     if "KOされない" in text:
-        return "BATTLE: KO_PROTECT (KO耐性)"
+        return "BATTLE: KO_IMMUNITY (KO耐性)"
     if "効果" in text and "受けない" in text:
-        return "BATTLE: IMMUNITY (効果耐性)"
-    if "バトル" in text and "終了" in text:
-        return "BATTLE: END_BATTLE (バトル強制終了)"
+        return "BATTLE: EFFECT_IMMUNITY (効果耐性)"
     
-    # 3. パワー・ダメージ系
-    if "元のパワー" in text:
-        return "STAT: BASE_POWER (基本パワー変更)"
-    if "ダメージ" in text and "与える" in text: # 注釈削除で消えなかったもの
-        return "STAT: DAMAGE_DEAL (ダメージを与える)"
-    
-    # 4. トリッキーな移動・発動
-    if "持ち主" in text and ("手札" in text or "デッキ" in text) and "終了時" in text:
-        return "MOVE: BOUNCE_DELAYED (終了時バウンス)"
+    # 5. ルール・特殊処理
+    if "扱う" in text:
+        return "RULE: TREAT_AS (名称/属性変更)"
+    if "何枚でも" in text:
+        return "RULE: DECK_BUILD (デッキ構築)"
     if "入れ替える" in text:
-        return "MOVE: SWAP (入れ替え)"
-    if "発動する" in text:
-        return "EFFECT: ACTIVATE (他効果の発動)"
+        return "RULE: SWAP (入れ替え)"
+    if "やり直す" in text:
+        return "RULE: RESTART (再実行)"
     
-    # 5. その他キーワード(注釈削除漏れチェック含む)
-    if "ダブルアタック" in text: return "KEYWORD: DOUBLE (注釈漏れ?)"
-    if "バニッシュ" in text: return "KEYWORD: BANISH (注釈漏れ?)"
-    if "再起動" in text: return "KEYWORD: REBOOT (注釈漏れ?)"
+    # 6. ダメージ系
+    if "ダメージ" in text:
+        return "GAME: DAMAGE (ダメージ処理)"
     
-    # 6. 前回修正したはずのもの(残存チェック)
-    if "アタック" in text and "できない" in text: return "CHECK: ATTACK_DISABLE (修正漏れ)"
-    if "無効" in text: return "CHECK: NEGATE (修正漏れ)"
-    if "ライフ" in text: return "CHECK: LIFE (修正漏れ)"
-    if "コスト" in text and ("-" in text or "下げる" in text): return "CHECK: COST (修正漏れ)"
+    # 7. その他
+    if "全て" in text or "すべて" in text:
+        return "TARGET: ALL (全体対象の複雑な効果)"
     
-    return "UNCATEGORIZED (完全未分類)"
+    return "UNKNOWN: HARDCASE (要個別確認)"
 
 def main():
     cards = load_cards()
-    print(f"Loaded {len(cards)} cards. Analyzing remaining UNCATEGORIZED effects...")
+    print(f"Loaded {len(cards)} cards. Deep diving into remaining UNCATEGORIZED effects...")
     
     registry = defaultdict(list)
     total_issues = 0
@@ -102,7 +110,7 @@ def main():
         raw_text = card.get("効果(テキスト)") or card.get("effect_text") or ""
         raw_trigger = card.get("効果(トリガー)") or card.get("trigger_text") or ""
         
-        # 正規化(Parserと同じロジックを通す)
+        # 正規化
         text = Effect(raw_text)._normalize(raw_text) if raw_text else ""
         trigger = Effect(raw_trigger)._normalize(raw_trigger) if raw_trigger else ""
         
@@ -121,8 +129,8 @@ def main():
             if failures:
                 unique_failures = list(set(failures))
                 for fail_text in unique_failures:
-                    # ここで詳細分類を実行
-                    category = classify_detailed(fail_text)
+                    # ここで深掘り分類
+                    category = classify_deep_dive(fail_text)
                     registry[category].append({
                         "id": cid,
                         "name": name,
@@ -133,16 +141,16 @@ def main():
         except Exception:
             pass 
 
-    # --- レポート出力 ---
+    # --- レポート出力 ---
     print("\n" + "="*60)
-    print(f"DETAILED ANALYSIS REPORT (Remaining Issues: {total_issues})")
+    print(f"DEEP DIVE REPORT (Remaining Issues: {total_issues})")
     print("="*60)
     
     sorted_categories = sorted(registry.items(), key=lambda x: len(x[1]), reverse=True)
     
     for category, items in sorted_categories:
         print(f"\n■ {category}: {len(items)} cases")
-        for item in items[:3]:
+        for item in items[:3]: # サンプル3件
             print(f"  - [{item['id']} {item['name']}] ... {item['text']}")
         if len(items) > 3:
             print(f"    ... and {len(items)-3} more.")
