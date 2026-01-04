@@ -222,11 +222,16 @@ class GameManager:
         if success and remaining_ability_actions:
             for i, next_act in enumerate(remaining_ability_actions):
                 if self.active_interaction:
+                    # 次のインタラクション発生時、現在のコンテキストを引き継ぐ
                     if "continuation" in self.active_interaction:
                         self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i:]
+                        # effect_contextはresolver内で既にcontinuationに保存されているはずだが、念のため同期
+                        if "effect_context" not in self.active_interaction["continuation"]:
+                             self.active_interaction["continuation"]["effect_context"] = effect_context
                     break
                 
-                if not self._perform_logic(player, next_act, source_card):
+                # ★修正: コンテキストを引き継いで次のアクションを実行
+                if not self._perform_logic(player, next_act, source_card, effect_context=effect_context):
                     if self.active_interaction and "continuation" in self.active_interaction:
                         self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i+1:]
                     break
@@ -560,20 +565,30 @@ class GameManager:
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
         
+        # ★修正: コンテキストの初期化
+        effect_context = {}
+        
         for i, action in enumerate(ability.actions):
             if self.active_interaction:
                 log_event("INFO", "game.ability_suspend", "Ability execution suspended for interaction", player=player.name)
                 if "continuation" in self.active_interaction:
                      self.active_interaction["continuation"]["remaining_ability_actions"] = ability.actions[i:]
+                     # ★修正: コンテキストを保存
+                     self.active_interaction["continuation"]["effect_context"] = effect_context
                 break
-                
-            success = self._perform_logic(player, action, source_card)
+            
+            # ★修正: コンテキストを渡す
+            success = self._perform_logic(player, action, source_card, effect_context=effect_context)
             if not success:
                 if self.active_interaction and "continuation" in self.active_interaction:
                      self.active_interaction["continuation"]["remaining_ability_actions"] = ability.actions[i+1:]
+                     # ★修正: コンテキストを保存
+                     self.active_interaction["continuation"]["effect_context"] = effect_context
                 break
 
-    def _perform_logic(self, player: Player, action: Any, source_card: CardInstance) -> bool:
+    # ★修正: effect_context 引数を追加
+    def _perform_logic(self, player: Player, action: Any, source_card: CardInstance, effect_context: Optional[Dict[str, Any]] = None) -> bool:
         log_event("INFO", "game.effect", f"Resolving action {action.type} for {source_card.master.name}", player=player.name)
         from .effects.resolver import execute_action
-        return execute_action(self, player, action, source_card)
+        # ★修正: コンテキストを渡す
+        return execute_action(self, player, action, source_card, effect_context=effect_context)

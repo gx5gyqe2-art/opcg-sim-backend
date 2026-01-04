@@ -205,8 +205,27 @@ class Effect:
     def _parse_condition(self, text: str) -> Optional[Condition]:
         type_ = ConditionType.NONE
         op = CompareOperator.EQ
+        val = 0
+        target_in_condition = None
+
+        if '公開したカード' in text:
+            type_ = ConditionType.CONTEXT
+            if 'イベント' in text: val = "TYPE_EVENT"
+            elif 'キャラ' in text: val = "TYPE_CHARACTER"
+            elif '特徴' in text:
+                val = "HAS_TRAIT"
+                m = re.search(r'[《<]([^》>]+)[》>]', text)
+                if m: target_in_condition = TargetQuery(raw_text=m.group(0), traits=[m.group(1)])
+            elif 'コスト' in text:
+                val = "COST_CHECK"
+                nums = re.findall(r'(\d+)', text)
+                if nums: target_in_condition = TargetQuery(raw_text=text, cost_min=int(nums[0]))
+
+        elif 'そうした場合' in text:
+            type_ = ConditionType.CONTEXT
+            val = "LAST_ACTION_SUCCESS"
         
-        if 'ライフ' in text: type_ = ConditionType.LIFE_COUNT
+        elif 'ライフ' in text: type_ = ConditionType.LIFE_COUNT
         elif 'ドン' in text: type_ = ConditionType.DON_COUNT
         elif '手札' in text: type_ = ConditionType.HAND_COUNT
         elif 'トラッシュ' in text: type_ = ConditionType.TRASH_COUNT
@@ -215,14 +234,13 @@ class Effect:
         elif 'リーダー' in text: type_ = ConditionType.LEADER_NAME
         elif 'キャラ' in text or '持つ' in text: type_ = ConditionType.HAS_UNIT
 
-        target_in_condition = None
-        if type_ in [ConditionType.HAS_TRAIT, ConditionType.HAS_UNIT]:
-             target_in_condition = parse_target(text)
+        if type_ not in [ConditionType.CONTEXT, ConditionType.NONE]:
+             if type_ in [ConditionType.HAS_TRAIT, ConditionType.HAS_UNIT]:
+                 target_in_condition = parse_target(text)
+             
+             nums = re.findall(r'(\d+)', text)
+             if nums: val = int(nums[0])
 
-        val = 0
-        nums = re.findall(r'(\d+)', text)
-        if nums: val = int(nums[0])
-        
         if '以上' in text: op = CompareOperator.GE
         elif '以下' in text: op = CompareOperator.LE
         
@@ -235,13 +253,14 @@ class Effect:
         m_trait = re.search(r'[《<]([^》>]+)[》>]', text)
         if m_trait:
             str_val = m_trait.group(1)
-            type_ = ConditionType.HAS_TRAIT
-            op = CompareOperator.HAS
+            if type_ != ConditionType.CONTEXT:
+                type_ = ConditionType.HAS_TRAIT
+                op = CompareOperator.HAS
 
         if type_ == ConditionType.LEADER_NAME: 
             val = str_val
             op = CompareOperator.EQ
-        elif type_ == ConditionType.HAS_TRAIT:
+        elif type_ == ConditionType.HAS_TRAIT and type_ != ConditionType.CONTEXT:
             val = str_val
             op = CompareOperator.HAS
 

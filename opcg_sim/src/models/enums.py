@@ -151,6 +151,7 @@ class ConditionType(Enum):
     DECK_COUNT = auto() 
     LEADER_NAME = auto()
     LEADER_TRAIT = auto()
+    CONTEXT = auto()
     OTHER = auto()
     NONE = auto()
 

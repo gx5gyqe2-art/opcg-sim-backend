@@ -2,18 +2,46 @@ from typing import Optional, List, Any, Dict
 import random
 from ...models.enums import ActionType, Zone, ConditionType, CompareOperator, TriggerType
 from ...models.effect_types import EffectAction, Condition
+from ...models.models import CardType
 from ...utils.logger_config import log_event
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..gamestate import GameManager, Player, CardInstance
 
-def check_condition(game_manager: 'GameManager', player: 'Player', condition: Optional[Condition], source_card: 'CardInstance') -> bool:
+def check_condition(game_manager: 'GameManager', player: 'Player', condition: Optional[Condition], source_card: 'CardInstance', effect_context: Optional[Dict[str, Any]] = None) -> bool:
     if not condition: return True
     from .matcher import get_target_cards
     
+    if effect_context is None: effect_context = {}
+
     res = False
-    if condition.target:
+    
+    if condition.type == ConditionType.CONTEXT:
+        if condition.value == "LAST_ACTION_SUCCESS":
+            res = effect_context.get("last_action_success", False)
+            log_event("DEBUG", "resolver.ctx_check", f"Checking LAST_ACTION_SUCCESS: {res}", player=player.name)
+        
+        elif str(condition.value).startswith("TYPE_") or condition.value in ["HAS_TRAIT", "COST_CHECK"]:
+            revealed = effect_context.get("revealed_cards", [])
+            if not revealed:
+                res = False
+            else:
+                target_card = revealed[0]
+                
+                if condition.value == "TYPE_EVENT":
+                    res = (target_card.master.type == CardType.EVENT)
+                elif condition.value == "TYPE_CHARACTER":
+                    res = (target_card.master.type == CardType.CHARACTER)
+                elif condition.value == "HAS_TRAIT" and condition.target:
+                    res = any(t in target_card.master.traits for t in condition.target.traits)
+                elif condition.value == "COST_CHECK" and condition.target:
+                    # TargetQueryの条件を簡易チェック (ここでは最小コストのみ)
+                    res = True
+                    if condition.target.cost_min is not None and target_card.current_cost < condition.target.cost_min:
+                        res = False
+
+    elif condition.target:
         matches = get_target_cards(game_manager, condition.target, source_card)
         res = len(matches) > 0
         log_event("DEBUG", "resolver.check_condition_target", f"Target condition: {len(matches)} matches", player=player.name)
@@ -62,7 +90,7 @@ def execute_action(
     from .matcher import get_target_cards
     if effect_context is None: effect_context = {}
 
-    if not check_condition(game_manager, player, action.condition, source_card):
+    if not check_condition(game_manager, player, action.condition, source_card, effect_context):
         return True
 
     targets = []
@@ -112,7 +140,9 @@ def execute_action(
     if targets and action.target and action.target.tag == "last_target":
         effect_context["last_target_uuid"] = targets[0].uuid
 
-    self_execute(game_manager, player, action, targets, source_card=source_card)
+    action_success = self_execute(game_manager, player, action, targets, source_card=source_card, effect_context=effect_context)
+    
+    effect_context["last_action_success"] = action_success
 
     if action.then_actions:
         for sub in action.then_actions:
@@ -121,7 +151,10 @@ def execute_action(
                 
     return True
 
-def self_execute(game_manager, player, action, targets, source_card=None):
+def self_execute(game_manager, player, action, targets, source_card=None, effect_context=None) -> bool:
+    if effect_context is None: effect_context = {}
+    is_success = True
+
     if action.type == ActionType.DRAW:
         game_manager.draw_card(player, action.value)
     elif action.type == ActionType.RAMP_DON:
@@ -139,12 +172,17 @@ def self_execute(game_manager, player, action, targets, source_card=None):
     elif action.type == ActionType.LOOK:
         target_p = game_manager.opponent if '相手' in action.raw_text else player
         moved_count = 0
+        moved_cards = []
         for _ in range(action.value):
             if target_p.deck:
                 card = target_p.deck.pop(0)
                 player.temp_zone.append(card)
+                moved_cards.append(card)
                 moved_count += 1
+        
+        effect_context["revealed_cards"] = moved_cards
         log_event("INFO", "resolver.look", f"Moved {moved_count} cards from {target_p.name}'s deck to temp_zone", player=player.name)
+        if not moved_cards: is_success = False
     
     elif action.type == ActionType.KO:
         for t in targets:
@@ -160,6 +198,8 @@ def self_execute(game_manager, player, action, targets, source_card=None):
             if real_owner: game_manager.move_card(t, Zone.HAND, real_owner)
 
     elif action.type == ActionType.TRASH:
+        if not targets and "できる" in action.raw_text:
+             is_success = False
         for t in targets:
             owner, _ = game_manager._find_card_location(t)
             real_owner = game_manager.p1 if t.owner_id == game_manager.p1.name else game_manager.p2
@@ -351,3 +391,5 @@ def self_execute(game_manager, player, action, targets, source_card=None):
                 returned_count += 1
 
         log_event("INFO", "effect.return_don", f"{target_player.name} returned {returned_count} Don to deck", player=player.name)
+    
+    return is_success
