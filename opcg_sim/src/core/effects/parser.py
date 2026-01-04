@@ -143,6 +143,21 @@ class Effect:
         )]
 
     def _detect_action_type(self, text: str) -> ActionType:
+        # ▼ 追加ロジック
+        # 0. ライフ操作 (手札に加える=MOVE_TO_HAND 以外)
+        if 'ライフ' in text:
+            if '加える' in text and '手札' not in text: return ActionType.LIFE_MANIPULATE
+            if '置く' in text or '向き' in text: return ActionType.LIFE_MANIPULATE
+
+        # 0. コスト操作
+        if 'コスト' in text and ('-' in text or '下げる' in text):
+             return ActionType.COST_CHANGE
+        
+        # 0. 能力付与
+        if '得る' in text:
+            return ActionType.GRANT_KEYWORD
+        # ▲ 追加ロジックここまで
+
         # 1. ドン加速
         if 'ドン' in text and '追加' in text: return ActionType.RAMP_DON
         

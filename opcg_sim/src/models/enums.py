@@ -79,7 +79,7 @@ class ActionType(Enum):
     BP_BUFF = auto()
     SET_BASE_POWER = auto()
     COST_BUFF = auto()
-    COST_CHANGE = auto()
+    # COST_CHANGE = auto() # 重複を避けるため下の新規定義を使用
     ATTACH_DON = auto()
     REST_DON = auto()
     RAMP_DON = auto()
@@ -87,9 +87,15 @@ class ActionType(Enum):
     NEGATE_EFFECT = auto()
     SWAP_POWER = auto()
     KEYWORD = auto()
+    
+    # ▼ 追加定義
+    LIFE_MANIPULATE = auto() # ライフ操作（回復、表向きなど）
+    COST_CHANGE = auto()     # コスト増減
+    GRANT_KEYWORD = auto()   # キーワード能力付与（速攻など）
+    
     OTHER = auto()
     
-    # ▼ Parser互換用に追加
+    # ▼ Parser互換用
     MOVE_TO_HAND = auto() # MOVE_CARDのエイリアス的扱い
     TRASH = auto()        # DISCARD/TRASH_FROM_DECKの汎用版
     BUFF = auto()         # BP_BUFFのエイリアス

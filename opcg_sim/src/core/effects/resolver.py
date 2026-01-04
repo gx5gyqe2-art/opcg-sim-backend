@@ -166,3 +166,62 @@ def self_execute(game_manager, player, action, targets):
             don.attached_to = target_card.uuid
             player.don_attached_cards.append(don)
             target_card.attached_don += 1
+            
+    # ▼ 追加実装: コスト操作
+    elif action.type == ActionType.COST_CHANGE:
+        for t in targets:
+            t.cost_buff += action.value
+            log_event("INFO", "effect.cost_change", f"{t.master.name} cost buffed by {action.value}", player=player.name)
+
+    # ▼ 追加実装: ライフ操作
+    elif action.type == ActionType.LIFE_MANIPULATE:
+        txt = action.raw_text
+        
+        # 1. ライフ回復 (デッキの上からライフに加える)
+        if 'ライフ' in txt and ('加える' in txt or '置く' in txt) and '手札' not in txt:
+            # ソースが指定されていなければデッキトップとみなす
+            source_list = player.deck
+            # もしターゲット指定があればそれを使う（例：トラッシュから加える）
+            if targets:
+                # ターゲットカードをそれぞれの場所から移動
+                for t in targets:
+                    owner, current_zone = game_manager._find_card_location(t)
+                    if owner:
+                        game_manager.move_card(t, Zone.LIFE, owner, dest_position="TOP")
+                        log_event("INFO", "effect.life_recover", f"Added {t.master.name} to Life", player=player.name)
+            else:
+                # デッキトップから1枚
+                if source_list:
+                    card = source_list.pop(0)
+                    player.life.append(card)
+                    log_event("INFO", "effect.life_recover", "Recovered 1 Life from Deck", player=player.name)
+
+        # 2. ライフの操作 (表向き/裏向き)
+        elif '向き' in txt:
+            target_lives = targets if targets else player.life
+            for card in target_lives:
+                if '表' in txt: card.is_face_up = True
+                elif '裏' in txt: card.is_face_up = False
+                log_event("INFO", "effect.life_face", f"Life {card.uuid} face changed", player=player.name)
+
+    # ▼ 追加実装: 能力付与
+    elif action.type == ActionType.GRANT_KEYWORD:
+        # 生テキストからキーワードを推測
+        keywords = {
+            "速攻": "速攻",
+            "ブロッカー": "ブロッカー",
+            "バニッシュ": "バニッシュ",
+            "ダブルアタック": "ダブルアタック",
+            "突進": "突進",
+            "再起動": "再起動"
+        }
+        found_kw = None
+        for k, v in keywords.items():
+            if k in action.raw_text:
+                found_kw = v
+                break
+        
+        if found_kw:
+            for t in targets:
+                t.current_keywords.add(found_kw)
+                log_event("INFO", "effect.grant_keyword", f"Granted [{found_kw}] to {t.master.name}", player=player.name)
