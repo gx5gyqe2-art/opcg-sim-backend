@@ -1,4 +1,5 @@
 from typing import Optional, List, Any, Dict
+import random
 from ...models.enums import ActionType, Zone, ConditionType, CompareOperator, TriggerType
 from ...models.effect_types import EffectAction, Condition
 from ...utils.logger_config import log_event
@@ -139,6 +140,9 @@ def self_execute(game_manager, player, action, targets, source_card=None):
         log_event("INFO", "resolver.look", f"Moved {moved_count} cards to temp_zone", player=player.name)
     elif action.type == ActionType.KO:
         for t in targets:
+            if "PREVENT_LEAVE" in t.flags:
+                log_event("INFO", "resolver.prevent_leave", f"{t.master.name} is protected from leaving field", player=player.name)
+                continue
             owner, _ = game_manager._find_card_location(t)
             if owner: game_manager.move_card(t, Zone.TRASH, owner)
     elif action.type == ActionType.MOVE_TO_HAND:
@@ -249,7 +253,6 @@ def self_execute(game_manager, player, action, targets, source_card=None):
     elif action.type == ActionType.RESTRICTION:
         log_event("INFO", "effect.restriction", f"Restriction applied: {action.raw_text}", player=player.name)
 
-    # ▼ 追加: デッキトップ操作
     elif action.type == ActionType.DECK_TOP:
         for t in targets:
             owner, _ = game_manager._find_card_location(t)
@@ -257,19 +260,49 @@ def self_execute(game_manager, player, action, targets, source_card=None):
                 game_manager.move_card(t, Zone.DECK, owner, dest_position="TOP")
                 log_event("INFO", "effect.deck_top", f"Moved {t.master.name} to Deck Top", player=player.name)
 
-    # ▼ 追加: ダメージ処理 (1点ダメージ=ライフを1枚手札へ)
     elif action.type == ActionType.DEAL_DAMAGE:
-        # 対象が自分か相手かを判定 (デフォルトは相手)
         target_p = player if '自分' in action.raw_text or '受ける' in action.raw_text else game_manager.opponent
         if target_p.life:
             life_card = target_p.life.pop(0)
             target_p.hand.append(life_card)
             log_event("INFO", "effect.damage", f"{target_p.name} took 1 damage from effect", player=player.name)
 
-    # ▼ 追加: 選択肢 (ログのみ)
     elif action.type == ActionType.SELECT_OPTION:
         log_event("INFO", "effect.select_option", "Option selection required (Logic pending)", player=player.name)
 
-    # ▼ 追加: コスト固定 (ログのみ)
     elif action.type == ActionType.SET_COST:
         log_event("INFO", "effect.set_cost", f"Cost set request: {action.raw_text}", player=player.name)
+
+    elif action.type == ActionType.SHUFFLE:
+        random.shuffle(player.deck)
+        log_event("INFO", "effect.shuffle", "Deck shuffled", player=player.name)
+
+    elif action.type == ActionType.PREVENT_LEAVE:
+        for t in targets:
+            t.flags.add("PREVENT_LEAVE")
+            log_event("INFO", "effect.prevent_leave", f"{t.master.name} gained PREVENT_LEAVE", player=player.name)
+
+    elif action.type == ActionType.REPLACE_EFFECT:
+        log_event("INFO", "effect.replace", f"Replacement Effect: {action.raw_text}", player=player.name)
+
+    # ▼ 追加: 付与されているドンの移動
+    elif action.type == ActionType.MOVE_ATTACHED_DON:
+        # 自分(source)またはターゲットについているドンを探す
+        # 簡易実装: source_cardにドンがついていればそれを移動
+        don_source = source_card if source_card and source_card.attached_don > 0 else None
+        
+        # ターゲットに指定されたキャラへ移動
+        if don_source and targets:
+            target_card = targets[0]
+            # ドンを1枚探して付け替える
+            moving_don = next((d for d in player.don_attached_cards if d.attached_to == don_source.uuid), None)
+            
+            if moving_don:
+                moving_don.attached_to = target_card.uuid
+                don_source.attached_don -= 1
+                target_card.attached_don += 1
+                log_event("INFO", "effect.move_don", f"Moved Don from {don_source.master.name} to {target_card.master.name}", player=player.name)
+
+    # ▼ 追加: ドンフェイズ操作 (ログのみ)
+    elif action.type == ActionType.MODIFY_DON_PHASE:
+        log_event("INFO", "effect.modify_don_phase", f"Don Phase Modified: {action.raw_text}", player=player.name)

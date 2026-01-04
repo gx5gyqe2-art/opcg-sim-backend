@@ -121,7 +121,9 @@ class Effect:
             ActionType.LIFE_RECOVER,
             ActionType.VICTORY,
             ActionType.RULE_PROCESSING,
-            ActionType.SELECT_OPTION
+            ActionType.SELECT_OPTION,
+            ActionType.REPLACE_EFFECT,
+            ActionType.MODIFY_DON_PHASE # 追加
         ]
         
         if act_type not in NO_TARGET_ACTIONS:
@@ -141,40 +143,31 @@ class Effect:
         )]
 
     def _detect_action_type(self, text: str) -> ActionType:
-        # 1. 選択肢
-        if '選ぶ' in text and ('つ' in text or 'から' in text):
-            return ActionType.SELECT_OPTION
+        # 1. 付与されているドンの移動 (最優先)
+        if '付与されているドン' in text and '付与する' in text:
+            return ActionType.MOVE_ATTACHED_DON
 
-        # 2. ダメージ
-        if 'ダメージ' in text and ('与える' in text or '受ける' in text):
+        # 2. ドンフェイズ操作
+        if 'ドンフェイズ' in text:
+            return ActionType.MODIFY_DON_PHASE
+
+        # 3. ダメージ (条件緩和: '与えてもよい'なども含むため '与え' まで短縮)
+        if 'ダメージ' in text and ('与え' in text or '受ける' in text):
             return ActionType.DEAL_DAMAGE
 
-        # 3. コスト固定
-        if 'コスト' in text and 'にする' in text:
-            return ActionType.SET_COST
-
-        # 4. デッキトップ操作
-        if 'デッキ' in text and '上' in text and ('置く' in text or '戻す' in text or '加える' in text):
-            return ActionType.DECK_TOP
-
         # --- 以下既存 ---
-        if 'できない' in text or '不可' in text or '加えられない' in text:
-             return ActionType.RESTRICTION
-
-        if '発動する' in text and ('効果' in text or 'イベント' in text):
-            return ActionType.EXECUTE_MAIN_EFFECT
-
-        if '勝利する' in text and ('ゲーム' in text or '敗北' in text):
-            return ActionType.VICTORY
-
-        if 'としても扱う' in text or '何枚でも' in text or 'カウンター' in text:
-            return ActionType.RULE_PROCESSING
-
-        if 'アタック' in text and ('できない' in text or '不可' in text):
-            return ActionType.ATTACK_DISABLE
-            
-        if '無効' in text:
-            return ActionType.NEGATE_EFFECT
+        if '代わりに' in text: return ActionType.REPLACE_EFFECT
+        if '選ぶ' in text and ('つ' in text or 'から' in text): return ActionType.SELECT_OPTION
+        if 'シャッフル' in text: return ActionType.SHUFFLE
+        if 'コスト' in text and 'にする' in text: return ActionType.SET_COST
+        if '場を離れない' in text: return ActionType.PREVENT_LEAVE
+        if 'デッキ' in text and '上' in text and ('置く' in text or '戻す' in text or '加える' in text): return ActionType.DECK_TOP
+        if 'できない' in text or '不可' in text or '加えられない' in text: return ActionType.RESTRICTION
+        if '発動する' in text and ('効果' in text or 'イベント' in text): return ActionType.EXECUTE_MAIN_EFFECT
+        if '勝利する' in text and ('ゲーム' in text or '敗北' in text): return ActionType.VICTORY
+        if 'としても扱う' in text or '何枚でも' in text or 'カウンター' in text: return ActionType.RULE_PROCESSING
+        if 'アタック' in text and ('できない' in text or '不可' in text): return ActionType.ATTACK_DISABLE
+        if '無効' in text: return ActionType.NEGATE_EFFECT
             
         if 'ライフ' in text:
             if '加える' in text: return ActionType.LIFE_MANIPULATE
@@ -183,25 +176,15 @@ class Effect:
         if 'コスト' in text and ('-' in text or '下げる' in text or '+' in text or '上げる' in text):
              return ActionType.COST_CHANGE
         
-        if '得る' in text:
-            return ActionType.GRANT_KEYWORD
-
+        if '得る' in text: return ActionType.GRANT_KEYWORD
         if 'ドン' in text and '追加' in text: return ActionType.RAMP_DON
-        
         if '引く' in text: return ActionType.DRAW
-        
         if '登場' in text: return ActionType.PLAY_CARD
-        
         if 'KO' in text: return ActionType.KO
-        
         if '手札' in text and ('戻す' in text or '加える' in text): return ActionType.MOVE_TO_HAND
-        
         if 'トラッシュ' in text or '捨てる' in text: return ActionType.TRASH
-        
         if 'デッキ' in text and '下' in text: return ActionType.DECK_BOTTOM
-        
         if 'パワー' in text: return ActionType.BUFF
-        
         if 'レスト' in text: return ActionType.REST
         if 'アクティブ' in text: return ActionType.ACTIVE
         

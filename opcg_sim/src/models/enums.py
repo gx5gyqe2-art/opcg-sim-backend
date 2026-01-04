@@ -94,13 +94,18 @@ class ActionType(Enum):
     VICTORY = auto()
     RULE_PROCESSING = auto()
     RESTRICTION = auto()
+    DECK_TOP = auto()
+    SET_COST = auto()
+    DEAL_DAMAGE = auto()
+    SELECT_OPTION = auto()
+    PASSIVE_EFFECT = auto()
     
-    # ▼ 追加: Deep Dive対応
-    DECK_TOP = auto()       # デッキトップ操作
-    SET_COST = auto()       # コスト固定(0にする等)
-    DEAL_DAMAGE = auto()    # ダメージ処理
-    SELECT_OPTION = auto()  # 選択肢
-    PASSIVE_EFFECT = auto() # 常在効果など
+    PREVENT_LEAVE = auto()
+    REPLACE_EFFECT = auto()
+    
+    # ▼ 追加: 最終完遂用
+    MOVE_ATTACHED_DON = auto() # 付与されているドンの移動
+    MODIFY_DON_PHASE = auto()  # ドンフェイズの処理変更
 
     OTHER = auto()
     
