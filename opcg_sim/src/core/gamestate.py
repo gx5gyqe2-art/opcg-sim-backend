@@ -99,6 +99,8 @@ class GameManager:
             candidates.extend(p.trash)
             candidates.extend(p.life)
             candidates.extend(p.deck)
+            # ▼ 追加: temp_zone も検索対象に含める
+            candidates.extend(p.temp_zone)
             
             for c in candidates:
                 if c.uuid == uuid:
@@ -185,7 +187,10 @@ class GameManager:
         return request
 
     def resolve_interaction(self, player: Player, payload: Dict[str, Any]):
-        if not self.active_interaction: return
+        if not self.active_interaction:
+            log_event("WARNING", "game.resolve_interaction", "No active interaction found", player=player.name)
+            return
+
         continuation = self.active_interaction.get("continuation")
         if not continuation:
             self.active_interaction = None
@@ -197,26 +202,41 @@ class GameManager:
         remaining_ability_actions = continuation.get("remaining_ability_actions", [])
         
         source_card = self._find_card_by_uuid(source_uuid)
+        
         if not source_card:
             log_event("ERROR", "game.resume_fail", f"Source card {source_uuid} not found")
             self.active_interaction = None
             return
 
+        # 選択結果をセット
         effect_context["selected_uuids"] = payload.get("selected_uuids", [])
+        
+        # インタラクション状態を一度解除
         self.active_interaction = None
 
         from .effects.resolver import execute_action
-        log_event("INFO", "game.resume_effect", f"Resuming effect for {source_card.name}", player=player.name)
+        try:
+            log_event("INFO", "game.resume_effect", f"Resuming effect for {source_card.master.name}", player=player.name)
+        except:
+            log_event("INFO", "game.resume_effect", "Resuming effect", player=player.name)
         
+        # 1. 中断していたアクションを実行
         success = execute_action(self, player, action, source_card, effect_context=effect_context)
         
+        # 2. 成功したら、残りのアクション（Abilityの続き）を実行
         if success and remaining_ability_actions:
             for i, next_act in enumerate(remaining_ability_actions):
+                # 既に別のインタラクションで中断されている場合はループを抜ける
                 if self.active_interaction:
-                    self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i:]
+                    # この場合、新しいactive_interactionにさらに残りのアクションを引き継ぐ
+                    if "continuation" in self.active_interaction:
+                        self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i:]
                     break
+                
+                # 次のアクションを実行
                 if not self._perform_logic(player, next_act, source_card):
-                    if self.active_interaction:
+                    # 中断発生: 残りのアクションを保存
+                    if self.active_interaction and "continuation" in self.active_interaction:
                         self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i+1:]
                     break
 
