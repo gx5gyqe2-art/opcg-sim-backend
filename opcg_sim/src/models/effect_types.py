@@ -62,3 +62,4 @@ class Ability:
     costs: List[EffectAction] = field(default_factory=list)
     actions: List[EffectAction] = field(default_factory=list)
     raw_text: str = ""
+ 
