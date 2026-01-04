@@ -107,7 +107,8 @@ class Effect:
         return self._parse_atomic_action(text, is_cost)
 
     def _parse_atomic_action(self, text: str, is_cost: bool) -> List[EffectAction]:
-        if '見て' in text or '公開' in text:
+        # ▼ 修正: 「見る」を追加 (終止形対応)
+        if '見て' in text or '公開' in text or '見る' in text:
             return self._handle_look_action(text)
 
         act_type = self._detect_action_type(text)
