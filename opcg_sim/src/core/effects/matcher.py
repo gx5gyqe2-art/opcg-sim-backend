@@ -2,9 +2,9 @@ import re
 import logging
 from ...models.effect_types  import TargetQuery, _nfc
 from ...models.enums import Player, Zone, ParserKeyword
-from ...utils.logger_config import log_event  # 追加: 既存ロガーのインポート
+from ...utils.logger_config import log_event
 
-# logger = logging.getLogger("opcg_sim") # 既存ロガーを使用するため標準ロガーは削除/無効化
+# logger = logging.getLogger("opcg_sim")
 
 def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQuery:
     tq = TargetQuery(raw_text=tgt_text, player=default_player)
@@ -33,7 +33,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.player = Player.SELF
 
     # ゾーン判定
-    if _nfc(ParserKeyword.HAND) in tgt_text: tq.zone = Zone.HAND
+    if _nfc(ParserKeyword.HAND) in tgt_text:
+        # ★修正: 「戻す」「加える」は移動先の話なので、検索元としては扱わない
+        if "戻す" in tgt_text or "加える" in tgt_text:
+            pass # FIELDのままにする
+        else:
+            tq.zone = Zone.HAND
     elif _nfc(ParserKeyword.TRASH) in tgt_text: tq.zone = Zone.TRASH
     elif _nfc(ParserKeyword.LIFE) in tgt_text: tq.zone = Zone.LIFE
     elif _nfc(ParserKeyword.DECK) in tgt_text: tq.zone = Zone.DECK
@@ -143,13 +148,10 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         
         results.append(card)
 
-    # ▼ 追加: 対象が見つからなかった場合のログ出力
     if not results:
-        # select_mode が ALL や REMAINING の場合は0件でも正常な場合が多いが、
-        # 通常のCHOOSEモードで0件の場合は「対象不在」の可能性が高いため警告を出す
         log_level = "WARNING"
         if query.select_mode in ["ALL", "REMAINING"] or query.is_up_to:
-            log_level = "INFO" # 「まで」や「全て」の場合は0件でも正常ケースとしてINFOに留める
+            log_level = "INFO"
         
         log_event(
             level_key=log_level,
@@ -163,7 +165,6 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
                 "candidates_scanned": len(candidates)
             }
         )
-    # ▲ 追加ここまで
 
     if query.count == -1 or query.select_mode in ["ALL", "REMAINING"]:
         return results

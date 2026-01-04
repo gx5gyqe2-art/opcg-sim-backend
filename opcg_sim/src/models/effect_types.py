@@ -30,10 +30,14 @@ class TargetQuery:
     is_rest: Optional[bool] = None
     
     count: int = 1
+    # ▼ 追加: 「〜枚まで」判定用フラグ
+    is_up_to: bool = False 
+    
     select_mode: str = "CHOOSE" # CHOOSE, ALL, RANDOM, SOURCE, REFERENCE, REMAINING
-    tag: Optional[str] = None # ▼ 追加: 指示語解決用のID
+    tag: Optional[str] = None
     raw_text: str = ""
 
+# ... (以下、Condition等は変更なし) ...
 @dataclass
 class Condition:
     type: ConditionType
@@ -52,7 +56,7 @@ class EffectAction:
     source_zone: Zone = Zone.ANY
     dest_zone: Zone = Zone.ANY
     dest_position: str = "BOTTOM"
-    details: Optional[Dict[str, Any]] = None # str -> Optional[Dict] に変更推奨（互換性のため）
+    details: Optional[Dict[str, Any]] = None
     then_actions: List[EffectAction] = field(default_factory=list)
     raw_text: str = ""
 
@@ -62,4 +66,3 @@ class Ability:
     costs: List[EffectAction] = field(default_factory=list)
     actions: List[EffectAction] = field(default_factory=list)
     raw_text: str = ""
- 
