@@ -221,7 +221,7 @@ class Effect:
                 nums = re.findall(r'(\d+)', text)
                 if nums: target_in_condition = TargetQuery(raw_text=text, cost_min=int(nums[0]))
 
-        elif 'そうした場合' in text:
+        elif 'そうした' in text or '登場させた' in text:
             type_ = ConditionType.CONTEXT
             val = "LAST_ACTION_SUCCESS"
         
