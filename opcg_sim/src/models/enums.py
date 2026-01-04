@@ -148,6 +148,7 @@ class ConditionType(Enum):
     HAS_UNIT = auto()
     IS_RESTED = auto()
     DON_COUNT = auto()
+    DECK_COUNT = auto() 
     LEADER_NAME = auto()
     LEADER_TRAIT = auto()
     OTHER = auto()

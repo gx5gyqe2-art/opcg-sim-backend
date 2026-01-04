@@ -3,8 +3,9 @@ import os
 import json
 import re
 from collections import defaultdict
+from typing import Optional, List
 
-# --- パス設定 ---
+# --- パス設定 ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = current_dir
 if "opcg_sim" not in sys.path:
@@ -13,10 +14,16 @@ if "opcg_sim" not in sys.path:
 try:
     from opcg_sim.src.utils.loader import DataCleaner
     from opcg_sim.src.core.effects.parser import Effect
-    from opcg_sim.src.models.enums import ActionType
+    from opcg_sim.src.models.enums import ConditionType, CompareOperator, Zone
 except ImportError as e:
     print(f"Import Error: {e}")
     sys.exit(1)
+
+# --- 判定用キーワード定数 ---
+KEYWORDS = {
+    "CONDITION_INDICATORS": ["場合", "なら", "することで"],
+    "TARGET_INDICATORS": ["選び", "対象とし", "キャラを", "枚を", "カードを"]
+}
 
 def load_cards():
     candidates = [
@@ -28,132 +35,127 @@ def load_cards():
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
-    print("Error: opcg_cards.json found.")
+    print("Error: opcg_cards.json not found.")
     return []
 
-def find_pattern_b_actions(actions, found_list):
+class AnalysisStats:
+    def __init__(self):
+        # Condition統計
+        self.cond_expected = 0      # キーワードから条件があると推測される数
+        self.cond_detected = 0      # 実際にConditionオブジェクトが生成された数
+        self.cond_types = defaultdict(int) # ConditionTypeごとの内訳
+        self.cond_missed = []       # 解析漏れサンプル
+
+        # Target統計
+        self.target_expected = 0    # キーワードから対象選択があると推測される数
+        self.target_detected = 0    # 実際にTargetオブジェクトが生成された数
+        self.target_zones = defaultdict(int) # 対象Zoneごとの内訳
+        self.target_missed = []     # 解析漏れサンプル
+
+    def add_condition_result(self, raw_text, condition):
+        # テキストによる期待値判定
+        has_indicator = any(k in raw_text for k in KEYWORDS["CONDITION_INDICATORS"])
+        
+        if has_indicator:
+            self.cond_expected += 1
+            if condition and condition.type != ConditionType.NONE:
+                self.cond_detected += 1
+                self.cond_types[condition.type.name] += 1
+            else:
+                self.cond_missed.append(f"[{raw_text}] -> Missed")
+        elif condition and condition.type != ConditionType.NONE:
+            # キーワードがないのにConditionが生成された場合(暗黙的な条件など)
+            self.cond_types[condition.type.name] += 1
+
+    def add_target_result(self, raw_text, target):
+        # ターゲット選択を含まないアクションタイプを除外するロジックが必要だが
+        # ここでは簡易的にキーワードベースでチェック
+        has_indicator = any(k in raw_text for k in KEYWORDS["TARGET_INDICATORS"])
+        
+        # 明らかに対象を取らないアクション(ドローなど)を除外したい場合はここでフィルタ
+        
+        if has_indicator:
+            self.target_expected += 1
+            if target:
+                self.target_detected += 1
+                zone_name = target.zone.name if hasattr(target, 'zone') else "UNKNOWN"
+                self.target_zones[zone_name] += 1
+            else:
+                self.target_missed.append(f"[{raw_text}] -> Missed")
+
+def analyze_actions(actions, stats: AnalysisStats):
     for act in actions:
-        if act.type == ActionType.OTHER and not act.then_actions:
-            found_list.append(act.raw_text)
+        # Conditionの検証
+        stats.add_condition_result(act.raw_text, act.condition)
+        
+        # Targetの検証
+        stats.add_target_result(act.raw_text, act.target)
+
+        # 再帰探索
         if act.then_actions:
-            find_pattern_b_actions(act.then_actions, found_list)
-
-def classify_deep_dive(text):
-    """
-    UNCATEGORIZED (OTHER) として残ったものをさらに深掘り分類する
-    """
-    if not text: return "EMPTY"
-    
-    # 1. 発動制限・行動制限 (RESTRICTION系)
-    # Parserの検知漏れの可能性が高い
-    if "発動できない" in text:
-        return "RESTRICTION: ACTIVATION (発動禁止)"
-    if "アタックできない" in text:
-        return "RESTRICTION: ATTACK (アタック禁止)"
-    if "ブロックできない" in text or "ブロックされない" in text:
-        return "RESTRICTION: BLOCK (ブロック禁止/不可)"
-    if "加えられない" in text:
-        return "RESTRICTION: ADD_TO_HAND (手札回収禁止)"
-
-    # 2. コスト操作 (COST_CHANGE系)
-    # "+" などの記号ゆらぎや、"コストXになる" などの固定化
-    if "コスト" in text:
-        if "+" in text or "＋" in text:
-            return "COST: INCREASE (コスト加算)"
-        if "なる" in text:
-            return "COST: SET (コスト固定)"
-        return "COST: OTHER (その他コスト関連)"
-
-    # 3. パワー操作 (BUFF/DEBUFF系)
-    # 複雑な条件でParserが漏らしたケース
-    if "パワー" in text:
-        if "なる" in text:
-            return "POWER: SET (パワー固定)"
-        if "倍" in text:
-            return "POWER: MULTIPLY (パワー倍増)"
-        return "POWER: OTHER (その他パワー関連)"
-
-    # 4. バトル・耐性
-    if "KOされない" in text:
-        return "BATTLE: KO_IMMUNITY (KO耐性)"
-    if "効果" in text and "受けない" in text:
-        return "BATTLE: EFFECT_IMMUNITY (効果耐性)"
-    
-    # 5. ルール・特殊処理
-    if "扱う" in text:
-        return "RULE: TREAT_AS (名称/属性変更)"
-    if "何枚でも" in text:
-        return "RULE: DECK_BUILD (デッキ構築)"
-    if "入れ替える" in text:
-        return "RULE: SWAP (入れ替え)"
-    if "やり直す" in text:
-        return "RULE: RESTART (再実行)"
-    
-    # 6. ダメージ系
-    if "ダメージ" in text:
-        return "GAME: DAMAGE (ダメージ処理)"
-    
-    # 7. その他
-    if "全て" in text or "すべて" in text:
-        return "TARGET: ALL (全体対象の複雑な効果)"
-    
-    return "UNKNOWN: HARDCASE (要個別確認)"
+            analyze_actions(act.then_actions, stats)
 
 def main():
     cards = load_cards()
-    print(f"Loaded {len(cards)} cards. Deep diving into remaining UNCATEGORIZED effects...")
+    print(f"Loaded {len(cards)} cards. Analyzing Conditions and Targets...")
     
-    registry = defaultdict(list)
-    total_issues = 0
+    stats = AnalysisStats()
 
     for i, card in enumerate(cards):
         raw_text = card.get("効果(テキスト)") or card.get("effect_text") or ""
         raw_trigger = card.get("効果(トリガー)") or card.get("trigger_text") or ""
         
-        # 正規化
-        text = Effect(raw_text)._normalize(raw_text) if raw_text else ""
-        trigger = Effect(raw_trigger)._normalize(raw_trigger) if raw_trigger else ""
+        texts = []
+        if raw_text: texts.append(Effect(raw_text)._normalize(raw_text))
+        if raw_trigger: texts.append(Effect(raw_trigger)._normalize(raw_trigger))
         
         cid = card.get("number") or f"ID-{i}"
-        name = card.get("name") or "Unknown"
+        
+        for text in texts:
+            if not text: continue
+            try:
+                abilities = Effect(text).abilities
+                for abi in abilities:
+                    analyze_actions(abi.actions, stats)
+            except Exception:
+                pass
 
-        try:
-            abilities = []
-            if text: abilities.extend(Effect(text).abilities)
-            if trigger: abilities.extend(Effect(trigger).abilities)
-            
-            failures = []
-            for abi in abilities:
-                find_pattern_b_actions(abi.actions, failures)
-            
-            if failures:
-                unique_failures = list(set(failures))
-                for fail_text in unique_failures:
-                    # ここで深掘り分類
-                    category = classify_deep_dive(fail_text)
-                    registry[category].append({
-                        "id": cid,
-                        "name": name,
-                        "text": fail_text
-                    })
-                    total_issues += 1
-
-        except Exception:
-            pass 
-
-    # --- レポート出力 ---
+    # --- レポート出力 ---
     print("\n" + "="*60)
-    print(f"DEEP DIVE REPORT (Remaining Issues: {total_issues})")
+    print("PARSER COMPONENT ANALYSIS REPORT")
     print("="*60)
     
-    sorted_categories = sorted(registry.items(), key=lambda x: len(x[1]), reverse=True)
+    # 1. Condition Report
+    cond_rate = (stats.cond_detected / stats.cond_expected * 100) if stats.cond_expected else 0
+    print(f"\n■ CONDITION Analysis")
+    print(f"  Expected (Text-based): {stats.cond_expected}")
+    print(f"  Detected (Parsed)    : {stats.cond_detected}")
+    print(f"  Coverage Rate        : {cond_rate:.1f}%")
     
-    for category, items in sorted_categories:
-        print(f"\n■ {category}: {len(items)} cases")
-        for item in items[:3]: # サンプル3件
-            print(f"  - [{item['id']} {item['name']}] ... {item['text']}")
-        if len(items) > 3:
-            print(f"    ... and {len(items)-3} more.")
+    print("  [Type Breakdown]")
+    for k, v in sorted(stats.cond_types.items(), key=lambda x: x[1], reverse=True):
+        print(f"    - {k}: {v}")
+        
+    if stats.cond_missed:
+        print(f"  [Top 5 Missed Samples]")
+        for s in stats.cond_missed[:5]:
+            print(f"    {s}")
+
+    # 2. Target Report
+    target_rate = (stats.target_detected / stats.target_expected * 100) if stats.target_expected else 0
+    print(f"\n■ TARGET Analysis")
+    print(f"  Expected (Text-based): {stats.target_expected}")
+    print(f"  Detected (Parsed)    : {stats.target_detected}")
+    print(f"  Coverage Rate        : {target_rate:.1f}%")
+    
+    print("  [Zone Breakdown]")
+    for k, v in sorted(stats.target_zones.items(), key=lambda x: x[1], reverse=True):
+        print(f"    - {k}: {v}")
+
+    if stats.target_missed:
+        print(f"  [Top 5 Missed Samples]")
+        for s in stats.target_missed[:5]:
+            print(f"    {s}")
 
 if __name__ == "__main__":
     main()

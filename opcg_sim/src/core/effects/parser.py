@@ -107,7 +107,6 @@ class Effect:
         return self._parse_atomic_action(text, is_cost)
 
     def _parse_atomic_action(self, text: str, is_cost: bool) -> List[EffectAction]:
-        # ▼ 修正: 「見る」を追加 (終止形対応)
         if '見て' in text or '公開' in text or '見る' in text:
             return self._handle_look_action(text)
 
@@ -211,6 +210,7 @@ class Effect:
         elif 'ドン' in text: type_ = ConditionType.DON_COUNT
         elif '手札' in text: type_ = ConditionType.HAND_COUNT
         elif 'トラッシュ' in text: type_ = ConditionType.TRASH_COUNT
+        elif 'デッキ' in text: type_ = ConditionType.DECK_COUNT
         elif '特徴' in text: type_ = ConditionType.HAS_TRAIT
         elif 'リーダー' in text: type_ = ConditionType.LEADER_NAME
         elif 'キャラ' in text or '持つ' in text: type_ = ConditionType.HAS_UNIT

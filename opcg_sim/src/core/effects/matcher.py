@@ -79,11 +79,14 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         else: tq.power_max = val
     
     # 状態
-    if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True # "レストにする" の "レスト" 部分マッチに依存
-    elif _nfc("レスト") in tgt_text: tq.is_rest = True # キーワードが "レストにする" なので単体 "レスト" も補足
+    if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
+    elif _nfc("レスト") in tgt_text: tq.is_rest = True
     elif _nfc("アクティブ") in tgt_text: tq.is_rest = False
     
-    # 枚数
+    # 枚数と「まで」の判定
+    if _nfc("まで") in tgt_text:
+        tq.is_up_to = True 
+
     if _nfc(ParserKeyword.ALL_HIRAGANA) in tgt_text or _nfc(ParserKeyword.ALL) in tgt_text:
         tq.count = -1
         tq.select_mode = "ALL"
@@ -94,12 +97,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     return tq
 
 def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
-    # ... (既存ロジック変更なし) ...
-    # 1. 自己参照モード
     if query.select_mode == "SOURCE":
         return [source_card]
 
-    # 2. 対象プレイヤーの決定
     target_players = []
     if query.player == Player.SELF:
         target_players = [game_manager.turn_player]
@@ -112,7 +112,6 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         target_players = [owner] if owner else []
 
     candidates = []
-    # 3. 指定ゾーンからの抽出
     for p in target_players:
         if query.zone == Zone.FIELD:
             candidates.extend(p.field)
@@ -128,7 +127,6 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         elif query.zone == Zone.TEMP:
             candidates.extend(p.temp_zone)
 
-    # 4. フィルタリング
     results = []
     for card in candidates:
         if not card: continue
@@ -144,7 +142,6 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         
         results.append(card)
 
-    # 5. 枚数制限の適用
     if query.count == -1 or query.select_mode in ["ALL", "REMAINING"]:
         return results
     return results[:query.count]

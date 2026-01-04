@@ -37,6 +37,11 @@ def check_condition(game_manager: 'GameManager', player: 'Player', condition: Op
         if condition.operator == CompareOperator.GE: res = val >= condition.value
         elif condition.operator == CompareOperator.LE: res = val <= condition.value
         else: res = val == condition.value
+    elif condition.type == ConditionType.DECK_COUNT:
+        val = len(player.deck)
+        if condition.operator == CompareOperator.GE: res = val >= condition.value
+        elif condition.operator == CompareOperator.LE: res = val <= condition.value
+        else: res = val == condition.value
     elif condition.type == ConditionType.HAS_TRAIT:
         has_in_field = any(condition.value in c.master.traits for c in player.field)
         has_in_source = (source_card and condition.value in source_card.master.traits)
@@ -132,13 +137,11 @@ def self_execute(game_manager, player, action, targets, source_card=None):
         log_event("INFO", "resolver.ramp_don", f"Ramped {action.value} Don", player=player.name)
     
     elif action.type == ActionType.LOOK:
-        # ▼ 修正: 「相手」が含まれる場合は相手のデッキを参照
         target_p = game_manager.opponent if '相手' in action.raw_text else player
         moved_count = 0
         for _ in range(action.value):
             if target_p.deck:
                 card = target_p.deck.pop(0)
-                # 確認のために操作プレイヤーのtemp_zoneに置くが、所有権(owner_id)は変わらない
                 player.temp_zone.append(card)
                 moved_count += 1
         log_event("INFO", "resolver.look", f"Moved {moved_count} cards from {target_p.name}'s deck to temp_zone", player=player.name)
@@ -153,22 +156,18 @@ def self_execute(game_manager, player, action, targets, source_card=None):
     elif action.type == ActionType.MOVE_TO_HAND:
         for t in targets:
             owner, _ = game_manager._find_card_location(t)
-            # ▼ 修正: owner_idに基づいて本来の持ち主の手札に戻す
             real_owner = game_manager.p1 if t.owner_id == game_manager.p1.name else game_manager.p2
             if real_owner: game_manager.move_card(t, Zone.HAND, real_owner)
 
     elif action.type == ActionType.TRASH:
         for t in targets:
             owner, _ = game_manager._find_card_location(t)
-            # ▼ 修正: owner_idに基づいて本来の持ち主のトラッシュに戻す
             real_owner = game_manager.p1 if t.owner_id == game_manager.p1.name else game_manager.p2
             if real_owner: game_manager.move_card(t, Zone.TRASH, real_owner)
 
     elif action.type == ActionType.DECK_BOTTOM:
         for t in targets:
             owner, _ = game_manager._find_card_location(t)
-            # ▼ 修正: owner_idに基づいて本来の持ち主のデッキ下に戻す
-            # (相手のデッキを見た後に自分のデッキに入れてしまわないように)
             real_owner = game_manager.p1 if t.owner_id == game_manager.p1.name else game_manager.p2
             if real_owner: game_manager.move_card(t, Zone.DECK, real_owner, dest_position="BOTTOM")
 
@@ -271,7 +270,6 @@ def self_execute(game_manager, player, action, targets, source_card=None):
     elif action.type == ActionType.DECK_TOP:
         for t in targets:
             owner, _ = game_manager._find_card_location(t)
-            # ▼ 修正: owner_idに基づいて本来の持ち主のデッキ上に戻す
             real_owner = game_manager.p1 if t.owner_id == game_manager.p1.name else game_manager.p2
             if real_owner:
                 game_manager.move_card(t, Zone.DECK, real_owner, dest_position="TOP")
