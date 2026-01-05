@@ -180,7 +180,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
                 "candidates_scanned": len(candidates)
             }
         )
-
-    if query.count == -1 or query.select_mode in ["ALL", "REMAINING"]:
-        return results
-    return results[:query.count]
+    
+    # 修正: 候補リスト取得段階では枚数でスライスしない。
+    # ここで切ってしまうと、候補が複数ある場合にユーザーが選択できなくなるため。
+    return results
