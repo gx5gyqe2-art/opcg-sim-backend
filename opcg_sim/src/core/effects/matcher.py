@@ -24,83 +24,88 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.zone = Zone.TEMP
         return tq
 
-    # プレイヤー判定の優先順位: お互い > 持ち主 > 相手 > 自分
-    if _nfc(ParserKeyword.EACH_OTHER) in tgt_text: 
-        tq.player = Player.ALL
-    elif _nfc(ParserKeyword.OWNER) in tgt_text: 
-        tq.player = Player.OWNER
-    elif _nfc(ParserKeyword.OPPONENT) in tgt_text:
-        tq.player = Player.OPPONENT
-    elif _nfc(ParserKeyword.SELF) in tgt_text or _nfc(ParserKeyword.SELF_REF) in tgt_text:
-        tq.player = Player.SELF
+    # プレイヤー判定
+    if _nfc(ParserKeyword.EACH_OTHER) in tgt_text: tq.player = Player.ALL
+    elif _nfc(ParserKeyword.OWNER) in tgt_text: tq.player = Player.OWNER
+    elif _nfc(ParserKeyword.OPPONENT) in tgt_text: tq.player = Player.OPPONENT
+    elif _nfc(ParserKeyword.SELF) in tgt_text or _nfc(ParserKeyword.SELF_REF) in tgt_text: tq.player = Player.SELF
 
-    # ゾーン判定
-    # 修正: 「手札」が含まれていても、「戻す」「加える」がある場合は検索対象エリアとしての「手札」ではないため除外する
-    is_hand_target = False
-    if _nfc(ParserKeyword.HAND) in tgt_text:
-        if "戻す" in tgt_text or "加える" in tgt_text:
-            is_hand_target = False
-        else:
-            is_hand_target = True
+    # --- ゾーン判定 (正規表現版) ---
+    # 「〜を」「〜から」「〜の」が付いているゾーンを検索対象とする
+    # 「〜に」「〜へ」は移動先なので除外される
+    
+    zone_map = {
+        _nfc("手札"): Zone.HAND,
+        _nfc("トラッシュ"): Zone.TRASH,
+        _nfc("ライフ"): Zone.LIFE,
+        _nfc("デッキ"): Zone.DECK,
+        _nfc("コストエリア"): Zone.COST_AREA,
+        _nfc("場"): Zone.FIELD
+    }
+    
+    found_zone = None
+    
+    # 優先度1: 明示的な対象指示 (〜を、〜から、〜の)
+    # (?:.{0,5}) は「1枚」などの数量が間に挟まることを許容する
+    pattern = re.compile(r'(手札|トラッシュ|ライフ|デッキ|場|コストエリア)(?:.{0,5})(?:を|から|の)')
+    matches = pattern.findall(tgt_text)
+    
+    if matches:
+        for m in matches:
+            z_name = _nfc(m)
+            if z_name in zone_map:
+                found_zone = zone_map[z_name]
+                break
+    
+    # 優先度2: ドン指定 (ドン!!はコストエリア)
+    if not found_zone and _nfc(ParserKeyword.DON) in tgt_text:
+        found_zone = Zone.COST_AREA
 
-    if is_hand_target:
-        tq.zone = Zone.HAND
-    elif _nfc(ParserKeyword.TRASH) in tgt_text: tq.zone = Zone.TRASH
-    elif _nfc(ParserKeyword.LIFE) in tgt_text: tq.zone = Zone.LIFE
-    elif _nfc(ParserKeyword.DECK) in tgt_text: tq.zone = Zone.DECK
-    elif _nfc(ParserKeyword.DON) in tgt_text: tq.zone = Zone.COST_AREA 
-    else: tq.zone = Zone.FIELD
+    if found_zone:
+        tq.zone = found_zone
+    else:
+        # デフォルト
+        tq.zone = Zone.FIELD
 
-    # カードタイプ判定
+    # --- カードタイプ ---
     if _nfc(ParserKeyword.LEADER) in tgt_text: tq.card_type.append("LEADER")
     if _nfc(ParserKeyword.CHARACTER) in tgt_text: tq.card_type.append("CHARACTER")
     if _nfc(ParserKeyword.EVENT) in tgt_text: tq.card_type.append("EVENT")
     if _nfc(ParserKeyword.STAGE) in tgt_text: tq.card_type.append("STAGE")
     
-    # 名称指定
+    # --- その他フィルタ ---
     m_name = re.search(r'「([^」]+)」', tgt_text)
     if m_name:
-        name_val = m_name.group(1)
-        full_match = m_name.group(0)
-        exclusion_marker = _nfc(ParserKeyword.EXCEPT)
-        if (full_match + exclusion_marker) not in tgt_text:
-            tq.names.append(name_val)
+        if (m_name.group(0) + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
+            tq.names.append(m_name.group(1))
     
-    # 特徴・属性
     traits = re.findall(_nfc(ParserKeyword.TRAIT + r'[《<]([^》>]+)[》>]'), tgt_text)
     tq.traits.extend(traits)
     attrs = re.findall(_nfc(ParserKeyword.ATTRIBUTE + r'[((]([^))]+)[))]'), tgt_text)
     tq.attributes.extend(attrs)
     
-    # 色
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
-    # コスト
     m_c = re.search(_nfc(ParserKeyword.COST + r'\D?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
         val = int(m_c.group(1))
         if m_c.group(2) == _nfc(ParserKeyword.ABOVE): tq.cost_min = val
         else: tq.cost_max = val
 
-    # パワー
     m_p = re.search(_nfc(ParserKeyword.POWER + r'\D?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_p:
         val = int(m_p.group(1))
         if m_p.group(2) == _nfc(ParserKeyword.ABOVE): tq.power_min = val
         else: tq.power_max = val
     
-    # 状態
     if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
     elif _nfc("レスト") in tgt_text: tq.is_rest = True
     elif _nfc("アクティブ") in tgt_text:
-        # 「アクティブにならない」等の場合は除外
         if _nfc("ならない") not in tgt_text:
             tq.is_rest = False
     
-    # 枚数と「まで」の判定
-    if re.search(r'(\d+|枚)まで', tgt_text):
-        tq.is_up_to = True 
+    if re.search(r'(\d+|枚)まで', tgt_text): tq.is_up_to = True 
 
     if _nfc(ParserKeyword.ALL_HIRAGANA) in tgt_text or _nfc(ParserKeyword.ALL) in tgt_text:
         tq.count = -1
@@ -109,43 +114,33 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         m_cnt = re.search(r'(\d+)' + _nfc(ParserKeyword.COUNT_SUFFIX), tgt_text)
         tq.count = int(m_cnt.group(1)) if m_cnt else 1
     
-    log_event("DEBUG", "matcher.parse_result", f"Parsed: player={tq.player.name}, count={tq.count}, up_to={tq.is_up_to}")
+    log_event("DEBUG", "matcher.parse_result", f"Parsed: player={tq.player.name}, count={tq.count}, up_to={tq.is_up_to}, zone={tq.zone}")
     return tq
 
 def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
-    if query.select_mode == "SOURCE":
-        return [source_card]
+    if query.select_mode == "SOURCE": return [source_card]
 
     owner_player = game_manager.p1 if game_manager.p1.name == source_card.owner_id else game_manager.p2
     opponent_player = game_manager.p2 if owner_player == game_manager.p1 else game_manager.p1
 
     target_players = []
-    if query.player == Player.SELF:
-        target_players = [owner_player]
-    elif query.player == Player.OPPONENT:
-        target_players = [opponent_player]
-    elif query.player == Player.ALL:
-        target_players = [game_manager.p1, game_manager.p2]
-    elif query.player == Player.OWNER:
-        target_players = [owner_player]
+    if query.player == Player.SELF: target_players = [owner_player]
+    elif query.player == Player.OPPONENT: target_players = [opponent_player]
+    elif query.player == Player.ALL: target_players = [game_manager.p1, game_manager.p2]
+    elif query.player == Player.OWNER: target_players = [owner_player]
 
     candidates = []
     for p in target_players:
         if not p: continue
-        
         if query.zone == Zone.FIELD:
             candidates.extend(p.field)
             if not query.card_type or "LEADER" in query.card_type:
                 if p.leader: candidates.append(p.leader)
             if p.stage: candidates.append(p.stage)
-        elif query.zone == Zone.HAND:
-            candidates.extend(p.hand)
-        elif query.zone == Zone.TRASH:
-            candidates.extend(p.trash)
-        elif query.zone == Zone.LIFE:
-            candidates.extend(p.life)
-        elif query.zone == Zone.TEMP:
-            candidates.extend(p.temp_zone)
+        elif query.zone == Zone.HAND: candidates.extend(p.hand)
+        elif query.zone == Zone.TRASH: candidates.extend(p.trash)
+        elif query.zone == Zone.LIFE: candidates.extend(p.life)
+        elif query.zone == Zone.TEMP: candidates.extend(p.temp_zone)
 
     results = []
     for card in candidates:
@@ -159,28 +154,13 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         if query.names and card.master.name not in query.names: continue
         if query.traits and not any(t in card.master.traits for t in query.traits): continue
         if query.is_rest is not None and card.is_rest != query.is_rest: continue
-        
         results.append(card)
 
     if not results:
         log_level = "WARNING"
-        if query.select_mode in ["ALL", "REMAINING"] or query.is_up_to:
-            log_level = "INFO"
-        
-        log_event(
-            level_key=log_level,
-            action="matcher.no_target",
-            msg=f"No targets found for query: {query.raw_text}",
-            player="system",
-            payload={
-                "query_raw": query.raw_text,
-                "zone": query.zone.name,
-                "target_player": query.player.name,
-                "real_target_names": [p.name for p in target_players],
-                "candidates_scanned": len(candidates)
-            }
-        )
-    
-    # 修正: 候補リスト取得段階では枚数でスライスしない。
-    # ここで切ってしまうと、候補が複数ある場合にユーザーが選択できなくなるため。
+        if query.select_mode in ["ALL", "REMAINING"] or query.is_up_to: log_level = "INFO"
+        log_event(level_key=log_level, action="matcher.no_target", msg=f"No targets found for query: {query.raw_text}", player="system", payload={"query_raw": query.raw_text, "zone": query.zone.name, "target_player": query.player.name, "real_target_names": [p.name for p in target_players], "candidates_scanned": len(candidates)})
+
+    # ★重要: ここでスライス処理（results[:count]）を行わない！
+    # 候補選択ロジック（Resolver）に全候補を渡す必要がある。
     return results

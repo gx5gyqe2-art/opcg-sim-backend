@@ -3,184 +3,199 @@
     "id": "BASIC_KO_AND_COST",
     "title": "【基本】コスト指定KOとドン!!コスト支払い",
     "setup": {
-      "p1": {
-        "field": ["Tester"],
-        "don_active": 2
-      },
-      "p2": {
-        "field": [
-          { "name": "LowCostEnemy", "cost": 3 },
-          { "name": "HighCostEnemy", "cost": 5 }
-        ]
-      }
+      "p1": { "field": ["Tester"], "don_active": 2 },
+      "p2": { "field": [ { "name": "LowCostEnemy", "cost": 3 }, { "name": "HighCostEnemy", "cost": 5 } ] }
     },
     "source": "Tester",
     "text": "【起動メイン】ドン!!-1：コスト4以下の相手のキャラ1枚をKOする。",
-    "interaction": [
-      { "select_cards": ["LowCostEnemy"] }
-    ],
-    "expect": {
-      "success": true,
-      "p1_don_active": 1,
-      "p1_don_deck_count": 9,
-      "p2_field_has": ["HighCostEnemy"],
-      "p2_trash_has": ["LowCostEnemy"]
-    }
+    "interaction": [ { "select_cards": ["LowCostEnemy"] } ],
+    "expect": { "success": true, "p1_don_active": 1, "p1_don_deck_count": 9, "p2_field_has": ["HighCostEnemy"], "p2_trash_has": ["LowCostEnemy"] }
   },
   {
     "id": "MATCHER_TRAIT_FILTER",
     "title": "【対象】特徴によるフィルタリング検証",
     "setup": {
-      "p1": {
-        "field": ["Tester"]
-      },
-      "p2": {
-        "field": [
-          { "name": "Luffy", "traits": ["麦わらの一味", "超新星"] },
-          { "name": "Kaido", "traits": ["百獣海賊団", "四皇"] }
-        ]
-      }
+      "p1": { "field": ["Tester"] },
+      "p2": { "field": [ { "name": "Luffy", "traits": ["麦わらの一味", "超新星"] }, { "name": "Kaido", "traits": ["百獣海賊団", "四皇"] } ] }
     },
     "source": "Tester",
     "text": "【登場時】特徴《麦わらの一味》を持つキャラ1枚をKOする。",
-    "interaction": [
-      { "select_cards": ["Luffy"] }
-    ],
-    "expect": {
-      "success": true,
-      "p2_trash_has": ["Luffy"],
-      "p2_field_has": ["Kaido"]
-    }
+    "interaction": [ { "select_cards": ["Luffy"] } ],
+    "expect": { "success": true, "p2_trash_has": ["Luffy"], "p2_field_has": ["Kaido"] }
   },
   {
     "id": "SEQUENCE_AND_CONDITION",
     "title": "【複合】条件付き実行（〜場合、〜する）",
     "setup": {
-      "p1": {
-        "field": ["Tester"],
-        "hand": ["DiscardCard"]
-      },
-      "p2": {
-        "field": ["Enemy"]
-      }
+      "p1": { "field": ["Tester"], "hand": ["DiscardCard"] },
+      "p2": { "field": ["Enemy"] }
     },
     "source": "Tester",
     "text": "【起動メイン】手札1枚を捨てることができる：相手のキャラ1枚をKOする。",
-    "interaction": [
-      { "select_cards": ["DiscardCard"] },
-      { "select_cards": ["Enemy"] }
-    ],
-    "expect": {
-      "success": true,
-      "p1_hand_count": 0,
-      "p2_trash_has": ["Enemy"]
-    }
+    "interaction": [ { "select_cards": ["DiscardCard"] }, { "select_cards": ["Enemy"] } ],
+    "expect": { "success": true, "p1_hand_count": 0, "p2_trash_has": ["Enemy"] }
   },
   {
     "id": "SEQUENCE_CONDITION_FAILED",
     "title": "【複合】条件不成立時の処理スキップ",
-    "setup": {
-      "p1": {
-        "field": ["Tester"],
-        "hand": []
-      },
-      "p2": {
-        "field": ["Enemy"]
-      }
-    },
+    "setup": { "p1": { "field": ["Tester"], "hand": [] }, "p2": { "field": ["Enemy"] } },
     "source": "Tester",
     "text": "【起動メイン】手札1枚を捨てることができる：相手のキャラ1枚をKOする。",
     "interaction": [],
-    "expect": {
-      "p2_field_has": ["Enemy"]
-    }
+    "expect": { "p2_field_has": ["Enemy"] }
   },
   {
     "id": "ERROR_NO_TARGET",
     "title": "【異常系】対象不在による失敗",
-    "setup": {
-      "p1": {
-        "field": ["Tester"]
-      },
-      "p2": {
-        "field": []
-      }
-    },
+    "setup": { "p1": { "field": ["Tester"] }, "p2": { "field": [] } },
     "source": "Tester",
     "text": "【登場時】相手のキャラ1枚をKOする。",
     "interaction": [],
-    "expect": {
-      "success": false,
-      "error_msg_contains": "KO"
-    }
+    "expect": { "success": false, "error_msg_contains": "KO" }
   },
   {
     "id": "FEATURE_FREEZE",
     "title": "【新規】フリーズ効果（アクティブにならない）",
-    "setup": {
-      "p1": {
-        "field": ["Tester"]
-      },
-      "p2": {
-        "field": [
-          { "name": "Target", "is_rest": true }
-        ]
-      }
-    },
+    "setup": { "p1": { "field": ["Tester"] }, "p2": { "field": [ { "name": "Target", "is_rest": true } ] } },
     "source": "Tester",
     "text": "【登場時】相手のキャラ1枚は、次の自分のターン開始時までアクティブにならない。",
-    "interaction": [
-      { "select_cards": ["Target"] }
-    ],
-    "expect": {
-      "success": true,
-      "p2_field_check": [
-        { "name": "Target", "has_flag": "FREEZE" }
-      ]
-    }
+    "interaction": [ { "select_cards": ["Target"] } ],
+    "expect": { "success": true, "p2_field_check": [ { "name": "Target", "has_flag": "FREEZE" } ] }
   },
   {
     "id": "FEATURE_SELECT_OPTION",
     "title": "【新規】選択肢効果（未実装部分の動作確認）",
-    "setup": {
-      "p1": {
-        "field": ["Tester"]
-      }
-    },
+    "setup": { "p1": { "field": ["Tester"] } },
     "source": "Tester",
     "text": "【登場時】以下の2つから1つを選ぶ。・カードを1枚引く。・ドン!!1枚をアクティブで追加する。",
-    "interaction": [
-      { "select_option": 0 }
-    ],
-    "expect": {
-      "success": true
-    }
+    "interaction": [ { "select_option": 0 } ],
+    "expect": { "success": true }
   },
   {
     "id": "VERIFY_SELECTION_SOURCE",
     "title": "【検証】選択候補の正当性チェック（Trash回収）",
-    "setup": {
-      "p1": {
-        "field": ["Tester"],
-        "hand": ["HandCard"],
-        "trash": ["TrashTarget", "TrashNoise"] 
-      }
-    },
+    "setup": { "p1": { "field": ["Tester"], "hand": ["HandCard"], "trash": ["TrashTarget", "TrashNoise"] } },
     "source": "Tester",
     "text": "【登場時】自分のトラッシュのキャラ1枚を手札に戻す。",
-    "interaction": [
-      {
-        "verify_candidates": {
-          "has_names": ["TrashTarget", "TrashNoise"], 
-          "missing_names": ["HandCard", "Tester"],
-          "count": 2
-        },
-        "select_cards": ["TrashTarget"]
-      }
-    ],
-    "expect": {
-      "success": true,
-      "p1_hand_count": 2 
-    }
+    "interaction": [ { "verify_candidates": { "has_names": ["TrashTarget", "TrashNoise"], "missing_names": ["HandCard", "Tester"], "count": 2 }, "select_cards": ["TrashTarget"] } ],
+    "expect": { "success": true, "p1_hand_count": 2 }
+  },
+  {
+    "id": "LIFE_ADD_DECK_P1",
+    "title": "【P1】デッキトップからライフ追加",
+    "active_player": "p1",
+    "setup": { "p1": { "field": ["Tester"], "deck": ["TopCard"], "life": [] } },
+    "source": "Tester",
+    "text": "【登場時】自分のデッキの上から1枚をライフに加える。",
+    "expect": { "success": true, "p1_life_count": 1, "p1_deck_count": 0 }
+  },
+  {
+    "id": "LIFE_ADD_HAND_P1",
+    "title": "【P1】手札からライフ追加",
+    "active_player": "p1",
+    "setup": { "p1": { "field": ["Tester"], "hand": ["HandCard"], "life": [] } },
+    "source": "Tester",
+    "text": "【登場時】自分の手札1枚をライフに加える。",
+    "interaction": [ { "select_cards": ["HandCard"] } ],
+    "expect": { "success": true, "p1_life_count": 1, "p1_hand_count": 0 }
+  },
+  {
+    "id": "LIFE_ADD_TRASH_P1",
+    "title": "【P1】トラッシュからライフ追加",
+    "active_player": "p1",
+    "setup": { "p1": { "field": ["Tester"], "trash": ["TrashCard"], "life": [] } },
+    "source": "Tester",
+    "text": "【登場時】自分のトラッシュのキャラ1枚をライフに加える。",
+    "interaction": [ { "select_cards": ["TrashCard"] } ],
+    "expect": { "success": true, "p1_life_count": 1, "p1_trash_count": 0 }
+  },
+  {
+    "id": "LIFE_ADD_FIELD_P1",
+    "title": "【P1】フィールドからライフ追加",
+    "active_player": "p1",
+    "setup": { "p1": { "field": ["Tester", "FieldCard"], "life": [] } },
+    "source": "Tester",
+    "text": "【登場時】自分の場のキャラ1枚をライフに加える。",
+    "interaction": [ { "select_cards": ["FieldCard"] } ],
+    "expect": { "success": true, "p1_life_count": 1, "p1_field_count": 1 }
+  },
+  {
+    "id": "LIFE_TO_HAND_P1",
+    "title": "【P1】ライフを手札に加える",
+    "active_player": "p1",
+    "setup": { "p1": { "field": ["Tester"], "hand": [], "life": ["LifeCard"] } },
+    "source": "Tester",
+    "text": "【登場時】自分のライフ1枚を手札に加える。",
+    "interaction": [ { "select_cards": ["LifeCard"] } ],
+    "expect": { "success": true, "p1_life_count": 0, "p1_hand_count": 1 }
+  },
+  {
+    "id": "LIFE_TO_TRASH_P1",
+    "title": "【P1】ライフをトラッシュに置く",
+    "active_player": "p1",
+    "setup": { "p1": { "field": ["Tester"], "trash": [], "life": ["LifeCard"] } },
+    "source": "Tester",
+    "text": "【登場時】自分のライフ1枚をトラッシュに置く。",
+    "interaction": [ { "select_cards": ["LifeCard"] } ],
+    "expect": { "success": true, "p1_life_count": 0, "p1_trash_count": 1 }
+  },
+  {
+    "id": "LIFE_ADD_DECK_P2",
+    "title": "【P2】デッキトップからライフ追加",
+    "active_player": "p2",
+    "setup": { "p2": { "field": ["Tester"], "deck": ["TopCard"], "life": [] } },
+    "source": "Tester",
+    "text": "【登場時】自分のデッキの上から1枚をライフに加える。",
+    "expect": { "success": true, "p2_life_count": 1, "p2_deck_count": 0 }
+  },
+  {
+    "id": "LIFE_ADD_HAND_P2",
+    "title": "【P2】手札からライフ追加",
+    "active_player": "p2",
+    "setup": { "p2": { "field": ["Tester"], "hand": ["HandCard"], "life": [] } },
+    "source": "Tester",
+    "text": "【登場時】自分の手札1枚をライフに加える。",
+    "interaction": [ { "select_cards": ["HandCard"] } ],
+    "expect": { "success": true, "p2_life_count": 1, "p2_hand_count": 0 }
+  },
+  {
+    "id": "LIFE_ADD_TRASH_P2",
+    "title": "【P2】トラッシュからライフ追加",
+    "active_player": "p2",
+    "setup": { "p2": { "field": ["Tester"], "trash": ["TrashCard"], "life": [] } },
+    "source": "Tester",
+    "text": "【登場時】自分のトラッシュのキャラ1枚をライフに加える。",
+    "interaction": [ { "select_cards": ["TrashCard"] } ],
+    "expect": { "success": true, "p2_life_count": 1, "p2_trash_count": 0 }
+  },
+  {
+    "id": "LIFE_ADD_FIELD_P2",
+    "title": "【P2】フィールドからライフ追加",
+    "active_player": "p2",
+    "setup": { "p2": { "field": ["Tester", "FieldCard"], "life": [] } },
+    "source": "Tester",
+    "text": "【登場時】自分の場のキャラ1枚をライフに加える。",
+    "interaction": [ { "select_cards": ["FieldCard"] } ],
+    "expect": { "success": true, "p2_life_count": 1, "p2_field_count": 1 }
+  },
+  {
+    "id": "LIFE_TO_HAND_P2",
+    "title": "【P2】ライフを手札に加える",
+    "active_player": "p2",
+    "setup": { "p2": { "field": ["Tester"], "hand": [], "life": ["LifeCard"] } },
+    "source": "Tester",
+    "text": "【登場時】自分のライフ1枚を手札に加える。",
+    "interaction": [ { "select_cards": ["LifeCard"] } ],
+    "expect": { "success": true, "p2_life_count": 0, "p2_hand_count": 1 }
+  },
+  {
+    "id": "LIFE_TO_TRASH_P2",
+    "title": "【P2】ライフをトラッシュに置く",
+    "active_player": "p2",
+    "setup": { "p2": { "field": ["Tester"], "trash": [], "life": ["LifeCard"] } },
+    "source": "Tester",
+    "text": "【登場時】自分のライフ1枚をトラッシュに置く。",
+    "interaction": [ { "select_cards": ["LifeCard"] } ],
+    "expect": { "success": true, "p2_life_count": 0, "p2_trash_count": 1 }
   }
 ]

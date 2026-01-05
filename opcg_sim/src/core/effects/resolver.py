@@ -170,7 +170,6 @@ def execute_action(
     
     effect_context["last_action_success"] = action_success
     
-    # ★修正: 失敗を正しく返す
     if not action_success:
         return False
 
@@ -279,37 +278,31 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
             log_event("INFO", "effect.cost_change", f"{t.master.name} cost buffed by {action.value}", player=player.name)
 
     elif action.type == ActionType.LIFE_MANIPULATE:
-        txt = action.raw_text
-        if '手札' in txt and '加える' in txt:
-            if targets:
-                for t in targets:
-                    owner, current_zone = game_manager._find_card_location(t)
-                    if owner and current_zone == owner.life:
-                        game_manager.move_card(t, Zone.HAND, owner)
-                        log_event("INFO", "effect.life_to_hand", f"Moved {t.master.name} from Life to Hand", player=player.name)
-            else:
-                if action.target and not action.target.is_up_to:
-                    return False
-
-        elif ('加える' in txt or '置く' in txt) and '手札' not in txt:
+        # 修正: 対象の現在位置に基づいて移動先を決定する（Hand->Lifeに対応）
+        moved_any = False
+        if targets:
+            for t in targets:
+                owner, current_zone = game_manager._find_card_location(t)
+                if not owner: continue
+                
+                if current_zone == owner.life:
+                    # ライフにあるカードが対象 = ライフから手札へ（基本動作）
+                    game_manager.move_card(t, Zone.HAND, owner)
+                    log_event("INFO", "effect.life_to_hand", f"Moved {t.master.name} from Life to Hand", player=player.name)
+                    moved_any = True
+                else:
+                    # それ以外（手札、場、トラッシュなど） = ライフへの追加
+                    game_manager.move_card(t, Zone.LIFE, owner, dest_position="TOP")
+                    log_event("INFO", "effect.life_recover", f"Added {t.master.name} to Life", player=player.name)
+                    moved_any = True
+        
+        # 対象がない場合 = デッキトップからのライフ回復（デフォルト動作）
+        if not moved_any and not targets:
             source_list = player.deck
-            if targets:
-                for t in targets:
-                    owner, current_zone = game_manager._find_card_location(t)
-                    if owner:
-                        game_manager.move_card(t, Zone.LIFE, owner, dest_position="TOP")
-                        log_event("INFO", "effect.life_recover", f"Added {t.master.name} to Life", player=player.name)
-            else:
-                if source_list:
-                    card = source_list.pop(0)
-                    player.life.append(card)
-                    log_event("INFO", "effect.life_recover", "Recovered 1 Life from Deck", player=player.name)
-        elif '向き' in txt:
-            target_lives = targets if targets else player.life
-            for card in target_lives:
-                if '表' in txt: card.is_face_up = True
-                elif '裏' in txt: card.is_face_up = False
-                log_event("INFO", "effect.life_face", f"Life {card.uuid} face changed", player=player.name)
+            if source_list:
+                card = source_list.pop(0)
+                player.life.append(card)
+                log_event("INFO", "effect.life_recover", "Recovered 1 Life from Deck", player=player.name)
 
     elif action.type == ActionType.GRANT_KEYWORD:
         keywords = {
@@ -416,7 +409,6 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
 
     elif action.type == ActionType.RETURN_DON:
         target_player = game_manager.opponent if "相手" in action.raw_text else player
-        # ▼ 修正: 負の値が来る可能性があるため絶対値を使用
         count = abs(action.value) if action.value != 0 else 1
         
         returned_count = 0

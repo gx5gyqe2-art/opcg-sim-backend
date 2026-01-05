@@ -127,7 +127,6 @@ class Effect:
             ActionType.PASSIVE_EFFECT
         ]
         
-        # 修正: "時" は「ターン終了時まで」等の期間指定で頻出するため、ターゲット除外条件から外す
         is_calculation_or_rule = any(kw in text for kw in ["につき", "できない", "されない", "得る", "いる"])
         
         if act_type not in NO_TARGET_ACTIONS and not is_calculation_or_rule:
@@ -136,7 +135,6 @@ class Effect:
                 if not target.tag: target.tag = "last_target"
             else:
                 default_p = Player.SELF
-                # 修正: FREEZEも基本的に相手を対象にすることが多いため追加
                 if act_type in [ActionType.KO, ActionType.DEAL_DAMAGE, ActionType.REST, ActionType.ATTACK_DISABLE, ActionType.FREEZE]:
                     if "自分" not in text:
                         default_p = Player.OPPONENT
@@ -180,7 +178,6 @@ class Effect:
         if 'シャッフル' in text: return ActionType.SHUFFLE
         if 'コスト' in text and 'にする' in text: return ActionType.SET_COST
         if '場を離れない' in text: return ActionType.PREVENT_LEAVE
-        if 'デッキ' in text and '上' in text and ('置く' in text or '戻す' in text or '加える' in text): return ActionType.DECK_TOP
         if 'できない' in text or '不可' in text or '加えられない' in text: return ActionType.RESTRICTION
         if '発動する' in text and ('効果' in text or 'イベント' in text): return ActionType.EXECUTE_MAIN_EFFECT
         if '勝利する' in text and ('ゲーム' in text or '敗北' in text): return ActionType.VICTORY
@@ -188,9 +185,12 @@ class Effect:
         if 'アタック' in text and ('できない' in text or '不可' in text): return ActionType.ATTACK_DISABLE
         if '無効' in text: return ActionType.NEGATE_EFFECT
             
+        # ★修正: ライフ操作判定を優先
         if 'ライフ' in text:
-            if '加える' in text: return ActionType.LIFE_MANIPULATE
-            if '置く' in text or '向き' in text: return ActionType.LIFE_MANIPULATE
+            if any(k in text for k in ['加える', '置く', '向き', '手札', 'トラッシュ']):
+                return ActionType.LIFE_MANIPULATE
+
+        if 'デッキ' in text and '上' in text and ('置く' in text or '戻す' in text or '加える' in text): return ActionType.DECK_TOP
 
         if 'コスト' in text and ('-' in text or '下げる' in text or '+' in text or '上げる' in text):
              return ActionType.COST_CHANGE
@@ -335,4 +335,3 @@ class Effect:
                 look.then_actions.append(bottom)
 
         return [look]
-    

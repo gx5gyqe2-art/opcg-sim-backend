@@ -1,6 +1,6 @@
 import sys
 import os
-import json  # 変更: yaml -> json
+import json
 import traceback
 from typing import List, Dict, Any
 
@@ -73,10 +73,20 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
             card = create_mock_card(p_obj.name, c_def)
             p_obj.hand.append(card)
         
-        # Trash (追加)
+        # Trash
         for c_def in p_data.get("trash", []):
             card = create_mock_card(p_obj.name, c_def)
             p_obj.trash.append(card)
+            
+        # Deck
+        for c_def in p_data.get("deck", []):
+            card = create_mock_card(p_obj.name, c_def)
+            p_obj.deck.append(card)
+            
+        # Life
+        for c_def in p_data.get("life", []):
+            card = create_mock_card(p_obj.name, c_def)
+            p_obj.life.append(card)
 
         # Don Active
         active_count = p_data.get("don_active", 0)
@@ -104,13 +114,20 @@ def run_scenario(scenario: Dict) -> Dict:
     try:
         # 1. セットアップ
         gm = setup_game_from_json(scenario)
-        p1 = gm.p1
+        
+        # 操作プレイヤーの切り替え (デフォルトはP1)
+        active_player_key = scenario.get("active_player", "p1")
+        active_player = gm.p1 if active_player_key == "p1" else gm.p2
+        
+        if active_player_key == "p2":
+            gm.turn_player = gm.p2
+            gm.opponent = gm.p1
         
         # 2. 効果発動元の特定
         source_name = scenario["source"]
-        source_card = find_card_by_name(p1, source_name)
+        source_card = find_card_by_name(active_player, source_name)
         if not source_card:
-            raise Exception(f"Source card '{source_name}' not found in P1 field/hand.")
+            raise Exception(f"Source card '{source_name}' not found in {active_player_key.upper()} field/hand.")
         
         # 3. テキストのParse
         text = scenario["text"]
@@ -123,7 +140,7 @@ def run_scenario(scenario: Dict) -> Dict:
         # 4. 効果解決 (Interaction処理含む)
         success = False
         try:
-            gm.resolve_ability(p1, ability, source_card)
+            gm.resolve_ability(active_player, ability, source_card)
             
             # Interactionループ
             interaction_steps = scenario.get("interaction", [])
@@ -136,34 +153,29 @@ def run_scenario(scenario: Dict) -> Dict:
                 
                 if step_idx >= len(interaction_steps):
                     if req.get("can_skip"):
-                        gm.resolve_interaction(p1, {}) # Pass
+                        gm.resolve_interaction(active_player, {}) # Pass
                     else:
                         raise Exception(f"Unexpected interaction required: {req['action_type']}")
                 else:
                     step_input = interaction_steps[step_idx]
                     
-                    # ▼▼▼ 追加: 候補の検証ロジック ▼▼▼
+                    # 候補の検証ロジック
                     if "verify_candidates" in step_input:
                         verify = step_input["verify_candidates"]
                         candidates = req.get("candidates", [])
-                        # CardInstanceから名前リストを抽出
                         candidate_names = [c.master.name for c in candidates]
                         
-                        # 1. 含まれているべきカードのチェック (has_names)
                         for expected in verify.get("has_names", []):
                             if expected not in candidate_names:
                                 raise Exception(f"Validation Error: Expected candidate '{expected}' not found. Candidates: {candidate_names}")
 
-                        # 2. 含まれていてはいけないカードのチェック (missing_names)
                         for unexpected in verify.get("missing_names", []):
                             if unexpected in candidate_names:
                                 raise Exception(f"Validation Error: Unexpected candidate '{unexpected}' found. Candidates: {candidate_names}")
                         
-                        # 3. 候補数のチェック
                         if "count" in verify:
                             if len(candidates) != verify["count"]:
                                 raise Exception(f"Validation Error: Candidate count mismatch. Expected {verify['count']}, Got {len(candidates)}")
-                    # ▲▲▲ 追加ここまで ▲▲▲
 
                     payload = {}
                     
@@ -181,7 +193,7 @@ def run_scenario(scenario: Dict) -> Dict:
                     if "select_option" in step_input:
                         payload["selected_option_index"] = step_input["select_option"]
 
-                    gm.resolve_interaction(p1, payload)
+                    gm.resolve_interaction(active_player, payload)
                     step_idx += 1
             
             success = True
@@ -196,7 +208,6 @@ def run_scenario(scenario: Dict) -> Dict:
         # 5. 検証 (Expectations)
         expect = scenario.get("expect", {})
         
-        # 成功/失敗の期待値
         exp_success = expect.get("success")
         if exp_success is not None:
             if exp_success != success:
@@ -204,7 +215,6 @@ def run_scenario(scenario: Dict) -> Dict:
             else:
                 result_report["details"].append(f"✅ Success matched: {success}")
 
-        # エラーメッセージの検証
         exp_msg = expect.get("error_msg_contains")
         if exp_msg:
             found_msg = any(exp_msg in d for d in result_report["details"])
@@ -213,27 +223,32 @@ def run_scenario(scenario: Dict) -> Dict:
             else:
                 result_report["details"].append(f"❌ Error message missing '{exp_msg}'")
 
-        # 状態検証
-        if "p1_don_active" in expect:
-            actual = len(p1.don_active)
-            if actual == expect["p1_don_active"]:
-                result_report["details"].append(f"✅ P1 Don Active: {actual}")
-            else:
-                result_report["details"].append(f"❌ P1 Don Active: Expected {expect['p1_don_active']}, Got {actual}")
-        
-        if "p1_don_deck_count" in expect:
-            actual = len(p1.don_deck)
-            if actual == expect["p1_don_deck_count"]:
-                result_report["details"].append(f"✅ P1 Don Deck: {actual}")
-            else:
-                result_report["details"].append(f"❌ P1 Don Deck: Expected {expect['p1_don_deck_count']}, Got {actual}")
+        # 状態検証ヘルパー
+        def check_prop(pid, p_obj, key, label):
+            if key in expect:
+                actual = 0
+                if "hand_count" in label: actual = len(p_obj.hand)
+                elif "deck_count" in label: actual = len(p_obj.deck)
+                elif "life_count" in label: actual = len(p_obj.life)
+                elif "trash_count" in label: actual = len(p_obj.trash)
+                elif "field_count" in label: actual = len(p_obj.field)
+                
+                if actual == expect[key]:
+                    result_report["details"].append(f"✅ {pid} {label}: {actual}")
+                else:
+                    result_report["details"].append(f"❌ {pid} {label}: Expected {expect[key]}, Got {actual}")
 
-        if "p1_hand_count" in expect:
-            actual = len(p1.hand)
-            if actual == expect["p1_hand_count"]:
-                result_report["details"].append(f"✅ P1 Hand Count: {actual}")
-            else:
-                result_report["details"].append(f"❌ P1 Hand Count: Expected {expect['p1_hand_count']}, Got {actual}")
+        check_prop("p1", gm.p1, "p1_hand_count", "Hand Count")
+        check_prop("p1", gm.p1, "p1_deck_count", "Deck Count")
+        check_prop("p1", gm.p1, "p1_life_count", "Life Count")
+        check_prop("p1", gm.p1, "p1_trash_count", "Trash Count")
+        check_prop("p1", gm.p1, "p1_field_count", "Field Count")
+
+        check_prop("p2", gm.p2, "p2_hand_count", "Hand Count")
+        check_prop("p2", gm.p2, "p2_deck_count", "Deck Count")
+        check_prop("p2", gm.p2, "p2_life_count", "Life Count")
+        check_prop("p2", gm.p2, "p2_trash_count", "Trash Count")
+        check_prop("p2", gm.p2, "p2_field_count", "Field Count")
 
         if "p2_field_has" in expect:
             current_names = [c.master.name for c in gm.p2.field]
@@ -272,11 +287,7 @@ def run_scenario(scenario: Dict) -> Dict:
 
     return result_report
 
-# ---------------------------------------------------------
-# メイン
-# ---------------------------------------------------------
 def main():
-    # 変更: JSONファイルを読み込む
     json_path = os.path.join(current_dir, "test_scenarios.json")
     if not os.path.exists(json_path):
         print(f"Scenario file not found: {json_path}")
