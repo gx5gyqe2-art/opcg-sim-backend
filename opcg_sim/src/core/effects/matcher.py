@@ -1,5 +1,6 @@
 import re
 import logging
+import unicodedata
 from ...models.effect_types  import TargetQuery, _nfc
 from ...models.enums import Player, Zone, ParserKeyword
 from ...utils.logger_config import log_event
@@ -9,6 +10,9 @@ from ...utils.logger_config import log_event
 def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQuery:
     tq = TargetQuery(raw_text=tgt_text, player=default_player)
     
+    # デバッグログ: パース入力の確認
+    log_event("DEBUG", "matcher.parse_start", f"Parsing target text: {tgt_text}")
+
     # 定数化
     if tgt_text == _nfc(ParserKeyword.THIS_CARD) or (tgt_text == _nfc(ParserKeyword.SELF_REF) and _nfc(ParserKeyword.SELF_REF + "の") not in tgt_text):
         tq.select_mode = "SOURCE"
@@ -20,21 +24,20 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.zone = Zone.TEMP
         return tq
 
+    # プレイヤー判定の優先順位: お互い > 持ち主 > 相手 > 自分
     if _nfc(ParserKeyword.EACH_OTHER) in tgt_text: 
         tq.player = Player.ALL
     elif _nfc(ParserKeyword.OWNER) in tgt_text: 
         tq.player = Player.OWNER
     elif _nfc(ParserKeyword.OPPONENT) in tgt_text:
-        if default_player == Player.OPPONENT:
-            tq.player = Player.SELF
-        else:
-            tq.player = Player.OPPONENT
+        # 修正: シンプルに「相手」があれば対象をOPPONENTにする
+        tq.player = Player.OPPONENT
     elif _nfc(ParserKeyword.SELF) in tgt_text or _nfc(ParserKeyword.SELF_REF) in tgt_text:
         tq.player = Player.SELF
 
     # ゾーン判定
     if _nfc(ParserKeyword.HAND) in tgt_text:
-        # ★修正: 「戻す」「加える」は移動先の話なので、検索元としては扱わない
+        # 「戻す」「加える」は移動先の話なので、検索元としては扱わない
         if "戻す" in tgt_text or "加える" in tgt_text:
             pass # FIELDのままにする
         else:
@@ -66,7 +69,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     attrs = re.findall(_nfc(ParserKeyword.ATTRIBUTE + r'[((]([^))]+)[))]'), tgt_text)
     tq.attributes.extend(attrs)
     
-    # 色（色はEnum化も可能だが、現状はリストで維持）
+    # 色
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
@@ -89,8 +92,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     elif _nfc("レスト") in tgt_text: tq.is_rest = True
     elif _nfc("アクティブ") in tgt_text: tq.is_rest = False
     
-    # 枚数と「まで」の判定
-    if _nfc("まで") in tgt_text:
+    # 修正: 枚数と「まで」の判定を厳密化
+    # 「ターン開始時まで」などに誤反応しないよう、数字や「枚」の直後にある場合のみとする
+    if re.search(r'(\d+|枚)まで', tgt_text):
         tq.is_up_to = True 
 
     if _nfc(ParserKeyword.ALL_HIRAGANA) in tgt_text or _nfc(ParserKeyword.ALL) in tgt_text:
@@ -100,25 +104,33 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         m_cnt = re.search(r'(\d+)' + _nfc(ParserKeyword.COUNT_SUFFIX), tgt_text)
         tq.count = int(m_cnt.group(1)) if m_cnt else 1
     
+    log_event("DEBUG", "matcher.parse_result", f"Parsed: player={tq.player.name}, count={tq.count}, up_to={tq.is_up_to}")
     return tq
 
 def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
     if query.select_mode == "SOURCE":
         return [source_card]
 
+    # 修正: SELF/OPPONENT の解決を source_card の持ち主基準に変更
+    # これにより相手ターン中のカウンターやトリガーでも正しく「自分」=「カードの持ち主」となる
+    owner_player = game_manager.p1 if game_manager.p1.name == source_card.owner_id else game_manager.p2
+    opponent_player = game_manager.p2 if owner_player == game_manager.p1 else game_manager.p1
+
     target_players = []
     if query.player == Player.SELF:
-        target_players = [game_manager.turn_player]
+        target_players = [owner_player]
     elif query.player == Player.OPPONENT:
-        target_players = [game_manager.opponent]
+        target_players = [opponent_player]
     elif query.player == Player.ALL:
         target_players = [game_manager.p1, game_manager.p2]
     elif query.player == Player.OWNER:
-        owner, _ = game_manager._find_card_location(source_card)
-        target_players = [owner] if owner else []
+        # OWNER指定の場合は、そのカードの現在位置の持ち主ではなく、元々の持ち主(owner_player)を指すのが通例
+        target_players = [owner_player]
 
     candidates = []
     for p in target_players:
+        if not p: continue # 安全策
+        
         if query.zone == Zone.FIELD:
             candidates.extend(p.field)
             if not query.card_type or "LEADER" in query.card_type:
@@ -132,6 +144,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             candidates.extend(p.life)
         elif query.zone == Zone.TEMP:
             candidates.extend(p.temp_zone)
+        # COST_AREA (Don) の検索が必要な場合はここに追加
 
     results = []
     for card in candidates:
@@ -149,6 +162,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         results.append(card)
 
     if not results:
+        # デバッグ: 検索失敗時の詳細ログ
         log_level = "WARNING"
         if query.select_mode in ["ALL", "REMAINING"] or query.is_up_to:
             log_level = "INFO"
@@ -162,6 +176,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
                 "query_raw": query.raw_text,
                 "zone": query.zone.name,
                 "target_player": query.player.name,
+                "real_target_names": [p.name for p in target_players],
                 "candidates_scanned": len(candidates)
             }
         )
