@@ -99,7 +99,6 @@ def execute_action(
         selected_option = effect_context.get("selected_option_index")
         
         if selected_option is None:
-            # TODO: 将来的にはActionから選択肢テキストを取得
             options = [
                 {"label": "選択肢1", "value": 0},
                 {"label": "選択肢2", "value": 1}
@@ -171,13 +170,12 @@ def execute_action(
     
     effect_context["last_action_success"] = action_success
     
-    # ★修正: 実行失敗時は False を返却する
+    # ★修正: 失敗を正しく返す
     if not action_success:
         return False
 
     if action.then_actions:
         for sub in action.then_actions:
-            # ★修正: 連鎖アクションが失敗した場合も False を返却する
             if not execute_action(game_manager, player, sub, source_card, effect_context):
                 return False
                 
@@ -418,7 +416,8 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
 
     elif action.type == ActionType.RETURN_DON:
         target_player = game_manager.opponent if "相手" in action.raw_text else player
-        count = action.value if action.value > 0 else 1
+        # ▼ 修正: 負の値が来る可能性があるため絶対値を使用
+        count = abs(action.value) if action.value != 0 else 1
         
         returned_count = 0
         

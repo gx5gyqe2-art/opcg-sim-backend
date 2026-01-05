@@ -207,8 +207,7 @@ class GameManager:
             self.active_interaction = None
             return
 
-        # ★修正: selected_uuids だけでなく payload 全体をマージする
-        # これにより selected_option_index なども effect_context に渡る
+        # ▼ 修正: ペイロードを全てマージ (selected_option_index対応)
         for k, v in payload.items():
             effect_context[k] = v
         
@@ -222,10 +221,24 @@ class GameManager:
         
         success = execute_action(self, player, action, source_card, effect_context=effect_context)
         
+        # ▼ 修正: 使い終わった選択状態をクリア (次のアクションの誤動作防止)
+        if "selected_uuids" in effect_context:
+            del effect_context["selected_uuids"]
+        if "selected_option_index" in effect_context:
+            del effect_context["selected_option_index"]
+
+        # ▼ 修正: 再開後の失敗検知
+        if not success:
+            if self.active_interaction:
+                pass # 再度中断された
+            else:
+                error_msg = f"効果の解決に失敗しました: {action.raw_text or action.type}"
+                log_event("WARNING", "game.effect_failed", error_msg, player=player.name)
+                raise ValueError(error_msg)
+
         if success and remaining_ability_actions:
             for i, next_act in enumerate(remaining_ability_actions):
                 if self.active_interaction:
-                    # 次のインタラクション発生時、現在のコンテキストを引き継ぐ
                     if "continuation" in self.active_interaction:
                         self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i:]
                         if "effect_context" not in self.active_interaction["continuation"]:
@@ -568,7 +581,7 @@ class GameManager:
         
         effect_context = {}
 
-        # ★修正: コストとアクションを結合して一連の処理として実行する
+        # ★修正: コストとアクションを連結
         all_actions = list(ability.costs) + list(ability.actions)
         
         for i, action in enumerate(all_actions):

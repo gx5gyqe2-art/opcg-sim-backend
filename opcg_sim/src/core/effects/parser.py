@@ -155,13 +155,13 @@ class Effect:
         if 'アタック' in text and '対象' in text and '変更' in text:
             return ActionType.REDIRECT_ATTACK
 
-        if 'ドン' in text and '戻す' in text and 'ドンデッキ' in text:
+        # ▼ 修正: ドン消費・戻しの判定強化
+        if 'ドン' in text and ('戻す' in text or 'ドンデッキ' in text or '-' in text or '−' in text):
             return ActionType.RETURN_DON
         
         if '付与されているドン' in text and '付与する' in text:
             return ActionType.MOVE_ATTACHED_DON
 
-        # ▼ 優先度S: ドン!!付与の検知漏れ修正
         if 'ドン' in text and ('付与' in text or '付ける' in text):
             return ActionType.ATTACH_DON
 
