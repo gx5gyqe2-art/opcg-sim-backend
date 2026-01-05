@@ -36,7 +36,6 @@ def check_condition(game_manager: 'GameManager', player: 'Player', condition: Op
                 elif condition.value == "HAS_TRAIT" and condition.target:
                     res = any(t in target_card.master.traits for t in condition.target.traits)
                 elif condition.value == "COST_CHECK" and condition.target:
-                    # TargetQueryの条件を簡易チェック (ここでは最小コストのみ)
                     res = True
                     if condition.target.cost_min is not None and target_card.current_cost < condition.target.cost_min:
                         res = False
@@ -95,6 +94,38 @@ def execute_action(
 
     targets = []
     selected_uuids = effect_context.get("selected_uuids")
+    
+    # ▼ 追加: SELECT_OPTION の処理
+    # 対象選択よりも前に、選択肢分岐がある場合はここでハンドリング
+    if action.type == ActionType.SELECT_OPTION:
+        selected_option = effect_context.get("selected_option_index")
+        
+        if selected_option is None:
+            # TODO: 将来的にはActionから選択肢テキストを取得する。現在は仮の選択肢。
+            options = [
+                {"label": "選択肢1", "value": 0},
+                {"label": "選択肢2", "value": 1}
+            ]
+            
+            game_manager.active_interaction = {
+                "player_id": player.name,
+                "action_type": "SELECT_OPTION", # フロントエンド側でこれに対応するモーダル表示が必要
+                "message": action.raw_text or "効果を選択してください",
+                "options": options,
+                "can_skip": False,
+                "continuation": {
+                    "action": action,
+                    "source_card_uuid": source_card.uuid,
+                    "effect_context": effect_context
+                }
+            }
+            log_event("INFO", "resolver.select_option_suspend", "Suspended for Option Selection", player=player.name)
+            return False
+            
+        else:
+            # 選択済みの場合
+            log_event("INFO", "resolver.select_option_resume", f"Option {selected_option} selected", player=player.name)
+            # ※ ここで選択に応じた分岐処理が必要だが、現在はParserが分岐をサポートしていないためログ出力のみ
 
     if action.target:
         if action.target.select_mode == "REFERENCE":
@@ -155,9 +186,7 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
     if effect_context is None: effect_context = {}
     is_success = True
 
-    # ▼ 追加: 対象選択が必須なアクションの定義
-    # これらは「対象をとる」ことが前提のアクションであり、対象不在なら失敗とみなす
-    # (LIFE_MANIPULATEは対象をとらないケースもあるためここには含めない)
+    # ▼ 追加: 対象選択が必須なアクションの定義 (前回提案分)
     TARGET_REQUIRED_ACTIONS = [
         ActionType.KO, ActionType.MOVE_TO_HAND, ActionType.TRASH,
         ActionType.DECK_BOTTOM, ActionType.DECK_TOP, 
@@ -171,7 +200,6 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
     
     # ▼ 追加: 共通チェック処理
     if action.type in TARGET_REQUIRED_ACTIONS:
-        # ターゲット指定があり、かつ「〜まで」(任意数)ではない場合
         if action.target and not action.target.is_up_to:
             if not targets:
                 log_event("DEBUG", "resolver.fail_no_target", f"Action {action.type} failed: Target required but not found.", player=player.name)
@@ -220,8 +248,6 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
             if real_owner: game_manager.move_card(t, Zone.HAND, real_owner)
 
     elif action.type == ActionType.TRASH:
-        # 共通チェックにより、ターゲット必須でtargets空の場合は既にreturn Falseされている。
-        # ここでは「できる」が含まれる場合の処理や、通常の処理を行う。
         if not targets and "できる" in action.raw_text:
              is_success = False
         
@@ -265,7 +291,6 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
                         game_manager.move_card(t, Zone.HAND, owner)
                         log_event("INFO", "effect.life_to_hand", f"Moved {t.master.name} from Life to Hand", player=player.name)
             else:
-                # 対象必須の文脈で対象がない場合は失敗
                 if action.target and not action.target.is_up_to:
                     return False
 
@@ -352,8 +377,10 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
             target_p.hand.append(life_card)
             log_event("INFO", "effect.damage", f"{target_p.name} took 1 damage from effect", player=player.name)
 
+    # ▼ 優先度A: SELECT_OPTIONの実装 (現在はログのみ)
     elif action.type == ActionType.SELECT_OPTION:
-        log_event("INFO", "effect.select_option", "Option selection required (Logic pending)", player=player.name)
+        # execute_action側で中断/再開制御は行っているため、ここに来るのは「選択後」
+        log_event("INFO", "effect.select_option", "Option processed (Branch logic not implemented in Parser yet)", player=player.name)
 
     elif action.type == ActionType.SET_COST:
         log_event("INFO", "effect.set_cost", f"Cost set request: {action.raw_text}", player=player.name)
@@ -422,4 +449,25 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
 
         log_event("INFO", "effect.return_don", f"{target_player.name} returned {returned_count} Don to deck", player=player.name)
     
+    # ▼ 優先度S: FREEZE実装
+    elif action.type == ActionType.FREEZE:
+        for t in targets:
+            t.flags.add("FREEZE")
+            log_event("INFO", "effect.freeze", f"{t.master.name} frozen", player=player.name)
+
+    # ▼ 優先度S: PLAY_CARD実装
+    elif action.type == ActionType.PLAY_CARD:
+        for t in targets:
+            owner, current_zone = game_manager._find_card_location(t)
+            if owner:
+                game_manager.move_card(t, Zone.FIELD, owner)
+                t.is_newly_played = True
+                t.attached_don = 0
+                log_event("INFO", "effect.play_card", f"Played {t.master.name} by effect", player=player.name)
+
+                if not t.ability_disabled:
+                    for ability in t.master.abilities:
+                        if ability.trigger == TriggerType.ON_PLAY:
+                            game_manager.resolve_ability(player, ability, source_card=t)
+
     return is_success

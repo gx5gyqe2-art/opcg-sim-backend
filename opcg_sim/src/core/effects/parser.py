@@ -127,8 +127,6 @@ class Effect:
             ActionType.PASSIVE_EFFECT
         ]
         
-        # ★ Step 3 修正: 「いる」を追加
-        # 「〜につき」「〜時」「できない」「されない」「得る」「いる」
         is_calculation_or_rule = any(kw in text for kw in ["につき", "時", "できない", "されない", "得る", "いる"])
         
         if act_type not in NO_TARGET_ACTIONS and not is_calculation_or_rule:
@@ -162,6 +160,10 @@ class Effect:
         
         if '付与されているドン' in text and '付与する' in text:
             return ActionType.MOVE_ATTACHED_DON
+
+        # ▼ 優先度S: ドン!!付与の検知漏れ修正
+        if 'ドン' in text and ('付与' in text or '付ける' in text):
+            return ActionType.ATTACH_DON
 
         if 'ドンフェイズ' in text:
             return ActionType.MODIFY_DON_PHASE
