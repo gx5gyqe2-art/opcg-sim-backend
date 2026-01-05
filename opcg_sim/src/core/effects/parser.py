@@ -127,7 +127,8 @@ class Effect:
             ActionType.PASSIVE_EFFECT
         ]
         
-        is_calculation_or_rule = any(kw in text for kw in ["につき", "時", "できない", "されない", "得る", "いる"])
+        # 修正: "時" は「ターン終了時まで」等の期間指定で頻出するため、ターゲット除外条件から外す
+        is_calculation_or_rule = any(kw in text for kw in ["につき", "できない", "されない", "得る", "いる"])
         
         if act_type not in NO_TARGET_ACTIONS and not is_calculation_or_rule:
             if any(kw in text for kw in ['それ', 'そのカード', 'そのキャラ']):
@@ -135,7 +136,8 @@ class Effect:
                 if not target.tag: target.tag = "last_target"
             else:
                 default_p = Player.SELF
-                if act_type in [ActionType.KO, ActionType.DEAL_DAMAGE, ActionType.REST, ActionType.ATTACK_DISABLE]:
+                # 修正: FREEZEも基本的に相手を対象にすることが多いため追加
+                if act_type in [ActionType.KO, ActionType.DEAL_DAMAGE, ActionType.REST, ActionType.ATTACK_DISABLE, ActionType.FREEZE]:
                     if "自分" not in text:
                         default_p = Player.OPPONENT
                 
@@ -155,7 +157,6 @@ class Effect:
         if 'アタック' in text and '対象' in text and '変更' in text:
             return ActionType.REDIRECT_ATTACK
 
-        # ▼ 修正: ドン消費・戻しの判定強化
         if 'ドン' in text and ('戻す' in text or 'ドンデッキ' in text or '-' in text or '−' in text):
             return ActionType.RETURN_DON
         
@@ -334,3 +335,4 @@ class Effect:
                 look.then_actions.append(bottom)
 
         return [look]
+    
