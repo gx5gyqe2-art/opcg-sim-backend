@@ -155,6 +155,28 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
     if effect_context is None: effect_context = {}
     is_success = True
 
+    # ▼ 追加: 対象選択が必須なアクションの定義
+    # これらは「対象をとる」ことが前提のアクションであり、対象不在なら失敗とみなす
+    # (LIFE_MANIPULATEは対象をとらないケースもあるためここには含めない)
+    TARGET_REQUIRED_ACTIONS = [
+        ActionType.KO, ActionType.MOVE_TO_HAND, ActionType.TRASH,
+        ActionType.DECK_BOTTOM, ActionType.DECK_TOP, 
+        ActionType.REST, ActionType.ACTIVE, ActionType.BUFF, 
+        ActionType.COST_CHANGE, ActionType.GRANT_KEYWORD, 
+        ActionType.ATTACK_DISABLE, ActionType.NEGATE_EFFECT, 
+        ActionType.PREVENT_LEAVE, ActionType.ATTACH_DON, 
+        ActionType.MOVE_ATTACHED_DON, ActionType.REDIRECT_ATTACK,
+        ActionType.FREEZE, ActionType.PLAY_CARD, ActionType.SET_COST
+    ]
+    
+    # ▼ 追加: 共通チェック処理
+    if action.type in TARGET_REQUIRED_ACTIONS:
+        # ターゲット指定があり、かつ「〜まで」(任意数)ではない場合
+        if action.target and not action.target.is_up_to:
+            if not targets:
+                log_event("DEBUG", "resolver.fail_no_target", f"Action {action.type} failed: Target required but not found.", player=player.name)
+                return False
+
     if action.type == ActionType.DRAW:
         game_manager.draw_card(player, action.value)
     elif action.type == ActionType.RAMP_DON:
@@ -198,8 +220,11 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
             if real_owner: game_manager.move_card(t, Zone.HAND, real_owner)
 
     elif action.type == ActionType.TRASH:
+        # 共通チェックにより、ターゲット必須でtargets空の場合は既にreturn Falseされている。
+        # ここでは「できる」が含まれる場合の処理や、通常の処理を行う。
         if not targets and "できる" in action.raw_text:
              is_success = False
+        
         for t in targets:
             owner, _ = game_manager._find_card_location(t)
             real_owner = game_manager.p1 if t.owner_id == game_manager.p1.name else game_manager.p2
@@ -239,6 +264,11 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
                     if owner and current_zone == owner.life:
                         game_manager.move_card(t, Zone.HAND, owner)
                         log_event("INFO", "effect.life_to_hand", f"Moved {t.master.name} from Life to Hand", player=player.name)
+            else:
+                # 対象必須の文脈で対象がない場合は失敗
+                if action.target and not action.target.is_up_to:
+                    return False
+
         elif ('加える' in txt or '置く' in txt) and '手札' not in txt:
             source_list = player.deck
             if targets:

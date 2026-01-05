@@ -586,9 +586,24 @@ class GameManager:
                      self.active_interaction["continuation"]["effect_context"] = effect_context
                 break
 
-    # ★修正: effect_context 引数を追加
+    # ★修正: 失敗時に例外を投げるように変更
     def _perform_logic(self, player: Player, action: Any, source_card: CardInstance, effect_context: Optional[Dict[str, Any]] = None) -> bool:
         log_event("INFO", "game.effect", f"Resolving action {action.type} for {source_card.master.name}", player=player.name)
         from .effects.resolver import execute_action
-        # ★修正: コンテキストを渡す
-        return execute_action(self, player, action, source_card, effect_context=effect_context)
+        
+        success = execute_action(self, player, action, source_card, effect_context=effect_context)
+        
+        # 実行失敗時の検知ロジック
+        if not success:
+            # ユーザー選択のための中断であれば、エラーではないのでFalseを返して終了
+            if self.active_interaction:
+                return False
+            
+            # 選択待ちでもないのに失敗した場合は、実行不可エラーとして扱う
+            error_msg = f"効果の解決に失敗しました: {action.raw_text or action.type}"
+            log_event("WARNING", "game.effect_failed", error_msg, player=player.name)
+            
+            # ここで例外を投げると、API側でキャッチされフロントにメッセージとして返る
+            raise ValueError(error_msg)
+
+        return success
