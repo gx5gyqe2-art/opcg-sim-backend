@@ -95,13 +95,11 @@ def execute_action(
     targets = []
     selected_uuids = effect_context.get("selected_uuids")
     
-    # ▼ 追加: SELECT_OPTION の処理
-    # 対象選択よりも前に、選択肢分岐がある場合はここでハンドリング
     if action.type == ActionType.SELECT_OPTION:
         selected_option = effect_context.get("selected_option_index")
         
         if selected_option is None:
-            # TODO: 将来的にはActionから選択肢テキストを取得する。現在は仮の選択肢。
+            # TODO: 将来的にはActionから選択肢テキストを取得
             options = [
                 {"label": "選択肢1", "value": 0},
                 {"label": "選択肢2", "value": 1}
@@ -109,7 +107,7 @@ def execute_action(
             
             game_manager.active_interaction = {
                 "player_id": player.name,
-                "action_type": "SELECT_OPTION", # フロントエンド側でこれに対応するモーダル表示が必要
+                "action_type": "SELECT_OPTION", 
                 "message": action.raw_text or "効果を選択してください",
                 "options": options,
                 "can_skip": False,
@@ -123,9 +121,7 @@ def execute_action(
             return False
             
         else:
-            # 選択済みの場合
             log_event("INFO", "resolver.select_option_resume", f"Option {selected_option} selected", player=player.name)
-            # ※ ここで選択に応じた分岐処理が必要だが、現在はParserが分岐をサポートしていないためログ出力のみ
 
     if action.target:
         if action.target.select_mode == "REFERENCE":
@@ -174,9 +170,14 @@ def execute_action(
     action_success = self_execute(game_manager, player, action, targets, source_card=source_card, effect_context=effect_context)
     
     effect_context["last_action_success"] = action_success
+    
+    # ★修正: 実行失敗時は False を返却する
+    if not action_success:
+        return False
 
     if action.then_actions:
         for sub in action.then_actions:
+            # ★修正: 連鎖アクションが失敗した場合も False を返却する
             if not execute_action(game_manager, player, sub, source_card, effect_context):
                 return False
                 
@@ -186,7 +187,6 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
     if effect_context is None: effect_context = {}
     is_success = True
 
-    # ▼ 追加: 対象選択が必須なアクションの定義 (前回提案分)
     TARGET_REQUIRED_ACTIONS = [
         ActionType.KO, ActionType.MOVE_TO_HAND, ActionType.TRASH,
         ActionType.DECK_BOTTOM, ActionType.DECK_TOP, 
@@ -198,7 +198,6 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
         ActionType.FREEZE, ActionType.PLAY_CARD, ActionType.SET_COST
     ]
     
-    # ▼ 追加: 共通チェック処理
     if action.type in TARGET_REQUIRED_ACTIONS:
         if action.target and not action.target.is_up_to:
             if not targets:
@@ -377,9 +376,7 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
             target_p.hand.append(life_card)
             log_event("INFO", "effect.damage", f"{target_p.name} took 1 damage from effect", player=player.name)
 
-    # ▼ 優先度A: SELECT_OPTIONの実装 (現在はログのみ)
     elif action.type == ActionType.SELECT_OPTION:
-        # execute_action側で中断/再開制御は行っているため、ここに来るのは「選択後」
         log_event("INFO", "effect.select_option", "Option processed (Branch logic not implemented in Parser yet)", player=player.name)
 
     elif action.type == ActionType.SET_COST:
@@ -449,13 +446,11 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
 
         log_event("INFO", "effect.return_don", f"{target_player.name} returned {returned_count} Don to deck", player=player.name)
     
-    # ▼ 優先度S: FREEZE実装
     elif action.type == ActionType.FREEZE:
         for t in targets:
             t.flags.add("FREEZE")
             log_event("INFO", "effect.freeze", f"{t.master.name} frozen", player=player.name)
 
-    # ▼ 優先度S: PLAY_CARD実装
     elif action.type == ActionType.PLAY_CARD:
         for t in targets:
             owner, current_zone = game_manager._find_card_location(t)
