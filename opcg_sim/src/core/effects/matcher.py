@@ -35,12 +35,16 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.player = Player.SELF
 
     # ゾーン判定
+    # 修正: 「手札」が含まれていても、「戻す」「加える」がある場合は検索対象エリアとしての「手札」ではないため除外する
+    is_hand_target = False
     if _nfc(ParserKeyword.HAND) in tgt_text:
-        # 「戻す」「加える」は移動先の話なので、検索元としては扱わない
         if "戻す" in tgt_text or "加える" in tgt_text:
-            pass # FIELDのままにする
+            is_hand_target = False
         else:
-            tq.zone = Zone.HAND
+            is_hand_target = True
+
+    if is_hand_target:
+        tq.zone = Zone.HAND
     elif _nfc(ParserKeyword.TRASH) in tgt_text: tq.zone = Zone.TRASH
     elif _nfc(ParserKeyword.LIFE) in tgt_text: tq.zone = Zone.LIFE
     elif _nfc(ParserKeyword.DECK) in tgt_text: tq.zone = Zone.DECK
@@ -90,8 +94,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
     elif _nfc("レスト") in tgt_text: tq.is_rest = True
     elif _nfc("アクティブ") in tgt_text:
-        # ★修正: 「アクティブにならない」という効果テキストの場合、
-        # 対象を「アクティブのカード」に限定してはいけないため除外する
+        # 「アクティブにならない」等の場合は除外
         if _nfc("ならない") not in tgt_text:
             tq.is_rest = False
     

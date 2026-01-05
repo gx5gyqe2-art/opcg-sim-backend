@@ -155,5 +155,32 @@
     "expect": {
       "success": true
     }
+  },
+  {
+    "id": "VERIFY_SELECTION_SOURCE",
+    "title": "【検証】選択候補の正当性チェック（Trash回収）",
+    "setup": {
+      "p1": {
+        "field": ["Tester"],
+        "hand": ["HandCard"],
+        "trash": ["TrashTarget", "TrashNoise"] 
+      }
+    },
+    "source": "Tester",
+    "text": "【登場時】自分のトラッシュのキャラ1枚を手札に戻す。",
+    "interaction": [
+      {
+        "verify_candidates": {
+          "has_names": ["TrashTarget", "TrashNoise"], 
+          "missing_names": ["HandCard", "Tester"],
+          "count": 2
+        },
+        "select_cards": ["TrashTarget"]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_count": 2 
+    }
   }
 ]

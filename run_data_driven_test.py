@@ -72,6 +72,11 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
         for c_def in p_data.get("hand", []):
             card = create_mock_card(p_obj.name, c_def)
             p_obj.hand.append(card)
+        
+        # Trash (追加)
+        for c_def in p_data.get("trash", []):
+            card = create_mock_card(p_obj.name, c_def)
+            p_obj.trash.append(card)
 
         # Don Active
         active_count = p_data.get("don_active", 0)
@@ -84,6 +89,7 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
     return gm
 
 def find_card_by_name(player: Player, name: str) -> CardInstance:
+    # 検索範囲をフィールドと手札に限定（必要に応じて拡張）
     for c in player.field + player.hand:
         if c.master.name == name:
             return c
@@ -135,6 +141,30 @@ def run_scenario(scenario: Dict) -> Dict:
                         raise Exception(f"Unexpected interaction required: {req['action_type']}")
                 else:
                     step_input = interaction_steps[step_idx]
+                    
+                    # ▼▼▼ 追加: 候補の検証ロジック ▼▼▼
+                    if "verify_candidates" in step_input:
+                        verify = step_input["verify_candidates"]
+                        candidates = req.get("candidates", [])
+                        # CardInstanceから名前リストを抽出
+                        candidate_names = [c.master.name for c in candidates]
+                        
+                        # 1. 含まれているべきカードのチェック (has_names)
+                        for expected in verify.get("has_names", []):
+                            if expected not in candidate_names:
+                                raise Exception(f"Validation Error: Expected candidate '{expected}' not found. Candidates: {candidate_names}")
+
+                        # 2. 含まれていてはいけないカードのチェック (missing_names)
+                        for unexpected in verify.get("missing_names", []):
+                            if unexpected in candidate_names:
+                                raise Exception(f"Validation Error: Unexpected candidate '{unexpected}' found. Candidates: {candidate_names}")
+                        
+                        # 3. 候補数のチェック
+                        if "count" in verify:
+                            if len(candidates) != verify["count"]:
+                                raise Exception(f"Validation Error: Candidate count mismatch. Expected {verify['count']}, Got {len(candidates)}")
+                    # ▲▲▲ 追加ここまで ▲▲▲
+
                     payload = {}
                     
                     # カード選択
