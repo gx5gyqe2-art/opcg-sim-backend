@@ -30,7 +30,6 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     elif _nfc(ParserKeyword.OWNER) in tgt_text: 
         tq.player = Player.OWNER
     elif _nfc(ParserKeyword.OPPONENT) in tgt_text:
-        # 修正: シンプルに「相手」があれば対象をOPPONENTにする
         tq.player = Player.OPPONENT
     elif _nfc(ParserKeyword.SELF) in tgt_text or _nfc(ParserKeyword.SELF_REF) in tgt_text:
         tq.player = Player.SELF
@@ -90,10 +89,13 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 状態
     if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
     elif _nfc("レスト") in tgt_text: tq.is_rest = True
-    elif _nfc("アクティブ") in tgt_text: tq.is_rest = False
+    elif _nfc("アクティブ") in tgt_text:
+        # ★修正: 「アクティブにならない」という効果テキストの場合、
+        # 対象を「アクティブのカード」に限定してはいけないため除外する
+        if _nfc("ならない") not in tgt_text:
+            tq.is_rest = False
     
-    # 修正: 枚数と「まで」の判定を厳密化
-    # 「ターン開始時まで」などに誤反応しないよう、数字や「枚」の直後にある場合のみとする
+    # 枚数と「まで」の判定
     if re.search(r'(\d+|枚)まで', tgt_text):
         tq.is_up_to = True 
 
@@ -111,8 +113,6 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
     if query.select_mode == "SOURCE":
         return [source_card]
 
-    # 修正: SELF/OPPONENT の解決を source_card の持ち主基準に変更
-    # これにより相手ターン中のカウンターやトリガーでも正しく「自分」=「カードの持ち主」となる
     owner_player = game_manager.p1 if game_manager.p1.name == source_card.owner_id else game_manager.p2
     opponent_player = game_manager.p2 if owner_player == game_manager.p1 else game_manager.p1
 
@@ -124,12 +124,11 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
     elif query.player == Player.ALL:
         target_players = [game_manager.p1, game_manager.p2]
     elif query.player == Player.OWNER:
-        # OWNER指定の場合は、そのカードの現在位置の持ち主ではなく、元々の持ち主(owner_player)を指すのが通例
         target_players = [owner_player]
 
     candidates = []
     for p in target_players:
-        if not p: continue # 安全策
+        if not p: continue
         
         if query.zone == Zone.FIELD:
             candidates.extend(p.field)
@@ -144,7 +143,6 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             candidates.extend(p.life)
         elif query.zone == Zone.TEMP:
             candidates.extend(p.temp_zone)
-        # COST_AREA (Don) の検索が必要な場合はここに追加
 
     results = []
     for card in candidates:
@@ -162,7 +160,6 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         results.append(card)
 
     if not results:
-        # デバッグ: 検索失敗時の詳細ログ
         log_level = "WARNING"
         if query.select_mode in ["ALL", "REMAINING"] or query.is_up_to:
             log_level = "INFO"
