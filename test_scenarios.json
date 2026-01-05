@@ -197,5 +197,61 @@
     "text": "【登場時】自分のライフ1枚をトラッシュに置く。",
     "interaction": [ { "select_cards": ["LifeCard"] } ],
     "expect": { "success": true, "p2_life_count": 0, "p2_trash_count": 1 }
+  },
+  {
+    "id": "TRIGGER_TURN_END",
+    "title": "【トリガー】自分のターン終了時",
+    "setup": { "p1": { "field": ["Tester"], "deck": ["Card"], "don_active": 0, "don_rested": 1 } },
+    "source": "Tester",
+    "text": "【ターン終了時】ドン!!1枚をアクティブにする。",
+    "expect": { "success": true, "p1_don_active": 1 }
+  },
+  {
+    "id": "TRIGGER_OPP_TURN_END",
+    "title": "【トリガー】相手のターン終了時",
+    "setup": { "p1": { "field": ["Tester"], "deck": ["Card"] } },
+    "source": "Tester",
+    "text": "【相手のターン終了時】カードを1枚引く。",
+    "expect": { "success": true, "p1_hand_count": 1 }
+  },
+  {
+    "id": "TRIGGER_ON_ATTACK",
+    "title": "【トリガー】自分のアタック時",
+    "setup": { "p1": { "field": ["Tester"], "deck": ["Card"] } },
+    "source": "Tester",
+    "text": "【アタック時】カードを1枚引く。",
+    "expect": { "success": true, "p1_hand_count": 1 }
+  },
+  {
+    "id": "TRIGGER_ON_OPP_ATTACK",
+    "title": "【トリガー】相手のアタック時",
+    "setup": { "p1": { "field": ["Tester"], "deck": ["Card"] } },
+    "source": "Tester",
+    "text": "【相手のアタック時】カードを1枚引く。",
+    "expect": { "success": true, "p1_hand_count": 1 }
+  },
+  {
+    "id": "TRIGGER_ON_BLOCK",
+    "title": "【トリガー】ブロック時",
+    "setup": { "p1": { "field": ["Tester"], "deck": ["Card"] } },
+    "source": "Tester",
+    "text": "【ブロック時】カードを1枚引く。",
+    "expect": { "success": true, "p1_hand_count": 1 }
+  },
+  {
+    "id": "TRIGGER_ON_KO",
+    "title": "【トリガー】KO時",
+    "setup": { "p1": { "field": ["Tester"] }, "p2": { "life": ["LifeCard"], "trash": [] } },
+    "source": "Tester",
+    "text": "【KO時】相手のライフ1枚をトラッシュに置く。",
+    "expect": { "success": true, "p2_life_count": 0, "p2_trash_count": 1 }
+  },
+  {
+    "id": "TRIGGER_PASSIVE_MY_TURN",
+    "title": "【トリガー】〜のターン中（常時効果のテスト）",
+    "setup": { "p1": { "field": ["Tester"], "deck": ["Card"] } },
+    "source": "Tester",
+    "text": "【自分のターン中】カードを1枚引く。",
+    "expect": { "success": true, "p1_hand_count": 1 }
   }
 ]

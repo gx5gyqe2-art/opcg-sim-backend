@@ -92,7 +92,7 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
         active_count = p_data.get("don_active", 0)
         p_obj.don_active = [DonInstance(p_obj.name) for _ in range(active_count)]
         
-        # Don Deck
+        # Don Deck (調整)
         deck_count = 10 - active_count
         p_obj.don_deck = [DonInstance(p_obj.name) for _ in range(deck_count)]
 
@@ -228,10 +228,11 @@ def run_scenario(scenario: Dict) -> Dict:
             if key in expect:
                 actual = 0
                 
-                # ★修正箇所: 具体的なキーを先に判定するように順序を変更
+                # 具体的なキーを先に判定
                 if "don_deck_count" in key: actual = len(p_obj.don_deck)
                 elif "don_active" in key: actual = len(p_obj.don_active)
-                # 以下、一般的なキー
+                
+                # 一般的なキーは後にする
                 elif "hand_count" in key: actual = len(p_obj.hand)
                 elif "deck_count" in key: actual = len(p_obj.deck)
                 elif "life_count" in key: actual = len(p_obj.life)
@@ -309,9 +310,14 @@ def main():
 
     print(f"🚀 Running {len(scenarios)} Scenarios (JSON Mode)...\n")
     
+    # 全シナリオの結果を格納するリスト
+    all_results = []
+    
     passed_count = 0
     for s in scenarios:
         res = run_scenario(s)
+        all_results.append(res)
+        
         status_icon = "✅" if res["passed"] else "❌"
         print(f"{status_icon} [{s['id']}] {s['title']}")
         for d in res["details"]:
@@ -321,6 +327,45 @@ def main():
         if res["passed"]: passed_count += 1
 
     print(f"\nResult: {passed_count}/{len(scenarios)} Passed")
+
+    # --- レポート出力処理 ---
+    report_file_txt = os.path.join(current_dir, "test_report.txt")
+    report_file_json = os.path.join(current_dir, "test_report.json")
+
+    try:
+        # テキスト形式のレポート出力
+        with open(report_file_txt, "w", encoding="utf-8") as f:
+            f.write(f"Test Execution Report\n")
+            f.write(f"Total Scenarios: {len(scenarios)}\n")
+            f.write(f"Passed: {passed_count}\n")
+            f.write(f"Failed: {len(scenarios) - passed_count}\n")
+            f.write("=" * 60 + "\n\n")
+            
+            for res in all_results:
+                status = "PASS" if res["passed"] else "FAIL"
+                icon = "✅" if res["passed"] else "❌"
+                f.write(f"{icon} [{status}] {res['id']}: {res['title']}\n")
+                for d in res['details']:
+                    f.write(f"    {d}\n")
+                f.write("-" * 60 + "\n")
+        
+        print(f"\n📄 Text Report saved to: {report_file_txt}")
+
+        # JSON形式のレポート出力
+        with open(report_file_json, "w", encoding="utf-8") as f:
+            json.dump({
+                "summary": {
+                    "total": len(scenarios),
+                    "passed": passed_count,
+                    "failed": len(scenarios) - passed_count
+                },
+                "results": all_results
+            }, f, ensure_ascii=False, indent=2)
+            
+        print(f"📄 JSON Report saved to: {report_file_json}")
+
+    except Exception as e:
+        print(f"❌ Failed to save report files: {e}")
 
 if __name__ == "__main__":
     main()
