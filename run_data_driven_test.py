@@ -92,7 +92,7 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
         active_count = p_data.get("don_active", 0)
         p_obj.don_active = [DonInstance(p_obj.name) for _ in range(active_count)]
         
-        # Don Deck (調整)
+        # Don Deck
         deck_count = 10 - active_count
         p_obj.don_deck = [DonInstance(p_obj.name) for _ in range(deck_count)]
 
@@ -227,11 +227,16 @@ def run_scenario(scenario: Dict) -> Dict:
         def check_prop(pid, p_obj, key, label):
             if key in expect:
                 actual = 0
-                if "hand_count" in label: actual = len(p_obj.hand)
-                elif "deck_count" in label: actual = len(p_obj.deck)
-                elif "life_count" in label: actual = len(p_obj.life)
-                elif "trash_count" in label: actual = len(p_obj.trash)
-                elif "field_count" in label: actual = len(p_obj.field)
+                
+                # ★修正箇所: 具体的なキーを先に判定するように順序を変更
+                if "don_deck_count" in key: actual = len(p_obj.don_deck)
+                elif "don_active" in key: actual = len(p_obj.don_active)
+                # 以下、一般的なキー
+                elif "hand_count" in key: actual = len(p_obj.hand)
+                elif "deck_count" in key: actual = len(p_obj.deck)
+                elif "life_count" in key: actual = len(p_obj.life)
+                elif "trash_count" in key: actual = len(p_obj.trash)
+                elif "field_count" in key: actual = len(p_obj.field)
                 
                 if actual == expect[key]:
                     result_report["details"].append(f"✅ {pid} {label}: {actual}")
@@ -243,6 +248,8 @@ def run_scenario(scenario: Dict) -> Dict:
         check_prop("p1", gm.p1, "p1_life_count", "Life Count")
         check_prop("p1", gm.p1, "p1_trash_count", "Trash Count")
         check_prop("p1", gm.p1, "p1_field_count", "Field Count")
+        check_prop("p1", gm.p1, "p1_don_active", "Don Active")
+        check_prop("p1", gm.p1, "p1_don_deck_count", "Don Deck Count")
 
         check_prop("p2", gm.p2, "p2_hand_count", "Hand Count")
         check_prop("p2", gm.p2, "p2_deck_count", "Deck Count")

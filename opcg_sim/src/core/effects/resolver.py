@@ -278,7 +278,6 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
             log_event("INFO", "effect.cost_change", f"{t.master.name} cost buffed by {action.value}", player=player.name)
 
     elif action.type == ActionType.LIFE_MANIPULATE:
-        # 修正: 対象の現在位置に基づいて移動先を決定する（Hand->Lifeに対応）
         moved_any = False
         if targets:
             for t in targets:
@@ -286,17 +285,18 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
                 if not owner: continue
                 
                 if current_zone == owner.life:
-                    # ライフにあるカードが対象 = ライフから手札へ（基本動作）
-                    game_manager.move_card(t, Zone.HAND, owner)
-                    log_event("INFO", "effect.life_to_hand", f"Moved {t.master.name} from Life to Hand", player=player.name)
+                    dest = Zone.HAND
+                    if "トラッシュ" in action.raw_text or "捨てる" in action.raw_text:
+                         dest = Zone.TRASH
+                    
+                    game_manager.move_card(t, dest, owner)
+                    log_event("INFO", "effect.life_move", f"Moved {t.master.name} from Life to {dest.name}", player=player.name)
                     moved_any = True
                 else:
-                    # それ以外（手札、場、トラッシュなど） = ライフへの追加
                     game_manager.move_card(t, Zone.LIFE, owner, dest_position="TOP")
                     log_event("INFO", "effect.life_recover", f"Added {t.master.name} to Life", player=player.name)
                     moved_any = True
         
-        # 対象がない場合 = デッキトップからのライフ回復（デフォルト動作）
         if not moved_any and not targets:
             source_list = player.deck
             if source_list:
