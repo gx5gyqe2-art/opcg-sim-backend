@@ -1,5 +1,6 @@
 from typing import Optional, List, Any, Dict
 import random
+import copy
 from ...models.enums import ActionType, Zone, ConditionType, CompareOperator, TriggerType
 from ...models.effect_types import EffectAction, Condition
 from ...models.models import CardType
@@ -99,12 +100,10 @@ def execute_action(
         selected_option = effect_context.get("selected_option_index")
         
         if selected_option is None:
-            # 選択肢のラベル生成
             labels = []
             if action.details and "option_labels" in action.details:
                 labels = [{"label": l, "value": i} for i, l in enumerate(action.details["option_labels"])]
             else:
-                # デフォルト
                 labels = [{"label": "選択肢1", "value": 0}, {"label": "選択肢2", "value": 1}]
 
             game_manager.active_interaction = {
@@ -124,14 +123,27 @@ def execute_action(
             
         else:
             log_event("INFO", "resolver.select_option_resume", f"Option {selected_option} selected", player=player.name)
-            # ★ 追加: 選ばれたオプションを実行する
             if action.details and "resolvable_options" in action.details:
                 options = action.details["resolvable_options"]
                 if 0 <= selected_option < len(options):
                     chosen_action = options[selected_option]
                     log_event("INFO", "resolver.execute_option", f"Executing option {selected_option}", player=player.name)
-                    # 再帰的に実行
-                    sub_success = execute_action(game_manager, player, chosen_action, source_card, effect_context)
+                    
+                    effective_action = copy.copy(action)
+                    effective_action.type = chosen_action.type
+                    effective_action.target = chosen_action.target
+                    effective_action.value = chosen_action.value
+                    effective_action.condition = chosen_action.condition
+                    effective_action.raw_text = chosen_action.raw_text
+                    effective_action.details = chosen_action.details
+                    effective_action.source_zone = chosen_action.source_zone
+                    effective_action.dest_zone = chosen_action.dest_zone
+                    
+                    effective_action.then_actions = list(action.then_actions)
+                    if chosen_action.then_actions:
+                        effective_action.then_actions[0:0] = chosen_action.then_actions
+
+                    sub_success = execute_action(game_manager, player, effective_action, source_card, effect_context)
                     if not sub_success: return False
 
     if action.target:
@@ -338,16 +350,13 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
                     log_event("INFO", "effect.life_recover", f"Added {t.master.name} to Life", player=player.name)
                     moved_any = True
         
-        # ターゲットがない場合
         if not moved_any and not targets:
-            # 「ライフに加える」系ならデッキから回復
             if "加える" in action.raw_text or "回復" in action.raw_text or "デッキ" in action.raw_text:
                 source_list = player.deck
                 if source_list:
                     card = source_list.pop(0)
                     player.life.append(card)
                     log_event("INFO", "effect.life_recover", "Recovered 1 Life from Deck", player=player.name)
-            # 「トラッシュに置く」「手札に加える」系でターゲット無しなら失敗とする
             elif "トラッシュ" in action.raw_text or "手札" in action.raw_text:
                 is_success = False
                 log_event("DEBUG", "resolver.life_manipulate_fail", "Target required for Life manipulation but not found", player=player.name)
