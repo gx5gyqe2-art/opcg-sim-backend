@@ -47,7 +47,7 @@ class Effect:
             costs = []
             actions = []
             if ':' in body_text:
-                cost_text, effect_text = body_text.split(':', 1)
+                cost_text, effect_text = body_text.rsplit(':', 1)
                 costs = self._parse_recursive(cost_text, is_cost=True)
                 actions = self._parse_recursive(effect_text)
             else:
@@ -168,7 +168,7 @@ class Effect:
             ActionType.OTHER
         ]
         
-        is_calculation_or_rule = any(kw in text for kw in ["につき", "できない", "されない", "得る", "いる"])
+        is_calculation_or_rule = any(kw in text for kw in ["につき", "できない", "されない", "いる"])
         
         if act_type not in NO_TARGET_ACTIONS and not is_calculation_or_rule:
             if any(kw in text for kw in ['それ', 'そのカード', 'そのキャラ']):

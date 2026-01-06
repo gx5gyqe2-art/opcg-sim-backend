@@ -418,7 +418,7 @@
     ],
     "expect": {
       "success": true,
-      "p1_hand_count": 1,
+      "p1_hand_count": 2,
       "p1_field_count": 1
     }
   },
