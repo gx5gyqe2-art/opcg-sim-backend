@@ -264,6 +264,35 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
         for t in targets: t.is_rest = True
     elif action.type == ActionType.ACTIVE:
         for t in targets: t.is_rest = False
+    
+    elif action.type == ActionType.ACTIVE_DON:
+        count = action.value
+        if count <= 0: count = 1
+        reactivated = 0
+        
+        # attached don -> active
+        if player.don_attached_cards:
+            while reactivated < count and player.don_attached_cards:
+                don = player.don_attached_cards.pop()
+                if don.attached_to:
+                    attached_card = game_manager._find_card_by_uuid(don.attached_to)
+                    if attached_card:
+                        attached_card.attached_don = max(0, attached_card.attached_don - 1)
+                don.attached_to = None
+                don.is_rest = False
+                player.don_active.append(don)
+                reactivated += 1
+                
+        # rested don -> active
+        if reactivated < count and player.don_rested:
+            while reactivated < count and player.don_rested:
+                don = player.don_rested.pop()
+                don.is_rest = False
+                player.don_active.append(don)
+                reactivated += 1
+                
+        log_event("INFO", "resolver.active_don", f"Activated {reactivated} Don", player=player.name)
+
     elif action.type == ActionType.ATTACH_DON:
         if targets and player.don_active:
             don = player.don_active.pop(0)

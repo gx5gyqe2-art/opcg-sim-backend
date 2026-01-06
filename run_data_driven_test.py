@@ -136,6 +136,18 @@ def run_scenario(scenario: Dict) -> Dict:
             raise Exception("Parser failed to extract abilities.")
         
         ability = effect_obj.abilities[0]
+
+        # ▼ トリガー検証ロジックを追加
+        expected_trigger = scenario.get("expected_trigger")
+        if expected_trigger:
+            actual_trigger = ability.trigger.name  # Enumのメンバー名 (例: "ON_PLAY")
+            if actual_trigger != expected_trigger:
+                result_report["details"].append(f"❌ Trigger Mismatch: Expected {expected_trigger}, Got {actual_trigger}")
+                # トリガー不一致は即失敗扱いにする
+                result_report["passed"] = False
+                return result_report
+            else:
+                result_report["details"].append(f"✅ Trigger matched: {actual_trigger}")
         
         # 4. 効果解決 (Interaction処理含む)
         success = False

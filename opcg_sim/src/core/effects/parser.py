@@ -56,13 +56,15 @@ class Effect:
                 self.abilities.append(Ability(trigger=trigger, costs=costs, actions=actions, raw_text=part))
 
     def _detect_trigger(self, text: str) -> TriggerType:
+        # 具体的なものから先に判定する
         if '『登場時』' in text: return TriggerType.ON_PLAY
         if '『起動メイン』' in text: return TriggerType.ACTIVATE_MAIN
+        if '『相手のアタック時』' in text: return TriggerType.ON_OPP_ATTACK  # 追加
         if '『アタック時』' in text: return TriggerType.ON_ATTACK
         if '『ブロック時』' in text: return TriggerType.ON_BLOCK
         if '『KO時』' in text: return TriggerType.ON_KO
-        if '『ターン終了時』' in text: return TriggerType.TURN_END
         if '『相手のターン終了時』' in text: return TriggerType.OPP_TURN_END
+        if '『ターン終了時』' in text: return TriggerType.TURN_END
         if '『自分のターン中』' in text: return TriggerType.PASSIVE
         if '『相手のターン中』' in text: return TriggerType.PASSIVE
         if '『カウンター』' in text: return TriggerType.COUNTER
@@ -124,7 +126,8 @@ class Effect:
             ActionType.SELECT_OPTION,
             ActionType.REPLACE_EFFECT,
             ActionType.MODIFY_DON_PHASE,
-            ActionType.PASSIVE_EFFECT
+            ActionType.PASSIVE_EFFECT,
+            ActionType.ACTIVE_DON  # 追加
         ]
         
         is_calculation_or_rule = any(kw in text for kw in ["につき", "できない", "されない", "得る", "いる"])
@@ -185,7 +188,6 @@ class Effect:
         if 'アタック' in text and ('できない' in text or '不可' in text): return ActionType.ATTACK_DISABLE
         if '無効' in text: return ActionType.NEGATE_EFFECT
             
-        # ★修正: ライフ操作判定を優先
         if 'ライフ' in text:
             if any(k in text for k in ['加える', '置く', '向き', '手札', 'トラッシュ']):
                 return ActionType.LIFE_MANIPULATE
@@ -205,7 +207,11 @@ class Effect:
         if 'デッキ' in text and '下' in text: return ActionType.DECK_BOTTOM
         if 'パワー' in text: return ActionType.BUFF
         if 'レスト' in text: return ActionType.REST
-        if 'アクティブ' in text: return ActionType.ACTIVE
+        
+        # 修正: アクティブにする処理の判定順序
+        if 'アクティブ' in text: 
+            if 'ドン' in text: return ActionType.ACTIVE_DON  # ドンをアクティブにする
+            return ActionType.ACTIVE # キャラをアクティブにする
         
         return ActionType.OTHER
 
