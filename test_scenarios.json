@@ -281,5 +281,44 @@
     "text": "【自分のターン中】カードを1枚引く。",
     "expected_trigger": "PASSIVE",
     "expect": { "success": true, "p1_hand_count": 1 }
+  },
+  {
+    "id": "OP13_079_IMU_ACTIVATE_HAND",
+    "title": "【OP13-079 イム】起動メイン：手札コストでドロー",
+    "setup": {
+      "p1": { "field": ["OP13-079"], "hand": ["CostCard"], "deck": ["DrawCard"] }
+    },
+    "source": "OP13-079",
+    "text": "【起動メイン】【ターン1回】自分の、特徴《天竜人》を持つキャラか、手札1枚をトラッシュに置くことができる：カード1枚を引く。",
+    "expected_trigger": "ACTIVATE_MAIN",
+    "interaction": [
+      { "select_option": 1 },
+      { "select_cards": ["CostCard"] }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_count": 1,
+      "p1_trash_has": ["CostCard"]
+    }
+  },
+  {
+    "id": "OP13_079_IMU_ACTIVATE_CHARA",
+    "title": "【OP13-079 イム】起動メイン：キャラコストでドロー",
+    "setup": {
+      "p1": { "field": ["OP13-079", { "name": "Tenryubito", "traits": ["天竜人"] }], "deck": ["DrawCard"], "hand": [] }
+    },
+    "source": "OP13-079",
+    "text": "【起動メイン】【ターン1回】自分の、特徴《天竜人》を持つキャラか、手札1枚をトラッシュに置くことができる：カード1枚を引く。",
+    "expected_trigger": "ACTIVATE_MAIN",
+    "interaction": [
+      { "select_option": 0 },
+      { "select_cards": ["Tenryubito"] }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_count": 1,
+      "p1_field_count": 1,
+      "p1_trash_has": ["Tenryubito"]
+    }
   }
 ]

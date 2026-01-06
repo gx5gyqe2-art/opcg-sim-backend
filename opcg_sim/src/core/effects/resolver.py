@@ -99,16 +99,19 @@ def execute_action(
         selected_option = effect_context.get("selected_option_index")
         
         if selected_option is None:
-            options = [
-                {"label": "選択肢1", "value": 0},
-                {"label": "選択肢2", "value": 1}
-            ]
-            
+            # 選択肢のラベル生成
+            labels = []
+            if action.details and "option_labels" in action.details:
+                labels = [{"label": l, "value": i} for i, l in enumerate(action.details["option_labels"])]
+            else:
+                # デフォルト
+                labels = [{"label": "選択肢1", "value": 0}, {"label": "選択肢2", "value": 1}]
+
             game_manager.active_interaction = {
                 "player_id": player.name,
                 "action_type": "SELECT_OPTION", 
                 "message": action.raw_text or "効果を選択してください",
-                "options": options,
+                "options": labels,
                 "can_skip": False,
                 "continuation": {
                     "action": action,
@@ -121,6 +124,15 @@ def execute_action(
             
         else:
             log_event("INFO", "resolver.select_option_resume", f"Option {selected_option} selected", player=player.name)
+            # ★ 追加: 選ばれたオプションを実行する
+            if action.details and "resolvable_options" in action.details:
+                options = action.details["resolvable_options"]
+                if 0 <= selected_option < len(options):
+                    chosen_action = options[selected_option]
+                    log_event("INFO", "resolver.execute_option", f"Executing option {selected_option}", player=player.name)
+                    # 再帰的に実行
+                    sub_success = execute_action(game_manager, player, chosen_action, source_card, effect_context)
+                    if not sub_success: return False
 
     if action.target:
         if action.target.select_mode == "REFERENCE":

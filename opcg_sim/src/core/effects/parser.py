@@ -94,6 +94,11 @@ class Effect:
         return self._get_deepest_action(action.then_actions[-1])
 
     def _parse_logic_block(self, text: str, is_cost: bool) -> List[EffectAction]:
+        # OR条件の分岐判定 (Aか、Bを〜)
+        or_action = self._parse_or_split(text, is_cost)
+        if or_action:
+            return [or_action]
+
         match = re.search(r'^(.+?)(場合|なら|することで)、(.+)$', text)
         if match:
             condition_text, _, result_text = match.groups()
@@ -106,6 +111,47 @@ class Effect:
                 raw_text=text
             )]
         return self._parse_atomic_action(text, is_cost)
+
+    def _parse_or_split(self, text: str, is_cost: bool) -> Optional[EffectAction]:
+        """「Aか、Bを〜」のような選択テキストを分解してSELECT_OPTIONにする"""
+        if 'か、' in text:
+            # 単純な分割: 「か、」で2つに分かれるケースを想定
+            parts = text.split('か、', 1)
+            if len(parts) == 2:
+                part_a_raw = parts[0].strip()
+                part_b_raw = parts[1].strip()
+                
+                # 後半部分から動詞句（「〜を...」）を抽出して、前半にも適用する
+                # 例: part_a="キャラ", part_b="手札1枚をトラッシュに置く"
+                # -> verb_part="をトラッシュに置く"
+                # -> text_a="キャラをトラッシュに置く", text_b="手札1枚をトラッシュに置く"
+                
+                match = re.search(r'(を|に)(.+)$', part_b_raw)
+                if match:
+                    connector = match.group(1)
+                    verb = match.group(2)
+                    
+                    # 前半部分に動詞がない場合のみ補完
+                    text_a = part_a_raw
+                    if connector not in text_a:
+                        text_a = f"{part_a_raw}{connector}{verb}"
+                    
+                    text_b = part_b_raw
+                    
+                    # 再帰的にパース
+                    actions_a = self._parse_recursive(text_a, is_cost)
+                    actions_b = self._parse_recursive(text_b, is_cost)
+                    
+                    if actions_a and actions_b:
+                        return EffectAction(
+                            type=ActionType.SELECT_OPTION,
+                            details={
+                                "resolvable_options": [actions_a[0], actions_b[0]],
+                                "option_labels": [text_a, text_b]
+                            },
+                            raw_text=text
+                        )
+        return None
 
     def _parse_atomic_action(self, text: str, is_cost: bool) -> List[EffectAction]:
         if '見て' in text or '公開' in text or '見る' in text:
@@ -154,7 +200,6 @@ class Effect:
         )]
 
     def _detect_action_type(self, text: str) -> ActionType:
-        # ドン関連の判定を最優先にする
         if 'ドン' in text:
             if ('戻す' in text or 'ドンデッキ' in text or '-' in text or '−' in text):
                 return ActionType.RETURN_DON
@@ -169,7 +214,6 @@ class Effect:
             if 'アクティブ' in text:
                 return ActionType.ACTIVE_DON
 
-        # ライフ操作の判定を優先
         if 'ライフ' in text:
             if any(k in text for k in ['加える', '置く', '向き', '手札', 'トラッシュ']):
                 return ActionType.LIFE_MANIPULATE
