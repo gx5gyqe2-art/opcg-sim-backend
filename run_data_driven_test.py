@@ -91,9 +91,19 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
         # Don Active
         active_count = p_data.get("don_active", 0)
         p_obj.don_active = [DonInstance(p_obj.name) for _ in range(active_count)]
+
+        # Don Rested (追加修正: レストドンも配置可能に)
+        rested_count = p_data.get("don_rested", 0)
+        p_obj.don_rested = []
+        for _ in range(rested_count):
+            d = DonInstance(p_obj.name)
+            d.is_rest = True
+            p_obj.don_rested.append(d)
         
-        # Don Deck (調整)
-        deck_count = 10 - active_count
+        # Don Deck (調整: アクティブとレストの合計を引く)
+        total_in_play = active_count + rested_count
+        deck_count = 10 - total_in_play
+        if deck_count < 0: deck_count = 0
         p_obj.don_deck = [DonInstance(p_obj.name) for _ in range(deck_count)]
 
     return gm
@@ -137,13 +147,12 @@ def run_scenario(scenario: Dict) -> Dict:
         
         ability = effect_obj.abilities[0]
 
-        # ▼ トリガー検証ロジックを追加
+        # トリガー検証
         expected_trigger = scenario.get("expected_trigger")
         if expected_trigger:
-            actual_trigger = ability.trigger.name  # Enumのメンバー名 (例: "ON_PLAY")
+            actual_trigger = ability.trigger.name
             if actual_trigger != expected_trigger:
                 result_report["details"].append(f"❌ Trigger Mismatch: Expected {expected_trigger}, Got {actual_trigger}")
-                # トリガー不一致は即失敗扱いにする
                 result_report["passed"] = False
                 return result_report
             else:

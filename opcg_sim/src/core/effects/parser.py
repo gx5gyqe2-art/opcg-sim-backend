@@ -56,10 +56,9 @@ class Effect:
                 self.abilities.append(Ability(trigger=trigger, costs=costs, actions=actions, raw_text=part))
 
     def _detect_trigger(self, text: str) -> TriggerType:
-        # 具体的なものから先に判定する
         if '『登場時』' in text: return TriggerType.ON_PLAY
         if '『起動メイン』' in text: return TriggerType.ACTIVATE_MAIN
-        if '『相手のアタック時』' in text: return TriggerType.ON_OPP_ATTACK  # 追加
+        if '『相手のアタック時』' in text: return TriggerType.ON_OPP_ATTACK
         if '『アタック時』' in text: return TriggerType.ON_ATTACK
         if '『ブロック時』' in text: return TriggerType.ON_BLOCK
         if '『KO時』' in text: return TriggerType.ON_KO
@@ -127,7 +126,7 @@ class Effect:
             ActionType.REPLACE_EFFECT,
             ActionType.MODIFY_DON_PHASE,
             ActionType.PASSIVE_EFFECT,
-            ActionType.ACTIVE_DON  # 追加
+            ActionType.ACTIVE_DON
         ]
         
         is_calculation_or_rule = any(kw in text for kw in ["につき", "できない", "されない", "得る", "いる"])
@@ -155,20 +154,28 @@ class Effect:
         )]
 
     def _detect_action_type(self, text: str) -> ActionType:
+        # ドン関連の判定を最優先にする
+        if 'ドン' in text:
+            if ('戻す' in text or 'ドンデッキ' in text or '-' in text or '−' in text):
+                return ActionType.RETURN_DON
+            if '付与されているドン' in text and '付与する' in text:
+                return ActionType.MOVE_ATTACHED_DON
+            if '付与' in text or '付ける' in text:
+                return ActionType.ATTACH_DON
+            if 'ドンフェイズ' in text:
+                return ActionType.MODIFY_DON_PHASE
+            if '追加' in text:
+                return ActionType.RAMP_DON
+            if 'アクティブ' in text:
+                return ActionType.ACTIVE_DON
+
+        # ライフ操作の判定を優先
+        if 'ライフ' in text:
+            if any(k in text for k in ['加える', '置く', '向き', '手札', 'トラッシュ']):
+                return ActionType.LIFE_MANIPULATE
+
         if 'アタック' in text and '対象' in text and '変更' in text:
             return ActionType.REDIRECT_ATTACK
-
-        if 'ドン' in text and ('戻す' in text or 'ドンデッキ' in text or '-' in text or '−' in text):
-            return ActionType.RETURN_DON
-        
-        if '付与されているドン' in text and '付与する' in text:
-            return ActionType.MOVE_ATTACHED_DON
-
-        if 'ドン' in text and ('付与' in text or '付ける' in text):
-            return ActionType.ATTACH_DON
-
-        if 'ドンフェイズ' in text:
-            return ActionType.MODIFY_DON_PHASE
 
         if 'ダメージ' in text and ('与え' in text or '受ける' in text):
             return ActionType.DEAL_DAMAGE
@@ -188,17 +195,12 @@ class Effect:
         if 'アタック' in text and ('できない' in text or '不可' in text): return ActionType.ATTACK_DISABLE
         if '無効' in text: return ActionType.NEGATE_EFFECT
             
-        if 'ライフ' in text:
-            if any(k in text for k in ['加える', '置く', '向き', '手札', 'トラッシュ']):
-                return ActionType.LIFE_MANIPULATE
-
         if 'デッキ' in text and '上' in text and ('置く' in text or '戻す' in text or '加える' in text): return ActionType.DECK_TOP
 
         if 'コスト' in text and ('-' in text or '下げる' in text or '+' in text or '上げる' in text):
              return ActionType.COST_CHANGE
         
         if '得る' in text: return ActionType.GRANT_KEYWORD
-        if 'ドン' in text and '追加' in text: return ActionType.RAMP_DON
         if '引く' in text: return ActionType.DRAW
         if '登場' in text: return ActionType.PLAY_CARD
         if 'KO' in text: return ActionType.KO
@@ -207,11 +209,7 @@ class Effect:
         if 'デッキ' in text and '下' in text: return ActionType.DECK_BOTTOM
         if 'パワー' in text: return ActionType.BUFF
         if 'レスト' in text: return ActionType.REST
-        
-        # 修正: アクティブにする処理の判定順序
-        if 'アクティブ' in text: 
-            if 'ドン' in text: return ActionType.ACTIVE_DON  # ドンをアクティブにする
-            return ActionType.ACTIVE # キャラをアクティブにする
+        if 'アクティブ' in text: return ActionType.ACTIVE
         
         return ActionType.OTHER
 

@@ -326,12 +326,19 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
                     log_event("INFO", "effect.life_recover", f"Added {t.master.name} to Life", player=player.name)
                     moved_any = True
         
+        # ターゲットがない場合
         if not moved_any and not targets:
-            source_list = player.deck
-            if source_list:
-                card = source_list.pop(0)
-                player.life.append(card)
-                log_event("INFO", "effect.life_recover", "Recovered 1 Life from Deck", player=player.name)
+            # 「ライフに加える」系ならデッキから回復
+            if "加える" in action.raw_text or "回復" in action.raw_text or "デッキ" in action.raw_text:
+                source_list = player.deck
+                if source_list:
+                    card = source_list.pop(0)
+                    player.life.append(card)
+                    log_event("INFO", "effect.life_recover", "Recovered 1 Life from Deck", player=player.name)
+            # 「トラッシュに置く」「手札に加える」系でターゲット無しなら失敗とする
+            elif "トラッシュ" in action.raw_text or "手札" in action.raw_text:
+                is_success = False
+                log_event("DEBUG", "resolver.life_manipulate_fail", "Target required for Life manipulation but not found", player=player.name)
 
     elif action.type == ActionType.GRANT_KEYWORD:
         keywords = {

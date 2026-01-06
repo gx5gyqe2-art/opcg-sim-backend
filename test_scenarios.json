@@ -270,6 +270,7 @@
     "source": "Tester",
     "text": "【KO時】相手のライフ1枚をトラッシュに置く。",
     "expected_trigger": "ON_KO",
+    "interaction": [ { "select_cards": ["LifeCard"] } ],
     "expect": { "success": true, "p2_life_count": 0, "p2_trash_count": 1 }
   },
   {
