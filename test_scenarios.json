@@ -3,76 +3,159 @@
     "id": "BASIC_KO_AND_COST",
     "title": "【基本】コスト指定KOとドン!!コスト支払い",
     "setup": {
-      "p1": { "field": ["Tester"], "don_active": 2, "don_deck": 8 },
-      "p2": { "field": [ "HighCostEnemy", { "name": "LowCostEnemy", "cost": 4 } ], "trash": ["LowCostEnemy"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "don_active": 2,
+        "don_deck": 8
+      },
+      "p2": {
+        "field": [
+          "HighCostEnemy",
+          {
+            "name": "LowCostEnemy",
+            "cost": 4
+          }
+        ],
+        "trash": [
+          "LowCostEnemy"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【起動メイン】ドン!!-1(自分の場のドン!!を指定の数ドン!!デッキに戻すことができる)：コスト4以下の相手のキャラ1枚をKOする。",
     "expected_trigger": "ACTIVATE_MAIN",
-    "interaction": [ { "select_cards": ["LowCostEnemy"] } ],
+    "interaction": [
+      {
+        "select_cards": [
+          "LowCostEnemy"
+        ]
+      }
+    ],
     "expect": {
       "success": true,
       "p1_don_active": 1,
       "p1_don_deck_count": 9,
-      "p2_field_has": ["HighCostEnemy"],
-      "p2_trash_has": ["LowCostEnemy"]
+      "p2_field_has": [
+        "HighCostEnemy"
+      ],
+      "p2_trash_has": [
+        "LowCostEnemy"
+      ]
     }
   },
   {
     "id": "MATCHER_TRAIT_FILTER",
     "title": "【対象】特徴によるフィルタリング検証",
     "setup": {
-      "p1": { "field": ["Tester"] },
+      "p1": {
+        "field": [
+          "Tester"
+        ]
+      },
       "p2": {
         "field": [
-          { "name": "Luffy", "traits": ["麦わらの一味"] },
-          { "name": "Kaido", "traits": ["百獣海賊団"] }
+          {
+            "name": "Luffy",
+            "traits": [
+              "麦わらの一味"
+            ]
+          },
+          {
+            "name": "Kaido",
+            "traits": [
+              "百獣海賊団"
+            ]
+          }
         ]
       }
     },
     "source": "Tester",
     "text": "【登場時】特徴《麦わらの一味》を持つキャラ1枚をKOする。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["Luffy"] } ],
+    "interaction": [
+      {
+        "select_cards": [
+          "Luffy"
+        ]
+      }
+    ],
     "expect": {
       "success": true,
-      "p2_field_has": ["Kaido"],
-      "p2_trash_has": ["Luffy"]
+      "p2_field_has": [
+        "Kaido"
+      ],
+      "p2_trash_has": [
+        "Luffy"
+      ]
     }
   },
   {
     "id": "SEQUENCE_AND_CONDITION",
     "title": "【複合】条件付き実行（〜場合、〜する）",
     "setup": {
-      "p1": { "field": ["Tester"], "hand": ["DiscardCard"] },
-      "p2": { "field": ["Enemy"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "hand": [
+          "DiscardCard"
+        ]
+      },
+      "p2": {
+        "field": [
+          "Enemy"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【起動メイン】手札1枚を捨てることができる：相手のキャラ1枚をKOする。",
     "expected_trigger": "ACTIVATE_MAIN",
     "interaction": [
-      { "select_cards": ["DiscardCard"] },
-      { "select_cards": ["Enemy"] }
+      {
+        "select_cards": [
+          "DiscardCard"
+        ]
+      },
+      {
+        "select_cards": [
+          "Enemy"
+        ]
+      }
     ],
     "expect": {
       "success": true,
       "p1_hand_count": 0,
-      "p2_trash_has": ["Enemy"]
+      "p2_trash_has": [
+        "Enemy"
+      ]
     }
   },
   {
     "id": "SEQUENCE_CONDITION_FAILED",
     "title": "【複合】条件不成立時の処理スキップ",
     "setup": {
-      "p1": { "field": ["Tester"], "hand": [] },
-      "p2": { "field": ["Enemy"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "hand": []
+      },
+      "p2": {
+        "field": [
+          "Enemy"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【起動メイン】手札1枚を捨てることができる：相手のキャラ1枚をKOする。",
     "expected_trigger": "ACTIVATE_MAIN",
     "expect": {
       "success": false,
-      "p2_field_has": ["Enemy"],
+      "p2_field_has": [
+        "Enemy"
+      ],
       "error_msg_contains": "手札1枚を捨てることができる"
     }
   },
@@ -80,8 +163,14 @@
     "id": "ERROR_NO_TARGET",
     "title": "【異常系】対象不在による失敗",
     "setup": {
-      "p1": { "field": ["Tester"] },
-      "p2": { "field": [] }
+      "p1": {
+        "field": [
+          "Tester"
+        ]
+      },
+      "p2": {
+        "field": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】相手のキャラ1枚をKOする。",
@@ -95,28 +184,57 @@
     "id": "FEATURE_FREEZE",
     "title": "【新規】フリーズ効果（アクティブにならない）",
     "setup": {
-      "p1": { "field": ["Tester"] },
-      "p2": { "field": ["Enemy"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ]
+      },
+      "p2": {
+        "field": [
+          "Enemy"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【登場時】相手のキャラ1枚は、次の自分のターン開始時までアクティブにならない。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["Enemy"] } ],
+    "interaction": [
+      {
+        "select_cards": [
+          "Enemy"
+        ]
+      }
+    ],
     "expect": {
       "success": true,
-      "p2_field_check": [ { "name": "Enemy", "has_flag": "FREEZE" } ]
+      "p2_field_check": [
+        {
+          "name": "Enemy",
+          "has_flag": "FREEZE"
+        }
+      ]
     }
   },
   {
     "id": "FEATURE_SELECT_OPTION",
     "title": "【新規】選択肢効果（未実装部分の動作確認）",
     "setup": {
-      "p1": { "field": ["Tester"], "don_active": 0, "don_deck": 1 }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "don_active": 0,
+        "don_deck": 1
+      }
     },
     "source": "Tester",
     "text": "【登場時】ドン!!カード1枚をレストで追加するか、カード1枚を引く。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_option": 0 } ],
+    "interaction": [
+      {
+        "select_option": 0
+      }
+    ],
     "expect": {
       "success": true
     }
@@ -125,15 +243,32 @@
     "id": "VERIFY_SELECTION_SOURCE",
     "title": "【検証】選択候補の正当性チェック（Trash回収）",
     "setup": {
-      "p1": { "field": ["Tester"], "hand": [], "trash": ["Target1", "Target2"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "hand": [],
+        "trash": [
+          "Target1",
+          "Target2"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分のトラッシュのキャラ1枚を手札に戻す。",
     "expected_trigger": "ON_PLAY",
     "interaction": [
       {
-        "verify_candidates": { "has_names": ["Target1", "Target2"], "count": 2 },
-        "select_cards": ["Target1"]
+        "verify_candidates": {
+          "has_names": [
+            "Target1",
+            "Target2"
+          ],
+          "count": 2
+        },
+        "select_cards": [
+          "Target1"
+        ]
       }
     ],
     "expect": {
@@ -145,251 +280,568 @@
     "id": "LIFE_ADD_DECK_P1",
     "title": "【P1】デッキトップからライフ追加",
     "setup": {
-      "p1": { "field": ["Tester"], "deck": ["TopCard"], "life": [] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "deck": [
+          "TopCard"
+        ],
+        "life": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分のデッキの上から1枚をライフに加える。",
     "expected_trigger": "ON_PLAY",
-    "expect": { "success": true, "p1_deck_count": 0, "p1_life_count": 1 }
+    "expect": {
+      "success": true,
+      "p1_deck_count": 0,
+      "p1_life_count": 1
+    }
   },
   {
     "id": "LIFE_ADD_HAND_P1",
     "title": "【P1】手札からライフ追加",
     "setup": {
-      "p1": { "field": ["Tester"], "hand": ["HandCard"], "life": [] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "hand": [
+          "HandCard"
+        ],
+        "life": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分の手札1枚をライフに加える。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["HandCard"] } ],
-    "expect": { "success": true, "p1_hand_count": 0, "p1_life_count": 1 }
+    "interaction": [
+      {
+        "select_cards": [
+          "HandCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_count": 0,
+      "p1_life_count": 1
+    }
   },
   {
     "id": "LIFE_ADD_TRASH_P1",
     "title": "【P1】トラッシュからライフ追加",
     "setup": {
-      "p1": { "field": ["Tester"], "trash": ["TrashCard"], "life": [] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "trash": [
+          "TrashCard"
+        ],
+        "life": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分のトラッシュのキャラ1枚をライフに加える。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["TrashCard"] } ],
-    "expect": { "success": true, "p1_life_count": 1, "p1_trash_count": 0 }
+    "interaction": [
+      {
+        "select_cards": [
+          "TrashCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_life_count": 1,
+      "p1_trash_count": 0
+    }
   },
   {
     "id": "LIFE_ADD_FIELD_P1",
     "title": "【P1】フィールドからライフ追加",
     "setup": {
-      "p1": { "field": ["Tester", "FieldCard"], "life": [] }
+      "p1": {
+        "field": [
+          "Tester",
+          "FieldCard"
+        ],
+        "life": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分の場のキャラ1枚をライフに加える。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["FieldCard"] } ],
-    "expect": { "success": true, "p1_life_count": 1, "p1_field_count": 1 }
+    "interaction": [
+      {
+        "select_cards": [
+          "FieldCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_life_count": 1,
+      "p1_field_count": 1
+    }
   },
   {
     "id": "LIFE_TO_HAND_P1",
     "title": "【P1】ライフを手札に加える",
     "setup": {
-      "p1": { "field": ["Tester"], "life": ["LifeCard"], "hand": [] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "life": [
+          "LifeCard"
+        ],
+        "hand": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分のライフ1枚を手札に加える。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["LifeCard"] } ],
-    "expect": { "success": true, "p1_hand_count": 1, "p1_life_count": 0 }
+    "interaction": [
+      {
+        "select_cards": [
+          "LifeCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_count": 1,
+      "p1_life_count": 0
+    }
   },
   {
     "id": "LIFE_TO_TRASH_P1",
     "title": "【P1】ライフをトラッシュに置く",
     "setup": {
-      "p1": { "field": ["Tester"], "life": ["LifeCard"], "trash": [] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "life": [
+          "LifeCard"
+        ],
+        "trash": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分のライフ1枚をトラッシュに置く。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["LifeCard"] } ],
-    "expect": { "success": true, "p1_life_count": 0, "p1_trash_count": 1 }
+    "interaction": [
+      {
+        "select_cards": [
+          "LifeCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_life_count": 0,
+      "p1_trash_count": 1
+    }
   },
   {
     "id": "LIFE_ADD_DECK_P2",
     "title": "【P2】デッキトップからライフ追加",
     "setup": {
-      "p1": { "field": ["Dummy"] },
-      "p2": { "field": ["Tester"], "deck": ["TopCard"], "life": [] }
+      "p1": {
+        "field": [
+          "Dummy"
+        ]
+      },
+      "p2": {
+        "field": [
+          "Tester"
+        ],
+        "deck": [
+          "TopCard"
+        ],
+        "life": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分のデッキの上から1枚をライフに加える。",
     "active_player": "p2",
     "expected_trigger": "ON_PLAY",
-    "expect": { "success": true, "p2_deck_count": 0, "p2_life_count": 1 }
+    "expect": {
+      "success": true,
+      "p2_deck_count": 0,
+      "p2_life_count": 1
+    }
   },
   {
     "id": "LIFE_ADD_HAND_P2",
     "title": "【P2】手札からライフ追加",
     "setup": {
-      "p1": { "field": ["Dummy"] },
-      "p2": { "field": ["Tester"], "hand": ["HandCard"], "life": [] }
+      "p1": {
+        "field": [
+          "Dummy"
+        ]
+      },
+      "p2": {
+        "field": [
+          "Tester"
+        ],
+        "hand": [
+          "HandCard"
+        ],
+        "life": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分の手札1枚をライフに加える。",
     "active_player": "p2",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["HandCard"] } ],
-    "expect": { "success": true, "p2_hand_count": 0, "p2_life_count": 1 }
+    "interaction": [
+      {
+        "select_cards": [
+          "HandCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_hand_count": 0,
+      "p2_life_count": 1
+    }
   },
   {
     "id": "LIFE_ADD_TRASH_P2",
     "title": "【P2】トラッシュからライフ追加",
     "setup": {
-      "p1": { "field": ["Dummy"] },
-      "p2": { "field": ["Tester"], "trash": ["TrashCard"], "life": [] }
+      "p1": {
+        "field": [
+          "Dummy"
+        ]
+      },
+      "p2": {
+        "field": [
+          "Tester"
+        ],
+        "trash": [
+          "TrashCard"
+        ],
+        "life": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分のトラッシュのキャラ1枚をライフに加える。",
     "active_player": "p2",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["TrashCard"] } ],
-    "expect": { "success": true, "p2_life_count": 1, "p2_trash_count": 0 }
+    "interaction": [
+      {
+        "select_cards": [
+          "TrashCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_life_count": 1,
+      "p2_trash_count": 0
+    }
   },
   {
     "id": "LIFE_ADD_FIELD_P2",
     "title": "【P2】フィールドからライフ追加",
     "setup": {
-      "p1": { "field": ["Dummy"] },
-      "p2": { "field": ["Tester", "FieldCard"], "life": [] }
+      "p1": {
+        "field": [
+          "Dummy"
+        ]
+      },
+      "p2": {
+        "field": [
+          "Tester",
+          "FieldCard"
+        ],
+        "life": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分の場のキャラ1枚をライフに加える。",
     "active_player": "p2",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["FieldCard"] } ],
-    "expect": { "success": true, "p2_life_count": 1, "p2_field_count": 1 }
+    "interaction": [
+      {
+        "select_cards": [
+          "FieldCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_life_count": 1,
+      "p2_field_count": 1
+    }
   },
   {
     "id": "LIFE_TO_HAND_P2",
     "title": "【P2】ライフを手札に加える",
     "setup": {
-      "p1": { "field": ["Dummy"] },
-      "p2": { "field": ["Tester"], "life": ["LifeCard"], "hand": [] }
+      "p1": {
+        "field": [
+          "Dummy"
+        ]
+      },
+      "p2": {
+        "field": [
+          "Tester"
+        ],
+        "life": [
+          "LifeCard"
+        ],
+        "hand": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分のライフ1枚を手札に加える。",
     "active_player": "p2",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["LifeCard"] } ],
-    "expect": { "success": true, "p2_hand_count": 1, "p2_life_count": 0 }
+    "interaction": [
+      {
+        "select_cards": [
+          "LifeCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_hand_count": 1,
+      "p2_life_count": 0
+    }
   },
   {
     "id": "LIFE_TO_TRASH_P2",
     "title": "【P2】ライフをトラッシュに置く",
     "setup": {
-      "p1": { "field": ["Dummy"] },
-      "p2": { "field": ["Tester"], "life": ["LifeCard"], "trash": [] }
+      "p1": {
+        "field": [
+          "Dummy"
+        ]
+      },
+      "p2": {
+        "field": [
+          "Tester"
+        ],
+        "life": [
+          "LifeCard"
+        ],
+        "trash": []
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分のライフ1枚をトラッシュに置く。",
     "active_player": "p2",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["LifeCard"] } ],
-    "expect": { "success": true, "p2_life_count": 0, "p2_trash_count": 1 }
+    "interaction": [
+      {
+        "select_cards": [
+          "LifeCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_life_count": 0,
+      "p2_trash_count": 1
+    }
   },
   {
     "id": "TRIGGER_TURN_END",
     "title": "【トリガー】自分のターン終了時",
     "setup": {
-      "p1": { "field": ["Tester"], "don_rested": 1 }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "don_rested": 1
+      }
     },
     "source": "Tester",
     "text": "【ターン終了時】自分のドン!!1枚までを、アクティブにする。",
     "expected_trigger": "TURN_END",
-    "expect": { "success": true, "p1_don_active": 1 }
+    "expect": {
+      "success": true,
+      "p1_don_active": 1
+    }
   },
   {
     "id": "TRIGGER_OPP_TURN_END",
     "title": "【トリガー】相手のターン終了時",
     "setup": {
-      "p1": { "field": ["Tester"], "deck": ["Card1"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "deck": [
+          "Card1"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【相手のターン終了時】カード1枚を引く。",
     "expected_trigger": "OPP_TURN_END",
-    "expect": { "success": true, "p1_hand_count": 1 }
+    "expect": {
+      "success": true,
+      "p1_hand_count": 1
+    }
   },
   {
     "id": "TRIGGER_ON_ATTACK",
     "title": "【トリガー】自分のアタック時",
     "setup": {
-      "p1": { "field": ["Tester"], "deck": ["Card1"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "deck": [
+          "Card1"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【アタック時】カード1枚を引く。",
     "expected_trigger": "ON_ATTACK",
-    "expect": { "success": true, "p1_hand_count": 1 }
+    "expect": {
+      "success": true,
+      "p1_hand_count": 1
+    }
   },
   {
     "id": "TRIGGER_ON_OPP_ATTACK",
     "title": "【トリガー】相手のアタック時",
     "setup": {
-      "p1": { "field": ["Tester"], "deck": ["Card1"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "deck": [
+          "Card1"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【相手のアタック時】カード1枚を引く。",
     "expected_trigger": "ON_OPP_ATTACK",
-    "expect": { "success": true, "p1_hand_count": 1 }
+    "expect": {
+      "success": true,
+      "p1_hand_count": 1
+    }
   },
   {
     "id": "TRIGGER_ON_BLOCK",
     "title": "【トリガー】ブロック時",
     "setup": {
-      "p1": { "field": ["Tester"] },
-      "p2": { "life": ["LifeCard"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ]
+      },
+      "p2": {
+        "life": [
+          "LifeCard"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【ブロック時】相手のライフ1枚をトラッシュに置く。",
     "expected_trigger": "ON_BLOCK",
-    "interaction": [ { "select_cards": ["LifeCard"] } ],
-    "expect": { "success": true, "p2_life_count": 0, "p2_trash_count": 1 }
+    "interaction": [
+      {
+        "select_cards": [
+          "LifeCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_life_count": 0,
+      "p2_trash_count": 1
+    }
   },
   {
     "id": "TRIGGER_ON_KO",
     "title": "【トリガー】KO時",
     "setup": {
-      "p1": { "field": ["Tester"], "deck": ["Card1"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "deck": [
+          "Card1"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【KO時】カード1枚を引く。",
     "expected_trigger": "ON_KO",
-    "expect": { "success": true, "p1_hand_count": 1 }
+    "expect": {
+      "success": true,
+      "p1_hand_count": 1
+    }
   },
   {
     "id": "TRIGGER_PASSIVE_MY_TURN",
     "title": "【トリガー】〜のターン中（常時効果のテスト）",
     "setup": {
-      "p1": { "field": ["Tester"], "deck": ["Card1"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "deck": [
+          "Card1"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【自分のターン中】カード1枚を引く。",
     "expected_trigger": "PASSIVE",
-    "expect": { "success": true, "p1_hand_count": 1 }
+    "expect": {
+      "success": true,
+      "p1_hand_count": 1
+    }
   },
   {
     "id": "OP13_079_IMU_ACTIVATE_HAND",
     "title": "【OP13-079 イム】起動メイン：手札コストでドロー",
     "setup": {
       "p1": {
-        "field": [ { "name": "OP13-079", "traits": ["天竜人"] } ],
-        "hand": [ "CostCard" ],
-        "deck": ["DrawCard"]
+        "field": [
+          {
+            "name": "OP13-079",
+            "traits": [
+              "天竜人"
+            ]
+          }
+        ],
+        "hand": [
+          "CostCard"
+        ],
+        "deck": [
+          "DrawCard"
+        ]
       }
     },
     "source": "OP13-079",
     "text": "【起動メイン】ターン1回：自分の、特徴《天竜人》を持つキャラか、手札1枚をトラッシュに置くことができる：カード1枚を引く。",
     "expected_trigger": "ACTIVATE_MAIN",
     "interaction": [
-      { "select_option": 1 },
-      { "select_cards": ["CostCard"] }
+      {
+        "select_option": 1
+      },
+      {
+        "select_cards": [
+          "CostCard"
+        ]
+      }
     ],
     "expect": {
       "success": true,
@@ -402,19 +854,39 @@
     "setup": {
       "p1": {
         "field": [
-          { "name": "OP13-079", "traits": ["天竜人"] },
-          { "name": "Tenryubito", "traits": ["天竜人"] }
+          {
+            "name": "OP13-079",
+            "traits": [
+              "天竜人"
+            ]
+          },
+          {
+            "name": "Tenryubito",
+            "traits": [
+              "天竜人"
+            ]
+          }
         ],
-        "hand": [ "HandCard" ],
-        "deck": ["DrawCard"]
+        "hand": [
+          "HandCard"
+        ],
+        "deck": [
+          "DrawCard"
+        ]
       }
     },
     "source": "OP13-079",
     "text": "【起動メイン】ターン1回：自分の、特徴《天竜人》を持つキャラか、手札1枚をトラッシュに置くことができる：カード1枚を引く。",
     "expected_trigger": "ACTIVATE_MAIN",
     "interaction": [
-      { "select_option": 0 },
-      { "select_cards": ["Tenryubito"] }
+      {
+        "select_option": 0
+      },
+      {
+        "select_cards": [
+          "Tenryubito"
+        ]
+      }
     ],
     "expect": {
       "success": true,
@@ -426,179 +898,642 @@
     "id": "EFFECT_BUFF_POWER",
     "title": "【効果】パワー増加（バフ）",
     "setup": {
-      "p1": { "field": ["Tester", "BuffTarget"] }
+      "p1": {
+        "field": [
+          "Tester",
+          "BuffTarget"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【起動メイン】自分のキャラ1枚を、このターン中、パワー+2000。",
     "expected_trigger": "ACTIVATE_MAIN",
-    "interaction": [ { "select_cards": ["BuffTarget"] } ],
-    "expect": { "success": true, "p1_field_check": [ { "name": "BuffTarget", "power_buff": 2000 } ] }
+    "interaction": [
+      {
+        "select_cards": [
+          "BuffTarget"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_field_check": [
+        {
+          "name": "BuffTarget",
+          "power_buff": 2000
+        }
+      ]
+    }
   },
   {
     "id": "EFFECT_COST_MINUS",
     "title": "【効果】コスト減少（デバフ）",
     "setup": {
-      "p1": { "field": ["Tester"] },
-      "p2": { "field": [ { "name": "Enemy", "cost": 5 } ] }
+      "p1": {
+        "field": [
+          "Tester"
+        ]
+      },
+      "p2": {
+        "field": [
+          {
+            "name": "Enemy",
+            "cost": 5
+          }
+        ]
+      }
     },
     "source": "Tester",
     "text": "【登場時】相手のキャラ1枚を、このターン中、コスト-2。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["Enemy"] } ],
-    "expect": { "success": true, "p2_field_check": [ { "name": "Enemy", "cost": 3 } ] }
+    "interaction": [
+      {
+        "select_cards": [
+          "Enemy"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_field_check": [
+        {
+          "name": "Enemy",
+          "cost": 3
+        }
+      ]
+    }
   },
   {
     "id": "EFFECT_REST_TARGET",
     "title": "【効果】相手キャラをレストにする",
     "setup": {
-      "p1": { "field": ["Tester"] },
-      "p2": { "field": [ { "name": "ActiveEnemy", "is_rest": false } ] }
+      "p1": {
+        "field": [
+          "Tester"
+        ]
+      },
+      "p2": {
+        "field": [
+          {
+            "name": "ActiveEnemy",
+            "is_rest": false
+          }
+        ]
+      }
     },
     "source": "Tester",
     "text": "【登場時】相手のキャラ1枚をレストにする。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["ActiveEnemy"] } ],
-    "expect": { "success": true, "p2_field_check": [ { "name": "ActiveEnemy", "is_rest": true } ] }
+    "interaction": [
+      {
+        "select_cards": [
+          "ActiveEnemy"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_field_check": [
+        {
+          "name": "ActiveEnemy",
+          "is_rest": true
+        }
+      ]
+    }
   },
   {
     "id": "EFFECT_ACTIVE_SELF",
     "title": "【効果】自分キャラをアクティブにする",
     "setup": {
-      "p1": { "field": ["Tester", { "name": "RestedAlly", "is_rest": true }] }
+      "p1": {
+        "field": [
+          "Tester",
+          {
+            "name": "RestedAlly",
+            "is_rest": true
+          }
+        ]
+      }
     },
     "source": "Tester",
     "text": "【起動メイン】自分のキャラ1枚をアクティブにする。",
     "expected_trigger": "ACTIVATE_MAIN",
-    "interaction": [ { "select_cards": ["RestedAlly"] } ],
-    "expect": { "success": true, "p1_field_check": [ { "name": "RestedAlly", "is_rest": false } ] }
+    "interaction": [
+      {
+        "select_cards": [
+          "RestedAlly"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_field_check": [
+        {
+          "name": "RestedAlly",
+          "is_rest": false
+        }
+      ]
+    }
   },
   {
     "id": "EFFECT_SEARCHER_LOOK_ADD",
     "title": "【効果】サーチ（見る→加える→デッキ下）",
     "setup": {
-      "p1": { 
-        "field": ["Tester"], 
-        "deck": ["Noise1", "TargetCard", "Noise2", "Noise3", "Noise4"] 
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "deck": [
+          "Noise1",
+          "TargetCard",
+          "Noise2",
+          "Noise3",
+          "Noise4"
+        ]
       }
     },
     "source": "Tester",
     "text": "【登場時】自分のデッキの上から3枚を見て、カード1枚を公開し、手札に加える。残りをデッキの下に置く。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ 
-      { "select_cards": ["TargetCard"] } 
+    "interaction": [
+      {
+        "select_cards": [
+          "TargetCard"
+        ]
+      }
     ],
-    "expect": { 
-      "success": true, 
-      "p1_hand_count": 1, 
-      "p1_deck_count": 4 
+    "expect": {
+      "success": true,
+      "p1_hand_count": 1,
+      "p1_deck_count": 4
     }
   },
   {
     "id": "EFFECT_DECK_BOTTOM_REMOVAL",
     "title": "【効果】デッキ下送り（除去）",
     "setup": {
-      "p1": { "field": ["Tester"] },
-      "p2": { "field": ["Enemy"], "deck": ["BottomCard"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ]
+      },
+      "p2": {
+        "field": [
+          "Enemy"
+        ],
+        "deck": [
+          "BottomCard"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【登場時】相手のキャラ1枚をデッキの下に置く。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["Enemy"] } ],
-    "expect": { "success": true, "p2_field_count": 0, "p2_deck_count": 2 }
+    "interaction": [
+      {
+        "select_cards": [
+          "Enemy"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_field_count": 0,
+      "p2_deck_count": 2
+    }
   },
   {
     "id": "EFFECT_GRANT_KEYWORD",
     "title": "【効果】キーワード能力付与（速攻）",
     "setup": {
-      "p1": { "field": ["Tester", "Ally"] }
+      "p1": {
+        "field": [
+          "Tester",
+          "Ally"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【起動メイン】自分のキャラ1枚は、このターン中、速攻を得る。",
     "expected_trigger": "ACTIVATE_MAIN",
-    "interaction": [ { "select_cards": ["Ally"] } ],
-    "expect": { "success": true, "p1_field_check": [ { "name": "Ally", "has_keyword": "速攻" } ] }
+    "interaction": [
+      {
+        "select_cards": [
+          "Ally"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_field_check": [
+        {
+          "name": "Ally",
+          "has_keyword": "速攻"
+        }
+      ]
+    }
   },
   {
     "id": "EFFECT_PLAY_FROM_HAND",
     "title": "【効果】手札から登場させる",
     "setup": {
-      "p1": { "field": ["Tester"], "hand": ["PlayTarget"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "hand": [
+          "PlayTarget"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【起動メイン】手札のキャラ1枚を登場させる。",
     "expected_trigger": "ACTIVATE_MAIN",
-    "interaction": [ { "select_cards": ["PlayTarget"] } ],
-    "expect": { "success": true, "p1_hand_count": 0, "p1_field_count": 2, "p1_field_has": ["PlayTarget"] }
+    "interaction": [
+      {
+        "select_cards": [
+          "PlayTarget"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_count": 0,
+      "p1_field_count": 2,
+      "p1_field_has": [
+        "PlayTarget"
+      ]
+    }
   },
   {
     "id": "EFFECT_ATTACH_DON",
     "title": "【効果】ドン!!付与",
     "setup": {
-      "p1": { "field": ["Tester", "Ally"], "don_active": 2 }
+      "p1": {
+        "field": [
+          "Tester",
+          "Ally"
+        ],
+        "don_active": 2
+      }
     },
     "source": "Tester",
     "text": "【起動メイン】自分のキャラ1枚にドン!!1枚を付与する。",
     "expected_trigger": "ACTIVATE_MAIN",
-    "interaction": [ { "select_cards": ["Ally"] } ],
-    "expect": { "success": true, "p1_don_active": 1, "p1_field_check": [ { "name": "Ally", "attached_don": 1 } ] }
+    "interaction": [
+      {
+        "select_cards": [
+          "Ally"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_don_active": 1,
+      "p1_field_check": [
+        {
+          "name": "Ally",
+          "attached_don": 1
+        }
+      ]
+    }
   },
   {
     "id": "EFFECT_PREVENT_LEAVE",
     "title": "【効果】場を離れない（耐性付与）",
     "setup": {
-      "p1": { "field": ["Tester", "Ally"] }
+      "p1": {
+        "field": [
+          "Tester",
+          "Ally"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【登場時】自分のキャラ1枚は、場を離れない。",
     "expected_trigger": "ON_PLAY",
-    "interaction": [ { "select_cards": ["Ally"] } ],
-    "expect": { "success": true, "p1_field_check": [ { "name": "Ally", "has_flag": "PREVENT_LEAVE" } ] }
+    "interaction": [
+      {
+        "select_cards": [
+          "Ally"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_field_check": [
+        {
+          "name": "Ally",
+          "has_flag": "PREVENT_LEAVE"
+        }
+      ]
+    }
   },
   {
     "id": "EFFECT_DEAL_DAMAGE",
     "title": "【効果】ダメージを与える（ライフ減少）",
     "setup": {
-      "p1": { "field": ["Tester"] },
-      "p2": { "life": ["LifeCard"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ]
+      },
+      "p2": {
+        "life": [
+          "LifeCard"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【登場時】相手のリーダーに1ダメージを与える。",
     "expected_trigger": "ON_PLAY",
-    "expect": { "success": true, "p2_life_count": 0, "p2_hand_count": 1 }
+    "expect": {
+      "success": true,
+      "p2_life_count": 0,
+      "p2_hand_count": 1
+    }
   },
   {
     "id": "EFFECT_VICTORY",
     "title": "【効果】特殊勝利",
     "setup": {
-      "p1": { "field": ["Tester"] }
+      "p1": {
+        "field": [
+          "Tester"
+        ]
+      }
     },
     "source": "Tester",
     "text": "【起動メイン】ゲームに勝利する。",
     "expected_trigger": "ACTIVATE_MAIN",
-    "expect": { "success": true }
+    "expect": {
+      "success": true
+    }
   },
   {
     "id": "TRIGGER_COUNTER_BUFF",
     "title": "【トリガー】カウンター（パワー増加）",
     "setup": {
-      "p1": { "hand": ["CounterCard"], "field": ["Leader"] }
+      "p1": {
+        "hand": [
+          "CounterCard"
+        ],
+        "field": [
+          "Leader"
+        ]
+      }
     },
     "source": "CounterCard",
     "text": "【カウンター】自分のリーダーかキャラ1枚を、このバトル中、パワー+4000。",
     "expected_trigger": "COUNTER",
-    "interaction": [ { "select_cards": ["Leader"] } ],
-    "expect": { "success": true }
+    "interaction": [
+      {
+        "select_cards": [
+          "Leader"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true
+    }
   },
   {
     "id": "TRIGGER_LIFE_EFFECT",
     "title": "【トリガー】ライフトリガー発動",
     "setup": {
-      "p1": { "life": ["TriggerCard"], "field": ["Ally"] }
+      "p1": {
+        "life": [
+          "TriggerCard"
+        ],
+        "field": [
+          "Ally"
+        ]
+      }
     },
     "source": "TriggerCard",
     "text": "【トリガー】自分のキャラ1枚をアクティブにする。",
     "expected_trigger": "TRIGGER",
-    "interaction": [ { "select_cards": ["Ally"] } ],
-    "expect": { "success": true }
+    "interaction": [
+      {
+        "select_cards": [
+          "Ally"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true
+    }
+  },
+  {
+    "id": "MECHANIC_BLOCKER",
+    "title": "【ルール】ブロッカーによる攻撃対象変更",
+    "setup": {
+      "p1": {
+        "field": [
+          "Attacker"
+        ],
+        "don_active": 1
+      },
+      "p2": {
+        "field": [
+          {
+            "name": "OP01-073",
+            "id": "Blocker",
+            "power": 4000,
+            "is_active": true,
+            "abilities": [
+              "BLOCKER"
+            ]
+          }
+        ],
+        "leader": "P2Leader"
+      }
+    },
+    "source": "Attacker",
+    "text": "(攻撃宣言)",
+    "manual_action": {
+      "type": "ATTACK",
+      "target": "P2Leader"
+    },
+    "interaction": [
+      {
+        "player": "p2",
+        "use_blocker": true,
+        "blocker_card": "Blocker"
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_field_check": [
+        {
+          "name": "Blocker",
+          "is_rest": true
+        }
+      ]
+    }
+  },
+  {
+    "id": "KEYWORD_DOUBLE_BANISH",
+    "title": "【キーワード】ダブルアタック＆バニッシュ検証",
+    "setup": {
+      "p1": {
+        "field": [
+          {
+            "name": "OP01-121",
+            "power": 5000,
+            "keywords": [
+              "DOUBLE_ATTACK",
+              "BANISH"
+            ]
+          }
+        ]
+      },
+      "p2": {
+        "life": [
+          "TriggerCard",
+          "NormalCard"
+        ],
+        "life_count": 2,
+        "leader": "P2Leader"
+      }
+    },
+    "source": "OP01-121",
+    "text": "(攻撃宣言)",
+    "manual_action": {
+      "type": "ATTACK",
+      "target": "P2Leader"
+    },
+    "interaction": [
+      {
+        "player": "p2",
+        "use_blocker": false
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_life_count": 0,
+      "p2_trash_count": 2,
+      "p2_hand_count": 0
+    }
+  },
+  {
+    "id": "EFFECT_BOUNCE",
+    "title": "【効果】キャラを手札に戻す（バウンス）",
+    "setup": {
+      "p1": {
+        "field": [
+          "ST03-014"
+        ]
+      },
+      "p2": {
+        "field": [
+          {
+            "name": "TargetChar",
+            "cost": 3
+          }
+        ],
+        "hand": []
+      }
+    },
+    "source": "ST03-014",
+    "text": "【登場時】コスト3以下の相手のキャラ1枚までを、持ち主の手札に戻す。",
+    "expected_trigger": "ON_PLAY",
+    "interaction": [
+      {
+        "select_cards": [
+          "TargetChar"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_field_count": 0,
+      "p2_hand_count": 1,
+      "p2_hand_has": [
+        "TargetChar"
+      ]
+    }
+  },
+  {
+    "id": "EFFECT_SET_COST_ZERO",
+    "title": "【効果】コストを特定の値に変更（0にする）",
+    "setup": {
+      "p1": {
+        "field": [
+          "OP03-091"
+        ]
+      },
+      "p2": {
+        "field": [
+          {
+            "name": "OP01-010",
+            "cost": 1,
+            "text": "なし"
+          }
+        ]
+      }
+    },
+    "source": "OP03-091",
+    "text": "【登場時】相手の元々の効果のないキャラ1枚までを、このターン中、コスト0にする。",
+    "expected_trigger": "ON_PLAY",
+    "interaction": [
+      {
+        "select_cards": [
+          "OP01-010"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_field_check": [
+        {
+          "name": "OP01-010",
+          "cost": 0
+        }
+      ]
+    }
+  },
+  {
+    "id": "EFFECT_SEARCH_TRASH_REMAIN",
+    "title": "【効果】サーチ後に残りをトラッシュへ",
+    "setup": {
+      "p1": {
+        "field": [
+          "OP04-039"
+        ],
+        "don_active": 1,
+        "hand": [
+          "C1",
+          "C2"
+        ],
+        "deck": [
+          {
+            "name": "DressrosaCard",
+            "traits": [
+              "ドレスローザ"
+            ]
+          },
+          "TrashCard"
+        ]
+      }
+    },
+    "source": "OP04-039",
+    "text": "【起動メイン】➀：自分の手札が6枚以下の場合、自分のデッキの上から2枚を見て、特徴《ドレスローザ》を持つカード1枚までを公開し、手札に加える。その後、残りをトラッシュに置く。",
+    "expected_trigger": "ACTIVATE_MAIN",
+    "interaction": [
+      {
+        "select_cards": [
+          "DressrosaCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_count": 3,
+      "p1_trash_has": [
+        "TrashCard"
+      ],
+      "p1_deck_count": 0
+    }
   }
 ]

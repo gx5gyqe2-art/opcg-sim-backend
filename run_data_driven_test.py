@@ -62,6 +62,18 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
     # プレイヤー状態のセットアップ
     for pid, p_obj in [("p1", p1), ("p2", p2)]:
         p_data = scenario.get("setup", {}).get(pid, {})
+        # Leader Setup
+        leader_def = p_data.get("leader")
+        if leader_def:
+            l_card = create_mock_card(p_obj.name, leader_def)
+            # 強制的にリーダータイプにする（モック生成の簡易ハック）
+            # l_card.master.type = CardType.LEADER # frozenなので直接書き換え不可だが、テスト用なら属性無視で通るか、あるいは作り直す
+            # ここでは簡易的に属性をごまかす
+            object.__setattr__(l_card.master, 'type', CardType.LEADER) 
+            # もし object.__setattr__ が使えない環境なら、mock作成時に調整が必要だが一旦これで。
+            object.__setattr__(l_card.master, 'life', 5)
+            p_obj.leader = l_card
+        
         
         # Field
         for c_def in p_data.get("field", []):
@@ -139,13 +151,25 @@ def run_scenario(scenario: Dict) -> Dict:
         if not source_card:
             raise Exception(f"Source card '{source_name}' not found in {active_player_key.upper()} zones.")
         
-        # 3. テキストのParse
-        text = scenario["text"]
-        effect_obj = Effect(text)
-        if not effect_obj.abilities:
-            raise Exception("Parser failed to extract abilities.")
-        
-        ability = effect_obj.abilities[0]
+        # 3. アクション実行 または テキストParse
+        ability = None
+        if "manual_action" in scenario:
+            act = scenario["manual_action"]
+            if act["type"] == "ATTACK":
+                target_card = gm.p2.leader if act["target"] == "P2Leader" else gm.p1.leader
+                if not target_card: raise Exception("Target leader not found")
+                gm.declare_attack(source_card, target_card)
+                
+                # ダミーAbility (後続のTrigger検証などをパスするため)
+                class DummyAbility:
+                    trigger = None
+                ability = DummyAbility()
+        else:
+            text = scenario["text"]
+            effect_obj = Effect(text)
+            if not effect_obj.abilities:
+                raise Exception("Parser failed to extract abilities.")
+            ability = effect_obj.abilities[0]
 
         # トリガー検証
         expected_trigger = scenario.get("expected_trigger")
@@ -161,7 +185,8 @@ def run_scenario(scenario: Dict) -> Dict:
         # 4. 効果解決 (Interaction処理含む)
         success = False
         try:
-            gm.resolve_ability(active_player, ability, source_card)
+            if not hasattr(ability, 'trigger') or ability.trigger is not None:
+                gm.resolve_ability(active_player, ability, source_card)
             
             # Interactionループ
             interaction_steps = scenario.get("interaction", [])

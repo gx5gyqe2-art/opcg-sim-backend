@@ -176,7 +176,7 @@ class Effect:
                 if not target.tag: target.tag = "last_target"
             else:
                 default_p = Player.SELF
-                if act_type in [ActionType.KO, ActionType.DEAL_DAMAGE, ActionType.REST, ActionType.ATTACK_DISABLE, ActionType.FREEZE]:
+                if act_type in [ActionType.KO, ActionType.DEAL_DAMAGE, ActionType.REST, ActionType.ATTACK_DISABLE, ActionType.FREEZE, ActionType.MOVE_TO_HAND]:
                     if "自分" not in text:
                         default_p = Player.OPPONENT
                 
@@ -384,17 +384,29 @@ class Effect:
             
         if '残り' in text or '下' in text:
             rem_target = TargetQuery(zone=Zone.TEMP, select_mode="ALL", player=Player.SELF)
-            bottom = EffectAction(
-                type=ActionType.DECK_BOTTOM, 
+            
+            dest_z = Zone.DECK
+            dest_pos = "BOTTOM"
+            act_t = ActionType.DECK_BOTTOM
+            raw_t = "残りをデッキの下に置く"
+
+            if 'トラッシュ' in text:
+                dest_z = Zone.TRASH
+                dest_pos = None
+                act_t = ActionType.TRASH
+                raw_t = "残りをトラッシュに置く"
+
+            remainder_action = EffectAction(
+                type=act_t, 
                 target=rem_target, 
                 source_zone=Zone.TEMP, 
-                dest_zone=Zone.DECK, 
-                dest_position="BOTTOM",
-                raw_text="残りをデッキの下に置く"
+                dest_zone=dest_z, 
+                dest_position=dest_pos,
+                raw_text=raw_t
             )
             if look.then_actions:
-                look.then_actions[-1].then_actions.append(bottom)
+                look.then_actions[-1].then_actions.append(remainder_action)
             else:
-                look.then_actions.append(bottom)
+                look.then_actions.append(remainder_action)
 
         return [look]

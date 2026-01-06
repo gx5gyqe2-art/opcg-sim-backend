@@ -431,6 +431,9 @@ class GameManager:
                 don.is_rest = True
 
     def has_blocker(self, player: Player) -> bool:
+        for card in player.field:
+            if not card.is_rest and "ブロッカー" in card.current_keywords:
+                return True
         return False
 
     def declare_attack(self, attacker: Card, target: Card):
@@ -534,13 +537,22 @@ class GameManager:
         
         if target == target_owner.leader:
             if attacker_pwr >= target_pwr:
-                if target_owner.life:
-                    life_card = target_owner.life.pop(0)
-                    self.move_card(life_card, Zone.HAND, target_owner)
-                    log_event("INFO", "game.damage_life", f"{target_owner.name} takes 1 damage to life", player=target_owner.name)
-                else:
-                    self.winner = attacker_owner.name
-                    log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name)
+                # ダブルアタック & バニッシュ判定
+                damage_amount = 2 if "ダブルアタック" in attacker.current_keywords else 1
+                is_banish = "バニッシュ" in attacker.current_keywords
+
+                log_event("INFO", "game.damage_step", f"Dealing {damage_amount} damage (Banish: {is_banish})", player=attacker_owner.name)
+
+                for _ in range(damage_amount):
+                    if target_owner.life:
+                        life_card = target_owner.life.pop(0)
+                        dest_zone = Zone.TRASH if is_banish else Zone.HAND
+                        self.move_card(life_card, dest_zone, target_owner)
+                        log_event("INFO", "game.damage_life", f"{target_owner.name} takes damage to {dest_zone.name}", player=target_owner.name)
+                    else:
+                        self.winner = attacker_owner.name
+                        log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name)
+                        break
         else:
             if attacker_pwr >= target_pwr:
                 self.move_card(target, Zone.TRASH, target_owner)

@@ -1,0 +1,514 @@
+{
+  "summary": {
+    "total": 48,
+    "passed": 45,
+    "failed": 3
+  },
+  "results": [
+    {
+      "id": "BASIC_KO_AND_COST",
+      "title": "【基本】コスト指定KOとドン!!コスト支払い",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "✅ Success matched: True",
+        "✅ p1 Don Active: 1",
+        "✅ p1 Don Deck Count: 9",
+        "✅ P2 Field has HighCostEnemy",
+        "✅ P2 Trash has LowCostEnemy"
+      ]
+    },
+    {
+      "id": "MATCHER_TRAIT_FILTER",
+      "title": "【対象】特徴によるフィルタリング検証",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ P2 Field has Kaido",
+        "✅ P2 Trash has Luffy"
+      ]
+    },
+    {
+      "id": "SEQUENCE_AND_CONDITION",
+      "title": "【複合】条件付き実行（〜場合、〜する）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 0",
+        "✅ P2 Trash has Enemy"
+      ]
+    },
+    {
+      "id": "SEQUENCE_CONDITION_FAILED",
+      "title": "【複合】条件不成立時の処理スキップ",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "Caught Expected Error: 効果の解決に失敗しました: 手札1枚を捨てることができる",
+        "✅ Success matched: False",
+        "✅ Error message contains '手札1枚を捨てることができる'",
+        "✅ P2 Field has Enemy"
+      ]
+    },
+    {
+      "id": "ERROR_NO_TARGET",
+      "title": "【異常系】対象不在による失敗",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "Caught Expected Error: 効果の解決に失敗しました: 相手のキャラ1枚をKOする",
+        "✅ Success matched: False",
+        "✅ Error message contains 'KO'"
+      ]
+    },
+    {
+      "id": "FEATURE_FREEZE",
+      "title": "【新規】フリーズ効果（アクティブにならない）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ Enemy has flag FREEZE"
+      ]
+    },
+    {
+      "id": "FEATURE_SELECT_OPTION",
+      "title": "【新規】選択肢効果（未実装部分の動作確認）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True"
+      ]
+    },
+    {
+      "id": "VERIFY_SELECTION_SOURCE",
+      "title": "【検証】選択候補の正当性チェック（Trash回収）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 1"
+      ]
+    },
+    {
+      "id": "LIFE_ADD_DECK_P1",
+      "title": "【P1】デッキトップからライフ追加",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p1 Deck Count: 0",
+        "✅ p1 Life Count: 1"
+      ]
+    },
+    {
+      "id": "LIFE_ADD_HAND_P1",
+      "title": "【P1】手札からライフ追加",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 0",
+        "✅ p1 Life Count: 1"
+      ]
+    },
+    {
+      "id": "LIFE_ADD_TRASH_P1",
+      "title": "【P1】トラッシュからライフ追加",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p1 Life Count: 1",
+        "✅ p1 Trash Count: 0"
+      ]
+    },
+    {
+      "id": "LIFE_ADD_FIELD_P1",
+      "title": "【P1】フィールドからライフ追加",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p1 Life Count: 1",
+        "✅ p1 Field Count: 1"
+      ]
+    },
+    {
+      "id": "LIFE_TO_HAND_P1",
+      "title": "【P1】ライフを手札に加える",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 1",
+        "✅ p1 Life Count: 0"
+      ]
+    },
+    {
+      "id": "LIFE_TO_TRASH_P1",
+      "title": "【P1】ライフをトラッシュに置く",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p1 Life Count: 0",
+        "✅ p1 Trash Count: 1"
+      ]
+    },
+    {
+      "id": "LIFE_ADD_DECK_P2",
+      "title": "【P2】デッキトップからライフ追加",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p2 Deck Count: 0",
+        "✅ p2 Life Count: 1"
+      ]
+    },
+    {
+      "id": "LIFE_ADD_HAND_P2",
+      "title": "【P2】手札からライフ追加",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p2 Hand Count: 0",
+        "✅ p2 Life Count: 1"
+      ]
+    },
+    {
+      "id": "LIFE_ADD_TRASH_P2",
+      "title": "【P2】トラッシュからライフ追加",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p2 Life Count: 1",
+        "✅ p2 Trash Count: 0"
+      ]
+    },
+    {
+      "id": "LIFE_ADD_FIELD_P2",
+      "title": "【P2】フィールドからライフ追加",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p2 Life Count: 1",
+        "✅ p2 Field Count: 1"
+      ]
+    },
+    {
+      "id": "LIFE_TO_HAND_P2",
+      "title": "【P2】ライフを手札に加える",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p2 Hand Count: 1",
+        "✅ p2 Life Count: 0"
+      ]
+    },
+    {
+      "id": "LIFE_TO_TRASH_P2",
+      "title": "【P2】ライフをトラッシュに置く",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p2 Life Count: 0",
+        "✅ p2 Trash Count: 1"
+      ]
+    },
+    {
+      "id": "TRIGGER_TURN_END",
+      "title": "【トリガー】自分のターン終了時",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: TURN_END",
+        "✅ Success matched: True",
+        "✅ p1 Don Active: 1"
+      ]
+    },
+    {
+      "id": "TRIGGER_OPP_TURN_END",
+      "title": "【トリガー】相手のターン終了時",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: OPP_TURN_END",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 1"
+      ]
+    },
+    {
+      "id": "TRIGGER_ON_ATTACK",
+      "title": "【トリガー】自分のアタック時",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_ATTACK",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 1"
+      ]
+    },
+    {
+      "id": "TRIGGER_ON_OPP_ATTACK",
+      "title": "【トリガー】相手のアタック時",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_OPP_ATTACK",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 1"
+      ]
+    },
+    {
+      "id": "TRIGGER_ON_BLOCK",
+      "title": "【トリガー】ブロック時",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_BLOCK",
+        "✅ Success matched: True",
+        "✅ p2 Life Count: 0",
+        "✅ p2 Trash Count: 1"
+      ]
+    },
+    {
+      "id": "TRIGGER_ON_KO",
+      "title": "【トリガー】KO時",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_KO",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 1"
+      ]
+    },
+    {
+      "id": "TRIGGER_PASSIVE_MY_TURN",
+      "title": "【トリガー】〜のターン中（常時効果のテスト）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: PASSIVE",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 1"
+      ]
+    },
+    {
+      "id": "OP13_079_IMU_ACTIVATE_HAND",
+      "title": "【OP13-079 イム】起動メイン：手札コストでドロー",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 1"
+      ]
+    },
+    {
+      "id": "OP13_079_IMU_ACTIVATE_CHARA",
+      "title": "【OP13-079 イム】起動メイン：キャラコストでドロー",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 2",
+        "✅ p1 Field Count: 1"
+      ]
+    },
+    {
+      "id": "EFFECT_BUFF_POWER",
+      "title": "【効果】パワー増加（バフ）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "✅ Success matched: True",
+        "✅ BuffTarget power_buff is 2000"
+      ]
+    },
+    {
+      "id": "EFFECT_COST_MINUS",
+      "title": "【効果】コスト減少（デバフ）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ Enemy cost is 3"
+      ]
+    },
+    {
+      "id": "EFFECT_REST_TARGET",
+      "title": "【効果】相手キャラをレストにする",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ ActiveEnemy is_rest is True"
+      ]
+    },
+    {
+      "id": "EFFECT_ACTIVE_SELF",
+      "title": "【効果】自分キャラをアクティブにする",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "✅ Success matched: True",
+        "✅ RestedAlly is_rest is False"
+      ]
+    },
+    {
+      "id": "EFFECT_SEARCHER_LOOK_ADD",
+      "title": "【効果】サーチ（見る→加える→デッキ下）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 1",
+        "✅ p1 Deck Count: 4"
+      ]
+    },
+    {
+      "id": "EFFECT_DECK_BOTTOM_REMOVAL",
+      "title": "【効果】デッキ下送り（除去）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p2 Deck Count: 2",
+        "✅ p2 Field Count: 0"
+      ]
+    },
+    {
+      "id": "EFFECT_GRANT_KEYWORD",
+      "title": "【効果】キーワード能力付与（速攻）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "✅ Success matched: True",
+        "✅ Ally has keyword 速攻"
+      ]
+    },
+    {
+      "id": "EFFECT_PLAY_FROM_HAND",
+      "title": "【効果】手札から登場させる",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 0",
+        "✅ p1 Field Count: 2",
+        "✅ P1 Field has PlayTarget"
+      ]
+    },
+    {
+      "id": "EFFECT_ATTACH_DON",
+      "title": "【効果】ドン!!付与",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "✅ Success matched: True",
+        "✅ p1 Don Active: 1",
+        "✅ Ally attached_don is 1"
+      ]
+    },
+    {
+      "id": "EFFECT_PREVENT_LEAVE",
+      "title": "【効果】場を離れない（耐性付与）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ Ally has flag PREVENT_LEAVE"
+      ]
+    },
+    {
+      "id": "EFFECT_DEAL_DAMAGE",
+      "title": "【効果】ダメージを与える（ライフ減少）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p2 Hand Count: 1",
+        "✅ p2 Life Count: 0"
+      ]
+    },
+    {
+      "id": "EFFECT_VICTORY",
+      "title": "【効果】特殊勝利",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "✅ Success matched: True"
+      ]
+    },
+    {
+      "id": "TRIGGER_COUNTER_BUFF",
+      "title": "【トリガー】カウンター（パワー増加）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: COUNTER",
+        "✅ Success matched: True"
+      ]
+    },
+    {
+      "id": "TRIGGER_LIFE_EFFECT",
+      "title": "【トリガー】ライフトリガー発動",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: TRIGGER",
+        "✅ Success matched: True"
+      ]
+    },
+    {
+      "id": "MECHANIC_BLOCKER",
+      "title": "【ルール】ブロッカーによる攻撃対象変更",
+      "passed": true,
+      "details": [
+        "✅ Success matched: True"
+      ]
+    },
+    {
+      "id": "KEYWORD_DOUBLE_BANISH",
+      "title": "【キーワード】ダブルアタック＆バニッシュ検証",
+      "passed": false,
+      "details": [
+        "✅ Success matched: True",
+        "✅ p2 Hand Count: 0",
+        "❌ p2 Life Count: Expected 0, Got 2",
+        "❌ p2 Trash Count: Expected 2, Got 0"
+      ]
+    },
+    {
+      "id": "EFFECT_BOUNCE",
+      "title": "【効果】キャラを手札に戻す（バウンス）",
+      "passed": false,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "❌ p2 Hand Count: Expected 1, Got 0",
+        "❌ p2 Field Count: Expected 0, Got 1"
+      ]
+    },
+    {
+      "id": "EFFECT_SET_COST_ZERO",
+      "title": "【効果】コストを特定の値に変更（0にする）",
+      "passed": false,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "❌ OP01-010 cost mismatch. Exp 0, Got 1"
+      ]
+    },
+    {
+      "id": "EFFECT_SEARCH_TRASH_REMAIN",
+      "title": "【効果】サーチ後に残りをトラッシュへ",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "✅ Success matched: True",
+        "✅ p1 Hand Count: 3",
+        "✅ p1 Deck Count: 0"
+      ]
+    }
+  ]
+}

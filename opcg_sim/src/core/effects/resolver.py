@@ -436,7 +436,10 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
         log_event("INFO", "effect.select_option", "Option processed (Branch logic not implemented in Parser yet)", player=player.name)
 
     elif action.type == ActionType.SET_COST:
-        log_event("INFO", "effect.set_cost", f"Cost set request: {action.raw_text}", player=player.name)
+        for t in targets:
+            diff = action.value - t.current_cost
+            t.cost_buff += diff
+            log_event("INFO", "effect.set_cost", f"Set {t.master.name} cost to {action.value}", player=player.name)
 
     elif action.type == ActionType.SHUFFLE:
         random.shuffle(player.deck)
