@@ -1,130 +1,197 @@
 import os
+import re
 
-# --- ファイルパス ---
-path_gamestate = os.path.join("opcg_sim", "src", "core", "gamestate.py")
-path_resolver = os.path.join("opcg_sim", "src", "core", "effects", "resolver.py")
-path_parser = os.path.join("opcg_sim", "src", "core", "effects", "parser.py")
+# --- File Paths ---
+path_matcher = os.path.join("opcg_sim", "src", "core", "effects", "matcher.py")
+path_runner = "run_data_driven_test.py"
 
-def apply_fix(path, start_marker, end_marker, new_content):
-    """
-    start_marker から end_marker の手前までを new_content に置き換える
-    """
-    print(f"Checking {path}...")
-    if not os.path.exists(path):
-        print(f"❌ File not found: {path}")
+def fix_matcher():
+    """matcher.py: '持ち主'の誤検知と'コストXにする'の誤フィルタリングを修正"""
+    print(f"Checking {path_matcher}...")
+    if not os.path.exists(path_matcher):
+        print(f"❌ File not found: {path_matcher}")
         return
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path_matcher, "r", encoding="utf-8") as f:
         content = f.read()
 
-    start_idx = content.find(start_marker)
-    if start_idx == -1:
-        # すでに修正済みかもしれないので、主要キーワードをチェック
-        if new_content.strip()[:20] in content: # 簡易チェック
-             print(f"ℹ️ Code seems already updated in {os.path.basename(path)}")
+    # 1. Player判定ロジックの修正
+    # 「持ち主」が含まれていても、それが「持ち主の手札/デッキ/etc」という移動先指定の場合は対象プレイヤー判定に使わない
+    old_player_logic = """    if _nfc(ParserKeyword.EACH_OTHER) in tgt_text: tq.player = Player.ALL
+    elif _nfc(ParserKeyword.OWNER) in tgt_text: tq.player = Player.OWNER
+    elif _nfc(ParserKeyword.OPPONENT) in tgt_text: tq.player = Player.OPPONENT
+    elif _nfc(ParserKeyword.SELF) in tgt_text or _nfc(ParserKeyword.SELF_REF) in tgt_text: tq.player = Player.SELF"""
+
+    new_player_logic = """    if _nfc(ParserKeyword.EACH_OTHER) in tgt_text: tq.player = Player.ALL
+    elif _nfc(ParserKeyword.OPPONENT) in tgt_text: tq.player = Player.OPPONENT
+    elif _nfc(ParserKeyword.OWNER) in tgt_text: 
+        # "持ち主の[領域]" という表現は移動先を示すことが多いため、選択モードとしては無視する
+        is_dest = False
+        for suffix in ["の手札", "のデッキ", "のライフ", "のトラッシュ"]:
+            if _nfc(ParserKeyword.OWNER + suffix) in tgt_text:
+                is_dest = True
+                break
+        
+        if not is_dest:
+            tq.player = Player.OWNER
+        elif _nfc(ParserKeyword.OPPONENT) in tgt_text:
+            tq.player = Player.OPPONENT
         else:
-             print(f"⚠️ Start marker not found in {os.path.basename(path)}")
-             print(f"   Marker: '{start_marker.strip()}'")
+            # デフォルトに戻す（通常は自分だが、文脈による）
+            tq.player = default_player
+            
+    elif _nfc(ParserKeyword.SELF) in tgt_text or _nfc(ParserKeyword.SELF_REF) in tgt_text: tq.player = Player.SELF"""
+
+    # 2. Cost判定ロジックの修正
+    # 「にする」が続く場合はフィルタとして扱わない
+    old_cost_logic_start = "m_c = re.search(_nfc(ParserKeyword.COST + r'[^+\-\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)"
+    
+    new_cost_logic = """    # Cost
+    # [^+\-\d]? ensures we don't match "+2" or "-2" as part of the number prefix
+    m_c = re.search(_nfc(ParserKeyword.COST + r'[^+\-\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    if m_c:
+        # Extra check: ensure match start isn't preceded by + or -
+        start_idx = m_c.start()
+        prefix_context = tgt_text[max(0, start_idx-1):start_idx]
+        
+        # Extra check: ensure match end isn't followed by "にする" (SET_COST action)
+        end_idx = m_c.end()
+        post_match = tgt_text[end_idx:]
+        is_set_action = _nfc("にする") in post_match[:5]
+
+        if prefix_context not in ['+', '-', '\\u2212', '\\u2010'] and not is_set_action:
+            val = int(m_c.group(1))
+            if m_c.group(2) == _nfc(ParserKeyword.ABOVE): tq.cost_min = val
+            else: tq.cost_max = val"""
+
+    # 置換実行
+    updated = False
+    
+    # Player部分を置換（空白やインデントの違いを吸収するため、特徴的な部分で検索）
+    if "elif _nfc(ParserKeyword.OWNER) in tgt_text: tq.player = Player.OWNER" in content:
+        content = content.replace(old_player_logic, new_player_logic)
+        updated = True
+        print("✅ Patched matcher.py: Player detection logic")
+    
+    # Cost部分を置換（m_cの検索行から次のブロック手前までを置換するのは難しいので、m_c定義行を目印にする）
+    # ここはブロック全体を置き換える
+    cost_block_pattern = r"# Cost[\s\S]+?else: tq.cost_max = val"
+    match = re.search(cost_block_pattern, content)
+    if match:
+        content = content.replace(match.group(0), new_cost_logic)
+        updated = True
+        print("✅ Patched matcher.py: Cost filter logic")
+
+    if updated:
+        with open(path_matcher, "w", encoding="utf-8") as f:
+            f.write(content)
+    else:
+        print("⚠️ matcher.py patterns not found (already updated?)")
+
+
+def fix_runner_battle_flow():
+    """run_data_driven_test.py: マニュアルアクション後のバトル進行ロジックを追加"""
+    print(f"Checking {path_runner}...")
+    if not os.path.exists(path_runner):
+        print(f"❌ File not found: {path_runner}")
         return
 
-    # end_marker が None の場合は、start_marker の行だけ置換（parser用）
-    if end_marker is None:
-        # 行全体を置換
-        end_idx = content.find("\n", start_idx)
-        if end_idx == -1: end_idx = len(content)
+    with open(path_runner, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # manual_action処理の後に、バトル進行ループを挿入する
+    # 目印: Interactionループの前あたり
+    
+    target_marker = 'gm.resolve_interaction(active_player, payload)'
+    
+    # 既存のInteractionループの中に、バトルフェーズ進行ロジックを注入したいが、
+    # 構造上、Interactionループの外側（manual_actionの直後）で処理する方が安全か、
+    # あるいはInteractionループ内で active_interaction が無い場合も回すか。
+    
+    # 最も簡単なのは、manual_actionブロックの最後に「解決まで回す」コードを入れること
+    # しかし manual_action は if "manual_action" in scenario: の中にある
+    
+    # run_scenario 関数内の manual_action 処理ブロックを探す
+    manual_block_end = "ability = DummyAbility()"
+    
+    extra_logic = """
+                # バトル進行自動化: 決着がつくまでブロック/カウンターをパスする（シナリオで指定がない限り）
+                # Interactionループで処理させるため、ここでは何もしないが、
+                # Interactionループの終了条件や処理を拡張する必要がある。
+    """
+    
+    # 実は run_data_driven_test.py の while gm.active_interaction ループは
+    # active_interaction がある間しか回らない。
+    # バトル中は active_interaction が（PendingMessageとして）出るはずだが、
+    # gm.active_interaction プロパティには入っていない（gm.get_pending_request()で取る設計）。
+    
+    # 現行の run_data_driven_test.py は gm.active_interaction しか見ていないのが欠陥。
+    # gm.get_pending_request() もチェックするように修正が必要。
+    
+    loop_start = "while gm.active_interaction and loop_limit > 0:"
+    new_loop_start = "while (gm.active_interaction or gm.get_pending_request()) and loop_limit > 0:"
+    
+    if loop_start in content:
+        content = content.replace(loop_start, new_loop_start)
+        print("✅ Patched run_data_driven_test.py: Loop condition extended")
         
-        # インデントを維持するために元の行を取得
-        original_line = content[start_idx:end_idx]
-        indent = original_line[:len(original_line) - len(original_line.lstrip())]
-        
-        # 置換
-        new_full_content = content[:start_idx] + new_content + content[end_idx:]
-    else:
-        # ブロック置換
-        end_idx = content.find(end_marker, start_idx + len(start_marker))
-        if end_idx == -1:
-            print(f"⚠️ End marker not found in {os.path.basename(path)}")
-            return
-        
-        # 置換実行
-        new_full_content = content[:start_idx] + new_content + content[end_idx:]
-
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(new_full_content)
-    print(f"✅ Fixed {os.path.basename(path)}")
-
-
-# 1. GAMESTATE FIX (Double Attack & Banish)
-gs_start = "def resolve_attack(self):"
-gs_end = "def check_victory(self):" # 次のメソッド
-gs_new = """def resolve_attack(self):
-        if not self.active_battle:
-            return
-
-        attacker = self.active_battle["attacker"]
-        target = self.active_battle["target"]
-        attacker_owner = self.active_battle["attacker_owner"]
-        target_owner = self.active_battle["target_owner"]
-        counter_buff = self.active_battle.get("counter_buff", 0)
-
-        is_my_turn = (attacker_owner == self.turn_player)
-        is_target_turn = (target_owner == self.turn_player)
-        
-        attacker_pwr = attacker.get_power(is_my_turn)
-        target_pwr = target.get_power(is_target_turn) + counter_buff
-        
-        log_event("DEBUG", "game.resolve_attack_pre", f"Attacker: {attacker.master.name}({attacker_pwr}) vs Target: {target.master.name}({target_pwr})", player=attacker_owner.name if attacker_owner else "system")
-        
-        if target == target_owner.leader:
-            if attacker_pwr >= target_pwr:
-                # ダブルアタック & バニッシュ判定
-                damage_amount = 2 if "ダブルアタック" in attacker.current_keywords else 1
-                is_banish = "バニッシュ" in attacker.current_keywords
-
-                log_event("INFO", "game.damage_step", f"Dealing {damage_amount} damage (Banish: {is_banish})", player=attacker_owner.name)
-
-                for _ in range(damage_amount):
-                    if target_owner.life:
-                        life_card = target_owner.life.pop(0)
-                        dest_zone = Zone.TRASH if is_banish else Zone.HAND
-                        self.move_card(life_card, dest_zone, target_owner)
-                        log_event("INFO", "game.damage_life", f"{target_owner.name} takes damage to {dest_zone.name}", player=target_owner.name)
+    # さらに、ループ内で pending_request を active_interaction として扱う処理を追加
+    req_logic = "req = gm.active_interaction"
+    new_req_logic = """
+                if not gm.active_interaction:
+                    # Pending RequestをInteractionとしてラップする
+                    pending = gm.get_pending_request()
+                    if pending:
+                        # 自動処理可能なフェーズかチェック
+                        action_type = pending.get("action")
+                        player_id = pending.get("player_id")
+                        target_p = gm.p1 if player_id == "P1" else gm.p2
+                        
+                        # ブロック/カウンターの要求であれば、シナリオ指定がない限りパスする
+                        # シナリオのinteractionステップが残っていればそちらに従う
+                        
+                        if step_idx >= len(interaction_steps):
+                            # ステップが尽きている -> 自動パス
+                            if action_type == "SELECT_BLOCKER":
+                                gm.handle_block(None)
+                                continue
+                            elif action_type == "SELECT_COUNTER":
+                                gm.apply_counter(target_p, None)
+                                continue
+                        
+                        # ステップが残っている場合、active_interactionとして偽装して後続処理に任せる
+                        req = {
+                            "action_type": action_type,
+                            "candidates": [], # 必要なら埋める
+                            "can_skip": pending.get("can_skip", False)
+                        }
+                        # 次の処理へ（reqを使う）
                     else:
-                        self.winner = attacker_owner.name
-                        log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name)
-                        break
-        else:
-            if attacker_pwr >= target_pwr:
-                self.move_card(target, Zone.TRASH, target_owner)
-                log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
+                        break # 何もなければ終了
+                else:
+                    req = gm.active_interaction
+    """
+    
+    # req = gm.active_interaction を置換
+    # インデント調整が必要
+    pattern = r"                req = gm\.active_interaction"
+    if re.search(pattern, content):
+        # 置換後のインデントを合わせる
+        replacement = new_req_logic.replace("\n", "\n                ")
+        # 最初の改行のインデントを除去
+        replacement = replacement.replace("                \n", "\n") 
         
-        target.reset_turn_status()
-        self.active_battle = None
-        self.phase = Phase.MAIN
-        self.check_victory()
+        # 正規表現ではなく単純置換で行く（インデントが崩れやすいため注意）
+        content = content.replace("                req = gm.active_interaction", new_req_logic.strip().replace("\n", "\n                "))
+        print("✅ Patched run_data_driven_test.py: Added battle phase progression logic")
+    else:
+        print("⚠️ run_data_driven_test.py loop body not matched (check indentation)")
 
-    """
-
-# 2. RESOLVER FIX (Set Cost)
-res_start = "elif action.type == ActionType.SET_COST:"
-res_end = "elif action.type == ActionType.SHUFFLE:" # 次のブロック
-res_new = """elif action.type == ActionType.SET_COST:
-        for t in targets:
-            diff = action.value - t.current_cost
-            t.cost_buff += diff
-            log_event("INFO", "effect.set_cost", f"Set {t.master.name} cost to {action.value}", player=player.name)
-
-    """
-
-# 3. PARSER FIX (Bounce Target)
-# 特定のif文の行だけを置き換える
-par_start = "if act_type in [ActionType.KO, ActionType.DEAL_DAMAGE, ActionType.REST, ActionType.ATTACK_DISABLE, ActionType.FREEZE]:"
-par_new = "if act_type in [ActionType.KO, ActionType.DEAL_DAMAGE, ActionType.REST, ActionType.ATTACK_DISABLE, ActionType.FREEZE, ActionType.MOVE_TO_HAND]:"
-
+    with open(path_runner, "w", encoding="utf-8") as f:
+        f.write(content)
 
 if __name__ == "__main__":
-    print("🚀 Starting FINAL Force Fix...")
-    apply_fix(path_gamestate, gs_start, gs_end, gs_new)
-    apply_fix(path_resolver, res_start, res_end, res_new)
-    apply_fix(path_parser, par_start, None, par_new)
-    print("✨ Finished. Please run the test again.")
+    print("🚀 Starting Logic Bug Fixes...")
+    fix_matcher()
+    fix_runner_battle_flow()
+    print("✨ Updates completed.")

@@ -20,10 +20,25 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.zone = Zone.TEMP
         return tq
 
-    # Player
+    # Player Detection (Fixed)
     if _nfc(ParserKeyword.EACH_OTHER) in tgt_text: tq.player = Player.ALL
-    elif _nfc(ParserKeyword.OWNER) in tgt_text: tq.player = Player.OWNER
     elif _nfc(ParserKeyword.OPPONENT) in tgt_text: tq.player = Player.OPPONENT
+    elif _nfc(ParserKeyword.OWNER) in tgt_text: 
+        # "持ち主の[領域]" という表現は移動先を示すことが多いため、選択モードとしては無視する
+        is_dest = False
+        for suffix in ["の手札", "のデッキ", "のライフ", "のトラッシュ"]:
+            if _nfc(ParserKeyword.OWNER + suffix) in tgt_text:
+                is_dest = True
+                break
+        
+        if not is_dest:
+            tq.player = Player.OWNER
+        elif _nfc(ParserKeyword.OPPONENT) in tgt_text:
+            tq.player = Player.OPPONENT
+        else:
+            # デフォルトに戻す（通常は自分だが、文脈による）
+            tq.player = default_player
+            
     elif _nfc(ParserKeyword.SELF) in tgt_text or _nfc(ParserKeyword.SELF_REF) in tgt_text: tq.player = Player.SELF
 
     # --- Zone Detection ---
@@ -94,7 +109,13 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         # Extra check: ensure match start isn't preceded by + or -
         start_idx = m_c.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
-        if prefix_context not in ['+', '-', '\u2212', '\u2010']:
+        
+        # Extra check: ensure match end isn't followed by "にする" (SET_COST action)
+        end_idx = m_c.end()
+        post_match = tgt_text[end_idx:]
+        is_set_action = _nfc("にする") in post_match[:5]
+
+        if prefix_context not in ['+', '-', '\u2212', '\u2010'] and not is_set_action:
             val = int(m_c.group(1))
             if m_c.group(2) == _nfc(ParserKeyword.ABOVE): tq.cost_min = val
             else: tq.cost_max = val

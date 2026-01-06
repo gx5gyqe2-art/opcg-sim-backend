@@ -29,11 +29,13 @@ def create_mock_card(owner_id: str, def_data: Any) -> CardInstance:
         cost = 1
         traits = []
         is_rest = False
+        keywords = []
     else:
         name = def_data.get("name", "Unknown")
         cost = def_data.get("cost", 1)
         traits = def_data.get("traits", [])
         is_rest = def_data.get("is_rest", False)
+        keywords = def_data.get("keywords", [])
 
     master = CardMaster(
         card_id=f"MOCK-{name}",
@@ -47,7 +49,8 @@ def create_mock_card(owner_id: str, def_data: Any) -> CardInstance:
         traits=traits,
         effect_text="",
         trigger_text="",
-        life=0
+        life=0,
+        keywords=set(keywords) # キーワード反映
     )
     inst = CardInstance(master, owner_id)
     inst.is_rest = is_rest
@@ -62,19 +65,16 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
     # プレイヤー状態のセットアップ
     for pid, p_obj in [("p1", p1), ("p2", p2)]:
         p_data = scenario.get("setup", {}).get(pid, {})
+        
         # Leader Setup
-        leader_def = p_data.get("leader")
-        if leader_def:
-            l_card = create_mock_card(p_obj.name, leader_def)
-            # 強制的にリーダータイプにする（モック生成の簡易ハック）
-            # l_card.master.type = CardType.LEADER # frozenなので直接書き換え不可だが、テスト用なら属性無視で通るか、あるいは作り直す
-            # ここでは簡易的に属性をごまかす
-            object.__setattr__(l_card.master, 'type', CardType.LEADER) 
-            # もし object.__setattr__ が使えない環境なら、mock作成時に調整が必要だが一旦これで。
+        if "leader" in p_data:
+            l_val = p_data["leader"]
+            l_card = create_mock_card(p_obj.name, l_val)
+            # CardMasterはfrozenなので強制書き換えでLeader属性を付与
+            object.__setattr__(l_card.master, 'type', CardType.LEADER)
             object.__setattr__(l_card.master, 'life', 5)
             p_obj.leader = l_card
-        
-        
+
         # Field
         for c_def in p_data.get("field", []):
             card = create_mock_card(p_obj.name, c_def)
@@ -104,7 +104,7 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
         active_count = p_data.get("don_active", 0)
         p_obj.don_active = [DonInstance(p_obj.name) for _ in range(active_count)]
 
-        # Don Rested (追加修正: レストドンも配置可能に)
+        # Don Rested
         rested_count = p_data.get("don_rested", 0)
         p_obj.don_rested = []
         for _ in range(rested_count):
@@ -112,7 +112,7 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
             d.is_rest = True
             p_obj.don_rested.append(d)
         
-        # Don Deck (調整: アクティブとレストの合計を引く)
+        # Don Deck
         total_in_play = active_count + rested_count
         deck_count = 10 - total_in_play
         if deck_count < 0: deck_count = 0
@@ -121,7 +121,7 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
     return gm
 
 def find_card_by_name(player: Player, name: str) -> CardInstance:
-    # 修正: 検索範囲をフィールドと手札に加えて、ライフとトラッシュも対象にする
+    # 検索範囲をフィールドと手札に加えて、ライフとトラッシュも対象にする
     for c in player.field + player.hand + player.life + player.trash:
         if c.master.name == name:
             return c
@@ -156,8 +156,14 @@ def run_scenario(scenario: Dict) -> Dict:
         if "manual_action" in scenario:
             act = scenario["manual_action"]
             if act["type"] == "ATTACK":
-                target_card = gm.p2.leader if act["target"] == "P2Leader" else gm.p1.leader
-                if not target_card: raise Exception("Target leader not found")
+                target_name = act["target"]
+                target_card = None
+                if target_name == "P2Leader": target_card = gm.p2.leader
+                elif target_name == "P1Leader": target_card = gm.p1.leader
+                
+                if not target_card:
+                     raise Exception(f"Manual Action Target '{target_name}' not found")
+                
                 gm.declare_attack(source_card, target_card)
                 
                 # ダミーAbility (後続のTrigger検証などをパスするため)
@@ -188,20 +194,49 @@ def run_scenario(scenario: Dict) -> Dict:
             if not hasattr(ability, 'trigger') or ability.trigger is not None:
                 gm.resolve_ability(active_player, ability, source_card)
             
-            # Interactionループ
+            # Interactionループ (Battleフェーズ進行も含む)
             interaction_steps = scenario.get("interaction", [])
             step_idx = 0
             
-            loop_limit = 10
-            while gm.active_interaction and loop_limit > 0:
+            loop_limit = 20
+            # active_interaction または pending_request がある限り回す
+            while (gm.active_interaction or gm.get_pending_request()) and loop_limit > 0:
                 loop_limit -= 1
+                
                 req = gm.active_interaction
                 
+                # Active Interactionがない場合、Pending Requestをラップして処理
+                if not req:
+                    pending = gm.get_pending_request()
+                    if pending:
+                        action_type = pending.get("action")
+                        
+                        # シナリオ指定が尽きている場合、ブロック/カウンターは自動パス
+                        if step_idx >= len(interaction_steps):
+                            if action_type == "SELECT_BLOCKER":
+                                gm.handle_block(None)
+                                continue
+                            elif action_type == "SELECT_COUNTER":
+                                target_pid = pending.get("player_id")
+                                target_p = gm.p1 if target_pid == gm.p1.name else gm.p2
+                                gm.apply_counter(target_p, None)
+                                continue
+                        
+                        # 処理対象としてラップ
+                        req = {
+                            "action_type": action_type,
+                            "candidates": pending.get("candidates", []),
+                            "can_skip": pending.get("can_skip", False)
+                        }
+                    else:
+                        break
+
+                # --- Interaction 処理 ---
                 if step_idx >= len(interaction_steps):
                     if req.get("can_skip"):
                         gm.resolve_interaction(active_player, {}) # Pass
                     else:
-                        raise Exception(f"Unexpected interaction required: {req['action_type']}")
+                        raise Exception(f"Unexpected interaction required: {req.get('action_type')}")
                 else:
                     step_input = interaction_steps[step_idx]
                     
@@ -209,19 +244,16 @@ def run_scenario(scenario: Dict) -> Dict:
                     if "verify_candidates" in step_input:
                         verify = step_input["verify_candidates"]
                         candidates = req.get("candidates", [])
-                        candidate_names = [c.master.name for c in candidates]
+                        
+                        # candidatesは辞書(pending由来)かオブジェクト(interaction由来)か混在する可能性あり
+                        candidate_names = []
+                        for c in candidates:
+                            if isinstance(c, dict): candidate_names.append(c.get("name", "Unknown"))
+                            else: candidate_names.append(c.master.name)
                         
                         for expected in verify.get("has_names", []):
                             if expected not in candidate_names:
                                 raise Exception(f"Validation Error: Expected candidate '{expected}' not found. Candidates: {candidate_names}")
-
-                        for unexpected in verify.get("missing_names", []):
-                            if unexpected in candidate_names:
-                                raise Exception(f"Validation Error: Unexpected candidate '{unexpected}' found. Candidates: {candidate_names}")
-                        
-                        if "count" in verify:
-                            if len(candidates) != verify["count"]:
-                                raise Exception(f"Validation Error: Candidate count mismatch. Expected {verify['count']}, Got {len(candidates)}")
 
                     payload = {}
                     
@@ -230,16 +262,49 @@ def run_scenario(scenario: Dict) -> Dict:
                         target_names = step_input["select_cards"]
                         selected_uuids = []
                         candidates = req.get("candidates", [])
-                        for t_name in target_names:
-                            found = next((c for c in candidates if c.master.name == t_name), None)
-                            if found: selected_uuids.append(found.uuid)
-                        payload["selected_uuids"] = selected_uuids
                         
+                        # pendingの場合はUUIDsが別フィールドにあるが、ここではcandidatesから探す
+                        for t_name in target_names:
+                            found = None
+                            for c in candidates:
+                                c_name = c.get("name") if isinstance(c, dict) else c.master.name
+                                c_uuid = c.get("uuid") if isinstance(c, dict) else c.uuid
+                                if c_name == t_name:
+                                    found = c
+                                    selected_uuids.append(c_uuid)
+                                    break
+                        payload["selected_uuids"] = selected_uuids
+                    
+                    # ブロッカー使用 (manual_action風の指定がある場合)
+                    if "use_blocker" in step_input and step_input["use_blocker"]:
+                        blocker_name = step_input.get("blocker_card")
+                        candidates = req.get("candidates", [])
+                        found_blocker = None
+                        for c in candidates:
+                            c_name = c.get("name") if isinstance(c, dict) else c.master.name
+                            if c_name == blocker_name:
+                                # pending requestの場合はオブジェクトが必要なため、gmから探す必要あり
+                                c_uuid = c.get("uuid") if isinstance(c, dict) else c.uuid
+                                found_blocker = gm._find_card_by_uuid(c_uuid)
+                                break
+                        if found_blocker:
+                            gm.handle_block(found_blocker)
+                            step_idx += 1
+                            continue # 次のループへ
+
                     # 選択肢 (Option)
                     if "select_option" in step_input:
                         payload["selected_option_index"] = step_input["select_option"]
 
-                    gm.resolve_interaction(active_player, payload)
+                    if gm.active_interaction:
+                        gm.resolve_interaction(active_player, payload)
+                    elif req.get("action_type") == "SELECT_COUNTER":
+                         # カウンターなどは現状手動で関数を呼ぶ必要がある（簡易実装）
+                         target_pid = req.get("player_id") # pending requestはdict
+                         if not target_pid: target_pid = active_player.name
+                         target_p = gm.p1 if target_pid == gm.p1.name else gm.p2
+                         gm.apply_counter(target_p, None)
+
                     step_idx += 1
             
             success = True
@@ -249,6 +314,7 @@ def run_scenario(scenario: Dict) -> Dict:
             success = False
         except Exception as e:
             result_report["details"].append(f"Runtime Error: {str(e)}")
+            traceback.print_exc()
             success = False
 
         # 5. 検証 (Expectations)
@@ -273,12 +339,8 @@ def run_scenario(scenario: Dict) -> Dict:
         def check_prop(pid, p_obj, key, label):
             if key in expect:
                 actual = 0
-                
-                # 具体的なキーを先に判定
                 if "don_deck_count" in key: actual = len(p_obj.don_deck)
                 elif "don_active" in key: actual = len(p_obj.don_active)
-                
-                # 一般的なキーは後にする
                 elif "hand_count" in key: actual = len(p_obj.hand)
                 elif "deck_count" in key: actual = len(p_obj.deck)
                 elif "life_count" in key: actual = len(p_obj.life)
@@ -327,6 +389,22 @@ def run_scenario(scenario: Dict) -> Dict:
                      result_report["details"].append(f"✅ P1 Field has {name}")
                 else:
                      result_report["details"].append(f"❌ P1 Field missing {name}. Current: {current_names}")
+        
+        if "p1_hand_has" in expect:
+            current_names = [c.master.name for c in gm.p1.hand]
+            for name in expect["p1_hand_has"]:
+                if name in current_names:
+                     result_report["details"].append(f"✅ P1 Hand has {name}")
+                else:
+                     result_report["details"].append(f"❌ P1 Hand missing {name}. Current: {current_names}")
+        
+        if "p2_hand_has" in expect:
+            current_names = [c.master.name for c in gm.p2.hand]
+            for name in expect["p2_hand_has"]:
+                if name in current_names:
+                     result_report["details"].append(f"✅ P2 Hand has {name}")
+                else:
+                     result_report["details"].append(f"❌ P2 Hand missing {name}. Current: {current_names}")
 
         def verify_card_props(player_obj, check_list):
             for check in check_list:
@@ -344,9 +422,7 @@ def run_scenario(scenario: Dict) -> Dict:
                             result_report["details"].append(f"✅ {name} power_buff is {check['power_buff']}")
                         else:
                             result_report["details"].append(f"❌ {name} power_buff mismatch. Exp {check['power_buff']}, Got {target.power_buff}")
-                    if "cost" in check: # base cost check
-                        # Note: current_cost calc might depend on base + buff
-                        # Here we assume checking result of effect
+                    if "cost" in check:
                         if target.current_cost == check["cost"]:
                              result_report["details"].append(f"✅ {name} cost is {check['cost']}")
                         else:

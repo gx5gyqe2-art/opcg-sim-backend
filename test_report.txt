@@ -1,7 +1,7 @@
 Test Execution Report
 Total Scenarios: 48
-Passed: 45
-Failed: 3
+Passed: 46
+Failed: 2
 ============================================================
 
 ✅ [PASS] BASIC_KO_AND_COST: 【基本】コスト指定KOとドン!!コスト支払い
@@ -248,15 +248,16 @@ Failed: 3
 ------------------------------------------------------------
 ❌ [FAIL] KEYWORD_DOUBLE_BANISH: 【キーワード】ダブルアタック＆バニッシュ検証
     ✅ Success matched: True
-    ✅ p2 Hand Count: 0
-    ❌ p2 Life Count: Expected 0, Got 2
+    ❌ p2 Hand Count: Expected 0, Got 1
+    ❌ p2 Life Count: Expected 0, Got 1
     ❌ p2 Trash Count: Expected 2, Got 0
 ------------------------------------------------------------
-❌ [FAIL] EFFECT_BOUNCE: 【効果】キャラを手札に戻す（バウンス）
+✅ [PASS] EFFECT_BOUNCE: 【効果】キャラを手札に戻す（バウンス）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
-    ❌ p2 Hand Count: Expected 1, Got 0
-    ❌ p2 Field Count: Expected 0, Got 1
+    ✅ p2 Hand Count: 1
+    ✅ p2 Field Count: 0
+    ✅ P2 Hand has TargetChar
 ------------------------------------------------------------
 ❌ [FAIL] EFFECT_SET_COST_ZERO: 【効果】コストを特定の値に変更（0にする）
     ✅ Trigger matched: ON_PLAY

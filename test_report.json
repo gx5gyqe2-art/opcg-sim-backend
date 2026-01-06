@@ -1,8 +1,8 @@
 {
   "summary": {
     "total": 48,
-    "passed": 45,
-    "failed": 3
+    "passed": 46,
+    "failed": 2
   },
   "results": [
     {
@@ -473,20 +473,21 @@
       "passed": false,
       "details": [
         "✅ Success matched: True",
-        "✅ p2 Hand Count: 0",
-        "❌ p2 Life Count: Expected 0, Got 2",
+        "❌ p2 Hand Count: Expected 0, Got 1",
+        "❌ p2 Life Count: Expected 0, Got 1",
         "❌ p2 Trash Count: Expected 2, Got 0"
       ]
     },
     {
       "id": "EFFECT_BOUNCE",
       "title": "【効果】キャラを手札に戻す（バウンス）",
-      "passed": false,
+      "passed": true,
       "details": [
         "✅ Trigger matched: ON_PLAY",
         "✅ Success matched: True",
-        "❌ p2 Hand Count: Expected 1, Got 0",
-        "❌ p2 Field Count: Expected 0, Got 1"
+        "✅ p2 Hand Count: 1",
+        "✅ p2 Field Count: 0",
+        "✅ P2 Hand has TargetChar"
       ]
     },
     {
