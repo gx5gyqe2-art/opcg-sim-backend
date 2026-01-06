@@ -123,6 +123,10 @@ def execute_action(
             
         else:
             log_event("INFO", "resolver.select_option_resume", f"Option {selected_option} selected", player=player.name)
+            
+            if "selected_option_index" in effect_context:
+                del effect_context["selected_option_index"]
+
             if action.details and "resolvable_options" in action.details:
                 options = action.details["resolvable_options"]
                 if 0 <= selected_option < len(options):
@@ -158,7 +162,7 @@ def execute_action(
             
             is_search = (action.target.zone == Zone.TEMP) or (action.source_zone == Zone.TEMP)
             
-            should_interact = action.target.select_mode not in ["ALL", "SOURCE", "SELF"] and (len(candidates) > 0 or is_search)
+            should_interact = action.target.select_mode not in ["ALL", "SOURCE", "SELF", "REMAINING"] and (len(candidates) > 0 or is_search)
 
             if should_interact:
                 if selected_uuids is None:
@@ -184,6 +188,9 @@ def execute_action(
                     return False
                 
                 targets = [c for c in candidates if c.uuid in selected_uuids]
+                
+                if "selected_uuids" in effect_context:
+                    del effect_context["selected_uuids"]
             else:
                 targets = candidates
 
@@ -362,7 +369,8 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
                 log_event("DEBUG", "resolver.life_manipulate_fail", "Target required for Life manipulation but not found", player=player.name)
 
     elif action.type == ActionType.GRANT_KEYWORD:
-        keywords = {
+        # 修正: キーワードを柔軟に判定
+        keywords_map = {
             "速攻": "速攻",
             "ブロッカー": "ブロッカー",
             "バニッシュ": "バニッシュ",
@@ -371,14 +379,14 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
             "再起動": "再起動"
         }
         found_kw = None
-        for k, v in keywords.items():
-            if k in action.raw_text:
-                found_kw = v
-                break
-        if found_kw:
-            for t in targets:
-                t.current_keywords.add(found_kw)
-                log_event("INFO", "effect.grant_keyword", f"Granted [{found_kw}] to {t.master.name}", player=player.name)
+        for kw_jp, kw_internal in keywords_map.items():
+            if kw_jp in action.raw_text:
+                found_kw = kw_internal
+                # マッチしたらループ継続せずに追加
+                for t in targets:
+                    t.current_keywords.add(found_kw)
+                    log_event("INFO", "effect.grant_keyword", f"Granted [{found_kw}] to {t.master.name}", player=player.name)
+                break # 1つ見つかればOKとする（複数付与は現状考慮外）
 
     elif action.type == ActionType.ATTACK_DISABLE:
         for t in targets:

@@ -124,7 +124,7 @@ class Effect:
                     verb = match.group(2)
                     
                     text_a = part_a_raw
-                    # 修正適用済み: 重複チェックを削除して強制結合
+                    # 修正: 「を」などが重複しても強制的に結合して動詞を補完する
                     text_a = f"{part_a_raw}{connector}{verb}"
                     
                     text_b = part_b_raw
@@ -148,7 +148,9 @@ class Effect:
             return self._handle_look_action(text)
 
         act_type = self._detect_action_type(text)
-        val = self._extract_number(text)
+        
+        # アクションタイプに応じた数値抽出
+        val = self._extract_value_for_action(text, act_type)
 
         target = None
         NO_TARGET_ACTIONS = [
@@ -162,7 +164,8 @@ class Effect:
             ActionType.REPLACE_EFFECT,
             ActionType.MODIFY_DON_PHASE,
             ActionType.PASSIVE_EFFECT,
-            ActionType.ACTIVE_DON
+            ActionType.ACTIVE_DON,
+            ActionType.OTHER
         ]
         
         is_calculation_or_rule = any(kw in text for kw in ["につき", "できない", "されない", "得る", "いる"])
@@ -188,6 +191,38 @@ class Effect:
             value=val,
             raw_text=text
         )]
+
+    def _extract_value_for_action(self, text: str, act_type: ActionType) -> int:
+        num_pattern = r'([+\-＋−]?\s*\d+)'
+        
+        if act_type == ActionType.BUFF:
+            match = re.search(r'パワー' + num_pattern, text)
+            if match:
+                val_str = self._normalize_number_str(match.group(1))
+                return int(val_str)
+        
+        if act_type == ActionType.COST_CHANGE:
+            match = re.search(r'コスト' + num_pattern, text)
+            if match:
+                val_str = self._normalize_number_str(match.group(1))
+                return int(val_str)
+        
+        return self._extract_number(text)
+
+    def _normalize_number_str(self, s: str) -> str:
+        s = unicodedata.normalize('NFKC', s)
+        s = s.replace(' ', '').replace('　', '')
+        return s
+
+    def _extract_number(self, text: str) -> int:
+        match = re.search(r'([-\u2212\u2010\u2011\u2012\u2013\u2014\u2015\uff0d+]?)(\d+)', text)
+        if match:
+            sign = match.group(1)
+            num = int(match.group(2))
+            if sign in ['-', '\u2212', '\u2010', '\u2011', '\u2012', '\u2013', '\u2014', '\u2015', '\uff0d']:
+                return -num
+            return num
+        return 0
 
     def _detect_action_type(self, text: str) -> ActionType:
         if 'ドン' in text:
@@ -246,16 +281,6 @@ class Effect:
         if 'アクティブ' in text: return ActionType.ACTIVE
         
         return ActionType.OTHER
-
-    def _extract_number(self, text: str) -> int:
-        match = re.search(r'([-\u2212\u2010\u2011\u2012\u2013\u2014\u2015\uff0d+]?)(\d+)', text)
-        if match:
-            sign = match.group(1)
-            num = int(match.group(2))
-            if sign in ['-', '\u2212', '\u2010', '\u2011', '\u2012', '\u2013', '\u2014', '\u2015', '\uff0d']:
-                return -num
-            return num
-        return 0
 
     def _parse_condition(self, text: str) -> Optional[Condition]:
         type_ = ConditionType.NONE

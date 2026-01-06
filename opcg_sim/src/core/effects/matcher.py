@@ -5,15 +5,11 @@ from ...models.effect_types  import TargetQuery, _nfc
 from ...models.enums import Player, Zone, ParserKeyword
 from ...utils.logger_config import log_event
 
-# logger = logging.getLogger("opcg_sim")
-
 def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQuery:
     tq = TargetQuery(raw_text=tgt_text, player=default_player)
     
-    # デバッグログ: パース入力の確認
     log_event("DEBUG", "matcher.parse_start", f"Parsing target text: {tgt_text}")
 
-    # 定数化
     if tgt_text == _nfc(ParserKeyword.THIS_CARD) or (tgt_text == _nfc(ParserKeyword.SELF_REF) and _nfc(ParserKeyword.SELF_REF + "の") not in tgt_text):
         tq.select_mode = "SOURCE"
         return tq
@@ -24,16 +20,13 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.zone = Zone.TEMP
         return tq
 
-    # プレイヤー判定
+    # Player
     if _nfc(ParserKeyword.EACH_OTHER) in tgt_text: tq.player = Player.ALL
     elif _nfc(ParserKeyword.OWNER) in tgt_text: tq.player = Player.OWNER
     elif _nfc(ParserKeyword.OPPONENT) in tgt_text: tq.player = Player.OPPONENT
     elif _nfc(ParserKeyword.SELF) in tgt_text or _nfc(ParserKeyword.SELF_REF) in tgt_text: tq.player = Player.SELF
 
-    # --- ゾーン判定 (正規表現版) ---
-    # 「〜を」「〜から」「〜の」が付いているゾーンを検索対象とする
-    # 「〜に」「〜へ」は移動先なので除外される
-    
+    # --- Zone Detection ---
     zone_map = {
         _nfc("手札"): Zone.HAND,
         _nfc("トラッシュ"): Zone.TRASH,
@@ -45,35 +38,42 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     
     found_zone = None
     
-    # 優先度1: 明示的な対象指示 (〜を、〜から、〜の)
-    # (?:.{0,5}) は「1枚」などの数量が間に挟まることを許容する
+    # Check for explicit zone keywords
     pattern = re.compile(r'(手札|トラッシュ|ライフ|デッキ|場|コストエリア)(?:.{0,5})(?:を|から|の)')
-    matches = pattern.findall(tgt_text)
+    matches = pattern.finditer(tgt_text)
     
-    if matches:
-        for m in matches:
-            z_name = _nfc(m)
-            if z_name in zone_map:
-                found_zone = zone_map[z_name]
-                break
+    for m in matches:
+        z_name = _nfc(m.group(1))
+        post_match = tgt_text[m.end():]
+        
+        # Exclude destination phrasing like "Deck Bottom"
+        if z_name == _nfc("デッキ") and (_nfc("下") in post_match or _nfc("上") in post_match):
+             if _nfc("から") not in post_match[:5]: 
+                 continue
+        
+        if z_name in zone_map:
+            found_zone = zone_map[z_name]
+            break
     
-    # 優先度2: ドン指定 (ドン!!はコストエリア)
-    if not found_zone and _nfc(ParserKeyword.DON) in tgt_text:
-        found_zone = Zone.COST_AREA
+    # Priority: Explicit Zone > Context Implication > Don Keyword > Default Field
+    if not found_zone:
+        if _nfc(ParserKeyword.LEADER) in tgt_text or _nfc(ParserKeyword.CHARACTER) in tgt_text:
+            found_zone = Zone.FIELD
+        elif _nfc(ParserKeyword.DON) in tgt_text:
+            found_zone = Zone.COST_AREA
 
     if found_zone:
         tq.zone = found_zone
     else:
-        # デフォルト
         tq.zone = Zone.FIELD
 
-    # --- カードタイプ ---
+    # --- Card Type ---
     if _nfc(ParserKeyword.LEADER) in tgt_text: tq.card_type.append("LEADER")
     if _nfc(ParserKeyword.CHARACTER) in tgt_text: tq.card_type.append("CHARACTER")
     if _nfc(ParserKeyword.EVENT) in tgt_text: tq.card_type.append("EVENT")
     if _nfc(ParserKeyword.STAGE) in tgt_text: tq.card_type.append("STAGE")
     
-    # --- その他フィルタ ---
+    # --- Filters ---
     m_name = re.search(r'「([^」]+)」', tgt_text)
     if m_name:
         if (m_name.group(0) + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
@@ -87,23 +87,33 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
-    m_c = re.search(_nfc(ParserKeyword.COST + r'\D?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    # Cost
+    # [^+\-\d]? ensures we don't match "+2" or "-2" as part of the number prefix
+    m_c = re.search(_nfc(ParserKeyword.COST + r'[^+\-\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
-        val = int(m_c.group(1))
-        if m_c.group(2) == _nfc(ParserKeyword.ABOVE): tq.cost_min = val
-        else: tq.cost_max = val
+        # Extra check: ensure match start isn't preceded by + or -
+        start_idx = m_c.start()
+        prefix_context = tgt_text[max(0, start_idx-1):start_idx]
+        if prefix_context not in ['+', '-', '\u2212', '\u2010']:
+            val = int(m_c.group(1))
+            if m_c.group(2) == _nfc(ParserKeyword.ABOVE): tq.cost_min = val
+            else: tq.cost_max = val
 
-    m_p = re.search(_nfc(ParserKeyword.POWER + r'\D?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    # Power
+    m_p = re.search(_nfc(ParserKeyword.POWER + r'[^+\-\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_p:
-        val = int(m_p.group(1))
-        if m_p.group(2) == _nfc(ParserKeyword.ABOVE): tq.power_min = val
-        else: tq.power_max = val
+        start_idx = m_p.start()
+        prefix_context = tgt_text[max(0, start_idx-1):start_idx]
+        if prefix_context not in ['+', '-', '\u2212', '\u2010']:
+            val = int(m_p.group(1))
+            if m_p.group(2) == _nfc(ParserKeyword.ABOVE): tq.power_min = val
+            else: tq.power_max = val
     
-    if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
-    elif _nfc("レスト") in tgt_text: tq.is_rest = True
-    elif _nfc("アクティブ") in tgt_text:
-        if _nfc("ならない") not in tgt_text:
-            tq.is_rest = False
+    # Status
+    if _nfc("にする") not in tgt_text and _nfc("ならない") not in tgt_text:
+        if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
+        elif _nfc("レスト") in tgt_text: tq.is_rest = True
+        elif _nfc("アクティブ") in tgt_text: tq.is_rest = False
     
     if re.search(r'(\d+|枚)まで', tgt_text): tq.is_up_to = True 
 
@@ -161,6 +171,4 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         if query.select_mode in ["ALL", "REMAINING"] or query.is_up_to: log_level = "INFO"
         log_event(level_key=log_level, action="matcher.no_target", msg=f"No targets found for query: {query.raw_text}", player="system", payload={"query_raw": query.raw_text, "zone": query.zone.name, "target_player": query.player.name, "real_target_names": [p.name for p in target_players], "candidates_scanned": len(candidates)})
 
-    # ★重要: ここでスライス処理（results[:count]）を行わない！
-    # 候補選択ロジック（Resolver）に全候補を渡す必要がある。
     return results

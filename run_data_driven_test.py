@@ -109,8 +109,8 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
     return gm
 
 def find_card_by_name(player: Player, name: str) -> CardInstance:
-    # 検索範囲をフィールドと手札に限定（必要に応じて拡張）
-    for c in player.field + player.hand:
+    # 修正: 検索範囲をフィールドと手札に加えて、ライフとトラッシュも対象にする
+    for c in player.field + player.hand + player.life + player.trash:
         if c.master.name == name:
             return c
     return None
@@ -137,7 +137,7 @@ def run_scenario(scenario: Dict) -> Dict:
         source_name = scenario["source"]
         source_card = find_card_by_name(active_player, source_name)
         if not source_card:
-            raise Exception(f"Source card '{source_name}' not found in {active_player_key.upper()} field/hand.")
+            raise Exception(f"Source card '{source_name}' not found in {active_player_key.upper()} zones.")
         
         # 3. テキストのParse
         text = scenario["text"]
@@ -295,10 +295,18 @@ def run_scenario(scenario: Dict) -> Dict:
                 else:
                      result_report["details"].append(f"❌ P2 Trash missing {name}. Current: {current_names}")
 
-        if "p2_field_check" in expect:
-            for check in expect["p2_field_check"]:
+        if "p1_field_has" in expect:
+            current_names = [c.master.name for c in gm.p1.field]
+            for name in expect["p1_field_has"]:
+                if name in current_names:
+                     result_report["details"].append(f"✅ P1 Field has {name}")
+                else:
+                     result_report["details"].append(f"❌ P1 Field missing {name}. Current: {current_names}")
+
+        def verify_card_props(player_obj, check_list):
+            for check in check_list:
                 name = check["name"]
-                target = find_card_by_name(gm.p2, name)
+                target = find_card_by_name(player_obj, name)
                 if target:
                     if "has_flag" in check:
                         flag = check["has_flag"]
@@ -306,6 +314,40 @@ def run_scenario(scenario: Dict) -> Dict:
                             result_report["details"].append(f"✅ {name} has flag {flag}")
                         else:
                             result_report["details"].append(f"❌ {name} missing flag {flag}")
+                    if "power_buff" in check:
+                        if target.power_buff == check["power_buff"]:
+                            result_report["details"].append(f"✅ {name} power_buff is {check['power_buff']}")
+                        else:
+                            result_report["details"].append(f"❌ {name} power_buff mismatch. Exp {check['power_buff']}, Got {target.power_buff}")
+                    if "cost" in check: # base cost check
+                        # Note: current_cost calc might depend on base + buff
+                        # Here we assume checking result of effect
+                        if target.current_cost == check["cost"]:
+                             result_report["details"].append(f"✅ {name} cost is {check['cost']}")
+                        else:
+                             result_report["details"].append(f"❌ {name} cost mismatch. Exp {check['cost']}, Got {target.current_cost}")
+                    if "is_rest" in check:
+                        if target.is_rest == check["is_rest"]:
+                             result_report["details"].append(f"✅ {name} is_rest is {check['is_rest']}")
+                        else:
+                             result_report["details"].append(f"❌ {name} is_rest mismatch. Exp {check['is_rest']}, Got {target.is_rest}")
+                    if "has_keyword" in check:
+                        kw = check["has_keyword"]
+                        if kw in target.current_keywords:
+                             result_report["details"].append(f"✅ {name} has keyword {kw}")
+                        else:
+                             result_report["details"].append(f"❌ {name} missing keyword {kw}")
+                    if "attached_don" in check:
+                        if target.attached_don == check["attached_don"]:
+                             result_report["details"].append(f"✅ {name} attached_don is {check['attached_don']}")
+                        else:
+                             result_report["details"].append(f"❌ {name} attached_don mismatch. Exp {check['attached_don']}, Got {target.attached_don}")
+
+        if "p2_field_check" in expect:
+            verify_card_props(gm.p2, expect["p2_field_check"])
+        
+        if "p1_field_check" in expect:
+            verify_card_props(gm.p1, expect["p1_field_check"])
         
         error_count = sum(1 for d in result_report["details"] if "❌" in d)
         result_report["passed"] = (error_count == 0)
