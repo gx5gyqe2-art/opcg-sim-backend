@@ -20,22 +20,52 @@ except ImportError as e:
     sys.exit(1)
 
 # ---------------------------------------------------------
+# ロギングヘルパー: 標準出力をファイルにも保存する
+# ---------------------------------------------------------
+class TeeLogger(object):
+    def __init__(self, filename):
+        self.terminal = sys.stdout
+        self.log = open(filename, "w", encoding="utf-8")
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
+
+# ---------------------------------------------------------
 # ヘルパー: モック環境構築
 # ---------------------------------------------------------
 def create_mock_card(owner_id: str, def_data: Any) -> CardInstance:
     """JSON定義からCardInstanceを生成"""
+    
+    KEYWORD_MAP = {
+        "DOUBLE_ATTACK": "ダブルアタック",
+        "BANISH": "バニッシュ",
+        "BLOCKER": "ブロッカー",
+        "RUSH": "速攻"
+    }
+
     if isinstance(def_data, str):
         name = def_data
         cost = 1
         traits = []
         is_rest = False
         keywords = []
+        text = ""
     else:
         name = def_data.get("name", "Unknown")
         cost = def_data.get("cost", 1)
         traits = def_data.get("traits", [])
         is_rest = def_data.get("is_rest", False)
         keywords = def_data.get("keywords", [])
+        text = def_data.get("text", "")
+
+    converted_keywords = set()
+    for k in keywords:
+        converted_keywords.add(KEYWORD_MAP.get(k, k))
 
     master = CardMaster(
         card_id=f"MOCK-{name}",
@@ -47,10 +77,10 @@ def create_mock_card(owner_id: str, def_data: Any) -> CardInstance:
         counter=1000,
         attribute=Attribute.SLASH,
         traits=traits,
-        effect_text="",
+        effect_text=text,
         trigger_text="",
         life=0,
-        keywords=set(keywords) # キーワード反映
+        keywords=converted_keywords
     )
     inst = CardInstance(master, owner_id)
     inst.is_rest = is_rest
@@ -460,6 +490,11 @@ def run_scenario(scenario: Dict) -> Dict:
     return result_report
 
 def main():
+    # ★追加: コンソール出力をファイルにも保存する設定
+    log_path = os.path.join(current_dir, "full_execution_log.txt")
+    sys.stdout = TeeLogger(log_path)
+    print(f"📄 Full Execution Log will be saved to: {log_path}\n")
+
     json_path = os.path.join(current_dir, "test_scenarios.json")
     if not os.path.exists(json_path):
         print(f"Scenario file not found: {json_path}")

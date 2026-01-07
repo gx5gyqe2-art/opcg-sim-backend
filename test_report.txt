@@ -1,7 +1,7 @@
 Test Execution Report
 Total Scenarios: 48
-Passed: 46
-Failed: 2
+Passed: 47
+Failed: 1
 ============================================================
 
 ✅ [PASS] BASIC_KO_AND_COST: 【基本】コスト指定KOとドン!!コスト支払い
@@ -246,11 +246,11 @@ Failed: 2
 ✅ [PASS] MECHANIC_BLOCKER: 【ルール】ブロッカーによる攻撃対象変更
     ✅ Success matched: True
 ------------------------------------------------------------
-❌ [FAIL] KEYWORD_DOUBLE_BANISH: 【キーワード】ダブルアタック＆バニッシュ検証
+✅ [PASS] KEYWORD_DOUBLE_BANISH: 【キーワード】ダブルアタック＆バニッシュ検証
     ✅ Success matched: True
-    ❌ p2 Hand Count: Expected 0, Got 1
-    ❌ p2 Life Count: Expected 0, Got 1
-    ❌ p2 Trash Count: Expected 2, Got 0
+    ✅ p2 Hand Count: 0
+    ✅ p2 Life Count: 0
+    ✅ p2 Trash Count: 2
 ------------------------------------------------------------
 ✅ [PASS] EFFECT_BOUNCE: 【効果】キャラを手札に戻す（バウンス）
     ✅ Trigger matched: ON_PLAY

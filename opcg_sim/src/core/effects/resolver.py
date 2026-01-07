@@ -437,8 +437,8 @@ def self_execute(game_manager, player, action, targets, source_card=None, effect
 
     elif action.type == ActionType.SET_COST:
         for t in targets:
-            diff = action.value - t.current_cost
-            t.cost_buff += diff
+            new_buff = action.value - t.master.cost
+            t.cost_buff = new_buff
             log_event("INFO", "effect.set_cost", f"Set {t.master.name} cost to {action.value}", player=player.name)
 
     elif action.type == ActionType.SHUFFLE:

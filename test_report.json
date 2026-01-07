@@ -1,8 +1,8 @@
 {
   "summary": {
     "total": 48,
-    "passed": 46,
-    "failed": 2
+    "passed": 47,
+    "failed": 1
   },
   "results": [
     {
@@ -470,12 +470,12 @@
     {
       "id": "KEYWORD_DOUBLE_BANISH",
       "title": "【キーワード】ダブルアタック＆バニッシュ検証",
-      "passed": false,
+      "passed": true,
       "details": [
         "✅ Success matched: True",
-        "❌ p2 Hand Count: Expected 0, Got 1",
-        "❌ p2 Life Count: Expected 0, Got 1",
-        "❌ p2 Trash Count: Expected 2, Got 0"
+        "✅ p2 Hand Count: 0",
+        "✅ p2 Life Count: 0",
+        "✅ p2 Trash Count: 2"
       ]
     },
     {

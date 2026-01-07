@@ -207,6 +207,13 @@ class Effect:
                 val_str = self._normalize_number_str(match.group(1))
                 return int(val_str)
         
+        # ★追加: コスト設定効果の場合、専用のパターンで数値を抽出する
+        if act_type == ActionType.SET_COST:
+            # "コストXにする" または "コストをXにする"
+            match = re.search(r'コスト(?:を)?(\d+)にする', text)
+            if match:
+                return int(match.group(1))
+
         return self._extract_number(text)
 
     def _normalize_number_str(self, s: str) -> str:
