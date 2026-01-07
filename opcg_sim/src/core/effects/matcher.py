@@ -92,8 +92,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         if (m_name.group(0) + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
             tq.names.append(m_name.group(1))
     
-    traits = re.findall(_nfc(ParserKeyword.TRAIT + r'[《<]([^》>]+)[》>]'), tgt_text)
+    # 修正: "特徴"キーワードに依存せず、二重山括弧内をすべて特徴として抽出する
+    # 例: "特徴《A》か《B》" -> ["A", "B"] 両方抽出可能にする
+    traits = re.findall(r'[《<]([^》>]+)[》>]', tgt_text)
     tq.traits.extend(traits)
+
     attrs = re.findall(_nfc(ParserKeyword.ATTRIBUTE + r'[((]([^))]+)[))]'), tgt_text)
     tq.attributes.extend(attrs)
     
@@ -101,7 +104,6 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
     # --- Cost Filter (Fix: Ignore "Set Cost" actions) ---
-    # 修正: 正規表現から \D? を削除し、直後の文字を飲み込まないようにする
     m_c = re.search(_nfc(ParserKeyword.COST + r'[^+\-\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
         # Check context: Don't match "+2" or "-2"

@@ -277,10 +277,11 @@ Failed: 7
     ✅ P2 Field has StrongEnemy
     ❌ P2 Trash missing WeakEnemy. Current: []
 ------------------------------------------------------------
-✅ [PASS] FILTER_ATTRIBUTE_COLOR: 【対象】属性・色による回収
+❌ [FAIL] FILTER_ATTRIBUTE_COLOR: 【対象】属性・色による回収
     ✅ Trigger matched: ON_PLAY
-    ✅ Success matched: True
-    ✅ P1 Hand has RedSlash
+    Caught Expected Error: 効果の解決に失敗しました: 自分のトラッシュの赤の《打》属性のキャラ1枚を手札に戻す
+    ❌ Success Mismatch: Expected True, Got False
+    ❌ P1 Hand missing RedSlash. Current: []
 ------------------------------------------------------------
 ✅ [PASS] FILTER_TYPE_EVENT: 【対象】イベントカードの回収
     ✅ Trigger matched: ON_PLAY
@@ -315,30 +316,27 @@ Failed: 7
     ❌ Success Mismatch: Expected True, Got False
     ❌ P2 Trash missing BuffedEnemy. Current: []
 ------------------------------------------------------------
-❌ [FAIL] TARGET_MULTIPLE_TRAITS: 【対象】複数の特徴（OR条件）によるサーチ
+✅ [PASS] TARGET_MULTIPLE_TRAITS: 【対象】複数の特徴（OR条件）によるサーチ
     ✅ Trigger matched: ON_PLAY
-    Caught Expected Error: 効果の解決に失敗しました: 選択して手札に加える
-    ❌ Success Mismatch: Expected True, Got False
-    ❌ P1 Hand missing SupernovaCard. Current: []
+    ✅ Success matched: True
+    ✅ P1 Hand has SupernovaCard
 ------------------------------------------------------------
 ❌ [FAIL] OP13_087_CHARLOS: 【登場時】デッキトップ廃棄（チャルロス聖）
-    CRITICAL ERROR: Traceback (most recent call last):
-  File "/private/var/mobile/Containers/Shared/AppGroup/CE559E9A-7AC6-432F-A987-A60073506A77/File Provider Storage/Repositories/opcg-sim-backend/run_data_driven_test.py", line 208, in run_scenario
-    text = scenario["text"]
-KeyError: 'text'
-
+    ✅ Trigger matched: ON_PLAY
+    Caught Expected Error: 効果の解決に失敗しました: 自分のデッキの上から1枚をトラッシュに置く
+    ❌ Success Mismatch: Expected True, Got False
 ------------------------------------------------------------
 ❌ [FAIL] ST02_007_BONNEY: 【起動メイン】超新星サーチ（ジュエリー・ボニー）
-    CRITICAL ERROR: Traceback (most recent call last):
-  File "/private/var/mobile/Containers/Shared/AppGroup/CE559E9A-7AC6-432F-A987-A60073506A77/File Provider Storage/Repositories/opcg-sim-backend/run_data_driven_test.py", line 208, in run_scenario
-    text = scenario["text"]
-KeyError: 'text'
-
+    ✅ Trigger matched: ACTIVATE_MAIN
+    Caught Expected Error: 効果の解決に失敗しました: 1,このキャラをレストにできる
+    ❌ Success Mismatch: Expected True, Got False
+    ✅ p1 Don Active: 0
+    ❌ P1 Hand missing Supernova Card. Current: []
 ------------------------------------------------------------
 ❌ [FAIL] OP09_095_LAFFITTE: 【起動メイン】黒ひげ海賊団サーチ（ラフィット）
-    CRITICAL ERROR: Traceback (most recent call last):
-  File "/private/var/mobile/Containers/Shared/AppGroup/CE559E9A-7AC6-432F-A987-A60073506A77/File Provider Storage/Repositories/opcg-sim-backend/run_data_driven_test.py", line 208, in run_scenario
-    text = scenario["text"]
-KeyError: 'text'
-
+    ✅ Trigger matched: ACTIVATE_MAIN
+    Caught Expected Error: 効果の解決に失敗しました: 自分のドン1枚とこのキャラをレストにできる
+    ❌ Success Mismatch: Expected True, Got False
+    ✅ p1 Don Active: 0
+    ❌ P1 Hand missing Blackbeard Card. Current: []
 ------------------------------------------------------------
