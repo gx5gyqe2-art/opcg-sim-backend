@@ -101,7 +101,8 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
     # --- Cost Filter (Fix: Ignore "Set Cost" actions) ---
-    m_c = re.search(_nfc(ParserKeyword.COST + r'[^+\-\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    # 修正: 正規表現から \D? を削除し、直後の文字を飲み込まないようにする
+    m_c = re.search(_nfc(ParserKeyword.COST + r'[^+\-\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
         # Check context: Don't match "+2" or "-2"
         start_idx = m_c.start()

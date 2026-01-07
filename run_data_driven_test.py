@@ -63,6 +63,10 @@ def create_mock_card(owner_id: str, def_data: Any) -> CardInstance:
         keywords = def_data.get("keywords", [])
         text = def_data.get("text", "")
 
+    # テキストが「なし」の場合は空文字として扱う
+    if text == "なし":
+        text = ""
+
     converted_keywords = set()
     for k in keywords:
         converted_keywords.add(KEYWORD_MAP.get(k, k))
@@ -568,3 +572,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

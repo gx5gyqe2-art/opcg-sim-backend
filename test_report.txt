@@ -1,7 +1,7 @@
 Test Execution Report
 Total Scenarios: 48
-Passed: 47
-Failed: 1
+Passed: 48
+Failed: 0
 ============================================================
 
 ✅ [PASS] BASIC_KO_AND_COST: 【基本】コスト指定KOとドン!!コスト支払い
@@ -259,10 +259,10 @@ Failed: 1
     ✅ p2 Field Count: 0
     ✅ P2 Hand has TargetChar
 ------------------------------------------------------------
-❌ [FAIL] EFFECT_SET_COST_ZERO: 【効果】コストを特定の値に変更（0にする）
+✅ [PASS] EFFECT_SET_COST_ZERO: 【効果】コストを特定の値に変更（0にする）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
-    ❌ OP01-010 cost mismatch. Exp 0, Got 1
+    ✅ OP01-010 cost is 0
 ------------------------------------------------------------
 ✅ [PASS] EFFECT_SEARCH_TRASH_REMAIN: 【効果】サーチ後に残りをトラッシュへ
     ✅ Trigger matched: ACTIVATE_MAIN

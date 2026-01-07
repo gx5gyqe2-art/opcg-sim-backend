@@ -5,7 +5,13 @@ path_matcher = os.path.join("opcg_sim", "src", "core", "effects", "matcher.py")
 path_runner = "run_data_driven_test.py"
 
 # ---------------------------------------------------------
-# 1. matcher.py の完全なコード (修正済み)
+# 1. matcher.py の完全なコード (正規表現修正済み)
+# ---------------------------------------------------------
+# 修正点:
+# m_c = re.search(... r'[^+\-\d]?(\d+)\D?(' ...) 
+# ↓ 
+# m_c = re.search(... r'[^+\-\d]?(\d+)(' ...) 
+# (\D? を削除して、直後の文字（"に"など）を飲み込まないように変更)
 # ---------------------------------------------------------
 matcher_code = """import re
 import logging
@@ -110,7 +116,8 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
     # --- Cost Filter (Fix: Ignore "Set Cost" actions) ---
-    m_c = re.search(_nfc(ParserKeyword.COST + r'[^+\-\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    # 修正: 正規表現から \\D? を削除し、直後の文字を飲み込まないようにする
+    m_c = re.search(_nfc(ParserKeyword.COST + r'[^+\-\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
         # Check context: Don't match "+2" or "-2"
         start_idx = m_c.start()
@@ -212,97 +219,32 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 """
 
 # ---------------------------------------------------------
-# 2. run_data_driven_test.py のループ部分修正
+# 2. run_data_driven_test.py のループ部分修正用コード
 # ---------------------------------------------------------
-# インタラクション処理で、pending_requestがある場合に resolve_interaction を呼ぶように修正
-# インデントに注意して置換用のコードブロックを用意
-
-runner_fix_logic = """
-            # Active Interactionがない場合、Pending Requestをラップして処理
-            if not req:
-                pending = gm.get_pending_request()
-                if pending:
-                    action_type = pending.get("action")
-                    
-                    # シナリオ指定が尽きている場合、ブロック/カウンターは自動パス
-                    if step_idx >= len(interaction_steps):
-                        if action_type == "SELECT_BLOCKER":
-                            gm.handle_block(None)
-                            continue
-                        elif action_type == "SELECT_COUNTER":
-                            target_pid = pending.get("player_id")
-                            target_p = gm.p1 if target_pid == gm.p1.name else gm.p2
-                            gm.apply_counter(target_p, None)
-                            continue
-                    
-                    # 処理対象としてラップ
-                    req = {
-                        "action_type": action_type,
-                        "candidates": pending.get("candidates", []),
-                        "can_skip": pending.get("can_skip", False)
-                    }
-                else:
-                    break
-
-            # --- Interaction 処理 ---
-            if step_idx >= len(interaction_steps):
-                if req.get("can_skip"):
-                    if gm.active_interaction:
-                        gm.resolve_interaction(active_player, {}) # Pass
-                    else:
-                        # Pending状態でのパス処理（ActionTypeに応じてメソッドを呼ぶ必要があるが、簡易的に次へ）
-                        # 本来はActionに応じたパス用メソッドを呼ぶべき
-                        pass
-                else:
-                    raise Exception(f"Unexpected interaction required: {req.get('action_type')}")
-            else:
-                step_input = interaction_steps[step_idx]
-                
-                # ... (中略: 検証ロジック) ...
-
-                payload = {}
-                # ... (中略: payload構築) ...
-                if "select_option" in step_input:
-                    payload["selected_option_index"] = step_input["select_option"]
-
-                # 実行: active_interactionがあればresolve, なければ個別対応
-                if gm.active_interaction:
-                    gm.resolve_interaction(active_player, payload)
-                elif req.get("action_type") == "SELECT_COUNTER":
-                        target_pid = req.get("player_id")
-                        if not target_pid: target_pid = active_player.name
-                        target_p = gm.p1 if target_pid == gm.p1.name else gm.p2
-                        gm.apply_counter(target_p, None)
-                
-                step_idx += 1
-"""
-
 def update_files():
     # 1. matcher.py を上書き
     print(f"Overwriting {path_matcher} with fixed code...")
-    with open(path_matcher, "w", encoding="utf-8") as f:
-        f.write(matcher_code)
-    print("✅ matcher.py updated.")
+    try:
+        with open(path_matcher, "w", encoding="utf-8") as f:
+            f.write(matcher_code)
+        print("✅ matcher.py updated.")
+    except FileNotFoundError:
+        print(f"❌ Error: {path_matcher} not found. Please run this script from the root directory.")
+        return
 
-    # 2. run_data_driven_test.py を修正 (簡易的な置換ではなく、ループ構造全体を安全なものに差し替えることを推奨したいが、
-    #    ここではmake.pyと同様に 'req = gm.active_interaction' をフックにして挿入する)
-    
+    # 2. run_data_driven_test.py を修正
     print(f"Patching {path_runner}...")
     if os.path.exists(path_runner):
         with open(path_runner, "r", encoding="utf-8") as f:
             runner_content = f.read()
         
-        # 古いループロジックを探して置換（ピンポイントで修正するのは難しいため、
-        # Active Interaction取得部分の周辺を補強する）
-        
-        # 以前のパッチが当たっているか確認
+        # 挿入位置の特定とコードの挿入
+        # "req = gm.active_interaction" の直後に Pending Request 処理を追加する
         if "pending = gm.get_pending_request()" not in runner_content:
             target_line = "req = gm.active_interaction"
-            # インデントを合わせる (16スペース)
-            # loop_limit 内の最初の req = ... を探す
-            if target_line in runner_content:
-                # 挿入するロジック（インデント調整済み）
-                insert_code = """
+            
+            # 挿入するロジック（インデント調整済み: 16スペース）
+            insert_code = """
                 # Active Interactionがない場合、Pending Requestをラップして処理
                 if not req:
                     pending = gm.get_pending_request()
@@ -328,17 +270,20 @@ def update_files():
                         }
                     else:
                         break
-                """
-                # 置換実行
-                runner_content = runner_content.replace(target_line, target_line + insert_code)
+"""
+            # 置換実行 (最初の1箇所のみ置換)
+            if target_line in runner_content:
+                runner_content = runner_content.replace(target_line, target_line + insert_code, 1)
                 
                 with open(path_runner, "w", encoding="utf-8") as f:
                     f.write(runner_content)
                 print("✅ run_data_driven_test.py patched.")
             else:
-                print("⚠️ Target line not found in runner.")
+                print("⚠️ Target line 'req = gm.active_interaction' not found in runner. Skipping patch.")
         else:
             print("ℹ️ run_data_driven_test.py already patched.")
+    else:
+        print(f"⚠️ {path_runner} not found.")
 
 if __name__ == "__main__":
     update_files()
