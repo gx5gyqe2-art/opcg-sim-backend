@@ -1,8 +1,8 @@
 {
   "summary": {
-    "total": 48,
-    "passed": 48,
-    "failed": 0
+    "total": 59,
+    "passed": 52,
+    "failed": 7
   },
   "results": [
     {
@@ -509,6 +509,121 @@
         "✅ Success matched: True",
         "✅ p1 Hand Count: 3",
         "✅ p1 Deck Count: 0"
+      ]
+    },
+    {
+      "id": "FILTER_POWER_MAX",
+      "title": "【対象】パワー指定（〜以下）によるKO",
+      "passed": false,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "Caught Expected Error: 効果の解決に失敗しました: 相手のパワー3000以下のキャラ1枚をKOする",
+        "❌ Success Mismatch: Expected True, Got False",
+        "✅ P2 Field has StrongEnemy",
+        "❌ P2 Trash missing WeakEnemy. Current: []"
+      ]
+    },
+    {
+      "id": "FILTER_ATTRIBUTE_COLOR",
+      "title": "【対象】属性・色による回収",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ P1 Hand has RedSlash"
+      ]
+    },
+    {
+      "id": "FILTER_TYPE_EVENT",
+      "title": "【対象】イベントカードの回収",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ P1 Hand has CounterEvent"
+      ]
+    },
+    {
+      "id": "FILTER_EXCLUDE_SELF",
+      "title": "【対象】自分自身を除く選択",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ACTIVATE_MAIN",
+        "✅ Success matched: True",
+        "✅ P1 Field has Tester",
+        "✅ P1 Hand has OtherAlly"
+      ]
+    },
+    {
+      "id": "TARGET_ALL_ENEMIES",
+      "title": "【対象】相手のキャラすべてをKO（全体除去）",
+      "passed": true,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "✅ Success matched: True",
+        "✅ p2 Field Count: 0",
+        "✅ P2 Trash has Enemy1",
+        "✅ P2 Trash has Enemy2",
+        "✅ P2 Trash has Enemy3",
+        "✅ P1 Field has Ally1"
+      ]
+    },
+    {
+      "id": "TARGET_NAME_PARTIAL",
+      "title": "【対象】名前に特定の文字列を含むカードの指定",
+      "passed": false,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "Caught Expected Error: 効果の解決に失敗しました: 自分の手札の、名前に「ルフィ」を含むキャラ1枚を捨てる",
+        "❌ Success Mismatch: Expected True, Got False",
+        "✅ P1 Hand has Luffytaro",
+        "✅ P1 Hand has Zoro"
+      ]
+    },
+    {
+      "id": "TARGET_ORIGINAL_POWER",
+      "title": "【対象】元々のパワーを参照する除去",
+      "passed": false,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "Caught Expected Error: 効果の解決に失敗しました: 相手の元々のパワー3000以下のキャラ1枚をKOする",
+        "❌ Success Mismatch: Expected True, Got False",
+        "❌ P2 Trash missing BuffedEnemy. Current: []"
+      ]
+    },
+    {
+      "id": "TARGET_MULTIPLE_TRAITS",
+      "title": "【対象】複数の特徴（OR条件）によるサーチ",
+      "passed": false,
+      "details": [
+        "✅ Trigger matched: ON_PLAY",
+        "Caught Expected Error: 効果の解決に失敗しました: 選択して手札に加える",
+        "❌ Success Mismatch: Expected True, Got False",
+        "❌ P1 Hand missing SupernovaCard. Current: []"
+      ]
+    },
+    {
+      "id": "OP13_087_CHARLOS",
+      "title": "【登場時】デッキトップ廃棄（チャルロス聖）",
+      "passed": false,
+      "details": [
+        "CRITICAL ERROR: Traceback (most recent call last):\n  File \"/private/var/mobile/Containers/Shared/AppGroup/CE559E9A-7AC6-432F-A987-A60073506A77/File Provider Storage/Repositories/opcg-sim-backend/run_data_driven_test.py\", line 208, in run_scenario\n    text = scenario[\"text\"]\nKeyError: 'text'\n"
+      ]
+    },
+    {
+      "id": "ST02_007_BONNEY",
+      "title": "【起動メイン】超新星サーチ（ジュエリー・ボニー）",
+      "passed": false,
+      "details": [
+        "CRITICAL ERROR: Traceback (most recent call last):\n  File \"/private/var/mobile/Containers/Shared/AppGroup/CE559E9A-7AC6-432F-A987-A60073506A77/File Provider Storage/Repositories/opcg-sim-backend/run_data_driven_test.py\", line 208, in run_scenario\n    text = scenario[\"text\"]\nKeyError: 'text'\n"
+      ]
+    },
+    {
+      "id": "OP09_095_LAFFITTE",
+      "title": "【起動メイン】黒ひげ海賊団サーチ（ラフィット）",
+      "passed": false,
+      "details": [
+        "CRITICAL ERROR: Traceback (most recent call last):\n  File \"/private/var/mobile/Containers/Shared/AppGroup/CE559E9A-7AC6-432F-A987-A60073506A77/File Provider Storage/Repositories/opcg-sim-backend/run_data_driven_test.py\", line 208, in run_scenario\n    text = scenario[\"text\"]\nKeyError: 'text'\n"
       ]
     }
   ]
