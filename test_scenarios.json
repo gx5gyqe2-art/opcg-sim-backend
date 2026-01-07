@@ -1535,5 +1535,485 @@
       ],
       "p1_deck_count": 0
     }
+  },
+  {
+    "id": "FILTER_POWER_MAX",
+    "title": "【対象】パワー指定（〜以下）によるKO",
+    "setup": {
+      "p1": {
+        "field": [
+          "Tester"
+        ]
+      },
+      "p2": {
+        "field": [
+          {
+            "name": "WeakEnemy",
+            "power": 3000
+          },
+          {
+            "name": "StrongEnemy",
+            "power": 4000
+          }
+        ]
+      }
+    },
+    "source": "Tester",
+    "text": "【登場時】相手のパワー3000以下のキャラ1枚をKOする。",
+    "expected_trigger": "ON_PLAY",
+    "interaction": [
+      {
+        "select_cards": [
+          "WeakEnemy"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_trash_has": [
+        "WeakEnemy"
+      ],
+      "p2_field_has": [
+        "StrongEnemy"
+      ]
+    }
+  },
+  {
+    "id": "FILTER_ATTRIBUTE_COLOR",
+    "title": "【対象】属性・色による回収",
+    "setup": {
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "trash": [
+          {
+            "name": "RedSlash",
+            "color": "RED",
+            "attribute": "SLASH"
+          },
+          {
+            "name": "GreenStrike",
+            "color": "GREEN",
+            "attribute": "STRIKE"
+          }
+        ]
+      }
+    },
+    "source": "Tester",
+    "text": "【登場時】自分のトラッシュの赤の<打>属性のキャラ1枚を手札に戻す。",
+    "expected_trigger": "ON_PLAY",
+    "interaction": [
+      {
+        "select_cards": [
+          "RedSlash"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_has": [
+        "RedSlash"
+      ]
+    }
+  },
+  {
+    "id": "FILTER_TYPE_EVENT",
+    "title": "【対象】イベントカードの回収",
+    "setup": {
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "trash": [
+          {
+            "name": "CounterEvent",
+            "type": "EVENT"
+          },
+          {
+            "name": "CharacterCard",
+            "type": "CHARACTER"
+          }
+        ]
+      }
+    },
+    "source": "Tester",
+    "text": "【登場時】自分のトラッシュのイベント1枚を手札に戻す。",
+    "expected_trigger": "ON_PLAY",
+    "interaction": [
+      {
+        "select_cards": [
+          "CounterEvent"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_has": [
+        "CounterEvent"
+      ]
+    }
+  },
+  {
+    "id": "FILTER_EXCLUDE_SELF",
+    "title": "【対象】自分自身を除く選択",
+    "setup": {
+      "p1": {
+        "field": [
+          "Tester",
+          "OtherAlly"
+        ]
+      }
+    },
+    "source": "Tester",
+    "text": "【起動メイン】自分のこのカード以外のキャラ1枚を手札に戻す。",
+    "expected_trigger": "ACTIVATE_MAIN",
+    "interaction": [
+      {
+        "verify_candidates": {
+          "has_names": [
+            "OtherAlly"
+          ],
+          "count": 1
+        },
+        "select_cards": [
+          "OtherAlly"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_has": [
+        "OtherAlly"
+      ],
+      "p1_field_has": [
+        "Tester"
+      ]
+    }
+  },
+  {
+    "id": "TARGET_ALL_ENEMIES",
+    "title": "【対象】相手のキャラすべてをKO（全体除去）",
+    "setup": {
+      "p1": {
+        "field": [
+          "Tester",
+          "Ally1"
+        ]
+      },
+      "p2": {
+        "field": [
+          "Enemy1",
+          "Enemy2",
+          "Enemy3"
+        ]
+      }
+    },
+    "source": "Tester",
+    "text": "【登場時】相手のキャラすべてをKOする。",
+    "expected_trigger": "ON_PLAY",
+    "expect": {
+      "success": true,
+      "p2_field_count": 0,
+      "p2_trash_has": [
+        "Enemy1",
+        "Enemy2",
+        "Enemy3"
+      ],
+      "p1_field_has": [
+        "Ally1"
+      ]
+    }
+  },
+  {
+    "id": "TARGET_NAME_PARTIAL",
+    "title": "【対象】名前に特定の文字列を含むカードの指定",
+    "setup": {
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "hand": [
+          {
+            "name": "Monkey.D.Luffy",
+            "type": "CHARACTER"
+          },
+          {
+            "name": "Luffytaro",
+            "type": "CHARACTER"
+          },
+          {
+            "name": "Zoro",
+            "type": "CHARACTER"
+          }
+        ]
+      }
+    },
+    "source": "Tester",
+    "text": "【登場時】自分の手札の、名前に「ルフィ」を含むキャラ1枚を捨てる。",
+    "expected_trigger": "ON_PLAY",
+    "interaction": [
+      {
+        "select_cards": [
+          "Monkey.D.Luffy"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_has": [
+        "Luffytaro",
+        "Zoro"
+      ]
+    }
+  },
+  {
+    "id": "TARGET_ORIGINAL_POWER",
+    "title": "【対象】元々のパワーを参照する除去",
+    "setup": {
+      "p1": {
+        "field": [
+          "Tester"
+        ]
+      },
+      "p2": {
+        "field": [
+          {
+            "name": "BuffedEnemy",
+            "power": 2000,
+            "power_buff": 5000
+          }
+        ]
+      }
+    },
+    "source": "Tester",
+    "text": "【登場時】相手の元々のパワー3000以下のキャラ1枚をKOする。",
+    "expected_trigger": "ON_PLAY",
+    "interaction": [
+      {
+        "select_cards": [
+          "BuffedEnemy"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p2_trash_has": [
+        "BuffedEnemy"
+      ]
+    }
+  },
+  {
+    "id": "TARGET_MULTIPLE_TRAITS",
+    "title": "【対象】複数の特徴（OR条件）によるサーチ",
+    "setup": {
+      "p1": {
+        "field": [
+          "Tester"
+        ],
+        "deck": [
+          {
+            "name": "NavyCard",
+            "traits": [
+              "海軍"
+            ]
+          },
+          {
+            "name": "SupernovaCard",
+            "traits": [
+              "超新星"
+            ]
+          },
+          {
+            "name": "PirateCard",
+            "traits": [
+              "海賊"
+            ]
+          }
+        ]
+      }
+    },
+    "source": "Tester",
+    "text": "【登場時】自分のデッキの上から3枚を見て、特徴《海軍》か《超新星》を持つカード1枚を手札に加える。",
+    "expected_trigger": "ON_PLAY",
+    "interaction": [
+      {
+        "select_cards": [
+          "SupernovaCard"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_has": [
+        "SupernovaCard"
+      ]
+    }
+  },
+  {
+    "id": "OP13_087_CHARLOS",
+    "title": "【登場時】デッキトップ廃棄（チャルロス聖）",
+    "setup": {
+      "p1": {
+        "hand": [
+          {
+            "name": "OP13-087 Charlos",
+            "cost": 2,
+            "power": 0,
+            "attribute": "RANGED",
+            "color": "BLACK",
+            "traits": [
+              "天竜人"
+            ],
+            "text": "【ブロッカー】\n【登場時】自分のデッキの上から1枚をトラッシュに置く。"
+          }
+        ],
+        "deck": [
+          "TopCard",
+          "SecondCard"
+        ]
+      }
+    },
+    "source": "OP13-087 Charlos",
+    "expected_trigger": "ON_PLAY",
+    "expect": {
+      "success": true,
+      "p1_trash_has": [
+        "TopCard"
+      ],
+      "p1_deck_head": "SecondCard"
+    }
+  },
+  {
+    "id": "ST02_007_BONNEY",
+    "title": "【起動メイン】超新星サーチ（ジュエリー・ボニー）",
+    "setup": {
+      "p1": {
+        "field": [
+          {
+            "name": "ST02-007 Jewelry Bonney",
+            "cost": 1,
+            "power": 1000,
+            "attribute": "SPECIAL",
+            "color": "GREEN",
+            "traits": [
+              "超新星",
+              "ボニー海賊団"
+            ],
+            "text": "【起動メイン】①(コストエリアのドン!!を指定の数レストにできる)，このキャラをレストにできる：自分のデッキの上から5枚を見て、特徴《超新星》を持つカード1枚までを公開し、手札に加える。その後、残りを好きな順番でデッキの下に置く。"
+          }
+        ],
+        "deck": [
+          {
+            "name": "Supernova Card",
+            "traits": [
+              "超新星"
+            ]
+          },
+          "CardA",
+          "CardB",
+          "CardC",
+          "CardD",
+          "BottomCard"
+        ],
+        "don": {
+          "active": 1,
+          "rested": 0
+        }
+      }
+    },
+    "source": "ST02-007 Jewelry Bonney",
+    "expected_trigger": "ACTIVATE_MAIN",
+    "interaction": [
+      {
+        "select_cards": [
+          "Supernova Card"
+        ]
+      },
+      {
+        "sort_deck_bottom": [
+          "CardA",
+          "CardB",
+          "CardC",
+          "CardD"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_has": [
+        "Supernova Card"
+      ],
+      "p1_field_status": {
+        "ST02-007 Jewelry Bonney": "REST"
+      },
+      "p1_don_active": 0,
+      "p1_don_rested": 1
+    }
+  },
+  {
+    "id": "OP09_095_LAFFITTE",
+    "title": "【起動メイン】黒ひげ海賊団サーチ（ラフィット）",
+    "setup": {
+      "p1": {
+        "field": [
+          {
+            "name": "OP09-095 Laffitte",
+            "cost": 1,
+            "power": 1000,
+            "attribute": "STRIKE",
+            "color": "BLACK",
+            "traits": [
+              "黒ひげ海賊団"
+            ],
+            "text": "【起動メイン】自分のドン!!1枚とこのキャラをレストにできる：自分のデッキの上から5枚を見て、特徴《黒ひげ海賊団》を持つカード1枚までを公開し、手札に加える。その後、残りを好きな順番でデッキの下に置く。"
+          }
+        ],
+        "deck": [
+          {
+            "name": "Blackbeard Card",
+            "traits": [
+              "黒ひげ海賊団"
+            ]
+          },
+          "Card1",
+          "Card2",
+          "Card3",
+          "Card4"
+        ],
+        "don": {
+          "active": 1,
+          "rested": 0
+        }
+      }
+    },
+    "source": "OP09-095 Laffitte",
+    "expected_trigger": "ACTIVATE_MAIN",
+    "interaction": [
+      {
+        "select_cards": [
+          "Blackbeard Card"
+        ]
+      },
+      {
+        "sort_deck_bottom": [
+          "Card1",
+          "Card2",
+          "Card3",
+          "Card4"
+        ]
+      }
+    ],
+    "expect": {
+      "success": true,
+      "p1_hand_has": [
+        "Blackbeard Card"
+      ],
+      "p1_field_status": {
+        "OP09-095 Laffitte": "REST"
+      },
+      "p1_don_active": 0,
+      "p1_don_rested": 1
+    }
   }
 ]
