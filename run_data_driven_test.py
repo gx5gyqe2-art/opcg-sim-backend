@@ -7,7 +7,6 @@ import io
 import shutil
 from typing import List, Dict, Any, Tuple
 
-# --- パス設定 ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
@@ -22,15 +21,11 @@ except ImportError as e:
     print(f"Import Error: {e}")
     sys.exit(1)
 
-# ---------------------------------------------------------
-# ロギング: 画面出力のフィルタリングのみを行う（ファイル保存なし）
-# ---------------------------------------------------------
 class StdoutFilter(object):
     def __init__(self):
         self.terminal = sys.stdout
 
     def write(self, message):
-        # 画面にはJSON形式の内部ログを表示しない（見やすくするため）
         is_json_log = message.strip().startswith("{") and '"sessionId":' in message
         if not is_json_log:
             self.terminal.write(message)
@@ -38,9 +33,6 @@ class StdoutFilter(object):
     def flush(self):
         self.terminal.flush()
 
-# ---------------------------------------------------------
-# モック環境構築
-# ---------------------------------------------------------
 def create_mock_card(owner_id: str, def_data: Any) -> CardInstance:
     KEYWORD_MAP = {
         "DOUBLE_ATTACK": "ダブルアタック",
@@ -49,16 +41,35 @@ def create_mock_card(owner_id: str, def_data: Any) -> CardInstance:
         "RUSH": "速攻"
     }
 
+    name = "Unknown"
+    cost = 1
+    power = 5000
+    counter = 1000
+    color_val = Color.RED
+    attr_val = Attribute.SLASH
+    type_val = CardType.CHARACTER
+    traits = []
+    is_rest = False
+    keywords = []
+    text = ""
+    
     if isinstance(def_data, str):
         name = def_data
-        cost = 1
-        traits = []
-        is_rest = False
-        keywords = []
-        text = ""
     else:
         name = def_data.get("name", "Unknown")
         cost = def_data.get("cost", 1)
+        power = def_data.get("power", 5000)
+        counter = def_data.get("counter", 1000)
+        
+        c_str = def_data.get("color", "RED")
+        if hasattr(Color, c_str): color_val = getattr(Color, c_str)
+        
+        a_str = def_data.get("attribute", "SLASH")
+        if hasattr(Attribute, a_str): attr_val = getattr(Attribute, a_str)
+        
+        t_str = def_data.get("type", "CHARACTER")
+        if hasattr(CardType, t_str): type_val = getattr(CardType, t_str)
+        
         traits = def_data.get("traits", [])
         is_rest = def_data.get("is_rest", False)
         keywords = def_data.get("keywords", [])
@@ -74,12 +85,12 @@ def create_mock_card(owner_id: str, def_data: Any) -> CardInstance:
     master = CardMaster(
         card_id=f"MOCK-{name}",
         name=name,
-        type=CardType.CHARACTER,
-        color=Color.RED,
+        type=type_val,
+        color=color_val,
         cost=cost,
-        power=5000,
-        counter=1000,
-        attribute=Attribute.SLASH,
+        power=power,
+        counter=counter,
+        attribute=attr_val,
         traits=traits,
         effect_text=text,
         trigger_text="",
@@ -149,19 +160,14 @@ def find_card_by_name(player: Player, name: str) -> CardInstance:
             return c
     return None
 
-# ---------------------------------------------------------
-# テスト実行ロジック (ログキャプチャ機能付き)
-# ---------------------------------------------------------
 def run_scenario(scenario: Dict) -> Tuple[Dict, str]:
     result_report = {"id": scenario["id"], "title": scenario["title"], "passed": False, "details": []}
     
-    # ログキャプチャ開始（一時的にstdoutをメモリバッファに向ける）
     capture_io = io.StringIO()
     original_stdout = sys.stdout
     sys.stdout = capture_io
 
     try:
-        # 1. セットアップ
         gm = setup_game_from_json(scenario)
         
         active_player_key = scenario.get("active_player", "p1")
@@ -206,7 +212,6 @@ def run_scenario(scenario: Dict) -> Tuple[Dict, str]:
             if actual_trigger != expected_trigger:
                 result_report["details"].append(f"❌ Trigger Mismatch: Expected {expected_trigger}, Got {actual_trigger}")
                 result_report["passed"] = False
-                # 早期リターン時もログを復元して返す
                 captured_log = capture_io.getvalue()
                 sys.stdout = original_stdout
                 return result_report, captured_log
@@ -324,7 +329,7 @@ def run_scenario(scenario: Dict) -> Tuple[Dict, str]:
             success = False
         except Exception as e:
             result_report["details"].append(f"Runtime Error: {str(e)}")
-            traceback.print_exc() # これもcapture_ioに入る
+            traceback.print_exc()
             success = False
 
         expect = scenario.get("expect", {})
@@ -465,14 +470,12 @@ def run_scenario(scenario: Dict) -> Tuple[Dict, str]:
         result_report["passed"] = False
         result_report["details"].append(f"CRITICAL ERROR: {traceback.format_exc()}")
 
-    # キャプチャ終了
     captured_log = capture_io.getvalue()
     sys.stdout = original_stdout
     
     return result_report, captured_log
 
 def main():
-    # 画面出力フィルタの設定（ファイル保存はしない）
     sys.stdout = StdoutFilter()
 
     json_path = os.path.join(current_dir, "test_scenarios.json")
@@ -487,7 +490,6 @@ def main():
         print(f"JSON Decode Error: {e}")
         return
 
-    # --- 1. failed_logs ディレクトリの初期化（クリア） ---
     failed_logs_dir = os.path.join(current_dir, "failed_logs")
     if os.path.exists(failed_logs_dir):
         try:
@@ -499,16 +501,13 @@ def main():
     print(f"🚀 Running {len(scenarios)} Scenarios (JSON Mode)...\n")
     
     all_results = []
-    failed_logs_collection = [] # 失敗したテストのログを溜めるリスト
+    failed_logs_collection = []
     
     passed_count = 0
     for s in scenarios:
         res, log_content = run_scenario(s)
         all_results.append(res)
         
-        # --- 本来のstdout (StdoutFilter) に書き出す ---
-        # run_scenario中は止めていたので、ここで一気に書き出す
-        # JSONログはここでフィルタリングされて画面には出ない
         print(log_content, end="")
         
         status_icon = "✅" if res["passed"] else "❌"
@@ -527,13 +526,8 @@ def main():
                     failure_details_text += line
             print("-" * 50)
             
-            # --- 失敗ログの収集 (AIデバッグ用) ---
-            # 1. テスト項目 (Scenario JSON)
             scenario_json_str = json.dumps(s, indent=2, ensure_ascii=False)
             
-            # 2. ログ (log_content) -> 既に持っている（JSON含む完全版）
-            
-            # 3. 結果 (Result details) -> res['details'] 全体を含める
             full_details = "\n".join(res['details'])
             
             combined_log = (
@@ -547,12 +541,11 @@ def main():
 
     print(f"\nResult: {passed_count}/{len(scenarios)} Passed")
 
-    # --- 失敗ログの分割保存処理 ---
     if failed_logs_collection:
         print(f"\n💾 Saving {len(failed_logs_collection)} failed scenarios for AI analysis...")
         print(f"   Directory: {failed_logs_dir}")
         
-        items_per_file = 5 # 失敗ログは重いので5件ずつにする
+        items_per_file = 5
         num_chunks = math.ceil(len(failed_logs_collection) / items_per_file)
 
         for i in range(num_chunks):
@@ -565,7 +558,6 @@ def main():
     else:
         print("\n🎉 No failures! No failed logs generated.")
 
-    # --- レポート出力 (テキスト) ---
     report_file_txt = os.path.join(current_dir, "test_report.txt")
     try:
         with open(report_file_txt, "w", encoding="utf-8") as f:

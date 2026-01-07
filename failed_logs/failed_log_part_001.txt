@@ -1,67 +1,3 @@
-=== ❌ FAILED SCENARIO: [FILTER_POWER_MAX] 【対象】パワー指定（〜以下）によるKO ===
-
---- [1. SCENARIO DEFINITION] ---
-{
-  "id": "FILTER_POWER_MAX",
-  "title": "【対象】パワー指定（〜以下）によるKO",
-  "setup": {
-    "p1": {
-      "field": [
-        "Tester"
-      ]
-    },
-    "p2": {
-      "field": [
-        {
-          "name": "WeakEnemy",
-          "power": 3000
-        },
-        {
-          "name": "StrongEnemy",
-          "power": 4000
-        }
-      ]
-    }
-  },
-  "source": "Tester",
-  "text": "【登場時】相手のパワー3000以下のキャラ1枚をKOする。",
-  "expected_trigger": "ON_PLAY",
-  "interaction": [
-    {
-      "select_cards": [
-        "WeakEnemy"
-      ]
-    }
-  ],
-  "expect": {
-    "success": true,
-    "p2_trash_has": [
-      "WeakEnemy"
-    ],
-    "p2_field_has": [
-      "StrongEnemy"
-    ]
-  }
-}
-
---- [2. EXECUTION LOG] ---
-{"timestamp": "2026-01-07T22:53:27.752138", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.752225", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.752673", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 相手のパワー3000以下のキャラ1枚をKOする", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.752812", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=OPPONENT, count=1, up_to=False, zone=Zone.FIELD", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.752894", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.KO for Tester", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.752977", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.no_target", "msg": "No targets found for query: 相手のパワー3000以下のキャラ1枚をKOする", "payload": {"query_raw": "相手のパワー3000以下のキャラ1枚をKOする", "zone": "FIELD", "target_player": "OPPONENT", "real_target_names": ["P2"], "candidates_scanned": 2}}
-{"timestamp": "2026-01-07T22:53:27.753070", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.KO failed: Target required but not found.", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.753137", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: 相手のパワー3000以下のキャラ1枚をKOする", "payload": null}
-
---- [3. RESULT REPORT] ---
-✅ Trigger matched: ON_PLAY
-Caught Expected Error: 効果の解決に失敗しました: 相手のパワー3000以下のキャラ1枚をKOする
-❌ Success Mismatch: Expected True, Got False
-✅ P2 Field has StrongEnemy
-❌ P2 Trash missing WeakEnemy. Current: []
-
-============================================================
 === ❌ FAILED SCENARIO: [FILTER_ATTRIBUTE_COLOR] 【対象】属性・色による回収 ===
 
 --- [1. SCENARIO DEFINITION] ---
@@ -106,14 +42,14 @@ Caught Expected Error: 効果の解決に失敗しました: 相手のパワー3
 }
 
 --- [2. EXECUTION LOG] ---
-{"timestamp": "2026-01-07T22:53:27.762406", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.762509", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.762991", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のトラッシュの赤の《打》属性のキャラ1枚を手札に戻す", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.763133", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.TRASH", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.763219", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.MOVE_TO_HAND for Tester", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.763482", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.no_target", "msg": "No targets found for query: 自分のトラッシュの赤の《打》属性のキャラ1枚を手札に戻す", "payload": {"query_raw": "自分のトラッシュの赤の《打》属性のキャラ1枚を手札に戻す", "zone": "TRASH", "target_player": "SELF", "real_target_names": ["P1"], "candidates_scanned": 2}}
-{"timestamp": "2026-01-07T22:53:27.763574", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.MOVE_TO_HAND failed: Target required but not found.", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.763642", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: 自分のトラッシュの赤の《打》属性のキャラ1枚を手札に戻す", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.904894", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.905229", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.906029", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のトラッシュの赤の《打》属性のキャラ1枚を手札に戻す", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.906211", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.TRASH", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.906333", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.MOVE_TO_HAND for Tester", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.907388", "source": "BE", "level": "WARNING", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.no_target", "msg": "No targets found for query: 自分のトラッシュの赤の《打》属性のキャラ1枚を手札に戻す", "payload": {"query_raw": "自分のトラッシュの赤の《打》属性のキャラ1枚を手札に戻す", "zone": "TRASH", "target_player": "SELF", "real_target_names": ["P1"], "candidates_scanned": 2}}
+{"timestamp": "2026-01-08T01:55:44.907499", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.MOVE_TO_HAND failed: Target required but not found.", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.907570", "source": "BE", "level": "WARNING", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: 自分のトラッシュの赤の《打》属性のキャラ1枚を手札に戻す", "payload": null}
 
 --- [3. RESULT REPORT] ---
 ✅ Trigger matched: ON_PLAY
@@ -135,7 +71,7 @@ Caught Expected Error: 効果の解決に失敗しました: 自分のトラッ�
       ],
       "hand": [
         {
-          "name": "Monkey.D.Luffy",
+          "name": "モンキー・D・ルフィ",
           "type": "CHARACTER"
         },
         {
@@ -155,7 +91,7 @@ Caught Expected Error: 効果の解決に失敗しました: 自分のトラッ�
   "interaction": [
     {
       "select_cards": [
-        "Monkey.D.Luffy"
+        "モンキー・D・ルフィ"
       ]
     }
   ],
@@ -169,14 +105,14 @@ Caught Expected Error: 効果の解決に失敗しました: 自分のトラッ�
 }
 
 --- [2. EXECUTION LOG] ---
-{"timestamp": "2026-01-07T22:53:27.784609", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.784739", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.785216", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分の手札の、名前に「ルフィ」を含むキャラ1枚を捨てる", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.785387", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.HAND", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.785479", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.TRASH for Tester", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.785561", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.no_target", "msg": "No targets found for query: 自分の手札の、名前に「ルフィ」を含むキャラ1枚を捨てる", "payload": {"query_raw": "自分の手札の、名前に「ルフィ」を含むキャラ1枚を捨てる", "zone": "HAND", "target_player": "SELF", "real_target_names": ["P1"], "candidates_scanned": 3}}
-{"timestamp": "2026-01-07T22:53:27.785675", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.TRASH failed: Target required but not found.", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.785828", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: 自分の手札の、名前に「ルフィ」を含むキャラ1枚を捨てる", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.936119", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.936219", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.936974", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分の手札の、名前に「ルフィ」を含むキャラ1枚を捨てる", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.937122", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.HAND", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.937209", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.TRASH for Tester", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.937293", "source": "BE", "level": "WARNING", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.no_target", "msg": "No targets found for query: 自分の手札の、名前に「ルフィ」を含むキャラ1枚を捨てる", "payload": {"query_raw": "自分の手札の、名前に「ルフィ」を含むキャラ1枚を捨てる", "zone": "HAND", "target_player": "SELF", "real_target_names": ["P1"], "candidates_scanned": 3}}
+{"timestamp": "2026-01-08T01:55:44.937390", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.TRASH failed: Target required but not found.", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.937455", "source": "BE", "level": "WARNING", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: 自分の手札の、名前に「ルフィ」を含むキャラ1枚を捨てる", "payload": null}
 
 --- [3. RESULT REPORT] ---
 ✅ Trigger matched: ON_PLAY
@@ -184,63 +120,6 @@ Caught Expected Error: 効果の解決に失敗しました: 自分の手札の�
 ❌ Success Mismatch: Expected True, Got False
 ✅ P1 Hand has Luffytaro
 ✅ P1 Hand has Zoro
-
-============================================================
-=== ❌ FAILED SCENARIO: [TARGET_ORIGINAL_POWER] 【対象】元々のパワーを参照する除去 ===
-
---- [1. SCENARIO DEFINITION] ---
-{
-  "id": "TARGET_ORIGINAL_POWER",
-  "title": "【対象】元々のパワーを参照する除去",
-  "setup": {
-    "p1": {
-      "field": [
-        "Tester"
-      ]
-    },
-    "p2": {
-      "field": [
-        {
-          "name": "BuffedEnemy",
-          "power": 2000,
-          "power_buff": 5000
-        }
-      ]
-    }
-  },
-  "source": "Tester",
-  "text": "【登場時】相手の元々のパワー3000以下のキャラ1枚をKOする。",
-  "expected_trigger": "ON_PLAY",
-  "interaction": [
-    {
-      "select_cards": [
-        "BuffedEnemy"
-      ]
-    }
-  ],
-  "expect": {
-    "success": true,
-    "p2_trash_has": [
-      "BuffedEnemy"
-    ]
-  }
-}
-
---- [2. EXECUTION LOG] ---
-{"timestamp": "2026-01-07T22:53:27.795849", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.795957", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.796300", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 相手の元々のパワー3000以下のキャラ1枚をKOする", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.796448", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=OPPONENT, count=1, up_to=False, zone=Zone.FIELD", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.796542", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.KO for Tester", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.796630", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.no_target", "msg": "No targets found for query: 相手の元々のパワー3000以下のキャラ1枚をKOする", "payload": {"query_raw": "相手の元々のパワー3000以下のキャラ1枚をKOする", "zone": "FIELD", "target_player": "OPPONENT", "real_target_names": ["P2"], "candidates_scanned": 1}}
-{"timestamp": "2026-01-07T22:53:27.796720", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.KO failed: Target required but not found.", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.796785", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: 相手の元々のパワー3000以下のキャラ1枚をKOする", "payload": null}
-
---- [3. RESULT REPORT] ---
-✅ Trigger matched: ON_PLAY
-Caught Expected Error: 効果の解決に失敗しました: 相手の元々のパワー3000以下のキャラ1枚をKOする
-❌ Success Mismatch: Expected True, Got False
-❌ P2 Trash missing BuffedEnemy. Current: []
 
 ============================================================
 === ❌ FAILED SCENARIO: [OP13_087_CHARLOS] 【登場時】デッキトップ廃棄（チャルロス聖） ===
@@ -283,18 +162,202 @@ Caught Expected Error: 効果の解決に失敗しました: 相手の元々の�
 }
 
 --- [2. EXECUTION LOG] ---
-{"timestamp": "2026-01-07T22:53:27.808954", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.809044", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.809485", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のデッキの上から1枚をトラッシュに置く", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.809613", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.DECK", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.809696", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.DECK_TOP for OP13-087 Charlos", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.809779", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.no_target", "msg": "No targets found for query: 自分のデッキの上から1枚をトラッシュに置く", "payload": {"query_raw": "自分のデッキの上から1枚をトラッシュに置く", "zone": "DECK", "target_player": "SELF", "real_target_names": ["P1"], "candidates_scanned": 0}}
-{"timestamp": "2026-01-07T22:53:27.809874", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.DECK_TOP failed: Target required but not found.", "payload": null}
-{"timestamp": "2026-01-07T22:53:27.809941", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: 自分のデッキの上から1枚をトラッシュに置く", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.958976", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.959165", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.959952", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のデッキの上から1枚をトラッシュに置く", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.960135", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.DECK", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.960363", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.DECK_TOP for OP13-087 Charlos", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.960461", "source": "BE", "level": "WARNING", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.no_target", "msg": "No targets found for query: 自分のデッキの上から1枚をトラッシュに置く", "payload": {"query_raw": "自分のデッキの上から1枚をトラッシュに置く", "zone": "DECK", "target_player": "SELF", "real_target_names": ["P1"], "candidates_scanned": 0}}
+{"timestamp": "2026-01-08T01:55:44.960573", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.DECK_TOP failed: Target required but not found.", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.960649", "source": "BE", "level": "WARNING", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: 自分のデッキの上から1枚をトラッシュに置く", "payload": null}
 
 --- [3. RESULT REPORT] ---
 ✅ Trigger matched: ON_PLAY
 Caught Expected Error: 効果の解決に失敗しました: 自分のデッキの上から1枚をトラッシュに置く
 ❌ Success Mismatch: Expected True, Got False
+
+============================================================
+=== ❌ FAILED SCENARIO: [ST02_007_BONNEY] 【起動メイン】超新星サーチ（ジュエリー・ボニー） ===
+
+--- [1. SCENARIO DEFINITION] ---
+{
+  "id": "ST02_007_BONNEY",
+  "title": "【起動メイン】超新星サーチ（ジュエリー・ボニー）",
+  "setup": {
+    "p1": {
+      "field": [
+        {
+          "name": "ST02-007 Jewelry Bonney",
+          "cost": 1,
+          "power": 1000,
+          "attribute": "SPECIAL",
+          "color": "GREEN",
+          "traits": [
+            "超新星",
+            "ボニー海賊団"
+          ],
+          "text": "【起動メイン】①(コストエリアのドン!!を指定の数レストにできる)，このキャラをレストにできる：自分のデッキの上から5枚を見て、特徴《超新星》を持つカード1枚までを公開し、手札に加える。その後、残りを好きな順番でデッキの下に置く。"
+        }
+      ],
+      "deck": [
+        {
+          "name": "Supernova Card",
+          "traits": [
+            "超新星"
+          ]
+        },
+        "CardA",
+        "CardB",
+        "CardC",
+        "CardD",
+        "BottomCard"
+      ],
+      "don": {
+        "active": 1,
+        "rested": 0
+      }
+    }
+  },
+  "source": "ST02-007 Jewelry Bonney",
+  "expected_trigger": "ACTIVATE_MAIN",
+  "interaction": [
+    {
+      "select_cards": [
+        "Supernova Card"
+      ]
+    },
+    {
+      "sort_deck_bottom": [
+        "CardA",
+        "CardB",
+        "CardC",
+        "CardD"
+      ]
+    }
+  ],
+  "expect": {
+    "success": true,
+    "p1_hand_has": [
+      "Supernova Card"
+    ],
+    "p1_field_status": {
+      "ST02-007 Jewelry Bonney": "REST"
+    },
+    "p1_don_active": 0,
+    "p1_don_rested": 1
+  },
+  "text": "【起動メイン】①(コストエリアのドン!!を指定の数レストにできる)，このキャラをレストにできる：自分のデッキの上から5枚を見て、特徴《超新星》を持つカード1枚までを公開し、手札に加える。その後、残りを好きな順番でデッキの下に置く。"
+}
+
+--- [2. EXECUTION LOG] ---
+{"timestamp": "2026-01-08T01:55:44.970525", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.970652", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.971346", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 1,このキャラをレストにできる", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.971543", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=OPPONENT, count=1, up_to=False, zone=Zone.FIELD", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.971665", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のデッキの上から5枚を見て、特徴《超新星》を持つカード1枚までを公開し、手札に加える", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.971816", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=5, up_to=True, zone=Zone.DECK", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.971941", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 残りを好きな順番でデッキの下に置く", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.972041", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.REST for ST02-007 Jewelry Bonney", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.972184", "source": "BE", "level": "WARNING", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.no_target", "msg": "No targets found for query: 1,このキャラをレストにできる", "payload": {"query_raw": "1,このキャラをレストにできる", "zone": "FIELD", "target_player": "OPPONENT", "real_target_names": ["P2"], "candidates_scanned": 0}}
+{"timestamp": "2026-01-08T01:55:44.972300", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.REST failed: Target required but not found.", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.972376", "source": "BE", "level": "WARNING", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: 1,このキャラをレストにできる", "payload": null}
+
+--- [3. RESULT REPORT] ---
+✅ Trigger matched: ACTIVATE_MAIN
+Caught Expected Error: 効果の解決に失敗しました: 1,このキャラをレストにできる
+❌ Success Mismatch: Expected True, Got False
+✅ p1 Don Active: 0
+❌ P1 Hand missing Supernova Card. Current: []
+
+============================================================
+=== ❌ FAILED SCENARIO: [OP09_095_LAFFITTE] 【起動メイン】黒ひげ海賊団サーチ（ラフィット） ===
+
+--- [1. SCENARIO DEFINITION] ---
+{
+  "id": "OP09_095_LAFFITTE",
+  "title": "【起動メイン】黒ひげ海賊団サーチ（ラフィット）",
+  "setup": {
+    "p1": {
+      "field": [
+        {
+          "name": "OP09-095 Laffitte",
+          "cost": 1,
+          "power": 1000,
+          "attribute": "STRIKE",
+          "color": "BLACK",
+          "traits": [
+            "黒ひげ海賊団"
+          ],
+          "text": "【起動メイン】自分のドン!!1枚とこのキャラをレストにできる：自分のデッキの上から5枚を見て、特徴《黒ひげ海賊団》を持つカード1枚までを公開し、手札に加える。その後、残りを好きな順番でデッキの下に置く。"
+        }
+      ],
+      "deck": [
+        {
+          "name": "Blackbeard Card",
+          "traits": [
+            "黒ひげ海賊団"
+          ]
+        },
+        "Card1",
+        "Card2",
+        "Card3",
+        "Card4"
+      ],
+      "don": {
+        "active": 1,
+        "rested": 0
+      }
+    }
+  },
+  "source": "OP09-095 Laffitte",
+  "expected_trigger": "ACTIVATE_MAIN",
+  "interaction": [
+    {
+      "select_cards": [
+        "Blackbeard Card"
+      ]
+    },
+    {
+      "sort_deck_bottom": [
+        "Card1",
+        "Card2",
+        "Card3",
+        "Card4"
+      ]
+    }
+  ],
+  "expect": {
+    "success": true,
+    "p1_hand_has": [
+      "Blackbeard Card"
+    ],
+    "p1_field_status": {
+      "OP09-095 Laffitte": "REST"
+    },
+    "p1_don_active": 0,
+    "p1_don_rested": 1
+  },
+  "text": "【起動メイン】自分のドン!!1枚とこのキャラをレストにできる：自分のデッキの上から5枚を見て、特徴《黒ひげ海賊団》を持つカード1枚までを公開し、手札に加える。その後、残りを好きな順番でデッキの下に置く。"
+}
+
+--- [2. EXECUTION LOG] ---
+{"timestamp": "2026-01-08T01:55:44.983927", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.984138", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.985152", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のドン1枚とこのキャラをレストにできる", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.985384", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.FIELD", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.985536", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のデッキの上から5枚を見て、特徴《黒ひげ海賊団》を持つカード1枚までを公開し、手札に加える", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.985695", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=5, up_to=True, zone=Zone.DECK", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.985820", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 残りを好きな順番でデッキの下に置く", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.985930", "source": "BE", "level": "INFO", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.REST for OP09-095 Laffitte", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.986026", "source": "BE", "level": "WARNING", "sessionId": "gen-ca9f7bd5", "player": "system", "action": "matcher.no_target", "msg": "No targets found for query: 自分のドン1枚とこのキャラをレストにできる", "payload": {"query_raw": "自分のドン1枚とこのキャラをレストにできる", "zone": "FIELD", "target_player": "SELF", "real_target_names": ["P1"], "candidates_scanned": 1}}
+{"timestamp": "2026-01-08T01:55:44.986128", "source": "BE", "level": "DEBUG", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.REST failed: Target required but not found.", "payload": null}
+{"timestamp": "2026-01-08T01:55:44.986199", "source": "BE", "level": "WARNING", "sessionId": "gen-ca9f7bd5", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: 自分のドン1枚とこのキャラをレストにできる", "payload": null}
+
+--- [3. RESULT REPORT] ---
+✅ Trigger matched: ACTIVATE_MAIN
+Caught Expected Error: 効果の解決に失敗しました: 自分のドン1枚とこのキャラをレストにできる
+❌ Success Mismatch: Expected True, Got False
+✅ p1 Don Active: 0
+❌ P1 Hand missing Blackbeard Card. Current: []
 
 ============================================================

@@ -1,5 +1,5 @@
 Test Execution Report
-Total: 59, Passed: 52
+Total: 59, Passed: 54
 
 ✅ BASIC_KO_AND_COST: 【基本】コスト指定KOとドン!!コスト支払い
     ✅ Trigger matched: ACTIVATE_MAIN
@@ -267,12 +267,11 @@ Total: 59, Passed: 52
     ✅ p1 Hand Count: 3
     ✅ p1 Deck Count: 0
 ------------------------------------------------------------
-❌ FILTER_POWER_MAX: 【対象】パワー指定（〜以下）によるKO
+✅ FILTER_POWER_MAX: 【対象】パワー指定（〜以下）によるKO
     ✅ Trigger matched: ON_PLAY
-    Caught Expected Error: 効果の解決に失敗しました: 相手のパワー3000以下のキャラ1枚をKOする
-    ❌ Success Mismatch: Expected True, Got False
+    ✅ Success matched: True
     ✅ P2 Field has StrongEnemy
-    ❌ P2 Trash missing WeakEnemy. Current: []
+    ✅ P2 Trash has WeakEnemy
 ------------------------------------------------------------
 ❌ FILTER_ATTRIBUTE_COLOR: 【対象】属性・色による回収
     ✅ Trigger matched: ON_PLAY
@@ -307,11 +306,10 @@ Total: 59, Passed: 52
     ✅ P1 Hand has Luffytaro
     ✅ P1 Hand has Zoro
 ------------------------------------------------------------
-❌ TARGET_ORIGINAL_POWER: 【対象】元々のパワーを参照する除去
+✅ TARGET_ORIGINAL_POWER: 【対象】元々のパワーを参照する除去
     ✅ Trigger matched: ON_PLAY
-    Caught Expected Error: 効果の解決に失敗しました: 相手の元々のパワー3000以下のキャラ1枚をKOする
-    ❌ Success Mismatch: Expected True, Got False
-    ❌ P2 Trash missing BuffedEnemy. Current: []
+    ✅ Success matched: True
+    ✅ P2 Trash has BuffedEnemy
 ------------------------------------------------------------
 ✅ TARGET_MULTIPLE_TRAITS: 【対象】複数の特徴（OR条件）によるサーチ
     ✅ Trigger matched: ON_PLAY

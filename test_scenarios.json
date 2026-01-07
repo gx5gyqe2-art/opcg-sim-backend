@@ -1590,7 +1590,7 @@
           {
             "name": "RedSlash",
             "color": "RED",
-            "attribute": "SLASH"
+            "attribute": "STRIKE"
           },
           {
             "name": "GreenStrike",
@@ -1735,7 +1735,7 @@
         ],
         "hand": [
           {
-            "name": "Monkey.D.Luffy",
+            "name": "モンキー・D・ルフィ",
             "type": "CHARACTER"
           },
           {
@@ -1755,7 +1755,7 @@
     "interaction": [
       {
         "select_cards": [
-          "Monkey.D.Luffy"
+          "モンキー・D・ルフィ"
         ]
       }
     ],
@@ -1870,7 +1870,12 @@
         ],
         "deck": [
           "TopCard",
-          "SecondCard"
+          "SecondCard",
+          "D1",
+          "D2",
+          "D3",
+          "D4",
+          "D5"
         ]
       }
     },
@@ -1915,7 +1920,10 @@
           "CardB",
           "CardC",
           "CardD",
-          "BottomCard"
+          "BottomCard",
+          "D1",
+          "D2",
+          "D3"
         ],
         "don": {
           "active": 1,
@@ -1981,7 +1989,12 @@
           "Card1",
           "Card2",
           "Card3",
-          "Card4"
+          "Card4",
+          "D1",
+          "D2",
+          "D3",
+          "D4",
+          "D5"
         ],
         "don": {
           "active": 1,
