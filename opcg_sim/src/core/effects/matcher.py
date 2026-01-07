@@ -20,11 +20,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.zone = Zone.TEMP
         return tq
 
-    # Player Detection (Fixed)
+    # --- Player Detection ---
     if _nfc(ParserKeyword.EACH_OTHER) in tgt_text: tq.player = Player.ALL
     elif _nfc(ParserKeyword.OPPONENT) in tgt_text: tq.player = Player.OPPONENT
     elif _nfc(ParserKeyword.OWNER) in tgt_text: 
-        # "持ち主の[領域]" という表現は移動先を示すことが多いため、選択モードとしては無視する
+        # "持ち主の[領域]" は移動先を示すことが多いため、選択ターゲットのPlayer判定には使わない
         is_dest = False
         for suffix in ["の手札", "のデッキ", "のライフ", "のトラッシュ"]:
             if _nfc(ParserKeyword.OWNER + suffix) in tgt_text:
@@ -36,7 +36,6 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         elif _nfc(ParserKeyword.OPPONENT) in tgt_text:
             tq.player = Player.OPPONENT
         else:
-            # デフォルトに戻す（通常は自分だが、文脈による）
             tq.player = default_player
             
     elif _nfc(ParserKeyword.SELF) in tgt_text or _nfc(ParserKeyword.SELF_REF) in tgt_text: tq.player = Player.SELF
@@ -70,7 +69,6 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             found_zone = zone_map[z_name]
             break
     
-    # Priority: Explicit Zone > Context Implication > Don Keyword > Default Field
     if not found_zone:
         if _nfc(ParserKeyword.LEADER) in tgt_text or _nfc(ParserKeyword.CHARACTER) in tgt_text:
             found_zone = Zone.FIELD
@@ -102,15 +100,14 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
-    # Cost
-    # [^+\-\d]? ensures we don't match "+2" or "-2" as part of the number prefix
+    # --- Cost Filter (Fix: Ignore "Set Cost" actions) ---
     m_c = re.search(_nfc(ParserKeyword.COST + r'[^+\-\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
-        # Extra check: ensure match start isn't preceded by + or -
+        # Check context: Don't match "+2" or "-2"
         start_idx = m_c.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
         
-        # Extra check: ensure match end isn't followed by "にする" (SET_COST action)
+        # Check context: Don't match if followed by "にする" (Set Cost Action)
         end_idx = m_c.end()
         post_match = tgt_text[end_idx:]
         is_set_action = _nfc("にする") in post_match[:5]
@@ -120,7 +117,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             if m_c.group(2) == _nfc(ParserKeyword.ABOVE): tq.cost_min = val
             else: tq.cost_max = val
 
-    # Power
+    # --- Power Filter ---
     m_p = re.search(_nfc(ParserKeyword.POWER + r'[^+\-\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_p:
         start_idx = m_p.start()
@@ -130,7 +127,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             if m_p.group(2) == _nfc(ParserKeyword.ABOVE): tq.power_min = val
             else: tq.power_max = val
     
-    # Status
+    # --- Status Filter ---
     if _nfc("にする") not in tgt_text and _nfc("ならない") not in tgt_text:
         if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
         elif _nfc("レスト") in tgt_text: tq.is_rest = True
@@ -145,6 +142,10 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         m_cnt = re.search(r'(\d+)' + _nfc(ParserKeyword.COUNT_SUFFIX), tgt_text)
         tq.count = int(m_cnt.group(1)) if m_cnt else 1
     
+    # --- Vanilla Check (Fix: Added) ---
+    if _nfc("効果のない") in tgt_text or _nfc("効果がない") in tgt_text:
+        tq.is_vanilla = True
+
     log_event("DEBUG", "matcher.parse_result", f"Parsed: player={tq.player.name}, count={tq.count}, up_to={tq.is_up_to}, zone={tq.zone}")
     return tq
 
@@ -182,6 +183,12 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         if query.cost_min is not None and card.current_cost < query.cost_min: continue
         if query.power_max is not None and card.get_power(True) > query.power_max: continue
         if query.power_min is not None and card.get_power(True) < query.power_min: continue
+        
+        # Vanilla Filter (Fix: Added)
+        if getattr(query, 'is_vanilla', False):
+            txt = card.master.effect_text
+            if txt and txt.strip() not in ["", "なし", "-"]: continue
+
         if query.names and card.master.name not in query.names: continue
         if query.traits and not any(t in card.master.traits for t in query.traits): continue
         if query.is_rest is not None and card.is_rest != query.is_rest: continue
