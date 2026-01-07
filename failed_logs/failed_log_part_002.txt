@@ -1,0 +1,184 @@
+=== ❌ FAILED SCENARIO: [ST02_007_BONNEY] 【起動メイン】超新星サーチ（ジュエリー・ボニー） ===
+
+--- [1. SCENARIO DEFINITION] ---
+{
+  "id": "ST02_007_BONNEY",
+  "title": "【起動メイン】超新星サーチ（ジュエリー・ボニー）",
+  "setup": {
+    "p1": {
+      "field": [
+        {
+          "name": "ST02-007 Jewelry Bonney",
+          "cost": 1,
+          "power": 1000,
+          "attribute": "SPECIAL",
+          "color": "GREEN",
+          "traits": [
+            "超新星",
+            "ボニー海賊団"
+          ],
+          "text": "【起動メイン】①(コストエリアのドン!!を指定の数レストにできる)，このキャラをレストにできる：自分のデッキの上から5枚を見て、特徴《超新星》を持つカード1枚までを公開し、手札に加える。その後、残りを好きな順番でデッキの下に置く。"
+        }
+      ],
+      "deck": [
+        {
+          "name": "Supernova Card",
+          "traits": [
+            "超新星"
+          ]
+        },
+        "CardA",
+        "CardB",
+        "CardC",
+        "CardD",
+        "BottomCard"
+      ],
+      "don": {
+        "active": 1,
+        "rested": 0
+      }
+    }
+  },
+  "source": "ST02-007 Jewelry Bonney",
+  "expected_trigger": "ACTIVATE_MAIN",
+  "interaction": [
+    {
+      "select_cards": [
+        "Supernova Card"
+      ]
+    },
+    {
+      "sort_deck_bottom": [
+        "CardA",
+        "CardB",
+        "CardC",
+        "CardD"
+      ]
+    }
+  ],
+  "expect": {
+    "success": true,
+    "p1_hand_has": [
+      "Supernova Card"
+    ],
+    "p1_field_status": {
+      "ST02-007 Jewelry Bonney": "REST"
+    },
+    "p1_don_active": 0,
+    "p1_don_rested": 1
+  },
+  "text": "【起動メイン】①(コストエリアのドン!!を指定の数レストにできる)，このキャラをレストにできる：自分のデッキの上から5枚を見て、特徴《超新星》を持つカード1枚までを公開し、手札に加える。その後、残りを好きな順番でデッキの下に置く。"
+}
+
+--- [2. EXECUTION LOG] ---
+{"timestamp": "2026-01-07T22:53:27.816018", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.816255", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.817007", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 1,このキャラをレストにできる", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.817159", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=OPPONENT, count=1, up_to=False, zone=Zone.FIELD", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.817263", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のデッキの上から5枚を見て、特徴《超新星》を持つカード1枚までを公開し、手札に加える", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.817394", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=5, up_to=True, zone=Zone.DECK", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.817498", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 残りを好きな順番でデッキの下に置く", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.817579", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.REST for ST02-007 Jewelry Bonney", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.817656", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.no_target", "msg": "No targets found for query: 1,このキャラをレストにできる", "payload": {"query_raw": "1,このキャラをレストにできる", "zone": "FIELD", "target_player": "OPPONENT", "real_target_names": ["P2"], "candidates_scanned": 0}}
+{"timestamp": "2026-01-07T22:53:27.817745", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.REST failed: Target required but not found.", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.817814", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: 1,このキャラをレストにできる", "payload": null}
+
+--- [3. RESULT REPORT] ---
+✅ Trigger matched: ACTIVATE_MAIN
+Caught Expected Error: 効果の解決に失敗しました: 1,このキャラをレストにできる
+❌ Success Mismatch: Expected True, Got False
+✅ p1 Don Active: 0
+❌ P1 Hand missing Supernova Card. Current: []
+
+============================================================
+=== ❌ FAILED SCENARIO: [OP09_095_LAFFITTE] 【起動メイン】黒ひげ海賊団サーチ（ラフィット） ===
+
+--- [1. SCENARIO DEFINITION] ---
+{
+  "id": "OP09_095_LAFFITTE",
+  "title": "【起動メイン】黒ひげ海賊団サーチ（ラフィット）",
+  "setup": {
+    "p1": {
+      "field": [
+        {
+          "name": "OP09-095 Laffitte",
+          "cost": 1,
+          "power": 1000,
+          "attribute": "STRIKE",
+          "color": "BLACK",
+          "traits": [
+            "黒ひげ海賊団"
+          ],
+          "text": "【起動メイン】自分のドン!!1枚とこのキャラをレストにできる：自分のデッキの上から5枚を見て、特徴《黒ひげ海賊団》を持つカード1枚までを公開し、手札に加える。その後、残りを好きな順番でデッキの下に置く。"
+        }
+      ],
+      "deck": [
+        {
+          "name": "Blackbeard Card",
+          "traits": [
+            "黒ひげ海賊団"
+          ]
+        },
+        "Card1",
+        "Card2",
+        "Card3",
+        "Card4"
+      ],
+      "don": {
+        "active": 1,
+        "rested": 0
+      }
+    }
+  },
+  "source": "OP09-095 Laffitte",
+  "expected_trigger": "ACTIVATE_MAIN",
+  "interaction": [
+    {
+      "select_cards": [
+        "Blackbeard Card"
+      ]
+    },
+    {
+      "sort_deck_bottom": [
+        "Card1",
+        "Card2",
+        "Card3",
+        "Card4"
+      ]
+    }
+  ],
+  "expect": {
+    "success": true,
+    "p1_hand_has": [
+      "Blackbeard Card"
+    ],
+    "p1_field_status": {
+      "OP09-095 Laffitte": "REST"
+    },
+    "p1_don_active": 0,
+    "p1_don_rested": 1
+  },
+  "text": "【起動メイン】自分のドン!!1枚とこのキャラをレストにできる：自分のデッキの上から5枚を見て、特徴《黒ひげ海賊団》を持つカード1枚までを公開し、手札に加える。その後、残りを好きな順番でデッキの下に置く。"
+}
+
+--- [2. EXECUTION LOG] ---
+{"timestamp": "2026-01-07T22:53:27.827694", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.827807", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.828353", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のドン1枚とこのキャラをレストにできる", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.828491", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.FIELD", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.828591", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のデッキの上から5枚を見て、特徴《黒ひげ海賊団》を持つカード1枚までを公開し、手札に加える", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.828713", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=5, up_to=True, zone=Zone.DECK", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.828992", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 残りを好きな順番でデッキの下に置く", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.829082", "source": "BE", "level": "INFO", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.REST for OP09-095 Laffitte", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.829186", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "system", "action": "matcher.no_target", "msg": "No targets found for query: 自分のドン1枚とこのキャラをレストにできる", "payload": {"query_raw": "自分のドン1枚とこのキャラをレストにできる", "zone": "FIELD", "target_player": "SELF", "real_target_names": ["P1"], "candidates_scanned": 1}}
+{"timestamp": "2026-01-07T22:53:27.829319", "source": "BE", "level": "DEBUG", "sessionId": "gen-9f2620ce", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.REST failed: Target required but not found.", "payload": null}
+{"timestamp": "2026-01-07T22:53:27.829398", "source": "BE", "level": "WARNING", "sessionId": "gen-9f2620ce", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: 自分のドン1枚とこのキャラをレストにできる", "payload": null}
+
+--- [3. RESULT REPORT] ---
+✅ Trigger matched: ACTIVATE_MAIN
+Caught Expected Error: 効果の解決に失敗しました: 自分のドン1枚とこのキャラをレストにできる
+❌ Success Mismatch: Expected True, Got False
+✅ p1 Don Active: 0
+❌ P1 Hand missing Blackbeard Card. Current: []
+
+============================================================

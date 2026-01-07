@@ -2,7 +2,10 @@ import sys
 import os
 import json
 import traceback
-from typing import List, Dict, Any
+import math
+import io
+import shutil
+from typing import List, Dict, Any, Tuple
 
 # --- パス設定 ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -20,27 +23,25 @@ except ImportError as e:
     sys.exit(1)
 
 # ---------------------------------------------------------
-# ロギングヘルパー: 標準出力をファイルにも保存する
+# ロギング: 画面出力のフィルタリングのみを行う（ファイル保存なし）
 # ---------------------------------------------------------
-class TeeLogger(object):
-    def __init__(self, filename):
+class StdoutFilter(object):
+    def __init__(self):
         self.terminal = sys.stdout
-        self.log = open(filename, "w", encoding="utf-8")
 
     def write(self, message):
-        self.terminal.write(message)
-        self.log.write(message)
+        # 画面にはJSON形式の内部ログを表示しない（見やすくするため）
+        is_json_log = message.strip().startswith("{") and '"sessionId":' in message
+        if not is_json_log:
+            self.terminal.write(message)
 
     def flush(self):
         self.terminal.flush()
-        self.log.flush()
 
 # ---------------------------------------------------------
-# ヘルパー: モック環境構築
+# モック環境構築
 # ---------------------------------------------------------
 def create_mock_card(owner_id: str, def_data: Any) -> CardInstance:
-    """JSON定義からCardInstanceを生成"""
-    
     KEYWORD_MAP = {
         "DOUBLE_ATTACK": "ダブルアタック",
         "BANISH": "バニッシュ",
@@ -63,7 +64,6 @@ def create_mock_card(owner_id: str, def_data: Any) -> CardInstance:
         keywords = def_data.get("keywords", [])
         text = def_data.get("text", "")
 
-    # テキストが「なし」の場合は空文字として扱う
     if text == "なし":
         text = ""
 
@@ -96,49 +96,39 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
     gm = GameManager(p1, p2)
     gm.start_game()
     
-    # プレイヤー状態のセットアップ
     for pid, p_obj in [("p1", p1), ("p2", p2)]:
         p_data = scenario.get("setup", {}).get(pid, {})
         
-        # Leader Setup
         if "leader" in p_data:
             l_val = p_data["leader"]
             l_card = create_mock_card(p_obj.name, l_val)
-            # CardMasterはfrozenなので強制書き換えでLeader属性を付与
             object.__setattr__(l_card.master, 'type', CardType.LEADER)
             object.__setattr__(l_card.master, 'life', 5)
             p_obj.leader = l_card
 
-        # Field
         for c_def in p_data.get("field", []):
             card = create_mock_card(p_obj.name, c_def)
             p_obj.field.append(card)
             
-        # Hand
         for c_def in p_data.get("hand", []):
             card = create_mock_card(p_obj.name, c_def)
             p_obj.hand.append(card)
         
-        # Trash
         for c_def in p_data.get("trash", []):
             card = create_mock_card(p_obj.name, c_def)
             p_obj.trash.append(card)
             
-        # Deck
         for c_def in p_data.get("deck", []):
             card = create_mock_card(p_obj.name, c_def)
             p_obj.deck.append(card)
             
-        # Life
         for c_def in p_data.get("life", []):
             card = create_mock_card(p_obj.name, c_def)
             p_obj.life.append(card)
 
-        # Don Active
         active_count = p_data.get("don_active", 0)
         p_obj.don_active = [DonInstance(p_obj.name) for _ in range(active_count)]
 
-        # Don Rested
         rested_count = p_data.get("don_rested", 0)
         p_obj.don_rested = []
         for _ in range(rested_count):
@@ -146,7 +136,6 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
             d.is_rest = True
             p_obj.don_rested.append(d)
         
-        # Don Deck
         total_in_play = active_count + rested_count
         deck_count = 10 - total_in_play
         if deck_count < 0: deck_count = 0
@@ -155,23 +144,26 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
     return gm
 
 def find_card_by_name(player: Player, name: str) -> CardInstance:
-    # 検索範囲をフィールドと手札に加えて、ライフとトラッシュも対象にする
     for c in player.field + player.hand + player.life + player.trash:
         if c.master.name == name:
             return c
     return None
 
 # ---------------------------------------------------------
-# テスト実行ロジック
+# テスト実行ロジック (ログキャプチャ機能付き)
 # ---------------------------------------------------------
-def run_scenario(scenario: Dict) -> Dict:
+def run_scenario(scenario: Dict) -> Tuple[Dict, str]:
     result_report = {"id": scenario["id"], "title": scenario["title"], "passed": False, "details": []}
     
+    # ログキャプチャ開始（一時的にstdoutをメモリバッファに向ける）
+    capture_io = io.StringIO()
+    original_stdout = sys.stdout
+    sys.stdout = capture_io
+
     try:
         # 1. セットアップ
         gm = setup_game_from_json(scenario)
         
-        # 操作プレイヤーの切り替え (デフォルトはP1)
         active_player_key = scenario.get("active_player", "p1")
         active_player = gm.p1 if active_player_key == "p1" else gm.p2
         
@@ -179,13 +171,11 @@ def run_scenario(scenario: Dict) -> Dict:
             gm.turn_player = gm.p2
             gm.opponent = gm.p1
         
-        # 2. 効果発動元の特定
         source_name = scenario["source"]
         source_card = find_card_by_name(active_player, source_name)
         if not source_card:
             raise Exception(f"Source card '{source_name}' not found in {active_player_key.upper()} zones.")
         
-        # 3. アクション実行 または テキストParse
         ability = None
         if "manual_action" in scenario:
             act = scenario["manual_action"]
@@ -200,7 +190,6 @@ def run_scenario(scenario: Dict) -> Dict:
                 
                 gm.declare_attack(source_card, target_card)
                 
-                # ダミーAbility (後続のTrigger検証などをパスするため)
                 class DummyAbility:
                     trigger = None
                 ability = DummyAbility()
@@ -211,41 +200,38 @@ def run_scenario(scenario: Dict) -> Dict:
                 raise Exception("Parser failed to extract abilities.")
             ability = effect_obj.abilities[0]
 
-        # トリガー検証
         expected_trigger = scenario.get("expected_trigger")
         if expected_trigger:
             actual_trigger = ability.trigger.name
             if actual_trigger != expected_trigger:
                 result_report["details"].append(f"❌ Trigger Mismatch: Expected {expected_trigger}, Got {actual_trigger}")
                 result_report["passed"] = False
-                return result_report
+                # 早期リターン時もログを復元して返す
+                captured_log = capture_io.getvalue()
+                sys.stdout = original_stdout
+                return result_report, captured_log
             else:
                 result_report["details"].append(f"✅ Trigger matched: {actual_trigger}")
         
-        # 4. 効果解決 (Interaction処理含む)
         success = False
         try:
             if not hasattr(ability, 'trigger') or ability.trigger is not None:
                 gm.resolve_ability(active_player, ability, source_card)
             
-            # Interactionループ (Battleフェーズ進行も含む)
             interaction_steps = scenario.get("interaction", [])
             step_idx = 0
             
             loop_limit = 20
-            # active_interaction または pending_request がある限り回す
             while (gm.active_interaction or gm.get_pending_request()) and loop_limit > 0:
                 loop_limit -= 1
                 
                 req = gm.active_interaction
                 
-                # Active Interactionがない場合、Pending Requestをラップして処理
                 if not req:
                     pending = gm.get_pending_request()
                     if pending:
                         action_type = pending.get("action")
                         
-                        # シナリオ指定が尽きている場合、ブロック/カウンターは自動パス
                         if step_idx >= len(interaction_steps):
                             if action_type == "SELECT_BLOCKER":
                                 gm.handle_block(None)
@@ -256,7 +242,6 @@ def run_scenario(scenario: Dict) -> Dict:
                                 gm.apply_counter(target_p, None)
                                 continue
                         
-                        # 処理対象としてラップ
                         req = {
                             "action_type": action_type,
                             "candidates": pending.get("candidates", []),
@@ -265,21 +250,18 @@ def run_scenario(scenario: Dict) -> Dict:
                     else:
                         break
 
-                # --- Interaction 処理 ---
                 if step_idx >= len(interaction_steps):
                     if req.get("can_skip"):
-                        gm.resolve_interaction(active_player, {}) # Pass
+                        gm.resolve_interaction(active_player, {}) 
                     else:
                         raise Exception(f"Unexpected interaction required: {req.get('action_type')}")
                 else:
                     step_input = interaction_steps[step_idx]
                     
-                    # 候補の検証ロジック
                     if "verify_candidates" in step_input:
                         verify = step_input["verify_candidates"]
                         candidates = req.get("candidates", [])
                         
-                        # candidatesは辞書(pending由来)かオブジェクト(interaction由来)か混在する可能性あり
                         candidate_names = []
                         for c in candidates:
                             if isinstance(c, dict): candidate_names.append(c.get("name", "Unknown"))
@@ -291,13 +273,11 @@ def run_scenario(scenario: Dict) -> Dict:
 
                     payload = {}
                     
-                    # カード選択
                     if "select_cards" in step_input:
                         target_names = step_input["select_cards"]
                         selected_uuids = []
                         candidates = req.get("candidates", [])
                         
-                        # pendingの場合はUUIDsが別フィールドにあるが、ここではcandidatesから探す
                         for t_name in target_names:
                             found = None
                             for c in candidates:
@@ -309,7 +289,6 @@ def run_scenario(scenario: Dict) -> Dict:
                                     break
                         payload["selected_uuids"] = selected_uuids
                     
-                    # ブロッカー使用 (manual_action風の指定がある場合)
                     if "use_blocker" in step_input and step_input["use_blocker"]:
                         blocker_name = step_input.get("blocker_card")
                         candidates = req.get("candidates", [])
@@ -317,24 +296,21 @@ def run_scenario(scenario: Dict) -> Dict:
                         for c in candidates:
                             c_name = c.get("name") if isinstance(c, dict) else c.master.name
                             if c_name == blocker_name:
-                                # pending requestの場合はオブジェクトが必要なため、gmから探す必要あり
                                 c_uuid = c.get("uuid") if isinstance(c, dict) else c.uuid
                                 found_blocker = gm._find_card_by_uuid(c_uuid)
                                 break
                         if found_blocker:
                             gm.handle_block(found_blocker)
                             step_idx += 1
-                            continue # 次のループへ
+                            continue
 
-                    # 選択肢 (Option)
                     if "select_option" in step_input:
                         payload["selected_option_index"] = step_input["select_option"]
 
                     if gm.active_interaction:
                         gm.resolve_interaction(active_player, payload)
                     elif req.get("action_type") == "SELECT_COUNTER":
-                         # カウンターなどは現状手動で関数を呼ぶ必要がある（簡易実装）
-                         target_pid = req.get("player_id") # pending requestはdict
+                         target_pid = req.get("player_id") 
                          if not target_pid: target_pid = active_player.name
                          target_p = gm.p1 if target_pid == gm.p1.name else gm.p2
                          gm.apply_counter(target_p, None)
@@ -348,10 +324,9 @@ def run_scenario(scenario: Dict) -> Dict:
             success = False
         except Exception as e:
             result_report["details"].append(f"Runtime Error: {str(e)}")
-            traceback.print_exc()
+            traceback.print_exc() # これもcapture_ioに入る
             success = False
 
-        # 5. 検証 (Expectations)
         expect = scenario.get("expect", {})
         
         exp_success = expect.get("success")
@@ -369,7 +344,6 @@ def run_scenario(scenario: Dict) -> Dict:
             else:
                 result_report["details"].append(f"❌ Error message missing '{exp_msg}'")
 
-        # 状態検証ヘルパー
         def check_prop(pid, p_obj, key, label):
             if key in expect:
                 actual = 0
@@ -491,13 +465,15 @@ def run_scenario(scenario: Dict) -> Dict:
         result_report["passed"] = False
         result_report["details"].append(f"CRITICAL ERROR: {traceback.format_exc()}")
 
-    return result_report
+    # キャプチャ終了
+    captured_log = capture_io.getvalue()
+    sys.stdout = original_stdout
+    
+    return result_report, captured_log
 
 def main():
-    # ★追加: コンソール出力をファイルにも保存する設定
-    log_path = os.path.join(current_dir, "full_execution_log.txt")
-    sys.stdout = TeeLogger(log_path)
-    print(f"📄 Full Execution Log will be saved to: {log_path}\n")
+    # 画面出力フィルタの設定（ファイル保存はしない）
+    sys.stdout = StdoutFilter()
 
     json_path = os.path.join(current_dir, "test_scenarios.json")
     if not os.path.exists(json_path):
@@ -511,65 +487,97 @@ def main():
         print(f"JSON Decode Error: {e}")
         return
 
+    # --- 1. failed_logs ディレクトリの初期化（クリア） ---
+    failed_logs_dir = os.path.join(current_dir, "failed_logs")
+    if os.path.exists(failed_logs_dir):
+        try:
+            shutil.rmtree(failed_logs_dir)
+        except Exception as e:
+            print(f"Warning: Could not clear failed_logs dir: {e}")
+    os.makedirs(failed_logs_dir, exist_ok=True)
+
     print(f"🚀 Running {len(scenarios)} Scenarios (JSON Mode)...\n")
     
-    # 全シナリオの結果を格納するリスト
     all_results = []
+    failed_logs_collection = [] # 失敗したテストのログを溜めるリスト
     
     passed_count = 0
     for s in scenarios:
-        res = run_scenario(s)
+        res, log_content = run_scenario(s)
         all_results.append(res)
         
-        status_icon = "✅" if res["passed"] else "❌"
-        print(f"{status_icon} [{s['id']}] {s['title']}")
-        for d in res["details"]:
-            print(f"    {d}")
-        print("-" * 50)
+        # --- 本来のstdout (StdoutFilter) に書き出す ---
+        # run_scenario中は止めていたので、ここで一気に書き出す
+        # JSONログはここでフィルタリングされて画面には出ない
+        print(log_content, end="")
         
-        if res["passed"]: passed_count += 1
+        status_icon = "✅" if res["passed"] else "❌"
+        
+        if res["passed"]:
+            print(f"{status_icon} [{s['id']}] {s['title']}")
+            passed_count += 1
+        else:
+            print(f"{status_icon} [{s['id']}] {s['title']}")
+            print("    ▼ FAILURE DETAILS:")
+            failure_details_text = ""
+            for d in res["details"]:
+                if "❌" in d or "Expected Error" in d:
+                    line = f"      {d}\n"
+                    print(line, end="")
+                    failure_details_text += line
+            print("-" * 50)
+            
+            # --- 失敗ログの収集 (AIデバッグ用) ---
+            # 1. テスト項目 (Scenario JSON)
+            scenario_json_str = json.dumps(s, indent=2, ensure_ascii=False)
+            
+            # 2. ログ (log_content) -> 既に持っている（JSON含む完全版）
+            
+            # 3. 結果 (Result details) -> res['details'] 全体を含める
+            full_details = "\n".join(res['details'])
+            
+            combined_log = (
+                f"=== ❌ FAILED SCENARIO: [{s['id']}] {s['title']} ===\n\n"
+                f"--- [1. SCENARIO DEFINITION] ---\n{scenario_json_str}\n\n"
+                f"--- [2. EXECUTION LOG] ---\n{log_content}\n"
+                f"--- [3. RESULT REPORT] ---\n{full_details}\n\n"
+                f"{'='*60}\n"
+            )
+            failed_logs_collection.append(combined_log)
 
     print(f"\nResult: {passed_count}/{len(scenarios)} Passed")
 
-    # --- レポート出力処理 ---
-    report_file_txt = os.path.join(current_dir, "test_report.txt")
-    report_file_json = os.path.join(current_dir, "test_report.json")
-
-    try:
-        # テキスト形式のレポート出力
-        with open(report_file_txt, "w", encoding="utf-8") as f:
-            f.write(f"Test Execution Report\n")
-            f.write(f"Total Scenarios: {len(scenarios)}\n")
-            f.write(f"Passed: {passed_count}\n")
-            f.write(f"Failed: {len(scenarios) - passed_count}\n")
-            f.write("=" * 60 + "\n\n")
-            
-            for res in all_results:
-                status = "PASS" if res["passed"] else "FAIL"
-                icon = "✅" if res["passed"] else "❌"
-                f.write(f"{icon} [{status}] {res['id']}: {res['title']}\n")
-                for d in res['details']:
-                    f.write(f"    {d}\n")
-                f.write("-" * 60 + "\n")
+    # --- 失敗ログの分割保存処理 ---
+    if failed_logs_collection:
+        print(f"\n💾 Saving {len(failed_logs_collection)} failed scenarios for AI analysis...")
+        print(f"   Directory: {failed_logs_dir}")
         
-        print(f"\n📄 Text Report saved to: {report_file_txt}")
+        items_per_file = 5 # 失敗ログは重いので5件ずつにする
+        num_chunks = math.ceil(len(failed_logs_collection) / items_per_file)
 
-        # JSON形式のレポート出力
-        with open(report_file_json, "w", encoding="utf-8") as f:
-            json.dump({
-                "summary": {
-                    "total": len(scenarios),
-                    "passed": passed_count,
-                    "failed": len(scenarios) - passed_count
-                },
-                "results": all_results
-            }, f, ensure_ascii=False, indent=2)
-            
-        print(f"📄 JSON Report saved to: {report_file_json}")
+        for i in range(num_chunks):
+            chunk = failed_logs_collection[i * items_per_file : (i + 1) * items_per_file]
+            filename = os.path.join(failed_logs_dir, f"failed_log_part_{i+1:03d}.txt")
+            with open(filename, "w", encoding="utf-8") as f:
+                for log_block in chunk:
+                    f.write(log_block)
+            print(f"  -> Created: {filename}")
+    else:
+        print("\n🎉 No failures! No failed logs generated.")
 
+    # --- レポート出力 (テキスト) ---
+    report_file_txt = os.path.join(current_dir, "test_report.txt")
+    try:
+        with open(report_file_txt, "w", encoding="utf-8") as f:
+            f.write(f"Test Execution Report\nTotal: {len(scenarios)}, Passed: {passed_count}\n\n")
+            for res in all_results:
+                icon = "✅" if res["passed"] else "❌"
+                f.write(f"{icon} {res['id']}: {res['title']}\n")
+                for d in res['details']: f.write(f"    {d}\n")
+                f.write("-" * 60 + "\n")
+        print(f"📄 Report saved to: {report_file_txt}")
     except Exception as e:
-        print(f"❌ Failed to save report files: {e}")
+        print(f"❌ Failed to save report: {e}")
 
 if __name__ == "__main__":
     main()
-

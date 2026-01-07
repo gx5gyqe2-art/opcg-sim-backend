@@ -1,10 +1,7 @@
 Test Execution Report
-Total Scenarios: 59
-Passed: 52
-Failed: 7
-============================================================
+Total: 59, Passed: 52
 
-✅ [PASS] BASIC_KO_AND_COST: 【基本】コスト指定KOとドン!!コスト支払い
+✅ BASIC_KO_AND_COST: 【基本】コスト指定KOとドン!!コスト支払い
     ✅ Trigger matched: ACTIVATE_MAIN
     ✅ Success matched: True
     ✅ p1 Don Active: 1
@@ -12,289 +9,289 @@ Failed: 7
     ✅ P2 Field has HighCostEnemy
     ✅ P2 Trash has LowCostEnemy
 ------------------------------------------------------------
-✅ [PASS] MATCHER_TRAIT_FILTER: 【対象】特徴によるフィルタリング検証
+✅ MATCHER_TRAIT_FILTER: 【対象】特徴によるフィルタリング検証
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ P2 Field has Kaido
     ✅ P2 Trash has Luffy
 ------------------------------------------------------------
-✅ [PASS] SEQUENCE_AND_CONDITION: 【複合】条件付き実行（〜場合、〜する）
+✅ SEQUENCE_AND_CONDITION: 【複合】条件付き実行（〜場合、〜する）
     ✅ Trigger matched: ACTIVATE_MAIN
     ✅ Success matched: True
     ✅ p1 Hand Count: 0
     ✅ P2 Trash has Enemy
 ------------------------------------------------------------
-✅ [PASS] SEQUENCE_CONDITION_FAILED: 【複合】条件不成立時の処理スキップ
+✅ SEQUENCE_CONDITION_FAILED: 【複合】条件不成立時の処理スキップ
     ✅ Trigger matched: ACTIVATE_MAIN
     Caught Expected Error: 効果の解決に失敗しました: 手札1枚を捨てることができる
     ✅ Success matched: False
     ✅ Error message contains '手札1枚を捨てることができる'
     ✅ P2 Field has Enemy
 ------------------------------------------------------------
-✅ [PASS] ERROR_NO_TARGET: 【異常系】対象不在による失敗
+✅ ERROR_NO_TARGET: 【異常系】対象不在による失敗
     ✅ Trigger matched: ON_PLAY
     Caught Expected Error: 効果の解決に失敗しました: 相手のキャラ1枚をKOする
     ✅ Success matched: False
     ✅ Error message contains 'KO'
 ------------------------------------------------------------
-✅ [PASS] FEATURE_FREEZE: 【新規】フリーズ効果（アクティブにならない）
+✅ FEATURE_FREEZE: 【新規】フリーズ効果（アクティブにならない）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ Enemy has flag FREEZE
 ------------------------------------------------------------
-✅ [PASS] FEATURE_SELECT_OPTION: 【新規】選択肢効果（未実装部分の動作確認）
+✅ FEATURE_SELECT_OPTION: 【新規】選択肢効果（未実装部分の動作確認）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
 ------------------------------------------------------------
-✅ [PASS] VERIFY_SELECTION_SOURCE: 【検証】選択候補の正当性チェック（Trash回収）
+✅ VERIFY_SELECTION_SOURCE: 【検証】選択候補の正当性チェック（Trash回収）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p1 Hand Count: 1
 ------------------------------------------------------------
-✅ [PASS] LIFE_ADD_DECK_P1: 【P1】デッキトップからライフ追加
+✅ LIFE_ADD_DECK_P1: 【P1】デッキトップからライフ追加
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p1 Deck Count: 0
     ✅ p1 Life Count: 1
 ------------------------------------------------------------
-✅ [PASS] LIFE_ADD_HAND_P1: 【P1】手札からライフ追加
+✅ LIFE_ADD_HAND_P1: 【P1】手札からライフ追加
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p1 Hand Count: 0
     ✅ p1 Life Count: 1
 ------------------------------------------------------------
-✅ [PASS] LIFE_ADD_TRASH_P1: 【P1】トラッシュからライフ追加
+✅ LIFE_ADD_TRASH_P1: 【P1】トラッシュからライフ追加
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p1 Life Count: 1
     ✅ p1 Trash Count: 0
 ------------------------------------------------------------
-✅ [PASS] LIFE_ADD_FIELD_P1: 【P1】フィールドからライフ追加
+✅ LIFE_ADD_FIELD_P1: 【P1】フィールドからライフ追加
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p1 Life Count: 1
     ✅ p1 Field Count: 1
 ------------------------------------------------------------
-✅ [PASS] LIFE_TO_HAND_P1: 【P1】ライフを手札に加える
+✅ LIFE_TO_HAND_P1: 【P1】ライフを手札に加える
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p1 Hand Count: 1
     ✅ p1 Life Count: 0
 ------------------------------------------------------------
-✅ [PASS] LIFE_TO_TRASH_P1: 【P1】ライフをトラッシュに置く
+✅ LIFE_TO_TRASH_P1: 【P1】ライフをトラッシュに置く
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p1 Life Count: 0
     ✅ p1 Trash Count: 1
 ------------------------------------------------------------
-✅ [PASS] LIFE_ADD_DECK_P2: 【P2】デッキトップからライフ追加
+✅ LIFE_ADD_DECK_P2: 【P2】デッキトップからライフ追加
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p2 Deck Count: 0
     ✅ p2 Life Count: 1
 ------------------------------------------------------------
-✅ [PASS] LIFE_ADD_HAND_P2: 【P2】手札からライフ追加
+✅ LIFE_ADD_HAND_P2: 【P2】手札からライフ追加
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p2 Hand Count: 0
     ✅ p2 Life Count: 1
 ------------------------------------------------------------
-✅ [PASS] LIFE_ADD_TRASH_P2: 【P2】トラッシュからライフ追加
+✅ LIFE_ADD_TRASH_P2: 【P2】トラッシュからライフ追加
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p2 Life Count: 1
     ✅ p2 Trash Count: 0
 ------------------------------------------------------------
-✅ [PASS] LIFE_ADD_FIELD_P2: 【P2】フィールドからライフ追加
+✅ LIFE_ADD_FIELD_P2: 【P2】フィールドからライフ追加
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p2 Life Count: 1
     ✅ p2 Field Count: 1
 ------------------------------------------------------------
-✅ [PASS] LIFE_TO_HAND_P2: 【P2】ライフを手札に加える
+✅ LIFE_TO_HAND_P2: 【P2】ライフを手札に加える
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p2 Hand Count: 1
     ✅ p2 Life Count: 0
 ------------------------------------------------------------
-✅ [PASS] LIFE_TO_TRASH_P2: 【P2】ライフをトラッシュに置く
+✅ LIFE_TO_TRASH_P2: 【P2】ライフをトラッシュに置く
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p2 Life Count: 0
     ✅ p2 Trash Count: 1
 ------------------------------------------------------------
-✅ [PASS] TRIGGER_TURN_END: 【トリガー】自分のターン終了時
+✅ TRIGGER_TURN_END: 【トリガー】自分のターン終了時
     ✅ Trigger matched: TURN_END
     ✅ Success matched: True
     ✅ p1 Don Active: 1
 ------------------------------------------------------------
-✅ [PASS] TRIGGER_OPP_TURN_END: 【トリガー】相手のターン終了時
+✅ TRIGGER_OPP_TURN_END: 【トリガー】相手のターン終了時
     ✅ Trigger matched: OPP_TURN_END
     ✅ Success matched: True
     ✅ p1 Hand Count: 1
 ------------------------------------------------------------
-✅ [PASS] TRIGGER_ON_ATTACK: 【トリガー】自分のアタック時
+✅ TRIGGER_ON_ATTACK: 【トリガー】自分のアタック時
     ✅ Trigger matched: ON_ATTACK
     ✅ Success matched: True
     ✅ p1 Hand Count: 1
 ------------------------------------------------------------
-✅ [PASS] TRIGGER_ON_OPP_ATTACK: 【トリガー】相手のアタック時
+✅ TRIGGER_ON_OPP_ATTACK: 【トリガー】相手のアタック時
     ✅ Trigger matched: ON_OPP_ATTACK
     ✅ Success matched: True
     ✅ p1 Hand Count: 1
 ------------------------------------------------------------
-✅ [PASS] TRIGGER_ON_BLOCK: 【トリガー】ブロック時
+✅ TRIGGER_ON_BLOCK: 【トリガー】ブロック時
     ✅ Trigger matched: ON_BLOCK
     ✅ Success matched: True
     ✅ p2 Life Count: 0
     ✅ p2 Trash Count: 1
 ------------------------------------------------------------
-✅ [PASS] TRIGGER_ON_KO: 【トリガー】KO時
+✅ TRIGGER_ON_KO: 【トリガー】KO時
     ✅ Trigger matched: ON_KO
     ✅ Success matched: True
     ✅ p1 Hand Count: 1
 ------------------------------------------------------------
-✅ [PASS] TRIGGER_PASSIVE_MY_TURN: 【トリガー】〜のターン中（常時効果のテスト）
+✅ TRIGGER_PASSIVE_MY_TURN: 【トリガー】〜のターン中（常時効果のテスト）
     ✅ Trigger matched: PASSIVE
     ✅ Success matched: True
     ✅ p1 Hand Count: 1
 ------------------------------------------------------------
-✅ [PASS] OP13_079_IMU_ACTIVATE_HAND: 【OP13-079 イム】起動メイン：手札コストでドロー
+✅ OP13_079_IMU_ACTIVATE_HAND: 【OP13-079 イム】起動メイン：手札コストでドロー
     ✅ Trigger matched: ACTIVATE_MAIN
     ✅ Success matched: True
     ✅ p1 Hand Count: 1
 ------------------------------------------------------------
-✅ [PASS] OP13_079_IMU_ACTIVATE_CHARA: 【OP13-079 イム】起動メイン：キャラコストでドロー
+✅ OP13_079_IMU_ACTIVATE_CHARA: 【OP13-079 イム】起動メイン：キャラコストでドロー
     ✅ Trigger matched: ACTIVATE_MAIN
     ✅ Success matched: True
     ✅ p1 Hand Count: 2
     ✅ p1 Field Count: 1
 ------------------------------------------------------------
-✅ [PASS] EFFECT_BUFF_POWER: 【効果】パワー増加（バフ）
+✅ EFFECT_BUFF_POWER: 【効果】パワー増加（バフ）
     ✅ Trigger matched: ACTIVATE_MAIN
     ✅ Success matched: True
     ✅ BuffTarget power_buff is 2000
 ------------------------------------------------------------
-✅ [PASS] EFFECT_COST_MINUS: 【効果】コスト減少（デバフ）
+✅ EFFECT_COST_MINUS: 【効果】コスト減少（デバフ）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ Enemy cost is 3
 ------------------------------------------------------------
-✅ [PASS] EFFECT_REST_TARGET: 【効果】相手キャラをレストにする
+✅ EFFECT_REST_TARGET: 【効果】相手キャラをレストにする
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ ActiveEnemy is_rest is True
 ------------------------------------------------------------
-✅ [PASS] EFFECT_ACTIVE_SELF: 【効果】自分キャラをアクティブにする
+✅ EFFECT_ACTIVE_SELF: 【効果】自分キャラをアクティブにする
     ✅ Trigger matched: ACTIVATE_MAIN
     ✅ Success matched: True
     ✅ RestedAlly is_rest is False
 ------------------------------------------------------------
-✅ [PASS] EFFECT_SEARCHER_LOOK_ADD: 【効果】サーチ（見る→加える→デッキ下）
+✅ EFFECT_SEARCHER_LOOK_ADD: 【効果】サーチ（見る→加える→デッキ下）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p1 Hand Count: 1
     ✅ p1 Deck Count: 4
 ------------------------------------------------------------
-✅ [PASS] EFFECT_DECK_BOTTOM_REMOVAL: 【効果】デッキ下送り（除去）
+✅ EFFECT_DECK_BOTTOM_REMOVAL: 【効果】デッキ下送り（除去）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p2 Deck Count: 2
     ✅ p2 Field Count: 0
 ------------------------------------------------------------
-✅ [PASS] EFFECT_GRANT_KEYWORD: 【効果】キーワード能力付与（速攻）
+✅ EFFECT_GRANT_KEYWORD: 【効果】キーワード能力付与（速攻）
     ✅ Trigger matched: ACTIVATE_MAIN
     ✅ Success matched: True
     ✅ Ally has keyword 速攻
 ------------------------------------------------------------
-✅ [PASS] EFFECT_PLAY_FROM_HAND: 【効果】手札から登場させる
+✅ EFFECT_PLAY_FROM_HAND: 【効果】手札から登場させる
     ✅ Trigger matched: ACTIVATE_MAIN
     ✅ Success matched: True
     ✅ p1 Hand Count: 0
     ✅ p1 Field Count: 2
     ✅ P1 Field has PlayTarget
 ------------------------------------------------------------
-✅ [PASS] EFFECT_ATTACH_DON: 【効果】ドン!!付与
+✅ EFFECT_ATTACH_DON: 【効果】ドン!!付与
     ✅ Trigger matched: ACTIVATE_MAIN
     ✅ Success matched: True
     ✅ p1 Don Active: 1
     ✅ Ally attached_don is 1
 ------------------------------------------------------------
-✅ [PASS] EFFECT_PREVENT_LEAVE: 【効果】場を離れない（耐性付与）
+✅ EFFECT_PREVENT_LEAVE: 【効果】場を離れない（耐性付与）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ Ally has flag PREVENT_LEAVE
 ------------------------------------------------------------
-✅ [PASS] EFFECT_DEAL_DAMAGE: 【効果】ダメージを与える（ライフ減少）
+✅ EFFECT_DEAL_DAMAGE: 【効果】ダメージを与える（ライフ減少）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p2 Hand Count: 1
     ✅ p2 Life Count: 0
 ------------------------------------------------------------
-✅ [PASS] EFFECT_VICTORY: 【効果】特殊勝利
+✅ EFFECT_VICTORY: 【効果】特殊勝利
     ✅ Trigger matched: ACTIVATE_MAIN
     ✅ Success matched: True
 ------------------------------------------------------------
-✅ [PASS] TRIGGER_COUNTER_BUFF: 【トリガー】カウンター（パワー増加）
+✅ TRIGGER_COUNTER_BUFF: 【トリガー】カウンター（パワー増加）
     ✅ Trigger matched: COUNTER
     ✅ Success matched: True
 ------------------------------------------------------------
-✅ [PASS] TRIGGER_LIFE_EFFECT: 【トリガー】ライフトリガー発動
+✅ TRIGGER_LIFE_EFFECT: 【トリガー】ライフトリガー発動
     ✅ Trigger matched: TRIGGER
     ✅ Success matched: True
 ------------------------------------------------------------
-✅ [PASS] MECHANIC_BLOCKER: 【ルール】ブロッカーによる攻撃対象変更
+✅ MECHANIC_BLOCKER: 【ルール】ブロッカーによる攻撃対象変更
     ✅ Success matched: True
 ------------------------------------------------------------
-✅ [PASS] KEYWORD_DOUBLE_BANISH: 【キーワード】ダブルアタック＆バニッシュ検証
+✅ KEYWORD_DOUBLE_BANISH: 【キーワード】ダブルアタック＆バニッシュ検証
     ✅ Success matched: True
     ✅ p2 Hand Count: 0
     ✅ p2 Life Count: 0
     ✅ p2 Trash Count: 2
 ------------------------------------------------------------
-✅ [PASS] EFFECT_BOUNCE: 【効果】キャラを手札に戻す（バウンス）
+✅ EFFECT_BOUNCE: 【効果】キャラを手札に戻す（バウンス）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p2 Hand Count: 1
     ✅ p2 Field Count: 0
     ✅ P2 Hand has TargetChar
 ------------------------------------------------------------
-✅ [PASS] EFFECT_SET_COST_ZERO: 【効果】コストを特定の値に変更（0にする）
+✅ EFFECT_SET_COST_ZERO: 【効果】コストを特定の値に変更（0にする）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ OP01-010 cost is 0
 ------------------------------------------------------------
-✅ [PASS] EFFECT_SEARCH_TRASH_REMAIN: 【効果】サーチ後に残りをトラッシュへ
+✅ EFFECT_SEARCH_TRASH_REMAIN: 【効果】サーチ後に残りをトラッシュへ
     ✅ Trigger matched: ACTIVATE_MAIN
     ✅ Success matched: True
     ✅ p1 Hand Count: 3
     ✅ p1 Deck Count: 0
 ------------------------------------------------------------
-❌ [FAIL] FILTER_POWER_MAX: 【対象】パワー指定（〜以下）によるKO
+❌ FILTER_POWER_MAX: 【対象】パワー指定（〜以下）によるKO
     ✅ Trigger matched: ON_PLAY
     Caught Expected Error: 効果の解決に失敗しました: 相手のパワー3000以下のキャラ1枚をKOする
     ❌ Success Mismatch: Expected True, Got False
     ✅ P2 Field has StrongEnemy
     ❌ P2 Trash missing WeakEnemy. Current: []
 ------------------------------------------------------------
-❌ [FAIL] FILTER_ATTRIBUTE_COLOR: 【対象】属性・色による回収
+❌ FILTER_ATTRIBUTE_COLOR: 【対象】属性・色による回収
     ✅ Trigger matched: ON_PLAY
     Caught Expected Error: 効果の解決に失敗しました: 自分のトラッシュの赤の《打》属性のキャラ1枚を手札に戻す
     ❌ Success Mismatch: Expected True, Got False
     ❌ P1 Hand missing RedSlash. Current: []
 ------------------------------------------------------------
-✅ [PASS] FILTER_TYPE_EVENT: 【対象】イベントカードの回収
+✅ FILTER_TYPE_EVENT: 【対象】イベントカードの回収
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ P1 Hand has CounterEvent
 ------------------------------------------------------------
-✅ [PASS] FILTER_EXCLUDE_SELF: 【対象】自分自身を除く選択
+✅ FILTER_EXCLUDE_SELF: 【対象】自分自身を除く選択
     ✅ Trigger matched: ACTIVATE_MAIN
     ✅ Success matched: True
     ✅ P1 Field has Tester
     ✅ P1 Hand has OtherAlly
 ------------------------------------------------------------
-✅ [PASS] TARGET_ALL_ENEMIES: 【対象】相手のキャラすべてをKO（全体除去）
+✅ TARGET_ALL_ENEMIES: 【対象】相手のキャラすべてをKO（全体除去）
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ p2 Field Count: 0
@@ -303,37 +300,37 @@ Failed: 7
     ✅ P2 Trash has Enemy3
     ✅ P1 Field has Ally1
 ------------------------------------------------------------
-❌ [FAIL] TARGET_NAME_PARTIAL: 【対象】名前に特定の文字列を含むカードの指定
+❌ TARGET_NAME_PARTIAL: 【対象】名前に特定の文字列を含むカードの指定
     ✅ Trigger matched: ON_PLAY
     Caught Expected Error: 効果の解決に失敗しました: 自分の手札の、名前に「ルフィ」を含むキャラ1枚を捨てる
     ❌ Success Mismatch: Expected True, Got False
     ✅ P1 Hand has Luffytaro
     ✅ P1 Hand has Zoro
 ------------------------------------------------------------
-❌ [FAIL] TARGET_ORIGINAL_POWER: 【対象】元々のパワーを参照する除去
+❌ TARGET_ORIGINAL_POWER: 【対象】元々のパワーを参照する除去
     ✅ Trigger matched: ON_PLAY
     Caught Expected Error: 効果の解決に失敗しました: 相手の元々のパワー3000以下のキャラ1枚をKOする
     ❌ Success Mismatch: Expected True, Got False
     ❌ P2 Trash missing BuffedEnemy. Current: []
 ------------------------------------------------------------
-✅ [PASS] TARGET_MULTIPLE_TRAITS: 【対象】複数の特徴（OR条件）によるサーチ
+✅ TARGET_MULTIPLE_TRAITS: 【対象】複数の特徴（OR条件）によるサーチ
     ✅ Trigger matched: ON_PLAY
     ✅ Success matched: True
     ✅ P1 Hand has SupernovaCard
 ------------------------------------------------------------
-❌ [FAIL] OP13_087_CHARLOS: 【登場時】デッキトップ廃棄（チャルロス聖）
+❌ OP13_087_CHARLOS: 【登場時】デッキトップ廃棄（チャルロス聖）
     ✅ Trigger matched: ON_PLAY
     Caught Expected Error: 効果の解決に失敗しました: 自分のデッキの上から1枚をトラッシュに置く
     ❌ Success Mismatch: Expected True, Got False
 ------------------------------------------------------------
-❌ [FAIL] ST02_007_BONNEY: 【起動メイン】超新星サーチ（ジュエリー・ボニー）
+❌ ST02_007_BONNEY: 【起動メイン】超新星サーチ（ジュエリー・ボニー）
     ✅ Trigger matched: ACTIVATE_MAIN
     Caught Expected Error: 効果の解決に失敗しました: 1,このキャラをレストにできる
     ❌ Success Mismatch: Expected True, Got False
     ✅ p1 Don Active: 0
     ❌ P1 Hand missing Supernova Card. Current: []
 ------------------------------------------------------------
-❌ [FAIL] OP09_095_LAFFITTE: 【起動メイン】黒ひげ海賊団サーチ（ラフィット）
+❌ OP09_095_LAFFITTE: 【起動メイン】黒ひげ海賊団サーチ（ラフィット）
     ✅ Trigger matched: ACTIVATE_MAIN
     Caught Expected Error: 効果の解決に失敗しました: 自分のドン1枚とこのキャラをレストにできる
     ❌ Success Mismatch: Expected True, Got False
