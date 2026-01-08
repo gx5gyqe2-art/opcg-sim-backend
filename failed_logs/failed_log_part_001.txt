@@ -49,14 +49,14 @@
 }
 
 --- [2. EXECUTION LOG] ---
-{"timestamp": "2026-01-08T22:19:12.438403", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.438958", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.440806", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: ドン-1", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.441604", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.COST_AREA", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.441902", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: コスト4以下の相手のキャラ1枚をKOする", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.442523", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=OPPONENT, count=1, up_to=False, zone=Zone.FIELD", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.442676", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.RETURN_DON for Tester", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.453909", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "P1", "action": "resolver.suspend", "msg": "Selection required for ActionType.RETURN_DON. Candidates: 2", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.371355", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.371754", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.375970", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: ドン-1", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.377817", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.COST_AREA", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.377956", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: コスト4以下の相手のキャラ1枚をKOする", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.378164", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=OPPONENT, count=1, up_to=False, zone=Zone.FIELD", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.378258", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.RETURN_DON for Tester", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.396872", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "P1", "action": "resolver.suspend", "msg": "Selection required for ActionType.RETURN_DON. Candidates: 2", "payload": null}
 
 --- [3. RESULT REPORT] ---
 ✅ Trigger matched: ACTIVATE_MAIN
@@ -144,18 +144,18 @@ Runtime Error: 'DonInstance' object has no attribute 'master'
 }
 
 --- [2. EXECUTION LOG] ---
-{"timestamp": "2026-01-08T22:19:12.795537", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.795621", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.796111", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: ドン1枚をレストにする,このキャラをレストにできる", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.796247", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.FIELD", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.796350", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のデッキの上から5枚を見て、特徴《超新星》を持つカード1枚までを公開し、手札に加える", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.796481", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=5, up_to=True, zone=Zone.DECK", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.796589", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 残りを好きな順番でデッキの下に置く", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.796670", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.REST for ST02-007 Jewelry Bonney", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.796748", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "P1", "action": "resolver.suspend", "msg": "Selection required for ActionType.REST. Candidates: 1", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.796822", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "P1", "action": "game.resume_effect", "msg": "Resuming effect for ST02-007 Jewelry Bonney", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.796898", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.REST failed: Target required but not found.", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.797065", "source": "BE", "level": "WARNING", "sessionId": "gen-b14d8564", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: ドン1枚をレストにする,このキャラをレストにできる", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.790450", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.790540", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.791530", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: ドン1枚をレストにする,このキャラをレストにできる", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.791728", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.FIELD", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.791854", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のデッキの上から5枚を見て、特徴《超新星》を持つカード1枚までを公開し、手札に加える", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.792033", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=5, up_to=True, zone=Zone.DECK", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.792169", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 残りを好きな順番でデッキの下に置く", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.792282", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.REST for ST02-007 Jewelry Bonney", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.792366", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "P1", "action": "resolver.suspend", "msg": "Selection required for ActionType.REST. Candidates: 1", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.792468", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "P1", "action": "game.resume_effect", "msg": "Resuming effect for ST02-007 Jewelry Bonney", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.792564", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "P1", "action": "resolver.fail_no_target", "msg": "Action ActionType.REST failed: Target required but not found.", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.792629", "source": "BE", "level": "WARNING", "sessionId": "gen-cc46a47e", "player": "P1", "action": "game.effect_failed", "msg": "効果の解決に失敗しました: ドン1枚をレストにする,このキャラをレストにできる", "payload": null}
 
 --- [3. RESULT REPORT] ---
 ✅ Trigger matched: ACTIVATE_MAIN
@@ -241,17 +241,17 @@ Caught Expected Error: 効果の解決に失敗しました: ドン1枚をレス
 }
 
 --- [2. EXECUTION LOG] ---
-{"timestamp": "2026-01-08T22:19:12.810770", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.810891", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.811817", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のドン1枚をレストにできる", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.811986", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.COST_AREA", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.812096", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のこのキャラをレストにできる", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.812219", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.FIELD", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.812320", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のデッキの上から5枚を見て、特徴《黒ひげ海賊団》を持つカード1枚までを公開し、手札に加える", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.812476", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=5, up_to=True, zone=Zone.DECK", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.812607", "source": "BE", "level": "DEBUG", "sessionId": "gen-b14d8564", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 残りを好きな順番でデッキの下に置く", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.812705", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.REST for OP09-095 Laffitte", "payload": null}
-{"timestamp": "2026-01-08T22:19:12.812810", "source": "BE", "level": "INFO", "sessionId": "gen-b14d8564", "player": "P1", "action": "resolver.suspend", "msg": "Selection required for ActionType.REST. Candidates: 1", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.803897", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "system", "action": "game.start", "msg": "Game initialization started", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.804302", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "P1", "action": "game.turn_player", "msg": "First Player: P1", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.806561", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のドン1枚をレストにできる", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.806974", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.COST_AREA", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.807119", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のこのキャラをレストにできる", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.807262", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=1, up_to=False, zone=Zone.FIELD", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.807617", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 自分のデッキの上から5枚を見て、特徴《黒ひげ海賊団》を持つカード1枚までを公開し、手札に加える", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.808104", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_result", "msg": "Parsed: player=SELF, count=5, up_to=True, zone=Zone.DECK", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.808278", "source": "BE", "level": "DEBUG", "sessionId": "gen-cc46a47e", "player": "system", "action": "matcher.parse_start", "msg": "Parsing target text: 残りを好きな順番でデッキの下に置く", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.808542", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "P1", "action": "game.effect", "msg": "Resolving action ActionType.REST for OP09-095 Laffitte", "payload": null}
+{"timestamp": "2026-01-08T23:13:54.808753", "source": "BE", "level": "INFO", "sessionId": "gen-cc46a47e", "player": "P1", "action": "resolver.suspend", "msg": "Selection required for ActionType.REST. Candidates: 1", "payload": null}
 
 --- [3. RESULT REPORT] ---
 ✅ Trigger matched: ACTIVATE_MAIN

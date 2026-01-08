@@ -39,6 +39,8 @@ if not CONST:
     }
 
 
+# opcg_sim/src/models/models.py
+
 @dataclass(frozen=True)
 class CardMaster:
     card_id: str
@@ -55,6 +57,24 @@ class CardMaster:
     life: int
     keywords: Set[str] = field(default_factory=set)
     abilities: Tuple[Ability, ...] = field(default_factory=tuple)
+
+    # ▼▼▼ このメソッドを追加してください ▼▼▼
+    def to_dict(self):
+        return {
+            "uuid": self.card_id,
+            "name": self.name,
+            "type": self.type.name if hasattr(self.type, "name") else str(self.type),
+            "color": [self.color.value] if hasattr(self.color, "value") else [],
+            "cost": self.cost,
+            "power": self.power,
+            "counter": self.counter,
+            "attributes": [self.attribute.value] if hasattr(self.attribute, "value") else [],
+            "text": self.effect_text,
+            "traits": self.traits,
+            "life": self.life
+        }
+    # ▲▲▲ 追加ここまで ▲▲▲
+
 
 @dataclass
 class CardInstance:
