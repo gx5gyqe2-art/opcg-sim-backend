@@ -4,9 +4,10 @@ import sys
 import json
 import traceback
 from typing import Any, Dict, Optional, List
-
 from fastapi import FastAPI, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
+from google.cloud import firestore
+
 
 current_api_dir = os.path.dirname(os.path.abspath(__file__))
 if current_api_dir not in sys.path:
@@ -34,6 +35,12 @@ CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
 app = FastAPI(title="OPCG Simulator API v1.5")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+db = None
+try:
+    db = firestore.Client()
+except Exception:
+    pass
+
 
 def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool = True, error_code: str = None, error_msg: str = None) -> Dict[str, Any]:
     # ... (既存コードと同じ) ...
@@ -329,6 +336,59 @@ async def game_battle(req: BattleActionRequest):
     except Exception as e:
         log_event("ERROR", "game.battle_fail", traceback.format_exc(), player=player_id)
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
+
+@app.get("/api/cards")
+async def get_all_cards():
+    try:
+        cards_data = [c.to_dict() for c in card_db.cards.values()]
+        return {"success": True, "cards": cards_data}
+    except Exception as e:
+        log_event("ERROR", "api.get_cards_fail", traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/deck")
+async def save_deck(deck_data: Dict[str, Any] = Body(...)):
+    if not db:
+        return {"success": False, "error": "Database not initialized"}
+
+    try:
+        doc_ref = db.collection("decks").document()
+        save_data = {
+            "id": doc_ref.id,
+            "name": deck_data.get("name", "Untitled Deck"),
+            "leader_id": deck_data.get("leader_id"),
+            "card_uuids": deck_data.get("card_uuids", []),
+            "don_uuids": deck_data.get("don_uuids", []),
+            "created_at": firestore.SERVER_TIMESTAMP
+        }
+        
+        doc_ref.set(save_data)
+        
+        log_event("INFO", "deck.save", f"Deck saved: {save_data['name']}", player="system", payload={"deck_id": doc_ref.id})
+        return {"success": True, "deck_id": doc_ref.id}
+    except Exception as e:
+        log_event("ERROR", "deck.save_fail", traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/deck/list")
+async def list_decks():
+    if not db:
+        return {"success": False, "error": "Database not initialized"}
+        
+    try:
+        docs = db.collection("decks").order_by("created_at", direction=firestore.Query.DESCENDING).stream()
+        decks = []
+        for doc in docs:
+            d = doc.to_dict()
+            if "created_at" in d and d["created_at"]:
+                d["created_at"] = str(d["created_at"])
+            decks.append(d)
+            
+        return {"success": True, "decks": decks}
+    except Exception as e:
+        log_event("ERROR", "deck.list_fail", traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
+
 
 @app.get("/health")
 async def health():
