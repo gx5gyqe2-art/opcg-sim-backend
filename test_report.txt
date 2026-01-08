@@ -323,13 +323,13 @@ Total: 59, Passed: 56
     ✅ Trigger matched: ACTIVATE_MAIN
     Caught Expected Error: 効果の解決に失敗しました: ドン1枚をレストにする,このキャラをレストにできる
     ❌ Success Mismatch: Expected True, Got False
-    ✅ p1 Don Active: 0
+    ❌ p1 Don Active: Expected 0, Got 1
     ❌ P1 Hand missing Supernova Card. Current: []
 ------------------------------------------------------------
 ❌ OP09_095_LAFFITTE: 【起動メイン】黒ひげ海賊団サーチ（ラフィット）
     ✅ Trigger matched: ACTIVATE_MAIN
-    Caught Expected Error: 効果の解決に失敗しました: 自分のドン1枚をレストにできる
+    Runtime Error: 'DonInstance' object has no attribute 'master'
     ❌ Success Mismatch: Expected True, Got False
-    ✅ p1 Don Active: 0
+    ❌ p1 Don Active: Expected 0, Got 1
     ❌ P1 Hand missing Blackbeard Card. Current: []
 ------------------------------------------------------------

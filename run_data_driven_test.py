@@ -137,10 +137,17 @@ def setup_game_from_json(scenario: Dict) -> GameManager:
             card = create_mock_card(p_obj.name, c_def)
             p_obj.life.append(card)
 
-        active_count = p_data.get("don_active", 0)
+        # 修正: ネストされた "don" プロパティの読み込みに対応
+        don_data = p_data.get("don")
+        if isinstance(don_data, dict):
+            active_count = don_data.get("active", 0)
+            rested_count = don_data.get("rested", 0)
+        else:
+            active_count = p_data.get("don_active", 0)
+            rested_count = p_data.get("don_rested", 0)
+
         p_obj.don_active = [DonInstance(p_obj.name) for _ in range(active_count)]
 
-        rested_count = p_data.get("don_rested", 0)
         p_obj.don_rested = []
         for _ in range(rested_count):
             d = DonInstance(p_obj.name)
