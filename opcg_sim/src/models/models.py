@@ -58,7 +58,6 @@ class CardMaster:
     keywords: Set[str] = field(default_factory=set)
     abilities: Tuple[Ability, ...] = field(default_factory=tuple)
 
-    # ▼▼▼ このメソッドを追加してください ▼▼▼
     def to_dict(self):
         return {
             "uuid": self.card_id,
@@ -71,9 +70,10 @@ class CardMaster:
             "attributes": [self.attribute.value] if hasattr(self.attribute, "value") else [],
             "text": self.effect_text,
             "traits": self.traits,
-            "life": self.life
+            "life": self.life,
+            "trigger_text": self.trigger_text # ▼ 追加: トリガー効果のテキストを含める
         }
-    # ▲▲▲ 追加ここまで ▲▲▲
+
 
 
 @dataclass
