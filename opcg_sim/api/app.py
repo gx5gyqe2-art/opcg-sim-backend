@@ -340,6 +340,11 @@ async def game_battle(req: BattleActionRequest):
 @app.get("/api/cards")
 async def get_all_cards():
     try:
+        # 【修正】まだロードされていないカードがあれば強制的にロードする
+        if len(card_db.cards) < len(card_db.raw_db):
+            for card_id in card_db.raw_db.keys():
+                card_db.get_card(card_id)
+
         cards_data = [c.to_dict() for c in card_db.cards.values()]
         return {"success": True, "cards": cards_data}
     except Exception as e:
