@@ -40,6 +40,7 @@ class Player:
             if self.deck:
                 self.hand.append(self.deck.pop(0))
 
+    # ... (前略)
     def to_dict(self, is_owner: bool = True):
         log_event("DEBUG", "gamestate.to_dict", f"Serializing player state for {self.name}", player=self.name)
         
@@ -62,6 +63,7 @@ class Player:
             player_props.get("DON_ACTIVE", "don_active"): [d.to_dict() for d in self.don_active],
             player_props.get("DON_RESTED", "don_rested"): [d.to_dict() for d in self.don_rested],
             "leader": leader_dict,
+            "stage": stage_dict, # 【追加】ここに追加してください！
             "zones": {
                 "field": [self._format_card(c, True) for c in self.field],
                 "hand": [self._format_card(c, is_owner) for c in self.hand],
@@ -70,6 +72,8 @@ class Player:
                 "stage": stage_dict
             }
         }
+    # ... (後略)
+
 
     def _format_card(self, card: Card, face_up: bool) -> dict:
         d = card.to_dict()
