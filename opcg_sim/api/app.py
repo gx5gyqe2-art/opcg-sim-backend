@@ -4,10 +4,10 @@ import sys
 import json
 import traceback
 from typing import Any, Dict, Optional, List
+
 from fastapi import FastAPI, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import firestore
-
 
 current_api_dir = os.path.dirname(os.path.abspath(__file__))
 if current_api_dir not in sys.path:
@@ -21,6 +21,8 @@ except ImportError:
 from opcg_sim.src.utils.logger_config import session_id_ctx, log_event
 from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.utils.loader import CardLoader, DeckLoader
+# 【追加】CardInstanceをインポート
+from opcg_sim.src.models.models import CardInstance
 
 def get_const():
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared_constants.json")
@@ -35,15 +37,18 @@ CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
 app = FastAPI(title="OPCG Simulator API v1.5")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# Firestore初期化 (修正済み)
 db = None
 try:
+    # 必要であれば database="your-db-id" を指定
     db = firestore.Client()
 except Exception:
     pass
 
-
+# ... (build_game_result_hybrid, middleware, log endpoints は変更なし) ...
 def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool = True, error_code: str = None, error_msg: str = None) -> Dict[str, Any]:
-    # ... (既存コードと同じ) ...
+    # ... (省略: 既存コードのまま) ...
     player_keys = CONST.get('PLAYER_KEYS', {})
     api_root_keys = CONST.get('API_ROOT_KEYS', {})
     error_props = CONST.get('ERROR_PROPERTIES', {})
@@ -111,7 +116,6 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
         api_root_keys.get('ERROR', 'error'): error_obj
     }
 
-# ... (middleware, logging, game creation endpoints は変更なし) ...
 @app.middleware("http")
 async def trace_logging_middleware(request: Request, call_next):
     s_id = request.headers.get("X-Session-ID") or request.query_params.get("sessionId")
@@ -153,6 +157,44 @@ card_db = CardLoader(CARD_DB_PATH)
 card_db.load()
 deck_loader = DeckLoader(card_db)
 
+# --- 【追加】DBまたはファイルからデッキを読み込む関数 ---
+def load_deck_mixed(source_str: str, owner_id: str):
+    # "db:" で始まる場合はFirestoreから読み込み
+    if source_str.startswith("db:"):
+        if not db:
+            raise ValueError("Firestore is not initialized.")
+        
+        deck_id = source_str[3:] # "db:"を除去
+        doc = db.collection("decks").document(deck_id).get()
+        if not doc.exists:
+            raise ValueError(f"Deck ID not found: {deck_id}")
+        
+        data = doc.to_dict()
+        leader_id = data.get("leader_id")
+        card_uuids = data.get("card_uuids", [])
+
+        # リーダー生成
+        leader_inst = None
+        if leader_id:
+            master = card_db.get_card(leader_id)
+            if master:
+                leader_inst = CardInstance(master, owner_id)
+        
+        # デッキ生成
+        cards_inst = []
+        for cid in card_uuids:
+            master = card_db.get_card(cid)
+            if master:
+                cards_inst.append(CardInstance(master, owner_id))
+        
+        log_event("INFO", "loader.db_load", f"Loaded deck from DB: {deck_id}", player=owner_id)
+        return leader_inst, cards_inst
+
+    else:
+        # 既存のファイル読み込み
+        path = os.path.join(DATA_DIR, source_str)
+        return deck_loader.load_deck(path, owner_id)
+
 @app.options("/api/game/create")
 async def options_game_create():
     return {"status": "ok"}
@@ -162,12 +204,22 @@ async def game_create(req: Any = Body(...)):
     try:
         game_id = str(uuid.uuid4())
         log_event(level_key="INFO", action="game.create", msg=f"Creating game: {game_id}", payload=req, player="system")
-        p1_path = os.path.join(DATA_DIR, req.get("p1_deck", ""))
-        p2_path = os.path.join(DATA_DIR, req.get("p2_deck", ""))
-        p1_leader, p1_cards = deck_loader.load_deck(p1_path, req.get("p1_name", "P1"))
-        p2_leader, p2_cards = deck_loader.load_deck(p2_path, req.get("p2_name", "P2"))
+        
+        # --- 【修正】load_deck_mixed を使用してデッキ読み込み ---
+        p1_source = req.get("p1_deck", "")
+        p2_source = req.get("p2_deck", "")
+        
+        # 必要なカードがロードされているか確認
+        if len(card_db.cards) < len(card_db.raw_db):
+             for card_id in card_db.raw_db.keys():
+                card_db.get_card(card_id)
+
+        p1_leader, p1_cards = load_deck_mixed(p1_source, req.get("p1_name", "P1"))
+        p2_leader, p2_cards = load_deck_mixed(p2_source, req.get("p2_name", "P2"))
+        
         player1 = Player(req.get("p1_name", "P1"), p1_cards, p1_leader)
         player2 = Player(req.get("p2_name", "P2"), p2_cards, p2_leader)
+        
         manager = GameManager(player1, player2)
         manager.start_game()
         GAMES[game_id] = manager
@@ -176,6 +228,7 @@ async def game_create(req: Any = Body(...)):
         log_event(level_key="ERROR", action="game.create_fail", msg=traceback.format_exc(), player="system")
         return {"success": False, "game_id": "", "error": {"message": str(e)}}
 
+# ... (game_action, game_battle など、以降の既存コードはそのまま) ...
 @app.options("/api/game/action")
 async def options_game_action():
     return {"status": "ok"}
@@ -287,7 +340,6 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             error_msg=str(e)
         )
 
-# ... (options_game_battle, game_battle, health endpoints は変更なし) ...
 @app.options("/api/game/battle")
 async def options_game_battle():
     return {"status": "ok"}
@@ -340,7 +392,6 @@ async def game_battle(req: BattleActionRequest):
 @app.get("/api/cards")
 async def get_all_cards():
     try:
-        # 【修正】まだロードされていないカードがあれば強制的にロードする
         if len(card_db.cards) < len(card_db.raw_db):
             for card_id in card_db.raw_db.keys():
                 card_db.get_card(card_id)
@@ -357,7 +408,11 @@ async def save_deck(deck_data: Dict[str, Any] = Body(...)):
         return {"success": False, "error": "Database not initialized"}
 
     try:
-        doc_ref = db.collection("decks").document()
+        if "id" in deck_data and deck_data["id"]:
+            doc_ref = db.collection("decks").document(deck_data["id"])
+        else:
+            doc_ref = db.collection("decks").document()
+
         save_data = {
             "id": doc_ref.id,
             "name": deck_data.get("name", "Untitled Deck"),
@@ -393,7 +448,6 @@ async def list_decks():
     except Exception as e:
         log_event("ERROR", "deck.list_fail", traceback.format_exc(), player="system")
         return {"success": False, "error": str(e)}
-
 
 @app.get("/health")
 async def health():
