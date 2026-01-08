@@ -1,11 +1,12 @@
 Test Execution Report
-Total: 59, Passed: 54
+Total: 59, Passed: 56
 
-✅ BASIC_KO_AND_COST: 【基本】コスト指定KOとドン!!コスト支払い
+❌ BASIC_KO_AND_COST: 【基本】コスト指定KOとドン!!コスト支払い
     ✅ Trigger matched: ACTIVATE_MAIN
-    ✅ Success matched: True
-    ✅ p1 Don Active: 1
-    ✅ p1 Don Deck Count: 9
+    Runtime Error: 'DonInstance' object has no attribute 'master'
+    ❌ Success Mismatch: Expected True, Got False
+    ❌ p1 Don Active: Expected 1, Got 2
+    ❌ p1 Don Deck Count: Expected 9, Got 8
     ✅ P2 Field has HighCostEnemy
     ✅ P2 Trash has LowCostEnemy
 ------------------------------------------------------------
@@ -273,11 +274,10 @@ Total: 59, Passed: 54
     ✅ P2 Field has StrongEnemy
     ✅ P2 Trash has WeakEnemy
 ------------------------------------------------------------
-❌ FILTER_ATTRIBUTE_COLOR: 【対象】属性・色による回収
+✅ FILTER_ATTRIBUTE_COLOR: 【対象】属性・色による回収
     ✅ Trigger matched: ON_PLAY
-    Caught Expected Error: 効果の解決に失敗しました: 自分のトラッシュの赤の《打》属性のキャラ1枚を手札に戻す
-    ❌ Success Mismatch: Expected True, Got False
-    ❌ P1 Hand missing RedSlash. Current: []
+    ✅ Success matched: True
+    ✅ P1 Hand has RedSlash
 ------------------------------------------------------------
 ✅ FILTER_TYPE_EVENT: 【対象】イベントカードの回収
     ✅ Trigger matched: ON_PLAY
@@ -299,10 +299,9 @@ Total: 59, Passed: 54
     ✅ P2 Trash has Enemy3
     ✅ P1 Field has Ally1
 ------------------------------------------------------------
-❌ TARGET_NAME_PARTIAL: 【対象】名前に特定の文字列を含むカードの指定
+✅ TARGET_NAME_PARTIAL: 【対象】名前に特定の文字列を含むカードの指定
     ✅ Trigger matched: ON_PLAY
-    Caught Expected Error: 効果の解決に失敗しました: 自分の手札の、名前に「ルフィ」を含むキャラ1枚を捨てる
-    ❌ Success Mismatch: Expected True, Got False
+    ✅ Success matched: True
     ✅ P1 Hand has Luffytaro
     ✅ P1 Hand has Zoro
 ------------------------------------------------------------
@@ -316,21 +315,20 @@ Total: 59, Passed: 54
     ✅ Success matched: True
     ✅ P1 Hand has SupernovaCard
 ------------------------------------------------------------
-❌ OP13_087_CHARLOS: 【登場時】デッキトップ廃棄（チャルロス聖）
+✅ OP13_087_CHARLOS: 【登場時】デッキトップ廃棄（チャルロス聖）
     ✅ Trigger matched: ON_PLAY
-    Caught Expected Error: 効果の解決に失敗しました: 自分のデッキの上から1枚をトラッシュに置く
-    ❌ Success Mismatch: Expected True, Got False
+    ✅ Success matched: True
 ------------------------------------------------------------
 ❌ ST02_007_BONNEY: 【起動メイン】超新星サーチ（ジュエリー・ボニー）
     ✅ Trigger matched: ACTIVATE_MAIN
-    Caught Expected Error: 効果の解決に失敗しました: 1,このキャラをレストにできる
+    Caught Expected Error: 効果の解決に失敗しました: ドン1枚をレストにする,このキャラをレストにできる
     ❌ Success Mismatch: Expected True, Got False
     ✅ p1 Don Active: 0
     ❌ P1 Hand missing Supernova Card. Current: []
 ------------------------------------------------------------
 ❌ OP09_095_LAFFITTE: 【起動メイン】黒ひげ海賊団サーチ（ラフィット）
     ✅ Trigger matched: ACTIVATE_MAIN
-    Caught Expected Error: 効果の解決に失敗しました: 自分のドン1枚とこのキャラをレストにできる
+    Caught Expected Error: 効果の解決に失敗しました: 自分のドン1枚をレストにできる
     ❌ Success Mismatch: Expected True, Got False
     ✅ p1 Don Active: 0
     ❌ P1 Hand missing Blackbeard Card. Current: []

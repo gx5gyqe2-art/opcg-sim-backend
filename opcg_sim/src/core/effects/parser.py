@@ -17,6 +17,13 @@ class Effect:
 
     def _normalize(self, text: str) -> str:
         if not text: return ""
+        
+        # 修正: Unicode正規化(NFKC)を行うと ① が 1 になってしまうため、
+        # その前に丸数字の置換を行う必要がある
+        circle_nums = '①②③④⑤⑥⑦⑧⑨⑩'
+        for i, char in enumerate(circle_nums, 1):
+            text = text.replace(char, f'ドン!!{i}枚をレストにする')
+
         text = unicodedata.normalize('NFKC', text)
         
         text = re.sub(r'\(.*?\)', '', text)
@@ -32,6 +39,7 @@ class Effect:
         }
         for k, v in replacements.items():
             text = text.replace(k, v)
+            
         text = re.sub(r'\s+', '', text)
         text = re.sub(r'ドン!!', 'ドン', text)
         text = re.sub(r'DON!!', 'ドン', text)
@@ -94,10 +102,6 @@ class Effect:
         return self._get_deepest_action(action.then_actions[-1])
 
     def _parse_logic_block(self, text: str, is_cost: bool) -> List[EffectAction]:
-        or_action = self._parse_or_split(text, is_cost)
-        if or_action:
-            return [or_action]
-
         match = re.search(r'^(.+?)(場合|なら|することで)、(.+)$', text)
         if match:
             condition_text, _, result_text = match.groups()
@@ -109,6 +113,15 @@ class Effect:
                 then_actions=then_actions,
                 raw_text=text
             )]
+
+        or_action = self._parse_or_split(text, is_cost)
+        if or_action:
+            return [or_action]
+        
+        and_actions = self._parse_and_split(text, is_cost)
+        if and_actions:
+            return and_actions
+
         return self._parse_atomic_action(text, is_cost)
 
     def _parse_or_split(self, text: str, is_cost: bool) -> Optional[EffectAction]:
@@ -123,12 +136,12 @@ class Effect:
                     connector = match.group(1)
                     verb = match.group(2)
                     
-                    text_a = part_a_raw
-                    # 修正: 「を」などが重複しても強制的に結合して動詞を補完する
                     text_a = f"{part_a_raw}{connector}{verb}"
-                    
                     text_b = part_b_raw
                     
+                    if "自分の" in text and "自分の" not in text_a: text_a = "自分の" + text_a
+                    if "相手の" in text and "相手の" not in text_a: text_a = "相手の" + text_a
+
                     actions_a = self._parse_recursive(text_a, is_cost)
                     actions_b = self._parse_recursive(text_b, is_cost)
                     
@@ -143,13 +156,83 @@ class Effect:
                         )
         return None
 
+    def _parse_and_split(self, text: str, is_cost: bool) -> List[EffectAction]:
+        protected_text = text
+        protected_text = protected_text.replace("特徴", "__TRAIT__")
+        protected_text = protected_text.replace("こと", "__THING__")
+        
+        placeholders = {}
+        def repl(m):
+            key = f"__BLK{len(placeholders)}__"
+            placeholders[key] = m.group(0)
+            return key
+            
+        protected_text = re.sub(r'「.*?」', repl, protected_text)
+        protected_text = re.sub(r'《.*?》', repl, protected_text)
+
+        if 'と' in protected_text:
+            connector = None
+            verb_part = None
+            
+            match_wo = re.search(r'を([^を]+)$', protected_text)
+            if match_wo:
+                connector = 'を'
+                verb_part = match_wo.group(1)
+            else:
+                match_ni = re.search(r'に([^に]+)$', protected_text)
+                if match_ni:
+                    connector = 'に'
+                    verb_part = match_ni.group(1)
+
+            if connector and verb_part:
+                split_pattern = r'と'
+                parts = re.split(split_pattern, protected_text)
+                
+                last_part = parts[-1]
+                conn_index = last_part.rfind(connector)
+                
+                if conn_index == -1: return []
+                    
+                last_target_part = last_part[:conn_index]
+                parts[-1] = last_target_part
+                
+                result_actions = []
+                context_prefix = ""
+                if "自分の" in text: context_prefix = "自分の"
+                elif "相手の" in text: context_prefix = "相手の"
+
+                for part in parts:
+                    if not part.strip(): continue
+                    part_text = part.strip()
+                    
+                    for k, v in placeholders.items():
+                        part_text = part_text.replace(k, v)
+                    part_text = part_text.replace("__TRAIT__", "特徴").replace("__THING__", "こと")
+                    
+                    if context_prefix and context_prefix not in part_text:
+                        part_text = context_prefix + part_text
+                    
+                    verb_restored = verb_part
+                    for k, v in placeholders.items():
+                        verb_restored = verb_restored.replace(k, v)
+                    verb_restored = verb_restored.replace("__TRAIT__", "特徴").replace("__THING__", "こと")
+
+                    full_text = f"{part_text}{connector}{verb_restored}"
+                    
+                    if full_text == text: return []
+                    
+                    actions = self._parse_recursive(full_text, is_cost)
+                    result_actions.extend(actions)
+                
+                if len(result_actions) >= 2:
+                    return result_actions
+        return []
+
     def _parse_atomic_action(self, text: str, is_cost: bool) -> List[EffectAction]:
         if '見て' in text or '公開' in text or '見る' in text:
             return self._handle_look_action(text)
 
         act_type = self._detect_action_type(text)
-        
-        # アクションタイプに応じた数値抽出
         val = self._extract_value_for_action(text, act_type)
 
         target = None
@@ -175,15 +258,21 @@ class Effect:
                 target = TargetQuery(select_mode="REFERENCE", raw_text="last_target")
                 if not target.tag: target.tag = "last_target"
             else:
-                default_p = Player.SELF
-                if act_type in [ActionType.KO, ActionType.DEAL_DAMAGE, ActionType.REST, ActionType.ATTACK_DISABLE, ActionType.FREEZE, ActionType.MOVE_TO_HAND]:
-                    if "自分" not in text:
-                        default_p = Player.OPPONENT
-                
-                target = parse_target(text, default_player=default_p)
-                
-                if any(kw in text for kw in ['選び', '対象とし']):
-                    target.tag = "last_target"
+                if act_type == ActionType.LIFE_MANIPULATE and "デッキの上" in text:
+                    target = None
+                else:
+                    default_p = Player.SELF
+                    if act_type in [ActionType.KO, ActionType.DEAL_DAMAGE, ActionType.ATTACK_DISABLE, ActionType.FREEZE, ActionType.MOVE_TO_HAND]:
+                        if "自分" not in text:
+                            default_p = Player.OPPONENT
+                    
+                    if act_type == ActionType.REST:
+                        default_p = Player.SELF
+
+                    target = parse_target(text, default_player=default_p)
+                    
+                    if any(kw in text for kw in ['選び', '対象とし']):
+                        target.tag = "last_target"
         
         return [EffectAction(
             type=act_type,
@@ -207,9 +296,7 @@ class Effect:
                 val_str = self._normalize_number_str(match.group(1))
                 return int(val_str)
         
-        # ★追加: コスト設定効果の場合、専用のパターンで数値を抽出する
         if act_type == ActionType.SET_COST:
-            # "コストXにする" または "コストをXにする"
             match = re.search(r'コスト(?:を)?(\d+)にする', text)
             if match:
                 return int(match.group(1))
@@ -245,6 +332,8 @@ class Effect:
                 return ActionType.RAMP_DON
             if 'アクティブ' in text:
                 return ActionType.ACTIVE_DON
+            if 'レスト' in text:
+                return ActionType.REST
 
         if 'ライフ' in text:
             if any(k in text for k in ['加える', '置く', '向き', '手札', 'トラッシュ']):

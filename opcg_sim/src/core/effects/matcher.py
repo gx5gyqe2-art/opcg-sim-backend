@@ -2,11 +2,13 @@ import re
 import logging
 import unicodedata
 from ...models.effect_types  import TargetQuery, _nfc
-from ...models.enums import Player, Zone, ParserKeyword
+from ...models.enums import Player, Zone, ParserKeyword, Attribute
 from ...utils.logger_config import log_event
 
 def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQuery:
     tq = TargetQuery(raw_text=tgt_text, player=default_player)
+    if not hasattr(tq, "flags"):
+        tq.flags = set()
     
     log_event("DEBUG", "matcher.parse_start", f"Parsing target text: {tgt_text}")
 
@@ -24,7 +26,6 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if _nfc(ParserKeyword.EACH_OTHER) in tgt_text: tq.player = Player.ALL
     elif _nfc(ParserKeyword.OPPONENT) in tgt_text: tq.player = Player.OPPONENT
     elif _nfc(ParserKeyword.OWNER) in tgt_text: 
-        # "持ち主の[領域]" は移動先を示すことが多いため、選択ターゲットのPlayer判定には使わない
         is_dest = False
         for suffix in ["の手札", "のデッキ", "のライフ", "のトラッシュ"]:
             if _nfc(ParserKeyword.OWNER + suffix) in tgt_text:
@@ -52,7 +53,6 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     
     found_zone = None
     
-    # Check for explicit zone keywords
     pattern = re.compile(r'(手札|トラッシュ|ライフ|デッキ|場|コストエリア)(?:.{0,5})(?:を|から|の)')
     matches = pattern.finditer(tgt_text)
     
@@ -60,7 +60,6 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         z_name = _nfc(m.group(1))
         post_match = tgt_text[m.end():]
         
-        # Exclude destination phrasing like "Deck Bottom"
         if z_name == _nfc("デッキ") and (_nfc("下") in post_match or _nfc("上") in post_match):
              if _nfc("から") not in post_match[:5]: 
                  continue
@@ -92,10 +91,22 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         if (m_name.group(0) + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
             tq.names.append(m_name.group(1))
     
-    # 修正: "特徴"キーワードに依存せず、二重山括弧内をすべて特徴として抽出する
-    # 例: "特徴《A》か《B》" -> ["A", "B"] 両方抽出可能にする
-    traits = re.findall(r'[《<]([^》>]+)[》>]', tgt_text)
-    tq.traits.extend(traits)
+    # 部分一致
+    if _nfc("含む") in tgt_text:
+        tq.flags.add("NAME_PARTIAL")
+    
+    # Traits/Attributes
+    raw_traits = re.findall(r'[《<]([^》>]+)[》>]', tgt_text)
+    attr_values = [a.value for a in Attribute if a != Attribute.NONE]
+    final_traits = []
+    
+    for t in raw_traits:
+        if t in attr_values:
+            tq.attributes.append(t)
+        else:
+            final_traits.append(t)
+            
+    tq.traits.extend(final_traits)
 
     attrs = re.findall(_nfc(ParserKeyword.ATTRIBUTE + r'[((]([^))]+)[))]'), tgt_text)
     tq.attributes.extend(attrs)
@@ -103,14 +114,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
-    # --- Cost Filter (Fix: Ignore "Set Cost" actions) ---
+    # --- Cost Filter ---
     m_c = re.search(_nfc(ParserKeyword.COST + r'[^+\-\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
-        # Check context: Don't match "+2" or "-2"
         start_idx = m_c.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
         
-        # Check context: Don't match if followed by "にする" (Set Cost Action)
         end_idx = m_c.end()
         post_match = tgt_text[end_idx:]
         is_set_action = _nfc("にする") in post_match[:5]
@@ -131,7 +140,8 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             else: tq.power_max = val
     
     # --- Status Filter ---
-    if _nfc("にする") not in tgt_text and _nfc("ならない") not in tgt_text:
+    # 修正: 「にできる」が含まれる場合は状態フィルタを適用しない（コスト支払い等のため）
+    if _nfc("にする") not in tgt_text and _nfc("ならない") not in tgt_text and _nfc("にできる") not in tgt_text:
         if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
         elif _nfc("レスト") in tgt_text: tq.is_rest = True
         elif _nfc("アクティブ") in tgt_text: tq.is_rest = False
@@ -145,7 +155,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         m_cnt = re.search(r'(\d+)' + _nfc(ParserKeyword.COUNT_SUFFIX), tgt_text)
         tq.count = int(m_cnt.group(1)) if m_cnt else 1
     
-    # --- Vanilla Check (Fix: Added) ---
+    # --- Vanilla Check ---
     if _nfc("効果のない") in tgt_text or _nfc("効果がない") in tgt_text:
         tq.is_vanilla = True
 
@@ -176,10 +186,22 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         elif query.zone == Zone.TRASH: candidates.extend(p.trash)
         elif query.zone == Zone.LIFE: candidates.extend(p.life)
         elif query.zone == Zone.TEMP: candidates.extend(p.temp_zone)
+        elif query.zone == Zone.DECK: candidates.extend(p.deck)
+        elif query.zone == Zone.COST_AREA:
+            candidates.extend(p.don_active)
+            candidates.extend(p.don_rested)
 
     results = []
     for card in candidates:
         if not card: continue
+        
+        # 修正: DonInstance用安全策 (master属性がないため)
+        if not hasattr(card, "master"):
+            # ドンの場合は、状態(Rest/Active)指定がある場合のみチェックする
+            if query.is_rest is not None and card.is_rest != query.is_rest: continue
+            results.append(card)
+            continue
+
         if query.colors and not any(c in card.master.color.value for c in query.colors): continue
         if query.attributes and card.master.attribute.value not in query.attributes: continue
         if query.cost_max is not None and card.current_cost > query.cost_max: continue
@@ -187,12 +209,16 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         if query.power_max is not None and card.get_power(True) > query.power_max: continue
         if query.power_min is not None and card.get_power(True) < query.power_min: continue
         
-        # Vanilla Filter (Fix: Added)
         if getattr(query, 'is_vanilla', False):
             txt = card.master.effect_text
             if txt and txt.strip() not in ["", "なし", "-"]: continue
 
-        if query.names and card.master.name not in query.names: continue
+        if query.names:
+            if hasattr(query, "flags") and "NAME_PARTIAL" in query.flags:
+                if not any(n in card.master.name for n in query.names): continue
+            else:
+                if card.master.name not in query.names: continue
+
         if query.traits and not any(t in card.master.traits for t in query.traits): continue
         if query.is_rest is not None and card.is_rest != query.is_rest: continue
         results.append(card)
