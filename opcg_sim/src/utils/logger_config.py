@@ -7,15 +7,25 @@ import urllib.error
 from datetime import datetime
 from contextvars import ContextVar
 from typing import Any, Optional
-from concurrent.futures import ThreadPoolExecutor # 追加
+from concurrent.futures import ThreadPoolExecutor
+from google.cloud import storage # 追加
 
 session_id_ctx: ContextVar[str] = ContextVar("session_id", default="sys-init")
 
-# 非同期実行用のスレッドプールを作成（最大3スレッドで裏方処理）
+# 非同期実行用のスレッドプール
 _executor = ThreadPoolExecutor(max_workers=3)
+
+# GCSクライアントの初期化 (認証は環境変数またはメタデータサーバーから自動取得)
+try:
+    _storage_client = storage.Client()
+except Exception as e:
+    # ローカル開発環境などで認証情報がない場合のフォールバック
+    # print(f"Warning: Failed to initialize GCS client: {e}")
+    _storage_client = None
 
 def load_shared_constants():
     current_dir = os.path.dirname(os.path.abspath(__file__))
+    # パス調整は環境に合わせて適宜
     path = os.path.abspath(os.path.join(current_dir, "..", "..", "..", "shared_constants.json"))
     if os.path.exists(path):
         try:
@@ -42,32 +52,23 @@ SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 SLACK_CHANNEL_INFO = os.environ.get("SLACK_CHANNEL_INFO")
 SLACK_CHANNEL_ERROR = os.environ.get("SLACK_CHANNEL_ERROR")
 SLACK_CHANNEL_DEBUG = os.environ.get("SLACK_CHANNEL_DEBUG")
-BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME")
+BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "opcg-sim-log") # デフォルト値を設定
 
-def get_gcp_access_token():
-    url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
-    req = urllib.request.Request(url)
-    req.add_header("Metadata-Flavor", "Google")
-    try:
-        with urllib.request.urlopen(req) as res:
-            data = json.loads(res.read().decode())
-            return data.get("access_token")
-    except:
-        return None
+def upload_to_gcs(filename: str, content: bytes, content_type: str = "application/json"):
+    """
+    google-cloud-storageライブラリを使用してGCSにアップロード
+    """
+    if not _storage_client or not BUCKET_NAME:
+        return
 
-def upload_to_gcs(filename: str, content: bytes):
-    token = get_gcp_access_token()
-    if not token or not BUCKET_NAME: return
-    
-    url = f"https://storage.googleapis.com/upload/storage/v1/b/{BUCKET_NAME}/o?uploadType=media&name={filename}"
-    req = urllib.request.Request(url, data=content, method="POST")
-    req.add_header("Authorization", f"Bearer {token}")
-    req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req) as res:
-            pass
-    except:
-        pass
+        bucket = _storage_client.bucket(BUCKET_NAME)
+        blob = bucket.blob(filename)
+        blob.upload_from_string(content, content_type=content_type)
+        # print(f"Uploaded log to gs://{BUCKET_NAME}/{filename}")
+    except Exception as e:
+        # ログ送信自体のエラーは標準出力に出してデバッグ可能にする
+        sys.stderr.write(f"Failed to upload log to GCS: {e}\n")
 
 def post_to_slack(text: str, channel: str, gcs_url: Optional[str] = None):
     if not SLACK_BOT_TOKEN or not channel: return
@@ -116,9 +117,11 @@ def log_event(
     now = datetime.now()
     sid = session_id_ctx.get()
     
+    # ペイロードからセッションIDを抽出（フロントからのログ転送などの場合）
     if isinstance(payload, dict) and K["SESSION"] in payload:
         sid = payload[K["SESSION"]]
     elif sid == "sys-init":
+        # セッションIDがない場合は生成
         sid = f"gen-{os.urandom(4).hex()}"
         session_id_ctx.set(sid)
 
@@ -133,30 +136,30 @@ def log_event(
         K["PAYLOAD"]: payload
     }
 
-    # 1. 標準出力への書き込み（これはCloud Runの基本ログとして重要なので同期的に行う）
+    # JSON文字列の生成
     try:
         log_json_str = json.dumps(log_data, ensure_ascii=False)
-        sys.stdout.write(log_json_str + "\n")
-        sys.stdout.flush()
+        # 整形済みJSON（ファイル保存用）
+        log_json_bytes = json.dumps(log_data, ensure_ascii=False, indent=2).encode('utf-8')
     except (TypeError, ValueError) as e:
         error_msg = f"LOG_SERIALIZATION_ERROR: {str(e)}"
         fallback_data = {**log_data, K["MESSAGE"]: error_msg, K["PAYLOAD"]: None}
         log_json_str = json.dumps(fallback_data, ensure_ascii=False)
-        sys.stdout.write(log_json_str + "\n")
-        sys.stdout.flush()
+        log_json_bytes = json.dumps(fallback_data, ensure_ascii=False, indent=2).encode('utf-8')
 
-    # 2. GCSアップロードとSlack通知を「バックグラウンド実行」に変更
-    # これにより、APIのレスポンス待ち時間に影響を与えなくなります
+    # 1. 標準出力への書き込み
+    # Cloud Runなどのコンテナ環境では標準出力が基本のログ収集源となるため維持推奨
+    sys.stdout.write(log_json_str + "\n")
+    sys.stdout.flush()
+
+    # 2. GCSアップロード (非同期実行)
+    # ファイル名: YYYYMMDD_HHMMSS_microseconds_SessionID_Action.json
     time_prefix = now.strftime("%Y%m%d_%H%M%S_%f")
     filename = f"{time_prefix}_{sid}_{action}.json"
     
-    try:
-        json_bytes = json.dumps(log_data, ensure_ascii=False, indent=2).encode('utf-8')
-        # 非同期実行: GCSアップロード
-        _executor.submit(upload_to_gcs, filename, json_bytes)
-    except:
-        pass
+    _executor.submit(upload_to_gcs, filename, log_json_bytes)
 
+    # 3. Slack通知 (非同期実行)
     target_channel = SLACK_CHANNEL_ID
     lv = level_key.upper()
     if lv == "INFO" and SLACK_CHANNEL_INFO:
@@ -166,15 +169,16 @@ def log_event(
     elif lv == "DEBUG" and SLACK_CHANNEL_DEBUG:
         target_channel = SLACK_CHANNEL_DEBUG
 
-    if not target_channel: return
+    if target_channel:
+        slack_msg = log_json_str
+        # エラー以外はメンションを削除して通知をマイルドに
+        if lv != "ERROR":
+            slack_msg = slack_msg.replace("<!here>", "").replace("<!channel>", "")
 
-    slack_msg = log_json_str
-    if lv != "ERROR":
-        slack_msg = slack_msg.replace("<!here>", "").replace("<!channel>", "")
-
-    gcs_url = None
-    if isinstance(payload, dict) and "game_state" in payload:
-        gcs_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{filename}"
-    
-    # 非同期実行: Slack通知
-    _executor.submit(post_to_slack, slack_msg, target_channel, gcs_url)
+        # 特定のペイロードがある場合、GCSへのリンクを生成（コンソールURL）
+        # ※一般公開バケットでない限り、直接アクセスには認証が必要なためコンソールURLを推奨
+        gcs_url = None
+        if BUCKET_NAME and (isinstance(payload, dict) and "game_state" in payload or action == "EFFECT_DEF_REPORT"):
+             gcs_url = f"https://storage.cloud.google.com/{BUCKET_NAME}/{filename}"
+        
+        _executor.submit(post_to_slack, slack_msg, target_channel, gcs_url)
