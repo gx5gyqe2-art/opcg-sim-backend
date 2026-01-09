@@ -3,7 +3,7 @@ import uuid
 import sys
 import json
 import traceback
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Union
 
 from fastapi import FastAPI, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,10 +18,9 @@ try:
 except ImportError:
     from .schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
 
-from opcg_sim.src.utils.logger_config import session_id_ctx, log_event
+from opcg_sim.src.utils.logger_config import session_id_ctx, log_event, save_batch_logs
 from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.utils.loader import CardLoader, DeckLoader
-# 【追加】CardInstanceをインポート
 from opcg_sim.src.models.models import CardInstance
 
 def get_const():
@@ -38,17 +37,13 @@ CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 app = FastAPI(title="OPCG Simulator API v1.5")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# Firestore初期化 (修正済み)
 db = None
 try:
-    # 必要であれば database="your-db-id" を指定
     db = firestore.Client()
 except Exception:
     pass
 
-# ... (build_game_result_hybrid, middleware, log endpoints は変更なし) ...
 def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool = True, error_code: str = None, error_msg: str = None) -> Dict[str, Any]:
-    # ... (省略: 既存コードのまま) ...
     player_keys = CONST.get('PLAYER_KEYS', {})
     api_root_keys = CONST.get('API_ROOT_KEYS', {})
     error_props = CONST.get('ERROR_PROPERTIES', {})
@@ -136,35 +131,45 @@ async def options_log():
     return {"status": "ok"}
 
 @app.post("/api/log")
-async def receive_frontend_log(data: Dict[str, Any] = Body(...)):
-    s_id = data.get("sessionId") or session_id_ctx.get()
-    token = session_id_ctx.set(s_id)
-    try:
-        log_event(
-            level_key=data.get("level", "info"),
-            action=data.get("action", "client.log"),
-            msg=data.get("msg", ""),
-            player=data.get("player", "system"),
-            payload=data.get("payload"),
-            source="FE"
-        )
-        return {"status": "ok"}
-    finally:
-        session_id_ctx.reset(token)
+async def receive_frontend_log(data: Union[Dict[str, Any], List[Dict[str, Any]]] = Body(...)):
+    if isinstance(data, list):
+        s_id = "unknown"
+        if len(data) > 0 and isinstance(data[0], dict):
+             s_id = data[0].get("sessionId") or session_id_ctx.get()
+        
+        token = session_id_ctx.set(s_id)
+        try:
+            save_batch_logs(data, s_id)
+            return {"status": "ok", "mode": "batch"}
+        finally:
+            session_id_ctx.reset(token)
+    else:
+        s_id = data.get("sessionId") or session_id_ctx.get()
+        token = session_id_ctx.set(s_id)
+        try:
+            log_event(
+                level_key=data.get("level", "info"),
+                action=data.get("action", "client.log"),
+                msg=data.get("msg", ""),
+                player=data.get("player", "system"),
+                payload=data.get("payload"),
+                source="FE"
+            )
+            return {"status": "ok", "mode": "single"}
+        finally:
+            session_id_ctx.reset(token)
 
 GAMES: Dict[str, GameManager] = {}
 card_db = CardLoader(CARD_DB_PATH)
 card_db.load()
 deck_loader = DeckLoader(card_db)
 
-# --- 【追加】DBまたはファイルからデッキを読み込む関数 ---
 def load_deck_mixed(source_str: str, owner_id: str):
-    # "db:" で始まる場合はFirestoreから読み込み
     if source_str.startswith("db:"):
         if not db:
             raise ValueError("Firestore is not initialized.")
         
-        deck_id = source_str[3:] # "db:"を除去
+        deck_id = source_str[3:]
         doc = db.collection("decks").document(deck_id).get()
         if not doc.exists:
             raise ValueError(f"Deck ID not found: {deck_id}")
@@ -173,14 +178,12 @@ def load_deck_mixed(source_str: str, owner_id: str):
         leader_id = data.get("leader_id")
         card_uuids = data.get("card_uuids", [])
 
-        # リーダー生成
         leader_inst = None
         if leader_id:
             master = card_db.get_card(leader_id)
             if master:
                 leader_inst = CardInstance(master, owner_id)
         
-        # デッキ生成
         cards_inst = []
         for cid in card_uuids:
             master = card_db.get_card(cid)
@@ -191,7 +194,6 @@ def load_deck_mixed(source_str: str, owner_id: str):
         return leader_inst, cards_inst
 
     else:
-        # 既存のファイル読み込み
         path = os.path.join(DATA_DIR, source_str)
         return deck_loader.load_deck(path, owner_id)
 
@@ -205,11 +207,9 @@ async def game_create(req: Any = Body(...)):
         game_id = str(uuid.uuid4())
         log_event(level_key="INFO", action="game.create", msg=f"Creating game: {game_id}", payload=req, player="system")
         
-        # --- 【修正】load_deck_mixed を使用してデッキ読み込み ---
         p1_source = req.get("p1_deck", "")
         p2_source = req.get("p2_deck", "")
         
-        # 必要なカードがロードされているか確認
         if len(card_db.cards) < len(card_db.raw_db):
              for card_id in card_db.raw_db.keys():
                 card_db.get_card(card_id)
@@ -228,7 +228,6 @@ async def game_create(req: Any = Body(...)):
         log_event(level_key="ERROR", action="game.create_fail", msg=traceback.format_exc(), player="system")
         return {"success": False, "game_id": "", "error": {"message": str(e)}}
 
-# ... (game_action, game_battle など、以降の既存コードはそのまま) ...
 @app.options("/api/game/action")
 async def options_game_action():
     return {"status": "ok"}
@@ -258,10 +257,8 @@ async def game_action(req: Dict[str, Any] = Body(...)):
     try:
         from opcg_sim.src.models.enums import TriggerType
         
-        # --- 定数取得 ---
         c_to_s = CONST.get('c_to_s_interface', {})
         game_actions = c_to_s.get('GAME_ACTIONS', {}).get('TYPES', {})
-        # ----------------
         
         current_player = manager.p1 if player_id == manager.p1.name else manager.p2
         opponent = manager.p2 if current_player == manager.p1 else manager.p1
@@ -320,7 +317,6 @@ async def game_action(req: Dict[str, Any] = Body(...)):
                 if ability.trigger == TriggerType.ACTIVATE_MAIN:
                     manager.resolve_ability(current_player, ability, source_card=operating_card)
 
-        # ▼ 追加: 効果選択の結果受信
         elif action_type == game_actions.get('RESOLVE_EFFECT_SELECTION', 'RESOLVE_EFFECT_SELECTION'):
             manager.resolve_interaction(current_player, payload)
 

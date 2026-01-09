@@ -10,13 +10,10 @@ from typing import Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 from google.cloud import storage
 
-# セッションID管理
 session_id_ctx: ContextVar[str] = ContextVar("session_id", default="sys-init")
 
-# 非同期実行用のスレッドプール
 _executor = ThreadPoolExecutor(max_workers=3)
 
-# GCSクライアントの初期化
 try:
     _storage_client = storage.Client()
     sys.stderr.write("✅ [DEBUG] GCS Client initialized successfully.\n")
@@ -24,7 +21,6 @@ except Exception as e:
     _storage_client = None
     sys.stderr.write(f"⚠️ [DEBUG] GCS Client Init Failed: {e}\n")
 
-# 定数読み込み
 def load_shared_constants():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     path = os.path.abspath(os.path.join(current_dir, "..", "..", "..", "shared_constants.json"))
@@ -48,19 +44,14 @@ K = LC.get('KEYS', {
     "PAYLOAD": "payload"
 })
 
-# 環境変数の取得
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 SLACK_CHANNEL_INFO = os.environ.get("SLACK_CHANNEL_INFO")
 SLACK_CHANNEL_ERROR = os.environ.get("SLACK_CHANNEL_ERROR")
 SLACK_CHANNEL_DEBUG = os.environ.get("SLACK_CHANNEL_DEBUG")
-BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "opcg-sim-logs")
+BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "opcg-sim-log")
 
 def upload_to_gcs(blob_name: str, content: bytes, content_type: str = "application/json"):
-    """
-    GCSへログファイルをアップロードする
-    """
-    # デバッグログ: 条件チェック
     if not _storage_client:
         sys.stderr.write("⚠️ [DEBUG] Upload skipped: _storage_client is None.\n")
         return
@@ -78,9 +69,6 @@ def upload_to_gcs(blob_name: str, content: bytes, content_type: str = "applicati
         sys.stderr.write(f"❌ [DEBUG] GCS Upload Failed: {e}\n")
 
 def post_to_slack(text: str, channel: str, gcs_url: Optional[str] = None):
-    """
-    Slackへ通知を送る
-    """
     if not SLACK_BOT_TOKEN or not channel: return
     
     url = "https://slack.com/api/chat.postMessage"
@@ -116,6 +104,25 @@ def post_to_slack(text: str, channel: str, gcs_url: Optional[str] = None):
     except:
         pass
 
+def save_batch_logs(log_list: list, session_id: str):
+    if not log_list:
+        return
+
+    now = datetime.now()
+    time_prefix = now.strftime("%Y%m%d_%H%M%S")
+    
+    blob_name = f"logs/{time_prefix}_{session_id}_BATCH.json"
+
+    try:
+        content = json.dumps(log_list, ensure_ascii=False, indent=2).encode('utf-8')
+        
+        _executor.submit(upload_to_gcs, blob_name, content)
+        
+        sys.stdout.write(f"📦 [BATCH_LOG] Received {len(log_list)} logs for session {session_id}. Saving to GCS.\n")
+        
+    except Exception as e:
+        sys.stderr.write(f"❌ [BATCH_ERROR] Failed to process batch logs: {e}\n")
+
 def log_event(
     level_key: str,
     action: str,
@@ -124,9 +131,6 @@ def log_event(
     payload: Any = None,
     source: str = "BE"
 ):
-    """
-    メインのログ出力関数
-    """
     now = datetime.now()
     sid = session_id_ctx.get()
     
@@ -159,24 +163,18 @@ def log_event(
     sys.stdout.write(log_json_str + "\n")
     sys.stdout.flush()
 
-    # デバッグ: アクション名の確認
-    # sys.stderr.write(f"[DEBUG] Processing action: {action}\n")
-
     gcs_url = None
     
-    # 報告の場合のみアップロード
     if action == "EFFECT_DEF_REPORT":
         folder = "reports"
         time_prefix = now.strftime("%Y%m%d_%H%M%S_%f")
         filename = f"{folder}/{time_prefix}_{sid}_{action}.json"
         
-        # 非同期実行
         _executor.submit(upload_to_gcs, filename, log_json_bytes)
         
         if BUCKET_NAME:
             gcs_url = f"https://storage.cloud.google.com/{BUCKET_NAME}/{filename}"
 
-    # Slack通知
     target_channel = SLACK_CHANNEL_ID
     lv = level_key.upper()
     
