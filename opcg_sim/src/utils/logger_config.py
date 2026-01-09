@@ -208,7 +208,7 @@ def log_event(
         target_channel = SLACK_CHANNEL_DEBUG
 
     # ▼▼▼ 修正: resolver. を除外対象に追加 ▼▼▼
-    ignore_prefixes = ("game.", "api.", "deck.", "loader.", "gamestate.", "schema.", "resolver.", "matcher.", "parser.")
+    ignore_prefixes = ("game.", "api.", "deck.", "loader.", "gamestate.", "schema.", "resolver.", "matcher.", "parser.", "effect.")
     
     if action.startswith(ignore_prefixes):
         target_channel = None
