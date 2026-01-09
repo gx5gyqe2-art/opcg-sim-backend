@@ -40,10 +40,8 @@ class Player:
             if self.deck:
                 self.hand.append(self.deck.pop(0))
 
-    # ... (前略)
     def to_dict(self, is_owner: bool = True):
-        log_event("DEBUG", "gamestate.to_dict", f"Serializing player state for {self.name}", player=self.name)
-        
+        # ログ削除: シリアライズログ
         player_props = CONST.get('PLAYER_PROPERTIES', {})
 
         leader_dict = self.leader.to_dict() if self.leader else None
@@ -63,7 +61,7 @@ class Player:
             player_props.get("DON_ACTIVE", "don_active"): [d.to_dict() for d in self.don_active],
             player_props.get("DON_RESTED", "don_rested"): [d.to_dict() for d in self.don_rested],
             "leader": leader_dict,
-            "stage": stage_dict, # 【追加】ここに追加してください！
+            "stage": stage_dict,
             "zones": {
                 "field": [self._format_card(c, True) for c in self.field],
                 "hand": [self._format_card(c, is_owner) for c in self.hand],
@@ -72,8 +70,6 @@ class Player:
                 "stage": stage_dict
             }
         }
-    # ... (後略)
-
 
     def _format_card(self, card: Card, face_up: bool) -> dict:
         d = card.to_dict()
@@ -231,7 +227,6 @@ class GameManager:
 
         if not success:
             if self.active_interaction:
-                # ★追加: 再中断された場合、残りのアクション情報を新しいInteractionに引き継ぐ
                 if "continuation" in self.active_interaction:
                     self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions
                     if "effect_context" not in self.active_interaction["continuation"]:
@@ -318,8 +313,7 @@ class GameManager:
         self.switch_turn()
 
     def switch_turn(self):
-        log_event("DEBUG", "game.turn_switch_start", f"Before switch: turn_player={self.turn_player.name}, count={self.turn_count}", player="system")
-        
+        # ログ削除: 開始ログ削除
         self.turn_player, self.opponent = self.opponent, self.turn_player
         self.turn_count += 1
         
@@ -411,8 +405,7 @@ class GameManager:
             else: target_list.append(card)
 
     def pay_cost(self, player: Player, cost: int, don_list: Optional[List[DonInstance]] = None):
-        log_event("DEBUG", "game.pay_cost_pre", f"Paying cost: {cost}, Provided Don count: {len(don_list) if don_list else 0}", player=player.name)
-        
+        # ログ削除: コスト詳細
         if don_list is not None:
             if len(don_list) < cost:
                 raise ValueError("指定されたドン!!の数が不足しています。")
@@ -467,7 +460,7 @@ class GameManager:
             "counter_buff": 0
         }
         
-        log_event("DEBUG", "game.attack_state", f"Battle initialized. Attacker: {attacker.uuid}, Target: {target.uuid}", player=attacker_owner.name)
+        # ログ削除: バトル初期化詳細
 
         if self.has_blocker(target_owner):
             self.phase = Phase.BLOCK_STEP
@@ -475,10 +468,8 @@ class GameManager:
         else:
             self.phase = Phase.BATTLE_COUNTER
             log_event("INFO", "game.phase_transition", f"No blockers. Moving to {self.phase.name}", player=target_owner.name)
-        log_event("DEBUG", "game.attack_transition_check", 
-                  f"Target: {target.master.name}, HasBlocker: {self.has_blocker(target_owner)}, FinalPhase: {self.phase.name}", 
-                  player=attacker_owner.name)
- 
+        
+        # ログ削除: 遷移チェック詳細
 
     def handle_block(self, blocker: Optional[Card] = None):
         if not self.active_battle:
@@ -537,7 +528,7 @@ class GameManager:
         attacker_pwr = attacker.get_power(is_my_turn)
         target_pwr = target.get_power(is_target_turn) + counter_buff
         
-        log_event("DEBUG", "game.resolve_attack_pre", f"Attacker: {attacker.master.name}({attacker_pwr}) vs Target: {target.master.name}({target_pwr})", player=attacker_owner.name if attacker_owner else "system")
+        # ログ削除: パワー計算詳細
         
         if target == target_owner.leader:
             if attacker_pwr >= target_pwr:
@@ -598,7 +589,6 @@ class GameManager:
         
         effect_context = {}
 
-        # ★修正: コストとアクションを連結
         all_actions = list(ability.costs) + list(ability.actions)
         
         for i, action in enumerate(all_actions):

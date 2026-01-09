@@ -55,8 +55,7 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
     if manager:
         active_pid = p1_key if manager.turn_player == manager.p1 else p2_key
 
-    log_event("DEBUG", "api.active_id_check", f"Logic check: manager.turn_player.name={manager.turn_player.name}, p1.name={manager.p1.name}, result_id={active_pid}", player="system")
-    log_event(level_key="DEBUG", action="api.build_state", msg=f"Turn Info: count={manager.turn_count if manager else 0}, active_pid={active_pid}", player="system")
+    # ログ削除: 毎回のステート構築詳細
 
     battle_props = CONST.get('BATTLE_PROPERTIES', {})
     raw_game_state = {
@@ -117,8 +116,9 @@ async def trace_logging_middleware(request: Request, call_next):
     if not s_id:
         s_id = f"gen-{uuid.uuid4().hex[:8]}"
     token = session_id_ctx.set(s_id)
-    if not request.url.path.endswith(("/health", "/favicon.ico")):
-        log_event(level_key="INFO", action="api.inbound", msg=f"{request.method} {request.url.path}", player="system")
+    
+    # ログ削除: APIインバウンドログ
+    
     try:
         response = await call_next(request)
         response.headers["X-Session-ID"] = s_id
@@ -236,7 +236,7 @@ async def options_game_action():
 async def game_action(req: Dict[str, Any] = Body(...)):
     action_type = req.get("action") or req.get("type")
     player_id = req.get("player_id", "system")
-    log_event("DEBUG", "api.action_received", f"Action: {action_type}", player=player_id, payload=req)
+    # ログ削除: アクション受信
 
     game_id = req.get("game_id")
     manager = GAMES.get(game_id)
@@ -366,7 +366,7 @@ async def game_battle(req: BattleActionRequest):
             if action_type != battle_types.get('PASS', 'PASS'):
                 raise ve
 
-        log_event("DEBUG", "api.battle_validation", f"Validation: {is_valid}", player=player_id)
+        # ログ削除: バリデーションチェック詳細
         
         if action_type == battle_types.get('SELECT_BLOCKER', 'SELECT_BLOCKER'):
             blocker = next((c for c in player.field if c.uuid == card_uuid), None)
