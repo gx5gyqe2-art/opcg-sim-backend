@@ -6,7 +6,7 @@ import urllib.parse
 import urllib.error
 from datetime import datetime
 from contextvars import ContextVar
-from typing import Any, Optional, List
+from typing import Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 from google.cloud import storage
 
@@ -46,7 +46,7 @@ K = LC.get('KEYS', {
     "PAYLOAD": "payload"
 })
 
-# 環境変数
+# 環境変数の取得
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 SLACK_CHANNEL_INFO = os.environ.get("SLACK_CHANNEL_INFO")
@@ -54,54 +54,24 @@ SLACK_CHANNEL_ERROR = os.environ.get("SLACK_CHANNEL_ERROR")
 SLACK_CHANNEL_DEBUG = os.environ.get("SLACK_CHANNEL_DEBUG")
 BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "opcg-sim-log")
 
-def update_report_file(new_record: dict):
+def upload_to_gcs(blob_name: str, content: bytes, content_type: str = "application/json"):
     """
-    報告用ファイル(all_reports.json)を読み込み、追記して保存する
-    ※ 同時書き込みが多いと競合でデータが消える可能性がありますが、
-       テストプレイ程度の頻度であれば実用上問題ありません。
+    GCSへログファイルをアップロードする
     """
     if not _storage_client or not BUCKET_NAME:
         return
 
-    file_name = "reports/all_reports.json"
-    bucket = _storage_client.bucket(BUCKET_NAME)
-    blob = bucket.blob(file_name)
-    
-    current_data = []
-    
-    # 既存データの読み込み（存在する場合）
-    if blob.exists():
-        try:
-            content = blob.download_as_text()
-            if content:
-                current_data = json.loads(content)
-                if not isinstance(current_data, list):
-                    # 配列でない場合は配列にする（過去データ保護）
-                    current_data = [current_data]
-        except Exception as e:
-            sys.stderr.write(f"Failed to read existing reports: {e}\n")
-
-    # 新しいデータを先頭に追加（最新が上に来るように）
-    current_data.insert(0, new_record)
-    
-    # 保存
-    try:
-        new_content = json.dumps(current_data, ensure_ascii=False, indent=2)
-        blob.upload_from_string(new_content, content_type="application/json")
-        sys.stdout.write(f"Report appended to gs://{BUCKET_NAME}/{file_name}\n")
-    except Exception as e:
-        sys.stderr.write(f"Failed to save report: {e}\n")
-
-def upload_log_file(filename: str, content: bytes):
-    """通常のログファイルを個別保存する場合に使用"""
-    if not _storage_client or not BUCKET_NAME: return
     try:
         bucket = _storage_client.bucket(BUCKET_NAME)
-        blob = bucket.blob(filename)
-        blob.upload_from_string(content, content_type="application/json")
-    except Exception: pass
+        blob = bucket.blob(blob_name)
+        blob.upload_from_string(content, content_type=content_type)
+    except Exception as e:
+        sys.stderr.write(f"GCS Upload Failed: {e}\n")
 
 def post_to_slack(text: str, channel: str, gcs_url: Optional[str] = None):
+    """
+    Slackへ通知を送る
+    """
     if not SLACK_BOT_TOKEN or not channel: return
     
     url = "https://slack.com/api/chat.postMessage"
@@ -110,14 +80,14 @@ def post_to_slack(text: str, channel: str, gcs_url: Optional[str] = None):
         blocks = [
             {
                 "type": "section",
-                "text": {"type": "mrkdwn", "text": f"{text}"}
+                "text": {"type": "mrkdwn", "text": f"📋 *New Report Received*\nLog uploaded to GCS:\n{text[:500]}..."}
             },
             {
                 "type": "actions",
                 "elements": [
                     {
                         "type": "button",
-                        "text": {"type": "plain_text", "text": "📂 View All Reports"},
+                        "text": {"type": "plain_text", "text": "View Report JSON"},
                         "url": gcs_url
                     }
                 ]
@@ -132,8 +102,10 @@ def post_to_slack(text: str, channel: str, gcs_url: Optional[str] = None):
     req.add_header("Authorization", f"Bearer {SLACK_BOT_TOKEN}")
     req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req) as res: pass
-    except: pass
+        with urllib.request.urlopen(req) as res:
+            pass
+    except:
+        pass
 
 def log_event(
     level_key: str,
@@ -143,6 +115,9 @@ def log_event(
     payload: Any = None,
     source: str = "BE"
 ):
+    """
+    メインのログ出力関数
+    """
     now = datetime.now()
     sid = session_id_ctx.get()
     
@@ -152,6 +127,7 @@ def log_event(
         sid = f"gen-{os.urandom(4).hex()}"
         session_id_ctx.set(sid)
 
+    # 1つのログオブジェクトとしてまとめる
     log_data = {
         K["TIME"]: now.isoformat(),
         K["SOURCE"]: source,
@@ -163,46 +139,49 @@ def log_event(
         K["PAYLOAD"]: payload
     }
 
-    # JSON化
+    # JSONシリアライズ
     try:
         log_json_str = json.dumps(log_data, ensure_ascii=False)
-    except Exception:
-        log_json_str = json.dumps({**log_data, K["PAYLOAD"]: "Serialization Error"}, ensure_ascii=False)
+        log_json_bytes = json.dumps(log_data, ensure_ascii=False, indent=2).encode('utf-8')
+    except (TypeError, ValueError) as e:
+        error_msg = f"LOG_SERIALIZATION_ERROR: {str(e)}"
+        fallback_data = {**log_data, K["MESSAGE"]: error_msg, K["PAYLOAD"]: None}
+        log_json_str = json.dumps(fallback_data, ensure_ascii=False)
+        log_json_bytes = json.dumps(fallback_data, ensure_ascii=False, indent=2).encode('utf-8')
 
-    # 1. コンソール出力（必須）
+    # 1. 標準出力（すべてのログを出力）
     sys.stdout.write(log_json_str + "\n")
     sys.stdout.flush()
 
-    # 2. GCSへの保存処理
+    # 2. GCSへの保存（「報告」の時だけ保存）
+    # ユーザー要望: 1報告につき1ファイル
     gcs_url = None
     
-    # ★ここが変更点: 報告(EFFECT_DEF_REPORT)だけを特別扱いして結合ファイルに保存
     if action == "EFFECT_DEF_REPORT":
-        _executor.submit(update_report_file, log_data)
+        folder = "reports"
+        time_prefix = now.strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"{folder}/{time_prefix}_{sid}_{action}.json"
+        
+        # 非同期でアップロード
+        _executor.submit(upload_to_gcs, filename, log_json_bytes)
+        
         if BUCKET_NAME:
-            gcs_url = f"https://storage.cloud.google.com/{BUCKET_NAME}/reports/all_reports.json"
-
-    # 必要であれば、エラーログだけは個別に残すなどの分岐も可能
-    # elif level_key.upper() == "ERROR":
-    #     fname = f"errors/{now.strftime('%Y%m%d_%H%M%S')}_{sid}.json"
-    #     _executor.submit(upload_log_file, fname, log_json_str.encode('utf-8'))
+            gcs_url = f"https://storage.cloud.google.com/{BUCKET_NAME}/{filename}"
 
     # 3. Slack通知
     target_channel = SLACK_CHANNEL_ID
     lv = level_key.upper()
     
-    if lv == "INFO" and SLACK_CHANNEL_INFO: target_channel = SLACK_CHANNEL_INFO
-    elif lv == "ERROR" and SLACK_CHANNEL_ERROR: target_channel = SLACK_CHANNEL_ERROR
-    elif lv == "DEBUG" and SLACK_CHANNEL_DEBUG: target_channel = SLACK_CHANNEL_DEBUG
+    if lv == "INFO" and SLACK_CHANNEL_INFO:
+        target_channel = SLACK_CHANNEL_INFO
+    elif lv == "ERROR" and SLACK_CHANNEL_ERROR:
+        target_channel = SLACK_CHANNEL_ERROR
+    elif lv == "DEBUG" and SLACK_CHANNEL_DEBUG:
+        target_channel = SLACK_CHANNEL_DEBUG
 
     if target_channel:
-        if action == "EFFECT_DEF_REPORT":
-            # 報告の時はリッチな通知
-            notify_text = f"📢 *新しい効果定義の報告がありました*\nUser: {player}\nCard: {msg}"
-            _executor.submit(post_to_slack, notify_text, target_channel, gcs_url)
-        else:
-            # 通常ログの時はシンプルに
-            slack_msg = log_json_str
-            if lv != "ERROR":
-                slack_msg = slack_msg.replace("<!here>", "").replace("<!channel>", "")
-            _executor.submit(post_to_slack, slack_msg, target_channel, None)
+        slack_msg = log_json_str
+        if lv != "ERROR":
+            slack_msg = slack_msg.replace("<!here>", "").replace("<!channel>", "")
+
+        _executor.submit(post_to_slack, slack_msg, target_channel, gcs_url)
