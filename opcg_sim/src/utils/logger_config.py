@@ -126,22 +126,18 @@ def save_batch_logs(fe_log_list: list, session_id: str):
         try:
             content = json.dumps(full_logs, ensure_ascii=False, indent=2).encode('utf-8')
             
-            # GCSアップロード
             upload_to_gcs(blob_name, content)
             
-            # ▼▼▼ 追加: 完了通知をSlackへ送る ▼▼▼
             if SLACK_CHANNEL_INFO:
                 gcs_url = f"https://storage.cloud.google.com/{BUCKET_NAME}/{blob_name}" if BUCKET_NAME else None
                 msg = f"Session: {session_id}\nRecords: {len(full_logs)} (FE: {len(fe_log_list)}, BE: {len(be_logs)})"
                 post_to_slack(msg, SLACK_CHANNEL_INFO, gcs_url)
-            # ▲▲▲ 追加ここまで ▲▲▲
 
             sys.stdout.write(f"📦 [BATCH_LOG] Session {session_id}: Merged {len(fe_log_list)} FE logs + {len(be_logs)} BE logs. Saved & Notified.\n")
             
         except Exception as e:
             sys.stderr.write(f"❌ [BATCH_ERROR] Failed to process/notify batch logs: {e}\n")
 
-    # 非同期で実行
     _executor.submit(_process_and_notify)
 
 def log_event(
@@ -211,8 +207,8 @@ def log_event(
     elif lv == "DEBUG" and SLACK_CHANNEL_DEBUG:
         target_channel = SLACK_CHANNEL_DEBUG
 
-    # ▼▼▼ 修正: 指定プレフィックスはエラーであってもSlack通知を完全に除外する ▼▼▼
-    ignore_prefixes = ("game.", "api.", "deck.", "loader.", "gamestate.", "schema.")
+    # ▼▼▼ 修正: resolver. を除外対象に追加 ▼▼▼
+    ignore_prefixes = ("game.", "api.", "deck.", "loader.", "gamestate.", "schema.", "resolver.", "matcher.", "parser.")
     
     if action.startswith(ignore_prefixes):
         target_channel = None
