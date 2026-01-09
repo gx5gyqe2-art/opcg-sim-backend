@@ -19,8 +19,10 @@ _executor = ThreadPoolExecutor(max_workers=3)
 # GCSクライアントの初期化
 try:
     _storage_client = storage.Client()
+    sys.stderr.write("✅ [DEBUG] GCS Client initialized successfully.\n")
 except Exception as e:
     _storage_client = None
+    sys.stderr.write(f"⚠️ [DEBUG] GCS Client Init Failed: {e}\n")
 
 # 定数読み込み
 def load_shared_constants():
@@ -58,15 +60,22 @@ def upload_to_gcs(blob_name: str, content: bytes, content_type: str = "applicati
     """
     GCSへログファイルをアップロードする
     """
-    if not _storage_client or not BUCKET_NAME:
+    # デバッグログ: 条件チェック
+    if not _storage_client:
+        sys.stderr.write("⚠️ [DEBUG] Upload skipped: _storage_client is None.\n")
+        return
+    if not BUCKET_NAME:
+        sys.stderr.write("⚠️ [DEBUG] Upload skipped: BUCKET_NAME is not set.\n")
         return
 
     try:
+        sys.stderr.write(f"⏳ [DEBUG] Attempting upload to gs://{BUCKET_NAME}/{blob_name} ...\n")
         bucket = _storage_client.bucket(BUCKET_NAME)
         blob = bucket.blob(blob_name)
         blob.upload_from_string(content, content_type=content_type)
+        sys.stderr.write(f"✅ [DEBUG] Upload successful: {blob_name}\n")
     except Exception as e:
-        sys.stderr.write(f"GCS Upload Failed: {e}\n")
+        sys.stderr.write(f"❌ [DEBUG] GCS Upload Failed: {e}\n")
 
 def post_to_slack(text: str, channel: str, gcs_url: Optional[str] = None):
     """
@@ -127,7 +136,6 @@ def log_event(
         sid = f"gen-{os.urandom(4).hex()}"
         session_id_ctx.set(sid)
 
-    # 1つのログオブジェクトとしてまとめる
     log_data = {
         K["TIME"]: now.isoformat(),
         K["SOURCE"]: source,
@@ -139,7 +147,6 @@ def log_event(
         K["PAYLOAD"]: payload
     }
 
-    # JSONシリアライズ
     try:
         log_json_str = json.dumps(log_data, ensure_ascii=False)
         log_json_bytes = json.dumps(log_data, ensure_ascii=False, indent=2).encode('utf-8')
@@ -149,26 +156,27 @@ def log_event(
         log_json_str = json.dumps(fallback_data, ensure_ascii=False)
         log_json_bytes = json.dumps(fallback_data, ensure_ascii=False, indent=2).encode('utf-8')
 
-    # 1. 標準出力（すべてのログを出力）
     sys.stdout.write(log_json_str + "\n")
     sys.stdout.flush()
 
-    # 2. GCSへの保存（「報告」の時だけ保存）
-    # ユーザー要望: 1報告につき1ファイル
+    # デバッグ: アクション名の確認
+    # sys.stderr.write(f"[DEBUG] Processing action: {action}\n")
+
     gcs_url = None
     
+    # 報告の場合のみアップロード
     if action == "EFFECT_DEF_REPORT":
         folder = "reports"
         time_prefix = now.strftime("%Y%m%d_%H%M%S_%f")
         filename = f"{folder}/{time_prefix}_{sid}_{action}.json"
         
-        # 非同期でアップロード
+        # 非同期実行
         _executor.submit(upload_to_gcs, filename, log_json_bytes)
         
         if BUCKET_NAME:
             gcs_url = f"https://storage.cloud.google.com/{BUCKET_NAME}/{filename}"
 
-    # 3. Slack通知
+    # Slack通知
     target_channel = SLACK_CHANNEL_ID
     lv = level_key.upper()
     
