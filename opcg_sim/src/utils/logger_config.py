@@ -49,7 +49,7 @@ SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 SLACK_CHANNEL_INFO = os.environ.get("SLACK_CHANNEL_INFO")
 SLACK_CHANNEL_ERROR = os.environ.get("SLACK_CHANNEL_ERROR")
 SLACK_CHANNEL_DEBUG = os.environ.get("SLACK_CHANNEL_DEBUG")
-BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "opcg-sim-log")
+BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "opcg-sim-logs")
 
 def upload_to_gcs(blob_name: str, content: bytes, content_type: str = "application/json"):
     if not _storage_client:
