@@ -9,8 +9,6 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     tq = TargetQuery(raw_text=tgt_text, player=default_player)
     if not hasattr(tq, "flags"):
         tq.flags = set()
-    
-    log_event("DEBUG", "matcher.parse_start", f"Parsing target text: {tgt_text}")
 
     if tgt_text == _nfc(ParserKeyword.THIS_CARD) or (tgt_text == _nfc(ParserKeyword.SELF_REF) and _nfc(ParserKeyword.SELF_REF + "の") not in tgt_text):
         tq.select_mode = "SOURCE"
@@ -159,7 +157,6 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if _nfc("効果のない") in tgt_text or _nfc("効果がない") in tgt_text:
         tq.is_vanilla = True
 
-    log_event("DEBUG", "matcher.parse_result", f"Parsed: player={tq.player.name}, count={tq.count}, up_to={tq.is_up_to}, zone={tq.zone}")
     return tq
 
 def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
