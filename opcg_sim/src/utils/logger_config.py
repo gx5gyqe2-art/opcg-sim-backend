@@ -6,7 +6,7 @@ import urllib.parse
 import urllib.error
 from datetime import datetime
 from contextvars import ContextVar
-from typing import Any, Optional
+from typing import Any, Optional, Dict, List
 from concurrent.futures import ThreadPoolExecutor
 from google.cloud import storage
 
@@ -49,7 +49,11 @@ SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID")
 SLACK_CHANNEL_INFO = os.environ.get("SLACK_CHANNEL_INFO")
 SLACK_CHANNEL_ERROR = os.environ.get("SLACK_CHANNEL_ERROR")
 SLACK_CHANNEL_DEBUG = os.environ.get("SLACK_CHANNEL_DEBUG")
-BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "opcg-sim-logs")
+BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "opcg-sim-log")
+
+# ▼▼▼ 追加: バックエンドログ一時保存用バッファ ▼▼▼
+BACKEND_LOG_BUFFER: Dict[str, List[Dict[str, Any]]] = {}
+# ▲▲▲ 追加ここまで ▲▲▲
 
 def upload_to_gcs(blob_name: str, content: bytes, content_type: str = "application/json"):
     if not _storage_client:
@@ -104,9 +108,23 @@ def post_to_slack(text: str, channel: str, gcs_url: Optional[str] = None):
     except:
         pass
 
-def save_batch_logs(log_list: list, session_id: str):
-    if not log_list:
+def save_batch_logs(fe_log_list: list, session_id: str):
+    # ▼▼▼ 修正: バックエンドログを合流させる処理 ▼▼▼
+    
+    # バッファからバックエンドログを取り出し、削除する
+    be_logs = BACKEND_LOG_BUFFER.pop(session_id, [])
+    
+    # フロントエンドログと結合
+    full_logs = fe_log_list + be_logs
+    
+    if not full_logs:
         return
+
+    # タイムスタンプでソート (時系列順にする)
+    try:
+        full_logs.sort(key=lambda x: x.get(K["TIME"], ""))
+    except:
+        pass # 万が一フォーマットが違ってもエラーで落とさない
 
     now = datetime.now()
     time_prefix = now.strftime("%Y%m%d_%H%M%S")
@@ -114,14 +132,16 @@ def save_batch_logs(log_list: list, session_id: str):
     blob_name = f"logs/{time_prefix}_{session_id}_BATCH.json"
 
     try:
-        content = json.dumps(log_list, ensure_ascii=False, indent=2).encode('utf-8')
+        content = json.dumps(full_logs, ensure_ascii=False, indent=2).encode('utf-8')
         
         _executor.submit(upload_to_gcs, blob_name, content)
         
-        sys.stdout.write(f"📦 [BATCH_LOG] Received {len(log_list)} logs for session {session_id}. Saving to GCS.\n")
+        # ログ件数を出力
+        sys.stdout.write(f"📦 [BATCH_LOG] Session {session_id}: Merged {len(fe_log_list)} FE logs + {len(be_logs)} BE logs. Saving to GCS.\n")
         
     except Exception as e:
         sys.stderr.write(f"❌ [BATCH_ERROR] Failed to process batch logs: {e}\n")
+    # ▲▲▲ 修正ここまで ▲▲▲
 
 def log_event(
     level_key: str,
@@ -150,6 +170,14 @@ def log_event(
         K["MESSAGE"]: msg,
         K["PAYLOAD"]: payload
     }
+
+    # ▼▼▼ 追加: バッファへの蓄積 ▼▼▼
+    # システム初期化ログ以外をバッファに保存
+    if sid != "sys-init":
+        if sid not in BACKEND_LOG_BUFFER:
+            BACKEND_LOG_BUFFER[sid] = []
+        BACKEND_LOG_BUFFER[sid].append(log_data)
+    # ▲▲▲ 追加ここまで ▲▲▲
 
     try:
         log_json_str = json.dumps(log_data, ensure_ascii=False)
@@ -185,13 +213,12 @@ def log_event(
     elif lv == "DEBUG" and SLACK_CHANNEL_DEBUG:
         target_channel = SLACK_CHANNEL_DEBUG
 
-    # ▼▼▼ 修正: schema. を除外対象に追加 ▼▼▼
+    # 前回の修正を含んだ除外設定
     ignore_prefixes = ("game.", "api.", "deck.", "loader.", "gamestate.", "schema.")
     
     if action.startswith(ignore_prefixes):
         if lv != "ERROR":
             target_channel = None
-    # ▲▲▲ 修正ここまで ▲▲▲
 
     if target_channel:
         slack_msg = log_json_str
