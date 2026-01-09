@@ -160,6 +160,7 @@ def log_event(
         log_json_str = json.dumps(fallback_data, ensure_ascii=False)
         log_json_bytes = json.dumps(fallback_data, ensure_ascii=False, indent=2).encode('utf-8')
 
+    # 標準出力には常に出す（これでクラウドのログ基盤には残る）
     sys.stdout.write(log_json_str + "\n")
     sys.stdout.flush()
 
@@ -175,6 +176,7 @@ def log_event(
         if BUCKET_NAME:
             gcs_url = f"https://storage.cloud.google.com/{BUCKET_NAME}/{filename}"
 
+    # Slack通知設定
     target_channel = SLACK_CHANNEL_ID
     lv = level_key.upper()
     
@@ -184,6 +186,15 @@ def log_event(
         target_channel = SLACK_CHANNEL_ERROR
     elif lv == "DEBUG" and SLACK_CHANNEL_DEBUG:
         target_channel = SLACK_CHANNEL_DEBUG
+
+    # ▼▼▼ 修正: ゲーム進行ログ（INFO/DEBUG）はSlack通知しない ▼▼▼
+    # action名が以下で始まる場合、エラー以外は通知対象から外す
+    ignore_prefixes = ("game.", "api.", "deck.", "loader.")
+    
+    if action.startswith(ignore_prefixes):
+        if lv != "ERROR":
+            target_channel = None
+    # ▲▲▲ 修正ここまで ▲▲▲
 
     if target_channel:
         slack_msg = log_json_str
