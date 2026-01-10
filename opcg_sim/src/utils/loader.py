@@ -3,7 +3,7 @@ import unicodedata
 import re
 from typing import List, Dict, Any, Optional, Tuple
 from ..models.models import CardMaster, CardInstance
-from ..core.effects.parser import EffectParser
+from ..core.effects.parser import Effect
 from ..models.effect_types import Ability
 from ..models.enums import CardType, Attribute, Color, TriggerType
 from ..utils.logger_config import log_event
@@ -12,6 +12,7 @@ def _nfc(text: str) -> str:
     return unicodedata.normalize('NFC', text)
 
 class RawDataLoader:
+    # ... (既存メソッド load_json は変更なし) ...
     @staticmethod
     def load_json(file_path: str) -> Any:
         log_event(level_key="DEBUG", action="loader.load_json", msg=f"Loading JSON from {file_path}...")
@@ -26,8 +27,7 @@ class RawDataLoader:
             return []
 
 class DataCleaner:
-    _parser = EffectParser()
-
+    # ... (normalize_text, parse_int, parse_traits, parse_abilities, map_color, map_card_type, map_attribute は変更なし) ...
     @staticmethod
     def normalize_text(text: Any) -> str:
         if text is None: return ""
@@ -52,18 +52,15 @@ class DataCleaner:
     def parse_abilities(text: str, is_trigger: bool = False) -> List[Ability]:
         s_text = DataCleaner.normalize_text(text)
         if not s_text or s_text in [_nfc("なし"), "None", ""]: return []
-        
-        abilities = []
-        blocks = re.split(r'(?=\[)', s_text) if '[' in s_text else [s_text]
-        
-        for block in blocks:
-            if not block.strip(): continue
-            ability = DataCleaner._parser.parse_ability(block.strip())
+        try:
+            effect_parser = Effect(s_text)
+            abilities = effect_parser.abilities
             if is_trigger:
-                ability.trigger = TriggerType.TRIGGER
-            abilities.append(ability)
-            
-        return abilities
+                for ability in abilities: ability.trigger = TriggerType.TRIGGER
+            return abilities
+        except Exception as e:
+            log_event(level_key="DEBUG", action="loader.parse_abilities_error", msg=f"Error parsing abilities text: '{s_text[:20]}...' -> {e}")
+            return []
 
     @staticmethod
     def map_color(value: str) -> Color:
@@ -90,19 +87,20 @@ class DataCleaner:
         return Attribute.NONE
 
 class CardLoader:
+    # --- DBのカラム名マッピング定義 ---
     DB_MAPPING = {
         "ID": ["number", "Number", _nfc("品番"), _nfc("型番"), "id"],
-        "NAME": ["name", "Name", _nfc("名前"), _nfc("カード名")],
+        "NAME": ["name", "Name", _nfc("名前"), _nfc("カード名")],
         "TYPE": [_nfc("種類"), "Type", "type"],
         "ATTRIBUTE": [_nfc("属性"), "Attribute", "attribute"],
         "COLOR": [_nfc("色"), "Color", "color"],
         "COST": [_nfc("コスト"), "Cost", "cost"],
-        "POWER": [_nfc("パワー"), "Power", "power"],
+        "POWER": [_nfc("パワー"), "Power", "power"],
         "COUNTER": [_nfc("カウンター"), "Counter", "counter"],
         "LIFE": [_nfc("ライフ"), "Life", "life"],
         "TRAITS": [_nfc("特徴"), "Traits", "traits"],
         "TEXT": [_nfc("効果(テキスト)"), _nfc("テキスト"), "Text", "text"],
-        "TRIGGER": [_nfc("効果(トリガー)"), _nfc("トリガー"), "Trigger", "trigger"]
+        "TRIGGER": [_nfc("効果(トリガー)"), _nfc("トリガー"), "Trigger", "trigger"]
     }
 
     def __init__(self, json_path: str):
@@ -142,6 +140,7 @@ class CardLoader:
                     return raw[norm_key]
             return default
         
+        # マッピング定数を使用
         M = self.DB_MAPPING
 
         card_id = DataCleaner.normalize_text(get_val(M["ID"], "N/A"))
