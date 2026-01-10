@@ -8,6 +8,24 @@ def get_manual_ability(card_id: str) -> List[Ability]:
     return MANUAL_EFFECTS.get(card_id, [])
 
 MANUAL_EFFECTS: Dict[str, List[Ability]] = {
+    "OP05-097": [
+        Ability(
+            trigger=TriggerType.YOUR_TURN,
+            effect=GameAction(
+                type=ActionType.BUFF,
+                target=TargetQuery(
+                    player=Player.SELF,
+                    zone=Zone.HAND,
+                    traits=["天竜人"],
+                    cost_min=2,
+                    select_mode="ALL"
+                ),
+                value=ValueSource(base=-1),
+                status="COST_REDUCTION",
+                raw_text="自分が手札から登場させるコスト2以上の特徴《天竜人》を持つキャラカードの支払うコストは1少なくなる"
+            )
+        )
+    ],
     "OP13-079": [
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,
@@ -73,7 +91,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.MOVE_TO_HAND,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["天竜人"], count=1, save_id="shalria_select"), 
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["天竜人"], count=1, save_id="shalria_select", is_up_to=True), 
                     destination=Zone.HAND,
                     raw_text="「シャルリア宮」以外の特徴《天竜人》を持つカード1枚までを公開し、手札に加える"
                 ),
@@ -108,7 +126,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             condition=Condition(type=ConditionType.LIFE_COUNT, operator=CompareOperator.LE, value=3),
             effect=GameAction(
                 type=ActionType.PLAY_CARD,
-                target=TargetQuery(zone=Zone.TRASH, player=Player.SELF, card_type=["STAGE"], cost_max=1, traits=["聖地マリージョア"], count=1, save_id="myosgard_revive"),
+                target=TargetQuery(zone=Zone.TRASH, player=Player.SELF, card_type=["STAGE"], cost_max=1, traits=["聖地マリージョア"], count=1, save_id="myosgard_revive", is_up_to=True),
                 destination=Zone.FIELD,
                 raw_text="自分のトラッシュからコスト1の特徴《聖地マリージョア》を持つステージカード1枚までを、登場させる"
             )
@@ -135,7 +153,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.MOVE_TO_HAND,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["五老星"], count=1, save_id="saturn_select"),
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["五老星"], count=1, save_id="saturn_select", is_up_to=True),
                     destination=Zone.HAND,
                     raw_text="特徴《五老星》を持つカード1枚までを公開し、手札に加える"
                 ),
@@ -154,7 +172,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             condition=Condition(type=ConditionType.TRASH_COUNT, operator=CompareOperator.GE, value=10),
             effect=GameAction(
                 type=ActionType.BUFF,
-                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], count=1, save_id="nasujuro_debuff"),
+                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], count=1, save_id="nasujuro_debuff", is_up_to=True),
                 value=ValueSource(base=-2000),
                 raw_text="相手のキャラ1枚までを、このターン中、パワー-2000"
             )
@@ -165,7 +183,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             trigger=TriggerType.ON_PLAY,
             cost=GameAction(
                 type=ActionType.DISCARD,
-                target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, save_id="mars_cost"),
+                target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, save_id="mars_cost", is_up_to=True),
                 raw_text="自分の手札1枚を捨てることができる"
             ),
             effect=GameAction(
@@ -204,7 +222,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.MOVE_TO_HAND,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["天竜人"], count=1, save_id="event_select"),
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["天竜人"], count=1, save_id="event_select", is_up_to=True),
                     destination=Zone.HAND
                 ),
                 GameAction(
@@ -220,12 +238,12 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             trigger=TriggerType.ACTIVATE_MAIN,
             cost=GameAction(
                 type=ActionType.REST,
-                target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=5, save_id="event_cost_don"), 
+                target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=5, save_id="event_cost_don", is_up_to=True), 
                 raw_text="自分のドン‼5枚をレストにできる"
             ),
             effect=GameAction(
                 type=ActionType.KO,
-                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=6, save_id="event_ko"),
+                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=6, save_id="event_ko", is_up_to=True),
                 raw_text="相手の元々のコスト6以下のキャラ1枚までを、KOする"
             )
         )
@@ -259,28 +277,9 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                         cost_max_dynamic="DON_COUNT_FIELD"
                     ),
                     destination=Zone.FIELD,
-                    raw_text="手札から自分の場のドン!!の枚数以下のコストを持つ黒の特徴《五老星》を持つキャラカード1枚までを、登場させる"
+                    raw_text="手札から自分の場のドン!!の枚数以下のコストを持つ黒の特徴《五老星》を持つキャラカード1枚までを, 登場させる"
                 )
             ])
         )
     ],
-     "OP05-097": [
-        Ability(
-            trigger=TriggerType.YOUR_TURN,
-            effect=GameAction(
-                type=ActionType.BUFF,
-                target=TargetQuery(
-                    player=Player.SELF,
-                    zone=Zone.HAND,
-                    traits=["天竜人"],
-                    cost_min=2,
-                    select_mode="ALL"
-                ),
-                value=ValueSource(base=-1),
-                status="COST_REDUCTION",
-                raw_text="自分が手札から登場させるコスト2以上の特徴《天竜人》を持つキャラカードの支払うコストは1少なくなる"
-            )
-        )
-    ],
-
 }
