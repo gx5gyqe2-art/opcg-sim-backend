@@ -5,6 +5,11 @@ from .enums import (
     Zone, Player, ActionType, TriggerType, 
     CompareOperator, ConditionType
 )
+import unicodedata
+
+def _nfc(text: str) -> str:
+    if not text: return ""
+    return unicodedata.normalize('NFC', text)
 
 @dataclass
 class TargetQuery:
