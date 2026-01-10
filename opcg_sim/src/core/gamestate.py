@@ -548,8 +548,13 @@ class GameManager:
                             if hasattr(target, 'attached_to'): target.attached_to = None
                 success = True
             elif act_name == "PLAY_CARD":
-                self.move_card(target, Zone.FIELD, owner); target.is_newly_played = True; success = True
+                self.move_card(target, Zone.FIELD, owner); target.is_newly_played = True
+                if not target.ability_disabled:
+                    for ability in target.master.abilities:
+                        if ability.trigger == TriggerType.ON_PLAY:
+                            self.resolve_ability(owner, ability, source_card=target)
                 self._apply_passive_effects(owner)
+                success = True
             elif act_name == "DECK_BOTTOM":
                 self.move_card(target, Zone.DECK, owner, dest_position="BOTTOM"); success = True
         return success
@@ -559,3 +564,4 @@ class GameManager:
         if val_source.dynamic_source == "COUNT_REFERENCE":
             log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name); return len(player.trash)
         return val_source.base
+
