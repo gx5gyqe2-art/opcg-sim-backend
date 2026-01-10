@@ -103,7 +103,8 @@ class PendingRequestSchema(BaseModel):
     # ▼ 追加フィールド
     candidates: Optional[List[CardSchema]] = Field(None, alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('CANDIDATES', 'candidates'))
     constraints: Optional[Dict[str, Any]] = Field(None, alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('CONSTRAINTS', 'constraints'))
-    options: Optional[List[Dict[str, Any]]] = Field(None, alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('OPTIONS', 'options'))
+    # 【修正】List[Dict] -> List[Any] に変更して文字列リストを受け入れるようにする
+    options: Optional[List[Any]] = Field(None, alias=CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('OPTIONS', 'options'))
 
 class GameActionResultSchema(BaseModel):
     model_config = ConfigDict(extra='allow', populate_by_name=True)
