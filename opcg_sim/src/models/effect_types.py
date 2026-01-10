@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import List, Optional, Any, Dict, Union
+from typing import List, Optional, Any, Dict, Union, Set
 from .enums import (
     Zone, Player, ActionType, TriggerType, 
     CompareOperator, ConditionType
@@ -30,6 +30,8 @@ class TargetQuery:
     select_mode: str = "CHOOSE"
     save_id: Optional[str] = None
     ref_id: Optional[str] = None
+    flags: Set[str] = field(default_factory=set)
+    is_vanilla: bool = False
     raw_text: str = ""
 
 @dataclass
