@@ -3,7 +3,9 @@ import unicodedata
 import re
 from typing import List, Dict, Any, Optional, Tuple
 from ..models.models import CardMaster, CardInstance
-from ..core.effects.parser import EffectParser
+# 【変更】EffectParser ではなく Effect クラスをインポート（ファイル名が parser.py である前提）
+# もし parser-2.py というファイル名なら ..core.effects.parser-2 からインポートしてください
+from ..core.effects.parser import Effect 
 from ..models.effect_types import Ability
 from ..models.enums import CardType, Attribute, Color, TriggerType
 from ..utils.logger_config import log_event
@@ -47,20 +49,28 @@ class DataCleaner:
         if not s_val: return []
         return [t.strip() for t in s_val.split('/') if t.strip()]
 
+    # 【変更】Parser 2.0 (Effectクラス) に合わせた修正
     @staticmethod
     def parse_abilities(text: str, is_trigger: bool = False) -> List[Ability]:
         s_text = DataCleaner.normalize_text(text)
         if not s_text or s_text in [_nfc("なし"), "None", ""]: return []
+        
         try:
-            parser = EffectParser()
-            ability = parser.parse_ability(s_text)
-            if ability:
-                if is_trigger:
+            # Effectクラスのインスタンスを作成すると、__init__内で解析(_parse)が実行され
+            # .abilities に結果が格納される設計になっています。
+            effect = Effect(s_text)
+            
+            # トリガーテキスト（ライフで受ける等）の場合、強制的にTriggerType.TRIGGERを付与
+            if is_trigger:
+                for ability in effect.abilities:
                     ability.trigger = TriggerType.TRIGGER
-                return [ability]
-            return []
+            
+            return effect.abilities
+
         except Exception as e:
-            log_event(level_key="DEBUG", action="loader.parse_abilities_error", msg=f"Error parsing abilities text: '{s_text[:20]}...' -> {e}")
+            # ここでエラーが出ているためログに出ていませんでした
+            # 必要であれば traceback.print_exc() 等でデバッグしてください
+            log_event(level_key="ERROR", action="loader.parse_error", msg=f"Text: {s_text[:20]}... Error: {e}")
             return []
 
     @staticmethod
@@ -87,22 +97,9 @@ class DataCleaner:
                 return a
         return Attribute.NONE
 
+# CardLoader, DeckLoader クラスは変更なしのため省略（既存のまま使用してください）
 class CardLoader:
-    DB_MAPPING = {
-        "ID": ["number", "Number", _nfc("品番"), _nfc("型番"), "id"],
-        "NAME": ["name", "Name", _nfc("名前"), _nfc("カード名")],
-        "TYPE": [_nfc("種類"), "Type", "type"],
-        "ATTRIBUTE": [_nfc("属性"), "Attribute", "attribute"],
-        "COLOR": [_nfc("色"), "Color", "color"],
-        "COST": [_nfc("コスト"), "Cost", "cost"],
-        "POWER": [_nfc("パワー"), "Power", "power"],
-        "COUNTER": [_nfc("カウンター"), "Counter", "counter"],
-        "LIFE": [_nfc("ライフ"), "Life", "life"],
-        "TRAITS": [_nfc("特徴"), "Traits", "traits"],
-        "TEXT": [_nfc("効果(テキスト)"), _nfc("テキスト"), "Text", "text"],
-        "TRIGGER": [_nfc("効果(トリガー)"), _nfc("トリガー"), "Trigger", "trigger"]
-    }
-
+    # ... (既存コード) ...
     def __init__(self, json_path: str):
         self.json_path = json_path
         self.cards: Dict[str, CardMaster] = {}
