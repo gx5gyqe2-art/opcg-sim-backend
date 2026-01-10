@@ -181,7 +181,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ),
             effect=GameAction(
                 type=ActionType.KO,
-                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=5, save_id="mars_ko"),
+                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=5, save_id="mars_ko", is_up_to=True),
                 raw_text="相手の元々のコスト5以下のキャラ1枚までを、KOする"
             )
         )
