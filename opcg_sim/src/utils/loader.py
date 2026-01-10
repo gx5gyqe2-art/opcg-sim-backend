@@ -3,9 +3,8 @@ import unicodedata
 import re
 from typing import List, Dict, Any, Optional, Tuple
 from ..models.models import CardMaster, CardInstance
-# 【変更】EffectParser ではなく Effect クラスをインポート（ファイル名が parser.py である前提）
-# もし parser-2.py というファイル名なら ..core.effects.parser-2 からインポートしてください
-from ..core.effects.parser import Effect 
+# 【修正】A案の EffectParser をインポート
+from ..core.effects.parser import EffectParser 
 from ..models.effect_types import Ability
 from ..models.enums import CardType, Attribute, Color, TriggerType
 from ..utils.logger_config import log_event
@@ -49,27 +48,29 @@ class DataCleaner:
         if not s_val: return []
         return [t.strip() for t in s_val.split('/') if t.strip()]
 
-    # 【変更】Parser 2.0 (Effectクラス) に合わせた修正
+    # 【修正】Parser 2.0 (A案) に対応
     @staticmethod
     def parse_abilities(text: str, is_trigger: bool = False) -> List[Ability]:
         s_text = DataCleaner.normalize_text(text)
         if not s_text or s_text in [_nfc("なし"), "None", ""]: return []
         
         try:
-            # Effectクラスのインスタンスを作成すると、__init__内で解析(_parse)が実行され
-            # .abilities に結果が格納される設計になっています。
-            effect = Effect(s_text)
+            # EffectParser (A案) のインスタンス化
+            parser = EffectParser()
             
-            # トリガーテキスト（ライフで受ける等）の場合、強制的にTriggerType.TRIGGERを付与
-            if is_trigger:
-                for ability in effect.abilities:
+            # _parse_single_text を使用して Ability オブジェクトを生成
+            # ※ A案では _parse_single_text(self, text: str, is_trigger: bool = False) と定義されています
+            ability = parser._parse_single_text(s_text, is_trigger=is_trigger)
+            
+            if ability:
+                # 念のためトリガー設定を補強（Parser内でも行われますが、ここで確実にする）
+                if is_trigger:
                     ability.trigger = TriggerType.TRIGGER
+                return [ability]
             
-            return effect.abilities
+            return []
 
         except Exception as e:
-            # ここでエラーが出ているためログに出ていませんでした
-            # 必要であれば traceback.print_exc() 等でデバッグしてください
             log_event(level_key="ERROR", action="loader.parse_error", msg=f"Text: {s_text[:20]}... Error: {e}")
             return []
 
@@ -97,9 +98,22 @@ class DataCleaner:
                 return a
         return Attribute.NONE
 
-# CardLoader, DeckLoader クラスは変更なしのため省略（既存のまま使用してください）
 class CardLoader:
-    # ... (既存コード) ...
+    DB_MAPPING = {
+        "ID": ["number", "Number", _nfc("品番"), _nfc("型番"), "id"],
+        "NAME": ["name", "Name", _nfc("名前"), _nfc("カード名")],
+        "TYPE": [_nfc("種類"), "Type", "type"],
+        "ATTRIBUTE": [_nfc("属性"), "Attribute", "attribute"],
+        "COLOR": [_nfc("色"), "Color", "color"],
+        "COST": [_nfc("コスト"), "Cost", "cost"],
+        "POWER": [_nfc("パワー"), "Power", "power"],
+        "COUNTER": [_nfc("カウンター"), "Counter", "counter"],
+        "LIFE": [_nfc("ライフ"), "Life", "life"],
+        "TRAITS": [_nfc("特徴"), "Traits", "traits"],
+        "TEXT": [_nfc("効果(テキスト)"), _nfc("テキスト"), "Text", "text"],
+        "TRIGGER": [_nfc("効果(トリガー)"), _nfc("トリガー"), "Trigger", "trigger"]
+    }
+
     def __init__(self, json_path: str):
         self.json_path = json_path
         self.cards: Dict[str, CardMaster] = {}
