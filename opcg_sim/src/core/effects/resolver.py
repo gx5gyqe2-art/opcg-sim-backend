@@ -1,5 +1,4 @@
 from typing import List, Any, Dict, Optional
-import re
 from ...models.effect_types import (
     EffectNode, GameAction, Sequence, Branch, Choice, ValueSource
 )
@@ -40,7 +39,7 @@ class EffectResolver:
             if isinstance(node, GameAction):
                 success = self._execute_game_action(player, node, source_card)
                 
-                # 中断された場合はここで終了（スタックの処理は再開時に委ねる）
+                # 中断時はここで終了（再開時はcontinuationから復元される）
                 if self.game_manager.active_interaction:
                     return
 
@@ -66,7 +65,8 @@ class EffectResolver:
                 return 
 
     def _execute_game_action(self, player, action: GameAction, source_card) -> bool:
-        targets = self._resolve_targets(player, action.target, source_card)
+        # 【修正】現在のアクション(action)を引数として渡す
+        targets = self._resolve_targets(player, action.target, source_card, action_node=action)
         
         # Noneが返ってきた場合は「ユーザー選択待ち」のため中断
         if targets is None:
@@ -84,10 +84,10 @@ class EffectResolver:
         
         return success
 
-    def _resolve_targets(self, player, query, source_card):
+    def _resolve_targets(self, player, query, source_card, action_node=None):
         if not query: return []
         
-        # 既に保存されたターゲットがある場合（中断からの再開時など）はそれを使う
+        # 保存されたターゲットがある場合はそれを使う（再開時）
         if query.save_id and query.save_id in self.context["saved_targets"]:
             return self.context["saved_targets"][query.save_id]
         
@@ -101,18 +101,15 @@ class EffectResolver:
         if len(candidates) == 0:
             return []
             
-        # 自動解決できる場合（候補数が要求数以下、かつ必須）
-        # ※本来は「対象を取れるなら取らなければならない」ルールのため、optionalでなければ自動選択
-        if len(candidates) <= required_count and not is_optional:
+        # 自動解決（候補数が要求数以下、かつ select_mode="ALL" または必須）
+        if (query.select_mode == "ALL") or (len(candidates) <= required_count and not is_optional):
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = candidates
             return candidates
 
-        # ユーザー選択が必要なため中断 (Suspend)
-        # 現在のアクション(GameAction)は _process_stack で pop されているため、
-        # 再開時に再実行できるようスタックに戻す必要がある、もしくは continuation に保持する。
-        # ここでは再開ロジック側で制御するため、必要な情報を保存して None を返す。
-        self._suspend_for_target_selection(player, candidates, query, source_card)
+        # ユーザー選択が必要なため中断
+        # 【修正】action_node を渡して、保存するスタックに含めるようにする
+        self._suspend_for_target_selection(player, candidates, query, source_card, action_node)
         return None
 
     def _calculate_value(self, player, val_source: ValueSource, targets) -> int:
@@ -155,32 +152,29 @@ class EffectResolver:
         }
         log_event("INFO", "resolver.suspend", "Suspended for player choice", player=player.name)
 
-    def _suspend_for_target_selection(self, player, candidates, query, source_card):
+    def _suspend_for_target_selection(self, player, candidates, query, source_card, action_node=None):
         required_count = getattr(query, 'count', 1)
-        is_optional = getattr(query, 'optional', False)
         
-        # 中断時に実行中だったアクション（スタックからPOP済み）を取得するのは難しいが、
-        # _process_stack の構造上、ターゲット選択で止まった場合は
-        # 「現在のアクション」をやり直す必要がある。
-        # そのため、continuation に「現在のターゲット処理が終わったらどうするか」ではなく、
-        # 「どこまでやったか」のコンテキストを残す。
-        
+        # 【修正】スタックの状態を保存する際、実行中だったアクション(action_node)をスタックの末尾に戻す
+        # これにより再開時にこのアクションから再試行される
+        saved_stack = self.execution_stack.copy()
+        if action_node:
+            saved_stack.append(action_node)
+
         self.game_manager.active_interaction = {
             "player_id": player.name,
             "action_type": "SELECT_TARGET",
             "message": f"対象を選択してください（最大{required_count}枚）",
             "candidates": candidates,
             "constraints": {
-                "min": 0 if is_optional else 1, # ※ルール依存だが簡易実装
+                "min": 1,
                 "max": required_count
             },
             "continuation": {
-                "execution_stack": self.execution_stack, # 次にやるべき残りのアクション
+                "execution_stack": saved_stack, # 修正後のスタックを保存
                 "effect_context": self.context,
                 "source_card_uuid": source_card.uuid,
-                "query": query,
-                # GameAction自体はスタックから消えているため、呼び出し元で再構成するか
-                # ここでは「選択結果を注入して再開する」ことを前提にする
+                "query": query
             }
         }
         log_event("INFO", "resolver.suspend", "Suspended for target selection", player=player.name)
@@ -203,17 +197,8 @@ class EffectResolver:
         """中断からの復帰用メソッド"""
         self.execution_stack = execution_stack
         self.context = effect_context
-        # 中断していたアクション自体は完了していないが、
-        # resume_executionが呼ばれる前に「選択結果」がcontextに注入されている前提。
-        # ただし、GameActionノード自体はpopされているため、
-        # _execute_game_action で止まった続きを行う必要がある。
-        # 現在の実装では _execute_game_action 内で再帰的に呼ぶわけではないので、
-        # 厳密には「中断したGameAction」をスタックに戻してから再開するのが正しい。
-        # しかし、query情報しか持っていないため、ここでは簡易的に
-        # 「次（スタックにあるもの）へ進む」として処理する。
-        # ※本来は GameAction 自体を continuation に保存すべき。
-        
-        # 今回は簡易修正として、_process_stack を呼んで残りの処理を続ける。
-        # (GameAction内の他の処理(value計算など)がスキップされるリスクがあるが、
-        #  ターゲット選択がメインの処理であることが多いため一旦許容)
+        # 再開時は、中断していたアクションがスタックの先頭（末尾）にあるはずなので、
+        # そのままループを再開すればよい。
+        # _execute_game_action -> _resolve_targets の中で save_id をチェックし、
+        # 保存されたターゲットを使って即座に完了するはず。
         self._process_stack(player, source_card)
