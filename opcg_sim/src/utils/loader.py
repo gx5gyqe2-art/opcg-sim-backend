@@ -3,7 +3,6 @@ import unicodedata
 import re
 from typing import List, Dict, Any, Optional, Tuple
 from ..models.models import CardMaster, CardInstance
-# 【修正】A案の EffectParser をインポート
 from ..core.effects.parser import EffectParser 
 from ..models.effect_types import Ability
 from ..models.enums import CardType, Attribute, Color, TriggerType
@@ -48,29 +47,24 @@ class DataCleaner:
         if not s_val: return []
         return [t.strip() for t in s_val.split('/') if t.strip()]
 
-    # 【修正】Parser 2.0 (A案) に対応
     @staticmethod
     def parse_abilities(text: str, is_trigger: bool = False) -> List[Ability]:
         s_text = DataCleaner.normalize_text(text)
         if not s_text or s_text in [_nfc("なし"), "None", ""]: return []
-        
         try:
-            # EffectParser (A案) のインスタンス化
             parser = EffectParser()
             
-            # _parse_single_text を使用して Ability オブジェクトを生成
-            # ※ A案では _parse_single_text(self, text: str, is_trigger: bool = False) と定義されています
-            ability = parser._parse_single_text(s_text, is_trigger=is_trigger)
+            # 【修正】メソッド名を最新のparser.pyに合わせる
+            # _parse_single_text は存在しないため、parse_ability を使用
+            ability = parser.parse_ability(s_text)
             
             if ability:
-                # 念のためトリガー設定を補強（Parser内でも行われますが、ここで確実にする）
                 if is_trigger:
                     ability.trigger = TriggerType.TRIGGER
                 return [ability]
-            
             return []
-
         except Exception as e:
+            # ここでエラーが握りつぶされていたのが原因です
             log_event(level_key="ERROR", action="loader.parse_error", msg=f"Text: {s_text[:20]}... Error: {e}")
             return []
 
