@@ -175,6 +175,12 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             candidates.extend(p.don_active)
             candidates.extend(p.don_rested)
 
+    # 【追加】動的コスト上限の計算
+    dynamic_cost_max = None
+    if query.cost_max_dynamic == "DON_COUNT_FIELD":
+        p = owner_player 
+        dynamic_cost_max = len(p.don_active) + len(p.don_rested) + len(p.don_attached_cards)
+
     results = []
     for card in candidates:
         if not card: continue
@@ -184,14 +190,18 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             results.append(card)
             continue
         
-        # 【追加】カードタイプのフィルタリング
         if query.card_type and card.master.type.name not in query.card_type:
             continue
 
         if query.colors and not any(c in card.master.color.value for c in query.colors): continue
         if query.attributes and card.master.attribute.value not in query.attributes: continue
+        
         if query.cost_max is not None and card.current_cost > query.cost_max: continue
         if query.cost_min is not None and card.current_cost < query.cost_min: continue
+        
+        # 【追加】動的コスト上限チェック
+        if dynamic_cost_max is not None and card.current_cost > dynamic_cost_max: continue
+
         if query.power_max is not None and card.get_power(True) > query.power_max: continue
         if query.power_min is not None and card.get_power(True) < query.power_min: continue
         

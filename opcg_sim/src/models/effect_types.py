@@ -22,6 +22,8 @@ class TargetQuery:
     names: List[str] = field(default_factory=list)
     cost_min: Optional[int] = None
     cost_max: Optional[int] = None
+    # 【追加】動的なコスト上限参照用のキー
+    cost_max_dynamic: Optional[str] = None
     power_min: Optional[int] = None
     power_max: Optional[int] = None
     is_rest: Optional[bool] = None
@@ -32,6 +34,8 @@ class TargetQuery:
     ref_id: Optional[str] = None
     flags: Set[str] = field(default_factory=set)
     is_vanilla: bool = False
+    # 【追加】厳密な個数チェックを行うかどうかのフラグ（コスト支払い等で使用）
+    is_strict_count: bool = False
     raw_text: str = ""
 
 @dataclass
