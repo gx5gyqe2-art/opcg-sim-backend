@@ -12,7 +12,6 @@ def _nfc(text: str) -> str:
     return unicodedata.normalize('NFC', text)
 
 class RawDataLoader:
-    # ... (既存メソッド load_json は変更なし) ...
     @staticmethod
     def load_json(file_path: str) -> Any:
         log_event(level_key="DEBUG", action="loader.load_json", msg=f"Loading JSON from {file_path}...")
@@ -27,7 +26,6 @@ class RawDataLoader:
             return []
 
 class DataCleaner:
-    # ... (normalize_text, parse_int, parse_traits, parse_abilities, map_color, map_card_type, map_attribute は変更なし) ...
     @staticmethod
     def normalize_text(text: Any) -> str:
         if text is None: return ""
@@ -53,11 +51,13 @@ class DataCleaner:
         s_text = DataCleaner.normalize_text(text)
         if not s_text or s_text in [_nfc("なし"), "None", ""]: return []
         try:
-            effect_parser = Effect(s_text)
-            abilities = effect_parser.abilities
-            if is_trigger:
-                for ability in abilities: ability.trigger = TriggerType.TRIGGER
-            return abilities
+            parser = EffectParser()
+            ability = parser.parse_ability(s_text)
+            if ability:
+                if is_trigger:
+                    ability.trigger = TriggerType.TRIGGER
+                return [ability]
+            return []
         except Exception as e:
             log_event(level_key="DEBUG", action="loader.parse_abilities_error", msg=f"Error parsing abilities text: '{s_text[:20]}...' -> {e}")
             return []
@@ -87,7 +87,6 @@ class DataCleaner:
         return Attribute.NONE
 
 class CardLoader:
-    # --- DBのカラム名マッピング定義 ---
     DB_MAPPING = {
         "ID": ["number", "Number", _nfc("品番"), _nfc("型番"), "id"],
         "NAME": ["name", "Name", _nfc("名前"), _nfc("カード名")],
@@ -140,7 +139,6 @@ class CardLoader:
                     return raw[norm_key]
             return default
         
-        # マッピング定数を使用
         M = self.DB_MAPPING
 
         card_id = DataCleaner.normalize_text(get_val(M["ID"], "N/A"))
@@ -183,7 +181,6 @@ class CardLoader:
         )
 
 class DeckLoader:
-    # ... (DeckLoader は特に変更なし) ...
     def __init__(self, card_loader: CardLoader):
         self.card_loader = card_loader
 

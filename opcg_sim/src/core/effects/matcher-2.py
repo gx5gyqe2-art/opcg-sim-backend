@@ -7,6 +7,8 @@ from ...utils.logger_config import log_event
 
 def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQuery:
     tq = TargetQuery(raw_text=tgt_text, player=default_player)
+    if not hasattr(tq, "flags"):
+        tq.flags = set()
 
     if tgt_text == _nfc(ParserKeyword.THIS_CARD) or (tgt_text == _nfc(ParserKeyword.SELF_REF) and _nfc(ParserKeyword.SELF_REF + "の") not in tgt_text):
         tq.select_mode = "SOURCE"
@@ -18,6 +20,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.zone = Zone.TEMP
         return tq
 
+    # --- Player Detection ---
     if _nfc(ParserKeyword.EACH_OTHER) in tgt_text: tq.player = Player.ALL
     elif _nfc(ParserKeyword.OPPONENT) in tgt_text: tq.player = Player.OPPONENT
     elif _nfc(ParserKeyword.OWNER) in tgt_text: 
@@ -36,6 +39,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             
     elif _nfc(ParserKeyword.SELF) in tgt_text or _nfc(ParserKeyword.SELF_REF) in tgt_text: tq.player = Player.SELF
 
+    # --- Zone Detection ---
     zone_map = {
         _nfc("手札"): Zone.HAND,
         _nfc("トラッシュ"): Zone.TRASH,
@@ -73,19 +77,23 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     else:
         tq.zone = Zone.FIELD
 
+    # --- Card Type ---
     if _nfc(ParserKeyword.LEADER) in tgt_text: tq.card_type.append("LEADER")
     if _nfc(ParserKeyword.CHARACTER) in tgt_text: tq.card_type.append("CHARACTER")
     if _nfc(ParserKeyword.EVENT) in tgt_text: tq.card_type.append("EVENT")
     if _nfc(ParserKeyword.STAGE) in tgt_text: tq.card_type.append("STAGE")
     
+    # --- Filters ---
     m_name = re.search(r'「([^」]+)」', tgt_text)
     if m_name:
         if (m_name.group(0) + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
             tq.names.append(m_name.group(1))
     
+    # 部分一致
     if _nfc("含む") in tgt_text:
         tq.flags.add("NAME_PARTIAL")
     
+    # Traits/Attributes
     raw_traits = re.findall(r'[《<]([^》>]+)[》>]', tgt_text)
     attr_values = [a.value for a in Attribute if a != Attribute.NONE]
     final_traits = []
@@ -104,6 +112,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
+    # --- Cost Filter ---
     m_c = re.search(_nfc(ParserKeyword.COST + r'[^+\-\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
         start_idx = m_c.start()
@@ -118,6 +127,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             if m_c.group(2) == _nfc(ParserKeyword.ABOVE): tq.cost_min = val
             else: tq.cost_max = val
 
+    # --- Power Filter ---
     m_p = re.search(_nfc(ParserKeyword.POWER + r'[^+\-\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_p:
         start_idx = m_p.start()
@@ -127,6 +137,8 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             if m_p.group(2) == _nfc(ParserKeyword.ABOVE): tq.power_min = val
             else: tq.power_max = val
     
+    # --- Status Filter ---
+    # 修正: 「にできる」が含まれる場合は状態フィルタを適用しない（コスト支払い等のため）
     if _nfc("にする") not in tgt_text and _nfc("ならない") not in tgt_text and _nfc("にできる") not in tgt_text:
         if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
         elif _nfc("レスト") in tgt_text: tq.is_rest = True
@@ -141,6 +153,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         m_cnt = re.search(r'(\d+)' + _nfc(ParserKeyword.COUNT_SUFFIX), tgt_text)
         tq.count = int(m_cnt.group(1)) if m_cnt else 1
     
+    # --- Vanilla Check ---
     if _nfc("効果のない") in tgt_text or _nfc("効果がない") in tgt_text:
         tq.is_vanilla = True
 
@@ -179,7 +192,9 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
     for card in candidates:
         if not card: continue
         
+        # 修正: DonInstance用安全策 (master属性がないため)
         if not hasattr(card, "master"):
+            # ドンの場合は、状態(Rest/Active)指定がある場合のみチェックする
             if query.is_rest is not None and card.is_rest != query.is_rest: continue
             results.append(card)
             continue
@@ -191,12 +206,12 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         if query.power_max is not None and card.get_power(True) > query.power_max: continue
         if query.power_min is not None and card.get_power(True) < query.power_min: continue
         
-        if query.is_vanilla:
+        if getattr(query, 'is_vanilla', False):
             txt = card.master.effect_text
             if txt and txt.strip() not in ["", "なし", "-"]: continue
 
         if query.names:
-            if "NAME_PARTIAL" in query.flags:
+            if hasattr(query, "flags") and "NAME_PARTIAL" in query.flags:
                 if not any(n in card.master.name for n in query.names): continue
             else:
                 if card.master.name not in query.names: continue

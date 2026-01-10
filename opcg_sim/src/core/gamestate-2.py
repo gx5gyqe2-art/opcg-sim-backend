@@ -7,7 +7,6 @@ from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
 from ..models.effect_types import TargetQuery, Ability
 from ..utils.logger_config import log_event
-from .effects.resolver import EffectResolver
 
 Card = CardInstance
 
@@ -42,13 +41,17 @@ class Player:
                 self.hand.append(self.deck.pop(0))
 
     def to_dict(self, is_owner: bool = True):
+        # ログ削除: シリアライズログ
         player_props = CONST.get('PLAYER_PROPERTIES', {})
+
         leader_dict = self.leader.to_dict() if self.leader else None
         if leader_dict:
             leader_dict["is_face_up"] = True
+
         stage_dict = self.stage.to_dict() if self.stage else None
         if stage_dict:
             stage_dict["is_face_up"] = True
+
         return {
             "player_id": self.name,
             "name": self.name,
@@ -97,6 +100,7 @@ class GameManager:
             candidates.extend(p.life)
             candidates.extend(p.deck)
             candidates.extend(p.temp_zone)
+            
             for c in candidates:
                 if c.uuid == uuid:
                     return c
@@ -105,6 +109,7 @@ class GameManager:
     def get_pending_request(self) -> Optional[Dict[str, Any]]:
         pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
         battle_actions = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+        
         KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
         KEY_ACTION = pending_props.get('ACTION', 'action')
         KEY_MSG = pending_props.get('MESSAGE', 'message')
@@ -113,6 +118,7 @@ class GameManager:
         KEY_CANDIDATES = pending_props.get('CANDIDATES', 'candidates')
         KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
         KEY_OPTIONS = pending_props.get('OPTIONS', 'options')
+
         ACT_BLOCKER = battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
         ACT_COUNTER = battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER')
 
@@ -136,85 +142,188 @@ class GameManager:
         request = None
         if self.phase == Phase.BLOCK_STEP and self.active_battle:
             target_owner = self.active_battle["target_owner"]
-            blockers = [c.uuid for c in target_owner.field if not c.is_rest and "ブロッカー" in c.current_keywords]
-            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True}
+            blockers = []
+            for c in target_owner.field:
+                is_active = not c.is_rest
+                has_keyword = "ブロッカー" in c.current_keywords
+                if is_active and has_keyword:
+                    blockers.append(c.uuid)
+
+            request = {
+                KEY_PID: target_owner.name,
+                KEY_ACTION: ACT_BLOCKER,
+                KEY_MSG: PendingMessage.SELECT_BLOCKER.value,
+                KEY_UUIDS: blockers,
+                KEY_SKIP: True
+            }
+
         elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
             target_owner = self.active_battle["target_owner"]
-            counters = [c.uuid for c in target_owner.hand if (c.master.counter and c.master.counter > 0) or (c.master.type == CardType.EVENT and any(abil.trigger == TriggerType.COUNTER for abil in c.master.abilities))]
-            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_COUNTER, KEY_MSG: PendingMessage.SELECT_COUNTER.value, KEY_UUIDS: counters, KEY_SKIP: True}
+            counters = [
+                c.uuid for c in target_owner.hand 
+                if (c.master.counter and c.master.counter > 0) or 
+                (c.master.type == CardType.EVENT and any(abil.trigger == TriggerType.COUNTER for abil in c.master.abilities))
+            ]
+            request = {
+                KEY_PID: target_owner.name,
+                KEY_ACTION: ACT_COUNTER,
+                KEY_MSG: PendingMessage.SELECT_COUNTER.value,
+                KEY_UUIDS: counters,
+                KEY_SKIP: True
+            }
         elif self.phase == Phase.MAIN:
             selectable = [c.uuid for c in self.turn_player.hand]
             selectable += [c.uuid for c in self.turn_player.field if not c.is_rest]
             if self.turn_player.leader and not self.turn_player.leader.is_rest:
                 selectable.append(self.turn_player.leader.uuid)
-            request = {KEY_PID: self.turn_player.name, KEY_ACTION: "MAIN_ACTION", KEY_MSG: PendingMessage.MAIN_ACTION.value, KEY_UUIDS: selectable, KEY_SKIP: True}
+            request = {
+                KEY_PID: self.turn_player.name,
+                KEY_ACTION: "MAIN_ACTION",
+                KEY_MSG: PendingMessage.MAIN_ACTION.value,
+                KEY_UUIDS: selectable,
+                KEY_SKIP: True
+            }
         return request
 
     def resolve_interaction(self, player: Player, payload: Dict[str, Any]):
         if not self.active_interaction:
             log_event("WARNING", "game.resolve_interaction", "No active interaction found", player=player.name)
             return
+
         continuation = self.active_interaction.get("continuation")
         if not continuation:
             self.active_interaction = None
             return
+
+        action = continuation["action"]
         source_uuid = continuation["source_card_uuid"]
+        effect_context = continuation.get("effect_context", {})
+        remaining_ability_actions = continuation.get("remaining_ability_actions", [])
+        
         source_card = self._find_card_by_uuid(source_uuid)
+        
         if not source_card:
             log_event("ERROR", "game.resume_fail", f"Source card {source_uuid} not found")
             self.active_interaction = None
             return
+
+        for k, v in payload.items():
+            effect_context[k] = v
+        
         self.active_interaction = None
-        resolver = EffectResolver(self)
-        log_event("INFO", "game.resume_effect", f"Resuming effect for {source_card.master.name}", player=player.name)
-        resolver.resume_choice(player, source_card, payload, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
+
+        from .effects.resolver import execute_action
+        try:
+            log_event("INFO", "game.resume_effect", f"Resuming effect for {source_card.master.name}", player=player.name)
+        except:
+            log_event("INFO", "game.resume_effect", "Resuming effect", player=player.name)
+        
+        success = execute_action(self, player, action, source_card, effect_context=effect_context)
+        
+        if "selected_uuids" in effect_context:
+            del effect_context["selected_uuids"]
+        if "selected_option_index" in effect_context:
+            del effect_context["selected_option_index"]
+
+        if not success:
+            if self.active_interaction:
+                if "continuation" in self.active_interaction:
+                    self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions
+                    if "effect_context" not in self.active_interaction["continuation"]:
+                        self.active_interaction["continuation"]["effect_context"] = effect_context
+            else:
+                error_msg = f"効果の解決に失敗しました: {action.raw_text or action.type}"
+                log_event("WARNING", "game.effect_failed", error_msg, player=player.name)
+                raise ValueError(error_msg)
+
+        if success and remaining_ability_actions:
+            for i, next_act in enumerate(remaining_ability_actions):
+                if self.active_interaction:
+                    if "continuation" in self.active_interaction:
+                        self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i:]
+                        if "effect_context" not in self.active_interaction["continuation"]:
+                             self.active_interaction["continuation"]["effect_context"] = effect_context
+                    break
+                
+                if not self._perform_logic(player, next_act, source_card, effect_context=effect_context):
+                    if self.active_interaction and "continuation" in self.active_interaction:
+                        self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i+1:]
+                    break
+
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
+        
         pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
         KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
         KEY_ACTION = pending_props.get('ACTION', 'action')
+        
         battle_actions = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
         ACT_BLOCKER = battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
         ACT_COUNTER = battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER')
         ACT_PASS = battle_actions.get('PASS', 'PASS')
+        
         RESOLVE_SELECTION = CONST.get('c_to_s_interface', {}).get('GAME_ACTIONS', {}).get('TYPES', {}).get('RESOLVE_EFFECT_SELECTION', 'RESOLVE_EFFECT_SELECTION')
-        if not pending: raise ValueError("現在実行可能なアクションはありません。")
-        if pending[KEY_PID] != player.name: raise ValueError(f"現在は {pending[KEY_PID]} のターン/フェイズです。")
+
+        if not pending:
+            raise ValueError("現在実行可能なアクションはありません。")
+        
+        if pending[KEY_PID] != player.name:
+            raise ValueError(f"現在は {pending[KEY_PID]} のターン/フェイズです。")
+            
         if pending[KEY_ACTION] != action_type:
-            if pending[KEY_ACTION] in [ACT_COUNTER, ACT_BLOCKER] and action_type == ACT_PASS: return True
-            if self.active_interaction and action_type == RESOLVE_SELECTION: return True
+            if pending[KEY_ACTION] in [ACT_COUNTER, ACT_BLOCKER] and action_type == ACT_PASS:
+                return True
+            if self.active_interaction and action_type == RESOLVE_SELECTION:
+                return True
+
             raise ValueError(f"不適切なアクションです。期待されているアクション: {pending[KEY_ACTION]}")
         return True
 
     def start_game(self, first_player: Optional[Player] = None):
         log_event("INFO", "game.start", "Game initialization started")
-        self.p1.setup_game(); self.p2.setup_game()
-        if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
-        else: self.turn_player = self.p1; self.opponent = self.p2
+        
+        self.p1.setup_game()
+        self.p2.setup_game()
+        if first_player:
+            self.turn_player = first_player
+            self.opponent = self.p2 if first_player == self.p1 else self.p1
+        else:
+            self.turn_player = self.p1
+            self.opponent = self.p2
+        
         log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
-        self.turn_count = 1; self.refresh_phase()
+        self.turn_count = 1
+        self.refresh_phase()
 
     def end_turn(self):
         self._validate_action(self.turn_player, "MAIN_ACTION")
         self.phase = Phase.END
         log_event("INFO", "game.phase_end", f"Turn {self.turn_count} ending", player=self.turn_player.name)
+        
         all_units = [self.turn_player.leader] + self.turn_player.field
-        if self.turn_player.stage: all_units.append(self.turn_player.stage)
+        if self.turn_player.stage:
+            all_units.append(self.turn_player.stage)
+        
         for card in all_units:
             if card and card.master.abilities:
                 for ability in card.master.abilities:
-                    if ability.trigger == TriggerType.TURN_END: self.resolve_ability(self.turn_player, ability, source_card=card)
+                    if ability.trigger == TriggerType.TURN_END:
+                        self.resolve_ability(self.turn_player, ability, source_card=card)
         self.switch_turn()
 
     def switch_turn(self):
+        # ログ削除: 開始ログ削除
         self.turn_player, self.opponent = self.opponent, self.turn_player
         self.turn_count += 1
+        
         log_event("INFO", "game.turn_switch_end", f"After switch: turn_player={self.turn_player.name}, count={self.turn_count}", player="system")
         self.refresh_phase()
 
     def refresh_phase(self):
-        self._reset_player_status(self.opponent); self.refresh_all(self.turn_player); self.draw_phase()
+        self._reset_player_status(self.opponent)
+        self.refresh_all(self.turn_player)
+        self.draw_phase()
 
     def _reset_player_status(self, player: Player):
         all_units = [player.leader] + player.field
@@ -229,30 +338,40 @@ class GameManager:
             if card:
                 is_frozen = "FREEZE" in card.flags
                 card.reset_turn_status()
-                if not is_frozen: card.is_rest = False
-        player.don_active.extend(player.don_rested); player.don_rested = []
-        for don in player.don_attached_cards: don.attached_to = None; player.don_active.append(don)
+                if not is_frozen:
+                    card.is_rest = False
+        
+        player.don_active.extend(player.don_rested)
+        player.don_rested = []
+        for don in player.don_attached_cards:
+            don.attached_to = None
+            player.don_active.append(don)
         player.don_attached_cards = [] 
 
     def draw_phase(self):
-        if self.turn_count > 1: self.draw_card(self.turn_player)
+        if self.turn_count > 1:
+            self.draw_card(self.turn_player)
         self.don_phase()
 
     def don_phase(self):
         cards_to_add = 1 if self.turn_count == 1 else 2
         for _ in range(cards_to_add):
             if self.turn_player.don_deck:
-                don = self.turn_player.don_deck.pop(0); self.turn_player.don_active.append(don)
+                don = self.turn_player.don_deck.pop(0)
+                self.turn_player.don_active.append(don)
         self.main_phase()
 
-    def main_phase(self): self.phase = Phase.MAIN
+    def main_phase(self):
+        self.phase = Phase.MAIN
 
     def draw_card(self, player: Player, count: int = 1):
         for _ in range(count):
             if player.deck:
-                card = player.deck.pop(0); player.hand.append(card)
+                card = player.deck.pop(0)
+                player.hand.append(card)
                 log_event("INFO", "game.draw", f"Player {player.name} drew a card", player=player.name)
-        if not player.deck and not self.winner: self.check_victory()
+        if not player.deck and not self.winner:
+            self.check_victory()
 
     def _find_card_location(self, card: Card) -> Tuple[Optional[Player], Optional[List[Any]]]:
         for p in [self.p1, self.p2]:
@@ -265,109 +384,240 @@ class GameManager:
 
     def move_card(self, card: Card, dest_zone: Zone, dest_player: Player, dest_position: str = "BOTTOM"):
         current_owner, current_list = self._find_card_location(card)
-        if current_list is not None and card in current_list: current_list.remove(card)
-        elif current_owner and current_owner.stage == card: current_owner.stage = None
+        if current_list is not None and card in current_list:
+            current_list.remove(card)
+        elif current_owner and current_owner.stage == card:
+            current_owner.stage = None
+        
         target_list = None
         if dest_zone == Zone.FIELD and card.master.type == CardType.STAGE:
-            if dest_player.stage is not None: self.move_card(dest_player.stage, Zone.TRASH, dest_player)
+            if dest_player.stage is not None:
+                self.move_card(dest_player.stage, Zone.TRASH, dest_player)
             dest_player.stage = card
         elif dest_zone == Zone.HAND: target_list = dest_player.hand
         elif dest_zone == Zone.FIELD: target_list = dest_player.field
         elif dest_zone == Zone.TRASH: target_list = dest_player.trash
         elif dest_zone == Zone.LIFE: target_list = dest_player.life
         elif dest_zone == Zone.DECK: target_list = dest_player.deck
+        
         if target_list is not None:
             if dest_position == "TOP": target_list.insert(0, card)
             else: target_list.append(card)
 
     def pay_cost(self, player: Player, cost: int, don_list: Optional[List[DonInstance]] = None):
+        # ログ削除: コスト詳細
         if don_list is not None:
-            if len(don_list) < cost: raise ValueError("指定されたドン!!の数が不足しています。")
+            if len(don_list) < cost:
+                raise ValueError("指定されたドン!!の数が不足しています。")
             for don in don_list:
-                if don in player.don_active: player.don_active.remove(don); player.don_rested.append(don); don.is_rest = True
-                elif don in player.don_attached_cards: player.don_attached_cards.remove(don); player.don_rested.append(don); don.is_rest = True; don.attached_to = None
+                if don in player.don_active:
+                    player.don_active.remove(don)
+                    player.don_rested.append(don)
+                    don.is_rest = True
+                elif don in player.don_attached_cards:
+                    player.don_attached_cards.remove(don)
+                    player.don_rested.append(don)
+                    don.is_rest = True
+                    don.attached_to = None
         else:
-            if len(player.don_active) < cost: raise ValueError("ドン!!が不足しています。")
-            for _ in range(cost): don = player.don_active.pop(0); player.don_rested.append(don); don.is_rest = True
+            if len(player.don_active) < cost:
+                raise ValueError("ドン!!が不足しています。")
+            for _ in range(cost):
+                don = player.don_active.pop(0)
+                player.don_rested.append(don)
+                don.is_rest = True
 
     def has_blocker(self, player: Player) -> bool:
         for card in player.field:
-            if not card.is_rest and "ブロッカー" in card.current_keywords: return True
+            if not card.is_rest and "ブロッカー" in card.current_keywords:
+                return True
         return False
 
     def declare_attack(self, attacker: Card, target: Card):
         attacker_owner, _ = self._find_card_location(attacker)
         target_owner, _ = self._find_card_location(target)
+        
         self._validate_action(attacker_owner, "MAIN_ACTION")
-        if "ATTACK_DISABLE" in attacker.flags: raise ValueError("このカードは効果によりアタックできません。")
-        if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
-        if target.master.type == CardType.CHARACTER and not target.is_rest: raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
+
+        if "ATTACK_DISABLE" in attacker.flags:
+            raise ValueError("このカードは効果によりアタックできません。")
+
+        if attacker.is_rest:
+            raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
+        
+        if target.master.type == CardType.CHARACTER and not target.is_rest:
+            raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
+
         log_event("INFO", "game.attack_declare", f"{attacker.master.name} is attacking {target.master.name}", player=attacker_owner.name)
+        
         attacker.is_rest = True
-        self.active_battle = {"attacker": attacker, "target": target, "attacker_owner": attacker_owner, "target_owner": target_owner, "counter_buff": 0}
-        if self.has_blocker(target_owner): self.phase = Phase.BLOCK_STEP; log_event("INFO", "game.phase_transition", f"Blockers detected. Moving to {self.phase.name}", player=target_owner.name)
-        else: self.phase = Phase.BATTLE_COUNTER; log_event("INFO", "game.phase_transition", f"No blockers. Moving to {self.phase.name}", player=target_owner.name)
+        
+        self.active_battle = {
+            "attacker": attacker,
+            "target": target,
+            "attacker_owner": attacker_owner,
+            "target_owner": target_owner,
+            "counter_buff": 0
+        }
+        
+        # ログ削除: バトル初期化詳細
+
+        if self.has_blocker(target_owner):
+            self.phase = Phase.BLOCK_STEP
+            log_event("INFO", "game.phase_transition", f"Blockers detected. Moving to {self.phase.name}", player=target_owner.name)
+        else:
+            self.phase = Phase.BATTLE_COUNTER
+            log_event("INFO", "game.phase_transition", f"No blockers. Moving to {self.phase.name}", player=target_owner.name)
+        
+        # ログ削除: 遷移チェック詳細
 
     def handle_block(self, blocker: Optional[Card] = None):
-        if not self.active_battle: return
-        target_owner = self.active_battle["target_owner"]; self._validate_action(target_owner, "SELECT_BLOCKER")
-        if blocker: log_event("INFO", "game.block_execute", f"{blocker.master.name} blocks the attack", player=target_owner.name); blocker.is_rest = True; self.active_battle["target"] = blocker
-        else: log_event("INFO", "game.block_skip", "No block declared", player=target_owner.name)
-        self.phase = Phase.BATTLE_COUNTER; log_event("INFO", "game.phase_transition", f"Moving to {self.phase.name}", player=target_owner.name)
+        if not self.active_battle:
+            return
+            
+        target_owner = self.active_battle["target_owner"]
+        self._validate_action(target_owner, "SELECT_BLOCKER")
+
+        if blocker:
+            log_event("INFO", "game.block_execute", f"{blocker.master.name} blocks the attack", player=target_owner.name)
+            blocker.is_rest = True
+            self.active_battle["target"] = blocker
+        else:
+            log_event("INFO", "game.block_skip", "No block declared", player=target_owner.name)
+
+        self.phase = Phase.BATTLE_COUNTER
+        log_event("INFO", "game.phase_transition", f"Moving to {self.phase.name}", player=target_owner.name)
 
     def apply_counter(self, player: Player, counter_card: Optional[Card] = None, don_list: Optional[List[DonInstance]] = None):
-        if not self.active_battle: return
-        if counter_card is None: log_event("INFO", "game.counter_pass", "Player passed counter step", player=player.name); self.resolve_attack(); return
+        if not self.active_battle:
+            return
+
+        if counter_card is None:
+            log_event("INFO", "game.counter_pass", "Player passed counter step", player=player.name)
+            self.resolve_attack()
+            return
+
         self._validate_action(player, "SELECT_COUNTER")
+
         log_event("INFO", "game.counter_play", f"Playing counter card: {counter_card.master.name}", player=player.name)
         if counter_card.master.type == CardType.EVENT:
             self.pay_cost(player, counter_card.master.cost, don_list)
             for ability in counter_card.master.abilities:
-                if ability.trigger == TriggerType.COUNTER: self.resolve_ability(player, ability, source_card=counter_card)
+                if ability.trigger == TriggerType.COUNTER:
+                    self.resolve_ability(player, ability, source_card=counter_card)
             self.move_card(counter_card, Zone.TRASH, player)
         else:
-            counter_value = counter_card.master.counter or 0; self.active_battle["counter_buff"] += counter_value
-            log_event("INFO", "game.counter_apply", f"Added {counter_value} power to target", player=player.name); self.move_card(counter_card, Zone.TRASH, player)
+            counter_value = counter_card.master.counter or 0
+            self.active_battle["counter_buff"] += counter_value
+            log_event("INFO", "game.counter_apply", f"Added {counter_value} power to target", player=player.name)
+            self.move_card(counter_card, Zone.TRASH, player)
 
     def resolve_attack(self):
-        if not self.active_battle: return
-        attacker = self.active_battle["attacker"]; target = self.active_battle["target"]
-        attacker_owner = self.active_battle["attacker_owner"]; target_owner = self.active_battle["target_owner"]
+        if not self.active_battle:
+            return
+
+        attacker = self.active_battle["attacker"]
+        target = self.active_battle["target"]
+        attacker_owner = self.active_battle["attacker_owner"]
+        target_owner = self.active_battle["target_owner"]
         counter_buff = self.active_battle.get("counter_buff", 0)
-        is_my_turn = (attacker_owner == self.turn_player); is_target_turn = (target_owner == self.turn_player)
-        attacker_pwr = attacker.get_power(is_my_turn); target_pwr = target.get_power(is_target_turn) + counter_buff
+
+        is_my_turn = (attacker_owner == self.turn_player)
+        is_target_turn = (target_owner == self.turn_player)
+        
+        attacker_pwr = attacker.get_power(is_my_turn)
+        target_pwr = target.get_power(is_target_turn) + counter_buff
+        
+        # ログ削除: パワー計算詳細
+        
         if target == target_owner.leader:
             if attacker_pwr >= target_pwr:
-                damage_amount = 2 if "ダブルアタック" in attacker.current_keywords else 1; is_banish = "バニッシュ" in attacker.current_keywords
+                # ダブルアタック & バニッシュ判定
+                damage_amount = 2 if "ダブルアタック" in attacker.current_keywords else 1
+                is_banish = "バニッシュ" in attacker.current_keywords
+
                 log_event("INFO", "game.damage_step", f"Dealing {damage_amount} damage (Banish: {is_banish})", player=attacker_owner.name)
+
                 for _ in range(damage_amount):
                     if target_owner.life:
-                        life_card = target_owner.life.pop(0); dest_zone = Zone.TRASH if is_banish else Zone.HAND
+                        life_card = target_owner.life.pop(0)
+                        dest_zone = Zone.TRASH if is_banish else Zone.HAND
                         self.move_card(life_card, dest_zone, target_owner)
                         log_event("INFO", "game.damage_life", f"{target_owner.name} takes damage to {dest_zone.name}", player=target_owner.name)
-                    else: self.winner = attacker_owner.name; log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name); break
+                    else:
+                        self.winner = attacker_owner.name
+                        log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name)
+                        break
         else:
-            if attacker_pwr >= target_pwr: self.move_card(target, Zone.TRASH, target_owner); log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
-        target.reset_turn_status(); self.active_battle = None; self.phase = Phase.MAIN; self.check_victory()
+            if attacker_pwr >= target_pwr:
+                self.move_card(target, Zone.TRASH, target_owner)
+                log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
+        
+        target.reset_turn_status()
+        self.active_battle = None
+        self.phase = Phase.MAIN
+        self.check_victory()
 
     def check_victory(self):
-        if not self.p1.deck: self.winner = self.p2.name
-        elif not self.p2.deck: self.winner = self.p1.name
+        if not self.p1.deck:
+            self.winner = self.p2.name
+        elif not self.p2.deck:
+            self.winner = self.p1.name
 
     def play_card_action(self, player: Player, card: Card):
         if card not in player.hand: return
         self._validate_action(player, "MAIN_ACTION")
+        
         log_event("INFO", "game.play_card", f"Playing card: {card.master.name}", player=player.name, payload={"card_uuid": card.uuid})
+        
         if card.master.type == CardType.EVENT:
             for ability in card.master.abilities:
-                if ability.trigger in [TriggerType.ON_PLAY, TriggerType.ACTIVATE_MAIN]: self.resolve_ability(player, ability, source_card=card)
+                if ability.trigger in [TriggerType.ON_PLAY, TriggerType.ACTIVATE_MAIN]:
+                    self.resolve_ability(player, ability, source_card=card)
             self.move_card(card, Zone.TRASH, player)
         else:
-            self.move_card(card, Zone.FIELD, player); card.attached_don = 0; card.is_newly_played = True
+            self.move_card(card, Zone.FIELD, player)
+            card.attached_don = 0
+            card.is_newly_played = True
             if not card.ability_disabled:
                 for ability in card.master.abilities:
-                    if ability.trigger == TriggerType.ON_PLAY: self.resolve_ability(player, ability, source_card=card)
+                    if ability.trigger == TriggerType.ON_PLAY:
+                        self.resolve_ability(player, ability, source_card=card)
 
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
-        resolver = EffectResolver(self); resolver.resolve_ability(player, ability, source_card)
+        
+        effect_context = {}
+
+        all_actions = list(ability.costs) + list(ability.actions)
+        
+        for i, action in enumerate(all_actions):
+            if self.active_interaction:
+                log_event("INFO", "game.ability_suspend", "Ability execution suspended for interaction", player=player.name)
+                if "continuation" in self.active_interaction:
+                     self.active_interaction["continuation"]["remaining_ability_actions"] = all_actions[i:]
+                     self.active_interaction["continuation"]["effect_context"] = effect_context
+                break
+            
+            success = self._perform_logic(player, action, source_card, effect_context=effect_context)
+            if not success:
+                if self.active_interaction and "continuation" in self.active_interaction:
+                     self.active_interaction["continuation"]["remaining_ability_actions"] = all_actions[i+1:]
+                     self.active_interaction["continuation"]["effect_context"] = effect_context
+                break
+
+    def _perform_logic(self, player: Player, action: Any, source_card: CardInstance, effect_context: Optional[Dict[str, Any]] = None) -> bool:
+        log_event("INFO", "game.effect", f"Resolving action {action.type} for {source_card.master.name}", player=player.name)
+        from .effects.resolver import execute_action
+        
+        success = execute_action(self, player, action, source_card, effect_context=effect_context)
+        
+        if not success:
+            if self.active_interaction:
+                return False
+            
+            error_msg = f"効果の解決に失敗しました: {action.raw_text or action.type}"
+            log_event("WARNING", "game.effect_failed", error_msg, player=player.name)
+            raise ValueError(error_msg)
+
+        return success
