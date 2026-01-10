@@ -55,7 +55,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                         traits=["聖地マリージョア"], 
                         count=1,
                         save_id="imu_start_play",
-                        # 【追加】1枚「まで」なのでTrueに設定
+                        # 1枚「まで」なのでTrueに設定
                         is_up_to=True
                     ),
                     destination=Zone.FIELD,
@@ -63,16 +63,12 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.SHUFFLE,
-
                     raw_text="デッキをシャッフルする"
                 )
             ])
         )
     ],
 
-    # ... (以下のカード定義は以前と同じため省略) ...
-    # シャルリア宮, チャルロス聖, ミョスガルド聖, etc...
-    # 必要であれば既存の定義をコピーしてください
     # ----------------------------------------------------
     # シャルリア宮 (OP13-086)
     # ----------------------------------------------------
@@ -107,7 +103,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ])
         )
     ],
-    # (他の定義も同様)
     "OP13-087": [
         Ability(
             trigger=TriggerType.ON_PLAY,
@@ -238,12 +233,12 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             cost=Sequence(actions=[
                 GameAction(
                     type=ActionType.REST,
-                    target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, names=["虚の玉座"], count=1),
+                    target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, names=["虚の玉座"], count=1, save_id="throne_rest"),
                     raw_text="このステージをレストにする"
                 ),
                 GameAction(
                     type=ActionType.REST,
-                    target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=3),
+                    target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=3, save_id="throne_don"),
                     raw_text="ドン!!3枚をレストにする"
                 )
             ]),
@@ -253,12 +248,11 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                     # コスト条件: 「自分の場のドン!!の枚数以下のコスト」
                     # 注: 現在のActionType.PLAY_CARDの実装では動的なコスト上限チェック（ドン枚数参照）が
                     # 難しいため、ここでは簡易的に traits=["五老星"], colors=["黒"] のみを指定しています。
-                    # 厳密なルール適用には、TargetQueryにコスト上限の動的参照機能を追加する必要があります。
-                    target=TargetQuery(player=Player.SELF, zone=Zone.HAND, traits=["五老星"], colors=["黒"], count=1, is_up_to=True),
+                    target=TargetQuery(player=Player.SELF, zone=Zone.HAND, traits=["五老星"], colors=["黒"], count=1, is_up_to=True, save_id="throne_play"),
                     destination=Zone.FIELD,
                     raw_text="手札から自分の場のドン!!の枚数以下のコストを持つ黒の特徴《五老星》を持つキャラカード1枚までを、登場させる"
                 )
             ])
         )
-    ],
+    ]
 }
