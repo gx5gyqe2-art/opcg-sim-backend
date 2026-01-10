@@ -171,5 +171,17 @@ class DonInstance:
             props.get('UUID', 'uuid'): self.uuid,
             props.get('OWNER_ID', 'owner_id'): self.owner_id,
             props.get('IS_REST', 'is_rest'): self.is_rest,
-            "attached_to": self.attached_to # ※これは専用プロパティのためベタ書き維持、または新規定数定義を推奨
+            "attached_to": self.attached_to,
+            # 【追加】CardSchemaのバリデーションを通すためのダミー値
+            props.get('NAME', 'name'): "ドン!!",
+            props.get('TYPE', 'type'): "DON",
+            props.get('ATTRIBUTE', 'attribute'): "Special",
+            props.get('POWER', 'power'): 0,
+            props.get('COST', 'cost'): 0,
+            props.get('COUNTER', 'counter'): 0,
+            props.get('TRAITS', 'traits'): [],
+            props.get('TEXT', 'text'): "",
+            props.get('IS_FACE_UP', 'is_face_up'): True,
+            props.get('ATTACHED_DON', 'attached_don'): 0,
+            props.get('KEYWORDS', 'keywords'): []
         }
