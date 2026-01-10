@@ -94,6 +94,7 @@ class EffectResolver:
         is_optional = getattr(query, 'optional', False)
         is_up_to = getattr(query, 'is_up_to', False)
         is_strict = getattr(query, 'is_strict_count', False)
+        is_don_resource = (query.zone == Zone.COST_AREA)
         
         if len(candidates) == 0:
             return []
@@ -102,10 +103,11 @@ class EffectResolver:
             log_event("INFO", "resolver.strict_count_fail", f"Insufficient targets for strict count: found {len(candidates)}, needed {required_count}", player=player.name)
             return []
             
-        if (query.select_mode == "ALL") or (len(candidates) <= required_count and not is_optional and not is_up_to):
+        if (query.select_mode == "ALL") or (len(candidates) <= required_count and not is_optional and not is_up_to) or (is_don_resource and not is_up_to):
+            selected = candidates[:required_count] if is_don_resource else candidates
             if query.save_id:
-                self.context["saved_targets"][query.save_id] = candidates
-            return candidates
+                self.context["saved_targets"][query.save_id] = selected
+            return selected
 
         self._suspend_for_target_selection(player, candidates, query, source_card, action_node)
         return None

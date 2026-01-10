@@ -18,8 +18,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                     zone=Zone.HAND,
                     traits=["天竜人"],
                     cost_min=2,
-                    select_mode="ALL",
-                    raw_text="自分が手札から登場させるコスト2以上の特徴《天竜人》を持つキャラカード"
+                    select_mode="ALL"
                 ),
                 value=ValueSource(base=-1),
                 status="COST_REDUCTION",
@@ -256,12 +255,12 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             cost=Sequence(actions=[
                 GameAction(
                     type=ActionType.REST,
-                    target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, names=["虚の玉座"], count=1, is_strict_count=True),
+                    target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, names=["虚の玉座"], count=1, is_strict_count=True, save_id="throne_rest"),
                     raw_text="このステージをレストにする"
                 ),
                 GameAction(
                     type=ActionType.REST,
-                    target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=3, is_strict_count=True, is_rest=False),
+                    target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=3, is_strict_count=True, is_rest=False, save_id="throne_don_rest"),
                     raw_text="ドン!!3枚をレストにする"
                 )
             ]),
