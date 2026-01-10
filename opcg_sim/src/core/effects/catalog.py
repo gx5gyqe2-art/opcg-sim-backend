@@ -15,10 +15,9 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
     # リーダー: イム (OP13-079)
     # ----------------------------------------------------
     "OP13-079": [
-        # アビリティ1: 起動メイン
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,
-            condition=Condition(type=ConditionType.TURN_LIMIT, value=1), # ターン1回
+            condition=Condition(type=ConditionType.TURN_LIMIT, value=1),
             cost=Choice(
                 message="コストを選択してください",
                 option_labels=[
@@ -26,13 +25,11 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                     "手札1枚をトラッシュ"
                 ],
                 options=[
-                    # 1. 自分の特徴《天竜人》を持つキャラをトラッシュに置く
                     GameAction(
                         type=ActionType.TRASH,
                         target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, traits=["天竜人"], count=1, save_id="cost_char"),
                         raw_text="自分の特徴《天竜人》を持つキャラをトラッシュに置く"
                     ),
-                    # 2. 手札1枚をトラッシュに置く
                     GameAction(
                         type=ActionType.TRASH,
                         target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, save_id="cost_hand"),
@@ -46,11 +43,9 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 raw_text="カード1枚を引く"
             )
         ),
-        # アビリティ2: ゲーム開始時
         Ability(
             trigger=TriggerType.GAME_START,
             effect=Sequence(actions=[
-                # 1. デッキから対象を探して登場させる
                 GameAction(
                     type=ActionType.PLAY_CARD,
                     target=TargetQuery(
@@ -59,21 +54,25 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                         card_type=["STAGE"], 
                         traits=["聖地マリージョア"], 
                         count=1,
-                        save_id="imu_start_play"
+                        save_id="imu_start_play",
+                        # 【追加】1枚「まで」なのでTrueに設定
+                        is_up_to=True
                     ),
                     destination=Zone.FIELD,
                     raw_text="ゲーム開始時、自分のデッキから特徴《聖地マリージョア》を持つステージカード1枚までを、登場させる"
                 ),
-                # 2. デッキをシャッフル
-                # 【修正】targetを削除（対象選択不要にするため）
                 GameAction(
                     type=ActionType.SHUFFLE,
+                    target=TargetQuery(zone=Zone.DECK, player=Player.SELF),
                     raw_text="デッキをシャッフルする"
                 )
             ])
         )
     ],
 
+    # ... (以下のカード定義は以前と同じため省略) ...
+    # シャルリア宮, チャルロス聖, ミョスガルド聖, etc...
+    # 必要であれば既存の定義をコピーしてください
     # ----------------------------------------------------
     # シャルリア宮 (OP13-086)
     # ----------------------------------------------------
@@ -108,10 +107,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ])
         )
     ],
-
-    # ----------------------------------------------------
-    # チャルロス聖 (OP13-087)
-    # ----------------------------------------------------
+    # (他の定義も同様)
     "OP13-087": [
         Ability(
             trigger=TriggerType.ON_PLAY,
@@ -122,10 +118,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ],
-
-    # ----------------------------------------------------
-    # ミョスガルド聖 (OP13-092)
-    # ----------------------------------------------------
     "OP13-092": [
         Ability(
             trigger=TriggerType.ON_PLAY,
@@ -138,10 +130,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ],
-    
-    # ----------------------------------------------------
-    # トップマン・ウォーキュリー聖 (OP13-089)
-    # ----------------------------------------------------
     "OP13-089": [
         Ability(
             trigger=TriggerType.ON_KO,
@@ -152,10 +140,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ],
-
-    # ----------------------------------------------------
-    # ジェイガルシア・サターン聖 (OP13-083)
-    # ----------------------------------------------------
     "OP13-083": [
         Ability(
             trigger=TriggerType.ON_PLAY,
@@ -180,10 +164,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ])
         )
     ],
-
-    # ----------------------------------------------------
-    # イーザンバロン・V・ナス寿郎聖 (OP13-080)
-    # ----------------------------------------------------
     "OP13-080": [
         Ability(
             trigger=TriggerType.ON_ATTACK,
@@ -196,10 +176,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ],
-
-    # ----------------------------------------------------
-    # マーカス・マーズ聖 (OP13-091)
-    # ----------------------------------------------------
     "OP13-091": [
         Ability(
             trigger=TriggerType.ON_PLAY,
@@ -215,10 +191,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ],
-
-    # ----------------------------------------------------
-    # "五老星"ここに!!! (OP13-096)
-    # ----------------------------------------------------
     "OP13-096": [
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,
@@ -241,10 +213,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ])
         )
     ],
-
-    # ----------------------------------------------------
-    # 世界の均衡など…永遠には保てぬのだ (OP13-097)
-    # ----------------------------------------------------
     "OP13-097": [
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,
@@ -260,10 +228,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ],
-
-    # ----------------------------------------------------
-    # 虚の玉座 (OP13-099)
-    # ----------------------------------------------------
     "OP13-099": [
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,

@@ -30,7 +30,6 @@ class EffectResolver:
 
     def _process_stack(self, player, source_card):
         while self.execution_stack:
-            # 中断要求があればループを抜ける
             if self.game_manager.active_interaction:
                 return
 
@@ -39,7 +38,6 @@ class EffectResolver:
             if isinstance(node, GameAction):
                 success = self._execute_game_action(player, node, source_card)
                 
-                # 中断時はここで終了（再開時はcontinuationから復元される）
                 if self.game_manager.active_interaction:
                     return
 
@@ -65,10 +63,8 @@ class EffectResolver:
                 return 
 
     def _execute_game_action(self, player, action: GameAction, source_card) -> bool:
-        # 【修正】現在のアクション(action)を引数として渡す
         targets = self._resolve_targets(player, action.target, source_card, action_node=action)
         
-        # Noneが返ってきた場合は「ユーザー選択待ち」のため中断
         if targets is None:
             return False
 
@@ -87,7 +83,6 @@ class EffectResolver:
     def _resolve_targets(self, player, query, source_card, action_node=None):
         if not query: return []
         
-        # 保存されたターゲットがある場合はそれを使う（再開時）
         if query.save_id and query.save_id in self.context["saved_targets"]:
             return self.context["saved_targets"][query.save_id]
         
@@ -96,19 +91,18 @@ class EffectResolver:
         
         required_count = getattr(query, 'count', 1)
         is_optional = getattr(query, 'optional', False)
+        # 【修正】TargetQueryのis_up_toプロパティも確認する
+        is_up_to = getattr(query, 'is_up_to', False)
         
-        # 候補がない場合
         if len(candidates) == 0:
             return []
             
-        # 自動解決（候補数が要求数以下、かつ select_mode="ALL" または必須）
-        if (query.select_mode == "ALL") or (len(candidates) <= required_count and not is_optional):
+        # 自動解決条件: 全選択、または (候補数<=要求数 かつ 必須 かつ 「～まで」ではない)
+        if (query.select_mode == "ALL") or (len(candidates) <= required_count and not is_optional and not is_up_to):
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = candidates
             return candidates
 
-        # ユーザー選択が必要なため中断
-        # 【修正】action_node を渡して、保存するスタックに含めるようにする
         self._suspend_for_target_selection(player, candidates, query, source_card, action_node)
         return None
 
@@ -155,8 +149,6 @@ class EffectResolver:
     def _suspend_for_target_selection(self, player, candidates, query, source_card, action_node=None):
         required_count = getattr(query, 'count', 1)
         
-        # 【修正】スタックの状態を保存する際、実行中だったアクション(action_node)をスタックの末尾に戻す
-        # これにより再開時にこのアクションから再試行される
         saved_stack = self.execution_stack.copy()
         if action_node:
             saved_stack.append(action_node)
@@ -171,7 +163,7 @@ class EffectResolver:
                 "max": required_count
             },
             "continuation": {
-                "execution_stack": saved_stack, # 修正後のスタックを保存
+                "execution_stack": saved_stack,
                 "effect_context": self.context,
                 "source_card_uuid": source_card.uuid,
                 "query": query
@@ -194,11 +186,6 @@ class EffectResolver:
         self._process_stack(player, source_card)
 
     def resume_execution(self, player, source_card, execution_stack, effect_context):
-        """中断からの復帰用メソッド"""
         self.execution_stack = execution_stack
         self.context = effect_context
-        # 再開時は、中断していたアクションがスタックの先頭（末尾）にあるはずなので、
-        # そのままループを再開すればよい。
-        # _execute_game_action -> _resolve_targets の中で save_id をチェックし、
-        # 保存されたターゲットを使って即座に完了するはず。
         self._process_stack(player, source_card)
