@@ -1,143 +1,212 @@
 import re
-from typing import List, Optional
+from typing import List, Optional, Tuple, Any
+from ...models.enums import TriggerType, ActionType, Zone
 from ...models.effect_types import (
-    Ability, EffectNode, GameAction, Sequence, Branch, Choice, ValueSource, TargetQuery, Condition, _nfc
+    EffectNode, GameAction, Sequence, Branch, Choice, Ability, 
+    TargetQuery, ValueSource
 )
-from ...models.enums import ActionType, TriggerType, ConditionType
-from .matcher import parse_target
 from ...utils.logger_config import log_event
+
+class TextScanner:
+    """
+    テキスト解析の第一段階を行うクラス。
+    テキストを正規化し、構造ブロック（トリガー、コスト、効果本体）に分割する。
+    """
+    def __init__(self, raw_text: str):
+        self.raw_text = self._normalize(raw_text)
+        self.cursor = 0
+
+    def _normalize(self, text: str) -> str:
+        # 表記ゆれの統一と正規化
+        text = text.replace('ドン!!', 'DON!!')
+        text = text.replace('：', ':') # 全角コロンを半角に
+        text = text.replace('、', ',') # 読点をカンマに（内部処理用）
+        text = text.replace('。', '.') # 句点をドットに
+        # 余分な空白の削除
+        return text.strip()
+
+    def parse_structure(self) -> Tuple[Optional[str], Optional[str], str]:
+        """
+        戻り値: (trigger_text, cost_text, effect_body_text)
+        """
+        text = self.raw_text
+        trigger = None
+        cost = None
+        body = text
+
+        # 1. トリガーの抽出 [Trigger]
+        # 行頭にある [~] をトリガーとして認識
+        trigger_match = re.match(r'^\[(.*?)\]', body)
+        if trigger_match:
+            trigger = trigger_match.group(1)
+            body = body[trigger_match.end():].strip()
+
+        # 2. コストの抽出 (Cost):
+        # 文中に「:」がある場合、それより前をコストとみなすことが多い
+        # ただし「起動メイン」などのキーワードの後にあることが多い
+        if ':' in body:
+            parts = body.split(':', 1)
+            # コストっぽいキーワードが含まれているか簡易チェック
+            # (厳密な判定は次のフェーズで行うが、ここでは構造分解のみ)
+            potential_cost = parts[0]
+            # 括弧書きのコスト (1) や、テキストによるコスト "手札1枚を捨てる" など
+            cost = potential_cost.strip()
+            body = parts[1].strip()
+
+        return trigger, cost, body
 
 class EffectParser:
     def __init__(self):
-        pass
+        self.scanner = None
 
-    def parse_ability(self, text: str) -> Ability:
-        log_event("DEBUG", "parser.input", f"Input text: {text[:50]}")
-        try:
-            norm_text = _nfc(text)
-            
-            # トリガー（発動タイミング）の判定は 【 】 に限定
-            trigger = self._detect_trigger(norm_text)
-            log_event("INFO", "parser.trigger", f"Detected trigger: {trigger.name}")
-            
-            cost_node = None
-            effect_text = norm_text
-            
-            # 解析用に 【 】 タグのみを除去（ 『 』 はキーワードとして残す）
-            clean_text = re.sub(r'【(登場時|起動メイン|アタック時|相手のターン中|自分のターン中|カウンター|メイン|KO時|ドン!!\d+)】', '', norm_text).strip()
-            
-            if _nfc(":") in clean_text:
-                parts = clean_text.split(_nfc(":"), 1)
-                cost_node = self._parse_to_node(parts[0], is_cost=True)
-                effect_text = parts[1]
-            else:
-                effect_text = clean_text
-
-            effect_node = self._parse_to_node(effect_text)
-            return Ability(
-                trigger=trigger,
-                cost=cost_node,
-                effect=effect_node,
-                raw_text=norm_text
-            )
-        except Exception as e:
-            log_event(level_key="ERROR", action="parser.parse_ability_error", msg=f"Failed to parse: {text[:20]} | Error: {str(e)}")
-            return Ability(trigger=TriggerType.UNKNOWN, effect=None, raw_text=_nfc(text))
-
-    def _parse_to_node(self, text: str, is_cost: bool = False) -> EffectNode:
-        norm_text = _nfc(text)
-        parts = re.split(_nfc(r'。|その後、'), norm_text)
-        parts = [p.strip() for p in parts if p.strip()]
-        if len(parts) > 1:
-            return Sequence(actions=[self._parse_logic_block(p, is_cost) for p in parts])
-        return self._parse_logic_block(parts[0], is_cost)
-
-    def _parse_logic_block(self, text: str, is_cost: bool) -> EffectNode:
-        norm_text = _nfc(text)
-        match = re.search(_nfc(r'^(.+?)(?:場合|なら|することで)、(.+)$'), norm_text)
-        if match:
-            cond_text, rest_text = match.groups()
-            return Branch(
-                condition=self._parse_condition_obj(cond_text),
-                if_true=self._parse_to_node(rest_text, is_cost)
-            )
-        if _nfc("以下から1つを選ぶ") in norm_text:
-            options = self._extract_options(norm_text)
-            return Choice(
-                message=_nfc("効果を選択してください"),
-                options=[self._parse_to_node(opt, is_cost) for opt in options],
-                option_labels=options
-            )
-        return self._parse_atomic_action(norm_text, is_cost)
-
-    def _parse_atomic_action(self, text: str, is_cost: bool) -> GameAction:
-        norm_text = _nfc(text)
-        act_type = self._detect_action_type(norm_text)
-        value_src = self._parse_value(norm_text, act_type)
-        target_query = parse_target(norm_text)
+    def parse(self, card_master) -> List[Ability]:
+        """
+        カードのテキスト全体を解析し、Abilityのリストを返すメインメソッド。
+        """
+        full_text = card_master.effect_text or ""
+        trigger_text = card_master.trigger_text or ""
         
-        # 『 』で囲まれたキーワード能力（ブロッカー等）の付与をチェック
-        keyword_match = re.search(r'『(.*?)』', norm_text)
-        status = keyword_match.group(1) if keyword_match else None
+        abilities = []
 
-        if _nfc("選び") in norm_text:
-            target_query.save_id = "selected_card"
-        if _nfc("そのカード") in norm_text or _nfc("そのキャラ") in norm_text:
-            target_query.ref_id = "selected_card"
-            
-        return GameAction(
-            type=act_type, 
-            target=target_query, 
-            value=value_src, 
-            status=status,
-            raw_text=norm_text
+        # 1. 起動メイン/登場時などの通常効果の解析
+        if full_text:
+            # 複数の効果が含まれている場合（改行などで区切られている場合）の対応も可能だが
+            # ここではまず全文を1つのアビリティとして解析を試みる
+            parsed_ability = self._parse_single_text(full_text)
+            if parsed_ability:
+                abilities.append(parsed_ability)
+
+        # 2. トリガー（ライフで受ける効果など）の解析
+        if trigger_text:
+            # トリガー効果として解析（TriggerTypeは呼び出し元で設定される想定だがここでは構造のみ）
+            t_ability = self._parse_single_text(trigger_text, is_trigger=True)
+            if t_ability:
+                # ライフ等から発動するトリガーであることをマーク
+                t_ability.trigger = TriggerType.TRIGGER 
+                abilities.append(t_ability)
+
+        return abilities
+
+    def _parse_single_text(self, text: str, is_trigger: bool = False) -> Optional[Ability]:
+        scanner = TextScanner(text)
+        raw_trigger, raw_cost, raw_body = scanner.parse_structure()
+
+        # トリガータイプの判定
+        trigger_type = self._map_trigger_type(raw_trigger)
+        if is_trigger:
+            trigger_type = TriggerType.TRIGGER
+
+        # コストの解析 (Sequenceとして生成)
+        cost_node = self._parse_flow(raw_cost) if raw_cost else None
+
+        # 効果本体の解析 (Sequenceとして生成)
+        effect_node = self._parse_flow(raw_body) if raw_body else None
+
+        if not effect_node and not cost_node:
+            return None
+
+        return Ability(
+            trigger=trigger_type,
+            cost=cost_node,
+            effect=effect_node,
+            condition=None # 必要であれば解析
         )
 
-    def _parse_value(self, text: str, act_type: ActionType) -> ValueSource:
-        norm_text = _nfc(text)
-        nums = re.findall(r'[+-]?\d+', norm_text)
-        base_val = int(nums[0]) if nums else 0
-        if _nfc("枚につき") in norm_text or _nfc("枚数につき") in norm_text:
-            return ValueSource(base=0, dynamic_source="COUNT_REFERENCE", multiplier=base_val if base_val != 0 else 1)
-        return ValueSource(base=base_val)
-
-    def _detect_trigger(self, text: str) -> TriggerType:
-        norm_text = _nfc(text)
-        # システムトリガーは 【 】 のみで判定
-        if _nfc("【登場時】") in norm_text: return TriggerType.ON_PLAY
-        if _nfc("【起動メイン】") in norm_text: return TriggerType.ACTIVATE_MAIN
-        if _nfc("【アタック時】") in norm_text: return TriggerType.ON_ATTACK
-        if _nfc("【相手のターン中】") in norm_text: return TriggerType.OPPONENT_TURN
-        if _nfc("【自分のターン中】") in norm_text: return TriggerType.YOUR_TURN
-        if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER
-        if _nfc("【KO時】") in norm_text: return TriggerType.ON_KO
+    def _map_trigger_type(self, text: Optional[str]) -> TriggerType:
+        if not text:
+            return TriggerType.UNKNOWN
+        if "登場時" in text: return TriggerType.ON_PLAY
+        if "アタック時" in text: return TriggerType.WHEN_ATTACKING
+        if "起動メイン" in text: return TriggerType.ACTIVATE_MAIN
+        if "ターン終了時" in text: return TriggerType.TURN_END
+        if "ブロック時" in text: return TriggerType.ON_BLOCK
+        if "KO時" in text: return TriggerType.ON_KO
+        if "カウンター" in text: return TriggerType.COUNTER
+        if "トリガー" in text: return TriggerType.TRIGGER
         return TriggerType.UNKNOWN
 
-    def _detect_action_type(self, text: str) -> ActionType:
-        norm_text = _nfc(text)
-        if _nfc("引く") in norm_text: return ActionType.DRAW
-        if _nfc("KOする") in norm_text: return ActionType.KO
-        if _nfc("パワー") in norm_text: return ActionType.BUFF
-        if _nfc("登場させる") in norm_text: return ActionType.PLAY_CARD
-        if _nfc("トラッシュに置く") in norm_text: return ActionType.DISCARD
-        if _nfc("手札に戻す") in norm_text: return ActionType.BOUNCE
-        if _nfc("レストにする") in norm_text: return ActionType.REST
-        if _nfc("得る") in norm_text and _nfc("『") in norm_text: return ActionType.BUFF # キーワード付与
-        return ActionType.OTHER
+    def _parse_flow(self, text: str) -> Optional[EffectNode]:
+        """
+        テキスト（効果本体やコスト）を読み、文節ごとに分割して Sequence を生成する。
+        ここが「構造分解」の肝となる部分。
+        """
+        if not text:
+            return None
 
-    def _parse_condition_obj(self, text: str) -> Condition:
-        norm_text = _nfc(text)
-        if _nfc("ドン!!") in norm_text and _nfc("枚以上") in norm_text:
-            return Condition(type=ConditionType.DON_COUNT, raw_text=norm_text)
-        if _nfc("ライフ") in norm_text:
-            return Condition(type=ConditionType.LIFE_COUNT, raw_text=norm_text)
-        return Condition(type=ConditionType.GENERIC, raw_text=norm_text)
+        # 1. 句読点や接続詞での分割
+        # 「Aし、その後Bする」 -> [A, B]
+        # 「A。B。」 -> [A, B]
+        
+        # まず句点(.)で分割
+        sentences = [s.strip() for s in text.split('.') if s.strip()]
+        
+        actions = []
+        for sentence in sentences:
+            # 読点(,)や「その後」で分割
+            # ※本来は「～場合」などのBranch解析もここで行う
+            
+            # 簡易的な分割: カンマで区切られた部分をそれぞれアクション候補とする
+            # ただし「（対象）を～し、」のような文脈依存の分割が必要
+            clauses = [c.strip() for c in sentence.split(',') if c.strip()]
+            
+            for clause in clauses:
+                # 文節をアクションに変換
+                action = self._create_action_from_clause(clause)
+                if action:
+                    actions.append(action)
 
-    def _extract_options(self, text: str) -> List[str]:
-        norm_text = _nfc(text)
-        lines = norm_text.split('\n')
-        options = [re.sub(_nfc(r'^[・\-]\s*'), '', l).strip() for l in lines if l.strip().startswith((_nfc('・'), _nfc('-')))]
-        if not options:
-            parts = re.split(_nfc(r'、'), norm_text)
-            options = [p.strip() for p in parts if _nfc("選ぶ") not in p]
-        return options
+        if not actions:
+            return None
+            
+        if len(actions) == 1:
+            return actions[0]
+            
+        return Sequence(actions=actions)
+
+    def _create_action_from_clause(self, clause: str) -> EffectNode:
+        """
+        文節（Clause）を解析し、GameAction または Branch などを返す。
+        現状はプレースホルダー的な実装だが、動詞判定の入り口となる。
+        """
+        # 条件分岐の簡易判定
+        if "場合" in clause:
+            # TODO: Branch解析の実装 (B案以降で詳細化)
+            pass
+
+        # 動詞ベースのアクション判定 (Matcher)
+        # ここは将来的に辞書ベースのマッパー(B案)に置き換える
+        
+        # 例: シャルリア宮の「残りをトラッシュに置く」
+        if "残りをトラッシュ" in clause:
+            return GameAction(
+                type=ActionType.MOVE,
+                target=TargetQuery(group="REMAINING_CARDS"), # 特殊グループ
+                destination=Zone.TRASH,
+                raw_text=clause
+            )
+            
+        # 例: 手札を捨てる
+        if "手札" in clause and ("捨てる" in clause or "捨て" in clause):
+            return GameAction(
+                type=ActionType.DISCARD,
+                target=TargetQuery(target_player="SELF", zone=Zone.HAND, count=1), # 仮: 1枚と仮定
+                raw_text=clause
+            )
+            
+        # 例: 山札の上を見る
+        if "山札の上から" in clause and "見る" in clause:
+             match = re.search(r'(\d+)枚', clause)
+             count = int(match.group(1)) if match else 1
+             return GameAction(
+                 type=ActionType.LOOK,
+                 target=TargetQuery(zone=Zone.DECK, count=count),
+                 raw_text=clause
+             )
+
+        # デフォルト: 未解析のアクションとして返す
+        # これによりエラーで落ちずに「何もしないアクション」として通過する
+        return GameAction(
+            type=ActionType.OTHER, 
+            raw_text=clause
+        )
+
