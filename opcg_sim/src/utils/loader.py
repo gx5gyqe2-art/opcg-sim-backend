@@ -182,3 +182,40 @@ class CardLoader:
             life=life,
             abilities=combined_abilities
         )
+
+class DeckLoader:
+    # ... (DeckLoader は特に変更なし) ...
+    def __init__(self, card_loader: CardLoader):
+        self.card_loader = card_loader
+
+    def load_deck(self, file_path: str, owner_id: str) -> Tuple[Optional[CardInstance], List[CardInstance]]:
+        data = RawDataLoader.load_json(file_path)
+        deck_data = {}
+        if isinstance(data, list) and len(data) > 0:
+            deck_data = data[0]
+        elif isinstance(data, dict):
+            deck_data = data
+        else:
+            log_event(level_key="ERROR", action="loader.invalid_deck", msg=f"Invalid deck format in {file_path}", player="system")
+            return None, []
+
+        leader_instance = None
+        if "leader" in deck_data:
+            leader_id = deck_data["leader"].get("number")
+            if leader_id:
+                leader_master = self.card_loader.get_card(leader_id)
+                if leader_master:
+                    leader_instance = CardInstance(leader_master, owner_id)
+
+        deck_list: List[CardInstance] = []
+        if "cards" in deck_data:
+            for item in deck_data["cards"]:
+                card_id = item.get("number")
+                count = item.get("count", 0)
+                master = self.card_loader.get_card(card_id)
+                if master:
+                    for _ in range(count):
+                        deck_list.append(CardInstance(master, owner_id))
+
+        log_event(level_key="INFO", action="loader.deck_load_success", msg=f"Loaded Deck: Leader={leader_instance.master.name if leader_instance else 'None'}, Deck Size={len(deck_list)}", player=owner_id)
+        return leader_instance, deck_list
