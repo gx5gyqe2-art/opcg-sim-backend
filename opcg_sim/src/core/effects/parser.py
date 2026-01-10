@@ -15,15 +15,23 @@ class EffectParser:
         log_event("DEBUG", "parser.input", f"Input text: {text[:50]}")
         try:
             norm_text = _nfc(text)
+            
+            # トリガー（発動タイミング）の判定は 【 】 に限定
             trigger = self._detect_trigger(norm_text)
             log_event("INFO", "parser.trigger", f"Detected trigger: {trigger.name}")
             
             cost_node = None
             effect_text = norm_text
-            if _nfc(":") in norm_text:
-                cost_part, effect_part = norm_text.split(_nfc(":"), 1)
-                cost_node = self._parse_to_node(cost_part, is_cost=True)
-                effect_text = effect_part
+            
+            # 解析用に 【 】 タグのみを除去（ 『 』 はキーワードとして残す）
+            clean_text = re.sub(r'【(登場時|起動メイン|アタック時|相手のターン中|自分のターン中|カウンター|メイン|KO時|ドン!!\d+)】', '', norm_text).strip()
+            
+            if _nfc(":") in clean_text:
+                parts = clean_text.split(_nfc(":"), 1)
+                cost_node = self._parse_to_node(parts[0], is_cost=True)
+                effect_text = parts[1]
+            else:
+                effect_text = clean_text
 
             effect_node = self._parse_to_node(effect_text)
             return Ability(
@@ -67,11 +75,23 @@ class EffectParser:
         act_type = self._detect_action_type(norm_text)
         value_src = self._parse_value(norm_text, act_type)
         target_query = parse_target(norm_text)
+        
+        # 『 』で囲まれたキーワード能力（ブロッカー等）の付与をチェック
+        keyword_match = re.search(r'『(.*?)』', norm_text)
+        status = keyword_match.group(1) if keyword_match else None
+
         if _nfc("選び") in norm_text:
             target_query.save_id = "selected_card"
         if _nfc("そのカード") in norm_text or _nfc("そのキャラ") in norm_text:
             target_query.ref_id = "selected_card"
-        return GameAction(type=act_type, target=target_query, value=value_src, raw_text=norm_text)
+            
+        return GameAction(
+            type=act_type, 
+            target=target_query, 
+            value=value_src, 
+            status=status,
+            raw_text=norm_text
+        )
 
     def _parse_value(self, text: str, act_type: ActionType) -> ValueSource:
         norm_text = _nfc(text)
@@ -83,11 +103,14 @@ class EffectParser:
 
     def _detect_trigger(self, text: str) -> TriggerType:
         norm_text = _nfc(text)
-        if _nfc("『登場時』") in norm_text: return TriggerType.ON_PLAY
-        if _nfc("『起動メイン』") in norm_text: return TriggerType.ACTIVATE_MAIN
-        if _nfc("『アタック時』") in norm_text: return TriggerType.ON_ATTACK
-        if _nfc("『相手のターン中』") in norm_text: return TriggerType.OPPONENT_TURN
-        if _nfc("『自分のターン中』") in norm_text: return TriggerType.YOUR_TURN
+        # システムトリガーは 【 】 のみで判定
+        if _nfc("【登場時】") in norm_text: return TriggerType.ON_PLAY
+        if _nfc("【起動メイン】") in norm_text: return TriggerType.ACTIVATE_MAIN
+        if _nfc("【アタック時】") in norm_text: return TriggerType.ON_ATTACK
+        if _nfc("【相手のターン中】") in norm_text: return TriggerType.OPPONENT_TURN
+        if _nfc("【自分のターン中】") in norm_text: return TriggerType.YOUR_TURN
+        if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER
+        if _nfc("【KO時】") in norm_text: return TriggerType.ON_KO
         return TriggerType.UNKNOWN
 
     def _detect_action_type(self, text: str) -> ActionType:
@@ -99,6 +122,7 @@ class EffectParser:
         if _nfc("トラッシュに置く") in norm_text: return ActionType.DISCARD
         if _nfc("手札に戻す") in norm_text: return ActionType.BOUNCE
         if _nfc("レストにする") in norm_text: return ActionType.REST
+        if _nfc("得る") in norm_text and _nfc("『") in norm_text: return ActionType.BUFF # キーワード付与
         return ActionType.OTHER
 
     def _parse_condition_obj(self, text: str) -> Condition:
