@@ -15,6 +15,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
     # リーダー: イム (OP13-079)
     # ----------------------------------------------------
     "OP13-079": [
+        # アビリティ1: 起動メイン
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,
             condition=Condition(type=ConditionType.TURN_LIMIT, value=1), # ターン1回
@@ -45,7 +46,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 raw_text="カード1枚を引く"
             )
         ),
-        # 【追加】ゲーム開始時
+        # アビリティ2: ゲーム開始時
         Ability(
             trigger=TriggerType.GAME_START,
             effect=Sequence(actions=[
@@ -64,9 +65,9 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                     raw_text="ゲーム開始時、自分のデッキから特徴《聖地マリージョア》を持つステージカード1枚までを、登場させる"
                 ),
                 # 2. デッキをシャッフル
+                # 【修正】targetを削除（対象選択不要にするため）
                 GameAction(
                     type=ActionType.SHUFFLE,
-                    target=TargetQuery(zone=Zone.DECK, player=Player.SELF),
                     raw_text="デッキをシャッフルする"
                 )
             ])
