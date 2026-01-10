@@ -175,7 +175,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ],
-    "OP13-094": [
+    "OP13-084": [
         Ability(
             trigger=TriggerType.YOUR_TURN,
             effect=GameAction(
