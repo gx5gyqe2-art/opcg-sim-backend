@@ -22,7 +22,7 @@ class RawDataLoader:
                     return json.load(f)
             except (UnicodeDecodeError, json.JSONDecodeError):
                 continue
-        log_event(level_key="ERROR", action="loader.file_load_failed", msg=f"Failed to load {file_path} with any supported encoding.")
+        log_event(level_key="ERROR", action="loader.file_load_failed", msg=f"Failed to load {file_path}")
         return []
 
 class DataCleaner:

@@ -115,7 +115,6 @@ class GameManager:
         KEY_OPTIONS = pending_props.get('OPTIONS', 'options')
         ACT_BLOCKER = battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
         ACT_COUNTER = battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER')
-
         if self.active_interaction:
             req = {
                 KEY_PID: self.active_interaction.get("player_id"),
@@ -128,11 +127,9 @@ class GameManager:
                 KEY_OPTIONS: self.active_interaction.get("options")
             }
             return req
-
         if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
             log_event("ERROR", "game.pending_request_error", f"Active battle missing in phase: {self.phase.name}")
             self.phase = Phase.MAIN
-
         request = None
         if self.phase == Phase.BLOCK_STEP and self.active_battle:
             target_owner = self.active_battle["target_owner"]
@@ -167,7 +164,6 @@ class GameManager:
         self.active_interaction = None
         resolver = EffectResolver(self)
         log_event("INFO", "game.resume_effect", f"Resuming effect for {source_card.master.name}", player=player.name)
-        
         selected_index = payload.get("index", payload.get("selected_option_index", 0))
         resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
@@ -362,13 +358,17 @@ class GameManager:
         log_event("INFO", "game.play_card", f"Playing card: {card.master.name}", player=player.name, payload={"card_uuid": card.uuid})
         if card.master.type == CardType.EVENT:
             for ability in card.master.abilities:
-                if ability.trigger in [TriggerType.ON_PLAY, TriggerType.ACTIVATE_MAIN]: self.resolve_ability(player, ability, source_card=card)
+                log_event("DEBUG", "game.trigger_check", f"Event trigger: {ability.trigger.name}")
+                if ability.trigger in [TriggerType.ON_PLAY, TriggerType.ACTIVATE_MAIN]:
+                    self.resolve_ability(player, ability, source_card=card)
             self.move_card(card, Zone.TRASH, player)
         else:
             self.move_card(card, Zone.FIELD, player); card.attached_don = 0; card.is_newly_played = True
             if not card.ability_disabled:
                 for ability in card.master.abilities:
-                    if ability.trigger == TriggerType.ON_PLAY: self.resolve_ability(player, ability, source_card=card)
+                    log_event("DEBUG", "game.trigger_check", f"Char trigger: {ability.trigger.name}")
+                    if ability.trigger == TriggerType.ON_PLAY:
+                        self.resolve_ability(player, ability, source_card=card)
 
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
@@ -377,49 +377,31 @@ class GameManager:
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int) -> bool:
         if not action: return False
         log_event("INFO", "game.apply_action", f"Applying {action.type.name} to {len(targets)} targets", player=player.name)
-        
         if action.type == ActionType.DRAW:
-            self.draw_card(player, value)
-            return True
-
+            self.draw_card(player, value); return True
         success = False
         for target in targets:
             owner, _ = self._find_card_location(target)
             if not owner: continue
-            
             if action.type == ActionType.KO:
-                self.move_card(target, Zone.TRASH, owner)
-                log_event("INFO", "game.action_ko", f"{target.master.name} was KO'd by effect", player=player.name)
-                success = True
+                self.move_card(target, Zone.TRASH, owner); log_event("INFO", "game.action_ko", f"{target.master.name} was KO'd by effect", player=player.name); success = True
             elif action.type == ActionType.DISCARD:
-                self.move_card(target, Zone.TRASH, owner)
-                success = True
+                self.move_card(target, Zone.TRASH, owner); success = True
             elif action.type == ActionType.BOUNCE:
-                self.move_card(target, Zone.HAND, owner)
-                success = True
+                self.move_card(target, Zone.HAND, owner); success = True
             elif action.type == ActionType.MOVE:
-                dest_zone = action.destination or Zone.TRASH
-                self.move_card(target, dest_zone, owner)
-                success = True
+                dest_zone = action.destination or Zone.TRASH; self.move_card(target, dest_zone, owner); success = True
             elif action.type == ActionType.BUFF:
-                if hasattr(target, 'power_offset'):
-                    target.power_offset += value
-                log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name)
-                success = True
+                if hasattr(target, 'power_offset'): target.power_offset += value
+                log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name); success = True
             elif action.type == ActionType.REST:
-                target.is_rest = True
-                success = True
+                target.is_rest = True; success = True
             elif action.type == ActionType.PLAY_CARD:
-                self.move_card(target, Zone.FIELD, owner)
-                target.is_newly_played = True
-                success = True
-                
+                self.move_card(target, Zone.FIELD, owner); target.is_newly_played = True; success = True
         return success
 
     def get_dynamic_value(self, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict) -> int:
         if not val_source: return 0
         if val_source.dynamic_source == "COUNT_REFERENCE":
-            log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name)
-            # モデルにparamsがないため、現在はデフォルトでTrashをカウント
-            return len(player.trash)
+            log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name); return len(player.trash)
         return val_source.base

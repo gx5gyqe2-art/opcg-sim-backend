@@ -12,9 +12,11 @@ class EffectParser:
         pass
 
     def parse_ability(self, text: str) -> Ability:
+        log_event("DEBUG", "parser.input", f"Input text: {text[:50]}")
         try:
             norm_text = _nfc(text)
             trigger = self._detect_trigger(norm_text)
+            log_event("INFO", "parser.trigger", f"Detected trigger: {trigger.name}")
             
             cost_node = None
             effect_text = norm_text
@@ -24,8 +26,6 @@ class EffectParser:
                 effect_text = effect_part
 
             effect_node = self._parse_to_node(effect_text)
-
-            log_event(level_key="DEBUG", action="parser.parse_ability_success", msg=f"Parsed ability: {norm_text[:30]}...")
             return Ability(
                 trigger=trigger,
                 cost=cost_node,
@@ -33,14 +33,13 @@ class EffectParser:
                 raw_text=norm_text
             )
         except Exception as e:
-            log_event(level_key="ERROR", action="parser.parse_ability_error", msg=f"Failed to parse: {text} | Error: {str(e)}")
+            log_event(level_key="ERROR", action="parser.parse_ability_error", msg=f"Failed to parse: {text[:20]} | Error: {str(e)}")
             return Ability(trigger=TriggerType.UNKNOWN, effect=None, raw_text=_nfc(text))
 
     def _parse_to_node(self, text: str, is_cost: bool = False) -> EffectNode:
         norm_text = _nfc(text)
         parts = re.split(_nfc(r'。|その後、'), norm_text)
         parts = [p.strip() for p in parts if p.strip()]
-        
         if len(parts) > 1:
             return Sequence(actions=[self._parse_logic_block(p, is_cost) for p in parts])
         return self._parse_logic_block(parts[0], is_cost)
@@ -54,7 +53,6 @@ class EffectParser:
                 condition=self._parse_condition_obj(cond_text),
                 if_true=self._parse_to_node(rest_text, is_cost)
             )
-
         if _nfc("以下から1つを選ぶ") in norm_text:
             options = self._extract_options(norm_text)
             return Choice(
@@ -62,7 +60,6 @@ class EffectParser:
                 options=[self._parse_to_node(opt, is_cost) for opt in options],
                 option_labels=options
             )
-
         return self._parse_atomic_action(norm_text, is_cost)
 
     def _parse_atomic_action(self, text: str, is_cost: bool) -> GameAction:
@@ -70,32 +67,18 @@ class EffectParser:
         act_type = self._detect_action_type(norm_text)
         value_src = self._parse_value(norm_text, act_type)
         target_query = parse_target(norm_text)
-        
         if _nfc("選び") in norm_text:
             target_query.save_id = "selected_card"
-        
         if _nfc("そのカード") in norm_text or _nfc("そのキャラ") in norm_text:
             target_query.ref_id = "selected_card"
-
-        return GameAction(
-            type=act_type,
-            target=target_query,
-            value=value_src,
-            raw_text=norm_text
-        )
+        return GameAction(type=act_type, target=target_query, value=value_src, raw_text=norm_text)
 
     def _parse_value(self, text: str, act_type: ActionType) -> ValueSource:
         norm_text = _nfc(text)
         nums = re.findall(r'[+-]?\d+', norm_text)
         base_val = int(nums[0]) if nums else 0
-        
         if _nfc("枚につき") in norm_text or _nfc("枚数につき") in norm_text:
-            return ValueSource(
-                base=0,
-                dynamic_source="COUNT_REFERENCE",
-                multiplier=base_val if base_val != 0 else 1
-            )
-            
+            return ValueSource(base=0, dynamic_source="COUNT_REFERENCE", multiplier=base_val if base_val != 0 else 1)
         return ValueSource(base=base_val)
 
     def _detect_trigger(self, text: str) -> TriggerType:
