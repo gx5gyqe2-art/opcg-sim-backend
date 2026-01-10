@@ -264,4 +264,23 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ])
         )
     ],
+     "OP05-097": [
+        Ability(
+            trigger=TriggerType.YOUR_TURN,
+            effect=GameAction(
+                type=ActionType.BUFF,
+                target=TargetQuery(
+                    player=Player.SELF,
+                    zone=Zone.HAND,
+                    traits=["天竜人"],
+                    cost_min=2,
+                    select_mode="ALL"
+                ),
+                value=ValueSource(base=-1),
+                status="COST_REDUCTION",
+                raw_text="自分が手札から登場させるコスト2以上の特徴《天竜人》を持つキャラカードの支払うコストは1少なくなる"
+            )
+        )
+    ],
+
 }
