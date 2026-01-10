@@ -144,6 +144,7 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         potential_cards = []
         if current_player.leader: potential_cards.append(current_player.leader)
         potential_cards.extend(current_player.field)
+        if current_player.stage: potential_cards.append(current_player.stage)
         operating_card = next((c for c in potential_cards if c.uuid == card_uuid), None)
         if action_type == game_actions.get('PLAY', 'PLAY'):
             target_card_in_hand = next((c for c in current_player.hand if c.uuid == card_uuid), None)
