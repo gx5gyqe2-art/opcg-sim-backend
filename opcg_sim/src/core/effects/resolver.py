@@ -2,7 +2,7 @@ from typing import List, Any, Dict, Optional
 from ...models.effect_types import (
     EffectNode, GameAction, Sequence, Branch, Choice, ValueSource
 )
-from ...models.enums import ActionType, Zone, TriggerType, ConditionType
+from ...models.enums import ActionType, Zone, TriggerType, ConditionType, CompareOperator
 from ...utils.logger_config import log_event
 import re
 
@@ -43,7 +43,6 @@ class EffectResolver:
                     return
 
                 self.context["last_action_success"] = success
-                # コストアクションが失敗した場合、その後の処理（効果）も中止する
                 if not success and node.raw_text and ":" in source_card.master.effect_text:
                     log_event("WARNING", "resolver.cost_failed", "Action failed, stopping execution", player=player.name)
                     self.execution_stack.clear()
@@ -94,17 +93,15 @@ class EffectResolver:
         required_count = getattr(query, 'count', 1)
         is_optional = getattr(query, 'optional', False)
         is_up_to = getattr(query, 'is_up_to', False)
-        is_strict = getattr(query, 'is_strict_count', False) # 【追加】
+        is_strict = getattr(query, 'is_strict_count', False)
         
         if len(candidates) == 0:
             return []
 
-        # 【追加】厳密チェック：候補数が要求数未満かつ厳密フラグがある場合、対象なしとして返す（処理失敗へ）
         if is_strict and len(candidates) < required_count:
             log_event("INFO", "resolver.strict_count_fail", f"Insufficient targets for strict count: found {len(candidates)}, needed {required_count}", player=player.name)
             return []
             
-        # 自動解決条件: 全選択、または (候補数<=要求数 かつ 必須 かつ 「～まで」ではない)
         if (query.select_mode == "ALL") or (len(candidates) <= required_count and not is_optional and not is_up_to):
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = candidates
@@ -135,6 +132,13 @@ class EffectResolver:
             nums = re.findall(r'\d+', condition.raw_text)
             required = int(nums[0]) if nums else 0
             return len(player.life) <= required
+
+        if condition.type == ConditionType.TRASH_COUNT:
+            required = condition.value if isinstance(condition.value, int) else 0
+            if not required:
+                nums = re.findall(r'\d+', condition.raw_text)
+                required = int(nums[0]) if nums else 0
+            return len(player.trash) >= required
             
         return True
 

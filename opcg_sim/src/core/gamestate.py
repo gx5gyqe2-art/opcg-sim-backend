@@ -419,6 +419,12 @@ class GameManager:
         log_event("INFO", "game.attack_declare", f"{attacker.master.name} is attacking {target.master.name}", player=attacker_owner.name)
         attacker.is_rest = True
         self.active_battle = {"attacker": attacker, "target": target, "attacker_owner": attacker_owner, "target_owner": target_owner, "counter_buff": 0}
+        
+        if attacker.master.abilities:
+            for ability in attacker.master.abilities:
+                if ability.trigger == TriggerType.ON_ATTACK:
+                    self.resolve_ability(attacker_owner, ability, source_card=attacker)
+
         if self.has_blocker(target_owner): self.phase = Phase.BLOCK_STEP; log_event("INFO", "game.phase_transition", f"Blockers detected. Moving to {self.phase.name}", player=target_owner.name)
         else: self.phase = Phase.BATTLE_COUNTER; log_event("INFO", "game.phase_transition", f"No blockers. Moving to {self.phase.name}", player=target_owner.name)
 
