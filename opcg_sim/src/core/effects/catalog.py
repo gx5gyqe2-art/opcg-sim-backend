@@ -79,6 +79,46 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ])
         )
     ],
+    "OP13-082": [
+        Ability(
+            trigger=TriggerType.ACTIVATE_MAIN,
+            condition=Condition(type=ConditionType.LEADER_NAME, value="イム"),
+            cost=Sequence(actions=[
+                GameAction(
+                    type=ActionType.REST,
+                    target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=1, is_strict_count=True, is_rest=False, save_id="gorosei_cost_don"),
+                    raw_text="自分のドン!!1枚をレストにする"
+                ),
+                GameAction(
+                    type=ActionType.DISCARD,
+                    target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, save_id="gorosei_cost_hand"),
+                    raw_text="自分の手札1枚を捨てる"
+                )
+            ]),
+            effect=Sequence(actions=[
+                GameAction(
+                    type=ActionType.TRASH,
+                    target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, card_type=["CHARACTER"], select_mode="ALL"),
+                    raw_text="自分のキャラすべてをトラッシュに置く"
+                ),
+                GameAction(
+                    type=ActionType.PLAY_CARD,
+                    target=TargetQuery(
+                        player=Player.SELF, 
+                        zone=Zone.TRASH, 
+                        traits=["五老星"], 
+                        power_max=5000, 
+                        power_min=5000, 
+                        count=5, 
+                        is_up_to=True, 
+                        save_id="gorosei_play"
+                    ),
+                    destination=Zone.FIELD,
+                    raw_text="自分のトラッシュからパワー5000のカード名の異なる特徴《五老星》を持つキャラカード5枚までを、登場させる"
+                )
+            ])
+        )
+    ],
     "OP13-086": [
         Ability(
             trigger=TriggerType.ON_PLAY,
