@@ -183,6 +183,10 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             if query.is_rest is not None and card.is_rest != query.is_rest: continue
             results.append(card)
             continue
+        
+        # 【追加】カードタイプのフィルタリング
+        if query.card_type and card.master.type.name not in query.card_type:
+            continue
 
         if query.colors and not any(c in card.master.color.value for c in query.colors): continue
         if query.attributes and card.master.attribute.value not in query.attributes: continue
