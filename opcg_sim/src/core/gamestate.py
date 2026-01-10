@@ -31,13 +31,18 @@ class Player:
         self.leader: Optional[Card] = leader
         self.temp_zone: List[Card] = [] 
 
-    def setup_game(self):
+    # 【変更】セットアップ処理を分割
+    def shuffle_deck(self):
         random.shuffle(self.deck)
+
+    def place_life(self):
         if self.leader:
             life_count = self.leader.master.life
             for _ in range(life_count):
                 if self.deck:
                     self.life.append(self.deck.pop(0))
+
+    def draw_initial_hand(self):
         for _ in range(5):
             if self.deck:
                 self.hand.append(self.deck.pop(0))
@@ -85,6 +90,7 @@ class GameManager:
         self.winner: Optional[str] = None
         self.active_battle: Optional[Dict[str, Any]] = None
         self.active_interaction: Optional[Dict[str, Any]] = None
+        self.setup_phase_pending = False # 【追加】セットアップ中断フラグ
 
     def _find_card_by_uuid(self, uuid: str) -> Optional[CardInstance]:
         all_players = [self.p1, self.p2]
@@ -205,6 +211,11 @@ class GameManager:
             
             resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
+        # 【追加】セットアップ中断からの復帰
+        if not self.active_interaction and self.setup_phase_pending:
+            self.finish_setup()
+            self.setup_phase_pending = False
+
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
         if not pending: raise ValueError("現在実行可能なアクションはありません。")
@@ -231,20 +242,40 @@ class GameManager:
 
     def start_game(self, first_player: Optional[Player] = None):
         log_event("INFO", "game.start", "Game initialization started")
-        self.p1.setup_game(); self.p2.setup_game()
         
-        # 【追加】ゲーム開始時効果の解決 (イムなど)
+        # 1. デッキシャッフル
+        self.p1.shuffle_deck()
+        self.p2.shuffle_deck()
+        
+        # 2. ゲーム開始時効果 (ライフ配置前に実行)
         for p in [self.p1, self.p2]:
             if p.leader:
                 for ability in p.leader.master.abilities:
                     if ability.trigger == TriggerType.GAME_START:
                         log_event("INFO", "game.trigger_gamestart", f"Resolving GAME_START for {p.leader.master.name}", player=p.name)
                         self.resolve_ability(p, ability, source_card=p.leader)
+                        
+                        # 効果処理中に選択（インタラクション）が発生した場合、ここで中断してAPI応答を返す
+                        if self.active_interaction:
+                            self.setup_phase_pending = True
+                            if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
+                            else: self.turn_player = self.p1; self.opponent = self.p2
+                            return
 
+        # 3. セットアップ完了 (中断がなければ即実行)
+        self.finish_setup()
+        
         if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
         else: self.turn_player = self.p1; self.opponent = self.p2
         log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
         self.turn_count = 1; self.refresh_phase()
+
+    def finish_setup(self):
+        log_event("INFO", "game.setup_finish", "Finishing setup (Life/Hand)", player="system")
+        self.p1.place_life()
+        self.p1.draw_initial_hand()
+        self.p2.place_life()
+        self.p2.draw_initial_hand()
 
     def end_turn(self):
         self._validate_action(self.turn_player, "MAIN_ACTION")
@@ -441,13 +472,11 @@ class GameManager:
             
         success = False
         
-        # 【追加】SHUFFLEアクション
         if act_name == "SHUFFLE":
             random.shuffle(player.deck)
             log_event("INFO", "game.action_shuffle", "Deck shuffled", player=player.name)
             return True
 
-        # LOOKアクション (山札操作)
         if act_name == "LOOK":
             count = value
             deck = player.deck

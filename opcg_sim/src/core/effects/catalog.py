@@ -63,7 +63,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.SHUFFLE,
-                    target=TargetQuery(zone=Zone.DECK, player=Player.SELF),
+
                     raw_text="デッキをシャッフルする"
                 )
             ])
