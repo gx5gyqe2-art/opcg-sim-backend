@@ -2,13 +2,13 @@ from typing import Dict, List
 from ...models.effect_types import (
     Ability, Sequence, GameAction, TargetQuery, ValueSource, Branch, Choice, Condition
 )
-from ...models.enums import TriggerType, ActionType, Zone, ConditionType, CompareOperator, Player, Color
+from ...models.enums import TriggerType, ActionType, Zone, ConditionType, CompareOperator, Player
 
 def get_manual_ability(card_id: str) -> List[Ability]:
-    """カードIDから手動定義された効果リストを取得する"""
+    """カードIDから手動定義された効果リストを取得する。定義がなければ空リストを返す。"""
     return MANUAL_EFFECTS.get(card_id, [])
 
-# カードごとの効果定義
+# カードIDごとの効果定義
 MANUAL_EFFECTS: Dict[str, List[Ability]] = {
     
     # ----------------------------------------------------
@@ -17,9 +17,14 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
     "OP13-079": [
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,
-            condition=Condition(type=ConditionType.TURN_LIMIT, value=1),
+            condition=Condition(type=ConditionType.TURN_LIMIT, value=1), # ターン1回
             cost=Choice(
                 message="コストを選択してください",
+                # 【修正】option_labels を追加（これがボタンの文字になります）
+                option_labels=[
+                    "自分の特徴《天竜人》を持つキャラをトラッシュ",
+                    "手札1枚をトラッシュ"
+                ],
                 options=[
                     # 1. 自分の特徴《天竜人》を持つキャラをトラッシュに置く
                     GameAction(
@@ -58,14 +63,12 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.MOVE_TO_HAND,
-                    # 【重要】save_idを追加して選択ループを回避
                     target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["天竜人"], count=1, save_id="shalria_select"), 
                     destination=Zone.HAND,
                     raw_text="「シャルリア宮」以外の特徴《天竜人》を持つカード1枚までを公開し、手札に加える"
                 ),
                 GameAction(
                     type=ActionType.TRASH,
-                    # 【重要】count=99にして自動全選択にする（残り全て）
                     target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL", count=99),
                     destination=Zone.TRASH,
                     raw_text="残りをトラッシュに置く"
@@ -86,7 +89,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
     "OP13-087": [
         Ability(
             trigger=TriggerType.ON_PLAY,
-            # デッキトップ1枚トラッシュは選択余地がないためsave_id不要（自動）
             effect=GameAction(
                 type=ActionType.TRASH,
                 target=TargetQuery(player=Player.SELF, zone=Zone.DECK, count=1),
@@ -145,7 +147,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.DECK_BOTTOM,
-                    # count=99で残り全てを対象にする
                     target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL", count=99),
                     destination=Zone.DECK,
                     raw_text="残りを好きな順番でデッキの下に置く"
