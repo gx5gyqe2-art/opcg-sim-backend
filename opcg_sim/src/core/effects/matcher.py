@@ -190,8 +190,14 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             # レスト状態の指定があればチェック
             if query.is_rest is not None and card.is_rest != query.is_rest: continue
             
-            # 【追加】カードタイプ指定がある場合（例: CHARACTER）、ドン!!は対象外とする
+            # 【修正】特定の属性指定がある場合、ドン!!はそれらを持たないので対象外として弾く
             if query.card_type: continue
+            if query.traits: continue
+            if query.colors: continue
+            if query.attributes: continue
+            if query.names: continue
+            if query.cost_min is not None or query.cost_max is not None: continue
+            if query.power_min is not None or query.power_max is not None: continue
             
             results.append(card)
             continue
