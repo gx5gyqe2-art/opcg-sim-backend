@@ -340,6 +340,12 @@ class GameManager:
         self._apply_passive_effects(self.turn_player)
 
     def _apply_passive_effects(self, player: Player):
+        affected_cards = [player.leader, player.stage] + player.field + player.hand
+        for c in affected_cards:
+            if c:
+                c.cost_buff = 0
+                c.base_power_override = None
+
         all_units = [player.leader] + player.field
         if player.stage: all_units.append(player.stage)
         for card in all_units:
@@ -517,6 +523,10 @@ class GameManager:
                 if action.status == "POWER_OVERRIDE":
                     target.base_power_override = value
                     log_event("INFO", "game.action_override", f"{target.master.name}'s power set to {value}", player=player.name)
+                elif action.status == "COST_REDUCTION":
+                    if hasattr(target, 'cost_buff'):
+                        target.cost_buff += value
+                        log_event("INFO", "game.action_cost_reduction", f"{target.master.name}'s cost changed by {value}", player=player.name)
                 else:
                     if hasattr(target, 'power_buff'):
                         target.power_buff += value
@@ -543,4 +553,3 @@ class GameManager:
         if val_source.dynamic_source == "COUNT_REFERENCE":
             log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name); return len(player.trash)
         return val_source.base
-

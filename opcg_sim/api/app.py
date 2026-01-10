@@ -148,7 +148,7 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         operating_card = next((c for c in potential_cards if c.uuid == card_uuid), None)
         if action_type == game_actions.get('PLAY', 'PLAY'):
             target_card_in_hand = next((c for c in current_player.hand if c.uuid == card_uuid), None)
-            if target_card_in_hand: manager.pay_cost(current_player, target_card_in_hand.master.cost); manager.play_card_action(current_player, target_card_in_hand)
+            if target_card_in_hand: manager.pay_cost(current_player, target_card_in_hand.current_cost); manager.play_card_action(current_player, target_card_in_hand)
             else: raise ValueError("対象のカードが手札にありません。")
         elif action_type == game_actions.get('TURN_END', 'TURN_END'): manager.end_turn()
         elif action_type in [game_actions.get('ATTACK', 'ATTACK'), game_actions.get('ATTACK_CONFIRM', 'ATTACK_CONFIRM')]:
