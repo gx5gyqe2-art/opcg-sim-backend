@@ -39,8 +39,14 @@ class EffectResolver:
             from .matcher import get_target_cards
             candidates = get_target_cards(self.game_manager, node.target, source_card)
             required = getattr(node.target, 'count', 1)
+            
             if getattr(node.target, 'is_strict_count', False) and len(candidates) < required:
+                log_event("DEBUG", "resolver.satisfy_fail", f"Insufficient candidates for {node.type.name}: {len(candidates)}/{required}", player=player.name)
                 return False
+            
+            if not getattr(node.target, 'is_up_to', False) and len(candidates) == 0:
+                return False
+                
             return True
         elif isinstance(node, Sequence):
             return all(self._can_satisfy_node(player, a, source_card) for a in node.actions)

@@ -318,9 +318,17 @@ class GameManager:
                 is_frozen = "FREEZE" in card.flags
                 card.reset_turn_status()
                 if not is_frozen: card.is_rest = False
-        player.don_active.extend(player.don_rested); player.don_rested = []
-        for don in player.don_attached_cards: don.attached_to = None; player.don_active.append(don)
-        player.don_attached_cards = [] 
+        
+        for don in player.don_rested:
+            don.is_rest = False
+            player.don_active.append(don)
+        player.don_rested = []
+        
+        for don in player.don_attached_cards:
+            don.is_rest = False
+            don.attached_to = None
+            player.don_active.append(don)
+        player.don_attached_cards = []
 
     def draw_phase(self):
         if self.turn_count > 1: self.draw_card(self.turn_player)
