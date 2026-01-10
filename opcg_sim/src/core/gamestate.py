@@ -131,7 +131,6 @@ class GameManager:
                 KEY_SKIP: self.active_interaction.get("can_skip", False),
                 KEY_CANDIDATES: candidate_dicts,
                 KEY_CONSTRAINTS: self.active_interaction.get("constraints"),
-                # 【追加】選択肢のリストをレスポンスに含める
                 "options": self.active_interaction.get("options"), 
                 "request_id": str(uuid.uuid4())
             }
@@ -195,7 +194,6 @@ class GameManager:
             if query and getattr(query, 'save_id', None):
                  continuation["effect_context"]["saved_targets"][query.save_id] = selected_cards
             
-            # コンテキストの last_target も更新
             continuation["effect_context"]["saved_targets"]["last_target"] = selected_cards
 
             self.active_interaction = None
@@ -205,7 +203,8 @@ class GameManager:
             log_event("INFO", "game.resume_choice", f"Resuming choice for {source_card.master.name}", player=player.name)
             selected_index = payload.get("index", payload.get("selected_option_index", 0))
             
-            self.active_interaction = None
+            # 【修正】ここでの self.active_interaction = None を削除
+            # resolver.resume_choice 内で、データを取り出した後に None にされるため
             resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
     def _validate_action(self, player: Player, action_type: str):
@@ -427,7 +426,7 @@ class GameManager:
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int) -> bool:
         if not action: return False
         
-        # 名前比較で判定（Enumの同一性問題を回避）
+        # 名前比較で判定
         act_name = action.type.name if hasattr(action.type, 'name') else str(action.type)
         log_event("INFO", "game.apply_action", f"Applying {act_name} to {len(targets)} targets", player=player.name)
         
@@ -436,7 +435,6 @@ class GameManager:
             
         success = False
         
-        # LOOKアクション (山札操作)
         if act_name == "LOOK":
             count = value
             deck = player.deck
