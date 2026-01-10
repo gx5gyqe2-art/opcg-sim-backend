@@ -1,7 +1,7 @@
 import re
 from typing import List, Optional
 from ...models.effect_types import (
-    Ability, EffectNode, GameAction, Sequence, Branch, Choice, ValueSource, TargetQuery
+    Ability, EffectNode, GameAction, Sequence, Branch, Choice, ValueSource, TargetQuery, Condition
 )
 from ...models.enums import ActionType, TriggerType, ConditionType
 from .matcher import parse_target
@@ -48,7 +48,7 @@ class EffectParser:
         if match:
             cond_text, rest_text = match.groups()
             return Branch(
-                condition=self._parse_condition(cond_text),
+                condition=self._parse_condition_obj(cond_text),
                 if_true=self._parse_to_node(rest_text, is_cost)
             )
 
@@ -111,10 +111,12 @@ class EffectParser:
         if "レストにする" in text: return ActionType.REST
         return ActionType.OTHER
 
-    def _parse_condition(self, text: str) -> ConditionType:
-        if "ドン!!" in text and "枚以上" in text: return ConditionType.DON_COUNT
-        if "ライフ" in text: return ConditionType.LIFE_COUNT
-        return ConditionType.GENERIC
+    def _parse_condition_obj(self, text: str) -> Condition:
+        if "ドン!!" in text and "枚以上" in text:
+            return Condition(type=ConditionType.DON_COUNT, raw_text=text)
+        if "ライフ" in text:
+            return Condition(type=ConditionType.LIFE_COUNT, raw_text=text)
+        return Condition(type=ConditionType.GENERIC, raw_text=text)
 
     def _extract_options(self, text: str) -> List[str]:
         lines = text.split('\n')

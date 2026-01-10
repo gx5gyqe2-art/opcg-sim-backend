@@ -5,7 +5,7 @@ import re
 import traceback
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
-from ..models.effect_types import TargetQuery, Ability, ValueSource
+from ..models.effect_types import TargetQuery, Ability, ValueSource, GameAction
 from ..utils.logger_config import log_event
 from .effects.resolver import EffectResolver
 
@@ -190,24 +190,24 @@ class GameManager:
         if not val_source:
             return 0
         
-        if val_source.value is not None:
-            return val_source.value
-
         source_type = val_source.dynamic_source
+        base_val = 0
         if source_type == "HAND_COUNT":
-            return len(player.hand)
+            base_val = len(player.hand)
         elif source_type == "TRASH_COUNT":
-            return len(player.trash)
+            base_val = len(player.trash)
         elif source_type == "LIFE_COUNT":
-            return len(player.life)
+            base_val = len(player.life)
         elif source_type == "DON_COUNT":
-            return len(player.don_active) + len(player.don_rested) + len(player.don_attached_cards)
+            base_val = len(player.don_active) + len(player.don_rested) + len(player.don_attached_cards)
         elif source_type == "TARGET_POWER" and targets:
-            return targets[0].get_power(player == self.turn_player)
+            base_val = targets[0].get_power(player == self.turn_player)
+        else:
+            base_val = val_source.base
         
-        return 0
+        return (base_val // val_source.divisor) * val_source.multiplier
 
-    def apply_action_to_engine(self, player: Player, action_node: Any, targets: List[CardInstance], value: int = 0) -> bool:
+    def apply_action_to_engine(self, player: Player, action_node: GameAction, targets: List[CardInstance], value: int = 0) -> bool:
         action_type = action_node.type
         log_event("INFO", "game.engine_action", f"Applying {action_type.name}", player=player.name)
 
@@ -221,7 +221,7 @@ class GameManager:
         elif action_type == ActionType.DRAW:
             self.draw_card(player, value)
 
-        elif action_type == ActionType.BP_BUFF:
+        elif action_type == ActionType.BUFF or action_type == ActionType.BP_BUFF:
             duration = getattr(action_node, 'duration', 'TURN')
             for target in targets:
                 target.power_buff += value
@@ -237,11 +237,7 @@ class GameManager:
                 target.is_rest = False
 
         elif action_type == ActionType.REST_DON:
-            for _ in range(value):
-                if player.don_active:
-                    don = player.don_active.pop(0)
-                    player.don_rested.append(don)
-                    don.is_rest = True
+            self.pay_cost(player, value)
 
         elif action_type == ActionType.ACTIVE_DON:
             for _ in range(value):
@@ -260,8 +256,9 @@ class GameManager:
             for target in targets:
                 self.play_card_action(player, target)
 
-        elif action_type == ActionType.MOVE_CARD:
-            dest_zone = getattr(action_node, 'destination', Zone.TRASH)
+        elif action_type == ActionType.MOVE_CARD or action_type == ActionType.DISCARD or action_type == ActionType.BOUNCE:
+            dest_zone = action_node.destination or Zone.TRASH
+            if action_type == ActionType.BOUNCE: dest_zone = Zone.HAND
             for target in targets:
                 self.move_card(target, dest_zone, player)
 
@@ -272,9 +269,9 @@ class GameManager:
             log_event("WARNING", "game.resolve_interaction", "No active interaction found", player=player.name)
             return
 
+        selected_index = payload.get("selected_option", 0)
         log_event("INFO", "game.resume_effect", "Resuming interaction via resolver", player=player.name)
-        self.active_interaction = None
-        self.resolver.resume_choice(player, payload)
+        self.resolver.resume_choice(player, selected_index)
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
@@ -374,12 +371,14 @@ class GameManager:
 
     def draw_phase(self):
         if self.turn_count > 1:
-            self.apply_action_to_engine(self.turn_player, type(ActionType.DRAW, (object,), {'type': ActionType.DRAW}), [], 1)
+            dummy_action = GameAction(type=ActionType.DRAW)
+            self.apply_action_to_engine(self.turn_player, dummy_action, [], 1)
         self.don_phase()
 
     def don_phase(self):
         cards_to_add = 1 if self.turn_count == 1 else 2
-        self.apply_action_to_engine(self.turn_player, type(ActionType.ADD_DON, (object,), {'type': ActionType.ADD_DON}), [], cards_to_add)
+        dummy_action = GameAction(type=ActionType.ADD_DON)
+        self.apply_action_to_engine(self.turn_player, dummy_action, [], cards_to_add)
         self.main_phase()
 
     def main_phase(self):
@@ -521,11 +520,11 @@ class GameManager:
             for ability in counter_card.master.abilities:
                 if ability.trigger == TriggerType.COUNTER:
                     self.resolve_ability(player, ability, source_card=counter_card)
-            self.move_card(counter_card, Zone.TRASH, player)
+            self.move_card(counter_card, Zone.HAND if False else Zone.TRASH, player)
         else:
             counter_value = counter_card.master.counter or 0
-            buff_node = type('BuffAction', (object,), {'type': ActionType.BP_BUFF, 'duration': 'BATTLE'})
-            self.apply_action_to_engine(player, buff_node, [], counter_value)
+            dummy_action = GameAction(type=ActionType.BP_BUFF, duration="BATTLE")
+            self.apply_action_to_engine(player, dummy_action, [], counter_value)
             self.move_card(counter_card, Zone.TRASH, player)
 
     def resolve_attack(self):
@@ -563,8 +562,8 @@ class GameManager:
                         break
         else:
             if attacker_pwr >= target_pwr:
-                ko_node = type('KOAction', (object,), {'type': ActionType.KO})
-                self.apply_action_to_engine(attacker_owner, ko_node, [target])
+                ko_action = GameAction(type=ActionType.KO)
+                self.apply_action_to_engine(attacker_owner, ko_action, [target])
         
         target.reset_turn_status()
         self.active_battle = None
