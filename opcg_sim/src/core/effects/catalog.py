@@ -2,13 +2,13 @@ from typing import Dict, List
 from ...models.effect_types import (
     Ability, Sequence, GameAction, TargetQuery, ValueSource, Branch, Choice, Condition
 )
-from ...models.enums import TriggerType, ActionType, Zone, ConditionType, CompareOperator, Player
+from ...models.enums import TriggerType, ActionType, Zone, ConditionType, CompareOperator, Player, Color
 
 def get_manual_ability(card_id: str) -> List[Ability]:
-    """カードIDから手動定義された効果リストを取得する"""
+    """カードIDから手動定義された効果リストを取得する。定義がなければ空リストを返す。"""
     return MANUAL_EFFECTS.get(card_id, [])
 
-# カードごとの効果定義
+# カードIDごとの効果定義
 MANUAL_EFFECTS: Dict[str, List[Ability]] = {
     
     # ----------------------------------------------------
@@ -53,18 +53,21 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 GameAction(
                     type=ActionType.LOOK,
                     value=ValueSource(base=3),
+                    # source_zoneは不要。対象(DECK)を指定。
                     target=TargetQuery(zone=Zone.DECK, player=Player.SELF, count=3),
                     destination=Zone.TEMP,
                     raw_text="自分のデッキの上から3枚を見る"
                 ),
                 GameAction(
                     type=ActionType.MOVE_TO_HAND,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["天竜人"], count=1), 
+                    # traits=["天竜人"], count=1, 自身以外(exclude_ids等はTargetQueryの仕様に合わせて実装が必要だが一旦省略)
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["天竜人"], count=1),
                     destination=Zone.HAND,
                     raw_text="「シャルリア宮」以外の特徴《天竜人》を持つカード1枚までを公開し、手札に加える"
                 ),
                 GameAction(
                     type=ActionType.TRASH,
+                    # group="REMAINING_CARDS" の代わりに select_mode="ALL" で TEMPを指定
                     target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL"),
                     destination=Zone.TRASH,
                     raw_text="残りをトラッシュに置く"
@@ -72,7 +75,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 GameAction(
                     type=ActionType.DISCARD,
                     target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1),
-                    destination=Zone.TRASH,
                     raw_text="自分の手札1枚を捨てる"
                 )
             ])
@@ -102,6 +104,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             condition=Condition(type=ConditionType.LIFE_COUNT, operator=CompareOperator.LE, value=3), # LE (<=)
             effect=GameAction(
                 type=ActionType.PLAY_CARD,
+                # type -> card_type, cost -> cost_max (コスト1「の」なので本来はcost_min=1, cost_max=1だが、cost_max=1で代用)
                 target=TargetQuery(zone=Zone.TRASH, player=Player.SELF, card_type=["STAGE"], cost_max=1, traits=["聖地マリージョア"], count=1),
                 destination=Zone.FIELD,
                 raw_text="自分のトラッシュからコスト1の特徴《聖地マリージョア》を持つステージカード1枚までを、登場させる"
@@ -161,6 +164,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             condition=Condition(type=ConditionType.TRASH_COUNT, operator=CompareOperator.GE, value=10), # GE (>=)
             effect=GameAction(
                 type=ActionType.BUFF,
+                # type -> card_type
                 target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], count=1),
                 value=ValueSource(base=-2000),
                 raw_text="相手のキャラ1枚までを、このターン中、パワー-2000"
@@ -181,6 +185,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ),
             effect=GameAction(
                 type=ActionType.KO,
+                # cost=5 -> cost_max=5
                 target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=5),
                 raw_text="相手の元々のコスト5以下のキャラ1枚までを、KOする"
             )
@@ -222,7 +227,8 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             trigger=TriggerType.ACTIVATE_MAIN,
             cost=GameAction(
                 type=ActionType.REST,
-                target=TargetQuery(player=Player.SELF, zone=Zone.DON_DECK, count=5), 
+                # Zone.DON -> Zone.COST_AREA (アクティブなドンならコストエリア)
+                target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=5), 
                 raw_text="自分のドン‼5枚をレストにできる"
             ),
             effect=GameAction(
@@ -240,12 +246,14 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,
             cost=Sequence(actions=[
+                # namesはリスト形式
                 GameAction(type=ActionType.REST, target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, names=["虚の玉座"], count=1)),
-                GameAction(type=ActionType.REST, target=TargetQuery(player=Player.SELF, zone=Zone.DON_DECK, count=3))
+                GameAction(type=ActionType.REST, target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=3))
             ]),
             effect=GameAction(
                 type=ActionType.PLAY_CARD,
-                target=TargetQuery(player=Player.SELF, zone=Zone.HAND, traits=["五老星"], colors=["Black"]),
+                # color="Black" -> colors=["黒"] (Matcherが日本語判定の場合)
+                target=TargetQuery(player=Player.SELF, zone=Zone.HAND, traits=["五老星"], colors=["黒"]),
                 destination=Zone.FIELD,
                 raw_text="手札から黒の特徴《五老星》を持つキャラカード1枚までを登場させる"
             )
