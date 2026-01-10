@@ -15,21 +15,22 @@ class RawDataLoader:
     @staticmethod
     def load_json(file_path: str) -> Any:
         log_event(level_key="DEBUG", action="loader.load_json", msg=f"Loading JSON from {file_path}...")
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            log_event(level_key="ERROR", action="loader.file_not_found", msg=f"File not found: {file_path}")
-            return []
-        except json.JSONDecodeError as e:
-            log_event(level_key="ERROR", action="loader.json_decode_error", msg=str(e))
-            return []
+        encodings = ['utf-8-sig', 'utf-8', 'cp932']
+        for enc in encodings:
+            try:
+                with open(file_path, 'r', encoding=enc) as f:
+                    return json.load(f)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                continue
+        log_event(level_key="ERROR", action="loader.file_load_failed", msg=f"Failed to load {file_path} with any supported encoding.")
+        return []
 
 class DataCleaner:
     @staticmethod
     def normalize_text(text: Any) -> str:
         if text is None: return ""
-        return unicodedata.normalize('NFKC', str(text)).strip()
+        s = str(text).strip()
+        return unicodedata.normalize('NFKC', s)
 
     @staticmethod
     def parse_int(value: Any, default: int = 0) -> int:
@@ -119,12 +120,9 @@ class CardLoader:
     def get_card(self, card_id: str) -> Optional[CardMaster]:
         if card_id in self.cards:
             return self.cards[card_id]
-
         raw_data = self.raw_db.get(card_id)
         if not raw_data:
-            log_event(level_key="ERROR", action="loader.card_not_found", msg=f"Card ID not found in database: {card_id}")
             return None
-
         normalized_raw = {DataCleaner.normalize_text(k): v for k, v in raw_data.items()}
         master = self._create_card_master(normalized_raw)
         if master:
@@ -138,13 +136,10 @@ class CardLoader:
                 if norm_key in raw:
                     return raw[norm_key]
             return default
-        
         M = self.DB_MAPPING
-
         card_id = DataCleaner.normalize_text(get_val(M["ID"], "N/A"))
         if not card_id or card_id == "N/A" or "dummy" in card_id.lower():
             return None
-
         name = DataCleaner.normalize_text(get_val(M["NAME"]))
         type_val = get_val(M["TYPE"])
         c_type = DataCleaner.map_card_type(type_val) if type_val else CardType.UNKNOWN
@@ -159,25 +154,13 @@ class CardLoader:
         traits = DataCleaner.parse_traits(get_val(M["TRAITS"]))
         effect_text = DataCleaner.normalize_text(get_val(M["TEXT"]))
         trigger_text = DataCleaner.normalize_text(get_val(M["TRIGGER"]))
-        
         main_abilities = DataCleaner.parse_abilities(effect_text, is_trigger=False)
         trigger_abilities = DataCleaner.parse_abilities(trigger_text, is_trigger=True)
         combined_abilities = tuple(main_abilities + trigger_abilities)
-
         return CardMaster(
-            card_id=card_id,
-            name=name,
-            type=c_type,
-            color=color,
-            cost=cost,
-            power=power,
-            counter=counter,
-            attribute=attribute,
-            traits=traits,
-            effect_text=effect_text,
-            trigger_text=trigger_text,
-            life=life,
-            abilities=combined_abilities
+            card_id=card_id, name=name, type=c_type, color=color, cost=cost, power=power,
+            counter=counter, attribute=attribute, traits=traits, effect_text=effect_text,
+            trigger_text=trigger_text, life=life, abilities=combined_abilities
         )
 
 class DeckLoader:
@@ -186,23 +169,12 @@ class DeckLoader:
 
     def load_deck(self, file_path: str, owner_id: str) -> Tuple[Optional[CardInstance], List[CardInstance]]:
         data = RawDataLoader.load_json(file_path)
-        deck_data = {}
-        if isinstance(data, list) and len(data) > 0:
-            deck_data = data[0]
-        elif isinstance(data, dict):
-            deck_data = data
-        else:
-            log_event(level_key="ERROR", action="loader.invalid_deck", msg=f"Invalid deck format in {file_path}", player="system")
-            return None, []
-
+        deck_data = data[0] if isinstance(data, list) and len(data) > 0 else (data if isinstance(data, dict) else {})
         leader_instance = None
         if "leader" in deck_data:
             leader_id = deck_data["leader"].get("number")
-            if leader_id:
-                leader_master = self.card_loader.get_card(leader_id)
-                if leader_master:
-                    leader_instance = CardInstance(leader_master, owner_id)
-
+            master = self.card_loader.get_card(leader_id)
+            if master: leader_instance = CardInstance(master, owner_id)
         deck_list: List[CardInstance] = []
         if "cards" in deck_data:
             for item in deck_data["cards"]:
@@ -210,8 +182,6 @@ class DeckLoader:
                 count = item.get("count", 0)
                 master = self.card_loader.get_card(card_id)
                 if master:
-                    for _ in range(count):
-                        deck_list.append(CardInstance(master, owner_id))
-
+                    for _ in range(count): deck_list.append(CardInstance(master, owner_id))
         log_event(level_key="INFO", action="loader.deck_load_success", msg=f"Loaded Deck: Leader={leader_instance.master.name if leader_instance else 'None'}, Deck Size={len(deck_list)}", player=owner_id)
         return leader_instance, deck_list
