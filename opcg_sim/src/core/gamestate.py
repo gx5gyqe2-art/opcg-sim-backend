@@ -5,7 +5,7 @@ import re
 import traceback
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
-from ..models.effect_types import TargetQuery, Ability
+from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource
 from ..utils.logger_config import log_event
 from .effects.resolver import EffectResolver
 
@@ -167,7 +167,8 @@ class GameManager:
         self.active_interaction = None
         resolver = EffectResolver(self)
         log_event("INFO", "game.resume_effect", f"Resuming effect for {source_card.master.name}", player=player.name)
-        resolver.resume_choice(player, source_card, payload, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
+        selected_index = payload.get("index", 0)
+        resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
@@ -371,3 +372,39 @@ class GameManager:
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
         resolver = EffectResolver(self); resolver.resolve_ability(player, ability, source_card)
+
+    def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int) -> bool:
+        if not action: return False
+        log_event("INFO", "game.apply_action", f"Applying {action.type.name} to {len(targets)} targets", player=player.name)
+        success = False
+        for target in targets:
+            owner, _ = self._find_card_location(target)
+            if not owner: continue
+            if action.type == ActionType.KO:
+                self.move_card(target, Zone.TRASH, owner)
+                log_event("INFO", "game.action_ko", f"{target.master.name} was KO'd by effect", player=player.name)
+                success = True
+            elif action.type == ActionType.DRAW:
+                self.draw_card(player, value)
+                success = True
+            elif action.type == ActionType.MOVE:
+                dest_zone = action.params.get("zone", Zone.TRASH)
+                self.move_card(target, dest_zone, player)
+                success = True
+            elif action.type == ActionType.BUFF:
+                target.power_offset += value
+                log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name)
+                success = True
+            elif action.type == ActionType.REST:
+                target.is_rest = True
+                success = True
+        return success
+
+    def get_dynamic_value(self, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict) -> int:
+        if val_source.dynamic_source == "COUNT_REFERENCE":
+            log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name)
+            target_zone = val_source.params.get("zone", "trash")
+            if target_zone == "trash": return len(player.trash)
+            elif target_zone == "field": return len(player.field)
+        return val_source.value or 0
+
