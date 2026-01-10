@@ -31,7 +31,18 @@ class Player:
         self.leader: Optional[Card] = leader
         self.temp_zone: List[Card] = [] 
 
-    # 【変更】セットアップ処理を分割
+    def setup_game(self):
+        random.shuffle(self.deck)
+        if self.leader:
+            life_count = self.leader.master.life
+            for _ in range(life_count):
+                if self.deck:
+                    self.life.append(self.deck.pop(0))
+        for _ in range(5):
+            if self.deck:
+                self.hand.append(self.deck.pop(0))
+
+    # 【追加】セットアップ処理の分割用メソッド
     def shuffle_deck(self):
         random.shuffle(self.deck)
 
@@ -90,7 +101,7 @@ class GameManager:
         self.winner: Optional[str] = None
         self.active_battle: Optional[Dict[str, Any]] = None
         self.active_interaction: Optional[Dict[str, Any]] = None
-        self.setup_phase_pending = False # 【追加】セットアップ中断フラグ
+        self.setup_phase_pending = False
 
     def _find_card_by_uuid(self, uuid: str) -> Optional[CardInstance]:
         all_players = [self.p1, self.p2]
@@ -211,10 +222,14 @@ class GameManager:
             
             resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
-        # 【追加】セットアップ中断からの復帰
+        # 【修正】セットアップ中断からの復帰時に、ターン1を開始する
         if not self.active_interaction and self.setup_phase_pending:
             self.finish_setup()
             self.setup_phase_pending = False
+            # ターン開始処理 (start_gameの末尾と同じ処理)
+            log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
+            self.turn_count = 1
+            self.refresh_phase()
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
@@ -243,11 +258,9 @@ class GameManager:
     def start_game(self, first_player: Optional[Player] = None):
         log_event("INFO", "game.start", "Game initialization started")
         
-        # 1. デッキシャッフル
         self.p1.shuffle_deck()
         self.p2.shuffle_deck()
         
-        # 2. ゲーム開始時効果 (ライフ配置前に実行)
         for p in [self.p1, self.p2]:
             if p.leader:
                 for ability in p.leader.master.abilities:
@@ -255,14 +268,12 @@ class GameManager:
                         log_event("INFO", "game.trigger_gamestart", f"Resolving GAME_START for {p.leader.master.name}", player=p.name)
                         self.resolve_ability(p, ability, source_card=p.leader)
                         
-                        # 効果処理中に選択（インタラクション）が発生した場合、ここで中断してAPI応答を返す
                         if self.active_interaction:
                             self.setup_phase_pending = True
                             if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
                             else: self.turn_player = self.p1; self.opponent = self.p2
                             return
 
-        # 3. セットアップ完了 (中断がなければ即実行)
         self.finish_setup()
         
         if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
