@@ -18,7 +18,8 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                     zone=Zone.HAND,
                     traits=["天竜人"],
                     cost_min=2,
-                    select_mode="ALL"
+                    select_mode="ALL",
+                    raw_text="自分が手札から登場させるコスト2以上の特徴《天竜人》を持つキャラカード"
                 ),
                 value=ValueSource(base=-1),
                 status="COST_REDUCTION",
@@ -272,8 +273,10 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                         zone=Zone.HAND, 
                         traits=["五老星"], 
                         colors=["黒"], 
+                        card_type=["CHARACTER"],
                         count=1, 
                         is_up_to=True,
+                        save_id="throne_play",
                         cost_max_dynamic="DON_COUNT_FIELD"
                     ),
                     destination=Zone.FIELD,
