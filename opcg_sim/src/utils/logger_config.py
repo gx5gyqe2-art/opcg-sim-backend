@@ -9,6 +9,12 @@ from contextvars import ContextVar
 from typing import Any, Optional, Dict, List
 from concurrent.futures import ThreadPoolExecutor
 from google.cloud import storage
+import io
+
+if hasattr(sys.stdout, 'buffer'):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+if hasattr(sys.stderr, 'buffer'):
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 session_id_ctx: ContextVar[str] = ContextVar("session_id", default="sys-init")
 
@@ -53,7 +59,7 @@ BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "opcg-sim-log")
 
 BACKEND_LOG_BUFFER: Dict[str, List[Dict[str, Any]]] = {}
 
-def upload_to_gcs(blob_name: str, content: bytes, content_type: str = "application/json"):
+def upload_to_gcs(blob_name: str, content: bytes, content_type: str = "application/json; charset=utf-8"):
     if not _storage_client:
         sys.stderr.write("⚠️ [DEBUG] Upload skipped: _storage_client is None.\n")
         return
@@ -124,7 +130,7 @@ def save_batch_logs(fe_log_list: list, session_id: str):
 
     def _process_and_notify():
         try:
-            content = json.dumps(full_logs, ensure_ascii=False, indent=2).encode('utf-8')
+            content = json.dumps(full_logs, ensure_ascii=True, indent=2).encode('utf-8')
             
             upload_to_gcs(blob_name, content)
             
@@ -174,13 +180,13 @@ def log_event(
         BACKEND_LOG_BUFFER[sid].append(log_data)
 
     try:
-        log_json_str = json.dumps(log_data, ensure_ascii=False)
-        log_json_bytes = json.dumps(log_data, ensure_ascii=False, indent=2).encode('utf-8')
+        log_json_str = json.dumps(log_data, ensure_ascii=True)
+        log_json_bytes = json.dumps(log_data, ensure_ascii=True, indent=2).encode('utf-8')
     except (TypeError, ValueError) as e:
         error_msg = f"LOG_SERIALIZATION_ERROR: {str(e)}"
         fallback_data = {**log_data, K["MESSAGE"]: error_msg, K["PAYLOAD"]: None}
-        log_json_str = json.dumps(fallback_data, ensure_ascii=False)
-        log_json_bytes = json.dumps(fallback_data, ensure_ascii=False, indent=2).encode('utf-8')
+        log_json_str = json.dumps(fallback_data, ensure_ascii=True)
+        log_json_bytes = json.dumps(fallback_data, ensure_ascii=True, indent=2).encode('utf-8')
 
     sys.stdout.write(log_json_str + "\n")
     sys.stdout.flush()
@@ -207,12 +213,10 @@ def log_event(
     elif lv == "DEBUG" and SLACK_CHANNEL_DEBUG:
         target_channel = SLACK_CHANNEL_DEBUG
 
-    # ▼▼▼ 修正: resolver. を除外対象に追加 ▼▼▼
     ignore_prefixes = ("game.", "api.", "deck.", "loader.", "gamestate.", "schema.", "resolver.", "matcher.", "parser.", "effect.")
     
     if action.startswith(ignore_prefixes):
         target_channel = None
-    # ▲▲▲ 修正ここまで ▲▲▲
 
     if target_channel:
         slack_msg = log_json_str
