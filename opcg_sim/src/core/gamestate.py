@@ -3,7 +3,7 @@ import random
 import unicodedata
 import re
 import traceback
-import uuid  # 追加
+import uuid
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
 from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource
@@ -115,10 +115,8 @@ class GameManager:
         KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
         KEY_OPTIONS = pending_props.get('OPTIONS', 'options')
         
-        # インタラクション（効果解決中の選択待ち）がある場合
         if self.active_interaction:
             action_type = self.active_interaction.get("action_type")
-            # ターゲット選択の場合、フロントエンドが理解しやすいアクション名に変換（例: SEARCH_AND_SELECT）
             fe_action = "SEARCH_AND_SELECT" if action_type == "SELECT_TARGET" else action_type
             
             candidates = self.active_interaction.get("candidates", [])
@@ -134,11 +132,10 @@ class GameManager:
                 KEY_CANDIDATES: candidate_dicts,
                 KEY_CONSTRAINTS: self.active_interaction.get("constraints"),
                 KEY_OPTIONS: self.active_interaction.get("options"),
-                "request_id": str(uuid.uuid4()) # ユニークID付与
+                "request_id": str(uuid.uuid4())
             }
             return req
 
-        # バトルフェイズ等の標準的な待機状態
         if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
             log_event("ERROR", "game.pending_request_error", f"Active battle missing in phase: {self.phase.name}")
             self.phase = Phase.MAIN
@@ -181,31 +178,28 @@ class GameManager:
             self.active_interaction = None
             return
 
-        # リゾルバの復元
         resolver = EffectResolver(self)
         
-        # ▼ ターゲット選択の回答受信処理
         if action_type == "SELECT_TARGET":
             log_event("INFO", "game.resume_target", f"Resuming target selection for {source_card.master.name}", player=player.name)
             selected_uuids = payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])
             
-            # 選択されたUUIDからカードオブジェクトを特定
             selected_cards = []
             candidates = self.active_interaction.get("candidates", [])
             for uid in selected_uuids:
                 card = next((c for c in candidates if c.uuid == uid), None)
                 if card: selected_cards.append(card)
             
-            # コンテキストに保存 (save_idがある場合)
             query = continuation.get("query")
             if query and getattr(query, 'save_id', None):
                  continuation["effect_context"]["saved_targets"][query.save_id] = selected_cards
             
-            # active_interactionをクリアしてから再開
+            # コンテキストの last_target も更新
+            continuation["effect_context"]["saved_targets"]["last_target"] = selected_cards
+
             self.active_interaction = None
             resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
             
-        # ▼ 選択肢(Choice)の回答受信処理
         elif action_type == "CHOICE":
             log_event("INFO", "game.resume_choice", f"Resuming choice for {source_card.master.name}", player=player.name)
             selected_index = payload.get("index", payload.get("selected_option_index", 0))
@@ -229,16 +223,10 @@ class GameManager:
         
         if pending[KEY_PID] != player.name: raise ValueError(f"現在は {pending[KEY_PID]} のターン/フェイズです。")
         
-        # 期待されるアクションと一致するか確認
         expected_action = pending[KEY_ACTION]
-        
-        # 例外1: バトル中のPASSはブロック/カウンター選択時に許可
         if expected_action in [ACT_COUNTER, ACT_BLOCKER] and action_type == ACT_PASS: return True
-        
-        # 例外2: インタラクション中の回答は RESOLVE_EFFECT_SELECTION として許可
         if self.active_interaction and action_type == RESOLVE_SELECTION: return True
         
-        # 通常の一致確認
         if expected_action != action_type:
             raise ValueError(f"不適切なアクションです。期待されているアクション: {expected_action}")
         return True
@@ -323,6 +311,7 @@ class GameManager:
         current_owner, current_list = self._find_card_location(card)
         if current_list is not None and card in current_list: current_list.remove(card)
         elif current_owner and current_owner.stage == card: current_owner.stage = None
+        
         target_list = None
         if dest_zone == Zone.FIELD and card.master.type == CardType.STAGE:
             if dest_player.stage is not None: self.move_card(dest_player.stage, Zone.TRASH, dest_player)
@@ -332,6 +321,8 @@ class GameManager:
         elif dest_zone == Zone.TRASH: target_list = dest_player.trash
         elif dest_zone == Zone.LIFE: target_list = dest_player.life
         elif dest_zone == Zone.DECK: target_list = dest_player.deck
+        elif dest_zone == Zone.TEMP: target_list = dest_player.temp_zone
+        
         if target_list is not None:
             if dest_position == "TOP": target_list.insert(0, card)
             else: target_list.append(card)
@@ -434,28 +425,57 @@ class GameManager:
 
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int) -> bool:
         if not action: return False
-        log_event("INFO", "game.apply_action", f"Applying {action.type.name} to {len(targets)} targets", player=player.name)
-        if action.type == ActionType.DRAW:
+        
+        # 名前比較で判定（Enumの同一性問題を回避）
+        act_name = action.type.name if hasattr(action.type, 'name') else str(action.type)
+        log_event("INFO", "game.apply_action", f"Applying {act_name} to {len(targets)} targets", player=player.name)
+        
+        if act_name == "DRAW":
             self.draw_card(player, value); return True
+            
         success = False
+        
+        # LOOKアクション (山札操作)
+        if act_name == "LOOK":
+            count = value
+            deck = player.deck
+            if len(deck) < count: count = len(deck)
+            
+            log_event("INFO", "game.action_look", f"Looking at {count} cards from DECK", player=player.name)
+            for _ in range(count):
+                card = deck.pop(0)
+                player.temp_zone.append(card)
+            return True
+
         for target in targets:
             owner, _ = self._find_card_location(target)
             if not owner: continue
-            if action.type == ActionType.KO:
+            
+            if act_name == "KO":
                 self.move_card(target, Zone.TRASH, owner); log_event("INFO", "game.action_ko", f"{target.master.name} was KO'd by effect", player=player.name); success = True
-            elif action.type == ActionType.DISCARD:
+            
+            elif act_name in ["DISCARD", "TRASH"]:
                 self.move_card(target, Zone.TRASH, owner); success = True
-            elif action.type == ActionType.BOUNCE:
+            
+            elif act_name in ["BOUNCE", "MOVE_TO_HAND"]:
                 self.move_card(target, Zone.HAND, owner); success = True
-            elif action.type == ActionType.MOVE:
+            
+            elif act_name == "MOVE":
                 dest_zone = action.destination or Zone.TRASH; self.move_card(target, dest_zone, owner); success = True
-            elif action.type == ActionType.BUFF:
+            
+            elif act_name == "BUFF":
                 if hasattr(target, 'power_offset'): target.power_offset += value
                 log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name); success = True
-            elif action.type == ActionType.REST:
+            
+            elif act_name == "REST":
                 target.is_rest = True; success = True
-            elif action.type == ActionType.PLAY_CARD:
+            
+            elif act_name == "PLAY_CARD":
                 self.move_card(target, Zone.FIELD, owner); target.is_newly_played = True; success = True
+                
+            elif act_name == "DECK_BOTTOM":
+                self.move_card(target, Zone.DECK, owner, dest_position="BOTTOM"); success = True
+
         return success
 
     def get_dynamic_value(self, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict) -> int:
