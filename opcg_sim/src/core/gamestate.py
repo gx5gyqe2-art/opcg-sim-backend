@@ -210,8 +210,6 @@ class GameManager:
             if query and getattr(query, 'save_id', None):
                  continuation["effect_context"]["saved_targets"][query.save_id] = selected_cards
             
-            continuation["effect_context"]["saved_targets"]["last_target"] = selected_cards
-
             self.active_interaction = None
             resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
             
@@ -564,4 +562,3 @@ class GameManager:
         if val_source.dynamic_source == "COUNT_REFERENCE":
             log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name); return len(player.trash)
         return val_source.base
-

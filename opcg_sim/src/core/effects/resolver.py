@@ -21,6 +21,10 @@ class EffectResolver:
             log_event("INFO", "resolver.condition_failed", f"Condition not met for {source_card.master.name}", player=player.name)
             return
 
+        if ability.cost and not self._can_satisfy_node(player, ability.cost, source_card):
+            log_event("WARNING", "resolver.cost_impossible", f"Cost cannot be satisfied for {source_card.master.name}", player=player.name)
+            raise ValueError(f"コストの条件を満たすことができません: {source_card.master.name}")
+
         self.execution_stack = []
         if ability.effect:
             self.execution_stack.append(ability.effect)
@@ -28,6 +32,19 @@ class EffectResolver:
             self.execution_stack.append(ability.cost)
 
         self._process_stack(player, source_card)
+
+    def _can_satisfy_node(self, player, node: EffectNode, source_card) -> bool:
+        if isinstance(node, GameAction):
+            if not node.target: return True
+            from .matcher import get_target_cards
+            candidates = get_target_cards(self.game_manager, node.target, source_card)
+            required = getattr(node.target, 'count', 1)
+            if getattr(node.target, 'is_strict_count', False) and len(candidates) < required:
+                return False
+            return True
+        elif isinstance(node, Sequence):
+            return all(self._can_satisfy_node(player, a, source_card) for a in node.actions)
+        return True
 
     def _process_stack(self, player, source_card):
         while self.execution_stack:
@@ -94,7 +111,7 @@ class EffectResolver:
         is_optional = getattr(query, 'optional', False)
         is_up_to = getattr(query, 'is_up_to', False)
         is_strict = getattr(query, 'is_strict_count', False)
-        is_don_resource = (query.zone == Zone.COST_AREA)
+        is_resource = (query.zone == Zone.COST_AREA)
         
         if len(candidates) == 0:
             return []
@@ -103,11 +120,15 @@ class EffectResolver:
             log_event("INFO", "resolver.strict_count_fail", f"Insufficient targets for strict count: found {len(candidates)}, needed {required_count}", player=player.name)
             return []
             
-        if (query.select_mode == "ALL") or (len(candidates) <= required_count and not is_optional and not is_up_to) or (is_don_resource and not is_up_to):
-            selected = candidates[:required_count] if is_don_resource else candidates
+        if (query.select_mode == "ALL") or (len(candidates) <= required_count and not is_optional and not is_up_to) or (is_resource and not is_up_to):
+            selected = candidates[:required_count] if is_resource else candidates
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = selected
             return selected
+
+        if not query.save_id:
+            log_event("ERROR", "resolver.save_id_missing", f"Selection required but save_id is missing for {source_card.master.name}", player=player.name)
+            raise ValueError(f"プレイヤーの選択が必要ですが、ID(save_id)が未定義のため処理できません: {source_card.master.name}")
 
         self._suspend_for_target_selection(player, candidates, query, source_card, action_node)
         return None
