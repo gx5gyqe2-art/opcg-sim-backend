@@ -175,7 +175,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             candidates.extend(p.don_active)
             candidates.extend(p.don_rested)
 
-    # 【追加】動的コスト上限の計算
+    # 動的コスト上限の計算
     dynamic_cost_max = None
     if query.cost_max_dynamic == "DON_COUNT_FIELD":
         p = owner_player 
@@ -185,8 +185,14 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
     for card in candidates:
         if not card: continue
         
+        # ドン!!カード（masterを持たない）の処理
         if not hasattr(card, "master"):
+            # レスト状態の指定があればチェック
             if query.is_rest is not None and card.is_rest != query.is_rest: continue
+            
+            # 【追加】カードタイプ指定がある場合（例: CHARACTER）、ドン!!は対象外とする
+            if query.card_type: continue
+            
             results.append(card)
             continue
         
@@ -199,7 +205,6 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         if query.cost_max is not None and card.current_cost > query.cost_max: continue
         if query.cost_min is not None and card.current_cost < query.cost_min: continue
         
-        # 【追加】動的コスト上限チェック
         if dynamic_cost_max is not None and card.current_cost > dynamic_cost_max: continue
 
         if query.power_max is not None and card.get_power(True) > query.power_max: continue

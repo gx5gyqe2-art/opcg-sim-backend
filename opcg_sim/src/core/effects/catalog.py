@@ -55,7 +55,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                         traits=["聖地マリージョア"], 
                         count=1,
                         save_id="imu_start_play",
-                        # 【追加】1枚「まで」なのでTrueに設定
                         is_up_to=True
                     ),
                     destination=Zone.FIELD,
@@ -70,9 +69,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
         )
     ],
 
-    # ... (以下のカード定義は以前と同じため省略) ...
-    # シャルリア宮, チャルロス聖, ミョスガルド聖, etc...
-    # 必要であれば既存の定義をコピーしてください
     # ----------------------------------------------------
     # シャルリア宮 (OP13-086)
     # ----------------------------------------------------
@@ -107,7 +103,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ])
         )
     ],
-    # (他の定義も同様)
     "OP13-087": [
         Ability(
             trigger=TriggerType.ON_PLAY,
@@ -228,6 +223,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ],
+    
     # ----------------------------------------------------
     # 虚の玉座 (OP13-099)
     # ----------------------------------------------------
@@ -244,8 +240,8 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.REST,
-                    # コスト: 厳密に3枚必要
-                    target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=3, is_strict_count=True),
+                    # コスト: 厳密に3枚必要、かつ【追加】アクティブなドン!!のみ (is_rest=False)
+                    target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=3, is_strict_count=True, is_rest=False),
                     raw_text="ドン!!3枚をレストにする"
                 )
             ]),
@@ -267,5 +263,5 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 )
             ])
         )
-    ]
+    ],
 }
