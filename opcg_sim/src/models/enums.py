@@ -113,6 +113,10 @@ class ActionType(Enum):
     TRASH = auto()
     BUFF = auto()
     ACTIVE_DON = auto()
+    
+    # 追加分
+    BOUNCE = auto()
+    MOVE = auto()
 
 class TriggerType(Enum):
     ON_PLAY = "登場時"
@@ -146,6 +150,7 @@ class ConditionType(Enum):
     HAS_TRAIT = auto()
     HAS_ATTRIBUTE = auto()
     HAS_UNIT = auto()
+    HAS_DON = auto()
     IS_RESTED = auto()
     DON_COUNT = auto()
     DECK_COUNT = auto() 
