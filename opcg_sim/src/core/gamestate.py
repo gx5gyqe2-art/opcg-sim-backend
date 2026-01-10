@@ -335,7 +335,19 @@ class GameManager:
                 don = self.turn_player.don_deck.pop(0); self.turn_player.don_active.append(don)
         self.main_phase()
 
-    def main_phase(self): self.phase = Phase.MAIN
+    def main_phase(self): 
+        self.phase = Phase.MAIN
+        self._apply_passive_effects(self.turn_player)
+
+    def _apply_passive_effects(self, player: Player):
+        all_units = [player.leader] + player.field
+        if player.stage: all_units.append(player.stage)
+        for card in all_units:
+            if not card or not card.master.abilities: continue
+            for ability in card.master.abilities:
+                if ability.trigger == TriggerType.YOUR_TURN:
+                    log_event("DEBUG", "game.passive_trigger", f"Applying passive effect: {card.master.name}", player=player.name)
+                    self.resolve_ability(player, ability, source_card=card)
 
     def draw_card(self, player: Player, count: int = 1):
         for _ in range(count):
@@ -456,7 +468,6 @@ class GameManager:
         log_event("INFO", "game.play_card", f"Playing card: {card.master.name}", player=player.name, payload={"card_uuid": card.uuid})
         if card.master.type == CardType.EVENT:
             for ability in card.master.abilities:
-                log_event("DEBUG", "game.trigger_check", f"Event trigger: {ability.trigger.name}")
                 if ability.trigger in [TriggerType.ON_PLAY, TriggerType.ACTIVATE_MAIN]:
                     self.resolve_ability(player, ability, source_card=card)
             self.move_card(card, Zone.TRASH, player)
@@ -464,9 +475,9 @@ class GameManager:
             self.move_card(card, Zone.FIELD, player); card.attached_don = 0; card.is_newly_played = True
             if not card.ability_disabled:
                 for ability in card.master.abilities:
-                    log_event("DEBUG", "game.trigger_check", f"Char trigger: {ability.trigger.name}")
                     if ability.trigger == TriggerType.ON_PLAY:
                         self.resolve_ability(player, ability, source_card=card)
+            self._apply_passive_effects(player)
 
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
@@ -474,51 +485,43 @@ class GameManager:
 
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int) -> bool:
         if not action: return False
-        
         act_name = action.type.name if hasattr(action.type, 'name') else str(action.type)
         log_event("INFO", "game.apply_action", f"Applying {act_name} to {len(targets)} targets", player=player.name)
-        
         if act_name == "DRAW":
             self.draw_card(player, value); return True
-            
-        success = False
-        
         if act_name == "SHUFFLE":
             random.shuffle(player.deck)
             log_event("INFO", "game.action_shuffle", "Deck shuffled", player=player.name)
             return True
-
         if act_name == "LOOK":
             count = value
             deck = player.deck
             if len(deck) < count: count = len(deck)
-            
             log_event("INFO", "game.action_look", f"Looking at {count} cards from DECK", player=player.name)
             for _ in range(count):
                 card = deck.pop(0)
                 player.temp_zone.append(card)
             return True
-
         for target in targets:
             owner, source_list = self._find_card_location(target)
             if not owner: continue
-            
             if act_name == "KO":
                 self.move_card(target, Zone.TRASH, owner); log_event("INFO", "game.action_ko", f"{target.master.name} was KO'd by effect", player=player.name); success = True
-            
             elif act_name in ["DISCARD", "TRASH"]:
                 self.move_card(target, Zone.TRASH, owner); success = True
-            
             elif act_name in ["BOUNCE", "MOVE_TO_HAND"]:
                 self.move_card(target, Zone.HAND, owner); success = True
-            
             elif act_name == "MOVE":
                 dest_zone = action.destination or Zone.TRASH; self.move_card(target, dest_zone, owner); success = True
-            
             elif act_name == "BUFF":
-                if hasattr(target, 'power_offset'): target.power_offset += value
-                log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name); success = True
-            
+                if action.status == "POWER_OVERRIDE":
+                    target.base_power_override = value
+                    log_event("INFO", "game.action_override", f"{target.master.name}'s power set to {value}", player=player.name)
+                else:
+                    if hasattr(target, 'power_buff'):
+                        target.power_buff += value
+                        log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name)
+                success = True
             elif act_name == "REST":
                 target.is_rest = True
                 if isinstance(target, DonInstance) and source_list is not None:
@@ -526,16 +529,13 @@ class GameManager:
                         if target in source_list:
                             source_list.remove(target)
                             owner.don_rested.append(target)
-                            if hasattr(target, 'attached_to'):
-                                target.attached_to = None
+                            if hasattr(target, 'attached_to'): target.attached_to = None
                 success = True
-            
             elif act_name == "PLAY_CARD":
                 self.move_card(target, Zone.FIELD, owner); target.is_newly_played = True; success = True
-                
+                self._apply_passive_effects(owner)
             elif act_name == "DECK_BOTTOM":
                 self.move_card(target, Zone.DECK, owner, dest_position="BOTTOM"); success = True
-
         return success
 
     def get_dynamic_value(self, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict) -> int:
@@ -543,3 +543,4 @@ class GameManager:
         if val_source.dynamic_source == "COUNT_REFERENCE":
             log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name); return len(player.trash)
         return val_source.base
+

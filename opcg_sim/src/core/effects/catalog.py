@@ -5,15 +5,9 @@ from ...models.effect_types import (
 from ...models.enums import TriggerType, ActionType, Zone, ConditionType, CompareOperator, Player, Color
 
 def get_manual_ability(card_id: str) -> List[Ability]:
-    """カードIDから手動定義された効果リストを取得する。定義がなければ空リストを返す。"""
     return MANUAL_EFFECTS.get(card_id, [])
 
-# カードIDごとの効果定義
 MANUAL_EFFECTS: Dict[str, List[Ability]] = {
-    
-    # ----------------------------------------------------
-    # リーダー: イム (OP13-079)
-    # ----------------------------------------------------
     "OP13-079": [
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,
@@ -62,16 +56,11 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.SHUFFLE,
-
                     raw_text="デッキをシャッフルする"
                 )
             ])
         )
     ],
-
-    # ----------------------------------------------------
-    # シャルリア宮 (OP13-086)
-    # ----------------------------------------------------
     "OP13-086": [
         Ability(
             trigger=TriggerType.ON_PLAY,
@@ -186,6 +175,24 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ],
+    "OP13-094": [
+        Ability(
+            trigger=TriggerType.YOUR_TURN,
+            effect=GameAction(
+                type=ActionType.BUFF,
+                target=TargetQuery(
+                    player=Player.SELF, 
+                    zone=Zone.FIELD, 
+                    traits=["五老星"], 
+                    card_type=["CHARACTER"], 
+                    select_mode="ALL"
+                ),
+                value=ValueSource(base=7000),
+                status="POWER_OVERRIDE",
+                raw_text="自分の特徴《五老星》を持つキャラすべてのパワーを7000にする"
+            )
+        )
+    ],
     "OP13-096": [
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,
@@ -223,10 +230,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ],
-    
-    # ----------------------------------------------------
-    # 虚の玉座 (OP13-099)
-    # ----------------------------------------------------
     "OP13-099": [
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,
@@ -234,13 +237,11 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             cost=Sequence(actions=[
                 GameAction(
                     type=ActionType.REST,
-                    # コスト: 厳密に1枚必要
                     target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, names=["虚の玉座"], count=1, is_strict_count=True),
                     raw_text="このステージをレストにする"
                 ),
                 GameAction(
                     type=ActionType.REST,
-                    # コスト: 厳密に3枚必要、かつ【追加】アクティブなドン!!のみ (is_rest=False)
                     target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=3, is_strict_count=True, is_rest=False),
                     raw_text="ドン!!3枚をレストにする"
                 )
@@ -248,7 +249,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             effect=Sequence(actions=[
                 GameAction(
                     type=ActionType.PLAY_CARD,
-                    # 動的コスト上限: 自分の場のドン!!枚数
                     target=TargetQuery(
                         player=Player.SELF, 
                         zone=Zone.HAND, 
@@ -256,7 +256,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                         colors=["黒"], 
                         count=1, 
                         is_up_to=True,
-                        cost_max_dynamic="DON_COUNT_FIELD" # 動的参照を指定
+                        cost_max_dynamic="DON_COUNT_FIELD"
                     ),
                     destination=Zone.FIELD,
                     raw_text="手札から自分の場のドン!!の枚数以下のコストを持つ黒の特徴《五老星》を持つキャラカード1枚までを、登場させる"
