@@ -167,7 +167,8 @@ class GameManager:
         self.active_interaction = None
         resolver = EffectResolver(self)
         log_event("INFO", "game.resume_effect", f"Resuming effect for {source_card.master.name}", player=player.name)
-        selected_index = payload.get("index", 0)
+        
+        selected_index = payload.get("index", payload.get("selected_option_index", 0))
         resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
     def _validate_action(self, player: Player, action_type: str):
@@ -376,35 +377,49 @@ class GameManager:
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int) -> bool:
         if not action: return False
         log_event("INFO", "game.apply_action", f"Applying {action.type.name} to {len(targets)} targets", player=player.name)
+        
+        if action.type == ActionType.DRAW:
+            self.draw_card(player, value)
+            return True
+
         success = False
         for target in targets:
             owner, _ = self._find_card_location(target)
             if not owner: continue
+            
             if action.type == ActionType.KO:
                 self.move_card(target, Zone.TRASH, owner)
                 log_event("INFO", "game.action_ko", f"{target.master.name} was KO'd by effect", player=player.name)
                 success = True
-            elif action.type == ActionType.DRAW:
-                self.draw_card(player, value)
+            elif action.type == ActionType.DISCARD:
+                self.move_card(target, Zone.TRASH, owner)
+                success = True
+            elif action.type == ActionType.BOUNCE:
+                self.move_card(target, Zone.HAND, owner)
                 success = True
             elif action.type == ActionType.MOVE:
-                dest_zone = action.params.get("zone", Zone.TRASH)
-                self.move_card(target, dest_zone, player)
+                dest_zone = action.destination or Zone.TRASH
+                self.move_card(target, dest_zone, owner)
                 success = True
             elif action.type == ActionType.BUFF:
-                target.power_offset += value
+                if hasattr(target, 'power_offset'):
+                    target.power_offset += value
                 log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name)
                 success = True
             elif action.type == ActionType.REST:
                 target.is_rest = True
                 success = True
+            elif action.type == ActionType.PLAY_CARD:
+                self.move_card(target, Zone.FIELD, owner)
+                target.is_newly_played = True
+                success = True
+                
         return success
 
     def get_dynamic_value(self, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict) -> int:
+        if not val_source: return 0
         if val_source.dynamic_source == "COUNT_REFERENCE":
             log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name)
-            target_zone = val_source.params.get("zone", "trash")
-            if target_zone == "trash": return len(player.trash)
-            elif target_zone == "field": return len(player.field)
-        return val_source.value or 0
-
+            # モデルにparamsがないため、現在はデフォルトでTrashをカウント
+            return len(player.trash)
+        return val_source.base
