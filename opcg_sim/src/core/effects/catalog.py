@@ -24,13 +24,13 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                     # 1. 自分の特徴《天竜人》を持つキャラをトラッシュに置く
                     GameAction(
                         type=ActionType.TRASH,
-                        target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, traits=["天竜人"], count=1),
+                        target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, traits=["天竜人"], count=1, save_id="cost_char"),
                         raw_text="自分の特徴《天竜人》を持つキャラをトラッシュに置く"
                     ),
                     # 2. 手札1枚をトラッシュに置く
                     GameAction(
                         type=ActionType.TRASH,
-                        target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1),
+                        target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, save_id="cost_hand"),
                         raw_text="手札1枚をトラッシュに置く"
                     )
                 ]
@@ -50,7 +50,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
         Ability(
             trigger=TriggerType.ON_PLAY,
             effect=Sequence(actions=[
-                # 【修正】LOOKから target を削除（自動処理にするため）
                 GameAction(
                     type=ActionType.LOOK,
                     value=ValueSource(base=3),
@@ -59,19 +58,21 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.MOVE_TO_HAND,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["天竜人"], count=1), 
+                    # 【重要】save_idを追加して選択ループを回避
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["天竜人"], count=1, save_id="shalria_select"), 
                     destination=Zone.HAND,
                     raw_text="「シャルリア宮」以外の特徴《天竜人》を持つカード1枚までを公開し、手札に加える"
                 ),
                 GameAction(
                     type=ActionType.TRASH,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL"),
+                    # 【重要】count=99にして自動全選択にする（残り全て）
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL", count=99),
                     destination=Zone.TRASH,
                     raw_text="残りをトラッシュに置く"
                 ),
                 GameAction(
                     type=ActionType.DISCARD,
-                    target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1),
+                    target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, save_id="shalria_discard"),
                     destination=Zone.TRASH,
                     raw_text="自分の手札1枚を捨てる"
                 )
@@ -85,6 +86,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
     "OP13-087": [
         Ability(
             trigger=TriggerType.ON_PLAY,
+            # デッキトップ1枚トラッシュは選択余地がないためsave_id不要（自動）
             effect=GameAction(
                 type=ActionType.TRASH,
                 target=TargetQuery(player=Player.SELF, zone=Zone.DECK, count=1),
@@ -102,7 +104,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             condition=Condition(type=ConditionType.LIFE_COUNT, operator=CompareOperator.LE, value=3),
             effect=GameAction(
                 type=ActionType.PLAY_CARD,
-                target=TargetQuery(zone=Zone.TRASH, player=Player.SELF, card_type=["STAGE"], cost_max=1, traits=["聖地マリージョア"], count=1),
+                target=TargetQuery(zone=Zone.TRASH, player=Player.SELF, card_type=["STAGE"], cost_max=1, traits=["聖地マリージョア"], count=1, save_id="myosgard_revive"),
                 destination=Zone.FIELD,
                 raw_text="自分のトラッシュからコスト1の特徴《聖地マリージョア》を持つステージカード1枚までを、登場させる"
             )
@@ -130,7 +132,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
         Ability(
             trigger=TriggerType.ON_PLAY,
             effect=Sequence(actions=[
-                # 【修正】LOOKから target を削除
                 GameAction(
                     type=ActionType.LOOK,
                     value=ValueSource(base=5),
@@ -138,13 +139,14 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.MOVE_TO_HAND,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["五老星"], count=1),
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["五老星"], count=1, save_id="saturn_select"),
                     destination=Zone.HAND,
                     raw_text="特徴《五老星》を持つカード1枚までを公開し、手札に加える"
                 ),
                 GameAction(
                     type=ActionType.DECK_BOTTOM,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL"),
+                    # count=99で残り全てを対象にする
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL", count=99),
                     destination=Zone.DECK,
                     raw_text="残りを好きな順番でデッキの下に置く"
                 )
@@ -161,7 +163,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             condition=Condition(type=ConditionType.TRASH_COUNT, operator=CompareOperator.GE, value=10),
             effect=GameAction(
                 type=ActionType.BUFF,
-                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], count=1),
+                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], count=1, save_id="nasujuro_debuff"),
                 value=ValueSource(base=-2000),
                 raw_text="相手のキャラ1枚までを、このターン中、パワー-2000"
             )
@@ -176,12 +178,12 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             trigger=TriggerType.ON_PLAY,
             cost=GameAction(
                 type=ActionType.DISCARD,
-                target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1),
+                target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, save_id="mars_cost"),
                 raw_text="自分の手札1枚を捨てることができる"
             ),
             effect=GameAction(
                 type=ActionType.KO,
-                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=5),
+                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=5, save_id="mars_ko"),
                 raw_text="相手の元々のコスト5以下のキャラ1枚までを、KOする"
             )
         )
@@ -194,7 +196,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,
             effect=Sequence(actions=[
-                # 【修正】LOOKから target を削除
                 GameAction(
                     type=ActionType.LOOK,
                     value=ValueSource(base=3),
@@ -202,12 +203,12 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.MOVE_TO_HAND,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["天竜人"], count=1),
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, traits=["天竜人"], count=1, save_id="event_select"),
                     destination=Zone.HAND
                 ),
                 GameAction(
                     type=ActionType.TRASH,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL"),
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL", count=99),
                     destination=Zone.TRASH
                 )
             ])
@@ -222,12 +223,12 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             trigger=TriggerType.ACTIVATE_MAIN,
             cost=GameAction(
                 type=ActionType.REST,
-                target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=5), 
+                target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=5, save_id="event_cost_don"), 
                 raw_text="自分のドン‼5枚をレストにできる"
             ),
             effect=GameAction(
                 type=ActionType.KO,
-                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=6),
+                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=6, save_id="event_ko"),
                 raw_text="相手の元々のコスト6以下のキャラ1枚までを、KOする"
             )
         )
@@ -240,12 +241,12 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
         Ability(
             trigger=TriggerType.ACTIVATE_MAIN,
             cost=Sequence(actions=[
-                GameAction(type=ActionType.REST, target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, names=["虚の玉座"], count=1)),
-                GameAction(type=ActionType.REST, target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=3))
+                GameAction(type=ActionType.REST, target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, names=["虚の玉座"], count=1, save_id="throne_rest")),
+                GameAction(type=ActionType.REST, target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=3, save_id="throne_don"))
             ]),
             effect=GameAction(
                 type=ActionType.PLAY_CARD,
-                target=TargetQuery(player=Player.SELF, zone=Zone.HAND, traits=["五老星"], colors=["黒"]),
+                target=TargetQuery(player=Player.SELF, zone=Zone.HAND, traits=["五老星"], colors=["黒"], save_id="throne_play"),
                 destination=Zone.FIELD,
                 raw_text="手札から黒の特徴《五老星》を持つキャラカード1枚までを登場させる"
             )
