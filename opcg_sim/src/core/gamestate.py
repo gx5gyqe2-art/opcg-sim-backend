@@ -42,7 +42,6 @@ class Player:
             if self.deck:
                 self.hand.append(self.deck.pop(0))
 
-    # 【追加】セットアップ処理の分割用メソッド
     def shuffle_deck(self):
         random.shuffle(self.deck)
 
@@ -222,11 +221,9 @@ class GameManager:
             
             resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
-        # 【修正】セットアップ中断からの復帰時に、ターン1を開始する
         if not self.active_interaction and self.setup_phase_pending:
             self.finish_setup()
             self.setup_phase_pending = False
-            # ターン開始処理 (start_gameの末尾と同じ処理)
             log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
             self.turn_count = 1
             self.refresh_phase()
@@ -349,7 +346,6 @@ class GameManager:
 
     def _find_card_location(self, card: Card) -> Tuple[Optional[Player], Optional[List[Any]]]:
         for p in [self.p1, self.p2]:
-            # 【修正】ドン!!エリア（active, rested, attached）も探索対象に追加
             zones = [
                 p.hand, p.field, p.life, p.trash, p.deck, p.temp_zone,
                 p.don_active, p.don_rested, p.don_attached_cards
@@ -504,7 +500,7 @@ class GameManager:
             return True
 
         for target in targets:
-            owner, _ = self._find_card_location(target)
+            owner, source_list = self._find_card_location(target)
             if not owner: continue
             
             if act_name == "KO":
@@ -524,7 +520,15 @@ class GameManager:
                 log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name); success = True
             
             elif act_name == "REST":
-                target.is_rest = True; success = True
+                target.is_rest = True
+                if isinstance(target, DonInstance) and source_list is not None:
+                    if source_list is not owner.don_rested:
+                        if target in source_list:
+                            source_list.remove(target)
+                            owner.don_rested.append(target)
+                            if hasattr(target, 'attached_to'):
+                                target.attached_to = None
+                success = True
             
             elif act_name == "PLAY_CARD":
                 self.move_card(target, Zone.FIELD, owner); target.is_newly_played = True; success = True
