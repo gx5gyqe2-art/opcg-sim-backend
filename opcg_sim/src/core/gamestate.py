@@ -203,8 +203,6 @@ class GameManager:
             log_event("INFO", "game.resume_choice", f"Resuming choice for {source_card.master.name}", player=player.name)
             selected_index = payload.get("index", payload.get("selected_option_index", 0))
             
-            # 【修正】ここでの self.active_interaction = None を削除
-            # resolver.resume_choice 内で、データを取り出した後に None にされるため
             resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
     def _validate_action(self, player: Player, action_type: str):
@@ -234,6 +232,15 @@ class GameManager:
     def start_game(self, first_player: Optional[Player] = None):
         log_event("INFO", "game.start", "Game initialization started")
         self.p1.setup_game(); self.p2.setup_game()
+        
+        # 【追加】ゲーム開始時効果の解決 (イムなど)
+        for p in [self.p1, self.p2]:
+            if p.leader:
+                for ability in p.leader.master.abilities:
+                    if ability.trigger == TriggerType.GAME_START:
+                        log_event("INFO", "game.trigger_gamestart", f"Resolving GAME_START for {p.leader.master.name}", player=p.name)
+                        self.resolve_ability(p, ability, source_card=p.leader)
+
         if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
         else: self.turn_player = self.p1; self.opponent = self.p2
         log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
@@ -426,7 +433,6 @@ class GameManager:
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int) -> bool:
         if not action: return False
         
-        # 名前比較で判定
         act_name = action.type.name if hasattr(action.type, 'name') else str(action.type)
         log_event("INFO", "game.apply_action", f"Applying {act_name} to {len(targets)} targets", player=player.name)
         
@@ -435,6 +441,13 @@ class GameManager:
             
         success = False
         
+        # 【追加】SHUFFLEアクション
+        if act_name == "SHUFFLE":
+            random.shuffle(player.deck)
+            log_event("INFO", "game.action_shuffle", "Deck shuffled", player=player.name)
+            return True
+
+        # LOOKアクション (山札操作)
         if act_name == "LOOK":
             count = value
             deck = player.deck

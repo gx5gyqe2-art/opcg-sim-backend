@@ -2,7 +2,7 @@ from typing import Dict, List
 from ...models.effect_types import (
     Ability, Sequence, GameAction, TargetQuery, ValueSource, Branch, Choice, Condition
 )
-from ...models.enums import TriggerType, ActionType, Zone, ConditionType, CompareOperator, Player
+from ...models.enums import TriggerType, ActionType, Zone, ConditionType, CompareOperator, Player, Color
 
 def get_manual_ability(card_id: str) -> List[Ability]:
     """カードIDから手動定義された効果リストを取得する。定義がなければ空リストを返す。"""
@@ -20,7 +20,6 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             condition=Condition(type=ConditionType.TURN_LIMIT, value=1), # ターン1回
             cost=Choice(
                 message="コストを選択してください",
-                # 【修正】option_labels を追加（これがボタンの文字になります）
                 option_labels=[
                     "自分の特徴《天竜人》を持つキャラをトラッシュ",
                     "手札1枚をトラッシュ"
@@ -45,6 +44,32 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 value=ValueSource(base=1),
                 raw_text="カード1枚を引く"
             )
+        ),
+        # 【追加】ゲーム開始時
+        Ability(
+            trigger=TriggerType.GAME_START,
+            effect=Sequence(actions=[
+                # 1. デッキから対象を探して登場させる
+                GameAction(
+                    type=ActionType.PLAY_CARD,
+                    target=TargetQuery(
+                        zone=Zone.DECK, 
+                        player=Player.SELF, 
+                        card_type=["STAGE"], 
+                        traits=["聖地マリージョア"], 
+                        count=1,
+                        save_id="imu_start_play"
+                    ),
+                    destination=Zone.FIELD,
+                    raw_text="ゲーム開始時、自分のデッキから特徴《聖地マリージョア》を持つステージカード1枚までを、登場させる"
+                ),
+                # 2. デッキをシャッフル
+                GameAction(
+                    type=ActionType.SHUFFLE,
+                    target=TargetQuery(zone=Zone.DECK, player=Player.SELF),
+                    raw_text="デッキをシャッフルする"
+                )
+            ])
         )
     ],
 

@@ -117,8 +117,7 @@ class ActionType(Enum):
     BOUNCE = auto()
     MOVE = auto()
     
-    # 必要に応じて追加
-    HEAL = auto() # parserで使用
+    HEAL = auto() 
 
 class TriggerType(Enum):
     ON_PLAY = "登場時"
@@ -134,10 +133,12 @@ class TriggerType(Enum):
     RULE = "ルール"
     PASSIVE = "常時"
     
-    # 不足していたものを追加
     YOUR_TURN = "自分のターン中"
     OPPONENT_TURN = "相手のターン中"
     OPPONENT_ATTACK = "相手のアタック時"
+    
+    # 【追加】ゲーム開始時
+    GAME_START = "ゲーム開始時"
     
     UNKNOWN = "不明"
 
@@ -168,9 +169,8 @@ class ConditionType(Enum):
     OTHER = auto()
     NONE = auto()
     
-    # 【追加】不足していた定義
-    TURN_LIMIT = auto() # ターン1回制限など
-    GENERIC = auto()    # 汎用条件
+    TURN_LIMIT = auto()
+    GENERIC = auto()
 
 class ParserKeyword(str, Enum):
     DON = "ドン"
