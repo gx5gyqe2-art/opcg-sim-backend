@@ -3,7 +3,7 @@ import unicodedata
 import re
 from typing import List, Dict, Any, Optional, Tuple
 from ..models.models import CardMaster, CardInstance
-from ..core.effects.parser import EffectParser
+from ..core.effects.parser import Effect
 from ..models.effect_types import Ability
 from ..models.enums import CardType, Attribute, Color, TriggerType
 from ..utils.logger_config import log_event
@@ -12,6 +12,7 @@ def _nfc(text: str) -> str:
     return unicodedata.normalize('NFC', text)
 
 class RawDataLoader:
+    # ... (既存メソッド load_json は変更なし) ...
     @staticmethod
     def load_json(file_path: str) -> Any:
         log_event(level_key="DEBUG", action="loader.load_json", msg=f"Loading JSON from {file_path}...")
@@ -26,8 +27,7 @@ class RawDataLoader:
             return []
 
 class DataCleaner:
-    _parser = EffectParser()
-
+    # ... (normalize_text, parse_int, parse_traits, parse_abilities, map_color, map_card_type, map_attribute は変更なし) ...
     @staticmethod
     def normalize_text(text: Any) -> str:
         if text is None: return ""
@@ -52,18 +52,15 @@ class DataCleaner:
     def parse_abilities(text: str, is_trigger: bool = False) -> List[Ability]:
         s_text = DataCleaner.normalize_text(text)
         if not s_text or s_text in [_nfc("なし"), "None", ""]: return []
-        
-        abilities = []
-        blocks = re.split(r'(?=\[)', s_text) if '[' in s_text else [s_text]
-        
-        for block in blocks:
-            if not block.strip(): continue
-            ability = DataCleaner._parser.parse_ability(block.strip())
+        try:
+            effect_parser = Effect(s_text)
+            abilities = effect_parser.abilities
             if is_trigger:
-                ability.trigger = TriggerType.TRIGGER
-            abilities.append(ability)
-            
-        return abilities
+                for ability in abilities: ability.trigger = TriggerType.TRIGGER
+            return abilities
+        except Exception as e:
+            log_event(level_key="DEBUG", action="loader.parse_abilities_error", msg=f"Error parsing abilities text: '{s_text[:20]}...' -> {e}")
+            return []
 
     @staticmethod
     def map_color(value: str) -> Color:
@@ -90,19 +87,20 @@ class DataCleaner:
         return Attribute.NONE
 
 class CardLoader:
+    # --- DBのカラム名マッピング定義 ---
     DB_MAPPING = {
         "ID": ["number", "Number", _nfc("品番"), _nfc("型番"), "id"],
-        "NAME": ["name", "Name", _nfc("名前"), _nfc("カード名")],
+        "NAME": ["name", "Name", _nfc("名前"), _nfc("カード名")],
         "TYPE": [_nfc("種類"), "Type", "type"],
         "ATTRIBUTE": [_nfc("属性"), "Attribute", "attribute"],
         "COLOR": [_nfc("色"), "Color", "color"],
         "COST": [_nfc("コスト"), "Cost", "cost"],
-        "POWER": [_nfc("パワー"), "Power", "power"],
+        "POWER": [_nfc("パワー"), "Power", "power"],
         "COUNTER": [_nfc("カウンター"), "Counter", "counter"],
         "LIFE": [_nfc("ライフ"), "Life", "life"],
         "TRAITS": [_nfc("特徴"), "Traits", "traits"],
         "TEXT": [_nfc("効果(テキスト)"), _nfc("テキスト"), "Text", "text"],
-        "TRIGGER": [_nfc("効果(トリガー)"), _nfc("トリガー"), "Trigger", "trigger"]
+        "TRIGGER": [_nfc("効果(トリガー)"), _nfc("トリガー"), "Trigger", "trigger"]
     }
 
     def __init__(self, json_path: str):
@@ -142,6 +140,7 @@ class CardLoader:
                     return raw[norm_key]
             return default
         
+        # マッピング定数を使用
         M = self.DB_MAPPING
 
         card_id = DataCleaner.normalize_text(get_val(M["ID"], "N/A"))
@@ -182,3 +181,40 @@ class CardLoader:
             life=life,
             abilities=combined_abilities
         )
+
+class DeckLoader:
+    # ... (DeckLoader は特に変更なし) ...
+    def __init__(self, card_loader: CardLoader):
+        self.card_loader = card_loader
+
+    def load_deck(self, file_path: str, owner_id: str) -> Tuple[Optional[CardInstance], List[CardInstance]]:
+        data = RawDataLoader.load_json(file_path)
+        deck_data = {}
+        if isinstance(data, list) and len(data) > 0:
+            deck_data = data[0]
+        elif isinstance(data, dict):
+            deck_data = data
+        else:
+            log_event(level_key="ERROR", action="loader.invalid_deck", msg=f"Invalid deck format in {file_path}", player="system")
+            return None, []
+
+        leader_instance = None
+        if "leader" in deck_data:
+            leader_id = deck_data["leader"].get("number")
+            if leader_id:
+                leader_master = self.card_loader.get_card(leader_id)
+                if leader_master:
+                    leader_instance = CardInstance(leader_master, owner_id)
+
+        deck_list: List[CardInstance] = []
+        if "cards" in deck_data:
+            for item in deck_data["cards"]:
+                card_id = item.get("number")
+                count = item.get("count", 0)
+                master = self.card_loader.get_card(card_id)
+                if master:
+                    for _ in range(count):
+                        deck_list.append(CardInstance(master, owner_id))
+
+        log_event(level_key="INFO", action="loader.deck_load_success", msg=f"Loaded Deck: Leader={leader_instance.master.name if leader_instance else 'None'}, Deck Size={len(deck_list)}", player=owner_id)
+        return leader_instance, deck_list

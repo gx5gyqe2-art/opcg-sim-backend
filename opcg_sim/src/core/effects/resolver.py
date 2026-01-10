@@ -1,527 +1,122 @@
-from typing import Optional, List, Any, Dict
-import random
-import copy
-from ...models.enums import ActionType, Zone, ConditionType, CompareOperator, TriggerType
-from ...models.effect_types import EffectAction, Condition
-from ...models.models import CardType
+from typing import List, Any, Dict, Optional
+from ...models.effect_types import (
+    EffectNode, GameAction, Sequence, Branch, Choice, ValueSource
+)
+from ...models.enums import ActionType, Zone, TriggerType
 from ...utils.logger_config import log_event
 
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from ..gamestate import GameManager, Player, CardInstance
-
-def check_condition(game_manager: 'GameManager', player: 'Player', condition: Optional[Condition], source_card: 'CardInstance', effect_context: Optional[Dict[str, Any]] = None) -> bool:
-    if not condition: return True
-    from .matcher import get_target_cards
-    
-    if effect_context is None: effect_context = {}
-
-    res = False
-    
-    if condition.type == ConditionType.CONTEXT:
-        if condition.value == "LAST_ACTION_SUCCESS":
-            res = effect_context.get("last_action_success", False)
-            log_event("DEBUG", "resolver.ctx_check", f"Checking LAST_ACTION_SUCCESS: {res}", player=player.name)
-        
-        elif str(condition.value).startswith("TYPE_") or condition.value in ["HAS_TRAIT", "COST_CHECK"]:
-            revealed = effect_context.get("revealed_cards", [])
-            if not revealed:
-                res = False
-            else:
-                target_card = revealed[0]
-                
-                if condition.value == "TYPE_EVENT":
-                    res = (target_card.master.type == CardType.EVENT)
-                elif condition.value == "TYPE_CHARACTER":
-                    res = (target_card.master.type == CardType.CHARACTER)
-                elif condition.value == "HAS_TRAIT" and condition.target:
-                    res = any(t in target_card.master.traits for t in condition.target.traits)
-                elif condition.value == "COST_CHECK" and condition.target:
-                    res = True
-                    if condition.target.cost_min is not None and target_card.current_cost < condition.target.cost_min:
-                        res = False
-
-    elif condition.target:
-        matches = get_target_cards(game_manager, condition.target, source_card)
-        res = len(matches) > 0
-        log_event("DEBUG", "resolver.check_condition_target", f"Target condition: {len(matches)} matches", player=player.name)
-    elif condition.type == ConditionType.LIFE_COUNT:
-        val = len(player.life)
-        if condition.operator == CompareOperator.GE: res = val >= condition.value
-        elif condition.operator == CompareOperator.LE: res = val <= condition.value
-        else: res = val == condition.value
-    elif condition.type == ConditionType.HAND_COUNT:
-        val = len(player.hand)
-        if condition.operator == CompareOperator.GE: res = val >= condition.value
-        elif condition.operator == CompareOperator.LE: res = val <= condition.value
-        else: res = val == condition.value
-    elif condition.type == ConditionType.DON_COUNT:
-        val = len(player.don_active) + len(player.don_rested)
-        if condition.operator == CompareOperator.GE: res = val >= condition.value
-        elif condition.operator == CompareOperator.LE: res = val <= condition.value
-        else: res = val == condition.value
-    elif condition.type == ConditionType.TRASH_COUNT:
-        val = len(player.trash)
-        if condition.operator == CompareOperator.GE: res = val >= condition.value
-        elif condition.operator == CompareOperator.LE: res = val <= condition.value
-        else: res = val == condition.value
-    elif condition.type == ConditionType.DECK_COUNT:
-        val = len(player.deck)
-        if condition.operator == CompareOperator.GE: res = val >= condition.value
-        elif condition.operator == CompareOperator.LE: res = val <= condition.value
-        else: res = val == condition.value
-    elif condition.type == ConditionType.HAS_TRAIT:
-        has_in_field = any(condition.value in c.master.traits for c in player.field)
-        has_in_source = (source_card and condition.value in source_card.master.traits)
-        res = has_in_field or has_in_source
-    elif condition.type == ConditionType.LEADER_NAME:
-        res = player.leader and player.leader.master.name == condition.value
-    
-    log_event("INFO", "resolver.condition_result", f"Condition [{condition.raw_text}]: {res}", player=player.name)
-    return res
-
-def execute_action(
-    game_manager: 'GameManager', 
-    player: 'Player', 
-    action: EffectAction, 
-    source_card: 'CardInstance', 
-    effect_context: Optional[Dict[str, Any]] = None
-) -> bool:
-    from .matcher import get_target_cards
-    if effect_context is None: effect_context = {}
-
-    if not check_condition(game_manager, player, action.condition, source_card, effect_context):
-        return True
-
-    targets = []
-    selected_uuids = effect_context.get("selected_uuids")
-    
-    if action.type == ActionType.SELECT_OPTION:
-        selected_option = effect_context.get("selected_option_index")
-        
-        if selected_option is None:
-            labels = []
-            if action.details and "option_labels" in action.details:
-                labels = [{"label": l, "value": i} for i, l in enumerate(action.details["option_labels"])]
-            else:
-                labels = [{"label": "選択肢1", "value": 0}, {"label": "選択肢2", "value": 1}]
-
-            game_manager.active_interaction = {
-                "player_id": player.name,
-                "action_type": "SELECT_OPTION", 
-                "message": action.raw_text or "効果を選択してください",
-                "options": labels,
-                "can_skip": False,
-                "continuation": {
-                    "action": action,
-                    "source_card_uuid": source_card.uuid,
-                    "effect_context": effect_context
-                }
-            }
-            log_event("INFO", "resolver.select_option_suspend", "Suspended for Option Selection", player=player.name)
-            return False
-            
-        else:
-            log_event("INFO", "resolver.select_option_resume", f"Option {selected_option} selected", player=player.name)
-            
-            if "selected_option_index" in effect_context:
-                del effect_context["selected_option_index"]
-
-            if action.details and "resolvable_options" in action.details:
-                options = action.details["resolvable_options"]
-                if 0 <= selected_option < len(options):
-                    chosen_action = options[selected_option]
-                    log_event("INFO", "resolver.execute_option", f"Executing option {selected_option}", player=player.name)
-                    
-                    effective_action = copy.copy(action)
-                    effective_action.type = chosen_action.type
-                    effective_action.target = chosen_action.target
-                    effective_action.value = chosen_action.value
-                    effective_action.condition = chosen_action.condition
-                    effective_action.raw_text = chosen_action.raw_text
-                    effective_action.details = chosen_action.details
-                    effective_action.source_zone = chosen_action.source_zone
-                    effective_action.dest_zone = chosen_action.dest_zone
-                    
-                    effective_action.then_actions = list(action.then_actions)
-                    if chosen_action.then_actions:
-                        effective_action.then_actions[0:0] = chosen_action.then_actions
-
-                    sub_success = execute_action(game_manager, player, effective_action, source_card, effect_context)
-                    if not sub_success: return False
-
-    if action.target:
-        if action.target.select_mode == "REFERENCE":
-            last_uuid = effect_context.get("last_target_uuid")
-            if last_uuid:
-                ref_card = game_manager._find_card_by_uuid(last_uuid)
-                if ref_card: targets = [ref_card]
-            log_event("DEBUG", "resolver.resolve_reference", f"Resolved reference to: {[t.name for t in targets]}", player=player.name)
-        else:
-            candidates = get_target_cards(game_manager, action.target, source_card)
-            
-            is_search = (action.target.zone == Zone.TEMP) or (action.source_zone == Zone.TEMP)
-            
-            should_interact = action.target.select_mode not in ["ALL", "SOURCE", "SELF", "REMAINING"] and (len(candidates) > 0 or is_search)
-
-            if should_interact:
-                if selected_uuids is None:
-                    log_event("INFO", "resolver.suspend", f"Selection required for {action.type}. Candidates: {len(candidates)}", player=player.name)
-                    
-                    display_candidates = candidates
-                    if is_search:
-                        display_candidates = player.temp_zone
-                    
-                    game_manager.active_interaction = {
-                        "player_id": player.name,
-                        "action_type": "SEARCH_AND_SELECT",
-                        "message": action.raw_text or "対象を選択してください",
-                        "candidates": display_candidates, 
-                        "selectable_uuids": [c.uuid for c in candidates],
-                        "can_skip": True,
-                        "continuation": {
-                            "action": action,
-                            "source_card_uuid": source_card.uuid,
-                            "effect_context": effect_context
-                        }
-                    }
-                    return False
-                
-                targets = [c for c in candidates if c.uuid in selected_uuids]
-                
-                if "selected_uuids" in effect_context:
-                    del effect_context["selected_uuids"]
-            else:
-                targets = candidates
-
-    if targets and action.target and action.target.tag == "last_target":
-        effect_context["last_target_uuid"] = targets[0].uuid
-
-    action_success = self_execute(game_manager, player, action, targets, source_card=source_card, effect_context=effect_context)
-    
-    effect_context["last_action_success"] = action_success
-    
-    if not action_success:
-        return False
-
-    if action.then_actions:
-        for sub in action.then_actions:
-            if not execute_action(game_manager, player, sub, source_card, effect_context):
-                return False
-                
-    return True
-
-def self_execute(game_manager, player, action, targets, source_card=None, effect_context=None) -> bool:
-    if effect_context is None: effect_context = {}
-    is_success = True
-
-    TARGET_REQUIRED_ACTIONS = [
-        ActionType.KO, ActionType.MOVE_TO_HAND, ActionType.TRASH,
-        ActionType.DECK_BOTTOM, ActionType.DECK_TOP, 
-        ActionType.REST, ActionType.ACTIVE, ActionType.BUFF, 
-        ActionType.COST_CHANGE, ActionType.GRANT_KEYWORD, 
-        ActionType.ATTACK_DISABLE, ActionType.NEGATE_EFFECT, 
-        ActionType.PREVENT_LEAVE, ActionType.ATTACH_DON, 
-        ActionType.MOVE_ATTACHED_DON, ActionType.REDIRECT_ATTACK,
-        ActionType.FREEZE, ActionType.PLAY_CARD, ActionType.SET_COST
-    ]
-    
-    if action.type in TARGET_REQUIRED_ACTIONS:
-        if action.target and not action.target.is_up_to:
-            if not targets:
-                log_event("DEBUG", "resolver.fail_no_target", f"Action {action.type} failed: Target required but not found.", player=player.name)
-                return False
-
-    if action.type == ActionType.DRAW:
-        game_manager.draw_card(player, action.value)
-    elif action.type == ActionType.RAMP_DON:
-        for _ in range(action.value):
-            if player.don_deck:
-                don = player.don_deck.pop(0)
-                if 'レスト' in action.raw_text:
-                    don.is_rest = True
-                    player.don_rested.append(don)
-                else:
-                    don.is_rest = False
-                    player.don_active.append(don)
-        log_event("INFO", "resolver.ramp_don", f"Ramped {action.value} Don", player=player.name)
-    
-    elif action.type == ActionType.LOOK:
-        target_p = game_manager.opponent if '相手' in action.raw_text else player
-        moved_count = 0
-        moved_cards = []
-        for _ in range(action.value):
-            if target_p.deck:
-                card = target_p.deck.pop(0)
-                player.temp_zone.append(card)
-                moved_cards.append(card)
-                moved_count += 1
-        
-        effect_context["revealed_cards"] = moved_cards
-        log_event("INFO", "resolver.look", f"Moved {moved_count} cards from {target_p.name}'s deck to temp_zone", player=player.name)
-        if not moved_cards: is_success = False
-    
-    elif action.type == ActionType.KO:
-        for t in targets:
-            if "PREVENT_LEAVE" in t.flags:
-                log_event("INFO", "resolver.prevent_leave", f"{t.master.name} is protected from leaving field", player=player.name)
-                continue
-            owner, _ = game_manager._find_card_location(t)
-            if owner: game_manager.move_card(t, Zone.TRASH, owner)
-    elif action.type == ActionType.MOVE_TO_HAND:
-        for t in targets:
-            owner, _ = game_manager._find_card_location(t)
-            real_owner = game_manager.p1 if t.owner_id == game_manager.p1.name else game_manager.p2
-            if real_owner: game_manager.move_card(t, Zone.HAND, real_owner)
-
-    elif action.type == ActionType.TRASH:
-        if not targets and "できる" in action.raw_text:
-             is_success = False
-        
-        for t in targets:
-            owner, _ = game_manager._find_card_location(t)
-            real_owner = game_manager.p1 if t.owner_id == game_manager.p1.name else game_manager.p2
-            if real_owner: game_manager.move_card(t, Zone.TRASH, real_owner)
-
-    elif action.type == ActionType.DECK_BOTTOM:
-        for t in targets:
-            owner, _ = game_manager._find_card_location(t)
-            real_owner = game_manager.p1 if t.owner_id == game_manager.p1.name else game_manager.p2
-            if real_owner: game_manager.move_card(t, Zone.DECK, real_owner, dest_position="BOTTOM")
-
-    elif action.type == ActionType.BUFF:
-        for t in targets: t.power_buff += action.value
-    elif action.type == ActionType.REST:
-        for t in targets: t.is_rest = True
-    elif action.type == ActionType.ACTIVE:
-        for t in targets: t.is_rest = False
-    
-    elif action.type == ActionType.ACTIVE_DON:
-        count = action.value
-        if count <= 0: count = 1
-        reactivated = 0
-        
-        # attached don -> active
-        if player.don_attached_cards:
-            while reactivated < count and player.don_attached_cards:
-                don = player.don_attached_cards.pop()
-                if don.attached_to:
-                    attached_card = game_manager._find_card_by_uuid(don.attached_to)
-                    if attached_card:
-                        attached_card.attached_don = max(0, attached_card.attached_don - 1)
-                don.attached_to = None
-                don.is_rest = False
-                player.don_active.append(don)
-                reactivated += 1
-                
-        # rested don -> active
-        if reactivated < count and player.don_rested:
-            while reactivated < count and player.don_rested:
-                don = player.don_rested.pop()
-                don.is_rest = False
-                player.don_active.append(don)
-                reactivated += 1
-                
-        log_event("INFO", "resolver.active_don", f"Activated {reactivated} Don", player=player.name)
-
-    elif action.type == ActionType.ATTACH_DON:
-        if targets and player.don_active:
-            don = player.don_active.pop(0)
-            target_card = targets[0]
-            don.attached_to = target_card.uuid
-            player.don_attached_cards.append(don)
-            target_card.attached_don += 1
-            
-    elif action.type == ActionType.COST_CHANGE:
-        for t in targets:
-            t.cost_buff += action.value
-            log_event("INFO", "effect.cost_change", f"{t.master.name} cost buffed by {action.value}", player=player.name)
-
-    elif action.type == ActionType.LIFE_MANIPULATE:
-        moved_any = False
-        if targets:
-            for t in targets:
-                owner, current_zone = game_manager._find_card_location(t)
-                if not owner: continue
-                
-                if current_zone == owner.life:
-                    dest = Zone.HAND
-                    if "トラッシュ" in action.raw_text or "捨てる" in action.raw_text:
-                         dest = Zone.TRASH
-                    
-                    game_manager.move_card(t, dest, owner)
-                    log_event("INFO", "effect.life_move", f"Moved {t.master.name} from Life to {dest.name}", player=player.name)
-                    moved_any = True
-                else:
-                    game_manager.move_card(t, Zone.LIFE, owner, dest_position="TOP")
-                    log_event("INFO", "effect.life_recover", f"Added {t.master.name} to Life", player=player.name)
-                    moved_any = True
-        
-        if not moved_any and not targets:
-            if "加える" in action.raw_text or "回復" in action.raw_text or "デッキ" in action.raw_text:
-                source_list = player.deck
-                if source_list:
-                    card = source_list.pop(0)
-                    player.life.append(card)
-                    log_event("INFO", "effect.life_recover", "Recovered 1 Life from Deck", player=player.name)
-            elif "トラッシュ" in action.raw_text or "手札" in action.raw_text:
-                is_success = False
-                log_event("DEBUG", "resolver.life_manipulate_fail", "Target required for Life manipulation but not found", player=player.name)
-
-    elif action.type == ActionType.GRANT_KEYWORD:
-        # 修正: キーワードを柔軟に判定
-        keywords_map = {
-            "速攻": "速攻",
-            "ブロッカー": "ブロッカー",
-            "バニッシュ": "バニッシュ",
-            "ダブルアタック": "ダブルアタック",
-            "突進": "突進",
-            "再起動": "再起動"
+class EffectResolver:
+    def __init__(self, game_manager):
+        self.game_manager = game_manager
+        self.execution_stack: List[EffectNode] = []
+        self.context: Dict[str, Any] = {
+            "saved_targets": {},  # save_id によるカード参照用
+            "saved_values": {},   # save_count による数値保持用
+            "last_action_success": True
         }
-        found_kw = None
-        for kw_jp, kw_internal in keywords_map.items():
-            if kw_jp in action.raw_text:
-                found_kw = kw_internal
-                # マッチしたらループ継続せずに追加
-                for t in targets:
-                    t.current_keywords.add(found_kw)
-                    log_event("INFO", "effect.grant_keyword", f"Granted [{found_kw}] to {t.master.name}", player=player.name)
-                break # 1つ見つかればOKとする（複数付与は現状考慮外）
 
-    elif action.type == ActionType.ATTACK_DISABLE:
-        for t in targets:
-            t.flags.add("ATTACK_DISABLE")
-            log_event("INFO", "effect.attack_disable", f"{t.master.name} cannot attack", player=player.name)
+    def resolve_ability(self, player, ability, source_card):
+        # 1. 発動条件のチェック
+        if ability.condition and not self._check_condition(player, ability.condition, source_card):
+            return
 
-    elif action.type == ActionType.NEGATE_EFFECT:
-        for t in targets:
-            t.negated = True
-            log_event("INFO", "effect.negate", f"{t.master.name} effects negated", player=player.name)
+        # 2. スタックの初期化（コスト -> 効果の順に積む）
+        self.execution_stack = []
+        if ability.effect:
+            self.execution_stack.append(ability.effect)
+        if ability.cost:
+            self.execution_stack.append(ability.cost)
 
-    elif action.type == ActionType.EXECUTE_MAIN_EFFECT:
-        exec_targets = targets if targets else [source_card] if source_card else []
-        for t in exec_targets:
-             if not t or not t.master.abilities: continue
-             target_ability = next((a for a in t.master.abilities if a.trigger not in [TriggerType.TRIGGER, TriggerType.COUNTER]), None)
-             if target_ability:
-                 log_event("INFO", "effect.execute_main", f"Executing nested ability of {t.master.name}", player=player.name)
-                 game_manager.resolve_ability(player, target_ability, source_card=t)
+        self._process_stack(player, source_card)
 
-    elif action.type == ActionType.VICTORY:
-        game_manager.winner = player.name
-        log_event("INFO", "game.victory_special", f"{player.name} wins by effect!", player=player.name)
+    def _process_stack(self, player, source_card):
+        while self.execution_stack:
+            node = self.execution_stack.pop()
 
-    elif action.type == ActionType.RULE_PROCESSING:
-        log_event("INFO", "effect.rule", f"Static rule processed: {action.raw_text}", player=player.name)
+            if isinstance(node, GameAction):
+                success = self._execute_game_action(player, node, source_card)
+                self.context["last_action_success"] = success
+                if not success and "cost" in str(type(node)): # コスト失敗時は中断
+                    self.execution_stack.clear()
+                    return
 
-    elif action.type == ActionType.RESTRICTION:
-        log_event("INFO", "effect.restriction", f"Restriction applied: {action.raw_text}", player=player.name)
+            elif isinstance(node, Sequence):
+                # 先頭から実行するため、逆順にスタックに積む
+                for sub_node in reversed(node.actions):
+                    self.execution_stack.append(sub_node)
 
-    elif action.type == ActionType.DECK_TOP:
-        for t in targets:
-            owner, _ = game_manager._find_card_location(t)
-            real_owner = game_manager.p1 if t.owner_id == game_manager.p1.name else game_manager.p2
-            if real_owner:
-                game_manager.move_card(t, Zone.DECK, real_owner, dest_position="TOP")
-                log_event("INFO", "effect.deck_top", f"Moved {t.master.name} to Deck Top", player=player.name)
+            elif isinstance(node, Branch):
+                if self._check_condition(player, node.condition, source_card):
+                    if node.if_true:
+                        self.execution_stack.append(node.if_true)
+                elif node.if_false:
+                    self.execution_stack.append(node.if_false)
 
-    elif action.type == ActionType.DEAL_DAMAGE:
-        target_p = player if '自分' in action.raw_text or '受ける' in action.raw_text else game_manager.opponent
-        if target_p.life:
-            life_card = target_p.life.pop(0)
-            target_p.hand.append(life_card)
-            log_event("INFO", "effect.damage", f"{target_p.name} took 1 damage from effect", player=player.name)
+            elif isinstance(node, Choice):
+                # ユーザー選択が必要なため、スタックを保持して中断
+                self._suspend_for_choice(player, node, source_card)
+                return 
 
-    elif action.type == ActionType.SELECT_OPTION:
-        log_event("INFO", "effect.select_option", "Option processed (Branch logic not implemented in Parser yet)", player=player.name)
-
-    elif action.type == ActionType.SET_COST:
-        for t in targets:
-            new_buff = action.value - t.master.cost
-            t.cost_buff = new_buff
-            log_event("INFO", "effect.set_cost", f"Set {t.master.name} cost to {action.value}", player=player.name)
-
-    elif action.type == ActionType.SHUFFLE:
-        random.shuffle(player.deck)
-        log_event("INFO", "effect.shuffle", "Deck shuffled", player=player.name)
-
-    elif action.type == ActionType.PREVENT_LEAVE:
-        for t in targets:
-            t.flags.add("PREVENT_LEAVE")
-            log_event("INFO", "effect.prevent_leave", f"{t.master.name} gained PREVENT_LEAVE", player=player.name)
-
-    elif action.type == ActionType.REPLACE_EFFECT:
-        log_event("INFO", "effect.replace", f"Replacement Effect: {action.raw_text}", player=player.name)
-
-    elif action.type == ActionType.MOVE_ATTACHED_DON:
-        don_source = source_card if source_card and source_card.attached_don > 0 else None
+    def _execute_game_action(self, player, action: GameAction, source_card) -> bool:
+        log_event("INFO", "resolver.action", f"Executing {action.type}", player=player.name)
         
-        if don_source and targets:
-            target_card = targets[0]
-            moving_don = next((d for d in player.don_attached_cards if d.attached_to == don_source.uuid), None)
-            
-            if moving_don:
-                moving_don.attached_to = target_card.uuid
-                don_source.attached_don -= 1
-                target_card.attached_don += 1
-                log_event("INFO", "effect.move_don", f"Moved Don from {don_source.master.name} to {target_card.master.name}", player=player.name)
-
-    elif action.type == ActionType.MODIFY_DON_PHASE:
-        log_event("INFO", "effect.modify_don_phase", f"Don Phase Modified: {action.raw_text}", player=player.name)
-
-    elif action.type == ActionType.REDIRECT_ATTACK:
-        if game_manager.active_battle and targets:
-            new_target = targets[0]
-            game_manager.active_battle["target"] = new_target
-            log_event("INFO", "effect.redirect", f"Attack target changed to {new_target.master.name}", player=player.name)
-
-    elif action.type == ActionType.RETURN_DON:
-        target_player = game_manager.opponent if "相手" in action.raw_text else player
-        count = abs(action.value) if action.value != 0 else 1
+        # ターゲットの解決
+        targets = self._resolve_targets(player, action.target, source_card)
         
-        returned_count = 0
+        # 値の解決（ValueSource の計算）
+        value = self._calculate_value(player, action.value, targets)
+
+        # 実際のゲーム状態変更（既存の self_execute 相当のロジック）
+        # ここで action.save_id があれば targets を self.context["saved_targets"] に保存
+        return self.game_manager.apply_action_to_engine(player, action, targets, value)
+
+    def _resolve_targets(self, player, query, source_card):
+        if not query: return []
+        if query.ref_id:
+            return self.context["saved_targets"].get(query.ref_id, [])
         
-        while returned_count < count and target_player.don_active:
-            don = target_player.don_active.pop()
-            target_player.don_deck.append(don)
-            returned_count += 1
-            
-        while returned_count < count and target_player.don_rested:
-            don = target_player.don_rested.pop()
-            target_player.don_deck.append(don)
-            returned_count += 1
-            
-        if returned_count < count and target_player.don_attached_cards:
-            while returned_count < count and target_player.don_attached_cards:
-                don = target_player.don_attached_cards.pop()
-                if don.attached_to:
-                    attached_card = game_manager._find_card_by_uuid(don.attached_to)
-                    if attached_card:
-                        attached_card.attached_don = max(0, attached_card.attached_don - 1)
-                
-                don.attached_to = None
-                target_player.don_deck.append(don)
-                returned_count += 1
+        from .matcher import get_target_cards
+        targets = get_target_cards(self.game_manager, query, source_card)
+        
+        if query.save_id:
+            self.context["saved_targets"][query.save_id] = targets
+        return targets
 
-        log_event("INFO", "effect.return_don", f"{target_player.name} returned {returned_count} Don to deck", player=player.name)
-    
-    elif action.type == ActionType.FREEZE:
-        for t in targets:
-            t.flags.add("FREEZE")
-            log_event("INFO", "effect.freeze", f"{t.master.name} frozen", player=player.name)
+    def _calculate_value(self, player, val_source: ValueSource, targets) -> int:
+        if not val_source.dynamic_source:
+            return val_source.base
+        
+        # 動的な値計算（トラッシュ枚数、対象のパワー等）
+        base_val = self.game_manager.get_dynamic_value(player, val_source, targets, self.context)
+        return (base_val // val_source.divisor) * val_source.multiplier
 
-    elif action.type == ActionType.PLAY_CARD:
-        for t in targets:
-            owner, current_zone = game_manager._find_card_location(t)
-            if owner:
-                game_manager.move_card(t, Zone.FIELD, owner)
-                t.is_newly_played = True
-                t.attached_don = 0
-                log_event("INFO", "effect.play_card", f"Played {t.master.name} by effect", player=player.name)
+    def _suspend_for_choice(self, player, node: Choice, source_card):
+        # GameManagerに現在のスタックとコンテキストを預けてAPIレスポンスを返す
+        self.game_manager.active_interaction = {
+            "player_id": player.name,
+            "action_type": "CHOICE",
+            "message": node.message,
+            "options": node.option_labels,
+            "continuation": {
+                "stack": self.execution_stack,
+                "context": self.context,
+                "source_card_uuid": source_card.uuid,
+                "node": node # どのChoiceを処理中か保持
+            }
+        }
+        log_event("INFO", "resolver.suspend", "Suspended for player choice", player=player.name)
 
-                if not t.ability_disabled:
-                    for ability in t.master.abilities:
-                        if ability.trigger == TriggerType.ON_PLAY:
-                            game_manager.resolve_ability(player, ability, source_card=t)
+    def resume_choice(self, player, selected_index):
+        # 中断していたスタックを復元して再開
+        cont = self.game_manager.active_interaction["continuation"]
+        self.execution_stack = cont["stack"]
+        self.context = cont["context"]
+        source_card = self.game_manager._find_card_by_uuid(cont["source_card_uuid"])
+        node = cont["node"]
 
-    return is_success
+        # 選ばれた選択肢をスタックに積んで再開
+        if 0 <= selected_index < len(node.options):
+            self.execution_stack.append(node.options[selected_index])
+        
+        self.game_manager.active_interaction = None
+        self._process_stack(player, source_card)

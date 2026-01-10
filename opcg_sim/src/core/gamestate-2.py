@@ -5,9 +5,8 @@ import re
 import traceback
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
-from ..models.effect_types import TargetQuery, Ability, ValueSource
+from ..models.effect_types import TargetQuery, Ability
 from ..utils.logger_config import log_event
-from .effects.resolver import EffectResolver
 
 Card = CardInstance
 
@@ -42,6 +41,7 @@ class Player:
                 self.hand.append(self.deck.pop(0))
 
     def to_dict(self, is_owner: bool = True):
+        # ログ削除: シリアライズログ
         player_props = CONST.get('PLAYER_PROPERTIES', {})
 
         leader_dict = self.leader.to_dict() if self.leader else None
@@ -87,7 +87,6 @@ class GameManager:
         self.winner: Optional[str] = None
         self.active_battle: Optional[Dict[str, Any]] = None
         self.active_interaction: Optional[Dict[str, Any]] = None
-        self.resolver = EffectResolver(self)
 
     def _find_card_by_uuid(self, uuid: str) -> Optional[CardInstance]:
         all_players = [self.p1, self.p2]
@@ -186,95 +185,71 @@ class GameManager:
             }
         return request
 
-    def get_dynamic_value(self, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict[str, Any]) -> int:
-        if not val_source:
-            return 0
-        
-        if val_source.value is not None:
-            return val_source.value
-
-        source_type = val_source.dynamic_source
-        if source_type == "HAND_COUNT":
-            return len(player.hand)
-        elif source_type == "TRASH_COUNT":
-            return len(player.trash)
-        elif source_type == "LIFE_COUNT":
-            return len(player.life)
-        elif source_type == "DON_COUNT":
-            return len(player.don_active) + len(player.don_rested) + len(player.don_attached_cards)
-        elif source_type == "TARGET_POWER" and targets:
-            return targets[0].get_power(player == self.turn_player)
-        
-        return 0
-
-    def apply_action_to_engine(self, player: Player, action_node: Any, targets: List[CardInstance], value: int = 0) -> bool:
-        action_type = action_node.type
-        log_event("INFO", "game.engine_action", f"Applying {action_type.name}", player=player.name)
-
-        if action_type == ActionType.KO:
-            for target in targets:
-                if "PREVENT_LEAVE" not in target.flags:
-                    owner, _ = self._find_card_location(target)
-                    if owner:
-                        self.move_card(target, Zone.TRASH, owner)
-        
-        elif action_type == ActionType.DRAW:
-            self.draw_card(player, value)
-
-        elif action_type == ActionType.BP_BUFF:
-            duration = getattr(action_node, 'duration', 'TURN')
-            for target in targets:
-                target.power_buff += value
-                if duration == 'BATTLE' and self.active_battle:
-                    self.active_battle["counter_buff"] = self.active_battle.get("counter_buff", 0) + value
-
-        elif action_type == ActionType.REST:
-            for target in targets:
-                target.is_rest = True
-
-        elif action_type == ActionType.ACTIVE:
-            for target in targets:
-                target.is_rest = False
-
-        elif action_type == ActionType.REST_DON:
-            for _ in range(value):
-                if player.don_active:
-                    don = player.don_active.pop(0)
-                    player.don_rested.append(don)
-                    don.is_rest = True
-
-        elif action_type == ActionType.ACTIVE_DON:
-            for _ in range(value):
-                if player.don_rested:
-                    don = player.don_rested.pop(0)
-                    player.don_active.append(don)
-                    don.is_rest = False
-
-        elif action_type == ActionType.ADD_DON:
-            for _ in range(value):
-                if player.don_deck:
-                    don = player.don_deck.pop(0)
-                    player.don_active.append(don)
-
-        elif action_type == ActionType.PLAY_CARD:
-            for target in targets:
-                self.play_card_action(player, target)
-
-        elif action_type == ActionType.MOVE_CARD:
-            dest_zone = getattr(action_node, 'destination', Zone.TRASH)
-            for target in targets:
-                self.move_card(target, dest_zone, player)
-
-        return True
-
     def resolve_interaction(self, player: Player, payload: Dict[str, Any]):
         if not self.active_interaction:
             log_event("WARNING", "game.resolve_interaction", "No active interaction found", player=player.name)
             return
 
-        log_event("INFO", "game.resume_effect", "Resuming interaction via resolver", player=player.name)
+        continuation = self.active_interaction.get("continuation")
+        if not continuation:
+            self.active_interaction = None
+            return
+
+        action = continuation["action"]
+        source_uuid = continuation["source_card_uuid"]
+        effect_context = continuation.get("effect_context", {})
+        remaining_ability_actions = continuation.get("remaining_ability_actions", [])
+        
+        source_card = self._find_card_by_uuid(source_uuid)
+        
+        if not source_card:
+            log_event("ERROR", "game.resume_fail", f"Source card {source_uuid} not found")
+            self.active_interaction = None
+            return
+
+        for k, v in payload.items():
+            effect_context[k] = v
+        
         self.active_interaction = None
-        self.resolver.resume_choice(player, payload)
+
+        from .effects.resolver import execute_action
+        try:
+            log_event("INFO", "game.resume_effect", f"Resuming effect for {source_card.master.name}", player=player.name)
+        except:
+            log_event("INFO", "game.resume_effect", "Resuming effect", player=player.name)
+        
+        success = execute_action(self, player, action, source_card, effect_context=effect_context)
+        
+        if "selected_uuids" in effect_context:
+            del effect_context["selected_uuids"]
+        if "selected_option_index" in effect_context:
+            del effect_context["selected_option_index"]
+
+        if not success:
+            if self.active_interaction:
+                if "continuation" in self.active_interaction:
+                    self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions
+                    if "effect_context" not in self.active_interaction["continuation"]:
+                        self.active_interaction["continuation"]["effect_context"] = effect_context
+            else:
+                error_msg = f"効果の解決に失敗しました: {action.raw_text or action.type}"
+                log_event("WARNING", "game.effect_failed", error_msg, player=player.name)
+                raise ValueError(error_msg)
+
+        if success and remaining_ability_actions:
+            for i, next_act in enumerate(remaining_ability_actions):
+                if self.active_interaction:
+                    if "continuation" in self.active_interaction:
+                        self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i:]
+                        if "effect_context" not in self.active_interaction["continuation"]:
+                             self.active_interaction["continuation"]["effect_context"] = effect_context
+                    break
+                
+                if not self._perform_logic(player, next_act, source_card, effect_context=effect_context):
+                    if self.active_interaction and "continuation" in self.active_interaction:
+                        self.active_interaction["continuation"]["remaining_ability_actions"] = remaining_ability_actions[i+1:]
+                    break
+
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
@@ -338,6 +313,7 @@ class GameManager:
         self.switch_turn()
 
     def switch_turn(self):
+        # ログ削除: 開始ログ削除
         self.turn_player, self.opponent = self.opponent, self.turn_player
         self.turn_count += 1
         
@@ -374,12 +350,15 @@ class GameManager:
 
     def draw_phase(self):
         if self.turn_count > 1:
-            self.apply_action_to_engine(self.turn_player, type(ActionType.DRAW, (object,), {'type': ActionType.DRAW}), [], 1)
+            self.draw_card(self.turn_player)
         self.don_phase()
 
     def don_phase(self):
         cards_to_add = 1 if self.turn_count == 1 else 2
-        self.apply_action_to_engine(self.turn_player, type(ActionType.ADD_DON, (object,), {'type': ActionType.ADD_DON}), [], cards_to_add)
+        for _ in range(cards_to_add):
+            if self.turn_player.don_deck:
+                don = self.turn_player.don_deck.pop(0)
+                self.turn_player.don_active.append(don)
         self.main_phase()
 
     def main_phase(self):
@@ -426,6 +405,7 @@ class GameManager:
             else: target_list.append(card)
 
     def pay_cost(self, player: Player, cost: int, don_list: Optional[List[DonInstance]] = None):
+        # ログ削除: コスト詳細
         if don_list is not None:
             if len(don_list) < cost:
                 raise ValueError("指定されたドン!!の数が不足しています。")
@@ -480,12 +460,16 @@ class GameManager:
             "counter_buff": 0
         }
         
+        # ログ削除: バトル初期化詳細
+
         if self.has_blocker(target_owner):
             self.phase = Phase.BLOCK_STEP
             log_event("INFO", "game.phase_transition", f"Blockers detected. Moving to {self.phase.name}", player=target_owner.name)
         else:
             self.phase = Phase.BATTLE_COUNTER
             log_event("INFO", "game.phase_transition", f"No blockers. Moving to {self.phase.name}", player=target_owner.name)
+        
+        # ログ削除: 遷移チェック詳細
 
     def handle_block(self, blocker: Optional[Card] = None):
         if not self.active_battle:
@@ -524,8 +508,8 @@ class GameManager:
             self.move_card(counter_card, Zone.TRASH, player)
         else:
             counter_value = counter_card.master.counter or 0
-            buff_node = type('BuffAction', (object,), {'type': ActionType.BP_BUFF, 'duration': 'BATTLE'})
-            self.apply_action_to_engine(player, buff_node, [], counter_value)
+            self.active_battle["counter_buff"] += counter_value
+            log_event("INFO", "game.counter_apply", f"Added {counter_value} power to target", player=player.name)
             self.move_card(counter_card, Zone.TRASH, player)
 
     def resolve_attack(self):
@@ -544,8 +528,11 @@ class GameManager:
         attacker_pwr = attacker.get_power(is_my_turn)
         target_pwr = target.get_power(is_target_turn) + counter_buff
         
+        # ログ削除: パワー計算詳細
+        
         if target == target_owner.leader:
             if attacker_pwr >= target_pwr:
+                # ダブルアタック & バニッシュ判定
                 damage_amount = 2 if "ダブルアタック" in attacker.current_keywords else 1
                 is_banish = "バニッシュ" in attacker.current_keywords
 
@@ -563,8 +550,8 @@ class GameManager:
                         break
         else:
             if attacker_pwr >= target_pwr:
-                ko_node = type('KOAction', (object,), {'type': ActionType.KO})
-                self.apply_action_to_engine(attacker_owner, ko_node, [target])
+                self.move_card(target, Zone.TRASH, target_owner)
+                log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
         
         target.reset_turn_status()
         self.active_battle = None
@@ -599,5 +586,38 @@ class GameManager:
 
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
-        log_event("INFO", "game.resolve_ability_start", f"Starting resolver for {source_card.master.name}", player=player.name)
-        self.resolver.resolve_ability(player, ability, source_card)
+        
+        effect_context = {}
+
+        all_actions = list(ability.costs) + list(ability.actions)
+        
+        for i, action in enumerate(all_actions):
+            if self.active_interaction:
+                log_event("INFO", "game.ability_suspend", "Ability execution suspended for interaction", player=player.name)
+                if "continuation" in self.active_interaction:
+                     self.active_interaction["continuation"]["remaining_ability_actions"] = all_actions[i:]
+                     self.active_interaction["continuation"]["effect_context"] = effect_context
+                break
+            
+            success = self._perform_logic(player, action, source_card, effect_context=effect_context)
+            if not success:
+                if self.active_interaction and "continuation" in self.active_interaction:
+                     self.active_interaction["continuation"]["remaining_ability_actions"] = all_actions[i+1:]
+                     self.active_interaction["continuation"]["effect_context"] = effect_context
+                break
+
+    def _perform_logic(self, player: Player, action: Any, source_card: CardInstance, effect_context: Optional[Dict[str, Any]] = None) -> bool:
+        log_event("INFO", "game.effect", f"Resolving action {action.type} for {source_card.master.name}", player=player.name)
+        from .effects.resolver import execute_action
+        
+        success = execute_action(self, player, action, source_card, effect_context=effect_context)
+        
+        if not success:
+            if self.active_interaction:
+                return False
+            
+            error_msg = f"効果の解決に失敗しました: {action.raw_text or action.type}"
+            log_event("WARNING", "game.effect_failed", error_msg, player=player.name)
+            raise ValueError(error_msg)
+
+        return success
