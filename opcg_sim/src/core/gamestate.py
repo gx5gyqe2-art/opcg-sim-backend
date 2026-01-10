@@ -131,7 +131,8 @@ class GameManager:
                 KEY_SKIP: self.active_interaction.get("can_skip", False),
                 KEY_CANDIDATES: candidate_dicts,
                 KEY_CONSTRAINTS: self.active_interaction.get("constraints"),
-                KEY_OPTIONS: self.active_interaction.get("options"),
+                # 【追加】選択肢のリストをレスポンスに含める
+                "options": self.active_interaction.get("options"), 
                 "request_id": str(uuid.uuid4())
             }
             return req
