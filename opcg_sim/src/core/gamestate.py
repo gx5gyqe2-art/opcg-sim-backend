@@ -3,6 +3,7 @@ import random
 import unicodedata
 import re
 import traceback
+import uuid  # 追加
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
 from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource
@@ -113,76 +114,133 @@ class GameManager:
         KEY_CANDIDATES = pending_props.get('CANDIDATES', 'candidates')
         KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
         KEY_OPTIONS = pending_props.get('OPTIONS', 'options')
-        ACT_BLOCKER = battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
-        ACT_COUNTER = battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER')
+        
+        # インタラクション（効果解決中の選択待ち）がある場合
         if self.active_interaction:
+            action_type = self.active_interaction.get("action_type")
+            # ターゲット選択の場合、フロントエンドが理解しやすいアクション名に変換（例: SEARCH_AND_SELECT）
+            fe_action = "SEARCH_AND_SELECT" if action_type == "SELECT_TARGET" else action_type
+            
+            candidates = self.active_interaction.get("candidates", [])
+            candidate_dicts = [c.to_dict() for c in candidates] if candidates else []
+            candidate_uuids = [c.uuid for c in candidates] if candidates else []
+            
             req = {
                 KEY_PID: self.active_interaction.get("player_id"),
-                KEY_ACTION: self.active_interaction.get("action_type"),
+                KEY_ACTION: fe_action,
                 KEY_MSG: self.active_interaction.get("message", "選択してください"),
-                KEY_UUIDS: self.active_interaction.get("selectable_uuids", []),
+                KEY_UUIDS: self.active_interaction.get("selectable_uuids", candidate_uuids),
                 KEY_SKIP: self.active_interaction.get("can_skip", False),
-                KEY_CANDIDATES: [c.to_dict() for c in self.active_interaction.get("candidates", [])],
+                KEY_CANDIDATES: candidate_dicts,
                 KEY_CONSTRAINTS: self.active_interaction.get("constraints"),
-                KEY_OPTIONS: self.active_interaction.get("options")
+                KEY_OPTIONS: self.active_interaction.get("options"),
+                "request_id": str(uuid.uuid4()) # ユニークID付与
             }
             return req
+
+        # バトルフェイズ等の標準的な待機状態
         if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
             log_event("ERROR", "game.pending_request_error", f"Active battle missing in phase: {self.phase.name}")
             self.phase = Phase.MAIN
+            
         request = None
+        ACT_BLOCKER = battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
+        ACT_COUNTER = battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER')
+        
         if self.phase == Phase.BLOCK_STEP and self.active_battle:
             target_owner = self.active_battle["target_owner"]
             blockers = [c.uuid for c in target_owner.field if not c.is_rest and "ブロッカー" in c.current_keywords]
-            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True}
+            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
         elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
             target_owner = self.active_battle["target_owner"]
             counters = [c.uuid for c in target_owner.hand if (c.master.counter and c.master.counter > 0) or (c.master.type == CardType.EVENT and any(abil.trigger == TriggerType.COUNTER for abil in c.master.abilities))]
-            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_COUNTER, KEY_MSG: PendingMessage.SELECT_COUNTER.value, KEY_UUIDS: counters, KEY_SKIP: True}
+            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_COUNTER, KEY_MSG: PendingMessage.SELECT_COUNTER.value, KEY_UUIDS: counters, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
         elif self.phase == Phase.MAIN:
             selectable = [c.uuid for c in self.turn_player.hand]
             selectable += [c.uuid for c in self.turn_player.field if not c.is_rest]
             if self.turn_player.leader and not self.turn_player.leader.is_rest:
                 selectable.append(self.turn_player.leader.uuid)
-            request = {KEY_PID: self.turn_player.name, KEY_ACTION: "MAIN_ACTION", KEY_MSG: PendingMessage.MAIN_ACTION.value, KEY_UUIDS: selectable, KEY_SKIP: True}
+            request = {KEY_PID: self.turn_player.name, KEY_ACTION: "MAIN_ACTION", KEY_MSG: PendingMessage.MAIN_ACTION.value, KEY_UUIDS: selectable, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
         return request
 
     def resolve_interaction(self, player: Player, payload: Dict[str, Any]):
         if not self.active_interaction:
             log_event("WARNING", "game.resolve_interaction", "No active interaction found", player=player.name)
             return
+            
         continuation = self.active_interaction.get("continuation")
         if not continuation:
             self.active_interaction = None
             return
+            
+        action_type = self.active_interaction.get("action_type")
         source_uuid = continuation["source_card_uuid"]
         source_card = self._find_card_by_uuid(source_uuid)
         if not source_card:
             log_event("ERROR", "game.resume_fail", f"Source card {source_uuid} not found")
             self.active_interaction = None
             return
-        self.active_interaction = None
+
+        # リゾルバの復元
         resolver = EffectResolver(self)
-        log_event("INFO", "game.resume_effect", f"Resuming effect for {source_card.master.name}", player=player.name)
-        selected_index = payload.get("index", payload.get("selected_option_index", 0))
-        resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
+        
+        # ▼ ターゲット選択の回答受信処理
+        if action_type == "SELECT_TARGET":
+            log_event("INFO", "game.resume_target", f"Resuming target selection for {source_card.master.name}", player=player.name)
+            selected_uuids = payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])
+            
+            # 選択されたUUIDからカードオブジェクトを特定
+            selected_cards = []
+            candidates = self.active_interaction.get("candidates", [])
+            for uid in selected_uuids:
+                card = next((c for c in candidates if c.uuid == uid), None)
+                if card: selected_cards.append(card)
+            
+            # コンテキストに保存 (save_idがある場合)
+            query = continuation.get("query")
+            if query and getattr(query, 'save_id', None):
+                 continuation["effect_context"]["saved_targets"][query.save_id] = selected_cards
+            
+            # active_interactionをクリアしてから再開
+            self.active_interaction = None
+            resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
+            
+        # ▼ 選択肢(Choice)の回答受信処理
+        elif action_type == "CHOICE":
+            log_event("INFO", "game.resume_choice", f"Resuming choice for {source_card.master.name}", player=player.name)
+            selected_index = payload.get("index", payload.get("selected_option_index", 0))
+            
+            self.active_interaction = None
+            resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
+        if not pending: raise ValueError("現在実行可能なアクションはありません。")
+        
         pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
         KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
         KEY_ACTION = pending_props.get('ACTION', 'action')
+        
         battle_actions = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
         ACT_BLOCKER = battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
         ACT_COUNTER = battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER')
         ACT_PASS = battle_actions.get('PASS', 'PASS')
         RESOLVE_SELECTION = CONST.get('c_to_s_interface', {}).get('GAME_ACTIONS', {}).get('TYPES', {}).get('RESOLVE_EFFECT_SELECTION', 'RESOLVE_EFFECT_SELECTION')
-        if not pending: raise ValueError("現在実行可能なアクションはありません。")
+        
         if pending[KEY_PID] != player.name: raise ValueError(f"現在は {pending[KEY_PID]} のターン/フェイズです。")
-        if pending[KEY_ACTION] != action_type:
-            if pending[KEY_ACTION] in [ACT_COUNTER, ACT_BLOCKER] and action_type == ACT_PASS: return True
-            if self.active_interaction and action_type == RESOLVE_SELECTION: return True
-            raise ValueError(f"不適切なアクションです。期待されているアクション: {pending[KEY_ACTION]}")
+        
+        # 期待されるアクションと一致するか確認
+        expected_action = pending[KEY_ACTION]
+        
+        # 例外1: バトル中のPASSはブロック/カウンター選択時に許可
+        if expected_action in [ACT_COUNTER, ACT_BLOCKER] and action_type == ACT_PASS: return True
+        
+        # 例外2: インタラクション中の回答は RESOLVE_EFFECT_SELECTION として許可
+        if self.active_interaction and action_type == RESOLVE_SELECTION: return True
+        
+        # 通常の一致確認
+        if expected_action != action_type:
+            raise ValueError(f"不適切なアクションです。期待されているアクション: {expected_action}")
         return True
 
     def start_game(self, first_player: Optional[Player] = None):
