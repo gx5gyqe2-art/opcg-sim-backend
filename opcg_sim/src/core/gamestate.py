@@ -349,7 +349,11 @@ class GameManager:
 
     def _find_card_location(self, card: Card) -> Tuple[Optional[Player], Optional[List[Any]]]:
         for p in [self.p1, self.p2]:
-            zones = [p.hand, p.field, p.life, p.trash, p.deck, p.temp_zone]
+            # 【修正】ドン!!エリア（active, rested, attached）も探索対象に追加
+            zones = [
+                p.hand, p.field, p.life, p.trash, p.deck, p.temp_zone,
+                p.don_active, p.don_rested, p.don_attached_cards
+            ]
             if p.leader == card: return p, None
             if p.stage == card: return p, None
             for zone in zones:
