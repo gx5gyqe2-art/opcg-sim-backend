@@ -221,12 +221,13 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             else:
                 if card.master.name not in query.names: continue
 
+        if query.traits and not any(t in card.master.traits for t in query.traits): continue
+        if query.is_rest is not None and card.is_rest != query.is_rest: continue
+
         if query.is_unique_name:
             if card.master.name in seen_names: continue
             seen_names.add(card.master.name)
 
-        if query.traits and not any(t in card.master.traits for t in query.traits): continue
-        if query.is_rest is not None and card.is_rest != query.is_rest: continue
         results.append(card)
 
     if not results:
