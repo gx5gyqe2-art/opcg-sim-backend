@@ -16,7 +16,6 @@ class SandboxManager:
             "p2": self._init_player(p2_name, p2_deck, p2_leader)
         }
         self.setup_initial_state()
-        # ゲーム開始時に1ターン目を開始する
         self.start_turn_process()
 
     def _init_player(self, name: str, deck: List[CardInstance], leader: Optional[CardInstance]) -> Dict[str, Any]:
@@ -40,25 +39,19 @@ class SandboxManager:
         for pid in ["p1", "p2"]:
             player = self.state[pid]
             random.shuffle(player["deck"])
-            # ライフ設定
             if player["leader"]:
                 life_count = player["leader"].master.life
                 for _ in range(life_count):
                     if player["deck"]:
                         player["life"].append(player["deck"].pop(0))
-            # 初期手札5枚
             for _ in range(5):
                 if player["deck"]:
                     player["hand"].append(player["deck"].pop(0))
 
-    # --- ターン遷移ロジック ---
-
     def refresh_phase(self):
-        """リフレッシュフェーズ"""
         pid = self.active_player_id
         p = self.state[pid]
         
-        # 1. キャラクター、リーダー、ステージのアクティブ化 & ドン剥離
         if p["leader"]: 
             p["leader"].is_rest = False
             p["leader"].attached_don = 0
@@ -69,10 +62,8 @@ class SandboxManager:
             c.is_rest = False
             c.attached_don = 0
             
-        # 2. ドン!!の返却とアクティブ化
         p["don_active"].extend(p["don_attached"])
         p["don_attached"] = []
-        
         p["don_active"].extend(p["don_rested"])
         p["don_rested"] = []
         
@@ -83,35 +74,26 @@ class SandboxManager:
         log_event("INFO", "sandbox.refresh", f"Refreshed all cards for {pid}", player="system")
 
     def draw_phase(self):
-        """ドローフェーズ"""
-        if self.turn_count == 1:
-            return
-
+        if self.turn_count == 1: return
         pid = self.active_player_id
         p = self.state[pid]
-        
         if p["deck"]:
-            card = p["deck"].pop(0)
-            p["hand"].append(card)
+            p["hand"].append(p["deck"].pop(0))
             log_event("INFO", "sandbox.draw", f"Player {pid} drew a card", player="system")
 
     def don_phase(self):
-        """ドン!!フェーズ"""
         pid = self.active_player_id
         p = self.state[pid]
-        
         add_count = 1 if self.turn_count == 1 else 2
         current_total = len(p["don_active"]) + len(p["don_rested"]) + len(p["don_attached"])
         limit = 10
         can_add = max(0, limit - current_total)
         actual_add = min(add_count, can_add)
-        
         for _ in range(actual_add):
             if p["don_deck"]:
                 don = p["don_deck"].pop(0)
                 don.is_rest = False
                 p["don_active"].append(don)
-        
         log_event("INFO", "sandbox.don", f"Player {pid} added {actual_add} don!!", player="system")
 
     def start_turn_process(self):
@@ -125,8 +107,6 @@ class SandboxManager:
         self.active_player_id = "p2" if self.active_player_id == "p1" else "p1"
         self.turn_count += 1
         self.start_turn_process()
-
-    # --- 汎用操作 ---
 
     def _find_card_location(self, card_uuid: str):
         for pid in ["p1", "p2"]:
@@ -151,17 +131,22 @@ class SandboxManager:
         src_pid, src_zone, src_idx = self._find_card_location(card_uuid)
         if not src_pid: return False
 
-        # ドン!!自動支払いのための事前チェック
+        # --- 自動支払いコストの計算 ---
         cost_to_pay = 0
         p_src = self.state[src_pid]
         p_dest = self.state[dest_pid]
         
-        # 手札からフィールド(自陣)への移動かつ、コストを持つカードの場合
+        # 手札から自陣フィールドへの移動時
         if src_zone == "hand" and dest_zone == "field" and src_pid == dest_pid:
             if 0 <= src_idx < len(p_src["hand"]):
                 c = p_src["hand"][src_idx]
-                if hasattr(c, "cost") and c.cost > 0:
-                    cost_to_pay = c.cost
+                # コスト取得をより堅牢に (master経由も考慮)
+                val = getattr(c, "cost", None)
+                if val is None and hasattr(c, "master"):
+                    val = getattr(c.master, "cost", 0)
+                
+                if val is not None and val > 0:
+                    cost_to_pay = val
 
         card = None
         
@@ -186,8 +171,6 @@ class SandboxManager:
 
         # 配置
         if dest_zone == "leader":
-            old = p_dest["leader"]
-            if old: p_dest["trash"].append(old)
             p_dest["leader"] = card
         elif dest_zone == "stage":
             old = p_dest["stage"]
@@ -196,7 +179,6 @@ class SandboxManager:
         else:
             dest_list = p_dest.get(dest_zone)
             if dest_list is None: return False 
-            
             if index == -1 or index >= len(dest_list):
                 dest_list.append(card)
             else:
@@ -204,11 +186,10 @@ class SandboxManager:
         
         log_event("INFO", "sandbox.move", f"Moved {card.uuid} to {dest_pid}.{dest_zone}", player="system")
 
-        # ドン!!自動支払い実行
+        # --- 自動支払い実行 ---
         if cost_to_pay > 0:
             active_dons = p_src["don_active"]
             rest_dons = p_src["don_rested"]
-            
             pay_amount = min(cost_to_pay, len(active_dons))
             if pay_amount > 0:
                 for _ in range(pay_amount):
@@ -220,7 +201,6 @@ class SandboxManager:
         return True
 
     def attach_don(self, don_uuid: str, target_uuid: str):
-        # ドンを探す
         src_pid, src_zone, src_idx = self._find_card_location(don_uuid)
         if not src_pid or "don" not in src_zone: return False
         
@@ -234,7 +214,6 @@ class SandboxManager:
         
         if not don_card: return False
         
-        # ターゲットを探す (Leader or Field)
         t_pid, t_zone, t_idx = self._find_card_location(target_uuid)
         if not t_pid: return False
         
@@ -244,10 +223,9 @@ class SandboxManager:
         elif t_zone == "field": target_card = t_p["field"][t_idx]
         
         if not target_card:
-            p["don_active"].append(don_card) # 戻す
+            p["don_active"].append(don_card)
             return False
             
-        # 付与処理
         don_card.attached_to = target_uuid
         don_card.is_rest = False
         p["don_attached"].append(don_card)
