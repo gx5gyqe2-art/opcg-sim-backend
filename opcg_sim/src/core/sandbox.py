@@ -73,7 +73,7 @@ class SandboxManager:
         p_src = self.state[src_pid]
         
         if src_zone == "leader":
-            pass 
+            pass # Leader shouldn't be moved usually
         elif src_zone == "stage":
             card = p_src["stage"]
             p_src["stage"] = None
@@ -83,6 +83,7 @@ class SandboxManager:
 
         if not card: return False
 
+        # Reset basic status
         if hasattr(card, "is_rest"): card.is_rest = False
         if hasattr(card, "attached_don"): card.attached_don = 0
 
@@ -191,22 +192,31 @@ class SandboxManager:
 
     def _player_to_dict(self, pid: str):
         p = self.state[pid]
+        
+        # カードを表向きにするためのヘルパー関数
+        def fmt(card, face_up=True):
+            if not card: return None
+            d = card.to_dict()
+            if face_up:
+                d["is_face_up"] = True
+            return d
+
         return {
             "player_id": p["name"], 
             "name": p["name"],
             "life_count": len(p["life"]),
             "hand_count": len(p["hand"]),
             "don_deck_count": len(p["don_deck"]),
-            "don_active": [d.to_dict() for d in p["don_active"]],
-            "don_rested": [d.to_dict() for d in p["don_rested"]],
-            "leader": p["leader"].to_dict() if p["leader"] else None,
-            "stage": p["stage"].to_dict() if p["stage"] else None,
+            "don_active": [fmt(d) for d in p["don_active"]],
+            "don_rested": [fmt(d) for d in p["don_rested"]],
+            "leader": fmt(p["leader"]), # リーダーを表向きに
+            "stage": fmt(p["stage"]),   # ステージを表向きに
             "zones": {
-                "field": [c.to_dict() for c in p["field"]],
-                "hand": [c.to_dict() for c in p["hand"]],
-                "life": [c.to_dict() for c in p["life"]],
-                "trash": [c.to_dict() for c in p["trash"]],
-                "stage": p["stage"].to_dict() if p["stage"] else None,
-                "deck": [c.to_dict() for c in p["deck"]] 
+                "field": [fmt(c) for c in p["field"]], # フィールドを表向きに
+                "hand": [fmt(c) for c in p["hand"]],   # 手札を表向きに
+                "life": [fmt(c, False) for c in p["life"]], # ライフは裏向きのまま
+                "trash": [fmt(c) for c in p["trash"]], # トラッシュは表向きに
+                "stage": fmt(p["stage"]),
+                "deck": [fmt(c, False) for c in p["deck"]] # デッキは裏向き
             }
         }
