@@ -12,6 +12,7 @@ current_api_dir = os.path.dirname(os.path.abspath(__file__))
 if current_api_dir not in sys.path:
     sys.path.append(current_api_dir)
 
+
 try:
     from schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
 except ImportError:
