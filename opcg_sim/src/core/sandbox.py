@@ -2,6 +2,7 @@ import uuid
 import random
 import traceback
 from typing import Dict, List, Optional, Any
+from datetime import datetime
 from ..models.models import CardInstance, DonInstance
 from ..models.enums import Zone
 from ..utils.logger_config import log_event
@@ -9,6 +10,7 @@ from ..utils.logger_config import log_event
 class SandboxManager:
     def __init__(self, p1_deck: List[CardInstance], p2_deck: List[CardInstance], p1_leader: Optional[CardInstance], p2_leader: Optional[CardInstance], p1_name: str = "P1", p2_name: str = "P2"):
         self.game_id = str(uuid.uuid4())
+        self.created_at = datetime.now().isoformat()
         self.turn_count = 1
         self.active_player_id = "p1"
         self.state = {
@@ -140,7 +142,6 @@ class SandboxManager:
         if src_zone == "hand" and dest_zone == "field" and src_pid == dest_pid:
             if 0 <= src_idx < len(p_src["hand"]):
                 c = p_src["hand"][src_idx]
-                # コスト取得をより堅牢に (master経由も考慮)
                 val = getattr(c, "cost", None)
                 if val is None and hasattr(c, "master"):
                     val = getattr(c.master, "cost", 0)
@@ -264,6 +265,7 @@ class SandboxManager:
     def to_dict(self):
         return {
             "game_id": self.game_id,
+            "created_at": getattr(self, "created_at", None),
             "mode": "sandbox",
             "turn_info": {
                 "turn_count": self.turn_count,

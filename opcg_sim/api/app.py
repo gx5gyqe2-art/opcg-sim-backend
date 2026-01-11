@@ -319,17 +319,17 @@ async def sandbox_list():
     # 辞書から直接情報を取得
     for gid, mgr in SANDBOX_GAMES.items():
         try:
-            # マネージャーから情報を抽出
             p1_name = mgr.state["p1"]["name"]
             p2_name = mgr.state["p2"]["name"]
             turn = mgr.turn_count
+            created_at = getattr(mgr, "created_at", "N/A")
             
             games.append({
                 "game_id": gid,
                 "p1_name": p1_name,
                 "p2_name": p2_name,
                 "turn": turn,
-                "created_at": "N/A"
+                "created_at": created_at
             })
         except Exception:
             continue
