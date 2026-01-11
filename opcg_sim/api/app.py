@@ -12,12 +12,12 @@ current_api_dir = os.path.dirname(os.path.abspath(__file__))
 if current_api_dir not in sys.path:
     sys.path.append(current_api_dir)
 
-
 try:
     from schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
 except ImportError:
     from .schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
 
+# SandboxManagerのインポート
 try:
     from opcg_sim.src.core.sandbox import SandboxManager
 except ImportError:
@@ -39,7 +39,7 @@ BASE_DIR = os.path.dirname(current_api_dir)
 DATA_DIR = os.path.join(BASE_DIR, "data")
 CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
-app = FastAPI(title="OPCG Simulator API v1.5")
+app = FastAPI(title="OPCG Simulator API v1.6")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 db = None
@@ -97,8 +97,9 @@ async def receive_frontend_log(data: Union[Dict[str, Any], List[Dict[str, Any]]]
         try: log_event(level_key=data.get("level", "info"), action=data.get("action", "client.log"), msg=data.get("msg", ""), player=data.get("player", "system"), payload=data.get("payload"), source="FE"); return {"status": "ok", "mode": "single"}
         finally: session_id_ctx.reset(token)
 
+# ゲーム管理用辞書
 GAMES: Dict[str, GameManager] = {}
-SANDBOX_GAMES: Dict[str, SandboxManager] = {}
+SANDBOX_GAMES: Dict[str, 'SandboxManager'] = {}
 
 card_db = CardLoader(CARD_DB_PATH); card_db.load(); deck_loader = DeckLoader(card_db)
 
@@ -223,30 +224,76 @@ async def save_deck(deck_data: Dict[str, Any] = Body(...)):
 
 @app.get("/api/deck/list")
 async def list_decks():
-    if not db: return {"success": False, "error": "Database not initialized"}
-    try:
-        docs = db.collection("decks").order_by("created_at", direction=firestore.Query.DESCENDING).stream(); decks = []
-        for doc in docs:
-            d = doc.to_dict()
-            if "created_at" in d and d["created_at"]: d["created_at"] = str(d["created_at"])
-            decks.append(d)
-        return {"success": True, "decks": decks}
-    except Exception as e:
-        log_event("ERROR", "deck.list_fail", traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
+    decks = []
+    
+    # 1. ローカルのデフォルトデッキファイルを読み込む
+    default_files = ["imu.json", "nami.json"]
+    for filename in default_files:
+        try:
+            path = os.path.join(DATA_DIR, filename)
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    
+                deck_data = data[0] if isinstance(data, list) and len(data) > 0 else data
+                
+                if isinstance(deck_data, dict):
+                    formatted_deck = {
+                        "id": filename, 
+                        "name": deck_data.get("name", filename.replace(".json", "")),
+                        "leader_id": None,
+                        "card_uuids": [],
+                        "don_uuids": [],
+                        "created_at": None
+                    }
+                    if "leader" in deck_data:
+                        formatted_deck["leader_id"] = deck_data["leader"].get("number")
+                    if "cards" in deck_data:
+                        for card in deck_data["cards"]:
+                            cid = card.get("number")
+                            count = card.get("count", 1)
+                            if cid:
+                                formatted_deck["card_uuids"].extend([cid] * count)
+                    decks.append(formatted_deck)
+        except Exception as e:
+            log_event("WARNING", "deck.list_local_load_fail", f"Failed to load {filename}: {e}", player="system")
+
+    # 2. Firestoreからデッキを読み込む
+    if db:
+        try:
+            docs = db.collection("decks").order_by("created_at", direction=firestore.Query.DESCENDING).stream()
+            for doc in docs:
+                d = doc.to_dict()
+                if "created_at" in d and d["created_at"]:
+                    d["created_at"] = str(d["created_at"])
+                decks.append(d)
+        except Exception as e:
+            log_event("ERROR", "deck.list_db_fail", traceback.format_exc(), player="system")
+
+    return {"success": True, "decks": decks}
 
 @app.post("/api/sandbox/create")
 async def sandbox_create(req: Any = Body(...)):
     try:
         game_id = str(uuid.uuid4())
         log_event(level_key="INFO", action="sandbox.create", msg=f"Creating sandbox: {game_id}", payload=req, player="system")
+        
         p1_source = req.get("p1_deck", "")
         p2_source = req.get("p2_deck", "")
+        
         if len(card_db.cards) < len(card_db.raw_db):
              for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
+             
+        # load_deck_mixed を使用してDB/ローカル両対応にする
         p1_leader, p1_cards = load_deck_mixed(p1_source, req.get("p1_name", "P1"))
         p2_leader, p2_cards = load_deck_mixed(p2_source, req.get("p2_name", "P2"))
+        
+        if "SandboxManager" not in globals():
+            raise ImportError("SandboxManager not loaded")
+
         manager = SandboxManager(p1_cards, p2_cards, p1_leader, p2_leader, req.get("p1_name", "P1"), req.get("p2_name", "P2"))
         SANDBOX_GAMES[manager.game_id] = manager
+        
         return {"success": True, "game_id": manager.game_id, "game_state": manager.to_dict()}
     except Exception as e:
         log_event(level_key="ERROR", action="sandbox.create_fail", msg=traceback.format_exc(), player="system")
@@ -256,7 +303,10 @@ async def sandbox_create(req: Any = Body(...)):
 async def sandbox_action(req: Dict[str, Any] = Body(...)):
     game_id = req.get("game_id")
     manager = SANDBOX_GAMES.get(game_id)
-    if not manager: return {"success": False, "error": "Sandbox game not found"}
+    
+    if not manager:
+        return {"success": False, "error": "Sandbox game not found"}
+        
     try:
         manager.process_action(req)
         return {"success": True, "game_id": game_id, "game_state": manager.to_dict()}
