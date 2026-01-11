@@ -160,6 +160,29 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ],
+    "OP13-090": [  # チャルロス聖の追加
+        Ability(
+            trigger=TriggerType.ON_PLAY,
+            cost=GameAction(
+                type=ActionType.REST,
+                target=TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=1, is_strict_count=True, is_rest=False, save_id="charlos_cost_don"),
+                raw_text="ドン!!1枚をレストにできる"
+            ),
+            effect=GameAction(
+                type=ActionType.KO,
+                target=TargetQuery(
+                    player=Player.OPPONENT, 
+                    zone=Zone.FIELD, 
+                    card_type=["CHARACTER"], 
+                    cost_max=4, 
+                    count=1, 
+                    is_up_to=True, 
+                    save_id="charlos_ko_target"  # ログのエラー原因だったsave_idを定義
+                ),
+                raw_text="相手のコスト4以下のキャラ1枚までを、KOする"
+            )
+        )
+    ],
     "OP13-092": [
         Ability(
             trigger=TriggerType.ON_PLAY,
