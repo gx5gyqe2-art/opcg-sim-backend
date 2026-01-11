@@ -39,12 +39,12 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 options=[
                     GameAction(
                         type=ActionType.TRASH,
-                        target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, traits=["天竜人"], count=1, save_id="cost_char"),
+                        target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, traits=["天竜人"], count=1, save_id="imu_cost_char"),
                         raw_text="自分の特徴《天竜人》を持つキャラをトラッシュに置く"
                     ),
                     GameAction(
                         type=ActionType.TRASH,
-                        target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, save_id="cost_hand"),
+                        target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, save_id="imu_cost_hand"),
                         raw_text="手札1枚をトラッシュに置く"
                     )
                 ]
@@ -155,7 +155,12 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             trigger=TriggerType.ON_PLAY,
             effect=GameAction(
                 type=ActionType.TRASH,
-                target=TargetQuery(player=Player.SELF, zone=Zone.DECK, count=1),
+                target=TargetQuery(
+                    player=Player.SELF, 
+                    zone=Zone.DECK, 
+                    count=1, 
+                    save_id="charlos_mill_target"
+                ),
                 raw_text="自分のデッキの上から1枚をトラッシュに置く"
             )
         )
@@ -319,7 +324,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                         cost_max_dynamic="DON_COUNT_FIELD"
                     ),
                     destination=Zone.FIELD,
-                    raw_text="手札から自分の場のドン!!の枚数以下のコストを持つ黒の特徴《五老星》を持つキャラカード1枚までを, 登場させる"
+                    raw_text="手札から自分の場のドン!!の枚数以下のコストを持つ黒の特徴《五老星》を持つキャラカード1枚までを、登場させる"
                 )
             ])
         )
