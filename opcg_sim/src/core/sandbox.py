@@ -40,13 +40,11 @@ class SandboxManager:
         for pid in ["p1", "p2"]:
             player = self.state[pid]
             random.shuffle(player["deck"])
-            # ライフ設定
             if player["leader"]:
                 life_count = player["leader"].master.life
                 for _ in range(life_count):
                     if player["deck"]:
                         player["life"].append(player["deck"].pop(0))
-            # 初期手札5枚
             for _ in range(5):
                 if player["deck"]:
                     player["hand"].append(player["deck"].pop(0))
@@ -54,11 +52,10 @@ class SandboxManager:
     # --- ターン遷移ロジック ---
 
     def refresh_phase(self):
-        """リフレッシュフェーズ: 全カードをアクティブにし、ドン!!を戻す"""
+        """リフレッシュフェーズ"""
         pid = self.active_player_id
         p = self.state[pid]
         
-        # 1. キャラクター、リーダー、ステージのアクティブ化 & ドン剥離
         if p["leader"]: 
             p["leader"].is_rest = False
             p["leader"].attached_don = 0
@@ -69,16 +66,12 @@ class SandboxManager:
             c.is_rest = False
             c.attached_don = 0
             
-        # 2. ドン!!の返却とアクティブ化
-        # 付与されていたドンをアクティブに戻す
         p["don_active"].extend(p["don_attached"])
         p["don_attached"] = []
         
-        # レスト状態のドンをアクティブに戻す
         p["don_active"].extend(p["don_rested"])
         p["don_rested"] = []
         
-        # 全ドン!!の状態リセット
         for d in p["don_active"]:
             d.is_rest = False
             d.attached_to = None
@@ -86,8 +79,7 @@ class SandboxManager:
         log_event("INFO", "sandbox.refresh", f"Refreshed all cards for {pid}", player="system")
 
     def draw_phase(self):
-        """ドローフェーズ: カードを引く"""
-        # 先攻1ターン目(turn_count=1)はドローなし
+        """ドローフェーズ"""
         if self.turn_count == 1:
             return
 
@@ -100,15 +92,11 @@ class SandboxManager:
             log_event("INFO", "sandbox.draw", f"Player {pid} drew a card", player="system")
 
     def don_phase(self):
-        """ドン!!フェーズ: ドン!!を追加する"""
+        """ドン!!フェーズ"""
         pid = self.active_player_id
         p = self.state[pid]
         
-        # 先攻1ターン目は1枚、それ以外は2枚追加
         add_count = 1 if self.turn_count == 1 else 2
-        
-        # 場のドン!!は最大10枚まで
-        # (refresh後なので active, rested, attached の合計を見る必要はないが、念のため全領域チェック)
         current_total = len(p["don_active"]) + len(p["don_rested"]) + len(p["don_attached"])
         limit = 10
         can_add = max(0, limit - current_total)
@@ -123,21 +111,15 @@ class SandboxManager:
         log_event("INFO", "sandbox.don", f"Player {pid} added {actual_add} don!!", player="system")
 
     def start_turn_process(self):
-        """ターン開始処理フロー"""
         log_event("INFO", "sandbox.turn_start", f"Turn {self.turn_count} started for {self.active_player_id}", player="system")
         self.refresh_phase()
         self.draw_phase()
         self.don_phase()
 
     def end_turn_process(self):
-        """ターン終了処理: プレイヤー交代して次のターンへ"""
         log_event("INFO", "sandbox.turn_end", f"Turn {self.turn_count} ended for {self.active_player_id}", player="system")
-        
-        # プレイヤー交代
         self.active_player_id = "p2" if self.active_player_id == "p1" else "p1"
         self.turn_count += 1
-        
-        # 次のターンの開始処理を実行
         self.start_turn_process()
 
     # --- 汎用操作 ---
@@ -152,7 +134,8 @@ class SandboxManager:
                 "hand": p_data["hand"], "field": p_data["field"], "trash": p_data["trash"],
                 "life": p_data["life"], "deck": p_data["deck"],
                 "don_active": p_data["don_active"], "don_rested": p_data["don_rested"],
-                "don_attached": p_data["don_attached"], "temp": p_data["temp"]
+                "don_attached": p_data["don_attached"], "temp": p_data["temp"],
+                "don_deck": p_data["don_deck"]  # ★追加: ドンデッキも検索対象にする
             }
             for zone_name, card_list in lists.items():
                 for i, card in enumerate(card_list):
@@ -167,15 +150,8 @@ class SandboxManager:
         card = None
         p_src = self.state[src_pid]
         
-        # 取り出し
         if src_zone == "leader":
-            # Leaderは基本移動しないが、Sandboxならありえるかもしれない
-            # ここでは複製せず移動とするなら、元の場所をNoneにする必要があるが、
-            # Leader枠が空くのはまずいので、コピー移動にするか要検討。
-            # 一旦、Leader/Stageは特別扱いせず移動可能にする。
             card = p_src["leader"]
-            # p_src["leader"] = None # Leaderを消すとエラーになる箇所が多いので残すか、None許容するか
-            pass 
         elif src_zone == "stage":
             card = p_src["stage"]
             p_src["stage"] = None
@@ -185,15 +161,12 @@ class SandboxManager:
 
         if not card: return False
 
-        # ステータスリセット (移動時)
         if hasattr(card, "is_rest"): card.is_rest = False
         if hasattr(card, "attached_don"): card.attached_don = 0
 
         p_dest = self.state[dest_pid]
         
-        # 配置
         if dest_zone == "leader":
-            # Leaderの入れ替えは特殊だがSandboxなので上書き
             p_dest["leader"] = card
         elif dest_zone == "stage":
             old = p_dest["stage"]
@@ -234,7 +207,6 @@ class SandboxManager:
         elif act_type == "TURN_END":
             self.end_turn_process()
         elif act_type == "DRAW":
-            # 手動ドロー用
             pid = req.get("player_id", self.active_player_id)
             if self.state[pid]["deck"]:
                 self.state[pid]["hand"].append(self.state[pid]["deck"].pop(0))
@@ -281,6 +253,7 @@ class SandboxManager:
                 "life": [fmt(c, False) for c in p["life"]],
                 "trash": [fmt(c) for c in p["trash"]],
                 "stage": fmt(p["stage"]),
-                "deck": [fmt(c, False) for c in p["deck"]]
+                "deck": [fmt(c, False) for c in p["deck"]],
+                "don_deck": [fmt(c, False) for c in p["don_deck"]] # ★追加: ドンデッキの内容を含める
             }
         }
