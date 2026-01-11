@@ -16,7 +16,6 @@ class SandboxManager:
             "p2": self._init_player(p2_name, p2_deck, p2_leader)
         }
         self.setup_initial_state()
-        # ゲーム開始時に1ターン目を開始する
         self.start_turn_process()
 
     def _init_player(self, name: str, deck: List[CardInstance], leader: Optional[CardInstance]) -> Dict[str, Any]:
@@ -49,10 +48,8 @@ class SandboxManager:
                 if player["deck"]:
                     player["hand"].append(player["deck"].pop(0))
 
-    # --- ターン遷移ロジック ---
-
+    # --- ターン遷移 ---
     def refresh_phase(self):
-        """リフレッシュフェーズ"""
         pid = self.active_player_id
         p = self.state[pid]
         
@@ -79,35 +76,27 @@ class SandboxManager:
         log_event("INFO", "sandbox.refresh", f"Refreshed all cards for {pid}", player="system")
 
     def draw_phase(self):
-        """ドローフェーズ"""
-        if self.turn_count == 1:
-            return
-
+        if self.turn_count == 1: return
         pid = self.active_player_id
         p = self.state[pid]
-        
         if p["deck"]:
             card = p["deck"].pop(0)
             p["hand"].append(card)
             log_event("INFO", "sandbox.draw", f"Player {pid} drew a card", player="system")
 
     def don_phase(self):
-        """ドン!!フェーズ"""
         pid = self.active_player_id
         p = self.state[pid]
-        
         add_count = 1 if self.turn_count == 1 else 2
         current_total = len(p["don_active"]) + len(p["don_rested"]) + len(p["don_attached"])
         limit = 10
         can_add = max(0, limit - current_total)
         actual_add = min(add_count, can_add)
-        
         for _ in range(actual_add):
             if p["don_deck"]:
                 don = p["don_deck"].pop(0)
                 don.is_rest = False
                 p["don_active"].append(don)
-        
         log_event("INFO", "sandbox.don", f"Player {pid} added {actual_add} don!!", player="system")
 
     def start_turn_process(self):
@@ -122,8 +111,7 @@ class SandboxManager:
         self.turn_count += 1
         self.start_turn_process()
 
-    # --- 汎用操作 ---
-
+    # --- ユーティリティ ---
     def _find_card_location(self, card_uuid: str):
         for pid in ["p1", "p2"]:
             p_data = self.state[pid]
@@ -143,6 +131,7 @@ class SandboxManager:
                         return pid, zone_name, i
         return None, None, None
 
+    # --- アクション処理 ---
     def move_card(self, card_uuid: str, dest_pid: str, dest_zone: str, index: int = -1):
         src_pid, src_zone, src_idx = self._find_card_location(card_uuid)
         if not src_pid: return False
@@ -151,10 +140,10 @@ class SandboxManager:
         p_src = self.state[src_pid]
         p_dest = self.state[dest_pid]
         
-        # --- 1. カードの取り出し処理 ---
+        # 取り出し
         if src_zone == "leader":
             card = p_src["leader"]
-            p_src["leader"] = None  # 元の場所を空にする（増殖防止）
+            p_src["leader"] = None
         elif src_zone == "stage":
             card = p_src["stage"]
             p_src["stage"] = None
@@ -165,15 +154,12 @@ class SandboxManager:
 
         if not card: return False
 
-        # --- 2. ステータス更新 ---
-        # 所有者を移動先のプレイヤーに書き換える（相手陣地での消失防止）
-        if hasattr(card, "owner_id"):
-            card.owner_id = p_dest["name"]
-
+        # ステータスリセット (所有権更新含む)
+        if hasattr(card, "owner_id"): card.owner_id = p_dest["name"]
         if hasattr(card, "is_rest"): card.is_rest = False
         if hasattr(card, "attached_don"): card.attached_don = 0
 
-        # --- 3. 配置処理 ---
+        # 配置
         if dest_zone == "leader":
             old = p_dest["leader"]
             if old: p_dest["trash"].append(old)
@@ -185,7 +171,6 @@ class SandboxManager:
         else:
             dest_list = p_dest.get(dest_zone)
             if dest_list is None: return False 
-            
             if index == -1 or index >= len(dest_list):
                 dest_list.append(card)
             else:
@@ -194,16 +179,52 @@ class SandboxManager:
         log_event("INFO", "sandbox.move", f"Moved {card.uuid} to {dest_pid}.{dest_zone}", player="system")
         return True
 
+    def attach_don(self, don_uuid: str, target_uuid: str):
+        # ドンを探す
+        src_pid, src_zone, src_idx = self._find_card_location(don_uuid)
+        if not src_pid or "don" not in src_zone: return False
+        
+        p = self.state[src_pid]
+        don_card = None
+        
+        if src_zone == "don_active": don_card = p["don_active"].pop(src_idx)
+        elif src_zone == "don_rested": don_card = p["don_rested"].pop(src_idx)
+        elif src_zone == "don_attached": don_card = p["don_attached"].pop(src_idx)
+        elif src_zone == "don_deck": don_card = p["don_deck"].pop(src_idx)
+        
+        if not don_card: return False
+        
+        # ターゲットを探す (Leader or Field)
+        t_pid, t_zone, t_idx = self._find_card_location(target_uuid)
+        if not t_pid: return False # ターゲットが見つからない
+        
+        t_p = self.state[t_pid]
+        target_card = None
+        if t_zone == "leader": target_card = t_p["leader"]
+        elif t_zone == "field": target_card = t_p["field"][t_idx]
+        
+        if not target_card:
+            p["don_active"].append(don_card) # 戻す
+            return False
+            
+        # 付与処理
+        don_card.attached_to = target_uuid
+        don_card.is_rest = False # 付与時はアクティブ扱いが良いか？ルール上はレストではないが、コストとしては消費済み
+        # 本システムでは attached_don リストに入れて管理
+        p["don_attached"].append(don_card)
+        target_card.attached_don += 1
+        
+        log_event("INFO", "sandbox.attach", f"Attached {don_uuid} to {target_uuid}", player="system")
+        return True
+
     def toggle_rest(self, card_uuid: str):
         src_pid, src_zone, src_idx = self._find_card_location(card_uuid)
         if not src_pid: return
-        
-        card = None
         p_src = self.state[src_pid]
+        card = None
         if src_zone == "leader": card = p_src["leader"]
         elif src_zone == "stage": card = p_src["stage"]
         else: card = p_src[src_zone][src_idx]
-        
         if card:
             card.is_rest = not card.is_rest
             log_event("INFO", "sandbox.rest", f"Toggled rest for {card.uuid}", player="system")
@@ -212,6 +233,8 @@ class SandboxManager:
         act_type = req.get("action_type")
         if act_type == "MOVE_CARD":
             self.move_card(req["card_uuid"], req["dest_player_id"], req["dest_zone"], req.get("index", -1))
+        elif act_type == "ATTACH_DON":
+            self.attach_don(req["card_uuid"], req["target_uuid"])
         elif act_type == "TOGGLE_REST":
             self.toggle_rest(req["card_uuid"])
         elif act_type == "TURN_END":
@@ -239,12 +262,10 @@ class SandboxManager:
 
     def _player_to_dict(self, pid: str):
         p = self.state[pid]
-        
         def fmt(card, face_up=True):
             if not card: return None
             d = card.to_dict()
-            if face_up:
-                d["is_face_up"] = True
+            if face_up: d["is_face_up"] = True
             return d
 
         return {
