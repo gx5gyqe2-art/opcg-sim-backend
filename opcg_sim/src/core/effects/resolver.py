@@ -127,7 +127,7 @@ class EffectResolver:
             return []
             
         if (query.select_mode == "ALL") or (len(candidates) <= required_count and not is_optional and not is_up_to) or (is_resource and not is_up_to):
-            selected = candidates[:required_count] if is_resource else candidates
+            selected = candidates[:required_count] if required_count > 0 else candidates
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = selected
             return selected

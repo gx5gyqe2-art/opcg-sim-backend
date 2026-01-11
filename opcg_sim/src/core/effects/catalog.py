@@ -18,7 +18,8 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                     zone=Zone.HAND,
                     traits=["天竜人"],
                     cost_min=2,
-                    select_mode="ALL"
+                    select_mode="ALL",
+                    count=-1
                 ),
                 value=ValueSource(base=-1),
                 status="COST_REDUCTION",
@@ -98,7 +99,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             effect=Sequence(actions=[
                 GameAction(
                     type=ActionType.TRASH,
-                    target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, card_type=["CHARACTER"], select_mode="ALL"),
+                    target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, card_type=["CHARACTER"], select_mode="ALL", count=-1),
                     raw_text="自分のキャラすべてをトラッシュに置く"
                 ),
                 GameAction(
@@ -137,7 +138,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.TRASH,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL", count=99),
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL", count=-1),
                     destination=Zone.TRASH,
                     raw_text="残りをトラッシュに置く"
                 ),
@@ -150,7 +151,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ])
         )
     ],
-    "OP13-087": [
+    "OP13-087": [  # チャルロス聖
         Ability(
             trigger=TriggerType.ON_PLAY,
             effect=GameAction(
@@ -159,7 +160,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                     player=Player.SELF, 
                     zone=Zone.DECK, 
                     count=1, 
-                    save_id="charlos_mill_target"
+                    select_mode="ALL"  # ユーザー選択を回避し、先頭(Top)を自動解決
                 ),
                 raw_text="自分のデッキの上から1枚をトラッシュに置く"
             )
@@ -204,7 +205,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.DECK_BOTTOM,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL", count=99),
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL", count=-1),
                     destination=Zone.DECK,
                     raw_text="残りを好きな順番でデッキの下に置く"
                 )
@@ -248,7 +249,8 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                     zone=Zone.FIELD, 
                     traits=["五老星"], 
                     card_type=["CHARACTER"], 
-                    select_mode="ALL"
+                    select_mode="ALL",
+                    count=-1
                 ),
                 value=ValueSource(base=7000),
                 status="POWER_OVERRIDE",
@@ -272,7 +274,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 GameAction(
                     type=ActionType.TRASH,
-                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL", count=99),
+                    target=TargetQuery(zone=Zone.TEMP, player=Player.SELF, select_mode="ALL", count=-1),
                     destination=Zone.TRASH
                 )
             ])
