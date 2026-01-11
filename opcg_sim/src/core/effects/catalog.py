@@ -97,11 +97,13 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 )
             ]),
             effect=Sequence(actions=[
+                # 盤面リセット：自動解決（count=-1, select_mode="ALL"）
                 GameAction(
                     type=ActionType.TRASH,
                     target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, card_type=["CHARACTER"], select_mode="ALL", count=-1),
                     raw_text="自分のキャラすべてをトラッシュに置く"
                 ),
+                # トラッシュ蘇生：is_unique_name=True で名称重複排除
                 GameAction(
                     type=ActionType.PLAY_CARD,
                     target=TargetQuery(

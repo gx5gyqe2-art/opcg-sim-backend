@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any, Tuple, Set
+from typing import List, Optional, Any, Tuple, Dict, Set
 import random
 import unicodedata
 import re
@@ -382,6 +382,21 @@ class GameManager:
 
     def move_card(self, card: Card, dest_zone: Zone, dest_player: Player, dest_position: str = "BOTTOM"):
         current_owner, current_list = self._find_card_location(card)
+        
+        # 領域移動時はステータスをリセット（特にトラッシュ/手札へ戻る場合）
+        if dest_zone in [Zone.TRASH, Zone.HAND]:
+            card.reset_turn_status()
+            
+        # フィールドから離れる場合、付与されていたドン‼をレスト状態で持ち主に返す
+        if current_owner and current_list is not None and current_list is current_owner.field:
+            attached_dons = [d for d in current_owner.don_attached_cards if d.attached_to == card.uuid]
+            for don in attached_dons:
+                current_owner.don_attached_cards.remove(don)
+                don.attached_to = None
+                don.is_rest = True
+                current_owner.don_rested.append(don)
+            card.attached_don = 0
+
         if current_list is not None and card in current_list: current_list.remove(card)
         elif current_owner and current_owner.stage == card: current_owner.stage = None
         
