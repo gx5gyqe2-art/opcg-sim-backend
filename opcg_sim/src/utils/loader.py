@@ -74,13 +74,20 @@ class DataCleaner:
             log_event(level_key="ERROR", action="loader.parse_error", msg=f"Text: {s_text[:20]}... Error: {e}")
             return []
 
+    # 変更: 単一のColorではなくList[Color]を返すメソッドに変更
     @staticmethod
-    def map_color(value: str) -> Color:
+    def map_colors(value: str) -> List[Color]:
         clean_str = DataCleaner.normalize_text(value)
-        for c in Color:
+        found_colors = []
+        # 列挙体の定義順に関わらず全ての色をチェック
+        target_colors = [Color.RED, Color.GREEN, Color.BLUE, Color.PURPLE, Color.BLACK, Color.YELLOW]
+        for c in target_colors:
             if DataCleaner.normalize_text(str(c.value)) in clean_str or DataCleaner.normalize_text(c.name) in clean_str.upper():
-                return c
-        return Color.UNKNOWN
+                found_colors.append(c)
+        
+        if not found_colors:
+            return [Color.UNKNOWN]
+        return found_colors
 
     @staticmethod
     def map_card_type(type_str: str) -> CardType:
@@ -158,8 +165,11 @@ class CardLoader:
         c_type = DataCleaner.map_card_type(type_val) if type_val else CardType.UNKNOWN
         attr_val = get_val(M["ATTRIBUTE"])
         attribute = DataCleaner.map_attribute(attr_val) if attr_val else Attribute.NONE
+        
+        # 変更: 単一のmap_colorではなくmap_colorsを使用してリストを取得
         color_val = get_val(M["COLOR"])
-        color = DataCleaner.map_color(color_val) if color_val else Color.UNKNOWN
+        colors = DataCleaner.map_colors(color_val) if color_val else [Color.UNKNOWN]
+        
         cost = DataCleaner.parse_int(get_val(M["COST"]))
         power = DataCleaner.parse_int(get_val(M["POWER"]))
         counter = DataCleaner.parse_int(get_val(M["COUNTER"]))
@@ -181,8 +191,9 @@ class CardLoader:
             trigger_abilities = DataCleaner.parse_abilities(trigger_text, is_trigger=True)
             combined_abilities = tuple(main_abilities + trigger_abilities)
 
+        # color 引数を colors に変更
         return CardMaster(
-            card_id=card_id, name=name, type=c_type, color=color, cost=cost, power=power,
+            card_id=card_id, name=name, type=c_type, colors=colors, cost=cost, power=power,
             counter=counter, attribute=attribute, traits=traits, effect_text=effect_text,
             trigger_text=trigger_text, life=life, abilities=combined_abilities
         )

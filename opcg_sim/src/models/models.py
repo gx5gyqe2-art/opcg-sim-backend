@@ -46,7 +46,7 @@ class CardMaster:
     card_id: str
     name: str
     type: CardType
-    color: Color
+    colors: List[Color] # 変更: color -> colors (リスト化)
     cost: int
     power: int
     counter: int
@@ -63,7 +63,7 @@ class CardMaster:
             "uuid": self.card_id,
             "name": self.name,
             "type": self.type.name if hasattr(self.type, "name") else str(self.type),
-            "color": [self.color.value] if hasattr(self.color, "value") else [],
+            "color": [c.value for c in self.colors] if self.colors else [], # 変更: リスト内の各色の値を出力
             "cost": self.cost,
             "power": self.power,
             "counter": self.counter,
@@ -71,7 +71,7 @@ class CardMaster:
             "text": self.effect_text,
             "traits": self.traits,
             "life": self.life,
-            "trigger_text": self.trigger_text # ▼ 追加: トリガー効果のテキストを含める
+            "trigger_text": self.trigger_text
         }
 
 
