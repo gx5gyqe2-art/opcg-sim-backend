@@ -4,7 +4,6 @@ import sys
 import json
 import traceback
 from typing import Any, Dict, Optional, List, Union
-# WebSocket, WebSocketDisconnect を追加
 from fastapi import FastAPI, Body, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import firestore
@@ -40,7 +39,7 @@ BASE_DIR = os.path.dirname(current_api_dir)
 DATA_DIR = os.path.join(BASE_DIR, "data")
 CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
-app = FastAPI(title="OPCG Simulator API v1.7") # Version updated
+app = FastAPI(title="OPCG Simulator API v1.7")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 db = None
@@ -264,6 +263,8 @@ async def save_deck(deck_data: Dict[str, Any] = Body(...)):
 @app.get("/api/deck/list")
 async def list_decks():
     decks = []
+    
+    # 1. ローカルのデフォルトデッキファイルを読み込む
     default_files = ["imu.json", "nami.json"]
     for filename in default_files:
         try:
@@ -271,7 +272,9 @@ async def list_decks():
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
                     data = json.load(f)
+                    
                 deck_data = data[0] if isinstance(data, list) and len(data) > 0 else data
+                
                 if isinstance(deck_data, dict):
                     formatted_deck = {
                         "id": filename, 
@@ -285,23 +288,53 @@ async def list_decks():
                         formatted_deck["leader_id"] = deck_data["leader"].get("number")
                     if "cards" in deck_data:
                         for card in deck_data["cards"]:
-                            cid = card.get("number"); count = card.get("count", 1)
-                            if cid: formatted_deck["card_uuids"].extend([cid] * count)
+                            cid = card.get("number")
+                            count = card.get("count", 1)
+                            if cid:
+                                formatted_deck["card_uuids"].extend([cid] * count)
                     decks.append(formatted_deck)
         except Exception as e:
             log_event("WARNING", "deck.list_local_load_fail", f"Failed to load {filename}: {e}", player="system")
+
+    # 2. Firestoreからデッキを読み込む
     if db:
         try:
             docs = db.collection("decks").order_by("created_at", direction=firestore.Query.DESCENDING).stream()
             for doc in docs:
                 d = doc.to_dict()
-                if "created_at" in d and d["created_at"]: d["created_at"] = str(d["created_at"])
+                if "created_at" in d and d["created_at"]:
+                    d["created_at"] = str(d["created_at"])
                 decks.append(d)
         except Exception as e:
             log_event("ERROR", "deck.list_db_fail", traceback.format_exc(), player="system")
+
     return {"success": True, "decks": decks}
 
 # --- Sandbox Endpoints ---
+
+@app.get("/api/sandbox/list")
+async def sandbox_list():
+    """現在アクティブなサンドボックスゲームの一覧を返す"""
+    games = []
+    # 辞書から直接情報を取得
+    for gid, mgr in SANDBOX_GAMES.items():
+        try:
+            # マネージャーから情報を抽出
+            p1_name = mgr.state["p1"]["name"]
+            p2_name = mgr.state["p2"]["name"]
+            turn = mgr.turn_count
+            
+            games.append({
+                "game_id": gid,
+                "p1_name": p1_name,
+                "p2_name": p2_name,
+                "turn": turn,
+                "created_at": "N/A"
+            })
+        except Exception:
+            continue
+            
+    return {"success": True, "games": games}
 
 @app.post("/api/sandbox/create")
 async def sandbox_create(req: Any = Body(...)):
@@ -315,6 +348,7 @@ async def sandbox_create(req: Any = Body(...)):
         if len(card_db.cards) < len(card_db.raw_db):
              for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
              
+        # load_deck_mixed を使用してDB/ローカル両対応にする
         p1_leader, p1_cards = load_deck_mixed(p1_source, req.get("p1_name", "P1"))
         p2_leader, p2_cards = load_deck_mixed(p2_source, req.get("p2_name", "P2"))
         
