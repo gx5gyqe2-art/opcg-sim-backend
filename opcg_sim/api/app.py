@@ -18,6 +18,11 @@ try:
 except ImportError:
     from .schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
 
+try:
+    from opcg_sim.src.core.sandbox import SandboxManager
+except ImportError:
+    pass
+
 from opcg_sim.src.utils.logger_config import session_id_ctx, log_event, save_batch_logs
 from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.utils.loader import CardLoader, DeckLoader
@@ -93,6 +98,8 @@ async def receive_frontend_log(data: Union[Dict[str, Any], List[Dict[str, Any]]]
         finally: session_id_ctx.reset(token)
 
 GAMES: Dict[str, GameManager] = {}
+SANDBOX_GAMES: Dict[str, SandboxManager] = {}
+
 card_db = CardLoader(CARD_DB_PATH); card_db.load(); deck_loader = DeckLoader(card_db)
 
 def load_deck_mixed(source_str: str, owner_id: str):
@@ -226,6 +233,36 @@ async def list_decks():
         return {"success": True, "decks": decks}
     except Exception as e:
         log_event("ERROR", "deck.list_fail", traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
+
+@app.post("/api/sandbox/create")
+async def sandbox_create(req: Any = Body(...)):
+    try:
+        game_id = str(uuid.uuid4())
+        log_event(level_key="INFO", action="sandbox.create", msg=f"Creating sandbox: {game_id}", payload=req, player="system")
+        p1_source = req.get("p1_deck", "")
+        p2_source = req.get("p2_deck", "")
+        if len(card_db.cards) < len(card_db.raw_db):
+             for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
+        p1_leader, p1_cards = load_deck_mixed(p1_source, req.get("p1_name", "P1"))
+        p2_leader, p2_cards = load_deck_mixed(p2_source, req.get("p2_name", "P2"))
+        manager = SandboxManager(p1_cards, p2_cards, p1_leader, p2_leader, req.get("p1_name", "P1"), req.get("p2_name", "P2"))
+        SANDBOX_GAMES[manager.game_id] = manager
+        return {"success": True, "game_id": manager.game_id, "game_state": manager.to_dict()}
+    except Exception as e:
+        log_event(level_key="ERROR", action="sandbox.create_fail", msg=traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/sandbox/action")
+async def sandbox_action(req: Dict[str, Any] = Body(...)):
+    game_id = req.get("game_id")
+    manager = SANDBOX_GAMES.get(game_id)
+    if not manager: return {"success": False, "error": "Sandbox game not found"}
+    try:
+        manager.process_action(req)
+        return {"success": True, "game_id": game_id, "game_state": manager.to_dict()}
+    except Exception as e:
+        log_event(level_key="ERROR", action="sandbox.action_fail", msg=traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
 
 @app.get("/health")
 async def health(): return {"status": "ok", "constants_loaded": bool(CONST), "session_id": session_id_ctx.get()}
