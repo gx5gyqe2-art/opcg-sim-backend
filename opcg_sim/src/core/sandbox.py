@@ -135,7 +135,7 @@ class SandboxManager:
                 "life": p_data["life"], "deck": p_data["deck"],
                 "don_active": p_data["don_active"], "don_rested": p_data["don_rested"],
                 "don_attached": p_data["don_attached"], "temp": p_data["temp"],
-                "don_deck": p_data["don_deck"]  # ★追加: ドンデッキも検索対象にする
+                "don_deck": p_data["don_deck"]
             }
             for zone_name, card_list in lists.items():
                 for i, card in enumerate(card_list):
@@ -149,24 +149,34 @@ class SandboxManager:
 
         card = None
         p_src = self.state[src_pid]
+        p_dest = self.state[dest_pid]
         
+        # --- 1. カードの取り出し処理 ---
         if src_zone == "leader":
             card = p_src["leader"]
+            p_src["leader"] = None  # 元の場所を空にする（増殖防止）
         elif src_zone == "stage":
             card = p_src["stage"]
             p_src["stage"] = None
         else:
             src_list = p_src[src_zone]
-            card = src_list.pop(src_idx)
+            if 0 <= src_idx < len(src_list):
+                card = src_list.pop(src_idx)
 
         if not card: return False
+
+        # --- 2. ステータス更新 ---
+        # 所有者を移動先のプレイヤーに書き換える（相手陣地での消失防止）
+        if hasattr(card, "owner_id"):
+            card.owner_id = p_dest["name"]
 
         if hasattr(card, "is_rest"): card.is_rest = False
         if hasattr(card, "attached_don"): card.attached_don = 0
 
-        p_dest = self.state[dest_pid]
-        
+        # --- 3. 配置処理 ---
         if dest_zone == "leader":
+            old = p_dest["leader"]
+            if old: p_dest["trash"].append(old)
             p_dest["leader"] = card
         elif dest_zone == "stage":
             old = p_dest["stage"]
@@ -254,6 +264,6 @@ class SandboxManager:
                 "trash": [fmt(c) for c in p["trash"]],
                 "stage": fmt(p["stage"]),
                 "deck": [fmt(c, False) for c in p["deck"]],
-                "don_deck": [fmt(c, False) for c in p["don_deck"]] # ★追加: ドンデッキの内容を含める
+                "don_deck": [fmt(c, False) for c in p["don_deck"]]
             }
         }
