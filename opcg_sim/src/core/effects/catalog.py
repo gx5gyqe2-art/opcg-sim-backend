@@ -112,6 +112,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                         power_min=5000, 
                         count=5, 
                         is_up_to=True, 
+                        is_unique_name=True,
                         save_id="gorosei_play"
                     ),
                     destination=Zone.FIELD,
@@ -151,7 +152,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ])
         )
     ],
-    "OP13-087": [  # チャルロス聖
+    "OP13-087": [
         Ability(
             trigger=TriggerType.ON_PLAY,
             effect=GameAction(
@@ -160,7 +161,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                     player=Player.SELF, 
                     zone=Zone.DECK, 
                     count=1, 
-                    select_mode="ALL"  # ユーザー選択を回避し、先頭(Top)を自動解決
+                    select_mode="ALL"
                 ),
                 raw_text="自分のデッキの上から1枚をトラッシュに置く"
             )

@@ -181,6 +181,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         dynamic_cost_max = len(p.don_active) + len(p.don_rested) + len(p.don_attached_cards)
 
     results = []
+    seen_names = set()
     for card in candidates:
         if not card: continue
         
@@ -219,6 +220,10 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
                 if not any(n in card.master.name for n in query.names): continue
             else:
                 if card.master.name not in query.names: continue
+
+        if query.is_unique_name:
+            if card.master.name in seen_names: continue
+            seen_names.add(card.master.name)
 
         if query.traits and not any(t in card.master.traits for t in query.traits): continue
         if query.is_rest is not None and card.is_rest != query.is_rest: continue
