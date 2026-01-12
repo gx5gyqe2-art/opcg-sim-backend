@@ -8,8 +8,9 @@ from ..models.enums import Zone
 from ..utils.logger_config import log_event
 
 class SandboxManager:
-    def __init__(self, p1_deck: List[CardInstance], p2_deck: List[CardInstance], p1_leader: Optional[CardInstance], p2_leader: Optional[CardInstance], p1_name: str = "P1", p2_name: str = "P2"):
+    def __init__(self, p1_deck: List[CardInstance], p2_deck: List[CardInstance], p1_leader: Optional[CardInstance], p2_leader: Optional[CardInstance], p1_name: str = "P1", p2_name: str = "P2", room_name: str = "Custom Room"):
         self.game_id = str(uuid.uuid4())
+        self.room_name = room_name
         self.created_at = datetime.now().isoformat()
         self.turn_count = 1
         self.active_player_id = "p1"
@@ -133,12 +134,10 @@ class SandboxManager:
         src_pid, src_zone, src_idx = self._find_card_location(card_uuid)
         if not src_pid: return False
 
-        # --- 自動支払いコストの計算 ---
         cost_to_pay = 0
         p_src = self.state[src_pid]
         p_dest = self.state[dest_pid]
         
-        # 手札から自陣フィールドへの移動時
         if src_zone == "hand" and dest_zone == "field" and src_pid == dest_pid:
             if 0 <= src_idx < len(p_src["hand"]):
                 c = p_src["hand"][src_idx]
@@ -151,7 +150,6 @@ class SandboxManager:
 
         card = None
         
-        # 取り出し
         if src_zone == "leader":
             card = p_src["leader"]
             p_src["leader"] = None 
@@ -165,12 +163,10 @@ class SandboxManager:
 
         if not card: return False
 
-        # ステータスリセット
         if hasattr(card, "owner_id"): card.owner_id = p_dest["name"]
         if hasattr(card, "is_rest"): card.is_rest = False
         if hasattr(card, "attached_don"): card.attached_don = 0
 
-        # 配置
         if dest_zone == "leader":
             p_dest["leader"] = card
         elif dest_zone == "stage":
@@ -187,7 +183,6 @@ class SandboxManager:
         
         log_event("INFO", "sandbox.move", f"Moved {card.uuid} to {dest_pid}.{dest_zone}", player="system")
 
-        # --- 自動支払い実行 ---
         if cost_to_pay > 0:
             active_dons = p_src["don_active"]
             rest_dons = p_src["don_rested"]
@@ -265,6 +260,7 @@ class SandboxManager:
     def to_dict(self):
         return {
             "game_id": self.game_id,
+            "room_name": self.room_name,
             "created_at": getattr(self, "created_at", None),
             "mode": "sandbox",
             "turn_info": {
