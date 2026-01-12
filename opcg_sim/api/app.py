@@ -3,6 +3,7 @@ import uuid
 import sys
 import json
 import traceback
+import asyncio
 from typing import Any, Dict, Optional, List, Union
 from fastapi import FastAPI, Body, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,15 +63,23 @@ class ConnectionManager:
             except Exception as e:
                 print(f"Failed to send initial state: {e}")
 
-    def disconnect(self, websocket: WebSocket, game_id: str):
+    async def disconnect(self, websocket: WebSocket, game_id: str):
         if game_id in self.active_connections:
             if websocket in self.active_connections[game_id]:
                 self.active_connections[game_id].remove(websocket)
             if not self.active_connections[game_id]:
+                # 全ての接続が切れた場合、即座に削除せず20分(1200秒)の猶予を持たせる
                 del self.active_connections[game_id]
-                if game_id in SANDBOX_GAMES:
-                    del SANDBOX_GAMES[game_id]
-                    log_event(level_key="INFO", action="sandbox.auto_delete", msg=f"Deleted sandbox {game_id} (No active connections)", player="system")
+                log_event(level_key="INFO", action="sandbox.disconnect", msg=f"All connections closed for {game_id}. Starting 20-min grace period.", player="system")
+                asyncio.create_task(self.delayed_cleanup(game_id, 1200))
+
+    async def delayed_cleanup(self, game_id: str, delay: int):
+        await asyncio.sleep(delay)
+        # 猶予期間終了後、依然として新しい接続がない場合のみ削除を実行
+        if game_id not in self.active_connections or not self.active_connections[game_id]:
+            if game_id in SANDBOX_GAMES:
+                del SANDBOX_GAMES[game_id]
+                log_event(level_key="INFO", action="sandbox.auto_delete", msg=f"Deleted sandbox {game_id} after grace period", player="system")
 
     async def broadcast(self, game_id: str, message: dict):
         if game_id in self.active_connections:
@@ -341,7 +350,8 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str):
     try:
         while True: await websocket.receive_text()
     except WebSocketDisconnect:
-        ws_manager.disconnect(websocket, game_id)
+        # 修正: awaitを追加
+        await ws_manager.disconnect(websocket, game_id)
 
 @app.get("/health")
 async def health(): return {"status": "ok", "constants_loaded": bool(CONST), "session_id": session_id_ctx.get()}
