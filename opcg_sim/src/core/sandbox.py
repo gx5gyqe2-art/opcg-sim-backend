@@ -105,17 +105,32 @@ class SandboxManager:
     def move_card(self, card_uuid: str, dest_pid: str, dest_zone: str, index: int = -1):
         spid, szone, sidx = self._find_card_location(card_uuid)
         if not spid: return False
+        
+        # --- 修正: 異なるプレイヤーエリアへの移動を禁止 ---
+        if spid != dest_pid:
+            log_event("WARNING", "sandbox.move_blocked", "Cannot move card to opponent's area.", player="system")
+            return False
+
+        # --- 修正: リーダーカードの移動を一切禁止 ---
+        if szone == "leader":
+            log_event("WARNING", "sandbox.move_blocked", "Leader card is immovable.", player="system")
+            return False
+        
         p_src, p_dest = self.state[spid], self.state[dest_pid]
+        
         cost = 0
         if szone == "hand" and dest_zone == "field" and spid == dest_pid:
             c = p_src["hand"][sidx]
             cost = getattr(c, "cost", getattr(c.master, "cost", 0))
+            
         if szone == "leader": card = p_src["leader"]; p_src["leader"] = None 
         elif szone == "stage": card = p_src["stage"]; p_src["stage"] = None
         else: card = p_src[szone].pop(sidx)
+        
         if hasattr(card, "owner_id"): card.owner_id = p_dest["name"]
         if hasattr(card, "is_rest"): card.is_rest = False
         if hasattr(card, "attached_don"): card.attached_don = 0
+        
         if dest_zone == "leader": p_dest["leader"] = card
         elif dest_zone == "stage":
             if p_dest["stage"]: p_dest["trash"].append(p_dest["stage"])
@@ -124,9 +139,11 @@ class SandboxManager:
             dest_list = p_dest[dest_zone]
             if index == -1 or index >= len(dest_list): dest_list.append(card)
             else: dest_list.insert(index, card)
+            
         if cost > 0:
             for _ in range(min(cost, len(p_src["don_active"]))):
                 don = p_src["don_active"].pop(0); don.is_rest = True; p_src["don_rested"].append(don)
+                
         log_event("INFO", "sandbox.move_card", f"Moved {card_uuid} to {dest_zone} at index {index}", player="system")
         return True
 
