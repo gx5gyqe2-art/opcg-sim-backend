@@ -126,7 +126,12 @@ def save_batch_logs(fe_log_list: list, session_id: str):
 
     now = datetime.now()
     time_prefix = now.strftime("%Y%m%d_%H%M%S")
-    blob_name = f"logs/{time_prefix}_{session_id}_BATCH.json"
+    
+    folder = "logs"
+    if any(log.get(K["ACTION"], "").startswith("sandbox.") for log in full_logs):
+        folder = "sandbox_logs"
+    
+    blob_name = f"{folder}/{time_prefix}_{session_id}_BATCH.json"
 
     def _process_and_notify():
         try:
@@ -194,7 +199,7 @@ def log_event(
     gcs_url = None
     
     if action == "EFFECT_DEF_REPORT":
-        folder = "reports"
+        folder = "sandbox_reports" if action.startswith("sandbox.") else "reports"
         time_prefix = now.strftime("%Y%m%d_%H%M%S_%f")
         filename = f"{folder}/{time_prefix}_{sid}_{action}.json"
         
@@ -213,7 +218,7 @@ def log_event(
     elif lv == "DEBUG" and SLACK_CHANNEL_DEBUG:
         target_channel = SLACK_CHANNEL_DEBUG
 
-    ignore_prefixes = ("game.", "api.", "deck.", "loader.", "gamestate.", "schema.", "resolver.", "matcher.", "parser.", "effect.")
+    ignore_prefixes = ("game.", "api.", "deck.", "loader.", "gamestate.", "schema.", "resolver.", "matcher.", "parser.", "effect.", "sandbox.")
     
     if action.startswith(ignore_prefixes):
         target_channel = None
