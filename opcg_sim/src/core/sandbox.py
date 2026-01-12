@@ -8,9 +8,10 @@ from ..models.enums import Zone
 from ..utils.logger_config import log_event
 
 class SandboxManager:
+    # room_name を引数に追加
     def __init__(self, p1_deck: List[CardInstance], p2_deck: List[CardInstance], p1_leader: Optional[CardInstance], p2_leader: Optional[CardInstance], p1_name: str = "P1", p2_name: str = "P2", room_name: str = "Custom Room"):
         self.game_id = str(uuid.uuid4())
-        self.room_name = room_name
+        self.room_name = room_name # 部屋名を保存
         self.created_at = datetime.now().isoformat()
         self.turn_count = 1
         self.active_player_id = "p1"
@@ -260,7 +261,7 @@ class SandboxManager:
     def to_dict(self):
         return {
             "game_id": self.game_id,
-            "room_name": self.room_name,
+            "room_name": self.room_name, # 辞書に部屋名を含める
             "created_at": getattr(self, "created_at", None),
             "mode": "sandbox",
             "turn_info": {

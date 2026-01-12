@@ -114,6 +114,9 @@ async def trace_logging_middleware(request: Request, call_next):
         response = await call_next(request); response.headers["X-Session-ID"] = s_id; return response
     finally: session_id_ctx.reset(token)
 
+@app.options("/api/log")
+async def options_log(): return {"status": "ok"}
+
 @app.post("/api/log")
 async def receive_frontend_log(data: Union[Dict[str, Any], List[Dict[str, Any]]] = Body(...)):
     if isinstance(data, list):
@@ -148,6 +151,9 @@ def load_deck_mixed(source_str: str, owner_id: str):
     else:
         path = os.path.join(DATA_DIR, source_str); return deck_loader.load_deck(path, owner_id)
 
+@app.options("/api/game/create")
+async def options_game_create(): return {"status": "ok"}
+
 @app.post("/api/game/create")
 async def game_create(req: Any = Body(...)):
     try:
@@ -160,6 +166,9 @@ async def game_create(req: Any = Body(...)):
         manager = GameManager(player1, player2); manager.start_game(); GAMES[game_id] = manager; return build_game_result_hybrid(manager, game_id)
     except Exception as e:
         log_event(level_key="ERROR", action="game.create_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "game_id": "", "error": {"message": str(e)}}
+
+@app.options("/api/game/action")
+async def options_game_action(): return {"status": "ok"}
 
 @app.post("/api/game/action")
 async def game_action(req: Dict[str, Any] = Body(...)):
@@ -203,6 +212,9 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         return build_game_result_hybrid(manager, game_id, success=True)
     except Exception as e:
         log_event(level_key="ERROR", action="game.action_fail", msg=traceback.format_exc(), player=player_id, payload=req); return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
+
+@app.options("/api/game/battle")
+async def options_game_battle(): return {"status": "ok"}
 
 @app.post("/api/game/battle")
 async def game_battle(req: BattleActionRequest):
@@ -281,7 +293,7 @@ async def sandbox_list():
         try:
             games.append({
                 "game_id": gid,
-                "room_name": getattr(mgr, "room_name", "Untitled Room"),
+                "room_name": getattr(mgr, "room_name", "Untitled Room"), # 部屋名を追加
                 "p1_name": mgr.state["p1"]["name"],
                 "p2_name": mgr.state["p2"]["name"],
                 "turn": mgr.turn_count,
@@ -294,20 +306,19 @@ async def sandbox_list():
 @app.post("/api/sandbox/create")
 async def sandbox_create(req: Any = Body(...)):
     try:
-        game_id = str(uuid.uuid4())
-        log_event(level_key="INFO", action="sandbox.create", msg=f"Creating sandbox: {game_id}", payload=req, player="system")
+        game_id = str(uuid.uuid4()); log_event(level_key="INFO", action="sandbox.create", msg=f"Creating sandbox: {game_id}", payload=req, player="system")
         p1_source = req.get("p1_deck", ""); p2_source = req.get("p2_deck", "")
         if len(card_db.cards) < len(card_db.raw_db):
              for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
         p1_leader, p1_cards = load_deck_mixed(p1_source, req.get("p1_name", "P1")); p2_leader, p2_cards = load_deck_mixed(p2_source, req.get("p2_name", "P2"))
-        if "SandboxManager" not in globals():
-            raise ImportError("SandboxManager not loaded")
+        if "SandboxManager" not in globals(): raise ImportError("SandboxManager not loaded")
+        
+        # リクエストから room_name を取得して渡す
         manager = SandboxManager(p1_cards, p2_cards, p1_leader, p2_leader, req.get("p1_name", "P1"), req.get("p2_name", "P2"), room_name=req.get("room_name", "Custom Room"))
         SANDBOX_GAMES[manager.game_id] = manager
         return {"success": True, "game_id": manager.game_id, "game_state": manager.to_dict()}
     except Exception as e:
-        log_event(level_key="ERROR", action="sandbox.create_fail", msg=traceback.format_exc(), player="system")
-        return {"success": False, "error": str(e)}
+        log_event(level_key="ERROR", action="sandbox.create_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
 
 @app.post("/api/sandbox/action")
 async def sandbox_action(req: Dict[str, Any] = Body(...)):
@@ -318,8 +329,7 @@ async def sandbox_action(req: Dict[str, Any] = Body(...)):
         await ws_manager.broadcast(game_id, {"type": "STATE_UPDATE", "state": new_state})
         return {"success": True, "game_id": game_id, "game_state": new_state}
     except Exception as e:
-        log_event(level_key="ERROR", action="sandbox.action_fail", msg=traceback.format_exc(), player="system")
-        return {"success": False, "error": str(e)}
+        log_event(level_key="ERROR", action="sandbox.action_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
 
 @app.websocket("/ws/sandbox/{game_id}")
 async def websocket_endpoint(websocket: WebSocket, game_id: str):
