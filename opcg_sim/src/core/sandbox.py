@@ -24,18 +24,10 @@ class SandboxManager:
     def _init_player(self, name: str) -> Dict[str, Any]:
         return {
             "name": name,
-            "life": [],
-            "hand": [],
-            "field": [],
-            "trash": [],
-            "deck": [],
+            "life": [], "hand": [], "field": [], "trash": [], "deck": [],
             "don_deck": [DonInstance(owner_id=name) for _ in range(10)],
-            "don_active": [],
-            "don_rested": [],
-            "don_attached": [], 
-            "leader": None,
-            "stage": None,
-            "temp": []
+            "don_active": [], "don_rested": [], "don_attached": [], 
+            "leader": None, "stage": None, "temp": []
         }
 
     def set_player_deck(self, pid: str, deck: List[CardInstance], leader: Optional[CardInstance]):
@@ -43,12 +35,10 @@ class SandboxManager:
         p = self.state[pid]
         p["deck"] = deck
         p["leader"] = leader
-        log_event("INFO", "sandbox.set_deck", f"Set deck for {pid}", player="system")
 
     def toggle_ready(self, pid: str):
         if self.status != "WAITING": return
         self.ready_states[pid] = not self.ready_states[pid]
-        log_event("INFO", "sandbox.ready", f"Player {pid} ready: {self.ready_states[pid]}", player="system")
 
     def start_game(self):
         if self.status != "WAITING": return
@@ -57,7 +47,6 @@ class SandboxManager:
         self.turn_count = 1
         self.setup_initial_state()
         self.start_turn_process()
-        log_event("INFO", "sandbox.start", "Sandbox game started", player="system")
 
     def setup_initial_state(self):
         for pid in ["p1", "p2"]:
@@ -70,8 +59,7 @@ class SandboxManager:
                 if player["deck"]: player["hand"].append(player["deck"].pop(0))
 
     def refresh_phase(self):
-        pid = self.active_player_id
-        p = self.state[pid]
+        p = self.state[self.active_player_id]
         if p["leader"]: p["leader"].is_rest = False; p["leader"].attached_don = 0
         if p["stage"]: p["stage"].is_rest = False
         for c in p["field"]: c.is_rest = False; c.attached_don = 0
@@ -112,16 +100,16 @@ class SandboxManager:
         return None, None, None
 
     def move_card(self, card_uuid: str, dest_pid: str, dest_zone: str, index: int = -1):
-        src_pid, src_zone, src_idx = self._find_card_location(card_uuid)
-        if not src_pid: return False
-        p_src, p_dest = self.state[src_pid], self.state[dest_pid]
+        spid, szone, sidx = self._find_card_location(card_uuid)
+        if not spid: return False
+        p_src, p_dest = self.state[spid], self.state[dest_pid]
         cost = 0
-        if src_zone == "hand" and dest_zone == "field" and src_pid == dest_pid:
-            c = p_src["hand"][src_idx]
+        if szone == "hand" and dest_zone == "field" and spid == dest_pid:
+            c = p_src["hand"][sidx]
             cost = getattr(c, "cost", getattr(c.master, "cost", 0))
-        if src_zone == "leader": card = p_src["leader"]; p_src["leader"] = None 
-        elif src_zone == "stage": card = p_src["stage"]; p_src["stage"] = None
-        else: card = p_src[src_zone].pop(src_idx)
+        if szone == "leader": card = p_src["leader"]; p_src["leader"] = None 
+        elif szone == "stage": card = p_src["stage"]; p_src["stage"] = None
+        else: card = p_src[szone].pop(sidx)
         if hasattr(card, "owner_id"): card.owner_id = p_dest["name"]
         if hasattr(card, "is_rest"): card.is_rest = False
         if hasattr(card, "attached_don"): card.attached_don = 0
