@@ -68,6 +68,9 @@ class ConnectionManager:
                 self.active_connections[game_id].remove(websocket)
             if not self.active_connections[game_id]:
                 del self.active_connections[game_id]
+                if game_id in SANDBOX_GAMES:
+                    del SANDBOX_GAMES[game_id]
+                    log_event(level_key="INFO", action="sandbox.auto_delete", msg=f"Deleted sandbox {game_id} (No active connections)", player="system")
 
     async def broadcast(self, game_id: str, message: dict):
         if game_id in self.active_connections:
@@ -293,7 +296,7 @@ async def sandbox_list():
         try:
             games.append({
                 "game_id": gid,
-                "room_name": getattr(mgr, "room_name", "Untitled Room"), # 部屋名を追加
+                "room_name": getattr(mgr, "room_name", "Untitled Room"),
                 "p1_name": mgr.state["p1"]["name"],
                 "p2_name": mgr.state["p2"]["name"],
                 "turn": mgr.turn_count,
@@ -307,14 +310,9 @@ async def sandbox_list():
 async def sandbox_create(req: Any = Body(...)):
     try:
         game_id = str(uuid.uuid4()); log_event(level_key="INFO", action="sandbox.create", msg=f"Creating sandbox: {game_id}", payload=req, player="system")
-        p1_source = req.get("p1_deck", ""); p2_source = req.get("p2_deck", "")
-        if len(card_db.cards) < len(card_db.raw_db):
-             for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
-        p1_leader, p1_cards = load_deck_mixed(p1_source, req.get("p1_name", "P1")); p2_leader, p2_cards = load_deck_mixed(p2_source, req.get("p2_name", "P2"))
+        p1_name = req.get("p1_name", "P1"); p2_name = req.get("p2_name", "P2")
         if "SandboxManager" not in globals(): raise ImportError("SandboxManager not loaded")
-        
-        # リクエストから room_name を取得して渡す
-        manager = SandboxManager(p1_cards, p2_cards, p1_leader, p2_leader, req.get("p1_name", "P1"), req.get("p2_name", "P2"), room_name=req.get("room_name", "Custom Room"))
+        manager = SandboxManager(p1_name=p1_name, p2_name=p2_name, room_name=req.get("room_name", "Custom Room"))
         SANDBOX_GAMES[manager.game_id] = manager
         return {"success": True, "game_id": manager.game_id, "game_state": manager.to_dict()}
     except Exception as e:
@@ -324,8 +322,14 @@ async def sandbox_create(req: Any = Body(...)):
 async def sandbox_action(req: Dict[str, Any] = Body(...)):
     game_id = req.get("game_id"); manager = SANDBOX_GAMES.get(game_id)
     if not manager: return {"success": False, "error": "Sandbox game not found"}
+    act_type = req.get("action_type"); pid = req.get("player_id")
     try:
-        manager.process_action(req); new_state = manager.to_dict()
+        if act_type == "SET_DECK":
+            deck_id = req.get("deck_id"); owner_name = manager.state[pid]["name"]
+            leader, cards = load_deck_mixed(deck_id, owner_name)
+            manager.set_player_deck(pid, cards, leader)
+        else: manager.process_action(req)
+        new_state = manager.to_dict()
         await ws_manager.broadcast(game_id, {"type": "STATE_UPDATE", "state": new_state})
         return {"success": True, "game_id": game_id, "game_state": new_state}
     except Exception as e:
