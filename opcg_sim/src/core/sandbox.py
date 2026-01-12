@@ -1,27 +1,24 @@
 import uuid
 import random
 import traceback
-import time
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 from ..models.models import CardInstance, DonInstance
 from ..models.enums import Zone
 from ..utils.logger_config import log_event
 
 class SandboxManager:
-    def __init__(self, p1_deck: List[CardInstance], p2_deck: List[CardInstance], p1_leader: Optional[CardInstance], p2_leader: Optional[CardInstance], p1_name: str = "P1", p2_name: str = "P2", game_id: Optional[str] = None):
-        self.game_id = game_id or str(uuid.uuid4())
+    def __init__(self, p1_deck: List[CardInstance], p2_deck: List[CardInstance], p1_leader: Optional[CardInstance], p2_leader: Optional[CardInstance], p1_name: str = "P1", p2_name: str = "P2"):
+        self.game_id = str(uuid.uuid4())
         self.created_at = datetime.now().isoformat()
         self.turn_count = 1
         self.active_player_id = "p1"
-        self.last_save_time = 0
         self.state = {
             "p1": self._init_player(p1_name, p1_deck, p1_leader),
             "p2": self._init_player(p2_name, p2_deck, p2_leader)
         }
-        if not game_id:
-            self.setup_initial_state()
-            self.start_turn_process()
+        self.setup_initial_state()
+        self.start_turn_process()
 
     def _init_player(self, name: str, deck: List[CardInstance], leader: Optional[CardInstance]) -> Dict[str, Any]:
         return {
@@ -56,21 +53,26 @@ class SandboxManager:
     def refresh_phase(self):
         pid = self.active_player_id
         p = self.state[pid]
+        
         if p["leader"]: 
             p["leader"].is_rest = False
             p["leader"].attached_don = 0
         if p["stage"]: 
             p["stage"].is_rest = False
+        
         for c in p["field"]:
             c.is_rest = False
             c.attached_don = 0
+            
         p["don_active"].extend(p["don_attached"])
         p["don_attached"] = []
         p["don_active"].extend(p["don_rested"])
         p["don_rested"] = []
+        
         for d in p["don_active"]:
             d.is_rest = False
             d.attached_to = None
+            
         log_event("INFO", "sandbox.refresh", f"Refreshed all cards for {pid}", player="system")
 
     def draw_phase(self):
@@ -113,6 +115,7 @@ class SandboxManager:
             p_data = self.state[pid]
             if p_data["leader"] and p_data["leader"].uuid == card_uuid: return pid, "leader", -1
             if p_data["stage"] and p_data["stage"].uuid == card_uuid: return pid, "stage", -1
+            
             lists = {
                 "hand": p_data["hand"], "field": p_data["field"], "trash": p_data["trash"],
                 "life": p_data["life"], "deck": p_data["deck"],
@@ -129,18 +132,26 @@ class SandboxManager:
     def move_card(self, card_uuid: str, dest_pid: str, dest_zone: str, index: int = -1):
         src_pid, src_zone, src_idx = self._find_card_location(card_uuid)
         if not src_pid: return False
+
+        # --- 自動支払いコストの計算 ---
         cost_to_pay = 0
         p_src = self.state[src_pid]
         p_dest = self.state[dest_pid]
+        
+        # 手札から自陣フィールドへの移動時
         if src_zone == "hand" and dest_zone == "field" and src_pid == dest_pid:
             if 0 <= src_idx < len(p_src["hand"]):
                 c = p_src["hand"][src_idx]
                 val = getattr(c, "cost", None)
                 if val is None and hasattr(c, "master"):
                     val = getattr(c.master, "cost", 0)
+                
                 if val is not None and val > 0:
                     cost_to_pay = val
+
         card = None
+        
+        # 取り出し
         if src_zone == "leader":
             card = p_src["leader"]
             p_src["leader"] = None 
@@ -151,10 +162,15 @@ class SandboxManager:
             src_list = p_src[src_zone]
             if 0 <= src_idx < len(src_list):
                 card = src_list.pop(src_idx)
+
         if not card: return False
+
+        # ステータスリセット
         if hasattr(card, "owner_id"): card.owner_id = p_dest["name"]
         if hasattr(card, "is_rest"): card.is_rest = False
         if hasattr(card, "attached_don"): card.attached_don = 0
+
+        # 配置
         if dest_zone == "leader":
             p_dest["leader"] = card
         elif dest_zone == "stage":
@@ -168,7 +184,10 @@ class SandboxManager:
                 dest_list.append(card)
             else:
                 dest_list.insert(index, card)
+        
         log_event("INFO", "sandbox.move", f"Moved {card.uuid} to {dest_pid}.{dest_zone}", player="system")
+
+        # --- 自動支払い実行 ---
         if cost_to_pay > 0:
             active_dons = p_src["don_active"]
             rest_dons = p_src["don_rested"]
@@ -179,31 +198,40 @@ class SandboxManager:
                     don.is_rest = True
                     rest_dons.append(don)
                 log_event("INFO", "sandbox.auto_pay", f"Auto paid {pay_amount} don", player="system")
+
         return True
 
     def attach_don(self, don_uuid: str, target_uuid: str):
         src_pid, src_zone, src_idx = self._find_card_location(don_uuid)
         if not src_pid or "don" not in src_zone: return False
+        
         p = self.state[src_pid]
         don_card = None
+        
         if src_zone == "don_active": don_card = p["don_active"].pop(src_idx)
         elif src_zone == "don_rested": don_card = p["don_rested"].pop(src_idx)
         elif src_zone == "don_attached": don_card = p["don_attached"].pop(src_idx)
         elif src_zone == "don_deck": don_card = p["don_deck"].pop(src_idx)
+        
         if not don_card: return False
+        
         t_pid, t_zone, t_idx = self._find_card_location(target_uuid)
         if not t_pid: return False
+        
         t_p = self.state[t_pid]
         target_card = None
         if t_zone == "leader": target_card = t_p["leader"]
         elif t_zone == "field": target_card = t_p["field"][t_idx]
+        
         if not target_card:
             p["don_active"].append(don_card)
             return False
+            
         don_card.attached_to = target_uuid
         don_card.is_rest = False
         p["don_attached"].append(don_card)
         target_card.attached_don += 1
+        
         log_event("INFO", "sandbox.attach", f"Attached {don_uuid} to {target_uuid}", player="system")
         return True
 
@@ -238,7 +266,6 @@ class SandboxManager:
         return {
             "game_id": self.game_id,
             "created_at": getattr(self, "created_at", None),
-            "expires_at": (datetime.now() + timedelta(days=1)).timestamp(),
             "mode": "sandbox",
             "turn_info": {
                 "turn_count": self.turn_count,
@@ -256,9 +283,10 @@ class SandboxManager:
         p = self.state[pid]
         def fmt(card, face_up=True):
             if not card: return None
-            d = card if isinstance(card, dict) else card.to_dict()
+            d = card.to_dict()
             if face_up: d["is_face_up"] = True
             return d
+
         return {
             "player_id": p["name"], 
             "name": p["name"],
