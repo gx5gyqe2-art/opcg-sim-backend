@@ -35,10 +35,12 @@ class SandboxManager:
         p = self.state[pid]
         p["deck"] = deck
         p["leader"] = leader
+        log_event("INFO", "sandbox.set_deck", f"Set deck for {pid}", player="system")
 
     def toggle_ready(self, pid: str):
         if self.status != "WAITING": return
         self.ready_states[pid] = not self.ready_states[pid]
+        log_event("INFO", "sandbox.ready", f"Player {pid} ready: {self.ready_states[pid]}", player="system")
 
     def start_game(self):
         if self.status != "WAITING": return
@@ -47,6 +49,7 @@ class SandboxManager:
         self.turn_count = 1
         self.setup_initial_state()
         self.start_turn_process()
+        log_event("INFO", "sandbox.start", "Sandbox game started", player="system")
 
     def setup_initial_state(self):
         for pid in ["p1", "p2"]:
@@ -124,6 +127,7 @@ class SandboxManager:
         if cost > 0:
             for _ in range(min(cost, len(p_src["don_active"]))):
                 don = p_src["don_active"].pop(0); don.is_rest = True; p_src["don_rested"].append(don)
+        log_event("INFO", "sandbox.move_card", f"Moved {card_uuid} to {dest_zone} at index {index}", player="system")
         return True
 
     def attach_don(self, don_uuid: str, target_uuid: str):
