@@ -20,6 +20,7 @@ class SandboxManager:
             "p2": self._init_player(p2_name)
         }
         self.ready_states = {"p1": False, "p2": False}
+        self.mulligan_used = {"p1": False, "p2": False}
 
     def _init_player(self, name: str) -> Dict[str, Any]:
         return {
@@ -47,6 +48,7 @@ class SandboxManager:
         if not self.ready_states["p1"] or not self.ready_states["p2"]: return
         self.status = "PLAYING"
         self.turn_count = 1
+        self.mulligan_used = {"p1": False, "p2": False}
         self.setup_initial_state()
         self.start_turn_process()
         log_event("INFO", "sandbox.start", "Sandbox game started", player="system")
@@ -60,6 +62,70 @@ class SandboxManager:
                     if player["deck"]: player["life"].append(player["deck"].pop(0))
             for _ in range(5):
                 if player["deck"]: player["hand"].append(player["deck"].pop(0))
+
+    def reset_game(self):
+        self.turn_count = 1
+        self.active_player_id = "p1"
+        self.mulligan_used = {"p1": False, "p2": False}
+        
+        for pid in ["p1", "p2"]:
+            p = self.state[pid]
+            
+            cards = []
+            cards.extend(p["hand"]); p["hand"] = []
+            cards.extend(p["field"]); p["field"] = []
+            cards.extend(p["life"]); p["life"] = []
+            cards.extend(p["trash"]); p["trash"] = []
+            if p["stage"]: cards.append(p["stage"]); p["stage"] = None
+            cards.extend(p["temp"]); p["temp"] = []
+            cards.extend(p["deck"]); p["deck"] = []
+            
+            for c in cards:
+                c.is_rest = False
+                c.attached_don = 0
+                if hasattr(c, 'cost_buff'): c.cost_buff = 0
+                if hasattr(c, 'power_buff'): c.power_buff = 0
+            
+            p["deck"] = cards
+            
+            dons = []
+            dons.extend(p["don_active"]); p["don_active"] = []
+            dons.extend(p["don_rested"]); p["don_rested"] = []
+            dons.extend(p["don_attached"]); p["don_attached"] = []
+            dons.extend(p["don_deck"]); p["don_deck"] = []
+            
+            for d in dons:
+                d.is_rest = False
+                d.attached_to = None
+            
+            p["don_deck"] = dons
+            
+            if p["leader"]:
+                p["leader"].is_rest = False
+                p["leader"].attached_don = 0
+
+        self.setup_initial_state()
+        self.start_turn_process()
+        log_event("INFO", "sandbox.reset", "Game reset executed", player="system")
+
+    def mulligan(self, pid: str):
+        # 修正: 回数制限チェックを削除
+        p = self.state[pid]
+        
+        p["deck"].extend(p["hand"])
+        p["hand"] = []
+        
+        random.shuffle(p["deck"])
+        for _ in range(5):
+            if p["deck"]: p["hand"].append(p["deck"].pop(0))
+            
+        # self.mulligan_used[pid] = True # フラグ更新も不要だが残しても影響なし
+        log_event("INFO", "sandbox.mulligan", f"Player {pid} executed mulligan", player=pid)
+
+    def shuffle_deck(self, pid: str):
+        p = self.state[pid]
+        random.shuffle(p["deck"])
+        log_event("INFO", "sandbox.shuffle", f"Player {pid} shuffled deck", player=pid)
 
     def refresh_phase(self):
         p = self.state[self.active_player_id]
@@ -106,12 +172,10 @@ class SandboxManager:
         spid, szone, sidx = self._find_card_location(card_uuid)
         if not spid: return False
         
-        # --- 修正: 異なるプレイヤーエリアへの移動を禁止 ---
         if spid != dest_pid:
             log_event("WARNING", "sandbox.move_blocked", "Cannot move card to opponent's area.", player="system")
             return False
 
-        # --- 修正: リーダーカードの移動を一切禁止 ---
         if szone == "leader":
             log_event("WARNING", "sandbox.move_blocked", "Leader card is immovable.", player="system")
             return False
@@ -178,12 +242,16 @@ class SandboxManager:
             if self.state[pid]["deck"]: self.state[pid]["hand"].append(self.state[pid]["deck"].pop(0))
         elif at == "READY": self.toggle_ready(req.get("player_id"))
         elif at == "START": self.start_game()
+        elif at == "RESET": self.reset_game()
+        elif at == "MULLIGAN": self.mulligan(req.get("player_id"))
+        elif at == "SHUFFLE": self.shuffle_deck(req.get("player_id"))
 
     def to_dict(self):
         return {
             "game_id": self.game_id, "room_name": self.room_name, "status": self.status, "ready_states": self.ready_states,
             "turn_info": {"turn_count": self.turn_count, "current_phase": "SANDBOX", "active_player_id": self.active_player_id},
-            "players": {pid: self._player_to_dict(pid) for pid in ["p1", "p2"]}
+            "players": {pid: self._player_to_dict(pid) for pid in ["p1", "p2"]},
+            "mulligan_used": self.mulligan_used
         }
 
     def _player_to_dict(self, pid: str):
