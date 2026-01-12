@@ -3,7 +3,6 @@ import uuid
 import sys
 import json
 import traceback
-import time
 from typing import Any, Dict, Optional, List, Union
 from fastapi import FastAPI, Body, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +17,7 @@ try:
 except ImportError:
     from .schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
 
+# SandboxManagerのインポート
 try:
     from opcg_sim.src.core.sandbox import SandboxManager
 except ImportError:
@@ -46,8 +46,10 @@ db = None
 try: db = firestore.Client()
 except Exception: pass
 
+# --- WebSocket Manager Definition ---
 class ConnectionManager:
     def __init__(self):
+        # game_id -> List[WebSocket]
         self.active_connections: Dict[str, List[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, game_id: str):
@@ -56,22 +58,13 @@ class ConnectionManager:
             self.active_connections[game_id] = []
         self.active_connections[game_id].append(websocket)
         
+        # 接続時に現在の状態があれば送信 (Join時の初期同期用)
         manager_inst = SANDBOX_GAMES.get(game_id)
-        if not manager_inst and db:
-            doc = db.collection("sandbox_games").document(game_id).get()
-            if doc.exists:
-                data = doc.to_dict()
-                manager_inst = SandboxManager([], [], None, None, game_id=game_id)
-                manager_inst.state = data.get("players", manager_inst.state)
-                manager_inst.turn_count = data.get("turn_info", {}).get("turn_count", 1)
-                manager_inst.active_player_id = data.get("turn_info", {}).get("active_player_id", "p1")
-                SANDBOX_GAMES[game_id] = manager_inst
-
         if manager_inst:
             try:
                 await websocket.send_json({"type": "STATE_UPDATE", "state": manager_inst.to_dict()})
             except Exception as e:
-                log_event("ERROR", "ws.initial_state_fail", f"Failed to send initial state: {e}", player="system")
+                print(f"Failed to send initial state: {e}")
 
     def disconnect(self, websocket: WebSocket, game_id: str):
         if game_id in self.active_connections:
@@ -89,6 +82,7 @@ class ConnectionManager:
                     pass
 
 ws_manager = ConnectionManager()
+# ------------------------------------
 
 def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool = True, error_code: str = None, error_msg: str = None) -> Dict[str, Any]:
     player_keys = CONST.get('PLAYER_KEYS', {}); api_root_keys = CONST.get('API_ROOT_KEYS', {}); error_props = CONST.get('ERROR_PROPERTIES', {})
@@ -125,6 +119,9 @@ async def trace_logging_middleware(request: Request, call_next):
         response = await call_next(request); response.headers["X-Session-ID"] = s_id; return response
     finally: session_id_ctx.reset(token)
 
+@app.options("/api/log")
+async def options_log(): return {"status": "ok"}
+
 @app.post("/api/log")
 async def receive_frontend_log(data: Union[Dict[str, Any], List[Dict[str, Any]]] = Body(...)):
     if isinstance(data, list):
@@ -138,6 +135,7 @@ async def receive_frontend_log(data: Union[Dict[str, Any], List[Dict[str, Any]]]
         try: log_event(level_key=data.get("level", "info"), action=data.get("action", "client.log"), msg=data.get("msg", ""), player=data.get("player", "system"), payload=data.get("payload"), source="FE"); return {"status": "ok", "mode": "single"}
         finally: session_id_ctx.reset(token)
 
+# ゲーム管理用辞書
 GAMES: Dict[str, GameManager] = {}
 SANDBOX_GAMES: Dict[str, 'SandboxManager'] = {}
 
@@ -159,6 +157,9 @@ def load_deck_mixed(source_str: str, owner_id: str):
     else:
         path = os.path.join(DATA_DIR, source_str); return deck_loader.load_deck(path, owner_id)
 
+@app.options("/api/game/create")
+async def options_game_create(): return {"status": "ok"}
+
 @app.post("/api/game/create")
 async def game_create(req: Any = Body(...)):
     try:
@@ -171,6 +172,9 @@ async def game_create(req: Any = Body(...)):
         manager = GameManager(player1, player2); manager.start_game(); GAMES[game_id] = manager; return build_game_result_hybrid(manager, game_id)
     except Exception as e:
         log_event(level_key="ERROR", action="game.create_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "game_id": "", "error": {"message": str(e)}}
+
+@app.options("/api/game/action")
+async def options_game_action(): return {"status": "ok"}
 
 @app.post("/api/game/action")
 async def game_action(req: Dict[str, Any] = Body(...)):
@@ -215,6 +219,9 @@ async def game_action(req: Dict[str, Any] = Body(...)):
     except Exception as e:
         log_event(level_key="ERROR", action="game.action_fail", msg=traceback.format_exc(), player=player_id, payload=req); return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
 
+@app.options("/api/game/battle")
+async def options_game_battle(): return {"status": "ok"}
+
 @app.post("/api/game/battle")
 async def game_battle(req: BattleActionRequest):
     game_id = req.game_id; player_id = req.player_id; action_type = req.action_type; card_uuid = req.card_uuid
@@ -256,6 +263,8 @@ async def save_deck(deck_data: Dict[str, Any] = Body(...)):
 @app.get("/api/deck/list")
 async def list_decks():
     decks = []
+    
+    # 1. ローカルのデフォルトデッキファイルを読み込む
     default_files = ["imu.json", "nami.json"]
     for filename in default_files:
         try:
@@ -263,78 +272,127 @@ async def list_decks():
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
                     data = json.load(f)
+                    
                 deck_data = data[0] if isinstance(data, list) and len(data) > 0 else data
+                
                 if isinstance(deck_data, dict):
-                    formatted_deck = {"id": filename, "name": deck_data.get("name", filename.replace(".json", "")), "leader_id": None, "card_uuids": [], "don_uuids": [], "created_at": None}
-                    if "leader" in deck_data: formatted_deck["leader_id"] = deck_data["leader"].get("number")
+                    formatted_deck = {
+                        "id": filename, 
+                        "name": deck_data.get("name", filename.replace(".json", "")),
+                        "leader_id": None,
+                        "card_uuids": [],
+                        "don_uuids": [],
+                        "created_at": None
+                    }
+                    if "leader" in deck_data:
+                        formatted_deck["leader_id"] = deck_data["leader"].get("number")
                     if "cards" in deck_data:
                         for card in deck_data["cards"]:
-                            cid = card.get("number"); count = card.get("count", 1)
-                            if cid: formatted_deck["card_uuids"].extend([cid] * count)
+                            cid = card.get("number")
+                            count = card.get("count", 1)
+                            if cid:
+                                formatted_deck["card_uuids"].extend([cid] * count)
                     decks.append(formatted_deck)
-        except Exception as e: log_event("WARNING", "deck.list_local_load_fail", f"Failed to load {filename}: {e}", player="system")
+        except Exception as e:
+            log_event("WARNING", "deck.list_local_load_fail", f"Failed to load {filename}: {e}", player="system")
+
+    # 2. Firestoreからデッキを読み込む
     if db:
         try:
             docs = db.collection("decks").order_by("created_at", direction=firestore.Query.DESCENDING).stream()
             for doc in docs:
                 d = doc.to_dict()
-                if "created_at" in d and d["created_at"]: d["created_at"] = str(d["created_at"])
+                if "created_at" in d and d["created_at"]:
+                    d["created_at"] = str(d["created_at"])
                 decks.append(d)
-        except Exception as e: log_event("ERROR", "deck.list_db_fail", traceback.format_exc(), player="system")
+        except Exception as e:
+            log_event("ERROR", "deck.list_db_fail", traceback.format_exc(), player="system")
+
     return {"success": True, "decks": decks}
+
+# --- Sandbox Endpoints ---
 
 @app.get("/api/sandbox/list")
 async def sandbox_list():
+    """現在アクティブなサンドボックスゲームの一覧を返す"""
     games = []
+    # 辞書から直接情報を取得
     for gid, mgr in SANDBOX_GAMES.items():
         try:
-            games.append({"game_id": gid, "p1_name": mgr.state["p1"]["name"], "p2_name": mgr.state["p2"]["name"], "turn": mgr.turn_count, "created_at": getattr(mgr, "created_at", "N/A")})
-        except Exception: continue
+            p1_name = mgr.state["p1"]["name"]
+            p2_name = mgr.state["p2"]["name"]
+            turn = mgr.turn_count
+            created_at = getattr(mgr, "created_at", "N/A")
+            
+            games.append({
+                "game_id": gid,
+                "p1_name": p1_name,
+                "p2_name": p2_name,
+                "turn": turn,
+                "created_at": created_at
+            })
+        except Exception:
+            continue
+            
     return {"success": True, "games": games}
 
 @app.post("/api/sandbox/create")
 async def sandbox_create(req: Any = Body(...)):
     try:
-        game_id = str(uuid.uuid4()); log_event(level_key="INFO", action="sandbox.create", msg=f"Creating sandbox: {game_id}", payload=req, player="system")
-        p1_source = req.get("p1_deck", ""); p2_source = req.get("p2_deck", "")
+        game_id = str(uuid.uuid4())
+        log_event(level_key="INFO", action="sandbox.create", msg=f"Creating sandbox: {game_id}", payload=req, player="system")
+        
+        p1_source = req.get("p1_deck", "")
+        p2_source = req.get("p2_deck", "")
+        
         if len(card_db.cards) < len(card_db.raw_db):
              for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
-        p1_leader, p1_cards = load_deck_mixed(p1_source, req.get("p1_name", "P1")); p2_leader, p2_cards = load_deck_mixed(p2_source, req.get("p2_name", "P2"))
-        manager = SandboxManager(p1_cards, p2_cards, p1_leader, p2_leader, req.get("p1_name", "P1"), req.get("p2_name", "P2"), game_id=game_id)
-        state_dict = manager.to_dict()
-        if db: db.collection("sandbox_games").document(game_id).set(state_dict)
-        SANDBOX_GAMES[game_id] = manager
-        return {"success": True, "game_id": game_id, "game_state": state_dict}
+             
+        # load_deck_mixed を使用してDB/ローカル両対応にする
+        p1_leader, p1_cards = load_deck_mixed(p1_source, req.get("p1_name", "P1"))
+        p2_leader, p2_cards = load_deck_mixed(p2_source, req.get("p2_name", "P2"))
+        
+        if "SandboxManager" not in globals():
+            raise ImportError("SandboxManager not loaded")
+
+        manager = SandboxManager(p1_cards, p2_cards, p1_leader, p2_leader, req.get("p1_name", "P1"), req.get("p2_name", "P2"))
+        SANDBOX_GAMES[manager.game_id] = manager
+        
+        return {"success": True, "game_id": manager.game_id, "game_state": manager.to_dict()}
     except Exception as e:
-        log_event(level_key="ERROR", action="sandbox.create_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
+        log_event(level_key="ERROR", action="sandbox.create_fail", msg=traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
 
 @app.post("/api/sandbox/action")
 async def sandbox_action(req: Dict[str, Any] = Body(...)):
-    game_id = req.get("game_id"); manager = SANDBOX_GAMES.get(game_id)
-    if not manager and db:
-        doc = db.collection("sandbox_games").document(game_id).get()
-        if doc.exists:
-            data = doc.to_dict(); manager = SandboxManager([], [], None, None, game_id=game_id)
-            manager.state = data.get("players", manager.state); manager.turn_count = data.get("turn_info", {}).get("turn_count", 1); manager.active_player_id = data.get("turn_info", {}).get("active_player_id", "p1")
-            SANDBOX_GAMES[game_id] = manager
-    if not manager: return {"success": False, "error": "Sandbox game not found"}
+    game_id = req.get("game_id")
+    manager = SANDBOX_GAMES.get(game_id)
+    
+    if not manager:
+        return {"success": False, "error": "Sandbox game not found"}
+        
     try:
-        manager.process_action(req); new_state = manager.to_dict()
-        curr_time = time.time(); last_save = getattr(manager, "last_save_time", 0); act_type = req.get("action_type")
-        if act_type == "TURN_END" or (curr_time - last_save) > 5:
-            if db: db.collection("sandbox_games").document(game_id).set(new_state)
-            manager.last_save_time = curr_time
+        manager.process_action(req)
+        new_state = manager.to_dict()
+        
+        # Broadcast the update
         await ws_manager.broadcast(game_id, {"type": "STATE_UPDATE", "state": new_state})
+        
         return {"success": True, "game_id": game_id, "game_state": new_state}
     except Exception as e:
-        log_event(level_key="ERROR", action="sandbox.action_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
+        log_event(level_key="ERROR", action="sandbox.action_fail", msg=traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
 
+# WebSocket Endpoint
 @app.websocket("/ws/sandbox/{game_id}")
 async def websocket_endpoint(websocket: WebSocket, game_id: str):
     await ws_manager.connect(websocket, game_id)
     try:
-        while True: await websocket.receive_text()
-    except WebSocketDisconnect: ws_manager.disconnect(websocket, game_id)
+        while True:
+            # Keep connection alive and potential future client-to-server msg
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, game_id)
 
 @app.get("/health")
 async def health(): return {"status": "ok", "constants_loaded": bool(CONST), "session_id": session_id_ctx.get()}
