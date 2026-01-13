@@ -68,14 +68,12 @@ class ConnectionManager:
             if websocket in self.active_connections[game_id]:
                 self.active_connections[game_id].remove(websocket)
             if not self.active_connections[game_id]:
-                # 全ての接続が切れた場合、即座に削除せず20分(1200秒)の猶予を持たせる
                 del self.active_connections[game_id]
                 log_event(level_key="INFO", action="sandbox.disconnect", msg=f"All connections closed for {game_id}. Starting 20-min grace period.", player="system")
                 asyncio.create_task(self.delayed_cleanup(game_id, 1200))
 
     async def delayed_cleanup(self, game_id: str, delay: int):
         await asyncio.sleep(delay)
-        # 猶予期間終了後、依然として新しい接続がない場合のみ削除を実行
         if game_id not in self.active_connections or not self.active_connections[game_id]:
             if game_id in SANDBOX_GAMES:
                 del SANDBOX_GAMES[game_id]
@@ -266,6 +264,21 @@ async def save_deck(deck_data: Dict[str, Any] = Body(...)):
     except Exception as e:
         log_event("ERROR", "deck.save_fail", traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
 
+@app.get("/api/deck/get")
+async def get_deck(id: str):
+    try:
+        leader, cards = load_deck_mixed(id, "system")
+        return {
+            "success": True,
+            "deck": {
+                "leader": [leader.master.to_dict()] if leader else [],
+                "cards": [c.master.to_dict() for c in cards]
+            }
+        }
+    except Exception as e:
+        log_event(level_key="ERROR", action="api.get_deck_fail", msg=str(e), player="system")
+        return {"success": False, "error": str(e)}
+
 @app.get("/api/deck/list")
 async def list_decks():
     decks = []
@@ -350,7 +363,6 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str):
     try:
         while True: await websocket.receive_text()
     except WebSocketDisconnect:
-        # 修正: awaitを追加
         await ws_manager.disconnect(websocket, game_id)
 
 @app.get("/health")
