@@ -11,6 +11,7 @@ def _nfc(text: str) -> str:
     if not text: return ""
     return unicodedata.normalize('NFC', text)
 
+
 @dataclass
 class TargetQuery:
     zone: Union[Zone, List[Zone]] = Zone.FIELD
