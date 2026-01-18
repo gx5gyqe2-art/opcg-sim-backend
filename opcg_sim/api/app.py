@@ -264,6 +264,18 @@ async def save_deck(deck_data: Dict[str, Any] = Body(...)):
     except Exception as e:
         log_event("ERROR", "deck.save_fail", traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
 
+@app.delete("/api/deck/{deck_id}")
+async def delete_deck(deck_id: str):
+    if not db:
+        return {"success": False, "error": "Database not initialized"}
+    try:
+        db.collection("decks").document(deck_id).delete()
+        log_event("INFO", "deck.delete", f"Deck deleted: {deck_id}", player="system")
+        return {"success": True, "deck_id": deck_id}
+    except Exception as e:
+        log_event("ERROR", "deck.delete_fail", traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
+
 @app.get("/api/deck/get")
 async def get_deck(id: str):
     try:
