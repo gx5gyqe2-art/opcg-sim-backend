@@ -10,6 +10,7 @@ from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource
 from ..utils.logger_config import log_event
 from .effects.resolver import EffectResolver
 
+
 Card = CardInstance
 
 def _nfc(text: str) -> str:
