@@ -36,6 +36,7 @@ class TargetQuery:
     is_vanilla: bool = False
     is_strict_count: bool = False
     is_unique_name: bool = False
+    exclude_ids: List[str] = field(default_factory=list) # 追加
     raw_text: str = ""
 
 @dataclass
@@ -65,6 +66,7 @@ class GameAction(EffectNode):
     duration: str = "INSTANT"
     status: Optional[str] = None
     destination: Optional[Zone] = None
+    is_rest: Optional[bool] = None # 追加
     raw_text: str = ""
 
 @dataclass
