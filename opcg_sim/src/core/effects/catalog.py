@@ -8,6 +8,7 @@ def get_manual_ability(card_id: str) -> List[Ability]:
     return MANUAL_EFFECTS.get(card_id, [])
 
 MANUAL_EFFECTS: Dict[str, List[Ability]] = {
+    # --- 既存のカード (イム/五老星など) ---
     "OP05-097": [
         Ability(
             trigger=TriggerType.YOUR_TURN,
@@ -334,4 +335,327 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ])
         )
     ],
+    
+    # --- 新規追加: Nami.json 関連カード ---
+    "OP06-106": [
+        Ability(
+            trigger=TriggerType.ON_PLAY,
+            effect=Choice(
+                message="効果を使用しますか？",
+                option_labels=["使用する", "使用しない"],
+                options=[
+                    Sequence(actions=[
+                        GameAction(
+                            type=ActionType.MOVE_CARD,
+                            target=TargetQuery(player=Player.SELF, zone=Zone.LIFE, count=1, select_mode="CHOOSE"),
+                            destination=Zone.HAND,
+                            raw_text="自分のライフの上か下から1枚を手札に加える"
+                        ),
+                        GameAction(
+                            type=ActionType.MOVE_CARD,
+                            target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, select_mode="CHOOSE", is_up_to=True),
+                            destination=Zone.LIFE,
+                            raw_text="自分の手札1枚までを、ライフの上に加える"
+                        )
+                    ]),
+                    GameAction(type=ActionType.OTHER, raw_text="何もしない")
+                ]
+            )
+        )
+    ],
+    "OP06-047": [
+        Ability(
+            trigger=TriggerType.ON_PLAY,
+            effect=Sequence(actions=[
+                GameAction(
+                    type=ActionType.DECK_BOTTOM,
+                    target=TargetQuery(player=Player.OPPONENT, zone=Zone.HAND, select_mode="ALL", count=-1),
+                    raw_text="相手は自身の手札すべてをデッキに戻す"
+                ),
+                GameAction(
+                    type=ActionType.SHUFFLE,
+                    target=TargetQuery(player=Player.OPPONENT, zone=Zone.DECK),
+                    raw_text="デッキをシャッフルする"
+                ),
+                GameAction(
+                    type=ActionType.DRAW,
+                    target=TargetQuery(player=Player.OPPONENT, zone=Zone.DECK),
+                    value=ValueSource(base=5),
+                    raw_text="その後、相手はカード5枚を引く"
+                )
+            ])
+        )
+    ],
+    "P-096": [
+        Ability(
+            trigger=TriggerType.ON_PLAY,
+            effect=Sequence(actions=[
+                GameAction(type=ActionType.DRAW, value=ValueSource(base=1), raw_text="カード1枚を引く"),
+                GameAction(
+                    type=ActionType.DISCARD,
+                    target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, select_mode="CHOOSE"),
+                    raw_text="自分の手札1枚を捨てる"
+                )
+            ])
+        ),
+        Ability(
+            trigger=TriggerType.ACTIVATE_MAIN,
+            condition=Condition(type=ConditionType.TURN_LIMIT, value=1),
+            effect=GameAction(
+                type=ActionType.ATTACH_DON,
+                target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, names=["ナミ"], count=1, select_mode="CHOOSE"),
+                value=ValueSource(base=1),
+                is_rest=True,
+                raw_text="自分の「ナミ」1枚にレストのドン‼1枚までを、付与する"
+            )
+        )
+    ],
+    "PRB02-016": [
+        Ability(
+            trigger=TriggerType.ACTIVATE_MAIN,
+            cost=Sequence(actions=[
+                GameAction(
+                    type=ActionType.REST,
+                    target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, is_strict_count=True, count=1, ref_id="self"),
+                    raw_text="このキャラをレストにする"
+                ),
+                Choice(
+                    message="コスト（ライフを手札に加える）を支払いますか？",
+                    option_labels=["支払う", "支払わない"],
+                    options=[
+                        GameAction(
+                            type=ActionType.MOVE_CARD,
+                            target=TargetQuery(player=Player.SELF, zone=Zone.LIFE, count=1, select_mode="CHOOSE"),
+                            destination=Zone.HAND,
+                            raw_text="自分のライフの上か下から1枚を手札に加える"
+                        ),
+                        GameAction(type=ActionType.OTHER, raw_text="何もしない")
+                    ]
+                )
+            ]),
+            effect=GameAction(
+                type=ActionType.BUFF,
+                target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, card_type=["LEADER", "CHARACTER"], count=1, select_mode="CHOOSE", is_up_to=True),
+                value=ValueSource(base=3000),
+                raw_text="自分のリーダーかキャラ1枚までを、このターン中、パワー+3000"
+            )
+        )
+    ],
+    "OP04-056": [
+        Ability(
+            trigger=TriggerType.ACTIVATE_MAIN,
+            effect=GameAction(
+                type=ActionType.DECK_BOTTOM,
+                target=TargetQuery(player=Player.ALL, zone=Zone.FIELD, card_type=["CHARACTER"], count=1, select_mode="CHOOSE", is_up_to=True),
+                raw_text="キャラ1枚までを、持ち主のデッキの下に置く"
+            )
+        )
+    ],
+    "OP12-051": [
+        Ability(
+            trigger=TriggerType.ACTIVATE_MAIN,
+            cost=Sequence(actions=[
+                GameAction(type=ActionType.REST, target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, is_strict_count=True, count=1, ref_id="self"), raw_text="このキャラをレストにする"),
+                GameAction(type=ActionType.DISCARD, target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, select_mode="CHOOSE"), raw_text="自分の手札1枚を捨てる")
+            ]),
+            effect=GameAction(
+                type=ActionType.DEBUFF, 
+                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, cost_max=4, count=1, select_mode="CHOOSE", is_up_to=True), 
+                status="BLOCKER_DISABLE", 
+                raw_text="相手のコスト4以下のキャラ1枚までを、このターン中、【ブロッカー】を発動できない"
+            )
+        )
+    ],
+    "OP07-116": [
+        Ability(
+            trigger=TriggerType.ACTIVATE_MAIN,
+            effect=Sequence(actions=[
+                GameAction(
+                    type=ActionType.BUFF,
+                    target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, card_type=["LEADER", "CHARACTER"], count=1, select_mode="CHOOSE", is_up_to=True),
+                    value=ValueSource(base=1000),
+                    raw_text="自分のリーダーかキャラ1枚までを、このターン中、パワー+1000"
+                ),
+                Branch(
+                    condition=Condition(type=ConditionType.LIFE_COUNT, player=Player.OPPONENT, value=2, operator=CompareOperator.LE),
+                    true_action=GameAction(
+                        type=ActionType.REST,
+                        target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=4, count=1, select_mode="CHOOSE", is_up_to=True),
+                        raw_text="相手のライフが2枚以下の場合、相手のコスト4以下のキャラ1枚までを、レストにする"
+                    )
+                )
+            ])
+        )
+    ],
+    "OP06-104": [
+        Ability(
+            trigger=TriggerType.ON_KO,
+            condition=Condition(type=ConditionType.LIFE_COUNT, player=Player.OPPONENT, value=3, operator=CompareOperator.LE),
+            effect=GameAction(
+                type=ActionType.MOVE_CARD,
+                target=TargetQuery(player=Player.SELF, zone=Zone.DECK, count=1, select_mode="TOP"),
+                destination=Zone.LIFE,
+                raw_text="相手のライフが3枚以下の場合、自分のデッキの上から1枚までを、ライフの上に加える"
+            )
+        )
+    ],
+    "PRB02-008": [
+        Ability(
+            trigger=TriggerType.ON_KO,
+            effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=2), raw_text="カード2枚を引く")
+        )
+    ],
+    "EB03-053": [
+        Ability(
+            trigger=TriggerType.ON_PLAY,
+            effect=Sequence(actions=[
+                GameAction(
+                    type=ActionType.ATTACH_DON,
+                    target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, card_type=["LEADER"], count=1, select_mode="CHOOSE"),
+                    value=ValueSource(base=1),
+                    is_rest=True,
+                    raw_text="自分のリーダーにレストのドン‼1枚までを、付与する"
+                ),
+                Branch(
+                    condition=Condition(type=ConditionType.LIFE_COUNT, player=Player.OPPONENT, value=3, operator=CompareOperator.GE),
+                    true_action=GameAction(
+                        type=ActionType.MOVE_CARD,
+                        target=TargetQuery(player=Player.OPPONENT, zone=Zone.LIFE, count=1, select_mode="TOP"),
+                        destination=Zone.HAND,
+                        raw_text="相手のライフが3枚以上の場合、相手のライフの上から1枚までを、持ち主の手札に加える"
+                    )
+                )
+            ])
+        ),
+        Ability(
+            trigger=TriggerType.ON_KO,
+            cost=GameAction(type=ActionType.OTHER, raw_text="自分のライフの上から1枚を表向きにする"),
+            effect=GameAction(
+                type=ActionType.PLAY_CARD,
+                target=TargetQuery(player=Player.SELF, zone=Zone.HAND, card_type=["CHARACTER"], power_max=6000, count=1, select_mode="CHOOSE", is_up_to=True),
+                raw_text="自分の手札からパワー6000以下のキャラカード1枚までを、登場させる"
+            )
+        )
+    ],
+    "OP08-047": [
+        Ability(
+            trigger=TriggerType.ON_PLAY,
+            cost=GameAction(
+                type=ActionType.MOVE_CARD,
+                target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, card_type=["CHARACTER"], count=1, select_mode="CHOOSE", exclude_ids=["self"]),
+                destination=Zone.HAND,
+                raw_text="このキャラ以外の自分のキャラ1枚を持ち主の手札に戻す"
+            ),
+            effect=GameAction(
+                type=ActionType.MOVE_CARD,
+                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=6, count=1, select_mode="CHOOSE", is_up_to=True),
+                destination=Zone.HAND,
+                raw_text="相手のコスト6以下のキャラ1枚までを、持ち主の手札に戻す"
+            )
+        )
+    ],
+    "EB03-055": [
+        Ability(
+            trigger=TriggerType.ON_PLAY,
+            cost=GameAction(
+                type=ActionType.TRASH,
+                target=TargetQuery(player=Player.SELF, zone=Zone.LIFE, count=1, select_mode="TOP"),
+                raw_text="自分のライフの上から1枚をトラッシュに置く"
+            ),
+            effect=Branch(
+                condition=Condition(type=ConditionType.LEADER_TRAIT, value="麦わらの一味", player=Player.SELF),
+                true_action=GameAction(
+                    type=ActionType.MOVE_CARD,
+                    target=TargetQuery(player=Player.SELF, zone=Zone.DECK, count=2, select_mode="TOP", is_up_to=True),
+                    destination=Zone.LIFE,
+                    raw_text="自分のリーダーが特徴《麦わらの一味》を持つ場合、自分のデッキの上から2枚までを、ライフの上に加える"
+                )
+            )
+        ),
+        Ability(
+            trigger=TriggerType.ON_KO,
+            condition=Condition(type=ConditionType.CONTEXT, value="OPPONENT_TURN"),
+            effect=GameAction(
+                type=ActionType.DAMAGE,
+                target=TargetQuery(player=Player.OPPONENT, zone=Zone.LIFE, count=1),
+                raw_text="相手に1ダメージを与えてもよい"
+            )
+        )
+    ],
+    "OP13-042": [
+        Ability(
+            trigger=TriggerType.ON_PLAY,
+            effect=Sequence(actions=[
+                GameAction(type=ActionType.DRAW, value=ValueSource(base=2), raw_text="カード2枚を引く"),
+                GameAction(type=ActionType.DISCARD, target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, select_mode="CHOOSE"), raw_text="自分の手札1枚を捨てる"),
+                GameAction(
+                    type=ActionType.ATTACH_DON,
+                    target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, card_type=["LEADER"], count=1, select_mode="CHOOSE"),
+                    value=ValueSource(base=2),
+                    is_rest=True,
+                    raw_text="自分のリーダーにレストのドン‼2枚までを、付与する"
+                ),
+                GameAction(
+                    type=ActionType.ATTACH_DON,
+                    target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, card_type=["CHARACTER"], count=1, select_mode="CHOOSE"),
+                    value=ValueSource(base=2),
+                    is_rest=True,
+                    raw_text="自分のキャラ1枚にレストのドン‼2枚までを、付与する"
+                )
+            ])
+        )
+    ],
+    "OP11-041": [
+        Ability(
+            trigger=TriggerType.ON_LIFE_DECREASE,
+            condition=Condition(type=ConditionType.AND, args=[
+                 Condition(type=ConditionType.CONTEXT, value="SELF_TURN"),
+                 Condition(type=ConditionType.HAND_COUNT, player=Player.SELF, value=7, operator=CompareOperator.LE),
+                 Condition(type=ConditionType.TURN_LIMIT, value=1)
+            ]),
+            effect=Choice(
+                 message="効果を使用しますか？（1枚引く）",
+                 option_labels=["使用する", "使用しない"],
+                 options=[
+                     GameAction(type=ActionType.DRAW, value=ValueSource(base=1), raw_text="カード1枚を引く"),
+                     GameAction(type=ActionType.OTHER, raw_text="何もしない")
+                 ]
+            )
+        ),
+        Ability(
+            trigger=TriggerType.OPPONENT_ATTACK,
+            condition=Condition(type=ConditionType.AND, args=[
+                 Condition(type=ConditionType.HAS_DON, value=1, operator=CompareOperator.GE),
+                 Condition(type=ConditionType.TURN_LIMIT, value=1)
+            ]),
+            effect=Choice(
+                 message="効果を使用しますか？（手札1枚捨ててパワー+2000）",
+                 option_labels=["使用する", "使用しない"],
+                 options=[
+                     Sequence(actions=[
+                         GameAction(type=ActionType.DISCARD, target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, select_mode="CHOOSE"), raw_text="自分の手札1枚を捨てる"),
+                         GameAction(
+                            type=ActionType.BUFF,
+                            target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, card_type=["LEADER"], count=1, ref_id="self"),
+                            value=ValueSource(base=2000),
+                            raw_text="このリーダーは、このターン中、パワー+2000"
+                         )
+                     ]),
+                     GameAction(type=ActionType.OTHER, raw_text="何もしない")
+                 ]
+            )
+        )
+    ],
+    "OP03-048": [
+        Ability(
+            trigger=TriggerType.ON_PLAY,
+            condition=Condition(type=ConditionType.LEADER_NAME, value="ナミ", player=Player.SELF),
+            effect=GameAction(
+                type=ActionType.MOVE_CARD,
+                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=5, count=1, select_mode="CHOOSE", is_up_to=True),
+                destination=Zone.HAND,
+                raw_text="自分のリーダーが「ナミ」の場合、相手のコスト5以下のキャラ1枚までを、持ち主の手札に戻す"
+            )
+        )
+    ]
 }
