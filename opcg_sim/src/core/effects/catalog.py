@@ -478,7 +478,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 Branch(
                     condition=Condition(type=ConditionType.LIFE_COUNT, player=Player.OPPONENT, value=2, operator=CompareOperator.LE),
-                    true_action=GameAction(
+                    if_true=GameAction( # true_action -> if_true
                         type=ActionType.REST,
                         target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"], cost_max=4, count=1, select_mode="CHOOSE", is_up_to=True),
                         raw_text="相手のライフが2枚以下の場合、相手のコスト4以下のキャラ1枚までを、レストにする"
@@ -518,7 +518,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 ),
                 Branch(
                     condition=Condition(type=ConditionType.LIFE_COUNT, player=Player.OPPONENT, value=3, operator=CompareOperator.GE),
-                    true_action=GameAction(
+                    if_true=GameAction( # true_action -> if_true
                         type=ActionType.MOVE_CARD,
                         target=TargetQuery(player=Player.OPPONENT, zone=Zone.LIFE, count=1, select_mode="TOP"),
                         destination=Zone.HAND,
@@ -564,7 +564,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             ),
             effect=Branch(
                 condition=Condition(type=ConditionType.LEADER_TRAIT, value="麦わらの一味", player=Player.SELF),
-                true_action=GameAction(
+                if_true=GameAction( # true_action -> if_true
                     type=ActionType.MOVE_CARD,
                     target=TargetQuery(player=Player.SELF, zone=Zone.DECK, count=2, select_mode="TOP", is_up_to=True),
                     destination=Zone.LIFE,
