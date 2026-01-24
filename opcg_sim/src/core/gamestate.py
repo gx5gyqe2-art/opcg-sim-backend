@@ -489,7 +489,11 @@ class GameManager:
                         log_event("INFO", "game.damage_life", f"{target_owner.name} takes damage to {dest_zone.name}", player=target_owner.name)
                     else: self.winner = attacker_owner.name; log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name); break
         else:
-            if attacker_pwr >= target_pwr: self.move_card(target, Zone.TRASH, target_owner); log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
+            if attacker_pwr >= target_pwr:
+                self.move_card(target, Zone.TRASH, target_owner)
+                log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
+                self._resolve_on_ko(target, target_owner)
+
         target.reset_turn_status(); self.active_battle = None; self.phase = Phase.MAIN; self.check_victory()
 
     def check_victory(self):
@@ -517,6 +521,13 @@ class GameManager:
         if source_card.negated or source_card.ability_disabled: return
         resolver = EffectResolver(self); resolver.resolve_ability(player, ability, source_card)
 
+    def _resolve_on_ko(self, card: Card, owner: Player):
+        if not card.master.abilities: return
+        for ability in card.master.abilities:
+            if ability.trigger == TriggerType.ON_KO:
+                log_event("INFO", "game.trigger_ko", f"Resolving ON_KO for {card.master.name}", player=owner.name)
+                self.resolve_ability(owner, ability, source_card=card)
+
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int) -> bool:
         if not action: return False
         act_name = action.type.name if hasattr(action.type, 'name') else str(action.type)
@@ -540,7 +551,10 @@ class GameManager:
             owner, source_list = self._find_card_location(target)
             if not owner: continue
             if act_name == "KO":
-                self.move_card(target, Zone.TRASH, owner); log_event("INFO", "game.action_ko", f"{target.master.name} was KO'd by effect", player=player.name); success = True
+                self.move_card(target, Zone.TRASH, owner)
+                log_event("INFO", "game.action_ko", f"{target.master.name} was KO'd by effect", player=player.name)
+                self._resolve_on_ko(target, owner)
+                success = True
             elif act_name in ["DISCARD", "TRASH"]:
                 self.move_card(target, Zone.TRASH, owner); success = True
             elif act_name in ["BOUNCE", "MOVE_TO_HAND"]:
