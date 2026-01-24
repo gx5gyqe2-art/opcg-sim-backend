@@ -459,7 +459,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 GameAction(type=ActionType.DISCARD, target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, select_mode="CHOOSE"), raw_text="自分の手札1枚を捨てる")
             ]),
             effect=GameAction(
-                type=ActionType.BUFF, # DEBUFF -> BUFF
+                type=ActionType.BUFF, 
                 target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, cost_max=4, count=1, select_mode="CHOOSE", is_up_to=True), 
                 status="BLOCKER_DISABLE", 
                 raw_text="相手のコスト4以下のキャラ1枚までを、このターン中、【ブロッカー】を発動できない"
@@ -658,4 +658,4 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ]
-}次は
+}
