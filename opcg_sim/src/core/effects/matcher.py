@@ -200,7 +200,11 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         if query.card_type and card.master.type.name not in query.card_type:
             continue
 
-        if query.colors and not any(c in card.master.color.value for c in query.colors): continue
+        # 【修正】card.master.colors (List[Color]) の各値を確認するように変更
+        if query.colors:
+            card_colors = [c.value for c in card.master.colors] if card.master.colors else []
+            if not any(qc in card_colors for qc in query.colors): continue
+
         if query.attributes and card.master.attribute.value not in query.attributes: continue
         
         if query.cost_max is not None and card.current_cost > query.cost_max: continue
