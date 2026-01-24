@@ -96,7 +96,10 @@ class ActionType(Enum):
     RESTRICTION = auto()
     DECK_TOP = auto()
     SET_COST = auto()
+    
     DEAL_DAMAGE = auto()
+    DAMAGE = DEAL_DAMAGE # エイリアス追加
+    
     SELECT_OPTION = auto()
     PASSIVE_EFFECT = auto()
     
@@ -112,6 +115,7 @@ class ActionType(Enum):
     MOVE_TO_HAND = auto()
     TRASH = auto()
     BUFF = auto()
+    DEBUFF = BUFF # エイリアス追加（念のため）
     ACTIVE_DON = auto()
     
     BOUNCE = auto()
@@ -137,7 +141,9 @@ class TriggerType(Enum):
     OPPONENT_TURN = "相手のターン中"
     OPPONENT_ATTACK = "相手のアタック時"
     
-    # 【追加】ゲーム開始時
+    ON_DAMAGE_DEALT_TO_LIFE = "ライフダメージ時" # 追加
+    ON_LIFE_DECREASE = "ライフ減少時" # 追加
+    
     GAME_START = "ゲーム開始時"
     
     UNKNOWN = "不明"
@@ -166,6 +172,11 @@ class ConditionType(Enum):
     LEADER_NAME = auto()
     LEADER_TRAIT = auto()
     CONTEXT = auto()
+    
+    # 追加: 複合条件用
+    AND = auto()
+    OR = auto()
+    
     OTHER = auto()
     NONE = auto()
     

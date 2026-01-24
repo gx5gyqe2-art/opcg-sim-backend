@@ -36,7 +36,7 @@ class TargetQuery:
     is_vanilla: bool = False
     is_strict_count: bool = False
     is_unique_name: bool = False
-    exclude_ids: List[str] = field(default_factory=list) # 追加
+    exclude_ids: List[str] = field(default_factory=list)
     raw_text: str = ""
 
 @dataclass
@@ -51,8 +51,10 @@ class ValueSource:
 class Condition:
     type: ConditionType
     target: Optional[TargetQuery] = None
+    player: Player = Player.SELF  # 追加: デフォルトは自分
     operator: CompareOperator = CompareOperator.EQ
     value: Union[int, str, ValueSource] = 0
+    args: List[Condition] = field(default_factory=list) # 追加: AND/OR条件用
     raw_text: str = ""
 
 class EffectNode:
@@ -66,7 +68,7 @@ class GameAction(EffectNode):
     duration: str = "INSTANT"
     status: Optional[str] = None
     destination: Optional[Zone] = None
-    is_rest: Optional[bool] = None # 追加
+    is_rest: Optional[bool] = None
     raw_text: str = ""
 
 @dataclass

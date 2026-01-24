@@ -658,4 +658,4 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
             )
         )
     ]
-}
+}次は
