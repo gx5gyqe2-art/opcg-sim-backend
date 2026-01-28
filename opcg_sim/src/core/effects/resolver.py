@@ -20,13 +20,11 @@ class EffectResolver:
 
     def resolve_ability(self, player, ability, source_card):
         if ability.condition and not self._check_condition(player, ability.condition, source_card):
-            # ▼▼▼ 修正: 失敗時にスナップショットを作成 ▼▼▼
             self._log_failure_snapshot(player, source_card, ability, "CONDITION_MISMATCH", f"Condition type: {ability.condition.type.name}")
             log_event("INFO", "resolver.condition_failed", f"Condition not met for {source_card.master.name}", player=player.name)
             return
 
         if ability.cost and not self._can_satisfy_node(player, ability.cost, source_card):
-            # ▼▼▼ 修正: 失敗時にスナップショットを作成 ▼▼▼
             self._log_failure_snapshot(player, source_card, ability, "COST_UNSATISFIED", "Insufficient resources or targets for cost")
             log_event("WARNING", "resolver.cost_impossible", f"Cost cannot be satisfied for {source_card.master.name}", player=player.name)
             raise ValueError(f"コストの条件を満たすことができません: {source_card.master.name}")
@@ -39,7 +37,6 @@ class EffectResolver:
 
         self._process_stack(player, source_card)
 
-    # ▼▼▼ 追加: スナップショット出力用メソッド ▼▼▼
     def _log_failure_snapshot(self, player, source_card, ability, error_code, detail_msg):
         """
         失敗時の状況をJSONにまとめてログ出力する。
@@ -72,7 +69,6 @@ class EffectResolver:
             
         except Exception as e:
             print(f"Snapshot generation failed: {e}")
-    # ▲▲▲ 追加ここまで ▲▲▲
 
     def _can_satisfy_node(self, player, node: EffectNode, source_card) -> bool:
         """
@@ -164,6 +160,10 @@ class EffectResolver:
     def _resolve_targets(self, player, query, source_card, action_node=None):
         if not query: return []
         
+        # ▼▼▼ 追加: 再開時に、一時的に渡された選択結果があればそれを返す ▼▼▼
+        if "temp_resolved_targets" in self.context:
+            return self.context.pop("temp_resolved_targets")
+
         # 既に保存されたターゲットがある場合（例：「選んだカードを...」）
         if query.save_id and query.save_id in self.context["saved_targets"]:
             return self.context["saved_targets"][query.save_id]
@@ -204,13 +204,7 @@ class EffectResolver:
             return selected
 
         # ユーザー選択が必要
-        if not query.save_id:
-            # save_idがないのに選択が必要な状況は、自動化できないためエラーか警告
-            # 一旦先頭から取るフォールバックを入れるか、エラーにする
-            log_event("WARNING", "resolver.auto_select_fallback", f"Ambiguous target selection without save_id. Picking first {required_count}.", player=player.name)
-            selected = candidates[:required_count]
-            return selected
-
+        # save_idがなくても選択が必要な場合は選択画面を出す（以前のフォールバック削除）
         self._suspend_for_target_selection(player, candidates, query, source_card, action_node)
         return None
 
@@ -372,6 +366,21 @@ class EffectResolver:
 
     def _suspend_for_target_selection(self, player, candidates, query, source_card, action_node=None):
         required_count = getattr(query, 'count', 1)
+        is_up_to = getattr(query, 'is_up_to', False)
+        
+        # ▼▼▼ 修正: 強制か任意かで最小選択数を変える ▼▼▼
+        if is_up_to:
+            # 「〜まで選ぶ」なら、0枚選択（キャンセル）も許可する
+            min_select = 0
+        else:
+            # 「〜を選ぶ」なら、必ず指定枚数選ばせる（ただし候補数が足りない場合は全選択まで）
+            min_select = required_count
+            if min_select > len(candidates):
+                min_select = len(candidates)
+            # 候補が1枚以上あるのに、minが0になるのを防ぐ（強制効果のため）
+            if min_select < 1 and len(candidates) > 0:
+                min_select = 1
+        # ▲▲▲ 修正ここまで ▲▲▲
         
         saved_stack = self.execution_stack.copy()
         if action_node:
@@ -383,7 +392,7 @@ class EffectResolver:
             "message": f"対象を選択してください（最大{required_count}枚）",
             "candidates": candidates,
             "constraints": {
-                "min": 1,
+                "min": min_select,
                 "max": required_count
             },
             "continuation": {
@@ -393,7 +402,7 @@ class EffectResolver:
                 "query": query
             }
         }
-        log_event("INFO", "resolver.suspend", "Suspended for target selection", player=player.name)
+        log_event("INFO", "resolver.suspend", f"Suspended for target selection (min:{min_select}, max:{required_count})", player=player.name)
 
     def resume_choice(self, player, source_card, selected_index, execution_stack, effect_context):
         self.execution_stack = execution_stack

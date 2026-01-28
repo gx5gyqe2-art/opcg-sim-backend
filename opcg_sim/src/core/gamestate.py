@@ -4,7 +4,7 @@ import unicodedata
 import re
 import traceback
 import uuid
-import json  # 追加
+import json
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
 from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource
@@ -104,7 +104,6 @@ class GameManager:
         self.active_interaction: Optional[Dict[str, Any]] = None
         self.setup_phase_pending = False
 
-    # ▼▼▼ 追加: デバッグ用スナップショット生成メソッド ▼▼▼
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """
         現在のゲーム状態をAIデバッグ用に全ダンプする。
@@ -138,7 +137,6 @@ class GameManager:
             "p2_state": _dump_player(self.p2),
             "active_interaction": str(self.active_interaction) if self.active_interaction else None
         }
-    # ▲▲▲ 追加ここまで ▲▲▲
 
     def _find_card_by_uuid(self, uuid: str) -> Optional[CardInstance]:
         all_players = [self.p1, self.p2]
@@ -245,6 +243,11 @@ class GameManager:
                 if card: selected_cards.append(card)
             
             query = continuation.get("query")
+
+            # ▼▼▼ 修正: save_idがなくても、一時的に選択結果を渡せるようにする ▼▼▼
+            if "effect_context" in continuation:
+                continuation["effect_context"]["temp_resolved_targets"] = selected_cards
+
             if query and getattr(query, 'save_id', None):
                  continuation["effect_context"]["saved_targets"][query.save_id] = selected_cards
             
@@ -584,6 +587,10 @@ class GameManager:
                 card = deck.pop(0)
                 player.temp_zone.append(card)
             return True
+        
+        # ▼▼▼ 修正: 初期値をTrueに設定（対象0枚でも「何もしないことに成功した」とみなすため） ▼▼▼
+        success = True 
+
         for target in targets:
             owner, source_list = self._find_card_location(target)
             if not owner: continue
