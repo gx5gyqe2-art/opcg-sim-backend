@@ -24,11 +24,13 @@ class EffectResolver:
         # 1. 条件チェック
         if ability.condition and not self._check_condition(player, ability.condition, source_card):
             self._log_failure_snapshot(player, source_card, ability, "CONDITION_MISMATCH", f"Condition type: {ability.condition.type.name}")
+            log_event("INFO", "resolver.condition_failed", f"Condition not met for {source_card.master.name}", player=player.name)
             return
 
         # 2. コストチェック
         if ability.cost and not self._can_satisfy_node(player, ability.cost, source_card):
             self._log_failure_snapshot(player, source_card, ability, "COST_UNSATISFIED", "Insufficient resources or targets for cost")
+            log_event("WARNING", "resolver.cost_impossible", f"Cost cannot be satisfied for {source_card.master.name}", player=player.name)
             raise ValueError(f"コストの条件を満たすことができません: {source_card.master.name}")
 
         self.execution_stack = []
@@ -64,7 +66,6 @@ class EffectResolver:
             print(f"Report generation failed: {e}")
 
     def _log_failure_snapshot(self, player, source_card, ability, error_code, detail_msg):
-        # (エラー時のスナップショット処理は変更なし)
         try:
             snapshot = self.game_manager.get_debug_snapshot()
             try:
@@ -84,13 +85,13 @@ class EffectResolver:
         except: pass
 
     def _can_satisfy_node(self, player, node: EffectNode, source_card) -> bool:
-        # (変更なし)
         if isinstance(node, GameAction):
             if not node.target: return True
             from .matcher import get_target_cards
             candidates = get_target_cards(self.game_manager, node.target, source_card)
             required = getattr(node.target, 'count', 1)
             if getattr(node.target, 'is_strict_count', False) and len(candidates) < required:
+                log_event("DEBUG", "resolver.satisfy_fail", f"Insufficient candidates for {node.type.name}: {len(candidates)}/{required}", player=player.name)
                 return False
             if not getattr(node.target, 'is_up_to', False) and len(candidates) == 0:
                 return False
@@ -102,7 +103,6 @@ class EffectResolver:
         return True
 
     def _process_stack(self, player, source_card):
-        # (変更なし)
         while self.execution_stack:
             if self.game_manager.active_interaction:
                 return
@@ -167,7 +167,6 @@ class EffectResolver:
         return success
 
     def _resolve_targets(self, player, query, source_card, action_node=None):
-        # (前回修正済みの内容を維持)
         if not query: return []
         
         if "temp_resolved_targets" in self.context:
@@ -194,6 +193,7 @@ class EffectResolver:
             return []
 
         if is_strict and len(candidates) < required_count:
+            log_event("INFO", "resolver.strict_count_fail", f"Insufficient targets for strict count: found {len(candidates)}, needed {required_count}", player=player.name)
             return []
             
         if (query.select_mode == "ALL") or \
@@ -209,19 +209,20 @@ class EffectResolver:
         return None
 
     def _calculate_value(self, player, val_source: ValueSource, targets) -> int:
-        # (変更なし)
         if not val_source or not val_source.dynamic_source:
             return val_source.base if val_source else 0
+        
         base_val = self.game_manager.get_dynamic_value(player, val_source, targets, self.context)
+        
         val = base_val
         if val_source.divisor > 1:
             val = val // val_source.divisor
         if val_source.multiplier != 1:
             val = val * val_source.multiplier
+            
         return val
 
     def _check_condition(self, player, condition: Condition, source_card) -> bool:
-        # (変更なし)
         if not condition: return True
         if condition.type == ConditionType.AND:
             return all(self._check_condition(player, sub, source_card) for sub in condition.args)
@@ -232,6 +233,8 @@ class EffectResolver:
         if condition.player == Player.OPPONENT:
             target_player = self.game_manager.p2 if player == self.game_manager.p1 else self.game_manager.p1
         
+        log_event("DEBUG", "resolver.check_condition", f"Checking {condition.type.name} for {target_player.name}", player=player.name)
+
         current_val = 0
         target_val = condition.value if isinstance(condition.value, int) else 0
         
@@ -341,6 +344,7 @@ class EffectResolver:
         required_count = getattr(query, 'count', 1)
         is_up_to = getattr(query, 'is_up_to', False)
         
+        # 強制/任意の区別
         if is_up_to:
             min_select = 0
         else:
