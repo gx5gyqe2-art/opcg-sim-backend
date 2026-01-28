@@ -1,14 +1,84 @@
+import json
+import os
 from typing import Dict, List
+from ...models.effect_types import Ability
+from ...utils.logger_config import log_event
+
+# グローバル変数として生成データを保持
+GENERATED_EFFECTS: Dict[str, List[Ability]] = {}
+
+def load_generated_effects(json_path: str = "opcg_sim/data/generated_effects.json"):
+    """
+    LLM生成された効果定義JSONをロードしてメモリにキャッシュする。
+    サーバー起動時（app.pyなど）に呼び出すことを想定。
+    """
+    global GENERATED_EFFECTS
+    
+    if not os.path.exists(json_path):
+        log_event("WARNING", "catalog.load_skip", f"Generated effects file not found: {json_path}")
+        return
+
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        count = 0
+        for card_id, effects_data in data.items():
+            if not isinstance(effects_data, list):
+                continue
+                
+            abilities = []
+            for effect_dict in effects_data:
+                # effect_types.py で実装した from_dict を使用してオブジェクト化
+                try:
+                    ability = Ability.from_dict(effect_dict)
+                    abilities.append(ability)
+                except Exception as e:
+                    log_event("ERROR", "catalog.parse_error", f"Failed to parse effect for {card_id}: {e}")
+            
+            if abilities:
+                GENERATED_EFFECTS[card_id] = abilities
+                count += 1
+            
+        log_event("INFO", "catalog.load_success", f"Loaded {count} generated card effects from {json_path}")
+        
+    except Exception as e:
+        log_event("ERROR", "catalog.load_error", f"Failed to load generated effects: {str(e)}")
+
+def get_ability(card_id: str) -> List[Ability]:
+    """
+    カードIDに対応する効果定義を取得する。
+    
+    優先順位:
+    1. 手動定義 (MANUAL_EFFECTS) - 開発者が手動で修正・実装したもの（最優先）
+    2. 自動生成 (GENERATED_EFFECTS) - LLMによって生成されたもの
+    """
+    # 1. 手動定義を確認
+    if card_id in MANUAL_EFFECTS:
+        return MANUAL_EFFECTS[card_id]
+    
+    # 2. 自動生成データを確認
+    if card_id in GENERATED_EFFECTS:
+        return GENERATED_EFFECTS[card_id]
+        
+    return []
+
+# 既存コードとの互換性のため残すが、実態は get_ability に委譲
+def get_manual_ability(card_id: str) -> List[Ability]:
+    return get_ability(card_id)
+
+
+# --- 以下、既存の手動定義データ (MANUAL_EFFECTS) ---
+# ※ 以前のファイル内容にある MANUAL_EFFECTS の定義をそのまま維持してください。
+# ここでは紙幅の都合上、省略していますが、実際のファイルには必ず含めてください。
+
 from ...models.effect_types import (
-    Ability, Sequence, GameAction, TargetQuery, ValueSource, Branch, Choice, Condition
+    Sequence, GameAction, TargetQuery, ValueSource, Branch, Choice, Condition
 )
 from ...models.enums import TriggerType, ActionType, Zone, ConditionType, CompareOperator, Player, Color
 
-def get_manual_ability(card_id: str) -> List[Ability]:
-    return MANUAL_EFFECTS.get(card_id, [])
-
 MANUAL_EFFECTS: Dict[str, List[Ability]] = {
-    # --- 既存のカード (イム/五老星など) ---
+
     "OP05-097": [
         Ability(
             trigger=TriggerType.YOUR_TURN,
