@@ -1,4 +1,6 @@
 from typing import List, Any, Dict, Optional, Union
+import json
+from dataclasses import asdict
 from ...models.effect_types import (
     EffectNode, GameAction, Sequence, Branch, Choice, ValueSource, Condition, TargetQuery
 )
@@ -18,12 +20,15 @@ class EffectResolver:
 
     def resolve_ability(self, player, ability, source_card):
         if ability.condition and not self._check_condition(player, ability.condition, source_card):
+            # ▼▼▼ 修正: 失敗時にスナップショットを作成 ▼▼▼
+            self._log_failure_snapshot(player, source_card, ability, "CONDITION_MISMATCH", f"Condition type: {ability.condition.type.name}")
             log_event("INFO", "resolver.condition_failed", f"Condition not met for {source_card.master.name}", player=player.name)
             return
 
         if ability.cost and not self._can_satisfy_node(player, ability.cost, source_card):
+            # ▼▼▼ 修正: 失敗時にスナップショットを作成 ▼▼▼
+            self._log_failure_snapshot(player, source_card, ability, "COST_UNSATISFIED", "Insufficient resources or targets for cost")
             log_event("WARNING", "resolver.cost_impossible", f"Cost cannot be satisfied for {source_card.master.name}", player=player.name)
-            # コストが払えない場合は例外ではなく単に中断とする場合もあるが、ここでは明示的に通知
             raise ValueError(f"コストの条件を満たすことができません: {source_card.master.name}")
 
         self.execution_stack = []
@@ -33,6 +38,41 @@ class EffectResolver:
             self.execution_stack.append(ability.cost)
 
         self._process_stack(player, source_card)
+
+    # ▼▼▼ 追加: スナップショット出力用メソッド ▼▼▼
+    def _log_failure_snapshot(self, player, source_card, ability, error_code, detail_msg):
+        """
+        失敗時の状況をJSONにまとめてログ出力する。
+        これをコピーしてAIに渡すとデバッグしてくれる。
+        """
+        try:
+            snapshot = self.game_manager.get_debug_snapshot()
+            
+            try:
+                ability_dump = asdict(ability)
+                ability_dump = str(ability_dump) 
+            except:
+                ability_dump = str(ability)
+
+            debug_data = {
+                "error_code": error_code,
+                "detail": detail_msg,
+                "source_card": {
+                    "id": source_card.master.id,
+                    "name": source_card.master.name,
+                    "uuid": source_card.uuid,
+                    "zone_location": self.game_manager._find_card_location(source_card)[1].__class__.__name__ if self.game_manager._find_card_location(source_card)[1] else "Unknown"
+                },
+                "failed_ability": ability_dump, 
+                "game_state": snapshot
+            }
+            
+            json_str = json.dumps(debug_data, ensure_ascii=False, indent=2)
+            print(f"\n======== [DEBUG_SNAPSHOT_START] ========\nAI_PROMPT: 以下のJSONはOPCGシミュレータのエラーログです。カード {source_card.master.name} の効果発動が {error_code} で失敗しました。game_state と failed_ability を分析し、なぜ条件を満たせなかったのか、またはLLMの生成したJSONデータのどこが間違っているか特定してください。\n\n{json_str}\n======== [DEBUG_SNAPSHOT_END] ========\n")
+            
+        except Exception as e:
+            print(f"Snapshot generation failed: {e}")
+    # ▲▲▲ 追加ここまで ▲▲▲
 
     def _can_satisfy_node(self, player, node: EffectNode, source_card) -> bool:
         """

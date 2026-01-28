@@ -4,6 +4,7 @@ import unicodedata
 import re
 import traceback
 import uuid
+import json  # 追加
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
 from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource
@@ -102,6 +103,42 @@ class GameManager:
         self.active_battle: Optional[Dict[str, Any]] = None
         self.active_interaction: Optional[Dict[str, Any]] = None
         self.setup_phase_pending = False
+
+    # ▼▼▼ 追加: デバッグ用スナップショット生成メソッド ▼▼▼
+    def get_debug_snapshot(self) -> Dict[str, Any]:
+        """
+        現在のゲーム状態をAIデバッグ用に全ダンプする。
+        """
+        def _dump_zone(zone: List[Card]) -> List[str]:
+            # カードID(名前) [状態] の形式で出力
+            return [f"{c.uuid[:4]}:{c.master.id}({c.master.name}){'[REST]' if c.is_rest else '[ACT]'}" for c in zone]
+
+        def _dump_player(p: Player) -> Dict[str, Any]:
+            return {
+                "life": len(p.life),
+                "hand_count": len(p.hand),
+                "hand_ids": [c.master.id for c in p.hand], # 手札の中身もIDだけ見る
+                "field": _dump_zone(p.field),
+                "trash_count": len(p.trash),
+                "trash_top": [c.master.id for c in p.trash[-3:]], # トラッシュの最新3枚
+                "leader": f"{p.leader.master.id}({p.leader.master.name})" if p.leader else None,
+                "stage": f"{p.stage.master.id}({p.stage.master.name})" if p.stage else None,
+                "don": {
+                    "active": len(p.don_active),
+                    "rested": len(p.don_rested),
+                    "attached": len(p.don_attached_cards)
+                }
+            }
+
+        return {
+            "turn_count": self.turn_count,
+            "phase": self.phase.name,
+            "turn_player": self.turn_player.name,
+            "p1_state": _dump_player(self.p1),
+            "p2_state": _dump_player(self.p2),
+            "active_interaction": str(self.active_interaction) if self.active_interaction else None
+        }
+    # ▲▲▲ 追加ここまで ▲▲▲
 
     def _find_card_by_uuid(self, uuid: str) -> Optional[CardInstance]:
         all_players = [self.p1, self.p2]
