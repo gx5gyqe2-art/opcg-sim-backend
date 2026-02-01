@@ -250,14 +250,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 5
+            "value": 5,
+            "save_id": "looked_cards"
           },
           {
             "type": "PLAY_CARD",
@@ -580,11 +574,6 @@
           },
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP"
-            },
             "value": 3,
             "destination": "TEMP"
           },
@@ -2145,14 +2134,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 4
+            "value": 4,
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -2389,12 +2372,7 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 7,
-                "select_mode": "TOP"
-              },
+              "value": 7,
               "save_id": "looked_cards"
             },
             {
@@ -2533,14 +2511,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards_eb02_017"
-            },
-            "value": 5
+            "value": 5,
+            "save_id": "looked_cards_eb02_017"
           },
           {
             "type": "MOVE_CARD",
@@ -2651,12 +2623,6 @@
       "trigger": "ACTIVATE_MAIN",
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 4,
-          "select_mode": "TOP"
-        },
         "value": 4,
         "select_from_looked": {
           "count": 1,
@@ -2754,11 +2720,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3
-            },
+            "value": 3,
             "save_id": "looked_cards"
           },
           {
@@ -2868,11 +2830,7 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 5
-              },
+              "value": 5,
               "save_id": "looked_cards"
             },
             {
@@ -2969,12 +2927,7 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 5,
-                "select_mode": "TOP"
-              },
+              "value": 5,
               "save_id": "looked_cards"
             },
             {
@@ -3061,14 +3014,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
-            "value": 4
+            "value": 4,
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -3114,13 +3061,8 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 7,
-                "select_mode": "TOP",
-                "save_id": "looked_cards_eb02_032"
-              }
+              "value": 7,
+              "save_id": "looked_cards_eb02_032"
             },
             {
               "type": "MOVE_CARD",
@@ -3246,13 +3188,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP"
-            },
-            "destination": "TEMP"
+            "destination": "TEMP",
+            "value": 3
           },
           {
             "type": "REVEAL",
@@ -3420,14 +3357,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 4
+            "value": 4,
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -3779,12 +3710,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP"
-            },
             "save_id": "temp_looked_cards",
             "value": 4
           },
@@ -4027,12 +3952,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "sub_effect": {
               "type": "PLAY_CARD",
               "target": {
@@ -4133,14 +4052,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
-            "value": 4
+            "value": 4,
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -4683,12 +4596,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "save_id": "looked_cards",
             "value": 5
           },
@@ -5231,12 +5138,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "destination": "TEMP",
             "value": 5
           },
@@ -6024,13 +5925,6 @@
         "steps": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -6205,13 +6099,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -6751,14 +6638,7 @@
         "type": "Sequence",
         "actions": [
           {
-            "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "type": "LOOK"
           },
           {
             "type": "MOVE_CARD",
@@ -6854,7 +6734,7 @@
             "CHARACTER"
           ],
           "traits": [
-            "FILM"
+            "フィルム"
           ],
           "count": 1,
           "select_mode": "CHOOSE",
@@ -7000,13 +6880,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 4
           },
           {
@@ -7127,13 +7000,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 7,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
             "value": 7
           },
           {
@@ -8149,12 +8015,6 @@
       },
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 3,
-          "select_mode": "TOP"
-        },
         "value": 3,
         "sub_effect": {
           "type": "Sequence",
@@ -8627,12 +8487,6 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 5,
-                "select_mode": "TOP"
-              },
               "save_id": "looked_cards",
               "value": 5
             },
@@ -10146,14 +10000,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "MOVE_CARD",
@@ -10497,13 +10344,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -10827,10 +10667,6 @@
       "effect": {
         "type": "LOOK",
         "value": 5,
-        "target": {
-          "player": "SELF",
-          "zone": "DECK"
-        },
         "effect": {
           "type": "Sequence",
           "effects": [
@@ -11331,12 +11167,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP"
-            },
             "destination": "TEMP",
             "save_id": "revealed_card",
             "value": 1
@@ -11650,13 +11480,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "Choice",
@@ -11711,13 +11535,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "location": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -11878,13 +11695,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "REVEAL",
@@ -12044,12 +11855,6 @@
           },
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP"
-            },
             "effect": {
               "type": "MOVE_CARD",
               "target": {
@@ -12102,13 +11907,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -12671,13 +12469,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -12995,13 +12786,6 @@
       "effect": {
         "type": "LOOK",
         "value": 5,
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 5,
-          "select_mode": "TOP",
-          "save_id": "looked_cards"
-        },
         "sub_effect": {
           "type": "Sequence",
           "actions": [
@@ -13449,13 +13233,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -13843,13 +13620,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 3
           },
           {
@@ -13900,13 +13670,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 3
           },
           {
@@ -14344,23 +14107,11 @@
         "choices": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP"
-            },
             "destination": "DECK_TOP",
             "value": 3
           },
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP"
-            },
             "destination": "DECK_BOTTOM",
             "value": 3
           }
@@ -14412,12 +14163,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 2,
-              "select_mode": "TOP"
-            },
             "save_id": "looked_cards",
             "value": 2
           },
@@ -14459,12 +14204,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "value": 5
           },
           {
@@ -15155,12 +14894,7 @@
           {
             "type": "LOOK",
             "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP",
-              "save_id": "looked_cards_temp"
-            }
+            "save_id": "looked_cards_temp"
           },
           {
             "type": "REVEAL",
@@ -15392,11 +15126,6 @@
           {
             "type": "LOOK",
             "value": 3,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP"
-            },
             "save_id": "looked_cards"
           },
           {
@@ -16190,14 +15919,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 5
+            "value": 5,
+            "save_id": "looked_cards"
           },
           {
             "type": "REVEAL",
@@ -16332,14 +16055,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 5
+            "value": 5,
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -16796,12 +16513,7 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 5,
-                "select_mode": "TOP"
-              },
+              "value": 5,
               "save_id": "looked_cards"
             },
             {
@@ -17160,14 +16872,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 5
+            "value": 5,
+            "save_id": "looked_cards"
           },
           {
             "type": "REVEAL",
@@ -17987,14 +17693,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
-            "value": 5
+            "value": 5,
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -18655,12 +18355,7 @@
           {
             "type": "LOOK",
             "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "from_top": true,
-              "save_id": "looked_cards"
-            }
+            "save_id": "looked_cards"
           },
           {
             "type": "TRASH",
@@ -18702,13 +18397,8 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 3,
-                "select_mode": "TOP",
-                "save_id": "looked_cards"
-              }
+              "value": 3,
+              "save_id": "looked_cards"
             },
             {
               "type": "MOVE_CARD",
@@ -18774,13 +18464,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP"
-            },
-            "destination": "TEMP",
             "value": 3
           },
           {
@@ -18964,13 +18647,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5,
+            "save_id": "looked_cards"
           },
           {
             "type": "PLAY_CARD",
@@ -19412,13 +19090,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 4,
+            "save_id": "looked_cards"
           },
           {
             "type": "REVEAL",
@@ -19489,14 +19162,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards_from_deck"
-            },
-            "value": 3
+            "value": 3,
+            "save_id": "looked_cards_from_deck"
           },
           {
             "type": "REVEAL",
@@ -19904,12 +19571,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "top_x": true
-            },
+            "value": 5,
             "save_id": "looked_cards"
           },
           {
@@ -20915,12 +20577,6 @@
         "steps": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "value": 5
           },
           {
@@ -21090,11 +20746,6 @@
           {
             "type": "LOOK",
             "value": 2,
-            "target": {
-              "zone": "DECK",
-              "player": "SELF",
-              "select_mode": "TOP"
-            },
             "save_id": "looked_cards"
           },
           {
@@ -21206,12 +20857,7 @@
           {
             "type": "LOOK",
             "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -21392,11 +21038,6 @@
       "effect": {
         "type": "LOOK",
         "value": 7,
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "select_mode": "TOP"
-        },
         "sub_effects": [
           {
             "type": "MOVE_CARD",
@@ -21538,13 +21179,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "temp_looked_cards"
-            },
             "value": 5
           },
           {
@@ -22019,12 +21653,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "destination": "TEMP",
             "value": 5
           },
@@ -22696,13 +22324,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "value": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 3
           },
           {
             "type": "PLAY_CARD",
@@ -23016,13 +22638,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "temp_deck_top_cards"
-            },
             "value": 3
           },
           {
@@ -24189,14 +23804,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "REVEAL",
@@ -24455,14 +24063,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 3,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP"
-            },
-            "save_id": "looked_cards"
+            "value": 3
           },
           {
             "type": "REVEAL",
@@ -24884,13 +24485,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "REVEAL",
@@ -25243,12 +24838,6 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 3,
-                "select_mode": "TOP"
-              },
               "save_id": "looked_cards"
             },
             {
@@ -25579,11 +25168,6 @@
       "trigger": "ON_PLAY",
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 5
-        },
         "value": 5,
         "destination": "DECK",
         "destination_select_mode": "CHOOSE",
@@ -25877,13 +25461,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -26019,13 +25596,6 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 5,
-                "select_mode": "TOP",
-                "save_id": "looked_cards"
-              },
               "destination": "TEMP",
               "value": 5
             },
@@ -26248,14 +25818,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 3
+            "value": 3,
+            "save_id": "looked_cards"
           },
           {
             "type": "REVEAL",
@@ -27217,12 +26781,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "destination": "TEMP",
             "save_id": "looked_cards",
             "value": 5
@@ -27370,14 +26928,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "temp_looked_cards"
-            },
-            "value": 5
+            "value": 5,
+            "save_id": "temp_looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -27662,13 +27214,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -27894,13 +27439,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 3
           },
           {
@@ -28168,13 +27706,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
             "value": 3
           },
           {
@@ -28660,12 +28191,6 @@
       "trigger": "ON_PLAY",
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 4,
-          "select_mode": "TOP"
-        },
         "save_id": "looked_cards",
         "value": 4,
         "sub_effect": {
@@ -29417,13 +28942,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards_from_deck"
-            },
             "value": 5
           },
           {
@@ -29633,12 +29151,6 @@
           {
             "type": "LOOK",
             "value": 1,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP"
-            },
             "play_filter": {
               "card_type": [
                 "CHARACTER"
@@ -30426,13 +29938,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -30500,13 +30005,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 3,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 3
           },
           {
             "type": "MOVE_CARD",
@@ -31786,13 +31285,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -32020,14 +31512,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 1,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP",
-              "save_id": "revealed_card"
-            }
+            "value": 1
           },
           {
             "type": "PLAY_CARD",
@@ -32174,14 +31659,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards_pool"
-            },
-            "value": 5
+            "value": 5,
+            "save_id": "looked_cards_pool"
           },
           {
             "type": "MOVE_CARD",
@@ -32396,13 +31875,8 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 5,
-                "top_from": "TOP",
-                "save_id": "looked_cards"
-              }
+              "value": 5,
+              "save_id": "looked_cards"
             },
             {
               "type": "DRAW",
@@ -32666,14 +32140,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
-            "value": 5
+            "value": 5,
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -33107,12 +32575,6 @@
       "trigger": "ACTIVATE_MAIN",
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 5,
-          "select_mode": "TOP"
-        },
         "value": 5,
         "sub_effect": {
           "type": "SEQUENCE",
@@ -33190,12 +32652,6 @@
       "effect": {
         "type": "LOOK",
         "value": 3,
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 3,
-          "from_top": true
-        },
         "destination": "DECK",
         "reorder": true,
         "placement_choice": true
@@ -33235,13 +32691,7 @@
           {
             "type": "LOOK",
             "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -33373,14 +32823,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from": "TOP",
-              "save_id": "temp_search_pool"
-            },
-            "value": 5
+            "value": 5,
+            "save_id": "temp_search_pool"
           },
           {
             "type": "MOVE_CARD",
@@ -33457,12 +32901,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP"
-            },
             "destination": "TEMP",
             "reveal": true,
             "save_id": "revealed_card_op07048"
@@ -34283,14 +33721,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 5
+            "value": 5,
+            "save_id": "looked_cards"
           },
           {
             "type": "REVEAL",
@@ -34521,13 +33953,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5,
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -35474,12 +34901,7 @@
           {
             "type": "LOOK",
             "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "from_top": true,
-              "save_id": "looked_cards"
-            }
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -35582,13 +35004,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -36035,14 +35450,7 @@
         "type": "Sequence",
         "actions": [
           {
-            "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "type": "LOOK"
           },
           {
             "type": "PLAY_CARD",
@@ -36087,14 +35495,7 @@
         "type": "Sequence",
         "actions": [
           {
-            "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "type": "LOOK"
           },
           {
             "type": "PLAY_CARD",
@@ -36339,13 +35740,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 4
           },
           {
@@ -37007,13 +36401,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "MOVE_CARD",
@@ -37476,12 +36864,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP"
-            },
+            "value": 1,
             "save_id": "revealed_card"
           },
           {
@@ -37598,12 +36981,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP"
-            },
             "destination": "TEMP",
             "save_id": "revealed_card_pool",
             "value": 1
@@ -37659,13 +37036,9 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "from_top": true,
-              "save_id": "looked_cards"
-            }
+            "value": 3,
+            "from_top": true,
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -37736,11 +37109,6 @@
           {
             "type": "LOOK",
             "value": 1,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP"
-            },
             "reveal": true,
             "save_id": "revealed_card"
           },
@@ -38626,12 +37994,6 @@
       "effect": {
         "type": "LOOK",
         "value": 5,
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 5,
-          "select_mode": "TOP"
-        },
         "resolution": [
           {
             "type": "REVEAL",
@@ -39259,14 +38621,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 7,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 7,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 7
           },
           {
             "type": "PLAY_CARD",
@@ -39574,14 +38929,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "REVEAL",
@@ -39990,12 +39338,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true
-            },
             "save_id": "looked_cards",
             "value": 5
           },
@@ -40534,13 +39876,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "temp_looked_cards"
-            },
+            "save_id": "temp_looked_cards",
             "value": 5
           },
           {
@@ -41026,13 +40362,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
+            "save_id": "looked_cards",
             "value": 5
           },
           {
@@ -41165,13 +40495,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -41449,13 +40773,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "REVEAL",
@@ -41628,13 +40946,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -41752,14 +41063,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 5,
-            "target": {
-              "zone": "DECK",
-              "player": "SELF",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "MOVE_CARD",
@@ -41816,14 +41120,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 4,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 4
           },
           {
             "type": "MOVE_CARD",
@@ -41870,14 +41167,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 4,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 4
           },
           {
             "type": "MOVE_CARD",
@@ -42271,13 +41561,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
             "value": 4
           },
           {
@@ -43199,10 +42482,6 @@
       "effect": {
         "type": "LOOK",
         "value": 5,
-        "target": {
-          "player": "SELF",
-          "zone": "DECK"
-        },
         "sub_effects": [
           {
             "type": "MOVE_CARD",
@@ -43241,11 +42520,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3
-            },
             "save_id": "looked_cards",
             "value": 3
           },
@@ -43408,13 +42682,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
             "value": 3
           },
           {
@@ -43526,14 +42793,7 @@
           "type": "Sequence",
           "actions": [
             {
-              "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 3,
-                "select_mode": "TOP",
-                "save_id": "looked_cards"
-              }
+              "type": "LOOK"
             },
             {
               "type": "MOVE_CARD",
@@ -43840,13 +43100,6 @@
         "steps": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -44118,13 +43371,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -44199,13 +43445,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -44988,12 +44227,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -45288,12 +44521,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
+            "value": 5,
             "destination": "TEMP"
           },
           {
@@ -45302,7 +44530,7 @@
               "player": "SELF",
               "zone": "TEMP",
               "traits": [
-                "ODYSSEY"
+                "オデッセイ"
               ],
               "card_type": [
                 "CHARACTER"
@@ -45714,13 +44942,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
             "value": 3
           },
           {
@@ -45931,12 +45152,6 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 5,
-                "select_mode": "TOP"
-              },
               "destination": "TEMP",
               "save_id": "looked_cards"
             },
@@ -46077,13 +45292,6 @@
       "trigger": "ACTIVATE_MAIN",
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 5,
-          "select_mode": "TOP",
-          "save_id": "looked_cards"
-        },
         "value": 5,
         "sub_effect": {
           "type": "Sequence",
@@ -46224,14 +45432,7 @@
         "type": "Sequence",
         "actions": [
           {
-            "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "type": "LOOK"
           },
           {
             "type": "MOVE_CARD",
@@ -46314,14 +45515,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "select_mode": "ALL",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -46700,13 +45893,6 @@
       "trigger": "ACTIVATE_MAIN",
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 3,
-          "select_mode": "TOP",
-          "save_id": "looked_cards_main"
-        },
         "value": 3,
         "resolution": [
           {
@@ -46748,13 +45934,6 @@
       "trigger": "COUNTER",
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 3,
-          "select_mode": "TOP",
-          "save_id": "looked_cards_counter"
-        },
         "value": 3,
         "resolution": [
           {
@@ -47857,12 +47036,6 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 3,
-                "select_mode": "TOP"
-              },
               "save_id": "looked_cards_op10_106"
             },
             {
@@ -48010,13 +47183,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards_temp"
-            },
             "value": 5
           },
           {
@@ -48500,12 +47666,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
+            "value": 5,
             "save_id": "looked_cards"
           },
           {
@@ -49360,12 +48521,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "destination": "TEMP",
             "save_id": "looked_cards",
             "value": 5
@@ -49561,13 +48716,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5,
+            "save_id": "looked_cards"
           },
           {
             "type": "REVEAL",
@@ -49609,14 +48759,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 4
+            "value": 4,
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -49753,13 +48897,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "zone": "DECK",
-              "player": "SELF",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5,
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -50092,13 +49231,7 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 5,
-                "select_mode": "TOP",
-                "save_id": "looked_cards"
-              }
+              "value": 5
             },
             {
               "type": "REVEAL",
@@ -50148,13 +49281,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
             "value": 4
           },
           {
@@ -50196,12 +49322,7 @@
       "trigger": "ON_PLAY",
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 3,
-          "select_mode": "TOP"
-        },
+        "value": 3,
         "destination": "DECK"
       }
     },
@@ -50297,13 +49418,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "PLAY_CARD",
@@ -50545,12 +49660,7 @@
       },
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 5,
-          "select_mode": "TOP"
-        },
+        "value": 5,
         "on_look_effect": [
           {
             "type": "MOVE_CARD",
@@ -50613,12 +49723,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "OPPONENT",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP"
-            },
             "value": 1
           },
           {
@@ -50649,12 +49753,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "OPPONENT",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP"
-            },
             "value": 1
           },
           {
@@ -50889,11 +49987,6 @@
         "sequence": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP"
-            },
             "value": 5,
             "save_id": "looked_cards"
           },
@@ -50950,11 +50043,6 @@
       },
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "OPPONENT",
-          "zone": "DECK",
-          "select_mode": "TOP"
-        },
         "value": 1
       }
     }
@@ -51918,14 +51006,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 3
+            "value": 3,
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -52114,13 +51196,7 @@
           {
             "type": "LOOK",
             "value": 3,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "save_id": "looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -52759,53 +51835,48 @@
     {
       "trigger": "ON_PLAY",
       "effect": {
-        "type": "LOOK",
-        "value": 5,
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "select_mode": "TOP",
-          "save_id": "looked_cards"
-        },
-        "effect": {
-          "type": "Sequence",
-          "actions": [
-            {
-              "type": "REVEAL",
-              "target": {
-                "player": "SELF",
-                "zone": "TEMP",
-                "from_id": "looked_cards",
-                "count": 1,
-                "select_mode": "CHOOSE",
-                "is_up_to": true,
-                "card_name": "モンキー・Ｄ・ルフィ",
-                "card_type": [
-                  "EVENT"
-                ],
-                "colors": [
-                  "赤"
-                ],
-                "save_id": "revealed_card"
-              },
-              "effect": {
-                "type": "MOVE_CARD",
-                "destination": "HAND"
-              }
+        "type": "Sequence",
+        "actions": [
+          {
+            "type": "LOOK",
+            "value": 5,
+            "save_id": "looked_cards"
+          },
+          {
+            "type": "REVEAL",
+            "target": {
+              "player": "SELF",
+              "zone": "TEMP",
+              "from_id": "looked_cards",
+              "count": 1,
+              "select_mode": "CHOOSE",
+              "is_up_to": true,
+              "card_name": "モンキー・Ｄ・ルフィ",
+              "card_type": [
+                "EVENT"
+              ],
+              "colors": [
+                "赤"
+              ],
+              "save_id": "revealed_card"
             },
-            {
-              "type": "DECK_BOTTOM",
-              "target": {
-                "player": "SELF",
-                "zone": "TEMP",
-                "from_id": "looked_cards",
-                "exclude_id": "revealed_card",
-                "select_mode": "ALL"
-              },
-              "order": "ANY"
+            "effect": {
+              "type": "MOVE_CARD",
+              "destination": "HAND"
             }
-          ]
-        }
+          },
+          {
+            "type": "DECK_BOTTOM",
+            "target": {
+              "player": "SELF",
+              "zone": "TEMP",
+              "from_id": "looked_cards",
+              "exclude_id": "revealed_card",
+              "select_mode": "ALL"
+            },
+            "order": "ANY"
+          }
+        ]
       }
     }
   ],
@@ -52989,14 +52060,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 5
+            "value": 5,
+            "save_id": "looked_cards"
           },
           {
             "type": "REVEAL",
@@ -53198,12 +52263,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP"
-            },
+            "value": 4,
             "save_id": "looked_cards"
           },
           {
@@ -53676,11 +52736,6 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 5
-              },
               "destination": "TEMP",
               "save_id": "looked_cards",
               "value": 5
@@ -53880,13 +52935,6 @@
           "effects": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 5,
-                "top_from": true,
-                "save_id": "looked_cards"
-              },
               "value": 5
             },
             {
@@ -54353,11 +53401,6 @@
           {
             "type": "LOOK",
             "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP"
-            },
             "destination": "TEMP",
             "save_id": "looked_cards"
           },
@@ -54640,11 +53683,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP"
-            },
             "value": 1,
             "destination": "TEMP",
             "save_id": "revealed_card"
@@ -55074,13 +54112,6 @@
         "sequence": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 4
           },
           {
@@ -55354,13 +54385,8 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 3,
-                "select_mode": "TOP",
-                "save_id": "looked_cards"
-              }
+              "value": 3,
+              "save_id": "looked_cards"
             },
             {
               "type": "MOVE_CARD",
@@ -55420,13 +54446,8 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 3,
-                "from_top": true,
-                "save_id": "looked_cards"
-              }
+              "value": 3,
+              "save_id": "looked_cards"
             },
             {
               "type": "MOVE_CARD",
@@ -55613,13 +54634,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "top_from_deck": true,
-              "save_id": "looked_cards"
-            }
+            "value": 3,
+            "save_id": "looked_cards"
           },
           {
             "type": "DRAW",
@@ -56022,14 +55038,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 3
+            "value": 3,
+            "save_id": "looked_cards"
           },
           {
             "type": "ADD_TO_HAND",
@@ -56401,13 +55411,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -56525,13 +55528,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -57112,12 +56108,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP"
-            },
             "destination": "TEMP",
             "value": 4
           },
@@ -57220,13 +56210,7 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 4,
-                "from_top": true,
-                "save_id": "looked_cards"
-              }
+              "value": 4
             },
             {
               "type": "MOVE_CARD",
@@ -58727,13 +57711,7 @@
           {
             "type": "LOOK",
             "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards_op13_065"
-            }
+            "save_id": "looked_cards_op13_065"
           },
           {
             "type": "MOVE_CARD",
@@ -59455,12 +58433,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
+            "value": 5,
             "save_id": "looked_cards"
           },
           {
@@ -59559,13 +58532,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards_from_deck"
-            },
             "value": 3
           },
           {
@@ -59875,13 +58841,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 3
           },
           {
@@ -60376,13 +59335,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 4
           },
           {
@@ -60539,12 +59491,6 @@
       "trigger": "ACTIVATE_MAIN",
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 5,
-          "select_mode": "TOP"
-        },
         "then": {
           "type": "Sequence",
           "actions": [
@@ -60977,13 +59923,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -61078,13 +60017,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "REVEAL",
@@ -61300,13 +60233,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 4
           },
           {
@@ -61473,7 +60399,7 @@
         "type": "LEADER_TRAIT",
         "player": "SELF",
         "traits": [
-          "FILM",
+          "フィルム",
           "麦わらの一味"
         ]
       },
@@ -62157,13 +61083,6 @@
           "actions": [
             {
               "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 4,
-                "select_mode": "TOP",
-                "save_id": "looked_cards"
-              },
               "value": 4
             },
             {
@@ -62985,13 +61904,6 @@
           },
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards_temp"
-            },
             "destination": "TEMP",
             "value": 5
           },
@@ -63807,14 +62719,7 @@
           "type": "Sequence",
           "actions": [
             {
-              "type": "LOOK",
-              "target": {
-                "player": "SELF",
-                "zone": "DECK",
-                "count": 4,
-                "select_mode": "TOP",
-                "save_id": "looked_cards"
-              }
+              "type": "LOOK"
             },
             {
               "type": "MOVE_CARD",
@@ -64132,11 +63037,6 @@
           {
             "type": "LOOK",
             "value": 3,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "select_mode": "TOP"
-            },
             "destination": "TEMP",
             "save_id": "looked_cards_temp"
           },
@@ -64219,14 +63119,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
-            "value": 3
+            "value": 3,
+            "save_id": "looked_cards"
           },
           {
             "type": "REVEAL",
@@ -64278,15 +63172,9 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "destination": "TEMP",
-            "value": 3
+            "value": 3,
+            "save_id": "looked_cards"
           },
           {
             "type": "REVEAL",
@@ -64642,12 +63530,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "save_id": "looked_cards",
             "value": 5
           },
@@ -65991,13 +64873,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 5
           },
           {
@@ -66524,12 +65399,6 @@
       },
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 5,
-          "from_top": true
-        },
         "destination": "DECK_TOP_OR_BOTTOM",
         "select_mode": "CHOOSE_ORDER",
         "value": 5
@@ -66675,12 +65544,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "save_id": "looked_cards",
             "value": 5
           },
@@ -67856,12 +66719,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP"
-            },
             "destination": "DECK"
           },
           {
@@ -68406,13 +67263,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "prb02_007_looked_cards"
-            },
+            "save_id": "prb02_007_looked_cards",
             "value": 5
           },
           {
@@ -68611,14 +67462,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "ADD_TO_HAND",
@@ -69376,14 +68220,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "MOVE_CARD",
@@ -69844,12 +68681,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP"
-            },
             "value": 3
           },
           {
@@ -70393,7 +69224,7 @@
             "CHARACTER"
           ],
           "traits": [
-            "FILM"
+            "フィルム"
           ],
           "select_mode": "ALL"
         },
@@ -70667,14 +69498,7 @@
         "actions": [
           {
             "type": "LOOK",
-            "value": 5,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true,
-              "save_id": "looked_cards"
-            }
+            "value": 5
           },
           {
             "type": "MOVE_CARD",
@@ -73024,7 +71848,7 @@
             "CHARACTER"
           ],
           "traits": [
-            "FILM"
+            "フィルム"
           ],
           "count": 1,
           "select_mode": "CHOOSE",
@@ -73089,13 +71913,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP",
-              "save_id": "looked_cards"
-            },
             "value": 3
           },
           {
@@ -73397,12 +72214,6 @@
           {
             "type": "LOOK",
             "value": 1,
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP"
-            },
             "reveal": true,
             "save_id": "revealed_from_deck"
           },
@@ -73499,12 +72310,6 @@
       "effect": {
         "type": "LOOK",
         "value": 3,
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 3,
-          "select_mode": "TOP"
-        },
         "destination": "DECK",
         "destination_choice": [
           "TOP",
@@ -73578,12 +72383,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "from": "TOP"
-            },
             "save_id": "looked_cards",
             "value": 3
           },
@@ -73677,12 +72476,6 @@
           },
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP"
-            },
             "save_id": "revealed_card"
           },
           {
@@ -73785,13 +72578,8 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "st13_002_looked_cards"
-            }
+            "value": 5,
+            "save_id": "st13_002_looked_cards"
           },
           {
             "type": "MOVE_CARD",
@@ -74333,12 +73121,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "save_id": "looked_cards",
             "value": 5
           },
@@ -74637,12 +73419,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "destination": "TEMP",
             "save_id": "looked_cards",
             "value": 5
@@ -75706,12 +74482,6 @@
       "trigger": "ON_PLAY",
       "effect": {
         "type": "LOOK",
-        "target": {
-          "player": "SELF",
-          "zone": "DECK",
-          "count": 3,
-          "select_mode": "TOP"
-        },
         "destination": "DECK",
         "reorder_allowed": true,
         "value": 3
@@ -75725,13 +74495,7 @@
         "type": "Sequence",
         "actions": [
           {
-            "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 3,
-              "select_mode": "TOP"
-            }
+            "type": "LOOK"
           },
           {
             "type": "MOVE_CARD",
@@ -75883,12 +74647,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "destination": "TEMP",
             "value": 5
           },
@@ -76705,13 +75463,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP",
-              "save_id": "st22_002_looked_cards"
-            },
             "value": 5
           },
           {
@@ -76969,13 +75720,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP",
-              "save_id": "revealed_card"
-            },
             "value": 1,
             "reveal": true
           },
@@ -77090,14 +75834,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP",
-              "reveal": true,
-              "save_id": "revealed_card"
-            },
             "value": 1
           },
           {
@@ -77202,13 +75938,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 1,
-              "select_mode": "TOP",
-              "save_id": "revealed_card"
-            },
             "value": 1,
             "destination": "TEMP",
             "reveal": true
@@ -77525,12 +76254,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "from_top": true
-            },
             "destination": "TEMP",
             "value": 5
           },
@@ -78651,12 +77374,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 5,
-              "select_mode": "TOP"
-            },
             "save_id": "looked_cards"
           },
           {
@@ -78806,13 +77523,6 @@
         "actions": [
           {
             "type": "LOOK",
-            "target": {
-              "player": "SELF",
-              "zone": "DECK",
-              "count": 4,
-              "from_top": true,
-              "save_id": "looked_cards"
-            },
             "value": 4
           },
           {
