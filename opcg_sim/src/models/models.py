@@ -55,6 +55,7 @@ class CardMaster:
     effect_text: str
     trigger_text: str
     life: int
+    block_icon: str = ""
     keywords: Set[str] = field(default_factory=set)
     abilities: Tuple[Ability, ...] = field(default_factory=tuple)
 
@@ -71,7 +72,8 @@ class CardMaster:
             "text": self.effect_text,
             "traits": self.traits,
             "life": self.life,
-            "trigger_text": self.trigger_text
+            "trigger_text": self.trigger_text,
+            "block_icon": self.block_icon
         }
 
 

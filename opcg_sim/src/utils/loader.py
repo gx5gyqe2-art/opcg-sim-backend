@@ -119,7 +119,8 @@ class CardLoader:
         "LIFE": [_nfc("ライフ"), "Life", "life"],
         "TRAITS": [_nfc("特徴"), "Traits", "traits"],
         "TEXT": [_nfc("効果(テキスト)"), _nfc("テキスト"), "Text", "text"],
-        "TRIGGER": [_nfc("効果(トリガー)"), _nfc("トリガー"), "Trigger", "trigger"]
+        "TRIGGER": [_nfc("効果(トリガー)"), _nfc("トリガー"), "Trigger", "trigger"],
+        "BLOCK_ICON": [_nfc("ブロックアイコン"), "block_icon", "blockIcon"]
     }
 
     def __init__(self, json_path: str):
@@ -177,6 +178,7 @@ class CardLoader:
         traits = DataCleaner.parse_traits(get_val(M["TRAITS"]))
         effect_text = DataCleaner.normalize_text(get_val(M["TEXT"]))
         trigger_text = DataCleaner.normalize_text(get_val(M["TRIGGER"]))
+        block_icon = DataCleaner.normalize_text(get_val(M["BLOCK_ICON"], "")) or ""
 
         # 【変更】Catalog優先ロジック
         # 1. まずカタログを確認
@@ -195,7 +197,7 @@ class CardLoader:
         return CardMaster(
             card_id=card_id, name=name, type=c_type, colors=colors, cost=cost, power=power,
             counter=counter, attribute=attribute, traits=traits, effect_text=effect_text,
-            trigger_text=trigger_text, life=life, abilities=combined_abilities
+            trigger_text=trigger_text, life=life, block_icon=block_icon, abilities=combined_abilities
         )
 
 class DeckLoader:
