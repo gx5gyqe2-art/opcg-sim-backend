@@ -46,6 +46,14 @@ class SandboxManager:
         self.ready_states[pid] = not self.ready_states[pid]
         log_event("INFO", "sandbox.ready", f"Player {pid} ready: {self.ready_states[pid]}", player="system")
 
+    def kick_player(self, pid: str):
+        if self.status != "WAITING": return
+        p = self.state[pid]
+        p["deck"] = []
+        p["leader"] = None
+        self.ready_states[pid] = False
+        log_event("INFO", "sandbox.kick", f"Player {pid} kicked", player="system")
+
     def start_game(self):
         if self.status != "WAITING": return
         if not self.ready_states["p1"] or not self.ready_states["p2"]: return
@@ -238,6 +246,10 @@ class SandboxManager:
             if pid in self.mulligan_finished:
                 self.mulligan_finished[pid] = True
                 log_event("INFO", "sandbox.mulligan_finish", f"Player {pid} finished mulligan", player=pid)
+        elif at == "KICK_PLAYER":
+            target = req.get("target_player_id")
+            if target in ["p1", "p2"]:
+                self.kick_player(target)
 
     def to_dict(self):
         return {
