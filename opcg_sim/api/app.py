@@ -334,7 +334,9 @@ async def sandbox_list():
                 "p1_name": mgr.state["p1"]["name"],
                 "p2_name": mgr.state["p2"]["name"],
                 "turn": mgr.turn_count,
-                "created_at": getattr(mgr, "created_at", "N/A")
+                "created_at": getattr(mgr, "created_at", "N/A"),
+                "active_connections": len(ws_manager.active_connections.get(gid, [])),
+                "status": mgr.status,
             })
         except Exception:
             continue
@@ -365,7 +367,10 @@ async def sandbox_action(req: Dict[str, Any] = Body(...)):
             manager.ready_states[pid] = True
         else: manager.process_action(req)
         new_state = manager.to_dict()
-        await ws_manager.broadcast(game_id, {"type": "STATE_UPDATE", "state": new_state})
+        broadcast_msg = {"type": "STATE_UPDATE", "state": new_state}
+        if act_type == "KICK_PLAYER":
+            broadcast_msg["kicked_player"] = req.get("target_player_id")
+        await ws_manager.broadcast(game_id, broadcast_msg)
         return {"success": True, "game_id": game_id, "game_state": new_state}
     except Exception as e:
         log_event(level_key="ERROR", action="sandbox.action_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
