@@ -362,6 +362,7 @@ async def sandbox_action(req: Dict[str, Any] = Body(...)):
             deck_id = req.get("deck_id"); owner_name = manager.state[pid]["name"]
             leader, cards = load_deck_mixed(deck_id, owner_name)
             manager.set_player_deck(pid, cards, leader)
+            manager.ready_states[pid] = True
         else: manager.process_action(req)
         new_state = manager.to_dict()
         await ws_manager.broadcast(game_id, {"type": "STATE_UPDATE", "state": new_state})
