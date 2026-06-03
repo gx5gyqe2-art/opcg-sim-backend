@@ -169,7 +169,7 @@ ATTACK_DISABLE/RESTRICTION を継続効果として登録する。
   - バトルKO（`resolve_attack`）: `status="BATTLE_KO"` 保護を確認。
 - パーサ: `prevent_leave` ルールが `場を離れない`→LEAVE / `KOされない`→BATTLE_KO を生成。
 
-## 現況（ルール17種 + エンジン/resolver/継続効果/除去保護 時点）
+## 現況（ルール15種 + エンジン/resolver/継続効果/除去保護 時点）
 
 - 原子句カバレッジ（ルール命中率）: **約57%**
 - `ActionType.OTHER`（実行時に何もしない句）: **942 → 421 に削減（約55%減）**
