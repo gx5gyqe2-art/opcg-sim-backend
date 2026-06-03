@@ -17,7 +17,8 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from ...models.effect_types import EffectNode
+from ...models.effect_types import EffectNode, GameAction
+from ...models.enums import ActionType
 from ...utils.logger_config import log_event
 from .parser import EffectParser
 from .rules import ParseContext, RuleRegistry, default_registry
@@ -30,6 +31,9 @@ class EffectParserV2(EffectParser):
         # 解析中に「ルール未対応でレガシーに落ちた」原子句を蓄積する。
         self.unmatched: List[str] = []
         self.rule_hits: List[str] = []
+        # フォールバックの結果 ActionType.OTHER になった（=実行時に何もしない）原子句。
+        # 「効果が動かない」問題の直接の標的リスト。
+        self.fallback_other: List[str] = []
 
     def _parse_atomic_action(self, text: str, is_cost: bool):
         """原子句の解釈をレジストリ優先に置き換える。
@@ -49,13 +53,17 @@ class EffectParserV2(EffectParser):
 
         # フォールバック（=未対応として記録）
         self.unmatched.append(ctx.text)
+        node = super()._parse_atomic_action(text, is_cost)
+        if isinstance(node, GameAction) and node.type == ActionType.OTHER:
+            self.fallback_other.append(ctx.text)
         log_event(
             "DEBUG",
             "parserv2.fallback",
             f"No rule matched, using legacy: {ctx.text[:40]}",
         )
-        return super()._parse_atomic_action(text, is_cost)
+        return node
 
     def reset_stats(self) -> None:
         self.unmatched.clear()
         self.rule_hits.clear()
+        self.fallback_other.clear()

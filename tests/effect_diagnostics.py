@@ -101,6 +101,13 @@ def run(top: int = 25):
     for clause, cnt in Counter(parser.unmatched).most_common(top):
         snippet = clause[:60].replace("\n", " ")
         print(f"  {cnt:4d}  {snippet}")
+    print()
+
+    print(f"--- ★OTHER化する原子句 ランキング 上位{top} ★最優先 ---")
+    print("   （= 解析できても実行時に何もしない＝「効果が動かない」直接原因）")
+    for clause, cnt in Counter(parser.fallback_other).most_common(top):
+        snippet = clause[:60].replace("\n", " ")
+        print(f"  {cnt:4d}  {snippet}")
 
 
 if __name__ == "__main__":

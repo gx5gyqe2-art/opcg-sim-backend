@@ -129,3 +129,80 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
         value=ValueSource(base=int(m.group(1))),
         raw_text=t,
     )
+
+
+# 符号として使われ得る各種マイナス記号（ASCII / 全角 / 数学記号 / ハイフン）
+_SIGN_RE = re.compile(r"コスト[ 　]*([+\-－−‐])[ 　]*(\d+)")
+
+
+# ---------------------------------------------------------------------------
+# コスト増減: 「（対象）を、…コスト±N」
+#   従来は ActionType.OTHER に落ちて「解析できたが何もしない」状態だった。
+#   resolver は BUFF + status="COST_REDUCTION" を cost_buff 加算として実行できる。
+# ---------------------------------------------------------------------------
+@rule("cost_change", priority=58)
+def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    m = _SIGN_RE.search(t)
+    if not m:
+        return None
+    sign = -1 if m.group(1) in "-－−‐" else 1
+    value = sign * int(m.group(2))
+    tq = parse_target(t)
+    return GameAction(
+        type=ActionType.BUFF,
+        target=tq,
+        value=ValueSource(base=value),
+        status="COST_REDUCTION",
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# デッキシャッフル: 「デッキをシャッフルする」
+#   従来は OTHER（legacy にシャッフル判定が無かった）。resolver は SHUFFLE を実行可。
+# ---------------------------------------------------------------------------
+@rule("shuffle", priority=85)
+def _shuffle(ctx: ParseContext) -> Optional[GameAction]:
+    if _nfc("シャッフル") not in ctx.text:
+        return None
+    return GameAction(type=ActionType.SHUFFLE, raw_text=ctx.text)
+
+
+# ---------------------------------------------------------------------------
+# 残りをデッキの下へ: 「残りを（好きな順番で）デッキの下に置く」
+#   「置き、」で文分割されると「…デッキの下に」だけが残り OTHER 化していた。
+#   置く有無に依らず、残り(TEMP)→デッキ下 として解釈する。
+# ---------------------------------------------------------------------------
+@rule("remaining_deck_bottom", priority=65)
+def _remaining_deck_bottom(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("残り") not in t or _nfc("デッキの下") not in t:
+        return None
+    return GameAction(
+        type=ActionType.DECK_BOTTOM,
+        target=TargetQuery(
+            player=Player.SELF, zone=Zone.TEMP, select_mode="REMAINING", count=-1
+        ),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 自己登場: 「このカード／このキャラ／このリーダーを登場させる」
+#   主にトリガー（ライフから自身を登場）で使われる。対象は自身(ref_id=self)。
+#   従来は対象が汎用 FIELD/SELF になり、誤った対象を登場させていた。
+# ---------------------------------------------------------------------------
+@rule("play_self", priority=75)
+def _play_self(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("登場させる") not in t:
+        return None
+    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?登場させる"), t):
+        return None
+    return GameAction(
+        type=ActionType.PLAY_CARD,
+        target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, count=1, ref_id="self"),
+        destination=Zone.FIELD,
+        raw_text=t,
+    )

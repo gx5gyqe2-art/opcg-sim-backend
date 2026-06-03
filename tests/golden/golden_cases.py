@@ -106,6 +106,56 @@ CASES = [
             }
         ],
     },
+    # ----- コスト増減（相手キャラ, 現状 OTHER → 修正対象） -----------------
+    {
+        "id": "cost_reduction_opponent",
+        "text": "相手のキャラ1枚までを、このターン中、コスト-2。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "COST_REDUCTION",
+                    "value": -2,
+                    "target": {"player": "OPPONENT", "card_type": ["CHARACTER"], "is_up_to": True},
+                }
+            }
+        ],
+    },
+    # ----- このカードを登場させる（トリガー自己登場, 対象=自身） -----------
+    {
+        "id": "play_self_trigger",
+        "text": "このカードを登場させる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "PLAY_CARD",
+                    "target": {"ref_id": "self"},
+                }
+            }
+        ],
+    },
+    # ----- デッキシャッフル（現状 OTHER → 修正対象） ----------------------
+    {
+        "id": "shuffle_deck",
+        "text": "デッキをシャッフルする。",
+        "expect": [{"effect": {"kind": "action", "type": "SHUFFLE"}}],
+    },
+    # ----- 残りをデッキの下へ（分割で truncate され OTHER 化していた） -----
+    {
+        "id": "remaining_deck_bottom",
+        "text": "残りを好きな順番でデッキの下に置く。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "DECK_BOTTOM",
+                    "target": {"zone": "TEMP"},
+                }
+            }
+        ],
+    },
     # ----- カウンターのパワー付与（OP13-097 世界の均衡） -------------------
     {
         "id": "counter_power_buff_3000",
