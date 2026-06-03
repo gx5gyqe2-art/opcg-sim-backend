@@ -135,17 +135,34 @@ ATTACK_DISABLE/RESTRICTION を継続効果として登録する。
 これにより「このバトル中バフが同ターンの後続バトルへ誤って持ち越す」バグや、
 「次の相手のターン終了時までアタック不可」のような複数ターン跨ぎ制限が正しく動く。
 
-## 現況（ルール16種 + エンジン/resolver/継続効果 時点）
+## 除去保護（PREVENT_LEAVE）
 
-- 原子句カバレッジ（ルール命中率）: **約56%**
-- `ActionType.OTHER`（実行時に何もしない句）: **942 → 467 に削減**
-- テスト: `test_parser.py`(8) + `test_golden.py`(19) + `test_effects_engine.py`(9) = 全36件緑
+「相手の効果で場を離れない」「バトルでKOされない」のように、カードが場を離れる
+瞬間に介入して除去を無効化する効果。多くは条件付き PASSIVE（例: トラッシュ7枚以上）。
+
+設計（ライブ評価・ラッチしない）:
+- `GameManager._active_protection(card, status_values)` が、除去の瞬間に対象カードの
+  PASSIVE 能力（effect が PREVENT_LEAVE）を走査し、条件を `EffectResolver._check_condition`
+  でその場評価する。スナップショット的なフラグを持たないため、条件変動に正しく追随。
+- フック点:
+  - 効果除去（`apply_action_to_engine` の KO/DISCARD/BOUNCE/MOVE/DECK_* 等）:
+    相手の効果で・フィールド上の対象に対してのみ `status="LEAVE"` 保護を確認。
+  - バトルKO（`resolve_attack`）: `status="BATTLE_KO"` 保護を確認。
+- パーサ: `prevent_leave` ルールが `場を離れない`→LEAVE / `KOされない`→BATTLE_KO を生成。
+
+## 現況（ルール17種 + エンジン/resolver/継続効果/除去保護 時点）
+
+- 原子句カバレッジ（ルール命中率）: **約57%**
+- `ActionType.OTHER`（実行時に何もしない句）: **942 → 421 に削減（約55%減）**
+- テスト: `test_parser.py`(8) + `test_golden.py`(21) + `test_effects_engine.py`(12) = 全41件緑
 - パーサルール: draw / ko / rest / rest_self_cost / power_buff / discard /
   cost_change / play_self / shuffle / remaining_deck_bottom / don_return / don_add /
-  execute_main / attack_disable（+ power_buff の duration 付与）
+  execute_main / attack_disable / prevent_leave
 
-### 残課題（今後）
+### 残課題（今後・長い裾野）
 
-- `バトルでKOされない` / `相手の効果で場を離れない` = `PREVENT_LEAVE` 系の継続効果
-  （KO/移動の直前に介入する仕組みが必要）
-- COST/KEYWORD の duration 対応（現状 `_apply_passive_effects` がこれらを毎回再計算するため要設計）
+残る OTHER は頻度の低い多様な専用効果に分散（上位でも 1 表現あたり 10 件前後）。
+費用対効果は逓減しており、今後は次の2方針が現実的:
+1. ライフ操作（表/裏向き）・デッキ操作（並び替え）・ドン!!可変返却などを順次ルール化。
+2. V2 を本番有効化し、実デッキ(imu/nami)で回しながら不足を golden に追加して個別対応。
+- COST/KEYWORD の duration 対応は `_apply_passive_effects` の再計算と統合する設計が必要。

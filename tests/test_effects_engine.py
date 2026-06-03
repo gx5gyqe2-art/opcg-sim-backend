@@ -5,8 +5,16 @@
     または: OPCG_LOG_SILENT=1 python tests/test_effects_engine.py
 """
 from engine_helpers import action, make_game, make_instance, make_master
-from opcg_sim.src.models.effect_types import Ability, GameAction, ValueSource
-from opcg_sim.src.models.enums import ActionType, CardType, TriggerType
+from opcg_sim.src.models.effect_types import Ability, Condition, GameAction, ValueSource
+from opcg_sim.src.models.enums import (
+    ActionType,
+    CardType,
+    CompareOperator,
+    ConditionType,
+    Player,
+    TriggerType,
+    Zone,
+)
 
 
 def test_ramp_don_active():
@@ -154,6 +162,66 @@ def test_reset_turn_status_keeps_timed_effects():
     assert card.power_buff == 0           # 通常バフは消える
     assert card.timed_power == 1000        # 継続効果は残る
     assert "ATTACK_DISABLE" in card.timed_flags
+
+
+def _prevent_leave_master(card_id, status, condition=None):
+    ab = Ability(
+        trigger=TriggerType.PASSIVE,
+        condition=condition,
+        effect=GameAction(type=ActionType.PREVENT_LEAVE, status=status),
+    )
+    return make_master(card_id=card_id, name=f"被保護{status}", abilities=(ab,))
+
+
+def test_prevent_leave_blocks_opponent_effect_ko_when_condition_met():
+    """トラッシュ7枚以上の場合、相手の効果KOで場を離れない。条件を満たさなければKOされる。"""
+    gm, p1, p2 = make_game()
+    cond = Condition(type=ConditionType.TRASH_COUNT, operator=CompareOperator.GE, value=7, player=Player.SELF)
+    target = make_instance(_prevent_leave_master("PL-1", "LEAVE", cond), owner=p1.name)
+    p1.field.append(target)
+
+    # トラッシュ7枚 → 保護有効。相手(p2)の効果KOは通らない
+    for i in range(7):
+        p1.trash.append(make_instance(make_master(card_id=f"TR-{i}"), owner=p1.name))
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [target], 0)
+    assert target in p1.field
+
+    # トラッシュを6枚に減らす → 保護無効。相手の効果KOが通る
+    p1.trash.pop()
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [target], 0)
+    assert target not in p1.field
+    assert target in p1.trash
+
+
+def test_prevent_leave_does_not_block_own_effect():
+    """「相手の効果で」場を離れない: 自分の効果による移動は防がない。"""
+    gm, p1, _ = make_game()
+    cond = Condition(type=ConditionType.TRASH_COUNT, operator=CompareOperator.GE, value=0, player=Player.SELF)
+    target = make_instance(_prevent_leave_master("PL-2", "LEAVE", cond), owner=p1.name)
+    p1.field.append(target)
+    # 自分(p1)の効果で手札に戻す → 保護対象外なので戻る
+    gm.apply_action_to_engine(p1, action(ActionType.BOUNCE), [target], 0)
+    assert target not in p1.field
+    assert target in p1.hand
+
+
+def test_prevent_battle_ko_in_resolve_attack():
+    """バトルでKOされない: パワー負けでも戦闘ではKOされない。"""
+    gm, p1, p2 = make_game()
+    p1.deck.append(make_instance(make_master(card_id="DK"), owner=p1.name))  # check_victory 回避
+    p2.deck.append(make_instance(make_master(card_id="DK2"), owner=p2.name))
+    attacker = make_instance(make_master(card_id="ATK", power=6000), owner=p1.name)
+    p1.field.append(attacker)
+    target = make_instance(_prevent_leave_master("PL-3", "BATTLE_KO"), owner=p2.name)
+    p2.field.append(target)
+
+    gm.active_battle = {
+        "attacker": attacker, "target": target,
+        "attacker_owner": p1, "target_owner": p2, "counter_buff": 0,
+    }
+    gm.resolve_attack()
+    # 6000 >= 5000 だが BATTLE_KO 保護で場に残る
+    assert target in p2.field
 
 
 if __name__ == "__main__":

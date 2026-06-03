@@ -564,9 +564,12 @@ class GameManager:
                     else: self.winner = attacker_owner.name; log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name); break
         else:
             if attacker_pwr >= target_pwr:
-                self.move_card(target, Zone.TRASH, target_owner)
-                log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
-                self._resolve_on_ko(target, target_owner)
+                if self._active_protection(target, ("BATTLE_KO",)):
+                    log_event("INFO", "game.battle_ko_prevented", f"{target.master.name} is protected from battle KO", player=target_owner.name)
+                else:
+                    self.move_card(target, Zone.TRASH, target_owner)
+                    log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
+                    self._resolve_on_ko(target, target_owner)
 
         target.reset_turn_status(); self.active_battle = None; self.phase = Phase.MAIN; self.check_victory()
         self.continuous.expire("BATTLE_END", self.turn_count)
@@ -597,6 +600,30 @@ class GameManager:
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
         resolver = EffectResolver(self); resolver.resolve_ability(player, ability, source_card)
+
+    # 除去保護（PREVENT_LEAVE）の判定。除去が起こる瞬間に、対象カードの
+    # PASSIVE 能力を走査し、条件（例: トラッシュ7枚以上）をライブ評価する。
+    # status_values: "LEAVE"（相手の効果で場を離れない）/ "BATTLE_KO"（バトルでKOされない）
+    def _active_protection(self, card: CardInstance, status_values: Tuple[str, ...]) -> bool:
+        if not card or not getattr(card, "master", None) or card.negated:
+            return False
+        owner = self.p1 if self.p1.name == card.owner_id else self.p2
+        resolver = None
+        for ab in card.master.abilities:
+            if ab.trigger != TriggerType.PASSIVE:
+                continue
+            eff = ab.effect
+            if not isinstance(eff, GameAction) or eff.type != ActionType.PREVENT_LEAVE:
+                continue
+            if eff.status not in status_values:
+                continue
+            if ab.condition is not None:
+                if resolver is None:
+                    resolver = EffectResolver(self)
+                if not resolver._check_condition(owner, ab.condition, card):
+                    continue
+            return True
+        return False
 
     def _resolve_on_ko(self, card: Card, owner: Player):
         if not card.master.abilities: return
@@ -685,10 +712,22 @@ class GameManager:
         # ▼▼▼ 修正: 初期値をTrueに設定（対象0枚でも「何もしないことに成功した」とみなすため） ▼▼▼
         success = True
 
+        # 「相手の効果で場を離れない」対象になり得る除去アクション
+        _LEAVE_ACTIONS = {"KO", "DISCARD", "TRASH", "BOUNCE", "MOVE_TO_HAND", "MOVE", "DECK_BOTTOM", "DECK_TOP", "MOVE_CARD"}
+
         for target in targets:
             owner, source_list = self._find_card_location(target)
             if not owner: continue
-            if act_name == "KO":
+            # 相手の効果でフィールド上のカードを場から除去しようとする場合、保護を確認
+            if (act_name in _LEAVE_ACTIONS and player.name != owner.name
+                    and source_list is owner.field
+                    and self._active_protection(target, ("LEAVE",))):
+                log_event("INFO", "game.leave_prevented", f"{target.master.name} is protected from leaving the field by opponent's effect", player=owner.name)
+                continue
+            if act_name == "PREVENT_LEAVE":
+                # 保護マーカー自体は no-op（実際の保護は除去時に _active_protection で評価）。
+                success = True
+            elif act_name == "KO":
                 self.move_card(target, Zone.TRASH, owner)
                 log_event("INFO", "game.action_ko", f"{target.master.name} was KO'd by effect", player=player.name)
                 self._resolve_on_ko(target, owner)

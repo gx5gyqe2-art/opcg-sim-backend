@@ -141,6 +141,28 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# 除去保護: 「相手の効果で場を離れない」「（バトルで）KOされない」
+#   保護マーカーを生成し、除去の瞬間に gamestate 側でライブ評価される。
+#   多くは条件付き PASSIVE（例: トラッシュ7枚以上の場合）。
+# ---------------------------------------------------------------------------
+@rule("prevent_leave", priority=64)
+def _prevent_leave(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("場を離れない") in t:
+        status = "LEAVE"
+    elif _nfc("KOされない") in t:
+        status = "BATTLE_KO"
+    else:
+        return None
+    return GameAction(
+        type=ActionType.PREVENT_LEAVE,
+        target=TargetQuery(select_mode="SOURCE"),
+        status=status,
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
 # アタック制限: 「（このターン中／次の…まで）アタックできない」
 #   継続効果として管理し、適切なタイミングで失効する（従来 OTHER）。
 # ---------------------------------------------------------------------------

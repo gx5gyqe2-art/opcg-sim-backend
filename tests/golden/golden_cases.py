@@ -183,6 +183,26 @@ CASES = [
             }
         ],
     },
+    # ----- 除去保護: 相手の効果で場を離れない（条件付き PASSIVE） ----------
+    {
+        "id": "prevent_leave_conditional",
+        "text": "自分のトラッシュが7枚以上ある場合、このキャラは相手の効果で場を離れない。",
+        "expect": [
+            {
+                "trigger": "PASSIVE",
+                "condition": {"type": "TRASH_COUNT", "operator": "GE", "value": 7},
+                "effect": {"kind": "action", "type": "PREVENT_LEAVE", "status": "LEAVE"},
+            }
+        ],
+    },
+    # ----- 除去保護: バトルでKOされない -----------------------------------
+    {
+        "id": "prevent_battle_ko",
+        "text": "このキャラは、このターン中、バトルでKOされない。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "PREVENT_LEAVE", "status": "BATTLE_KO"}}
+        ],
+    },
     # ----- このバトル中のパワー付与（duration=THIS_BATTLE） --------------
     {
         "id": "battle_power_buff_duration",
