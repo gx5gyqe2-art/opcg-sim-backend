@@ -63,9 +63,14 @@ def get_ability(card_id: str) -> List[Ability]:
         
     return []
 
-# 既存コードとの互換性のため残すが、実態は get_ability に委譲
 def get_manual_ability(card_id: str) -> List[Ability]:
-    return get_ability(card_id)
+    """手動オーバーライド(MANUAL_EFFECTS)のみを返す。
+
+    効果定義の主役は parser.py（日本語テキスト→Ability 変換）。
+    LLM生成データ(generated_effects.json)は精度が低いため、ここでは
+    手動定義のみをオーバーライドとして扱い、生成データは参照しない。
+    """
+    return MANUAL_EFFECTS.get(card_id, [])
 
 
 # --- 以下、既存の手動定義データ (MANUAL_EFFECTS) ---
