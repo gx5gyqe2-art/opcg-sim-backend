@@ -183,6 +183,15 @@ CASES = [
             }
         ],
     },
+    # ----- トリガー: このカードの【メイン】効果を発動する -----------------
+    {
+        "id": "execute_main_trigger",
+        "text": "このカードの【メイン】効果を発動する。",
+        "as_trigger": True,
+        "expect": [
+            {"trigger": "TRIGGER", "effect": {"kind": "action", "type": "EXECUTE_MAIN_EFFECT"}}
+        ],
+    },
     # ----- カウンターのパワー付与（OP13-097 世界の均衡） -------------------
     {
         "id": "counter_power_buff_3000",

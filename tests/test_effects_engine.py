@@ -4,8 +4,9 @@
     OPCG_LOG_SILENT=1 python -m pytest tests/test_effects_engine.py -q -s
     または: OPCG_LOG_SILENT=1 python tests/test_effects_engine.py
 """
-from engine_helpers import action, make_game
-from opcg_sim.src.models.enums import ActionType
+from engine_helpers import action, make_game, make_instance, make_master
+from opcg_sim.src.models.effect_types import Ability, GameAction, ValueSource
+from opcg_sim.src.models.enums import ActionType, CardType, TriggerType
 
 
 def test_ramp_don_active():
@@ -61,6 +62,35 @@ def test_return_don_not_enough():
     assert ok
     assert len(p1.don_active) + len(p1.don_rested) == 0
     assert len(p1.don_deck) == 10
+
+
+def test_execute_main_effect_reinvokes_main():
+    """EXECUTE_MAIN_EFFECT: トリガーが自身の ACTIVATE_MAIN 効果(ここでは DRAW2)を再発動。"""
+    gm, p1, _ = make_game()
+    # デッキを5枚用意
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+
+    # 自身の【メイン】= カード2枚ドロー を持つカード
+    main_ability = Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=2)),
+    )
+    master = make_master(card_id="E-001", name="再発動イベント", type=CardType.EVENT,
+                         abilities=(main_ability,))
+    source = make_instance(master, owner=p1.name)
+
+    # トリガー能力: このカードの【メイン】効果を発動する
+    trigger_ability = Ability(
+        trigger=TriggerType.TRIGGER,
+        effect=GameAction(type=ActionType.EXECUTE_MAIN_EFFECT),
+    )
+
+    assert len(p1.hand) == 0
+    gm.resolve_ability(p1, trigger_ability, source_card=source)
+    # 【メイン】の DRAW2 が再発動して手札2枚・デッキ3枚
+    assert len(p1.hand) == 2
+    assert len(p1.deck) == 3
 
 
 if __name__ == "__main__":

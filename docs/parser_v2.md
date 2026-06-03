@@ -105,21 +105,27 @@ tests/
 そこで実行系を `tests/test_effects_engine.py`（実 GameManager 上で盤面変化を検証）
 で守りながら拡充する。
 
-実装済み:
+実装済み（gamestate.apply_action_to_engine）:
 - `RETURN_DON`（`ドン‼-N`）: 場のドン!!を N 枚ドン!!デッキへ戻す（レスト→アクティブ→付与の順）
 - `RAMP_DON` の `status="RESTED"` 対応（`レストで追加`）: レスト状態でコストエリアへ
 
-## 現況（ルール13種 + エンジン実行2種 時点）
+実装済み（resolver）:
+- `EXECUTE_MAIN_EFFECT`（`このカードの【メイン】効果を発動する`）: source_card 自身の
+  ACTIVATE_MAIN 能力の効果を実行スタックへ展開して再発動（コストは支払わない）。
+  自己参照による無限ループは `_main_expanded` フラグで1回に限定。
 
-- 原子句カバレッジ（ルール命中率）: **約53%**
-- `ActionType.OTHER`（実行時に何もしない句）: **942 → 582 に削減**
-- テスト: 既存 `test_parser.py`(8) + `test_golden.py`(15) + `test_effects_engine.py`(4) = 全27件緑
+## 現況（ルール14種 + エンジン/resolver 実行3種 時点）
+
+- 原子句カバレッジ（ルール命中率）: **約55%**
+- `ActionType.OTHER`（実行時に何もしない句）: **942 → 504 に削減**
+- テスト: 既存 `test_parser.py`(8) + `test_golden.py`(16) + `test_effects_engine.py`(5) = 全29件緑
 - パーサルール: draw / ko / rest / rest_self_cost / power_buff / discard /
-  cost_change / play_self / shuffle / remaining_deck_bottom / don_return / don_add
+  cost_change / play_self / shuffle / remaining_deck_bottom / don_return / don_add /
+  execute_main
 
 ### 次の最優先ターゲット（診断の OTHER ランキングより）
 
-resolver の再帰・継続時間の意味論が絡むため別増分とする：
+継続時間（duration）の管理機構が必要なため別増分とする：
 
-- `このカードの効果を発動する`（77）= トリガーの自己メイン再発動（`EXECUTE_MAIN_EFFECT`／resolver 改修）
-- `このキャラはアタックできない` / `バトルでKOされない` = 制限・常時効果（`RESTRICTION`/`PREVENT_LEAVE`／継続効果の管理）
+- `このキャラはアタックできない` / `バトルでKOされない` / `相手の効果で場を離れない`
+  = 制限・常時効果（`RESTRICTION`/`ATTACK_DISABLE`/`PREVENT_LEAVE`／「このターン中」等の継続管理）

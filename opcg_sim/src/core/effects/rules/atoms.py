@@ -199,6 +199,18 @@ def _don_add(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# 自己メイン再発動: 「このカードの【メイン】効果を発動する」
+#   主にトリガー。resolver が自身の ACTIVATE_MAIN 効果を再実行する。
+#   「（対象）を、発動する」（イベントのプレイ）とは "効果を発動" の有無で区別。
+# ---------------------------------------------------------------------------
+@rule("execute_main", priority=82)
+def _execute_main(ctx: ParseContext) -> Optional[GameAction]:
+    if _nfc("効果を発動") not in ctx.text:
+        return None
+    return GameAction(type=ActionType.EXECUTE_MAIN_EFFECT, raw_text=ctx.text)
+
+
+# ---------------------------------------------------------------------------
 # デッキシャッフル: 「デッキをシャッフルする」
 #   従来は OTHER（legacy にシャッフル判定が無かった）。resolver は SHUFFLE を実行可。
 # ---------------------------------------------------------------------------
