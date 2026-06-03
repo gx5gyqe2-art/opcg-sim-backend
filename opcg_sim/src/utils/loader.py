@@ -3,10 +3,14 @@ import unicodedata
 import re
 from typing import List, Dict, Any, Optional, Tuple
 from ..models.models import CardMaster, CardInstance
-from ..core.effects.parser import EffectParser 
-# 【追加】Catalogの読み込み関数をインポート
-from ..core.effects.catalog import get_manual_ability
+from ..core.effects.parser import EffectParser
 from ..models.effect_types import Ability
+
+try:
+    from ..core.effects.catalog import get_manual_ability as _get_manual_ability
+except ImportError:
+    def _get_manual_ability(card_id: str):  # type: ignore[misc]
+        return []
 from ..models.enums import CardType, Attribute, Color, TriggerType
 from ..utils.logger_config import log_event
 
@@ -180,17 +184,15 @@ class CardLoader:
         trigger_text = DataCleaner.normalize_text(get_val(M["TRIGGER"]))
         block_icon = DataCleaner.normalize_text(get_val(M["BLOCK_ICON"], "")) or ""
 
-        # 【変更】Catalog優先ロジック
-        # 1. まずカタログを確認
-        manual_abilities = get_manual_ability(card_id)
-        
+        # 優先順位: catalog override (手動定義) > parser.py (自動)
+        manual_abilities = _get_manual_ability(card_id)
         if manual_abilities:
             combined_abilities = tuple(manual_abilities)
             log_event("DEBUG", "loader.manual_load", f"Loaded manual abilities for {card_id} ({name})")
         else:
-            # 2. なければ従来のParserを使用
-            main_abilities = DataCleaner.parse_abilities(effect_text, is_trigger=False)
-            trigger_abilities = DataCleaner.parse_abilities(trigger_text, is_trigger=True)
+            parser = EffectParser()
+            main_abilities = parser.parse_card_text(effect_text) if effect_text else []
+            trigger_abilities = parser.parse_card_text(trigger_text, as_trigger=True) if trigger_text else []
             combined_abilities = tuple(main_abilities + trigger_abilities)
 
         # color 引数を colors に変更

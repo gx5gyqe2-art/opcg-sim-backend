@@ -22,11 +22,11 @@ def str_to_enum(enum_cls, value, default=None):
     try:
         # 名前での一致を試みる (例: "KO")
         return enum_cls[value]
-    except KeyError:
+    except (KeyError, TypeError):
         try:
             # 値での一致を試みる (例: "KOする") - LLMは通常名前(Key)を返す
             return enum_cls(value)
-        except ValueError:
+        except (ValueError, TypeError):
             return default
 
 def filter_dataclass_fields(cls, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -100,9 +100,9 @@ class TargetQuery:
         if "player" in data:
             data["player"] = str_to_enum(Player, data["player"], Player.SELF)
             
-        # Set変換 (JSONはListで来るため)
+        # Set変換 (JSONはListで来るため)。ハッシュ不可な要素(dict/list)は除外
         if "flags" in data and isinstance(data["flags"], list):
-            data["flags"] = set(data["flags"])
+            data["flags"] = {f for f in data["flags"] if isinstance(f, (str, int, float, bool, tuple))}
             
         clean_data = filter_dataclass_fields(cls, data)
         return cls(**clean_data)
@@ -122,7 +122,7 @@ class ValueSource:
 
 @dataclass
 class Condition:
-    type: ConditionType
+    type: ConditionType = ConditionType.NONE
     target: Optional[TargetQuery] = None
     player: Player = Player.SELF
     operator: CompareOperator = CompareOperator.EQ
@@ -188,8 +188,12 @@ class GameAction(EffectNode):
              data["value"] = ValueSource()
              
         if "destination" in data:
-             data["destination"] = str_to_enum(Zone, data["destination"])
-             
+             dest = data["destination"]
+             # destination が TargetQuery 形式の dict の場合は zone を取り出す
+             if isinstance(dest, dict):
+                 dest = dest.get("zone")
+             data["destination"] = str_to_enum(Zone, dest)
+
         clean_data = filter_dataclass_fields(cls, data)
         return cls(**clean_data)
 
@@ -213,8 +217,8 @@ class Sequence(EffectNode):
 
 @dataclass
 class Branch(EffectNode):
-    condition: Condition
-    if_true: EffectNode
+    condition: Optional[Condition] = None
+    if_true: Optional[EffectNode] = None
     if_false: Optional[EffectNode] = None
 
     @classmethod
@@ -235,7 +239,7 @@ class Branch(EffectNode):
 
 @dataclass
 class Choice(EffectNode):
-    message: str
+    message: str = ""
     options: List[EffectNode] = field(default_factory=list)
     option_labels: List[str] = field(default_factory=list)
     player: Player = Player.SELF

@@ -7,7 +7,10 @@ import asyncio
 from typing import Any, Dict, Optional, List, Union
 from fastapi import FastAPI, Body, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from google.cloud import firestore
+try:
+    from google.cloud import firestore
+except Exception:
+    firestore = None
 
 current_api_dir = os.path.dirname(os.path.abspath(__file__))
 if current_api_dir not in sys.path:
@@ -144,6 +147,9 @@ GAMES: Dict[str, GameManager] = {}
 SANDBOX_GAMES: Dict[str, 'SandboxManager'] = {}
 
 card_db = CardLoader(CARD_DB_PATH); card_db.load(); deck_loader = DeckLoader(card_db)
+
+# NOTE: 効果定義は catalog.py(手動オーバーライド) > parser.py を主軸とする。
+# LLM生成データ(generated_effects.json)は精度が低いためランタイムでは読み込まない。
 
 def load_deck_mixed(source_str: str, owner_id: str):
     if source_str.startswith("db:"):
