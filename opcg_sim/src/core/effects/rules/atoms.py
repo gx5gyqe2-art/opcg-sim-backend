@@ -159,6 +159,46 @@ def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# ドン!!返却: 「ドン‼-N」（場のドン!!を N 枚ドン!!デッキへ戻す）
+#   多くはコストとして登場。従来 OTHER（何もしない）だった。
+# ---------------------------------------------------------------------------
+_DON_RETURN_RE = re.compile(r"ドン(?:!!|‼)[ 　]*[-－−‐][ 　]*(\d+)")
+
+
+@rule("don_return", priority=88)
+def _don_return(ctx: ParseContext) -> Optional[GameAction]:
+    m = _DON_RETURN_RE.search(ctx.text)
+    if not m:
+        return None
+    return GameAction(
+        type=ActionType.RETURN_DON,
+        value=ValueSource(base=int(m.group(1))),
+        raw_text=ctx.text,
+    )
+
+
+# ---------------------------------------------------------------------------
+# ドン!!追加: 「ドン!!デッキからドン!!N枚までを、アクティブ/レストで追加する」
+#   「レストで追加」は従来 OTHER。status=RESTED を付けて resolver に伝える。
+# ---------------------------------------------------------------------------
+@rule("don_add", priority=86)
+def _don_add(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("追加") not in t:
+        return None
+    is_active = _nfc("アクティブで追加") in t or _nfc("アクティブで加える") in t
+    is_rested = _nfc("レストで追加") in t
+    if not (is_active or is_rested):
+        return None
+    return GameAction(
+        type=ActionType.RAMP_DON,
+        value=ValueSource(base=_first_int(t, 1)),
+        status="RESTED" if is_rested else None,
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
 # デッキシャッフル: 「デッキをシャッフルする」
 #   従来は OTHER（legacy にシャッフル判定が無かった）。resolver は SHUFFLE を実行可。
 # ---------------------------------------------------------------------------

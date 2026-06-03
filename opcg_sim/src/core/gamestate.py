@@ -645,12 +645,37 @@ class GameManager:
                     log_event("INFO", "game.action_heal", f"{player.name} +1 life from deck top", player=player.name)
             return True
         if act_name == "RAMP_DON":
+            # status=="RESTED" の場合はレスト状態でコストエリアへ（「レストで追加」）。
+            add_rested = getattr(action, "status", None) == "RESTED"
             for _ in range(value):
                 if player.don_deck:
                     don = player.don_deck.pop(0)
-                    don.is_rest = False
-                    player.don_active.append(don)
-                    log_event("INFO", "game.action_ramp_don", f"{player.name} ramped 1 DON!!", player=player.name)
+                    don.is_rest = add_rested
+                    if add_rested:
+                        player.don_rested.append(don)
+                    else:
+                        player.don_active.append(don)
+                    log_event("INFO", "game.action_ramp_don", f"{player.name} ramped 1 DON!! (rested={add_rested})", player=player.name)
+            return True
+
+        if act_name == "RETURN_DON":
+            # 「ドン‼-N」: 場のドン!!を N 枚、ドン!!デッキへ戻す。
+            # 影響の小さい順（レスト→アクティブ→付与中）に戻す。
+            returned = 0
+            for _ in range(value):
+                if player.don_rested:
+                    don = player.don_rested.pop()
+                elif player.don_active:
+                    don = player.don_active.pop()
+                elif player.don_attached_cards:
+                    don = player.don_attached_cards.pop()
+                else:
+                    break
+                don.is_rest = False
+                don.attached_to = None
+                player.don_deck.append(don)
+                returned += 1
+            log_event("INFO", "game.action_return_don", f"{player.name} returned {returned} DON!! to don deck", player=player.name)
             return True
 
         # ▼▼▼ 修正: 初期値をTrueに設定（対象0枚でも「何もしないことに成功した」とみなすため） ▼▼▼

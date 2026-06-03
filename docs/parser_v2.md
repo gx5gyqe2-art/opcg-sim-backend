@@ -98,18 +98,28 @@ tests/
   セグメント分割でキーワードが脱落するケース。専用ルールで対応予定。
 - `ドン!!-1` / `コスト-N` 系のコスト操作：未対応。`COST_CHANGE` 実装と合わせて対応予定。
 
-## 現況（ルール9種時点）
+## エンジン実行系（apply_action_to_engine）の拡充 — 改善策④
 
-- 原子句カバレッジ（ルール命中率）: **約47%**
-- `ActionType.OTHER`（実行時に何もしない句）: **942 → 796 に削減**
-- ゴールデンケース: 13件（全緑）/ 既存 `tests/test_parser.py` も維持・緑
-- ルール: draw / ko / rest / rest_self_cost / power_buff / discard /
-  cost_change / play_self / shuffle / remaining_deck_bottom
+パーサが正しい ActionType を生成しても、`gamestate.apply_action_to_engine` に
+実行処理が無ければ盤面は変わらない（=`ActionType.OTHER` 同様のサイレント失敗）。
+そこで実行系を `tests/test_effects_engine.py`（実 GameManager 上で盤面変化を検証）
+で守りながら拡充する。
+
+実装済み:
+- `RETURN_DON`（`ドン‼-N`）: 場のドン!!を N 枚ドン!!デッキへ戻す（レスト→アクティブ→付与の順）
+- `RAMP_DON` の `status="RESTED"` 対応（`レストで追加`）: レスト状態でコストエリアへ
+
+## 現況（ルール13種 + エンジン実行2種 時点）
+
+- 原子句カバレッジ（ルール命中率）: **約53%**
+- `ActionType.OTHER`（実行時に何もしない句）: **942 → 582 に削減**
+- テスト: 既存 `test_parser.py`(8) + `test_golden.py`(15) + `test_effects_engine.py`(4) = 全27件緑
+- パーサルール: draw / ko / rest / rest_self_cost / power_buff / discard /
+  cost_change / play_self / shuffle / remaining_deck_bottom / don_return / don_add
 
 ### 次の最優先ターゲット（診断の OTHER ランキングより）
 
-resolver / gamestate 側の対応（改善策④）も必要なため本増分では未着手：
+resolver の再帰・継続時間の意味論が絡むため別増分とする：
 
-- `このカードの効果を発動する`（77）= トリガーの自己メイン再発動（`EXECUTE_MAIN_EFFECT` の実装が必要）
-- `ドン‼-N` / `レストで追加`（計100超）= ドン!! の返却・レスト追加（`RETURN_DON` 等の実装が必要）
-- `このキャラはアタックできない` / `バトルでKOされない` = 制限・常時効果（`RESTRICTION`/`PREVENT_LEAVE` の実装が必要）
+- `このカードの効果を発動する`（77）= トリガーの自己メイン再発動（`EXECUTE_MAIN_EFFECT`／resolver 改修）
+- `このキャラはアタックできない` / `バトルでKOされない` = 制限・常時効果（`RESTRICTION`/`PREVENT_LEAVE`／継続効果の管理）

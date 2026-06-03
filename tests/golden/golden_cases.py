@@ -156,6 +156,33 @@ CASES = [
             }
         ],
     },
+    # ----- ドン!!返却をコストにしたドロー（ドン‼-1） ----------------------
+    {
+        "id": "don_return_cost",
+        "text": "【起動メイン】ドン‼-1：カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {"kind": "action", "type": "RETURN_DON", "value": 1},
+                "effect": {"kind": "action", "type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- ドン!!をレストで追加（従来 OTHER） -----------------------------
+    {
+        "id": "don_add_rested",
+        "text": "ドン‼デッキからドン‼1枚までを、レストで追加する。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "RAMP_DON",
+                    "status": "RESTED",
+                    "value": 1,
+                }
+            }
+        ],
+    },
     # ----- カウンターのパワー付与（OP13-097 世界の均衡） -------------------
     {
         "id": "counter_power_buff_3000",
