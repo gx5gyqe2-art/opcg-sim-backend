@@ -145,6 +145,12 @@ SANDBOX_GAMES: Dict[str, 'SandboxManager'] = {}
 
 card_db = CardLoader(CARD_DB_PATH); card_db.load(); deck_loader = DeckLoader(card_db)
 
+try:
+    from opcg_sim.src.core.effects.catalog import load_generated_effects
+    load_generated_effects(os.path.join(DATA_DIR, "generated_effects.json"))
+except Exception as _e:
+    log_event("WARNING", "app.generated_effects_skip", f"Could not load generated_effects.json: {_e}", player="system")
+
 def load_deck_mixed(source_str: str, owner_id: str):
     if source_str.startswith("db:"):
         if not db: raise ValueError("Firestore is not initialized.")

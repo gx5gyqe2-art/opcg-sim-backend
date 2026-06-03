@@ -468,7 +468,8 @@ class GameManager:
 
     def has_blocker(self, player: Player) -> bool:
         for card in player.field:
-            if not card.is_rest and "ブロッカー" in card.current_keywords: return True
+            if not card.is_rest and "ブロッカー" in card.current_keywords and "BLOCKER_DISABLED" not in card.flags:
+                return True
         return False
 
     def declare_attack(self, attacker: Card, target: Card):
@@ -486,6 +487,13 @@ class GameManager:
             for ability in attacker.master.abilities:
                 if ability.trigger == TriggerType.ON_ATTACK:
                     self.resolve_ability(attacker_owner, ability, source_card=attacker)
+
+        opp_cards = ([target_owner.leader] if target_owner.leader else []) + target_owner.field
+        for card in opp_cards:
+            for ability in card.master.abilities:
+                if ability.trigger == TriggerType.ON_OPP_ATTACK:
+                    log_event("INFO", "game.trigger_opp_attack", f"ON_OPP_ATTACK fired for {card.master.name}", player=target_owner.name)
+                    self.resolve_ability(target_owner, ability, source_card=card)
 
         if self.has_blocker(target_owner): self.phase = Phase.BLOCK_STEP; log_event("INFO", "game.phase_transition", f"Blockers detected. Moving to {self.phase.name}", player=target_owner.name)
         else: self.phase = Phase.BATTLE_COUNTER; log_event("INFO", "game.phase_transition", f"No blockers. Moving to {self.phase.name}", player=target_owner.name)
@@ -524,9 +532,17 @@ class GameManager:
                 log_event("INFO", "game.damage_step", f"Dealing {damage_amount} damage (Banish: {is_banish})", player=attacker_owner.name)
                 for _ in range(damage_amount):
                     if target_owner.life:
-                        life_card = target_owner.life.pop(0); dest_zone = Zone.TRASH if is_banish else Zone.HAND
+                        life_card = target_owner.life.pop(0)
+                        dest_zone = Zone.TRASH if is_banish else Zone.HAND
+                        trigger_ability = None if is_banish else next(
+                            (a for a in life_card.master.abilities if a.trigger == TriggerType.TRIGGER), None
+                        )
                         self.move_card(life_card, dest_zone, target_owner)
                         log_event("INFO", "game.damage_life", f"{target_owner.name} takes damage to {dest_zone.name}", player=target_owner.name)
+                        if trigger_ability:
+                            log_event("INFO", "game.trigger_keyword", f"TRIGGER activated: {life_card.master.name}", player=target_owner.name)
+                            self.resolve_ability(target_owner, trigger_ability, source_card=life_card)
+                        self._fire_on_life_decrease(target_owner)
                     else: self.winner = attacker_owner.name; log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name); break
         else:
             if attacker_pwr >= target_pwr:
@@ -568,15 +584,32 @@ class GameManager:
                 log_event("INFO", "game.trigger_ko", f"Resolving ON_KO for {card.master.name}", player=owner.name)
                 self.resolve_ability(owner, ability, source_card=card)
 
+    def _fire_on_life_decrease(self, player: Player):
+        cards = ([player.leader] if player.leader else []) + player.field
+        for card in cards:
+            for ability in card.master.abilities:
+                if ability.trigger == TriggerType.ON_LIFE_DECREASE:
+                    log_event("INFO", "game.trigger_life_decrease", f"ON_LIFE_DECREASE fired for {card.master.name}", player=player.name)
+                    self.resolve_ability(player, ability, source_card=card)
+
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int) -> bool:
         if not action: return False
         act_name = action.type.name if hasattr(action.type, 'name') else str(action.type)
         log_event("INFO", "game.apply_action", f"Applying {act_name} to {len(targets)} targets", player=player.name)
         if act_name == "DRAW":
-            self.draw_card(player, value); return True
+            target_player = player
+            if action.target and getattr(action.target, 'player', None) is not None:
+                if getattr(action.target.player, 'name', '') == 'OPPONENT':
+                    target_player = self.p2 if player == self.p1 else self.p1
+            self.draw_card(target_player, value)
+            return True
         if act_name == "SHUFFLE":
-            random.shuffle(player.deck)
-            log_event("INFO", "game.action_shuffle", "Deck shuffled", player=player.name)
+            target_player = player
+            if action.target and getattr(action.target, 'player', None) is not None:
+                if getattr(action.target.player, 'name', '') == 'OPPONENT':
+                    target_player = self.p2 if player == self.p1 else self.p1
+            random.shuffle(target_player.deck)
+            log_event("INFO", "game.action_shuffle", "Deck shuffled", player=target_player.name)
             return True
         if act_name == "LOOK":
             count = value
@@ -588,8 +621,23 @@ class GameManager:
                 player.temp_zone.append(card)
             return True
         
+        if act_name in ["HEAL", "LIFE_RECOVER"]:
+            for _ in range(value):
+                if player.deck:
+                    player.life.append(player.deck.pop(0))
+                    log_event("INFO", "game.action_heal", f"{player.name} +1 life from deck top", player=player.name)
+            return True
+        if act_name == "RAMP_DON":
+            for _ in range(value):
+                if player.don_deck:
+                    don = player.don_deck.pop(0)
+                    don.is_rest = False
+                    player.don_active.append(don)
+                    log_event("INFO", "game.action_ramp_don", f"{player.name} ramped 1 DON!!", player=player.name)
+            return True
+
         # ▼▼▼ 修正: 初期値をTrueに設定（対象0枚でも「何もしないことに成功した」とみなすため） ▼▼▼
-        success = True 
+        success = True
 
         for target in targets:
             owner, source_list = self._find_card_location(target)
@@ -613,6 +661,13 @@ class GameManager:
                     if hasattr(target, 'cost_buff'):
                         target.cost_buff += value
                         log_event("INFO", "game.action_cost_reduction", f"{target.master.name}'s cost changed by {value}", player=player.name)
+                elif action.status == "BLOCKER_DISABLE":
+                    target.flags.add("BLOCKER_DISABLED")
+                    if hasattr(target.current_keywords, 'discard'):
+                        target.current_keywords.discard("ブロッカー")
+                    elif "ブロッカー" in target.current_keywords:
+                        target.current_keywords.remove("ブロッカー")
+                    log_event("INFO", "game.action_blocker_disable", f"{target.master.name} blocker disabled", player=player.name)
                 else:
                     if hasattr(target, 'power_buff'):
                         target.power_buff += value
@@ -637,6 +692,30 @@ class GameManager:
                 success = True
             elif act_name == "DECK_BOTTOM":
                 self.move_card(target, Zone.DECK, owner, dest_position="BOTTOM"); success = True
+            elif act_name in ["ACTIVE", "ACTIVE_DON"]:
+                target.is_rest = False
+                if isinstance(target, DonInstance):
+                    if target in owner.don_rested:
+                        owner.don_rested.remove(target)
+                        owner.don_active.append(target)
+                log_event("INFO", "game.action_active", f"Card activated for {owner.name}", player=player.name)
+                success = True
+            elif act_name == "ATTACH_DON":
+                if player.don_active:
+                    don = player.don_active.pop(0)
+                    don.attached_to = target.uuid
+                    don.is_rest = False
+                    player.don_attached_cards.append(don)
+                    target.attached_don += 1
+                    log_event("INFO", "game.action_attach_don", f"DON!! attached to {target.master.name}", player=player.name)
+                success = True
+            elif act_name == "MOVE_CARD":
+                dest = action.destination if action.destination else Zone.HAND
+                dest_pos = getattr(action, 'dest_position', 'BOTTOM') or 'BOTTOM'
+                self.move_card(target, dest, owner, dest_position=dest_pos)
+                success = True
+            elif act_name == "DECK_TOP":
+                self.move_card(target, Zone.DECK, owner, dest_position="TOP"); success = True
         return success
 
     def get_dynamic_value(self, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict) -> int:
