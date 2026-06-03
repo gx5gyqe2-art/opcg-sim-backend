@@ -189,7 +189,10 @@ class EffectParser:
     def _parse_to_node(self, text: str, is_cost: bool = False) -> EffectNode:
         norm_text = _nfc(text)
 
-        split_pattern = _nfc(r'。|その後、|置き、|加え、|引く、|捨て、|発動できる、|させ、')
+        # 連用形「引き、」を「引く、」に正規化してから分割
+        norm_text = re.sub(_nfc(r'引き、'), _nfc('引く、'), norm_text)
+        # 「引く、」は lookbehind で分割（「引く」を前の部分に残す）
+        split_pattern = _nfc(r'。|その後、|置き、|加え、|(?<=引く)、|捨て、|発動できる、|させ、')
 
         parts = re.split(split_pattern, norm_text)
         parts = [p.strip() for p in parts if p.strip()]
@@ -236,12 +239,13 @@ class EffectParser:
         # destination の推定
         destination = None
         if act_type == ActionType.MOVE_CARD:
-            if _nfc("手札") in norm_text and _nfc("加える") in norm_text:
-                destination = Zone.HAND
-            elif _nfc("ライフの上") in norm_text:
+            # ライフを先に判定（「手札...ライフの上に加える」の誤検知を防ぐ）
+            if _nfc("ライフの上に加える") in norm_text or _nfc("ライフの上から") not in norm_text and _nfc("ライフの上") in norm_text and _nfc("加える") in norm_text:
                 destination = Zone.LIFE
             elif _nfc("ライフの下") in norm_text:
                 destination = Zone.LIFE
+            elif _nfc("手札に加える") in norm_text or _nfc("手札に戻す") in norm_text or (_nfc("手札") in norm_text and _nfc("加える") in norm_text):
+                destination = Zone.HAND
             elif _nfc("トラッシュ") in norm_text:
                 destination = Zone.TRASH
             elif _nfc("デッキの上") in norm_text:
@@ -274,10 +278,17 @@ class EffectParser:
 
     def _parse_value(self, text: str, act_type: ActionType) -> ValueSource:
         norm_text = _nfc(text)
+        if _nfc("枚につき") in norm_text or _nfc("枚数につき") in norm_text:
+            nums = re.findall(r'[+-]?\d+', norm_text)
+            base_val = int(nums[0]) if nums else 1
+            return ValueSource(base=0, dynamic_source="COUNT_REFERENCE", multiplier=base_val)
+        # BUFF: パワー±N から値を取り出す（1枚などの数量と混在するため専用パターン使用）
+        if act_type == ActionType.BUFF:
+            m = re.search(_nfc(r'パワー([+-]?\d+)'), norm_text)
+            if m:
+                return ValueSource(base=int(m.group(1)))
         nums = re.findall(r'[+-]?\d+', norm_text)
         base_val = int(nums[0]) if nums else 0
-        if _nfc("枚につき") in norm_text or _nfc("枚数につき") in norm_text:
-            return ValueSource(base=0, dynamic_source="COUNT_REFERENCE", multiplier=base_val if base_val != 0 else 1)
         return ValueSource(base=base_val)
 
     def _detect_action_type(self, text: str) -> ActionType:
@@ -293,8 +304,8 @@ class EffectParser:
         if _nfc("アクティブで追加") in t or _nfc("アクティブで加える") in t:
             return ActionType.RAMP_DON
 
-        # カード引く
-        if _nfc("引く") in t:
+        # カード引く（連用形「引き」も対応）
+        if _nfc("引く") in t or re.search(_nfc(r'カード\d*枚?を?引き'), t):
             return ActionType.DRAW
 
         # KO
@@ -337,8 +348,8 @@ class EffectParser:
         if _nfc("手札に戻す") in t or _nfc("手札に加える") in t:
             return ActionType.BOUNCE
 
-        # レストにする
-        if _nfc("レストにする") in t or _nfc("レストにできる") in t:
+        # レストにする（連用形「レストにし」も対応）
+        if re.search(_nfc(r'レストに(する|できる|し[、。]|して)'), t):
             return ActionType.REST
 
         # アクティブにする（DON!!以外）
