@@ -8,7 +8,10 @@ from datetime import datetime
 from contextvars import ContextVar
 from typing import Any, Optional, Dict, List
 from concurrent.futures import ThreadPoolExecutor
-from google.cloud import storage
+try:
+    from google.cloud import storage
+except Exception:
+    storage = None
 import io
 
 if hasattr(sys.stdout, 'buffer'):
@@ -21,8 +24,11 @@ session_id_ctx: ContextVar[str] = ContextVar("session_id", default="sys-init")
 _executor = ThreadPoolExecutor(max_workers=3)
 
 try:
-    _storage_client = storage.Client()
-    sys.stderr.write("✅ [DEBUG] GCS Client initialized successfully.\n")
+    _storage_client = storage.Client() if storage is not None else None
+    if _storage_client is not None:
+        sys.stderr.write("✅ [DEBUG] GCS Client initialized successfully.\n")
+    else:
+        sys.stderr.write("⚠️ [DEBUG] GCS Client skipped: google.cloud.storage unavailable.\n")
 except Exception as e:
     _storage_client = None
     sys.stderr.write(f"⚠️ [DEBUG] GCS Client Init Failed: {e}\n")

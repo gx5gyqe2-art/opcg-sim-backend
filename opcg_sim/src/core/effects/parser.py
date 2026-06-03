@@ -91,9 +91,21 @@ class EffectParser:
             # 効果本体の解析
             effect_node = self._parse_to_node(effect_text)
 
+            # 先頭のゲート条件（「〜の場合、」）を ability.condition に引き上げる
+            final_condition = turn_limit_cond
+            if isinstance(effect_node, Branch) and effect_node.if_false is None and effect_node.condition is not None:
+                if final_condition is None:
+                    final_condition = effect_node.condition
+                else:
+                    final_condition = Condition(
+                        type=ConditionType.AND,
+                        args=[final_condition, effect_node.condition]
+                    )
+                effect_node = effect_node.if_true
+
             return Ability(
                 trigger=trigger,
-                condition=turn_limit_cond,
+                condition=final_condition,
                 cost=cost_node,
                 effect=effect_node,
                 raw_text=_nfc(text)
@@ -129,6 +141,7 @@ class EffectParser:
         norm_text = _nfc(text)
         if _nfc("【登場時】") in norm_text: return TriggerType.ON_PLAY
         if _nfc("【起動メイン】") in norm_text: return TriggerType.ACTIVATE_MAIN
+        if _nfc("【メイン】") in norm_text: return TriggerType.ACTIVATE_MAIN
         if _nfc("【アタック時】") in norm_text: return TriggerType.ON_ATTACK
         if _nfc("【ブロック時】") in norm_text: return TriggerType.ON_BLOCK
         if _nfc("【KO時】") in norm_text: return TriggerType.ON_KO

@@ -7,7 +7,10 @@ import asyncio
 from typing import Any, Dict, Optional, List, Union
 from fastapi import FastAPI, Body, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from google.cloud import firestore
+try:
+    from google.cloud import firestore
+except Exception:
+    firestore = None
 
 current_api_dir = os.path.dirname(os.path.abspath(__file__))
 if current_api_dir not in sys.path:
