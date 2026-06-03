@@ -110,8 +110,14 @@ class EffectResolver:
             node = self.execution_stack.pop()
 
             if isinstance(node, GameAction):
+                # 「このカードの【メイン】効果を発動する」: 自身の ACTIVATE_MAIN
+                # 能力の効果を実行スタックに展開して再発動する（主にトリガー）。
+                if node.type == ActionType.EXECUTE_MAIN_EFFECT:
+                    self._expand_main_effect(source_card)
+                    continue
+
                 success = self._execute_game_action(player, node, source_card)
-                
+
                 if self.game_manager.active_interaction:
                     return
 
@@ -134,7 +140,31 @@ class EffectResolver:
 
             elif isinstance(node, Choice):
                 self._suspend_for_choice(player, node, source_card)
-                return 
+                return
+
+    def _expand_main_effect(self, source_card):
+        """source_card 自身の 【メイン】(ACTIVATE_MAIN) 能力の効果を実行スタックへ展開する。
+
+        トリガー「このカードの【メイン】効果を発動する」用。コストは支払わず効果のみ。
+        多段展開（自己参照）による無限ループを防ぐためフラグで1回に限定する。
+        """
+        if self.context.get("_main_expanded"):
+            log_event("WARNING", "resolver.execute_main_loop", "EXECUTE_MAIN_EFFECT re-entry blocked", player=source_card.owner_id)
+            return
+        self.context["_main_expanded"] = True
+
+        main_abilities = [
+            ab for ab in source_card.master.abilities
+            if ab.trigger == TriggerType.ACTIVATE_MAIN and ab.effect is not None
+        ]
+        if not main_abilities:
+            log_event("WARNING", "resolver.execute_main_missing", f"No ACTIVATE_MAIN ability on {source_card.master.name}", player=source_card.owner_id)
+            return
+
+        # 既存スタックの「後」に積む = 先に実行されるよう reversed で push
+        for ab in reversed(main_abilities):
+            self.execution_stack.append(ab.effect)
+        log_event("INFO", "resolver.execute_main", f"Expanded {len(main_abilities)} main effect(s) of {source_card.master.name}", player=source_card.owner_id)
 
     def _execute_game_action(self, player, action: GameAction, source_card) -> bool:
         targets = self._resolve_targets(player, action.target, source_card, action_node=action)

@@ -62,6 +62,8 @@ SLACK_CHANNEL_INFO = os.environ.get("SLACK_CHANNEL_INFO")
 SLACK_CHANNEL_ERROR = os.environ.get("SLACK_CHANNEL_ERROR")
 SLACK_CHANNEL_DEBUG = os.environ.get("SLACK_CHANNEL_DEBUG")
 BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "opcg-sim-log")
+# テスト/診断ツール向け: 標準出力へのログ出力を抑止する（バッファ蓄積は維持）。
+LOG_SILENT = os.environ.get("OPCG_LOG_SILENT", "").lower() in ("1", "true", "yes")
 
 BACKEND_LOG_BUFFER: Dict[str, List[Dict[str, Any]]] = {}
 
@@ -199,8 +201,9 @@ def log_event(
         log_json_str = json.dumps(fallback_data, ensure_ascii=True)
         log_json_bytes = json.dumps(fallback_data, ensure_ascii=True, indent=2).encode('utf-8')
 
-    sys.stdout.write(log_json_str + "\n")
-    sys.stdout.flush()
+    if not LOG_SILENT:
+        sys.stdout.write(log_json_str + "\n")
+        sys.stdout.flush()
 
     gcs_url = None
     

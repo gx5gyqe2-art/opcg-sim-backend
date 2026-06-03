@@ -103,6 +103,8 @@ class GameManager:
         self.active_battle: Optional[Dict[str, Any]] = None
         self.active_interaction: Optional[Dict[str, Any]] = None
         self.setup_phase_pending = False
+        from .effects.continuous import ContinuousEffectManager
+        self.continuous = ContinuousEffectManager(self)
 
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """
@@ -334,6 +336,7 @@ class GameManager:
             if card and card.master.abilities:
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.TURN_END: self.resolve_ability(self.turn_player, ability, source_card=card)
+        self.continuous.expire("TURN_END", self.turn_count)
         self.switch_turn()
 
     def switch_turn(self):
@@ -491,7 +494,7 @@ class GameManager:
         attacker_owner, _ = self._find_card_location(attacker)
         target_owner, _ = self._find_card_location(target)
         self._validate_action(attacker_owner, "MAIN_ACTION")
-        if "ATTACK_DISABLE" in attacker.flags: raise ValueError("このカードは効果によりアタックできません。")
+        if "ATTACK_DISABLE" in attacker.flags or "ATTACK_DISABLE" in attacker.timed_flags: raise ValueError("このカードは効果によりアタックできません。")
         if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
         if target.master.type == CardType.CHARACTER and not target.is_rest: raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
         log_event("INFO", "game.attack_declare", f"{attacker.master.name} is attacking {target.master.name}", player=attacker_owner.name)
@@ -561,11 +564,15 @@ class GameManager:
                     else: self.winner = attacker_owner.name; log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name); break
         else:
             if attacker_pwr >= target_pwr:
-                self.move_card(target, Zone.TRASH, target_owner)
-                log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
-                self._resolve_on_ko(target, target_owner)
+                if self._active_protection(target, ("BATTLE_KO",)):
+                    log_event("INFO", "game.battle_ko_prevented", f"{target.master.name} is protected from battle KO", player=target_owner.name)
+                else:
+                    self.move_card(target, Zone.TRASH, target_owner)
+                    log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
+                    self._resolve_on_ko(target, target_owner)
 
         target.reset_turn_status(); self.active_battle = None; self.phase = Phase.MAIN; self.check_victory()
+        self.continuous.expire("BATTLE_END", self.turn_count)
         if not self.winner:
             self._apply_passive_effects(self.turn_player)
 
@@ -593,6 +600,30 @@ class GameManager:
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
         resolver = EffectResolver(self); resolver.resolve_ability(player, ability, source_card)
+
+    # 除去保護（PREVENT_LEAVE）の判定。除去が起こる瞬間に、対象カードの
+    # PASSIVE 能力を走査し、条件（例: トラッシュ7枚以上）をライブ評価する。
+    # status_values: "LEAVE"（相手の効果で場を離れない）/ "BATTLE_KO"（バトルでKOされない）
+    def _active_protection(self, card: CardInstance, status_values: Tuple[str, ...]) -> bool:
+        if not card or not getattr(card, "master", None) or card.negated:
+            return False
+        owner = self.p1 if self.p1.name == card.owner_id else self.p2
+        resolver = None
+        for ab in card.master.abilities:
+            if ab.trigger != TriggerType.PASSIVE:
+                continue
+            eff = ab.effect
+            if not isinstance(eff, GameAction) or eff.type != ActionType.PREVENT_LEAVE:
+                continue
+            if eff.status not in status_values:
+                continue
+            if ab.condition is not None:
+                if resolver is None:
+                    resolver = EffectResolver(self)
+                if not resolver._check_condition(owner, ab.condition, card):
+                    continue
+            return True
+        return False
 
     def _resolve_on_ko(self, card: Card, owner: Player):
         if not card.master.abilities: return
@@ -645,21 +676,58 @@ class GameManager:
                     log_event("INFO", "game.action_heal", f"{player.name} +1 life from deck top", player=player.name)
             return True
         if act_name == "RAMP_DON":
+            # status=="RESTED" の場合はレスト状態でコストエリアへ（「レストで追加」）。
+            add_rested = getattr(action, "status", None) == "RESTED"
             for _ in range(value):
                 if player.don_deck:
                     don = player.don_deck.pop(0)
-                    don.is_rest = False
-                    player.don_active.append(don)
-                    log_event("INFO", "game.action_ramp_don", f"{player.name} ramped 1 DON!!", player=player.name)
+                    don.is_rest = add_rested
+                    if add_rested:
+                        player.don_rested.append(don)
+                    else:
+                        player.don_active.append(don)
+                    log_event("INFO", "game.action_ramp_don", f"{player.name} ramped 1 DON!! (rested={add_rested})", player=player.name)
+            return True
+
+        if act_name == "RETURN_DON":
+            # 「ドン‼-N」: 場のドン!!を N 枚、ドン!!デッキへ戻す。
+            # 影響の小さい順（レスト→アクティブ→付与中）に戻す。
+            returned = 0
+            for _ in range(value):
+                if player.don_rested:
+                    don = player.don_rested.pop()
+                elif player.don_active:
+                    don = player.don_active.pop()
+                elif player.don_attached_cards:
+                    don = player.don_attached_cards.pop()
+                else:
+                    break
+                don.is_rest = False
+                don.attached_to = None
+                player.don_deck.append(don)
+                returned += 1
+            log_event("INFO", "game.action_return_don", f"{player.name} returned {returned} DON!! to don deck", player=player.name)
             return True
 
         # ▼▼▼ 修正: 初期値をTrueに設定（対象0枚でも「何もしないことに成功した」とみなすため） ▼▼▼
         success = True
 
+        # 「相手の効果で場を離れない」対象になり得る除去アクション
+        _LEAVE_ACTIONS = {"KO", "DISCARD", "TRASH", "BOUNCE", "MOVE_TO_HAND", "MOVE", "DECK_BOTTOM", "DECK_TOP", "MOVE_CARD"}
+
         for target in targets:
             owner, source_list = self._find_card_location(target)
             if not owner: continue
-            if act_name == "KO":
+            # 相手の効果でフィールド上のカードを場から除去しようとする場合、保護を確認
+            if (act_name in _LEAVE_ACTIONS and player.name != owner.name
+                    and source_list is owner.field
+                    and self._active_protection(target, ("LEAVE",))):
+                log_event("INFO", "game.leave_prevented", f"{target.master.name} is protected from leaving the field by opponent's effect", player=owner.name)
+                continue
+            if act_name == "PREVENT_LEAVE":
+                # 保護マーカー自体は no-op（実際の保護は除去時に _active_protection で評価）。
+                success = True
+            elif act_name == "KO":
                 self.move_card(target, Zone.TRASH, owner)
                 log_event("INFO", "game.action_ko", f"{target.master.name} was KO'd by effect", player=player.name)
                 self._resolve_on_ko(target, owner)
@@ -686,9 +754,21 @@ class GameManager:
                         target.current_keywords.remove("ブロッカー")
                     log_event("INFO", "game.action_blocker_disable", f"{target.master.name} blocker disabled", player=player.name)
                 else:
-                    if hasattr(target, 'power_buff'):
+                    # 「このバトル中」のパワー増減は継続効果として管理し、バトル終了時に失効させる
+                    # （従来は power_buff に直接加算され、同一ターンの後続バトルへ誤って持ち越していた）。
+                    if getattr(action, "duration", "INSTANT") == "THIS_BATTLE":
+                        self.continuous.apply(target, "POWER", "THIS_BATTLE", amount=value)
+                    elif hasattr(target, 'power_buff'):
                         target.power_buff += value
                         log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name)
+                success = True
+            elif act_name in ["ATTACK_DISABLE", "RESTRICTION"]:
+                # 「（このターン中／次の相手のターン終了時まで）アタックできない」
+                dur = getattr(action, "duration", "INSTANT")
+                if dur == "UNTIL_NEXT_TURN_END":
+                    self.continuous.apply(target, "FLAG", "UNTIL_NEXT_TURN_END", flag="ATTACK_DISABLE", expire_turn=self.turn_count + 1)
+                else:
+                    self.continuous.apply(target, "FLAG", "THIS_TURN", flag="ATTACK_DISABLE")
                 success = True
             elif act_name == "REST":
                 target.is_rest = True

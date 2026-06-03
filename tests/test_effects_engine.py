@@ -1,0 +1,242 @@
+"""エンジン実行系（apply_action_to_engine）の効果セマンティクステスト。
+
+実行:
+    OPCG_LOG_SILENT=1 python -m pytest tests/test_effects_engine.py -q -s
+    または: OPCG_LOG_SILENT=1 python tests/test_effects_engine.py
+"""
+from engine_helpers import action, make_game, make_instance, make_master
+from opcg_sim.src.models.effect_types import Ability, Condition, GameAction, ValueSource
+from opcg_sim.src.models.enums import (
+    ActionType,
+    CardType,
+    CompareOperator,
+    ConditionType,
+    Player,
+    TriggerType,
+    Zone,
+)
+
+
+def test_ramp_don_active():
+    """RAMP_DON: ドン!!デッキからアクティブで追加。"""
+    gm, p1, _ = make_game()
+    assert len(p1.don_deck) == 10 and len(p1.don_active) == 0
+    ok = gm.apply_action_to_engine(p1, action(ActionType.RAMP_DON, value=2), [], 2)
+    assert ok
+    assert len(p1.don_active) == 2
+    assert len(p1.don_deck) == 8
+    assert all(not d.is_rest for d in p1.don_active)
+
+
+def test_ramp_don_rested():
+    """RAMP_DON + status=RESTED: レストで追加（レスト状態でコストエリアへ）。"""
+    gm, p1, _ = make_game()
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.RAMP_DON, value=1, status="RESTED"), [], 1
+    )
+    assert ok
+    assert len(p1.don_rested) == 1
+    assert len(p1.don_active) == 0
+    assert len(p1.don_deck) == 9
+    assert p1.don_rested[0].is_rest is True
+
+
+def test_return_don_from_field():
+    """RETURN_DON: 場のドン!!をN枚ドン!!デッキへ戻す（ドン‼-N）。"""
+    gm, p1, _ = make_game()
+    # 場に active 2, rested 2 を用意（don_deck から移す）
+    for _ in range(2):
+        p1.don_active.append(p1.don_deck.pop(0))
+    for _ in range(2):
+        d = p1.don_deck.pop(0)
+        d.is_rest = True
+        p1.don_rested.append(d)
+    assert len(p1.don_deck) == 6
+
+    ok = gm.apply_action_to_engine(p1, action(ActionType.RETURN_DON, value=2), [], 2)
+    assert ok
+    # 場のドンが計4→2に、don_deck が 6→8 に戻る
+    assert len(p1.don_active) + len(p1.don_rested) == 2
+    assert len(p1.don_deck) == 8
+    # 戻ったドンは非レストに正規化されている
+    assert all(not d.is_rest for d in p1.don_deck)
+
+
+def test_return_don_not_enough():
+    """場のドンが要求数に満たない場合でも、ある分だけ戻して落ちない。"""
+    gm, p1, _ = make_game()
+    p1.don_active.append(p1.don_deck.pop(0))  # 場に1枚だけ
+    ok = gm.apply_action_to_engine(p1, action(ActionType.RETURN_DON, value=3), [], 3)
+    assert ok
+    assert len(p1.don_active) + len(p1.don_rested) == 0
+    assert len(p1.don_deck) == 10
+
+
+def test_execute_main_effect_reinvokes_main():
+    """EXECUTE_MAIN_EFFECT: トリガーが自身の ACTIVATE_MAIN 効果(ここでは DRAW2)を再発動。"""
+    gm, p1, _ = make_game()
+    # デッキを5枚用意
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+
+    # 自身の【メイン】= カード2枚ドロー を持つカード
+    main_ability = Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=2)),
+    )
+    master = make_master(card_id="E-001", name="再発動イベント", type=CardType.EVENT,
+                         abilities=(main_ability,))
+    source = make_instance(master, owner=p1.name)
+
+    # トリガー能力: このカードの【メイン】効果を発動する
+    trigger_ability = Ability(
+        trigger=TriggerType.TRIGGER,
+        effect=GameAction(type=ActionType.EXECUTE_MAIN_EFFECT),
+    )
+
+    assert len(p1.hand) == 0
+    gm.resolve_ability(p1, trigger_ability, source_card=source)
+    # 【メイン】の DRAW2 が再発動して手札2枚・デッキ3枚
+    assert len(p1.hand) == 2
+    assert len(p1.deck) == 3
+
+
+def _make_field_char(player, name="戦士", power=5000):
+    inst = make_instance(make_master(card_id=f"C-{name}", name=name, power=power), owner=player.name)
+    player.field.append(inst)
+    return inst
+
+
+def test_battle_power_buff_expires_at_battle_end():
+    """このバトル中のパワー増減はバトル終了で失効し、後続バトルへ持ち越さない。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1)
+    base = card.get_power(True)
+
+    gm.continuous.apply(card, "POWER", "THIS_BATTLE", amount=3000)
+    assert card.get_power(True) == base + 3000
+
+    gm.continuous.expire("BATTLE_END", gm.turn_count)
+    assert card.get_power(True) == base  # 失効
+
+
+def test_this_turn_restriction_expires_at_turn_end():
+    """このターン中のアタック制限は、ターン終了で失効する。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1)
+
+    gm.continuous.apply(card, "FLAG", "THIS_TURN", flag="ATTACK_DISABLE")
+    assert "ATTACK_DISABLE" in card.timed_flags
+
+    gm.continuous.expire("TURN_END", gm.turn_count)
+    assert "ATTACK_DISABLE" not in card.timed_flags
+
+
+def test_multi_turn_restriction_survives_one_turn_then_expires():
+    """次の相手のターン終了時までの制限は、1回のターン終了を跨ぎ、その後失効する。"""
+    gm, p1, _ = make_game()
+    gm.turn_count = 5
+    card = _make_field_char(p1)
+
+    # turn 5 に適用 → expire_turn=6
+    gm.continuous.apply(card, "FLAG", "UNTIL_NEXT_TURN_END", flag="ATTACK_DISABLE", expire_turn=6)
+
+    # turn 5 の終了では失効しない
+    gm.continuous.expire("TURN_END", 5)
+    assert "ATTACK_DISABLE" in card.timed_flags
+
+    # turn 6 の終了で失効する
+    gm.continuous.expire("TURN_END", 6)
+    assert "ATTACK_DISABLE" not in card.timed_flags
+
+
+def test_reset_turn_status_keeps_timed_effects():
+    """reset_turn_status は継続効果(timed_*)をクリアしない（ターン跨ぎ保持の要）。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1)
+    gm.continuous.apply(card, "POWER", "UNTIL_NEXT_TURN_END", amount=1000, expire_turn=99)
+    gm.continuous.apply(card, "FLAG", "UNTIL_NEXT_TURN_END", flag="ATTACK_DISABLE", expire_turn=99)
+    card.power_buff = 500  # ターン境界で消えるべき通常バフ
+
+    card.reset_turn_status()
+    assert card.power_buff == 0           # 通常バフは消える
+    assert card.timed_power == 1000        # 継続効果は残る
+    assert "ATTACK_DISABLE" in card.timed_flags
+
+
+def _prevent_leave_master(card_id, status, condition=None):
+    ab = Ability(
+        trigger=TriggerType.PASSIVE,
+        condition=condition,
+        effect=GameAction(type=ActionType.PREVENT_LEAVE, status=status),
+    )
+    return make_master(card_id=card_id, name=f"被保護{status}", abilities=(ab,))
+
+
+def test_prevent_leave_blocks_opponent_effect_ko_when_condition_met():
+    """トラッシュ7枚以上の場合、相手の効果KOで場を離れない。条件を満たさなければKOされる。"""
+    gm, p1, p2 = make_game()
+    cond = Condition(type=ConditionType.TRASH_COUNT, operator=CompareOperator.GE, value=7, player=Player.SELF)
+    target = make_instance(_prevent_leave_master("PL-1", "LEAVE", cond), owner=p1.name)
+    p1.field.append(target)
+
+    # トラッシュ7枚 → 保護有効。相手(p2)の効果KOは通らない
+    for i in range(7):
+        p1.trash.append(make_instance(make_master(card_id=f"TR-{i}"), owner=p1.name))
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [target], 0)
+    assert target in p1.field
+
+    # トラッシュを6枚に減らす → 保護無効。相手の効果KOが通る
+    p1.trash.pop()
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [target], 0)
+    assert target not in p1.field
+    assert target in p1.trash
+
+
+def test_prevent_leave_does_not_block_own_effect():
+    """「相手の効果で」場を離れない: 自分の効果による移動は防がない。"""
+    gm, p1, _ = make_game()
+    cond = Condition(type=ConditionType.TRASH_COUNT, operator=CompareOperator.GE, value=0, player=Player.SELF)
+    target = make_instance(_prevent_leave_master("PL-2", "LEAVE", cond), owner=p1.name)
+    p1.field.append(target)
+    # 自分(p1)の効果で手札に戻す → 保護対象外なので戻る
+    gm.apply_action_to_engine(p1, action(ActionType.BOUNCE), [target], 0)
+    assert target not in p1.field
+    assert target in p1.hand
+
+
+def test_prevent_battle_ko_in_resolve_attack():
+    """バトルでKOされない: パワー負けでも戦闘ではKOされない。"""
+    gm, p1, p2 = make_game()
+    p1.deck.append(make_instance(make_master(card_id="DK"), owner=p1.name))  # check_victory 回避
+    p2.deck.append(make_instance(make_master(card_id="DK2"), owner=p2.name))
+    attacker = make_instance(make_master(card_id="ATK", power=6000), owner=p1.name)
+    p1.field.append(attacker)
+    target = make_instance(_prevent_leave_master("PL-3", "BATTLE_KO"), owner=p2.name)
+    p2.field.append(target)
+
+    gm.active_battle = {
+        "attacker": attacker, "target": target,
+        "attacker_owner": p1, "target_owner": p2, "counter_buff": 0,
+    }
+    gm.resolve_attack()
+    # 6000 >= 5000 だが BATTLE_KO 保護で場に残る
+    assert target in p2.field
+
+
+if __name__ == "__main__":
+    import traceback
+
+    tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
+    passed = failed = 0
+    for t in tests:
+        try:
+            t()
+            passed += 1
+            print(f"PASS {t.__name__}")
+        except Exception:
+            failed += 1
+            print(f"FAIL {t.__name__}")
+            traceback.print_exc()
+    print(f"\n=== engine: {passed} passed, {failed} failed / {len(tests)} ===")
+    raise SystemExit(1 if failed else 0)

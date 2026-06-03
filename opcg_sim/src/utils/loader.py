@@ -1,4 +1,5 @@
 import json
+import os
 import unicodedata
 import re
 from typing import List, Dict, Any, Optional, Tuple
@@ -13,6 +14,24 @@ except ImportError:
         return []
 from ..models.enums import CardType, Attribute, Color, TriggerType
 from ..utils.logger_config import log_event
+
+
+def make_parser():
+    """効果パーサのファクトリ。
+
+    既定は合成ルールレジストリ版 (EffectParserV2)。環境変数
+    OPCG_PARSER=legacy を設定すると従来の EffectParser に即時ロールバックできる。
+    V2 は「構造分解はレガシー流用＋原子句のみルール化、未対応はレガシーへ
+    フォールバック」のため、全カード比較で退行(新規OTHER)が0であることを確認済み。
+    """
+    if os.environ.get("OPCG_PARSER", "v2").lower() == "legacy":
+        return EffectParser()
+    try:
+        from ..core.effects.parser_v2 import EffectParserV2
+        return EffectParserV2()
+    except Exception as e:  # 念のため: V2 読み込み失敗時はレガシーへ退避
+        log_event("ERROR", "loader.parser_v2_fallback", f"V2 unavailable, using legacy: {e}", player="system")
+        return EffectParser()
 
 def _nfc(text: str) -> str:
     return unicodedata.normalize('NFC', text)
@@ -61,7 +80,7 @@ class DataCleaner:
         s_text = DataCleaner.normalize_text(text)
         if not s_text or s_text in [_nfc("なし"), "None", ""]: return []
         try:
-            parser = EffectParser()
+            parser = make_parser()
             # Parserのメソッド呼び出し (parse_card_text または parse_ability)
             # ※ 前回の修正に合わせて parse_card_text を推奨
             if hasattr(parser, 'parse_card_text'):
@@ -190,7 +209,7 @@ class CardLoader:
             combined_abilities = tuple(manual_abilities)
             log_event("DEBUG", "loader.manual_load", f"Loaded manual abilities for {card_id} ({name})")
         else:
-            parser = EffectParser()
+            parser = make_parser()
             main_abilities = parser.parse_card_text(effect_text) if effect_text else []
             trigger_abilities = parser.parse_card_text(trigger_text, as_trigger=True) if trigger_text else []
             combined_abilities = tuple(main_abilities + trigger_abilities)
