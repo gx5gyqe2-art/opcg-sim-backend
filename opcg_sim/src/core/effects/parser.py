@@ -253,6 +253,11 @@ class EffectParser:
         if keyword_match:
             status = keyword_match.group(1)
 
+        if act_type == ActionType.GRANT_KEYWORD:
+            kw_match = re.search(_nfc(r'【(ブロッカー|速攻[^】]*|ダブルアタック|バニッシュ|ブロック不可|貫通|シフト)】'), norm_text)
+            if kw_match:
+                status = kw_match.group(1)
+
         if _nfc("選び") in norm_text:
             target_query.save_id = "selected_card"
         if _nfc("そのカード") in norm_text or _nfc("そのキャラ") in norm_text:

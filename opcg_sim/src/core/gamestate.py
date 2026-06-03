@@ -387,20 +387,35 @@ class GameManager:
         self._apply_passive_effects(self.turn_player)
 
     def _apply_passive_effects(self, player: Player):
-        affected_cards = [player.leader, player.stage] + player.field + player.hand
-        for c in affected_cards:
-            if c:
-                c.cost_buff = 0
-                c.base_power_override = None
+        opponent = self.p2 if player == self.p1 else self.p1
 
-        all_units = [player.leader] + player.field
-        if player.stage: all_units.append(player.stage)
-        for card in all_units:
+        # Step 1: 両プレイヤーのバフ・一時キーワードをリセット
+        for p in [player, opponent]:
+            for c in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
+                if c:
+                    c.cost_buff = 0
+                    c.base_power_override = None
+                    c.current_keywords = c.master.keywords.copy()
+            for c in p.hand:
+                if c:
+                    c.cost_buff = 0
+
+        # Step 2: YOUR_TURN 効果（アクティブプレイヤーのカードのみ）
+        for card in ([player.leader] if player.leader else []) + player.field:
             if not card or not card.master.abilities: continue
             for ability in card.master.abilities:
                 if ability.trigger == TriggerType.YOUR_TURN:
-                    log_event("DEBUG", "game.passive_trigger", f"Applying passive effect: {card.master.name}", player=player.name)
+                    log_event("DEBUG", "game.passive_trigger", f"YOUR_TURN: {card.master.name}", player=player.name)
                     self.resolve_ability(player, ability, source_card=card)
+
+        # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）
+        for p in [player, opponent]:
+            for card in ([p.leader] if p.leader else []) + p.field:
+                if not card or not card.master.abilities: continue
+                for ability in card.master.abilities:
+                    if ability.trigger == TriggerType.PASSIVE:
+                        log_event("DEBUG", "game.passive_trigger", f"PASSIVE: {card.master.name}", player=p.name)
+                        self.resolve_ability(p, ability, source_card=card)
 
     def draw_card(self, player: Player, count: int = 1):
         for _ in range(count):
@@ -551,6 +566,8 @@ class GameManager:
                 self._resolve_on_ko(target, target_owner)
 
         target.reset_turn_status(); self.active_battle = None; self.phase = Phase.MAIN; self.check_victory()
+        if not self.winner:
+            self._apply_passive_effects(self.turn_player)
 
     def check_victory(self):
         if not self.p1.deck: self.winner = self.p2.name
@@ -716,6 +733,17 @@ class GameManager:
                 success = True
             elif act_name == "DECK_TOP":
                 self.move_card(target, Zone.DECK, owner, dest_position="TOP"); success = True
+            elif act_name == "GRANT_KEYWORD":
+                keyword = action.status
+                if not keyword and getattr(action, 'raw_text', ''):
+                    import unicodedata as _ud
+                    _kw = re.search(r'【([^】]+)】', _ud.normalize('NFC', action.raw_text))
+                    if _kw:
+                        keyword = _kw.group(1)
+                if keyword:
+                    target.current_keywords.add(keyword)
+                    log_event("INFO", "game.action_grant_keyword", f"【{keyword}】→ {target.master.name}", player=player.name)
+                success = True
         return success
 
     def get_dynamic_value(self, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict) -> int:
