@@ -11,22 +11,40 @@ class EffectParser:
     def __init__(self):
         pass
 
+    # キーワード能力タグのみのセグメントパターン（Ability オブジェクト生成不要）
+    # 括弧は半角・全角どちらも受け付ける
+    _KEYWORD_ONLY_RE = re.compile(
+        r'^【(?:ブロッカー|速攻(?:[：:キャラ]*)?|ダブルアタック|バニッシュ|ブロック不可|フィルム|貫通|シフト|ルール)】(?:[（(][^）)]*[）)])?$'
+    )
+    # キーワード説明の括弧書き（全角・半角）
+    _PAREN_ONLY_RE = re.compile(r'^[（(].+[）)]$')
+    # コスト・制限タグ
+    _DON_TURN_TAG_RE = re.compile(r'【(?:ターン1回|ドン[ ]*(?:!!|‼)[ ]*[××][ ]*\d+)】')
+    # 既知のトリガータグ（これ以外の【X】はトリガーではない）
+    _TRIGGER_TAG_RE = re.compile(
+        r'【(?:登場時|起動メイン|メイン|アタック時|ブロック時|KO時|自分のターン終了時|'
+        r'相手のターン終了時|相手のアタック時|自分のターン中|相手のターン中|'
+        r'カウンター|トリガー|ゲーム開始時)】'
+    )
+
     def parse_card_text(self, text: str, as_trigger: bool = False) -> List[Ability]:
-        """
-        カード1枚分のテキストを受け取り、全 Ability のリストを返す。
-        複数の ability は ' / ' または改行で区切られている。
-        as_trigger=True の場合、生成した全 Ability の trigger を TRIGGER に上書きする。
-        """
         norm = _nfc(text)
         if not norm or norm.strip() in ['なし', 'None', '']:
             return []
 
-        # キーワードのみの能力（【ブロッカー】等）を除去してテキストだけ処理
         segments = re.split(r'\s*/\s*|\n', norm)
         segments = [s.strip() for s in segments if s.strip()]
 
         abilities = []
         for seg in segments:
+            # キーワード能力宣言 / キーワード説明括弧書きはスキップ（Ability 不要）
+            if self._KEYWORD_ONLY_RE.match(seg):
+                continue
+            if self._PAREN_ONLY_RE.match(seg) and not re.search(r'【[^】]+】', seg):
+                continue
+            # 「・」で始まる選択肢セグメントは Choice の option として親セグメントで処理済み
+            if seg.startswith(_nfc('・')):
+                continue
             try:
                 ab = self.parse_ability(seg)
                 if ab.trigger != TriggerType.UNKNOWN or ab.effect is not None:
@@ -45,22 +63,22 @@ class EffectParser:
         try:
             norm_text = _nfc(text)
 
+            # トリガー検出は前処理前のテキストで行う（コスト/制限タグ除去前に判定）
+            trigger = self._detect_trigger(norm_text)
+            log_event("INFO", "parser.trigger", f"Detected trigger: {trigger.name}")
+
             # 【ターン1回】を前処理で検出し条件として記憶
             turn_limit_cond = None
             if _nfc("【ターン1回】") in norm_text or _nfc("(ターンに1回)") in norm_text or _nfc("（ターンに1回）") in norm_text:
                 turn_limit_cond = Condition(type=ConditionType.TURN_LIMIT, value=1)
                 norm_text = re.sub(_nfc(r'【ターン1回】|\(ターンに1回\)|（ターンに1回）'), '', norm_text).strip()
 
-            # 【ドン!!×N】コストタグを前処理で検出
+            # 【ドン!!×N】コストタグを前処理で検出（スペース有無・‼ 混在に対応）
             don_cost_value = 0
-            don_match = re.search(_nfc(r'【ドン[!!‼][×x×](\d+)】'), norm_text)
+            don_match = re.search(_nfc(r'【ドン[ ]*(?:!!|‼)[ ]*[××][ ]*(\d+)】'), norm_text)
             if don_match:
                 don_cost_value = int(don_match.group(1))
                 norm_text = norm_text.replace(don_match.group(0), '').strip()
-
-            # トリガー検出（【 】のみ対象）
-            trigger = self._detect_trigger(norm_text)
-            log_event("INFO", "parser.trigger", f"Detected trigger: {trigger.name}")
 
             # トリガータグの除去
             clean_text = re.sub(r'【.*?】', '', norm_text).strip()
@@ -153,6 +171,19 @@ class EffectParser:
         if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER
         if _nfc("【トリガー】") in norm_text: return TriggerType.TRIGGER
         if _nfc("【ゲーム開始時】") in norm_text: return TriggerType.GAME_START
+
+        # 【ドン!!×N】 または 【ターン1回】 のみ（既知トリガータグなし）→ 起動メイン
+        # 【ブロッカー】等を得る効果も正しく ACTIVATE_MAIN と判定できるよう、
+        # 既知トリガータグ (_TRIGGER_TAG_RE) の有無のみを判断基準にする
+        if self._DON_TURN_TAG_RE.search(norm_text) and not self._TRIGGER_TAG_RE.search(norm_text):
+            return TriggerType.ACTIVATE_MAIN
+
+        # 既知トリガータグがなければ → PASSIVE（常時・条件付き効果・特殊タイミング等）
+        # キーワードタグ（【ブロッカー】等）は既に _TRIGGER_TAG_RE に含まれておらず
+        # この時点で明示的なトリガーが判別できないため PASSIVE として扱う
+        if not self._TRIGGER_TAG_RE.search(norm_text):
+            return TriggerType.PASSIVE
+
         return TriggerType.UNKNOWN
 
     def _parse_to_node(self, text: str, is_cost: bool = False) -> EffectNode:
@@ -308,6 +339,12 @@ class EffectParser:
         # アクティブにする（DON!!以外）
         if _nfc("アクティブにする") in t:
             return ActionType.ACTIVE
+
+        # キーワード能力の付与（ブロッカーを得る、速攻を得る等）
+        if _nfc("を得る") in t and any(_nfc(kw) in t for kw in [
+            "ブロッカー", "速攻", "ダブルアタック", "バニッシュ", "ブロック不可", "貫通"
+        ]):
+            return ActionType.GRANT_KEYWORD
 
         # パワー / 得る → BUFF
         if _nfc("パワー") in t or _nfc("得る") in t:
