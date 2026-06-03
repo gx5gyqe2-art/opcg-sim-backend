@@ -183,6 +183,44 @@ CASES = [
             }
         ],
     },
+    # ----- このバトル中のパワー付与（duration=THIS_BATTLE） --------------
+    {
+        "id": "battle_power_buff_duration",
+        "text": "自分のリーダーを、このバトル中、パワー+2000。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "value": 2000,
+                    "duration": "THIS_BATTLE",
+                }
+            }
+        ],
+    },
+    # ----- アタック制限（このターン中） -----------------------------------
+    {
+        "id": "attack_disable_this_turn",
+        "text": "相手のキャラ1枚までは、このターン中、アタックできない。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "ATTACK_DISABLE",
+                    "duration": "THIS_TURN",
+                    "target": {"player": "OPPONENT"},
+                }
+            }
+        ],
+    },
+    # ----- アタック制限（次の相手のターン終了時まで→複数ターン） -----------
+    {
+        "id": "attack_disable_next_turn",
+        "text": "相手のキャラ1枚までは、次の相手のターン終了時まで、アタックできない。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "ATTACK_DISABLE", "duration": "UNTIL_NEXT_TURN_END"}}
+        ],
+    },
     # ----- トリガー: このカードの【メイン】効果を発動する -----------------
     {
         "id": "execute_main_trigger",

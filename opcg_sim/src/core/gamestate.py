@@ -103,6 +103,8 @@ class GameManager:
         self.active_battle: Optional[Dict[str, Any]] = None
         self.active_interaction: Optional[Dict[str, Any]] = None
         self.setup_phase_pending = False
+        from .effects.continuous import ContinuousEffectManager
+        self.continuous = ContinuousEffectManager(self)
 
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """
@@ -334,6 +336,7 @@ class GameManager:
             if card and card.master.abilities:
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.TURN_END: self.resolve_ability(self.turn_player, ability, source_card=card)
+        self.continuous.expire("TURN_END", self.turn_count)
         self.switch_turn()
 
     def switch_turn(self):
@@ -491,7 +494,7 @@ class GameManager:
         attacker_owner, _ = self._find_card_location(attacker)
         target_owner, _ = self._find_card_location(target)
         self._validate_action(attacker_owner, "MAIN_ACTION")
-        if "ATTACK_DISABLE" in attacker.flags: raise ValueError("このカードは効果によりアタックできません。")
+        if "ATTACK_DISABLE" in attacker.flags or "ATTACK_DISABLE" in attacker.timed_flags: raise ValueError("このカードは効果によりアタックできません。")
         if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
         if target.master.type == CardType.CHARACTER and not target.is_rest: raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
         log_event("INFO", "game.attack_declare", f"{attacker.master.name} is attacking {target.master.name}", player=attacker_owner.name)
@@ -566,6 +569,7 @@ class GameManager:
                 self._resolve_on_ko(target, target_owner)
 
         target.reset_turn_status(); self.active_battle = None; self.phase = Phase.MAIN; self.check_victory()
+        self.continuous.expire("BATTLE_END", self.turn_count)
         if not self.winner:
             self._apply_passive_effects(self.turn_player)
 
@@ -711,9 +715,21 @@ class GameManager:
                         target.current_keywords.remove("ブロッカー")
                     log_event("INFO", "game.action_blocker_disable", f"{target.master.name} blocker disabled", player=player.name)
                 else:
-                    if hasattr(target, 'power_buff'):
+                    # 「このバトル中」のパワー増減は継続効果として管理し、バトル終了時に失効させる
+                    # （従来は power_buff に直接加算され、同一ターンの後続バトルへ誤って持ち越していた）。
+                    if getattr(action, "duration", "INSTANT") == "THIS_BATTLE":
+                        self.continuous.apply(target, "POWER", "THIS_BATTLE", amount=value)
+                    elif hasattr(target, 'power_buff'):
                         target.power_buff += value
                         log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name)
+                success = True
+            elif act_name in ["ATTACK_DISABLE", "RESTRICTION"]:
+                # 「（このターン中／次の相手のターン終了時まで）アタックできない」
+                dur = getattr(action, "duration", "INSTANT")
+                if dur == "UNTIL_NEXT_TURN_END":
+                    self.continuous.apply(target, "FLAG", "UNTIL_NEXT_TURN_END", flag="ATTACK_DISABLE", expire_turn=self.turn_count + 1)
+                else:
+                    self.continuous.apply(target, "FLAG", "THIS_TURN", flag="ATTACK_DISABLE")
                 success = True
             elif act_name == "REST":
                 target.is_rest = True

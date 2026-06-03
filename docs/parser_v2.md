@@ -114,18 +114,38 @@ tests/
   ACTIVATE_MAIN 能力の効果を実行スタックへ展開して再発動（コストは支払わない）。
   自己参照による無限ループは `_main_expanded` フラグで1回に限定。
 
-## 現況（ルール14種 + エンジン/resolver 実行3種 時点）
+## 継続効果（期間付き効果）の管理 — `effects/continuous.py`
 
-- 原子句カバレッジ（ルール命中率）: **約55%**
-- `ActionType.OTHER`（実行時に何もしない句）: **942 → 504 に削減**
-- テスト: 既存 `test_parser.py`(8) + `test_golden.py`(16) + `test_effects_engine.py`(5) = 全29件緑
+「このバトル中」「このターン中」「次の相手のターン終了時まで」のように、適用後に
+特定タイミングで失効する効果を `ContinuousEffectManager` が一元管理する。
+
+設計（既存エンジン非破壊）:
+- 効果は CardInstance の *専用フィールド* `timed_power` / `timed_flags` に反映。
+  これらは `reset_turn_status()` でクリアされない＝ターン境界を跨いで存続できる。
+  既存の `power_buff` / `flags`（ターン境界でリセット）とは独立で衝突しない。
+- `get_power()` は `timed_power` を加算。アタック制限は `timed_flags` の
+  `ATTACK_DISABLE` を `declare_attack` で参照。
+- 失効は `expire(event)` を **バトル終了**（`resolve_attack`）と
+  **ターン終了**（`end_turn`）のフックで呼ぶ。リセット後の再適用が不要。
+
+対応 Duration: `THIS_BATTLE` / `THIS_TURN` / `UNTIL_NEXT_TURN_END`。
+ルーティング: `apply_action_to_engine` で BUFF(duration=THIS_BATTLE) と
+ATTACK_DISABLE/RESTRICTION を継続効果として登録する。
+
+これにより「このバトル中バフが同ターンの後続バトルへ誤って持ち越す」バグや、
+「次の相手のターン終了時までアタック不可」のような複数ターン跨ぎ制限が正しく動く。
+
+## 現況（ルール16種 + エンジン/resolver/継続効果 時点）
+
+- 原子句カバレッジ（ルール命中率）: **約56%**
+- `ActionType.OTHER`（実行時に何もしない句）: **942 → 467 に削減**
+- テスト: `test_parser.py`(8) + `test_golden.py`(19) + `test_effects_engine.py`(9) = 全36件緑
 - パーサルール: draw / ko / rest / rest_self_cost / power_buff / discard /
   cost_change / play_self / shuffle / remaining_deck_bottom / don_return / don_add /
-  execute_main
+  execute_main / attack_disable（+ power_buff の duration 付与）
 
-### 次の最優先ターゲット（診断の OTHER ランキングより）
+### 残課題（今後）
 
-継続時間（duration）の管理機構が必要なため別増分とする：
-
-- `このキャラはアタックできない` / `バトルでKOされない` / `相手の効果で場を離れない`
-  = 制限・常時効果（`RESTRICTION`/`ATTACK_DISABLE`/`PREVENT_LEAVE`／「このターン中」等の継続管理）
+- `バトルでKOされない` / `相手の効果で場を離れない` = `PREVENT_LEAVE` 系の継続効果
+  （KO/移動の直前に介入する仕組みが必要）
+- COST/KEYWORD の duration 対応（現状 `_apply_passive_effects` がこれらを毎回再計算するため要設計）

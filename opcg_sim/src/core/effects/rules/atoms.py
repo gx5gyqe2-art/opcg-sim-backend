@@ -114,6 +114,14 @@ def _discard(ctx: ParseContext) -> Optional[GameAction]:
 # ---------------------------------------------------------------------------
 # パワー増減: 「（対象）を、…パワー±N」
 # ---------------------------------------------------------------------------
+def _duration_of(text: str) -> str:
+    if _nfc("このバトル中") in text:
+        return "THIS_BATTLE"
+    if _nfc("このターン中") in text:
+        return "THIS_TURN"
+    return "INSTANT"
+
+
 @rule("power_buff", priority=60)
 def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -127,8 +135,23 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
         type=ActionType.BUFF,
         target=tq,
         value=ValueSource(base=int(m.group(1))),
+        duration=_duration_of(t),
         raw_text=t,
     )
+
+
+# ---------------------------------------------------------------------------
+# アタック制限: 「（このターン中／次の…まで）アタックできない」
+#   継続効果として管理し、適切なタイミングで失効する（従来 OTHER）。
+# ---------------------------------------------------------------------------
+@rule("attack_disable", priority=62)
+def _attack_disable(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("アタックできない") not in t:
+        return None
+    tq = parse_target(t)
+    duration = "UNTIL_NEXT_TURN_END" if _nfc("次の") in t else "THIS_TURN"
+    return GameAction(type=ActionType.ATTACK_DISABLE, target=tq, duration=duration, raw_text=t)
 
 
 # 符号として使われ得る各種マイナス記号（ASCII / 全角 / 数学記号 / ハイフン）

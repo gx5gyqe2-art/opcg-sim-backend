@@ -95,6 +95,10 @@ class CardInstance:
     negated: bool = False
     ability_disabled: bool = False
     ability_used_this_turn: Dict[int, int] = field(default_factory=dict)
+    # ContinuousEffectManager 専用。reset_turn_status ではクリアしない
+    # （ターン境界を跨いで存続する期間付き効果を保持するため）。
+    timed_power: int = 0
+    timed_flags: Set[str] = field(default_factory=set)
 
     def __post_init__(self):
         if not self.uuid:
@@ -119,7 +123,7 @@ class CardInstance:
         if self.master.type not in [CardType.LEADER, CardType.CHARACTER]:
             return 0
         base = self.base_power_override if self.base_power_override is not None else self.master.power
-        buff = self.power_buff
+        buff = self.power_buff + self.timed_power
         don_power = (self.attached_don * 1000) if is_my_turn else 0
         return base + buff + don_power
 

@@ -93,6 +93,69 @@ def test_execute_main_effect_reinvokes_main():
     assert len(p1.deck) == 3
 
 
+def _make_field_char(player, name="戦士", power=5000):
+    inst = make_instance(make_master(card_id=f"C-{name}", name=name, power=power), owner=player.name)
+    player.field.append(inst)
+    return inst
+
+
+def test_battle_power_buff_expires_at_battle_end():
+    """このバトル中のパワー増減はバトル終了で失効し、後続バトルへ持ち越さない。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1)
+    base = card.get_power(True)
+
+    gm.continuous.apply(card, "POWER", "THIS_BATTLE", amount=3000)
+    assert card.get_power(True) == base + 3000
+
+    gm.continuous.expire("BATTLE_END", gm.turn_count)
+    assert card.get_power(True) == base  # 失効
+
+
+def test_this_turn_restriction_expires_at_turn_end():
+    """このターン中のアタック制限は、ターン終了で失効する。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1)
+
+    gm.continuous.apply(card, "FLAG", "THIS_TURN", flag="ATTACK_DISABLE")
+    assert "ATTACK_DISABLE" in card.timed_flags
+
+    gm.continuous.expire("TURN_END", gm.turn_count)
+    assert "ATTACK_DISABLE" not in card.timed_flags
+
+
+def test_multi_turn_restriction_survives_one_turn_then_expires():
+    """次の相手のターン終了時までの制限は、1回のターン終了を跨ぎ、その後失効する。"""
+    gm, p1, _ = make_game()
+    gm.turn_count = 5
+    card = _make_field_char(p1)
+
+    # turn 5 に適用 → expire_turn=6
+    gm.continuous.apply(card, "FLAG", "UNTIL_NEXT_TURN_END", flag="ATTACK_DISABLE", expire_turn=6)
+
+    # turn 5 の終了では失効しない
+    gm.continuous.expire("TURN_END", 5)
+    assert "ATTACK_DISABLE" in card.timed_flags
+
+    # turn 6 の終了で失効する
+    gm.continuous.expire("TURN_END", 6)
+    assert "ATTACK_DISABLE" not in card.timed_flags
+
+
+def test_reset_turn_status_keeps_timed_effects():
+    """reset_turn_status は継続効果(timed_*)をクリアしない（ターン跨ぎ保持の要）。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1)
+    gm.continuous.apply(card, "POWER", "UNTIL_NEXT_TURN_END", amount=1000, expire_turn=99)
+    gm.continuous.apply(card, "FLAG", "UNTIL_NEXT_TURN_END", flag="ATTACK_DISABLE", expire_turn=99)
+    card.power_buff = 500  # ターン境界で消えるべき通常バフ
+
+    card.reset_turn_status()
+    assert card.power_buff == 0           # 通常バフは消える
+    assert card.timed_power == 1000        # 継続効果は残る
+    assert "ATTACK_DISABLE" in card.timed_flags
+
+
 if __name__ == "__main__":
     import traceback
 

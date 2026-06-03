@@ -76,6 +76,7 @@ def summarize_node(node) -> Optional[Dict[str, Any]]:
             "target": summarize_target(node.target),
             "value": node.value.base if node.value else 0,
             "status": node.status,
+            "duration": node.duration,
             "destination": _enum_name(node.destination),
         }
     if isinstance(node, Sequence):
