@@ -172,7 +172,10 @@ class CardInstance:
             props.get('IS_FACE_UP', 'is_face_up'): self.is_face_up,
             props.get('ATTACHED_DON', 'attached_don'): self.attached_don,
             props.get('OWNER_ID', 'owner_id'): self.owner_id,
-            props.get('KEYWORDS', 'keywords'): list(self.current_keywords | self.timed_keywords)
+            props.get('KEYWORDS', 'keywords'): list(self.current_keywords | self.timed_keywords),
+            props.get('TRIGGER_TEXT', 'trigger_text'): self.master.trigger_text or '',
+            props.get('ABILITY_DISABLED', 'ability_disabled'): self.ability_disabled,
+            props.get('IS_FROZEN', 'is_frozen'): 'FREEZE' in self.flags,
         }
 
 @dataclass
