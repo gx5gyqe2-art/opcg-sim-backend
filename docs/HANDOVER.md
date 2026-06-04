@@ -1,6 +1,7 @@
 # 引き継ぎ資料 — カード効果システム刷新
 
-最終更新: 2026-06-03 / 対象ブランチ: `main`（PR #4 マージ済み）
+最終更新: 2026-06-04 / 作業ブランチ: `claude/card-effect-resolution-6vag2`
+（PR #4 = 刷新の土台。本ブランチでルール拡充・正確性修正・継続効果統合・置換効果を追加）
 
 このドキュメントは、本リポジトリ（opcg-sim-backend）の **カード効果処理の刷新作業** を
 引き継ぐための資料です。詳細な設計は `docs/parser_v2.md` を、本書はその上位の
@@ -29,55 +30,45 @@
 
 ## 2. 現在の状態（このPR時点）
 
-| 指標 | 開始時 | 現在 |
-|---|---|---|
-| 原子句カバレッジ（ルール命中率） | 0% | 約70.4%（grant_keyword + ライフ操作5種 + ドン操作4種） |
-| `ActionType.OTHER`（実行時に何もしない句） | 942 | 342（約64%減） |
-| テスト総数 | 17 | 81（全緑） |
-| 本番パーサ | レガシー | **EffectParserV2（既定）** |
-
-> 追記1（キーワード付与の修正）: 「このキャラは【ブロッカー】を得る」等が構造分解で
-> キーワードを脱落させ誤って `BUFF` に落ちていたバグを修正。`parse_ability` の
-> タグ一括除去をトリガー/注釈タグに限定し（キーワード能力タグは保持）、
-> `grant_keyword` ルールで `GRANT_KEYWORD` を生成（146 句）。
->
-> 追記2（ライフ操作）: デッキ→ライフ／ライフ→手札／手札→ライフ／ライフ→トラッシュ／
-> 表・裏向き をルール化（`life_*`）。`life_to_hand` は legacy が「ライフの上か下から
-> …手札に加える」を `destination=LIFE` と誤判定していたバグを修正。`FACE_UP_LIFE`
-> のエンジン実行も追加。
->
-> 追記3（ドン!!操作）: 付与／アクティブ／レスト／ドンデッキに戻す をルール化
-> （`don_*`）。ドンは均質なため枚数(value)ベースで処理。エンジンに `REST_DON`
-> 実行系が欠落しており【ドン!!×N】コストが no-op だったバグを修正。`ATTACH_DON`
-> を複数枚＋レスト付与対応、`RETURN_DON` を相手対象対応に拡張。詳細は
-> `docs/parser_v2.md`。
->
-> 追記4（正確性バグ修正）: 【ターン1回】を `resolver` で enforce（従来 `TURN_LIMIT`
-> が常に True で何度でも発動できた）。条件の fail-safe 化として `OTHER` を False に、
-> `GENERIC` は許容＋ログに整理し、リーダー特徴の `『X』` 記法を `LEADER_TRAIT` に
-> 分類。詳細は §7-4,5。
->
-> 追記5（条件分類の拡充）: 未分類だった `GENERIC` 条件を実条件へ分類して評価可能化
-> （GENERIC 251→132）。`FIELD_COUNT`（盤面のキャラ枚数, フィルタ対応）/`DECK_COUNT`
-> /`LEADER_COLOR`（多色）を新たにパース・評価。誤発動源を約120件削減。詳細は §7-5。
->
-> 追記6（キーワード付与の永続化）: `GRANT_KEYWORD` を継続効果マネージャ経由で
-> `timed_keywords` に付与するよう変更。従来は `current_keywords` に直接加算していたため
-> `_apply_passive_effects` のリセットで即消えていた（146件の付与が実質不発）。
-> `has_keyword()` で参照を一本化し、duration（THIS_TURN/THIS_BATTLE/PERMANENT）で失効、
-> 場を離れる際は `drop_for` で破棄。詳細は §7-2。
->
-> 追記7（コスト増減の永続化）: 「このターン中、コスト-N」等の期間付きコスト増減も
-> 同根（`cost_buff` が passive リセットで消滅）だったため、`timed_cost`（継続効果）に
-> 統合。`cost_change` ルールが duration を付与し、期間付きのみ継続効果へ回す。§7-2 完了。
->
-> 追記8（置換効果 MVP）: 「このキャラが(バトルで)?KOされる/場を離れる場合、代わりに〜」を
-> `REPLACE_EFFECT`（置換を `sub_effect` に保持）として実装。`_active_replacement` が除去の
-> 瞬間に PASSIVE 能力を走査し、条件・実行可能性を満たせば置換を実行して本来の除去を
-> スキップする。`GameAction.sub_effect` を追加。詳細・残課題は §7-3。
+| 指標 | 刷新開始時 | PR#4 時点 | 現在 |
+|---|---|---|---|
+| 原子句カバレッジ（ルール命中率） | 0% | 約57% | **約70.4%** |
+| `ActionType.OTHER`（実行時に何もしない句） | 942 | 421 | **333** |
+| 未分類条件 `GENERIC`（誤発動の温床） | — | 251 | **94** |
+| パーサルール数 | 0 | 15 | **25** |
+| テスト総数 | 17 | 43 | **81（全緑）** |
+| 本番パーサ | レガシー | EffectParserV2 | **EffectParserV2（既定）** |
 
 - 全2652カードの能力構築・実デッキ(imu/nami)ロード・ゲーム開始〜数ターン進行を確認済み。
-- レガシー vs V2 の全カード比較で **退行(新規OTHER)=0**。
+- レガシー vs V2 の全カード比較で **退行(新規OTHER)=0** を一貫して維持。
+
+### 本セッション（本ブランチ）で追加した内容
+
+**パーサルール拡充（15→25種）**
+- `grant_keyword`: 「【ブロッカー】等を得る」。構造分解でキーワードが脱落し誤 `BUFF` に
+  落ちていたバグを修正（タグ一括除去をキーワード能力タグ保持に限定）。
+- ライフ操作 `life_recover`/`life_to_hand`/`hand_to_life`/`life_to_trash`/`life_face`。
+  `life_to_hand` は legacy が「ライフの上か下から…手札に加える」を `dest=LIFE` と誤判定して
+  いた no-op バグを修正。`FACE_UP_LIFE` 実行系を追加。
+- ドン操作 `don_attach`/`don_set_active`/`don_set_rest`/`don_return_deck`（枚数ベース）。
+
+**正確性バグ修正**
+- 【ターン1回】(`TURN_LIMIT`) を enforce（従来常に True で無制限発動できた）。
+- エンジンに `REST_DON` 実行系が無く【ドン!!×N】コストが no-op だったのを修正。
+- 条件 fail-safe: 解釈不能な `OTHER` 条件は False。`GENERIC` は許容＋ログに整理しつつ、
+  評価可能なクラスタ（`LEADER_TRAIT 『X』`/`FIELD_COUNT`/`DECK_COUNT`/`LEADER_COLOR`）へ
+  分類して誤発動源を削減（GENERIC 251→94）。
+
+**継続効果マネージャの統合（§7-2 完了）**
+- `GRANT_KEYWORD` を `timed_keywords`、期間付き `COST` を `timed_cost` に統合。従来は
+  `_apply_passive_effects` のリセットで即消えていた（キーワード146句が実質不発・コスト減少も
+  消滅）。`has_keyword()`/`current_cost` で参照を一本化し、duration で失効、場を離れる際は
+  `drop_for` で破棄（未配線だった）。
+
+**置換効果 MVP（§7-3）**
+- 「このキャラが(バトルで)?KOされる/場を離れる場合、代わりに〜」を `REPLACE_EFFECT`
+  （置換を `sub_effect` に保持）として実装。`_active_replacement` が除去の瞬間に PASSIVE を
+  走査し、条件・実行可能性を満たせば置換を実行して本来の除去をスキップ。
 
 ---
 
@@ -118,19 +109,27 @@
 
 `effects/continuous.py` の `ContinuousEffectManager`。
 
-- `CardInstance.timed_power` / `timed_flags` に反映。**これらは `reset_turn_status()` で
-  クリアされない**（ターン境界を跨いで存続する鍵）。既存の `power_buff`/`flags`
-  （ターン境界でリセット）とは独立で衝突しない。
+- `CardInstance` の専用フィールド `timed_power` / `timed_cost` / `timed_flags` /
+  `timed_keywords` に反映。**これらは `reset_turn_status()` でクリアされない**
+  （ターン境界を跨いで存続する鍵）。既存の `power_buff`/`cost_buff`/`flags`/`current_keywords`
+  （ターン境界 or passive 再計算でリセット）とは独立で衝突しない。
+- kind: `POWER` / `COST` / `FLAG` / `KEYWORD`。Duration: `THIS_BATTLE` / `THIS_TURN` /
+  `UNTIL_NEXT_TURN_END` / `PERMANENT`（場を離れるまで持続）。
 - 失効は `expire(event)` を **バトル終了**(`resolve_attack`)・**ターン終了**(`end_turn`)で呼ぶ。
-- Duration: `THIS_BATTLE` / `THIS_TURN` / `UNTIL_NEXT_TURN_END`。
+  カードが場を離れる際は `move_card` が `drop_for(uuid)` を呼び、その分を破棄する。
+- 参照側: `get_power()`=`timed_power` 加算、`current_cost`=`timed_cost` 加算、
+  `has_keyword()`=`current_keywords ∪ timed_keywords`、アタック制限=`timed_flags`。
 
-### 除去保護（PREVENT_LEAVE）
+### 除去保護（PREVENT_LEAVE）と置換効果（REPLACE_EFFECT）
 
-`gamestate._active_protection(card, status)`。除去が起こる瞬間に対象の PASSIVE 能力を走査し、
-条件（例: トラッシュ7枚以上）を `EffectResolver._check_condition` で**ライブ評価**する
-（フラグをラッチしないので条件変動に追随）。
-- `status="LEAVE"`: 相手の効果で場を離れない（KO/bounce/trash 等の除去時）
-- `status="BATTLE_KO"`: バトルでKOされない（`resolve_attack` の戦闘KO時）
+`gamestate._active_protection(card, status)` / `_active_replacement(card, status)`。除去が
+起こる瞬間に対象の PASSIVE 能力を走査し、条件（例: トラッシュ7枚以上）を
+`EffectResolver._check_condition` で**ライブ評価**する（フラグをラッチしないので条件変動に追随）。
+- 保護 `PREVENT_LEAVE`: `status="LEAVE"`（相手の効果で場を離れない）/ `"BATTLE_KO"`
+  （バトルでKOされない）。
+- 置換 `REPLACE_EFFECT`: 「代わりに〜」。実行可能性（`_can_satisfy_node`）も満たせば
+  `sub_effect`（置換アクション）を実行し本来の除去をスキップ。同じ `LEAVE`/`BATTLE_KO`
+  フックに相乗り（保護を先に判定、無ければ置換を判定）。
 
 ---
 
@@ -149,8 +148,8 @@
 | `opcg_sim/src/core/effects/resolver.py` | IR の実行（EXECUTE_MAIN_EFFECT 等もここ） |
 | `opcg_sim/src/core/effects/catalog.py` | 手動オーバーライド(MANUAL_EFFECTS, 13枚) |
 | `opcg_sim/src/core/gamestate.py` | ゲームエンジン本体（apply_action_to_engine / 除去保護 / 継続効果フック） |
-| `opcg_sim/src/models/effect_types.py` | IR 定義（Ability/GameAction/TargetQuery/Condition…） |
-| `opcg_sim/src/models/models.py` | CardMaster/CardInstance（`timed_power`/`timed_flags` 追加済） |
+| `opcg_sim/src/models/effect_types.py` | IR 定義（Ability/GameAction/TargetQuery/Condition…）。`GameAction.sub_effect`（置換用） |
+| `opcg_sim/src/models/models.py` | CardMaster/CardInstance（`timed_power`/`timed_cost`/`timed_flags`/`timed_keywords`、`has_keyword()`） |
 | `opcg_sim/src/models/enums.py` | ActionType/TriggerType/Zone… |
 | `opcg_sim/src/utils/loader.py` | カードDB/デッキ読込・`make_parser()` ファクトリ |
 
@@ -159,10 +158,10 @@
 | パス | 役割 |
 |---|---|
 | `tests/test_parser.py` | レガシーパーサの単体テスト（8件） |
-| `tests/golden/golden_cases.py` | **ゴールデンコーパス（効果セマンティクスの期待値）** |
+| `tests/golden/golden_cases.py` | **ゴールデンコーパス（効果セマンティクスの期待値, 40件）** |
 | `tests/golden/summarize.py` | AST→指紋(summary) 変換＋部分一致判定 |
-| `tests/test_golden.py` | ゴールデン・ランナー（21件） |
-| `tests/test_effects_engine.py` | エンジン実行系の盤面変化テスト（12件） |
+| `tests/test_golden.py` | ゴールデン・ランナー（40件） |
+| `tests/test_effects_engine.py` | エンジン実行系の盤面変化テスト（31件） |
 | `tests/test_gameplay_smoke.py` | 実デッキでのゲーム進行スモーク（2件） |
 | `tests/engine_helpers.py` | 最小 GameManager 構築ヘルパ |
 | `tests/effect_diagnostics.py` | **未対応句/OTHER ランキングの可視化** |
@@ -209,7 +208,7 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
 
 ## 7. 既知の課題・残タスク（優先度順）
 
-1. **裾野の OTHER（約342件）のルール化** — 頻度は低く多様（上位でも10件前後/表現）。
+1. **裾野の OTHER（約333件）のルール化** — 頻度は低く多様（上位でも10件前後/表現）。
    `effect_diagnostics.py` の「OTHER化する原子句ランキング」を起点に継続。
    候補: デッキ並び替え（デッキの上か下に置く）、ライフを見て上か下に置く
    （look-and-place）、公開して手札に加える 等。
@@ -248,7 +247,9 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
 5. **条件の fail-safe 化＋分類拡充（進行中）** — 真に解釈不能な `OTHER` は False に
    倒す（誤発動防止）。`GENERIC`（実在するが未分類の条件）は一律 False にすると多数の
    効果が永久不発になり有害なため許容(True)＋ログ可視化に留め、**評価可能なクラスタを
-   個別に実条件へ分類**して誤発動源を減らす方針。分類実績で **GENERIC 251→132**:
+   個別に実条件へ分類**して誤発動源を減らす方針。分類実績で **GENERIC 251→94**
+   （`FIELD_COUNT`/`DECK_COUNT`/`LEADER_COLOR`/`LEADER_TRAIT『X』` への分類＋置換効果の
+   トリガー文脈除外による）:
    - リーダー特徴の `『X』` 記法 → `LEADER_TRAIT`（18件）
    - 盤面のキャラ枚数「(レストの/特徴《X》の/コストN以上の)キャラがM枚以上/以下いる/がいる」
      → `FIELD_COUNT`（target フィルタ対応, 85件）。数値はフィルタ(コストN)と枚数(M枚)が
@@ -269,10 +270,12 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
   全角/半角・`!!`/`‼`(U+203C)・各種マイナス記号の揺れに注意（ルールの正規表現は両対応にする）。
 - **pytest の出力キャプチャ**: logger が `sys.stdout` を直接掴むため、`pytest` は
   `-s`（キャプチャ無効）で実行する。`OPCG_LOG_SILENT=1` 併用推奨。
-- **`timed_power`/`timed_flags` は reset_turn_status でクリアしない**設計。ここを
-  「リセット対象に追加」してしまうと複数ターン跨ぎ効果が壊れる。
-- **`_apply_passive_effects` は cost_buff/current_keywords を毎回リセット**するが
-  power_buff/flags はリセットしない。継続効果に COST/KEYWORD を載せる際はこの相互作用に注意。
+- **`timed_*`（power/cost/flags/keywords）は reset_turn_status でクリアしない**設計。ここを
+  「リセット対象に追加」してしまうと複数ターン跨ぎ効果・付与キーワード・期間付きコストが壊れる。
+- **`_apply_passive_effects` は cost_buff/current_keywords を毎回リセット**する（power_buff/flags
+  はしない）。期間付きの COST/KEYWORD はこのリセットを避けるため `timed_cost`/`timed_keywords`
+  に載せている（直接 cost_buff/current_keywords へ加えると即消える）。INSTANT/PASSIVE の
+  コスト・キーワードは従来どおり reset+reapply で機能する。
 - **CardMaster は frozen dataclass**。abilities は生成時に確定。テストで能力を差し替える
   場合は `make_master(..., abilities=(...))` で構築する。
 - **新パーサの効果は V2 有効化後にのみ反映**。`OPCG_PARSER=legacy` 時はレガシー解釈に戻る
@@ -297,5 +300,6 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
 ## 10. 参考
 
 - `docs/parser_v2.md` — 設計詳細・ルール一覧・現況・残課題
-- PR #4 — 本作業一式
+- PR #4 — 刷新の土台（合成ルールレジストリ＋V2本番化）
+- 本ブランチ `claude/card-effect-resolution-6vag2` — ルール拡充・正確性修正・継続効果統合・置換効果
 - 計測の起点コマンド: `OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py --top 40`
