@@ -200,7 +200,7 @@ class GameManager:
         
         if self.phase == Phase.BLOCK_STEP and self.active_battle:
             target_owner = self.active_battle["target_owner"]
-            blockers = [c.uuid for c in target_owner.field if not c.is_rest and "ブロッカー" in c.current_keywords]
+            blockers = [c.uuid for c in target_owner.field if not c.is_rest and c.has_keyword("ブロッカー")]
             request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
         elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
             target_owner = self.active_battle["target_owner"]
@@ -455,6 +455,8 @@ class GameManager:
                 don.is_rest = True
                 current_owner.don_rested.append(don)
             card.attached_don = 0
+            # 場を離れたら継続効果（timed_power/flags/keywords）を破棄する。
+            self.continuous.drop_for(card.uuid)
 
         if current_list is not None and card in current_list: current_list.remove(card)
         elif current_owner and current_owner.stage == card: current_owner.stage = None
@@ -486,7 +488,7 @@ class GameManager:
 
     def has_blocker(self, player: Player) -> bool:
         for card in player.field:
-            if not card.is_rest and "ブロッカー" in card.current_keywords and "BLOCKER_DISABLED" not in card.flags:
+            if not card.is_rest and card.has_keyword("ブロッカー") and "BLOCKER_DISABLED" not in card.flags:
                 return True
         return False
 
@@ -546,7 +548,7 @@ class GameManager:
         attacker_pwr = attacker.get_power(is_my_turn); target_pwr = target.get_power(is_target_turn) + counter_buff
         if target == target_owner.leader:
             if attacker_pwr >= target_pwr:
-                damage_amount = 2 if "ダブルアタック" in attacker.current_keywords else 1; is_banish = "バニッシュ" in attacker.current_keywords
+                damage_amount = 2 if attacker.has_keyword("ダブルアタック") else 1; is_banish = attacker.has_keyword("バニッシュ")
                 log_event("INFO", "game.damage_step", f"Dealing {damage_amount} damage (Banish: {is_banish})", player=attacker_owner.name)
                 for _ in range(damage_amount):
                     if target_owner.life:
@@ -789,10 +791,8 @@ class GameManager:
                         log_event("INFO", "game.action_cost_reduction", f"{target.master.name}'s cost changed by {value}", player=player.name)
                 elif action.status == "BLOCKER_DISABLE":
                     target.flags.add("BLOCKER_DISABLED")
-                    if hasattr(target.current_keywords, 'discard'):
-                        target.current_keywords.discard("ブロッカー")
-                    elif "ブロッカー" in target.current_keywords:
-                        target.current_keywords.remove("ブロッカー")
+                    target.current_keywords.discard("ブロッカー")
+                    target.timed_keywords.discard("ブロッカー")  # 効果付与分の【ブロッカー】も無効化
                     log_event("INFO", "game.action_blocker_disable", f"{target.master.name} blocker disabled", player=player.name)
                 else:
                     # 「このバトル中」のパワー増減は継続効果として管理し、バトル終了時に失効させる
@@ -879,8 +879,13 @@ class GameManager:
                     if _kw:
                         keyword = _kw.group(1)
                 if keyword:
-                    target.current_keywords.add(keyword)
-                    log_event("INFO", "game.action_grant_keyword", f"【{keyword}】→ {target.master.name}", player=player.name)
+                    # 継続効果として付与する（timed_keywords）。current_keywords へ直接
+                    # 加えると _apply_passive_effects のリセットで消えてしまうため。
+                    dur = getattr(action, "duration", "INSTANT")
+                    cdur = dur if dur in ("THIS_TURN", "THIS_BATTLE", "UNTIL_NEXT_TURN_END") else "PERMANENT"
+                    expire_turn = self.turn_count + 1 if cdur == "UNTIL_NEXT_TURN_END" else 0
+                    self.continuous.apply(target, "KEYWORD", cdur, keyword=keyword, expire_turn=expire_turn)
+                    log_event("INFO", "game.action_grant_keyword", f"【{keyword}】→ {target.master.name} ({cdur})", player=player.name)
                 success = True
         return success
 

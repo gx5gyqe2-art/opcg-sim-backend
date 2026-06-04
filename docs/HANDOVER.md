@@ -33,7 +33,7 @@
 |---|---|---|
 | 原子句カバレッジ（ルール命中率） | 0% | 約70.4%（grant_keyword + ライフ操作5種 + ドン操作4種） |
 | `ActionType.OTHER`（実行時に何もしない句） | 942 | 342（約64%減） |
-| テスト総数 | 17 | 73（全緑） |
+| テスト総数 | 17 | 75（全緑） |
 | 本番パーサ | レガシー | **EffectParserV2（既定）** |
 
 > 追記1（キーワード付与の修正）: 「このキャラは【ブロッカー】を得る」等が構造分解で
@@ -60,6 +60,12 @@
 > 追記5（条件分類の拡充）: 未分類だった `GENERIC` 条件を実条件へ分類して評価可能化
 > （GENERIC 251→132）。`FIELD_COUNT`（盤面のキャラ枚数, フィルタ対応）/`DECK_COUNT`
 > /`LEADER_COLOR`（多色）を新たにパース・評価。誤発動源を約120件削減。詳細は §7-5。
+>
+> 追記6（キーワード付与の永続化）: `GRANT_KEYWORD` を継続効果マネージャ経由で
+> `timed_keywords` に付与するよう変更。従来は `current_keywords` に直接加算していたため
+> `_apply_passive_effects` のリセットで即消えていた（146件の付与が実質不発）。
+> `has_keyword()` で参照を一本化し、duration（THIS_TURN/THIS_BATTLE/PERMANENT）で失効、
+> 場を離れる際は `drop_for` で破棄。詳細は §7-2。
 
 - 全2652カードの能力構築・実デッキ(imu/nami)ロード・ゲーム開始〜数ターン進行を確認済み。
 - レガシー vs V2 の全カード比較で **退行(新規OTHER)=0**。
@@ -199,9 +205,9 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
    候補: デッキ並び替え（デッキの上か下に置く）、ライフを見て上か下に置く
    （look-and-place）、公開して手札に加える 等。
    - キーワード付与（【ブロッカー】等を得る）は **対応済み**（`grant_keyword`）。
-     ただし `GRANT_KEYWORD` は `current_keywords` に直接加算するため、`THIS_TURN` 等の
-     duration 失効と、`_apply_passive_effects` の `current_keywords` 毎回リセットとの
-     統合は未対応（下記2と同根の課題）。
+     `GRANT_KEYWORD` は継続効果マネージャ経由で `timed_keywords` に付与され、
+     `_apply_passive_effects` のリセットで消えず、duration（THIS_TURN/THIS_BATTLE/
+     PERMANENT）で失効する（下記2のうち KEYWORD は対応済み）。
    - ライフ操作（デッキ↔ライフ↔手札／トラッシュ／表・裏向き）は **対応済み**（`life_*`）。
      残: 「ライフを見て上か下に置く」等の look-and-place 系。なお MOVE_CARD は
      `dest_position` フィールドを持たず常に末尾（下）へ入るため「ライフの上に加える」の
@@ -209,8 +215,11 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
    - ドン!!操作（付与／アクティブ／レスト／ドンデッキに戻す）は **対応済み**（`don_*`、
      枚数ベース）。残: REST_DON をコストにする句の充足判定（現状 target=None のため
      `_can_satisfy_node` がドン枚数を検証せず常に True）。
-2. **COST/KEYWORD の duration 対応** — 現状 `_apply_passive_effects` がこれらを毎回
-   再計算するため、継続効果マネージャと統合する設計が必要（POWER/FLAG は対応済）。
+2. **COST の duration 対応** — `_apply_passive_effects` が `cost_buff` を毎回リセット
+   するため、継続効果マネージャと統合する設計が必要（POWER/FLAG/**KEYWORD は対応済**）。
+   KEYWORD は `timed_keywords`（継続効果マネージャ管理、`_apply_passive_effects` の
+   リセット対象外）に付与し、`has_keyword()` で本来＋付与分を参照、`drop_for` で
+   場を離れる際に破棄する方式で解決済み。COST も同様に `timed_cost` 化が候補。
 3. **置換効果（「代わりに〜」）** — 「KOされる場合、代わりに手札を捨てる」等。
    除去保護の枠組みを拡張して置換に対応する余地。
 4. ~~**ターン1回制限の enforce**~~ **対応済み**。`resolver.resolve_ability` が

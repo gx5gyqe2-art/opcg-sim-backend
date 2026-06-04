@@ -99,6 +99,10 @@ class CardInstance:
     # （ターン境界を跨いで存続する期間付き効果を保持するため）。
     timed_power: int = 0
     timed_flags: Set[str] = field(default_factory=set)
+    # 効果で付与されたキーワード（【ブロッカー】等）。current_keywords は
+    # _apply_passive_effects で master のコピーに毎回リセットされるため、付与分は
+    # ここに保持して消えないようにする。失効は ContinuousEffectManager が管理。
+    timed_keywords: Set[str] = field(default_factory=set)
 
     def __post_init__(self):
         if not self.uuid:
@@ -118,6 +122,10 @@ class CardInstance:
                     keyword_val = getattr(action, 'details', None)
                     if keyword_val:
                         self.current_keywords.add(keyword_val)
+
+    def has_keyword(self, keyword: str) -> bool:
+        """カードが指定キーワードを持つか（本来のキーワード＋効果で付与された分）。"""
+        return keyword in self.current_keywords or keyword in self.timed_keywords
 
     def get_power(self, is_my_turn: bool) -> int:
         if self.master.type not in [CardType.LEADER, CardType.CHARACTER]:
@@ -161,7 +169,7 @@ class CardInstance:
             props.get('IS_FACE_UP', 'is_face_up'): self.is_face_up,
             props.get('ATTACHED_DON', 'attached_don'): self.attached_don,
             props.get('OWNER_ID', 'owner_id'): self.owner_id,
-            props.get('KEYWORDS', 'keywords'): list(self.current_keywords)
+            props.get('KEYWORDS', 'keywords'): list(self.current_keywords | self.timed_keywords)
         }
 
 @dataclass

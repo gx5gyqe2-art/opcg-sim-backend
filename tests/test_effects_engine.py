@@ -165,16 +165,44 @@ def test_reset_turn_status_keeps_timed_effects():
 
 
 def test_grant_keyword_adds_to_current_keywords():
-    """GRANT_KEYWORD: status のキーワードを対象の current_keywords に付与する。"""
+    """GRANT_KEYWORD: status のキーワードを付与し、passive 再計算後も保持される。"""
     gm, p1, _ = make_game()
     card = _make_field_char(p1)
-    assert "ブロッカー" not in card.current_keywords
+    assert not card.has_keyword("ブロッカー")
 
     ok = gm.apply_action_to_engine(
         p1, action(ActionType.GRANT_KEYWORD, status="ブロッカー"), [card], 0
     )
     assert ok
-    assert "ブロッカー" in card.current_keywords
+    assert card.has_keyword("ブロッカー")
+    # _apply_passive_effects は current_keywords を master のコピーに戻すが、
+    # 付与分は timed_keywords に保持されるため消えない（修正前は消えていた）。
+    gm._apply_passive_effects(p1)
+    assert card.has_keyword("ブロッカー")
+
+
+def test_grant_keyword_this_turn_expires_at_turn_end():
+    """duration=THIS_TURN のキーワード付与はターン終了で失効する。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1)
+    gm.apply_action_to_engine(
+        p1, action(ActionType.GRANT_KEYWORD, status="速攻", duration="THIS_TURN"), [card], 0
+    )
+    assert card.has_keyword("速攻")
+    gm.continuous.expire("TURN_END", gm.turn_count)
+    assert not card.has_keyword("速攻")
+
+
+def test_grant_keyword_dropped_when_leaving_field():
+    """場を離れると付与キーワード（継続効果）は破棄される。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1)
+    gm.apply_action_to_engine(
+        p1, action(ActionType.GRANT_KEYWORD, status="ブロッカー"), [card], 0
+    )
+    assert card.has_keyword("ブロッカー")
+    gm.move_card(card, Zone.TRASH, p1)
+    assert not card.has_keyword("ブロッカー")
 
 
 def test_life_recover_from_deck():
