@@ -200,7 +200,7 @@ class GameManager:
         
         if self.phase == Phase.BLOCK_STEP and self.active_battle:
             target_owner = self.active_battle["target_owner"]
-            blockers = [c.uuid for c in target_owner.field if not c.is_rest and "ブロッカー" in c.current_keywords]
+            blockers = [c.uuid for c in target_owner.field if not c.is_rest and c.has_keyword("ブロッカー")]
             request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
         elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
             target_owner = self.active_battle["target_owner"]
@@ -455,6 +455,8 @@ class GameManager:
                 don.is_rest = True
                 current_owner.don_rested.append(don)
             card.attached_don = 0
+            # 場を離れたら継続効果（timed_power/flags/keywords）を破棄する。
+            self.continuous.drop_for(card.uuid)
 
         if current_list is not None and card in current_list: current_list.remove(card)
         elif current_owner and current_owner.stage == card: current_owner.stage = None
@@ -486,7 +488,7 @@ class GameManager:
 
     def has_blocker(self, player: Player) -> bool:
         for card in player.field:
-            if not card.is_rest and "ブロッカー" in card.current_keywords and "BLOCKER_DISABLED" not in card.flags:
+            if not card.is_rest and card.has_keyword("ブロッカー") and "BLOCKER_DISABLED" not in card.flags:
                 return True
         return False
 
@@ -546,7 +548,7 @@ class GameManager:
         attacker_pwr = attacker.get_power(is_my_turn); target_pwr = target.get_power(is_target_turn) + counter_buff
         if target == target_owner.leader:
             if attacker_pwr >= target_pwr:
-                damage_amount = 2 if "ダブルアタック" in attacker.current_keywords else 1; is_banish = "バニッシュ" in attacker.current_keywords
+                damage_amount = 2 if attacker.has_keyword("ダブルアタック") else 1; is_banish = attacker.has_keyword("バニッシュ")
                 log_event("INFO", "game.damage_step", f"Dealing {damage_amount} damage (Banish: {is_banish})", player=attacker_owner.name)
                 for _ in range(damage_amount):
                     if target_owner.life:
@@ -566,6 +568,8 @@ class GameManager:
             if attacker_pwr >= target_pwr:
                 if self._active_protection(target, ("BATTLE_KO",)):
                     log_event("INFO", "game.battle_ko_prevented", f"{target.master.name} is protected from battle KO", player=target_owner.name)
+                elif self._active_replacement(target, ("BATTLE_KO",)):
+                    log_event("INFO", "game.battle_ko_replaced", f"{target.master.name}'s battle KO was replaced by an alternative effect", player=target_owner.name)
                 else:
                     self.move_card(target, Zone.TRASH, target_owner)
                     log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
@@ -625,6 +629,36 @@ class GameManager:
             return True
         return False
 
+    # 置換効果（REPLACE_EFFECT）の判定。除去の瞬間に対象の PASSIVE 能力を走査し、
+    # 「代わりに〜」の置換アクションを（条件・実行可能性を満たせば）実行して True を返す。
+    # True の場合、呼び出し側は本来の除去を行わずスキップする。
+    def _active_replacement(self, card: CardInstance, status_values: Tuple[str, ...]) -> bool:
+        if not card or not getattr(card, "master", None) or card.negated:
+            return False
+        owner = self.p1 if self.p1.name == card.owner_id else self.p2
+        for ab in card.master.abilities:
+            if ab.trigger != TriggerType.PASSIVE:
+                continue
+            eff = ab.effect
+            if not isinstance(eff, GameAction) or eff.type != ActionType.REPLACE_EFFECT:
+                continue
+            if eff.status not in status_values:
+                continue
+            sub = getattr(eff, "sub_effect", None)
+            if sub is None:
+                continue
+            resolver = EffectResolver(self)
+            if ab.condition is not None and not resolver._check_condition(owner, ab.condition, card):
+                continue
+            # 代わりの行動が取れない（例: 捨てる手札が無い）場合は置換不成立＝本来の除去が起こる。
+            if not resolver._can_satisfy_node(owner, sub, card):
+                continue
+            log_event("INFO", "game.replacement", f"Replacement effect activated for {card.master.name}", player=owner.name)
+            resolver.execution_stack = [sub]
+            resolver._process_stack(owner, card)
+            return True
+        return False
+
     def _resolve_on_ko(self, card: Card, owner: Player):
         if not card.master.abilities: return
         for ability in card.master.abilities:
@@ -639,6 +673,17 @@ class GameManager:
                 if ability.trigger == TriggerType.ON_LIFE_DECREASE:
                     log_event("INFO", "game.trigger_life_decrease", f"ON_LIFE_DECREASE fired for {card.master.name}", player=player.name)
                     self.resolve_ability(player, ability, source_card=card)
+
+    def _don_pool_player(self, player: Player, action: GameAction) -> Player:
+        """ドン操作の対象プレイヤー。「相手は…」は status="OPPONENT"、
+        対象クエリの player=OPPONENT でも相手を指す。既定は効果の実行者。"""
+        opp = self.p2 if player == self.p1 else self.p1
+        if getattr(action, 'status', None) == "OPPONENT":
+            return opp
+        tgt = getattr(action, 'target', None)
+        if tgt is not None and getattr(getattr(tgt, 'player', None), 'name', '') == 'OPPONENT':
+            return opp
+        return player
 
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int) -> bool:
         if not action: return False
@@ -690,23 +735,53 @@ class GameManager:
             return True
 
         if act_name == "RETURN_DON":
-            # 「ドン‼-N」: 場のドン!!を N 枚、ドン!!デッキへ戻す。
+            # 「ドン‼-N」/「ドン!!デッキに戻す」: 場のドン!!を N 枚ドン!!デッキへ戻す。
             # 影響の小さい順（レスト→アクティブ→付与中）に戻す。
+            tp = self._don_pool_player(player, action)
             returned = 0
             for _ in range(value):
-                if player.don_rested:
-                    don = player.don_rested.pop()
-                elif player.don_active:
-                    don = player.don_active.pop()
-                elif player.don_attached_cards:
-                    don = player.don_attached_cards.pop()
+                if tp.don_rested:
+                    don = tp.don_rested.pop()
+                elif tp.don_active:
+                    don = tp.don_active.pop()
+                elif tp.don_attached_cards:
+                    don = tp.don_attached_cards.pop()
                 else:
                     break
                 don.is_rest = False
                 don.attached_to = None
-                player.don_deck.append(don)
+                tp.don_deck.append(don)
                 returned += 1
-            log_event("INFO", "game.action_return_don", f"{player.name} returned {returned} DON!! to don deck", player=player.name)
+            log_event("INFO", "game.action_return_don", f"{tp.name} returned {returned} DON!! to don deck", player=tp.name)
+            return True
+
+        if act_name == "REST_DON":
+            # 「ドン!!N枚をレストにする」/【ドン!!×N】コスト: アクティブ→レスト。
+            # ドンは均質なため枚数(value)ベースで処理する。
+            tp = self._don_pool_player(player, action)
+            rested = 0
+            for _ in range(value):
+                if not tp.don_active:
+                    break
+                don = tp.don_active.pop(0)
+                don.is_rest = True
+                tp.don_rested.append(don)
+                rested += 1
+            log_event("INFO", "game.action_rest_don", f"{tp.name} rested {rested} DON!!", player=tp.name)
+            return True
+
+        if act_name == "ACTIVE_DON" and not getattr(action, 'target', None):
+            # 「ドン!!N枚をアクティブにする」: レスト→アクティブ（枚数ベース）。
+            tp = self._don_pool_player(player, action)
+            activated = 0
+            for _ in range(value):
+                if not tp.don_rested:
+                    break
+                don = tp.don_rested.pop()
+                don.is_rest = False
+                tp.don_active.append(don)
+                activated += 1
+            log_event("INFO", "game.action_active_don", f"{tp.name} activated {activated} DON!!", player=tp.name)
             return True
 
         # ▼▼▼ 修正: 初期値をTrueに設定（対象0枚でも「何もしないことに成功した」とみなすため） ▼▼▼
@@ -718,12 +793,15 @@ class GameManager:
         for target in targets:
             owner, source_list = self._find_card_location(target)
             if not owner: continue
-            # 相手の効果でフィールド上のカードを場から除去しようとする場合、保護を確認
+            # 相手の効果でフィールド上のカードを場から除去しようとする場合、保護/置換を確認
             if (act_name in _LEAVE_ACTIONS and player.name != owner.name
-                    and source_list is owner.field
-                    and self._active_protection(target, ("LEAVE",))):
-                log_event("INFO", "game.leave_prevented", f"{target.master.name} is protected from leaving the field by opponent's effect", player=owner.name)
-                continue
+                    and source_list is owner.field):
+                if self._active_protection(target, ("LEAVE",)):
+                    log_event("INFO", "game.leave_prevented", f"{target.master.name} is protected from leaving the field by opponent's effect", player=owner.name)
+                    continue
+                if self._active_replacement(target, ("LEAVE",)):
+                    log_event("INFO", "game.leave_replaced", f"{target.master.name}'s removal was replaced by an alternative effect", player=owner.name)
+                    continue
             if act_name == "PREVENT_LEAVE":
                 # 保護マーカー自体は no-op（実際の保護は除去時に _active_protection で評価）。
                 success = True
@@ -743,15 +821,20 @@ class GameManager:
                     target.base_power_override = value
                     log_event("INFO", "game.action_override", f"{target.master.name}'s power set to {value}", player=player.name)
                 elif action.status == "COST_REDUCTION":
-                    if hasattr(target, 'cost_buff'):
+                    # 期間付き（このターン中／このバトル中 等）は継続効果(timed_cost)へ。
+                    # cost_buff は _apply_passive_effects で毎回リセットされ消えるため。
+                    # 期間指定なし(INSTANT)は従来どおり cost_buff（PASSIVE 再計算で再適用される）。
+                    dur = getattr(action, "duration", "INSTANT")
+                    if dur in ("THIS_TURN", "THIS_BATTLE", "UNTIL_NEXT_TURN_END"):
+                        expire_turn = self.turn_count + 1 if dur == "UNTIL_NEXT_TURN_END" else 0
+                        self.continuous.apply(target, "COST", dur, amount=value, expire_turn=expire_turn)
+                    elif hasattr(target, 'cost_buff'):
                         target.cost_buff += value
-                        log_event("INFO", "game.action_cost_reduction", f"{target.master.name}'s cost changed by {value}", player=player.name)
+                    log_event("INFO", "game.action_cost_reduction", f"{target.master.name}'s cost changed by {value} ({dur})", player=player.name)
                 elif action.status == "BLOCKER_DISABLE":
                     target.flags.add("BLOCKER_DISABLED")
-                    if hasattr(target.current_keywords, 'discard'):
-                        target.current_keywords.discard("ブロッカー")
-                    elif "ブロッカー" in target.current_keywords:
-                        target.current_keywords.remove("ブロッカー")
+                    target.current_keywords.discard("ブロッカー")
+                    target.timed_keywords.discard("ブロッカー")  # 効果付与分の【ブロッカー】も無効化
                     log_event("INFO", "game.action_blocker_disable", f"{target.master.name} blocker disabled", player=player.name)
                 else:
                     # 「このバトル中」のパワー増減は継続効果として管理し、バトル終了時に失効させる
@@ -798,13 +881,24 @@ class GameManager:
                 log_event("INFO", "game.action_active", f"Card activated for {owner.name}", player=player.name)
                 success = True
             elif act_name == "ATTACH_DON":
-                if player.don_active:
-                    don = player.don_active.pop(0)
+                # value 枚のドン!!を付与する。status="RESTED" の場合はレストのドンを
+                # レストのまま付与する（無ければもう一方のプールから補う）。
+                from_rested = (action.status == "RESTED")
+                n = value if value and value > 0 else 1
+                attached = 0
+                for _ in range(n):
+                    pool = player.don_rested if from_rested else player.don_active
+                    if not pool:
+                        pool = player.don_active if from_rested else player.don_rested
+                    if not pool:
+                        break
+                    don = pool.pop(0)
                     don.attached_to = target.uuid
-                    don.is_rest = False
+                    don.is_rest = from_rested
                     player.don_attached_cards.append(don)
                     target.attached_don += 1
-                    log_event("INFO", "game.action_attach_don", f"DON!! attached to {target.master.name}", player=player.name)
+                    attached += 1
+                log_event("INFO", "game.action_attach_don", f"{attached} DON!! attached to {target.master.name} (rested={from_rested})", player=player.name)
                 success = True
             elif act_name == "MOVE_CARD":
                 dest = action.destination if action.destination else Zone.HAND
@@ -813,6 +907,12 @@ class GameManager:
                 success = True
             elif act_name == "DECK_TOP":
                 self.move_card(target, Zone.DECK, owner, dest_position="TOP"); success = True
+            elif act_name == "FACE_UP_LIFE":
+                # 「ライフを表向き／裏向きにする」: status="DOWN" のみ裏向き、他は表向き。
+                target.is_face_up = (action.status != "DOWN")
+                log_event("INFO", "game.action_face_up_life",
+                          f"{target.master.name} life set face_up={target.is_face_up}", player=player.name)
+                success = True
             elif act_name == "GRANT_KEYWORD":
                 keyword = action.status
                 if not keyword and getattr(action, 'raw_text', ''):
@@ -821,8 +921,13 @@ class GameManager:
                     if _kw:
                         keyword = _kw.group(1)
                 if keyword:
-                    target.current_keywords.add(keyword)
-                    log_event("INFO", "game.action_grant_keyword", f"【{keyword}】→ {target.master.name}", player=player.name)
+                    # 継続効果として付与する（timed_keywords）。current_keywords へ直接
+                    # 加えると _apply_passive_effects のリセットで消えてしまうため。
+                    dur = getattr(action, "duration", "INSTANT")
+                    cdur = dur if dur in ("THIS_TURN", "THIS_BATTLE", "UNTIL_NEXT_TURN_END") else "PERMANENT"
+                    expire_turn = self.turn_count + 1 if cdur == "UNTIL_NEXT_TURN_END" else 0
+                    self.continuous.apply(target, "KEYWORD", cdur, keyword=keyword, expire_turn=expire_turn)
+                    log_event("INFO", "game.action_grant_keyword", f"【{keyword}】→ {target.master.name} ({cdur})", player=player.name)
                 success = True
         return success
 

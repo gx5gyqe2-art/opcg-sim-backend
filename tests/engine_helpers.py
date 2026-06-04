@@ -63,11 +63,12 @@ def make_game(p1_name="P1", p2_name="P2"):
     return gm, p1, p2
 
 
-def action(type, value=0, status=None, target=None, destination=None):
+def action(type, value=0, status=None, target=None, destination=None, duration="INSTANT"):
     return GameAction(
         type=type,
         value=ValueSource(base=value),
         status=status,
         target=target,
         destination=destination,
+        duration=duration,
     )

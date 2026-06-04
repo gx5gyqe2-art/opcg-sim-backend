@@ -25,6 +25,7 @@ from ...utils.logger_config import log_event
 THIS_TURN = "THIS_TURN"               # 現在のターン終了時に失効
 THIS_BATTLE = "THIS_BATTLE"           # 現在のバトル解決時に失効
 UNTIL_NEXT_TURN_END = "UNTIL_NEXT_TURN_END"  # 次のターン終了時に失効（複数ターン跨ぎ）
+PERMANENT = "PERMANENT"               # ターン/バトルでは失効しない（場を離れるまで持続）
 
 # expire() に渡すイベント
 EV_TURN_END = "TURN_END"
@@ -34,9 +35,10 @@ EV_BATTLE_END = "BATTLE_END"
 @dataclass
 class ContinuousEffect:
     target_uuid: str
-    kind: str          # "POWER" | "FLAG"
+    kind: str          # "POWER" | "COST" | "FLAG" | "KEYWORD"
     amount: int = 0
     flag: str = ""
+    keyword: str = ""
     duration: str = THIS_TURN
     expire_turn: int = 0  # UNTIL_NEXT_TURN_END 用: この turn_count の TURN_END で失効
 
@@ -46,12 +48,13 @@ class ContinuousEffectManager:
         self.gm = game_manager
         self.effects: List[ContinuousEffect] = []
 
-    def apply(self, card, kind, duration, amount=0, flag="", expire_turn=0) -> ContinuousEffect:
+    def apply(self, card, kind, duration, amount=0, flag="", keyword="", expire_turn=0) -> ContinuousEffect:
         eff = ContinuousEffect(
             target_uuid=card.uuid,
             kind=kind,
             amount=amount,
             flag=flag,
+            keyword=keyword,
             duration=duration,
             expire_turn=expire_turn,
         )
@@ -60,7 +63,7 @@ class ContinuousEffectManager:
         log_event(
             "INFO",
             "continuous.apply",
-            f"{kind} {amount or flag} on {card.master.name} ({duration})",
+            f"{kind} {amount or flag or keyword} on {card.master.name} ({duration})",
             player=card.owner_id,
         )
         return eff
@@ -68,14 +71,22 @@ class ContinuousEffectManager:
     def _apply_to_card(self, card, eff: ContinuousEffect) -> None:
         if eff.kind == "POWER":
             card.timed_power += eff.amount
+        elif eff.kind == "COST":
+            card.timed_cost += eff.amount
         elif eff.kind == "FLAG":
             card.timed_flags.add(eff.flag)
+        elif eff.kind == "KEYWORD":
+            card.timed_keywords.add(eff.keyword)
 
     def _remove_from_card(self, card, eff: ContinuousEffect) -> None:
         if eff.kind == "POWER":
             card.timed_power -= eff.amount
+        elif eff.kind == "COST":
+            card.timed_cost -= eff.amount
         elif eff.kind == "FLAG":
             card.timed_flags.discard(eff.flag)
+        elif eff.kind == "KEYWORD":
+            card.timed_keywords.discard(eff.keyword)
 
     def _is_expired(self, eff: ContinuousEffect, event: str, turn_count: int) -> bool:
         if event == EV_BATTLE_END:

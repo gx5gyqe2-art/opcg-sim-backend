@@ -171,6 +171,7 @@ class ConditionType(Enum):
     DECK_COUNT = auto() 
     LEADER_NAME = auto()
     LEADER_TRAIT = auto()
+    LEADER_COLOR = auto()
     CONTEXT = auto()
     
     # 追加: 複合条件用

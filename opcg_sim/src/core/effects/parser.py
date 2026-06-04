@@ -80,18 +80,27 @@ class EffectParser:
                 don_cost_value = int(don_match.group(1))
                 norm_text = norm_text.replace(don_match.group(0), '').strip()
 
-            # トリガータグの除去
-            clean_text = re.sub(r'【.*?】', '', norm_text).strip()
+            # トリガー/注釈タグの除去。
+            # ただしキーワード能力タグ（【ブロッカー】等）は効果本体で「付与」を
+            # 表すため保持する。脱落すると原子句が「このキャラはを得る」になり、
+            # GRANT_KEYWORD（付与すべきキーワード）を復元できなくなる（既知バグ）。
+            clean_text = re.sub(
+                _nfc(r'【(?!ブロッカー|速攻|ダブルアタック|バニッシュ|ブロック不可|貫通|シフト)[^】]*?】'),
+                '', norm_text
+            ).strip()
 
             cost_node = None
             effect_text = clean_text
 
-            # コストの分離（全角コロン優先、なければ半角コロン）
-            colon = _nfc("：") if _nfc("：") in clean_text else (_nfc(":") if _nfc(":") in clean_text else None)
-            if colon and colon in clean_text:
-                parts = clean_text.split(colon, 1)
-                cost_node = self._parse_cost_node(parts[0])
-                effect_text = parts[1]
+            # コストの分離（全角コロン優先、なければ半角コロン）。
+            # ただし【速攻：キャラ】のようにキーワード能力タグ内部の「：」は
+            # コスト区切りではないため、タグ内部をマスクした上で判定する。
+            masked = re.sub(r'【[^】]*】', lambda m: '〇' * len(m.group(0)), clean_text)
+            colon = _nfc("：") if _nfc("：") in masked else (_nfc(":") if _nfc(":") in masked else None)
+            if colon:
+                idx = masked.index(colon)
+                cost_node = self._parse_cost_node(clean_text[:idx])
+                effect_text = clean_text[idx + 1:]
 
             # ドン!!コストタグを cost_node に統合
             if don_cost_value > 0:
@@ -121,6 +130,20 @@ class EffectParser:
                     )
                 effect_node = effect_node.if_true
 
+            # 置換効果（「このキャラが(バトルで)?KOされる/場を離れる場合、代わりに〜」）。
+            # 「…される場合」はゲート条件ではなくトリガー文脈なので、REPLACE_EFFECT で
+            # 包み（置換アクションは sub_effect に保持）、PASSIVE 能力として扱う。
+            repl_status = self._replacement_status(_nfc(text))
+            if repl_status and effect_node is not None:
+                effect_node = GameAction(
+                    type=ActionType.REPLACE_EFFECT,
+                    status=repl_status,
+                    sub_effect=effect_node,
+                    raw_text=_nfc(text),
+                )
+                final_condition = None
+                trigger = TriggerType.PASSIVE
+
             return Ability(
                 trigger=trigger,
                 condition=final_condition,
@@ -131,6 +154,21 @@ class EffectParser:
         except Exception as e:
             log_event(level_key="ERROR", action="parser.parse_ability_error", msg=f"Failed to parse: {text[:20]} | Error: {str(e)}")
             return Ability(trigger=TriggerType.UNKNOWN, effect=None, raw_text=_nfc(text))
+
+    def _replacement_status(self, norm_text: str) -> Optional[str]:
+        """置換効果（「代わりに〜」）の対象除去種別を返す。MVP は自身(このキャラ)のみ。
+
+        - 「バトルでKOされる」→ "BATTLE_KO"（戦闘KOの置換）
+        - 「(相手の効果で)場を離れる / KOされる」→ "LEAVE"（相手効果による除去の置換）
+        該当しなければ None。
+        """
+        if _nfc("代わりに") not in norm_text:
+            return None
+        if _nfc("このキャラ") not in norm_text:
+            return None  # MVP: 自身の置換のみ（リーダーが他キャラを守る型は対象外）
+        if _nfc("場を離れる") not in norm_text and _nfc("KOされ") not in norm_text:
+            return None
+        return "BATTLE_KO" if _nfc("バトル") in norm_text else "LEAVE"
 
     def _parse_cost_node(self, cost_text: str) -> Optional[EffectNode]:
         """
@@ -401,13 +439,42 @@ class EffectParser:
         if _nfc("トラッシュ") in norm_text:
             return Condition(type=ConditionType.TRASH_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
+        # デッキ枚数（「自分のデッキが20枚以下の場合」等）。"デッキの上から…" は除外。
+        if _nfc("デッキが") in norm_text:
+            return Condition(type=ConditionType.DECK_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
+
         if _nfc("リーダーが") in norm_text or _nfc("リーダーの特徴") in norm_text:
-            trait_match = re.search(_nfc(r'[《<]([^》>]+)[》>]'), norm_text)
+            # 特徴は《X》だけでなく『X』（『白ひげ海賊団』『B・W』等の名称系特徴）でも書かれる。
+            trait_match = re.search(_nfc(r'[《<『]([^》>』]+)[》>』]'), norm_text)
             name_match = re.search(_nfc(r'「([^」]+)」'), norm_text)
             if trait_match:
                 return Condition(type=ConditionType.LEADER_TRAIT, value=trait_match.group(1), player=p, raw_text=norm_text)
             if name_match:
                 return Condition(type=ConditionType.LEADER_NAME, value=name_match.group(1), player=p, raw_text=norm_text)
+            if _nfc("多色") in norm_text:
+                return Condition(type=ConditionType.LEADER_COLOR, value=_nfc("多色"), player=p, raw_text=norm_text)
+
+        # 盤面のキャラ枚数（「自分の（レストの／特徴《X》の／コストN以上の）キャラがM枚以上いる」
+        # 「…キャラがいる」）。数値が「フィルタ(コストN以上)」と「枚数(M枚)」で混在し得るため、
+        # 閾値は必ず「M枚」側から取り、フィルタは parse_target に委ねる（保守的な分類）。
+        # 「このキャラが…される/場を離れる/登場した」等の単体状態・置換条件は対象外。
+        if (_nfc("キャラ") in norm_text and _nfc("このキャラ") not in norm_text
+                and (_nfc("いる") in norm_text or re.search(_nfc(r"\d+枚(以上|以下)"), norm_text))
+                and not re.search(_nfc(r"(される|場を離れる|登場した|公開)"), norm_text)):
+            tq = parse_target(norm_text)
+            mc = re.search(_nfc(r"(\d+)枚(以上|以下|より多い|未満)?"), norm_text)
+            if mc:
+                thr = int(mc.group(1))
+                cnt_op = {
+                    _nfc('以上'): CompareOperator.GE,
+                    _nfc('以下'): CompareOperator.LE,
+                    _nfc('より多い'): CompareOperator.GT,
+                    _nfc('未満'): CompareOperator.LT,
+                }.get(mc.group(2), CompareOperator.GE)
+            else:
+                thr, cnt_op = 1, CompareOperator.GE  # 「いる」=1枚以上
+            return Condition(type=ConditionType.FIELD_COUNT, target=tq,
+                             operator=cnt_op, value=thr, player=tq.player, raw_text=norm_text)
 
         return Condition(type=ConditionType.GENERIC, raw_text=norm_text)
 

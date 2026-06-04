@@ -164,6 +164,328 @@ def test_reset_turn_status_keeps_timed_effects():
     assert "ATTACK_DISABLE" in card.timed_flags
 
 
+def test_grant_keyword_adds_to_current_keywords():
+    """GRANT_KEYWORD: status のキーワードを付与し、passive 再計算後も保持される。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1)
+    assert not card.has_keyword("ブロッカー")
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.GRANT_KEYWORD, status="ブロッカー"), [card], 0
+    )
+    assert ok
+    assert card.has_keyword("ブロッカー")
+    # _apply_passive_effects は current_keywords を master のコピーに戻すが、
+    # 付与分は timed_keywords に保持されるため消えない（修正前は消えていた）。
+    gm._apply_passive_effects(p1)
+    assert card.has_keyword("ブロッカー")
+
+
+def test_cost_reduction_this_turn_persists_and_expires():
+    """COST_REDUCTION(THIS_TURN): passive 再計算で消えず、ターン終了で失効する。"""
+    gm, p1, _ = make_game()
+    card = make_instance(make_master(card_id="CC-1", cost=5), owner=p1.name)
+    p1.field.append(card)
+
+    gm.apply_action_to_engine(
+        p1, action(ActionType.BUFF, value=-2, status="COST_REDUCTION", duration="THIS_TURN"),
+        [card], -2)
+    assert card.current_cost == 3
+    gm._apply_passive_effects(p1)        # cost_buff をリセットするが timed_cost は残る
+    assert card.current_cost == 3
+    gm.continuous.expire("TURN_END", gm.turn_count)
+    assert card.current_cost == 5
+
+
+def test_grant_keyword_this_turn_expires_at_turn_end():
+    """duration=THIS_TURN のキーワード付与はターン終了で失効する。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1)
+    gm.apply_action_to_engine(
+        p1, action(ActionType.GRANT_KEYWORD, status="速攻", duration="THIS_TURN"), [card], 0
+    )
+    assert card.has_keyword("速攻")
+    gm.continuous.expire("TURN_END", gm.turn_count)
+    assert not card.has_keyword("速攻")
+
+
+def test_grant_keyword_dropped_when_leaving_field():
+    """場を離れると付与キーワード（継続効果）は破棄される。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1)
+    gm.apply_action_to_engine(
+        p1, action(ActionType.GRANT_KEYWORD, status="ブロッカー"), [card], 0
+    )
+    assert card.has_keyword("ブロッカー")
+    gm.move_card(card, Zone.TRASH, p1)
+    assert not card.has_keyword("ブロッカー")
+
+
+def test_life_recover_from_deck():
+    """HEAL: デッキの上から value 枚をライフに加える（対象不要）。"""
+    gm, p1, _ = make_game()
+    for i in range(3):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    assert len(p1.life) == 0 and len(p1.deck) == 3
+
+    ok = gm.apply_action_to_engine(p1, action(ActionType.HEAL, value=2), [], 2)
+    assert ok
+    assert len(p1.life) == 2
+    assert len(p1.deck) == 1
+
+
+def test_life_to_hand_move_card():
+    """MOVE_CARD(dest=HAND): ライフのカードを手札へ移す。"""
+    gm, p1, _ = make_game()
+    life_card = make_instance(make_master(card_id="LF"), owner=p1.name)
+    p1.life.append(life_card)
+    assert len(p1.hand) == 0
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.MOVE_CARD, destination=Zone.HAND), [life_card], 0
+    )
+    assert ok
+    assert life_card in p1.hand
+    assert life_card not in p1.life
+
+
+def test_face_up_life_sets_flag():
+    """FACE_UP_LIFE: status で is_face_up を切り替える。"""
+    gm, p1, _ = make_game()
+    life_card = make_instance(make_master(card_id="LF2"), owner=p1.name)
+    p1.life.append(life_card)
+    assert life_card.is_face_up is False
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.FACE_UP_LIFE, status="UP"), [life_card], 0
+    )
+    assert ok
+    assert life_card.is_face_up is True
+
+    gm.apply_action_to_engine(
+        p1, action(ActionType.FACE_UP_LIFE, status="DOWN"), [life_card], 0
+    )
+    assert life_card.is_face_up is False
+
+
+def test_rest_don_by_value():
+    """REST_DON: value 枚のアクティブドンをレストにする（枚数ベース）。"""
+    gm, p1, _ = make_game()
+    for _ in range(3):
+        p1.don_active.append(p1.don_deck.pop(0))
+    ok = gm.apply_action_to_engine(p1, action(ActionType.REST_DON, value=2), [], 2)
+    assert ok
+    assert len(p1.don_rested) == 2
+    assert len(p1.don_active) == 1
+    assert all(d.is_rest for d in p1.don_rested)
+
+
+def test_active_don_by_value():
+    """ACTIVE_DON: value 枚のレストドンをアクティブにする（枚数ベース, target=None）。"""
+    gm, p1, _ = make_game()
+    for _ in range(2):
+        d = p1.don_deck.pop(0)
+        d.is_rest = True
+        p1.don_rested.append(d)
+    ok = gm.apply_action_to_engine(p1, action(ActionType.ACTIVE_DON, value=1), [], 1)
+    assert ok
+    assert len(p1.don_active) == 1
+    assert len(p1.don_rested) == 1
+    assert p1.don_active[0].is_rest is False
+
+
+def test_attach_don_rested_multiple():
+    """ATTACH_DON: status=RESTED で value 枚のレストドンをレストのまま付与する。"""
+    gm, p1, _ = make_game()
+    for _ in range(2):
+        d = p1.don_deck.pop(0)
+        d.is_rest = True
+        p1.don_rested.append(d)
+    target = _make_field_char(p1)
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.ATTACH_DON, value=2, status="RESTED"), [target], 2
+    )
+    assert ok
+    assert target.attached_don == 2
+    assert len(p1.don_attached_cards) == 2
+    assert all(d.is_rest for d in p1.don_attached_cards)
+    assert len(p1.don_rested) == 0
+
+
+def test_return_don_opponent_via_status():
+    """RETURN_DON + status=OPPONENT: 相手の場のドンをドンデッキへ戻す。"""
+    gm, p1, p2 = make_game()
+    p2.don_active.append(p2.don_deck.pop(0))  # 相手の場に1枚
+    assert len(p2.don_active) == 1 and len(p2.don_deck) == 9
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.RETURN_DON, value=1, status="OPPONENT"), [], 1
+    )
+    assert ok
+    assert len(p2.don_active) == 0
+    assert len(p2.don_deck) == 10
+    # 実行者(p1)のドンは不変
+    assert len(p1.don_active) == 0
+
+
+def test_turn_limit_blocks_second_activation():
+    """【ターン1回】: 同一ターンの2回目は不発。ターンリセット後は再発動可。"""
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    ab = Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        condition=Condition(type=ConditionType.TURN_LIMIT, value=1),
+        effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)),
+    )
+    src = make_instance(make_master(card_id="TL-1", abilities=(ab,)), owner=p1.name)
+    p1.field.append(src)
+
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert len(p1.hand) == 1
+    gm.resolve_ability(p1, ab, source_card=src)   # 2回目は制限で不発
+    assert len(p1.hand) == 1
+    src.reset_turn_status()                        # ターン境界でカウンタが戻る
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert len(p1.hand) == 2
+
+
+def test_turn_limit_enforced_via_parsed_ability():
+    """パーサ→リゾルバ統合: 【ターン1回】の起動メインが2回目に不発になる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    abilities = tuple(EffectParserV2().parse_card_text("【起動メイン】【ターン1回】カード1枚を引く。"))
+    src = make_instance(make_master(card_id="TL-2", abilities=abilities), owner=p1.name)
+    p1.field.append(src)
+
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    assert len(p1.hand) == 1
+
+
+def test_leader_trait_bracket_condition_gates_effect():
+    """『X』を含む特徴の LEADER_TRAIT 条件が正しく評価される（満たす/満たさない）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "【起動メイン】自分のリーダーが『白ひげ海賊団』を含む特徴を持つ場合、カード1枚を引く。"))
+    src = make_instance(make_master(card_id="LT-1", abilities=abilities), owner=p1.name)
+    p1.field.append(src)
+
+    # リーダーが該当特徴を持たない → 不発
+    p1.leader = make_instance(make_master(card_id="LD-A", type=CardType.LEADER, traits=[]), owner=p1.name)
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    assert len(p1.hand) == 0
+
+    # リーダーが該当特徴を持つ → 発動
+    p1.leader = make_instance(
+        make_master(card_id="LD-B", type=CardType.LEADER, traits=["白ひげ海賊団"]), owner=p1.name)
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    assert len(p1.hand) == 1
+
+
+def test_field_count_condition_counts_rested_chars():
+    """FIELD_COUNT(レストのキャラが2枚以上いる)が target フィルタ込みで評価される。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "【起動メイン】自分のレストのキャラが2枚以上いる場合、カード1枚を引く。"))
+    src = make_instance(make_master(card_id="FC-1", abilities=abilities), owner=p1.name)
+    p1.field.append(src)  # src はアクティブ（カウント対象外）
+    rested = []
+    for i in range(2):
+        c = make_instance(make_master(card_id=f"R-{i}"), owner=p1.name)
+        c.is_rest = True
+        p1.field.append(c)
+        rested.append(c)
+
+    gm.resolve_ability(p1, abilities[0], source_card=src)  # レスト2枚 >= 2 → 発動
+    assert len(p1.hand) == 1
+    rested[0].is_rest = False                               # レスト1枚に減らす
+    gm.resolve_ability(p1, abilities[0], source_card=src)  # 1 < 2 → 不発
+    assert len(p1.hand) == 1
+
+
+def test_leader_color_multicolor_condition():
+    """LEADER_COLOR(多色): リーダーが2色以上のときのみ発動する。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    from opcg_sim.src.models.enums import Color
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "【起動メイン】自分のリーダーが多色の場合、カード1枚を引く。"))
+    src = make_instance(make_master(card_id="LC-1", abilities=abilities), owner=p1.name)
+    p1.field.append(src)
+
+    # 単色リーダー（既定 [RED]）→ 不発
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    assert len(p1.hand) == 0
+    # 多色化（colors は List のため frozen dataclass でも内容変更可）→ 発動
+    p1.leader.master.colors.append(Color.BLUE)
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    assert len(p1.hand) == 1
+
+
+def test_replacement_prevents_effect_ko_and_runs_alternative():
+    """置換: 相手の効果KOを回避し、代わりに自分の手札を1枚捨てる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "このキャラがKOされる場合、代わりに自分の手札1枚を捨てる。"))
+    target = make_instance(make_master(card_id="RP-1", abilities=abilities), owner=p1.name)
+    p1.field.append(target)
+    p1.hand.append(make_instance(make_master(card_id="H-1"), owner=p1.name))
+
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [target], 0)
+    assert target in p1.field      # 置換でKO回避
+    assert len(p1.hand) == 0       # 代わりに手札1枚を捨てた
+
+
+def test_replacement_not_applied_when_alternative_impossible():
+    """代わりの行動が取れない（手札なし）場合は置換不成立で本来のKOが起こる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "このキャラがKOされる場合、代わりに自分の手札1枚を捨てる。"))
+    target = make_instance(make_master(card_id="RP-2", abilities=abilities), owner=p1.name)
+    p1.field.append(target)  # 手札なし
+
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [target], 0)
+    assert target not in p1.field
+    assert target in p1.trash
+
+
+def test_replacement_prevents_battle_ko():
+    """置換: バトルKOを回避し、代わりに手札を捨てる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    p1.deck.append(make_instance(make_master(card_id="DK"), owner=p1.name))
+    p2.deck.append(make_instance(make_master(card_id="DK2"), owner=p2.name))
+    attacker = make_instance(make_master(card_id="ATK", power=6000), owner=p1.name)
+    p1.field.append(attacker)
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "このキャラは、このターン中、バトルでKOされる場合、代わりに自分の手札1枚を捨てる。"))
+    target = make_instance(make_master(card_id="RB", power=5000, abilities=abilities), owner=p2.name)
+    p2.field.append(target)
+    p2.hand.append(make_instance(make_master(card_id="H-2"), owner=p2.name))
+
+    gm.active_battle = {
+        "attacker": attacker, "target": target,
+        "attacker_owner": p1, "target_owner": p2, "counter_buff": 0,
+    }
+    gm.resolve_attack()
+    assert target in p2.field       # バトルKOを置換で回避
+    assert len(p2.hand) == 0        # 代わりに手札1枚を捨てた
+
+
 def _prevent_leave_master(card_id, status, condition=None):
     ab = Ability(
         trigger=TriggerType.PASSIVE,

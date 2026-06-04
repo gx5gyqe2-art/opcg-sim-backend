@@ -70,7 +70,7 @@ def summarize_node(node) -> Optional[Dict[str, Any]]:
     if node is None:
         return None
     if isinstance(node, GameAction):
-        return {
+        out = {
             "kind": "action",
             "type": _enum_name(node.type),
             "target": summarize_target(node.target),
@@ -79,6 +79,9 @@ def summarize_node(node) -> Optional[Dict[str, Any]]:
             "duration": node.duration,
             "destination": _enum_name(node.destination),
         }
+        if getattr(node, "sub_effect", None) is not None:
+            out["sub_effect"] = summarize_node(node.sub_effect)
+        return out
     if isinstance(node, Sequence):
         return {"kind": "seq", "actions": [summarize_node(a) for a in node.actions]}
     if isinstance(node, Branch):

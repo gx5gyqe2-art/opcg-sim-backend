@@ -170,6 +170,8 @@ class GameAction(EffectNode):
     destination: Optional[Zone] = None
     is_rest: Optional[bool] = None
     raw_text: str = ""
+    # REPLACE_EFFECT 用: 「代わりに〜」で実行する置換アクション（除去の代替）。
+    sub_effect: Optional["EffectNode"] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> GameAction:
@@ -193,6 +195,9 @@ class GameAction(EffectNode):
              if isinstance(dest, dict):
                  dest = dest.get("zone")
              data["destination"] = str_to_enum(Zone, dest)
+
+        if "sub_effect" in data and isinstance(data["sub_effect"], dict):
+            data["sub_effect"] = effect_node_from_dict(data["sub_effect"])
 
         clean_data = filter_dataclass_fields(cls, data)
         return cls(**clean_data)

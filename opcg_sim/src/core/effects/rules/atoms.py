@@ -141,6 +141,247 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# キーワード付与: 「（対象）は【ブロッカー】を得る」
+#   parser.py の構造分解が keyword タグを保持するようになり、原子句に
+#   【ブロッカー】等が残る。これを GRANT_KEYWORD(status=キーワード名) に変換する。
+#   従来は keyword が脱落して BUFF/OTHER に落ち、能力が付かなかった（既知バグ）。
+#   「このキャラ／このリーダー／このカード」が主語なら対象は自身(SOURCE)。
+# ---------------------------------------------------------------------------
+_KEYWORD_GRANT_RE = re.compile(
+    _nfc(r"【(ブロッカー|速攻[^】]*|ダブルアタック|バニッシュ|ブロック不可|貫通|シフト)】")
+)
+
+
+@rule("grant_keyword", priority=63)
+def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("得る") not in t:
+        return None
+    m = _KEYWORD_GRANT_RE.search(t)
+    if not m:
+        return None
+    # パワー増減を伴う複合句は power_buff に委ねる（単一アクションでは両立不可）。
+    if re.search(_nfc(r"パワー[+-]\d+"), t):
+        return None
+    keyword = m.group(1)
+    if re.search(_nfc(r"この(カード|キャラ|リーダー)"), t):
+        tq = TargetQuery(select_mode="SOURCE")
+    else:
+        tq = parse_target(t)
+    return GameAction(
+        type=ActionType.GRANT_KEYWORD,
+        target=tq,
+        status=keyword,
+        duration=_duration_of(t),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# ライフ操作 ---------------------------------------------------------------
+#   実カードに頻出するライフ周りの原子句をルール化する。従来は legacy へ
+#   フォールバックし、一部は誤った destination（ライフ→手札なのに dest=LIFE）や
+#   OTHER（表/裏向き）になっていた。
+# ---------------------------------------------------------------------------
+
+
+@rule("life_face", priority=72)
+def _life_face(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）ライフ…を表向き／裏向きにする」→ FACE_UP_LIFE(status=UP/DOWN)。"""
+    t = ctx.text
+    if _nfc("ライフ") not in t:
+        return None
+    if _nfc("表向き") in t:
+        status = "UP"
+    elif _nfc("裏向き") in t:
+        status = "DOWN"
+    else:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.LIFE
+    return GameAction(type=ActionType.FACE_UP_LIFE, target=tq, status=status, raw_text=t)
+
+
+@rule("life_recover", priority=71)
+def _life_recover(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）デッキの上から…ライフの上に加える」→ HEAL（デッキ上→ライフ）。
+
+    エンジンの HEAL は対象を見ずデッキ上から value 枚をライフへ加えるため、
+    対象選択待ちに陥らないよう target=None とする（legacy は target=LIFE で
+    余計な選択を発生させていた）。
+    """
+    t = ctx.text
+    if _nfc("デッキの上") not in t or _nfc("ライフ") not in t:
+        return None
+    if _nfc("加える") not in t and _nfc("置く") not in t:
+        return None
+    if _nfc("手札") in t:
+        return None  # デッキ→手札 等は別アクション
+    return GameAction(
+        type=ActionType.HEAL,
+        target=None,
+        value=ValueSource(base=_first_int(t, 1)),
+        raw_text=t,
+    )
+
+
+@rule("life_to_hand", priority=70)
+def _life_to_hand(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分／相手の）ライフの上（か下）から…手札に加える／戻す」→ MOVE_CARD(dest=HAND)。
+
+    legacy は「上か下から」を destination=LIFE と誤判定していた（実質 no-op）。
+    """
+    t = ctx.text
+    if _nfc("ライフの上") not in t and _nfc("ライフの下") not in t:
+        return None
+    if _nfc("手札に加える") not in t and _nfc("手札に戻す") not in t:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.LIFE
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=tq,
+        destination=Zone.HAND,
+        raw_text=t,
+    )
+
+
+@rule("hand_to_life", priority=69)
+def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）手札…を、ライフの上／下に加える」→ MOVE_CARD(dest=LIFE)。"""
+    t = ctx.text
+    if _nfc("手札") not in t:
+        return None
+    if _nfc("ライフの上に加える") not in t and _nfc("ライフの下に加える") not in t:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.HAND
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=tq,
+        destination=Zone.LIFE,
+        raw_text=t,
+    )
+
+
+@rule("life_to_trash", priority=68)
+def _life_to_trash(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分／相手の）ライフの上（か下）から…トラッシュに置く」→ TRASH。"""
+    t = ctx.text
+    if _nfc("ライフの上") not in t and _nfc("ライフの下") not in t:
+        return None
+    if _nfc("トラッシュ") not in t or _nfc("置く") not in t:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.LIFE
+    return GameAction(type=ActionType.TRASH, target=tq, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# ドン!! 操作 --------------------------------------------------------------
+#   ドン!!は均質（どれを選んでも同じ）なため、対象を1枚ずつ選択させると
+#   無意味な中断が起きる。そこで枚数(value)ベースで扱い、対象は持たない
+#   （付与=ATTACH_DON のみ付与先キャラを対象に持つ）。プレイヤーは
+#   status="OPPONENT" で相手のドンを指す（「相手は自身の…」用）。
+# ---------------------------------------------------------------------------
+_DON_COUNT_RE = re.compile(_nfc(r"ドン(?:!!|‼)?[ 　]*(\d+)[ 　]*枚"))
+
+
+def _don_count(t: str) -> int:
+    if _nfc("すべて") in t or _nfc("全て") in t:
+        return 99  # エンジン側でプールが尽きるまで処理
+    m = _DON_COUNT_RE.search(t)
+    return int(m.group(1)) if m else 1
+
+
+def _don_opponent(t: str) -> Optional[str]:
+    return "OPPONENT" if (_nfc("相手") in t and _nfc("自分") not in t) else None
+
+
+@rule("don_attach", priority=84)
+def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）リーダーかキャラ1枚に（レストの）ドン!!N枚までを付与する」→ ATTACH_DON。
+
+    付与先（リーダー/キャラ）を対象に持つ。「レストのドン」は status="RESTED"。
+    付与先は parse_target だと「レスト」で is_rest が立ってしまうため手動構築する。
+    """
+    t = ctx.text
+    if _nfc("付与") not in t or _nfc("ドン") not in t:
+        return None
+    recipient = TargetQuery(player=Player.SELF, zone=Zone.FIELD, count=1)
+    if _nfc("リーダー") in t:
+        recipient.card_type.append("LEADER")
+    if _nfc("キャラ") in t:
+        recipient.card_type.append("CHARACTER")
+    if not recipient.card_type:
+        recipient.card_type.extend(["LEADER", "CHARACTER"])
+    return GameAction(
+        type=ActionType.ATTACH_DON,
+        target=recipient,
+        value=ValueSource(base=_don_count(t)),
+        status="RESTED" if _nfc("レストのドン") in t else None,
+        raw_text=t,
+    )
+
+
+@rule("don_set_active", priority=74)
+def _don_set_active(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）ドン!!N枚までを、アクティブにする」→ ACTIVE_DON（レスト→アクティブ）。"""
+    t = ctx.text
+    if _nfc("ドン") not in t:
+        return None
+    if _nfc("アクティブにする") not in t and _nfc("アクティブにできる") not in t:
+        return None
+    return GameAction(
+        type=ActionType.ACTIVE_DON,
+        target=None,
+        value=ValueSource(base=_don_count(t)),
+        status=_don_opponent(t),
+        raw_text=t,
+    )
+
+
+@rule("don_set_rest", priority=74)
+def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）ドン!!N枚をレストにする/できる」→ REST_DON（アクティブ→レスト）。多くはコスト。"""
+    t = ctx.text
+    if _nfc("ドン") not in t:
+        return None
+    if not re.search(_nfc(r"レストに(する|できる|し[、。])"), t):
+        return None
+    if _nfc("アクティブ") in t:
+        return None
+    return GameAction(
+        type=ActionType.REST_DON,
+        target=None,
+        value=ValueSource(base=_don_count(t)),
+        status=_don_opponent(t),
+        raw_text=t,
+    )
+
+
+@rule("don_return_deck", priority=83)
+def _don_return_deck(ctx: ParseContext) -> Optional[GameAction]:
+    """「（場の）ドン!!…をドン!!デッキに戻す」→ RETURN_DON。
+
+    「ドン!!-N」記法は上位の don_return が処理するため、ここは明示的な
+    「ドン!!デッキに戻す」表記のみを担う。
+    """
+    t = ctx.text
+    if _nfc("ドン") not in t or _nfc("戻す") not in t:
+        return None
+    if not re.search(_nfc(r"ドン(?:!!|‼)?デッキ"), t):
+        return None
+    return GameAction(
+        type=ActionType.RETURN_DON,
+        target=None,
+        value=ValueSource(base=_don_count(t)),
+        status=_don_opponent(t),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
 # 除去保護: 「相手の効果で場を離れない」「（バトルで）KOされない」
 #   保護マーカーを生成し、除去の瞬間に gamestate 側でライブ評価される。
 #   多くは条件付き PASSIVE（例: トラッシュ7枚以上の場合）。
@@ -199,6 +440,7 @@ def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
         target=tq,
         value=ValueSource(base=value),
         status="COST_REDUCTION",
+        duration=_duration_of(t),
         raw_text=t,
     )
 
