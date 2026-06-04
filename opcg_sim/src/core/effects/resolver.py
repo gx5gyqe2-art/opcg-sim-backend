@@ -337,7 +337,13 @@ class EffectResolver:
             return self._compare(current_val, condition.operator, target_val)
 
         elif condition.type == ConditionType.FIELD_COUNT:
-            current_val = len(target_player.field) + (1 if target_player.stage else 0)
+            # 盤面のキャラ枚数条件。target にフィルタ（レスト/特徴/コスト/プレイヤー）が
+            # あれば matcher で実体化して数える。無ければ場全体の枚数。
+            if condition.target is not None:
+                from .matcher import get_target_cards
+                current_val = len(get_target_cards(self.game_manager, condition.target, source_card))
+            else:
+                current_val = len(target_player.field) + (1 if target_player.stage else 0)
             return self._compare(current_val, condition.operator, target_val)
 
         elif condition.type == ConditionType.HAS_DON:
@@ -350,6 +356,14 @@ class EffectResolver:
             if isinstance(expected_name, str):
                 return expected_name in target_player.leader.master.name
             return False
+
+        elif condition.type == ConditionType.LEADER_COLOR:
+            if not target_player.leader: return False
+            colors = target_player.leader.master.colors or []
+            color_vals = [getattr(c, 'value', c) for c in colors]
+            if condition.value == "多色":
+                return len(colors) >= 2
+            return condition.value in color_vals
 
         elif condition.type == ConditionType.LEADER_TRAIT:
             if not target_player.leader: return False

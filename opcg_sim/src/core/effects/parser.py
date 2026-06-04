@@ -410,6 +410,10 @@ class EffectParser:
         if _nfc("トラッシュ") in norm_text:
             return Condition(type=ConditionType.TRASH_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
+        # デッキ枚数（「自分のデッキが20枚以下の場合」等）。"デッキの上から…" は除外。
+        if _nfc("デッキが") in norm_text:
+            return Condition(type=ConditionType.DECK_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
+
         if _nfc("リーダーが") in norm_text or _nfc("リーダーの特徴") in norm_text:
             # 特徴は《X》だけでなく『X』（『白ひげ海賊団』『B・W』等の名称系特徴）でも書かれる。
             trait_match = re.search(_nfc(r'[《<『]([^》>』]+)[》>』]'), norm_text)
@@ -418,6 +422,30 @@ class EffectParser:
                 return Condition(type=ConditionType.LEADER_TRAIT, value=trait_match.group(1), player=p, raw_text=norm_text)
             if name_match:
                 return Condition(type=ConditionType.LEADER_NAME, value=name_match.group(1), player=p, raw_text=norm_text)
+            if _nfc("多色") in norm_text:
+                return Condition(type=ConditionType.LEADER_COLOR, value=_nfc("多色"), player=p, raw_text=norm_text)
+
+        # 盤面のキャラ枚数（「自分の（レストの／特徴《X》の／コストN以上の）キャラがM枚以上いる」
+        # 「…キャラがいる」）。数値が「フィルタ(コストN以上)」と「枚数(M枚)」で混在し得るため、
+        # 閾値は必ず「M枚」側から取り、フィルタは parse_target に委ねる（保守的な分類）。
+        # 「このキャラが…される/場を離れる/登場した」等の単体状態・置換条件は対象外。
+        if (_nfc("キャラ") in norm_text and _nfc("このキャラ") not in norm_text
+                and (_nfc("いる") in norm_text or re.search(_nfc(r"\d+枚(以上|以下)"), norm_text))
+                and not re.search(_nfc(r"(される|場を離れる|登場した|公開)"), norm_text)):
+            tq = parse_target(norm_text)
+            mc = re.search(_nfc(r"(\d+)枚(以上|以下|より多い|未満)?"), norm_text)
+            if mc:
+                thr = int(mc.group(1))
+                cnt_op = {
+                    _nfc('以上'): CompareOperator.GE,
+                    _nfc('以下'): CompareOperator.LE,
+                    _nfc('より多い'): CompareOperator.GT,
+                    _nfc('未満'): CompareOperator.LT,
+                }.get(mc.group(2), CompareOperator.GE)
+            else:
+                thr, cnt_op = 1, CompareOperator.GE  # 「いる」=1枚以上
+            return Condition(type=ConditionType.FIELD_COUNT, target=tq,
+                             operator=cnt_op, value=thr, player=tq.player, raw_text=norm_text)
 
         return Condition(type=ConditionType.GENERIC, raw_text=norm_text)
 

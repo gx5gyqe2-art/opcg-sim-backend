@@ -345,6 +345,51 @@ def test_leader_trait_bracket_condition_gates_effect():
     assert len(p1.hand) == 1
 
 
+def test_field_count_condition_counts_rested_chars():
+    """FIELD_COUNT(レストのキャラが2枚以上いる)が target フィルタ込みで評価される。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "【起動メイン】自分のレストのキャラが2枚以上いる場合、カード1枚を引く。"))
+    src = make_instance(make_master(card_id="FC-1", abilities=abilities), owner=p1.name)
+    p1.field.append(src)  # src はアクティブ（カウント対象外）
+    rested = []
+    for i in range(2):
+        c = make_instance(make_master(card_id=f"R-{i}"), owner=p1.name)
+        c.is_rest = True
+        p1.field.append(c)
+        rested.append(c)
+
+    gm.resolve_ability(p1, abilities[0], source_card=src)  # レスト2枚 >= 2 → 発動
+    assert len(p1.hand) == 1
+    rested[0].is_rest = False                               # レスト1枚に減らす
+    gm.resolve_ability(p1, abilities[0], source_card=src)  # 1 < 2 → 不発
+    assert len(p1.hand) == 1
+
+
+def test_leader_color_multicolor_condition():
+    """LEADER_COLOR(多色): リーダーが2色以上のときのみ発動する。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    from opcg_sim.src.models.enums import Color
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "【起動メイン】自分のリーダーが多色の場合、カード1枚を引く。"))
+    src = make_instance(make_master(card_id="LC-1", abilities=abilities), owner=p1.name)
+    p1.field.append(src)
+
+    # 単色リーダー（既定 [RED]）→ 不発
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    assert len(p1.hand) == 0
+    # 多色化（colors は List のため frozen dataclass でも内容変更可）→ 発動
+    p1.leader.master.colors.append(Color.BLUE)
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    assert len(p1.hand) == 1
+
+
 def _prevent_leave_master(card_id, status, condition=None):
     ab = Ability(
         trigger=TriggerType.PASSIVE,

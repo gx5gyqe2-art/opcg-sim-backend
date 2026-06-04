@@ -419,6 +419,33 @@ CASES = [
             }
         ],
     },
+    # ----- 条件: 盤面のキャラ枚数（FIELD_COUNT, 従来 GENERIC） --------------
+    {
+        "id": "cond_field_count_chars",
+        "text": "自分のキャラが3枚以上いる場合、カード1枚を引く。",
+        "expect": [
+            {
+                "condition": {"type": "FIELD_COUNT", "operator": "GE", "value": 3, "player": "SELF"},
+                "effect": {"kind": "action", "type": "DRAW"},
+            }
+        ],
+    },
+    # ----- 条件: デッキ枚数（DECK_COUNT, 従来 GENERIC） --------------------
+    {
+        "id": "cond_deck_count",
+        "text": "自分のデッキが20枚以下の場合、カード1枚を引く。",
+        "expect": [
+            {"condition": {"type": "DECK_COUNT", "operator": "LE", "value": 20}, "effect": {"type": "DRAW"}}
+        ],
+    },
+    # ----- 条件: リーダーが多色（LEADER_COLOR, 従来 GENERIC） --------------
+    {
+        "id": "cond_leader_multicolor",
+        "text": "自分のリーダーが多色の場合、カード1枚を引く。",
+        "expect": [
+            {"condition": {"type": "LEADER_COLOR", "value": "多色"}, "effect": {"type": "DRAW"}}
+        ],
+    },
     # ----- カウンターのパワー付与（OP13-097 世界の均衡） -------------------
     {
         "id": "counter_power_buff_3000",
