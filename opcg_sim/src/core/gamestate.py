@@ -640,6 +640,17 @@ class GameManager:
                     log_event("INFO", "game.trigger_life_decrease", f"ON_LIFE_DECREASE fired for {card.master.name}", player=player.name)
                     self.resolve_ability(player, ability, source_card=card)
 
+    def _don_pool_player(self, player: Player, action: GameAction) -> Player:
+        """ドン操作の対象プレイヤー。「相手は…」は status="OPPONENT"、
+        対象クエリの player=OPPONENT でも相手を指す。既定は効果の実行者。"""
+        opp = self.p2 if player == self.p1 else self.p1
+        if getattr(action, 'status', None) == "OPPONENT":
+            return opp
+        tgt = getattr(action, 'target', None)
+        if tgt is not None and getattr(getattr(tgt, 'player', None), 'name', '') == 'OPPONENT':
+            return opp
+        return player
+
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int) -> bool:
         if not action: return False
         act_name = action.type.name if hasattr(action.type, 'name') else str(action.type)
@@ -690,23 +701,53 @@ class GameManager:
             return True
 
         if act_name == "RETURN_DON":
-            # 「ドン‼-N」: 場のドン!!を N 枚、ドン!!デッキへ戻す。
+            # 「ドン‼-N」/「ドン!!デッキに戻す」: 場のドン!!を N 枚ドン!!デッキへ戻す。
             # 影響の小さい順（レスト→アクティブ→付与中）に戻す。
+            tp = self._don_pool_player(player, action)
             returned = 0
             for _ in range(value):
-                if player.don_rested:
-                    don = player.don_rested.pop()
-                elif player.don_active:
-                    don = player.don_active.pop()
-                elif player.don_attached_cards:
-                    don = player.don_attached_cards.pop()
+                if tp.don_rested:
+                    don = tp.don_rested.pop()
+                elif tp.don_active:
+                    don = tp.don_active.pop()
+                elif tp.don_attached_cards:
+                    don = tp.don_attached_cards.pop()
                 else:
                     break
                 don.is_rest = False
                 don.attached_to = None
-                player.don_deck.append(don)
+                tp.don_deck.append(don)
                 returned += 1
-            log_event("INFO", "game.action_return_don", f"{player.name} returned {returned} DON!! to don deck", player=player.name)
+            log_event("INFO", "game.action_return_don", f"{tp.name} returned {returned} DON!! to don deck", player=tp.name)
+            return True
+
+        if act_name == "REST_DON":
+            # 「ドン!!N枚をレストにする」/【ドン!!×N】コスト: アクティブ→レスト。
+            # ドンは均質なため枚数(value)ベースで処理する。
+            tp = self._don_pool_player(player, action)
+            rested = 0
+            for _ in range(value):
+                if not tp.don_active:
+                    break
+                don = tp.don_active.pop(0)
+                don.is_rest = True
+                tp.don_rested.append(don)
+                rested += 1
+            log_event("INFO", "game.action_rest_don", f"{tp.name} rested {rested} DON!!", player=tp.name)
+            return True
+
+        if act_name == "ACTIVE_DON" and not getattr(action, 'target', None):
+            # 「ドン!!N枚をアクティブにする」: レスト→アクティブ（枚数ベース）。
+            tp = self._don_pool_player(player, action)
+            activated = 0
+            for _ in range(value):
+                if not tp.don_rested:
+                    break
+                don = tp.don_rested.pop()
+                don.is_rest = False
+                tp.don_active.append(don)
+                activated += 1
+            log_event("INFO", "game.action_active_don", f"{tp.name} activated {activated} DON!!", player=tp.name)
             return True
 
         # ▼▼▼ 修正: 初期値をTrueに設定（対象0枚でも「何もしないことに成功した」とみなすため） ▼▼▼
@@ -798,13 +839,24 @@ class GameManager:
                 log_event("INFO", "game.action_active", f"Card activated for {owner.name}", player=player.name)
                 success = True
             elif act_name == "ATTACH_DON":
-                if player.don_active:
-                    don = player.don_active.pop(0)
+                # value 枚のドン!!を付与する。status="RESTED" の場合はレストのドンを
+                # レストのまま付与する（無ければもう一方のプールから補う）。
+                from_rested = (action.status == "RESTED")
+                n = value if value and value > 0 else 1
+                attached = 0
+                for _ in range(n):
+                    pool = player.don_rested if from_rested else player.don_active
+                    if not pool:
+                        pool = player.don_active if from_rested else player.don_rested
+                    if not pool:
+                        break
+                    don = pool.pop(0)
                     don.attached_to = target.uuid
-                    don.is_rest = False
+                    don.is_rest = from_rested
                     player.don_attached_cards.append(don)
                     target.attached_don += 1
-                    log_event("INFO", "game.action_attach_don", f"DON!! attached to {target.master.name}", player=player.name)
+                    attached += 1
+                log_event("INFO", "game.action_attach_don", f"{attached} DON!! attached to {target.master.name} (rested={from_rested})", player=player.name)
                 success = True
             elif act_name == "MOVE_CARD":
                 dest = action.destination if action.destination else Zone.HAND

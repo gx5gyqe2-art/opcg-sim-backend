@@ -224,6 +224,67 @@ def test_face_up_life_sets_flag():
     assert life_card.is_face_up is False
 
 
+def test_rest_don_by_value():
+    """REST_DON: value 枚のアクティブドンをレストにする（枚数ベース）。"""
+    gm, p1, _ = make_game()
+    for _ in range(3):
+        p1.don_active.append(p1.don_deck.pop(0))
+    ok = gm.apply_action_to_engine(p1, action(ActionType.REST_DON, value=2), [], 2)
+    assert ok
+    assert len(p1.don_rested) == 2
+    assert len(p1.don_active) == 1
+    assert all(d.is_rest for d in p1.don_rested)
+
+
+def test_active_don_by_value():
+    """ACTIVE_DON: value 枚のレストドンをアクティブにする（枚数ベース, target=None）。"""
+    gm, p1, _ = make_game()
+    for _ in range(2):
+        d = p1.don_deck.pop(0)
+        d.is_rest = True
+        p1.don_rested.append(d)
+    ok = gm.apply_action_to_engine(p1, action(ActionType.ACTIVE_DON, value=1), [], 1)
+    assert ok
+    assert len(p1.don_active) == 1
+    assert len(p1.don_rested) == 1
+    assert p1.don_active[0].is_rest is False
+
+
+def test_attach_don_rested_multiple():
+    """ATTACH_DON: status=RESTED で value 枚のレストドンをレストのまま付与する。"""
+    gm, p1, _ = make_game()
+    for _ in range(2):
+        d = p1.don_deck.pop(0)
+        d.is_rest = True
+        p1.don_rested.append(d)
+    target = _make_field_char(p1)
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.ATTACH_DON, value=2, status="RESTED"), [target], 2
+    )
+    assert ok
+    assert target.attached_don == 2
+    assert len(p1.don_attached_cards) == 2
+    assert all(d.is_rest for d in p1.don_attached_cards)
+    assert len(p1.don_rested) == 0
+
+
+def test_return_don_opponent_via_status():
+    """RETURN_DON + status=OPPONENT: 相手の場のドンをドンデッキへ戻す。"""
+    gm, p1, p2 = make_game()
+    p2.don_active.append(p2.don_deck.pop(0))  # 相手の場に1枚
+    assert len(p2.don_active) == 1 and len(p2.don_deck) == 9
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.RETURN_DON, value=1, status="OPPONENT"), [], 1
+    )
+    assert ok
+    assert len(p2.don_active) == 0
+    assert len(p2.don_deck) == 10
+    # 実行者(p1)のドンは不変
+    assert len(p1.don_active) == 0
+
+
 def _prevent_leave_master(card_id, status, condition=None):
     ab = Ability(
         trigger=TriggerType.PASSIVE,

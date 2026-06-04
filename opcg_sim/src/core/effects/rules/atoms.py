@@ -278,6 +278,110 @@ def _life_to_trash(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# ドン!! 操作 --------------------------------------------------------------
+#   ドン!!は均質（どれを選んでも同じ）なため、対象を1枚ずつ選択させると
+#   無意味な中断が起きる。そこで枚数(value)ベースで扱い、対象は持たない
+#   （付与=ATTACH_DON のみ付与先キャラを対象に持つ）。プレイヤーは
+#   status="OPPONENT" で相手のドンを指す（「相手は自身の…」用）。
+# ---------------------------------------------------------------------------
+_DON_COUNT_RE = re.compile(_nfc(r"ドン(?:!!|‼)?[ 　]*(\d+)[ 　]*枚"))
+
+
+def _don_count(t: str) -> int:
+    if _nfc("すべて") in t or _nfc("全て") in t:
+        return 99  # エンジン側でプールが尽きるまで処理
+    m = _DON_COUNT_RE.search(t)
+    return int(m.group(1)) if m else 1
+
+
+def _don_opponent(t: str) -> Optional[str]:
+    return "OPPONENT" if (_nfc("相手") in t and _nfc("自分") not in t) else None
+
+
+@rule("don_attach", priority=84)
+def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）リーダーかキャラ1枚に（レストの）ドン!!N枚までを付与する」→ ATTACH_DON。
+
+    付与先（リーダー/キャラ）を対象に持つ。「レストのドン」は status="RESTED"。
+    付与先は parse_target だと「レスト」で is_rest が立ってしまうため手動構築する。
+    """
+    t = ctx.text
+    if _nfc("付与") not in t or _nfc("ドン") not in t:
+        return None
+    recipient = TargetQuery(player=Player.SELF, zone=Zone.FIELD, count=1)
+    if _nfc("リーダー") in t:
+        recipient.card_type.append("LEADER")
+    if _nfc("キャラ") in t:
+        recipient.card_type.append("CHARACTER")
+    if not recipient.card_type:
+        recipient.card_type.extend(["LEADER", "CHARACTER"])
+    return GameAction(
+        type=ActionType.ATTACH_DON,
+        target=recipient,
+        value=ValueSource(base=_don_count(t)),
+        status="RESTED" if _nfc("レストのドン") in t else None,
+        raw_text=t,
+    )
+
+
+@rule("don_set_active", priority=74)
+def _don_set_active(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）ドン!!N枚までを、アクティブにする」→ ACTIVE_DON（レスト→アクティブ）。"""
+    t = ctx.text
+    if _nfc("ドン") not in t:
+        return None
+    if _nfc("アクティブにする") not in t and _nfc("アクティブにできる") not in t:
+        return None
+    return GameAction(
+        type=ActionType.ACTIVE_DON,
+        target=None,
+        value=ValueSource(base=_don_count(t)),
+        status=_don_opponent(t),
+        raw_text=t,
+    )
+
+
+@rule("don_set_rest", priority=74)
+def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）ドン!!N枚をレストにする/できる」→ REST_DON（アクティブ→レスト）。多くはコスト。"""
+    t = ctx.text
+    if _nfc("ドン") not in t:
+        return None
+    if not re.search(_nfc(r"レストに(する|できる|し[、。])"), t):
+        return None
+    if _nfc("アクティブ") in t:
+        return None
+    return GameAction(
+        type=ActionType.REST_DON,
+        target=None,
+        value=ValueSource(base=_don_count(t)),
+        status=_don_opponent(t),
+        raw_text=t,
+    )
+
+
+@rule("don_return_deck", priority=83)
+def _don_return_deck(ctx: ParseContext) -> Optional[GameAction]:
+    """「（場の）ドン!!…をドン!!デッキに戻す」→ RETURN_DON。
+
+    「ドン!!-N」記法は上位の don_return が処理するため、ここは明示的な
+    「ドン!!デッキに戻す」表記のみを担う。
+    """
+    t = ctx.text
+    if _nfc("ドン") not in t or _nfc("戻す") not in t:
+        return None
+    if not re.search(_nfc(r"ドン(?:!!|‼)?デッキ"), t):
+        return None
+    return GameAction(
+        type=ActionType.RETURN_DON,
+        target=None,
+        value=ValueSource(base=_don_count(t)),
+        status=_don_opponent(t),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
 # 除去保護: 「相手の効果で場を離れない」「（バトルで）KOされない」
 #   保護マーカーを生成し、除去の瞬間に gamestate 側でライブ評価される。
 #   多くは条件付き PASSIVE（例: トラッシュ7枚以上の場合）。

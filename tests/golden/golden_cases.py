@@ -359,6 +359,55 @@ CASES = [
             {"effect": {"kind": "action", "type": "FACE_UP_LIFE", "status": "DOWN"}}
         ],
     },
+    # ----- ドン操作: レストのドンをリーダー/キャラに付与（ATTACH_DON） -----
+    {
+        "id": "don_attach_rested",
+        "text": "自分のリーダーかキャラ1枚にレストのドン‼1枚までを、付与する。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "ATTACH_DON",
+                    "value": 1,
+                    "status": "RESTED",
+                    "target": {"zone": "FIELD", "player": "SELF",
+                               "card_type": ["LEADER", "CHARACTER"]},
+                }
+            }
+        ],
+    },
+    # ----- ドン操作: ドンをアクティブにする（ACTIVE_DON, 枚数ベース） -------
+    {
+        "id": "don_set_active",
+        "text": "自分のドン‼2枚までを、アクティブにする。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "ACTIVE_DON", "value": 2, "target": None}}
+        ],
+    },
+    # ----- ドン操作: ドンをレストにする（REST_DON, 多くはコスト） ----------
+    {
+        "id": "don_set_rest",
+        "text": "自分のドン‼2枚をレストにできる。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "REST_DON", "value": 2, "target": None}}
+        ],
+    },
+    # ----- ドン操作: 場のドンをドンデッキに戻す（RETURN_DON, 従来 OTHER） --
+    {
+        "id": "don_return_to_deck",
+        "text": "自分の場のドン‼を1枚以上ドン‼デッキに戻すことができる。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "RETURN_DON", "value": 1, "target": None}}
+        ],
+    },
+    # ----- ドン操作: 相手が自身のドンをドンデッキに戻す（player=OPPONENT） --
+    {
+        "id": "don_return_opponent",
+        "text": "相手は自身の場のドン‼1枚をドン‼デッキに戻す。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "RETURN_DON", "value": 1, "status": "OPPONENT"}}
+        ],
+    },
     # ----- カウンターのパワー付与（OP13-097 世界の均衡） -------------------
     {
         "id": "counter_power_buff_3000",
