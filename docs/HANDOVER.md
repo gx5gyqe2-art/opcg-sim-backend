@@ -187,6 +187,38 @@ engine +2: test_freeze_keeps_character_rested_after_refresh / test_negate_effect
   - 効果テキスト `<p>` の直後に `trigger_text` ブロックを追加。
     `【トリガー】`（赤太字）＋ テキスト本文を区切り線付きで表示（`trigger_text` が空文字の場合は非表示）。
 
+#### UI拡張フェーズ2: 効果解決ログパネル（フロントエンド + バックエンド API 拡張）
+
+**背景**: カード効果が発動・解決されても UI 側には何も表示されず、何が起きているか追いにくかった。
+バックエンドの `EffectResolver.action_history` には既に per-action の解決履歴が蓄積されていたが、
+API レスポンスには含まれておらず、フロントに届いていなかった。
+
+**バックエンド変更（`opcg-sim-backend`）**
+
+- `opcg_sim/src/core/gamestate.py`:
+  - `GameManager.__init__` に `self.action_events: List[Dict] = []` を追加（per-request バッファ）。
+  - `resolve_ability` を修正: `EffectResolver` インスタンスの `action_history` を解決後に
+    `action_events` へコピー（フィールド: type="EFFECT", player, card_name, action, targets, value, success）。
+- `opcg_sim/api/app.py`:
+  - `build_game_result_hybrid` の戻り値に `action_events` キーを追加。
+  - `game_action` ハンドラ: try ブロック先頭で `manager.action_events = []` リセット。
+    各アクション（PLAY/ATTACK/TURN_END/ATTACH_DON/ACTIVATE_MAIN）に日本語メッセージ付きイベントを追加。
+  - `game_battle` ハンドラ: 同様に BLOCK/COUNTER/PASS イベントを追加。
+
+**フロントエンド変更（`opcg-sim-frontend`）**
+
+- `src/api/types.ts`: `ActionEvent` インターフェース追加。`GameActionResult` に `action_events?` フィールド追加。
+- `src/api/client.ts`: `sendAction` / `sendBattleAction` の戻り値に `action_events` を含める。
+- `src/game/actions.ts`: `useGameAction` に `addEventLog?` コールバックを追加。
+  各アクション後、`result.action_events` があれば `addEventLog` を呼び出す。
+- `src/ui/ActionLog.tsx`（新規）: 右上固定の折りたたみ式ログパネル。
+  - アクションタイプ（PLAY=緑/ATTACK=赤/TURN_END=グレー等）でカラーコーディング。
+  - EFFECT サブタイプ（DRAW/KO/BOUNCE/BUFF/FREEZE/NEGATE_EFFECT 等）は日本語ラベルに変換。
+  - 失敗イベント（`success=false`）は半透明表示。
+  - 最大50件を保持（古いものを押し出し）。
+- `src/screens/RealGame.tsx`: `eventLog` ステート + `addEventLog` コールバックを追加。
+  `useGameAction` に渡し、`<ActionLog events={eventLog} />` を DOM オーバーレイとしてレンダリング。
+
 **シリアライズ負荷の分析（この変更に付随）**
 - ゲーム中の状態更新（約 46 枚）: 3 フィールド追加で raw +10 KB、gzip +0.6 KB → 実質無視できる。
 - 全カードリスト（2652 枚）: raw +535 KB、gzip +31 KB → 許容範囲（日本語は gzip で約 70% 圧縮）。
@@ -454,7 +486,7 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
 | フェーズ | 内容 | 状態 |
 |---|---|---|
 | Phase 1 | FREEZE/NEGATE オーバーレイ、trigger_text 表示、API シリアライズ拡張 | **完了** |
-| Phase 2 | 効果解決ログ（バックエンド: レスポンスに解決ログ追加、フロント: ログパネル表示） | 未着手 |
+| Phase 2 | 効果解決ログ（バックエンド: レスポンスに解決ログ追加、フロント: ログパネル表示） | **完了** |
 | Phase 3 | PendingRequest UI 改善（どの効果でどのカードが対象か、より具体的なメッセージ） | 未着手 |
 
 1. **裾野の OTHER／フォールバックのルール化** — 頻度は低く多様（上位でも10件前後/表現）。
