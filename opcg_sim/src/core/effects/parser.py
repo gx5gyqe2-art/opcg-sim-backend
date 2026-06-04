@@ -236,8 +236,10 @@ class EffectParser:
         norm_text = re.sub(
             _nfc(r'(デッキの上から\d+枚(?:まで)?を見て)、'), r'\1。', norm_text
         )
-        # 「引く、」は lookbehind で分割（「引く」を前の部分に残す）
-        split_pattern = _nfc(r'。|その後、|置き、|加え、|(?<=引く)、|捨て、|発動できる、|させ、')
+        # 「引く、」「捨て、」は lookbehind で分割（動詞を前の部分に残す）
+        # 「捨て、」を ON で消費すると「自分の手札1枚を」が動詞なしの断片になるため
+        # (?<=捨て)、 に変更して「捨て」を前クローズに残す。
+        split_pattern = _nfc(r'。|その後、|置き、|加え、|(?<=引く)、|(?<=捨て)、|発動できる、|させ、')
 
         parts = re.split(split_pattern, norm_text)
         parts = [p.strip() for p in parts if p.strip()]

@@ -789,4 +789,55 @@ CASES = [
             }
         ],
     },
+    # ----- 手札捨て＋ステージレストをコストにした起動効果 ------------------
+    # 「自分の手札1枚を捨て、このステージをレストにできる」が split_pattern の
+    # 「捨て、」で分割され「自分の手札1枚を」が動詞なし断片化していた問題を修正。
+    # (?<=捨て)、 に変更することで「捨て」を前クローズに残す。
+    {
+        "id": "discard_rest_stage_cost",
+        "text": "【起動メイン】自分の手札1枚を捨て、このステージをレストにできる：カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {
+                    "kind": "seq",
+                    "actions": [
+                        {"kind": "action", "type": "DISCARD"},
+                        {"kind": "action", "type": "REST"},
+                    ],
+                },
+                "effect": {"kind": "action", "type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 手札捨て＋このキャラをトラッシュをコストにした起動効果 ----------
+    {
+        "id": "discard_trash_self_cost",
+        "text": "【起動メイン】自分の手札1枚を捨て、このキャラをトラッシュに置くことができる：カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {
+                    "kind": "seq",
+                    "actions": [
+                        {"kind": "action", "type": "DISCARD"},
+                        {"kind": "action", "type": "TRASH"},
+                    ],
+                },
+                "effect": {"kind": "action", "type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 効果テキスト中の「捨ててもよい」（任意 discard） ----------------
+    {
+        "id": "discard_optional",
+        "text": "【登場時】自分の手札1枚を捨ててもよい：カード2枚を引く。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "cost": {"kind": "action", "type": "DISCARD"},
+                "effect": {"kind": "action", "type": "DRAW", "value": 2},
+            }
+        ],
+    },
 ]

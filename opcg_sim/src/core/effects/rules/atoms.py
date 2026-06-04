@@ -102,7 +102,8 @@ def _rest(ctx: ParseContext) -> Optional[GameAction]:
 @rule("discard", priority=50)
 def _discard(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    if _nfc("捨てる") not in t:
+    # 連用形「捨て」も対象（「捨て」は「捨てる」「捨てて」「捨て（て形）」すべてを包含）
+    if _nfc("捨て") not in t:
         return None
     # 「デッキ…トラッシュに置く」等は別アクション。ここは手札の discard に限定する。
     if _nfc("手札") not in t:
