@@ -156,6 +156,42 @@ engine +2: test_freeze_keeps_character_rested_after_refresh / test_negate_effect
 
 **結果**: カバレッジ 93.8%→95.4%（+1.6pt）、OTHER 175→108（−67件）、退行=0。
 
+#### UI拡張フェーズ1: 凍結・効果無効オーバーレイ＋トリガーテキスト表示（フロントエンド + バックエンド API 拡張）
+
+**背景**: バックエンドで FREEZE/NEGATE_EFFECT を実装したが、フロントエンドの Pixi.js 描画や
+カード詳細モーダルには状態表示がなく、ゲーム中にどのカードが凍結・効果無効かが見えなかった。
+また `trigger_text`（トリガー効果テキスト）も API から返っておらず、詳細シートに表示できていなかった。
+
+**バックエンド変更（`opcg-sim-backend`）**
+
+- `shared_constants.json`: `CARD_PROPERTIES` に `TRIGGER_TEXT` / `ABILITY_DISABLED` / `IS_FROZEN` を追加。
+  両者間で API フィールド名を一元管理している定数ファイルであり、フロント/バック双方がこれを参照する。
+- `opcg_sim/src/models/models.py`: `CardInstance.to_dict()` に 3 フィールドを追加。
+  - `trigger_text`: `self.master.trigger_text or ''`（トリガー効果テキスト）
+  - `ability_disabled`: `self.ability_disabled`（効果無効フラグ）
+  - `is_frozen`: `'FREEZE' in self.flags`（凍結フラグ）
+
+**フロントエンド変更（`opcg-sim-frontend`）**
+
+- `src/game/types.ts`: `BaseCard` に `trigger_text?: string` / `ability_disabled?: boolean` /
+  `is_frozen?: boolean` を追加（API 新フィールドに型を付与）。
+- `src/layout/layout.config.ts`: 状態バッジ用カラー定数を追加。
+  - Pixi 用数値 (0xRRGGBB): `BADGE_FROZEN_BG: 0x2980b9` / `BADGE_NEGATE_BG: 0x7f8c8d`
+  - CSS 用文字列: `BADGE_FROZEN_CSS: '#2980b9'` / `BADGE_NEGATE_CSS: '#7f8c8d'`
+- `src/ui/CardRenderer.tsx`: 重なり枚数バッジの後に状態オーバーレイを追加。
+  - `card.is_frozen` が真: 青半透明矩形（alpha 0.3）＋「凍結」ラベル（`'screen'` 回転モード）。
+  - `card.ability_disabled` が真: グレー半透明矩形（alpha 0.3）＋「効果無効」ラベル。
+  - 両方同時に有効な場合は Y 座標を ±ch×0.12 にずらしてラベルが重ならないよう調整。
+- `src/ui/CardDetailSheet.tsx`: 詳細モーダルの表示を拡張。
+  - バッジ行（属性・特徴の隣）に `凍結` / `効果無効` 状態バッジを追加。
+  - 効果テキスト `<p>` の直後に `trigger_text` ブロックを追加。
+    `【トリガー】`（赤太字）＋ テキスト本文を区切り線付きで表示（`trigger_text` が空文字の場合は非表示）。
+
+**シリアライズ負荷の分析（この変更に付随）**
+- ゲーム中の状態更新（約 46 枚）: 3 フィールド追加で raw +10 KB、gzip +0.6 KB → 実質無視できる。
+- 全カードリスト（2652 枚）: raw +535 KB、gzip +31 KB → 許容範囲（日本語は gzip で約 70% 圧縮）。
+- Cache-Control の追加実装は不要と判断（既存のキャッシュ設定で十分）。
+
 ---
 
 ### 前ブランチ（`claude/handoff-materials-review-u5cqy`）で追加した内容（最新順）
@@ -412,6 +448,14 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
 ---
 
 ## 7. 既知の課題・残タスク（優先度順）
+
+### UI拡張フェーズ（進行状況）
+
+| フェーズ | 内容 | 状態 |
+|---|---|---|
+| Phase 1 | FREEZE/NEGATE オーバーレイ、trigger_text 表示、API シリアライズ拡張 | **完了** |
+| Phase 2 | 効果解決ログ（バックエンド: レスポンスに解決ログ追加、フロント: ログパネル表示） | 未着手 |
+| Phase 3 | PendingRequest UI 改善（どの効果でどのカードが対象か、より具体的なメッセージ） | 未着手 |
 
 1. **裾野の OTHER／フォールバックのルール化** — 頻度は低く多様（上位でも10件前後/表現）。
    `effect_diagnostics.py` の「未対応(フォールバック)原子句ランキング」「OTHER化する原子句
