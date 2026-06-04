@@ -840,4 +840,91 @@ CASES = [
             }
         ],
     },
+    # ----- 手札→デッキ下（hand_to_deck） -----------------------------------
+    {
+        "id": "hand_to_deck_1",
+        "text": "【ドン‼×1】【起動メイン】【ターン1回】カード1枚を引き、自分の手札1枚をデッキの上か下に置く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"kind": "action", "type": "DRAW", "value": 1},
+                        {"kind": "action", "type": "DECK_BOTTOM", "target": {"zone": "HAND"}},
+                    ],
+                },
+            }
+        ],
+    },
+    # ----- ライフ→手札（もよい形）（life_to_hand_optional） ----------------
+    {
+        "id": "life_to_hand_optional",
+        "text": "【メイン】自分の手札から「エドワード・ニューゲート」1枚までを、登場させる。その後、自分のライフの上か下から1枚を手札に加えてもよい。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"kind": "action", "type": "PLAY_CARD"},
+                        {"kind": "action", "type": "MOVE_CARD", "target": {"zone": "LIFE"}, "destination": "HAND"},
+                    ],
+                },
+            }
+        ],
+    },
+    # ----- ドン!! スペース表記（ドン !!-1）（don_return_space） ------------
+    {
+        "id": "don_return_space",
+        "text": "【起動メイン】【ターン1回】ドン !!-1：相手のドン!!1枚までを、レストにする。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {"kind": "action", "type": "RETURN_DON", "value": 1},
+            }
+        ],
+    },
+    # ----- 公開カード登場（play_revealed, レスト）--------------------------
+    # 「...の場合」はアビリティ条件として抽出されるため、effect は直接 PLAY_CARD になる。
+    {
+        "id": "play_revealed_rested",
+        "text": "自分のデッキの一番上を公開し、そのカードがコスト4以下の特徴《王下七武海》を持つキャラカードの場合、レストで登場させてもよい。",
+        "expect": [
+            {
+                "trigger": "PASSIVE",
+                "effect": {"kind": "action", "type": "PLAY_CARD", "status": "RESTED"},
+            }
+        ],
+    },
+    # ----- アクティブキャラへのアタック付与（PERMANENT）-------------------
+    {
+        "id": "attack_active_permanent",
+        "text": "【ドン‼×2】このキャラは相手のアクティブのキャラにもアタックできる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "GRANT_KEYWORD",
+                    "status": "ATTACK_ACTIVE",
+                    "duration": "PERMANENT",
+                },
+            }
+        ],
+    },
+    # ----- アクティブキャラへのアタック付与（THIS_TURN, 対象付き）----------
+    {
+        "id": "attack_active_this_turn",
+        "text": "【登場時】自分の特徴《SWORD》を持つ、リーダーかキャラ1枚までは、このターン中、アクティブのキャラにもアタックできる。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "action",
+                    "type": "GRANT_KEYWORD",
+                    "status": "ATTACK_ACTIVE",
+                    "duration": "THIS_TURN",
+                },
+            }
+        ],
+    },
 ]

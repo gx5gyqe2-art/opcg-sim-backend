@@ -237,7 +237,9 @@ def _life_to_hand(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ライフの上") not in t and _nfc("ライフの下") not in t:
         return None
-    if _nfc("手札に加える") not in t and _nfc("手札に戻す") not in t:
+    # 「加えてもよい」は「加える」を含まないため個別に対応する
+    if (_nfc("手札に加える") not in t and _nfc("手札に戻す") not in t
+            and _nfc("手札に加えてもよい") not in t):
         return None
     tq = parse_target(t)
     tq.zone = Zone.LIFE
@@ -452,7 +454,8 @@ def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
 # ドン!!返却: 「ドン‼-N」（場のドン!!を N 枚ドン!!デッキへ戻す）
 #   多くはコストとして登場。従来 OTHER（何もしない）だった。
 # ---------------------------------------------------------------------------
-_DON_RETURN_RE = re.compile(r"ドン(?:!!|‼)[ 　]*[-－−‐][ 　]*(\d+)")
+# 「ドン !!-1」のように ドン と !! の間にスペースが入る表記も許容する
+_DON_RETURN_RE = re.compile(r"ドン[ 　]*(?:!!|‼)[ 　]*[-－−‐][ 　]*(\d+)")
 
 
 @rule("don_return", priority=88)
@@ -898,5 +901,88 @@ def _remaining_trash(ctx: ParseContext) -> Optional[GameAction]:
         target=TargetQuery(
             player=Player.SELF, zone=Zone.TEMP, select_mode="REMAINING", count=-1
         ),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 手札→デッキ上か下:
+#   「自分の手札N枚を（好きな順番で並び替え、）デッキの上か下（/上/下）に置く」
+#   → DECK_BOTTOM(zone=HAND)。
+#   「並び替え」は UI 未実装のため無視（順序不定でデッキ下）。
+#   「上か下」の選択 UI も未実装のため保守的にデッキ下扱い。
+# ---------------------------------------------------------------------------
+@rule("hand_to_deck", priority=64)
+def _hand_to_deck(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("手札") not in t:
+        return None
+    if _nfc("デッキ") not in t or _nfc("置く") not in t:
+        return None
+    # 「ライフ」「トラッシュ」を含む場合は別ルールへ委ねる
+    if _nfc("ライフ") in t or _nfc("トラッシュ") in t:
+        return None
+    if not re.search(_nfc(r"デッキの(上か下|上|下)に置く"), t):
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.HAND
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(
+        type=ActionType.DECK_BOTTOM,
+        target=tq,
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 公開カードをそのまま登場させる:
+#   「（レストで）登場させてもよい」— 明示ゾーン指定なし（デッキ公開→条件付き登場の文脈）。
+#   play_card_from_zone(priority=52) が「手札/トラッシュ」明示の場合を先に担当するため、
+#   ここは明示ゾーンなし・かつ「このカード/キャラ」指定なしの残余ケースを拾う。
+#   UI 未実装のため任意(もよい)も即登場扱い。is_up_to=True で登場しない選択も可。
+# ---------------------------------------------------------------------------
+@rule("play_revealed", priority=40)
+def _play_revealed(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"登場させてもよい"), t):
+        return None
+    if re.search(_nfc(r"この(カード|キャラ|リーダー)を"), t):
+        return None  # play_self が担当
+    if _nfc("手札") in t or _nfc("トラッシュ") in t:
+        return None  # play_card_from_zone が担当（ゾーン明示）
+    status = "RESTED" if re.search(_nfc(r"レストで(、)?登場"), t) else None
+    tq = TargetQuery(player=Player.SELF, zone=Zone.FIELD, count=1, is_up_to=True)
+    return GameAction(
+        type=ActionType.PLAY_CARD,
+        target=tq,
+        destination=Zone.FIELD,
+        status=status,
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# アクティブキャラへのアタック付与:
+#   「（このターン中、）アクティブのキャラにもアタックできる」
+#   → GRANT_KEYWORD("ATTACK_ACTIVE")。
+#   通常はレストキャラしか攻撃できないが、このキーワードがあればアクティブも攻撃可。
+#   単体ルール「このキャラは相手のアクティブのキャラにもアタックできる」は PERMANENT、
+#   対象付き「リーダーかキャラ1枚までは、このターン中、〜」は THIS_TURN。
+# ---------------------------------------------------------------------------
+@rule("attack_active", priority=60)
+def _attack_active(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"アクティブ.*キャラ.*アタックできる"), t):
+        return None
+    duration = "THIS_TURN" if _nfc("このターン中") in t else "PERMANENT"
+    tq = parse_target(t)
+    if re.search(_nfc(r"このキャラは"), t):
+        tq = TargetQuery(select_mode="SOURCE")
+    return GameAction(
+        type=ActionType.GRANT_KEYWORD,
+        target=tq,
+        status="ATTACK_ACTIVE",
+        duration=duration,
         raw_text=t,
     )

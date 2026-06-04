@@ -498,7 +498,9 @@ class GameManager:
         self._validate_action(attacker_owner, "MAIN_ACTION")
         if "ATTACK_DISABLE" in attacker.flags or "ATTACK_DISABLE" in attacker.timed_flags: raise ValueError("このカードは効果によりアタックできません。")
         if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
-        if target.master.type == CardType.CHARACTER and not target.is_rest: raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
+        if (target.master.type == CardType.CHARACTER and not target.is_rest
+                and not attacker.has_keyword("ATTACK_ACTIVE")):
+            raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
         log_event("INFO", "game.attack_declare", f"{attacker.master.name} is attacking {target.master.name}", player=attacker_owner.name)
         attacker.is_rest = True
         self.active_battle = {"attacker": attacker, "target": target, "attacker_owner": attacker_owner, "target_owner": target_owner, "counter_buff": 0}
