@@ -621,6 +621,24 @@ CASES = [
             }
         ],
     },
+    # ----- デッキから直接登場（サーチ→登場, play_from_deck, zone=DECK） --------------------
+    #   従来はレガシーフォールバックで zone=FIELD/TEMP に誤ターゲット（盤面 no-op）だった。
+    {
+        "id": "play_from_deck_named",
+        "text": "【KO時】自分のデッキから「スマイリー」1枚までを、登場させ、デッキをシャッフルする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "PLAY_CARD", "destination": "FIELD",
+                         "target": {"zone": "DECK", "player": "SELF", "names": ["スマイリー"], "is_up_to": True}},
+                        {"type": "SHUFFLE"},
+                    ],
+                },
+            }
+        ],
+    },
     # ----- サーチ（特徴フィルタ）: 見て特徴Xのカードを手札に加える --------------------------
     {
         "id": "deck_search_trait",

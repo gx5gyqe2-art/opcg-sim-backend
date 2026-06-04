@@ -812,6 +812,40 @@ def _play_card_from_zone(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+# ---------------------------------------------------------------------------
+# デッキから直接登場（サーチ→登場）:
+#   「自分のデッキから（コスト/名前/特徴で絞った）キャラ1枚までを、（レストで）登場させる」
+#   → PLAY_CARD(zone=DECK, dest=FIELD)。後続の「デッキをシャッフルする」は shuffle が担当。
+#   「デッキの上から…公開/見て」(LOOK 文脈) とは「デッキから」(検索) で区別。
+#   ドン!!/手札/トラッシュ/ライフ明示・「このキャラを」(play_self) は対象外。
+# ---------------------------------------------------------------------------
+@rule("play_from_deck", priority=53)
+def _play_from_deck(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("デッキから") not in t:
+        return None
+    # 「登場させる」断定・連用形「登場させ、」(split 後は末尾「登場」) の両方を拾う。
+    if not re.search(_nfc(r"を、?(?:レストで)?登場(?:させ(?:る)?)?$"), t):
+        return None
+    if re.search(_nfc(r"この(カード|キャラ|リーダー)を"), t):
+        return None  # play_self が担当
+    if any(_nfc(z) in t for z in ["ドン", "手札", "トラッシュ", "ライフ"]):
+        return None  # ドン操作・手札/トラッシュ/ライフからの登場は別ルール
+    tq = parse_target(t)
+    tq.zone = Zone.DECK
+    tq.player = Player.SELF
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    status = "RESTED" if re.search(_nfc(r"レストで(、)?登場"), t) else None
+    return GameAction(
+        type=ActionType.PLAY_CARD,
+        target=tq,
+        destination=Zone.FIELD,
+        status=status,
+        raw_text=t,
+    )
+
+
 @rule("play_self", priority=75)
 def _play_self(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -992,8 +1026,9 @@ def _play_from_temp(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if re.search(_nfc(r"この(カード|キャラ|リーダー)を"), t):
         return None  # play_self が担当
-    if any(_nfc(z) in t for z in ["手札", "トラッシュ", "ライフ"]):
-        return None  # 明示ゾーンは play_card_from_zone 等が担当
+    if any(_nfc(z) in t for z in ["手札", "トラッシュ", "ライフ", "デッキ"]):
+        return None  # 明示ゾーンは play_card_from_zone 等が担当。「デッキから…登場」(直接登場)も
+        #             公開→TEMP の文脈ではないため除外（分割後の登場句に デッキ は残らない）。
     if not re.search(_nfc(r"\d+枚"), t):
         return None  # 「N枚（まで）」の指定がある登場句に限定（条件/トリガー文を除外）
     tq = parse_target(t)
