@@ -231,11 +231,12 @@ def _life_recover(ctx: ParseContext) -> Optional[GameAction]:
 @rule("life_to_hand", priority=70)
 def _life_to_hand(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分／相手の）ライフの上（か下）から…手札に加える／戻す」→ MOVE_CARD(dest=HAND)。
-
-    legacy は「上か下から」を destination=LIFE と誤判定していた（実質 no-op）。
+    「自分のライフN枚を手札に加えることができる」（上か下を明示しない形）も対応。
     """
     t = ctx.text
-    if _nfc("ライフの上") not in t and _nfc("ライフの下") not in t:
+    has_life_pos = _nfc("ライフの上") in t or _nfc("ライフの下") in t
+    has_life_count = bool(re.search(_nfc(r"ライフ\d*枚"), t))
+    if not has_life_pos and not has_life_count:
         return None
     # 「加えてもよい」は「加える」を含まないため個別に対応する
     if (_nfc("手札に加える") not in t and _nfc("手札に戻す") not in t
@@ -271,14 +272,17 @@ def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
 
 @rule("life_to_trash", priority=68)
 def _life_to_trash(ctx: ParseContext) -> Optional[GameAction]:
-    """「（自分／相手の）ライフの上（か下）から…トラッシュに置く」→ TRASH。"""
+    """「（自分／相手の）ライフの上（か下）から…トラッシュに置く（もよい）」→ TRASH。"""
     t = ctx.text
     if _nfc("ライフの上") not in t and _nfc("ライフの下") not in t:
         return None
-    if _nfc("トラッシュ") not in t or _nfc("置く") not in t:
+    # 「置く」「置いて」「置いてもよい」等の活用形に対応（トラッシュに置で統一）
+    if _nfc("トラッシュ") not in t or not re.search(_nfc(r"トラッシュに置"), t):
         return None
     tq = parse_target(t)
     tq.zone = Zone.LIFE
+    if _nfc("まで") in t or _nfc("もよい") in t:
+        tq.is_up_to = True
     return GameAction(type=ActionType.TRASH, target=tq, raw_text=t)
 
 
@@ -828,8 +832,9 @@ def _play_self(ctx: ParseContext) -> Optional[GameAction]:
 @rule("trash_self", priority=67)
 def _trash_self(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    if _nfc("トラッシュ") not in t or _nfc("置く") not in t:
+    if _nfc("トラッシュ") not in t:
         return None
+    # 「置く」なしの短縮形「このキャラをトラッシュに」「代わりにこのキャラをトラッシュに」も対応
     if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?トラッシュ"), t):
         return None
     return GameAction(
@@ -986,3 +991,71 @@ def _attack_active(ctx: ParseContext) -> Optional[GameAction]:
         duration=duration,
         raw_text=t,
     )
+
+
+# ---------------------------------------------------------------------------
+# フリーズ: 「（相手の）レストのキャラ1枚までは、次の相手のリフレッシュフェイズでアクティブにならない」
+#   → FREEZE(target=相手のレストキャラ, is_up_to=True)。
+#   エンジンの refresh_all が card.flags に "FREEZE" があればアクティブ化をスキップする。
+# ---------------------------------------------------------------------------
+@rule("freeze_target", priority=65)
+def _freeze_target(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"アクティブにならない"), t):
+        return None
+    tq = parse_target(t)
+    tq.player = Player.OPPONENT
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.FREEZE, target=tq, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# 効果無効: 「（相手の）リーダーかキャラ1枚までを、このターン中、効果を無効にする」
+#   → NEGATE_EFFECT(target=相手リーダー/キャラ, duration=THIS_TURN)。
+#   エンジンは ability_disabled=True を対象に設定し、能力発動をブロックする。
+# ---------------------------------------------------------------------------
+@rule("negate_effect", priority=65)
+def _negate_effect(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"効果を無効にする"), t):
+        return None
+    tq = parse_target(t)
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(
+        type=ActionType.NEGATE_EFFECT,
+        target=tq,
+        duration="THIS_TURN",
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# ルール処理: 「ルール上、このカードはカード名を「X」としても扱う」
+#              「ルール上、このカードはデッキに何枚でも入れることができる」
+#   → RULE_PROCESSING（エンジン no-op）。
+#   ゲームエンジンには影響しないルール注記（デッキ構築ルール等）を吸収する。
+# ---------------------------------------------------------------------------
+@rule("rule_processing", priority=35)
+def _rule_processing(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"ルール上"), t):
+        return None
+    return GameAction(type=ActionType.RULE_PROCESSING, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# 自己制限: 「自分は、（このターン中、）...できない/られない」
+#   → RULE_PROCESSING（エンジン no-op）。
+#   「自分の効果でライフを手札に加えられない」「自分はキャラカードを登場できない」等。
+#   制限チェックは未実装のため、解析だけ行いエンジンは何もしない（OTHER 脱出のみ）。
+# ---------------------------------------------------------------------------
+@rule("self_cannot", priority=33)
+def _self_cannot(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("自分は") not in t:
+        return None
+    if not re.search(_nfc(r"(できない|られない)"), t):
+        return None
+    return GameAction(type=ActionType.RULE_PROCESSING, raw_text=t)

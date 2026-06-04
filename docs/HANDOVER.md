@@ -34,11 +34,11 @@
 
 | 指標 | 刷新開始時 | PR#4 時点 | 現在 |
 |---|---|---|---|
-| 原子句カバレッジ（ルール命中率） | 0% | 約57% | **約93.8%** |
-| `ActionType.OTHER`（実行時に何もしない句） | 942 | 421 | **175** |
+| 原子句カバレッジ（ルール命中率） | 0% | 約57% | **約95.4%** |
+| `ActionType.OTHER`（実行時に何もしない句） | 942 | 421 | **108** |
 | 未分類条件 `GENERIC`（誤発動の温床） | — | 251 | **94** |
-| パーサルール数 | 0 | 15 | **45** |
-| テスト総数 | 17 | 43 | **125（全緑）** |
+| パーサルール数 | 0 | 15 | **49** |
+| テスト総数 | 17 | 43 | **137（全緑）** |
 | 本番パーサ | レガシー | EffectParserV2 | **EffectParserV2（既定）** |
 
 > 前セッション全体でカバレッジ 70.4%→92.5%（+22.1pt）、OTHER 333→234（−99件）、
@@ -47,6 +47,9 @@
 > 本セッション（BWP0A）ラウンド2：life_to_hand もよい / hand_to_deck / ドン!!スペース表記 /
 > 公開登場 / アクティブアタック：カバレッジ 93.0%→93.8%（+0.8pt）、OTHER 209→175（−34件）、
 > ルール 42→45（+3種）、テスト 118→125（+7件）。退行=0 を全ラウンドで維持。
+> 本セッション（BWP0A）ラウンド3：FREEZE / NEGATE_EFFECT / ルール処理 / 自己制限 / ライフ枚数形 /
+> trash_self 短縮形 / life_to_trash もよい：カバレッジ 93.8%→95.4%（+1.6pt）、OTHER 175→108（−67件）、
+> ルール 45→49（+4種）、テスト 125→137（+12件）。退行=0 を全ラウンドで維持。
 
 - 全2652カードの能力構築・実デッキ(imu/nami)ロード・ゲーム開始〜数ターン進行を確認済み。
 - レガシー vs V2 の全カード比較で **退行(新規OTHER)=0** を一貫して維持。
@@ -127,6 +130,31 @@ play_revealed_rested / attack_active_permanent / attack_active_this_turn / disca
 engine +2: test_hand_to_deck_bottom / test_attack_active_*）
 
 **結果**: カバレッジ 93.0%→93.8%（+0.8pt）、OTHER 209→175（−34件）、退行=0。
+
+#### ラウンド3: FREEZE / NEGATE_EFFECT / ルール処理 / 自己制限 / 各種 fix（ルール 45→49, テスト +12）
+
+**修正（3箇所）— `rules/atoms.py`**
+- `life_to_hand`: `ライフの上/下` 必須だった判定を拡張。`ライフN枚` 形式（例:「自分のライフ1枚を手札に加えることができる」）も対応。3件解消。
+- `trash_self`: `置く` の必須チェックを削除。「このキャラをトラッシュに」（短縮形）・「代わりにこのキャラをトラッシュに」も拾う。4件解消。
+- `life_to_trash`: `置く` チェックを `re.search(r"トラッシュに置")` に変更。「トラッシュに置いてもよい」等の活用形に対応。`is_up_to=True` も付与。2件解消。
+
+**新ルール（4種）— `rules/atoms.py`**
+- `freeze_target`（priority=65）: 「（相手の）レストのキャラ1枚までは、次の相手のリフレッシュフェイズでアクティブにならない」→ FREEZE(target=相手のレストキャラ, is_up_to=True)。エンジンの `refresh_all` が `card.flags["FREEZE"]` を確認してからリセットするため、ターン境界を跨ぐ `flags` に直接書き込む。4件解消。
+- `negate_effect`（priority=65）: 「（相手の）リーダーかキャラ1枚までを、このターン中、効果を無効にする」→ NEGATE_EFFECT(target=相手, duration=THIS_TURN)。エンジンが `target.ability_disabled=True` をセットし、ability 発動をブロック。`reset_turn_status()` で解除。6件解消。
+- `rule_processing`（priority=35）: 「ルール上、このカードはカード名を「X」としても扱う」「ルール上、デッキに何枚でも入れられる」等 → RULE_PROCESSING（エンジン no-op）。ゲームエンジンに影響しないルール注記を吸収。6件解消。
+- `self_cannot`（priority=33）: 「自分は（このターン中）…できない/られない」→ RULE_PROCESSING（no-op）。自己制限メカニクス未実装のため解析のみで OTHER 脱出。4件解消。
+
+**エンジン修正（3箇所）— `gamestate.apply_action_to_engine`**
+- `FREEZE`: `target.flags.add("FREEZE")`。`refresh_all` が reset 前にフラグを読む設計に乗るため flags に書き込む（timed_flags でなく）。
+- `NEGATE_EFFECT`: `target.ability_disabled=True`; `target._refresh_keywords()` でキーワードも無効化。
+- `RULE_PROCESSING`: `success=True`（意図的 no-op）。
+
+**テスト +12**（golden +8: freeze_rested_char / negate_effect_char / negate_effect_leader_or_char /
+rule_card_alias / self_cannot_life_to_hand / life_to_hand_count_form / trash_self_short /
+life_to_trash_optional;
+engine +2: test_freeze_keeps_character_rested_after_refresh / test_negate_effect_sets_ability_disabled）
+
+**結果**: カバレッジ 93.8%→95.4%（+1.6pt）、OTHER 175→108（−67件）、退行=0。
 
 ---
 
@@ -335,10 +363,10 @@ engine +2: test_hand_to_deck_bottom / test_attack_active_*）
 | パス | 役割 |
 |---|---|
 | `tests/test_parser.py` | レガシーパーサの単体テスト（8件） |
-| `tests/golden/golden_cases.py` | **ゴールデンコーパス（効果セマンティクスの期待値, 65件）** |
+| `tests/golden/golden_cases.py` | **ゴールデンコーパス（効果セマンティクスの期待値, 79件）** |
 | `tests/golden/summarize.py` | AST→指紋(summary) 変換＋部分一致判定 |
-| `tests/test_golden.py` | ゴールデン・ランナー（65件） |
-| `tests/test_effects_engine.py` | エンジン実行系の盤面変化テスト（43件） |
+| `tests/test_golden.py` | ゴールデン・ランナー（79件） |
+| `tests/test_effects_engine.py` | エンジン実行系の盤面変化テスト（48件） |
 | `tests/test_gameplay_smoke.py` | 実デッキでのゲーム進行スモーク（2件） |
 | `tests/engine_helpers.py` | 最小 GameManager 構築ヘルパ |
 | `tests/effect_diagnostics.py` | **未対応句/OTHER ランキングの可視化** |
@@ -397,15 +425,16 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
    - ~~**手札→デッキ上か下（6件）**~~ **対応済み**（本ブランチ ラウンド2, `hand_to_deck`）。
    - ~~**公開カードをレストで登場させてもよい（5件）**~~ **対応済み**（本ブランチ ラウンド2, `play_revealed`）。
    - ~~**アクティブのキャラにもアタックできる（6件）**~~ **対応済み**（本ブランチ ラウンド2, `attack_active`）。
+   - ~~**「次のリフレッシュフェイズでアクティブにならない」（4件）**~~ **対応済み**（本ブランチ ラウンド3, `freeze_target`）。
+   - ~~**「効果を無効にする」（相手キャラ/リーダー, 6件）**~~ **対応済み**（本ブランチ ラウンド3, `negate_effect`）。
+   - ~~**「自分は〜できない」形の自己制限（4件）**~~ **対応済み**（本ブランチ ラウンド3, `self_cannot`→RULE_PROCESSING）。
    - **ライフ look-and-place「自分か相手のライフの上から1枚を見て、ライフの上か下に置く」（10件）** —
      ライフは TEMP を介さず上下選択 UI も未実装。デッキサーチとは別系統の設計が要る。
    - **「任意のコストを宣言し、相手のデッキの上から1枚を公開する」（6件）** — コスト宣言という
      ゲーム独自メカニクス＋専用 ActionType の設計が必要。
-   - **「効果を無効にする」（相手キャラ/リーダー, 6件）** — NEGATE_EFFECT。継続効果に
-     ability_disabled フラグ付与の設計が必要。
-   - **「次のリフレッシュフェイズでアクティブにならない」（4件）** — FREEZE 系。継続効果に
-     REFRESH_DISABLE フラグを追加する設計が必要。
-   - 「自分は〜できない」形の自己制限（4件）、「パワーが相手と同じになる」（3件, 動的値）等。
+   - **「パワーが相手と同じになる」（3件, 動的値）** — 対象の base_power_override を
+     ゲーム中に動的評価する必要がある。未実装。
+   - **「デッキの上から1枚を公開し、コスト2のキャラ1枚までを登場させる」（2件）** — look_deck + 条件付き play_revealed の複合。`look_deck` が独立クローズに分割されれば `play_revealed` で解決できるかもしれないが要調査。
    - キーワード付与（【ブロッカー】等を得る）は **対応済み**（`grant_keyword`）。
      `GRANT_KEYWORD` は継続効果マネージャ経由で `timed_keywords` に付与され、
      `_apply_passive_effects` のリセットで消えず、duration（THIS_TURN/THIS_BATTLE/

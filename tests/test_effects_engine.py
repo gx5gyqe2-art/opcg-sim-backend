@@ -725,6 +725,34 @@ def test_hand_to_deck_bottom():
     assert hand_card in p1.deck  # デッキ下に加わった
 
 
+def test_freeze_keeps_character_rested_after_refresh():
+    """FREEZE: フリーズされたキャラはリフレッシュフェイズでアクティブになれない。"""
+    gm, p1, p2 = make_game()
+    char = make_instance(make_master(card_id="F-1", type=CardType.CHARACTER), owner=p2.name)
+    char.is_rest = True
+    p2.field.append(char)
+    # FREEZE フラグを直接付与（パーサーを経由せず engine 層だけを検証）
+    ok = gm.apply_action_to_engine(p1, action(ActionType.FREEZE), [char], 0)
+    assert ok
+    assert "FREEZE" in char.flags
+    # p2 のリフレッシュを再現（refresh_all は turn_player を引数に取る）
+    gm.refresh_all(p2)
+    assert char.is_rest is True  # FREEZE 済みなので依然レスト
+
+
+def test_negate_effect_sets_ability_disabled():
+    """NEGATE_EFFECT: ability_disabled=True になり能力発動がブロックされる。"""
+    gm, p1, p2 = make_game()
+    char = make_instance(make_master(card_id="N-1", type=CardType.CHARACTER), owner=p2.name)
+    p2.field.append(char)
+    ok = gm.apply_action_to_engine(p1, action(ActionType.NEGATE_EFFECT), [char], 0)
+    assert ok
+    assert char.ability_disabled is True
+    # reset_turn_status で THIS_TURN の無効化は解除される
+    char.reset_turn_status()
+    assert char.ability_disabled is False
+
+
 def test_attack_active_allows_attacking_active_character():
     """ATTACK_ACTIVE キーワード持ちはアクティブキャラにアタック可能。
     _validate_action はゲームフロー依存なのでパッチし、攻撃可否の条件だけを検証する。

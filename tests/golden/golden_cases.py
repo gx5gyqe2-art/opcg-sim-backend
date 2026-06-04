@@ -927,4 +927,118 @@ CASES = [
             }
         ],
     },
+    # ----- フリーズ: 「次の相手のリフレッシュフェイズでアクティブにならない」 -------
+    {
+        "id": "freeze_rested_char",
+        "text": "【登場時】相手のレストのキャラ1枚までは、次の相手のリフレッシュフェイズでアクティブにならない。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "action",
+                    "type": "FREEZE",
+                    "target": {"player": "OPPONENT", "is_up_to": True},
+                },
+            }
+        ],
+    },
+    # ----- 効果無効: 「相手のキャラ1枚までを、このターン中、効果を無効にする」 -----
+    {
+        "id": "negate_effect_char",
+        "text": "【登場時】相手のキャラ1枚までを、このターン中、効果を無効にする。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "action",
+                    "type": "NEGATE_EFFECT",
+                    "target": {"player": "OPPONENT", "is_up_to": True},
+                    "duration": "THIS_TURN",
+                },
+            }
+        ],
+    },
+    # ----- 効果無効: 「相手のリーダーかキャラ1枚までを、このターン中、効果を無効にする」 --
+    {
+        "id": "negate_effect_leader_or_char",
+        "text": "【起動メイン】相手のリーダーかキャラ1枚までを、このターン中、効果を無効にする。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "effect": {
+                    "kind": "action",
+                    "type": "NEGATE_EFFECT",
+                    "target": {"player": "OPPONENT", "is_up_to": True},
+                    "duration": "THIS_TURN",
+                },
+            }
+        ],
+    },
+    # ----- ルール処理: 「ルール上、このカードはカード名を「X」としても扱う」 ----------
+    {
+        "id": "rule_card_alias",
+        "text": "ルール上、このカードはカード名を「ウソップ」としても扱う。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "RULE_PROCESSING",
+                },
+            }
+        ],
+    },
+    # ----- 自己制限: 「自分は、このターン中、自分の効果でライフを手札に加えられない」 --
+    {
+        "id": "self_cannot_life_to_hand",
+        "text": "自分は、このターン中、自分の効果でライフを手札に加えられない。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "RULE_PROCESSING",
+                },
+            }
+        ],
+    },
+    # ----- ライフ→手札（枚数形）: 「自分のライフ1枚を手札に加えることができる」 ------
+    {
+        "id": "life_to_hand_count_form",
+        "text": "自分のライフ1枚を手札に加えることができる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "LIFE"},
+                    "destination": "HAND",
+                },
+            }
+        ],
+    },
+    # ----- 自己トラッシュ（短縮形）: 「このキャラをトラッシュに」（置く省略）---------
+    {
+        "id": "trash_self_short",
+        "text": "【起動メイン】このキャラをトラッシュに：カード2枚を引く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {"kind": "action", "type": "TRASH"},
+                "effect": {"kind": "action", "type": "DRAW", "value": 2},
+            }
+        ],
+    },
+    # ----- ライフ→トラッシュ（もよい形）: 「ライフの上から1枚をトラッシュに置いてもよい」 --
+    {
+        "id": "life_to_trash_optional",
+        "text": "代わりに自分のライフの上から1枚をトラッシュに置いてもよい。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "TRASH",
+                    "target": {"zone": "LIFE", "is_up_to": True},
+                },
+            }
+        ],
+    },
 ]

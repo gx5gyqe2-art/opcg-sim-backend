@@ -873,6 +873,22 @@ class GameManager:
                 else:
                     self.continuous.apply(target, "FLAG", "THIS_TURN", flag="ATTACK_DISABLE")
                 success = True
+            elif act_name == "FREEZE":
+                # 「次の相手のリフレッシュフェイズでアクティブにならない」
+                # refresh_all が flags["FREEZE"] を確認してからリセットするため、
+                # ターン境界を跨ぐ flags に直接書き込む（timed_flags でなく flags）。
+                target.flags.add("FREEZE")
+                log_event("INFO", "game.action_freeze", f"{target.master.name} frozen (won't activate next refresh)", player=player.name)
+                success = True
+            elif act_name == "NEGATE_EFFECT":
+                # 「（このターン中、）効果を無効にする」
+                target.ability_disabled = True
+                target._refresh_keywords()
+                log_event("INFO", "game.action_negate", f"{target.master.name} ability disabled this turn", player=player.name)
+                success = True
+            elif act_name == "RULE_PROCESSING":
+                # ルール上の注記（カード名 alias、デッキ枚数ルール等）→ エンジン no-op
+                success = True
             elif act_name == "REST":
                 target.is_rest = True
                 if isinstance(target, DonInstance) and source_list is not None:
