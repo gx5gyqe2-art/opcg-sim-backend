@@ -178,6 +178,106 @@ def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# ライフ操作 ---------------------------------------------------------------
+#   実カードに頻出するライフ周りの原子句をルール化する。従来は legacy へ
+#   フォールバックし、一部は誤った destination（ライフ→手札なのに dest=LIFE）や
+#   OTHER（表/裏向き）になっていた。
+# ---------------------------------------------------------------------------
+
+
+@rule("life_face", priority=72)
+def _life_face(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）ライフ…を表向き／裏向きにする」→ FACE_UP_LIFE(status=UP/DOWN)。"""
+    t = ctx.text
+    if _nfc("ライフ") not in t:
+        return None
+    if _nfc("表向き") in t:
+        status = "UP"
+    elif _nfc("裏向き") in t:
+        status = "DOWN"
+    else:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.LIFE
+    return GameAction(type=ActionType.FACE_UP_LIFE, target=tq, status=status, raw_text=t)
+
+
+@rule("life_recover", priority=71)
+def _life_recover(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）デッキの上から…ライフの上に加える」→ HEAL（デッキ上→ライフ）。
+
+    エンジンの HEAL は対象を見ずデッキ上から value 枚をライフへ加えるため、
+    対象選択待ちに陥らないよう target=None とする（legacy は target=LIFE で
+    余計な選択を発生させていた）。
+    """
+    t = ctx.text
+    if _nfc("デッキの上") not in t or _nfc("ライフ") not in t:
+        return None
+    if _nfc("加える") not in t and _nfc("置く") not in t:
+        return None
+    if _nfc("手札") in t:
+        return None  # デッキ→手札 等は別アクション
+    return GameAction(
+        type=ActionType.HEAL,
+        target=None,
+        value=ValueSource(base=_first_int(t, 1)),
+        raw_text=t,
+    )
+
+
+@rule("life_to_hand", priority=70)
+def _life_to_hand(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分／相手の）ライフの上（か下）から…手札に加える／戻す」→ MOVE_CARD(dest=HAND)。
+
+    legacy は「上か下から」を destination=LIFE と誤判定していた（実質 no-op）。
+    """
+    t = ctx.text
+    if _nfc("ライフの上") not in t and _nfc("ライフの下") not in t:
+        return None
+    if _nfc("手札に加える") not in t and _nfc("手札に戻す") not in t:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.LIFE
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=tq,
+        destination=Zone.HAND,
+        raw_text=t,
+    )
+
+
+@rule("hand_to_life", priority=69)
+def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）手札…を、ライフの上／下に加える」→ MOVE_CARD(dest=LIFE)。"""
+    t = ctx.text
+    if _nfc("手札") not in t:
+        return None
+    if _nfc("ライフの上に加える") not in t and _nfc("ライフの下に加える") not in t:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.HAND
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=tq,
+        destination=Zone.LIFE,
+        raw_text=t,
+    )
+
+
+@rule("life_to_trash", priority=68)
+def _life_to_trash(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分／相手の）ライフの上（か下）から…トラッシュに置く」→ TRASH。"""
+    t = ctx.text
+    if _nfc("ライフの上") not in t and _nfc("ライフの下") not in t:
+        return None
+    if _nfc("トラッシュ") not in t or _nfc("置く") not in t:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.LIFE
+    return GameAction(type=ActionType.TRASH, target=tq, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
 # 除去保護: 「相手の効果で場を離れない」「（バトルで）KOされない」
 #   保護マーカーを生成し、除去の瞬間に gamestate 側でライブ評価される。
 #   多くは条件付き PASSIVE（例: トラッシュ7枚以上の場合）。

@@ -177,6 +177,53 @@ def test_grant_keyword_adds_to_current_keywords():
     assert "ブロッカー" in card.current_keywords
 
 
+def test_life_recover_from_deck():
+    """HEAL: デッキの上から value 枚をライフに加える（対象不要）。"""
+    gm, p1, _ = make_game()
+    for i in range(3):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    assert len(p1.life) == 0 and len(p1.deck) == 3
+
+    ok = gm.apply_action_to_engine(p1, action(ActionType.HEAL, value=2), [], 2)
+    assert ok
+    assert len(p1.life) == 2
+    assert len(p1.deck) == 1
+
+
+def test_life_to_hand_move_card():
+    """MOVE_CARD(dest=HAND): ライフのカードを手札へ移す。"""
+    gm, p1, _ = make_game()
+    life_card = make_instance(make_master(card_id="LF"), owner=p1.name)
+    p1.life.append(life_card)
+    assert len(p1.hand) == 0
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.MOVE_CARD, destination=Zone.HAND), [life_card], 0
+    )
+    assert ok
+    assert life_card in p1.hand
+    assert life_card not in p1.life
+
+
+def test_face_up_life_sets_flag():
+    """FACE_UP_LIFE: status で is_face_up を切り替える。"""
+    gm, p1, _ = make_game()
+    life_card = make_instance(make_master(card_id="LF2"), owner=p1.name)
+    p1.life.append(life_card)
+    assert life_card.is_face_up is False
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.FACE_UP_LIFE, status="UP"), [life_card], 0
+    )
+    assert ok
+    assert life_card.is_face_up is True
+
+    gm.apply_action_to_engine(
+        p1, action(ActionType.FACE_UP_LIFE, status="DOWN"), [life_card], 0
+    )
+    assert life_card.is_face_up is False
+
+
 def _prevent_leave_master(card_id, status, condition=None):
     ab = Ability(
         trigger=TriggerType.PASSIVE,

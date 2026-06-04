@@ -283,6 +283,82 @@ CASES = [
             }
         ],
     },
+    # ----- ライフ操作: デッキの上からライフへ（回復, deck→life） ----------
+    #   従来は HEAL だが target=LIFE で対象選択待ちに陥っていた。target=None で
+    #   エンジンがデッキ上から value 枚をライフに加える。
+    {
+        "id": "life_recover_from_deck",
+        "text": "自分のデッキの上から1枚までを、ライフの上に加える。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "HEAL", "value": 1, "target": None}}
+        ],
+    },
+    # ----- ライフ操作: ライフ→手札（上か下から, dest=LIFE 誤りを修正） -------
+    {
+        "id": "life_to_hand_top_or_bottom",
+        "text": "自分のライフの上か下から1枚を手札に加えることができる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "destination": "HAND",
+                    "target": {"zone": "LIFE", "player": "SELF"},
+                }
+            }
+        ],
+    },
+    # ----- ライフ操作: 手札→ライフ（hand→life） ----------------------------
+    {
+        "id": "hand_to_life_top",
+        "text": "自分の手札1枚までを、ライフの上に加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "destination": "LIFE",
+                    "target": {"zone": "HAND", "player": "SELF", "is_up_to": True},
+                }
+            }
+        ],
+    },
+    # ----- ライフ操作: ライフ→トラッシュ（life→trash） --------------------
+    {
+        "id": "life_to_trash_opponent",
+        "text": "相手のライフの上から1枚までを、トラッシュに置く。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "TRASH",
+                    "target": {"zone": "LIFE", "player": "OPPONENT", "is_up_to": True},
+                }
+            }
+        ],
+    },
+    # ----- ライフ操作: 表向き/裏向き（FACE_UP_LIFE, 従来 OTHER） -----------
+    {
+        "id": "life_face_up",
+        "text": "自分のライフの上から1枚を表向きにできる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "FACE_UP_LIFE",
+                    "status": "UP",
+                    "target": {"zone": "LIFE", "player": "SELF"},
+                }
+            }
+        ],
+    },
+    {
+        "id": "life_face_down_all",
+        "text": "自分のライフすべてを裏向きにする。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "FACE_UP_LIFE", "status": "DOWN"}}
+        ],
+    },
     # ----- カウンターのパワー付与（OP13-097 世界の均衡） -------------------
     {
         "id": "counter_power_buff_3000",

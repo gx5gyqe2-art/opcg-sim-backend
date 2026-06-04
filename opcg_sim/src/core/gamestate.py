@@ -813,6 +813,12 @@ class GameManager:
                 success = True
             elif act_name == "DECK_TOP":
                 self.move_card(target, Zone.DECK, owner, dest_position="TOP"); success = True
+            elif act_name == "FACE_UP_LIFE":
+                # 「ライフを表向き／裏向きにする」: status="DOWN" のみ裏向き、他は表向き。
+                target.is_face_up = (action.status != "DOWN")
+                log_event("INFO", "game.action_face_up_life",
+                          f"{target.master.name} life set face_up={target.is_face_up}", player=player.name)
+                success = True
             elif act_name == "GRANT_KEYWORD":
                 keyword = action.status
                 if not keyword and getattr(action, 'raw_text', ''):
