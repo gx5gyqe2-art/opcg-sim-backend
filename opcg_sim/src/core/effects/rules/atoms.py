@@ -544,14 +544,16 @@ def _remaining_deck_bottom(ctx: ParseContext) -> Optional[GameAction]:
 # ---------------------------------------------------------------------------
 @rule("look_deck", priority=80)
 def _look_deck(ctx: ParseContext) -> Optional[GameAction]:
-    """「（自分の）デッキの上からN枚（まで）を見て」→ LOOK（デッキ上 N 枚→TEMP）。
+    """「（自分の）デッキの上からN枚（まで）を見て／公開し」→ LOOK（デッキ上 N 枚→TEMP）。
 
-    parser.py が「デッキの上からN枚を見て、」を独立クローズに分割するようになったため、
-    LOOK を明示生成する。後続の「公開し手札に加える」(search_to_hand) や
-    「並び替えてデッキへ戻す」(temp_to_deck)、「残りを…」(remaining_*) が TEMP を消費する。
+    parser.py が「デッキの上からN枚を見て、」「…を公開し、」を独立クローズに分割するため、
+    LOOK を明示生成する。後続の「公開し手札に加える」(search_to_hand)・「登場させる」
+    (play_from_temp)・「並び替えてデッキへ戻す」(temp_to_deck)・「残りを…」(remaining_*) が
+    TEMP を消費する。「公開し」は本来 REVEAL（相手に開示）だが、登場/サーチ処理のため候補を
+    TEMP に載せる点は「見て」と同じなので LOOK で扱う。
     """
     t = ctx.text
-    m = re.search(_nfc(r"デッキの上から(\d+)枚(?:まで)?を見て"), t)
+    m = re.search(_nfc(r"デッキの上から(\d+)枚(?:まで)?を(?:見て|公開し)"), t)
     if not m:
         return None
     return GameAction(
@@ -958,6 +960,42 @@ def _play_revealed(ctx: ParseContext) -> Optional[GameAction]:
         return None  # play_card_from_zone が担当（ゾーン明示）
     status = "RESTED" if re.search(_nfc(r"レストで(、)?登場"), t) else None
     tq = TargetQuery(player=Player.SELF, zone=Zone.FIELD, count=1, is_up_to=True)
+    return GameAction(
+        type=ActionType.PLAY_CARD,
+        target=tq,
+        destination=Zone.FIELD,
+        status=status,
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 公開したデッキトップを登場させる（デッキ公開→条件付き登場）:
+#   「（コスト/特徴/名前で絞った）キャラ（カード）1枚までを、（レストで）登場させる」
+#   → PLAY_CARD(zone=TEMP, dest=FIELD)。
+#   parser.py が「デッキの上からN枚を公開し、」を独立クローズに分割し、look_deck が候補を
+#   TEMP に載せた後、本ルールが TEMP からフィルタ一致の1枚を登場させる。登場しなかった残りは
+#   remaining_*（残り→デッキ）が戻す。明示ゾーン（手札/トラッシュ/ライフ）句や「このキャラを」
+#   （play_self）、条件/トリガー文（「登場させた場合/時」）は対象外。
+# ---------------------------------------------------------------------------
+@rule("play_from_temp", priority=39)
+def _play_from_temp(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    # 「1枚までを登場させ(る)」「…を登場させ、」（連用形, させ、split 後は末尾「登場」）を対象。
+    if not re.search(_nfc(r"を、?(?:レストで)?登場(?:させ(?:る)?)?$"), t):
+        return None
+    if re.search(_nfc(r"この(カード|キャラ|リーダー)を"), t):
+        return None  # play_self が担当
+    if any(_nfc(z) in t for z in ["手札", "トラッシュ", "ライフ"]):
+        return None  # 明示ゾーンは play_card_from_zone 等が担当
+    if not re.search(_nfc(r"\d+枚"), t):
+        return None  # 「N枚（まで）」の指定がある登場句に限定（条件/トリガー文を除外）
+    tq = parse_target(t)
+    tq.zone = Zone.TEMP
+    tq.player = Player.SELF
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    status = "RESTED" if re.search(_nfc(r"レストで(、)?登場"), t) else None
     return GameAction(
         type=ActionType.PLAY_CARD,
         target=tq,

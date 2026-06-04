@@ -1,6 +1,6 @@
 # 引き継ぎ資料 — カード効果システム刷新
 
-最終更新: 2026-06-04 / ブランチ: `main`（`claude/handoff-docs-review-bIYkG` を PR #7 でマージ済み）
+最終更新: 2026-06-04 / ブランチ: `claude/handoff-docs-review-PHoSv`（`main` から分岐・作業中）
 
 **マージ履歴（新しい順）**
 - PR #4 — 合成ルールレジストリ刷新の土台・EffectParserV2 本番化
@@ -8,6 +8,7 @@
 - `claude/handoff-materials-review-u5cqy` — 診断上位 OTHER 表現5種ルール化・サーチ構造修正
 - `claude/handoff-materials-review-BWP0A` — 「手札捨て」修正・パーサ Round 2-3・UI拡張フェーズ1-3（main にマージ済み）
 - `claude/handoff-docs-review-bIYkG` — GENERIC条件94→1・保護者型置換効果対応（PR #7 で main にマージ済み）
+- `claude/handoff-docs-review-PHoSv` — **デッキ公開→条件付き登場の構造修正（本ブランチ・作業中）**
 
 このドキュメントは、本リポジトリ（opcg-sim-backend）の **カード効果処理の刷新作業** を
 引き継ぐための資料です。詳細な設計は `docs/parser_v2.md` を、本書はその上位の
@@ -55,7 +56,8 @@
 | BWP0A ラウンド1 | 手札捨て断片修正 | 93.0% | 209 | 42 | 118 |
 | BWP0A ラウンド2 | hand_to_deck 等5種 | 93.8% | 175 | 45 | 125 |
 | BWP0A ラウンド3 | FREEZE/NEGATE_EFFECT 等 | 95.4% | 108 | 49 | 137 |
-| **bIYkG ラウンド1-4** | **GENERIC条件94→1・保護者型置換効果** | **95.4%** | **108** | **49** | **165** |
+| bIYkG ラウンド1-4 | GENERIC条件94→1・保護者型置換効果 | 95.4% | 108 | 49 | 165 |
+| **PHoSv ラウンド1** | **デッキ公開→条件付き登場の構造修正** | **95.9%** | **104** | **50** | **170** |
 
 **UI 拡張フェーズ（opcg-sim-frontend 連携）**
 
@@ -95,6 +97,49 @@
 - 「このキャラが(バトルで)?KOされる/場を離れる場合、代わりに〜」を `REPLACE_EFFECT`
   （置換を `sub_effect` に保持）として実装。`_active_replacement` が除去の瞬間に PASSIVE を
   走査し、条件・実行可能性を満たせば置換を実行して本来の除去をスキップ。
+
+### 本ブランチ（`claude/handoff-docs-review-PHoSv`）で追加した内容
+
+#### ラウンド1: デッキ公開→条件付き登場の構造修正（ルール 49→50, テスト +5）
+
+**問題（トレースで判明）**: 「自分のデッキの上から1枚を公開し、コスト2のキャラカード1枚までを、
+登場させる。その後、残りを…」が **1原子句化**していた（`_parse_to_node` の分割パターンに
+`公開し、` が無い）。その結果:
+- レガシーフォールバックが `PLAY_CARD` の対象を **`zone=FIELD` または `zone=DECK`** と文言次第で
+  誤推定（**OTHER指標に出ない隠れミスターゲット**。デッキ全体から自由に登場できてしまうルール違反）。
+- 末尾の `残りを…デッキへ` が `DECK_BOTTOM(zone=TEMP)` だが LOOK が無く **TEMP が空＝no-op**。
+- 連用形「登場させ、残りを…」は `させ、` split で `登場` が `させ` から切れ **OTHER** 化（OP06-057）。
+
+**修正（サーチ構造修正 u5cqy R4 と同型）**
+- `parser.py _parse_to_node`: `(デッキの上から\d+枚(?:まで)?を公開し)、` を `。` へ置換し、LOOK を
+  独立クローズに分割（デッキ文脈限定。`公開する`（句点付き別構文）は対象外）。
+- `rules/atoms.py look_deck`: 正規表現を `を(?:見て|公開し)` に拡張し、公開句も LOOK(→TEMP) 化。
+- `rules/atoms.py play_from_temp`（新規, priority=39）: 分割後の「（フィルタ）1枚までを、
+  （レストで）登場させ(る)」→ `PLAY_CARD(zone=TEMP, dest=FIELD)`。明示ゾーン（手札/トラッシュ/
+  ライフ）・`このキャラを`（play_self）・条件/トリガー文（「登場させた場合/時」）は除外。
+  連用形 `登場`（末尾）も `$` アンカーで拾う。残りは既存 `remaining_*` が TEMP から戻す。
+- `matcher.py parse_target`: 特徴抽出の正規表現に `『』` を追加（`『白ひげ海賊団』を含む特徴を持つ`）。
+  名前は `「」`、特徴は `《》`/`『』` で衝突しない（condition 側も `『X』` を特徴として扱う）。
+
+**ツール修正**
+- `tests/compare_parsers.py _has_other`: `json.dumps(..., default=str)` を追加。summary に
+  enum（`CompareOperator` 等）が混じると **退行検知ツールがクラッシュしていた既存バグ**を修正。
+
+**テスト +5**
+- golden +3（`deck_reveal_play_cost` / `deck_reveal_play_trait`（『』特徴フィルタ） /
+  `deck_reveal_play_rested`（連用形・RESTED））。
+- engine +2（`test_deck_reveal_play_from_temp_flow`（LOOK→PLAY_CARD(TEMP)→TEMPリーク無し） /
+  `test_deck_reveal_play_rested_status`（レスト登場で is_rest=True））。
+
+**結果**: カバレッジ 95.4%→95.9%（+0.5pt）、OTHER 108→104（−4）、フォールバック 227→201（−26）、
+`play_from_temp` 26件命中、退行(新規OTHER)=0。OTHER減に加え、上記**隠れミスターゲット約7枚
+（OP06-057/OP06-119/OP08-052/OP08-054/ST12-010/ST12-013/ST12-017）を正しい TEMP 経由に是正**。
+
+**残（本クラスタの未対応・フォロー候補）**
+- scry-1「公開し、そのカードをデッキの上か下に置く」（OP08-049）＋条件付き速攻 — 登場を伴わない別型。
+- 条件付き任意登場「そのカードが…の場合、登場させてもよい」（OP12-058）＋`登場させた場合`の速攻付与。
+- `play_revealed`（「一番上を公開し…登場させてもよい」単一句, priority=40）は依然 `zone=FIELD` の
+  ミスターゲットが残る（LOOK を伴わない単一句のため。TEMP 化には公開句の分割 or 自前 LOOK が必要）。
 
 ### 本ブランチ（`claude/handoff-docs-review-bIYkG`）で追加した内容
 
@@ -620,7 +665,9 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
      ゲーム独自メカニクス＋専用 ActionType の設計が必要。
    - **「パワーが相手と同じになる」（3件, 動的値）** — 対象の base_power_override を
      ゲーム中に動的評価する必要がある。未実装。
-   - **「デッキの上から1枚を公開し、コスト2のキャラ1枚までを登場させる」（2件）** — look_deck + 条件付き play_revealed の複合。`look_deck` が独立クローズに分割されれば `play_revealed` で解決できるかもしれないが要調査。
+   - ~~**「デッキの上から1枚を公開し、コスト2のキャラ1枚までを登場させる」（2件）**~~ **対応済み**
+     （本ブランチ PHoSv ラウンド1, `公開し、`分割＋`look_deck`拡張＋`play_from_temp`新設）。
+     残: 任意登場「…の場合、登場させてもよい」（OP12-058）・scry-1（OP08-049）・`play_revealed`単一句の TEMP 化。
    - キーワード付与（【ブロッカー】等を得る）は **対応済み**（`grant_keyword`）。
      `GRANT_KEYWORD` は継続効果マネージャ経由で `timed_keywords` に付与され、
      `_apply_passive_effects` のリセットで消えず、duration（THIS_TURN/THIS_BATTLE/

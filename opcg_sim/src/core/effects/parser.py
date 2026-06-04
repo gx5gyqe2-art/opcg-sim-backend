@@ -237,6 +237,13 @@ class EffectParser:
         norm_text = re.sub(
             _nfc(r'(デッキの上から\d+枚(?:まで)?を見て)、'), r'\1。', norm_text
         )
+        # 「デッキの上からN枚を公開し、…1枚までを登場させる」も同様に分割し、LOOK を独立化する。
+        # （区切らないと公開→登場が1原子句化し、レガシーフォールバックが PLAY_CARD の対象を
+        #  FIELD/DECK に誤推定する。分割後は look_deck(LOOK→TEMP)＋play_from_temp(TEMP→FIELD)＋
+        #  remaining_*（残り→デッキ）が正しく連携する。）「公開する」（句点付き別構文）は対象外。
+        norm_text = re.sub(
+            _nfc(r'(デッキの上から\d+枚(?:まで)?を公開し)、'), r'\1。', norm_text
+        )
         # 「引く、」「捨て、」は lookbehind で分割（動詞を前の部分に残す）
         # 「捨て、」を ON で消費すると「自分の手札1枚を」が動詞なしの断片になるため
         # (?<=捨て)、 に変更して「捨て」を前クローズに残す。

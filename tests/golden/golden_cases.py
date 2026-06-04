@@ -558,6 +558,69 @@ CASES = [
             }
         ],
     },
+    # ----- デッキ公開→条件付き登場（LOOK+play_from_temp+remaining, temp リーク無し） -----
+    #   従来は「公開し、…登場させる」が1原子句化し、レガシーが PLAY_CARD の対象を
+    #   FIELD/DECK に誤推定していた。parser.py が「…を公開し、」で分割し、look_deck が
+    #   LOOK→TEMP、play_from_temp が TEMP→FIELD、残りを DECK_BOTTOM(TEMP) が戻す。
+    {
+        "id": "deck_reveal_play_cost",
+        "text": "【登場時】自分のデッキの上から1枚を公開し、コスト2のキャラカード1枚までを、登場させる。その後、残りをデッキの上か下に置く。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 1},
+                        {
+                            "type": "PLAY_CARD",
+                            "destination": "FIELD",
+                            "target": {"zone": "TEMP", "player": "SELF", "cost_max": 2, "is_up_to": True},
+                        },
+                        {"type": "DECK_BOTTOM", "target": {"zone": "TEMP"}},
+                    ],
+                },
+            }
+        ],
+    },
+    # ----- デッキ公開→特徴フィルタで登場（『白ひげ海賊団』） -------------------------------
+    {
+        "id": "deck_reveal_play_trait",
+        "text": "【登場時】自分のデッキの上から1枚を公開し、コスト4以下の『白ひげ海賊団』を含む特徴を持つキャラカード1枚までを、登場させる。その後、残りをデッキの上か下に置く。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 1},
+                        {
+                            "type": "PLAY_CARD",
+                            "destination": "FIELD",
+                            "target": {"zone": "TEMP", "cost_max": 4, "traits": ["白ひげ海賊団"], "is_up_to": True},
+                        },
+                        {"type": "DECK_BOTTOM", "target": {"zone": "TEMP"}},
+                    ],
+                }
+            }
+        ],
+    },
+    # ----- デッキ公開→レストで登場（status=RESTED, 連用形「登場させ、」も同型） -----------
+    {
+        "id": "deck_reveal_play_rested",
+        "text": "【アタック時】自分のデッキの上から1枚を公開し、コスト2のキャラカード1枚までを、レストで登場させる。その後、残りをデッキの上か下に置く。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 1},
+                        {"type": "PLAY_CARD", "destination": "FIELD", "status": "RESTED", "target": {"zone": "TEMP", "cost_max": 2}},
+                        {"type": "DECK_BOTTOM", "target": {"zone": "TEMP"}},
+                    ],
+                }
+            }
+        ],
+    },
     # ----- サーチ（特徴フィルタ）: 見て特徴Xのカードを手札に加える --------------------------
     {
         "id": "deck_search_trait",

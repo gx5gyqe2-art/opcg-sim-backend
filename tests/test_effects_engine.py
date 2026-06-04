@@ -712,6 +712,57 @@ def test_deck_search_look_grab_remaining_flow():
     assert len(p1.deck) == 4
 
 
+def test_deck_reveal_play_from_temp_flow():
+    """デッキ公開→登場の一連フロー: LOOK(deck→temp) → PLAY_CARD(temp→field) → 残りをデッキ下。
+
+    デッキ上に [c0(cost2 キャラ), c1, c2] を積み、上1枚を公開して TEMP へ。
+    公開した1枚を登場させ、登場しなかった分（このケースは0枚）は temp に残さない。
+    """
+    from opcg_sim.src.models.effect_types import GameAction, TargetQuery, ValueSource
+    gm, p1, _ = make_game()
+    top = make_instance(make_master(card_id="R-0", cost=2), owner=p1.name)
+    rest = [make_instance(make_master(card_id=f"R-{i}", cost=3), owner=p1.name) for i in (1, 2)]
+    p1.deck = [top] + rest
+    field_before = len(p1.field)
+
+    # 1) LOOK 1 → temp に上から1枚（公開）
+    assert gm.apply_action_to_engine(p1, action(ActionType.LOOK, value=1), [], 1)
+    assert p1.temp_zone == [top]
+    assert p1.deck == rest
+
+    # 2) PLAY_CARD(temp→field): 公開した cost<=2 のキャラを登場
+    play = GameAction(
+        type=ActionType.PLAY_CARD,
+        target=TargetQuery(player=Player.SELF, zone=Zone.TEMP, cost_max=2, count=1, is_up_to=True),
+        destination=Zone.FIELD,
+        value=ValueSource(base=0),
+    )
+    assert gm.apply_action_to_engine(p1, play, [top], 0)
+    assert top in p1.field
+    assert len(p1.field) == field_before + 1
+    assert len(p1.temp_zone) == 0  # 登場で temp から抜けた（リーク無し）
+
+
+def test_deck_reveal_play_rested_status():
+    """公開→レストで登場（status=RESTED）: 登場したキャラが is_rest=True になる。"""
+    from opcg_sim.src.models.effect_types import GameAction, TargetQuery, ValueSource
+    gm, p1, _ = make_game()
+    top = make_instance(make_master(card_id="RR-0", cost=2), owner=p1.name)
+    p1.deck = [top, make_instance(make_master(card_id="RR-1"), owner=p1.name)]
+
+    assert gm.apply_action_to_engine(p1, action(ActionType.LOOK, value=1), [], 1)
+    play = GameAction(
+        type=ActionType.PLAY_CARD,
+        target=TargetQuery(player=Player.SELF, zone=Zone.TEMP, cost_max=2, count=1, is_up_to=True),
+        destination=Zone.FIELD,
+        status="RESTED",
+        value=ValueSource(base=0),
+    )
+    assert gm.apply_action_to_engine(p1, play, [top], 0)
+    assert top in p1.field
+    assert top.is_rest is True
+
+
 def test_hand_to_deck_bottom():
     """DECK_BOTTOM(zone=HAND): 手札1枚をデッキ下へ（hand_to_deck ルールの実行検証）。"""
     from opcg_sim.src.models.effect_types import TargetQuery

@@ -86,7 +86,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if _nfc("含む") in tgt_text:
         tq.flags.add("NAME_PARTIAL")
     
-    raw_traits = re.findall(r'[《<]([^》>]+)[》>]', tgt_text)
+    # 特徴は《X》/<X> に加え 『X』（例: 『白ひげ海賊団』を含む特徴を持つ）でも表記される。
+    # 名前は「X」を使うため 『』 と衝突しない（condition 側も 『X』 を特徴として扱う）。
+    raw_traits = re.findall(r'[《<『]([^》>』]+)[》>』]', tgt_text)
     attr_values = [a.value for a in Attribute if a != Attribute.NONE]
     final_traits = []
     

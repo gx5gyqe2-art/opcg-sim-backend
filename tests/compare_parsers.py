@@ -33,7 +33,8 @@ def _summ_list(parser, text, as_trigger=False):
 
 
 def _has_other(summ_list):
-    blob = json.dumps(summ_list, ensure_ascii=False)
+    # summary には enum（CompareOperator 等）が混じることがあるため default=str で吸収する。
+    blob = json.dumps(summ_list, ensure_ascii=False, default=str)
     return '"type": "OTHER"' in blob
 
 
