@@ -436,7 +436,20 @@ class EffectParser:
         # 対象プレイヤーの判定
         p = Player.OPPONENT if _nfc("相手") in norm_text else Player.SELF
 
-        if _nfc("ドン!!") in norm_text or _nfc("ドン‼") in norm_text:
+        if re.search(_nfc(r'ドン[ 　]*(?:!!|‼)'), norm_text):
+            # 「自分のドン!!が相手より多い」等の相互比較条件
+            if (re.search(_nfc(r'相手.{0,20}ドン[ 　]*(?:!!|‼)'), norm_text)
+                    or re.search(_nfc(r'ドン[ 　]*(?:!!|‼).{0,20}(?:より|以上|以下)'), norm_text)
+                    and _nfc("相手") in norm_text):
+                op_m = re.search(_nfc(r'(以下|以上|より多い|未満|より少ない)'), norm_text)
+                cmp_op = {
+                    _nfc('以上'): CompareOperator.GE,
+                    _nfc('以下'): CompareOperator.LE,
+                    _nfc('より多い'): CompareOperator.GT,
+                    _nfc('未満'): CompareOperator.LT,
+                    _nfc('より少ない'): CompareOperator.LT,
+                }.get(op_m.group(1) if op_m else '', CompareOperator.GE)
+                return Condition(type=ConditionType.DON_COUNT_COMPARE, operator=cmp_op, player=Player.SELF, raw_text=norm_text)
             return Condition(type=ConditionType.DON_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
         if _nfc("ライフ") in norm_text:
@@ -452,7 +465,8 @@ class EffectParser:
         if _nfc("デッキが") in norm_text:
             return Condition(type=ConditionType.DECK_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
-        if _nfc("リーダーが") in norm_text or _nfc("リーダーの特徴") in norm_text:
+        if (_nfc("リーダーが") in norm_text or _nfc("リーダーの特徴") in norm_text
+                or _nfc("リーダーのパワー") in norm_text):
             # 特徴は《X》だけでなく『X』（『白ひげ海賊団』『B・W』等の名称系特徴）でも書かれる。
             trait_match = re.search(_nfc(r'[《<『]([^》>』]+)[》>』]'), norm_text)
             name_match = re.search(_nfc(r'「([^」]+)」'), norm_text)
@@ -462,17 +476,31 @@ class EffectParser:
                 return Condition(type=ConditionType.LEADER_NAME, value=name_match.group(1), player=p, raw_text=norm_text)
             if _nfc("多色") in norm_text:
                 return Condition(type=ConditionType.LEADER_COLOR, value=_nfc("多色"), player=p, raw_text=norm_text)
+            # 単色リーダー条件（「自分のリーダーが青を含む」等）
+            color_m = re.search(_nfc(r'(赤|青|緑|黄|黒|紫)'), norm_text)
+            if color_m:
+                return Condition(type=ConditionType.LEADER_COLOR, value=color_m.group(1), player=p, raw_text=norm_text)
             # 属性条件（斬/打/射/特/知）。括弧は半角・全角どちらも対応。
             attr_m = re.search(_nfc(r'属性[（(]([^）)]+)[）)]'), norm_text)
             if attr_m:
                 return Condition(type=ConditionType.LEADER_ATTRIBUTE, value=attr_m.group(1), player=p, raw_text=norm_text)
+            # リーダーの状態条件（アクティブ/レスト/パワー）
+            if _nfc("アクティブ") in norm_text:
+                return Condition(type=ConditionType.LEADER_STATE, value="IS_ACTIVE", player=p, raw_text=norm_text)
+            if _nfc("レスト") in norm_text:
+                return Condition(type=ConditionType.LEADER_STATE, value="IS_RESTED", player=p, raw_text=norm_text)
+            pow_leader_m = re.search(_nfc(r'パワーが?(\d+)(以上|以下)'), norm_text)
+            if pow_leader_m:
+                thr = int(pow_leader_m.group(1))
+                op = CompareOperator.GE if pow_leader_m.group(2) == _nfc('以上') else CompareOperator.LE
+                return Condition(type=ConditionType.LEADER_STATE, value=("POWER", thr), operator=op, player=p, raw_text=norm_text)
 
         # 盤面のキャラ枚数（「自分の（レストの／特徴《X》の／コストN以上の）キャラがM枚以上いる」
         # 「…キャラがいる」）。数値が「フィルタ(コストN以上)」と「枚数(M枚)」で混在し得るため、
         # 閾値は必ず「M枚」側から取り、フィルタは parse_target に委ねる（保守的な分類）。
         # 「このキャラが…される/場を離れる/登場した」等の単体状態・置換条件は対象外。
         if (_nfc("キャラ") in norm_text and _nfc("このキャラ") not in norm_text
-                and (_nfc("いる") in norm_text or re.search(_nfc(r"\d+枚(以上|以下)"), norm_text))
+                and (_nfc("いる") in norm_text or _nfc("いない") in norm_text or re.search(_nfc(r"\d+枚(以上|以下)"), norm_text))
                 and not re.search(_nfc(r"(される|場を離れる|登場した|公開)"), norm_text)
                 and _nfc("のみ") not in norm_text):
             tq = parse_target(norm_text)
@@ -485,6 +513,11 @@ class EffectParser:
                     _nfc('より多い'): CompareOperator.GT,
                     _nfc('未満'): CompareOperator.LT,
                 }.get(mc.group(2), CompareOperator.GE)
+                # 「N枚いない」→ 実質 N枚未満
+                if _nfc("いない") in norm_text and mc.group(2) is None:
+                    cnt_op = CompareOperator.LT
+            elif _nfc("いない") in norm_text:
+                thr, cnt_op = 1, CompareOperator.LT  # 1枚もいない
             else:
                 thr, cnt_op = 1, CompareOperator.GE  # 「いる」=1枚以上
             return Condition(type=ConditionType.FIELD_COUNT, target=tq,
@@ -498,7 +531,7 @@ class EffectParser:
                 return Condition(type=ConditionType.SOURCE_STATE, value="IS_ACTIVE", player=p, raw_text=norm_text)
             if _nfc("レスト") in norm_text:
                 return Condition(type=ConditionType.SOURCE_STATE, value="IS_RESTED", player=p, raw_text=norm_text)
-            pow_m = re.search(_nfc(r'パワーが(\d+)(以上|以下)'), norm_text)
+            pow_m = re.search(_nfc(r'パワーが?(\d+)(以上|以下)'), norm_text)
             if pow_m:
                 thr = int(pow_m.group(1))
                 op = CompareOperator.GE if pow_m.group(2) == _nfc('以上') else CompareOperator.LE
@@ -515,17 +548,35 @@ class EffectParser:
             if contains_m:
                 return Condition(type=ConditionType.FIELD_ALL_TRAIT, value=(contains_m.group(1), True), player=p, raw_text=norm_text)
 
-        # HAS_CHARACTER: 特定の名前のキャラが場にいる/いない
-        has_char_m = re.search(_nfc(r'「([^」]+)」がい(る|ない)'), norm_text)
+        # HAS_CHARACTER: 特定の名前のキャラが場にいる/いない（枚数指定含む）
+        has_char_count_m = re.search(_nfc(r'「([^」]+)」が(\d+)枚(以上|以下)?い'), norm_text)
+        if has_char_count_m:
+            char_name = has_char_count_m.group(1)
+            count_thr = int(has_char_count_m.group(2))
+            cnt_op = {
+                _nfc('以上'): CompareOperator.GE,
+                _nfc('以下'): CompareOperator.LE,
+            }.get(has_char_count_m.group(3) or '', CompareOperator.GE)
+            return Condition(type=ConditionType.HAS_CHARACTER, value=(char_name, count_thr), operator=cnt_op, player=p, raw_text=norm_text)
+        has_char_m = re.search(_nfc(r'「([^」]+)」が(?:い(る|ない)|あ(る|ない))'), norm_text)
         if has_char_m:
             char_name = has_char_m.group(1)
-            present = has_char_m.group(2) == _nfc('る')
+            present_part = has_char_m.group(2) or has_char_m.group(3)
+            present = present_part == _nfc('る')
             op = CompareOperator.GE if present else CompareOperator.EQ
             return Condition(type=ConditionType.HAS_CHARACTER, value=char_name, operator=op, player=p, raw_text=norm_text)
 
         # RESTED_COUNT: レスト状態のカード総数（フィールド＋ドン!!）
         if _nfc("レストのカード") in norm_text:
             return Condition(type=ConditionType.RESTED_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
+
+        # PREV_ACTION: 直前アクションの成否（「そうした場合」「そうしなかった場合」「登場させた場合」）
+        if _nfc("そうしなかった") in norm_text:
+            return Condition(type=ConditionType.PREV_ACTION, value="SKIPPED", player=p, raw_text=norm_text)
+        if _nfc("そうした") in norm_text:
+            return Condition(type=ConditionType.PREV_ACTION, value="SUCCEEDED", player=p, raw_text=norm_text)
+        if _nfc("登場させた") in norm_text and _nfc("場合") in norm_text:
+            return Condition(type=ConditionType.PREV_ACTION, value="PLAYED_CARD", player=p, raw_text=norm_text)
 
         return Condition(type=ConditionType.GENERIC, raw_text=norm_text)
 

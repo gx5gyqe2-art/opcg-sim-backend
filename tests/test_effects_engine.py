@@ -945,6 +945,83 @@ def test_rested_count():
     assert _check_cond(gm, p1, cond_ge4, p1.leader) is False
 
 
+def test_prev_action_succeeded():
+    """PREV_ACTION / SUCCEEDED: last_action_success=True のときのみ True。"""
+    gm, p1, _ = make_game()
+    cond = Condition(type=ConditionType.PREV_ACTION, value="SUCCEEDED")
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    resolver = EffectResolver(gm)
+
+    resolver.context["last_action_success"] = True
+    resolver.context["_last_had_targets"] = True
+    assert resolver._check_condition(p1, cond, p1.leader) is True
+
+    resolver.context["last_action_success"] = False
+    assert resolver._check_condition(p1, cond, p1.leader) is False
+
+
+def test_prev_action_skipped():
+    """PREV_ACTION / SKIPPED: last_action_success=False のときのみ True。"""
+    gm, p1, _ = make_game()
+    cond = Condition(type=ConditionType.PREV_ACTION, value="SKIPPED")
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    resolver = EffectResolver(gm)
+
+    resolver.context["last_action_success"] = False
+    assert resolver._check_condition(p1, cond, p1.leader) is True
+
+    resolver.context["last_action_success"] = True
+    resolver.context["_last_had_targets"] = True
+    assert resolver._check_condition(p1, cond, p1.leader) is False
+
+
+def test_don_count_compare():
+    """DON_COUNT_COMPARE: 自分のドン!!が相手より多い場合のみ True。"""
+    gm, p1, p2 = make_game()
+    cond = Condition(
+        type=ConditionType.DON_COUNT_COMPARE,
+        operator=CompareOperator.GT,
+        player=Player.SELF,
+    )
+    # p1: active=3, p2: active=2
+    from opcg_sim.src.models.models import DonInstance
+    for _ in range(3):
+        p1.don_active.append(DonInstance(owner_id=p1.name))
+    for _ in range(2):
+        p2.don_active.append(DonInstance(owner_id=p2.name))
+
+    assert _check_cond(gm, p1, cond, p1.leader) is True   # 3 > 2
+    assert _check_cond(gm, p2, cond, p2.leader) is False  # 2 > 3 = False
+
+
+def test_leader_state_is_active():
+    """LEADER_STATE / IS_ACTIVE: リーダーがアクティブのときだけ True。"""
+    gm, p1, _ = make_game()
+    cond = Condition(type=ConditionType.LEADER_STATE, value="IS_ACTIVE")
+
+    p1.leader.is_rest = False
+    assert _check_cond(gm, p1, cond, p1.leader) is True
+
+    p1.leader.is_rest = True
+    assert _check_cond(gm, p1, cond, p1.leader) is False
+
+
+def test_leader_state_power_le():
+    """LEADER_STATE / POWER_LE: リーダーのパワーが閾値以下のときだけ True。"""
+    gm, p1, _ = make_game()
+    cond = Condition(
+        type=ConditionType.LEADER_STATE,
+        value=("POWER", 5000),
+        operator=CompareOperator.LE,
+    )
+
+    p1.leader = make_instance(make_master(card_id="L1", power=4000), owner=p1.name)
+    assert _check_cond(gm, p1, cond, p1.leader) is True   # 4000 <= 5000
+
+    p1.leader = make_instance(make_master(card_id="L2", power=6000), owner=p1.name)
+    assert _check_cond(gm, p1, cond, p1.leader) is False  # 6000 > 5000
+
+
 if __name__ == "__main__":
     import traceback
 

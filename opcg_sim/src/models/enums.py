@@ -194,6 +194,12 @@ class ConditionType(Enum):
     LEADER_ATTRIBUTE = auto()
     # レスト状態のカード総数（フィールド＋ドン!!）
     RESTED_COUNT = auto()
+    # 直前アクションの実行結果（そうした / そうしなかった / 登場させた）
+    PREV_ACTION = auto()
+    # 自分と相手のドン!!枚数の相対比較
+    DON_COUNT_COMPARE = auto()
+    # リーダーの状態条件（IS_ACTIVE / IS_RESTED / POWER）
+    LEADER_STATE = auto()
 
 class ParserKeyword(str, Enum):
     DON = "ドン"

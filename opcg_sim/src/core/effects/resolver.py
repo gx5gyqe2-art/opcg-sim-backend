@@ -207,9 +207,15 @@ class EffectResolver:
 
     def _execute_game_action(self, player, action: GameAction, source_card) -> bool:
         targets = self._resolve_targets(player, action.target, source_card, action_node=action)
-        
+
         if targets is None:
             return False
+
+        # PREV_ACTION 条件評価用: ターゲットの有無を記録
+        if action.target is not None:
+            self.context["_last_had_targets"] = bool(targets)
+        else:
+            self.context["_last_had_targets"] = None
 
         if action.target and not targets and not getattr(action.target, 'is_up_to', False):
             log_event("INFO", "resolver.no_targets", f"No targets found for action {action.type.name}", player=player.name)
@@ -428,15 +434,23 @@ class EffectResolver:
             return all(any(trait == t for t in c.master.traits) for c in chars)
 
         elif condition.type == ConditionType.HAS_CHARACTER:
-            # 特定名前のキャラが場にいる（GE=いる）/いない（EQ=いない）
-            char_name = condition.value
-            if not isinstance(char_name, str): return True
-            count = sum(1 for c in target_player.field if char_name in c.master.name)
-            if target_player.leader and char_name in target_player.leader.master.name:
-                count += 1
-            if condition.operator == CompareOperator.GE:
-                return count >= 1
-            return count == 0  # EQ = 「がいない」
+            # 特定名前のキャラが場にいる/いない（枚数指定あり/なし）
+            char_val = condition.value
+            if isinstance(char_val, tuple):
+                char_name, count_thr = char_val
+                count = sum(1 for c in target_player.field if char_name in c.master.name)
+                if target_player.leader and char_name in target_player.leader.master.name:
+                    count += 1
+                return self._compare(count, condition.operator, count_thr)
+            elif isinstance(char_val, str):
+                char_name = char_val
+                count = sum(1 for c in target_player.field if char_name in c.master.name)
+                if target_player.leader and char_name in target_player.leader.master.name:
+                    count += 1
+                if condition.operator == CompareOperator.GE:
+                    return count >= 1
+                return count == 0  # EQ = 「がいない」
+            return True
 
         elif condition.type == ConditionType.LEADER_ATTRIBUTE:
             # リーダーの属性条件（斬/打/射/特/知）
@@ -452,6 +466,33 @@ class EffectResolver:
             if target_player.stage and target_player.stage.is_rest: count += 1
             count += len(target_player.don_rested)
             return self._compare(count, condition.operator, target_val)
+
+        elif condition.type == ConditionType.PREV_ACTION:
+            sv = condition.value
+            success = self.context.get("last_action_success", True)
+            had_targets = self.context.get("_last_had_targets")
+            if sv == "SKIPPED":
+                return (not success) or (had_targets is False)
+            # SUCCEEDED / PLAYED_CARD どちらも「直前アクションが成立した」
+            return success and had_targets is not False
+
+        elif condition.type == ConditionType.DON_COUNT_COMPARE:
+            opp = self.game_manager.p2 if player == self.game_manager.p1 else self.game_manager.p1
+            my_don = len(player.don_active) + len(player.don_rested) + len(player.don_attached_cards)
+            opp_don = len(opp.don_active) + len(opp.don_rested) + len(opp.don_attached_cards)
+            return self._compare(my_don, condition.operator, opp_don)
+
+        elif condition.type == ConditionType.LEADER_STATE:
+            leader = target_player.leader
+            if not leader: return False
+            sv = condition.value
+            if sv == "IS_ACTIVE": return not leader.is_rest
+            if sv == "IS_RESTED": return leader.is_rest
+            if isinstance(sv, tuple) and sv[0] == "POWER":
+                is_my_turn = (player == self.game_manager.turn_player)
+                power = leader.get_power(is_my_turn)
+                return self._compare(power, condition.operator, sv[1])
+            return False
 
         # 真に解釈不能な OTHER は fail-safe に倒す（誤発動を防ぐ）。
         if condition.type == ConditionType.OTHER:
