@@ -184,6 +184,17 @@ class ConditionType(Enum):
     TURN_LIMIT = auto()
     GENERIC = auto()
 
+    # このキャラ自身の状態条件（IS_RESTED / IS_ACTIVE / ENTERED_THIS_TURN / POWER）
+    SOURCE_STATE = auto()
+    # 場のキャラ全員が特定の特徴を持つ（「のみ」条件）
+    FIELD_ALL_TRAIT = auto()
+    # 特定の名前のキャラが場にいる/いない
+    HAS_CHARACTER = auto()
+    # リーダーの属性条件（斬/打/射/特/知）
+    LEADER_ATTRIBUTE = auto()
+    # レスト状態のカード総数（フィールド＋ドン!!）
+    RESTED_COUNT = auto()
+
 class ParserKeyword(str, Enum):
     DON = "ドン"
     COST = "コスト"

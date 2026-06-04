@@ -1041,4 +1041,113 @@ CASES = [
             }
         ],
     },
+    # ===== 新条件タイプ（GENERIC 分類拡充） =====
+    # ----- 条件: このキャラがレストの（SOURCE_STATE / IS_RESTED） -----------
+    {
+        "id": "cond_source_is_rested",
+        "text": "【自分のターン中】このキャラがレストの場合、カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "YOUR_TURN",
+                "condition": {"type": "SOURCE_STATE", "value": "IS_RESTED"},
+                "effect": {"type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 条件: このキャラがアクティブの（SOURCE_STATE / IS_ACTIVE） --------
+    {
+        "id": "cond_source_is_active",
+        "text": "【自分のターン中】このキャラがアクティブの場合、カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "YOUR_TURN",
+                "condition": {"type": "SOURCE_STATE", "value": "IS_ACTIVE"},
+                "effect": {"type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 条件: このキャラが登場したターンの（SOURCE_STATE / ENTERED_THIS_TURN） -
+    {
+        "id": "cond_source_entered_this_turn",
+        "text": "【自分のターン中】このキャラが登場したターンの場合、カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "YOUR_TURN",
+                "condition": {"type": "SOURCE_STATE", "value": "ENTERED_THIS_TURN"},
+                "effect": {"type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 条件: このキャラのパワーが7000以上の（SOURCE_STATE / POWER）--------
+    {
+        "id": "cond_source_power_ge",
+        "text": "【自分のターン中】このキャラのパワーが7000以上の場合、カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "YOUR_TURN",
+                "condition": {"type": "SOURCE_STATE", "operator": "GE"},
+                "effect": {"type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 条件: 場のキャラが特定の特徴のみ（FIELD_ALL_TRAIT）-----------------
+    {
+        "id": "cond_field_all_trait",
+        "text": "【自分のターン中】自分の場のキャラが、特徴《天竜人》を持つキャラのみの場合、カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "YOUR_TURN",
+                "condition": {"type": "FIELD_ALL_TRAIT", "player": "SELF"},
+                "effect": {"type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 条件: 特定キャラが場にいる（HAS_CHARACTER / 存在）-----------------
+    {
+        "id": "cond_has_character_present",
+        "text": "【自分のターン中】自分の「ルフィ」がいる場合、カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "YOUR_TURN",
+                "condition": {"type": "HAS_CHARACTER", "operator": "GE", "player": "SELF"},
+                "effect": {"type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 条件: 特定キャラが場にいない（HAS_CHARACTER / 不在）---------------
+    {
+        "id": "cond_has_character_absent",
+        "text": "【自分のターン中】自分の「ルフィ」がいない場合、カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "YOUR_TURN",
+                "condition": {"type": "HAS_CHARACTER", "operator": "EQ", "player": "SELF"},
+                "effect": {"type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 条件: リーダーの属性（LEADER_ATTRIBUTE）--------------------------
+    {
+        "id": "cond_leader_attribute",
+        "text": "【自分のターン中】自分のリーダーが属性(斬)を持つ場合、カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "YOUR_TURN",
+                "condition": {"type": "LEADER_ATTRIBUTE", "value": "斬", "player": "SELF"},
+                "effect": {"type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 条件: レストのカード枚数（RESTED_COUNT）---------------------------
+    {
+        "id": "cond_rested_count",
+        "text": "【自分のターン中】自分のレストのカードが8枚以上ある場合、カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "YOUR_TURN",
+                "condition": {"type": "RESTED_COUNT", "operator": "GE", "value": 8, "player": "SELF"},
+                "effect": {"type": "DRAW", "value": 1},
+            }
+        ],
+    },
 ]

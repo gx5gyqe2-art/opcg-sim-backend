@@ -795,6 +795,156 @@ def test_attack_active_not_granted_means_no_active_attack():
     assert raised, "ATTACK_ACTIVE なしはアクティブキャラへの攻撃で例外を出すべき"
 
 
+# ===== 新条件タイプ（GENERIC 分類拡充）のエンジンテスト =====
+
+def _check_cond(gm, player, condition, source):
+    """EffectResolver._check_condition を呼ぶ薄いラッパ。"""
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    return EffectResolver(gm)._check_condition(player, condition, source)
+
+
+def test_source_state_is_rested():
+    """SOURCE_STATE / IS_RESTED: レスト状態のときだけ True。"""
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(), owner=p1.name)
+    p1.field.append(src)
+    cond = Condition(type=ConditionType.SOURCE_STATE, value="IS_RESTED")
+
+    src.is_rest = True
+    assert _check_cond(gm, p1, cond, src) is True
+
+    src.is_rest = False
+    assert _check_cond(gm, p1, cond, src) is False
+
+
+def test_source_state_is_active():
+    """SOURCE_STATE / IS_ACTIVE: アクティブ状態のときだけ True。"""
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(), owner=p1.name)
+    p1.field.append(src)
+    cond = Condition(type=ConditionType.SOURCE_STATE, value="IS_ACTIVE")
+
+    src.is_rest = False
+    assert _check_cond(gm, p1, cond, src) is True
+
+    src.is_rest = True
+    assert _check_cond(gm, p1, cond, src) is False
+
+
+def test_source_state_entered_this_turn():
+    """SOURCE_STATE / ENTERED_THIS_TURN: is_newly_played が True のときだけ True。"""
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(), owner=p1.name)
+    p1.field.append(src)
+    cond = Condition(type=ConditionType.SOURCE_STATE, value="ENTERED_THIS_TURN")
+
+    src.is_newly_played = True
+    assert _check_cond(gm, p1, cond, src) is True
+
+    src.is_newly_played = False
+    assert _check_cond(gm, p1, cond, src) is False
+
+
+def test_source_state_power_ge():
+    """SOURCE_STATE / POWER_GE: パワーが閾値以上のときだけ True。"""
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(power=6000), owner=p1.name)
+    p1.field.append(src)
+    cond = Condition(
+        type=ConditionType.SOURCE_STATE,
+        value=("POWER", 7000),
+        operator=CompareOperator.GE,
+    )
+
+    assert _check_cond(gm, p1, cond, src) is False  # 6000 < 7000
+
+    src.power_buff = 1000  # 6000 + 1000 = 7000 → True
+    assert _check_cond(gm, p1, cond, src) is True
+
+
+def test_field_all_trait_exact():
+    """FIELD_ALL_TRAIT: 全キャラが特定の特徴を持つときのみ True。"""
+    from opcg_sim.src.models.enums import Attribute
+    gm, p1, _ = make_game()
+    m1 = make_master(card_id="C1", traits=["天竜人"])
+    m2 = make_master(card_id="C2", traits=["天竜人", "海軍"])
+    m3 = make_master(card_id="C3", traits=["麦わらの一味"])
+    p1.field.append(make_instance(m1, owner=p1.name))
+    p1.field.append(make_instance(m2, owner=p1.name))
+    cond = Condition(type=ConditionType.FIELD_ALL_TRAIT, value=("天竜人", False), player=Player.SELF)
+
+    assert _check_cond(gm, p1, cond, p1.leader) is True  # 両方天竜人
+
+    p1.field.append(make_instance(m3, owner=p1.name))
+    assert _check_cond(gm, p1, cond, p1.leader) is False  # 麦わらの一味が混在
+
+
+def test_has_character_present_and_absent():
+    """HAS_CHARACTER: キャラの存在/不在を正しく判定する。"""
+    gm, p1, _ = make_game()
+    luffy = make_instance(make_master(card_id="LF", name="ルフィ"), owner=p1.name)
+    p1.field.append(luffy)
+    cond_present = Condition(
+        type=ConditionType.HAS_CHARACTER, value="ルフィ", operator=CompareOperator.GE, player=Player.SELF
+    )
+    cond_absent = Condition(
+        type=ConditionType.HAS_CHARACTER, value="ゾロ", operator=CompareOperator.EQ, player=Player.SELF
+    )
+
+    assert _check_cond(gm, p1, cond_present, p1.leader) is True   # ルフィがいる
+    assert _check_cond(gm, p1, cond_absent, p1.leader) is True    # ゾロがいない
+
+    zoro = make_instance(make_master(card_id="ZR", name="ゾロ"), owner=p1.name)
+    p1.field.append(zoro)
+    assert _check_cond(gm, p1, cond_absent, p1.leader) is False   # ゾロが登場
+
+
+def test_leader_attribute():
+    """LEADER_ATTRIBUTE: リーダーの属性が一致するときだけ True。"""
+    from opcg_sim.src.models.enums import Attribute
+    gm, p1, _ = make_game()
+    # make_player はデフォルト SLASH リーダーを作成する
+    cond_slash = Condition(
+        type=ConditionType.LEADER_ATTRIBUTE, value="斬", player=Player.SELF
+    )
+    cond_strike = Condition(
+        type=ConditionType.LEADER_ATTRIBUTE, value="打", player=Player.SELF
+    )
+    assert _check_cond(gm, p1, cond_slash, p1.leader) is True
+    assert _check_cond(gm, p1, cond_strike, p1.leader) is False
+
+
+def test_rested_count():
+    """RESTED_COUNT: フィールド＋リーダー＋ドン!! のレスト総数を正しく数える。"""
+    gm, p1, _ = make_game()
+    c1 = make_instance(make_master(card_id="C1"), owner=p1.name)
+    c2 = make_instance(make_master(card_id="C2"), owner=p1.name)
+    p1.field.extend([c1, c2])
+    c1.is_rest = True
+    p1.leader.is_rest = True
+
+    from opcg_sim.src.models.models import DonInstance
+    don = DonInstance(owner_id=p1.name)
+    don.is_rest = True
+    p1.don_rested.append(don)
+
+    cond_ge3 = Condition(
+        type=ConditionType.RESTED_COUNT,
+        operator=CompareOperator.GE,
+        value=3,
+        player=Player.SELF,
+    )
+    cond_ge4 = Condition(
+        type=ConditionType.RESTED_COUNT,
+        operator=CompareOperator.GE,
+        value=4,
+        player=Player.SELF,
+    )
+    # rested: c1(1) + leader(1) + don(1) = 3
+    assert _check_cond(gm, p1, cond_ge3, p1.leader) is True
+    assert _check_cond(gm, p1, cond_ge4, p1.leader) is False
+
+
 if __name__ == "__main__":
     import traceback
 

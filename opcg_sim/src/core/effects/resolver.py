@@ -398,6 +398,61 @@ class EffectResolver:
             # 使用回数制限は resolve_ability 側で enforce する（ここでは常に通す）。
             return True
 
+        elif condition.type == ConditionType.SOURCE_STATE:
+            # このキャラ自身の状態条件（レスト/アクティブ/登場ターン/パワー）
+            if source_card is None: return False
+            sv = condition.value
+            if sv == "IS_RESTED":
+                return source_card.is_rest
+            if sv == "IS_ACTIVE":
+                return not source_card.is_rest
+            if sv == "ENTERED_THIS_TURN":
+                return getattr(source_card, 'is_newly_played', False)
+            if isinstance(sv, tuple) and sv[0] == "POWER":
+                is_my_turn = (player == self.game_manager.turn_player)
+                power = source_card.get_power(is_my_turn)
+                return self._compare(power, condition.operator, sv[1])
+            log_event("WARNING", "resolver.source_state_unknown",
+                      f"Unknown SOURCE_STATE subtype: {sv}", player=player.name)
+            return False
+
+        elif condition.type == ConditionType.FIELD_ALL_TRAIT:
+            # 場のキャラ全員が特定の特徴を持つ（「のみ」条件）
+            val = condition.value
+            if not isinstance(val, tuple): return True
+            trait, contains = val
+            chars = target_player.field
+            if not chars: return False
+            if contains:
+                return all(any(trait in t for t in c.master.traits) for c in chars)
+            return all(any(trait == t for t in c.master.traits) for c in chars)
+
+        elif condition.type == ConditionType.HAS_CHARACTER:
+            # 特定名前のキャラが場にいる（GE=いる）/いない（EQ=いない）
+            char_name = condition.value
+            if not isinstance(char_name, str): return True
+            count = sum(1 for c in target_player.field if char_name in c.master.name)
+            if target_player.leader and char_name in target_player.leader.master.name:
+                count += 1
+            if condition.operator == CompareOperator.GE:
+                return count >= 1
+            return count == 0  # EQ = 「がいない」
+
+        elif condition.type == ConditionType.LEADER_ATTRIBUTE:
+            # リーダーの属性条件（斬/打/射/特/知）
+            if not target_player.leader: return False
+            attr = condition.value
+            if not isinstance(attr, str): return True
+            return target_player.leader.master.attribute.value == attr
+
+        elif condition.type == ConditionType.RESTED_COUNT:
+            # レスト状態のカード総数（フィールド＋リーダー＋ステージ＋ドン!!）
+            count = sum(1 for c in target_player.field if c.is_rest)
+            if target_player.leader and target_player.leader.is_rest: count += 1
+            if target_player.stage and target_player.stage.is_rest: count += 1
+            count += len(target_player.don_rested)
+            return self._compare(count, condition.operator, target_val)
+
         # 真に解釈不能な OTHER は fail-safe に倒す（誤発動を防ぐ）。
         if condition.type == ConditionType.OTHER:
             log_event("WARNING", "resolver.condition_unhandled",
