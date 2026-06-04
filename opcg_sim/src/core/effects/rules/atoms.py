@@ -534,6 +534,31 @@ def _remaining_deck_bottom(ctx: ParseContext) -> Optional[GameAction]:
 #   主にトリガー（ライフから自身を登場）で使われる。対象は自身(ref_id=self)。
 #   従来は対象が汎用 FIELD/SELF になり、誤った対象を登場させていた。
 # ---------------------------------------------------------------------------
+@rule("reveal_hand", priority=59)
+def _reveal_hand(ctx: ParseContext) -> Optional[GameAction]:
+    """「自分の手札から（コスト/パワー/特徴で絞った）カードN枚を公開する/できる/することができる」
+    → REVEAL（情報開示, zone=HAND）。
+
+    公開は盤面を動かさず、指定枚数の手札を公開する（多くは条件成立の証明）。
+    「公開し、手札に加える」（デッキを見てのサーチ）は別物（手札に加える/デッキを含む）なので除外。
+    従来は OTHER（公開できない no-op）、または「パワーN…公開」が誤って BUFF に落ちていた。
+    """
+    t = ctx.text
+    if _nfc("公開") not in t or _nfc("手札") not in t:
+        return None
+    # サーチ（デッキを見て公開し手札に加える）系・手札に戻す系は対象外。
+    if _nfc("手札に加える") in t or _nfc("手札に戻す") in t:
+        return None
+    if _nfc("デッキの上") in t or _nfc("デッキの下") in t:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.HAND
+    # 「できる」「ことができる」「まで」は任意（対象不在でも no-op 成功）。
+    if _nfc("できる") in t or _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.REVEAL, target=tq, raw_text=t)
+
+
 @rule("active_target", priority=51)
 def _active_target(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分の/相手の）キャラ/リーダー1枚（まで）を、アクティブにする/できる」→ ACTIVE。

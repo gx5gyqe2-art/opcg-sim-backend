@@ -649,6 +649,24 @@ def test_play_card_rested_enters_rested():
     assert card.is_rest is True
 
 
+def test_reveal_keeps_card_in_hand():
+    """REVEAL: 手札のカードを公開しても盤面（手札）は動かず成功する。"""
+    gm, p1, _ = make_game()
+    card = make_instance(make_master(card_id="EV-1", name="公開イベント"), owner=p1.name)
+    p1.hand.append(card)
+    ok = gm.apply_action_to_engine(p1, action(ActionType.REVEAL), [card], 0)
+    assert ok
+    assert card in p1.hand  # 公開しても手札に残る
+    assert len(p1.trash) == 0
+
+
+def test_reveal_no_targets_is_noop_success():
+    """REVEAL: 公開対象が無くても（任意公開）落ちずに成功扱い。"""
+    gm, p1, _ = make_game()
+    ok = gm.apply_action_to_engine(p1, action(ActionType.REVEAL), [], 0)
+    assert ok
+
+
 if __name__ == "__main__":
     import traceback
 

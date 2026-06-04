@@ -517,6 +517,34 @@ CASES = [
             {"effect": {"kind": "action", "type": "TRASH", "target": {"zone": "TEMP"}}}
         ],
     },
+    # ----- 手札公開: 「自分の手札からイベント2枚を公開することができる」（OTHER 解消） ------
+    {
+        "id": "reveal_hand_events",
+        "text": "自分の手札からイベント2枚を公開することができる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "REVEAL",
+                    "target": {"zone": "HAND", "player": "SELF", "card_type": ["EVENT"], "count": 2, "is_up_to": True},
+                }
+            }
+        ],
+    },
+    # ----- 手札公開: 「パワー8000のキャラ1枚を公開できる」（誤 BUFF → REVEAL に修正） --------
+    {
+        "id": "reveal_hand_power_char",
+        "text": "自分の手札からパワー8000のキャラカード1枚を公開できる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "REVEAL",
+                    "target": {"zone": "HAND", "player": "SELF", "card_type": ["CHARACTER"], "power_max": 8000},
+                }
+            }
+        ],
+    },
     # ----- 非自己アクティブ: 「自分のキャラ1枚までをアクティブにする」（4件 fallback） -------
     {
         "id": "active_target_self_char",

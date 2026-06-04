@@ -826,6 +826,10 @@ class GameManager:
                 success = True
             elif act_name in ["DISCARD", "TRASH"]:
                 self.move_card(target, Zone.TRASH, owner); success = True
+            elif act_name == "REVEAL":
+                # 公開: 盤面は動かさず、公開した事実をログに残す（条件成立の証明等）。
+                log_event("INFO", "game.action_reveal", f"{target.master.name} was revealed", player=owner.name)
+                success = True
             elif act_name in ["BOUNCE", "MOVE_TO_HAND"]:
                 self.move_card(target, Zone.HAND, owner); success = True
             elif act_name == "MOVE":
