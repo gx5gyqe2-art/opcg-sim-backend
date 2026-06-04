@@ -470,6 +470,53 @@ CASES = [
             {"effect": {"kind": "action", "type": "REPLACE_EFFECT", "status": "BATTLE_KO"}}
         ],
     },
+    # ----- 自己トラッシュ（このキャラをトラッシュに置く, 最頻出 OTHER 49件） ----
+    #   KO ではなく単なる移動。対象は自身(SOURCE)。多くはコストで使われる。
+    {
+        "id": "trash_self_cost",
+        "text": "このキャラをトラッシュに置くことができる。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "TRASH", "target": {"player": "SELF"}}}
+        ],
+    },
+    # ----- 自己アクティブ（このキャラをアクティブにする, OTHER 27件） -----------
+    {
+        "id": "active_self",
+        "text": "このキャラをアクティブにする。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "ACTIVE", "target": {"player": "SELF"}}}
+        ],
+    },
+    # ----- ステージをレスト（このステージをレストにできる, 「できる」取りこぼし 20件） -
+    {
+        "id": "rest_stage_can",
+        "text": "このステージをレストにできる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "REST",
+                    "target": {"zone": "FIELD", "card_type": ["STAGE"]},
+                }
+            }
+        ],
+    },
+    # ----- デッキの上からトラッシュ（mill, TRASH_FROM_DECK, OTHER 11件） --------
+    {
+        "id": "mill_deck_top",
+        "text": "自分のデッキの上から2枚をトラッシュに置く。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "TRASH_FROM_DECK", "value": 2, "target": None}}
+        ],
+    },
+    # ----- 残りをトラッシュへ（remaining→trash, OTHER 18件） -------------------
+    {
+        "id": "remaining_trash",
+        "text": "残りをトラッシュに置く。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "TRASH", "target": {"zone": "TEMP"}}}
+        ],
+    },
     # ----- カウンターのパワー付与（OP13-097 世界の均衡） -------------------
     {
         "id": "counter_power_buff_3000",

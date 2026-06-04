@@ -84,7 +84,9 @@ def _rest_self_cost(ctx: ParseContext) -> Optional[GameAction]:
 @rule("rest", priority=40)
 def _rest(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    if not re.search(_nfc(r"レストに(する|し[、。])"), t):
+    # 「レストにする／し／できる」を対象とする。従来は「できる」を取りこぼし、
+    # 「このステージをレストにできる」等が OTHER に落ちていた。
+    if not re.search(_nfc(r"レストに(する|できる|し[、。])"), t):
         return None
     if re.search(_nfc(r"このキャラをレスト|このリーダーをレスト"), t):
         return None  # 自己レストは rest_self_cost が担当
@@ -543,5 +545,88 @@ def _play_self(ctx: ParseContext) -> Optional[GameAction]:
         type=ActionType.PLAY_CARD,
         target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, count=1, ref_id="self"),
         destination=Zone.FIELD,
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 自己トラッシュ: 「このキャラ／このカード／このリーダーをトラッシュに置く（ことができる）」
+#   多くはコスト（このキャラをトラッシュして…）。KO ではなく単なる移動なので
+#   ON_KO は誘発しない。対象は自身(SOURCE)。従来は OTHER に落ちる最頻出表現（49 件）。
+#   「このキャラ以外の…をトラッシュ」を巻き込まないよう、直後が「を(、)?トラッシュ」の
+#   ものに限定する（残り/デッキの上からの mill は別ルールが担当）。
+# ---------------------------------------------------------------------------
+@rule("trash_self", priority=67)
+def _trash_self(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("トラッシュ") not in t or _nfc("置く") not in t:
+        return None
+    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?トラッシュ"), t):
+        return None
+    return GameAction(
+        type=ActionType.TRASH,
+        target=TargetQuery(select_mode="SOURCE"),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 自己アクティブ: 「このキャラ／このカード／このリーダーをアクティブにする/できる」
+#   対象は自身(SOURCE)。ドン!!のアクティブ化（don_set_active）とは「ドン」の有無で区別。
+#   従来は OTHER に落ちていた（27 件）。
+# ---------------------------------------------------------------------------
+@rule("active_self", priority=75)
+def _active_self(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("ドン") in t:
+        return None  # ドン!!のアクティブ化は don_set_active が担当
+    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?アクティブに(する|できる)"), t):
+        return None
+    return GameAction(
+        type=ActionType.ACTIVE,
+        target=TargetQuery(select_mode="SOURCE"),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# デッキ上をトラッシュへ（mill）: 「（自分／相手の）デッキの上からN枚をトラッシュに置く」
+#   デッキは並びが意味を持つため対象選択させず、枚数(value)ベースでデッキ上から
+#   N 枚をトラッシュへ送る。「相手は…」は status="OPPONENT"。従来 OTHER（11 件）。
+#   デッキ→ライフ(life_recover)は ライフ を含むため上位ルールが先に拾う。
+# ---------------------------------------------------------------------------
+@rule("mill_deck", priority=66)
+def _mill_deck(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("デッキの上") not in t:
+        return None
+    if _nfc("トラッシュ") not in t or _nfc("置く") not in t:
+        return None
+    return GameAction(
+        type=ActionType.TRASH_FROM_DECK,
+        target=None,
+        value=ValueSource(base=_first_int(t, 1)),
+        status="OPPONENT" if (_nfc("相手") in t and _nfc("自分") not in t) else None,
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 残りをトラッシュへ: 「残りを（好きな順番で）?トラッシュに置く」
+#   「見る／公開する」等で TEMP に出した残余をトラッシュへ送る。remaining_deck_bottom
+#   （残り→デッキの下）のトラッシュ版。従来 OTHER（18 件）。
+# ---------------------------------------------------------------------------
+@rule("remaining_trash", priority=64)
+def _remaining_trash(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("残り") not in t:
+        return None
+    if _nfc("トラッシュ") not in t or _nfc("置く") not in t:
+        return None
+    return GameAction(
+        type=ActionType.TRASH,
+        target=TargetQuery(
+            player=Player.SELF, zone=Zone.TEMP, select_mode="REMAINING", count=-1
+        ),
         raw_text=t,
     )

@@ -546,6 +546,61 @@ def test_prevent_battle_ko_in_resolve_attack():
     assert target in p2.field
 
 
+def test_trash_from_deck_mills_top():
+    """TRASH_FROM_DECK: 自分のデッキ上から value 枚をトラッシュへ送る（mill）。"""
+    gm, p1, _ = make_game()
+    cards = [make_instance(make_master(card_id=f"M-{i}"), owner=p1.name) for i in range(5)]
+    p1.deck.extend(cards)
+    ok = gm.apply_action_to_engine(p1, action(ActionType.TRASH_FROM_DECK, value=2), [], 2)
+    assert ok
+    assert len(p1.deck) == 3
+    assert len(p1.trash) == 2
+    # 上から（先頭から）送られる
+    assert p1.trash == cards[:2]
+
+
+def test_trash_from_deck_stops_when_empty():
+    """デッキが要求枚数に満たなくても、ある分だけ送って落ちない。"""
+    gm, p1, _ = make_game()
+    p1.deck.append(make_instance(make_master(card_id="M-only"), owner=p1.name))
+    ok = gm.apply_action_to_engine(p1, action(ActionType.TRASH_FROM_DECK, value=3), [], 3)
+    assert ok
+    assert len(p1.deck) == 0
+    assert len(p1.trash) == 1
+
+
+def test_trash_from_deck_opponent():
+    """status=OPPONENT で相手のデッキ上をトラッシュへ送る。"""
+    gm, p1, p2 = make_game()
+    p2.deck.extend(make_instance(make_master(card_id=f"O-{i}"), owner=p2.name) for i in range(3))
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.TRASH_FROM_DECK, value=1, status="OPPONENT"), [], 1
+    )
+    assert ok
+    assert len(p2.deck) == 2 and len(p2.trash) == 1
+    assert len(p1.trash) == 0  # 自分のデッキは減らない
+
+
+def test_trash_self_moves_to_trash_without_ko_trigger():
+    """TRASH(target=SOURCE): このキャラをトラッシュへ。KO ではないので場から消えるだけ。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1, name="自壊")
+    ok = gm.apply_action_to_engine(p1, action(ActionType.TRASH), [card], 0)
+    assert ok
+    assert card not in p1.field
+    assert card in p1.trash
+
+
+def test_active_sets_card_active():
+    """ACTIVE(target=SOURCE): レストのキャラをアクティブに戻す。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1, name="再起")
+    card.is_rest = True
+    ok = gm.apply_action_to_engine(p1, action(ActionType.ACTIVE), [card], 0)
+    assert ok
+    assert card.is_rest is False
+
+
 if __name__ == "__main__":
     import traceback
 

@@ -720,6 +720,20 @@ class GameManager:
                     player.life.append(player.deck.pop(0))
                     log_event("INFO", "game.action_heal", f"{player.name} +1 life from deck top", player=player.name)
             return True
+        if act_name == "TRASH_FROM_DECK":
+            # 「（自分／相手の）デッキの上からN枚をトラッシュに置く」（mill）。
+            # デッキは並びが意味を持つため対象選択させず、上から value 枚を送る。
+            target_player = player
+            if getattr(action, "status", None) == "OPPONENT":
+                target_player = self.p2 if player == self.p1 else self.p1
+            milled = 0
+            for _ in range(value):
+                if not target_player.deck:
+                    break
+                target_player.trash.append(target_player.deck.pop(0))
+                milled += 1
+            log_event("INFO", "game.action_trash_from_deck", f"{target_player.name} milled {milled} card(s) from deck top", player=target_player.name)
+            return True
         if act_name == "RAMP_DON":
             # status=="RESTED" の場合はレスト状態でコストエリアへ（「レストで追加」）。
             add_rested = getattr(action, "status", None) == "RESTED"
