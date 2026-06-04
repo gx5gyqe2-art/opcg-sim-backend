@@ -667,6 +667,51 @@ def test_reveal_no_targets_is_noop_success():
     assert ok
 
 
+def test_deck_search_look_grab_remaining_flow():
+    """サーチの一連フロー: LOOK(deck→temp) → MOVE_CARD(temp→hand) → DECK_BOTTOM(残りtemp→deck下)。
+
+    デッキ上に [c0(cost2), c1(cost5), c2(cost1), c3(cost4)] を積み、コスト4以上を1枚取得。
+    """
+    from opcg_sim.src.models.effect_types import GameAction, TargetQuery, ValueSource
+    gm, p1, _ = make_game()
+    costs = [2, 5, 1, 4]
+    deck = [make_instance(make_master(card_id=f"S-{i}", cost=c), owner=p1.name) for i, c in enumerate(costs)]
+    # さらに底にダミーを積んでおく（LOOK が掘る範囲外）
+    bottom = make_instance(make_master(card_id="BOT"), owner=p1.name)
+    p1.deck = list(deck) + [bottom]
+
+    # 1) LOOK 4 → temp に上から4枚
+    assert gm.apply_action_to_engine(p1, action(ActionType.LOOK, value=4), [], 4)
+    assert len(p1.temp_zone) == 4
+    assert p1.deck == [bottom]
+
+    # 2) MOVE_CARD(temp→hand): コスト5以上(=ここでは cost>=5 の c1)を手札へ
+    grab = GameAction(
+        type=ActionType.MOVE_CARD,
+        target=TargetQuery(player=Player.SELF, zone=Zone.TEMP, cost_min=5, count=1, is_up_to=True),
+        destination=Zone.HAND,
+        value=ValueSource(base=0),
+    )
+    picked = [c for c in p1.temp_zone if c.master.cost >= 5]
+    assert gm.apply_action_to_engine(p1, grab, picked, 0)
+    assert deck[1] in p1.hand
+    assert len(p1.temp_zone) == 3
+
+    # 3) DECK_BOTTOM(残りの temp 全件→デッキ下)
+    remaining = list(p1.temp_zone)
+    db = GameAction(
+        type=ActionType.DECK_BOTTOM,
+        target=TargetQuery(player=Player.SELF, zone=Zone.TEMP, select_mode="REMAINING", count=-1),
+        value=ValueSource(base=0),
+    )
+    assert gm.apply_action_to_engine(p1, db, remaining, 0)
+    assert len(p1.temp_zone) == 0  # temp リーク無し
+    # 残り3枚がデッキ下に積まれた（bottom の後ろ）
+    assert p1.deck[0] is bottom
+    assert all(c in p1.deck[1:] for c in remaining)
+    assert len(p1.deck) == 4
+
+
 if __name__ == "__main__":
     import traceback
 

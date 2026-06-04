@@ -517,6 +517,64 @@ CASES = [
             {"effect": {"kind": "action", "type": "TRASH", "target": {"zone": "TEMP"}}}
         ],
     },
+    # ----- サーチ: デッキを見て公開し手札に加える（LOOK+grab+remaining に構造修正） --------
+    #   従来は構造分解で LOOK が欠落し、対象が誤って FIELD/BOUNCE(count=4) になっていた。
+    #   parser.py が「デッキの上からN枚を見て、」で分割し、count 誤取得も解消。
+    {
+        "id": "deck_search_to_hand",
+        "text": "【登場時】自分のデッキの上から4枚を見て、コスト4以上のカード1枚までを公開し、手札に加える。残りを好きな順番でデッキの下に置く。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 4},
+                        {
+                            "type": "MOVE_CARD",
+                            "destination": "HAND",
+                            "target": {"zone": "TEMP", "player": "SELF", "cost_min": 4, "count": 1, "is_up_to": True},
+                        },
+                        {"type": "DECK_BOTTOM", "target": {"zone": "TEMP"}},
+                    ],
+                },
+            }
+        ],
+    },
+    # ----- scry: デッキを見て並び替えデッキへ戻す（LOOK+temp_to_deck, temp リーク無し） -----
+    {
+        "id": "deck_scry_rearrange",
+        "text": "【起動メイン】自分のデッキの上から3枚を見て、好きな順番に並び替え、デッキの上か下に置く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 3},
+                        {"type": "DECK_BOTTOM", "target": {"zone": "TEMP"}},
+                    ],
+                },
+            }
+        ],
+    },
+    # ----- サーチ（特徴フィルタ）: 見て特徴Xのカードを手札に加える --------------------------
+    {
+        "id": "deck_search_trait",
+        "text": "【登場時】自分のデッキの上から5枚を見て、特徴《麦わらの一味》を持つカード1枚までを公開し、手札に加える。残りを好きな順番でデッキの下に置く。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 5},
+                        {"type": "MOVE_CARD", "destination": "HAND", "target": {"zone": "TEMP", "traits": ["麦わらの一味"], "is_up_to": True}},
+                        {"type": "DECK_BOTTOM", "target": {"zone": "TEMP"}},
+                    ],
+                }
+            }
+        ],
+    },
     # ----- 手札公開: 「自分の手札からイベント2枚を公開することができる」（OTHER 解消） ------
     {
         "id": "reveal_hand_events",

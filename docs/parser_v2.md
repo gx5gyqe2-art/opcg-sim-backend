@@ -232,12 +232,12 @@ ATTACK_DISABLE/RESTRICTION、および GRANT_KEYWORD を継続効果として登
 - MVP制約: 自身（このキャラ）のみ対象。他キャラを守る型・置換が対象選択で中断する場合・
   「できる」の任意選択UIは今後の課題。
 
-## 現況（ルール39種 + エンジン/resolver/継続効果/除去保護/置換効果 時点）
+## 現況（ルール42種 + エンジン/resolver/継続効果/除去保護/置換効果/サーチ構造修正 時点）
 
-- 原子句カバレッジ（ルール命中率）: **約87.6%**
-- `ActionType.OTHER`（実行時に何もしない句）: **263**（開始時 942 から約72%削減）
-- テスト: `test_parser.py`(8) + `test_golden.py`(59) + `test_effects_engine.py`(42)
-  + `test_gameplay_smoke.py`(2) = 全111件緑
+- 原子句カバレッジ（ルール命中率）: **約92.5%**
+- `ActionType.OTHER`（実行時に何もしない句）: **234**（開始時 942 から約75%削減）
+- テスト: `test_parser.py`(8) + `test_golden.py`(62) + `test_effects_engine.py`(43)
+  + `test_gameplay_smoke.py`(2) = 全115件緑
 - レガシー vs V2 全カード比較: 退行(新規OTHER)=0 を維持
 - パーサルール: draw / ko / rest / rest_self_cost / power_buff / discard /
   cost_change / play_self / shuffle / remaining_deck_bottom / don_return / don_add /
@@ -246,7 +246,22 @@ ATTACK_DISABLE/RESTRICTION、および GRANT_KEYWORD を継続効果として登
   don_attach / don_set_active / don_set_rest / don_return_deck /
   trash_self / active_self / mill_deck / remaining_trash /
   bounce / deck_bottom_general / remaining_deck_top_or_bottom / play_card_from_zone /
-  active_target / blocker_disable / rush_natural / **reveal_hand**（＋ rest/mill_deck を拡張）
+  active_target / blocker_disable / rush_natural / reveal_hand /
+  **look_deck / search_to_hand / temp_to_deck**（＋ rest/mill_deck を拡張、
+  ＋ parser.py に「デッキの上からN枚を見て、」の構造分割を追加）
+
+### サーチ構造分解の修正（parser.py `_parse_to_node`）
+
+「デッキの上からN枚を見て、…M枚までを公開し、手札に加える。残りを…」のような **サーチ** は、
+従来「見て、」が分割境界に無く 1 原子句化していたため、`parse_target` が「N枚」を count に
+誤取得し、LOOK も欠落して誤った BOUNCE を生成していた。`_parse_to_node` で
+「デッキの上から\d+枚を見て、」の読点を「。」に置換して **LOOK を独立クローズ化** し、
+`look_deck`(→LOOK) / `search_to_hand`(TEMP→HAND) / `temp_to_deck`(残り TEMP→デッキ) /
+`remaining_deck_bottom` が各クローズを解釈する。デッキ文脈に限定してライフ等の「見て、」へは
+影響させず、`compare_parsers` で退行=0 を確認済み（改善 449→735）。
+
+> **TEMP リーク注意**: LOOK は候補を temp_zone に移すため、後続で TEMP を必ず消費する
+> （grab／残り戻し）こと。消費しないと temp_zone にカードが取り残されデッキから消失する。
 
 ### 残課題（今後・長い裾野）
 

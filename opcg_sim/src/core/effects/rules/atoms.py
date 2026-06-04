@@ -534,6 +534,78 @@ def _remaining_deck_bottom(ctx: ParseContext) -> Optional[GameAction]:
 #   主にトリガー（ライフから自身を登場）で使われる。対象は自身(ref_id=self)。
 #   従来は対象が汎用 FIELD/SELF になり、誤った対象を登場させていた。
 # ---------------------------------------------------------------------------
+@rule("look_deck", priority=80)
+def _look_deck(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）デッキの上からN枚（まで）を見て」→ LOOK（デッキ上 N 枚→TEMP）。
+
+    parser.py が「デッキの上からN枚を見て、」を独立クローズに分割するようになったため、
+    LOOK を明示生成する。後続の「公開し手札に加える」(search_to_hand) や
+    「並び替えてデッキへ戻す」(temp_to_deck)、「残りを…」(remaining_*) が TEMP を消費する。
+    """
+    t = ctx.text
+    m = re.search(_nfc(r"デッキの上から(\d+)枚(?:まで)?を見て"), t)
+    if not m:
+        return None
+    return GameAction(
+        type=ActionType.LOOK,
+        value=ValueSource(base=int(m.group(1))),
+        raw_text=t,
+    )
+
+
+@rule("search_to_hand", priority=54)
+def _search_to_hand(ctx: ParseContext) -> Optional[GameAction]:
+    """「（公開し、）（コスト/特徴/名前で絞った）カードM枚までを手札に加える」（サーチの取得）
+    → MOVE_CARD(zone=TEMP, dest=HAND)。
+
+    直前の look_deck が候補を TEMP に置いている前提で、TEMP からフィルタ一致を手札へ。
+    明示的な別ソース（トラッシュ/ライフ/手札から/デッキ）がある句は対象外（既存ルールが担当）。
+    """
+    t = ctx.text
+    if _nfc("手札に加える") not in t:
+        return None
+    # 明示的なソースゾーンがある句は別ルール（life_to_hand 等）に委ねる。
+    if any(_nfc(z) in t for z in ["トラッシュ", "ライフ", "手札から", "デッキ"]):
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.TEMP
+    tq.player = Player.SELF
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=tq,
+        destination=Zone.HAND,
+        raw_text=t,
+    )
+
+
+@rule("temp_to_deck", priority=63)
+def _temp_to_deck(ctx: ParseContext) -> Optional[GameAction]:
+    """「（好きな順番に並び替え、）デッキの上か下に置く」「好きな順番で置く」（scry の戻し）
+    → DECK_BOTTOM（TEMP 全件→デッキ下, 保守的）。
+
+    look_deck の後、手札に取らなかった残りをデッキへ戻す。「残り」を含む句は
+    remaining_* が担当するため除外。上下/並び替えの選択 UI は未実装のため下へ戻す。
+    """
+    t = ctx.text
+    if _nfc("残り") in t or _nfc("手札") in t:
+        return None  # remaining_* / search_to_hand が担当
+    has_arrange = _nfc("並び替え") in t or _nfc("並び変え") in t or _nfc("好きな順番") in t
+    to_deck = _nfc("デッキの上か下") in t or _nfc("デッキの下") in t or _nfc("デッキの上") in t
+    if not (has_arrange and (_nfc("置く") in t or _nfc("戻す") in t)):
+        return None
+    if not to_deck and _nfc("置く") not in t:
+        return None
+    return GameAction(
+        type=ActionType.DECK_BOTTOM,
+        target=TargetQuery(
+            player=Player.SELF, zone=Zone.TEMP, select_mode="REMAINING", count=-1
+        ),
+        raw_text=t,
+    )
+
+
 @rule("reveal_hand", priority=59)
 def _reveal_hand(ctx: ParseContext) -> Optional[GameAction]:
     """「自分の手札から（コスト/パワー/特徴で絞った）カードN枚を公開する/できる/することができる」
