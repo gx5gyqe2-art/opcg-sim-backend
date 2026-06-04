@@ -31,10 +31,15 @@
 
 | 指標 | 開始時 | 現在 |
 |---|---|---|
-| 原子句カバレッジ（ルール命中率） | 0% | 約57% |
+| 原子句カバレッジ（ルール命中率） | 0% | 約60%（grant_keyword 追加） |
 | `ActionType.OTHER`（実行時に何もしない句） | 942 | 421（約55%減） |
-| テスト総数 | 17 | 43（全緑） |
+| テスト総数 | 17 | 46（全緑） |
 | 本番パーサ | レガシー | **EffectParserV2（既定）** |
+
+> 追記（キーワード付与の修正）: 「このキャラは【ブロッカー】を得る」等が構造分解で
+> キーワードを脱落させ誤って `BUFF` に落ちていたバグを修正。`parse_ability` の
+> タグ一括除去をトリガー/注釈タグに限定し（キーワード能力タグは保持）、
+> `grant_keyword` ルールで `GRANT_KEYWORD` を生成（146 句）。詳細は `docs/parser_v2.md`。
 
 - 全2652カードの能力構築・実デッキ(imu/nami)ロード・ゲーム開始〜数ターン進行を確認済み。
 - レガシー vs V2 の全カード比較で **退行(新規OTHER)=0**。
@@ -172,6 +177,10 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
 1. **裾野の OTHER（約421件）のルール化** — 頻度は低く多様（上位でも10件前後/表現）。
    `effect_diagnostics.py` の「OTHER化する原子句ランキング」を起点に継続。
    候補: ライフ表/裏向き、デッキ並び替え（デッキの上か下に置く）、可変ドン返却 等。
+   - キーワード付与（【ブロッカー】等を得る）は **対応済み**（`grant_keyword`）。
+     ただし `GRANT_KEYWORD` は `current_keywords` に直接加算するため、`THIS_TURN` 等の
+     duration 失効と、`_apply_passive_effects` の `current_keywords` 毎回リセットとの
+     統合は未対応（下記2と同根の課題）。
 2. **COST/KEYWORD の duration 対応** — 現状 `_apply_passive_effects` がこれらを毎回
    再計算するため、継続効果マネージャと統合する設計が必要（POWER/FLAG は対応済）。
 3. **置換効果（「代わりに〜」）** — 「KOされる場合、代わりに手札を捨てる」等。

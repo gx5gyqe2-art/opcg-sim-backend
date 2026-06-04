@@ -80,18 +80,27 @@ class EffectParser:
                 don_cost_value = int(don_match.group(1))
                 norm_text = norm_text.replace(don_match.group(0), '').strip()
 
-            # トリガータグの除去
-            clean_text = re.sub(r'【.*?】', '', norm_text).strip()
+            # トリガー/注釈タグの除去。
+            # ただしキーワード能力タグ（【ブロッカー】等）は効果本体で「付与」を
+            # 表すため保持する。脱落すると原子句が「このキャラはを得る」になり、
+            # GRANT_KEYWORD（付与すべきキーワード）を復元できなくなる（既知バグ）。
+            clean_text = re.sub(
+                _nfc(r'【(?!ブロッカー|速攻|ダブルアタック|バニッシュ|ブロック不可|貫通|シフト)[^】]*?】'),
+                '', norm_text
+            ).strip()
 
             cost_node = None
             effect_text = clean_text
 
-            # コストの分離（全角コロン優先、なければ半角コロン）
-            colon = _nfc("：") if _nfc("：") in clean_text else (_nfc(":") if _nfc(":") in clean_text else None)
-            if colon and colon in clean_text:
-                parts = clean_text.split(colon, 1)
-                cost_node = self._parse_cost_node(parts[0])
-                effect_text = parts[1]
+            # コストの分離（全角コロン優先、なければ半角コロン）。
+            # ただし【速攻：キャラ】のようにキーワード能力タグ内部の「：」は
+            # コスト区切りではないため、タグ内部をマスクした上で判定する。
+            masked = re.sub(r'【[^】]*】', lambda m: '〇' * len(m.group(0)), clean_text)
+            colon = _nfc("：") if _nfc("：") in masked else (_nfc(":") if _nfc(":") in masked else None)
+            if colon:
+                idx = masked.index(colon)
+                cost_node = self._parse_cost_node(clean_text[:idx])
+                effect_text = clean_text[idx + 1:]
 
             # ドン!!コストタグを cost_node に統合
             if don_cost_value > 0:

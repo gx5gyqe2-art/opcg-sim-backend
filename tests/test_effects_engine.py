@@ -164,6 +164,19 @@ def test_reset_turn_status_keeps_timed_effects():
     assert "ATTACK_DISABLE" in card.timed_flags
 
 
+def test_grant_keyword_adds_to_current_keywords():
+    """GRANT_KEYWORD: status のキーワードを対象の current_keywords に付与する。"""
+    gm, p1, _ = make_game()
+    card = _make_field_char(p1)
+    assert "ブロッカー" not in card.current_keywords
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.GRANT_KEYWORD, status="ブロッカー"), [card], 0
+    )
+    assert ok
+    assert "ブロッカー" in card.current_keywords
+
+
 def _prevent_leave_master(card_id, status, condition=None):
     ab = Ability(
         trigger=TriggerType.PASSIVE,

@@ -141,6 +141,43 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# キーワード付与: 「（対象）は【ブロッカー】を得る」
+#   parser.py の構造分解が keyword タグを保持するようになり、原子句に
+#   【ブロッカー】等が残る。これを GRANT_KEYWORD(status=キーワード名) に変換する。
+#   従来は keyword が脱落して BUFF/OTHER に落ち、能力が付かなかった（既知バグ）。
+#   「このキャラ／このリーダー／このカード」が主語なら対象は自身(SOURCE)。
+# ---------------------------------------------------------------------------
+_KEYWORD_GRANT_RE = re.compile(
+    _nfc(r"【(ブロッカー|速攻[^】]*|ダブルアタック|バニッシュ|ブロック不可|貫通|シフト)】")
+)
+
+
+@rule("grant_keyword", priority=63)
+def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("得る") not in t:
+        return None
+    m = _KEYWORD_GRANT_RE.search(t)
+    if not m:
+        return None
+    # パワー増減を伴う複合句は power_buff に委ねる（単一アクションでは両立不可）。
+    if re.search(_nfc(r"パワー[+-]\d+"), t):
+        return None
+    keyword = m.group(1)
+    if re.search(_nfc(r"この(カード|キャラ|リーダー)"), t):
+        tq = TargetQuery(select_mode="SOURCE")
+    else:
+        tq = parse_target(t)
+    return GameAction(
+        type=ActionType.GRANT_KEYWORD,
+        target=tq,
+        status=keyword,
+        duration=_duration_of(t),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
 # 除去保護: 「相手の効果で場を離れない」「（バトルで）KOされない」
 #   保護マーカーを生成し、除去の瞬間に gamestate 側でライブ評価される。
 #   多くは条件付き PASSIVE（例: トラッシュ7枚以上の場合）。

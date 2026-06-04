@@ -250,6 +250,39 @@ CASES = [
             {"trigger": "TRIGGER", "effect": {"kind": "action", "type": "EXECUTE_MAIN_EFFECT"}}
         ],
     },
+    # ----- キーワード付与: このキャラは【ブロッカー】を得る ----------------
+    #   構造分解で keyword タグが脱落し「このキャラはを得る」になっていた既知バグ。
+    #   keyword タグを保持し GRANT_KEYWORD(status=キーワード名) を生成する。
+    {
+        "id": "grant_keyword_blocker_self",
+        "text": "【起動メイン】このキャラは【ブロッカー】を得る。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "effect": {
+                    "kind": "action",
+                    "type": "GRANT_KEYWORD",
+                    "status": "ブロッカー",
+                    "target": {"player": "SELF"},
+                },
+            }
+        ],
+    },
+    # ----- キーワード付与: このターン中【速攻】を得る（duration 付き） -------
+    {
+        "id": "grant_keyword_rush_this_turn",
+        "text": "このキャラは、このターン中、【速攻】を得る。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "GRANT_KEYWORD",
+                    "status": "速攻",
+                    "duration": "THIS_TURN",
+                }
+            }
+        ],
+    },
     # ----- カウンターのパワー付与（OP13-097 世界の均衡） -------------------
     {
         "id": "counter_power_buff_3000",
