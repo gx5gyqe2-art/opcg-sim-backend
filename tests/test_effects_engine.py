@@ -181,6 +181,22 @@ def test_grant_keyword_adds_to_current_keywords():
     assert card.has_keyword("ブロッカー")
 
 
+def test_cost_reduction_this_turn_persists_and_expires():
+    """COST_REDUCTION(THIS_TURN): passive 再計算で消えず、ターン終了で失効する。"""
+    gm, p1, _ = make_game()
+    card = make_instance(make_master(card_id="CC-1", cost=5), owner=p1.name)
+    p1.field.append(card)
+
+    gm.apply_action_to_engine(
+        p1, action(ActionType.BUFF, value=-2, status="COST_REDUCTION", duration="THIS_TURN"),
+        [card], -2)
+    assert card.current_cost == 3
+    gm._apply_passive_effects(p1)        # cost_buff をリセットするが timed_cost は残る
+    assert card.current_cost == 3
+    gm.continuous.expire("TURN_END", gm.turn_count)
+    assert card.current_cost == 5
+
+
 def test_grant_keyword_this_turn_expires_at_turn_end():
     """duration=THIS_TURN のキーワード付与はターン終了で失効する。"""
     gm, p1, _ = make_game()

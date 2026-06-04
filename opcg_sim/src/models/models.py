@@ -99,6 +99,9 @@ class CardInstance:
     # （ターン境界を跨いで存続する期間付き効果を保持するため）。
     timed_power: int = 0
     timed_flags: Set[str] = field(default_factory=set)
+    # 期間付きのコスト増減（「このターン中、コスト-N」等）。cost_buff は
+    # _apply_passive_effects で毎回 0 にリセットされるため、期間付き分はここに保持する。
+    timed_cost: int = 0
     # 効果で付与されたキーワード（【ブロッカー】等）。current_keywords は
     # _apply_passive_effects で master のコピーに毎回リセットされるため、付与分は
     # ここに保持して消えないようにする。失効は ContinuousEffectManager が管理。
@@ -137,7 +140,7 @@ class CardInstance:
 
     @property
     def current_cost(self) -> int:
-        result = self.master.cost + self.cost_buff
+        result = self.master.cost + self.cost_buff + self.timed_cost
         return max(0, result)
 
     def reset_turn_status(self):

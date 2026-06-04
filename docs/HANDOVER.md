@@ -33,7 +33,7 @@
 |---|---|---|
 | 原子句カバレッジ（ルール命中率） | 0% | 約70.4%（grant_keyword + ライフ操作5種 + ドン操作4種） |
 | `ActionType.OTHER`（実行時に何もしない句） | 942 | 342（約64%減） |
-| テスト総数 | 17 | 75（全緑） |
+| テスト総数 | 17 | 76（全緑） |
 | 本番パーサ | レガシー | **EffectParserV2（既定）** |
 
 > 追記1（キーワード付与の修正）: 「このキャラは【ブロッカー】を得る」等が構造分解で
@@ -66,6 +66,10 @@
 > `_apply_passive_effects` のリセットで即消えていた（146件の付与が実質不発）。
 > `has_keyword()` で参照を一本化し、duration（THIS_TURN/THIS_BATTLE/PERMANENT）で失効、
 > 場を離れる際は `drop_for` で破棄。詳細は §7-2。
+>
+> 追記7（コスト増減の永続化）: 「このターン中、コスト-N」等の期間付きコスト増減も
+> 同根（`cost_buff` が passive リセットで消滅）だったため、`timed_cost`（継続効果）に
+> 統合。`cost_change` ルールが duration を付与し、期間付きのみ継続効果へ回す。§7-2 完了。
 
 - 全2652カードの能力構築・実デッキ(imu/nami)ロード・ゲーム開始〜数ターン進行を確認済み。
 - レガシー vs V2 の全カード比較で **退行(新規OTHER)=0**。
@@ -215,11 +219,14 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
    - ドン!!操作（付与／アクティブ／レスト／ドンデッキに戻す）は **対応済み**（`don_*`、
      枚数ベース）。残: REST_DON をコストにする句の充足判定（現状 target=None のため
      `_can_satisfy_node` がドン枚数を検証せず常に True）。
-2. **COST の duration 対応** — `_apply_passive_effects` が `cost_buff` を毎回リセット
-   するため、継続効果マネージャと統合する設計が必要（POWER/FLAG/**KEYWORD は対応済**）。
-   KEYWORD は `timed_keywords`（継続効果マネージャ管理、`_apply_passive_effects` の
-   リセット対象外）に付与し、`has_keyword()` で本来＋付与分を参照、`drop_for` で
-   場を離れる際に破棄する方式で解決済み。COST も同様に `timed_cost` 化が候補。
+2. ~~**COST/KEYWORD の duration 対応**~~ **対応済み**（POWER/FLAG も含め継続効果マネージャに
+   統合）。`_apply_passive_effects` が `cost_buff`/`current_keywords` を毎回リセットして
+   期間付き効果が消える問題を、専用フィールド（リセット対象外）で解決:
+   - KEYWORD → `timed_keywords`（`has_keyword()` で本来＋付与分を参照）
+   - COST → `timed_cost`（`current_cost` に加算。期間付きのみ継続効果へ、INSTANT は
+     従来どおり `cost_buff`＝PASSIVE 再計算で再適用）
+   いずれも `drop_for` で場を離れる際に破棄。残: COST のうち PASSIVE（条件付き常時）の
+   duration 統合は対象外（reset+reapply で正しく機能するため不要）。
 3. **置換効果（「代わりに〜」）** — 「KOされる場合、代わりに手札を捨てる」等。
    除去保護の枠組みを拡張して置換に対応する余地。
 4. ~~**ターン1回制限の enforce**~~ **対応済み**。`resolver.resolve_ability` が

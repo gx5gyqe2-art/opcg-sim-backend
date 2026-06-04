@@ -35,7 +35,7 @@ EV_BATTLE_END = "BATTLE_END"
 @dataclass
 class ContinuousEffect:
     target_uuid: str
-    kind: str          # "POWER" | "FLAG" | "KEYWORD"
+    kind: str          # "POWER" | "COST" | "FLAG" | "KEYWORD"
     amount: int = 0
     flag: str = ""
     keyword: str = ""
@@ -71,6 +71,8 @@ class ContinuousEffectManager:
     def _apply_to_card(self, card, eff: ContinuousEffect) -> None:
         if eff.kind == "POWER":
             card.timed_power += eff.amount
+        elif eff.kind == "COST":
+            card.timed_cost += eff.amount
         elif eff.kind == "FLAG":
             card.timed_flags.add(eff.flag)
         elif eff.kind == "KEYWORD":
@@ -79,6 +81,8 @@ class ContinuousEffectManager:
     def _remove_from_card(self, card, eff: ContinuousEffect) -> None:
         if eff.kind == "POWER":
             card.timed_power -= eff.amount
+        elif eff.kind == "COST":
+            card.timed_cost -= eff.amount
         elif eff.kind == "FLAG":
             card.timed_flags.discard(eff.flag)
         elif eff.kind == "KEYWORD":

@@ -440,6 +440,7 @@ def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
         target=tq,
         value=ValueSource(base=value),
         status="COST_REDUCTION",
+        duration=_duration_of(t),
         raw_text=t,
     )
 

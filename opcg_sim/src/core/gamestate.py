@@ -786,9 +786,16 @@ class GameManager:
                     target.base_power_override = value
                     log_event("INFO", "game.action_override", f"{target.master.name}'s power set to {value}", player=player.name)
                 elif action.status == "COST_REDUCTION":
-                    if hasattr(target, 'cost_buff'):
+                    # 期間付き（このターン中／このバトル中 等）は継続効果(timed_cost)へ。
+                    # cost_buff は _apply_passive_effects で毎回リセットされ消えるため。
+                    # 期間指定なし(INSTANT)は従来どおり cost_buff（PASSIVE 再計算で再適用される）。
+                    dur = getattr(action, "duration", "INSTANT")
+                    if dur in ("THIS_TURN", "THIS_BATTLE", "UNTIL_NEXT_TURN_END"):
+                        expire_turn = self.turn_count + 1 if dur == "UNTIL_NEXT_TURN_END" else 0
+                        self.continuous.apply(target, "COST", dur, amount=value, expire_turn=expire_turn)
+                    elif hasattr(target, 'cost_buff'):
                         target.cost_buff += value
-                        log_event("INFO", "game.action_cost_reduction", f"{target.master.name}'s cost changed by {value}", player=player.name)
+                    log_event("INFO", "game.action_cost_reduction", f"{target.master.name}'s cost changed by {value} ({dur})", player=player.name)
                 elif action.status == "BLOCKER_DISABLE":
                     target.flags.add("BLOCKER_DISABLED")
                     target.current_keywords.discard("ブロッカー")
