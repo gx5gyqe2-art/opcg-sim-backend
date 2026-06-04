@@ -37,7 +37,10 @@
     "IS_FACE_UP": "is_face_up",
     "ATTACHED_DON": "attached_don",
     "OWNER_ID": "owner_id",
-    "KEYWORDS": "keywords"
+    "KEYWORDS": "keywords",
+    "TRIGGER_TEXT": "trigger_text",
+    "ABILITY_DISABLED": "ability_disabled",
+    "IS_FROZEN": "is_frozen"
   },
   "LOG_CONFIG": {
     "KEYS": {

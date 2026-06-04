@@ -789,4 +789,256 @@ CASES = [
             }
         ],
     },
+    # ----- 手札捨て＋ステージレストをコストにした起動効果 ------------------
+    # 「自分の手札1枚を捨て、このステージをレストにできる」が split_pattern の
+    # 「捨て、」で分割され「自分の手札1枚を」が動詞なし断片化していた問題を修正。
+    # (?<=捨て)、 に変更することで「捨て」を前クローズに残す。
+    {
+        "id": "discard_rest_stage_cost",
+        "text": "【起動メイン】自分の手札1枚を捨て、このステージをレストにできる：カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {
+                    "kind": "seq",
+                    "actions": [
+                        {"kind": "action", "type": "DISCARD"},
+                        {"kind": "action", "type": "REST"},
+                    ],
+                },
+                "effect": {"kind": "action", "type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 手札捨て＋このキャラをトラッシュをコストにした起動効果 ----------
+    {
+        "id": "discard_trash_self_cost",
+        "text": "【起動メイン】自分の手札1枚を捨て、このキャラをトラッシュに置くことができる：カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {
+                    "kind": "seq",
+                    "actions": [
+                        {"kind": "action", "type": "DISCARD"},
+                        {"kind": "action", "type": "TRASH"},
+                    ],
+                },
+                "effect": {"kind": "action", "type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 効果テキスト中の「捨ててもよい」（任意 discard） ----------------
+    {
+        "id": "discard_optional",
+        "text": "【登場時】自分の手札1枚を捨ててもよい：カード2枚を引く。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "cost": {"kind": "action", "type": "DISCARD"},
+                "effect": {"kind": "action", "type": "DRAW", "value": 2},
+            }
+        ],
+    },
+    # ----- 手札→デッキ下（hand_to_deck） -----------------------------------
+    {
+        "id": "hand_to_deck_1",
+        "text": "【ドン‼×1】【起動メイン】【ターン1回】カード1枚を引き、自分の手札1枚をデッキの上か下に置く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"kind": "action", "type": "DRAW", "value": 1},
+                        {"kind": "action", "type": "DECK_BOTTOM", "target": {"zone": "HAND"}},
+                    ],
+                },
+            }
+        ],
+    },
+    # ----- ライフ→手札（もよい形）（life_to_hand_optional） ----------------
+    {
+        "id": "life_to_hand_optional",
+        "text": "【メイン】自分の手札から「エドワード・ニューゲート」1枚までを、登場させる。その後、自分のライフの上か下から1枚を手札に加えてもよい。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"kind": "action", "type": "PLAY_CARD"},
+                        {"kind": "action", "type": "MOVE_CARD", "target": {"zone": "LIFE"}, "destination": "HAND"},
+                    ],
+                },
+            }
+        ],
+    },
+    # ----- ドン!! スペース表記（ドン !!-1）（don_return_space） ------------
+    {
+        "id": "don_return_space",
+        "text": "【起動メイン】【ターン1回】ドン !!-1：相手のドン!!1枚までを、レストにする。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {"kind": "action", "type": "RETURN_DON", "value": 1},
+            }
+        ],
+    },
+    # ----- 公開カード登場（play_revealed, レスト）--------------------------
+    # 「...の場合」はアビリティ条件として抽出されるため、effect は直接 PLAY_CARD になる。
+    {
+        "id": "play_revealed_rested",
+        "text": "自分のデッキの一番上を公開し、そのカードがコスト4以下の特徴《王下七武海》を持つキャラカードの場合、レストで登場させてもよい。",
+        "expect": [
+            {
+                "trigger": "PASSIVE",
+                "effect": {"kind": "action", "type": "PLAY_CARD", "status": "RESTED"},
+            }
+        ],
+    },
+    # ----- アクティブキャラへのアタック付与（PERMANENT）-------------------
+    {
+        "id": "attack_active_permanent",
+        "text": "【ドン‼×2】このキャラは相手のアクティブのキャラにもアタックできる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "GRANT_KEYWORD",
+                    "status": "ATTACK_ACTIVE",
+                    "duration": "PERMANENT",
+                },
+            }
+        ],
+    },
+    # ----- アクティブキャラへのアタック付与（THIS_TURN, 対象付き）----------
+    {
+        "id": "attack_active_this_turn",
+        "text": "【登場時】自分の特徴《SWORD》を持つ、リーダーかキャラ1枚までは、このターン中、アクティブのキャラにもアタックできる。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "action",
+                    "type": "GRANT_KEYWORD",
+                    "status": "ATTACK_ACTIVE",
+                    "duration": "THIS_TURN",
+                },
+            }
+        ],
+    },
+    # ----- フリーズ: 「次の相手のリフレッシュフェイズでアクティブにならない」 -------
+    {
+        "id": "freeze_rested_char",
+        "text": "【登場時】相手のレストのキャラ1枚までは、次の相手のリフレッシュフェイズでアクティブにならない。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "action",
+                    "type": "FREEZE",
+                    "target": {"player": "OPPONENT", "is_up_to": True},
+                },
+            }
+        ],
+    },
+    # ----- 効果無効: 「相手のキャラ1枚までを、このターン中、効果を無効にする」 -----
+    {
+        "id": "negate_effect_char",
+        "text": "【登場時】相手のキャラ1枚までを、このターン中、効果を無効にする。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "action",
+                    "type": "NEGATE_EFFECT",
+                    "target": {"player": "OPPONENT", "is_up_to": True},
+                    "duration": "THIS_TURN",
+                },
+            }
+        ],
+    },
+    # ----- 効果無効: 「相手のリーダーかキャラ1枚までを、このターン中、効果を無効にする」 --
+    {
+        "id": "negate_effect_leader_or_char",
+        "text": "【起動メイン】相手のリーダーかキャラ1枚までを、このターン中、効果を無効にする。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "effect": {
+                    "kind": "action",
+                    "type": "NEGATE_EFFECT",
+                    "target": {"player": "OPPONENT", "is_up_to": True},
+                    "duration": "THIS_TURN",
+                },
+            }
+        ],
+    },
+    # ----- ルール処理: 「ルール上、このカードはカード名を「X」としても扱う」 ----------
+    {
+        "id": "rule_card_alias",
+        "text": "ルール上、このカードはカード名を「ウソップ」としても扱う。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "RULE_PROCESSING",
+                },
+            }
+        ],
+    },
+    # ----- 自己制限: 「自分は、このターン中、自分の効果でライフを手札に加えられない」 --
+    {
+        "id": "self_cannot_life_to_hand",
+        "text": "自分は、このターン中、自分の効果でライフを手札に加えられない。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "RULE_PROCESSING",
+                },
+            }
+        ],
+    },
+    # ----- ライフ→手札（枚数形）: 「自分のライフ1枚を手札に加えることができる」 ------
+    {
+        "id": "life_to_hand_count_form",
+        "text": "自分のライフ1枚を手札に加えることができる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "LIFE"},
+                    "destination": "HAND",
+                },
+            }
+        ],
+    },
+    # ----- 自己トラッシュ（短縮形）: 「このキャラをトラッシュに」（置く省略）---------
+    {
+        "id": "trash_self_short",
+        "text": "【起動メイン】このキャラをトラッシュに：カード2枚を引く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {"kind": "action", "type": "TRASH"},
+                "effect": {"kind": "action", "type": "DRAW", "value": 2},
+            }
+        ],
+    },
+    # ----- ライフ→トラッシュ（もよい形）: 「ライフの上から1枚をトラッシュに置いてもよい」 --
+    {
+        "id": "life_to_trash_optional",
+        "text": "代わりに自分のライフの上から1枚をトラッシュに置いてもよい。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "TRASH",
+                    "target": {"zone": "LIFE", "is_up_to": True},
+                },
+            }
+        ],
+    },
 ]

@@ -105,6 +105,7 @@ class GameManager:
         self.setup_phase_pending = False
         from .effects.continuous import ContinuousEffectManager
         self.continuous = ContinuousEffectManager(self)
+        self.action_events: List[Dict] = []  # per-request event buffer; reset in API handler
 
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """
@@ -498,7 +499,9 @@ class GameManager:
         self._validate_action(attacker_owner, "MAIN_ACTION")
         if "ATTACK_DISABLE" in attacker.flags or "ATTACK_DISABLE" in attacker.timed_flags: raise ValueError("このカードは効果によりアタックできません。")
         if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
-        if target.master.type == CardType.CHARACTER and not target.is_rest: raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
+        if (target.master.type == CardType.CHARACTER and not target.is_rest
+                and not attacker.has_keyword("ATTACK_ACTIVE")):
+            raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
         log_event("INFO", "game.attack_declare", f"{attacker.master.name} is attacking {target.master.name}", player=attacker_owner.name)
         attacker.is_rest = True
         self.active_battle = {"attacker": attacker, "target": target, "attacker_owner": attacker_owner, "target_owner": target_owner, "counter_buff": 0}
@@ -603,7 +606,18 @@ class GameManager:
 
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
-        resolver = EffectResolver(self); resolver.resolve_ability(player, ability, source_card)
+        resolver = EffectResolver(self)
+        resolver.resolve_ability(player, ability, source_card)
+        for ev in resolver.action_history:
+            self.action_events.append({
+                "type": "EFFECT",
+                "player": player.name,
+                "card_name": source_card.master.name,
+                "action": ev.get("action", ""),
+                "targets": ev.get("targets", []),
+                "value": ev.get("value"),
+                "success": ev.get("success", True),
+            })
 
     # 除去保護（PREVENT_LEAVE）の判定。除去が起こる瞬間に、対象カードの
     # PASSIVE 能力を走査し、条件（例: トラッシュ7枚以上）をライブ評価する。
@@ -870,6 +884,22 @@ class GameManager:
                     self.continuous.apply(target, "FLAG", "UNTIL_NEXT_TURN_END", flag="ATTACK_DISABLE", expire_turn=self.turn_count + 1)
                 else:
                     self.continuous.apply(target, "FLAG", "THIS_TURN", flag="ATTACK_DISABLE")
+                success = True
+            elif act_name == "FREEZE":
+                # 「次の相手のリフレッシュフェイズでアクティブにならない」
+                # refresh_all が flags["FREEZE"] を確認してからリセットするため、
+                # ターン境界を跨ぐ flags に直接書き込む（timed_flags でなく flags）。
+                target.flags.add("FREEZE")
+                log_event("INFO", "game.action_freeze", f"{target.master.name} frozen (won't activate next refresh)", player=player.name)
+                success = True
+            elif act_name == "NEGATE_EFFECT":
+                # 「（このターン中、）効果を無効にする」
+                target.ability_disabled = True
+                target._refresh_keywords()
+                log_event("INFO", "game.action_negate", f"{target.master.name} ability disabled this turn", player=player.name)
+                success = True
+            elif act_name == "RULE_PROCESSING":
+                # ルール上の注記（カード名 alias、デッキ枚数ルール等）→ エンジン no-op
                 success = True
             elif act_name == "REST":
                 target.is_rest = True

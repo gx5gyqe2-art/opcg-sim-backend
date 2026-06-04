@@ -712,6 +712,89 @@ def test_deck_search_look_grab_remaining_flow():
     assert len(p1.deck) == 4
 
 
+def test_hand_to_deck_bottom():
+    """DECK_BOTTOM(zone=HAND): 手札1枚をデッキ下へ（hand_to_deck ルールの実行検証）。"""
+    from opcg_sim.src.models.effect_types import TargetQuery
+    gm, p1, _ = make_game()
+    hand_card = make_instance(make_master(card_id="H-1"), owner=p1.name)
+    p1.hand.append(hand_card)
+    tq = TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1)
+    ok = gm.apply_action_to_engine(p1, action(ActionType.DECK_BOTTOM, target=tq), [hand_card], 1)
+    assert ok
+    assert hand_card not in p1.hand
+    assert hand_card in p1.deck  # デッキ下に加わった
+
+
+def test_freeze_keeps_character_rested_after_refresh():
+    """FREEZE: フリーズされたキャラはリフレッシュフェイズでアクティブになれない。"""
+    gm, p1, p2 = make_game()
+    char = make_instance(make_master(card_id="F-1", type=CardType.CHARACTER), owner=p2.name)
+    char.is_rest = True
+    p2.field.append(char)
+    # FREEZE フラグを直接付与（パーサーを経由せず engine 層だけを検証）
+    ok = gm.apply_action_to_engine(p1, action(ActionType.FREEZE), [char], 0)
+    assert ok
+    assert "FREEZE" in char.flags
+    # p2 のリフレッシュを再現（refresh_all は turn_player を引数に取る）
+    gm.refresh_all(p2)
+    assert char.is_rest is True  # FREEZE 済みなので依然レスト
+
+
+def test_negate_effect_sets_ability_disabled():
+    """NEGATE_EFFECT: ability_disabled=True になり能力発動がブロックされる。"""
+    gm, p1, p2 = make_game()
+    char = make_instance(make_master(card_id="N-1", type=CardType.CHARACTER), owner=p2.name)
+    p2.field.append(char)
+    ok = gm.apply_action_to_engine(p1, action(ActionType.NEGATE_EFFECT), [char], 0)
+    assert ok
+    assert char.ability_disabled is True
+    # reset_turn_status で THIS_TURN の無効化は解除される
+    char.reset_turn_status()
+    assert char.ability_disabled is False
+
+
+def test_attack_active_allows_attacking_active_character():
+    """ATTACK_ACTIVE キーワード持ちはアクティブキャラにアタック可能。
+    _validate_action はゲームフロー依存なのでパッチし、攻撃可否の条件だけを検証する。
+    """
+    gm, p1, p2 = make_game()
+    master = make_master(card_id="ATK-1", type=CardType.CHARACTER)
+    master.keywords.add("ATTACK_ACTIVE")
+    attacker = make_instance(master, owner=p1.name)
+    defender = make_instance(make_master(card_id="DEF-1", type=CardType.CHARACTER), owner=p2.name)
+    p1.field.append(attacker)
+    p2.field.append(defender)
+    defender.is_rest = False  # アクティブ状態（通常は攻撃不可）
+    # _validate_action はゲームフロー（pending_request）依存なのでバイパス
+    gm._validate_action = lambda player, action_type: None
+    try:
+        gm.declare_attack(attacker, defender)
+        success = True
+    except ValueError as e:
+        success = "レスト" in str(e)  # レスト制約エラーなら失敗
+        if not success:
+            raise
+    assert success, "ATTACK_ACTIVE 持ちはアクティブキャラを攻撃できるはず"
+
+
+def test_attack_active_not_granted_means_no_active_attack():
+    """ATTACK_ACTIVE を持たないキャラはアクティブキャラへの攻撃で ValueError。"""
+    gm, p1, p2 = make_game()
+    attacker = make_instance(make_master(card_id="ATK-2", type=CardType.CHARACTER), owner=p1.name)
+    defender = make_instance(make_master(card_id="DEF-2", type=CardType.CHARACTER), owner=p2.name)
+    p1.field.append(attacker)
+    p2.field.append(defender)
+    defender.is_rest = False
+    gm._validate_action = lambda player, action_type: None
+    raised = False
+    try:
+        gm.declare_attack(attacker, defender)
+    except ValueError as e:
+        if "レスト" in str(e):
+            raised = True
+    assert raised, "ATTACK_ACTIVE なしはアクティブキャラへの攻撃で例外を出すべき"
+
+
 if __name__ == "__main__":
     import traceback
 

@@ -426,10 +426,12 @@ class EffectResolver:
         return False
 
     def _suspend_for_choice(self, player, node: Choice, source_card):
+        base_msg = node.message if node.message else "選択してください"
         self.game_manager.active_interaction = {
             "player_id": player.name,
             "action_type": "CHOICE",
-            "message": node.message,
+            "source_card_name": source_card.master.name,
+            "message": f"「{source_card.master.name}」の効果: {base_msg}",
             "options": node.option_labels,
             "continuation": {
                 "execution_stack": self.execution_stack,
@@ -458,10 +460,13 @@ class EffectResolver:
         if action_node:
             saved_stack.append(action_node)
 
+        up_to_str = "まで" if is_up_to else ""
+        count_str = f"{required_count}枚{up_to_str}" if required_count != 1 else f"1枚{up_to_str}"
         self.game_manager.active_interaction = {
             "player_id": player.name,
             "action_type": "SELECT_TARGET",
-            "message": f"対象を選択してください（最大{required_count}枚）",
+            "source_card_name": source_card.master.name,
+            "message": f"「{source_card.master.name}」の効果: 対象を選択（{count_str}）",
             "candidates": candidates,
             "constraints": {
                 "min": min_select,
