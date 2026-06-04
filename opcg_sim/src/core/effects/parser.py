@@ -242,7 +242,7 @@ class EffectParser:
         #  FIELD/DECK に誤推定する。分割後は look_deck(LOOK→TEMP)＋play_from_temp(TEMP→FIELD)＋
         #  remaining_*（残り→デッキ）が正しく連携する。）「公開する」（句点付き別構文）は対象外。
         norm_text = re.sub(
-            _nfc(r'(デッキの上から\d+枚(?:まで)?を公開し)、'), r'\1。', norm_text
+            _nfc(r'(デッキの(?:上から\d+枚(?:まで)?|一番上)を公開し)、'), r'\1。', norm_text
         )
         # 「引く、」「捨て、」は lookbehind で分割（動詞を前の部分に残す）
         # 「捨て、」を ON で消費すると「自分の手札1枚を」が動詞なしの断片になるため
@@ -606,8 +606,10 @@ class EffectParser:
             op = CompareOperator.LT if fc_cmp_m.group(1) == _nfc('少ない') else CompareOperator.GT
             return Condition(type=ConditionType.FIELD_COUNT_COMPARE, operator=op, player=Player.SELF, raw_text=norm_text)
 
-        # REVEALED_CARD_TRAIT: 公開したカードの特徴/コスト/タイプ条件
-        if _nfc("公開し") in norm_text and _nfc("そのカード") in norm_text:
+        # REVEALED_CARD_TRAIT: 公開したカードの特徴/コスト/タイプ条件。
+        # 公開(LOOK)が独立クローズに分割される場合、条件側には「公開し」が残らないため
+        # 「そのカード」を主たる手掛かりとする（filter が1つも取れなければ下へフォールスルー）。
+        if _nfc("そのカード") in norm_text:
             val: dict = {}
             # 含む特徴: 『X』を含む特徴
             contains_m = re.search(_nfc(r'[『「]([^』」]+)[』」]を含む特徴'), norm_text)

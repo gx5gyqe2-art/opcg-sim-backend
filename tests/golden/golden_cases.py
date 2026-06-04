@@ -947,15 +947,31 @@ CASES = [
             }
         ],
     },
-    # ----- 公開カード登場（play_revealed, レスト）--------------------------
-    # 「...の場合」はアビリティ条件として抽出されるため、effect は直接 PLAY_CARD になる。
+    # ----- 公開→条件付き登場（インライン条件: LOOK→Branch(REVEALED_CARD_TRAIT)→PLAY_CARD(TEMP)）-----
+    #   「デッキの一番上を公開し」を独立クローズに分割して LOOK(→TEMP) 化し、
+    #   「そのカードが…の場合」を REVEALED_CARD_TRAIT のインライン Branch として保持する
+    #   （アビリティ条件へ lift しない＝公開を先に実行してから条件評価できる）。
+    #   従来は条件が lift され公開(LOOK)が消失し、PLAY_CARD が zone=FIELD に誤ターゲットしていた。
     {
         "id": "play_revealed_rested",
         "text": "自分のデッキの一番上を公開し、そのカードがコスト4以下の特徴《王下七武海》を持つキャラカードの場合、レストで登場させてもよい。",
         "expect": [
             {
-                "trigger": "PASSIVE",
-                "effect": {"kind": "action", "type": "PLAY_CARD", "status": "RESTED"},
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 1},
+                        {
+                            "kind": "branch",
+                            "condition": {"type": "REVEALED_CARD_TRAIT"},
+                            "if_true": {
+                                "type": "PLAY_CARD",
+                                "status": "RESTED",
+                                "target": {"zone": "TEMP"},
+                            },
+                        },
+                    ],
+                },
             }
         ],
     },

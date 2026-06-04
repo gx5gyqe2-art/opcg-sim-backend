@@ -230,9 +230,14 @@ class EffectResolver:
         value = self._calculate_value(player, action.value, targets)
         success = self.game_manager.apply_action_to_engine(player, action, targets, value)
 
-        # REVEALED_CARD_TRAIT 条件評価用: REVEAL/LOOK 実行後に公開カードを記録
-        if action.type in (ActionType.REVEAL, ActionType.LOOK, ActionType.FACE_UP_LIFE) and targets:
-            self.context["last_revealed_card"] = targets[0]
+        # REVEALED_CARD_TRAIT 条件評価用: REVEAL/LOOK 実行後に公開カードを記録。
+        # LOOK はターゲット無し（デッキ上から枚数ベースで TEMP へ移動）なので、
+        # 移動先 TEMP の先頭（=公開したデッキトップ）を公開カードとして記録する。
+        if action.type in (ActionType.REVEAL, ActionType.LOOK, ActionType.FACE_UP_LIFE):
+            if targets:
+                self.context["last_revealed_card"] = targets[0]
+            elif action.type == ActionType.LOOK and getattr(player, "temp_zone", None):
+                self.context["last_revealed_card"] = player.temp_zone[0]
 
         # ▼▼▼ 追加: 実行履歴を記録 ▼▼▼
         target_names = [f"{t.master.name}({t.uuid[:4]})" for t in targets]

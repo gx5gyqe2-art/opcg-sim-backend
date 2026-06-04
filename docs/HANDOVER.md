@@ -57,7 +57,8 @@
 | BWP0A ラウンド2 | hand_to_deck 等5種 | 93.8% | 175 | 45 | 125 |
 | BWP0A ラウンド3 | FREEZE/NEGATE_EFFECT 等 | 95.4% | 108 | 49 | 137 |
 | bIYkG ラウンド1-4 | GENERIC条件94→1・保護者型置換効果 | 95.4% | 108 | 49 | 165 |
-| **PHoSv ラウンド1** | **デッキ公開→条件付き登場の構造修正** | **95.9%** | **104** | **50** | **170** |
+| PHoSv ラウンド1 | デッキ公開→条件付き登場の構造修正 | 95.9% | 104 | 50 | 170 |
+| **PHoSv ラウンド2** | **公開→インライン条件→登場（play_revealed TEMP化）** | **95.9%** | **104** | **50** | **172** |
 
 **UI 拡張フェーズ（opcg-sim-frontend 連携）**
 
@@ -135,11 +136,46 @@
 `play_from_temp` 26件命中、退行(新規OTHER)=0。OTHER減に加え、上記**隠れミスターゲット約7枚
 （OP06-057/OP06-119/OP08-052/OP08-054/ST12-010/ST12-013/ST12-017）を正しい TEMP 経由に是正**。
 
-**残（本クラスタの未対応・フォロー候補）**
-- scry-1「公開し、そのカードをデッキの上か下に置く」（OP08-049）＋条件付き速攻 — 登場を伴わない別型。
-- 条件付き任意登場「そのカードが…の場合、登場させてもよい」（OP12-058）＋`登場させた場合`の速攻付与。
-- `play_revealed`（「一番上を公開し…登場させてもよい」単一句, priority=40）は依然 `zone=FIELD` の
-  ミスターゲットが残る（LOOK を伴わない単一句のため。TEMP 化には公開句の分割 or 自前 LOOK が必要）。
+**残（本クラスタの未対応・フォロー候補）→ 一部はラウンド2で対応**
+- scry-1「公開し、そのカードをデッキの上か下に置く」（OP08-049）＋条件付き速攻 — 登場を伴わない別型。**未対応**。
+- ~~条件付き任意登場「そのカードが…の場合、登場させてもよい」~~ **ラウンド2で対応**（deck系）。
+- ~~`play_revealed`（…単一句）の `zone=FIELD` ミスターゲット~~ **ラウンド2で TEMP 化**。
+
+#### ラウンド2: 公開→インライン条件→登場（play_revealed の TEMP 化, テスト +2/golden 改修1）
+
+**問題（トレースで判明）**: 「（デッキの一番上を）公開し、そのカードが…の場合、（レストで）登場
+させてもよい」が、`_parse_logic_block` で `Branch(REVEALED_CARD_TRAIT, PLAY_CARD)` になった後、
+**先頭ゲート条件の lift（§パーサ parse_ability 121行）でアビリティ条件へ引き上げられ**ていた。
+結果、(1) 公開(LOOK)が実行されず条件の raw_text に埋もれて消失、(2) `PLAY_CARD` が `zone=FIELD`
+へ誤ターゲット、(3) resolver はアビリティ条件を効果実行**前**に評価するため `REVEALED_CARD_TRAIT`
+を公開前に判定するという**順序矛盾**を抱えていた（OTHER指標に出ない隠れ不具合）。
+
+**修正（インライン条件を Sequence 内に保持して lift させない）**
+- `parser.py _parse_to_node`: 分割対象に `デッキの一番上を公開し、` を追加（Round1 の `\d+枚` 版と統合）。
+  分割で `Sequence[LOOK, Branch(...)]` になるため、top-level Branch ではなくなり **lift されない**
+  → `REVEALED_CARD_TRAIT` がインライン Branch として残り、LOOK→条件評価の順序が正しくなる。
+- `parser.py _parse_condition_obj`: `REVEALED_CARD_TRAIT` の判定を `公開し` 非依存に緩和
+  （分割後の条件側に `公開し` が残らないため、`そのカード`＋filter を手掛かりにする）。
+- `rules/atoms.py look_deck`: `デッキの一番上を(見て|公開し)` も LOOK(value=1) として拾う。
+- `rules/atoms.py play_revealed`: 対象を `zone=FIELD` → **`zone=TEMP`** に修正（公開で TEMP に
+  載った1枚＝公開カードを登場。filter は条件側 `REVEALED_CARD_TRAIT` が担う）。
+- `resolver.py`: `LOOK` 実行後、`targets` が無くても `player.temp_zone[0]`（公開デッキトップ）を
+  `context["last_revealed_card"]` に記録（従来は REVEAL/FACE_UP_LIFE のみ・targets 必須で、
+  LOOK では未設定→`REVEALED_CARD_TRAIT` が permissive True に倒れて誤登場の恐れがあった）。
+
+**結果**: deck系3枚（OP01-060/OP07-048/OP12-058）が
+`Sequence[LOOK(1) → Branch(REVEALED_CARD_TRAIT → PLAY_CARD(TEMP[,RESTED])) → (残り→デッキ)]`
+の正しいインライン構造に。退行(新規OTHER)=0、テスト 170→172。
+- golden 改修1（`play_revealed_rested` を新構造 seq+branch に更新）。
+- engine +2（`test_reveal_conditional_play_match`（条件一致→対象選択→登場・temp リーク無し） /
+  `test_reveal_conditional_play_no_match`（条件不一致→登場せず temp に残る））。
+
+**残（本ラウンドのスコープ外）**
+- **ライフ公開系（OP10-022/ST13-007/010/014, 4枚）**: 「自分のライフの上から1枚を公開し、…の場合、
+  登場させてもよい」。登場元が**ライフ**（デッキでない）ため、ライフ→TEMP 公開と未登場カードの
+  ライフへの戻しが要る。保留中の難所「ライフ look-and-place」と同系統で、別途エンジン拡張が必要。
+- OP12-058 の `登場させた場合…【速攻】` は GENERIC（permissive）止まり（PREV_ACTION 化は別途）。
+- scry-1（OP08-049, 公開→デッキ上下＋速攻）は登場を伴わない別型で未対応。
 
 ### 本ブランチ（`claude/handoff-docs-review-bIYkG`）で追加した内容
 
@@ -643,6 +679,34 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
 | Phase 1 | FREEZE/NEGATE オーバーレイ、trigger_text 表示、API シリアライズ拡張 | **完了** |
 | Phase 2 | 効果解決ログ（バックエンド: レスポンスに解決ログ追加、フロント: ログパネル表示） | **完了** |
 | Phase 3 | PendingRequest UI 改善（どの効果でどのカードが対象か、より具体的なメッセージ） | **完了** |
+
+### ★ 隠れミスターゲット／lift 不具合の横展開調査（OTHER指標に出ない不具合）
+
+**背景**: PHoSv ラウンド1-2 で、`OTHER` には現れないが**意味的に壊れている**不具合を2類型発見した:
+- **ミスターゲット型**: ルール未命中でレガシーへフォールバックした句が、`PLAY_CARD` 等の
+  ActionType は正しく出すが**対象 zone を文言依存で誤推定**（FIELD/DECK など）。実行はされるが
+  盤面操作が誤る（例: デッキ公開→登場の7枚が `zone=FIELD/DECK`、ライフ操作の上下区別欠落 等）。
+- **条件 lift 型**: インライン条件（「公開し→その結果で条件分岐→実行」）が、先頭ゲート条件の
+  lift でアビリティ条件へ引き上げられ、**前段アクション（公開/LOOK）が消失**し順序矛盾を起こす。
+
+いずれも `effect_diagnostics.py`（OTHER カウント）や `compare_parsers.py`（新規OTHER検知）では
+**捕捉できない**ため、専用の検出が要る。
+
+**やること（横展開）**:
+1. **検出ツールの追加** — `tests/` に「V2 が生成した `PLAY_CARD`/`MOVE_CARD`/`BOUNCE`/`KO` 等の
+   対象 zone とテキストの整合を突き合わせ、疑わしい組み合わせ（例: `PLAY_CARD zone=FIELD`、
+   `公開/見て` を含むのに LOOK 無し、`そのカード`条件が ability.condition に lift されている等）を
+   洗い出す」診断を新設する（OTHER ランキングと同様にカード番号付きで列挙）。
+2. **既知パターンの洗い出し** — まず以下を機械的に列挙し、件数を可視化:
+   - `PLAY_CARD` で `target.zone == FIELD`（プレイ元が場＝ほぼ誤り）。
+   - `ability.condition.type == REVEALED_CARD_TRAIT`（lift 済み＝公開消失の疑い）。
+   - `公開し/見て` を含むカードで `LOOK` アクションが生成されていない。
+3. **既存対応の横展開** — 検出された各クラスタに対し、本ブランチと同型（公開句の分割＋TEMP化、
+   インライン Branch 化、対象 zone の正規化）で順次是正する。
+4. **回帰防止** — 上記診断をスモークに組み込み、`PLAY_CARD zone=FIELD` などの「禁止パターン」
+   件数が増えたら気づけるようにする（compare_parsers の OTHER 退行検知の対象外領域を補完）。
+
+> 着手の起点: 本ブランチ PHoSv のラウンド1-2（§本ブランチ）が具体例＋修正パターンの雛形。
 
 1. **裾野の OTHER／フォールバックのルール化** — 頻度は低く多様（上位でも10件前後/表現）。
    `effect_diagnostics.py` の「未対応(フォールバック)原子句ランキング」「OTHER化する原子句

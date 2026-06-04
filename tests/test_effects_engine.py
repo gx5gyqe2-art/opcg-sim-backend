@@ -763,6 +763,65 @@ def test_deck_reveal_play_rested_status():
     assert top.is_rest is True
 
 
+def _reveal_then_play_ability():
+    """LOOK(1) → Branch(REVEALED_CARD_TRAIT: cost<=4 キャラ) → PLAY_CARD(TEMP, RESTED)。"""
+    from opcg_sim.src.models.effect_types import Branch, Sequence, TargetQuery
+    cond = Condition(
+        type=ConditionType.REVEALED_CARD_TRAIT,
+        player=Player.SELF,
+        value={"cost": 4, "cost_op": CompareOperator.LE, "card_type": "キャラ"},
+    )
+    play = GameAction(
+        type=ActionType.PLAY_CARD,
+        target=TargetQuery(player=Player.SELF, zone=Zone.TEMP, count=1, is_up_to=True),
+        destination=Zone.FIELD,
+        status="RESTED",
+        value=ValueSource(base=0),
+    )
+    return Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        effect=Sequence(actions=[
+            GameAction(type=ActionType.LOOK, value=ValueSource(base=1)),
+            Branch(condition=cond, if_true=play),
+        ]),
+    )
+
+
+def test_reveal_conditional_play_match():
+    """公開→条件一致: 公開したデッキトップ(cost4 キャラ)を選んで登場（レスト）させると temp が空になる。
+
+    「登場させてもよい」（任意・最大1枚）は対象選択で中断するため、公開カードを選択して再開する。
+    """
+    gm, p1, _ = make_game()
+    top = make_instance(make_master(card_id="RV-0", cost=4, type=CardType.CHARACTER), owner=p1.name)
+    p1.deck = [top, make_instance(make_master(card_id="RV-1"), owner=p1.name)]
+    field_before = len(p1.field)
+
+    gm.resolve_ability(p1, _reveal_then_play_ability(), source_card=p1.leader)
+    # LOOK→条件一致→PLAY_CARD(TEMP) が対象選択で中断する
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "SELECT_TARGET"
+    gm.resolve_interaction(p1, {"selected_uuids": [top.uuid]})
+
+    assert top in p1.field          # 公開カードが登場
+    assert top.is_rest is True       # レスト登場
+    assert len(p1.field) == field_before + 1
+    assert top not in p1.temp_zone   # temp リーク無し
+
+
+def test_reveal_conditional_play_no_match():
+    """公開→条件不一致: 公開したデッキトップ(cost8)は登場せず、場は変化しない。"""
+    gm, p1, _ = make_game()
+    top = make_instance(make_master(card_id="RV-8", cost=8, type=CardType.CHARACTER), owner=p1.name)
+    p1.deck = [top, make_instance(make_master(card_id="RV-9"), owner=p1.name)]
+    field_before = len(p1.field)
+
+    gm.resolve_ability(p1, _reveal_then_play_ability(), source_card=p1.leader)
+    assert top not in p1.field           # 条件不一致なので登場しない
+    assert len(p1.field) == field_before
+    assert top in p1.temp_zone           # 公開カードは temp に残る（後続の残り処理対象）
+
+
 def test_hand_to_deck_bottom():
     """DECK_BOTTOM(zone=HAND): 手札1枚をデッキ下へ（hand_to_deck ルールの実行検証）。"""
     from opcg_sim.src.models.effect_types import TargetQuery

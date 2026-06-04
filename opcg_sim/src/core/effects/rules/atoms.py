@@ -554,11 +554,14 @@ def _look_deck(ctx: ParseContext) -> Optional[GameAction]:
     """
     t = ctx.text
     m = re.search(_nfc(r"デッキの上から(\d+)枚(?:まで)?を(?:見て|公開し)"), t)
-    if not m:
+    n = int(m.group(1)) if m else None
+    if n is None and re.search(_nfc(r"デッキの一番上を(?:見て|公開し)"), t):
+        n = 1  # 「デッキの一番上を公開し」= 上から1枚
+    if n is None:
         return None
     return GameAction(
         type=ActionType.LOOK,
-        value=ValueSource(base=int(m.group(1))),
+        value=ValueSource(base=n),
         raw_text=t,
     )
 
@@ -959,7 +962,10 @@ def _play_revealed(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("手札") in t or _nfc("トラッシュ") in t:
         return None  # play_card_from_zone が担当（ゾーン明示）
     status = "RESTED" if re.search(_nfc(r"レストで(、)?登場"), t) else None
-    tq = TargetQuery(player=Player.SELF, zone=Zone.FIELD, count=1, is_up_to=True)
+    # 「（デッキ/ライフの一番上を）公開し、そのカードが…の場合、登場させてもよい」の登場句。
+    # 公開で候補が TEMP に載っている前提で、TEMP の1枚（=公開カード）を登場させる。
+    # 条件側（REVEALED_CARD_TRAIT）がフィルタを担うため、ここはフィルタ無し1枚で足りる。
+    tq = TargetQuery(player=Player.SELF, zone=Zone.TEMP, count=1, is_up_to=True)
     return GameAction(
         type=ActionType.PLAY_CARD,
         target=tq,
