@@ -650,27 +650,43 @@ class GameManager:
         if not card or not getattr(card, "master", None) or card.negated:
             return False
         owner = self.p1 if self.p1.name == card.owner_id else self.p2
-        for ab in card.master.abilities:
-            if ab.trigger != TriggerType.PASSIVE:
+
+        # 走査対象: 除去されるカード自身 → オーナーのリーダー → フィールドの他キャラ
+        # （自身の置換効果と、他キャラを守る OPPONENT_REMOVAL 型置換効果の両方をカバー）
+        candidates = [card]
+        if owner.leader and owner.leader is not card:
+            candidates.append(owner.leader)
+        for fc in owner.field:
+            if fc is not card:
+                candidates.append(fc)
+
+        for protector in candidates:
+            if getattr(protector, 'ability_disabled', False):
                 continue
-            eff = ab.effect
-            if not isinstance(eff, GameAction) or eff.type != ActionType.REPLACE_EFFECT:
-                continue
-            if eff.status not in status_values:
-                continue
-            sub = getattr(eff, "sub_effect", None)
-            if sub is None:
-                continue
-            resolver = EffectResolver(self)
-            if ab.condition is not None and not resolver._check_condition(owner, ab.condition, card):
-                continue
-            # 代わりの行動が取れない（例: 捨てる手札が無い）場合は置換不成立＝本来の除去が起こる。
-            if not resolver._can_satisfy_node(owner, sub, card):
-                continue
-            log_event("INFO", "game.replacement", f"Replacement effect activated for {card.master.name}", player=owner.name)
-            resolver.execution_stack = [sub]
-            resolver._process_stack(owner, card)
-            return True
+            for ab in protector.master.abilities:
+                if ab.trigger != TriggerType.PASSIVE:
+                    continue
+                eff = ab.effect
+                if not isinstance(eff, GameAction) or eff.type != ActionType.REPLACE_EFFECT:
+                    continue
+                if eff.status not in status_values:
+                    continue
+                sub = getattr(eff, "sub_effect", None)
+                if sub is None:
+                    continue
+                resolver = EffectResolver(self)
+                # 条件チェック: source_card には「除去されるカード」を渡す（OPPONENT_REMOVAL フィルタ評価のため）
+                if ab.condition is not None and not resolver._check_condition(owner, ab.condition, card):
+                    continue
+                # 代わりの行動が取れない場合は置換不成立
+                if not resolver._can_satisfy_node(owner, sub, protector):
+                    continue
+                log_event("INFO", "game.replacement",
+                          f"Replacement by {protector.master.name} activated for {card.master.name}",
+                          player=owner.name)
+                resolver.execution_stack = [sub]
+                resolver._process_stack(owner, protector)
+                return True
         return False
 
     def _resolve_on_ko(self, card: Card, owner: Player):

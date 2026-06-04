@@ -511,6 +511,26 @@ class EffectResolver:
                 return self._compare(power, condition.operator, sv[1])
             return False
 
+        elif condition.type == ConditionType.OPPONENT_REMOVAL:
+            # source_card = 除去されようとしているカード（_active_replacement から渡される）
+            if source_card is None: return False
+            val = condition.value
+            if not isinstance(val, dict): return True
+            # 元々のパワー（master.power）でフィルタ
+            if "power_max" in val and source_card.master.power > val["power_max"]:
+                return False
+            if "power_min" in val and source_card.master.power < val["power_min"]:
+                return False
+            # 元々のコスト
+            if "cost_max" in val and source_card.master.cost > val["cost_max"]:
+                return False
+            # 特徴
+            if "trait" in val:
+                traits = getattr(source_card.master, 'traits', []) or []
+                if val["trait"] not in traits:
+                    return False
+            return True
+
         elif condition.type == ConditionType.FIELD_COUNT_COMPARE:
             opp = self.game_manager.p2 if player == self.game_manager.p1 else self.game_manager.p1
             my_count = len(player.field)

@@ -204,6 +204,8 @@ class ConditionType(Enum):
     FIELD_COUNT_COMPARE = auto()
     # 公開したカードの特徴/コスト/タイプ条件（そのカードが...の場合）
     REVEALED_CARD_TRAIT = auto()
+    # 相手の効果/バトルで場を離れる/KOされる置換条件（元々のパワー/コスト/特徴フィルタ付き）
+    OPPONENT_REMOVAL = auto()
 
 class ParserKeyword(str, Enum):
     DON = "ドン"

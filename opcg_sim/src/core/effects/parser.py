@@ -130,9 +130,11 @@ class EffectParser:
                     )
                 effect_node = effect_node.if_true
 
-            # 置換効果（「このキャラが(バトルで)?KOされる/場を離れる場合、代わりに〜」）。
+            # 置換効果（「(このキャラ/他のキャラが)KOされる/場を離れる場合、代わりに〜」）。
             # 「…される場合」はゲート条件ではなくトリガー文脈なので、REPLACE_EFFECT で
             # 包み（置換アクションは sub_effect に保持）、PASSIVE 能力として扱う。
+            # 自身の置換（このキャラ）は条件が status に包含されるので ab.condition は不要。
+            # 他のキャラを守る型は OPPONENT_REMOVAL 条件を保持し、_active_replacement で評価。
             repl_status = self._replacement_status(_nfc(text))
             if repl_status and effect_node is not None:
                 effect_node = GameAction(
@@ -141,7 +143,8 @@ class EffectParser:
                     sub_effect=effect_node,
                     raw_text=_nfc(text),
                 )
-                final_condition = None
+                if _nfc("このキャラ") in _nfc(text):
+                    final_condition = None
                 trigger = TriggerType.PASSIVE
 
             return Ability(
@@ -156,7 +159,7 @@ class EffectParser:
             return Ability(trigger=TriggerType.UNKNOWN, effect=None, raw_text=_nfc(text))
 
     def _replacement_status(self, norm_text: str) -> Optional[str]:
-        """置換効果（「代わりに〜」）の対象除去種別を返す。MVP は自身(このキャラ)のみ。
+        """置換効果（「代わりに〜」）の対象除去種別を返す。
 
         - 「バトルでKOされる」→ "BATTLE_KO"（戦闘KOの置換）
         - 「(相手の効果で)場を離れる / KOされる」→ "LEAVE"（相手効果による除去の置換）
@@ -164,8 +167,6 @@ class EffectParser:
         """
         if _nfc("代わりに") not in norm_text:
             return None
-        if _nfc("このキャラ") not in norm_text:
-            return None  # MVP: 自身の置換のみ（リーダーが他キャラを守る型は対象外）
         if _nfc("場を離れる") not in norm_text and _nfc("KOされ") not in norm_text:
             return None
         return "BATTLE_KO" if _nfc("バトル") in norm_text else "LEAVE"
@@ -577,6 +578,20 @@ class EffectParser:
         # RESTED_COUNT: レスト状態のカード総数（フィールド＋ドン!!）
         if _nfc("レストのカード") in norm_text:
             return Condition(type=ConditionType.RESTED_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
+
+        # OPPONENT_REMOVAL: 相手の効果/バトルで場を離れる/KOされる置換条件
+        if ((_nfc("相手の効果で") in norm_text or _nfc("相手によって") in norm_text)
+                and (_nfc("場を離れる") in norm_text or _nfc("KOされる") in norm_text)):
+            val: dict = {"trigger": "KO" if _nfc("KOされる") in norm_text else "LEAVE"}
+            pow_max_m = re.search(_nfc(r'元々のパワー(\d+)以下'), norm_text)
+            pow_min_m = re.search(_nfc(r'元々のパワー(\d+)以上'), norm_text)
+            cost_max_m = re.search(_nfc(r'元々のコスト(\d+)以下'), norm_text)
+            trait_m = re.search(_nfc(r'[《<]([^》>]+)[》>]'), norm_text)
+            if pow_max_m: val["power_max"] = int(pow_max_m.group(1))
+            if pow_min_m: val["power_min"] = int(pow_min_m.group(1))
+            if cost_max_m: val["cost_max"] = int(cost_max_m.group(1))
+            if trait_m: val["trait"] = trait_m.group(1)
+            return Condition(type=ConditionType.OPPONENT_REMOVAL, value=val, player=p, raw_text=norm_text)
 
         # FIELD_COUNT_COMPARE: 自分と相手の場キャラ数の相対比較
         fc_cmp_m = re.search(_nfc(r'キャラが相手のキャラより(少ない|多い)'), norm_text)

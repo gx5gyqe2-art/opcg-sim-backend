@@ -945,6 +945,65 @@ def test_rested_count():
     assert _check_cond(gm, p1, cond_ge4, p1.leader) is False
 
 
+def test_opponent_removal_condition_power_filter():
+    """OPPONENT_REMOVAL: 元々のパワーが閾値以下のカードだけ置換が発動する。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+
+    # 置換効果を持つ「守護者」カードを p1 フィールドに置く
+    protector_abilities = tuple(EffectParserV2().parse_card_text(
+        "自分の元々のパワー7000以下のキャラが相手の効果で場を離れる場合、代わりに自分の手札1枚を捨てる。"
+    ))
+    protector = make_instance(make_master(card_id="PT-1", name="守護者", abilities=protector_abilities), owner=p1.name)
+    p1.field.append(protector)
+
+    # 対象1: パワー6000（閾値以下） → 置換が発動して手札を捨て、フィールドに残る
+    weak = make_instance(make_master(card_id="WK-1", power=6000), owner=p1.name)
+    p1.field.append(weak)
+    p1.hand.append(make_instance(make_master(card_id="H-1"), owner=p1.name))
+
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [weak], 0)
+    assert weak in p1.field,   "パワー6000は置換で残るべき"
+    assert len(p1.hand) == 0,  "代わりに手札を捨てたはず"
+
+    # 対象2: パワー8000（閾値超え） → 置換不発動、KO される
+    strong = make_instance(make_master(card_id="ST-1", power=8000), owner=p1.name)
+    p1.field.append(strong)
+
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [strong], 0)
+    assert strong not in p1.field, "パワー8000は置換なしにKOされるべき"
+    assert strong in p1.trash
+
+
+def test_opponent_removal_condition_trait_filter():
+    """OPPONENT_REMOVAL: 特徴フィルタが一致するカードだけ置換が発動する。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+
+    protector_abilities = tuple(EffectParserV2().parse_card_text(
+        "自分の特徴《エッグヘッド》を持つキャラが相手の効果でKOされる場合、代わりに自分の手札1枚を捨てる。"
+    ))
+    protector = make_instance(make_master(card_id="PT-2", name="守護者2", abilities=protector_abilities), owner=p1.name)
+    p1.field.append(protector)
+
+    # 特徴一致 → 置換
+    egghead = make_instance(make_master(card_id="EH-1", traits=["エッグヘッド"]), owner=p1.name)
+    p1.field.append(egghead)
+    p1.hand.append(make_instance(make_master(card_id="H-2"), owner=p1.name))
+
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [egghead], 0)
+    assert egghead in p1.field
+    assert len(p1.hand) == 0
+
+    # 特徴不一致 → 置換なし、KO
+    other = make_instance(make_master(card_id="OT-1", traits=["麦わらの一味"]), owner=p1.name)
+    p1.field.append(other)
+
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [other], 0)
+    assert other not in p1.field
+    assert other in p1.trash
+
+
 def test_field_count_compare():
     """FIELD_COUNT_COMPARE: 自分のキャラ数が相手より少ない場合のみ True。"""
     gm, p1, p2 = make_game()
