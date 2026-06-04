@@ -116,7 +116,7 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
             except Exception as e: log_event(level_key="ERROR", action="api.pending_validation", msg=f"Pending Validation Error: {e}", player="system"); pending_req_data = pending_obj
     error_obj = None
     if not success: error_obj = {error_props.get('CODE', 'code'): error_code, error_props.get('MESSAGE', 'message'): error_msg}
-    return {api_root_keys.get('SUCCESS', 'success'): success, "game_id": game_id, api_root_keys.get('GAME_STATE', 'game_state'): validated_state, api_root_keys.get('PENDING_REQUEST', 'pending_request'): pending_req_data, api_root_keys.get('ERROR', 'error'): error_obj}
+    return {api_root_keys.get('SUCCESS', 'success'): success, "game_id": game_id, api_root_keys.get('GAME_STATE', 'game_state'): validated_state, api_root_keys.get('PENDING_REQUEST', 'pending_request'): pending_req_data, api_root_keys.get('ERROR', 'error'): error_obj, "action_events": getattr(manager, 'action_events', []) if manager else []}
 
 @app.middleware("http")
 async def trace_logging_middleware(request: Request, call_next):
@@ -195,6 +195,7 @@ async def game_action(req: Dict[str, Any] = Body(...)):
     card_uuid = payload.get("uuid") or payload.get("card_id"); target_ids = payload.get("target_ids", [])
     target_uuid = target_ids[0] if isinstance(target_ids, list) and len(target_ids) > 0 else payload.get("target_uuid")
     try:
+        manager.action_events = []
         from opcg_sim.src.models.enums import TriggerType
         c_to_s = CONST.get('c_to_s_interface', {}); game_actions = c_to_s.get('GAME_ACTIONS', {}).get('TYPES', {})
         current_player = manager.p1 if player_id == manager.p1.name else manager.p2; opponent = manager.p2 if current_player == manager.p1 else manager.p1
@@ -205,9 +206,13 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         operating_card = next((c for c in potential_cards if c.uuid == card_uuid), None)
         if action_type == game_actions.get('PLAY', 'PLAY'):
             target_card_in_hand = next((c for c in current_player.hand if c.uuid == card_uuid), None)
-            if target_card_in_hand: manager.pay_cost(current_player, target_card_in_hand.current_cost); manager.play_card_action(current_player, target_card_in_hand)
+            if target_card_in_hand:
+                manager.action_events.append({"type": "PLAY", "player": player_id, "card_name": target_card_in_hand.master.name, "message": f"「{target_card_in_hand.master.name}」を登場"})
+                manager.pay_cost(current_player, target_card_in_hand.current_cost); manager.play_card_action(current_player, target_card_in_hand)
             else: raise ValueError("対象のカードが手札にありません。")
-        elif action_type == game_actions.get('TURN_END', 'TURN_END'): manager.end_turn()
+        elif action_type == game_actions.get('TURN_END', 'TURN_END'):
+            manager.action_events.append({"type": "TURN_END", "player": player_id, "message": f"ターン{manager.turn_count}終了"})
+            manager.end_turn()
         elif action_type in [game_actions.get('ATTACK', 'ATTACK'), game_actions.get('ATTACK_CONFIRM', 'ATTACK_CONFIRM')]:
             if card_uuid == target_uuid: raise ValueError("自分自身を攻撃対象に選択することはできません。")
             if not operating_card: raise ValueError("アタックするカードが見つかりません。")
@@ -215,13 +220,17 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             if opponent.stage: opponent_units.append(opponent.stage)
             attack_target = next((c for c in opponent_units if c.uuid == target_uuid), None)
             if not attack_target: raise ValueError("攻撃対象が見つかりません。")
+            manager.action_events.append({"type": "ATTACK", "player": player_id, "card_name": operating_card.master.name, "message": f"「{operating_card.master.name}」→「{attack_target.master.name}」攻撃"})
             log_event("INFO", "api.attack_execute", f"Attacking: {operating_card.master.name} -> {attack_target.master.name}", player=player_id); manager.declare_attack(operating_card, attack_target)
         elif action_type == game_actions.get('ATTACH_DON', 'ATTACH_DON'):
             if not operating_card: raise ValueError("ドン!!を付与する対象のカードが見つかりません。")
-            if current_player.don_active: don = current_player.don_active.pop(0); don.attached_to = operating_card.uuid; current_player.don_attached_cards.append(don); operating_card.attached_don += 1
+            if current_player.don_active:
+                don = current_player.don_active.pop(0); don.attached_to = operating_card.uuid; current_player.don_attached_cards.append(don); operating_card.attached_don += 1
+                manager.action_events.append({"type": "ATTACH_DON", "player": player_id, "card_name": operating_card.master.name, "message": f"「{operating_card.master.name}」にドン!!付与"})
             else: raise ValueError("アクティブなドン!!が不足しています。")
         elif action_type == game_actions.get('ACTIVATE_MAIN', 'ACTIVATE_MAIN'):
             if not operating_card: raise ValueError("効果を発動するカードが見つかりません。")
+            manager.action_events.append({"type": "ACTIVATE_MAIN", "player": player_id, "card_name": operating_card.master.name, "message": f"「{operating_card.master.name}」の効果起動"})
             for ability in operating_card.master.abilities:
                 if ability.trigger == TriggerType.ACTIVATE_MAIN: manager.resolve_ability(current_player, ability, source_card=operating_card)
         elif action_type == game_actions.get('RESOLVE_EFFECT_SELECTION', 'RESOLVE_EFFECT_SELECTION'): manager.resolve_interaction(current_player, payload)
@@ -239,14 +248,21 @@ async def game_battle(req: BattleActionRequest):
     if not manager: log_event("ERROR", "api.battle_action", f"Game not found: {game_id}", player=player_id); return build_game_result_hybrid(None, game_id, success=False, error_code=error_codes.get('GAME_NOT_FOUND', 'GAME_NOT_FOUND'), error_msg="Game not found")
     player = manager.p1 if player_id == manager.p1.name else manager.p2
     try:
+        manager.action_events = []
         try: manager._validate_action(player, action_type)
         except Exception as ve:
             if action_type != battle_types.get('PASS', 'PASS'): raise ve
         if action_type == battle_types.get('SELECT_BLOCKER', 'SELECT_BLOCKER'):
-            blocker = next((c for c in player.field if c.uuid == card_uuid), None); manager.handle_block(blocker)
+            blocker = next((c for c in player.field if c.uuid == card_uuid), None)
+            if blocker: manager.action_events.append({"type": "BLOCK", "player": player_id, "card_name": blocker.master.name, "message": f"「{blocker.master.name}」でブロック"})
+            manager.handle_block(blocker)
         elif action_type == battle_types.get('SELECT_COUNTER', 'SELECT_COUNTER'):
-            counter_card = next((c for c in player.hand if c.uuid == card_uuid), None); manager.apply_counter(player, counter_card)
-        elif action_type == battle_types.get('PASS', 'PASS'): manager.apply_counter(player, None)
+            counter_card = next((c for c in player.hand if c.uuid == card_uuid), None)
+            if counter_card: manager.action_events.append({"type": "COUNTER", "player": player_id, "card_name": counter_card.master.name, "message": f"「{counter_card.master.name}」でカウンター(+{counter_card.counter or 0})"})
+            manager.apply_counter(player, counter_card)
+        elif action_type == battle_types.get('PASS', 'PASS'):
+            manager.action_events.append({"type": "PASS", "player": player_id, "message": "パス"})
+            manager.apply_counter(player, None)
         return build_game_result_hybrid(manager, game_id, success=True)
     except Exception as e:
         log_event("ERROR", "game.battle_fail", traceback.format_exc(), player=player_id); return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))

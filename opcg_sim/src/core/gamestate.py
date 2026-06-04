@@ -105,6 +105,7 @@ class GameManager:
         self.setup_phase_pending = False
         from .effects.continuous import ContinuousEffectManager
         self.continuous = ContinuousEffectManager(self)
+        self.action_events: List[Dict] = []  # per-request event buffer; reset in API handler
 
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """
@@ -605,7 +606,18 @@ class GameManager:
 
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
-        resolver = EffectResolver(self); resolver.resolve_ability(player, ability, source_card)
+        resolver = EffectResolver(self)
+        resolver.resolve_ability(player, ability, source_card)
+        for ev in resolver.action_history:
+            self.action_events.append({
+                "type": "EFFECT",
+                "player": player.name,
+                "card_name": source_card.master.name,
+                "action": ev.get("action", ""),
+                "targets": ev.get("targets", []),
+                "value": ev.get("value"),
+                "success": ev.get("success", True),
+            })
 
     # 除去保護（PREVENT_LEAVE）の判定。除去が起こる瞬間に、対象カードの
     # PASSIVE 能力を走査し、条件（例: トラッシュ7枚以上）をライブ評価する。
