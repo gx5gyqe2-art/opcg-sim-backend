@@ -229,7 +229,11 @@ class EffectResolver:
 
         value = self._calculate_value(player, action.value, targets)
         success = self.game_manager.apply_action_to_engine(player, action, targets, value)
-        
+
+        # REVEALED_CARD_TRAIT 条件評価用: REVEAL/LOOK 実行後に公開カードを記録
+        if action.type in (ActionType.REVEAL, ActionType.LOOK, ActionType.FACE_UP_LIFE) and targets:
+            self.context["last_revealed_card"] = targets[0]
+
         # ▼▼▼ 追加: 実行履歴を記録 ▼▼▼
         target_names = [f"{t.master.name}({t.uuid[:4]})" for t in targets]
         self.action_history.append({
@@ -434,14 +438,27 @@ class EffectResolver:
             return all(any(trait == t for t in c.master.traits) for c in chars)
 
         elif condition.type == ConditionType.HAS_CHARACTER:
-            # 特定名前のキャラが場にいる/いない（枚数指定あり/なし）
+            # 特定名前のキャラが場にいる/いない（枚数指定・状態指定あり/なし）
             char_val = condition.value
             if isinstance(char_val, tuple):
-                char_name, count_thr = char_val
-                count = sum(1 for c in target_player.field if char_name in c.master.name)
-                if target_player.leader and char_name in target_player.leader.master.name:
-                    count += 1
-                return self._compare(count, condition.operator, count_thr)
+                char_name, sub = char_val
+                if isinstance(sub, str) and sub in ("IS_RESTED", "IS_ACTIVE"):
+                    # 状態付き: 「X」がレスト/アクティブ
+                    candidates = [c for c in target_player.field if char_name in c.master.name]
+                    if target_player.leader and char_name in target_player.leader.master.name:
+                        candidates.append(target_player.leader)
+                    if not candidates:
+                        return False
+                    if sub == "IS_RESTED":
+                        return any(c.is_rest for c in candidates)
+                    return any(not c.is_rest for c in candidates)
+                else:
+                    # 枚数指定: (char_name, count_thr)
+                    count_thr = sub
+                    count = sum(1 for c in target_player.field if char_name in c.master.name)
+                    if target_player.leader and char_name in target_player.leader.master.name:
+                        count += 1
+                    return self._compare(count, condition.operator, count_thr)
             elif isinstance(char_val, str):
                 char_name = char_val
                 count = sum(1 for c in target_player.field if char_name in c.master.name)
@@ -493,6 +510,51 @@ class EffectResolver:
                 power = leader.get_power(is_my_turn)
                 return self._compare(power, condition.operator, sv[1])
             return False
+
+        elif condition.type == ConditionType.FIELD_COUNT_COMPARE:
+            opp = self.game_manager.p2 if player == self.game_manager.p1 else self.game_manager.p1
+            my_count = len(player.field)
+            opp_count = len(opp.field)
+            return self._compare(my_count, condition.operator, opp_count)
+
+        elif condition.type == ConditionType.REVEALED_CARD_TRAIT:
+            card = self.context.get("last_revealed_card")
+            if card is None:
+                log_event("WARNING", "resolver.revealed_card_missing",
+                          "REVEALED_CARD_TRAIT: no last_revealed_card in context",
+                          player=player.name)
+                return True  # コンテキスト未設定は permissive fallback
+            val = condition.value
+            if not isinstance(val, dict):
+                return True
+            # 特徴チェック
+            if "trait" in val:
+                trait = val["trait"]
+                contains = val.get("trait_contains", False)
+                traits = getattr(card.master, 'traits', []) or []
+                if contains:
+                    if not any(trait in t for t in traits):
+                        return False
+                else:
+                    if not any(trait == t for t in traits):
+                        return False
+            # コストチェック
+            if "cost" in val:
+                cost_op = val.get("cost_op", CompareOperator.LE)
+                if not self._compare(card.master.cost, cost_op, val["cost"]):
+                    return False
+            # カードタイプチェック
+            if "card_type" in val:
+                from ...models.enums import CardType
+                type_map = {
+                    "キャラ": CardType.CHARACTER,
+                    "イベント": CardType.EVENT,
+                    "ステージ": CardType.STAGE,
+                }
+                expected = type_map.get(val["card_type"])
+                if expected and card.master.type != expected:
+                    return False
+            return True
 
         # 真に解釈不能な OTHER は fail-safe に倒す（誤発動を防ぐ）。
         if condition.type == ConditionType.OTHER:

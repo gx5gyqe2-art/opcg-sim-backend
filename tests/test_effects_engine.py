@@ -945,6 +945,88 @@ def test_rested_count():
     assert _check_cond(gm, p1, cond_ge4, p1.leader) is False
 
 
+def test_field_count_compare():
+    """FIELD_COUNT_COMPARE: 自分のキャラ数が相手より少ない場合のみ True。"""
+    gm, p1, p2 = make_game()
+    cond = Condition(
+        type=ConditionType.FIELD_COUNT_COMPARE,
+        operator=CompareOperator.LT,
+        player=Player.SELF,
+    )
+    # p1: 1枚, p2: 2枚
+    p1.field.append(make_instance(make_master(card_id="A1"), owner=p1.name))
+    p2.field.extend([
+        make_instance(make_master(card_id="B1"), owner=p2.name),
+        make_instance(make_master(card_id="B2"), owner=p2.name),
+    ])
+    assert _check_cond(gm, p1, cond, p1.leader) is True   # 1 < 2
+    assert _check_cond(gm, p2, cond, p2.leader) is False  # 2 < 1 = False
+
+
+def test_has_character_rested_state():
+    """HAS_CHARACTER + IS_RESTED: 指名キャラがレストのときだけ True。"""
+    gm, p1, _ = make_game()
+    uta = make_instance(make_master(card_id="UTA", name="ウタ"), owner=p1.name)
+    p1.field.append(uta)
+    cond = Condition(
+        type=ConditionType.HAS_CHARACTER,
+        value=("ウタ", "IS_RESTED"),
+        operator=CompareOperator.GE,
+        player=Player.SELF,
+    )
+    uta.is_rest = False
+    assert _check_cond(gm, p1, cond, p1.leader) is False
+
+    uta.is_rest = True
+    assert _check_cond(gm, p1, cond, p1.leader) is True
+
+
+def test_revealed_card_trait_match():
+    """REVEALED_CARD_TRAIT: context に公開カードがセットされ、特徴が一致する場合 True。"""
+    gm, p1, _ = make_game()
+    cond = Condition(
+        type=ConditionType.REVEALED_CARD_TRAIT,
+        value={"trait": "白ひげ海賊団", "trait_contains": True},
+        player=Player.SELF,
+    )
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    resolver = EffectResolver(gm)
+
+    revealed = make_instance(make_master(card_id="WB1", traits=["白ひげ海賊団"]), owner=p1.name)
+    resolver.context["last_revealed_card"] = revealed
+    assert resolver._check_condition(p1, cond, p1.leader) is True
+
+    other = make_instance(make_master(card_id="OP1", traits=["麦わらの一味"]), owner=p1.name)
+    resolver.context["last_revealed_card"] = other
+    assert resolver._check_condition(p1, cond, p1.leader) is False
+
+
+def test_revealed_card_trait_cost_and_type():
+    """REVEALED_CARD_TRAIT: コスト条件 + カードタイプも正しく評価する。"""
+    from opcg_sim.src.models.enums import CardType
+    gm, p1, _ = make_game()
+    cond = Condition(
+        type=ConditionType.REVEALED_CARD_TRAIT,
+        value={"trait": "王下七武海", "trait_contains": False, "cost": 4, "cost_op": CompareOperator.LE, "card_type": "キャラ"},
+        player=Player.SELF,
+    )
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    resolver = EffectResolver(gm)
+
+    match = make_instance(
+        make_master(card_id="SL1", cost=3, traits=["王下七武海"], type=CardType.CHARACTER), owner=p1.name
+    )
+    resolver.context["last_revealed_card"] = match
+    assert resolver._check_condition(p1, cond, p1.leader) is True
+
+    # コストオーバー
+    over_cost = make_instance(
+        make_master(card_id="SL2", cost=5, traits=["王下七武海"], type=CardType.CHARACTER), owner=p1.name
+    )
+    resolver.context["last_revealed_card"] = over_cost
+    assert resolver._check_condition(p1, cond, p1.leader) is False
+
+
 def test_prev_action_succeeded():
     """PREV_ACTION / SUCCEEDED: last_action_success=True のときのみ True。"""
     gm, p1, _ = make_game()

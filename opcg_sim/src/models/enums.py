@@ -200,6 +200,10 @@ class ConditionType(Enum):
     DON_COUNT_COMPARE = auto()
     # リーダーの状態条件（IS_ACTIVE / IS_RESTED / POWER）
     LEADER_STATE = auto()
+    # 自分と相手の場キャラ数の相対比較
+    FIELD_COUNT_COMPARE = auto()
+    # 公開したカードの特徴/コスト/タイプ条件（そのカードが...の場合）
+    REVEALED_CARD_TRAIT = auto()
 
 class ParserKeyword(str, Enum):
     DON = "ドン"

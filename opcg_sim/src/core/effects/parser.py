@@ -548,7 +548,14 @@ class EffectParser:
             if contains_m:
                 return Condition(type=ConditionType.FIELD_ALL_TRAIT, value=(contains_m.group(1), True), player=p, raw_text=norm_text)
 
-        # HAS_CHARACTER: 特定の名前のキャラが場にいる/いない（枚数指定含む）
+        # HAS_CHARACTER: 特定の名前のキャラが場にいる/いない（枚数指定・状態指定含む）
+        # 状態付き: 「X」がレストの / 「X」がアクティブの
+        has_char_state_m = re.search(_nfc(r'「([^」]+)」が(レスト|アクティブ)'), norm_text)
+        if has_char_state_m:
+            char_name = has_char_state_m.group(1)
+            state = "IS_RESTED" if has_char_state_m.group(2) == _nfc('レスト') else "IS_ACTIVE"
+            return Condition(type=ConditionType.HAS_CHARACTER, value=(char_name, state), operator=CompareOperator.GE, player=p, raw_text=norm_text)
+        # 枚数指定
         has_char_count_m = re.search(_nfc(r'「([^」]+)」が(\d+)枚(以上|以下)?い'), norm_text)
         if has_char_count_m:
             char_name = has_char_count_m.group(1)
@@ -558,6 +565,7 @@ class EffectParser:
                 _nfc('以下'): CompareOperator.LE,
             }.get(has_char_count_m.group(3) or '', CompareOperator.GE)
             return Condition(type=ConditionType.HAS_CHARACTER, value=(char_name, count_thr), operator=cnt_op, player=p, raw_text=norm_text)
+        # 存在/不在
         has_char_m = re.search(_nfc(r'「([^」]+)」が(?:い(る|ない)|あ(る|ない))'), norm_text)
         if has_char_m:
             char_name = has_char_m.group(1)
@@ -569,6 +577,38 @@ class EffectParser:
         # RESTED_COUNT: レスト状態のカード総数（フィールド＋ドン!!）
         if _nfc("レストのカード") in norm_text:
             return Condition(type=ConditionType.RESTED_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
+
+        # FIELD_COUNT_COMPARE: 自分と相手の場キャラ数の相対比較
+        fc_cmp_m = re.search(_nfc(r'キャラが相手のキャラより(少ない|多い)'), norm_text)
+        if fc_cmp_m:
+            op = CompareOperator.LT if fc_cmp_m.group(1) == _nfc('少ない') else CompareOperator.GT
+            return Condition(type=ConditionType.FIELD_COUNT_COMPARE, operator=op, player=Player.SELF, raw_text=norm_text)
+
+        # REVEALED_CARD_TRAIT: 公開したカードの特徴/コスト/タイプ条件
+        if _nfc("公開し") in norm_text and _nfc("そのカード") in norm_text:
+            val: dict = {}
+            # 含む特徴: 『X』を含む特徴
+            contains_m = re.search(_nfc(r'[『「]([^』」]+)[』」]を含む特徴'), norm_text)
+            if contains_m:
+                val["trait"] = contains_m.group(1)
+                val["trait_contains"] = True
+            # 完全一致特徴: 《X》
+            exact_m = re.search(_nfc(r'[《<]([^》>]+)[》>]'), norm_text)
+            if exact_m and "trait" not in val:
+                val["trait"] = exact_m.group(1)
+                val["trait_contains"] = False
+            # コスト条件
+            cost_m = re.search(_nfc(r'コスト(\d+)(以上|以下)'), norm_text)
+            if cost_m:
+                val["cost"] = int(cost_m.group(1))
+                val["cost_op"] = CompareOperator.GE if cost_m.group(2) == _nfc('以上') else CompareOperator.LE
+            # カードタイプ
+            if _nfc("キャラカード") in norm_text:
+                val["card_type"] = "キャラ"
+            elif _nfc("イベントカード") in norm_text:
+                val["card_type"] = "イベント"
+            if val:
+                return Condition(type=ConditionType.REVEALED_CARD_TRAIT, value=val, player=p, raw_text=norm_text)
 
         # PREV_ACTION: 直前アクションの成否（「そうした場合」「そうしなかった場合」「登場させた場合」）
         if _nfc("そうしなかった") in norm_text:
