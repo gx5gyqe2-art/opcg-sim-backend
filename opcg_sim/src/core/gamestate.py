@@ -568,6 +568,8 @@ class GameManager:
             if attacker_pwr >= target_pwr:
                 if self._active_protection(target, ("BATTLE_KO",)):
                     log_event("INFO", "game.battle_ko_prevented", f"{target.master.name} is protected from battle KO", player=target_owner.name)
+                elif self._active_replacement(target, ("BATTLE_KO",)):
+                    log_event("INFO", "game.battle_ko_replaced", f"{target.master.name}'s battle KO was replaced by an alternative effect", player=target_owner.name)
                 else:
                     self.move_card(target, Zone.TRASH, target_owner)
                     log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
@@ -624,6 +626,36 @@ class GameManager:
                     resolver = EffectResolver(self)
                 if not resolver._check_condition(owner, ab.condition, card):
                     continue
+            return True
+        return False
+
+    # 置換効果（REPLACE_EFFECT）の判定。除去の瞬間に対象の PASSIVE 能力を走査し、
+    # 「代わりに〜」の置換アクションを（条件・実行可能性を満たせば）実行して True を返す。
+    # True の場合、呼び出し側は本来の除去を行わずスキップする。
+    def _active_replacement(self, card: CardInstance, status_values: Tuple[str, ...]) -> bool:
+        if not card or not getattr(card, "master", None) or card.negated:
+            return False
+        owner = self.p1 if self.p1.name == card.owner_id else self.p2
+        for ab in card.master.abilities:
+            if ab.trigger != TriggerType.PASSIVE:
+                continue
+            eff = ab.effect
+            if not isinstance(eff, GameAction) or eff.type != ActionType.REPLACE_EFFECT:
+                continue
+            if eff.status not in status_values:
+                continue
+            sub = getattr(eff, "sub_effect", None)
+            if sub is None:
+                continue
+            resolver = EffectResolver(self)
+            if ab.condition is not None and not resolver._check_condition(owner, ab.condition, card):
+                continue
+            # 代わりの行動が取れない（例: 捨てる手札が無い）場合は置換不成立＝本来の除去が起こる。
+            if not resolver._can_satisfy_node(owner, sub, card):
+                continue
+            log_event("INFO", "game.replacement", f"Replacement effect activated for {card.master.name}", player=owner.name)
+            resolver.execution_stack = [sub]
+            resolver._process_stack(owner, card)
             return True
         return False
 
@@ -761,12 +793,15 @@ class GameManager:
         for target in targets:
             owner, source_list = self._find_card_location(target)
             if not owner: continue
-            # 相手の効果でフィールド上のカードを場から除去しようとする場合、保護を確認
+            # 相手の効果でフィールド上のカードを場から除去しようとする場合、保護/置換を確認
             if (act_name in _LEAVE_ACTIONS and player.name != owner.name
-                    and source_list is owner.field
-                    and self._active_protection(target, ("LEAVE",))):
-                log_event("INFO", "game.leave_prevented", f"{target.master.name} is protected from leaving the field by opponent's effect", player=owner.name)
-                continue
+                    and source_list is owner.field):
+                if self._active_protection(target, ("LEAVE",)):
+                    log_event("INFO", "game.leave_prevented", f"{target.master.name} is protected from leaving the field by opponent's effect", player=owner.name)
+                    continue
+                if self._active_replacement(target, ("LEAVE",)):
+                    log_event("INFO", "game.leave_replaced", f"{target.master.name}'s removal was replaced by an alternative effect", player=owner.name)
+                    continue
             if act_name == "PREVENT_LEAVE":
                 # 保護マーカー自体は no-op（実際の保護は除去時に _active_protection で評価）。
                 success = True

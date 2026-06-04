@@ -434,6 +434,58 @@ def test_leader_color_multicolor_condition():
     assert len(p1.hand) == 1
 
 
+def test_replacement_prevents_effect_ko_and_runs_alternative():
+    """置換: 相手の効果KOを回避し、代わりに自分の手札を1枚捨てる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "このキャラがKOされる場合、代わりに自分の手札1枚を捨てる。"))
+    target = make_instance(make_master(card_id="RP-1", abilities=abilities), owner=p1.name)
+    p1.field.append(target)
+    p1.hand.append(make_instance(make_master(card_id="H-1"), owner=p1.name))
+
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [target], 0)
+    assert target in p1.field      # 置換でKO回避
+    assert len(p1.hand) == 0       # 代わりに手札1枚を捨てた
+
+
+def test_replacement_not_applied_when_alternative_impossible():
+    """代わりの行動が取れない（手札なし）場合は置換不成立で本来のKOが起こる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "このキャラがKOされる場合、代わりに自分の手札1枚を捨てる。"))
+    target = make_instance(make_master(card_id="RP-2", abilities=abilities), owner=p1.name)
+    p1.field.append(target)  # 手札なし
+
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [target], 0)
+    assert target not in p1.field
+    assert target in p1.trash
+
+
+def test_replacement_prevents_battle_ko():
+    """置換: バトルKOを回避し、代わりに手札を捨てる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    p1.deck.append(make_instance(make_master(card_id="DK"), owner=p1.name))
+    p2.deck.append(make_instance(make_master(card_id="DK2"), owner=p2.name))
+    attacker = make_instance(make_master(card_id="ATK", power=6000), owner=p1.name)
+    p1.field.append(attacker)
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "このキャラは、このターン中、バトルでKOされる場合、代わりに自分の手札1枚を捨てる。"))
+    target = make_instance(make_master(card_id="RB", power=5000, abilities=abilities), owner=p2.name)
+    p2.field.append(target)
+    p2.hand.append(make_instance(make_master(card_id="H-2"), owner=p2.name))
+
+    gm.active_battle = {
+        "attacker": attacker, "target": target,
+        "attacker_owner": p1, "target_owner": p2, "counter_buff": 0,
+    }
+    gm.resolve_attack()
+    assert target in p2.field       # バトルKOを置換で回避
+    assert len(p2.hand) == 0        # 代わりに手札1枚を捨てた
+
+
 def _prevent_leave_master(card_id, status, condition=None):
     ab = Ability(
         trigger=TriggerType.PASSIVE,

@@ -130,6 +130,20 @@ class EffectParser:
                     )
                 effect_node = effect_node.if_true
 
+            # 置換効果（「このキャラが(バトルで)?KOされる/場を離れる場合、代わりに〜」）。
+            # 「…される場合」はゲート条件ではなくトリガー文脈なので、REPLACE_EFFECT で
+            # 包み（置換アクションは sub_effect に保持）、PASSIVE 能力として扱う。
+            repl_status = self._replacement_status(_nfc(text))
+            if repl_status and effect_node is not None:
+                effect_node = GameAction(
+                    type=ActionType.REPLACE_EFFECT,
+                    status=repl_status,
+                    sub_effect=effect_node,
+                    raw_text=_nfc(text),
+                )
+                final_condition = None
+                trigger = TriggerType.PASSIVE
+
             return Ability(
                 trigger=trigger,
                 condition=final_condition,
@@ -140,6 +154,21 @@ class EffectParser:
         except Exception as e:
             log_event(level_key="ERROR", action="parser.parse_ability_error", msg=f"Failed to parse: {text[:20]} | Error: {str(e)}")
             return Ability(trigger=TriggerType.UNKNOWN, effect=None, raw_text=_nfc(text))
+
+    def _replacement_status(self, norm_text: str) -> Optional[str]:
+        """置換効果（「代わりに〜」）の対象除去種別を返す。MVP は自身(このキャラ)のみ。
+
+        - 「バトルでKOされる」→ "BATTLE_KO"（戦闘KOの置換）
+        - 「(相手の効果で)場を離れる / KOされる」→ "LEAVE"（相手効果による除去の置換）
+        該当しなければ None。
+        """
+        if _nfc("代わりに") not in norm_text:
+            return None
+        if _nfc("このキャラ") not in norm_text:
+            return None  # MVP: 自身の置換のみ（リーダーが他キャラを守る型は対象外）
+        if _nfc("場を離れる") not in norm_text and _nfc("KOされ") not in norm_text:
+            return None
+        return "BATTLE_KO" if _nfc("バトル") in norm_text else "LEAVE"
 
     def _parse_cost_node(self, cost_text: str) -> Optional[EffectNode]:
         """

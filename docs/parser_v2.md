@@ -208,7 +208,24 @@ ATTACK_DISABLE/RESTRICTION、および GRANT_KEYWORD を継続効果として登
   - バトルKO（`resolve_attack`）: `status="BATTLE_KO"` 保護を確認。
 - パーサ: `prevent_leave` ルールが `場を離れない`→LEAVE / `KOされない`→BATTLE_KO を生成。
 
-## 現況（ルール25種 + エンジン/resolver/継続効果/除去保護 時点）
+## 置換効果（REPLACE_EFFECT）
+
+「このキャラが(バトルで)?KOされる/場を離れる場合、代わりに〜」を、除去を別の行動に
+置き換える効果として扱う（除去保護の枠組みの拡張）。
+
+設計:
+- パーサ: `parse_ability` が「代わりに」＋「このキャラ…される/場を離れる」を検出し、
+  置換アクションを `GameAction.sub_effect` に保持した `REPLACE_EFFECT`（PASSIVE）を生成。
+  `バトル`→`status=BATTLE_KO` / それ以外→`status=LEAVE`。「…される場合」はゲート条件では
+  なくトリガー文脈なので `ability.condition` には載せない。
+- エンジン: `GameManager._active_replacement(card, status_values)` が除去の瞬間に PASSIVE の
+  `REPLACE_EFFECT` を走査し、条件（ライブ評価）と置換の実行可能性（`_can_satisfy_node`、
+  例: 捨てる手札があるか）を満たせば置換を実行し、本来の除去をスキップする。
+- フック点: 効果除去（`status="LEAVE"`）/ バトルKO（`status="BATTLE_KO"`）。
+- MVP制約: 自身（このキャラ）のみ対象。他キャラを守る型・置換が対象選択で中断する場合・
+  「できる」の任意選択UIは今後の課題。
+
+## 現況（ルール25種 + エンジン/resolver/継続効果/除去保護/置換効果 時点）
 
 - 原子句カバレッジ（ルール命中率）: **約70.4%**（grant_keyword 57→60.1%、
   ライフ操作5種 60.1→64.5%、ドン操作4種 64.5→70.4%）
@@ -216,8 +233,8 @@ ATTACK_DISABLE/RESTRICTION、および GRANT_KEYWORD を継続効果として登
   （ライフ表/裏向き・ドンデッキへ戻す 等が OTHER から実行可能 ActionType へ。なお
   キーワード付与は従来 OTHER ではなく誤 BUFF だったため、146 句の
   `BUFF`→`GRANT_KEYWORD` は別途の改善）
-- テスト: `test_parser.py`(8) + `test_golden.py`(38) + `test_effects_engine.py`(28)
-  + `test_gameplay_smoke.py`(2) = 全76件緑
+- テスト: `test_parser.py`(8) + `test_golden.py`(40) + `test_effects_engine.py`(31)
+  + `test_gameplay_smoke.py`(2) = 全81件緑
 - レガシー vs V2 全カード比較: 退行(新規OTHER)=0 を維持
 - パーサルール: draw / ko / rest / rest_self_cost / power_buff / discard /
   cost_change / play_self / shuffle / remaining_deck_bottom / don_return / don_add /

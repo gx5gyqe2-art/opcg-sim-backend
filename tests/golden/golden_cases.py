@@ -446,6 +446,30 @@ CASES = [
             {"condition": {"type": "LEADER_COLOR", "value": "多色"}, "effect": {"type": "DRAW"}}
         ],
     },
+    # ----- 置換効果: KOされる場合、代わりに手札を捨てる（REPLACE_EFFECT） ----
+    {
+        "id": "replace_on_ko_discard",
+        "text": "このキャラがKOされる場合、代わりに自分の手札1枚を捨てる。",
+        "expect": [
+            {
+                "trigger": "PASSIVE",
+                "effect": {
+                    "kind": "action",
+                    "type": "REPLACE_EFFECT",
+                    "status": "LEAVE",
+                    "sub_effect": {"type": "DISCARD", "target": {"zone": "HAND"}},
+                },
+            }
+        ],
+    },
+    # ----- 置換効果: バトルでKOされる場合、代わりに（status=BATTLE_KO） ------
+    {
+        "id": "replace_battle_ko",
+        "text": "このキャラは、このターン中、バトルでKOされる場合、代わりに自分の手札1枚を捨てることができる。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "REPLACE_EFFECT", "status": "BATTLE_KO"}}
+        ],
+    },
     # ----- カウンターのパワー付与（OP13-097 世界の均衡） -------------------
     {
         "id": "counter_power_buff_3000",
