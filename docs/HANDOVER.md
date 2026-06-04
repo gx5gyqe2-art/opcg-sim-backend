@@ -1,13 +1,13 @@
 # 引き継ぎ資料 — カード効果システム刷新
 
-最終更新: 2026-06-04 / ブランチ: `claude/handoff-docs-review-bIYkG`（main ベース、未マージ）
+最終更新: 2026-06-04 / ブランチ: `main`（`claude/handoff-docs-review-bIYkG` を PR #7 でマージ済み）
 
 **マージ履歴（新しい順）**
 - PR #4 — 合成ルールレジストリ刷新の土台・EffectParserV2 本番化
 - PR #6 — ルール拡充・正確性修正・継続効果統合・置換効果
 - `claude/handoff-materials-review-u5cqy` — 診断上位 OTHER 表現5種ルール化・サーチ構造修正
 - `claude/handoff-materials-review-BWP0A` — 「手札捨て」修正・パーサ Round 2-3・UI拡張フェーズ1-3（main にマージ済み）
-- `claude/handoff-docs-review-bIYkG` — GENERIC条件94→1・保護者型置換効果対応（**進行中、未マージ**）
+- `claude/handoff-docs-review-bIYkG` — GENERIC条件94→1・保護者型置換効果対応（PR #7 で main にマージ済み）
 
 このドキュメントは、本リポジトリ（opcg-sim-backend）の **カード効果処理の刷新作業** を
 引き継ぐための資料です。詳細な設計は `docs/parser_v2.md` を、本書はその上位の
