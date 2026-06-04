@@ -27,11 +27,28 @@ class EffectResolver:
             log_event("INFO", "resolver.condition_failed", f"Condition not met for {source_card.master.name}", player=player.name)
             return
 
+        # 1.5 使用回数制限（【ターン1回】等）の enforce。
+        #   ability_used_this_turn は reset_turn_status（毎ターン境界で呼ばれる）で
+        #   クリアされるため、ターン単位の使用回数として機能する。
+        turn_limit = self._turn_limit_of(ability.condition)
+        limit_key = used_count = None
+        if turn_limit is not None:
+            limit_key = self._ability_key(source_card, ability)
+            used_count = source_card.ability_used_this_turn.get(limit_key, 0)
+            if used_count >= turn_limit:
+                self._log_failure_snapshot(player, source_card, ability, "TURN_LIMIT_REACHED", f"Used {used_count}/{turn_limit} this turn")
+                log_event("WARNING", "resolver.turn_limit", f"Ability already used {used_count}/{turn_limit} this turn: {source_card.master.name}", player=player.name)
+                return
+
         # 2. コストチェック
         if ability.cost and not self._can_satisfy_node(player, ability.cost, source_card):
             self._log_failure_snapshot(player, source_card, ability, "COST_UNSATISFIED", "Insufficient resources or targets for cost")
             log_event("WARNING", "resolver.cost_impossible", f"Cost cannot be satisfied for {source_card.master.name}", player=player.name)
             raise ValueError(f"コストの条件を満たすことができません: {source_card.master.name}")
+
+        # 発動成立（条件・コストを満たした）→ 使用回数を消費する。
+        if turn_limit is not None:
+            source_card.ability_used_this_turn[limit_key] = used_count + 1
 
         self.execution_stack = []
         if ability.effect:
@@ -45,6 +62,28 @@ class EffectResolver:
         # ▼▼▼ 追加: 処理完了時にレポートを出力（中断されていなければ） ▼▼▼
         if not self.game_manager.active_interaction:
             self._log_execution_report(player, source_card, ability)
+
+    def _turn_limit_of(self, condition):
+        """条件ツリー中の TURN_LIMIT 制限値を返す（無ければ None）。AND/OR の入れ子も探索。"""
+        if condition is None:
+            return None
+        if condition.type == ConditionType.TURN_LIMIT:
+            v = condition.value
+            return v if isinstance(v, int) and v > 0 else 1
+        if condition.type in (ConditionType.AND, ConditionType.OR):
+            for sub in condition.args:
+                v = self._turn_limit_of(sub)
+                if v is not None:
+                    return v
+        return None
+
+    def _ability_key(self, source_card, ability):
+        """使用回数カウンタのキー。master.abilities 内の位置（同一性）で識別する。"""
+        abilities = getattr(source_card.master, 'abilities', ()) or ()
+        for i, ab in enumerate(abilities):
+            if ab is ability:
+                return i
+        return id(ability)
 
     def _log_execution_report(self, player, source_card, ability):
         """
@@ -342,8 +381,25 @@ class EffectResolver:
             return True
 
         elif condition.type == ConditionType.TURN_LIMIT:
-            return True 
-            
+            # 使用回数制限は resolve_ability 側で enforce する（ここでは常に通す）。
+            return True
+
+        # 真に解釈不能な OTHER は fail-safe に倒す（誤発動を防ぐ）。
+        if condition.type == ConditionType.OTHER:
+            log_event("WARNING", "resolver.condition_unhandled",
+                      f"Unparseable condition treated as False (fail-safe): {condition.raw_text[:40]}",
+                      player=player.name)
+            return False
+
+        # GENERIC は「実在するが未分類の条件」（例: リーダーが多色／レストのキャラが2枚以上）。
+        # これらを False に倒すと多数の効果が永久に不発になり誤発動より有害なため、
+        # 暫定的に許容(True)しつつ可視化する。分類拡充で個別に評価可能化していく。
+        if condition.type == ConditionType.GENERIC:
+            log_event("INFO", "resolver.condition_generic",
+                      f"GENERIC condition permitted (unclassified): {condition.raw_text[:40]}",
+                      player=player.name)
+            return True
+
         return True
 
     def _compare(self, current: int, operator: CompareOperator, target: int) -> bool:

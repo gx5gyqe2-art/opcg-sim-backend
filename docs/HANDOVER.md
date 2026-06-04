@@ -33,7 +33,7 @@
 |---|---|---|
 | 原子句カバレッジ（ルール命中率） | 0% | 約70.4%（grant_keyword + ライフ操作5種 + ドン操作4種） |
 | `ActionType.OTHER`（実行時に何もしない句） | 942 | 342（約64%減） |
-| テスト総数 | 17 | 64（全緑） |
+| テスト総数 | 17 | 68（全緑） |
 | 本番パーサ | レガシー | **EffectParserV2（既定）** |
 
 > 追記1（キーワード付与の修正）: 「このキャラは【ブロッカー】を得る」等が構造分解で
@@ -51,6 +51,11 @@
 > 実行系が欠落しており【ドン!!×N】コストが no-op だったバグを修正。`ATTACH_DON`
 > を複数枚＋レスト付与対応、`RETURN_DON` を相手対象対応に拡張。詳細は
 > `docs/parser_v2.md`。
+>
+> 追記4（正確性バグ修正）: 【ターン1回】を `resolver` で enforce（従来 `TURN_LIMIT`
+> が常に True で何度でも発動できた）。条件の fail-safe 化として `OTHER` を False に、
+> `GENERIC` は許容＋ログに整理し、リーダー特徴の `『X』` 記法を `LEADER_TRAIT` に
+> 分類。詳細は §7-4,5。
 
 - 全2652カードの能力構築・実デッキ(imu/nami)ロード・ゲーム開始〜数ターン進行を確認済み。
 - レガシー vs V2 の全カード比較で **退行(新規OTHER)=0**。
@@ -204,9 +209,17 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
    再計算するため、継続効果マネージャと統合する設計が必要（POWER/FLAG は対応済）。
 3. **置換効果（「代わりに〜」）** — 「KOされる場合、代わりに手札を捨てる」等。
    除去保護の枠組みを拡張して置換に対応する余地。
-4. **ターン1回制限の enforce** — `CardInstance.ability_used_this_turn` は定義/リセット
-   されるが未参照。`TURN_LIMIT` 条件が常に True（`resolver._check_condition`）。
-5. **条件の fail-safe 化** — `GENERIC`/未対応条件が True に倒れる（誤発動の温床）。
+4. ~~**ターン1回制限の enforce**~~ **対応済み**。`resolver.resolve_ability` が
+   `TURN_LIMIT` を検出し `source_card.ability_used_this_turn[ability位置]` で
+   使用回数を管理する（条件・コストを満たし発動成立した時点で消費）。カウンタは
+   `reset_turn_status`（毎ターン境界で両者に呼ばれる）でクリアされ、ターン単位で機能。
+5. **条件の fail-safe 化（部分対応）** — 真に解釈不能な `OTHER` は False に倒すよう
+   変更（`resolver._check_condition`）。一方 `GENERIC`（約233件）は「実在するが未分類の
+   条件」（例: リーダーが多色／レストのキャラが2枚以上）であり、一律 False にすると
+   多数の効果が永久に不発になり誤発動より有害なため、**暫定的に許容(True)＋ログ可視化**
+   に留めた。恒久対応は GENERIC の分類拡充（条件パーサ強化）で個別に評価可能化していく。
+   - 着手済み: リーダー特徴条件の `『X』` 記法を `LEADER_TRAIT` に分類（従来 GENERIC、18件）。
+   - 残候補: 盤面枚数（`FIELD_COUNT` をフィルタ対応）、リーダー多色、置換トリガー条件。
 6. **catalog の縮退** — parser が賢くなった分、`MANUAL_EFFECTS`(13枚) を1枚ずつ
    golden で検証しながら削れる。
 

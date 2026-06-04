@@ -285,6 +285,66 @@ def test_return_don_opponent_via_status():
     assert len(p1.don_active) == 0
 
 
+def test_turn_limit_blocks_second_activation():
+    """【ターン1回】: 同一ターンの2回目は不発。ターンリセット後は再発動可。"""
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    ab = Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        condition=Condition(type=ConditionType.TURN_LIMIT, value=1),
+        effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)),
+    )
+    src = make_instance(make_master(card_id="TL-1", abilities=(ab,)), owner=p1.name)
+    p1.field.append(src)
+
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert len(p1.hand) == 1
+    gm.resolve_ability(p1, ab, source_card=src)   # 2回目は制限で不発
+    assert len(p1.hand) == 1
+    src.reset_turn_status()                        # ターン境界でカウンタが戻る
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert len(p1.hand) == 2
+
+
+def test_turn_limit_enforced_via_parsed_ability():
+    """パーサ→リゾルバ統合: 【ターン1回】の起動メインが2回目に不発になる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    abilities = tuple(EffectParserV2().parse_card_text("【起動メイン】【ターン1回】カード1枚を引く。"))
+    src = make_instance(make_master(card_id="TL-2", abilities=abilities), owner=p1.name)
+    p1.field.append(src)
+
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    assert len(p1.hand) == 1
+
+
+def test_leader_trait_bracket_condition_gates_effect():
+    """『X』を含む特徴の LEADER_TRAIT 条件が正しく評価される（満たす/満たさない）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "【起動メイン】自分のリーダーが『白ひげ海賊団』を含む特徴を持つ場合、カード1枚を引く。"))
+    src = make_instance(make_master(card_id="LT-1", abilities=abilities), owner=p1.name)
+    p1.field.append(src)
+
+    # リーダーが該当特徴を持たない → 不発
+    p1.leader = make_instance(make_master(card_id="LD-A", type=CardType.LEADER, traits=[]), owner=p1.name)
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    assert len(p1.hand) == 0
+
+    # リーダーが該当特徴を持つ → 発動
+    p1.leader = make_instance(
+        make_master(card_id="LD-B", type=CardType.LEADER, traits=["白ひげ海賊団"]), owner=p1.name)
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    assert len(p1.hand) == 1
+
+
 def _prevent_leave_master(card_id, status, condition=None):
     ab = Ability(
         trigger=TriggerType.PASSIVE,

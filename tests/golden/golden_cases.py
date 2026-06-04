@@ -408,6 +408,17 @@ CASES = [
             {"effect": {"kind": "action", "type": "RETURN_DON", "value": 1, "status": "OPPONENT"}}
         ],
     },
+    # ----- 条件: リーダーが『X』を含む特徴を持つ（LEADER_TRAIT, 従来 GENERIC） -
+    {
+        "id": "cond_leader_trait_bracket",
+        "text": "自分のリーダーが『白ひげ海賊団』を含む特徴を持つ場合、カード1枚を引く。",
+        "expect": [
+            {
+                "condition": {"type": "LEADER_TRAIT", "value": "白ひげ海賊団"},
+                "effect": {"kind": "action", "type": "DRAW", "value": 1},
+            }
+        ],
+    },
     # ----- カウンターのパワー付与（OP13-097 世界の均衡） -------------------
     {
         "id": "counter_power_buff_3000",

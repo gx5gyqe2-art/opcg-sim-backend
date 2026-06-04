@@ -411,7 +411,8 @@ class EffectParser:
             return Condition(type=ConditionType.TRASH_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
         if _nfc("リーダーが") in norm_text or _nfc("リーダーの特徴") in norm_text:
-            trait_match = re.search(_nfc(r'[《<]([^》>]+)[》>]'), norm_text)
+            # 特徴は《X》だけでなく『X』（『白ひげ海賊団』『B・W』等の名称系特徴）でも書かれる。
+            trait_match = re.search(_nfc(r'[《<『]([^》>』]+)[》>』]'), norm_text)
             name_match = re.search(_nfc(r'「([^」]+)」'), norm_text)
             if trait_match:
                 return Condition(type=ConditionType.LEADER_TRAIT, value=trait_match.group(1), player=p, raw_text=norm_text)
