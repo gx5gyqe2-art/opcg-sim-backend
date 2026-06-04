@@ -877,7 +877,11 @@ class GameManager:
                             if hasattr(target, 'attached_to'): target.attached_to = None
                 success = True
             elif act_name == "PLAY_CARD":
-                self.move_card(target, Zone.FIELD, owner); target.is_newly_played = True
+                self.move_card(target, Zone.FIELD, owner)
+                target.is_newly_played = True
+                # 「レストで登場させる」: フィールドに出た瞬間レスト状態にする。
+                if getattr(action, "status", None) == "RESTED":
+                    target.is_rest = True
                 if not target.ability_disabled:
                     for ability in target.master.abilities:
                         if ability.trigger == TriggerType.ON_PLAY:

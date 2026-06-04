@@ -534,6 +534,174 @@ def _remaining_deck_bottom(ctx: ParseContext) -> Optional[GameAction]:
 #   主にトリガー（ライフから自身を登場）で使われる。対象は自身(ref_id=self)。
 #   従来は対象が汎用 FIELD/SELF になり、誤った対象を登場させていた。
 # ---------------------------------------------------------------------------
+@rule("active_target", priority=51)
+def _active_target(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の/相手の）キャラ/リーダー1枚（まで）を、アクティブにする/できる」→ ACTIVE。
+
+    active_self（「このキャラを…」priority=75）・don_set_active（「ドン」priority=74）
+    が先に処理されるため、本ルールはそれ以外の対象指定アクティブを担う。
+    「自分のキャラ1枚までを、アクティブにする」等が典型。
+    """
+    t = ctx.text
+    if _nfc("ドン") in t:
+        return None  # don_set_active が担当
+    if not re.search(_nfc(r"アクティブに(する|できる)"), t):
+        return None
+    if re.search(_nfc(r"この(カード|キャラ|リーダー)を"), t):
+        return None  # active_self が担当
+    tq = parse_target(t)
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.ACTIVE, target=tq, raw_text=t)
+
+
+@rule("blocker_disable", priority=61)
+def _blocker_disable(ctx: ParseContext) -> Optional[GameAction]:
+    """「（相手は、）（このバトル中、）【ブロッカー】を発動できない」
+    → BUFF(status=BLOCKER_DISABLE, target=相手フィールド全体)。
+
+    エンジンの BLOCKER_DISABLE ブランチが対象の flags に "BLOCKER_DISABLED" を立て、
+    has_blocker() がブロック不可と判断する。flags はターン終了時にリセットされる。
+    """
+    t = ctx.text
+    if _nfc("ブロッカー") not in t or _nfc("発動できない") not in t:
+        return None
+    tq = TargetQuery(
+        player=Player.OPPONENT, zone=Zone.FIELD, count=-1, select_mode="ALL"
+    )
+    return GameAction(
+        type=ActionType.BUFF,
+        target=tq,
+        status="BLOCKER_DISABLE",
+        duration="THIS_BATTLE" if _nfc("このバトル中") in t else "THIS_TURN",
+        raw_text=t,
+    )
+
+
+@rule("rush_natural", priority=61)
+def _rush_natural(ctx: ParseContext) -> Optional[GameAction]:
+    """「（このキャラは）登場したターンにキャラへアタックできる」
+    → GRANT_KEYWORD("速攻", PERMANENT)。
+
+    【速攻】タグを持たない自然言語表現からキーワード付与を生成する。
+    登場したターン限定でなく PERMANENT（場を離れるまで）とする
+    （= 常に速攻を持つ）のが実際の効果に近い。
+    """
+    t = ctx.text
+    if not re.search(_nfc(r"登場した(ターン|時)に.*アタックできる"), t):
+        return None
+    return GameAction(
+        type=ActionType.GRANT_KEYWORD,
+        target=TargetQuery(select_mode="SOURCE"),
+        status="速攻",
+        duration="PERMANENT",
+        raw_text=t,
+    )
+
+
+@rule("bounce", priority=56)
+def _bounce(ctx: ParseContext) -> Optional[GameAction]:
+    """「（コストN以下の）（特徴X の）キャラ1枚（まで）を（持ち主の）手札に戻す（ことができる）」
+    → BOUNCE（フィールド→手札）。
+
+    OPTCG では「持ち主の手札に戻す」はほぼ相手カードを対象とするため、
+    「自分の」が明示されていなければ OPPONENT をデフォルトとする。
+    「手札から…手札に戻す」等の二段指示は除外（手札 source 文脈）。
+    """
+    t = ctx.text
+    if not re.search(_nfc(r"手札に戻す(ことができる)?"), t):
+        return None
+    if _nfc("手札から") in t:
+        return None  # 「手札から何かして手札に戻す」等の誤検知を避ける
+    tq = parse_target(t)
+    # 「自分の」明示がなければ OPPONENT（「持ち主の手札」→相手カードが多数派）。
+    if tq.player != Player.OPPONENT and _nfc("自分の") not in t:
+        tq.player = Player.OPPONENT
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.BOUNCE, target=tq, raw_text=t)
+
+
+@rule("deck_bottom_general", priority=55)
+def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
+    """「（対象）を（持ち主の/好きな順番で）デッキの下に置く」→ DECK_BOTTOM。
+
+    remaining_deck_bottom（「残り」→TEMP→DECK）は priority=65 で先に処理される。
+    本ルールは一般的なフィールドカード→デッキ下、手札→デッキ下を担う。
+    「持ち主のデッキの下」でプレイヤー未指定なら OPPONENT（相手キャラ対象が多い）。
+    """
+    t = ctx.text
+    if _nfc("デッキの下") not in t or _nfc("置く") not in t:
+        return None
+    if _nfc("残り") in t:
+        return None  # remaining_deck_bottom / remaining_deck_top_or_bottom が担当
+    tq = parse_target(t)
+    # 「持ち主のデッキの下」でプレイヤーがデフォルト(SELF)なら OPPONENT に補正。
+    if _nfc("持ち主") in t and tq.player != Player.OPPONENT:
+        tq.player = Player.OPPONENT
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.DECK_BOTTOM, target=tq, raw_text=t)
+
+
+@rule("remaining_deck_top_or_bottom", priority=63)
+def _remaining_deck_top_or_bottom(ctx: ParseContext) -> Optional[GameAction]:
+    """「残りを（好きな順番に並び替え、）?デッキの上か下に置く」→ DECK_BOTTOM（保守的）。
+
+    「上か下」を選ぶ UI は未実装のため、保守的にデッキ下扱い。
+    「残りをデッキの下に置く」は remaining_deck_bottom(priority=65) が優先処理する。
+    """
+    t = ctx.text
+    if _nfc("残り") not in t or _nfc("デッキ") not in t:
+        return None
+    if not re.search(_nfc(r"上か下|上か、下"), t):
+        return None  # 「上か下」の択がある場合のみ
+    return GameAction(
+        type=ActionType.DECK_BOTTOM,
+        target=TargetQuery(
+            player=Player.SELF, zone=Zone.TEMP, select_mode="REMAINING", count=-1
+        ),
+        raw_text=t,
+    )
+
+
+@rule("play_card_from_zone", priority=52)
+def _play_card_from_zone(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）手札/トラッシュからコストN以下の...カード1枚（まで）を（レストで）登場させる」
+    → PLAY_CARD（手札/トラッシュ→フィールド）。
+
+    play_self（このカード/キャラ自身を登場させる）とは「このカード/キャラ」の有無で区別。
+    「登場させてもよい」（任意）は選択 UI 未実装のため登場させる扱いにする。
+    レスト登場（レストで登場させる）は status="RESTED" をエンジンに伝える。
+    """
+    t = ctx.text
+    if not re.search(_nfc(r"登場させ(る|てもよい|ることができる)"), t):
+        return None
+    if re.search(_nfc(r"この(カード|キャラ|リーダー)を"), t):
+        return None  # play_self が担当
+    has_hand = _nfc("手札") in t
+    has_trash = _nfc("トラッシュ") in t
+    if not has_hand and not has_trash:
+        return None  # 手札/トラッシュ以外からの登場（プレイ自体）は対象外
+    tq = parse_target(t)
+    # parse_target は「手札から」「トラッシュから」を zone に反映するが、
+    # フィールドキャラ系（「場のキャラを」）と混在する場合に備えて上書き。
+    if has_trash:
+        tq.zone = Zone.TRASH
+    elif has_hand:
+        tq.zone = Zone.HAND
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    status = "RESTED" if re.search(_nfc(r"レストで(、)?登場"), t) else None
+    return GameAction(
+        type=ActionType.PLAY_CARD,
+        target=tq,
+        destination=Zone.FIELD,
+        status=status,
+        raw_text=t,
+    )
+
+
 @rule("play_self", priority=75)
 def _play_self(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -600,7 +768,11 @@ def _mill_deck(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("デッキの上") not in t:
         return None
-    if _nfc("トラッシュ") not in t or _nfc("置く") not in t:
+    if _nfc("トラッシュ") not in t:
+        return None
+    # 「置く」「置き（連用形）」「置いて」「置いてもよい」など活用形に対応。
+    # 「デッキの上から2枚をトラッシュに置き、シャッフルする」等の連鎖文も拾う。
+    if not re.search(_nfc(r"トラッシュに置|トラッシュに$"), t):
         return None
     return GameAction(
         type=ActionType.TRASH_FROM_DECK,

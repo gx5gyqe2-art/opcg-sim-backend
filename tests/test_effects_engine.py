@@ -601,6 +601,54 @@ def test_active_sets_card_active():
     assert card.is_rest is False
 
 
+def test_bounce_moves_to_owner_hand():
+    """BOUNCE: フィールドのカードを持ち主の手札へ戻す。"""
+    gm, p1, p2 = make_game()
+    target = _make_field_char(p2, name="被バウンス")
+    assert target in p2.field
+    ok = gm.apply_action_to_engine(p1, action(ActionType.BOUNCE), [target], 0)
+    assert ok
+    assert target not in p2.field
+    assert target in p2.hand
+
+
+def test_deck_bottom_sends_hand_card():
+    """DECK_BOTTOM(zone=HAND): 手札のカードをデッキ下へ送る。"""
+    gm, p1, _ = make_game()
+    card = make_instance(make_master(card_id="H-001"), owner=p1.name)
+    p1.hand.append(card)
+    ok = gm.apply_action_to_engine(p1, action(ActionType.DECK_BOTTOM), [card], 0)
+    assert ok
+    assert card not in p1.hand
+    assert p1.deck[-1] is card  # デッキの末尾（bottom）へ
+
+
+def test_play_card_from_trash_reanimates():
+    """PLAY_CARD: トラッシュのカードをフィールドへ出す（リアニメーション）。"""
+    gm, p1, _ = make_game()
+    card = make_instance(make_master(card_id="T-001", name="甦るキャラ"), owner=p1.name)
+    p1.trash.append(card)
+    assert card in p1.trash
+    ok = gm.apply_action_to_engine(p1, action(ActionType.PLAY_CARD), [card], 0)
+    assert ok
+    assert card not in p1.trash
+    assert card in p1.field
+    assert card.is_newly_played is True
+
+
+def test_play_card_rested_enters_rested():
+    """PLAY_CARD + status=RESTED: レストで登場させる。"""
+    gm, p1, _ = make_game()
+    from opcg_sim.src.models.effect_types import GameAction, ValueSource
+    card = make_instance(make_master(card_id="R-001", name="レスト登場"), owner=p1.name)
+    p1.trash.append(card)
+    act = GameAction(type=ActionType.PLAY_CARD, value=ValueSource(base=0), status="RESTED")
+    ok = gm.apply_action_to_engine(p1, act, [card], 0)
+    assert ok
+    assert card in p1.field
+    assert card.is_rest is True
+
+
 if __name__ == "__main__":
     import traceback
 

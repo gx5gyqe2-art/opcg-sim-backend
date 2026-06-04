@@ -33,19 +33,15 @@
 
 | 指標 | 刷新開始時 | PR#4 時点 | 現在 |
 |---|---|---|---|
-| 原子句カバレッジ（ルール命中率） | 0% | 約57% | **約75.2%** |
-| `ActionType.OTHER`（実行時に何もしない句） | 942 | 421 | **333** |
+| 原子句カバレッジ（ルール命中率） | 0% | 約57% | **約87.1%** |
+| `ActionType.OTHER`（実行時に何もしない句） | 942 | 421 | **281** |
 | 未分類条件 `GENERIC`（誤発動の温床） | — | 251 | **94** |
-| パーサルール数 | 0 | 15 | **30** |
-| テスト総数 | 17 | 43 | **91（全緑）** |
+| パーサルール数 | 0 | 15 | **38** |
+| テスト総数 | 17 | 43 | **107（全緑）** |
 | 本番パーサ | レガシー | EffectParserV2 | **EffectParserV2（既定）** |
 
-> 注: 今回のセッションでカバレッジは 70.4%→75.2% に上昇したが `OTHER` は 333 で横ばい。
-> これは対応した5表現（後述）が**レガシーでは既に非 OTHER**（`トラッシュに置く`→TRASH 等）に
-> 落ちており、OTHER 指標には現れないため。実利は ①カバレッジ向上、②自己対象の正確化
-> （SOURCE 指定で誤選択/no-op を回避）、③**`TRASH_FROM_DECK`（mill）の実行系を新設**して
-> 「デッキ上をトラッシュ」が実際に盤面へ反映されるようにしたこと（OTHER 指標が捉えない
-> サイレント失敗の解消）。
+> 本セッション全体でカバレッジ 70.4%→87.1%（+16.7pt）、OTHER 333→281（−52件）、
+> ルール 25→38（+13種）、テスト 81→107（+26件）。退行(新規OTHER)=0 を全ラウンドで維持。
 
 - 全2652カードの能力構築・実デッキ(imu/nami)ロード・ゲーム開始〜数ターン進行を確認済み。
 - レガシー vs V2 の全カード比較で **退行(新規OTHER)=0** を一貫して維持。
@@ -78,7 +74,40 @@
   （置換を `sub_effect` に保持）として実装。`_active_replacement` が除去の瞬間に PASSIVE を
   走査し、条件・実行可能性を満たせば置換を実行して本来の除去をスキップ。
 
-### 本セッション（`claude/handoff-materials-review-u5cqy`）で追加した内容
+### 本セッション（`claude/handoff-materials-review-u5cqy`）で追加した内容（最新順）
+
+---
+
+#### ラウンド2: bounce・deck_bottom・play_card_from_zone・active_target・blocker_disable・rush_natural（ルール 30→38）
+
+**パーサルール追加（8種）— `rules/atoms.py`**
+- `bounce`: 「（コストN以下の）キャラ1枚までを、持ち主の手札に戻す」→ BOUNCE。
+  「自分の」明示がなければ OPPONENT をデフォルト（「持ち主の手札」＝相手カード対象が多数派）。
+- `deck_bottom_general`: 「（コストN以下の）キャラを持ち主のデッキの下に置く」「自分の手札N枚をデッキの下に置く」「相手は自身の手札1枚をデッキの下に置く」→ DECK_BOTTOM。
+  「持ち主」+プレイヤー未指定で OPPONENT に補正。「残り」は除外し remaining_* ルールに委ねる。
+- `remaining_deck_top_or_bottom`: 「残りをデッキの上か下に置く」→ DECK_BOTTOM（保守的）。
+  「上か下」の選択 UI は未実装のためデッキ下扱いとする。
+- `play_card_from_zone`: 「（手札/トラッシュ）からコストN以下のキャラカード1枚までを（レストで）登場させる（ことができる/てもよい）」→ PLAY_CARD(zone=HAND/TRASH, dest=FIELD)。
+  レスト登場は status="RESTED" をエンジンに伝え is_rest=True にセット（エンジン側も対応追加）。
+- `active_target`: 「自分のキャラ1枚までを、アクティブにする/できる」→ ACTIVE（非自己・非ドン）。
+  active_self(priority=75)/don_set_active(priority=74)より低い priority=51 で衝突しない。
+- `blocker_disable`: 「相手は（このバトル中）【ブロッカー】を発動できない」→ BUFF(BLOCKER_DISABLE)。
+  エンジンの BLOCKER_DISABLE ブランチが対象フィールド全体に "BLOCKER_DISABLED" フラグを立てる。
+- `rush_natural`: 「登場したターンにキャラへアタックできる」→ GRANT_KEYWORD("速攻", PERMANENT)。
+  【速攻】タグを持たない自然言語表現からキーワード付与を生成。
+- `mill_deck`（拡張）: 「置き（連用形）」「置いてもよい」等の活用形に対応。
+  `re.search(r"トラッシュに置|トラッシュに$")` で活用形・文末「に」も拾う。
+
+**エンジン実行系の追加 — `gamestate.apply_action_to_engine`**
+- PLAY_CARD + status="RESTED": レストで登場させる時 `target.is_rest = True`。
+
+**テスト（103→107）**
+- golden +8（active_target / blocker_disable / rush_natural / mill 連用形 / bounce×2 / deck_bottom×2 / remaining_deck_top_or_bottom / play_from_hand / play_from_trash）
+- 退行(新規OTHER)=0を維持。カバレッジ 85.1%→87.1%、OTHER 322→281（−41）。
+
+---
+
+#### ラウンド1: 診断上位5表現のルール化
 
 引き継ぎ資料の TDD サイクル（§5）に沿い、診断「未対応(フォールバック)原子句ランキング」
 上位5表現をルール化（ルール 25→30）。全表現がランキングから消えたことを確認済み。
@@ -248,15 +277,21 @@ OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py  # 命中率↑/OTHER↓
    `effect_diagnostics.py` の「未対応(フォールバック)原子句ランキング」「OTHER化する原子句
    ランキング」を起点に継続。本セッションで上位5表現（自己トラッシュ/自己アクティブ/
    ステージのレスト/デッキ→トラッシュ mill/残り→トラッシュ）は **対応済み**。
-   次の候補（現在のランキング上位）:
-   - 「（コストN以下の）キャラを**持ち主の手札／デッキの下に戻す**」（10件前後×複数）—
-     `MOVE_TO_HAND`/`MOVE_CARD(dest=DECK)` への正確な宛先割当（持ち主＝OWNER）。
-   - デッキ look-and-arrange「デッキの上からN枚を見て、好きな順番に並び替え、上か下に置く」（7件）—
-     並び替え＋上下選択（`MOVE_CARD` に `dest_position` が無い既存制約に注意）。
-   - look-and-place「ライフ/デッキの上から見て、上か下に置く」（10件）。
-   - 「公開して手札に加える」（6件）、「残りをデッキの上か下に置く」（6件）。
-   - 構造断片「自分の手札1枚を」（11件）— セグメント分割で動詞が切り離される構造的課題
-     （`parse_ability` の分割境界の見直しが必要。単純なルール追加では解けない）。
+   bounce / deck_bottom / play_card_from_zone / active_target / blocker_disable /
+   rush_natural は **対応済み**（本セッション）。次の候補（現在のランキング上位）:
+   - **構造断片「自分の手札1枚を」（11件 OTHER）** — セグメント分割で動詞が切り離される。
+     `parse_ability` の分割境界の見直しが必要で単純なルール追加では解けない。
+   - **ライフ look-and-place「自分か相手のライフの上から1枚を見て、ライフの上か下に置く」（10件）** —
+     ライフを見て上下どちらに戻すか選択する UI が未実装。MOVE_CARD(dest=LIFE)として
+     保守的に実装可能だが上下選択が失われる。
+   - **デッキ look-and-arrange「デッキの上からN枚を見て、好きな順番に並び替え、上か下に置く」（13件）** —
+     並び替え操作が複雑。LOOK+DECK_BOTTOM で近似可能だが並び替え UI は未実装。
+   - **「任意のコストを宣言し、相手のデッキの上から1枚を公開する」（6件）** — コスト宣言という
+     ゲーム独自メカニクスが必要。UI と専用 ActionType の設計が必要。
+   - **「公開することができる」（10件）** — REVEAL(zone=HAND)。エンジン実行系を追加すれば対応可能。
+   - **「次のリフレッシュフェイズでアクティブにならない」（4件）** — FREEZE 系。継続効果に
+     REFRESH_DISABLE フラグを追加する設計が必要。
+   - 「自分は〜できない」形の自己制限（4件）— 禁止フラグの種類が多く個別設計が必要。
    - キーワード付与（【ブロッカー】等を得る）は **対応済み**（`grant_keyword`）。
      `GRANT_KEYWORD` は継続効果マネージャ経由で `timed_keywords` に付与され、
      `_apply_passive_effects` のリセットで消えず、duration（THIS_TURN/THIS_BATTLE/

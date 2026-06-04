@@ -517,6 +517,176 @@ CASES = [
             {"effect": {"kind": "action", "type": "TRASH", "target": {"zone": "TEMP"}}}
         ],
     },
+    # ----- 非自己アクティブ: 「自分のキャラ1枚までをアクティブにする」（4件 fallback） -------
+    {
+        "id": "active_target_self_char",
+        "text": "自分のキャラ1枚までを、アクティブにする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "ACTIVE",
+                    "target": {"player": "SELF", "card_type": ["CHARACTER"], "is_up_to": True},
+                }
+            }
+        ],
+    },
+    # ----- ブロッカー無効: 「相手はこのバトル中【ブロッカー】を発動できない」（4件 OTHER） ----
+    {
+        "id": "blocker_disable_this_battle",
+        "text": "相手は、このバトル中、【ブロッカー】を発動できない。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "BLOCKER_DISABLE",
+                    "duration": "THIS_BATTLE",
+                    "target": {"player": "OPPONENT"},
+                }
+            }
+        ],
+    },
+    # ----- 速攻（自然言語）: 「登場したターンにキャラへアタックできる」（4件 OTHER） ----------
+    {
+        "id": "rush_natural_keyword",
+        "text": "このキャラは登場したターンにキャラへアタックできる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "GRANT_KEYWORD",
+                    "status": "速攻",
+                    "duration": "PERMANENT",
+                }
+            }
+        ],
+    },
+    # ----- mill「置き」活用形: 「デッキの上からN枚をトラッシュに置き、シャッフルする」 -------
+    {
+        "id": "mill_deck_conjunctive",
+        "text": "自分のデッキの上から2枚をトラッシュに置き、デッキをシャッフルする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "TRASH_FROM_DECK", "value": 2},
+                        {"type": "SHUFFLE"},
+                    ],
+                }
+            }
+        ],
+    },
+    # ----- バウンス: 「（コストN以下の）キャラを持ち主の手札に戻す」（OPPONENT デフォルト） ---
+    {
+        "id": "bounce_to_owner_opponent",
+        "text": "コスト3以下のキャラ1枚までを、持ち主の手札に戻す。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BOUNCE",
+                    "target": {"player": "OPPONENT", "card_type": ["CHARACTER"], "cost_max": 3, "is_up_to": True},
+                }
+            }
+        ],
+    },
+    # ----- バウンス: 「自分のキャラを持ち主の手札に戻す」（SELF 明示） ----------
+    {
+        "id": "bounce_self_to_hand",
+        "text": "自分のキャラ1枚を持ち主の手札に戻すことができる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BOUNCE",
+                    "target": {"player": "SELF", "card_type": ["CHARACTER"]},
+                }
+            }
+        ],
+    },
+    # ----- デッキ下送り: 「（コストN以下の）キャラを持ち主のデッキの下に置く」 ----
+    {
+        "id": "deck_bottom_to_owner",
+        "text": "コスト2以下のキャラ1枚までを、持ち主のデッキの下に置く。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "DECK_BOTTOM",
+                    "target": {"player": "OPPONENT", "card_type": ["CHARACTER"], "cost_max": 2, "is_up_to": True},
+                }
+            }
+        ],
+    },
+    # ----- デッキ下送り: 「自分の手札N枚をデッキの下に置く」 -------------------
+    {
+        "id": "hand_to_deck_bottom",
+        "text": "自分の手札2枚を好きな順番でデッキの下に置く。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "DECK_BOTTOM",
+                    "target": {"zone": "HAND", "player": "SELF", "count": 2},
+                }
+            }
+        ],
+    },
+    # ----- デッキ下送り: 「相手は自身の手札1枚をデッキの下に置く」 --------------
+    {
+        "id": "opp_hand_to_deck_bottom",
+        "text": "相手は自身の手札1枚をデッキの下に置く。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "DECK_BOTTOM",
+                    "target": {"zone": "HAND", "player": "OPPONENT", "count": 1},
+                }
+            }
+        ],
+    },
+    # ----- 残り→デッキ上か下（上か下選択, 保守的に DECK_BOTTOM）-----------------
+    {
+        "id": "remaining_deck_top_or_bottom",
+        "text": "残りをデッキの上か下に置く。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "DECK_BOTTOM", "target": {"zone": "TEMP"}}}
+        ],
+    },
+    # ----- 手札から登場させる（PLAY_CARD from HAND） --------------------------
+    {
+        "id": "play_from_hand_cost_filter",
+        "text": "自分の手札からコスト2以下のキャラカード1枚までを、登場させる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "PLAY_CARD",
+                    "target": {"zone": "HAND", "player": "SELF", "cost_max": 2, "is_up_to": True},
+                    "destination": "FIELD",
+                }
+            }
+        ],
+    },
+    # ----- トラッシュからレストで登場させる（PLAY_CARD from TRASH, RESTED） ------
+    {
+        "id": "play_from_trash_rested",
+        "text": "自分のトラッシュからコスト4以下のキャラカード1枚までを、レストで登場させる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "PLAY_CARD",
+                    "target": {"zone": "TRASH", "player": "SELF", "cost_max": 4, "is_up_to": True},
+                    "destination": "FIELD",
+                    "status": "RESTED",
+                }
+            }
+        ],
+    },
     # ----- カウンターのパワー付与（OP13-097 世界の均衡） -------------------
     {
         "id": "counter_power_buff_3000",
