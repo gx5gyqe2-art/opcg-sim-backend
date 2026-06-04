@@ -184,6 +184,29 @@ class ConditionType(Enum):
     TURN_LIMIT = auto()
     GENERIC = auto()
 
+    # このキャラ自身の状態条件（IS_RESTED / IS_ACTIVE / ENTERED_THIS_TURN / POWER）
+    SOURCE_STATE = auto()
+    # 場のキャラ全員が特定の特徴を持つ（「のみ」条件）
+    FIELD_ALL_TRAIT = auto()
+    # 特定の名前のキャラが場にいる/いない
+    HAS_CHARACTER = auto()
+    # リーダーの属性条件（斬/打/射/特/知）
+    LEADER_ATTRIBUTE = auto()
+    # レスト状態のカード総数（フィールド＋ドン!!）
+    RESTED_COUNT = auto()
+    # 直前アクションの実行結果（そうした / そうしなかった / 登場させた）
+    PREV_ACTION = auto()
+    # 自分と相手のドン!!枚数の相対比較
+    DON_COUNT_COMPARE = auto()
+    # リーダーの状態条件（IS_ACTIVE / IS_RESTED / POWER）
+    LEADER_STATE = auto()
+    # 自分と相手の場キャラ数の相対比較
+    FIELD_COUNT_COMPARE = auto()
+    # 公開したカードの特徴/コスト/タイプ条件（そのカードが...の場合）
+    REVEALED_CARD_TRAIT = auto()
+    # 相手の効果/バトルで場を離れる/KOされる置換条件（元々のパワー/コスト/特徴フィルタ付き）
+    OPPONENT_REMOVAL = auto()
+
 class ParserKeyword(str, Enum):
     DON = "ドン"
     COST = "コスト"

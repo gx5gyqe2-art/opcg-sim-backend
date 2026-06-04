@@ -795,6 +795,374 @@ def test_attack_active_not_granted_means_no_active_attack():
     assert raised, "ATTACK_ACTIVE なしはアクティブキャラへの攻撃で例外を出すべき"
 
 
+# ===== 新条件タイプ（GENERIC 分類拡充）のエンジンテスト =====
+
+def _check_cond(gm, player, condition, source):
+    """EffectResolver._check_condition を呼ぶ薄いラッパ。"""
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    return EffectResolver(gm)._check_condition(player, condition, source)
+
+
+def test_source_state_is_rested():
+    """SOURCE_STATE / IS_RESTED: レスト状態のときだけ True。"""
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(), owner=p1.name)
+    p1.field.append(src)
+    cond = Condition(type=ConditionType.SOURCE_STATE, value="IS_RESTED")
+
+    src.is_rest = True
+    assert _check_cond(gm, p1, cond, src) is True
+
+    src.is_rest = False
+    assert _check_cond(gm, p1, cond, src) is False
+
+
+def test_source_state_is_active():
+    """SOURCE_STATE / IS_ACTIVE: アクティブ状態のときだけ True。"""
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(), owner=p1.name)
+    p1.field.append(src)
+    cond = Condition(type=ConditionType.SOURCE_STATE, value="IS_ACTIVE")
+
+    src.is_rest = False
+    assert _check_cond(gm, p1, cond, src) is True
+
+    src.is_rest = True
+    assert _check_cond(gm, p1, cond, src) is False
+
+
+def test_source_state_entered_this_turn():
+    """SOURCE_STATE / ENTERED_THIS_TURN: is_newly_played が True のときだけ True。"""
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(), owner=p1.name)
+    p1.field.append(src)
+    cond = Condition(type=ConditionType.SOURCE_STATE, value="ENTERED_THIS_TURN")
+
+    src.is_newly_played = True
+    assert _check_cond(gm, p1, cond, src) is True
+
+    src.is_newly_played = False
+    assert _check_cond(gm, p1, cond, src) is False
+
+
+def test_source_state_power_ge():
+    """SOURCE_STATE / POWER_GE: パワーが閾値以上のときだけ True。"""
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(power=6000), owner=p1.name)
+    p1.field.append(src)
+    cond = Condition(
+        type=ConditionType.SOURCE_STATE,
+        value=("POWER", 7000),
+        operator=CompareOperator.GE,
+    )
+
+    assert _check_cond(gm, p1, cond, src) is False  # 6000 < 7000
+
+    src.power_buff = 1000  # 6000 + 1000 = 7000 → True
+    assert _check_cond(gm, p1, cond, src) is True
+
+
+def test_field_all_trait_exact():
+    """FIELD_ALL_TRAIT: 全キャラが特定の特徴を持つときのみ True。"""
+    from opcg_sim.src.models.enums import Attribute
+    gm, p1, _ = make_game()
+    m1 = make_master(card_id="C1", traits=["天竜人"])
+    m2 = make_master(card_id="C2", traits=["天竜人", "海軍"])
+    m3 = make_master(card_id="C3", traits=["麦わらの一味"])
+    p1.field.append(make_instance(m1, owner=p1.name))
+    p1.field.append(make_instance(m2, owner=p1.name))
+    cond = Condition(type=ConditionType.FIELD_ALL_TRAIT, value=("天竜人", False), player=Player.SELF)
+
+    assert _check_cond(gm, p1, cond, p1.leader) is True  # 両方天竜人
+
+    p1.field.append(make_instance(m3, owner=p1.name))
+    assert _check_cond(gm, p1, cond, p1.leader) is False  # 麦わらの一味が混在
+
+
+def test_has_character_present_and_absent():
+    """HAS_CHARACTER: キャラの存在/不在を正しく判定する。"""
+    gm, p1, _ = make_game()
+    luffy = make_instance(make_master(card_id="LF", name="ルフィ"), owner=p1.name)
+    p1.field.append(luffy)
+    cond_present = Condition(
+        type=ConditionType.HAS_CHARACTER, value="ルフィ", operator=CompareOperator.GE, player=Player.SELF
+    )
+    cond_absent = Condition(
+        type=ConditionType.HAS_CHARACTER, value="ゾロ", operator=CompareOperator.EQ, player=Player.SELF
+    )
+
+    assert _check_cond(gm, p1, cond_present, p1.leader) is True   # ルフィがいる
+    assert _check_cond(gm, p1, cond_absent, p1.leader) is True    # ゾロがいない
+
+    zoro = make_instance(make_master(card_id="ZR", name="ゾロ"), owner=p1.name)
+    p1.field.append(zoro)
+    assert _check_cond(gm, p1, cond_absent, p1.leader) is False   # ゾロが登場
+
+
+def test_leader_attribute():
+    """LEADER_ATTRIBUTE: リーダーの属性が一致するときだけ True。"""
+    from opcg_sim.src.models.enums import Attribute
+    gm, p1, _ = make_game()
+    # make_player はデフォルト SLASH リーダーを作成する
+    cond_slash = Condition(
+        type=ConditionType.LEADER_ATTRIBUTE, value="斬", player=Player.SELF
+    )
+    cond_strike = Condition(
+        type=ConditionType.LEADER_ATTRIBUTE, value="打", player=Player.SELF
+    )
+    assert _check_cond(gm, p1, cond_slash, p1.leader) is True
+    assert _check_cond(gm, p1, cond_strike, p1.leader) is False
+
+
+def test_rested_count():
+    """RESTED_COUNT: フィールド＋リーダー＋ドン!! のレスト総数を正しく数える。"""
+    gm, p1, _ = make_game()
+    c1 = make_instance(make_master(card_id="C1"), owner=p1.name)
+    c2 = make_instance(make_master(card_id="C2"), owner=p1.name)
+    p1.field.extend([c1, c2])
+    c1.is_rest = True
+    p1.leader.is_rest = True
+
+    from opcg_sim.src.models.models import DonInstance
+    don = DonInstance(owner_id=p1.name)
+    don.is_rest = True
+    p1.don_rested.append(don)
+
+    cond_ge3 = Condition(
+        type=ConditionType.RESTED_COUNT,
+        operator=CompareOperator.GE,
+        value=3,
+        player=Player.SELF,
+    )
+    cond_ge4 = Condition(
+        type=ConditionType.RESTED_COUNT,
+        operator=CompareOperator.GE,
+        value=4,
+        player=Player.SELF,
+    )
+    # rested: c1(1) + leader(1) + don(1) = 3
+    assert _check_cond(gm, p1, cond_ge3, p1.leader) is True
+    assert _check_cond(gm, p1, cond_ge4, p1.leader) is False
+
+
+def test_opponent_removal_condition_power_filter():
+    """OPPONENT_REMOVAL: 元々のパワーが閾値以下のカードだけ置換が発動する。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+
+    # 置換効果を持つ「守護者」カードを p1 フィールドに置く
+    protector_abilities = tuple(EffectParserV2().parse_card_text(
+        "自分の元々のパワー7000以下のキャラが相手の効果で場を離れる場合、代わりに自分の手札1枚を捨てる。"
+    ))
+    protector = make_instance(make_master(card_id="PT-1", name="守護者", abilities=protector_abilities), owner=p1.name)
+    p1.field.append(protector)
+
+    # 対象1: パワー6000（閾値以下） → 置換が発動して手札を捨て、フィールドに残る
+    weak = make_instance(make_master(card_id="WK-1", power=6000), owner=p1.name)
+    p1.field.append(weak)
+    p1.hand.append(make_instance(make_master(card_id="H-1"), owner=p1.name))
+
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [weak], 0)
+    assert weak in p1.field,   "パワー6000は置換で残るべき"
+    assert len(p1.hand) == 0,  "代わりに手札を捨てたはず"
+
+    # 対象2: パワー8000（閾値超え） → 置換不発動、KO される
+    strong = make_instance(make_master(card_id="ST-1", power=8000), owner=p1.name)
+    p1.field.append(strong)
+
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [strong], 0)
+    assert strong not in p1.field, "パワー8000は置換なしにKOされるべき"
+    assert strong in p1.trash
+
+
+def test_opponent_removal_condition_trait_filter():
+    """OPPONENT_REMOVAL: 特徴フィルタが一致するカードだけ置換が発動する。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+
+    protector_abilities = tuple(EffectParserV2().parse_card_text(
+        "自分の特徴《エッグヘッド》を持つキャラが相手の効果でKOされる場合、代わりに自分の手札1枚を捨てる。"
+    ))
+    protector = make_instance(make_master(card_id="PT-2", name="守護者2", abilities=protector_abilities), owner=p1.name)
+    p1.field.append(protector)
+
+    # 特徴一致 → 置換
+    egghead = make_instance(make_master(card_id="EH-1", traits=["エッグヘッド"]), owner=p1.name)
+    p1.field.append(egghead)
+    p1.hand.append(make_instance(make_master(card_id="H-2"), owner=p1.name))
+
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [egghead], 0)
+    assert egghead in p1.field
+    assert len(p1.hand) == 0
+
+    # 特徴不一致 → 置換なし、KO
+    other = make_instance(make_master(card_id="OT-1", traits=["麦わらの一味"]), owner=p1.name)
+    p1.field.append(other)
+
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [other], 0)
+    assert other not in p1.field
+    assert other in p1.trash
+
+
+def test_field_count_compare():
+    """FIELD_COUNT_COMPARE: 自分のキャラ数が相手より少ない場合のみ True。"""
+    gm, p1, p2 = make_game()
+    cond = Condition(
+        type=ConditionType.FIELD_COUNT_COMPARE,
+        operator=CompareOperator.LT,
+        player=Player.SELF,
+    )
+    # p1: 1枚, p2: 2枚
+    p1.field.append(make_instance(make_master(card_id="A1"), owner=p1.name))
+    p2.field.extend([
+        make_instance(make_master(card_id="B1"), owner=p2.name),
+        make_instance(make_master(card_id="B2"), owner=p2.name),
+    ])
+    assert _check_cond(gm, p1, cond, p1.leader) is True   # 1 < 2
+    assert _check_cond(gm, p2, cond, p2.leader) is False  # 2 < 1 = False
+
+
+def test_has_character_rested_state():
+    """HAS_CHARACTER + IS_RESTED: 指名キャラがレストのときだけ True。"""
+    gm, p1, _ = make_game()
+    uta = make_instance(make_master(card_id="UTA", name="ウタ"), owner=p1.name)
+    p1.field.append(uta)
+    cond = Condition(
+        type=ConditionType.HAS_CHARACTER,
+        value=("ウタ", "IS_RESTED"),
+        operator=CompareOperator.GE,
+        player=Player.SELF,
+    )
+    uta.is_rest = False
+    assert _check_cond(gm, p1, cond, p1.leader) is False
+
+    uta.is_rest = True
+    assert _check_cond(gm, p1, cond, p1.leader) is True
+
+
+def test_revealed_card_trait_match():
+    """REVEALED_CARD_TRAIT: context に公開カードがセットされ、特徴が一致する場合 True。"""
+    gm, p1, _ = make_game()
+    cond = Condition(
+        type=ConditionType.REVEALED_CARD_TRAIT,
+        value={"trait": "白ひげ海賊団", "trait_contains": True},
+        player=Player.SELF,
+    )
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    resolver = EffectResolver(gm)
+
+    revealed = make_instance(make_master(card_id="WB1", traits=["白ひげ海賊団"]), owner=p1.name)
+    resolver.context["last_revealed_card"] = revealed
+    assert resolver._check_condition(p1, cond, p1.leader) is True
+
+    other = make_instance(make_master(card_id="OP1", traits=["麦わらの一味"]), owner=p1.name)
+    resolver.context["last_revealed_card"] = other
+    assert resolver._check_condition(p1, cond, p1.leader) is False
+
+
+def test_revealed_card_trait_cost_and_type():
+    """REVEALED_CARD_TRAIT: コスト条件 + カードタイプも正しく評価する。"""
+    from opcg_sim.src.models.enums import CardType
+    gm, p1, _ = make_game()
+    cond = Condition(
+        type=ConditionType.REVEALED_CARD_TRAIT,
+        value={"trait": "王下七武海", "trait_contains": False, "cost": 4, "cost_op": CompareOperator.LE, "card_type": "キャラ"},
+        player=Player.SELF,
+    )
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    resolver = EffectResolver(gm)
+
+    match = make_instance(
+        make_master(card_id="SL1", cost=3, traits=["王下七武海"], type=CardType.CHARACTER), owner=p1.name
+    )
+    resolver.context["last_revealed_card"] = match
+    assert resolver._check_condition(p1, cond, p1.leader) is True
+
+    # コストオーバー
+    over_cost = make_instance(
+        make_master(card_id="SL2", cost=5, traits=["王下七武海"], type=CardType.CHARACTER), owner=p1.name
+    )
+    resolver.context["last_revealed_card"] = over_cost
+    assert resolver._check_condition(p1, cond, p1.leader) is False
+
+
+def test_prev_action_succeeded():
+    """PREV_ACTION / SUCCEEDED: last_action_success=True のときのみ True。"""
+    gm, p1, _ = make_game()
+    cond = Condition(type=ConditionType.PREV_ACTION, value="SUCCEEDED")
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    resolver = EffectResolver(gm)
+
+    resolver.context["last_action_success"] = True
+    resolver.context["_last_had_targets"] = True
+    assert resolver._check_condition(p1, cond, p1.leader) is True
+
+    resolver.context["last_action_success"] = False
+    assert resolver._check_condition(p1, cond, p1.leader) is False
+
+
+def test_prev_action_skipped():
+    """PREV_ACTION / SKIPPED: last_action_success=False のときのみ True。"""
+    gm, p1, _ = make_game()
+    cond = Condition(type=ConditionType.PREV_ACTION, value="SKIPPED")
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    resolver = EffectResolver(gm)
+
+    resolver.context["last_action_success"] = False
+    assert resolver._check_condition(p1, cond, p1.leader) is True
+
+    resolver.context["last_action_success"] = True
+    resolver.context["_last_had_targets"] = True
+    assert resolver._check_condition(p1, cond, p1.leader) is False
+
+
+def test_don_count_compare():
+    """DON_COUNT_COMPARE: 自分のドン!!が相手より多い場合のみ True。"""
+    gm, p1, p2 = make_game()
+    cond = Condition(
+        type=ConditionType.DON_COUNT_COMPARE,
+        operator=CompareOperator.GT,
+        player=Player.SELF,
+    )
+    # p1: active=3, p2: active=2
+    from opcg_sim.src.models.models import DonInstance
+    for _ in range(3):
+        p1.don_active.append(DonInstance(owner_id=p1.name))
+    for _ in range(2):
+        p2.don_active.append(DonInstance(owner_id=p2.name))
+
+    assert _check_cond(gm, p1, cond, p1.leader) is True   # 3 > 2
+    assert _check_cond(gm, p2, cond, p2.leader) is False  # 2 > 3 = False
+
+
+def test_leader_state_is_active():
+    """LEADER_STATE / IS_ACTIVE: リーダーがアクティブのときだけ True。"""
+    gm, p1, _ = make_game()
+    cond = Condition(type=ConditionType.LEADER_STATE, value="IS_ACTIVE")
+
+    p1.leader.is_rest = False
+    assert _check_cond(gm, p1, cond, p1.leader) is True
+
+    p1.leader.is_rest = True
+    assert _check_cond(gm, p1, cond, p1.leader) is False
+
+
+def test_leader_state_power_le():
+    """LEADER_STATE / POWER_LE: リーダーのパワーが閾値以下のときだけ True。"""
+    gm, p1, _ = make_game()
+    cond = Condition(
+        type=ConditionType.LEADER_STATE,
+        value=("POWER", 5000),
+        operator=CompareOperator.LE,
+    )
+
+    p1.leader = make_instance(make_master(card_id="L1", power=4000), owner=p1.name)
+    assert _check_cond(gm, p1, cond, p1.leader) is True   # 4000 <= 5000
+
+    p1.leader = make_instance(make_master(card_id="L2", power=6000), owner=p1.name)
+    assert _check_cond(gm, p1, cond, p1.leader) is False  # 6000 > 5000
+
+
 if __name__ == "__main__":
     import traceback
 
