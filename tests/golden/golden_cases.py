@@ -1505,6 +1505,36 @@ CASES = [
             }
         ],
     },
+    # ===== 構造的難所: trigger断片（「〈timing〉時、発動できる」埋め込みトリガー） =====
+    # 「相手がアタックした時、発動できる」→ ディスパッチ対象 ON_OPP_ATTACK へ。OTHER は消える。
+    {
+        "id": "text_trigger_opp_attack",
+        "text": "【ターン1回】相手がアタックした時、発動できる。相手のリーダーかキャラ1枚までを、このターン中、パワー-1000。",
+        "expect": [
+            {
+                "trigger": "ON_OPP_ATTACK",
+                "condition": {"type": "TURN_LIMIT"},
+                "effect": {"kind": "action", "type": "BUFF", "value": -1000},
+            }
+        ],
+    },
+    # 非ディスパッチ timing × PASSIVE → ACTIVATE_MAIN（常時誤発動を避け手動発動可能に）。
+    {
+        "id": "text_trigger_passive_to_main",
+        "text": "このキャラが相手の効果でレストになった時、発動できる。このキャラをトラッシュに置き、カード2枚を引くことができる。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "TRASH"},
+                        {"type": "DRAW", "value": 2},
+                    ],
+                },
+            }
+        ],
+    },
     # ===== 構造的難所 C7: ライフ scry（対話選択 Choice ツリー） =====
     # 「自分か相手のライフの上から1枚までを見て、ライフの上か下に置く」→
     #   Choice[自分/相手/見ない] → 各 Seq[LOOK_LIFE → Choice[上/下に置く]]。
