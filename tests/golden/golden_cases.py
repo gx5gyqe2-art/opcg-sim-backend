@@ -1247,4 +1247,74 @@ CASES = [
             }
         ],
     },
+    # ===== A1: self_to_hand — このカードを手札に加える =====
+    # 「このカード/このキャラカードを手札に加える（ことができる）」は MOVE_CARD(SOURCE→HAND)。
+    # 従来は search_to_hand が zone=TEMP に誤設定していた（D detector 対象8枚）。
+    {
+        "id": "self_to_hand_trigger",
+        "text": "【トリガー】このカードを手札に加える。",
+        "expect": [
+            {
+                "trigger": "TRIGGER",
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "destination": "HAND",
+                    # zone が TEMP ではないこと（SOURCE モード: zone は FIELD デフォルト）。
+                    # search_to_hand が誤って zone=TEMP に設定していた bug を検出する。
+                    "target": {"player": "SELF", "zone": "FIELD"},
+                },
+            }
+        ],
+    },
+    {
+        "id": "self_to_hand_ko",
+        "text": "【KO時】このキャラカードを手札に加えることができる。",
+        "expect": [
+            {
+                "trigger": "ON_KO",
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "destination": "HAND",
+                    "target": {"player": "SELF", "zone": "FIELD"},
+                },
+            }
+        ],
+    },
+    # ===== A2: trash_to_deck_ordered — トラッシュから好きな順番でデッキ下へ =====
+    # 従来は temp_to_deck が zone=TEMP に誤設定していた（D detector 対象~18枚）。
+    {
+        "id": "trash_to_deck_ordered",
+        "text": "自分のトラッシュのカード3枚を好きな順番でデッキの下に置くことができる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "DECK_BOTTOM",
+                    "target": {"zone": "TRASH", "player": "SELF", "count": 3},
+                }
+            }
+        ],
+    },
+    # ===== A2b: field_char_to_deck_ordered — コスト付きキャラを持ち主デッキ下へ =====
+    # 従来は temp_to_deck が zone=TEMP に誤設定していた（OP06-058 等）。
+    {
+        "id": "field_char_to_deck_ordered",
+        "text": "コスト6以下のキャラ2枚までを、好きな順番で持ち主のデッキの下に置く。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "DECK_BOTTOM",
+                    "target": {
+                        "player": "OPPONENT",
+                        "card_type": ["CHARACTER"],
+                        "cost_max": 6,
+                        "is_up_to": True,
+                    },
+                }
+            }
+        ],
+    },
 ]

@@ -36,6 +36,6 @@ def test_no_revealed_card_trait_lift():
 def test_cd_detectors_do_not_grow():
     """C/D: 段階的に減らす想定。ベースライン実測値を超えて増えていないこと。"""
     _, hits = scan()
-    # ベースライン（PHoSv ラウンド3 時点の実測。減ったら下げること）
+    # ベースライン（LM00j ラウンド1 時点の実測。A1/A2 是正で D: 56→9）
     assert len(_unique_cards(hits, KEY_C)) <= 8
-    assert len(_unique_cards(hits, KEY_D)) <= 56
+    assert len(_unique_cards(hits, KEY_D)) <= 9
