@@ -1247,4 +1247,194 @@ CASES = [
             }
         ],
     },
+    # ===== A1: self_to_hand — このカードを手札に加える =====
+    # 「このカード/このキャラカードを手札に加える（ことができる）」は MOVE_CARD(SOURCE→HAND)。
+    # 従来は search_to_hand が zone=TEMP に誤設定していた（D detector 対象8枚）。
+    {
+        "id": "self_to_hand_trigger",
+        "text": "【トリガー】このカードを手札に加える。",
+        "expect": [
+            {
+                "trigger": "TRIGGER",
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "destination": "HAND",
+                    # zone が TEMP ではないこと（SOURCE モード: zone は FIELD デフォルト）。
+                    # search_to_hand が誤って zone=TEMP に設定していた bug を検出する。
+                    "target": {"player": "SELF", "zone": "FIELD"},
+                },
+            }
+        ],
+    },
+    {
+        "id": "self_to_hand_ko",
+        "text": "【KO時】このキャラカードを手札に加えることができる。",
+        "expect": [
+            {
+                "trigger": "ON_KO",
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "destination": "HAND",
+                    "target": {"player": "SELF", "zone": "FIELD"},
+                },
+            }
+        ],
+    },
+    # ===== A2: trash_to_deck_ordered — トラッシュから好きな順番でデッキ下へ =====
+    # 従来は temp_to_deck が zone=TEMP に誤設定していた（D detector 対象~18枚）。
+    {
+        "id": "trash_to_deck_ordered",
+        "text": "自分のトラッシュのカード3枚を好きな順番でデッキの下に置くことができる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "DECK_BOTTOM",
+                    "target": {"zone": "TRASH", "player": "SELF", "count": 3},
+                }
+            }
+        ],
+    },
+    # ===== A2b: field_char_to_deck_ordered — コスト付きキャラを持ち主デッキ下へ =====
+    # 従来は temp_to_deck が zone=TEMP に誤設定していた（OP06-058 等）。
+    {
+        "id": "field_char_to_deck_ordered",
+        "text": "コスト6以下のキャラ2枚までを、好きな順番で持ち主のデッキの下に置く。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "DECK_BOTTOM",
+                    "target": {
+                        "player": "OPPONENT",
+                        "card_type": ["CHARACTER"],
+                        "cost_max": 6,
+                        "is_up_to": True,
+                    },
+                }
+            }
+        ],
+    },
+    # ===== C11: hand_to_life — dest_position フィールド =====
+    # GameAction に dest_position が追加されたことで hand_to_life がライフ上/下を正確に区別できる。
+    {
+        "id": "hand_to_life_top",
+        "text": "自分の手札1枚をライフの上に加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "HAND", "player": "SELF"},
+                    "destination": "LIFE",
+                    "dest_position": "TOP",
+                }
+            }
+        ],
+    },
+    {
+        "id": "hand_to_life_bottom",
+        "text": "自分の手札1枚をライフの下に加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "HAND", "player": "SELF"},
+                    "destination": "LIFE",
+                    "dest_position": "BOTTOM",
+                }
+            }
+        ],
+    },
+    # ===== D12d: rest_self — このキャラをレストにする（効果文脈） =====
+    {
+        "id": "rest_self_effect",
+        "text": "【登場時】このキャラをレストにする。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "action",
+                    "type": "REST",
+                    "target": {"player": "SELF"},
+                },
+            }
+        ],
+    },
+    # ===== D12b: trash_to_hand — トラッシュからカードを手札に =====
+    {
+        "id": "trash_event_to_hand",
+        "text": "【登場時】自分のトラッシュのイベント1枚までを、手札に加える。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "TRASH", "player": "SELF", "is_up_to": True},
+                    "destination": "HAND",
+                },
+            }
+        ],
+    },
+    # ===== ko: KOできる（任意KO, OP05-060系, OTHER 2件） =====
+    {
+        "id": "ko_optional_trait",
+        "text": "自分の特徴《王下七武海》を持つキャラ1枚をKOできる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "KO",
+                    "target": {"player": "SELF", "traits": ["王下七武海"]},
+                }
+            }
+        ],
+    },
+    # ===== B5: scry-1 デッキの上か下に置く =====
+    # 「公開し、デッキの上か下に置く」→ LOOK + DECK_BOTTOM(TEMP)。
+    # scry_place ルールで OTHER だった 2 件を修正。
+    {
+        "id": "scry_one_deck_top_or_bottom",
+        "text": "【登場時】自分のデッキの上から1枚を公開し、デッキの上か下に置く。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 1},
+                        {"type": "DECK_BOTTOM", "target": {"zone": "TEMP"}},
+                    ],
+                },
+            }
+        ],
+    },
+    # ===== B6: 登場させた場合 → PREV_ACTION condition =====
+    # 「登場させた場合、【速攻】を得る」→ Branch(PREV_ACTION=PLAYED_CARD, GRANT_KEYWORD)。
+    # legacy parser の _parse_condition_obj が「場合」を strip 済みのテキストに対して
+    # 「場合」の有無を再チェックしていたバグを修正。
+    {
+        "id": "prev_action_played_card_rush",
+        "text": "【メイン】自分のデッキの上から1枚を公開し、コスト5以下のキャラカード1枚までを、登場させてもよい。登場させた場合、そのキャラは、このターン中、【速攻】を得る。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 1},
+                        {"type": "PLAY_CARD"},
+                        {
+                            "kind": "branch",
+                            "condition": {"type": "PREV_ACTION"},
+                            "if_true": {"type": "GRANT_KEYWORD", "status": "速攻"},
+                        },
+                    ],
+                }
+            }
+        ],
+    },
 ]
