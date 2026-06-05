@@ -341,21 +341,22 @@ class GameManager:
         self.mulligan_done = set()
         log_event("INFO", "game.mulligan_start", "Mulligan phase started")
 
-    def do_mulligan(self, player: 'Player', card_uuids_to_return: List[str]) -> None:
-        """指定カードをデッキ底に戻してシャッフル→5枚まで引き直す（1回限り）"""
+    def do_mulligan(self, player: 'Player') -> None:
+        """手札5枚全てをデッキ底に戻してシャッフル→5枚引き直す（全交換・1回限り）"""
         if self.phase != Phase.MULLIGAN:
             raise ValueError("マリガンフェーズではありません。")
         if player.name in self.mulligan_done:
             raise ValueError("既にマリガンを実施済みです。")
-        cards_to_return = [c for c in player.hand if c.uuid in card_uuids_to_return]
-        for card in cards_to_return:
-            player.hand.remove(card)
-            player.deck.append(card)
+        # 手札を全てデッキ底に戻す
+        hand_count = len(player.hand)
+        player.deck.extend(player.hand)
+        player.hand.clear()
         random.shuffle(player.deck)
-        while len(player.hand) < 5 and player.deck:
-            player.hand.append(player.deck.pop(0))
+        for _ in range(5):
+            if player.deck:
+                player.hand.append(player.deck.pop(0))
         self.mulligan_done.add(player.name)
-        log_event("INFO", "game.mulligan", f"Mulligan: {player.name} returned {len(cards_to_return)} cards", player=player.name)
+        log_event("INFO", "game.mulligan", f"Mulligan: {player.name} returned all {hand_count} cards", player=player.name)
         self._check_mulligan_complete()
 
     def keep_hand(self, player: 'Player') -> None:
