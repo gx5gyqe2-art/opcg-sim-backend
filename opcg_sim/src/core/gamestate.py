@@ -103,6 +103,7 @@ class GameManager:
         self.active_battle: Optional[Dict[str, Any]] = None
         self.active_interaction: Optional[Dict[str, Any]] = None
         self.setup_phase_pending = False
+        self.mulligan_done: Set[str] = set()
         from .effects.continuous import ContinuousEffectManager
         self.continuous = ContinuousEffectManager(self)
         self.action_events: List[Dict] = []  # per-request event buffer; reset in API handler
@@ -170,6 +171,23 @@ class GameManager:
         KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
         KEY_OPTIONS = pending_props.get('OPTIONS', 'options')
         
+        # マリガンフェーズ中は手番の決まっていないプレイヤー順に要求
+        if self.phase == Phase.MULLIGAN:
+            for player in [self.p1, self.p2]:
+                if player.name not in self.mulligan_done:
+                    hand_candidates = [c.to_dict() for c in player.hand]
+                    return {
+                        KEY_PID: player.name,
+                        KEY_ACTION: "MULLIGAN",
+                        KEY_MSG: "マリガンするカードを選んでください（交換なし＝キープ）",
+                        KEY_CANDIDATES: hand_candidates,
+                        KEY_UUIDS: [c.uuid for c in player.hand],
+                        KEY_CONSTRAINTS: {"min": 0, "max": len(player.hand)},
+                        KEY_SKIP: True,
+                        "request_id": str(uuid.uuid4()),
+                    }
+            return None
+
         if self.active_interaction:
             action_type = self.active_interaction.get("action_type")
             fe_action = "SEARCH_AND_SELECT" if action_type == "SELECT_TARGET" else action_type
@@ -314,11 +332,48 @@ class GameManager:
                             return
 
         self.finish_setup()
-        
+
         if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
         else: self.turn_player = self.p1; self.opponent = self.p2
         log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
-        self.turn_count = 1; self.refresh_phase()
+        # マリガンフェーズへ移行（両プレイヤーの確定後にゲーム開始）
+        self.phase = Phase.MULLIGAN
+        self.mulligan_done = set()
+        log_event("INFO", "game.mulligan_start", "Mulligan phase started")
+
+    def do_mulligan(self, player: 'Player', card_uuids_to_return: List[str]) -> None:
+        """指定カードをデッキ底に戻してシャッフル→5枚まで引き直す（1回限り）"""
+        if self.phase != Phase.MULLIGAN:
+            raise ValueError("マリガンフェーズではありません。")
+        if player.name in self.mulligan_done:
+            raise ValueError("既にマリガンを実施済みです。")
+        cards_to_return = [c for c in player.hand if c.uuid in card_uuids_to_return]
+        for card in cards_to_return:
+            player.hand.remove(card)
+            player.deck.append(card)
+        random.shuffle(player.deck)
+        while len(player.hand) < 5 and player.deck:
+            player.hand.append(player.deck.pop(0))
+        self.mulligan_done.add(player.name)
+        log_event("INFO", "game.mulligan", f"Mulligan: {player.name} returned {len(cards_to_return)} cards", player=player.name)
+        self._check_mulligan_complete()
+
+    def keep_hand(self, player: 'Player') -> None:
+        """手札をキープしてマリガンをスキップ"""
+        if self.phase != Phase.MULLIGAN:
+            raise ValueError("マリガンフェーズではありません。")
+        if player.name in self.mulligan_done:
+            raise ValueError("既にマリガンを実施済みです。")
+        self.mulligan_done.add(player.name)
+        log_event("INFO", "game.mulligan_keep", f"Keep hand: {player.name}", player=player.name)
+        self._check_mulligan_complete()
+
+    def _check_mulligan_complete(self) -> None:
+        """両プレイヤーのマリガン確定後にゲーム開始"""
+        if self.p1.name in self.mulligan_done and self.p2.name in self.mulligan_done:
+            log_event("INFO", "game.mulligan_complete", "Both players done — starting game", player="system")
+            self.turn_count = 1
+            self.refresh_phase()
 
     def finish_setup(self):
         log_event("INFO", "game.setup_finish", "Finishing setup (Life/Hand)", player="system")

@@ -28,6 +28,7 @@ class Attribute(Enum):
 
 class Phase(Enum):
     SETUP = auto()
+    MULLIGAN = auto()
     REFRESH = auto()
     DRAW = auto()
     DON = auto()

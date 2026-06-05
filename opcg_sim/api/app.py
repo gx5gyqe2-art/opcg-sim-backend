@@ -234,6 +234,19 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             for ability in operating_card.master.abilities:
                 if ability.trigger == TriggerType.ACTIVATE_MAIN: manager.resolve_ability(current_player, ability, source_card=operating_card)
         elif action_type == game_actions.get('RESOLVE_EFFECT_SELECTION', 'RESOLVE_EFFECT_SELECTION'): manager.resolve_interaction(current_player, payload)
+        elif action_type == 'MULLIGAN':
+            return_uuids = payload.get("card_uuids", [])
+            manager.do_mulligan(current_player, return_uuids)
+            manager.action_events.append({"type": "MULLIGAN", "player": player_id, "message": f"マリガン（{len(return_uuids)}枚交換）"})
+            # VS CPU: P1 決定後 P2 は自動キープ
+            if current_player == manager.p1 and manager.p2.name not in manager.mulligan_done:
+                manager.keep_hand(manager.p2)
+        elif action_type == 'KEEP_HAND':
+            manager.keep_hand(current_player)
+            manager.action_events.append({"type": "KEEP_HAND", "player": player_id, "message": "手札キープ"})
+            # VS CPU: P1 決定後 P2 は自動キープ
+            if current_player == manager.p1 and manager.p2.name not in manager.mulligan_done:
+                manager.keep_hand(manager.p2)
         return build_game_result_hybrid(manager, game_id, success=True)
     except Exception as e:
         log_event(level_key="ERROR", action="game.action_fail", msg=traceback.format_exc(), player=player_id, payload=req); return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
