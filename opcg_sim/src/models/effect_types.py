@@ -169,6 +169,7 @@ class GameAction(EffectNode):
     status: Optional[str] = None
     destination: Optional[Zone] = None
     is_rest: Optional[bool] = None
+    dest_position: Optional[str] = None  # "TOP" | "BOTTOM" for life/deck insertion
     raw_text: str = ""
     # REPLACE_EFFECT 用: 「代わりに〜」で実行する置換アクション（除去の代替）。
     sub_effect: Optional["EffectNode"] = None

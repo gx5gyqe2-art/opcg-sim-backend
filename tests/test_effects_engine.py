@@ -905,6 +905,108 @@ def test_attack_active_not_granted_means_no_active_attack():
     assert raised, "ATTACK_ACTIVE なしはアクティブキャラへの攻撃で例外を出すべき"
 
 
+# ===== レスト制限（PREVENT_REST）のエンジンテスト =====
+def test_prevent_rest_sets_flag_and_survives_then_expires():
+    """PREVENT_REST(UNTIL_NEXT_TURN_END): CANNOT_REST を timed_flags に立て、
+    自ターン終了は跨ぎ、次の相手ターン終了で失効する。"""
+    gm, p1, p2 = make_game()
+    gm.turn_count = 3
+    target = make_instance(make_master(card_id="PR-EXP", type=CardType.CHARACTER), owner=p2.name)
+    p2.field.append(target)
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.PREVENT_REST, duration="UNTIL_NEXT_TURN_END"), [target], 0
+    )
+    assert ok
+    assert "CANNOT_REST" in target.timed_flags
+
+    gm.continuous.expire("TURN_END", 3)   # 適用ターンの終了では失効しない
+    assert "CANNOT_REST" in target.timed_flags
+    gm.continuous.expire("TURN_END", 4)   # 次の相手ターンの終了で失効
+    assert "CANNOT_REST" not in target.timed_flags
+
+
+def test_prevent_rest_blocks_attack_declaration():
+    """CANNOT_REST 持ちはアタック宣言（本体をレストにする操作）で ValueError。"""
+    gm, p1, p2 = make_game()
+    attacker = make_instance(make_master(card_id="PR-ATK", type=CardType.CHARACTER), owner=p2.name)
+    defender = make_instance(make_master(card_id="PR-DEF", type=CardType.CHARACTER), owner=p1.name)
+    p2.field.append(attacker)
+    p1.field.append(defender)
+    defender.is_rest = True  # 通常はレスト済みキャラへ攻撃可能
+    gm.apply_action_to_engine(
+        p2, action(ActionType.PREVENT_REST, duration="UNTIL_NEXT_TURN_END"), [attacker], 0
+    )
+    gm._validate_action = lambda player, action_type: None
+    raised = False
+    try:
+        gm.declare_attack(attacker, defender)
+    except ValueError as e:
+        raised = "レスト" in str(e)
+    assert raised, "CANNOT_REST 持ちはアタック宣言で例外を出すべき"
+
+
+def test_prevent_rest_excludes_card_from_blocking():
+    """CANNOT_REST 持ちの【ブロッカー】はブロック候補から除外される。"""
+    gm, p1, p2 = make_game()
+    blk_master = make_master(card_id="PR-BLK", type=CardType.CHARACTER)
+    blk_master.keywords.add("ブロッカー")
+    blocker = make_instance(blk_master, owner=p2.name)
+    p2.field.append(blocker)
+    assert gm.has_blocker(p2) is True
+
+    gm.apply_action_to_engine(
+        p1, action(ActionType.PREVENT_REST, duration="UNTIL_NEXT_TURN_END"), [blocker], 0
+    )
+    assert "CANNOT_REST" in blocker.timed_flags
+    assert gm.has_blocker(p2) is False  # レスト不可＝ブロック不可
+
+
+# ===== モーダル選択「以下から1つを選ぶ」のエンジン実行テスト =====
+def test_modal_choice_executes_selected_option():
+    """「以下から1つを選ぶ」: CHOICE で中断→選んだ選択肢(DRAW 2)が実行される。
+    従来は options が空でサイレント no-op だった難所の回帰テスト。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "【登場時】以下から1つを選ぶ。 / ・相手のコスト4以下のキャラ1枚までを、KOする。 / ・カード2枚を引く。"))
+    src = make_instance(make_master(card_id="MC-1", abilities=abilities), owner=p1.name)
+    p1.field.append(src)
+
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    # CHOICE で中断し、選択肢ラベルが2件提示される
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "CHOICE"
+    assert len(gm.active_interaction["options"]) == 2
+    # index 1（カード2枚を引く）を選択 → 手札 +2
+    assert len(p1.hand) == 0
+    gm.resolve_interaction(p1, {"index": 1})
+    assert len(p1.hand) == 2
+    assert gm.active_interaction is None
+
+
+def test_modal_choice_ko_option_targets_opponent():
+    """選択肢 index 0（相手キャラ KO）を選ぶと、対象選択へ遷移し相手キャラを KO する。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    victim = make_instance(make_master(card_id="V-1", type=CardType.CHARACTER, cost=3), owner=p2.name)
+    p2.field.append(victim)
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "【登場時】以下から1つを選ぶ。 / ・相手のコスト4以下のキャラ1枚までを、KOする。 / ・カード2枚を引く。"))
+    src = make_instance(make_master(card_id="MC-2", abilities=abilities), owner=p1.name)
+    p1.field.append(src)
+
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    gm.resolve_interaction(p1, {"index": 0})   # KO 選択肢
+    # 対象選択（SELECT_TARGET）へ遷移し、相手キャラを選んで KO
+    assert gm.active_interaction is not None
+    gm.resolve_interaction(p1, {"selected_uuids": [victim.uuid]})
+    assert victim not in p2.field
+    assert any(c.uuid == victim.uuid for c in p2.trash)
+
+
 # ===== 新条件タイプ（GENERIC 分類拡充）のエンジンテスト =====
 
 def _check_cond(gm, player, condition, source):
@@ -1271,6 +1373,120 @@ def test_leader_state_power_le():
 
     p1.leader = make_instance(make_master(card_id="L2", power=6000), owner=p1.name)
     assert _check_cond(gm, p1, cond, p1.leader) is False  # 6000 > 5000
+
+
+# ----- 構造的難所 C7: ライフ scry（対話選択 Choice の suspend/resume フロー） --------
+def _life_scry_ability():
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    text = "【登場時】自分か相手のライフの上から1枚までを見て、ライフの上か下に置く。"
+    return EffectParserV2().parse_card_text(text)[0]
+
+
+def _setup_scry_game():
+    gm, p1, p2 = make_game()
+    a = make_instance(make_master(card_id="LA", name="A"), owner=p1.name)
+    b = make_instance(make_master(card_id="LB", name="B"), owner=p1.name)
+    c = make_instance(make_master(card_id="LC", name="C"), owner=p1.name)
+    p1.life = [a, b, c]
+    oa = make_instance(make_master(card_id="OA", name="OA"), owner=p2.name)
+    ob = make_instance(make_master(card_id="OB", name="OB"), owner=p2.name)
+    p2.life = [oa, ob]
+    return gm, p1, p2
+
+
+def test_life_scry_self_to_bottom():
+    """自分のライフ上(A)を見て下に置く: [A,B,C] → [B,C,A]、temp リーク無し。"""
+    gm, p1, _ = _setup_scry_game()
+    gm.resolve_ability(p1, _life_scry_ability(), source_card=p1.leader)
+    # 1) どのライフを見るか（自分=index0）
+    assert gm.active_interaction["action_type"] == "CHOICE"
+    gm.resolve_interaction(p1, {"index": 0})
+    # LOOK_LIFE 実行後: A が temp、life は [B,C]
+    assert [c.master.name for c in p1.life] == ["B", "C"]
+    assert [c.master.name for c in p1.temp_zone] == ["A"]
+    # 2) 上か下か（下=index1）
+    assert gm.active_interaction["action_type"] == "CHOICE"
+    gm.resolve_interaction(p1, {"index": 1})
+    assert [c.master.name for c in p1.life] == ["B", "C", "A"]
+    assert p1.temp_zone == []
+    assert gm.active_interaction is None
+
+
+def test_life_scry_self_to_top_noop():
+    """自分のライフ上(A)を見て上に戻す: 並びは [A,B,C] のまま、temp リーク無し。"""
+    gm, p1, _ = _setup_scry_game()
+    gm.resolve_ability(p1, _life_scry_ability(), source_card=p1.leader)
+    gm.resolve_interaction(p1, {"index": 0})   # 自分
+    gm.resolve_interaction(p1, {"index": 0})   # 上に戻す
+    assert [c.master.name for c in p1.life] == ["A", "B", "C"]
+    assert p1.temp_zone == []
+    assert gm.active_interaction is None
+
+
+def test_life_scry_opponent_to_bottom():
+    """相手のライフ上(OA)を見て下に置く: 相手 [OA,OB] → [OB,OA]、相手 temp リーク無し。"""
+    gm, p1, p2 = _setup_scry_game()
+    gm.resolve_ability(p1, _life_scry_ability(), source_card=p1.leader)
+    gm.resolve_interaction(p1, {"index": 1})   # 相手のライフを見る
+    assert [c.master.name for c in p2.life] == ["OB"]
+    assert [c.master.name for c in p2.temp_zone] == ["OA"]
+    gm.resolve_interaction(p1, {"index": 1})   # 下に置く
+    assert [c.master.name for c in p2.life] == ["OB", "OA"]
+    assert p2.temp_zone == []
+    assert gm.active_interaction is None
+
+
+def test_life_scry_skip():
+    """「1枚まで」= 任意 → 見ない（index2）を選ぶとライフは不変・temp リーク無し。"""
+    gm, p1, p2 = _setup_scry_game()
+    gm.resolve_ability(p1, _life_scry_ability(), source_card=p1.leader)
+    gm.resolve_interaction(p1, {"index": 2})   # 見ない
+    assert [c.master.name for c in p1.life] == ["A", "B", "C"]
+    assert p1.temp_zone == [] and p2.temp_zone == []
+    assert gm.active_interaction is None
+
+
+# ----- 構造的難所: select断片（SELECT→ref_id の suspend/resume リンク） --------
+def test_select_then_attack_disable_linked():
+    """「相手のキャラ1枚までを選ぶ。選んだキャラはアタックできない」:
+    SELECT で選んだ相手キャラに後続の ATTACK_DISABLE が ref_id 経由で適用される。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    x = make_instance(make_master(card_id="SX", name="X", cost=3, type=CardType.CHARACTER), owner=p2.name)
+    y = make_instance(make_master(card_id="SY", name="Y", cost=3, type=CardType.CHARACTER), owner=p2.name)
+    p2.field = [x, y]
+    ab = EffectParserV2().parse_card_text(
+        "【登場時】相手のコスト6以下のキャラ1枚までを選ぶ。選んだキャラは、このターン中、アタックできない。"
+    )[0]
+
+    gm.resolve_ability(p1, ab, source_card=p1.leader)
+    # 候補2枚 → 選択で中断
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "SELECT_TARGET"
+    gm.resolve_interaction(p1, {"selected_uuids": [x.uuid]})
+
+    # 選んだ X にのみ ATTACK_DISABLE（Y は無傷）
+    assert "ATTACK_DISABLE" in x.timed_flags
+    assert "ATTACK_DISABLE" not in y.timed_flags
+    assert gm.active_interaction is None
+
+
+def test_select_skip_none_selected():
+    """「1枚まで」= 任意 → 何も選ばない（空選択）と後続も対象なしで no-op。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    x = make_instance(make_master(card_id="SX2", name="X", cost=3, type=CardType.CHARACTER), owner=p2.name)
+    y = make_instance(make_master(card_id="SY2", name="Y", cost=3, type=CardType.CHARACTER), owner=p2.name)
+    p2.field = [x, y]
+    ab = EffectParserV2().parse_card_text(
+        "【登場時】相手のコスト6以下のキャラ1枚までを選ぶ。選んだキャラは、このターン中、アタックできない。"
+    )[0]
+    gm.resolve_ability(p1, ab, source_card=p1.leader)
+    assert gm.active_interaction["action_type"] == "SELECT_TARGET"
+    gm.resolve_interaction(p1, {"selected_uuids": []})  # 選ばない
+    assert "ATTACK_DISABLE" not in x.timed_flags
+    assert "ATTACK_DISABLE" not in y.timed_flags
+    assert gm.active_interaction is None
 
 
 if __name__ == "__main__":
