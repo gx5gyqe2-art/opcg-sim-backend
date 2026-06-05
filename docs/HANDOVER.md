@@ -1,8 +1,9 @@
 # 引き継ぎ資料 — カード効果システム刷新
 
-最終更新: 2026-06-05 / ブランチ: `claude/current-status-overview-MfmMw`（main にマージ済み）
+最終更新: 2026-06-05 / ブランチ: `claude/handoff-documentation-review-2WntU`（main にマージ済み）
 
 **マージ履歴（新しい順）**
+- `claude/handoff-documentation-review-2WntU` — **マリガン機能実装（OPCG公式ルール・全入れ替え）・GAME_STARTトリガー後マリガン修正・両プレイヤー個別マリガン・UI改善（通知/TOPボタン/ログを中央線に集約）（main にマージ済み）**
 - `claude/current-status-overview-MfmMw` — **UI操作性改善フェーズ4-5＋バグ修正2件: デッキ選択UI統一・ボードハイライト対象選択・temp_zone全表示修正（main にマージ済み）**
 - `claude/handoff-documentation-review-tM2nD` — **レスト制限「…レストにできない」(PREVENT_REST 新設・9/9)＋モーダル選択「以下から1つを選ぶ」の空 Choice 修正（21カード機能化）（PR #10 で main にマージ済み）**
 - PR #4 — 合成ルールレジストリ刷新の土台・EffectParserV2 本番化
@@ -88,6 +89,9 @@
 | Phase 5 | ボードハイライト対象選択: SEARCH_AND_SELECT/SELECT_COUNTER をモーダルから盤面直接クリックへ刷新 |
 | Fix 1 | isBoardSelectMode が temp_zone 対象で誤 ON になり選択不可になる問題を修正 |
 | Fix 2 | デッキサーチで全公開カードをモーダル表示・条件外カードをグレーアウト |
+| **マリガン** | **OPCG公式ルール準拠マリガン機能実装（全入れ替え・Phase.MULLIGAN 新設・両プレイヤー個別決定）** |
+| **Fix 3** | **GAME_START トリガー持ちリーダー（イム等）でマリガン画面が出ない問題を修正** |
+| **UI整理** | **通知バナー・TOPボタン・ActionLog をターン終了ボタンと同じ中央線（midY）に集約** |
 
 - 全2652カードの能力構築・実デッキ(imu/nami)ロード・ゲーム開始〜数ターン進行を確認済み。
 - レガシー vs V2 の全カード比較で **退行(新規OTHER)=0** を一貫して維持。
@@ -119,6 +123,108 @@
 - 「このキャラが(バトルで)?KOされる/場を離れる場合、代わりに〜」を `REPLACE_EFFECT`
   （置換を `sub_effect` に保持）として実装。`_active_replacement` が除去の瞬間に PASSIVE を
   走査し、条件・実行可能性を満たせば置換を実行して本来の除去をスキップ。
+
+### 本ブランチ（`claude/handoff-documentation-review-2WntU`）で追加した内容
+
+#### マリガン機能実装（OPCG公式ルール準拠・全入れ替え）
+
+**背景**: ゲーム開始時のマリガン（手札全入れ替え）が未実装だった。OPCG公式ルールでは
+ゲーム開始時に手札5枚を確認し、気に入らなければ全枚数をデッキに戻してシャッフル・再ドローできる（1回限り）。
+
+**バックエンド変更（`opcg_sim/src/core/gamestate.py`）**
+
+- `Phase.MULLIGAN` を `Phase` enum に追加（SETUP → MULLIGAN → REFRESH の流れ）。
+- `mulligan_done: set` フィールドを `GameManager` に追加。マリガン/キープを決定したプレイヤー名を格納。
+- `do_mulligan(player)`: 手札全枚数をデッキに戻してシャッフルし、5枚再ドロー。`mulligan_done` に登録後 `_check_mulligan_complete()` を呼ぶ。
+- `keep_hand(player)`: 手札をそのまま維持。`mulligan_done` に登録後 `_check_mulligan_complete()` を呼ぶ。
+- `_check_mulligan_complete()`: 両プレイヤーが完了したら `refresh_phase()` へ進む。
+- `get_pending_request()`: `Phase.MULLIGAN` 時に `[p1, p2]` 順でまだ決定していないプレイヤーへ `action="MULLIGAN_CHOICE"` を返す。
+
+**バックエンド変更（`opcg_sim/api/app.py`）**
+
+- `MULLIGAN` / `KEEP_HAND` アクションハンドラを追加: それぞれ `manager.do_mulligan()` / `manager.keep_hand()` を呼ぶ。
+- 両プレイヤーが個別に決定する（P2 の自動キープは廃止）。
+
+**フロントエンド変更（`src/screens/RealGame.tsx`）**
+
+- `pendingRequest.action === 'MULLIGAN_CHOICE'` 時にマリガン画面を表示。
+- 「マリガン（全入れ替え）」「キープ」の2ボタンを表示し、対応するアクションを送信。
+- 現在の手札を確認できるようボード状態を描画したまま overlay を表示。
+
+#### GAME_STARTトリガー持ちリーダーでマリガン画面が出ない問題の修正
+
+**症状**: イム等 GAME_START トリガーを持つリーダーでゲームを開始すると、マリガン画面が表示されずターンが始まった。
+
+**原因**: `start_game()` は GAME_START トリガー持ちのリーダーが存在する場合に `setup_phase_pending = True`
+をセットして早期 return する。`resolve_interaction()` で GAME_START インタラクション解決後、
+`setup_phase_pending` フラグを検出して直接 `refresh_phase()` を呼んでいたため、`Phase.MULLIGAN` をスキップしていた。
+
+**修正（`opcg_sim/src/core/gamestate.py` — `resolve_interaction()`）**
+
+```python
+# Before（マリガンをスキップしていた）:
+if not self.active_interaction and self.setup_phase_pending:
+    self.finish_setup()
+    self.setup_phase_pending = False
+    self.turn_count = 1
+    self.refresh_phase()  # MULLIGAN をスキップ
+
+# After（MULLIGAN フェーズへ正しく移行）:
+if not self.active_interaction and self.setup_phase_pending:
+    self.finish_setup()
+    self.setup_phase_pending = False
+    self.phase = Phase.MULLIGAN
+    self.mulligan_done = set()
+    log_event("INFO", "game.mulligan_start", "Mulligan phase started")
+```
+
+#### 両プレイヤー個別マリガン（P2 自動キープ廃止）
+
+**背景**: 当初実装では P1 がマリガン/キープを選択した直後に P2 が自動でキープしていた。
+一人二役シミュレーション（一人のプレイヤーが両者の視点で操作）を目指しているため、両プレイヤーが個別に決定できるよう変更。
+
+**変更（`opcg_sim/api/app.py`）**:
+- `MULLIGAN` ハンドラから `manager.keep_hand(p2)` の自動呼び出しを削除。
+- `KEEP_HAND` ハンドラから同様の自動呼び出しを削除。
+- `get_pending_request()` が P1 完了後に P2 への `MULLIGAN_CHOICE` を返すことで、フロントが P2 用のマリガン画面を表示する。
+
+#### UI改善: 通知バナー・TOPボタン・ActionLog を中央線（midY）に集約
+
+**背景**: 攻撃対象選択バナー・ボード選択バナー・汎用ペンディング通知が画面上部（`top: '20px'`）に
+固定されており、ボード上カードと重なることがあった。また TOPへボタンと ActionLog も散在していた。
+ターン終了ボタンが `layoutCoords.y = midY = H/2` の中央線に配置されているため、
+関連 UI も同じ線に集約する。
+
+**変更（`src/screens/RealGame.tsx`）**:
+
+- 攻撃対象選択バナー・ボード選択バナー・汎用ペンディング通知の縦位置を変更:
+  - Before: `top: '20px'`
+  - After: `top: layoutCoords ? \`${layoutCoords.y}px\` : '50%'` + `transform: 'translate(-50%, -50%)'`
+- TOPへボタンを中央線に移動・スタイル調整:
+  - 縦位置: `top: layoutCoords ? \`${layoutCoords.y}px\` : '50%'` + `transform: 'translateY(-50%)'`
+  - 表示テキスト: "TOPへ" → "TOP"（小型化してボードの邪魔にならないデザインに）
+- ActionLog ラッパーを `bottom: midY` で配置（ヘッダーを中央線に固定、コンテンツを上方展開）:
+  ```jsx
+  <div style={{
+    position: 'absolute',
+    right: '115px',
+    bottom: layoutCoords ? `${layoutCoords.y}px` : '50%',
+    zIndex: 150,
+  }}>
+    <ActionLog events={eventLog} />
+  </div>
+  ```
+
+**変更（`src/ui/ActionLog.tsx`）**:
+
+- `position: fixed` / `top: 56px` / `right: 8px` を削除（親ラッパーが配置を制御）。
+- コンテンツ展開方向を変更: ヘッダーが底辺に固定、コンテンツが上方向に展開。
+  - DOM 順序: コンテンツ div → ヘッダー div（コンテンツが上、ヘッダーが下）
+  - 初期状態: `isOpen: false`（折りたたみ）
+  - アイコン: ▲ = 閉じている（上方向に開く）、▼ = 開いている
+- MULLIGAN/KEEP_HAND ログのカラーコードを追加（MULLIGAN: `#e67e22`、KEEP_HAND: `#2ecc71`）。
+
+---
 
 ### 本ブランチ（`claude/current-status-overview-MfmMw`）で追加した内容
 
@@ -1243,6 +1349,10 @@ PHoSv ラウンド1-2 で主要ケース（7枚のミスターゲット是正・
 | UI Phase 5: ボードハイライト対象選択（選択可能カードにゴールド枠・クリックで確定） | current-status-overview-MfmMw |
 | Fix: isBoardSelectMode が temp_zone 対象で誤 ON（選択不可）になる問題 | current-status-overview-MfmMw |
 | Fix: デッキサーチで全公開カードをモーダル表示・条件外をグレーアウト（backend+frontend） | current-status-overview-MfmMw |
+| マリガン機能実装（OPCG公式ルール準拠・全入れ替え・Phase.MULLIGAN 新設・両プレイヤー個別決定） | handoff-documentation-review-2WntU |
+| Fix: GAME_STARTトリガー持ちリーダー（イム等）でマリガン画面が出ない問題（resolve_interaction 修正） | handoff-documentation-review-2WntU |
+| 両プレイヤー個別マリガン（P2 自動キープ廃止・一人二役シミュレーション対応） | handoff-documentation-review-2WntU |
+| UI整理: 通知バナー・TOPボタン・ActionLog をターン終了ボタンと同じ中央線（midY）に集約 | handoff-documentation-review-2WntU |
 
 ---
 
