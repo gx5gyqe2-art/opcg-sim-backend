@@ -1,9 +1,9 @@
 # 引き継ぎ資料 — カード効果システム刷新
 
-最終更新: 2026-06-05 / ブランチ: `claude/handoff-documentation-review-tM2nD`（`main` から分岐・作業中）
+最終更新: 2026-06-05 / ブランチ: `claude/handoff-documentation-review-tM2nD`（PR #10 で `main` にマージ済み）
 
 **マージ履歴（新しい順）**
-- `claude/handoff-documentation-review-tM2nD` — **レスト制限「…レストにできない」(PREVENT_REST 新設・9/9)＋モーダル選択「以下から1つを選ぶ」の空 Choice 修正（21カード機能化）（本ブランチ・作業中）**
+- `claude/handoff-documentation-review-tM2nD` — **レスト制限「…レストにできない」(PREVENT_REST 新設・9/9)＋モーダル選択「以下から1つを選ぶ」の空 Choice 修正（21カード機能化）（PR #10 で main にマージ済み）**
 - PR #4 — 合成ルールレジストリ刷新の土台・EffectParserV2 本番化
 - PR #6 — ルール拡充・正確性修正・継続効果統合・置換効果
 - `claude/handoff-materials-review-u5cqy` — 診断上位 OTHER 表現5種ルール化・サーチ構造修正
