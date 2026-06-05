@@ -285,8 +285,9 @@ class GameManager:
             self.finish_setup()
             self.setup_phase_pending = False
             log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
-            self.turn_count = 1
-            self.refresh_phase()
+            self.phase = Phase.MULLIGAN
+            self.mulligan_done = set()
+            log_event("INFO", "game.mulligan_start", "Mulligan phase started")
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
