@@ -201,7 +201,7 @@ class GameManager:
         
         if self.phase == Phase.BLOCK_STEP and self.active_battle:
             target_owner = self.active_battle["target_owner"]
-            blockers = [c.uuid for c in target_owner.field if not c.is_rest and c.has_keyword("ブロッカー")]
+            blockers = [c.uuid for c in target_owner.field if not c.is_rest and c.has_keyword("ブロッカー") and "CANNOT_REST" not in c.timed_flags]
             request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
         elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
             target_owner = self.active_battle["target_owner"]
@@ -489,7 +489,9 @@ class GameManager:
 
     def has_blocker(self, player: Player) -> bool:
         for card in player.field:
-            if not card.is_rest and card.has_keyword("ブロッカー") and "BLOCKER_DISABLED" not in card.flags:
+            if (not card.is_rest and card.has_keyword("ブロッカー")
+                    and "BLOCKER_DISABLED" not in card.flags
+                    and "CANNOT_REST" not in card.timed_flags):
                 return True
         return False
 
@@ -498,6 +500,7 @@ class GameManager:
         target_owner, _ = self._find_card_location(target)
         self._validate_action(attacker_owner, "MAIN_ACTION")
         if "ATTACK_DISABLE" in attacker.flags or "ATTACK_DISABLE" in attacker.timed_flags: raise ValueError("このカードは効果によりアタックできません。")
+        if "CANNOT_REST" in attacker.timed_flags: raise ValueError("このカードは効果によりレストにできないためアタックできません。")
         if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
         if (target.master.type == CardType.CHARACTER and not target.is_rest
                 and not attacker.has_keyword("ATTACK_ACTIVE")):
@@ -924,6 +927,18 @@ class GameManager:
                     self.continuous.apply(target, "FLAG", "UNTIL_NEXT_TURN_END", flag="ATTACK_DISABLE", expire_turn=self.turn_count + 1)
                 else:
                     self.continuous.apply(target, "FLAG", "THIS_TURN", flag="ATTACK_DISABLE")
+                success = True
+            elif act_name == "PREVENT_REST":
+                # 「（相手の）キャラは…までレストにできない」: レスト不可＝そのキャラは
+                # 自身をレストできない＝アタックもブロックもできない（どちらも本体をレストにする）。
+                # ATTACK_DISABLE と同様、継続効果の timed_flags に "CANNOT_REST" を載せ、
+                # declare_attack / has_blocker でこのフラグを弾く。
+                dur = getattr(action, "duration", "INSTANT")
+                if dur == "UNTIL_NEXT_TURN_END":
+                    self.continuous.apply(target, "FLAG", "UNTIL_NEXT_TURN_END", flag="CANNOT_REST", expire_turn=self.turn_count + 1)
+                else:
+                    self.continuous.apply(target, "FLAG", "THIS_TURN", flag="CANNOT_REST")
+                log_event("INFO", "game.action_prevent_rest", f"{target.master.name} cannot be rested ({dur})", player=player.name)
                 success = True
             elif act_name == "FREEZE":
                 # 「次の相手のリフレッシュフェイズでアクティブにならない」

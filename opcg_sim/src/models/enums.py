@@ -95,6 +95,7 @@ class ActionType(Enum):
     VICTORY = auto()
     RULE_PROCESSING = auto()
     RESTRICTION = auto()
+    PREVENT_REST = auto()  # 「（相手の）キャラは…までレストにできない」: レスト不可＝アタック/ブロック不可
     DECK_TOP = auto()
     SET_COST = auto()
     
