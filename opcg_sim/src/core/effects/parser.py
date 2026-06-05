@@ -79,6 +79,21 @@ class EffectParser:
         segments = re.split(r'\s*/\s*|\n', norm)
         segments = [s.strip() for s in segments if s.strip()]
 
+        # 「以下から…選ぶ」の選択肢項目（` / ` で別セグメントに分かれた「・」項目や
+        # 条件付き項目）を、Choice を導入する親セグメントへ `\n` で再結合する。
+        # 従来は別 Ability として分割→破棄され、options が空の Choice になっていた（難所）。
+        # 新しい 【...】 タグで始まるセグメントは別能力なので再結合を打ち切る。
+        merged: List[str] = []
+        absorbing = False
+        for seg in segments:
+            opens_new_ability = seg.startswith(_nfc('【'))
+            if absorbing and not opens_new_ability:
+                merged[-1] = merged[-1] + '\n' + seg
+                continue
+            merged.append(seg)
+            absorbing = bool(re.search(_nfc(r'以下から.{0,6}?選ぶ'), seg))
+        segments = merged
+
         abilities = []
         for seg in segments:
             # キーワード能力宣言 / キーワード説明括弧書きはスキップ（Ability 不要）
@@ -86,7 +101,7 @@ class EffectParser:
                 continue
             if self._PAREN_ONLY_RE.match(seg) and not re.search(r'【[^】]+】', seg):
                 continue
-            # 「・」で始まる選択肢セグメントは Choice の option として親セグメントで処理済み
+            # 「・」で始まる選択肢セグメント（再結合できなかった孤立項目）はスキップ
             if seg.startswith(_nfc('・')):
                 continue
             try:
@@ -274,6 +289,14 @@ class EffectParser:
 
     def _parse_to_node(self, text: str, is_cost: bool = False) -> EffectNode:
         norm_text = _nfc(text)
+
+        # 選択肢「以下から…選ぶ」: 「・」項目（または改行区切りの各文）を options として
+        # Choice を生成する。後続の「。」分割より前に処理しないと選択肢構造が壊れるため、
+        # ここで最優先に捌く。「…の場合、以下から…選ぶ」の先頭条件ゲートは Branch でラップ。
+        if re.search(_nfc(r'以下から.{0,6}?選ぶ'), norm_text):
+            choice = self._parse_choice(norm_text, is_cost)
+            if choice is not None:
+                return choice
 
         # 連用形「引き、」を「引く、」に正規化してから分割
         norm_text = re.sub(_nfc(r'引き、'), _nfc('引く、'), norm_text)
@@ -692,11 +715,48 @@ class EffectParser:
 
         return Condition(type=ConditionType.GENERIC, raw_text=norm_text)
 
+    def _parse_choice(self, text: str, is_cost: bool) -> Optional[EffectNode]:
+        """「（条件、）以下から…選ぶ。\n・項目…」を Choice（必要なら条件 Branch）に変換する。
+
+        options が抽出できない場合は None を返し、呼び出し側が通常解析へフォールバックする。
+        """
+        norm = _nfc(text)
+        m = re.search(_nfc(r'以下から.{0,6}?選ぶ'), norm)
+        if not m:
+            return None
+        head = norm[:m.end()]            # 「（条件、）…以下から1つを選ぶ」
+        tail = norm[m.end():]            # 「。\n・A。\n・B。」（選択肢本体）
+        tail = tail.lstrip(_nfc('。\n 　'))
+        options = self._extract_options(tail)
+        if len(options) < 2:
+            return None  # 選択肢が割れない場合は Choice 化しない（誤検知防止）
+        # 「相手は以下から…選ぶ」は相手が選択する（IR に記録。既定は自分）。
+        chooser = Player.OPPONENT if re.search(_nfc(r'相手は\s*以下から'), head) else Player.SELF
+        choice = Choice(
+            message=_nfc("効果を選択してください"),
+            options=[self._parse_to_node(opt, is_cost) for opt in options],
+            option_labels=options,
+            player=chooser,
+        )
+        # 「…の場合／なら、以下から…選ぶ」: 先頭の条件ゲートを Branch でラップする。
+        cond_m = re.search(_nfc(r'^(.+?)(?:場合|なら)、\s*以下から'), head)
+        if cond_m:
+            return Branch(condition=self._parse_condition_obj(cond_m.group(1)), if_true=choice)
+        return choice
+
     def _extract_options(self, text: str) -> List[str]:
         norm_text = _nfc(text)
-        lines = norm_text.split('\n')
-        options = [re.sub(_nfc(r'^[・\-]\s*'), '', l).strip() for l in lines if l.strip().startswith((_nfc('・'), _nfc('-')))]
-        if not options:
-            parts = re.split(_nfc(r'、'), norm_text)
-            options = [p.strip() for p in parts if _nfc("選ぶ") not in p and _nfc("以下から") not in p]
-        return options
+        lines = [l.strip() for l in norm_text.split('\n') if l.strip()]
+        # 「・」始まりの行を選択肢として優先抽出（末尾の「。」は除去）。
+        bullets = [
+            re.sub(_nfc(r'^[・\-]\s*'), '', l).rstrip(_nfc('。')).strip()
+            for l in lines if l.startswith((_nfc('・'), _nfc('-')))
+        ]
+        if bullets:
+            return bullets
+        # 「・」が無い場合: 改行区切りの各文（2件以上）を選択肢とみなす。
+        if len(lines) > 1:
+            return [l.rstrip(_nfc('。')).strip() for l in lines]
+        # 単一行のみ: 従来の「、」分割フォールバック（後方互換）。
+        parts = re.split(_nfc(r'、'), norm_text)
+        return [p.strip() for p in parts if _nfc("選ぶ") not in p and _nfc("以下から") not in p]

@@ -1598,6 +1598,61 @@ CASES = [
             }
         ],
     },
+    # ===== 構造的難所: モーダル選択「以下から1つを選ぶ」（ ・項目を Choice の options へ） =====
+    #   従来は ` / ` で別 Ability に分割→破棄され options が空だった。
+    {
+        "id": "modal_choice_two_options",
+        "text": "【登場時】以下から1つを選ぶ。 / ・相手のコスト4以下のキャラ1枚までを、KOする。 / ・カード2枚を引く。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "choice",
+                    "options": [
+                        {"kind": "action", "type": "KO",
+                         "target": {"player": "OPPONENT", "cost_max": 4, "is_up_to": True}},
+                        {"kind": "action", "type": "DRAW", "value": 2},
+                    ],
+                },
+            }
+        ],
+    },
+    # 選択肢の前段に条件ゲート（「…の場合、以下から1つを選ぶ」）→ ability.condition へ lift。
+    {
+        "id": "modal_choice_condition_gate",
+        "text": "【メイン】自分のリーダーが多色の場合、以下から1つを選ぶ。 / ・相手のコスト4以下のキャラ1枚までを、持ち主の手札に戻す。 / ・カード2枚を引く。",
+        "expect": [
+            {
+                "condition": {"type": "LEADER_COLOR"},
+                "effect": {
+                    "kind": "choice",
+                    "options": [
+                        {"kind": "action", "type": "BOUNCE"},
+                        {"kind": "action", "type": "DRAW", "value": 2},
+                    ],
+                },
+            }
+        ],
+    },
+    # 選択肢の片方が自前の条件 Branch を持つ（OP14-069 同型: 条件付き KO ／ レスト制限）。
+    {
+        "id": "modal_choice_option_with_branch",
+        "text": "【登場時】以下から1つを選ぶ。 / ・自分のリーダーが特徴《ドンキホーテ海賊団》を持つ場合、相手のコスト8以下のキャラ1枚までを、KOする。 / ・相手のコスト7以下のキャラ3枚までは、次の相手のエンドフェイズ終了時まで、レストにできない。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "choice",
+                    "options": [
+                        {"kind": "branch",
+                         "condition": {"type": "LEADER_TRAIT"},
+                         "if_true": {"kind": "action", "type": "KO"}},
+                        {"kind": "action", "type": "PREVENT_REST", "duration": "UNTIL_NEXT_TURN_END"},
+                    ],
+                },
+            }
+        ],
+    },
     # 「元々のパワー7000にする」— base_power_override に静的値をセット。
     {
         "id": "set_power_base_value",

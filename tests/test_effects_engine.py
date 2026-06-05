@@ -962,6 +962,51 @@ def test_prevent_rest_excludes_card_from_blocking():
     assert gm.has_blocker(p2) is False  # レスト不可＝ブロック不可
 
 
+# ===== モーダル選択「以下から1つを選ぶ」のエンジン実行テスト =====
+def test_modal_choice_executes_selected_option():
+    """「以下から1つを選ぶ」: CHOICE で中断→選んだ選択肢(DRAW 2)が実行される。
+    従来は options が空でサイレント no-op だった難所の回帰テスト。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "【登場時】以下から1つを選ぶ。 / ・相手のコスト4以下のキャラ1枚までを、KOする。 / ・カード2枚を引く。"))
+    src = make_instance(make_master(card_id="MC-1", abilities=abilities), owner=p1.name)
+    p1.field.append(src)
+
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    # CHOICE で中断し、選択肢ラベルが2件提示される
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "CHOICE"
+    assert len(gm.active_interaction["options"]) == 2
+    # index 1（カード2枚を引く）を選択 → 手札 +2
+    assert len(p1.hand) == 0
+    gm.resolve_interaction(p1, {"index": 1})
+    assert len(p1.hand) == 2
+    assert gm.active_interaction is None
+
+
+def test_modal_choice_ko_option_targets_opponent():
+    """選択肢 index 0（相手キャラ KO）を選ぶと、対象選択へ遷移し相手キャラを KO する。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    victim = make_instance(make_master(card_id="V-1", type=CardType.CHARACTER, cost=3), owner=p2.name)
+    p2.field.append(victim)
+    abilities = tuple(EffectParserV2().parse_card_text(
+        "【登場時】以下から1つを選ぶ。 / ・相手のコスト4以下のキャラ1枚までを、KOする。 / ・カード2枚を引く。"))
+    src = make_instance(make_master(card_id="MC-2", abilities=abilities), owner=p1.name)
+    p1.field.append(src)
+
+    gm.resolve_ability(p1, abilities[0], source_card=src)
+    gm.resolve_interaction(p1, {"index": 0})   # KO 選択肢
+    # 対象選択（SELECT_TARGET）へ遷移し、相手キャラを選んで KO
+    assert gm.active_interaction is not None
+    gm.resolve_interaction(p1, {"selected_uuids": [victim.uuid]})
+    assert victim not in p2.field
+    assert any(c.uuid == victim.uuid for c in p2.trash)
+
+
 # ===== 新条件タイプ（GENERIC 分類拡充）のエンジンテスト =====
 
 def _check_cond(gm, player, condition, source):
