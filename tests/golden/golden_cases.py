@@ -241,6 +241,37 @@ CASES = [
             {"effect": {"kind": "action", "type": "ATTACK_DISABLE", "duration": "UNTIL_NEXT_TURN_END"}}
         ],
     },
+    # ----- レスト制限（次の相手のターン終了時まで、レストにできない） -------
+    #   対象キャラはレストにできない＝アタック/ブロックができない（どちらも本体をレストにするため）。
+    {
+        "id": "rest_restrict_next_turn",
+        "text": "相手のコスト5以下のキャラ1枚までは、次の相手のターン終了時まで、レストにできない。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "PREVENT_REST",
+                    "duration": "UNTIL_NEXT_TURN_END",
+                    "target": {"player": "OPPONENT", "cost_max": 5, "is_up_to": True},
+                }
+            }
+        ],
+    },
+    # ----- レスト制限（次の相手のエンドフェイズ終了時まで・複数枚） ----------
+    {
+        "id": "rest_restrict_endphase_multi",
+        "text": "相手のコスト7以下のキャラ3枚までは、次の相手のエンドフェイズ終了時まで、レストにできない。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "PREVENT_REST",
+                    "duration": "UNTIL_NEXT_TURN_END",
+                    "target": {"player": "OPPONENT", "cost_max": 7, "is_up_to": True},
+                }
+            }
+        ],
+    },
     # ----- トリガー: このカードの【メイン】効果を発動する -----------------
     {
         "id": "execute_main_trigger",

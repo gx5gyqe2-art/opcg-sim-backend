@@ -1333,6 +1333,34 @@ def _freeze_target(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# レスト制限: 「（相手の）コストN以下のキャラM枚までは、次の相手の（ターン/エンドフェイズ）
+#             終了時まで、レストにできない」
+#   → PREVENT_REST(target=相手キャラ, duration)。
+#   「レストにできない」＝そのキャラは（自身を）レストにできない＝アタックもブロックも
+#   できない（どちらも本体をレストにする操作のため）。エンジンは timed_flags に
+#   "CANNOT_REST" を立て、declare_attack / has_blocker でこのフラグを弾く。
+#   freeze_target（アクティブにならない）とは逆向きのレスト制限。
+# ---------------------------------------------------------------------------
+@rule("rest_restrict", priority=66)
+def _rest_restrict(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"レストにできない"), t):
+        return None
+    tq = parse_target(t)
+    tq.player = Player.OPPONENT  # 全カード「相手の…キャラ」を対象にする
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    # 「次の…終了時まで」は次の相手ターンを跨いで持続、それ以外は当ターン限り。
+    duration = "UNTIL_NEXT_TURN_END" if _nfc("次の") in t else "THIS_TURN"
+    return GameAction(
+        type=ActionType.PREVENT_REST,
+        target=tq,
+        duration=duration,
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
 # 効果無効: 「（相手の）リーダーかキャラ1枚までを、このターン中、効果を無効にする」
 #   → NEGATE_EFFECT(target=相手リーダー/キャラ, duration=THIS_TURN)。
 #   エンジンは ability_disabled=True を対象に設定し、能力発動をブロックする。

@@ -905,6 +905,63 @@ def test_attack_active_not_granted_means_no_active_attack():
     assert raised, "ATTACK_ACTIVE なしはアクティブキャラへの攻撃で例外を出すべき"
 
 
+# ===== レスト制限（PREVENT_REST）のエンジンテスト =====
+def test_prevent_rest_sets_flag_and_survives_then_expires():
+    """PREVENT_REST(UNTIL_NEXT_TURN_END): CANNOT_REST を timed_flags に立て、
+    自ターン終了は跨ぎ、次の相手ターン終了で失効する。"""
+    gm, p1, p2 = make_game()
+    gm.turn_count = 3
+    target = make_instance(make_master(card_id="PR-EXP", type=CardType.CHARACTER), owner=p2.name)
+    p2.field.append(target)
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.PREVENT_REST, duration="UNTIL_NEXT_TURN_END"), [target], 0
+    )
+    assert ok
+    assert "CANNOT_REST" in target.timed_flags
+
+    gm.continuous.expire("TURN_END", 3)   # 適用ターンの終了では失効しない
+    assert "CANNOT_REST" in target.timed_flags
+    gm.continuous.expire("TURN_END", 4)   # 次の相手ターンの終了で失効
+    assert "CANNOT_REST" not in target.timed_flags
+
+
+def test_prevent_rest_blocks_attack_declaration():
+    """CANNOT_REST 持ちはアタック宣言（本体をレストにする操作）で ValueError。"""
+    gm, p1, p2 = make_game()
+    attacker = make_instance(make_master(card_id="PR-ATK", type=CardType.CHARACTER), owner=p2.name)
+    defender = make_instance(make_master(card_id="PR-DEF", type=CardType.CHARACTER), owner=p1.name)
+    p2.field.append(attacker)
+    p1.field.append(defender)
+    defender.is_rest = True  # 通常はレスト済みキャラへ攻撃可能
+    gm.apply_action_to_engine(
+        p2, action(ActionType.PREVENT_REST, duration="UNTIL_NEXT_TURN_END"), [attacker], 0
+    )
+    gm._validate_action = lambda player, action_type: None
+    raised = False
+    try:
+        gm.declare_attack(attacker, defender)
+    except ValueError as e:
+        raised = "レスト" in str(e)
+    assert raised, "CANNOT_REST 持ちはアタック宣言で例外を出すべき"
+
+
+def test_prevent_rest_excludes_card_from_blocking():
+    """CANNOT_REST 持ちの【ブロッカー】はブロック候補から除外される。"""
+    gm, p1, p2 = make_game()
+    blk_master = make_master(card_id="PR-BLK", type=CardType.CHARACTER)
+    blk_master.keywords.add("ブロッカー")
+    blocker = make_instance(blk_master, owner=p2.name)
+    p2.field.append(blocker)
+    assert gm.has_blocker(p2) is True
+
+    gm.apply_action_to_engine(
+        p1, action(ActionType.PREVENT_REST, duration="UNTIL_NEXT_TURN_END"), [blocker], 0
+    )
+    assert "CANNOT_REST" in blocker.timed_flags
+    assert gm.has_blocker(p2) is False  # レスト不可＝ブロック不可
+
+
 # ===== 新条件タイプ（GENERIC 分類拡充）のエンジンテスト =====
 
 def _check_cond(gm, player, condition, source):
