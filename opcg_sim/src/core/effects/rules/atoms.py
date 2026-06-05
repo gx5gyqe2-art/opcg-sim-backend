@@ -162,6 +162,36 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# パワー設定（上書き）: 「（対象）を、…パワーNにする／元々のパワーNにする」
+#   power_buff(priority=60) は「±N」を担当し「にする」を明示除外している。
+#   ここは静的な数値設定（base_power_override）のみを担当する。
+#   エンジンは BUFF+status="POWER_OVERRIDE" で base_power_override をセットし、
+#   reset_turn_status() で失効する（「このターン中」相当のセマンティクス）。
+#   「相手のリーダーと同じパワーになる」「入れ替える」等の動的参照は C9 の別件として除外。
+# ---------------------------------------------------------------------------
+@rule("set_power", priority=59)
+def _set_power(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    # 動的参照（同値・入れ替え）は対象外
+    if _nfc("同じパワー") in t or _nfc("入れ替") in t:
+        return None
+    m = re.search(_nfc(r"パワー(?:を)?(\d+)に(?:なる|する)"), t)
+    if not m:
+        return None
+    tq = parse_target(t)
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(
+        type=ActionType.BUFF,
+        status="POWER_OVERRIDE",
+        target=tq,
+        value=ValueSource(base=int(m.group(1))),
+        duration=_duration_of(t),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
 # キーワード付与: 「（対象）は【ブロッカー】を得る」
 #   parser.py の構造分解が keyword タグを保持するようになり、原子句に
 #   【ブロッカー】等が残る。これを GRANT_KEYWORD(status=キーワード名) に変換する。
@@ -960,6 +990,31 @@ def _trash_self(ctx: ParseContext) -> Optional[GameAction]:
         target=TargetQuery(select_mode="SOURCE"),
         raw_text=t,
     )
+
+
+# ---------------------------------------------------------------------------
+# 選択型トラッシュ: 「（自分/相手の）（コストN以下／特徴X の）キャラ1枚（まで）を
+#   トラッシュに置く（ことができる）」→ TRASH（選択したフィールドのキャラ→トラッシュ）。
+#   trash_self(priority=67) が「このキャラ／このカード／このリーダー」主語の自己トラッシュを
+#   先に担当するため、ここは *選択型*（自分/相手のキャラを選んでトラッシュ）を拾う。
+#   残り(remaining_trash)・デッキ(mill_deck)・手札・ライフ等の別ソース文脈は除外。
+#   エンジンの TRASH は選択ターゲットを既にトラッシュへ移動する（gamestate）。
+# ---------------------------------------------------------------------------
+@rule("trash_target", priority=57)
+def _trash_target(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"トラッシュに置"), t):
+        return None
+    # 自己トラッシュ（このキャラ／このカード／このリーダーを、?トラッシュ）は trash_self が担当
+    if re.search(_nfc(r"この(カード|キャラ|リーダー)を、?トラッシュ"), t):
+        return None
+    # 別ソース文脈は各専用ルールへ委ねる（残り/デッキ/手札/ライフ）
+    if _nfc("残り") in t or _nfc("デッキ") in t or _nfc("手札") in t or _nfc("ライフ") in t:
+        return None
+    tq = parse_target(t)
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.TRASH, target=tq, raw_text=t)
 
 
 # ---------------------------------------------------------------------------

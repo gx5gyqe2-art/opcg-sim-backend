@@ -1437,4 +1437,71 @@ CASES = [
             }
         ],
     },
+    # ===== 裾野OTHER: 選択型トラッシュ（trash_target） =====
+    # 「自分のキャラ1枚をトラッシュに置く」— このキャラ以外の選択型。trash_self(SOURCE)とは別。
+    {
+        "id": "trash_target_own_char",
+        "text": "【起動メイン】自分のキャラ1枚をトラッシュに置くことができる：カード2枚を引く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {
+                    "kind": "action",
+                    "type": "TRASH",
+                    "target": {"player": "SELF", "zone": "FIELD"},
+                },
+                "effect": {"kind": "action", "type": "DRAW", "value": 2},
+            }
+        ],
+    },
+    # 特徴フィルタ『』付きの選択型トラッシュ。
+    {
+        "id": "trash_target_trait",
+        "text": "【KO時】自分の『白ひげ海賊団』を含む特徴を持つキャラ1枚をトラッシュに置くことができる。",
+        "expect": [
+            {
+                "trigger": "ON_KO",
+                "effect": {
+                    "kind": "action",
+                    "type": "TRASH",
+                    "target": {"player": "SELF", "traits": ["白ひげ海賊団"]},
+                },
+            }
+        ],
+    },
+    # ===== 裾野OTHER: パワー設定/上書き（set_power → BUFF+POWER_OVERRIDE） =====
+    # 「パワー0にする」— 静的なパワー上書き。power_buff(±N)は「にする」を除外しているため別ルール。
+    {
+        "id": "set_power_zero",
+        "text": "相手のキャラ1枚までを、このターン中、パワー0にする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "POWER_OVERRIDE",
+                    "value": 0,
+                    "duration": "THIS_TURN",
+                    "target": {"player": "OPPONENT", "is_up_to": True},
+                },
+            }
+        ],
+    },
+    # 「元々のパワー7000にする」— base_power_override に静的値をセット。
+    {
+        "id": "set_power_base_value",
+        "text": "自分のリーダーかキャラ1枚までを、このターン中、元々のパワー7000にする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "POWER_OVERRIDE",
+                    "value": 7000,
+                    "duration": "THIS_TURN",
+                    "target": {"player": "SELF", "is_up_to": True},
+                },
+            }
+        ],
+    },
 ]

@@ -1,6 +1,6 @@
 # 引き継ぎ資料 — カード効果システム刷新
 
-最終更新: 2026-06-05 / ブランチ: `claude/handoff-materials-review-LM00j`（`main` から分岐・作業中）
+最終更新: 2026-06-05 / ブランチ: `claude/handoff-materials-review-oI1Np`（`main` から分岐・作業中）
 
 **マージ履歴（新しい順）**
 - PR #4 — 合成ルールレジストリ刷新の土台・EffectParserV2 本番化
@@ -9,7 +9,8 @@
 - `claude/handoff-materials-review-BWP0A` — 「手札捨て」修正・パーサ Round 2-3・UI拡張フェーズ1-3（main にマージ済み）
 - `claude/handoff-docs-review-bIYkG` — GENERIC条件94→1・保護者型置換効果対応（PR #7 で main にマージ済み）
 - `claude/handoff-docs-review-PHoSv` — デッキ公開→条件付き登場の構造修正・隠れ不具合検出ツール新設（main にマージ済み）
-- `claude/handoff-materials-review-LM00j` — **A1/A2/B5/B6/C11/D12/D13 修正・D detector 56→8（本ブランチ・作業中）**
+- `claude/handoff-materials-review-LM00j` — A1/A2/B5/B6/C11/D12/D13 修正・D detector 56→8（PR #8 で main にマージ済み）
+- `claude/handoff-materials-review-oI1Np` — **set_power（パワー上書き）／trash_target（選択型トラッシュ）ルール追加・カバレッジ 96.8%→97.3%（本ブランチ・作業中）**
 
 このドキュメントは、本リポジトリ（opcg-sim-backend）の **カード効果処理の刷新作業** を
 引き継ぐための資料です。詳細な設計は `docs/parser_v2.md` を、本書はその上位の
@@ -62,7 +63,8 @@
 | PHoSv ラウンド2 | 公開→インライン条件→登場（play_revealed TEMP化） | 95.9% | 104 | 50 | 172 |
 | PHoSv ラウンド3 | 隠れ不具合検出ツール新設・play_from_deck・回帰ガード | 95.9% | 104 | 51 | 176 |
 | LM00j ラウンド1 | A1/A2: self_to_hand 新規ルール＋temp_to_deck 除外, D detector 56→8 | 95.9% | 104 | 52 | ～180 |
-| **LM00j ラウンド2-3** | **C11/D13/D12b/D12d/B5/B6 修正・ルール4追加** | **96.7%** | **102** | **55** | **～185** |
+| LM00j ラウンド2-3 | C11/D13/D12b/D12d/B5/B6 修正・ルール4追加 | 96.7% | 102 | 55 | ～185 |
+| **oI1Np ラウンド1** | **set_power(POWER_OVERRIDE)／trash_target ルール追加** | **97.3%** | **101** | **+2** | **190** |
 
 **UI 拡張フェーズ（opcg-sim-frontend 連携）**
 
@@ -102,6 +104,29 @@
 - 「このキャラが(バトルで)?KOされる/場を離れる場合、代わりに〜」を `REPLACE_EFFECT`
   （置換を `sub_effect` に保持）として実装。`_active_replacement` が除去の瞬間に PASSIVE を
   走査し、条件・実行可能性を満たせば置換を実行して本来の除去をスキップ。
+
+### 本ブランチ（`claude/handoff-materials-review-oI1Np`）で追加した内容
+
+#### ラウンド1: set_power（パワー上書き）／trash_target（選択型トラッシュ）ルール追加（ルール +2, テスト +4）
+
+裾野 burn down の継続として、レガシーフォールバックに落ちていた2クラスタをルール化した。
+**いずれもエンジン改修は不要**（実行系が既存）。
+
+**set_power — 「（対象）を…パワーNにする／元々のパワーNにする」→ `BUFF(status="POWER_OVERRIDE")`**（priority=59）
+- `rules/atoms.py` に追加。`power_buff`(priority=60) は `±N` を担当し「にする」を明示除外しているため衝突しない。
+- **正確性バグ修正**: レガシーは「パワー0にする」を `BUFF(value=0)`（＝+0 の no-op）、「元々のパワー7000にする」を `BUFF(value=7000)`（＝**加算** +7000）と誤生成していた。本ルールは `status="POWER_OVERRIDE"` を付与し、エンジン（`gamestate` の `target.base_power_override = value`）で**パワーを上書き設定**する。`base_power_override` は `reset_turn_status()` で失効（「このターン中」相当）。
+- 動的参照（「相手のリーダーと同じパワーになる」「入れ替える」＝C9）は除外。
+
+**trash_target — 「（自分/相手の）（コスト/特徴で絞った）キャラ1枚（まで）をトラッシュに置く」→ `TRASH`（選択ターゲット）**（priority=57）
+- `trash_self`(priority=67) が「このキャラ／このカード／このリーダー」の自己トラッシュを先に担当するため、ここは**選択型**（フィールドのキャラを選んでトラッシュ）を拾う。`残り`/`デッキ`/`手札`/`ライフ` の別ソース文脈は除外。
+- レガシーは `DISCARD(zone=FIELD)` を生成していた（エンジン上 DISCARD と TRASH は同一挙動＝`move_card→TRASH` のため盤面結果は同等）。本ルールで V2 ネイティブ化＋golden で固定。
+
+**テスト +4**（golden）: `set_power_zero` / `set_power_base_value` / `trash_target_own_char` / `trash_target_trait`。
+
+**結果**: カバレッジ 96.8%→**97.3%**（+0.5pt, フォールバック 159→131）、テスト 186→**190**（全緑）、退行(新規OTHER)=0、隠れミスターゲット A=0/B=0/C=8/D=8（不変）。
+- 注: `OTHER` 数は 101 のまま不変。本クラスタは「解析できても何もしない（OTHER）」ではなく「**誤った ActionType を出していた隠れ不具合**」（set_power の加算/no-op）と、レガシーで等価動作していた句（trash_target）であり、OTHER 指標には現れない。OTHER ランキング残上位は構造的難所（ライフ公開系 C7・コスト宣言 C8・敗北→勝利 C10・レスト制限・select/trigger 断片）が中心。
+
+---
 
 ### 本ブランチ（`claude/handoff-materials-review-LM00j`）で追加した内容
 
@@ -869,6 +894,7 @@ PHoSv ラウンド1-2 で主要ケース（7枚のミスターゲット是正・
   - `effect_diagnostics.py` 起点で継続。残るものは構造的難所・専用メカニクスが中心（単純ルール追加では解きにくい）。
   - 対応済み（代表）: 自己トラッシュ/自己アクティブ/ステージレスト/mill/残りトラッシュ/bounce/deck_bottom/play_card_from_zone/reveal_hand/サーチ・scry 構造分解/FREEZE/NEGATE_EFFECT/自己制限/hand_to_deck/play_revealed/attack_active。
   - **LM00j 追加対応**: ~~D12b trash_to_hand（TRASH→HAND）~~完了 / ~~D12d rest_self＋ko "KOできる"~~完了。
+  - **oI1Np 追加対応**: set_power（「パワーNにする」の加算/no-op を POWER_OVERRIDE に是正）／trash_target（選択型「キャラをトラッシュに置く」を V2 ネイティブ化）。カバレッジ 96.8→97.3%（フォールバック −28）。`OTHER` 指標は不変（本クラスタは OTHER ではなく誤 ActionType／等価フォールバックだったため）。
 
 ~~**D13【完了 LM00j R2】REST_DON コストの充足判定**~~
   - ~~`_can_satisfy_node` でドン枚数検証が走らず常に True（コスト不足でも発動できる）だった。~~
@@ -925,6 +951,8 @@ PHoSv ラウンド1-2 で主要ケース（7枚のミスターゲット是正・
 | D12d: rest_self ルール追加・ko "KOできる" 対応 | LM00j R2 |
 | B5: scry_place ルール追加（「デッキの上か下に置く」） | LM00j R3 |
 | B6: PREV_ACTION 条件生成（「登場させた場合」parser.py 修正） | LM00j R3 |
+| set_power: パワー上書きルール（加算/no-op BUFF → POWER_OVERRIDE 是正） | oI1Np R1 |
+| trash_target: 選択型トラッシュルール（V2 ネイティブ化, カバレッジ +0.5pt） | oI1Np R1 |
 
 ---
 
