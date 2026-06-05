@@ -3,7 +3,7 @@
 最終更新: 2026-06-05 / ブランチ: `claude/current-status-overview-MfmMw`（main にマージ済み）
 
 **マージ履歴（新しい順）**
-- `claude/current-status-overview-MfmMw` — **UI操作性改善フェーズ4-5: デッキ選択UI統一・ボードハイライト対象選択（main にマージ済み）**
+- `claude/current-status-overview-MfmMw` — **UI操作性改善フェーズ4-5＋バグ修正2件: デッキ選択UI統一・ボードハイライト対象選択・temp_zone全表示修正（main にマージ済み）**
 - `claude/handoff-documentation-review-tM2nD` — **レスト制限「…レストにできない」(PREVENT_REST 新設・9/9)＋モーダル選択「以下から1つを選ぶ」の空 Choice 修正（21カード機能化）（PR #10 で main にマージ済み）**
 - PR #4 — 合成ルールレジストリ刷新の土台・EffectParserV2 本番化
 - PR #6 — ルール拡充・正確性修正・継続効果統合・置換効果
@@ -86,6 +86,8 @@
 | Phase 3 | PendingRequest overlay 改善（ソースカード名付きメッセージ・バトル表示カード名化） |
 | Phase 4 | デッキ選択UI統一: VS CPU モード・サンドボックスで API 全デッキから自由に選択可能に |
 | Phase 5 | ボードハイライト対象選択: SEARCH_AND_SELECT/SELECT_COUNTER をモーダルから盤面直接クリックへ刷新 |
+| Fix 1 | isBoardSelectMode が temp_zone 対象で誤 ON になり選択不可になる問題を修正 |
+| Fix 2 | デッキサーチで全公開カードをモーダル表示・条件外カードをグレーアウト |
 
 - 全2652カードの能力構築・実デッキ(imu/nami)ロード・ゲーム開始〜数ターン進行を確認済み。
 - レガシー vs V2 の全カード比較で **退行(新規OTHER)=0** を一貫して維持。
@@ -160,6 +162,38 @@
   - バナー overlay: ゴールドボーダーでメッセージを表示。複数選択時は選択数カウンター＋確定ボタン、
     `can_skip=true` 時はパスボタンを表示。
   - `renderScene` deps: `pendingRequest`・`boardSelected` を追加してハイライト変化で即再描画。
+
+#### バグ修正1: ボードハイライトモードで temp_zone 対象の選択が出ない問題
+
+**症状**: 「山札の上からN枚を見て〜を加える」効果発動時、選択対象が表示されなかった。
+
+**原因**: `isBoardSelectMode` が `selectable_uuids.length > 0` だけを条件としていたため、
+temp_zone（デッキ公開一時ゾーン）のカードを選ぶ場合もボードモードが ON になっていた。
+temp_zone カードは Pixi ボードに描画されないため、ゴールドハイライトが出ず `CardSelectModal`
+も非表示となり、何も選べない状態に。
+
+**修正** (`src/screens/RealGame.tsx`):
+`isBoardSelectMode` の条件に `.some(uuid => boardUuids.has(uuid))` を追加。
+`selectable_uuids` の中にボード描画ゾーン（hand/field/leader/stage）のカードが
+1枚も存在しない場合は `false` に落とし、`CardSelectModal` へフォールバックする。
+
+#### バグ修正2: デッキサーチで条件外カードが非表示になる問題
+
+**症状**: 「上からN枚見て、その中からキャラを1枚手札に加える」など条件付きサーチ効果で、
+条件を満たすカードだけしかモーダルに表示されず、めくった全カードが見られなかった。
+
+**原因**: `resolver._suspend_for_target_selection` が `get_target_cards`（フィルタ済み候補）
+のみを `candidates` にセットしていた。条件外のカードは frontend に届かず不可視。
+
+**修正**:
+- **Backend** (`opcg_sim/src/core/effects/resolver.py`): query.zone が TEMP の場合、
+  `candidates` に `all_temp_zone`（全公開カード）を設定し、フィルタ済みUUIDは
+  `selectable_uuids` として分離。`None` の場合はキーを省略して `generate_pending_request`
+  のフォールバック（全 candidate_uuids）を維持。
+- **Frontend** (`src/ui/CardSelectModal.tsx`): `selectableUuids?: string[]` prop を追加。
+  選択不可カードは `opacity: 0.4` ＋「選択不可」ラベルで表示し、クリック無効。
+- **Frontend** (`src/screens/RealGame.tsx`): `CardSelectModal` に
+  `pendingRequest.selectable_uuids` を渡すよう更新。
 
 ---
 
@@ -1207,6 +1241,8 @@ PHoSv ラウンド1-2 で主要ケース（7枚のミスターゲット是正・
 | モーダル選択: 「以下から1つを選ぶ」空 Choice 修正（21カードのモーダル効果を機能化） | tM2nD |
 | UI Phase 4: デッキ選択UI統一（VS CPU・サンドボックスで API 全デッキから自由選択） | current-status-overview-MfmMw |
 | UI Phase 5: ボードハイライト対象選択（選択可能カードにゴールド枠・クリックで確定） | current-status-overview-MfmMw |
+| Fix: isBoardSelectMode が temp_zone 対象で誤 ON（選択不可）になる問題 | current-status-overview-MfmMw |
+| Fix: デッキサーチで全公開カードをモーダル表示・条件外をグレーアウト（backend+frontend） | current-status-overview-MfmMw |
 
 ---
 
