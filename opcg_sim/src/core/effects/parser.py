@@ -27,6 +27,50 @@ class EffectParser:
         r'カウンター|トリガー|ゲーム開始時)】'
     )
 
+    # テキスト埋め込みトリガー「〈timing〉時、発動できる」のうち、エンジンが実際に
+    # ディスパッチする timing → TriggerType。これに該当すれば自動発動するよう上書きする。
+    # （非ディスパッチの timing は既存トリガーを維持し、PASSIVE のみ手動発動へ退避する。）
+    _DISPATCHED_TEXT_TRIGGERS = (
+        ("相手のキャラがアタックした時", "ON_OPP_ATTACK"),
+        ("相手がアタックした時", "ON_OPP_ATTACK"),
+        ("ライフが離れた時", "ON_LIFE_DECREASE"),
+    )
+
+    def _strip_text_trigger(self, trigger, effect_text: str):
+        """効果文先頭の埋め込みトリガー宣言「〈timing〉時、発動できる」/「〈cond〉場合、発動できる」/
+        単独「発動できる」を取り除く。
+
+        従来これらは「発動できる」が動詞なしの原子句 → ActionType.OTHER（サイレント失敗）に
+        落ち、後続の本体効果のみが効いていた。トリガー宣言を解消して:
+          - 「〈cond〉場合、発動できる」→ 条件を残し「発動できる」のみ除去（Branch-lift に委ねる）
+          - 「〈timing〉時、発動できる」→ 節ごと除去。ディスパッチ対象 timing はトリガー上書き。
+            非ディスパッチ timing は既存トリガー維持（PASSIVE のみ ACTIVATE_MAIN に退避＝
+            常時誤発動を避けつつ手動発動可能にする）。
+        戻り値: (新トリガー, 残りの効果テキスト)。
+        """
+        t = effect_text
+        # 「〈X〉(時|場合)、発動できる」または 先頭「発動できる」のみにマッチ（誤検知防止に
+        # 「を発動できる」等の効果動詞形は対象外＝直前は「時、」「場合、」か文頭に限定）。
+        m = re.match(_nfc(r"^((?:[^。]*?(?:時|場合))、)?発動できる(?:ことができる)?[。、]?"), t)
+        if not m:
+            return trigger, t
+        prefix = m.group(1) or ""
+        remainder = t[m.end():].strip()
+        # 「…場合、発動できる」→ 条件部を残して Branch-lift に任せる
+        if _nfc("場合") in prefix:
+            return trigger, (prefix + remainder).strip()
+        new_trigger = trigger
+        from ...models.enums import TriggerType as _TT
+        for key, tt_name in self._DISPATCHED_TEXT_TRIGGERS:
+            if _nfc(key) in prefix:
+                new_trigger = getattr(_TT, tt_name)
+                break
+        else:
+            if trigger == _TT.PASSIVE:
+                # 非ディスパッチ timing × PASSIVE は常時誤発動の温床 → 手動発動へ退避
+                new_trigger = _TT.ACTIVATE_MAIN
+        return new_trigger, remainder
+
     def parse_card_text(self, text: str, as_trigger: bool = False) -> List[Ability]:
         norm = _nfc(text)
         if not norm or norm.strip() in ['なし', 'None', '']:
@@ -114,6 +158,9 @@ class EffectParser:
                     cost_node = Sequence(actions=[don_cost_action, cost_node])
                 else:
                     cost_node = don_cost_action
+
+            # テキスト埋め込みトリガー宣言「〈timing〉時、発動できる」を解消（OTHER 化を防ぐ）。
+            trigger, effect_text = self._strip_text_trigger(trigger, effect_text)
 
             # 効果本体の解析
             effect_node = self._parse_to_node(effect_text)

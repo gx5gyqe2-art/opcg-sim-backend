@@ -1437,4 +1437,151 @@ CASES = [
             }
         ],
     },
+    # ===== 裾野OTHER: 選択型トラッシュ（trash_target） =====
+    # 「自分のキャラ1枚をトラッシュに置く」— このキャラ以外の選択型。trash_self(SOURCE)とは別。
+    {
+        "id": "trash_target_own_char",
+        "text": "【起動メイン】自分のキャラ1枚をトラッシュに置くことができる：カード2枚を引く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {
+                    "kind": "action",
+                    "type": "TRASH",
+                    "target": {"player": "SELF", "zone": "FIELD"},
+                },
+                "effect": {"kind": "action", "type": "DRAW", "value": 2},
+            }
+        ],
+    },
+    # 特徴フィルタ『』付きの選択型トラッシュ。
+    {
+        "id": "trash_target_trait",
+        "text": "【KO時】自分の『白ひげ海賊団』を含む特徴を持つキャラ1枚をトラッシュに置くことができる。",
+        "expect": [
+            {
+                "trigger": "ON_KO",
+                "effect": {
+                    "kind": "action",
+                    "type": "TRASH",
+                    "target": {"player": "SELF", "traits": ["白ひげ海賊団"]},
+                },
+            }
+        ],
+    },
+    # ===== 裾野OTHER: パワー設定/上書き（set_power → BUFF+POWER_OVERRIDE） =====
+    # 「パワー0にする」— 静的なパワー上書き。power_buff(±N)は「にする」を除外しているため別ルール。
+    {
+        "id": "set_power_zero",
+        "text": "相手のキャラ1枚までを、このターン中、パワー0にする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "POWER_OVERRIDE",
+                    "value": 0,
+                    "duration": "THIS_TURN",
+                    "target": {"player": "OPPONENT", "is_up_to": True},
+                },
+            }
+        ],
+    },
+    # ===== 構造的難所: select断片（「…を選ぶ。選んだキャラは…」） =====
+    # 「（対象）を選ぶ」→ SELECT(save_id) ／ 後続「選んだキャラ」→ ref_id="selected_card"。
+    {
+        "id": "select_then_attack_disable",
+        "text": "【登場時】相手のコスト6以下のキャラ1枚までを選ぶ。選んだキャラは、このターン中、アタックできない。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "SELECT", "target": {"player": "OPPONENT", "cost_max": 6, "is_up_to": True}},
+                        {"type": "ATTACK_DISABLE", "target": {"ref_id": "selected_card"}},
+                    ],
+                },
+            }
+        ],
+    },
+    # ===== 構造的難所: trigger断片（「〈timing〉時、発動できる」埋め込みトリガー） =====
+    # 「相手がアタックした時、発動できる」→ ディスパッチ対象 ON_OPP_ATTACK へ。OTHER は消える。
+    {
+        "id": "text_trigger_opp_attack",
+        "text": "【ターン1回】相手がアタックした時、発動できる。相手のリーダーかキャラ1枚までを、このターン中、パワー-1000。",
+        "expect": [
+            {
+                "trigger": "ON_OPP_ATTACK",
+                "condition": {"type": "TURN_LIMIT"},
+                "effect": {"kind": "action", "type": "BUFF", "value": -1000},
+            }
+        ],
+    },
+    # 非ディスパッチ timing × PASSIVE → ACTIVATE_MAIN（常時誤発動を避け手動発動可能に）。
+    {
+        "id": "text_trigger_passive_to_main",
+        "text": "このキャラが相手の効果でレストになった時、発動できる。このキャラをトラッシュに置き、カード2枚を引くことができる。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "TRASH"},
+                        {"type": "DRAW", "value": 2},
+                    ],
+                },
+            }
+        ],
+    },
+    # ===== 構造的難所 C7: ライフ scry（対話選択 Choice ツリー） =====
+    # 「自分か相手のライフの上から1枚までを見て、ライフの上か下に置く」→
+    #   Choice[自分/相手/見ない] → 各 Seq[LOOK_LIFE → Choice[上/下に置く]]。
+    {
+        "id": "life_scry_top_or_bottom",
+        "text": "【登場時】自分か相手のライフの上から1枚までを見て、ライフの上か下に置く。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "choice",
+                    "options": [
+                        {"kind": "seq", "actions": [
+                            {"type": "LOOK_LIFE"},
+                            {"kind": "choice", "options": [
+                                {"type": "MOVE_CARD", "destination": "LIFE", "dest_position": "TOP"},
+                                {"type": "MOVE_CARD", "destination": "LIFE", "dest_position": "BOTTOM"},
+                            ]},
+                        ]},
+                        {"kind": "seq", "actions": [
+                            {"type": "LOOK_LIFE"},
+                            {"kind": "choice", "options": [
+                                {"type": "MOVE_CARD", "destination": "LIFE", "dest_position": "TOP"},
+                                {"type": "MOVE_CARD", "destination": "LIFE", "dest_position": "BOTTOM"},
+                            ]},
+                        ]},
+                        {"kind": "seq", "actions": []},
+                    ],
+                },
+            }
+        ],
+    },
+    # 「元々のパワー7000にする」— base_power_override に静的値をセット。
+    {
+        "id": "set_power_base_value",
+        "text": "自分のリーダーかキャラ1枚までを、このターン中、元々のパワー7000にする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "POWER_OVERRIDE",
+                    "value": 7000,
+                    "duration": "THIS_TURN",
+                    "target": {"player": "SELF", "is_up_to": True},
+                },
+            }
+        ],
+    },
 ]
