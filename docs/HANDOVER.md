@@ -1,8 +1,9 @@
 # 引き継ぎ資料 — カード効果システム刷新
 
-最終更新: 2026-06-05 / ブランチ: `claude/handoff-documentation-review-tM2nD`（PR #10 で `main` にマージ済み）
+最終更新: 2026-06-05 / ブランチ: `claude/current-status-overview-MfmMw`（main にマージ済み）
 
 **マージ履歴（新しい順）**
+- `claude/current-status-overview-MfmMw` — **UI操作性改善フェーズ4-5: デッキ選択UI統一・ボードハイライト対象選択（main にマージ済み）**
 - `claude/handoff-documentation-review-tM2nD` — **レスト制限「…レストにできない」(PREVENT_REST 新設・9/9)＋モーダル選択「以下から1つを選ぶ」の空 Choice 修正（21カード機能化）（PR #10 で main にマージ済み）**
 - PR #4 — 合成ルールレジストリ刷新の土台・EffectParserV2 本番化
 - PR #6 — ルール拡充・正確性修正・継続効果統合・置換効果
@@ -83,6 +84,8 @@
 | Phase 1 | FREEZE/NEGATE Pixi オーバーレイ・trigger_text 表示・API シリアライズ拡張 |
 | Phase 2 | 効果解決ログパネル（`ActionLog.tsx`・`action_events` API フィールド） |
 | Phase 3 | PendingRequest overlay 改善（ソースカード名付きメッセージ・バトル表示カード名化） |
+| Phase 4 | デッキ選択UI統一: VS CPU モード・サンドボックスで API 全デッキから自由に選択可能に |
+| Phase 5 | ボードハイライト対象選択: SEARCH_AND_SELECT/SELECT_COUNTER をモーダルから盤面直接クリックへ刷新 |
 
 - 全2652カードの能力構築・実デッキ(imu/nami)ロード・ゲーム開始〜数ターン進行を確認済み。
 - レガシー vs V2 の全カード比較で **退行(新規OTHER)=0** を一貫して維持。
@@ -114,6 +117,51 @@
 - 「このキャラが(バトルで)?KOされる/場を離れる場合、代わりに〜」を `REPLACE_EFFECT`
   （置換を `sub_effect` に保持）として実装。`_active_replacement` が除去の瞬間に PASSIVE を
   走査し、条件・実行可能性を満たせば置換を実行して本来の除去をスキップ。
+
+### 本ブランチ（`claude/current-status-overview-MfmMw`）で追加した内容
+
+#### Phase 4: デッキ選択UI統一（opcg-sim-frontend）
+
+**課題**: VS CPU（`RealGame`）はデッキが `imu.json`/`nami.json` にハードコードされており、
+構築済みデッキを使えなかった。サンドボックスも API デッキ（Firestore）のみでローカルデッキが
+混在表示されていなかった。
+
+**変更ファイル**: `src/App.tsx`・`src/screens/RealGame.tsx`・`src/screens/SandboxGame.tsx`
+
+- `App.tsx`: `handleStart` のフォールバック `|| 'imu.json'` / `|| 'nami.json'` を除去。
+  空 p1/p2 をそのまま `RealGame` に渡すことで既存のデッキ選択画面（VS CPU SETUP）が表示される。
+- `RealGame.tsx` / `SandboxGame.tsx`: `fetchDecks` を修正。従来は Firestore デッキのみ表示し
+  `.json` ファイルを除外した後 imu/nami をハードコード挿入していたが、API が返す全デッキ
+  （`.json` プレフィックス付きIDはそのまま、それ以外は `db:` プレフィックス付き）を動的に列挙するよう変更。
+
+#### Phase 5: ボードハイライト対象選択（opcg-sim-frontend）
+
+**課題**: カード効果の対象選択（`SEARCH_AND_SELECT`/`SELECT_COUNTER`）が別画面の
+`CardSelectModal`（全画面モーダル）で行われており、攻撃対象選択（盤面クリック）と
+操作感が一致していなかった。
+
+**変更ファイル**: `src/layout/layout.config.ts`・`src/ui/CardRenderer.tsx`・
+`src/ui/BoardSide.tsx`・`src/screens/RealGame.tsx`
+
+**実装内容**:
+- `layout.config.ts`: ゴールドハイライト (`HIGHLIGHT_SELECTABLE: 0xF1C40F`) と
+  緑選択済み (`HIGHLIGHT_SELECTED: 0x2ECC71`) のカラー定数を追加（PIXI用数値＋CSS文字列）。
+- `CardRenderer.tsx`: `isSelectable`/`isSelected` を options 型に追加。選択可能カードには
+  ゴールド枠線、選択済みカードには緑半透明オーバーレイ＋✓チェックマークを描画。
+- `BoardSide.tsx`: `selectableUuids`/`selectedUuids`（`Set<string>`）パラメータを追加し
+  `getCardOpts` 経由で各カードに反映。
+- `RealGame.tsx`:
+  - `boardSelected: string[]` ステートを追加。`pendingRequest.request_id` 変化時にリセット。
+  - `isBoardSelectMode`: `SEARCH_AND_SELECT`/`SELECT_COUNTER` かつ `selectable_uuids` が
+    ある場合に true になる派生値。
+  - `onCardClick`: ボード選択モード中は対象カードクリックで即確定（単体選択）またはトグル
+    （複数選択）し、非対象クリックは無視。
+  - `showSearchModal`: `isBoardSelectMode` の場合は false（モーダル非表示）。
+  - バナー overlay: ゴールドボーダーでメッセージを表示。複数選択時は選択数カウンター＋確定ボタン、
+    `can_skip=true` 時はパスボタンを表示。
+  - `renderScene` deps: `pendingRequest`・`boardSelected` を追加してハイライト変化で即再描画。
+
+---
 
 ### 本ブランチ（`claude/handoff-documentation-review-tM2nD`）で追加した内容
 
@@ -1157,6 +1205,8 @@ PHoSv ラウンド1-2 で主要ケース（7枚のミスターゲット是正・
 | trigger断片: 埋め込み「〈timing〉時、発動できる」解消（13カード, OTHER −13） | oI1Np R4 |
 | レスト制限: PREVENT_REST 新設（「…レストにできない」＝アタック/ブロック封じ・9/9, OTHER −8） | tM2nD |
 | モーダル選択: 「以下から1つを選ぶ」空 Choice 修正（21カードのモーダル効果を機能化） | tM2nD |
+| UI Phase 4: デッキ選択UI統一（VS CPU・サンドボックスで API 全デッキから自由選択） | current-status-overview-MfmMw |
+| UI Phase 5: ボードハイライト対象選択（選択可能カードにゴールド枠・クリックで確定） | current-status-overview-MfmMw |
 
 ---
 
