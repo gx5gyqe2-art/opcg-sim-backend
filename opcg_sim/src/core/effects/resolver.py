@@ -631,7 +631,7 @@ class EffectResolver:
     def _suspend_for_target_selection(self, player, candidates, query, source_card, action_node=None):
         required_count = getattr(query, 'count', 1)
         is_up_to = getattr(query, 'is_up_to', False)
-        
+
         # 強制/任意の区別
         if is_up_to:
             min_select = 0
@@ -641,19 +641,30 @@ class EffectResolver:
                 min_select = len(candidates)
             if min_select < 1 and len(candidates) > 0:
                 min_select = 1
-        
+
         saved_stack = self.execution_stack.copy()
         if action_node:
             saved_stack.append(action_node)
 
+        # temp_zone からの選択（デッキサーチ）では全公開カードを表示し、
+        # 条件を満たすカードだけを selectable_uuids で絞り込む
+        view_candidates = candidates
+        selectable_uuids = None
+        if getattr(query, 'zone', None) == Zone.TEMP:
+            owner_player = self.game_manager.p1 if self.game_manager.p1.name == source_card.owner_id else self.game_manager.p2
+            all_temp = list(owner_player.temp_zone)
+            if len(all_temp) > len(candidates):
+                view_candidates = all_temp
+                selectable_uuids = [c.uuid for c in candidates]
+
         up_to_str = "まで" if is_up_to else ""
         count_str = f"{required_count}枚{up_to_str}" if required_count != 1 else f"1枚{up_to_str}"
-        self.game_manager.active_interaction = {
+        interaction = {
             "player_id": player.name,
             "action_type": "SELECT_TARGET",
             "source_card_name": source_card.master.name,
             "message": f"「{source_card.master.name}」の効果: 対象を選択（{count_str}）",
-            "candidates": candidates,
+            "candidates": view_candidates,
             "constraints": {
                 "min": min_select,
                 "max": required_count
@@ -665,6 +676,9 @@ class EffectResolver:
                 "query": query
             }
         }
+        if selectable_uuids is not None:
+            interaction["selectable_uuids"] = selectable_uuids
+        self.game_manager.active_interaction = interaction
         log_event("INFO", "resolver.suspend", f"Suspended for target selection (min:{min_select}, max:{required_count})", player=player.name)
 
     def resume_choice(self, player, source_card, selected_index, execution_stack, effect_context):
