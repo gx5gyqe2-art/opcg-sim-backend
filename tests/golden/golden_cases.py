@@ -1317,4 +1317,81 @@ CASES = [
             }
         ],
     },
+    # ===== C11: hand_to_life — dest_position フィールド =====
+    # GameAction に dest_position が追加されたことで hand_to_life がライフ上/下を正確に区別できる。
+    {
+        "id": "hand_to_life_top",
+        "text": "自分の手札1枚をライフの上に加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "HAND", "player": "SELF"},
+                    "destination": "LIFE",
+                    "dest_position": "TOP",
+                }
+            }
+        ],
+    },
+    {
+        "id": "hand_to_life_bottom",
+        "text": "自分の手札1枚をライフの下に加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "HAND", "player": "SELF"},
+                    "destination": "LIFE",
+                    "dest_position": "BOTTOM",
+                }
+            }
+        ],
+    },
+    # ===== D12d: rest_self — このキャラをレストにする（効果文脈） =====
+    {
+        "id": "rest_self_effect",
+        "text": "【登場時】このキャラをレストにする。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "action",
+                    "type": "REST",
+                    "target": {"player": "SELF"},
+                },
+            }
+        ],
+    },
+    # ===== D12b: trash_to_hand — トラッシュからカードを手札に =====
+    {
+        "id": "trash_event_to_hand",
+        "text": "【登場時】自分のトラッシュのイベント1枚までを、手札に加える。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "TRASH", "player": "SELF", "is_up_to": True},
+                    "destination": "HAND",
+                },
+            }
+        ],
+    },
+    # ===== ko: KOできる（任意KO, OP05-060系, OTHER 2件） =====
+    {
+        "id": "ko_optional_trait",
+        "text": "自分の特徴《王下七武海》を持つキャラ1枚をKOできる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "KO",
+                    "target": {"player": "SELF", "traits": ["王下七武海"]},
+                }
+            }
+        ],
+    },
 ]

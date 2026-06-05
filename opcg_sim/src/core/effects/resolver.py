@@ -125,6 +125,9 @@ class EffectResolver:
 
     def _can_satisfy_node(self, player, node: EffectNode, source_card) -> bool:
         if isinstance(node, GameAction):
+            if node.type == ActionType.REST_DON:
+                cost = node.value.base if node.value else 1
+                return len(player.don_active) >= cost
             if not node.target: return True
             from .matcher import get_target_cards
             candidates = get_target_cards(self.game_manager, node.target, source_card)

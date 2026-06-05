@@ -78,6 +78,7 @@ def summarize_node(node) -> Optional[Dict[str, Any]]:
             "status": node.status,
             "duration": node.duration,
             "destination": _enum_name(node.destination),
+            "dest_position": getattr(node, "dest_position", None),
         }
         if getattr(node, "sub_effect", None) is not None:
             out["sub_effect"] = summarize_node(node.sub_effect)

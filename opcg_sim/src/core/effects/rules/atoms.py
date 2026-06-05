@@ -47,7 +47,7 @@ def _draw(ctx: ParseContext) -> Optional[GameAction]:
 @rule("ko", priority=70)
 def _ko(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    if _nfc("KOする") not in t:
+    if not re.search(_nfc(r"KO(する|できる)"), t):
         return None
     tq = parse_target(t)
     if _nfc("まで") in t or re.search(r"\d+枚まで", t):
@@ -74,6 +74,24 @@ def _rest_self_cost(ctx: ParseContext) -> Optional[GameAction]:
             is_strict_count=True,
             ref_id="self",
         ),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 自己レスト（効果）: 「このキャラ／このリーダーをレストにする（できる）」(コスト以外)
+# ---------------------------------------------------------------------------
+@rule("rest_self", priority=76)
+def _rest_self(ctx: ParseContext) -> Optional[GameAction]:
+    """「このキャラ／このリーダーをレストにする（できる）」(効果文脈) → REST(SOURCE)。"""
+    if ctx.is_cost:
+        return None  # コスト文脈は rest_self_cost が担当
+    t = ctx.text
+    if not re.search(_nfc(r"このキャラをレスト|このリーダーをレスト"), t):
+        return None
+    return GameAction(
+        type=ActionType.REST,
+        target=TargetQuery(select_mode="SOURCE"),
         raw_text=t,
     )
 
@@ -254,7 +272,7 @@ def _life_to_hand(ctx: ParseContext) -> Optional[GameAction]:
 
 @rule("hand_to_life", priority=69)
 def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
-    """「（自分の）手札…を、ライフの上／下に加える」→ MOVE_CARD(dest=LIFE)。"""
+    """「（自分の）手札…を、ライフの上／下に加える」→ MOVE_CARD(dest=LIFE, dest_position=TOP/BOTTOM)。"""
     t = ctx.text
     if _nfc("手札") not in t:
         return None
@@ -262,10 +280,12 @@ def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
         return None
     tq = parse_target(t)
     tq.zone = Zone.HAND
+    dest_position = "TOP" if _nfc("ライフの上に加える") in t else "BOTTOM"
     return GameAction(
         type=ActionType.MOVE_CARD,
         target=tq,
         destination=Zone.LIFE,
+        dest_position=dest_position,
         raw_text=t,
     )
 
@@ -582,6 +602,31 @@ def _search_to_hand(ctx: ParseContext) -> Optional[GameAction]:
         return None
     tq = parse_target(t)
     tq.zone = Zone.TEMP
+    tq.player = Player.SELF
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=tq,
+        destination=Zone.HAND,
+        raw_text=t,
+    )
+
+
+@rule("trash_to_hand", priority=62)
+def _trash_to_hand(ctx: ParseContext) -> Optional[GameAction]:
+    """「自分のトラッシュの（種別/名前/色/コスト条件の）カード/キャラ/イベントN枚までを手札に加える」
+    → MOVE_CARD(zone=TRASH, dest=HAND)。
+
+    search_to_hand(54) より高優先で、トラッシュ明示のパターンを先取りする。
+    """
+    t = ctx.text
+    if _nfc("手札に加える") not in t and _nfc("手札に加えてもよい") not in t:
+        return None
+    if _nfc("トラッシュ") not in t:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.TRASH
     tq.player = Player.SELF
     if _nfc("まで") in t:
         tq.is_up_to = True
