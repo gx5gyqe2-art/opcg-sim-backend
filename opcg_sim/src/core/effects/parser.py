@@ -639,7 +639,8 @@ class EffectParser:
             return Condition(type=ConditionType.PREV_ACTION, value="SKIPPED", player=p, raw_text=norm_text)
         if _nfc("そうした") in norm_text:
             return Condition(type=ConditionType.PREV_ACTION, value="SUCCEEDED", player=p, raw_text=norm_text)
-        if _nfc("登場させた") in norm_text and _nfc("場合") in norm_text:
+        # "場合" は _parse_logic_block の区切り正規表現で削除済みのため単独でチェック
+        if _nfc("登場させた") in norm_text:
             return Condition(type=ConditionType.PREV_ACTION, value="PLAYED_CARD", player=p, raw_text=norm_text)
 
         return Condition(type=ConditionType.GENERIC, raw_text=norm_text)

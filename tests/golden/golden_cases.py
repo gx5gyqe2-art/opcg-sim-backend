@@ -1394,4 +1394,47 @@ CASES = [
             }
         ],
     },
+    # ===== B5: scry-1 デッキの上か下に置く =====
+    # 「公開し、デッキの上か下に置く」→ LOOK + DECK_BOTTOM(TEMP)。
+    # scry_place ルールで OTHER だった 2 件を修正。
+    {
+        "id": "scry_one_deck_top_or_bottom",
+        "text": "【登場時】自分のデッキの上から1枚を公開し、デッキの上か下に置く。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 1},
+                        {"type": "DECK_BOTTOM", "target": {"zone": "TEMP"}},
+                    ],
+                },
+            }
+        ],
+    },
+    # ===== B6: 登場させた場合 → PREV_ACTION condition =====
+    # 「登場させた場合、【速攻】を得る」→ Branch(PREV_ACTION=PLAYED_CARD, GRANT_KEYWORD)。
+    # legacy parser の _parse_condition_obj が「場合」を strip 済みのテキストに対して
+    # 「場合」の有無を再チェックしていたバグを修正。
+    {
+        "id": "prev_action_played_card_rush",
+        "text": "【メイン】自分のデッキの上から1枚を公開し、コスト5以下のキャラカード1枚までを、登場させてもよい。登場させた場合、そのキャラは、このターン中、【速攻】を得る。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 1},
+                        {"type": "PLAY_CARD"},
+                        {
+                            "kind": "branch",
+                            "condition": {"type": "PREV_ACTION"},
+                            "if_true": {"type": "GRANT_KEYWORD", "status": "速攻"},
+                        },
+                    ],
+                }
+            }
+        ],
+    },
 ]

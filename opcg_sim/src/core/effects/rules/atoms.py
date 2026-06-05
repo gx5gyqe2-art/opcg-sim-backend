@@ -811,6 +811,28 @@ def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(type=ActionType.DECK_BOTTOM, target=tq, raw_text=t)
 
 
+@rule("scry_place", priority=64)
+def _scry_place(ctx: ParseContext) -> Optional[GameAction]:
+    """「（そのカードを）デッキの上か下に置く」（公開後の単純配置）
+    → DECK_BOTTOM(TEMP)。LOOK 直後に「上か下」を選んで置くパターン。
+
+    「好きな順番」付きは temp_to_deck が担当。「残り」付きは
+    remaining_deck_top_or_bottom が担当。選択 UI 未実装のため下に保守的フォールバック。
+    """
+    t = ctx.text
+    if not re.search(_nfc(r"デッキの上か下に置く"), t):
+        return None
+    if _nfc("残り") in t or _nfc("好きな順番") in t or _nfc("並び替え") in t:
+        return None  # 既存ルールへ委ねる
+    if _nfc("手札") in t:
+        return None  # hand_to_deck が担当
+    return GameAction(
+        type=ActionType.DECK_BOTTOM,
+        target=TargetQuery(player=Player.SELF, zone=Zone.TEMP),
+        raw_text=t,
+    )
+
+
 @rule("remaining_deck_top_or_bottom", priority=63)
 def _remaining_deck_top_or_bottom(ctx: ParseContext) -> Optional[GameAction]:
     """「残りを（好きな順番に並び替え、）?デッキの上か下に置く」→ DECK_BOTTOM（保守的）。
