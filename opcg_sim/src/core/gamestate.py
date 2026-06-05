@@ -761,6 +761,13 @@ class GameManager:
             log_event("INFO", "game.action_look_life", f"{target_player.name} revealed {moved} life card(s)", player=player.name)
             return True
 
+        if act_name == "SELECT":
+            # 「（対象）を選ぶ」: 対象選択のみ（盤面は動かさない）。選択結果は
+            # _resolve_targets / resolve_interaction が target.save_id="selected_card" に
+            # 保存済み。後続の「選んだ／その（カード/キャラ/リーダー）」が ref_id で参照する。
+            log_event("INFO", "game.action_select", f"Selected {len(targets)} card(s)", player=player.name)
+            return True
+
         if act_name in ["HEAL", "LIFE_RECOVER"]:
             for _ in range(value):
                 if player.deck:

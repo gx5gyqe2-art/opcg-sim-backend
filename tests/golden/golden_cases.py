@@ -1487,6 +1487,24 @@ CASES = [
             }
         ],
     },
+    # ===== 構造的難所: select断片（「…を選ぶ。選んだキャラは…」） =====
+    # 「（対象）を選ぶ」→ SELECT(save_id) ／ 後続「選んだキャラ」→ ref_id="selected_card"。
+    {
+        "id": "select_then_attack_disable",
+        "text": "【登場時】相手のコスト6以下のキャラ1枚までを選ぶ。選んだキャラは、このターン中、アタックできない。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "SELECT", "target": {"player": "OPPONENT", "cost_max": 6, "is_up_to": True}},
+                        {"type": "ATTACK_DISABLE", "target": {"ref_id": "selected_card"}},
+                    ],
+                },
+            }
+        ],
+    },
     # ===== 構造的難所 C7: ライフ scry（対話選択 Choice ツリー） =====
     # 「自分か相手のライフの上から1枚までを見て、ライフの上か下に置く」→
     #   Choice[自分/相手/見ない] → 各 Seq[LOOK_LIFE → Choice[上/下に置く]]。

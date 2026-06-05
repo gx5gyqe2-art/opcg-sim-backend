@@ -102,6 +102,7 @@ class ActionType(Enum):
     DAMAGE = DEAL_DAMAGE # エイリアス追加
     
     SELECT_OPTION = auto()
+    SELECT = auto()  # 「（対象）を選ぶ」: 対象を選択して保存（save_id）するだけのアクション
     PASSIVE_EFFECT = auto()
     
     PREVENT_LEAVE = auto()

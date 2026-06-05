@@ -854,6 +854,30 @@ def _rush_natural(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+@rule("select_target", priority=58)
+def _select_target(ctx: ParseContext) -> Optional[GameAction]:
+    """「（対象）を選ぶ」（終止形・単独の選択句）→ SELECT（対象を選択して保存）。
+
+    「…を選ぶ。選んだキャラは…」のように選択と効果が別文に分割されたケースで、
+    選択句が動詞なしの OTHER に落ちていたのを是正する。選択結果は
+    target.save_id="selected_card" に保存され、後続句の「選んだ／その
+    （カード/キャラ/リーダー）」が ref_id で参照する（matcher.parse_target が付与）。
+
+    除外: 「以下から（1つを）選ぶ」（Choice）、連用形「選び、」（legacy が同一句で
+    save_id を付与する連結形）。
+    """
+    t = ctx.text
+    if _nfc("を選ぶ") not in t:
+        return None
+    if _nfc("以下から") in t or _nfc("効果を選択") in t:
+        return None
+    tq = parse_target(t)
+    tq.save_id = "selected_card"
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.SELECT, target=tq, raw_text=t)
+
+
 @rule("bounce", priority=56)
 def _bounce(ctx: ParseContext) -> Optional[GameAction]:
     """「（コストN以下の）（特徴X の）キャラ1枚（まで）を（持ち主の）手札に戻す（ことができる）」

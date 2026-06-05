@@ -1344,6 +1344,49 @@ def test_life_scry_skip():
     assert gm.active_interaction is None
 
 
+# ----- 構造的難所: select断片（SELECT→ref_id の suspend/resume リンク） --------
+def test_select_then_attack_disable_linked():
+    """「相手のキャラ1枚までを選ぶ。選んだキャラはアタックできない」:
+    SELECT で選んだ相手キャラに後続の ATTACK_DISABLE が ref_id 経由で適用される。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    x = make_instance(make_master(card_id="SX", name="X", cost=3, type=CardType.CHARACTER), owner=p2.name)
+    y = make_instance(make_master(card_id="SY", name="Y", cost=3, type=CardType.CHARACTER), owner=p2.name)
+    p2.field = [x, y]
+    ab = EffectParserV2().parse_card_text(
+        "【登場時】相手のコスト6以下のキャラ1枚までを選ぶ。選んだキャラは、このターン中、アタックできない。"
+    )[0]
+
+    gm.resolve_ability(p1, ab, source_card=p1.leader)
+    # 候補2枚 → 選択で中断
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "SELECT_TARGET"
+    gm.resolve_interaction(p1, {"selected_uuids": [x.uuid]})
+
+    # 選んだ X にのみ ATTACK_DISABLE（Y は無傷）
+    assert "ATTACK_DISABLE" in x.timed_flags
+    assert "ATTACK_DISABLE" not in y.timed_flags
+    assert gm.active_interaction is None
+
+
+def test_select_skip_none_selected():
+    """「1枚まで」= 任意 → 何も選ばない（空選択）と後続も対象なしで no-op。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    x = make_instance(make_master(card_id="SX2", name="X", cost=3, type=CardType.CHARACTER), owner=p2.name)
+    y = make_instance(make_master(card_id="SY2", name="Y", cost=3, type=CardType.CHARACTER), owner=p2.name)
+    p2.field = [x, y]
+    ab = EffectParserV2().parse_card_text(
+        "【登場時】相手のコスト6以下のキャラ1枚までを選ぶ。選んだキャラは、このターン中、アタックできない。"
+    )[0]
+    gm.resolve_ability(p1, ab, source_card=p1.leader)
+    assert gm.active_interaction["action_type"] == "SELECT_TARGET"
+    gm.resolve_interaction(p1, {"selected_uuids": []})  # 選ばない
+    assert "ATTACK_DISABLE" not in x.timed_flags
+    assert "ATTACK_DISABLE" not in y.timed_flags
+    assert gm.active_interaction is None
+
+
 if __name__ == "__main__":
     import traceback
 
