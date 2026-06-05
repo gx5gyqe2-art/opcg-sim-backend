@@ -1487,6 +1487,38 @@ CASES = [
             }
         ],
     },
+    # ===== 構造的難所 C7: ライフ scry（対話選択 Choice ツリー） =====
+    # 「自分か相手のライフの上から1枚までを見て、ライフの上か下に置く」→
+    #   Choice[自分/相手/見ない] → 各 Seq[LOOK_LIFE → Choice[上/下に置く]]。
+    {
+        "id": "life_scry_top_or_bottom",
+        "text": "【登場時】自分か相手のライフの上から1枚までを見て、ライフの上か下に置く。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "choice",
+                    "options": [
+                        {"kind": "seq", "actions": [
+                            {"type": "LOOK_LIFE"},
+                            {"kind": "choice", "options": [
+                                {"type": "MOVE_CARD", "destination": "LIFE", "dest_position": "TOP"},
+                                {"type": "MOVE_CARD", "destination": "LIFE", "dest_position": "BOTTOM"},
+                            ]},
+                        ]},
+                        {"kind": "seq", "actions": [
+                            {"type": "LOOK_LIFE"},
+                            {"kind": "choice", "options": [
+                                {"type": "MOVE_CARD", "destination": "LIFE", "dest_position": "TOP"},
+                                {"type": "MOVE_CARD", "destination": "LIFE", "dest_position": "BOTTOM"},
+                            ]},
+                        ]},
+                        {"kind": "seq", "actions": []},
+                    ],
+                },
+            }
+        ],
+    },
     # 「元々のパワー7000にする」— base_power_override に静的値をセット。
     {
         "id": "set_power_base_value",

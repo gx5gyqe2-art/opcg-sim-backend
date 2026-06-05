@@ -743,7 +743,24 @@ class GameManager:
                 card = deck.pop(0)
                 player.temp_zone.append(card)
             return True
-        
+
+        if act_name == "LOOK_LIFE":
+            # 「（自分か相手の）ライフの上から N枚を見る」→ 対象プレイヤーのライフ上 value 枚を
+            # 同プレイヤーの temp_zone へ移して公開する。後続の Choice が temp→ライフ上/下に戻す。
+            # status=="OPPONENT" で相手のライフを対象（相手の temp_zone に載るため、戻し先も相手）。
+            target_player = player
+            if getattr(action, "status", None) == "OPPONENT":
+                target_player = self.p2 if player == self.p1 else self.p1
+            count = value if value else 1
+            moved = 0
+            for _ in range(count):
+                if not target_player.life:
+                    break
+                target_player.temp_zone.append(target_player.life.pop(0))
+                moved += 1
+            log_event("INFO", "game.action_look_life", f"{target_player.name} revealed {moved} life card(s)", player=player.name)
+            return True
+
         if act_name in ["HEAL", "LIFE_RECOVER"]:
             for _ in range(value):
                 if player.deck:

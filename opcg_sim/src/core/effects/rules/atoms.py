@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from ....models.effect_types import GameAction, TargetQuery, ValueSource
+from ....models.effect_types import Choice, GameAction, Sequence, TargetQuery, ValueSource
 from ....models.enums import ActionType, Player, Zone
 from ..matcher import parse_target
 from .base import ParseContext, rule, _nfc
@@ -251,6 +251,67 @@ def _life_face(ctx: ParseContext) -> Optional[GameAction]:
     tq = parse_target(t)
     tq.zone = Zone.LIFE
     return GameAction(type=ActionType.FACE_UP_LIFE, target=tq, status=status, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# ライフ scry（C7）: 「（自分か相手の）ライフの上から1枚（まで）を見て、ライフの上か下に置く」
+#   → 対話選択（Choice）で実装する。フロントは action_type="CHOICE"＋options を
+#     既にボタン描画・index 返却まで対応済みなので、バックエンドで Choice ツリーを
+#     生成すれば end-to-end で動く（resolver の suspend/resume に乗る）。
+#   構造:
+#     Choice[どのライフを見るか]
+#       ├ 自分: Sequence[LOOK_LIFE(SELF,1) → Choice[上/下に置く（SELF）]]
+#       ├ 相手: Sequence[LOOK_LIFE(OPP,1)  → Choice[上/下に置く（OPP）]]
+#       └ （「まで」なら）見ない: Sequence[]（no-op）
+#   LOOK_LIFE が対象ライフ上 1 枚を temp_zone へ移し、後続 Choice が temp→ライフ上/下へ戻す。
+# ---------------------------------------------------------------------------
+def _place_temp_to_life(target_player: Player, position: str, raw: str) -> GameAction:
+    """temp_zone の公開カードを target_player のライフの上(TOP)/下(BOTTOM)へ戻す。"""
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=TargetQuery(zone=Zone.TEMP, player=target_player, select_mode="ALL", count=1),
+        destination=Zone.LIFE,
+        dest_position=position,
+        raw_text=raw,
+    )
+
+
+def _scry_one_life(target_player: Player, status: str, raw: str) -> Sequence:
+    look = GameAction(type=ActionType.LOOK_LIFE, status=status, value=ValueSource(base=1), raw_text=raw)
+    place = Choice(
+        message="ライフの上か下に置く",
+        option_labels=["ライフの上に置く", "ライフの下に置く"],
+        options=[
+            _place_temp_to_life(target_player, "TOP", raw),
+            _place_temp_to_life(target_player, "BOTTOM", raw),
+        ],
+    )
+    return Sequence(actions=[look, place])
+
+
+@rule("life_scry_top", priority=73)
+def _life_scry_top(ctx: ParseContext) -> Optional[Choice]:
+    t = ctx.text
+    if _nfc("ライフの上から") not in t or _nfc("見て") not in t:
+        return None
+    # 戻し先が「ライフの上か下」のもののみ（「ライフすべてを見て…」並び替えは別パターン）。
+    if not (_nfc("ライフの上か下") in t or (_nfc("ライフの上") in t and _nfc("下に置く") in t)):
+        return None
+    both = _nfc("自分か相手") in t
+    labels: list = []
+    options: list = []
+    if both or (_nfc("自分") in t and _nfc("相手") not in t):
+        labels.append("自分のライフを見る")
+        options.append(_scry_one_life(Player.SELF, "SELF", t))
+    if both or (_nfc("相手") in t and _nfc("自分") not in t):
+        labels.append("相手のライフを見る")
+        options.append(_scry_one_life(Player.OPPONENT, "OPPONENT", t))
+    if not options:
+        return None
+    if _nfc("まで") in t:  # 「1枚まで」= 任意 → 見ない選択肢
+        labels.append("見ない")
+        options.append(Sequence(actions=[]))
+    return Choice(message="どちらのライフを見ますか", option_labels=labels, options=options)
 
 
 @rule("life_recover", priority=71)

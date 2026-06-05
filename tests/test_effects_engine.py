@@ -1273,6 +1273,77 @@ def test_leader_state_power_le():
     assert _check_cond(gm, p1, cond, p1.leader) is False  # 6000 > 5000
 
 
+# ----- 構造的難所 C7: ライフ scry（対話選択 Choice の suspend/resume フロー） --------
+def _life_scry_ability():
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    text = "【登場時】自分か相手のライフの上から1枚までを見て、ライフの上か下に置く。"
+    return EffectParserV2().parse_card_text(text)[0]
+
+
+def _setup_scry_game():
+    gm, p1, p2 = make_game()
+    a = make_instance(make_master(card_id="LA", name="A"), owner=p1.name)
+    b = make_instance(make_master(card_id="LB", name="B"), owner=p1.name)
+    c = make_instance(make_master(card_id="LC", name="C"), owner=p1.name)
+    p1.life = [a, b, c]
+    oa = make_instance(make_master(card_id="OA", name="OA"), owner=p2.name)
+    ob = make_instance(make_master(card_id="OB", name="OB"), owner=p2.name)
+    p2.life = [oa, ob]
+    return gm, p1, p2
+
+
+def test_life_scry_self_to_bottom():
+    """自分のライフ上(A)を見て下に置く: [A,B,C] → [B,C,A]、temp リーク無し。"""
+    gm, p1, _ = _setup_scry_game()
+    gm.resolve_ability(p1, _life_scry_ability(), source_card=p1.leader)
+    # 1) どのライフを見るか（自分=index0）
+    assert gm.active_interaction["action_type"] == "CHOICE"
+    gm.resolve_interaction(p1, {"index": 0})
+    # LOOK_LIFE 実行後: A が temp、life は [B,C]
+    assert [c.master.name for c in p1.life] == ["B", "C"]
+    assert [c.master.name for c in p1.temp_zone] == ["A"]
+    # 2) 上か下か（下=index1）
+    assert gm.active_interaction["action_type"] == "CHOICE"
+    gm.resolve_interaction(p1, {"index": 1})
+    assert [c.master.name for c in p1.life] == ["B", "C", "A"]
+    assert p1.temp_zone == []
+    assert gm.active_interaction is None
+
+
+def test_life_scry_self_to_top_noop():
+    """自分のライフ上(A)を見て上に戻す: 並びは [A,B,C] のまま、temp リーク無し。"""
+    gm, p1, _ = _setup_scry_game()
+    gm.resolve_ability(p1, _life_scry_ability(), source_card=p1.leader)
+    gm.resolve_interaction(p1, {"index": 0})   # 自分
+    gm.resolve_interaction(p1, {"index": 0})   # 上に戻す
+    assert [c.master.name for c in p1.life] == ["A", "B", "C"]
+    assert p1.temp_zone == []
+    assert gm.active_interaction is None
+
+
+def test_life_scry_opponent_to_bottom():
+    """相手のライフ上(OA)を見て下に置く: 相手 [OA,OB] → [OB,OA]、相手 temp リーク無し。"""
+    gm, p1, p2 = _setup_scry_game()
+    gm.resolve_ability(p1, _life_scry_ability(), source_card=p1.leader)
+    gm.resolve_interaction(p1, {"index": 1})   # 相手のライフを見る
+    assert [c.master.name for c in p2.life] == ["OB"]
+    assert [c.master.name for c in p2.temp_zone] == ["OA"]
+    gm.resolve_interaction(p1, {"index": 1})   # 下に置く
+    assert [c.master.name for c in p2.life] == ["OB", "OA"]
+    assert p2.temp_zone == []
+    assert gm.active_interaction is None
+
+
+def test_life_scry_skip():
+    """「1枚まで」= 任意 → 見ない（index2）を選ぶとライフは不変・temp リーク無し。"""
+    gm, p1, p2 = _setup_scry_game()
+    gm.resolve_ability(p1, _life_scry_ability(), source_card=p1.leader)
+    gm.resolve_interaction(p1, {"index": 2})   # 見ない
+    assert [c.master.name for c in p1.life] == ["A", "B", "C"]
+    assert p1.temp_zone == [] and p2.temp_zone == []
+    assert gm.active_interaction is None
+
+
 if __name__ == "__main__":
     import traceback
 

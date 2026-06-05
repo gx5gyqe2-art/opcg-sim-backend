@@ -70,6 +70,7 @@ class ActionType(Enum):
     DISCARD = auto()
     TRASH_FROM_DECK = auto()
     LOOK = auto()
+    LOOK_LIFE = auto()
     REVEAL = auto()
     SHUFFLE = auto()
     PLAY_CARD = auto()
