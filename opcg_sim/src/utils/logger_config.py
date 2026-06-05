@@ -206,16 +206,6 @@ def log_event(
         sys.stdout.flush()
 
     gcs_url = None
-    
-    if action == "EFFECT_DEF_REPORT":
-        folder = "sandbox_reports" if action.startswith("sandbox.") else "reports"
-        time_prefix = now.strftime("%Y%m%d_%H%M%S_%f")
-        filename = f"{folder}/{time_prefix}_{sid}_{action}.json"
-        
-        _executor.submit(upload_to_gcs, filename, log_json_bytes)
-        
-        if BUCKET_NAME:
-            gcs_url = f"https://storage.cloud.google.com/{BUCKET_NAME}/{filename}"
 
     target_channel = SLACK_CHANNEL_ID
     lv = level_key.upper()
