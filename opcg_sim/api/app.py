@@ -234,6 +234,12 @@ async def game_action(req: Dict[str, Any] = Body(...)):
             for ability in operating_card.master.abilities:
                 if ability.trigger == TriggerType.ACTIVATE_MAIN: manager.resolve_ability(current_player, ability, source_card=operating_card)
         elif action_type == game_actions.get('RESOLVE_EFFECT_SELECTION', 'RESOLVE_EFFECT_SELECTION'): manager.resolve_interaction(current_player, payload)
+        elif action_type == 'MULLIGAN':
+            manager.do_mulligan(current_player)
+            manager.action_events.append({"type": "MULLIGAN", "player": player_id, "message": "マリガン（手札全交換）"})
+        elif action_type == 'KEEP_HAND':
+            manager.keep_hand(current_player)
+            manager.action_events.append({"type": "KEEP_HAND", "player": player_id, "message": "手札キープ"})
         return build_game_result_hybrid(manager, game_id, success=True)
     except Exception as e:
         log_event(level_key="ERROR", action="game.action_fail", msg=traceback.format_exc(), player=player_id, payload=req); return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))

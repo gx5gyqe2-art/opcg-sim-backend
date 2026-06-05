@@ -80,7 +80,8 @@ def _target_zones(action):
 
 
 # 「TEMP を populate する」アクション（これが無いと TEMP 消費は no-op）。
-_TEMP_POPULATORS = {ActionType.LOOK}
+# LOOK（デッキ上→TEMP）と LOOK_LIFE（ライフ上→TEMP）の両方が TEMP を満たす。
+_TEMP_POPULATORS = {ActionType.LOOK, ActionType.LOOK_LIFE}
 # 「TEMP を消費する」操作で、消費元が TEMP のもの。
 _TEMP_CONSUMER_ZONE = Zone.TEMP
 

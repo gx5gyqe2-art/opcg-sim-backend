@@ -146,6 +146,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if _nfc("効果のない") in tgt_text or _nfc("効果がない") in tgt_text:
         tq.is_vanilla = True
 
+    # 「選んだ／その（カード/キャラ/リーダー）」は直前の選択（SELECT, save_id="selected_card"）で
+    # 保存した対象を参照する。resolver._resolve_targets は ref_id が saved_targets に
+    # 無ければ通常マッチへフォールバックするため、選択が先行しない場合も安全。
+    if re.search(_nfc(r"(選んだ|その)(カード|キャラ|リーダー)"), tgt_text):
+        tq.ref_id = "selected_card"
+
     return tq
 
 def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
