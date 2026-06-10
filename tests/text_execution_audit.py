@@ -27,9 +27,10 @@ from collections import Counter, defaultdict
 
 import conftest  # noqa: F401
 
-from opcg_sim.src.models.enums import ActionType, Zone, Player
+from opcg_sim.src.models.enums import ActionType, Zone, Player, CardType
 from opcg_sim.src.models.effect_types import GameAction, Sequence, Branch, Choice
 from opcg_sim.src.utils.loader import CardLoader
+from effect_coverage import _build_test_state
 
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "opcg_sim", "data")
 
@@ -76,6 +77,34 @@ _VERB_ACTIONS = {
 }
 
 
+def runtime_hidden_leak(master, ability):
+    """能力を発動し、デッキ/ライフ(隠しゾーン)の対象選択で中断する＝中身が見える、を検出。
+    発動できない(コスト未達等)場合や例外は「リークなし」として扱う（保守的）。"""
+    try:
+        on_play = (ability.trigger.name if hasattr(ability.trigger, "name") else "") == "ON_PLAY"
+        gm, p1, p2, src = _build_test_state(master, source_in_hand=on_play)
+        if on_play and master.type != CardType.EVENT:
+            gm.play_card_action(p1, src)
+        else:
+            gm.resolve_ability(p1, ability, src)
+        n = 0
+        while gm.active_interaction and n < 30:
+            ia = gm.active_interaction
+            q = (ia.get("continuation") or {}).get("query")
+            if q is not None and getattr(q, "zone", None) in (Zone.DECK, Zone.LIFE):
+                return True
+            cand = ia.get("selectable_uuids") or [c.uuid for c in ia.get("candidates", [])]
+            try:
+                gm.resolve_interaction(p1 if p1.name == ia.get("player_id") else p2,
+                                       {"selected_uuids": cand[:1], "index": 0})
+            except Exception:
+                break
+            n += 1
+    except Exception:
+        return False
+    return False
+
+
 def audit_ability(text, ability):
     """1能力をテキストと突き合わせてフラグのリストを返す。"""
     flags = []
@@ -93,16 +122,6 @@ def audit_ability(text, ability):
             continue
         raw = _nfc(a.raw_text or "")
         tq = a.target
-
-        # FLAG_HIDDEN_LEAK: デッキ/ライフの「上から/下から」(位置指定=不可視)を対話選択させる。
-        #   「デッキから」(山札サーチ)や「見て/公開/選ぶ/上か下」は対象外（正当な対話）。
-        if tq and getattr(tq, "zone", None) in (Zone.DECK, Zone.LIFE):
-            mode = getattr(tq, "select_mode", "CHOOSE")
-            positional = ("上から" in raw or "下から" in raw)
-            interactive_words = ("見て" in raw or "公開" in raw or "選ぶ" in raw
-                                 or "選び" in raw or "か下" in raw)
-            if positional and mode == "CHOOSE" and not interactive_words and a.type != ActionType.LOOK:
-                flags.append(("FLAG_HIDDEN_LEAK", f"{a.type.name} {tq.zone.name} '{raw[:30]}'"))
 
         # FLAG_DURATION
         dur = getattr(a, "duration", "INSTANT")
@@ -156,7 +175,11 @@ def run(flag_filter=None, card_filter=None, deck_filter=None):
             continue
         text = getattr(m, "effect_text", "") or ""
         for ab in m.abilities:
-            for fname, detail in audit_ability(text, ab):
+            ab_flags = audit_ability(text, ab)
+            # FLAG_HIDDEN_LEAK は実行時に判定（隠しゾーンで実際に選択中断するか）
+            if (not flag_filter or flag_filter == "HIDDEN_LEAK") and runtime_hidden_leak(m, ab):
+                ab_flags.append(("FLAG_HIDDEN_LEAK", "deck/life 選択中断(中身が見える)"))
+            for fname, detail in ab_flags:
                 if flag_filter and fname != f"FLAG_{flag_filter}":
                     continue
                 flag_counts[fname] += 1
