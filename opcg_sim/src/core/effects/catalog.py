@@ -378,6 +378,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                             type=ActionType.BUFF,
                             target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, card_type=["LEADER"], count=1, ref_id="self"),
                             value=ValueSource(base=2000),
+                            duration="THIS_TURN",
                             raw_text="このリーダーは、このターン中、パワー+2000"
                          )
                      ]),

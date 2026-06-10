@@ -192,9 +192,11 @@ def test_homuresaki_shared_trigger():
     p1.field = [target]
     p2.field = fillers(1, "P2", cost=3)
     p2.life = fillers(2, "P2")
+    before_pw = target.get_power(True)
     gm.play_card_action(p1, src)
     drain(gm)
-    assert target.power_buff == 1000
+    # 「このターン中、パワー+1000」は継続効果(timed_power)で管理される
+    assert target.get_power(True) == before_pw + 1000
     assert p2.field[0].is_rest is True
 
 
@@ -322,6 +324,38 @@ def test_nami_leader_opp_attack_buff():
     before = p1.leader.get_power(False)
     fire(gm, p1, p1.leader, "ON_OPP_ATTACK")
     assert p1.leader.get_power(False) == before + 2000
+
+
+def test_nami_leader_buff_is_this_turn_not_battle():
+    """OP11-041 の「このターン中+2000」がバトル中限定になっていない:
+    被攻撃リーダーの reset_turn_status(バトル終了)で消えず、ターン終了で失効する。"""
+    from opcg_sim.src.models.models import CardType as CT
+    gm, p1, p2 = base(turn=4, turn_player_is_p1=False)  # 相手(p2)のターン
+    p1.leader = inst("OP11-041")
+    p1.hand = fillers(2, "P1")
+    p1.life = fillers(3, "P1")
+    p2.leader = CardInstance(make_master(card_id="L2", name="L2", power=5000, type=CT.LEADER), "P2")
+    atk = CardInstance(make_master(card_id="A", name="A", power=6000), "P2")
+    atk.is_rest = False
+    p2.field = [atk]
+    base_pw = p1.leader.get_power(False)
+    gm.declare_attack(atk, p1.leader)
+    drain(gm)  # ON_OPP_ATTACK の Choice を解決（先頭=使用する）
+    assert p1.leader.get_power(False) == base_pw + 2000
+    gm.apply_counter(p1, None)  # カウンターをパス → resolve_attack（リーダーが対象で reset される）
+    assert p1.leader.get_power(False) == base_pw + 2000, "バトル終了後も+2000が残るべき(THIS_TURN)"
+    gm.continuous.expire("TURN_END", gm.turn_count)
+    assert p1.leader.get_power(False) == base_pw, "ターン終了で失効するべき"
+
+
+def test_throne_dynamic_cost_limit_parsed():
+    """虚の玉座: 「場のドン!!の枚数以下のコスト」が cost_max_dynamic に解釈される。"""
+    m = db().get_card("OP13-099")
+    ab = next(a for a in m.abilities if a.trigger.name == "ACTIVATE_MAIN")
+    # effect は PLAY_CARD（手札から登場）。動的コスト上限が設定されていること。
+    play = ab.effect if ab.effect.type.name == "PLAY_CARD" else None
+    assert play is not None
+    assert play.target.cost_max_dynamic == "DON_COUNT_FIELD"
 
 
 if __name__ == "__main__":

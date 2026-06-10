@@ -1015,10 +1015,15 @@ class GameManager:
                     target.timed_keywords.discard("ブロッカー")  # 効果付与分の【ブロッカー】も無効化
                     log_event("INFO", "game.action_blocker_disable", f"{target.master.name} blocker disabled", player=player.name)
                 else:
-                    # 「このバトル中」のパワー増減は継続効果として管理し、バトル終了時に失効させる
-                    # （従来は power_buff に直接加算され、同一ターンの後続バトルへ誤って持ち越していた）。
-                    if getattr(action, "duration", "INSTANT") == "THIS_BATTLE":
-                        self.continuous.apply(target, "POWER", "THIS_BATTLE", amount=value)
+                    # 期間付きパワー増減は継続効果(timed_power)として管理する。
+                    #  - THIS_BATTLE: バトル終了で失効（同一ターンの後続バトルへ持ち越さない）。
+                    #  - THIS_TURN / UNTIL_NEXT_TURN_END: ターン境界の reset_turn_status で
+                    #    消えると困る（例: 被攻撃リーダーの「このターン中+N」が resolve_attack の
+                    #    target.reset_turn_status で battle 終了時に即消える）。継続効果に載せて存続させる。
+                    dur = getattr(action, "duration", "INSTANT")
+                    if dur in ("THIS_BATTLE", "THIS_TURN", "UNTIL_NEXT_TURN_END"):
+                        expire_turn = self.turn_count + 1 if dur == "UNTIL_NEXT_TURN_END" else 0
+                        self.continuous.apply(target, "POWER", dur, amount=value, expire_turn=expire_turn)
                     elif hasattr(target, 'power_buff'):
                         target.power_buff += value
                         log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name)
