@@ -281,6 +281,20 @@ class GameManager:
 
             resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
+        elif action_type == "CONFIRM_OPTIONAL":
+            # 任意効果（「〜してもよい」）の発動可否。accepted=False（パス/拒否）ならスキップ。
+            accepted = payload.get("accepted")
+            if accepted is None:
+                # selected_uuids 非空 / index>0 / skip フラグ等から推定（既定は発動=True）
+                if payload.get("skip") is True or payload.get("declined") is True:
+                    accepted = False
+                else:
+                    accepted = payload.get("index", 0) == 0
+            optional_node = continuation.get("optional_node")
+            self.active_interaction = None
+            resolver.resume_optional(player, source_card, bool(accepted), optional_node,
+                                     continuation.get("execution_stack", []), continuation.get("effect_context", {}))
+
         elif action_type == "DECLARE_COST":
             # C8: 宣言コストを記録し、相手デッキトップを公開して context に保存してから再開。
             declared = payload.get("declared_value", payload.get("index", 0))

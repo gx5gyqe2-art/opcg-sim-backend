@@ -170,6 +170,14 @@ class EffectResolver:
                     self._suspend_for_cost_declaration(player, source_card)
                     return
 
+                # 任意効果（「〜してもよい」）: 発動するかを yes/no で確認する。未確認なら中断し、
+                # resume(yes) 時に id(node) を context の確認済み集合へ入れて同じノードを再投入する
+                # （no はスキップ）。共有ノード(CardMaster)を汚さないよう確認状態は context で持つ。
+                confirmed = self.context.setdefault("_confirmed_optionals", set())
+                if getattr(node, "is_optional", False) and id(node) not in confirmed:
+                    self._suspend_for_optional_confirmation(player, node, source_card)
+                    return
+
                 success = self._execute_game_action(player, node, source_card)
 
                 if self.game_manager.active_interaction:
@@ -661,6 +669,33 @@ class EffectResolver:
             }
         }
         log_event("INFO", "resolver.suspend", "Suspended for player choice", player=player.name)
+
+    def _suspend_for_optional_confirmation(self, player, node, source_card):
+        """任意効果（「〜してもよい」）の発動可否を yes/no で確認するため中断する。
+        node は execution_stack から既に pop 済みなので、continuation に退避する。"""
+        self.game_manager.active_interaction = {
+            "player_id": player.name,
+            "action_type": "CONFIRM_OPTIONAL",
+            "source_card_name": source_card.master.name,
+            "message": f"「{source_card.master.name}」の効果を発動しますか？",
+            "can_skip": True,
+            "continuation": {
+                "execution_stack": self.execution_stack,
+                "effect_context": self.context,
+                "source_card_uuid": source_card.uuid,
+                "optional_node": node,
+            },
+        }
+        log_event("INFO", "resolver.suspend", "Suspended for optional confirmation", player=player.name)
+
+    def resume_optional(self, player, source_card, accepted, optional_node, execution_stack, effect_context):
+        """任意効果確認からの再開。accepted=True なら確認済みにして再投入、False ならスキップ。"""
+        self.execution_stack = execution_stack
+        self.context = effect_context
+        if accepted and optional_node is not None:
+            self.context.setdefault("_confirmed_optionals", set()).add(id(optional_node))
+            self.execution_stack.append(optional_node)
+        self._process_stack(player, source_card)
 
     def _suspend_for_cost_declaration(self, player, source_card):
         """C8: 数値（コスト）の宣言を待つインタラクションへ中断する。

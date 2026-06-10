@@ -158,6 +158,37 @@ def test_c8_declare_cost_mismatch_skips_effect():
     assert victim in p2.field  # KO されない
 
 
+def test_optional_effect_confirm_yes_executes():
+    """任意効果(is_optional)は yes/no 確認を経て、yes でドロー実行。"""
+    gm, p1, _ = make_game()
+    for i in range(3):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    opt_draw = GameAction(type=ActionType.DRAW, value=ValueSource(base=1), is_optional=True)
+    ability = Ability(trigger=TriggerType.ON_PLAY, effect=opt_draw)
+    src = _make_field_char(p1, name="任意ドロー")
+
+    gm.resolve_ability(p1, ability, source_card=src)
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "CONFIRM_OPTIONAL"
+    assert len(p1.hand) == 0  # まだ引いていない
+    gm.resolve_interaction(p1, {"accepted": True})
+    assert len(p1.hand) == 1  # yes → ドロー実行
+
+
+def test_optional_effect_confirm_no_skips():
+    """任意効果を no で拒否するとスキップされる。"""
+    gm, p1, _ = make_game()
+    for i in range(3):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    opt_draw = GameAction(type=ActionType.DRAW, value=ValueSource(base=1), is_optional=True)
+    ability = Ability(trigger=TriggerType.ON_PLAY, effect=opt_draw)
+    src = _make_field_char(p1, name="任意ドロー")
+
+    gm.resolve_ability(p1, ability, source_card=src)
+    gm.resolve_interaction(p1, {"accepted": False})
+    assert len(p1.hand) == 0  # no → スキップ
+
+
 def test_c10_deckout_win_replacement():
     """C10: デッキアウトしたプレイヤーが「敗北する代わりに勝利する」PASSIVE を持つ場合、
     本人が勝利する。持たない相手がデッキアウトした場合は通常どおり相手が敗北する。"""

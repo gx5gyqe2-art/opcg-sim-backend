@@ -391,7 +391,17 @@ class EffectParser:
                 option_labels=options
             )
 
-        return self._parse_atomic_action(norm_text, is_cost)
+        node = self._parse_atomic_action(norm_text, is_cost)
+
+        # 任意効果マーカー: 効果文脈で「〜してもよい／てもよい」で終わる句は、発動するかを
+        # プレイヤーが選べる（resolver が yes/no 確認へ中断）。コストは ":" で既に任意のため対象外。
+        # 「できる」は注釈/コスト/キーワード/トリガー宣言で多義のため、ここでは明示マーカーのみ拾う。
+        if (not is_cost and isinstance(node, GameAction)
+                and node.type not in (ActionType.REPLACE_EFFECT, ActionType.DECLARE_COST, ActionType.OTHER)
+                and re.search(_nfc(r"(してもよい|てもよい)"), norm_text)):
+            node.is_optional = True
+
+        return node
 
     def _parse_atomic_action(self, text: str, is_cost: bool) -> GameAction:
         norm_text = _nfc(text)

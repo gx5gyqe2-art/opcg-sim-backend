@@ -173,6 +173,9 @@ class GameAction(EffectNode):
     raw_text: str = ""
     # REPLACE_EFFECT 用: 「代わりに〜」で実行する置換アクション（除去の代替）。
     sub_effect: Optional["EffectNode"] = None
+    # 任意効果（「〜してもよい／てもよい」）。発動するかをプレイヤーが選ぶ。
+    # resolver が実行前に yes/no 確認インタラクションへ中断する。
+    is_optional: bool = False
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> GameAction:
