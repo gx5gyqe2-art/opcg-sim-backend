@@ -241,8 +241,9 @@ class EffectParser:
         """
         norm = _nfc(cost_text)
 
-        if re.search(_nfc(r'このキャラをレスト|このリーダーをレスト|このキャラをレストにできる'), norm):
-            return GameAction(
+        m = re.search(_nfc(r'この(?:キャラ|リーダー)をレストに(し[、，]|できる|する)'), norm)
+        if m:
+            rest_action = GameAction(
                 type=ActionType.REST,
                 target=TargetQuery(
                     player=Player.SELF,
@@ -253,6 +254,19 @@ class EffectParser:
                 ),
                 raw_text=norm
             )
+            # 「このキャラをレストにし、<追加コスト>」のように自己レストの後に別コストが
+            # 続く場合、従来は REST のみ返して後続（手札を捨てる／ライフを手札に加える 等）を
+            # 破棄していた。残りも解析して REST と結合した Sequence にする。
+            remainder = norm[m.end():].strip('、，。 ')
+            if remainder and remainder not in ('ことができる', 'できる'):
+                rest_node = self._parse_to_node(remainder, is_cost=True)
+                actions = [rest_action]
+                if isinstance(rest_node, Sequence):
+                    actions.extend(rest_node.actions)
+                else:
+                    actions.append(rest_node)
+                return Sequence(actions=actions)
+            return rest_action
 
         return self._parse_to_node(norm, is_cost=True)
 

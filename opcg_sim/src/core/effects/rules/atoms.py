@@ -1088,7 +1088,10 @@ def _trash_self(ctx: ParseContext) -> Optional[GameAction]:
 @rule("trash_target", priority=57)
 def _trash_target(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    if not re.search(_nfc(r"トラッシュに置"), t):
+    # 「トラッシュに置く」のほか、構造分割で動詞が落ちた「…をトラッシュに」(節末)も拾う。
+    # 例: 五老星(OP13-082)「自分のキャラすべてをトラッシュに置き、…」は「置き、」で分割され
+    # 「自分のキャラすべてをトラッシュに」となり、従来は OTHER に落ちて全体KOが不発だった。
+    if not re.search(_nfc(r"トラッシュに置|トラッシュに$"), t):
         return None
     # 自己トラッシュ（このキャラ／このカード／このリーダーを、?トラッシュ）は trash_self が担当
     if re.search(_nfc(r"この(カード|キャラ|リーダー)を、?トラッシュ"), t):
