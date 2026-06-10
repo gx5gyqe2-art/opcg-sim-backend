@@ -1,14 +1,13 @@
 """実行カバレッジスクリプト。
 
-全カードの ACTIVATE_MAIN 能力を GameManager 上で直接発動し、
-「実行時にどう動いたか」を分類して手動テストの優先順位付けに使う。
+全カードの全トリガータイプ能力を GameManager 上で発動し、
+手動テストの優先順位付けに使う分類レポートを出力する。
 
 分類:
   ERROR        : 例外発生 → エンジン修正が必要（最優先）
   INTERACTIVE  : 発動中にプレイヤー選択が発生 → 手動テスト必須リスト
-  EXECUTED     : 盤面変化あり・自動確認済み
-  NO_CHANGE    : 発動完了したが盤面変化なし（条件未達 or OTHER の疑い）
-  SKIP         : ACTIVATE_MAIN 能力なし（対象外）
+  EXECUTED     : 盤面変化ありまたは action_events 記録あり・自動確認済み
+  NO_CHANGE    : 発動完了したが変化なし（条件未達 or OTHER の疑い）
 
 has_other フラグ: AST 中に ActionType.OTHER が含まれる（effect_diagnostics の OTHER と同義）
 
@@ -17,14 +16,15 @@ has_other フラグ: AST 中に ActionType.OTHER が含まれる（effect_diagno
     OPCG_LOG_SILENT=1 python tests/effect_coverage.py --show INTERACTIVE
     OPCG_LOG_SILENT=1 python tests/effect_coverage.py --show ERROR
     OPCG_LOG_SILENT=1 python tests/effect_coverage.py --show NO_CHANGE
+    OPCG_LOG_SILENT=1 python tests/effect_coverage.py --trigger ON_PLAY
     OPCG_LOG_SILENT=1 python tests/effect_coverage.py --card OP01-001
 """
 import os
 import sys
 import traceback
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import conftest  # noqa: F401
 
@@ -42,7 +42,7 @@ DATA = os.path.join(
 
 
 # ---------------------------------------------------------------------------
-# フィラーカード（テスト用ダミー）
+# フィラーカード
 # ---------------------------------------------------------------------------
 
 _filler_master: Optional[CardMaster] = None
@@ -61,18 +61,22 @@ def _instances(n: int, owner: str) -> List[CardInstance]:
 
 
 # ---------------------------------------------------------------------------
-# テスト用ゲームステート構築
+# テスト用ゲームステート
 # ---------------------------------------------------------------------------
 
 def _build_test_state(
     test_card: CardMaster,
-) -> Tuple["GameManager", Player, Player, CardInstance]:
-    """メインフェイズ・リソース豊富な状態のゲームを組み立てる。"""
+    source_in_hand: bool = False,
+) -> Tuple[GameManager, Player, Player, CardInstance]:
+    """メインフェイズ・リソース豊富な状態のテストゲームを構築する。
+
+    source_in_hand=True のときはテストカードを手札に置く（ON_PLAY 用）。
+    """
     p1 = make_player("P1")
     p2 = make_player("P2")
 
     # P1: ドン 10 枚・手札 5 枚・トラッシュ 10 枚・デッキ 20 枚・ライフ 5 枚
-    # フィールドに 3 体（フィールド数条件・コスト払い条件を満たすため）
+    # フィールド 3 体（フィールド条件・コスト条件を満たす）
     p1.don_deck   = _instances(5,  "P1")
     p1.don_active = _instances(10, "P1")
     p1.hand       = _instances(5,  "P1")
@@ -94,9 +98,10 @@ def _build_test_state(
     gm.turn_count  = 2
     gm.phase       = Phase.MAIN
 
-    # テストカードを適切なゾーンに配置
     source = CardInstance(test_card, "P1")
-    if test_card.type == CardType.LEADER:
+    if source_in_hand:
+        p1.hand.append(source)
+    elif test_card.type == CardType.LEADER:
         p1.leader = source
     elif test_card.type == CardType.STAGE:
         p1.stage = source
@@ -128,8 +133,8 @@ def _snap_diff(before: tuple, after: tuple) -> str:
     )
 
 
-def _drain(gm: "GameManager", limit: int = 30) -> Tuple[bool, int]:
-    """空選択でインタラクションを消化。(スタック検知, 処理数) を返す。"""
+def _drain(gm: GameManager, limit: int = 30) -> Tuple[bool, int]:
+    """空選択でインタラクションを消化。(スタック, 処理数) を返す。"""
     count = 0
     while gm.active_interaction and count < limit:
         ia     = gm.active_interaction
@@ -163,7 +168,7 @@ def _walk(node):
             yield from _walk(o)
 
 
-def _has_other(abilities) -> bool:
+def _has_other_in(abilities) -> bool:
     for ab in abilities:
         for act in list(_walk(ab.effect)) + list(_walk(ab.cost)):
             if act and act.type == ActionType.OTHER:
@@ -175,69 +180,151 @@ def _has_other(abilities) -> bool:
 # 分類
 # ---------------------------------------------------------------------------
 
-_PRIORITY = {"ERROR": 4, "INTERACTIVE": 3, "EXECUTED": 2, "NO_CHANGE": 1, "SKIP": 0}
+_PRIORITY = {"ERROR": 4, "INTERACTIVE": 3, "EXECUTED": 2, "NO_CHANGE": 1}
 
 
 @dataclass
-class CardResult:
+class AbilityResult:
     card_id:   str
     name:      str
-    status:    str    # ERROR / INTERACTIVE / EXECUTED / NO_CHANGE / SKIP
+    trigger:   str    # TriggerType.name
+    status:    str    # ERROR / INTERACTIVE / EXECUTED / NO_CHANGE
     has_other: bool = False
     detail:    str  = ""
 
 
-def classify(master: CardMaster) -> CardResult:
-    activate_abs = [ab for ab in master.abilities if ab.trigger == TriggerType.ACTIVATE_MAIN]
-    h_other      = _has_other(master.abilities)
+def _outcome(
+    gm: GameManager,
+    p1: Player,
+    before: tuple,
+    card_id: str,
+    name: str,
+    trig: str,
+    h_other: bool,
+) -> AbilityResult:
+    """発動後のゲーム状態から結果を返す。"""
+    stuck, n_ia = _drain(gm)
+    after   = _snap(p1, gm.p2)
+    changed = before != after
+    # resolve_ability が登録するアクション履歴（REVEAL/SHUFFLE を EXECUTED に分類するため）
+    has_events = bool(getattr(gm, "action_events", []))
 
-    if not activate_abs:
-        return CardResult(master.card_id, master.name, "SKIP", h_other)
+    if stuck or gm.active_interaction:
+        msg = gm.active_interaction.get("message", "") if gm.active_interaction else "stuck in drain loop"
+        return AbilityResult(card_id, name, trig, "INTERACTIVE", h_other, msg)
+    if changed:
+        return AbilityResult(card_id, name, trig, "EXECUTED", h_other, _snap_diff(before, after))
+    if n_ia > 0:
+        return AbilityResult(card_id, name, trig, "INTERACTIVE", h_other,
+                             f"{n_ia} interaction(s) auto-resolved (no state change)")
+    if has_events:
+        return AbilityResult(card_id, name, trig, "EXECUTED", h_other,
+                             "ability fired (no visible state change)")
+    return AbilityResult(card_id, name, trig, "NO_CHANGE", h_other,
+                         "no state change, no interaction")
 
-    best = CardResult(master.card_id, master.name, "NO_CHANGE", h_other, "no ability fired")
 
-    for ability in activate_abs:
-        try:
-            gm, p1, p2, source = _build_test_state(master)
-        except Exception as e:
-            return CardResult(master.card_id, master.name, "ERROR", h_other, f"setup: {e}")
+def _test_on_play(master: CardMaster, h_other: bool) -> AbilityResult:
+    """ON_PLAY: play_card_action を経由（全 ON_PLAY 能力を一括発動）。"""
+    try:
+        gm, p1, p2, source = _build_test_state(master, source_in_hand=True)
+    except Exception as e:
+        return AbilityResult(master.card_id, master.name, "ON_PLAY", "ERROR", h_other, f"setup: {e}")
 
-        before = _snap(p1, p2)
+    before = _snap(p1, p2)
+    try:
+        gm.play_card_action(p1, source)
+    except Exception:
+        return AbilityResult(master.card_id, master.name, "ON_PLAY", "ERROR", h_other,
+                             traceback.format_exc(limit=2))
 
-        try:
-            gm.resolve_ability(p1, ability, source)
-        except Exception:
-            return CardResult(master.card_id, master.name, "ERROR", h_other,
-                              traceback.format_exc(limit=2))
+    return _outcome(gm, p1, before, master.card_id, master.name, "ON_PLAY", h_other)
 
-        stuck, n_ia = _drain(gm)
-        after   = _snap(p1, p2)
-        changed = before != after
 
-        if stuck or gm.active_interaction:
-            msg = gm.active_interaction.get("message", "") if gm.active_interaction else "stuck in drain loop"
-            r = CardResult(master.card_id, master.name, "INTERACTIVE", h_other, msg)
-        elif changed:
-            r = CardResult(master.card_id, master.name, "EXECUTED", h_other, _snap_diff(before, after))
-        elif n_ia > 0:
-            # インタラクションがあったが空選択で解決 → 実際のプレイヤー選択が必要
-            r = CardResult(master.card_id, master.name, "INTERACTIVE", h_other,
-                           f"{n_ia} interaction(s) auto-resolved (no state change)")
+def _test_ability(master: CardMaster, ability, trig: str, h_other: bool) -> AbilityResult:
+    """resolve_ability を直接呼んでテスト（ON_PLAY 以外の全トリガー）。"""
+    try:
+        gm, p1, p2, source = _build_test_state(master)
+    except Exception as e:
+        return AbilityResult(master.card_id, master.name, trig, "ERROR", h_other, f"setup: {e}")
+
+    before = _snap(p1, p2)
+    try:
+        gm.resolve_ability(p1, ability, source)
+    except Exception:
+        return AbilityResult(master.card_id, master.name, trig, "ERROR", h_other,
+                             traceback.format_exc(limit=2))
+
+    return _outcome(gm, p1, before, master.card_id, master.name, trig, h_other)
+
+
+def classify(master: CardMaster) -> List[AbilityResult]:
+    """カードの全能力をトリガータイプ別にテストし、各タイプの最悪結果を返す。"""
+    if not master.abilities:
+        return []
+
+    h_other_all = _has_other_in(master.abilities)
+
+    by_trigger: Dict[str, list] = defaultdict(list)
+    for ab in master.abilities:
+        k = ab.trigger.name if hasattr(ab.trigger, "name") else str(ab.trigger)
+        by_trigger[k].append(ab)
+
+    results: List[AbilityResult] = []
+    for trig, abilities in by_trigger.items():
+        h_other = _has_other_in(abilities) or h_other_all
+
+        if trig == "ON_PLAY":
+            # play_card_action が全 ON_PLAY を発動するためまとめてテスト
+            r = _test_on_play(master, h_other)
         else:
-            r = CardResult(master.card_id, master.name, "NO_CHANGE", h_other,
-                           "no state change, no interaction (condition failed or OTHER)")
+            r = None
+            for ability in abilities:
+                ri = _test_ability(master, ability, trig, h_other)
+                if r is None or _PRIORITY.get(ri.status, 0) > _PRIORITY.get(r.status, 0):
+                    r = ri
 
-        if _PRIORITY.get(r.status, 0) > _PRIORITY.get(best.status, 0):
-            best = r
+        if r:
+            results.append(r)
 
-    return best
+    return results
+
+
+# ---------------------------------------------------------------------------
+# 出力
+# ---------------------------------------------------------------------------
+
+_LABELS = {
+    "ERROR":       "--- ERROR ({n} 件) --- ← 要修正",
+    "INTERACTIVE": "--- INTERACTIVE ({n} 件) --- ← 手動テスト優先リスト",
+    "EXECUTED":    "--- EXECUTED ({n} 件) ---",
+    "NO_CHANGE":   "--- NO_CHANGE ({n} 件) --- ← 条件未達 or OTHER の疑い",
+}
+
+
+def _print_section(items: List[AbilityResult], status: str) -> None:
+    label = _LABELS.get(status, f"--- {status} ({{n}} 件) ---").format(n=len(items))
+    print(label)
+    if not items:
+        print("  (なし)")
+    else:
+        for r in sorted(items, key=lambda x: (x.card_id, x.trigger)):
+            other_mark = " [OTHER]" if r.has_other else ""
+            print(f"  [{r.trigger:<20}] {r.card_id:<12}  {r.name}{other_mark}")
+            if r.detail:
+                print(f"    └ {r.detail[:120]}")
+    print()
 
 
 # ---------------------------------------------------------------------------
 # メイン
 # ---------------------------------------------------------------------------
 
-def run(show: Optional[str] = None, card_filter: Optional[str] = None) -> None:
+def run(
+    show:        Optional[str] = None,
+    card_filter: Optional[str] = None,
+    trig_filter: Optional[str] = None,
+) -> None:
     db = CardLoader(os.path.join(DATA, "opcg_cards.json"))
     db.load()
 
@@ -245,8 +332,9 @@ def run(show: Optional[str] = None, card_filter: Optional[str] = None) -> None:
     if card_filter:
         card_ids = [c for c in card_ids if c == card_filter]
 
-    results: List[CardResult] = []
-    total = len(card_ids)
+    all_results: List[AbilityResult] = []
+    skipped = 0
+    total   = len(card_ids)
 
     for i, cid in enumerate(card_ids, 1):
         if i % 200 == 0:
@@ -255,60 +343,59 @@ def run(show: Optional[str] = None, card_filter: Optional[str] = None) -> None:
         master = db.get_card(cid)
         if master is None:
             continue
-        results.append(classify(master))
+        card_results = classify(master)
+        if not card_results:
+            skipped += 1
+            continue
+        for r in card_results:
+            if trig_filter is None or r.trigger == trig_filter:
+                all_results.append(r)
 
     sys.stderr.write(f"\r完了: {total} カード処理済み\n")
 
     # --- サマリ ---
-    counts     = Counter(r.status for r in results)
-    other_flag = Counter(r.status for r in results if r.has_other)
-    print("=== 実行カバレッジ ===")
-    for s in ("ERROR", "INTERACTIVE", "EXECUTED", "NO_CHANGE", "SKIP"):
-        n    = counts[s]
-        o    = other_flag.get(s, 0)
+    counts = Counter(r.status for r in all_results)
+    print("=== 実行カバレッジ (能力単位) ===")
+    print(f"  能力なし(SKIP)  : {skipped:4d}")
+    for s in ("ERROR", "INTERACTIVE", "EXECUTED", "NO_CHANGE"):
+        o    = sum(1 for r in all_results if r.status == s and r.has_other)
         note = f"  (うち OTHER フラグ {o} 件)" if o else ""
-        print(f"  {s:<14}: {n:4d}{note}")
+        print(f"  {s:<14}: {counts[s]:4d}{note}")
     print()
 
-    # --- 詳細出力 ---
+    # --- トリガー別内訳 ---
+    print("--- トリガー別内訳 ---")
+    trig_status: Dict[str, Counter] = defaultdict(Counter)
+    for r in all_results:
+        trig_status[r.trigger][r.status] += 1
+    for trig in sorted(trig_status):
+        cs    = trig_status[trig]
+        parts = [f"{s}={cs[s]}" for s in ("ERROR", "INTERACTIVE", "EXECUTED", "NO_CHANGE") if cs[s]]
+        print(f"  {trig:<22}  {', '.join(parts)}")
+    print()
+
+    # --- 詳細リスト ---
     # --show 指定時はその分類のみ、デフォルトは ERROR と INTERACTIVE
     targets = [show] if show else ["ERROR", "INTERACTIVE"]
-    _LABELS = {
-        "ERROR":       "--- ERROR ({n} 件) --- ← 要修正",
-        "INTERACTIVE": "--- INTERACTIVE ({n} 件) --- ← 手動テスト優先リスト",
-        "EXECUTED":    "--- EXECUTED ({n} 件) ---",
-        "NO_CHANGE":   "--- NO_CHANGE ({n} 件) --- ← 条件未達 or OTHER の疑い",
-        "SKIP":        "--- SKIP ({n} 件) ---",
-    }
     for target in targets:
-        items = [r for r in results if r.status == target]
-        label = _LABELS.get(target, "--- {target} ({n} 件) ---").format(n=len(items), target=target)
-        print(label)
-        if not items:
-            print("  (なし)")
-            print()
-            continue
-        for r in sorted(items, key=lambda x: x.card_id):
-            other_mark = " [OTHER]" if r.has_other else ""
-            print(f"  {r.card_id:<12}  {r.name}{other_mark}")
-            if r.detail:
-                print(f"    └ {r.detail[:120]}")
-        print()
+        items = [r for r in all_results if r.status == target]
+        _print_section(items, target)
 
 
 if __name__ == "__main__":
     show_opt = None
     card_opt = None
+    trig_opt = None
     args = sys.argv[1:]
     i = 0
     while i < len(args):
         if args[i] == "--show" and i + 1 < len(args):
-            show_opt = args[i + 1]
-            i += 2
+            show_opt = args[i + 1]; i += 2
         elif args[i] == "--card" and i + 1 < len(args):
-            card_opt = args[i + 1]
-            i += 2
+            card_opt = args[i + 1]; i += 2
+        elif args[i] == "--trigger" and i + 1 < len(args):
+            trig_opt = args[i + 1]; i += 2
         else:
             i += 1
 
-    run(show=show_opt, card_filter=card_opt)
+    run(show=show_opt, card_filter=card_opt, trig_filter=trig_opt)
