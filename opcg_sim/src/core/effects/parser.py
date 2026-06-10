@@ -538,6 +538,11 @@ class EffectParser:
     def _parse_condition_obj(self, text: str) -> Condition:
         norm_text = _nfc(text)
 
+        # C8「公開したカードが宣言したコストと同じ場合」: 宣言コスト＝公開カードのコスト。
+        # 他の数値/特徴条件より先に判定する（「コスト」を含むため誤分類を避ける）。
+        if _nfc("宣言したコスト") in norm_text and _nfc("同じ") in norm_text:
+            return Condition(type=ConditionType.DECLARED_COST_MATCH, raw_text=norm_text)
+
         # 比較演算子と数値を抽出
         operator = CompareOperator.EQ
         value = 0

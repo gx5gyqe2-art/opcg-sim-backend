@@ -164,6 +164,12 @@ class EffectResolver:
                     self._expand_main_effect(source_card)
                     continue
 
+                # C8 コスト宣言: 数値入力インタラクションへ中断（resume 時に相手デッキトップを
+                # 公開して context に記録し、残りの実行スタックを再開する）。
+                if node.type == ActionType.DECLARE_COST:
+                    self._suspend_for_cost_declaration(player, source_card)
+                    return
+
                 success = self._execute_game_action(player, node, source_card)
 
                 if self.game_manager.active_interaction:
@@ -563,6 +569,16 @@ class EffectResolver:
             opp_count = len(opp.field)
             return self._compare(my_count, condition.operator, opp_count)
 
+        elif condition.type == ConditionType.DECLARED_COST_MATCH:
+            # C8: 公開カードのコストが宣言コストと一致するか。
+            card = self.context.get("last_revealed_card")
+            declared = self.context.get("declared_cost")
+            if card is None or declared is None:
+                log_event("INFO", "resolver.declared_cost_missing",
+                          "DECLARED_COST_MATCH: missing revealed card or declared cost", player=player.name)
+                return False  # 情報が無ければ不成立（誤発動防止）
+            return card.master.cost == declared
+
         elif condition.type == ConditionType.REVEALED_CARD_TRAIT:
             card = self.context.get("last_revealed_card")
             if card is None:
@@ -645,6 +661,24 @@ class EffectResolver:
             }
         }
         log_event("INFO", "resolver.suspend", "Suspended for player choice", player=player.name)
+
+    def _suspend_for_cost_declaration(self, player, source_card):
+        """C8: 数値（コスト）の宣言を待つインタラクションへ中断する。
+        resume 時に gamestate.resolve_interaction が宣言値を context に記録し、相手デッキ
+        トップを公開してから残りの execution_stack を再開する。"""
+        self.game_manager.active_interaction = {
+            "player_id": player.name,
+            "action_type": "DECLARE_COST",
+            "source_card_name": source_card.master.name,
+            "message": f"「{source_card.master.name}」の効果: コストを宣言してください",
+            "constraints": {"min": 0, "max": 10},
+            "continuation": {
+                "execution_stack": self.execution_stack,
+                "effect_context": self.context,
+                "source_card_uuid": source_card.uuid,
+            },
+        }
+        log_event("INFO", "resolver.suspend", "Suspended for cost declaration", player=player.name)
 
     def _suspend_for_target_selection(self, player, candidates, query, source_card, action_node=None):
         required_count = getattr(query, 'count', 1)

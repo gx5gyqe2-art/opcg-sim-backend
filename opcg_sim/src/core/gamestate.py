@@ -278,8 +278,29 @@ class GameManager:
         elif action_type == "CHOICE":
             log_event("INFO", "game.resume_choice", f"Resuming choice for {source_card.master.name}", player=player.name)
             selected_index = payload.get("index", payload.get("selected_option_index", 0))
-            
+
             resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
+
+        elif action_type == "DECLARE_COST":
+            # C8: 宣言コストを記録し、相手デッキトップを公開して context に保存してから再開。
+            declared = payload.get("declared_value", payload.get("index", 0))
+            try:
+                declared = int(declared)
+            except (TypeError, ValueError):
+                declared = 0
+            effect_context = continuation.get("effect_context", {})
+            effect_context["declared_cost"] = declared
+            opponent = self.p2 if player == self.p1 else self.p1
+            revealed = opponent.deck[0] if opponent.deck else None
+            if revealed is not None:
+                effect_context["last_revealed_card"] = revealed
+                log_event("INFO", "game.declare_cost",
+                          f"{source_card.master.name}: declared {declared}, revealed {revealed.master.name}(cost {revealed.master.cost})",
+                          player=player.name)
+            else:
+                log_event("INFO", "game.declare_cost", f"{source_card.master.name}: declared {declared}, opponent deck empty", player=player.name)
+            self.active_interaction = None
+            resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), effect_context)
 
         if not self.active_interaction and self.setup_phase_pending:
             self.finish_setup()

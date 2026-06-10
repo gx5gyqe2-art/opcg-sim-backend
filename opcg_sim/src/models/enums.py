@@ -99,6 +99,7 @@ class ActionType(Enum):
     PREVENT_REST = auto()  # 「（相手の）キャラは…までレストにできない」: レスト不可＝アタック/ブロック不可
     DECK_TOP = auto()
     SET_COST = auto()
+    DECLARE_COST = auto()  # C8「任意のコストを宣言し、相手のデッキの上から1枚を公開する」
     
     DEAL_DAMAGE = auto()
     DAMAGE = DEAL_DAMAGE # エイリアス追加
@@ -210,6 +211,8 @@ class ConditionType(Enum):
     REVEALED_CARD_TRAIT = auto()
     # 相手の効果/バトルで場を離れる/KOされる置換条件（元々のパワー/コスト/特徴フィルタ付き）
     OPPONENT_REMOVAL = auto()
+    # C8「公開したカードが宣言したコストと同じ場合」: 宣言コスト＝公開カードのコスト
+    DECLARED_COST_MATCH = auto()
 
 class ParserKeyword(str, Enum):
     DON = "ドン"
@@ -264,3 +267,4 @@ class PendingMessage(str, Enum):
     MAIN_ACTION = "メインアクションを選択してください"
     SELECT_BLOCKER = "ブロッカーを選択してください"
     SELECT_COUNTER = "カウンターカードを選択してください"
+    DECLARE_COST = "コストを宣言してください"

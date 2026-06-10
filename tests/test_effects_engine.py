@@ -107,6 +107,57 @@ def _make_field_char(player, name="戦士", power=5000):
     return inst
 
 
+def _c8_ability(ko_target):
+    """C8: Sequence[DECLARE_COST, Branch(DECLARED_COST_MATCH → KO opponent)]。"""
+    from opcg_sim.src.models.effect_types import Sequence as Seq, Branch, TargetQuery
+    return Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        effect=Seq(actions=[
+            GameAction(type=ActionType.DECLARE_COST),
+            Branch(
+                condition=Condition(type=ConditionType.DECLARED_COST_MATCH),
+                if_true=GameAction(type=ActionType.KO,
+                                   target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, is_up_to=True)),
+            ),
+        ]),
+    )
+
+
+def test_c8_declare_cost_match_executes_effect():
+    """C8: 宣言コストが相手デッキトップのコストと一致 → 後続効果(KO)が実行される。"""
+    gm, p1, p2 = make_game()
+    # 相手デッキトップ = コスト5
+    p2.deck = [make_instance(make_master(card_id="TOP", cost=5), owner=p2.name)]
+    victim = make_instance(make_master(card_id="V", cost=3), owner=p2.name)
+    p2.field.append(victim)
+    src = _make_field_char(p1, name="OP11")
+
+    gm.resolve_ability(p1, _c8_ability(victim), source_card=src)
+    # DECLARE_COST で中断
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "DECLARE_COST"
+    # コスト5を宣言（一致）→ KO の対象選択へ
+    gm.resolve_interaction(p1, {"declared_value": 5})
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "SELECT_TARGET"
+    # 対象(victim)を選択 → KO 実行
+    gm.resolve_interaction(p1, {"selected_uuids": [victim.uuid]})
+    assert victim not in p2.field  # KO された
+
+
+def test_c8_declare_cost_mismatch_skips_effect():
+    """C8: 宣言コストが不一致 → 後続効果は実行されない。"""
+    gm, p1, p2 = make_game()
+    p2.deck = [make_instance(make_master(card_id="TOP", cost=5), owner=p2.name)]
+    victim = make_instance(make_master(card_id="V", cost=3), owner=p2.name)
+    p2.field.append(victim)
+    src = _make_field_char(p1, name="OP11")
+
+    gm.resolve_ability(p1, _c8_ability(victim), source_card=src)
+    gm.resolve_interaction(p1, {"declared_value": 2})  # 不一致
+    assert victim in p2.field  # KO されない
+
+
 def test_c10_deckout_win_replacement():
     """C10: デッキアウトしたプレイヤーが「敗北する代わりに勝利する」PASSIVE を持つ場合、
     本人が勝利する。持たない相手がデッキアウトした場合は通常どおり相手が敗北する。"""

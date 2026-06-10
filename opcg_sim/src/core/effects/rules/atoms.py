@@ -1498,6 +1498,20 @@ def _win_on_deckout(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+# ---------------------------------------------------------------------------
+# C8 コスト宣言: 「任意のコストを宣言し、相手のデッキの上から1枚を公開する」
+#   → DECLARE_COST。エンジンは数値入力インタラクションで宣言値を受け取り、相手デッキ
+#   トップを公開して context に記録する。後続の「公開したカードが宣言したコストと同じ
+#   場合、…」は DECLARED_COST_MATCH 条件の Branch として解釈される（OP11系6枚）。
+# ---------------------------------------------------------------------------
+@rule("declare_cost", priority=92)
+def _declare_cost(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("コストを宣言") not in t:
+        return None
+    return GameAction(type=ActionType.DECLARE_COST, raw_text=t)
+
+
 @rule("rule_processing", priority=35)
 def _rule_processing(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
