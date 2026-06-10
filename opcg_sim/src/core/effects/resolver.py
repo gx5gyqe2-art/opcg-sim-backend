@@ -1,5 +1,6 @@
 from typing import List, Any, Dict, Optional, Union
 import json
+import os
 from dataclasses import asdict
 from ...models.effect_types import (
     EffectNode, GameAction, Sequence, Branch, Choice, ValueSource, Condition, TargetQuery
@@ -86,9 +87,9 @@ class EffectResolver:
         return id(ability)
 
     def _log_execution_report(self, player, source_card, ability):
-        """
-        効果処理の結果（何をしてどうなったか）をまとめて出力する
-        """
+        """効果処理の結果（何をしてどうなったか）をまとめて出力する。"""
+        if os.environ.get("OPCG_LOG_SILENT"):
+            return
         try:
             snapshot = self.game_manager.get_debug_snapshot()
             
@@ -105,6 +106,8 @@ class EffectResolver:
             print(f"Report generation failed: {e}")
 
     def _log_failure_snapshot(self, player, source_card, ability, error_code, detail_msg):
+        if os.environ.get("OPCG_LOG_SILENT"):
+            return
         try:
             snapshot = self.game_manager.get_debug_snapshot()
             try:
