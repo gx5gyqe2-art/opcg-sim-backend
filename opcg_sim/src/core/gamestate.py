@@ -810,6 +810,28 @@ class GameManager:
                     target_player = self.p2 if player == self.p1 else self.p1
             self.draw_card(target_player, value)
             return True
+        if act_name in ("DEAL_DAMAGE", "DAMAGE"):
+            # 「相手に N ダメージを与える」: 相手リーダーへ N ダメージ。ライフ上から N 枚を
+            # 手札へ移し（【トリガー】発動・ON_LIFE_DECREASE 発火）、ライフが尽きれば勝利。
+            # 従来 DEAL_DAMAGE は未実装で no-op だった（ニコ・ロビン等のダメージ効果が不発）。
+            damaged = self.p2 if player == self.p1 else self.p1
+            if action.target and getattr(getattr(action.target, 'player', None), 'name', '') == 'SELF':
+                damaged = player
+            n = value if value and value > 0 else 1
+            for _ in range(n):
+                if damaged.life:
+                    life_card = damaged.life.pop(0)
+                    trig = next((a for a in life_card.master.abilities if a.trigger == TriggerType.TRIGGER), None)
+                    self.move_card(life_card, Zone.HAND, damaged)
+                    log_event("INFO", "game.deal_damage", f"{damaged.name} takes 1 damage to HAND", player=player.name)
+                    if trig:
+                        self.resolve_ability(damaged, trig, source_card=life_card)
+                    self._fire_on_life_decrease(damaged)
+                else:
+                    self.winner = player.name
+                    log_event("INFO", "game.victory", f"{player.name} wins (effect damage)", player=player.name)
+                    break
+            return True
         if act_name == "SHUFFLE":
             target_player = player
             if action.target and getattr(action.target, 'player', None) is not None:
