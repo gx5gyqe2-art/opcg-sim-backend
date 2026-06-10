@@ -41,11 +41,13 @@ def _nfc(s: str) -> str:
 
 
 def walk(node):
-    """AST を GameAction 単位で走査（cost/effect 兼用）。"""
+    """AST を GameAction 単位で走査（cost/effect/sub_effect 再帰）。"""
     if node is None:
         return
     if isinstance(node, GameAction):
         yield node
+        if node.sub_effect is not None:
+            yield from walk(node.sub_effect)
     elif isinstance(node, Sequence):
         for a in node.actions:
             yield from walk(a)
@@ -67,13 +69,24 @@ _VERB_ACTIONS = {
     "手札に戻": {"BOUNCE", "MOVE_TO_HAND", "MOVE_CARD"},
     "トラッシュに置": {"TRASH", "DISCARD", "TRASH_FROM_DECK", "KO", "MOVE", "MOVE_CARD"},
     "捨てる": {"DISCARD", "TRASH"},
-    "レストにする": {"REST"},
+    # REST_DON を含む: 「相手のドン!!1枚をレストにする」は REST_DON が正解
+    "レストにする": {"REST", "REST_DON", "ATTACH_DON"},
     "アクティブにする": {"ACTIVE", "ACTIVE_DON"},
+    # 「登場させた時」はトリガー条件なので別途除外ロジックで対処
     "登場させ": {"PLAY_CARD"},
     "ライフの上に加え": {"MOVE_CARD", "HEAL", "MOVE"},
+    # 「ダメージを与えた時」はトリガー条件なので別途除外ロジックで対処
     "ダメージを与え": {"DEAL_DAMAGE"},
     "デッキの下に置": {"DECK_BOTTOM", "MOVE_CARD", "MOVE"},
-    "公開": {"REVEAL", "LOOK", "MOVE_TO_HAND", "SEARCH"},
+    # 公開: FACE_UP_LIFE はライフを表向きで公開する動作、DECLARE_COST は公開+宣言の複合
+    "公開": {"REVEAL", "LOOK", "MOVE_TO_HAND", "SEARCH", "FACE_UP_LIFE", "DECLARE_COST"},
+}
+
+# 動詞がトリガー条件（〜した時）としてのみ現れる場合はチェックをスキップする
+# 対: "登場させた時" / "ダメージを与えた時" など
+_TRIGGER_CONDITION_SKIP = {
+    "登場させ": (re.compile(_nfc(r"登場させた時")), re.compile(_nfc(r"登場させ(る|てもよい|ることができる)"))),
+    "ダメージを与え": (re.compile(_nfc(r"ダメージを与えた時")), re.compile(_nfc(r"ダメージを与え(る|てもよい|ることができる)"))),
 }
 
 
@@ -108,7 +121,9 @@ def runtime_hidden_leak(master, ability):
 def audit_ability(text, ability):
     """1能力をテキストと突き合わせてフラグのリストを返す。"""
     flags = []
-    actions = list(walk(ability.cost)) + list(walk(ability.effect))
+    cost_actions = list(walk(ability.cost))
+    effect_actions = list(walk(ability.effect))
+    actions = cost_actions + effect_actions
     action_types = {a.type.name for a in actions if a and hasattr(a.type, "name")}
     # 能力ローカルのテキスト（無ければカード全文）でキーワード判定の誤検出を抑える
     ab_text = _nfc(getattr(ability, "raw_text", "") or "") or _nfc(text)
@@ -117,13 +132,17 @@ def audit_ability(text, ability):
     if any(a.type == ActionType.OTHER for a in actions if a):
         flags.append(("FLAG_OTHER", ""))
 
-    for a in actions:
+    # FLAG_DURATION はコストアクションではなくエフェクトアクションのみチェック
+    # （コスト句に「このターン中」が混入する誤検出を防ぐ）
+    for a in effect_actions:
         if not a:
             continue
         raw = _nfc(a.raw_text or "")
         tq = a.target
 
-        # FLAG_DURATION
+        # REPLACE_EFFECT コンテナ自体の duration は不問（sub_effect が担う）
+        if a.type == ActionType.REPLACE_EFFECT:
+            continue
         dur = getattr(a, "duration", "INSTANT")
         if "このターン中" in raw and dur != "THIS_TURN":
             flags.append(("FLAG_DURATION", f"このターン中→{dur} '{raw[:30]}'"))
@@ -147,7 +166,14 @@ def audit_ability(text, ability):
     # FLAG_MISSING_ACTION: 能力テキストの動詞があるのに対応アクションが無い（OTHER 時は除外）
     if not any(a.type == ActionType.OTHER for a in actions if a):
         for kw, expected in _VERB_ACTIONS.items():
-            if kw in ab_text and not (expected & action_types):
+            if kw not in ab_text:
+                continue
+            # トリガー条件（〜した時）としてのみ現れる場合はスキップ
+            if kw in _TRIGGER_CONDITION_SKIP:
+                trig_pat, eff_pat = _TRIGGER_CONDITION_SKIP[kw]
+                if trig_pat.search(ab_text) and not eff_pat.search(ab_text):
+                    continue
+            if not (expected & action_types):
                 flags.append(("FLAG_MISSING_ACTION", f"'{kw}' 期待{expected} 実際{sorted(action_types)}"))
 
     return flags

@@ -281,9 +281,10 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 GameAction(type=ActionType.DISCARD, target=TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1, select_mode="CHOOSE", save_id="op12_051_cost"), raw_text="自分の手札1枚を捨てる")
             ]),
             effect=GameAction(
-                type=ActionType.BUFF, 
-                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, cost_max=4, count=1, select_mode="CHOOSE", is_up_to=True, save_id="op12_051_debuff"), 
-                status="BLOCKER_DISABLE", 
+                type=ActionType.BUFF,
+                target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, cost_max=4, count=1, select_mode="CHOOSE", is_up_to=True, save_id="op12_051_debuff"),
+                status="BLOCKER_DISABLE",
+                duration="THIS_TURN",
                 raw_text="相手のコスト4以下のキャラ1枚までを、このターン中、【ブロッカー】を発動できない"
             )
         )

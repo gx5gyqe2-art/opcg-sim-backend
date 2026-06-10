@@ -112,8 +112,9 @@ def _rest(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if re.search(_nfc(r"このキャラをレスト|このリーダーをレスト"), t):
         return None  # 自己レストは rest_self_cost が担当
-    if _nfc("ドン") in t:
-        return None  # ドン!!のレストは don_set_rest が担当（キャラの REST と区別）
+    # ドン!!が直接のレスト対象の場合のみ除外（「ドン!!が付与されている」等の修飾語は除外しない）
+    if re.search(_nfc(r"ドン!![^がのは]*をレストに|コストエリア.*レストに"), t):
+        return None  # ドン!!自体のレストは don_set_rest が担当
     tq = parse_target(t)
     if _nfc("まで") in t:
         tq.is_up_to = True
@@ -487,10 +488,16 @@ def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("付与") not in t or _nfc("ドン") not in t:
         return None
-    recipient = TargetQuery(player=Player.SELF, zone=Zone.FIELD, count=1)
-    if _nfc("リーダー") in t:
+    # 付与先（に付与 の前の主語）が「相手の」なら OPPONENT、それ以外は SELF
+    # 例: 「相手のキャラ1枚に相手のレストのドン!!1枚を付与する」→ recipient=OPPONENT
+    # 例: 「自分のリーダーかキャラ1枚にドン!!を付与する」→ recipient=SELF
+    ni_idx = t.find(_nfc("に付与")) if _nfc("に付与") in t else len(t)
+    recipient_part = t[:ni_idx]
+    player = Player.OPPONENT if re.search(_nfc(r"相手の[^でに]*?(キャラ|リーダー)"), recipient_part) else Player.SELF
+    recipient = TargetQuery(player=player, zone=Zone.FIELD, count=1)
+    if _nfc("リーダー") in recipient_part:
         recipient.card_type.append("LEADER")
-    if _nfc("キャラ") in t:
+    if _nfc("キャラ") in recipient_part:
         recipient.card_type.append("CHARACTER")
     if not recipient.card_type:
         recipient.card_type.extend(["LEADER", "CHARACTER"])
@@ -498,7 +505,8 @@ def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
         type=ActionType.ATTACH_DON,
         target=recipient,
         value=ValueSource(base=_don_count(t)),
-        status="RESTED" if _nfc("レストのドン") in t else None,
+        status="RESTED" if _nfc("レストのドン") in t or _nfc("コストエリアのドン") in t else None,
+        duration=_duration_of(t),
         raw_text=t,
     )
 
@@ -530,6 +538,10 @@ def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
     if not re.search(_nfc(r"レストに(する|できる|し[、。]|し$)"), t.strip()):
         return None
     if _nfc("アクティブ") in t:
+        return None
+    # 「ドン!!が付与されているキャラをレストにする」等、ドン!!が修飾語として使われている場合は
+    # キャラを対象とする REST に委ねる（ドン!!自体をレストにするわけではない）
+    if re.search(_nfc(r"ドン!!.*付与"), t):
         return None
     return GameAction(
         type=ActionType.REST_DON,
@@ -581,6 +593,7 @@ def _prevent_leave(ctx: ParseContext) -> Optional[GameAction]:
         type=ActionType.PREVENT_LEAVE,
         target=TargetQuery(select_mode="SOURCE"),
         status=status,
+        duration=_duration_of(t),
         raw_text=t,
     )
 
