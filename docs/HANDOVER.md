@@ -11,6 +11,11 @@
 > NO_CHANGE 450 / WARN 313 を自動三分類。**NO_CHANGE のエンジン隠れバグ=0**（全て
 > コスト不成立/条件未達/PASSIVE/測定限界に分解）。検証中に【トリガー】(EXECUTE_MAIN_EFFECT)
 > が COUNTER 効果イベントで不発のバグを発見・修正。詳細は §16。
+>
+> **§17 追記（トラックB=全カード横断検証）**: `tests/full_card_audit.py` で全2652枚の
+> 全能力(3164)を発動し構造不変条件を検証。**例外0/カード消失0/TEMPリーク0**を達成
+> （REVEAL カードがデッキに戻らず temp 残留する実バグを根絶）。各カードの実行シグネチャを
+> `full_card_baseline.json` に凍結し全カード回帰網を構築。詳細は §17。
 
 このドキュメントは、本リポジトリ（opcg-sim-backend）の **カード効果処理の刷新作業** を
 引き継ぐための資料です。詳細な設計は `docs/parser_v2.md` を、本書はその上位の
@@ -605,3 +610,54 @@ OPCG_LOG_SILENT=1 python tests/quality_map.py --show WARN_DIRECTION
   トラックB（全カード横断ハーネス）＋トラックC（手動）で詰める。
 - 次トラック候補: **B（全カード横断検証ハーネス）** で identity/power/keyword/temp-leak まで
   含めた回帰をセット単位で固定するのが、品質地図で「バグなし」を確認した今の自然な次手。
+
+---
+
+## 17. 完全シミュレータ再計画 — トラックB（全カード横断検証）
+
+2デッキ限定だった深い検証を全2652枚へ拡張。意味的正しさ（テキスト通りか）は手動/golden
+で詰めるが、**カード保全に関する構造不変条件**は意味を知らずとも全カードで自動保証できる。
+
+### ツール `tests/full_card_audit.py`（新規）
+
+```bash
+OPCG_LOG_SILENT=1 python tests/full_card_audit.py            # 構造不変条件＋セット別内訳
+OPCG_LOG_SILENT=1 python tests/full_card_audit.py --show     # 異常カード一覧
+OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen    # 挙動ベースライン再生成
+```
+
+全カードの全能力を汎用盤面で発動し、以下を検証する。**現在すべて 0**。
+
+| 不変条件 | 件数 | 意味 |
+|---|---|---|
+| EXCEPTION | **0** | 発動中の例外（クラッシュ） |
+| CARD_LOSS | **0** | カード総数（全ゾーン＋temp）の減少＝消失 |
+| TEMP_LEAK | **0** | 解決完了後の temp 残留＝デッキ等から消失予備軍 |
+
+### 2層の回帰網
+
+1. **構造不変条件ゲート** `tests/test_full_card_audit.py` — 例外/消失/リーク=0 を固定。
+2. **挙動ベースライン** `tests/test_full_card_baseline.py` ＋ `full_card_baseline.json`
+   （3152能力）— 各 (card_id|trigger) の実行シグネチャ（ゾーン差分 + power/keyword/rest/cost
+   差分、または INTERACTIVE/ERROR）を凍結。**どのカードの挙動が変わっても検出**する。
+   意図的に挙動を変えた場合は `--regen` で更新する。
+
+### 発見・修正した実バグ
+
+- **REVEAL カードの TEMP リーク**: 「デッキの上から1枚を公開し、〜の場合」等は公開カードを
+  temp に載せて条件評価するが、後続で消費されず temp に残留していた（10枚、デッキから消失）。
+  「公開」はカードを動かさない（デッキトップに留まる）のが正しい挙動。
+  `resolver._reclaim_temp_to_deck_top()` で**解決完了（中断なし）時に temp 残留をデッキ
+  トップへ回収**して根絶。
+- （計測アーティファクト）`effect_coverage._smart_drain` が `max=-1`(ALL/REMAINING、例
+  「残りをデッキの下に置く」)で1枚しか選ばず temp に取り残していた問題を全候補選択に修正
+  （TEMP_LEAK 見かけ 218→10、上記実バグ修正で →0）。
+
+### 残課題（次の担当へ）
+
+- 構造不変条件は守られたが、**意味的正しさ**（効果がテキスト通りの対象/数値か）は別途
+  必要。トラックC（手動検証）で INTERACTIVE 71件＋主要カードを実プレイ確認、または
+  golden / `test_realdeck_play` をセット単位で拡充する。
+- 挙動ベースラインは「現状の挙動」を凍結しただけなので、**現状が正しいことの保証ではない**。
+  バグ修正で挙動が変わる際は差分をレビューして `--regen`。新弾追加時も `--regen`。
+- 次トラック候補: **C（手動検証）** で意味的正しさを詰める、または **D（フロント仕上げ）**。
