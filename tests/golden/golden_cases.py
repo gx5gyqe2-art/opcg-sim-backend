@@ -1743,6 +1743,23 @@ CASES = [
             }
         ],
     },
+    # 「このターン中、コスト0にする」— COST_OVERRIDE で base_cost_override をセット。
+    {
+        "id": "set_cost_zero_this_turn",
+        "text": "相手の元々の効果のないキャラ1枚までを、このターン中、コスト0にする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "COST_OVERRIDE",
+                    "value": 0,
+                    "duration": "THIS_TURN",
+                    "target": {"player": "OPPONENT", "is_up_to": True},
+                },
+            }
+        ],
+    },
     # 「元々のパワー7000にする」— base_power_override に静的値をセット。
     {
         "id": "set_power_base_value",

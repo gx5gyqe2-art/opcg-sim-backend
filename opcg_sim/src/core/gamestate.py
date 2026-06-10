@@ -1028,6 +1028,11 @@ class GameManager:
                 if action.status == "POWER_OVERRIDE":
                     target.base_power_override = value
                     log_event("INFO", "game.action_override", f"{target.master.name}'s power set to {value}", player=player.name)
+                elif action.status == "COST_OVERRIDE":
+                    # コスト絶対値セット（「このターン中、コスト0にする」等）。base_power_override
+                    # と同様に reset_turn_status で失効する（passive 再計算では消えない）。
+                    target.base_cost_override = value
+                    log_event("INFO", "game.action_cost_override", f"{target.master.name}'s cost set to {value}", player=player.name)
                 elif action.status == "COST_REDUCTION":
                     # 期間付き（このターン中／このバトル中 等）は継続効果(timed_cost)へ。
                     # cost_buff は _apply_passive_effects で毎回リセットされ消えるため。

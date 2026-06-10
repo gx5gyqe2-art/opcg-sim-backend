@@ -578,6 +578,31 @@ _SIGN_RE = re.compile(r"コスト[ 　]*([+\-－−‐])[ 　]*(\d+)")
 #   従来は ActionType.OTHER に落ちて「解析できたが何もしない」状態だった。
 #   resolver は BUFF + status="COST_REDUCTION" を cost_buff 加算として実行できる。
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# コスト絶対値セット: 「（対象）を、（このターン中、）コスト0にする」
+#   → BUFF + status="COST_OVERRIDE"。エンジンは base_cost_override をセットし、
+#   reset_turn_status() で失効する（set_power の COST 版）。
+#   「コスト-N」等の増減は cost_change(priority=58) が担当（こちらは「Nにする」限定）。
+# ---------------------------------------------------------------------------
+@rule("set_cost", priority=60)
+def _set_cost(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    m = re.search(_nfc(r"コスト(?:を)?(\d+)に(?:なる|する)"), t)
+    if not m:
+        return None
+    tq = parse_target(t)
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(
+        type=ActionType.BUFF,
+        status="COST_OVERRIDE",
+        target=tq,
+        value=ValueSource(base=int(m.group(1))),
+        duration=_duration_of(t),
+        raw_text=t,
+    )
+
+
 @rule("cost_change", priority=58)
 def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -1446,4 +1471,6 @@ def _self_cannot(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if not re.search(_nfc(r"(できない|られない)"), t):
         return None
-    return GameAction(type=ActionType.RULE_PROCESSING, raw_text=t)
+    # 制限自体はエンジン未実装(no-op)だが、「このターン中／このバトル中」の期間は
+    # 正しく保持する（監査 DURATION の真値化。将来の enforce 時にそのまま使える）。
+    return GameAction(type=ActionType.RULE_PROCESSING, duration=_duration_of(t), raw_text=t)
