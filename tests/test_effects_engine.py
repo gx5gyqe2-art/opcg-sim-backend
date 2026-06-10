@@ -973,7 +973,10 @@ def test_reveal_conditional_play_no_match():
     gm.resolve_ability(p1, _reveal_then_play_ability(), source_card=p1.leader)
     assert top not in p1.field           # 条件不一致なので登場しない
     assert len(p1.field) == field_before
-    assert top in p1.temp_zone           # 公開カードは temp に残る（後続の残り処理対象）
+    # 公開（公開し）はカードを動かさない＝デッキトップに留まる。解決完了時に temp 残留を
+    # デッキトップへ回収するため、temp リークはなく公開カードはデッキ先頭に戻る。
+    assert top not in p1.temp_zone       # temp リーク無し
+    assert p1.deck[0] is top             # 公開カードはデッキトップに留まる
 
 
 def test_hand_to_deck_bottom():

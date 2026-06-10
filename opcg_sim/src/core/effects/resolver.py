@@ -204,6 +204,27 @@ class EffectResolver:
                 self._suspend_for_choice(player, node, source_card)
                 return
 
+        # スタックを完走（中断なし）した時点で temp_zone に残ったカードを回収する。
+        # 「デッキの上から1枚を公開し、〜の場合」等の REVEAL は公開カードを temp に載せて
+        # 条件評価するが、公開は本来カードを動かさない（デッキトップに留まる）。後続で消費
+        # されなかった temp カードはデッキトップへ戻す（TEMP リーク＝デッキ消失の防止）。
+        if not self.game_manager.active_interaction:
+            self._reclaim_temp_to_deck_top()
+
+    def _reclaim_temp_to_deck_top(self):
+        """解決完了時に temp_zone に取り残されたカードを各オーナーのデッキトップへ戻す。"""
+        for p in (self.game_manager.p1, self.game_manager.p2):
+            if not getattr(p, "temp_zone", None):
+                continue
+            leftover = list(p.temp_zone)
+            p.temp_zone.clear()
+            # 公開順を保って上から戻す（reversed で先頭が最上段になるよう挿入）
+            for card in reversed(leftover):
+                p.deck.insert(0, card)
+            if leftover:
+                log_event("INFO", "resolver.temp_reclaim",
+                          f"Returned {len(leftover)} revealed card(s) to deck top", player=p.name)
+
     def _expand_main_effect(self, source_card):
         """source_card 自身の 【メイン】(ACTIVATE_MAIN) 能力の効果を実行スタックへ展開する。
 

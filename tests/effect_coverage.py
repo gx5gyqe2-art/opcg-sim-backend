@@ -151,9 +151,18 @@ def _smart_drain(gm: GameManager, limit: int = 30) -> Tuple[bool, int]:
             candidates = ia.get("selectable_uuids") or [
                 c.uuid for c in ia.get("candidates", [])
             ]
-            min_req  = (ia.get("constraints") or {}).get("min", 0)
-            # min_req 枚を優先、候補があれば少なくとと1枚は選ぶ
-            n_select = max(min_req, 1) if candidates else 0
+            cons     = ia.get("constraints") or {}
+            min_req  = cons.get("min", 0)
+            max_req  = cons.get("max", 1)
+            # max が -1（=ALL/REMAINING、例「残りをデッキの下に置く」）の場合は全候補を選ぶ。
+            # 従来は max(min,1)=1枚しか選ばず、残りの temp カードが取り残されて
+            # TEMP リーク（デッキから消失）に見える測定アーティファクトを生んでいた。
+            if max_req is not None and max_req < 0:
+                n_select = len(candidates)
+            else:
+                n_select = max(min_req, 1) if candidates else 0
+                if max_req:
+                    n_select = min(n_select, max_req)
             selected = candidates[:n_select]
             payload  = {"selected_uuids": selected, "index": 0}
         else:  # CHOICE 等は先頭の選戠肢
