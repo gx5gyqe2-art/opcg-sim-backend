@@ -1185,4 +1185,28 @@ class GameManager:
         if not val_source: return 0
         if val_source.dynamic_source == "COUNT_REFERENCE":
             log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name); return len(player.trash)
+        # C9「（相手のリーダー／選んだキャラ／アタックしているキャラ）と同じパワーになる」。
+        # 発動時スナップショット: 参照カードの現在パワーを固定値として返す（以後の変動に追随しない）。
+        if val_source.dynamic_source == "REFERENCE_POWER":
+            ref = self._resolve_power_reference(player, val_source.ref_id, context)
+            if ref is None:
+                return val_source.base
+            ref_owner, _ = self._find_card_location(ref)
+            is_ref_turn = bool(ref_owner) and ref_owner.name == self.turn_player.name
+            return ref.get_power(is_ref_turn)
         return val_source.base
+
+    def _resolve_power_reference(self, player, ref_id, context):
+        """C9 の同値パワー参照カードを解決する。ref_id: selected/opp_leader/attacker。"""
+        opponent = self.p2 if player == self.p1 else self.p1
+        if ref_id == "opp_leader":
+            return opponent.leader
+        if ref_id == "attacker":
+            return (self.active_battle or {}).get("attacker")
+        if ref_id == "selected":
+            saved = (context or {}).get("saved_targets", {})
+            sel = saved.get("selected_card") or saved.get("selected")
+            if isinstance(sel, list):
+                return sel[0] if sel else None
+            return sel
+        return None

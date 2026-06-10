@@ -136,9 +136,11 @@ def audit_ability(text, ability):
                 flags.append(("FLAG_COST_LIMIT", f"'{raw[:34]}'"))
 
         # FLAG_TARGET_SIDE: 「相手の(キャラ/リーダー)」を対象にするのに player=SELF。
-        #   「相手の効果で」等の非対象節は除外。
+        #   「相手の効果で」等の非対象節は除外。対象が明示的に SOURCE（このキャラ自身）の場合、
+        #   「相手の…」はパワー参照等の修飾であって対象側ではないため除外（C9 同値パワー等）。
         if tq is not None and getattr(tq, "player", None) == Player.SELF \
                 and getattr(tq, "zone", None) == Zone.FIELD \
+                and getattr(tq, "select_mode", None) != "SOURCE" \
                 and re.search(r"相手の(?!効果)[^。]*?(キャラ|リーダー)", raw):
             flags.append(("FLAG_TARGET_SIDE", f"相手の→SELF '{raw[:30]}'"))
 

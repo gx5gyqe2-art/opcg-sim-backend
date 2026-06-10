@@ -175,6 +175,36 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
 #   reset_turn_status() で失効する（「このターン中」相当のセマンティクス）。
 #   「相手のリーダーと同じパワーになる」「入れ替える」等の動的参照は C9 の別件として除外。
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# C9 同値パワー: 「このキャラの元々のパワーは、（このターン中、）
+#   （相手のリーダー／選んだキャラ／アタックしているリーダーかキャラ）と同じパワーになる」
+#   → BUFF+POWER_OVERRIDE。値は発動時スナップショット（dynamic_source=REFERENCE_POWER）。
+#   参照は ref_id: opp_leader / selected / attacker。対象は自身(SOURCE)。
+# ---------------------------------------------------------------------------
+@rule("power_equalize", priority=62)
+def _power_equalize(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("同じパワー") not in t:
+        return None
+    # 参照先を判定（アタック文脈＞選択＞相手リーダー）
+    if _nfc("アタックしている") in t:
+        ref = "attacker"
+    elif _nfc("選んだ") in t:
+        ref = "selected"
+    elif _nfc("相手のリーダー") in t:
+        ref = "opp_leader"
+    else:
+        return None  # 未知の参照は set_power 等にフォールバック
+    return GameAction(
+        type=ActionType.BUFF,
+        status="POWER_OVERRIDE",
+        target=TargetQuery(select_mode="SOURCE"),
+        value=ValueSource(dynamic_source="REFERENCE_POWER", ref_id=ref),
+        duration=_duration_of(t),
+        raw_text=t,
+    )
+
+
 @rule("set_power", priority=59)
 def _set_power(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text

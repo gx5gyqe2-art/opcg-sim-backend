@@ -107,6 +107,28 @@ def _make_field_char(player, name="戦士", power=5000):
     return inst
 
 
+def test_power_equalize_snapshot_opp_leader():
+    """C9 同値パワー: 相手リーダーのパワーを発動時スナップショットで自身に固定する。
+    スナップショット後に相手リーダーのパワーが変動しても追随しない。"""
+    gm, p1, p2 = make_game()
+    src = _make_field_char(p1, name="ボン・クレー", power=3000)
+    p2.leader.base_power_override = 6000  # 相手リーダーを 6000 に
+    # 値解決（発動時スナップショット）→ POWER_OVERRIDE で適用
+    val = gm.get_dynamic_value(
+        p1, ValueSource(dynamic_source="REFERENCE_POWER", ref_id="opp_leader"), [src], {})
+    assert val == 6000
+    gm.apply_action_to_engine(
+        p1, action(ActionType.BUFF, value=val, status="POWER_OVERRIDE", duration="THIS_TURN"),
+        [src], val)
+    assert src.get_power(True) == 6000
+    # 相手リーダーが後で変動してもスナップショットは追随しない
+    p2.leader.base_power_override = 1000
+    assert src.get_power(True) == 6000
+    # ターン終了で失効し元に戻る
+    src.reset_turn_status()
+    assert src.get_power(True) == 3000
+
+
 def test_battle_power_buff_expires_at_battle_end():
     """このバトル中のパワー増減はバトル終了で失効し、後続バトルへ持ち越さない。"""
     gm, p1, _ = make_game()

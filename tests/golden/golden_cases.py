@@ -1743,6 +1743,39 @@ CASES = [
             }
         ],
     },
+    # ----- C9 同値パワー（発動時スナップショット, DURATION/OTHER 監査対応） -------
+    # 「このキャラの元々のパワーは、このターン中、相手のリーダーと同じパワーになる」
+    {
+        "id": "power_equalize_opp_leader",
+        "text": "このキャラの元々のパワーは、このターン中、相手のリーダーと同じパワーになる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "POWER_OVERRIDE",
+                    "duration": "THIS_TURN",
+                    "target": {"select_mode": "SOURCE"},
+                },
+            }
+        ],
+    },
+    # 「選んだキャラと同じパワーになる」→ ref=selected。
+    {
+        "id": "power_equalize_selected",
+        "text": "このキャラの元々のパワーは、このターン中、選んだキャラと同じパワーになる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "POWER_OVERRIDE",
+                    "duration": "THIS_TURN",
+                    "target": {"select_mode": "SOURCE"},
+                },
+            }
+        ],
+    },
     # 「このターン中、コスト0にする」— COST_OVERRIDE で base_cost_override をセット。
     {
         "id": "set_cost_zero_this_turn",
