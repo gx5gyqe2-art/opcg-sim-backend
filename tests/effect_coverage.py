@@ -203,19 +203,24 @@ def _has_other_in(abilities) -> bool:
 # ActionType 名 → (変化前 tuple, 変化後 tuple) から「期待方向」を返す関数
 # snap インデックス: 0=p1_hand 1=p1_field 2=p1_trash 3=p1_deck 4=p1_life 5=p1_don
 #                       6=p2_hand 7=p2_field 8=p2_trash 9=p2_deck 10=p2_life
+# 方向チェックは「対象がどちら側か」に依存しない side-agnostic で書く。対象側を固定して
+# 書くと、相手キャラを KO/デッキ送り/ハンデスする効果や自己バウンス等が軒並み誤検知になる
+# （effect_coverage の汎用足場では対象側が一意に定まらないため）。
 _DIRECTION: Dict[str, any] = {
-    "DRAW":             lambda b, a: a[0] > b[0],           # 手札増
-    "DISCARD":          lambda b, a: a[0] < b[0],           # 手札減
-    "KO":               lambda b, a: a[7] < b[7],           # 相手フィールド減
-    "BOUNCE":           lambda b, a: a[7] < b[7],           # 相手フィールド減
-    "RAMP_DON":         lambda b, a: a[5] > b[5],           # ドン増
-    "RETURN_DON":       lambda b, a: a[5] < b[5],           # ドン減
-    "HEAL":             lambda b, a: a[4] > b[4],           # ライフ増
-    "TRASH_FROM_DECK":  lambda b, a: a[3] < b[3] or a[9] < b[9],  # どちらかのデッキ減
-    "PLAY_CARD":        lambda b, a: a[1] > b[1],           # P1フィールド増
-    "DECK_BOTTOM":      lambda b, a: a[3] < b[3] or a[1] < b[1],  # デッキへ戻る（フィールド減）
-    "TRASH_FROM_HAND":  lambda b, a: a[0] < b[0],           # 手札減
-    "MOVE":             lambda b, a: b != a,                # 何か変わればOK
+    "DRAW":             lambda b, a: a[0] > b[0],                       # 自分の手札増
+    "DISCARD":          lambda b, a: a[0] < b[0] or a[6] < b[6],        # どちらかの手札減
+    "KO":               lambda b, a: a[1] < b[1] or a[7] < b[7],        # どちらかのフィールド減
+    "BOUNCE":           lambda b, a: a[1] < b[1] or a[7] < b[7],        # どちらかのフィールド減
+    "RAMP_DON":         lambda b, a: a[5] > b[5],                       # ドン増
+    "RETURN_DON":       lambda b, a: a[5] < b[5],                       # ドン減
+    "HEAL":             lambda b, a: a[4] > b[4] or a[10] > b[10],      # どちらかのライフ増
+    "TRASH_FROM_DECK":  lambda b, a: a[3] < b[3] or a[9] < b[9],        # どちらかのデッキ減
+    # PLAY_CARD: フィールド増、または公開/サーチでデッキが減る派生も許容（look-and-play 系）
+    "PLAY_CARD":        lambda b, a: a[1] > b[1] or a[7] > b[7] or a[3] < b[3] or a[9] < b[9],
+    # DECK_BOTTOM: どちらかのフィールド減＋どちらかのデッキ増（場→デッキ）
+    "DECK_BOTTOM":      lambda b, a: (a[1] < b[1] or a[7] < b[7]) and (a[3] > b[3] or a[9] > b[9]),
+    "TRASH_FROM_HAND":  lambda b, a: a[0] < b[0] or a[6] < b[6],        # どちらかの手札減
+    "MOVE":             lambda b, a: b != a,                            # 何か変わればOK
 }
 
 

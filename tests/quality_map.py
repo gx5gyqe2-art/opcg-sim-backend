@@ -51,6 +51,16 @@ _TARGETED = {
     ActionType.MOVE_CARD, ActionType.DECK_BOTTOM, ActionType.MOVE, ActionType.ACTIVE,
 }
 
+# ゾーン枚数 snapshot で変化が見えるアクション（DRAW=手札増 等）。これらが「変化なし」なら
+# 真の実装漏れ/不具合の可能性が高い。逆に BUFF/コスト/キーワード/レスト切替等は枚数に出ない
+# （_snap が power/cost/keyword/rest を見ないため）＝測定限界であって不具合ではない。
+_ZONE_VISIBLE = {
+    ActionType.DRAW, ActionType.KO, ActionType.BOUNCE, ActionType.TRASH, ActionType.DISCARD,
+    ActionType.MOVE_CARD, ActionType.MOVE, ActionType.DECK_BOTTOM, ActionType.PLAY_CARD,
+    ActionType.TRASH_FROM_DECK, ActionType.HEAL, ActionType.RAMP_DON, ActionType.RETURN_DON,
+    ActionType.LIFE_RECOVER, ActionType.DEAL_DAMAGE,
+}
+
 
 def _abilities_for(master, trig: str):
     return [ab for ab in master.abilities
@@ -93,26 +103,48 @@ def classify_no_change(master, trig: str) -> str:
     if trig in ("PASSIVE", "OPPONENT_TURN", "YOUR_TURN"):
         return "PASSIVE"
     saw_targeted = False
+    saw_zone_visible = False
     for ab in abs_:
         types = _effect_action_types(ab)
         if not types:
             continue
+        # 任意コスト（":" の前段）を持つ能力は、汎用盤面で特定のコスト（特定キャラを手札に戻す/
+        # 特定カードを捨てる 等）を払えず発動しない＝想定どおりの no-op（handover #1）。
+        if getattr(ab, "cost", None) is not None:
+            return "COST_UNMET"
         if _has_real_condition(ab):
             return "COND_FALSE"
-        if all(t in _STATIC_OR_RESTRICTION for t in types):
-            return "RESTRICTION"
+        if any(t in _ZONE_VISIBLE for t in types):
+            saw_zone_visible = True
         if any(t in _TARGETED for t in types):
             saw_targeted = True
+        if all(t in _STATIC_OR_RESTRICTION for t in types):
+            return "RESTRICTION"
+    # ゾーン枚数に出るアクションが無い（BUFF/コスト/キーワード/レスト等のみ）＝測定限界
+    if not saw_zone_visible:
+        return "STAT_ONLY"
     if saw_targeted:
         return "NO_TARGET"
     return "NO_IMPL"
 
 
 def classify_warn(master, trig: str) -> str:
-    """WARN（方向不一致）能力の細分類。"""
+    """WARN（方向不一致）能力の細分類。
+
+    - PLAY_ARTIFACT: ON_PLAY は play_card_action がソースを手札→場へ動かす（手札-1/場+1、
+      ramp で don+）ため、DRAW の手札+1 が相殺されたり、コスト不成立で効果本体が不発でも
+      play 自体の盤面変化が残って「方向不一致」に見える＝測定アーティファクト（誤検知）。
+    - MODAL: Branch/Choice を含む（別パス実行の誤検知）。
+    - DIRECTION: 上記以外＝★真に方向が疑わしい。
+    """
+    if trig == "ON_PLAY":
+        return "PLAY_ARTIFACT"
     abs_ = _abilities_for(master, trig)
     for ab in abs_:
         if _has_node(ab.effect, (Branch, Choice)):
+            return "MODAL"
+        # コスト付き能力はコスト不成立で本体不発＝play同様の誤検知になりやすい
+        if getattr(ab, "cost", None) is not None:
             return "MODAL"
     return "DIRECTION"
 
@@ -147,12 +179,15 @@ def run(show: Optional[str] = None, card_filter: Optional[str] = None) -> None:
              "WARN_DIRECTION", "WARN_MODAL"]
     print("=== 品質地図: NO_CHANGE / WARN 三分類 ===")
     print("  [NO_CHANGE]")
-    for k in ("NO_IMPL", "NO_TARGET", "COND_FALSE", "RESTRICTION", "PASSIVE"):
-        mark = "  ★真のバグ候補" if k == "NO_IMPL" else ""
+    for k in ("NO_IMPL", "NO_TARGET", "STAT_ONLY", "COST_UNMET", "COND_FALSE", "RESTRICTION", "PASSIVE"):
+        mark = "  ★真のバグ候補" if k == "NO_IMPL" else (
+            "  (枚数に出ない: power/cost/keyword 等=測定限界)" if k == "STAT_ONLY" else (
+            "  (汎用盤面で任意コスト不成立=正常)" if k == "COST_UNMET" else ""))
         print(f"    {k:<12}: {len(buckets[k]):4d}{mark}")
     print("  [WARN 方向不一致]")
-    print(f"    DIRECTION   : {len(buckets['WARN_DIRECTION']):4d}  ★真のバグ候補")
-    print(f"    MODAL       : {len(buckets['WARN_MODAL']):4d}  (別パス実行の誤検知が大半)")
+    print(f"    DIRECTION    : {len(buckets['WARN_DIRECTION']):4d}  ★真のバグ候補")
+    print(f"    MODAL        : {len(buckets['WARN_MODAL']):4d}  (Branch/Choice/コスト付き=誤検知が大半)")
+    print(f"    PLAY_ARTIFACT: {len(buckets['WARN_PLAY_ARTIFACT']):4d}  (ON_PLAY: play移動が枚数差を汚す=測定限界)")
     print()
 
     targets = [show] if show else ["NO_IMPL", "WARN_DIRECTION"]
