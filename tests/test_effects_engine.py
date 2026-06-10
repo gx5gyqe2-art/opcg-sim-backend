@@ -107,6 +107,32 @@ def _make_field_char(player, name="戦士", power=5000):
     return inst
 
 
+def test_c10_deckout_win_replacement():
+    """C10: デッキアウトしたプレイヤーが「敗北する代わりに勝利する」PASSIVE を持つ場合、
+    本人が勝利する。持たない相手がデッキアウトした場合は通常どおり相手が敗北する。"""
+    win_ab = Ability(
+        trigger=TriggerType.PASSIVE,
+        condition=Condition(type=ConditionType.DECK_COUNT, operator=CompareOperator.LE, value=0),
+        effect=GameAction(type=ActionType.VICTORY, status="REPLACE_DECKOUT_LOSS"),
+    )
+    gm, p1, p2 = make_game()
+    # p1 のリーダーに勝敗置換能力を付与（CardMaster は frozen のため abilities 付きで構築）
+    p1.leader = make_instance(
+        make_master(card_id="L-NAMI", name="ナミ", type=CardType.LEADER, abilities=(win_ab,)),
+        owner=p1.name)
+    p1.deck = []          # p1 がデッキアウト
+    p2.deck = [make_instance(make_master(card_id="D"), owner=p2.name)]
+    gm.check_victory()
+    assert gm.winner == p1.name  # 通常 p2 勝利のところ、置換で p1 勝利
+
+    # 置換能力が無い場合は通常どおり（相手の勝利）
+    gm2, q1, q2 = make_game()
+    q1.deck = []
+    q2.deck = [make_instance(make_master(card_id="D"), owner=q2.name)]
+    gm2.check_victory()
+    assert gm2.winner == q2.name
+
+
 def test_power_equalize_snapshot_opp_leader():
     """C9 同値パワー: 相手リーダーのパワーを発動時スナップショットで自身に固定する。
     スナップショット後に相手リーダーのパワーが変動しても追随しない。"""

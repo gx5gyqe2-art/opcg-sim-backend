@@ -1480,6 +1480,24 @@ def _negate_effect(ctx: ParseContext) -> Optional[GameAction]:
 #   → RULE_PROCESSING（エンジン no-op）。
 #   ゲームエンジンには影響しないルール注記（デッキ構築ルール等）を吸収する。
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# C10 勝敗置換: 「（自分のデッキが0枚になった場合、）自分は敗北する代わりに勝利する」
+#   → VICTORY + status="REPLACE_DECKOUT_LOSS"。エンジン check_victory が
+#   デッキアウト時にこの PASSIVE を走査し、敗北を勝利へ置換する（OP03-040 ナミ等）。
+#   "ルール上" を含むため rule_processing(p35) より高優先度で先に捕捉する。
+# ---------------------------------------------------------------------------
+@rule("win_on_deckout", priority=95)
+def _win_on_deckout(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("敗北する代わりに勝利") not in t and _nfc("敗北する代わりに、勝利") not in t:
+        return None
+    return GameAction(
+        type=ActionType.VICTORY,
+        status="REPLACE_DECKOUT_LOSS",
+        raw_text=t,
+    )
+
+
 @rule("rule_processing", priority=35)
 def _rule_processing(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text

@@ -676,8 +676,29 @@ class GameManager:
             self._apply_passive_effects(self.turn_player)
 
     def check_victory(self):
-        if not self.p1.deck: self.winner = self.p2.name
-        elif not self.p2.deck: self.winner = self.p1.name
+        # デッキアウト: 通常は本人の敗北（相手の勝利）。ただし C10「自分のデッキが0枚に
+        # なった場合、敗北する代わりに勝利する」(VICTORY/REPLACE_DECKOUT_LOSS) を持つ場合は
+        # 本人の勝利へ置換する（OP03-040 ナミ等）。
+        if not self.p1.deck:
+            self.winner = self.p1.name if self._has_deckout_win_replace(self.p1) else self.p2.name
+        elif not self.p2.deck:
+            self.winner = self.p2.name if self._has_deckout_win_replace(self.p2) else self.p1.name
+
+    def _has_deckout_win_replace(self, player) -> bool:
+        """player がデッキアウト時の敗北→勝利の置換能力(PASSIVE)を持つか。"""
+        units = [player.leader] + list(player.field)
+        for card in units:
+            if not card or not getattr(card, "master", None) or getattr(card, "negated", False):
+                continue
+            if getattr(card, "ability_disabled", False):
+                continue
+            for ab in card.master.abilities:
+                if ab.trigger != TriggerType.PASSIVE:
+                    continue
+                eff = self._find_action(ab.effect, ActionType.VICTORY)
+                if eff is not None and eff.status == "REPLACE_DECKOUT_LOSS":
+                    return True
+        return False
 
     def play_card_action(self, player: Player, card: Card):
         if card not in player.hand: return
