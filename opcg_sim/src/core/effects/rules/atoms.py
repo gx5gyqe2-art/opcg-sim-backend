@@ -203,6 +203,29 @@ _KEYWORD_GRANT_RE = re.compile(
 )
 
 
+@rule("prevent_leave_and_keyword", priority=70)
+def _prevent_leave_and_keyword(ctx: ParseContext):
+    """「このキャラは相手の効果で場を離れず（離れない）、【X】を得る」の複合。
+    PREVENT_LEAVE と GRANT_KEYWORD の両方を Sequence で返す。従来は1原子句のため
+    GRANT_KEYWORD のみが残り、トラッシュ7枚以上の除去保護(ナス寿郎/ウォーキュリー/マーズ)が
+    脱落していた。条件(トラッシュ7枚以上)は ability 側に lift されるので原子句は分割しない。"""
+    t = ctx.text
+    if not (_nfc("場を離れない") in t or _nfc("場を離れず") in t):
+        return None
+    if _nfc("得る") not in t:
+        return None
+    m = _KEYWORD_GRANT_RE.search(t)
+    if not m:
+        return None
+    keyword = m.group(1)
+    src = TargetQuery(select_mode="SOURCE")
+    prevent = GameAction(type=ActionType.PREVENT_LEAVE, target=TargetQuery(select_mode="SOURCE"),
+                         status="LEAVE", raw_text=t)
+    grant = GameAction(type=ActionType.GRANT_KEYWORD, target=src, status=keyword,
+                       duration=_duration_of(t), raw_text=t)
+    return Sequence(actions=[prevent, grant])
+
+
 @rule("grant_keyword", priority=63)
 def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -509,7 +532,9 @@ def _don_return_deck(ctx: ParseContext) -> Optional[GameAction]:
 @rule("prevent_leave", priority=64)
 def _prevent_leave(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    if _nfc("場を離れない") in t:
+    # 「場を離れない」(終止形) と「場を離れず」(連用中止形、「…場を離れず、【X】を得る」の分割後)
+    # の両方を保護マーカーとして拾う。
+    if _nfc("場を離れない") in t or _nfc("場を離れず") in t:
         status = "LEAVE"
     elif _nfc("KOされない") in t:
         status = "BATTLE_KO"

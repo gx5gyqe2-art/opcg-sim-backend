@@ -7,7 +7,7 @@ import uuid
 import json
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
-from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource
+from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource, Sequence, Branch, Choice
 from ..utils.logger_config import log_event
 from .effects.resolver import EffectResolver
 
@@ -684,6 +684,28 @@ class GameManager:
     # 除去保護（PREVENT_LEAVE）の判定。除去が起こる瞬間に、対象カードの
     # PASSIVE 能力を走査し、条件（例: トラッシュ7枚以上）をライブ評価する。
     # status_values: "LEAVE"（相手の効果で場を離れない）/ "BATTLE_KO"（バトルでKOされない）
+    def _find_action(self, node, action_type: ActionType) -> Optional[GameAction]:
+        """効果ツリー(GameAction/Sequence/Branch/Choice)から指定タイプの GameAction を探す。
+        「場を離れず、【X】を得る」のように PREVENT_LEAVE が Sequence の一要素になる場合に対応。"""
+        if node is None:
+            return None
+        if isinstance(node, GameAction):
+            return node if node.type == action_type else None
+        if isinstance(node, Sequence):
+            for a in node.actions:
+                found = self._find_action(a, action_type)
+                if found is not None:
+                    return found
+        elif isinstance(node, Branch):
+            return self._find_action(node.if_true, action_type) or (
+                self._find_action(node.if_false, action_type) if node.if_false else None)
+        elif isinstance(node, Choice):
+            for o in node.options:
+                found = self._find_action(o, action_type)
+                if found is not None:
+                    return found
+        return None
+
     def _active_protection(self, card: CardInstance, status_values: Tuple[str, ...]) -> bool:
         if not card or not getattr(card, "master", None) or card.negated:
             return False
@@ -692,8 +714,8 @@ class GameManager:
         for ab in card.master.abilities:
             if ab.trigger != TriggerType.PASSIVE:
                 continue
-            eff = ab.effect
-            if not isinstance(eff, GameAction) or eff.type != ActionType.PREVENT_LEAVE:
+            eff = self._find_action(ab.effect, ActionType.PREVENT_LEAVE)
+            if eff is None:
                 continue
             if eff.status not in status_values:
                 continue
@@ -728,8 +750,8 @@ class GameManager:
             for ab in protector.master.abilities:
                 if ab.trigger != TriggerType.PASSIVE:
                     continue
-                eff = ab.effect
-                if not isinstance(eff, GameAction) or eff.type != ActionType.REPLACE_EFFECT:
+                eff = self._find_action(ab.effect, ActionType.REPLACE_EFFECT)
+                if eff is None:
                     continue
                 if eff.status not in status_values:
                     continue
