@@ -47,7 +47,9 @@ def _draw(ctx: ParseContext) -> Optional[GameAction]:
 @rule("ko", priority=70)
 def _ko(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    if not re.search(_nfc(r"KO(する|できる)"), t):
+    # 「KOする／できる」に加え、Sequence 分割で末尾が連用形「KOし」になる句も対象
+    # （例:「相手の…をKOし、このカードを手札に加える」→ 前段「…をKOし」）。
+    if not re.search(_nfc(r"KO(する|できる)"), t) and not re.search(_nfc(r"KOし(?:[、。]|$)"), t.strip()):
         return None
     tq = parse_target(t)
     if _nfc("まで") in t or re.search(r"\d+枚まで", t):
@@ -104,10 +106,14 @@ def _rest(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     # 「レストにする／し／できる」を対象とする。従来は「できる」を取りこぼし、
     # 「このステージをレストにできる」等が OTHER に落ちていた。
-    if not re.search(_nfc(r"レストに(する|できる|し[、。])"), t):
+    # 「レストにする／し、／し。」に加え、Sequence 分割で末尾が連用形「レストにし」になる
+    # 句も対象（例:「相手の…をレストにし、このカードを手札に加える」→ 前段「…をレストにし」）。
+    if not re.search(_nfc(r"レストに(する|できる|し[、。]|し$)"), t.strip()):
         return None
     if re.search(_nfc(r"このキャラをレスト|このリーダーをレスト"), t):
         return None  # 自己レストは rest_self_cost が担当
+    if _nfc("ドン") in t:
+        return None  # ドン!!のレストは don_set_rest が担当（キャラの REST と区別）
     tq = parse_target(t)
     if _nfc("まで") in t:
         tq.is_up_to = True
@@ -490,7 +496,8 @@ def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ドン") not in t:
         return None
-    if not re.search(_nfc(r"レストに(する|できる|し[、。])"), t):
+    # Sequence 分割で末尾が連用形「レストにし」になる句（例:「ドン‼1枚をレストにし、…捨てる」）も対象
+    if not re.search(_nfc(r"レストに(する|できる|し[、。]|し$)"), t.strip()):
         return None
     if _nfc("アクティブ") in t:
         return None
@@ -913,7 +920,10 @@ def _bounce(ctx: ParseContext) -> Optional[GameAction]:
     「手札から…手札に戻す」等の二段指示は除外（手札 source 文脈）。
     """
     t = ctx.text
-    if not re.search(_nfc(r"手札に戻す(ことができる)?"), t):
+    # 「手札に戻す」に加え、Sequence 分割で末尾が連用形「手札に戻し」になる句も対象
+    # （例:「相手の…を持ち主の手札に戻し、このカードを手札に加える」→ 前段「…手札に戻し」）。
+    if not re.search(_nfc(r"手札に戻す(ことができる)?"), t) \
+            and not re.search(_nfc(r"手札に戻し(?:[、。]|$)"), t.strip()):
         return None
     if _nfc("手札から") in t:
         return None  # 「手札から何かして手札に戻す」等の誤検知を避ける

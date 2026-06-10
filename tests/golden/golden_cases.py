@@ -1653,6 +1653,41 @@ CASES = [
             }
         ],
     },
+    # ----- 相手への除去＋自己バウンス（TRIGGER, TARGET_SIDE 監査フラグ対応） ----
+    # 「相手の…をKOし、このカードを手札に加える」は Sequence に分割され、
+    # 前段の KO 対象は OPPONENT、後段の自己バウンスは SOURCE になる。
+    # 分割しないと self_to_hand が丸呑みし相手キャラの KO が消失していた。
+    {
+        "id": "trigger_ko_opp_then_self_bounce",
+        "text": "相手のコスト1以下のキャラ1枚までを、KOし、このカードを手札に加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "KO", "target": {"player": "OPPONENT", "cost_max": 1}},
+                        {"type": "MOVE_CARD", "target": {"select_mode": "SOURCE"}},
+                    ],
+                }
+            }
+        ],
+    },
+    # 「相手の…をレストにし、このカードを手札に加える」も同型（レスト＋自己バウンス）。
+    {
+        "id": "trigger_rest_opp_then_self_bounce",
+        "text": "相手のコスト2以下のキャラ1枚までを、レストにし、このカードを手札に加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "REST", "target": {"player": "OPPONENT", "cost_max": 2}},
+                        {"type": "MOVE_CARD", "target": {"select_mode": "SOURCE"}},
+                    ],
+                }
+            }
+        ],
+    },
     # ----- 動的コスト上限: ライフ枚数依存（COST_LIMIT 監査フラグ対応） --------
     # 「相手のライフの枚数以下のコストを持つ相手のキャラ」→ cost_max_dynamic=LIFE_COUNT_OPPONENT
     {

@@ -53,6 +53,9 @@ def summarize_target(tq) -> Optional[Dict[str, Any]]:
     out["is_up_to"] = tq.is_up_to
     if tq.ref_id:
         out["ref_id"] = tq.ref_id
+    sm = getattr(tq, "select_mode", None)
+    if sm:
+        out["select_mode"] = sm
     return out
 
 

@@ -110,6 +110,9 @@ def test_gorosei_revival():
     p1.leader = inst("OP13-079")
     src = inst("OP13-082")
     p1.field = [inst("OP13-080"), inst("OP13-091"), inst("OP13-089"), src]
+    # コストは「ドン‼1枚をレストにし、手札1枚を捨てる」= REST_DON + DISCARD。
+    # DISCARD コストの支払い用に手札を 1 枚用意する。
+    p1.hand = fillers(1, "P1")
     p1.trash = [inst(c) for c in ["OP13-080", "OP13-083", "OP13-084", "OP13-091", "OP13-089"]] * 2
     before_field = len(p1.field)
     fire(gm, p1, src, "ACTIVATE_MAIN")
