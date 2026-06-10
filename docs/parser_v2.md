@@ -263,6 +263,30 @@ ATTACK_DISABLE/RESTRICTION、および GRANT_KEYWORD を継続効果として登
 > **TEMP リーク注意**: LOOK は候補を temp_zone に移すため、後続で TEMP を必ず消費する
 > （grab／残り戻し）こと。消費しないと temp_zone にカードが取り残されデッキから消失する。
 
+### モーダル選択「以下から1つを選ぶ」の構造修正（parser.py, tM2nD）
+
+`以下から1つを選ぶ` を含む **全21カード**が `Choice(options=[])`（空 options）で生成され、
+選択肢がまるごと消える silent no-op だった。2段の脱落が原因:
+1. `parse_card_text` が能力テキストを ` / ` で分割するため「・〈選択肢〉」が**別 Ability に割れて破棄**。
+2. `_parse_to_node` が `。` で分割するため、残しても選択肢構造が砕けて Sequence 化。
+
+修正は `parser.py` の3点:
+- `parse_card_text`: Choice 導入セグメント（`以下から…選ぶ`）に続く非 `【...】` セグメントを
+  `\n` で**親へ再結合**（新タグで打ち切り）。
+- `_parse_to_node`: `。` 分割より**前に** Choice を検出し新ヘルパ `_parse_choice` で生成（早期 return）。
+- `_parse_choice` / `_extract_options`: option を再帰解析（option 内 `〈条件〉場合、…` は Branch 化）、
+  先頭ゲート条件（`…の場合、以下から…選ぶ`）は Branch でラップ、`相手は…選ぶ` は `Choice.player=OPPONENT`。
+
+結果: **21/21 が非空 Choice 化**。退行(新規OTHER)=0、隠れミスターゲット A/B=0・C/D≤8 維持。
+OTHER 指標は +2（従来 silent 破棄の選択肢句が初めて可視化された分で退行でない）。
+
+### レスト制限「…レストにできない」（ActionType `PREVENT_REST`, tM2nD）
+
+「相手のキャラは…までレストにできない」＝対象は自身をレストにできない＝**アタックもブロックも不可**
+（どちらも本体をレストにする操作）。`rest_restrict` ルール＋ `timed_flags["CANNOT_REST"]`（継続効果・
+次相手ターン終了で失効）で実装し、`declare_attack`/`has_blocker` で弾く。`FREEZE`（アクティブにならない）
+の逆向き。対象9カードを全てネイティブ化。
+
 ### 残課題（今後・長い裾野）
 
 残る OTHER は頻度の低い多様な専用効果に分散（上位でも 1 表現あたり 10 件前後）。

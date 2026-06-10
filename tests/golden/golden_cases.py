@@ -241,6 +241,37 @@ CASES = [
             {"effect": {"kind": "action", "type": "ATTACK_DISABLE", "duration": "UNTIL_NEXT_TURN_END"}}
         ],
     },
+    # ----- レスト制限（次の相手のターン終了時まで、レストにできない） -------
+    #   対象キャラはレストにできない＝アタック/ブロックができない（どちらも本体をレストにするため）。
+    {
+        "id": "rest_restrict_next_turn",
+        "text": "相手のコスト5以下のキャラ1枚までは、次の相手のターン終了時まで、レストにできない。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "PREVENT_REST",
+                    "duration": "UNTIL_NEXT_TURN_END",
+                    "target": {"player": "OPPONENT", "cost_max": 5, "is_up_to": True},
+                }
+            }
+        ],
+    },
+    # ----- レスト制限（次の相手のエンドフェイズ終了時まで・複数枚） ----------
+    {
+        "id": "rest_restrict_endphase_multi",
+        "text": "相手のコスト7以下のキャラ3枚までは、次の相手のエンドフェイズ終了時まで、レストにできない。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "PREVENT_REST",
+                    "duration": "UNTIL_NEXT_TURN_END",
+                    "target": {"player": "OPPONENT", "cost_max": 7, "is_up_to": True},
+                }
+            }
+        ],
+    },
     # ----- トリガー: このカードの【メイン】効果を発動する -----------------
     {
         "id": "execute_main_trigger",
@@ -1244,6 +1275,398 @@ CASES = [
                 "trigger": "YOUR_TURN",
                 "condition": {"type": "RESTED_COUNT", "operator": "GE", "value": 8, "player": "SELF"},
                 "effect": {"type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ===== A1: self_to_hand — このカードを手札に加える =====
+    # 「このカード/このキャラカードを手札に加える（ことができる）」は MOVE_CARD(SOURCE→HAND)。
+    # 従来は search_to_hand が zone=TEMP に誤設定していた（D detector 対象8枚）。
+    {
+        "id": "self_to_hand_trigger",
+        "text": "【トリガー】このカードを手札に加える。",
+        "expect": [
+            {
+                "trigger": "TRIGGER",
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "destination": "HAND",
+                    # zone が TEMP ではないこと（SOURCE モード: zone は FIELD デフォルト）。
+                    # search_to_hand が誤って zone=TEMP に設定していた bug を検出する。
+                    "target": {"player": "SELF", "zone": "FIELD"},
+                },
+            }
+        ],
+    },
+    {
+        "id": "self_to_hand_ko",
+        "text": "【KO時】このキャラカードを手札に加えることができる。",
+        "expect": [
+            {
+                "trigger": "ON_KO",
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "destination": "HAND",
+                    "target": {"player": "SELF", "zone": "FIELD"},
+                },
+            }
+        ],
+    },
+    # ===== A2: trash_to_deck_ordered — トラッシュから好きな順番でデッキ下へ =====
+    # 従来は temp_to_deck が zone=TEMP に誤設定していた（D detector 対象~18枚）。
+    {
+        "id": "trash_to_deck_ordered",
+        "text": "自分のトラッシュのカード3枚を好きな順番でデッキの下に置くことができる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "DECK_BOTTOM",
+                    "target": {"zone": "TRASH", "player": "SELF", "count": 3},
+                }
+            }
+        ],
+    },
+    # ===== A2b: field_char_to_deck_ordered — コスト付きキャラを持ち主デッキ下へ =====
+    # 従来は temp_to_deck が zone=TEMP に誤設定していた（OP06-058 等）。
+    {
+        "id": "field_char_to_deck_ordered",
+        "text": "コスト6以下のキャラ2枚までを、好きな順番で持ち主のデッキの下に置く。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "DECK_BOTTOM",
+                    "target": {
+                        "player": "OPPONENT",
+                        "card_type": ["CHARACTER"],
+                        "cost_max": 6,
+                        "is_up_to": True,
+                    },
+                }
+            }
+        ],
+    },
+    # ===== C11: hand_to_life — dest_position フィールド =====
+    # GameAction に dest_position が追加されたことで hand_to_life がライフ上/下を正確に区別できる。
+    {
+        "id": "hand_to_life_top",
+        "text": "自分の手札1枚をライフの上に加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "HAND", "player": "SELF"},
+                    "destination": "LIFE",
+                    "dest_position": "TOP",
+                }
+            }
+        ],
+    },
+    {
+        "id": "hand_to_life_bottom",
+        "text": "自分の手札1枚をライフの下に加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "HAND", "player": "SELF"},
+                    "destination": "LIFE",
+                    "dest_position": "BOTTOM",
+                }
+            }
+        ],
+    },
+    # ===== D12d: rest_self — このキャラをレストにする（効果文脈） =====
+    {
+        "id": "rest_self_effect",
+        "text": "【登場時】このキャラをレストにする。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "action",
+                    "type": "REST",
+                    "target": {"player": "SELF"},
+                },
+            }
+        ],
+    },
+    # ===== D12b: trash_to_hand — トラッシュからカードを手札に =====
+    {
+        "id": "trash_event_to_hand",
+        "text": "【登場時】自分のトラッシュのイベント1枚までを、手札に加える。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "TRASH", "player": "SELF", "is_up_to": True},
+                    "destination": "HAND",
+                },
+            }
+        ],
+    },
+    # ===== ko: KOできる（任意KO, OP05-060系, OTHER 2件） =====
+    {
+        "id": "ko_optional_trait",
+        "text": "自分の特徴《王下七武海》を持つキャラ1枚をKOできる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "KO",
+                    "target": {"player": "SELF", "traits": ["王下七武海"]},
+                }
+            }
+        ],
+    },
+    # ===== B5: scry-1 デッキの上か下に置く =====
+    # 「公開し、デッキの上か下に置く」→ LOOK + DECK_BOTTOM(TEMP)。
+    # scry_place ルールで OTHER だった 2 件を修正。
+    {
+        "id": "scry_one_deck_top_or_bottom",
+        "text": "【登場時】自分のデッキの上から1枚を公開し、デッキの上か下に置く。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 1},
+                        {"type": "DECK_BOTTOM", "target": {"zone": "TEMP"}},
+                    ],
+                },
+            }
+        ],
+    },
+    # ===== B6: 登場させた場合 → PREV_ACTION condition =====
+    # 「登場させた場合、【速攻】を得る」→ Branch(PREV_ACTION=PLAYED_CARD, GRANT_KEYWORD)。
+    # legacy parser の _parse_condition_obj が「場合」を strip 済みのテキストに対して
+    # 「場合」の有無を再チェックしていたバグを修正。
+    {
+        "id": "prev_action_played_card_rush",
+        "text": "【メイン】自分のデッキの上から1枚を公開し、コスト5以下のキャラカード1枚までを、登場させてもよい。登場させた場合、そのキャラは、このターン中、【速攻】を得る。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "LOOK", "value": 1},
+                        {"type": "PLAY_CARD"},
+                        {
+                            "kind": "branch",
+                            "condition": {"type": "PREV_ACTION"},
+                            "if_true": {"type": "GRANT_KEYWORD", "status": "速攻"},
+                        },
+                    ],
+                }
+            }
+        ],
+    },
+    # ===== 裾野OTHER: 選択型トラッシュ（trash_target） =====
+    # 「自分のキャラ1枚をトラッシュに置く」— このキャラ以外の選択型。trash_self(SOURCE)とは別。
+    {
+        "id": "trash_target_own_char",
+        "text": "【起動メイン】自分のキャラ1枚をトラッシュに置くことができる：カード2枚を引く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {
+                    "kind": "action",
+                    "type": "TRASH",
+                    "target": {"player": "SELF", "zone": "FIELD"},
+                },
+                "effect": {"kind": "action", "type": "DRAW", "value": 2},
+            }
+        ],
+    },
+    # 特徴フィルタ『』付きの選択型トラッシュ。
+    {
+        "id": "trash_target_trait",
+        "text": "【KO時】自分の『白ひげ海賊団』を含む特徴を持つキャラ1枚をトラッシュに置くことができる。",
+        "expect": [
+            {
+                "trigger": "ON_KO",
+                "effect": {
+                    "kind": "action",
+                    "type": "TRASH",
+                    "target": {"player": "SELF", "traits": ["白ひげ海賊団"]},
+                },
+            }
+        ],
+    },
+    # ===== 裾野OTHER: パワー設定/上書き（set_power → BUFF+POWER_OVERRIDE） =====
+    # 「パワー0にする」— 静的なパワー上書き。power_buff(±N)は「にする」を除外しているため別ルール。
+    {
+        "id": "set_power_zero",
+        "text": "相手のキャラ1枚までを、このターン中、パワー0にする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "POWER_OVERRIDE",
+                    "value": 0,
+                    "duration": "THIS_TURN",
+                    "target": {"player": "OPPONENT", "is_up_to": True},
+                },
+            }
+        ],
+    },
+    # ===== 構造的難所: select断片（「…を選ぶ。選んだキャラは…」） =====
+    # 「（対象）を選ぶ」→ SELECT(save_id) ／ 後続「選んだキャラ」→ ref_id="selected_card"。
+    {
+        "id": "select_then_attack_disable",
+        "text": "【登場時】相手のコスト6以下のキャラ1枚までを選ぶ。選んだキャラは、このターン中、アタックできない。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "SELECT", "target": {"player": "OPPONENT", "cost_max": 6, "is_up_to": True}},
+                        {"type": "ATTACK_DISABLE", "target": {"ref_id": "selected_card"}},
+                    ],
+                },
+            }
+        ],
+    },
+    # ===== 構造的難所: trigger断片（「〈timing〉時、発動できる」埋め込みトリガー） =====
+    # 「相手がアタックした時、発動できる」→ ディスパッチ対象 ON_OPP_ATTACK へ。OTHER は消える。
+    {
+        "id": "text_trigger_opp_attack",
+        "text": "【ターン1回】相手がアタックした時、発動できる。相手のリーダーかキャラ1枚までを、このターン中、パワー-1000。",
+        "expect": [
+            {
+                "trigger": "ON_OPP_ATTACK",
+                "condition": {"type": "TURN_LIMIT"},
+                "effect": {"kind": "action", "type": "BUFF", "value": -1000},
+            }
+        ],
+    },
+    # 非ディスパッチ timing × PASSIVE → ACTIVATE_MAIN（常時誤発動を避け手動発動可能に）。
+    {
+        "id": "text_trigger_passive_to_main",
+        "text": "このキャラが相手の効果でレストになった時、発動できる。このキャラをトラッシュに置き、カード2枚を引くことができる。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "TRASH"},
+                        {"type": "DRAW", "value": 2},
+                    ],
+                },
+            }
+        ],
+    },
+    # ===== 構造的難所 C7: ライフ scry（対話選択 Choice ツリー） =====
+    # 「自分か相手のライフの上から1枚までを見て、ライフの上か下に置く」→
+    #   Choice[自分/相手/見ない] → 各 Seq[LOOK_LIFE → Choice[上/下に置く]]。
+    {
+        "id": "life_scry_top_or_bottom",
+        "text": "【登場時】自分か相手のライフの上から1枚までを見て、ライフの上か下に置く。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "choice",
+                    "options": [
+                        {"kind": "seq", "actions": [
+                            {"type": "LOOK_LIFE"},
+                            {"kind": "choice", "options": [
+                                {"type": "MOVE_CARD", "destination": "LIFE", "dest_position": "TOP"},
+                                {"type": "MOVE_CARD", "destination": "LIFE", "dest_position": "BOTTOM"},
+                            ]},
+                        ]},
+                        {"kind": "seq", "actions": [
+                            {"type": "LOOK_LIFE"},
+                            {"kind": "choice", "options": [
+                                {"type": "MOVE_CARD", "destination": "LIFE", "dest_position": "TOP"},
+                                {"type": "MOVE_CARD", "destination": "LIFE", "dest_position": "BOTTOM"},
+                            ]},
+                        ]},
+                        {"kind": "seq", "actions": []},
+                    ],
+                },
+            }
+        ],
+    },
+    # ===== 構造的難所: モーダル選択「以下から1つを選ぶ」（ ・項目を Choice の options へ） =====
+    #   従来は ` / ` で別 Ability に分割→破棄され options が空だった。
+    {
+        "id": "modal_choice_two_options",
+        "text": "【登場時】以下から1つを選ぶ。 / ・相手のコスト4以下のキャラ1枚までを、KOする。 / ・カード2枚を引く。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "choice",
+                    "options": [
+                        {"kind": "action", "type": "KO",
+                         "target": {"player": "OPPONENT", "cost_max": 4, "is_up_to": True}},
+                        {"kind": "action", "type": "DRAW", "value": 2},
+                    ],
+                },
+            }
+        ],
+    },
+    # 選択肢の前段に条件ゲート（「…の場合、以下から1つを選ぶ」）→ ability.condition へ lift。
+    {
+        "id": "modal_choice_condition_gate",
+        "text": "【メイン】自分のリーダーが多色の場合、以下から1つを選ぶ。 / ・相手のコスト4以下のキャラ1枚までを、持ち主の手札に戻す。 / ・カード2枚を引く。",
+        "expect": [
+            {
+                "condition": {"type": "LEADER_COLOR"},
+                "effect": {
+                    "kind": "choice",
+                    "options": [
+                        {"kind": "action", "type": "BOUNCE"},
+                        {"kind": "action", "type": "DRAW", "value": 2},
+                    ],
+                },
+            }
+        ],
+    },
+    # 選択肢の片方が自前の条件 Branch を持つ（OP14-069 同型: 条件付き KO ／ レスト制限）。
+    {
+        "id": "modal_choice_option_with_branch",
+        "text": "【登場時】以下から1つを選ぶ。 / ・自分のリーダーが特徴《ドンキホーテ海賊団》を持つ場合、相手のコスト8以下のキャラ1枚までを、KOする。 / ・相手のコスト7以下のキャラ3枚までは、次の相手のエンドフェイズ終了時まで、レストにできない。",
+        "expect": [
+            {
+                "trigger": "ON_PLAY",
+                "effect": {
+                    "kind": "choice",
+                    "options": [
+                        {"kind": "branch",
+                         "condition": {"type": "LEADER_TRAIT"},
+                         "if_true": {"kind": "action", "type": "KO"}},
+                        {"kind": "action", "type": "PREVENT_REST", "duration": "UNTIL_NEXT_TURN_END"},
+                    ],
+                },
+            }
+        ],
+    },
+    # 「元々のパワー7000にする」— base_power_override に静的値をセット。
+    {
+        "id": "set_power_base_value",
+        "text": "自分のリーダーかキャラ1枚までを、このターン中、元々のパワー7000にする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "POWER_OVERRIDE",
+                    "value": 7000,
+                    "duration": "THIS_TURN",
+                    "target": {"player": "SELF", "is_up_to": True},
+                },
             }
         ],
     },

@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from ....models.effect_types import GameAction, TargetQuery, ValueSource
+from ....models.effect_types import Choice, GameAction, Sequence, TargetQuery, ValueSource
 from ....models.enums import ActionType, Player, Zone
 from ..matcher import parse_target
 from .base import ParseContext, rule, _nfc
@@ -47,7 +47,7 @@ def _draw(ctx: ParseContext) -> Optional[GameAction]:
 @rule("ko", priority=70)
 def _ko(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    if _nfc("KOする") not in t:
+    if not re.search(_nfc(r"KO(する|できる)"), t):
         return None
     tq = parse_target(t)
     if _nfc("まで") in t or re.search(r"\d+枚まで", t):
@@ -74,6 +74,24 @@ def _rest_self_cost(ctx: ParseContext) -> Optional[GameAction]:
             is_strict_count=True,
             ref_id="self",
         ),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 自己レスト（効果）: 「このキャラ／このリーダーをレストにする（できる）」(コスト以外)
+# ---------------------------------------------------------------------------
+@rule("rest_self", priority=76)
+def _rest_self(ctx: ParseContext) -> Optional[GameAction]:
+    """「このキャラ／このリーダーをレストにする（できる）」(効果文脈) → REST(SOURCE)。"""
+    if ctx.is_cost:
+        return None  # コスト文脈は rest_self_cost が担当
+    t = ctx.text
+    if not re.search(_nfc(r"このキャラをレスト|このリーダーをレスト"), t):
+        return None
+    return GameAction(
+        type=ActionType.REST,
+        target=TargetQuery(select_mode="SOURCE"),
         raw_text=t,
     )
 
@@ -144,6 +162,36 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# パワー設定（上書き）: 「（対象）を、…パワーNにする／元々のパワーNにする」
+#   power_buff(priority=60) は「±N」を担当し「にする」を明示除外している。
+#   ここは静的な数値設定（base_power_override）のみを担当する。
+#   エンジンは BUFF+status="POWER_OVERRIDE" で base_power_override をセットし、
+#   reset_turn_status() で失効する（「このターン中」相当のセマンティクス）。
+#   「相手のリーダーと同じパワーになる」「入れ替える」等の動的参照は C9 の別件として除外。
+# ---------------------------------------------------------------------------
+@rule("set_power", priority=59)
+def _set_power(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    # 動的参照（同値・入れ替え）は対象外
+    if _nfc("同じパワー") in t or _nfc("入れ替") in t:
+        return None
+    m = re.search(_nfc(r"パワー(?:を)?(\d+)に(?:なる|する)"), t)
+    if not m:
+        return None
+    tq = parse_target(t)
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(
+        type=ActionType.BUFF,
+        status="POWER_OVERRIDE",
+        target=tq,
+        value=ValueSource(base=int(m.group(1))),
+        duration=_duration_of(t),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
 # キーワード付与: 「（対象）は【ブロッカー】を得る」
 #   parser.py の構造分解が keyword タグを保持するようになり、原子句に
 #   【ブロッカー】等が残る。これを GRANT_KEYWORD(status=キーワード名) に変換する。
@@ -153,6 +201,29 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
 _KEYWORD_GRANT_RE = re.compile(
     _nfc(r"【(ブロッカー|速攻[^】]*|ダブルアタック|バニッシュ|ブロック不可|貫通|シフト)】")
 )
+
+
+@rule("prevent_leave_and_keyword", priority=70)
+def _prevent_leave_and_keyword(ctx: ParseContext):
+    """「このキャラは相手の効果で場を離れず（離れない）、【X】を得る」の複合。
+    PREVENT_LEAVE と GRANT_KEYWORD の両方を Sequence で返す。従来は1原子句のため
+    GRANT_KEYWORD のみが残り、トラッシュ7枚以上の除去保護(ナス寿郎/ウォーキュリー/マーズ)が
+    脱落していた。条件(トラッシュ7枚以上)は ability 側に lift されるので原子句は分割しない。"""
+    t = ctx.text
+    if not (_nfc("場を離れない") in t or _nfc("場を離れず") in t):
+        return None
+    if _nfc("得る") not in t:
+        return None
+    m = _KEYWORD_GRANT_RE.search(t)
+    if not m:
+        return None
+    keyword = m.group(1)
+    src = TargetQuery(select_mode="SOURCE")
+    prevent = GameAction(type=ActionType.PREVENT_LEAVE, target=TargetQuery(select_mode="SOURCE"),
+                         status="LEAVE", raw_text=t)
+    grant = GameAction(type=ActionType.GRANT_KEYWORD, target=src, status=keyword,
+                       duration=_duration_of(t), raw_text=t)
+    return Sequence(actions=[prevent, grant])
 
 
 @rule("grant_keyword", priority=63)
@@ -205,6 +276,67 @@ def _life_face(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(type=ActionType.FACE_UP_LIFE, target=tq, status=status, raw_text=t)
 
 
+# ---------------------------------------------------------------------------
+# ライフ scry（C7）: 「（自分か相手の）ライフの上から1枚（まで）を見て、ライフの上か下に置く」
+#   → 対話選択（Choice）で実装する。フロントは action_type="CHOICE"＋options を
+#     既にボタン描画・index 返却まで対応済みなので、バックエンドで Choice ツリーを
+#     生成すれば end-to-end で動く（resolver の suspend/resume に乗る）。
+#   構造:
+#     Choice[どのライフを見るか]
+#       ├ 自分: Sequence[LOOK_LIFE(SELF,1) → Choice[上/下に置く（SELF）]]
+#       ├ 相手: Sequence[LOOK_LIFE(OPP,1)  → Choice[上/下に置く（OPP）]]
+#       └ （「まで」なら）見ない: Sequence[]（no-op）
+#   LOOK_LIFE が対象ライフ上 1 枚を temp_zone へ移し、後続 Choice が temp→ライフ上/下へ戻す。
+# ---------------------------------------------------------------------------
+def _place_temp_to_life(target_player: Player, position: str, raw: str) -> GameAction:
+    """temp_zone の公開カードを target_player のライフの上(TOP)/下(BOTTOM)へ戻す。"""
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=TargetQuery(zone=Zone.TEMP, player=target_player, select_mode="ALL", count=1),
+        destination=Zone.LIFE,
+        dest_position=position,
+        raw_text=raw,
+    )
+
+
+def _scry_one_life(target_player: Player, status: str, raw: str) -> Sequence:
+    look = GameAction(type=ActionType.LOOK_LIFE, status=status, value=ValueSource(base=1), raw_text=raw)
+    place = Choice(
+        message="ライフの上か下に置く",
+        option_labels=["ライフの上に置く", "ライフの下に置く"],
+        options=[
+            _place_temp_to_life(target_player, "TOP", raw),
+            _place_temp_to_life(target_player, "BOTTOM", raw),
+        ],
+    )
+    return Sequence(actions=[look, place])
+
+
+@rule("life_scry_top", priority=73)
+def _life_scry_top(ctx: ParseContext) -> Optional[Choice]:
+    t = ctx.text
+    if _nfc("ライフの上から") not in t or _nfc("見て") not in t:
+        return None
+    # 戻し先が「ライフの上か下」のもののみ（「ライフすべてを見て…」並び替えは別パターン）。
+    if not (_nfc("ライフの上か下") in t or (_nfc("ライフの上") in t and _nfc("下に置く") in t)):
+        return None
+    both = _nfc("自分か相手") in t
+    labels: list = []
+    options: list = []
+    if both or (_nfc("自分") in t and _nfc("相手") not in t):
+        labels.append("自分のライフを見る")
+        options.append(_scry_one_life(Player.SELF, "SELF", t))
+    if both or (_nfc("相手") in t and _nfc("自分") not in t):
+        labels.append("相手のライフを見る")
+        options.append(_scry_one_life(Player.OPPONENT, "OPPONENT", t))
+    if not options:
+        return None
+    if _nfc("まで") in t:  # 「1枚まで」= 任意 → 見ない選択肢
+        labels.append("見ない")
+        options.append(Sequence(actions=[]))
+    return Choice(message="どちらのライフを見ますか", option_labels=labels, options=options)
+
+
 @rule("life_recover", priority=71)
 def _life_recover(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分の）デッキの上から…ライフの上に加える」→ HEAL（デッキ上→ライフ）。
@@ -254,7 +386,7 @@ def _life_to_hand(ctx: ParseContext) -> Optional[GameAction]:
 
 @rule("hand_to_life", priority=69)
 def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
-    """「（自分の）手札…を、ライフの上／下に加える」→ MOVE_CARD(dest=LIFE)。"""
+    """「（自分の）手札…を、ライフの上／下に加える」→ MOVE_CARD(dest=LIFE, dest_position=TOP/BOTTOM)。"""
     t = ctx.text
     if _nfc("手札") not in t:
         return None
@@ -262,10 +394,12 @@ def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
         return None
     tq = parse_target(t)
     tq.zone = Zone.HAND
+    dest_position = "TOP" if _nfc("ライフの上に加える") in t else "BOTTOM"
     return GameAction(
         type=ActionType.MOVE_CARD,
         target=tq,
         destination=Zone.LIFE,
+        dest_position=dest_position,
         raw_text=t,
     )
 
@@ -398,7 +532,9 @@ def _don_return_deck(ctx: ParseContext) -> Optional[GameAction]:
 @rule("prevent_leave", priority=64)
 def _prevent_leave(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    if _nfc("場を離れない") in t:
+    # 「場を離れない」(終止形) と「場を離れず」(連用中止形、「…場を離れず、【X】を得る」の分割後)
+    # の両方を保護マーカーとして拾う。
+    if _nfc("場を離れない") in t or _nfc("場を離れず") in t:
         status = "LEAVE"
     elif _nfc("KOされない") in t:
         status = "BATTLE_KO"
@@ -593,6 +729,31 @@ def _search_to_hand(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+@rule("trash_to_hand", priority=62)
+def _trash_to_hand(ctx: ParseContext) -> Optional[GameAction]:
+    """「自分のトラッシュの（種別/名前/色/コスト条件の）カード/キャラ/イベントN枚までを手札に加える」
+    → MOVE_CARD(zone=TRASH, dest=HAND)。
+
+    search_to_hand(54) より高優先で、トラッシュ明示のパターンを先取りする。
+    """
+    t = ctx.text
+    if _nfc("手札に加える") not in t and _nfc("手札に加えてもよい") not in t:
+        return None
+    if _nfc("トラッシュ") not in t:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.TRASH
+    tq.player = Player.SELF
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=tq,
+        destination=Zone.HAND,
+        raw_text=t,
+    )
+
+
 @rule("temp_to_deck", priority=63)
 def _temp_to_deck(ctx: ParseContext) -> Optional[GameAction]:
     """「（好きな順番に並び替え、）デッキの上か下に置く」「好きな順番で置く」（scry の戻し）
@@ -600,10 +761,19 @@ def _temp_to_deck(ctx: ParseContext) -> Optional[GameAction]:
 
     look_deck の後、手札に取らなかった残りをデッキへ戻す。「残り」を含む句は
     remaining_* が担当するため除外。上下/並び替えの選択 UI は未実装のため下へ戻す。
+
+    明示ソース（トラッシュ/ライフ）またはフィールドのキャラ対象（コスト/枚数フィルタ付き）は
+    deck_bottom_general(priority=55) が担当するため除外。
     """
     t = ctx.text
     if _nfc("残り") in t or _nfc("手札") in t:
         return None  # remaining_* / search_to_hand が担当
+    # 明示ソースゾーンがある場合は deck_bottom_general に委ねる
+    if _nfc("トラッシュ") in t or _nfc("ライフ") in t:
+        return None
+    # キャラ対象（コスト/枚数フィルタ付き、すべて、以外）はフィールドターゲット → deck_bottom_general
+    if re.search(_nfc(r"コスト\d+以[下上]|キャラ\d+枚|キャラすべて|キャラ以外"), t):
+        return None
     has_arrange = _nfc("並び替え") in t or _nfc("並び変え") in t or _nfc("好きな順番") in t
     to_deck = _nfc("デッキの上か下") in t or _nfc("デッキの下") in t or _nfc("デッキの上") in t
     if not (has_arrange and (_nfc("置く") in t or _nfc("戻す") in t)):
@@ -709,6 +879,30 @@ def _rush_natural(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+@rule("select_target", priority=58)
+def _select_target(ctx: ParseContext) -> Optional[GameAction]:
+    """「（対象）を選ぶ」（終止形・単独の選択句）→ SELECT（対象を選択して保存）。
+
+    「…を選ぶ。選んだキャラは…」のように選択と効果が別文に分割されたケースで、
+    選択句が動詞なしの OTHER に落ちていたのを是正する。選択結果は
+    target.save_id="selected_card" に保存され、後続句の「選んだ／その
+    （カード/キャラ/リーダー）」が ref_id で参照する（matcher.parse_target が付与）。
+
+    除外: 「以下から（1つを）選ぶ」（Choice）、連用形「選び、」（legacy が同一句で
+    save_id を付与する連結形）。
+    """
+    t = ctx.text
+    if _nfc("を選ぶ") not in t:
+        return None
+    if _nfc("以下から") in t or _nfc("効果を選択") in t:
+        return None
+    tq = parse_target(t)
+    tq.save_id = "selected_card"
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.SELECT, target=tq, raw_text=t)
+
+
 @rule("bounce", priority=56)
 def _bounce(ctx: ParseContext) -> Optional[GameAction]:
     """「（コストN以下の）（特徴X の）キャラ1枚（まで）を（持ち主の）手札に戻す（ことができる）」
@@ -734,14 +928,17 @@ def _bounce(ctx: ParseContext) -> Optional[GameAction]:
 
 @rule("deck_bottom_general", priority=55)
 def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
-    """「（対象）を（持ち主の/好きな順番で）デッキの下に置く」→ DECK_BOTTOM。
+    """「（対象）を（持ち主の/好きな順番で）デッキの下に置く/戻す」→ DECK_BOTTOM。
 
     remaining_deck_bottom（「残り」→TEMP→DECK）は priority=65 で先に処理される。
-    本ルールは一般的なフィールドカード→デッキ下、手札→デッキ下を担う。
+    temp_to_deck（scry 戻し、priority=63）がスキップした明示ソース付きパターンも担当。
     「持ち主のデッキの下」でプレイヤー未指定なら OPPONENT（相手キャラ対象が多い）。
+    「戻す」も「置く」と同義として受け付ける。
     """
     t = ctx.text
-    if _nfc("デッキの下") not in t or _nfc("置く") not in t:
+    if _nfc("デッキの下") not in t:
+        return None
+    if _nfc("置く") not in t and _nfc("戻す") not in t:
         return None
     if _nfc("残り") in t:
         return None  # remaining_deck_bottom / remaining_deck_top_or_bottom が担当
@@ -752,6 +949,28 @@ def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("まで") in t:
         tq.is_up_to = True
     return GameAction(type=ActionType.DECK_BOTTOM, target=tq, raw_text=t)
+
+
+@rule("scry_place", priority=64)
+def _scry_place(ctx: ParseContext) -> Optional[GameAction]:
+    """「（そのカードを）デッキの上か下に置く」（公開後の単純配置）
+    → DECK_BOTTOM(TEMP)。LOOK 直後に「上か下」を選んで置くパターン。
+
+    「好きな順番」付きは temp_to_deck が担当。「残り」付きは
+    remaining_deck_top_or_bottom が担当。選択 UI 未実装のため下に保守的フォールバック。
+    """
+    t = ctx.text
+    if not re.search(_nfc(r"デッキの上か下に置く"), t):
+        return None
+    if _nfc("残り") in t or _nfc("好きな順番") in t or _nfc("並び替え") in t:
+        return None  # 既存ルールへ委ねる
+    if _nfc("手札") in t:
+        return None  # hand_to_deck が担当
+    return GameAction(
+        type=ActionType.DECK_BOTTOM,
+        target=TargetQuery(player=Player.SELF, zone=Zone.TEMP),
+        raw_text=t,
+    )
 
 
 @rule("remaining_deck_top_or_bottom", priority=63)
@@ -879,6 +1098,58 @@ def _trash_self(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(
         type=ActionType.TRASH,
         target=TargetQuery(select_mode="SOURCE"),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 選択型トラッシュ: 「（自分/相手の）（コストN以下／特徴X の）キャラ1枚（まで）を
+#   トラッシュに置く（ことができる）」→ TRASH（選択したフィールドのキャラ→トラッシュ）。
+#   trash_self(priority=67) が「このキャラ／このカード／このリーダー」主語の自己トラッシュを
+#   先に担当するため、ここは *選択型*（自分/相手のキャラを選んでトラッシュ）を拾う。
+#   残り(remaining_trash)・デッキ(mill_deck)・手札・ライフ等の別ソース文脈は除外。
+#   エンジンの TRASH は選択ターゲットを既にトラッシュへ移動する（gamestate）。
+# ---------------------------------------------------------------------------
+@rule("trash_target", priority=57)
+def _trash_target(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    # 「トラッシュに置く」のほか、構造分割で動詞が落ちた「…をトラッシュに」(節末)も拾う。
+    # 例: 五老星(OP13-082)「自分のキャラすべてをトラッシュに置き、…」は「置き、」で分割され
+    # 「自分のキャラすべてをトラッシュに」となり、従来は OTHER に落ちて全体KOが不発だった。
+    if not re.search(_nfc(r"トラッシュに置|トラッシュに$"), t):
+        return None
+    # 自己トラッシュ（このキャラ／このカード／このリーダーを、?トラッシュ）は trash_self が担当
+    if re.search(_nfc(r"この(カード|キャラ|リーダー)を、?トラッシュ"), t):
+        return None
+    # 別ソース文脈は各専用ルールへ委ねる（残り/デッキ/手札/ライフ）
+    if _nfc("残り") in t or _nfc("デッキ") in t or _nfc("手札") in t or _nfc("ライフ") in t:
+        return None
+    tq = parse_target(t)
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.TRASH, target=tq, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# 自己手札回収: 「このカード／このキャラカードを手札に加える（ことができる）」
+#   KO時/トリガー等で自カードを手札に戻す効果。SOURCE モードで自身を参照。
+#   search_to_hand(priority=54) が zone=TEMP に誤設定するより先に処理する（priority=75）。
+#   明示ソースゾーン（トラッシュから）がある場合は対象外（別途対応）。
+# ---------------------------------------------------------------------------
+@rule("self_to_hand", priority=75)
+def _self_to_hand(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"この(カード|キャラカード)を"), t):
+        return None
+    if _nfc("手札に加える") not in t and _nfc("手札に加えてもよい") not in t:
+        return None
+    # 明示ソース（「トラッシュから」「ライフから」）は別ルールに委ねる
+    if _nfc("トラッシュ") in t or _nfc("ライフ") in t:
+        return None
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=TargetQuery(select_mode="SOURCE"),
+        destination=Zone.HAND,
         raw_text=t,
     )
 
@@ -1087,6 +1358,34 @@ def _freeze_target(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("まで") in t:
         tq.is_up_to = True
     return GameAction(type=ActionType.FREEZE, target=tq, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# レスト制限: 「（相手の）コストN以下のキャラM枚までは、次の相手の（ターン/エンドフェイズ）
+#             終了時まで、レストにできない」
+#   → PREVENT_REST(target=相手キャラ, duration)。
+#   「レストにできない」＝そのキャラは（自身を）レストにできない＝アタックもブロックも
+#   できない（どちらも本体をレストにする操作のため）。エンジンは timed_flags に
+#   "CANNOT_REST" を立て、declare_attack / has_blocker でこのフラグを弾く。
+#   freeze_target（アクティブにならない）とは逆向きのレスト制限。
+# ---------------------------------------------------------------------------
+@rule("rest_restrict", priority=66)
+def _rest_restrict(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"レストにできない"), t):
+        return None
+    tq = parse_target(t)
+    tq.player = Player.OPPONENT  # 全カード「相手の…キャラ」を対象にする
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    # 「次の…終了時まで」は次の相手ターンを跨いで持続、それ以外は当ターン限り。
+    duration = "UNTIL_NEXT_TURN_END" if _nfc("次の") in t else "THIS_TURN"
+    return GameAction(
+        type=ActionType.PREVENT_REST,
+        target=tq,
+        duration=duration,
+        raw_text=t,
+    )
 
 
 # ---------------------------------------------------------------------------

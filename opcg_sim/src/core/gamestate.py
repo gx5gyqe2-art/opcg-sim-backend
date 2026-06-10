@@ -7,7 +7,7 @@ import uuid
 import json
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
-from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource
+from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource, Sequence, Branch, Choice
 from ..utils.logger_config import log_event
 from .effects.resolver import EffectResolver
 
@@ -103,6 +103,7 @@ class GameManager:
         self.active_battle: Optional[Dict[str, Any]] = None
         self.active_interaction: Optional[Dict[str, Any]] = None
         self.setup_phase_pending = False
+        self.mulligan_done: Set[str] = set()
         from .effects.continuous import ContinuousEffectManager
         self.continuous = ContinuousEffectManager(self)
         self.action_events: List[Dict] = []  # per-request event buffer; reset in API handler
@@ -113,18 +114,18 @@ class GameManager:
         """
         def _dump_zone(zone: List[Card]) -> List[str]:
             # カードID(名前) [状態] の形式で出力
-            return [f"{c.uuid[:4]}:{c.master.id}({c.master.name}){'[REST]' if c.is_rest else '[ACT]'}" for c in zone]
+            return [f"{c.uuid[:4]}:{c.master.card_id}({c.master.name}){'[REST]' if c.is_rest else '[ACT]'}" for c in zone]
 
         def _dump_player(p: Player) -> Dict[str, Any]:
             return {
                 "life": len(p.life),
                 "hand_count": len(p.hand),
-                "hand_ids": [c.master.id for c in p.hand], # 手札の中身もIDだけ見る
+                "hand_ids": [c.master.card_id for c in p.hand],
                 "field": _dump_zone(p.field),
                 "trash_count": len(p.trash),
-                "trash_top": [c.master.id for c in p.trash[-3:]], # トラッシュの最新3枚
-                "leader": f"{p.leader.master.id}({p.leader.master.name})" if p.leader else None,
-                "stage": f"{p.stage.master.id}({p.stage.master.name})" if p.stage else None,
+                "trash_top": [c.master.card_id for c in p.trash[-3:]],
+                "leader": f"{p.leader.master.card_id}({p.leader.master.name})" if p.leader else None,
+                "stage": f"{p.stage.master.card_id}({p.stage.master.name})" if p.stage else None,
                 "don": {
                     "active": len(p.don_active),
                     "rested": len(p.don_rested),
@@ -170,6 +171,23 @@ class GameManager:
         KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
         KEY_OPTIONS = pending_props.get('OPTIONS', 'options')
         
+        # マリガンフェーズ中は手番の決まっていないプレイヤー順に要求
+        if self.phase == Phase.MULLIGAN:
+            for player in [self.p1, self.p2]:
+                if player.name not in self.mulligan_done:
+                    hand_candidates = [c.to_dict() for c in player.hand]
+                    return {
+                        KEY_PID: player.name,
+                        KEY_ACTION: "MULLIGAN",
+                        KEY_MSG: "マリガンするカードを選んでください（交換なし＝キープ）",
+                        KEY_CANDIDATES: hand_candidates,
+                        KEY_UUIDS: [c.uuid for c in player.hand],
+                        KEY_CONSTRAINTS: {"min": 0, "max": len(player.hand)},
+                        KEY_SKIP: True,
+                        "request_id": str(uuid.uuid4()),
+                    }
+            return None
+
         if self.active_interaction:
             action_type = self.active_interaction.get("action_type")
             fe_action = "SEARCH_AND_SELECT" if action_type == "SELECT_TARGET" else action_type
@@ -201,7 +219,7 @@ class GameManager:
         
         if self.phase == Phase.BLOCK_STEP and self.active_battle:
             target_owner = self.active_battle["target_owner"]
-            blockers = [c.uuid for c in target_owner.field if not c.is_rest and c.has_keyword("ブロッカー")]
+            blockers = [c.uuid for c in target_owner.field if not c.is_rest and c.has_keyword("ブロッカー") and "CANNOT_REST" not in c.timed_flags]
             request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
         elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
             target_owner = self.active_battle["target_owner"]
@@ -267,8 +285,9 @@ class GameManager:
             self.finish_setup()
             self.setup_phase_pending = False
             log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
-            self.turn_count = 1
-            self.refresh_phase()
+            self.phase = Phase.MULLIGAN
+            self.mulligan_done = set()
+            log_event("INFO", "game.mulligan_start", "Mulligan phase started")
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
@@ -314,11 +333,49 @@ class GameManager:
                             return
 
         self.finish_setup()
-        
+
         if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
         else: self.turn_player = self.p1; self.opponent = self.p2
         log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
-        self.turn_count = 1; self.refresh_phase()
+        # マリガンフェーズへ移行（両プレイヤーの確定後にゲーム開始）
+        self.phase = Phase.MULLIGAN
+        self.mulligan_done = set()
+        log_event("INFO", "game.mulligan_start", "Mulligan phase started")
+
+    def do_mulligan(self, player: 'Player') -> None:
+        """手札5枚全てをデッキ底に戻してシャッフル→5枚引き直す（全交換・1回限り）"""
+        if self.phase != Phase.MULLIGAN:
+            raise ValueError("マリガンフェーズではありません。")
+        if player.name in self.mulligan_done:
+            raise ValueError("既にマリガンを実施済みです。")
+        # 手札を全てデッキ底に戻す
+        hand_count = len(player.hand)
+        player.deck.extend(player.hand)
+        player.hand.clear()
+        random.shuffle(player.deck)
+        for _ in range(5):
+            if player.deck:
+                player.hand.append(player.deck.pop(0))
+        self.mulligan_done.add(player.name)
+        log_event("INFO", "game.mulligan", f"Mulligan: {player.name} returned all {hand_count} cards", player=player.name)
+        self._check_mulligan_complete()
+
+    def keep_hand(self, player: 'Player') -> None:
+        """手札をキープしてマリガンをスキップ"""
+        if self.phase != Phase.MULLIGAN:
+            raise ValueError("マリガンフェーズではありません。")
+        if player.name in self.mulligan_done:
+            raise ValueError("既にマリガンを実施済みです。")
+        self.mulligan_done.add(player.name)
+        log_event("INFO", "game.mulligan_keep", f"Keep hand: {player.name}", player=player.name)
+        self._check_mulligan_complete()
+
+    def _check_mulligan_complete(self) -> None:
+        """両プレイヤーのマリガン確定後にゲーム開始"""
+        if self.p1.name in self.mulligan_done and self.p2.name in self.mulligan_done:
+            log_event("INFO", "game.mulligan_complete", "Both players done — starting game", player="system")
+            self.turn_count = 1
+            self.refresh_phase()
 
     def finish_setup(self):
         log_event("INFO", "game.setup_finish", "Finishing setup (Life/Hand)", player="system")
@@ -405,16 +462,18 @@ class GameManager:
                     c.cost_buff = 0
 
         # Step 2: YOUR_TURN 効果（アクティブプレイヤーのカードのみ）
-        for card in ([player.leader] if player.leader else []) + player.field:
+        #   ステージ（player.stage）も対象に含める。聖地マリージョア(コスト軽減)・
+        #   虚の玉座(リーダー+1000) 等の STAGE の YOUR_TURN 効果が従来発動していなかった。
+        for card in ([player.leader] if player.leader else []) + player.field + ([player.stage] if player.stage else []):
             if not card or not card.master.abilities: continue
             for ability in card.master.abilities:
                 if ability.trigger == TriggerType.YOUR_TURN:
                     log_event("DEBUG", "game.passive_trigger", f"YOUR_TURN: {card.master.name}", player=player.name)
                     self.resolve_ability(player, ability, source_card=card)
 
-        # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）
+        # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）。ステージも含める。
         for p in [player, opponent]:
-            for card in ([p.leader] if p.leader else []) + p.field:
+            for card in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
                 if not card or not card.master.abilities: continue
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.PASSIVE:
@@ -489,7 +548,9 @@ class GameManager:
 
     def has_blocker(self, player: Player) -> bool:
         for card in player.field:
-            if not card.is_rest and card.has_keyword("ブロッカー") and "BLOCKER_DISABLED" not in card.flags:
+            if (not card.is_rest and card.has_keyword("ブロッカー")
+                    and "BLOCKER_DISABLED" not in card.flags
+                    and "CANNOT_REST" not in card.timed_flags):
                 return True
         return False
 
@@ -498,6 +559,7 @@ class GameManager:
         target_owner, _ = self._find_card_location(target)
         self._validate_action(attacker_owner, "MAIN_ACTION")
         if "ATTACK_DISABLE" in attacker.flags or "ATTACK_DISABLE" in attacker.timed_flags: raise ValueError("このカードは効果によりアタックできません。")
+        if "CANNOT_REST" in attacker.timed_flags: raise ValueError("このカードは効果によりレストにできないためアタックできません。")
         if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
         if (target.master.type == CardType.CHARACTER and not target.is_rest
                 and not attacker.has_keyword("ATTACK_ACTIVE")):
@@ -622,6 +684,28 @@ class GameManager:
     # 除去保護（PREVENT_LEAVE）の判定。除去が起こる瞬間に、対象カードの
     # PASSIVE 能力を走査し、条件（例: トラッシュ7枚以上）をライブ評価する。
     # status_values: "LEAVE"（相手の効果で場を離れない）/ "BATTLE_KO"（バトルでKOされない）
+    def _find_action(self, node, action_type: ActionType) -> Optional[GameAction]:
+        """効果ツリー(GameAction/Sequence/Branch/Choice)から指定タイプの GameAction を探す。
+        「場を離れず、【X】を得る」のように PREVENT_LEAVE が Sequence の一要素になる場合に対応。"""
+        if node is None:
+            return None
+        if isinstance(node, GameAction):
+            return node if node.type == action_type else None
+        if isinstance(node, Sequence):
+            for a in node.actions:
+                found = self._find_action(a, action_type)
+                if found is not None:
+                    return found
+        elif isinstance(node, Branch):
+            return self._find_action(node.if_true, action_type) or (
+                self._find_action(node.if_false, action_type) if node.if_false else None)
+        elif isinstance(node, Choice):
+            for o in node.options:
+                found = self._find_action(o, action_type)
+                if found is not None:
+                    return found
+        return None
+
     def _active_protection(self, card: CardInstance, status_values: Tuple[str, ...]) -> bool:
         if not card or not getattr(card, "master", None) or card.negated:
             return False
@@ -630,8 +714,8 @@ class GameManager:
         for ab in card.master.abilities:
             if ab.trigger != TriggerType.PASSIVE:
                 continue
-            eff = ab.effect
-            if not isinstance(eff, GameAction) or eff.type != ActionType.PREVENT_LEAVE:
+            eff = self._find_action(ab.effect, ActionType.PREVENT_LEAVE)
+            if eff is None:
                 continue
             if eff.status not in status_values:
                 continue
@@ -666,8 +750,8 @@ class GameManager:
             for ab in protector.master.abilities:
                 if ab.trigger != TriggerType.PASSIVE:
                     continue
-                eff = ab.effect
-                if not isinstance(eff, GameAction) or eff.type != ActionType.REPLACE_EFFECT:
+                eff = self._find_action(ab.effect, ActionType.REPLACE_EFFECT)
+                if eff is None:
                     continue
                 if eff.status not in status_values:
                     continue
@@ -726,6 +810,28 @@ class GameManager:
                     target_player = self.p2 if player == self.p1 else self.p1
             self.draw_card(target_player, value)
             return True
+        if act_name in ("DEAL_DAMAGE", "DAMAGE"):
+            # 「相手に N ダメージを与える」: 相手リーダーへ N ダメージ。ライフ上から N 枚を
+            # 手札へ移し（【トリガー】発動・ON_LIFE_DECREASE 発火）、ライフが尽きれば勝利。
+            # 従来 DEAL_DAMAGE は未実装で no-op だった（ニコ・ロビン等のダメージ効果が不発）。
+            damaged = self.p2 if player == self.p1 else self.p1
+            if action.target and getattr(getattr(action.target, 'player', None), 'name', '') == 'SELF':
+                damaged = player
+            n = value if value and value > 0 else 1
+            for _ in range(n):
+                if damaged.life:
+                    life_card = damaged.life.pop(0)
+                    trig = next((a for a in life_card.master.abilities if a.trigger == TriggerType.TRIGGER), None)
+                    self.move_card(life_card, Zone.HAND, damaged)
+                    log_event("INFO", "game.deal_damage", f"{damaged.name} takes 1 damage to HAND", player=player.name)
+                    if trig:
+                        self.resolve_ability(damaged, trig, source_card=life_card)
+                    self._fire_on_life_decrease(damaged)
+                else:
+                    self.winner = player.name
+                    log_event("INFO", "game.victory", f"{player.name} wins (effect damage)", player=player.name)
+                    break
+            return True
         if act_name == "SHUFFLE":
             target_player = player
             if action.target and getattr(action.target, 'player', None) is not None:
@@ -743,7 +849,31 @@ class GameManager:
                 card = deck.pop(0)
                 player.temp_zone.append(card)
             return True
-        
+
+        if act_name == "LOOK_LIFE":
+            # 「（自分か相手の）ライフの上から N枚を見る」→ 対象プレイヤーのライフ上 value 枚を
+            # 同プレイヤーの temp_zone へ移して公開する。後続の Choice が temp→ライフ上/下に戻す。
+            # status=="OPPONENT" で相手のライフを対象（相手の temp_zone に載るため、戻し先も相手）。
+            target_player = player
+            if getattr(action, "status", None) == "OPPONENT":
+                target_player = self.p2 if player == self.p1 else self.p1
+            count = value if value else 1
+            moved = 0
+            for _ in range(count):
+                if not target_player.life:
+                    break
+                target_player.temp_zone.append(target_player.life.pop(0))
+                moved += 1
+            log_event("INFO", "game.action_look_life", f"{target_player.name} revealed {moved} life card(s)", player=player.name)
+            return True
+
+        if act_name == "SELECT":
+            # 「（対象）を選ぶ」: 対象選択のみ（盤面は動かさない）。選択結果は
+            # _resolve_targets / resolve_interaction が target.save_id="selected_card" に
+            # 保存済み。後続の「選んだ／その（カード/キャラ/リーダー）」が ref_id で参照する。
+            log_event("INFO", "game.action_select", f"Selected {len(targets)} card(s)", player=player.name)
+            return True
+
         if act_name in ["HEAL", "LIFE_RECOVER"]:
             for _ in range(value):
                 if player.deck:
@@ -900,6 +1030,18 @@ class GameManager:
                     self.continuous.apply(target, "FLAG", "UNTIL_NEXT_TURN_END", flag="ATTACK_DISABLE", expire_turn=self.turn_count + 1)
                 else:
                     self.continuous.apply(target, "FLAG", "THIS_TURN", flag="ATTACK_DISABLE")
+                success = True
+            elif act_name == "PREVENT_REST":
+                # 「（相手の）キャラは…までレストにできない」: レスト不可＝そのキャラは
+                # 自身をレストできない＝アタックもブロックもできない（どちらも本体をレストにする）。
+                # ATTACK_DISABLE と同様、継続効果の timed_flags に "CANNOT_REST" を載せ、
+                # declare_attack / has_blocker でこのフラグを弾く。
+                dur = getattr(action, "duration", "INSTANT")
+                if dur == "UNTIL_NEXT_TURN_END":
+                    self.continuous.apply(target, "FLAG", "UNTIL_NEXT_TURN_END", flag="CANNOT_REST", expire_turn=self.turn_count + 1)
+                else:
+                    self.continuous.apply(target, "FLAG", "THIS_TURN", flag="CANNOT_REST")
+                log_event("INFO", "game.action_prevent_rest", f"{target.master.name} cannot be rested ({dur})", player=player.name)
                 success = True
             elif act_name == "FREEZE":
                 # 「次の相手のリフレッシュフェイズでアクティブにならない」

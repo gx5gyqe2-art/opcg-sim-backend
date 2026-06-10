@@ -28,6 +28,7 @@ class Attribute(Enum):
 
 class Phase(Enum):
     SETUP = auto()
+    MULLIGAN = auto()
     REFRESH = auto()
     DRAW = auto()
     DON = auto()
@@ -70,6 +71,7 @@ class ActionType(Enum):
     DISCARD = auto()
     TRASH_FROM_DECK = auto()
     LOOK = auto()
+    LOOK_LIFE = auto()
     REVEAL = auto()
     SHUFFLE = auto()
     PLAY_CARD = auto()
@@ -94,6 +96,7 @@ class ActionType(Enum):
     VICTORY = auto()
     RULE_PROCESSING = auto()
     RESTRICTION = auto()
+    PREVENT_REST = auto()  # 「（相手の）キャラは…までレストにできない」: レスト不可＝アタック/ブロック不可
     DECK_TOP = auto()
     SET_COST = auto()
     
@@ -101,6 +104,7 @@ class ActionType(Enum):
     DAMAGE = DEAL_DAMAGE # エイリアス追加
     
     SELECT_OPTION = auto()
+    SELECT = auto()  # 「（対象）を選ぶ」: 対象を選択して保存（save_id）するだけのアクション
     PASSIVE_EFFECT = auto()
     
     PREVENT_LEAVE = auto()
