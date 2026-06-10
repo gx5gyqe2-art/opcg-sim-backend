@@ -462,16 +462,18 @@ class GameManager:
                     c.cost_buff = 0
 
         # Step 2: YOUR_TURN 効果（アクティブプレイヤーのカードのみ）
-        for card in ([player.leader] if player.leader else []) + player.field:
+        #   ステージ（player.stage）も対象に含める。聖地マリージョア(コスト軽減)・
+        #   虚の玉座(リーダー+1000) 等の STAGE の YOUR_TURN 効果が従来発動していなかった。
+        for card in ([player.leader] if player.leader else []) + player.field + ([player.stage] if player.stage else []):
             if not card or not card.master.abilities: continue
             for ability in card.master.abilities:
                 if ability.trigger == TriggerType.YOUR_TURN:
                     log_event("DEBUG", "game.passive_trigger", f"YOUR_TURN: {card.master.name}", player=player.name)
                     self.resolve_ability(player, ability, source_card=card)
 
-        # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）
+        # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）。ステージも含める。
         for p in [player, opponent]:
-            for card in ([p.leader] if p.leader else []) + p.field:
+            for card in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
                 if not card or not card.master.abilities: continue
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.PASSIVE:
