@@ -7,6 +7,7 @@
   ERROR        : 例外発生 → エンジン修正が必要（最優先）
   INTERACTIVE  : 発動中にプレイヤー選択が発生 → 手動テスト必須リスト
   EXECUTED     : 盤面変化ありまたは action_events 記録あり・自動確認済み
+  EXECUTED+WARN: EXECUTED かつ効果タイプと盤面変化の方向が不一致（要確認）
   NO_CHANGE    : 発動完了したが変化なし（条件未達 or OTHER の疑い）
 
 has_other フラグ: AST 中に ActionType.OTHER が含まれる（effect_diagnostics の OTHER と同義）
@@ -133,14 +134,33 @@ def _snap_diff(before: tuple, after: tuple) -> str:
     )
 
 
-def _drain(gm: GameManager, limit: int = 30) -> Tuple[bool, int]:
-    """空選択でインタラクションを消化。(スタック, 処理数) を返す。"""
+def _smart_drain(gm: GameManager, limit: int = 30) -> Tuple[bool, int]:
+    """インタラクションを賢㍖に解決する。
+
+    - SELECT_TARGET: selectable_uuids から constraints.min 枚を選ぶ（空選択でなく有効な候補を渡す）
+    - CHOICE: 先頭の選戠肢（index=0）を選ぶ
+    - (stuck, 処理数) を返す
+    """
     count = 0
     while gm.active_interaction and count < limit:
-        ia     = gm.active_interaction
-        player = gm.p1 if gm.p1.name == ia.get("player_id") else gm.p2
+        ia          = gm.active_interaction
+        player      = gm.p1 if gm.p1.name == ia.get("player_id") else gm.p2
+        action_type = ia.get("action_type", "")
+
+        if action_type == "SELECT_TARGET":
+            candidates = ia.get("selectable_uuids") or [
+                c.uuid for c in ia.get("candidates", [])
+            ]
+            min_req  = (ia.get("constraints") or {}).get("min", 0)
+            # min_req 枚を優先、候補があれば少なくとと1枚は選ぶ
+            n_select = max(min_req, 1) if candidates else 0
+            selected = candidates[:n_select]
+            payload  = {"selected_uuids": selected, "index": 0}
+        else:  # CHOICE 等は先頭の選戠肢
+            payload = {"selected_uuids": [], "index": 0}
+
         try:
-            gm.resolve_interaction(player, {"selected_uuids": [], "index": 0})
+            gm.resolve_interaction(player, payload)
         except Exception:
             break
         count += 1
@@ -177,6 +197,59 @@ def _has_other_in(abilities) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# 方向性アサーション（改善第二値なし）
+# ---------------------------------------------------------------------------
+
+# ActionType 名 → (変化前 tuple, 変化後 tuple) から「期待方向」を返す関数
+# snap インデックス: 0=p1_hand 1=p1_field 2=p1_trash 3=p1_deck 4=p1_life 5=p1_don
+#                       6=p2_hand 7=p2_field 8=p2_trash 9=p2_deck 10=p2_life
+_DIRECTION: Dict[str, any] = {
+    "DRAW":             lambda b, a: a[0] > b[0],           # 手札増
+    "DISCARD":          lambda b, a: a[0] < b[0],           # 手札減
+    "KO":               lambda b, a: a[7] < b[7],           # 相手フィールド減
+    "BOUNCE":           lambda b, a: a[7] < b[7],           # 相手フィールド減
+    "RAMP_DON":         lambda b, a: a[5] > b[5],           # ドン増
+    "RETURN_DON":       lambda b, a: a[5] < b[5],           # ドン減
+    "HEAL":             lambda b, a: a[4] > b[4],           # ライフ増
+    "TRASH_FROM_DECK":  lambda b, a: a[3] < b[3] or a[9] < b[9],  # どちらかのデッキ減
+    "PLAY_CARD":        lambda b, a: a[1] > b[1],           # P1フィールド増
+    "DECK_BOTTOM":      lambda b, a: a[3] < b[3] or a[1] < b[1],  # デッキへ戻る（フィールド減）
+    "TRASH_FROM_HAND":  lambda b, a: a[0] < b[0],           # 手札減
+    "MOVE":             lambda b, a: b != a,                # 何か変わればOK
+}
+
+
+def _soft_assert(abilities, before: tuple, after: tuple) -> Optional[str]:
+    """単一効果タイプの能力に限り、盤面変化の方向が期待値と逆の場合に警告を返す。
+
+    複合効果（DRAW+KO 等）は誤検知が多いためチェック対象外。
+    変化なし（条件未達の可能性）は警告しない。
+    """
+    if before == after:
+        return None  # 変化なし = 条件未達の可能性が高いためスキップ
+
+    type_names = [
+        act.type.name
+        for ab in abilities
+        for act in _walk(ab.effect)
+        if act and act.type != ActionType.OTHER
+    ]
+    if not type_names:
+        return None
+
+    # 複数のタイプが混在する場合は誤検知が多いためチェックしない
+    unique_types = {n for n in type_names if n in _DIRECTION}
+    if len(unique_types) != 1:
+        return None
+
+    (dominant,) = unique_types
+    checker = _DIRECTION[dominant]
+    if not checker(before, after):
+        return f"WARN: {dominant} 期待だが方向不一致"
+    return None
+
+
+# ---------------------------------------------------------------------------
 # 分類
 # ---------------------------------------------------------------------------
 
@@ -201,9 +274,10 @@ def _outcome(
     name: str,
     trig: str,
     h_other: bool,
+    abilities=None,
 ) -> AbilityResult:
-    """発動後のゲーム状態から結果を返す。"""
-    stuck, n_ia = _drain(gm)
+    """発動後のゲーム状態から結果を返す。インタラクションは賢㍖選戠で消化。"""
+    stuck, n_ia = _smart_drain(gm)
     after   = _snap(p1, gm.p2)
     changed = before != after
     # resolve_ability が登録するアクション履歴（REVEAL/SHUFFLE を EXECUTED に分類するため）
@@ -213,10 +287,13 @@ def _outcome(
         msg = gm.active_interaction.get("message", "") if gm.active_interaction else "stuck in drain loop"
         return AbilityResult(card_id, name, trig, "INTERACTIVE", h_other, msg)
     if changed:
-        return AbilityResult(card_id, name, trig, "EXECUTED", h_other, _snap_diff(before, after))
+        diff = _snap_diff(before, after)
+        warn = _soft_assert(abilities or [], before, after) if abilities else None
+        detail = f"{diff}  |  {warn}" if warn else diff
+        return AbilityResult(card_id, name, trig, "EXECUTED", h_other, detail)
     if n_ia > 0:
         return AbilityResult(card_id, name, trig, "INTERACTIVE", h_other,
-                             f"{n_ia} interaction(s) auto-resolved (no state change)")
+                             f"{n_ia} interaction(s) smart-resolved (no state change)")
     if has_events:
         return AbilityResult(card_id, name, trig, "EXECUTED", h_other,
                              "ability fired (no visible state change)")
@@ -226,6 +303,8 @@ def _outcome(
 
 def _test_on_play(master: CardMaster, h_other: bool) -> AbilityResult:
     """ON_PLAY: play_card_action を経由（全 ON_PLAY 能力を一括発動）。"""
+    on_play_abs = [ab for ab in master.abilities
+                   if (ab.trigger.name if hasattr(ab.trigger, "name") else str(ab.trigger)) == "ON_PLAY"]
     try:
         gm, p1, p2, source = _build_test_state(master, source_in_hand=True)
     except Exception as e:
@@ -238,7 +317,7 @@ def _test_on_play(master: CardMaster, h_other: bool) -> AbilityResult:
         return AbilityResult(master.card_id, master.name, "ON_PLAY", "ERROR", h_other,
                              traceback.format_exc(limit=2))
 
-    return _outcome(gm, p1, before, master.card_id, master.name, "ON_PLAY", h_other)
+    return _outcome(gm, p1, before, master.card_id, master.name, "ON_PLAY", h_other, on_play_abs)
 
 
 def _test_ability(master: CardMaster, ability, trig: str, h_other: bool) -> AbilityResult:
@@ -255,7 +334,7 @@ def _test_ability(master: CardMaster, ability, trig: str, h_other: bool) -> Abil
         return AbilityResult(master.card_id, master.name, trig, "ERROR", h_other,
                              traceback.format_exc(limit=2))
 
-    return _outcome(gm, p1, before, master.card_id, master.name, trig, h_other)
+    return _outcome(gm, p1, before, master.card_id, master.name, trig, h_other, [ability])
 
 
 def classify(master: CardMaster) -> List[AbilityResult]:
@@ -310,7 +389,8 @@ def _print_section(items: List[AbilityResult], status: str) -> None:
     else:
         for r in sorted(items, key=lambda x: (x.card_id, x.trigger)):
             other_mark = " [OTHER]" if r.has_other else ""
-            print(f"  [{r.trigger:<20}] {r.card_id:<12}  {r.name}{other_mark}")
+            warn_mark  = " [WARN]"  if r.detail and "WARN" in r.detail else ""
+            print(f"  [{r.trigger:<20}] {r.card_id:<12}  {r.name}{other_mark}{warn_mark}")
             if r.detail:
                 print(f"    └ {r.detail[:120]}")
     print()
@@ -355,12 +435,15 @@ def run(
 
     # --- サマリ ---
     counts = Counter(r.status for r in all_results)
+    warn_count = sum(1 for r in all_results if r.status == "EXECUTED" and "WARN" in r.detail)
     print("=== 実行カバレッジ (能力単位) ===")
     print(f"  能力なし(SKIP)  : {skipped:4d}")
     for s in ("ERROR", "INTERACTIVE", "EXECUTED", "NO_CHANGE"):
         o    = sum(1 for r in all_results if r.status == s and r.has_other)
         note = f"  (うち OTHER フラグ {o} 件)" if o else ""
         print(f"  {s:<14}: {counts[s]:4d}{note}")
+    if warn_count:
+        print(f"  WARN 付き EXECUTED: {warn_count:4d}  ← 方向不一致の疑い（要確認）")
     print()
 
     # --- トリガー別内訳 ---
@@ -380,6 +463,16 @@ def run(
     for target in targets:
         items = [r for r in all_results if r.status == target]
         _print_section(items, target)
+
+    # WARN 付き EXECUTED も常に表示（--show 指定なし or --show EXECUTED 時）
+    if not show or show == "EXECUTED":
+        warn_items = [r for r in all_results if r.status == "EXECUTED" and "WARN" in r.detail]
+        if warn_items:
+            print(f"--- WARN 付き EXECUTED ({len(warn_items)} 件) --- ← 方向不一致の疑い（要確認）")
+            for r in sorted(warn_items, key=lambda x: (x.card_id, x.trigger)):
+                print(f"  [{r.trigger:<20}] {r.card_id:<12}  {r.name}")
+                print(f"    └ {r.detail[:120]}")
+            print()
 
 
 if __name__ == "__main__":
