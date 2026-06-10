@@ -114,18 +114,18 @@ class GameManager:
         """
         def _dump_zone(zone: List[Card]) -> List[str]:
             # カードID(名前) [状態] の形式で出力
-            return [f"{c.uuid[:4]}:{c.master.id}({c.master.name}){'[REST]' if c.is_rest else '[ACT]'}" for c in zone]
+            return [f"{c.uuid[:4]}:{c.master.card_id}({c.master.name}){'[REST]' if c.is_rest else '[ACT]'}" for c in zone]
 
         def _dump_player(p: Player) -> Dict[str, Any]:
             return {
                 "life": len(p.life),
                 "hand_count": len(p.hand),
-                "hand_ids": [c.master.id for c in p.hand], # 手札の中身もIDだけ見る
+                "hand_ids": [c.master.card_id for c in p.hand],
                 "field": _dump_zone(p.field),
                 "trash_count": len(p.trash),
-                "trash_top": [c.master.id for c in p.trash[-3:]], # トラッシュの最新3枚
-                "leader": f"{p.leader.master.id}({p.leader.master.name})" if p.leader else None,
-                "stage": f"{p.stage.master.id}({p.stage.master.name})" if p.stage else None,
+                "trash_top": [c.master.card_id for c in p.trash[-3:]],
+                "leader": f"{p.leader.master.card_id}({p.leader.master.name})" if p.leader else None,
+                "stage": f"{p.stage.master.card_id}({p.stage.master.name})" if p.stage else None,
                 "don": {
                     "active": len(p.don_active),
                     "rested": len(p.don_rested),
