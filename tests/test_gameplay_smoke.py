@@ -37,6 +37,14 @@ def _drain_interactions(gm, limit=20):
         count += 1
 
 
+def _finish_mulligan(gm):
+    """マリガンフェーズを両プレイヤー keep で確定し、ゲームを開始させる。"""
+    from opcg_sim.src.models.enums import Phase
+    if gm.phase == Phase.MULLIGAN:
+        gm.keep_hand(gm.p1)
+        gm.keep_hand(gm.p2)
+
+
 def test_v2_is_active_by_default():
     assert type(make_parser()).__name__ == "EffectParserV2"
 
@@ -45,6 +53,8 @@ def test_real_game_runs_several_turns():
     gm = _build_game()
     gm.start_game()
     _drain_interactions(gm)  # リーダーの GAME_START 等を消化
+    _finish_mulligan(gm)     # マリガンフェーズを確定（両者キープ）→ ゲーム開始
+    _drain_interactions(gm)
 
     # セットアップ完了の確認
     assert len(gm.p1.hand) > 0 and len(gm.p2.hand) > 0

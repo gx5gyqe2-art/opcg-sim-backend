@@ -42,10 +42,13 @@ class EffectResolver:
                 return
 
         # 2. コストチェック
+        #   OPCG では「〜できる：」のコスト句（ability.cost）は常に任意。支払えない場合は
+        #   能力が発生しないだけで、例外にはしない（旧実装は raise していたため、任意コストを
+        #   払えない ON_PLAY 等を持つカードを出すとゲームが落ちていた）。
         if ability.cost and not self._can_satisfy_node(player, ability.cost, source_card):
             self._log_failure_snapshot(player, source_card, ability, "COST_UNSATISFIED", "Insufficient resources or targets for cost")
-            log_event("WARNING", "resolver.cost_impossible", f"Cost cannot be satisfied for {source_card.master.name}", player=player.name)
-            raise ValueError(f"コストの条件を満たすことができません: {source_card.master.name}")
+            log_event("INFO", "resolver.cost_skipped", f"Optional cost cannot be paid — ability skipped: {source_card.master.name}", player=player.name)
+            return
 
         # 発動成立（条件・コストを満たした）→ 使用回数を消費する。
         if turn_limit is not None:
