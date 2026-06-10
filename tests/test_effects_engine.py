@@ -101,6 +101,30 @@ def test_execute_main_effect_reinvokes_main():
     assert len(p1.deck) == 3
 
 
+def test_execute_main_effect_falls_back_to_counter():
+    """EXECUTE_MAIN_EFFECT(【トリガー】): ACTIVATE_MAIN が無ければ COUNTER 能力を展開する。
+    効果が【カウンター】に書かれたトリガーイベント(OP01-028 等)が従来 no-op だった回帰。"""
+    gm, p1, p2 = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    # 【カウンター】= カード2枚ドロー を持つイベント（ACTIVATE_MAIN は無い）
+    counter_ability = Ability(
+        trigger=TriggerType.COUNTER,
+        effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=2)),
+    )
+    trigger_ability = Ability(
+        trigger=TriggerType.TRIGGER,
+        effect=GameAction(type=ActionType.EXECUTE_MAIN_EFFECT),
+    )
+    master = make_master(card_id="E-CNT", name="トリガーカウンター", type=CardType.EVENT,
+                         abilities=(counter_ability, trigger_ability))
+    source = make_instance(master, owner=p1.name)
+
+    assert len(p1.hand) == 0
+    gm.resolve_ability(p1, trigger_ability, source_card=source)
+    assert len(p1.hand) == 2  # COUNTER の DRAW2 が展開・実行された
+
+
 def _make_field_char(player, name="戦士", power=5000):
     inst = make_instance(make_master(card_id=f"C-{name}", name=name, power=power), owner=player.name)
     player.field.append(inst)

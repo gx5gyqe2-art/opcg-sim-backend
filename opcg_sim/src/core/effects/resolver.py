@@ -219,8 +219,16 @@ class EffectResolver:
             ab for ab in source_card.master.abilities
             if ab.trigger == TriggerType.ACTIVATE_MAIN and ab.effect is not None
         ]
+        # 【トリガー】(ライフ公開時に発動)は ACTIVATE_MAIN だけでなく、効果が【カウンター】に
+        # 書かれたイベント(例: OP01-028/OP13-039)も発動対象。ACTIVATE_MAIN が無ければ
+        # COUNTER 能力にフォールバックする（従来は ACTIVATE_MAIN 限定で何も発動しなかった）。
         if not main_abilities:
-            log_event("WARNING", "resolver.execute_main_missing", f"No ACTIVATE_MAIN ability on {source_card.master.name}", player=source_card.owner_id)
+            main_abilities = [
+                ab for ab in source_card.master.abilities
+                if ab.trigger == TriggerType.COUNTER and ab.effect is not None
+            ]
+        if not main_abilities:
+            log_event("WARNING", "resolver.execute_main_missing", f"No ACTIVATE_MAIN/COUNTER ability on {source_card.master.name}", player=source_card.owner_id)
             return
 
         # 既存スタックの「後」に積む = 先に実行されるよう reversed で push
