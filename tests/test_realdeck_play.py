@@ -348,6 +348,38 @@ def test_nami_leader_buff_is_this_turn_not_battle():
     assert p1.leader.get_power(False) == base_pw, "ターン終了で失効するべき"
 
 
+def test_blocker_keyword_loaded():
+    """【ブロッカー】がカード本来のキーワードとして master.keywords に載る（従来は空で
+    has_keyword('ブロッカー')=False になりブロッカーが一切機能しなかった）。"""
+    for cid in ("PRB02-008", "OP13-087", "OP13-042"):
+        c = inst(cid)
+        assert c.has_keyword("ブロッカー"), f"{cid} はブロッカーを持つべき"
+    # 条件付き付与（「…場合、【速攻】を得る」）は静的キーワードにしない
+    assert not inst("OP13-080").has_keyword("速攻")
+
+
+def test_blocker_flow_enters_block_step():
+    """ブロッカーがいると BLOCK_STEP に入り、ブロック宣言で攻撃対象が差し替わる。"""
+    from opcg_sim.src.models.models import CardType as CT
+    p1, p2 = make_player("P1"), make_player("P2")
+    p1.leader = inst("OP13-079", "P1")
+    p2.leader = CardInstance(make_master(card_id="L", name="L", power=5000, type=CT.LEADER), "P2")
+    blk = inst("PRB02-008", "P2")
+    blk.is_rest = False
+    p2.field = [blk]
+    atk = inst("OP13-080", "P1")
+    atk.is_rest = False
+    p1.field = [atk]
+    gm = GameManager(p1, p2)
+    gm.turn_player, gm.opponent, gm.turn_count, gm.phase = p1, p2, 3, Phase.MAIN
+    gm.declare_attack(atk, p2.leader)
+    assert gm.phase == Phase.BLOCK_STEP
+    pr = gm.get_pending_request() or {}
+    assert pr.get("action") == "SELECT_BLOCKER" and blk.uuid in (pr.get("selectable_uuids") or [])
+    gm.handle_block(blk)
+    assert gm.active_battle["target"] is blk and blk.is_rest is True
+
+
 def test_counter_after_opp_attack_trigger():
     """カウンター衝突バグの回帰: 守備リーダーの ON_OPP_ATTACK(Choice) が中断しても、
     解決後に防御フェイズへ進み SELECT_COUNTER が出る（カウンターが使える）。"""

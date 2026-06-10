@@ -16,6 +16,29 @@ from ..models.enums import CardType, Attribute, Color, TriggerType
 from ..utils.logger_config import log_event
 
 
+# カードが本来持つキーワード能力（タグ【X】が能力として記載されているもの）。
+_STATIC_KEYWORDS = ["ブロッカー", "速攻", "ダブルアタック", "バニッシュ"]
+
+
+def _extract_static_keywords(effect_text: str):
+    """effect_text からカード本来のキーワード（【ブロッカー】等）を抽出する。
+    「を得る」(条件付き付与=GRANT_KEYWORD)・「を発動できない」(無効)・「を持つ」(参照) の
+    文脈は除外し、カード自身が静的に持つキーワードのみ集める。"""
+    kws = set()
+    if not effect_text:
+        return kws
+    t = unicodedata.normalize("NFC", effect_text)
+    for k in _STATIC_KEYWORDS:
+        for m in re.finditer(r'【' + re.escape(k) + r'】', t):
+            after = t[m.end():m.end() + 4]
+            if after.startswith("を得") or after.startswith("を発動") \
+                    or after.startswith("を持") or after.startswith("を無効"):
+                continue
+            kws.add(k)
+            break
+    return kws
+
+
 def make_parser():
     """効果パーサのファクトリ。
 
@@ -214,11 +237,17 @@ class CardLoader:
             trigger_abilities = parser.parse_card_text(trigger_text, as_trigger=True) if trigger_text else []
             combined_abilities = tuple(main_abilities + trigger_abilities)
 
+        # カードが本来持つキーワード（【ブロッカー】等）を effect_text から抽出する。
+        # 従来 master.keywords は常に空で、has_keyword("ブロッカー") が False になり
+        # ブロッカーが一切機能しなかった（has_blocker が常に False → BLOCK_STEP に入らない）。
+        keywords = _extract_static_keywords(effect_text)
+
         # color 引数を colors に変更
         return CardMaster(
             card_id=card_id, name=name, type=c_type, colors=colors, cost=cost, power=power,
             counter=counter, attribute=attribute, traits=traits, effect_text=effect_text,
-            trigger_text=trigger_text, life=life, block_icon=block_icon, abilities=combined_abilities
+            trigger_text=trigger_text, life=life, block_icon=block_icon, abilities=combined_abilities,
+            keywords=keywords
         )
 
 class DeckLoader:
