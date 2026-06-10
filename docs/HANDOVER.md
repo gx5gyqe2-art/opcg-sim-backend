@@ -517,9 +517,25 @@ OPCG_LOG_SILENT=1 python tests/text_execution_audit.py --card OP11-041
   ナミ等2枚)。`win_on_deckout` ルールが `VICTORY+status="REPLACE_DECKOUT_LOSS"`、
   `check_victory` がデッキアウト時に本人の PASSIVE を走査して敗北を勝利へ置換。
 
+### 任意効果の発動可否（「〜してもよい」yes/no 確認）
+
+ユーザー要望「置換に限らず〈〜できる〉系効果を発動するか選べるようにしたい」に対し、
+**通常の効果解決パス**（resolver の suspend/resume が使える）で任意効果の yes/no 確認を実装した。
+
+- `GameAction.is_optional`。`parser._parse_logic_block` が効果文脈で「してもよい／てもよい」
+  終止の GameAction に付与（コスト/REPLACE_EFFECT/DECLARE_COST/OTHER は除外。多義の「できる」は
+  注釈/コスト/キーワード/トリガー宣言を誤検知するため**明示マーカーのみ**拾う）。
+- resolver は実行前に `CONFIRM_OPTIONAL` インタラクションへ中断（`_suspend_for_optional_confirmation`）。
+  yes で発動・no でスキップ（`resume_optional`）。確認状態は context の `_confirmed_optionals`
+  （id 集合）で持ち、共有ノード(CardMaster)を汚さない。
+- フロント(`RealGame.tsx`)に「発動する／発動しない」オーバーレイを追加し `accepted` を送出。
+- 既知の制限: 現状は **明示マーカー「してもよい/てもよい」** のみ。より曖昧な「〜できる」
+  （文脈依存で任意の場合がある）の拾い上げは誤発動リスクがあるため未対応。必要なら効果動詞ごとに
+  ホワイトリスト方式で段階追加する。
+
 ### 残課題（次の担当へ）
 
-- **E15 任意置換「代わりに〜できる」の選択UI**（ユーザー希望: 選択UI）: パーサは既に
+- **E15 任意置換「代わりに〜できる」の選択UI**（上記の通常パスの確認とは別件）: パーサは既に
   `REPLACE_EFFECT(sub_effect)` を正しく生成し、現状は自動実行（取れるなら実行）。対話的な
   yes/no を挟むには、**同期的な除去フロー（`apply_action_to_engine` の KO/leave・`resolve_attack`
   から呼ばれる `_active_replacement`）の途中で中断・再開する機構**が必要。これは §7 E14
