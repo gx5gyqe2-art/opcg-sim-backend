@@ -16,11 +16,12 @@
     OPCG_LOG_SILENT=1 python tests/full_card_audit.py --show     # 異常カード一覧
 """
 import argparse
+import json
 import os
 import re
 import sys
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List
 
 import conftest  # noqa: F401
@@ -30,6 +31,8 @@ from opcg_sim.src.utils.loader import CardLoader
 
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                     "opcg_sim", "data")
+BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "full_card_baseline.json")
 
 
 def _total_cards(p) -> int:
@@ -96,6 +99,68 @@ def audit() -> List[Anomaly]:
     return anomalies
 
 
+def _stat_delta(p1, p2, b_stats) -> tuple:
+    """効果由来の power/keyword/rest/cost 集計（枚数に出ない変化の固定用）。"""
+    units = []
+    for p in (p1, p2):
+        if p.leader:
+            units.append(p.leader)
+        units.extend(p.field)
+    pw = sum(c.power_buff + c.timed_power + (c.base_power_override or 0) for c in units)
+    kw = sum(len(getattr(c, "timed_keywords", ())) for c in units)
+    rs = sum(1 for c in units if getattr(c, "is_rest", False))
+    cu = list(p1.hand) + list(p2.hand) + units
+    co = sum(getattr(c, "cost_buff", 0) + getattr(c, "timed_cost", 0)
+             + (getattr(c, "base_cost_override", None) or 0) for c in cu)
+    return (pw, kw, rs, co)
+
+
+def signatures() -> Dict[str, str]:
+    """各 (card_id|trigger) の実行シグネチャ（status + ゾーン差分 + stat 差分）を返す。
+    汎用盤面・決定的 smart_drain により再現可能。挙動が変わるとシグネチャが変わる＝回帰検出。"""
+    db = CardLoader(os.path.join(DATA, "opcg_cards.json"))
+    db.load()
+    card_ids = sorted(db.raw_db.keys())
+    sigs: Dict[str, str] = {}
+    total = len(card_ids)
+    for i, cid in enumerate(card_ids, 1):
+        if i % 300 == 0:
+            sys.stderr.write(f"\r進行中: {i}/{total}...")
+            sys.stderr.flush()
+        master = db.get_card(cid)
+        if master is None or not master.abilities:
+            continue
+        seen = set()
+        for ab in master.abilities:
+            trig = ab.trigger.name if hasattr(ab.trigger, "name") else str(ab.trigger)
+            if trig in seen:
+                continue
+            seen.add(trig)
+            key = f"{cid}|{trig}"
+            try:
+                if trig == "ON_PLAY":
+                    gm, p1, p2, src = cov._build_test_state(master, source_in_hand=True)
+                    b = cov._snap(p1, p2); bs = _stat_delta(p1, p2, None)
+                    gm.play_card_action(p1, src)
+                else:
+                    gm, p1, p2, src = cov._build_test_state(master)
+                    b = cov._snap(p1, p2); bs = _stat_delta(p1, p2, None)
+                    gm.resolve_ability(p1, ab, src)
+                cov._smart_drain(gm)
+            except Exception as e:
+                sigs[key] = f"ERROR:{str(e)[:30]}"
+                continue
+            if gm.active_interaction:
+                sigs[key] = "INTERACTIVE"
+                continue
+            a = cov._snap(p1, p2); as_ = _stat_delta(p1, p2, None)
+            zone = cov._snap_diff(b, a) or "-"
+            stat = f"pw{as_[0]-bs[0]},kw{as_[1]-bs[1]},rs{as_[2]-bs[2]},co{as_[3]-bs[3]}"
+            sigs[key] = f"{zone} | {stat}"
+    sys.stderr.write(f"\r完了: {total} カード処理済み\n")
+    return sigs
+
+
 def run(show: bool = False) -> None:
     anomalies = audit()
     by_kind = defaultdict(int)
@@ -119,8 +184,21 @@ def run(show: bool = False) -> None:
             print(f"  [{a.kind}] {a.card_id} {a.trigger}  {a.detail}")
 
 
+def regenerate_baseline() -> int:
+    sigs = signatures()
+    with open(BASELINE, "w", encoding="utf-8") as f:
+        json.dump(sigs, f, ensure_ascii=False, indent=0, sort_keys=True)
+    print(f"ベースライン生成: {len(sigs)} 能力 → {BASELINE}")
+    return len(sigs)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--show", action="store_true")
+    ap.add_argument("--regen", action="store_true",
+                    help="挙動ベースライン(full_card_baseline.json)を再生成する")
     args = ap.parse_args()
-    run(show=args.show)
+    if args.regen:
+        regenerate_baseline()
+    else:
+        run(show=args.show)
