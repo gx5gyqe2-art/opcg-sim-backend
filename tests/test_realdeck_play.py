@@ -348,6 +348,36 @@ def test_nami_leader_buff_is_this_turn_not_battle():
     assert p1.leader.get_power(False) == base_pw, "ターン終了で失効するべき"
 
 
+def test_counter_after_opp_attack_trigger():
+    """カウンター衝突バグの回帰: 守備リーダーの ON_OPP_ATTACK(Choice) が中断しても、
+    解決後に防御フェイズへ進み SELECT_COUNTER が出る（カウンターが使える）。"""
+    from opcg_sim.src.core.gamestate import GameManager as GM  # noqa
+    p1, p2 = make_player("P1"), make_player("P2")
+    p1.leader = inst("OP13-079", "P1")
+    p2.leader = inst("OP11-041", "P2")  # ON_OPP_ATTACK で Choice 中断
+    p2.hand = fillers(2, "P2")
+    p2.life = fillers(3, "P2")
+    atk = inst("OP13-080", "P1")
+    atk.is_rest = False
+    p1.field = [atk]
+    gm = GameManager(p1, p2)
+    gm.turn_player = p1
+    gm.opponent = p2
+    gm.turn_count = 3
+    gm.phase = Phase.MAIN
+    for _ in range(6):
+        if p2.don_deck:
+            p2.don_active.append(p2.don_deck.pop(0))
+    gm.declare_attack(atk, p2.leader)
+    # ON_OPP_ATTACK の Choice 等の割り込みを解決
+    drain(gm)
+    pending = gm.get_pending_request() or {}
+    assert pending.get("action") == "SELECT_COUNTER", f"割り込み解決後はカウンター段階のはず: {pending.get('action')}"
+    # カウンターをパスしてバトル解決まで例外なく進む
+    gm.apply_counter(p2, None)
+    assert gm.active_battle is None
+
+
 def test_throne_dynamic_cost_limit_parsed():
     """虚の玉座: 「場のドン!!の枚数以下のコスト」が cost_max_dynamic に解釈される。"""
     m = db().get_card("OP13-099")
