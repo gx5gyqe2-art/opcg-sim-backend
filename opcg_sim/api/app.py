@@ -264,7 +264,7 @@ async def game_battle(req: BattleActionRequest):
             manager.handle_block(blocker)
         elif action_type == battle_types.get('SELECT_COUNTER', 'SELECT_COUNTER'):
             counter_card = next((c for c in player.hand if c.uuid == card_uuid), None)
-            if counter_card: manager.action_events.append({"type": "COUNTER", "player": player_id, "card_name": counter_card.master.name, "message": f"「{counter_card.master.name}」でカウンター(+{counter_card.counter or 0})"})
+            if counter_card: manager.action_events.append({"type": "COUNTER", "player": player_id, "card_name": counter_card.master.name, "message": f"「{counter_card.master.name}」でカウンター(+{counter_card.master.counter or 0})"})
             manager.apply_counter(player, counter_card)
         elif action_type == battle_types.get('PASS', 'PASS'):
             manager.action_events.append({"type": "PASS", "player": player_id, "message": "パス"})
