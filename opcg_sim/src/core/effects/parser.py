@@ -94,6 +94,23 @@ class EffectParser:
             absorbing = bool(re.search(_nfc(r'以下から.{0,6}?選ぶ'), seg))
         segments = merged
 
+        # 「【メイン】/【カウンター】<効果>」のように、本体を持たない先頭トリガータグだけの
+        # セグメントは、次セグメント（同一の効果本体）を共有する *別トリガーの能力*。
+        # `/` 分割で「【メイン】」が本体なしの別セグメントに割れ、ACTIVATE_MAIN の effect が
+        # None になっていた（焔裂き 等）。次セグメントの本体を借りて展開する。
+        # キーワードのみタグ（【ブロッカー】等）は効果共有ではないため対象外。
+        expanded: List[str] = []
+        for i, seg in enumerate(segments):
+            is_lone_tag = bool(re.fullmatch(_nfc(r'【[^】]+】'), seg)) and not self._KEYWORD_ONLY_RE.match(seg)
+            if (is_lone_tag and i + 1 < len(segments)
+                    and segments[i + 1].startswith(_nfc('【'))
+                    and not self._KEYWORD_ONLY_RE.match(segments[i + 1])):
+                body = re.sub(_nfc(r'^【[^】]+】'), '', segments[i + 1])
+                expanded.append(seg + body)
+            else:
+                expanded.append(seg)
+        segments = expanded
+
         abilities = []
         for seg in segments:
             # キーワード能力宣言 / キーワード説明括弧書きはスキップ（Ability 不要）
