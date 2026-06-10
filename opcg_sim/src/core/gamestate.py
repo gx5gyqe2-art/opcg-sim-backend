@@ -289,6 +289,13 @@ class GameManager:
             self.mulligan_done = set()
             log_event("INFO", "game.mulligan_start", "Mulligan phase started")
 
+        # バトルトリガー(ON_ATTACK/ON_OPP_ATTACK)解決中の中断から復帰した場合:
+        # バトルが進行中(active_battle あり)でまだ防御フェイズへ遷移していなければ、
+        # 残りトリガーの解決＋フェイズ遷移を再開する（カウンター衝突エラーの防止）。
+        if (not self.active_interaction and self.active_battle
+                and self.phase not in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER)):
+            self._advance_battle_triggers()
+
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
         if not pending: raise ValueError("現在実行可能なアクションはありません。")
@@ -567,21 +574,44 @@ class GameManager:
         log_event("INFO", "game.attack_declare", f"{attacker.master.name} is attacking {target.master.name}", player=attacker_owner.name)
         attacker.is_rest = True
         self.active_battle = {"attacker": attacker, "target": target, "attacker_owner": attacker_owner, "target_owner": target_owner, "counter_buff": 0}
-        
+
+        # アタック時/相手のアタック時トリガーを順に解決する。途中でいずれかが対象選択や
+        # 選択(Choice)で中断した場合、解決前にブロッカー/カウンター段階へ進むと、未解決の
+        # interaction とカウンター操作が衝突する（"期待:CHOICE" エラー）。トリガーを待ち行列に
+        # 積み、_advance_battle_triggers で1つずつ解決し、全て片付いてからフェイズ遷移する。
+        triggers = []
         if attacker.master.abilities:
             for ability in attacker.master.abilities:
                 if ability.trigger == TriggerType.ON_ATTACK:
-                    self.resolve_ability(attacker_owner, ability, source_card=attacker)
-
+                    triggers.append((attacker_owner, ability, attacker))
         opp_cards = ([target_owner.leader] if target_owner.leader else []) + target_owner.field
         for card in opp_cards:
             for ability in card.master.abilities:
                 if ability.trigger == TriggerType.ON_OPP_ATTACK:
-                    log_event("INFO", "game.trigger_opp_attack", f"ON_OPP_ATTACK fired for {card.master.name}", player=target_owner.name)
-                    self.resolve_ability(target_owner, ability, source_card=card)
+                    triggers.append((target_owner, ability, card))
+        self._battle_triggers = triggers
+        self._advance_battle_triggers()
 
-        if self.has_blocker(target_owner): self.phase = Phase.BLOCK_STEP; log_event("INFO", "game.phase_transition", f"Blockers detected. Moving to {self.phase.name}", player=target_owner.name)
-        else: self.phase = Phase.BATTLE_COUNTER; log_event("INFO", "game.phase_transition", f"No blockers. Moving to {self.phase.name}", player=target_owner.name)
+    def _advance_battle_triggers(self):
+        """積んだバトルトリガーを順に解決し、全て解決後に防御フェイズへ遷移する。
+        途中で interaction が立ったら中断（resolve_interaction が解決後に再度呼ぶ）。"""
+        if not self.active_battle:
+            self._battle_triggers = []
+            return
+        while getattr(self, "_battle_triggers", None):
+            player, ability, card = self._battle_triggers.pop(0)
+            log_event("INFO", "game.trigger_battle", f"Battle trigger: {card.master.name} ({ability.trigger.name})", player=player.name)
+            self.resolve_ability(player, ability, source_card=card)
+            if self.active_interaction:
+                return  # 中断: 解決後に resolve_interaction から再開される
+        # 全トリガー解決 → ブロッカー/カウンター段階へ
+        target_owner = self.active_battle["target_owner"]
+        if self.has_blocker(target_owner):
+            self.phase = Phase.BLOCK_STEP
+            log_event("INFO", "game.phase_transition", f"Blockers detected. Moving to {self.phase.name}", player=target_owner.name)
+        else:
+            self.phase = Phase.BATTLE_COUNTER
+            log_event("INFO", "game.phase_transition", f"No blockers. Moving to {self.phase.name}", player=target_owner.name)
 
     def handle_block(self, blocker: Optional[Card] = None):
         if not self.active_battle: return
@@ -1015,10 +1045,15 @@ class GameManager:
                     target.timed_keywords.discard("ブロッカー")  # 効果付与分の【ブロッカー】も無効化
                     log_event("INFO", "game.action_blocker_disable", f"{target.master.name} blocker disabled", player=player.name)
                 else:
-                    # 「このバトル中」のパワー増減は継続効果として管理し、バトル終了時に失効させる
-                    # （従来は power_buff に直接加算され、同一ターンの後続バトルへ誤って持ち越していた）。
-                    if getattr(action, "duration", "INSTANT") == "THIS_BATTLE":
-                        self.continuous.apply(target, "POWER", "THIS_BATTLE", amount=value)
+                    # 期間付きパワー増減は継続効果(timed_power)として管理する。
+                    #  - THIS_BATTLE: バトル終了で失効（同一ターンの後続バトルへ持ち越さない）。
+                    #  - THIS_TURN / UNTIL_NEXT_TURN_END: ターン境界の reset_turn_status で
+                    #    消えると困る（例: 被攻撃リーダーの「このターン中+N」が resolve_attack の
+                    #    target.reset_turn_status で battle 終了時に即消える）。継続効果に載せて存続させる。
+                    dur = getattr(action, "duration", "INSTANT")
+                    if dur in ("THIS_BATTLE", "THIS_TURN", "UNTIL_NEXT_TURN_END"):
+                        expire_turn = self.turn_count + 1 if dur == "UNTIL_NEXT_TURN_END" else 0
+                        self.continuous.apply(target, "POWER", dur, amount=value, expire_turn=expire_turn)
                     elif hasattr(target, 'power_buff'):
                         target.power_buff += value
                         log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name)

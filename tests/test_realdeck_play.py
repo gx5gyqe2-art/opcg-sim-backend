@@ -192,9 +192,11 @@ def test_homuresaki_shared_trigger():
     p1.field = [target]
     p2.field = fillers(1, "P2", cost=3)
     p2.life = fillers(2, "P2")
+    before_pw = target.get_power(True)
     gm.play_card_action(p1, src)
     drain(gm)
-    assert target.power_buff == 1000
+    # 「このターン中、パワー+1000」は継続効果(timed_power)で管理される
+    assert target.get_power(True) == before_pw + 1000
     assert p2.field[0].is_rest is True
 
 
@@ -322,6 +324,100 @@ def test_nami_leader_opp_attack_buff():
     before = p1.leader.get_power(False)
     fire(gm, p1, p1.leader, "ON_OPP_ATTACK")
     assert p1.leader.get_power(False) == before + 2000
+
+
+def test_nami_leader_buff_is_this_turn_not_battle():
+    """OP11-041 の「このターン中+2000」がバトル中限定になっていない:
+    被攻撃リーダーの reset_turn_status(バトル終了)で消えず、ターン終了で失効する。"""
+    from opcg_sim.src.models.models import CardType as CT
+    gm, p1, p2 = base(turn=4, turn_player_is_p1=False)  # 相手(p2)のターン
+    p1.leader = inst("OP11-041")
+    p1.hand = fillers(2, "P1")
+    p1.life = fillers(3, "P1")
+    p2.leader = CardInstance(make_master(card_id="L2", name="L2", power=5000, type=CT.LEADER), "P2")
+    atk = CardInstance(make_master(card_id="A", name="A", power=6000), "P2")
+    atk.is_rest = False
+    p2.field = [atk]
+    base_pw = p1.leader.get_power(False)
+    gm.declare_attack(atk, p1.leader)
+    drain(gm)  # ON_OPP_ATTACK の Choice を解決（先頭=使用する）
+    assert p1.leader.get_power(False) == base_pw + 2000
+    gm.apply_counter(p1, None)  # カウンターをパス → resolve_attack（リーダーが対象で reset される）
+    assert p1.leader.get_power(False) == base_pw + 2000, "バトル終了後も+2000が残るべき(THIS_TURN)"
+    gm.continuous.expire("TURN_END", gm.turn_count)
+    assert p1.leader.get_power(False) == base_pw, "ターン終了で失効するべき"
+
+
+def test_blocker_keyword_loaded():
+    """【ブロッカー】がカード本来のキーワードとして master.keywords に載る（従来は空で
+    has_keyword('ブロッカー')=False になりブロッカーが一切機能しなかった）。"""
+    for cid in ("PRB02-008", "OP13-087", "OP13-042"):
+        c = inst(cid)
+        assert c.has_keyword("ブロッカー"), f"{cid} はブロッカーを持つべき"
+    # 条件付き付与（「…場合、【速攻】を得る」）は静的キーワードにしない
+    assert not inst("OP13-080").has_keyword("速攻")
+
+
+def test_blocker_flow_enters_block_step():
+    """ブロッカーがいると BLOCK_STEP に入り、ブロック宣言で攻撃対象が差し替わる。"""
+    from opcg_sim.src.models.models import CardType as CT
+    p1, p2 = make_player("P1"), make_player("P2")
+    p1.leader = inst("OP13-079", "P1")
+    p2.leader = CardInstance(make_master(card_id="L", name="L", power=5000, type=CT.LEADER), "P2")
+    blk = inst("PRB02-008", "P2")
+    blk.is_rest = False
+    p2.field = [blk]
+    atk = inst("OP13-080", "P1")
+    atk.is_rest = False
+    p1.field = [atk]
+    gm = GameManager(p1, p2)
+    gm.turn_player, gm.opponent, gm.turn_count, gm.phase = p1, p2, 3, Phase.MAIN
+    gm.declare_attack(atk, p2.leader)
+    assert gm.phase == Phase.BLOCK_STEP
+    pr = gm.get_pending_request() or {}
+    assert pr.get("action") == "SELECT_BLOCKER" and blk.uuid in (pr.get("selectable_uuids") or [])
+    gm.handle_block(blk)
+    assert gm.active_battle["target"] is blk and blk.is_rest is True
+
+
+def test_counter_after_opp_attack_trigger():
+    """カウンター衝突バグの回帰: 守備リーダーの ON_OPP_ATTACK(Choice) が中断しても、
+    解決後に防御フェイズへ進み SELECT_COUNTER が出る（カウンターが使える）。"""
+    from opcg_sim.src.core.gamestate import GameManager as GM  # noqa
+    p1, p2 = make_player("P1"), make_player("P2")
+    p1.leader = inst("OP13-079", "P1")
+    p2.leader = inst("OP11-041", "P2")  # ON_OPP_ATTACK で Choice 中断
+    p2.hand = fillers(2, "P2")
+    p2.life = fillers(3, "P2")
+    atk = inst("OP13-080", "P1")
+    atk.is_rest = False
+    p1.field = [atk]
+    gm = GameManager(p1, p2)
+    gm.turn_player = p1
+    gm.opponent = p2
+    gm.turn_count = 3
+    gm.phase = Phase.MAIN
+    for _ in range(6):
+        if p2.don_deck:
+            p2.don_active.append(p2.don_deck.pop(0))
+    gm.declare_attack(atk, p2.leader)
+    # ON_OPP_ATTACK の Choice 等の割り込みを解決
+    drain(gm)
+    pending = gm.get_pending_request() or {}
+    assert pending.get("action") == "SELECT_COUNTER", f"割り込み解決後はカウンター段階のはず: {pending.get('action')}"
+    # カウンターをパスしてバトル解決まで例外なく進む
+    gm.apply_counter(p2, None)
+    assert gm.active_battle is None
+
+
+def test_throne_dynamic_cost_limit_parsed():
+    """虚の玉座: 「場のドン!!の枚数以下のコスト」が cost_max_dynamic に解釈される。"""
+    m = db().get_card("OP13-099")
+    ab = next(a for a in m.abilities if a.trigger.name == "ACTIVATE_MAIN")
+    # effect は PLAY_CARD（手札から登場）。動的コスト上限が設定されていること。
+    play = ab.effect if ab.effect.type.name == "PLAY_CARD" else None
+    assert play is not None
+    assert play.target.cost_max_dynamic == "DON_COUNT_FIELD"
 
 
 if __name__ == "__main__":

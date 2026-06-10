@@ -288,7 +288,19 @@ class EffectResolver:
         if is_strict and len(candidates) < required_count:
             log_event("INFO", "resolver.strict_count_fail", f"Insufficient targets for strict count: found {len(candidates)}, needed {required_count}", player=player.name)
             return []
-            
+
+        # 隠しゾーン（デッキ/ライフ）の直接ターゲットは「上から」位置指定で自動取得する。
+        #   デッキ/ライフは非公開かつ順序のあるゾーンで、中身を見て個別に選ぶことはできない
+        #   （中身を見て選ぶ対話は LOOK→TEMP=zone TEMP 経由のみ）。直接 DECK/LIFE を選択中断
+        #   させると相手/自分の隠し情報が見えて任意に選べてしまう（情報リーク）。候補は
+        #   get_target_cards が上から順で返すため、上から count 枚（"まで"は available 上限）を取る。
+        if query.zone in (Zone.DECK, Zone.LIFE):
+            n = required_count if required_count and required_count > 0 else len(candidates)
+            selected = candidates[:n]
+            if query.save_id:
+                self.context["saved_targets"][query.save_id] = selected
+            return selected
+
         if (query.select_mode == "ALL") or \
            (len(candidates) <= required_count and not is_up_to) or \
            (is_resource and not is_up_to):
