@@ -1,6 +1,11 @@
 # 引き継ぎ資料 — カード効果システム刷新
 
-最終更新: 2026-06-10 / ブランチ: `claude/realgame-effect-processing-bugs-h98p18`
+最終更新: 2026-06-10 / ブランチ: `claude/system-issues-review-45ftlh`
+
+> **§15 セッション追記（全カード効果再現に向けた監査 burn-down ＋ 設計案件 C8/C9/C10）**
+> を末尾に追加。監査フラグ COST_LIMIT 15→0 / DURATION 48→24 / TARGET_SIDE 32→16 /
+> OTHER 57→50。C8（コスト宣言・数値入力UI込み）・C9（同値パワー・スナップショット）・
+> C10（敗北→勝利の置換）を実装。詳細は §15 を参照。
 
 このドキュメントは、本リポジトリ（opcg-sim-backend）の **カード効果処理の刷新作業** を
 引き継ぐための資料です。詳細な設計は `docs/parser_v2.md` を、本書はその上位の
@@ -469,3 +474,58 @@ OPCG_LOG_SILENT=1 python tests/text_execution_audit.py --card OP11-041
 - 計測の起点: `OPCG_LOG_SILENT=1 python tests/text_execution_audit.py`（不一致監査）/
   `tests/effect_diagnostics.py --top 40`（OTHER）
 - 2デッキ回帰: `OPCG_LOG_SILENT=1 python -m pytest tests/test_realdeck_play.py -q -s -p no:cacheprovider`
+
+---
+
+## 15. 本セッションの修正（全カード効果再現に向けた監査 burn-down ＋ 設計案件）
+
+ブランチ `claude/system-issues-review-45ftlh`。「全カードの効果再現」を目標に、監査ハーネス
+(`text_execution_audit.py`)のフラグをカテゴリ単位で burn-down し、設計が必要な難所
+(C8/C9/C10)を実装した。全テスト **232→244 緑**、退行(新規OTHER)=0、A/B=0・C/D≤8 を維持。
+
+### 監査フラグの推移
+
+| フラグ | 開始 | 現在 | 主因と対応 |
+|---|---|---|---|
+| COST_LIMIT | 15 | **0** | ライフ枚数依存の動的コスト上限（LIFE_COUNT_OPPONENT/SELF/BOTH） |
+| DURATION | 48 | **24** | 連用形チェーン分割・コスト0セット(COST_OVERRIDE)・自己制限の期間保持・C9 |
+| TARGET_SIDE | 32 | **16** | 相手除去＋自己バウンスの分割・SOURCE対象時の検知器誤検知除外 |
+| OTHER | 57 | **50** | C8/C10/コスト0セット 等で解消（残りは長い裾野） |
+
+### 根本原因カテゴリ修正
+
+| # | 不具合 | 修正 |
+|---|---|---|
+| 1 | **連用形「〜し、」連結句の丸呑み**（前段の相手除去/デバフが消失） | `parser._parse_to_node` の Sequence 分割に `(?<=KOし)、`/`(?<=レストにし)、`/`(?<=戻し)、`/`(?<=\d)し、` を追加。ko/rest/bounce/don_set_rest を分割後の末尾連用形に対応。TRIGGER の「相手をKO/レスト/戻し→自己バウンス」やスクアード型「パワー-Nし→ライフ手札」を正しく Sequence 化 |
+| 2 | **ライフ枚数の動的コスト上限が未制限** | `matcher.parse_target` に `cost_max_dynamic=LIFE_COUNT_*`、`get_target_cards` で評価。コスト修飾句中の「お互い/相手/自分の」がプレイヤー判定へ漏れる問題も `player_text` で除去 |
+| 3 | **「コスト0にする」が OTHER** | `set_cost` ルール＋`COST_OVERRIDE`。`models.base_cost_override`（base_power_override と対称・reset_turn_status で失効）を追加 |
+
+### 設計案件（ユーザー意思決定のうえ実装）
+
+- **C8 コスト宣言メカニクス**（OP11系6枚, *数値入力UI*）: 「任意のコストを宣言し、相手の
+  デッキの上から1枚を公開する。…宣言したコストと同じ場合、…」。
+  `ActionType.DECLARE_COST` / `ConditionType.DECLARED_COST_MATCH` / `PendingMessage.DECLARE_COST`
+  を新設。resolver は数値入力インタラクション(`_suspend_for_cost_declaration`)へ中断し、
+  `gamestate.resolve_interaction` が宣言値を記録＋相手デッキトップを公開(`last_revealed_card`)
+  してから再開。フロント(`RealGame.tsx`)に 0〜max のボタン式オーバーレイを追加し
+  `declared_value` を送出。
+- **C9 同値パワー**（*発動時スナップショット*）: 「このキャラの元々のパワーは、…相手の
+  リーダー/選んだキャラ/アタックしているキャラと同じパワーになる」。`power_equalize` ルールが
+  `BUFF+POWER_OVERRIDE`、値は `ValueSource(dynamic_source="REFERENCE_POWER", ref_id=...)`。
+  `gamestate.get_dynamic_value` が発動時に参照カードの現在パワーで解決（以後の変動に追随しない）。
+- **C10 勝敗置換**: 「自分のデッキが0枚になった場合、自分は敗北する代わりに勝利する」(OP03-040
+  ナミ等2枚)。`win_on_deckout` ルールが `VICTORY+status="REPLACE_DECKOUT_LOSS"`、
+  `check_victory` がデッキアウト時に本人の PASSIVE を走査して敗北を勝利へ置換。
+
+### 残課題（次の担当へ）
+
+- **E15 任意置換「代わりに〜できる」の選択UI**（ユーザー希望: 選択UI）: パーサは既に
+  `REPLACE_EFFECT(sub_effect)` を正しく生成し、現状は自動実行（取れるなら実行）。対話的な
+  yes/no を挟むには、**同期的な除去フロー（`apply_action_to_engine` の KO/leave・`resolve_attack`
+  から呼ばれる `_active_replacement`）の途中で中断・再開する機構**が必要。これは §7 E14
+  「置換が対象選択で中断する場合」と同じ構造的ブロッカーで、除去/保護フローの suspend/resume
+  対応という独立した中規模リファクタを要する。多くの任意置換はプレイヤーに有利な置換のため
+  自動実行で実害は小さいが、UI 化は本リファクタとセットで着手するのが安全。
+- 監査の DURATION(24)/TARGET_SIDE(16)/OTHER(50)/MISSING_ACTION(118) の残りは 2デッキ外の
+  多様な専用効果と検知器のアドバイザリが中心。同手順（監査でフラグ→カテゴリ修正→回帰）で継続。
+- C9 の `attacker` 参照は `active_battle` 経由。バトル外コンテキストでの同値参照は要確認。
