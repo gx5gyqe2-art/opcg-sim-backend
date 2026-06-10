@@ -5,7 +5,12 @@
 > **§15 セッション追記（全カード効果再現に向けた監査 burn-down ＋ 設計案件 C8/C9/C10）**
 > を末尾に追加。監査フラグ COST_LIMIT 15→0 / DURATION 48→24 / TARGET_SIDE 32→16 /
 > OTHER 57→50。C8（コスト宣言・数値入力UI込み）・C9（同値パワー・スナップショット）・
-> C10（敗北→勝利の置換）を実装。詳細は §15 を参照。
+> C10（敗北→勝利の置換）・任意効果「〜してもよい」yes/no を実装。詳細は §15。
+>
+> **§16 追記（完全シミュレータ再計画・トラックA=品質地図）**: `tests/quality_map.py` で
+> NO_CHANGE 450 / WARN 313 を自動三分類。**NO_CHANGE のエンジン隠れバグ=0**（全て
+> コスト不成立/条件未達/PASSIVE/測定限界に分解）。検証中に【トリガー】(EXECUTE_MAIN_EFFECT)
+> が COUNTER 効果イベントで不発のバグを発見・修正。詳細は §16。
 
 このドキュメントは、本リポジトリ（opcg-sim-backend）の **カード効果処理の刷新作業** を
 引き継ぐための資料です。詳細な設計は `docs/parser_v2.md` を、本書はその上位の
@@ -545,3 +550,58 @@ OPCG_LOG_SILENT=1 python tests/text_execution_audit.py --card OP11-041
 - 監査の DURATION(24)/TARGET_SIDE(16)/OTHER(50)/MISSING_ACTION(118) の残りは 2デッキ外の
   多様な専用効果と検知器のアドバイザリが中心。同手順（監査でフラグ→カテゴリ修正→回帰）で継続。
 - C9 の `attacker` 参照は `active_battle` 経由。バトル外コンテキストでの同値参照は要確認。
+
+---
+
+## 16. 完全シミュレータ再計画 — トラックA（品質地図）
+
+「全カード効果再現」に向けた再計画の第一トラック。実行カバレッジの曖昧な分類
+（NO_CHANGE 450 / WARN 313）を自動で細分類し、**真のエンジンバグ件数を確定**した。
+
+### ツール `tests/quality_map.py`（新規）
+
+```bash
+OPCG_LOG_SILENT=1 python tests/quality_map.py                 # 全体サマリ
+OPCG_LOG_SILENT=1 python tests/quality_map.py --show NO_IMPL   # 実装漏れ候補
+OPCG_LOG_SILENT=1 python tests/quality_map.py --show WARN_DIRECTION
+```
+
+`effect_coverage` の分類機構を再利用し、NO_CHANGE と WARN を以下に細分類する。
+
+| 分類 | 件数 | 意味 |
+|---|---|---|
+| **NO_IMPL** | **0** | ★ゾーン変化アクションがあるのに不変＝真のバグ。**0件＝隠れバグなし** |
+| COST_UNMET | 157 | 任意コスト（":"前段）が汎用盤面で払えず不発＝正常（handover #1） |
+| COND_FALSE | 156 | ゲート条件が汎用盤面で未達＝正常 |
+| PASSIVE | 116 | PASSIVE/継続系。resolve_ability では盤面が動かない設計（静的適用） |
+| STAT_ONLY | 21 | power/cost/keyword のみ＝枚数 snapshot で不可視（測定限界） |
+| WARN_PLAY_ARTIFACT | 251 | ON_PLAY: play_card_action のソース移動が枚数差を汚す測定限界 |
+| WARN_MODAL | 93 | Branch/Choice/コスト付き＝別パス実行の誤検知 |
+| WARN_DIRECTION | 48 | サーチ系/up-to対象0/複合効果の heuristic 残り |
+
+### 結論
+
+- **枚数 snapshot で検出可能な範囲では、NO_CHANGE のエンジン隠れバグは 0**。450件は全て
+  正当な理由（コスト不成立・条件未達・PASSIVE 静的・測定限界）に分解された。
+- WARN の「真の疑い」は heuristic を side-agnostic 化（`effect_coverage._DIRECTION` を相手
+  KO/ハンデス/自己バウンス対応に修正）して 266→48 に縮小。残りはサーチ系/複合効果の
+  測定限界で、本物の方向バグは検出されなかった。
+
+### 検証中に発見・修正した実バグ
+
+- **【トリガー】(EXECUTE_MAIN_EFFECT) が COUNTER 効果イベントで不発**: STAT_ONLY 21件を
+  stat 信号で検証したところ全件 action_history が空＝効果未実行と判明。原因は
+  `resolver._expand_main_effect` が **ACTIVATE_MAIN しか展開しない**こと。効果が【カウンター】
+  に書かれたトリガーイベント（OP01-028 必殺緑星ラフレシア / OP13-039 ゴムゴムの蛇銃 等）が
+  軒並み no-op だった。COUNTER へのフォールバックを追加して修正（OP01-028 のパワー-2000 適用を確認）。
+
+### 残課題（次の担当へ）
+
+- STAT_ONLY の残りは「レストの相手キャラ」等を要求し汎用盤面で対象ゼロ＝正常、または
+  キャラの【トリガー】（ON_PLAY 効果の発動）という別セマンティクス（イベントの COUNTER
+  展開とは別問題）。後者の扱いは要設計。
+- WARN_DIRECTION 48 の一部はサーチ系で `smart_drain` が ORDER_CARDS/対象選択を完了できず
+  TEMP に残留する（C/D detector ≤8 が追跡）。実プレイUIでは解決する想定だが、厳密な検証は
+  トラックB（全カード横断ハーネス）＋トラックC（手動）で詰める。
+- 次トラック候補: **B（全カード横断検証ハーネス）** で identity/power/keyword/temp-leak まで
+  含めた回帰をセット単位で固定するのが、品質地図で「バグなし」を確認した今の自然な次手。
