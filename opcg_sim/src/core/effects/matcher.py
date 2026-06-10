@@ -18,8 +18,15 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.zone = Zone.TEMP
         return tq
 
-    if _nfc(ParserKeyword.EACH_OTHER) in tgt_text: tq.player = Player.ALL
-    elif _nfc(ParserKeyword.OPPONENT) in tgt_text: tq.player = Player.OPPONENT
+    # プレイヤー判定では「(お互い/相手/自分)のライフの枚数以下のコストを持つ」のような
+    # コスト上限修飾句を除去する。この「お互いの/相手の」はコスト基準であって対象側ではなく
+    # （実際の対象は後続の「相手のキャラ」等）、player を誤って ALL/OPPONENT にしてしまうため。
+    player_text = re.sub(
+        _nfc(r'(?:お互いの|相手の|自分の)?ライフの(?:合計)?枚数(?:分)?以下のコストを持つ'),
+        '', tgt_text)
+
+    if _nfc(ParserKeyword.EACH_OTHER) in player_text: tq.player = Player.ALL
+    elif _nfc(ParserKeyword.OPPONENT) in player_text: tq.player = Player.OPPONENT
     elif _nfc(ParserKeyword.OWNER) in tgt_text: 
         is_dest = False
         for suffix in ["の手札", "のデッキ", "のライフ", "のトラッシュ"]:
@@ -34,7 +41,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         else:
             tq.player = default_player
             
-    elif _nfc(ParserKeyword.SELF) in tgt_text or _nfc(ParserKeyword.SELF_REF) in tgt_text: tq.player = Player.SELF
+    elif _nfc(ParserKeyword.SELF) in player_text or _nfc(ParserKeyword.SELF_REF) in tgt_text: tq.player = Player.SELF
 
     zone_map = {
         _nfc("手札"): Zone.HAND,
@@ -126,6 +133,21 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if re.search(_nfc(r'\u30c9\u30f3(?:!!|\u203c)?\u306e\u679a\u6570(?:\u5206)?\u4ee5\u4e0b\u306e\u30b3\u30b9\u30c8'), tgt_text):
         tq.cost_max_dynamic = "DON_COUNT_FIELD"
 
+    # \u52d5\u7684\u30b3\u30b9\u30c8\u4e0a\u9650: \u300c(\u76f8\u624b\u306e/\u81ea\u5206\u306e/\u304a\u4e92\u3044\u306e) \u30e9\u30a4\u30d5\u306e(\u5408\u8a08)?\u679a\u6570(\u5206)?\u4ee5\u4e0b\u306e\u30b3\u30b9\u30c8\u300d\u3002
+    #   \u30e9\u30a4\u30d5\u679a\u6570\u3067\u30b3\u30b9\u30c8\u4e0a\u9650\u304c\u6c7a\u307e\u308b\uff08OP04-112 \u30e4\u30de\u30c8 / OP05-102 \u30b2\u30c0\u30c4 \u7b49\uff09\u3002
+    #   \u300c\u304a\u4e92\u3044\u306e\u2026\u5408\u8a08\u300d\u306f\u4e21\u8005\u30e9\u30a4\u30d5\u5408\u8a08\u3001\u305d\u308c\u4ee5\u5916\u306f\u6240\u6709\u8005\u57fa\u6e96\u3067 \u76f8\u624b/\u81ea\u5206 \u3092\u5224\u5b9a\u3002
+    #   \u30a8\u30f3\u30b8\u30f3 get_target_cards \u304c LIFE_COUNT_* \u3092\u8a55\u4fa1\u3059\u308b\u3002
+    if re.search(_nfc(r'\u30e9\u30a4\u30d5\u306e(?:\u5408\u8a08)?\u679a\u6570(?:\u5206)?\u4ee5\u4e0b\u306e\u30b3\u30b9\u30c8'), tgt_text):
+        m_life = re.search(_nfc(r'(\u304a\u4e92\u3044\u306e|\u76f8\u624b\u306e|\u81ea\u5206\u306e)?\u30e9\u30a4\u30d5\u306e(?:\u5408\u8a08)?\u679a\u6570'), tgt_text)
+        prefix = m_life.group(1) if m_life and m_life.group(1) else ""
+        if prefix == _nfc("\u304a\u4e92\u3044\u306e"):
+            tq.cost_max_dynamic = "LIFE_COUNT_BOTH"
+        elif prefix == _nfc("\u81ea\u5206\u306e"):
+            tq.cost_max_dynamic = "LIFE_COUNT_SELF"
+        else:
+            # \u65e2\u5b9a\u306f\u76f8\u624b\u306e\u30e9\u30a4\u30d5\uff08\u300c\u76f8\u624b\u306e\u300d\u660e\u793a\uff0f\u7701\u7565\u6642\u3068\u3082\u76f8\u624b\u57fa\u6e96\u304c\u5927\u534a\uff09
+            tq.cost_max_dynamic = "LIFE_COUNT_OPPONENT"
+
     m_p = re.search(_nfc(ParserKeyword.POWER + r'[^+\-\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_p:
         start_idx = m_p.start()
@@ -191,8 +213,14 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
     dynamic_cost_max = None
     if query.cost_max_dynamic == "DON_COUNT_FIELD":
-        p = owner_player 
+        p = owner_player
         dynamic_cost_max = len(p.don_active) + len(p.don_rested) + len(p.don_attached_cards)
+    elif query.cost_max_dynamic == "LIFE_COUNT_OPPONENT":
+        dynamic_cost_max = len(opponent_player.life)
+    elif query.cost_max_dynamic == "LIFE_COUNT_SELF":
+        dynamic_cost_max = len(owner_player.life)
+    elif query.cost_max_dynamic == "LIFE_COUNT_BOTH":
+        dynamic_cost_max = len(owner_player.life) + len(opponent_player.life)
 
     results = []
     seen_names = set()

@@ -41,6 +41,8 @@ def summarize_target(tq) -> Optional[Dict[str, Any]]:
         out["names"] = list(tq.names)
     if tq.cost_max is not None:
         out["cost_max"] = tq.cost_max
+    if getattr(tq, "cost_max_dynamic", None) is not None:
+        out["cost_max_dynamic"] = tq.cost_max_dynamic
     if tq.cost_min is not None:
         out["cost_min"] = tq.cost_min
     if tq.power_max is not None:

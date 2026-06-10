@@ -1653,6 +1653,61 @@ CASES = [
             }
         ],
     },
+    # ----- 動的コスト上限: ライフ枚数依存（COST_LIMIT 監査フラグ対応） --------
+    # 「相手のライフの枚数以下のコストを持つ相手のキャラ」→ cost_max_dynamic=LIFE_COUNT_OPPONENT
+    {
+        "id": "cost_limit_opp_life_ko",
+        "text": "相手のライフの枚数以下のコストを持つ相手のキャラ1枚までを、KOする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "KO",
+                    "target": {
+                        "player": "OPPONENT",
+                        "cost_max_dynamic": "LIFE_COUNT_OPPONENT",
+                        "is_up_to": True,
+                    },
+                }
+            }
+        ],
+    },
+    # 「自分のライフの枚数以下のコストを持つ相手のキャラ」→ LIFE_COUNT_SELF
+    {
+        "id": "cost_limit_self_life_ko",
+        "text": "自分のライフの枚数以下のコストを持つ相手のキャラ1枚までを、KOする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "KO",
+                    "target": {
+                        "player": "OPPONENT",
+                        "cost_max_dynamic": "LIFE_COUNT_SELF",
+                        "is_up_to": True,
+                    },
+                }
+            }
+        ],
+    },
+    # 「お互いのライフの合計枚数以下のコストを持つ相手のキャラ」→ LIFE_COUNT_BOTH
+    {
+        "id": "cost_limit_both_life_ko",
+        "text": "お互いのライフの合計枚数以下のコストを持つ相手のキャラ1枚までを、KOする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "KO",
+                    "target": {
+                        "player": "OPPONENT",
+                        "cost_max_dynamic": "LIFE_COUNT_BOTH",
+                        "is_up_to": True,
+                    },
+                }
+            }
+        ],
+    },
     # 「元々のパワー7000にする」— base_power_override に静的値をセット。
     {
         "id": "set_power_base_value",
