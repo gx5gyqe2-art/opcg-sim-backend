@@ -68,13 +68,16 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     }
     
     found_zone = None
-    
+
+    # ゾーン検出も修飾句除去後のテキストで行う。「お互いのライフの合計枚数以下の
+    # コストを持つ相手のキャラをKOする」で zone=LIFE と誤検出し、フィールドの
+    # キャラではなくライフ札を動かしていた（雷迎/ロブ・ルッチ等のトリガー）。
     pattern = re.compile(r'(手札|トラッシュ|ライフ|デッキ|場|コストエリア)(?:.{0,5})(?:を|から|の)')
-    matches = pattern.finditer(tgt_text)
-    
+    matches = pattern.finditer(player_text)
+
     for m in matches:
         z_name = _nfc(m.group(1))
-        post_match = tgt_text[m.end():]
+        post_match = player_text[m.end():]
         
         if z_name == _nfc("デッキ") and (_nfc("下") in post_match or _nfc("上") in post_match):
              if _nfc("から") not in post_match[:5]: 

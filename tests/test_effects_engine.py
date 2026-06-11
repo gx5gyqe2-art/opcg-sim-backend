@@ -1999,3 +1999,22 @@ def test_opponent_chooses_own_hand_discard():
     gm.resolve_interaction(p2, {"selected_uuids": [chosen], "index": 0})
     assert len(p1.hand) == 2
     assert len(p2.hand) == 1
+
+
+def test_life_down_to_n_trash():
+    """RC-6: 「自分のライフが1枚になるようにライフの上からトラッシュに置く」が
+    残り1枚まで全てトラッシュする（従来は1枚だけ）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abilities = parser.parse_card_text(
+        "【メイン】自分のライフが1枚になるようにライフの上からトラッシュに置く。")
+    assert abilities
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(card_id="E-RAI", name="雷迎", type=CardType.EVENT), owner="P1")
+    for i in range(5):
+        p1.life.append(make_instance(make_master(card_id=f"L-{i}", name=f"ライフ{i}"), owner="P1"))
+
+    gm.resolve_ability(p1, abilities[0], src)
+    assert gm.active_interaction is None
+    assert len(p1.life) == 1, f"ライフは1枚になるはず: {len(p1.life)}"
+    assert len(p1.trash) == 4

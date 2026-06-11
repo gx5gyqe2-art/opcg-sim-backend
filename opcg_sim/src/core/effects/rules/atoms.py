@@ -698,13 +698,22 @@ def _life_to_trash(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分／相手の）ライフの上（か下）から…トラッシュに置く（もよい）」→ TRASH。"""
     t = ctx.text
     if _nfc("ライフの上") not in t and _nfc("ライフの下") not in t:
-        return None
+        # 位置指定なしの「（相手の）ライフ1枚までをトラッシュに置く」も上から自動取得で受ける
+        if not re.search(_nfc(r"ライフ[\d０-９]*枚(?:まで)?を?、?トラッシュに置"), t):
+            return None
     # 「置く」「置いて」「置いてもよい」等の活用形に対応（トラッシュに置で統一）
     if _nfc("トラッシュ") not in t or not re.search(_nfc(r"トラッシュに置"), t):
         return None
     tq = parse_target(t)
     tq.zone = Zone.LIFE
-    if _nfc("まで") in t or _nfc("もよい") in t:
+    # 「自分のライフが1枚になるように…トラッシュに置く」: N枚を残して全て置く。
+    # 従来は「1枚」を枚数と誤読し、1枚だけトラッシュしていた（雷迎/我が神なり）。
+    m_down = re.search(_nfc(r"が([\d０-９]+)枚になるように"), t)
+    if m_down:
+        tq.count = _to_int(m_down.group(1))
+        tq.count_dynamic = "DOWN_TO_N"
+        tq.is_up_to = False
+    elif _nfc("まで") in t or _nfc("もよい") in t:
         tq.is_up_to = True
     return GameAction(type=ActionType.TRASH, target=tq, raw_text=t)
 

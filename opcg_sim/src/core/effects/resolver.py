@@ -326,7 +326,14 @@ class EffectResolver:
         is_up_to = getattr(query, 'is_up_to', False)
         is_strict = getattr(query, 'is_strict_count', False)
         is_resource = (query.zone == Zone.COST_AREA)
-        
+
+        # 「<ゾーン>がN枚になるように」: N 枚を残して残り全てを対象にする（雷迎 等）。
+        if getattr(query, "count_dynamic", None) == "DOWN_TO_N":
+            required_count = max(0, len(candidates) - max(required_count, 0))
+            if required_count == 0:
+                return []
+            is_up_to = False
+
         if len(candidates) == 0:
             return []
 

@@ -2285,4 +2285,34 @@ CASES = [
                         "target": {"player": "SELF", "zone": "HAND"}}}
         ],
     },
+    # ----- ゾーン検出はコスト上限修飾の「ライフ」に汚染されない（雷迎トリガー等） ------
+    {
+        "id": "dynamic_cost_cap_ko_targets_field",
+        "text": "【トリガー】お互いのライフの合計枚数以下のコストを持つ相手のキャラ1枚までを、KOする。",
+        "expect": [
+            {"trigger": "TRIGGER",
+             "effect": {"kind": "action", "type": "KO",
+                        "target": {"player": "OPPONENT", "zone": "FIELD"}}}
+        ],
+    },
+    # ----- RC-6: 「ライフがN枚になるように」は N 枚残して全てトラッシュ ----------------
+    {
+        "id": "life_down_to_one_trash",
+        "text": "【メイン】自分のライフが1枚になるようにライフの上からトラッシュに置く。",
+        "expect": [
+            {"trigger": "ACTIVATE_MAIN",
+             "effect": {"kind": "action", "type": "TRASH",
+                        "target": {"player": "SELF", "zone": "LIFE"}}}
+        ],
+    },
+    # ----- 位置指定なしの「相手のライフ1枚までをトラッシュに置く」も上から自動取得 -------
+    {
+        "id": "opp_life_to_trash_no_position",
+        "text": "【登場時】相手のライフ1枚までをトラッシュに置く。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "effect": {"kind": "action", "type": "TRASH",
+                        "target": {"player": "OPPONENT", "zone": "LIFE"}}}
+        ],
+    },
 ]

@@ -74,7 +74,10 @@ class TargetQuery:
     power_max: Optional[int] = None
     is_rest: Optional[bool] = None
     count: int = 1
-    is_up_to: bool = False 
+    is_up_to: bool = False
+    # "DOWN_TO_N": 「<ゾーン>がN枚になるように」— count 枚を残して残り全てを対象にする
+    # （resolver._resolve_targets が len(candidates) - count 枚に解決する）。
+    count_dynamic: Optional[str] = None
     select_mode: str = "CHOOSE"
     save_id: Optional[str] = None
     ref_id: Optional[str] = None
