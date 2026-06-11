@@ -420,6 +420,27 @@ def _execute_event(ctx: ParseContext) -> Optional[GameAction]:
 #   「ライフの下／デッキへ…好きな順番で置く」等の移動系は別ルールが担当するため、
 #   ライフ内に留まる並べ替え（"デッキ" を含まない）に限定する。
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# ライフ→デッキ上: 「（自分の）ライフ（すべて）を見て、N枚を（自分の）デッキの上に置く」
+#   → MOVE_CARD(zone=LIFE, dest=DECK top)。隠しゾーン保護によりライフ上から N 枚を取得し
+#   デッキトップへ（カード保全）。後続の「ライフを好きな順番で置く」は order_life が担当。
+# ---------------------------------------------------------------------------
+@rule("life_to_deck_top", priority=76)
+def _life_to_deck_top(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"ライフ.*見て"), t) or not re.search(_nfc(r"デッキの上に置(く|き)"), t):
+        return None
+    m = re.search(_nfc(r"(\d+)枚を"), t)
+    n = int(m.group(1)) if m else 1
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=TargetQuery(zone=Zone.LIFE, player=Player.SELF, count=n),
+        destination=Zone.DECK,
+        dest_position="TOP",
+        raw_text=t,
+    )
+
+
 @rule("order_life", priority=77)
 def _order_life(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text

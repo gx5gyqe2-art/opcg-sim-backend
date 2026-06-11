@@ -1758,3 +1758,23 @@ def test_no_effect_play_passive_blocks_effect_play():
     p1.hand.append(normal)
     gm.apply_action_to_engine(p1, action(ActionType.PLAY_CARD, destination=Zone.FIELD), [normal], 0)
     assert normal in p1.field
+
+
+def test_life_to_deck_top_moves_top_life_card():
+    """LIFE→DECK top: ライフ上から1枚をデッキトップへ（カード保全・隠しゾーン保護で上から取得）。"""
+    from opcg_sim.src.models.effect_types import TargetQuery
+    gm, p1, _ = make_game()
+    life_cards = [make_instance(make_master(card_id=f"LF-{i}"), owner="P1") for i in range(3)]
+    p1.life.extend(life_cards)
+    p1.deck.append(make_instance(make_master(card_id="DK-0"), owner="P1"))
+    top_life = p1.life[0]
+    n_life, n_deck = len(p1.life), len(p1.deck)
+    act = action(ActionType.MOVE_CARD, destination=Zone.DECK,
+                 target=TargetQuery(zone=Zone.LIFE, player=Player.SELF, count=1))
+    act.dest_position = "TOP"
+    ok = gm.apply_action_to_engine(p1, act, [top_life], 0)
+    assert ok
+    assert len(p1.life) == n_life - 1
+    assert len(p1.deck) == n_deck + 1
+    assert p1.deck[0] is top_life      # デッキトップへ
+    assert top_life not in p1.life     # ライフから消えた（カード保全, 計は不変）

@@ -1989,6 +1989,15 @@ CASES = [
             {"effect": {"kind": "action", "type": "LOOK", "value": 1, "status": None}}
         ],
     },
+    # ----- ライフを見て1枚をデッキ上へ（LIFE→DECK top, ST13-004 前段） --------
+    {
+        "id": "life_view_to_deck_top",
+        "text": "自分のライフすべてを見て、1枚を自分のデッキの上に置く。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "MOVE_CARD", "destination": "DECK",
+                        "dest_position": "TOP", "target": {"zone": "LIFE", "player": "SELF", "count": 1}}}
+        ],
+    },
     # ----- サーチ結果をライフへ（TEMP→LIFE, look_deck の後段） --------------
     {
         "id": "search_temp_to_life",
