@@ -1624,9 +1624,21 @@ def _dual_tier_play_from_trash(ctx: ParseContext) -> Optional[EffectNode]:
         return None
     c1, c2 = int(m.group(1)), int(m.group(2))
 
+    # 主語修飾（特徴《X》/名前「X」/ゾーン「手札かトラッシュ」/色）は parse_target に拾わせ、
+    # 両ティアで共有する（従来は CHARACTER/TRASH 固定で特徴・手札が脱落: EB03-049）。
+    base = parse_target(t)
+
     def _tier(cost_max: int, rested: bool) -> GameAction:
-        tq = TargetQuery(player=Player.SELF, zone=Zone.TRASH, card_type=["CHARACTER"],
-                         cost_max=cost_max, count=1, is_up_to=True)
+        tq = TargetQuery(
+            player=base.player or Player.SELF,
+            zone=base.zone if base.zone not in (Zone.FIELD, None) else Zone.TRASH,
+            card_type=list(base.card_type) or ["CHARACTER"],
+            traits=list(base.traits),
+            names=list(base.names),
+            colors=list(base.colors),
+            attributes=list(base.attributes),
+            cost_max=cost_max, count=1, is_up_to=True,
+        )
         return GameAction(
             type=ActionType.PLAY_CARD,
             target=tq,

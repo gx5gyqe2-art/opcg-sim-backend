@@ -99,7 +99,25 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         elif _nfc(ParserKeyword.DON) in tgt_text:
             found_zone = Zone.COST_AREA
 
-    if found_zone:
+    # 複数ゾーン「手札かトラッシュから」「場か手札の」: 「Zか(ら)Z」並列で
+    # 候補ゾーンを併記する（EB03-049 手札かトラッシュ / OP13-079 場か手札）。
+    # 「場」は「登場/場合」と紛れるため後置詞（の/から/に/か）を要求する。
+    multi_zones = []
+    if re.search(_nfc(r'(手札|トラッシュ|デッキ|ライフ|場)(?:から|の|に)?か[、,]?(?:[^。]{0,4})?(手札|トラッシュ|デッキ|ライフ|場)'), player_text):
+        zone_markers = [
+            (_nfc("手札"), Zone.HAND), (_nfc("トラッシュ"), Zone.TRASH),
+            (_nfc("ライフ"), Zone.LIFE), (_nfc("デッキ"), Zone.DECK),
+        ]
+        for zk, zv in zone_markers:
+            if zk in player_text and zv not in multi_zones:
+                multi_zones.append(zv)
+        # 「場」はゾーン後置詞付きのときだけ（登場/場合を除外）
+        if re.search(_nfc(r'場(?:の|から|に|か)'), player_text) and Zone.FIELD not in multi_zones:
+            multi_zones.append(Zone.FIELD)
+
+    if len(multi_zones) >= 2:
+        tq.zone = multi_zones
+    elif found_zone:
         tq.zone = found_zone
     else:
         tq.zone = Zone.FIELD
@@ -244,22 +262,26 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
     elif query.player == Player.ALL: target_players = [game_manager.p1, game_manager.p2]
     elif query.player == Player.OWNER: target_players = [owner_player]
 
+    # zone はリスト（「手札かトラッシュから」EB03-049 / 「場か手札」OP13-079）も取り得る。
+    zones = query.zone if isinstance(query.zone, list) else [query.zone]
+
     candidates = []
     for p in target_players:
         if not p: continue
-        if query.zone == Zone.FIELD:
-            candidates.extend(p.field)
-            if not query.card_type or "LEADER" in query.card_type:
-                if p.leader: candidates.append(p.leader)
-            if p.stage: candidates.append(p.stage)
-        elif query.zone == Zone.HAND: candidates.extend(p.hand)
-        elif query.zone == Zone.TRASH: candidates.extend(p.trash)
-        elif query.zone == Zone.LIFE: candidates.extend(p.life)
-        elif query.zone == Zone.TEMP: candidates.extend(p.temp_zone)
-        elif query.zone == Zone.DECK: candidates.extend(p.deck)
-        elif query.zone == Zone.COST_AREA:
-            candidates.extend(p.don_active)
-            candidates.extend(p.don_rested)
+        for z in zones:
+            if z == Zone.FIELD:
+                candidates.extend(p.field)
+                if not query.card_type or "LEADER" in query.card_type:
+                    if p.leader: candidates.append(p.leader)
+                if p.stage: candidates.append(p.stage)
+            elif z == Zone.HAND: candidates.extend(p.hand)
+            elif z == Zone.TRASH: candidates.extend(p.trash)
+            elif z == Zone.LIFE: candidates.extend(p.life)
+            elif z == Zone.TEMP: candidates.extend(p.temp_zone)
+            elif z == Zone.DECK: candidates.extend(p.deck)
+            elif z == Zone.COST_AREA:
+                candidates.extend(p.don_active)
+                candidates.extend(p.don_rested)
 
     dynamic_cost_max = None
     if query.cost_max_dynamic == "DON_COUNT_FIELD":
@@ -339,6 +361,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
     if not results:
         log_level = "WARNING"
         if query.select_mode in ["ALL", "REMAINING"] or query.is_up_to: log_level = "INFO"
-        log_event(level_key=log_level, action="matcher.no_target", msg=f"No targets found for query: {query.raw_text}", player="system", payload={"query_raw": query.raw_text, "zone": query.zone.name, "target_player": query.player.name, "real_target_names": [p.name for p in target_players], "candidates_scanned": len(candidates)})
+        zone_name = ",".join(z.name for z in zones)
+        log_event(level_key=log_level, action="matcher.no_target", msg=f"No targets found for query: {query.raw_text}", player="system", payload={"query_raw": query.raw_text, "zone": zone_name, "target_player": query.player.name, "real_target_names": [p.name for p in target_players], "candidates_scanned": len(candidates)})
 
     return results
