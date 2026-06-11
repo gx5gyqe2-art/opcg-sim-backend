@@ -1500,24 +1500,28 @@ class GameManager:
                 log_event("INFO", "game.action_active", f"Card activated for {owner.name}", player=player.name)
                 success = True
             elif act_name == "ATTACH_DON":
-                # value 枚のドン!!を付与する。status="RESTED" の場合はレストのドンを
-                # レストのまま付与する（無ければもう一方のプールから補う）。
-                from_rested = (action.status == "RESTED")
+                # value 枚のドン!!を付与する。status に "RESTED" を含めばレストのドンを
+                # レストのまま付与する（無ければもう一方のプールから補う）。status に "OPP" を
+                # 含めば相手のドンプールから付与する（OP15-015「相手のレストのドン‼を付与」）。
+                st = action.status or ""
+                from_rested = ("RESTED" in st)
+                from_opp = ("OPP" in st)
+                don_owner = (self.p2 if player == self.p1 else self.p1) if from_opp else player
                 n = value if value and value > 0 else 1
                 attached = 0
                 for _ in range(n):
-                    pool = player.don_rested if from_rested else player.don_active
+                    pool = don_owner.don_rested if from_rested else don_owner.don_active
                     if not pool:
-                        pool = player.don_active if from_rested else player.don_rested
+                        pool = don_owner.don_active if from_rested else don_owner.don_rested
                     if not pool:
                         break
                     don = pool.pop(0)
                     don.attached_to = target.uuid
                     don.is_rest = from_rested
-                    player.don_attached_cards.append(don)
+                    don_owner.don_attached_cards.append(don)
                     target.attached_don += 1
                     attached += 1
-                log_event("INFO", "game.action_attach_don", f"{attached} DON!! attached to {target.master.name} (rested={from_rested})", player=player.name)
+                log_event("INFO", "game.action_attach_don", f"{attached} DON!! attached to {target.master.name} (rested={from_rested}, opp_pool={from_opp})", player=player.name)
                 success = True
             elif act_name == "MOVE_CARD":
                 dest = action.destination if action.destination else Zone.HAND

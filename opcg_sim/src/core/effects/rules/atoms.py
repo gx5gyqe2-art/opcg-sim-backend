@@ -772,11 +772,26 @@ def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
         recipient.count = 1
     if not recipient.card_type:
         recipient.card_type.extend(["LEADER", "CHARACTER"])
+    # 付与するドンのプール元を判定する。ドン枚数句の直前に「相手の」があれば
+    # 相手のドンを付与する（OP15-015「相手のキャラ1枚に相手のレストのドン‼1枚」）。
+    # 既定（明示なし/「自分の」）はコントローラー自身のドン。
+    from_opp_pool = False
+    don_m = _DON_COUNT_RE.search(t) or re.search(_nfc(r"ドン(?:!!|‼)"), t)
+    if don_m:
+        pre = t[max(0, don_m.start() - 8):don_m.start()]
+        if _nfc("相手") in pre:
+            from_opp_pool = True
+    is_rested = _nfc("レストのドン") in t or _nfc("コストエリアのドン") in t
+    status_parts = []
+    if is_rested:
+        status_parts.append("RESTED")
+    if from_opp_pool:
+        status_parts.append("OPP")
     return GameAction(
         type=ActionType.ATTACH_DON,
         target=recipient,
         value=ValueSource(base=_don_count(t)),
-        status="RESTED" if _nfc("レストのドン") in t or _nfc("コストエリアのドン") in t else None,
+        status="_".join(status_parts) if status_parts else None,
         duration=_duration_of(t),
         raw_text=t,
     )
