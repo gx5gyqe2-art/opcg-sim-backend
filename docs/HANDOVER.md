@@ -30,23 +30,23 @@
 
 | 指標 | 刷新開始時 | **現在** |
 |---|---|---|
-| 原子句カバレッジ（ルール命中率） | 0% | **98.3%** |
-| `ActionType.OTHER`（実行時に何もしない句） | 942 | **58** |
+| 原子句カバレッジ（ルール命中率） | 0% | **98.8%** |
+| `ActionType.OTHER`（実行時に何もしない句） | 942 | **39** |
 | 未分類条件 `GENERIC`（誤発動の温床） | — | **1** |
-| atoms.py ルール数 | 0 | **67** |
-| テスト総数 | 17 | **249（全緑）** |
+| atoms.py ルール数 | 0 | **73** |
+| テスト総数 | 17 | **259（全緑）** |
 | 本番パーサ | レガシー | **EffectParserV2（既定）** |
 
 ### 監査フラグ（`tests/text_execution_audit.py` による全カード検証）
 
 | フラグ | 件数 | 意味 |
 |---|---|---|
-| FLAG_OTHER | **58** | 未実装句（裾野の専用効果が残存） |
+| FLAG_OTHER | **42** | 未実装句（裾野の専用効果が残存） |
 | FLAG_HIDDEN_LEAK | **0** | 隠しゾーン情報リーク（全解決済み） |
 | FLAG_DURATION | **0** | 期間不一致（全解決済み） |
 | FLAG_COST_LIMIT | **0** | 動的コスト上限未設定（全解決済み） |
 | FLAG_TARGET_SIDE | **0** | 対象プレイヤー逆（全解決済み） |
-| FLAG_MISSING_ACTION | **7** | 動詞に対応アクション無し（複雑な分岐効果） |
+| FLAG_MISSING_ACTION | **3** | 動詞に対応アクション無し（複雑な分岐効果） |
 
 ### 構造不変条件（`tests/full_card_audit.py` による全2652枚検証）
 
@@ -244,20 +244,22 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen
 
 ## 7. 残タスク（優先度順）
 
-### A. OTHER 58件の裾野 burn down（継続）
+### A. OTHER 39件の裾野 burn down（継続）
 
 `effect_diagnostics.py` 起点で継続。残るものは構造的難所・専用メカニクスが中心。
 
-- **ライフ並び替え（~8件）**: `ACTION_TYPE.ORDER_LIFE` 新設 + `gamestate.action_order_life()` 追加
-- **複数選択→分岐効果（~7件）**: `Choice` AST 拡張（現在未サポート）
-- **イベントカードを動的発動（~6件）**: `PLAY_CARD_FROM_ZONE` アクション拡張
-- **その他複合効果（~37件）**: 個別対応
+- ✅ **ライフ並び替え**: `ActionType.ORDER_LIFE` 新設 + `gamestate` 実装済み（`order_life` ルール）
+- ✅ **イベント動的発動**: `ActionType.EXECUTE_EVENT` 新設 + `resolve_ability` 再入で実装済み
+- ✅ **効果ダメージ / 相手デッキ閲覧 / 複合除去保護 / 除外フィルタ**: ルール追加済み
+- **ドン!! 複合句（~7件）**: 「自分のドン‼1枚と…」のコスト断片。parser の構造分解で要対応
+- **その他複合効果（残り）**: 個別対応（勝利宣言・登場制限・手札全戻し等）
 
-### B. MISSING_ACTION 7件（複雑な分岐パターン）
+### B. MISSING_ACTION 3件（複雑な分岐パターン）
 
-残る7件は全て「〜するか、〜する」形式の二択選択を必要とするケース
-（OP05-096/OP07-097/OP09-022/OP14-062/OP14-104 等）。現状の `Choice` AST では
-「以下から1つを選ぶ」形式のみサポートし、`するか` 形式の選択は未対応。
+「〜するか、〜する」形式の二択は `parser._parse_suruka_choice` で Choice 化済み
+（動詞終止形 u 段かな直後の「か、」を境界に分割。OP05-096 等が解決）。残る3件は
+「以下から1つを…」でも「するか」でもない不規則な分岐（例: 数値条件で分岐する複合効果）で、
+個別の構造解析が必要。`text_execution_audit.py --flag MISSING_ACTION` で棚卸しする。
 
 ### C. 置換効果（REPLACE_EFFECT）の残
 
@@ -279,10 +281,15 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen
 `tests/test_mistarget_guard.py` の上限（現在 C≤8 / D≤8）。
 横展開是正でカードが減ったら上限値を新しい実測値に下げて固定する。
 
-### F. フロント lint 削減
+### F. フロント lint 削減（現状 137件: error 129 / warning 8）
 
-- `src/screens/DeckBuilder.tsx`・`SandboxGame.tsx`・`localLogic.ts` の `any` ~98件を proper type に置換
-- `react-hooks/exhaustive-deps` ~31件: useEffect 依存配列の修正
+- ✅ 安全分は処理済み: 未使用 catch バインディング6件→`catch {}`、eslint に `argsIgnorePattern '^_'`
+  追加、`logger.ts` の `any`→`unknown`（lint 148→137、ビルド緑維持）
+- **`@typescript-eslint/no-explicit-any` 94件**: `SandboxGame.tsx`/`localLogic.ts`/`BoardSide.tsx`/
+  `DeckBuilder.tsx`/`RealGame.tsx` 等。ドメイン型（CardInstance vs CardData、API レスポンス
+  スキーマ）の設計判断が必要なため**人間レビュー必須**。`as any` キャストと API デコード周りが中心。
+- **`react-hooks/exhaustive-deps` 8件**（warning）: 依存配列追加で再レンダリング挙動が変わり得る
+  ものを含む（WebSocket 接続・初期化 useEffect 等）。closure 挙動を確認してから個別対応。
 
 ### G. 効果適用アニメーション（視覚QA 必須）
 
