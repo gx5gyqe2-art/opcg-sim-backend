@@ -2117,6 +2117,20 @@ CASES = [
             {"effect": {"kind": "action", "type": "RULE_PROCESSING"}}
         ],
     },
+    # ----- 二段ティアのトラッシュ登場（OP06-086 ゲッコー・モリア） --------------------
+    {
+        "id": "dual_tier_play_from_trash",
+        "text": "【登場時】自分のトラッシュのコスト4以下のキャラカード1枚までとコスト2以下のキャラカード1枚までを選び、1枚を登場させ、残りをレストで登場させる。",
+        "expect": [
+            {"trigger": "ON_PLAY", "effect": {"kind": "seq", "actions": [
+                {"kind": "seq", "actions": [
+                    {"type": "PLAY_CARD", "target": {"zone": "TRASH", "cost_max": 4}},
+                    {"type": "PLAY_CARD", "status": "RESTED", "target": {"zone": "TRASH", "cost_max": 2}},
+                ]},
+                {"type": "PLAY_CARD", "target": {"zone": "TEMP"}},
+            ]}}
+        ],
+    },
     # ----- スコープ付き相手効果無効（DISABLE_ABILITY OPP_ONPLAY, OP09-081 後段） --------
     {
         "id": "scoped_negate_opp_onplay",

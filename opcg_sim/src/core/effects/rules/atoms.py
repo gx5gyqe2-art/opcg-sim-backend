@@ -1456,6 +1456,39 @@ def _remaining_deck_top_or_bottom(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+# ---------------------------------------------------------------------------
+# 二段ティアのトラッシュ登場: 「自分のトラッシュのコストX以下のキャラカード1枚までと
+#   コストY以下のキャラカード1枚までを選び、1枚を登場させ、残りをレストで登場させる」
+#   → Sequence[PLAY_CARD(trash, cost<=X, 1まで, active), PLAY_CARD(trash, cost<=Y, 1まで, rested)]。
+#   2つのコストティアから各1枚までを選び、片方をアクティブ・もう片方をレストで登場する
+#   （どちらを active/rested にするかは選択だが、ティア対応で active=X側/rested=Y側に固定する
+#   近似）。後段の「残りをレストで登場させる」断片は TEMP 空につき no-op になる。OP06-086。
+# ---------------------------------------------------------------------------
+@rule("dual_tier_play_from_trash", priority=68)
+def _dual_tier_play_from_trash(ctx: ParseContext) -> Optional[EffectNode]:
+    t = ctx.text
+    if _nfc("トラッシュ") not in t or _nfc("登場") not in t:
+        return None
+    m = re.search(_nfc(r"コスト(\d+)以下.*?と.*?コスト(\d+)以下"), t)
+    if not m:
+        return None
+    c1, c2 = int(m.group(1)), int(m.group(2))
+
+    def _tier(cost_max: int, rested: bool) -> GameAction:
+        tq = TargetQuery(player=Player.SELF, zone=Zone.TRASH, card_type=["CHARACTER"],
+                         cost_max=cost_max, count=1, is_up_to=True)
+        return GameAction(
+            type=ActionType.PLAY_CARD,
+            target=tq,
+            destination=Zone.FIELD,
+            status="RESTED" if rested else None,
+            raw_text=t,
+        )
+
+    # 「1枚を登場させ(active)」= 上位ティア(コストX) / 「残りをレストで登場」= 下位ティア(コストY)。
+    return Sequence(actions=[_tier(c1, rested=False), _tier(c2, rested=True)])
+
+
 @rule("play_card_from_zone", priority=52)
 def _play_card_from_zone(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分の）手札/トラッシュからコストN以下の...カード1枚（まで）を（レストで）登場させる」
