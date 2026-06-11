@@ -170,6 +170,13 @@ class EffectResolver:
                     self._suspend_for_cost_declaration(player, source_card)
                     return
 
+                # 遅延実行（「このターン終了時、〜」）: 即時実行せず end_turn フックへ予約する。
+                # 既に遅延フラッシュ中（_flushing_delayed）の再実行は通常どおり実行する。
+                if getattr(node, "delay", None) == "TURN_END" and not self.context.get("_flushing_delayed"):
+                    self.game_manager.pending_end_of_turn.append((player, node, source_card))
+                    log_event("INFO", "resolver.defer_turn_end", f"Deferred to end of turn: {node.type.name}", player=player.name)
+                    continue
+
                 # 任意効果（「〜してもよい」）: 発動するかを yes/no で確認する。未確認なら中断し、
                 # resume(yes) 時に id(node) を context の確認済み集合へ入れて同じノードを再投入する
                 # （no はスキップ）。共有ノード(CardMaster)を汚さないよう確認状態は context で持つ。

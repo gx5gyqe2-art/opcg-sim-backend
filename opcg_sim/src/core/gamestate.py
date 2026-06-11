@@ -111,6 +111,9 @@ class GameManager:
         from .effects.continuous import ContinuousEffectManager
         self.continuous = ContinuousEffectManager(self)
         self.action_events: List[Dict] = []  # per-request event buffer; reset in API handler
+        # 「このターン終了時、〜」の遅延アクション待ち行列: (player, GameAction, source_card)。
+        # resolver が積み、end_turn が解決する。
+        self.pending_end_of_turn: List[tuple] = []
 
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """
@@ -440,8 +443,33 @@ class GameManager:
             if card and card.master.abilities:
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.TURN_END: self.resolve_ability(self.turn_player, ability, source_card=card)
+        # 「このターン終了時、〜」で予約された遅延アクションを解決する。
+        self._flush_pending_end_of_turn()
         self.continuous.expire("TURN_END", self.turn_count)
         self.switch_turn()
+
+    def _flush_pending_end_of_turn(self):
+        """end_turn フックで、予約された遅延アクション（このターン終了時、〜）を解決する。"""
+        if not self.pending_end_of_turn:
+            return
+        pending = self.pending_end_of_turn
+        self.pending_end_of_turn = []
+        for player, node, source_card in pending:
+            # 場を離れたカードのソース由来でも、トラッシュ送り等は対象解決時に弾かれる。
+            resolver = EffectResolver(self)
+            resolver.context["_flushing_delayed"] = True
+            resolver.execution_stack = [node]
+            try:
+                resolver._process_stack(player, source_card)
+            except Exception as e:
+                log_event("WARNING", "game.delayed_action_error", f"Deferred action failed: {e}", player=player.name)
+            for ev in resolver.action_history:
+                self.action_events.append({
+                    "type": "EFFECT", "player": player.name,
+                    "card_name": source_card.master.name,
+                    "action": ev.get("action", ""), "targets": ev.get("targets", []),
+                    "value": ev.get("value"), "success": ev.get("success", True),
+                })
 
     def switch_turn(self):
         # 追加ターン（EXTRA_TURN）: 予約したプレイヤーがターンプレイヤーのまま継続する

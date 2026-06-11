@@ -600,6 +600,8 @@ def _test_on_play(
     sb     = _stat_snap(p1, p2)
     try:
         gm.play_card_action(p1, source)
+        if not gm.active_interaction:
+            gm._flush_pending_end_of_turn()  # 「このターン終了時、〜」の遅延分を測定対象に含める
     except Exception:
         return AbilityResult(master.card_id, master.name, "ON_PLAY", "ERROR", h_other,
                              traceback.format_exc(limit=2))
@@ -628,6 +630,8 @@ def _test_ability(
     sb     = _stat_snap(p1, p2)
     try:
         gm.resolve_ability(p1, ability, source)
+        if not gm.active_interaction:
+            gm._flush_pending_end_of_turn()  # 「このターン終了時、〜」の遅延分を測定対象に含める
     except Exception:
         return AbilityResult(master.card_id, master.name, trig, "ERROR", h_other,
                              traceback.format_exc(limit=2))

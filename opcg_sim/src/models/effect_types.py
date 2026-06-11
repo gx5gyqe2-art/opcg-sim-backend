@@ -187,6 +187,10 @@ class GameAction(EffectNode):
     # 任意効果（「〜してもよい／てもよい」）。発動するかをプレイヤーが選ぶ。
     # resolver が実行前に yes/no 確認インタラクションへ中断する。
     is_optional: bool = False
+    # 遅延実行マーカー。"TURN_END" の場合、resolver は即時実行せず
+    # game_manager.pending_end_of_turn に積み、end_turn で解決する
+    # （「このターン終了時、〜」OP03-005/OP13-024/OP08-074 等）。
+    delay: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> GameAction:

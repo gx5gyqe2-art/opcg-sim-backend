@@ -2266,6 +2266,31 @@ def test_until_next_turn_end_buff_expiry_boundary():
     assert char.get_power(True) == 4000, "次ターン終了で失効するべき"
 
 
+def test_delayed_turn_end_action_defers_then_fires():
+    """「このターン終了時、〜」: 解決時は即時実行せず、end_turn で発火する（OP03-005 系）。"""
+    from opcg_sim.src.models.effect_types import Sequence as _Seq, TargetQuery as _TQ
+    gm, p1, p2 = make_game()
+    gm.turn_player, gm.opponent = p1, p2
+    gm.turn_count = 2
+    source = make_instance(make_master(card_id="C-DLY", name="遅延"), owner="P1")
+    p1.field.append(source)
+    src_tq = _TQ(select_mode="SOURCE")
+    buff = GameAction(type=ActionType.BUFF, value=ValueSource(base=2000),
+                      target=src_tq, duration="THIS_TURN")
+    trash = GameAction(type=ActionType.TRASH, target=src_tq, delay="TURN_END")
+    ab = Ability(trigger=TriggerType.ACTIVATE_MAIN, effect=_Seq(actions=[buff, trash]))
+    gm.resolve_ability(p1, ab, source_card=source)
+    # 即時: バフは適用、トラッシュは保留（場に残る）
+    assert source in p1.field, "TRASH は即時実行されず保留されるべき"
+    assert source.get_power(True) == 3000, "BUFF は即時適用される"
+    assert len(gm.pending_end_of_turn) == 1
+    # ターン終了で遅延 TRASH が発火する
+    gm._flush_pending_end_of_turn()
+    assert source not in p1.field, "end_turn で遅延 TRASH が発火するべき"
+    assert source in p1.trash
+    assert gm.pending_end_of_turn == []
+
+
 def cov_drain(gm):
     import effect_coverage as _cov
     _cov._smart_drain(gm, record={})
