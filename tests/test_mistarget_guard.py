@@ -36,6 +36,7 @@ def test_no_revealed_card_trait_lift():
 def test_cd_detectors_do_not_grow():
     """C/D: 段階的に減らす想定。ベースライン実測値を超えて増えていないこと。"""
     _, hits = scan()
-    # ベースライン（LM00j ラウンド1 時点の実測。A1/A2 是正で D: 56→9）
-    assert len(_unique_cards(hits, KEY_C)) <= 8
-    assert len(_unique_cards(hits, KEY_D)) <= 9
+    # 実測値に合わせて上限を更新（OTHER burn down 完了後: C 7→6, D 8→7）。
+    # 値を下げたら上限も追従して固定する（doc §7-E の運用）。
+    assert len(_unique_cards(hits, KEY_C)) <= 6
+    assert len(_unique_cards(hits, KEY_D)) <= 7
