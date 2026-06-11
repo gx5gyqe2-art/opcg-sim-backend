@@ -927,6 +927,13 @@ class GameManager:
             log_event("INFO", "game.action_shuffle", "Deck shuffled", player=target_player.name)
             return True
         if act_name == "LOOK":
+            if getattr(action, "status", None) == "OPPONENT":
+                # 「相手のデッキの上から N 枚を見る」: 公開のみで盤面は不変（並びも変えない）。
+                # 後続消費が無いため temp_zone には載せない（TEMP リーク防止）。
+                opp = self.p2 if player == self.p1 else self.p1
+                count = min(value if value else 1, len(opp.deck))
+                log_event("INFO", "game.action_look_opp", f"Looking at {count} cards from OPPONENT DECK", player=player.name)
+                return True
             count = value
             deck = player.deck
             if len(deck) < count: count = len(deck)

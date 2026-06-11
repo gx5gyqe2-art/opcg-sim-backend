@@ -83,6 +83,8 @@ class TargetQuery:
     is_strict_count: bool = False
     is_unique_name: bool = False
     exclude_ids: List[str] = field(default_factory=list)
+    # 「「◯◯」以外のキャラ」: 除外するカード名（matcher で一致を弾く）。
+    exclude_names: List[str] = field(default_factory=list)
     raw_text: str = ""
 
     @classmethod

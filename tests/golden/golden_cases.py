@@ -1810,4 +1810,60 @@ CASES = [
             }
         ],
     },
+    # ----- 効果ダメージ（DEAL_DAMAGE） -----------------------------------
+    # 「相手に N ダメージを与える」: 相手リーダーへ N ダメージ（旧 OTHER）。
+    {
+        "id": "deal_damage_opponent",
+        "text": "【メイン】相手に1ダメージを与える。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "DEAL_DAMAGE", "value": 1,
+                        "target": {"player": "OPPONENT"}}}
+        ],
+    },
+    # 「自分は N ダメージを受ける」: 自分リーダーへ N ダメージ。
+    {
+        "id": "deal_damage_self",
+        "text": "【登場時】自分は1ダメージを受ける。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "DEAL_DAMAGE", "value": 1,
+                        "target": {"player": "SELF"}}}
+        ],
+    },
+    # ----- 相手デッキを覗く（LOOK + OPPONENT, 後続なしの純粋な公開） --------
+    {
+        "id": "look_opponent_deck_top",
+        "text": "【アタック時】相手のデッキの上から1枚を見る。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "LOOK", "value": 1, "status": "OPPONENT"}}
+        ],
+    },
+    # ----- 複合除去保護: 「相手の効果で、KOされずレストにされない」 ---------
+    {
+        "id": "prevent_ko_and_rest",
+        "text": "このキャラは相手の効果で、KOされずレストにされない。",
+        "expect": [
+            {"effect": {"kind": "seq", "actions": [
+                {"kind": "action", "type": "PREVENT_LEAVE"},
+                {"kind": "action", "type": "PREVENT_REST"},
+            ]}}
+        ],
+    },
+    # 「このキャラは相手の効果でレストにされない」: 単独のレスト不可保護。
+    {
+        "id": "prevent_rest_self",
+        "text": "このキャラは相手の効果でレストにされない。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "PREVENT_REST",
+                        "target": {"select_mode": "SOURCE"}}}
+        ],
+    },
+    # ----- 除外フィルタ: 「「◯◯」以外のキャラ1枚」 ------------------------
+    {
+        "id": "exclude_named_character",
+        "text": "【登場時】相手の「モンキー・D・ルフィ」以外のキャラ1枚までを、持ち主のデッキの下に置く。",
+        "expect": [
+            {"effect": {"kind": "action",
+                        "target": {"player": "OPPONENT", "exclude_names": ["モンキー・D・ルフィ"]}}}
+        ],
+    },
 ]

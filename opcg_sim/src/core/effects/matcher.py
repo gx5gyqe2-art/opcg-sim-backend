@@ -89,6 +89,10 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if m_name:
         if (m_name.group(0) + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
             tq.names.append(m_name.group(1))
+        else:
+            # 「「◯◯」以外のキャラ」: その名前を除外対象にする（従来は無視され、
+            # 当該カード自身も対象に含めてしまっていた）。
+            tq.exclude_names.append(m_name.group(1))
     
     if _nfc("含む") in tgt_text:
         tq.flags.add("NAME_PARTIAL")
@@ -266,6 +270,8 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
                 if not any(n in card.master.name for n in query.names): continue
             else:
                 if card.master.name not in query.names: continue
+
+        if query.exclude_names and card.master.name in query.exclude_names: continue
 
         if query.traits and not any(t in card.master.traits for t in query.traits): continue
         if query.is_rest is not None and card.is_rest != query.is_rest: continue

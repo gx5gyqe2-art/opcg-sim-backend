@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from ....models.effect_types import Choice, GameAction, Sequence, TargetQuery, ValueSource
+from ....models.effect_types import Choice, EffectNode, GameAction, Sequence, TargetQuery, ValueSource
 from ....models.enums import ActionType, Player, Zone
 from ..matcher import parse_target
 from .base import ParseContext, rule, _nfc
@@ -641,6 +641,98 @@ def _prevent_leave(ctx: ParseContext) -> Optional[GameAction]:
         target=TargetQuery(select_mode="SOURCE"),
         status=status,
         duration=_duration_of(t),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 複合除去保護: 「（このキャラは相手の効果で、）KOされず（、）レストにされない」
+#   除去保護(PREVENT_LEAVE) + レスト不可(PREVENT_REST) の複合（従来 OTHER）。
+#   「相手の効果で」KO されない場合は除去（場を離れる）保護＝status="LEAVE"。
+#   prevent_ko_and_rest を prevent_leave/rest_restrict より高優先で先に拾う。
+# ---------------------------------------------------------------------------
+@rule("prevent_ko_and_rest", priority=67)
+def _prevent_ko_and_rest(ctx: ParseContext) -> Optional[EffectNode]:
+    t = ctx.text
+    if not (re.search(_nfc(r"KOされ(?:ず|ない)"), t) and _nfc("レストにされない") in t):
+        return None
+    # 「相手の効果で」KO されない＝効果除去保護（LEAVE）。明示が無ければバトルKO保護。
+    ko_status = "LEAVE" if (_nfc("相手の効果") in t or _nfc("効果で") in t) else "BATTLE_KO"
+    prevent_ko = GameAction(
+        type=ActionType.PREVENT_LEAVE,
+        target=TargetQuery(select_mode="SOURCE"),
+        status=ko_status,
+        duration=_duration_of(t),
+        raw_text=t,
+    )
+    prevent_rest = GameAction(
+        type=ActionType.PREVENT_REST,
+        target=TargetQuery(select_mode="SOURCE"),
+        duration=_duration_of(t),
+        raw_text=t,
+    )
+    return Sequence(actions=[prevent_ko, prevent_rest])
+
+
+# ---------------------------------------------------------------------------
+# レスト不可保護: 「このキャラは相手の効果でレストにされない」（自身の静的保護, 従来 OTHER）。
+#   rest_restrict(「相手の…キャラはレストにできない」=相手キャラへの制限) とは別物で、
+#   こちらは自身(SOURCE)が相手効果でレストされないようにする保護。
+# ---------------------------------------------------------------------------
+@rule("prevent_rest_self", priority=66)
+def _prevent_rest_self(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("レストにされない") not in t:
+        return None
+    if not re.search(_nfc(r"この(カード|キャラ|リーダー)"), t):
+        return None
+    return GameAction(
+        type=ActionType.PREVENT_REST,
+        target=TargetQuery(select_mode="SOURCE"),
+        duration=_duration_of(t),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 効果ダメージ: 「相手に N ダメージを与える」「自分は N ダメージを受ける」
+#   → DEAL_DAMAGE。エンジンは対象リーダーのライフ上 N 枚を手札へ移し、
+#   ライフが尽きれば勝利（gamestate の DEAL_DAMAGE 実装）。従来 OTHER（不発）。
+#   「与えてもよい」は登場/サーチ系の任意効果と同様、選択 UI 未実装のため実行扱い。
+# ---------------------------------------------------------------------------
+@rule("deal_damage", priority=55)
+def _deal_damage(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    m = re.search(_nfc(r"(\d+)\s*ダメージを(与え|受け)"), t)
+    if not m:
+        return None
+    n = int(m.group(1))
+    # 「自分は／自分に…受ける／与える」は自分が被ダメージ、それ以外は相手。
+    is_self = m.group(2) == _nfc("受け") or _nfc("自分は") in t or _nfc("自分に") in t
+    player = Player.SELF if is_self else Player.OPPONENT
+    return GameAction(
+        type=ActionType.DEAL_DAMAGE,
+        target=TargetQuery(player=player),
+        value=ValueSource(base=n),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 相手デッキの覗き見: 「相手のデッキの上から N 枚を見る」（後続消費なしの純粋な公開）
+#   → LOOK + status="OPPONENT"。盤面は不変（並びも変えない）。look_deck(自分・TEMP移動)
+#   とは別経路。look_deck は「見て／公開し」(連用) を拾うため「見る」(終止) とは衝突しない。
+# ---------------------------------------------------------------------------
+@rule("look_opp_deck", priority=81)
+def _look_opp_deck(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    m = re.search(_nfc(r"相手のデッキの上から(\d+)枚(?:まで)?を見る"), t)
+    if not m:
+        return None
+    return GameAction(
+        type=ActionType.LOOK,
+        status="OPPONENT",
+        value=ValueSource(base=int(m.group(1))),
         raw_text=t,
     )
 
