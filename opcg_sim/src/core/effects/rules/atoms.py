@@ -23,6 +23,25 @@ def _first_int(text: str, default: int = 0) -> int:
     return int(nums[0]) if nums else default
 
 
+# 丸数字（①②… / ➀➁…）= コストとして「ドン!!を N 枚レストにする」の表記（NFC では非分解で残る）。
+_CIRCLED_DIGITS = {
+    "①": 1, "②": 2, "③": 3, "④": 4, "⑤": 5, "⑥": 6, "⑦": 7, "⑧": 8, "⑨": 9, "⑩": 10,
+    "➀": 1, "➁": 2, "➂": 3, "➃": 4, "➄": 5, "➅": 6, "➆": 7, "➇": 8, "➈": 9, "➉": 10,
+}
+
+
+# ---------------------------------------------------------------------------
+# 丸数字コスト: 「①：…」「➀：…」（コストエリアのドン!!を N 枚レストにする）→ REST_DON(N)。
+#   従来は丸数字単体が OTHER に落ちていた（OP05-032 / OP05-119 等）。コスト文脈の単体表記。
+# ---------------------------------------------------------------------------
+@rule("don_cost_circled", priority=91)
+def _don_cost_circled(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text.strip()
+    if t in _CIRCLED_DIGITS:
+        return GameAction(type=ActionType.REST_DON, value=ValueSource(base=_CIRCLED_DIGITS[t]), raw_text=ctx.text)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # ドロー: 「カードN枚を引く」
 # ---------------------------------------------------------------------------
@@ -55,7 +74,7 @@ def _ko(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     # 「KOする／できる」に加え、Sequence 分割で末尾が連用形「KOし」になる句も対象
     # （例:「相手の…をKOし、このカードを手札に加える」→ 前段「…をKOし」）。
-    if not re.search(_nfc(r"KO(する|できる)"), t) and not re.search(_nfc(r"KOし(?:[、。]|$)"), t.strip()):
+    if not re.search(_nfc(r"KO(する|できる|してもよい)"), t) and not re.search(_nfc(r"KOし(?:[、。]|$)"), t.strip()):
         return None
     tq = parse_target(t)
     if _nfc("まで") in t or re.search(r"\d+枚まで", t):
@@ -345,7 +364,9 @@ def _life_cards_to_trash(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ライフ") not in t or _nfc("トラッシュ") not in t:
         return None
-    if _nfc("表向き") not in t:
+    # 「ライフの表向きのカード…をトラッシュに置く」(life→trash) に限定する。
+    # 「トラッシュから…ライフの上に表向きで加える」(trash→life) の逆方向を誤検知しない。
+    if not re.search(_nfc(r"ライフの表向き"), t) or not re.search(_nfc(r"トラッシュに置"), t):
         return None
     tq = parse_target(t)
     tq.zone = Zone.LIFE
@@ -418,6 +439,27 @@ def _execute_event(ctx: ParseContext) -> Optional[GameAction]:
 #   「ライフの下／デッキへ…好きな順番で置く」等の移動系は別ルールが担当するため、
 #   ライフ内に留まる並べ替え（"デッキ" を含まない）に限定する。
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# ライフ→デッキ上: 「（自分の）ライフ（すべて）を見て、N枚を（自分の）デッキの上に置く」
+#   → MOVE_CARD(zone=LIFE, dest=DECK top)。隠しゾーン保護によりライフ上から N 枚を取得し
+#   デッキトップへ（カード保全）。後続の「ライフを好きな順番で置く」は order_life が担当。
+# ---------------------------------------------------------------------------
+@rule("life_to_deck_top", priority=76)
+def _life_to_deck_top(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"ライフ.*見て"), t) or not re.search(_nfc(r"デッキの上に置(く|き)"), t):
+        return None
+    m = re.search(_nfc(r"(\d+)枚を"), t)
+    n = int(m.group(1)) if m else 1
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=TargetQuery(zone=Zone.LIFE, player=Player.SELF, count=n),
+        destination=Zone.DECK,
+        dest_position="TOP",
+        raw_text=t,
+    )
+
+
 @rule("order_life", priority=77)
 def _order_life(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -504,15 +546,17 @@ def _life_to_hand(ctx: ParseContext) -> Optional[GameAction]:
 
 @rule("hand_to_life", priority=69)
 def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
-    """「（自分の）手札…を、ライフの上／下に加える」→ MOVE_CARD(dest=LIFE, dest_position=TOP/BOTTOM)。"""
+    """「（自分の）手札／トラッシュ…を、ライフの上／下に（表向きで）加える」
+    → MOVE_CARD(dest=LIFE, dest_position=TOP/BOTTOM)。「表向きで」修飾とトラッシュ源も許容。"""
     t = ctx.text
-    if _nfc("手札") not in t:
+    if _nfc("手札") not in t and _nfc("トラッシュ") not in t:
         return None
-    if _nfc("ライフの上に加える") not in t and _nfc("ライフの下に加える") not in t:
+    if not re.search(_nfc(r"ライフの(上|下)に(?:表向きで)?加える"), t):
         return None
     tq = parse_target(t)
-    tq.zone = Zone.HAND
-    dest_position = "TOP" if _nfc("ライフの上に加える") in t else "BOTTOM"
+    # 源ゾーン: 手札優先（「手札」明示があれば HAND）、無ければトラッシュ。
+    tq.zone = Zone.HAND if _nfc("手札") in t else Zone.TRASH
+    dest_position = "TOP" if _nfc("ライフの上") in t else "BOTTOM"
     return GameAction(
         type=ActionType.MOVE_CARD,
         target=tq,
@@ -613,6 +657,22 @@ def _don_set_active(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+# ---------------------------------------------------------------------------
+# ドン!!複合コストの前半断片: 「自分のドン‼N枚と」
+#   「自分のドン‼N枚とこのキャラ／このリーダーをレストにできる」というコストは、レガシー構造分解で
+#   「自分のドン‼N枚と」(断片) と「…をレストにできる」(REST self) に割れる。後半は rest_self_cost が
+#   拾うが、前半の断片は従来 OTHER。これを REST_DON（ドン!!を N 枚レスト）として補完する。
+#   「枚と」で終わる断片に限定し、効果文への誤爆を避ける（多くはコスト=ctx.is_cost）。
+# ---------------------------------------------------------------------------
+@rule("don_rest_cost_fragment", priority=76)
+def _don_rest_cost_fragment(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text.strip()
+    m = re.match(_nfc(r"^(?:自分の)?ドン[‼!]*\s*(\d+)枚と$"), t)
+    if not m:
+        return None
+    return GameAction(type=ActionType.REST_DON, value=ValueSource(base=int(m.group(1))), raw_text=ctx.text)
+
+
 @rule("don_set_rest", priority=74)
 def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分の）ドン!!N枚をレストにする/できる」→ REST_DON（アクティブ→レスト）。多くはコスト。"""
@@ -637,6 +697,20 @@ def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+# ---------------------------------------------------------------------------
+# 付与ドンをコストエリアへ: 「（自分の）付与されているドン‼（合計）N枚をコストエリアにレストで戻す」
+#   → MOVE_ATTACHED_DON。付与中のドン!!を N 枚外し、レスト状態でコストエリアへ戻す（多くはコスト）。
+# ---------------------------------------------------------------------------
+@rule("move_attached_don", priority=85)
+def _move_attached_don(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("付与") not in t or _nfc("ドン") not in t:
+        return None
+    if not re.search(_nfc(r"コストエリアに.*レスト"), t):
+        return None
+    return GameAction(type=ActionType.MOVE_ATTACHED_DON, value=ValueSource(base=_first_int(t, 1)), raw_text=t)
+
+
 @rule("don_return_deck", priority=83)
 def _don_return_deck(ctx: ParseContext) -> Optional[GameAction]:
     """「（場の）ドン!!…をドン!!デッキに戻す」→ RETURN_DON。
@@ -645,7 +719,7 @@ def _don_return_deck(ctx: ParseContext) -> Optional[GameAction]:
     「ドン!!デッキに戻す」表記のみを担う。
     """
     t = ctx.text
-    if _nfc("ドン") not in t or _nfc("戻す") not in t:
+    if _nfc("ドン") not in t or not re.search(_nfc(r"戻(す|して)"), t):
         return None
     if not re.search(_nfc(r"ドン(?:!!|‼)?デッキ"), t):
         return None
@@ -776,9 +850,41 @@ def _look_opp_deck(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# 自分デッキトップの公開: 「（自分の）デッキの上からN枚を公開する」（終止形・後続条件用）
+#   → LOOK（自分・TEMP へ移して公開）。後続の「公開したカードが…の場合」が
+#   REVEALED_CARD_TRAIT 条件で temp[0] を参照し、未消費 temp は解決完了時にデッキトップへ戻る。
+#   look_deck(「見て/公開し」連用) とは語尾で区別（「公開する」終止形を拾う）。
+# ---------------------------------------------------------------------------
+@rule("reveal_deck_top", priority=79)
+def _reveal_deck_top(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("相手のデッキ") in t:
+        return None  # 相手デッキは look_opp_deck が担当
+    m = re.search(_nfc(r"デッキの上から(\d+)枚(?:まで)?を公開する"), t)
+    if not m:
+        return None
+    return GameAction(type=ActionType.LOOK, value=ValueSource(base=int(m.group(1))), raw_text=t)
+
+
+# ---------------------------------------------------------------------------
 # アタック制限: 「（このターン中／次の…まで）アタックできない」
 #   継続効果として管理し、適切なタイミングで失効する（従来 OTHER）。
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# アタック対象変更: 「（選んだキャラ/このリーダー等）にアタックの対象を変更する／にする」
+#   → REDIRECT_ATTACK。進行中バトルの対象をコントローラー側の別キャラ/リーダーへ差し替える。
+#   ブロッカーの注釈文「アタックの対象をこのカードにできる」(にできる) は別処理なので除外。
+# ---------------------------------------------------------------------------
+@rule("redirect_attack", priority=58)
+def _redirect_attack(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"アタックの対象を.*(変更する|にする)"), t):
+        return None
+    if _nfc("このカードにできる") in t:
+        return None
+    return GameAction(type=ActionType.REDIRECT_ATTACK, target=parse_target(t), raw_text=t)
+
+
 @rule("attack_disable", priority=62)
 def _attack_disable(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -984,6 +1090,33 @@ def _search_to_hand(ctx: ParseContext) -> Optional[GameAction]:
         type=ActionType.MOVE_CARD,
         target=tq,
         destination=Zone.HAND,
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# サーチ結果をライフへ: 「（公開し、）カードM枚までを、ライフの上／下に（表向きで）加える」
+#   → MOVE_CARD(zone=TEMP, dest=LIFE)。直前の look_deck が候補を TEMP に置いている前提。
+#   明示ソース（手札/トラッシュ/デッキ）がある句は hand_to_life / life_recover が担当。
+# ---------------------------------------------------------------------------
+@rule("search_to_life", priority=53)
+def _search_to_life(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"ライフの(上|下)に(?:表向きで)?加える"), t):
+        return None
+    if any(_nfc(z) in t for z in ["手札", "トラッシュ", "デッキ"]):
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.TEMP
+    tq.player = Player.SELF
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    dest_position = "TOP" if _nfc("ライフの上") in t else "BOTTOM"
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=tq,
+        destination=Zone.LIFE,
+        dest_position=dest_position,
         raw_text=t,
     )
 
@@ -1199,7 +1332,7 @@ def _bounce(ctx: ParseContext) -> Optional[GameAction]:
     # 「手札に戻す」に加え、Sequence 分割で末尾が連用形「手札に戻し」になる句も対象
     # （例:「相手の…を持ち主の手札に戻し、このカードを手札に加える」→ 前段「…手札に戻し」）。
     if not re.search(_nfc(r"手札に戻す(ことができる)?"), t) \
-            and not re.search(_nfc(r"手札に戻し(?:[、。]|$)"), t.strip()):
+            and not re.search(_nfc(r"手札に戻し(?:[、。]|てもよい|$)"), t.strip()):
         return None
     if _nfc("手札から") in t:
         return None  # 「手札から何かして手札に戻す」等の誤検知を避ける
@@ -1290,7 +1423,9 @@ def _play_card_from_zone(ctx: ParseContext) -> Optional[GameAction]:
     レスト登場（レストで登場させる）は status="RESTED" をエンジンに伝える。
     """
     t = ctx.text
-    if not re.search(_nfc(r"登場させ(る|てもよい|ることができる)"), t):
+    # 「登場させる/させてもよい/させることができる」に加え、短縮形「登場できる」も拾う
+    # （例: OP05-111「手札から「コトリ」1枚を、登場できる」）。
+    if not re.search(_nfc(r"登場(させ(る|てもよい|ることができる)|できる)"), t):
         return None
     if re.search(_nfc(r"この(カード|キャラ|リーダー)を"), t):
         return None  # play_self が担当
@@ -1495,7 +1630,8 @@ def _remaining_trash(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("残り") not in t:
         return None
-    if _nfc("トラッシュ") not in t or _nfc("置く") not in t:
+    # 「置く」(終止) と Sequence 分割後の連用形「置き」(例:「残りをトラッシュに置き、…捨てる」) を拾う。
+    if _nfc("トラッシュ") not in t or not re.search(_nfc(r"置(く|き)"), t):
         return None
     return GameAction(
         type=ActionType.TRASH,
@@ -1518,12 +1654,11 @@ def _hand_to_deck(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("手札") not in t:
         return None
-    if _nfc("デッキ") not in t or _nfc("置く") not in t:
+    # 「デッキの上/下に置く」に加え、「（手札すべてを）デッキに戻す/戻し」(シャッフル前提) も拾う。
+    if not re.search(_nfc(r"デッキの(上か下|上|下)に置(く|い)"), t) and not re.search(_nfc(r"デッキに戻"), t):
         return None
-    # 「ライフ」「トラッシュ」を含む場合は別ルールへ委ねる
-    if _nfc("ライフ") in t or _nfc("トラッシュ") in t:
-        return None
-    if not re.search(_nfc(r"デッキの(上か下|上|下)に置く"), t):
+    # 「ライフ」「トラッシュ」「ドン」を含む場合は別ルールへ委ねる
+    if _nfc("ライフ") in t or _nfc("トラッシュ") in t or _nfc("ドン") in t:
         return None
     tq = parse_target(t)
     tq.zone = Zone.HAND
@@ -1655,6 +1790,32 @@ def _freeze_target(ctx: ParseContext) -> Optional[GameAction]:
 #   "CANNOT_REST" を立て、declare_attack / has_blocker でこのフラグを弾く。
 #   freeze_target（アクティブにならない）とは逆向きのレスト制限。
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# レスト登場 PASSIVE: 「（自分の）キャラ（カード）はレストで登場する」
+#   → RESTRICTION(status="RESTED_PLAY")。自分のキャラ登場時にレスト状態にする PASSIVE マーカー。
+#   gamestate の play_card_action / PLAY_CARD 効果が走査して is_rest=True にする。
+# ---------------------------------------------------------------------------
+@rule("rested_play_passive", priority=67)
+def _rested_play_passive(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"キャラ(?:カード)?はレストで登場する"), t):
+        return None
+    return GameAction(type=ActionType.RESTRICTION, status="RESTED_PLAY", raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# 登場制限 PASSIVE: 「手札のこのカードは、効果で登場できない」
+#   → RESTRICTION(status="NO_EFFECT_PLAY")。効果による手札からの登場対象から自身を除外する
+#   PASSIVE マーカー。gamestate の PLAY_CARD（効果・手札源）が走査して登場をスキップする。
+# ---------------------------------------------------------------------------
+@rule("no_effect_play_passive", priority=67)
+def _no_effect_play_passive(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"効果で登場できない"), t):
+        return None
+    return GameAction(type=ActionType.RESTRICTION, status="NO_EFFECT_PLAY", raw_text=t)
+
+
 @rule("rest_restrict", priority=66)
 def _rest_restrict(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -1703,6 +1864,9 @@ def _negate_effect(ctx: ParseContext) -> Optional[GameAction]:
 @rule("self_effect_disabled", priority=64)
 def _self_effect_disabled(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
+    # 「効果が無効になる」(自動詞・自身の効果が無効化される)。
+    # 「（自分の/相手の）【登場時】効果は無効になる」等の "は" + 範囲修飾付きは意味が
+    # 異なり（特定トリガーのみ無効・対象が相手）SOURCE 全無効では不正確なため対象外。
     if not re.search(_nfc(r"効果が無効になる"), t):
         return None
     return GameAction(
@@ -1735,6 +1899,21 @@ def _win_on_deckout(ctx: ParseContext) -> Optional[GameAction]:
         status="REPLACE_DECKOUT_LOSS",
         raw_text=t,
     )
+
+
+# ---------------------------------------------------------------------------
+# 勝利宣言: 「（自分は）ゲームに勝利する」→ VICTORY（即時勝利）。従来 OTHER。
+#   「敗北する代わりに勝利」(デッキアウト置換) は win_on_deckout(priority 95) が先に拾うため、
+#   ここは無条件/条件付きの能動勝利のみ（status なし → エンジンが即 winner 設定）。
+# ---------------------------------------------------------------------------
+@rule("declare_victory", priority=22)
+def _declare_victory(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("ゲームに勝利") not in t:
+        return None
+    if _nfc("代わりに") in t:  # デッキアウト置換は win_on_deckout が担当
+        return None
+    return GameAction(type=ActionType.VICTORY, raw_text=t)
 
 
 # ---------------------------------------------------------------------------

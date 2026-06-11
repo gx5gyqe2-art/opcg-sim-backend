@@ -1662,3 +1662,119 @@ if __name__ == "__main__":
             traceback.print_exc()
     print(f"\n=== engine: {passed} passed, {failed} failed / {len(tests)} ===")
     raise SystemExit(1 if failed else 0)
+
+
+def test_redirect_attack_changes_battle_target():
+    """REDIRECT_ATTACK: 進行中バトルの対象をコントローラー側のキャラへ差し替える。"""
+    gm, p1, p2 = make_game()
+    attacker = make_instance(make_master(card_id="A-1", name="Attacker", type=CardType.CHARACTER), owner="P2")
+    redirect = make_instance(make_master(card_id="R-1", name="Redirect", type=CardType.CHARACTER), owner="P1")
+    p2.field.append(attacker)
+    p1.field.append(redirect)
+    # 進行中バトル: P2 の attacker が P1 リーダーを攻撃中
+    gm.active_battle = {"attacker": attacker, "target": p1.leader,
+                        "attacker_owner": p2, "target_owner": p1, "counter_buff": 0}
+    ok = gm.apply_action_to_engine(p1, action(ActionType.REDIRECT_ATTACK), [redirect], 0)
+    assert ok
+    assert gm.active_battle["target"] is redirect
+    assert gm.active_battle["target_owner"] is p1
+
+
+def test_redirect_attack_no_battle_is_noop():
+    """進行中バトルが無ければ REDIRECT_ATTACK は安全に no-op（落ちない）。"""
+    gm, p1, _ = make_game()
+    redirect = make_instance(make_master(card_id="R-2", name="Redirect", type=CardType.CHARACTER), owner="P1")
+    p1.field.append(redirect)
+    assert gm.active_battle is None
+    ok = gm.apply_action_to_engine(p1, action(ActionType.REDIRECT_ATTACK), [redirect], 0)
+    assert ok
+    assert gm.active_battle is None
+
+
+def test_move_attached_don_to_cost_area():
+    """MOVE_ATTACHED_DON: 付与ドンN枚を外しレストでコストエリア(don_rested)へ。attached_don も減算。"""
+    gm, p1, _ = make_game()
+    char = make_instance(make_master(card_id="C-1", name="Char", type=CardType.CHARACTER), owner="P1")
+    char.attached_don = 2
+    p1.field.append(char)
+    # 付与ドン2枚を用意（don_deck から移し、attached_to を char に向ける）
+    for _ in range(2):
+        d = p1.don_deck.pop(0)
+        d.attached_to = char.uuid
+        p1.don_attached_cards.append(d)
+    assert len(p1.don_attached_cards) == 2 and len(p1.don_rested) == 0
+    ok = gm.apply_action_to_engine(p1, action(ActionType.MOVE_ATTACHED_DON, value=2), [], 2)
+    assert ok
+    assert len(p1.don_attached_cards) == 0
+    assert len(p1.don_rested) == 2
+    assert all(d.is_rest and d.attached_to is None for d in p1.don_rested)
+    assert char.attached_don == 0
+
+
+def test_rested_play_passive_makes_chars_enter_rested():
+    """「自分のキャラはレストで登場する」PASSIVE: 効果(PLAY_CARD)で出たキャラがレスト状態になる。"""
+    from opcg_sim.src.models.effect_types import Ability, GameAction
+    gm, p1, _ = make_game()
+    # リーダーに RESTED_PLAY の PASSIVE を付与
+    passive = Ability(trigger=TriggerType.PASSIVE,
+                      effect=GameAction(type=ActionType.RESTRICTION, status="RESTED_PLAY"))
+    p1.leader.master = make_master(card_id="L-RP", name="RestedLeader", type=CardType.LEADER,
+                                   life=5, abilities=(passive,))
+    assert gm._has_rested_play(p1) is True
+
+    # 効果で手札のキャラを登場 → owner は所在(手札=p1)から決まり、PASSIVE でレスト化される。
+    char = make_instance(make_master(card_id="C-RP", name="Char", type=CardType.CHARACTER), owner="P1")
+    p1.hand.append(char)
+    ok = gm.apply_action_to_engine(p1, action(ActionType.PLAY_CARD, destination=Zone.FIELD), [char], 0)
+    assert ok
+    assert char in p1.field
+    assert char.is_rest is True
+
+    # PASSIVE が無い player では通常どおりアクティブで登場する。
+    gm2, q1, _ = make_game()
+    assert gm2._has_rested_play(q1) is False
+    char2 = make_instance(make_master(card_id="C-N", name="Char2", type=CardType.CHARACTER), owner="P1")
+    q1.hand.append(char2)
+    gm2.apply_action_to_engine(q1, action(ActionType.PLAY_CARD, destination=Zone.FIELD), [char2], 0)
+    assert char2 in q1.field and char2.is_rest is False
+
+
+def test_no_effect_play_passive_blocks_effect_play():
+    """「手札のこのカードは効果で登場できない」PASSIVE: 効果(PLAY_CARD,手札源)で登場しない。"""
+    from opcg_sim.src.models.effect_types import Ability, GameAction
+    gm, p1, _ = make_game()
+    passive = Ability(trigger=TriggerType.PASSIVE,
+                      effect=GameAction(type=ActionType.RESTRICTION, status="NO_EFFECT_PLAY"))
+    blocked = make_instance(make_master(card_id="C-NB", name="Blocked", type=CardType.CHARACTER,
+                                        abilities=(passive,)), owner="P1")
+    p1.hand.append(blocked)
+    ok = gm.apply_action_to_engine(p1, action(ActionType.PLAY_CARD, destination=Zone.FIELD), [blocked], 0)
+    assert ok  # アクション自体は成功扱い（対象がスキップされるだけ）
+    assert blocked not in p1.field
+    assert blocked in p1.hand  # 手札に残る
+
+    # 制限の無いキャラは通常どおり効果で登場する。
+    normal = make_instance(make_master(card_id="C-NN", name="Normal", type=CardType.CHARACTER), owner="P1")
+    p1.hand.append(normal)
+    gm.apply_action_to_engine(p1, action(ActionType.PLAY_CARD, destination=Zone.FIELD), [normal], 0)
+    assert normal in p1.field
+
+
+def test_life_to_deck_top_moves_top_life_card():
+    """LIFE→DECK top: ライフ上から1枚をデッキトップへ（カード保全・隠しゾーン保護で上から取得）。"""
+    from opcg_sim.src.models.effect_types import TargetQuery
+    gm, p1, _ = make_game()
+    life_cards = [make_instance(make_master(card_id=f"LF-{i}"), owner="P1") for i in range(3)]
+    p1.life.extend(life_cards)
+    p1.deck.append(make_instance(make_master(card_id="DK-0"), owner="P1"))
+    top_life = p1.life[0]
+    n_life, n_deck = len(p1.life), len(p1.deck)
+    act = action(ActionType.MOVE_CARD, destination=Zone.DECK,
+                 target=TargetQuery(zone=Zone.LIFE, player=Player.SELF, count=1))
+    act.dest_position = "TOP"
+    ok = gm.apply_action_to_engine(p1, act, [top_life], 0)
+    assert ok
+    assert len(p1.life) == n_life - 1
+    assert len(p1.deck) == n_deck + 1
+    assert p1.deck[0] is top_life      # デッキトップへ
+    assert top_life not in p1.life     # ライフから消えた（カード保全, 計は不変）

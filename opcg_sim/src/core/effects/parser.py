@@ -173,9 +173,13 @@ class EffectParser:
             # コスト区切りではないため、タグ内部をマスクした上で判定する。
             masked = re.sub(r'【[^】]*】', lambda m: '〇' * len(m.group(0)), clean_text)
             colon = _nfc("：") if _nfc("：") in masked else (_nfc(":") if _nfc(":") in masked else None)
+            cost_gate_cond = None
             if colon:
                 idx = masked.index(colon)
-                cost_node = self._parse_cost_node(clean_text[:idx])
+                cost_text = clean_text[:idx]
+                # コスト節先頭のゲート条件「〜の場合、」を ability 条件へ引き上げる（OP11-103 等）。
+                cost_gate_cond, cost_text = self._extract_leading_condition(cost_text)
+                cost_node = self._parse_cost_node(cost_text)
                 effect_text = clean_text[idx + 1:]
 
             # ドン!!コストタグを cost_node に統合
@@ -199,6 +203,9 @@ class EffectParser:
 
             # 先頭のゲート条件（「〜の場合、」）を ability.condition に引き上げる
             final_condition = turn_limit_cond
+            if cost_gate_cond is not None:  # コスト節から引き上げた条件
+                final_condition = cost_gate_cond if final_condition is None else Condition(
+                    type=ConditionType.AND, args=[final_condition, cost_gate_cond])
             if isinstance(effect_node, Branch) and effect_node.if_false is None and effect_node.condition is not None:
                 if final_condition is None:
                     final_condition = effect_node.condition
@@ -249,6 +256,22 @@ class EffectParser:
         if _nfc("場を離れる") not in norm_text and _nfc("KOされ") not in norm_text:
             return None
         return "BATTLE_KO" if _nfc("バトル") in norm_text else "LEAVE"
+
+    def _extract_leading_condition(self, text: str):
+        """テキスト先頭のゲート条件「〜の場合、/〜なら、」を (Condition, 残りテキスト) に分離する。
+
+        条件が解釈できない（GENERIC）場合は引き上げず (None, 元テキスト) を返す（誤抽出防止）。
+        コスト節先頭の条件（例:「自分のリーダーが「しらほし」の場合、…できる」）を
+        ability.condition へ引き上げるために使う。
+        """
+        norm = _nfc(text)
+        m = re.match(_nfc(r'^(.+?)(?:の場合|なら)、(.+)$'), norm, re.DOTALL)
+        if not m:
+            return None, text
+        cond = self._parse_condition_obj(m.group(1))
+        if cond is None or cond.type == ConditionType.GENERIC:
+            return None, text
+        return cond, m.group(2)
 
     def _parse_cost_node(self, cost_text: str) -> Optional[EffectNode]:
         """
@@ -381,6 +404,12 @@ class EffectParser:
         suruka = self._parse_suruka_choice(norm_text, is_cost)
         if suruka is not None:
             return suruka
+
+        # 共有対象の二択「<X>を、<A>か<B>」（か の後に読点なし）: 1つの対象 X に対する
+        # 2アクションの択一（例:「…キャラ1枚までを、ライフの上に表向きで加えるか登場させる」）。
+        shared = self._parse_shared_target_choice(norm_text, is_cost)
+        if shared is not None:
+            return shared
 
         # 連用形「引き、」を「引く、」に正規化してから分割
         norm_text = re.sub(_nfc(r'引き、'), _nfc('引く、'), norm_text)
@@ -914,6 +943,40 @@ class EffectParser:
             options=[opt_a, opt_b],
             option_labels=[left, right],
             player=chooser,
+        )
+
+    def _parse_shared_target_choice(self, text: str, is_cost: bool) -> Optional[EffectNode]:
+        """「<X>を、<A>か<B>」形式の共有対象二択を Choice に変換する（無ければ None）。
+
+        対象 X を両オプションの先頭に補って解釈する点が _parse_suruka_choice（別対象）と異なる。
+        「か」の後に読点が無い（"加えるか登場させる"）ことで読点付き二択(「するか、」)と区別する。
+        左右がともに実行系アクションに解釈できる場合のみ Choice 化する（過検知防止）。
+        """
+        norm = _nfc(text)
+        if _nfc("以下から") in norm or _nfc("か、") in norm:
+            return None  # モーダル選択 / 読点付き二択は別経路
+        sep = norm.rfind(_nfc("を、"))
+        if sep < 0:
+            return None
+        target_part = norm[:sep]
+        actions = norm[sep + len(_nfc("を、")):]
+        # アクション部の動詞終止形(u段かな)直後の「か」(読点なし)を境界にする。
+        m = re.search(_nfc(r'[るくすつぶむうぐ]か(?![、。])'), actions)
+        if not m:
+            return None
+        a = actions[:m.start() + 1].strip()
+        b = actions[m.end():].strip().rstrip(_nfc('。')).strip()
+        if not a or not b or not target_part:
+            return None
+        opt_a = self._parse_to_node(f"{target_part}を、{a}", is_cost)
+        opt_b = self._parse_to_node(f"{target_part}を、{b}", is_cost)
+        if not (self._node_has_real_action(opt_a) and self._node_has_real_action(opt_b)):
+            return None
+        return Choice(
+            message=_nfc("効果を選択してください"),
+            options=[opt_a, opt_b],
+            option_labels=[a, b],
+            player=Player.SELF,
         )
 
     def _extract_options(self, text: str) -> List[str]:

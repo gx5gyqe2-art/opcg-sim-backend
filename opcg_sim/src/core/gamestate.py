@@ -746,11 +746,39 @@ class GameManager:
             self.move_card(card, Zone.TRASH, player)
         else:
             self.move_card(card, Zone.FIELD, player); card.attached_don = 0; card.is_newly_played = True
+            if self._has_rested_play(player):  # 「自分のキャラはレストで登場する」PASSIVE
+                card.is_rest = True
             if not card.ability_disabled:
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.ON_PLAY:
                         self.resolve_ability(player, ability, source_card=card)
             self._apply_passive_effects(player)
+
+    def _has_rested_play(self, player: Player) -> bool:
+        """player が「自分のキャラはレストで登場する」PASSIVE を持つか（RESTED_PLAY マーカー）。"""
+        cards = ([player.leader] if player.leader else []) + list(player.field)
+        for c in cards:
+            if not c or getattr(c, "ability_disabled", False) or not getattr(c, "master", None):
+                continue
+            for ab in c.master.abilities:
+                if ab.trigger != TriggerType.PASSIVE:
+                    continue
+                act = self._find_action(ab.effect, ActionType.RESTRICTION)
+                if act is not None and getattr(act, "status", None) == "RESTED_PLAY":
+                    return True
+        return False
+
+    def _blocks_effect_play(self, card: CardInstance) -> bool:
+        """card が「手札のこのカードは効果で登場できない」PASSIVE を持つか（NO_EFFECT_PLAY）。"""
+        if not card or not getattr(card, "master", None):
+            return False
+        for ab in card.master.abilities:
+            if ab.trigger != TriggerType.PASSIVE:
+                continue
+            act = self._find_action(ab.effect, ActionType.RESTRICTION)
+            if act is not None and getattr(act, "status", None) == "NO_EFFECT_PLAY":
+                return True
+        return False
 
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
@@ -958,6 +986,49 @@ class GameManager:
                 target_player.temp_zone.append(target_player.life.pop(0))
                 moved += 1
             log_event("INFO", "game.action_look_life", f"{target_player.name} revealed {moved} life card(s)", player=player.name)
+            return True
+
+        if act_name == "MOVE_ATTACHED_DON":
+            # 「付与されているドン‼N枚をコストエリアにレストで戻す」: 付与中のドンを N 枚外し、
+            # レスト状態で don_rested（コストエリア）へ。付与先キャラの attached_don も減算する。
+            n = value if value and value > 0 else 1
+            moved = 0
+            for don in list(player.don_attached_cards):
+                if moved >= n:
+                    break
+                tgt_uuid = getattr(don, "attached_to", None)
+                player.don_attached_cards.remove(don)
+                don.attached_to = None
+                don.is_rest = True
+                player.don_rested.append(don)
+                if tgt_uuid:
+                    tgt = next((c for c in ([player.leader] + player.field) if c and c.uuid == tgt_uuid), None)
+                    if tgt is not None and getattr(tgt, "attached_don", 0) > 0:
+                        tgt.attached_don -= 1
+                moved += 1
+            log_event("INFO", "game.move_attached_don", f"{player.name} returned {moved} attached DON!! to cost area", player=player.name)
+            # コストとして使われるため、要求枚数を戻せたかを成否で返す（付与ドン不足なら不成立）。
+            return moved >= n
+
+        if act_name == "REDIRECT_ATTACK":
+            # 「（選んだキャラ/このリーダー等）にアタックの対象を変更する」: 進行中バトルの
+            # 対象を差し替える。targets[0] が新しい対象（多くはコントローラー側のキャラ/リーダー）。
+            if self.active_battle and targets:
+                new_target = targets[0]
+                self.active_battle["target"] = new_target
+                self.active_battle["target_owner"] = self.p1 if self.p1.name == new_target.owner_id else self.p2
+                log_event("INFO", "game.redirect_attack",
+                          f"Attack redirected to {new_target.master.name}", player=player.name)
+            return True
+
+        if act_name == "VICTORY":
+            # 「（自分は）ゲームに勝利する」: 能動勝利。即座に winner を設定する。
+            # status="REPLACE_DECKOUT_LOSS" はデッキアウト敗北の置換マーカー(PASSIVE)で、
+            # 直接実行されない（_has_deckout_win_replace で走査）。万一実行された場合は無視。
+            if getattr(action, "status", None) == "REPLACE_DECKOUT_LOSS":
+                return True
+            self.winner = player.name
+            log_event("INFO", "game.victory", f"{player.name} wins (effect)", player=player.name)
             return True
 
         if act_name == "ORDER_LIFE":
@@ -1200,10 +1271,16 @@ class GameManager:
                             if hasattr(target, 'attached_to'): target.attached_to = None
                 success = True
             elif act_name == "PLAY_CARD":
+                # 「手札のこのカードは効果で登場できない」: 手札源かつ当該 PASSIVE を持つ対象は
+                # 効果による登場をスキップする（NO_EFFECT_PLAY）。
+                if source_list is getattr(owner, "hand", None) and self._blocks_effect_play(target):
+                    log_event("INFO", "game.play_blocked", f"{target.master.name} cannot be played by effect", player=owner.name)
+                    continue
                 self.move_card(target, Zone.FIELD, owner)
                 target.is_newly_played = True
                 # 「レストで登場させる」: フィールドに出た瞬間レスト状態にする。
-                if getattr(action, "status", None) == "RESTED":
+                # 効果の明示 RESTED、または owner の「キャラはレストで登場する」PASSIVE のいずれか。
+                if getattr(action, "status", None) == "RESTED" or self._has_rested_play(owner):
                     target.is_rest = True
                 if not target.ability_disabled:
                     for ability in target.master.abilities:

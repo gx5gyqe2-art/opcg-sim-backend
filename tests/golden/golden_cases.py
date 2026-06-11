@@ -1904,4 +1904,170 @@ CASES = [
             ]}}
         ],
     },
+    # ----- ドン!!複合コスト「自分のドン‼N枚と…をレストにできる」 ----------
+    # コスト前半の断片「自分のドン‼N枚と」を REST_DON 化（従来 OTHER）。
+    {
+        "id": "don_and_rest_self_cost",
+        "text": "【起動メイン】自分のドン‼1枚とこのキャラをレストにできる：カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {"kind": "seq", "actions": [
+                    {"kind": "action", "type": "REST_DON", "value": 1},
+                    {"kind": "action", "type": "REST", "target": {"ref_id": "self"}},
+                ]},
+                "effect": {"kind": "action", "type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 勝利宣言「自分はゲームに勝利する」→ VICTORY（即時勝利） --------
+    {
+        "id": "declare_victory",
+        "text": "【メイン】自分はゲームに勝利する。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "VICTORY", "status": None}}
+        ],
+    },
+    # ----- 手札全戻し「自分の手札すべてをデッキに戻し、シャッフル」 --------
+    {
+        "id": "hand_all_to_deck",
+        "text": "【登場時】自分の手札すべてをデッキに戻し、デッキをシャッフルする。",
+        "expect": [
+            {"effect": {"kind": "seq", "actions": [
+                {"kind": "action", "type": "DECK_BOTTOM", "target": {"zone": "HAND", "player": "SELF"}},
+                {"kind": "action", "type": "SHUFFLE"},
+            ]}}
+        ],
+    },
+    # ----- 活用形/「てもよい」の取りこぼし補完 ----------------------------
+    # bounce: 「…手札に戻してもよい」（任意形）
+    {
+        "id": "bounce_optional_form",
+        "text": "【登場時】相手のコスト5以下のキャラ1枚までを、持ち主の手札に戻してもよい。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "BOUNCE", "target": {"player": "OPPONENT", "is_up_to": True}}}
+        ],
+    },
+    # hand→デッキの下: 「…デッキの下に置いてもよい」（任意・並び替え）
+    {
+        "id": "hand_to_deck_bottom_optional",
+        "text": "【登場時】自分の手札すべてを好きな順番でデッキの下に置いてもよい。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "DECK_BOTTOM", "target": {"zone": "HAND", "player": "SELF"}}}
+        ],
+    },
+    # ドン!!デッキ返却: 「相手は…ドン‼1枚をドン‼デッキに戻してもよい」
+    {
+        "id": "don_return_deck_optional",
+        "text": "相手は自身のアクティブのドン‼1枚をドン‼デッキに戻してもよい。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "RETURN_DON", "value": 1, "status": "OPPONENT"}}
+        ],
+    },
+    # ----- 「任意の枚数」可変選択（is_up_to + 大きめ count で 0..N 選択） ----
+    {
+        "id": "ko_any_number_optional",
+        "text": "【メイン】自分のコスト2以下の特徴《スリラーバーク海賊団》を持つキャラを任意の枚数KOしてもよい。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "KO",
+                        "target": {"player": "SELF", "is_up_to": True}}}
+        ],
+    },
+    {
+        "id": "bounce_any_number_optional",
+        "text": "【カウンター】自分の場のキャラを任意の枚数手札に戻してもよい。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "BOUNCE",
+                        "target": {"player": "SELF", "is_up_to": True}}}
+        ],
+    },
+    # ----- 自分デッキトップの公開（条件評価用, LOOK で TEMP へ→reclaim） --------
+    {
+        "id": "reveal_self_deck_top",
+        "text": "【登場時】自分のデッキの上から1枚を公開する。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "LOOK", "value": 1, "status": None}}
+        ],
+    },
+    # ----- コスト節先頭の条件を ability.condition へ引き上げ ----------------
+    {
+        "id": "cost_prefix_condition_lifted",
+        "text": "【起動メイン】自分のリーダーが「しらほし」の場合、このキャラをレストにできる：相手のコスト3以下のキャラ1枚までを、KOする。",
+        "expect": [
+            {"trigger": "ACTIVATE_MAIN",
+             "condition": {"type": "LEADER_NAME"},
+             "cost": {"kind": "action", "type": "REST", "target": {"ref_id": "self"}},
+             "effect": {"kind": "action", "type": "KO"}}
+        ],
+    },
+    # ----- 丸数字コスト（①＝ドン1枚レスト） --------------------------------
+    {
+        "id": "don_cost_circled_one",
+        "text": "【起動メイン】①：このキャラをアクティブにする。",
+        "expect": [
+            {"trigger": "ACTIVATE_MAIN",
+             "cost": {"kind": "action", "type": "REST_DON", "value": 1}}
+        ],
+    },
+    # ----- ライフを見て1枚をデッキ上へ（LIFE→DECK top, ST13-004 前段） --------
+    {
+        "id": "life_view_to_deck_top",
+        "text": "自分のライフすべてを見て、1枚を自分のデッキの上に置く。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "MOVE_CARD", "destination": "DECK",
+                        "dest_position": "TOP", "target": {"zone": "LIFE", "player": "SELF", "count": 1}}}
+        ],
+    },
+    # ----- サーチ結果をライフへ（TEMP→LIFE, look_deck の後段） --------------
+    {
+        "id": "search_temp_to_life",
+        "text": "カード1枚までを、ライフの上に加える。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "MOVE_CARD", "destination": "LIFE",
+                        "dest_position": "TOP", "target": {"zone": "TEMP", "is_up_to": True}}}
+        ],
+    },
+    # ----- 登場制限 PASSIVE（手札のこのカードは効果で登場できない） ----------
+    {
+        "id": "no_effect_play_passive",
+        "text": "手札のこのカードは、効果で登場できない。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "RESTRICTION", "status": "NO_EFFECT_PLAY"}}
+        ],
+    },
+    # ----- レスト登場 PASSIVE（自分のキャラはレストで登場する） -------------
+    {
+        "id": "rested_play_passive",
+        "text": "自分のキャラカードはレストで登場する。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "RESTRICTION", "status": "RESTED_PLAY"}}
+        ],
+    },
+    # ----- 付与ドンをコストエリアへ（MOVE_ATTACHED_DON） ------------------
+    {
+        "id": "move_attached_don_to_cost",
+        "text": "自分の付与されているドン‼合計2枚をコストエリアにレストで戻すことができる。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "MOVE_ATTACHED_DON", "value": 2}}
+        ],
+    },
+    # ----- アタック対象変更（REDIRECT_ATTACK） ----------------------------
+    {
+        "id": "redirect_attack_selected",
+        "text": "選んだキャラにアタックの対象を変更する。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "REDIRECT_ATTACK"}}
+        ],
+    },
+    # ----- 共有対象の二択「Xを、AかB」（加えるか登場させる）-------------------
+    {
+        "id": "shared_target_choice_life_or_play",
+        "text": "【登場時】自分のトラッシュからコスト4以下の特徴《スリラーバーク海賊団》を持つキャラカード1枚までを、ライフの上に表向きで加えるか登場させる。",
+        "expect": [
+            {"effect": {"kind": "choice", "options": [
+                {"kind": "action", "type": "MOVE_CARD", "destination": "LIFE"},
+                {"kind": "action", "type": "PLAY_CARD"},
+            ]}}
+        ],
+    },
 ]
