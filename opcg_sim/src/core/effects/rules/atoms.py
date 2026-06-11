@@ -86,6 +86,58 @@ def _draw(ctx: ParseContext) -> Optional[GameAction]:
 # ---------------------------------------------------------------------------
 # KO: 「（対象）をKOする」
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# 選択グループ分配（§7-1）: 「<対象>N枚(まで)を選び、(…)M枚を<A>(、)残りを<B>」
+#   N>M の選択集合を1度だけ選び、先頭 M 枚に A を、残りに B を適用する。
+#   本ルールは「選び、…M枚を<A>」までを SELECT + A(グループ先頭 M) に変換する。
+#   後続の「残りを<B>」は既存の REMAINING 句が拾い、resolver がグループの残余を参照する。
+# ---------------------------------------------------------------------------
+_SEL_GROUP_ID = "_sel_group"
+
+
+def _distribute_apply(apply_text: str, count: int, full_text: str,
+                      select_mode: str, ref_id: Optional[str]) -> Optional[GameAction]:
+    """分配の片側アクション（パワー±N=BUFF / KO）を、グループ参照対象で構築する。"""
+    tq = TargetQuery(select_mode=select_mode, ref_id=ref_id, count=count)
+    mp = re.search(_nfc(rf"パワー({_SIGN}[\d０-９]+)"), apply_text)
+    if mp:
+        return GameAction(type=ActionType.BUFF, target=tq,
+                          value=ValueSource(base=_to_int(mp.group(1))),
+                          duration=_duration_of(full_text), raw_text=apply_text)
+    if re.search(_nfc(r"KO(する|し|できる)"), apply_text):
+        return GameAction(type=ActionType.KO, target=tq, raw_text=apply_text)
+    if re.search(_nfc(r"手札に(戻す|加える)"), apply_text):
+        return GameAction(type=ActionType.BOUNCE, target=tq, raw_text=apply_text)
+    return None
+
+
+@rule("select_distribute", priority=93)
+def _select_distribute(ctx: ParseContext) -> Optional[EffectNode]:
+    t = ctx.text
+    m_sel = re.search(_nfc(r"(.+?)([\d０-９]+)枚(まで)?を選び[、,]"), t)
+    if not m_sel:
+        return None
+    after = t[m_sel.end():]
+    m_app = re.search(_nfc(r"([\d０-９]+)枚を(.+)"), after)
+    if not m_app:
+        return None
+    sel_n = _to_int(m_sel.group(2))
+    apply_m = _to_int(m_app.group(1))
+    # 真の分配（選択数 > 適用数）のみを扱う。N==M は通常の単一アクション。
+    if sel_n <= apply_m or apply_m < 1:
+        return None
+    apply_action = _distribute_apply(
+        m_app.group(2), apply_m, t, select_mode="GROUP_FIRST", ref_id=_SEL_GROUP_ID)
+    if apply_action is None:
+        return None
+    sel_tq = parse_target(m_sel.group(1))
+    sel_tq.count = sel_n
+    sel_tq.is_up_to = bool(m_sel.group(3))
+    sel_tq.save_id = _SEL_GROUP_ID
+    select_action = GameAction(type=ActionType.SELECT, target=sel_tq, raw_text=t)
+    return Sequence(actions=[select_action, apply_action])
+
+
 @rule("ko", priority=70)
 def _ko(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text

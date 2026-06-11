@@ -2291,6 +2291,29 @@ def test_delayed_turn_end_action_defers_then_fires():
     assert gm.pending_end_of_turn == []
 
 
+def test_select_group_distribution_field():
+    """§7-1 選択グループ分配: 「2枚を選び、1枚を-3000、残りを-2000」が
+    選択集合の先頭1枚に -3000、残りに -2000 を適用する（OP08-118 系）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    gm.turn_player, gm.opponent = p1, p2
+    gm.turn_count = 2
+    e1 = make_instance(make_master(card_id="E1", name="敵1", power=5000), owner="P2")
+    e2 = make_instance(make_master(card_id="E2", name="敵2", power=5000), owner="P2")
+    p2.field += [e1, e2]
+    src = make_instance(make_master(card_id="SD", name="分配"), owner="P1")
+    p1.field.append(src)
+    ab = EffectParserV2().parse_card_text(
+        "【登場時】相手のキャラ2枚までを選び、次の相手のターン終了時まで、"
+        "1枚をパワー-3000し、残りをパワー-2000。")[0]
+    gm.resolve_ability(p1, ab, source_card=src)
+    # 2枚を明示選択して分配を完走させる
+    assert gm.active_interaction and gm.active_interaction.get("action_type") == "SELECT_TARGET"
+    gm.resolve_interaction(p1, {"selected_uuids": [e1.uuid, e2.uuid], "index": 0})
+    powers = sorted([e1.get_power(False), e2.get_power(False)])
+    assert powers == [2000, 3000], f"先頭=-3000/残り=-2000 の分配を期待: {powers}"
+
+
 def cov_drain(gm):
     import effect_coverage as _cov
     _cov._smart_drain(gm, record={})

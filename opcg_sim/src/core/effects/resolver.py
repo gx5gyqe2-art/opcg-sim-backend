@@ -9,6 +9,11 @@ from ...models.enums import ActionType, Zone, TriggerType, ConditionType, Compar
 from ...utils.logger_config import log_event
 import re
 
+# 選択グループ分配（§7-1）で「N枚を選び」の選択集合を保存する save_id。
+# atoms._SEL_GROUP_ID と一致させる。
+_SEL_GROUP_ID = "_sel_group"
+
+
 class EffectResolver:
     def __init__(self, game_manager):
         self.game_manager = game_manager
@@ -350,12 +355,31 @@ class EffectResolver:
         if query.save_id and query.save_id in self.context["saved_targets"]:
             return self.context["saved_targets"][query.save_id]
         
+        # 選択グループ分配（§7-1）: 先頭 M 枚を取り、消費済みとして記録する
+        # （後続の「残り」が消費分を除いて参照する）。
+        if getattr(query, "select_mode", None) == "GROUP_FIRST" and query.ref_id:
+            group = self.context["saved_targets"].get(query.ref_id, [])
+            consumed = self.context.setdefault("_grp_consumed", {}).setdefault(query.ref_id, [])
+            avail = [c for c in group if c.uuid not in consumed]
+            n = query.count if query.count and query.count > 0 else 1
+            picked = avail[:n]
+            consumed.extend(c.uuid for c in picked)
+            return picked
+
         if query.ref_id:
              if query.ref_id == "self":
                  return [source_card]
              if query.ref_id in self.context["saved_targets"]:
                  return self.context["saved_targets"][query.ref_id]
-        
+
+        # 「残り」: 直前の選択グループが存在すれば、その消費済みを除いた残余を対象にする
+        # （field 分配 OP08-118 等。グループが無ければ従来どおり TEMP=公開残りを参照）。
+        if getattr(query, "select_mode", None) == "REMAINING":
+            group = self.context["saved_targets"].get(_SEL_GROUP_ID)
+            if group:
+                consumed = self.context.setdefault("_grp_consumed", {}).setdefault(_SEL_GROUP_ID, [])
+                return [c for c in group if c.uuid not in consumed]
+
         from .matcher import get_target_cards
         candidates = get_target_cards(self.game_manager, query, source_card)
         
