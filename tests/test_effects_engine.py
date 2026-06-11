@@ -2158,3 +2158,49 @@ def test_life_reveal_conditional_play_matches_and_plays():
         guard += 1
     assert sabo in p1.field, "コスト5の「サボ」は登場できるべき"
     assert len(p1.temp_zone) == 0
+
+
+def test_declare_cost_reveal_and_match():
+    """C8/RC-7: 「任意のコストを宣言し、相手のデッキの上から1枚を公開する。
+    公開したカードが宣言したコストと同じ場合、…パワー+5000」のエンドツーエンド。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abs_ = parser.parse_card_text(
+        "【カウンター】任意のコストを宣言し、相手のデッキの上から1枚を公開する。"
+        "公開したカードが宣言したコストと同じ場合、自分のリーダーかキャラ1枚までを、このバトル中、パワー+5000。")
+    assert abs_
+    gm, p1, p2 = make_game()
+    src = make_instance(make_master(card_id="E-DC", name="援護", type=CardType.EVENT), owner="P1")
+    p1.hand.append(src)  # resume はソースカードを盤面/手札から uuid 解決する
+    p2.deck.append(make_instance(make_master(card_id="D-3", name="山札3", cost=3), owner="P2"))
+
+    gm.resolve_ability(p1, abs_[0], src)
+    ia = gm.active_interaction
+    assert ia is not None and ia["action_type"] == "DECLARE_COST"
+    # 一致するコスト(3)を宣言 → リーダー対象選択 → +5000
+    gm.resolve_interaction(p1, {"declared_value": 3})
+    guard = 0
+    while gm.active_interaction and guard < 4:
+        ia = gm.active_interaction
+        pl = gm.p1 if gm.p1.name == ia.get("player_id") else gm.p2
+        cands = ia.get("selectable_uuids") or [c.uuid for c in ia.get("candidates", [])]
+        gm.resolve_interaction(pl, {"selected_uuids": cands[:1], "index": 0})
+        guard += 1
+    assert p1.leader.get_power(True) >= 5000 + p1.leader.master.power - 1000, \
+        f"宣言一致でバフが乗るべき: {p1.leader.get_power(True)}"
+
+    # 不一致宣言ではバフされない
+    gm2, q1, q2 = make_game()
+    src2 = make_instance(make_master(card_id="E-DC2", name="援護2", type=CardType.EVENT), owner="P1")
+    q1.hand.append(src2)
+    q2.deck.append(make_instance(make_master(card_id="D-3b", name="山札3b", cost=3), owner="P2"))
+    gm2.resolve_ability(q1, abs_[0], src2)
+    gm2.resolve_interaction(q1, {"declared_value": 7})
+    guard = 0
+    while gm2.active_interaction and guard < 4:
+        ia = gm2.active_interaction
+        pl = gm2.p1 if gm2.p1.name == ia.get("player_id") else gm2.p2
+        cands = ia.get("selectable_uuids") or [c.uuid for c in ia.get("candidates", [])]
+        gm2.resolve_interaction(pl, {"selected_uuids": cands[:1], "index": 0})
+        guard += 1
+    assert q1.leader.timed_power == 0, "不一致宣言ではバフされない"

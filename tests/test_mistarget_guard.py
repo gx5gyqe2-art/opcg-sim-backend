@@ -38,5 +38,5 @@ def test_cd_detectors_do_not_grow():
     _, hits = scan()
     # 実測値に合わせて上限を更新（OTHER burn down 完了後: C 7→6, D 8→7）。
     # 値を下げたら上限も追従して固定する（doc §7-E の運用）。
-    assert len(_unique_cards(hits, KEY_C)) <= 6
-    assert len(_unique_cards(hits, KEY_D)) <= 7
+    assert len(_unique_cards(hits, KEY_C)) <= 0
+    assert len(_unique_cards(hits, KEY_D)) <= 4
