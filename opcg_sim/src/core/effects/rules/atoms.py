@@ -34,6 +34,12 @@ def _draw(ctx: ParseContext) -> Optional[GameAction]:
     # 付与/その他の「引く」誤検知を避けるため、ドロー以外の強い動詞があれば見送る
     if _nfc("付与") in t or _nfc("KOする") in t:
         return None
+    # 「引く代わりに」は REPLACE_EFFECT 文脈なので除外（life_recover 等が担当）
+    if re.search(_nfc(r"引く代わりに"), t):
+        return None
+    # 「引くことができない」= ドロー制限であり、ドローアクションではない（self_cannot が担当）
+    if re.search(_nfc(r"引くことができない"), t):
+        return None
     return GameAction(
         type=ActionType.DRAW,
         value=ValueSource(base=_first_int(t, 1)),
@@ -206,6 +212,23 @@ def _power_equalize(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+@rule("power_swap", priority=61)
+def _power_swap(ctx: ParseContext) -> Optional[GameAction]:
+    """「選んだキャラそれぞれの元々のパワーを、このターン中/このバトル中、入れ替える」→ SWAP_POWER。"""
+    t = ctx.text
+    if _nfc("入れ替え") not in t:
+        return None
+    if _nfc("パワー") not in t:
+        return None
+    tq = parse_target(t)
+    return GameAction(
+        type=ActionType.SWAP_POWER,
+        target=tq,
+        duration=_duration_of(t),
+        raw_text=t,
+    )
+
+
 @rule("set_power", priority=59)
 def _set_power(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -308,9 +331,29 @@ def _life_face(ctx: ParseContext) -> Optional[GameAction]:
         status = "DOWN"
     else:
         return None
+    # 「ライフの表向きのカードをトラッシュに置く」はトラッシュアクション（修飾語として使用）
+    if _nfc("トラッシュ") in t:
+        return None
     tq = parse_target(t)
     tq.zone = Zone.LIFE
     return GameAction(type=ActionType.FACE_UP_LIFE, target=tq, status=status, raw_text=t)
+
+
+@rule("life_cards_to_trash", priority=74)
+def _life_cards_to_trash(ctx: ParseContext) -> Optional[GameAction]:
+    """「自分のライフの表向きのカードすべてをトラッシュに置く」→ TRASH(zone=LIFE, face-up filter)。"""
+    t = ctx.text
+    if _nfc("ライフ") not in t or _nfc("トラッシュ") not in t:
+        return None
+    if _nfc("表向き") not in t:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.LIFE
+    tq.player = Player.SELF
+    if _nfc("すべて") in t or _nfc("全て") in t:
+        tq.count = -1
+        tq.select_mode = "ALL"
+    return GameAction(type=ActionType.TRASH, target=tq, raw_text=t)
 
 
 # ---------------------------------------------------------------------------
@@ -488,6 +531,10 @@ def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("付与") not in t or _nfc("ドン") not in t:
         return None
+    # 「付与されている」が対象フィルタ（キャラ/パワー等を修飾）ならドン付与ではない。
+    # 「付与されているドン!!を...に付与する」のようにドン自体を移動するケースは除外しない。
+    if re.search(_nfc(r"付与されている"), t) and not re.search(_nfc(r"に付与する"), t):
+        return None
     # 付与先（に付与 の前の主語）が「相手の」なら OPPONENT、それ以外は SELF
     # 例: 「相手のキャラ1枚に相手のレストのドン!!1枚を付与する」→ recipient=OPPONENT
     # 例: 「自分のリーダーかキャラ1枚にドン!!を付与する」→ recipient=SELF
@@ -650,10 +697,15 @@ def _set_cost(ctx: ParseContext) -> Optional[GameAction]:
 def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     m = _SIGN_RE.search(t)
-    if not m:
-        return None
-    sign = -1 if m.group(1) in "-－−‐" else 1
-    value = sign * int(m.group(2))
+    if m:
+        sign = -1 if m.group(1) in "-－−‐" else 1
+        value = sign * int(m.group(2))
+    else:
+        # 「支払うコストはN少なくなる」パターン（コスト軽減）
+        m2 = re.search(_nfc(r"コストは(\d+)少なくなる"), t)
+        if not m2:
+            return None
+        value = -int(m2.group(1))
     tq = parse_target(t)
     return GameAction(
         type=ActionType.BUFF,
@@ -786,13 +838,39 @@ def _search_to_hand(ctx: ParseContext) -> Optional[GameAction]:
     明示的な別ソース（トラッシュ/ライフ/手札から/デッキ）がある句は対象外（既存ルールが担当）。
     """
     t = ctx.text
-    if _nfc("手札に加える") not in t:
+    # 「手札に加える」（辞書形）と「手札に加え」（連用形、split後の末尾）の両方を対象とする
+    # 「手札に加えられない」（禁止節）は除外
+    if not re.search(_nfc(r"手札に加え(?!られ)"), t):
         return None
     # 明示的なソースゾーンがある句は別ルール（life_to_hand 等）に委ねる。
     if any(_nfc(z) in t for z in ["トラッシュ", "ライフ", "手札から", "デッキ"]):
         return None
     tq = parse_target(t)
     tq.zone = Zone.TEMP
+    tq.player = Player.SELF
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=tq,
+        destination=Zone.HAND,
+        raw_text=t,
+    )
+
+
+@rule("search_deck_to_hand", priority=67)
+def _search_deck_to_hand(ctx: ParseContext) -> Optional[GameAction]:
+    """「自分のデッキから（条件）のカードN枚までを公開し、手札に加える/加え」→ MOVE_CARD(zone=DECK, dest=HAND)。
+
+    デッキを直接検索して手札に加えるサーチ効果（LOOK 文脈ではなくデッキ直接参照）。
+    """
+    t = ctx.text
+    if _nfc("デッキから") not in t:
+        return None
+    if not re.search(_nfc(r"手札に加え(?!られ)"), t):
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.DECK
     tq.player = Player.SELF
     if _nfc("まで") in t:
         tq.is_up_to = True
@@ -876,8 +954,8 @@ def _reveal_hand(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("公開") not in t or _nfc("手札") not in t:
         return None
-    # サーチ（デッキを見て公開し手札に加える）系・手札に戻す系は対象外。
-    if _nfc("手札に加える") in t or _nfc("手札に戻す") in t:
+    # サーチ（デッキを見て公開し手札に加える/加え）系・手札に戻す系は対象外。
+    if re.search(_nfc(r"手札に加え(?!られ)"), t) or _nfc("手札に戻す") in t:
         return None
     if _nfc("デッキの上") in t or _nfc("デッキの下") in t:
         return None
@@ -1016,7 +1094,7 @@ def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("デッキの下") not in t:
         return None
-    if _nfc("置く") not in t and _nfc("戻す") not in t:
+    if _nfc("置く") not in t and _nfc("戻す") not in t and _nfc("置き") not in t:
         return None
     if _nfc("残り") in t:
         return None  # remaining_deck_bottom / remaining_deck_top_or_bottom が担当
@@ -1483,6 +1561,24 @@ def _negate_effect(ctx: ParseContext) -> Optional[GameAction]:
         type=ActionType.NEGATE_EFFECT,
         target=tq,
         duration="THIS_TURN",
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 自己効果無効: 「このキャラは、このターン中、効果が無効になる」
+#   「効果が無効になる」（受け身/自動詞）→ DISABLE_ABILITY(target=self, THIS_TURN)。
+#   「効果を無効にする」（他動詞、相手対象）は negate_effect(p65) が担当。
+# ---------------------------------------------------------------------------
+@rule("self_effect_disabled", priority=64)
+def _self_effect_disabled(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"効果が無効になる"), t):
+        return None
+    return GameAction(
+        type=ActionType.DISABLE_ABILITY,
+        target=TargetQuery(select_mode="SOURCE"),
+        duration=_duration_of(t),
         raw_text=t,
     )
 

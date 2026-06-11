@@ -79,7 +79,8 @@ _VERB_ACTIONS = {
     "ダメージを与え": {"DEAL_DAMAGE"},
     "デッキの下に置": {"DECK_BOTTOM", "MOVE_CARD", "MOVE"},
     # 公開: FACE_UP_LIFE はライフを表向きで公開する動作、DECLARE_COST は公開+宣言の複合
-    "公開": {"REVEAL", "LOOK", "MOVE_TO_HAND", "SEARCH", "FACE_UP_LIFE", "DECLARE_COST"},
+    # MOVE_CARD: 「公開し手札に加える」はサーチ（MOVE_CARD）として実装されるケースも含む
+    "公開": {"REVEAL", "LOOK", "MOVE_TO_HAND", "SEARCH", "FACE_UP_LIFE", "DECLARE_COST", "MOVE_CARD"},
 }
 
 # 動詞がトリガー条件（〜した時）としてのみ現れる場合はチェックをスキップする
@@ -87,6 +88,20 @@ _VERB_ACTIONS = {
 _TRIGGER_CONDITION_SKIP = {
     "登場させ": (re.compile(_nfc(r"登場させた時")), re.compile(_nfc(r"登場させ(る|てもよい|ることができる)"))),
     "ダメージを与え": (re.compile(_nfc(r"ダメージを与えた時")), re.compile(_nfc(r"ダメージを与え(る|てもよい|ることができる)"))),
+    "手札に戻": (
+        re.compile(_nfc(r"手札に戻った時")),
+        re.compile(_nfc(r"手札に戻(す|せる|すことができる)"))
+    ),
+}
+
+# 動詞がテキスト中に現れるが、実アクションではない特定パターン
+# (禁止節・受け身ルール・コスト修飾語など)
+_VERB_EXTRA_SKIP = {
+    "手札に加え":   re.compile(_nfc(r"手札に加えられない")),       # 禁止節
+    "デッキの下に置": re.compile(_nfc(r"デッキの下に置かれる")),  # 受け身ルール
+    "ドロー":       re.compile(_nfc(r"ドローフェイズ")),          # フェーズ名
+    "登場させ":     re.compile(_nfc(r"登場させる[^。\n]*コスト")), # コスト低減の名詞節
+    "を引く":       re.compile(_nfc(r"引くことができない")),       # ドロー禁止節
 }
 
 
@@ -125,8 +140,15 @@ def audit_ability(text, ability):
     effect_actions = list(walk(ability.effect))
     actions = cost_actions + effect_actions
     action_types = {a.type.name for a in actions if a and hasattr(a.type, "name")}
-    # 能力ローカルのテキスト（無ければカード全文）でキーワード判定の誤検出を抑える
-    ab_text = _nfc(getattr(ability, "raw_text", "") or "") or _nfc(text)
+    # 能力ローカルのテキスト（無ければ内部アクションノードの raw_text、最終フォールバックはカード全文）
+    _ab_rt = _nfc(getattr(ability, "raw_text", "") or "")
+    if not _ab_rt:
+        # Catalog entries: collect raw_text from inner action nodes
+        inner_texts = [_nfc(a.raw_text or "") for a in actions if a and getattr(a, "raw_text", None)]
+        _ab_rt = " ".join(inner_texts)
+    if not _ab_rt:
+        _ab_rt = _nfc(text)
+    ab_text = _ab_rt
 
     # FLAG_OTHER
     if any(a.type == ActionType.OTHER for a in actions if a):
@@ -172,6 +194,21 @@ def audit_ability(text, ability):
             if kw in _TRIGGER_CONDITION_SKIP:
                 trig_pat, eff_pat = _TRIGGER_CONDITION_SKIP[kw]
                 if trig_pat.search(ab_text) and not eff_pat.search(ab_text):
+                    continue
+            # 否定節・受け身ルール・コスト名詞節によるスキップ
+            if kw in _VERB_EXTRA_SKIP:
+                skip_pat = _VERB_EXTRA_SKIP[kw]
+                # positive action formを確認する正規表現
+                positive_forms = {
+                    "手札に加え": _nfc(r"手札に加え(る|よい|られる|ることができる|た)"),
+                    "デッキの下に置": _nfc(r"デッキの下に置(く|き[、。]|いた)"),
+                    "ドロー": _nfc(r"ドロー(する|し[、。]|した|させる)"),
+                    "登場させ": _nfc(r"登場させ(てもよい|ることができる|る[。、]|る$|た)"),
+                    "を引く": _nfc(r"[^きれ]を引(く|いた|いて)"),
+                }
+                has_skip = skip_pat.search(ab_text)
+                has_positive = bool(re.search(positive_forms.get(kw, r"$^"), ab_text)) if kw in positive_forms else False
+                if has_skip and not has_positive:
                     continue
             if not (expected & action_types):
                 flags.append(("FLAG_MISSING_ACTION", f"'{kw}' 期待{expected} 実際{sorted(action_types)}"))
