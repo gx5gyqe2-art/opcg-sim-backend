@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Optional
 
 from ....models.effect_types import Choice, EffectNode, GameAction, Sequence, TargetQuery, ValueSource
@@ -17,10 +18,23 @@ from ....models.enums import ActionType, Player, Zone
 from ..matcher import parse_target
 from .base import ParseContext, rule, _nfc
 
+# カードテキストは NFC 正規化のため全角符号（＋ U+FF0B / － U+FF0D / − U+2212 /
+# ‐ U+2010）が半角に畳まれず残る。符号を扱う正規表現は必ずこのクラスを使う。
+_SIGN = r"[+＋\-－−‐]"
+_MINUS_CHARS = "-－−‐"
+
+
+def _to_int(s: str) -> int:
+    """全角符号・全角数字混じりの数値文字列を int にする。"""
+    s = unicodedata.normalize("NFKC", s)
+    for ch in _MINUS_CHARS[1:]:
+        s = s.replace(ch, "-")
+    return int(s.replace("＋", "+"))
+
 
 def _first_int(text: str, default: int = 0) -> int:
-    nums = re.findall(r"[+-]?\d+", text)
-    return int(nums[0]) if nums else default
+    nums = re.findall(rf"{_SIGN}?[\d０-９]+", text)
+    return _to_int(nums[0]) if nums else default
 
 
 # 丸数字（①②… / ➀➁…）= コストとして「ドン!!を N 枚レストにする」の表記（NFC では非分解で残る）。
@@ -188,19 +202,29 @@ def _buff_target(t: str) -> TargetQuery:
 @rule("power_buff", priority=60)
 def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    m = re.search(_nfc(r"パワー([+-]\d+)"), t)
+    m = re.search(_nfc(rf"パワー({_SIGN}[\d０-９]+)"), t)
     if not m:
         return None
     if _nfc("にする") in t:
         return None  # 「パワーをNにする」は base_power_override 系（別ルールで対応予定）
     tq = _buff_target(t)
-    return GameAction(
+    buff = GameAction(
         type=ActionType.BUFF,
         target=tq,
-        value=ValueSource(base=int(m.group(1))),
+        value=ValueSource(base=_to_int(m.group(1))),
         duration=_duration_of(t),
         raw_text=t,
     )
+    # 複合句「バトルでKOされず、パワー±N」: 除去保護とバフを両方生成する
+    # （grant_keyword はパワー増減を伴う句を本ルールに委ねるため、ここで拾わないと
+    #   保護側が黙って脱落する）。
+    if re.search(_nfc(r"バトルでKOされ(ず|ない)"), t):
+        prevent = GameAction(
+            type=ActionType.PREVENT_LEAVE, target=TargetQuery(select_mode="SOURCE"),
+            status="BATTLE_KO", duration=_duration_of(t), raw_text=t,
+        )
+        return Sequence(actions=[prevent, buff])
+    return buff
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +348,7 @@ def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
     if not m:
         return None
     # パワー増減を伴う複合句は power_buff に委ねる（単一アクションでは両立不可）。
-    if re.search(_nfc(r"パワー[+-]\d+"), t):
+    if re.search(_nfc(rf"パワー{_SIGN}[\d０-９]+"), t):
         return None
     keyword = m.group(1)
     if re.search(_nfc(r"この(カード|キャラ|リーダー)"), t):
@@ -684,7 +708,7 @@ def _don_set_active(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ドン") not in t:
         return None
-    if _nfc("アクティブにする") not in t and _nfc("アクティブにできる") not in t:
+    if not re.search(_nfc(r"アクティブに(する|できる|し$)"), t.strip()):
         return None
     return GameAction(
         type=ActionType.ACTIVE_DON,
@@ -934,7 +958,7 @@ def _attack_disable(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # 符号として使われ得る各種マイナス記号（ASCII / 全角 / 数学記号 / ハイフン）
-_SIGN_RE = re.compile(r"コスト[ 　]*([+\-－−‐])[ 　]*(\d+)")
+_SIGN_RE = re.compile(r"コスト[ 　]*([+＋\-－−‐])[ 　]*(\d+)")
 
 
 # ---------------------------------------------------------------------------
@@ -1279,7 +1303,7 @@ def _active_target(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ドン") in t:
         return None  # don_set_active が担当
-    if not re.search(_nfc(r"アクティブに(する|できる)"), t):
+    if not re.search(_nfc(r"アクティブに(する|できる|し$)"), t.strip()):
         return None
     if re.search(_nfc(r"この(カード|キャラ|リーダー)を"), t):
         return None  # active_self が担当
@@ -1662,7 +1686,7 @@ def _active_self(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ドン") in t:
         return None  # ドン!!のアクティブ化は don_set_active が担当
-    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?アクティブに(する|できる)"), t):
+    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?アクティブに(する|できる|し$)"), t.strip()):
         return None
     return GameAction(
         type=ActionType.ACTIVE,

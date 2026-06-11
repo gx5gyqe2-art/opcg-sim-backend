@@ -2177,4 +2177,39 @@ CASES = [
             ]}}
         ],
     },
+    # ----- RC-1: 全角符号（＋ U+FF0B / － U+FF0D）はNFCで畳まれない ----------------
+    {
+        "id": "fullwidth_plus_power_buff",
+        "text": "【アタック時】このキャラは、このターン中、パワー＋１０００。",
+        "expect": [
+            {"trigger": "ON_ATTACK",
+             "effect": {"kind": "action", "type": "BUFF", "value": 1000,
+                        "target": {"select_mode": "SOURCE"}}}
+        ],
+    },
+    # ----- RC-1: 全角＋とアクティブ化の連用接続（OP06-028 系）。分割境界で両アクション保全 --
+    {
+        "id": "don_active_then_fullwidth_buff",
+        "text": "【アタック時】自分のドン !!1枚までをアクティブにし、このキャラは、このターン中、パワー＋1000。",
+        "expect": [
+            {"trigger": "ON_ATTACK",
+             "effect": {"kind": "seq", "actions": [
+                 {"type": "ACTIVE_DON", "value": 1},
+                 {"type": "BUFF", "value": 1000, "target": {"select_mode": "SOURCE"}},
+             ]}}
+        ],
+    },
+    # ----- RC-1複合: 「バトルでKOされずパワー＋N」は保護とバフの両方を生成する -----------
+    {
+        "id": "prevent_battle_ko_with_buff",
+        "text": "【アタック時】このキャラは、次の自分のターン開始時まで、バトルでKOされずパワー＋2000。",
+        "expect": [
+            {"trigger": "ON_ATTACK",
+             "effect": {"kind": "seq", "actions": [
+                 {"type": "PREVENT_LEAVE", "status": "BATTLE_KO",
+                  "target": {"select_mode": "SOURCE"}},
+                 {"type": "BUFF", "value": 2000, "target": {"select_mode": "SOURCE"}},
+             ]}}
+        ],
+    },
 ]
