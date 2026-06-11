@@ -423,6 +423,28 @@ def test_throne_dynamic_cost_limit_parsed():
     assert play.target.cost_max_dynamic == "DON_COUNT_FIELD"
 
 
+def test_op07_042_replacement_with_selection_completes():
+    """OP07-042 ゲッコー・モリア: 相手効果で場を離れる場合、代わりに自分の他キャラ1枚を
+    持ち主のデッキの下に置いてもよい（任意＋対象選択を伴う置換, E14/E15）。
+
+    置換 sub_effect が任意確認/対象選択で中断しても、_active_replacement が同期的に
+    自動解決して完了し、(1) ダングリング interaction を残さず、(2) 本来の除去を置換する
+    （moria は KO されず、別キャラがデッキ下へ）ことを検証する。"""
+    gm, p1, p2 = base(turn=4, turn_player_is_p1=False)  # 相手(p2)のターン
+    moria = inst("OP07-042", owner="P1")
+    victim = make_master(card_id="VIC", name="身代わり")
+    other = CardInstance(victim, "P1")
+    p1.field = [moria, other]
+    p1.deck = []
+    # p2 が相手効果で moria を KO しようとする → 置換が発動
+    ko = GameAction(type=ActionType.KO, target=TargetQuery(player=PL.OPPONENT, zone=Zone.FIELD))
+    gm.apply_action_to_engine(p2, ko, [moria], 0)
+    assert gm.active_interaction is None, "置換解決後にダングリング interaction を残さない"
+    assert moria in p1.field, "置換により moria は KO されず場に残る"
+    assert other not in p1.field, "身代わりが場を離れる"
+    assert len(p1.deck) == 1, "身代わりがデッキの下に置かれる"
+
+
 def test_op09_081_scoped_negate_opponent_onplay():
     """OP09-081 ティーチ: 起動メインで「次の相手のターン終了時まで、相手の登場時効果は
     無効になる」。発動後、相手が登場させたキャラの ON_PLAY が解決されないことを検証する。"""
