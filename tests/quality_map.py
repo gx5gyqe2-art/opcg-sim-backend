@@ -131,14 +131,12 @@ def classify_no_change(master, trig: str) -> str:
 def classify_warn(master, trig: str) -> str:
     """WARN（方向不一致）能力の細分類。
 
-    - PLAY_ARTIFACT: ON_PLAY は play_card_action がソースを手札→場へ動かす（手札-1/場+1、
-      ramp で don+）ため、DRAW の手札+1 が相殺されたり、コスト不成立で効果本体が不発でも
-      play 自体の盤面変化が残って「方向不一致」に見える＝測定アーティファクト（誤検知）。
     - MODAL: Branch/Choice を含む（別パス実行の誤検知）。
     - DIRECTION: 上記以外＝★真に方向が疑わしい。
+
+    旧 PLAY_ARTIFACT 分類は effect_coverage 側の登場アーティファクト控除（H-2）で
+    解消されたため、ON_PLAY も MODAL/DIRECTION の判定に乗せる。
     """
-    if trig == "ON_PLAY":
-        return "PLAY_ARTIFACT"
     abs_ = _abilities_for(master, trig)
     for ab in abs_:
         if _has_node(ab.effect, (Branch, Choice)):
@@ -149,7 +147,9 @@ def classify_warn(master, trig: str) -> str:
     return "DIRECTION"
 
 
-def run(show: Optional[str] = None, card_filter: Optional[str] = None) -> None:
+def collect_buckets(card_filter: Optional[str] = None) -> Dict[str, list]:
+    """全カードを分類し、NO_CHANGE 細分類 / WARN 細分類 / SELECT_MISMATCH の
+    バケットを返す（test_quality_gates からも再利用する）。"""
     db = CardLoader(os.path.join(DATA, "opcg_cards.json"))
     db.load()
     card_ids = sorted(db.raw_db.keys())
@@ -173,7 +173,14 @@ def run(show: Optional[str] = None, card_filter: Optional[str] = None) -> None:
             elif r.status == "EXECUTED" and "WARN" in (r.detail or ""):
                 sub = classify_warn(master, r.trigger)
                 buckets[f"WARN_{sub}"].append(r)
+            if getattr(r, "select_issues", ""):
+                buckets["SELECT_MISMATCH"].append(r)
     sys.stderr.write(f"\r完了: {total} カード処理済み\n")
+    return buckets
+
+
+def run(show: Optional[str] = None, card_filter: Optional[str] = None) -> None:
+    buckets = collect_buckets(card_filter)
 
     order = ["NO_IMPL", "NO_TARGET", "COND_FALSE", "RESTRICTION", "PASSIVE",
              "WARN_DIRECTION", "WARN_MODAL"]
@@ -181,7 +188,7 @@ def run(show: Optional[str] = None, card_filter: Optional[str] = None) -> None:
     print("  [NO_CHANGE]")
     for k in ("NO_IMPL", "NO_TARGET", "STAT_ONLY", "COST_UNMET", "COND_FALSE", "RESTRICTION", "PASSIVE"):
         mark = "  ★真のバグ候補" if k == "NO_IMPL" else (
-            "  (枚数に出ない: power/cost/keyword 等=測定限界)" if k == "STAT_ONLY" else (
+            "  ★真のバグ候補(H-1 でステータスも測定済み=バフ等が未適用)" if k == "STAT_ONLY" else (
             "  (汎用盤面で任意コスト不成立=正常)" if k == "COST_UNMET" else ""))
         print(f"    {k:<12}: {len(buckets[k]):4d}{mark}")
     print("  [WARN 方向不一致]")

@@ -20,9 +20,12 @@ has_other フラグ: AST 中に ActionType.OTHER が含まれる（effect_diagno
     OPCG_LOG_SILENT=1 python tests/effect_coverage.py --trigger ON_PLAY
     OPCG_LOG_SILENT=1 python tests/effect_coverage.py --card OP01-001
 """
+import itertools
 import os
+import re
 import sys
 import traceback
+import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
@@ -35,6 +38,7 @@ from opcg_sim.src.models.enums import ActionType, CardType, TriggerType, Phase
 from opcg_sim.src.models.effect_types import Branch, Choice, GameAction, Sequence
 from opcg_sim.src.utils.loader import CardLoader
 from engine_helpers import make_master, make_player
+from interactive_target_audit import audit_target
 
 DATA = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -134,20 +138,141 @@ def _snap_diff(before: tuple, after: tuple) -> str:
     )
 
 
-def _smart_drain(gm: GameManager, limit: int = 30) -> Tuple[bool, int]:
+# ---------------------------------------------------------------------------
+# ステータススナップショット（H-1: 枚数に出ない変化の測定）
+# ---------------------------------------------------------------------------
+
+def _stat_snap(p1: Player, p2: Player) -> dict:
+    """盤面カードの power/cost/keyword/flag/rest、手札カードの cost、ドンの
+    active/rested 構成を uuid キーで記録する。
+
+    ゾーン枚数スナップショットでは見えない BUFF / GRANT_KEYWORD / REST /
+    COST_CHANGE 等の変化を検出可能にする。
+    """
+    out: dict = {}
+    for p in (p1, p2):
+        units = ([p.leader] if p.leader else []) + list(p.field)
+        if getattr(p, "stage", None):
+            units.append(p.stage)
+        for c in units:
+            out[c.uuid] = (
+                c.get_power(True),
+                c.current_cost,
+                frozenset(c.current_keywords | c.timed_keywords),
+                frozenset(c.flags | c.timed_flags),
+                c.is_rest,
+            )
+        for c in p.hand:
+            out[c.uuid] = (0, c.current_cost, frozenset(), frozenset(), False)
+        out[f"__don__{p.name}"] = (
+            len(p.don_active), len(p.don_rested), frozenset(), frozenset(), False,
+        )
+    return out
+
+
+def _stat_changed(sb: dict, sa: dict, ignore=frozenset()) -> bool:
+    """両スナップショットに存在する uuid のみ比較する（移動した/新規のカードは
+    タプル表現が変わるため対象外。ignore はソースカード等の除外用）。"""
+    keys = (sb.keys() & sa.keys()) - set(ignore)
+    return any(sb[k] != sa[k] for k in keys)
+
+
+def _stat_diff(sb: dict, sa: dict, ignore=frozenset()) -> str:
+    parts = []
+    for k in sorted(sb.keys() & sa.keys()):
+        if k in ignore or sb[k] == sa[k]:
+            continue
+        b, a = sb[k], sa[k]
+        sub = []
+        if b[0] != a[0]:
+            sub.append(f"pw{b[0]}→{a[0]}")
+        if b[1] != a[1]:
+            sub.append(f"co{b[1]}→{a[1]}")
+        if b[2] != a[2]:
+            added = sorted(a[2] - b[2]); removed = sorted(b[2] - a[2])
+            sub.append("kw" + "+".join(added) + ("-" + "-".join(removed) if removed else ""))
+        if b[3] != a[3]:
+            added = sorted(a[3] - b[3]); removed = sorted(b[3] - a[3])
+            sub.append("fl" + "+".join(added) + ("-" + "-".join(removed) if removed else ""))
+        if b[4] != a[4]:
+            sub.append("rest" if a[4] else "active")
+        parts.append(f"{str(k)[:8]}:{','.join(sub)}")
+        if len(parts) >= 5:
+            parts.append("…")
+            break
+    return "; ".join(parts)
+
+
+def _selection_issues(ia: dict) -> List[str]:
+    """SELECT_TARGET 中断時、実際の選択候補をテキスト由来の制約と突き合わせる（H-4）。
+
+    静的監査（audit_target: クエリ vs テキスト）に加え、実行時の候補カードが
+    テキストの側/コスト上限/特徴と矛盾しないかを検証する。
+    """
+    cont  = ia.get("continuation") or {}
+    query = cont.get("query")
+    stack = cont.get("execution_stack") or []
+    node  = stack[-1] if stack else None
+    raw   = getattr(node, "raw_text", "") or ""
+    if not raw or query is None:
+        return []
+
+    issues = [f"静的:{x}" for x in audit_target(raw, query)]
+
+    r   = unicodedata.normalize("NFKC", raw)
+    sel = set(ia.get("selectable_uuids") or [])
+    cands = [c for c in ia.get("candidates", []) if not sel or c.uuid in sel]
+    if cands:
+        has_aite  = re.search(r"相手の[^。、]*?(キャラ|リーダー)", r) and "自分の" not in r
+        has_jibun = re.search(r"自分の[^。、]*?(キャラ|リーダー)", r) and "相手の" not in r
+        owners = {c.owner_id for c in cands}
+        if has_aite and owners == {"P1"}:
+            issues.append("実行時:相手対象だが候補が全て自分側")
+        if has_jibun and owners == {"P2"}:
+            issues.append("実行時:自分対象だが候補が全て相手側")
+        m = re.search(r"コスト(\d+)以下", r)
+        if m:
+            cap  = int(m.group(1))
+            over = sum(1 for c in cands if c.current_cost > cap)
+            if over:
+                issues.append(f"実行時:コスト{cap}以下指定だが上限超過候補 {over} 枚")
+        traits = [t for t in re.findall(r"《([^》]+)》", r)
+                  if t not in ("斬", "打", "特", "知", "活")]
+        if traits and not any(set(c.master.traits) & set(traits) for c in cands):
+            issues.append(f"実行時:特徴{traits}を持つ候補ゼロ")
+
+    deduped: List[str] = []
+    for x in issues:
+        if x not in deduped:
+            deduped.append(x)
+    return [f"«{raw[:30]}» {x}" for x in deduped]
+
+
+def _smart_drain(
+    gm: GameManager,
+    limit: int = 30,
+    choice_plan: Optional[List[int]] = None,
+    record: Optional[dict] = None,
+) -> Tuple[bool, int]:
     """インタラクションを賢㍖に解決する。
 
     - SELECT_TARGET: selectable_uuids から constraints.min 枚を選ぶ（空選択でなく有効な候補を渡す）
-    - CHOICE: 先頭の選戠肢（index=0）を選ぶ
+    - CHOICE: choice_plan から index を消費する（既定は先頭=0。H-3 のパス列挙用）
+    - record に choices（遭遇した選択肢数）と select_issues（H-4 検証結果）を記録する
     - (stuck, 処理数) を返す
     """
     count = 0
+    plan  = list(choice_plan or [])
     while gm.active_interaction and count < limit:
         ia          = gm.active_interaction
         player      = gm.p1 if gm.p1.name == ia.get("player_id") else gm.p2
         action_type = ia.get("action_type", "")
 
         if action_type == "SELECT_TARGET":
+            if record is not None:
+                iss = _selection_issues(ia)
+                if iss:
+                    record.setdefault("select_issues", []).extend(iss)
             candidates = ia.get("selectable_uuids") or [
                 c.uuid for c in ia.get("candidates", [])
             ]
@@ -165,7 +290,13 @@ def _smart_drain(gm: GameManager, limit: int = 30) -> Tuple[bool, int]:
                     n_select = min(n_select, max_req)
             selected = candidates[:n_select]
             payload  = {"selected_uuids": selected, "index": 0}
-        else:  # CHOICE 等は先頭の選戠肢
+        elif action_type == "CHOICE":
+            n_opt = len(ia.get("options") or []) or 2
+            idx   = plan.pop(0) if plan else 0
+            if record is not None:
+                record.setdefault("choices", []).append(n_opt)
+            payload = {"selected_uuids": [], "index": min(idx, n_opt - 1)}
+        else:  # CONFIRM_OPTIONAL / DECLARE_COST 等は先頭の選戠肢
             payload = {"selected_uuids": [], "index": 0}
 
         try:
@@ -233,13 +364,54 @@ _DIRECTION: Dict[str, any] = {
 }
 
 
-def _soft_assert(abilities, before: tuple, after: tuple) -> Optional[str]:
+def _card_keys(sb: dict, sa: dict, ignore):
+    """両スナップショットに存在するカード uuid（ドン擬似キー除く）。"""
+    return [k for k in (sb.keys() & sa.keys()) - set(ignore)
+            if not str(k).startswith("__don__")]
+
+
+def _any_card(sb, sa, ignore, fn) -> bool:
+    return any(fn(sb[k], sa[k]) for k in _card_keys(sb, sa, ignore))
+
+
+# ステータス差分（H-1）に基づく方向チェック。ゾーン枚数では検証できなかった
+# BUFF / キーワード付与 / レスト切替 / コスト変更を検証する。
+_STAT_DIRECTION: Dict[str, any] = {
+    # BUFF はパワー以外に BLOCKER_DISABLE 等の status バリエーションを持つため
+    # 「何らかのカードステータス変化」を期待方向とする
+    "BUFF":           lambda sb, sa, ig: _any_card(sb, sa, ig, lambda b, a: b != a),
+    "BP_BUFF":        lambda sb, sa, ig: _any_card(sb, sa, ig, lambda b, a: b[0] != a[0]),
+    "SET_BASE_POWER": lambda sb, sa, ig: _any_card(sb, sa, ig, lambda b, a: b[0] != a[0]),
+    "SWAP_POWER":     lambda sb, sa, ig: _any_card(sb, sa, ig, lambda b, a: b[0] != a[0]),
+    "COST_CHANGE":    lambda sb, sa, ig: _any_card(sb, sa, ig, lambda b, a: b[1] != a[1]),
+    "COST_BUFF":      lambda sb, sa, ig: _any_card(sb, sa, ig, lambda b, a: b[1] != a[1]),
+    "SET_COST":       lambda sb, sa, ig: _any_card(sb, sa, ig, lambda b, a: b[1] != a[1]),
+    "GRANT_KEYWORD":  lambda sb, sa, ig: _any_card(sb, sa, ig, lambda b, a: b[2] != a[2]),
+    "REST":           lambda sb, sa, ig: _any_card(sb, sa, ig, lambda b, a: not b[4] and a[4]),
+    "ACTIVE":         lambda sb, sa, ig: _any_card(sb, sa, ig, lambda b, a: b[4] and not a[4]),
+    "FREEZE":         lambda sb, sa, ig: _any_card(sb, sa, ig, lambda b, a: a[3] - b[3]),
+    "REST_DON":       lambda sb, sa, ig: any(
+        sa[k][0] < sb[k][0] for k in (sb.keys() & sa.keys()) if str(k).startswith("__don__")),
+}
+
+
+def _soft_assert(
+    abilities,
+    before: tuple,
+    after: tuple,
+    sb: Optional[dict] = None,
+    sa: Optional[dict] = None,
+    ignore=frozenset(),
+) -> Optional[str]:
     """単一効果タイプの能力に限り、盤面変化の方向が期待値と逆の場合に警告を返す。
 
+    ゾーン枚数（_DIRECTION）とカードステータス（_STAT_DIRECTION）の両面で判定し、
+    どちらかが期待方向を満たせば OK とする。
     複合効果（DRAW+KO 等）は誤検知が多いためチェック対象外。
     変化なし（条件未達の可能性）は警告しない。
     """
-    if before == after:
+    stat_moved = sb is not None and sa is not None and _stat_changed(sb, sa, ignore)
+    if before == after and not stat_moved:
         return None  # 変化なし = 条件未達の可能性が高いためスキップ
 
     type_names = [
@@ -252,13 +424,17 @@ def _soft_assert(abilities, before: tuple, after: tuple) -> Optional[str]:
         return None
 
     # 複数のタイプが混在する場合は誤検知が多いためチェックしない
-    unique_types = {n for n in type_names if n in _DIRECTION}
+    unique_types = {n for n in type_names if n in _DIRECTION or n in _STAT_DIRECTION}
     if len(unique_types) != 1:
         return None
 
     (dominant,) = unique_types
-    checker = _DIRECTION[dominant]
-    if not checker(before, after):
+    ok = False
+    if dominant in _DIRECTION and _DIRECTION[dominant](before, after):
+        ok = True
+    if not ok and dominant in _STAT_DIRECTION and sb is not None and sa is not None:
+        ok = _STAT_DIRECTION[dominant](sb, sa, ignore)
+    if not ok:
         return f"WARN: {dominant} 期待だが方向不一致"
     return None
 
@@ -278,6 +454,8 @@ class AbilityResult:
     status:    str    # ERROR / INTERACTIVE / EXECUTED / NO_CHANGE
     has_other: bool = False
     detail:    str  = ""
+    select_issues: str = ""   # H-4: 対話選択候補とテキストの矛盾
+    choices:   tuple = ()     # H-3: 遭遇した CHOICE の選択肢数（パス列挙用）
 
 
 def _outcome(
@@ -289,33 +467,71 @@ def _outcome(
     trig: str,
     h_other: bool,
     abilities=None,
+    sb: Optional[dict] = None,
+    ignore=frozenset(),
+    record: Optional[dict] = None,
+    before_eff: Optional[tuple] = None,
+    choice_plan: Optional[List[int]] = None,
 ) -> AbilityResult:
-    """発動後のゲーム状態から結果を返す。インタラクションは賢㍖選戠で消化。"""
-    stuck, n_ia = _smart_drain(gm)
-    after   = _snap(p1, gm.p2)
-    changed = before != after
+    """発動後のゲーム状態から結果を返す。インタラクションは賢㍖選戠で消化。
+
+    before_eff: 登場アーティファクト控除後の基準スナップショット（H-2）。
+    指定時は「効果由来の変化」をこの基準と比較して判定する。
+    """
+    if record is None:
+        record = {}
+    stuck, n_ia = _smart_drain(gm, choice_plan=choice_plan, record=record)
+    after = _snap(p1, gm.p2)
+    sa    = _stat_snap(p1, gm.p2) if sb is not None else None
+    base  = before_eff if before_eff is not None else before
+    stat_moved = sb is not None and _stat_changed(sb, sa, ignore)
+    changed    = base != after or stat_moved
     # resolve_ability が登録するアクション履歴（REVEAL/SHUFFLE を EXECUTED に分類するため）
     has_events = bool(getattr(gm, "action_events", []))
+    sel_iss = " / ".join(record.get("select_issues", []))
+    chs     = tuple(record.get("choices", []))
 
     if stuck or gm.active_interaction:
         msg = gm.active_interaction.get("message", "") if gm.active_interaction else "stuck in drain loop"
-        return AbilityResult(card_id, name, trig, "INTERACTIVE", h_other, msg)
+        return AbilityResult(card_id, name, trig, "INTERACTIVE", h_other, msg, sel_iss, chs)
     if changed:
-        diff = _snap_diff(before, after)
-        warn = _soft_assert(abilities or [], before, after) if abilities else None
+        diff = _snap_diff(base, after) or "(zone変化なし)"
+        if sb is not None and stat_moved:
+            sd = _stat_diff(sb, sa, ignore)
+            if sd:
+                diff = f"{diff}  |  stat: {sd}"
+        warn = _soft_assert(abilities or [], base, after, sb, sa, ignore) if abilities else None
         detail = f"{diff}  |  {warn}" if warn else diff
-        return AbilityResult(card_id, name, trig, "EXECUTED", h_other, detail)
+        return AbilityResult(card_id, name, trig, "EXECUTED", h_other, detail, sel_iss, chs)
     if n_ia > 0:
         return AbilityResult(card_id, name, trig, "INTERACTIVE", h_other,
-                             f"{n_ia} interaction(s) smart-resolved (no state change)")
+                             f"{n_ia} interaction(s) smart-resolved (no state change)", sel_iss, chs)
     if has_events:
         return AbilityResult(card_id, name, trig, "EXECUTED", h_other,
-                             "ability fired (no visible state change)")
+                             "ability fired (no visible state change)", sel_iss, chs)
     return AbilityResult(card_id, name, trig, "NO_CHANGE", h_other,
-                         "no state change, no interaction")
+                         "no state change, no interaction", sel_iss, chs)
 
 
-def _test_on_play(master: CardMaster, h_other: bool) -> AbilityResult:
+def _play_artifact(before: tuple, master: CardMaster) -> tuple:
+    """登場行為そのものによるゾーン変化（手札→場/トラッシュ）を before に織り込む（H-2）。
+
+    play_card_action はテストカードを手札から動かすため、効果が何もしなくても
+    「手札-1/場+1」等の差分が残り、方向チェックを汚染していた（PLAY_ARTIFACT）。
+    """
+    art = list(before)
+    art[0] -= 1  # p1_hand
+    if master.type == CardType.EVENT:
+        art[2] += 1  # p1_trash（イベントは解決後トラッシュへ）
+    elif master.type == CardType.CHARACTER:
+        art[1] += 1  # p1_field
+    # STAGE は player.stage スロットに置かれ _snap には現れない
+    return tuple(art)
+
+
+def _test_on_play(
+    master: CardMaster, h_other: bool, choice_plan: Optional[List[int]] = None,
+) -> AbilityResult:
     """ON_PLAY: play_card_action を経由（全 ON_PLAY 能力を一括発動）。"""
     on_play_abs = [ab for ab in master.abilities
                    if (ab.trigger.name if hasattr(ab.trigger, "name") else str(ab.trigger)) == "ON_PLAY"]
@@ -325,16 +541,22 @@ def _test_on_play(master: CardMaster, h_other: bool) -> AbilityResult:
         return AbilityResult(master.card_id, master.name, "ON_PLAY", "ERROR", h_other, f"setup: {e}")
 
     before = _snap(p1, p2)
+    sb     = _stat_snap(p1, p2)
     try:
         gm.play_card_action(p1, source)
     except Exception:
         return AbilityResult(master.card_id, master.name, "ON_PLAY", "ERROR", h_other,
                              traceback.format_exc(limit=2))
 
-    return _outcome(gm, p1, before, master.card_id, master.name, "ON_PLAY", h_other, on_play_abs)
+    return _outcome(gm, p1, before, master.card_id, master.name, "ON_PLAY", h_other,
+                    on_play_abs, sb=sb, ignore=frozenset({source.uuid}),
+                    before_eff=_play_artifact(before, master), choice_plan=choice_plan)
 
 
-def _test_ability(master: CardMaster, ability, trig: str, h_other: bool) -> AbilityResult:
+def _test_ability(
+    master: CardMaster, ability, trig: str, h_other: bool,
+    choice_plan: Optional[List[int]] = None,
+) -> AbilityResult:
     """resolve_ability を直接呼んでテスト（ON_PLAY 以外の全トリガー）。"""
     try:
         gm, p1, p2, source = _build_test_state(master)
@@ -342,13 +564,51 @@ def _test_ability(master: CardMaster, ability, trig: str, h_other: bool) -> Abil
         return AbilityResult(master.card_id, master.name, trig, "ERROR", h_other, f"setup: {e}")
 
     before = _snap(p1, p2)
+    sb     = _stat_snap(p1, p2)
     try:
         gm.resolve_ability(p1, ability, source)
     except Exception:
         return AbilityResult(master.card_id, master.name, trig, "ERROR", h_other,
                              traceback.format_exc(limit=2))
 
-    return _outcome(gm, p1, before, master.card_id, master.name, trig, h_other, [ability])
+    return _outcome(gm, p1, before, master.card_id, master.name, trig, h_other,
+                    [ability], sb=sb, choice_plan=choice_plan)
+
+
+_MAX_PATHS = 8
+
+
+def _run_paths(fn) -> AbilityResult:
+    """CHOICE の全パスを列挙して最悪結果を返す（H-3、上限 _MAX_PATHS 実行）。
+
+    fn(choice_plan) -> AbilityResult。初回（全て index=0）で遭遇した選択肢数から
+    残りパスを列挙する。深さが実行ごとに変わる場合も choice_plan の余剰は無害。
+    """
+    first = fn(None)
+    counts = first.choices
+    if not counts or all(n <= 1 for n in counts):
+        return first
+
+    results = [first]
+    all_paths = list(itertools.product(*[range(n) for n in counts]))
+    for path in all_paths[1:_MAX_PATHS]:
+        results.append(fn(list(path)))
+
+    worst = max(results, key=lambda r: (
+        _PRIORITY.get(r.status, 0),
+        1 if "WARN" in (r.detail or "") else 0,
+        1 if r.select_issues else 0,
+    ))
+    # 全パスの select_issues を統合する
+    merged: List[str] = []
+    for r in results:
+        for x in (r.select_issues.split(" / ") if r.select_issues else []):
+            if x and x not in merged:
+                merged.append(x)
+    if worst is not first and worst.status != first.status:
+        worst.detail = f"[path={all_paths[results.index(worst)]}] {worst.detail}"
+    worst.select_issues = " / ".join(merged)
+    return worst
 
 
 def classify(master: CardMaster) -> List[AbilityResult]:
@@ -369,11 +629,12 @@ def classify(master: CardMaster) -> List[AbilityResult]:
 
         if trig == "ON_PLAY":
             # play_card_action が全 ON_PLAY を発動するためまとめてテスト
-            r = _test_on_play(master, h_other)
+            r = _run_paths(lambda plan: _test_on_play(master, h_other, choice_plan=plan))
         else:
             r = None
             for ability in abilities:
-                ri = _test_ability(master, ability, trig, h_other)
+                ri = _run_paths(
+                    lambda plan, _ab=ability: _test_ability(master, _ab, trig, h_other, choice_plan=plan))
                 if r is None or _PRIORITY.get(ri.status, 0) > _PRIORITY.get(r.status, 0):
                     r = ri
 
@@ -450,6 +711,7 @@ def run(
     # --- サマリ ---
     counts = Counter(r.status for r in all_results)
     warn_count = sum(1 for r in all_results if r.status == "EXECUTED" and "WARN" in r.detail)
+    sel_count  = sum(1 for r in all_results if r.select_issues)
     print("=== 実行カバレッジ (能力単位) ===")
     print(f"  能力なし(SKIP)  : {skipped:4d}")
     for s in ("ERROR", "INTERACTIVE", "EXECUTED", "NO_CHANGE"):
@@ -458,6 +720,8 @@ def run(
         print(f"  {s:<14}: {counts[s]:4d}{note}")
     if warn_count:
         print(f"  WARN 付き EXECUTED: {warn_count:4d}  ← 方向不一致の疑い（要確認）")
+    if sel_count:
+        print(f"  SELECT_MISMATCH : {sel_count:4d}  ← 選択候補とテキストの矛盾（H-4）")
     print()
 
     # --- トリガー別内訳 ---
@@ -486,6 +750,16 @@ def run(
             for r in sorted(warn_items, key=lambda x: (x.card_id, x.trigger)):
                 print(f"  [{r.trigger:<20}] {r.card_id:<12}  {r.name}")
                 print(f"    └ {r.detail[:120]}")
+            print()
+
+    # SELECT_MISMATCH（H-4）も常に表示
+    if not show or show == "SELECT":
+        sel_items = [r for r in all_results if r.select_issues]
+        if sel_items:
+            print(f"--- SELECT_MISMATCH ({len(sel_items)} 件) --- ← 選択候補とテキストの矛盾（H-4）")
+            for r in sorted(sel_items, key=lambda x: (x.card_id, x.trigger)):
+                print(f"  [{r.trigger:<20}] {r.card_id:<12}  {r.name}")
+                print(f"    └ {r.select_issues[:160]}")
             print()
 
 
