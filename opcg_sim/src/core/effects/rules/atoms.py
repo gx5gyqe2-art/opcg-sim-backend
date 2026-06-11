@@ -465,7 +465,8 @@ def _life_recover(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("デッキの上") not in t or _nfc("ライフ") not in t:
         return None
-    if _nfc("加える") not in t and _nfc("置く") not in t:
+    # 「加える」(終止) に加え連用形「加え」(「…ライフの上に加え、その後…」の分割後) も拾う。
+    if _nfc("加え") not in t and _nfc("置く") not in t:
         return None
     if _nfc("手札") in t:
         return None  # デッキ→手札 等は別アクション
