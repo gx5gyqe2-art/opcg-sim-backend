@@ -792,6 +792,23 @@ def _look_opp_deck(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# 自分デッキトップの公開: 「（自分の）デッキの上からN枚を公開する」（終止形・後続条件用）
+#   → LOOK（自分・TEMP へ移して公開）。後続の「公開したカードが…の場合」が
+#   REVEALED_CARD_TRAIT 条件で temp[0] を参照し、未消費 temp は解決完了時にデッキトップへ戻る。
+#   look_deck(「見て/公開し」連用) とは語尾で区別（「公開する」終止形を拾う）。
+# ---------------------------------------------------------------------------
+@rule("reveal_deck_top", priority=79)
+def _reveal_deck_top(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("相手のデッキ") in t:
+        return None  # 相手デッキは look_opp_deck が担当
+    m = re.search(_nfc(r"デッキの上から(\d+)枚(?:まで)?を公開する"), t)
+    if not m:
+        return None
+    return GameAction(type=ActionType.LOOK, value=ValueSource(base=int(m.group(1))), raw_text=t)
+
+
+# ---------------------------------------------------------------------------
 # アタック制限: 「（このターン中／次の…まで）アタックできない」
 #   継続効果として管理し、適切なタイミングで失効する（従来 OTHER）。
 # ---------------------------------------------------------------------------
@@ -1721,6 +1738,9 @@ def _negate_effect(ctx: ParseContext) -> Optional[GameAction]:
 @rule("self_effect_disabled", priority=64)
 def _self_effect_disabled(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
+    # 「効果が無効になる」(自動詞・自身の効果が無効化される)。
+    # 「（自分の/相手の）【登場時】効果は無効になる」等の "は" + 範囲修飾付きは意味が
+    # 異なり（特定トリガーのみ無効・対象が相手）SOURCE 全無効では不正確なため対象外。
     if not re.search(_nfc(r"効果が無効になる"), t):
         return None
     return GameAction(

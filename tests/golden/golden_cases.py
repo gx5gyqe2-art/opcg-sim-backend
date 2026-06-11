@@ -1981,4 +1981,12 @@ CASES = [
                         "target": {"player": "SELF", "is_up_to": True}}}
         ],
     },
+    # ----- 自分デッキトップの公開（条件評価用, LOOK で TEMP へ→reclaim） --------
+    {
+        "id": "reveal_self_deck_top",
+        "text": "【登場時】自分のデッキの上から1枚を公開する。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "LOOK", "value": 1, "status": None}}
+        ],
+    },
 ]
