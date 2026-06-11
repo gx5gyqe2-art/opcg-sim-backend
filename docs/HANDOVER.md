@@ -285,8 +285,40 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 2. **OPPONENT_TURN / TURN_END 系トリガーの実プレイ配線**: resolve_ability 直呼びでは動くが、
    ターン進行からの自動発火経路の網羅検証は未実施（Phase 4 H-6 バトルシナリオ網羅で対応予定）。
 3. **ドン付与の相手プール**（OP15-015）: 「相手のレストのドン‼を付与」が自分のドンを使う。
-4. **遅延効果**（OP03-005 サッチ）: 「このターン終了時、このキャラをトラッシュ」が即時実行される。
+4. **遅延効果**（OP03-005 サッチ / OP13-024 ゴードン）: 「このターン終了時、…」が即時実行される。
 5. **文脈依存の「N枚につき」**（捨てたカード1枚につき等）: 直前アクションの結果数参照が未実装
    （フラット値のまま）。
-6. **Phase 4 未着手**: 条件/コスト充足盤面の合成（COND_FALSE 264 / COST_UNMET 226 の実行検証）、
-   バトルシナリオ網羅（THIS_BATTLE/カウンターステップ/ブロッカー無効の実戦検証）。
+6. **「他の「X」」の自己除外**（EB02-018 バギー）: 「自分のキャラの他の「バギー」がいない」が
+   ソース自身を数えてしまう。
+7. **二重制約/複数ゾーンの対象**（EB03-049/OP06-086/OP13-079）: 「コスト6以下とコスト4以下を
+   1枚ずつ」「手札か場の…」の Choice/Sequence 分配が部分対応（interactive_target_audit に残存）。
+
+---
+
+## 8. 2026-06 Phase 4/5（深層ハーネス＋検出分の修正）
+
+### 追加した検出ハーネス
+
+| ツール | 役割 | 結果 |
+|---|---|---|
+| `tests/condition_synth.py` (H-5) | 条件/コストを満たす盤面を合成して発動・分類。実評価器で再検証し合成漏れを除外 | 490 未検証能力 → 1233 実行確認 / SATISFIED_NO_CHANGE 9 |
+| `tests/battle_coverage.py` (H-6) | declare_attack→handle_block→counter を駆動し ON_ATTACK/ON_BLOCK/ON_OPP_ATTACK/COUNTER を実戦発火 | 494 発火 / ERROR 0 |
+| `effect_coverage._zone_fingerprint`/`_moved` | 枚数で相殺されるグロスのカード移動を検出（ドロー+手札→デッキ cost 等） | 偽 NO_CHANGE を排除 |
+
+### Phase 5 で修正した実バグ
+
+- **ON_BLOCK 未発火**（14枚）: `handle_block` が【ブロック時】能力を発動していなかった。
+- **複合条件「Aがいて、Bの場合」の誤読**（~9枚）: 単一条件＋最初の数値で誤分類していた
+  （例:「コスト8以上のキャラがいて、手札6枚以下」→ `HAND_COUNT>=8`）。`_parse_condition_obj`
+  が連結部で2分割して `AND` を構成するようにした。
+
+### 新しい不変条件・運用
+
+- **`passive_*`（passive_power / passive_power_override / passive_counter）は再計算レイヤ**。
+  即時効果の `power_buff`/`base_power_override`/`cost_buff` とは別で、`_apply_passive_effects` が
+  毎回 0/None にリセットして再適用する。
+- **H-4〜H-7 のゲートは `tests/test_quality_gates.py`**: SATISFIED_NO_CHANGE≤9 /
+  BATTLE_NO_CHANGE=0 / battle ERROR=0 / interactive_audit≤11 をラチェット固定。
+- **`condition_synth` の合成盤面は実評価器（`_check_condition`/`_can_satisfy_node`）で再検証する**。
+  合成しきれない条件型（DON_COUNT_COMPARE/PREV_ACTION/色フィルタ等）は UNHANDLED に落とし、
+  真バグ候補（SATISFIED_NO_CHANGE）に混ぜない。

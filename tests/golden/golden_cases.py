@@ -2324,4 +2324,29 @@ CASES = [
                         "status": "ON_PLAY"}}
         ],
     },
+    # ----- 複合条件「Aがいて、Bの場合」は AND に分解する（単一条件への誤読是正） --------
+    {
+        "id": "compound_field_and_hand_condition",
+        "text": "【登場時】自分のコスト8以上のキャラがいて、自分の手札が6枚以下の場合、カード1枚を引く。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "condition": {"type": "AND", "args": [
+                 {"type": "FIELD_COUNT", "operator": "GE"},
+                 {"type": "HAND_COUNT", "operator": "LE", "value": 6},
+             ]},
+             "effect": {"kind": "action", "type": "DRAW"}}
+        ],
+    },
+    {
+        "id": "compound_trait_count_and_life",
+        "text": "【登場時】自分の特徴《ドンキホーテ海賊団》を持つキャラが2枚以上いて、自分のライフが3枚以下の場合、相手のコスト4以下のキャラ1枚までを、KOする。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "condition": {"type": "AND", "args": [
+                 {"type": "FIELD_COUNT", "operator": "GE", "value": 2},
+                 {"type": "LIFE_COUNT", "operator": "LE", "value": 3},
+             ]},
+             "effect": {"kind": "action", "type": "KO"}}
+        ],
+    },
 ]

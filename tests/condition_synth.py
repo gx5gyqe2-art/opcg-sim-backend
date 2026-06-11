@@ -164,6 +164,14 @@ def _satisfy_condition(gm, controller, cond, source) -> Optional[bool]:
 
     if cond.type in (ConditionType.HAS_TRAIT, ConditionType.HAS_ATTRIBUTE,
                      ConditionType.HAS_UNIT, ConditionType.HAS_CHARACTER):
+        # 不在条件（「…がいない場合」= EQ 0 / 単純文字列の EQ）は注入すると壊れる。
+        # 汎用盤面は既に該当カードを持たないため、何もしないで満たす。
+        if cond.type == ConditionType.HAS_CHARACTER:
+            cv = cond.value
+            absent = (op == CompareOperator.EQ and (
+                isinstance(cv, str) or (isinstance(cv, tuple) and not isinstance(cv[1], str))))
+            if absent:
+                return True
         q = cond.target
         traits = list(getattr(q, "traits", []) or []) if q else []
         attrs = list(getattr(q, "attributes", []) or []) if q else []
