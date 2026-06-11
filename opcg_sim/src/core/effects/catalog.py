@@ -359,7 +359,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                  option_labels=["使用する", "使用しない"],
                  options=[
                      GameAction(type=ActionType.DRAW, value=ValueSource(base=1), raw_text="カード1枚を引く"),
-                     GameAction(type=ActionType.OTHER, raw_text="何もしない")
+                     GameAction(type=ActionType.RULE_PROCESSING, raw_text="何もしない")
                  ]
             )
         ),
@@ -383,7 +383,7 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                             raw_text="このリーダーは、このターン中、パワー+2000"
                          )
                      ]),
-                     GameAction(type=ActionType.OTHER, raw_text="何もしない")
+                     GameAction(type=ActionType.RULE_PROCESSING, raw_text="何もしない")
                  ]
             )
         )

@@ -31,7 +31,10 @@ class Player:
         self.don_rested: List[DonInstance] = []
         self.don_attached_cards: List[DonInstance] = [] 
         self.leader: Optional[Card] = leader
-        self.temp_zone: List[Card] = [] 
+        self.temp_zone: List[Card] = []
+        # 「相手の登場時効果は無効になる」(スコープ付き相手効果無効) の期限。
+        # turn_count <= negate_onplay_until の間、このプレイヤーの ON_PLAY 解決をスキップする。
+        self.negate_onplay_until: int = 0
 
     def setup_game(self):
         random.shuffle(self.deck)
@@ -748,7 +751,12 @@ class GameManager:
             self.move_card(card, Zone.FIELD, player); card.attached_don = 0; card.is_newly_played = True
             if self._has_rested_play(player):  # 「自分のキャラはレストで登場する」PASSIVE
                 card.is_rest = True
-            if not card.ability_disabled:
+            # 「相手の登場時効果は無効になる」(OPP_ONPLAY) 期間中はこのプレイヤーの ON_PLAY を解決しない。
+            onplay_negated = getattr(player, "negate_onplay_until", 0) >= self.turn_count
+            if onplay_negated:
+                log_event("INFO", "game.onplay_negated",
+                          f"{card.master.name}'s ON_PLAY is negated by opponent's effect", player=player.name)
+            if not card.ability_disabled and not onplay_negated:
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.ON_PLAY:
                         self.resolve_ability(player, ability, source_card=card)
@@ -882,10 +890,54 @@ class GameManager:
                 log_event("INFO", "game.replacement",
                           f"Replacement by {protector.master.name} activated for {card.master.name}",
                           player=owner.name)
+                # 置換は除去の解決中（apply_action_to_engine 内）に発生する「入れ子の中断」で、
+                # 現行の単一 continuation 設計ではネスト中断を表現できない（doc §7-C E14/E15）。
+                # 完全な continuation スタック化は高リスクのため、置換 sub_effect が対象選択／
+                # 任意確認で中断した場合は、その場で保守的に自動解決して同期完了させる
+                # （任意=実行＝保護を採用、対象=有効候補を選択）。これにより置換は必ず完了し、
+                # ダングリング interaction（カードが KO もされず置換も未完了の宙吊り）を防ぐ。
+                outer_interaction = self.active_interaction
+                self.active_interaction = None
                 resolver.execution_stack = [sub]
                 resolver._process_stack(owner, protector)
+                self._auto_resolve_replacement(owner)
+                # 置換解決で外側の interaction を壊していないことを保証（元の状態へ戻す）。
+                self.active_interaction = outer_interaction
                 return True
         return False
+
+    def _auto_resolve_replacement(self, owner: Player, limit: int = 16) -> None:
+        """置換 sub_effect が残した中断（任意確認／対象選択）を保守的に同期解決する。
+
+        単一 continuation 設計ではネストした中断を UI へ伝播できないため、置換は headless で
+        完結させる: 任意確認(CONFIRM_OPTIONAL)は accept（保護を実行）、対象選択(SELECT_TARGET)は
+        有効候補から必要数を自動選択する。選択 UI のフロント連携は E14/E15 の将来課題。"""
+        n = 0
+        while self.active_interaction and n < limit:
+            ia = self.active_interaction
+            atype = ia.get("action_type")
+            pid = ia.get("player_id")
+            actor = self.p1 if self.p1.name == pid else self.p2
+            if atype == "SELECT_TARGET":
+                cand = ia.get("selectable_uuids") or [c.uuid for c in ia.get("candidates", [])]
+                mx = (ia.get("constraints") or {}).get("max", 1) or 1
+                payload = {"selected_uuids": cand[:mx], "index": 0}
+            elif atype == "CONFIRM_OPTIONAL":
+                payload = {"accepted": True}
+            elif atype == "CHOICE":
+                payload = {"index": 0}
+            else:
+                # 想定外の中断種別は安全側に倒して打ち切る（宙吊り防止のため interaction を解除）。
+                self.active_interaction = None
+                break
+            try:
+                self.resolve_interaction(actor, payload)
+            except Exception as e:
+                log_event("WARNING", "game.replacement_autoresolve_fail",
+                          f"Auto-resolve of replacement interaction failed: {e}", player=owner.name)
+                self.active_interaction = None
+                break
+            n += 1
 
     def _resolve_on_ko(self, card: Card, owner: Player):
         if not card.master.abilities: return
@@ -1019,6 +1071,16 @@ class GameManager:
                 self.active_battle["target_owner"] = self.p1 if self.p1.name == new_target.owner_id else self.p2
                 log_event("INFO", "game.redirect_attack",
                           f"Attack redirected to {new_target.master.name}", player=player.name)
+            return True
+
+        if act_name == "DISABLE_ABILITY" and getattr(action, "status", None) == "OPP_ONPLAY":
+            # 「（次の相手のターン終了時まで、）相手の登場時効果は無効になる」: 相手プレイヤーに
+            # ON_PLAY 無効化の期限(turn_count)を設定する。次の相手ターン(=turn_count+1)を覆う。
+            opp = self.p2 if player == self.p1 else self.p1
+            dur = getattr(action, "duration", "INSTANT")
+            opp.negate_onplay_until = self.turn_count + (1 if dur == "UNTIL_NEXT_TURN_END" else 0)
+            log_event("INFO", "game.negate_opp_onplay",
+                      f"{opp.name}'s ON_PLAY negated until turn {opp.negate_onplay_until}", player=player.name)
             return True
 
         if act_name == "VICTORY":

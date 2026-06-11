@@ -119,7 +119,10 @@ def runtime_hidden_leak(master, ability):
         while gm.active_interaction and n < 30:
             ia = gm.active_interaction
             q = (ia.get("continuation") or {}).get("query")
-            if q is not None and getattr(q, "zone", None) in (Zone.DECK, Zone.LIFE):
+            if (q is not None and getattr(q, "zone", None) in (Zone.DECK, Zone.LIFE)
+                    and "REVEAL_SELECT" not in getattr(q, "flags", set())):
+                # REVEAL_SELECT は「自分のライフ／デッキを明示公開して選ぶ」正当な対話で、
+                # 情報リークではない（resolver も同 flag で対話選択を許可する）。
                 return True
             cand = ia.get("selectable_uuids") or [c.uuid for c in ia.get("candidates", [])]
             try:
@@ -177,12 +180,19 @@ def audit_ability(text, ability):
                 flags.append(("FLAG_COST_LIMIT", f"'{raw[:34]}'"))
 
         # FLAG_TARGET_SIDE: 「相手の(キャラ/リーダー)」を対象にするのに player=SELF。
-        #   「相手の効果で」等の非対象節は除外。対象が明示的に SOURCE（このキャラ自身）の場合、
-        #   「相手の…」はパワー参照等の修飾であって対象側ではないため除外（C9 同値パワー等）。
+        #   除外:
+        #    - 「相手の効果で」等の非対象節。
+        #    - 対象が明示的に SOURCE（このキャラ自身）の場合（C9 同値パワー等）。
+        #    - 直前の選択を参照する ref_id（「選んだキャラ」=保存済み対象を使うため player は無関係）。
+        #    - 期間/タイミング句「(次の)相手の(ターン/エンドフェイズ)(終了時)(まで/中)」（matcher も
+        #      player 判定からこれを除去する。残すと「このキャラのパワー+N」等で誤検出する）。
+        raw_no_dur = re.sub(
+            _nfc(r"(?:次の)?相手の(?:ターン|エンドフェイズ)(?:終了時)?(?:まで|中)"), "", raw)
         if tq is not None and getattr(tq, "player", None) == Player.SELF \
                 and getattr(tq, "zone", None) == Zone.FIELD \
                 and getattr(tq, "select_mode", None) != "SOURCE" \
-                and re.search(r"相手の(?!効果)[^。]*?(キャラ|リーダー)", raw):
+                and not getattr(tq, "ref_id", None) \
+                and re.search(r"相手の(?!効果)[^。]*?(キャラ|リーダー)", raw_no_dur):
             flags.append(("FLAG_TARGET_SIDE", f"相手の→SELF '{raw[:30]}'"))
 
     # FLAG_MISSING_ACTION: 能力テキストの動詞があるのに対応アクションが無い（OTHER 時は除外）

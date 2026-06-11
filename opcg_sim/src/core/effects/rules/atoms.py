@@ -175,6 +175,16 @@ def _duration_of(text: str) -> str:
     return "INSTANT"
 
 
+def _buff_target(t: str) -> TargetQuery:
+    """パワー/コスト増減の対象を解決する。主語が「この(キャラ/リーダー/カード)」
+    （「以外」を除く）なら自身(SOURCE)を返す。PASSIVE 自己バフが CHOOSE で
+    対象選択中断に陥るのを防ぎ、「このキャラ」が常に自身を指す意味とも一致する。
+    それ以外は通常の parse_target に委ねる。"""
+    if re.search(_nfc(r"この(キャラ|リーダー|カード)(?:は|の)"), t) and _nfc("以外") not in t:
+        return TargetQuery(select_mode="SOURCE")
+    return parse_target(t)
+
+
 @rule("power_buff", priority=60)
 def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -183,7 +193,7 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if _nfc("にする") in t:
         return None  # 「パワーをNにする」は base_power_override 系（別ルールで対応予定）
-    tq = parse_target(t)
+    tq = _buff_target(t)
     return GameAction(
         type=ActionType.BUFF,
         target=tq,
@@ -257,7 +267,7 @@ def _set_power(ctx: ParseContext) -> Optional[GameAction]:
     m = re.search(_nfc(r"パワー(?:を)?(\d+)に(?:なる|する)"), t)
     if not m:
         return None
-    tq = parse_target(t)
+    tq = _buff_target(t)
     if _nfc("まで") in t:
         tq.is_up_to = True
     return GameAction(
@@ -356,6 +366,29 @@ def _life_face(ctx: ParseContext) -> Optional[GameAction]:
     tq = parse_target(t)
     tq.zone = Zone.LIFE
     return GameAction(type=ActionType.FACE_UP_LIFE, target=tq, status=status, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# 自ライフ上の公開: 「（…時、）自分のライフの上からN枚（まで）を公開する」
+#   → FACE_UP_LIFE(zone=LIFE, SELF)。ライフ上を表向きにして公開する（位置指定=上からN枚
+#   なので隠しゾーン保護の自動取得に乗り、情報リークにならない）。「ライフの上か下に置く」
+#   (scry) や「ライフすべてを見て」(並び替え) とは語尾・構造で区別。OP15-119 等で従来 OTHER。
+#   先頭のトリガー節「相手が…発動した時、」はエンジン未ディスパッチのため自動発動はしないが、
+#   原子句としては公開アクションを正しく生成して OTHER を脱する。
+# ---------------------------------------------------------------------------
+@rule("reveal_own_life_top", priority=70)
+def _reveal_own_life_top(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"自分のライフの上から(\d+)枚(?:まで)?を公開する"), t):
+        return None
+    if _nfc("ライフの上か下") in t or _nfc("好きな順番") in t:
+        return None  # scry / 並び替えは別ルール
+    m = re.search(_nfc(r"ライフの上から(\d+)枚"), t)
+    n = int(m.group(1)) if m else 1
+    tq = TargetQuery(zone=Zone.LIFE, player=Player.SELF, count=n)
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.FACE_UP_LIFE, target=tq, status="UP", raw_text=t)
 
 
 @rule("life_cards_to_trash", priority=74)
@@ -947,7 +980,7 @@ def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
         if not m2:
             return None
         value = -int(m2.group(1))
-    tq = parse_target(t)
+    tq = _buff_target(t)
     return GameAction(
         type=ActionType.BUFF,
         target=tq,
@@ -1362,7 +1395,9 @@ def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("デッキの下") not in t:
         return None
-    if _nfc("置く") not in t and _nfc("戻す") not in t and _nfc("置き") not in t:
+    # 「置く」(終止) / 「戻す」/ 連用「置き」に加え、て形「置いて」「置いてもよい」も拾う
+    # （例: OP07-042「…キャラ1枚を持ち主のデッキの下に置いてもよい」が従来 OTHER だった）。
+    if not re.search(_nfc(r"デッキの下に(?:好きな順番で)?置(く|き|いて)"), t) and _nfc("戻す") not in t:
         return None
     if _nfc("残り") in t:
         return None  # remaining_deck_bottom / remaining_deck_top_or_bottom が担当
@@ -1419,6 +1454,39 @@ def _remaining_deck_top_or_bottom(ctx: ParseContext) -> Optional[GameAction]:
         ),
         raw_text=t,
     )
+
+
+# ---------------------------------------------------------------------------
+# 二段ティアのトラッシュ登場: 「自分のトラッシュのコストX以下のキャラカード1枚までと
+#   コストY以下のキャラカード1枚までを選び、1枚を登場させ、残りをレストで登場させる」
+#   → Sequence[PLAY_CARD(trash, cost<=X, 1まで, active), PLAY_CARD(trash, cost<=Y, 1まで, rested)]。
+#   2つのコストティアから各1枚までを選び、片方をアクティブ・もう片方をレストで登場する
+#   （どちらを active/rested にするかは選択だが、ティア対応で active=X側/rested=Y側に固定する
+#   近似）。後段の「残りをレストで登場させる」断片は TEMP 空につき no-op になる。OP06-086。
+# ---------------------------------------------------------------------------
+@rule("dual_tier_play_from_trash", priority=68)
+def _dual_tier_play_from_trash(ctx: ParseContext) -> Optional[EffectNode]:
+    t = ctx.text
+    if _nfc("トラッシュ") not in t or _nfc("登場") not in t:
+        return None
+    m = re.search(_nfc(r"コスト(\d+)以下.*?と.*?コスト(\d+)以下"), t)
+    if not m:
+        return None
+    c1, c2 = int(m.group(1)), int(m.group(2))
+
+    def _tier(cost_max: int, rested: bool) -> GameAction:
+        tq = TargetQuery(player=Player.SELF, zone=Zone.TRASH, card_type=["CHARACTER"],
+                         cost_max=cost_max, count=1, is_up_to=True)
+        return GameAction(
+            type=ActionType.PLAY_CARD,
+            target=tq,
+            destination=Zone.FIELD,
+            status="RESTED" if rested else None,
+            raw_text=t,
+        )
+
+    # 「1枚を登場させ(active)」= 上位ティア(コストX) / 「残りをレストで登場」= 下位ティア(コストY)。
+    return Sequence(actions=[_tier(c1, rested=False), _tier(c2, rested=True)])
 
 
 @rule("play_card_from_zone", priority=52)
@@ -1497,9 +1565,10 @@ def _play_from_deck(ctx: ParseContext) -> Optional[GameAction]:
 @rule("play_self", priority=75)
 def _play_self(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    if _nfc("登場させる") not in t:
-        return None
-    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?登場させる"), t):
+    # 「このカードを登場させる」(終止) と、Sequence 分割で連用形「登場させ、」が末尾
+    # 「このカードを登場」になった断片の両方を拾う（例: OP08-113【トリガー】
+    # 「…このカードを登場させ、相手の…をKOする」が「このカードを登場」で OTHER だった）。
+    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?登場(させる)?$"), t.strip()):
         return None
     return GameAction(
         type=ActionType.PLAY_CARD,
@@ -1944,6 +2013,62 @@ def _rule_processing(ctx: ParseContext) -> Optional[GameAction]:
     if not re.search(_nfc(r"ルール上"), t):
         return None
     return GameAction(type=ActionType.RULE_PROCESSING, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# コスト節の裸の数値: 「1:このキャラをアクティブにする」のように コロン左側が単独の
+#   数値だけになるカード（OP05-032 ピーカ 等）。この数値は効果の連番表記であって
+#   コストではないため、no-op（RULE_PROCESSING）に吸収して OTHER 化を防ぐ。
+#   ドン!!コスト（【ドン!!×N】）・丸数字コスト（①）は別タグ/ルールで処理済み。
+# ---------------------------------------------------------------------------
+@rule("bare_number_cost_noop", priority=93)
+def _bare_number_cost_noop(ctx: ParseContext) -> Optional[GameAction]:
+    if not ctx.is_cost:
+        return None
+    if not re.fullmatch(r"\d+", ctx.text.strip()):
+        return None
+    return GameAction(type=ActionType.RULE_PROCESSING, raw_text=ctx.text)
+
+
+# ---------------------------------------------------------------------------
+# 自己効果無効（受動・「は」）: 「この効果は無効になる」「自分の（【登場時】）効果は無効になる」
+#   → RULE_PROCESSING（no-op）。自身/自分側の効果が無効化される表現で、盤面操作を伴わない
+#   ドローバック or 条件分岐下の自己打ち消し（OP05-100 エネル / OP09-081 ティーチ前段）。
+#   「効果が無効になる」(自動詞) は self_effect_disabled(p64) が DISABLE_ABILITY を担う。
+#   「相手の…効果は無効になる」(スコープ付き相手無効) は scoped_negate_onplay(p65) が担当する。
+# ---------------------------------------------------------------------------
+@rule("self_effect_negated_noop", priority=63)
+def _self_effect_negated_noop(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("効果は無効になる") not in t:
+        return None
+    if _nfc("相手の") in t:
+        return None  # スコープ付き相手無効は scoped_negate_opp_onplay（実効果あり）
+    return GameAction(type=ActionType.RULE_PROCESSING, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# スコープ付き相手効果無効: 「（次の相手のターン終了時まで、）相手の登場時効果は無効になる」
+#   → DISABLE_ABILITY(status="OPP_ONPLAY", duration)。エンジンは相手プレイヤーに
+#   「登場時効果の無効化」期限(turn_count)を設定し、play_card_action が ON_PLAY の解決を
+#   スキップする。スコープは現状【登場時】(ON_PLAY)のみ対応（parser が 登場時 を保全する）。
+#   OP09-081 マーシャル・D・ティーチ。
+# ---------------------------------------------------------------------------
+@rule("scoped_negate_opp_onplay", priority=66)
+def _scoped_negate_opp_onplay(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("効果は無効になる") not in t:
+        return None
+    if _nfc("相手の") not in t or _nfc("登場時") not in t:
+        return None
+    dur = "UNTIL_NEXT_TURN_END" if _nfc("次の") in t else "THIS_TURN"
+    return GameAction(
+        type=ActionType.DISABLE_ABILITY,
+        status="OPP_ONPLAY",
+        target=None,
+        duration=dur,
+        raw_text=t,
+    )
 
 
 # ---------------------------------------------------------------------------
