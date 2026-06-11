@@ -30,18 +30,18 @@
 
 | 指標 | 刷新開始時 | **現在** |
 |---|---|---|
-| 原子句カバレッジ（ルール命中率） | 0% | **98.8%** |
-| `ActionType.OTHER`（実行時に何もしない句） | 942 | **39** |
+| 原子句カバレッジ（ルール命中率） | 0% | **99.x%** |
+| `ActionType.OTHER`（実行時に何もしない句） | 942 | **18** |
 | 未分類条件 `GENERIC`（誤発動の温床） | — | **1** |
-| atoms.py ルール数 | 0 | **73** |
-| テスト総数 | 17 | **259（全緑）** |
+| atoms.py ルール数 | 0 | **76** |
+| テスト総数 | 17 | **268（全緑）** |
 | 本番パーサ | レガシー | **EffectParserV2（既定）** |
 
 ### 監査フラグ（`tests/text_execution_audit.py` による全カード検証）
 
 | フラグ | 件数 | 意味 |
 |---|---|---|
-| FLAG_OTHER | **42** | 未実装句（裾野の専用効果が残存） |
+| FLAG_OTHER | **22** | 未実装句（裾野の専用効果が残存） |
 | FLAG_HIDDEN_LEAK | **0** | 隠しゾーン情報リーク（全解決済み） |
 | FLAG_DURATION | **0** | 期間不一致（全解決済み） |
 | FLAG_COST_LIMIT | **0** | 動的コスト上限未設定（全解決済み） |
@@ -244,15 +244,21 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen
 
 ## 7. 残タスク（優先度順）
 
-### A. OTHER 39件の裾野 burn down（継続）
+### A. OTHER 18件の裾野 burn down（継続）
 
-`effect_diagnostics.py` 起点で継続。残るものは構造的難所・専用メカニクスが中心。
+`effect_diagnostics.py` 起点で継続。残るものは構造的難所・combat/play-flow 系メカニクスが中心。
 
-- ✅ **ライフ並び替え**: `ActionType.ORDER_LIFE` 新設 + `gamestate` 実装済み（`order_life` ルール）
-- ✅ **イベント動的発動**: `ActionType.EXECUTE_EVENT` 新設 + `resolve_ability` 再入で実装済み
-- ✅ **効果ダメージ / 相手デッキ閲覧 / 複合除去保護 / 除外フィルタ**: ルール追加済み
-- **ドン!! 複合句（~7件）**: 「自分のドン‼1枚と…」のコスト断片。parser の構造分解で要対応
-- **その他複合効果（残り）**: 個別対応（勝利宣言・登場制限・手札全戻し等）
+- ✅ **済**: ライフ並び替え(ORDER_LIFE) / イベント発動(EXECUTE_EVENT) / 効果ダメージ /
+  相手・自分デッキ閲覧 / 複合除去保護 / 除外フィルタ / ドン複合コスト(REST_DON) / 勝利宣言(VICTORY) /
+  手札全戻し / 活用形・「てもよい」取りこぼし / 「任意の枚数」可変選択 / 「KOしてもよい」
+- **残18件（要エンジン/構造作業・combat 影響のため要 play-test）**:
+  - アタック対象変更 `REDIRECT_ATTACK`（3枚）: バトル中の対象差し替え。エンジンのアタック解決にフック必要
+  - レスト登場 / 効果で登場できない フラグ（2枚 OP09-022/OP12-036）: 登場フロー/手札制限への影響
+  - 付与ドンをコストエリアに戻す（1枚 ST28-004）: `MOVE_ATTACHED_DON` のエンジン未実装
+  - ライフ全見て1枚をデッキ上へ（2枚）/ dual-tier選択・トラッシュ枚数で段階効果（2枚）: catalog 個別 or 新ActionType
+  - トリガー解析エッジ（「リーダーが「しらほし」の場合」「イベントかブロッカーを発動した時」等）
+  - 「この/相手の効果は無効になる」（範囲修飾付き）/ 記号断片 ①/➀（実害なし）
+  - 「代わりに〜できる」任意置換（1枚）: 下記 C(E14/E15) と同じ系統で見送り中
 
 ### B. MISSING_ACTION 3件（複雑な分岐パターン）
 
@@ -261,15 +267,22 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen
 「以下から1つを…」でも「するか」でもない不規則な分岐（例: 数値条件で分岐する複合効果）で、
 個別の構造解析が必要。`text_execution_audit.py --flag MISSING_ACTION` で棚卸しする。
 
-### C. 置換効果（REPLACE_EFFECT）の残
+### C. 置換効果（REPLACE_EFFECT）の残 — E14/E15【見送り中（2026-06-11 判断）】
+
+**判断の根拠**: (1) 現状の card DB に「複数選択を伴う複雑な置換」カードが実質存在しない、
+(2) `GameManager.active_interaction` が**単一 continuation のみ保持する設計**で、置換が他効果の
+解決中に発生する「ネストした中断」を表現できない（核アーキテクチャ改修が必要）。受益カードが
+無い段階での高リスク改修を避け、該当カード出現時に着手する方針。
 
 **E14 置換実行が対象選択で中断する場合の挙動**
 - 置換 `sub_effect` の実行中に `_suspend_for_target_selection` が起動する場合
-  （例: 「代わりに手札2枚を選んで捨てる」）の処理。現状は同期 auto-execute のため
-  対象選択 UI が出ない。→ REPLACE_EFFECT をスタック上に積み直す設計変更が必要。
+  （例: 「代わりに手札2枚を選んで捨てる」）。現状は `_active_replacement` が同期 auto-execute。
+  → REPLACE_EFFECT をスタックに積み直し、`active_interaction` を呼び出し側へ伝播させる設計変更。
+  ネストした中断は単一 continuation 設計の拡張（continuation スタック化）が前提。
 
 **E15 任意（「できる」）の選択 UI**
-- 「代わりに〜できる」形の置換の yes/no UI。E14 の suspend/resume 実装後に対応。
+- 「代わりに〜できる」形の置換の yes/no UI。E14 の suspend/resume 実装後に
+  既存 `_suspend_for_optional_confirmation` でほぼ自動サポート。
 
 ### D. INTERACTIVE 71件の手動検証
 
