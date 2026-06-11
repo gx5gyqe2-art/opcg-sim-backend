@@ -186,7 +186,37 @@ def _duration_of(text: str) -> str:
         return "THIS_BATTLE"
     if _nfc("このターン中") in text:
         return "THIS_TURN"
+    # 「次の(自分の/相手の)ターン(開始/終了)時まで」: いずれも相手ターン明けの境界で
+    # 失効する UNTIL_NEXT_TURN_END に写像する（「次の自分のターン開始時まで」は
+    # 相手ターン終了＝自分ターン開始と同境界。「次の自分のターン終了時まで」(1枚のみ)
+    # は厳密には1ターン長いが近似する）。従来は INSTANT に落ち、ターン境界処理で
+    # 即消えていた。
+    if re.search(_nfc(r"次の(自分の|相手の)?ターン(開始|終了)時まで"), text):
+        return "UNTIL_NEXT_TURN_END"
     return "INSTANT"
+
+
+def _subject_target(t: str) -> TargetQuery:
+    """制限/付与系の「<主語>は、<述語>」句から主語側の対象クエリを作る。
+
+    主語が「この(キャラ/リーダー/カード)」（または主語省略）なら SOURCE。
+    それ以外は主語部分のみを parse_target に渡し、特徴/コスト上限/枚数などの
+    修飾を保全する（述語側の「相手の効果で」等を player 判定に混ぜない）。
+    枚数指定が無い場合は該当全体(ALL)、「N枚まで」は is_up_to を立てる。
+    """
+    m = re.match(_nfc(r"^(.+?)は、?"), t)
+    if not m:
+        return TargetQuery(select_mode="SOURCE")
+    subject = m.group(1).strip()
+    if re.search(_nfc(r"この(キャラ|リーダー|カード)$"), subject) and _nfc("以外") not in subject:
+        return TargetQuery(select_mode="SOURCE")
+    tq = parse_target(subject)
+    if not re.search(_nfc(r"[\d０-９]+枚"), subject):
+        tq.count = -1
+        tq.select_mode = "ALL"
+    elif _nfc("まで") in subject:
+        tq.is_up_to = True
+    return tq
 
 
 def _buff_target(t: str) -> TargetQuery:
@@ -807,12 +837,17 @@ def _prevent_leave(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("場を離れない") in t or _nfc("場を離れず") in t:
         status = "LEAVE"
     elif _nfc("KOされない") in t:
-        status = "BATTLE_KO"
+        # 「効果でKOされない」は除去保護(LEAVE)、「バトルでKOされない」は BATTLE_KO。
+        # 修飾なしの「KOされない」は両方を意味するため LEAVE+BATTLE_KO 相当の広い方(LEAVE)
+        # ではなくバトル保護として扱ってきた従来挙動を維持する。
+        status = "LEAVE" if _nfc("効果でKOされ") in t else "BATTLE_KO"
     else:
         return None
+    # 主語の修飾（「自分の特徴《X》を持つキャラすべては」等）を保全する。
+    # 従来は常に SOURCE 固定で、他カードを守る範囲保護が消失していた（EB04-057 等）。
     return GameAction(
         type=ActionType.PREVENT_LEAVE,
-        target=TargetQuery(select_mode="SOURCE"),
+        target=_subject_target(t),
         status=status,
         duration=_duration_of(t),
         raw_text=t,
@@ -1324,9 +1359,21 @@ def _blocker_disable(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ブロッカー") not in t or _nfc("発動できない") not in t:
         return None
-    tq = TargetQuery(
-        player=Player.OPPONENT, zone=Zone.FIELD, count=-1, select_mode="ALL"
-    )
+    # 「コスト5以下のキャラの【ブロッカー】」等の制約は述部側に現れるため、
+    # 全文を parse_target に渡して cost/power 上限・特徴を保全する。
+    # 「自分のリーダーがアタックする際」のようなタイミング限定句は player 判定を
+    # 汚すため除去する（タイミング限定自体は未対応＝広めに無効化される。TODO: 限定）。
+    t2 = re.sub(_nfc(r"自分の(リーダー|キャラ)が[^、]*アタックする際"), "", t)
+    tq = parse_target(t2)
+    tq.zone = Zone.FIELD
+    if tq.player == Player.SELF and _nfc("自分") not in t2:
+        # 主語省略（「このバトル中、【ブロッカー】を発動できない」）は相手既定
+        tq.player = Player.OPPONENT
+    if not re.search(_nfc(r"[\d０-９]+枚"), t2):
+        tq.count = -1
+        tq.select_mode = "ALL"
+    elif _nfc("まで") in t2:
+        tq.is_up_to = True
     return GameAction(
         type=ActionType.BUFF,
         target=tq,
@@ -1348,9 +1395,11 @@ def _rush_natural(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if not re.search(_nfc(r"登場した(ターン|時)に.*アタックできる"), t):
         return None
+    # 主語が「自分の特徴《X》を持つキャラは」等の場合は対象クエリを保全する
+    # （従来は SOURCE 固定で範囲付与が自身のみになっていた。OP11-001/OP11-031 等）。
     return GameAction(
         type=ActionType.GRANT_KEYWORD,
-        target=TargetQuery(select_mode="SOURCE"),
+        target=_subject_target(t),
         status="速攻",
         duration="PERMANENT",
         raw_text=t,

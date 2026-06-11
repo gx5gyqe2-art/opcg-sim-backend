@@ -2212,4 +2212,44 @@ CASES = [
              ]}}
         ],
     },
+    # ----- RC-2: 制限/付与系の主語修飾の保全（SOURCE ハードコード是正） -----------
+    {
+        "id": "scoped_prevent_leave_traits",
+        "text": "自分の特徴《科学者》を持つキャラすべては、相手の効果で場を離れない。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "PREVENT_LEAVE", "status": "LEAVE",
+                        "target": {"zone": "FIELD", "traits": ["科学者"],
+                                   "select_mode": "ALL"}}}
+        ],
+    },
+    {
+        "id": "scoped_rush_traits",
+        "text": "自分の特徴《SWORD》を持つキャラは、登場したターンにキャラへアタックできる。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "GRANT_KEYWORD", "status": "速攻",
+                        "target": {"traits": ["SWORD"], "select_mode": "ALL"}}}
+        ],
+    },
+    {
+        "id": "blocker_disable_cost_cap_upto",
+        "text": "【登場時】相手の元々のコスト4以下のキャラ1枚までは、このターン中、【ブロッカー】を発動できない。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "effect": {"kind": "action", "type": "BUFF", "status": "BLOCKER_DISABLE",
+                        "target": {"cost_max": 4}}}
+        ],
+    },
+    # ----- RC-2: 「次の…まで」の期間が INSTANT に落ちない -------------------------
+    {
+        "id": "until_next_turn_prevent_battle_ko",
+        "text": "【アタック時】このキャラは、次の自分のターン開始時まで、バトルでKOされずパワー＋2000。",
+        "expect": [
+            {"trigger": "ON_ATTACK",
+             "effect": {"kind": "seq", "actions": [
+                 {"type": "PREVENT_LEAVE", "status": "BATTLE_KO",
+                  "duration": "UNTIL_NEXT_TURN_END"},
+                 {"type": "BUFF", "value": 2000, "duration": "UNTIL_NEXT_TURN_END"},
+             ]}}
+        ],
+    },
 ]

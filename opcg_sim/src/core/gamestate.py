@@ -10,6 +10,7 @@ from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType,
 from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource, Sequence, Branch, Choice
 from ..utils.logger_config import log_event
 from .effects.resolver import EffectResolver
+from .effects.matcher import get_target_cards
 
 
 Card = CardInstance
@@ -832,21 +833,51 @@ class GameManager:
         if not card or not getattr(card, "master", None) or card.negated:
             return False
         owner = self.p1 if self.p1.name == card.owner_id else self.p2
+
+        # トリガー効果が継続効果として付与した期間付き保護（timed_flags）。
+        # 例: 「このキャラは、次の自分のターン開始時まで、バトルでKOされない」(ON_ATTACK)
+        for s in status_values:
+            if f"PREVENT_{s}" in (card.flags | card.timed_flags):
+                return True
+
         resolver = None
-        for ab in card.master.abilities:
-            if ab.trigger != TriggerType.PASSIVE:
+        # 走査対象: 自身に加え、オーナーのリーダー/フィールド/ステージの範囲保護
+        # （「自分の特徴《X》を持つキャラすべては…場を離れない」等。従来は自身のみ走査で
+        #   他カードを守る保護が機能しなかった）。
+        protectors = [card]
+        if owner.leader and owner.leader is not card:
+            protectors.append(owner.leader)
+        protectors.extend(fc for fc in owner.field if fc is not card)
+        if getattr(owner, "stage", None) and owner.stage is not card:
+            protectors.append(owner.stage)
+
+        for protector in protectors:
+            if getattr(protector, "ability_disabled", False) or getattr(protector, "negated", False):
                 continue
-            eff = self._find_action(ab.effect, ActionType.PREVENT_LEAVE)
-            if eff is None:
-                continue
-            if eff.status not in status_values:
-                continue
-            if ab.condition is not None:
-                if resolver is None:
-                    resolver = EffectResolver(self)
-                if not resolver._check_condition(owner, ab.condition, card):
+            for ab in protector.master.abilities:
+                if ab.trigger != TriggerType.PASSIVE:
                     continue
-            return True
+                eff = self._find_action(ab.effect, ActionType.PREVENT_LEAVE)
+                if eff is None:
+                    continue
+                if eff.status not in status_values:
+                    continue
+                # 保護対象クエリの照合: SOURCE は protector 自身のみを守る。
+                # 範囲クエリは card が範囲に含まれるかを実体化して確認する。
+                tgt = getattr(eff, "target", None)
+                if tgt is None or getattr(tgt, "select_mode", "SOURCE") == "SOURCE":
+                    if protector is not card:
+                        continue
+                else:
+                    if card not in get_target_cards(self, tgt, protector):
+                        continue
+                if ab.condition is not None:
+                    if resolver is None:
+                        resolver = EffectResolver(self)
+                    src = card if protector is card else protector
+                    if not resolver._check_condition(owner, ab.condition, src):
+                        continue
+                return True
         return False
 
     # 置換効果（REPLACE_EFFECT）の判定。除去の瞬間に対象の PASSIVE 能力を走査し、
@@ -1231,7 +1262,16 @@ class GameManager:
                     log_event("INFO", "game.leave_replaced", f"{target.master.name}'s removal was replaced by an alternative effect", player=owner.name)
                     continue
             if act_name == "PREVENT_LEAVE":
-                # 保護マーカー自体は no-op（実際の保護は除去時に _active_protection で評価）。
+                # PASSIVE 由来(INSTANT)はマーカーのみ（除去時に _active_protection が走査）。
+                # トリガー効果の期間付き保護は継続効果フラグとして対象に付与する
+                # （従来は no-op で「次の…まで、バトルでKOされない」が機能しなかった）。
+                dur = getattr(action, "duration", "INSTANT")
+                if dur in ("THIS_TURN", "THIS_BATTLE", "UNTIL_NEXT_TURN_END"):
+                    flag = f"PREVENT_{action.status or 'LEAVE'}"
+                    expire_turn = self.turn_count + 1 if dur == "UNTIL_NEXT_TURN_END" else 0
+                    self.continuous.apply(target, "FLAG", dur, flag=flag, expire_turn=expire_turn)
+                    log_event("INFO", "game.action_prevent_leave",
+                              f"{target.master.name} protected ({action.status}, {dur})", player=player.name)
                 success = True
             elif act_name == "KO":
                 self.move_card(target, Zone.TRASH, owner)

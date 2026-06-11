@@ -1806,3 +1806,91 @@ def test_life_to_deck_reveal_select_suspends_and_resumes():
     assert p1.deck[0].master.card_id == 'LF1'
     assert 'LF1' not in [c.master.card_id for c in p1.life]
     assert len(p1.life) + len(p1.deck) == 5  # カード保全
+
+
+def test_scoped_prevent_leave_protects_trait_characters():
+    """RC-2: 「自分の特徴《X》を持つキャラすべては、相手の効果で場を離れない」
+    範囲保護が他カード（特徴一致キャラ）を守り、不一致キャラは守らない。"""
+    from opcg_sim.src.models.effect_types import Ability, TargetQuery
+    gm, p1, p2 = make_game()
+    protector_ab = Ability(
+        trigger=TriggerType.PASSIVE,
+        effect=GameAction(
+            type=ActionType.PREVENT_LEAVE, status="LEAVE",
+            target=TargetQuery(player=Player.SELF, zone=Zone.FIELD,
+                               card_type=["CHARACTER"], traits=["科学者"],
+                               count=-1, select_mode="ALL"),
+        ),
+    )
+    protector = make_instance(
+        make_master(card_id="P-PL", name="守護者", abilities=(protector_ab,)), owner="P1")
+    scientist = make_instance(
+        make_master(card_id="C-SCI", name="科学者A", traits=["科学者"]), owner="P1")
+    other = make_instance(make_master(card_id="C-OTH", name="一般人"), owner="P1")
+    p1.field.extend([protector, scientist, other])
+
+    # 相手(P2)の効果による KO: 特徴一致キャラは守られる
+    ok = gm.apply_action_to_engine(p2, action(ActionType.KO), [scientist], 0)
+    assert scientist in p1.field, "特徴一致キャラは範囲保護で場に残るべき"
+    # 不一致キャラは KO される
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [other], 0)
+    assert other not in p1.field and other in p1.trash
+    # 自分自身(P1)の効果による除去は保護対象外（「相手の効果で」）
+    gm.apply_action_to_engine(p1, action(ActionType.KO), [scientist], 0)
+    assert scientist in p1.trash
+
+
+def test_timed_prevent_battle_ko_flag():
+    """RC-2/RC-1複合: 期間付き PREVENT_LEAVE(BATTLE_KO) が継続フラグとして付与され、
+    バトル KO を防ぎ、ターン境界で失効する。"""
+    gm, p1, p2 = make_game()
+    char = make_instance(make_master(card_id="C-PRV", name="不死身", power=1000), owner="P1")
+    p1.field.append(char)
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.PREVENT_LEAVE, status="BATTLE_KO",
+                   duration="UNTIL_NEXT_TURN_END"), [char], 0)
+    assert ok
+    assert "PREVENT_BATTLE_KO" in char.timed_flags
+    assert gm._active_protection(char, ("BATTLE_KO",)) is True
+    assert gm._active_protection(char, ("LEAVE",)) is False
+
+    # ターン経過で失効する（UNTIL_NEXT_TURN_END → turn_count+1 の TURN_END）
+    gm.continuous.expire("TURN_END", gm.turn_count + 1)
+    assert "PREVENT_BATTLE_KO" not in char.timed_flags
+    assert gm._active_protection(char, ("BATTLE_KO",)) is False
+
+
+def test_blocker_disable_respects_cost_cap():
+    """RC-2: 「コスト5以下のキャラの【ブロッカー】を発動できない」がコスト上限で絞られる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abilities = parser.parse_card_text(
+        "【アタック時】相手は、このバトル中、コスト5以下のキャラの【ブロッカー】を発動できない。")
+    assert abilities, "解析失敗"
+    ab = abilities[0]
+    acts = [a for a in _walk_nodes(ab.effect)
+            if getattr(a, "status", None) == "BLOCKER_DISABLE"]
+    assert acts, "BLOCKER_DISABLE が生成されるべき"
+    tq = acts[0].target
+    assert tq.cost_max == 5, f"コスト上限が保持されるべき: {tq.cost_max}"
+    assert tq.player == Player.OPPONENT
+    assert tq.count == -1 and tq.select_mode == "ALL"
+
+
+def _walk_nodes(node):
+    from opcg_sim.src.models.effect_types import Sequence as _Seq, Branch as _Br, Choice as _Ch
+    if node is None:
+        return
+    if isinstance(node, GameAction):
+        yield node
+    elif isinstance(node, _Seq):
+        for a in node.actions:
+            yield from _walk_nodes(a)
+    elif isinstance(node, _Br):
+        yield from _walk_nodes(node.if_true)
+        if node.if_false:
+            yield from _walk_nodes(node.if_false)
+    elif isinstance(node, _Ch):
+        for o in node.options:
+            yield from _walk_nodes(o)
