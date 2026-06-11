@@ -78,6 +78,9 @@ class TargetQuery:
     select_mode: str = "CHOOSE"
     save_id: Optional[str] = None
     ref_id: Optional[str] = None
+    # 「自分の手札1枚を相手が選び、捨てる」等で選択を行うプレイヤー
+    # （None=効果のコントローラー）。resolver の対話サスペンドが参照する。
+    chooser: Optional[Player] = None
     flags: Set[str] = field(default_factory=set)
     is_vanilla: bool = False
     is_strict_count: bool = False

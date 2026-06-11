@@ -30,6 +30,15 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     player_text = re.sub(
         _nfc(r'(?:次の)?相手の(?:ターン|エンドフェイズ)(?:終了時)?(?:まで|中)'),
         '', player_text)
+    # 選択者句「相手が選び/選ぶ/選んで」は対象側ではなく「誰が選ぶか」の指定
+    # （「自分の手札1枚を相手が選び、捨てる」= 対象は自分の手札、選ぶのは相手）。
+    # player 判定から除去し、chooser として保持する。
+    chooser = None
+    if re.search(_nfc(r'相手が選(?:び|ぶ|んで)'), player_text):
+        chooser = Player.OPPONENT
+        player_text = re.sub(_nfc(r'相手が選(?:び|ぶ|んで)'), '', player_text)
+    # トリガー条件句「相手が…した時、」も対象側判定を汚すため除去する
+    player_text = re.sub(_nfc(r'相手が[^、。]*した時、?'), '', player_text)
 
     if _nfc(ParserKeyword.EACH_OTHER) in player_text: tq.player = Player.ALL
     elif _nfc(ParserKeyword.OPPONENT) in player_text: tq.player = Player.OPPONENT
@@ -196,6 +205,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 無ければ通常マッチへフォールバックするため、選択が先行しない場合も安全。
     if re.search(_nfc(r"(選んだ|その)(カード|キャラ|リーダー)"), tgt_text):
         tq.ref_id = "selected_card"
+
+    if chooser is not None:
+        tq.chooser = chooser
 
     return tq
 

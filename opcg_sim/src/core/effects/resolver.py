@@ -779,8 +779,14 @@ class EffectResolver:
 
         up_to_str = "まで" if is_up_to else ""
         count_str = f"{required_count}枚{up_to_str}" if required_count != 1 else f"1枚{up_to_str}"
+        # 「相手が選び」: 選択者が効果コントローラーの相手に指定されている場合は
+        # 相手プレイヤーに選択させる（RC-3）。
+        chooser_player = player
+        if getattr(query, "chooser", None) is not None and query.chooser == Player.OPPONENT:
+            gm = self.game_manager
+            chooser_player = gm.p2 if player is gm.p1 else gm.p1
         interaction = {
-            "player_id": player.name,
+            "player_id": chooser_player.name,
             "action_type": "SELECT_TARGET",
             "source_card_name": source_card.master.name,
             "message": f"「{source_card.master.name}」の効果: 対象を選択（{count_str}）",

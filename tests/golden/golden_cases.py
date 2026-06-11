@@ -2275,4 +2275,14 @@ CASES = [
                                           "divisor": 1, "multiplier": 1}}}
         ],
     },
+    # ----- RC-3: 「相手が選び」は選択者指定であって対象側ではない --------------------
+    {
+        "id": "opponent_chooser_discard_own_hand",
+        "text": "【KO時】自分の手札1枚を相手が選び、捨てる。",
+        "expect": [
+            {"trigger": "ON_KO",
+             "effect": {"kind": "action", "type": "DISCARD",
+                        "target": {"player": "SELF", "zone": "HAND"}}}
+        ],
+    },
 ]

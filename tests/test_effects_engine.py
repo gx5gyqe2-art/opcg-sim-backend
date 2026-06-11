@@ -1971,3 +1971,31 @@ def test_per_n_rest_don_count():
     gm._apply_passive_effects(p1)
     assert char.get_power(True) == 3000, (
         f"レストドン7枚 // 3 * 1000 = +2000 のはず: {char.get_power(True)}")
+
+
+def test_opponent_chooses_own_hand_discard():
+    """RC-3: 「自分の手札1枚を相手が選び、捨てる」は自分の手札が対象で、
+    選択者は相手プレイヤーになる（従来は相手の手札を捨てていた）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abilities = parser.parse_card_text("【KO時】自分の手札1枚を相手が選び、捨てる。")
+    assert abilities
+    gm, p1, p2 = make_game()
+    src = make_instance(make_master(card_id="C-CHO", name="カン十郎"), owner="P1")
+    p1.field.append(src)
+    for i in range(3):
+        p1.hand.append(make_instance(make_master(card_id=f"H-{i}", name=f"手札{i}"), owner="P1"))
+    p2.hand.append(make_instance(make_master(card_id="H-OPP", name="相手手札"), owner="P2"))
+
+    gm.resolve_ability(p1, abilities[0], src)
+    ia = gm.active_interaction
+    assert ia is not None and ia["action_type"] == "SELECT_TARGET"
+    assert ia["player_id"] == "P2", f"選択者は相手のはず: {ia['player_id']}"
+    cand_owners = {c.owner_id for c in ia["candidates"]}
+    assert cand_owners == {"P1"}, f"候補は自分の手札のはず: {cand_owners}"
+
+    # 相手が1枚選んで解決 → 自分の手札が減り、相手の手札は減らない
+    chosen = ia["candidates"][0].uuid
+    gm.resolve_interaction(p2, {"selected_uuids": [chosen], "index": 0})
+    assert len(p1.hand) == 2
+    assert len(p2.hand) == 1
