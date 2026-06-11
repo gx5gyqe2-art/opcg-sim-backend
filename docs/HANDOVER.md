@@ -1,6 +1,6 @@
 # 引き継ぎ資料 — カード効果システム刷新
 
-最終更新: 2026-06-11 / ブランチ: `claude/system-issues-review-45ftlh`
+最終更新: 2026-06-11 / ブランチ: `claude/handoff-materials-review-46flvn`
 
 このドキュメントは `opcg-sim-backend` の **カード効果処理システム** を引き継ぐための資料です。
 設計詳細は `docs/parser_v2.md`、本書はその上位のオリエンテーション（全体像・運用・残タスク）を担います。
@@ -33,15 +33,15 @@
 | 原子句カバレッジ（ルール命中率） | 0% | **99%超** |
 | `ActionType.OTHER`（実行時に何もしない句） | 942 | **6** |
 | 未分類条件 `GENERIC`（誤発動の温床） | — | **1** |
-| atoms.py ルール数 | 0 | **84** |
-| テスト総数 | 17 | **283（全緑）** |
+| atoms.py ルール数 | 0 | **83** |
+| テスト総数 | 17 | **284（全緑）** |
 | 本番パーサ | レガシー | **EffectParserV2（既定）** |
 
 ### 監査フラグ（`tests/text_execution_audit.py` による全カード検証）
 
 | フラグ | 件数 | 意味 |
 |---|---|---|
-| FLAG_OTHER | **12** | 未実装句（裾野の専用効果が残存） |
+| FLAG_OTHER | **11** | 未実装句（裾野の専用効果が残存） |
 | FLAG_HIDDEN_LEAK | **0** | 隠しゾーン情報リーク（全解決済み） |
 | FLAG_DURATION | **0** | 期間不一致（全解決済み） |
 | FLAG_COST_LIMIT | **0** | 動的コスト上限未設定（全解決済み） |
@@ -62,9 +62,9 @@
 |---|---|---|
 | SKIP | 325 | 能力なし |
 | ERROR | **0** | 例外発生（全解決済み） |
-| INTERACTIVE | 71 | 対象選択が必要（手動テスト優先リスト） |
-| EXECUTED | 2631 | 盤面変化確認済み |
-| NO_CHANGE | 450 | 条件未達/コスト不成立/PASSIVE/測定限界（実バグ=0確認済み） |
+| INTERACTIVE | 459 | 対象選択が必要（`interactive_target_audit.py` で対象の正しさを自動監査済み） |
+| EXECUTED | 2241 | 盤面変化確認済み |
+| NO_CHANGE | 452 | 条件未達/コスト不成立/PASSIVE/測定限界（実バグ=0確認済み） |
 
 ---
 
@@ -171,6 +171,7 @@
 | `tests/effect_coverage.py` | 全カード実行カバレッジ（SKIP/ERROR/INTERACTIVE/EXECUTED/NO_CHANGE） |
 | `tests/compare_parsers.py` | レガシー vs V2 の全カード差分（退行検知） |
 | `tests/mistarget_diagnostics.py` | 隠れミスターゲット/lift 不具合の検出 |
+| `tests/interactive_target_audit.py` | **INTERACTIVE 対象の自動監査**（解釈済み TargetQuery をテキストと照合し、対象側/コスト上限/枚数/特徴の不一致候補を検出。`--top N`） |
 | `full_card_baseline.json` | 全3152能力の実行シグネチャ凍結（挙動ベースライン） |
 
 ### フロントエンド（opcg-sim-frontend）
@@ -244,7 +245,7 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen
 
 ## 7. 残タスク（優先度順）
 
-### A. OTHER 12件の裾野 burn down（継続）
+### A. OTHER 6件の裾野 burn down（継続）
 
 `effect_diagnostics.py` 起点で継続。**方針: catalog は使わず parser/エンジン拡張で対応**（2026-06-11）。
 
@@ -255,7 +256,7 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen
   **レスト登場(RESTED_PLAY)** / **登場制限(NO_EFFECT_PLAY)**
 - ✅ **追加で済**: ライフ→デッキ上(LIFE_TO_DECK) / サーチ結果をライフへ(TEMP→LIFE) /
   丸数字コスト①➀(REST_DON)
-- **残7件（各1カードの深い構造/エンジン作業 or 見送り）**:
+- **残6件（各1カードの深い構造/エンジン作業 or 見送り。詳細は下記）**:
   - OP07-042「代わりに〜できる」任意置換: **E14/E15（見送り中）**
   - OP05-100「この効果は無効になる」: **実質no-op（OTHER=何もしない=正しい）**
   - OP11-103: コスト節内の条件「リーダーが「しらほし」の場合」→ ability 条件への抽出（構造）
@@ -340,6 +341,22 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen
   正しく再計算される（かつて除外されていたバグは修正済み）。
 - **全カード挙動ベースライン `full_card_baseline.json`** は「現状の挙動」を凍結したもの。
   バグ修正で挙動が変わる際は差分をレビューして `full_card_audit.py --regen` で更新する。
+- **`parse_target` の対象側(player)判定は期間/タイミング句の「相手の」に注意**。「次の相手のターン
+  終了時まで」等の duration を player 判定から除外している（しないと「自分のリーダーを…パワー+N」が
+  OPPONENT 強化になる）。新しい duration 表現を増やす際は `matcher.py` の除去正規表現に追加する。
+- **隠しゾーン（ライフ/デッキ）からの「見て選ぶ」は `TargetQuery.flags` に `"REVEAL_SELECT"` を付ける**。
+  resolver は通常ライフ/デッキを「上から自動取得」する（情報リーク防止）が、自分のライフを明示公開して
+  選ぶ効果（「ライフすべてを見て1枚をデッキ上に置く」等）はこの flag で対話選択に切り替える。
+- **「持ち主の…」での OPPONENT 補正は「自分の(キャラ/リーダー)」明示を尊重する**こと
+  （`deck_bottom_general` 等）。明示が無いときだけ相手既定にする。
+- **ドン付与(ATTACH_DON)の付与先は `parse_target` で解析**し特徴/名前/コスト絞り込みを拾う
+  （手動構築すると filter が脱落する）。`is_rest` 漏れだけ明示リセットする。
+
+### 直近のミスターゲット是正（2026-06-11, `interactive_target_audit.py` 起点）
+- 「自分のキャラを持ち主のデッキの下に置く」が相手対象になる不具合（deck_bottom）を修正。
+- 「次の相手のターン終了時まで」で自己バフ(パワー/コスト)が相手強化になる不具合（parse_target）を修正。
+- ドン付与の付与先フィルタ脱落を修正。
+- ライフ→デッキの「見て選ぶ」を自動取得から対話選択(`REVEAL_SELECT`)へ修正。
 
 ---
 
