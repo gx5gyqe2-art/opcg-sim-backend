@@ -613,6 +613,22 @@ def _don_set_active(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+# ---------------------------------------------------------------------------
+# ドン!!複合コストの前半断片: 「自分のドン‼N枚と」
+#   「自分のドン‼N枚とこのキャラ／このリーダーをレストにできる」というコストは、レガシー構造分解で
+#   「自分のドン‼N枚と」(断片) と「…をレストにできる」(REST self) に割れる。後半は rest_self_cost が
+#   拾うが、前半の断片は従来 OTHER。これを REST_DON（ドン!!を N 枚レスト）として補完する。
+#   「枚と」で終わる断片に限定し、効果文への誤爆を避ける（多くはコスト=ctx.is_cost）。
+# ---------------------------------------------------------------------------
+@rule("don_rest_cost_fragment", priority=76)
+def _don_rest_cost_fragment(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text.strip()
+    m = re.match(_nfc(r"^(?:自分の)?ドン[‼!]*\s*(\d+)枚と$"), t)
+    if not m:
+        return None
+    return GameAction(type=ActionType.REST_DON, value=ValueSource(base=int(m.group(1))), raw_text=ctx.text)
+
+
 @rule("don_set_rest", priority=74)
 def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分の）ドン!!N枚をレストにする/できる」→ REST_DON（アクティブ→レスト）。多くはコスト。"""
@@ -1518,12 +1534,11 @@ def _hand_to_deck(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("手札") not in t:
         return None
-    if _nfc("デッキ") not in t or _nfc("置く") not in t:
+    # 「デッキの上/下に置く」に加え、「（手札すべてを）デッキに戻す/戻し」(シャッフル前提) も拾う。
+    if not re.search(_nfc(r"デッキの(上か下|上|下)に置く"), t) and not re.search(_nfc(r"デッキに戻"), t):
         return None
-    # 「ライフ」「トラッシュ」を含む場合は別ルールへ委ねる
-    if _nfc("ライフ") in t or _nfc("トラッシュ") in t:
-        return None
-    if not re.search(_nfc(r"デッキの(上か下|上|下)に置く"), t):
+    # 「ライフ」「トラッシュ」「ドン」を含む場合は別ルールへ委ねる
+    if _nfc("ライフ") in t or _nfc("トラッシュ") in t or _nfc("ドン") in t:
         return None
     tq = parse_target(t)
     tq.zone = Zone.HAND
@@ -1735,6 +1750,21 @@ def _win_on_deckout(ctx: ParseContext) -> Optional[GameAction]:
         status="REPLACE_DECKOUT_LOSS",
         raw_text=t,
     )
+
+
+# ---------------------------------------------------------------------------
+# 勝利宣言: 「（自分は）ゲームに勝利する」→ VICTORY（即時勝利）。従来 OTHER。
+#   「敗北する代わりに勝利」(デッキアウト置換) は win_on_deckout(priority 95) が先に拾うため、
+#   ここは無条件/条件付きの能動勝利のみ（status なし → エンジンが即 winner 設定）。
+# ---------------------------------------------------------------------------
+@rule("declare_victory", priority=22)
+def _declare_victory(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("ゲームに勝利") not in t:
+        return None
+    if _nfc("代わりに") in t:  # デッキアウト置換は win_on_deckout が担当
+        return None
+    return GameAction(type=ActionType.VICTORY, raw_text=t)
 
 
 # ---------------------------------------------------------------------------

@@ -1904,4 +1904,39 @@ CASES = [
             ]}}
         ],
     },
+    # ----- ドン!!複合コスト「自分のドン‼N枚と…をレストにできる」 ----------
+    # コスト前半の断片「自分のドン‼N枚と」を REST_DON 化（従来 OTHER）。
+    {
+        "id": "don_and_rest_self_cost",
+        "text": "【起動メイン】自分のドン‼1枚とこのキャラをレストにできる：カード1枚を引く。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {"kind": "seq", "actions": [
+                    {"kind": "action", "type": "REST_DON", "value": 1},
+                    {"kind": "action", "type": "REST", "target": {"ref_id": "self"}},
+                ]},
+                "effect": {"kind": "action", "type": "DRAW", "value": 1},
+            }
+        ],
+    },
+    # ----- 勝利宣言「自分はゲームに勝利する」→ VICTORY（即時勝利） --------
+    {
+        "id": "declare_victory",
+        "text": "【メイン】自分はゲームに勝利する。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "VICTORY", "status": None}}
+        ],
+    },
+    # ----- 手札全戻し「自分の手札すべてをデッキに戻し、シャッフル」 --------
+    {
+        "id": "hand_all_to_deck",
+        "text": "【登場時】自分の手札すべてをデッキに戻し、デッキをシャッフルする。",
+        "expect": [
+            {"effect": {"kind": "seq", "actions": [
+                {"kind": "action", "type": "DECK_BOTTOM", "target": {"zone": "HAND", "player": "SELF"}},
+                {"kind": "action", "type": "SHUFFLE"},
+            ]}}
+        ],
+    },
 ]

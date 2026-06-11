@@ -960,6 +960,16 @@ class GameManager:
             log_event("INFO", "game.action_look_life", f"{target_player.name} revealed {moved} life card(s)", player=player.name)
             return True
 
+        if act_name == "VICTORY":
+            # 「（自分は）ゲームに勝利する」: 能動勝利。即座に winner を設定する。
+            # status="REPLACE_DECKOUT_LOSS" はデッキアウト敗北の置換マーカー(PASSIVE)で、
+            # 直接実行されない（_has_deckout_win_replace で走査）。万一実行された場合は無視。
+            if getattr(action, "status", None) == "REPLACE_DECKOUT_LOSS":
+                return True
+            self.winner = player.name
+            log_event("INFO", "game.victory", f"{player.name} wins (effect)", player=player.name)
+            return True
+
         if act_name == "ORDER_LIFE":
             # 「（自分/相手の）ライフすべてを見て、好きな順番で置く」: ライフを公開し任意順に
             # 並べ替える（対象選択を伴う INTERACTIVE）。並べ替えはプレイヤーの選択で枚数は不変。
