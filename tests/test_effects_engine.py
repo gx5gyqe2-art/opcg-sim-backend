@@ -1662,3 +1662,30 @@ if __name__ == "__main__":
             traceback.print_exc()
     print(f"\n=== engine: {passed} passed, {failed} failed / {len(tests)} ===")
     raise SystemExit(1 if failed else 0)
+
+
+def test_redirect_attack_changes_battle_target():
+    """REDIRECT_ATTACK: 進行中バトルの対象をコントローラー側のキャラへ差し替える。"""
+    gm, p1, p2 = make_game()
+    attacker = make_instance(make_master(card_id="A-1", name="Attacker", type=CardType.CHARACTER), owner="P2")
+    redirect = make_instance(make_master(card_id="R-1", name="Redirect", type=CardType.CHARACTER), owner="P1")
+    p2.field.append(attacker)
+    p1.field.append(redirect)
+    # 進行中バトル: P2 の attacker が P1 リーダーを攻撃中
+    gm.active_battle = {"attacker": attacker, "target": p1.leader,
+                        "attacker_owner": p2, "target_owner": p1, "counter_buff": 0}
+    ok = gm.apply_action_to_engine(p1, action(ActionType.REDIRECT_ATTACK), [redirect], 0)
+    assert ok
+    assert gm.active_battle["target"] is redirect
+    assert gm.active_battle["target_owner"] is p1
+
+
+def test_redirect_attack_no_battle_is_noop():
+    """進行中バトルが無ければ REDIRECT_ATTACK は安全に no-op（落ちない）。"""
+    gm, p1, _ = make_game()
+    redirect = make_instance(make_master(card_id="R-2", name="Redirect", type=CardType.CHARACTER), owner="P1")
+    p1.field.append(redirect)
+    assert gm.active_battle is None
+    ok = gm.apply_action_to_engine(p1, action(ActionType.REDIRECT_ATTACK), [redirect], 0)
+    assert ok
+    assert gm.active_battle is None

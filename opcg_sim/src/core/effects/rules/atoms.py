@@ -816,6 +816,21 @@ def _reveal_deck_top(ctx: ParseContext) -> Optional[GameAction]:
 # アタック制限: 「（このターン中／次の…まで）アタックできない」
 #   継続効果として管理し、適切なタイミングで失効する（従来 OTHER）。
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# アタック対象変更: 「（選んだキャラ/このリーダー等）にアタックの対象を変更する／にする」
+#   → REDIRECT_ATTACK。進行中バトルの対象をコントローラー側の別キャラ/リーダーへ差し替える。
+#   ブロッカーの注釈文「アタックの対象をこのカードにできる」(にできる) は別処理なので除外。
+# ---------------------------------------------------------------------------
+@rule("redirect_attack", priority=58)
+def _redirect_attack(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"アタックの対象を.*(変更する|にする)"), t):
+        return None
+    if _nfc("このカードにできる") in t:
+        return None
+    return GameAction(type=ActionType.REDIRECT_ATTACK, target=parse_target(t), raw_text=t)
+
+
 @rule("attack_disable", priority=62)
 def _attack_disable(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text

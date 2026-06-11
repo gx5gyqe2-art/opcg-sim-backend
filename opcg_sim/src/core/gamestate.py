@@ -960,6 +960,17 @@ class GameManager:
             log_event("INFO", "game.action_look_life", f"{target_player.name} revealed {moved} life card(s)", player=player.name)
             return True
 
+        if act_name == "REDIRECT_ATTACK":
+            # 「（選んだキャラ/このリーダー等）にアタックの対象を変更する」: 進行中バトルの
+            # 対象を差し替える。targets[0] が新しい対象（多くはコントローラー側のキャラ/リーダー）。
+            if self.active_battle and targets:
+                new_target = targets[0]
+                self.active_battle["target"] = new_target
+                self.active_battle["target_owner"] = self.p1 if self.p1.name == new_target.owner_id else self.p2
+                log_event("INFO", "game.redirect_attack",
+                          f"Attack redirected to {new_target.master.name}", player=player.name)
+            return True
+
         if act_name == "VICTORY":
             # 「（自分は）ゲームに勝利する」: 能動勝利。即座に winner を設定する。
             # status="REPLACE_DECKOUT_LOSS" はデッキアウト敗北の置換マーカー(PASSIVE)で、

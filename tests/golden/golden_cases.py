@@ -1989,6 +1989,14 @@ CASES = [
             {"effect": {"kind": "action", "type": "LOOK", "value": 1, "status": None}}
         ],
     },
+    # ----- アタック対象変更（REDIRECT_ATTACK） ----------------------------
+    {
+        "id": "redirect_attack_selected",
+        "text": "選んだキャラにアタックの対象を変更する。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "REDIRECT_ATTACK"}}
+        ],
+    },
     # ----- 共有対象の二択「Xを、AかB」（加えるか登場させる）-------------------
     {
         "id": "shared_target_choice_life_or_play",
