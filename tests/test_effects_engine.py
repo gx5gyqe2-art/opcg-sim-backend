@@ -2332,6 +2332,26 @@ def test_opp_turn_end_fires_at_end_turn():
     assert after == before + 1, "非ターンプレイヤーの OPP_TURN_END が発火するべき"
 
 
+def test_prev_action_count_scaling():
+    """§7-5 文脈依存「捨てたカード1枚につき、…パワー+N」: 直前アクションで対象にした
+    枚数に比例してバフ値が決まる（P-051 系。2枚捨て→+2000）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    gm.turn_player, gm.opponent = p1, p2
+    gm.turn_count = 2
+    src = make_instance(make_master(card_id="P051", name="ボニー", power=5000), owner="P1")
+    p1.field.append(src)
+    for i in range(2):
+        p1.hand.append(make_instance(make_master(card_id=f"H{i}", name=f"手{i}"), owner="P1"))
+    ab = EffectParserV2().parse_card_text(
+        "【アタック時】自分の手札を任意の枚数捨ててもよい。"
+        "捨てたカード1枚につき、このキャラは、このバトル中、パワー+1000。")[0]
+    gm.resolve_ability(p1, ab, source_card=src)
+    gm.resolve_interaction(p1, {"accepted": True, "index": 0})       # 任意効果を発動
+    gm.resolve_interaction(p1, {"selected_uuids": [c.uuid for c in p1.hand], "index": 0})
+    assert src.get_power(True) == 7000, "2枚捨て → +2000 を期待"
+
+
 def cov_drain(gm):
     import effect_coverage as _cov
     _cov._smart_drain(gm, record={})

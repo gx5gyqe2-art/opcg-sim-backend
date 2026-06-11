@@ -1596,6 +1596,10 @@ class GameManager:
         if not val_source: return 0
         if val_source.dynamic_source == "COUNT_REFERENCE":
             log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name); return len(player.trash)
+        # 文脈依存「直前アクションで捨てた/戻した/KOした…カードN枚につき」（§7-5）。
+        # 生の枚数を返す（divisor/multiplier は _calculate_value が適用する）。
+        if val_source.dynamic_source == "PREV_ACTION_COUNT":
+            return int((context or {}).get("_last_action_count", 0) or 0)
         # 「<範囲>N枚につき」の汎用カウント（RC-4）。範囲クエリを毎回実体化して数える
         # （PASSIVE 再計算で盤面に追随する）。
         if val_source.dynamic_source == "COUNT_QUERY" and getattr(val_source, "count_query", None) is not None:

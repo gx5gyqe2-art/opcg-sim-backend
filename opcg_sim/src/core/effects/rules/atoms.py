@@ -287,7 +287,13 @@ def _per_n_value(t: str, x: int) -> Optional[ValueSource]:
         return None
     counted = m.group(1).strip()
     n = max(_to_int(m.group(2)), 1)
-    if re.search(_nfc(r"(捨てた|戻した|KOした|置いた|レストにした|付与されている|異なる)"), counted):
+    # 文脈依存「直前アクションで<捨てた/戻した/KOした/置いた/レストにした>カードN枚につき」は
+    # 直前アクションが対象にした枚数を参照する（§7-5）。resolver が _last_action_count を記録。
+    if re.search(_nfc(r"(捨てた|戻した|KOした|置いた|レストにした)"), counted):
+        return ValueSource(base=0, dynamic_source="PREV_ACTION_COUNT",
+                           divisor=n, multiplier=x)
+    # 「付与されているドンN枚につき」「カード名の異なる…」は別機構（対象固有/名前集合）のため未対応。
+    if re.search(_nfc(r"(付与されている|異なる)"), counted):
         return None
     if re.fullmatch(_nfc(r"(自分の)?トラッシュ(にあるカード)?"), counted):
         return ValueSource(base=0, dynamic_source="COUNT_REFERENCE",

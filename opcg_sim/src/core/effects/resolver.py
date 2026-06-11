@@ -330,6 +330,11 @@ class EffectResolver:
                 # LOOK_LIFE は temp 末尾に append するため、公開カードは末尾
                 self.context["last_revealed_card"] = player.temp_zone[-1]
 
+        # 文脈依存スケーリング（§7-5「捨てたカード1枚につき」等）用に、直前アクションが
+        # 対象にした枚数を記録する。SELECT 等のメタアクションは数えない。
+        if success and action.type not in (ActionType.SELECT,):
+            self.context["_last_action_count"] = len(targets)
+
         # ▼▼▼ 追加: 実行履歴を記録 ▼▼▼
         target_names = [f"{t.master.name}({t.uuid[:4]})" for t in targets]
         self.action_history.append({
@@ -338,7 +343,7 @@ class EffectResolver:
             "targets": target_names,
             "value": value
         })
-        
+
         return success
 
     def _resolve_targets(self, player, query, source_card, action_node=None):
