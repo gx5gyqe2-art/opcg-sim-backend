@@ -746,11 +746,27 @@ class GameManager:
             self.move_card(card, Zone.TRASH, player)
         else:
             self.move_card(card, Zone.FIELD, player); card.attached_don = 0; card.is_newly_played = True
+            if self._has_rested_play(player):  # 「自分のキャラはレストで登場する」PASSIVE
+                card.is_rest = True
             if not card.ability_disabled:
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.ON_PLAY:
                         self.resolve_ability(player, ability, source_card=card)
             self._apply_passive_effects(player)
+
+    def _has_rested_play(self, player: Player) -> bool:
+        """player が「自分のキャラはレストで登場する」PASSIVE を持つか（RESTED_PLAY マーカー）。"""
+        cards = ([player.leader] if player.leader else []) + list(player.field)
+        for c in cards:
+            if not c or getattr(c, "ability_disabled", False) or not getattr(c, "master", None):
+                continue
+            for ab in c.master.abilities:
+                if ab.trigger != TriggerType.PASSIVE:
+                    continue
+                act = self._find_action(ab.effect, ActionType.RESTRICTION)
+                if act is not None and getattr(act, "status", None) == "RESTED_PLAY":
+                    return True
+        return False
 
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
@@ -1246,7 +1262,8 @@ class GameManager:
                 self.move_card(target, Zone.FIELD, owner)
                 target.is_newly_played = True
                 # 「レストで登場させる」: フィールドに出た瞬間レスト状態にする。
-                if getattr(action, "status", None) == "RESTED":
+                # 効果の明示 RESTED、または owner の「キャラはレストで登場する」PASSIVE のいずれか。
+                if getattr(action, "status", None) == "RESTED" or self._has_rested_play(owner):
                     target.is_rest = True
                 if not target.ability_disabled:
                     for ability in target.master.abilities:

@@ -1709,3 +1709,31 @@ def test_move_attached_don_to_cost_area():
     assert len(p1.don_rested) == 2
     assert all(d.is_rest and d.attached_to is None for d in p1.don_rested)
     assert char.attached_don == 0
+
+
+def test_rested_play_passive_makes_chars_enter_rested():
+    """「自分のキャラはレストで登場する」PASSIVE: 効果(PLAY_CARD)で出たキャラがレスト状態になる。"""
+    from opcg_sim.src.models.effect_types import Ability, GameAction
+    gm, p1, _ = make_game()
+    # リーダーに RESTED_PLAY の PASSIVE を付与
+    passive = Ability(trigger=TriggerType.PASSIVE,
+                      effect=GameAction(type=ActionType.RESTRICTION, status="RESTED_PLAY"))
+    p1.leader.master = make_master(card_id="L-RP", name="RestedLeader", type=CardType.LEADER,
+                                   life=5, abilities=(passive,))
+    assert gm._has_rested_play(p1) is True
+
+    # 効果で手札のキャラを登場 → owner は所在(手札=p1)から決まり、PASSIVE でレスト化される。
+    char = make_instance(make_master(card_id="C-RP", name="Char", type=CardType.CHARACTER), owner="P1")
+    p1.hand.append(char)
+    ok = gm.apply_action_to_engine(p1, action(ActionType.PLAY_CARD, destination=Zone.FIELD), [char], 0)
+    assert ok
+    assert char in p1.field
+    assert char.is_rest is True
+
+    # PASSIVE が無い player では通常どおりアクティブで登場する。
+    gm2, q1, _ = make_game()
+    assert gm2._has_rested_play(q1) is False
+    char2 = make_instance(make_master(card_id="C-N", name="Char2", type=CardType.CHARACTER), owner="P1")
+    q1.hand.append(char2)
+    gm2.apply_action_to_engine(q1, action(ActionType.PLAY_CARD, destination=Zone.FIELD), [char2], 0)
+    assert char2 in q1.field and char2.is_rest is False

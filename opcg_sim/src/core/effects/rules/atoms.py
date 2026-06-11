@@ -1723,6 +1723,19 @@ def _freeze_target(ctx: ParseContext) -> Optional[GameAction]:
 #   "CANNOT_REST" を立て、declare_attack / has_blocker でこのフラグを弾く。
 #   freeze_target（アクティブにならない）とは逆向きのレスト制限。
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# レスト登場 PASSIVE: 「（自分の）キャラ（カード）はレストで登場する」
+#   → RESTRICTION(status="RESTED_PLAY")。自分のキャラ登場時にレスト状態にする PASSIVE マーカー。
+#   gamestate の play_card_action / PLAY_CARD 効果が走査して is_rest=True にする。
+# ---------------------------------------------------------------------------
+@rule("rested_play_passive", priority=67)
+def _rested_play_passive(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"キャラ(?:カード)?はレストで登場する"), t):
+        return None
+    return GameAction(type=ActionType.RESTRICTION, status="RESTED_PLAY", raw_text=t)
+
+
 @rule("rest_restrict", priority=66)
 def _rest_restrict(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text

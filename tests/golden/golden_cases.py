@@ -1989,6 +1989,14 @@ CASES = [
             {"effect": {"kind": "action", "type": "LOOK", "value": 1, "status": None}}
         ],
     },
+    # ----- レスト登場 PASSIVE（自分のキャラはレストで登場する） -------------
+    {
+        "id": "rested_play_passive",
+        "text": "自分のキャラカードはレストで登場する。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "RESTRICTION", "status": "RESTED_PLAY"}}
+        ],
+    },
     # ----- 付与ドンをコストエリアへ（MOVE_ATTACHED_DON） ------------------
     {
         "id": "move_attached_don_to_cost",
