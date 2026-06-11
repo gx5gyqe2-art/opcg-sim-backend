@@ -2117,4 +2117,37 @@ CASES = [
             {"effect": {"kind": "action", "type": "RULE_PROCESSING"}}
         ],
     },
+    # ----- 自己バフは SOURCE を対象にする（「N枚につき」の枚が count 誤読されない） -----
+    {
+        "id": "self_power_buff_is_source",
+        "text": "このキャラは、自分のトラッシュにあるカード5枚につき、パワー+1000。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "BUFF", "value": 1000,
+                        "target": {"select_mode": "SOURCE"}}}
+        ],
+    },
+    # ----- 段階効果「…の枚数によって以下の効果をそれぞれ適用する」(OP15-092) ----------
+    {
+        "id": "apply_each_by_trash_count",
+        "text": ("自分のトラッシュの枚数によって以下の効果をそれぞれ適用する。 / "
+                 "・10枚以上ある場合、このキャラは元々のパワー9000になり、コスト+10。 / "
+                 "・20枚以上ある場合、相手のターン中、自分のリーダーを、元々のパワー7000にする。 / "
+                 "・30枚以上ある場合、このキャラのパワー+1000。"),
+        "expect": [
+            {"effect": {"kind": "seq", "actions": [
+                {"kind": "branch",
+                 "condition": {"type": "TRASH_COUNT", "operator": "GE", "value": 10},
+                 "if_true": {"kind": "seq", "actions": [
+                     {"type": "BUFF", "status": "POWER_OVERRIDE", "value": 9000},
+                     {"type": "BUFF", "status": "COST_REDUCTION", "value": 10},
+                 ]}},
+                {"kind": "branch",
+                 "condition": {"type": "TRASH_COUNT", "operator": "GE", "value": 20},
+                 "if_true": {"type": "BUFF", "status": "POWER_OVERRIDE", "value": 7000}},
+                {"kind": "branch",
+                 "condition": {"type": "TRASH_COUNT", "operator": "GE", "value": 30},
+                 "if_true": {"type": "BUFF", "value": 1000}},
+            ]}}
+        ],
+    },
 ]

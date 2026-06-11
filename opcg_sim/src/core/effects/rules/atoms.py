@@ -175,6 +175,16 @@ def _duration_of(text: str) -> str:
     return "INSTANT"
 
 
+def _buff_target(t: str) -> TargetQuery:
+    """パワー/コスト増減の対象を解決する。主語が「この(キャラ/リーダー/カード)」
+    （「以外」を除く）なら自身(SOURCE)を返す。PASSIVE 自己バフが CHOOSE で
+    対象選択中断に陥るのを防ぎ、「このキャラ」が常に自身を指す意味とも一致する。
+    それ以外は通常の parse_target に委ねる。"""
+    if re.search(_nfc(r"この(キャラ|リーダー|カード)(?:は|の)"), t) and _nfc("以外") not in t:
+        return TargetQuery(select_mode="SOURCE")
+    return parse_target(t)
+
+
 @rule("power_buff", priority=60)
 def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -183,7 +193,7 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if _nfc("にする") in t:
         return None  # 「パワーをNにする」は base_power_override 系（別ルールで対応予定）
-    tq = parse_target(t)
+    tq = _buff_target(t)
     return GameAction(
         type=ActionType.BUFF,
         target=tq,
@@ -257,7 +267,7 @@ def _set_power(ctx: ParseContext) -> Optional[GameAction]:
     m = re.search(_nfc(r"パワー(?:を)?(\d+)に(?:なる|する)"), t)
     if not m:
         return None
-    tq = parse_target(t)
+    tq = _buff_target(t)
     if _nfc("まで") in t:
         tq.is_up_to = True
     return GameAction(
@@ -970,7 +980,7 @@ def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
         if not m2:
             return None
         value = -int(m2.group(1))
-    tq = parse_target(t)
+    tq = _buff_target(t)
     return GameAction(
         type=ActionType.BUFF,
         target=tq,

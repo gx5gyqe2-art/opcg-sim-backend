@@ -91,7 +91,10 @@ class EffectParser:
                 merged[-1] = merged[-1] + '\n' + seg
                 continue
             merged.append(seg)
-            absorbing = bool(re.search(_nfc(r'以下から.{0,6}?選ぶ'), seg))
+            # 「以下から…選ぶ」(Choice) と「…によって以下の効果をそれぞれ適用する」
+            # (段階効果 Sequence-of-Branch) の双方で後続の「・」項目を本体へ吸収する。
+            absorbing = bool(re.search(_nfc(r'以下から.{0,6}?選ぶ'), seg)
+                             or re.search(_nfc(r'以下の効果を.{0,4}?適用する'), seg))
         segments = merged
 
         # 「【メイン】/【カウンター】<効果>」のように、本体を持たない先頭トリガータグだけの
@@ -397,6 +400,14 @@ class EffectParser:
             choice = self._parse_choice(norm_text, is_cost)
             if choice is not None:
                 return choice
+
+        # 段階効果「（自分の）<ゾーン>の枚数によって以下の効果をそれぞれ適用する。\n・N枚以上…」:
+        # 「それぞれ適用」= 該当する全ティアを累積適用する（択一ではない）。各「・」項目を
+        # Branch[<ゾーン>_COUNT >= N] → 効果 に変換した Sequence にする（従来 OTHER で全不発）。
+        if re.search(_nfc(r'以下の効果を.{0,4}?適用する'), norm_text):
+            applied = self._parse_apply_each(norm_text, is_cost)
+            if applied is not None:
+                return applied
 
         # 二択「AするかB、する」: 「以下から1つを選ぶ」を介さない 〜するか〜する 形式の択一。
         # 動詞終止形(u段かな)＋「か、」を境界に2アクションへ分割して Choice 化する
@@ -874,6 +885,56 @@ class EffectParser:
             return Condition(type=ConditionType.PREV_ACTION, value="PLAYED_CARD", player=p, raw_text=norm_text)
 
         return Condition(type=ConditionType.GENERIC, raw_text=norm_text)
+
+    def _parse_apply_each(self, text: str, is_cost: bool) -> Optional[EffectNode]:
+        """「<ゾーン>の枚数によって以下の効果をそれぞれ適用する。\n・N枚以上…」を
+        Sequence[Branch[ZONE_COUNT>=N] → 効果, …] に変換する（該当ティアを累積適用）。
+
+        OP15-092 のような段階パッシブ。「それぞれ適用」のため択一(Choice)ではなく、
+        条件を満たす全ティアを順に適用する。閾値は各項目の「N枚以上」から取る。
+        項目が割れない/参照ゾーンが取れない場合は None（呼び出し側が従来解析へフォールバック）。
+        """
+        norm = _nfc(text)
+        # 参照ゾーン（枚数の基準）と対象プレイヤーを head から判定。
+        head_m = re.search(_nfc(r'(自分|相手|お互い)?の?(トラッシュ|ライフ|手札|デッキ)の枚数によって'), norm)
+        if not head_m:
+            return None
+        zone_word = head_m.group(2)
+        ctype = {
+            _nfc("トラッシュ"): ConditionType.TRASH_COUNT,
+            _nfc("ライフ"): ConditionType.LIFE_COUNT,
+            _nfc("手札"): ConditionType.HAND_COUNT,
+            _nfc("デッキ"): ConditionType.DECK_COUNT,
+        }.get(_nfc(zone_word))
+        if ctype is None:
+            return None
+        cplayer = Player.OPPONENT if head_m.group(1) == _nfc("相手") else Player.SELF
+        # 本体（適用する。以降）の「・」項目を抽出。
+        m_end = re.search(_nfc(r'以下の効果を.{0,4}?適用する'), norm)
+        tail = norm[m_end.end():].lstrip(_nfc('。\n 　')) if m_end else ""
+        options = self._extract_options(tail)
+        branches: List[EffectNode] = []
+        for opt in options:
+            cm = re.match(_nfc(r'\s*(\d+)枚以上(?:ある)?(?:の)?(?:場合)?[、,]?\s*(.+)$'), opt, re.DOTALL)
+            if not cm:
+                continue
+            thr = int(cm.group(1))
+            eff_text = cm.group(2).strip().rstrip(_nfc('。'))
+            # 「<主語>は…になり、コスト+M」の連用中止は文境界として正規化し、後段フラグメントに
+            # 主語を伝播する（区切ると「コスト+M」が主語を失い対象が曖昧化＝PASSIVE で対象選択
+            # 中断に陥るため）。主語が「この(キャラ/リーダー/カード)は」のときのみ伝播する。
+            subj_m = re.match(_nfc(r'(この(?:キャラ|リーダー|カード)は)'), eff_text)
+            subj = subj_m.group(1) if subj_m else ''
+            eff_text = re.sub(_nfc(r'になり、'), _nfc('になる。') + subj, eff_text)
+            eff_node = self._parse_to_node(eff_text, is_cost)
+            if eff_node is None:
+                continue
+            cond = Condition(type=ctype, operator=CompareOperator.GE, value=thr,
+                             player=cplayer, raw_text=opt)
+            branches.append(Branch(condition=cond, if_true=eff_node))
+        if not branches:
+            return None
+        return Sequence(actions=branches) if len(branches) > 1 else branches[0]
 
     def _parse_choice(self, text: str, is_cost: bool) -> Optional[EffectNode]:
         """「（条件、）以下から…選ぶ。\n・項目…」を Choice（必要なら条件 Branch）に変換する。
