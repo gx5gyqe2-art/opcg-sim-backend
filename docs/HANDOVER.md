@@ -187,8 +187,9 @@
 | `src/layout/layout.config.ts` | `BADGE_FROZEN_BG/CSS`・`BADGE_NEGATE_BG/CSS` 色定数を追加 |
 | `src/ui/CardRenderer.tsx` | `is_frozen`/`ability_disabled` の Pixi 半透明オーバーレイを追加 |
 | `src/ui/CardDetailSheet.tsx` | 状態バッジ（凍結/効果無効）・`trigger_text` ブロックを追加 |
-| `src/ui/ActionLog.tsx` | **効果解決ログパネル**（新規。右上固定・折りたたみ式） |
-| `src/screens/RealGame.tsx` | `eventLog` ステート・`<ActionLog>` レンダリング・対話 UI |
+| `src/ui/ActionLog.tsx` | **効果解決ログパネル**（右上固定・折りたたみ式） |
+| `src/ui/EffectToast.tsx` | **効果適用の一時トースト**（新規。KO/ドロー/バウンス等を上部に短時間表示） |
+| `src/screens/RealGame.tsx` | `eventLog`/`effectToasts` ステート・`<ActionLog>`/`<EffectToast>` レンダリング・対話 UI |
 | `shared_constants.json` | `TRIGGER_TEXT`/`ABILITY_DISABLED`/`IS_FROZEN` を `CARD_PROPERTIES` に追加 |
 
 ---
@@ -311,11 +312,19 @@ INTERACTIVE 能力の「対象がテキスト通りか」は `tests/interactive_
   根拠コメント付き eslint-disable で意図を固定（stale callback は ref 経由）。
 - `npm run lint` 0 / `npm run build`（tsc+vite）緑。
 
-### G. 効果適用アニメーション（視覚QA 必須）
+### G. 効果適用の視覚フィードバック — 🟡 **最小版を実装（トースト）／座標アニメは視覚QA待ち**
 
-- KO/バウンス/ドローの視覚フィードバック追加
-- フロント: `src/screens/RealGame.tsx` の action_events を消費してアニメ発火
-- ブラウザ確認が必須。自動テスト不可。
+- ✅ **済（ラウンド2）**: `src/ui/EffectToast.tsx` を追加。`action_events` を消費し KO/ドロー/
+  バウンス/トラッシュ/登場等の主要効果を画面上部中央に短時間フェード表示する。`RealGame.tsx` の
+  `addEventLog` から主要アクションのみ抽出（失敗/no-op 除外、除去系は赤強調）、自己消滅タイマー管理。
+  純粋な追加レイヤー（pointerEvents:none・Pixi/状態非干渉）。lint 0 / build 緑。
+- **残（視覚QA必須・自動テスト不可）**: カードが実際に飛ぶ／光る等の座標アニメーション本体と、
+  トーストの最終的な見栄え・表示時間・位置のブラウザ調整。`src/ui/CardRenderer.tsx`（Pixi）と
+  座標（`layoutEngine`）を絡めるため、ブラウザでの確認が前提。
+
+### D（再掲）. INTERACTIVE 選択モーダルの描画確認 — 視覚QAのみ残
+
+対象の正しさは自動監査済み。選択候補が視覚的に正しく描画されるかのブラウザ確認のみ残る（§7-D）。
 
 ---
 
