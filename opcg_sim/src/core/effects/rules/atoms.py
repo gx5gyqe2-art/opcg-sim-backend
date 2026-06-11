@@ -55,7 +55,7 @@ def _ko(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     # 「KOする／できる」に加え、Sequence 分割で末尾が連用形「KOし」になる句も対象
     # （例:「相手の…をKOし、このカードを手札に加える」→ 前段「…をKOし」）。
-    if not re.search(_nfc(r"KO(する|できる)"), t) and not re.search(_nfc(r"KOし(?:[、。]|$)"), t.strip()):
+    if not re.search(_nfc(r"KO(する|できる|してもよい)"), t) and not re.search(_nfc(r"KOし(?:[、。]|$)"), t.strip()):
         return None
     tq = parse_target(t)
     if _nfc("まで") in t or re.search(r"\d+枚まで", t):

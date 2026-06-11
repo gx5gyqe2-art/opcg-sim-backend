@@ -174,6 +174,13 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     else:
         m_cnt = re.search(r'(\d+)' + _nfc(ParserKeyword.COUNT_SUFFIX), tgt_text)
         tq.count = int(m_cnt.group(1)) if m_cnt else 1
+
+    # 「任意の枚数」: プレイヤーが 0..N 枚を任意に選べる可変選択。is_up_to=True かつ
+    # 大きめの count（フィールド/手札の実上限を超える）で対象選択中断（_suspend_for_target_selection,
+    # min=0/max=count）に乗せる。select_mode は CHOOSE のまま（ALL=自動全選択にしない）。
+    if _nfc("任意の枚数") in tgt_text:
+        tq.is_up_to = True
+        tq.count = 50
     
     if _nfc("効果のない") in tgt_text or _nfc("効果がない") in tgt_text:
         tq.is_vanilla = True

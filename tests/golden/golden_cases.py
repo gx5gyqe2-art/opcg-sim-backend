@@ -1964,4 +1964,21 @@ CASES = [
             {"effect": {"kind": "action", "type": "RETURN_DON", "value": 1, "status": "OPPONENT"}}
         ],
     },
+    # ----- 「任意の枚数」可変選択（is_up_to + 大きめ count で 0..N 選択） ----
+    {
+        "id": "ko_any_number_optional",
+        "text": "【メイン】自分のコスト2以下の特徴《スリラーバーク海賊団》を持つキャラを任意の枚数KOしてもよい。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "KO",
+                        "target": {"player": "SELF", "is_up_to": True}}}
+        ],
+    },
+    {
+        "id": "bounce_any_number_optional",
+        "text": "【カウンター】自分の場のキャラを任意の枚数手札に戻してもよい。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "BOUNCE",
+                        "target": {"player": "SELF", "is_up_to": True}}}
+        ],
+    },
 ]

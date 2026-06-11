@@ -2889,7 +2889,7 @@
 "ST08-007|TRIGGER": "- | pw0,kw0,rs0,co0",
 "ST08-008|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co-2",
 "ST08-009|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
-"ST08-013|ACTIVATE_MAIN": "p1_field:4→3, p1_trash:10→11 | pw0,kw0,rs0,co0",
+"ST08-013|ACTIVATE_MAIN": "p1_field:4→3, p1_trash:10→11, p2_field:3→2, p2_trash:0→1 | pw0,kw0,rs0,co0",
 "ST08-014|ACTIVATE_MAIN": "p1_hand:5→6, p1_life:5→4 | pw0,kw0,rs0,co-7",
 "ST08-014|TRIGGER": "- | pw0,kw0,rs0,co0",
 "ST08-015|ACTIVATE_MAIN": "p2_field:3→2, p2_trash:0→1 | pw0,kw0,rs0,co0",
