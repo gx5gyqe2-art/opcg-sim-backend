@@ -1,6 +1,6 @@
 # 引き継ぎ資料 — カード効果システム刷新
 
-最終更新: 2026-06-11 / ブランチ: `claude/handoff-materials-review-46flvn`
+最終更新: 2026-06-11（ラウンド2: OTHER=0 / 全監査フラグ=0 達成） / ブランチ: `claude/handoff-doc-review-agahff`
 
 このドキュメントは `opcg-sim-backend` の **カード効果処理システム** を引き継ぐための資料です。
 設計詳細は `docs/parser_v2.md`、本書はその上位のオリエンテーション（全体像・運用・残タスク）を担います。
@@ -30,23 +30,25 @@
 
 | 指標 | 刷新開始時 | **現在** |
 |---|---|---|
-| 原子句カバレッジ（ルール命中率） | 0% | **99%超** |
-| `ActionType.OTHER`（実行時に何もしない句） | 942 | **6** |
+| 原子句カバレッジ（ルール命中率） | 0% | **99.6%** |
+| `ActionType.OTHER`（実行時に何もしない句） | 942 | **0** |
 | 未分類条件 `GENERIC`（誤発動の温床） | — | **1** |
-| atoms.py ルール数 | 0 | **83** |
-| テスト総数 | 17 | **284（全緑）** |
+| atoms.py ルール数 | 0 | **88** |
+| テスト総数 | 17 | **295（全緑）** |
 | 本番パーサ | レガシー | **EffectParserV2（既定）** |
 
 ### 監査フラグ（`tests/text_execution_audit.py` による全カード検証）
 
+**全フラグ 0 を達成（2026-06-11 ラウンド2）。**
+
 | フラグ | 件数 | 意味 |
 |---|---|---|
-| FLAG_OTHER | **11** | 未実装句（裾野の専用効果が残存） |
-| FLAG_HIDDEN_LEAK | **0** | 隠しゾーン情報リーク（全解決済み） |
+| FLAG_OTHER | **0** | 未実装句（全カードで ActionType.OTHER=0） |
+| FLAG_HIDDEN_LEAK | **0** | 隠しゾーン情報リーク（REVEAL_SELECT は正当として除外） |
 | FLAG_DURATION | **0** | 期間不一致（全解決済み） |
 | FLAG_COST_LIMIT | **0** | 動的コスト上限未設定（全解決済み） |
-| FLAG_TARGET_SIDE | **0** | 対象プレイヤー逆（全解決済み） |
-| FLAG_MISSING_ACTION | **1** | 動詞に対応アクション無し（複雑な分岐効果） |
+| FLAG_TARGET_SIDE | **0** | 対象プレイヤー逆（期間句「相手の〜」/ref_id を除外） |
+| FLAG_MISSING_ACTION | **0** | 動詞に対応アクション無し（全解決済み） |
 
 ### 構造不変条件（`tests/full_card_audit.py` による全2652枚検証）
 
@@ -62,9 +64,9 @@
 |---|---|---|
 | SKIP | 325 | 能力なし |
 | ERROR | **0** | 例外発生（全解決済み） |
-| INTERACTIVE | 459 | 対象選択が必要（`interactive_target_audit.py` で対象の正しさを自動監査済み） |
-| EXECUTED | 2241 | 盤面変化確認済み |
-| NO_CHANGE | 452 | 条件未達/コスト不成立/PASSIVE/測定限界（実バグ=0確認済み） |
+| INTERACTIVE | 408 | 対象選択が必要（`interactive_target_audit.py` で対象の正しさを自動監査済み） |
+| EXECUTED | 2290 | 盤面変化確認済み |
+| NO_CHANGE | 455 | 条件未達/コスト不成立/PASSIVE/測定限界（実バグ=0確認済み） |
 
 ---
 
@@ -245,61 +247,60 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen
 
 ## 7. 残タスク（優先度順）
 
-### A. OTHER 6件の裾野 burn down（継続）
+### A. OTHER 裾野 burn down — ✅ **完了（OTHER 6→0, 2026-06-11 ラウンド2）**
 
-`effect_diagnostics.py` 起点で継続。**方針: catalog は使わず parser/エンジン拡張で対応**（2026-06-11）。
+`effect_diagnostics.py` 起点で全カードの `ActionType.OTHER` を 0 に到達。
+**方針: catalog は使わず parser/エンジン拡張で対応**。
 
-- ✅ **済（parser/エンジン+テスト）**: ライフ並び替え(ORDER_LIFE) / イベント発動(EXECUTE_EVENT) /
-  効果ダメージ / 相手・自分デッキ閲覧 / 複合除去保護 / 除外フィルタ / ドン複合コスト(REST_DON) /
-  勝利宣言(VICTORY) / 手札全戻し / 活用形・「てもよい」 / 「任意の枚数」可変選択 / 「KOしてもよい」 /
-  **共有対象二択(「加えるか登場」, MISSING 3→1)** / **REDIRECT_ATTACK** / **MOVE_ATTACHED_DON** /
-  **レスト登場(RESTED_PLAY)** / **登場制限(NO_EFFECT_PLAY)**
-- ✅ **追加で済**: ライフ→デッキ上(LIFE_TO_DECK) / サーチ結果をライフへ(TEMP→LIFE) /
-  丸数字コスト①➀(REST_DON)
-- **残6件（各1カードの深い構造/エンジン作業 or 見送り。詳細は下記）**:
-  - OP07-042「代わりに〜できる」任意置換: **E14/E15（見送り中）**
-  - OP05-100「この効果は無効になる」: **実質no-op（OTHER=何もしない=正しい）**
-  - OP11-103: コスト節内の条件「リーダーが「しらほし」の場合」→ ability 条件への抽出（構造）
-  - OP15-119: 新トリガー「相手がイベント/ブロッカーを発動した時」（構造）
-  - OP06-086: dual-tier（コスト4以下と2以下を1枚ずつ選び登場）= 二重選択
-  - OP15-092: トラッシュ枚数で段階効果（条件パッシブの Sequence-of-Branch）
-  - OP09-081: 「自分/相手の【登場時】効果は無効になる」= scoped 効果無効（範囲修飾・要慎重設計）
+- ✅ **既存ラウンド**: ライフ並び替え(ORDER_LIFE) / イベント発動(EXECUTE_EVENT) / 効果ダメージ /
+  相手・自分デッキ閲覧 / 複合除去保護 / 除外フィルタ / ドン複合コスト / 勝利宣言(VICTORY) /
+  共有対象二択 / REDIRECT_ATTACK / MOVE_ATTACHED_DON / レスト登場 / 登場制限 など
+- ✅ **ラウンド2（本書更新時）で解消した残件**:
+  - OP07-042「代わりに〜できる」任意置換: `deck_bottom_general` を て形「置いて」に対応＋C項(E14)で完結
+  - OP05-100 / OP09-081前段「この/自分の効果は無効になる」: `self_effect_negated_noop`（no-op）
+  - OP15-119 新トリガー「相手がイベント/ブロッカーを発動した時、…公開する」: `reveal_own_life_top`
+    (FACE_UP_LIFE)。※トリガーの自動ディスパッチはエンジン未対応（公開アクションは正しく生成）
+  - OP06-086 dual-tier（コスト4以下と2以下を1枚ずつ選び登場）: `dual_tier_play_from_trash`
+    （Sequence[PLAY active, PLAY rested]）
+  - OP15-092 トラッシュ枚数で段階効果: `_parse_apply_each`（Sequence-of-Branch, ZONE_COUNT>=N）
+  - OP09-081後段「相手の【登場時】効果は無効になる」: `scoped_negate_opp_onplay`
+    (DISABLE_ABILITY OPP_ONPLAY)＋`Player.negate_onplay_until`＋play_card_action での ON_PLAY スキップ
+  - OP05-032「1:このキャラをアクティブ」のコスト節裸数値: `bare_number_cost_noop`
+  - OP11-041 catalog の「何もしない」: OTHER→RULE_PROCESSING
+- **付随改善**: 自己バフ対象を `_buff_target` で SOURCE 化（「N枚につき」の枚数 count 誤読を是正）。
+  「追加し、」を Sequence 分割境界に追加（ドン操作後段の登場/付与の脱落防止）。
 
-### B. MISSING_ACTION 1件（複雑な分岐パターン）
+### B. MISSING_ACTION — ✅ **完了（1→0, 2026-06-11 ラウンド2）**
 
-「〜するか、〜する」二択は `parser._parse_suruka_choice`、共有対象「Xを、AかB」は
-`_parse_shared_target_choice` で Choice 化済み（MISSING 7→1）。残る1件は「以下から1つを…」でも
-「するか」でもない不規則な分岐で個別の構造解析が必要。
-`text_execution_audit.py --flag MISSING_ACTION` で棚卸しする。
+残っていた OP09-022 リム「…レストで追加し、…登場させる」を `parser` の Sequence 分割境界に
+「追加し、」を追加して解消（RAMP_DON の後段 PLAY_CARD 脱落を是正）。
+`text_execution_audit.py --flag MISSING_ACTION` で 0 を確認。
 
-### C. 置換効果（REPLACE_EFFECT）の残 — E14/E15【見送り中（2026-06-11 判断）】
+### C. 置換効果（REPLACE_EFFECT）E14/E15 — ✅ **同期完了で対応（2026-06-11 ラウンド2）**
 
-**判断の根拠**: (1) 現状の card DB に「複数選択を伴う複雑な置換」カードが実質存在しない、
-(2) `GameManager.active_interaction` が**単一 continuation のみ保持する設計**で、置換が他効果の
-解決中に発生する「ネストした中断」を表現できない（核アーキテクチャ改修が必要）。受益カードが
-無い段階での高リスク改修を避け、該当カード出現時に着手する方針。
+OP07-042 を実 DECK_BOTTOM 化したことで、置換 `sub_effect` が任意確認/対象選択で中断する
+**ネストした中断**が顕在化（ダングリング interaction＝カードが KO もされず置換も未完了の宙吊り）。
 
-**E14 置換実行が対象選択で中断する場合の挙動**
-- 置換 `sub_effect` の実行中に `_suspend_for_target_selection` が起動する場合
-  （例: 「代わりに手札2枚を選んで捨てる」）。現状は `_active_replacement` が同期 auto-execute。
-  → REPLACE_EFFECT をスタックに積み直し、`active_interaction` を呼び出し側へ伝播させる設計変更。
-  ネストした中断は単一 continuation 設計の拡張（continuation スタック化）が前提。
+**完全な continuation スタック化は引き続き見送り**（高リスク・フロント対話化が前提）だが、
+`_active_replacement` に `_auto_resolve_replacement` を追加し、置換中断を**保守的に同期解決**して
+必ず完了させる方式で安全化した:
+- 任意確認(CONFIRM_OPTIONAL) → accept（保護を実行） / 対象選択(SELECT_TARGET) → 有効候補を自動選択
+- 解決前後で外側 interaction を保全（除去解決スタックを壊さない）
 
-**E15 任意（「できる」）の選択 UI**
-- 「代わりに〜できる」形の置換の yes/no UI。E14 の suspend/resume 実装後に
-  既存 `_suspend_for_optional_confirmation` でほぼ自動サポート。
+→ OP07-042 / OP05-032 が EXECUTED（保護＋身代わり移動）。回帰テスト
+`test_op07_042_replacement_with_selection_completes` で固定。
+**将来課題**: 置換内の選択をフロントへ提示する完全な対話化（continuation スタック）。
 
-### D. INTERACTIVE 対象の検証 — 対象の正しさは自動監査済み（2026-06-11）
+### D. INTERACTIVE 対象の検証 — 対象の正しさは自動監査済み（フロント描画のみ残）
 
-INTERACTIVE 459 能力の「対象がテキスト通りか（対象側/コスト上限/枚数/特徴）」は
-`tests/interactive_target_audit.py` で自動照合し、見つかった対象取り違え3件を是正済み（§8 参照）。
-**残るのは「選択モーダルが視覚的に候補を正しく描画するか」のブラウザ確認のみ**（フロント描画）。
-新カード追加時は `interactive_target_audit.py` を再実行して対象の不一致候補を洗い出す。
+INTERACTIVE 能力の「対象がテキスト通りか」は `tests/interactive_target_audit.py` で自動照合済み。
+**残るのは「選択モーダルが視覚的に候補を正しく描画するか」のブラウザ確認のみ**（フロント描画・視覚QA）。
+新カード追加時は `interactive_target_audit.py` を再実行する。
 
-### E. 隠れミスターゲット（C/D detector）
+### E. 隠れミスターゲット（C/D detector）— ✅ **上限を実測値へ更新（2026-06-11 ラウンド2）**
 
-`tests/test_mistarget_guard.py` の上限（現在 C≤8 / D≤9、実測 C=7 / D=8。A/B=0 維持）。
-横展開是正でカードが減ったら上限値を新しい実測値に下げて固定する。
+`tests/test_mistarget_guard.py` の上限を OTHER burn down 完了後の実測値に固定（C≤6 / D≤7、A/B=0 維持）。
+横展開是正でさらに減ったら上限値を追従して下げる運用は継続。
 
 ### F. フロント lint 削減 — ✅ 完了（lint 137→0, 2026-06-11）
 
@@ -352,6 +353,21 @@ INTERACTIVE 459 能力の「対象がテキスト通りか（対象側/コスト
   （`deck_bottom_general` 等）。明示が無いときだけ相手既定にする。
 - **ドン付与(ATTACH_DON)の付与先は `parse_target` で解析**し特徴/名前/コスト絞り込みを拾う
   （手動構築すると filter が脱落する）。`is_rest` 漏れだけ明示リセットする。
+- **自己バフの対象は `atoms._buff_target` を使う**（power_buff/set_power/cost_change）。主語が
+  「この(キャラ/リーダー/カード)」なら SOURCE を返す。直接 `parse_target` を使うと「N枚につき」の
+  「N枚」を count 誤読し場の複数キャラを巻き込む／PASSIVE で対象選択中断に陥る。
+- **置換 sub_effect が中断したら `_auto_resolve_replacement` が同期完結させる**（E14/E15）。
+  置換は除去解決の最中（apply_action_to_engine 内）に走るため、単一 continuation 設計では
+  ネスト中断を UI へ伝播できない。任意=accept・対象=自動選択で headless 完結し宙吊りを防ぐ。
+  完全な対話化（continuation スタック）は将来課題。置換 sub_effect を増やす際はこの自動解決で
+  完了することを `effect_coverage --card` / 専用テストで確認する。
+- **スコープ付き相手効果無効は `Player.negate_onplay_until` で表現**（OP09-081）。「相手の【登場時】
+  効果は無効になる」は parser が【登場時】を非タグ化して保全し、`DISABLE_ABILITY status=OPP_ONPLAY`
+  を生成、apply 時に相手プレイヤーへ期限(turn_count)を設定、`play_card_action` が期間中の ON_PLAY を
+  スキップする。スコープは現状【登場時】(ON_PLAY)のみ。他トリガーのスコープ無効を足す際は
+  parser の非タグ化対象とスキップ箇所を拡張する。
+- **「追加し、」は Sequence 分割境界**。ドン操作(RAMP_DON)の後段（登場/付与）が同一原子句に
+  飲まれて脱落するのを防ぐ。同種の連用接続を増やす際は `parser._parse_to_node` の split_pattern に追加。
 
 ### 直近のミスターゲット是正（2026-06-11, `interactive_target_audit.py` 起点）
 - 「自分のキャラを持ち主のデッキの下に置く」が相手対象になる不具合（deck_bottom）を修正。
