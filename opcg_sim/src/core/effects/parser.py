@@ -382,6 +382,12 @@ class EffectParser:
         if suruka is not None:
             return suruka
 
+        # 共有対象の二択「<X>を、<A>か<B>」（か の後に読点なし）: 1つの対象 X に対する
+        # 2アクションの択一（例:「…キャラ1枚までを、ライフの上に表向きで加えるか登場させる」）。
+        shared = self._parse_shared_target_choice(norm_text, is_cost)
+        if shared is not None:
+            return shared
+
         # 連用形「引き、」を「引く、」に正規化してから分割
         norm_text = re.sub(_nfc(r'引き、'), _nfc('引く、'), norm_text)
         # デッキの上を見るサーチ/並べ替えは「見て、」で区切り、LOOK を独立アクション化する。
@@ -914,6 +920,40 @@ class EffectParser:
             options=[opt_a, opt_b],
             option_labels=[left, right],
             player=chooser,
+        )
+
+    def _parse_shared_target_choice(self, text: str, is_cost: bool) -> Optional[EffectNode]:
+        """「<X>を、<A>か<B>」形式の共有対象二択を Choice に変換する（無ければ None）。
+
+        対象 X を両オプションの先頭に補って解釈する点が _parse_suruka_choice（別対象）と異なる。
+        「か」の後に読点が無い（"加えるか登場させる"）ことで読点付き二択(「するか、」)と区別する。
+        左右がともに実行系アクションに解釈できる場合のみ Choice 化する（過検知防止）。
+        """
+        norm = _nfc(text)
+        if _nfc("以下から") in norm or _nfc("か、") in norm:
+            return None  # モーダル選択 / 読点付き二択は別経路
+        sep = norm.rfind(_nfc("を、"))
+        if sep < 0:
+            return None
+        target_part = norm[:sep]
+        actions = norm[sep + len(_nfc("を、")):]
+        # アクション部の動詞終止形(u段かな)直後の「か」(読点なし)を境界にする。
+        m = re.search(_nfc(r'[るくすつぶむうぐ]か(?![、。])'), actions)
+        if not m:
+            return None
+        a = actions[:m.start() + 1].strip()
+        b = actions[m.end():].strip().rstrip(_nfc('。')).strip()
+        if not a or not b or not target_part:
+            return None
+        opt_a = self._parse_to_node(f"{target_part}を、{a}", is_cost)
+        opt_b = self._parse_to_node(f"{target_part}を、{b}", is_cost)
+        if not (self._node_has_real_action(opt_a) and self._node_has_real_action(opt_b)):
+            return None
+        return Choice(
+            message=_nfc("効果を選択してください"),
+            options=[opt_a, opt_b],
+            option_labels=[a, b],
+            player=Player.SELF,
         )
 
     def _extract_options(self, text: str) -> List[str]:

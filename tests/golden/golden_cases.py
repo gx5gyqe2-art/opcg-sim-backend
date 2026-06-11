@@ -1989,4 +1989,15 @@ CASES = [
             {"effect": {"kind": "action", "type": "LOOK", "value": 1, "status": None}}
         ],
     },
+    # ----- 共有対象の二択「Xを、AかB」（加えるか登場させる）-------------------
+    {
+        "id": "shared_target_choice_life_or_play",
+        "text": "【登場時】自分のトラッシュからコスト4以下の特徴《スリラーバーク海賊団》を持つキャラカード1枚までを、ライフの上に表向きで加えるか登場させる。",
+        "expect": [
+            {"effect": {"kind": "choice", "options": [
+                {"kind": "action", "type": "MOVE_CARD", "destination": "LIFE"},
+                {"kind": "action", "type": "PLAY_CARD"},
+            ]}}
+        ],
+    },
 ]

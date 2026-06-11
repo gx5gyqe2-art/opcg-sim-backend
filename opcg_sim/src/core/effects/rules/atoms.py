@@ -345,7 +345,9 @@ def _life_cards_to_trash(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ライフ") not in t or _nfc("トラッシュ") not in t:
         return None
-    if _nfc("表向き") not in t:
+    # 「ライフの表向きのカード…をトラッシュに置く」(life→trash) に限定する。
+    # 「トラッシュから…ライフの上に表向きで加える」(trash→life) の逆方向を誤検知しない。
+    if not re.search(_nfc(r"ライフの表向き"), t) or not re.search(_nfc(r"トラッシュに置"), t):
         return None
     tq = parse_target(t)
     tq.zone = Zone.LIFE
@@ -504,15 +506,17 @@ def _life_to_hand(ctx: ParseContext) -> Optional[GameAction]:
 
 @rule("hand_to_life", priority=69)
 def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
-    """「（自分の）手札…を、ライフの上／下に加える」→ MOVE_CARD(dest=LIFE, dest_position=TOP/BOTTOM)。"""
+    """「（自分の）手札／トラッシュ…を、ライフの上／下に（表向きで）加える」
+    → MOVE_CARD(dest=LIFE, dest_position=TOP/BOTTOM)。「表向きで」修飾とトラッシュ源も許容。"""
     t = ctx.text
-    if _nfc("手札") not in t:
+    if _nfc("手札") not in t and _nfc("トラッシュ") not in t:
         return None
-    if _nfc("ライフの上に加える") not in t and _nfc("ライフの下に加える") not in t:
+    if not re.search(_nfc(r"ライフの(上|下)に(?:表向きで)?加える"), t):
         return None
     tq = parse_target(t)
-    tq.zone = Zone.HAND
-    dest_position = "TOP" if _nfc("ライフの上に加える") in t else "BOTTOM"
+    # 源ゾーン: 手札優先（「手札」明示があれば HAND）、無ければトラッシュ。
+    tq.zone = Zone.HAND if _nfc("手札") in t else Zone.TRASH
+    dest_position = "TOP" if _nfc("ライフの上") in t else "BOTTOM"
     return GameAction(
         type=ActionType.MOVE_CARD,
         target=tq,
