@@ -2204,3 +2204,68 @@ def test_declare_cost_reveal_and_match():
         gm2.resolve_interaction(pl, {"selected_uuids": cands[:1], "index": 0})
         guard += 1
     assert q1.leader.timed_power == 0, "不一致宣言ではバフされない"
+
+
+def test_on_block_ability_fires():
+    """H-6: 【ブロック時】効果が handle_block で発動する（従来は未発火＝no-op）。"""
+    from opcg_sim.src.models.effect_types import Ability, TargetQuery
+    from opcg_sim.src.models.enums import Phase
+    gm, p1, p2 = make_game()
+    # p2 のブロッカーに ON_BLOCK「カード1枚を引く」を持たせる
+    block_ab = Ability(trigger=TriggerType.ON_BLOCK,
+                       effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)))
+    blocker = make_instance(make_master(card_id="C-BLK", name="ブロッカー", power=3000,
+                                        abilities=(block_ab,)), owner="P2")
+    blocker.current_keywords.add("ブロッカー")  # BLOCK_STEP に入る条件
+    p2.field.append(blocker)
+    p2.deck.append(make_instance(make_master(card_id="D-1", name="山1"), owner="P2"))
+    attacker = make_instance(make_master(card_id="C-ATK", name="攻撃役", power=5000), owner="P1")
+    p1.field.append(attacker)
+    gm.turn_player, gm.opponent = p1, p2
+
+    from opcg_sim.src.models.enums import Phase
+    gm.phase = Phase.MAIN
+    gm.declare_attack(attacker, p2.leader)
+    cov_drain(gm)
+    assert gm.phase == Phase.BLOCK_STEP, "ブロッカーがいれば BLOCK_STEP に入る"
+    hand_before = len(p2.hand)
+    gm.handle_block(blocker)
+    cov_drain(gm)
+    assert len(p2.hand) == hand_before + 1, "ON_BLOCK のドローが発動するべき"
+
+
+def test_this_battle_buff_expires_on_resolve():
+    """H-6: THIS_BATTLE のパワー増は resolve_attack（バトル終了）で失効する。"""
+    gm, p1, p2 = make_game()
+    char = make_instance(make_master(card_id="C-TB", name="戦士", power=5000), owner="P1")
+    p1.field.append(char)
+    gm.turn_player, gm.opponent = p1, p2
+    gm.apply_action_to_engine(
+        p1, action(ActionType.BUFF, value=2000, duration="THIS_BATTLE"), [char], 2000)
+    assert char.get_power(True) == 7000
+    gm.continuous.expire("BATTLE_END", gm.turn_count)
+    assert char.get_power(True) == 5000, "THIS_BATTLE はバトル終了で失効するべき"
+
+
+def test_until_next_turn_end_buff_expiry_boundary():
+    """H-6: UNTIL_NEXT_TURN_END は付与ターンの end では消えず、次ターン end で消える。"""
+    gm, p1, p2 = make_game()
+    char = make_instance(make_master(card_id="C-UN", name="守人", power=4000), owner="P1")
+    p1.field.append(char)
+    gm.turn_player, gm.opponent = p1, p2
+    gm.turn_count = 4
+    gm.apply_action_to_engine(
+        p1, action(ActionType.BUFF, value=2000, duration="UNTIL_NEXT_TURN_END"),
+        [char], 2000)
+    assert char.get_power(True) == 6000
+    # 同ターン終了（turn_count 4）では消えない
+    gm.continuous.expire("TURN_END", 4)
+    assert char.get_power(True) == 6000, "付与ターンの終了では失効しない"
+    # 次の相手ターン終了（turn_count 5 = expire_turn）で失効
+    gm.continuous.expire("TURN_END", 5)
+    assert char.get_power(True) == 4000, "次ターン終了で失効するべき"
+
+
+def cov_drain(gm):
+    import effect_coverage as _cov
+    _cov._smart_drain(gm, record={})
