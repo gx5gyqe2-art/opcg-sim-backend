@@ -1989,6 +1989,15 @@ CASES = [
             {"effect": {"kind": "action", "type": "LOOK", "value": 1, "status": None}}
         ],
     },
+    # ----- 丸数字コスト（①＝ドン1枚レスト） --------------------------------
+    {
+        "id": "don_cost_circled_one",
+        "text": "【起動メイン】①：このキャラをアクティブにする。",
+        "expect": [
+            {"trigger": "ACTIVATE_MAIN",
+             "cost": {"kind": "action", "type": "REST_DON", "value": 1}}
+        ],
+    },
     # ----- ライフを見て1枚をデッキ上へ（LIFE→DECK top, ST13-004 前段） --------
     {
         "id": "life_view_to_deck_top",

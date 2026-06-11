@@ -23,6 +23,25 @@ def _first_int(text: str, default: int = 0) -> int:
     return int(nums[0]) if nums else default
 
 
+# 丸数字（①②… / ➀➁…）= コストとして「ドン!!を N 枚レストにする」の表記（NFC では非分解で残る）。
+_CIRCLED_DIGITS = {
+    "①": 1, "②": 2, "③": 3, "④": 4, "⑤": 5, "⑥": 6, "⑦": 7, "⑧": 8, "⑨": 9, "⑩": 10,
+    "➀": 1, "➁": 2, "➂": 3, "➃": 4, "➄": 5, "➅": 6, "➆": 7, "➇": 8, "➈": 9, "➉": 10,
+}
+
+
+# ---------------------------------------------------------------------------
+# 丸数字コスト: 「①：…」「➀：…」（コストエリアのドン!!を N 枚レストにする）→ REST_DON(N)。
+#   従来は丸数字単体が OTHER に落ちていた（OP05-032 / OP05-119 等）。コスト文脈の単体表記。
+# ---------------------------------------------------------------------------
+@rule("don_cost_circled", priority=91)
+def _don_cost_circled(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text.strip()
+    if t in _CIRCLED_DIGITS:
+        return GameAction(type=ActionType.REST_DON, value=ValueSource(base=_CIRCLED_DIGITS[t]), raw_text=ctx.text)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # ドロー: 「カードN枚を引く」
 # ---------------------------------------------------------------------------
