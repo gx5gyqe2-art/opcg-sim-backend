@@ -1894,3 +1894,29 @@ def _walk_nodes(node):
     elif isinstance(node, _Ch):
         for o in node.options:
             yield from _walk_nodes(o)
+
+
+def test_passive_buff_does_not_stack_across_recalcs():
+    """PASSIVE「パワー+1000」が _apply_passive_effects の再計算で累積しない。
+
+    従来は power_buff に直接加算され、盤面操作のたびに +1000 ずつ際限なく
+    増えていた（実プレイの「テキスト通り動かない」主要因の一つ）。"""
+    from opcg_sim.src.models.effect_types import Ability, TargetQuery
+    gm, p1, _ = make_game()
+    ab = Ability(
+        trigger=TriggerType.PASSIVE,
+        effect=GameAction(type=ActionType.BUFF, target=TargetQuery(select_mode="SOURCE"),
+                          value=ValueSource(base=1000)),
+    )
+    char = make_instance(make_master(card_id="C-PB", name="自己バフ", power=1000,
+                                     abilities=(ab,)), owner="P1")
+    p1.field.append(char)
+
+    for _ in range(3):
+        gm._apply_passive_effects(p1)
+    assert char.get_power(True) == 2000, (
+        f"PASSIVE +1000 は何度再計算しても +1000 のまま: {char.get_power(True)}")
+
+    # 場を離れて戻れば再適用される（レイヤは再計算で再構築）
+    gm._apply_passive_effects(p1)
+    assert char.passive_power == 1000 and char.power_buff == 0

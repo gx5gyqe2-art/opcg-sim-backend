@@ -89,6 +89,9 @@ class CardInstance:
     is_face_up: bool = False
     power_buff: int = 0
     cost_buff: int = 0
+    # PASSIVE/YOUR_TURN 由来のパワー修正の再計算レイヤ。_apply_passive_effects が
+    # 毎回 0 にリセットして再適用する（power_buff に加えると再計算のたびに累積する）。
+    passive_power: int = 0
     base_power_override: Optional[int] = None
     # 「このターン中、コスト0にする」等のコスト絶対値セット。base_power_override と対称で、
     # _apply_passive_effects ではリセットせず reset_turn_status のみで失効させる。
@@ -137,7 +140,7 @@ class CardInstance:
         if self.master.type not in [CardType.LEADER, CardType.CHARACTER]:
             return 0
         base = self.base_power_override if self.base_power_override is not None else self.master.power
-        buff = self.power_buff + self.timed_power
+        buff = self.power_buff + self.timed_power + self.passive_power
         don_power = (self.attached_don * 1000) if is_my_turn else 0
         return base + buff + don_power
 

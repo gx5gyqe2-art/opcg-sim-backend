@@ -501,30 +501,38 @@ class GameManager:
             for c in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
                 if c:
                     c.cost_buff = 0
+                    c.passive_power = 0
                     c.base_power_override = None
                     c.current_keywords = c.master.keywords.copy()
             for c in p.hand:
                 if c:
                     c.cost_buff = 0
 
-        # Step 2: YOUR_TURN 効果（アクティブプレイヤーのカードのみ）
-        #   ステージ（player.stage）も対象に含める。聖地マリージョア(コスト軽減)・
-        #   虚の玉座(リーダー+1000) 等の STAGE の YOUR_TURN 効果が従来発動していなかった。
-        for card in ([player.leader] if player.leader else []) + player.field + ([player.stage] if player.stage else []):
-            if not card or not card.master.abilities: continue
-            for ability in card.master.abilities:
-                if ability.trigger == TriggerType.YOUR_TURN:
-                    log_event("DEBUG", "game.passive_trigger", f"YOUR_TURN: {card.master.name}", player=player.name)
-                    self.resolve_ability(player, ability, source_card=card)
-
-        # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）。ステージも含める。
-        for p in [player, opponent]:
-            for card in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
+        # Step 2/3 で適用される INSTANT パワーバフは passive_power（再計算レイヤ）に
+        # 載せる。power_buff に加えると _apply_passive_effects が呼ばれるたびに
+        # 累積し、PASSIVE「パワー+1000」が盤面操作のたびに際限なく増えていた。
+        self._in_passive_recalc = True
+        try:
+            # Step 2: YOUR_TURN 効果（アクティブプレイヤーのカードのみ）
+            #   ステージ（player.stage）も対象に含める。聖地マリージョア(コスト軽減)・
+            #   虚の玉座(リーダー+1000) 等の STAGE の YOUR_TURN 効果が従来発動していなかった。
+            for card in ([player.leader] if player.leader else []) + player.field + ([player.stage] if player.stage else []):
                 if not card or not card.master.abilities: continue
                 for ability in card.master.abilities:
-                    if ability.trigger == TriggerType.PASSIVE:
-                        log_event("DEBUG", "game.passive_trigger", f"PASSIVE: {card.master.name}", player=p.name)
-                        self.resolve_ability(p, ability, source_card=card)
+                    if ability.trigger == TriggerType.YOUR_TURN:
+                        log_event("DEBUG", "game.passive_trigger", f"YOUR_TURN: {card.master.name}", player=player.name)
+                        self.resolve_ability(player, ability, source_card=card)
+
+            # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）。ステージも含める。
+            for p in [player, opponent]:
+                for card in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
+                    if not card or not card.master.abilities: continue
+                    for ability in card.master.abilities:
+                        if ability.trigger == TriggerType.PASSIVE:
+                            log_event("DEBUG", "game.passive_trigger", f"PASSIVE: {card.master.name}", player=p.name)
+                            self.resolve_ability(p, ability, source_card=card)
+        finally:
+            self._in_passive_recalc = False
 
     def draw_card(self, player: Player, count: int = 1):
         for _ in range(count):
@@ -1323,6 +1331,10 @@ class GameManager:
                     if dur in ("THIS_BATTLE", "THIS_TURN", "UNTIL_NEXT_TURN_END"):
                         expire_turn = self.turn_count + 1 if dur == "UNTIL_NEXT_TURN_END" else 0
                         self.continuous.apply(target, "POWER", dur, amount=value, expire_turn=expire_turn)
+                    elif getattr(self, "_in_passive_recalc", False):
+                        # PASSIVE/YOUR_TURN 再計算中: 再計算レイヤに載せる（累積防止）
+                        target.passive_power += value
+                        log_event("INFO", "game.action_buff", f"{target.master.name} passive power {value:+d}", player=player.name)
                     elif hasattr(target, 'power_buff'):
                         target.power_buff += value
                         log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name)

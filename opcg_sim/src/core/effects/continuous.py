@@ -49,6 +49,15 @@ class ContinuousEffectManager:
         self.effects: List[ContinuousEffect] = []
 
     def apply(self, card, kind, duration, amount=0, flag="", keyword="", expire_turn=0) -> ContinuousEffect:
+        # KEYWORD/FLAG は集合セマンティクス（重複付与は無意味）のため、同一内容の効果が
+        # 既に生きていれば再登録しない。PASSIVE 再計算が同じ付与を繰り返すと effects
+        # リストが際限なく成長するのを防ぐ（POWER/COST は正当な重ね掛けがあるため対象外）。
+        if kind in ("KEYWORD", "FLAG"):
+            for e in self.effects:
+                if (e.target_uuid == card.uuid and e.kind == kind and e.flag == flag
+                        and e.keyword == keyword and e.duration == duration
+                        and e.expire_turn == expire_turn):
+                    return e
         eff = ContinuousEffect(
             target_uuid=card.uuid,
             kind=kind,
