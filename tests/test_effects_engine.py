@@ -1778,3 +1778,31 @@ def test_life_to_deck_top_moves_top_life_card():
     assert len(p1.deck) == n_deck + 1
     assert p1.deck[0] is top_life      # デッキトップへ
     assert top_life not in p1.life     # ライフから消えた（カード保全, 計は不変）
+
+
+def test_life_to_deck_reveal_select_suspends_and_resumes():
+    """「ライフすべてを見て1枚をデッキ上へ」: REVEAL_SELECT で対話選択に中断し、
+    プレイヤーが選んだライフがデッキトップへ移る（自動「上から取得」ではない）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    from opcg_sim.src.models.enums import TriggerType, CardType
+    txt = '【登場時】自分のライフすべてを見て、1枚を自分のデッキの上に置き、ライフを好きな順番で置く。'
+    abils = EffectParserV2().parse_card_text(txt)
+    gm, p1, _ = make_game()
+    for i in range(3):
+        p1.life.append(make_instance(make_master(card_id=f'LF{i}'), owner=p1.name))
+    for i in range(2):
+        p1.deck.append(make_instance(make_master(card_id=f'DK{i}'), owner=p1.name))
+    src = make_instance(make_master(card_id='SRC', type=CardType.CHARACTER, abilities=tuple(abils)), owner=p1.name)
+    p1.field.append(src)
+    on_play = [a for a in abils if a.trigger == TriggerType.ON_PLAY][0]
+    gm.resolve_ability(p1, on_play, source_card=src)
+    # 3枚あるので「上から自動取得」ではなく対話選択に中断する
+    assert gm.active_interaction is not None
+    assert gm.active_interaction.get("action_type") == "SELECT_TARGET"
+    assert len(gm.active_interaction.get("candidates", [])) == 3
+    # プレイヤーが LF1（トップでない）を選択 → デッキトップへ
+    chosen = [c.uuid for c in gm.active_interaction["candidates"] if c.master.card_id == 'LF1']
+    gm.resolve_interaction(p1, {"selected_uuids": chosen})
+    assert p1.deck[0].master.card_id == 'LF1'
+    assert 'LF1' not in [c.master.card_id for c in p1.life]
+    assert len(p1.life) + len(p1.deck) == 5  # カード保全

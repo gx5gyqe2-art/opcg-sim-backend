@@ -451,9 +451,13 @@ def _life_to_deck_top(ctx: ParseContext) -> Optional[GameAction]:
         return None
     m = re.search(_nfc(r"(\d+)枚を"), t)
     n = int(m.group(1)) if m else 1
+    # 「ライフすべてを見て」= 自分のライフを公開して選ぶため、対話選択を許可する flag を付与
+    # （隠しゾーンの自動「上から取得」ではなく、プレイヤーがどのライフを置くか選べる）。
+    tq = TargetQuery(zone=Zone.LIFE, player=Player.SELF, count=n)
+    tq.flags.add("REVEAL_SELECT")
     return GameAction(
         type=ActionType.MOVE_CARD,
-        target=TargetQuery(zone=Zone.LIFE, player=Player.SELF, count=n),
+        target=tq,
         destination=Zone.DECK,
         dest_position="TOP",
         raw_text=t,
