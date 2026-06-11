@@ -2314,6 +2314,24 @@ def test_select_group_distribution_field():
     assert powers == [2000, 3000], f"先頭=-3000/残り=-2000 の分配を期待: {powers}"
 
 
+def test_opp_turn_end_fires_at_end_turn():
+    """§7-2 【相手のターン終了時】(OPP_TURN_END): ターンプレイヤーのターン終了で、
+    非ターンプレイヤーの当該能力が自動発火する。"""
+    gm, p1, p2 = make_game()
+    gm.turn_player, gm.opponent = p1, p2
+    gm.turn_count = 2
+    fired = {"n": 0}
+    ramp = GameAction(type=ActionType.RAMP_DON, value=ValueSource(base=1))
+    ab = Ability(trigger=TriggerType.OPP_TURN_END, effect=ramp)
+    watcher = make_instance(
+        make_master(card_id="W", name="監視", abilities=(ab,)), owner="P2")
+    p2.field.append(watcher)
+    before = len(p2.don_active) + len(p2.don_rested)
+    gm._fire_turn_end_triggers()  # p1 のターン終了 → p2 の【相手のターン終了時】が発火
+    after = len(p2.don_active) + len(p2.don_rested)
+    assert after == before + 1, "非ターンプレイヤーの OPP_TURN_END が発火するべき"
+
+
 def cov_drain(gm):
     import effect_coverage as _cov
     _cov._smart_drain(gm, record={})

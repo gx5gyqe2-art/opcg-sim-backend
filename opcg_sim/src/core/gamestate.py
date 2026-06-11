@@ -437,16 +437,26 @@ class GameManager:
         self._validate_action(self.turn_player, "MAIN_ACTION")
         self.phase = Phase.END
         log_event("INFO", "game.phase_end", f"Turn {self.turn_count} ending", player=self.turn_player.name)
-        all_units = [self.turn_player.leader] + self.turn_player.field
-        if self.turn_player.stage: all_units.append(self.turn_player.stage)
-        for card in all_units:
-            if card and card.master.abilities:
-                for ability in card.master.abilities:
-                    if ability.trigger == TriggerType.TURN_END: self.resolve_ability(self.turn_player, ability, source_card=card)
+        self._fire_turn_end_triggers()
         # 「このターン終了時、〜」で予約された遅延アクションを解決する。
         self._flush_pending_end_of_turn()
         self.continuous.expire("TURN_END", self.turn_count)
         self.switch_turn()
+
+    def _fire_turn_end_triggers(self):
+        """ターン終了時トリガーを発火する。ターンプレイヤーの【自分のターン終了時】
+        (TURN_END) と、非ターンプレイヤーの【相手のターン終了時】(OPP_TURN_END)。"""
+        def _units(pl):
+            us = [pl.leader] + pl.field
+            if pl.stage: us.append(pl.stage)
+            return us
+        for pl, trig in ((self.turn_player, TriggerType.TURN_END),
+                         (self.opponent, TriggerType.OPP_TURN_END)):
+            for card in _units(pl):
+                if card and card.master.abilities:
+                    for ability in card.master.abilities:
+                        if ability.trigger == trig:
+                            self.resolve_ability(pl, ability, source_card=card)
 
     def _flush_pending_end_of_turn(self):
         """end_turn フックで、予約された遅延アクション（このターン終了時、〜）を解決する。"""
