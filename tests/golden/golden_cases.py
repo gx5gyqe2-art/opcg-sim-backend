@@ -1939,4 +1939,29 @@ CASES = [
             ]}}
         ],
     },
+    # ----- 活用形/「てもよい」の取りこぼし補完 ----------------------------
+    # bounce: 「…手札に戻してもよい」（任意形）
+    {
+        "id": "bounce_optional_form",
+        "text": "【登場時】相手のコスト5以下のキャラ1枚までを、持ち主の手札に戻してもよい。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "BOUNCE", "target": {"player": "OPPONENT", "is_up_to": True}}}
+        ],
+    },
+    # hand→デッキの下: 「…デッキの下に置いてもよい」（任意・並び替え）
+    {
+        "id": "hand_to_deck_bottom_optional",
+        "text": "【登場時】自分の手札すべてを好きな順番でデッキの下に置いてもよい。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "DECK_BOTTOM", "target": {"zone": "HAND", "player": "SELF"}}}
+        ],
+    },
+    # ドン!!デッキ返却: 「相手は…ドン‼1枚をドン‼デッキに戻してもよい」
+    {
+        "id": "don_return_deck_optional",
+        "text": "相手は自身のアクティブのドン‼1枚をドン‼デッキに戻してもよい。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "RETURN_DON", "value": 1, "status": "OPPONENT"}}
+        ],
+    },
 ]

@@ -661,7 +661,7 @@ def _don_return_deck(ctx: ParseContext) -> Optional[GameAction]:
     「ドン!!デッキに戻す」表記のみを担う。
     """
     t = ctx.text
-    if _nfc("ドン") not in t or _nfc("戻す") not in t:
+    if _nfc("ドン") not in t or not re.search(_nfc(r"戻(す|して)"), t):
         return None
     if not re.search(_nfc(r"ドン(?:!!|‼)?デッキ"), t):
         return None
@@ -1215,7 +1215,7 @@ def _bounce(ctx: ParseContext) -> Optional[GameAction]:
     # 「手札に戻す」に加え、Sequence 分割で末尾が連用形「手札に戻し」になる句も対象
     # （例:「相手の…を持ち主の手札に戻し、このカードを手札に加える」→ 前段「…手札に戻し」）。
     if not re.search(_nfc(r"手札に戻す(ことができる)?"), t) \
-            and not re.search(_nfc(r"手札に戻し(?:[、。]|$)"), t.strip()):
+            and not re.search(_nfc(r"手札に戻し(?:[、。]|てもよい|$)"), t.strip()):
         return None
     if _nfc("手札から") in t:
         return None  # 「手札から何かして手札に戻す」等の誤検知を避ける
@@ -1306,7 +1306,9 @@ def _play_card_from_zone(ctx: ParseContext) -> Optional[GameAction]:
     レスト登場（レストで登場させる）は status="RESTED" をエンジンに伝える。
     """
     t = ctx.text
-    if not re.search(_nfc(r"登場させ(る|てもよい|ることができる)"), t):
+    # 「登場させる/させてもよい/させることができる」に加え、短縮形「登場できる」も拾う
+    # （例: OP05-111「手札から「コトリ」1枚を、登場できる」）。
+    if not re.search(_nfc(r"登場(させ(る|てもよい|ることができる)|できる)"), t):
         return None
     if re.search(_nfc(r"この(カード|キャラ|リーダー)を"), t):
         return None  # play_self が担当
@@ -1511,7 +1513,8 @@ def _remaining_trash(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("残り") not in t:
         return None
-    if _nfc("トラッシュ") not in t or _nfc("置く") not in t:
+    # 「置く」(終止) と Sequence 分割後の連用形「置き」(例:「残りをトラッシュに置き、…捨てる」) を拾う。
+    if _nfc("トラッシュ") not in t or not re.search(_nfc(r"置(く|き)"), t):
         return None
     return GameAction(
         type=ActionType.TRASH,
@@ -1535,7 +1538,7 @@ def _hand_to_deck(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("手札") not in t:
         return None
     # 「デッキの上/下に置く」に加え、「（手札すべてを）デッキに戻す/戻し」(シャッフル前提) も拾う。
-    if not re.search(_nfc(r"デッキの(上か下|上|下)に置く"), t) and not re.search(_nfc(r"デッキに戻"), t):
+    if not re.search(_nfc(r"デッキの(上か下|上|下)に置(く|い)"), t) and not re.search(_nfc(r"デッキに戻"), t):
         return None
     # 「ライフ」「トラッシュ」「ドン」を含む場合は別ルールへ委ねる
     if _nfc("ライフ") in t or _nfc("トラッシュ") in t or _nfc("ドン") in t:
