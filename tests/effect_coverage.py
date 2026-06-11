@@ -180,6 +180,37 @@ def _stat_changed(sb: dict, sa: dict, ignore=frozenset()) -> bool:
     return any(sb[k] != sa[k] for k in keys)
 
 
+def _zone_fingerprint(p1: Player, p2: Player) -> dict:
+    """全カード uuid → 所在ゾーン名 のマップ。ゾーン枚数では相殺されて見えない
+    「グロスのカード移動」を検出するための指紋（例: ドロー+手札→デッキの cost が
+    枚数では純0でも、各カードの所在は変わる）。don も含める。"""
+    out: dict = {}
+    for p in (p1, p2):
+        pref = p.name
+        zones = {
+            "hand": p.hand, "field": p.field, "trash": p.trash,
+            "deck": p.deck, "life": p.life, "temp": getattr(p, "temp_zone", []),
+            "don_active": p.don_active, "don_rested": p.don_rested,
+            "don_attached": getattr(p, "don_attached_cards", []),
+        }
+        for zname, zone in zones.items():
+            for c in zone:
+                out[f"{pref}:{c.uuid}"] = zname
+        if p.leader:
+            out[f"{pref}:{p.leader.uuid}"] = "leader"
+        if getattr(p, "stage", None):
+            out[f"{pref}:{p.stage.uuid}"] = "stage"
+    return out
+
+
+def _moved(fb: dict, fa: dict) -> bool:
+    """指紋 fb→fa でカードがゾーン移動した（=何か実行された）か。"""
+    for k in fb.keys() | fa.keys():
+        if fb.get(k) != fa.get(k):
+            return True
+    return False
+
+
 def _stat_diff(sb: dict, sa: dict, ignore=frozenset()) -> str:
     parts = []
     for k in sorted(sb.keys() & sa.keys()):

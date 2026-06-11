@@ -694,6 +694,30 @@ class EffectParser:
     def _parse_condition_obj(self, text: str) -> Condition:
         norm_text = _nfc(text)
 
+        # 複合条件「Aがいて、Bの場合」「Aが…以下で、Bの…」= A かつ B。
+        # 連結部（がいて/がい(ない)て/があり/以上で/以下で 等）の直後の読点で2分割し、
+        # 各半を再帰解析して AND にする。従来は全文を1条件として最初の数値で誤分類していた
+        # （例「コスト8以上のキャラがいて、手札6枚以下」→ HAND_COUNT>=8 と誤読）。
+        split_m = re.search(
+            _nfc(r'^(?P<a>.+?(?:がい(?:て|る)|枚以上いて|枚以下いて|がいなくて|があり|がある|'
+                 r'以上で|以下で|以上であり|以下であり))、(?P<b>.+)$'),
+            norm_text)
+        if split_m:
+            a_txt = split_m.group("a")
+            b_txt = split_m.group("b")
+            # 「がいて」連結は存在条件なので「いる」に正規化して再帰解析する
+            a_norm = re.sub(_nfc(r'いて$'), _nfc('いる'), a_txt)
+            a_norm = re.sub(_nfc(r'いなくて$'), _nfc('いない'), a_norm)
+            a_norm = re.sub(_nfc(r'(以上|以下)で$'), r'\1', a_norm)
+            sub_a = self._parse_condition_obj(a_norm)
+            sub_b = self._parse_condition_obj(b_txt)
+            valid = [c for c in (sub_a, sub_b)
+                     if c and c.type not in (ConditionType.NONE, ConditionType.OTHER)]
+            if len(valid) == 2:
+                return Condition(type=ConditionType.AND, args=valid, raw_text=norm_text)
+            if len(valid) == 1:
+                return valid[0]
+
         # C8「公開したカードが宣言したコストと同じ場合」: 宣言コスト＝公開カードのコスト。
         # 他の数値/特徴条件より先に判定する（「コスト」を含むため誤分類を避ける）。
         if _nfc("宣言したコスト") in norm_text and _nfc("同じ") in norm_text:

@@ -77,3 +77,43 @@ def test_parser_fallback_ratchet():
     assert n <= MAX_FALLBACK, (
         f"フォールバック原子句 {n} > {MAX_FALLBACK}: "
         + " / ".join(list(parser.unmatched)[:5]))
+
+
+# --- Phase 4 深層ハーネスのゲート ---------------------------------------------
+MAX_SATISFIED_NO_CHANGE = 9   # 条件/コスト充足盤面で実行しても盤面が動かない（H-5）
+MAX_BATTLE_NO_CHANGE    = 0   # バトル文脈で発火しても変化なし（H-6）
+MAX_INTERACTIVE_AUDIT   = 11  # 対象クエリとテキストの矛盾（残存は二重制約/複数ゾーンの部分対応）
+
+
+def test_condition_synth_no_change_ratchet():
+    """H-5: 条件/コストを満たした盤面で発動しても一切動かない能力の上限。
+
+    残存はリーダーへの特徴付与・既にアクティブな対象・遅延効果・色フィルタ等の
+    合成/測定限界（HANDOVER §7 残課題）。新規バグで増えたら気づけるよう固定する。"""
+    import condition_synth
+    buckets = condition_synth.collect()
+    items = buckets.get("SATISFIED_NO_CHANGE", [])
+    assert len(items) <= MAX_SATISFIED_NO_CHANGE, (
+        f"SATISFIED_NO_CHANGE {len(items)} > {MAX_SATISFIED_NO_CHANGE}: "
+        + ", ".join(f"{c}/{t}" for c, _, t, _ in items[:10]))
+    assert not buckets.get("ERROR"), f"条件合成で例外: {buckets.get('ERROR')[:5]}"
+
+
+def test_battle_coverage_no_errors():
+    """H-6: バトル文脈（攻撃/ブロック/カウンター）で全トリガーが例外なく発火する。"""
+    import battle_coverage
+    buckets = battle_coverage.collect()
+    assert not buckets.get("ERROR"), f"バトル文脈で例外: {buckets.get('ERROR')[:5]}"
+    no_change = buckets.get("BATTLE_NO_CHANGE", [])
+    assert len(no_change) <= MAX_BATTLE_NO_CHANGE, (
+        f"BATTLE_NO_CHANGE {len(no_change)} > {MAX_BATTLE_NO_CHANGE}: "
+        + ", ".join(f"{c}/{t}" for c, _, t, _ in no_change[:10]))
+
+
+def test_interactive_audit_ratchet():
+    """H-7: 対象クエリとテキストの矛盾検出（精度向上後の真陽性近似）。"""
+    import interactive_target_audit
+    flagged = interactive_target_audit.run(top=0)
+    assert len(flagged) <= MAX_INTERACTIVE_AUDIT, (
+        f"interactive audit {len(flagged)} > {MAX_INTERACTIVE_AUDIT}: "
+        + ", ".join(n for n, _ in flagged[:12]))

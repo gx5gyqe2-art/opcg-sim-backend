@@ -713,7 +713,19 @@ class GameManager:
     def handle_block(self, blocker: Optional[Card] = None):
         if not self.active_battle: return
         target_owner = self.active_battle["target_owner"]; self._validate_action(target_owner, "SELECT_BLOCKER")
-        if blocker: log_event("INFO", "game.block_execute", f"{blocker.master.name} blocks the attack", player=target_owner.name); blocker.is_rest = True; self.active_battle["target"] = blocker
+        if blocker:
+            log_event("INFO", "game.block_execute", f"{blocker.master.name} blocks the attack", player=target_owner.name)
+            blocker.is_rest = True
+            self.active_battle["target"] = blocker
+            # 【ブロック時】効果を発動する（従来は未発火＝14枚が no-op だった）。
+            if blocker.master.abilities and not blocker.ability_disabled and not blocker.negated:
+                for ability in blocker.master.abilities:
+                    if ability.trigger == TriggerType.ON_BLOCK:
+                        log_event("INFO", "game.trigger_block", f"ON_BLOCK: {blocker.master.name}", player=target_owner.name)
+                        self.resolve_ability(target_owner, ability, source_card=blocker)
+            if self.active_interaction:
+                # ブロック時効果が対象選択等で中断した場合はここで返す（resume が継続）。
+                return
         else: log_event("INFO", "game.block_skip", "No block declared", player=target_owner.name)
         self.phase = Phase.BATTLE_COUNTER; log_event("INFO", "game.phase_transition", f"Moving to {self.phase.name}", player=target_owner.name)
 
