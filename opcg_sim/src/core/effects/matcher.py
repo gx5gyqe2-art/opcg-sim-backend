@@ -24,6 +24,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     player_text = re.sub(
         _nfc(r'(?:お互いの|相手の|自分の)?ライフの(?:合計)?枚数(?:分)?以下のコストを持つ'),
         '', tgt_text)
+    # 期間/タイミング句の「相手の」は対象側ではないため除去する
+    # （「自分のリーダーを、次の相手のターン終了時まで、パワー+2000」で OPPONENT 誤判定を防ぐ）。
+    # 「相手のキャラ」等の実対象修飾は残すよう、ターン/エンドフェイズ＋まで/中 に限定する。
+    player_text = re.sub(
+        _nfc(r'(?:次の)?相手の(?:ターン|エンドフェイズ)(?:終了時)?(?:まで|中)'),
+        '', player_text)
 
     if _nfc(ParserKeyword.EACH_OTHER) in player_text: tq.player = Player.ALL
     elif _nfc(ParserKeyword.OPPONENT) in player_text: tq.player = Player.OPPONENT

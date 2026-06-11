@@ -626,12 +626,13 @@ def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
     # 例: 「自分のリーダーかキャラ1枚にドン!!を付与する」→ recipient=SELF
     ni_idx = t.find(_nfc("に付与")) if _nfc("に付与") in t else len(t)
     recipient_part = t[:ni_idx]
-    player = Player.OPPONENT if re.search(_nfc(r"相手の[^でに]*?(キャラ|リーダー)"), recipient_part) else Player.SELF
-    recipient = TargetQuery(player=player, zone=Zone.FIELD, count=1)
-    if _nfc("リーダー") in recipient_part:
-        recipient.card_type.append("LEADER")
-    if _nfc("キャラ") in recipient_part:
-        recipient.card_type.append("CHARACTER")
+    # 付与先は parse_target で解析し、特徴《X》/名前「X」/コスト等のフィルタも拾う
+    # （従来は card_type のみの手動構築で特徴等が脱落していた）。
+    recipient = parse_target(recipient_part)
+    recipient.zone = Zone.FIELD
+    recipient.is_rest = None  # 「レストのドン」の「レスト」が is_rest に漏れるのを防ぐ
+    if recipient.count is None or recipient.count <= 0:
+        recipient.count = 1
     if not recipient.card_type:
         recipient.card_type.extend(["LEADER", "CHARACTER"])
     return GameAction(
@@ -1366,8 +1367,11 @@ def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("残り") in t:
         return None  # remaining_deck_bottom / remaining_deck_top_or_bottom が担当
     tq = parse_target(t)
-    # 「持ち主のデッキの下」でプレイヤーがデフォルト(SELF)なら OPPONENT に補正。
-    if _nfc("持ち主") in t and tq.player != Player.OPPONENT:
+    # 「持ち主のデッキの下」でプレイヤー未指定なら OPPONENT（相手キャラ対象が多い）。
+    # ただし「自分の（キャラ/リーダー）」が明示されている場合は SELF を尊重する
+    # （例: EB03-026「自分のキャラ1枚を持ち主のデッキの下に置く」）。
+    if _nfc("持ち主") in t and tq.player != Player.OPPONENT \
+            and not re.search(_nfc(r"自分の[^。：]*?(キャラ|リーダー)"), t):
         tq.player = Player.OPPONENT
     if _nfc("まで") in t:
         tq.is_up_to = True
