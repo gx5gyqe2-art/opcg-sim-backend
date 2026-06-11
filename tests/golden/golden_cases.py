@@ -1989,6 +1989,17 @@ CASES = [
             {"effect": {"kind": "action", "type": "LOOK", "value": 1, "status": None}}
         ],
     },
+    # ----- コスト節先頭の条件を ability.condition へ引き上げ ----------------
+    {
+        "id": "cost_prefix_condition_lifted",
+        "text": "【起動メイン】自分のリーダーが「しらほし」の場合、このキャラをレストにできる：相手のコスト3以下のキャラ1枚までを、KOする。",
+        "expect": [
+            {"trigger": "ACTIVATE_MAIN",
+             "condition": {"type": "LEADER_NAME"},
+             "cost": {"kind": "action", "type": "REST", "target": {"ref_id": "self"}},
+             "effect": {"kind": "action", "type": "KO"}}
+        ],
+    },
     # ----- 丸数字コスト（①＝ドン1枚レスト） --------------------------------
     {
         "id": "don_cost_circled_one",

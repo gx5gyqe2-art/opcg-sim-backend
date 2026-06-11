@@ -173,9 +173,13 @@ class EffectParser:
             # コスト区切りではないため、タグ内部をマスクした上で判定する。
             masked = re.sub(r'【[^】]*】', lambda m: '〇' * len(m.group(0)), clean_text)
             colon = _nfc("：") if _nfc("：") in masked else (_nfc(":") if _nfc(":") in masked else None)
+            cost_gate_cond = None
             if colon:
                 idx = masked.index(colon)
-                cost_node = self._parse_cost_node(clean_text[:idx])
+                cost_text = clean_text[:idx]
+                # コスト節先頭のゲート条件「〜の場合、」を ability 条件へ引き上げる（OP11-103 等）。
+                cost_gate_cond, cost_text = self._extract_leading_condition(cost_text)
+                cost_node = self._parse_cost_node(cost_text)
                 effect_text = clean_text[idx + 1:]
 
             # ドン!!コストタグを cost_node に統合
@@ -199,6 +203,9 @@ class EffectParser:
 
             # 先頭のゲート条件（「〜の場合、」）を ability.condition に引き上げる
             final_condition = turn_limit_cond
+            if cost_gate_cond is not None:  # コスト節から引き上げた条件
+                final_condition = cost_gate_cond if final_condition is None else Condition(
+                    type=ConditionType.AND, args=[final_condition, cost_gate_cond])
             if isinstance(effect_node, Branch) and effect_node.if_false is None and effect_node.condition is not None:
                 if final_condition is None:
                     final_condition = effect_node.condition
@@ -249,6 +256,22 @@ class EffectParser:
         if _nfc("場を離れる") not in norm_text and _nfc("KOされ") not in norm_text:
             return None
         return "BATTLE_KO" if _nfc("バトル") in norm_text else "LEAVE"
+
+    def _extract_leading_condition(self, text: str):
+        """テキスト先頭のゲート条件「〜の場合、/〜なら、」を (Condition, 残りテキスト) に分離する。
+
+        条件が解釈できない（GENERIC）場合は引き上げず (None, 元テキスト) を返す（誤抽出防止）。
+        コスト節先頭の条件（例:「自分のリーダーが「しらほし」の場合、…できる」）を
+        ability.condition へ引き上げるために使う。
+        """
+        norm = _nfc(text)
+        m = re.match(_nfc(r'^(.+?)(?:の場合|なら)、(.+)$'), norm, re.DOTALL)
+        if not m:
+            return None, text
+        cond = self._parse_condition_obj(m.group(1))
+        if cond is None or cond.type == ConditionType.GENERIC:
+            return None, text
+        return cond, m.group(2)
 
     def _parse_cost_node(self, cost_text: str) -> Optional[EffectNode]:
         """
