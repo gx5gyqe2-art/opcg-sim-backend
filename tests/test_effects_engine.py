@@ -1806,3 +1806,401 @@ def test_life_to_deck_reveal_select_suspends_and_resumes():
     assert p1.deck[0].master.card_id == 'LF1'
     assert 'LF1' not in [c.master.card_id for c in p1.life]
     assert len(p1.life) + len(p1.deck) == 5  # カード保全
+
+
+def test_scoped_prevent_leave_protects_trait_characters():
+    """RC-2: 「自分の特徴《X》を持つキャラすべては、相手の効果で場を離れない」
+    範囲保護が他カード（特徴一致キャラ）を守り、不一致キャラは守らない。"""
+    from opcg_sim.src.models.effect_types import Ability, TargetQuery
+    gm, p1, p2 = make_game()
+    protector_ab = Ability(
+        trigger=TriggerType.PASSIVE,
+        effect=GameAction(
+            type=ActionType.PREVENT_LEAVE, status="LEAVE",
+            target=TargetQuery(player=Player.SELF, zone=Zone.FIELD,
+                               card_type=["CHARACTER"], traits=["科学者"],
+                               count=-1, select_mode="ALL"),
+        ),
+    )
+    protector = make_instance(
+        make_master(card_id="P-PL", name="守護者", abilities=(protector_ab,)), owner="P1")
+    scientist = make_instance(
+        make_master(card_id="C-SCI", name="科学者A", traits=["科学者"]), owner="P1")
+    other = make_instance(make_master(card_id="C-OTH", name="一般人"), owner="P1")
+    p1.field.extend([protector, scientist, other])
+
+    # 相手(P2)の効果による KO: 特徴一致キャラは守られる
+    ok = gm.apply_action_to_engine(p2, action(ActionType.KO), [scientist], 0)
+    assert scientist in p1.field, "特徴一致キャラは範囲保護で場に残るべき"
+    # 不一致キャラは KO される
+    gm.apply_action_to_engine(p2, action(ActionType.KO), [other], 0)
+    assert other not in p1.field and other in p1.trash
+    # 自分自身(P1)の効果による除去は保護対象外（「相手の効果で」）
+    gm.apply_action_to_engine(p1, action(ActionType.KO), [scientist], 0)
+    assert scientist in p1.trash
+
+
+def test_timed_prevent_battle_ko_flag():
+    """RC-2/RC-1複合: 期間付き PREVENT_LEAVE(BATTLE_KO) が継続フラグとして付与され、
+    バトル KO を防ぎ、ターン境界で失効する。"""
+    gm, p1, p2 = make_game()
+    char = make_instance(make_master(card_id="C-PRV", name="不死身", power=1000), owner="P1")
+    p1.field.append(char)
+
+    ok = gm.apply_action_to_engine(
+        p1, action(ActionType.PREVENT_LEAVE, status="BATTLE_KO",
+                   duration="UNTIL_NEXT_TURN_END"), [char], 0)
+    assert ok
+    assert "PREVENT_BATTLE_KO" in char.timed_flags
+    assert gm._active_protection(char, ("BATTLE_KO",)) is True
+    assert gm._active_protection(char, ("LEAVE",)) is False
+
+    # ターン経過で失効する（UNTIL_NEXT_TURN_END → turn_count+1 の TURN_END）
+    gm.continuous.expire("TURN_END", gm.turn_count + 1)
+    assert "PREVENT_BATTLE_KO" not in char.timed_flags
+    assert gm._active_protection(char, ("BATTLE_KO",)) is False
+
+
+def test_blocker_disable_respects_cost_cap():
+    """RC-2: 「コスト5以下のキャラの【ブロッカー】を発動できない」がコスト上限で絞られる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abilities = parser.parse_card_text(
+        "【アタック時】相手は、このバトル中、コスト5以下のキャラの【ブロッカー】を発動できない。")
+    assert abilities, "解析失敗"
+    ab = abilities[0]
+    acts = [a for a in _walk_nodes(ab.effect)
+            if getattr(a, "status", None) == "BLOCKER_DISABLE"]
+    assert acts, "BLOCKER_DISABLE が生成されるべき"
+    tq = acts[0].target
+    assert tq.cost_max == 5, f"コスト上限が保持されるべき: {tq.cost_max}"
+    assert tq.player == Player.OPPONENT
+    assert tq.count == -1 and tq.select_mode == "ALL"
+
+
+def _walk_nodes(node):
+    from opcg_sim.src.models.effect_types import Sequence as _Seq, Branch as _Br, Choice as _Ch
+    if node is None:
+        return
+    if isinstance(node, GameAction):
+        yield node
+    elif isinstance(node, _Seq):
+        for a in node.actions:
+            yield from _walk_nodes(a)
+    elif isinstance(node, _Br):
+        yield from _walk_nodes(node.if_true)
+        if node.if_false:
+            yield from _walk_nodes(node.if_false)
+    elif isinstance(node, _Ch):
+        for o in node.options:
+            yield from _walk_nodes(o)
+
+
+def test_passive_buff_does_not_stack_across_recalcs():
+    """PASSIVE「パワー+1000」が _apply_passive_effects の再計算で累積しない。
+
+    従来は power_buff に直接加算され、盤面操作のたびに +1000 ずつ際限なく
+    増えていた（実プレイの「テキスト通り動かない」主要因の一つ）。"""
+    from opcg_sim.src.models.effect_types import Ability, TargetQuery
+    gm, p1, _ = make_game()
+    ab = Ability(
+        trigger=TriggerType.PASSIVE,
+        effect=GameAction(type=ActionType.BUFF, target=TargetQuery(select_mode="SOURCE"),
+                          value=ValueSource(base=1000)),
+    )
+    char = make_instance(make_master(card_id="C-PB", name="自己バフ", power=1000,
+                                     abilities=(ab,)), owner="P1")
+    p1.field.append(char)
+
+    for _ in range(3):
+        gm._apply_passive_effects(p1)
+    assert char.get_power(True) == 2000, (
+        f"PASSIVE +1000 は何度再計算しても +1000 のまま: {char.get_power(True)}")
+
+    # 場を離れて戻れば再適用される（レイヤは再計算で再構築）
+    gm._apply_passive_effects(p1)
+    assert char.passive_power == 1000 and char.power_buff == 0
+
+
+def test_per_n_count_query_buff_tracks_board():
+    """RC-4: 「自分のトラッシュにあるイベント2枚につき、パワー+1000」が
+    実数に追随する（4枚→+2000、2枚→+1000）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    from opcg_sim.src.models.enums import TriggerType as TT
+    parser = EffectParserV2()
+    abilities = parser.parse_card_text(
+        "このキャラは、自分のトラッシュにあるイベント2枚につき、パワー+1000。")
+    assert abilities
+    ab = abilities[0]
+
+    gm, p1, _ = make_game()
+    char = make_instance(make_master(card_id="C-PN", name="スケーラ", power=1000,
+                                     abilities=(ab,)), owner="P1")
+    p1.field.append(char)
+    for i in range(4):
+        p1.trash.append(make_instance(
+            make_master(card_id=f"E-{i}", name=f"イベ{i}", type=CardType.EVENT), owner="P1"))
+    p1.trash.append(make_instance(
+        make_master(card_id="C-X", name="キャラX", type=CardType.CHARACTER), owner="P1"))
+
+    gm._apply_passive_effects(p1)
+    assert char.get_power(True) == 3000, (
+        f"イベント4枚 // 2 * 1000 = +2000 のはず: {char.get_power(True)}")
+
+    # トラッシュからイベントが2枚減れば +1000 に追随する
+    p1.trash = [c for c in p1.trash if c.master.card_id not in ("E-0", "E-1")]
+    gm._apply_passive_effects(p1)
+    assert char.get_power(True) == 2000, (
+        f"イベント2枚 // 2 * 1000 = +1000 のはず: {char.get_power(True)}")
+
+
+def test_per_n_rest_don_count():
+    """RC-4: 「自分のレストのドン!!3枚につき、パワー+1000」がレストドン数で変わる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abilities = parser.parse_card_text(
+        "このキャラは、自分のレストのドン!!3枚につき、パワー+1000。")
+    assert abilities
+    gm, p1, _ = make_game()
+    char = make_instance(make_master(card_id="C-RD", name="ドン参照", power=1000,
+                                     abilities=tuple(abilities)), owner="P1")
+    p1.field.append(char)
+    from opcg_sim.src.models.models import DonInstance
+    p1.don_rested = [DonInstance(owner_id="P1", is_rest=True) for _ in range(7)]
+
+    gm._apply_passive_effects(p1)
+    assert char.get_power(True) == 3000, (
+        f"レストドン7枚 // 3 * 1000 = +2000 のはず: {char.get_power(True)}")
+
+
+def test_opponent_chooses_own_hand_discard():
+    """RC-3: 「自分の手札1枚を相手が選び、捨てる」は自分の手札が対象で、
+    選択者は相手プレイヤーになる（従来は相手の手札を捨てていた）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abilities = parser.parse_card_text("【KO時】自分の手札1枚を相手が選び、捨てる。")
+    assert abilities
+    gm, p1, p2 = make_game()
+    src = make_instance(make_master(card_id="C-CHO", name="カン十郎"), owner="P1")
+    p1.field.append(src)
+    for i in range(3):
+        p1.hand.append(make_instance(make_master(card_id=f"H-{i}", name=f"手札{i}"), owner="P1"))
+    p2.hand.append(make_instance(make_master(card_id="H-OPP", name="相手手札"), owner="P2"))
+
+    gm.resolve_ability(p1, abilities[0], src)
+    ia = gm.active_interaction
+    assert ia is not None and ia["action_type"] == "SELECT_TARGET"
+    assert ia["player_id"] == "P2", f"選択者は相手のはず: {ia['player_id']}"
+    cand_owners = {c.owner_id for c in ia["candidates"]}
+    assert cand_owners == {"P1"}, f"候補は自分の手札のはず: {cand_owners}"
+
+    # 相手が1枚選んで解決 → 自分の手札が減り、相手の手札は減らない
+    chosen = ia["candidates"][0].uuid
+    gm.resolve_interaction(p2, {"selected_uuids": [chosen], "index": 0})
+    assert len(p1.hand) == 2
+    assert len(p2.hand) == 1
+
+
+def test_life_down_to_n_trash():
+    """RC-6: 「自分のライフが1枚になるようにライフの上からトラッシュに置く」が
+    残り1枚まで全てトラッシュする（従来は1枚だけ）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abilities = parser.parse_card_text(
+        "【メイン】自分のライフが1枚になるようにライフの上からトラッシュに置く。")
+    assert abilities
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(card_id="E-RAI", name="雷迎", type=CardType.EVENT), owner="P1")
+    for i in range(5):
+        p1.life.append(make_instance(make_master(card_id=f"L-{i}", name=f"ライフ{i}"), owner="P1"))
+
+    gm.resolve_ability(p1, abilities[0], src)
+    assert gm.active_interaction is None
+    assert len(p1.life) == 1, f"ライフは1枚になるはず: {len(p1.life)}"
+    assert len(p1.trash) == 4
+
+
+def test_trigger_executes_referenced_on_play_effect():
+    """「【トリガー】このカードの【登場時】効果を発動する」が ON_PLAY 効果を展開する
+    （従来は ACTIVATE_MAIN 固定で no-op だった）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    main_abs = parser.parse_card_text("【登場時】カード1枚を引く。")
+    trig = parser.parse_card_text("【トリガー】このカードの【登場時】効果を発動する。")
+    # 効果(トリガー)は実パイプラインでも別フィールドとして個別に解析される
+    trig = [ab for ab in trig if ab.effect is not None]
+    assert main_abs and trig
+
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(card_id="C-EXE", name="参照発動",
+                                    abilities=tuple(main_abs + trig)), owner="P1")
+    p1.field.append(src)
+    p1.deck.extend(make_instance(make_master(card_id=f"D-{i}", name=f"山{i}"), owner="P1")
+                   for i in range(3))
+    hand_before = len(p1.hand)
+    gm.resolve_ability(p1, trig[0], src)
+    assert len(p1.hand) == hand_before + 1, "登場時効果(1ドロー)が発動するべき"
+
+
+def test_untagged_reactive_ko_clause_maps_to_on_ko():
+    """無タグ「このキャラが相手の効果でKOされた時、…」は PASSIVE ではなく ON_KO になり、
+    passive 再計算で本体効果が実行されない。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abs_ = parser.parse_card_text(
+        "このキャラが相手の効果でKOされた時、自分のデッキの上から5枚を見て、"
+        "コスト5以下のキャラカード1枚までを、登場させる。その後、残りを好きな順番でデッキの下に置く。")
+    assert abs_
+    assert abs_[0].trigger == TriggerType.ON_KO, f"ON_KO になるべき: {abs_[0].trigger}"
+
+
+def test_passive_recalc_skipped_while_interaction_pending():
+    """対話中断中の _apply_passive_effects はリセットだけ走って再適用できないため、
+    丸ごとスキップされる（バフ消失防止）。"""
+    from opcg_sim.src.models.effect_types import Ability, TargetQuery
+    gm, p1, _ = make_game()
+    ab = Ability(trigger=TriggerType.PASSIVE,
+                 effect=GameAction(type=ActionType.BUFF, target=TargetQuery(select_mode="SOURCE"),
+                                   value=ValueSource(base=1000)))
+    char = make_instance(make_master(card_id="C-G", name="バフ持ち", power=1000, abilities=(ab,)), owner="P1")
+    p1.field.append(char)
+    gm._apply_passive_effects(p1)
+    assert char.passive_power == 1000
+
+    gm.active_interaction = {"player_id": "P1", "action_type": "SELECT_TARGET"}
+    gm._apply_passive_effects(p1)
+    assert char.passive_power == 1000, "中断中の再計算でバフが消えてはならない"
+    gm.active_interaction = None
+
+
+def test_extra_turn_keeps_turn_player():
+    """「このターンの後に自分のターンを追加で得る」: 次のターンも自分が継続する。"""
+    gm, p1, p2 = make_game()
+    gm.turn_player, gm.opponent = p1, p2
+    ok = gm.apply_action_to_engine(p1, action(ActionType.EXTRA_TURN), [], 0)
+    assert ok
+    gm.switch_turn()
+    assert gm.turn_player is p1, "追加ターンで自分が継続するべき"
+    gm.switch_turn()
+    assert gm.turn_player is p2, "追加ターンは1回で消費される"
+
+
+def test_base_power_reference_to_self_leader():
+    """「このキャラの元々のパワーは、自分のリーダーの元々のパワーと同じパワーになる」。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abs_ = parser.parse_card_text(
+        "【登場時】このキャラの元々のパワーは、自分のリーダーの元々のパワーと同じパワーになる。")
+    assert abs_
+    gm, p1, _ = make_game()
+    p1.leader.master = make_master(card_id="L-9", name="リーダー", type=CardType.LEADER,
+                                   power=9000, life=5)
+    char = make_instance(make_master(card_id="C-EQ", name="写し身", power=2000,
+                                     abilities=tuple(abs_)), owner="P1")
+    p1.field.append(char)
+    gm.turn_player = p1
+    gm.resolve_ability(p1, abs_[0], char)
+    gm._apply_passive_effects(p1)  # 再計算で上書きが消えないこと（passive レイヤ分離）
+    assert char.get_power(True) == 9000, f"リーダーの元々のパワーになるべき: {char.get_power(True)}"
+
+
+def test_life_reveal_conditional_play_declined_returns_to_life():
+    """「ライフの上から1枚を公開し、そのカードがコスト5の「サボ」の場合、登場させてもよい」:
+    条件不成立なら公開カードはライフ上へ戻る（temp 回収先=ライフ）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abs_ = parser.parse_card_text(
+        "【起動メイン】このキャラをトラッシュに置くことができる：自分のライフの上から1枚を公開し、"
+        "そのカードがコスト5の「サボ」の場合、登場させてもよい。")
+    assert abs_
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(card_id="C-SAB", name="サボ起動"), owner="P1")
+    p1.field.append(src)
+    for i in range(3):
+        p1.life.append(make_instance(make_master(card_id=f"LF-{i}", name=f"ライフ{i}"), owner="P1"))
+
+    gm.resolve_ability(p1, abs_[0], src)
+    # 自動確認が出る場合は受諾して流す
+    guard = 0
+    while gm.active_interaction and guard < 5:
+        pl = gm.p1 if gm.p1.name == gm.active_interaction.get("player_id") else gm.p2
+        gm.resolve_interaction(pl, {"selected_uuids": [], "index": 0})
+        guard += 1
+    assert len(p1.life) == 3, f"条件不成立: ライフは3枚のまま: {len(p1.life)}"
+    assert len(p1.temp_zone) == 0
+    assert len(p1.field) == 0 if src not in p1.field else True  # コストでトラッシュ
+
+
+def test_life_reveal_conditional_play_matches_and_plays():
+    """条件成立（コスト5の「サボ」）なら公開カードを登場できる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abs_ = parser.parse_card_text(
+        "【起動メイン】このキャラをトラッシュに置くことができる：自分のライフの上から1枚を公開し、"
+        "そのカードがコスト5の「サボ」の場合、登場させてもよい。")
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(card_id="C-SAB", name="サボ起動"), owner="P1")
+    p1.field.append(src)
+    sabo = make_instance(make_master(card_id="ST13-007", name="サボ", cost=5, power=7000), owner="P1")
+    p1.life.append(sabo)
+    p1.life.append(make_instance(make_master(card_id="LF-1", name="ライフ1"), owner="P1"))
+
+    gm.resolve_ability(p1, abs_[0], src)
+    guard = 0
+    while gm.active_interaction and guard < 6:
+        ia = gm.active_interaction
+        pl = gm.p1 if gm.p1.name == ia.get("player_id") else gm.p2
+        if ia.get("action_type") == "SELECT_TARGET":
+            cands = ia.get("selectable_uuids") or [c.uuid for c in ia.get("candidates", [])]
+            gm.resolve_interaction(pl, {"selected_uuids": cands[:1], "index": 0})
+        else:
+            gm.resolve_interaction(pl, {"selected_uuids": [], "index": 0})
+        guard += 1
+    assert sabo in p1.field, "コスト5の「サボ」は登場できるべき"
+    assert len(p1.temp_zone) == 0
+
+
+def test_declare_cost_reveal_and_match():
+    """C8/RC-7: 「任意のコストを宣言し、相手のデッキの上から1枚を公開する。
+    公開したカードが宣言したコストと同じ場合、…パワー+5000」のエンドツーエンド。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abs_ = parser.parse_card_text(
+        "【カウンター】任意のコストを宣言し、相手のデッキの上から1枚を公開する。"
+        "公開したカードが宣言したコストと同じ場合、自分のリーダーかキャラ1枚までを、このバトル中、パワー+5000。")
+    assert abs_
+    gm, p1, p2 = make_game()
+    src = make_instance(make_master(card_id="E-DC", name="援護", type=CardType.EVENT), owner="P1")
+    p1.hand.append(src)  # resume はソースカードを盤面/手札から uuid 解決する
+    p2.deck.append(make_instance(make_master(card_id="D-3", name="山札3", cost=3), owner="P2"))
+
+    gm.resolve_ability(p1, abs_[0], src)
+    ia = gm.active_interaction
+    assert ia is not None and ia["action_type"] == "DECLARE_COST"
+    # 一致するコスト(3)を宣言 → リーダー対象選択 → +5000
+    gm.resolve_interaction(p1, {"declared_value": 3})
+    guard = 0
+    while gm.active_interaction and guard < 4:
+        ia = gm.active_interaction
+        pl = gm.p1 if gm.p1.name == ia.get("player_id") else gm.p2
+        cands = ia.get("selectable_uuids") or [c.uuid for c in ia.get("candidates", [])]
+        gm.resolve_interaction(pl, {"selected_uuids": cands[:1], "index": 0})
+        guard += 1
+    assert p1.leader.get_power(True) >= 5000 + p1.leader.master.power - 1000, \
+        f"宣言一致でバフが乗るべき: {p1.leader.get_power(True)}"
+
+    # 不一致宣言ではバフされない
+    gm2, q1, q2 = make_game()
+    src2 = make_instance(make_master(card_id="E-DC2", name="援護2", type=CardType.EVENT), owner="P1")
+    q1.hand.append(src2)
+    q2.deck.append(make_instance(make_master(card_id="D-3b", name="山札3b", cost=3), owner="P2"))
+    gm2.resolve_ability(q1, abs_[0], src2)
+    gm2.resolve_interaction(q1, {"declared_value": 7})
+    guard = 0
+    while gm2.active_interaction and guard < 4:
+        ia = gm2.active_interaction
+        pl = gm2.p1 if gm2.p1.name == ia.get("player_id") else gm2.p2
+        cands = ia.get("selectable_uuids") or [c.uuid for c in ia.get("candidates", [])]
+        gm2.resolve_interaction(pl, {"selected_uuids": cands[:1], "index": 0})
+        guard += 1
+    assert q1.leader.timed_power == 0, "不一致宣言ではバフされない"

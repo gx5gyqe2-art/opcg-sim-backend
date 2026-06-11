@@ -165,7 +165,16 @@ def scan():
         deck_top_look = bool(
             _re.search(r"デッキの(?:上から\d+枚(?:まで)?|一番上)を(?:公開|見て)", ntext)
         )
-        if deck_top_look and not card_has_look:
+        # 任意コスト宣言（DECLARE_COST）は、相手デッキトップの公開を AST の LOOK ではなく
+        # 宣言インタラクションの resume フック（gamestate.resolve_interaction）で行う
+        # 設計のため、LOOK 不在は no-op ではない（test_declare_cost_reveal_and_match で
+        # エンドツーエンド検証済み）。
+        card_has_declare = any(
+            a.type == ActionType.DECLARE_COST
+            for ab in abilities
+            for a in list(_walk_actions(ab.effect)) + list(_walk_actions(ab.cost))
+        )
+        if deck_top_look and not card_has_look and not card_has_declare:
             hits[KEY_C].append((number, name, ntext[:60]))
 
     return cards_scanned, hits

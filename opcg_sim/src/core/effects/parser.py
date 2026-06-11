@@ -104,7 +104,9 @@ class EffectParser:
         # キーワードのみタグ（【ブロッカー】等）は効果共有ではないため対象外。
         expanded: List[str] = []
         for i, seg in enumerate(segments):
-            is_lone_tag = bool(re.fullmatch(_nfc(r'【[^】]+】'), seg)) and not self._KEYWORD_ONLY_RE.match(seg)
+            # 「【自分のターン中】【登場時】」のような複数タグのみのセグメントも本体共有の
+            # 対象にする（従来は単一タグ限定で、OP08-007 の ON_PLAY 側が effect=None になった）。
+            is_lone_tag = bool(re.fullmatch(_nfc(r'(?:【[^】]+】)+'), seg)) and not self._KEYWORD_ONLY_RE.match(seg)
             if (is_lone_tag and i + 1 < len(segments)
                     and segments[i + 1].startswith(_nfc('【'))
                     and not self._KEYWORD_ONLY_RE.match(segments[i + 1])):
@@ -147,6 +149,13 @@ class EffectParser:
             # 区別できなくなるため）。同時に、この【登場時】がトリガー誤検出（ON_PLAY）の原因に
             # なっていたのを解消する（このセグメントの真のトリガーは【起動メイン】等）。OP09-081。
             norm_text = re.sub(_nfc(r'(相手の)【(登場時)】(効果)'), r'\1\2\3', norm_text)
+
+            # 参照発動「このカードの【登場時】/【KO時】効果を発動する」の参照タグも
+            # 非タグ化して保全する（clean_text のタグ除去で参照先が消え、常に
+            # ACTIVATE_MAIN を展開して no-op になっていた。OP16-102 等 15 枚）。
+            norm_text = re.sub(
+                _nfc(r'(この(?:カード|キャラ)の)【(登場時|KO時|アタック時|起動メイン|メイン)】(効果)'),
+                r'\1\2\3', norm_text)
 
             # トリガー検出は前処理前のテキストで行う（コスト/制限タグ除去前に判定）
             trigger = self._detect_trigger(norm_text)
@@ -388,6 +397,15 @@ class EffectParser:
         if self._DON_TURN_TAG_RE.search(norm_text) and not self._TRIGGER_TAG_RE.search(norm_text):
             return TriggerType.ACTIVATE_MAIN
 
+        # 無タグの反応型「この(キャラ/カード)が…KOされた時、」等は PASSIVE ではなく
+        # 対応するトリガーへ写像する。PASSIVE のままだと _apply_passive_effects の
+        # 再計算のたびに本体効果が実行され、さらに対話中断が後続の解決を飲み込む
+        # （OP11-035/OP11-051 等）。
+        if re.match(_nfc(r'^この(キャラ|カード)が[^。【】]*KOされた時'), norm_text):
+            return TriggerType.ON_KO
+        if re.match(_nfc(r'^この(リーダー|キャラ|カード)が[^。【】]*アタック(した|された)時'), norm_text):
+            return TriggerType.ON_ATTACK
+
         # 既知トリガータグがなければ → PASSIVE（常時・条件付き効果・特殊タイミング等）
         # キーワードタグ（【ブロッカー】等）は既に _TRIGGER_TAG_RE に含まれておらず
         # この時点で明示的なトリガーが判別できないため PASSIVE として扱う
@@ -458,9 +476,13 @@ class EffectParser:
         # 「ドン‼…をレストで追加し、自分の手札から…を登場させる」のように「追加し、」で
         # ドン操作(RAMP_DON)と後続アクションが連結される句も分割する（区切らないと don_add が
         # 全体を丸呑みし、後段の登場/サーチが消失する＝MISSING_ACTION。OP09-022 リム 等）。
+        # 「…をアクティブにし、このキャラは…パワー＋N」のようにドン/自己のアクティブ化と
+        # 後続バフが連用接続される句も分割する（区切らないと power_buff が全体を丸呑みし、
+        # 前段のアクティブ化が消失する。OP06-028/029 等）。
         split_pattern = _nfc(
             r'。|その後、|(?<=置き)、|(?<=加え)、|(?<=引く)、|(?<=捨て)、|発動できる、|させ、'
             r'|(?<=KOし)、|(?<=レストにし)、|(?<=戻し)、|(?<=\d)し、|(?<=付与し)、|(?<=追加し)、'
+            r'|(?<=アクティブにし)、'
         )
 
         parts = re.split(split_pattern, norm_text)
@@ -487,16 +509,20 @@ class EffectParser:
             if life_reveal_m:
                 n = int(life_reveal_m.group(1))
                 remaining_cond = life_reveal_m.group(2)
-                face_up_action = GameAction(
-                    type=ActionType.FACE_UP_LIFE,
-                    target=TargetQuery(zone=Zone.LIFE, player=Player.SELF, count=n),
+                # LOOK_LIFE でライフ上 n 枚を temp へ公開する。後続の「登場させてもよい」
+                # (play_from_temp) が temp から消費し、不発時は resolver の temp 回収が
+                # ライフ上へ戻す。従来は FACE_UP_LIFE（その場で表向き）で temp に載らず、
+                # 消費側が no-op だった（OP10-022/ST13-007 等）。
+                look_action = GameAction(
+                    type=ActionType.LOOK_LIFE,
+                    value=ValueSource(base=n),
                     raw_text=life_reveal_m.group(0),
                 )
                 branch = Branch(
                     condition=self._parse_condition_obj(remaining_cond),
                     if_true=self._parse_to_node(rest_text, is_cost)
                 )
-                return Sequence(actions=[face_up_action, branch])
+                return Sequence(actions=[look_action, branch])
             return Branch(
                 condition=self._parse_condition_obj(cond_text),
                 if_true=self._parse_to_node(rest_text, is_cost)
@@ -868,11 +894,20 @@ class EffectParser:
             if exact_m and "trait" not in val:
                 val["trait"] = exact_m.group(1)
                 val["trait_contains"] = False
-            # コスト条件
-            cost_m = re.search(_nfc(r'コスト(\d+)(以上|以下)'), norm_text)
+            # コスト条件（「コスト5以下」「コスト5の」= 完全一致）
+            cost_m = re.search(_nfc(r'コスト(\d+)(以上|以下)?'), norm_text)
             if cost_m:
                 val["cost"] = int(cost_m.group(1))
-                val["cost_op"] = CompareOperator.GE if cost_m.group(2) == _nfc('以上') else CompareOperator.LE
+                if cost_m.group(2) == _nfc('以上'):
+                    val["cost_op"] = CompareOperator.GE
+                elif cost_m.group(2) == _nfc('以下'):
+                    val["cost_op"] = CompareOperator.LE
+                else:
+                    val["cost_op"] = CompareOperator.EQ
+            # カード名条件（「サボ」等の完全一致。『X』を含む特徴 とは別）
+            name_m = re.search(_nfc(r'「([^」]+)」'), norm_text)
+            if name_m:
+                val["name"] = name_m.group(1)
             # カードタイプ
             if _nfc("キャラカード") in norm_text:
                 val["card_type"] = "キャラ"

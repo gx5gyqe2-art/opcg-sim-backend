@@ -74,10 +74,16 @@ class TargetQuery:
     power_max: Optional[int] = None
     is_rest: Optional[bool] = None
     count: int = 1
-    is_up_to: bool = False 
+    is_up_to: bool = False
+    # "DOWN_TO_N": 「<ゾーン>がN枚になるように」— count 枚を残して残り全てを対象にする
+    # （resolver._resolve_targets が len(candidates) - count 枚に解決する）。
+    count_dynamic: Optional[str] = None
     select_mode: str = "CHOOSE"
     save_id: Optional[str] = None
     ref_id: Optional[str] = None
+    # 「自分の手札1枚を相手が選び、捨てる」等で選択を行うプレイヤー
+    # （None=効果のコントローラー）。resolver の対話サスペンドが参照する。
+    chooser: Optional[Player] = None
     flags: Set[str] = field(default_factory=set)
     is_vanilla: bool = False
     is_strict_count: bool = False
@@ -116,6 +122,9 @@ class ValueSource:
     multiplier: int = 1
     divisor: int = 1
     ref_id: Optional[str] = None
+    # dynamic_source="COUNT_QUERY" 用: 数える対象の範囲（「自分のトラッシュにある
+    # イベントN枚につき」のイベント等）。値 = (該当数 // divisor) * multiplier。
+    count_query: Optional[TargetQuery] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> ValueSource:

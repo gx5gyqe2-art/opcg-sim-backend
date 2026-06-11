@@ -87,6 +87,13 @@ def summarize_node(node) -> Optional[Dict[str, Any]]:
             "destination": _enum_name(node.destination),
             "dest_position": getattr(node, "dest_position", None),
         }
+        # 動的値（「N枚につき」等）はスケーリング指紋も載せる
+        if node.value is not None and node.value.dynamic_source:
+            out["value_dynamic"] = {
+                "source": node.value.dynamic_source,
+                "divisor": node.value.divisor,
+                "multiplier": node.value.multiplier,
+            }
         if getattr(node, "sub_effect", None) is not None:
             out["sub_effect"] = summarize_node(node.sub_effect)
         return out

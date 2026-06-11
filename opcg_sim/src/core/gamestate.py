@@ -10,6 +10,7 @@ from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType,
 from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource, Sequence, Branch, Choice
 from ..utils.logger_config import log_event
 from .effects.resolver import EffectResolver
+from .effects.matcher import get_target_cards
 
 
 Card = CardInstance
@@ -443,6 +444,13 @@ class GameManager:
         self.switch_turn()
 
     def switch_turn(self):
+        # 追加ターン（EXTRA_TURN）: 予約したプレイヤーがターンプレイヤーのまま継続する
+        if getattr(self, "pending_extra_turn", None) == self.turn_player.name:
+            self.pending_extra_turn = None
+            self.turn_count += 1
+            log_event("INFO", "game.extra_turn", f"{self.turn_player.name} takes an extra turn", player=self.turn_player.name)
+            self.refresh_phase()
+            return
         self.turn_player, self.opponent = self.opponent, self.turn_player
         self.turn_count += 1
         log_event("INFO", "game.turn_switch_end", f"After switch: turn_player={self.turn_player.name}, count={self.turn_count}", player="system")
@@ -492,7 +500,45 @@ class GameManager:
         self.phase = Phase.MAIN
         self._apply_passive_effects(self.turn_player)
 
+    _REACTIVE_RE = re.compile(r'(された|した|受けた|なった)時、')
+
+    def _is_reactive_passive(self, ability) -> bool:
+        """無タグの反応型（「…が登場した時、」「…が戻された時、」等）でトリガー写像が
+        まだ無い PASSIVE 能力か。常時効果ではないため再計算ループで実行してはならない
+        （実行すると盤面操作のたびに本体効果が発動し、対話中断が他の解決を飲み込む）。"""
+        first = self._find_first_action(ability.effect)
+        raw = getattr(first, "raw_text", "") if first is not None else ""
+        return bool(self._REACTIVE_RE.search(unicodedata.normalize("NFC", raw or "")))
+
+    def _find_first_action(self, node):
+        if node is None:
+            return None
+        if isinstance(node, GameAction):
+            return node
+        if isinstance(node, Sequence):
+            for a in node.actions:
+                found = self._find_first_action(a)
+                if found is not None:
+                    return found
+        elif isinstance(node, Branch):
+            return self._find_first_action(node.if_true) or self._find_first_action(node.if_false)
+        elif isinstance(node, Choice):
+            for o in node.options:
+                found = self._find_first_action(o)
+                if found is not None:
+                    return found
+        return None
+
     def _apply_passive_effects(self, player: Player):
+        # 対話中断中は再計算しない。Step1 のリセットは無条件に走る一方、Step2/3 の
+        # resolve_ability は active_interaction ガードで何も実行できず、リセットだけが
+        # 残って PASSIVE/YOUR_TURN バフが消えてしまうため（クザンのコスト-5 等）。
+        if self.active_interaction:
+            return
+        # YOUR_TURN 効果は常にターンプレイヤー基準で適用する（呼び出し元が owner を
+        # 渡しても誤適用しない）。
+        if self.turn_player is not None:
+            player = self.turn_player
         opponent = self.p2 if player == self.p1 else self.p1
 
         # Step 1: 両プレイヤーのバフ・一時キーワードをリセット
@@ -500,30 +546,43 @@ class GameManager:
             for c in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
                 if c:
                     c.cost_buff = 0
-                    c.base_power_override = None
+                    c.passive_power = 0
+                    c.passive_power_override = None
                     c.current_keywords = c.master.keywords.copy()
             for c in p.hand:
                 if c:
                     c.cost_buff = 0
+                    c.passive_counter = 0
 
-        # Step 2: YOUR_TURN 効果（アクティブプレイヤーのカードのみ）
-        #   ステージ（player.stage）も対象に含める。聖地マリージョア(コスト軽減)・
-        #   虚の玉座(リーダー+1000) 等の STAGE の YOUR_TURN 効果が従来発動していなかった。
-        for card in ([player.leader] if player.leader else []) + player.field + ([player.stage] if player.stage else []):
-            if not card or not card.master.abilities: continue
-            for ability in card.master.abilities:
-                if ability.trigger == TriggerType.YOUR_TURN:
-                    log_event("DEBUG", "game.passive_trigger", f"YOUR_TURN: {card.master.name}", player=player.name)
-                    self.resolve_ability(player, ability, source_card=card)
-
-        # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）。ステージも含める。
-        for p in [player, opponent]:
-            for card in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
+        # Step 2/3 で適用される INSTANT パワーバフは passive_power（再計算レイヤ）に
+        # 載せる。power_buff に加えると _apply_passive_effects が呼ばれるたびに
+        # 累積し、PASSIVE「パワー+1000」が盤面操作のたびに際限なく増えていた。
+        self._in_passive_recalc = True
+        try:
+            # Step 2: YOUR_TURN 効果（アクティブプレイヤーのカードのみ）
+            #   ステージ（player.stage）も対象に含める。聖地マリージョア(コスト軽減)・
+            #   虚の玉座(リーダー+1000) 等の STAGE の YOUR_TURN 効果が従来発動していなかった。
+            for card in ([player.leader] if player.leader else []) + player.field + ([player.stage] if player.stage else []):
                 if not card or not card.master.abilities: continue
                 for ability in card.master.abilities:
-                    if ability.trigger == TriggerType.PASSIVE:
-                        log_event("DEBUG", "game.passive_trigger", f"PASSIVE: {card.master.name}", player=p.name)
-                        self.resolve_ability(p, ability, source_card=card)
+                    if ability.trigger == TriggerType.YOUR_TURN:
+                        if self._is_reactive_passive(ability):
+                            continue  # 「【自分のターン中】…された時」型はイベント誘発（EB02-035 等）
+                        log_event("DEBUG", "game.passive_trigger", f"YOUR_TURN: {card.master.name}", player=player.name)
+                        self.resolve_ability(player, ability, source_card=card)
+
+            # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）。ステージも含める。
+            for p in [player, opponent]:
+                for card in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
+                    if not card or not card.master.abilities: continue
+                    for ability in card.master.abilities:
+                        if ability.trigger == TriggerType.PASSIVE:
+                            if self._is_reactive_passive(ability):
+                                continue  # 「…された時」型はイベント誘発であり再計算で実行しない
+                            log_event("DEBUG", "game.passive_trigger", f"PASSIVE: {card.master.name}", player=p.name)
+                            self.resolve_ability(p, ability, source_card=card)
+        finally:
+            self._in_passive_recalc = False
 
     def draw_card(self, player: Player, count: int = 1):
         for _ in range(count):
@@ -669,7 +728,7 @@ class GameManager:
                 if ability.trigger == TriggerType.COUNTER: self.resolve_ability(player, ability, source_card=counter_card)
             self.move_card(counter_card, Zone.TRASH, player)
         else:
-            counter_value = counter_card.master.counter or 0; self.active_battle["counter_buff"] += counter_value
+            counter_value = getattr(counter_card, "current_counter", counter_card.master.counter or 0); self.active_battle["counter_buff"] += counter_value
             log_event("INFO", "game.counter_apply", f"Added {counter_value} power to target", player=player.name); self.move_card(counter_card, Zone.TRASH, player)
 
     def resolve_attack(self):
@@ -749,6 +808,10 @@ class GameManager:
             self.move_card(card, Zone.TRASH, player)
         else:
             self.move_card(card, Zone.FIELD, player); card.attached_don = 0; card.is_newly_played = True
+            # 登場した時点で継続効果（PASSIVE/YOUR_TURN）を適用してから ON_PLAY を解決する。
+            # 例: クザン「相手のキャラすべてをコスト-5」+【登場時】コスト0のキャラをKO —
+            # 自身の継続効果が ON_PLAY の対象判定に反映される必要がある。
+            self._apply_passive_effects(self.turn_player)
             if self._has_rested_play(player):  # 「自分のキャラはレストで登場する」PASSIVE
                 card.is_rest = True
             # 「相手の登場時効果は無効になる」(OPP_ONPLAY) 期間中はこのプレイヤーの ON_PLAY を解決しない。
@@ -832,21 +895,51 @@ class GameManager:
         if not card or not getattr(card, "master", None) or card.negated:
             return False
         owner = self.p1 if self.p1.name == card.owner_id else self.p2
+
+        # トリガー効果が継続効果として付与した期間付き保護（timed_flags）。
+        # 例: 「このキャラは、次の自分のターン開始時まで、バトルでKOされない」(ON_ATTACK)
+        for s in status_values:
+            if f"PREVENT_{s}" in (card.flags | card.timed_flags):
+                return True
+
         resolver = None
-        for ab in card.master.abilities:
-            if ab.trigger != TriggerType.PASSIVE:
+        # 走査対象: 自身に加え、オーナーのリーダー/フィールド/ステージの範囲保護
+        # （「自分の特徴《X》を持つキャラすべては…場を離れない」等。従来は自身のみ走査で
+        #   他カードを守る保護が機能しなかった）。
+        protectors = [card]
+        if owner.leader and owner.leader is not card:
+            protectors.append(owner.leader)
+        protectors.extend(fc for fc in owner.field if fc is not card)
+        if getattr(owner, "stage", None) and owner.stage is not card:
+            protectors.append(owner.stage)
+
+        for protector in protectors:
+            if getattr(protector, "ability_disabled", False) or getattr(protector, "negated", False):
                 continue
-            eff = self._find_action(ab.effect, ActionType.PREVENT_LEAVE)
-            if eff is None:
-                continue
-            if eff.status not in status_values:
-                continue
-            if ab.condition is not None:
-                if resolver is None:
-                    resolver = EffectResolver(self)
-                if not resolver._check_condition(owner, ab.condition, card):
+            for ab in protector.master.abilities:
+                if ab.trigger != TriggerType.PASSIVE:
                     continue
-            return True
+                eff = self._find_action(ab.effect, ActionType.PREVENT_LEAVE)
+                if eff is None:
+                    continue
+                if eff.status not in status_values:
+                    continue
+                # 保護対象クエリの照合: SOURCE は protector 自身のみを守る。
+                # 範囲クエリは card が範囲に含まれるかを実体化して確認する。
+                tgt = getattr(eff, "target", None)
+                if tgt is None or getattr(tgt, "select_mode", "SOURCE") == "SOURCE":
+                    if protector is not card:
+                        continue
+                else:
+                    if card not in get_target_cards(self, tgt, protector):
+                        continue
+                if ab.condition is not None:
+                    if resolver is None:
+                        resolver = EffectResolver(self)
+                    src = card if protector is card else protector
+                    if not resolver._check_condition(owner, ab.condition, src):
+                        continue
+                return True
         return False
 
     # 置換効果（REPLACE_EFFECT）の判定。除去の瞬間に対象の PASSIVE 能力を走査し、
@@ -1035,7 +1128,10 @@ class GameManager:
             for _ in range(count):
                 if not target_player.life:
                     break
-                target_player.temp_zone.append(target_player.life.pop(0))
+                card_ = target_player.life.pop(0)
+                # 不発時の回収先を記録する（temp 回収はデッキトップではなくライフ上へ戻す）
+                card_._temp_origin = "LIFE"
+                target_player.temp_zone.append(card_)
                 moved += 1
             log_event("INFO", "game.action_look_life", f"{target_player.name} revealed {moved} life card(s)", player=player.name)
             return True
@@ -1081,6 +1177,12 @@ class GameManager:
             opp.negate_onplay_until = self.turn_count + (1 if dur == "UNTIL_NEXT_TURN_END" else 0)
             log_event("INFO", "game.negate_opp_onplay",
                       f"{opp.name}'s ON_PLAY negated until turn {opp.negate_onplay_until}", player=player.name)
+            return True
+
+        if act_name == "EXTRA_TURN":
+            # 「このターンの後に自分のターンを追加で得る」: switch_turn が消費する
+            self.pending_extra_turn = player.name
+            log_event("INFO", "game.action_extra_turn", f"{player.name} will take an extra turn", player=player.name)
             return True
 
         if act_name == "VICTORY":
@@ -1231,7 +1333,16 @@ class GameManager:
                     log_event("INFO", "game.leave_replaced", f"{target.master.name}'s removal was replaced by an alternative effect", player=owner.name)
                     continue
             if act_name == "PREVENT_LEAVE":
-                # 保護マーカー自体は no-op（実際の保護は除去時に _active_protection で評価）。
+                # PASSIVE 由来(INSTANT)はマーカーのみ（除去時に _active_protection が走査）。
+                # トリガー効果の期間付き保護は継続効果フラグとして対象に付与する
+                # （従来は no-op で「次の…まで、バトルでKOされない」が機能しなかった）。
+                dur = getattr(action, "duration", "INSTANT")
+                if dur in ("THIS_TURN", "THIS_BATTLE", "UNTIL_NEXT_TURN_END"):
+                    flag = f"PREVENT_{action.status or 'LEAVE'}"
+                    expire_turn = self.turn_count + 1 if dur == "UNTIL_NEXT_TURN_END" else 0
+                    self.continuous.apply(target, "FLAG", dur, flag=flag, expire_turn=expire_turn)
+                    log_event("INFO", "game.action_prevent_leave",
+                              f"{target.master.name} protected ({action.status}, {dur})", player=player.name)
                 success = True
             elif act_name == "KO":
                 self.move_card(target, Zone.TRASH, owner)
@@ -1250,7 +1361,11 @@ class GameManager:
                 dest_zone = action.destination or Zone.TRASH; self.move_card(target, dest_zone, owner); success = True
             elif act_name == "BUFF":
                 if action.status == "POWER_OVERRIDE":
-                    target.base_power_override = value
+                    # PASSIVE 再計算由来は再計算レイヤへ（即時効果の上書きを消さない）
+                    if getattr(self, "_in_passive_recalc", False):
+                        target.passive_power_override = value
+                    else:
+                        target.base_power_override = value
                     log_event("INFO", "game.action_override", f"{target.master.name}'s power set to {value}", player=player.name)
                 elif action.status == "COST_OVERRIDE":
                     # コスト絶対値セット（「このターン中、コスト0にする」等）。base_power_override
@@ -1268,6 +1383,14 @@ class GameManager:
                     elif hasattr(target, 'cost_buff'):
                         target.cost_buff += value
                     log_event("INFO", "game.action_cost_reduction", f"{target.master.name}'s cost changed by {value} ({dur})", player=player.name)
+                elif action.status == "COUNTER":
+                    # 「カウンター+Nになる」: 手札カードのカウンター値修正。
+                    # PASSIVE 再計算レイヤ（passive_counter）に載せる。
+                    if getattr(self, "_in_passive_recalc", False):
+                        target.passive_counter += value
+                    else:
+                        target.passive_counter += value  # 即時付与も同レイヤ（手札は recalc でリセット）
+                    log_event("INFO", "game.action_counter_buff", f"{target.master.name} counter {value:+d}", player=player.name)
                 elif action.status == "BLOCKER_DISABLE":
                     target.flags.add("BLOCKER_DISABLED")
                     target.current_keywords.discard("ブロッカー")
@@ -1283,6 +1406,10 @@ class GameManager:
                     if dur in ("THIS_BATTLE", "THIS_TURN", "UNTIL_NEXT_TURN_END"):
                         expire_turn = self.turn_count + 1 if dur == "UNTIL_NEXT_TURN_END" else 0
                         self.continuous.apply(target, "POWER", dur, amount=value, expire_turn=expire_turn)
+                    elif getattr(self, "_in_passive_recalc", False):
+                        # PASSIVE/YOUR_TURN 再計算中: 再計算レイヤに載せる（累積防止）
+                        target.passive_power += value
+                        log_event("INFO", "game.action_buff", f"{target.master.name} passive power {value:+d}", player=player.name)
                     elif hasattr(target, 'power_buff'):
                         target.power_buff += value
                         log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name)
@@ -1415,6 +1542,18 @@ class GameManager:
         if not val_source: return 0
         if val_source.dynamic_source == "COUNT_REFERENCE":
             log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name); return len(player.trash)
+        # 「<範囲>N枚につき」の汎用カウント（RC-4）。範囲クエリを毎回実体化して数える
+        # （PASSIVE 再計算で盤面に追随する）。
+        if val_source.dynamic_source == "COUNT_QUERY" and getattr(val_source, "count_query", None) is not None:
+            src = None
+            src_uuid = (context or {}).get("_source_card_uuid")
+            if src_uuid:
+                src = self._find_card_by_uuid(src_uuid)
+            if src is None:
+                src = player.leader
+            n = len(get_target_cards(self, val_source.count_query, src))
+            log_event("INFO", "game.get_dynamic_value", f"COUNT_QUERY = {n}", player=player.name)
+            return n
         # C9「（相手のリーダー／選んだキャラ／アタックしているキャラ）と同じパワーになる」。
         # 発動時スナップショット: 参照カードの現在パワーを固定値として返す（以後の変動に追随しない）。
         if val_source.dynamic_source == "REFERENCE_POWER":
@@ -1424,6 +1563,12 @@ class GameManager:
             ref_owner, _ = self._find_card_location(ref)
             is_ref_turn = bool(ref_owner) and ref_owner.name == self.turn_player.name
             return ref.get_power(is_ref_turn)
+        # 「元々のパワーと同じ」: 参照カードの基礎値（master.power）を写す（バフ非追随）
+        if val_source.dynamic_source == "REFERENCE_BASE_POWER":
+            ref = self._resolve_power_reference(player, val_source.ref_id, context)
+            if ref is None:
+                return val_source.base
+            return ref.master.power
         return val_source.base
 
     def _resolve_power_reference(self, player, ref_id, context):
@@ -1431,6 +1576,8 @@ class GameManager:
         opponent = self.p2 if player == self.p1 else self.p1
         if ref_id == "opp_leader":
             return opponent.leader
+        if ref_id == "self_leader":
+            return player.leader
         if ref_id == "attacker":
             return (self.active_battle or {}).get("attacker")
         if ref_id == "selected":

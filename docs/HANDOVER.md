@@ -233,3 +233,60 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
   `tests/effect_diagnostics.py --top 40`
 - 2デッキ回帰: `python -m pytest tests/test_realdeck_play.py -p no:capture -q`
 - 全カード回帰: `python -m pytest tests/test_full_card_baseline.py tests/test_full_card_audit.py -p no:capture -q`
+
+---
+
+## 7. 2026-06 カード効果再現性向上の変更点（card-effect-bugs ブランチ）
+
+### 修正した根本原因（コード実証済み）
+
+| # | 根本原因 | 主な修正箇所 |
+|---|---|---|
+| RC-1 | 全角符号（＋/－/−/‐）が NFC で畳まれず `[+-]` 正規表現が不一致 | atoms.py `_SIGN`/`_to_int`、matcher.py 上限判定 |
+| RC-2 | 制限/付与系ルールが対象をハードコードし主語修飾（特徴/コスト上限/枚数）を破棄 | atoms.py `_subject_target`、gamestate `_active_protection`（範囲保護の走査＋期間付き保護フラグ） |
+| RC-3 | 「相手が選び」等の従属節が対象側判定を汚染 | matcher.py 除去リスト＋`TargetQuery.chooser`（選択者指定） |
+| RC-4 | 「N枚につき+X」がフラット値になる | `ValueSource.count_query`＋`COUNT_QUERY` 動的値（毎回実体化して数える） |
+| RC-6 | 「ライフがN枚になるように」が「N枚だけ」になる | `TargetQuery.count_dynamic="DOWN_TO_N"` |
+| - | **PASSIVE バフが再計算のたびに累積**（+1000 が際限なく増える） | `CardInstance.passive_power`/`passive_power_override`/`passive_counter`（再計算レイヤ） |
+| - | **対話中断中の再計算がバフを消す**（リセットだけ走り再適用が中断ガードで空振り） | `_apply_passive_effects` 冒頭で中断中は skip |
+| - | 無タグ反応型「…KOされた時」が PASSIVE 扱いで毎回発動 | `_detect_trigger` の ON_KO/ON_ATTACK 写像＋`_is_reactive_passive` ガード |
+| - | コスト上限修飾「ライフの…枚数以下の」がゾーン検出を汚染（KOの代わりにライフを墓地送り） | matcher.py ゾーン検出も除去後テキストで実施 |
+| - | 「このカードの【登場時】効果を発動する」が常に ACTIVATE_MAIN を展開 | 参照タグの非タグ化保全＋`_expand_main_effect(ref_trigger)` |
+| - | 複数タグのみのセグメント（【自分のターン中】【登場時】/）が本体を共有しない | parser.py セグメント共有の複数タグ対応 |
+| - | ライフ公開→条件付き登場が no-op（FACE_UP のみで TEMP 未経由） | LOOK_LIFE 経由＋`_temp_origin="LIFE"` 回収 |
+| - | 中断→再開経路で `save_id` 保存がスキップ | resolver `_resolve_targets` 再開パス |
+
+### 新しい不変条件
+
+- **`passive_power` / `passive_power_override` / `passive_counter` は再計算レイヤ**。
+  `_apply_passive_effects` Step1 が毎回リセットして再適用する。即時効果は従来どおり
+  `power_buff` / `base_power_override`（reset_turn_status で失効）へ。両者を混ぜないこと。
+- **`_apply_passive_effects` は `active_interaction` 中に呼ばれても何もしない**。
+  リセットだけ走って再適用できないため（資産消失防止）。
+- **PREVENT_LEAVE は期間付きなら継続フラグ `PREVENT_<status>`**（timed_flags）として付与される。
+  PASSIVE はマーカーのまま除去時走査（範囲保護はリーダー/フィールド/ステージも走査される）。
+- **temp 回収先は `_temp_origin` 属性で決まる**（"LIFE"=ライフ上、未設定=デッキトップ）。
+- **DECLARE_COST の相手デッキトップ公開は resume フックで行う**（AST に LOOK は無い。
+  mistarget 検出器 C は DECLARE_COST 保持カードを除外済み）。
+
+### 監査ハーネスの強化（tests/effect_coverage.py）
+
+- H-1: ステータス差分測定（power/cost/keywords/flags/rest/don 構成）
+- H-2: ON_PLAY の登場アーティファクト控除（プレイ自体の盤面変化を除外）
+- H-3: CHOICE 全パス列挙（上限8）
+- H-4: SELECT_TARGET 候補のテキスト照合（SELECT_MISMATCH）
+- `tests/test_quality_gates.py`: ラチェット式ゲート
+  （WARN_DIRECTION=0 / STAT_ONLY=0 / NO_IMPL=0 / SELECT_MISMATCH≤2 / フォールバック=0）
+
+### 既知の残課題（優先順）
+
+1. **mistarget D 残り4枚**（OP10-058/OP10-022/OP08-118/OP06-086）:
+   「2枚までを選び、1枚を…、残りを…」の選択グループ分配（選択結果の REMAINING 参照）が未実装。
+2. **OPPONENT_TURN / TURN_END 系トリガーの実プレイ配線**: resolve_ability 直呼びでは動くが、
+   ターン進行からの自動発火経路の網羅検証は未実施（Phase 4 H-6 バトルシナリオ網羅で対応予定）。
+3. **ドン付与の相手プール**（OP15-015）: 「相手のレストのドン‼を付与」が自分のドンを使う。
+4. **遅延効果**（OP03-005 サッチ）: 「このターン終了時、このキャラをトラッシュ」が即時実行される。
+5. **文脈依存の「N枚につき」**（捨てたカード1枚につき等）: 直前アクションの結果数参照が未実装
+   （フラット値のまま）。
+6. **Phase 4 未着手**: 条件/コスト充足盤面の合成（COND_FALSE 264 / COST_UNMET 226 の実行検証）、
+   バトルシナリオ網羅（THIS_BATTLE/カウンターステップ/ブロッカー無効の実戦検証）。

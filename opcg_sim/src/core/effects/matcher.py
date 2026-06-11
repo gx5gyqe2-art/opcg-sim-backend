@@ -30,6 +30,15 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     player_text = re.sub(
         _nfc(r'(?:次の)?相手の(?:ターン|エンドフェイズ)(?:終了時)?(?:まで|中)'),
         '', player_text)
+    # 選択者句「相手が選び/選ぶ/選んで」は対象側ではなく「誰が選ぶか」の指定
+    # （「自分の手札1枚を相手が選び、捨てる」= 対象は自分の手札、選ぶのは相手）。
+    # player 判定から除去し、chooser として保持する。
+    chooser = None
+    if re.search(_nfc(r'相手が選(?:び|ぶ|んで)'), player_text):
+        chooser = Player.OPPONENT
+        player_text = re.sub(_nfc(r'相手が選(?:び|ぶ|んで)'), '', player_text)
+    # トリガー条件句「相手が…した時、」も対象側判定を汚すため除去する
+    player_text = re.sub(_nfc(r'相手が[^、。]*した時、?'), '', player_text)
 
     if _nfc(ParserKeyword.EACH_OTHER) in player_text: tq.player = Player.ALL
     elif _nfc(ParserKeyword.OPPONENT) in player_text: tq.player = Player.OPPONENT
@@ -59,13 +68,16 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     }
     
     found_zone = None
-    
+
+    # ゾーン検出も修飾句除去後のテキストで行う。「お互いのライフの合計枚数以下の
+    # コストを持つ相手のキャラをKOする」で zone=LIFE と誤検出し、フィールドの
+    # キャラではなくライフ札を動かしていた（雷迎/ロブ・ルッチ等のトリガー）。
     pattern = re.compile(r'(手札|トラッシュ|ライフ|デッキ|場|コストエリア)(?:.{0,5})(?:を|から|の)')
-    matches = pattern.finditer(tgt_text)
-    
+    matches = pattern.finditer(player_text)
+
     for m in matches:
         z_name = _nfc(m.group(1))
-        post_match = tgt_text[m.end():]
+        post_match = player_text[m.end():]
         
         if z_name == _nfc("デッキ") and (_nfc("下") in post_match or _nfc("上") in post_match):
              if _nfc("から") not in post_match[:5]: 
@@ -123,7 +135,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
-    m_c = re.search(_nfc(ParserKeyword.COST + r'[^+\-\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    m_c = re.search(_nfc(ParserKeyword.COST + r'[^+＋\-－−‐\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
         start_idx = m_c.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
@@ -132,7 +144,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         post_match = tgt_text[end_idx:]
         is_set_action = _nfc("にする") in post_match[:5]
 
-        if prefix_context not in ['+', '-', '\u2212', '\u2010'] and not is_set_action:
+        if prefix_context not in ['+', '-', '\u2212', '\u2010', '\uff0b', '\uff0d'] and not is_set_action:
             val = int(m_c.group(1))
             if m_c.group(2) == _nfc(ParserKeyword.ABOVE): tq.cost_min = val
             else: tq.cost_max = val
@@ -158,11 +170,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             # \u65e2\u5b9a\u306f\u76f8\u624b\u306e\u30e9\u30a4\u30d5\uff08\u300c\u76f8\u624b\u306e\u300d\u660e\u793a\uff0f\u7701\u7565\u6642\u3068\u3082\u76f8\u624b\u57fa\u6e96\u304c\u5927\u534a\uff09
             tq.cost_max_dynamic = "LIFE_COUNT_OPPONENT"
 
-    m_p = re.search(_nfc(ParserKeyword.POWER + r'[^+\-\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    m_p = re.search(_nfc(ParserKeyword.POWER + r'[^+\uff0b\-\uff0d\u2212\u2010\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_p:
         start_idx = m_p.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
-        if prefix_context not in ['+', '-', '\u2212', '\u2010']:
+        if prefix_context not in ['+', '-', '\u2212', '\u2010', '\uff0b', '\uff0d']:
             val = int(m_p.group(1))
             if m_p.group(2) == _nfc(ParserKeyword.ABOVE): tq.power_min = val
             else: tq.power_max = val
@@ -196,6 +208,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 無ければ通常マッチへフォールバックするため、選択が先行しない場合も安全。
     if re.search(_nfc(r"(選んだ|その)(カード|キャラ|リーダー)"), tgt_text):
         tq.ref_id = "selected_card"
+
+    if chooser is not None:
+        tq.chooser = chooser
 
     return tq
 

@@ -106,7 +106,8 @@ def _stat_delta(p1, p2, b_stats) -> tuple:
         if p.leader:
             units.append(p.leader)
         units.extend(p.field)
-    pw = sum(c.power_buff + c.timed_power + (c.base_power_override or 0) for c in units)
+    pw = sum(c.power_buff + c.timed_power + getattr(c, "passive_power", 0)
+             + (c.base_power_override or 0) for c in units)
     kw = sum(len(getattr(c, "timed_keywords", ())) for c in units)
     rs = sum(1 for c in units if getattr(c, "is_rest", False))
     cu = list(p1.hand) + list(p2.hand) + units

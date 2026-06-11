@@ -2149,7 +2149,9 @@ CASES = [
         "id": "self_power_buff_is_source",
         "text": "このキャラは、自分のトラッシュにあるカード5枚につき、パワー+1000。",
         "expect": [
-            {"effect": {"kind": "action", "type": "BUFF", "value": 1000,
+            {"effect": {"kind": "action", "type": "BUFF",
+                        "value_dynamic": {"source": "COUNT_REFERENCE",
+                                          "divisor": 5, "multiplier": 1000},
                         "target": {"select_mode": "SOURCE"}}}
         ],
     },
@@ -2175,6 +2177,151 @@ CASES = [
                  "condition": {"type": "TRASH_COUNT", "operator": "GE", "value": 30},
                  "if_true": {"type": "BUFF", "value": 1000}},
             ]}}
+        ],
+    },
+    # ----- RC-1: 全角符号（＋ U+FF0B / － U+FF0D）はNFCで畳まれない ----------------
+    {
+        "id": "fullwidth_plus_power_buff",
+        "text": "【アタック時】このキャラは、このターン中、パワー＋１０００。",
+        "expect": [
+            {"trigger": "ON_ATTACK",
+             "effect": {"kind": "action", "type": "BUFF", "value": 1000,
+                        "target": {"select_mode": "SOURCE"}}}
+        ],
+    },
+    # ----- RC-1: 全角＋とアクティブ化の連用接続（OP06-028 系）。分割境界で両アクション保全 --
+    {
+        "id": "don_active_then_fullwidth_buff",
+        "text": "【アタック時】自分のドン !!1枚までをアクティブにし、このキャラは、このターン中、パワー＋1000。",
+        "expect": [
+            {"trigger": "ON_ATTACK",
+             "effect": {"kind": "seq", "actions": [
+                 {"type": "ACTIVE_DON", "value": 1},
+                 {"type": "BUFF", "value": 1000, "target": {"select_mode": "SOURCE"}},
+             ]}}
+        ],
+    },
+    # ----- RC-1複合: 「バトルでKOされずパワー＋N」は保護とバフの両方を生成する -----------
+    {
+        "id": "prevent_battle_ko_with_buff",
+        "text": "【アタック時】このキャラは、次の自分のターン開始時まで、バトルでKOされずパワー＋2000。",
+        "expect": [
+            {"trigger": "ON_ATTACK",
+             "effect": {"kind": "seq", "actions": [
+                 {"type": "PREVENT_LEAVE", "status": "BATTLE_KO",
+                  "target": {"select_mode": "SOURCE"}},
+                 {"type": "BUFF", "value": 2000, "target": {"select_mode": "SOURCE"}},
+             ]}}
+        ],
+    },
+    # ----- RC-2: 制限/付与系の主語修飾の保全（SOURCE ハードコード是正） -----------
+    {
+        "id": "scoped_prevent_leave_traits",
+        "text": "自分の特徴《科学者》を持つキャラすべては、相手の効果で場を離れない。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "PREVENT_LEAVE", "status": "LEAVE",
+                        "target": {"zone": "FIELD", "traits": ["科学者"],
+                                   "select_mode": "ALL"}}}
+        ],
+    },
+    {
+        "id": "scoped_rush_traits",
+        "text": "自分の特徴《SWORD》を持つキャラは、登場したターンにキャラへアタックできる。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "GRANT_KEYWORD", "status": "速攻",
+                        "target": {"traits": ["SWORD"], "select_mode": "ALL"}}}
+        ],
+    },
+    {
+        "id": "blocker_disable_cost_cap_upto",
+        "text": "【登場時】相手の元々のコスト4以下のキャラ1枚までは、このターン中、【ブロッカー】を発動できない。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "effect": {"kind": "action", "type": "BUFF", "status": "BLOCKER_DISABLE",
+                        "target": {"cost_max": 4}}}
+        ],
+    },
+    # ----- RC-2: 「次の…まで」の期間が INSTANT に落ちない -------------------------
+    {
+        "id": "until_next_turn_prevent_battle_ko",
+        "text": "【アタック時】このキャラは、次の自分のターン開始時まで、バトルでKOされずパワー＋2000。",
+        "expect": [
+            {"trigger": "ON_ATTACK",
+             "effect": {"kind": "seq", "actions": [
+                 {"type": "PREVENT_LEAVE", "status": "BATTLE_KO",
+                  "duration": "UNTIL_NEXT_TURN_END"},
+                 {"type": "BUFF", "value": 2000, "duration": "UNTIL_NEXT_TURN_END"},
+             ]}}
+        ],
+    },
+    # ----- RC-4: 「<範囲>N枚につき」は実数を毎回数えるスケーリング値になる ----------
+    {
+        "id": "per_n_count_query_events_in_trash",
+        "text": "このキャラは、自分のトラッシュにあるイベント2枚につき、パワー+1000。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "BUFF",
+                        "value_dynamic": {"source": "COUNT_QUERY",
+                                          "divisor": 2, "multiplier": 1000},
+                        "target": {"select_mode": "SOURCE"}}}
+        ],
+    },
+    {
+        "id": "per_n_draw_scaled_by_trait_chars",
+        "text": "【登場時】自分の特徴《海王類》を持つキャラ1枚につき、カード1枚を引く。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "effect": {"kind": "action", "type": "DRAW",
+                        "value_dynamic": {"source": "COUNT_QUERY",
+                                          "divisor": 1, "multiplier": 1}}}
+        ],
+    },
+    # ----- RC-3: 「相手が選び」は選択者指定であって対象側ではない --------------------
+    {
+        "id": "opponent_chooser_discard_own_hand",
+        "text": "【KO時】自分の手札1枚を相手が選び、捨てる。",
+        "expect": [
+            {"trigger": "ON_KO",
+             "effect": {"kind": "action", "type": "DISCARD",
+                        "target": {"player": "SELF", "zone": "HAND"}}}
+        ],
+    },
+    # ----- ゾーン検出はコスト上限修飾の「ライフ」に汚染されない（雷迎トリガー等） ------
+    {
+        "id": "dynamic_cost_cap_ko_targets_field",
+        "text": "【トリガー】お互いのライフの合計枚数以下のコストを持つ相手のキャラ1枚までを、KOする。",
+        "expect": [
+            {"trigger": "TRIGGER",
+             "effect": {"kind": "action", "type": "KO",
+                        "target": {"player": "OPPONENT", "zone": "FIELD"}}}
+        ],
+    },
+    # ----- RC-6: 「ライフがN枚になるように」は N 枚残して全てトラッシュ ----------------
+    {
+        "id": "life_down_to_one_trash",
+        "text": "【メイン】自分のライフが1枚になるようにライフの上からトラッシュに置く。",
+        "expect": [
+            {"trigger": "ACTIVATE_MAIN",
+             "effect": {"kind": "action", "type": "TRASH",
+                        "target": {"player": "SELF", "zone": "LIFE"}}}
+        ],
+    },
+    # ----- 位置指定なしの「相手のライフ1枚までをトラッシュに置く」も上から自動取得 -------
+    {
+        "id": "opp_life_to_trash_no_position",
+        "text": "【登場時】相手のライフ1枚までをトラッシュに置く。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "effect": {"kind": "action", "type": "TRASH",
+                        "target": {"player": "OPPONENT", "zone": "LIFE"}}}
+        ],
+    },
+    # ----- 参照発動: 「このカードの【登場時】効果を発動する」は参照先を保持する ---------
+    {
+        "id": "execute_referenced_on_play",
+        "text": "このカードの登場時効果を発動する。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "EXECUTE_MAIN_EFFECT",
+                        "status": "ON_PLAY"}}
         ],
     },
 ]

@@ -89,6 +89,15 @@ class CardInstance:
     is_face_up: bool = False
     power_buff: int = 0
     cost_buff: int = 0
+    # PASSIVE/YOUR_TURN 由来のパワー修正の再計算レイヤ。_apply_passive_effects が
+    # 毎回 0 にリセットして再適用する（power_buff に加えると再計算のたびに累積する）。
+    passive_power: int = 0
+    # PASSIVE 由来のパワー上書きの再計算レイヤ。即時効果の base_power_override を
+    # 再計算リセットから守るために分離する（即時の同値パワー効果が消えないように）。
+    passive_power_override: Optional[int] = None
+    # PASSIVE 由来のカウンター値修正（「手札の…はカウンター+2000になる」）。
+    # _apply_passive_effects が毎回リセットして再適用する。
+    passive_counter: int = 0
     base_power_override: Optional[int] = None
     # 「このターン中、コスト0にする」等のコスト絶対値セット。base_power_override と対称で、
     # _apply_passive_effects ではリセットせず reset_turn_status のみで失効させる。
@@ -136,10 +145,17 @@ class CardInstance:
     def get_power(self, is_my_turn: bool) -> int:
         if self.master.type not in [CardType.LEADER, CardType.CHARACTER]:
             return 0
-        base = self.base_power_override if self.base_power_override is not None else self.master.power
-        buff = self.power_buff + self.timed_power
+        override = (self.base_power_override if self.base_power_override is not None
+                    else self.passive_power_override)
+        base = override if override is not None else self.master.power
+        buff = self.power_buff + self.timed_power + self.passive_power
         don_power = (self.attached_don * 1000) if is_my_turn else 0
         return base + buff + don_power
+
+    @property
+    def current_counter(self) -> int:
+        """カウンター値（基礎値＋効果による修正）。apply_counter が参照する。"""
+        return (self.master.counter or 0) + self.passive_counter
 
     @property
     def current_cost(self) -> int:
@@ -151,6 +167,7 @@ class CardInstance:
         self.power_buff = 0
         self.cost_buff = 0
         self.base_power_override = None
+        self.passive_power_override = None
         self.base_cost_override = None
         self.negated = False
         self.ability_disabled = False
