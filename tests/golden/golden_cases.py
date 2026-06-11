@@ -1653,6 +1653,146 @@ CASES = [
             }
         ],
     },
+    # ----- 相手への除去＋自己バウンス（TRIGGER, TARGET_SIDE 監査フラグ対応） ----
+    # 「相手の…をKOし、このカードを手札に加える」は Sequence に分割され、
+    # 前段の KO 対象は OPPONENT、後段の自己バウンスは SOURCE になる。
+    # 分割しないと self_to_hand が丸呑みし相手キャラの KO が消失していた。
+    {
+        "id": "trigger_ko_opp_then_self_bounce",
+        "text": "相手のコスト1以下のキャラ1枚までを、KOし、このカードを手札に加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "KO", "target": {"player": "OPPONENT", "cost_max": 1}},
+                        {"type": "MOVE_CARD", "target": {"select_mode": "SOURCE"}},
+                    ],
+                }
+            }
+        ],
+    },
+    # 「相手の…をレストにし、このカードを手札に加える」も同型（レスト＋自己バウンス）。
+    {
+        "id": "trigger_rest_opp_then_self_bounce",
+        "text": "相手のコスト2以下のキャラ1枚までを、レストにし、このカードを手札に加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "seq",
+                    "actions": [
+                        {"type": "REST", "target": {"player": "OPPONENT", "cost_max": 2}},
+                        {"type": "MOVE_CARD", "target": {"select_mode": "SOURCE"}},
+                    ],
+                }
+            }
+        ],
+    },
+    # ----- 動的コスト上限: ライフ枚数依存（COST_LIMIT 監査フラグ対応） --------
+    # 「相手のライフの枚数以下のコストを持つ相手のキャラ」→ cost_max_dynamic=LIFE_COUNT_OPPONENT
+    {
+        "id": "cost_limit_opp_life_ko",
+        "text": "相手のライフの枚数以下のコストを持つ相手のキャラ1枚までを、KOする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "KO",
+                    "target": {
+                        "player": "OPPONENT",
+                        "cost_max_dynamic": "LIFE_COUNT_OPPONENT",
+                        "is_up_to": True,
+                    },
+                }
+            }
+        ],
+    },
+    # 「自分のライフの枚数以下のコストを持つ相手のキャラ」→ LIFE_COUNT_SELF
+    {
+        "id": "cost_limit_self_life_ko",
+        "text": "自分のライフの枚数以下のコストを持つ相手のキャラ1枚までを、KOする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "KO",
+                    "target": {
+                        "player": "OPPONENT",
+                        "cost_max_dynamic": "LIFE_COUNT_SELF",
+                        "is_up_to": True,
+                    },
+                }
+            }
+        ],
+    },
+    # 「お互いのライフの合計枚数以下のコストを持つ相手のキャラ」→ LIFE_COUNT_BOTH
+    {
+        "id": "cost_limit_both_life_ko",
+        "text": "お互いのライフの合計枚数以下のコストを持つ相手のキャラ1枚までを、KOする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "KO",
+                    "target": {
+                        "player": "OPPONENT",
+                        "cost_max_dynamic": "LIFE_COUNT_BOTH",
+                        "is_up_to": True,
+                    },
+                }
+            }
+        ],
+    },
+    # ----- C9 同値パワー（発動時スナップショット, DURATION/OTHER 監査対応） -------
+    # 「このキャラの元々のパワーは、このターン中、相手のリーダーと同じパワーになる」
+    {
+        "id": "power_equalize_opp_leader",
+        "text": "このキャラの元々のパワーは、このターン中、相手のリーダーと同じパワーになる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "POWER_OVERRIDE",
+                    "duration": "THIS_TURN",
+                    "target": {"select_mode": "SOURCE"},
+                },
+            }
+        ],
+    },
+    # 「選んだキャラと同じパワーになる」→ ref=selected。
+    {
+        "id": "power_equalize_selected",
+        "text": "このキャラの元々のパワーは、このターン中、選んだキャラと同じパワーになる。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "POWER_OVERRIDE",
+                    "duration": "THIS_TURN",
+                    "target": {"select_mode": "SOURCE"},
+                },
+            }
+        ],
+    },
+    # 「このターン中、コスト0にする」— COST_OVERRIDE で base_cost_override をセット。
+    {
+        "id": "set_cost_zero_this_turn",
+        "text": "相手の元々の効果のないキャラ1枚までを、このターン中、コスト0にする。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "BUFF",
+                    "status": "COST_OVERRIDE",
+                    "value": 0,
+                    "duration": "THIS_TURN",
+                    "target": {"player": "OPPONENT", "is_up_to": True},
+                },
+            }
+        ],
+    },
     # 「元々のパワー7000にする」— base_power_override に静的値をセット。
     {
         "id": "set_power_base_value",

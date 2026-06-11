@@ -278,8 +278,43 @@ class GameManager:
         elif action_type == "CHOICE":
             log_event("INFO", "game.resume_choice", f"Resuming choice for {source_card.master.name}", player=player.name)
             selected_index = payload.get("index", payload.get("selected_option_index", 0))
-            
+
             resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
+
+        elif action_type == "CONFIRM_OPTIONAL":
+            # 任意効果（「〜してもよい」）の発動可否。accepted=False（パス/拒否）ならスキップ。
+            accepted = payload.get("accepted")
+            if accepted is None:
+                # selected_uuids 非空 / index>0 / skip フラグ等から推定（既定は発動=True）
+                if payload.get("skip") is True or payload.get("declined") is True:
+                    accepted = False
+                else:
+                    accepted = payload.get("index", 0) == 0
+            optional_node = continuation.get("optional_node")
+            self.active_interaction = None
+            resolver.resume_optional(player, source_card, bool(accepted), optional_node,
+                                     continuation.get("execution_stack", []), continuation.get("effect_context", {}))
+
+        elif action_type == "DECLARE_COST":
+            # C8: 宣言コストを記録し、相手デッキトップを公開して context に保存してから再開。
+            declared = payload.get("declared_value", payload.get("index", 0))
+            try:
+                declared = int(declared)
+            except (TypeError, ValueError):
+                declared = 0
+            effect_context = continuation.get("effect_context", {})
+            effect_context["declared_cost"] = declared
+            opponent = self.p2 if player == self.p1 else self.p1
+            revealed = opponent.deck[0] if opponent.deck else None
+            if revealed is not None:
+                effect_context["last_revealed_card"] = revealed
+                log_event("INFO", "game.declare_cost",
+                          f"{source_card.master.name}: declared {declared}, revealed {revealed.master.name}(cost {revealed.master.cost})",
+                          player=player.name)
+            else:
+                log_event("INFO", "game.declare_cost", f"{source_card.master.name}: declared {declared}, opponent deck empty", player=player.name)
+            self.active_interaction = None
+            resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), effect_context)
 
         if not self.active_interaction and self.setup_phase_pending:
             self.finish_setup()
@@ -676,8 +711,29 @@ class GameManager:
             self._apply_passive_effects(self.turn_player)
 
     def check_victory(self):
-        if not self.p1.deck: self.winner = self.p2.name
-        elif not self.p2.deck: self.winner = self.p1.name
+        # デッキアウト: 通常は本人の敗北（相手の勝利）。ただし C10「自分のデッキが0枚に
+        # なった場合、敗北する代わりに勝利する」(VICTORY/REPLACE_DECKOUT_LOSS) を持つ場合は
+        # 本人の勝利へ置換する（OP03-040 ナミ等）。
+        if not self.p1.deck:
+            self.winner = self.p1.name if self._has_deckout_win_replace(self.p1) else self.p2.name
+        elif not self.p2.deck:
+            self.winner = self.p2.name if self._has_deckout_win_replace(self.p2) else self.p1.name
+
+    def _has_deckout_win_replace(self, player) -> bool:
+        """player がデッキアウト時の敗北→勝利の置換能力(PASSIVE)を持つか。"""
+        units = [player.leader] + list(player.field)
+        for card in units:
+            if not card or not getattr(card, "master", None) or getattr(card, "negated", False):
+                continue
+            if getattr(card, "ability_disabled", False):
+                continue
+            for ab in card.master.abilities:
+                if ab.trigger != TriggerType.PASSIVE:
+                    continue
+                eff = self._find_action(ab.effect, ActionType.VICTORY)
+                if eff is not None and eff.status == "REPLACE_DECKOUT_LOSS":
+                    return True
+        return False
 
     def play_card_action(self, player: Player, card: Card):
         if card not in player.hand: return
@@ -1028,6 +1084,11 @@ class GameManager:
                 if action.status == "POWER_OVERRIDE":
                     target.base_power_override = value
                     log_event("INFO", "game.action_override", f"{target.master.name}'s power set to {value}", player=player.name)
+                elif action.status == "COST_OVERRIDE":
+                    # コスト絶対値セット（「このターン中、コスト0にする」等）。base_power_override
+                    # と同様に reset_turn_status で失効する（passive 再計算では消えない）。
+                    target.base_cost_override = value
+                    log_event("INFO", "game.action_cost_override", f"{target.master.name}'s cost set to {value}", player=player.name)
                 elif action.status == "COST_REDUCTION":
                     # 期間付き（このターン中／このバトル中 等）は継続効果(timed_cost)へ。
                     # cost_buff は _apply_passive_effects で毎回リセットされ消えるため。
@@ -1180,4 +1241,28 @@ class GameManager:
         if not val_source: return 0
         if val_source.dynamic_source == "COUNT_REFERENCE":
             log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name); return len(player.trash)
+        # C9「（相手のリーダー／選んだキャラ／アタックしているキャラ）と同じパワーになる」。
+        # 発動時スナップショット: 参照カードの現在パワーを固定値として返す（以後の変動に追随しない）。
+        if val_source.dynamic_source == "REFERENCE_POWER":
+            ref = self._resolve_power_reference(player, val_source.ref_id, context)
+            if ref is None:
+                return val_source.base
+            ref_owner, _ = self._find_card_location(ref)
+            is_ref_turn = bool(ref_owner) and ref_owner.name == self.turn_player.name
+            return ref.get_power(is_ref_turn)
         return val_source.base
+
+    def _resolve_power_reference(self, player, ref_id, context):
+        """C9 の同値パワー参照カードを解決する。ref_id: selected/opp_leader/attacker。"""
+        opponent = self.p2 if player == self.p1 else self.p1
+        if ref_id == "opp_leader":
+            return opponent.leader
+        if ref_id == "attacker":
+            return (self.active_battle or {}).get("attacker")
+        if ref_id == "selected":
+            saved = (context or {}).get("saved_targets", {})
+            sel = saved.get("selected_card") or saved.get("selected")
+            if isinstance(sel, list):
+                return sel[0] if sel else None
+            return sel
+        return None

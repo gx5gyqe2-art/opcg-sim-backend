@@ -90,6 +90,9 @@ class CardInstance:
     power_buff: int = 0
     cost_buff: int = 0
     base_power_override: Optional[int] = None
+    # 「このターン中、コスト0にする」等のコスト絶対値セット。base_power_override と対称で、
+    # _apply_passive_effects ではリセットせず reset_turn_status のみで失効させる。
+    base_cost_override: Optional[int] = None
     current_keywords: Set[str] = field(default_factory=set)
     flags: Set[str] = field(default_factory=set)
     negated: bool = False
@@ -140,13 +143,15 @@ class CardInstance:
 
     @property
     def current_cost(self) -> int:
-        result = self.master.cost + self.cost_buff + self.timed_cost
+        base = self.base_cost_override if self.base_cost_override is not None else self.master.cost
+        result = base + self.cost_buff + self.timed_cost
         return max(0, result)
 
     def reset_turn_status(self):
         self.power_buff = 0
         self.cost_buff = 0
         self.base_power_override = None
+        self.base_cost_override = None
         self.negated = False
         self.ability_disabled = False
         self.flags.clear()

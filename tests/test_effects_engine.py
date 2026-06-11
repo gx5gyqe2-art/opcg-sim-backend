@@ -101,10 +101,164 @@ def test_execute_main_effect_reinvokes_main():
     assert len(p1.deck) == 3
 
 
+def test_execute_main_effect_falls_back_to_counter():
+    """EXECUTE_MAIN_EFFECT(【トリガー】): ACTIVATE_MAIN が無ければ COUNTER 能力を展開する。
+    効果が【カウンター】に書かれたトリガーイベント(OP01-028 等)が従来 no-op だった回帰。"""
+    gm, p1, p2 = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    # 【カウンター】= カード2枚ドロー を持つイベント（ACTIVATE_MAIN は無い）
+    counter_ability = Ability(
+        trigger=TriggerType.COUNTER,
+        effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=2)),
+    )
+    trigger_ability = Ability(
+        trigger=TriggerType.TRIGGER,
+        effect=GameAction(type=ActionType.EXECUTE_MAIN_EFFECT),
+    )
+    master = make_master(card_id="E-CNT", name="トリガーカウンター", type=CardType.EVENT,
+                         abilities=(counter_ability, trigger_ability))
+    source = make_instance(master, owner=p1.name)
+
+    assert len(p1.hand) == 0
+    gm.resolve_ability(p1, trigger_ability, source_card=source)
+    assert len(p1.hand) == 2  # COUNTER の DRAW2 が展開・実行された
+
+
 def _make_field_char(player, name="戦士", power=5000):
     inst = make_instance(make_master(card_id=f"C-{name}", name=name, power=power), owner=player.name)
     player.field.append(inst)
     return inst
+
+
+def _c8_ability(ko_target):
+    """C8: Sequence[DECLARE_COST, Branch(DECLARED_COST_MATCH → KO opponent)]。"""
+    from opcg_sim.src.models.effect_types import Sequence as Seq, Branch, TargetQuery
+    return Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        effect=Seq(actions=[
+            GameAction(type=ActionType.DECLARE_COST),
+            Branch(
+                condition=Condition(type=ConditionType.DECLARED_COST_MATCH),
+                if_true=GameAction(type=ActionType.KO,
+                                   target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, is_up_to=True)),
+            ),
+        ]),
+    )
+
+
+def test_c8_declare_cost_match_executes_effect():
+    """C8: 宣言コストが相手デッキトップのコストと一致 → 後続効果(KO)が実行される。"""
+    gm, p1, p2 = make_game()
+    # 相手デッキトップ = コスト5
+    p2.deck = [make_instance(make_master(card_id="TOP", cost=5), owner=p2.name)]
+    victim = make_instance(make_master(card_id="V", cost=3), owner=p2.name)
+    p2.field.append(victim)
+    src = _make_field_char(p1, name="OP11")
+
+    gm.resolve_ability(p1, _c8_ability(victim), source_card=src)
+    # DECLARE_COST で中断
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "DECLARE_COST"
+    # コスト5を宣言（一致）→ KO の対象選択へ
+    gm.resolve_interaction(p1, {"declared_value": 5})
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "SELECT_TARGET"
+    # 対象(victim)を選択 → KO 実行
+    gm.resolve_interaction(p1, {"selected_uuids": [victim.uuid]})
+    assert victim not in p2.field  # KO された
+
+
+def test_c8_declare_cost_mismatch_skips_effect():
+    """C8: 宣言コストが不一致 → 後続効果は実行されない。"""
+    gm, p1, p2 = make_game()
+    p2.deck = [make_instance(make_master(card_id="TOP", cost=5), owner=p2.name)]
+    victim = make_instance(make_master(card_id="V", cost=3), owner=p2.name)
+    p2.field.append(victim)
+    src = _make_field_char(p1, name="OP11")
+
+    gm.resolve_ability(p1, _c8_ability(victim), source_card=src)
+    gm.resolve_interaction(p1, {"declared_value": 2})  # 不一致
+    assert victim in p2.field  # KO されない
+
+
+def test_optional_effect_confirm_yes_executes():
+    """任意効果(is_optional)は yes/no 確認を経て、yes でドロー実行。"""
+    gm, p1, _ = make_game()
+    for i in range(3):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    opt_draw = GameAction(type=ActionType.DRAW, value=ValueSource(base=1), is_optional=True)
+    ability = Ability(trigger=TriggerType.ON_PLAY, effect=opt_draw)
+    src = _make_field_char(p1, name="任意ドロー")
+
+    gm.resolve_ability(p1, ability, source_card=src)
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "CONFIRM_OPTIONAL"
+    assert len(p1.hand) == 0  # まだ引いていない
+    gm.resolve_interaction(p1, {"accepted": True})
+    assert len(p1.hand) == 1  # yes → ドロー実行
+
+
+def test_optional_effect_confirm_no_skips():
+    """任意効果を no で拒否するとスキップされる。"""
+    gm, p1, _ = make_game()
+    for i in range(3):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    opt_draw = GameAction(type=ActionType.DRAW, value=ValueSource(base=1), is_optional=True)
+    ability = Ability(trigger=TriggerType.ON_PLAY, effect=opt_draw)
+    src = _make_field_char(p1, name="任意ドロー")
+
+    gm.resolve_ability(p1, ability, source_card=src)
+    gm.resolve_interaction(p1, {"accepted": False})
+    assert len(p1.hand) == 0  # no → スキップ
+
+
+def test_c10_deckout_win_replacement():
+    """C10: デッキアウトしたプレイヤーが「敗北する代わりに勝利する」PASSIVE を持つ場合、
+    本人が勝利する。持たない相手がデッキアウトした場合は通常どおり相手が敗北する。"""
+    win_ab = Ability(
+        trigger=TriggerType.PASSIVE,
+        condition=Condition(type=ConditionType.DECK_COUNT, operator=CompareOperator.LE, value=0),
+        effect=GameAction(type=ActionType.VICTORY, status="REPLACE_DECKOUT_LOSS"),
+    )
+    gm, p1, p2 = make_game()
+    # p1 のリーダーに勝敗置換能力を付与（CardMaster は frozen のため abilities 付きで構築）
+    p1.leader = make_instance(
+        make_master(card_id="L-NAMI", name="ナミ", type=CardType.LEADER, abilities=(win_ab,)),
+        owner=p1.name)
+    p1.deck = []          # p1 がデッキアウト
+    p2.deck = [make_instance(make_master(card_id="D"), owner=p2.name)]
+    gm.check_victory()
+    assert gm.winner == p1.name  # 通常 p2 勝利のところ、置換で p1 勝利
+
+    # 置換能力が無い場合は通常どおり（相手の勝利）
+    gm2, q1, q2 = make_game()
+    q1.deck = []
+    q2.deck = [make_instance(make_master(card_id="D"), owner=q2.name)]
+    gm2.check_victory()
+    assert gm2.winner == q2.name
+
+
+def test_power_equalize_snapshot_opp_leader():
+    """C9 同値パワー: 相手リーダーのパワーを発動時スナップショットで自身に固定する。
+    スナップショット後に相手リーダーのパワーが変動しても追随しない。"""
+    gm, p1, p2 = make_game()
+    src = _make_field_char(p1, name="ボン・クレー", power=3000)
+    p2.leader.base_power_override = 6000  # 相手リーダーを 6000 に
+    # 値解決（発動時スナップショット）→ POWER_OVERRIDE で適用
+    val = gm.get_dynamic_value(
+        p1, ValueSource(dynamic_source="REFERENCE_POWER", ref_id="opp_leader"), [src], {})
+    assert val == 6000
+    gm.apply_action_to_engine(
+        p1, action(ActionType.BUFF, value=val, status="POWER_OVERRIDE", duration="THIS_TURN"),
+        [src], val)
+    assert src.get_power(True) == 6000
+    # 相手リーダーが後で変動してもスナップショットは追随しない
+    p2.leader.base_power_override = 1000
+    assert src.get_power(True) == 6000
+    # ターン終了で失効し元に戻る
+    src.reset_turn_status()
+    assert src.get_power(True) == 3000
 
 
 def test_battle_power_buff_expires_at_battle_end():
@@ -819,7 +973,10 @@ def test_reveal_conditional_play_no_match():
     gm.resolve_ability(p1, _reveal_then_play_ability(), source_card=p1.leader)
     assert top not in p1.field           # 条件不一致なので登場しない
     assert len(p1.field) == field_before
-    assert top in p1.temp_zone           # 公開カードは temp に残る（後続の残り処理対象）
+    # 公開（公開し）はカードを動かさない＝デッキトップに留まる。解決完了時に temp 残留を
+    # デッキトップへ回収するため、temp リークはなく公開カードはデッキ先頭に戻る。
+    assert top not in p1.temp_zone       # temp リーク無し
+    assert p1.deck[0] is top             # 公開カードはデッキトップに留まる
 
 
 def test_hand_to_deck_bottom():

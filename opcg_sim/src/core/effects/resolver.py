@@ -164,6 +164,20 @@ class EffectResolver:
                     self._expand_main_effect(source_card)
                     continue
 
+                # C8 コスト宣言: 数値入力インタラクションへ中断（resume 時に相手デッキトップを
+                # 公開して context に記録し、残りの実行スタックを再開する）。
+                if node.type == ActionType.DECLARE_COST:
+                    self._suspend_for_cost_declaration(player, source_card)
+                    return
+
+                # 任意効果（「〜してもよい」）: 発動するかを yes/no で確認する。未確認なら中断し、
+                # resume(yes) 時に id(node) を context の確認済み集合へ入れて同じノードを再投入する
+                # （no はスキップ）。共有ノード(CardMaster)を汚さないよう確認状態は context で持つ。
+                confirmed = self.context.setdefault("_confirmed_optionals", set())
+                if getattr(node, "is_optional", False) and id(node) not in confirmed:
+                    self._suspend_for_optional_confirmation(player, node, source_card)
+                    return
+
                 success = self._execute_game_action(player, node, source_card)
 
                 if self.game_manager.active_interaction:
@@ -190,6 +204,27 @@ class EffectResolver:
                 self._suspend_for_choice(player, node, source_card)
                 return
 
+        # スタックを完走（中断なし）した時点で temp_zone に残ったカードを回収する。
+        # 「デッキの上から1枚を公開し、〜の場合」等の REVEAL は公開カードを temp に載せて
+        # 条件評価するが、公開は本来カードを動かさない（デッキトップに留まる）。後続で消費
+        # されなかった temp カードはデッキトップへ戻す（TEMP リーク＝デッキ消失の防止）。
+        if not self.game_manager.active_interaction:
+            self._reclaim_temp_to_deck_top()
+
+    def _reclaim_temp_to_deck_top(self):
+        """解決完了時に temp_zone に取り残されたカードを各オーナーのデッキトップへ戻す。"""
+        for p in (self.game_manager.p1, self.game_manager.p2):
+            if not getattr(p, "temp_zone", None):
+                continue
+            leftover = list(p.temp_zone)
+            p.temp_zone.clear()
+            # 公開順を保って上から戻す（reversed で先頭が最上段になるよう挿入）
+            for card in reversed(leftover):
+                p.deck.insert(0, card)
+            if leftover:
+                log_event("INFO", "resolver.temp_reclaim",
+                          f"Returned {len(leftover)} revealed card(s) to deck top", player=p.name)
+
     def _expand_main_effect(self, source_card):
         """source_card 自身の 【メイン】(ACTIVATE_MAIN) 能力の効果を実行スタックへ展開する。
 
@@ -205,8 +240,16 @@ class EffectResolver:
             ab for ab in source_card.master.abilities
             if ab.trigger == TriggerType.ACTIVATE_MAIN and ab.effect is not None
         ]
+        # 【トリガー】(ライフ公開時に発動)は ACTIVATE_MAIN だけでなく、効果が【カウンター】に
+        # 書かれたイベント(例: OP01-028/OP13-039)も発動対象。ACTIVATE_MAIN が無ければ
+        # COUNTER 能力にフォールバックする（従来は ACTIVATE_MAIN 限定で何も発動しなかった）。
         if not main_abilities:
-            log_event("WARNING", "resolver.execute_main_missing", f"No ACTIVATE_MAIN ability on {source_card.master.name}", player=source_card.owner_id)
+            main_abilities = [
+                ab for ab in source_card.master.abilities
+                if ab.trigger == TriggerType.COUNTER and ab.effect is not None
+            ]
+        if not main_abilities:
+            log_event("WARNING", "resolver.execute_main_missing", f"No ACTIVATE_MAIN/COUNTER ability on {source_card.master.name}", player=source_card.owner_id)
             return
 
         # 既存スタックの「後」に積む = 先に実行されるよう reversed で push
@@ -563,6 +606,16 @@ class EffectResolver:
             opp_count = len(opp.field)
             return self._compare(my_count, condition.operator, opp_count)
 
+        elif condition.type == ConditionType.DECLARED_COST_MATCH:
+            # C8: 公開カードのコストが宣言コストと一致するか。
+            card = self.context.get("last_revealed_card")
+            declared = self.context.get("declared_cost")
+            if card is None or declared is None:
+                log_event("INFO", "resolver.declared_cost_missing",
+                          "DECLARED_COST_MATCH: missing revealed card or declared cost", player=player.name)
+                return False  # 情報が無ければ不成立（誤発動防止）
+            return card.master.cost == declared
+
         elif condition.type == ConditionType.REVEALED_CARD_TRAIT:
             card = self.context.get("last_revealed_card")
             if card is None:
@@ -645,6 +698,51 @@ class EffectResolver:
             }
         }
         log_event("INFO", "resolver.suspend", "Suspended for player choice", player=player.name)
+
+    def _suspend_for_optional_confirmation(self, player, node, source_card):
+        """任意効果（「〜してもよい」）の発動可否を yes/no で確認するため中断する。
+        node は execution_stack から既に pop 済みなので、continuation に退避する。"""
+        self.game_manager.active_interaction = {
+            "player_id": player.name,
+            "action_type": "CONFIRM_OPTIONAL",
+            "source_card_name": source_card.master.name,
+            "message": f"「{source_card.master.name}」の効果を発動しますか？",
+            "can_skip": True,
+            "continuation": {
+                "execution_stack": self.execution_stack,
+                "effect_context": self.context,
+                "source_card_uuid": source_card.uuid,
+                "optional_node": node,
+            },
+        }
+        log_event("INFO", "resolver.suspend", "Suspended for optional confirmation", player=player.name)
+
+    def resume_optional(self, player, source_card, accepted, optional_node, execution_stack, effect_context):
+        """任意効果確認からの再開。accepted=True なら確認済みにして再投入、False ならスキップ。"""
+        self.execution_stack = execution_stack
+        self.context = effect_context
+        if accepted and optional_node is not None:
+            self.context.setdefault("_confirmed_optionals", set()).add(id(optional_node))
+            self.execution_stack.append(optional_node)
+        self._process_stack(player, source_card)
+
+    def _suspend_for_cost_declaration(self, player, source_card):
+        """C8: 数値（コスト）の宣言を待つインタラクションへ中断する。
+        resume 時に gamestate.resolve_interaction が宣言値を context に記録し、相手デッキ
+        トップを公開してから残りの execution_stack を再開する。"""
+        self.game_manager.active_interaction = {
+            "player_id": player.name,
+            "action_type": "DECLARE_COST",
+            "source_card_name": source_card.master.name,
+            "message": f"「{source_card.master.name}」の効果: コストを宣言してください",
+            "constraints": {"min": 0, "max": 10},
+            "continuation": {
+                "execution_stack": self.execution_stack,
+                "effect_context": self.context,
+                "source_card_uuid": source_card.uuid,
+            },
+        }
+        log_event("INFO", "resolver.suspend", "Suspended for cost declaration", player=player.name)
 
     def _suspend_for_target_selection(self, player, candidates, query, source_card, action_node=None):
         required_count = getattr(query, 'count', 1)

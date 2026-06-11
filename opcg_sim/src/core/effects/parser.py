@@ -255,8 +255,49 @@ class EffectParser:
         コストテキストを解析する。
         「このキャラをレストにできる」「このリーダーをレストにできる」パターンを
         ref_id="self" の REST アクションとして処理する。
+        「ドン!!-N,<追加コスト>」パターンを RETURN_DON + 追加コストの Sequence として処理する。
+        「N(レスト説明文),追加コスト」パターンを REST_DON + 追加コストの Sequence として処理する。
         """
         norm = _nfc(cost_text)
+
+        # 「N(コストエリアの説明文),追加コスト」: REST_DON + 追加コストを Sequence に分割
+        # 例: 3(コストエリアのドン!!を指定の数レストにできる),自分の手札1枚を捨てることができる
+        # 例: ①(コストエリアのドン!!を指定の数レストにできる),このキャラを手札に戻すことができる
+        num_paren_m = re.match(
+            _nfc(r'([①-⑨⑩➀-➉]|\d+)(\([^)]*\))[、，,　 ]+(.+)'),
+            norm, re.DOTALL
+        )
+        if num_paren_m and _nfc('レスト') in num_paren_m.group(2):
+            num_paren_part = num_paren_m.group(1) + num_paren_m.group(2)
+            add_cost_part = num_paren_m.group(3).strip()
+            num_node = self._parse_to_node(num_paren_part, is_cost=True)
+            add_node = self._parse_to_node(add_cost_part, is_cost=True)
+            if num_node is not None and add_node is not None:
+                num_acts = num_node.actions if isinstance(num_node, Sequence) else [num_node]
+                add_acts = add_node.actions if isinstance(add_node, Sequence) else [add_node]
+                return Sequence(actions=num_acts + add_acts)
+            return num_node if num_node is not None else add_node
+
+        # 「ドン!!-N,<追加コスト>」: ドン!!返却＋追加コストを Sequence に分割
+        # 「ドン!!-N(説明文),追加コスト」のように括弧付き説明が挟まる表記も対応
+        don_prefix_m = re.match(
+            _nfc(r'(ドン[ 　]*(?:!!|‼)[ 　]*[-－−‐][ 　]*(\d+))(?:\([^)]*\))?[、，,　 ]+(.+)'),
+            norm, re.DOTALL
+        )
+        if don_prefix_m:
+            don_count = int(don_prefix_m.group(2))
+            rest_part = don_prefix_m.group(3).strip()
+            don_action = GameAction(
+                type=ActionType.RETURN_DON,
+                value=ValueSource(base=don_count),
+                raw_text=don_prefix_m.group(1),
+            )
+            rest_node = self._parse_to_node(rest_part, is_cost=True)
+            if rest_node is not None:
+                if isinstance(rest_node, Sequence):
+                    return Sequence(actions=[don_action] + rest_node.actions)
+                return Sequence(actions=[don_action, rest_node])
+            return don_action
 
         m = re.search(_nfc(r'この(?:キャラ|リーダー)をレストに(し[、，]|できる|する)'), norm)
         if m:
@@ -271,19 +312,24 @@ class EffectParser:
                 ),
                 raw_text=norm
             )
-            # 「このキャラをレストにし、<追加コスト>」のように自己レストの後に別コストが
-            # 続く場合、従来は REST のみ返して後続（手札を捨てる／ライフを手札に加える 等）を
-            # 破棄していた。残りも解析して REST と結合した Sequence にする。
+            before_part = norm[:m.start()].strip('、，。 ')
             remainder = norm[m.end():].strip('、，。 ')
+
+            actions = []
+            if before_part:
+                before_node = self._parse_to_node(before_part, is_cost=True)
+                if isinstance(before_node, Sequence):
+                    actions.extend(before_node.actions)
+                elif before_node is not None:
+                    actions.append(before_node)
+            actions.append(rest_action)
             if remainder and remainder not in ('ことができる', 'できる'):
                 rest_node = self._parse_to_node(remainder, is_cost=True)
-                actions = [rest_action]
                 if isinstance(rest_node, Sequence):
                     actions.extend(rest_node.actions)
-                else:
+                elif rest_node is not None:
                     actions.append(rest_node)
-                return Sequence(actions=actions)
-            return rest_action
+            return Sequence(actions=actions) if len(actions) > 1 else (actions[0] if actions else rest_action)
 
         return self._parse_to_node(norm, is_cost=True)
 
@@ -348,7 +394,18 @@ class EffectParser:
         # 「引く、」「捨て、」は lookbehind で分割（動詞を前の部分に残す）
         # 「捨て、」を ON で消費すると「自分の手札1枚を」が動詞なしの断片になるため
         # (?<=捨て)、 に変更して「捨て」を前クローズに残す。
-        split_pattern = _nfc(r'。|その後、|置き、|加え、|(?<=引く)、|(?<=捨て)、|発動できる、|させ、')
+        # 「相手の…をKOし、このカードを手札に加える」のような〈相手への除去＋自己バウンス〉は
+        # KOし／レストにし／戻し（連用形＋読点）が逐次接続。これを区切らないと self_to_hand 等が
+        # 全体を丸呑みし、前段の相手への除去アクションが消失する（TRIGGER カードで多発）。
+        # 動詞を前クローズに残すため lookbehind で「、」のみ分割する。
+        # 「相手のキャラを、このターン中、パワー-4000し、自分のライフの上から1枚を手札に
+        # 加える」のように 数値+「し、」で別アクションが連結される句も分割する
+        # （区切らないと後続の手札/ライフ操作ルールが全体を丸呑みし、前段のバフ/デバフが
+        # 消失する）。数値直後の「し、」に限定し、公開し/レストにし等の他語尾には影響しない。
+        split_pattern = _nfc(
+            r'。|その後、|(?<=置き)、|(?<=加え)、|(?<=引く)、|(?<=捨て)、|発動できる、|させ、'
+            r'|(?<=KOし)、|(?<=レストにし)、|(?<=戻し)、|(?<=\d)し、|(?<=付与し)、'
+        )
 
         parts = re.split(split_pattern, norm_text)
         parts = [p.strip() for p in parts if p.strip()]
@@ -366,6 +423,24 @@ class EffectParser:
         match = re.search(_nfc(r'^(.+?)(?:場合|なら|することで)、(.+)$'), norm_text)
         if match:
             cond_text, rest_text = match.groups()
+            # 「ライフの上から1枚を公開し、」が cond_text の先頭に埋め込まれている場合は
+            # FACE_UP_LIFE アクションとして先行実行する（条件節ではなくアクション節）
+            life_reveal_m = re.match(
+                _nfc(r'自分のライフの上から(\d+)枚を公開し、(.+)'), cond_text
+            )
+            if life_reveal_m:
+                n = int(life_reveal_m.group(1))
+                remaining_cond = life_reveal_m.group(2)
+                face_up_action = GameAction(
+                    type=ActionType.FACE_UP_LIFE,
+                    target=TargetQuery(zone=Zone.LIFE, player=Player.SELF, count=n),
+                    raw_text=life_reveal_m.group(0),
+                )
+                branch = Branch(
+                    condition=self._parse_condition_obj(remaining_cond),
+                    if_true=self._parse_to_node(rest_text, is_cost)
+                )
+                return Sequence(actions=[face_up_action, branch])
             return Branch(
                 condition=self._parse_condition_obj(cond_text),
                 if_true=self._parse_to_node(rest_text, is_cost)
@@ -380,7 +455,17 @@ class EffectParser:
                 option_labels=options
             )
 
-        return self._parse_atomic_action(norm_text, is_cost)
+        node = self._parse_atomic_action(norm_text, is_cost)
+
+        # 任意効果マーカー: 効果文脈で「〜してもよい／てもよい」で終わる句は、発動するかを
+        # プレイヤーが選べる（resolver が yes/no 確認へ中断）。コストは ":" で既に任意のため対象外。
+        # 「できる」は注釈/コスト/キーワード/トリガー宣言で多義のため、ここでは明示マーカーのみ拾う。
+        if (not is_cost and isinstance(node, GameAction)
+                and node.type not in (ActionType.REPLACE_EFFECT, ActionType.DECLARE_COST, ActionType.OTHER)
+                and re.search(_nfc(r"(してもよい|てもよい)"), norm_text)):
+            node.is_optional = True
+
+        return node
 
     def _parse_atomic_action(self, text: str, is_cost: bool) -> GameAction:
         norm_text = _nfc(text)
@@ -526,6 +611,11 @@ class EffectParser:
 
     def _parse_condition_obj(self, text: str) -> Condition:
         norm_text = _nfc(text)
+
+        # C8「公開したカードが宣言したコストと同じ場合」: 宣言コスト＝公開カードのコスト。
+        # 他の数値/特徴条件より先に判定する（「コスト」を含むため誤分類を避ける）。
+        if _nfc("宣言したコスト") in norm_text and _nfc("同じ") in norm_text:
+            return Condition(type=ConditionType.DECLARED_COST_MATCH, raw_text=norm_text)
 
         # 比較演算子と数値を抽出
         operator = CompareOperator.EQ
