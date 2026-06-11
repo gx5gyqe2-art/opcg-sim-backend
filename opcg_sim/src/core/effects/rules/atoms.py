@@ -2010,8 +2010,32 @@ def _self_effect_negated_noop(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("効果は無効になる") not in t:
         return None
     if _nfc("相手の") in t:
-        return None  # スコープ付き相手無効は別ルール（実効果あり）
+        return None  # スコープ付き相手無効は scoped_negate_opp_onplay（実効果あり）
     return GameAction(type=ActionType.RULE_PROCESSING, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# スコープ付き相手効果無効: 「（次の相手のターン終了時まで、）相手の登場時効果は無効になる」
+#   → DISABLE_ABILITY(status="OPP_ONPLAY", duration)。エンジンは相手プレイヤーに
+#   「登場時効果の無効化」期限(turn_count)を設定し、play_card_action が ON_PLAY の解決を
+#   スキップする。スコープは現状【登場時】(ON_PLAY)のみ対応（parser が 登場時 を保全する）。
+#   OP09-081 マーシャル・D・ティーチ。
+# ---------------------------------------------------------------------------
+@rule("scoped_negate_opp_onplay", priority=66)
+def _scoped_negate_opp_onplay(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("効果は無効になる") not in t:
+        return None
+    if _nfc("相手の") not in t or _nfc("登場時") not in t:
+        return None
+    dur = "UNTIL_NEXT_TURN_END" if _nfc("次の") in t else "THIS_TURN"
+    return GameAction(
+        type=ActionType.DISABLE_ABILITY,
+        status="OPP_ONPLAY",
+        target=None,
+        duration=dur,
+        raw_text=t,
+    )
 
 
 # ---------------------------------------------------------------------------

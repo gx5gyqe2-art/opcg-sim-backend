@@ -423,6 +423,34 @@ def test_throne_dynamic_cost_limit_parsed():
     assert play.target.cost_max_dynamic == "DON_COUNT_FIELD"
 
 
+def test_op09_081_scoped_negate_opponent_onplay():
+    """OP09-081 ティーチ: 起動メインで「次の相手のターン終了時まで、相手の登場時効果は
+    無効になる」。発動後、相手が登場させたキャラの ON_PLAY が解決されないことを検証する。"""
+    gm, p1, p2 = base(turn=3, turn_player_is_p1=True)
+    teach = inst("OP09-081", owner="P1")
+    p1.field = [teach]
+    p1.hand = fillers(1, "P1")  # 手札1枚（捨てコスト用）
+    # 起動メイン（DISABLE_ABILITY OPP_ONPLAY, UNTIL_NEXT_TURN_END）を発動
+    fire(gm, p1, teach, "ACTIVATE_MAIN")
+    assert p2.negate_onplay_until >= gm.turn_count, "相手の ON_PLAY 無効化期限が設定される"
+
+    # 相手ターンに遷移して相手がドロー系 ON_PLAY キャラを登場 → ON_PLAY が発動しないこと
+    gm.turn_player, gm.opponent = p2, p1
+    gm.turn_count += 1
+    gm.phase = Phase.MAIN
+    for _ in range(4):
+        if p2.don_deck:
+            p2.don_active.append(p2.don_deck.pop(0))
+    p2.deck = fillers(3, "P2")
+    drawer = inst("EB01-023", owner="P2")  # 【登場時】カード1枚を引く
+    p2.hand = [drawer]
+    hand_before = len(p2.hand)
+    gm.play_card_action(p2, drawer)
+    drain(gm)
+    # ON_PLAY(ドロー)が無効化されるため、場に出た drawer の分だけ手札が減り、ドローは発生しない
+    assert len(p2.hand) == hand_before - 1, "ON_PLAY 無効化中はドローが発生しない"
+
+
 if __name__ == "__main__":
     import traceback
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

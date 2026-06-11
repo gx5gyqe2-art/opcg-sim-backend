@@ -142,6 +142,12 @@ class EffectParser:
         try:
             norm_text = _nfc(text)
 
+            # スコープ付き効果無効「相手の【登場時】効果は無効になる」の【登場時】を非タグ化して
+            # 保全する（後段の clean_text がタグを除去するとスコープが失われ、全効果無効と
+            # 区別できなくなるため）。同時に、この【登場時】がトリガー誤検出（ON_PLAY）の原因に
+            # なっていたのを解消する（このセグメントの真のトリガーは【起動メイン】等）。OP09-081。
+            norm_text = re.sub(_nfc(r'(相手の)【(登場時)】(効果)'), r'\1\2\3', norm_text)
+
             # トリガー検出は前処理前のテキストで行う（コスト/制限タグ除去前に判定）
             trigger = self._detect_trigger(norm_text)
             log_event("INFO", "parser.trigger", f"Detected trigger: {trigger.name}")

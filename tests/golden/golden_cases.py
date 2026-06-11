@@ -2117,6 +2117,19 @@ CASES = [
             {"effect": {"kind": "action", "type": "RULE_PROCESSING"}}
         ],
     },
+    # ----- スコープ付き相手効果無効（DISABLE_ABILITY OPP_ONPLAY, OP09-081 後段） --------
+    {
+        "id": "scoped_negate_opp_onplay",
+        "text": "【起動メイン】自分の手札1枚を捨てることができる:次の相手のターン終了時まで、相手の【登場時】効果は無効になる。",
+        "expect": [
+            {
+                "trigger": "ACTIVATE_MAIN",
+                "cost": {"kind": "action", "type": "DISCARD"},
+                "effect": {"kind": "action", "type": "DISABLE_ABILITY",
+                           "status": "OPP_ONPLAY", "duration": "UNTIL_NEXT_TURN_END"},
+            }
+        ],
+    },
     # ----- 自己バフは SOURCE を対象にする（「N枚につき」の枚が count 誤読されない） -----
     {
         "id": "self_power_buff_is_source",

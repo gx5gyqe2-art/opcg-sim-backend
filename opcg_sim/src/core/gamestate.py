@@ -31,7 +31,10 @@ class Player:
         self.don_rested: List[DonInstance] = []
         self.don_attached_cards: List[DonInstance] = [] 
         self.leader: Optional[Card] = leader
-        self.temp_zone: List[Card] = [] 
+        self.temp_zone: List[Card] = []
+        # 「相手の登場時効果は無効になる」(スコープ付き相手効果無効) の期限。
+        # turn_count <= negate_onplay_until の間、このプレイヤーの ON_PLAY 解決をスキップする。
+        self.negate_onplay_until: int = 0
 
     def setup_game(self):
         random.shuffle(self.deck)
@@ -748,7 +751,12 @@ class GameManager:
             self.move_card(card, Zone.FIELD, player); card.attached_don = 0; card.is_newly_played = True
             if self._has_rested_play(player):  # 「自分のキャラはレストで登場する」PASSIVE
                 card.is_rest = True
-            if not card.ability_disabled:
+            # 「相手の登場時効果は無効になる」(OPP_ONPLAY) 期間中はこのプレイヤーの ON_PLAY を解決しない。
+            onplay_negated = getattr(player, "negate_onplay_until", 0) >= self.turn_count
+            if onplay_negated:
+                log_event("INFO", "game.onplay_negated",
+                          f"{card.master.name}'s ON_PLAY is negated by opponent's effect", player=player.name)
+            if not card.ability_disabled and not onplay_negated:
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.ON_PLAY:
                         self.resolve_ability(player, ability, source_card=card)
@@ -1019,6 +1027,16 @@ class GameManager:
                 self.active_battle["target_owner"] = self.p1 if self.p1.name == new_target.owner_id else self.p2
                 log_event("INFO", "game.redirect_attack",
                           f"Attack redirected to {new_target.master.name}", player=player.name)
+            return True
+
+        if act_name == "DISABLE_ABILITY" and getattr(action, "status", None) == "OPP_ONPLAY":
+            # 「（次の相手のターン終了時まで、）相手の登場時効果は無効になる」: 相手プレイヤーに
+            # ON_PLAY 無効化の期限(turn_count)を設定する。次の相手ターン(=turn_count+1)を覆う。
+            opp = self.p2 if player == self.p1 else self.p1
+            dur = getattr(action, "duration", "INSTANT")
+            opp.negate_onplay_until = self.turn_count + (1 if dur == "UNTIL_NEXT_TURN_END" else 0)
+            log_event("INFO", "game.negate_opp_onplay",
+                      f"{opp.name}'s ON_PLAY negated until turn {opp.negate_onplay_until}", player=player.name)
             return True
 
         if act_name == "VICTORY":
