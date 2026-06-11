@@ -337,7 +337,9 @@ class EffectResolver:
         #   （中身を見て選ぶ対話は LOOK→TEMP=zone TEMP 経由のみ）。直接 DECK/LIFE を選択中断
         #   させると相手/自分の隠し情報が見えて任意に選べてしまう（情報リーク）。候補は
         #   get_target_cards が上から順で返すため、上から count 枚（"まで"は available 上限）を取る。
-        if query.zone in (Zone.DECK, Zone.LIFE):
+        #   例外: 「（自分の）ライフすべてを見て、1枚を選ぶ」等は flag="REVEAL_SELECT" を持ち、
+        #   自分のライフを明示的に公開して選ぶため対話選択を許可する（情報リークにならない）。
+        if query.zone in (Zone.DECK, Zone.LIFE) and "REVEAL_SELECT" not in getattr(query, "flags", set()):
             n = required_count if required_count and required_count > 0 else len(candidates)
             selected = candidates[:n]
             if query.save_id:
