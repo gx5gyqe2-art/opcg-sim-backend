@@ -358,6 +358,29 @@ def _life_face(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(type=ActionType.FACE_UP_LIFE, target=tq, status=status, raw_text=t)
 
 
+# ---------------------------------------------------------------------------
+# 自ライフ上の公開: 「（…時、）自分のライフの上からN枚（まで）を公開する」
+#   → FACE_UP_LIFE(zone=LIFE, SELF)。ライフ上を表向きにして公開する（位置指定=上からN枚
+#   なので隠しゾーン保護の自動取得に乗り、情報リークにならない）。「ライフの上か下に置く」
+#   (scry) や「ライフすべてを見て」(並び替え) とは語尾・構造で区別。OP15-119 等で従来 OTHER。
+#   先頭のトリガー節「相手が…発動した時、」はエンジン未ディスパッチのため自動発動はしないが、
+#   原子句としては公開アクションを正しく生成して OTHER を脱する。
+# ---------------------------------------------------------------------------
+@rule("reveal_own_life_top", priority=70)
+def _reveal_own_life_top(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"自分のライフの上から(\d+)枚(?:まで)?を公開する"), t):
+        return None
+    if _nfc("ライフの上か下") in t or _nfc("好きな順番") in t:
+        return None  # scry / 並び替えは別ルール
+    m = re.search(_nfc(r"ライフの上から(\d+)枚"), t)
+    n = int(m.group(1)) if m else 1
+    tq = TargetQuery(zone=Zone.LIFE, player=Player.SELF, count=n)
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.FACE_UP_LIFE, target=tq, status="UP", raw_text=t)
+
+
 @rule("life_cards_to_trash", priority=74)
 def _life_cards_to_trash(ctx: ParseContext) -> Optional[GameAction]:
     """「自分のライフの表向きのカードすべてをトラッシュに置く」→ TRASH(zone=LIFE, face-up filter)。"""
@@ -1362,7 +1385,9 @@ def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("デッキの下") not in t:
         return None
-    if _nfc("置く") not in t and _nfc("戻す") not in t and _nfc("置き") not in t:
+    # 「置く」(終止) / 「戻す」/ 連用「置き」に加え、て形「置いて」「置いてもよい」も拾う
+    # （例: OP07-042「…キャラ1枚を持ち主のデッキの下に置いてもよい」が従来 OTHER だった）。
+    if not re.search(_nfc(r"デッキの下に(?:好きな順番で)?置(く|き|いて)"), t) and _nfc("戻す") not in t:
         return None
     if _nfc("残り") in t:
         return None  # remaining_deck_bottom / remaining_deck_top_or_bottom が担当
@@ -1497,9 +1522,10 @@ def _play_from_deck(ctx: ParseContext) -> Optional[GameAction]:
 @rule("play_self", priority=75)
 def _play_self(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    if _nfc("登場させる") not in t:
-        return None
-    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?登場させる"), t):
+    # 「このカードを登場させる」(終止) と、Sequence 分割で連用形「登場させ、」が末尾
+    # 「このカードを登場」になった断片の両方を拾う（例: OP08-113【トリガー】
+    # 「…このカードを登場させ、相手の…をKOする」が「このカードを登場」で OTHER だった）。
+    if not re.search(_nfc(r"この(カード|キャラ|リーダー)を、?登場(させる)?$"), t.strip()):
         return None
     return GameAction(
         type=ActionType.PLAY_CARD,
@@ -1943,6 +1969,38 @@ def _rule_processing(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if not re.search(_nfc(r"ルール上"), t):
         return None
+    return GameAction(type=ActionType.RULE_PROCESSING, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# コスト節の裸の数値: 「1:このキャラをアクティブにする」のように コロン左側が単独の
+#   数値だけになるカード（OP05-032 ピーカ 等）。この数値は効果の連番表記であって
+#   コストではないため、no-op（RULE_PROCESSING）に吸収して OTHER 化を防ぐ。
+#   ドン!!コスト（【ドン!!×N】）・丸数字コスト（①）は別タグ/ルールで処理済み。
+# ---------------------------------------------------------------------------
+@rule("bare_number_cost_noop", priority=93)
+def _bare_number_cost_noop(ctx: ParseContext) -> Optional[GameAction]:
+    if not ctx.is_cost:
+        return None
+    if not re.fullmatch(r"\d+", ctx.text.strip()):
+        return None
+    return GameAction(type=ActionType.RULE_PROCESSING, raw_text=ctx.text)
+
+
+# ---------------------------------------------------------------------------
+# 自己効果無効（受動・「は」）: 「この効果は無効になる」「自分の（【登場時】）効果は無効になる」
+#   → RULE_PROCESSING（no-op）。自身/自分側の効果が無効化される表現で、盤面操作を伴わない
+#   ドローバック or 条件分岐下の自己打ち消し（OP05-100 エネル / OP09-081 ティーチ前段）。
+#   「効果が無効になる」(自動詞) は self_effect_disabled(p64) が DISABLE_ABILITY を担う。
+#   「相手の…効果は無効になる」(スコープ付き相手無効) は scoped_negate_onplay(p65) が担当する。
+# ---------------------------------------------------------------------------
+@rule("self_effect_negated_noop", priority=63)
+def _self_effect_negated_noop(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("効果は無効になる") not in t:
+        return None
+    if _nfc("相手の") in t:
+        return None  # スコープ付き相手無効は別ルール（実効果あり）
     return GameAction(type=ActionType.RULE_PROCESSING, raw_text=t)
 
 

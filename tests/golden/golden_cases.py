@@ -2070,4 +2070,51 @@ CASES = [
             ]}}
         ],
     },
+    # ----- デッキの下に「置いてもよい」(て形, OP07-042 置換 sub_effect) ----------
+    {
+        "id": "deck_bottom_te_form",
+        "text": "自分の、「ゲッコー・モリア」以外のキャラ1枚を持ち主のデッキの下に置いてもよい。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "DECK_BOTTOM"}}
+        ],
+    },
+    # ----- 自己登場の連用形断片「このカードを登場させ、…」(OP08-113) -------------
+    {
+        "id": "play_self_continuative",
+        "text": "【トリガー】このカードを登場させ、相手のコスト3以下のキャラ1枚までを、KOする。",
+        "expect": [
+            {"effect": {"kind": "seq", "actions": [
+                {"kind": "action", "type": "PLAY_CARD", "target": {"ref_id": "self"}},
+                {"kind": "action", "type": "KO"},
+            ]}}
+        ],
+    },
+    # ----- ドン追加「追加し、」の後段を落とさない（OP09-022 MISSING_ACTION） -------
+    {
+        "id": "ramp_then_play",
+        "text": "【起動メイン】ドン!!デッキからドン!!1枚までを、レストで追加し、自分の手札からコスト5以下のキャラカード1枚までを、登場させる。",
+        "expect": [
+            {"effect": {"kind": "seq", "actions": [
+                {"kind": "action", "type": "RAMP_DON"},
+                {"kind": "action", "type": "PLAY_CARD"},
+            ]}}
+        ],
+    },
+    # ----- 自ライフ上の公開（FACE_UP_LIFE, OP15-119） ----------------------------
+    {
+        "id": "reveal_own_life_top",
+        "text": "自分のライフの上から1枚までを公開する。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "FACE_UP_LIFE",
+                        "target": {"zone": "LIFE", "player": "SELF"}}}
+        ],
+    },
+    # ----- 自己効果無効「は」(受動・no-op, OP05-100 / OP09-081 前段) --------------
+    {
+        "id": "self_effect_negated_noop",
+        "text": "この効果は無効になる。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "RULE_PROCESSING"}}
+        ],
+    },
 ]
