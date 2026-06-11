@@ -19,11 +19,11 @@ DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                     "opcg_sim", "data")
 
 # ラチェット上限（現状値で固定。修正が進んだら引き下げる）
-MAX_WARN_DIRECTION  = 42
-MAX_STAT_ONLY       = 15
+MAX_WARN_DIRECTION  = 0
+MAX_STAT_ONLY       = 0
 MAX_NO_IMPL         = 0
-MAX_SELECT_MISMATCH = 3
-MAX_FALLBACK        = 19
+MAX_SELECT_MISMATCH = 2
+MAX_FALLBACK        = 11
 
 
 @pytest.fixture(scope="module")

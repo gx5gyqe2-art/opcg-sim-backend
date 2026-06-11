@@ -558,6 +558,8 @@ class GameManager:
                 if not card or not card.master.abilities: continue
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.YOUR_TURN:
+                        if self._is_reactive_passive(ability):
+                            continue  # 「【自分のターン中】…された時」型はイベント誘発（EB02-035 等）
                         log_event("DEBUG", "game.passive_trigger", f"YOUR_TURN: {card.master.name}", player=player.name)
                         self.resolve_ability(player, ability, source_card=card)
 

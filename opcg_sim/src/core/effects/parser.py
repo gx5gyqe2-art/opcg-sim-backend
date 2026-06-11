@@ -104,7 +104,9 @@ class EffectParser:
         # キーワードのみタグ（【ブロッカー】等）は効果共有ではないため対象外。
         expanded: List[str] = []
         for i, seg in enumerate(segments):
-            is_lone_tag = bool(re.fullmatch(_nfc(r'【[^】]+】'), seg)) and not self._KEYWORD_ONLY_RE.match(seg)
+            # 「【自分のターン中】【登場時】」のような複数タグのみのセグメントも本体共有の
+            # 対象にする（従来は単一タグ限定で、OP08-007 の ON_PLAY 側が effect=None になった）。
+            is_lone_tag = bool(re.fullmatch(_nfc(r'(?:【[^】]+】)+'), seg)) and not self._KEYWORD_ONLY_RE.match(seg)
             if (is_lone_tag and i + 1 < len(segments)
                     and segments[i + 1].startswith(_nfc('【'))
                     and not self._KEYWORD_ONLY_RE.match(segments[i + 1])):

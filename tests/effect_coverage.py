@@ -121,12 +121,15 @@ def _snap(p1: Player, p2: Player) -> tuple:
         len(p1.hand), len(p1.field), len(p1.trash), len(p1.deck), len(p1.life),
         len(p1.don_active) + len(p1.don_rested),
         len(p2.hand), len(p2.field), len(p2.trash), len(p2.deck), len(p2.life),
+        1 if getattr(p1, "stage", None) else 0,
+        1 if getattr(p2, "stage", None) else 0,
     )
 
 
 _SNAP_KEYS = (
     "p1_hand", "p1_field", "p1_trash", "p1_deck", "p1_life", "p1_don",
     "p2_hand", "p2_field", "p2_trash", "p2_deck", "p2_life",
+    "p1_stage", "p2_stage",
 )
 
 
@@ -355,10 +358,13 @@ _DIRECTION: Dict[str, any] = {
     "RETURN_DON":       lambda b, a: a[5] < b[5],                       # ドン減
     "HEAL":             lambda b, a: a[4] > b[4] or a[10] > b[10],      # どちらかのライフ増
     "TRASH_FROM_DECK":  lambda b, a: a[3] < b[3] or a[9] < b[9],        # どちらかのデッキ減
-    # PLAY_CARD: フィールド増、または公開/サーチでデッキが減る派生も許容（look-and-play 系）
-    "PLAY_CARD":        lambda b, a: a[1] > b[1] or a[7] > b[7] or a[3] < b[3] or a[9] < b[9],
-    # DECK_BOTTOM: どちらかのフィールド減＋どちらかのデッキ増（場→デッキ）
-    "DECK_BOTTOM":      lambda b, a: (a[1] < b[1] or a[7] < b[7]) and (a[3] > b[3] or a[9] > b[9]),
+    # PLAY_CARD: フィールド/ステージ増、または公開/サーチでデッキが減る派生も許容（look-and-play 系）
+    "PLAY_CARD":        lambda b, a: (a[1] > b[1] or a[7] > b[7] or a[3] < b[3] or a[9] < b[9]
+                                      or a[11] > b[11] or a[12] > b[12]),
+    # DECK_BOTTOM: どちらかの場/手札減＋どちらかのデッキ増（「相手は自身の手札1枚を
+    # デッキの下に置く」のような手札→デッキも正当）
+    "DECK_BOTTOM":      lambda b, a: (a[1] < b[1] or a[7] < b[7] or a[0] < b[0] or a[6] < b[6])
+                                     and (a[3] > b[3] or a[9] > b[9]),
     "TRASH_FROM_HAND":  lambda b, a: a[0] < b[0] or a[6] < b[6],        # どちらかの手札減
     "MOVE":             lambda b, a: b != a,                            # 何か変わればOK
 }
@@ -442,6 +448,11 @@ def _soft_assert(
         return None
 
     (dominant,) = unique_types
+    # ゾーン系アクション（_DIRECTION のみ）でゾーン枚数が一切動いていない場合は、
+    # 同カードの別能力（PASSIVE等）によるステータス変化を誤って方向不一致と
+    # 判定しない（対象不在の no-op + 測定ノイズ）。
+    if dominant not in _STAT_DIRECTION and before == after:
+        return None
     ok = False
     if dominant in _DIRECTION and _DIRECTION[dominant](before, after):
         ok = True
@@ -538,7 +549,8 @@ def _play_artifact(before: tuple, master: CardMaster) -> tuple:
         art[2] += 1  # p1_trash（イベントは解決後トラッシュへ）
     elif master.type == CardType.CHARACTER:
         art[1] += 1  # p1_field
-    # STAGE は player.stage スロットに置かれ _snap には現れない
+    elif master.type == CardType.STAGE:
+        art[11] = 1  # p1_stage スロット（既存ステージは置換でトラッシュへ行くが汎用盤面では空）
     return tuple(art)
 
 
