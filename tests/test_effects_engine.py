@@ -2018,3 +2018,25 @@ def test_life_down_to_n_trash():
     assert gm.active_interaction is None
     assert len(p1.life) == 1, f"ライフは1枚になるはず: {len(p1.life)}"
     assert len(p1.trash) == 4
+
+
+def test_trigger_executes_referenced_on_play_effect():
+    """「【トリガー】このカードの【登場時】効果を発動する」が ON_PLAY 効果を展開する
+    （従来は ACTIVATE_MAIN 固定で no-op だった）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    main_abs = parser.parse_card_text("【登場時】カード1枚を引く。")
+    trig = parser.parse_card_text("【トリガー】このカードの【登場時】効果を発動する。")
+    # 効果(トリガー)は実パイプラインでも別フィールドとして個別に解析される
+    trig = [ab for ab in trig if ab.effect is not None]
+    assert main_abs and trig
+
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(card_id="C-EXE", name="参照発動",
+                                    abilities=tuple(main_abs + trig)), owner="P1")
+    p1.field.append(src)
+    p1.deck.extend(make_instance(make_master(card_id=f"D-{i}", name=f"山{i}"), owner="P1")
+                   for i in range(3))
+    hand_before = len(p1.hand)
+    gm.resolve_ability(p1, trig[0], src)
+    assert len(p1.hand) == hand_before + 1, "登場時効果(1ドロー)が発動するべき"

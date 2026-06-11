@@ -1145,7 +1145,16 @@ def _don_add(ctx: ParseContext) -> Optional[GameAction]:
 def _execute_main(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("効果を発動") not in ctx.text:
         return None
-    return GameAction(type=ActionType.EXECUTE_MAIN_EFFECT, raw_text=ctx.text)
+    # どのトリガーの効果を再発動するかを status に記録する
+    # （「このカードの【登場時】効果を発動する」等。従来は常に ACTIVATE_MAIN を
+    #   展開しており、【登場時】/【KO時】参照のトリガーが no-op だった）。
+    ref = None
+    for tag, trig in ((r"登場時", "ON_PLAY"), (r"KO時", "ON_KO"),
+                      (r"アタック時", "ON_ATTACK"), (r"起動メイン|メイン", "ACTIVATE_MAIN")):
+        if re.search(_nfc(rf"【?(?:{tag})】?効果"), ctx.text):
+            ref = trig
+            break
+    return GameAction(type=ActionType.EXECUTE_MAIN_EFFECT, status=ref, raw_text=ctx.text)
 
 
 # ---------------------------------------------------------------------------

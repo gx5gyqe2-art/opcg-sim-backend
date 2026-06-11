@@ -148,6 +148,13 @@ class EffectParser:
             # なっていたのを解消する（このセグメントの真のトリガーは【起動メイン】等）。OP09-081。
             norm_text = re.sub(_nfc(r'(相手の)【(登場時)】(効果)'), r'\1\2\3', norm_text)
 
+            # 参照発動「このカードの【登場時】/【KO時】効果を発動する」の参照タグも
+            # 非タグ化して保全する（clean_text のタグ除去で参照先が消え、常に
+            # ACTIVATE_MAIN を展開して no-op になっていた。OP16-102 等 15 枚）。
+            norm_text = re.sub(
+                _nfc(r'(この(?:カード|キャラ)の)【(登場時|KO時|アタック時|起動メイン|メイン)】(効果)'),
+                r'\1\2\3', norm_text)
+
             # トリガー検出は前処理前のテキストで行う（コスト/制限タグ除去前に判定）
             trigger = self._detect_trigger(norm_text)
             log_event("INFO", "parser.trigger", f"Detected trigger: {trigger.name}")

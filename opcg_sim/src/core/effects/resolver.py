@@ -161,7 +161,7 @@ class EffectResolver:
                 # 「このカードの【メイン】効果を発動する」: 自身の ACTIVATE_MAIN
                 # 能力の効果を実行スタックに展開して再発動する（主にトリガー）。
                 if node.type == ActionType.EXECUTE_MAIN_EFFECT:
-                    self._expand_main_effect(source_card)
+                    self._expand_main_effect(source_card, ref_trigger=node.status)
                     continue
 
                 # C8 コスト宣言: 数値入力インタラクションへ中断（resume 時に相手デッキトップを
@@ -225,10 +225,13 @@ class EffectResolver:
                 log_event("INFO", "resolver.temp_reclaim",
                           f"Returned {len(leftover)} revealed card(s) to deck top", player=p.name)
 
-    def _expand_main_effect(self, source_card):
-        """source_card 自身の 【メイン】(ACTIVATE_MAIN) 能力の効果を実行スタックへ展開する。
+    def _expand_main_effect(self, source_card, ref_trigger=None):
+        """source_card 自身の参照先トリガー能力の効果を実行スタックへ展開する。
 
-        トリガー「このカードの【メイン】効果を発動する」用。コストは支払わず効果のみ。
+        トリガー「このカードの【メイン】/【登場時】/【KO時】効果を発動する」用。
+        ref_trigger（"ON_PLAY"/"ON_KO"/"ON_ATTACK"/"ACTIVATE_MAIN"）が指定されれば
+        そのトリガーの能力を展開する（従来は常に ACTIVATE_MAIN で、【登場時】/【KO時】
+        参照のトリガーが no-op だった）。コストは支払わず効果のみ。
         多段展開（自己参照）による無限ループを防ぐためフラグで1回に限定する。
         """
         if self.context.get("_main_expanded"):
@@ -236,12 +239,19 @@ class EffectResolver:
             return
         self.context["_main_expanded"] = True
 
+        ref_map = {
+            "ON_PLAY": TriggerType.ON_PLAY,
+            "ON_KO": TriggerType.ON_KO,
+            "ON_ATTACK": TriggerType.ON_ATTACK,
+            "ACTIVATE_MAIN": TriggerType.ACTIVATE_MAIN,
+        }
+        primary = ref_map.get(ref_trigger, TriggerType.ACTIVATE_MAIN)
         main_abilities = [
             ab for ab in source_card.master.abilities
-            if ab.trigger == TriggerType.ACTIVATE_MAIN and ab.effect is not None
+            if ab.trigger == primary and ab.effect is not None
         ]
         # 【トリガー】(ライフ公開時に発動)は ACTIVATE_MAIN だけでなく、効果が【カウンター】に
-        # 書かれたイベント(例: OP01-028/OP13-039)も発動対象。ACTIVATE_MAIN が無ければ
+        # 書かれたイベント(例: OP01-028/OP13-039)も発動対象。参照先能力が無ければ
         # COUNTER 能力にフォールバックする（従来は ACTIVATE_MAIN 限定で何も発動しなかった）。
         if not main_abilities:
             main_abilities = [
@@ -249,7 +259,7 @@ class EffectResolver:
                 if ab.trigger == TriggerType.COUNTER and ab.effect is not None
             ]
         if not main_abilities:
-            log_event("WARNING", "resolver.execute_main_missing", f"No ACTIVATE_MAIN/COUNTER ability on {source_card.master.name}", player=source_card.owner_id)
+            log_event("WARNING", "resolver.execute_main_missing", f"No {primary.name}/COUNTER ability on {source_card.master.name}", player=source_card.owner_id)
             return
 
         # 既存スタックの「後」に積む = 先に実行されるよう reversed で push

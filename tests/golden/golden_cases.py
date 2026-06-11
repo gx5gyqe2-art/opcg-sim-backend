@@ -2315,4 +2315,13 @@ CASES = [
                         "target": {"player": "OPPONENT", "zone": "LIFE"}}}
         ],
     },
+    # ----- 参照発動: 「このカードの【登場時】効果を発動する」は参照先を保持する ---------
+    {
+        "id": "execute_referenced_on_play",
+        "text": "このカードの登場時効果を発動する。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "EXECUTE_MAIN_EFFECT",
+                        "status": "ON_PLAY"}}
+        ],
+    },
 ]
