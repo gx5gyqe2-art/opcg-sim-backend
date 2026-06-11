@@ -375,6 +375,13 @@ class EffectParser:
             if choice is not None:
                 return choice
 
+        # 二択「AするかB、する」: 「以下から1つを選ぶ」を介さない 〜するか〜する 形式の択一。
+        # 動詞終止形(u段かな)＋「か、」を境界に2アクションへ分割して Choice 化する
+        # （従来 MISSING_ACTION。名詞の「か」=「自分か相手」「リーダーかキャラ」とは語尾で区別）。
+        suruka = self._parse_suruka_choice(norm_text, is_cost)
+        if suruka is not None:
+            return suruka
+
         # 連用形「引き、」を「引く、」に正規化してから分割
         norm_text = re.sub(_nfc(r'引き、'), _nfc('引く、'), norm_text)
         # デッキの上を見るサーチ/並べ替えは「見て、」で区切り、LOOK を独立アクション化する。
@@ -864,6 +871,50 @@ class EffectParser:
         if cond_m:
             return Branch(condition=self._parse_condition_obj(cond_m.group(1)), if_true=choice)
         return choice
+
+    def _node_has_real_action(self, node) -> bool:
+        """node が「実行系のあるアクション」を含むか（OTHER だけの空振りでないか）を判定。"""
+        if node is None:
+            return False
+        if isinstance(node, GameAction):
+            return node.type != ActionType.OTHER
+        if isinstance(node, Sequence):
+            return any(self._node_has_real_action(a) for a in node.actions)
+        if isinstance(node, Branch):
+            return self._node_has_real_action(node.if_true) or self._node_has_real_action(node.if_false)
+        if isinstance(node, Choice):
+            return any(self._node_has_real_action(o) for o in node.options)
+        return False
+
+    def _parse_suruka_choice(self, text: str, is_cost: bool) -> Optional[EffectNode]:
+        """「AするかB、する」形式の二択を Choice に変換する（無ければ None）。
+
+        動詞終止形(u 段かな)の直後に来る「か、」だけを境界にすることで、名詞の並列
+        （「自分か相手」「リーダーかキャラ」「イベントか【ブロッカー】」）を誤って割らない。
+        左右がともに実行系アクションに解釈できる場合のみ Choice 化し、過検知を避ける。
+        """
+        norm = _nfc(text)
+        if _nfc("以下から") in norm:
+            return None  # モーダル選択は _parse_choice が担当
+        m = re.search(_nfc(r'[るくすつぶむうぐ]か、'), norm)
+        if not m:
+            return None
+        boundary = m.start() + 1  # 動詞末尾の次（「か」の位置）
+        left = norm[:boundary].strip()
+        right = norm[m.end():].strip().rstrip(_nfc('。')).strip()
+        if not left or not right:
+            return None
+        chooser = Player.OPPONENT if re.search(_nfc(r'相手は'), norm[:boundary]) else Player.SELF
+        opt_a = self._parse_to_node(left, is_cost)
+        opt_b = self._parse_to_node(right, is_cost)
+        if not (self._node_has_real_action(opt_a) and self._node_has_real_action(opt_b)):
+            return None  # どちらかが空振りなら択一にしない（レガシー解釈へ委ねる）
+        return Choice(
+            message=_nfc("効果を選択してください"),
+            options=[opt_a, opt_b],
+            option_labels=[left, right],
+            player=chooser,
+        )
 
     def _extract_options(self, text: str) -> List[str]:
         norm_text = _nfc(text)

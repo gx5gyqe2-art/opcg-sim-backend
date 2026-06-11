@@ -986,7 +986,7 @@
 "OP05-094|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co-3",
 "OP05-094|TRIGGER": "p1_hand:5→6, p1_trash:10→11, p1_deck:20→18 | pw0,kw0,rs0,co0",
 "OP05-095|COUNTER": "- | pw4000,kw0,rs0,co0",
-"OP05-096|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
+"OP05-096|ACTIVATE_MAIN": "p2_field:3→2, p2_trash:0→1 | pw0,kw0,rs0,co0",
 "OP05-096|TRIGGER": "p2_field:3→2, p2_trash:0→1 | pw0,kw0,rs0,co0",
 "OP05-097|YOUR_TURN": "- | pw0,kw0,rs0,co0",
 "OP05-098|OPPONENT_TURN": "p1_hand:5→4, p1_trash:10→11 | pw0,kw0,rs0,co0",

@@ -960,6 +960,34 @@ class GameManager:
             log_event("INFO", "game.action_look_life", f"{target_player.name} revealed {moved} life card(s)", player=player.name)
             return True
 
+        if act_name == "ORDER_LIFE":
+            # 「（自分/相手の）ライフすべてを見て、好きな順番で置く」: ライフを公開し任意順に
+            # 並べ替える（対象選択を伴う INTERACTIVE）。並べ替えはプレイヤーの選択で枚数は不変。
+            # ヘッドレス（自動）では現状の並びを保持する（カード消失なし・TEMP 非汚染）。
+            target_player = player
+            if getattr(action, "status", None) == "OPPONENT":
+                target_player = self.p2 if player == self.p1 else self.p1
+            log_event("INFO", "game.action_order_life",
+                      f"{target_player.name} reorders {len(target_player.life)} life card(s)", player=player.name)
+            return True
+
+        if act_name == "EXECUTE_EVENT":
+            # 「自分の手札から（条件）イベント1枚までを、発動する」: 手札のイベントの効果を
+            # 解決し、発動後にトラッシュへ送る。効果解決は DEAL_DAMAGE のライフトリガー解決
+            # （上記）と同じく resolve_ability の再入で行う（新規実行コンテキストを生成する
+            # ため既存スタックを汚さない）。targets は matcher が手札のイベントを解決済み。
+            _main_trigs = (TriggerType.ACTIVATE_MAIN, TriggerType.COUNTER, TriggerType.ON_PLAY)
+            for ev in targets:
+                ev_ability = next((a for a in ev.master.abilities
+                                   if a.effect is not None and a.trigger in _main_trigs), None)
+                if ev_ability is None:
+                    ev_ability = next((a for a in ev.master.abilities if a.effect is not None), None)
+                if ev_ability is not None:
+                    self.resolve_ability(player, ev_ability, source_card=ev)
+                self.move_card(ev, Zone.TRASH, player)
+                log_event("INFO", "game.execute_event", f"Activated event {ev.master.name}", player=player.name)
+            return True
+
         if act_name == "SELECT":
             # 「（対象）を選ぶ」: 対象選択のみ（盤面は動かさない）。選択結果は
             # _resolve_targets / resolve_interaction が target.save_id="selected_card" に

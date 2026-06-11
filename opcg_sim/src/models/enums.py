@@ -115,6 +115,9 @@ class ActionType(Enum):
     MODIFY_DON_PHASE = auto()
     REDIRECT_ATTACK = auto()
 
+    ORDER_LIFE = auto()    # 「（自分/相手の）ライフすべてを見て、好きな順番で置く」: ライフ内並べ替え
+    EXECUTE_EVENT = auto() # 「自分の手札から…イベント1枚までを、発動する」: 手札イベントの発動
+
     OTHER = auto()
     
     MOVE_TO_HAND = auto()

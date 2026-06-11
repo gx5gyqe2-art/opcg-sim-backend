@@ -392,6 +392,43 @@ def _scry_one_life(target_player: Player, status: str, raw: str) -> Sequence:
     return Sequence(actions=[look, place])
 
 
+# ---------------------------------------------------------------------------
+# イベント発動: 「自分の手札から（条件）イベント1枚までを、発動する」
+#   → EXECUTE_EVENT。エンジンは手札の該当イベントの効果を解決しトラッシュへ送る。
+#   PLAY_CARD（キャラ登場）とは別概念。従来 OTHER（不発）。
+#   「発動した時」(トリガー条件) とは "発動する"(終止) で区別する。
+# ---------------------------------------------------------------------------
+@rule("execute_event", priority=71)
+def _execute_event(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"発動する"), t):
+        return None
+    if _nfc("イベント") not in t or _nfc("手札") not in t:
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.HAND
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.EXECUTE_EVENT, target=tq, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# ライフ並び替え: 「（自分/相手の）ライフすべてを見て、好きな順番で置く」
+#   → ORDER_LIFE（ライフ内を任意順に並べ替え。対象選択を伴う）。従来 OTHER。
+#   「ライフの下／デッキへ…好きな順番で置く」等の移動系は別ルールが担当するため、
+#   ライフ内に留まる並べ替え（"デッキ" を含まない）に限定する。
+# ---------------------------------------------------------------------------
+@rule("order_life", priority=77)
+def _order_life(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"ライフ.*好きな順番で置く"), t):
+        return None
+    if _nfc("デッキ") in t:  # 「デッキの下に好きな順番で置く」等は移動系（別ルール）
+        return None
+    status = "OPPONENT" if _nfc("相手のライフ") in t else None
+    return GameAction(type=ActionType.ORDER_LIFE, status=status, raw_text=t)
+
+
 @rule("life_scry_top", priority=73)
 def _life_scry_top(ctx: ParseContext) -> Optional[Choice]:
     t = ctx.text

@@ -1866,4 +1866,42 @@ CASES = [
                         "target": {"player": "OPPONENT", "exclude_names": ["モンキー・D・ルフィ"]}}}
         ],
     },
+    # ----- ライフ並び替え（ORDER_LIFE） ----------------------------------
+    # 「（自分の）ライフすべてを見て、好きな順番で置く」: ライフ内を任意順に並べ替え。
+    {
+        "id": "order_life_self",
+        "text": "【登場時】自分のライフすべてを見て、好きな順番で置く。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "ORDER_LIFE", "status": None}}
+        ],
+    },
+    # 「相手のライフすべてを見て、好きな順番で置く」: 相手のライフを並べ替え（妨害）。
+    {
+        "id": "order_life_opponent",
+        "text": "相手のライフすべてを見て、好きな順番で置く。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "ORDER_LIFE", "status": "OPPONENT"}}
+        ],
+    },
+    # ----- イベント発動（EXECUTE_EVENT） ---------------------------------
+    # 「自分の手札から（条件）イベント1枚までを、発動する」: 手札のイベントを発動。
+    {
+        "id": "execute_event_from_hand",
+        "text": "【登場時】自分の手札から特徴《ドレスローザ》を持つイベント1枚までを、発動する。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "EXECUTE_EVENT",
+                        "target": {"zone": "HAND", "player": "SELF", "traits": ["ドレスローザ"]}}}
+        ],
+    },
+    # ----- 二択「〜するか、〜する」（Choice AST） -------------------------
+    {
+        "id": "choice_suruka_two_option",
+        "text": "【メイン】カード1枚を引くか、相手のキャラ1枚をレストにする。",
+        "expect": [
+            {"effect": {"kind": "choice", "options": [
+                {"kind": "action", "type": "DRAW", "value": 1},
+                {"kind": "action", "type": "REST"},
+            ]}}
+        ],
+    },
 ]
