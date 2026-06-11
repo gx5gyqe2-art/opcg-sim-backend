@@ -82,7 +82,7 @@ def test_parser_fallback_ratchet():
 # --- Phase 4 深層ハーネスのゲート ---------------------------------------------
 MAX_SATISFIED_NO_CHANGE = 9   # 条件/コスト充足盤面で実行しても盤面が動かない（H-5）
 MAX_BATTLE_NO_CHANGE    = 0   # バトル文脈で発火しても変化なし（H-6）
-MAX_INTERACTIVE_AUDIT   = 11  # 対象クエリとテキストの矛盾（残存は二重制約/複数ゾーンの部分対応）
+MAX_INTERACTIVE_AUDIT   = 0   # 対象クエリとテキストの矛盾（集約監査で誤検知を排除し 0 に締結）
 
 
 def test_condition_synth_no_change_ratchet():
