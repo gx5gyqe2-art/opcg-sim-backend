@@ -493,7 +493,45 @@ class GameManager:
         self.phase = Phase.MAIN
         self._apply_passive_effects(self.turn_player)
 
+    _REACTIVE_RE = re.compile(r'(された|した|受けた|なった)時、')
+
+    def _is_reactive_passive(self, ability) -> bool:
+        """無タグの反応型（「…が登場した時、」「…が戻された時、」等）でトリガー写像が
+        まだ無い PASSIVE 能力か。常時効果ではないため再計算ループで実行してはならない
+        （実行すると盤面操作のたびに本体効果が発動し、対話中断が他の解決を飲み込む）。"""
+        first = self._find_first_action(ability.effect)
+        raw = getattr(first, "raw_text", "") if first is not None else ""
+        return bool(self._REACTIVE_RE.search(unicodedata.normalize("NFC", raw or "")))
+
+    def _find_first_action(self, node):
+        if node is None:
+            return None
+        if isinstance(node, GameAction):
+            return node
+        if isinstance(node, Sequence):
+            for a in node.actions:
+                found = self._find_first_action(a)
+                if found is not None:
+                    return found
+        elif isinstance(node, Branch):
+            return self._find_first_action(node.if_true) or self._find_first_action(node.if_false)
+        elif isinstance(node, Choice):
+            for o in node.options:
+                found = self._find_first_action(o)
+                if found is not None:
+                    return found
+        return None
+
     def _apply_passive_effects(self, player: Player):
+        # 対話中断中は再計算しない。Step1 のリセットは無条件に走る一方、Step2/3 の
+        # resolve_ability は active_interaction ガードで何も実行できず、リセットだけが
+        # 残って PASSIVE/YOUR_TURN バフが消えてしまうため（クザンのコスト-5 等）。
+        if self.active_interaction:
+            return
+        # YOUR_TURN 効果は常にターンプレイヤー基準で適用する（呼び出し元が owner を
+        # 渡しても誤適用しない）。
+        if self.turn_player is not None:
+            player = self.turn_player
         opponent = self.p2 if player == self.p1 else self.p1
 
         # Step 1: 両プレイヤーのバフ・一時キーワードをリセット
@@ -529,6 +567,8 @@ class GameManager:
                     if not card or not card.master.abilities: continue
                     for ability in card.master.abilities:
                         if ability.trigger == TriggerType.PASSIVE:
+                            if self._is_reactive_passive(ability):
+                                continue  # 「…された時」型はイベント誘発であり再計算で実行しない
                             log_event("DEBUG", "game.passive_trigger", f"PASSIVE: {card.master.name}", player=p.name)
                             self.resolve_ability(p, ability, source_card=card)
         finally:
@@ -758,6 +798,10 @@ class GameManager:
             self.move_card(card, Zone.TRASH, player)
         else:
             self.move_card(card, Zone.FIELD, player); card.attached_don = 0; card.is_newly_played = True
+            # 登場した時点で継続効果（PASSIVE/YOUR_TURN）を適用してから ON_PLAY を解決する。
+            # 例: クザン「相手のキャラすべてをコスト-5」+【登場時】コスト0のキャラをKO —
+            # 自身の継続効果が ON_PLAY の対象判定に反映される必要がある。
+            self._apply_passive_effects(self.turn_player)
             if self._has_rested_play(player):  # 「自分のキャラはレストで登場する」PASSIVE
                 card.is_rest = True
             # 「相手の登場時効果は無効になる」(OPP_ONPLAY) 期間中はこのプレイヤーの ON_PLAY を解決しない。

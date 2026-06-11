@@ -2040,3 +2040,34 @@ def test_trigger_executes_referenced_on_play_effect():
     hand_before = len(p1.hand)
     gm.resolve_ability(p1, trig[0], src)
     assert len(p1.hand) == hand_before + 1, "登場時効果(1ドロー)が発動するべき"
+
+
+def test_untagged_reactive_ko_clause_maps_to_on_ko():
+    """無タグ「このキャラが相手の効果でKOされた時、…」は PASSIVE ではなく ON_KO になり、
+    passive 再計算で本体効果が実行されない。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abs_ = parser.parse_card_text(
+        "このキャラが相手の効果でKOされた時、自分のデッキの上から5枚を見て、"
+        "コスト5以下のキャラカード1枚までを、登場させる。その後、残りを好きな順番でデッキの下に置く。")
+    assert abs_
+    assert abs_[0].trigger == TriggerType.ON_KO, f"ON_KO になるべき: {abs_[0].trigger}"
+
+
+def test_passive_recalc_skipped_while_interaction_pending():
+    """対話中断中の _apply_passive_effects はリセットだけ走って再適用できないため、
+    丸ごとスキップされる（バフ消失防止）。"""
+    from opcg_sim.src.models.effect_types import Ability, TargetQuery
+    gm, p1, _ = make_game()
+    ab = Ability(trigger=TriggerType.PASSIVE,
+                 effect=GameAction(type=ActionType.BUFF, target=TargetQuery(select_mode="SOURCE"),
+                                   value=ValueSource(base=1000)))
+    char = make_instance(make_master(card_id="C-G", name="バフ持ち", power=1000, abilities=(ab,)), owner="P1")
+    p1.field.append(char)
+    gm._apply_passive_effects(p1)
+    assert char.passive_power == 1000
+
+    gm.active_interaction = {"player_id": "P1", "action_type": "SELECT_TARGET"}
+    gm._apply_passive_effects(p1)
+    assert char.passive_power == 1000, "中断中の再計算でバフが消えてはならない"
+    gm.active_interaction = None

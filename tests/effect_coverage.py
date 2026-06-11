@@ -392,6 +392,14 @@ _STAT_DIRECTION: Dict[str, any] = {
     "FREEZE":         lambda sb, sa, ig: _any_card(sb, sa, ig, lambda b, a: a[3] - b[3]),
     "REST_DON":       lambda sb, sa, ig: any(
         sa[k][0] < sb[k][0] for k in (sb.keys() & sa.keys()) if str(k).startswith("__don__")),
+    # 両プレイヤーのドン総数（active+rested）減少/増加。ゾーンスナップは p1_don しか
+    # 持たないため、相手ドンの返却/追加はここで判定する。
+    "RETURN_DON":     lambda sb, sa, ig: any(
+        sa[k][0] + sa[k][1] < sb[k][0] + sb[k][1]
+        for k in (sb.keys() & sa.keys()) if str(k).startswith("__don__")),
+    "RAMP_DON":       lambda sb, sa, ig: any(
+        sa[k][0] + sa[k][1] > sb[k][0] + sb[k][1]
+        for k in (sb.keys() & sa.keys()) if str(k).startswith("__don__")),
 }
 
 
@@ -423,8 +431,13 @@ def _soft_assert(
     if not type_names:
         return None
 
-    # 複数のタイプが混在する場合は誤検知が多いためチェックしない
-    unique_types = {n for n in type_names if n in _DIRECTION or n in _STAT_DIRECTION}
+    # 複数のタイプが混在する場合は誤検知が多いためチェックしない。
+    # 「方向マップに無いタイプを無視」すると複合効果（HEAL+ダメージ、LOOK+手札追加等）の
+    # 相殺で誤検知するため、能力の全アクションが単一タイプの場合のみ判定する。
+    all_types = set(type_names)
+    if len(all_types) != 1:
+        return None
+    unique_types = {n for n in all_types if n in _DIRECTION or n in _STAT_DIRECTION}
     if len(unique_types) != 1:
         return None
 
@@ -557,9 +570,14 @@ def _test_ability(
     master: CardMaster, ability, trig: str, h_other: bool,
     choice_plan: Optional[List[int]] = None,
 ) -> AbilityResult:
-    """resolve_ability を直接呼んでテスト（ON_PLAY 以外の全トリガー）。"""
+    """resolve_ability を直接呼んでテスト（ON_PLAY 以外の全トリガー）。
+
+    TRIGGER（ライフ公開時）はソースが場ではなく手札（ライフ由来）にある状態が実態に
+    近い。「このカードを登場させる」が field→field の見えない移動になり方向検査を
+    誤判定しないよう、手札起点で発動する。
+    """
     try:
-        gm, p1, p2, source = _build_test_state(master)
+        gm, p1, p2, source = _build_test_state(master, source_in_hand=(trig == "TRIGGER"))
     except Exception as e:
         return AbilityResult(master.card_id, master.name, trig, "ERROR", h_other, f"setup: {e}")
 

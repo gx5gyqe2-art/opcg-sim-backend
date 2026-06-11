@@ -395,6 +395,15 @@ class EffectParser:
         if self._DON_TURN_TAG_RE.search(norm_text) and not self._TRIGGER_TAG_RE.search(norm_text):
             return TriggerType.ACTIVATE_MAIN
 
+        # 無タグの反応型「この(キャラ/カード)が…KOされた時、」等は PASSIVE ではなく
+        # 対応するトリガーへ写像する。PASSIVE のままだと _apply_passive_effects の
+        # 再計算のたびに本体効果が実行され、さらに対話中断が後続の解決を飲み込む
+        # （OP11-035/OP11-051 等）。
+        if re.match(_nfc(r'^この(キャラ|カード)が[^。【】]*KOされた時'), norm_text):
+            return TriggerType.ON_KO
+        if re.match(_nfc(r'^この(リーダー|キャラ|カード)が[^。【】]*アタック(した|された)時'), norm_text):
+            return TriggerType.ON_ATTACK
+
         # 既知トリガータグがなければ → PASSIVE（常時・条件付き効果・特殊タイミング等）
         # キーワードタグ（【ブロッカー】等）は既に _TRIGGER_TAG_RE に含まれておらず
         # この時点で明示的なトリガーが判別できないため PASSIVE として扱う
