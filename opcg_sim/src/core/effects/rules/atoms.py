@@ -1366,8 +1366,11 @@ def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("残り") in t:
         return None  # remaining_deck_bottom / remaining_deck_top_or_bottom が担当
     tq = parse_target(t)
-    # 「持ち主のデッキの下」でプレイヤーがデフォルト(SELF)なら OPPONENT に補正。
-    if _nfc("持ち主") in t and tq.player != Player.OPPONENT:
+    # 「持ち主のデッキの下」でプレイヤー未指定なら OPPONENT（相手キャラ対象が多い）。
+    # ただし「自分の（キャラ/リーダー）」が明示されている場合は SELF を尊重する
+    # （例: EB03-026「自分のキャラ1枚を持ち主のデッキの下に置く」）。
+    if _nfc("持ち主") in t and tq.player != Player.OPPONENT \
+            and not re.search(_nfc(r"自分の[^。：]*?(キャラ|リーダー)"), t):
         tq.player = Player.OPPONENT
     if _nfc("まで") in t:
         tq.is_up_to = True
