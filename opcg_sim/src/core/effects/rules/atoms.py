@@ -1736,6 +1736,19 @@ def _rested_play_passive(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(type=ActionType.RESTRICTION, status="RESTED_PLAY", raw_text=t)
 
 
+# ---------------------------------------------------------------------------
+# 登場制限 PASSIVE: 「手札のこのカードは、効果で登場できない」
+#   → RESTRICTION(status="NO_EFFECT_PLAY")。効果による手札からの登場対象から自身を除外する
+#   PASSIVE マーカー。gamestate の PLAY_CARD（効果・手札源）が走査して登場をスキップする。
+# ---------------------------------------------------------------------------
+@rule("no_effect_play_passive", priority=67)
+def _no_effect_play_passive(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"効果で登場できない"), t):
+        return None
+    return GameAction(type=ActionType.RESTRICTION, status="NO_EFFECT_PLAY", raw_text=t)
+
+
 @rule("rest_restrict", priority=66)
 def _rest_restrict(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text

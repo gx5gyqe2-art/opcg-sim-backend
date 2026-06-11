@@ -1989,6 +1989,14 @@ CASES = [
             {"effect": {"kind": "action", "type": "LOOK", "value": 1, "status": None}}
         ],
     },
+    # ----- 登場制限 PASSIVE（手札のこのカードは効果で登場できない） ----------
+    {
+        "id": "no_effect_play_passive",
+        "text": "手札のこのカードは、効果で登場できない。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "RESTRICTION", "status": "NO_EFFECT_PLAY"}}
+        ],
+    },
     # ----- レスト登場 PASSIVE（自分のキャラはレストで登場する） -------------
     {
         "id": "rested_play_passive",

@@ -768,6 +768,18 @@ class GameManager:
                     return True
         return False
 
+    def _blocks_effect_play(self, card: CardInstance) -> bool:
+        """card が「手札のこのカードは効果で登場できない」PASSIVE を持つか（NO_EFFECT_PLAY）。"""
+        if not card or not getattr(card, "master", None):
+            return False
+        for ab in card.master.abilities:
+            if ab.trigger != TriggerType.PASSIVE:
+                continue
+            act = self._find_action(ab.effect, ActionType.RESTRICTION)
+            if act is not None and getattr(act, "status", None) == "NO_EFFECT_PLAY":
+                return True
+        return False
+
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
         if source_card.negated or source_card.ability_disabled: return
         resolver = EffectResolver(self)
@@ -1259,6 +1271,11 @@ class GameManager:
                             if hasattr(target, 'attached_to'): target.attached_to = None
                 success = True
             elif act_name == "PLAY_CARD":
+                # 「手札のこのカードは効果で登場できない」: 手札源かつ当該 PASSIVE を持つ対象は
+                # 効果による登場をスキップする（NO_EFFECT_PLAY）。
+                if source_list is getattr(owner, "hand", None) and self._blocks_effect_play(target):
+                    log_event("INFO", "game.play_blocked", f"{target.master.name} cannot be played by effect", player=owner.name)
+                    continue
                 self.move_card(target, Zone.FIELD, owner)
                 target.is_newly_played = True
                 # 「レストで登場させる」: フィールドに出た瞬間レスト状態にする。

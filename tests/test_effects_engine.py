@@ -1737,3 +1737,24 @@ def test_rested_play_passive_makes_chars_enter_rested():
     q1.hand.append(char2)
     gm2.apply_action_to_engine(q1, action(ActionType.PLAY_CARD, destination=Zone.FIELD), [char2], 0)
     assert char2 in q1.field and char2.is_rest is False
+
+
+def test_no_effect_play_passive_blocks_effect_play():
+    """「手札のこのカードは効果で登場できない」PASSIVE: 効果(PLAY_CARD,手札源)で登場しない。"""
+    from opcg_sim.src.models.effect_types import Ability, GameAction
+    gm, p1, _ = make_game()
+    passive = Ability(trigger=TriggerType.PASSIVE,
+                      effect=GameAction(type=ActionType.RESTRICTION, status="NO_EFFECT_PLAY"))
+    blocked = make_instance(make_master(card_id="C-NB", name="Blocked", type=CardType.CHARACTER,
+                                        abilities=(passive,)), owner="P1")
+    p1.hand.append(blocked)
+    ok = gm.apply_action_to_engine(p1, action(ActionType.PLAY_CARD, destination=Zone.FIELD), [blocked], 0)
+    assert ok  # アクション自体は成功扱い（対象がスキップされるだけ）
+    assert blocked not in p1.field
+    assert blocked in p1.hand  # 手札に残る
+
+    # 制限の無いキャラは通常どおり効果で登場する。
+    normal = make_instance(make_master(card_id="C-NN", name="Normal", type=CardType.CHARACTER), owner="P1")
+    p1.hand.append(normal)
+    gm.apply_action_to_engine(p1, action(ActionType.PLAY_CARD, destination=Zone.FIELD), [normal], 0)
+    assert normal in p1.field
