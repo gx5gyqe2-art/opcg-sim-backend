@@ -657,6 +657,20 @@ def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+# ---------------------------------------------------------------------------
+# 付与ドンをコストエリアへ: 「（自分の）付与されているドン‼（合計）N枚をコストエリアにレストで戻す」
+#   → MOVE_ATTACHED_DON。付与中のドン!!を N 枚外し、レスト状態でコストエリアへ戻す（多くはコスト）。
+# ---------------------------------------------------------------------------
+@rule("move_attached_don", priority=85)
+def _move_attached_don(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if _nfc("付与") not in t or _nfc("ドン") not in t:
+        return None
+    if not re.search(_nfc(r"コストエリアに.*レスト"), t):
+        return None
+    return GameAction(type=ActionType.MOVE_ATTACHED_DON, value=ValueSource(base=_first_int(t, 1)), raw_text=t)
+
+
 @rule("don_return_deck", priority=83)
 def _don_return_deck(ctx: ParseContext) -> Optional[GameAction]:
     """「（場の）ドン!!…をドン!!デッキに戻す」→ RETURN_DON。

@@ -1989,6 +1989,14 @@ CASES = [
             {"effect": {"kind": "action", "type": "LOOK", "value": 1, "status": None}}
         ],
     },
+    # ----- 付与ドンをコストエリアへ（MOVE_ATTACHED_DON） ------------------
+    {
+        "id": "move_attached_don_to_cost",
+        "text": "自分の付与されているドン‼合計2枚をコストエリアにレストで戻すことができる。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "MOVE_ATTACHED_DON", "value": 2}}
+        ],
+    },
     # ----- アタック対象変更（REDIRECT_ATTACK） ----------------------------
     {
         "id": "redirect_attack_selected",

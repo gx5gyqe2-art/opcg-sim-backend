@@ -960,6 +960,28 @@ class GameManager:
             log_event("INFO", "game.action_look_life", f"{target_player.name} revealed {moved} life card(s)", player=player.name)
             return True
 
+        if act_name == "MOVE_ATTACHED_DON":
+            # 「付与されているドン‼N枚をコストエリアにレストで戻す」: 付与中のドンを N 枚外し、
+            # レスト状態で don_rested（コストエリア）へ。付与先キャラの attached_don も減算する。
+            n = value if value and value > 0 else 1
+            moved = 0
+            for don in list(player.don_attached_cards):
+                if moved >= n:
+                    break
+                tgt_uuid = getattr(don, "attached_to", None)
+                player.don_attached_cards.remove(don)
+                don.attached_to = None
+                don.is_rest = True
+                player.don_rested.append(don)
+                if tgt_uuid:
+                    tgt = next((c for c in ([player.leader] + player.field) if c and c.uuid == tgt_uuid), None)
+                    if tgt is not None and getattr(tgt, "attached_don", 0) > 0:
+                        tgt.attached_don -= 1
+                moved += 1
+            log_event("INFO", "game.move_attached_don", f"{player.name} returned {moved} attached DON!! to cost area", player=player.name)
+            # コストとして使われるため、要求枚数を戻せたかを成否で返す（付与ドン不足なら不成立）。
+            return moved >= n
+
         if act_name == "REDIRECT_ATTACK":
             # 「（選んだキャラ/このリーダー等）にアタックの対象を変更する」: 進行中バトルの
             # 対象を差し替える。targets[0] が新しい対象（多くはコントローラー側のキャラ/リーダー）。

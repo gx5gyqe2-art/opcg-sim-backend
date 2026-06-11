@@ -1689,3 +1689,23 @@ def test_redirect_attack_no_battle_is_noop():
     ok = gm.apply_action_to_engine(p1, action(ActionType.REDIRECT_ATTACK), [redirect], 0)
     assert ok
     assert gm.active_battle is None
+
+
+def test_move_attached_don_to_cost_area():
+    """MOVE_ATTACHED_DON: 付与ドンN枚を外しレストでコストエリア(don_rested)へ。attached_don も減算。"""
+    gm, p1, _ = make_game()
+    char = make_instance(make_master(card_id="C-1", name="Char", type=CardType.CHARACTER), owner="P1")
+    char.attached_don = 2
+    p1.field.append(char)
+    # 付与ドン2枚を用意（don_deck から移し、attached_to を char に向ける）
+    for _ in range(2):
+        d = p1.don_deck.pop(0)
+        d.attached_to = char.uuid
+        p1.don_attached_cards.append(d)
+    assert len(p1.don_attached_cards) == 2 and len(p1.don_rested) == 0
+    ok = gm.apply_action_to_engine(p1, action(ActionType.MOVE_ATTACHED_DON, value=2), [], 2)
+    assert ok
+    assert len(p1.don_attached_cards) == 0
+    assert len(p1.don_rested) == 2
+    assert all(d.is_rest and d.attached_to is None for d in p1.don_rested)
+    assert char.attached_don == 0
