@@ -265,12 +265,12 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen
   - OP15-092: トラッシュ枚数で段階効果（条件パッシブの Sequence-of-Branch）
   - OP09-081: 「自分/相手の【登場時】効果は無効になる」= scoped 効果無効（範囲修飾・要慎重設計）
 
-### B. MISSING_ACTION 3件（複雑な分岐パターン）
+### B. MISSING_ACTION 1件（複雑な分岐パターン）
 
-「〜するか、〜する」形式の二択は `parser._parse_suruka_choice` で Choice 化済み
-（動詞終止形 u 段かな直後の「か、」を境界に分割。OP05-096 等が解決）。残る3件は
-「以下から1つを…」でも「するか」でもない不規則な分岐（例: 数値条件で分岐する複合効果）で、
-個別の構造解析が必要。`text_execution_audit.py --flag MISSING_ACTION` で棚卸しする。
+「〜するか、〜する」二択は `parser._parse_suruka_choice`、共有対象「Xを、AかB」は
+`_parse_shared_target_choice` で Choice 化済み（MISSING 7→1）。残る1件は「以下から1つを…」でも
+「するか」でもない不規則な分岐で個別の構造解析が必要。
+`text_execution_audit.py --flag MISSING_ACTION` で棚卸しする。
 
 ### C. 置換効果（REPLACE_EFFECT）の残 — E14/E15【見送り中（2026-06-11 判断）】
 
@@ -289,25 +289,26 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen
 - 「代わりに〜できる」形の置換の yes/no UI。E14 の suspend/resume 実装後に
   既存 `_suspend_for_optional_confirmation` でほぼ自動サポート。
 
-### D. INTERACTIVE 71件の手動検証
+### D. INTERACTIVE 対象の検証 — 対象の正しさは自動監査済み（2026-06-11）
 
-`effect_coverage.py --show INTERACTIVE` で対象カードを確認し、実プレイで意味的正しさを検証する。
-自動テストでは検証できない「テキスト通りの対象/数値か」はこのルートで詰める。
+INTERACTIVE 459 能力の「対象がテキスト通りか（対象側/コスト上限/枚数/特徴）」は
+`tests/interactive_target_audit.py` で自動照合し、見つかった対象取り違え3件を是正済み（§8 参照）。
+**残るのは「選択モーダルが視覚的に候補を正しく描画するか」のブラウザ確認のみ**（フロント描画）。
+新カード追加時は `interactive_target_audit.py` を再実行して対象の不一致候補を洗い出す。
 
 ### E. 隠れミスターゲット（C/D detector）
 
-`tests/test_mistarget_guard.py` の上限（現在 C≤8 / D≤8）。
+`tests/test_mistarget_guard.py` の上限（現在 C≤8 / D≤9、実測 C=7 / D=8。A/B=0 維持）。
 横展開是正でカードが減ったら上限値を新しい実測値に下げて固定する。
 
-### F. フロント lint 削減（現状 137件: error 129 / warning 8）
+### F. フロント lint 削減 — ✅ 完了（lint 137→0, 2026-06-11）
 
-- ✅ 安全分は処理済み: 未使用 catch バインディング6件→`catch {}`、eslint に `argsIgnorePattern '^_'`
-  追加、`logger.ts` の `any`→`unknown`（lint 148→137、ビルド緑維持）
-- **`@typescript-eslint/no-explicit-any` 94件**: `SandboxGame.tsx`/`localLogic.ts`/`BoardSide.tsx`/
-  `DeckBuilder.tsx`/`RealGame.tsx` 等。ドメイン型（CardInstance vs CardData、API レスポンス
-  スキーマ）の設計判断が必要なため**人間レビュー必須**。`as any` キャストと API デコード周りが中心。
-- **`react-hooks/exhaustive-deps` 8件**（warning）: 依存配列追加で再レンダリング挙動が変わり得る
-  ものを含む（WebSocket 接続・初期化 useEffect 等）。closure 挙動を確認してから個別対応。
+- `any` 94件を全廃（`VirtualZoneCard`/`DeckInput`/`DeckCardData`/`attached_to`/`GameState` 拡張等の
+  ドメイン型と API レスポンス型を新設）。
+- `static-components` 31件を解消（DeckBuilder の内部コンポーネント外出し＝state 喪失バグも是正）。
+- `exhaustive-deps`/`set-state-in-effect` は WebSocket・初期化 useEffect を「mount時1回」で維持し
+  根拠コメント付き eslint-disable で意図を固定（stale callback は ref 経由）。
+- `npm run lint` 0 / `npm run build`（tsc+vite）緑。
 
 ### G. 効果適用アニメーション（視覚QA 必須）
 
