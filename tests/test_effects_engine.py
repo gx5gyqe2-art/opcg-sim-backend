@@ -2071,3 +2071,90 @@ def test_passive_recalc_skipped_while_interaction_pending():
     gm._apply_passive_effects(p1)
     assert char.passive_power == 1000, "中断中の再計算でバフが消えてはならない"
     gm.active_interaction = None
+
+
+def test_extra_turn_keeps_turn_player():
+    """「このターンの後に自分のターンを追加で得る」: 次のターンも自分が継続する。"""
+    gm, p1, p2 = make_game()
+    gm.turn_player, gm.opponent = p1, p2
+    ok = gm.apply_action_to_engine(p1, action(ActionType.EXTRA_TURN), [], 0)
+    assert ok
+    gm.switch_turn()
+    assert gm.turn_player is p1, "追加ターンで自分が継続するべき"
+    gm.switch_turn()
+    assert gm.turn_player is p2, "追加ターンは1回で消費される"
+
+
+def test_base_power_reference_to_self_leader():
+    """「このキャラの元々のパワーは、自分のリーダーの元々のパワーと同じパワーになる」。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abs_ = parser.parse_card_text(
+        "【登場時】このキャラの元々のパワーは、自分のリーダーの元々のパワーと同じパワーになる。")
+    assert abs_
+    gm, p1, _ = make_game()
+    p1.leader.master = make_master(card_id="L-9", name="リーダー", type=CardType.LEADER,
+                                   power=9000, life=5)
+    char = make_instance(make_master(card_id="C-EQ", name="写し身", power=2000,
+                                     abilities=tuple(abs_)), owner="P1")
+    p1.field.append(char)
+    gm.turn_player = p1
+    gm.resolve_ability(p1, abs_[0], char)
+    gm._apply_passive_effects(p1)  # 再計算で上書きが消えないこと（passive レイヤ分離）
+    assert char.get_power(True) == 9000, f"リーダーの元々のパワーになるべき: {char.get_power(True)}"
+
+
+def test_life_reveal_conditional_play_declined_returns_to_life():
+    """「ライフの上から1枚を公開し、そのカードがコスト5の「サボ」の場合、登場させてもよい」:
+    条件不成立なら公開カードはライフ上へ戻る（temp 回収先=ライフ）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abs_ = parser.parse_card_text(
+        "【起動メイン】このキャラをトラッシュに置くことができる：自分のライフの上から1枚を公開し、"
+        "そのカードがコスト5の「サボ」の場合、登場させてもよい。")
+    assert abs_
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(card_id="C-SAB", name="サボ起動"), owner="P1")
+    p1.field.append(src)
+    for i in range(3):
+        p1.life.append(make_instance(make_master(card_id=f"LF-{i}", name=f"ライフ{i}"), owner="P1"))
+
+    gm.resolve_ability(p1, abs_[0], src)
+    # 自動確認が出る場合は受諾して流す
+    guard = 0
+    while gm.active_interaction and guard < 5:
+        pl = gm.p1 if gm.p1.name == gm.active_interaction.get("player_id") else gm.p2
+        gm.resolve_interaction(pl, {"selected_uuids": [], "index": 0})
+        guard += 1
+    assert len(p1.life) == 3, f"条件不成立: ライフは3枚のまま: {len(p1.life)}"
+    assert len(p1.temp_zone) == 0
+    assert len(p1.field) == 0 if src not in p1.field else True  # コストでトラッシュ
+
+
+def test_life_reveal_conditional_play_matches_and_plays():
+    """条件成立（コスト5の「サボ」）なら公開カードを登場できる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abs_ = parser.parse_card_text(
+        "【起動メイン】このキャラをトラッシュに置くことができる：自分のライフの上から1枚を公開し、"
+        "そのカードがコスト5の「サボ」の場合、登場させてもよい。")
+    gm, p1, _ = make_game()
+    src = make_instance(make_master(card_id="C-SAB", name="サボ起動"), owner="P1")
+    p1.field.append(src)
+    sabo = make_instance(make_master(card_id="ST13-007", name="サボ", cost=5, power=7000), owner="P1")
+    p1.life.append(sabo)
+    p1.life.append(make_instance(make_master(card_id="LF-1", name="ライフ1"), owner="P1"))
+
+    gm.resolve_ability(p1, abs_[0], src)
+    guard = 0
+    while gm.active_interaction and guard < 6:
+        ia = gm.active_interaction
+        pl = gm.p1 if gm.p1.name == ia.get("player_id") else gm.p2
+        if ia.get("action_type") == "SELECT_TARGET":
+            cands = ia.get("selectable_uuids") or [c.uuid for c in ia.get("candidates", [])]
+            gm.resolve_interaction(pl, {"selected_uuids": cands[:1], "index": 0})
+        else:
+            gm.resolve_interaction(pl, {"selected_uuids": [], "index": 0})
+        guard += 1
+    assert sabo in p1.field, "コスト5の「サボ」は登場できるべき"
+    assert len(p1.temp_zone) == 0

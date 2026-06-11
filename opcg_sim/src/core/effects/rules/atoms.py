@@ -319,13 +319,18 @@ def _power_equalize(ctx: ParseContext) -> Optional[GameAction]:
         ref = "selected"
     elif _nfc("相手のリーダー") in t:
         ref = "opp_leader"
+    elif _nfc("自分のリーダー") in t:
+        ref = "self_leader"
     else:
         return None  # 未知の参照は set_power 等にフォールバック
+    # 「元々のパワーと同じ」は参照カードの基礎値（master.power）を写す
+    source = ("REFERENCE_BASE_POWER"
+              if re.search(_nfc(r"元々のパワーと同じ"), t) else "REFERENCE_POWER")
     return GameAction(
         type=ActionType.BUFF,
         status="POWER_OVERRIDE",
         target=TargetQuery(select_mode="SOURCE"),
-        value=ValueSource(dynamic_source="REFERENCE_POWER", ref_id=ref),
+        value=ValueSource(dynamic_source=source, ref_id=ref),
         duration=_duration_of(t),
         raw_text=t,
     )
@@ -816,8 +821,9 @@ def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ドン") not in t:
         return None
-    # Sequence 分割で末尾が連用形「レストにし」になる句（例:「ドン‼1枚をレストにし、…捨てる」）も対象
-    if not re.search(_nfc(r"レストに(する|できる|し[、。]|し$)"), t.strip()):
+    # Sequence 分割で末尾が連用形「レストにし」になる句（例:「ドン‼1枚をレストにし、…捨てる」）も対象。
+    # 「レストにしてもよい」（任意）も受ける。
+    if not re.search(_nfc(r"レストに(する|できる|してもよい|し[、。]|し$)"), t.strip()):
         return None
     if _nfc("アクティブ") in t:
         return None
@@ -1378,6 +1384,8 @@ def _reveal_hand(ctx: ParseContext) -> Optional[GameAction]:
     # 「できる」「ことができる」「まで」は任意（対象不在でも no-op 成功）。
     if _nfc("できる") in t or _nfc("まで") in t:
         tq.is_up_to = True
+    # 後続の「公開したカードを…」(revealed_to_deck_top 等) が参照できるよう保存する
+    tq.save_id = "revealed_cards"
     return GameAction(type=ActionType.REVEAL, target=tq, raw_text=t)
 
 
@@ -2214,3 +2222,135 @@ def _self_cannot(ctx: ParseContext) -> Optional[GameAction]:
     # 制限自体はエンジン未実装(no-op)だが、「このターン中／このバトル中」の期間は
     # 正しく保持する（監査 DURATION の真値化。将来の enforce 時にそのまま使える）。
     return GameAction(type=ActionType.RULE_PROCESSING, duration=_duration_of(t), raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# 手札からトラッシュへ: 「（自分の）手札の…（カード）N枚をトラッシュに置く（ことができる）」
+#   実質は手札を捨てるコスト/効果（DISCARD と同じ移動）。trash_target は手札文脈を
+#   除外しているため、ここで拾う。「手札か場の…」のような複数ゾーンは multi_zone_trash が担当。
+# ---------------------------------------------------------------------------
+@rule("hand_to_trash", priority=58)
+def _hand_to_trash(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"手札の[^。]*?をトラッシュに置"), t):
+        return None
+    if re.search(_nfc(r"手札か|か、?手札"), t):
+        return None  # 複数ゾーンは multi_zone_trash が担当
+    tq = parse_target(t)
+    tq.zone = Zone.HAND
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    return GameAction(type=ActionType.TRASH, target=tq, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# 複数ゾーンのトラッシュコスト: 「自分の手札か場の「X」1枚をトラッシュに置く」
+# 「自分の、特徴《Y》を持つキャラか、手札1枚をトラッシュに置く」
+#   ゾーンごとに条件が異なるため、ゾーン別 TRASH の Choice にする。
+# ---------------------------------------------------------------------------
+@rule("multi_zone_trash", priority=59)
+def _multi_zone_trash(ctx: ParseContext) -> Optional[EffectNode]:
+    t = ctx.text
+    if not re.search(_nfc(r"トラッシュに置"), t):
+        return None
+    m_a = re.search(_nfc(r"手札か場の"), t)
+    m_b = re.search(_nfc(r"キャラか、?手札"), t)
+    if not m_a and not m_b:
+        return None
+    field_tq = parse_target(t)
+    field_tq.zone = Zone.FIELD
+    hand_tq = TargetQuery(player=Player.SELF, zone=Zone.HAND, count=1)
+    if m_b:
+        # 「特徴《Y》を持つキャラか、手札1枚」: 手札側は無条件
+        hand_tq.traits = []
+        hand_tq.names = []
+    else:
+        # 「手札か場の「X」1枚」: 名前条件は両ゾーン共通
+        hand_tq.names = list(field_tq.names)
+        hand_tq.traits = list(field_tq.traits)
+    return Choice(
+        message="トラッシュに置くカードを選択",
+        option_labels=["場から選ぶ", "手札から選ぶ"],
+        options=[
+            GameAction(type=ActionType.TRASH, target=field_tq, raw_text=t),
+            GameAction(type=ActionType.TRASH, target=hand_tq, raw_text=t),
+        ],
+    )
+
+
+# ---------------------------------------------------------------------------
+# 追加ターン: 「このターンの後に自分のターンを追加で得る」
+# ---------------------------------------------------------------------------
+@rule("extra_turn", priority=85)
+def _extra_turn(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"ターンを追加で得る"), t):
+        return None
+    return GameAction(type=ActionType.EXTRA_TURN, raw_text=t)
+
+
+# ---------------------------------------------------------------------------
+# 公開したカードをデッキの上へ: 「公開したカードをデッキの上に置く」
+#   公開（LOOK/REVEAL→TEMP）済みのカードをデッキトップへ戻す。
+# ---------------------------------------------------------------------------
+@rule("revealed_to_deck_top", priority=64)
+def _revealed_to_deck_top(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"公開した(カード|残り)?を?、?デッキの(上|一番上)に(置く|戻す)"), t):
+        return None
+    # 手札公開（reveal_hand が saved_targets["revealed_cards"] に保存）を優先参照し、
+    # 無ければ TEMP（デッキ公開の残り）を全て戻す。
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=TargetQuery(player=Player.SELF, zone=Zone.TEMP, count=-1,
+                           select_mode="ALL", ref_id="revealed_cards"),
+        destination=Zone.DECK,
+        dest_position="TOP",
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# カウンター値修正: 「自分の手札の…（カード）すべては、カウンター+Nになる」
+#   手札カードのカウンター値修正（PASSIVE 再計算レイヤ passive_counter）。
+# ---------------------------------------------------------------------------
+@rule("counter_buff", priority=64)
+def _counter_buff(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    m = re.search(_nfc(rf"カウンター({_SIGN}[\d０-９]+)になる"), t)
+    if not m:
+        return None
+    tq = _subject_target(t)
+    if tq.select_mode != "SOURCE":
+        tq.zone = Zone.HAND
+    return GameAction(
+        type=ActionType.BUFF,
+        status="COUNTER",
+        target=tq,
+        value=ValueSource(base=_to_int(m.group(1))),
+        duration=_duration_of(t),
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 残りをレストで登場: 「残りを（コストN以下なら）レストで登場させる」
+#   直前の選択/公開の残り（TEMP/REMAINING）をレスト状態で登場させる。
+#   コスト条件付きは cost_max で絞る（OP10-058「残りがコスト4以下なら…」）。
+# ---------------------------------------------------------------------------
+@rule("remaining_play_rested", priority=66)
+def _remaining_play_rested(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    m = re.search(_nfc(r"残り(?:が|を)(?:コスト([\d０-９]+)以下なら)?、?レストで登場させる"), t)
+    if not m:
+        return None
+    tq = TargetQuery(player=Player.SELF, zone=Zone.TEMP, count=-1, select_mode="REMAINING")
+    if m.group(1):
+        tq.cost_max = _to_int(m.group(1))
+    return GameAction(
+        type=ActionType.PLAY_CARD,
+        target=tq,
+        destination=Zone.FIELD,
+        status="RESTED",
+        raw_text=t,
+    )

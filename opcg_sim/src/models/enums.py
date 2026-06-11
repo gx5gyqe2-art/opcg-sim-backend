@@ -94,6 +94,7 @@ class ActionType(Enum):
     ATTACK_DISABLE = auto()
     EXECUTE_MAIN_EFFECT = auto()
     VICTORY = auto()
+    EXTRA_TURN = auto()  # 「このターンの後に自分のターンを追加で得る」
     RULE_PROCESSING = auto()
     RESTRICTION = auto()
     PREVENT_REST = auto()  # 「（相手の）キャラは…までレストにできない」: レスト不可＝アタック/ブロック不可

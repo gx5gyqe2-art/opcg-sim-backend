@@ -23,7 +23,7 @@ MAX_WARN_DIRECTION  = 0
 MAX_STAT_ONLY       = 0
 MAX_NO_IMPL         = 0
 MAX_SELECT_MISMATCH = 2
-MAX_FALLBACK        = 11
+MAX_FALLBACK        = 0
 
 
 @pytest.fixture(scope="module")

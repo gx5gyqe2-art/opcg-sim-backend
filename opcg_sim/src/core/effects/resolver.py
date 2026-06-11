@@ -199,6 +199,11 @@ class EffectResolver:
                         self.execution_stack.append(node.if_true)
                 elif node.if_false:
                     self.execution_stack.append(node.if_false)
+                else:
+                    # 条件不成立で何も実行しなかった事実を記録する。
+                    # 後続の「（登場）させた場合」（PREV_ACTION=SUCCEEDED）が、
+                    # 不発の分岐を「成功」と誤評価しないようにする（ST13-007 等）。
+                    self.context["last_action_success"] = False
 
             elif isinstance(node, Choice):
                 self._suspend_for_choice(player, node, source_card)
@@ -212,7 +217,9 @@ class EffectResolver:
             self._reclaim_temp_to_deck_top()
 
     def _reclaim_temp_to_deck_top(self):
-        """解決完了時に temp_zone に取り残されたカードを各オーナーのデッキトップへ戻す。"""
+        """解決完了時に temp_zone に取り残されたカードを元のゾーンの先頭へ戻す。
+
+        既定はデッキトップ。LOOK_LIFE 由来（_temp_origin == "LIFE"）はライフ上へ戻す。"""
         for p in (self.game_manager.p1, self.game_manager.p2):
             if not getattr(p, "temp_zone", None):
                 continue
@@ -220,10 +227,14 @@ class EffectResolver:
             p.temp_zone.clear()
             # 公開順を保って上から戻す（reversed で先頭が最上段になるよう挿入）
             for card in reversed(leftover):
-                p.deck.insert(0, card)
+                if getattr(card, "_temp_origin", None) == "LIFE":
+                    card._temp_origin = None
+                    p.life.insert(0, card)
+                else:
+                    p.deck.insert(0, card)
             if leftover:
                 log_event("INFO", "resolver.temp_reclaim",
-                          f"Returned {len(leftover)} revealed card(s) to deck top", player=p.name)
+                          f"Returned {len(leftover)} revealed card(s) to origin zone top", player=p.name)
 
     def _expand_main_effect(self, source_card, ref_trigger=None):
         """source_card 自身の参照先トリガー能力の効果を実行スタックへ展開する。
@@ -297,11 +308,15 @@ class EffectResolver:
         # REVEALED_CARD_TRAIT 条件評価用: REVEAL/LOOK 実行後に公開カードを記録。
         # LOOK はターゲット無し（デッキ上から枚数ベースで TEMP へ移動）なので、
         # 移動先 TEMP の先頭（=公開したデッキトップ）を公開カードとして記録する。
-        if action.type in (ActionType.REVEAL, ActionType.LOOK, ActionType.FACE_UP_LIFE):
+        if action.type in (ActionType.REVEAL, ActionType.LOOK, ActionType.FACE_UP_LIFE,
+                           ActionType.LOOK_LIFE):
             if targets:
                 self.context["last_revealed_card"] = targets[0]
             elif action.type == ActionType.LOOK and getattr(player, "temp_zone", None):
                 self.context["last_revealed_card"] = player.temp_zone[0]
+            elif action.type == ActionType.LOOK_LIFE and getattr(player, "temp_zone", None):
+                # LOOK_LIFE は temp 末尾に append するため、公開カードは末尾
+                self.context["last_revealed_card"] = player.temp_zone[-1]
 
         # ▼▼▼ 追加: 実行履歴を記録 ▼▼▼
         target_names = [f"{t.master.name}({t.uuid[:4]})" for t in targets]
@@ -318,7 +333,12 @@ class EffectResolver:
         if not query: return []
         
         if "temp_resolved_targets" in self.context:
-            return self.context.pop("temp_resolved_targets")
+            resumed = self.context.pop("temp_resolved_targets")
+            # 中断→再開で解決した対象も save_id 保存を行う（「公開したカードを…」等の
+            # 後続参照が、再開経路だけ保存されず空振りしていた）。
+            if query.save_id:
+                self.context["saved_targets"][query.save_id] = resumed
+            return resumed
 
         if query.save_id and query.save_id in self.context["saved_targets"]:
             return self.context["saved_targets"][query.save_id]
@@ -663,6 +683,9 @@ class EffectResolver:
                 cost_op = val.get("cost_op", CompareOperator.LE)
                 if not self._compare(card.master.cost, cost_op, val["cost"]):
                     return False
+            # カード名チェック（完全一致）
+            if "name" in val and card.master.name != val["name"]:
+                return False
             # カードタイプチェック
             if "card_type" in val:
                 from ...models.enums import CardType

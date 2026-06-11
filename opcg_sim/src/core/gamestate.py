@@ -444,6 +444,13 @@ class GameManager:
         self.switch_turn()
 
     def switch_turn(self):
+        # 追加ターン（EXTRA_TURN）: 予約したプレイヤーがターンプレイヤーのまま継続する
+        if getattr(self, "pending_extra_turn", None) == self.turn_player.name:
+            self.pending_extra_turn = None
+            self.turn_count += 1
+            log_event("INFO", "game.extra_turn", f"{self.turn_player.name} takes an extra turn", player=self.turn_player.name)
+            self.refresh_phase()
+            return
         self.turn_player, self.opponent = self.opponent, self.turn_player
         self.turn_count += 1
         log_event("INFO", "game.turn_switch_end", f"After switch: turn_player={self.turn_player.name}, count={self.turn_count}", player="system")
@@ -540,11 +547,12 @@ class GameManager:
                 if c:
                     c.cost_buff = 0
                     c.passive_power = 0
-                    c.base_power_override = None
+                    c.passive_power_override = None
                     c.current_keywords = c.master.keywords.copy()
             for c in p.hand:
                 if c:
                     c.cost_buff = 0
+                    c.passive_counter = 0
 
         # Step 2/3 で適用される INSTANT パワーバフは passive_power（再計算レイヤ）に
         # 載せる。power_buff に加えると _apply_passive_effects が呼ばれるたびに
@@ -720,7 +728,7 @@ class GameManager:
                 if ability.trigger == TriggerType.COUNTER: self.resolve_ability(player, ability, source_card=counter_card)
             self.move_card(counter_card, Zone.TRASH, player)
         else:
-            counter_value = counter_card.master.counter or 0; self.active_battle["counter_buff"] += counter_value
+            counter_value = getattr(counter_card, "current_counter", counter_card.master.counter or 0); self.active_battle["counter_buff"] += counter_value
             log_event("INFO", "game.counter_apply", f"Added {counter_value} power to target", player=player.name); self.move_card(counter_card, Zone.TRASH, player)
 
     def resolve_attack(self):
@@ -1120,7 +1128,10 @@ class GameManager:
             for _ in range(count):
                 if not target_player.life:
                     break
-                target_player.temp_zone.append(target_player.life.pop(0))
+                card_ = target_player.life.pop(0)
+                # 不発時の回収先を記録する（temp 回収はデッキトップではなくライフ上へ戻す）
+                card_._temp_origin = "LIFE"
+                target_player.temp_zone.append(card_)
                 moved += 1
             log_event("INFO", "game.action_look_life", f"{target_player.name} revealed {moved} life card(s)", player=player.name)
             return True
@@ -1166,6 +1177,12 @@ class GameManager:
             opp.negate_onplay_until = self.turn_count + (1 if dur == "UNTIL_NEXT_TURN_END" else 0)
             log_event("INFO", "game.negate_opp_onplay",
                       f"{opp.name}'s ON_PLAY negated until turn {opp.negate_onplay_until}", player=player.name)
+            return True
+
+        if act_name == "EXTRA_TURN":
+            # 「このターンの後に自分のターンを追加で得る」: switch_turn が消費する
+            self.pending_extra_turn = player.name
+            log_event("INFO", "game.action_extra_turn", f"{player.name} will take an extra turn", player=player.name)
             return True
 
         if act_name == "VICTORY":
@@ -1344,7 +1361,11 @@ class GameManager:
                 dest_zone = action.destination or Zone.TRASH; self.move_card(target, dest_zone, owner); success = True
             elif act_name == "BUFF":
                 if action.status == "POWER_OVERRIDE":
-                    target.base_power_override = value
+                    # PASSIVE 再計算由来は再計算レイヤへ（即時効果の上書きを消さない）
+                    if getattr(self, "_in_passive_recalc", False):
+                        target.passive_power_override = value
+                    else:
+                        target.base_power_override = value
                     log_event("INFO", "game.action_override", f"{target.master.name}'s power set to {value}", player=player.name)
                 elif action.status == "COST_OVERRIDE":
                     # コスト絶対値セット（「このターン中、コスト0にする」等）。base_power_override
@@ -1362,6 +1383,14 @@ class GameManager:
                     elif hasattr(target, 'cost_buff'):
                         target.cost_buff += value
                     log_event("INFO", "game.action_cost_reduction", f"{target.master.name}'s cost changed by {value} ({dur})", player=player.name)
+                elif action.status == "COUNTER":
+                    # 「カウンター+Nになる」: 手札カードのカウンター値修正。
+                    # PASSIVE 再計算レイヤ（passive_counter）に載せる。
+                    if getattr(self, "_in_passive_recalc", False):
+                        target.passive_counter += value
+                    else:
+                        target.passive_counter += value  # 即時付与も同レイヤ（手札は recalc でリセット）
+                    log_event("INFO", "game.action_counter_buff", f"{target.master.name} counter {value:+d}", player=player.name)
                 elif action.status == "BLOCKER_DISABLE":
                     target.flags.add("BLOCKER_DISABLED")
                     target.current_keywords.discard("ブロッカー")
@@ -1534,6 +1563,12 @@ class GameManager:
             ref_owner, _ = self._find_card_location(ref)
             is_ref_turn = bool(ref_owner) and ref_owner.name == self.turn_player.name
             return ref.get_power(is_ref_turn)
+        # 「元々のパワーと同じ」: 参照カードの基礎値（master.power）を写す（バフ非追随）
+        if val_source.dynamic_source == "REFERENCE_BASE_POWER":
+            ref = self._resolve_power_reference(player, val_source.ref_id, context)
+            if ref is None:
+                return val_source.base
+            return ref.master.power
         return val_source.base
 
     def _resolve_power_reference(self, player, ref_id, context):
@@ -1541,6 +1576,8 @@ class GameManager:
         opponent = self.p2 if player == self.p1 else self.p1
         if ref_id == "opp_leader":
             return opponent.leader
+        if ref_id == "self_leader":
+            return player.leader
         if ref_id == "attacker":
             return (self.active_battle or {}).get("attacker")
         if ref_id == "selected":

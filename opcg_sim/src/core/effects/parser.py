@@ -509,16 +509,20 @@ class EffectParser:
             if life_reveal_m:
                 n = int(life_reveal_m.group(1))
                 remaining_cond = life_reveal_m.group(2)
-                face_up_action = GameAction(
-                    type=ActionType.FACE_UP_LIFE,
-                    target=TargetQuery(zone=Zone.LIFE, player=Player.SELF, count=n),
+                # LOOK_LIFE でライフ上 n 枚を temp へ公開する。後続の「登場させてもよい」
+                # (play_from_temp) が temp から消費し、不発時は resolver の temp 回収が
+                # ライフ上へ戻す。従来は FACE_UP_LIFE（その場で表向き）で temp に載らず、
+                # 消費側が no-op だった（OP10-022/ST13-007 等）。
+                look_action = GameAction(
+                    type=ActionType.LOOK_LIFE,
+                    value=ValueSource(base=n),
                     raw_text=life_reveal_m.group(0),
                 )
                 branch = Branch(
                     condition=self._parse_condition_obj(remaining_cond),
                     if_true=self._parse_to_node(rest_text, is_cost)
                 )
-                return Sequence(actions=[face_up_action, branch])
+                return Sequence(actions=[look_action, branch])
             return Branch(
                 condition=self._parse_condition_obj(cond_text),
                 if_true=self._parse_to_node(rest_text, is_cost)
@@ -890,11 +894,20 @@ class EffectParser:
             if exact_m and "trait" not in val:
                 val["trait"] = exact_m.group(1)
                 val["trait_contains"] = False
-            # コスト条件
-            cost_m = re.search(_nfc(r'コスト(\d+)(以上|以下)'), norm_text)
+            # コスト条件（「コスト5以下」「コスト5の」= 完全一致）
+            cost_m = re.search(_nfc(r'コスト(\d+)(以上|以下)?'), norm_text)
             if cost_m:
                 val["cost"] = int(cost_m.group(1))
-                val["cost_op"] = CompareOperator.GE if cost_m.group(2) == _nfc('以上') else CompareOperator.LE
+                if cost_m.group(2) == _nfc('以上'):
+                    val["cost_op"] = CompareOperator.GE
+                elif cost_m.group(2) == _nfc('以下'):
+                    val["cost_op"] = CompareOperator.LE
+                else:
+                    val["cost_op"] = CompareOperator.EQ
+            # カード名条件（「サボ」等の完全一致。『X』を含む特徴 とは別）
+            name_m = re.search(_nfc(r'「([^」]+)」'), norm_text)
+            if name_m:
+                val["name"] = name_m.group(1)
             # カードタイプ
             if _nfc("キャラカード") in norm_text:
                 val["card_type"] = "キャラ"
