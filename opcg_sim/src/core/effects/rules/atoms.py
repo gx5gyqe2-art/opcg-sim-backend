@@ -1054,6 +1054,33 @@ def _search_to_hand(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+# ---------------------------------------------------------------------------
+# サーチ結果をライフへ: 「（公開し、）カードM枚までを、ライフの上／下に（表向きで）加える」
+#   → MOVE_CARD(zone=TEMP, dest=LIFE)。直前の look_deck が候補を TEMP に置いている前提。
+#   明示ソース（手札/トラッシュ/デッキ）がある句は hand_to_life / life_recover が担当。
+# ---------------------------------------------------------------------------
+@rule("search_to_life", priority=53)
+def _search_to_life(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"ライフの(上|下)に(?:表向きで)?加える"), t):
+        return None
+    if any(_nfc(z) in t for z in ["手札", "トラッシュ", "デッキ"]):
+        return None
+    tq = parse_target(t)
+    tq.zone = Zone.TEMP
+    tq.player = Player.SELF
+    if _nfc("まで") in t:
+        tq.is_up_to = True
+    dest_position = "TOP" if _nfc("ライフの上") in t else "BOTTOM"
+    return GameAction(
+        type=ActionType.MOVE_CARD,
+        target=tq,
+        destination=Zone.LIFE,
+        dest_position=dest_position,
+        raw_text=t,
+    )
+
+
 @rule("search_deck_to_hand", priority=67)
 def _search_deck_to_hand(ctx: ParseContext) -> Optional[GameAction]:
     """「自分のデッキから（条件）のカードN枚までを公開し、手札に加える/加え」→ MOVE_CARD(zone=DECK, dest=HAND)。

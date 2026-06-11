@@ -2619,7 +2619,7 @@
 "OP16-118|ON_KO": "- | pw0,kw0,rs0,co0",
 "OP16-118|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
 "OP16-118|PASSIVE": "- | pw0,kw0,rs0,co0",
-"OP16-119|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
+"OP16-119|ON_PLAY": "p1_hand:6→5, p1_field:3→4, p1_deck:20→19, p1_life:5→6 | pw0,kw0,rs0,co0",
 "OP16-119|TRIGGER": "p2_field:3→2, p2_trash:0→1 | pw0,kw0,rs0,co0",
 "P-001|ACTIVATE_MAIN": "- | pw0,kw1,rs0,co0",
 "P-002|ACTIVATE_MAIN": "p1_hand:5→1, p1_deck:20→24 | pw0,kw0,rs0,co0",

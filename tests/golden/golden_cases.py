@@ -1989,6 +1989,15 @@ CASES = [
             {"effect": {"kind": "action", "type": "LOOK", "value": 1, "status": None}}
         ],
     },
+    # ----- サーチ結果をライフへ（TEMP→LIFE, look_deck の後段） --------------
+    {
+        "id": "search_temp_to_life",
+        "text": "カード1枚までを、ライフの上に加える。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "MOVE_CARD", "destination": "LIFE",
+                        "dest_position": "TOP", "target": {"zone": "TEMP", "is_up_to": True}}}
+        ],
+    },
     # ----- 登場制限 PASSIVE（手札のこのカードは効果で登場できない） ----------
     {
         "id": "no_effect_play_passive",
