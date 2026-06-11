@@ -1467,6 +1467,18 @@ class GameManager:
         if not val_source: return 0
         if val_source.dynamic_source == "COUNT_REFERENCE":
             log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name); return len(player.trash)
+        # 「<範囲>N枚につき」の汎用カウント（RC-4）。範囲クエリを毎回実体化して数える
+        # （PASSIVE 再計算で盤面に追随する）。
+        if val_source.dynamic_source == "COUNT_QUERY" and getattr(val_source, "count_query", None) is not None:
+            src = None
+            src_uuid = (context or {}).get("_source_card_uuid")
+            if src_uuid:
+                src = self._find_card_by_uuid(src_uuid)
+            if src is None:
+                src = player.leader
+            n = len(get_target_cards(self, val_source.count_query, src))
+            log_event("INFO", "game.get_dynamic_value", f"COUNT_QUERY = {n}", player=player.name)
+            return n
         # C9「（相手のリーダー／選んだキャラ／アタックしているキャラ）と同じパワーになる」。
         # 発動時スナップショット: 参照カードの現在パワーを固定値として返す（以後の変動に追随しない）。
         if val_source.dynamic_source == "REFERENCE_POWER":

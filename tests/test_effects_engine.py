@@ -1920,3 +1920,54 @@ def test_passive_buff_does_not_stack_across_recalcs():
     # 場を離れて戻れば再適用される（レイヤは再計算で再構築）
     gm._apply_passive_effects(p1)
     assert char.passive_power == 1000 and char.power_buff == 0
+
+
+def test_per_n_count_query_buff_tracks_board():
+    """RC-4: 「自分のトラッシュにあるイベント2枚につき、パワー+1000」が
+    実数に追随する（4枚→+2000、2枚→+1000）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    from opcg_sim.src.models.enums import TriggerType as TT
+    parser = EffectParserV2()
+    abilities = parser.parse_card_text(
+        "このキャラは、自分のトラッシュにあるイベント2枚につき、パワー+1000。")
+    assert abilities
+    ab = abilities[0]
+
+    gm, p1, _ = make_game()
+    char = make_instance(make_master(card_id="C-PN", name="スケーラ", power=1000,
+                                     abilities=(ab,)), owner="P1")
+    p1.field.append(char)
+    for i in range(4):
+        p1.trash.append(make_instance(
+            make_master(card_id=f"E-{i}", name=f"イベ{i}", type=CardType.EVENT), owner="P1"))
+    p1.trash.append(make_instance(
+        make_master(card_id="C-X", name="キャラX", type=CardType.CHARACTER), owner="P1"))
+
+    gm._apply_passive_effects(p1)
+    assert char.get_power(True) == 3000, (
+        f"イベント4枚 // 2 * 1000 = +2000 のはず: {char.get_power(True)}")
+
+    # トラッシュからイベントが2枚減れば +1000 に追随する
+    p1.trash = [c for c in p1.trash if c.master.card_id not in ("E-0", "E-1")]
+    gm._apply_passive_effects(p1)
+    assert char.get_power(True) == 2000, (
+        f"イベント2枚 // 2 * 1000 = +1000 のはず: {char.get_power(True)}")
+
+
+def test_per_n_rest_don_count():
+    """RC-4: 「自分のレストのドン!!3枚につき、パワー+1000」がレストドン数で変わる。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    parser = EffectParserV2()
+    abilities = parser.parse_card_text(
+        "このキャラは、自分のレストのドン!!3枚につき、パワー+1000。")
+    assert abilities
+    gm, p1, _ = make_game()
+    char = make_instance(make_master(card_id="C-RD", name="ドン参照", power=1000,
+                                     abilities=tuple(abilities)), owner="P1")
+    p1.field.append(char)
+    from opcg_sim.src.models.models import DonInstance
+    p1.don_rested = [DonInstance(owner_id="P1", is_rest=True) for _ in range(7)]
+
+    gm._apply_passive_effects(p1)
+    assert char.get_power(True) == 3000, (
+        f"レストドン7枚 // 3 * 1000 = +2000 のはず: {char.get_power(True)}")

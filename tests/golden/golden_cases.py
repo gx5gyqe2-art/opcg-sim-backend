@@ -2149,7 +2149,9 @@ CASES = [
         "id": "self_power_buff_is_source",
         "text": "このキャラは、自分のトラッシュにあるカード5枚につき、パワー+1000。",
         "expect": [
-            {"effect": {"kind": "action", "type": "BUFF", "value": 1000,
+            {"effect": {"kind": "action", "type": "BUFF",
+                        "value_dynamic": {"source": "COUNT_REFERENCE",
+                                          "divisor": 5, "multiplier": 1000},
                         "target": {"select_mode": "SOURCE"}}}
         ],
     },
@@ -2250,6 +2252,27 @@ CASES = [
                   "duration": "UNTIL_NEXT_TURN_END"},
                  {"type": "BUFF", "value": 2000, "duration": "UNTIL_NEXT_TURN_END"},
              ]}}
+        ],
+    },
+    # ----- RC-4: 「<範囲>N枚につき」は実数を毎回数えるスケーリング値になる ----------
+    {
+        "id": "per_n_count_query_events_in_trash",
+        "text": "このキャラは、自分のトラッシュにあるイベント2枚につき、パワー+1000。",
+        "expect": [
+            {"effect": {"kind": "action", "type": "BUFF",
+                        "value_dynamic": {"source": "COUNT_QUERY",
+                                          "divisor": 2, "multiplier": 1000},
+                        "target": {"select_mode": "SOURCE"}}}
+        ],
+    },
+    {
+        "id": "per_n_draw_scaled_by_trait_chars",
+        "text": "【登場時】自分の特徴《海王類》を持つキャラ1枚につき、カード1枚を引く。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "effect": {"kind": "action", "type": "DRAW",
+                        "value_dynamic": {"source": "COUNT_QUERY",
+                                          "divisor": 1, "multiplier": 1}}}
         ],
     },
 ]

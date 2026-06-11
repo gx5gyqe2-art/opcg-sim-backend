@@ -73,9 +73,12 @@ def _draw(ctx: ParseContext) -> Optional[GameAction]:
     # 「引くことができない」= ドロー制限であり、ドローアクションではない（self_cannot が担当）
     if re.search(_nfc(r"引くことができない"), t):
         return None
+    # ドロー枚数は「カードN枚」から取る（「キャラ1枚につき」等の先行数値と混同しない）
+    mx = re.search(_nfc(r"カード([\d０-９]+)枚"), t)
+    x = _to_int(mx.group(1)) if mx else _first_int(t, 1)
     return GameAction(
         type=ActionType.DRAW,
-        value=ValueSource(base=_first_int(t, 1)),
+        value=_per_n_value(t, x) or ValueSource(base=x),
         raw_text=t,
     )
 
@@ -219,6 +222,38 @@ def _subject_target(t: str) -> TargetQuery:
     return tq
 
 
+def _per_n_value(t: str, x: int) -> Optional[ValueSource]:
+    """「<数える対象>N枚につき」のスケーリング値を作る（RC-4）。
+
+    値 = (該当数 // N) * x。該当数は実行時に毎回数え直す
+    （COUNT_REFERENCE=自分のトラッシュ全体 / COUNT_QUERY=任意の範囲クエリ）。
+    直前アクションの結果数を参照する文脈依存（「捨てたカード1枚につき」等）と
+    「カード名の異なる」は未対応のため None（フラット値のまま）を返す。
+    """
+    m = re.search(_nfc(r"([^、。：:]*?)([\d０-９]+)枚につき"), t)
+    if not m:
+        return None
+    counted = m.group(1).strip()
+    n = max(_to_int(m.group(2)), 1)
+    if re.search(_nfc(r"(捨てた|戻した|KOした|置いた|レストにした|付与されている|異なる)"), counted):
+        return None
+    if re.fullmatch(_nfc(r"(自分の)?トラッシュ(にあるカード)?"), counted):
+        return ValueSource(base=0, dynamic_source="COUNT_REFERENCE",
+                           divisor=n, multiplier=x)
+    tq = parse_target(counted)
+    # 「トラッシュにあるイベント」等はゾーンキーワード直後に を/から/の が続かず
+    # parse_target のゾーン検出を素通りするため、明示的に上書きする。
+    if _nfc("トラッシュ") in counted:
+        tq.zone = Zone.TRASH
+    elif _nfc("手札") in counted:
+        tq.zone = Zone.HAND
+    tq.count = -1
+    tq.select_mode = "ALL"
+    tq.is_up_to = False
+    return ValueSource(base=0, dynamic_source="COUNT_QUERY",
+                       divisor=n, multiplier=x, count_query=tq)
+
+
 def _buff_target(t: str) -> TargetQuery:
     """パワー/コスト増減の対象を解決する。主語が「この(キャラ/リーダー/カード)」
     （「以外」を除く）なら自身(SOURCE)を返す。PASSIVE 自己バフが CHOOSE で
@@ -238,10 +273,11 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("にする") in t:
         return None  # 「パワーをNにする」は base_power_override 系（別ルールで対応予定）
     tq = _buff_target(t)
+    x = _to_int(m.group(1))
     buff = GameAction(
         type=ActionType.BUFF,
         target=tq,
-        value=ValueSource(base=_to_int(m.group(1))),
+        value=_per_n_value(t, x) or ValueSource(base=x),
         duration=_duration_of(t),
         raw_text=t,
     )
@@ -1043,7 +1079,7 @@ def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(
         type=ActionType.BUFF,
         target=tq,
-        value=ValueSource(base=value),
+        value=_per_n_value(t, value) or ValueSource(base=value),
         status="COST_REDUCTION",
         duration=_duration_of(t),
         raw_text=t,

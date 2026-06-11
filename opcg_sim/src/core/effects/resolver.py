@@ -279,6 +279,8 @@ class EffectResolver:
             })
             return False
 
+        # COUNT_QUERY 等の動的値計算でソースカードの所有者を解決できるようにする
+        self.context["_source_card_uuid"] = source_card.uuid if source_card else None
         value = self._calculate_value(player, action.value, targets)
         success = self.game_manager.apply_action_to_engine(player, action, targets, value)
 

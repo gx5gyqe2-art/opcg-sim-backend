@@ -116,6 +116,9 @@ class ValueSource:
     multiplier: int = 1
     divisor: int = 1
     ref_id: Optional[str] = None
+    # dynamic_source="COUNT_QUERY" 用: 数える対象の範囲（「自分のトラッシュにある
+    # イベントN枚につき」のイベント等）。値 = (該当数 // divisor) * multiplier。
+    count_query: Optional[TargetQuery] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> ValueSource:
