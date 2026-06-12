@@ -766,11 +766,14 @@ def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
     # 源ゾーン: 手札優先（「手札」明示があれば HAND）、無ければトラッシュ。
     tq.zone = Zone.HAND if _nfc("手札") in t else Zone.TRASH
     dest_position = "TOP" if _nfc("ライフの上") in t else "BOTTOM"
+    # 「表向きで加える」→ 表向き、「裏向きで」→ 裏向き、明示なし→ゾーン既定(裏向き)。
+    face_up = True if _nfc("表向き") in t else (False if _nfc("裏向き") in t else None)
     return GameAction(
         type=ActionType.MOVE_CARD,
         target=tq,
         destination=Zone.LIFE,
         dest_position=dest_position,
+        face_up=face_up,
         raw_text=t,
     )
 

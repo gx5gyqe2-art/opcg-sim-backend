@@ -366,6 +366,38 @@ def test_nami_leader_buff_is_this_turn_not_battle():
     assert p1.leader.get_power(False) == base_pw, "ターン終了で失効するべき"
 
 
+def test_add_to_life_face_up_op14_104():
+    """OP14-104「ライフの上に表向きで加える」: パーサが face_up=True を持ち、エンジンが
+    ライフ加入時に is_face_up を立てる（報告バグ「裏向きで加わってしまう」）。"""
+    m = db().get_card("OP14-104")
+
+    def walk(n):
+        from opcg_sim.src.models.effect_types import GameAction as GA, Sequence, Branch, Choice
+        if isinstance(n, GA):
+            yield n
+        elif isinstance(n, Sequence):
+            for a in n.actions:
+                yield from walk(a)
+        elif isinstance(n, Branch):
+            yield from walk(n.if_true)
+            yield from walk(n.if_false)
+        elif isinstance(n, Choice):
+            for o in n.options:
+                yield from walk(o)
+
+    move = next(a for ab in m.abilities for a in walk(ab.effect)
+                if a.type == ActionType.MOVE_CARD and a.destination == Zone.LIFE)
+    assert move.face_up is True, "「表向きで加える」は face_up=True"
+
+    gm, p1, p2 = base()
+    src = CardInstance(make_master(card_id="X", name="X"), "P1")
+    p1.trash = [src]
+    mv = GameAction(type=ActionType.MOVE_CARD, target=TargetQuery(player=PL.SELF, zone=Zone.TRASH),
+                    destination=Zone.LIFE, dest_position="TOP", face_up=True)
+    gm.apply_action_to_engine(p1, mv, [src], 0)
+    assert src in p1.life and src.is_face_up is True, "ライフに表向きで加わるべき"
+
+
 def test_ko_immunity_scope_op09_086():
     """OP09-086「相手の効果でKOされない」: 効果KOは防ぐが、手札に戻す/山札の下に置く等の
     非KO除去には耐性を持たない（報告バグ「KO以外の効果にも耐性を持ってしまう」）。"""

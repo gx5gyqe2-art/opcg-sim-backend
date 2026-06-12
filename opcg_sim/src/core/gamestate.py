@@ -1811,6 +1811,12 @@ class GameManager:
                     continue
                 dest_pos = getattr(action, 'dest_position', 'BOTTOM') or 'BOTTOM'
                 self.move_card(target, dest, owner, dest_position=dest_pos)
+                # 「ライフの上に表向きで加える」等: face_up が指定されていればライフでの向きを反映。
+                # ライフは既定で裏向き(is_face_up=False)なので、表向き指定を明示的に立てる。
+                if dest == Zone.LIFE and getattr(action, "face_up", None) is not None:
+                    target.is_face_up = bool(action.face_up)
+                    log_event("INFO", "game.move_card_face",
+                              f"{target.master.name} added to LIFE face_up={target.is_face_up}", player=player.name)
                 success = True
             elif act_name == "DECK_TOP":
                 self.move_card(target, Zone.DECK, owner, dest_position="TOP"); success = True
