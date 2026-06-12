@@ -354,10 +354,6 @@ def test_op13_004_leader_minus_1000_when_life_ge_4():
     assert leader_power(p1) == 5000            # ライフ3 → 解除
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP13-004: 能力1のトリガーが ACTIVATE_MAIN 化。"
-           "テキストは【ドン‼×1】の常在条件付き効果（コスト8以上キャラがいれば自リーダー・キャラ全体+1000）。"
-           "passive 再計算では適用されず、起動メイン発動が必要になってしまう。")
 def test_op13_004_all_buff_is_continuous_when_cost8_present():
     """OP13-004 能力1: コスト8以上キャラ＋ドン!!1で、起動操作なしに全体+1000が継続適用されるべき。"""
     gm, p1, p2, L = build("OP13-004")
@@ -365,8 +361,9 @@ def test_op13_004_all_buff_is_continuous_when_cost8_present():
     clear_field(p1)
     c = add_char(p1, cost=8, power=10000)
     _attach_don_to_leader(p1, L, 1)
-    gm._apply_passive_effects(p1)              # 常在効果なら passive 再計算で +1000 が乗るはず
-    assert leader_power(p1) == 6000            # 5000 +1000
+    gm._apply_passive_effects(p1)              # 常在効果なら passive 再計算で +1000 が乗る
+    # 5000(base) + 1000(付与ドン1枚=自ターン+1000) + 1000(常在バフ) = 7000
+    assert leader_power(p1) == 7000
     assert c.get_power(True) == 11000          # 10000 +1000
 
 
