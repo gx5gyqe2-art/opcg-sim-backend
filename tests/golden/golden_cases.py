@@ -2434,4 +2434,27 @@ CASES = [
                         "duration": "THIS_TURN"}},
         ],
     },
+    # OP13-079 イム: 埋め込み「ゲーム開始時、」→ GAME_START（先行のルール上節は除去）
+    # + デッキサーチ後のルール上シャッフル合成。第2能力はコスト択一(Choice)＋ドロー。
+    {
+        "id": "op13_079_imu_leader",
+        "text": "ルール上、自分はコスト2以上のイベントをデッキに入れることができず、ゲーム開始時、自分のデッキから特徴《聖地マリージョア》を持つステージカード1枚までを、登場させる。 / 【起動メイン】【ターン1回】自分の、特徴《天竜人》を持つキャラか、手札1枚をトラッシュに置くことができる:カード1枚を引く。",
+        "expect": [
+            {"trigger": "GAME_START",
+             "effect": {"kind": "seq", "actions": [
+                 {"type": "PLAY_CARD",
+                  "target": {"player": "SELF", "zone": "DECK", "card_type": ["STAGE"],
+                             "traits": ["聖地マリージョア"], "is_up_to": True}},
+                 {"type": "SHUFFLE"},
+             ]}},
+            {"trigger": "ACTIVATE_MAIN",
+             "condition": {"type": "TURN_LIMIT", "value": 1},
+             "cost": {"kind": "choice", "options": [
+                 {"type": "TRASH",
+                  "target": {"player": "SELF", "zone": "FIELD", "traits": ["天竜人"]}},
+                 {"type": "TRASH", "target": {"player": "SELF", "zone": "HAND"}},
+             ]},
+             "effect": {"kind": "action", "type": "DRAW", "value": 1}},
+        ],
+    },
 ]

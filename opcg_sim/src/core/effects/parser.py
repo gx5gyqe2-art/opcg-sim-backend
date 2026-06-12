@@ -161,6 +161,12 @@ class EffectParser:
                 _nfc(r'(この(?:カード|キャラ)の)【(登場時|KO時|アタック時|起動メイン|メイン)】(効果)'),
                 r'\1\2\3', norm_text)
 
+            # 「ルール上、…できず、ゲーム開始時、…」（OP13-079）: 前半はデッキ構築制限で
+            # ランタイム効果ではない。残すと parse_target が後半の対象解析を汚染する
+            # （EVENT/cost_min が混入）ため、ゲーム開始時節が続く場合のみ除去する。
+            # 単独の「ルール上、…」節（他18枚）は rule_processing ルールが担当するため不変。
+            norm_text = re.sub(_nfc(r'^ルール上、[^。]*?できず、(?=ゲーム開始時)'), '', norm_text)
+
             # トリガー検出は前処理前のテキストで行う（コスト/制限タグ除去前に判定）
             trigger = self._detect_trigger(norm_text)
             log_event("INFO", "parser.trigger", f"Detected trigger: {trigger.name}")
@@ -237,8 +243,22 @@ class EffectParser:
             # テキスト埋め込みトリガー宣言「〈timing〉時、発動できる」を解消（OTHER 化を防ぐ）。
             trigger, effect_text, activation_optional = self._strip_text_trigger(trigger, effect_text)
 
+            # テキスト埋め込み「ゲーム開始時、」のトリガー宣言を効果本体から除去する
+            # （残すと parse_target が宣言部まで対象解析してしまう）。
+            if trigger == TriggerType.GAME_START:
+                effect_text = re.sub(_nfc(r'^ゲーム開始時、'), '', effect_text).strip()
+
             # 効果本体の解析
             effect_node = self._parse_to_node(effect_text)
+
+            # ゲーム開始時のデッキサーチはルール上シャッフルを伴う（OP13-079）。
+            if (trigger == TriggerType.GAME_START and effect_node is not None
+                    and _nfc("デッキから") in effect_text):
+                effect_node = Sequence(actions=[
+                    effect_node,
+                    GameAction(type=ActionType.SHUFFLE,
+                               raw_text=_nfc("デッキをシャッフルする")),
+                ])
 
             # 先頭のゲート条件（「〜の場合、」）を ability.condition に引き上げる
             final_condition = turn_limit_cond
@@ -447,6 +467,10 @@ class EffectParser:
             return TriggerType.ON_KO
         if re.match(_nfc(r'^この(リーダー|キャラ|カード)が[^。【】]*アタック(した|された)時'), norm_text):
             return TriggerType.ON_ATTACK
+        # テキスト埋め込み「ゲーム開始時、」（タグ無し。OP13-079 等のリーダー初期セットアップ）。
+        # PASSIVE 判定だと常時再計算のたびに登場効果が走るため GAME_START へ写像する。
+        if re.match(_nfc(r'^ゲーム開始時、'), norm_text):
+            return TriggerType.GAME_START
 
         # 既知トリガータグがなければ → PASSIVE（常時・条件付き効果・特殊タイミング等）
         # キーワードタグ（【ブロッカー】等）は既に _TRIGGER_TAG_RE に含まれておらず
