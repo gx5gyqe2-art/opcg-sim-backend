@@ -614,8 +614,20 @@ backend テスト 374 passed / パーサ退行（新規OTHER）0 / フロント 
     （OP15-039・登場/KO 対象の正確化に横展開）。
   - OP15-001: `TargetQuery.min_attached_don` を追加。「ドン‼がN枚以上付与されているキャラ」を
     付与ドン下限で絞り込み（従来「N枚」が count に化けていた）。
+- ✅ **条件スコープ・複合アクション・対象フィルタの追加修正**（leader xfail 50→45）:
+  - ST29-001: 単一文の先頭「〜の場合、Aし、Bする」で条件が先頭アクションのみに掛かり後続が
+    無条件化していた。後続が単一文（内部に「。」無し・連用形連結）のとき効果先頭のゲート条件を
+    ability.condition へ引き上げ（横展開13件）。※`_extract_leading_condition` の「の場合」限定は
+    維持（「いる場合」まで広げると mistarget guard が退行するため OP01-002 等は据え置き）。
+  - OP06-020: 「キャラかドン‼…をレストにする」がドン側固定 → `rest_char_or_don` で Choice 化。
+  - OP10-022: 「キャラのコストの合計が N 以上」→ `ConditionType.FIELD_COST_SUM` 新設。
+  - OP11-021: 「キャラ…とドン‼…をアクティブにする」複合 → ACTIVE＋ACTIVE_DON の Sequence に分解。
+  - OP15-001: `TargetQuery.min_attached_don`（付与ドン下限）。ST13-002: `TargetQuery.is_face_up`
+    （ライフ表裏フィルタ）。
 - **既知の未解決（要設計）**:
   - 群B 実発火配線: 上記の各誘発を battle/盤面イベントから発火させる（`ON_KO`/`ON_LEAVE`/`ON_DON_RETURNED` 等）。
+  - coreference 色制約（OP01-002「戻したキャラと異なる色」）・名称限定 KO 置換（OP12-061）・
+    player 両者対象（ST03-001/OP02-093）・distinct 名（OP16-060）。
   - V2 coreference 保存ギャップ: 「そのキャラ」参照（ref_id="selected_card"）の先行アクションが
     V2 ルール生成だと selected_card を保存せず、参照が場全体へフォールスルーする（OP10-099 残因）。
     legacy `_parse_atomic_action` の save_id 付与が V2 ルール経路に無いのが原因。
