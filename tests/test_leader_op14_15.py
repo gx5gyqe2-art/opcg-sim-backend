@@ -203,8 +203,6 @@ def test_op14_060_opp_attack_returns_don_cost():
 # 相手キャラ1枚までをこのターン中コスト-10。その後デッキ上2枚トラッシュ(任意)。
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP14-079: PREVENT_LEAVE の範囲保護が card 所有者(=相手)のprotectorしか走査せず、保護能力を持つ自リーダー(別プレイヤー)が見つからないため、自分の効果でも相手キャラが場を離れてしまう")
 def test_op14_079_passive_prevents_own_effect_removal():
     """OP14-079 PASSIVE: 相手のキャラは自分の効果で場を離れないはず。"""
     gm, p1, p2, L = build("OP14-079")

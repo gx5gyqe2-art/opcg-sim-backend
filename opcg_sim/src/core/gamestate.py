@@ -1205,7 +1205,7 @@ class GameManager:
                     return found
         return None
 
-    def _active_protection(self, card: CardInstance, status_values: Tuple[str, ...]) -> bool:
+    def _active_protection(self, card: CardInstance, status_values: Tuple[str, ...], actor: Optional[Player] = None) -> bool:
         if not card or not getattr(card, "master", None) or card.negated:
             return False
         owner = self.p1 if self.p1.name == card.owner_id else self.p2
@@ -1226,6 +1226,16 @@ class GameManager:
         protectors.extend(fc for fc in owner.field if fc is not card)
         if getattr(owner, "stage", None) and owner.stage is not card:
             protectors.append(owner.stage)
+        # 除去を行うプレイヤー(actor)側の範囲保護も走査する。「相手のキャラすべては、自分の効果で
+        # 場を離れない」(OP14-079) のように、保護能力の持ち主(actor)と被保護カード(owner=相手)が
+        # 別プレイヤーのケースに対応する。range クエリの照合で actor の相手側＝owner 側のカードのみ
+        # 一致するため、自分側を守る保護は誤適用されない。
+        if actor is not None and actor is not owner:
+            if actor.leader and actor.leader is not card:
+                protectors.append(actor.leader)
+            protectors.extend(fc for fc in actor.field if fc is not card)
+            if getattr(actor, "stage", None) and actor.stage is not card:
+                protectors.append(actor.stage)
 
         for protector in protectors:
             if getattr(protector, "is_effect_negated", False) or getattr(protector, "negated", False):
@@ -1725,7 +1735,7 @@ class GameManager:
             if (act_name in _LEAVE_ACTIONS and player.name != owner.name
                     and source_list is owner.field):
                 guard_statuses = ("LEAVE", "EFFECT_KO") if act_name == "KO" else ("LEAVE",)
-                if self._active_protection(target, guard_statuses):
+                if self._active_protection(target, guard_statuses, actor=player):
                     log_event("INFO", "game.leave_prevented", f"{target.master.name} is protected from leaving the field by opponent's effect", player=owner.name)
                     continue
                 if self._active_replacement(target, guard_statuses):
