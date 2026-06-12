@@ -72,6 +72,112 @@ def test_return_don_not_enough():
     assert len(p1.don_deck) == 10
 
 
+def test_return_don_cost_requires_enough_don():
+    """「ドン!!-N」コスト: コストエリアのドン!!が N 枚未満なら能力は発動できない
+    （払えないコストで効果だけ通ってしまう不具合の回帰ガード）。"""
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    ab = Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        cost=GameAction(type=ActionType.RETURN_DON, value=ValueSource(base=1)),
+        effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)),
+    )
+    src = make_instance(make_master(card_id="RD-1", abilities=(ab,)), owner=p1.name)
+    p1.field.append(src)
+
+    # ドン!!が場に無い → コスト不成立。ドローしない。
+    assert len(p1.don_active) == 0 and len(p1.don_rested) == 0
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert len(p1.hand) == 0
+
+    # ドン!!を1枚用意 → 発動可。どのドン!!を戻すか選択を求められ、選択後に返却＆ドロー。
+    p1.don_active.append(p1.don_deck.pop(0))
+    deck_before = len(p1.don_deck)
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "SELECT_RESOURCE"
+    don_uuid = gm.active_interaction["candidates"][0].uuid
+    gm.resolve_interaction(p1, {"selected_uuids": [don_uuid]})
+    assert len(p1.hand) == 1
+    assert len(p1.don_active) == 0
+    assert len(p1.don_deck) == deck_before + 1
+
+
+def test_return_don_player_selects_attached_don():
+    """「ドン!!-N」で、コストエリアでなく付与中のドン!!を選んで戻せる。
+    付与中を戻すと付与先キャラの attached_don（パワー上昇）も解除される。"""
+    from opcg_sim.src.models.models import DonInstance
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    # キャラに1枚付与、コストエリアにアクティブ1枚。
+    host = make_instance(make_master(card_id="HOST"), owner=p1.name)
+    p1.field.append(host)
+    attached = DonInstance(owner_id=p1.name, attached_to=host.uuid)
+    host.attached_don = 1
+    p1.don_attached_cards.append(attached)
+    active = DonInstance(owner_id=p1.name)
+    p1.don_active.append(active)
+
+    ab = Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        cost=GameAction(type=ActionType.RETURN_DON, value=ValueSource(base=1)),
+        effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)),
+    )
+    src = make_instance(make_master(card_id="RD-2", abilities=(ab,)), owner=p1.name)
+    p1.field.append(src)
+
+    deck_before = len(p1.don_deck)
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert gm.active_interaction["action_type"] == "SELECT_RESOURCE"
+    # 候補にはアクティブも付与中も含まれる。付与中のドン!!を選んで戻す。
+    cand_uuids = [c.uuid for c in gm.active_interaction["candidates"]]
+    assert attached.uuid in cand_uuids and active.uuid in cand_uuids
+    gm.resolve_interaction(p1, {"selected_uuids": [attached.uuid]})
+
+    assert len(p1.hand) == 1                       # 効果は解決
+    assert attached not in p1.don_attached_cards   # 付与中ドンが外れた
+    assert host.attached_don == 0                  # パワー上昇も解除
+    assert active in p1.don_active                 # アクティブは温存（選ばなかった）
+    assert len(p1.don_deck) == deck_before + 1
+
+
+def test_trigger_event_goes_to_trash_when_activated():
+    """ライフ公開【トリガー】を発動した場合、カードは手札に残らずトラッシュへ行く
+    （発動しても手札に加わってしまう不具合の回帰ガード）。発動しなければ手札に残る。"""
+    # 発動するケース → トラッシュ
+    gm, p1, p2 = make_game()
+    for i in range(5):
+        p2.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p2.name))
+    trig = Ability(trigger=TriggerType.TRIGGER,
+                   effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)))
+    ev = make_master(card_id="EV-TRIG", type=CardType.EVENT, abilities=(trig,))
+    life_card = make_instance(ev, owner=p2.name)
+    p2.life.insert(0, life_card)
+    gm.apply_action_to_engine(
+        p1, GameAction(type=ActionType.DEAL_DAMAGE, value=ValueSource(base=1)), [], 1)
+    assert gm.active_interaction["action_type"] == "CONFIRM_TRIGGER"
+    gm.resolve_interaction(p2, {"accepted": True})
+    assert life_card not in p2.hand
+    assert life_card in p2.trash
+
+    # 発動しない（パス）ケース → 手札に残る
+    gm2, q1, q2 = make_game()
+    for i in range(5):
+        q2.deck.append(make_instance(make_master(card_id=f"E-{i}"), owner=q2.name))
+    trig2 = Ability(trigger=TriggerType.TRIGGER,
+                    effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)))
+    ev2 = make_master(card_id="EV-TRIG2", type=CardType.EVENT, abilities=(trig2,))
+    lc2 = make_instance(ev2, owner=q2.name)
+    q2.life.insert(0, lc2)
+    gm2.apply_action_to_engine(
+        q1, GameAction(type=ActionType.DEAL_DAMAGE, value=ValueSource(base=1)), [], 1)
+    gm2.resolve_interaction(q2, {"accepted": False})
+    assert lc2 in q2.hand
+    assert lc2 not in q2.trash
+
+
 def test_execute_main_effect_reinvokes_main():
     """EXECUTE_MAIN_EFFECT: トリガーが自身の ACTIVATE_MAIN 効果(ここでは DRAW2)を再発動。"""
     gm, p1, _ = make_game()
@@ -500,7 +606,7 @@ def test_turn_limit_blocks_second_activation():
     assert len(p1.hand) == 1
     gm.resolve_ability(p1, ab, source_card=src)   # 2回目は制限で不発
     assert len(p1.hand) == 1
-    src.reset_turn_status()                        # ターン境界でカウンタが戻る
+    src.reset_turn_status(clear_usage=True)        # ターン境界でカウンタが戻る
     gm.resolve_ability(p1, ab, source_card=src)
     assert len(p1.hand) == 2
 
@@ -517,6 +623,29 @@ def test_turn_limit_enforced_via_parsed_ability():
 
     gm.resolve_ability(p1, abilities[0], source_card=src)
     gm.resolve_ability(p1, abilities[0], source_card=src)
+    assert len(p1.hand) == 1
+
+
+def test_turn_limit_survives_midturn_reset():
+    """【ターン1回】の使用回数は、ターン途中の reset_turn_status（clear_usage 無し＝戦闘終了
+    や passive 再計算で呼ばれる）では戻らない。戻ると同一ターン内で複数回発動できてしまう
+    （報告バグの回帰ガード）。"""
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    ab = Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        condition=Condition(type=ConditionType.TURN_LIMIT, value=1),
+        effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)),
+    )
+    src = make_instance(make_master(card_id="TL-3", abilities=(ab,)), owner=p1.name)
+    p1.field.append(src)
+
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert len(p1.hand) == 1
+    # 戦闘終了相当の途中リセット（gamestate の battle 終了は keep_don=True で呼ぶ）。
+    src.reset_turn_status(keep_don=True)
+    gm.resolve_ability(p1, ab, source_card=src)   # 使用回数は維持されるので不発のまま
     assert len(p1.hand) == 1
 
 

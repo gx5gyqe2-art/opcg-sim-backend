@@ -177,7 +177,14 @@ class CardInstance:
         result = base + self.cost_buff + self.timed_cost
         return max(0, result)
 
-    def reset_turn_status(self, keep_don: bool = False):
+    def reset_turn_status(self, keep_don: bool = False, clear_usage: bool = False):
+        # NOTE: 本メソッドは「このターン中」の一時効果（パワー/コスト/フラグ等）の解除に
+        #   使われ、ターン境界だけでなく戦闘終了時(gamestate の battle 終了)や領域移動時
+        #   (move_card)などターン途中でも頻繁に呼ばれる。そのため【ターン1回】の使用回数
+        #   (ability_used_this_turn)はここで無条件にクリアしてはならない（クリアすると
+        #   戦闘のたびにカウンタが戻り、ターン1回効果が複数回使えてしまう）。
+        #   使用回数のリセットは clear_usage=True を明示した呼び出し（ターン境界、及び
+        #   カードが場を離れて新規状態になる領域移動）でのみ行う。
         self.power_buff = 0
         self.cost_buff = 0
         self.base_power_override = None
@@ -186,7 +193,8 @@ class CardInstance:
         self.negated = False
         self.ability_disabled = False
         self.flags.clear()
-        self.ability_used_this_turn.clear()
+        if clear_usage:
+            self.ability_used_this_turn.clear()
         # keep_don=True のときは付与ドン!!を維持する（相手ターン開始時の状態リセットでは
         # 付与ドン!!を剥がさず、自分の次のリフレッシュフェイズまで残す）。
         if not keep_don:
@@ -227,13 +235,21 @@ class DonInstance:
 
     def to_dict(self):
         props = CONST.get('CARD_PROPERTIES', {})
+        # ドン!!返却の選択 UI 等で状態を区別できるよう、名前に付与中/レストを併記する。
+        if self.attached_to:
+            display_name = "ドン!!(付与中)"
+        elif self.is_rest:
+            display_name = "ドン!!(レスト)"
+        else:
+            display_name = "ドン!!"
         return {
             props.get('UUID', 'uuid'): self.uuid,
             props.get('OWNER_ID', 'owner_id'): self.owner_id,
             props.get('IS_REST', 'is_rest'): self.is_rest,
             "attached_to": self.attached_to,
+            props.get('CARD_ID', 'card_id'): "DON",
             # 【追加】CardSchemaのバリデーションを通すためのダミー値
-            props.get('NAME', 'name'): "ドン!!",
+            props.get('NAME', 'name'): display_name,
             props.get('TYPE', 'type'): "DON",
             props.get('ATTRIBUTE', 'attribute'): "Special",
             props.get('POWER', 'power'): 0,

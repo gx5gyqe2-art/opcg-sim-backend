@@ -135,6 +135,9 @@ class GameManager:
         # _advance_pending_triggers が1件ずつ確認/解決し、中断時は resolve_interaction が再開する。
         # _battle_triggers と同型だが、戦闘解決の外（ダメージ後・効果ダメージ）でも使う汎用版。
         self._pending_triggers: List[Dict[str, Any]] = []
+        # RETURN_DON（ドン!!返却）でプレイヤーが選んだ戻すドン!!の uuid 一覧。
+        # resolver が選択解決時にセットし、apply_action_to_engine が消費する。
+        self._return_don_selection: Optional[List[str]] = None
 
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """
@@ -333,7 +336,18 @@ class GameManager:
             
             self.active_interaction = None
             resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
-            
+
+        elif action_type == "SELECT_RESOURCE":
+            # ドン!!返却(RETURN_DON)の対象ドン!!選択。選んだ uuid を context に載せて再開すると、
+            # RETURN_DON 再実行時に当該ドン!!を戻す。
+            selected_uuids = payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])
+            log_event("INFO", "game.resume_select_resource",
+                      f"Resuming DON selection: {len(selected_uuids)} selected", player=player.name)
+            effect_context = continuation.get("effect_context", {})
+            effect_context["_return_don_uuids"] = selected_uuids
+            self.active_interaction = None
+            resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), effect_context)
+
         elif action_type == "CHOICE":
             log_event("INFO", "game.resume_choice", f"Resuming choice for {source_card.master.name}", player=player.name)
             selected_index = payload.get("index", payload.get("selected_option_index", 0))
@@ -626,7 +640,8 @@ class GameManager:
         all_units = [player.leader] + player.field
         if player.stage: all_units.append(player.stage)
         for card in all_units:
-            if card: card.reset_turn_status(keep_don=True)
+            # ターン境界のリセット。【ターン1回】の使用回数もここで戻す。
+            if card: card.reset_turn_status(keep_don=True, clear_usage=True)
 
     def refresh_all(self, player: Player):
         all_units = [player.leader] + player.field
@@ -634,7 +649,8 @@ class GameManager:
         for card in all_units:
             if card:
                 is_frozen = "FREEZE" in card.flags
-                card.reset_turn_status()
+                # ターン境界のリセット。【ターン1回】の使用回数もここで戻す。
+                card.reset_turn_status(clear_usage=True)
                 if not is_frozen: card.is_rest = False
         
         for don in player.don_rested:
@@ -783,9 +799,10 @@ class GameManager:
     def move_card(self, card: Card, dest_zone: Zone, dest_player: Player, dest_position: str = "BOTTOM"):
         current_owner, current_list = self._find_card_location(card)
         
-        # 領域移動時はステータスをリセット（特にトラッシュ/手札へ戻る場合）
+        # 領域移動時はステータスをリセット（特にトラッシュ/手札へ戻る場合）。
+        # 場を離れると新規状態になるため【ターン1回】の使用回数もリセットする。
         if dest_zone in [Zone.TRASH, Zone.HAND]:
-            card.reset_turn_status()
+            card.reset_turn_status(clear_usage=True)
             
         # フィールドから離れる場合、付与されていたドン‼をレスト状態で持ち主に返す
         if current_owner and current_list is not None and current_list is current_owner.field:
@@ -922,9 +939,31 @@ class GameManager:
                 self._suspend_for_trigger_confirm(item)
                 return
             self._pending_triggers.pop(0)
+            self._relocate_activated_trigger_card(item)
             self.resolve_ability(item["player"], item["ability"], source_card=item["card"])
             if self.active_interaction:
                 return  # 効果解決が対象選択等で中断 → resolve_interaction が再開
+
+    def _relocate_activated_trigger_card(self, item: Dict[str, Any]) -> None:
+        """発動が確定したライフ公開【トリガー】のカードを、効果解決前に手札からトラッシュへ移す。
+
+        ライフのカードはダメージ時に一旦手札へ置かれるが、【トリガー】を「発動する」場合は
+        手札に残らず、効果解決後にトラッシュへ置かれる（OPCG ルール）。効果が自身を登場させる
+        /手札に加える場合は、その効果の move_card が（トラッシュにある）当該カードを再配置する
+        ため、最終的な置き場所は効果に従う。発動しない（パス）場合はこの関数を通らず手札に残る。
+        """
+        ability = item.get("ability")
+        card = item.get("card")
+        player = item.get("player")
+        if ability is None or card is None or player is None:
+            return
+        if getattr(ability, "trigger", None) != TriggerType.TRIGGER:
+            return  # ON_LIFE_DECREASE 等（場のカードの誘発）は対象外
+        if card in player.hand:
+            self.move_card(card, Zone.TRASH, player)
+            log_event("INFO", "game.trigger_card_to_trash",
+                      f"Trigger card moved to trash before resolving: {card.master.name}",
+                      player=player.name)
 
     def _suspend_for_trigger_confirm(self, item: Dict[str, Any]) -> None:
         """【トリガー】等の発動可否を yes/no で確認するため中断する。
@@ -1331,6 +1370,25 @@ class GameManager:
         self._enqueue_life_decrease(player, count)
         self._advance_pending_triggers()
 
+    def _return_one_don(self, tp: Player, don: DonInstance) -> bool:
+        """ドン!!1枚を tp の場（アクティブ/レスト/付与中）から外しドン!!デッキへ戻す。
+        付与中だった場合は付与先キャラの attached_don を減らしてパワー上昇を解除する。"""
+        if don in tp.don_rested:
+            tp.don_rested.remove(don)
+        elif don in tp.don_active:
+            tp.don_active.remove(don)
+        elif don in tp.don_attached_cards:
+            tp.don_attached_cards.remove(don)
+            host = self._find_card_by_uuid(don.attached_to) if don.attached_to else None
+            if host is not None and getattr(host, "attached_don", 0) > 0:
+                host.attached_don -= 1
+        else:
+            return False
+        don.is_rest = False
+        don.attached_to = None
+        tp.don_deck.append(don)
+        return True
+
     def _don_pool_player(self, player: Player, action: GameAction) -> Player:
         """ドン操作の対象プレイヤー。「相手は…」は status="OPPONENT"、
         対象クエリの player=OPPONENT でも相手を指す。既定は効果の実行者。"""
@@ -1573,22 +1631,32 @@ class GameManager:
 
         if act_name == "RETURN_DON":
             # 「ドン‼-N」/「ドン!!デッキに戻す」: 場のドン!!を N 枚ドン!!デッキへ戻す。
-            # 影響の小さい順（レスト→アクティブ→付与中）に戻す。
+            # resolver が対象ドン!!を選ばせた場合は _return_don_selection の uuid を戻す。
+            # 選択が無い（直接呼び出し/ヘッドレス）場合は影響の小さい順（レスト→アクティブ
+            # →付与中）に自動で戻す。
             tp = self._don_pool_player(player, action)
+            selection = getattr(self, "_return_don_selection", None)
+            self._return_don_selection = None
             returned = 0
-            for _ in range(value):
-                if tp.don_rested:
-                    don = tp.don_rested.pop()
-                elif tp.don_active:
-                    don = tp.don_active.pop()
-                elif tp.don_attached_cards:
-                    don = tp.don_attached_cards.pop()
-                else:
-                    break
-                don.is_rest = False
-                don.attached_to = None
-                tp.don_deck.append(don)
-                returned += 1
+            if selection:
+                by_uuid = {d.uuid: d for d in
+                           (tp.don_active + tp.don_rested + tp.don_attached_cards)}
+                for uid in selection:
+                    don = by_uuid.get(uid)
+                    if don is not None and self._return_one_don(tp, don):
+                        returned += 1
+            else:
+                for _ in range(value):
+                    if tp.don_rested:
+                        don = tp.don_rested[-1]
+                    elif tp.don_active:
+                        don = tp.don_active[-1]
+                    elif tp.don_attached_cards:
+                        don = tp.don_attached_cards[-1]
+                    else:
+                        break
+                    if self._return_one_don(tp, don):
+                        returned += 1
             log_event("INFO", "game.action_return_don", f"{tp.name} returned {returned} DON!! to don deck", player=tp.name)
             return True
 
