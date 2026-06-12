@@ -449,7 +449,6 @@ def test_st10_002_no_ramp_when_don_in_middle():
     assert don_total(p1) == field_before             # 変化なし
 
 
-@pytest.mark.xfail(strict=True, reason="ST10-002 BUG: 条件「または自分の場のドンが8枚以上」(DON_COUNT>=8)のOR節が欠落し、DON==0のみが条件")
 def test_st10_002_ramp_when_don_ge_8():
     """ST10-002 起動メイン: 場のドンが8枚以上でもOR条件成立でドン1枚アクティブ追加されるべき。"""
     gm, p1, p2, L = build("ST10-002")

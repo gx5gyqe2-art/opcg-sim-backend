@@ -779,6 +779,28 @@ class EffectParser:
     def _parse_condition_obj(self, text: str) -> Condition:
         norm_text = _nfc(text)
 
+        # 選言条件「A、または B」「Aか、B」= A または B。同一資源の二値しきい値
+        # （例「ドン!!が0枚、または8枚以上」ST10-002 /「ドン!!が0枚か、3枚以上」OP05-060）。
+        # 双方が数量しきい値（N枚 / 以上 / 以下）を含む場合のみ分割し、対象/選択肢の「AかB」誤爆を避ける。
+        or_split = re.search(_nfc(r'^(?P<a>.+?(?:\d+枚|以上|以下))(?:、?または|か、)(?P<b>.+)$'), norm_text)
+        if or_split and re.search(_nfc(r'\d+枚|以上|以下'), or_split.group("b")):
+            a_txt = or_split.group("a")
+            b_txt = or_split.group("b")
+            # 第2項で資源主語が省略されている場合（「…か、3枚以上ある場合」）は第1項の主語「…が」を補う。
+            resource_kw = ['ドン', '手札', 'ライフ', 'トラッシュ', 'デッキ', 'キャラ']
+            if not any(_nfc(k) in b_txt for k in resource_kw):
+                prefix = re.match(_nfc(r'(.*?が)'), a_txt)
+                if prefix:
+                    b_txt = prefix.group(1) + b_txt
+            sub_a = self._parse_condition_obj(a_txt)
+            sub_b = self._parse_condition_obj(b_txt)
+            valid = [c for c in (sub_a, sub_b)
+                     if c and c.type not in (ConditionType.NONE, ConditionType.OTHER)]
+            if len(valid) == 2:
+                return Condition(type=ConditionType.OR, args=valid, raw_text=norm_text)
+            if len(valid) == 1:
+                return valid[0]
+
         # 複合条件「Aがいて、Bの場合」「Aが…以下で、Bの…」= A かつ B。
         # 連結部（がいて/がい(ない)て/があり/以上で/以下で 等）の直後の読点で2分割し、
         # 各半を再帰解析して AND にする。従来は全文を1条件として最初の数値で誤分類していた

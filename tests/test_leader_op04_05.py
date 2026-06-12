@@ -430,7 +430,6 @@ def test_op05_060_ramp_when_zero_don():
     assert len(p1.don_active) + len(p1.don_rested) == 1   # 1枚追加
 
 
-@pytest.mark.xfail(strict=True, reason="OP05-060バグ: 条件が DON_COUNT==0 のみで『または3枚以上』が欠落。ドン3枚以上で追加されない")
 def test_op05_060_ramp_when_three_or_more_don():
     """OP05-060 起動メイン: 自場のドン3枚以上でもドン!!1枚をアクティブ追加すべき。"""
     gm, p1, p2, L = build("OP05-060")
