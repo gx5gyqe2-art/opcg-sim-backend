@@ -9,6 +9,11 @@ from ...models.enums import ActionType, Zone, TriggerType, ConditionType, Compar
 from ...utils.logger_config import log_event
 import re
 
+# 選択グループ分配（§7-1）で「N枚を選び」の選択集合を保存する save_id。
+# atoms._SEL_GROUP_ID と一致させる。
+_SEL_GROUP_ID = "_sel_group"
+
+
 class EffectResolver:
     def __init__(self, game_manager):
         self.game_manager = game_manager
@@ -170,6 +175,13 @@ class EffectResolver:
                     self._suspend_for_cost_declaration(player, source_card)
                     return
 
+                # 遅延実行（「このターン終了時、〜」）: 即時実行せず end_turn フックへ予約する。
+                # 既に遅延フラッシュ中（_flushing_delayed）の再実行は通常どおり実行する。
+                if getattr(node, "delay", None) == "TURN_END" and not self.context.get("_flushing_delayed"):
+                    self.game_manager.pending_end_of_turn.append((player, node, source_card))
+                    log_event("INFO", "resolver.defer_turn_end", f"Deferred to end of turn: {node.type.name}", player=player.name)
+                    continue
+
                 # 任意効果（「〜してもよい」）: 発動するかを yes/no で確認する。未確認なら中断し、
                 # resume(yes) 時に id(node) を context の確認済み集合へ入れて同じノードを再投入する
                 # （no はスキップ）。共有ノード(CardMaster)を汚さないよう確認状態は context で持つ。
@@ -318,6 +330,11 @@ class EffectResolver:
                 # LOOK_LIFE は temp 末尾に append するため、公開カードは末尾
                 self.context["last_revealed_card"] = player.temp_zone[-1]
 
+        # 文脈依存スケーリング（§7-5「捨てたカード1枚につき」等）用に、直前アクションが
+        # 対象にした枚数を記録する。SELECT 等のメタアクションは数えない。
+        if success and action.type not in (ActionType.SELECT,):
+            self.context["_last_action_count"] = len(targets)
+
         # ▼▼▼ 追加: 実行履歴を記録 ▼▼▼
         target_names = [f"{t.master.name}({t.uuid[:4]})" for t in targets]
         self.action_history.append({
@@ -326,7 +343,7 @@ class EffectResolver:
             "targets": target_names,
             "value": value
         })
-        
+
         return success
 
     def _resolve_targets(self, player, query, source_card, action_node=None):
@@ -343,12 +360,31 @@ class EffectResolver:
         if query.save_id and query.save_id in self.context["saved_targets"]:
             return self.context["saved_targets"][query.save_id]
         
+        # 選択グループ分配（§7-1）: 先頭 M 枚を取り、消費済みとして記録する
+        # （後続の「残り」が消費分を除いて参照する）。
+        if getattr(query, "select_mode", None) == "GROUP_FIRST" and query.ref_id:
+            group = self.context["saved_targets"].get(query.ref_id, [])
+            consumed = self.context.setdefault("_grp_consumed", {}).setdefault(query.ref_id, [])
+            avail = [c for c in group if c.uuid not in consumed]
+            n = query.count if query.count and query.count > 0 else 1
+            picked = avail[:n]
+            consumed.extend(c.uuid for c in picked)
+            return picked
+
         if query.ref_id:
              if query.ref_id == "self":
                  return [source_card]
              if query.ref_id in self.context["saved_targets"]:
                  return self.context["saved_targets"][query.ref_id]
-        
+
+        # 「残り」: 直前の選択グループが存在すれば、その消費済みを除いた残余を対象にする
+        # （field 分配 OP08-118 等。グループが無ければ従来どおり TEMP=公開残りを参照）。
+        if getattr(query, "select_mode", None) == "REMAINING":
+            group = self.context["saved_targets"].get(_SEL_GROUP_ID)
+            if group:
+                consumed = self.context.setdefault("_grp_consumed", {}).setdefault(_SEL_GROUP_ID, [])
+                return [c for c in group if c.uuid not in consumed]
+
         from .matcher import get_target_cards
         candidates = get_target_cards(self.game_manager, query, source_card)
         

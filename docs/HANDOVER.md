@@ -278,20 +278,34 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 - `tests/test_quality_gates.py`: ラチェット式ゲート
   （WARN_DIRECTION=0 / STAT_ONLY=0 / NO_IMPL=0 / SELECT_MISMATCH≤2 / フォールバック=0）
 
-### 既知の残課題（優先順）
+### 既知の残課題（優先順）→ 2026-06 解消
 
-1. **mistarget D 残り4枚**（OP10-058/OP10-022/OP08-118/OP06-086）:
-   「2枚までを選び、1枚を…、残りを…」の選択グループ分配（選択結果の REMAINING 参照）が未実装。
-2. **OPPONENT_TURN / TURN_END 系トリガーの実プレイ配線**: resolve_ability 直呼びでは動くが、
-   ターン進行からの自動発火経路の網羅検証は未実施（Phase 4 H-6 バトルシナリオ網羅で対応予定）。
-3. **ドン付与の相手プール**（OP15-015）: 「相手のレストのドン‼を付与」が自分のドンを使う。
-4. **遅延効果**（OP03-005 サッチ / OP13-024 ゴードン）: 「このターン終了時、…」が即時実行される。
-5. **文脈依存の「N枚につき」**（捨てたカード1枚につき等）: 直前アクションの結果数参照が未実装
-   （フラット値のまま）。
-6. **「他の「X」」の自己除外**（EB02-018 バギー）: 「自分のキャラの他の「バギー」がいない」が
-   ソース自身を数えてしまう。
-7. **二重制約/複数ゾーンの対象**（EB03-049/OP06-086/OP13-079）: 「コスト6以下とコスト4以下を
-   1枚ずつ」「手札か場の…」の Choice/Sequence 分配が部分対応（interactive_target_audit に残存）。
+1. ✅ **選択グループ分配**（OP08-118 等）: 「N枚を選び、1枚を…、残りを…」を `select_distribute`
+   ルールで SELECT(グループ保存)＋GROUP_FIRST/REMAINING に分解。resolver がグループの先頭/残余を
+   参照する（field 分配）。OP06-086/OP10-058 は二ティア/公開(TEMP)経由で近似。
+2. ✅ **OPPONENT_TURN / TURN_END 系トリガーの実プレイ配線**: `end_turn` を `_fire_turn_end_triggers`
+   に分離し、ターンプレイヤーの TURN_END に加え非ターンプレイヤーの **OPP_TURN_END** も自動発火する。
+3. ✅ **ドン付与の相手プール**（OP15-015）: `don_attach` がドン枚数句直前の「相手の」を検出し
+   status に "OPP" を付与、エンジンが相手のドンプールから付与する（status `RESTED_OPP`）。
+4. ✅ **遅延効果**（OP03-005 / OP13-024）: `GameAction.delay="TURN_END"`。parser_v2 が「ターン終了時、/に」
+   を遅延マークし、resolver が `pending_end_of_turn` に積み、`end_turn` で解決する。
+5. ✅ **文脈依存の「N枚につき」**（捨てたカード1枚につき等）: `PREV_ACTION_COUNT` 動的値。resolver が
+   `_last_action_count`(直前アクションの対象枚数)を記録し、`get_dynamic_value` が参照する。
+6. ✅ **「他の「X」」の自己除外**（EB02-018 等）: matcher が「他の／このキャラ以外」で `EXCLUDE_SOURCE`
+   フラグを立て、`get_target_cards` がソース自身を候補から除外する。
+7. ✅ **二重制約/複数ゾーンの対象**（EB03-049/OP03-096/OP13-079）: `TargetQuery.zone` のリスト対応
+   （手札かトラッシュ等）、`dual_tier_play_from_trash` が特徴/名前/ゾーンを両ティアで共有、
+   `_parse_target_alternative_choice` が「AかB、<動詞>」を制約別 Choice に分解。
+
+> 監査 `interactive_target_audit` は raw_text 共有の兄弟（Choice/二択/二ティア/自己コスト）を集約
+> 判定する精度改善で誤検知を排し、ラチェットを **0** に締結（`test_quality_gates`）。
+
+### 残る近似・未対応（軽微）
+
+- ドン付与済み枚数依存「付与されているドン1枚につき」・「カード名の異なる」系の動的値は未対応
+  （対象固有/名前集合の別機構が必要）。
+- OP06-086 の「コスト4以下と2以下を1枚ずつ選び1枚登場・残りレスト」は二ティア＋REMAINING で
+  近似（厳密な選択集合分配ではない）。
 
 ---
 

@@ -111,6 +111,9 @@ class GameManager:
         from .effects.continuous import ContinuousEffectManager
         self.continuous = ContinuousEffectManager(self)
         self.action_events: List[Dict] = []  # per-request event buffer; reset in API handler
+        # 「このターン終了時、〜」の遅延アクション待ち行列: (player, GameAction, source_card)。
+        # resolver が積み、end_turn が解決する。
+        self.pending_end_of_turn: List[tuple] = []
 
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """
@@ -434,14 +437,49 @@ class GameManager:
         self._validate_action(self.turn_player, "MAIN_ACTION")
         self.phase = Phase.END
         log_event("INFO", "game.phase_end", f"Turn {self.turn_count} ending", player=self.turn_player.name)
-        all_units = [self.turn_player.leader] + self.turn_player.field
-        if self.turn_player.stage: all_units.append(self.turn_player.stage)
-        for card in all_units:
-            if card and card.master.abilities:
-                for ability in card.master.abilities:
-                    if ability.trigger == TriggerType.TURN_END: self.resolve_ability(self.turn_player, ability, source_card=card)
+        self._fire_turn_end_triggers()
+        # 「このターン終了時、〜」で予約された遅延アクションを解決する。
+        self._flush_pending_end_of_turn()
         self.continuous.expire("TURN_END", self.turn_count)
         self.switch_turn()
+
+    def _fire_turn_end_triggers(self):
+        """ターン終了時トリガーを発火する。ターンプレイヤーの【自分のターン終了時】
+        (TURN_END) と、非ターンプレイヤーの【相手のターン終了時】(OPP_TURN_END)。"""
+        def _units(pl):
+            us = [pl.leader] + pl.field
+            if pl.stage: us.append(pl.stage)
+            return us
+        for pl, trig in ((self.turn_player, TriggerType.TURN_END),
+                         (self.opponent, TriggerType.OPP_TURN_END)):
+            for card in _units(pl):
+                if card and card.master.abilities:
+                    for ability in card.master.abilities:
+                        if ability.trigger == trig:
+                            self.resolve_ability(pl, ability, source_card=card)
+
+    def _flush_pending_end_of_turn(self):
+        """end_turn フックで、予約された遅延アクション（このターン終了時、〜）を解決する。"""
+        if not self.pending_end_of_turn:
+            return
+        pending = self.pending_end_of_turn
+        self.pending_end_of_turn = []
+        for player, node, source_card in pending:
+            # 場を離れたカードのソース由来でも、トラッシュ送り等は対象解決時に弾かれる。
+            resolver = EffectResolver(self)
+            resolver.context["_flushing_delayed"] = True
+            resolver.execution_stack = [node]
+            try:
+                resolver._process_stack(player, source_card)
+            except Exception as e:
+                log_event("WARNING", "game.delayed_action_error", f"Deferred action failed: {e}", player=player.name)
+            for ev in resolver.action_history:
+                self.action_events.append({
+                    "type": "EFFECT", "player": player.name,
+                    "card_name": source_card.master.name,
+                    "action": ev.get("action", ""), "targets": ev.get("targets", []),
+                    "value": ev.get("value"), "success": ev.get("success", True),
+                })
 
     def switch_turn(self):
         # 追加ターン（EXTRA_TURN）: 予約したプレイヤーがターンプレイヤーのまま継続する
@@ -1500,24 +1538,28 @@ class GameManager:
                 log_event("INFO", "game.action_active", f"Card activated for {owner.name}", player=player.name)
                 success = True
             elif act_name == "ATTACH_DON":
-                # value 枚のドン!!を付与する。status="RESTED" の場合はレストのドンを
-                # レストのまま付与する（無ければもう一方のプールから補う）。
-                from_rested = (action.status == "RESTED")
+                # value 枚のドン!!を付与する。status に "RESTED" を含めばレストのドンを
+                # レストのまま付与する（無ければもう一方のプールから補う）。status に "OPP" を
+                # 含めば相手のドンプールから付与する（OP15-015「相手のレストのドン‼を付与」）。
+                st = action.status or ""
+                from_rested = ("RESTED" in st)
+                from_opp = ("OPP" in st)
+                don_owner = (self.p2 if player == self.p1 else self.p1) if from_opp else player
                 n = value if value and value > 0 else 1
                 attached = 0
                 for _ in range(n):
-                    pool = player.don_rested if from_rested else player.don_active
+                    pool = don_owner.don_rested if from_rested else don_owner.don_active
                     if not pool:
-                        pool = player.don_active if from_rested else player.don_rested
+                        pool = don_owner.don_active if from_rested else don_owner.don_rested
                     if not pool:
                         break
                     don = pool.pop(0)
                     don.attached_to = target.uuid
                     don.is_rest = from_rested
-                    player.don_attached_cards.append(don)
+                    don_owner.don_attached_cards.append(don)
                     target.attached_don += 1
                     attached += 1
-                log_event("INFO", "game.action_attach_don", f"{attached} DON!! attached to {target.master.name} (rested={from_rested})", player=player.name)
+                log_event("INFO", "game.action_attach_don", f"{attached} DON!! attached to {target.master.name} (rested={from_rested}, opp_pool={from_opp})", player=player.name)
                 success = True
             elif act_name == "MOVE_CARD":
                 dest = action.destination if action.destination else Zone.HAND
@@ -1554,6 +1596,10 @@ class GameManager:
         if not val_source: return 0
         if val_source.dynamic_source == "COUNT_REFERENCE":
             log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name); return len(player.trash)
+        # 文脈依存「直前アクションで捨てた/戻した/KOした…カードN枚につき」（§7-5）。
+        # 生の枚数を返す（divisor/multiplier は _calculate_value が適用する）。
+        if val_source.dynamic_source == "PREV_ACTION_COUNT":
+            return int((context or {}).get("_last_action_count", 0) or 0)
         # 「<範囲>N枚につき」の汎用カウント（RC-4）。範囲クエリを毎回実体化して数える
         # （PASSIVE 再計算で盤面に追随する）。
         if val_source.dynamic_source == "COUNT_QUERY" and getattr(val_source, "count_query", None) is not None:

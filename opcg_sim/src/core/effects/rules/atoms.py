@@ -86,6 +86,58 @@ def _draw(ctx: ParseContext) -> Optional[GameAction]:
 # ---------------------------------------------------------------------------
 # KO: 「（対象）をKOする」
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# 選択グループ分配（§7-1）: 「<対象>N枚(まで)を選び、(…)M枚を<A>(、)残りを<B>」
+#   N>M の選択集合を1度だけ選び、先頭 M 枚に A を、残りに B を適用する。
+#   本ルールは「選び、…M枚を<A>」までを SELECT + A(グループ先頭 M) に変換する。
+#   後続の「残りを<B>」は既存の REMAINING 句が拾い、resolver がグループの残余を参照する。
+# ---------------------------------------------------------------------------
+_SEL_GROUP_ID = "_sel_group"
+
+
+def _distribute_apply(apply_text: str, count: int, full_text: str,
+                      select_mode: str, ref_id: Optional[str]) -> Optional[GameAction]:
+    """分配の片側アクション（パワー±N=BUFF / KO）を、グループ参照対象で構築する。"""
+    tq = TargetQuery(select_mode=select_mode, ref_id=ref_id, count=count)
+    mp = re.search(_nfc(rf"パワー({_SIGN}[\d０-９]+)"), apply_text)
+    if mp:
+        return GameAction(type=ActionType.BUFF, target=tq,
+                          value=ValueSource(base=_to_int(mp.group(1))),
+                          duration=_duration_of(full_text), raw_text=apply_text)
+    if re.search(_nfc(r"KO(する|し|できる)"), apply_text):
+        return GameAction(type=ActionType.KO, target=tq, raw_text=apply_text)
+    if re.search(_nfc(r"手札に(戻す|加える)"), apply_text):
+        return GameAction(type=ActionType.BOUNCE, target=tq, raw_text=apply_text)
+    return None
+
+
+@rule("select_distribute", priority=93)
+def _select_distribute(ctx: ParseContext) -> Optional[EffectNode]:
+    t = ctx.text
+    m_sel = re.search(_nfc(r"(.+?)([\d０-９]+)枚(まで)?を選び[、,]"), t)
+    if not m_sel:
+        return None
+    after = t[m_sel.end():]
+    m_app = re.search(_nfc(r"([\d０-９]+)枚を(.+)"), after)
+    if not m_app:
+        return None
+    sel_n = _to_int(m_sel.group(2))
+    apply_m = _to_int(m_app.group(1))
+    # 真の分配（選択数 > 適用数）のみを扱う。N==M は通常の単一アクション。
+    if sel_n <= apply_m or apply_m < 1:
+        return None
+    apply_action = _distribute_apply(
+        m_app.group(2), apply_m, t, select_mode="GROUP_FIRST", ref_id=_SEL_GROUP_ID)
+    if apply_action is None:
+        return None
+    sel_tq = parse_target(m_sel.group(1))
+    sel_tq.count = sel_n
+    sel_tq.is_up_to = bool(m_sel.group(3))
+    sel_tq.save_id = _SEL_GROUP_ID
+    select_action = GameAction(type=ActionType.SELECT, target=sel_tq, raw_text=t)
+    return Sequence(actions=[select_action, apply_action])
+
+
 @rule("ko", priority=70)
 def _ko(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -235,7 +287,13 @@ def _per_n_value(t: str, x: int) -> Optional[ValueSource]:
         return None
     counted = m.group(1).strip()
     n = max(_to_int(m.group(2)), 1)
-    if re.search(_nfc(r"(捨てた|戻した|KOした|置いた|レストにした|付与されている|異なる)"), counted):
+    # 文脈依存「直前アクションで<捨てた/戻した/KOした/置いた/レストにした>カードN枚につき」は
+    # 直前アクションが対象にした枚数を参照する（§7-5）。resolver が _last_action_count を記録。
+    if re.search(_nfc(r"(捨てた|戻した|KOした|置いた|レストにした)"), counted):
+        return ValueSource(base=0, dynamic_source="PREV_ACTION_COUNT",
+                           divisor=n, multiplier=x)
+    # 「付与されているドンN枚につき」「カード名の異なる…」は別機構（対象固有/名前集合）のため未対応。
+    if re.search(_nfc(r"(付与されている|異なる)"), counted):
         return None
     if re.fullmatch(_nfc(r"(自分の)?トラッシュ(にあるカード)?"), counted):
         return ValueSource(base=0, dynamic_source="COUNT_REFERENCE",
@@ -772,11 +830,26 @@ def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
         recipient.count = 1
     if not recipient.card_type:
         recipient.card_type.extend(["LEADER", "CHARACTER"])
+    # 付与するドンのプール元を判定する。ドン枚数句の直前に「相手の」があれば
+    # 相手のドンを付与する（OP15-015「相手のキャラ1枚に相手のレストのドン‼1枚」）。
+    # 既定（明示なし/「自分の」）はコントローラー自身のドン。
+    from_opp_pool = False
+    don_m = _DON_COUNT_RE.search(t) or re.search(_nfc(r"ドン(?:!!|‼)"), t)
+    if don_m:
+        pre = t[max(0, don_m.start() - 8):don_m.start()]
+        if _nfc("相手") in pre:
+            from_opp_pool = True
+    is_rested = _nfc("レストのドン") in t or _nfc("コストエリアのドン") in t
+    status_parts = []
+    if is_rested:
+        status_parts.append("RESTED")
+    if from_opp_pool:
+        status_parts.append("OPP")
     return GameAction(
         type=ActionType.ATTACH_DON,
         target=recipient,
         value=ValueSource(base=_don_count(t)),
-        status="RESTED" if _nfc("レストのドン") in t or _nfc("コストエリアのドン") in t else None,
+        status="_".join(status_parts) if status_parts else None,
         duration=_duration_of(t),
         raw_text=t,
     )
@@ -1609,9 +1682,21 @@ def _dual_tier_play_from_trash(ctx: ParseContext) -> Optional[EffectNode]:
         return None
     c1, c2 = int(m.group(1)), int(m.group(2))
 
+    # 主語修飾（特徴《X》/名前「X」/ゾーン「手札かトラッシュ」/色）は parse_target に拾わせ、
+    # 両ティアで共有する（従来は CHARACTER/TRASH 固定で特徴・手札が脱落: EB03-049）。
+    base = parse_target(t)
+
     def _tier(cost_max: int, rested: bool) -> GameAction:
-        tq = TargetQuery(player=Player.SELF, zone=Zone.TRASH, card_type=["CHARACTER"],
-                         cost_max=cost_max, count=1, is_up_to=True)
+        tq = TargetQuery(
+            player=base.player or Player.SELF,
+            zone=base.zone if base.zone not in (Zone.FIELD, None) else Zone.TRASH,
+            card_type=list(base.card_type) or ["CHARACTER"],
+            traits=list(base.traits),
+            names=list(base.names),
+            colors=list(base.colors),
+            attributes=list(base.attributes),
+            cost_max=cost_max, count=1, is_up_to=True,
+        )
         return GameAction(
             type=ActionType.PLAY_CARD,
             target=tq,

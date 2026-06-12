@@ -2266,6 +2266,92 @@ def test_until_next_turn_end_buff_expiry_boundary():
     assert char.get_power(True) == 4000, "次ターン終了で失効するべき"
 
 
+def test_delayed_turn_end_action_defers_then_fires():
+    """「このターン終了時、〜」: 解決時は即時実行せず、end_turn で発火する（OP03-005 系）。"""
+    from opcg_sim.src.models.effect_types import Sequence as _Seq, TargetQuery as _TQ
+    gm, p1, p2 = make_game()
+    gm.turn_player, gm.opponent = p1, p2
+    gm.turn_count = 2
+    source = make_instance(make_master(card_id="C-DLY", name="遅延"), owner="P1")
+    p1.field.append(source)
+    src_tq = _TQ(select_mode="SOURCE")
+    buff = GameAction(type=ActionType.BUFF, value=ValueSource(base=2000),
+                      target=src_tq, duration="THIS_TURN")
+    trash = GameAction(type=ActionType.TRASH, target=src_tq, delay="TURN_END")
+    ab = Ability(trigger=TriggerType.ACTIVATE_MAIN, effect=_Seq(actions=[buff, trash]))
+    gm.resolve_ability(p1, ab, source_card=source)
+    # 即時: バフは適用、トラッシュは保留（場に残る）
+    assert source in p1.field, "TRASH は即時実行されず保留されるべき"
+    assert source.get_power(True) == 3000, "BUFF は即時適用される"
+    assert len(gm.pending_end_of_turn) == 1
+    # ターン終了で遅延 TRASH が発火する
+    gm._flush_pending_end_of_turn()
+    assert source not in p1.field, "end_turn で遅延 TRASH が発火するべき"
+    assert source in p1.trash
+    assert gm.pending_end_of_turn == []
+
+
+def test_select_group_distribution_field():
+    """§7-1 選択グループ分配: 「2枚を選び、1枚を-3000、残りを-2000」が
+    選択集合の先頭1枚に -3000、残りに -2000 を適用する（OP08-118 系）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    gm.turn_player, gm.opponent = p1, p2
+    gm.turn_count = 2
+    e1 = make_instance(make_master(card_id="E1", name="敵1", power=5000), owner="P2")
+    e2 = make_instance(make_master(card_id="E2", name="敵2", power=5000), owner="P2")
+    p2.field += [e1, e2]
+    src = make_instance(make_master(card_id="SD", name="分配"), owner="P1")
+    p1.field.append(src)
+    ab = EffectParserV2().parse_card_text(
+        "【登場時】相手のキャラ2枚までを選び、次の相手のターン終了時まで、"
+        "1枚をパワー-3000し、残りをパワー-2000。")[0]
+    gm.resolve_ability(p1, ab, source_card=src)
+    # 2枚を明示選択して分配を完走させる
+    assert gm.active_interaction and gm.active_interaction.get("action_type") == "SELECT_TARGET"
+    gm.resolve_interaction(p1, {"selected_uuids": [e1.uuid, e2.uuid], "index": 0})
+    powers = sorted([e1.get_power(False), e2.get_power(False)])
+    assert powers == [2000, 3000], f"先頭=-3000/残り=-2000 の分配を期待: {powers}"
+
+
+def test_opp_turn_end_fires_at_end_turn():
+    """§7-2 【相手のターン終了時】(OPP_TURN_END): ターンプレイヤーのターン終了で、
+    非ターンプレイヤーの当該能力が自動発火する。"""
+    gm, p1, p2 = make_game()
+    gm.turn_player, gm.opponent = p1, p2
+    gm.turn_count = 2
+    fired = {"n": 0}
+    ramp = GameAction(type=ActionType.RAMP_DON, value=ValueSource(base=1))
+    ab = Ability(trigger=TriggerType.OPP_TURN_END, effect=ramp)
+    watcher = make_instance(
+        make_master(card_id="W", name="監視", abilities=(ab,)), owner="P2")
+    p2.field.append(watcher)
+    before = len(p2.don_active) + len(p2.don_rested)
+    gm._fire_turn_end_triggers()  # p1 のターン終了 → p2 の【相手のターン終了時】が発火
+    after = len(p2.don_active) + len(p2.don_rested)
+    assert after == before + 1, "非ターンプレイヤーの OPP_TURN_END が発火するべき"
+
+
+def test_prev_action_count_scaling():
+    """§7-5 文脈依存「捨てたカード1枚につき、…パワー+N」: 直前アクションで対象にした
+    枚数に比例してバフ値が決まる（P-051 系。2枚捨て→+2000）。"""
+    from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+    gm, p1, p2 = make_game()
+    gm.turn_player, gm.opponent = p1, p2
+    gm.turn_count = 2
+    src = make_instance(make_master(card_id="P051", name="ボニー", power=5000), owner="P1")
+    p1.field.append(src)
+    for i in range(2):
+        p1.hand.append(make_instance(make_master(card_id=f"H{i}", name=f"手{i}"), owner="P1"))
+    ab = EffectParserV2().parse_card_text(
+        "【アタック時】自分の手札を任意の枚数捨ててもよい。"
+        "捨てたカード1枚につき、このキャラは、このバトル中、パワー+1000。")[0]
+    gm.resolve_ability(p1, ab, source_card=src)
+    gm.resolve_interaction(p1, {"accepted": True, "index": 0})       # 任意効果を発動
+    gm.resolve_interaction(p1, {"selected_uuids": [c.uuid for c in p1.hand], "index": 0})
+    assert src.get_power(True) == 7000, "2枚捨て → +2000 を期待"
+
+
 def cov_drain(gm):
     import effect_coverage as _cov
     _cov._smart_drain(gm, record={})

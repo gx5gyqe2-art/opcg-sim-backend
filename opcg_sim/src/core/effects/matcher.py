@@ -24,6 +24,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     player_text = re.sub(
         _nfc(r'(?:お互いの|相手の|自分の)?ライフの(?:合計)?枚数(?:分)?以下のコストを持つ'),
         '', tgt_text)
+    # 同様に「(相手の/自分の)場のドン‼の枚数以下のコストを持つ」もコスト基準であって
+    # 対象側ではない（「自分の手札から…相手の場のドン‼の枚数以下のコストを持つ『X』」で
+    # player を OPPONENT に誤判定し相手手札を見てしまう: OP08-062 カタクリ）。
+    player_text = re.sub(
+        _nfc(r'(?:相手の|自分の|お互いの)?場のドン(?:!!|‼)?の枚数(?:分)?以下のコストを持つ'),
+        '', player_text)
     # 期間/タイミング句の「相手の」は対象側ではないため除去する
     # （「自分のリーダーを、次の相手のターン終了時まで、パワー+2000」で OPPONENT 誤判定を防ぐ）。
     # 「相手のキャラ」等の実対象修飾は残すよう、ターン/エンドフェイズ＋まで/中 に限定する。
@@ -93,7 +99,25 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         elif _nfc(ParserKeyword.DON) in tgt_text:
             found_zone = Zone.COST_AREA
 
-    if found_zone:
+    # 複数ゾーン「手札かトラッシュから」「場か手札の」: 「Zか(ら)Z」並列で
+    # 候補ゾーンを併記する（EB03-049 手札かトラッシュ / OP13-079 場か手札）。
+    # 「場」は「登場/場合」と紛れるため後置詞（の/から/に/か）を要求する。
+    multi_zones = []
+    if re.search(_nfc(r'(手札|トラッシュ|デッキ|ライフ|場)(?:から|の|に)?か[、,]?(?:[^。]{0,4})?(手札|トラッシュ|デッキ|ライフ|場)'), player_text):
+        zone_markers = [
+            (_nfc("手札"), Zone.HAND), (_nfc("トラッシュ"), Zone.TRASH),
+            (_nfc("ライフ"), Zone.LIFE), (_nfc("デッキ"), Zone.DECK),
+        ]
+        for zk, zv in zone_markers:
+            if zk in player_text and zv not in multi_zones:
+                multi_zones.append(zv)
+        # 「場」はゾーン後置詞付きのときだけ（登場/場合を除外）
+        if re.search(_nfc(r'場(?:の|から|に|か)'), player_text) and Zone.FIELD not in multi_zones:
+            multi_zones.append(Zone.FIELD)
+
+    if len(multi_zones) >= 2:
+        tq.zone = multi_zones
+    elif found_zone:
         tq.zone = found_zone
     else:
         tq.zone = Zone.FIELD
@@ -114,6 +138,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     
     if _nfc("含む") in tgt_text:
         tq.flags.add("NAME_PARTIAL")
+
+    # 「（このキャラ）他の」「このキャラ以外」: ソース自身を候補から除外する。
+    # 例: EB02-018「自分のキャラの他の『バギー』がいない場合」（自分自身を数えない）、
+    # OP04-111「このキャラ以外の自分の特徴《ホーミーズ》を持つキャラ」（自身をコストに使わない）。
+    if _nfc("他の") in tgt_text or _nfc("このキャラ以外") in tgt_text or _nfc("以外の自分") in tgt_text:
+        tq.flags.add("EXCLUDE_SOURCE")
     
     # 特徴は《X》/<X> に加え 『X』（例: 『白ひげ海賊団』を含む特徴を持つ）でも表記される。
     # 名前は「X」を使うため 『』 と衝突しない（condition 側も 『X』 を特徴として扱う）。
@@ -152,8 +182,14 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # \u52d5\u7684\u30b3\u30b9\u30c8\u4e0a\u9650: \u300c\uff08\u81ea\u5206\u306e\uff09\u5834\u306e\u30c9\u30f3!!\u306e\u679a\u6570\uff08\u5206\uff09\u4ee5\u4e0b\u306e\u30b3\u30b9\u30c8\u300d\u2192 DON_COUNT_FIELD\u3002
     #   \u6570\u5024\u3067\u306f\u306a\u304f\u5834\u306e\u30c9\u30f3!!\u679a\u6570\u3067\u30b3\u30b9\u30c8\u4e0a\u9650\u304c\u6c7a\u307e\u308b\uff08\u865a\u306e\u7389\u5ea7 OP13-099 \u7b49\uff09\u3002
     #   \u30a8\u30f3\u30b8\u30f3 get_target_cards \u304c DON_COUNT_FIELD \u3092\u8a55\u4fa1\u3059\u308b\u3002
-    if re.search(_nfc(r'\u30c9\u30f3(?:!!|\u203c)?\u306e\u679a\u6570(?:\u5206)?\u4ee5\u4e0b\u306e\u30b3\u30b9\u30c8'), tgt_text):
-        tq.cost_max_dynamic = "DON_COUNT_FIELD"
+    m_don_cap = re.search(_nfc(r'(\u76f8\u624b\u306e|\u81ea\u5206\u306e)?(?:\u5834\u306e)?\u30c9\u30f3(?:!!|\u203c)?\u306e\u679a\u6570(?:\u5206)?\u4ee5\u4e0b\u306e\u30b3\u30b9\u30c8'), tgt_text)
+    if m_don_cap:
+        # \u300c\u76f8\u624b\u306e\u5834\u306e\u30c9\u30f3\u203c\u306e\u679a\u6570\u4ee5\u4e0b\u306e\u30b3\u30b9\u30c8\u300d\u306f\u76f8\u624b\u306e\u30c9\u30f3\u679a\u6570\uff08OP08-062\uff09\u3001
+        # \u65e2\u5b9a\uff08\u660e\u793a\u306a\u3057/\u81ea\u5206\u306e\uff09\u306f\u81ea\u5206\u306e\u30c9\u30f3\u679a\u6570\uff08\u865a\u306e\u7389\u5ea7 OP13-099 \u7b49\uff09\u3002
+        if m_don_cap.group(1) == _nfc("\u76f8\u624b\u306e"):
+            tq.cost_max_dynamic = "DON_COUNT_FIELD_OPPONENT"
+        else:
+            tq.cost_max_dynamic = "DON_COUNT_FIELD"
 
     # \u52d5\u7684\u30b3\u30b9\u30c8\u4e0a\u9650: \u300c(\u76f8\u624b\u306e/\u81ea\u5206\u306e/\u304a\u4e92\u3044\u306e) \u30e9\u30a4\u30d5\u306e(\u5408\u8a08)?\u679a\u6570(\u5206)?\u4ee5\u4e0b\u306e\u30b3\u30b9\u30c8\u300d\u3002
     #   \u30e9\u30a4\u30d5\u679a\u6570\u3067\u30b3\u30b9\u30c8\u4e0a\u9650\u304c\u6c7a\u307e\u308b\uff08OP04-112 \u30e4\u30de\u30c8 / OP05-102 \u30b2\u30c0\u30c4 \u7b49\uff09\u3002
@@ -226,26 +262,33 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
     elif query.player == Player.ALL: target_players = [game_manager.p1, game_manager.p2]
     elif query.player == Player.OWNER: target_players = [owner_player]
 
+    # zone はリスト（「手札かトラッシュから」EB03-049 / 「場か手札」OP13-079）も取り得る。
+    zones = query.zone if isinstance(query.zone, list) else [query.zone]
+
     candidates = []
     for p in target_players:
         if not p: continue
-        if query.zone == Zone.FIELD:
-            candidates.extend(p.field)
-            if not query.card_type or "LEADER" in query.card_type:
-                if p.leader: candidates.append(p.leader)
-            if p.stage: candidates.append(p.stage)
-        elif query.zone == Zone.HAND: candidates.extend(p.hand)
-        elif query.zone == Zone.TRASH: candidates.extend(p.trash)
-        elif query.zone == Zone.LIFE: candidates.extend(p.life)
-        elif query.zone == Zone.TEMP: candidates.extend(p.temp_zone)
-        elif query.zone == Zone.DECK: candidates.extend(p.deck)
-        elif query.zone == Zone.COST_AREA:
-            candidates.extend(p.don_active)
-            candidates.extend(p.don_rested)
+        for z in zones:
+            if z == Zone.FIELD:
+                candidates.extend(p.field)
+                if not query.card_type or "LEADER" in query.card_type:
+                    if p.leader: candidates.append(p.leader)
+                if p.stage: candidates.append(p.stage)
+            elif z == Zone.HAND: candidates.extend(p.hand)
+            elif z == Zone.TRASH: candidates.extend(p.trash)
+            elif z == Zone.LIFE: candidates.extend(p.life)
+            elif z == Zone.TEMP: candidates.extend(p.temp_zone)
+            elif z == Zone.DECK: candidates.extend(p.deck)
+            elif z == Zone.COST_AREA:
+                candidates.extend(p.don_active)
+                candidates.extend(p.don_rested)
 
     dynamic_cost_max = None
     if query.cost_max_dynamic == "DON_COUNT_FIELD":
         p = owner_player
+        dynamic_cost_max = len(p.don_active) + len(p.don_rested) + len(p.don_attached_cards)
+    elif query.cost_max_dynamic == "DON_COUNT_FIELD_OPPONENT":
+        p = opponent_player
         dynamic_cost_max = len(p.don_active) + len(p.don_rested) + len(p.don_attached_cards)
     elif query.cost_max_dynamic == "LIFE_COUNT_OPPONENT":
         dynamic_cost_max = len(opponent_player.life)
@@ -254,11 +297,15 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
     elif query.cost_max_dynamic == "LIFE_COUNT_BOTH":
         dynamic_cost_max = len(owner_player.life) + len(opponent_player.life)
 
+    exclude_source = "EXCLUDE_SOURCE" in query.flags
+
     results = []
     seen_names = set()
     for card in candidates:
         if not card: continue
-        
+
+        if exclude_source and source_card is not None and card is source_card: continue
+
         if not hasattr(card, "master"):
             if query.is_rest is not None and card.is_rest != query.is_rest: continue
             if query.card_type: continue
@@ -314,6 +361,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
     if not results:
         log_level = "WARNING"
         if query.select_mode in ["ALL", "REMAINING"] or query.is_up_to: log_level = "INFO"
-        log_event(level_key=log_level, action="matcher.no_target", msg=f"No targets found for query: {query.raw_text}", player="system", payload={"query_raw": query.raw_text, "zone": query.zone.name, "target_player": query.player.name, "real_target_names": [p.name for p in target_players], "candidates_scanned": len(candidates)})
+        zone_name = ",".join(z.name for z in zones)
+        log_event(level_key=log_level, action="matcher.no_target", msg=f"No targets found for query: {query.raw_text}", player="system", payload={"query_raw": query.raw_text, "zone": zone_name, "target_player": query.player.name, "real_target_names": [p.name for p in target_players], "candidates_scanned": len(candidates)})
 
     return results

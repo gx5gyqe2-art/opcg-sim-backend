@@ -15,13 +15,28 @@
 """
 from __future__ import annotations
 
+import re
 from typing import List, Optional
 
-from ...models.effect_types import EffectNode, GameAction
+from ...models.effect_types import EffectNode, GameAction, Sequence, _nfc
 from ...models.enums import ActionType
 from ...utils.logger_config import log_event
 from .parser import EffectParser
 from .rules import ParseContext, RuleRegistry, default_registry
+
+
+# 「このターン終了時、〜」「ターン終了時に〜」= 遅延実行（ターン終了フックで解決）。
+# 「ターン終了時まで」は期間（duration）であって遅延ではないため除外する。
+_DELAY_TURN_END_RE = re.compile(_nfc(r"ターン終了時(?!まで)[、にはのでも]"))
+
+
+def _mark_delay(node: EffectNode, delay: str) -> None:
+    """ノード木中の GameAction に遅延マーカーを付与する。"""
+    if isinstance(node, GameAction):
+        node.delay = delay
+    elif isinstance(node, Sequence):
+        for a in node.actions:
+            _mark_delay(a, delay)
 
 
 class EffectParserV2(EffectParser):
@@ -41,9 +56,12 @@ class EffectParserV2(EffectParser):
         ルールが一致すればその結果を、なければレガシー実装にフォールバックする。
         """
         ctx = ParseContext(text=text, is_cost=is_cost)
+        delayed = bool(_DELAY_TURN_END_RE.search(_nfc(text)))
         result = self.registry.apply(ctx)
         if result is not None:
             self.rule_hits.append(result.rule_name)
+            if delayed:
+                _mark_delay(result.node, "TURN_END")
             log_event(
                 "DEBUG",
                 "parserv2.rule_hit",
@@ -54,6 +72,8 @@ class EffectParserV2(EffectParser):
         # フォールバック（=未対応として記録）
         self.unmatched.append(ctx.text)
         node = super()._parse_atomic_action(text, is_cost)
+        if delayed and node is not None:
+            _mark_delay(node, "TURN_END")
         if isinstance(node, GameAction) and node.type == ActionType.OTHER:
             self.fallback_other.append(ctx.text)
         log_event(

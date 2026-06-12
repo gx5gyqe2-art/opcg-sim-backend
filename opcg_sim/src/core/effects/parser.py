@@ -440,6 +440,13 @@ class EffectParser:
         if suruka is not None:
             return suruka
 
+        # 対象択一「<Aの対象>か、<Bの対象><枚数>を、<動詞>」: 制約の異なる2つの対象が
+        # 同じ動詞・枚数を共有する択一（例 OP03-096「相手のコスト0のキャラか、相手のコスト
+        # 3以下のステージ1枚までを、KOする」）。1アクションに融合して片方の制約が落ちるのを防ぐ。
+        alt = self._parse_target_alternative_choice(norm_text, is_cost)
+        if alt is not None:
+            return alt
+
         # 共有対象の二択「<X>を、<A>か<B>」（か の後に読点なし）: 1つの対象 X に対する
         # 2アクションの択一（例:「…キャラ1枚までを、ライフの上に表向きで加えるか登場させる」）。
         shared = self._parse_shared_target_choice(norm_text, is_cost)
@@ -1071,6 +1078,61 @@ class EffectParser:
             message=_nfc("効果を選択してください"),
             options=[opt_a, opt_b],
             option_labels=[left, right],
+            player=chooser,
+        )
+
+    def _parse_target_alternative_choice(self, text: str, is_cost: bool) -> Optional[EffectNode]:
+        """「<A対象>か、<B対象><枚数>を、<動詞>」形式の対象択一を Choice 化する（無ければ None）。
+
+        A と B は制約（コスト/特徴/種別/側）が異なる対象記述で、末尾の「<枚数>を、<動詞>」を
+        共有する。共有サフィックスを A 側にも補って各オプションを解釈する。
+        例 OP03-096「相手のコスト0のキャラか、相手のコスト3以下のステージ1枚までを、KOする」。
+
+        名詞並列の「自分か相手／リーダーかキャラ」等を誤って割らないよう、A・B の両方が
+        対象修飾語（コスト/特徴/枚数/種別）を含み、かつ両側が実行系アクションに解釈できる
+        場合のみ Choice 化する。
+        """
+        norm = _nfc(text)
+        if _nfc("以下から") in norm:
+            return None
+        # 「〜場合」を含む句は条件節（「ドンが0枚か、3枚以上ある場合」OP05-060）であって
+        # 対象択一ではない。条件分岐は専用経路に委ねる。
+        if _nfc("場合") in norm:
+            return None
+        m = re.search(_nfc(r'か、'), norm)
+        if not m:
+            return None
+        left = norm[:m.start()].strip()
+        right = norm[m.end():].strip().rstrip(_nfc('。')).strip()
+        if not left or not right:
+            return None
+        # 動詞終止形＋「か、」の場合は _parse_suruka_choice（別対象・動詞二択）に委ねる。
+        if re.search(_nfc(r'[るくすつぶむうぐ]$'), left):
+            return None
+        # 左側が「が\d+枚」等の数量条件記述（条件節の名残）なら対象ではない。
+        if re.search(_nfc(r'が\d+枚'), left):
+            return None
+        # 共有サフィックス「<枚数>(まで)?を、<動詞>」を right から抽出する。
+        suf = re.search(_nfc(r'(\d+枚(?:まで)?を、.+)$'), right)
+        if not suf:
+            return None
+        shared_suffix = suf.group(1)
+        # A 側は対象記述のみ（種別 キャラ/ステージ/リーダー 等を含むこと）。
+        if not re.search(_nfc(r'(キャラ|ステージ|リーダー|カード|ドン)'), left):
+            return None
+        # B 側（right の先頭〜枚数の手前）も対象記述であること。
+        b_desc = right[:suf.start()]
+        if not re.search(_nfc(r'(キャラ|ステージ|リーダー|カード|ドン)'), b_desc):
+            return None
+        opt_a = self._parse_to_node(left + shared_suffix, is_cost)
+        opt_b = self._parse_to_node(right, is_cost)
+        if not (self._node_has_real_action(opt_a) and self._node_has_real_action(opt_b)):
+            return None
+        chooser = Player.OPPONENT if re.search(_nfc(r'相手は'), norm[:m.start()]) else Player.SELF
+        return Choice(
+            message=_nfc("対象を選択してください"),
+            options=[opt_a, opt_b],
+            option_labels=[left, b_desc],
             player=chooser,
         )
 
