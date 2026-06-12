@@ -1316,8 +1316,9 @@ class GameManager:
                 if sub is None:
                     continue
                 resolver = EffectResolver(self)
-                # 条件チェック: source_card には「除去されるカード」を渡す（OPPONENT_REMOVAL フィルタ評価のため）
-                if ab.condition is not None and not resolver._check_condition(owner, ab.condition, card):
+                # 条件チェック: source_card=除去されるカード（OPPONENT_REMOVAL/名称フィルタ評価用）、
+                # host_card=保護者（HAS_DON 等の「能力保持カードの付与ドン」評価用。OP05-001 はリーダー）。
+                if ab.condition is not None and not resolver._check_condition(owner, ab.condition, card, host_card=protector):
                     continue
                 # 代わりの行動が取れない場合は置換不成立
                 if not resolver._can_satisfy_node(owner, sub, protector):

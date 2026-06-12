@@ -904,6 +904,14 @@ class EffectParser:
             return Condition(type=ConditionType.SOURCE_STATE,
                              value=("NAME", repl_name_m.group(1)),
                              player=Player.SELF, raw_text=norm_text)
+        # 置換の対象指定「（自分の）（元々の）パワーN以上/以下のキャラがKOされる/場を離れる（場合）」:
+        # 離脱カードのパワーで限定（OP05-001「自分のパワー5000以上のキャラがKOされる」）。
+        repl_pow_m = re.search(_nfc(r'パワー(\d+)(以上|以下)のキャラが(?:KOされる|場を離れる)'), norm_text)
+        if repl_pow_m:
+            op = CompareOperator.GE if repl_pow_m.group(2) == _nfc('以上') else CompareOperator.LE
+            return Condition(type=ConditionType.SOURCE_STATE,
+                             value=("POWER", int(repl_pow_m.group(1))), operator=op,
+                             player=Player.SELF, raw_text=norm_text)
 
         # 選言条件「A、または B」「Aか、B」= A または B。同一資源の二値しきい値
         # （例「ドン!!が0枚、または8枚以上」ST10-002 /「ドン!!が0枚か、3枚以上」OP05-060）。

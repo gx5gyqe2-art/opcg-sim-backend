@@ -493,12 +493,15 @@ class EffectResolver:
             
         return val
 
-    def _check_condition(self, player, condition: Condition, source_card) -> bool:
+    def _check_condition(self, player, condition: Condition, source_card, host_card=None) -> bool:
+        # host_card: 能力の保持カード（置換/除去保護では保護者=リーダー等）。HAS_DON 等の
+        # 「能力保持カードの状態」条件はこちらを見る。source_card は被保護/離脱カード。
+        # 通常の解決では host_card 未指定＝source_card と同一（自能力）。
         if not condition: return True
         if condition.type == ConditionType.AND:
-            return all(self._check_condition(player, sub, source_card) for sub in condition.args)
+            return all(self._check_condition(player, sub, source_card, host_card) for sub in condition.args)
         if condition.type == ConditionType.OR:
-            return any(self._check_condition(player, sub, source_card) for sub in condition.args)
+            return any(self._check_condition(player, sub, source_card, host_card) for sub in condition.args)
         
         target_player = player
         if condition.player == Player.OPPONENT:
@@ -572,9 +575,11 @@ class EffectResolver:
             return occurred >= ev_min
 
         elif condition.type == ConditionType.HAS_DON:
-            # 【ドン!!×N】: このカード（source_card）に付与されたドン!!が N 枚以上か。
-            # コストエリアの active ドン枚数ではなく、対象カードの attached_don を見る。
-            current_val = getattr(source_card, "attached_don", 0) if source_card is not None else 0
+            # 【ドン!!×N】: 能力保持カードに付与されたドン!!が N 枚以上か。コストエリアの active ドン
+            # ではなく attached_don を見る。置換/除去保護では保持カード(host=protector)を見る
+            # （被保護カード source_card ではない。OP05-001: リーダーの付与ドンで判定）。
+            host = host_card if host_card is not None else source_card
+            current_val = getattr(host, "attached_don", 0) if host is not None else 0
             return self._compare(current_val, condition.operator, target_val)
 
         elif condition.type == ConditionType.LEADER_NAME:
