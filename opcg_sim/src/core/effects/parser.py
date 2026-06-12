@@ -46,30 +46,34 @@ class EffectParser:
           - 「〈timing〉時、発動できる」→ 節ごと除去。ディスパッチ対象 timing はトリガー上書き。
             非ディスパッチ timing は既存トリガー維持（PASSIVE のみ ACTIVATE_MAIN に退避＝
             常時誤発動を避けつつ手動発動可能にする）。
-        戻り値: (新トリガー, 残りの効果テキスト)。
+        戻り値: (新トリガー, 残りの効果テキスト, 発動任意フラグ)。
+        発動任意フラグは、自動誘発トリガー（ディスパッチ対象 timing）の「発動できる」を
+        上書きした場合のみ True（任意発動＝使用確認が必要。OP11-041 等）。
         """
         t = effect_text
         # 「〈X〉(時|場合)、発動できる」または 先頭「発動できる」のみにマッチ（誤検知防止に
         # 「を発動できる」等の効果動詞形は対象外＝直前は「時、」「場合、」か文頭に限定）。
         m = re.match(_nfc(r"^((?:[^。]*?(?:時|場合))、)?発動できる(?:ことができる)?[。、]?"), t)
         if not m:
-            return trigger, t
+            return trigger, t, False
         prefix = m.group(1) or ""
         remainder = t[m.end():].strip()
         # 「…場合、発動できる」→ 条件部を残して Branch-lift に任せる
         if _nfc("場合") in prefix:
-            return trigger, (prefix + remainder).strip()
+            return trigger, (prefix + remainder).strip(), False
         new_trigger = trigger
+        activation_optional = False
         from ...models.enums import TriggerType as _TT
         for key, tt_name in self._DISPATCHED_TEXT_TRIGGERS:
             if _nfc(key) in prefix:
                 new_trigger = getattr(_TT, tt_name)
+                activation_optional = True
                 break
         else:
             if trigger == _TT.PASSIVE:
                 # 非ディスパッチ timing × PASSIVE は常時誤発動の温床 → 手動発動へ退避
                 new_trigger = _TT.ACTIVATE_MAIN
-        return new_trigger, remainder
+        return new_trigger, remainder, activation_optional
 
     def parse_card_text(self, text: str, as_trigger: bool = False) -> List[Ability]:
         norm = _nfc(text)
@@ -157,6 +161,12 @@ class EffectParser:
                 _nfc(r'(この(?:カード|キャラ)の)【(登場時|KO時|アタック時|起動メイン|メイン)】(効果)'),
                 r'\1\2\3', norm_text)
 
+            # 「ルール上、…できず、ゲーム開始時、…」（OP13-079）: 前半はデッキ構築制限で
+            # ランタイム効果ではない。残すと parse_target が後半の対象解析を汚染する
+            # （EVENT/cost_min が混入）ため、ゲーム開始時節が続く場合のみ除去する。
+            # 単独の「ルール上、…」節（他18枚）は rule_processing ルールが担当するため不変。
+            norm_text = re.sub(_nfc(r'^ルール上、[^。]*?できず、(?=ゲーム開始時)'), '', norm_text)
+
             # トリガー検出は前処理前のテキストで行う（コスト/制限タグ除去前に判定）
             trigger = self._detect_trigger(norm_text)
             log_event("INFO", "parser.trigger", f"Detected trigger: {trigger.name}")
@@ -173,6 +183,13 @@ class EffectParser:
             if don_match:
                 don_cost_value = int(don_match.group(1))
                 norm_text = norm_text.replace(don_match.group(0), '').strip()
+
+            # ターン文脈タグ＋イベントトリガーの二重タグ（例【相手のターン中】【KO時】）は、
+            # イベント側がトリガーになりターン文脈が脱落していた。タグ除去前に有無を記録し、
+            # 最終トリガーがターン常時型（YOUR_TURN/OPPONENT_TURN）でなければ CONTEXT 条件
+            # として ability.condition に統合する（resolver が turn_player で評価する）。
+            has_self_turn_tag = _nfc("【自分のターン中】") in norm_text
+            has_opp_turn_tag = _nfc("【相手のターン中】") in norm_text
 
             # トリガー/注釈タグの除去。
             # ただしキーワード能力タグ（【ブロッカー】等）は効果本体で「付与」を
@@ -224,13 +241,38 @@ class EffectParser:
                 )
 
             # テキスト埋め込みトリガー宣言「〈timing〉時、発動できる」を解消（OTHER 化を防ぐ）。
-            trigger, effect_text = self._strip_text_trigger(trigger, effect_text)
+            trigger, effect_text, activation_optional = self._strip_text_trigger(trigger, effect_text)
+
+            # テキスト埋め込み「ゲーム開始時、」のトリガー宣言を効果本体から除去する
+            # （残すと parse_target が宣言部まで対象解析してしまう）。
+            if trigger == TriggerType.GAME_START:
+                effect_text = re.sub(_nfc(r'^ゲーム開始時、'), '', effect_text).strip()
 
             # 効果本体の解析
             effect_node = self._parse_to_node(effect_text)
 
+            # ゲーム開始時のデッキサーチはルール上シャッフルを伴う（OP13-079）。
+            if (trigger == TriggerType.GAME_START and effect_node is not None
+                    and _nfc("デッキから") in effect_text):
+                effect_node = Sequence(actions=[
+                    effect_node,
+                    GameAction(type=ActionType.SHUFFLE,
+                               raw_text=_nfc("デッキをシャッフルする")),
+                ])
+
             # 先頭のゲート条件（「〜の場合、」）を ability.condition に引き上げる
             final_condition = turn_limit_cond
+            ctx_cond = None
+            if trigger not in (TriggerType.YOUR_TURN, TriggerType.OPPONENT_TURN):
+                if has_opp_turn_tag:
+                    ctx_cond = Condition(type=ConditionType.CONTEXT, value="OPPONENT_TURN",
+                                         raw_text=_nfc("【相手のターン中】"))
+                elif has_self_turn_tag:
+                    ctx_cond = Condition(type=ConditionType.CONTEXT, value="SELF_TURN",
+                                         raw_text=_nfc("【自分のターン中】"))
+            if ctx_cond is not None:  # ターン文脈タグの CONTEXT 条件を統合
+                final_condition = ctx_cond if final_condition is None else Condition(
+                    type=ConditionType.AND, args=[final_condition, ctx_cond])
             if don_cond is not None:  # 【ドン!!×N】の付与ドン条件を統合
                 final_condition = don_cond if final_condition is None else Condition(
                     type=ConditionType.AND, args=[final_condition, don_cond])
@@ -246,6 +288,12 @@ class EffectParser:
                         args=[final_condition, effect_node.condition]
                     )
                 effect_node = effect_node.if_true
+
+            # 自動誘発の「〈timing〉時、発動できる」は任意発動（resolver が CONFIRM_OPTIONAL で
+            # 使用確認を挟む）。複合効果の部分拒否の曖昧さを避けるため単一アクションに限定する。
+            if (activation_optional and isinstance(effect_node, GameAction)
+                    and effect_node.type != ActionType.OTHER):
+                effect_node.is_optional = True
 
             # 置換効果（「(このキャラ/他のキャラが)KOされる/場を離れる場合、代わりに〜」）。
             # 「…される場合」はゲート条件ではなくトリガー文脈なので、REPLACE_EFFECT で
@@ -419,6 +467,10 @@ class EffectParser:
             return TriggerType.ON_KO
         if re.match(_nfc(r'^この(リーダー|キャラ|カード)が[^。【】]*アタック(した|された)時'), norm_text):
             return TriggerType.ON_ATTACK
+        # テキスト埋め込み「ゲーム開始時、」（タグ無し。OP13-079 等のリーダー初期セットアップ）。
+        # PASSIVE 判定だと常時再計算のたびに登場効果が走るため GAME_START へ写像する。
+        if re.match(_nfc(r'^ゲーム開始時、'), norm_text):
+            return TriggerType.GAME_START
 
         # 既知トリガータグがなければ → PASSIVE（常時・条件付き効果・特殊タイミング等）
         # キーワードタグ（【ブロッカー】等）は既に _TRIGGER_TAG_RE に含まれておらず
@@ -469,6 +521,18 @@ class EffectParser:
 
         # 連用形「引き、」を「引く、」に正規化してから分割
         norm_text = re.sub(_nfc(r'引き、'), _nfc('引く、'), norm_text)
+        # 「デッキに戻しシャッフルする」は〈戻す〉と〈シャッフル〉の連用接続。区切らないと
+        # shuffle ルールが全体を丸呑みし、手札→デッキの移動(DECK_BOTTOM)が消失する（OP06-047）。
+        # 主語が「相手は」の場合はシャッフル対象が相手デッキになるよう主語を引き継ぐ。
+        # コスト形「戻しシャッフルできる」は別構文のため対象外。
+        norm_text = re.sub(
+            _nfc(r'(相手は[^。]*?)デッキに戻しシャッフルする'),
+            _nfc(r'\1デッキに戻す。相手のデッキをシャッフルする'), norm_text
+        )
+        norm_text = re.sub(
+            _nfc(r'デッキに戻しシャッフルする'),
+            _nfc('デッキに戻す。デッキをシャッフルする'), norm_text
+        )
         # デッキの上を見るサーチ/並べ替えは「見て、」で区切り、LOOK を独立アクション化する。
         # （区切らないと「デッキの上から4枚を見て、…1枚までを公開し手札に加える」が
         #  1原子句化し、parse_target が「4枚」を count に誤取得して誤った対象になる。）
@@ -721,7 +785,7 @@ class EffectParser:
         # （例「コスト8以上のキャラがいて、手札6枚以下」→ HAND_COUNT>=8 と誤読）。
         split_m = re.search(
             _nfc(r'^(?P<a>.+?(?:がい(?:て|る)|枚以上いて|枚以下いて|がいなくて|があり|がある|'
-                 r'以上で|以下で|以上であり|以下であり))、(?P<b>.+)$'),
+                 r'以上で|以下で|以上であり|以下であり|を持ち))、(?P<b>.+)$'),
             norm_text)
         if split_m:
             a_txt = split_m.group("a")
@@ -730,6 +794,8 @@ class EffectParser:
             a_norm = re.sub(_nfc(r'いて$'), _nfc('いる'), a_txt)
             a_norm = re.sub(_nfc(r'いなくて$'), _nfc('いない'), a_norm)
             a_norm = re.sub(_nfc(r'(以上|以下)で$'), r'\1', a_norm)
+            # 「を持ち」連結（例「リーダーが特徴《X》を持ち、…の場合」）は終止形に正規化
+            a_norm = re.sub(_nfc(r'を持ち$'), _nfc('を持つ'), a_norm)
             sub_a = self._parse_condition_obj(a_norm)
             sub_b = self._parse_condition_obj(b_txt)
             valid = [c for c in (sub_a, sub_b)
