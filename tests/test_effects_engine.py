@@ -72,6 +72,69 @@ def test_return_don_not_enough():
     assert len(p1.don_deck) == 10
 
 
+def test_return_don_cost_requires_enough_don():
+    """「ドン!!-N」コスト: コストエリアのドン!!が N 枚未満なら能力は発動できない
+    （払えないコストで効果だけ通ってしまう不具合の回帰ガード）。"""
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    ab = Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        cost=GameAction(type=ActionType.RETURN_DON, value=ValueSource(base=1)),
+        effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)),
+    )
+    src = make_instance(make_master(card_id="RD-1", abilities=(ab,)), owner=p1.name)
+    p1.field.append(src)
+
+    # ドン!!が場に無い → コスト不成立。ドローしない。
+    assert len(p1.don_active) == 0 and len(p1.don_rested) == 0
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert len(p1.hand) == 0
+
+    # ドン!!を1枚用意 → 発動可。1枚返却し、1枚ドロー。
+    p1.don_active.append(p1.don_deck.pop(0))
+    deck_before = len(p1.don_deck)
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert len(p1.hand) == 1
+    assert len(p1.don_active) == 0
+    assert len(p1.don_deck) == deck_before + 1
+
+
+def test_trigger_event_goes_to_trash_when_activated():
+    """ライフ公開【トリガー】を発動した場合、カードは手札に残らずトラッシュへ行く
+    （発動しても手札に加わってしまう不具合の回帰ガード）。発動しなければ手札に残る。"""
+    # 発動するケース → トラッシュ
+    gm, p1, p2 = make_game()
+    for i in range(5):
+        p2.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p2.name))
+    trig = Ability(trigger=TriggerType.TRIGGER,
+                   effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)))
+    ev = make_master(card_id="EV-TRIG", type=CardType.EVENT, abilities=(trig,))
+    life_card = make_instance(ev, owner=p2.name)
+    p2.life.insert(0, life_card)
+    gm.apply_action_to_engine(
+        p1, GameAction(type=ActionType.DEAL_DAMAGE, value=ValueSource(base=1)), [], 1)
+    assert gm.active_interaction["action_type"] == "CONFIRM_TRIGGER"
+    gm.resolve_interaction(p2, {"accepted": True})
+    assert life_card not in p2.hand
+    assert life_card in p2.trash
+
+    # 発動しない（パス）ケース → 手札に残る
+    gm2, q1, q2 = make_game()
+    for i in range(5):
+        q2.deck.append(make_instance(make_master(card_id=f"E-{i}"), owner=q2.name))
+    trig2 = Ability(trigger=TriggerType.TRIGGER,
+                    effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)))
+    ev2 = make_master(card_id="EV-TRIG2", type=CardType.EVENT, abilities=(trig2,))
+    lc2 = make_instance(ev2, owner=q2.name)
+    q2.life.insert(0, lc2)
+    gm2.apply_action_to_engine(
+        q1, GameAction(type=ActionType.DEAL_DAMAGE, value=ValueSource(base=1)), [], 1)
+    gm2.resolve_interaction(q2, {"accepted": False})
+    assert lc2 in q2.hand
+    assert lc2 not in q2.trash
+
+
 def test_execute_main_effect_reinvokes_main():
     """EXECUTE_MAIN_EFFECT: トリガーが自身の ACTIVATE_MAIN 効果(ここでは DRAW2)を再発動。"""
     gm, p1, _ = make_game()

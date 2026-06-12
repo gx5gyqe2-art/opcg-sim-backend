@@ -925,9 +925,31 @@ class GameManager:
                 self._suspend_for_trigger_confirm(item)
                 return
             self._pending_triggers.pop(0)
+            self._relocate_activated_trigger_card(item)
             self.resolve_ability(item["player"], item["ability"], source_card=item["card"])
             if self.active_interaction:
                 return  # 効果解決が対象選択等で中断 → resolve_interaction が再開
+
+    def _relocate_activated_trigger_card(self, item: Dict[str, Any]) -> None:
+        """発動が確定したライフ公開【トリガー】のカードを、効果解決前に手札からトラッシュへ移す。
+
+        ライフのカードはダメージ時に一旦手札へ置かれるが、【トリガー】を「発動する」場合は
+        手札に残らず、効果解決後にトラッシュへ置かれる（OPCG ルール）。効果が自身を登場させる
+        /手札に加える場合は、その効果の move_card が（トラッシュにある）当該カードを再配置する
+        ため、最終的な置き場所は効果に従う。発動しない（パス）場合はこの関数を通らず手札に残る。
+        """
+        ability = item.get("ability")
+        card = item.get("card")
+        player = item.get("player")
+        if ability is None or card is None or player is None:
+            return
+        if getattr(ability, "trigger", None) != TriggerType.TRIGGER:
+            return  # ON_LIFE_DECREASE 等（場のカードの誘発）は対象外
+        if card in player.hand:
+            self.move_card(card, Zone.TRASH, player)
+            log_event("INFO", "game.trigger_card_to_trash",
+                      f"Trigger card moved to trash before resolving: {card.master.name}",
+                      player=player.name)
 
     def _suspend_for_trigger_confirm(self, item: Dict[str, Any]) -> None:
         """【トリガー】等の発動可否を yes/no で確認するため中断する。

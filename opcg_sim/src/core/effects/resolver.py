@@ -152,6 +152,12 @@ class EffectResolver:
             if node.type == ActionType.REST_DON:
                 cost = node.value.base if node.value else 1
                 return len(player.don_active) >= cost
+            if node.type == ActionType.RETURN_DON:
+                # 「ドン!!-N」コスト: コストエリア（アクティブ＋レスト）のドン!!を N 枚
+                # ドン!!デッキへ返却する。返せるドン!!が足りなければ支払えない（＝発動不可）。
+                # 付与中(attached)のドン!!はコスト支払いには使えない。
+                cost = node.value.base if node.value else 1
+                return len(player.don_active) + len(player.don_rested) >= cost
             if not node.target: return True
             from .matcher import get_target_cards
             candidates = get_target_cards(self.game_manager, node.target, source_card)
