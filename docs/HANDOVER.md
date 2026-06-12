@@ -624,10 +624,19 @@ backend テスト 374 passed / パーサ退行（新規OTHER）0 / フロント 
   - OP11-021: 「キャラ…とドン‼…をアクティブにする」複合 → ACTIVE＋ACTIVE_DON の Sequence に分解。
   - OP15-001: `TargetQuery.min_attached_don`（付与ドン下限）。ST13-002: `TargetQuery.is_face_up`
     （ライフ表裏フィルタ）。
+- ✅ **厳密枚数コスト・トリガー句汚染の追加修正**（leader xfail 45→41）:
+  - OP12-001/OP03-021: 「N枚を公開/レストにできる」の「できる」がコストの任意性なのに is_up_to/
+    非 strict になり、N枚未満でもコストを払えていた。「まで」無しのちょうど N 枚コストは
+    `is_strict_count=True`（_can_satisfy_node が N枚未満を弾く）。横展開11件（REVEAL）。
+  - OP02-026/OP12-081: トリガー未認識のフォールバックで本文に残ったトリガー句「〜時、」が
+    「場合」ゲート条件文に混入し誤分類（手札→HAND_COUNT、相手→player 逆転）。`_parse_logic_block`
+    の「場合」分岐で条件文先頭の「時、」以降をゲート条件とする。
 - **既知の未解決（要設計）**:
   - 群B 実発火配線: 上記の各誘発を battle/盤面イベントから発火させる（`ON_KO`/`ON_LEAVE`/`ON_DON_RETURNED` 等）。
+    OP14-041 は ON_KO 化済みだが効果側に同種のトリガー句汚染（MOVE_CARD 対象に KO 条件フィルタが
+    混入）＋テストの ACTIVATE_MAIN 参照が残るため別途。
   - coreference 色制約（OP01-002「戻したキャラと異なる色」）・名称限定 KO 置換（OP12-061）・
-    player 両者対象（ST03-001/OP02-093）・distinct 名（OP16-060）。
+    player 両者対象（ST03-001/OP02-093）・distinct 名（OP16-060）・LIFE+HAND 合計条件（OP04-040）。
   - V2 coreference 保存ギャップ: 「そのキャラ」参照（ref_id="selected_card"）の先行アクションが
     V2 ルール生成だと selected_card を保存せず、参照が場全体へフォールスルーする（OP10-099 残因）。
     legacy `_parse_atomic_action` の save_id 付与が V2 ルール経路に無いのが原因。
