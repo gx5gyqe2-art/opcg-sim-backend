@@ -834,7 +834,7 @@ def _life_to_trash(ctx: ParseContext) -> Optional[GameAction]:
 #   （付与=ATTACH_DON のみ付与先キャラを対象に持つ）。プレイヤーは
 #   status="OPPONENT" で相手のドンを指す（「相手は自身の…」用）。
 # ---------------------------------------------------------------------------
-_DON_COUNT_RE = re.compile(_nfc(r"ドン(?:!!|‼)?[ 　]*(\d+)[ 　]*枚"))
+_DON_COUNT_RE = re.compile(_nfc(r"ドン(?:!!|‼)?[ 　]*(?:合計)?[ 　]*(\d+)[ 　]*枚"))
 
 
 def _don_count(t: str) -> int:
@@ -896,8 +896,15 @@ def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
     # 付与先（に付与 の前の主語）が「相手の」なら OPPONENT、それ以外は SELF
     # 例: 「相手のキャラ1枚に相手のレストのドン!!1枚を付与する」→ recipient=OPPONENT
     # 例: 「自分のリーダーかキャラ1枚にドン!!を付与する」→ recipient=SELF
-    ni_idx = t.find(_nfc("に付与")) if _nfc("に付与") in t else len(t)
+    has_ni_attach = _nfc("に付与") in t
+    ni_idx = t.find(_nfc("に付与")) if has_ni_attach else len(t)
     recipient_part = t[:ni_idx]
+    # 「[ドン…合計N枚まで]を、[キャラM枚]に付与する」(OP07-001) の形では、付与先は「を、」の後段。
+    # 「を、」より前の「ドン合計N枚」を recipient として数えると枚数(M)が N に化ける。
+    # 「[recipient]に[ドンN枚まで]を、付与する」(EB03-057 等) は「に付与」が無く recipient_part が
+    # 全文＝「を、」の後が「付与する」だけになるため、「に付与」がある形に限定する。
+    if has_ni_attach and _nfc("を、") in recipient_part:
+        recipient_part = recipient_part.rsplit(_nfc("を、"), 1)[-1]
     # 付与先は parse_target で解析し、特徴《X》/名前「X」/コスト等のフィルタも拾う
     # （従来は card_type のみの手動構築で特徴等が脱落していた）。
     recipient = parse_target(recipient_part)

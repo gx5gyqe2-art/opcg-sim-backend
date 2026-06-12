@@ -187,9 +187,6 @@ def test_op06_080_activation_cost_rests_two_don():
 # OP07-001 モンキー・D・ドラゴン（🐛 count↔value 逆転）— OP06-022 の鏡像
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason=(
-    "OP07-001: 『ドン合計2枚まで／キャラ1枚』が『キャラ2枚まで／各1枚』に逆転"
-    "（count↔value）。対象は1枚・付与ドンは最大2であるべき。"))
 def test_op07_001_attaches_up_to_two_don_to_single_character():
     """OP07-001【起動メイン】付与済みドン合計2枚までを『キャラ1枚』に付与すべき。
 
@@ -210,9 +207,6 @@ def test_op07_001_attaches_up_to_two_don_to_single_character():
     assert cons.get("max") == 1
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "OP07-001: ATTACH_DON value=1 のため、キャラが1体でも付与されるドンは1枚に留まる"
-    "（合計2枚まで集約されるべき）。鏡像 OP06-022 は同盤面で2枚付与。"))
 def test_op07_001_single_character_receives_both_don():
     """OP07-001: 自分キャラが1体だけなら、その1体にドン2枚が集約されるべき（バグで1枚）。"""
     gm, p1, p2, L = build("OP07-001")

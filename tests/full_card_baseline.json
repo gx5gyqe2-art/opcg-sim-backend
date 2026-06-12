@@ -1160,7 +1160,7 @@
 "OP06-118|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
 "OP06-118|ON_ATTACK": "- | pw0,kw0,rs0,co0",
 "OP06-119|ON_PLAY": "p1_hand:6→5, p1_field:3→5, p1_deck:20→19 | pw0,kw0,rs0,co0",
-"OP07-001|ACTIVATE_MAIN": "p1_don:10→9 | pw0,kw0,rs0,co0",
+"OP07-001|ACTIVATE_MAIN": "p1_don:10→8 | pw0,kw0,rs0,co0",
 "OP07-002|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
 "OP07-003|ACTIVATE_MAIN": "p1_field:4→3, p1_trash:10→11 | pw-2000,kw0,rs0,co0",
 "OP07-004|ON_PLAY": "p1_hand:6→5, p1_field:3→4, p1_trash:10→11, p1_deck:20→19 | pw0,kw0,rs0,co0",
