@@ -15,6 +15,18 @@ from .effects.matcher import get_target_cards
 
 Card = CardInstance
 
+# 自己制限（self_cannot）の制限キー。parser が RULE_PROCESSING + status=これらで生成し、
+# apply_action_to_engine が player.restrictions に記録、各アクション地点で enforce する。
+SELF_RESTRICTION_KEYS = {
+    "CANNOT_PLAY_FROM_HAND",      # 手札からカードをプレイできない
+    "CANNOT_PLAY_CHARACTER",      # キャラ(カード)を登場できない（min_cost で「コストN以上」に限定可）
+    "CANNOT_DRAW_BY_EFFECT",      # 自分の効果でカードを引くことができない
+    "CANNOT_LIFE_TO_HAND",        # 自分の効果でライフを手札に加えられない
+    "CANNOT_ATTACK_LEADER",       # リーダーにアタックできない
+    "CANNOT_ACTIVATE_DON",        # キャラの効果でドン‼をアクティブにできない
+}
+
+
 def _nfc(text: str) -> str:
     return unicodedata.normalize('NFC', text)
 
@@ -36,6 +48,10 @@ class Player:
         # 「相手の登場時効果は無効になる」(スコープ付き相手効果無効) の期限。
         # turn_count <= negate_onplay_until の間、このプレイヤーの ON_PLAY 解決をスキップする。
         self.negate_onplay_until: int = 0
+        # 自己制限（「自分は、このターン中、…できない」= self_cannot）の保管。
+        # key=制限種別(CANNOT_PLAY_CHARACTER 等) → {"expire": turn_count, "min_cost": Optional[int]}。
+        # turn_count <= expire の間だけ有効（negate_onplay_until と同じ遅延失効方式）。
+        self.restrictions: Dict[str, Dict[str, Any]] = {}
 
     def setup_game(self):
         random.shuffle(self.deck)
@@ -211,9 +227,13 @@ class GameManager:
                 KEY_SKIP: self.active_interaction.get("can_skip", False),
                 KEY_CANDIDATES: candidate_dicts,
                 KEY_CONSTRAINTS: self.active_interaction.get("constraints"),
-                "options": self.active_interaction.get("options"), 
+                "options": self.active_interaction.get("options"),
                 "request_id": str(uuid.uuid4())
             }
+            # ARRANGE_DECK(並び替え/上下選択)はフロントの UI 切替フラグを併せて渡す。
+            if action_type == "ARRANGE_DECK":
+                req["allow_position"] = self.active_interaction.get("allow_position", False)
+                req["allow_reorder"] = self.active_interaction.get("allow_reorder", False)
             return req
 
         if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
@@ -301,6 +321,42 @@ class GameManager:
             self.active_interaction = None
             resolver.resume_optional(player, source_card, bool(accepted), optional_node,
                                      continuation.get("execution_stack", []), continuation.get("effect_context", {}))
+
+        elif action_type == "ARRANGE_DECK":
+            # (2a)(2b) 並び替え/上下選択の確定。selected_uuids が配置順、position が上下。
+            # ヘッドレス(drain)は selected_uuids=[] / position 無し → 現状順・fixed_position。
+            ordered_uuids = payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])
+            position = (payload.get("position") or payload.get("extra", {}).get("position")
+                        or continuation.get("fixed_position", "BOTTOM"))
+            position = "TOP" if str(position).upper() == "TOP" else "BOTTOM"
+            cards = continuation.get("arrange_targets", [])
+            if ordered_uuids:
+                by_uuid = {c.uuid: c for c in cards}
+                ordered = [by_uuid[u] for u in ordered_uuids if u in by_uuid]
+                for c in cards:  # 指定漏れは元の順序で末尾に補う
+                    if c not in ordered:
+                        ordered.append(c)
+            else:
+                ordered = list(cards)
+            dest_kind = continuation.get("dest_kind", "DECK")
+            self.active_interaction = None
+            if dest_kind == "LIFE":
+                # ライフ並べ替え: ordered を新しいライフ順とする（life[0]=一番上）。
+                owner_name = continuation.get("dest_owner")
+                tp = self.p1 if (owner_name and self.p1.name == owner_name) else (self.p2 if owner_name else player)
+                rest = [c for c in tp.life if c not in ordered]
+                tp.life = ordered + rest
+                log_event("INFO", "game.resume_order_life", f"{tp.name} reordered {len(ordered)} life card(s)", player=player.name)
+            else:
+                # デッキ配置: BOTTOM は順に append（先頭が上）、TOP は逆順 insert(0) で
+                # ordered[0] が最上面になるようにする。
+                seq = ordered if position == "BOTTOM" else list(reversed(ordered))
+                for c in seq:
+                    owner, _ = self._find_card_location(c)
+                    if owner:
+                        self.move_card(c, Zone.DECK, owner, dest_position=position)
+                log_event("INFO", "game.resume_arrange_deck", f"Placed {len(ordered)} card(s) to deck {position}", player=player.name)
+            resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
         elif action_type == "DECLARE_COST":
             # C8: 宣言コストを記録し、相手デッキトップを公開して context に保存してから再開。
@@ -703,6 +759,11 @@ class GameManager:
         if "ATTACK_DISABLE" in attacker.flags or "ATTACK_DISABLE" in attacker.timed_flags: raise ValueError("このカードは効果によりアタックできません。")
         if "CANNOT_REST" in attacker.timed_flags: raise ValueError("このカードは効果によりレストにできないためアタックできません。")
         if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
+        # 自己制限（self_cannot）:「リーダーにアタックできない」。相手リーダーへの攻撃宣言を弾く。
+        if (target.master.type == CardType.LEADER
+                and attacker_owner is not None
+                and self._active_restriction(attacker_owner, "CANNOT_ATTACK_LEADER")):
+            raise ValueError("効果により、このターンはリーダーにアタックできません。")
         if (target.master.type == CardType.CHARACTER and not target.is_rest
                 and not attacker.has_keyword("ATTACK_ACTIVE")):
             raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
@@ -850,6 +911,17 @@ class GameManager:
     def play_card_action(self, player: Player, card: Card):
         if card not in player.hand: return
         self._validate_action(player, "MAIN_ACTION")
+        # 自己制限（self_cannot）: 「手札からカードをプレイできない」「キャラ（コストN以上）を登場できない」。
+        if self._active_restriction(player, "CANNOT_PLAY_FROM_HAND"):
+            raise ValueError("効果により、このターンは手札からカードをプレイできません。")
+        if card.master.type == CardType.CHARACTER:
+            char_rec = self._active_restriction(player, "CANNOT_PLAY_CHARACTER")
+            if char_rec is not None:
+                min_cost = char_rec.get("min_cost")
+                # 「元々のコスト」= master.cost（修正前の値）で判定する。
+                if min_cost is None or (card.master.cost is not None and card.master.cost >= min_cost):
+                    suffix = f"コスト{min_cost}以上の" if min_cost else ""
+                    raise ValueError(f"効果により、このターンは{suffix}キャラを登場できません。")
         log_event("INFO", "game.play_card", f"Playing card: {card.master.name}", player=player.name, payload={"card_uuid": card.uuid})
         if card.master.type == CardType.EVENT:
             for ability in card.master.abilities:
@@ -888,6 +960,18 @@ class GameManager:
                 if act is not None and getattr(act, "status", None) == "RESTED_PLAY":
                     return True
         return False
+
+    def _active_restriction(self, player: Player, key: str) -> Optional[Dict[str, Any]]:
+        """player に有効な自己制限（self_cannot）があれば、そのパラメータ dict を返す。
+        turn_count <= expire の間だけ有効。期限切れエントリは掃除して None を返す。"""
+        rec = getattr(player, "restrictions", {}).get(key)
+        if not rec:
+            return None
+        if self.turn_count <= rec.get("expire", -1):
+            return rec
+        # 期限切れは破棄
+        player.restrictions.pop(key, None)
+        return None
 
     def _blocks_effect_play(self, card: CardInstance) -> bool:
         """card が「手札のこのカードは効果で登場できない」PASSIVE を持つか（NO_EFFECT_PLAY）。"""
@@ -1112,11 +1196,27 @@ class GameManager:
         if not action: return False
         act_name = action.type.name if hasattr(action.type, 'name') else str(action.type)
         log_event("INFO", "game.apply_action", f"Applying {act_name} to {len(targets)} targets", player=player.name)
+        # 自己制限（「自分は、このターン中、…できない」= self_cannot）の登録。
+        # parser が RULE_PROCESSING + status=制限キーで生成する。対象を持たないため、
+        # 通常の `for target in targets` ループ前にここで処理して player に記録する。
+        if act_name == "RULE_PROCESSING" and getattr(action, "status", None) in SELF_RESTRICTION_KEYS:
+            rec: Dict[str, Any] = {"expire": self.turn_count}  # 「このターン中」: 現ターン内のみ有効
+            if action.value and getattr(action.value, "base", None):
+                rec["min_cost"] = action.value.base
+            player.restrictions[action.status] = rec
+            log_event("INFO", "game.self_restriction",
+                      f"{player.name} restricted: {action.status}{' (cost>=' + str(rec.get('min_cost')) + ')' if rec.get('min_cost') else ''} this turn",
+                      player=player.name)
+            return True
         if act_name == "DRAW":
             target_player = player
             if action.target and getattr(action.target, 'player', None) is not None:
                 if getattr(action.target.player, 'name', '') == 'OPPONENT':
                     target_player = self.p2 if player == self.p1 else self.p1
+            # 「自分の効果でカードを引くことができない」: 効果解決による DRAW を抑止する。
+            if self._active_restriction(target_player, "CANNOT_DRAW_BY_EFFECT"):
+                log_event("INFO", "game.draw_restricted", f"{target_player.name} cannot draw by effect this turn", player=player.name)
+                return True
             self.draw_card(target_player, value)
             return True
         if act_name in ("DEAL_DAMAGE", "DAMAGE"):
@@ -1246,9 +1346,10 @@ class GameManager:
             return True
 
         if act_name == "ORDER_LIFE":
-            # 「（自分/相手の）ライフすべてを見て、好きな順番で置く」: ライフを公開し任意順に
-            # 並べ替える（対象選択を伴う INTERACTIVE）。並べ替えはプレイヤーの選択で枚数は不変。
-            # ヘッドレス（自動）では現状の並びを保持する（カード消失なし・TEMP 非汚染）。
+            # 「（自分/相手の）ライフすべてを見て、好きな順番で置く」: ライフを任意順に並べ替える。
+            # ライフ2枚以上のときは resolver が ARRANGE_DECK 対話(dest_kind=LIFE)で先に中断し、
+            # プレイヤーが順序を選ぶ。ここに来るのはライフ1枚以下（並べ替え不要）の場合で、
+            # 並びを保持する（枚数不変・カード消失なし・TEMP 非汚染）。
             target_player = player
             if getattr(action, "status", None) == "OPPONENT":
                 target_player = self.p2 if player == self.p1 else self.p1
@@ -1353,6 +1454,10 @@ class GameManager:
         if act_name == "ACTIVE_DON" and not getattr(action, 'target', None):
             # 「ドン!!N枚をアクティブにする」: レスト→アクティブ（枚数ベース）。
             tp = self._don_pool_player(player, action)
+            # 「キャラの効果でドン‼をアクティブにできない」: 効果によるアクティブ化を抑止。
+            if self._active_restriction(tp, "CANNOT_ACTIVATE_DON"):
+                log_event("INFO", "game.active_don_restricted", f"{tp.name} cannot activate DON!! by effect this turn", player=player.name)
+                return True
             activated = 0
             for _ in range(value):
                 if not tp.don_rested:
@@ -1528,7 +1633,10 @@ class GameManager:
                 self._apply_passive_effects(owner)
                 success = True
             elif act_name == "DECK_BOTTOM":
-                self.move_card(target, Zone.DECK, owner, dest_position="BOTTOM"); success = True
+                # 並び替え/上下選択を要する場合は resolver が ARRANGE_DECK で先に中断するため、
+                # ここに来るのは位置確定（TOP/BOTTOM/未指定=BOTTOM）の配置のみ。
+                _pos = "TOP" if getattr(action, "dest_position", None) == "TOP" else "BOTTOM"
+                self.move_card(target, Zone.DECK, owner, dest_position=_pos); success = True
             elif act_name in ["ACTIVE", "ACTIVE_DON"]:
                 target.is_rest = False
                 if isinstance(target, DonInstance):
@@ -1563,6 +1671,13 @@ class GameManager:
                 success = True
             elif act_name == "MOVE_CARD":
                 dest = action.destination if action.destination else Zone.HAND
+                # 自己制限（self_cannot）:「自分の効果でライフを手札に加えられない」。
+                # 自分のライフ→自分の手札の移動のみ抑止する（相手への移動・他ゾーンは対象外）。
+                if (dest == Zone.HAND and source_list is owner.life and owner is player
+                        and self._active_restriction(player, "CANNOT_LIFE_TO_HAND")):
+                    log_event("INFO", "game.life_to_hand_restricted",
+                              f"{player.name} cannot add life to hand by effect this turn", player=player.name)
+                    continue
                 dest_pos = getattr(action, 'dest_position', 'BOTTOM') or 'BOTTOM'
                 self.move_card(target, dest, owner, dest_position=dest_pos)
                 success = True

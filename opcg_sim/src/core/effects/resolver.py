@@ -312,6 +312,13 @@ class EffectResolver:
             })
             return False
 
+        # (2a)(2b) デッキ配置/ライフ並び替えの対話化。並び替え(status=="ARRANGE")や
+        # 上下選択(dest_position=="CHOOSE")を伴う自分のカード配置・ライフ並べ替えは、
+        # プレイヤーに順序/位置を選ばせるため中断する。ヘッドレス(drain)は既定（現状順・
+        # デッキ下）で解決されるため挙動は不変。
+        if self._maybe_suspend_arrange(player, action, targets, source_card):
+            return False
+
         # COUNT_QUERY 等の動的値計算でソースカードの所有者を解決できるようにする
         self.context["_source_card_uuid"] = source_card.uuid if source_card else None
         value = self._calculate_value(player, action.value, targets)
@@ -422,9 +429,11 @@ class EffectResolver:
             return selected
 
         if (query.select_mode == "ALL") or \
+           (query.select_mode == "REMAINING") or \
            (len(candidates) <= required_count and not is_up_to) or \
            (is_resource and not is_up_to):
-            
+            # REMAINING（「残り」）は意味的に対象=残り全部のため選択中断しない
+            # （並び替え/上下は後段の ARRANGE_DECK 対話で扱う）。
             selected = candidates[:required_count] if required_count > 0 else candidates
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = selected
@@ -805,6 +814,70 @@ class EffectResolver:
             self.context.setdefault("_confirmed_optionals", set()).add(id(optional_node))
             self.execution_stack.append(optional_node)
         self._process_stack(player, source_card)
+
+    def _maybe_suspend_arrange(self, player, action, targets, source_card) -> bool:
+        """(2a)(2b) デッキ配置/ライフ並び替えが対話を要するなら中断する（要否を bool で返す）。
+        - ORDER_LIFE: ライフ全体を任意順に並べ替える（2枚以上のとき）。
+        - DECK_BOTTOM + status=="ARRANGE": 配置順をプレイヤーが選ぶ（2枚以上のとき）。
+        - DECK_BOTTOM + dest_position=="CHOOSE": デッキの上/下をプレイヤーが選ぶ。
+        ヘッドレスでは drain が既定（現状順・デッキ下）で解決し、結果は従来と同一。"""
+        gm = self.game_manager
+        if action.type == ActionType.ORDER_LIFE:
+            tp = player
+            if getattr(action, "status", None) == "OPPONENT":
+                tp = gm.p2 if player is gm.p1 else gm.p1
+            cards = list(tp.life)
+            if len(cards) < 2:
+                return False
+            self._suspend_for_arrange(player, source_card, cards, dest_kind="LIFE",
+                                      dest_owner=tp, needs_reorder=True, needs_pos=False,
+                                      fixed_position="TOP")
+            return True
+        if action.type == ActionType.DECK_BOTTOM:
+            needs_reorder = (getattr(action, "status", None) == "ARRANGE" and len(targets) >= 2)
+            needs_pos = (getattr(action, "dest_position", None) == "CHOOSE")
+            if not targets or not (needs_reorder or needs_pos):
+                return False
+            fixed = "TOP" if getattr(action, "dest_position", None) == "TOP" else "BOTTOM"
+            self._suspend_for_arrange(player, source_card, list(targets), dest_kind="DECK",
+                                      dest_owner=None, needs_reorder=needs_reorder,
+                                      needs_pos=needs_pos, fixed_position=fixed)
+            return True
+        return False
+
+    def _suspend_for_arrange(self, player, source_card, cards, dest_kind, dest_owner,
+                             needs_reorder, needs_pos, fixed_position):
+        """並び替え/上下選択のインタラクション(ARRANGE_DECK)へ中断する。
+        フロントは candidates を提示し、並び替え(DnD)と上/下トグルを返す。"""
+        parts = []
+        if needs_reorder:
+            parts.append("順番")
+        if needs_pos:
+            parts.append("置く位置(上/下)")
+        what = "／".join(parts) if parts else "配置"
+        self.game_manager.active_interaction = {
+            "player_id": player.name,
+            "action_type": "ARRANGE_DECK",
+            "source_card_name": source_card.master.name,
+            "message": f"「{source_card.master.name}」の効果: {what}を決めてください",
+            "candidates": list(cards),
+            # max=-1 はフロント CardSelectModal の並び替えモード（全カード配置）を意味する。
+            "constraints": {"min": 0, "max": -1 if needs_reorder else 0},
+            "allow_position": needs_pos,
+            "allow_reorder": needs_reorder,
+            "continuation": {
+                "execution_stack": self.execution_stack,
+                "effect_context": self.context,
+                "source_card_uuid": source_card.uuid,
+                "arrange_targets": list(cards),
+                "dest_kind": dest_kind,
+                "dest_owner": dest_owner.name if dest_owner is not None else None,
+                "fixed_position": fixed_position,
+            },
+        }
+        log_event("INFO", "resolver.suspend",
+                  f"Suspended for deck/life arrange ({dest_kind}, reorder={needs_reorder}, pos={needs_pos})",
+                  player=player.name)
 
     def _suspend_for_cost_declaration(self, player, source_card):
         """C8: 数値（コスト）の宣言を待つインタラクションへ中断する。

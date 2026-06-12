@@ -236,6 +236,25 @@ def _discard(ctx: ParseContext) -> Optional[GameAction]:
 # ---------------------------------------------------------------------------
 # パワー増減: 「（対象）を、…パワー±N」
 # ---------------------------------------------------------------------------
+def _deck_position(text: str) -> str:
+    """デッキ配置の位置を返す。「上か下」=CHOOSE（プレイヤーが選択）、
+    「上」のみ=TOP、それ以外=BOTTOM。エンジンが ARRANGE_DECK 対話で利用する。"""
+    t = _nfc(text)
+    if "デッキの上か下" in t or re.search(r"デッキの上か、?下", t):
+        return "CHOOSE"
+    if "デッキの上" in t and "デッキの下" not in t:
+        return "TOP"
+    return "BOTTOM"
+
+
+def _arrange_status(text: str) -> Optional[str]:
+    """「好きな順番／並び替え／並び変え」を含むなら "ARRANGE"（順序選択を要する）を返す。"""
+    t = _nfc(text)
+    if "好きな順番" in t or "並び替え" in t or "並び変え" in t:
+        return "ARRANGE"
+    return None
+
+
 def _duration_of(text: str) -> str:
     if _nfc("このバトル中") in text:
         return "THIS_BATTLE"
@@ -1111,6 +1130,10 @@ def _attack_disable(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("アタックできない") not in t:
         return None
+    # 「自分は、…、リーダーにアタックできない」は対象(リーダー)を無効化するのではなく、
+    # 効果コントローラー自身の攻撃側制限。self_cannot(CANNOT_ATTACK_LEADER) に委ねる。
+    if _nfc("自分は") in t and re.search(_nfc(r"リーダーにアタック"), t):
+        return None
     tq = parse_target(t)
     duration = "UNTIL_NEXT_TURN_END" if _nfc("次の") in t else "THIS_TURN"
     return GameAction(type=ActionType.ATTACK_DISABLE, target=tq, duration=duration, raw_text=t)
@@ -1257,11 +1280,15 @@ def _remaining_deck_bottom(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("残り") not in t or _nfc("デッキの下") not in t:
         return None
+    # (2b) 「残りを好きな順番でデッキの下に置く」: 順序選択を ARRANGE_DECK 対話で扱う
+    # （位置はデッキ下固定）。並び替え語が無ければ status なし（現状順で下）。
     return GameAction(
         type=ActionType.DECK_BOTTOM,
         target=TargetQuery(
             player=Player.SELF, zone=Zone.TEMP, select_mode="REMAINING", count=-1
         ),
+        status=_arrange_status(t),
+        dest_position="BOTTOM",
         raw_text=t,
     )
 
@@ -1403,10 +1430,12 @@ def _trash_to_hand(ctx: ParseContext) -> Optional[GameAction]:
 @rule("temp_to_deck", priority=63)
 def _temp_to_deck(ctx: ParseContext) -> Optional[GameAction]:
     """「（好きな順番に並び替え、）デッキの上か下に置く」「好きな順番で置く」（scry の戻し）
-    → DECK_BOTTOM（TEMP 全件→デッキ下, 保守的）。
+    → DECK_BOTTOM（TEMP 全件→デッキ）。
 
     look_deck の後、手札に取らなかった残りをデッキへ戻す。「残り」を含む句は
-    remaining_* が担当するため除外。上下/並び替えの選択 UI は未実装のため下へ戻す。
+    remaining_* が担当するため除外。status="ARRANGE"(順序選択)・dest_position(上/下/CHOOSE)を
+    付与し、エンジンが ARRANGE_DECK 対話で順序(DnD)と上下位置をプレイヤーに選ばせる
+    （ヘッドレスでは現状順・デッキ下に解決）。
 
     明示ソース（トラッシュ/ライフ）またはフィールドのキャラ対象（コスト/枚数フィルタ付き）は
     deck_bottom_general(priority=55) が担当するため除外。
@@ -1426,11 +1455,15 @@ def _temp_to_deck(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if not to_deck and _nfc("置く") not in t:
         return None
+    # (2a)(2b) status="ARRANGE"(順序選択) と dest_position(上/下/CHOOSE) を付与し、
+    # エンジンが ARRANGE_DECK 対話で順序・位置をプレイヤーに選ばせる。
     return GameAction(
         type=ActionType.DECK_BOTTOM,
         target=TargetQuery(
             player=Player.SELF, zone=Zone.TEMP, select_mode="REMAINING", count=-1
         ),
+        status=_arrange_status(t),
+        dest_position=_deck_position(t),
         raw_text=t,
     )
 
@@ -1647,7 +1680,8 @@ def _scry_place(ctx: ParseContext) -> Optional[GameAction]:
 def _remaining_deck_top_or_bottom(ctx: ParseContext) -> Optional[GameAction]:
     """「残りを（好きな順番に並び替え、）?デッキの上か下に置く」→ DECK_BOTTOM（保守的）。
 
-    「上か下」を選ぶ UI は未実装のため、保守的にデッキ下扱い。
+    「上か下」は dest_position="CHOOSE" として ARRANGE_DECK 対話でプレイヤーに選ばせる
+    （並び替え語があれば status="ARRANGE" も付与。ヘッドレスは現状順・デッキ下）。
     「残りをデッキの下に置く」は remaining_deck_bottom(priority=65) が優先処理する。
     """
     t = ctx.text
@@ -1655,11 +1689,14 @@ def _remaining_deck_top_or_bottom(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if not re.search(_nfc(r"上か下|上か、下"), t):
         return None  # 「上か下」の択がある場合のみ
+    # (2a)(2b) 上下選択(CHOOSE)＋並び替え(あれば ARRANGE)を ARRANGE_DECK 対話で解決する。
     return GameAction(
         type=ActionType.DECK_BOTTOM,
         target=TargetQuery(
             player=Player.SELF, zone=Zone.TEMP, select_mode="REMAINING", count=-1
         ),
+        status=_arrange_status(t),
+        dest_position=_deck_position(t),
         raw_text=t,
     )
 
@@ -1943,8 +1980,8 @@ def _remaining_trash(ctx: ParseContext) -> Optional[GameAction]:
 # 手札→デッキ上か下:
 #   「自分の手札N枚を（好きな順番で並び替え、）デッキの上か下（/上/下）に置く」
 #   → DECK_BOTTOM(zone=HAND)。
-#   「並び替え」は UI 未実装のため無視（順序不定でデッキ下）。
-#   「上か下」の選択 UI も未実装のため保守的にデッキ下扱い。
+#   「並び替え」「上か下」は status="ARRANGE"・dest_position で ARRANGE_DECK 対話化し、
+#   順序(DnD)と上下位置をプレイヤーに選ばせる（「デッキに戻す」シャッフル前提は対話化しない）。
 # ---------------------------------------------------------------------------
 @rule("hand_to_deck", priority=64)
 def _hand_to_deck(ctx: ParseContext) -> Optional[GameAction]:
@@ -1961,9 +1998,14 @@ def _hand_to_deck(ctx: ParseContext) -> Optional[GameAction]:
     tq.zone = Zone.HAND
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # (2a)(2b) 明示配置（「デッキの上/下に置く」）のみ順序/位置の対話対象。
+    # 「デッキに戻す」(シャッフル前提)は順序不問なので対話化しない。
+    explicit_place = bool(re.search(_nfc(r"デッキの(上か下|上|下)に置(く|い)"), t))
     return GameAction(
         type=ActionType.DECK_BOTTOM,
         target=tq,
+        status=_arrange_status(t) if explicit_place else None,
+        dest_position=_deck_position(t) if explicit_place else None,
         raw_text=t,
     )
 
@@ -2293,9 +2335,13 @@ def _scoped_negate_opp_onplay(ctx: ParseContext) -> Optional[GameAction]:
 
 # ---------------------------------------------------------------------------
 # 自己制限: 「自分は、（このターン中、）...できない/られない」
-#   → RULE_PROCESSING（エンジン no-op）。
-#   「自分の効果でライフを手札に加えられない」「自分はキャラカードを登場できない」等。
-#   制限チェックは未実装のため、解析だけ行いエンジンは何もしない（OTHER 脱出のみ）。
+#   → RULE_PROCESSING + status=制限キー。
+#   述語を判別して具体的な制限キーを付け、エンジン(gamestate.SELF_RESTRICTION_KEYS)が
+#   player.restrictions に記録して各アクション地点で enforce する。
+#   「自分の効果でライフを手札に加えられない」「キャラ（コストN以上）を登場できない」
+#   「リーダーにアタックできない」「カードを引けない」「ドン‼をアクティブにできない」等。
+#   述語を判別できない自己制限（例:「デッキに入れることができない」=構築ルール）は
+#   従来どおり status なしの no-op（解析のみ）。
 # ---------------------------------------------------------------------------
 @rule("self_cannot", priority=33)
 def _self_cannot(ctx: ParseContext) -> Optional[GameAction]:
@@ -2304,9 +2350,26 @@ def _self_cannot(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if not re.search(_nfc(r"(できない|られない)"), t):
         return None
-    # 制限自体はエンジン未実装(no-op)だが、「このターン中／このバトル中」の期間は
-    # 正しく保持する（監査 DURATION の真値化。将来の enforce 時にそのまま使える）。
-    return GameAction(type=ActionType.RULE_PROCESSING, duration=_duration_of(t), raw_text=t)
+    status: Optional[str] = None
+    value: Optional[ValueSource] = None
+    if _nfc("リーダー") in t and _nfc("アタック") in t:
+        status = "CANNOT_ATTACK_LEADER"
+    elif _nfc("ライフ") in t and _nfc("手札") in t:  # 「ライフを手札に加えられない」
+        status = "CANNOT_LIFE_TO_HAND"
+    elif _nfc("ドン") in t and _nfc("アクティブ") in t:  # 「ドン‼をアクティブにできない」
+        status = "CANNOT_ACTIVATE_DON"
+    elif _nfc("引く") in t or _nfc("ドロー") in t:  # 「カードを引くことができない」
+        status = "CANNOT_DRAW_BY_EFFECT"
+    elif _nfc("手札から") in t and _nfc("プレイ") in t:  # 「手札からカードをプレイできない」
+        status = "CANNOT_PLAY_FROM_HAND"
+    elif _nfc("登場できない") in t:  # 「（コストN以上の）キャラ（カード）を登場できない」
+        status = "CANNOT_PLAY_CHARACTER"
+        m = re.search(_nfc(r"コスト(\d+)以上"), t)
+        if m:
+            value = ValueSource(base=int(m.group(1)))
+    # 「このターン中／このバトル中」の期間は引き続き保持（DURATION の真値化）。
+    return GameAction(type=ActionType.RULE_PROCESSING, status=status, value=value,
+                      duration=_duration_of(t), raw_text=t)
 
 
 # ---------------------------------------------------------------------------
