@@ -13,12 +13,12 @@
 カードDB(日本語テキスト)
    │  loader.py: _create_card_master() / make_parser()
    ▼
-[ catalog.py 手動定義があれば優先 ] ─ なければ ─▶ [ EffectParserV2 ]
-   │                                                   │ 構造分解(レガシー流用)
-   │                                                   │ + 原子句のみ rules で解釈
-   │                                                   │ + 未対応はレガシーへフォールバック
-   ▼                                                   ▼
-   └──────────────▶  Ability(IR) ◀──────────────────────┘
+                [ EffectParserV2 ]
+                        │ 構造分解(レガシー流用)
+                        │ + 原子句のみ rules で解釈
+                        │ + 未対応はレガシーへフォールバック
+                        ▼
+                   Ability(IR)
                         │ trigger / condition / cost / effect
                         ▼  ゲーム中、該当タイミングで
                   resolver.py（EffectResolver）
@@ -106,7 +106,6 @@
 | `opcg_sim/src/core/effects/continuous.py` | 継続効果マネージャ |
 | `opcg_sim/src/core/effects/matcher.py` | 対象指定の解析(`parse_target`)・実体化(`get_target_cards`) |
 | `opcg_sim/src/core/effects/resolver.py` | IR の実行（EXECUTE_MAIN_EFFECT 等もここ） |
-| `opcg_sim/src/core/effects/catalog.py` | 手動オーバーライド(MANUAL_EFFECTS) |
 | `opcg_sim/src/core/gamestate.py` | ゲームエンジン本体（apply_action_to_engine / 除去保護 / 継続効果フック） |
 | `opcg_sim/src/models/effect_types.py` | IR 定義（Ability/GameAction/TargetQuery/Condition…）。`GameAction.sub_effect`（置換用）/`GameAction.face_up`（ライフへの向き）/`Ability.cost_optional`（任意コスト） |
 | `opcg_sim/src/models/models.py` | CardMaster/CardInstance（`timed_power`/`timed_cost`/`timed_flags`/`timed_keywords`、`has_keyword()`、`is_effect_negated`） |
@@ -202,7 +201,8 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 
 ## 5. 実装上の不変条件・注意点
 
-- **本番パスは loader 経由**。catalog(手動定義) > parser(V2) の優先順位（`loader._create_card_master`）。
+- **本番パスは loader 経由**。効果定義は EffectParserV2 の自動解析に一本化
+  （`loader._create_card_master`。旧 catalog.py の手動オーバーライドは廃止済み）。
 - **テキスト正規化**: パーサは NFC、loader の DataCleaner は NFKC を使う箇所がある。
   全角/半角・`!!`/`‼`(U+203C)・各種マイナス記号の揺れがある（ルールの正規表現は両対応にする）。
 - **pytest の出力キャプチャ**: logger が `sys.stdout` を直接掴むため、`pytest` は
@@ -473,7 +473,7 @@ backend テスト 374 passed / パーサ退行（新規OTHER）0 / フロント 
 | ⑥a | ライフへ「表向き」が裏向き | `face_up` を IR/エンジンが無視 | `GameAction.face_up`、hand_to_life、MOVE_CARD→LIFE | 14 |
 | ③c | 【トリガー】以外も捨てられる | discard 対象の【トリガー】絞り込み喪失 | `HAS_TRIGGER` フラグ（parser/matcher）、`【X】を持つ` タグ保全 | 10 |
 | ⑤b | 効果無効が途中で解除 | `ability_disabled` 素フラグが reset で消える | NEGATE_EFFECT を継続効果(`EFFECTS_DISABLED`)化、`is_effect_negated` | 6+ |
-| ⑤a/c | OP09-093 の登場ターン制約・キャラ無効が不発 | 複合条件と第2節の negate を取りこぼし | catalog に手動定義（条件 AND・キャラに negate＋attack_disable） | 1 |
+| ⑤a/c | OP09-093 の登場ターン制約・キャラ無効が不発 | 複合条件と第2節の negate を取りこぼし | parser の「を持ち、」AND 分割＋`negate_then_attack_disable` ルール（旧 catalog 手動定義は廃止） | 1 |
 | ②b | ライフ離脱時のドローが不発 | 効果でのライフ移動が ON_LIFE_DECREASE を発火せず | `move_card` がライフ離脱を誘発キューへ積む | 3+ |
 
 ### 新しい不変条件・注意点

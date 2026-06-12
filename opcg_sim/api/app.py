@@ -148,7 +148,7 @@ SANDBOX_GAMES: Dict[str, 'SandboxManager'] = {}
 
 card_db = CardLoader(CARD_DB_PATH); card_db.load()
 
-# NOTE: 効果定義は catalog.py(手動オーバーライド) > parser.py を主軸とする。
+# NOTE: 効果定義はカードテキストの自動解析（EffectParserV2）に一本化されている。
 # LLM生成データ(generated_effects.json)は精度が低いためランタイムでは読み込まない。
 
 def load_deck_mixed(source_str: str, owner_id: str):

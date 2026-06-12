@@ -7,11 +7,6 @@ from ..models.models import CardMaster
 from ..core.effects.parser import EffectParser
 from ..models.effect_types import Ability
 
-try:
-    from ..core.effects.catalog import get_manual_ability as _get_manual_ability
-except ImportError:
-    def _get_manual_ability(card_id: str):  # type: ignore[misc]
-        return []
 from ..models.enums import CardType, Attribute, Color, TriggerType
 from ..utils.logger_config import log_event
 
@@ -226,16 +221,11 @@ class CardLoader:
         trigger_text = DataCleaner.normalize_text(get_val(M["TRIGGER"]))
         block_icon = DataCleaner.normalize_text(get_val(M["BLOCK_ICON"], "")) or ""
 
-        # 優先順位: catalog override (手動定義) > parser.py (自動)
-        manual_abilities = _get_manual_ability(card_id)
-        if manual_abilities:
-            combined_abilities = tuple(manual_abilities)
-            log_event("DEBUG", "loader.manual_load", f"Loaded manual abilities for {card_id} ({name})")
-        else:
-            parser = make_parser()
-            main_abilities = parser.parse_card_text(effect_text) if effect_text else []
-            trigger_abilities = parser.parse_card_text(trigger_text, as_trigger=True) if trigger_text else []
-            combined_abilities = tuple(main_abilities + trigger_abilities)
+        # 効果定義はカードテキストの自動解析（EffectParserV2）に一本化されている。
+        parser = make_parser()
+        main_abilities = parser.parse_card_text(effect_text) if effect_text else []
+        trigger_abilities = parser.parse_card_text(trigger_text, as_trigger=True) if trigger_text else []
+        combined_abilities = tuple(main_abilities + trigger_abilities)
 
         # カードが本来持つキーワード（【ブロッカー】等）を effect_text から抽出する。
         # 従来 master.keywords は常に空で、has_keyword("ブロッカー") が False になり
