@@ -845,6 +845,20 @@ def _don_opponent(t: str) -> Optional[str]:
     return "OPPONENT" if (_nfc("相手") in t and _nfc("自分") not in t) else None
 
 
+@rule("don_phase_routing", priority=86)
+def _don_phase_routing(ctx: ParseContext) -> Optional[GameAction]:
+    """「自分のドン‼フェイズに置かれるドン‼…は、…に付与される」= ドン配置の常在ルール変更。
+
+    能動的な付与（ATTACH_DON）ではなく受動的な経路規則。エンジンはドンフェイズの配置経路を
+    モデルしていないため RULE_PROCESSING（no-op）として吸収する。誤って ATTACH_DON にすると
+    PASSIVE 再計算のたびにリーダーへ付与してパワーが際限なく増える（OP13-003）。
+    """
+    t = ctx.text
+    if _nfc("フェイズ") in t and _nfc("置かれる") in t and _nfc("付与される") in t:
+        return GameAction(type=ActionType.RULE_PROCESSING, raw_text=t)
+    return None
+
+
 @rule("don_attach", priority=84)
 def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分の）リーダーかキャラ1枚に（レストの）ドン!!N枚までを付与する」→ ATTACH_DON。

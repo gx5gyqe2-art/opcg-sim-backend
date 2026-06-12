@@ -333,9 +333,6 @@ def test_op13_002_ability1_draw_is_triggered_not_main():
 # OP13-003 ゴール・D・ロジャー  🐛 能力0の条件が DON_COUNT EQ 0 で反転（本来 ドン>=1）
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP13-003: 能力0の条件が DON_COUNT EQ 0（ドンが0枚の場合）に反転。"
-           "テキストは『自分の場のドン‼がある場合』＝ドン>=1。条件が逆。")
 def test_op13_003_attach_requires_don_present():
     """OP13-003 能力0: 場にドンがある（>=1）場合のみドン付与が発火する（正しい条件）。"""
     gm, p1, p2, L = build("OP13-003")
