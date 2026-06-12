@@ -127,14 +127,15 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if _nfc(ParserKeyword.EVENT) in tgt_text: tq.card_type.append("EVENT")
     if _nfc(ParserKeyword.STAGE) in tgt_text: tq.card_type.append("STAGE")
     
-    m_name = re.search(r'「([^」]+)」', tgt_text)
-    if m_name:
-        if (m_name.group(0) + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
-            tq.names.append(m_name.group(1))
+    # 名前は複数併記され得る（「「X」と「Y」すべて」ST30-001 /「「X」か「Y」」）。findall で全て拾い、
+    # matcher は names を OR（いずれかの名前）として扱う。
+    for _nm in re.findall(r'「([^」]+)」', tgt_text):
+        if (f'「{_nm}」' + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
+            tq.names.append(_nm)
         else:
             # 「「◯◯」以外のキャラ」: その名前を除外対象にする（従来は無視され、
             # 当該カード自身も対象に含めてしまっていた）。
-            tq.exclude_names.append(m_name.group(1))
+            tq.exclude_names.append(_nm)
     
     if _nfc("含む") in tgt_text:
         tq.flags.add("NAME_PARTIAL")

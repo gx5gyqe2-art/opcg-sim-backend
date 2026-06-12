@@ -394,9 +394,6 @@ def test_st30_001_passive_no_char_no_reduction():
     assert leader_power(p1) == 6000
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="ST30-001 能力1: 対象名から『モンキー・D・ルフィ』が欠落（names=エースのみ）。"
-                          "ルフィに+3000されない")
 def test_st30_001_opponent_turn_buffs_both_names():
     """ST30-001 能力1（相手ターン中）: 自場の『エース』と『ルフィ』両名すべて+3000。"""
     gm, p1, p2, L = build("ST30-001")
