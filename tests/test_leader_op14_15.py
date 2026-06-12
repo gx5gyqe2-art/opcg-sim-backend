@@ -166,8 +166,6 @@ def test_op14_041_opp_turn_char_play_draw():
     assert zone_counts(p1)["deck"] == deck_before - 1
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP14-041: 能力1がKO誘発でなくACTIVATE_MAIN化、KO条件フィルタが相手ライフ対象に誤付与＋power_max(≤5000)で5000以上(min)と逆。汎用盤面で相手ライフが手札に移動しない(NO_CHANGE)")
 def test_op14_041_ko_moves_opp_life_to_owner_hand():
     """OP14-041 能力1: 該当キャラKO時、相手ライフ上1枚を相手(持ち主)の手札へ。"""
     gm, p1, p2, L = build("OP14-041")
@@ -175,7 +173,7 @@ def test_op14_041_ko_moves_opp_life_to_owner_hand():
     set_life(p2, 5)
     p2_hand_before = zone_counts(p2)["hand"]
     p2_life_before = zone_counts(p2)["life"]
-    gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
+    gm.resolve_ability(p1, get_ability(L.master, "ON_KO"), L)
     auto_resolve(gm, p1)
     # 相手ライフが1枚減り、相手の手札へ移る（テキスト準拠）
     assert zone_counts(p2)["life"] == p2_life_before - 1

@@ -249,6 +249,16 @@ class EffectParser:
                 effect_text = re.sub(_nfc(r'^ゲーム開始時、'), '', effect_text).strip()
 
             # 効果本体の解析
+            # 埋め込み反応型トリガー（本文の「〜時、」）が認識された能力では、効果文先頭に残る
+            # そのトリガー句を除去する。残すと parse_target が KO 条件のフィルタ（特徴/パワー/枚数）を
+            # 効果の対象に取り込んでしまう（OP14-041: 「…パワー5000以上の…キャラがKOされた時、相手の
+            # ライフ1枚を手札に加える」で MOVE_CARD 対象にアマゾン・リリー/九蛇/power5000 が混入）。
+            if trigger in (TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE,
+                           TriggerType.ON_LEAVE, TriggerType.ON_EVENT_PLAY, TriggerType.ON_OPP_PLAY):
+                effect_text = re.sub(
+                    _nfc(r'^[^。：:]*?(?:された|なった|与えた|離れた|発動した|登場させた)時、'),
+                    '', effect_text).strip()
+
             # 効果先頭のゲート条件「〜の場合、」は、後続が単一文（内部に「。」が無く、連用形で
             # 連なる複数アクション）のとき ability.condition へ引き上げる。従来は先頭アクションのみ
             # 条件付きの内部 Branch になり、後続アクションが無条件化していた

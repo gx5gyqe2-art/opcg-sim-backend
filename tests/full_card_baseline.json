@@ -1743,7 +1743,7 @@
 "OP11-022|PASSIVE": "- | pw0,kw0,rs0,co0",
 "OP11-023|PASSIVE": "- | pw0,kw0,rs0,co0",
 "OP11-023|TRIGGER": "- | pw0,kw0,rs1,co0",
-"OP11-024|ON_KO": "p2_hand:3→2, p2_trash:0→1 | pw0,kw0,rs0,co0",
+"OP11-024|ON_KO": "p1_hand:5→4, p1_trash:10→11 | pw0,kw0,rs0,co0",
 "OP11-025|ON_OPP_ATTACK": "- | pw1000,kw0,rs1,co0",
 "OP11-027|PASSIVE": "- | pw0,kw0,rs0,co0",
 "OP11-028|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
