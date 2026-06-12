@@ -396,7 +396,7 @@ class EffectParser:
             # 「〜時、発動できる。」形は「発動できる。」を取り除いて本体を残す。
             rest = re.sub(_nfc(r'^発動できる[。、]?'), '', rest).strip()
             cond = Condition(type=ConditionType.EVENT_THIS_TURN, value=(ev_name, ev_min),
-                             player=Player.SELF, raw_text=t)
+                             operator=CompareOperator.GE, player=Player.SELF, raw_text=t)
             return cond, rest
         return None, effect_text
 
@@ -948,7 +948,7 @@ class EffectParser:
         # （例「コスト8以上のキャラがいて、手札6枚以下」→ HAND_COUNT>=8 と誤読）。
         split_m = re.search(
             _nfc(r'^(?P<a>.+?(?:がい(?:て|る)|枚以上いて|枚以下いて|がいなくて|があり|がある|'
-                 r'以上で|以下で|以上であり|以下であり|を持ち))、(?P<b>.+)$'),
+                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち))、(?P<b>.+)$'),
             norm_text)
         if split_m:
             a_txt = split_m.group("a")
@@ -956,6 +956,7 @@ class EffectParser:
             # 「がいて」連結は存在条件なので「いる」に正規化して再帰解析する
             a_norm = re.sub(_nfc(r'いて$'), _nfc('いる'), a_txt)
             a_norm = re.sub(_nfc(r'いなくて$'), _nfc('いない'), a_norm)
+            a_norm = re.sub(_nfc(r'(以上|以下)でかつ$'), r'\1', a_norm)
             a_norm = re.sub(_nfc(r'(以上|以下)で$'), r'\1', a_norm)
             # 「を持ち」連結（例「リーダーが特徴《X》を持ち、…の場合」）は終止形に正規化
             a_norm = re.sub(_nfc(r'を持ち$'), _nfc('を持つ'), a_norm)
@@ -1022,7 +1023,14 @@ class EffectParser:
         if ev_played_m:
             return Condition(type=ConditionType.EVENT_THIS_TURN,
                              value=(f"EVENT_PLAYED_COST_GE_{ev_played_m.group(1)}", 1),
-                             player=Player.SELF, raw_text=norm_text)
+                             operator=CompareOperator.GE, player=Player.SELF, raw_text=norm_text)
+
+        # 「このターン中、このリーダーの効果で（カードを）引いていない（場合）」: 当該ドローが
+        # まだ発生していないか（OP01-062）。1ターンに複数回引くのを防ぐ重複防止条件。
+        if re.search(_nfc(r'(?:この)?リーダーの効果で.{0,6}引いていない'), norm_text):
+            return Condition(type=ConditionType.EVENT_THIS_TURN,
+                             value=("LEADER_DREW_BY_EFFECT", 1),
+                             operator=CompareOperator.LT, player=Player.SELF, raw_text=norm_text)
 
         # ターン数条件（「自分の第2ターン以降の場合」OP15-058）。turn_count >= N。
         turn_m = re.search(_nfc(r'第(\d+)ターン以降'), norm_text)

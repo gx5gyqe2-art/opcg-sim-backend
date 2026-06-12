@@ -5,7 +5,7 @@ from dataclasses import asdict
 from ...models.effect_types import (
     EffectNode, GameAction, Sequence, Branch, Choice, ValueSource, Condition, TargetQuery
 )
-from ...models.enums import ActionType, Zone, TriggerType, ConditionType, CompareOperator, Player
+from ...models.enums import ActionType, Zone, TriggerType, ConditionType, CompareOperator, Player, CardType
 from ...utils.logger_config import log_event
 import re
 
@@ -361,6 +361,12 @@ class EffectResolver:
 
         success = self.game_manager.apply_action_to_engine(player, action, targets, value)
 
+        # 「このターン中、このリーダーの効果で引いていない」(OP01-062) 用: リーダー能力由来の
+        # ドローをターン内イベントに記録する（次回の同条件が false になり 1ターン複数ドローを防ぐ）。
+        if (success and action.type == ActionType.DRAW and source_card is not None
+                and getattr(source_card.master, "type", None) == CardType.LEADER):
+            self.game_manager.record_turn_event("LEADER_DREW_BY_EFFECT", value or 1)
+
         # REVEALED_CARD_TRAIT 条件評価用: REVEAL/LOOK 実行後に公開カードを記録。
         # LOOK はターゲット無し（デッキ上から枚数ベースで TEMP へ移動）なので、
         # 移動先 TEMP の先頭（=公開したデッキトップ）を公開カードとして記録する。
@@ -567,12 +573,13 @@ class EffectResolver:
                                  condition.operator, target_val)
 
         elif condition.type == ConditionType.EVENT_THIS_TURN:
-            # 「〈イベント〉した時」: このターン中に当該イベントが発生したか（value=(名前, 最小回数)）。
-            # 発生していなければ発動しない（OP06-042「ドン!!が戻された時」/OP07-038「場を離れた時」等）。
+            # 「〈イベント〉した時」: このターン中に当該イベントが発生したか（value=(名前, しきい値)）。
+            # 既定は「発生していなければ不発」（occurred>=しきい値）。operator が明示されれば従う
+            # （「引いていない」= occurred < 1 等の否定）。OP06-042/OP07-038/OP01-062 等。
             ev_name, ev_min = (condition.value if isinstance(condition.value, tuple)
                                else (condition.value, 1))
             occurred = getattr(self.game_manager, "_turn_events", {}).get(ev_name, 0)
-            return occurred >= ev_min
+            return self._compare(occurred, condition.operator, ev_min)
 
         elif condition.type == ConditionType.HAS_DON:
             # 【ドン!!×N】: 能力保持カードに付与されたドン!!が N 枚以上か。コストエリアの active ドン
