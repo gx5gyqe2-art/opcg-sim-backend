@@ -399,5 +399,48 @@ MANUAL_EFFECTS: Dict[str, List[Ability]] = {
                 raw_text="自分のリーダーが「ナミ」の場合、相手のコスト5以下のキャラ1枚までを、持ち主の手札に戻す"
             )
         )
+    ],
+    # OP09-093 マーシャル・D・ティーチ（キャラ）。
+    # 【起動メイン】【ターン1回】自分のリーダーが特徴《黒ひげ海賊団》を持ち、このキャラが登場
+    # したターンの場合、相手のリーダー1枚までを、このターン中、効果を無効にする。その後、相手の
+    # キャラ1枚までを、次の相手のターン終了時まで、効果を無効にし、そのキャラはアタックできない。
+    # 自動パーサは複合条件（リーダー特徴＋登場ターン）の片方と、第2節の「効果を無効にし」を
+    # 取りこぼすため手動定義する（B-3/B-2）。無効化は継続効果として A-6 で持続する。
+    "OP09-093": [
+        Ability(
+            trigger=TriggerType.ACTIVATE_MAIN,
+            condition=Condition(type=ConditionType.AND, args=[
+                Condition(type=ConditionType.LEADER_TRAIT, value="黒ひげ海賊団", player=Player.SELF),
+                Condition(type=ConditionType.SOURCE_STATE, value="ENTERED_THIS_TURN"),
+                Condition(type=ConditionType.TURN_LIMIT, value=1),
+            ]),
+            effect=Sequence(actions=[
+                # 相手のリーダー1枚までを、このターン中、効果を無効にする。
+                GameAction(
+                    type=ActionType.NEGATE_EFFECT,
+                    target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["LEADER"],
+                                       count=1, select_mode="CHOOSE", is_up_to=True),
+                    duration="THIS_TURN",
+                    raw_text="相手のリーダー1枚までを、このターン中、効果を無効にする",
+                ),
+                # その後、相手のキャラ1枚までを選び、次の相手のターン終了時まで、効果を無効にし、
+                # かつアタックできない（同一キャラに両方付与するため save_id/ref_id で固定）。
+                GameAction(
+                    type=ActionType.NEGATE_EFFECT,
+                    target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"],
+                                       count=1, select_mode="CHOOSE", is_up_to=True,
+                                       save_id="op09_093_char"),
+                    duration="UNTIL_NEXT_TURN_END",
+                    raw_text="相手のキャラ1枚までを、次の相手のターン終了時まで、効果を無効にする",
+                ),
+                GameAction(
+                    type=ActionType.ATTACK_DISABLE,
+                    target=TargetQuery(player=Player.OPPONENT, zone=Zone.FIELD, card_type=["CHARACTER"],
+                                       count=1, ref_id="op09_093_char"),
+                    duration="UNTIL_NEXT_TURN_END",
+                    raw_text="そのキャラはアタックできない",
+                ),
+            ]),
+        )
     ]
 }

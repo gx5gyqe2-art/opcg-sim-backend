@@ -138,8 +138,20 @@ class CardInstance:
                     if keyword_val:
                         self.current_keywords.add(keyword_val)
 
+    @property
+    def is_effect_negated(self) -> bool:
+        """このカードの効果が無効化されているか。
+        ability_disabled（同ターン内のフラグ）に加え、継続効果（timed_flags の
+        "EFFECTS_DISABLED"）も見る。後者は reset_turn_status でクリアされず、
+        「このターン中」/「次の相手のターン終了時まで」の無効化を途中のアクションで
+        解除されずに維持する（OP09-093 等）。"""
+        return self.ability_disabled or ("EFFECTS_DISABLED" in self.timed_flags)
+
     def has_keyword(self, keyword: str) -> bool:
-        """カードが指定キーワードを持つか（本来のキーワード＋効果で付与された分）。"""
+        """カードが指定キーワードを持つか（本来のキーワード＋効果で付与された分）。
+        効果が無効化されている場合はキーワード能力も持たない。"""
+        if self.is_effect_negated:
+            return False
         return keyword in self.current_keywords or keyword in self.timed_keywords
 
     def get_power(self, is_my_turn: bool) -> int:

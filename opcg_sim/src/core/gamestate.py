@@ -920,7 +920,7 @@ class GameManager:
             blocker.is_rest = True
             self.active_battle["target"] = blocker
             # 【ブロック時】効果を発動する（従来は未発火＝14枚が no-op だった）。
-            if blocker.master.abilities and not blocker.ability_disabled and not blocker.negated:
+            if blocker.master.abilities and not blocker.is_effect_negated and not blocker.negated:
                 for ability in blocker.master.abilities:
                     if ability.trigger == TriggerType.ON_BLOCK:
                         log_event("INFO", "game.trigger_block", f"ON_BLOCK: {blocker.master.name}", player=target_owner.name)
@@ -1007,7 +1007,7 @@ class GameManager:
         for card in units:
             if not card or not getattr(card, "master", None) or getattr(card, "negated", False):
                 continue
-            if getattr(card, "ability_disabled", False):
+            if getattr(card, "is_effect_negated", False):
                 continue
             for ab in card.master.abilities:
                 if ab.trigger != TriggerType.PASSIVE:
@@ -1050,7 +1050,7 @@ class GameManager:
             if onplay_negated:
                 log_event("INFO", "game.onplay_negated",
                           f"{card.master.name}'s ON_PLAY is negated by opponent's effect", player=player.name)
-            if not card.ability_disabled and not onplay_negated:
+            if not card.is_effect_negated and not onplay_negated:
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.ON_PLAY:
                         self.resolve_ability(player, ability, source_card=card)
@@ -1060,7 +1060,7 @@ class GameManager:
         """player が「自分のキャラはレストで登場する」PASSIVE を持つか（RESTED_PLAY マーカー）。"""
         cards = ([player.leader] if player.leader else []) + list(player.field)
         for c in cards:
-            if not c or getattr(c, "ability_disabled", False) or not getattr(c, "master", None):
+            if not c or getattr(c, "is_effect_negated", False) or not getattr(c, "master", None):
                 continue
             for ab in c.master.abilities:
                 if ab.trigger != TriggerType.PASSIVE:
@@ -1096,7 +1096,7 @@ class GameManager:
 
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance,
                         cost_confirmed: bool = False):
-        if source_card.negated or source_card.ability_disabled: return
+        if source_card.negated or source_card.is_effect_negated: return
         resolver = EffectResolver(self)
         resolver.resolve_ability(player, ability, source_card, cost_confirmed=cost_confirmed)
         for ev in resolver.action_history:
@@ -1158,7 +1158,7 @@ class GameManager:
             protectors.append(owner.stage)
 
         for protector in protectors:
-            if getattr(protector, "ability_disabled", False) or getattr(protector, "negated", False):
+            if getattr(protector, "is_effect_negated", False) or getattr(protector, "negated", False):
                 continue
             for ab in protector.master.abilities:
                 if ab.trigger != TriggerType.PASSIVE:
@@ -1204,7 +1204,7 @@ class GameManager:
                 candidates.append(fc)
 
         for protector in candidates:
-            if getattr(protector, 'ability_disabled', False):
+            if getattr(protector, 'is_effect_negated', False):
                 continue
             for ab in protector.master.abilities:
                 if ab.trigger != TriggerType.PASSIVE:
@@ -1728,10 +1728,16 @@ class GameManager:
                 log_event("INFO", "game.action_freeze", f"{target.master.name} frozen (won't activate next refresh)", player=player.name)
                 success = True
             elif act_name == "NEGATE_EFFECT":
-                # 「（このターン中、）効果を無効にする」
-                target.ability_disabled = True
+                # 「（このターン中／次の相手のターン終了時まで、）効果を無効にする」。
+                # 継続効果フラグ "EFFECTS_DISABLED" として付与し、reset_turn_status で
+                # 途中解除されないようにする（is_effect_negated が timed_flags も見る）。
+                # 期間指定が無い場合は当該ターン終了まで（THIS_TURN）として扱う。
+                dur = getattr(action, "duration", "INSTANT")
+                cdur = dur if dur in ("THIS_TURN", "THIS_BATTLE", "UNTIL_NEXT_TURN_END") else "THIS_TURN"
+                expire_turn = self.turn_count + 1 if cdur == "UNTIL_NEXT_TURN_END" else 0
+                self.continuous.apply(target, "FLAG", cdur, flag="EFFECTS_DISABLED", expire_turn=expire_turn)
                 target._refresh_keywords()
-                log_event("INFO", "game.action_negate", f"{target.master.name} ability disabled this turn", player=player.name)
+                log_event("INFO", "game.action_negate", f"{target.master.name} effects disabled ({cdur})", player=player.name)
                 success = True
             elif act_name == "RULE_PROCESSING":
                 # ルール上の注記（カード名 alias、デッキ枚数ルール等）→ エンジン no-op
@@ -1757,7 +1763,7 @@ class GameManager:
                 # 効果の明示 RESTED、または owner の「キャラはレストで登場する」PASSIVE のいずれか。
                 if getattr(action, "status", None) == "RESTED" or self._has_rested_play(owner):
                     target.is_rest = True
-                if not target.ability_disabled:
+                if not target.is_effect_negated:
                     for ability in target.master.abilities:
                         if ability.trigger == TriggerType.ON_PLAY:
                             self.resolve_ability(owner, ability, source_card=target)

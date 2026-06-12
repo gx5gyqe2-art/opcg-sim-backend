@@ -456,6 +456,42 @@ def test_opponent_turn_cost_buff_op16_080():
     assert ch.current_cost == 3, f"自分のターンでは+1されない（{ch.current_cost}）"
 
 
+def test_op09_093_negate_and_conditions():
+    """OP09-093: ①リーダー効果無効がターン中持続（途中の reset で解除されない、A-6）、
+    ②キャラの効果無効＋アタック不可が付与される（B-2）、③「登場したターン」制約が機能（B-3）。"""
+    from opcg_sim.src.models.models import CardType as CT
+    from opcg_sim.src.models.enums import TriggerType as TT
+
+    def setup(entered):
+        p1, p2 = make_player("P1"), make_player("P2")
+        p1.leader = CardInstance(make_master(card_id="L", name="ティーチ", type=CT.LEADER,
+                                             traits=["黒ひげ海賊団"]), "P1")
+        teach = inst("OP09-093", "P1")
+        teach.is_newly_played = entered
+        p1.field = [teach]
+        oppchar = CardInstance(make_master(card_id="OC", name="敵", type=CT.CHARACTER), "P2")
+        p2.field = [oppchar]
+        gm = GameManager(p1, p2)
+        gm.turn_player, gm.opponent, gm.turn_count, gm.phase = p1, p2, 3, Phase.MAIN
+        return gm, p1, p2, teach, oppchar
+
+    gm, p1, p2, teach, oppchar = setup(entered=True)
+    ab = next(a for a in teach.master.abilities if a.trigger == TT.ACTIVATE_MAIN)
+    gm.resolve_ability(p1, ab, teach)
+    drain(gm)
+    assert p2.leader.is_effect_negated, "リーダーの効果無効が付与される"
+    assert oppchar.is_effect_negated, "キャラの効果無効が付与される"
+    assert "ATTACK_DISABLE" in oppchar.timed_flags, "キャラはアタックできない"
+    p2.leader.reset_turn_status()  # 途中のアクション
+    assert p2.leader.is_effect_negated, "途中の reset で無効化が解除されてはいけない"
+
+    gm, p1, p2, teach, oppchar = setup(entered=False)
+    ab = next(a for a in teach.master.abilities if a.trigger == TT.ACTIVATE_MAIN)
+    gm.resolve_ability(p1, ab, teach)
+    drain(gm)
+    assert not p2.leader.is_effect_negated, "登場したターンでなければ発動しない"
+
+
 def test_discard_trigger_filter_op16_080():
     """OP16-080 のコスト「【トリガー】を持つカード1枚を捨てる」: トリガー非所持カードは
     捨てる対象に含まれない（報告バグ「トリガーを持たないカードも捨てられる」）。"""

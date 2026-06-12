@@ -1008,16 +1008,20 @@ def test_freeze_keeps_character_rested_after_refresh():
 
 
 def test_negate_effect_sets_ability_disabled():
-    """NEGATE_EFFECT: ability_disabled=True になり能力発動がブロックされる。"""
+    """NEGATE_EFFECT: 継続効果(timed_flags)として無効化し、is_effect_negated=True になる。
+    途中の reset_turn_status では解除されず（A-6）、ターン終了(continuous.expire)で失効する。"""
     gm, p1, p2 = make_game()
     char = make_instance(make_master(card_id="N-1", type=CardType.CHARACTER), owner=p2.name)
     p2.field.append(char)
     ok = gm.apply_action_to_engine(p1, action(ActionType.NEGATE_EFFECT), [char], 0)
     assert ok
-    assert char.ability_disabled is True
-    # reset_turn_status で THIS_TURN の無効化は解除される
+    assert char.is_effect_negated is True
+    # 途中のアクション（reset_turn_status）では解除されない（報告バグの回帰ガード）
     char.reset_turn_status()
-    assert char.ability_disabled is False
+    assert char.is_effect_negated is True, "途中で無効化が解除されてはいけない"
+    # ターン終了で失効する
+    gm.continuous.expire("TURN_END", gm.turn_count)
+    assert char.is_effect_negated is False
 
 
 def test_attack_active_allows_attacking_active_character():
