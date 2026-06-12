@@ -2457,4 +2457,126 @@ CASES = [
              "effect": {"kind": "action", "type": "DRAW", "value": 1}},
         ],
     },
+    # OP05-097 聖地マリージョア: 継続コスト軽減（COST_REDUCTION）
+    {
+        "id": "op05_097_marejoa_cost_reduction",
+        "text": "【自分のターン中】自分が手札から登場させるコスト2以上の特徴《天竜人》を持つキャラカードの支払うコストは1少なくなる。",
+        "expect": [
+            {"trigger": "YOUR_TURN",
+             "effect": {"kind": "action", "type": "BUFF", "value": -1,
+                        "status": "COST_REDUCTION",
+                        "target": {"player": "SELF", "zone": "HAND",
+                                   "traits": ["天竜人"], "cost_min": 2}}}
+        ],
+    },
+    # OP13-087 オハラ・バスター: デッキトップをトラッシュへ
+    {
+        "id": "op13_087_deck_top_trash",
+        "text": "【ブロッカー】(相手のアタックの後、このカードをレストにし、アタックの対象をこのカードにできる) / 【登場時】自分のデッキの上から1枚をトラッシュに置く。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "effect": {"kind": "action", "type": "TRASH_FROM_DECK", "value": 1}}
+        ],
+    },
+    # OP13-083 サターン聖: トラッシュ7枚以上で除去耐性(PASSIVE) + LOOK→手札→残りデッキ下
+    {
+        "id": "op13_083_saturn_look_search",
+        "text": "自分のトラッシュが7枚以上ある場合、このキャラは相手の効果で場を離れない。 / 【登場時】自分のデッキの上から5枚を見て、特徴《五老星》を持つカード1枚までを公開し、手札に加える。その後、残りを好きな順番でデッキの下に置く。",
+        "expect": [
+            {"trigger": "PASSIVE",
+             "condition": {"type": "TRASH_COUNT", "operator": "GE", "value": 7},
+             "effect": {"kind": "action", "type": "PREVENT_LEAVE", "status": "LEAVE"}},
+            {"trigger": "ON_PLAY",
+             "effect": {"kind": "seq", "actions": [
+                 {"type": "LOOK", "value": 5},
+                 {"type": "MOVE_CARD", "destination": "HAND",
+                  "target": {"zone": "TEMP", "traits": ["五老星"], "is_up_to": True}},
+                 {"type": "DECK_BOTTOM",
+                  "target": {"zone": "TEMP", "select_mode": "REMAINING"}},
+             ]}},
+        ],
+    },
+    # OP13-086 シャルリア宮: LOOK3 + 「以外」除外サーチ + 残りトラッシュ + 手札1捨て
+    {
+        "id": "op13_086_shalria_look_search",
+        "text": "【登場時】自分のデッキの上から3枚を見て、「シャルリア宮」以外の特徴《天竜人》を持つカード1枚までを公開し、手札に加える。その後、残りをトラッシュに置き、自分の手札1枚を捨てる。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "effect": {"kind": "seq", "actions": [
+                 {"type": "LOOK", "value": 3},
+                 {"type": "MOVE_CARD", "destination": "HAND",
+                  "target": {"zone": "TEMP", "traits": ["天竜人"],
+                             "exclude_names": ["シャルリア宮"], "is_up_to": True}},
+                 {"type": "TRASH", "target": {"zone": "TEMP", "select_mode": "REMAINING"}},
+                 {"type": "DISCARD", "target": {"player": "SELF", "zone": "HAND"}},
+             ]}}
+        ],
+    },
+    # OP13-096 イベント: LOOK3 + 除外サーチ + 残りトラッシュ（【メイン】= ACTIVATE_MAIN）
+    {
+        "id": "op13_096_event_look_search",
+        "text": "【メイン】自分のデッキの上から3枚を見て、「\"五老星\"ここに!!!」以外の特徴《天竜人》を持つカード1枚までを公開し、手札に加える。その後、残りをトラッシュに置く。",
+        "expect": [
+            {"trigger": "ACTIVATE_MAIN",
+             "effect": {"kind": "seq", "actions": [
+                 {"type": "LOOK", "value": 3},
+                 {"type": "MOVE_CARD", "destination": "HAND",
+                  "target": {"zone": "TEMP", "traits": ["天竜人"], "is_up_to": True}},
+                 {"type": "TRASH", "target": {"zone": "TEMP", "select_mode": "REMAINING"}},
+             ]}}
+        ],
+    },
+    # OP12-051 ヒナ: 複合コスト（自己レスト＋手札捨て）+ ブロッカー発動不可
+    {
+        "id": "op12_051_hina_blocker_disable",
+        "text": "【起動メイン】このキャラをレストにし、自分の手札1枚を捨てることができる:相手の元々のコスト4以下のキャラ1枚までは、このターン中、【ブロッカー】を発動できない。",
+        "expect": [
+            {"trigger": "ACTIVATE_MAIN",
+             "cost": {"kind": "seq", "actions": [
+                 {"type": "REST", "target": {"ref_id": "self"}},
+                 {"type": "DISCARD", "target": {"player": "SELF", "zone": "HAND"}},
+             ]},
+             "effect": {"kind": "action", "type": "BUFF", "status": "BLOCKER_DISABLE",
+                        "duration": "THIS_TURN",
+                        "target": {"player": "OPPONENT", "cost_max": 4,
+                                   "is_up_to": True}}}
+        ],
+    },
+    # OP08-047 バジル・ホーキンス: 自キャラバウンスコスト + 相手コスト6以下バウンス
+    {
+        "id": "op08_047_hawkins_bounce",
+        "text": "【登場時】このキャラ以外の自分のキャラ1枚を持ち主の手札に戻すことができる:コスト6以下のキャラ1枚までを、持ち主の手札に戻す。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "cost": {"kind": "action", "type": "BOUNCE",
+                      "target": {"player": "SELF", "zone": "FIELD",
+                                 "card_type": ["CHARACTER"]}},
+             "effect": {"kind": "action", "type": "BOUNCE",
+                        "target": {"player": "OPPONENT", "cost_max": 6,
+                                   "is_up_to": True}}}
+        ],
+    },
+    # OP03-048 ノジコ: リーダー名条件 + 相手コスト5以下バウンス
+    {
+        "id": "op03_048_nojiko_bounce",
+        "text": "【登場時】自分のリーダーが「ナミ」の場合、相手のコスト5以下のキャラ1枚までを、持ち主の手札に戻す。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "condition": {"type": "LEADER_NAME", "value": "ナミ"},
+             "effect": {"kind": "action", "type": "BOUNCE",
+                        "target": {"player": "OPPONENT", "cost_max": 5,
+                                   "is_up_to": True}}}
+        ],
+    },
+    # OP06-104 菊之丞: 相手ライフ3以下でデッキ上1枚をライフへ（HEAL）
+    {
+        "id": "op06_104_kiku_deck_to_life",
+        "text": "【KO時】相手のライフが3枚以下の場合、自分のデッキの上から1枚までを、ライフの上に加える。",
+        "expect": [
+            {"trigger": "ON_KO",
+             "condition": {"type": "LIFE_COUNT", "operator": "LE", "value": 3,
+                           "player": "OPPONENT"},
+             "effect": {"kind": "action", "type": "HEAL", "value": 1}}
+        ],
+    },
 ]
