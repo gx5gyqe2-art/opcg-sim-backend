@@ -486,6 +486,9 @@ class EffectParser:
         # 【ドン!!×N】 または 【ターン1回】 のみ（既知トリガータグなし）→ 起動メイン
         # 【ブロッカー】等を得る効果も正しく ACTIVATE_MAIN と判定できるよう、
         # 既知トリガータグ (_TRIGGER_TAG_RE) の有無のみを判断基準にする
+        # NOTE: 【ドン!!×N】のみ（活性化タグ無し）は本来「付与ドンN枚ある間の継続効果」=PASSIVE だが、
+        #   エンジンが passive 再計算で BUFF 等の継続適用を行わないため、PASSIVE 化すると当該能力が
+        #   無効化される（OP13-004 等）。継続効果の engine 配線が入るまで ACTIVATE_MAIN を維持する。
         if self._DON_TURN_TAG_RE.search(norm_text) and not self._TRIGGER_TAG_RE.search(norm_text):
             return embedded or TriggerType.ACTIVATE_MAIN
 
