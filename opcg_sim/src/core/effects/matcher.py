@@ -150,6 +150,15 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if _nfc("カード名の異なる") in tgt_text or _nfc("カード名が異なる") in tgt_text:
         tq.is_unique_name = True
 
+    # 「【X】効果を持たないキャラ」: 指定トリガー種別を持たないカードに限定（EB03-001/PRB01-001）。
+    _lacks = re.search(_nfc(r'【(登場時|アタック時|ブロック時|KO時|トリガー)】効果を持たない'), tgt_text)
+    if _lacks:
+        tq.lacks_trigger = {
+            _nfc("登場時"): "ON_PLAY", _nfc("アタック時"): "ON_ATTACK",
+            _nfc("ブロック時"): "ON_BLOCK", _nfc("KO時"): "ON_KO",
+            _nfc("トリガー"): "TRIGGER",
+        }[_lacks.group(1)]
+
     # 「【トリガー】を持つ（キャラ/カード）」対象フィルタ: トリガー能力所持に限定（matcher が絞り込む）。
     # 全対象種別で効くよう parse_target に置く（従来は discard ルールのみで、PLAY_CARD 等に
     # 適用されず「【トリガー】を持つキャラを登場」の絞り込みが脱落していた: OP03-022）。
@@ -387,6 +396,11 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
         # ライフの表裏（「ライフの表向きのカード」ST13-002）。裏向きライフを巻き込まないよう絞る。
         if query.is_face_up is not None and bool(getattr(card, "is_face_up", False)) != query.is_face_up:
+            continue
+
+        # 「【X】効果を持たないキャラ」: 指定トリガーを持つカードを除外（EB03-001/PRB01-001）。
+        if query.lacks_trigger is not None and any(
+                ab.trigger.name == query.lacks_trigger for ab in getattr(card.master, "abilities", ())):
             continue
         
         if query.is_vanilla:
