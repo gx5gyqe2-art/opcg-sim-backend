@@ -235,13 +235,21 @@ class DonInstance:
 
     def to_dict(self):
         props = CONST.get('CARD_PROPERTIES', {})
+        # ドン!!返却の選択 UI 等で状態を区別できるよう、名前に付与中/レストを併記する。
+        if self.attached_to:
+            display_name = "ドン!!(付与中)"
+        elif self.is_rest:
+            display_name = "ドン!!(レスト)"
+        else:
+            display_name = "ドン!!"
         return {
             props.get('UUID', 'uuid'): self.uuid,
             props.get('OWNER_ID', 'owner_id'): self.owner_id,
             props.get('IS_REST', 'is_rest'): self.is_rest,
             "attached_to": self.attached_to,
+            props.get('CARD_ID', 'card_id'): "DON",
             # 【追加】CardSchemaのバリデーションを通すためのダミー値
-            props.get('NAME', 'name'): "ドン!!",
+            props.get('NAME', 'name'): display_name,
             props.get('TYPE', 'type'): "DON",
             props.get('ATTRIBUTE', 'attribute'): "Special",
             props.get('POWER', 'power'): 0,

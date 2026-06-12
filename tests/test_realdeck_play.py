@@ -58,7 +58,7 @@ def drain(gm, limit=40):
     while gm.active_interaction and n < limit:
         ia = gm.active_interaction
         pl = gm.p1 if gm.p1.name == ia.get("player_id") else gm.p2
-        if ia.get("action_type") == "SELECT_TARGET":
+        if ia.get("action_type") in ("SELECT_TARGET", "SELECT_RESOURCE"):
             cand = ia.get("selectable_uuids") or [c.uuid for c in ia.get("candidates", [])]
             mx = (ia.get("constraints") or {}).get("max", 1) or 1
             payload = {"selected_uuids": cand[:mx], "index": 0}

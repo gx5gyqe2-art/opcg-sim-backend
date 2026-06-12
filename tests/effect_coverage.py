@@ -302,8 +302,8 @@ def _smart_drain(
         player      = gm.p1 if gm.p1.name == ia.get("player_id") else gm.p2
         action_type = ia.get("action_type", "")
 
-        if action_type == "SELECT_TARGET":
-            if record is not None:
+        if action_type in ("SELECT_TARGET", "SELECT_RESOURCE"):
+            if action_type == "SELECT_TARGET" and record is not None:
                 iss = _selection_issues(ia)
                 if iss:
                     record.setdefault("select_issues", []).extend(iss)

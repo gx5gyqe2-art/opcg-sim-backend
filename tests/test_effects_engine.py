@@ -91,12 +91,55 @@ def test_return_don_cost_requires_enough_don():
     gm.resolve_ability(p1, ab, source_card=src)
     assert len(p1.hand) == 0
 
-    # ドン!!を1枚用意 → 発動可。1枚返却し、1枚ドロー。
+    # ドン!!を1枚用意 → 発動可。どのドン!!を戻すか選択を求められ、選択後に返却＆ドロー。
     p1.don_active.append(p1.don_deck.pop(0))
     deck_before = len(p1.don_deck)
     gm.resolve_ability(p1, ab, source_card=src)
+    assert gm.active_interaction is not None
+    assert gm.active_interaction["action_type"] == "SELECT_RESOURCE"
+    don_uuid = gm.active_interaction["candidates"][0].uuid
+    gm.resolve_interaction(p1, {"selected_uuids": [don_uuid]})
     assert len(p1.hand) == 1
     assert len(p1.don_active) == 0
+    assert len(p1.don_deck) == deck_before + 1
+
+
+def test_return_don_player_selects_attached_don():
+    """「ドン!!-N」で、コストエリアでなく付与中のドン!!を選んで戻せる。
+    付与中を戻すと付与先キャラの attached_don（パワー上昇）も解除される。"""
+    from opcg_sim.src.models.models import DonInstance
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    # キャラに1枚付与、コストエリアにアクティブ1枚。
+    host = make_instance(make_master(card_id="HOST"), owner=p1.name)
+    p1.field.append(host)
+    attached = DonInstance(owner_id=p1.name, attached_to=host.uuid)
+    host.attached_don = 1
+    p1.don_attached_cards.append(attached)
+    active = DonInstance(owner_id=p1.name)
+    p1.don_active.append(active)
+
+    ab = Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        cost=GameAction(type=ActionType.RETURN_DON, value=ValueSource(base=1)),
+        effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)),
+    )
+    src = make_instance(make_master(card_id="RD-2", abilities=(ab,)), owner=p1.name)
+    p1.field.append(src)
+
+    deck_before = len(p1.don_deck)
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert gm.active_interaction["action_type"] == "SELECT_RESOURCE"
+    # 候補にはアクティブも付与中も含まれる。付与中のドン!!を選んで戻す。
+    cand_uuids = [c.uuid for c in gm.active_interaction["candidates"]]
+    assert attached.uuid in cand_uuids and active.uuid in cand_uuids
+    gm.resolve_interaction(p1, {"selected_uuids": [attached.uuid]})
+
+    assert len(p1.hand) == 1                       # 効果は解決
+    assert attached not in p1.don_attached_cards   # 付与中ドンが外れた
+    assert host.attached_don == 0                  # パワー上昇も解除
+    assert active in p1.don_active                 # アクティブは温存（選ばなかった）
     assert len(p1.don_deck) == deck_before + 1
 
 

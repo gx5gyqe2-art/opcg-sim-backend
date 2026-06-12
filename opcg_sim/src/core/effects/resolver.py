@@ -13,6 +13,9 @@ import re
 # atoms._SEL_GROUP_ID と一致させる。
 _SEL_GROUP_ID = "_sel_group"
 
+# context にキーが「無い」ことと「値が None/空」であることを区別するための番兵。
+_UNSET = object()
+
 
 class EffectResolver:
     def __init__(self, game_manager):
@@ -153,11 +156,13 @@ class EffectResolver:
                 cost = node.value.base if node.value else 1
                 return len(player.don_active) >= cost
             if node.type == ActionType.RETURN_DON:
-                # 「ドン!!-N」コスト: コストエリア（アクティブ＋レスト）のドン!!を N 枚
-                # ドン!!デッキへ返却する。返せるドン!!が足りなければ支払えない（＝発動不可）。
-                # 付与中(attached)のドン!!はコスト支払いには使えない。
+                # 「ドン!!-N」コスト: 自分の場のドン!!を N 枚ドン!!デッキへ返却する。
+                # 場のドン!!（アクティブ＋レスト＋付与中）のいずれからでも選んで戻せるため、
+                # 3 つの合計が必要枚数以上あれば支払える。
                 cost = node.value.base if node.value else 1
-                return len(player.don_active) + len(player.don_rested) >= cost
+                total = (len(player.don_active) + len(player.don_rested)
+                         + len(player.don_attached_cards))
+                return total >= cost
             if not node.target: return True
             from .matcher import get_target_cards
             candidates = get_target_cards(self.game_manager, node.target, source_card)
@@ -341,6 +346,19 @@ class EffectResolver:
         # COUNT_QUERY 等の動的値計算でソースカードの所有者を解決できるようにする
         self.context["_source_card_uuid"] = source_card.uuid if source_card else None
         value = self._calculate_value(player, action.value, targets)
+
+        # RETURN_DON（「ドン!!-N」/「場のドン!!をデッキに戻す」）: 自分の場のドン!!のうち
+        # どれを戻すかをプレイヤーに選ばせる。未選択なら SELECT_RESOURCE で中断し、再開時に
+        # 選択済みドン!!の uuid（context["_return_don_uuids"]）で実行する。
+        if action.type == ActionType.RETURN_DON:
+            pending = self.context.pop("_return_don_uuids", _UNSET)
+            if pending is _UNSET:
+                if self._suspend_for_don_selection(player, action, source_card, value):
+                    return None  # 中断: resume 時に再実行される
+                self.game_manager._return_don_selection = None  # 戻せるドンが無い等→通常実行
+            else:
+                self.game_manager._return_don_selection = pending
+
         success = self.game_manager.apply_action_to_engine(player, action, targets, value)
 
         # REVEALED_CARD_TRAIT 条件評価用: REVEAL/LOOK 実行後に公開カードを記録。
@@ -994,6 +1012,39 @@ class EffectResolver:
             interaction["selectable_uuids"] = selectable_uuids
         self.game_manager.active_interaction = interaction
         log_event("INFO", "resolver.suspend", f"Suspended for target selection (min:{min_select}, max:{required_count})", player=player.name)
+
+    def _suspend_for_don_selection(self, player, action, source_card, value) -> bool:
+        """RETURN_DON の対象ドン!!選択で中断する。戻せるドン!!が無ければ False を返し中断しない。
+
+        選択者・対象は _don_pool_player が決めるプール所有者（自分／相手「は…戻す」）。
+        候補は当該プレイヤーの場のドン!!全て（アクティブ＋レスト＋付与中）。
+        """
+        gm = self.game_manager
+        tp = gm._don_pool_player(player, action)
+        field_don = list(tp.don_active) + list(tp.don_rested) + list(tp.don_attached_cards)
+        n = value if value and value > 0 else 1
+        to_return = min(n, len(field_don))
+        if to_return <= 0:
+            return False
+
+        saved_stack = self.execution_stack.copy()
+        saved_stack.append(action)  # resume 時に RETURN_DON を再実行する
+        gm.active_interaction = {
+            "player_id": tp.name,
+            "action_type": "SELECT_RESOURCE",
+            "source_card_name": source_card.master.name if source_card else "",
+            "message": f"ドン!!デッキに戻すドン!!を{to_return}枚選択してください",
+            "candidates": field_don,
+            "constraints": {"min": to_return, "max": to_return},
+            "continuation": {
+                "execution_stack": saved_stack,
+                "effect_context": self.context,
+                "source_card_uuid": source_card.uuid if source_card else None,
+            },
+        }
+        log_event("INFO", "resolver.suspend",
+                  f"Suspended for DON selection (n:{to_return})", player=tp.name)
+        return True
 
     def resume_choice(self, player, source_card, selected_index, execution_stack, effect_context):
         self.execution_stack = execution_stack
