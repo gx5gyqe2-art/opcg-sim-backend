@@ -15,6 +15,18 @@ from .effects.matcher import get_target_cards
 
 Card = CardInstance
 
+# 自己制限（self_cannot）の制限キー。parser が RULE_PROCESSING + status=これらで生成し、
+# apply_action_to_engine が player.restrictions に記録、各アクション地点で enforce する。
+SELF_RESTRICTION_KEYS = {
+    "CANNOT_PLAY_FROM_HAND",      # 手札からカードをプレイできない
+    "CANNOT_PLAY_CHARACTER",      # キャラ(カード)を登場できない（min_cost で「コストN以上」に限定可）
+    "CANNOT_DRAW_BY_EFFECT",      # 自分の効果でカードを引くことができない
+    "CANNOT_LIFE_TO_HAND",        # 自分の効果でライフを手札に加えられない
+    "CANNOT_ATTACK_LEADER",       # リーダーにアタックできない
+    "CANNOT_ACTIVATE_DON",        # キャラの効果でドン‼をアクティブにできない
+}
+
+
 def _nfc(text: str) -> str:
     return unicodedata.normalize('NFC', text)
 
@@ -36,6 +48,10 @@ class Player:
         # 「相手の登場時効果は無効になる」(スコープ付き相手効果無効) の期限。
         # turn_count <= negate_onplay_until の間、このプレイヤーの ON_PLAY 解決をスキップする。
         self.negate_onplay_until: int = 0
+        # 自己制限（「自分は、このターン中、…できない」= self_cannot）の保管。
+        # key=制限種別(CANNOT_PLAY_CHARACTER 等) → {"expire": turn_count, "min_cost": Optional[int]}。
+        # turn_count <= expire の間だけ有効（negate_onplay_until と同じ遅延失効方式）。
+        self.restrictions: Dict[str, Dict[str, Any]] = {}
 
     def setup_game(self):
         random.shuffle(self.deck)
@@ -703,6 +719,11 @@ class GameManager:
         if "ATTACK_DISABLE" in attacker.flags or "ATTACK_DISABLE" in attacker.timed_flags: raise ValueError("このカードは効果によりアタックできません。")
         if "CANNOT_REST" in attacker.timed_flags: raise ValueError("このカードは効果によりレストにできないためアタックできません。")
         if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
+        # 自己制限（self_cannot）:「リーダーにアタックできない」。相手リーダーへの攻撃宣言を弾く。
+        if (target.master.type == CardType.LEADER
+                and attacker_owner is not None
+                and self._active_restriction(attacker_owner, "CANNOT_ATTACK_LEADER")):
+            raise ValueError("効果により、このターンはリーダーにアタックできません。")
         if (target.master.type == CardType.CHARACTER and not target.is_rest
                 and not attacker.has_keyword("ATTACK_ACTIVE")):
             raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
@@ -850,6 +871,17 @@ class GameManager:
     def play_card_action(self, player: Player, card: Card):
         if card not in player.hand: return
         self._validate_action(player, "MAIN_ACTION")
+        # 自己制限（self_cannot）: 「手札からカードをプレイできない」「キャラ（コストN以上）を登場できない」。
+        if self._active_restriction(player, "CANNOT_PLAY_FROM_HAND"):
+            raise ValueError("効果により、このターンは手札からカードをプレイできません。")
+        if card.master.type == CardType.CHARACTER:
+            char_rec = self._active_restriction(player, "CANNOT_PLAY_CHARACTER")
+            if char_rec is not None:
+                min_cost = char_rec.get("min_cost")
+                # 「元々のコスト」= master.cost（修正前の値）で判定する。
+                if min_cost is None or (card.master.cost is not None and card.master.cost >= min_cost):
+                    suffix = f"コスト{min_cost}以上の" if min_cost else ""
+                    raise ValueError(f"効果により、このターンは{suffix}キャラを登場できません。")
         log_event("INFO", "game.play_card", f"Playing card: {card.master.name}", player=player.name, payload={"card_uuid": card.uuid})
         if card.master.type == CardType.EVENT:
             for ability in card.master.abilities:
@@ -888,6 +920,18 @@ class GameManager:
                 if act is not None and getattr(act, "status", None) == "RESTED_PLAY":
                     return True
         return False
+
+    def _active_restriction(self, player: Player, key: str) -> Optional[Dict[str, Any]]:
+        """player に有効な自己制限（self_cannot）があれば、そのパラメータ dict を返す。
+        turn_count <= expire の間だけ有効。期限切れエントリは掃除して None を返す。"""
+        rec = getattr(player, "restrictions", {}).get(key)
+        if not rec:
+            return None
+        if self.turn_count <= rec.get("expire", -1):
+            return rec
+        # 期限切れは破棄
+        player.restrictions.pop(key, None)
+        return None
 
     def _blocks_effect_play(self, card: CardInstance) -> bool:
         """card が「手札のこのカードは効果で登場できない」PASSIVE を持つか（NO_EFFECT_PLAY）。"""
@@ -1112,11 +1156,27 @@ class GameManager:
         if not action: return False
         act_name = action.type.name if hasattr(action.type, 'name') else str(action.type)
         log_event("INFO", "game.apply_action", f"Applying {act_name} to {len(targets)} targets", player=player.name)
+        # 自己制限（「自分は、このターン中、…できない」= self_cannot）の登録。
+        # parser が RULE_PROCESSING + status=制限キーで生成する。対象を持たないため、
+        # 通常の `for target in targets` ループ前にここで処理して player に記録する。
+        if act_name == "RULE_PROCESSING" and getattr(action, "status", None) in SELF_RESTRICTION_KEYS:
+            rec: Dict[str, Any] = {"expire": self.turn_count}  # 「このターン中」: 現ターン内のみ有効
+            if action.value and getattr(action.value, "base", None):
+                rec["min_cost"] = action.value.base
+            player.restrictions[action.status] = rec
+            log_event("INFO", "game.self_restriction",
+                      f"{player.name} restricted: {action.status}{' (cost>=' + str(rec.get('min_cost')) + ')' if rec.get('min_cost') else ''} this turn",
+                      player=player.name)
+            return True
         if act_name == "DRAW":
             target_player = player
             if action.target and getattr(action.target, 'player', None) is not None:
                 if getattr(action.target.player, 'name', '') == 'OPPONENT':
                     target_player = self.p2 if player == self.p1 else self.p1
+            # 「自分の効果でカードを引くことができない」: 効果解決による DRAW を抑止する。
+            if self._active_restriction(target_player, "CANNOT_DRAW_BY_EFFECT"):
+                log_event("INFO", "game.draw_restricted", f"{target_player.name} cannot draw by effect this turn", player=player.name)
+                return True
             self.draw_card(target_player, value)
             return True
         if act_name in ("DEAL_DAMAGE", "DAMAGE"):
@@ -1355,6 +1415,10 @@ class GameManager:
         if act_name == "ACTIVE_DON" and not getattr(action, 'target', None):
             # 「ドン!!N枚をアクティブにする」: レスト→アクティブ（枚数ベース）。
             tp = self._don_pool_player(player, action)
+            # 「キャラの効果でドン‼をアクティブにできない」: 効果によるアクティブ化を抑止。
+            if self._active_restriction(tp, "CANNOT_ACTIVATE_DON"):
+                log_event("INFO", "game.active_don_restricted", f"{tp.name} cannot activate DON!! by effect this turn", player=player.name)
+                return True
             activated = 0
             for _ in range(value):
                 if not tp.don_rested:
@@ -1565,6 +1629,13 @@ class GameManager:
                 success = True
             elif act_name == "MOVE_CARD":
                 dest = action.destination if action.destination else Zone.HAND
+                # 自己制限（self_cannot）:「自分の効果でライフを手札に加えられない」。
+                # 自分のライフ→自分の手札の移動のみ抑止する（相手への移動・他ゾーンは対象外）。
+                if (dest == Zone.HAND and source_list is owner.life and owner is player
+                        and self._active_restriction(player, "CANNOT_LIFE_TO_HAND")):
+                    log_event("INFO", "game.life_to_hand_restricted",
+                              f"{player.name} cannot add life to hand by effect this turn", player=player.name)
+                    continue
                 dest_pos = getattr(action, 'dest_position', 'BOTTOM') or 'BOTTOM'
                 self.move_card(target, dest, owner, dest_position=dest_pos)
                 success = True

@@ -1111,6 +1111,10 @@ def _attack_disable(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("アタックできない") not in t:
         return None
+    # 「自分は、…、リーダーにアタックできない」は対象(リーダー)を無効化するのではなく、
+    # 効果コントローラー自身の攻撃側制限。self_cannot(CANNOT_ATTACK_LEADER) に委ねる。
+    if _nfc("自分は") in t and re.search(_nfc(r"リーダーにアタック"), t):
+        return None
     tq = parse_target(t)
     duration = "UNTIL_NEXT_TURN_END" if _nfc("次の") in t else "THIS_TURN"
     return GameAction(type=ActionType.ATTACK_DISABLE, target=tq, duration=duration, raw_text=t)
@@ -2296,9 +2300,13 @@ def _scoped_negate_opp_onplay(ctx: ParseContext) -> Optional[GameAction]:
 
 # ---------------------------------------------------------------------------
 # 自己制限: 「自分は、（このターン中、）...できない/られない」
-#   → RULE_PROCESSING（エンジン no-op）。
-#   「自分の効果でライフを手札に加えられない」「自分はキャラカードを登場できない」等。
-#   制限チェックは未実装のため、解析だけ行いエンジンは何もしない（OTHER 脱出のみ）。
+#   → RULE_PROCESSING + status=制限キー。
+#   述語を判別して具体的な制限キーを付け、エンジン(gamestate.SELF_RESTRICTION_KEYS)が
+#   player.restrictions に記録して各アクション地点で enforce する。
+#   「自分の効果でライフを手札に加えられない」「キャラ（コストN以上）を登場できない」
+#   「リーダーにアタックできない」「カードを引けない」「ドン‼をアクティブにできない」等。
+#   述語を判別できない自己制限（例:「デッキに入れることができない」=構築ルール）は
+#   従来どおり status なしの no-op（解析のみ）。
 # ---------------------------------------------------------------------------
 @rule("self_cannot", priority=33)
 def _self_cannot(ctx: ParseContext) -> Optional[GameAction]:
@@ -2307,9 +2315,26 @@ def _self_cannot(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if not re.search(_nfc(r"(できない|られない)"), t):
         return None
-    # 制限自体はエンジン未実装(no-op)だが、「このターン中／このバトル中」の期間は
-    # 正しく保持する（監査 DURATION の真値化。将来の enforce 時にそのまま使える）。
-    return GameAction(type=ActionType.RULE_PROCESSING, duration=_duration_of(t), raw_text=t)
+    status: Optional[str] = None
+    value: Optional[ValueSource] = None
+    if _nfc("リーダー") in t and _nfc("アタック") in t:
+        status = "CANNOT_ATTACK_LEADER"
+    elif _nfc("ライフ") in t and _nfc("手札") in t:  # 「ライフを手札に加えられない」
+        status = "CANNOT_LIFE_TO_HAND"
+    elif _nfc("ドン") in t and _nfc("アクティブ") in t:  # 「ドン‼をアクティブにできない」
+        status = "CANNOT_ACTIVATE_DON"
+    elif _nfc("引く") in t or _nfc("ドロー") in t:  # 「カードを引くことができない」
+        status = "CANNOT_DRAW_BY_EFFECT"
+    elif _nfc("手札から") in t and _nfc("プレイ") in t:  # 「手札からカードをプレイできない」
+        status = "CANNOT_PLAY_FROM_HAND"
+    elif _nfc("登場できない") in t:  # 「（コストN以上の）キャラ（カード）を登場できない」
+        status = "CANNOT_PLAY_CHARACTER"
+        m = re.search(_nfc(r"コスト(\d+)以上"), t)
+        if m:
+            value = ValueSource(base=int(m.group(1)))
+    # 「このターン中／このバトル中」の期間は引き続き保持（DURATION の真値化）。
+    return GameAction(type=ActionType.RULE_PROCESSING, status=status, value=value,
+                      duration=_duration_of(t), raw_text=t)
 
 
 # ---------------------------------------------------------------------------
