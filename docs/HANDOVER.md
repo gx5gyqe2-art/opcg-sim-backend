@@ -134,6 +134,10 @@
 | `tests/compare_parsers.py` | レガシー vs V2 の全カード差分（退行検知） |
 | `tests/mistarget_diagnostics.py` | ミスターゲット/lift 候補の検出 |
 | `tests/interactive_target_audit.py` | INTERACTIVE 対象の自動監査（TargetQuery とテキストの照合。`--top N`） |
+| `tests/leader_spec_probe.py` | リーダー1枚分のテキスト/パース結果(AST要約)/実行観測(classify)を出力（`<ID>`/`--set`/`--all`/`--json`） |
+| `tests/leader_test_helpers.py` | リーダー挙動テスト用ヘルパ（実DBの能力を汎用盤面で発動・対話駆動・盤面観測）。§12参照 |
+| `tests/test_leader_*.py` | 全137リーダーの挙動テスト（セット別13ファイル）。✅通常パス／🐛は xfail(strict) でバグ固定 |
+| `docs/leader_specs/` | リーダー効果テスト仕様書（セット別13本＋README/ISSUES/_GUIDE/_TEST_GUIDE）。§12参照 |
 | `full_card_baseline.json` | 全能力の実行シグネチャ凍結（挙動ベースライン） |
 
 ### フロントエンド（opcg-sim-frontend）
@@ -502,3 +506,77 @@ backend テスト 374 passed / パーサ退行（新規OTHER）0 / フロント 
   `tests/test_effects_engine.py`（NEGATE 継続化）に追加。
 - `full_card_baseline.json` は意図的変更分（②a 131枚・③b 1枚・③c 8枚）のみ再生成。
 - H-5 ラチェット（`test_quality_gates`）は +1（③c のコストが合成盤面で支払えず no-op になる測定限界）。
+
+---
+
+## 12. 2026-06 全リーダー効果の意味検証＋挙動テスト（leader-card-effect-tests ブランチ）
+
+全137リーダーカードを**1枚ずつテキスト精読**し、構造監査（クラッシュ/カード消失）では拾えない
+**意味バグ**（対象・数値・条件・トリガー種別の取り違え）を仕様書として洗い出し、テキスト準拠の
+**挙動テスト**で固定した。実装・カードデータは**未変更**（検出と固定のみ。修正は別タスク）。
+
+### 成果物
+
+| 種別 | パス | 内容 |
+|---|---|---|
+| プローブ | `tests/leader_spec_probe.py` | テキスト/パース結果(AST要約)/実行観測(classify)を1枚分まとめて出力 |
+| 仕様書 | `docs/leader_specs/<SET>.md`（13本） | 各リーダーの効果分解・テストケース表・パース照合・実観測照合・判定(✅/⚠️/🐛) |
+| 索引/一覧 | `docs/leader_specs/README.md` / `ISSUES.md` | 集計索引／検出バグの**根本原因パターン別**一覧＋修正優先順位 |
+| ガイド | `docs/leader_specs/_GUIDE.md` / `_TEST_GUIDE.md` | 仕様書作成ルール／pytest化のマーカー方針・ヘルパAPI |
+| ヘルパ | `tests/leader_test_helpers.py` | 実DBの能力を汎用盤面で発動・対話駆動・盤面観測 |
+| テスト | `tests/test_leader_<set>.py`（13本） | 全137リーダーの挙動テスト |
+
+### テスト設計（リグレッションの固定方法）
+
+- **常にテキスト準拠の「正しい挙動」をアサート**する（現実装に合わせない）。
+- 判定ラベルでマーカーを決める:
+  - ✅問題なし → 通常テスト（正しい挙動をロック）
+  - 🐛バグ → `@pytest.mark.xfail(strict=True, reason=原因)`。現実装では失敗＝xfailで緑。
+    **修正されると xpass→strictで赤**になり、マーカー除去（＝修正完了）を促す「バグ検知器」。
+  - ⚠️要確認 → 通常で書き、実際に正しく動けば通常パスへ昇格／不安定なら `xfail(strict=False)`。
+- 反転系（パワー GE/LE 等）は**条件成立・不成立の両盤面**でアサートして反転を確実に捕捉する。
+- 実行は **`-s` 必須**（ログ干渉で I/O エラーになるため）:
+  `OPCG_LOG_SILENT=1 python -m pytest tests/test_leader_*.py -q -s -p no:cacheprovider`
+- 現状の集計: **230 passed / 80 xfailed / 1 skipped**（failed・xpassed ゼロ）。
+  xfailed の各 `reason` が未修正の意味バグに対応する。
+
+### ヘルパ（`leader_test_helpers.py`）の要点
+
+- `build(card_id)` → `(gm, p1, p2, leader)`。`effect_coverage._build_test_state` を再利用した
+  リッチ盤面（p1=ドン10/手札5/トラッシュ10/デッキ20/ライフ5/フィールド3、p2=…）でリーダーを配置。
+- `get_ability(master, trigger, n=0)` で実パース済み能力を取得し `gm.resolve_ability(p1, ab, leader)`。
+- `auto_resolve(gm, player, plan=None)` が対話を駆動（既定: CONFIRM=受諾／SELECT=min枚／CHOICE=0）。
+  精密制御は `plan=[confirm(True), select_uuids([...]), choose(i)]`。
+- `add_char/clear_field/set_life`、観測 `leader_power/don_total/zone_counts`。
+- **注意（実装の癖）**: 【ドン‼×N】(HAS_DON) は §11 の通り `source_card.attached_don` を見るため、
+  リーダー発動の条件成立には `leader.attached_don = N` を設定する（コストエリアの active ドンではない）。
+
+### 検出した意味バグの根本原因パターン（`ISSUES.md` 参照、🐛計50件）
+
+| 群 | パターン | 代表ID | 根本原因（判明分） |
+|---|---|---|---|
+| A | パワー「以上」が常に「以下」に反転 | OP10-001/003, OP16-001, P-086, ST13-001 | `matcher.py:209` のパワー抽出正規表現 `\D?` が「以上」の「以」を食い group2=None → `else` で `power_max` に設定。cost 側(line168)は `\D?` 無しで正常 |
+| B | 誘発トリガーが ACTIVATE_MAIN/YOUR_TURN/ON_PLAY に化ける | OP01-061, OP03-040/076, OP06-042, OP12-081, OP13-002/100, OP16-041, P-117, PRB01-001 | 「〜した時」系の自動誘発が認識されず起動メイン等にフォールバック→**無条件・過剰発動**。`ON_DAMAGE_DEALT_TO_LIFE` 等は enum 定義のみで parser 未割当 |
+| C | 条件節の欠落・縮退・反転 | ST10-002(OR欠落), OP13-003(反転), OP14-020/ST14-001(コスト閾値縮退), OP02-026(FIELD→HAND) | パーサの条件解釈漏れ |
+| D | 条件のスコープ誤り（一部アクションにしか掛からない） | OP11-040, ST29-001 | 条件が後続アクションに波及しない |
+| E | 対象(TargetQuery)の条件欠落・取り違え | OP03-022, OP05-002, EB03-001/PRB01-001(「効果を持たない」除外), OP11-022(OR→ANDで対象常に空) | 「効果を持たない」除外は `TargetQuery`/`matcher` に機構自体が無い |
+| F | 数値・効果種別の取り違え | OP02-002(コスト-1→相手強化), OP07-001(count↔value), OP05-098(HEAL=0), OP06-080(丸数字➁→1) | 個別 |
+
+**修正優先順位（提案）**: A（原因特定済み・1行で5枚超解消）→ B（15枚・誘発機構の設計判断要）→ C/D → E/F
+（OP02-002 効果が正反対・OP11-022 対象が常に空、は実害大）。
+
+### 仕様書と実装の相互裏取り（重要）
+
+pytest化の過程で実AST/実挙動を確認した結果、**仕様書段階の🐛予想の一部は実装では正しく動作**して
+いた（例: OP04-040/OP12-081/OP13-004 は `cost_min=8` を保持、OP14-020 はコスト5以上で正しく発動、
+OP15-039/OP15-098 もテキスト通り）。これらは通常テストへ昇格。逆に真因が別と判明したものもある
+（OP12-081=条件プレイヤー逆転、OP13-004=トリガー種別誤り）。**最終的な事実はテストの判定が正**。
+
+### 残課題・引き継ぎ
+
+- 上表の🐛は**未修正**（本ブランチは検出と固定が責務）。修正時は A から着手すると複数 xfail が一括解消。
+- バグを修正したら、対応する `xfail(strict=True)` テストが xpass→赤になるので**マーカーを除去**して通常
+  テスト化する（＝修正完了の確認）。
+- ⚠️で `xfail(strict=False)` のもの（例 OP05-001/OP07-059/OP16-060 等）は、機構実装後に通常テスト化を検討。
+- カバレッジは**リーダーのみ**。キャラ/イベント/ステージへの横展開は未着手（同じ A/B 等の根本原因が
+  全カードに波及している可能性が高い）。
