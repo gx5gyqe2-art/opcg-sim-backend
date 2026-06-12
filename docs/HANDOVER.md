@@ -589,8 +589,21 @@ backend テスト 374 passed / パーサ退行（新規OTHER）0 / フロント 
   - コスト範囲（群E）: 「コストNからM」を cost_min/cost_max に（matcher）（OP10-099 のフィルタ部）。
   - 特徴 OR 名前（群E）: 「《特徴》か「名前」」が trait∧name の AND で対象常に空 →
     `TRAIT_OR_NAME` フラグで OR 照合（OP11-022）。
+- ✅ **群B 誘発トリガーの型是正（パースレベル）**（leader xfail 61→56）:
+  本文埋め込みの「〜された/与えた時」を `_detect_embedded_reactive` で検出し、ACTIVATE_MAIN/PASSIVE
+  フォールバックに化けていた誘発を本来の種別へ写像（`ON_KO`/`ON_DAMAGE_DEALT_TO_LIFE`/新規
+  `ON_LEAVE`/`ON_EVENT_PLAY`/`ON_OPP_PLAY`）。明示イベントタグと timing タグ（【ターン中】）には
+  劣後し、ターンタグは既存 CONTEXT 条件機構で保全。OP01-062/OP03-040/OP16-041/P-117/OP12-081 解消。
+  全カードで EB01-047/OP03-041/043/047/051/OP04-053/OP13-078 等も是正（trigger キーのリネームのみ・
+  挙動値不変）。**実発火の配線は未実装**（型のみ）。
+  - **残（要・イベント追跡機構）**: 「ドンが戻された時」「効果で捨てられた時」「場を離れた時」を
+    実際に発火させ、かつ「イベント無しでは発動しない」(no-fire-without-event) を満たすには、ターン内
+    イベント発生フラグの追跡が必要。OP06-042/OP07-038/OP12-040/OP13-100/OP09-061 等は `resolve_ability`
+    直接呼びでは効果が走るため、現状の挙動テスト(no-fire)は parse 修正だけでは緑化不可。
+  - **残（テスト競合）**: OP01-061（【自分のターン中】+KO・型テストのみ＝安全だが OP07-038/OP03-076 と
+    構造が近く一律化が困難）、OP03-076（型 xfail と YOUR_TURN ロックの通常テストが併存し矛盾）。
 - **既知の未解決（要設計）**:
-  - 群B（誘発トリガー化け 15枚）: `ON_KO`/`ON_DAMAGE_DEALT_TO_LIFE`/「場を離れた時」等の検出＋発火配線。
+  - 群B 実発火配線: 上記の各誘発を battle/盤面イベントから発火させる（`ON_KO`/`ON_LEAVE`/`ON_DON_RETURNED` 等）。
   - V2 coreference 保存ギャップ: 「そのキャラ」参照（ref_id="selected_card"）の先行アクションが
     V2 ルール生成だと selected_card を保存せず、参照が場全体へフォールスルーする（OP10-099 残因）。
     legacy `_parse_atomic_action` の save_id 付与が V2 ルール経路に無いのが原因。
