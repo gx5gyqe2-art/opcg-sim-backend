@@ -122,8 +122,7 @@
 | `tests/golden/summarize.py` | AST→指紋(summary) 変換＋部分一致判定 |
 | `tests/test_golden.py` | ゴールデン・ランナー（pytest / 単体実行 両対応） |
 | `tests/test_effects_engine.py` | エンジン実行系の盤面変化テスト |
-| `tests/test_realdeck_play.py` | 実デッキ(imu/nami)での盤面変化・保護・対話テスト |
-| `tests/test_gameplay_smoke.py` | 実デッキでのゲーム進行スモーク |
+| `tests/test_realdeck_play.py` | 実カード効果の盤面変化・保護・対話テスト |
 | `tests/test_mistarget_guard.py` | ミスターゲット/lift 検出器の回帰ガード（A/B 及び C/D 上限） |
 | `tests/test_full_card_audit.py` | 全カード構造不変条件ゲート（EXCEPTION/CARD_LOSS/TEMP_LEAK） |
 | `tests/test_full_card_baseline.py` | 全カード挙動ベースライン回帰（`full_card_baseline.json` と比較） |

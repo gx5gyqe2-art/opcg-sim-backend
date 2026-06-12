@@ -28,7 +28,7 @@ except ImportError:
 
 from opcg_sim.src.utils.logger_config import session_id_ctx, log_event, save_batch_logs
 from opcg_sim.src.core.gamestate import Player, GameManager
-from opcg_sim.src.utils.loader import CardLoader, DeckLoader
+from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.models import CardInstance
 
 def get_const():
@@ -146,26 +146,25 @@ async def receive_frontend_log(data: Union[Dict[str, Any], List[Dict[str, Any]]]
 GAMES: Dict[str, GameManager] = {}
 SANDBOX_GAMES: Dict[str, 'SandboxManager'] = {}
 
-card_db = CardLoader(CARD_DB_PATH); card_db.load(); deck_loader = DeckLoader(card_db)
+card_db = CardLoader(CARD_DB_PATH); card_db.load()
 
 # NOTE: 効果定義は catalog.py(手動オーバーライド) > parser.py を主軸とする。
 # LLM生成データ(generated_effects.json)は精度が低いためランタイムでは読み込まない。
 
 def load_deck_mixed(source_str: str, owner_id: str):
-    if source_str.startswith("db:"):
-        if not db: raise ValueError("Firestore is not initialized.")
-        deck_id = source_str[3:]; doc = db.collection("decks").document(deck_id).get()
-        if not doc.exists: raise ValueError(f"Deck ID not found: {deck_id}")
-        data = doc.to_dict(); leader_id = data.get("leader_id"); card_uuids = data.get("card_uuids", [])
-        leader_inst = None
-        if leader_id:
-            master = card_db.get_card(leader_id)
-            if master: leader_inst = CardInstance(master, owner_id)
-        cards_inst = [CardInstance(card_db.get_card(cid), owner_id) for cid in card_uuids if card_db.get_card(cid)]
-        log_event("INFO", "loader.db_load", f"Loaded deck from DB: {deck_id}", player=owner_id)
-        return leader_inst, cards_inst
-    else:
-        path = os.path.join(DATA_DIR, source_str); return deck_loader.load_deck(path, owner_id)
+    if not source_str.startswith("db:"):
+        raise ValueError(f"Unknown deck id: {source_str}")
+    if not db: raise ValueError("Firestore is not initialized.")
+    deck_id = source_str[3:]; doc = db.collection("decks").document(deck_id).get()
+    if not doc.exists: raise ValueError(f"Deck ID not found: {deck_id}")
+    data = doc.to_dict(); leader_id = data.get("leader_id"); card_uuids = data.get("card_uuids", [])
+    leader_inst = None
+    if leader_id:
+        master = card_db.get_card(leader_id)
+        if master: leader_inst = CardInstance(master, owner_id)
+    cards_inst = [CardInstance(card_db.get_card(cid), owner_id) for cid in card_uuids if card_db.get_card(cid)]
+    log_event("INFO", "loader.db_load", f"Loaded deck from DB: {deck_id}", player=owner_id)
+    return leader_inst, cards_inst
 
 @app.options("/api/game/create")
 async def options_game_create(): return {"status": "ok"}
@@ -329,24 +328,6 @@ async def get_deck(id: str):
 @app.get("/api/deck/list")
 async def list_decks():
     decks = []
-    default_files = ["imu.json", "nami.json"]
-    for filename in default_files:
-        try:
-            path = os.path.join(DATA_DIR, filename)
-            if os.path.exists(path):
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                deck_data = data[0] if isinstance(data, list) and len(data) > 0 else data
-                if isinstance(deck_data, dict):
-                    formatted_deck = {"id": filename, "name": deck_data.get("name", filename.replace(".json", "")), "leader_id": None, "card_uuids": [], "don_uuids": [], "created_at": None}
-                    if "leader" in deck_data: formatted_deck["leader_id"] = deck_data["leader"].get("number")
-                    if "cards" in deck_data:
-                        for card in deck_data["cards"]:
-                            cid = card.get("number"); count = card.get("count", 1)
-                            if cid: formatted_deck["card_uuids"].extend([cid] * count)
-                    decks.append(formatted_deck)
-        except Exception as e:
-            log_event("WARNING", "deck.list_local_load_fail", f"Failed to load {filename}: {e}", player="system")
     if db:
         try:
             docs = db.collection("decks").order_by("created_at", direction=firestore.Query.DESCENDING).stream()

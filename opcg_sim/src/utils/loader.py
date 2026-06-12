@@ -2,8 +2,8 @@ import json
 import os
 import unicodedata
 import re
-from typing import List, Dict, Any, Optional, Tuple
-from ..models.models import CardMaster, CardInstance
+from typing import List, Dict, Any, Optional
+from ..models.models import CardMaster
 from ..core.effects.parser import EffectParser
 from ..models.effect_types import Ability
 
@@ -249,26 +249,3 @@ class CardLoader:
             trigger_text=trigger_text, life=life, block_icon=block_icon, abilities=combined_abilities,
             keywords=keywords
         )
-
-class DeckLoader:
-    def __init__(self, card_loader: CardLoader):
-        self.card_loader = card_loader
-
-    def load_deck(self, file_path: str, owner_id: str) -> Tuple[Optional[CardInstance], List[CardInstance]]:
-        data = RawDataLoader.load_json(file_path)
-        deck_data = data[0] if isinstance(data, list) and len(data) > 0 else (data if isinstance(data, dict) else {})
-        leader_instance = None
-        if "leader" in deck_data:
-            leader_id = deck_data["leader"].get("number")
-            master = self.card_loader.get_card(leader_id)
-            if master: leader_instance = CardInstance(master, owner_id)
-        deck_list: List[CardInstance] = []
-        if "cards" in deck_data:
-            for item in deck_data["cards"]:
-                card_id = item.get("number")
-                count = item.get("count", 0)
-                master = self.card_loader.get_card(card_id)
-                if master:
-                    for _ in range(count): deck_list.append(CardInstance(master, owner_id))
-        log_event(level_key="INFO", action="loader.deck_load_success", msg=f"Loaded Deck: Leader={leader_instance.master.name if leader_instance else 'None'}, Deck Size={len(deck_list)}", player=owner_id)
-        return leader_instance, deck_list

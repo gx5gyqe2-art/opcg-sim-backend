@@ -2356,6 +2356,11 @@ def test_prev_action_count_scaling():
     assert src.get_power(True) == 7000, "2枚捨て → +2000 を期待"
 
 
+def test_v2_is_active_by_default():
+    from opcg_sim.src.utils.loader import make_parser
+    assert type(make_parser()).__name__ == "EffectParserV2"
+
+
 def cov_drain(gm):
     import effect_coverage as _cov
     _cov._smart_drain(gm, record={})
