@@ -170,8 +170,6 @@ def test_op03_021_insufficient_east_blue_chars_does_not_execute():
 # OP03-022 アーロン 🐛
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True, reason="OP03-022: 対象条件「【トリガー】を持つ」が指紋に欠落し"
-                                       "(target.traits/flags 空)、トリガー無しキャラも登場できてしまう")
 def test_op03_022_non_trigger_char_not_playable():
     """OP03-022 アタック時: 登場対象は「コスト4以下かつ【トリガー】を持つ」キャラのみ。
     トリガーを持たないコスト3キャラは登場できないべき。🐛"""

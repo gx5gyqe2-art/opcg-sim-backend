@@ -144,7 +144,13 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # OP04-111「このキャラ以外の自分の特徴《ホーミーズ》を持つキャラ」（自身をコストに使わない）。
     if _nfc("他の") in tgt_text or _nfc("このキャラ以外") in tgt_text or _nfc("以外の自分") in tgt_text:
         tq.flags.add("EXCLUDE_SOURCE")
-    
+
+    # 「【トリガー】を持つ（キャラ/カード）」対象フィルタ: トリガー能力所持に限定（matcher が絞り込む）。
+    # 全対象種別で効くよう parse_target に置く（従来は discard ルールのみで、PLAY_CARD 等に
+    # 適用されず「【トリガー】を持つキャラを登場」の絞り込みが脱落していた: OP03-022）。
+    if re.search(_nfc(r'【トリガー】を持つ'), tgt_text):
+        tq.flags.add("HAS_TRIGGER")
+
     # 特徴は《X》/<X> に加え 『X』（例: 『白ひげ海賊団』を含む特徴を持つ）でも表記される。
     # 名前は「X」を使うため 『』 と衝突しない（condition 側も 『X』 を特徴として扱う）。
     raw_traits = re.findall(r'[《<『]([^》>』]+)[》>』]', tgt_text)
