@@ -300,19 +300,16 @@ def test_op13_002_debuff_opponent_on_opp_attack():
     assert len(p1.hand) == hand_before - 1     # 手札1枚捨てた
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP13-002: 能力1のトリガーが ACTIVATE_MAIN 化。"
-           "テキストは『自分がダメージを受けた時/元々パワー6000以上のキャラがKOされた時』の誘発ドロー。"
-           "本来はダメージ被弾/KO誘発（ON_DAMAGE系/ON_KO等）であって起動メインではない。")
 def test_op13_002_ability1_draw_is_triggered_not_main():
     """OP13-002 能力1: ドローはダメージ被弾/KOの誘発であるべきで、ACTIVATE_MAIN化は誤り。"""
     gm, p1, p2, L = build("OP13-002")
     from opcg_sim.src.models.enums import TriggerType
     triggered = (TriggerType.ON_DAMAGE_DEALT_TO_LIFE, TriggerType.ON_LIFE_DECREASE,
                  TriggerType.ON_KO)
-    # ドローを持つ能力のトリガーが誘発種別であることを期待。現実装は ACTIVATE_MAIN なので失敗。
-    draw_ab = get_ability(L.master, "ACTIVATE_MAIN")
-    assert draw_ab.trigger in triggered
+    # ドローを持つ能力のトリガーが誘発種別（ダメージ被弾/KO）であるべき。ACTIVATE_MAIN は誤り。
+    trigs = [a.trigger for a in (L.master.abilities or [])]
+    assert any(t in triggered for t in trigs)
+    assert TriggerType.ACTIVATE_MAIN not in trigs
 
 
 # ===========================================================================
