@@ -151,8 +151,6 @@ def test_op03_021_opponent_cost6_not_targetable():
     assert big.is_rest is False   # コスト6は対象外
 
 
-@pytest.mark.xfail(strict=True, reason="OP03-021: コスト《東の海》2枚レストが strict でなく、"
-                                       "1枚しか無くてもコスト未達のまま効果が実行されてしまう疑い")
 def test_op03_021_insufficient_east_blue_chars_does_not_execute():
     """OP03-021: 《東の海》キャラが1枚しか無い→コスト未達で発動不可。
     本来は相手キャラがレストにならないはず。🐛(疑い)"""

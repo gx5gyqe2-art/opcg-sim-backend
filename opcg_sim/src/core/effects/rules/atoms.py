@@ -218,6 +218,11 @@ def _rest(ctx: ParseContext) -> Optional[GameAction]:
     tq = parse_target(t)
     if _nfc("まで") in t:
         tq.is_up_to = True
+    elif ctx.is_cost and isinstance(tq.count, int) and tq.count > 1:
+        # コストの「キャラN枚をレストにできる」はちょうど N 枚。「できる」は任意性であって
+        # 枚数ではないため、コスト充足判定で N 枚未満を弾けるよう厳密枚数にする
+        # （OP03-021: 《東の海》が2枚未満なら発動できないのが正）。
+        tq.is_strict_count = True
     return GameAction(type=ActionType.REST, target=tq, raw_text=t)
 
 
