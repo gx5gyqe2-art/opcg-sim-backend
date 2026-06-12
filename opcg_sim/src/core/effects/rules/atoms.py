@@ -980,10 +980,10 @@ def _prevent_leave(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("場を離れない") in t or _nfc("場を離れず") in t:
         status = "LEAVE"
     elif _nfc("KOされない") in t:
-        # 「効果でKOされない」は除去保護(LEAVE)、「バトルでKOされない」は BATTLE_KO。
-        # 修飾なしの「KOされない」は両方を意味するため LEAVE+BATTLE_KO 相当の広い方(LEAVE)
-        # ではなくバトル保護として扱ってきた従来挙動を維持する。
-        status = "LEAVE" if _nfc("効果でKOされ") in t else "BATTLE_KO"
+        # 「効果でKOされない」は KO 限定の除去保護(EFFECT_KO)。手札に戻す/山札の下に置く等の
+        # 非KO除去には効かない（従来は広い LEAVE に倒し、あらゆる除去に耐性が付いていた）。
+        # 「バトルでKOされない」は BATTLE_KO。修飾なし「KOされない」はバトル保護として維持。
+        status = "EFFECT_KO" if _nfc("効果でKOされ") in t else "BATTLE_KO"
     else:
         return None
     # 主語の修飾（「自分の特徴《X》を持つキャラすべては」等）を保全する。
@@ -1008,8 +1008,9 @@ def _prevent_ko_and_rest(ctx: ParseContext) -> Optional[EffectNode]:
     t = ctx.text
     if not (re.search(_nfc(r"KOされ(?:ず|ない)"), t) and _nfc("レストにされない") in t):
         return None
-    # 「相手の効果で」KO されない＝効果除去保護（LEAVE）。明示が無ければバトルKO保護。
-    ko_status = "LEAVE" if (_nfc("相手の効果") in t or _nfc("効果で") in t) else "BATTLE_KO"
+    # 「相手の効果で」KO されない＝KO 限定の効果除去保護（EFFECT_KO、非KO除去には効かない）。
+    # 明示が無ければバトルKO保護。
+    ko_status = "EFFECT_KO" if (_nfc("相手の効果") in t or _nfc("効果で") in t) else "BATTLE_KO"
     prevent_ko = GameAction(
         type=ActionType.PREVENT_LEAVE,
         target=TargetQuery(select_mode="SOURCE"),

@@ -366,6 +366,33 @@ def test_nami_leader_buff_is_this_turn_not_battle():
     assert p1.leader.get_power(False) == base_pw, "ターン終了で失効するべき"
 
 
+def test_ko_immunity_scope_op09_086():
+    """OP09-086「相手の効果でKOされない」: 効果KOは防ぐが、手札に戻す/山札の下に置く等の
+    非KO除去には耐性を持たない（報告バグ「KO以外の効果にも耐性を持ってしまう」）。"""
+    def fresh():
+        p1, p2 = make_player("P1"), make_player("P2")
+        bgs = inst("OP09-086", "P2")
+        p2.field = [bgs]
+        gm = GameManager(p1, p2)
+        gm.turn_player, gm.opponent, gm.turn_count, gm.phase = p1, p2, 3, Phase.MAIN
+        return gm, p1, p2, bgs
+
+    gm, p1, p2, bgs = fresh()
+    ko = GameAction(type=ActionType.KO, target=TargetQuery(player=PL.OPPONENT, zone=Zone.FIELD))
+    gm.apply_action_to_engine(p1, ko, [bgs], 0)
+    assert bgs in p2.field, "効果KOは防がれるべき"
+
+    gm, p1, p2, bgs = fresh()
+    bounce = GameAction(type=ActionType.BOUNCE, target=TargetQuery(player=PL.OPPONENT, zone=Zone.FIELD))
+    gm.apply_action_to_engine(p1, bounce, [bgs], 0)
+    assert bgs not in p2.field and bgs in p2.hand, "手札に戻す除去には耐性を持たない"
+
+    gm, p1, p2, bgs = fresh()
+    deck = GameAction(type=ActionType.DECK_BOTTOM, target=TargetQuery(player=PL.OPPONENT, zone=Zone.FIELD))
+    gm.apply_action_to_engine(p1, deck, [bgs], 0)
+    assert bgs not in p2.field and bgs in p2.deck, "山札の下に送る除去には耐性を持たない"
+
+
 def test_realtime_trash_scaled_power_op09_086():
     """OP09-086「自分のトラッシュ4枚につき+1000」: refresh_passive_state でトラッシュ
     枚数の変化が即時にパワーへ反映される（報告バグ「リアルタイムに反映されない」）。"""

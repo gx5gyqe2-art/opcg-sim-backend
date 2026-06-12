@@ -1603,13 +1603,19 @@ class GameManager:
         for target in targets:
             owner, source_list = self._find_card_location(target)
             if not owner: continue
-            # 相手の効果でフィールド上のカードを場から除去しようとする場合、保護/置換を確認
+            # 相手の効果でフィールド上のカードを場から除去しようとする場合、保護/置換を確認。
+            # 保護バケツの区別（A-8）:
+            #   "LEAVE"     = あらゆる除去（場を離れない）に効く保護。
+            #   "EFFECT_KO" = KO 限定の保護（「効果でKOされない」）。手札に戻す/山札へ送る等の
+            #                 非KO除去には効かない。
+            # KO アクションは LEAVE か EFFECT_KO のどちらでも防がれる。非KO除去は LEAVE のみ。
             if (act_name in _LEAVE_ACTIONS and player.name != owner.name
                     and source_list is owner.field):
-                if self._active_protection(target, ("LEAVE",)):
+                guard_statuses = ("LEAVE", "EFFECT_KO") if act_name == "KO" else ("LEAVE",)
+                if self._active_protection(target, guard_statuses):
                     log_event("INFO", "game.leave_prevented", f"{target.master.name} is protected from leaving the field by opponent's effect", player=owner.name)
                     continue
-                if self._active_replacement(target, ("LEAVE",)):
+                if self._active_replacement(target, guard_statuses):
                     log_event("INFO", "game.leave_replaced", f"{target.master.name}'s removal was replaced by an alternative effect", player=owner.name)
                     continue
             if act_name == "PREVENT_LEAVE":
