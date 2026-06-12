@@ -366,6 +366,23 @@ def test_nami_leader_buff_is_this_turn_not_battle():
     assert p1.leader.get_power(False) == base_pw, "ターン終了で失効するべき"
 
 
+def test_realtime_trash_scaled_power_op09_086():
+    """OP09-086「自分のトラッシュ4枚につき+1000」: refresh_passive_state でトラッシュ
+    枚数の変化が即時にパワーへ反映される（報告バグ「リアルタイムに反映されない」）。"""
+    from opcg_sim.src.models.models import CardType as CT
+    gm, p1, p2 = base()
+    p1.leader = CardInstance(make_master(card_id="L", name="ティーチ", type=CT.LEADER,
+                                         traits=["黒ひげ海賊団"]), "P1")
+    bgs = inst("OP09-086", "P1")  # base 5000
+    p1.field = [bgs]
+    p1.trash = fillers(4, "P1")
+    gm.refresh_passive_state()
+    assert bgs.get_power(True) == 6000, bgs.get_power(True)
+    p1.trash += fillers(4, "P1")  # 8 枚
+    gm.refresh_passive_state()
+    assert bgs.get_power(True) == 7000, bgs.get_power(True)
+
+
 def test_opponent_turn_cost_buff_op16_080():
     """OP16-080【相手のターン中】自分のキャラすべてをコスト+1: 相手ターン中だけ適用され、
     自分のターンには適用されない（報告バグ「コスト＋1効果が適用されていない」の回帰）。"""

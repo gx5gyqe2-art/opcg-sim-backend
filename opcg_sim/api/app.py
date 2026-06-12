@@ -240,6 +240,10 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         elif action_type == 'KEEP_HAND':
             manager.keep_hand(current_player)
             manager.action_events.append({"type": "KEEP_HAND", "player": player_id, "message": "手札キープ"})
+        # アクション境界で盤面依存の常在効果を再計算し、トラッシュ枚数等の変化を即時反映する
+        # （「自分のトラッシュN枚につき+1000」OP09-086 等のリアルタイム反映。A-9）。
+        # 中断が残る場合は refresh_passive_state 内で no-op（対話完了時に反映）。
+        manager.refresh_passive_state()
         return build_game_result_hybrid(manager, game_id, success=True)
     except Exception as e:
         log_event(level_key="ERROR", action="game.action_fail", msg=traceback.format_exc(), player=player_id, payload=req); return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))

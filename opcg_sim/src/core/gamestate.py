@@ -434,6 +434,15 @@ class GameManager:
                 and self.phase not in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER)):
             self._advance_battle_triggers()
 
+    def refresh_passive_state(self) -> None:
+        """盤面依存の常在効果（パワー/コスト/キーワード）を現在の盤面で再計算する。
+        API のアクション境界や対話完了時に呼び、トラッシュ枚数等の変化を即時反映する
+        （「自分のトラッシュN枚につき+1000」OP09-086 等のリアルタイム反映）。"""
+        if self.active_interaction or getattr(self, "_in_passive_recalc", False):
+            return
+        if self.turn_player is not None:
+            self._apply_passive_effects(self.turn_player)
+
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
         if not pending: raise ValueError("現在実行可能なアクションはありません。")
