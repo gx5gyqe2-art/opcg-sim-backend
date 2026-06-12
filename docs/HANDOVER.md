@@ -22,12 +22,22 @@
                         │ trigger / condition / cost / effect
                         ▼  ゲーム中、該当タイミングで
                   resolver.py（EffectResolver）
-                        │  AST を実行スタックで処理（対象選択は中断/再開）
+                        │  AST を実行スタックで処理（対象選択/任意確認は中断/再開）
                         ▼
-                  gamestate.py（apply_action_to_engine / continuous / 除去保護）
+                  gamestate.py（apply_action_to_engine / continuous / 除去保護
+                        │         / 誘発キュー _pending_triggers）
                         ▼
                      盤面更新
 ```
+
+### 誘発能力の待ち行列（_pending_triggers）
+
+ライフ公開【トリガー】・`ON_LIFE_DECREASE` 等の誘発能力は `gamestate._pending_triggers` へ積み、
+`_advance_pending_triggers()` が1件ずつ消化する（`_battle_triggers` と同型）。中断（対話）が立てば
+`resolve_interaction` が解決後に再開する。【トリガー】は「発動できる」（任意）のため
+`optional=True` で積み、`CONFIRM_TRIGGER` 対話で使う/使わないを確認してから解決する
+（複数枚＝ダブルアタック等でも中断を跨いで消失しない）。ドレインは戦闘解決末尾・効果ダメージ末尾・
+対話完了時・API アクション境界で行う。
 
 ### パーサ構成
 
@@ -58,6 +68,11 @@
   カードが場を離れる際は `move_card` が `drop_for(uuid)` を呼んで当該分を破棄する。
 - 参照側: `get_power()`=`timed_power` 加算、`current_cost`=`timed_cost` 加算、
   `has_keyword()`=`current_keywords ∪ timed_keywords`、アタック制限=`timed_flags`。
+- **効果無効化**は `FLAG "EFFECTS_DISABLED"`（timed_flags）として付与する。`reset_turn_status`
+  でクリアされないため「このターン中」/「次の相手のターン終了時まで」の無効化が途中のアクション
+  （戦闘の `target.reset_turn_status` 等）で解除されない。参照側は
+  `CardInstance.is_effect_negated`（= `ability_disabled` または timed_flags の `EFFECTS_DISABLED`）。
+  能力発動ガード・キーワード判定・除去保護の走査はこのプロパティを見る。
 
 ### 除去保護（PREVENT_LEAVE）と置換効果（REPLACE_EFFECT）
 
@@ -65,8 +80,10 @@
 起こる瞬間に対象の PASSIVE 能力を走査し、条件（例: トラッシュ7枚以上）を
 `EffectResolver._check_condition` でその場で評価する（フラグをラッチしない）。
 
-- 保護 `PREVENT_LEAVE`: `status="LEAVE"`（相手の効果で場を離れない）/ `"BATTLE_KO"`
-  （バトルでKOされない）。
+- 保護 `PREVENT_LEAVE`: `status="LEAVE"`（相手の効果で**あらゆる**除去から場を離れない）/
+  `"EFFECT_KO"`（**KO 限定**＝「効果でKOされない」。手札に戻す/山札へ送る等の非KO除去には効かない）/
+  `"BATTLE_KO"`（バトルでKOされない）。除去ディスパッチ（`apply_action_to_engine`）は KO アクション
+  には `("LEAVE","EFFECT_KO")`、非KO除去（bounce/deck/hand 等）には `("LEAVE",)` のみを照合する。
 - 置換 `REPLACE_EFFECT`: 「代わりに〜」。実行可能性（`_can_satisfy_node`）も満たせば
   `sub_effect`（置換アクション）を実行し本来の除去をスキップする。同じ `LEAVE`/`BATTLE_KO`
   フックで動作する（保護を先に判定、無ければ置換を判定）。
@@ -91,8 +108,8 @@
 | `opcg_sim/src/core/effects/resolver.py` | IR の実行（EXECUTE_MAIN_EFFECT 等もここ） |
 | `opcg_sim/src/core/effects/catalog.py` | 手動オーバーライド(MANUAL_EFFECTS) |
 | `opcg_sim/src/core/gamestate.py` | ゲームエンジン本体（apply_action_to_engine / 除去保護 / 継続効果フック） |
-| `opcg_sim/src/models/effect_types.py` | IR 定義（Ability/GameAction/TargetQuery/Condition…）。`GameAction.sub_effect`（置換用） |
-| `opcg_sim/src/models/models.py` | CardMaster/CardInstance（`timed_power`/`timed_cost`/`timed_flags`/`timed_keywords`、`has_keyword()`） |
+| `opcg_sim/src/models/effect_types.py` | IR 定義（Ability/GameAction/TargetQuery/Condition…）。`GameAction.sub_effect`（置換用）/`GameAction.face_up`（ライフへの向き）/`Ability.cost_optional`（任意コスト） |
+| `opcg_sim/src/models/models.py` | CardMaster/CardInstance（`timed_power`/`timed_cost`/`timed_flags`/`timed_keywords`、`has_keyword()`、`is_effect_negated`） |
 | `opcg_sim/src/models/enums.py` | ActionType/TriggerType/Zone/ConditionType… |
 | `opcg_sim/src/utils/loader.py` | カードDB/デッキ読込・`make_parser()` ファクトリ |
 
@@ -331,7 +348,7 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 - **`passive_*`（passive_power / passive_power_override / passive_counter）は再計算レイヤ**。
   即時効果の `power_buff`/`base_power_override`/`cost_buff` とは別で、`_apply_passive_effects` が
   毎回 0/None にリセットして再適用する。
-- **H-4〜H-7 のゲートは `tests/test_quality_gates.py`**: SATISFIED_NO_CHANGE≤9 /
+- **H-4〜H-7 のゲートは `tests/test_quality_gates.py`**: SATISFIED_NO_CHANGE≤10（§11 ③c で +1）/
   BATTLE_NO_CHANGE=0 / battle ERROR=0 / interactive_audit≤11 をラチェット固定。
 - **`condition_synth` の合成盤面は実評価器（`_check_condition`/`_can_satisfy_node`）で再検証する**。
   合成しきれない条件型（DON_COUNT_COMPARE/PREV_ACTION/色フィルタ等）は UNHANDLED に落とし、
@@ -436,4 +453,53 @@ parser(`self_cannot`)が述語を制限キーへ写像し、`apply_action_to_eng
 ### 残課題（この回で未着手）
 
 - 課題2(2c): 置換効果（`_auto_resolve_replacement`）の対話化は高リスクのため見送り（現状は自動解決）。
-- バックエンド全 365 passed・品質ゲート緑。フロントは tsc/eslint 通過、実機目視は未実施。
+
+---
+
+## 11. 2026-06 カード効果バグ修正（card-effect-bugs ブランチ）
+
+報告された効果処理の不具合を、個別カードでなく**共通機構**で修正した（横展開で波及200枚超を確認）。
+backend テスト 374 passed / パーサ退行（新規OTHER）0 / フロント tsc・build 成功。
+
+### 修正した根本原因
+
+| # | 症状 | 根本原因 | 主な修正箇所 | 波及 |
+|---|---|---|---|---:|
+| ① | 【トリガー】が自動発動 | ライフ公開時に確認なしで即解決。複数枚は中断跨ぎで消失 | `_pending_triggers`＋`CONFIRM_TRIGGER`（gamestate）、FE `RealGame.tsx` | 486 |
+| ②a | 【ドン‼×N】がドン無しで使える | タグを REST_DON コストに誤変換（付与ドン要件を喪失） | parser.py（`HAS_DON` 条件化）、resolver.py（`attached_don` 参照） | 210 |
+| ③b | 任意コストが強制実行 | コスト充足で確認なしに即支払い | `Ability.cost_optional`＋resolver の使用確認（accept まで使用回数も未消費） | 111 |
+| ③a | 【相手のターン中】が不適用 | `_apply_passive_effects` が OPPONENT_TURN を発火せず | gamestate Step 2'（非ターンプレイヤーのカードを走査） | 77 |
+| ④a | 盤面依存パワーが非リアルタイム | 再計算契機が限定的 | `refresh_passive_state()` を API アクション境界で呼ぶ | 20 |
+| ④b | 「効果でKOされない」が全除去耐性 | status を広い `LEAVE` に写像 | atoms.py `EFFECT_KO`、除去ディスパッチのバケツ分離 | 17 |
+| ⑥a | ライフへ「表向き」が裏向き | `face_up` を IR/エンジンが無視 | `GameAction.face_up`、hand_to_life、MOVE_CARD→LIFE | 14 |
+| ③c | 【トリガー】以外も捨てられる | discard 対象の【トリガー】絞り込み喪失 | `HAS_TRIGGER` フラグ（parser/matcher）、`【X】を持つ` タグ保全 | 10 |
+| ⑤b | 効果無効が途中で解除 | `ability_disabled` 素フラグが reset で消える | NEGATE_EFFECT を継続効果(`EFFECTS_DISABLED`)化、`is_effect_negated` | 6+ |
+| ⑤a/c | OP09-093 の登場ターン制約・キャラ無効が不発 | 複合条件と第2節の negate を取りこぼし | catalog に手動定義（条件 AND・キャラに negate＋attack_disable） | 1 |
+| ②b | ライフ離脱時のドローが不発 | 効果でのライフ移動が ON_LIFE_DECREASE を発火せず | `move_card` がライフ離脱を誘発キューへ積む | 3+ |
+
+### 新しい不変条件・注意点
+
+- **【ドン‼×N】= `Condition(HAS_DON, value=N, GE)`**。`resolver._check_condition` は
+  `source_card.attached_don` を見る（コストエリアの active ドンではない）。明示本文の
+  「ドン!!N枚をレストにする」コストは従来どおり REST_DON。
+- **任意コスト能力は `Ability.cost_optional`**（コスト句に「できる/してもよい」）。自動誘発トリガー
+  （ON_PLAY/ON_ATTACK/ON_OPP_ATTACK/ON_BLOCK 等）は発動前に `CONFIRM_OPTIONAL` で使用確認する。
+  `ACTIVATE_MAIN`（自発起動）は対象外。**使用回数は accept 後に消費**（拒否では未消費）。
+- **`_apply_passive_effects` の Step 2' が OPPONENT_TURN を非ターンプレイヤーのカードに適用**する
+  （cost_buff/passive_power 再計算レイヤなのでターンが替われば自然に消える）。
+- **`refresh_passive_state()` を API アクション境界で呼ぶ**（`app.py game_action` 末尾）。盤面依存の
+  常在パワー等を即時反映する。中断中・`_in_passive_recalc` 中は no-op（多重適用・無限再帰防止）。
+- **効果無効は `is_effect_negated` で参照**する（能力発動ガード・blocker・ON_PLAY 発火・除去保護の
+  protector スキップ・deckout 走査）。`ability_disabled` 直接参照は避ける。
+- **誘発は `_pending_triggers` キュー経由**。`move_card` でライフ離脱を積み、API 境界/対話完了/戦闘・
+  効果ダメージ末尾でドレインする。戦闘・効果ダメージは `life.pop` 済みのため `move_card` 経路では
+  二重計上しない。
+- **`【X】を持つ` のタグはタグ除去で保全**する（parser.py の除去正規表現に `(?!を持つ)`）。
+  トリガー検出は除去前テキストで済むため【トリガー】prefix は引き続き除去される。
+
+### テスト
+
+- 回帰テストを `tests/test_realdeck_play.py`（OP11-041/OP16-080/OP09-086/OP09-093/OP14-104）と
+  `tests/test_effects_engine.py`（NEGATE 継続化）に追加。
+- `full_card_baseline.json` は意図的変更分（②a 131枚・③b 1枚・③c 8枚）のみ再生成。
+- H-5 ラチェット（`test_quality_gates`）は +1（③c のコストが合成盤面で支払えず no-op になる測定限界）。
