@@ -247,6 +247,13 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     
     if re.search(r'(\d+|枚)まで', tgt_text): tq.is_up_to = True 
 
+    # ライフ等の表裏フィルタ（「ライフの表向きのカード」ST13-002）。「表向きで加える/にする」等の
+    # アクション修飾とは区別し、「表向きの」が対象名詞（カード/ライフ/キャラ）に掛かる形のみ。
+    if re.search(_nfc(r'表向きの(?:カード|ライフ|キャラ)'), tgt_text):
+        tq.is_face_up = True
+    elif re.search(_nfc(r'裏向きの(?:カード|ライフ|キャラ)'), tgt_text):
+        tq.is_face_up = False
+
     # 「ドン‼がN枚以上付与されているキャラ」: 付与ドン枚数の下限フィルタ（OP15-001）。
     # 枚数 N がフィルタなので、対象枚数(count)には数えないよう先に検出して句を除去する。
     count_text = tgt_text
@@ -371,6 +378,10 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
         # 付与ドン枚数の下限（「ドン‼がN枚以上付与されているキャラ」OP15-001）。
         if query.min_attached_don is not None and getattr(card, "attached_don", 0) < query.min_attached_don:
+            continue
+
+        # ライフの表裏（「ライフの表向きのカード」ST13-002）。裏向きライフを巻き込まないよう絞る。
+        if query.is_face_up is not None and bool(getattr(card, "is_face_up", False)) != query.is_face_up:
             continue
         
         if query.is_vanilla:

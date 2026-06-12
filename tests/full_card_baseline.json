@@ -2960,7 +2960,7 @@
 "ST12-017|COUNTER": "- | pw2000,kw0,rs0,co0",
 "ST13-001|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
 "ST13-002|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
-"ST13-002|TURN_END": "p1_trash:10→15, p1_life:5→0 | pw0,kw0,rs0,co0",
+"ST13-002|TURN_END": "- | pw0,kw0,rs0,co0",
 "ST13-003|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
 "ST13-003|PASSIVE": "- | pw0,kw0,rs0,co0",
 "ST13-004|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",

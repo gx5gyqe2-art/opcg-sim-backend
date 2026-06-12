@@ -180,9 +180,6 @@ def test_st13_002_a0_look5_arrange_completes_cleanly():
     assert len(p1.temp_zone) == 0       # temp リーク無し
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="ST13-002 能力1: ターン終了時 TRASH 対象が LIFE/ALL で『表向き』フィルタ欠落。"
-                          "裏向きライフ含む全ライフ(5→0)が落ちる")
 def test_st13_002_a1_turn_end_trashes_only_face_up_life():
     """ST13-002 能力1: ターン終了時、ライフの表向きカードのみをトラッシュ（裏向きは残す）。"""
     gm, p1, p2, L = build("ST13-002")

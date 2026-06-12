@@ -74,6 +74,8 @@ class TargetQuery:
     power_max: Optional[int] = None
     # 「ドン‼がN枚以上付与されているキャラ」: 付与ドン枚数の下限フィルタ（OP15-001）。
     min_attached_don: Optional[int] = None
+    # 「ライフの表向きの/裏向きのカード」: ライフ等の表裏フィルタ（True=表向き, ST13-002）。
+    is_face_up: Optional[bool] = None
     is_rest: Optional[bool] = None
     count: int = 1
     is_up_to: bool = False
