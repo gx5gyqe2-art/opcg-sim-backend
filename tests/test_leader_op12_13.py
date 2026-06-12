@@ -231,9 +231,6 @@ def test_op12_061_cost_reduction_returns_don():
 # OP12-081 コアラ  🐛 能力0の条件プレイヤー逆(OPPONENT→本来SELF)、能力1がACTIVATE_MAIN化
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP12-081: 能力0の条件が FIELD_COUNT(OPPONENT, cost>=8)>=2＝相手のコスト8以上が2枚。"
-           "テキストは『自分のコスト8以上のキャラが2枚以上』＝SELF。条件プレイヤーが逆。")
 def test_op12_081_draw_when_self_has_two_cost8():
     """OP12-081 アタック時: 自分のコスト8以上キャラが2枚以上で1枚引く（正しい挙動）。"""
     gm, p1, p2, L = build("OP12-081")

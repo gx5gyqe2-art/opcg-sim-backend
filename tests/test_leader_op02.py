@@ -161,7 +161,6 @@ def test_op02_025_cost2_wano_below_min_no_discount():
 #   トリガーも登場時→ACTIVATE_MAIN。
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="OP02-026: 条件『自分のキャラ3枚以下』が HAND_COUNT(手札枚数)に誤実装。場のキャラ枚数(FIELD_COUNT)であるべき")
 def test_op02_026_activates_two_don_when_field_le3():
     """OP02-026: 場のキャラ≤3枚なら、起動でレストドン2枚がアクティブになる（テキスト準拠）。"""
     gm, p1, p2, L = build("OP02-026")

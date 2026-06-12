@@ -654,8 +654,14 @@ class EffectParser:
                     if_true=self._parse_to_node(rest_text, is_cost)
                 )
                 return Sequence(actions=[look_action, branch])
+            # cond_text 先頭にトリガー句「〜時、」が残っている場合（トリガー未認識のフォールバックで
+            # 「自分が…登場させた時、自分のキャラが3枚以下の場合」のように混入）、ゲート条件は最後の
+            # 「時、」以降。残すと「手札から登場」の 手札 が HAND_COUNT を誤誘発する（OP02-026）。
+            cond_part = cond_text
+            if _nfc("時、") in cond_part:
+                cond_part = cond_part.rsplit(_nfc("時、"), 1)[-1]
             return Branch(
-                condition=self._parse_condition_obj(cond_text),
+                condition=self._parse_condition_obj(cond_part),
                 if_true=self._parse_to_node(rest_text, is_cost)
             )
 
