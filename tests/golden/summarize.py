@@ -87,6 +87,8 @@ def summarize_node(node) -> Optional[Dict[str, Any]]:
             "destination": _enum_name(node.destination),
             "dest_position": getattr(node, "dest_position", None),
         }
+        if getattr(node, "is_optional", False):
+            out["is_optional"] = True
         # 動的値（「N枚につき」等）はスケーリング指紋も載せる
         if node.value is not None and node.value.dynamic_source:
             out["value_dynamic"] = {

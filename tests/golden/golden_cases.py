@@ -2407,4 +2407,31 @@ CASES = [
              "effect": {"kind": "action", "type": "DEAL_DAMAGE", "value": 1}},
         ],
     },
+    # OP11-041 ナミ: 埋め込みトリガー「ライフが離れた時、発動できる」= 任意発動(is_optional)
+    # + CONTEXT(SELF_TURN)。第2能力は【ドン!!×1】= HAS_DON 条件 + 任意コスト。
+    {
+        "id": "op11_041_nami_leader",
+        "text": "【自分のターン中】【ターン1回】ライフが離れた時、発動できる。自分の手札が7枚以下の場合、カード1枚を引く。 / 【ドン!!×1】【相手のアタック時】【ターン1回】自分の手札1枚を捨てることができる:このリーダーは、このターン中、パワー+2000。",
+        "expect": [
+            {"trigger": "ON_LIFE_DECREASE",
+             "condition": {"type": "AND", "args": [
+                 {"type": "AND", "args": [
+                     {"type": "TURN_LIMIT", "value": 1},
+                     {"type": "CONTEXT", "value": "SELF_TURN"},
+                 ]},
+                 {"type": "HAND_COUNT", "operator": "LE", "value": 7},
+             ]},
+             "effect": {"kind": "action", "type": "DRAW", "value": 1,
+                        "is_optional": True}},
+            {"trigger": "ON_OPP_ATTACK",
+             "condition": {"type": "AND", "args": [
+                 {"type": "TURN_LIMIT", "value": 1},
+                 {"type": "HAS_DON", "operator": "GE", "value": 1},
+             ]},
+             "cost": {"kind": "action", "type": "DISCARD",
+                      "target": {"player": "SELF", "zone": "HAND"}},
+             "effect": {"kind": "action", "type": "BUFF", "value": 2000,
+                        "duration": "THIS_TURN"}},
+        ],
+    },
 ]

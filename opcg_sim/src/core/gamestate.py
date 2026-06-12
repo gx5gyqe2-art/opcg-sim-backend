@@ -415,6 +415,20 @@ class GameManager:
             self.active_interaction = None
             resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), effect_context)
 
+        # 再開経路（resume_execution/resume_choice/resume_optional）で実行された
+        # アクションも action_events へ記録する（resolve_ability 経由と同じ扱い。
+        # 記録しないと中断を挟んだ効果が「何も実行していない」ように見える）。
+        for ev in resolver.action_history:
+            self.action_events.append({
+                "type": "EFFECT",
+                "player": player.name,
+                "card_name": source_card.master.name,
+                "action": ev.get("action", ""),
+                "targets": ev.get("targets", []),
+                "value": ev.get("value"),
+                "success": ev.get("success", True),
+            })
+
         if not self.active_interaction and self.setup_phase_pending:
             self.finish_setup()
             self.setup_phase_pending = False

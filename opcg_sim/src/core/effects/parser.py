@@ -46,30 +46,34 @@ class EffectParser:
           - 「〈timing〉時、発動できる」→ 節ごと除去。ディスパッチ対象 timing はトリガー上書き。
             非ディスパッチ timing は既存トリガー維持（PASSIVE のみ ACTIVATE_MAIN に退避＝
             常時誤発動を避けつつ手動発動可能にする）。
-        戻り値: (新トリガー, 残りの効果テキスト)。
+        戻り値: (新トリガー, 残りの効果テキスト, 発動任意フラグ)。
+        発動任意フラグは、自動誘発トリガー（ディスパッチ対象 timing）の「発動できる」を
+        上書きした場合のみ True（任意発動＝使用確認が必要。OP11-041 等）。
         """
         t = effect_text
         # 「〈X〉(時|場合)、発動できる」または 先頭「発動できる」のみにマッチ（誤検知防止に
         # 「を発動できる」等の効果動詞形は対象外＝直前は「時、」「場合、」か文頭に限定）。
         m = re.match(_nfc(r"^((?:[^。]*?(?:時|場合))、)?発動できる(?:ことができる)?[。、]?"), t)
         if not m:
-            return trigger, t
+            return trigger, t, False
         prefix = m.group(1) or ""
         remainder = t[m.end():].strip()
         # 「…場合、発動できる」→ 条件部を残して Branch-lift に任せる
         if _nfc("場合") in prefix:
-            return trigger, (prefix + remainder).strip()
+            return trigger, (prefix + remainder).strip(), False
         new_trigger = trigger
+        activation_optional = False
         from ...models.enums import TriggerType as _TT
         for key, tt_name in self._DISPATCHED_TEXT_TRIGGERS:
             if _nfc(key) in prefix:
                 new_trigger = getattr(_TT, tt_name)
+                activation_optional = True
                 break
         else:
             if trigger == _TT.PASSIVE:
                 # 非ディスパッチ timing × PASSIVE は常時誤発動の温床 → 手動発動へ退避
                 new_trigger = _TT.ACTIVATE_MAIN
-        return new_trigger, remainder
+        return new_trigger, remainder, activation_optional
 
     def parse_card_text(self, text: str, as_trigger: bool = False) -> List[Ability]:
         norm = _nfc(text)
@@ -231,7 +235,7 @@ class EffectParser:
                 )
 
             # テキスト埋め込みトリガー宣言「〈timing〉時、発動できる」を解消（OTHER 化を防ぐ）。
-            trigger, effect_text = self._strip_text_trigger(trigger, effect_text)
+            trigger, effect_text, activation_optional = self._strip_text_trigger(trigger, effect_text)
 
             # 効果本体の解析
             effect_node = self._parse_to_node(effect_text)
@@ -264,6 +268,12 @@ class EffectParser:
                         args=[final_condition, effect_node.condition]
                     )
                 effect_node = effect_node.if_true
+
+            # 自動誘発の「〈timing〉時、発動できる」は任意発動（resolver が CONFIRM_OPTIONAL で
+            # 使用確認を挟む）。複合効果の部分拒否の曖昧さを避けるため単一アクションに限定する。
+            if (activation_optional and isinstance(effect_node, GameAction)
+                    and effect_node.type != ActionType.OTHER):
+                effect_node.is_optional = True
 
             # 置換効果（「(このキャラ/他のキャラが)KOされる/場を離れる場合、代わりに〜」）。
             # 「…される場合」はゲート条件ではなくトリガー文脈なので、REPLACE_EFFECT で
