@@ -1430,12 +1430,12 @@ def _trash_to_hand(ctx: ParseContext) -> Optional[GameAction]:
 @rule("temp_to_deck", priority=63)
 def _temp_to_deck(ctx: ParseContext) -> Optional[GameAction]:
     """「（好きな順番に並び替え、）デッキの上か下に置く」「好きな順番で置く」（scry の戻し）
-    → DECK_BOTTOM（TEMP 全件→デッキ下, 保守的）。
+    → DECK_BOTTOM（TEMP 全件→デッキ）。
 
     look_deck の後、手札に取らなかった残りをデッキへ戻す。「残り」を含む句は
-    remaining_* が担当するため除外。並び替え UI（CardSelectModal の DnD 並び替え＝
-    maxSelect<0）自体はフロントに実装済みだが、エンジンが並び替え用インタラクションを
-    発行する結線は未了のため、現状は上下/順序を選ばせず保守的にデッキ下（現状順）へ送る。
+    remaining_* が担当するため除外。status="ARRANGE"(順序選択)・dest_position(上/下/CHOOSE)を
+    付与し、エンジンが ARRANGE_DECK 対話で順序(DnD)と上下位置をプレイヤーに選ばせる
+    （ヘッドレスでは現状順・デッキ下に解決）。
 
     明示ソース（トラッシュ/ライフ）またはフィールドのキャラ対象（コスト/枚数フィルタ付き）は
     deck_bottom_general(priority=55) が担当するため除外。
@@ -1680,8 +1680,8 @@ def _scry_place(ctx: ParseContext) -> Optional[GameAction]:
 def _remaining_deck_top_or_bottom(ctx: ParseContext) -> Optional[GameAction]:
     """「残りを（好きな順番に並び替え、）?デッキの上か下に置く」→ DECK_BOTTOM（保守的）。
 
-    「上か下」を選ばせるエンジン結線が未了のため、保守的にデッキ下扱い
-    （フロントの DnD 並び替え UI 自体は実装済みだが、エンジンが選択を発行しない）。
+    「上か下」は dest_position="CHOOSE" として ARRANGE_DECK 対話でプレイヤーに選ばせる
+    （並び替え語があれば status="ARRANGE" も付与。ヘッドレスは現状順・デッキ下）。
     「残りをデッキの下に置く」は remaining_deck_bottom(priority=65) が優先処理する。
     """
     t = ctx.text
@@ -1980,8 +1980,8 @@ def _remaining_trash(ctx: ParseContext) -> Optional[GameAction]:
 # 手札→デッキ上か下:
 #   「自分の手札N枚を（好きな順番で並び替え、）デッキの上か下（/上/下）に置く」
 #   → DECK_BOTTOM(zone=HAND)。
-#   「並び替え」「上か下」は、フロントの DnD 並び替え UI は実装済みだが、エンジンが
-#   並び替え/上下の選択インタラクションを発行する結線が未了のため、現状順のままデッキ下へ送る。
+#   「並び替え」「上か下」は status="ARRANGE"・dest_position で ARRANGE_DECK 対話化し、
+#   順序(DnD)と上下位置をプレイヤーに選ばせる（「デッキに戻す」シャッフル前提は対話化しない）。
 # ---------------------------------------------------------------------------
 @rule("hand_to_deck", priority=64)
 def _hand_to_deck(ctx: ParseContext) -> Optional[GameAction]:

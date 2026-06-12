@@ -390,3 +390,50 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 - ライフ重ね間隔・ミニメニュー幅などの微調整は実機目視が未実施（型チェック/lint/バックエンド
   テスト 342 件は通過済み）。
 - 対人戦対応時: 裏向きライフ/相手手札のカード識別情報マスキング（上記リーク注記）。
+
+---
+
+## 10. 2026-06 対話化と自己制限のエンフォース
+
+### 課題3(3a): 自己制限（self_cannot）のエンフォース
+
+「自分は、このターン中、…できない」を従来の `RULE_PROCESSING` no-op から実エンフォースへ。
+parser(`self_cannot`)が述語を制限キーへ写像し、`apply_action_to_engine` が `player.restrictions`
+（key→{expire, min_cost}）に記録、各地点で enforce する。`gamestate.SELF_RESTRICTION_KEYS`：
+
+| キー | 述語 | enforce 地点 |
+|---|---|---|
+| `CANNOT_PLAY_CHARACTER`(min_cost対応) | キャラ（コストN以上）を登場できない | `play_card_action` |
+| `CANNOT_PLAY_FROM_HAND` | 手札からカードをプレイできない | `play_card_action` |
+| `CANNOT_ATTACK_LEADER` | リーダーにアタックできない | `declare_attack` |
+| `CANNOT_DRAW_BY_EFFECT` | 自分の効果でカードを引けない | `DRAW` |
+| `CANNOT_ACTIVATE_DON` | キャラの効果でドン‼をアクティブにできない | `ACTIVE_DON` |
+| `CANNOT_LIFE_TO_HAND` | 自分の効果でライフを手札に加えられない | `MOVE_CARD`(life→hand) |
+
+- 「このターン中」= 現ターンのみ有効（`turn_count <= expire` の遅延失効。`negate_onplay_until` と同方式）。
+- `attack_disable` から「自分は…リーダーにアタックできない」を除外し `self_cannot` に委譲。
+- 述語を判別できない自己制限（「デッキに入れられない」=構築ルール）は従来どおり no-op。
+- テスト: `tests/test_self_cannot.py`(16)。
+
+### 課題2(2a/2b): デッキ配置の上下選択・並び替え／ライフ並べ替えの対話化
+
+「好きな順番でデッキの上か下に置く」「ライフすべてを見て好きな順番で置く」を、従来の
+現状順・デッキ下固定から **ARRANGE_DECK 対話**へ。
+
+- **parser**: `temp_to_deck`/`remaining_deck_bottom`/`remaining_deck_top_or_bottom`/`hand_to_deck` に
+  `status="ARRANGE"`（順序選択）と `dest_position`（"TOP"/"BOTTOM"/"CHOOSE"）を付与。
+- **resolver**: `_maybe_suspend_arrange`/`_suspend_for_arrange` が DECK_BOTTOM(ARRANGE/CHOOSE) と
+  ORDER_LIFE を中断（`action_type="ARRANGE_DECK"`, `allow_reorder`/`allow_position`）。
+  `_resolve_targets` は REMAINING を「残り全部」として選択中断せず、ARRANGE_DECK 一本に集約。
+- **gamestate**: `resolve_interaction` の `ARRANGE_DECK` 分岐で順序適用＋上/下配置（TOP は逆順
+  insert で先頭が最上面）、ライフ再整列。DECK_BOTTOM ハンドラが `dest_position` を尊重。
+- **frontend**: `CardSelectModal` に `allowPosition`（「デッキの上へ/下へ」確定ボタン）を追加、
+  既存の DnD 並び替えモード(`maxSelect<0`)と併用。RealGame の `showSearchModal`/`handleSelectionResolve`
+  が ARRANGE_DECK を処理し `{selected_uuids(配置順), position}` を送信。
+- **不変条件**: ヘッドレス(`_smart_drain` の既定 payload=selected_uuids 空/position 無し)では
+  現状順・デッキ下に解決され**挙動不変**（baseline/品質ゲート維持）。テスト: `tests/test_arrange_deck.py`(7)。
+
+### 残課題（この回で未着手）
+
+- 課題2(2c): 置換効果（`_auto_resolve_replacement`）の対話化は高リスクのため見送り（現状は自動解決）。
+- バックエンド全 365 passed・品質ゲート緑。フロントは tsc/eslint 通過、実機目視は未実施。
