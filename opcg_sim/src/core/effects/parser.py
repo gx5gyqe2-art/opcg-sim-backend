@@ -733,7 +733,7 @@ class EffectParser:
         # （例「コスト8以上のキャラがいて、手札6枚以下」→ HAND_COUNT>=8 と誤読）。
         split_m = re.search(
             _nfc(r'^(?P<a>.+?(?:がい(?:て|る)|枚以上いて|枚以下いて|がいなくて|があり|がある|'
-                 r'以上で|以下で|以上であり|以下であり))、(?P<b>.+)$'),
+                 r'以上で|以下で|以上であり|以下であり|を持ち))、(?P<b>.+)$'),
             norm_text)
         if split_m:
             a_txt = split_m.group("a")
@@ -742,6 +742,8 @@ class EffectParser:
             a_norm = re.sub(_nfc(r'いて$'), _nfc('いる'), a_txt)
             a_norm = re.sub(_nfc(r'いなくて$'), _nfc('いない'), a_norm)
             a_norm = re.sub(_nfc(r'(以上|以下)で$'), r'\1', a_norm)
+            # 「を持ち」連結（例「リーダーが特徴《X》を持ち、…の場合」）は終止形に正規化
+            a_norm = re.sub(_nfc(r'を持ち$'), _nfc('を持つ'), a_norm)
             sub_a = self._parse_condition_obj(a_norm)
             sub_b = self._parse_condition_obj(b_txt)
             valid = [c for c in (sub_a, sub_b)

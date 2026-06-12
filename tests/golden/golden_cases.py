@@ -2364,4 +2364,32 @@ CASES = [
              ]}}
         ],
     },
+    # OP09-093 ティーチ: 「を持ち、」AND 条件 + 効果無効→アタック禁止の save_id/ref_id 連携
+    {
+        "id": "op09_093_teach_negate",
+        "text": "【ブロッカー】 / 【起動メイン】【ターン1回】自分のリーダーが特徴《黒ひげ海賊団》を持ち、このキャラが登場したターンの場合、相手のリーダー1枚までを、このターン中、効果を無効にする。その後、相手のキャラ1枚までを、次の相手のターン終了時まで、効果を無効にし、そのキャラはアタックできない。",
+        "expect": [
+            {"trigger": "ACTIVATE_MAIN",
+             "condition": {"type": "TURN_LIMIT"},
+             "effect": {"kind": "seq", "actions": [
+                 {"kind": "branch",
+                  "condition": {"type": "AND", "args": [
+                      {"type": "LEADER_TRAIT", "value": "黒ひげ海賊団"},
+                      {"type": "SOURCE_STATE", "value": "ENTERED_THIS_TURN"},
+                  ]},
+                  "if_true": {"type": "NEGATE_EFFECT",
+                              "target": {"player": "OPPONENT", "card_type": ["LEADER"]},
+                              "duration": "THIS_TURN"}},
+                 {"kind": "seq", "actions": [
+                     {"type": "NEGATE_EFFECT",
+                      "target": {"player": "OPPONENT", "card_type": ["CHARACTER"],
+                                 "is_up_to": True},
+                      "duration": "UNTIL_NEXT_TURN_END"},
+                     {"type": "ATTACK_DISABLE",
+                      "target": {"ref_id": "negate_attack_char"},
+                      "duration": "UNTIL_NEXT_TURN_END"},
+                 ]},
+             ]}}
+        ],
+    },
 ]
