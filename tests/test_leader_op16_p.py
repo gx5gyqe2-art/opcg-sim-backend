@@ -175,8 +175,6 @@ def test_op16_060_return_8_don_play_three_distinct_generals():
     assert g1 in p1.field and g2 in p1.field and g3 in p1.field
 
 
-@pytest.mark.xfail(strict=False,
-                   reason="OP16-060: 『カード名の異なる』distinct 制約がパース/実装に無く、同名の《大将》を複数登場できてしまう（要確認）")
 def test_op16_060_distinct_name_constraint_limits_same_name():
     """OP16-060: 「カード名の異なる」制約により、同名の《大将》は1枚しか登場できないべき。
 

@@ -145,6 +145,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if _nfc("他の") in tgt_text or _nfc("このキャラ以外") in tgt_text or _nfc("以外の自分") in tgt_text:
         tq.flags.add("EXCLUDE_SOURCE")
 
+    # 「カード名の異なる…N枚」: 選ぶカードはすべて名前が異なる（distinct）。matcher が名前重複を
+    # 除外して候補化することで、同名を複数選べないようにする（OP16-060/OP16-034/038 等）。
+    if _nfc("カード名の異なる") in tgt_text or _nfc("カード名が異なる") in tgt_text:
+        tq.is_unique_name = True
+
     # 「【トリガー】を持つ（キャラ/カード）」対象フィルタ: トリガー能力所持に限定（matcher が絞り込む）。
     # 全対象種別で効くよう parse_target に置く（従来は discard ルールのみで、PLAY_CARD 等に
     # 適用されず「【トリガー】を持つキャラを登場」の絞り込みが脱落していた: OP03-022）。
