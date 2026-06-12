@@ -230,7 +230,9 @@ def test_op10_099_cost5_in_range_grants_blocker():
 
 
 @pytest.mark.xfail(strict=True,
-    reason="OP10-099: 対象が cost_max=3 のみ（下限3欠落）。コスト2が誤って対象になりブロッカーを得てしまう")
+    reason="OP10-099: コスト範囲(cost_min=3/cost_max=8)は matcher で是正済み。残因は『そのキャラ』参照——"
+           "V2 でルール生成された先行アクション(ACTIVE)が selected_card を保存せず、GRANT_KEYWORD の "
+           "ref_id 参照が場全体へフォールスルーして範囲外コストにもブロッカーが付く（V2 coreference 保存ギャップ）")
 def test_op10_099_cost2_below_range_no_effect():
     """OP10-099: コスト2の《超新星》（下限3未満）は対象外でブロッカーを得ないべき。"""
     c = _op10_099_run(2)
@@ -238,7 +240,8 @@ def test_op10_099_cost2_below_range_no_effect():
 
 
 @pytest.mark.xfail(strict=True,
-    reason="OP10-099: 対象が cost_max=3 のみ（上限8欠落）。コスト9が誤って対象になりブロッカーを得てしまう")
+    reason="OP10-099: コスト範囲(cost_min=3/cost_max=8)は matcher で是正済み。残因は『そのキャラ』参照の "
+           "V2 coreference 保存ギャップ（GRANT_KEYWORD ref_id が場全体へフォールスルー）")
 def test_op10_099_cost9_above_range_no_effect():
     """OP10-099: コスト9の《超新星》（上限8超）は対象外でブロッカーを得ないべき。"""
     c = _op10_099_run(9)

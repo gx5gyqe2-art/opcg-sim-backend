@@ -165,7 +165,13 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
-    m_c = re.search(_nfc(ParserKeyword.COST + r'[^+＋\-－−‐\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    # コスト範囲「コストNからM」（N以上M以下）。範囲表記は単一しきい値より先に判定する
+    #   （従来は「コスト3」だけを拾い cost_max=3 に縮退していた: OP10-099）。
+    m_crange = re.search(_nfc(ParserKeyword.COST + r'(\d+)から(\d+)'), tgt_text)
+    if m_crange:
+        tq.cost_min = int(m_crange.group(1))
+        tq.cost_max = int(m_crange.group(2))
+    m_c = None if m_crange else re.search(_nfc(ParserKeyword.COST + r'[^+＋\-－−‐\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
         start_idx = m_c.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
