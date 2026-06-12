@@ -191,7 +191,8 @@ def test_op10_042_draw_when_hand_le5():
     gm, p1, p2, L = build("OP10-042")
     _fill_hand_to(p1, 5)
     deck_before = len(p1.deck)
-    gm.resolve_ability(p1, get_ability(L.master, "OPPONENT_TURN"), L)
+    gm.turn_player = p2   # 【相手のターン中】＝相手のターン（CONTEXT 条件を満たす）
+    gm.resolve_ability(p1, get_ability(L.master, "ON_KO"), L)
     auto_resolve(gm, p1)
     assert len(p1.hand) == 6 and len(p1.deck) == deck_before - 1
 
@@ -200,7 +201,8 @@ def test_op10_042_no_draw_when_hand_gt5():
     """OP10-042 能力1: 手札6枚（5枚超）ならドローしない。"""
     gm, p1, p2, L = build("OP10-042")
     _fill_hand_to(p1, 6)
-    gm.resolve_ability(p1, get_ability(L.master, "OPPONENT_TURN"), L)
+    gm.turn_player = p2   # 【相手のターン中】＝相手のターン
+    gm.resolve_ability(p1, get_ability(L.master, "ON_KO"), L)
     auto_resolve(gm, p1)
     assert len(p1.hand) == 6
 
