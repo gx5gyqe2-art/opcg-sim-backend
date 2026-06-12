@@ -647,6 +647,10 @@ class EffectResolver:
             if isinstance(sv, tuple) and sv[0] == "NAME":
                 # 置換の対象指定（「自分の「X」がKOされる場合」OP12-061）: 離れるカードが名前 X か。
                 return sv[1] in (source_card.master.name or "")
+            if isinstance(sv, tuple) and sv[0] == "COST":
+                # 置換の対象指定（「元々のコストN以上のキャラがKOされる」EB03-001）: 離脱カードの
+                # 元々コスト（master.cost）を比較する。
+                return self._compare(source_card.master.cost or 0, condition.operator, sv[1])
             log_event("WARNING", "resolver.source_state_unknown",
                       f"Unknown SOURCE_STATE subtype: {sv}", player=player.name)
             return False
