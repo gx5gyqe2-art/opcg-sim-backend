@@ -246,7 +246,6 @@ def test_eb03_001_replace_ko_of_cost4_char():
     assert len(p1.hand) == hand_before - 1              # 代わりに手札1枚捨て
 
 
-@pytest.mark.xfail(strict=False, reason="EB03-001: 要確認 — KO置換の対象制限『元々のコスト4以上』が効かず、コスト3キャラのKOまで置換されてしまう（GENERIC条件でフィルタ未適用の疑い）")
 def test_eb03_001_cost3_char_not_replaced():
     """EB03-001 PASSIVE: 元々コスト3以下のキャラがKOされる場合は置換対象外（通常KO）。"""
     gm, p1, p2, L = build("EB03-001")

@@ -396,7 +396,7 @@ class EffectParser:
             # 「〜時、発動できる。」形は「発動できる。」を取り除いて本体を残す。
             rest = re.sub(_nfc(r'^発動できる[。、]?'), '', rest).strip()
             cond = Condition(type=ConditionType.EVENT_THIS_TURN, value=(ev_name, ev_min),
-                             player=Player.SELF, raw_text=t)
+                             operator=CompareOperator.GE, player=Player.SELF, raw_text=t)
             return cond, rest
         return None, effect_text
 
@@ -904,6 +904,21 @@ class EffectParser:
             return Condition(type=ConditionType.SOURCE_STATE,
                              value=("NAME", repl_name_m.group(1)),
                              player=Player.SELF, raw_text=norm_text)
+        # 置換の対象指定「（自分の）（元々の）パワーN以上/以下のキャラがKOされる/場を離れる（場合）」:
+        # 離脱カードのパワーで限定（OP05-001「自分のパワー5000以上のキャラがKOされる」）。
+        repl_pow_m = re.search(_nfc(r'パワー(\d+)(以上|以下)のキャラが(?:KOされる|場を離れる)'), norm_text)
+        if repl_pow_m:
+            op = CompareOperator.GE if repl_pow_m.group(2) == _nfc('以上') else CompareOperator.LE
+            return Condition(type=ConditionType.SOURCE_STATE,
+                             value=("POWER", int(repl_pow_m.group(1))), operator=op,
+                             player=Player.SELF, raw_text=norm_text)
+        # 置換の対象指定「（自分の）（元々の）コストN以上/以下のキャラがKOされる/場を離れる」（EB03-001）。
+        repl_cost_m = re.search(_nfc(r'コスト(\d+)(以上|以下)のキャラが(?:KOされる|場を離れる)'), norm_text)
+        if repl_cost_m:
+            op = CompareOperator.GE if repl_cost_m.group(2) == _nfc('以上') else CompareOperator.LE
+            return Condition(type=ConditionType.SOURCE_STATE,
+                             value=("COST", int(repl_cost_m.group(1))), operator=op,
+                             player=Player.SELF, raw_text=norm_text)
 
         # 選言条件「A、または B」「Aか、B」= A または B。同一資源の二値しきい値
         # （例「ドン!!が0枚、または8枚以上」ST10-002 /「ドン!!が0枚か、3枚以上」OP05-060）。
@@ -933,7 +948,7 @@ class EffectParser:
         # （例「コスト8以上のキャラがいて、手札6枚以下」→ HAND_COUNT>=8 と誤読）。
         split_m = re.search(
             _nfc(r'^(?P<a>.+?(?:がい(?:て|る)|枚以上いて|枚以下いて|がいなくて|があり|がある|'
-                 r'以上で|以下で|以上であり|以下であり|を持ち))、(?P<b>.+)$'),
+                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち))、(?P<b>.+)$'),
             norm_text)
         if split_m:
             a_txt = split_m.group("a")
@@ -941,6 +956,7 @@ class EffectParser:
             # 「がいて」連結は存在条件なので「いる」に正規化して再帰解析する
             a_norm = re.sub(_nfc(r'いて$'), _nfc('いる'), a_txt)
             a_norm = re.sub(_nfc(r'いなくて$'), _nfc('いない'), a_norm)
+            a_norm = re.sub(_nfc(r'(以上|以下)でかつ$'), r'\1', a_norm)
             a_norm = re.sub(_nfc(r'(以上|以下)で$'), r'\1', a_norm)
             # 「を持ち」連結（例「リーダーが特徴《X》を持ち、…の場合」）は終止形に正規化
             a_norm = re.sub(_nfc(r'を持ち$'), _nfc('を持つ'), a_norm)
@@ -1000,6 +1016,21 @@ class EffectParser:
                 if _nfc("ある") in norm_text:
                     return Condition(type=ConditionType.DON_COUNT, operator=CompareOperator.GE, value=1, player=p, raw_text=norm_text)
             return Condition(type=ConditionType.DON_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
+
+        # イベント発動済み条件（「このターン中、自分が元々のコスト3以上のイベントを発動している場合」
+        # OP15-002）。このターン中にコストN以上のイベントを発動したか（EVENT_THIS_TURN）。未発動なら不発。
+        ev_played_m = re.search(_nfc(r'コスト(\d+)以上のイベントを発動している'), norm_text)
+        if ev_played_m:
+            return Condition(type=ConditionType.EVENT_THIS_TURN,
+                             value=(f"EVENT_PLAYED_COST_GE_{ev_played_m.group(1)}", 1),
+                             operator=CompareOperator.GE, player=Player.SELF, raw_text=norm_text)
+
+        # 「このターン中、このリーダーの効果で（カードを）引いていない（場合）」: 当該ドローが
+        # まだ発生していないか（OP01-062）。1ターンに複数回引くのを防ぐ重複防止条件。
+        if re.search(_nfc(r'(?:この)?リーダーの効果で.{0,6}引いていない'), norm_text):
+            return Condition(type=ConditionType.EVENT_THIS_TURN,
+                             value=("LEADER_DREW_BY_EFFECT", 1),
+                             operator=CompareOperator.LT, player=Player.SELF, raw_text=norm_text)
 
         # ターン数条件（「自分の第2ターン以降の場合」OP15-058）。turn_count >= N。
         turn_m = re.search(_nfc(r'第(\d+)ターン以降'), norm_text)

@@ -282,9 +282,6 @@ def test_op01_062_triggered_by_event_not_activate_main():
     assert trig != "ACTIVATE_MAIN"  # イベント誘発であるべき
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="OP01-062: 『このターン中このリーダー効果で引いていない』条件が欠落"
-                          "（毎イベント引けてしまう＝1ターン複数ドロー可の意味バグ）。")
 def test_op01_062_has_not_drawn_this_turn_condition():
     """OP01-062 / 重複防止条件: 『このターン中このリーダー効果で未ドロー』条件が AST に存在すべき。"""
     gm, p1, p2, L = build("OP01-062")
@@ -304,7 +301,8 @@ def test_op01_062_has_not_drawn_this_turn_condition():
     # 現状の条件型は {AND, HAS_DON, HAND_COUNT} のみで、
     # 「このターン中このリーダー効果で引いていない」を表す条件型
     # (TURN_LIMIT / CONTEXT / PREV_ACTION / SOURCE_STATE 等) が存在しない。
-    draw_limit_types = {"TURN_LIMIT", "CONTEXT", "PREV_ACTION", "SOURCE_STATE", "GENERIC"}
+    # 「このターン中…引いていない」は EVENT_THIS_TURN(LEADER_DREW_BY_EFFECT, LT) で表す。
+    draw_limit_types = {"TURN_LIMIT", "CONTEXT", "PREV_ACTION", "SOURCE_STATE", "GENERIC", "EVENT_THIS_TURN"}
     assert types & draw_limit_types
 
 

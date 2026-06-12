@@ -298,7 +298,6 @@ def test_op04_058_ramp_one_active_don():
 #   KOの代わりにそのキャラをTHIS_TURNパワー-1000できる
 # ===========================================================================
 
-@pytest.mark.xfail(strict=False, reason="OP05-001要確認: KO置換がリーダーPASSIVEで発火せず、5000以上のキャラが通常KOされる")
 def test_op05_001_replaces_ko_with_power_down():
     """OP05-001 相手ターン: パワー5000以上のキャラがKOされる代わりにパワー-1000で生存。"""
     gm, p1, p2, L = build("OP05-001")
