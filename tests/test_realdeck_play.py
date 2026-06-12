@@ -366,6 +366,20 @@ def test_nami_leader_buff_is_this_turn_not_battle():
     assert p1.leader.get_power(False) == base_pw, "ターン終了で失効するべき"
 
 
+def test_opponent_turn_cost_buff_op16_080():
+    """OP16-080【相手のターン中】自分のキャラすべてをコスト+1: 相手ターン中だけ適用され、
+    自分のターンには適用されない（報告バグ「コスト＋1効果が適用されていない」の回帰）。"""
+    gm, p1, p2 = base(turn_player_is_p1=False)  # p2 のターン（p1 から見て相手ターン）
+    p1.leader = inst("OP16-080", "P1")
+    ch = CardInstance(make_master(card_id="C", name="C", cost=3, power=4000), "P1")
+    p1.field = [ch]
+    gm._apply_passive_effects(gm.turn_player)
+    assert ch.current_cost == 4, f"相手ターン中はコスト+1（{ch.current_cost}）"
+    gm.turn_player, gm.opponent = p1, p2  # 自分のターンへ
+    gm._apply_passive_effects(gm.turn_player)
+    assert ch.current_cost == 3, f"自分のターンでは+1されない（{ch.current_cost}）"
+
+
 def test_optional_cost_not_forced_op16_080():
     """OP16-080【相手のアタック時】手札を捨てることが「できる」: 自動で捨てさせられず
     使用確認(CONFIRM_OPTIONAL)を挟む。拒否すれば手札は減らない（報告バグ「必ず手札を

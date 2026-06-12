@@ -705,6 +705,20 @@ class GameManager:
                         log_event("DEBUG", "game.passive_trigger", f"YOUR_TURN: {card.master.name}", player=player.name)
                         self.resolve_ability(player, ability, source_card=card)
 
+            # Step 2': OPPONENT_TURN 効果（非アクティブプレイヤーのカードのみ）。
+            #   「【相手のターン中】自分のキャラすべてをコスト+1」(OP16-080) 等の継続効果。
+            #   コントローラから見て「相手のターン」＝非ターンプレイヤーのカードが該当する。
+            #   YOUR_TURN と同じく再計算レイヤ（cost_buff/passive_power）へ載るため、
+            #   ターンが替われば自然に消える。
+            for card in ([opponent.leader] if opponent.leader else []) + opponent.field + ([opponent.stage] if opponent.stage else []):
+                if not card or not card.master.abilities: continue
+                for ability in card.master.abilities:
+                    if ability.trigger == TriggerType.OPPONENT_TURN:
+                        if self._is_reactive_passive(ability):
+                            continue  # 「【相手のターン中】…された時」型はイベント誘発
+                        log_event("DEBUG", "game.passive_trigger", f"OPPONENT_TURN: {card.master.name}", player=opponent.name)
+                        self.resolve_ability(opponent, ability, source_card=card)
+
             # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）。ステージも含める。
             for p in [player, opponent]:
                 for card in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
