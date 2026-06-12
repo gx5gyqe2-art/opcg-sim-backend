@@ -500,7 +500,7 @@ def test_turn_limit_blocks_second_activation():
     assert len(p1.hand) == 1
     gm.resolve_ability(p1, ab, source_card=src)   # 2回目は制限で不発
     assert len(p1.hand) == 1
-    src.reset_turn_status()                        # ターン境界でカウンタが戻る
+    src.reset_turn_status(clear_usage=True)        # ターン境界でカウンタが戻る
     gm.resolve_ability(p1, ab, source_card=src)
     assert len(p1.hand) == 2
 
@@ -517,6 +517,29 @@ def test_turn_limit_enforced_via_parsed_ability():
 
     gm.resolve_ability(p1, abilities[0], source_card=src)
     gm.resolve_ability(p1, abilities[0], source_card=src)
+    assert len(p1.hand) == 1
+
+
+def test_turn_limit_survives_midturn_reset():
+    """【ターン1回】の使用回数は、ターン途中の reset_turn_status（clear_usage 無し＝戦闘終了
+    や passive 再計算で呼ばれる）では戻らない。戻ると同一ターン内で複数回発動できてしまう
+    （報告バグの回帰ガード）。"""
+    gm, p1, _ = make_game()
+    for i in range(5):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    ab = Ability(
+        trigger=TriggerType.ACTIVATE_MAIN,
+        condition=Condition(type=ConditionType.TURN_LIMIT, value=1),
+        effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)),
+    )
+    src = make_instance(make_master(card_id="TL-3", abilities=(ab,)), owner=p1.name)
+    p1.field.append(src)
+
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert len(p1.hand) == 1
+    # 戦闘終了相当の途中リセット（gamestate の battle 終了は keep_don=True で呼ぶ）。
+    src.reset_turn_status(keep_don=True)
+    gm.resolve_ability(p1, ab, source_card=src)   # 使用回数は維持されるので不発のまま
     assert len(p1.hand) == 1
 
 

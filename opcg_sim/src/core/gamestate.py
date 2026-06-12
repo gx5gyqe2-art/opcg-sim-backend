@@ -626,7 +626,8 @@ class GameManager:
         all_units = [player.leader] + player.field
         if player.stage: all_units.append(player.stage)
         for card in all_units:
-            if card: card.reset_turn_status(keep_don=True)
+            # ターン境界のリセット。【ターン1回】の使用回数もここで戻す。
+            if card: card.reset_turn_status(keep_don=True, clear_usage=True)
 
     def refresh_all(self, player: Player):
         all_units = [player.leader] + player.field
@@ -634,7 +635,8 @@ class GameManager:
         for card in all_units:
             if card:
                 is_frozen = "FREEZE" in card.flags
-                card.reset_turn_status()
+                # ターン境界のリセット。【ターン1回】の使用回数もここで戻す。
+                card.reset_turn_status(clear_usage=True)
                 if not is_frozen: card.is_rest = False
         
         for don in player.don_rested:
@@ -783,9 +785,10 @@ class GameManager:
     def move_card(self, card: Card, dest_zone: Zone, dest_player: Player, dest_position: str = "BOTTOM"):
         current_owner, current_list = self._find_card_location(card)
         
-        # 領域移動時はステータスをリセット（特にトラッシュ/手札へ戻る場合）
+        # 領域移動時はステータスをリセット（特にトラッシュ/手札へ戻る場合）。
+        # 場を離れると新規状態になるため【ターン1回】の使用回数もリセットする。
         if dest_zone in [Zone.TRASH, Zone.HAND]:
-            card.reset_turn_status()
+            card.reset_turn_status(clear_usage=True)
             
         # フィールドから離れる場合、付与されていたドン‼をレスト状態で持ち主に返す
         if current_owner and current_list is not None and current_list is current_owner.field:

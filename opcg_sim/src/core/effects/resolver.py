@@ -34,8 +34,10 @@ class EffectResolver:
             return
 
         # 1.5 使用回数制限（【ターン1回】等）の enforce。
-        #   ability_used_this_turn は reset_turn_status（毎ターン境界で呼ばれる）で
-        #   クリアされるため、ターン単位の使用回数として機能する。
+        #   ability_used_this_turn は reset_turn_status(clear_usage=True) でクリアされる。
+        #   この明示クリアはターン境界（refresh_phase）と、カードが場を離れる領域移動でのみ
+        #   行われる。戦闘終了や passive 再計算など「ターン途中」の reset_turn_status では
+        #   クリアされないため、ターン単位の使用回数として正しく機能する。
         turn_limit = self._turn_limit_of(ability.condition)
         limit_key = used_count = None
         if turn_limit is not None:
