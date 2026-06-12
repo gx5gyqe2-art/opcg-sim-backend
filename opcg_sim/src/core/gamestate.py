@@ -84,7 +84,7 @@ class Player:
             "zones": {
                 "field": [self._format_card(c, True) for c in self.field],
                 "hand": [self._format_card(c, is_owner) for c in self.hand],
-                "life": [self._format_card(c, False) for c in self.life],
+                "life": [self._format_card(c, c.is_face_up) for c in self.life],
                 "trash": [self._format_card(c, True) for c in self.trash],
                 "stage": stage_dict
             }
