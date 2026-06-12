@@ -181,9 +181,6 @@ def test_op06_042_no_draw_without_don_returned_event():
 # OP06-080 ゲッコー・モリア（🐛 起動コスト➁=ドン2枚レストが value=1 に取りこぼし）
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason=(
-    "OP06-080: 起動コスト『➁(コストエリアのドン2枚レスト)』が REST_DON value=1 に"
-    "取りこぼされている（2であるべき）。"))
 def test_op06_080_activation_cost_rests_two_don():
     """OP06-080【アタック時】コストの➁はドン2枚レスト（value=2）であるべき（バグで1）。"""
     ab = get_ability(leader_master("OP06-080"), "ON_ATTACK")

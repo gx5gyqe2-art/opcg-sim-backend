@@ -65,7 +65,6 @@ def test_op04_001_draw_and_grant_haste():
     assert "速攻" in (c.current_keywords | c.timed_keywords)
 
 
-@pytest.mark.xfail(strict=False, reason="OP04-001要確認: コスト➁(ドン2枚レスト)がREST_DON value=1で1枚しかレストされない疑い")
 def test_op04_001_cost_rests_two_don():
     """OP04-001 起動メイン: コスト記号➁＝ドン!!2枚レストのはず（実装は1枚レスト疑い）。"""
     gm, p1, p2, L = build("OP04-001")

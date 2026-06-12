@@ -825,6 +825,18 @@ _DON_COUNT_RE = re.compile(_nfc(r"ドン(?:!!|‼)?[ 　]*(\d+)[ 　]*枚"))
 def _don_count(t: str) -> int:
     if _nfc("すべて") in t or _nfc("全て") in t:
         return 99  # エンジン側でプールが尽きるまで処理
+    # 先頭の丸数字（➁/③ 等）はコストエリアのドン!!レスト枚数を表す。
+    # 「➁(コストエリアのドン!!を指定の数レストにできる)」は N枚 表記を持たないため、
+    # 丸数字を拾わないと既定 1 に縮退する（OP04-001/OP06-080）。
+    stripped = t.strip()
+    if stripped and stripped[0] in _CIRCLED_DIGITS:
+        return _CIRCLED_DIGITS[stripped[0]]
+    # loader の DataCleaner（NFKC）は分解可能な丸数字（③=U+2462 等）を素の数字へ分解する。
+    # その結果「3(コストエリアのドン!!を指定の数レストにできる)」となるため、コストエリア注記を
+    # 伴う先頭の素数字もレスト枚数として拾う（ST02-001）。
+    m_lead = re.match(r'(\d+)\s*[（(]', stripped)
+    if m_lead and _nfc('コストエリア') in t:
+        return int(m_lead.group(1))
     m = _DON_COUNT_RE.search(t)
     return int(m.group(1)) if m else 1
 

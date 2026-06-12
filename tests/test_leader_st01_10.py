@@ -140,7 +140,6 @@ def test_st02_001_no_hand_cannot_activate():
     assert L.is_rest is True                         # 払えないのでアクティブにならない
 
 
-@pytest.mark.xfail(strict=False, reason="要確認(ST02-001): コスト③=ドン3枚レストだが REST_DON value=1 で1枚しかレストされない疑い")
 def test_st02_001_cost_rests_three_don():
     """ST02-001 起動メイン: コスト③はドン3枚をレストにするはず（テキスト準拠）。"""
     gm, p1, p2, L = build("ST02-001")
