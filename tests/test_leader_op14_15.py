@@ -305,8 +305,6 @@ def test_op15_001_opp_turn_no_debuff_when_mixed_traits():
     assert v.get_power(False) == 5000
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP15-001: 能力1で『相手のドン!!が2枚以上付与されている』対象フィルタが欠落し、付与ドン0のキャラもレスト可能になる(count=2に化け)")
 def test_op15_001_rest_requires_two_attached_don():
     """OP15-001 能力1: 付与ドン0のキャラはレスト対象外であるべき（フィルタ欠落のバグ）。"""
     gm, p1, p2, L = build("OP15-001")

@@ -247,11 +247,19 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     
     if re.search(r'(\d+|枚)まで', tgt_text): tq.is_up_to = True 
 
-    if _nfc(ParserKeyword.ALL_HIRAGANA) in tgt_text or _nfc(ParserKeyword.ALL) in tgt_text:
+    # 「ドン‼がN枚以上付与されているキャラ」: 付与ドン枚数の下限フィルタ（OP15-001）。
+    # 枚数 N がフィルタなので、対象枚数(count)には数えないよう先に検出して句を除去する。
+    count_text = tgt_text
+    m_adon = re.search(_nfc(r'ドン(?:!!|‼)?が(\d+)枚以上付与されている'), tgt_text)
+    if m_adon:
+        tq.min_attached_don = int(m_adon.group(1))
+        count_text = tgt_text.replace(m_adon.group(0), '')
+
+    if _nfc(ParserKeyword.ALL_HIRAGANA) in count_text or _nfc(ParserKeyword.ALL) in count_text:
         tq.count = -1
         tq.select_mode = "ALL"
     else:
-        m_cnt = re.search(r'(\d+)' + _nfc(ParserKeyword.COUNT_SUFFIX), tgt_text)
+        m_cnt = re.search(r'(\d+)' + _nfc(ParserKeyword.COUNT_SUFFIX), count_text)
         tq.count = int(m_cnt.group(1)) if m_cnt else 1
 
     # 「任意の枚数」: プレイヤーが 0..N 枚を任意に選べる可変選択。is_up_to=True かつ
@@ -360,6 +368,10 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
         if query.power_max is not None and card.get_power(True) > query.power_max: continue
         if query.power_min is not None and card.get_power(True) < query.power_min: continue
+
+        # 付与ドン枚数の下限（「ドン‼がN枚以上付与されているキャラ」OP15-001）。
+        if query.min_attached_don is not None and getattr(card, "attached_don", 0) < query.min_attached_don:
+            continue
         
         if query.is_vanilla:
             txt = card.master.effect_text
