@@ -237,8 +237,7 @@ def test_st14_001_cost8_present_buffs_leader():
     c2 = add_char(p1, name="A", cost=2, power=2000)
     c8 = add_char(p1, name="B", cost=8, power=9000)
     base = leader_power(p1)            # 付与ドン1枚込みの発動前パワー(6000)
-    gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
-    auto_resolve(gm, p1)
+    gm._apply_passive_effects(p1)     # 【ドン!!×1】常在効果は passive 再計算で適用
     assert c2.current_cost == 3        # 全キャラコスト+1
     assert c8.current_cost == 9
     assert leader_power(p1) == base + 1000   # コスト8以上いる→リーダー+1000

@@ -528,13 +528,20 @@ class EffectParser:
         if _nfc("【トリガー】") in norm_text: return TriggerType.TRIGGER
         if _nfc("【ゲーム開始時】") in norm_text: return TriggerType.GAME_START
 
-        # 【ドン!!×N】 または 【ターン1回】 のみ（既知トリガータグなし）→ 起動メイン
-        # 【ブロッカー】等を得る効果も正しく ACTIVATE_MAIN と判定できるよう、
-        # 既知トリガータグ (_TRIGGER_TAG_RE) の有無のみを判断基準にする
-        # NOTE: 【ドン!!×N】のみ（活性化タグ無し）は本来「付与ドンN枚ある間の継続効果」=PASSIVE だが、
-        #   エンジンが passive 再計算で BUFF 等の継続適用を行わないため、PASSIVE 化すると当該能力が
-        #   無効化される（OP13-004 等）。継続効果の engine 配線が入るまで ACTIVATE_MAIN を維持する。
+        # 【ドン!!×N】 または 【ターン1回】 のみ（既知トリガータグなし）。
+        # 【ターン1回】（起動回数制限）を含む、または【ドン!!×N】を含まない → 起動メイン（活性化能力）。
+        # 【ドン!!×N】のみ（活性化タグも【ターン1回】も無い）→ 常在（PASSIVE）条件付き効果。付与ドンが
+        # N枚ある間つねに適用される継続効果で、_apply_passive_effects が再計算レイヤ(passive_power 等)へ
+        # 適用する（OP13-004「コスト8以上がいれば全体+1000」/ ST14-001「全キャラ コスト+1」等）。
         if self._DON_TURN_TAG_RE.search(norm_text) and not self._TRIGGER_TAG_RE.search(norm_text):
+            has_don_tag = re.search(_nfc(r'【ドン[ ]*(?:!!|‼)[ ]*[××][ ]*\d+】'), norm_text)
+            has_turn1 = _nfc("【ターン1回】") in norm_text
+            # 反応型イベント句「〜した/された/終了 時」を含む【ドン!!×N】は継続効果ではなく誘発（KOした時/
+            # バトル終了時 等。OP04-086/ST08-013）。PASSIVE 化すると再計算で毎回発動するため除外する。
+            reactive_time = re.search(
+                _nfc(r'(?:した|された|受けた|なった|与えた|戻された|離れた|登場した|終了)時'), norm_text)
+            if has_don_tag and not has_turn1 and not reactive_time:
+                return embedded or TriggerType.PASSIVE
             return embedded or TriggerType.ACTIVATE_MAIN
 
         # 無タグの反応型「この(キャラ/カード)が…KOされた時、」等は PASSIVE ではなく

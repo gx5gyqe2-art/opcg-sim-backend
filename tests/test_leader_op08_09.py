@@ -304,8 +304,7 @@ def test_op09_061_all_char_cost_plus1():
     clear_field(p1)
     c1 = add_char(p1, name="味方1", cost=3)
     c2 = add_char(p1, name="味方2", cost=5)
-    gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
-    auto_resolve(gm, p1)
+    gm._apply_passive_effects(p1)   # 【ドン!!×1】常在効果は passive 再計算で適用
     assert c1.current_cost == 4
     assert c2.current_cost == 6
 
