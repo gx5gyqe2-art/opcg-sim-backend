@@ -578,6 +578,25 @@ backend テスト 374 passed / パーサ退行（新規OTHER）0 / フロント 
   - 副次: `quality_map.classify_no_change` が効果ツリー内部の Branch ゲート（「その後、〜の場合」等）を
     COND_FALSE と分類するよう改善（OP09-019 の汎用盤面 no-op を NO_IMPL 誤検出しないため。NO_IMPL=0 維持）。
   - **未解消**: OP14-041 は群B（KO誘発→ACTIVATE_MAIN化）が主因、ST30-001 の対象名欠落は群E のため xfail 継続。
+- ✅ **群C/E/F の一部を共通機構で解消**（leader xfail 80→61）:
+  - 丸数字コスト ➁/③（群F）: `_don_count` が「指定の数」表記の丸数字を拾わず value=1 に縮退。
+    先頭丸数字＋NFKC 分解後の素数字（loader）も枚数として解釈（OP06-080/OP04-001/ST02-001）。
+  - DON 存在条件の反転（群C）: 「（場の）ドン‼がある場合」が数値無しで既定 EQ 0 になり反転。
+    GE 1 として解釈（OP13-003）。併せて「ドン‼フェイズに置かれる…付与される」を ATTACH_DON
+    誤パース→RULE_PROCESSING（受動的ドン配置ルール、PASSIVE で毎回付与しパワー暴騰を防止）。
+  - OR 条件（群C）: 「ドン‼が0枚、または/か、N枚以上」の選言が先頭しきい値に縮退。
+    `_parse_condition_obj` に OR 分割を追加（第2項の資源主語省略も補完）（ST10-002/OP05-060）。
+  - コスト範囲（群E）: 「コストNからM」を cost_min/cost_max に（matcher）（OP10-099 のフィルタ部）。
+  - 特徴 OR 名前（群E）: 「《特徴》か「名前」」が trait∧name の AND で対象常に空 →
+    `TRAIT_OR_NAME` フラグで OR 照合（OP11-022）。
+- **既知の未解決（要設計）**:
+  - 群B（誘発トリガー化け 15枚）: `ON_KO`/`ON_DAMAGE_DEALT_TO_LIFE`/「場を離れた時」等の検出＋発火配線。
+  - V2 coreference 保存ギャップ: 「そのキャラ」参照（ref_id="selected_card"）の先行アクションが
+    V2 ルール生成だと selected_card を保存せず、参照が場全体へフォールスルーする（OP10-099 残因）。
+    legacy `_parse_atomic_action` の save_id 付与が V2 ルール経路に無いのが原因。
+  - 新フィールド要件: 「効果を持たない」除外・「カード名の異なる」distinct（TargetQuery 拡張）。
+  - エンジン未実装: `SWAP_POWER`（OP14-001）、範囲保護のクロスプレイヤー走査（OP14-079）。
+  - 裁定依存: ST14-001（「コスト+1」適用後に「コスト8以上」を評価する順序＝印刷/現在コストの解釈）。
 
 ### 仕様書と実装の相互裏取り（重要）
 
