@@ -236,6 +236,25 @@ def _discard(ctx: ParseContext) -> Optional[GameAction]:
 # ---------------------------------------------------------------------------
 # パワー増減: 「（対象）を、…パワー±N」
 # ---------------------------------------------------------------------------
+def _deck_position(text: str) -> str:
+    """デッキ配置の位置を返す。「上か下」=CHOOSE（プレイヤーが選択）、
+    「上」のみ=TOP、それ以外=BOTTOM。エンジンが ARRANGE_DECK 対話で利用する。"""
+    t = _nfc(text)
+    if "デッキの上か下" in t or re.search(r"デッキの上か、?下", t):
+        return "CHOOSE"
+    if "デッキの上" in t and "デッキの下" not in t:
+        return "TOP"
+    return "BOTTOM"
+
+
+def _arrange_status(text: str) -> Optional[str]:
+    """「好きな順番／並び替え／並び変え」を含むなら "ARRANGE"（順序選択を要する）を返す。"""
+    t = _nfc(text)
+    if "好きな順番" in t or "並び替え" in t or "並び変え" in t:
+        return "ARRANGE"
+    return None
+
+
 def _duration_of(text: str) -> str:
     if _nfc("このバトル中") in text:
         return "THIS_BATTLE"
@@ -1261,11 +1280,15 @@ def _remaining_deck_bottom(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("残り") not in t or _nfc("デッキの下") not in t:
         return None
+    # (2b) 「残りを好きな順番でデッキの下に置く」: 順序選択を ARRANGE_DECK 対話で扱う
+    # （位置はデッキ下固定）。並び替え語が無ければ status なし（現状順で下）。
     return GameAction(
         type=ActionType.DECK_BOTTOM,
         target=TargetQuery(
             player=Player.SELF, zone=Zone.TEMP, select_mode="REMAINING", count=-1
         ),
+        status=_arrange_status(t),
+        dest_position="BOTTOM",
         raw_text=t,
     )
 
@@ -1432,11 +1455,15 @@ def _temp_to_deck(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if not to_deck and _nfc("置く") not in t:
         return None
+    # (2a)(2b) status="ARRANGE"(順序選択) と dest_position(上/下/CHOOSE) を付与し、
+    # エンジンが ARRANGE_DECK 対話で順序・位置をプレイヤーに選ばせる。
     return GameAction(
         type=ActionType.DECK_BOTTOM,
         target=TargetQuery(
             player=Player.SELF, zone=Zone.TEMP, select_mode="REMAINING", count=-1
         ),
+        status=_arrange_status(t),
+        dest_position=_deck_position(t),
         raw_text=t,
     )
 
@@ -1662,11 +1689,14 @@ def _remaining_deck_top_or_bottom(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if not re.search(_nfc(r"上か下|上か、下"), t):
         return None  # 「上か下」の択がある場合のみ
+    # (2a)(2b) 上下選択(CHOOSE)＋並び替え(あれば ARRANGE)を ARRANGE_DECK 対話で解決する。
     return GameAction(
         type=ActionType.DECK_BOTTOM,
         target=TargetQuery(
             player=Player.SELF, zone=Zone.TEMP, select_mode="REMAINING", count=-1
         ),
+        status=_arrange_status(t),
+        dest_position=_deck_position(t),
         raw_text=t,
     )
 
@@ -1968,9 +1998,14 @@ def _hand_to_deck(ctx: ParseContext) -> Optional[GameAction]:
     tq.zone = Zone.HAND
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # (2a)(2b) 明示配置（「デッキの上/下に置く」）のみ順序/位置の対話対象。
+    # 「デッキに戻す」(シャッフル前提)は順序不問なので対話化しない。
+    explicit_place = bool(re.search(_nfc(r"デッキの(上か下|上|下)に置(く|い)"), t))
     return GameAction(
         type=ActionType.DECK_BOTTOM,
         target=tq,
+        status=_arrange_status(t) if explicit_place else None,
+        dest_position=_deck_position(t) if explicit_place else None,
         raw_text=t,
     )
 

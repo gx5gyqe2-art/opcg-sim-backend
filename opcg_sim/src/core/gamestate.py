@@ -227,9 +227,13 @@ class GameManager:
                 KEY_SKIP: self.active_interaction.get("can_skip", False),
                 KEY_CANDIDATES: candidate_dicts,
                 KEY_CONSTRAINTS: self.active_interaction.get("constraints"),
-                "options": self.active_interaction.get("options"), 
+                "options": self.active_interaction.get("options"),
                 "request_id": str(uuid.uuid4())
             }
+            # ARRANGE_DECK(並び替え/上下選択)はフロントの UI 切替フラグを併せて渡す。
+            if action_type == "ARRANGE_DECK":
+                req["allow_position"] = self.active_interaction.get("allow_position", False)
+                req["allow_reorder"] = self.active_interaction.get("allow_reorder", False)
             return req
 
         if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
@@ -317,6 +321,42 @@ class GameManager:
             self.active_interaction = None
             resolver.resume_optional(player, source_card, bool(accepted), optional_node,
                                      continuation.get("execution_stack", []), continuation.get("effect_context", {}))
+
+        elif action_type == "ARRANGE_DECK":
+            # (2a)(2b) 並び替え/上下選択の確定。selected_uuids が配置順、position が上下。
+            # ヘッドレス(drain)は selected_uuids=[] / position 無し → 現状順・fixed_position。
+            ordered_uuids = payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])
+            position = (payload.get("position") or payload.get("extra", {}).get("position")
+                        or continuation.get("fixed_position", "BOTTOM"))
+            position = "TOP" if str(position).upper() == "TOP" else "BOTTOM"
+            cards = continuation.get("arrange_targets", [])
+            if ordered_uuids:
+                by_uuid = {c.uuid: c for c in cards}
+                ordered = [by_uuid[u] for u in ordered_uuids if u in by_uuid]
+                for c in cards:  # 指定漏れは元の順序で末尾に補う
+                    if c not in ordered:
+                        ordered.append(c)
+            else:
+                ordered = list(cards)
+            dest_kind = continuation.get("dest_kind", "DECK")
+            self.active_interaction = None
+            if dest_kind == "LIFE":
+                # ライフ並べ替え: ordered を新しいライフ順とする（life[0]=一番上）。
+                owner_name = continuation.get("dest_owner")
+                tp = self.p1 if (owner_name and self.p1.name == owner_name) else (self.p2 if owner_name else player)
+                rest = [c for c in tp.life if c not in ordered]
+                tp.life = ordered + rest
+                log_event("INFO", "game.resume_order_life", f"{tp.name} reordered {len(ordered)} life card(s)", player=player.name)
+            else:
+                # デッキ配置: BOTTOM は順に append（先頭が上）、TOP は逆順 insert(0) で
+                # ordered[0] が最上面になるようにする。
+                seq = ordered if position == "BOTTOM" else list(reversed(ordered))
+                for c in seq:
+                    owner, _ = self._find_card_location(c)
+                    if owner:
+                        self.move_card(c, Zone.DECK, owner, dest_position=position)
+                log_event("INFO", "game.resume_arrange_deck", f"Placed {len(ordered)} card(s) to deck {position}", player=player.name)
+            resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
         elif action_type == "DECLARE_COST":
             # C8: 宣言コストを記録し、相手デッキトップを公開して context に保存してから再開。
@@ -1594,7 +1634,10 @@ class GameManager:
                 self._apply_passive_effects(owner)
                 success = True
             elif act_name == "DECK_BOTTOM":
-                self.move_card(target, Zone.DECK, owner, dest_position="BOTTOM"); success = True
+                # 並び替え/上下選択を要する場合は resolver が ARRANGE_DECK で先に中断するため、
+                # ここに来るのは位置確定（TOP/BOTTOM/未指定=BOTTOM）の配置のみ。
+                _pos = "TOP" if getattr(action, "dest_position", None) == "TOP" else "BOTTOM"
+                self.move_card(target, Zone.DECK, owner, dest_position=_pos); success = True
             elif act_name in ["ACTIVE", "ACTIVE_DON"]:
                 target.is_rest = False
                 if isinstance(target, DonInstance):
