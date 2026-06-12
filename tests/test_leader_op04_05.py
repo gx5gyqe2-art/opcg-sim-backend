@@ -342,7 +342,6 @@ def test_op05_002_buffs_revolutionary_chars():
     assert discard in p1.trash   # コストで革命軍カードを捨てた
 
 
-@pytest.mark.xfail(strict=True, reason="OP05-002バグ: 対象『か【トリガー】を持つ』キャラ条件が欠落(traits=革命軍のみ)。トリガー持ちが強化されない")
 def test_op05_002_buffs_trigger_keyword_chars():
     """OP05-002 起動メイン: 【トリガー】を持つキャラ（革命軍でなくても）も+3000対象。"""
     gm, p1, p2, L = build("OP05-002")

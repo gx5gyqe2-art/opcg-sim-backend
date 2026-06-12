@@ -150,6 +150,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 適用されず「【トリガー】を持つキャラを登場」の絞り込みが脱落していた: OP03-022）。
     if re.search(_nfc(r'【トリガー】を持つ'), tgt_text):
         tq.flags.add("HAS_TRIGGER")
+        # 「《特徴》か【トリガー】を持つ（キャラ）」= 特徴 OR トリガー所持（OP05-002）。
+        if re.search(_nfc(r'か【トリガー】を持つ'), tgt_text):
+            tq.flags.add("TRAIT_OR_TRIGGER")
 
     # 特徴は《X》/<X> に加え 『X』（例: 『白ひげ海賊団』を含む特徴を持つ）でも表記される。
     # 名前は「X」を使うため 『』 と衝突しない（condition 側も 『X』 を特徴として扱う）。
@@ -376,12 +379,21 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
             if query.exclude_names and card.master.name in query.exclude_names: continue
 
-            if query.traits and not any(t in card.master.traits for t in query.traits): continue
+            if query.traits and not any(t in card.master.traits for t in query.traits):
+                # 「《特徴》か【トリガー】を持つ」は特徴 OR トリガー所持。特徴不一致でも
+                # トリガー所持なら通す（OP05-002）。それ以外は従来どおり除外。
+                if "TRAIT_OR_TRIGGER" not in query.flags:
+                    continue
+                _trig = bool(getattr(card.master, "trigger_text", "")) or any(
+                    ab.trigger == TriggerType.TRIGGER for ab in getattr(card.master, "abilities", ()))
+                if not _trig:
+                    continue
         if query.is_rest is not None and card.is_rest != query.is_rest: continue
 
         # 「【トリガー】を持つカード」フィルタ: トリガー能力（master.trigger_text 非空、または
         # TriggerType.TRIGGER 能力）を持つカードのみに限定する（OP16-080 等）。
-        if "HAS_TRIGGER" in query.flags:
+        # TRAIT_OR_TRIGGER（特徴 OR トリガー）の場合は上の特徴フィルタで OR 判定済みのため除外。
+        if "HAS_TRIGGER" in query.flags and "TRAIT_OR_TRIGGER" not in query.flags:
             has_trig = bool(getattr(card.master, "trigger_text", "")) or any(
                 ab.trigger == TriggerType.TRIGGER for ab in getattr(card.master, "abilities", ()))
             if not has_trig:
