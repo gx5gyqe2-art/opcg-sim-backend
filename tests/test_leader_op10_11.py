@@ -160,8 +160,6 @@ def test_op10_022_cost_sum_ge5_fires():
     assert ch in p1.hand and ch not in p1.field  # バウンス成立
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP10-022: 『コスト合計5以上』条件が AST から欠落。合計4でも発動しキャラがバウンスされる")
 def test_op10_022_cost_sum_lt5_does_not_fire():
     """OP10-022: コスト合計4（5未満）では発動せず、キャラはバウンスされないべき。"""
     gm, p1, p2, L = build("OP10-022")

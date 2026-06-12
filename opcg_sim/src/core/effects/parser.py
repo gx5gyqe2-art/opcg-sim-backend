@@ -949,6 +949,14 @@ class EffectParser:
                 op = CompareOperator.GE if pow_leader_m.group(2) == _nfc('以上') else CompareOperator.LE
                 return Condition(type=ConditionType.LEADER_STATE, value=("POWER", thr), operator=op, player=p, raw_text=norm_text)
 
+        # キャラのコスト合計（「自分のキャラのコストの合計が N 以上/以下の場合」OP10-022）。
+        # 枚数(FIELD_COUNT)より先に判定する（「合計」を含むため誤分類を避ける）。
+        cost_sum_m = re.search(_nfc(r'キャラのコストの合計が(\d+)(以上|以下)'), norm_text)
+        if cost_sum_m:
+            thr = int(cost_sum_m.group(1))
+            op = CompareOperator.GE if cost_sum_m.group(2) == _nfc('以上') else CompareOperator.LE
+            return Condition(type=ConditionType.FIELD_COST_SUM, operator=op, value=thr, player=p, raw_text=norm_text)
+
         # 盤面のキャラ枚数（「自分の（レストの／特徴《X》の／コストN以上の）キャラがM枚以上いる」
         # 「…キャラがいる」）。数値が「フィルタ(コストN以上)」と「枚数(M枚)」で混在し得るため、
         # 閾値は必ず「M枚」側から取り、フィルタは parse_target に委ねる（保守的な分類）。

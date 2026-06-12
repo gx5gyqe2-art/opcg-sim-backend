@@ -548,6 +548,11 @@ class EffectResolver:
                 current_val = len(target_player.field) + (1 if target_player.stage else 0)
             return self._compare(current_val, condition.operator, target_val)
 
+        elif condition.type == ConditionType.FIELD_COST_SUM:
+            # 「（自分の）キャラのコストの合計が N 以上/以下」。場のキャラの現在コスト総和を比較する。
+            current_val = sum(c.current_cost for c in target_player.field)
+            return self._compare(current_val, condition.operator, target_val)
+
         elif condition.type == ConditionType.HAS_DON:
             # 【ドン!!×N】: このカード（source_card）に付与されたドン!!が N 枚以上か。
             # コストエリアの active ドン枚数ではなく、対象カードの attached_don を見る。
