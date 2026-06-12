@@ -235,6 +235,10 @@ class GameManager:
                 "options": self.active_interaction.get("options"),
                 "request_id": str(uuid.uuid4())
             }
+            # 効果の発生源カードを UI で表示できるよう uuid を併せて渡す。
+            src_uuid = self.active_interaction.get("source_card_uuid")
+            if src_uuid:
+                req[pending_props.get('SOURCE_CARD_UUID', 'source_card_uuid')] = src_uuid
             # ARRANGE_DECK(並び替え/上下選択)はフロントの UI 切替フラグを併せて渡す。
             if action_type == "ARRANGE_DECK":
                 req["allow_position"] = self.active_interaction.get("allow_position", False)
@@ -617,10 +621,12 @@ class GameManager:
         self._reset_player_status(self.opponent); self.refresh_all(self.turn_player); self.draw_phase()
 
     def _reset_player_status(self, player: Player):
+        # 相手ターン開始時に直前のターンプレイヤー(=現opponent)の一時効果を解除するが、
+        # 付与ドン!!は剥がさない（持ち主の次のリフレッシュフェイズまでカードに残る）。
         all_units = [player.leader] + player.field
         if player.stage: all_units.append(player.stage)
         for card in all_units:
-            if card: card.reset_turn_status()
+            if card: card.reset_turn_status(keep_don=True)
 
     def refresh_all(self, player: Player):
         all_units = [player.leader] + player.field
@@ -929,6 +935,7 @@ class GameManager:
             "player_id": player.name,
             "action_type": "CONFIRM_TRIGGER",
             "source_card_name": card.master.name,
+            "source_card_uuid": card.uuid,
             "message": f"【トリガー】「{card.master.name}」の効果を発動しますか？",
             "can_skip": True,
             "continuation": {"trigger_item": item},
@@ -1007,7 +1014,7 @@ class GameManager:
                     log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
                     self._resolve_on_ko(target, target_owner)
 
-        target.reset_turn_status(); self.active_battle = None; self.phase = Phase.MAIN; self.check_victory()
+        target.reset_turn_status(keep_don=True); self.active_battle = None; self.phase = Phase.MAIN; self.check_victory()
         self.continuous.expire("BATTLE_END", self.turn_count)
         if not self.winner:
             self._apply_passive_effects(self.turn_player)

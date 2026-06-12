@@ -161,7 +161,9 @@ class CardInstance:
                     else self.passive_power_override)
         base = override if override is not None else self.master.power
         buff = self.power_buff + self.timed_power + self.passive_power
-        don_power = (self.attached_don * 1000) if is_my_turn else 0
+        # 付与されたドン!!は自分の次のリフレッシュフェイズまでカードに付いたままなので、
+        # 相手ターン中（防御時など）も +1000/枚 のパワーを与え続ける。
+        don_power = self.attached_don * 1000
         return base + buff + don_power
 
     @property
@@ -175,7 +177,7 @@ class CardInstance:
         result = base + self.cost_buff + self.timed_cost
         return max(0, result)
 
-    def reset_turn_status(self):
+    def reset_turn_status(self, keep_don: bool = False):
         self.power_buff = 0
         self.cost_buff = 0
         self.base_power_override = None
@@ -185,7 +187,10 @@ class CardInstance:
         self.ability_disabled = False
         self.flags.clear()
         self.ability_used_this_turn.clear()
-        self.attached_don = 0
+        # keep_don=True のときは付与ドン!!を維持する（相手ターン開始時の状態リセットでは
+        # 付与ドン!!を剥がさず、自分の次のリフレッシュフェイズまで残す）。
+        if not keep_don:
+            self.attached_don = 0
         self.is_newly_played = False
         self._refresh_keywords()
 
