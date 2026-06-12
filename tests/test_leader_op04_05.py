@@ -285,6 +285,7 @@ def test_op04_058_ramp_one_active_don():
     gm, p1, p2, L = build("OP04-058")
     total_before = len(p1.don_active) + len(p1.don_rested)
     deck_before = len(p1.don_deck)
+    gm.record_turn_event("DON_RETURNED", 1)   # 発火条件「ドン!!が戻された時」を再現
     gm.resolve_ability(p1, get_ability(L.master, "OPPONENT_TURN"), L)
     auto_resolve(gm, p1)
     assert len(p1.don_active) + len(p1.don_rested) == total_before + 1

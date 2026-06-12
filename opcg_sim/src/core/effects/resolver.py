@@ -558,6 +558,19 @@ class EffectResolver:
             current_val = len(target_player.life) + len(target_player.hand)
             return self._compare(current_val, condition.operator, target_val)
 
+        elif condition.type == ConditionType.TURN_COUNT:
+            # 「自分の第Nターン以降の場合」（OP15-058）。turn_count を N と比較する。
+            return self._compare(getattr(self.game_manager, "turn_count", 0),
+                                 condition.operator, target_val)
+
+        elif condition.type == ConditionType.EVENT_THIS_TURN:
+            # 「〈イベント〉した時」: このターン中に当該イベントが発生したか（value=(名前, 最小回数)）。
+            # 発生していなければ発動しない（OP06-042「ドン!!が戻された時」/OP07-038「場を離れた時」等）。
+            ev_name, ev_min = (condition.value if isinstance(condition.value, tuple)
+                               else (condition.value, 1))
+            occurred = getattr(self.game_manager, "_turn_events", {}).get(ev_name, 0)
+            return occurred >= ev_min
+
         elif condition.type == ConditionType.HAS_DON:
             # 【ドン!!×N】: このカード（source_card）に付与されたドン!!が N 枚以上か。
             # コストエリアの active ドン枚数ではなく、対象カードの attached_don を見る。

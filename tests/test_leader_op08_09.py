@@ -310,7 +310,6 @@ def test_op09_061_all_char_cost_plus1():
     assert c2.current_cost == 6
 
 
-@pytest.mark.xfail(strict=True, reason="OP09-061: 能力1の発火条件『自分の場のドン!!が2枚以上戻された時』が欠落し、単なる自ターン/ターン1回で発火可能")
 def test_op09_061_ramp_requires_two_don_returned():
     """OP09-061 能力1: 本来『2枚以上戻された時』が前提だが、条件欠落で無条件発火する（バグ）。"""
     gm, p1, p2, L = build("OP09-061")

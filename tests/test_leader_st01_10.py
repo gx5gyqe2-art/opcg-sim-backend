@@ -331,7 +331,7 @@ def test_st08_001_attach_rested_don_to_leader():
     """ST08-001: 自分ターン中のKO連動で、このリーダーにレストのドン1枚付与（+1000、レスト）。"""
     gm, p1, p2, L = build("ST08-001")
     don_before = don_total(p1)
-    ab = get_ability(L.master, "YOUR_TURN")
+    ab = get_ability(L.master, "ON_KO")
     gm.resolve_ability(p1, ab, L)
     _drive(gm, p1, prefer_uuids=[L.uuid])
     assert leader_power(p1) == 6000                  # +1000

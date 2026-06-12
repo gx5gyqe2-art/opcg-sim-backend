@@ -423,8 +423,6 @@ def test_op15_058_ramp_and_attach_when_active():
     assert c.attached_don == 4
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP15-058: 条件『自分の第2ターン以降』がGENERIC(常時True)で未強制。第1ターン相当でも発動してドンが増えてしまう")
 def test_op15_058_blocked_on_first_turn():
     """OP15-058 能力1: 第1ターンでは条件未達で発動しないはず（GENERIC常時Trueのバグ）。"""
     gm, p1, p2, L = build("OP15-058")

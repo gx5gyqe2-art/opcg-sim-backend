@@ -159,9 +159,6 @@ def test_op06_022_condition_not_met_when_opponent_life_high():
 # OP06-042 ヴィンスモーク・レイジュ（🐛 発火条件「ドン返却時」欠落→自ターン無条件ドロー）
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason=(
-    "OP06-042: 発火条件『自分の場のドンがドンデッキに戻された時』が欠落し、"
-    "ドン返却イベントが無くても自ターンに無条件ドローしてしまう。"))
 def test_op06_042_no_draw_without_don_returned_event():
     """OP06-042【自分のターン中】ドン返却イベント無しではドローしないべき（バグで引く）。"""
     gm, p1, p2, L = build("OP06-042")
@@ -255,9 +252,6 @@ def test_op07_019_rest_don_then_rest_opponent_leader_or_character():
 # OP07-038 ボア・ハンコック（🐛 発火条件「自効果でキャラ退場時」欠落→無条件ドロー）
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason=(
-    "OP07-038: 発火条件『キャラが自分の効果で場を離れた時』が欠落し、退場イベントが"
-    "無くても自ターン・手札≤5で無条件ドローしてしまう。"))
 def test_op07_038_no_draw_without_leave_event():
     """OP07-038【自分のターン中】退場イベント無しでは手札≤5でもドローしないべき。"""
     gm, p1, p2, L = build("OP07-038")
@@ -363,9 +357,6 @@ def test_op07_097_activate_main_choice_play_egghead():
     assert len(p1.don_active) == active_before - 1         # コスト: ドン1枚レスト
 
 
-@pytest.mark.xfail(strict=False, reason=(
-    "要確認: OP07-097 選択肢①の FACE_UP_LIFE target.zone が LIFE と解釈され、手札の"
-    "《エッグヘッド》が候補にならず移動しない（手札→ライフ上の移動が表面化しない）。"))
 def test_op07_097_activate_main_choice_face_up_life():
     """OP07-097【起動メイン】選択肢①: コスト5以下《エッグヘッド》をライフ上に表向きで加える。"""
     gm, p1, p2, L = build("OP07-097")

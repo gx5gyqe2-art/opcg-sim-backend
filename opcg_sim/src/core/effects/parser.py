@@ -240,6 +240,11 @@ class EffectParser:
                     raw_text=_nfc(f"【ドン!!×{don_cost_value}】"),
                 )
 
+            # 効果文先頭の「〈イベント〉した時」（ドン返却/退場/捨て/トリガー登場 等）を EVENT_THIS_TURN
+            # 条件として引き上げ、効果本体から除去する。エンジンが該当イベントを記録していなければ
+            # 発動しない（OP06-042/OP07-038/OP12-040/OP13-100/OP09-061 の「イベント無しでは不発」）。
+            event_cond, effect_text = self._extract_event_condition(effect_text)
+
             # テキスト埋め込みトリガー宣言「〈timing〉時、発動できる」を解消（OTHER 化を防ぐ）。
             trigger, effect_text, activation_optional = self._strip_text_trigger(trigger, effect_text)
 
@@ -263,11 +268,14 @@ class EffectParser:
             # 連なる複数アクション）のとき ability.condition へ引き上げる。従来は先頭アクションのみ
             # 条件付きの内部 Branch になり、後続アクションが無条件化していた
             # （ST29-001「ライフ2枚以下なら引いて捨てる」の DISCARD が無条件化）。
+            # 純粋なゲーム状態条件（ターン数 等）は能力全体に掛かるため、複数文でも引き上げる。
+            _GLOBAL_GATE = (ConditionType.TURN_COUNT,)
             effect_gate_cond = None
             _lead_cond, _lead_rest = self._extract_leading_condition(effect_text)
-            if (_lead_cond is not None
-                    and _nfc("。") not in _lead_rest.rstrip(_nfc("。"))
-                    and re.search(_nfc(r'(し|き|り|め|ち|に|べ|ね|げ| じ)[、，]'), _lead_rest)):
+            if _lead_cond is not None and (
+                    _lead_cond.type in _GLOBAL_GATE
+                    or (_nfc("。") not in _lead_rest.rstrip(_nfc("。"))
+                        and re.search(_nfc(r'(し|き|り|め|ち|に|べ|ね|げ| じ)[、，]'), _lead_rest))):
                 effect_gate_cond = _lead_cond
                 effect_text = _lead_rest
 
@@ -298,6 +306,9 @@ class EffectParser:
             if don_cond is not None:  # 【ドン!!×N】の付与ドン条件を統合
                 final_condition = don_cond if final_condition is None else Condition(
                     type=ConditionType.AND, args=[final_condition, don_cond])
+            if event_cond is not None:  # 効果節先頭から引き上げたターン内イベント条件
+                final_condition = event_cond if final_condition is None else Condition(
+                    type=ConditionType.AND, args=[final_condition, event_cond])
             if effect_gate_cond is not None:  # 効果節先頭から引き上げたゲート条件（単一文・複数アクション）
                 final_condition = effect_gate_cond if final_condition is None else Condition(
                     type=ConditionType.AND, args=[final_condition, effect_gate_cond])
@@ -361,6 +372,33 @@ class EffectParser:
         if _nfc("場を離れる") not in norm_text and _nfc("KOされ") not in norm_text:
             return None
         return "BATTLE_KO" if _nfc("バトル") in norm_text else "LEAVE"
+
+    # 効果文先頭の「〈イベント〉した時、」をターン内イベント条件へ写像する定義。
+    # (正規表現, イベント名, 最小回数)。先頭マッチのみ採用し、本文から除去する。
+    _EVENT_CLAUSE_PATTERNS = (
+        (r'^自分の場のドン[ 　]*(?:!!|‼)?が(\d+)枚以上[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", None),
+        (r'^自分の場のドン[ 　]*(?:!!|‼)?が[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", 1),
+        (r'^[^。]*?キャラが自分の効果で場を離れた時、', "CHAR_LEFT_BY_OWN_EFFECT", 1),
+        (r'^自分の特徴《海軍》を持つカードの効果で[^。]*?捨てられた時、', "NAVY_DISCARD", 1),
+        (r'^自分の【トリガー】を持つキャラが登場した時、', "TRIGGER_CHAR_PLAYED", 1),
+    )
+
+    def _extract_event_condition(self, effect_text: str):
+        """効果文先頭の「〈イベント〉した時、」を (EVENT_THIS_TURN 条件, 残りテキスト) に分離する。
+        該当しなければ (None, 元テキスト)。「発動できる」が続く形（OP07-038/OP13-100）にも対応。"""
+        t = _nfc(effect_text)
+        for pat, ev_name, fixed_min in self._EVENT_CLAUSE_PATTERNS:
+            m = re.match(_nfc(pat), t)
+            if not m:
+                continue
+            ev_min = fixed_min if fixed_min is not None else int(m.group(1))
+            rest = t[m.end():].strip()
+            # 「〜時、発動できる。」形は「発動できる。」を取り除いて本体を残す。
+            rest = re.sub(_nfc(r'^発動できる[。、]?'), '', rest).strip()
+            cond = Condition(type=ConditionType.EVENT_THIS_TURN, value=(ev_name, ev_min),
+                             player=Player.SELF, raw_text=t)
+            return cond, rest
+        return None, effect_text
 
     def _extract_leading_condition(self, text: str):
         """テキスト先頭のゲート条件「〜の場合、/〜なら、」を (Condition, 残りテキスト) に分離する。
@@ -463,7 +501,9 @@ class EffectParser:
 
     def _detect_trigger(self, text: str) -> TriggerType:
         norm_text = _nfc(text)
-        if _nfc("【登場時】") in norm_text: return TriggerType.ON_PLAY
+        # 「【登場時】効果を持たない」は対象修飾（トリガーではない）。能力トリガーの【登場時】のみ拾う
+        # （PRB01-001「【起動メイン】…【登場時】効果を持たないキャラ…」が ON_PLAY 化するのを防ぐ）。
+        if re.search(_nfc(r'【登場時】(?!効果を持たない)'), norm_text): return TriggerType.ON_PLAY
         if _nfc("【起動メイン】") in norm_text: return TriggerType.ACTIVATE_MAIN
         if _nfc("【メイン】") in norm_text: return TriggerType.ACTIVATE_MAIN
         if _nfc("【アタック時】") in norm_text: return TriggerType.ON_ATTACK
@@ -477,8 +517,13 @@ class EffectParser:
         # 劣後する——【自分のターン中】系のカードは既存の挙動テストが YOUR_TURN ロックを前提に
         # するため、ここでは触らない（誘発化は別途、条件ゲート方式で扱うべき領域）。
         embedded = self._detect_embedded_reactive(norm_text)
-        if _nfc("【自分のターン中】") in norm_text: return TriggerType.YOUR_TURN
-        if _nfc("【相手のターン中】") in norm_text: return TriggerType.OPPONENT_TURN
+        # 【ターン中】タグ + 本文の KO/ライフダメージ誘発は、本来その イベント誘発
+        # （ON_KO/ON_DAMAGE_DEALT_TO_LIFE）でありターン中は CONTEXT 条件として後段で保全される。
+        # コスト節の後（「手札2枚を捨てる：相手のキャラがKOされた時、〜」OP03-076）も含めて上書きする。
+        primary_reactive = embedded if embedded in (
+            TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE) else None
+        if _nfc("【自分のターン中】") in norm_text: return primary_reactive or TriggerType.YOUR_TURN
+        if _nfc("【相手のターン中】") in norm_text: return primary_reactive or TriggerType.OPPONENT_TURN
         if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER
         if _nfc("【トリガー】") in norm_text: return TriggerType.TRIGGER
         if _nfc("【ゲーム開始時】") in norm_text: return TriggerType.GAME_START
@@ -948,6 +993,12 @@ class EffectParser:
                 if _nfc("ある") in norm_text:
                     return Condition(type=ConditionType.DON_COUNT, operator=CompareOperator.GE, value=1, player=p, raw_text=norm_text)
             return Condition(type=ConditionType.DON_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
+
+        # ターン数条件（「自分の第2ターン以降の場合」OP15-058）。turn_count >= N。
+        turn_m = re.search(_nfc(r'第(\d+)ターン以降'), norm_text)
+        if turn_m:
+            return Condition(type=ConditionType.TURN_COUNT, operator=CompareOperator.GE,
+                             value=int(turn_m.group(1)), player=p, raw_text=norm_text)
 
         # ライフ＋手札の合計（「自分のライフと手札の合計枚数が4枚以下の場合」OP04-040）。
         # LIFE_COUNT より先に判定する（「ライフ」を含むため誤分類を避ける）。
