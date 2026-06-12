@@ -2,7 +2,7 @@ import re
 import logging
 import unicodedata
 from ...models.effect_types  import TargetQuery, _nfc
-from ...models.enums import Player, Zone, ParserKeyword, Attribute
+from ...models.enums import Player, Zone, ParserKeyword, Attribute, TriggerType
 from ...utils.logger_config import log_event
 
 def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQuery:
@@ -350,6 +350,14 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
         if query.traits and not any(t in card.master.traits for t in query.traits): continue
         if query.is_rest is not None and card.is_rest != query.is_rest: continue
+
+        # 「【トリガー】を持つカード」フィルタ: トリガー能力（master.trigger_text 非空、または
+        # TriggerType.TRIGGER 能力）を持つカードのみに限定する（OP16-080 等）。
+        if "HAS_TRIGGER" in query.flags:
+            has_trig = bool(getattr(card.master, "trigger_text", "")) or any(
+                ab.trigger == TriggerType.TRIGGER for ab in getattr(card.master, "abilities", ()))
+            if not has_trig:
+                continue
         
         # 名前重複排除は全てのフィルタを通過した後に実施
         if query.is_unique_name:

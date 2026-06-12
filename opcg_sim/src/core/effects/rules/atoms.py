@@ -230,6 +230,9 @@ def _discard(ctx: ParseContext) -> Optional[GameAction]:
     tq = parse_target(t)
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # 「【トリガー】を持つカード」を捨てる: トリガー所持カードに限定する（matcher が絞り込む）。
+    if re.search(_nfc(r"【トリガー】を持つ"), t):
+        tq.flags.add("HAS_TRIGGER")
     return GameAction(type=ActionType.DISCARD, target=tq, raw_text=t)
 
 

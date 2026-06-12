@@ -456,6 +456,34 @@ def test_opponent_turn_cost_buff_op16_080():
     assert ch.current_cost == 3, f"自分のターンでは+1されない（{ch.current_cost}）"
 
 
+def test_discard_trigger_filter_op16_080():
+    """OP16-080 のコスト「【トリガー】を持つカード1枚を捨てる」: トリガー非所持カードは
+    捨てる対象に含まれない（報告バグ「トリガーを持たないカードも捨てられる」）。"""
+    from opcg_sim.src.core.effects.matcher import get_target_cards
+    from opcg_sim.src.models.effect_types import Sequence as Seq
+
+    m = db().get_card("OP16-080")
+
+    def walk(n):
+        from opcg_sim.src.models.effect_types import GameAction as GA
+        if isinstance(n, GA):
+            yield n
+        elif isinstance(n, Seq):
+            for a in n.actions:
+                yield from walk(a)
+
+    disc = next(a for ab in m.abilities if ab.cost for a in walk(ab.cost)
+                if a.type == ActionType.DISCARD)
+    assert "HAS_TRIGGER" in disc.target.flags
+
+    gm, p1, p2 = base()
+    trig = inst("OP14-104", "P1")  # トリガー所持
+    non = CardInstance(make_master(card_id="N", name="N"), "P1")  # トリガー非所持
+    p1.hand = [trig, non]
+    cands = get_target_cards(gm, disc.target, trig)
+    assert trig in cands and non not in cands, "トリガー非所持は対象外"
+
+
 def test_optional_cost_not_forced_op16_080():
     """OP16-080【相手のアタック時】手札を捨てることが「できる」: 自動で捨てさせられず
     使用確認(CONFIRM_OPTIONAL)を挟む。拒否すれば手札は減らない（報告バグ「必ず手札を
@@ -463,7 +491,8 @@ def test_optional_cost_not_forced_op16_080():
     from opcg_sim.src.models.models import CardType as CT
     gm, p1, p2 = base()  # p1 のターン。p2 が OP16-080 リーダーで防御
     p2.leader = inst("OP16-080", "P2")
-    p2.hand = fillers(2, "P2")
+    # コスト「【トリガー】を持つカード1枚を捨てる」を満たすため、トリガー持ちを手札に入れる。
+    p2.hand = [inst("OP14-104", "P2")]  # OP14-104 はトリガーを持つ
     atk = CardInstance(make_master(card_id="A", name="A", power=6000), "P1")
     atk.is_rest = False
     p1.field = [atk]
