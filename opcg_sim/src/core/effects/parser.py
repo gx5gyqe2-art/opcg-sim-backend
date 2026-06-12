@@ -249,6 +249,18 @@ class EffectParser:
                 effect_text = re.sub(_nfc(r'^ゲーム開始時、'), '', effect_text).strip()
 
             # 効果本体の解析
+            # 効果先頭のゲート条件「〜の場合、」は、後続が単一文（内部に「。」が無く、連用形で
+            # 連なる複数アクション）のとき ability.condition へ引き上げる。従来は先頭アクションのみ
+            # 条件付きの内部 Branch になり、後続アクションが無条件化していた
+            # （ST29-001「ライフ2枚以下なら引いて捨てる」の DISCARD が無条件化）。
+            effect_gate_cond = None
+            _lead_cond, _lead_rest = self._extract_leading_condition(effect_text)
+            if (_lead_cond is not None
+                    and _nfc("。") not in _lead_rest.rstrip(_nfc("。"))
+                    and re.search(_nfc(r'(し|き|り|め|ち|に|べ|ね|げ| じ)[、，]'), _lead_rest)):
+                effect_gate_cond = _lead_cond
+                effect_text = _lead_rest
+
             effect_node = self._parse_to_node(effect_text)
 
             # ゲーム開始時のデッキサーチはルール上シャッフルを伴う（OP13-079）。
@@ -276,6 +288,9 @@ class EffectParser:
             if don_cond is not None:  # 【ドン!!×N】の付与ドン条件を統合
                 final_condition = don_cond if final_condition is None else Condition(
                     type=ConditionType.AND, args=[final_condition, don_cond])
+            if effect_gate_cond is not None:  # 効果節先頭から引き上げたゲート条件（単一文・複数アクション）
+                final_condition = effect_gate_cond if final_condition is None else Condition(
+                    type=ConditionType.AND, args=[final_condition, effect_gate_cond])
             if cost_gate_cond is not None:  # コスト節から引き上げた条件
                 final_condition = cost_gate_cond if final_condition is None else Condition(
                     type=ConditionType.AND, args=[final_condition, cost_gate_cond])

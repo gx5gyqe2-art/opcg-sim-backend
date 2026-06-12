@@ -352,9 +352,6 @@ def test_st29_001_life0_draws_and_discards():
     assert z1["trash"] == z0["trash"] + 1
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="ST29-001: 『ライフ2枚以下の場合』条件が DRAW のみに係り DISCARD が無条件。"
-                          "ライフ3枚以上でも手札を捨ててしまう")
 def test_st29_001_life_ge3_does_nothing():
     """ST29-001（条件不成立）: ライフ3枚以上→ドローも捨ても起きない（何もしない）。"""
     gm, p1, p2, L = build("ST29-001")
