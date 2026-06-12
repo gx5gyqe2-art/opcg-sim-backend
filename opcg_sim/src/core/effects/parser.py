@@ -200,7 +200,7 @@ class EffectParser:
             # テキストで済んでおり、トリガー宣言の【トリガー】prefix は「を持つ」が続かないため
             # ここでは除去される。
             clean_text = re.sub(
-                _nfc(r'【(?!ブロッカー|速攻|ダブルアタック|バニッシュ|ブロック不可|貫通|シフト)[^】]*?】(?!を持つ)'),
+                _nfc(r'【(?!ブロッカー|速攻|ダブルアタック|バニッシュ|ブロック不可|貫通|シフト)[^】]*?】(?!を持つ|効果を持たない)'),
                 '', norm_text
             ).strip()
 
@@ -249,6 +249,28 @@ class EffectParser:
                 effect_text = re.sub(_nfc(r'^ゲーム開始時、'), '', effect_text).strip()
 
             # 効果本体の解析
+            # 埋め込み反応型トリガー（本文の「〜時、」）が認識された能力では、効果文先頭に残る
+            # そのトリガー句を除去する。残すと parse_target が KO 条件のフィルタ（特徴/パワー/枚数）を
+            # 効果の対象に取り込んでしまう（OP14-041: 「…パワー5000以上の…キャラがKOされた時、相手の
+            # ライフ1枚を手札に加える」で MOVE_CARD 対象にアマゾン・リリー/九蛇/power5000 が混入）。
+            if trigger in (TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE,
+                           TriggerType.ON_LEAVE, TriggerType.ON_EVENT_PLAY, TriggerType.ON_OPP_PLAY):
+                effect_text = re.sub(
+                    _nfc(r'^[^。：:]*?(?:された|なった|与えた|離れた|発動した|登場させた)時、'),
+                    '', effect_text).strip()
+
+            # 効果先頭のゲート条件「〜の場合、」は、後続が単一文（内部に「。」が無く、連用形で
+            # 連なる複数アクション）のとき ability.condition へ引き上げる。従来は先頭アクションのみ
+            # 条件付きの内部 Branch になり、後続アクションが無条件化していた
+            # （ST29-001「ライフ2枚以下なら引いて捨てる」の DISCARD が無条件化）。
+            effect_gate_cond = None
+            _lead_cond, _lead_rest = self._extract_leading_condition(effect_text)
+            if (_lead_cond is not None
+                    and _nfc("。") not in _lead_rest.rstrip(_nfc("。"))
+                    and re.search(_nfc(r'(し|き|り|め|ち|に|べ|ね|げ| じ)[、，]'), _lead_rest)):
+                effect_gate_cond = _lead_cond
+                effect_text = _lead_rest
+
             effect_node = self._parse_to_node(effect_text)
 
             # ゲーム開始時のデッキサーチはルール上シャッフルを伴う（OP13-079）。
@@ -276,6 +298,9 @@ class EffectParser:
             if don_cond is not None:  # 【ドン!!×N】の付与ドン条件を統合
                 final_condition = don_cond if final_condition is None else Condition(
                     type=ConditionType.AND, args=[final_condition, don_cond])
+            if effect_gate_cond is not None:  # 効果節先頭から引き上げたゲート条件（単一文・複数アクション）
+                final_condition = effect_gate_cond if final_condition is None else Condition(
+                    type=ConditionType.AND, args=[final_condition, effect_gate_cond])
             if cost_gate_cond is not None:  # コスト節から引き上げた条件
                 final_condition = cost_gate_cond if final_condition is None else Condition(
                     type=ConditionType.AND, args=[final_condition, cost_gate_cond])
@@ -447,6 +472,11 @@ class EffectParser:
         if _nfc("【自分のターン終了時】") in norm_text: return TriggerType.TURN_END
         if _nfc("【相手のターン終了時】") in norm_text: return TriggerType.OPP_TURN_END
         if _nfc("【相手のアタック時】") in norm_text: return TriggerType.OPPONENT_ATTACK
+        # 埋め込み反応型トリガー（本文の「〜された/与えた時」）は ACTIVATE_MAIN/PASSIVE/UNKNOWN
+        # フォールバックのみ上書きする。明示イベントタグ（上記）と timing タグ（【ターン中】）には
+        # 劣後する——【自分のターン中】系のカードは既存の挙動テストが YOUR_TURN ロックを前提に
+        # するため、ここでは触らない（誘発化は別途、条件ゲート方式で扱うべき領域）。
+        embedded = self._detect_embedded_reactive(norm_text)
         if _nfc("【自分のターン中】") in norm_text: return TriggerType.YOUR_TURN
         if _nfc("【相手のターン中】") in norm_text: return TriggerType.OPPONENT_TURN
         if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER
@@ -456,8 +486,11 @@ class EffectParser:
         # 【ドン!!×N】 または 【ターン1回】 のみ（既知トリガータグなし）→ 起動メイン
         # 【ブロッカー】等を得る効果も正しく ACTIVATE_MAIN と判定できるよう、
         # 既知トリガータグ (_TRIGGER_TAG_RE) の有無のみを判断基準にする
+        # NOTE: 【ドン!!×N】のみ（活性化タグ無し）は本来「付与ドンN枚ある間の継続効果」=PASSIVE だが、
+        #   エンジンが passive 再計算で BUFF 等の継続適用を行わないため、PASSIVE 化すると当該能力が
+        #   無効化される（OP13-004 等）。継続効果の engine 配線が入るまで ACTIVATE_MAIN を維持する。
         if self._DON_TURN_TAG_RE.search(norm_text) and not self._TRIGGER_TAG_RE.search(norm_text):
-            return TriggerType.ACTIVATE_MAIN
+            return embedded or TriggerType.ACTIVATE_MAIN
 
         # 無タグの反応型「この(キャラ/カード)が…KOされた時、」等は PASSIVE ではなく
         # 対応するトリガーへ写像する。PASSIVE のままだと _apply_passive_effects の
@@ -472,13 +505,39 @@ class EffectParser:
         if re.match(_nfc(r'^ゲーム開始時、'), norm_text):
             return TriggerType.GAME_START
 
-        # 既知トリガータグがなければ → PASSIVE（常時・条件付き効果・特殊タイミング等）
+        # 既知トリガータグがなければ → 埋め込み反応型 or PASSIVE（常時・条件付き効果・特殊タイミング等）
         # キーワードタグ（【ブロッカー】等）は既に _TRIGGER_TAG_RE に含まれておらず
         # この時点で明示的なトリガーが判別できないため PASSIVE として扱う
         if not self._TRIGGER_TAG_RE.search(norm_text):
-            return TriggerType.PASSIVE
+            return embedded or TriggerType.PASSIVE
 
-        return TriggerType.UNKNOWN
+        return embedded or TriggerType.UNKNOWN
+
+    def _detect_embedded_reactive(self, norm_text: str):
+        """タグではなく本文に埋め込まれた反応型トリガー（「〜された/与えた時」）を判定する。
+
+        timing タグ（【ターン中】）や ACTIVATE_MAIN/PASSIVE フォールバックより優先し、本来の誘発種別を
+        返す。明示イベントタグ（【登場時】【KO時】等）は呼び出し側で先に判定済みのため、ここは
+        無タグ／timing タグ／【ドン!!×N】のみのケースで効く。該当が無ければ None。
+        置換条件「KOされる時/場合」は『された』(過去) と区別され誤検出しない。
+        「登場した時」は OP13-100/OP14-041 等が YOUR_TURN ロック挙動を前提にするため対象外。
+        """
+        # 相手ライフへのダメージ誘発（「このリーダーのアタックによって、相手のライフにダメージを与えた時」）
+        if re.search(_nfc(r'ライフに.{0,8}ダメージを与えた時'), norm_text):
+            return TriggerType.ON_DAMAGE_DEALT_TO_LIFE
+        # KO 誘発（主語不問:「相手のキャラがKOされた時」「…キャラがKOされた時」）
+        if re.search(_nfc(r'KOされた時'), norm_text):
+            return TriggerType.ON_KO
+        # 場を離れた誘発（「自分の…キャラが場を離れた時」）
+        if re.search(_nfc(r'場を離れた時'), norm_text):
+            return TriggerType.ON_LEAVE
+        # イベント発動誘発（「自分がイベントを発動した時」）
+        if re.search(_nfc(r'イベントを発動した時'), norm_text):
+            return TriggerType.ON_EVENT_PLAY
+        # 相手の登場誘発（「相手が…登場させた時」）
+        if re.search(_nfc(r'相手が[^。]{0,30}登場させた時'), norm_text):
+            return TriggerType.ON_OPP_PLAY
+        return None
 
     def _parse_to_node(self, text: str, is_cost: bool = False) -> EffectNode:
         norm_text = _nfc(text)
@@ -608,8 +667,14 @@ class EffectParser:
                     if_true=self._parse_to_node(rest_text, is_cost)
                 )
                 return Sequence(actions=[look_action, branch])
+            # cond_text 先頭にトリガー句「〜時、」が残っている場合（トリガー未認識のフォールバックで
+            # 「自分が…登場させた時、自分のキャラが3枚以下の場合」のように混入）、ゲート条件は最後の
+            # 「時、」以降。残すと「手札から登場」の 手札 が HAND_COUNT を誤誘発する（OP02-026）。
+            cond_part = cond_text
+            if _nfc("時、") in cond_part:
+                cond_part = cond_part.rsplit(_nfc("時、"), 1)[-1]
             return Branch(
-                condition=self._parse_condition_obj(cond_text),
+                condition=self._parse_condition_obj(cond_part),
                 if_true=self._parse_to_node(rest_text, is_cost)
             )
 
@@ -779,6 +844,37 @@ class EffectParser:
     def _parse_condition_obj(self, text: str) -> Condition:
         norm_text = _nfc(text)
 
+        # 置換の対象指定「（自分の）「X」がKOされる/場を離れる（場合）」: 離れるカードが名前 X か
+        # （OP12-061「自分の「トラファルガー・ロー」がKOされる場合」）。離脱カードを source_card として
+        # 評価する SOURCE_STATE("NAME", X) にする。従来は GENERIC で名称限定が脱落していた。
+        repl_name_m = re.search(_nfc(r'「([^」]+)」が(?:KOされる|場を離れる)'), norm_text)
+        if repl_name_m:
+            return Condition(type=ConditionType.SOURCE_STATE,
+                             value=("NAME", repl_name_m.group(1)),
+                             player=Player.SELF, raw_text=norm_text)
+
+        # 選言条件「A、または B」「Aか、B」= A または B。同一資源の二値しきい値
+        # （例「ドン!!が0枚、または8枚以上」ST10-002 /「ドン!!が0枚か、3枚以上」OP05-060）。
+        # 双方が数量しきい値（N枚 / 以上 / 以下）を含む場合のみ分割し、対象/選択肢の「AかB」誤爆を避ける。
+        or_split = re.search(_nfc(r'^(?P<a>.+?(?:\d+枚|以上|以下))(?:、?または|か、)(?P<b>.+)$'), norm_text)
+        if or_split and re.search(_nfc(r'\d+枚|以上|以下'), or_split.group("b")):
+            a_txt = or_split.group("a")
+            b_txt = or_split.group("b")
+            # 第2項で資源主語が省略されている場合（「…か、3枚以上ある場合」）は第1項の主語「…が」を補う。
+            resource_kw = ['ドン', '手札', 'ライフ', 'トラッシュ', 'デッキ', 'キャラ']
+            if not any(_nfc(k) in b_txt for k in resource_kw):
+                prefix = re.match(_nfc(r'(.*?が)'), a_txt)
+                if prefix:
+                    b_txt = prefix.group(1) + b_txt
+            sub_a = self._parse_condition_obj(a_txt)
+            sub_b = self._parse_condition_obj(b_txt)
+            valid = [c for c in (sub_a, sub_b)
+                     if c and c.type not in (ConditionType.NONE, ConditionType.OTHER)]
+            if len(valid) == 2:
+                return Condition(type=ConditionType.OR, args=valid, raw_text=norm_text)
+            if len(valid) == 1:
+                return valid[0]
+
         # 複合条件「Aがいて、Bの場合」「Aが…以下で、Bの…」= A かつ B。
         # 連結部（がいて/がい(ない)て/があり/以上で/以下で 等）の直後の読点で2分割し、
         # 各半を再帰解析して AND にする。従来は全文を1条件として最初の数値で誤分類していた
@@ -842,7 +938,21 @@ class EffectParser:
                     _nfc('より少ない'): CompareOperator.LT,
                 }.get(op_m.group(1) if op_m else '', CompareOperator.GE)
                 return Condition(type=ConditionType.DON_COUNT_COMPARE, operator=cmp_op, player=Player.SELF, raw_text=norm_text)
+            # 明示の数値が無い存在条件「（場の）ドン‼がある場合」=1枚以上 /「ない場合」=0枚。
+            # 既定（nums 空）の EQ 0 は「0枚と等しい」になり「ある場合」を逆転させていた（OP13-003）。
+            # 「付与されているドン‼がある場合」は場のドン枚数ではなく付与ドン（attached）の条件なので
+            # ここでは触らない（既存挙動を維持し、別途 HAS_DON 系で扱うべき領域）。
+            if not nums and _nfc("付与") not in norm_text:
+                if _nfc("ない") in norm_text:
+                    return Condition(type=ConditionType.DON_COUNT, operator=CompareOperator.EQ, value=0, player=p, raw_text=norm_text)
+                if _nfc("ある") in norm_text:
+                    return Condition(type=ConditionType.DON_COUNT, operator=CompareOperator.GE, value=1, player=p, raw_text=norm_text)
             return Condition(type=ConditionType.DON_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
+
+        # ライフ＋手札の合計（「自分のライフと手札の合計枚数が4枚以下の場合」OP04-040）。
+        # LIFE_COUNT より先に判定する（「ライフ」を含むため誤分類を避ける）。
+        if _nfc("ライフと手札の合計") in norm_text or _nfc("手札とライフの合計") in norm_text:
+            return Condition(type=ConditionType.LIFE_HAND_SUM, operator=operator, value=value, player=p, raw_text=norm_text)
 
         if _nfc("ライフ") in norm_text:
             return Condition(type=ConditionType.LIFE_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
@@ -886,6 +996,14 @@ class EffectParser:
                 thr = int(pow_leader_m.group(1))
                 op = CompareOperator.GE if pow_leader_m.group(2) == _nfc('以上') else CompareOperator.LE
                 return Condition(type=ConditionType.LEADER_STATE, value=("POWER", thr), operator=op, player=p, raw_text=norm_text)
+
+        # キャラのコスト合計（「自分のキャラのコストの合計が N 以上/以下の場合」OP10-022）。
+        # 枚数(FIELD_COUNT)より先に判定する（「合計」を含むため誤分類を避ける）。
+        cost_sum_m = re.search(_nfc(r'キャラのコストの合計が(\d+)(以上|以下)'), norm_text)
+        if cost_sum_m:
+            thr = int(cost_sum_m.group(1))
+            op = CompareOperator.GE if cost_sum_m.group(2) == _nfc('以上') else CompareOperator.LE
+            return Condition(type=ConditionType.FIELD_COST_SUM, operator=op, value=thr, player=p, raw_text=norm_text)
 
         # 盤面のキャラ枚数（「自分の（レストの／特徴《X》の／コストN以上の）キャラがM枚以上いる」
         # 「…キャラがいる」）。数値が「フィルタ(コストN以上)」と「枚数(M枚)」で混在し得るため、

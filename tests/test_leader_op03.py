@@ -151,8 +151,6 @@ def test_op03_021_opponent_cost6_not_targetable():
     assert big.is_rest is False   # コスト6は対象外
 
 
-@pytest.mark.xfail(strict=True, reason="OP03-021: コスト《東の海》2枚レストが strict でなく、"
-                                       "1枚しか無くてもコスト未達のまま効果が実行されてしまう疑い")
 def test_op03_021_insufficient_east_blue_chars_does_not_execute():
     """OP03-021: 《東の海》キャラが1枚しか無い→コスト未達で発動不可。
     本来は相手キャラがレストにならないはず。🐛(疑い)"""
@@ -170,8 +168,6 @@ def test_op03_021_insufficient_east_blue_chars_does_not_execute():
 # OP03-022 アーロン 🐛
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True, reason="OP03-022: 対象条件「【トリガー】を持つ」が指紋に欠落し"
-                                       "(target.traits/flags 空)、トリガー無しキャラも登場できてしまう")
 def test_op03_022_non_trigger_char_not_playable():
     """OP03-022 アタック時: 登場対象は「コスト4以下かつ【トリガー】を持つ」キャラのみ。
     トリガーを持たないコスト3キャラは登場できないべき。🐛"""
@@ -221,8 +217,6 @@ def test_op03_040_deckout_win_only_when_deck_zero():
     assert gm.winner == p1.name   # 相手(p2)がデッキアウトで p1 勝利（置換は発動しない）
 
 
-@pytest.mark.xfail(strict=True, reason="OP03-040 能力1: トリガーが ACTIVATE_MAIN 化しており、"
-                                       "本来の「相手ライフにダメージを与えた時」(ON_DAMAGE_DEALT_TO_LIFE)誘発が失われている")
 def test_op03_040_life_damage_trigger_type():
     """OP03-040 能力1: 「相手のライフにダメージを与えた時」のデッキトップトラッシュは
     ダメージ誘発トリガーであるべき（起動メインではない）。🐛"""

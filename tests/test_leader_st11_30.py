@@ -139,9 +139,6 @@ def _st13_001_cost_query():
     )
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="ST13-001: コスト対象『パワー7000以上』が power_max=7000(以下)に反転。"
-                          "パワー8000のキャラが対象から漏れる")
 def test_st13_001_cost_target_power_ge_includes_8000():
     """ST13-001 コスト対象: パワー7000以上=8000のキャラが選択可能であるべき（条件成立盤面）。"""
     gm, p1, p2, L = build("ST13-001")
@@ -153,8 +150,6 @@ def test_st13_001_cost_target_power_ge_includes_8000():
     assert weak not in matched         # 6000は対象外
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="ST13-001: power_max=7000 で『パワー6000以下』が誤って対象化される（不等号逆）")
 def test_st13_001_cost_target_power_lt_7000_excluded():
     """ST13-001 コスト対象: パワー6000のキャラのみ→コスト対象不在であるべき（条件不成立盤面）。"""
     gm, p1, p2, L = build("ST13-001")
@@ -185,9 +180,6 @@ def test_st13_002_a0_look5_arrange_completes_cleanly():
     assert len(p1.temp_zone) == 0       # temp リーク無し
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="ST13-002 能力1: ターン終了時 TRASH 対象が LIFE/ALL で『表向き』フィルタ欠落。"
-                          "裏向きライフ含む全ライフ(5→0)が落ちる")
 def test_st13_002_a1_turn_end_trashes_only_face_up_life():
     """ST13-002 能力1: ターン終了時、ライフの表向きカードのみをトラッシュ（裏向きは残す）。"""
     gm, p1, p2, L = build("ST13-002")
@@ -219,9 +211,6 @@ def test_st13_003_life_not_zero_does_not_fire():
     assert len(p1.life) == life0       # 条件未達→ライフ追加なし
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="ST13-003: MOVE_CARD 取得元 zone=HAND のみで『手札かトラッシュ』の"
-                          "トラッシュ参照が欠落。トラッシュのコスト5キャラを加えられない")
 def test_st13_003_adds_cost5_char_from_trash():
     """ST13-003: ライフ0かつコスト5キャラがトラッシュにのみある場合でもライフ上に加えられるべき。"""
     gm, p1, p2, L = build("ST13-003")
@@ -360,9 +349,6 @@ def test_st29_001_life0_draws_and_discards():
     assert z1["trash"] == z0["trash"] + 1
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="ST29-001: 『ライフ2枚以下の場合』条件が DRAW のみに係り DISCARD が無条件。"
-                          "ライフ3枚以上でも手札を捨ててしまう")
 def test_st29_001_life_ge3_does_nothing():
     """ST29-001（条件不成立）: ライフ3枚以上→ドローも捨ても起きない（何もしない）。"""
     gm, p1, p2, L = build("ST29-001")
@@ -382,9 +368,6 @@ def test_st29_001_life_ge3_does_nothing():
 #   能力1 相手ターン中: 🐛「ポートガス・D・エース」と「モンキー・D・ルフィ」すべて+3000
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-                   reason="ST30-001 能力0: 条件『元々のパワー7000以上』が power_max=7000(以下)に縮退。"
-                          "パワー8000のキャラで-2000が発火しない")
 def test_st30_001_passive_power_ge7000_reduces_leader():
     """ST30-001 能力0（条件成立）: 元々パワー7000以上のキャラがいる→リーダー-2000(6000→4000)。"""
     gm, p1, p2, L = build("ST30-001")
@@ -394,8 +377,6 @@ def test_st30_001_passive_power_ge7000_reduces_leader():
     assert leader_power(p1) == 4000            # 6000-2000
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="ST30-001 能力0: power_max=7000 で『パワー6000以下』が誤って条件成立し-2000する")
 def test_st30_001_passive_power_lt7000_no_reduction():
     """ST30-001 能力0（条件不成立）: 元々パワー6000以下のキャラのみ→リーダー減算なし(6000)。"""
     gm, p1, p2, L = build("ST30-001")

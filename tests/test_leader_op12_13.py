@@ -64,9 +64,6 @@ def test_op12_001_buff_with_two_revealed_events():
     assert len(p1.hand) == 2                  # 公開なので手札は残る
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP12-001: コスト REVEAL(count=2) が is_up_to:true。テキストは『イベント2枚を公開』＝2枚ちょうど。"
-           "1枚しか公開できない盤面でも min=0 で発動・バフできてしまう（2枚未満なら発動不可が正）。")
 def test_op12_001_one_event_cannot_pay_cost():
     """OP12-001: 手札イベントが1枚のみ＝2枚公開コストを払えず、バフは発生しない（正しい挙動）。"""
     gm, p1, p2, L = build("OP12-001")
@@ -205,9 +202,6 @@ def test_op12_041_no_ramp_when_self_don_gt_opponent():
 # OP12-061 ドンキホーテ・ロシナンテ  ⚠️ 能力0の置換が「ロー」名称限定か
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP12-061: 能力0(KO置換)の条件が GENERIC で『トラファルガー・ロー』名称限定が欠落。"
-           "ロー以外のキャラKOでも置換が発火し、本来KOされるべきキャラが場に残る。")
 def test_op12_061_replacement_only_for_law():
     """OP12-061 能力0: 「トラファルガー・ロー」以外のキャラがKOされても置換しない（正しい挙動）。"""
     gm, p1, p2, L = build("OP12-061")
@@ -234,9 +228,6 @@ def test_op12_061_cost_reduction_returns_don():
 # OP12-081 コアラ  🐛 能力0の条件プレイヤー逆(OPPONENT→本来SELF)、能力1がACTIVATE_MAIN化
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP12-081: 能力0の条件が FIELD_COUNT(OPPONENT, cost>=8)>=2＝相手のコスト8以上が2枚。"
-           "テキストは『自分のコスト8以上のキャラが2枚以上』＝SELF。条件プレイヤーが逆。")
 def test_op12_081_draw_when_self_has_two_cost8():
     """OP12-081 アタック時: 自分のコスト8以上キャラが2枚以上で1枚引く（正しい挙動）。"""
     gm, p1, p2, L = build("OP12-081")
@@ -264,15 +255,13 @@ def test_op12_081_no_draw_when_self_has_one_cost8():
     assert len(p1.hand) == before              # 1枚では引かない（自他いずれでも未達）
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP12-081: 能力1のトリガーが ACTIVATE_MAIN 化。"
-           "テキストは『相手が元々コスト8以上のキャラを登場させた時/効果でキャラを登場させた時』の誘発。"
-           "誘発経路が失われ、相手の登場に反応しない。")
 def test_op12_081_ability1_is_triggered_not_activate_main():
-    """OP12-081 能力1: 相手のキャラ登場に反応する誘発であるべき（ACTIVATE_MAIN化は誤り）。"""
+    """OP12-081 能力1: 相手のキャラ登場に反応する誘発（ON_OPP_PLAY）であるべき（ACTIVATE_MAIN化は誤り）。"""
     gm, p1, p2, L = build("OP12-081")
-    trig = get_ability(L.master, "ON_PLAY", n=0)  # 本来は相手登場の誘発種別 → 存在しないはず
+    trig = get_ability(L.master, "ON_OPP_PLAY", n=0)  # 相手登場の誘発種別
     assert trig is not None
+    trigs = [a.trigger.name for a in (L.master.abilities or [])]
+    assert "ACTIVATE_MAIN" not in trigs
 
 
 # ===========================================================================
@@ -333,9 +322,6 @@ def test_op13_002_ability1_draw_is_triggered_not_main():
 # OP13-003 ゴール・D・ロジャー  🐛 能力0の条件が DON_COUNT EQ 0 で反転（本来 ドン>=1）
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP13-003: 能力0の条件が DON_COUNT EQ 0（ドンが0枚の場合）に反転。"
-           "テキストは『自分の場のドン‼がある場合』＝ドン>=1。条件が逆。")
 def test_op13_003_attach_requires_don_present():
     """OP13-003 能力0: 場にドンがある（>=1）場合のみドン付与が発火する（正しい条件）。"""
     gm, p1, p2, L = build("OP13-003")

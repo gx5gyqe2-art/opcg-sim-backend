@@ -73,8 +73,6 @@ def test_op16_001_grant_haste_power_at_threshold():
     assert _has_keyword(c, "速攻")
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="OP16-001: 『パワー8000以上』が power_max=8000(=8000以下)に反転(matcher.py:209/216 の正規表現 \\D? 不具合)。8000超のキャラが対象外になる")
 def test_op16_001_grant_haste_power_above_threshold():
     """OP16-001: パワー9000（8000以上）のキャラは【速攻】を得るべき（テキスト準拠）。
 
@@ -88,8 +86,6 @@ def test_op16_001_grant_haste_power_above_threshold():
     assert _has_keyword(c, "速攻")
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="OP16-001: 『パワー8000以上』が power_max=8000(=8000以下)に反転。7000のキャラが誤って対象になり付与される")
 def test_op16_001_grant_haste_power_below_threshold_excluded():
     """OP16-001: パワー7000（8000未満）のキャラは対象外で【速攻】を得ないべき。
 
@@ -149,8 +145,6 @@ def test_op16_022_no_active_when_non_impeldown_present():
 #   🐛 誘発「場を離れた時」が欠落し ACTIVATE_MAIN 化（トリガー種別の取りこぼし）。
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-                   reason="OP16-041: 誘発『自分の《インペルダウン》キャラが場を離れた時』が欠落し ACTIVATE_MAIN 化。本来は自動誘発であって起動メインではない")
 def test_op16_041_should_be_leave_triggered_not_activate_main():
     """OP16-041: 本来「場を離れた時」の自動誘発であり、起動メインであってはならない。
 
@@ -181,8 +175,6 @@ def test_op16_060_return_8_don_play_three_distinct_generals():
     assert g1 in p1.field and g2 in p1.field and g3 in p1.field
 
 
-@pytest.mark.xfail(strict=False,
-                   reason="OP16-060: 『カード名の異なる』distinct 制約がパース/実装に無く、同名の《大将》を複数登場できてしまう（要確認）")
 def test_op16_060_distinct_name_constraint_limits_same_name():
     """OP16-060: 「カード名の異なる」制約により、同名の《大将》は1枚しか登場できないべき。
 
@@ -366,8 +358,6 @@ def test_p086_deck_bottom_cost_target_at_threshold():
     assert victim in p1.deck and victim not in p1.field
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="P-086: コスト『パワー3000以上』が power_max=3000(=3000以下)に反転(matcher.py 正規表現 \\D? 不具合)。3000超のキャラがデッキ下コスト対象外になる")
 def test_p086_deck_bottom_cost_target_above_threshold():
     """P-086: パワー5000（3000以上）のキャラはデッキ下コストの対象になるべき（テキスト準拠）。
 
@@ -381,8 +371,6 @@ def test_p086_deck_bottom_cost_target_above_threshold():
     assert victim in p1.deck and victim not in p1.field
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="P-086: コスト『パワー3000以上』が power_max=3000(=3000以下)に反転。2000のキャラが誤ってデッキ下コスト対象になる")
 def test_p086_deck_bottom_cost_target_below_threshold_excluded():
     """P-086: パワー2000（3000未満）のキャラはデッキ下コストの対象外であるべき。
 
@@ -412,14 +400,12 @@ def test_p117_deckout_win_replacement():
     assert gm.winner == p1.name
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="P-117: 能力1の誘発『リーダーのアタックでライフにダメージを与えた時』(ON_DAMAGE_DEALT_TO_LIFE)が取りこぼされ ACTIVATE_MAIN 化")
 def test_p117_trash_trigger_should_be_damage_dealt_not_activate_main():
     """P-117 能力1: 誘発は「ライフにダメージを与えた時」であり、起動メインではないべき。
 
-    現実装は当該の TRASH_FROM_DECK 能力を ACTIVATE_MAIN として登録しているため、
-    ON_DAMAGE_DEALT_TO_LIFE トリガーの能力が存在しない → xfail。
+    「相手のライフにダメージを与えた時」を ON_DAMAGE_DEALT_TO_LIFE 誘発として登録する。
     """
+    gm, p1, p2, L = build("P-117")
     triggers = [
         (a.trigger.name if hasattr(a.trigger, "name") else str(a.trigger))
         for a in (L.master.abilities or [])

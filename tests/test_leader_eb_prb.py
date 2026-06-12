@@ -271,7 +271,6 @@ def test_eb03_001_main_debuff_and_grant_to_plain_char():
     assert plain.has_keyword("速攻")
 
 
-@pytest.mark.xfail(strict=True, reason="EB03-001: 能力1の対象制限『自分の【アタック時】効果を持たないキャラ』が欠落し、アタック時効果持ちキャラにも速攻が付く（TargetQueryにトリガー除外フィールド無し）")
 def test_eb03_001_grant_excludes_on_attack_char():
     """EB03-001 起動メイン: 【アタック時】効果持ちキャラは速攻付与の対象外であるべき。"""
     gm, p1, p2, L = build("EB03-001")
@@ -378,7 +377,6 @@ def test_prb01_001_cost9_not_targetable():
     assert not big.has_keyword("速攻")
 
 
-@pytest.mark.xfail(strict=True, reason="PRB01-001: 対象制限『【登場時】効果を持たない』が欠落（TargetQueryにトリガー除外フィールド無し）。登場時効果持ちキャラにも速攻が付く")
 def test_prb01_001_grant_excludes_on_play_char():
     """PRB01-001: 【登場時】効果を持つキャラは速攻付与の対象外であるべき。"""
     gm, p1, p2, L = build("PRB01-001")

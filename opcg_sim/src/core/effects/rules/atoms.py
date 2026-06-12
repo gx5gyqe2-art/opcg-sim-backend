@@ -218,6 +218,11 @@ def _rest(ctx: ParseContext) -> Optional[GameAction]:
     tq = parse_target(t)
     if _nfc("まで") in t:
         tq.is_up_to = True
+    elif ctx.is_cost and isinstance(tq.count, int) and tq.count > 1:
+        # コストの「キャラN枚をレストにできる」はちょうど N 枚。「できる」は任意性であって
+        # 枚数ではないため、コスト充足判定で N 枚未満を弾けるよう厳密枚数にする
+        # （OP03-021: 《東の海》が2枚未満なら発動できないのが正）。
+        tq.is_strict_count = True
     return GameAction(type=ActionType.REST, target=tq, raw_text=t)
 
 
@@ -730,10 +735,14 @@ def _life_recover(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if _nfc("手札") in t:
         return None  # デッキ→手札 等は別アクション
+    # 枚数は「デッキの上から N枚」から取る。_first_int だと先頭の反応型トリガー句
+    # 「ライフが0枚になった時、」の 0 を拾い value=0 になる（OP05-098）。
+    m_n = re.search(_nfc(r'デッキの上から[^。\d]*?(\d+)枚'), t)
+    n = int(m_n.group(1)) if m_n else _first_int(t, 1)
     return GameAction(
         type=ActionType.HEAL,
         target=None,
-        value=ValueSource(base=_first_int(t, 1)),
+        value=ValueSource(base=n),
         raw_text=t,
     )
 
@@ -772,8 +781,10 @@ def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
     if not re.search(_nfc(r"ライフの(上|下)に(?:表向きで)?加える"), t):
         return None
     tq = parse_target(t)
-    # 源ゾーン: 手札優先（「手札」明示があれば HAND）、無ければトラッシュ。
-    tq.zone = Zone.HAND if _nfc("手札") in t else Zone.TRASH
+    # 源ゾーン: parse_target が複数ゾーン（「手札かトラッシュ」ST13-003）を検出済みなら尊重する。
+    # 単一ゾーンのときのみ手札優先（「手札」明示があれば HAND）、無ければトラッシュ。
+    if not isinstance(tq.zone, list):
+        tq.zone = Zone.HAND if _nfc("手札") in t else Zone.TRASH
     dest_position = "TOP" if _nfc("ライフの上") in t else "BOTTOM"
     # 「表向きで加える」→ 表向き、「裏向きで」→ 裏向き、明示なし→ゾーン既定(裏向き)。
     face_up = True if _nfc("表向き") in t else (False if _nfc("裏向き") in t else None)
@@ -825,12 +836,38 @@ _DON_COUNT_RE = re.compile(_nfc(r"ドン(?:!!|‼)?[ 　]*(\d+)[ 　]*枚"))
 def _don_count(t: str) -> int:
     if _nfc("すべて") in t or _nfc("全て") in t:
         return 99  # エンジン側でプールが尽きるまで処理
+    # 先頭の丸数字（➁/③ 等）はコストエリアのドン!!レスト枚数を表す。
+    # 「➁(コストエリアのドン!!を指定の数レストにできる)」は N枚 表記を持たないため、
+    # 丸数字を拾わないと既定 1 に縮退する（OP04-001/OP06-080）。
+    stripped = t.strip()
+    if stripped and stripped[0] in _CIRCLED_DIGITS:
+        return _CIRCLED_DIGITS[stripped[0]]
+    # loader の DataCleaner（NFKC）は分解可能な丸数字（③=U+2462 等）を素の数字へ分解する。
+    # その結果「3(コストエリアのドン!!を指定の数レストにできる)」となるため、コストエリア注記を
+    # 伴う先頭の素数字もレスト枚数として拾う（ST02-001）。
+    m_lead = re.match(r'(\d+)\s*[（(]', stripped)
+    if m_lead and _nfc('コストエリア') in t:
+        return int(m_lead.group(1))
     m = _DON_COUNT_RE.search(t)
     return int(m.group(1)) if m else 1
 
 
 def _don_opponent(t: str) -> Optional[str]:
     return "OPPONENT" if (_nfc("相手") in t and _nfc("自分") not in t) else None
+
+
+@rule("don_phase_routing", priority=86)
+def _don_phase_routing(ctx: ParseContext) -> Optional[GameAction]:
+    """「自分のドン‼フェイズに置かれるドン‼…は、…に付与される」= ドン配置の常在ルール変更。
+
+    能動的な付与（ATTACH_DON）ではなく受動的な経路規則。エンジンはドンフェイズの配置経路を
+    モデルしていないため RULE_PROCESSING（no-op）として吸収する。誤って ATTACH_DON にすると
+    PASSIVE 再計算のたびにリーダーへ付与してパワーが際限なく増える（OP13-003）。
+    """
+    t = ctx.text
+    if _nfc("フェイズ") in t and _nfc("置かれる") in t and _nfc("付与される") in t:
+        return GameAction(type=ActionType.RULE_PROCESSING, raw_text=t)
+    return None
 
 
 @rule("don_attach", priority=84)
@@ -842,6 +879,11 @@ def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
     """
     t = ctx.text
     if _nfc("付与") not in t or _nfc("ドン") not in t:
+        return None
+    # 能動的な付与（「…に付与する」）でなければ ATTACH_DON ではない。「ドン‼が付与された時」等の
+    # 反応型トリガー句が本文に残っているだけのケース（OP02-002「…付与された時、…コスト-1」）で
+    # 誤って ATTACH_DON 化するのを防ぐ。
+    if not re.search(_nfc(r'付与(?:する|し|できる)'), t):
         return None
     # 「付与されている」が対象フィルタ（キャラ/パワー等を修飾）ならドン付与ではない。
     # 「付与されているドン!!を...に付与する」のようにドン自体を移動するケースは除外しない。
@@ -886,6 +928,33 @@ def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+@rule("active_char_and_don", priority=76)
+def _active_char_and_don(ctx: ParseContext) -> Optional[EffectNode]:
+    """「（特徴…）キャラ1枚までとドン‼N枚までを、アクティブにする」→ ACTIVE(キャラ)＋ACTIVE_DON(ドン)。
+
+    複合「AとBを、アクティブにする」でドン側だけが拾われキャラのアクティブが脱落していた
+    （OP11-021）。キャラ句とドン句を分けて 2 アクションの Sequence にする。
+    """
+    t = ctx.text
+    if not re.search(_nfc(r"アクティブに(する|できる)"), t):
+        return None
+    m = re.search(_nfc(r'(.+?キャラ[^、。]*?まで)と((?:レストの)?ドン(?:!!|‼)[^、。]*?まで)'), t)
+    if not m:
+        return None
+    char_part, don_part = m.group(1), m.group(2)
+    char_tq = parse_target(char_part)
+    char_tq.is_rest = None  # 対象は選択で絞る（アクティブ化の対象）
+    if _nfc("まで") in char_part:
+        char_tq.is_up_to = True
+    char_action = GameAction(type=ActionType.ACTIVE, target=char_tq, raw_text=char_part)
+    don_action = GameAction(
+        type=ActionType.ACTIVE_DON,
+        value=ValueSource(base=_don_count(don_part)),
+        raw_text=don_part,
+    )
+    return Sequence(actions=[char_action, don_action])
+
+
 @rule("don_set_active", priority=74)
 def _don_set_active(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分の）ドン!!N枚までを、アクティブにする」→ ACTIVE_DON（レスト→アクティブ）。"""
@@ -917,6 +986,37 @@ def _don_rest_cost_fragment(ctx: ParseContext) -> Optional[GameAction]:
     if not m:
         return None
     return GameAction(type=ActionType.REST_DON, value=ValueSource(base=int(m.group(1))), raw_text=ctx.text)
+
+
+@rule("rest_char_or_don", priority=76)
+def _rest_char_or_don(ctx: ParseContext) -> Optional[EffectNode]:
+    """「（相手の、コスト…の）キャラかドン‼N枚までを、レストにする」→ Choice[REST(キャラ), REST_DON]。
+
+    「か」でキャラとドンの択一だが、ドン側(REST_DON)だけ拾われキャラのレスト選択肢が
+    脱落していた（OP06-020）。キャラ句とドン句に分け、どちらをレストにするかの Choice にする。
+    """
+    t = ctx.text
+    if not re.search(_nfc(r"レストに(する|できる)"), t):
+        return None
+    m = re.search(_nfc(r'(.+?キャラ)か((?:レストの)?ドン[ 　]*(?:!!|‼)[^、。]*?まで)'), t)
+    if not m:
+        return None
+    char_part, don_part = m.group(1), m.group(2)
+    char_tq = parse_target(char_part)
+    char_tq.is_rest = None
+    if _nfc("まで") in t:
+        char_tq.is_up_to = True
+    char_action = GameAction(type=ActionType.REST, target=char_tq, raw_text=char_part)
+    # ドンの所有側: 「か」より前に「相手の」があれば相手のドン。
+    don_status = "OPPONENT" if _nfc("相手") in char_part else _don_opponent(t)
+    don_action = GameAction(
+        type=ActionType.REST_DON,
+        value=ValueSource(base=_don_count(don_part)),
+        status=don_status,
+        raw_text=don_part,
+    )
+    return Choice(message="レストにする対象を選ぶ", option_labels=["キャラ", "ドン!!"],
+                  options=[char_action, don_action])
 
 
 @rule("don_set_rest", priority=74)
@@ -1504,9 +1604,15 @@ def _reveal_hand(ctx: ParseContext) -> Optional[GameAction]:
         return None
     tq = parse_target(t)
     tq.zone = Zone.HAND
-    # 「できる」「ことができる」「まで」は任意（対象不在でも no-op 成功）。
-    if _nfc("できる") in t or _nfc("まで") in t:
+    # 「まで」のみ可変枚数（0..N）。「できる/ことができる」はコストの任意性であって枚数ではない
+    # （「イベント2枚を公開することができる」＝ちょうど2枚を任意で公開。cost_optional 側で処理）。
+    # 従来は「できる」でも is_up_to=True となり 2枚未満でもコストを払えてしまった（OP12-001）。
+    if _nfc("まで") in t:
         tq.is_up_to = True
+    else:
+        # ちょうど N 枚公開（「イベント2枚を公開する」）。コスト充足判定で候補が N 枚未満なら
+        # 支払い不可とするため厳密枚数にする（OP12-001: 1枚しか無いと発動できないのが正）。
+        tq.is_strict_count = True
     # 後続の「公開したカードを…」(revealed_to_deck_top 等) が参照できるよう保存する
     tq.save_id = "revealed_cards"
     return GameAction(type=ActionType.REVEAL, target=tq, raw_text=t)

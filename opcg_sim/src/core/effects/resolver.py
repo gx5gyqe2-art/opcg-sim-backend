@@ -548,6 +548,16 @@ class EffectResolver:
                 current_val = len(target_player.field) + (1 if target_player.stage else 0)
             return self._compare(current_val, condition.operator, target_val)
 
+        elif condition.type == ConditionType.FIELD_COST_SUM:
+            # 「（自分の）キャラのコストの合計が N 以上/以下」。場のキャラの現在コスト総和を比較する。
+            current_val = sum(c.current_cost for c in target_player.field)
+            return self._compare(current_val, condition.operator, target_val)
+
+        elif condition.type == ConditionType.LIFE_HAND_SUM:
+            # 「（自分の）ライフと手札の合計枚数が N 以上/以下」（OP04-040）。
+            current_val = len(target_player.life) + len(target_player.hand)
+            return self._compare(current_val, condition.operator, target_val)
+
         elif condition.type == ConditionType.HAS_DON:
             # 【ドン!!×N】: このカード（source_card）に付与されたドン!!が N 枚以上か。
             # コストエリアの active ドン枚数ではなく、対象カードの attached_don を見る。
@@ -616,6 +626,9 @@ class EffectResolver:
                 is_my_turn = (player == self.game_manager.turn_player)
                 power = source_card.get_power(is_my_turn)
                 return self._compare(power, condition.operator, sv[1])
+            if isinstance(sv, tuple) and sv[0] == "NAME":
+                # 置換の対象指定（「自分の「X」がKOされる場合」OP12-061）: 離れるカードが名前 X か。
+                return sv[1] in (source_card.master.name or "")
             log_event("WARNING", "resolver.source_state_unknown",
                       f"Unknown SOURCE_STATE subtype: {sv}", player=player.name)
             return False

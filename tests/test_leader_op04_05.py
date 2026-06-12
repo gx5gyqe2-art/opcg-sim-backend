@@ -65,7 +65,6 @@ def test_op04_001_draw_and_grant_haste():
     assert "速攻" in (c.current_keywords | c.timed_keywords)
 
 
-@pytest.mark.xfail(strict=False, reason="OP04-001要確認: コスト➁(ドン2枚レスト)がREST_DON value=1で1枚しかレストされない疑い")
 def test_op04_001_cost_rests_two_don():
     """OP04-001 起動メイン: コスト記号➁＝ドン!!2枚レストのはず（実装は1枚レスト疑い）。"""
     gm, p1, p2, L = build("OP04-001")
@@ -244,7 +243,6 @@ def test_op04_040_no_effect_when_total_ge5():
     assert after["life"] == before["life"]
 
 
-@pytest.mark.xfail(strict=True, reason="OP04-040バグ: 条件がLIFE_COUNTのみで手札枚数が合算されない。ライフ2+手札5=7(>4)でもドローしてしまう")
 def test_op04_040_condition_counts_hand_too():
     """OP04-040 アタック時: ライフ+手札の合計が5以上(ライフ2+手札5=7)ならドローしない。"""
     gm, p1, p2, L = build("OP04-040")
@@ -343,7 +341,6 @@ def test_op05_002_buffs_revolutionary_chars():
     assert discard in p1.trash   # コストで革命軍カードを捨てた
 
 
-@pytest.mark.xfail(strict=True, reason="OP05-002バグ: 対象『か【トリガー】を持つ』キャラ条件が欠落(traits=革命軍のみ)。トリガー持ちが強化されない")
 def test_op05_002_buffs_trigger_keyword_chars():
     """OP05-002 起動メイン: 【トリガー】を持つキャラ（革命軍でなくても）も+3000対象。"""
     gm, p1, p2, L = build("OP05-002")
@@ -431,7 +428,6 @@ def test_op05_060_ramp_when_zero_don():
     assert len(p1.don_active) + len(p1.don_rested) == 1   # 1枚追加
 
 
-@pytest.mark.xfail(strict=True, reason="OP05-060バグ: 条件が DON_COUNT==0 のみで『または3枚以上』が欠落。ドン3枚以上で追加されない")
 def test_op05_060_ramp_when_three_or_more_don():
     """OP05-060 起動メイン: 自場のドン3枚以上でもドン!!1枚をアクティブ追加すべき。"""
     gm, p1, p2, L = build("OP05-060")
@@ -449,7 +445,6 @@ def test_op05_060_ramp_when_three_or_more_don():
 #   【相手のターン中】【ターン1回】ライフが0になった時、デッキ上1枚をライフへ→手札1枚捨て
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True, reason="OP05-098バグ: HEAL value=0 でデッキ上1枚のライフ加算が機能しない(手札捨てのみ実行)")
 def test_op05_098_adds_life_from_deck():
     """OP05-098 相手ターン: デッキ上1枚をライフに加える（その後手札1枚を捨てる）。"""
     gm, p1, p2, L = build("OP05-098")

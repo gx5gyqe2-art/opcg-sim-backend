@@ -72,6 +72,12 @@ class TargetQuery:
     cost_max_dynamic: Optional[str] = None
     power_min: Optional[int] = None
     power_max: Optional[int] = None
+    # 「ドン‼がN枚以上付与されているキャラ」: 付与ドン枚数の下限フィルタ（OP15-001）。
+    min_attached_don: Optional[int] = None
+    # 「ライフの表向きの/裏向きのカード」: ライフ等の表裏フィルタ（True=表向き, ST13-002）。
+    is_face_up: Optional[bool] = None
+    # 「【X】効果を持たないキャラ」: 指定トリガー種別を持たないカードに限定（EB03-001/PRB01-001）。
+    lacks_trigger: Optional[str] = None
     is_rest: Optional[bool] = None
     count: int = 1
     is_up_to: bool = False

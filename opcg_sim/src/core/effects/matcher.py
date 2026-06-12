@@ -144,7 +144,30 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # OP04-111「このキャラ以外の自分の特徴《ホーミーズ》を持つキャラ」（自身をコストに使わない）。
     if _nfc("他の") in tgt_text or _nfc("このキャラ以外") in tgt_text or _nfc("以外の自分") in tgt_text:
         tq.flags.add("EXCLUDE_SOURCE")
-    
+
+    # 「カード名の異なる…N枚」: 選ぶカードはすべて名前が異なる（distinct）。matcher が名前重複を
+    # 除外して候補化することで、同名を複数選べないようにする（OP16-060/OP16-034/038 等）。
+    if _nfc("カード名の異なる") in tgt_text or _nfc("カード名が異なる") in tgt_text:
+        tq.is_unique_name = True
+
+    # 「【X】効果を持たないキャラ」: 指定トリガー種別を持たないカードに限定（EB03-001/PRB01-001）。
+    _lacks = re.search(_nfc(r'【(登場時|アタック時|ブロック時|KO時|トリガー)】効果を持たない'), tgt_text)
+    if _lacks:
+        tq.lacks_trigger = {
+            _nfc("登場時"): "ON_PLAY", _nfc("アタック時"): "ON_ATTACK",
+            _nfc("ブロック時"): "ON_BLOCK", _nfc("KO時"): "ON_KO",
+            _nfc("トリガー"): "TRIGGER",
+        }[_lacks.group(1)]
+
+    # 「【トリガー】を持つ（キャラ/カード）」対象フィルタ: トリガー能力所持に限定（matcher が絞り込む）。
+    # 全対象種別で効くよう parse_target に置く（従来は discard ルールのみで、PLAY_CARD 等に
+    # 適用されず「【トリガー】を持つキャラを登場」の絞り込みが脱落していた: OP03-022）。
+    if re.search(_nfc(r'【トリガー】を持つ'), tgt_text):
+        tq.flags.add("HAS_TRIGGER")
+        # 「《特徴》か【トリガー】を持つ（キャラ）」= 特徴 OR トリガー所持（OP05-002）。
+        if re.search(_nfc(r'か【トリガー】を持つ'), tgt_text):
+            tq.flags.add("TRAIT_OR_TRIGGER")
+
     # 特徴は《X》/<X> に加え 『X』（例: 『白ひげ海賊団』を含む特徴を持つ）でも表記される。
     # 名前は「X」を使うため 『』 と衝突しない（condition 側も 『X』 を特徴として扱う）。
     raw_traits = re.findall(r'[《<『]([^》>』]+)[》>』]', tgt_text)
@@ -159,13 +182,24 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             
     tq.traits.extend(final_traits)
 
+    # 「《特徴》（を持つキャラカード）か「名前」」= 特徴 OR 名前。「か」が名前の開き括弧へ
+    # 直接かかる場合に OR とみなす（OP11-022「《海王類》を持つキャラカードか「メガロ」」）。
+    if tq.traits and tq.names and re.search(_nfc(r'か[「『《]'), tgt_text):
+        tq.flags.add("TRAIT_OR_NAME")
+
     attrs = re.findall(_nfc(ParserKeyword.ATTRIBUTE + r'[((]([^))]+)[))]'), tgt_text)
     tq.attributes.extend(attrs)
     
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
-    m_c = re.search(_nfc(ParserKeyword.COST + r'[^+＋\-－−‐\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    # コスト範囲「コストNからM」（N以上M以下）。範囲表記は単一しきい値より先に判定する
+    #   （従来は「コスト3」だけを拾い cost_max=3 に縮退していた: OP10-099）。
+    m_crange = re.search(_nfc(ParserKeyword.COST + r'(\d+)から(\d+)'), tgt_text)
+    if m_crange:
+        tq.cost_min = int(m_crange.group(1))
+        tq.cost_max = int(m_crange.group(2))
+    m_c = None if m_crange else re.search(_nfc(ParserKeyword.COST + r'[^+＋\-－−‐\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
         start_idx = m_c.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
@@ -177,7 +211,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         if prefix_context not in ['+', '-', '\u2212', '\u2010', '\uff0b', '\uff0d'] and not is_set_action:
             val = int(m_c.group(1))
             if m_c.group(2) == _nfc(ParserKeyword.ABOVE): tq.cost_min = val
-            else: tq.cost_max = val
+            elif m_c.group(2) == _nfc(ParserKeyword.BELOW): tq.cost_max = val
+            else:
+                # 接尾辞なしの「コストNの」= ちょうど N。従来は cost_max=N（=以下）に誤って
+                # 範囲拡大していた（ST13-003「コスト5の」/OP15-039「コスト3の」）。
+                tq.cost_min = val
+                tq.cost_max = val
 
     # \u52d5\u7684\u30b3\u30b9\u30c8\u4e0a\u9650: \u300c\uff08\u81ea\u5206\u306e\uff09\u5834\u306e\u30c9\u30f3!!\u306e\u679a\u6570\uff08\u5206\uff09\u4ee5\u4e0b\u306e\u30b3\u30b9\u30c8\u300d\u2192 DON_COUNT_FIELD\u3002
     #   \u6570\u5024\u3067\u306f\u306a\u304f\u5834\u306e\u30c9\u30f3!!\u679a\u6570\u3067\u30b3\u30b9\u30c8\u4e0a\u9650\u304c\u6c7a\u307e\u308b\uff08\u865a\u306e\u7389\u5ea7 OP13-099 \u7b49\uff09\u3002
@@ -206,7 +245,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             # \u65e2\u5b9a\u306f\u76f8\u624b\u306e\u30e9\u30a4\u30d5\uff08\u300c\u76f8\u624b\u306e\u300d\u660e\u793a\uff0f\u7701\u7565\u6642\u3068\u3082\u76f8\u624b\u57fa\u6e96\u304c\u5927\u534a\uff09
             tq.cost_max_dynamic = "LIFE_COUNT_OPPONENT"
 
-    m_p = re.search(_nfc(ParserKeyword.POWER + r'[^+\uff0b\-\uff0d\u2212\u2010\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    m_p = re.search(_nfc(ParserKeyword.POWER + r'[^+\uff0b\-\uff0d\u2212\u2010\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_p:
         start_idx = m_p.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
@@ -222,11 +261,26 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     
     if re.search(r'(\d+|枚)まで', tgt_text): tq.is_up_to = True 
 
-    if _nfc(ParserKeyword.ALL_HIRAGANA) in tgt_text or _nfc(ParserKeyword.ALL) in tgt_text:
+    # ライフ等の表裏フィルタ（「ライフの表向きのカード」ST13-002）。「表向きで加える/にする」等の
+    # アクション修飾とは区別し、「表向きの」が対象名詞（カード/ライフ/キャラ）に掛かる形のみ。
+    if re.search(_nfc(r'表向きの(?:カード|ライフ|キャラ)'), tgt_text):
+        tq.is_face_up = True
+    elif re.search(_nfc(r'裏向きの(?:カード|ライフ|キャラ)'), tgt_text):
+        tq.is_face_up = False
+
+    # 「ドン‼がN枚以上付与されているキャラ」: 付与ドン枚数の下限フィルタ（OP15-001）。
+    # 枚数 N がフィルタなので、対象枚数(count)には数えないよう先に検出して句を除去する。
+    count_text = tgt_text
+    m_adon = re.search(_nfc(r'ドン(?:!!|‼)?が(\d+)枚以上付与されている'), tgt_text)
+    if m_adon:
+        tq.min_attached_don = int(m_adon.group(1))
+        count_text = tgt_text.replace(m_adon.group(0), '')
+
+    if _nfc(ParserKeyword.ALL_HIRAGANA) in count_text or _nfc(ParserKeyword.ALL) in count_text:
         tq.count = -1
         tq.select_mode = "ALL"
     else:
-        m_cnt = re.search(r'(\d+)' + _nfc(ParserKeyword.COUNT_SUFFIX), tgt_text)
+        m_cnt = re.search(r'(\d+)' + _nfc(ParserKeyword.COUNT_SUFFIX), count_text)
         tq.count = int(m_cnt.group(1)) if m_cnt else 1
 
     # 「任意の枚数」: プレイヤーが 0..N 枚を任意に選べる可変選択。is_up_to=True かつ
@@ -335,25 +389,58 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
         if query.power_max is not None and card.get_power(True) > query.power_max: continue
         if query.power_min is not None and card.get_power(True) < query.power_min: continue
+
+        # 付与ドン枚数の下限（「ドン‼がN枚以上付与されているキャラ」OP15-001）。
+        if query.min_attached_don is not None and getattr(card, "attached_don", 0) < query.min_attached_don:
+            continue
+
+        # ライフの表裏（「ライフの表向きのカード」ST13-002）。裏向きライフを巻き込まないよう絞る。
+        if query.is_face_up is not None and bool(getattr(card, "is_face_up", False)) != query.is_face_up:
+            continue
+
+        # 「【X】効果を持たないキャラ」: 指定トリガーを持つカードを除外（EB03-001/PRB01-001）。
+        if query.lacks_trigger is not None and any(
+                ab.trigger.name == query.lacks_trigger for ab in getattr(card.master, "abilities", ())):
+            continue
         
         if query.is_vanilla:
             txt = card.master.effect_text
             if txt and txt.strip() not in ["", "なし", "-"]: continue
 
-        if query.names:
+        # 「《特徴》か「名前」」= 特徴 OR 名前（両者の AND ではない）。OP11-022「《海王類》かメガロ」が
+        # trait∧name の AND になり対象が常に空になっていた。フラグ時は OR で照合する。
+        if "TRAIT_OR_NAME" in query.flags and (query.names or query.traits):
             if "NAME_PARTIAL" in query.flags:
-                if not any(n in card.master.name for n in query.names): continue
+                name_ok = bool(query.names) and any(n in card.master.name for n in query.names)
             else:
-                if card.master.name not in query.names: continue
+                name_ok = bool(query.names) and card.master.name in query.names
+            trait_ok = bool(query.traits) and any(t in card.master.traits for t in query.traits)
+            if not (name_ok or trait_ok): continue
+            if query.exclude_names and card.master.name in query.exclude_names: continue
+        else:
+            if query.names:
+                if "NAME_PARTIAL" in query.flags:
+                    if not any(n in card.master.name for n in query.names): continue
+                else:
+                    if card.master.name not in query.names: continue
 
-        if query.exclude_names and card.master.name in query.exclude_names: continue
+            if query.exclude_names and card.master.name in query.exclude_names: continue
 
-        if query.traits and not any(t in card.master.traits for t in query.traits): continue
+            if query.traits and not any(t in card.master.traits for t in query.traits):
+                # 「《特徴》か【トリガー】を持つ」は特徴 OR トリガー所持。特徴不一致でも
+                # トリガー所持なら通す（OP05-002）。それ以外は従来どおり除外。
+                if "TRAIT_OR_TRIGGER" not in query.flags:
+                    continue
+                _trig = bool(getattr(card.master, "trigger_text", "")) or any(
+                    ab.trigger == TriggerType.TRIGGER for ab in getattr(card.master, "abilities", ()))
+                if not _trig:
+                    continue
         if query.is_rest is not None and card.is_rest != query.is_rest: continue
 
         # 「【トリガー】を持つカード」フィルタ: トリガー能力（master.trigger_text 非空、または
         # TriggerType.TRIGGER 能力）を持つカードのみに限定する（OP16-080 等）。
-        if "HAS_TRIGGER" in query.flags:
+        # TRAIT_OR_TRIGGER（特徴 OR トリガー）の場合は上の特徴フィルタで OR 判定済みのため除外。
+        if "HAS_TRIGGER" in query.flags and "TRAIT_OR_TRIGGER" not in query.flags:
             has_trig = bool(getattr(card.master, "trigger_text", "")) or any(
                 ab.trigger == TriggerType.TRIGGER for ab in getattr(card.master, "abilities", ()))
             if not has_trig:

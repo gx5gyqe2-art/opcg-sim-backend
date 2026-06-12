@@ -37,8 +37,6 @@ def _attach_don_to_leader(player, n=1):
 # 2枚を選ぶ。選んだキャラそれぞれの元々のパワーを、このターン中、入れ替える。
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP14-001: SWAP_POWER がエンジン未実装(enums定義のみでapply_action_to_engineにハンドラ無し)。能力解決しても元々パワーが入れ替わらない")
 def test_op14_001_swap_original_power_of_two_chars():
     """OP14-001 起動メイン: 該当キャラ2体の元々パワーをこのターン中入れ替える。"""
     gm, p1, p2, L = build("OP14-001")
@@ -166,8 +164,6 @@ def test_op14_041_opp_turn_char_play_draw():
     assert zone_counts(p1)["deck"] == deck_before - 1
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP14-041: 能力1がKO誘発でなくACTIVATE_MAIN化、KO条件フィルタが相手ライフ対象に誤付与＋power_max(≤5000)で5000以上(min)と逆。汎用盤面で相手ライフが手札に移動しない(NO_CHANGE)")
 def test_op14_041_ko_moves_opp_life_to_owner_hand():
     """OP14-041 能力1: 該当キャラKO時、相手ライフ上1枚を相手(持ち主)の手札へ。"""
     gm, p1, p2, L = build("OP14-041")
@@ -175,7 +171,7 @@ def test_op14_041_ko_moves_opp_life_to_owner_hand():
     set_life(p2, 5)
     p2_hand_before = zone_counts(p2)["hand"]
     p2_life_before = zone_counts(p2)["life"]
-    gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
+    gm.resolve_ability(p1, get_ability(L.master, "ON_KO"), L)
     auto_resolve(gm, p1)
     # 相手ライフが1枚減り、相手の手札へ移る（テキスト準拠）
     assert zone_counts(p2)["life"] == p2_life_before - 1
@@ -207,8 +203,6 @@ def test_op14_060_opp_attack_returns_don_cost():
 # 相手キャラ1枚までをこのターン中コスト-10。その後デッキ上2枚トラッシュ(任意)。
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP14-079: PREVENT_LEAVE の範囲保護が card 所有者(=相手)のprotectorしか走査せず、保護能力を持つ自リーダー(別プレイヤー)が見つからないため、自分の効果でも相手キャラが場を離れてしまう")
 def test_op14_079_passive_prevents_own_effect_removal():
     """OP14-079 PASSIVE: 相手のキャラは自分の効果で場を離れないはず。"""
     gm, p1, p2, L = build("OP14-079")
@@ -305,8 +299,6 @@ def test_op15_001_opp_turn_no_debuff_when_mixed_traits():
     assert v.get_power(False) == 5000
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP15-001: 能力1で『相手のドン!!が2枚以上付与されている』対象フィルタが欠落し、付与ドン0のキャラもレスト可能になる(count=2に化け)")
 def test_op15_001_rest_requires_two_attached_don():
     """OP15-001 能力1: 付与ドン0のキャラはレスト対象外であるべき（フィルタ欠落のバグ）。"""
     gm, p1, p2, L = build("OP15-001")

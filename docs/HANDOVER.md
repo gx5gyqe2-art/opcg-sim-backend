@@ -537,8 +537,8 @@ backend テスト 374 passed / パーサ退行（新規OTHER）0 / フロント 
 - 反転系（パワー GE/LE 等）は**条件成立・不成立の両盤面**でアサートして反転を確実に捕捉する。
 - 実行は **`-s` 必須**（ログ干渉で I/O エラーになるため）:
   `OPCG_LOG_SILENT=1 python -m pytest tests/test_leader_*.py -q -s -p no:cacheprovider`
-- 現状の集計: **230 passed / 80 xfailed / 1 skipped**（failed・xpassed ゼロ）。
-  xfailed の各 `reason` が未修正の意味バグに対応する。
+- 集計（初版）: 230 passed / 80 xfailed / 1 skipped。**2026-06 の修正フェーズ後: leader xfail 80→33**
+  （後述 §12「修正進捗」参照）。xfailed の各 `reason` が未修正の意味バグに対応する。
 
 ### ヘルパ（`leader_test_helpers.py`）の要点
 
@@ -564,6 +564,85 @@ backend テスト 374 passed / パーサ退行（新規OTHER）0 / フロント 
 
 **修正優先順位（提案）**: A（原因特定済み・1行で5枚超解消）→ B（15枚・誘発機構の設計判断要）→ C/D → E/F
 （OP02-002 効果が正反対・OP11-022 対象が常に空、は実害大）。
+
+#### 修正進捗（2026-06）
+
+- ✅ **群A（不等号反転）解消**: `matcher.py:209` のパワー抽出正規表現から `\D?` を除去し、
+  「パワーN以上」を `power_max`（≤N）でなく `power_min`（≥N）へ正しく解釈するよう是正
+  （cost 側 line 168 と同形）。`parse_target` 経由のため、コスト/付与の対象フィルタと
+  FIELD_COUNT 条件（「パワーN以上のキャラがいる場合」）の双方が直る。
+  - リーダー xfail 12 件を通常テスト化（OP10-001/003・OP16-001・P-086・ST13-001・ST30-001 の
+    パワー条件）。リーダーテスト集計: **242 passed / 68 xfailed**（旧 230/80、failed・xpassed 0）。
+  - 全カード挙動ベースラインで「パワーN以上」フィルタを持つ 18 能力が ≥N へ是正
+    （`full_card_baseline.json` 再生成済み）。全テスト **633 passed / 68 xfailed / 1 skipped**。
+  - 副次: `quality_map.classify_no_change` が効果ツリー内部の Branch ゲート（「その後、〜の場合」等）を
+    COND_FALSE と分類するよう改善（OP09-019 の汎用盤面 no-op を NO_IMPL 誤検出しないため。NO_IMPL=0 維持）。
+  - **未解消**: OP14-041 は群B（KO誘発→ACTIVATE_MAIN化）が主因、ST30-001 の対象名欠落は群E のため xfail 継続。
+- ✅ **群C/E/F の一部を共通機構で解消**（leader xfail 80→61）:
+  - 丸数字コスト ➁/③（群F）: `_don_count` が「指定の数」表記の丸数字を拾わず value=1 に縮退。
+    先頭丸数字＋NFKC 分解後の素数字（loader）も枚数として解釈（OP06-080/OP04-001/ST02-001）。
+  - DON 存在条件の反転（群C）: 「（場の）ドン‼がある場合」が数値無しで既定 EQ 0 になり反転。
+    GE 1 として解釈（OP13-003）。併せて「ドン‼フェイズに置かれる…付与される」を ATTACH_DON
+    誤パース→RULE_PROCESSING（受動的ドン配置ルール、PASSIVE で毎回付与しパワー暴騰を防止）。
+  - OR 条件（群C）: 「ドン‼が0枚、または/か、N枚以上」の選言が先頭しきい値に縮退。
+    `_parse_condition_obj` に OR 分割を追加（第2項の資源主語省略も補完）（ST10-002/OP05-060）。
+  - コスト範囲（群E）: 「コストNからM」を cost_min/cost_max に（matcher）（OP10-099 のフィルタ部）。
+  - 特徴 OR 名前（群E）: 「《特徴》か「名前」」が trait∧name の AND で対象常に空 →
+    `TRAIT_OR_NAME` フラグで OR 照合（OP11-022）。
+- ✅ **群B 誘発トリガーの型是正（パースレベル）**（leader xfail 61→56）:
+  本文埋め込みの「〜された/与えた時」を `_detect_embedded_reactive` で検出し、ACTIVATE_MAIN/PASSIVE
+  フォールバックに化けていた誘発を本来の種別へ写像（`ON_KO`/`ON_DAMAGE_DEALT_TO_LIFE`/新規
+  `ON_LEAVE`/`ON_EVENT_PLAY`/`ON_OPP_PLAY`）。明示イベントタグと timing タグ（【ターン中】）には
+  劣後し、ターンタグは既存 CONTEXT 条件機構で保全。OP01-062/OP03-040/OP16-041/P-117/OP12-081 解消。
+  全カードで EB01-047/OP03-041/043/047/051/OP04-053/OP13-078 等も是正（trigger キーのリネームのみ・
+  挙動値不変）。**実発火の配線は未実装**（型のみ）。
+  - **残（要・イベント追跡機構）**: 「ドンが戻された時」「効果で捨てられた時」「場を離れた時」を
+    実際に発火させ、かつ「イベント無しでは発動しない」(no-fire-without-event) を満たすには、ターン内
+    イベント発生フラグの追跡が必要。OP06-042/OP07-038/OP12-040/OP13-100/OP09-061 等は `resolve_ability`
+    直接呼びでは効果が走るため、現状の挙動テスト(no-fire)は parse 修正だけでは緑化不可。
+  - **残（テスト競合）**: OP01-061（【自分のターン中】+KO・型テストのみ＝安全だが OP07-038/OP03-076 と
+    構造が近く一律化が困難）、OP03-076（型 xfail と YOUR_TURN ロックの通常テストが併存し矛盾）。
+- ✅ **群E/F 個別バグの追加修正**（leader xfail 56→50）:
+  - OP02-002: 「ドン‼が付与された時、…コスト-1」が ATTACH_DON（相手強化）に化け効果が正反対。
+    `_don_attach` を能動的付与（「…に付与する」）に限定し、BUFF cost-1 へ是正。
+  - OP05-098: 先頭トリガー句「ライフが0枚になった時、」の 0 を `_first_int` が拾い HEAL value=0。
+    `_life_recover` が「デッキの上から N枚」から枚数取得。
+  - OP03-022/OP05-002: 「【トリガー】を持つ」対象フィルタを parse_target へ移し全対象種別で適用。
+    「《特徴》か【トリガー】を持つ」は `TRAIT_OR_TRIGGER`（特徴 OR トリガー）で OR 照合。
+  - ST13-003: `hand_to_life` が「手札かトラッシュ」の複数ゾーンを単一 HAND に上書きしていたのを是正。
+    併せて接尾辞なし「コストNの」を cost_max（≤N）でなく**ちょうど N**（cost_min=cost_max=N）に
+    （OP15-039・登場/KO 対象の正確化に横展開）。
+  - OP15-001: `TargetQuery.min_attached_don` を追加。「ドン‼がN枚以上付与されているキャラ」を
+    付与ドン下限で絞り込み（従来「N枚」が count に化けていた）。
+- ✅ **条件スコープ・複合アクション・対象フィルタの追加修正**（leader xfail 50→45）:
+  - ST29-001: 単一文の先頭「〜の場合、Aし、Bする」で条件が先頭アクションのみに掛かり後続が
+    無条件化していた。後続が単一文（内部に「。」無し・連用形連結）のとき効果先頭のゲート条件を
+    ability.condition へ引き上げ（横展開13件）。※`_extract_leading_condition` の「の場合」限定は
+    維持（「いる場合」まで広げると mistarget guard が退行するため OP01-002 等は据え置き）。
+  - OP06-020: 「キャラかドン‼…をレストにする」がドン側固定 → `rest_char_or_don` で Choice 化。
+  - OP10-022: 「キャラのコストの合計が N 以上」→ `ConditionType.FIELD_COST_SUM` 新設。
+  - OP11-021: 「キャラ…とドン‼…をアクティブにする」複合 → ACTIVE＋ACTIVE_DON の Sequence に分解。
+  - OP15-001: `TargetQuery.min_attached_don`（付与ドン下限）。ST13-002: `TargetQuery.is_face_up`
+    （ライフ表裏フィルタ）。
+- ✅ **厳密枚数コスト・トリガー句汚染の追加修正**（leader xfail 45→41）:
+  - OP12-001/OP03-021: 「N枚を公開/レストにできる」の「できる」がコストの任意性なのに is_up_to/
+    非 strict になり、N枚未満でもコストを払えていた。「まで」無しのちょうど N 枚コストは
+    `is_strict_count=True`（_can_satisfy_node が N枚未満を弾く）。横展開11件（REVEAL）。
+  - OP02-026/OP12-081: トリガー未認識のフォールバックで本文に残ったトリガー句「〜時、」が
+    「場合」ゲート条件文に混入し誤分類（手札→HAND_COUNT、相手→player 逆転）。`_parse_logic_block`
+    の「場合」分岐で条件文先頭の「時、」以降をゲート条件とする。
+- **既知の未解決（要設計）**:
+  - 群B 実発火配線: 上記の各誘発を battle/盤面イベントから発火させる（`ON_KO`/`ON_LEAVE`/`ON_DON_RETURNED` 等）。
+    OP14-041 は ON_KO 化済みだが効果側に同種のトリガー句汚染（MOVE_CARD 対象に KO 条件フィルタが
+    混入）＋テストの ACTIVATE_MAIN 参照が残るため別途。
+  - coreference 色制約（OP01-002「戻したキャラと異なる色」）・名称限定 KO 置換（OP12-061）・
+    player 両者対象（ST03-001/OP02-093）・distinct 名（OP16-060）・LIFE+HAND 合計条件（OP04-040）。
+  - V2 coreference 保存ギャップ: 「そのキャラ」参照（ref_id="selected_card"）の先行アクションが
+    V2 ルール生成だと selected_card を保存せず、参照が場全体へフォールスルーする（OP10-099 残因）。
+    legacy `_parse_atomic_action` の save_id 付与が V2 ルール経路に無いのが原因。
+  - 新フィールド要件: 「効果を持たない」除外・「カード名の異なる」distinct（TargetQuery 拡張）。
+  - エンジン未実装: `SWAP_POWER`（OP14-001）、範囲保護のクロスプレイヤー走査（OP14-079）。
+  - 裁定依存: ST14-001（「コスト+1」適用後に「コスト8以上」を評価する順序＝印刷/現在コストの解釈）。
 
 ### 仕様書と実装の相互裏取り（重要）
 

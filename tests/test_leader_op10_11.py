@@ -46,8 +46,6 @@ def _fill_hand_to(p, n):
 #   🐛 条件が power_max=7000（GE→LE反転）。条件成立/不成立の両盤面で反転を捉える。
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP10-001: 能力1条件『パワー7000以上』が power_max=7000（GE→LE反転）。pw8000で成立すべきが不成立")
 def test_op10_001_active_don_condition_met_pw8000():
     """OP10-001 能力1: パワー8000のキャラがいれば（7000以上成立）ドン2枚アクティブになるべき。"""
     gm, p1, p2, L = build("OP10-001")
@@ -60,8 +58,6 @@ def test_op10_001_active_don_condition_met_pw8000():
     assert len(p1.don_active) == 10 and len(p1.don_rested) == 0
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP10-001: 同上反転。pw3000では『7000以上』不成立のはずだが power_max=7000 で逆に成立し発動してしまう")
 def test_op10_001_active_don_condition_unmet_pw3000():
     """OP10-001 能力1: パワー3000のキャラのみ（7000以上を満たさない）なら発動しないべき。"""
     gm, p1, p2, L = build("OP10-001")
@@ -125,8 +121,6 @@ def test_op10_002_no_fire_without_two_don():
 #   🐛 条件 power_max=6000（GE→LE反転）。成立/不成立の両盤面で反転を捉える。
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP10-003: 能力0条件『パワー6000以上』が power_max=6000（GE→LE反転）。pw7000で成立すべきが不成立")
 def test_op10_003_active_don_condition_met_pw7000():
     """OP10-003 能力0: pw7000のDQ海賊団キャラ（6000以上成立）でドン1枚アクティブになるべき。"""
     gm, p1, p2, L = build("OP10-003")
@@ -138,8 +132,6 @@ def test_op10_003_active_don_condition_met_pw7000():
     assert len(p1.don_rested) == 0  # 成立 → アクティブ復帰
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP10-003: 同上反転。pw5000では『6000以上』不成立のはずが power_max=6000 で逆に成立し発動")
 def test_op10_003_active_don_condition_unmet_pw5000():
     """OP10-003 能力0: pw5000のDQ海賊団キャラのみ（6000以上を満たさない）なら発動しないべき。"""
     gm, p1, p2, L = build("OP10-003")
@@ -168,8 +160,6 @@ def test_op10_022_cost_sum_ge5_fires():
     assert ch in p1.hand and ch not in p1.field  # バウンス成立
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP10-022: 『コスト合計5以上』条件が AST から欠落。合計4でも発動しキャラがバウンスされる")
 def test_op10_022_cost_sum_lt5_does_not_fire():
     """OP10-022: コスト合計4（5未満）では発動せず、キャラはバウンスされないべき。"""
     gm, p1, p2, L = build("OP10-022")
@@ -238,7 +228,9 @@ def test_op10_099_cost5_in_range_grants_blocker():
 
 
 @pytest.mark.xfail(strict=True,
-    reason="OP10-099: 対象が cost_max=3 のみ（下限3欠落）。コスト2が誤って対象になりブロッカーを得てしまう")
+    reason="OP10-099: コスト範囲(cost_min=3/cost_max=8)は matcher で是正済み。残因は『そのキャラ』参照——"
+           "V2 でルール生成された先行アクション(ACTIVE)が selected_card を保存せず、GRANT_KEYWORD の "
+           "ref_id 参照が場全体へフォールスルーして範囲外コストにもブロッカーが付く（V2 coreference 保存ギャップ）")
 def test_op10_099_cost2_below_range_no_effect():
     """OP10-099: コスト2の《超新星》（下限3未満）は対象外でブロッカーを得ないべき。"""
     c = _op10_099_run(2)
@@ -246,7 +238,8 @@ def test_op10_099_cost2_below_range_no_effect():
 
 
 @pytest.mark.xfail(strict=True,
-    reason="OP10-099: 対象が cost_max=3 のみ（上限8欠落）。コスト9が誤って対象になりブロッカーを得てしまう")
+    reason="OP10-099: コスト範囲(cost_min=3/cost_max=8)は matcher で是正済み。残因は『そのキャラ』参照の "
+           "V2 coreference 保存ギャップ（GRANT_KEYWORD ref_id が場全体へフォールスルー）")
 def test_op10_099_cost9_above_range_no_effect():
     """OP10-099: コスト9の《超新星》（上限8超）は対象外でブロッカーを得ないべき。"""
     c = _op10_099_run(9)
@@ -303,8 +296,6 @@ def test_op11_021_no_fire_when_hand_gt6():
     assert len(p1.don_rested) == 1  # 不発
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP11-021: 『《魚人族/人魚族》キャラ1枚までをアクティブ』部分が欠落しドンのアクティブのみ")
 def test_op11_021_fishman_char_should_be_activated():
     """OP11-021: 手札6枚以下なら《魚人族》レストキャラもアクティブになるべき。"""
     gm, p1, p2, L = build("OP11-021")
@@ -325,8 +316,6 @@ def test_op11_021_fishman_char_should_be_activated():
 #   成立すべき盤面（海王類）/ 不成立すべき盤面（無関係キャラ）の両方をアサート。
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP11-022: 『《海王類》か「メガロ」』の OR が trait∧name の AND になり対象が常に空。海王類キャラを登場できない")
 def test_op11_022_kaiou_char_should_be_playable():
     """OP11-022: 手札のコスト≤場ドンの《海王類》キャラは登場できるべき（OR の片方）。"""
     gm, p1, p2, L = build("OP11-022")

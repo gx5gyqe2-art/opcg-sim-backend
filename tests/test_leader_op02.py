@@ -84,7 +84,6 @@ def test_op02_001_turn_end_no_life_is_noop():
 # → 実装は ATTACH_DON（相手キャラへドン付与＝パワー+1000）に誤実装。
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="OP02-002: 「相手キャラのコスト-1」が ATTACH_DON(相手強化/パワー+1000)に誤実装。効果種別取り違え")
 def test_op02_002_reduces_opponent_cost_by_one():
     """OP02-002: 相手コスト7以下キャラのコストが-1される（テキスト準拠の正しい挙動）。"""
     gm, p1, p2, L = build("OP02-002")
@@ -162,7 +161,6 @@ def test_op02_025_cost2_wano_below_min_no_discount():
 #   トリガーも登場時→ACTIVATE_MAIN。
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="OP02-026: 条件『自分のキャラ3枚以下』が HAND_COUNT(手札枚数)に誤実装。場のキャラ枚数(FIELD_COUNT)であるべき")
 def test_op02_026_activates_two_don_when_field_le3():
     """OP02-026: 場のキャラ≤3枚なら、起動でレストドン2枚がアクティブになる（テキスト準拠）。"""
     gm, p1, p2, L = build("OP02-026")

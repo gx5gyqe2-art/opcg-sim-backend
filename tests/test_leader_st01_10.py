@@ -140,7 +140,6 @@ def test_st02_001_no_hand_cannot_activate():
     assert L.is_rest is True                         # 払えないのでアクティブにならない
 
 
-@pytest.mark.xfail(strict=False, reason="要確認(ST02-001): コスト③=ドン3枚レストだが REST_DON value=1 で1枚しかレストされない疑い")
 def test_st02_001_cost_rests_three_don():
     """ST02-001 起動メイン: コスト③はドン3枚をレストにするはず（テキスト準拠）。"""
     gm, p1, p2, L = build("ST02-001")
@@ -450,7 +449,6 @@ def test_st10_002_no_ramp_when_don_in_middle():
     assert don_total(p1) == field_before             # 変化なし
 
 
-@pytest.mark.xfail(strict=True, reason="ST10-002 BUG: 条件「または自分の場のドンが8枚以上」(DON_COUNT>=8)のOR節が欠落し、DON==0のみが条件")
 def test_st10_002_ramp_when_don_ge_8():
     """ST10-002 起動メイン: 場のドンが8枚以上でもOR条件成立でドン1枚アクティブ追加されるべき。"""
     gm, p1, p2, L = build("ST10-002")
