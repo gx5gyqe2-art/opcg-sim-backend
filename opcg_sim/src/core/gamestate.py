@@ -1615,6 +1615,20 @@ class GameManager:
                 milled += 1
             log_event("INFO", "game.action_trash_from_deck", f"{target_player.name} milled {milled} card(s) from deck top", player=target_player.name)
             return True
+        if act_name == "SWAP_POWER":
+            # 「選んだキャラそれぞれの元々のパワーを、このターン中、入れ替える」（OP14-001）。
+            # 2体の元々パワー(master.power)を相互に base_power_override へ上書きする
+            # （絶対値の base 上書きで reset_turn_status により失効＝このターン中）。
+            valid = [t for t in targets if t is not None]
+            if len(valid) >= 2:
+                a, b = valid[0], valid[1]
+                pa = a.master.power or 0
+                pb = b.master.power or 0
+                a.base_power_override = pb
+                b.base_power_override = pa
+                log_event("INFO", "game.action_swap_power",
+                          f"Swapped original power: {a.master.name}<->{b.master.name}", player=player.name)
+            return True
         if act_name == "RAMP_DON":
             # status=="RESTED" の場合はレスト状態でコストエリアへ（「レストで追加」）。
             add_rested = getattr(action, "status", None) == "RESTED"

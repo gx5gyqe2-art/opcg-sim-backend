@@ -2145,7 +2145,7 @@
 "OP14-015|ON_ATTACK": "- | pw-1000,kw0,rs0,co0",
 "OP14-016|ON_ATTACK": "- | pw0,kw0,rs0,co0",
 "OP14-016|PASSIVE": "- | pw0,kw0,rs0,co0",
-"OP14-017|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
+"OP14-017|ACTIVATE_MAIN": "- | pw2000,kw0,rs0,co0",
 "OP14-018|COUNTER": "- | pw0,kw0,rs0,co0",
 "OP14-018|TRIGGER": "p1_hand:5→4, p1_field:4→5 | pw0,kw0,rs0,co0",
 "OP14-019|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",

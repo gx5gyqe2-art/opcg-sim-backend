@@ -37,8 +37,6 @@ def _attach_don_to_leader(player, n=1):
 # 2枚を選ぶ。選んだキャラそれぞれの元々のパワーを、このターン中、入れ替える。
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP14-001: SWAP_POWER がエンジン未実装(enums定義のみでapply_action_to_engineにハンドラ無し)。能力解決しても元々パワーが入れ替わらない")
 def test_op14_001_swap_original_power_of_two_chars():
     """OP14-001 起動メイン: 該当キャラ2体の元々パワーをこのターン中入れ替える。"""
     gm, p1, p2, L = build("OP14-001")
