@@ -447,6 +447,11 @@ class EffectParser:
         if _nfc("【自分のターン終了時】") in norm_text: return TriggerType.TURN_END
         if _nfc("【相手のターン終了時】") in norm_text: return TriggerType.OPP_TURN_END
         if _nfc("【相手のアタック時】") in norm_text: return TriggerType.OPPONENT_ATTACK
+        # 埋め込み反応型トリガー（本文の「〜された/与えた時」）は ACTIVATE_MAIN/PASSIVE/UNKNOWN
+        # フォールバックのみ上書きする。明示イベントタグ（上記）と timing タグ（【ターン中】）には
+        # 劣後する——【自分のターン中】系のカードは既存の挙動テストが YOUR_TURN ロックを前提に
+        # するため、ここでは触らない（誘発化は別途、条件ゲート方式で扱うべき領域）。
+        embedded = self._detect_embedded_reactive(norm_text)
         if _nfc("【自分のターン中】") in norm_text: return TriggerType.YOUR_TURN
         if _nfc("【相手のターン中】") in norm_text: return TriggerType.OPPONENT_TURN
         if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER
@@ -457,7 +462,7 @@ class EffectParser:
         # 【ブロッカー】等を得る効果も正しく ACTIVATE_MAIN と判定できるよう、
         # 既知トリガータグ (_TRIGGER_TAG_RE) の有無のみを判断基準にする
         if self._DON_TURN_TAG_RE.search(norm_text) and not self._TRIGGER_TAG_RE.search(norm_text):
-            return TriggerType.ACTIVATE_MAIN
+            return embedded or TriggerType.ACTIVATE_MAIN
 
         # 無タグの反応型「この(キャラ/カード)が…KOされた時、」等は PASSIVE ではなく
         # 対応するトリガーへ写像する。PASSIVE のままだと _apply_passive_effects の
@@ -472,13 +477,39 @@ class EffectParser:
         if re.match(_nfc(r'^ゲーム開始時、'), norm_text):
             return TriggerType.GAME_START
 
-        # 既知トリガータグがなければ → PASSIVE（常時・条件付き効果・特殊タイミング等）
+        # 既知トリガータグがなければ → 埋め込み反応型 or PASSIVE（常時・条件付き効果・特殊タイミング等）
         # キーワードタグ（【ブロッカー】等）は既に _TRIGGER_TAG_RE に含まれておらず
         # この時点で明示的なトリガーが判別できないため PASSIVE として扱う
         if not self._TRIGGER_TAG_RE.search(norm_text):
-            return TriggerType.PASSIVE
+            return embedded or TriggerType.PASSIVE
 
-        return TriggerType.UNKNOWN
+        return embedded or TriggerType.UNKNOWN
+
+    def _detect_embedded_reactive(self, norm_text: str):
+        """タグではなく本文に埋め込まれた反応型トリガー（「〜された/与えた時」）を判定する。
+
+        timing タグ（【ターン中】）や ACTIVATE_MAIN/PASSIVE フォールバックより優先し、本来の誘発種別を
+        返す。明示イベントタグ（【登場時】【KO時】等）は呼び出し側で先に判定済みのため、ここは
+        無タグ／timing タグ／【ドン!!×N】のみのケースで効く。該当が無ければ None。
+        置換条件「KOされる時/場合」は『された』(過去) と区別され誤検出しない。
+        「登場した時」は OP13-100/OP14-041 等が YOUR_TURN ロック挙動を前提にするため対象外。
+        """
+        # 相手ライフへのダメージ誘発（「このリーダーのアタックによって、相手のライフにダメージを与えた時」）
+        if re.search(_nfc(r'ライフに.{0,8}ダメージを与えた時'), norm_text):
+            return TriggerType.ON_DAMAGE_DEALT_TO_LIFE
+        # KO 誘発（主語不問:「相手のキャラがKOされた時」「…キャラがKOされた時」）
+        if re.search(_nfc(r'KOされた時'), norm_text):
+            return TriggerType.ON_KO
+        # 場を離れた誘発（「自分の…キャラが場を離れた時」）
+        if re.search(_nfc(r'場を離れた時'), norm_text):
+            return TriggerType.ON_LEAVE
+        # イベント発動誘発（「自分がイベントを発動した時」）
+        if re.search(_nfc(r'イベントを発動した時'), norm_text):
+            return TriggerType.ON_EVENT_PLAY
+        # 相手の登場誘発（「相手が…登場させた時」）
+        if re.search(_nfc(r'相手が[^。]{0,30}登場させた時'), norm_text):
+            return TriggerType.ON_OPP_PLAY
+        return None
 
     def _parse_to_node(self, text: str, is_cost: bool = False) -> EffectNode:
         norm_text = _nfc(text)

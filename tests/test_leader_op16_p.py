@@ -145,8 +145,6 @@ def test_op16_022_no_active_when_non_impeldown_present():
 #   🐛 誘発「場を離れた時」が欠落し ACTIVATE_MAIN 化（トリガー種別の取りこぼし）。
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-                   reason="OP16-041: 誘発『自分の《インペルダウン》キャラが場を離れた時』が欠落し ACTIVATE_MAIN 化。本来は自動誘発であって起動メインではない")
 def test_op16_041_should_be_leave_triggered_not_activate_main():
     """OP16-041: 本来「場を離れた時」の自動誘発であり、起動メインであってはならない。
 
@@ -404,14 +402,12 @@ def test_p117_deckout_win_replacement():
     assert gm.winner == p1.name
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="P-117: 能力1の誘発『リーダーのアタックでライフにダメージを与えた時』(ON_DAMAGE_DEALT_TO_LIFE)が取りこぼされ ACTIVATE_MAIN 化")
 def test_p117_trash_trigger_should_be_damage_dealt_not_activate_main():
     """P-117 能力1: 誘発は「ライフにダメージを与えた時」であり、起動メインではないべき。
 
-    現実装は当該の TRASH_FROM_DECK 能力を ACTIVATE_MAIN として登録しているため、
-    ON_DAMAGE_DEALT_TO_LIFE トリガーの能力が存在しない → xfail。
+    「相手のライフにダメージを与えた時」を ON_DAMAGE_DEALT_TO_LIFE 誘発として登録する。
     """
+    gm, p1, p2, L = build("P-117")
     triggers = [
         (a.trigger.name if hasattr(a.trigger, "name") else str(a.trigger))
         for a in (L.master.abilities or [])

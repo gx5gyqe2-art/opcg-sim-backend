@@ -264,15 +264,13 @@ def test_op12_081_no_draw_when_self_has_one_cost8():
     assert len(p1.hand) == before              # 1枚では引かない（自他いずれでも未達）
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP12-081: 能力1のトリガーが ACTIVATE_MAIN 化。"
-           "テキストは『相手が元々コスト8以上のキャラを登場させた時/効果でキャラを登場させた時』の誘発。"
-           "誘発経路が失われ、相手の登場に反応しない。")
 def test_op12_081_ability1_is_triggered_not_activate_main():
-    """OP12-081 能力1: 相手のキャラ登場に反応する誘発であるべき（ACTIVATE_MAIN化は誤り）。"""
+    """OP12-081 能力1: 相手のキャラ登場に反応する誘発（ON_OPP_PLAY）であるべき（ACTIVATE_MAIN化は誤り）。"""
     gm, p1, p2, L = build("OP12-081")
-    trig = get_ability(L.master, "ON_PLAY", n=0)  # 本来は相手登場の誘発種別 → 存在しないはず
+    trig = get_ability(L.master, "ON_OPP_PLAY", n=0)  # 相手登場の誘発種別
     assert trig is not None
+    trigs = [a.trigger.name for a in (L.master.abilities or [])]
+    assert "ACTIVATE_MAIN" not in trigs
 
 
 # ===========================================================================

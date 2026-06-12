@@ -152,6 +152,9 @@ class TriggerType(Enum):
     
     ON_DAMAGE_DEALT_TO_LIFE = "ライフダメージ時" # 追加
     ON_LIFE_DECREASE = "ライフ減少時" # 追加
+    ON_LEAVE = "場を離れた時"          # 自分/相手のキャラが場を離れた時
+    ON_EVENT_PLAY = "イベント発動時"    # 自分がイベントを発動した時
+    ON_OPP_PLAY = "相手登場時"          # 相手がキャラを登場させた時
     
     GAME_START = "ゲーム開始時"
     

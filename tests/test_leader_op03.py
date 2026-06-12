@@ -221,8 +221,6 @@ def test_op03_040_deckout_win_only_when_deck_zero():
     assert gm.winner == p1.name   # 相手(p2)がデッキアウトで p1 勝利（置換は発動しない）
 
 
-@pytest.mark.xfail(strict=True, reason="OP03-040 能力1: トリガーが ACTIVATE_MAIN 化しており、"
-                                       "本来の「相手ライフにダメージを与えた時」(ON_DAMAGE_DEALT_TO_LIFE)誘発が失われている")
 def test_op03_040_life_damage_trigger_type():
     """OP03-040 能力1: 「相手のライフにダメージを与えた時」のデッキトップトラッシュは
     ダメージ誘発トリガーであるべき（起動メインではない）。🐛"""
