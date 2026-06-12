@@ -776,8 +776,10 @@ def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
     if not re.search(_nfc(r"ライフの(上|下)に(?:表向きで)?加える"), t):
         return None
     tq = parse_target(t)
-    # 源ゾーン: 手札優先（「手札」明示があれば HAND）、無ければトラッシュ。
-    tq.zone = Zone.HAND if _nfc("手札") in t else Zone.TRASH
+    # 源ゾーン: parse_target が複数ゾーン（「手札かトラッシュ」ST13-003）を検出済みなら尊重する。
+    # 単一ゾーンのときのみ手札優先（「手札」明示があれば HAND）、無ければトラッシュ。
+    if not isinstance(tq.zone, list):
+        tq.zone = Zone.HAND if _nfc("手札") in t else Zone.TRASH
     dest_position = "TOP" if _nfc("ライフの上") in t else "BOTTOM"
     # 「表向きで加える」→ 表向き、「裏向きで」→ 裏向き、明示なし→ゾーン既定(裏向き)。
     face_up = True if _nfc("表向き") in t else (False if _nfc("裏向き") in t else None)

@@ -197,7 +197,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         if prefix_context not in ['+', '-', '\u2212', '\u2010', '\uff0b', '\uff0d'] and not is_set_action:
             val = int(m_c.group(1))
             if m_c.group(2) == _nfc(ParserKeyword.ABOVE): tq.cost_min = val
-            else: tq.cost_max = val
+            elif m_c.group(2) == _nfc(ParserKeyword.BELOW): tq.cost_max = val
+            else:
+                # 接尾辞なしの「コストNの」= ちょうど N。従来は cost_max=N（=以下）に誤って
+                # 範囲拡大していた（ST13-003「コスト5の」/OP15-039「コスト3の」）。
+                tq.cost_min = val
+                tq.cost_max = val
 
     # \u52d5\u7684\u30b3\u30b9\u30c8\u4e0a\u9650: \u300c\uff08\u81ea\u5206\u306e\uff09\u5834\u306e\u30c9\u30f3!!\u306e\u679a\u6570\uff08\u5206\uff09\u4ee5\u4e0b\u306e\u30b3\u30b9\u30c8\u300d\u2192 DON_COUNT_FIELD\u3002
     #   \u6570\u5024\u3067\u306f\u306a\u304f\u5834\u306e\u30c9\u30f3!!\u679a\u6570\u3067\u30b3\u30b9\u30c8\u4e0a\u9650\u304c\u6c7a\u307e\u308b\uff08\u865a\u306e\u7389\u5ea7 OP13-099 \u7b49\uff09\u3002

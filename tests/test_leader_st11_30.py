@@ -214,9 +214,6 @@ def test_st13_003_life_not_zero_does_not_fire():
     assert len(p1.life) == life0       # 条件未達→ライフ追加なし
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="ST13-003: MOVE_CARD 取得元 zone=HAND のみで『手札かトラッシュ』の"
-                          "トラッシュ参照が欠落。トラッシュのコスト5キャラを加えられない")
 def test_st13_003_adds_cost5_char_from_trash():
     """ST13-003: ライフ0かつコスト5キャラがトラッシュにのみある場合でもライフ上に加えられるべき。"""
     gm, p1, p2, L = build("ST13-003")
