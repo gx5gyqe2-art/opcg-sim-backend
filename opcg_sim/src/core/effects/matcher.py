@@ -206,7 +206,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             # \u65e2\u5b9a\u306f\u76f8\u624b\u306e\u30e9\u30a4\u30d5\uff08\u300c\u76f8\u624b\u306e\u300d\u660e\u793a\uff0f\u7701\u7565\u6642\u3068\u3082\u76f8\u624b\u57fa\u6e96\u304c\u5927\u534a\uff09
             tq.cost_max_dynamic = "LIFE_COUNT_OPPONENT"
 
-    m_p = re.search(_nfc(ParserKeyword.POWER + r'[^+\uff0b\-\uff0d\u2212\u2010\d]?(\d+)\D?(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    m_p = re.search(_nfc(ParserKeyword.POWER + r'[^+\uff0b\-\uff0d\u2212\u2010\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_p:
         start_idx = m_p.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]

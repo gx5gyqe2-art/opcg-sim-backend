@@ -114,6 +114,11 @@ def classify_no_change(master, trig: str) -> str:
             return "COST_UNMET"
         if _has_real_condition(ab):
             return "COND_FALSE"
+        # 効果ツリー内部の Branch ゲート（Ability.condition ではなく「その後、〜の場合」等）も
+        # 条件不成立による no-op の正当な理由。汎用盤面で分岐が取られないとアクションは出ない
+        # （例 OP09-019「相手のパワー5000以上のキャラがいる場合、引く」）。実装漏れ(NO_IMPL)と区別する。
+        if _has_node(ab.effect, (Branch,)):
+            return "COND_FALSE"
         if any(t in _ZONE_VISIBLE for t in types):
             saw_zone_visible = True
         if any(t in _TARGETED for t in types):

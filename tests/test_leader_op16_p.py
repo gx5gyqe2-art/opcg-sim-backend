@@ -73,8 +73,6 @@ def test_op16_001_grant_haste_power_at_threshold():
     assert _has_keyword(c, "速攻")
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="OP16-001: 『パワー8000以上』が power_max=8000(=8000以下)に反転(matcher.py:209/216 の正規表現 \\D? 不具合)。8000超のキャラが対象外になる")
 def test_op16_001_grant_haste_power_above_threshold():
     """OP16-001: パワー9000（8000以上）のキャラは【速攻】を得るべき（テキスト準拠）。
 
@@ -88,8 +86,6 @@ def test_op16_001_grant_haste_power_above_threshold():
     assert _has_keyword(c, "速攻")
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="OP16-001: 『パワー8000以上』が power_max=8000(=8000以下)に反転。7000のキャラが誤って対象になり付与される")
 def test_op16_001_grant_haste_power_below_threshold_excluded():
     """OP16-001: パワー7000（8000未満）のキャラは対象外で【速攻】を得ないべき。
 
@@ -366,8 +362,6 @@ def test_p086_deck_bottom_cost_target_at_threshold():
     assert victim in p1.deck and victim not in p1.field
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="P-086: コスト『パワー3000以上』が power_max=3000(=3000以下)に反転(matcher.py 正規表現 \\D? 不具合)。3000超のキャラがデッキ下コスト対象外になる")
 def test_p086_deck_bottom_cost_target_above_threshold():
     """P-086: パワー5000（3000以上）のキャラはデッキ下コストの対象になるべき（テキスト準拠）。
 
@@ -381,8 +375,6 @@ def test_p086_deck_bottom_cost_target_above_threshold():
     assert victim in p1.deck and victim not in p1.field
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="P-086: コスト『パワー3000以上』が power_max=3000(=3000以下)に反転。2000のキャラが誤ってデッキ下コスト対象になる")
 def test_p086_deck_bottom_cost_target_below_threshold_excluded():
     """P-086: パワー2000（3000未満）のキャラはデッキ下コストの対象外であるべき。
 
