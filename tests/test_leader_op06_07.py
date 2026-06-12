@@ -363,9 +363,6 @@ def test_op07_097_activate_main_choice_play_egghead():
     assert len(p1.don_active) == active_before - 1         # コスト: ドン1枚レスト
 
 
-@pytest.mark.xfail(strict=False, reason=(
-    "要確認: OP07-097 選択肢①の FACE_UP_LIFE target.zone が LIFE と解釈され、手札の"
-    "《エッグヘッド》が候補にならず移動しない（手札→ライフ上の移動が表面化しない）。"))
 def test_op07_097_activate_main_choice_face_up_life():
     """OP07-097【起動メイン】選択肢①: コスト5以下《エッグヘッド》をライフ上に表向きで加える。"""
     gm, p1, p2, L = build("OP07-097")

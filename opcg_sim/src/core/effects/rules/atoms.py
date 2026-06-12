@@ -540,6 +540,10 @@ def _life_face(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ライフ") not in t:
         return None
+    # 「手札／デッキから…ライフの上に表向きで加える」は既存ライフの反転ではなく移動(MOVE_CARD)。
+    # hand_to_life / life_recover に委ねる（OP07-097: 手札のエッグヘッドをライフ上へ）。
+    if _nfc("加える") in t and (_nfc("手札") in t or _nfc("デッキ") in t):
+        return None
     if _nfc("表向き") in t:
         status = "UP"
     elif _nfc("裏向き") in t:
