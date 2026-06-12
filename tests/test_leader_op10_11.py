@@ -320,8 +320,6 @@ def test_op11_021_fishman_char_should_be_activated():
 #   成立すべき盤面（海王類）/ 不成立すべき盤面（無関係キャラ）の両方をアサート。
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP11-022: 『《海王類》か「メガロ」』の OR が trait∧name の AND になり対象が常に空。海王類キャラを登場できない")
 def test_op11_022_kaiou_char_should_be_playable():
     """OP11-022: 手札のコスト≤場ドンの《海王類》キャラは登場できるべき（OR の片方）。"""
     gm, p1, p2, L = build("OP11-022")

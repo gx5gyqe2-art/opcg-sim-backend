@@ -159,6 +159,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             
     tq.traits.extend(final_traits)
 
+    # 「《特徴》（を持つキャラカード）か「名前」」= 特徴 OR 名前。「か」が名前の開き括弧へ
+    # 直接かかる場合に OR とみなす（OP11-022「《海王類》を持つキャラカードか「メガロ」」）。
+    if tq.traits and tq.names and re.search(_nfc(r'か[「『《]'), tgt_text):
+        tq.flags.add("TRAIT_OR_NAME")
+
     attrs = re.findall(_nfc(ParserKeyword.ATTRIBUTE + r'[((]([^))]+)[))]'), tgt_text)
     tq.attributes.extend(attrs)
     
@@ -346,15 +351,26 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             txt = card.master.effect_text
             if txt and txt.strip() not in ["", "なし", "-"]: continue
 
-        if query.names:
+        # 「《特徴》か「名前」」= 特徴 OR 名前（両者の AND ではない）。OP11-022「《海王類》かメガロ」が
+        # trait∧name の AND になり対象が常に空になっていた。フラグ時は OR で照合する。
+        if "TRAIT_OR_NAME" in query.flags and (query.names or query.traits):
             if "NAME_PARTIAL" in query.flags:
-                if not any(n in card.master.name for n in query.names): continue
+                name_ok = bool(query.names) and any(n in card.master.name for n in query.names)
             else:
-                if card.master.name not in query.names: continue
+                name_ok = bool(query.names) and card.master.name in query.names
+            trait_ok = bool(query.traits) and any(t in card.master.traits for t in query.traits)
+            if not (name_ok or trait_ok): continue
+            if query.exclude_names and card.master.name in query.exclude_names: continue
+        else:
+            if query.names:
+                if "NAME_PARTIAL" in query.flags:
+                    if not any(n in card.master.name for n in query.names): continue
+                else:
+                    if card.master.name not in query.names: continue
 
-        if query.exclude_names and card.master.name in query.exclude_names: continue
+            if query.exclude_names and card.master.name in query.exclude_names: continue
 
-        if query.traits and not any(t in card.master.traits for t in query.traits): continue
+            if query.traits and not any(t in card.master.traits for t in query.traits): continue
         if query.is_rest is not None and card.is_rest != query.is_rest: continue
 
         # 「【トリガー】を持つカード」フィルタ: トリガー能力（master.trigger_text 非空、または
