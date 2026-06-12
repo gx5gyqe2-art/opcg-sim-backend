@@ -825,6 +825,7 @@ class EffectResolver:
             "player_id": player.name,
             "action_type": "CONFIRM_OPTIONAL",
             "source_card_name": source_card.master.name,
+            "source_card_uuid": source_card.uuid,
             "message": f"「{source_card.master.name}」の効果を発動しますか？",
             "can_skip": True,
             "continuation": {

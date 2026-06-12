@@ -96,7 +96,8 @@
     "MESSAGE": "message",
     "CANDIDATES": "candidates",
     "CONSTRAINTS": "constraints",
-    "OPTIONS": "options"
+    "OPTIONS": "options",
+    "SOURCE_CARD_UUID": "source_card_uuid"
   },
   "ERROR_PROPERTIES": {
     "CODE": "code",
