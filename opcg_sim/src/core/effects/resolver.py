@@ -553,6 +553,11 @@ class EffectResolver:
             current_val = sum(c.current_cost for c in target_player.field)
             return self._compare(current_val, condition.operator, target_val)
 
+        elif condition.type == ConditionType.LIFE_HAND_SUM:
+            # 「（自分の）ライフと手札の合計枚数が N 以上/以下」（OP04-040）。
+            current_val = len(target_player.life) + len(target_player.hand)
+            return self._compare(current_val, condition.operator, target_val)
+
         elif condition.type == ConditionType.HAS_DON:
             # 【ドン!!×N】: このカード（source_card）に付与されたドン!!が N 枚以上か。
             # コストエリアの active ドン枚数ではなく、対象カードの attached_don を見る。

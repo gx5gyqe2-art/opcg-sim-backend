@@ -175,6 +175,7 @@ class ConditionType(Enum):
     TRASH_COUNT = auto()
     FIELD_COUNT = auto()
     FIELD_COST_SUM = auto()  # 「（自分の）キャラのコストの合計が N 以上/以下」（OP10-022）
+    LIFE_HAND_SUM = auto()   # 「（自分の）ライフと手札の合計枚数が N 以上/以下」（OP04-040）
     HAS_TRAIT = auto()
     HAS_ATTRIBUTE = auto()
     HAS_UNIT = auto()

@@ -949,6 +949,11 @@ class EffectParser:
                     return Condition(type=ConditionType.DON_COUNT, operator=CompareOperator.GE, value=1, player=p, raw_text=norm_text)
             return Condition(type=ConditionType.DON_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
+        # ライフ＋手札の合計（「自分のライフと手札の合計枚数が4枚以下の場合」OP04-040）。
+        # LIFE_COUNT より先に判定する（「ライフ」を含むため誤分類を避ける）。
+        if _nfc("ライフと手札の合計") in norm_text or _nfc("手札とライフの合計") in norm_text:
+            return Condition(type=ConditionType.LIFE_HAND_SUM, operator=operator, value=value, player=p, raw_text=norm_text)
+
         if _nfc("ライフ") in norm_text:
             return Condition(type=ConditionType.LIFE_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 

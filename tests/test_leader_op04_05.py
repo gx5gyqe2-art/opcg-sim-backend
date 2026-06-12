@@ -243,7 +243,6 @@ def test_op04_040_no_effect_when_total_ge5():
     assert after["life"] == before["life"]
 
 
-@pytest.mark.xfail(strict=True, reason="OP04-040バグ: 条件がLIFE_COUNTのみで手札枚数が合算されない。ライフ2+手札5=7(>4)でもドローしてしまう")
 def test_op04_040_condition_counts_hand_too():
     """OP04-040 アタック時: ライフ+手札の合計が5以上(ライフ2+手札5=7)ならドローしない。"""
     gm, p1, p2, L = build("OP04-040")
