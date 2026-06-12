@@ -2392,4 +2392,19 @@ CASES = [
              ]}}
         ],
     },
+    # EB03-055 ニコ・ロビン: 二重タグ【相手のターン中】【KO時】→ ON_KO + CONTEXT 条件
+    {
+        "id": "eb03_055_robin_double_tag",
+        "text": "【登場時】自分のライフの上から1枚をトラッシュに置くことができる:自分のリーダーが特徴《麦わらの一味》を持つ場合、自分のデッキの上から2枚までを、ライフの上に加える。 / 【相手のターン中】【KO時】相手に1ダメージを与えてもよい。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "condition": {"type": "LEADER_TRAIT", "value": "麦わらの一味"},
+             "cost": {"kind": "action", "type": "TRASH",
+                      "target": {"player": "SELF", "zone": "LIFE"}},
+             "effect": {"kind": "action", "type": "HEAL", "value": 2}},
+            {"trigger": "ON_KO",
+             "condition": {"type": "CONTEXT", "value": "OPPONENT_TURN"},
+             "effect": {"kind": "action", "type": "DEAL_DAMAGE", "value": 1}},
+        ],
+    },
 ]

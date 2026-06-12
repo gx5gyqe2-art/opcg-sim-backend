@@ -174,6 +174,13 @@ class EffectParser:
                 don_cost_value = int(don_match.group(1))
                 norm_text = norm_text.replace(don_match.group(0), '').strip()
 
+            # ターン文脈タグ＋イベントトリガーの二重タグ（例【相手のターン中】【KO時】）は、
+            # イベント側がトリガーになりターン文脈が脱落していた。タグ除去前に有無を記録し、
+            # 最終トリガーがターン常時型（YOUR_TURN/OPPONENT_TURN）でなければ CONTEXT 条件
+            # として ability.condition に統合する（resolver が turn_player で評価する）。
+            has_self_turn_tag = _nfc("【自分のターン中】") in norm_text
+            has_opp_turn_tag = _nfc("【相手のターン中】") in norm_text
+
             # トリガー/注釈タグの除去。
             # ただしキーワード能力タグ（【ブロッカー】等）は効果本体で「付与」を
             # 表すため保持する。脱落すると原子句が「このキャラはを得る」になり、
@@ -231,6 +238,17 @@ class EffectParser:
 
             # 先頭のゲート条件（「〜の場合、」）を ability.condition に引き上げる
             final_condition = turn_limit_cond
+            ctx_cond = None
+            if trigger not in (TriggerType.YOUR_TURN, TriggerType.OPPONENT_TURN):
+                if has_opp_turn_tag:
+                    ctx_cond = Condition(type=ConditionType.CONTEXT, value="OPPONENT_TURN",
+                                         raw_text=_nfc("【相手のターン中】"))
+                elif has_self_turn_tag:
+                    ctx_cond = Condition(type=ConditionType.CONTEXT, value="SELF_TURN",
+                                         raw_text=_nfc("【自分のターン中】"))
+            if ctx_cond is not None:  # ターン文脈タグの CONTEXT 条件を統合
+                final_condition = ctx_cond if final_condition is None else Condition(
+                    type=ConditionType.AND, args=[final_condition, ctx_cond])
             if don_cond is not None:  # 【ドン!!×N】の付与ドン条件を統合
                 final_condition = don_cond if final_condition is None else Condition(
                     type=ConditionType.AND, args=[final_condition, don_cond])
