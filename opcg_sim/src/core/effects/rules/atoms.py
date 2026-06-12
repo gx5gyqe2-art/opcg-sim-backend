@@ -1406,7 +1406,9 @@ def _temp_to_deck(ctx: ParseContext) -> Optional[GameAction]:
     → DECK_BOTTOM（TEMP 全件→デッキ下, 保守的）。
 
     look_deck の後、手札に取らなかった残りをデッキへ戻す。「残り」を含む句は
-    remaining_* が担当するため除外。上下/並び替えの選択 UI は未実装のため下へ戻す。
+    remaining_* が担当するため除外。並び替え UI（CardSelectModal の DnD 並び替え＝
+    maxSelect<0）自体はフロントに実装済みだが、エンジンが並び替え用インタラクションを
+    発行する結線は未了のため、現状は上下/順序を選ばせず保守的にデッキ下（現状順）へ送る。
 
     明示ソース（トラッシュ/ライフ）またはフィールドのキャラ対象（コスト/枚数フィルタ付き）は
     deck_bottom_general(priority=55) が担当するため除外。
@@ -1647,7 +1649,8 @@ def _scry_place(ctx: ParseContext) -> Optional[GameAction]:
 def _remaining_deck_top_or_bottom(ctx: ParseContext) -> Optional[GameAction]:
     """「残りを（好きな順番に並び替え、）?デッキの上か下に置く」→ DECK_BOTTOM（保守的）。
 
-    「上か下」を選ぶ UI は未実装のため、保守的にデッキ下扱い。
+    「上か下」を選ばせるエンジン結線が未了のため、保守的にデッキ下扱い
+    （フロントの DnD 並び替え UI 自体は実装済みだが、エンジンが選択を発行しない）。
     「残りをデッキの下に置く」は remaining_deck_bottom(priority=65) が優先処理する。
     """
     t = ctx.text
@@ -1943,8 +1946,8 @@ def _remaining_trash(ctx: ParseContext) -> Optional[GameAction]:
 # 手札→デッキ上か下:
 #   「自分の手札N枚を（好きな順番で並び替え、）デッキの上か下（/上/下）に置く」
 #   → DECK_BOTTOM(zone=HAND)。
-#   「並び替え」は UI 未実装のため無視（順序不定でデッキ下）。
-#   「上か下」の選択 UI も未実装のため保守的にデッキ下扱い。
+#   「並び替え」「上か下」は、フロントの DnD 並び替え UI は実装済みだが、エンジンが
+#   並び替え/上下の選択インタラクションを発行する結線が未了のため、現状順のままデッキ下へ送る。
 # ---------------------------------------------------------------------------
 @rule("hand_to_deck", priority=64)
 def _hand_to_deck(ctx: ParseContext) -> Optional[GameAction]:

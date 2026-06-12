@@ -1247,8 +1247,10 @@ class GameManager:
 
         if act_name == "ORDER_LIFE":
             # 「（自分/相手の）ライフすべてを見て、好きな順番で置く」: ライフを公開し任意順に
-            # 並べ替える（対象選択を伴う INTERACTIVE）。並べ替えはプレイヤーの選択で枚数は不変。
-            # ヘッドレス（自動）では現状の並びを保持する（カード消失なし・TEMP 非汚染）。
+            # 並べ替える。並べ替えはプレイヤーの選択で枚数は不変。
+            # 並び替え UI（フロントの DnD）は実装済みだが、ここでエンジンが並び替え用
+            # インタラクションを発行する結線は未了のため、現状は並びを保持する（＝自動／
+            # ヘッドレスと同挙動。カード消失なし・TEMP 非汚染）。
             target_player = player
             if getattr(action, "status", None) == "OPPONENT":
                 target_player = self.p2 if player == self.p1 else self.p1
