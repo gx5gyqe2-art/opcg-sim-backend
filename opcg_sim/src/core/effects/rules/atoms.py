@@ -983,6 +983,37 @@ def _don_rest_cost_fragment(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(type=ActionType.REST_DON, value=ValueSource(base=int(m.group(1))), raw_text=ctx.text)
 
 
+@rule("rest_char_or_don", priority=76)
+def _rest_char_or_don(ctx: ParseContext) -> Optional[EffectNode]:
+    """「（相手の、コスト…の）キャラかドン‼N枚までを、レストにする」→ Choice[REST(キャラ), REST_DON]。
+
+    「か」でキャラとドンの択一だが、ドン側(REST_DON)だけ拾われキャラのレスト選択肢が
+    脱落していた（OP06-020）。キャラ句とドン句に分け、どちらをレストにするかの Choice にする。
+    """
+    t = ctx.text
+    if not re.search(_nfc(r"レストに(する|できる)"), t):
+        return None
+    m = re.search(_nfc(r'(.+?キャラ)か((?:レストの)?ドン[ 　]*(?:!!|‼)[^、。]*?まで)'), t)
+    if not m:
+        return None
+    char_part, don_part = m.group(1), m.group(2)
+    char_tq = parse_target(char_part)
+    char_tq.is_rest = None
+    if _nfc("まで") in t:
+        char_tq.is_up_to = True
+    char_action = GameAction(type=ActionType.REST, target=char_tq, raw_text=char_part)
+    # ドンの所有側: 「か」より前に「相手の」があれば相手のドン。
+    don_status = "OPPONENT" if _nfc("相手") in char_part else _don_opponent(t)
+    don_action = GameAction(
+        type=ActionType.REST_DON,
+        value=ValueSource(base=_don_count(don_part)),
+        status=don_status,
+        raw_text=don_part,
+    )
+    return Choice(message="レストにする対象を選ぶ", option_labels=["キャラ", "ドン!!"],
+                  options=[char_action, don_action])
+
+
 @rule("don_set_rest", priority=74)
 def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分の）ドン!!N枚をレストにする/できる」→ REST_DON（アクティブ→レスト）。多くはコスト。"""

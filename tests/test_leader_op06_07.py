@@ -61,9 +61,6 @@ def test_op06_001_no_film_card_cannot_pay_cost():
 # OP06-020 ホーディ・ジョーンズ（🐛 対象「コスト3以下キャラ」選択肢＆コスト上限欠落）
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason=(
-    "OP06-020: 効果が REST_DON(status=OPPONENT) 固定で『相手のコスト3以下のキャラを"
-    "レストにする』選択肢が欠落。コスト3キャラがレストにならない。"))
 def test_op06_020_rest_opponent_cost3_character():
     """OP06-020【起動メイン】相手のコスト3以下のキャラをレストにできるべき（バグで不可）。"""
     gm, p1, p2, L = build("OP06-020")
