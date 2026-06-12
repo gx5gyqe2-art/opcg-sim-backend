@@ -2349,4 +2349,19 @@ CASES = [
              "effect": {"kind": "action", "type": "KO"}}
         ],
     },
+    # ----- 旧 catalog.py（手動定義）担当カードのパーサ自動化（catalog 廃止） ----------
+    # OP06-047 プリン: 相手手札全戻し→相手デッキシャッフル→相手5ドロー
+    {
+        "id": "op06_047_pudding_redraw",
+        "text": "【登場時】相手は自身の手札すべてをデッキに戻しシャッフルする。その後、相手はカード5枚を引く。",
+        "expect": [
+            {"trigger": "ON_PLAY",
+             "effect": {"kind": "seq", "actions": [
+                 {"type": "DECK_BOTTOM",
+                  "target": {"player": "OPPONENT", "zone": "HAND", "select_mode": "ALL"}},
+                 {"type": "SHUFFLE", "target": {"player": "OPPONENT", "zone": "DECK"}},
+                 {"type": "DRAW", "value": 5, "target": {"player": "OPPONENT"}},
+             ]}}
+        ],
+    },
 ]

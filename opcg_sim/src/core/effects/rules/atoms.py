@@ -76,8 +76,14 @@ def _draw(ctx: ParseContext) -> Optional[GameAction]:
     # ドロー枚数は「カードN枚」から取る（「キャラ1枚につき」等の先行数値と混同しない）
     mx = re.search(_nfc(r"カード([\d０-９]+)枚"), t)
     x = _to_int(mx.group(1)) if mx else _first_int(t, 1)
+    # 「相手はカードN枚を引く」: ドローの主体は相手（target.player で executor が判定する。
+    # 無指定だと能力コントローラーが引いてしまう。OP06-047 等）
+    tq = None
+    if re.search(_nfc(r"相手は[^。]*引"), t):
+        tq = TargetQuery(player=Player.OPPONENT, zone=Zone.DECK, count=x)
     return GameAction(
         type=ActionType.DRAW,
+        target=tq,
         value=_per_n_value(t, x) or ValueSource(base=x),
         raw_text=t,
     )
@@ -1274,7 +1280,11 @@ def _execute_main(ctx: ParseContext) -> Optional[GameAction]:
 def _shuffle(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("シャッフル") not in ctx.text:
         return None
-    return GameAction(type=ActionType.SHUFFLE, raw_text=ctx.text)
+    # 「相手のデッキをシャッフルする」: 対象は相手デッキ（executor が target.player で判定）
+    tq = None
+    if _nfc("相手の") in ctx.text:
+        tq = TargetQuery(player=Player.OPPONENT, zone=Zone.DECK)
+    return GameAction(type=ActionType.SHUFFLE, target=tq, raw_text=ctx.text)
 
 
 # ---------------------------------------------------------------------------
