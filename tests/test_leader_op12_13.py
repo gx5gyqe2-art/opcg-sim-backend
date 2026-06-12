@@ -64,9 +64,6 @@ def test_op12_001_buff_with_two_revealed_events():
     assert len(p1.hand) == 2                  # 公開なので手札は残る
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP12-001: コスト REVEAL(count=2) が is_up_to:true。テキストは『イベント2枚を公開』＝2枚ちょうど。"
-           "1枚しか公開できない盤面でも min=0 で発動・バフできてしまう（2枚未満なら発動不可が正）。")
 def test_op12_001_one_event_cannot_pay_cost():
     """OP12-001: 手札イベントが1枚のみ＝2枚公開コストを払えず、バフは発生しない（正しい挙動）。"""
     gm, p1, p2, L = build("OP12-001")

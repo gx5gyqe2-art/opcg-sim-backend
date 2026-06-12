@@ -1599,9 +1599,15 @@ def _reveal_hand(ctx: ParseContext) -> Optional[GameAction]:
         return None
     tq = parse_target(t)
     tq.zone = Zone.HAND
-    # 「できる」「ことができる」「まで」は任意（対象不在でも no-op 成功）。
-    if _nfc("できる") in t or _nfc("まで") in t:
+    # 「まで」のみ可変枚数（0..N）。「できる/ことができる」はコストの任意性であって枚数ではない
+    # （「イベント2枚を公開することができる」＝ちょうど2枚を任意で公開。cost_optional 側で処理）。
+    # 従来は「できる」でも is_up_to=True となり 2枚未満でもコストを払えてしまった（OP12-001）。
+    if _nfc("まで") in t:
         tq.is_up_to = True
+    else:
+        # ちょうど N 枚公開（「イベント2枚を公開する」）。コスト充足判定で候補が N 枚未満なら
+        # 支払い不可とするため厳密枚数にする（OP12-001: 1枚しか無いと発動できないのが正）。
+        tq.is_strict_count = True
     # 後続の「公開したカードを…」(revealed_to_deck_top 等) が参照できるよう保存する
     tq.save_id = "revealed_cards"
     return GameAction(type=ActionType.REVEAL, target=tq, raw_text=t)

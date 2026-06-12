@@ -696,7 +696,7 @@ CASES = [
                 "effect": {
                     "kind": "action",
                     "type": "REVEAL",
-                    "target": {"zone": "HAND", "player": "SELF", "card_type": ["EVENT"], "count": 2, "is_up_to": True},
+                    "target": {"zone": "HAND", "player": "SELF", "card_type": ["EVENT"], "count": 2, "is_up_to": False},
                 }
             }
         ],
