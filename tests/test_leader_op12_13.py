@@ -145,9 +145,6 @@ def test_op12_020_insufficient_don_no_activation():
 # OP12-040 クザン  🐛 誘発条件(《海軍》効果起因の捨て)欠落＋固定1ドローで PASSIVE 常時ドロー化
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP12-040: trigger=PASSIVE で『《海軍》カードの効果で手札が捨てられた時』誘発が欠落。"
-           "汎用盤面で無条件に1枚引いてしまう。本来は何も捨てていない状態では発火しない。")
 def test_op12_040_no_draw_without_navy_discard_trigger():
     """OP12-040: 《海軍》効果での手札捨てが発生していない場面では引かない（正しい挙動）。"""
     gm, p1, p2, L = build("OP12-040")
@@ -411,9 +408,6 @@ def test_op13_079_activate_main_choice_cost_draws():
 # OP13-100 ジュエリー・ボニー  🐛 誘発条件「【トリガー】持ちキャラ登場時」欠落、YOUR_TURN単純起動化
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP13-100: trigger=YOUR_TURN の単純起動で『自分の【トリガー】を持つキャラが登場した時』"
-           "誘発条件が欠落。【トリガー】キャラ登場と無関係に毎ターン、レストのドン2枚を付与できてしまう。")
 def test_op13_100_no_attach_without_trigger_char_play():
     """OP13-100: 【トリガー】持ちキャラの登場が無い場面では付与が発火しない（正しい挙動）。"""
     gm, p1, p2, L = build("OP13-100")

@@ -118,6 +118,10 @@ class GameManager:
         self.turn_player = self.p1
         self.opponent = self.p2
         self.turn_count = 0
+        # このターン中に発生したイベントの回数（EVENT_THIS_TURN 条件用）。ターン開始でクリア。
+        # 例: "DON_RETURNED"（ドン!!デッキへ返却）/ "CHAR_LEFT_BY_OWN_EFFECT" / "NAVY_DISCARD" /
+        #     "TRIGGER_CHAR_PLAYED"。各イベント発生地点で record_turn_event() を呼ぶ。
+        self._turn_events: Dict[str, int] = {}
         self.phase = Phase.SETUP
         self.winner: Optional[str] = None
         self.active_battle: Optional[Dict[str, Any]] = None
@@ -618,7 +622,16 @@ class GameManager:
                     "value": ev.get("value"), "success": ev.get("success", True),
                 })
 
+    def record_turn_event(self, name: str, n: int = 1):
+        """このターン中に発生したイベントを記録する（EVENT_THIS_TURN 条件で参照）。"""
+        ev = getattr(self, "_turn_events", None)
+        if ev is None:
+            ev = self._turn_events = {}
+        ev[name] = ev.get(name, 0) + n
+
     def switch_turn(self):
+        # ターンが切り替わる/追加ターンに入る = 新しいターン。ターン内イベント記録をクリアする。
+        self._turn_events = {}
         # 追加ターン（EXTRA_TURN）: 予約したプレイヤーがターンプレイヤーのまま継続する
         if getattr(self, "pending_extra_turn", None) == self.turn_player.name:
             self.pending_extra_turn = None
@@ -1109,6 +1122,11 @@ class GameManager:
             self.move_card(card, Zone.TRASH, player)
         else:
             self.move_card(card, Zone.FIELD, player); card.attached_don = 0; card.is_newly_played = True
+            # 【トリガー】を持つキャラの登場をターン内イベントとして記録（OP13-100「自分の【トリガー】を
+            # 持つキャラが登場した時」）。trigger_text 非空 または TriggerType.TRIGGER 能力を持つ。
+            if (getattr(card.master, "trigger_text", "") or any(
+                    ab.trigger == TriggerType.TRIGGER for ab in (card.master.abilities or ()))):
+                self.record_turn_event("TRIGGER_CHAR_PLAYED", 1)
             # 登場した時点で継続効果（PASSIVE/YOUR_TURN）を適用してから ON_PLAY を解決する。
             # 例: クザン「相手のキャラすべてをコスト-5」+【登場時】コスト0のキャラをKO —
             # 自身の継続効果が ON_PLAY の対象判定に反映される必要がある。
@@ -1681,6 +1699,8 @@ class GameManager:
                         break
                     if self._return_one_don(tp, don):
                         returned += 1
+            if returned > 0:
+                self.record_turn_event("DON_RETURNED", returned)
             log_event("INFO", "game.action_return_don", f"{tp.name} returned {returned} DON!! to don deck", player=tp.name)
             return True
 

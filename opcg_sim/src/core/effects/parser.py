@@ -240,6 +240,11 @@ class EffectParser:
                     raw_text=_nfc(f"【ドン!!×{don_cost_value}】"),
                 )
 
+            # 効果文先頭の「〈イベント〉した時」（ドン返却/退場/捨て/トリガー登場 等）を EVENT_THIS_TURN
+            # 条件として引き上げ、効果本体から除去する。エンジンが該当イベントを記録していなければ
+            # 発動しない（OP06-042/OP07-038/OP12-040/OP13-100/OP09-061 の「イベント無しでは不発」）。
+            event_cond, effect_text = self._extract_event_condition(effect_text)
+
             # テキスト埋め込みトリガー宣言「〈timing〉時、発動できる」を解消（OTHER 化を防ぐ）。
             trigger, effect_text, activation_optional = self._strip_text_trigger(trigger, effect_text)
 
@@ -298,6 +303,9 @@ class EffectParser:
             if don_cond is not None:  # 【ドン!!×N】の付与ドン条件を統合
                 final_condition = don_cond if final_condition is None else Condition(
                     type=ConditionType.AND, args=[final_condition, don_cond])
+            if event_cond is not None:  # 効果節先頭から引き上げたターン内イベント条件
+                final_condition = event_cond if final_condition is None else Condition(
+                    type=ConditionType.AND, args=[final_condition, event_cond])
             if effect_gate_cond is not None:  # 効果節先頭から引き上げたゲート条件（単一文・複数アクション）
                 final_condition = effect_gate_cond if final_condition is None else Condition(
                     type=ConditionType.AND, args=[final_condition, effect_gate_cond])
@@ -361,6 +369,33 @@ class EffectParser:
         if _nfc("場を離れる") not in norm_text and _nfc("KOされ") not in norm_text:
             return None
         return "BATTLE_KO" if _nfc("バトル") in norm_text else "LEAVE"
+
+    # 効果文先頭の「〈イベント〉した時、」をターン内イベント条件へ写像する定義。
+    # (正規表現, イベント名, 最小回数)。先頭マッチのみ採用し、本文から除去する。
+    _EVENT_CLAUSE_PATTERNS = (
+        (r'^自分の場のドン[ 　]*(?:!!|‼)?が(\d+)枚以上[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", None),
+        (r'^自分の場のドン[ 　]*(?:!!|‼)?が[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", 1),
+        (r'^[^。]*?キャラが自分の効果で場を離れた時、', "CHAR_LEFT_BY_OWN_EFFECT", 1),
+        (r'^自分の特徴《海軍》を持つカードの効果で[^。]*?捨てられた時、', "NAVY_DISCARD", 1),
+        (r'^自分の【トリガー】を持つキャラが登場した時、', "TRIGGER_CHAR_PLAYED", 1),
+    )
+
+    def _extract_event_condition(self, effect_text: str):
+        """効果文先頭の「〈イベント〉した時、」を (EVENT_THIS_TURN 条件, 残りテキスト) に分離する。
+        該当しなければ (None, 元テキスト)。「発動できる」が続く形（OP07-038/OP13-100）にも対応。"""
+        t = _nfc(effect_text)
+        for pat, ev_name, fixed_min in self._EVENT_CLAUSE_PATTERNS:
+            m = re.match(_nfc(pat), t)
+            if not m:
+                continue
+            ev_min = fixed_min if fixed_min is not None else int(m.group(1))
+            rest = t[m.end():].strip()
+            # 「〜時、発動できる。」形は「発動できる。」を取り除いて本体を残す。
+            rest = re.sub(_nfc(r'^発動できる[。、]?'), '', rest).strip()
+            cond = Condition(type=ConditionType.EVENT_THIS_TURN, value=(ev_name, ev_min),
+                             player=Player.SELF, raw_text=t)
+            return cond, rest
+        return None, effect_text
 
     def _extract_leading_condition(self, text: str):
         """テキスト先頭のゲート条件「〜の場合、/〜なら、」を (Condition, 残りテキスト) に分離する。
