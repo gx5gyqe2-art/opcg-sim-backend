@@ -336,3 +336,57 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 - **`condition_synth` の合成盤面は実評価器（`_check_condition`/`_can_satisfy_node`）で再検証する**。
   合成しきれない条件型（DON_COUNT_COMPARE/PREV_ACTION/色フィルタ等）は UNHANDLED に落とし、
   真バグ候補（SATISFIED_NO_CHANGE）に混ぜない。
+
+---
+
+## 9. 2026-06 RealGame UI 改善（realgame-ui-improvements ブランチ）
+
+対戦画面（RealGame）の UI/UX 改善。backend PR #23 / frontend PR #23 で main へマージ済み。
+
+### Backend の変更（1行）
+
+- `gamestate.py` `Player.to_dict`: ライフを `_format_card(c, c.is_face_up)` でシリアライズ
+  （従来は常に `False` 固定で、FACE_UP_LIFE で表になったライフをクライアントが判別できなかった）。
+- **情報リーク注記**: `_format_card` は `is_face_up` を上書きするのみで、裏向きライフ/相手手札の
+  カード識別情報（name/card_id/text）は従来から全送信されている。本変更でリーク範囲は拡大しないが、
+  対人戦対応時はマスキングの検討が必要（trigger/candidates フローへの影響に注意）。
+
+### Frontend の変更
+
+| パス | 変更内容 |
+|---|---|
+| `src/game/cardTypes.ts` | **新規**。`normalizeCardType` — カード種別の英/日表記（'STAGE'/'ステージ' 等）を正規化 |
+| `src/game/cardActions.ts` | **新規**。`getAvailableActions(card, location, isMyTurn, activeDonCount)` — 実行可能アクション（登場/攻撃/ドン付与/効果起動）の一元判定。攻撃・ドン付与はリーダー/キャラのみ、起動メインは種別不問 |
+| `src/ui/CardActionMenu.tsx` | **新規**。カードタップ時にカード近傍へ出すミニアクションメニュー（画面端クランプ・上半分タップは下に/下半分は上に表示・ドン付与は枚数ステッパー内蔵） |
+| `src/ui/CardDetailSheet.tsx` | `renderButtons` を `getAvailableActions` ベースに書き換え（ステージに攻撃/ドン付与が出るバグの修正箇所） |
+| `src/ui/BoardSide.tsx` | ライフを仮想1枚+枚数バッジから **個別カードの横向き重ね表示** に変更（90°回転は `is_rest: true` のレンダリング用コピーで実現）。両陣営に適用。枚数バッジ併記 |
+| `src/ui/CardRenderer.tsx` | `options.onClick` のシグネチャを `(pos: {x,y}) => void` に変更（pointertap の `e.global` を渡す。autoDensity+全画面キャンバスのため CSS px と一致） |
+| `src/screens/RealGame.tsx` | `actionMenu` ステート追加。操作可能カードはミニメニュー、操作不可カード（相手/ライフ/トラッシュ等）は従来どおり直接詳細シート |
+| `src/ui/CardSelectModal.tsx` | 並び替えモード（`maxSelect < 0`）の小さい↑↓ボタンを廃止し、Pointer Events の **ドラッグ&ドロップ並び替え** に置換（追加依存なし） |
+| `src/layout/layout.config.ts` | `Z_INDEX.MINI_MENU: 1500` 追加（NOTIFICATION/OVERLAY より上、SHEET より下） |
+
+### 実装上の不変条件・注意点（UI）
+
+- **アクションボタンの表示可否は `getAvailableActions` に一元化**。新アクションを追加する場合は
+  ここに足すこと（CardDetailSheet と CardActionMenu の双方に反映される）。location だけで判定する
+  実装に戻すとステージ攻撃バグが再発する。
+- **ミニメニューは `gameState` / `pendingRequest.request_id` の変化で必ず自動クローズ**する
+  （RealGame の useEffect）。PIXI 盤面は状態変化のたびに全再構築されカード位置が変わるため、
+  アンカー座標が古くなるのを防ぐ。攻撃ターゲティング開始時（handleAction ATTACK 分岐）も閉じる。
+- **ライフの横向き描画はレンダリング用コピー `{ ...c, is_rest: true }`** を使う。onClick・詳細シートには
+  **元のカードオブジェクト**を渡すこと（コピーを渡すとレスト状態が誤表示される）。
+- **`life[0]` が山の一番上**（バックエンドはダメージ時 `life.pop(0)`、HEAL は append）。BoardSide は
+  逆順 addChild で `life[0]` を最前面・最上段に描画する。
+- **裏向きライフは `eventMode = 'none'` でタップ無効**。表向きのみタップ → 既存フロー（location 'life'
+  → isOperatable=false → 詳細シート直行）。
+- **`createCardContainer` の onClick は座標を受け取る**。座標不要の呼び出し元（Sandbox 等）は
+  引数を無視するラムダでよい。
+- **並び替えモードのドラッグ**は `setPointerCapture` + 6px 閾値 + `getBoundingClientRect` の矩形
+  ヒットテストで `selected`（=配置順）を splice 移動する。グリッドは `selected` 順で描画されるため
+  ライブ並べ替え自体が挿入位置のフィードバックになる。アイテムは `touch-action: none`（タッチ対応）。
+
+### 残課題（UI）
+
+- ライフ重ね間隔・ミニメニュー幅などの微調整は実機目視が未実施（型チェック/lint/バックエンド
+  テスト 342 件は通過済み）。
+- 対人戦対応時: 裏向きライフ/相手手札のカード識別情報マスキング（上記リーク注記）。
