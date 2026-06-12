@@ -730,10 +730,14 @@ def _life_recover(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if _nfc("手札") in t:
         return None  # デッキ→手札 等は別アクション
+    # 枚数は「デッキの上から N枚」から取る。_first_int だと先頭の反応型トリガー句
+    # 「ライフが0枚になった時、」の 0 を拾い value=0 になる（OP05-098）。
+    m_n = re.search(_nfc(r'デッキの上から[^。\d]*?(\d+)枚'), t)
+    n = int(m_n.group(1)) if m_n else _first_int(t, 1)
     return GameAction(
         type=ActionType.HEAL,
         target=None,
-        value=ValueSource(base=_first_int(t, 1)),
+        value=ValueSource(base=n),
         raw_text=t,
     )
 
@@ -868,6 +872,11 @@ def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
     """
     t = ctx.text
     if _nfc("付与") not in t or _nfc("ドン") not in t:
+        return None
+    # 能動的な付与（「…に付与する」）でなければ ATTACH_DON ではない。「ドン‼が付与された時」等の
+    # 反応型トリガー句が本文に残っているだけのケース（OP02-002「…付与された時、…コスト-1」）で
+    # 誤って ATTACH_DON 化するのを防ぐ。
+    if not re.search(_nfc(r'付与(?:する|し|できる)'), t):
         return None
     # 「付与されている」が対象フィルタ（キャラ/パワー等を修飾）ならドン付与ではない。
     # 「付与されているドン!!を...に付与する」のようにドン自体を移動するケースは除外しない。
