@@ -161,9 +161,9 @@ class CardInstance:
                     else self.passive_power_override)
         base = override if override is not None else self.master.power
         buff = self.power_buff + self.timed_power + self.passive_power
-        # 付与されたドン!!は自分の次のリフレッシュフェイズまでカードに付いたままなので、
-        # 相手ターン中（防御時など）も +1000/枚 のパワーを与え続ける。
-        don_power = self.attached_don * 1000
+        # 付与ドン!!のパワー(+1000/枚)は自分のターン中のみ適用する。
+        # （マーカー自体は相手ターンも残るが、パワー上昇は自ターンだけ）
+        don_power = (self.attached_don * 1000) if is_my_turn else 0
         return base + buff + don_power
 
     @property
@@ -194,13 +194,14 @@ class CardInstance:
         self.is_newly_played = False
         self._refresh_keywords()
 
-    def to_dict(self):
+    def to_dict(self, is_my_turn: bool = True):
         props = CONST.get('CARD_PROPERTIES', {})
         return {
             props.get('UUID', 'uuid'): self.uuid,
             props.get('CARD_ID', 'card_id'): self.master.card_id,
             props.get('NAME', 'name'): self.master.name,
-            props.get('POWER', 'power'): self.get_power(is_my_turn=True),
+            # 付与ドン!!のパワーは自分のターン中のみ反映する（相手ターンは加算しない）。
+            props.get('POWER', 'power'): self.get_power(is_my_turn=is_my_turn),
             props.get('COUNTER', 'counter'): self.master.counter,
             props.get('ATTRIBUTE', 'attribute'): self.master.attribute.value,
             props.get('COST', 'cost'): self.current_cost,

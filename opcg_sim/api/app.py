@@ -101,7 +101,7 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
     raw_game_state = {
         "game_id": game_id,
         "turn_info": {"turn_count": manager.turn_count if manager else 0, "current_phase": manager.phase.name if manager else "N/A", "active_player_id": active_pid, "winner": manager.winner if manager else None},
-        "players": {p1_key: manager.p1.to_dict() if manager else {}, p2_key: manager.p2.to_dict() if manager else {}},
+        "players": {p1_key: manager.p1.to_dict(is_my_turn=(manager.turn_player == manager.p1)) if manager else {}, p2_key: manager.p2.to_dict(is_my_turn=(manager.turn_player == manager.p2)) if manager else {}},
         battle_props.get('ACTIVE_BATTLE', 'active_battle'): {battle_props.get('ATTACKER_UUID', 'attacker_uuid'): manager.active_battle["attacker"].uuid, battle_props.get('TARGET_UUID', 'target_uuid'): manager.active_battle["target"].uuid, battle_props.get('COUNTER_BUFF', 'counter_buff'): manager.active_battle.get("counter_buff", 0)} if manager and manager.active_battle else None
     }
     validated_state = None

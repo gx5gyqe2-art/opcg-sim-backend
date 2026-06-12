@@ -79,12 +79,12 @@ class Player:
             if self.deck:
                 self.hand.append(self.deck.pop(0))
 
-    def to_dict(self, is_owner: bool = True):
+    def to_dict(self, is_owner: bool = True, is_my_turn: bool = True):
         player_props = CONST.get('PLAYER_PROPERTIES', {})
-        leader_dict = self.leader.to_dict() if self.leader else None
+        leader_dict = self.leader.to_dict(is_my_turn) if self.leader else None
         if leader_dict:
             leader_dict["is_face_up"] = True
-        stage_dict = self.stage.to_dict() if self.stage else None
+        stage_dict = self.stage.to_dict(is_my_turn) if self.stage else None
         if stage_dict:
             stage_dict["is_face_up"] = True
         return {
@@ -98,16 +98,16 @@ class Player:
             "leader": leader_dict,
             "stage": stage_dict,
             "zones": {
-                "field": [self._format_card(c, True) for c in self.field],
-                "hand": [self._format_card(c, is_owner) for c in self.hand],
-                "life": [self._format_card(c, c.is_face_up) for c in self.life],
-                "trash": [self._format_card(c, True) for c in self.trash],
+                "field": [self._format_card(c, True, is_my_turn) for c in self.field],
+                "hand": [self._format_card(c, is_owner, is_my_turn) for c in self.hand],
+                "life": [self._format_card(c, c.is_face_up, is_my_turn) for c in self.life],
+                "trash": [self._format_card(c, True, is_my_turn) for c in self.trash],
                 "stage": stage_dict
             }
         }
 
-    def _format_card(self, card: Card, face_up: bool) -> dict:
-        d = card.to_dict()
+    def _format_card(self, card: Card, face_up: bool, is_my_turn: bool = True) -> dict:
+        d = card.to_dict(is_my_turn)
         d["is_face_up"] = face_up
         return d
 
