@@ -515,16 +515,11 @@ class EffectParser:
         # 劣後する——【自分のターン中】系のカードは既存の挙動テストが YOUR_TURN ロックを前提に
         # するため、ここでは触らない（誘発化は別途、条件ゲート方式で扱うべき領域）。
         embedded = self._detect_embedded_reactive(norm_text)
-        # 【ターン中】タグ + 本文先頭（コスト「：」より前）の KO/ライフダメージ誘発は、本来その
-        # イベント誘発（ON_KO/ON_DAMAGE_DEALT_TO_LIFE）でありターン中は CONTEXT 条件として後段で保全
-        # される。primary 句（コスト節より前）に限り上書きする（コスト節後の誘発句は YOUR_TURN 維持）。
-        primary_reactive = None
-        if embedded in (TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE):
-            colon_pos = min([norm_text.find(c) for c in (_nfc("："), _nfc(":")) if c in norm_text]
-                            or [len(norm_text)])
-            rm = re.search(_nfc(r'(?:KOされた|ライフに[^。]{0,8}ダメージを与えた)時'), norm_text)
-            if rm and rm.start() < colon_pos:
-                primary_reactive = embedded
+        # 【ターン中】タグ + 本文の KO/ライフダメージ誘発は、本来その イベント誘発
+        # （ON_KO/ON_DAMAGE_DEALT_TO_LIFE）でありターン中は CONTEXT 条件として後段で保全される。
+        # コスト節の後（「手札2枚を捨てる：相手のキャラがKOされた時、〜」OP03-076）も含めて上書きする。
+        primary_reactive = embedded if embedded in (
+            TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE) else None
         if _nfc("【自分のターン中】") in norm_text: return primary_reactive or TriggerType.YOUR_TURN
         if _nfc("【相手のターン中】") in norm_text: return primary_reactive or TriggerType.OPPONENT_TURN
         if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER

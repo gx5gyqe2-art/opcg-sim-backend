@@ -267,8 +267,6 @@ def test_op03_058_non_gc_char_not_playable():
 # OP03-076 ロブ・ルッチ 🐛
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True, reason="OP03-076: 誘発条件「相手のキャラがKOされた時」が欠落し"
-                                       "YOUR_TURN の単純起動になっている（KO 無しでも手札2枚捨てでアクティブ化できる疑い）")
 def test_op03_076_requires_opponent_ko_trigger():
     """OP03-076: 効果は「相手のキャラがKOされた時」に誘発するべきで、
     KO に依存しない YOUR_TURN 起動になっていてはいけない。🐛"""
@@ -284,7 +282,7 @@ def test_op03_076_activates_leader_after_ko_with_discard():
     gm, p1, p2, L = build("OP03-076")
     L.is_rest = True
     p1.hand = [CardInstance(make_master(card_id=f"H{i}"), p1.name) for i in range(3)]
-    gm.resolve_ability(p1, get_ability(L.master, "YOUR_TURN"), L)
+    gm.resolve_ability(p1, get_ability(L.master, "ON_KO"), L)
     _drive(gm, p1)
     assert L.is_rest is False        # リーダーがアクティブに
     assert len(p1.hand) == 1         # 手札2枚を捨てた
@@ -295,7 +293,7 @@ def test_op03_076_turn_limit_blocks_second_activation():
     gm, p1, p2, L = build("OP03-076")
     L.is_rest = True
     p1.hand = [CardInstance(make_master(card_id=f"H{i}"), p1.name) for i in range(5)]
-    ab = get_ability(L.master, "YOUR_TURN")
+    ab = get_ability(L.master, "ON_KO")
     gm.resolve_ability(p1, ab, L)
     _drive(gm, p1)
     assert L.is_rest is False and len(p1.hand) == 3
