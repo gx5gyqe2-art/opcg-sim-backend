@@ -296,8 +296,6 @@ def test_op11_021_no_fire_when_hand_gt6():
     assert len(p1.don_rested) == 1  # 不発
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP11-021: 『《魚人族/人魚族》キャラ1枚までをアクティブ』部分が欠落しドンのアクティブのみ")
 def test_op11_021_fishman_char_should_be_activated():
     """OP11-021: 手札6枚以下なら《魚人族》レストキャラもアクティブになるべき。"""
     gm, p1, p2, L = build("OP11-021")

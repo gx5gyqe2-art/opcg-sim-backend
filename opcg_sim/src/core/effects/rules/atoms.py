@@ -923,6 +923,33 @@ def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+@rule("active_char_and_don", priority=76)
+def _active_char_and_don(ctx: ParseContext) -> Optional[EffectNode]:
+    """「（特徴…）キャラ1枚までとドン‼N枚までを、アクティブにする」→ ACTIVE(キャラ)＋ACTIVE_DON(ドン)。
+
+    複合「AとBを、アクティブにする」でドン側だけが拾われキャラのアクティブが脱落していた
+    （OP11-021）。キャラ句とドン句を分けて 2 アクションの Sequence にする。
+    """
+    t = ctx.text
+    if not re.search(_nfc(r"アクティブに(する|できる)"), t):
+        return None
+    m = re.search(_nfc(r'(.+?キャラ[^、。]*?まで)と((?:レストの)?ドン(?:!!|‼)[^、。]*?まで)'), t)
+    if not m:
+        return None
+    char_part, don_part = m.group(1), m.group(2)
+    char_tq = parse_target(char_part)
+    char_tq.is_rest = None  # 対象は選択で絞る（アクティブ化の対象）
+    if _nfc("まで") in char_part:
+        char_tq.is_up_to = True
+    char_action = GameAction(type=ActionType.ACTIVE, target=char_tq, raw_text=char_part)
+    don_action = GameAction(
+        type=ActionType.ACTIVE_DON,
+        value=ValueSource(base=_don_count(don_part)),
+        raw_text=don_part,
+    )
+    return Sequence(actions=[char_action, don_action])
+
+
 @rule("don_set_active", priority=74)
 def _don_set_active(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分の）ドン!!N枚までを、アクティブにする」→ ACTIVE_DON（レスト→アクティブ）。"""
