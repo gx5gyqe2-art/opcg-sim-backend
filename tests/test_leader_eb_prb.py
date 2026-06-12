@@ -347,7 +347,6 @@ def test_eb04_001_main_no_life_to_hand_when_life_le1():
 #   このターン中、【速攻】を得る。
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True, reason="PRB01-001: 【起動メイン】が ON_PLAY(登場時)としてパースされている（リマインド文『登場した』の誤検出）。本来は ACTIVATE_MAIN 能力であるべき")
 def test_prb01_001_trigger_should_be_activate_main():
     """PRB01-001: 速攻付与能力のトリガーは【起動メイン】(ACTIVATE_MAIN)であるべき。"""
     assert abilities_of(build("PRB01-001")[3].master, "ACTIVATE_MAIN"), \

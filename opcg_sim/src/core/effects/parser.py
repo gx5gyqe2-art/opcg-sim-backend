@@ -501,7 +501,9 @@ class EffectParser:
 
     def _detect_trigger(self, text: str) -> TriggerType:
         norm_text = _nfc(text)
-        if _nfc("【登場時】") in norm_text: return TriggerType.ON_PLAY
+        # 「【登場時】効果を持たない」は対象修飾（トリガーではない）。能力トリガーの【登場時】のみ拾う
+        # （PRB01-001「【起動メイン】…【登場時】効果を持たないキャラ…」が ON_PLAY 化するのを防ぐ）。
+        if re.search(_nfc(r'【登場時】(?!効果を持たない)'), norm_text): return TriggerType.ON_PLAY
         if _nfc("【起動メイン】") in norm_text: return TriggerType.ACTIVATE_MAIN
         if _nfc("【メイン】") in norm_text: return TriggerType.ACTIVATE_MAIN
         if _nfc("【アタック時】") in norm_text: return TriggerType.ON_ATTACK
