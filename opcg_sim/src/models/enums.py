@@ -178,6 +178,7 @@ class ConditionType(Enum):
     LIFE_HAND_SUM = auto()   # 「（自分の）ライフと手札の合計枚数が N 以上/以下」（OP04-040）
     EVENT_THIS_TURN = auto() # 「〈イベント〉した時」: このターン中に当該イベントが発生したか
                              # （value=(イベント名, 最小回数)。ドン返却/退場/捨て/トリガー登場 等）
+    TURN_COUNT = auto()      # 「自分の第Nターン以降の場合」: turn_count を value と比較（OP15-058）
     HAS_TRAIT = auto()
     HAS_ATTRIBUTE = auto()
     HAS_UNIT = auto()

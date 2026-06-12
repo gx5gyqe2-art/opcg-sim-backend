@@ -268,11 +268,14 @@ class EffectParser:
             # 連なる複数アクション）のとき ability.condition へ引き上げる。従来は先頭アクションのみ
             # 条件付きの内部 Branch になり、後続アクションが無条件化していた
             # （ST29-001「ライフ2枚以下なら引いて捨てる」の DISCARD が無条件化）。
+            # 純粋なゲーム状態条件（ターン数 等）は能力全体に掛かるため、複数文でも引き上げる。
+            _GLOBAL_GATE = (ConditionType.TURN_COUNT,)
             effect_gate_cond = None
             _lead_cond, _lead_rest = self._extract_leading_condition(effect_text)
-            if (_lead_cond is not None
-                    and _nfc("。") not in _lead_rest.rstrip(_nfc("。"))
-                    and re.search(_nfc(r'(し|き|り|め|ち|に|べ|ね|げ| じ)[、，]'), _lead_rest)):
+            if _lead_cond is not None and (
+                    _lead_cond.type in _GLOBAL_GATE
+                    or (_nfc("。") not in _lead_rest.rstrip(_nfc("。"))
+                        and re.search(_nfc(r'(し|き|り|め|ち|に|べ|ね|げ| じ)[、，]'), _lead_rest))):
                 effect_gate_cond = _lead_cond
                 effect_text = _lead_rest
 
@@ -993,6 +996,12 @@ class EffectParser:
                 if _nfc("ある") in norm_text:
                     return Condition(type=ConditionType.DON_COUNT, operator=CompareOperator.GE, value=1, player=p, raw_text=norm_text)
             return Condition(type=ConditionType.DON_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
+
+        # ターン数条件（「自分の第2ターン以降の場合」OP15-058）。turn_count >= N。
+        turn_m = re.search(_nfc(r'第(\d+)ターン以降'), norm_text)
+        if turn_m:
+            return Condition(type=ConditionType.TURN_COUNT, operator=CompareOperator.GE,
+                             value=int(turn_m.group(1)), player=p, raw_text=norm_text)
 
         # ライフ＋手札の合計（「自分のライフと手札の合計枚数が4枚以下の場合」OP04-040）。
         # LIFE_COUNT より先に判定する（「ライフ」を含むため誤分類を避ける）。
