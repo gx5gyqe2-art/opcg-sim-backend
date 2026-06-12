@@ -337,7 +337,8 @@ class GameManager:
             resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
         elif action_type == "CONFIRM_OPTIONAL":
-            # 任意効果（「〜してもよい」）の発動可否。accepted=False（パス/拒否）ならスキップ。
+            # 任意効果（「〜してもよい」）/ 任意コスト能力（「〜できる：」）の発動可否。
+            # accepted=False（パス/拒否）ならスキップ。
             accepted = payload.get("accepted")
             if accepted is None:
                 # selected_uuids 非空 / index>0 / skip フラグ等から推定（既定は発動=True）
@@ -345,10 +346,17 @@ class GameManager:
                     accepted = False
                 else:
                     accepted = payload.get("index", 0) == 0
-            optional_node = continuation.get("optional_node")
             self.active_interaction = None
-            resolver.resume_optional(player, source_card, bool(accepted), optional_node,
-                                     continuation.get("execution_stack", []), continuation.get("effect_context", {}))
+            confirm_ability = continuation.get("confirm_ability")
+            if confirm_ability is not None:
+                # 任意コスト能力（A-3）の使用確認: accept で cost_confirmed=True で再入。
+                # decline は何もしない（使用回数も未消費）。gamestate 経由で action_events を記録。
+                if accepted:
+                    self.resolve_ability(player, confirm_ability, source_card, cost_confirmed=True)
+            else:
+                optional_node = continuation.get("optional_node")
+                resolver.resume_optional(player, source_card, bool(accepted), optional_node,
+                                         continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
         elif action_type == "ARRANGE_DECK":
             # (2a)(2b) 並び替え/上下選択の確定。selected_uuids が配置順、position が上下。
@@ -1063,10 +1071,11 @@ class GameManager:
                 return True
         return False
 
-    def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance):
+    def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance,
+                        cost_confirmed: bool = False):
         if source_card.negated or source_card.ability_disabled: return
         resolver = EffectResolver(self)
-        resolver.resolve_ability(player, ability, source_card)
+        resolver.resolve_ability(player, ability, source_card, cost_confirmed=cost_confirmed)
         for ev in resolver.action_history:
             self.action_events.append({
                 "type": "EFFECT",

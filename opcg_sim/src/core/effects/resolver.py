@@ -26,7 +26,7 @@ class EffectResolver:
         # ▼▼▼ 追加: 実行履歴を記録するリスト ▼▼▼
         self.action_history: List[Dict[str, Any]] = []
 
-    def resolve_ability(self, player, ability, source_card):
+    def resolve_ability(self, player, ability, source_card, cost_confirmed=False):
         # 1. 条件チェック
         if ability.condition and not self._check_condition(player, ability.condition, source_card):
             self._log_failure_snapshot(player, source_card, ability, "CONDITION_MISMATCH", f"Condition type: {ability.condition.type.name}")
@@ -53,6 +53,17 @@ class EffectResolver:
         if ability.cost and not self._can_satisfy_node(player, ability.cost, source_card):
             self._log_failure_snapshot(player, source_card, ability, "COST_UNSATISFIED", "Insufficient resources or targets for cost")
             log_event("INFO", "resolver.cost_skipped", f"Optional cost cannot be paid — ability skipped: {source_card.master.name}", player=player.name)
+            return
+
+        # 2.5 任意コストの使用確認（A-3）。「〜できる：効果」のコスト句は任意で、自動誘発
+        #   （相手のアタック時/登場時/アタック時 等）では発動するかをプレイヤーに確認する。
+        #   ACTIVATE_MAIN（起動メイン=自発起動）は起動自体が意思表示のため確認しない。
+        #   未確認で中断 → resume(accept) が cost_confirmed=True で再入。decline は何もせず
+        #   使用回数も消費しない（払わなければ「使った」ことにならない）。
+        if (not cost_confirmed and ability.cost is not None
+                and getattr(ability, "cost_optional", False)
+                and ability.trigger != TriggerType.ACTIVATE_MAIN):
+            self._suspend_for_ability_cost_confirm(player, ability, source_card)
             return
 
         # 発動成立（条件・コストを満たした）→ 使用回数を消費する。
@@ -789,6 +800,23 @@ class EffectResolver:
             }
         }
         log_event("INFO", "resolver.suspend", "Suspended for player choice", player=player.name)
+
+    def _suspend_for_ability_cost_confirm(self, player, ability, source_card):
+        """任意コスト能力（「〜できる：効果」）の使用可否を確認するため中断する。
+        accept 時は resolve_interaction が resolve_ability を cost_confirmed=True で再入する。
+        FE は CONFIRM_OPTIONAL オーバーレイで描画する（専用UIを増やさない）。"""
+        self.game_manager.active_interaction = {
+            "player_id": player.name,
+            "action_type": "CONFIRM_OPTIONAL",
+            "source_card_name": source_card.master.name,
+            "message": f"「{source_card.master.name}」の効果を使用しますか？（コストを払う）",
+            "can_skip": True,
+            "continuation": {
+                "source_card_uuid": source_card.uuid,
+                "confirm_ability": ability,
+            },
+        }
+        log_event("INFO", "resolver.suspend", "Suspended for optional cost confirmation", player=player.name)
 
     def _suspend_for_optional_confirmation(self, player, node, source_card):
         """任意効果（「〜してもよい」）の発動可否を yes/no で確認するため中断する。

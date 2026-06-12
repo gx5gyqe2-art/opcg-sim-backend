@@ -366,6 +366,25 @@ def test_nami_leader_buff_is_this_turn_not_battle():
     assert p1.leader.get_power(False) == base_pw, "ターン終了で失効するべき"
 
 
+def test_optional_cost_not_forced_op16_080():
+    """OP16-080【相手のアタック時】手札を捨てることが「できる」: 自動で捨てさせられず
+    使用確認(CONFIRM_OPTIONAL)を挟む。拒否すれば手札は減らない（報告バグ「必ず手札を
+    捨てなければならない」の回帰ガード）。"""
+    from opcg_sim.src.models.models import CardType as CT
+    gm, p1, p2 = base()  # p1 のターン。p2 が OP16-080 リーダーで防御
+    p2.leader = inst("OP16-080", "P2")
+    p2.hand = fillers(2, "P2")
+    atk = CardInstance(make_master(card_id="A", name="A", power=6000), "P1")
+    atk.is_rest = False
+    p1.field = [atk]
+    hand_before = len(p2.hand)
+    gm.declare_attack(atk, p2.leader)
+    assert gm.active_interaction and gm.active_interaction["action_type"] == "CONFIRM_OPTIONAL"
+    assert len(p2.hand) == hand_before, "確認前に捨ててはいけない"
+    gm.resolve_interaction(p2, {"accepted": False})
+    assert len(p2.hand) == hand_before, "拒否したら手札は減らない"
+
+
 def test_blocker_keyword_loaded():
     """【ブロッカー】がカード本来のキーワードとして master.keywords に載る（従来は空で
     has_keyword('ブロッカー')=False になりブロッカーが一切機能しなかった）。"""

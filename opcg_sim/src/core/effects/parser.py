@@ -185,6 +185,7 @@ class EffectParser:
 
             cost_node = None
             effect_text = clean_text
+            cost_optional = False
 
             # コストの分離（全角コロン優先、なければ半角コロン）。
             # ただし【速攻：キャラ】のようにキーワード能力タグ内部の「：」は
@@ -199,6 +200,10 @@ class EffectParser:
                 cost_gate_cond, cost_text = self._extract_leading_condition(cost_text)
                 cost_node = self._parse_cost_node(cost_text)
                 effect_text = clean_text[idx + 1:]
+                # 「〜できる：」「〜してもよい：」のコスト句は任意（払うかをプレイヤーが選ぶ）。
+                # 自動誘発トリガーでは発動前に使用確認を挟むためのフラグ（resolver が参照）。
+                if _nfc("できる") in cost_text or _nfc("してもよい") in cost_text:
+                    cost_optional = True
 
             # 【ドン!!×N】は「このカードにドン!!がN枚以上付与されている」発動条件であり、
             # コストエリアのドンをレストにする支払いではない（従来は REST_DON コストに誤変換し、
@@ -260,6 +265,7 @@ class EffectParser:
                 condition=final_condition,
                 cost=cost_node,
                 effect=effect_node,
+                cost_optional=cost_optional,
                 raw_text=_nfc(text)
             )
         except Exception as e:

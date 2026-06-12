@@ -307,7 +307,7 @@
 "EB04-045|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
 "EB04-046|OPPONENT_TURN": "- | pw0,kw0,rs0,co2",
 "EB04-047|ACTIVATE_MAIN": "p1_field:4→3, p1_trash:10→11 | pw0,kw0,rs0,co0",
-"EB04-048|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co2",
+"EB04-048|ON_PLAY": "p1_trash:10→11, p1_deck:20→19 | pw0,kw0,rs0,co0",
 "EB04-048|PASSIVE": "- | pw0,kw0,rs0,co2",
 "EB04-049|ACTIVATE_MAIN": "p1_trash:10→12, p1_deck:20→18, p2_field:3→2, p2_trash:0→1 | pw0,kw0,rs0,co0",
 "EB04-049|TRIGGER": "p2_field:3→2, p2_trash:0→1 | pw0,kw0,rs0,co0",
