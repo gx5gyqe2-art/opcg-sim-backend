@@ -844,6 +844,15 @@ class EffectParser:
     def _parse_condition_obj(self, text: str) -> Condition:
         norm_text = _nfc(text)
 
+        # 置換の対象指定「（自分の）「X」がKOされる/場を離れる（場合）」: 離れるカードが名前 X か
+        # （OP12-061「自分の「トラファルガー・ロー」がKOされる場合」）。離脱カードを source_card として
+        # 評価する SOURCE_STATE("NAME", X) にする。従来は GENERIC で名称限定が脱落していた。
+        repl_name_m = re.search(_nfc(r'「([^」]+)」が(?:KOされる|場を離れる)'), norm_text)
+        if repl_name_m:
+            return Condition(type=ConditionType.SOURCE_STATE,
+                             value=("NAME", repl_name_m.group(1)),
+                             player=Player.SELF, raw_text=norm_text)
+
         # 選言条件「A、または B」「Aか、B」= A または B。同一資源の二値しきい値
         # （例「ドン!!が0枚、または8枚以上」ST10-002 /「ドン!!が0枚か、3枚以上」OP05-060）。
         # 双方が数量しきい値（N枚 / 以上 / 以下）を含む場合のみ分割し、対象/選択肢の「AかB」誤爆を避ける。
