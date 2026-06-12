@@ -240,6 +240,9 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         elif action_type == 'KEEP_HAND':
             manager.keep_hand(current_player)
             manager.action_events.append({"type": "KEEP_HAND", "player": player_id, "message": "手札キープ"})
+        # 効果でライフが離れた等で積まれた誘発（ON_LIFE_DECREASE 等）をアクション境界で消化する
+        # （A-5）。中断が残る場合は内部ガードで no-op（対話完了時に resolve_interaction が消化）。
+        manager._advance_pending_triggers()
         # アクション境界で盤面依存の常在効果を再計算し、トラッシュ枚数等の変化を即時反映する
         # （「自分のトラッシュN枚につき+1000」OP09-086 等のリアルタイム反映。A-9）。
         # 中断が残る場合は refresh_passive_state 内で no-op（対話完了時に反映）。

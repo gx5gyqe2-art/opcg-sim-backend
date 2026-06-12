@@ -779,9 +779,19 @@ class GameManager:
             # 場を離れたら継続効果（timed_power/flags/keywords）を破棄する。
             self.continuous.drop_for(card.uuid)
 
+        # ライフ領域から離れる場合（手札/トラッシュ/デッキへ移す効果等）、「ライフが離れた時」
+        # (ON_LIFE_DECREASE) を待ち行列へ積む。戦闘/効果ダメージは life.pop 済みでここを通らず、
+        # それぞれの経路が別途積むため二重計上しない。実際の解決は安全な境界
+        # （resolve_ability 完了時 / 対話完了時 / アクション境界）でまとめて行う。
+        left_life = (current_owner is not None and current_list is not None
+                     and current_list is current_owner.life)
+
         if current_list is not None and card in current_list: current_list.remove(card)
         elif current_owner and current_owner.stage == card: current_owner.stage = None
-        
+
+        if left_life:
+            self._enqueue_life_decrease(current_owner, 1)
+
         target_list = None
         if dest_zone == Zone.FIELD and card.master.type == CardType.STAGE:
             if dest_player.stage is not None: self.move_card(dest_player.stage, Zone.TRASH, dest_player)

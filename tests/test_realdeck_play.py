@@ -320,6 +320,24 @@ def test_nami_leader_life_decrease_draw():
     assert len(p1.hand) == before + 1
 
 
+def test_nami_life_decrease_fires_on_effect_departure():
+    """OP11-041【自分のターン中】ライフが離れた時: 効果でライフが手札に移った場合も
+    ON_LIFE_DECREASE が発火しドローする（報告バグ「ライフが離れた時のドローが発動しない」）。"""
+    gm, p1, p2 = base()
+    p1.leader = inst("OP11-041", "P1")
+    p1.hand = fillers(3, "P1")
+    p1.deck = fillers(10, "P1")
+    p1.life = fillers(3, "P1")
+    hand_before = len(p1.hand)
+    life_card = p1.life[0]
+    mv = GameAction(type=ActionType.MOVE_CARD, target=TargetQuery(player=PL.SELF, zone=Zone.LIFE),
+                    destination=Zone.HAND)
+    gm.apply_action_to_engine(p1, mv, [life_card], 0)
+    gm._advance_pending_triggers()
+    drain(gm)  # ON_LIFE_DECREASE の Choice を「使用する」で解決
+    assert len(p1.hand) - hand_before == 2, "ライフ移動(+1)＋ドロー(+1)"
+
+
 def test_nami_leader_opp_attack_buff():
     gm, p1, p2 = base()
     p1.leader = inst("OP11-041")
