@@ -537,8 +537,8 @@ backend テスト 374 passed / パーサ退行（新規OTHER）0 / フロント 
 - 反転系（パワー GE/LE 等）は**条件成立・不成立の両盤面**でアサートして反転を確実に捕捉する。
 - 実行は **`-s` 必須**（ログ干渉で I/O エラーになるため）:
   `OPCG_LOG_SILENT=1 python -m pytest tests/test_leader_*.py -q -s -p no:cacheprovider`
-- 現状の集計: **230 passed / 80 xfailed / 1 skipped**（failed・xpassed ゼロ）。
-  xfailed の各 `reason` が未修正の意味バグに対応する。
+- 集計（初版）: 230 passed / 80 xfailed / 1 skipped。**2026-06 の修正フェーズ後: leader xfail 80→33**
+  （後述 §12「修正進捗」参照）。xfailed の各 `reason` が未修正の意味バグに対応する。
 
 ### ヘルパ（`leader_test_helpers.py`）の要点
 
