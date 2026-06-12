@@ -512,7 +512,9 @@ class EffectResolver:
             return self._compare(current_val, condition.operator, target_val)
 
         elif condition.type == ConditionType.HAS_DON:
-            current_val = len(target_player.don_active)
+            # 【ドン!!×N】: このカード（source_card）に付与されたドン!!が N 枚以上か。
+            # コストエリアの active ドン枚数ではなく、対象カードの attached_don を見る。
+            current_val = getattr(source_card, "attached_don", 0) if source_card is not None else 0
             return self._compare(current_val, condition.operator, target_val)
 
         elif condition.type == ConditionType.LEADER_NAME:

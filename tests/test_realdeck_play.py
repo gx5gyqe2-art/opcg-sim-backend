@@ -323,10 +323,24 @@ def test_nami_leader_life_decrease_draw():
 def test_nami_leader_opp_attack_buff():
     gm, p1, p2 = base()
     p1.leader = inst("OP11-041")
+    p1.leader.attached_don = 1  # 【ドン!!×1】: 付与ドンが1枚必要
     p1.hand = fillers(2, "P1")
     before = p1.leader.get_power(False)
     fire(gm, p1, p1.leader, "ON_OPP_ATTACK")
     assert p1.leader.get_power(False) == before + 2000
+
+
+def test_nami_leader_opp_attack_requires_don():
+    """OP11-041【ドン!!×1】: 付与ドンが無ければ ON_OPP_ATTACK 効果は発動しない
+    （報告バグ「ドンがついていなくても使用できてしまう」の回帰ガード）。"""
+    gm, p1, p2 = base()
+    p1.leader = inst("OP11-041")
+    p1.leader.attached_don = 0
+    p1.hand = fillers(2, "P1")
+    before = p1.leader.get_power(False)
+    fire(gm, p1, p1.leader, "ON_OPP_ATTACK")
+    assert gm.active_interaction is None, "付与ドン0なら確認すら出ない"
+    assert p1.leader.get_power(False) == before, "付与ドン0で+2000してはいけない"
 
 
 def test_nami_leader_buff_is_this_turn_not_battle():
@@ -335,6 +349,7 @@ def test_nami_leader_buff_is_this_turn_not_battle():
     from opcg_sim.src.models.models import CardType as CT
     gm, p1, p2 = base(turn=4, turn_player_is_p1=False)  # 相手(p2)のターン
     p1.leader = inst("OP11-041")
+    p1.leader.attached_don = 1  # 【ドン!!×1】: 付与ドンが1枚必要
     p1.hand = fillers(2, "P1")
     p1.life = fillers(3, "P1")
     p2.leader = CardInstance(make_master(card_id="L2", name="L2", power=5000, type=CT.LEADER), "P2")
@@ -390,6 +405,7 @@ def test_counter_after_opp_attack_trigger():
     p1, p2 = make_player("P1"), make_player("P2")
     p1.leader = inst("OP13-079", "P1")
     p2.leader = inst("OP11-041", "P2")  # ON_OPP_ATTACK で Choice 中断
+    p2.leader.attached_don = 1  # 【ドン!!×1】: 付与ドンが1枚必要
     p2.hand = fillers(2, "P2")
     p2.life = fillers(3, "P2")
     atk = inst("OP13-080", "P1")

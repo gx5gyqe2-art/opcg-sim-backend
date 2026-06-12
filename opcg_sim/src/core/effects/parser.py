@@ -200,18 +200,19 @@ class EffectParser:
                 cost_node = self._parse_cost_node(cost_text)
                 effect_text = clean_text[idx + 1:]
 
-            # ドン!!コストタグを cost_node に統合
+            # 【ドン!!×N】は「このカードにドン!!がN枚以上付与されている」発動条件であり、
+            # コストエリアのドンをレストにする支払いではない（従来は REST_DON コストに誤変換し、
+            # 自分のターンは active ドンを消費し、相手ターンは active 0 で常に不発になっていた）。
+            # → HAS_DON 条件（付与ドン≧N）として ability.condition に統合する（resolver が
+            #    source_card.attached_don を参照して評価する）。
+            don_cond = None
             if don_cost_value > 0:
-                don_cost_action = GameAction(
-                    type=ActionType.REST_DON,
-                    value=ValueSource(base=don_cost_value),
-                    target=TargetQuery(zone=Zone.COST_AREA, player=Player.SELF, count=don_cost_value),
-                    raw_text=_nfc(f"ドン!!{don_cost_value}枚をレストにする")
+                don_cond = Condition(
+                    type=ConditionType.HAS_DON,
+                    value=don_cost_value,
+                    operator=CompareOperator.GE,
+                    raw_text=_nfc(f"【ドン!!×{don_cost_value}】"),
                 )
-                if cost_node is not None:
-                    cost_node = Sequence(actions=[don_cost_action, cost_node])
-                else:
-                    cost_node = don_cost_action
 
             # テキスト埋め込みトリガー宣言「〈timing〉時、発動できる」を解消（OTHER 化を防ぐ）。
             trigger, effect_text = self._strip_text_trigger(trigger, effect_text)
@@ -221,6 +222,9 @@ class EffectParser:
 
             # 先頭のゲート条件（「〜の場合、」）を ability.condition に引き上げる
             final_condition = turn_limit_cond
+            if don_cond is not None:  # 【ドン!!×N】の付与ドン条件を統合
+                final_condition = don_cond if final_condition is None else Condition(
+                    type=ConditionType.AND, args=[final_condition, don_cond])
             if cost_gate_cond is not None:  # コスト節から引き上げた条件
                 final_condition = cost_gate_cond if final_condition is None else Condition(
                     type=ConditionType.AND, args=[final_condition, cost_gate_cond])
