@@ -191,6 +191,9 @@ class GameAction(EffectNode):
     # game_manager.pending_end_of_turn に積み、end_turn で解決する
     # （「このターン終了時、〜」OP03-005/OP13-024/OP08-074 等）。
     delay: Optional[str] = None
+    # ライフ等へ「表向きで／裏向きで」加える際の向き。None=ゾーン既定（ライフは裏向き）。
+    # True=表向き、False=裏向き。MOVE_CARD→LIFE で engine が is_face_up に反映する。
+    face_up: Optional[bool] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> GameAction:
@@ -293,6 +296,9 @@ class Ability:
     cost: Optional[EffectNode] = None
     effect: Optional[EffectNode] = None
     raw_text: str = ""
+    # コスト句（「〜できる：」「〜してもよい：」）が任意か。True の場合、自動誘発トリガーの
+    # 解決前に「使う/使わない」確認(CONFIRM_OPTIONAL)を挟む。ACTIVATE_MAIN（自発起動）は対象外。
+    cost_optional: bool = False
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> Ability:

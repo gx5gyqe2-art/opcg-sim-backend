@@ -130,6 +130,11 @@ class GameManager:
         # 「このターン終了時、〜」の遅延アクション待ち行列: (player, GameAction, source_card)。
         # resolver が積み、end_turn が解決する。
         self.pending_end_of_turn: List[tuple] = []
+        # ライフ公開【トリガー】・ON_LIFE_DECREASE 等の誘発能力の待ち行列。
+        # 各要素 = {"player","ability","card","optional","_confirmed"}。
+        # _advance_pending_triggers が1件ずつ確認/解決し、中断時は resolve_interaction が再開する。
+        # _battle_triggers と同型だが、戦闘解決の外（ダメージ後・効果ダメージ）でも使う汎用版。
+        self._pending_triggers: List[Dict[str, Any]] = []
 
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """
@@ -269,8 +274,31 @@ class GameManager:
         if not continuation:
             self.active_interaction = None
             return
-            
+
         action_type = self.active_interaction.get("action_type")
+
+        # 誘発能力の発動確認（CONFIRM_TRIGGER）: continuation は trigger_item のみで
+        # source_card_uuid を持たないため、汎用 source 解決より先に処理する。
+        if action_type == "CONFIRM_TRIGGER":
+            item = continuation.get("trigger_item")
+            accepted = payload.get("accepted")
+            if accepted is None:
+                if payload.get("skip") is True or payload.get("declined") is True:
+                    accepted = False
+                else:
+                    accepted = payload.get("index", 0) == 0
+            self.active_interaction = None
+            if item is not None:
+                if accepted:
+                    item["_confirmed"] = True  # 先頭のまま再投入 → 解決へ
+                elif item in self._pending_triggers:
+                    self._pending_triggers.remove(item)
+            self._advance_pending_triggers()
+            if not self.active_interaction and self.active_battle \
+                    and self.phase not in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER):
+                self._advance_battle_triggers()
+            return
+
         source_uuid = continuation["source_card_uuid"]
         source_card = self._find_card_by_uuid(source_uuid)
         if not source_card:
@@ -386,6 +414,10 @@ class GameManager:
             self.phase = Phase.MULLIGAN
             self.mulligan_done = set()
             log_event("INFO", "game.mulligan_start", "Mulligan phase started")
+
+        # ライフ公開【トリガー】/ON_LIFE_DECREASE 等のペンディング誘発が残っていれば消化する。
+        if not self.active_interaction and self._pending_triggers:
+            self._advance_pending_triggers()
 
         # バトルトリガー(ON_ATTACK/ON_OPP_ATTACK)解決中の中断から復帰した場合:
         # バトルが進行中(active_battle あり)でまだ防御フェイズへ遷移していなければ、
@@ -809,6 +841,46 @@ class GameManager:
             self.phase = Phase.BATTLE_COUNTER
             log_event("INFO", "game.phase_transition", f"No blockers. Moving to {self.phase.name}", player=target_owner.name)
 
+    # --- 誘発能力（ライフ公開【トリガー】/ON_LIFE_DECREASE 等）の汎用待ち行列 ---
+    def _enqueue_trigger(self, player: Player, ability: Ability, card: CardInstance,
+                         optional: bool = False) -> None:
+        """誘発能力を待ち行列へ積む。optional=True は発動可否（使う/使わない）を確認する。"""
+        self._pending_triggers.append({
+            "player": player, "ability": ability, "card": card,
+            "optional": optional, "_confirmed": False,
+        })
+
+    def _advance_pending_triggers(self) -> None:
+        """積んだ誘発能力を順に消化する。中断（対話）が立ったら return し、
+        resolve_interaction が解決後に再度呼ぶ。optional は未確認なら確認対話へ中断する。"""
+        while self._pending_triggers:
+            if self.active_interaction:
+                return  # 別の対話が進行中: 解決後に再開される
+            item = self._pending_triggers[0]
+            if item.get("optional") and not item.get("_confirmed"):
+                self._suspend_for_trigger_confirm(item)
+                return
+            self._pending_triggers.pop(0)
+            self.resolve_ability(item["player"], item["ability"], source_card=item["card"])
+            if self.active_interaction:
+                return  # 効果解決が対象選択等で中断 → resolve_interaction が再開
+
+    def _suspend_for_trigger_confirm(self, item: Dict[str, Any]) -> None:
+        """【トリガー】等の発動可否を yes/no で確認するため中断する。
+        resolve_interaction が CONFIRM_TRIGGER を処理して同じ item を再投入/破棄する。"""
+        player = item["player"]
+        card = item["card"]
+        self.active_interaction = {
+            "player_id": player.name,
+            "action_type": "CONFIRM_TRIGGER",
+            "source_card_name": card.master.name,
+            "message": f"【トリガー】「{card.master.name}」の効果を発動しますか？",
+            "can_skip": True,
+            "continuation": {"trigger_item": item},
+        }
+        log_event("INFO", "game.suspend_trigger_confirm",
+                  f"Confirm trigger activation: {card.master.name}", player=player.name)
+
     def handle_block(self, blocker: Optional[Card] = None):
         if not self.active_battle: return
         target_owner = self.active_battle["target_owner"]; self._validate_action(target_owner, "SELECT_BLOCKER")
@@ -849,6 +921,7 @@ class GameManager:
         counter_buff = self.active_battle.get("counter_buff", 0)
         is_my_turn = (attacker_owner == self.turn_player); is_target_turn = (target_owner == self.turn_player)
         attacker_pwr = attacker.get_power(is_my_turn); target_pwr = target.get_power(is_target_turn) + counter_buff
+        life_lost = 0
         if target == target_owner.leader:
             if attacker_pwr >= target_pwr:
                 damage_amount = 2 if attacker.has_keyword("ダブルアタック") else 1; is_banish = attacker.has_keyword("バニッシュ")
@@ -862,10 +935,11 @@ class GameManager:
                         )
                         self.move_card(life_card, dest_zone, target_owner)
                         log_event("INFO", "game.damage_life", f"{target_owner.name} takes damage to {dest_zone.name}", player=target_owner.name)
+                        life_lost += 1
+                        # 【トリガー】は「発動できる」（任意）。即時解決せず確認付きで待ち行列へ。
+                        # 複数枚（ダブルアタック等）でも確認/解決が中断を跨いで消失しない。
                         if trigger_ability:
-                            log_event("INFO", "game.trigger_keyword", f"TRIGGER activated: {life_card.master.name}", player=target_owner.name)
-                            self.resolve_ability(target_owner, trigger_ability, source_card=life_card)
-                        self._fire_on_life_decrease(target_owner)
+                            self._enqueue_trigger(target_owner, trigger_ability, life_card, optional=True)
                     else: self.winner = attacker_owner.name; log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name); break
         else:
             if attacker_pwr >= target_pwr:
@@ -882,6 +956,10 @@ class GameManager:
         self.continuous.expire("BATTLE_END", self.turn_count)
         if not self.winner:
             self._apply_passive_effects(self.turn_player)
+        # ライフが離れた回数ぶん ON_LIFE_DECREASE を待ち行列へ積み、【トリガー】と共に消化する。
+        if life_lost and not self.winner:
+            self._enqueue_life_decrease(target_owner, life_lost)
+        self._advance_pending_triggers()
 
     def check_victory(self):
         # デッキアウト: 通常は本人の敗北（相手の勝利）。ただし C10「自分のデッキが0枚に
@@ -1173,13 +1251,22 @@ class GameManager:
                 log_event("INFO", "game.trigger_ko", f"Resolving ON_KO for {card.master.name}", player=owner.name)
                 self.resolve_ability(owner, ability, source_card=card)
 
-    def _fire_on_life_decrease(self, player: Player):
+    def _enqueue_life_decrease(self, player: Player, count: int = 1) -> None:
+        """「ライフが離れた時」(ON_LIFE_DECREASE) 能力を、離れた枚数ぶん待ち行列へ積む。
+        発動可否や条件（自分のターン中等）は resolve_ability/_check_condition が評価し、
+        各能力の効果（多くは「引くか/使わないか」の Choice）でプレイヤーが選ぶ。"""
         cards = ([player.leader] if player.leader else []) + player.field
-        for card in cards:
-            for ability in card.master.abilities:
-                if ability.trigger == TriggerType.ON_LIFE_DECREASE:
-                    log_event("INFO", "game.trigger_life_decrease", f"ON_LIFE_DECREASE fired for {card.master.name}", player=player.name)
-                    self.resolve_ability(player, ability, source_card=card)
+        for _ in range(max(1, count)):
+            for card in cards:
+                for ability in card.master.abilities:
+                    if ability.trigger == TriggerType.ON_LIFE_DECREASE:
+                        self._enqueue_trigger(player, ability, card, optional=False)
+
+    def _fire_on_life_decrease(self, player: Player, count: int = 1):
+        """ライフ離脱の誘発を積んで即座に消化する（効果ダメージ等の単発経路用）。
+        戦闘ダメージ経路は resolve_attack 末尾でまとめて積む。"""
+        self._enqueue_life_decrease(player, count)
+        self._advance_pending_triggers()
 
     def _don_pool_player(self, player: Player, action: GameAction) -> Player:
         """ドン操作の対象プレイヤー。「相手は…」は status="OPPONENT"、
@@ -1227,19 +1314,25 @@ class GameManager:
             if action.target and getattr(getattr(action.target, 'player', None), 'name', '') == 'SELF':
                 damaged = player
             n = value if value and value > 0 else 1
+            life_lost = 0
             for _ in range(n):
                 if damaged.life:
                     life_card = damaged.life.pop(0)
                     trig = next((a for a in life_card.master.abilities if a.trigger == TriggerType.TRIGGER), None)
                     self.move_card(life_card, Zone.HAND, damaged)
                     log_event("INFO", "game.deal_damage", f"{damaged.name} takes 1 damage to HAND", player=player.name)
+                    life_lost += 1
+                    # 【トリガー】は任意。確認付きで待ち行列へ積む（即時解決しない）。
                     if trig:
-                        self.resolve_ability(damaged, trig, source_card=life_card)
-                    self._fire_on_life_decrease(damaged)
+                        self._enqueue_trigger(damaged, trig, life_card, optional=True)
                 else:
                     self.winner = player.name
                     log_event("INFO", "game.victory", f"{player.name} wins (effect damage)", player=player.name)
                     break
+            # ON_LIFE_DECREASE を積み、【トリガー】と共にこの場で消化する。
+            if life_lost and not self.winner:
+                self._enqueue_life_decrease(damaged, life_lost)
+            self._advance_pending_triggers()
             return True
         if act_name == "SHUFFLE":
             target_player = player
