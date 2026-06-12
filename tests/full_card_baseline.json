@@ -2296,7 +2296,7 @@
 "OP14-120|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
 "OP15-001|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
 "OP15-001|OPPONENT_TURN": "- | pw0,kw0,rs0,co0",
-"OP15-002|ACTIVATE_MAIN": "p1_hand:5→6, p1_deck:20→19 | pw0,kw0,rs0,co0",
+"OP15-002|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
 "OP15-002|ON_ATTACK": "- | pw0,kw0,rs0,co0",
 "OP15-002|ON_OPP_ATTACK": "- | pw0,kw0,rs0,co0",
 "OP15-003|ACTIVATE_MAIN": "p1_don:10→9 | pw0,kw0,rs0,co0",

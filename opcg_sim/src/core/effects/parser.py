@@ -1016,6 +1016,14 @@ class EffectParser:
                     return Condition(type=ConditionType.DON_COUNT, operator=CompareOperator.GE, value=1, player=p, raw_text=norm_text)
             return Condition(type=ConditionType.DON_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
+        # イベント発動済み条件（「このターン中、自分が元々のコスト3以上のイベントを発動している場合」
+        # OP15-002）。このターン中にコストN以上のイベントを発動したか（EVENT_THIS_TURN）。未発動なら不発。
+        ev_played_m = re.search(_nfc(r'コスト(\d+)以上のイベントを発動している'), norm_text)
+        if ev_played_m:
+            return Condition(type=ConditionType.EVENT_THIS_TURN,
+                             value=(f"EVENT_PLAYED_COST_GE_{ev_played_m.group(1)}", 1),
+                             player=Player.SELF, raw_text=norm_text)
+
         # ターン数条件（「自分の第2ターン以降の場合」OP15-058）。turn_count >= N。
         turn_m = re.search(_nfc(r'第(\d+)ターン以降'), norm_text)
         if turn_m:

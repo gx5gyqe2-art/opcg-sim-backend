@@ -318,8 +318,6 @@ def test_op15_001_rest_requires_two_attached_don():
 # ⚠️→🐛 能力2: 条件がGENERIC(常時True)で未強制
 # ===========================================================================
 
-@pytest.mark.xfail(strict=True,
-    reason="OP15-002: 能力2の条件『元々コスト3以上のイベントを発動している』がGENERIC(常時True)で未強制。本来未発動なら不発のはずがドローしてしまう")
 def test_op15_002_draw_requires_cost3_event_played():
     """OP15-002 能力2: コスト3以上イベント未発動なら不発のはず（GENERIC常時Trueのバグ）。"""
     gm, p1, p2, L = build("OP15-002")

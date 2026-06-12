@@ -622,6 +622,14 @@ class GameManager:
                     "value": ev.get("value"), "success": ev.get("success", True),
                 })
 
+    def _record_event_played(self, card):
+        """イベントカード発動をターン内イベントとして記録する（「コストN以上のイベントを発動している」
+        OP15-002）。コスト k 以上の条件が拾えるよう、1..元々コスト までのしきい値を記録する。"""
+        cost = getattr(card.master, "cost", None) or 0
+        self.record_turn_event("EVENT_PLAYED", 1)
+        for k in range(1, cost + 1):
+            self.record_turn_event(f"EVENT_PLAYED_COST_GE_{k}", 1)
+
     def record_turn_event(self, name: str, n: int = 1):
         """このターン中に発生したイベントを記録する（EVENT_THIS_TURN 条件で参照）。"""
         ev = getattr(self, "_turn_events", None)
@@ -1116,6 +1124,7 @@ class GameManager:
                     raise ValueError(f"効果により、このターンは{suffix}キャラを登場できません。")
         log_event("INFO", "game.play_card", f"Playing card: {card.master.name}", player=player.name, payload={"card_uuid": card.uuid})
         if card.master.type == CardType.EVENT:
+            self._record_event_played(card)   # 「このターン中…イベントを発動」条件用（OP15-002）
             for ability in card.master.abilities:
                 if ability.trigger in [TriggerType.ON_PLAY, TriggerType.ACTIVATE_MAIN]:
                     self.resolve_ability(player, ability, source_card=card)
@@ -1607,6 +1616,7 @@ class GameManager:
             # ため既存スタックを汚さない）。targets は matcher が手札のイベントを解決済み。
             _main_trigs = (TriggerType.ACTIVATE_MAIN, TriggerType.COUNTER, TriggerType.ON_PLAY)
             for ev in targets:
+                self._record_event_played(ev)   # 「このターン中…イベントを発動」条件用（OP15-002）
                 ev_ability = next((a for a in ev.master.abilities
                                    if a.effect is not None and a.trigger in _main_trigs), None)
                 if ev_ability is None:
