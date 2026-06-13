@@ -314,6 +314,39 @@ def test_op11_001_no_replace_when_power_above_7000():
     assert len(p1.deck) == deck_before  # デッキ下送りは発生しない
 
 
+# ===========================================================================
+# OP11-101 カポネ・ベッジ（キャラ）
+#   【ターン1回】「カポネ・ベッジ」以外の自分の《超新星》キャラが相手の効果で場を
+#   離れる場合、代わりに自分のライフの上に裏向きで加えることができる。
+#   ✅ REPLACE_EFFECT(LEAVE): 離れるカード自身を持ち主のライフ(上/裏向き)へ移す。
+# ===========================================================================
+
+def _build_with_bedge_and_supernova():
+    """任意リーダー下で、p1 場に OP11-101（カポネ・ベッジ）＋《超新星》キャラを置く。"""
+    from opcg_sim.src.utils.loader import CardLoader
+    import os
+    db = CardLoader(os.path.join(os.path.dirname(__file__), "..", "opcg_sim", "data", "opcg_cards.json"))
+    db.load()
+    gm, p1, p2, L = build("OP01-001")
+    clear_field(p1); clear_field(p2)
+    bedge = make_char(p1, name="カポネ・ベッジ", cost=4)
+    bedge.master = db.get_card("OP11-101")
+    p1.field.append(bedge)
+    star = add_char(p1, name="超新星キャラ", power=5000, traits=["超新星"])
+    return gm, p1, p2, bedge, star
+
+
+def test_op11_101_replace_leave_supernova_to_life():
+    """OP11-101: 自分の《超新星》が相手効果で場を離れる→代わりに自ライフ上(裏向き)へ。"""
+    gm, p1, p2, bedge, star = _build_with_bedge_and_supernova()
+    life_before = len(p1.life)
+    assert _opponent_removes(gm, p2, star, "KO") is True
+    # 置換成立: 超新星キャラは KO されず、自分のライフへ裏向きで加わる。
+    assert star not in p1.field and star not in p1.trash
+    assert star in p1.life and len(p1.life) == life_before + 1
+    assert star.is_face_up is False
+    # 保護者（カポネ・ベッジ）は場に残る。
+    assert bedge in p1.field
 
 
 # ===========================================================================
