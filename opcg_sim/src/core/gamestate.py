@@ -1122,12 +1122,18 @@ class GameManager:
         # （resolve_ability 完了時 / 対話完了時 / アクション境界）でまとめて行う。
         left_life = (current_owner is not None and current_list is not None
                      and current_list is current_owner.life)
+        # 場（フィールド）からの離脱判定。キャラが場を離れた時(ON_LEAVE)誘発に使う。
+        left_field = (current_owner is not None and current_list is not None
+                      and current_list is current_owner.field
+                      and dest_zone != Zone.FIELD)
 
         if current_list is not None and card in current_list: current_list.remove(card)
         elif current_owner and current_owner.stage == card: current_owner.stage = None
 
         if left_life:
             self._enqueue_life_decrease(current_owner, 1)
+        if left_field and card.master.type == CardType.CHARACTER:
+            self._enqueue_on_leave(card, current_owner)
 
         target_list = None
         if dest_zone == Zone.FIELD and card.master.type == CardType.STAGE:
@@ -1696,6 +1702,50 @@ class GameManager:
             if ability.trigger == TriggerType.ON_KO:
                 log_event("INFO", "game.trigger_ko", f"Resolving ON_KO for {card.master.name}", player=owner.name)
                 self.resolve_ability(owner, ability, source_card=card)
+
+    def _leave_subject_matches(self, ability: Ability, leaving_card: Card,
+                               ability_owner: Player, leaving_owner: Player) -> bool:
+        """ON_LEAVE 誘発の主語フィルタ（「自分の特徴《X》を持つキャラが（相手の効果で）場を
+        離れた時」）が、実際に離れたカードに一致するか。条件には載らない主語修飾を raw_text
+        から解釈する（側＝自分/相手、特徴、カード名、「相手の効果で」限定）。"""
+        raw = _nfc(getattr(ability, "raw_text", "") or "")
+        pre = raw.split(_nfc("場を離れ"))[0]
+        # 側（自分/相手）: 既定は自分。
+        if _nfc("相手の") in pre and _nfc("自分の") not in pre:
+            if leaving_owner is ability_owner:
+                return False
+        else:
+            if leaving_owner is not ability_owner:
+                return False
+        # 「相手の効果で場を離れた時」限定: 相手のターン中（＝相手の効果による除去）でなければ不発。
+        # 自分のターン中の自己バウンス等では誘発しない（OP13-078）。
+        if _nfc("相手の効果で") in pre and self.turn_player is leaving_owner:
+            return False
+        # 特徴フィルタ（《X》/『X』。「X を含む特徴」も部分一致で拾う）。
+        traits = re.findall(r'[《<『]([^》>』]+)[》>』]', pre)
+        if traits and not any(any(t in ct for ct in leaving_card.master.traits) for t in traits):
+            return False
+        # カード名フィルタ（「X」）。
+        names = re.findall(r'「([^」]+)」', pre)
+        if names and not any(leaving_card.master.matches_name(n, partial=True) for n in names):
+            return False
+        return True
+
+    def _enqueue_on_leave(self, leaving_card: Card, leaving_owner: Player) -> None:
+        """キャラが場を離れた時(ON_LEAVE)の誘発を、両プレイヤーのリーダー/場から探して積む。
+        主語フィルタ（側・特徴・名前）に一致する能力のみを対象とする（バギー OP16-041 等）。"""
+        for owner in (self.p1, self.p2):
+            holders = ([owner.leader] if owner.leader else []) + list(owner.field)
+            for holder in holders:
+                if holder is leaving_card:
+                    continue
+                for ability in getattr(holder.master, "abilities", ()):
+                    if ability.trigger != TriggerType.ON_LEAVE:
+                        continue
+                    if not self._leave_subject_matches(ability, leaving_card, owner, leaving_owner):
+                        continue
+                    optional = _nfc("発動できる") in _nfc(getattr(ability, "raw_text", "") or "")
+                    self._enqueue_trigger(owner, ability, holder, optional=optional)
 
     def _enqueue_life_decrease(self, player: Player, count: int = 1) -> None:
         """「ライフが離れた時」(ON_LIFE_DECREASE) 能力を、離れた枚数ぶん待ち行列へ積む。
