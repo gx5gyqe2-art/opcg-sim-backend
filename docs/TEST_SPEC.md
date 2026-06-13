@@ -129,8 +129,14 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 ---
 
 ## 7. 既知の挙動差異
-リーダー効果のテキスト準拠期待と現挙動の差異は [`docs/leader_specs/ISSUES.md`](leader_specs/ISSUES.md) に集約
-（各項目は対応する `tests/test_leader_*.py` の xfail で固定）。差異が解消されればマーカーを外して通常テスト化する。
+記載先は対象の種別で分ける:
+
+- **リーダー効果**のテキスト準拠期待と現挙動の差異 → [`docs/leader_specs/ISSUES.md`](leader_specs/ISSUES.md) に集約
+  （各項目は対応する `tests/test_leader_*.py` の xfail で固定）。差異が解消されればマーカーを外して通常テスト化する。
+- **エンジンのモデル化制約**（「お互い」の同時両側処理・置換のネスト中断 等） → [`docs/SPEC.md`](SPEC.md) §6.1。
+- **パーサの構造分解・未対応表現** → [`docs/parser_v2.md`](parser_v2.md)「既知のパース制約」。未対応原子句は
+  `test_parser_fallback_ratchet`（上限0）で監視する。
+- **非リーダーカードの個別挙動**でバグ確定・修正したもの → §8 の手動検証フローに従い `tests/test_verified_decks.py` に回帰アサートを追加。
 
 ---
 
