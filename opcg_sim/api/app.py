@@ -4,6 +4,7 @@ import sys
 import json
 import traceback
 import asyncio
+from datetime import datetime
 from typing import Any, Dict, Optional, List, Union
 from fastapi import FastAPI, Body, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -91,6 +92,105 @@ class ConnectionManager:
                     pass
 
 ws_manager = ConnectionManager()
+
+
+class GameConnectionManager:
+    """ルールモードのオンライン対戦用 WebSocket 接続マネージャ。
+
+    状態は「全情報を配信し、表示制御はフロント側で行う」方針のため、接続ごとの
+    視点別シリアライズは行わず、同一ペイロードを全接続へブロードキャストする。
+    """
+
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, game_id: str):
+        await websocket.accept()
+        self.active_connections.setdefault(game_id, []).append(websocket)
+        # 接続直後に現在のルーム/対局状態を本人へ送る
+        try:
+            if game_id in RULE_ROOMS:
+                await websocket.send_json(build_rule_message(game_id))
+        except Exception as e:
+            log_event("ERROR", "game_ws.initial_state_fail", f"Failed to send initial state: {e}", player="system")
+
+    def disconnect(self, websocket: WebSocket, game_id: str):
+        conns = self.active_connections.get(game_id)
+        if not conns:
+            return
+        if websocket in conns:
+            conns.remove(websocket)
+        if not conns:
+            del self.active_connections[game_id]
+            log_event("INFO", "game_ws.disconnect", f"All connections closed for rule game {game_id}. Grace period started.", player="system")
+            asyncio.create_task(self.delayed_cleanup(game_id, 1200))
+
+    async def delayed_cleanup(self, game_id: str, delay: int):
+        await asyncio.sleep(delay)
+        if not self.active_connections.get(game_id):
+            RULE_ROOMS.pop(game_id, None)
+            GAMES.pop(game_id, None)
+            log_event("INFO", "game_ws.auto_delete", f"Deleted rule game {game_id} after grace period", player="system")
+
+    def count(self, game_id: str) -> int:
+        return len(self.active_connections.get(game_id, []))
+
+    async def broadcast(self, game_id: str, message: dict):
+        for connection in list(self.active_connections.get(game_id, [])):
+            try:
+                await connection.send_json(message)
+            except Exception:
+                pass
+
+
+game_ws_manager = GameConnectionManager()
+
+# ルールモード・オンライン対戦のルーム（ロビー）レジストリ。
+# 各値: {game_id, room_name, created_at, status(WAITING/PLAYING/FINISHED),
+#        ready{p1,p2}, decks{p1,p2:deck_id}, deck_preview{p1,p2:{leader_id,leader_name}}}
+# 対局開始後の GameManager 本体は GAMES[game_id] に格納し、進行は既存の
+# /api/game/action・/api/game/battle を共用する（差分は WS ブロードキャストのみ）。
+RULE_ROOMS: Dict[str, Dict[str, Any]] = {}
+
+
+def _rule_room_meta(game_id: str) -> Dict[str, Any]:
+    """WS メッセージへ付与するルーム メタ情報。"""
+    room = RULE_ROOMS.get(game_id, {})
+    return {
+        "room_name": room.get("room_name", "Rule Room"),
+        "status": room.get("status", "WAITING"),
+        "ready_states": room.get("ready", {"p1": False, "p2": False}),
+        "deck_preview": room.get("deck_preview", {"p1": None, "p2": None}),
+    }
+
+
+def build_rule_message(game_id: str) -> Dict[str, Any]:
+    """ルーム/対局状態を 1 つの WS/REST ペイロードへまとめる。
+
+    WAITING 中は game_state=None（フロントはセットアップ画面を表示）。
+    PLAYING/FINISHED は build_game_result_hybrid の結果を内包する。
+    """
+    msg: Dict[str, Any] = {"type": "STATE_UPDATE", "game_id": game_id}
+    msg.update(_rule_room_meta(game_id))
+    if msg["status"] in ("PLAYING", "FINISHED"):
+        manager = GAMES.get(game_id)
+        result = build_game_result_hybrid(manager, game_id, success=True)
+        msg.update(result)
+    else:
+        msg.update({"success": True, "game_state": None, "pending_request": None, "action_events": []})
+    return msg
+
+
+async def broadcast_rule_state(game_id: str):
+    """ルーム対局なら最新状態を全接続へ配信する（非ルーム対局では no-op）。"""
+    if game_id not in RULE_ROOMS:
+        return
+    manager = GAMES.get(game_id)
+    room = RULE_ROOMS[game_id]
+    if manager and manager.winner:
+        room["status"] = "FINISHED"
+    await game_ws_manager.broadcast(game_id, build_rule_message(game_id))
+
 
 def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool = True, error_code: str = None, error_msg: str = None) -> Dict[str, Any]:
     player_keys = CONST.get('PLAYER_KEYS', {}); api_root_keys = CONST.get('API_ROOT_KEYS', {}); error_props = CONST.get('ERROR_PROPERTIES', {})
@@ -245,7 +345,9 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         # （「自分のトラッシュN枚につき+1000」OP09-086 等のリアルタイム反映。A-9）。
         # 中断が残る場合は refresh_passive_state 内で no-op（対話完了時に反映）。
         manager.refresh_passive_state()
-        return build_game_result_hybrid(manager, game_id, success=True)
+        result = build_game_result_hybrid(manager, game_id, success=True)
+        await broadcast_rule_state(game_id)
+        return result
     except Exception as e:
         log_event(level_key="ERROR", action="game.action_fail", msg=traceback.format_exc(), player=player_id, payload=req); return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
 
@@ -274,7 +376,9 @@ async def game_battle(req: BattleActionRequest):
         elif action_type == battle_types.get('PASS', 'PASS'):
             manager.action_events.append({"type": "PASS", "player": player_id, "message": "パス"})
             manager.apply_counter(player, None)
-        return build_game_result_hybrid(manager, game_id, success=True)
+        result = build_game_result_hybrid(manager, game_id, success=True)
+        await broadcast_rule_state(game_id)
+        return result
     except Exception as e:
         log_event("ERROR", "game.battle_fail", traceback.format_exc(), player=player_id); return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
 
@@ -397,6 +501,123 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str):
         while True: await websocket.receive_text()
     except WebSocketDisconnect:
         await ws_manager.disconnect(websocket, game_id)
+
+
+# ============================================================================
+# ルールモード・オンライン対戦（ロビー / ルーム）
+#   フリーモード(sandbox)のルーム制を踏襲しつつ、対局進行は本物のルールエンジン
+#   (GameManager) を使う。状態同期は WebSocket(/ws/game/{id}) で全情報を配信し、
+#   相手手札の非表示などの表示制御はフロント側で行う方針。
+# ============================================================================
+
+@app.options("/api/rule/create")
+async def options_rule_create(): return {"status": "ok"}
+
+@app.post("/api/rule/create")
+async def rule_create(req: Any = Body(...)):
+    try:
+        game_id = str(uuid.uuid4())
+        room = {
+            "game_id": game_id,
+            "room_name": req.get("room_name", "Rule Room"),
+            "created_at": datetime.now().isoformat(),
+            "status": "WAITING",
+            "ready": {"p1": False, "p2": False},
+            "decks": {"p1": None, "p2": None},
+            "deck_preview": {"p1": None, "p2": None},
+        }
+        RULE_ROOMS[game_id] = room
+        log_event("INFO", "rule.create", f"Creating rule room: {game_id}", payload=req, player="system")
+        return {"success": True, "game_id": game_id, **_rule_room_meta(game_id), "game_state": None}
+    except Exception as e:
+        log_event("ERROR", "rule.create_fail", traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/rule/list")
+async def rule_list():
+    rooms = []
+    for gid, room in RULE_ROOMS.items():
+        try:
+            rooms.append({
+                "game_id": gid,
+                "room_name": room.get("room_name", "Rule Room"),
+                "p1_name": "P1",
+                "p2_name": "P2",
+                "turn": GAMES[gid].turn_count if gid in GAMES else 0,
+                "created_at": room.get("created_at", "N/A"),
+                "active_connections": game_ws_manager.count(gid),
+                "status": room.get("status", "WAITING"),
+                "ready_states": room.get("ready", {"p1": False, "p2": False}),
+            })
+        except Exception:
+            continue
+    return {"success": True, "games": rooms}
+
+def _deck_preview(deck_id: str, owner_id: str) -> Dict[str, Any]:
+    """ロビー表示用にデッキのリーダー情報のみ抽出する。"""
+    try:
+        leader, _cards = load_deck_mixed(deck_id, owner_id)
+        if leader:
+            return {"leader_id": leader.master.card_id, "leader_name": leader.master.name}
+    except Exception as e:
+        log_event("WARNING", "rule.deck_preview_fail", f"{deck_id}: {e}", player="system")
+    return None
+
+@app.options("/api/rule/action")
+async def options_rule_action(): return {"status": "ok"}
+
+@app.post("/api/rule/action")
+async def rule_action(req: Dict[str, Any] = Body(...)):
+    game_id = req.get("game_id"); room = RULE_ROOMS.get(game_id)
+    if not room:
+        return {"success": False, "error": "Rule room not found"}
+    act = req.get("action_type"); pid = req.get("player_id")
+    try:
+        if act == "SET_DECK":
+            if room["status"] != "WAITING":
+                return {"success": False, "error": "Game already started"}
+            if pid not in ("p1", "p2"):
+                return {"success": False, "error": "Invalid player_id"}
+            deck_id = req.get("deck_id")
+            room["decks"][pid] = deck_id
+            room["deck_preview"][pid] = _deck_preview(deck_id, pid)
+            room["ready"][pid] = bool(deck_id)
+        elif act == "KICK_PLAYER":
+            target = req.get("target_player_id")
+            if room["status"] == "WAITING" and target in ("p1", "p2"):
+                room["decks"][target] = None
+                room["deck_preview"][target] = None
+                room["ready"][target] = False
+        elif act == "START":
+            if room["status"] != "WAITING":
+                return {"success": False, "error": "Game already started"}
+            if not (room["ready"]["p1"] and room["ready"]["p2"]):
+                return {"success": False, "error": "Both players must be ready"}
+            if len(card_db.cards) < len(card_db.raw_db):
+                for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
+            p1_leader, p1_cards = load_deck_mixed(room["decks"]["p1"], "p1")
+            p2_leader, p2_cards = load_deck_mixed(room["decks"]["p2"], "p2")
+            player1 = Player("p1", p1_cards, p1_leader); player2 = Player("p2", p2_cards, p2_leader)
+            manager = GameManager(player1, player2); manager.start_game()
+            GAMES[game_id] = manager
+            room["status"] = "PLAYING"
+            log_event("INFO", "rule.start", f"Rule game started: {game_id}", player="system")
+        else:
+            return {"success": False, "error": f"Unknown rule action: {act}"}
+
+        await game_ws_manager.broadcast(game_id, build_rule_message(game_id))
+        return {"success": True, "game_id": game_id, **build_rule_message(game_id)}
+    except Exception as e:
+        log_event("ERROR", "rule.action_fail", traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
+
+@app.websocket("/ws/game/{game_id}")
+async def game_websocket_endpoint(websocket: WebSocket, game_id: str):
+    await game_ws_manager.connect(websocket, game_id)
+    try:
+        while True: await websocket.receive_text()
+    except WebSocketDisconnect:
+        game_ws_manager.disconnect(websocket, game_id)
 
 @app.get("/health")
 async def health(): return {"status": "ok", "constants_loaded": bool(CONST), "session_id": session_id_ctx.get()}
