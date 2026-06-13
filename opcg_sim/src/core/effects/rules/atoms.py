@@ -1258,6 +1258,14 @@ def _attack_disable(ctx: ParseContext) -> Optional[GameAction]:
     # 効果コントローラー自身の攻撃側制限。self_cannot(CANNOT_ATTACK_LEADER) に委ねる。
     if _nfc("自分は") in t and re.search(_nfc(r"リーダーにアタック"), t):
         return None
+    # 「このリーダー/キャラ/カードは、…（相手の…へ）アタックできない」= 効果保持カード自身の
+    # 攻撃側制限。対象（〜へ）ではなく自カード(SOURCE)に制限フラグを乗せる（OP12-020）。
+    # 対象限定（コストN以下のキャラへ等）はエンジン未モデルのため、自カードのアタック制限に近似する。
+    if re.search(_nfc(r'^この(?:リーダー|キャラ|カード)(?:は|が)'), t.strip()):
+        tq = TargetQuery(zone=Zone.FIELD, player=Player.SELF, count=1,
+                         ref_id="self", select_mode="SOURCE")
+        duration = "UNTIL_NEXT_TURN_END" if _nfc("次の") in t else "THIS_TURN"
+        return GameAction(type=ActionType.ATTACK_DISABLE, target=tq, duration=duration, raw_text=t)
     tq = parse_target(t)
     duration = "UNTIL_NEXT_TURN_END" if _nfc("次の") in t else "THIS_TURN"
     return GameAction(type=ActionType.ATTACK_DISABLE, target=tq, duration=duration, raw_text=t)

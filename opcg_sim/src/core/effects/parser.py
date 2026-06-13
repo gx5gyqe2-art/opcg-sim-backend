@@ -134,6 +134,13 @@ class EffectParser:
                 ab = self.parse_ability(seg)
                 if ab.trigger != TriggerType.UNKNOWN or ab.effect is not None:
                     abilities.append(ab)
+                    # 「（このリーダー/キャラが）アタックした時かアタックされた時」は ON_ATTACK と
+                    # ON_OPP_ATTACK の両方で誘発する（OP03-001）。ON_ATTACK 側を生成済みなら
+                    # ON_OPP_ATTACK の複製を追加する。
+                    if (ab.trigger == TriggerType.ON_ATTACK
+                            and _nfc("アタックした時かアタックされた時") in _nfc(seg)):
+                        import dataclasses
+                        abilities.append(dataclasses.replace(ab, trigger=TriggerType.ON_OPP_ATTACK))
             except Exception as e:
                 log_event("WARNING", "parser.segment_skip", f"Skipped segment: {seg[:30]} | {e}")
 
@@ -1103,6 +1110,10 @@ class EffectParser:
                 and not re.search(_nfc(r"(される|場を離れる|登場した|公開)"), norm_text)
                 and _nfc("のみ") not in norm_text):
             tq = parse_target(norm_text)
+            # 側の明示が無い「（コスト0の）キャラがいる場合」は両プレイヤーを数える（OP02-093:
+            # 相手キャラをコスト0にした後の存在判定）。「自分の/相手の」明示時はその側のみ。
+            if _nfc("自分") not in norm_text and _nfc("相手") not in norm_text:
+                tq.player = Player.ALL
             mc = re.search(_nfc(r"(\d+)枚(以上|以下|より多い|未満)?"), norm_text)
             if mc:
                 thr = int(mc.group(1))

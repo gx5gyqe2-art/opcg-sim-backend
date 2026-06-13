@@ -110,10 +110,6 @@ def test_op12_020_no_active_when_not_in_battle():
     assert L.is_rest is True                   # バトルしていないのでアクティブ化しないのが正
 
 
-@pytest.mark.xfail(strict=True,
-    reason="OP12-020: ATTACK_DISABLE が相手キャラ1枚を選択して付与する形。"
-           "テキストは『このリーダーが相手のコスト7以下キャラへアタックできない』＝自リーダーへの制限。"
-           "制限フラグは相手キャラではなく自リーダーに乗るのが正。")
 def test_op12_020_attack_restriction_on_self_leader():
     """OP12-020 起動メイン: アタック制限は自リーダーに付く（相手キャラに付くのは誤り）。"""
     gm, p1, p2, L = build("OP12-020")
