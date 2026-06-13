@@ -106,8 +106,6 @@ def test_op03_001_attack_no_discard_target_keeps_power():
     assert ch in p1.hand   # キャラは捨て対象外
 
 
-@pytest.mark.xfail(strict=False, reason="要確認: OP03-001 テキストは「アタックされた時」も誘発するが"
-                                        "指紋は ON_ATTACK 単独で ON_OPP_ATTACK が欠落（被アタック側未実装の疑い）")
 def test_op03_001_also_triggers_when_attacked():
     """OP03-001: 「アタックされた時」にも能力が誘発するべき（被アタック側トリガーの存在確認）。"""
     gm, p1, p2, L = build("OP03-001")

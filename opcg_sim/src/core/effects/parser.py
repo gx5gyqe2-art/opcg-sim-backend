@@ -134,6 +134,13 @@ class EffectParser:
                 ab = self.parse_ability(seg)
                 if ab.trigger != TriggerType.UNKNOWN or ab.effect is not None:
                     abilities.append(ab)
+                    # 「（このリーダー/キャラが）アタックした時かアタックされた時」は ON_ATTACK と
+                    # ON_OPP_ATTACK の両方で誘発する（OP03-001）。ON_ATTACK 側を生成済みなら
+                    # ON_OPP_ATTACK の複製を追加する。
+                    if (ab.trigger == TriggerType.ON_ATTACK
+                            and _nfc("アタックした時かアタックされた時") in _nfc(seg)):
+                        import dataclasses
+                        abilities.append(dataclasses.replace(ab, trigger=TriggerType.ON_OPP_ATTACK))
             except Exception as e:
                 log_event("WARNING", "parser.segment_skip", f"Skipped segment: {seg[:30]} | {e}")
 
