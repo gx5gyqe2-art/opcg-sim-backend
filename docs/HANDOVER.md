@@ -135,9 +135,9 @@
 | `tests/mistarget_diagnostics.py` | ミスターゲット/lift 候補の検出 |
 | `tests/interactive_target_audit.py` | INTERACTIVE 対象の自動監査（TargetQuery とテキストの照合。`--top N`） |
 | `tests/leader_spec_probe.py` | リーダー1枚分のテキスト/パース結果(AST要約)/実行観測(classify)を出力（`<ID>`/`--set`/`--all`/`--json`） |
-| `tests/leader_test_helpers.py` | リーダー挙動テスト用ヘルパ（実DBの能力を汎用盤面で発動・対話駆動・盤面観測）。§12参照 |
-| `tests/test_leader_*.py` | 全137リーダーの挙動テスト（セット別13ファイル）。✅通常パス／🐛は xfail(strict) でバグ固定 |
-| `docs/leader_specs/` | リーダー効果テスト仕様書（セット別13本＋README/ISSUES/_GUIDE/_TEST_GUIDE）。§12参照 |
+| `tests/leader_test_helpers.py` | リーダー挙動テスト用ヘルパ（実DBの能力を汎用盤面で発動・対話駆動・盤面観測） |
+| `tests/test_leader_*.py` | 全137リーダーの挙動テスト（セット別13ファイル）。期待挙動をアサートし、現挙動と異なる項目は xfail でマーク |
+| `docs/leader_specs/` | リーダー効果仕様（セット別13本＋README/_GUIDE/_TEST_GUIDE。既知の挙動差異は ISSUES.md） |
 | `full_card_baseline.json` | 全能力の実行シグネチャ凍結（挙動ベースライン） |
 
 ### フロントエンド（opcg-sim-frontend）
@@ -256,366 +256,125 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 
 ---
 
-## 7. 2026-06 カード効果再現性向上の変更点（card-effect-bugs ブランチ）
+---
 
-### 修正した根本原因（コード実証済み）
-
-| # | 根本原因 | 主な修正箇所 |
-|---|---|---|
-| RC-1 | 全角符号（＋/－/−/‐）が NFC で畳まれず `[+-]` 正規表現が不一致 | atoms.py `_SIGN`/`_to_int`、matcher.py 上限判定 |
-| RC-2 | 制限/付与系ルールが対象をハードコードし主語修飾（特徴/コスト上限/枚数）を破棄 | atoms.py `_subject_target`、gamestate `_active_protection`（範囲保護の走査＋期間付き保護フラグ） |
-| RC-3 | 「相手が選び」等の従属節が対象側判定を汚染 | matcher.py 除去リスト＋`TargetQuery.chooser`（選択者指定） |
-| RC-4 | 「N枚につき+X」がフラット値になる | `ValueSource.count_query`＋`COUNT_QUERY` 動的値（毎回実体化して数える） |
-| RC-6 | 「ライフがN枚になるように」が「N枚だけ」になる | `TargetQuery.count_dynamic="DOWN_TO_N"` |
-| - | **PASSIVE バフが再計算のたびに累積**（+1000 が際限なく増える） | `CardInstance.passive_power`/`passive_power_override`/`passive_counter`（再計算レイヤ） |
-| - | **対話中断中の再計算がバフを消す**（リセットだけ走り再適用が中断ガードで空振り） | `_apply_passive_effects` 冒頭で中断中は skip |
-| - | 無タグ反応型「…KOされた時」が PASSIVE 扱いで毎回発動 | `_detect_trigger` の ON_KO/ON_ATTACK 写像＋`_is_reactive_passive` ガード |
-| - | コスト上限修飾「ライフの…枚数以下の」がゾーン検出を汚染（KOの代わりにライフを墓地送り） | matcher.py ゾーン検出も除去後テキストで実施 |
-| - | 「このカードの【登場時】効果を発動する」が常に ACTIVATE_MAIN を展開 | 参照タグの非タグ化保全＋`_expand_main_effect(ref_trigger)` |
-| - | 複数タグのみのセグメント（【自分のターン中】【登場時】/）が本体を共有しない | parser.py セグメント共有の複数タグ対応 |
-| - | ライフ公開→条件付き登場が no-op（FACE_UP のみで TEMP 未経由） | LOOK_LIFE 経由＋`_temp_origin="LIFE"` 回収 |
-| - | 中断→再開経路で `save_id` 保存がスキップ | resolver `_resolve_targets` 再開パス |
-
-### 新しい不変条件
+## 7. 継続効果・パッシブ再計算
 
 - **`passive_power` / `passive_power_override` / `passive_counter` は再計算レイヤ**。
-  `_apply_passive_effects` Step1 が毎回リセットして再適用する。即時効果は従来どおり
-  `power_buff` / `base_power_override`（reset_turn_status で失効）へ。両者を混ぜないこと。
-- **`_apply_passive_effects` は `active_interaction` 中に呼ばれても何もしない**。
-  リセットだけ走って再適用できないため（資産消失防止）。
-- **PREVENT_LEAVE は期間付きなら継続フラグ `PREVENT_<status>`**（timed_flags）として付与される。
-  PASSIVE はマーカーのまま除去時走査（範囲保護はリーダー/フィールド/ステージも走査される）。
-- **temp 回収先は `_temp_origin` 属性で決まる**（"LIFE"=ライフ上、未設定=デッキトップ）。
-- **DECLARE_COST の相手デッキトップ公開は resume フックで行う**（AST に LOOK は無い。
-  mistarget 検出器 C は DECLARE_COST 保持カードを除外済み）。
+  `_apply_passive_effects` の Step1 が毎回 0/None にリセットして再適用する。即時効果は
+  `power_buff` / `base_power_override`（`reset_turn_status` で失効）に載せ、両者を混ぜない。
+- **`_apply_passive_effects` は `active_interaction` 中は何もしない**（リセットだけ走って再適用
+  できず資産が消えるのを防ぐ）。Step2/3 は `player.stage` も対象に含む。
+- **Step2' が OPPONENT_TURN を非ターンプレイヤーのカードに適用**する（cost_buff/passive_power
+  再計算レイヤなのでターンが替われば自然に消える）。
+- **`refresh_passive_state()` を API アクション境界で呼ぶ**（盤面依存の常在パワー等を即時反映）。
+  中断中・`_in_passive_recalc` 中は no-op（多重適用・無限再帰防止）。
+- **反応型「…された時」を含む常在は `_is_reactive_passive` で再計算から除外**する（毎回発動防止）。
+- **`timed_*`（power/cost/flags/keywords）は `reset_turn_status` でクリアしない**。期間付きの
+  COST/KEYWORD は `timed_cost`/`timed_keywords` に載せる（cost_buff/current_keywords へ直接加えると
+  passive 再計算で消える）。
 
-### 監査ハーネスの強化（tests/effect_coverage.py）
+## 8. 誘発・対話・コスト
 
-- H-1: ステータス差分測定（power/cost/keywords/flags/rest/don 構成）
-- H-2: ON_PLAY の登場アーティファクト控除（プレイ自体の盤面変化を除外）
-- H-3: CHOICE 全パス列挙（上限8）
-- H-4: SELECT_TARGET 候補のテキスト照合（SELECT_MISMATCH）
-- `tests/test_quality_gates.py`: ラチェット式ゲート
-  （WARN_DIRECTION=0 / STAT_ONLY=0 / NO_IMPL=0 / SELECT_MISMATCH≤2 / フォールバック=0）
-
-### 既知の残課題（優先順）→ 2026-06 解消
-
-1. ✅ **選択グループ分配**（OP08-118 等）: 「N枚を選び、1枚を…、残りを…」を `select_distribute`
-   ルールで SELECT(グループ保存)＋GROUP_FIRST/REMAINING に分解。resolver がグループの先頭/残余を
-   参照する（field 分配）。OP06-086/OP10-058 は二ティア/公開(TEMP)経由で近似。
-2. ✅ **OPPONENT_TURN / TURN_END 系トリガーの実プレイ配線**: `end_turn` を `_fire_turn_end_triggers`
-   に分離し、ターンプレイヤーの TURN_END に加え非ターンプレイヤーの **OPP_TURN_END** も自動発火する。
-3. ✅ **ドン付与の相手プール**（OP15-015）: `don_attach` がドン枚数句直前の「相手の」を検出し
-   status に "OPP" を付与、エンジンが相手のドンプールから付与する（status `RESTED_OPP`）。
-4. ✅ **遅延効果**（OP03-005 / OP13-024）: `GameAction.delay="TURN_END"`。parser_v2 が「ターン終了時、/に」
-   を遅延マークし、resolver が `pending_end_of_turn` に積み、`end_turn` で解決する。
-5. ✅ **文脈依存の「N枚につき」**（捨てたカード1枚につき等）: `PREV_ACTION_COUNT` 動的値。resolver が
-   `_last_action_count`(直前アクションの対象枚数)を記録し、`get_dynamic_value` が参照する。
-6. ✅ **「他の「X」」の自己除外**（EB02-018 等）: matcher が「他の／このキャラ以外」で `EXCLUDE_SOURCE`
-   フラグを立て、`get_target_cards` がソース自身を候補から除外する。
-7. ✅ **二重制約/複数ゾーンの対象**（EB03-049/OP03-096/OP13-079）: `TargetQuery.zone` のリスト対応
-   （手札かトラッシュ等）、`dual_tier_play_from_trash` が特徴/名前/ゾーンを両ティアで共有、
-   `_parse_target_alternative_choice` が「AかB、<動詞>」を制約別 Choice に分解。
-
-> 監査 `interactive_target_audit` は raw_text 共有の兄弟（Choice/二択/二ティア/自己コスト）を集約
-> 判定する精度改善で誤検知を排し、ラチェットを **0** に締結（`test_quality_gates`）。
-
-### 残る近似・未対応（軽微）
-
-- ドン付与済み枚数依存「付与されているドン1枚につき」・「カード名の異なる」系の動的値は未対応
-  （対象固有/名前集合の別機構が必要）。
-- OP06-086 の「コスト4以下と2以下を1枚ずつ選び1枚登場・残りレスト」は二ティア＋REMAINING で
-  近似（厳密な選択集合分配ではない）。
-
----
-
-## 8. 2026-06 Phase 4/5（深層ハーネス＋検出分の修正）
-
-### 追加した検出ハーネス
-
-| ツール | 役割 | 結果 |
-|---|---|---|
-| `tests/condition_synth.py` (H-5) | 条件/コストを満たす盤面を合成して発動・分類。実評価器で再検証し合成漏れを除外 | 490 未検証能力 → 1233 実行確認 / SATISFIED_NO_CHANGE 9 |
-| `tests/battle_coverage.py` (H-6) | declare_attack→handle_block→counter を駆動し ON_ATTACK/ON_BLOCK/ON_OPP_ATTACK/COUNTER を実戦発火 | 494 発火 / ERROR 0 |
-| `effect_coverage._zone_fingerprint`/`_moved` | 枚数で相殺されるグロスのカード移動を検出（ドロー+手札→デッキ cost 等） | 偽 NO_CHANGE を排除 |
-
-### Phase 5 で修正した実バグ
-
-- **ON_BLOCK 未発火**（14枚）: `handle_block` が【ブロック時】能力を発動していなかった。
-- **複合条件「Aがいて、Bの場合」の誤読**（~9枚）: 単一条件＋最初の数値で誤分類していた
-  （例:「コスト8以上のキャラがいて、手札6枚以下」→ `HAND_COUNT>=8`）。`_parse_condition_obj`
-  が連結部で2分割して `AND` を構成するようにした。
-
-### 新しい不変条件・運用
-
-- **`passive_*`（passive_power / passive_power_override / passive_counter）は再計算レイヤ**。
-  即時効果の `power_buff`/`base_power_override`/`cost_buff` とは別で、`_apply_passive_effects` が
-  毎回 0/None にリセットして再適用する。
-- **H-4〜H-7 のゲートは `tests/test_quality_gates.py`**: SATISFIED_NO_CHANGE≤10（§11 ③c で +1）/
-  BATTLE_NO_CHANGE=0 / battle ERROR=0 / interactive_audit≤11 をラチェット固定。
-- **`condition_synth` の合成盤面は実評価器（`_check_condition`/`_can_satisfy_node`）で再検証する**。
-  合成しきれない条件型（DON_COUNT_COMPARE/PREV_ACTION/色フィルタ等）は UNHANDLED に落とし、
-  真バグ候補（SATISFIED_NO_CHANGE）に混ぜない。
-
----
-
-## 9. 2026-06 RealGame UI 改善（realgame-ui-improvements ブランチ）
-
-対戦画面（RealGame）の UI/UX 改善。backend PR #23 / frontend PR #23 で main へマージ済み。
-
-### Backend の変更（1行）
-
-- `gamestate.py` `Player.to_dict`: ライフを `_format_card(c, c.is_face_up)` でシリアライズ
-  （従来は常に `False` 固定で、FACE_UP_LIFE で表になったライフをクライアントが判別できなかった）。
-- **情報リーク注記**: `_format_card` は `is_face_up` を上書きするのみで、裏向きライフ/相手手札の
-  カード識別情報（name/card_id/text）は従来から全送信されている。本変更でリーク範囲は拡大しないが、
-  対人戦対応時はマスキングの検討が必要（trigger/candidates フローへの影響に注意）。
-
-### Frontend の変更
-
-| パス | 変更内容 |
-|---|---|
-| `src/game/cardTypes.ts` | **新規**。`normalizeCardType` — カード種別の英/日表記（'STAGE'/'ステージ' 等）を正規化 |
-| `src/game/cardActions.ts` | **新規**。`getAvailableActions(card, location, isMyTurn, activeDonCount)` — 実行可能アクション（登場/攻撃/ドン付与/効果起動）の一元判定。攻撃・ドン付与はリーダー/キャラのみ、起動メインは種別不問 |
-| `src/ui/CardActionMenu.tsx` | **新規**。カードタップ時にカード近傍へ出すミニアクションメニュー（画面端クランプ・上半分タップは下に/下半分は上に表示・ドン付与は枚数ステッパー内蔵） |
-| `src/ui/CardDetailSheet.tsx` | `renderButtons` を `getAvailableActions` ベースに書き換え（ステージに攻撃/ドン付与が出るバグの修正箇所） |
-| `src/ui/BoardSide.tsx` | ライフを仮想1枚+枚数バッジから **個別カードの横向き重ね表示** に変更（90°回転は `is_rest: true` のレンダリング用コピーで実現）。両陣営に適用。枚数バッジ併記 |
-| `src/ui/CardRenderer.tsx` | `options.onClick` のシグネチャを `(pos: {x,y}) => void` に変更（pointertap の `e.global` を渡す。autoDensity+全画面キャンバスのため CSS px と一致） |
-| `src/screens/RealGame.tsx` | `actionMenu` ステート追加。操作可能カードはミニメニュー、操作不可カード（相手/ライフ/トラッシュ等）は従来どおり直接詳細シート |
-| `src/ui/CardSelectModal.tsx` | 並び替えモード（`maxSelect < 0`）の小さい↑↓ボタンを廃止し、Pointer Events の **ドラッグ&ドロップ並び替え** に置換（追加依存なし） |
-| `src/layout/layout.config.ts` | `Z_INDEX.MINI_MENU: 1500` 追加（NOTIFICATION/OVERLAY より上、SHEET より下） |
-
-### 実装上の不変条件・注意点（UI）
-
-- **アクションボタンの表示可否は `getAvailableActions` に一元化**。新アクションを追加する場合は
-  ここに足すこと（CardDetailSheet と CardActionMenu の双方に反映される）。location だけで判定する
-  実装に戻すとステージ攻撃バグが再発する。
-- **ミニメニューは `gameState` / `pendingRequest.request_id` の変化で必ず自動クローズ**する
-  （RealGame の useEffect）。PIXI 盤面は状態変化のたびに全再構築されカード位置が変わるため、
-  アンカー座標が古くなるのを防ぐ。攻撃ターゲティング開始時（handleAction ATTACK 分岐）も閉じる。
-- **ライフの横向き描画はレンダリング用コピー `{ ...c, is_rest: true }`** を使う。onClick・詳細シートには
-  **元のカードオブジェクト**を渡すこと（コピーを渡すとレスト状態が誤表示される）。
-- **`life[0]` が山の一番上**（バックエンドはダメージ時 `life.pop(0)`、HEAL は append）。BoardSide は
-  逆順 addChild で `life[0]` を最前面・最上段に描画する。
-- **裏向きライフは `eventMode = 'none'` でタップ無効**。表向きのみタップ → 既存フロー（location 'life'
-  → isOperatable=false → 詳細シート直行）。
-- **`createCardContainer` の onClick は座標を受け取る**。座標不要の呼び出し元（Sandbox 等）は
-  引数を無視するラムダでよい。
-- **並び替えモードのドラッグ**は `setPointerCapture` + 6px 閾値 + `getBoundingClientRect` の矩形
-  ヒットテストで `selected`（=配置順）を splice 移動する。グリッドは `selected` 順で描画されるため
-  ライブ並べ替え自体が挿入位置のフィードバックになる。アイテムは `touch-action: none`（タッチ対応）。
-
-### 残課題（UI）
-
-- ライフ重ね間隔・ミニメニュー幅などの微調整は実機目視が未実施（型チェック/lint/バックエンド
-  テスト 342 件は通過済み）。
-- 対人戦対応時: 裏向きライフ/相手手札のカード識別情報マスキング（上記リーク注記）。
-
----
-
-## 10. 2026-06 対話化と自己制限のエンフォース
-
-### 課題3(3a): 自己制限（self_cannot）のエンフォース
-
-「自分は、このターン中、…できない」を従来の `RULE_PROCESSING` no-op から実エンフォースへ。
-parser(`self_cannot`)が述語を制限キーへ写像し、`apply_action_to_engine` が `player.restrictions`
-（key→{expire, min_cost}）に記録、各地点で enforce する。`gamestate.SELF_RESTRICTION_KEYS`：
-
-| キー | 述語 | enforce 地点 |
-|---|---|---|
-| `CANNOT_PLAY_CHARACTER`(min_cost対応) | キャラ（コストN以上）を登場できない | `play_card_action` |
-| `CANNOT_PLAY_FROM_HAND` | 手札からカードをプレイできない | `play_card_action` |
-| `CANNOT_ATTACK_LEADER` | リーダーにアタックできない | `declare_attack` |
-| `CANNOT_DRAW_BY_EFFECT` | 自分の効果でカードを引けない | `DRAW` |
-| `CANNOT_ACTIVATE_DON` | キャラの効果でドン‼をアクティブにできない | `ACTIVE_DON` |
-| `CANNOT_LIFE_TO_HAND` | 自分の効果でライフを手札に加えられない | `MOVE_CARD`(life→hand) |
-
-- 「このターン中」= 現ターンのみ有効（`turn_count <= expire` の遅延失効。`negate_onplay_until` と同方式）。
-- `attack_disable` から「自分は…リーダーにアタックできない」を除外し `self_cannot` に委譲。
-- 述語を判別できない自己制限（「デッキに入れられない」=構築ルール）は従来どおり no-op。
-- テスト: `tests/test_self_cannot.py`(16)。
-
-### 課題2(2a/2b): デッキ配置の上下選択・並び替え／ライフ並べ替えの対話化
-
-「好きな順番でデッキの上か下に置く」「ライフすべてを見て好きな順番で置く」を、従来の
-現状順・デッキ下固定から **ARRANGE_DECK 対話**へ。
-
-- **parser**: `temp_to_deck`/`remaining_deck_bottom`/`remaining_deck_top_or_bottom`/`hand_to_deck` に
-  `status="ARRANGE"`（順序選択）と `dest_position`（"TOP"/"BOTTOM"/"CHOOSE"）を付与。
-- **resolver**: `_maybe_suspend_arrange`/`_suspend_for_arrange` が DECK_BOTTOM(ARRANGE/CHOOSE) と
-  ORDER_LIFE を中断（`action_type="ARRANGE_DECK"`, `allow_reorder`/`allow_position`）。
-  `_resolve_targets` は REMAINING を「残り全部」として選択中断せず、ARRANGE_DECK 一本に集約。
-- **gamestate**: `resolve_interaction` の `ARRANGE_DECK` 分岐で順序適用＋上/下配置（TOP は逆順
-  insert で先頭が最上面）、ライフ再整列。DECK_BOTTOM ハンドラが `dest_position` を尊重。
-- **frontend**: `CardSelectModal` に `allowPosition`（「デッキの上へ/下へ」確定ボタン）を追加、
-  既存の DnD 並び替えモード(`maxSelect<0`)と併用。RealGame の `showSearchModal`/`handleSelectionResolve`
-  が ARRANGE_DECK を処理し `{selected_uuids(配置順), position}` を送信。
-- **不変条件**: ヘッドレス(`_smart_drain` の既定 payload=selected_uuids 空/position 無し)では
-  現状順・デッキ下に解決され**挙動不変**（baseline/品質ゲート維持）。テスト: `tests/test_arrange_deck.py`(7)。
-
-### 残課題（この回で未着手）
-
-- 課題2(2c): 置換効果（`_auto_resolve_replacement`）の対話化は高リスクのため見送り（現状は自動解決）。
-
----
-
-## 11. 2026-06 カード効果バグ修正（card-effect-bugs ブランチ）
-
-報告された効果処理の不具合を、個別カードでなく**共通機構**で修正した（横展開で波及200枚超を確認）。
-backend テスト 374 passed / パーサ退行（新規OTHER）0 / フロント tsc・build 成功。
-
-### 修正した根本原因
-
-| # | 症状 | 根本原因 | 主な修正箇所 | 波及 |
-|---|---|---|---|---:|
-| ① | 【トリガー】が自動発動 | ライフ公開時に確認なしで即解決。複数枚は中断跨ぎで消失 | `_pending_triggers`＋`CONFIRM_TRIGGER`（gamestate）、FE `RealGame.tsx` | 486 |
-| ②a | 【ドン‼×N】がドン無しで使える | タグを REST_DON コストに誤変換（付与ドン要件を喪失） | parser.py（`HAS_DON` 条件化）、resolver.py（`attached_don` 参照） | 210 |
-| ③b | 任意コストが強制実行 | コスト充足で確認なしに即支払い | `Ability.cost_optional`＋resolver の使用確認（accept まで使用回数も未消費） | 111 |
-| ③a | 【相手のターン中】が不適用 | `_apply_passive_effects` が OPPONENT_TURN を発火せず | gamestate Step 2'（非ターンプレイヤーのカードを走査） | 77 |
-| ④a | 盤面依存パワーが非リアルタイム | 再計算契機が限定的 | `refresh_passive_state()` を API アクション境界で呼ぶ | 20 |
-| ④b | 「効果でKOされない」が全除去耐性 | status を広い `LEAVE` に写像 | atoms.py `EFFECT_KO`、除去ディスパッチのバケツ分離 | 17 |
-| ⑥a | ライフへ「表向き」が裏向き | `face_up` を IR/エンジンが無視 | `GameAction.face_up`、hand_to_life、MOVE_CARD→LIFE | 14 |
-| ③c | 【トリガー】以外も捨てられる | discard 対象の【トリガー】絞り込み喪失 | `HAS_TRIGGER` フラグ（parser/matcher）、`【X】を持つ` タグ保全 | 10 |
-| ⑤b | 効果無効が途中で解除 | `ability_disabled` 素フラグが reset で消える | NEGATE_EFFECT を継続効果(`EFFECTS_DISABLED`)化、`is_effect_negated` | 6+ |
-| ⑤a/c | OP09-093 の登場ターン制約・キャラ無効が不発 | 複合条件と第2節の negate を取りこぼし | parser の「を持ち、」AND 分割＋`negate_then_attack_disable` ルール（旧 catalog 手動定義は廃止） | 1 |
-| ②b | ライフ離脱時のドローが不発 | 効果でのライフ移動が ON_LIFE_DECREASE を発火せず | `move_card` がライフ離脱を誘発キューへ積む | 3+ |
-
-### 新しい不変条件・注意点
-
-- **【ドン‼×N】= `Condition(HAS_DON, value=N, GE)`**。`resolver._check_condition` は
-  `source_card.attached_don` を見る（コストエリアの active ドンではない）。明示本文の
-  「ドン!!N枚をレストにする」コストは従来どおり REST_DON。
-- **任意コスト能力は `Ability.cost_optional`**（コスト句に「できる/してもよい」）。自動誘発トリガー
+- **誘発は `_pending_triggers` キュー経由**。`move_card` がライフ離脱を `ON_LIFE_DECREASE` として
+  積み、API 境界/対話完了/戦闘・効果ダメージ末尾でドレインする（戦闘・効果ダメージは `life.pop`
+  済みのため二重計上しない）。
+- **【トリガー】（ライフ公開）は `CONFIRM_TRIGGER` で確認**してから解決する。複数枚はキューで保持し
+  中断跨ぎで消えない。
+- **【ドン‼×N】= `Condition(HAS_DON, value=N, GE)`**。`_check_condition` は `source_card.attached_don`
+  を見る（コストエリアの active ドンではない）。本文明示の「ドン!!N枚をレストにする」コストは REST_DON。
+- **任意コスト能力は `Ability.cost_optional`**（コスト句に「できる/してもよい」）。自動誘発
   （ON_PLAY/ON_ATTACK/ON_OPP_ATTACK/ON_BLOCK 等）は発動前に `CONFIRM_OPTIONAL` で使用確認する。
-  `ACTIVATE_MAIN`（自発起動）は対象外。**使用回数は accept 後に消費**（拒否では未消費）。
-- **`_apply_passive_effects` の Step 2' が OPPONENT_TURN を非ターンプレイヤーのカードに適用**する
-  （cost_buff/passive_power 再計算レイヤなのでターンが替われば自然に消える）。
-- **`refresh_passive_state()` を API アクション境界で呼ぶ**（`app.py game_action` 末尾）。盤面依存の
-  常在パワー等を即時反映する。中断中・`_in_passive_recalc` 中は no-op（多重適用・無限再帰防止）。
-- **効果無効は `is_effect_negated` で参照**する（能力発動ガード・blocker・ON_PLAY 発火・除去保護の
-  protector スキップ・deckout 走査）。`ability_disabled` 直接参照は避ける。
-- **誘発は `_pending_triggers` キュー経由**。`move_card` でライフ離脱を積み、API 境界/対話完了/戦闘・
-  効果ダメージ末尾でドレインする。戦闘・効果ダメージは `life.pop` 済みのため `move_card` 経路では
-  二重計上しない。
-- **`【X】を持つ` のタグはタグ除去で保全**する（parser.py の除去正規表現に `(?!を持つ)`）。
-  トリガー検出は除去前テキストで済むため【トリガー】prefix は引き続き除去される。
+  `ACTIVATE_MAIN`（自発起動）は対象外。使用回数は accept 後に消費（拒否では未消費）。
+- **ターン内イベント追跡**: `gamestate._turn_events` + `record_turn_event` + `EVENT_THIS_TURN` 条件。
+  「〈イベント〉した時、…でなければ発動しない」型の誘発条件を、イベント発生フラグで評価する。
+- **文脈依存「N枚につき」は `PREV_ACTION_COUNT` 動的値**（`_last_action_count`＝直前アクションの
+  対象枚数）。ドンの増減は targets を介さないため、REST_DON/ACTIVE_DON/RETURN_DON は実処理枚数を
+  記録してこの値に使う。「N枚につき+X」の対象実体化スケーリングは `ValueSource.count_query`/`COUNT_QUERY`。
+- **遅延効果「ターン終了時、」は `GameAction.delay="TURN_END"`** → `pending_end_of_turn` に積み
+  `end_turn` で解決。`end_turn` はターンプレイヤーの TURN_END に加え非ターンプレイヤーの
+  OPP_TURN_END も自動発火する（`_fire_turn_end_triggers`）。
 
-### テスト
+## 9. 対象解決・除去保護・置換
 
-- 回帰テストを `tests/test_realdeck_play.py`（OP11-041/OP16-080/OP09-086/OP09-093/OP14-104）と
-  `tests/test_effects_engine.py`（NEGATE 継続化）に追加。
-- `full_card_baseline.json` は意図的変更分（②a 131枚・③b 1枚・③c 8枚）のみ再生成。
-- H-5 ラチェット（`test_quality_gates`）は +1（③c のコストが合成盤面で支払えず no-op になる測定限界）。
+- **`parse_target` は主語修飾（特徴/コスト上限/枚数）を保全**する。「相手が選び」等の従属節は
+  player 判定から除去して `TargetQuery.chooser` へ。期間/タイミング句の「(次の)相手の(ターン/
+  エンドフェイズ)(終了時)(まで/中)」は player 判定から除外する（増やす際は除去正規表現に追加）。
+- **隠しゾーン（ライフ/デッキ）の対象は上から自動取得**（情報リーク防止）。明示公開して選ぶ効果は
+  `TargetQuery.flags` に `"REVEAL_SELECT"` を付け対話選択に切り替える。
+- **「他の／このキャラ以外」→ `EXCLUDE_SOURCE`**（`get_target_cards` がソース自身を除外）。
+- **`TargetQuery.zone` はリスト対応**（手札かトラッシュ等）。
+- **coreference「そのキャラ／そのカード」**: FIELD 選択を `saved_targets['selected_card']` に
+  自動保存し、後続 ref がそれを参照する。ref が未保存なら対象なし。能力内に選択 producer が
+  あるか否かで「選択への後方参照」と「文脈的指示（置換被害者・誘発主体）」を静的に切り分ける。
+- **除去保護 `PREVENT_LEAVE`**: 期間付きは継続フラグ `PREVENT_<status>`、PASSIVE はマーカーのまま
+  除去時に走査（範囲保護はリーダー/フィールド/ステージも走査）。`LEAVE`/`EFFECT_KO` をバケツ分離
+  （「効果でKOされない」は KO 限定で、手札戻し等の非KO除去には効かない）。
+- **置換 sub_effect は `_auto_resolve_replacement` が同期解決**する（任意=accept、対象=自動選択）。
+  置換は除去解決の最中（`apply_action_to_engine` 内）に走る。`active_interaction` は単一スロット設計。
+- **効果無効は `is_effect_negated` を参照**する（能力発動ガード・blocker・ON_PLAY 発火・除去保護の
+  protector スキップ・deckout 走査）。`NEGATE_EFFECT` は継続効果 `EFFECTS_DISABLED` 化。スコープ付き
+  相手効果無効は `Player.negate_onplay_until`（現状【登場時】のみ）。
+- **自己制限（self_cannot）は `player.restrictions`（key→{expire, min_cost}）に記録し各地点で enforce**:
+  `CANNOT_PLAY_CHARACTER`(min_cost対応)/`CANNOT_PLAY_FROM_HAND`/`CANNOT_ATTACK_LEADER`/
+  `CANNOT_DRAW_BY_EFFECT`/`CANNOT_ACTIVATE_DON`/`CANNOT_LIFE_TO_HAND`（`SELF_RESTRICTION_KEYS`）。
+  「このターン中」は `turn_count <= expire` の遅延失効。
 
----
+## 10. 値・符号・その他の解析要点
 
-## 12. 2026-06 全リーダー効果の意味検証＋挙動テスト（leader-card-effect-tests ブランチ）
+- 全角符号（＋/－/−/‐）は NFC/NFKC の揺れに両対応する（`_SIGN`/`_to_int`、上限判定）。
+- 丸数字コスト（➁/③）は枚数として解釈する（先頭丸数字＋NFKC 分解後の素数字も）。
+- パワー/コストの「N以上」「N以下」「NからM」を `power_min`/`power_max`/`cost_min`/`cost_max` に、
+  接尾辞なし「コストNの」はちょうど N（cost_min=cost_max=N）に解釈する。
+- 「ライフがN枚になるように」は `TargetQuery.count_dynamic="DOWN_TO_N"`。
+- 「まで」無しのちょうど N 枚コストは `is_strict_count`（N枚未満では支払えない）。
+- temp 回収先は `_temp_origin` 属性（"LIFE"=ライフ上、未設定=デッキトップ）。ライフへの向きは
+  `GameAction.face_up`。
+- デッキ配置の上下選択・並び替え／ライフ並べ替えは `ARRANGE_DECK` 対話（`status="ARRANGE"`/
+  `dest_position`）。ヘッドレス既定（payload 空）では現状順・デッキ下に解決され挙動不変。
+- 選択グループ分配（「N枚を選び、1枚を…、残りを…」）は `select_distribute` →
+  SELECT(グループ保存)＋`GROUP_FIRST`/`REMAINING`。
+- Sequence の分割境界は `_parse_to_node` の split_pattern（`。`/`その後、`/連用形の `(?<=置き)、` 等）。
+- 複合条件「Aがいて、Bの場合」「Aを持ち、…」は `AND` に分割する。
+- 「〜の代わりに〜」は択一（先行効果の条件を `AND(cond, NOT(後続条件))` に書き換え。`ConditionType.NOT`）。
+  ただし置換（「される/離れる代わりに」= `REPLACE_EFFECT`）は別経路。
+- 「（このリーダー/キャラが）バトルしている場合」は `SOURCE_STATE "IN_BATTLE"`（`active_battle` 参照）。
+- DECLARE_COST の相手デッキトップ公開は resume フックで行う（AST に LOOK は無い）。
 
-全137リーダーカードを**1枚ずつテキスト精読**し、構造監査（クラッシュ/カード消失）では拾えない
-**意味バグ**（対象・数値・条件・トリガー種別の取り違え）を仕様書として洗い出し、テキスト準拠の
-**挙動テスト**で固定した（初版は検出と固定のみ）。その後の修正フェーズで**共通機構として実装側を
-是正**し、leader xfail を 80→2 まで解消（詳細は下記「修正進捗（最終）」と `docs/leader_specs/ISSUES.md`）。
+## 11. リーダー効果仕様とテスト
 
-### 成果物
+- `docs/leader_specs/` にセット別仕様（基本／効果テキスト／期待挙動／テストケース）。索引は
+  `docs/leader_specs/README.md`、テスト方針・ヘルパ API は `_TEST_GUIDE.md`。
+- 挙動テストは `tests/test_leader_*.py`（`tests/leader_test_helpers.py` の盤面構築・対話駆動・観測 API）。
+  期待挙動をアサートし、現挙動と異なる項目は `@pytest.mark.xfail` で表現する。
+- 現在の既知の挙動差異は `docs/leader_specs/ISSUES.md`。
 
-| 種別 | パス | 内容 |
+## 12. 監査・品質ゲート
+
+| ツール | 役割 | 合格条件 |
 |---|---|---|
-| プローブ | `tests/leader_spec_probe.py` | テキスト/パース結果(AST要約)/実行観測(classify)を1枚分まとめて出力 |
-| 仕様書 | `docs/leader_specs/<SET>.md`（13本） | 各リーダーの効果分解・テストケース表・パース照合・実観測照合・判定(✅/⚠️/🐛) |
-| 索引/一覧 | `docs/leader_specs/README.md` / `ISSUES.md` | 集計索引／検出バグの**根本原因パターン別**一覧＋修正優先順位 |
-| ガイド | `docs/leader_specs/_GUIDE.md` / `_TEST_GUIDE.md` | 仕様書作成ルール／pytest化のマーカー方針・ヘルパAPI |
-| ヘルパ | `tests/leader_test_helpers.py` | 実DBの能力を汎用盤面で発動・対話駆動・盤面観測 |
-| テスト | `tests/test_leader_<set>.py`（13本） | 全137リーダーの挙動テスト |
+| `tests/full_card_audit.py` | 全カード構造不変条件＋挙動シグネチャ生成（`--regen` で `full_card_baseline.json` 更新） | EXCEPTION / CARD_LOSS / TEMP_LEAK = 0 |
+| `tests/test_full_card_baseline.py` | 挙動ベースライン回帰 | `full_card_baseline.json` と一致 |
+| `tests/compare_parsers.py` | レガシー vs V2 の全カード差分 | 新規 OTHER（退行）= 0 |
+| `tests/test_quality_gates.py` | NO_CHANGE/WARN/SELECT_MISMATCH 等のラチェット | 設定閾値以内 |
+| `tests/interactive_target_audit.py` | INTERACTIVE 対象と TargetQuery/テキストの照合 | 疑い 0 |
+| `tests/condition_synth.py` / `tests/battle_coverage.py` / `tests/effect_coverage.py` | 条件合成発動・戦闘発火・実行カバレッジ | ERROR 0 |
 
-### テスト設計（リグレッションの固定方法）
+挙動を変更したら、差分をレビューのうえ `full_card_audit.py --regen` でベースラインを更新し、
+上記ゲートを通す。`condition_synth` の合成盤面は実評価器（`_check_condition`/`_can_satisfy_node`）で
+再検証する。
 
-- **常にテキスト準拠の「正しい挙動」をアサート**する（現実装に合わせない）。
-- 判定ラベルでマーカーを決める:
-  - ✅問題なし → 通常テスト（正しい挙動をロック）
-  - 🐛バグ → `@pytest.mark.xfail(strict=True, reason=原因)`。現実装では失敗＝xfailで緑。
-    **修正されると xpass→strictで赤**になり、マーカー除去（＝修正完了）を促す「バグ検知器」。
-  - ⚠️要確認 → 通常で書き、実際に正しく動けば通常パスへ昇格／不安定なら `xfail(strict=False)`。
-- 反転系（パワー GE/LE 等）は**条件成立・不成立の両盤面**でアサートして反転を確実に捕捉する。
-- 実行は **`-s` 必須**（ログ干渉で I/O エラーになるため）:
-  `OPCG_LOG_SILENT=1 python -m pytest tests/test_leader_*.py -q -s -p no:cacheprovider`
-- 集計（初版）: 230 passed / 80 xfailed / 1 skipped。**2026-06 の修正フェーズ後: leader xfail 80→2**
-  （後述 §12「修正進捗（最終）」参照）。残る 2 件の `reason` が未解消の意味バグ。
+## 13. フロントエンド UI の要点（RealGame）
 
-### ヘルパ（`leader_test_helpers.py`）の要点
-
-- `build(card_id)` → `(gm, p1, p2, leader)`。`effect_coverage._build_test_state` を再利用した
-  リッチ盤面（p1=ドン10/手札5/トラッシュ10/デッキ20/ライフ5/フィールド3、p2=…）でリーダーを配置。
-- `get_ability(master, trigger, n=0)` で実パース済み能力を取得し `gm.resolve_ability(p1, ab, leader)`。
-- `auto_resolve(gm, player, plan=None)` が対話を駆動（既定: CONFIRM=受諾／SELECT=min枚／CHOICE=0）。
-  精密制御は `plan=[confirm(True), select_uuids([...]), choose(i)]`。
-- `add_char/clear_field/set_life`、観測 `leader_power/don_total/zone_counts`。
-- **注意（実装の癖）**: 【ドン‼×N】(HAS_DON) は §11 の通り `source_card.attached_don` を見るため、
-  リーダー発動の条件成立には `leader.attached_don = N` を設定する（コストエリアの active ドンではない）。
-
-### 検出した意味バグの根本原因パターン（初版の分類。解消状況は下記「修正進捗（最終）」/`ISSUES.md`）
-
-| 群 | パターン | 代表ID | 根本原因（判明分） |
-|---|---|---|---|
-| A | パワー「以上」が常に「以下」に反転 | OP10-001/003, OP16-001, P-086, ST13-001 | `matcher.py:209` のパワー抽出正規表現 `\D?` が「以上」の「以」を食い group2=None → `else` で `power_max` に設定。cost 側(line168)は `\D?` 無しで正常 |
-| B | 誘発トリガーが ACTIVATE_MAIN/YOUR_TURN/ON_PLAY に化ける | OP01-061, OP03-040/076, OP06-042, OP12-081, OP13-002/100, OP16-041, P-117, PRB01-001 | 「〜した時」系の自動誘発が認識されず起動メイン等にフォールバック→**無条件・過剰発動**。`ON_DAMAGE_DEALT_TO_LIFE` 等は enum 定義のみで parser 未割当 |
-| C | 条件節の欠落・縮退・反転 | ST10-002(OR欠落), OP13-003(反転), OP14-020/ST14-001(コスト閾値縮退), OP02-026(FIELD→HAND) | パーサの条件解釈漏れ |
-| D | 条件のスコープ誤り（一部アクションにしか掛からない） | OP11-040, ST29-001 | 条件が後続アクションに波及しない |
-| E | 対象(TargetQuery)の条件欠落・取り違え | OP03-022, OP05-002, EB03-001/PRB01-001(「効果を持たない」除外), OP11-022(OR→ANDで対象常に空) | 「効果を持たない」除外は `TargetQuery`/`matcher` に機構自体が無い |
-| F | 数値・効果種別の取り違え | OP02-002(コスト-1→相手強化), OP07-001(count↔value), OP05-098(HEAL=0), OP06-080(丸数字➁→1) | 個別 |
-
-**修正優先順位（提案）**: A（原因特定済み・1行で5枚超解消）→ B（15枚・誘発機構の設計判断要）→ C/D → E/F
-（OP02-002 効果が正反対・OP11-022 対象が常に空、は実害大）。
-
-#### 修正進捗（最終: leader xfail 80 → 2）
-
-詳細な根本原因・カード別の解消内容は `docs/leader_specs/ISSUES.md`（権威ソース）を参照。
-ここでは**着地した共通機構**と**残 2 件**のみ要約する。全テスト緑・パーサ退行0・構造監査0・
-挙動ベースライン整合を維持して段階的にマージ済み。
-
-着地した主な共通機構（横展開込み）:
-- 群A 不等号反転: `matcher` パワー抽出から `\D?` を除去し「パワーN以上」を `power_min` へ。
-- 群F 数値/種別取り違え: 丸数字コスト（`_don_count`）、`_don_attach` を能動付与に限定（OP02-002）、
-  `_life_recover` 枚数取得（OP05-098）。
-- 群C/E 条件・対象: DON 存在条件 GE1（OP13-003）、OR 分割（ST10-002/OP05-060）、コスト範囲
-  「NからM」、`TRAIT_OR_NAME`/`TRAIT_OR_TRIGGER`/`HAS_TRIGGER`、`min_attached_don`/`is_face_up`、
-  接尾辞なし「コストNの」=ちょうどN、`FIELD_COST_SUM`/`LIFE_HAND_SUM`/`TURN_COUNT` 条件、
-  ちょうどN枚コストの `is_strict_count`。
-- 群B 誘発トリガー: 本文埋め込み「〜された/与えた時」を本来種別へ写像（`ON_KO`/
-  `ON_DAMAGE_DEALT_TO_LIFE`/`ON_LEAVE`/`ON_EVENT_PLAY`/`ON_OPP_PLAY`）。**実発火配線も実装**:
-  ターン内イベント追跡（`gamestate._turn_events` + `record_turn_event` + `EVENT_THIS_TURN` 条件）で
-  no-fire-without-event を満たす（OP06-042/OP07-038/OP12-040/OP01-062 等）。
-- V2 coreference: FIELD 選択を `saved_targets['selected_card']` へ自動保存、ref 未保存は対象なし。
-  選択 producer の有無で文脈型（置換被害者/誘発主体）と静的に切り分け（OP10-099/OP07-059、
-  非退行: OP05-001/OP16-079）。色制約「異なる色」も選択カード参照で実装（OP01-002）。
-- その他: `〜の代わりに〜` 択一化（`ConditionType.NOT`、OP04-040）、`バトルしている場合`→
-  `SOURCE_STATE IN_BATTLE`（OP12-020）、REST_DON/ACTIVE_DON の実処理枚数記録で「レストにした
-  ドン1枚につき」スケーリング是正（OP13-001）、任意コストが*ライフ枚数を変える*場合のみ効果側
-  ライフ条件をコストに掛けない（`_node_moves_life`、OP13/ST07-001）、ST14-001 は裁定確定
-  （継続効果同時適用＝修正後コストで「コスト8以上」判定）。
-- エンジン拡張: `SWAP_POWER`（OP14-001）、範囲保護クロスプレイヤー（OP14-079）、名称限定 KO 置換
-  （OP12-061）、distinct 名（OP16-060）、「効果を持たない」除外（`lacks_trigger`）。
-
-**残 2 件（いずれも据え置きが妥当と判断）**:
-- **EB01-001**（要確認, strict=False）: 「《ワノ国》カウンター非所持キャラはカウンター+1000」の
-  ゾーン意味論が不確定（カウンターは手札で消費するがテストは場キャラを検証、`passive_counter` は
-  手札のみリセット）。`RULE_PROCESSING` no-op のまま。
-- **ST03-001**（strict=True）: 側無指定 BOUNCE「コスト5以下のキャラ」の対象は両プレイヤーのはず
-  だが、既定を ALL 化すると OPPONENT 既定の多数派（相手バウンス前提のテスト含む）と衝突し ~47枚
-  退行する。カード個別判定での切り分けが要設計。
-
-### 仕様書と実装の相互裏取り（重要）
-
-pytest化の過程で実AST/実挙動を確認した結果、**仕様書段階の🐛予想の一部は実装では正しく動作**して
-いた（例: OP04-040/OP12-081/OP13-004 は `cost_min=8` を保持、OP14-020 はコスト5以上で正しく発動、
-OP15-039/OP15-098 もテキスト通り）。これらは通常テストへ昇格。逆に真因が別と判明したものもある
-（OP12-081=条件プレイヤー逆転、OP13-004=トリガー種別誤り）。**最終的な事実はテストの判定が正**。
-
-### 残課題・引き継ぎ
-
-- 意味バグ修正はほぼ完了（leader xfail 80→2）。残る 2 件は上記「修正進捗（最終）」の通り
-  EB01-001（意味論不確定）・ST03-001（広域退行リスク）で、いずれも要設計のため据え置き。
-- 修正フローの不変条件: バグを直したら対応する `xfail` を除去して通常テスト化。挙動を意図的に
-  変えたら `python tests/full_card_audit.py --regen` で挙動ベースラインを更新し、`compare_parsers.py`
-  （★退行0）・`full_card_audit.py`（EXCEPTION/CARD_LOSS/TEMP_LEAK=0）・`test_quality_gates.py` を確認。
-- カバレッジは**リーダーのみ**だが、上記の共通機構修正は `parse_target`/`matcher`/resolver/gamestate
-  の汎用経路に入っているため、キャラ/イベント/ステージへも横展開済み（挙動ベースラインで検証）。
+- **アクションボタンの表示可否は `getAvailableActions` に一元化**する（CardDetailSheet と
+  CardActionMenu の双方に反映。location だけで判定するとステージに攻撃/ドン付与が出る）。
+- **ミニメニューは `gameState` / `pendingRequest.request_id` の変化で自動クローズ**する（盤面再構築で
+  アンカー座標が古くなるため。攻撃ターゲティング開始時も閉じる）。
+- **ライフの横向き描画はレンダリング用コピー `{ ...c, is_rest: true }`** を使い、onClick・詳細シートには
+  元のカードオブジェクトを渡す。
+- **`life[0]` が山の一番上**（バックエンドはダメージ時 `life.pop(0)`、HEAL は append）。BoardSide は
+  逆順 addChild で `life[0]` を最前面・最上段に描画する。裏向きライフは `eventMode='none'` でタップ無効。
+- **`Player.to_dict` はライフを `is_face_up` でシリアライズ**する。裏向きライフ/相手手札のカード識別
+  情報（name/card_id/text）は送信されるため、対人戦対応時はマスキングの検討が必要。
+- 並び替えモード（`maxSelect<0`）は Pointer Events のドラッグ&ドロップ（`setPointerCapture`＋6px 閾値＋
+  矩形ヒットテスト、`touch-action: none`）。`CardSelectModal` の `allowPosition` で上下配置を確定する。
