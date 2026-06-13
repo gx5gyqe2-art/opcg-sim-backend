@@ -194,6 +194,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
 
+    # 「（戻した／選んだ／その）キャラと異なる色の…」: 直前に選択／参照したカード
+    # (saved_targets['selected_card']) と色が一致する候補を除外する（OP01-002:
+    # 「戻したキャラと異なる色のコスト5以下のキャラカード」）。除外は resolver が実行する。
+    if _nfc("異なる色") in tgt_text:
+        tq.flags.add("EXCLUDE_SELECTED_COLOR")
+
     # コスト範囲「コストNからM」（N以上M以下）。範囲表記は単一しきい値より先に判定する
     #   （従来は「コスト3」だけを拾い cost_max=3 に縮退していた: OP10-099）。
     m_crange = re.search(_nfc(ParserKeyword.COST + r'(\d+)から(\d+)'), tgt_text)

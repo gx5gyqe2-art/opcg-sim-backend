@@ -75,24 +75,28 @@ def _op01_002_setup():
     return gm, p1, p2, L
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="OP01-002: PLAY_CARD に『戻したキャラと異なる色』の色制約が欠落"
-                          "(cost_max のみ)。同色のキャラが登場候補に残ってしまう。")
 def test_op01_002_play_excludes_same_color_as_bounced():
     """OP01-002 / 起動メイン: 戻したキャラ(赤)と同色のキャラは登場候補に出ない（異色制約）。"""
     gm, p1, p2, L = _op01_002_setup()
-    # 手札は赤のフィラーのみ＝戻す赤キャラと同色。異色制約が効けば登場候補は0。
+    # 手札に異色(青)1枚と同色(赤)1枚を用意。異色制約が効けば登場候補は青のみ。
+    blue = make_instance(make_master(card_id="BLUEPLAY", cost=3, type=CardType.CHARACTER),
+                         owner=p1.name)
+    blue.master.colors[:] = [Color.BLUE]
+    red_hand = make_instance(make_master(card_id="REDPLAY", cost=3, type=CardType.CHARACTER),
+                             owner=p1.name)  # make_master 既定で赤
+    p1.hand += [blue, red_hand]
     gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
     # 1段目: バウンス対象(赤キャラ)を選択
     assert gm.active_interaction["action_type"] == "SELECT_TARGET"
-    bounce = gm.active_interaction["candidates"][0]
+    bounce = [c for c in gm.active_interaction["candidates"]
+              if Color.RED in (c.master.colors or [])][0]
     gm.resolve_interaction(p1, {"selected_uuids": [bounce.uuid]})
-    # 2段目: 登場候補。正しくは赤(=戻したキャラと同色)は候補から除外されるべき。
+    # 2段目: 登場候補。赤(=戻したキャラと同色)は候補から除外され、青のみが残るべき。
     assert gm.active_interaction["action_type"] == "SELECT_TARGET"
     cands = gm.active_interaction["candidates"]
-    red_cands = [c for c in cands
-                 if Color.RED in (c.master.colors or [])]
-    assert red_cands == []  # 同色は登場できない（テキスト準拠の正しい挙動）
+    red_cands = [c for c in cands if Color.RED in (c.master.colors or [])]
+    assert red_cands == []   # 同色は登場できない（テキスト準拠の正しい挙動）
+    assert blue in cands     # 異色は登場できる
 
 
 def test_op01_002_bounce_then_play_changes_field_by_one():
@@ -101,7 +105,7 @@ def test_op01_002_bounce_then_play_changes_field_by_one():
     # 異色（青）コスト5以下キャラを手札に用意し、登場可能にする。
     blue = make_instance(make_master(card_id="BLUEPLAY", cost=3, type=CardType.CHARACTER),
                          owner=p1.name)
-    blue.master.colors.append(Color.BLUE)
+    blue.master.colors[:] = [Color.BLUE]   # make_master 既定の赤を上書きし純粋な異色にする
     p1.hand.append(blue)
     before = len(p1.field)
     gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)

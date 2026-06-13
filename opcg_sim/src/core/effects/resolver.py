@@ -447,7 +447,18 @@ class EffectResolver:
 
         from .matcher import get_target_cards
         candidates = get_target_cards(self.game_manager, query, source_card)
-        
+
+        # 「（戻した／選んだ）キャラと異なる色の…」: selected_card と色が重なる候補を除外する
+        # （OP01-002）。selected_card は直前の FIELD 選択（BOUNCE 等）で保存済み。
+        if "EXCLUDE_SELECTED_COLOR" in getattr(query, "flags", set()):
+            ref = self.context["saved_targets"].get("selected_card") or []
+            ref_colors = set()
+            for rc in ref:
+                ref_colors.update(c.value for c in (rc.master.colors or []))
+            if ref_colors:
+                candidates = [c for c in candidates
+                              if not (ref_colors & {col.value for col in (c.master.colors or [])})]
+
         required_count = getattr(query, 'count', 1)
         is_up_to = getattr(query, 'is_up_to', False)
         is_strict = getattr(query, 'is_strict_count', False)
