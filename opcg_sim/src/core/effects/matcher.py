@@ -255,7 +255,8 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             if m_p.group(2) == _nfc(ParserKeyword.ABOVE): tq.power_min = val
             else: tq.power_max = val
     
-    if _nfc("にする") not in tgt_text and _nfc("ならない") not in tgt_text and _nfc("にできる") not in tgt_text:
+    if (_nfc("にする") not in tgt_text and _nfc("にし") not in tgt_text
+            and _nfc("ならない") not in tgt_text and _nfc("にできる") not in tgt_text):
         if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
         elif _nfc("レスト") in tgt_text: tq.is_rest = True
         elif _nfc("アクティブ") in tgt_text: tq.is_rest = False

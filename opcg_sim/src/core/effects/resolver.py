@@ -405,6 +405,12 @@ class EffectResolver:
             # 後続参照が、再開経路だけ保存されず空振りしていた）。
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = resumed
+            # 「そのキャラ/そのカード」の coreference 用に、プレイヤー選択(CHOOSE)の結果を
+            # 既定キー selected_card にも保存する。明示 save_id（例:「選び」）が無い
+            # ACTIVE/BUFF 等の先行選択でも、後続 ref_id=selected_card が拾えるようにする。
+            if (getattr(query, "select_mode", None) == "CHOOSE" and not query.ref_id
+                    and query.zone == Zone.FIELD):
+                self.context["saved_targets"]["selected_card"] = resumed
             return resumed
 
         if query.save_id and query.save_id in self.context["saved_targets"]:
@@ -426,6 +432,10 @@ class EffectResolver:
                  return [source_card]
              if query.ref_id in self.context["saved_targets"]:
                  return self.context["saved_targets"][query.ref_id]
+             # ref_id が指定されているのに保存対象が無い（先行選択が条件未達でスキップ
+             # された／そもそも選択されなかった）。場全体クエリへフォールスルーすると
+             # 全カードへ誤適用する（OP10-099 範囲外コスト・OP07-059 条件未達）ため対象なし。
+             return []
 
         # 「残り」: 直前の選択グループが存在すれば、その消費済みを除いた残余を対象にする
         # （field 分配 OP08-118 等。グループが無ければ従来どおり TEMP=公開残りを参照）。
@@ -480,6 +490,9 @@ class EffectResolver:
             selected = candidates[:required_count] if required_count > 0 else candidates
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = selected
+            if (query.select_mode == "CHOOSE" and not query.ref_id
+                    and query.zone == Zone.FIELD):
+                self.context["saved_targets"]["selected_card"] = selected
             return selected
 
         self._suspend_for_target_selection(player, candidates, query, source_card, action_node)

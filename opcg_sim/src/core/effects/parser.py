@@ -132,6 +132,7 @@ class EffectParser:
                 continue
             try:
                 ab = self.parse_ability(seg)
+                self._normalize_coreference(ab)
                 if ab.trigger != TriggerType.UNKNOWN or ab.effect is not None:
                     abilities.append(ab)
                     # 「（このリーダー/キャラが）アタックした時かアタックされた時」は ON_ATTACK と
@@ -149,6 +150,49 @@ class EffectParser:
                 ab.trigger = TriggerType.TRIGGER
 
         return abilities
+
+    def _normalize_coreference(self, ability) -> None:
+        """『そのキャラ/そのカード』(ref_id='selected_card') の解決方針を静的に決める。
+
+        プレイヤー選択（save_id='selected_card'、または FIELD を CHOOSE で選ぶアクション）が
+        能力内に存在する場合、後続の ref_id 参照は「選んだカード」への厳密参照とみなす
+        （実行時に選択がスキップ/候補0で未保存なら resolver が対象なしを返す）。
+
+        そのような選択 producer が無い場合、『そのキャラ』は置換被害者や誘発の主体など
+        文脈的な指示なので、ref_id を外して自前クエリ（フォールスルー）で解決させる
+        （OP05-001 置換被害者・OP16-079 トラッシュ登場キャラ等）。
+        """
+        nodes = []
+
+        def walk(node):
+            if node is None:
+                return
+            nodes.append(node)
+            for f in ("if_true", "if_false", "sub_effect"):
+                walk(getattr(node, f, None))
+            for f in ("actions", "options"):
+                for child in (getattr(node, f, None) or []):
+                    walk(child)
+
+        walk(ability.cost)
+        walk(ability.effect)
+
+        def is_producer(n):
+            q = getattr(n, "target", None)
+            if q is None or q.ref_id is not None:
+                return False
+            if q.save_id == "selected_card":
+                return True
+            return q.select_mode == "CHOOSE" and q.zone == Zone.FIELD
+
+        def is_consumer(n):
+            q = getattr(n, "target", None)
+            return q is not None and q.ref_id == "selected_card"
+
+        if not any(is_producer(n) for n in nodes):
+            for n in nodes:
+                if is_consumer(n):
+                    n.target.ref_id = None
 
     def parse_ability(self, text: str) -> Ability:
         log_event("DEBUG", "parser.input", f"Input text: {text[:50]}")
