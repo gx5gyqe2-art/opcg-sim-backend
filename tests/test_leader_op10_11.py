@@ -244,7 +244,7 @@ def test_op10_099_cost9_above_range_no_effect():
 # ===========================================================================
 # OP11-001 コビー
 #   能力0【PASSIVE】: 自《SWORD》キャラに速攻系（登場ターンにキャラへアタック可）付与。✅
-#   能力1【ターン1回】: 元々pw7000以下の《海軍》が相手効果で離れる→置換でトラッシュ3枚デッキ下。⚠️
+#   能力1【ターン1回】: 元々pw7000以下の《海軍》が相手効果で離れる→置換でトラッシュ3枚デッキ下。✅
 # ===========================================================================
 
 def test_op11_001_sword_gains_rush():
@@ -256,11 +256,97 @@ def test_op11_001_sword_gains_rush():
     assert "速攻" in (c.current_keywords | c.timed_keywords)
 
 
-@pytest.mark.skip(reason="OP11-001 能力1: 相手効果による『場を離れる』置換(REPLACE_EFFECT)は"
-                         "汎用盤面で発火条件を再現できず安定検証不能（⚠️）")
-def test_op11_001_replace_leave_navy():
-    """OP11-001 能力1: 元々pw7000以下の《海軍》が相手効果で離れる時の置換（要個別検証）。"""
-    pass
+def _opponent_removes(gm, opponent, victim, action_type="KO"):
+    """相手(opponent)の効果で victim を場から除去する（KO/BOUNCE 等）。
+
+    汎用盤面では「相手効果で場を離れる」契機を直接イベント化しづらいため、
+    除去アクションを apply_action_to_engine で相手側プレイヤーから適用する。
+    OPPONENT 側からの _LEAVE_ACTIONS 適用は _active_replacement/_active_protection を
+    走査するので、置換効果（REPLACE_EFFECT status=LEAVE）の発火経路を再現できる。
+    """
+    from opcg_sim.src.models.effect_types import GameAction, TargetQuery
+    from opcg_sim.src.models.enums import ActionType, Player as _P
+    act = GameAction(type=ActionType[action_type], target=TargetQuery(player=_P.OPPONENT),
+                     raw_text=f"相手のキャラを{action_type}")
+    return gm.apply_action_to_engine(opponent, act, [victim], 0)
+
+
+def _setup_navy_with_trash(power):
+    """OP11-001 リーダー下で、p1 場に《海軍》(指定パワー)＋トラッシュ3枚を用意する。"""
+    gm, p1, p2, L = build("OP11-001")
+    clear_field(p1); clear_field(p2)
+    navy = add_char(p1, name="海軍兵", power=power, traits=["海軍"])
+    p1.trash[:] = [make_char(p1, name=f"trash{i}", power=1000) for i in range(3)]
+    return gm, p1, p2, L, navy
+
+
+def test_op11_001_replace_leave_navy_pw7000_or_less():
+    """OP11-001 能力1: 元々pw7000以下の《海軍》が相手効果で場を離れる→置換成立。
+
+    本来の除去（KO）は行われず、代わりにトラッシュ3枚がデッキの下へ置かれる。
+    """
+    gm, p1, p2, L, navy = _setup_navy_with_trash(power=6000)
+    deck_before = len(p1.deck)
+    assert _opponent_removes(gm, p2, navy, "KO") is True
+    # 置換成立: 海軍は KO されず場に残る
+    assert navy in p1.field and navy not in p1.trash
+    # 代わりにトラッシュ3枚 → デッキ下（トラッシュ -3 / デッキ +3）
+    assert len(p1.trash) == 0
+    assert len(p1.deck) == deck_before + 3
+
+
+def test_op11_001_replace_leave_navy_via_bounce():
+    """OP11-001 能力1: 除去が BOUNCE（手札に戻す）でも置換が成立し、場に残る。"""
+    gm, p1, p2, L, navy = _setup_navy_with_trash(power=7000)  # 7000ちょうどは対象
+    deck_before = len(p1.deck)
+    assert _opponent_removes(gm, p2, navy, "BOUNCE") is True
+    assert navy in p1.field and navy not in p1.hand
+    assert len(p1.deck) == deck_before + 3
+
+
+def test_op11_001_no_replace_when_power_above_7000():
+    """OP11-001 能力1: 元々pw8000（7000超）の《海軍》は対象外 → 置換せず通常どおりKO。"""
+    gm, p1, p2, L, navy = _setup_navy_with_trash(power=8000)
+    trash_before = len(p1.trash); deck_before = len(p1.deck)
+    assert _opponent_removes(gm, p2, navy, "KO") is True
+    # 置換不成立: 海軍は KO されトラッシュへ。トラッシュ→デッキの移動は起きない。
+    assert navy not in p1.field and navy in p1.trash
+    assert len(p1.deck) == deck_before  # デッキ下送りは発生しない
+
+
+# ===========================================================================
+# OP11-101 カポネ・ベッジ（キャラ）
+#   【ターン1回】「カポネ・ベッジ」以外の自分の《超新星》キャラが相手の効果で場を
+#   離れる場合、代わりに自分のライフの上に裏向きで加えることができる。
+#   ✅ REPLACE_EFFECT(LEAVE): 離れるカード自身を持ち主のライフ(上/裏向き)へ移す。
+# ===========================================================================
+
+def _build_with_bedge_and_supernova():
+    """任意リーダー下で、p1 場に OP11-101（カポネ・ベッジ）＋《超新星》キャラを置く。"""
+    from opcg_sim.src.utils.loader import CardLoader
+    import os
+    db = CardLoader(os.path.join(os.path.dirname(__file__), "..", "opcg_sim", "data", "opcg_cards.json"))
+    db.load()
+    gm, p1, p2, L = build("OP01-001")
+    clear_field(p1); clear_field(p2)
+    bedge = make_char(p1, name="カポネ・ベッジ", cost=4)
+    bedge.master = db.get_card("OP11-101")
+    p1.field.append(bedge)
+    star = add_char(p1, name="超新星キャラ", power=5000, traits=["超新星"])
+    return gm, p1, p2, bedge, star
+
+
+def test_op11_101_replace_leave_supernova_to_life():
+    """OP11-101: 自分の《超新星》が相手効果で場を離れる→代わりに自ライフ上(裏向き)へ。"""
+    gm, p1, p2, bedge, star = _build_with_bedge_and_supernova()
+    life_before = len(p1.life)
+    assert _opponent_removes(gm, p2, star, "KO") is True
+    # 置換成立: 超新星キャラは KO されず、自分のライフへ裏向きで加わる。
+    assert star not in p1.field and star not in p1.trash
+    assert star in p1.life and len(p1.life) == life_before + 1
+    assert star.is_face_up is False
+    # 保護者（カポネ・ベッジ）は場に残る。
+    assert bedge in p1.field
 
 
 # ===========================================================================

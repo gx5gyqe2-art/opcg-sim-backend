@@ -1652,8 +1652,11 @@ class GameManager:
                 # host_card=保護者（HAS_DON 等の「能力保持カードの付与ドン」評価用。OP05-001 はリーダー）。
                 if ab.condition is not None and not resolver._check_condition(owner, ab.condition, card, host_card=protector):
                     continue
-                # 代わりの行動が取れない場合は置換不成立
-                if not resolver._can_satisfy_node(owner, sub, protector):
+                # 代わりの行動が取れない場合は置換不成立。
+                # sub_effect の source は「離れるカード」(card) とする。置換文の「代わりに
+                # （そのカードを）〜」は離れるカード自身を対象に取り得るため（OP11-101 の
+                # 「代わりに自分のライフの上に裏向きで加える」= 離れるカードをライフへ）。
+                if not resolver._can_satisfy_node(owner, sub, card):
                     continue
                 # 【ターン1回】置換は1ターンに1回まで enforce する（parser が自己置換の TURN_LIMIT を
                 # 落とすため raw_text 併用。resolve_ability を経由しない置換経路のため直接管理）。
@@ -1672,7 +1675,7 @@ class GameManager:
                 outer_interaction = self.active_interaction
                 self.active_interaction = None
                 resolver.execution_stack = [sub]
-                resolver._process_stack(owner, protector)
+                resolver._process_stack(owner, card)
                 self._auto_resolve_replacement(owner)
                 # 置換解決で外側の interaction を壊していないことを保証（元の状態へ戻す）。
                 self.active_interaction = outer_interaction

@@ -361,7 +361,10 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
     target_players = []
     if query.player == Player.SELF: target_players = [owner_player]
     elif query.player == Player.OPPONENT: target_players = [opponent_player]
-    elif query.player == Player.ALL: target_players = [game_manager.p1, game_manager.p2]
+    # ALL（側無指定／「お互い」）は相手→自分の順で候補を並べる。除去等の既定選択
+    # （候補先頭から min 枚）が相手キャラになり、CPU・自己対戦・監査が自分のキャラを
+    # 自爆対象にしないため。自分のキャラも候補に含むので UI 上は両側から選べる（ST03-001 ほか）。
+    elif query.player == Player.ALL: target_players = [opponent_player, owner_player]
     elif query.player == Player.OWNER: target_players = [owner_player]
 
     # zone はリスト（「手札かトラッシュから」EB03-049 / 「場か手札」OP13-079）も取り得る。

@@ -60,23 +60,28 @@ def test_rule_room_lifecycle_and_ws_sync(client):
         client.post("/api/rule/action", json={"game_id": gid, "action_type": "SET_DECK", "player_id": "p2", "deck_id": "db:b"})
         ws1.receive_json(); ws2.receive_json()
 
-        # 対局開始 → PLAYING + 実ゲーム状態 + マリガン pending(p1)
+        # 対局開始 → PLAYING + 実ゲーム状態 + 先攻へマリガン pending
+        # 対戦モードの先行はランダム（コイントス）なので、先攻/後攻は固定せず
+        # pending_request から動的に解決する。
         started = client.post("/api/rule/action", json={"game_id": gid, "action_type": "START", "player_id": "p1"}).json()
         assert started["status"] == "PLAYING"
         msg = ws1.receive_json()
         ws2.receive_json()
         assert msg["status"] == "PLAYING"
         assert msg["game_state"] is not None
-        assert msg["pending_request"]["player_id"] == "p1"
+        # マリガンは先攻プレイヤーから要求される（先攻はランダム）
+        first = msg["pending_request"]["player_id"]
+        assert first in ("p1", "p2")
         assert msg["pending_request"]["action"] == "MULLIGAN"
+        second = "p2" if first == "p1" else "p1"
 
         # ゲームアクション（/api/game/action）でもルームへブロードキャストされる
-        kept = client.post("/api/game/action", json={"game_id": gid, "action": "KEEP_HAND", "player_id": "p1", "payload": {}}).json()
+        kept = client.post("/api/game/action", json={"game_id": gid, "action": "KEEP_HAND", "player_id": first, "payload": {}}).json()
         assert kept["success"]
         broadcast = ws1.receive_json()
         ws2.receive_json()
-        # マリガン要求が相手(p2)へ移る
-        assert broadcast["pending_request"]["player_id"] == "p2"
+        # マリガン要求が後攻プレイヤーへ移る
+        assert broadcast["pending_request"]["player_id"] == second
 
 
 def test_rule_start_requires_both_ready(client):

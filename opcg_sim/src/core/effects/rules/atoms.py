@@ -559,9 +559,11 @@ def _life_face(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ライフ") not in t:
         return None
-    # 「手札／デッキから…ライフの上に表向きで加える」は既存ライフの反転ではなく移動(MOVE_CARD)。
-    # hand_to_life / life_recover に委ねる（OP07-097: 手札のエッグヘッドをライフ上へ）。
-    if _nfc("加える") in t and (_nfc("手札") in t or _nfc("デッキ") in t):
+    # 「（源）から…ライフの上/下に（表向きで）加える」は既存ライフの反転ではなく移動(MOVE_CARD)。
+    #   - 手札／デッキ／トラッシュ源 → hand_to_life / life_recover（OP07-097 等）。
+    #   - 場のキャラ → field_char_to_life（OP03-123 等。priority が上なので通常はそちらが先取り）。
+    # 「ライフの上/下に…加える」表記はいずれも移動なので、ここでは扱わない。
+    if _nfc("加える") in t and re.search(_nfc(r"ライフの(上|下)"), t):
         return None
     if _nfc("表向き") in t:
         status = "UP"
@@ -575,6 +577,70 @@ def _life_face(ctx: ParseContext) -> Optional[GameAction]:
     tq = parse_target(t)
     tq.zone = Zone.LIFE
     return GameAction(type=ActionType.FACE_UP_LIFE, target=tq, status=status, raw_text=t)
+
+
+@rule("field_char_to_life", priority=73)
+def _field_char_to_life(ctx: ParseContext) -> Optional[GameAction]:
+    """「（コストN以下の）キャラ1枚（まで）を、（持ち主の）ライフの上（か下）に
+    （表向き／裏向きで）加える」→ 場のキャラを持ち主のライフへ移動（MOVE_CARD dest=LIFE）。
+
+    側の明示がなければ自分・相手の両方が対象（ALL）。移動先は対象カードの持ち主の
+    ライフ（「持ち主のライフ」）。「上か下」は上下の選択（Choice）、片方のみなら固定。
+    「表向き／裏向き」でライフでの向きを指定する（明示なしはゾーン既定＝裏向き）。
+
+    手札／デッキ／トラッシュ源は hand_to_life / life_recover が担当するため対象外。
+    「キャラ」の明示が無い置換文脈（「（…が場を離れる場合、）代わりに（自分の）ライフの
+    上に裏向きで加える」OP11-101）は、移動対象＝離れるカード自身（SOURCE）として扱う。
+    """
+    t = ctx.text
+    if not re.search(_nfc(r"ライフの(上|下)"), t):
+        return None
+    if _nfc("加える") not in t:
+        return None
+    # 源が手札／デッキ／トラッシュのものは別ルール（hand_to_life / life_recover）。
+    if _nfc("手札") in t or _nfc("デッキ") in t or _nfc("トラッシュ") in t:
+        return None
+
+    if _nfc("キャラ") in t:
+        # 「（コストN以下の）キャラ…を持ち主のライフへ」: 場のキャラを対象選択。
+        tq = parse_target(t)
+        tq.zone = Zone.FIELD
+        # 側無指定（parse_target 既定 SELF だが「自分」明示なし）→ ALL（両側のキャラが対象）。
+        # 「相手の」「自分の」明示はそれぞれ OPPONENT / SELF として尊重する。
+        if tq.player == Player.SELF and _nfc("自分") not in t:
+            tq.player = Player.ALL
+        if _nfc("まで") in t:
+            tq.is_up_to = True
+    elif _nfc("代わりに") in t:
+        # 「キャラ」明示なしの置換文脈（「（…場を離れる場合、）代わりに…ライフに加える」
+        # OP11-101）: 対象は発生源自身（離れるカード）。
+        tq = TargetQuery(select_mode="SOURCE", zone=Zone.FIELD, raw_text=t)
+    else:
+        # 「カード1枚までを、ライフの上に加える」等（scry/公開後の temp→ライフ）は
+        # 別ルールが担当するため、ここでは扱わない。
+        return None
+
+    face_up = True if _nfc("表向き") in t else (False if _nfc("裏向き") in t else None)
+
+    def _move(position: str) -> GameAction:
+        return GameAction(
+            type=ActionType.MOVE_CARD,
+            target=tq,
+            destination=Zone.LIFE,
+            dest_position=position,
+            face_up=face_up,
+            raw_text=t,
+        )
+
+    # 「上か下」→ 上/下の選択。片側のみ明示ならその位置へ固定。
+    if _nfc("上か下") in t:
+        return Choice(
+            message="ライフの上か下に加える",
+            option_labels=["ライフの上に加える", "ライフの下に加える"],
+            options=[_move("TOP"), _move("BOTTOM")],
+        )
+    position = "TOP" if _nfc("ライフの上") in t else "BOTTOM"
+    return _move(position)
 
 
 # ---------------------------------------------------------------------------
@@ -1799,9 +1865,14 @@ def _bounce(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("手札から") in t:
         return None  # 「手札から何かして手札に戻す」等の誤検知を避ける
     tq = parse_target(t)
-    # 「自分の」明示がなければ OPPONENT（「持ち主の手札」→相手カードが多数派）。
+    # 側の明示で対象を決める（テキスト準拠）:
+    #   「相手の」明示 → OPPONENT（parse_target で解決済み）
+    #   「自分の」明示 → SELF（parse_target で解決済み）
+    #   いずれも無指定（「（コストN以下の）キャラ…持ち主の手札に戻す」）→ ALL。
+    #     公式ルール上、側の指定がない対象は自分・相手の両キャラが対象で、
+    #     発動プレイヤーが選ぶ（戻り先は常に「持ち主の手札」）。ST03-001 ほか同型カード。
     if tq.player != Player.OPPONENT and _nfc("自分の") not in t:
-        tq.player = Player.OPPONENT
+        tq.player = Player.ALL
     if _nfc("まで") in t:
         tq.is_up_to = True
     return GameAction(type=ActionType.BOUNCE, target=tq, raw_text=t)
@@ -1826,12 +1897,17 @@ def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("残り") in t:
         return None  # remaining_deck_bottom / remaining_deck_top_or_bottom が担当
     tq = parse_target(t)
-    # 「持ち主のデッキの下」でプレイヤー未指定なら OPPONENT（相手キャラ対象が多い）。
-    # ただし「自分の（キャラ/リーダー）」が明示されている場合は SELF を尊重する
-    # （例: EB03-026「自分のキャラ1枚を持ち主のデッキの下に置く」）。
-    if _nfc("持ち主") in t and tq.player != Player.OPPONENT \
+    # 「持ち主のデッキの下」で側の明示がなければ ALL（テキスト準拠で自分・相手の両方が対象。
+    # 戻り先は常に「持ち主のデッキ」）。除去の既定選択は get_target_cards が ALL 候補を
+    # 「相手→自分」順に並べるため相手キャラが選ばれる。BOUNCE と同様の扱い。
+    # 除外:
+    #   - 「自分の（キャラ/リーダー）」明示 → SELF を尊重（例 EB03-026）。
+    #   - 「この（カード/キャラ/ステージ）」= 自己参照 → 対象は発生源自身なので ALL にしない
+    #     （例 OP12-080「このステージを持ち主のデッキの下に置く」）。
+    _self_ref = re.search(_nfc(r"この(カード|キャラ|ステージ)"), t)
+    if _nfc("持ち主") in t and tq.player != Player.OPPONENT and not _self_ref \
             and not re.search(_nfc(r"自分の[^。：]*?(キャラ|リーダー)"), t):
-        tq.player = Player.OPPONENT
+        tq.player = Player.ALL
     if _nfc("まで") in t:
         tq.is_up_to = True
     return GameAction(type=ActionType.DECK_BOTTOM, target=tq, raw_text=t)

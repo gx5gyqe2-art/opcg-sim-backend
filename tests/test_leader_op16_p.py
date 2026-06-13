@@ -57,9 +57,9 @@ def _has_keyword(inst, kw):
 # OP16-001 ポートガス・D・エース
 #   【起動メイン】【ターン1回】自分のパワー8000以上の「モンキー・D・ルフィ」か
 #   《白ひげ海賊団》キャラ1枚までに、このターン中【速攻】を付与。
-#   🐛 「パワー8000以上」が power_max=8000（=8000以下）に反転（matcher.py:209/216）。
+#   ✅ 「パワー8000以上」を power_min=8000 として正しくパースする。
 #   ※ 現実装は names と traits を AND 適用するため、対象は name=「モンキー・D・ルフィ」
-#      かつ trait《白ひげ海賊団》のキャラに限られる。本テストはパワー条件の反転に
+#      かつ trait《白ひげ海賊団》のキャラに限られる。本テストはパワー条件（8000以上）に
 #      焦点を当てるため、その両方を満たすキャラで検証する。
 # ===========================================================================
 
@@ -74,10 +74,7 @@ def test_op16_001_grant_haste_power_at_threshold():
 
 
 def test_op16_001_grant_haste_power_above_threshold():
-    """OP16-001: パワー9000（8000以上）のキャラは【速攻】を得るべき（テキスト準拠）。
-
-    現実装は power_max=8000 と誤パースするため 8000 超は対象外となり付与されない → xfail。
-    """
+    """OP16-001: パワー9000（8000以上）のキャラは【速攻】を得る（テキスト準拠）。"""
     gm, p1, p2, L = build("OP16-001")
     clear_field(p1)
     c = add_char(p1, name="モンキー・D・ルフィ", power=9000, traits=["白ひげ海賊団"])
@@ -87,10 +84,7 @@ def test_op16_001_grant_haste_power_above_threshold():
 
 
 def test_op16_001_grant_haste_power_below_threshold_excluded():
-    """OP16-001: パワー7000（8000未満）のキャラは対象外で【速攻】を得ないべき。
-
-    現実装は power_max=8000（8000以下を対象）と誤パースし、7000 にも付与してしまう → xfail。
-    """
+    """OP16-001: パワー7000（8000未満）のキャラは対象外で【速攻】を得ない（テキスト準拠）。"""
     gm, p1, p2, L = build("OP16-001")
     clear_field(p1)
     c = add_char(p1, name="モンキー・D・ルフィ", power=7000, traits=["白ひげ海賊団"])
@@ -142,14 +136,11 @@ def test_op16_022_no_active_when_non_impeldown_present():
 # OP16-041 バギー
 #   【ドン!!×1】【ターン1回】自分の《インペルダウン》キャラが場を離れた時、
 #   手札の「インペルダウンの囚人」1枚までを登場させる。
-#   🐛 誘発「場を離れた時」が欠落し ACTIVATE_MAIN 化（トリガー種別の取りこぼし）。
+#   ✅ 誘発「場を離れた時」を正しく取り込み、ACTIVATE_MAIN には化けない。
 # ===========================================================================
 
 def test_op16_041_should_be_leave_triggered_not_activate_main():
-    """OP16-041: 本来「場を離れた時」の自動誘発であり、起動メインであってはならない。
-
-    現実装は ACTIVATE_MAIN として登録されており、テキストの発動契機を満たさない → xfail。
-    """
+    """OP16-041: 「場を離れた時」の自動誘発であり、起動メインではない（テキスト準拠）。"""
     gm, p1, p2, L = build("OP16-041")
     main_abilities = abilities_of(L.master, "ACTIVATE_MAIN")
     assert not main_abilities, "場を離れた時の誘発が ACTIVATE_MAIN に化けている"
@@ -158,7 +149,7 @@ def test_op16_041_should_be_leave_triggered_not_activate_main():
 # ===========================================================================
 # OP16-060 センゴク
 #   【起動メイン】アクティブのドン!!8枚をドン!!デッキに戻す：手札からカード名の
-#   異なる《大将》キャラ3枚までを登場させる。  ⚠️ distinct-name 制約の欠落疑い。
+#   異なる《大将》キャラ3枚までを登場させる。  ✅ distinct-name 制約を適用する。
 # ===========================================================================
 
 def test_op16_060_return_8_don_play_three_distinct_generals():
@@ -176,10 +167,7 @@ def test_op16_060_return_8_don_play_three_distinct_generals():
 
 
 def test_op16_060_distinct_name_constraint_limits_same_name():
-    """OP16-060: 「カード名の異なる」制約により、同名の《大将》は1枚しか登場できないべき。
-
-    現実装は distinct 制約が無く同名2枚とも登場するため、テキスト準拠の本アサートは失敗 → xfail。
-    """
+    """OP16-060: 「カード名の異なる」制約により、同名の《大将》は1枚しか登場できない（テキスト準拠）。"""
     gm, p1, p2, L = build("OP16-060")
     a = make_char(p1, name="青雉", traits=["大将"])
     b = make_char(p1, name="青雉", traits=["大将"])  # 同名
@@ -345,7 +333,7 @@ def test_p076_targets_opponent_not_self():
 # P-086 トラファルガー・ロー
 #   【起動メイン】【ターン1回】ドン!!-3, 自分のパワー3000以上のキャラ1枚をデッキ下に置く：
 #   手札のコスト4以下《ハートの海賊団》キャラ1枚までを登場させる。
-#   🐛 コスト側「パワー3000以上」が power_max=3000（=3000以下）に反転（同正規表現不具合）。
+#   ✅ コスト側「パワー3000以上」を power_min=3000 として正しくパースする。
 # ===========================================================================
 
 def test_p086_deck_bottom_cost_target_at_threshold():
@@ -359,10 +347,7 @@ def test_p086_deck_bottom_cost_target_at_threshold():
 
 
 def test_p086_deck_bottom_cost_target_above_threshold():
-    """P-086: パワー5000（3000以上）のキャラはデッキ下コストの対象になるべき（テキスト準拠）。
-
-    現実装は power_max=3000 と誤パースし 3000 超を対象外にするため、5000 は選べず場に残る → xfail。
-    """
+    """P-086: パワー5000（3000以上）のキャラはデッキ下コストの対象になる（テキスト準拠）。"""
     gm, p1, p2, L = build("P-086")
     clear_field(p1)
     victim = add_char(p1, name="犠牲", power=5000, traits=["ハートの海賊団"])
@@ -372,10 +357,7 @@ def test_p086_deck_bottom_cost_target_above_threshold():
 
 
 def test_p086_deck_bottom_cost_target_below_threshold_excluded():
-    """P-086: パワー2000（3000未満）のキャラはデッキ下コストの対象外であるべき。
-
-    現実装は power_max=3000（3000以下を対象）と誤パースし、2000 を誤ってデッキ下に置ける → xfail。
-    """
+    """P-086: パワー2000（3000未満）のキャラはデッキ下コストの対象外（テキスト準拠）。"""
     gm, p1, p2, L = build("P-086")
     clear_field(p1)
     victim = add_char(p1, name="犠牲", power=2000, traits=["ハートの海賊団"])
@@ -388,7 +370,7 @@ def test_p086_deck_bottom_cost_target_below_threshold_excluded():
 # P-117 ナミ
 #   能力0【常在】自分デッキ0枚なら敗北の代わりに勝利（REPLACE_DECKOUT_LOSS）。
 #   能力1【ドン!!×1】このリーダーのアタックでライフにダメージを与えた時、デッキ上1枚を
-#         トラッシュへ置いてもよい。  🐛 能力1の誘発が ACTIVATE_MAIN 化。
+#         トラッシュへ置いてもよい。  ✅ 能力1を ON_DAMAGE_DEALT_TO_LIFE 誘発として登録する。
 # ===========================================================================
 
 def test_p117_deckout_win_replacement():
@@ -401,7 +383,7 @@ def test_p117_deckout_win_replacement():
 
 
 def test_p117_trash_trigger_should_be_damage_dealt_not_activate_main():
-    """P-117 能力1: 誘発は「ライフにダメージを与えた時」であり、起動メインではないべき。
+    """P-117 能力1: 誘発は「ライフにダメージを与えた時」であり、起動メインではない（テキスト準拠）。
 
     「相手のライフにダメージを与えた時」を ON_DAMAGE_DEALT_TO_LIFE 誘発として登録する。
     """

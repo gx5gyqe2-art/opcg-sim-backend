@@ -776,16 +776,17 @@ CASES = [
             }
         ],
     },
-    # ----- バウンス: 「（コストN以下の）キャラを持ち主の手札に戻す」（OPPONENT デフォルト） ---
+    # ----- バウンス: 「（コストN以下の）キャラを持ち主の手札に戻す」（側無指定 → ALL） ---
+    #   側の指定がない対象は自分・相手の両キャラが対象（テキスト準拠）。
     {
-        "id": "bounce_to_owner_opponent",
+        "id": "bounce_to_owner_any",
         "text": "コスト3以下のキャラ1枚までを、持ち主の手札に戻す。",
         "expect": [
             {
                 "effect": {
                     "kind": "action",
                     "type": "BOUNCE",
-                    "target": {"player": "OPPONENT", "card_type": ["CHARACTER"], "cost_max": 3, "is_up_to": True},
+                    "target": {"player": "ALL", "card_type": ["CHARACTER"], "cost_max": 3, "is_up_to": True},
                 }
             }
         ],
@@ -804,7 +805,8 @@ CASES = [
             }
         ],
     },
-    # ----- デッキ下送り: 「（コストN以下の）キャラを持ち主のデッキの下に置く」 ----
+    # ----- デッキ下送り: 「（コストN以下の）キャラを持ち主のデッキの下に置く」（側無指定 → ALL） ----
+    #   側の指定がない対象は自分・相手の両キャラが対象（テキスト準拠。BOUNCE と同様）。
     {
         "id": "deck_bottom_to_owner",
         "text": "コスト2以下のキャラ1枚までを、持ち主のデッキの下に置く。",
@@ -813,7 +815,7 @@ CASES = [
                 "effect": {
                     "kind": "action",
                     "type": "DECK_BOTTOM",
-                    "target": {"player": "OPPONENT", "card_type": ["CHARACTER"], "cost_max": 2, "is_up_to": True},
+                    "target": {"player": "ALL", "card_type": ["CHARACTER"], "cost_max": 2, "is_up_to": True},
                 }
             }
         ],
@@ -1339,7 +1341,7 @@ CASES = [
                     "kind": "action",
                     "type": "DECK_BOTTOM",
                     "target": {
-                        "player": "OPPONENT",
+                        "player": "ALL",
                         "card_type": ["CHARACTER"],
                         "cost_max": 6,
                         "is_up_to": True,
@@ -1376,6 +1378,39 @@ CASES = [
                     "target": {"zone": "HAND", "player": "SELF"},
                     "destination": "LIFE",
                     "dest_position": "BOTTOM",
+                }
+            }
+        ],
+    },
+    # ===== C11b: field_char_to_life — 場のキャラを持ち主のライフへ移動 =====
+    # 従来は life_face が「表向き」で誤って FACE_UP_LIFE(自ライフ反転) にしていた。
+    # 側無指定は ALL（両側のキャラが対象）、「相手の」「自分の」は明示を尊重する。
+    {
+        "id": "field_char_to_life_top_self_explicit",
+        "text": "自分のコスト3のキャラ1枚までを、持ち主のライフの上に表向きで加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "FIELD", "player": "SELF", "card_type": ["CHARACTER"]},
+                    "destination": "LIFE",
+                    "dest_position": "TOP",
+                }
+            }
+        ],
+    },
+    {
+        "id": "field_char_to_life_opponent_top",
+        "text": "相手のコスト3以下のキャラ1枚までを、相手のライフの上に表向きで加える。",
+        "expect": [
+            {
+                "effect": {
+                    "kind": "action",
+                    "type": "MOVE_CARD",
+                    "target": {"zone": "FIELD", "player": "OPPONENT", "card_type": ["CHARACTER"], "cost_max": 3, "is_up_to": True},
+                    "destination": "LIFE",
+                    "dest_position": "TOP",
                 }
             }
         ],
@@ -2542,7 +2577,7 @@ CASES = [
                                    "is_up_to": True}}}
         ],
     },
-    # OP08-047 バジル・ホーキンス: 自キャラバウンスコスト + 相手コスト6以下バウンス
+    # OP08-047 バジル・ホーキンス: 自キャラバウンスコスト + コスト6以下バウンス（側無指定 → ALL）
     {
         "id": "op08_047_hawkins_bounce",
         "text": "【登場時】このキャラ以外の自分のキャラ1枚を持ち主の手札に戻すことができる:コスト6以下のキャラ1枚までを、持ち主の手札に戻す。",
@@ -2552,7 +2587,7 @@ CASES = [
                       "target": {"player": "SELF", "zone": "FIELD",
                                  "card_type": ["CHARACTER"]}},
              "effect": {"kind": "action", "type": "BOUNCE",
-                        "target": {"player": "OPPONENT", "cost_max": 6,
+                        "target": {"player": "ALL", "cost_max": 6,
                                    "is_up_to": True}}}
         ],
     },
