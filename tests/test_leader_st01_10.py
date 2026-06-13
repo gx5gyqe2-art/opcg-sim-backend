@@ -154,26 +154,31 @@ def test_st02_001_cost_rests_three_don():
 # ===========================================================================
 # ST03-001 クロコダイル 🐛
 #   【起動メイン】【ターン1回】ドン-4：コスト5以下のキャラ1枚までを持ち主の手札に戻す
-#   原文は「キャラ」で自分・相手両方が対象。実装は OPPONENT 固定（対象範囲欠落）。
+#   原文は「キャラ」で自分・相手両方が対象（側無指定 → ALL）。
 # ===========================================================================
 
 def test_st03_001_bounce_opponent_character():
-    """ST03-001 起動メイン: ドン4戻し→相手のコスト5以下キャラを持ち主(相手)の手札へ戻す。"""
+    """ST03-001 起動メイン: ドン4戻し→相手のコスト5以下キャラを持ち主(相手)の手札へ戻す。
+
+    両側が対象になったため、相手キャラを明示的に選択してバウンスする。
+    """
     gm, p1, p2, L = build("ST03-001")
     clear_field(p2)
     victim = add_char(p2, name="相手キャラ", cost=3, power=2000)
     ab = get_ability(L.master, "ACTIVATE_MAIN")
     don_before = don_total(p1)
     gm.resolve_ability(p1, ab, L)
-    _drive(gm, p1)
+    _drive(gm, p1, prefer_uuids=[victim.uuid])
     assert victim not in p2.field
     assert victim in p2.hand                         # 持ち主(相手)の手札へ
     assert don_total(p1) == don_before - 4           # ドン-4コスト
 
 
-@pytest.mark.xfail(strict=True, reason="ST03-001 BUG: BOUNCE対象が player=OPPONENT 固定。原文「コスト5以下のキャラ」は自分のキャラも対象であるべき")
 def test_st03_001_bounce_can_target_own_character():
-    """ST03-001 起動メイン: 自分のコスト5以下キャラも対象に取れ、持ち主(自分)の手札へ戻るべき。"""
+    """ST03-001 起動メイン: 自分のコスト5以下キャラも対象に取れ、持ち主(自分)の手札へ戻る。
+
+    側無指定 BOUNCE は両プレイヤーが対象（ALL）。自分のキャラを選んで戻せる。
+    """
     gm, p1, p2, L = build("ST03-001")
     clear_field(p1)
     clear_field(p2)                                  # 相手キャラを除き、自分のキャラのみ

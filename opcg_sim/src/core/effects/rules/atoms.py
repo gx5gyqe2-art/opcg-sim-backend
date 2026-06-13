@@ -1799,9 +1799,14 @@ def _bounce(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("手札から") in t:
         return None  # 「手札から何かして手札に戻す」等の誤検知を避ける
     tq = parse_target(t)
-    # 「自分の」明示がなければ OPPONENT（「持ち主の手札」→相手カードが多数派）。
+    # 側の明示で対象を決める（テキスト準拠）:
+    #   「相手の」明示 → OPPONENT（parse_target で解決済み）
+    #   「自分の」明示 → SELF（parse_target で解決済み）
+    #   いずれも無指定（「（コストN以下の）キャラ…持ち主の手札に戻す」）→ ALL。
+    #     公式ルール上、側の指定がない対象は自分・相手の両キャラが対象で、
+    #     発動プレイヤーが選ぶ（戻り先は常に「持ち主の手札」）。ST03-001 ほか同型カード。
     if tq.player != Player.OPPONENT and _nfc("自分の") not in t:
-        tq.player = Player.OPPONENT
+        tq.player = Player.ALL
     if _nfc("まで") in t:
         tq.is_up_to = True
     return GameAction(type=ActionType.BOUNCE, target=tq, raw_text=t)
