@@ -303,3 +303,31 @@ def test_char_or_don_rest_count():
     char_opt = choice.options[0]
     assert char_opt.type == ActionType.REST
     assert char_opt.target.count == 2 and char_opt.target.is_up_to is True
+
+
+def test_char_or_don_rest_end_to_end():
+    """OP12-037: メイン効果でキャラ択を選び、相手キャラを実際に2枚レストできる。"""
+    from opcg_sim.src.models.enums import Phase
+    gm, p1, p2 = game("OP14-020", "OP14-020")
+    gm.turn_count = 3
+    gm.phase = Phase.MAIN
+    p1.don_active = [DonInstance(owner_id="P1") for _ in range(5)]  # コスト分
+    f1, f2 = inst("OP16-045", "P2"), inst("OP16-004", "P2")
+    f1.is_rest = f2.is_rest = False
+    p2.field = [f1, f2]
+    ev = inst("OP12-037")
+    p1.hand.append(ev)  # source は解決中に参照されるためゾーンに置く
+    EffectResolver(gm).resolve_ability(p1, ev.master.abilities[0], source_card=ev)
+    steps = 0
+    while gm.active_interaction and steps < 10:
+        steps += 1
+        ai = gm.active_interaction
+        at = ai.get("action_type")
+        if at == "CHOICE":
+            gm.resolve_interaction(p1, {"index": 0})  # キャラ
+        elif at in ("SELECT_TARGET", "SELECT_RESOURCE"):
+            cands = ai.get("candidates") or []
+            gm.resolve_interaction(p1, {"selected_uuids": [c.uuid for c in cands][:2]})
+        else:
+            break
+    assert f1.is_rest and f2.is_rest  # 相手キャラ2枚がレスト
