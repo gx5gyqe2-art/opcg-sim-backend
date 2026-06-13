@@ -1110,6 +1110,10 @@ class EffectParser:
                 and not re.search(_nfc(r"(される|場を離れる|登場した|公開)"), norm_text)
                 and _nfc("のみ") not in norm_text):
             tq = parse_target(norm_text)
+            # 側の明示が無い「（コスト0の）キャラがいる場合」は両プレイヤーを数える（OP02-093:
+            # 相手キャラをコスト0にした後の存在判定）。「自分の/相手の」明示時はその側のみ。
+            if _nfc("自分") not in norm_text and _nfc("相手") not in norm_text:
+                tq.player = Player.ALL
             mc = re.search(_nfc(r"(\d+)枚(以上|以下|より多い|未満)?"), norm_text)
             if mc:
                 thr = int(mc.group(1))
