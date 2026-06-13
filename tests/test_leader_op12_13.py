@@ -257,10 +257,6 @@ def test_op12_081_ability1_is_triggered_not_activate_main():
 # OP13-001 モンキー・D・ルフィ  ⚠️ branch条件 DON_COUNT が「アクティブのドン」限定か
 # ===========================================================================
 
-@pytest.mark.xfail(strict=False,
-    reason="OP13-001 要確認: 【相手のアタック時】レスト枚数×2000バフ。ON_OPP_ATTACK は"
-           "バトル文脈に依存し汎用盤面では安定起動しないため strict=False。"
-           "branch条件 DON_COUNT が『アクティブのドン5枚以下』限定かも要確認。")
 def test_op13_001_rest_don_buffs_leader():
     """OP13-001 相手のアタック時: ドンをレストし、レスト枚数×2000をリーダー等に付与。"""
     gm, p1, p2, L = build("OP13-001")

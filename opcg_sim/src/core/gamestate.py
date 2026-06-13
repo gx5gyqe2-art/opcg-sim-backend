@@ -1728,6 +1728,9 @@ class GameManager:
                 tp.don_rested.append(don)
                 rested += 1
             log_event("INFO", "game.action_rest_don", f"{tp.name} rested {rested} DON!!", player=tp.name)
+            # 「レストにしたドン!!1枚につき…」(§7-5) 用に実レスト枚数を記録する。ドンは targets を
+            # 介さず枚数処理するため、resolver の len(targets) では 0 になる（OP13-001）。
+            self._last_resource_count = rested
             return True
 
         if act_name == "ACTIVE_DON" and not getattr(action, 'target', None):
@@ -1746,6 +1749,7 @@ class GameManager:
                 tp.don_active.append(don)
                 activated += 1
             log_event("INFO", "game.action_active_don", f"{tp.name} activated {activated} DON!!", player=tp.name)
+            self._last_resource_count = activated
             return True
 
         # ▼▼▼ 修正: 初期値をTrueに設定（対象0枚でも「何もしないことに成功した」とみなすため） ▼▼▼
