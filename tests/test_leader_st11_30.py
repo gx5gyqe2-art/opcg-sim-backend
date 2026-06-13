@@ -243,20 +243,30 @@ def test_st14_001_cost8_present_buffs_leader():
     assert leader_power(p1) == base + 1000   # コスト8以上いる→リーダー+1000
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="ST14-001: 分岐条件『コスト8以上のキャラがいる場合』が FIELD_COUNT GE1 に"
-                          "縮退（cost_min=8 欠落）。コスト7以下のみでもリーダー+1000してしまう")
-def test_st14_001_only_cost7_no_leader_buff():
-    """ST14-001（条件不成立）: コスト7以下のキャラのみ→全キャラコスト+1のみ、リーダー+1000なし。"""
+def test_st14_001_cost7_buffed_to_8_counts_and_buffs_leader():
+    """ST14-001（裁定: 継続効果は同時適用）: 印刷コスト7のキャラはコスト+1で8になり、
+    『コスト8以上のキャラがいる』判定は修正後コストを参照するため成立し、リーダー+1000が乗る
+    （対象指定の「コストN以上/以下」が現行コストを見るのと同様。ユーザー裁定 2026-06-13）。"""
     gm, p1, p2, L = build("ST14-001")
     clear_field(p1)
     _attach_don(p1, L, 1)
     c7 = add_char(p1, name="A", cost=7, power=7000)
     base = leader_power(p1)            # 付与ドン1枚込みの発動前パワー(6000)
-    gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
-    auto_resolve(gm, p1)
-    assert c7.current_cost == 8        # コスト+1 は適用
-    assert leader_power(p1) == base    # コスト8以上不在→リーダーは増えない（テキスト）
+    gm._apply_passive_effects(p1)      # 【ドン!!×1】常在効果は passive 再計算で適用
+    assert c7.current_cost == 8        # コスト+1 適用後は 8
+    assert leader_power(p1) == base + 1000   # 修正後コスト8以上→リーダー+1000
+
+
+def test_st14_001_cost6_buffed_to_7_does_not_buff_leader():
+    """ST14-001（境界・不成立）: 印刷コスト6はコスト+1でも7止まり（<8）→リーダーは増えない。"""
+    gm, p1, p2, L = build("ST14-001")
+    clear_field(p1)
+    _attach_don(p1, L, 1)
+    c6 = add_char(p1, name="A", cost=6, power=7000)
+    base = leader_power(p1)
+    gm._apply_passive_effects(p1)
+    assert c6.current_cost == 7        # コスト+1 で 7（まだ 8 未満）
+    assert leader_power(p1) == base    # コスト8以上不在→リーダーは増えない
 
 
 # ===========================================================================
