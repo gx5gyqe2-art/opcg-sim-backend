@@ -62,6 +62,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | `tests/test_golden.py` / `tests/golden/*` | ゴールデンコーパス（AST 指紋の部分一致） |
 | `tests/test_full_card_audit.py` | 全カード構造不変条件ゲート（EXCEPTION/CARD_LOSS/TEMP_LEAK=0） |
 | `tests/test_full_card_baseline.py` | 全カード挙動ベースライン回帰（`full_card_baseline.json` と一致） |
+| `tests/test_verified_decks.py` | **手動検証済みデッキの効果回帰**（§8）。ベースラインが捕捉できない常在ルール（RULE_PROCESSING）・ON_LEAVE 誘発・勝利条件・ドンデッキ枚数・カード名別名・持続時間等を意味的に固定 |
 | `tests/test_cpu_selfplay.py` | CPU 対 CPU 自己対戦の完走・決定論・clone 非破壊・合法手適用・インバリアント検出 |
 
 ### リーダー効果（全137枚）
@@ -148,3 +149,7 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
    場合は §4・§5 の回帰フロー（ベースライン再生成・退行ゼロ・構造ゲート）を通す。
 4. リーダーの常在「ルール」効果（ドン!!デッキ枚数等）は per-ability 差分に現れない
    ため、**ゲーム不変条件として個別テストを足す**。
+
+検証で固定した挙動は `tests/test_verified_decks.py` に1ケースずつ集約する（ベースライン
+が見られない常在ルール・ON_LEAVE・勝利条件・別名・持続時間等の意味的回帰ガード）。
+新しいデッキを検証して挙動を直したら、同ファイルに対応するアサートを追記すること。
