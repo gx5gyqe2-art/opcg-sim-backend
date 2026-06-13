@@ -34,6 +34,48 @@ SELF_RESTRICTION_KEYS = {
 def _nfc(text: str) -> str:
     return unicodedata.normalize('NFC', text)
 
+
+# 【ターン1回】系の表記（置換/保護能力は parser が TURN_LIMIT 条件を落とすため raw_text からも拾う）。
+_TURN1_RE = re.compile(r'ターン1回|ターンに1回|1ターンに1回')
+
+
+def _condition_turn_limit(cond) -> Optional[int]:
+    """条件ツリー中の TURN_LIMIT 上限値を返す（無ければ None）。AND/OR の入れ子も探索。"""
+    if cond is None:
+        return None
+    if cond.type == ConditionType.TURN_LIMIT:
+        v = cond.value
+        return v if isinstance(v, int) and v > 0 else 1
+    if cond.type in (ConditionType.AND, ConditionType.OR):
+        for a in (cond.args or []):
+            r = _condition_turn_limit(a)
+            if r is not None:
+                return r
+    return None
+
+
+def _ability_turn_limit(ab) -> Optional[int]:
+    """能力の per-turn 使用上限。条件の TURN_LIMIT を優先し、無ければ raw_text の【ターン1回】表記から 1。
+
+    置換/保護能力（_active_replacement / _active_protection 経由）は parser が TURN_LIMIT を
+    ab.condition へ載せない（自己置換は final_condition=None）ため、raw_text を併用する。
+    """
+    lim = _condition_turn_limit(getattr(ab, "condition", None))
+    if lim is not None:
+        return lim
+    if _TURN1_RE.search(_nfc(getattr(ab, "raw_text", "") or "")):
+        return 1
+    return None
+
+
+def _ability_index(card, ab) -> Any:
+    """ability_used_this_turn のキー（master.abilities 内の位置。resolver._ability_key と整合）。"""
+    abilities = getattr(getattr(card, "master", None), "abilities", ()) or ()
+    for i, a in enumerate(abilities):
+        if a is ab:
+            return i
+    return id(ab)
+
 class Player:
     def __init__(self, name: str, deck: List[Card], leader: Optional[Card] = None):
         self.name = name
@@ -1518,6 +1560,15 @@ class GameManager:
                     src = card if protector is card else protector
                     if not resolver._check_condition(owner, ab.condition, src):
                         continue
+                # 【ターン1回】保護（例:「このキャラはターンに1回、相手の効果でKOされない」）は
+                # 1ターンに1回まで。_check_condition の TURN_LIMIT は常時 True を返すため、ここで
+                # 使用回数を直接 enforce する（resolve_ability を経由しない保護経路のため）。
+                limit = _ability_turn_limit(ab)
+                if limit is not None:
+                    key = _ability_index(protector, ab)
+                    if protector.ability_used_this_turn.get(key, 0) >= limit:
+                        continue
+                    protector.ability_used_this_turn[key] = protector.ability_used_this_turn.get(key, 0) + 1
                 return True
         return False
 
@@ -1560,6 +1611,11 @@ class GameManager:
                 # 代わりの行動が取れない場合は置換不成立
                 if not resolver._can_satisfy_node(owner, sub, protector):
                     continue
+                # 【ターン1回】置換は1ターンに1回まで enforce する（parser が自己置換の TURN_LIMIT を
+                # 落とすため raw_text 併用。resolve_ability を経由しない置換経路のため直接管理）。
+                _limit = _ability_turn_limit(ab)
+                if _limit is not None and protector.ability_used_this_turn.get(_ability_index(protector, ab), 0) >= _limit:
+                    continue
                 log_event("INFO", "game.replacement",
                           f"Replacement by {protector.master.name} activated for {card.master.name}",
                           player=owner.name)
@@ -1576,6 +1632,10 @@ class GameManager:
                 self._auto_resolve_replacement(owner)
                 # 置換解決で外側の interaction を壊していないことを保証（元の状態へ戻す）。
                 self.active_interaction = outer_interaction
+                # 発動成立 → 【ターン1回】の使用回数を消費する。
+                if _limit is not None:
+                    k = _ability_index(protector, ab)
+                    protector.ability_used_this_turn[k] = protector.ability_used_this_turn.get(k, 0) + 1
                 return True
         return False
 

@@ -95,6 +95,24 @@ def build_deck(db: CardLoader, owner_id: str, leader_id: Optional[str] = None) -
     return leader, cards
 
 
+def _zone_snapshot(manager: GameManager) -> Dict[str, int]:
+    """ゾーン枚数の軽量スナップショット（効果前後差分 snapshot_diff 用）。"""
+    snap: Dict[str, int] = {}
+    for p in (manager.p1, manager.p2):
+        snap[f"{p.name}_hand"] = len(p.hand)
+        snap[f"{p.name}_field"] = len(p.field)
+        snap[f"{p.name}_life"] = len(p.life)
+        snap[f"{p.name}_trash"] = len(p.trash)
+        snap[f"{p.name}_deck"] = len(p.deck)
+        snap[f"{p.name}_don"] = len(p.don_active) + len(p.don_rested) + len(p.don_attached_cards)
+    return snap
+
+
+def _snapshot_diff(before: Dict[str, int], after: Dict[str, int]) -> Dict[str, List[int]]:
+    """前後スナップショットの差分（変化のあったゾーンのみ {zone: [before, after]}）。"""
+    return {k: [before[k], after[k]] for k in before if before[k] != after.get(k)}
+
+
 def choose_move(manager: GameManager, moves: List[Dict[str, Any]]) -> Dict[str, Any]:
     """PR1 の既定方策: ランダム合法手（global random で決定論的）。
 
@@ -140,6 +158,7 @@ def run_one_game(
     verbose: bool = False,
     policy: str = "random",
     difficulty: str = "normal",
+    oracle: bool = False,
 ) -> Dict[str, Any]:
     """1 ゲームを決定論的に完走させ、結果サマリを返す。
 
@@ -185,6 +204,7 @@ def run_one_game(
             raise InvariantError([("NO_LEGAL_MOVE", f"no legal moves for {req_pid}")], step, trace_tail)
 
         move = pick(manager, actor, moves)
+        before_snap = _zone_snapshot(manager) if oracle else None
         manager.action_events = []
         try:
             if move["kind"] == "battle":
@@ -198,7 +218,7 @@ def run_one_game(
             )
 
         events = list(manager.action_events)
-        emit({
+        line = {
             "step": step,
             "turn": manager.turn_count,
             "phase": manager.phase.name,
@@ -206,7 +226,10 @@ def run_one_game(
             "action": move["action_type"],
             "payload": move.get("payload") or {"card_uuid": move.get("card_uuid")},
             "events": events,
-        })
+        }
+        if oracle:
+            line["snapshot_diff"] = _snapshot_diff(before_snap, _zone_snapshot(manager))
+        emit(line)
 
         # --- インバリアント検出（各ステップ後） ---
         violations = check_invariants(manager)
@@ -243,6 +266,8 @@ def main(argv=None):
                     help="手選択方策。random=高速ランダム / ai=評価関数ベース（効果トレース用・低速）")
     ap.add_argument("--difficulty", choices=["easy", "normal", "hard"], default="normal",
                     help="--policy ai のときの CPU 難易度")
+    ap.add_argument("--oracle", action="store_true",
+                    help="効果検証: 各ステップに snapshot_diff（盤面前後差分）を記録する")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args(argv)
 
@@ -255,7 +280,7 @@ def main(argv=None):
             try:
                 res = run_one_game(seed, db, args.p1_leader, args.p2_leader,
                                    max_steps=args.max_steps, trace_out=trace_out, verbose=args.verbose,
-                                   policy=args.policy, difficulty=args.difficulty)
+                                   policy=args.policy, difficulty=args.difficulty, oracle=args.oracle)
                 results.append(res)
                 print(f"game seed={seed}: winner={res['winner']} steps={res['steps']} "
                       f"turns={res['turns']} ({res['p1_leader']} vs {res['p2_leader']})")
