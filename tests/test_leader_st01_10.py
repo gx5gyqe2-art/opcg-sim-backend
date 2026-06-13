@@ -305,21 +305,30 @@ def test_st07_001_life_swap_when_life_le_2():
     assert len(p1.life) == life_before
 
 
-@pytest.mark.xfail(strict=False, reason="要確認(ST07-001): 「ライフ2枚以下」が効果側条件だがコスト(ライフ上下→手札)にも掛かり、ライフ3枚以上だとコストも不発の疑い")
-def test_st07_001_cost_is_unconditional_when_life_ge_3():
-    """ST07-001 アタック時: ライフ3枚でも先のコスト(ライフ上下→手札)は無条件で発生するはず。"""
+def test_st07_001_cost_unconditional_effect_gated_at_high_life():
+    """ST07-001 アタック時: コスト(ライフ上下→手札)は効果側条件に依存せず無条件で発生する。
+
+    ライフ5枚から発動すると、コストでライフ1枚を手札へ移し(+1手札/-1ライフ=ライフ4)、
+    効果側「自分のライフが2枚以下の場合」はコスト解決後でも4枚で不成立のため発動しない。
+    結果: 手札+1・ライフ-1（コストのみが解決される）。
+    ※ ライフ3枚以下から始めるとコストでライフが2枚以下まで下がり効果側も成立して
+       差し引きゼロになる（_swap 系テストが別途カバー）。コストの無条件性は高ライフで検証する。
+    """
     gm, p1, p2, L = build("ST07-001")
-    set_life(p1, 3)
+    set_life(p1, 5)
     for _ in range(2):
         d = p1.don_active.pop()
         p1.don_attached_cards.append(d)
     L.attached_don = 2
     ab = get_ability(L.master, "ON_ATTACK")
     hand_before = len(p1.hand)
+    life_before = len(p1.life)
     gm.resolve_ability(p1, ab, L)
     _drive(gm, p1)
-    # コスト(ライフ→手札)は条件非依存なので、ライフ3枚でも手札が1枚増えるはず
+    # コスト(ライフ→手札)は効果側条件に依存せず発生する。
     assert len(p1.hand) == hand_before + 1
+    # コスト後もライフ4枚→効果側「2枚以下」不成立なのでライフは戻らない（コストのみ反映）。
+    assert len(p1.life) == life_before - 1
 
 
 # ===========================================================================

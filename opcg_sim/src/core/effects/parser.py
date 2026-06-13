@@ -152,6 +152,28 @@ class EffectParser:
 
         return abilities
 
+    def _node_moves_life(self, node) -> bool:
+        """コストノードが *ライフ枚数を変動させる* 移動（ライフ→他ゾーン）を含むか。
+
+        ST07-001 の「ライフの上か下から1枚を手札に加える」コストのように、コスト自体が
+        ライフを減らす場合のみ True。手札を捨てる等のライフ非関与コストは False。
+        """
+        if node is None:
+            return False
+        children = []
+        if isinstance(node, Sequence):
+            children = node.actions or []
+        else:
+            children = [node]
+        for n in children:
+            tq = getattr(n, "target", None)
+            if (isinstance(n, GameAction)
+                    and n.type in (ActionType.MOVE_CARD, ActionType.MOVE,
+                                   ActionType.BOUNCE, ActionType.MOVE_TO_HAND, ActionType.TRASH)
+                    and tq is not None and tq.zone == Zone.LIFE):
+                return True
+        return False
+
     def _normalize_coreference(self, ability) -> None:
         """『そのキャラ/そのカード』(ref_id='selected_card') の解決方針を静的に決める。
 
@@ -408,7 +430,25 @@ class EffectParser:
             if cost_gate_cond is not None:  # コスト節から引き上げた条件
                 final_condition = cost_gate_cond if final_condition is None else Condition(
                     type=ConditionType.AND, args=[final_condition, cost_gate_cond])
-            if isinstance(effect_node, Branch) and effect_node.if_false is None and effect_node.condition is not None:
+            # 効果本体の単一ゲート Branch を ability.condition へ引き上げる。ただし、任意コスト
+            # （「〜できる：」「〜してもよい：」）が *条件の測る資源そのもの（ライフ枚数）を変動させる*
+            # 場合は、コロン後の条件をコストへ掛けてはならない（コスト解決後に条件を評価すべき）。
+            # ST07-001:「ライフの上か下から1枚を手札に加えることができる：ライフ2枚以下なら手札を
+            # ライフへ」— コスト自体がライフを1枚減らすため、ライフ条件はコスト後に判定する。よって
+            # 条件を効果側 Branch に残し、コストは無条件で発動させる（高ライフでもコストは払える）。
+            # ※ コストがライフ枚数を変えない場合（手札を捨てる等。OP08-111/114「捨てる：ライフ2枚
+            #   以下なら登場」）は従来どおり引き上げる（無意味なコスト払いを避ける）。
+            _COST_AFFECTED_GATE = (ConditionType.LIFE_COUNT, ConditionType.LIFE_HAND_SUM)
+            _cost_changes_life = (
+                cost_optional
+                and effect_node is not None
+                and isinstance(effect_node, Branch)
+                and effect_node.condition is not None
+                and effect_node.condition.type in _COST_AFFECTED_GATE
+                and self._node_moves_life(cost_node))
+            if (isinstance(effect_node, Branch) and effect_node.if_false is None
+                    and effect_node.condition is not None
+                    and not _cost_changes_life):
                 if final_condition is None:
                     final_condition = effect_node.condition
                 else:
