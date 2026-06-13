@@ -1,0 +1,88 @@
+"""ルールモード・オンライン対戦（ルーム/ロビー + WebSocket 同期）のテスト。
+
+Firestore に依存しないよう load_deck_mixed をモックし、実カード DB から
+リーダー + キャラ 50 枚のデッキを構築して GameManager を起動する。
+"""
+import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
+import pytest
+from fastapi.testclient import TestClient
+
+from opcg_sim.api import app as appmod
+from opcg_sim.src.models.models import CardInstance
+
+
+def _build_deck(owner_id):
+    leader, cards = None, []
+    for cid in appmod.card_db.raw_db.keys():
+        c = appmod.card_db.get_card(cid)
+        if c is None:
+            continue
+        if leader is None and c.type.name == "LEADER":
+            leader = CardInstance(c, owner_id)
+        elif c.type.name == "CHARACTER" and len(cards) < 50:
+            cards.append(CardInstance(c, owner_id))
+        if leader and len(cards) >= 50:
+            break
+    return leader, cards
+
+
+@pytest.fixture
+def client(monkeypatch):
+    monkeypatch.setattr(appmod, "load_deck_mixed", lambda src, owner: _build_deck(owner))
+    monkeypatch.setattr(appmod, "_deck_preview", lambda deck_id, owner: {"leader_id": "L", "leader_name": "Leader"})
+    # 各テストでレジストリを汚さないようにクリア
+    appmod.RULE_ROOMS.clear()
+    appmod.GAMES.clear()
+    return TestClient(appmod.app)
+
+
+def test_rule_room_lifecycle_and_ws_sync(client):
+    # ルーム作成 → WAITING
+    res = client.post("/api/rule/create", json={"room_name": "Test Room"}).json()
+    assert res["success"] and res["status"] == "WAITING"
+    gid = res["game_id"]
+
+    # 一覧に出る
+    listed = client.get("/api/rule/list").json()["games"]
+    assert any(r["game_id"] == gid for r in listed)
+
+    with client.websocket_connect(f"/ws/game/{gid}") as ws1, \
+         client.websocket_connect(f"/ws/game/{gid}") as ws2:
+        # 接続直後に WAITING 状態が届く
+        init = ws1.receive_json()
+        assert init["status"] == "WAITING" and init["game_state"] is None
+        ws2.receive_json()
+
+        # デッキ選択 → ready が立ち、両者へブロードキャスト
+        client.post("/api/rule/action", json={"game_id": gid, "action_type": "SET_DECK", "player_id": "p1", "deck_id": "db:a"})
+        assert ws1.receive_json()["ready_states"]["p1"] is True
+        ws2.receive_json()
+        client.post("/api/rule/action", json={"game_id": gid, "action_type": "SET_DECK", "player_id": "p2", "deck_id": "db:b"})
+        ws1.receive_json(); ws2.receive_json()
+
+        # 対局開始 → PLAYING + 実ゲーム状態 + マリガン pending(p1)
+        started = client.post("/api/rule/action", json={"game_id": gid, "action_type": "START", "player_id": "p1"}).json()
+        assert started["status"] == "PLAYING"
+        msg = ws1.receive_json()
+        ws2.receive_json()
+        assert msg["status"] == "PLAYING"
+        assert msg["game_state"] is not None
+        assert msg["pending_request"]["player_id"] == "p1"
+        assert msg["pending_request"]["action"] == "MULLIGAN"
+
+        # ゲームアクション（/api/game/action）でもルームへブロードキャストされる
+        kept = client.post("/api/game/action", json={"game_id": gid, "action": "KEEP_HAND", "player_id": "p1", "payload": {}}).json()
+        assert kept["success"]
+        broadcast = ws1.receive_json()
+        ws2.receive_json()
+        # マリガン要求が相手(p2)へ移る
+        assert broadcast["pending_request"]["player_id"] == "p2"
+
+
+def test_rule_start_requires_both_ready(client):
+    gid = client.post("/api/rule/create", json={"room_name": "R"}).json()["game_id"]
+    # p1 のみ ready
+    client.post("/api/rule/action", json={"game_id": gid, "action_type": "SET_DECK", "player_id": "p1", "deck_id": "db:a"})
+    res = client.post("/api/rule/action", json={"game_id": gid, "action_type": "START", "player_id": "p1"}).json()
+    assert res["success"] is False
+    assert appmod.RULE_ROOMS[gid]["status"] == "WAITING"
