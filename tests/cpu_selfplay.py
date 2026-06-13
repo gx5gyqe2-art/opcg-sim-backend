@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api
+from opcg_sim.src.core import action_api, cpu_ai
 from opcg_sim.src.core.invariants import check_invariants, check_turn_boundary
 from opcg_sim.src.models.models import CardInstance
 from opcg_sim.src.utils.loader import CardLoader
@@ -114,6 +114,22 @@ def choose_move(manager: GameManager, moves: List[Dict[str, Any]]) -> Dict[str, 
     return random.choice(moves)
 
 
+def _make_policy(policy: str, difficulty: str):
+    """手選択関数 (manager, actor, moves) -> move を返す。
+
+    'random' : choose_move（軽いバイアス付きランダム・高速）。
+    'ai'     : cpu_ai.decide（評価関数ベースの強い方策・低速＝効果トレース用）。
+    """
+    if policy == "ai":
+        # プレイヤーごとにターン内メモリを保持し、暴走防止ガード付きで意思決定する。
+        mem = {"p1": {}, "p2": {}}
+
+        def _ai(manager, actor, moves):
+            return cpu_ai.decide_guarded(manager, actor, difficulty, random, mem.setdefault(actor.name, {}))
+        return _ai
+    return lambda manager, actor, moves: choose_move(manager, moves)
+
+
 def run_one_game(
     seed: int,
     db: CardLoader,
@@ -122,6 +138,8 @@ def run_one_game(
     max_steps: int = DEFAULT_MAX_STEPS,
     trace_out=None,
     verbose: bool = False,
+    policy: str = "random",
+    difficulty: str = "normal",
 ) -> Dict[str, Any]:
     """1 ゲームを決定論的に完走させ、結果サマリを返す。
 
@@ -135,6 +153,7 @@ def run_one_game(
         raise RuntimeError("リーダーを含むデッキを構築できませんでした。")
     manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     manager.start_game()
+    pick = _make_policy(policy, difficulty)
 
     trace_tail: List[Dict[str, Any]] = []
     step = 0
@@ -165,7 +184,7 @@ def run_one_game(
         if not moves:
             raise InvariantError([("NO_LEGAL_MOVE", f"no legal moves for {req_pid}")], step, trace_tail)
 
-        move = choose_move(manager, moves)
+        move = pick(manager, actor, moves)
         manager.action_events = []
         try:
             if move["kind"] == "battle":
@@ -220,6 +239,10 @@ def main(argv=None):
     ap.add_argument("--p1-leader", default=None)
     ap.add_argument("--p2-leader", default=None)
     ap.add_argument("--out", default=None, help="トレース JSONL の出力先")
+    ap.add_argument("--policy", choices=["random", "ai"], default="random",
+                    help="手選択方策。random=高速ランダム / ai=評価関数ベース（効果トレース用・低速）")
+    ap.add_argument("--difficulty", choices=["easy", "normal", "hard"], default="normal",
+                    help="--policy ai のときの CPU 難易度")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args(argv)
 
@@ -231,7 +254,8 @@ def main(argv=None):
             seed = args.seed + i
             try:
                 res = run_one_game(seed, db, args.p1_leader, args.p2_leader,
-                                   max_steps=args.max_steps, trace_out=trace_out, verbose=args.verbose)
+                                   max_steps=args.max_steps, trace_out=trace_out, verbose=args.verbose,
+                                   policy=args.policy, difficulty=args.difficulty)
                 results.append(res)
                 print(f"game seed={seed}: winner={res['winner']} steps={res['steps']} "
                       f"turns={res['turns']} ({res['p1_leader']} vs {res['p2_leader']})")

@@ -30,6 +30,7 @@ except ImportError:
 from opcg_sim.src.utils.logger_config import session_id_ctx, log_event, save_batch_logs
 from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.core import action_api
+from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.models import CardInstance
 
@@ -246,6 +247,9 @@ async def receive_frontend_log(data: Union[Dict[str, Any], List[Dict[str, Any]]]
 
 GAMES: Dict[str, GameManager] = {}
 SANDBOX_GAMES: Dict[str, 'SandboxManager'] = {}
+# CPU 対戦のメタ情報レジストリ: {game_id: {"cpu_player_id": "p2", "difficulty": "hard"}}。
+# GAMES[game_id] に GameManager 本体を、ここに CPU 側の識別子と難易度を保持する。
+CPU_GAMES: Dict[str, Dict[str, Any]] = {}
 
 card_db = CardLoader(CARD_DB_PATH); card_db.load()
 
@@ -276,9 +280,20 @@ async def game_create(req: Any = Body(...)):
         p1_source = req.get("p1_deck", ""); p2_source = req.get("p2_deck", "")
         if len(card_db.cards) < len(card_db.raw_db):
              for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
+        vs_cpu = bool(req.get("vs_cpu", False))
+        # CPU 対戦時は p2 を CPU とし、デッキは cpu_deck（無指定なら p2_deck）を使う。
+        if vs_cpu and req.get("cpu_deck"):
+            p2_source = req.get("cpu_deck")
         p1_leader, p1_cards = load_deck_mixed(p1_source, req.get("p1_name", "P1")); p2_leader, p2_cards = load_deck_mixed(p2_source, req.get("p2_name", "P2"))
         player1 = Player(req.get("p1_name", "P1"), p1_cards, p1_leader); player2 = Player(req.get("p2_name", "P2"), p2_cards, p2_leader)
-        manager = GameManager(player1, player2); manager.start_game(); GAMES[game_id] = manager; return build_game_result_hybrid(manager, game_id)
+        manager = GameManager(player1, player2); manager.start_game(); GAMES[game_id] = manager
+        if vs_cpu:
+            difficulty = req.get("cpu_difficulty", "normal")
+            if difficulty not in ("easy", "normal", "hard"):
+                difficulty = "normal"
+            CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty}
+            log_event("INFO", "game.cpu_create", f"CPU game {game_id} (difficulty={difficulty}, cpu={player2.name})", player="system")
+        return build_game_result_hybrid(manager, game_id)
     except Exception as e:
         log_event(level_key="ERROR", action="game.create_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "game_id": "", "error": {"message": str(e)}}
 
@@ -320,6 +335,65 @@ async def game_battle(req: BattleActionRequest):
         return result
     except Exception as e:
         log_event("ERROR", "game.battle_fail", traceback.format_exc(), player=player_id); return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
+
+@app.options("/api/game/cpu/step")
+async def options_game_cpu_step(): return {"status": "ok"}
+
+@app.post("/api/game/cpu/step")
+async def game_cpu_step(req: Dict[str, Any] = Body(...)):
+    """CPU 対戦で CPU(p2) の「次の 1 手」を適用して返す（ポーリング駆動）。
+
+    レスポンスは通常の build_game_result_hybrid に加え:
+      - cpu_acted: この呼び出しで CPU が行動したか
+      - cpu_event: CPU が行った手の概要（action_events の先頭）
+      - waiting_for: 'cpu'(続けて step を呼べ)/'human'/'human_decision'/'game_over'
+    CPU が行動すべき状況でなければ cpu_acted=False で即返す（フロントはポーリング停止）。
+    """
+    game_id = req.get("game_id"); manager = GAMES.get(game_id); meta = CPU_GAMES.get(game_id)
+    error_codes = CONST.get('ERROR_CODES', {})
+    if not manager:
+        return build_game_result_hybrid(None, game_id, success=False, error_code=error_codes.get('GAME_NOT_FOUND', 'GAME_NOT_FOUND'), error_msg="指定されたゲームが見つかりません。")
+    if not meta:
+        return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg="このゲームは CPU 対戦ではありません。")
+
+    cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "normal")
+    cpu_player = manager.p1 if manager.p1.name == cpu_pid else manager.p2
+
+    def _waiting_for() -> str:
+        if manager.winner:
+            return "game_over"
+        pending = manager.get_pending_request()
+        if pending and pending.get("player_id") == cpu_pid:
+            return "cpu"
+        if pending:
+            # 人間(p1)宛の選択要求（メイン操作含む）。フロントは人間の入力を待つ。
+            return "human_decision"
+        return "human"
+
+    cpu_acted = False; cpu_event = None
+    try:
+        manager.action_events = []
+        if not manager.winner:
+            pending = manager.get_pending_request()
+            if pending and pending.get("player_id") == cpu_pid:
+                turn_mem = meta.setdefault("turn_mem", {})
+                move = cpu_ai.decide_guarded(manager, cpu_player, difficulty, mem=turn_mem)
+                if move is not None:
+                    if move["kind"] == "battle":
+                        action_api.apply_battle_action(manager, cpu_player, move["action_type"], move.get("card_uuid"))
+                    else:
+                        action_api.apply_game_action(manager, cpu_player, move["action_type"], move.get("payload", {}))
+                    cpu_acted = True
+                    cpu_event = manager.action_events[0] if manager.action_events else {"action": move["action_type"]}
+        result = build_game_result_hybrid(manager, game_id, success=True)
+        result["cpu_acted"] = cpu_acted
+        result["cpu_event"] = cpu_event
+        result["waiting_for"] = _waiting_for()
+        await broadcast_rule_state(game_id)
+        return result
+    except Exception as e:
+        log_event("ERROR", "game.cpu_step_fail", traceback.format_exc(), player=cpu_pid)
+        return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
 
 @app.get("/api/cards")
 async def get_all_cards():
