@@ -1186,6 +1186,12 @@ class EffectParser:
         if _nfc("ライフと手札の合計") in norm_text or _nfc("手札とライフの合計") in norm_text:
             return Condition(type=ConditionType.LIFE_HAND_SUM, operator=operator, value=value, player=p, raw_text=norm_text)
 
+        # お互い（両者）のライフ合計（「お互いのライフの合計枚数が5枚以下の場合」P-088 等）。
+        # 「ライフ」を含むため LIFE_COUNT より先に判定する。従来は p=SELF の LIFE_COUNT に
+        # 退化し、自分のライフのみで判定して条件が緩くなっていた。
+        if _nfc("お互い") in norm_text and _nfc("ライフ") in norm_text and _nfc("合計") in norm_text:
+            return Condition(type=ConditionType.LIFE_COUNT_BOTH, operator=operator, value=value, player=Player.SELF, raw_text=norm_text)
+
         if _nfc("ライフ") in norm_text:
             return Condition(type=ConditionType.LIFE_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 

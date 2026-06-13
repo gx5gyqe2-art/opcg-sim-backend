@@ -34,6 +34,21 @@ def _extract_static_keywords(effect_text: str):
     return kws
 
 
+def _extract_name_aliases(effect_text: str):
+    """「ルール上、このカードはカード名を「X」（と「Y」）としても扱う」の別名を抽出する。
+    RULE_PROCESSING は実行時 no-op のため、名前照合用の別名はここで静的に取り出して
+    CardMaster.name_aliases に持たせる（EB04-038 ロシナンテ&ロー、そげキング=ウソップ 等）。"""
+    if not effect_text:
+        return tuple()
+    t = unicodedata.normalize("NFC", effect_text)
+    aliases = []
+    for seg in re.findall(r'カード名を(.+?)としても扱う', t):
+        for nm in re.findall(r'「([^」]+)」', seg):
+            if nm not in aliases:
+                aliases.append(nm)
+    return tuple(aliases)
+
+
 def make_parser():
     """効果パーサのファクトリ。
 
@@ -231,11 +246,12 @@ class CardLoader:
         # 従来 master.keywords は常に空で、has_keyword("ブロッカー") が False になり
         # ブロッカーが一切機能しなかった（has_blocker が常に False → BLOCK_STEP に入らない）。
         keywords = _extract_static_keywords(effect_text)
+        name_aliases = _extract_name_aliases(effect_text)
 
         # color 引数を colors に変更
         return CardMaster(
             card_id=card_id, name=name, type=c_type, colors=colors, cost=cost, power=power,
             counter=counter, attribute=attribute, traits=traits, effect_text=effect_text,
             trigger_text=trigger_text, life=life, block_icon=block_icon, abilities=combined_abilities,
-            keywords=keywords
+            keywords=keywords, name_aliases=name_aliases
         )

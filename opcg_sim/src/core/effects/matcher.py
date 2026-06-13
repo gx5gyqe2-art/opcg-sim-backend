@@ -434,30 +434,28 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
         # 「《特徴》か「名前」」= 特徴 OR 名前（両者の AND ではない）。OP11-022「《海王類》かメガロ」が
         # trait∧name の AND になり対象が常に空になっていた。フラグ時は OR で照合する。
+        # 名前照合はカードの本来名＋ルール上の別名(matches_name)で行う。NAME_PARTIAL は
+        # 「「X」を含む」等の部分一致。_p*: 別名対応のローカルヘルパ。
+        _partial = "NAME_PARTIAL" in query.flags
+        def _name_in(names):  # noqa: E306
+            return bool(names) and any(card.master.matches_name(n, partial=_partial) for n in names)
+        def _excluded():  # noqa: E306
+            return query.exclude_names and any(card.master.matches_name(en) for en in query.exclude_names)
         if "NAME_OR_TYPE" in query.flags and query.names and query.card_type:
             type_ok = card.master.type.name in query.card_type
-            if "NAME_PARTIAL" in query.flags:
-                name_ok = any(n in card.master.name for n in query.names)
-            else:
-                name_ok = card.master.name in query.names
+            name_ok = _name_in(query.names)
             if not (type_ok or name_ok): continue
-            if query.exclude_names and card.master.name in query.exclude_names: continue
+            if _excluded(): continue
         elif "TRAIT_OR_NAME" in query.flags and (query.names or query.traits):
-            if "NAME_PARTIAL" in query.flags:
-                name_ok = bool(query.names) and any(n in card.master.name for n in query.names)
-            else:
-                name_ok = bool(query.names) and card.master.name in query.names
+            name_ok = _name_in(query.names)
             trait_ok = bool(query.traits) and any(t in card.master.traits for t in query.traits)
             if not (name_ok or trait_ok): continue
-            if query.exclude_names and card.master.name in query.exclude_names: continue
+            if _excluded(): continue
         else:
             if query.names:
-                if "NAME_PARTIAL" in query.flags:
-                    if not any(n in card.master.name for n in query.names): continue
-                else:
-                    if card.master.name not in query.names: continue
+                if not _name_in(query.names): continue
 
-            if query.exclude_names and card.master.name in query.exclude_names: continue
+            if _excluded(): continue
 
             if query.traits and not any(t in card.master.traits for t in query.traits):
                 # 「《特徴》か【トリガー】を持つ」は特徴 OR トリガー所持。特徴不一致でも

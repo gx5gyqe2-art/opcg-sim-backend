@@ -58,6 +58,23 @@ class CardMaster:
     block_icon: str = ""
     keywords: Set[str] = field(default_factory=set)
     abilities: Tuple[Ability, ...] = field(default_factory=tuple)
+    # 「ルール上、このカードはカード名を「X」（と「Y」）としても扱う」(EB04-038 ロシナンテ&ロー、
+    # そげキング=ウソップ 等) の別名。RULE_PROCESSING は実行時 no-op のため、名前照合は
+    # ここに保持した別名を all_names/matches_name 経由で参照して解決する。
+    name_aliases: Tuple[str, ...] = field(default_factory=tuple)
+
+    @property
+    def all_names(self) -> List[str]:
+        """カードが名乗る全カード名（本来名＋ルール上の別名）。"""
+        return [self.name, *self.name_aliases]
+
+    def matches_name(self, query_name: str, partial: bool = False) -> bool:
+        """query_name が本来名または別名のいずれかに一致するか。
+        partial=True なら query_name が各名の部分文字列であれば一致（テキスト準拠の
+        「「X」を含む」「「X」がKOされる」等の包含判定に合わせる）。"""
+        if partial:
+            return any(query_name in n for n in self.all_names)
+        return query_name in self.all_names
 
     def to_dict(self):
         return {
