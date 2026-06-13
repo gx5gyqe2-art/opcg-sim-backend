@@ -383,7 +383,12 @@ class EffectResolver:
         # 文脈依存スケーリング（§7-5「捨てたカード1枚につき」等）用に、直前アクションが
         # 対象にした枚数を記録する。SELECT 等のメタアクションは数えない。
         if success and action.type not in (ActionType.SELECT,):
-            self.context["_last_action_count"] = len(targets)
+            cnt = len(targets)
+            # ドン!!の増減（REST/ACTIVE/RETURN）は targets を介さず枚数処理するため、エンジンが
+            # 記録した実処理枚数を使う（「レストにしたドン!!1枚につき」OP13-001）。
+            if action.type in (ActionType.REST_DON, ActionType.ACTIVE_DON, ActionType.RETURN_DON):
+                cnt = getattr(self.game_manager, "_last_resource_count", cnt)
+            self.context["_last_action_count"] = cnt
 
         # ▼▼▼ 追加: 実行履歴を記録 ▼▼▼
         target_names = [f"{t.master.name}({t.uuid[:4]})" for t in targets]
