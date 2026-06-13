@@ -1881,7 +1881,7 @@
 "OP12-030|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
 "OP12-031|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs1,co0",
 "OP12-033|ON_BLOCK": "- | pw0,kw0,rs1,co0",
-"OP12-034|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
+"OP12-034|ON_PLAY": "p1_field:3→4, p1_deck:20→19 | pw0,kw0,rs0,co0",
 "OP12-036|PASSIVE": "- | pw0,kw0,rs0,co0",
 "OP12-037|ACTIVATE_MAIN": "- | pw0,kw0,rs1,co0",
 "OP12-037|COUNTER": "- | pw3000,kw0,rs0,co0",

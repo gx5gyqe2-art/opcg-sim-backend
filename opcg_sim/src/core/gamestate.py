@@ -1208,6 +1208,11 @@ class GameManager:
             for ability in attacker.master.abilities:
                 if ability.trigger == TriggerType.ON_ATTACK:
                     triggers.append((attacker_owner, ability, attacker))
+                # 「【自分のターン中】このキャラがレストになった時、…」はアタック宣言で自身が
+                # レストになった瞬間に誘発する（パーサは YOUR_TURN 反応型に写像し再計算では
+                # 実行しないため、ここで明示的に積む）。OP14-119/OP14-027/028/032/035 等。
+                elif _nfc("このキャラがレストになった時") in _nfc(ability.raw_text or ""):
+                    triggers.append((attacker_owner, ability, attacker))
         opp_cards = ([target_owner.leader] if target_owner.leader else []) + target_owner.field
         for card in opp_cards:
             for ability in card.master.abilities:

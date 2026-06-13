@@ -196,9 +196,17 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
 
     attrs = re.findall(_nfc(ParserKeyword.ATTRIBUTE + r'[((]([^))]+)[))]'), tgt_text)
     tq.attributes.extend(attrs)
-    
+
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
+
+    # 「属性《X》を持つカードか<種類/色>」= 属性 OR (種類∧色)（OP12-034 ペローナ
+    # 「属性(斬)を持つカードか緑のイベント」）。従来は属性・種類・色がすべて AND になり、
+    # 両立しない条件（斬かつ緑のイベント）で対象が常に空になっていた。属性句の直後に
+    # 「か」が続く場合に OR とみなす（matcher が属性一致 or 残りフィルタ一致で照合）。
+    if tq.attributes and (tq.card_type or tq.colors) and \
+            re.search(_nfc(r'属性[((][^))]+[))]を持つ(?:カード|キャラ)か'), tgt_text):
+        tq.flags.add("ATTR_OR_TYPE")
 
     # 「（戻した／選んだ／その）キャラと異なる色の…」: 直前に選択／参照したカード
     # (saved_targets['selected_card']) と色が一致する候補を除外する（OP01-002:
@@ -412,18 +420,29 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             results.append(card)
             continue
         
-        if query.card_type and card.master.type.name not in query.card_type:
-            # NAME_OR_TYPE（「「名前」か<種類>」）は種類不一致でも名前一致なら通すため、
-            # ここでは弾かず下の OR 判定に委ねる。
-            if "NAME_OR_TYPE" not in query.flags:
-                continue
-
-        # 【修正】card.master.colors (List[Color]) の各値を確認するように変更
-        if query.colors:
+        if "ATTR_OR_TYPE" in query.flags:
+            # 属性 OR (種類∧色): どちらかを満たせば通す（ペローナ OP12-034
+            # 「属性(斬)を持つカードか緑のイベント」）。個別の AND チェックは行わない。
+            card_attr = card.master.attribute.value
             card_colors = [c.value for c in card.master.colors] if card.master.colors else []
-            if not any(qc in card_colors for qc in query.colors): continue
+            attr_ok = bool(query.attributes) and card_attr in query.attributes
+            type_ok = (not query.card_type) or (card.master.type.name in query.card_type)
+            color_ok = (not query.colors) or any(qc in card_colors for qc in query.colors)
+            if not (attr_ok or (type_ok and color_ok)):
+                continue
+        else:
+            if query.card_type and card.master.type.name not in query.card_type:
+                # NAME_OR_TYPE（「「名前」か<種類>」）は種類不一致でも名前一致なら通すため、
+                # ここでは弾かず下の OR 判定に委ねる。
+                if "NAME_OR_TYPE" not in query.flags:
+                    continue
 
-        if query.attributes and card.master.attribute.value not in query.attributes: continue
+            # 【修正】card.master.colors (List[Color]) の各値を確認するように変更
+            if query.colors:
+                card_colors = [c.value for c in card.master.colors] if card.master.colors else []
+                if not any(qc in card_colors for qc in query.colors): continue
+
+            if query.attributes and card.master.attribute.value not in query.attributes: continue
         
         if query.cost_max is not None and card.current_cost > query.cost_max: continue
         if query.cost_min is not None and card.current_cost < query.cost_min: continue

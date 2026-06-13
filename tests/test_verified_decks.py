@@ -264,3 +264,42 @@ def test_buggy_leader_condition_all_impel():
     assert res._check_condition(p1, cond, p1.leader) is True
     p1.field.append(inst("OP16-004"))  # 非インペルダウン
     assert res._check_condition(p1, cond, p1.leader) is False
+
+
+# --- ミホーク（緑レストコントロール） -------------------------------------
+
+def test_perona_attribute_or_type_search():
+    """OP12-034 ペローナ: 「属性(斬)を持つカードか緑のイベント」は属性 OR (種類∧色)。"""
+    gm, p1, _ = game("OP14-020", "OP14-020")
+    tq = inst("OP12-034").master.abilities[0].effect.actions[1].target
+    assert "ATTR_OR_TYPE" in tq.flags
+    p1.temp_zone = [inst("ST24-002"), inst("OP12-037"), inst("EB01-015")]  # 斬キャラ/緑EV/緑特キャラ
+    names = {c.master.name for c in get_target_cards(gm, tq, inst("OP12-034"))}
+    assert names == {"キッド&キラー", "鬼気 九刀流 阿修羅 抜剣 亡者戯"}
+
+
+def test_on_rest_trigger_fires_on_attack():
+    """OP14-119 ミホーク: 「このキャラがレストになった時」がアタックで誘発し、相手を
+    レスト不可(CANNOT_REST)にする。"""
+    from opcg_sim.src.models.enums import Phase
+    gm, p1, p2 = game("OP14-020", "OP14-020")
+    gm.turn_count = 3
+    gm.phase = Phase.MAIN
+    miho = inst("OP14-119")
+    miho.is_rest = False
+    p1.field.append(miho)
+    foe = inst("OP16-045", "P2")  # コスト4（≤9）
+    foe.is_rest = False
+    p2.field.append(foe)
+    gm.declare_attack(miho, p2.leader)
+    if gm.active_interaction:
+        gm.resolve_interaction(p1, {"selected_uuids": [foe.uuid]})
+    assert "CANNOT_REST" in foe.timed_flags
+
+
+def test_char_or_don_rest_count():
+    """OP12-037: 「相手のキャラかドン!!合計2枚」はキャラ側も最大2枚レストにできる。"""
+    choice = inst("OP12-037").master.abilities[0].effect
+    char_opt = choice.options[0]
+    assert char_opt.type == ActionType.REST
+    assert char_opt.target.count == 2 and char_opt.target.is_up_to is True
