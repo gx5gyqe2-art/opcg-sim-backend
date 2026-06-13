@@ -48,6 +48,7 @@ def classify_battle(master, trig: str) -> str:
     # 攻撃の枠組みを用意する。ON_ATTACK/ON_BLOCK はソース側、ON_OPP_ATTACK/COUNTER は
     # 相手の攻撃に対する防御側として駆動する。
     gm.phase = Phase.MAIN
+    gm.turn_count = 3  # 最初のターン(turn_count<=2)のアタック禁止を避ける（通常進行ターン）
     fb = cov._zone_fingerprint(p1, p2)
     sb = cov._stat_snap(p1, p2)
     try:

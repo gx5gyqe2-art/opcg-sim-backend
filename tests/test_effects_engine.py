@@ -1158,6 +1158,7 @@ def test_attack_active_allows_attacking_active_character():
     _validate_action はゲームフロー依存なのでパッチし、攻撃可否の条件だけを検証する。
     """
     gm, p1, p2 = make_game()
+    gm.turn_count = 3  # 最初のターンのアタック禁止を避ける（通常進行ターン）
     master = make_master(card_id="ATK-1", type=CardType.CHARACTER)
     master.keywords.add("ATTACK_ACTIVE")
     attacker = make_instance(master, owner=p1.name)
@@ -1180,6 +1181,7 @@ def test_attack_active_allows_attacking_active_character():
 def test_attack_active_not_granted_means_no_active_attack():
     """ATTACK_ACTIVE を持たないキャラはアクティブキャラへの攻撃で ValueError。"""
     gm, p1, p2 = make_game()
+    gm.turn_count = 3  # 最初のターンのアタック禁止を避ける（通常進行ターン）
     attacker = make_instance(make_master(card_id="ATK-2", type=CardType.CHARACTER), owner=p1.name)
     defender = make_instance(make_master(card_id="DEF-2", type=CardType.CHARACTER), owner=p2.name)
     p1.field.append(attacker)
@@ -1219,6 +1221,7 @@ def test_prevent_rest_sets_flag_and_survives_then_expires():
 def test_prevent_rest_blocks_attack_declaration():
     """CANNOT_REST 持ちはアタック宣言（本体をレストにする操作）で ValueError。"""
     gm, p1, p2 = make_game()
+    gm.turn_count = 3  # 最初のターンのアタック禁止を避ける（通常進行ターン）
     attacker = make_instance(make_master(card_id="PR-ATK", type=CardType.CHARACTER), owner=p2.name)
     defender = make_instance(make_master(card_id="PR-DEF", type=CardType.CHARACTER), owner=p1.name)
     p2.field.append(attacker)
@@ -2355,6 +2358,7 @@ def test_on_block_ability_fires():
     attacker = make_instance(make_master(card_id="C-ATK", name="攻撃役", power=5000), owner="P1")
     p1.field.append(attacker)
     gm.turn_player, gm.opponent = p1, p2
+    gm.turn_count = 3  # 最初のターンのアタック禁止を避ける（通常進行ターン）
 
     from opcg_sim.src.models.enums import Phase
     gm.phase = Phase.MAIN

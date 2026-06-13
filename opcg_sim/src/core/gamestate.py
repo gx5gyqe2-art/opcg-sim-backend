@@ -322,20 +322,22 @@ class GameManager:
                     if min_cost is None or (c.master.cost is not None and c.master.cost >= min_cost):
                         continue  # この制限下では登場できないキャラ
                 moves.append({"kind": "game", "action_type": "PLAY", "payload": {"uuid": c.uuid}})
-            # アタック: アクティブな攻撃者 × 有効な対象
+            # アタック: アクティブな攻撃者 × 有効な対象。
+            # 各プレイヤーの最初のターン(turn_count<=2)はアタックできないため攻撃者を列挙しない。
             opponent = self.p2 if player == self.p1 else self.p1
             attackers = []
-            if player.leader and not player.leader.is_rest:
-                attackers.append(player.leader)
-            for c in player.field:
-                if c.is_rest:
-                    continue
-                if (c.master.type == CardType.CHARACTER and c.is_newly_played
-                        and not c.has_keyword("速攻")):
-                    continue
-                if "ATTACK_DISABLE" in c.flags or "ATTACK_DISABLE" in c.timed_flags:
-                    continue
-                attackers.append(c)
+            if self.turn_count > 2:
+                if player.leader and not player.leader.is_rest:
+                    attackers.append(player.leader)
+                for c in player.field:
+                    if c.is_rest:
+                        continue
+                    if (c.master.type == CardType.CHARACTER and c.is_newly_played
+                            and not c.has_keyword("速攻")):
+                        continue
+                    if "ATTACK_DISABLE" in c.flags or "ATTACK_DISABLE" in c.timed_flags:
+                        continue
+                    attackers.append(c)
             targets = []
             if opponent.leader:
                 targets.append(opponent.leader)
@@ -1180,6 +1182,11 @@ class GameManager:
         attacker_owner, _ = self._find_card_location(attacker)
         target_owner, _ = self._find_card_location(target)
         self._validate_action(attacker_owner, "MAIN_ACTION")
+        # 先攻・後攻ともに「自分の最初のターン」はリーダー・キャラのいずれもアタックできない（公式準拠）。
+        # ターンは先攻=turn_count 1、後攻=turn_count 2 と交互に進むため、turn_count <= 2 が
+        # 両プレイヤーの最初のターンを覆う。
+        if self.turn_count <= 2:
+            raise ValueError("最初のターンはアタックできません。")
         if "ATTACK_DISABLE" in attacker.flags or "ATTACK_DISABLE" in attacker.timed_flags: raise ValueError("このカードは効果によりアタックできません。")
         if "CANNOT_REST" in attacker.timed_flags: raise ValueError("このカードは効果によりレストにできないためアタックできません。")
         if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
