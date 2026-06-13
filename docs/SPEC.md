@@ -241,6 +241,19 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 - **スコープ付き相手効果無効は `Player.negate_onplay_until`**（現状【登場時】(ON_PLAY)のみ）。
 - **`parser._parse_to_node` の split_pattern が Sequence 分割境界を定義**する（`。`/`その後、`/連用形 `(?<=置き)、` 等）。
 
+### 6.1 既知の制約（エンジン・モデル化）
+
+リーダー効果の差異は `leader_specs/ISSUES.md`（xfail で固定）。ここではテストで固定して
+いない、エンジン側のモデル化上の既知制約を記す。
+
+- **「お互いの〜」の同時両側処理**: 「お互いのライフの上から1枚をトラッシュに置く」
+  （OP11-102）や「お互いは手札がN枚になるように捨てる」（OP05-058）のように、**両
+  プレイヤーへ同時に適用**すべき効果は、`Player.ALL` の単一対象選択としてモデル化され、
+  片側のみ解決されることがある。両者に独立して適用する「同時両側」処理は未対応。
+- **置換 sub_effect のネスト中断**: 置換（REPLACE_EFFECT）は除去解決の最中に走るため、
+  `active_interaction` 単一スロット設計ではネストした対話を提示できず、`_auto_resolve_replacement`
+  が保守的に同期解決する（§3.4）。フロントへ選択を提示する完全な対話化は未実装。
+
 ---
 
 ## 7. 関連ドキュメント
