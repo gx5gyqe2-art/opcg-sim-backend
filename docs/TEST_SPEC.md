@@ -49,6 +49,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | `tests/test_full_card_baseline.py` | 全カード挙動ベースライン回帰（`full_card_baseline.json` と一致） |
 | `tests/test_mistarget_guard.py` | ミスターゲット/lift 検出器の回帰ガード |
 | `tests/test_quality_gates.py` | NO_CHANGE/WARN/SELECT_MISMATCH のラチェット |
+| `tests/test_cpu_selfplay.py` | CPU 対 CPU 自己対戦の完走・決定論・clone 非破壊・合法手適用・インバリアント検出 |
 
 ### リーダー効果（全137枚）
 | ファイル | 役割 |
@@ -70,6 +71,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | `tests/text_execution_audit.py` | テキスト↔実行不一致の全カード監査（フラグ別） |
 | `tests/interactive_target_audit.py` | INTERACTIVE 対象と TargetQuery/テキストの照合 |
 | `tests/full_card_audit.py` | 全カード構造不変条件検証＋挙動ベースライン生成（`--regen` で更新） |
+| `tests/cpu_selfplay.py` | 決定論的 CPU 対 CPU 自己対戦（効果検証ハーネス）。`--seed N`/`--games K` で再現実行し、各ステップでインバリアント検出（FIELD_LIMIT/DON_CONSERVATION/UUID_DUPLICATE/STUCK/TEMP_ZONE_LEAK 等）、違反時はトレース末尾とリプロ seed を出力。`--out trace.jsonl` で機械可読トレース、`--verbose` で 1 手ずつ表示。`--p1-leader/--p2-leader` でリーダー指定 |
 | `tests/leader_spec_probe.py` | リーダー1枚のテキスト/AST要約/実行観測の出力（`<ID>`/`--set`/`--all`/`--json`） |
 | `tests/condition_synth.py` / `tests/battle_coverage.py` | 条件合成発動 / 戦闘発火カバレッジ |
 

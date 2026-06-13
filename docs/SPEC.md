@@ -26,10 +26,14 @@
 
 | モード | エンジン | エンドポイント | 特徴 |
 |---|---|---|---|
-| **ルールモード** | `GameManager`（`core/gamestate.py`） | `/api/game/*`（REST）＋ `/api/rule/*` ＋ `/ws/game/{id}` | 公式ルールを自動進行。ソロ（ホットシート）とオンライン対戦に対応 |
+| **ルールモード** | `GameManager`（`core/gamestate.py`） | `/api/game/*`（REST）＋ `/api/rule/*` ＋ `/api/game/cpu/step` ＋ `/ws/game/{id}` | 公式ルールを自動進行。ソロ（ホットシート）／オンライン対戦／**CPU 対戦**に対応 |
 | **フリーモード** | `SandboxManager`（`core/sandbox.py`） | `/api/sandbox/*` ＋ `/ws/sandbox/{id}` | ルール強制なしの自由操作。ソロ／オンライン対戦に対応 |
 
 カード効果は `GameManager`（ルールモード）でのみ解決される。フリーモードは盤面操作のみ。
+
+ルールモードのアクション適用ロジックは `core/action_api.py`（`apply_game_action`/`apply_battle_action`）に
+集約され、HTTP エンドポイント・CPU 対戦ドライバ・自己対戦ランナーが**同一コアパス**を通る。
+CPU（AI）・効果検証ハーネスの詳細は [`docs/CPU_BATTLE_PLAN.md`](CPU_BATTLE_PLAN.md)。
 
 ---
 
@@ -120,6 +124,22 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 
 ---
 
+## 2.5 CPU 対戦（ルールモード・ソロ）
+
+人間（p1）が CPU（p2）と対戦する。AI はバックエンドの `core/cpu_ai.py` に置き、
+`GameManager.clone()` 上で各合法手を試して評価する 1-ply 先読みで意思決定する。
+
+- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（easy/normal/hard）/
+  `cpu_deck`。CPU メタは `app.py` の `CPU_GAMES` に保持（`{cpu_player_id, difficulty}`）。
+- **逐次進行**: `POST /api/game/cpu/step {game_id}` が CPU の次の 1 手を `action_api` 経由で適用し、
+  `{cpu_acted, cpu_event, waiting_for}` を返す（`waiting_for`: `cpu`=継続/`human`/`human_decision`/`game_over`）。
+  フロントは `waiting_for!='cpu'` までポーリングして 1 手ずつ演出する。
+- **暴走防止**: ターン内の手総数キャップと起動効果/ドン付与の繰り返しキャップで CPU ターンが必ず終わる。
+- 合法手は `GameManager.get_legal_actions`、効果対話の既定解決は `default_interaction_payload`。
+- 詳細・効果検証ハーネス（CPU 対 CPU 自己対戦）は [`docs/CPU_BATTLE_PLAN.md`](CPU_BATTLE_PLAN.md)。
+
+---
+
 ## 3. カード効果システム
 
 カードの日本語テキストを解析し中間表現(IR)へ落とし、対局中に解決する。設計詳細は
@@ -179,9 +199,12 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 
 | パス | 役割 |
 |---|---|
-| `opcg_sim/api/app.py` | FastAPI。REST/WS エンドポイント、`GAMES`/`SANDBOX_GAMES`/`RULE_ROOMS`、`build_game_result_hybrid`、`build_rule_message`/`broadcast_rule_state`、`GameConnectionManager` |
+| `opcg_sim/api/app.py` | FastAPI。REST/WS エンドポイント、`GAMES`/`SANDBOX_GAMES`/`RULE_ROOMS`/`CPU_GAMES`、`/api/game/cpu/step`、`build_game_result_hybrid`、`build_rule_message`/`broadcast_rule_state`、`GameConnectionManager` |
 | `opcg_sim/api/schemas.py` | レスポンス/リクエストの Pydantic スキーマ |
-| `opcg_sim/src/core/gamestate.py` | ルールエンジン本体（ターン/戦闘/召喚酔い/5体上限/効果解決/除去保護/誘発キュー） |
+| `opcg_sim/src/core/gamestate.py` | ルールエンジン本体（ターン/戦闘/召喚酔い/5体上限/効果解決/除去保護/誘発キュー、`clone`/`get_legal_actions`/`default_interaction_payload`） |
+| `opcg_sim/src/core/action_api.py` | アクション適用の共通コアパス（`apply_game_action`/`apply_battle_action`）。HTTP/CPU/自己対戦が共用 |
+| `opcg_sim/src/core/cpu_ai.py` | CPU(AI) 意思決定（`evaluate`/`decide`/`decide_guarded`）。1-ply 先読み・難易度・暴走防止 |
+| `opcg_sim/src/core/invariants.py` | 対局中インバリアント検出（自己対戦/テストの各ステップ後に呼ぶ） |
 | `opcg_sim/src/core/sandbox.py` | フリーモードの盤面マネージャ |
 | `opcg_sim/src/core/effects/parser.py` / `parser_v2.py` | レガシー/V2 パーサ |
 | `opcg_sim/src/core/effects/rules/base.py` / `atoms.py` | ルール基盤／原子アクションルール群 |

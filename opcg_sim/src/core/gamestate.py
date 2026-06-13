@@ -181,6 +181,170 @@ class GameManager:
             "active_interaction": str(self.active_interaction) if self.active_interaction else None
         }
 
+    def clone(self) -> "GameManager":
+        """現在のゲーム状態の独立した深いコピーを返す（先読み/シミュレーション用）。
+
+        `continuous` がマネージャへの後方参照を持つが deepcopy が循環を解決する。
+        一時バッファ（action_events）はコピー後にリセットする。
+        本体（self）は一切変化させない（docs/CPU_BATTLE_PLAN.md §2.2）。
+        """
+        import copy
+        snapshot = copy.deepcopy(self)
+        snapshot.action_events = []
+        return snapshot
+
+    def get_legal_actions(self, player: Optional[Player] = None) -> List[Dict[str, Any]]:
+        """現在 `player`（既定=pending の要求先）が取れる合法手を列挙する。
+
+        返り値は適用可能なアクションの dict リスト:
+          - ゲームアクション: {"kind":"game", "action_type":..., "payload":{...}}
+          - 戦闘アクション:   {"kind":"battle", "action_type":..., "card_uuid":...}
+          - 効果対話の解決:   {"kind":"game", "action_type":"RESOLVE_EFFECT_SELECTION", "payload":{...}}
+
+        AI（探索/方策）と自己対戦ランナーが共有する合法手の単一の真実源。
+        効果対話（SELECT_TARGET/CHOICE 等）は組合せ爆発を避けるため、
+        `default_interaction_payload` による「妥当な既定解決」を1手として返す（PR1）。
+        生成手はすべて `_validate_action` を通過することをテストで保証する。
+        """
+        pending = self.get_pending_request()
+        if not pending:
+            return []
+        pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
+        KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
+        KEY_ACTION = pending_props.get('ACTION', 'action')
+        battle_actions = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+        ACT_BLOCKER = battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
+        ACT_COUNTER = battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER')
+        ACT_PASS = battle_actions.get('PASS', 'PASS')
+        RESOLVE = CONST.get('c_to_s_interface', {}).get('GAME_ACTIONS', {}).get('TYPES', {}).get('RESOLVE_EFFECT_SELECTION', 'RESOLVE_EFFECT_SELECTION')
+
+        req_pid = pending[KEY_PID]
+        # player 未指定なら要求先プレイヤーを行動主体とする。
+        if player is None:
+            player = self.p1 if self.p1.name == req_pid else self.p2
+        # 要求先と異なるプレイヤーは合法手なし（手番/フェイズ外）。
+        if player.name != req_pid:
+            return []
+
+        action = pending[KEY_ACTION]
+        moves: List[Dict[str, Any]] = []
+
+        if action == "MULLIGAN":
+            moves.append({"kind": "game", "action_type": "MULLIGAN", "payload": {}})
+            moves.append({"kind": "game", "action_type": "KEEP_HAND", "payload": {}})
+            return moves
+
+        if action == ACT_BLOCKER:
+            for uid in pending.get(pending_props.get('SELECTABLE_UUIDS', 'selectable_uuids'), []):
+                moves.append({"kind": "battle", "action_type": ACT_BLOCKER, "card_uuid": uid})
+            moves.append({"kind": "battle", "action_type": ACT_PASS, "card_uuid": None})
+            return moves
+
+        if action == ACT_COUNTER:
+            for uid in pending.get(pending_props.get('SELECTABLE_UUIDS', 'selectable_uuids'), []):
+                moves.append({"kind": "battle", "action_type": ACT_COUNTER, "card_uuid": uid})
+            moves.append({"kind": "battle", "action_type": ACT_PASS, "card_uuid": None})
+            return moves
+
+        if action == "MAIN_ACTION":
+            # プレイ可能な手札（コストを active ドン!! で支払える＋自己制限を尊重）。
+            # play_card_action と同じ制限判定を行い、登場が弾かれる手を最初から除外する。
+            don_active = len(player.don_active)
+            cannot_play_hand = self._active_restriction(player, "CANNOT_PLAY_FROM_HAND") is not None
+            char_rec = self._active_restriction(player, "CANNOT_PLAY_CHARACTER")
+            for c in player.hand:
+                if c.current_cost > don_active:
+                    continue
+                if cannot_play_hand:
+                    continue
+                if c.master.type == CardType.CHARACTER and char_rec is not None:
+                    min_cost = char_rec.get("min_cost")
+                    if min_cost is None or (c.master.cost is not None and c.master.cost >= min_cost):
+                        continue  # この制限下では登場できないキャラ
+                moves.append({"kind": "game", "action_type": "PLAY", "payload": {"uuid": c.uuid}})
+            # アタック: アクティブな攻撃者 × 有効な対象
+            opponent = self.p2 if player == self.p1 else self.p1
+            attackers = []
+            if player.leader and not player.leader.is_rest:
+                attackers.append(player.leader)
+            for c in player.field:
+                if c.is_rest:
+                    continue
+                if (c.master.type == CardType.CHARACTER and c.is_newly_played
+                        and not c.has_keyword("速攻")):
+                    continue
+                if "ATTACK_DISABLE" in c.flags or "ATTACK_DISABLE" in c.timed_flags:
+                    continue
+                attackers.append(c)
+            targets = []
+            if opponent.leader:
+                targets.append(opponent.leader)
+            for c in opponent.field:
+                if c.is_rest:
+                    targets.append(c)
+            for atk in attackers:
+                for tgt in targets:
+                    moves.append({"kind": "game", "action_type": "ATTACK",
+                                  "payload": {"uuid": atk.uuid, "target_ids": [tgt.uuid]}})
+            # ドン!!付与（アクティブな自分のリーダー/キャラへ）
+            if don_active > 0:
+                for c in attackers + [c for c in player.field if c.is_rest]:
+                    moves.append({"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": c.uuid}})
+            # 起動メイン効果
+            from ..models.enums import TriggerType as _TT
+            units = ([player.leader] if player.leader else []) + list(player.field)
+            if player.stage:
+                units.append(player.stage)
+            for c in units:
+                if c.is_effect_negated or getattr(c, "negated", False):
+                    continue
+                if any(a.trigger == _TT.ACTIVATE_MAIN for a in c.master.abilities):
+                    moves.append({"kind": "game", "action_type": "ACTIVATE_MAIN", "payload": {"uuid": c.uuid}})
+            # ターン終了は常に合法
+            moves.append({"kind": "game", "action_type": "TURN_END", "payload": {}})
+            return moves
+
+        # 効果対話（SEARCH_AND_SELECT / CHOICE / CONFIRM_OPTIONAL / ARRANGE_DECK /
+        # DECLARE_COST / SELECT_RESOURCE 等）は既定解決を1手として返す。
+        payload = self.default_interaction_payload(pending)
+        moves.append({"kind": "game", "action_type": RESOLVE, "payload": payload})
+        return moves
+
+    def default_interaction_payload(self, pending: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """効果対話に対する「妥当な既定解決」のペイロードを構築する。
+
+        本番（自己対戦/CPU）でも使える機械的な既定選択:
+          - 必要最小数 (constraints.min) を満たすよう候補の先頭から選ぶ
+          - can_skip なら 0 件選択（スキップ）も可だが、min>0 のときは min 件選ぶ
+          - CHOICE/CONFIRM 系は index=0（最初の選択肢/発動する）
+        AI（PR2）は本メソッドを評価関数で上書きして最良選択を選ぶ。
+        """
+        if pending is None:
+            pending = self.get_pending_request() or {}
+        pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
+        KEY_UUIDS = pending_props.get('SELECTABLE_UUIDS', 'selectable_uuids')
+        KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
+        uuids = list(pending.get(KEY_UUIDS, []) or [])
+        constraints = pending.get(KEY_CONSTRAINTS) or {}
+        try:
+            min_n = int(constraints.get("min", 0))
+        except (TypeError, ValueError):
+            min_n = 0
+        try:
+            max_n = int(constraints.get("max", len(uuids)))
+        except (TypeError, ValueError):
+            max_n = len(uuids)
+        take = max(min_n, 0)
+        take = min(take, max_n, len(uuids))
+        selected = uuids[:take]
+        return {
+            "selected_uuids": selected,
+            "index": 0,
+            "accepted": True,
+            "position": "BOTTOM",
+            "declared_value": 0,
+        }
+
     def _find_card_by_uuid(self, uuid: str) -> Optional[CardInstance]:
         all_players = [self.p1, self.p2]
         for p in all_players:
