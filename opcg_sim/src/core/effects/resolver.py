@@ -532,7 +532,9 @@ class EffectResolver:
             return all(self._check_condition(player, sub, source_card, host_card) for sub in condition.args)
         if condition.type == ConditionType.OR:
             return any(self._check_condition(player, sub, source_card, host_card) for sub in condition.args)
-        
+        if condition.type == ConditionType.NOT:
+            return not self._check_condition(player, condition.args[0], source_card, host_card)
+
         target_player = player
         if condition.player == Player.OPPONENT:
             target_player = self.game_manager.p2 if player == self.game_manager.p1 else self.game_manager.p1
