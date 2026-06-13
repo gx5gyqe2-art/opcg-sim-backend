@@ -29,6 +29,7 @@ except ImportError:
 
 from opcg_sim.src.utils.logger_config import session_id_ctx, log_event, save_batch_logs
 from opcg_sim.src.core.gamestate import Player, GameManager
+from opcg_sim.src.core import action_api
 from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.models import CardInstance
 
@@ -290,61 +291,11 @@ async def game_action(req: Dict[str, Any] = Body(...)):
     game_id = req.get("game_id"); manager = GAMES.get(game_id); error_codes = CONST.get('ERROR_CODES', {})
     if not manager: return build_game_result_hybrid(None, game_id, success=False, error_code=error_codes.get('GAME_NOT_FOUND', 'GAME_NOT_FOUND'), error_msg="指定されたゲームが見つかりません。")
     payload = req.get("payload") or req.get("full_payload") or {}
-    card_uuid = payload.get("uuid") or payload.get("card_id"); target_ids = payload.get("target_ids", [])
-    target_uuid = target_ids[0] if isinstance(target_ids, list) and len(target_ids) > 0 else payload.get("target_uuid")
     try:
         manager.action_events = []
-        from opcg_sim.src.models.enums import TriggerType
-        c_to_s = CONST.get('c_to_s_interface', {}); game_actions = c_to_s.get('GAME_ACTIONS', {}).get('TYPES', {})
-        current_player = manager.p1 if player_id == manager.p1.name else manager.p2; opponent = manager.p2 if current_player == manager.p1 else manager.p1
-        potential_cards = []
-        if current_player.leader: potential_cards.append(current_player.leader)
-        potential_cards.extend(current_player.field)
-        if current_player.stage: potential_cards.append(current_player.stage)
-        operating_card = next((c for c in potential_cards if c.uuid == card_uuid), None)
-        if action_type == game_actions.get('PLAY', 'PLAY'):
-            target_card_in_hand = next((c for c in current_player.hand if c.uuid == card_uuid), None)
-            if target_card_in_hand:
-                manager.action_events.append({"type": "PLAY", "player": player_id, "card_name": target_card_in_hand.master.name, "message": f"「{target_card_in_hand.master.name}」を登場"})
-                manager.pay_cost(current_player, target_card_in_hand.current_cost); manager.play_card_action(current_player, target_card_in_hand)
-            else: raise ValueError("対象のカードが手札にありません。")
-        elif action_type == game_actions.get('TURN_END', 'TURN_END'):
-            manager.action_events.append({"type": "TURN_END", "player": player_id, "message": f"ターン{manager.turn_count}終了"})
-            manager.end_turn()
-        elif action_type in [game_actions.get('ATTACK', 'ATTACK'), game_actions.get('ATTACK_CONFIRM', 'ATTACK_CONFIRM')]:
-            if card_uuid == target_uuid: raise ValueError("自分自身を攻撃対象に選択することはできません。")
-            if not operating_card: raise ValueError("アタックするカードが見つかりません。")
-            opponent_units = [opponent.leader] + opponent.field
-            if opponent.stage: opponent_units.append(opponent.stage)
-            attack_target = next((c for c in opponent_units if c.uuid == target_uuid), None)
-            if not attack_target: raise ValueError("攻撃対象が見つかりません。")
-            manager.action_events.append({"type": "ATTACK", "player": player_id, "card_name": operating_card.master.name, "message": f"「{operating_card.master.name}」→「{attack_target.master.name}」攻撃"})
-            log_event("INFO", "api.attack_execute", f"Attacking: {operating_card.master.name} -> {attack_target.master.name}", player=player_id); manager.declare_attack(operating_card, attack_target)
-        elif action_type == game_actions.get('ATTACH_DON', 'ATTACH_DON'):
-            if not operating_card: raise ValueError("ドン!!を付与する対象のカードが見つかりません。")
-            if current_player.don_active:
-                don = current_player.don_active.pop(0); don.attached_to = operating_card.uuid; current_player.don_attached_cards.append(don); operating_card.attached_don += 1
-                manager.action_events.append({"type": "ATTACH_DON", "player": player_id, "card_name": operating_card.master.name, "message": f"「{operating_card.master.name}」にドン!!付与"})
-            else: raise ValueError("アクティブなドン!!が不足しています。")
-        elif action_type == game_actions.get('ACTIVATE_MAIN', 'ACTIVATE_MAIN'):
-            if not operating_card: raise ValueError("効果を発動するカードが見つかりません。")
-            manager.action_events.append({"type": "ACTIVATE_MAIN", "player": player_id, "card_name": operating_card.master.name, "message": f"「{operating_card.master.name}」の効果起動"})
-            for ability in operating_card.master.abilities:
-                if ability.trigger == TriggerType.ACTIVATE_MAIN: manager.resolve_ability(current_player, ability, source_card=operating_card)
-        elif action_type == game_actions.get('RESOLVE_EFFECT_SELECTION', 'RESOLVE_EFFECT_SELECTION'): manager.resolve_interaction(current_player, payload)
-        elif action_type == 'MULLIGAN':
-            manager.do_mulligan(current_player)
-            manager.action_events.append({"type": "MULLIGAN", "player": player_id, "message": "マリガン（手札全交換）"})
-        elif action_type == 'KEEP_HAND':
-            manager.keep_hand(current_player)
-            manager.action_events.append({"type": "KEEP_HAND", "player": player_id, "message": "手札キープ"})
-        # 効果でライフが離れた等で積まれた誘発（ON_LIFE_DECREASE 等）をアクション境界で消化する
-        # （A-5）。中断が残る場合は内部ガードで no-op（対話完了時に resolve_interaction が消化）。
-        manager._advance_pending_triggers()
-        # アクション境界で盤面依存の常在効果を再計算し、トラッシュ枚数等の変化を即時反映する
-        # （「自分のトラッシュN枚につき+1000」OP09-086 等のリアルタイム反映。A-9）。
-        # 中断が残る場合は refresh_passive_state 内で no-op（対話完了時に反映）。
-        manager.refresh_passive_state()
+        # ディスパッチは action_api（CPU ドライバ・自己対戦ランナーと同一コアパス）へ委譲する。
+        current_player = manager.p1 if player_id == manager.p1.name else manager.p2
+        action_api.apply_game_action(manager, current_player, action_type, payload)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
         return result
@@ -362,20 +313,8 @@ async def game_battle(req: BattleActionRequest):
     player = manager.p1 if player_id == manager.p1.name else manager.p2
     try:
         manager.action_events = []
-        try: manager._validate_action(player, action_type)
-        except Exception as ve:
-            if action_type != battle_types.get('PASS', 'PASS'): raise ve
-        if action_type == battle_types.get('SELECT_BLOCKER', 'SELECT_BLOCKER'):
-            blocker = next((c for c in player.field if c.uuid == card_uuid), None)
-            if blocker: manager.action_events.append({"type": "BLOCK", "player": player_id, "card_name": blocker.master.name, "message": f"「{blocker.master.name}」でブロック"})
-            manager.handle_block(blocker)
-        elif action_type == battle_types.get('SELECT_COUNTER', 'SELECT_COUNTER'):
-            counter_card = next((c for c in player.hand if c.uuid == card_uuid), None)
-            if counter_card: manager.action_events.append({"type": "COUNTER", "player": player_id, "card_name": counter_card.master.name, "message": f"「{counter_card.master.name}」でカウンター(+{counter_card.master.counter or 0})"})
-            manager.apply_counter(player, counter_card)
-        elif action_type == battle_types.get('PASS', 'PASS'):
-            manager.action_events.append({"type": "PASS", "player": player_id, "message": "パス"})
-            manager.apply_counter(player, None)
+        # ディスパッチは action_api（CPU ドライバ・自己対戦ランナーと同一コアパス）へ委譲する。
+        action_api.apply_battle_action(manager, player, action_type, card_uuid)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
         return result
