@@ -405,6 +405,12 @@ class EffectResolver:
             # 後続参照が、再開経路だけ保存されず空振りしていた）。
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = resumed
+            # 「そのキャラ/そのカード」の coreference 用に、プレイヤー選択(CHOOSE)の結果を
+            # 既定キー selected_card にも保存する。明示 save_id（例:「選び」）が無い
+            # ACTIVE/BUFF 等の先行選択でも、後続 ref_id=selected_card が拾えるようにする。
+            if (getattr(query, "select_mode", None) == "CHOOSE" and not query.ref_id
+                    and query.zone == Zone.FIELD):
+                self.context["saved_targets"]["selected_card"] = resumed
             return resumed
 
         if query.save_id and query.save_id in self.context["saved_targets"]:
@@ -426,6 +432,10 @@ class EffectResolver:
                  return [source_card]
              if query.ref_id in self.context["saved_targets"]:
                  return self.context["saved_targets"][query.ref_id]
+             # ref_id が指定されているのに保存対象が無い（先行選択が条件未達でスキップ
+             # された／そもそも選択されなかった）。場全体クエリへフォールスルーすると
+             # 全カードへ誤適用する（OP10-099 範囲外コスト・OP07-059 条件未達）ため対象なし。
+             return []
 
         # 「残り」: 直前の選択グループが存在すれば、その消費済みを除いた残余を対象にする
         # （field 分配 OP08-118 等。グループが無ければ従来どおり TEMP=公開残りを参照）。
@@ -437,7 +447,18 @@ class EffectResolver:
 
         from .matcher import get_target_cards
         candidates = get_target_cards(self.game_manager, query, source_card)
-        
+
+        # 「（戻した／選んだ）キャラと異なる色の…」: selected_card と色が重なる候補を除外する
+        # （OP01-002）。selected_card は直前の FIELD 選択（BOUNCE 等）で保存済み。
+        if "EXCLUDE_SELECTED_COLOR" in getattr(query, "flags", set()):
+            ref = self.context["saved_targets"].get("selected_card") or []
+            ref_colors = set()
+            for rc in ref:
+                ref_colors.update(c.value for c in (rc.master.colors or []))
+            if ref_colors:
+                candidates = [c for c in candidates
+                              if not (ref_colors & {col.value for col in (c.master.colors or [])})]
+
         required_count = getattr(query, 'count', 1)
         is_up_to = getattr(query, 'is_up_to', False)
         is_strict = getattr(query, 'is_strict_count', False)
@@ -480,6 +501,9 @@ class EffectResolver:
             selected = candidates[:required_count] if required_count > 0 else candidates
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = selected
+            if (query.select_mode == "CHOOSE" and not query.ref_id
+                    and query.zone == Zone.FIELD):
+                self.context["saved_targets"]["selected_card"] = selected
             return selected
 
         self._suspend_for_target_selection(player, candidates, query, source_card, action_node)
@@ -508,7 +532,9 @@ class EffectResolver:
             return all(self._check_condition(player, sub, source_card, host_card) for sub in condition.args)
         if condition.type == ConditionType.OR:
             return any(self._check_condition(player, sub, source_card, host_card) for sub in condition.args)
-        
+        if condition.type == ConditionType.NOT:
+            return not self._check_condition(player, condition.args[0], source_card, host_card)
+
         target_player = player
         if condition.player == Player.OPPONENT:
             target_player = self.game_manager.p2 if player == self.game_manager.p1 else self.game_manager.p1
@@ -647,6 +673,13 @@ class EffectResolver:
                 return not source_card.is_rest
             if sv == "ENTERED_THIS_TURN":
                 return getattr(source_card, 'is_newly_played', False)
+            if sv == "IN_BATTLE":
+                # 「このリーダー/キャラが（相手のキャラと）バトルしている場合」(OP12-020): 進行中の
+                # バトル(active_battle)に source_card が攻撃側/防御側として関与しているか。
+                ab = self.game_manager.active_battle
+                if not ab:
+                    return False
+                return source_card in (ab.get("attacker"), ab.get("target"))
             if isinstance(sv, tuple) and sv[0] == "POWER":
                 is_my_turn = (player == self.game_manager.turn_player)
                 power = source_card.get_power(is_my_turn)

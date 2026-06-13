@@ -194,7 +194,8 @@ class ConditionType(Enum):
     # 追加: 複合条件用
     AND = auto()
     OR = auto()
-    
+    NOT = auto()
+
     OTHER = auto()
     NONE = auto()
     

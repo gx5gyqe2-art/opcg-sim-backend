@@ -289,9 +289,6 @@ def test_op07_059_freeze_when_foxy_chars_ge_three():
     assert "FREEZE" in (victim.flags | victim.timed_flags)   # FREEZE 付与
 
 
-@pytest.mark.xfail(strict=False, reason=(
-    "要確認: OP07-059 FREEZE は ref_id=selected_card が未保存（branch条件未達で SELECT スキップ）"
-    "でも相手キャラへフォールバック適用される。条件未達なら FREEZE されないのが正。"))
 def test_op07_059_no_freeze_when_foxy_chars_below_three():
     """OP07-059: 《フォクシー海賊団》が2体以下なら条件未達でFREEZEされないべき。"""
     gm, p1, p2, L = build("OP07-059")

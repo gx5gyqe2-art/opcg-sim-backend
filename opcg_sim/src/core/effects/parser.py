@@ -132,6 +132,8 @@ class EffectParser:
                 continue
             try:
                 ab = self.parse_ability(seg)
+                self._normalize_coreference(ab)
+                self._normalize_replacement_alternative(ab)
                 if ab.trigger != TriggerType.UNKNOWN or ab.effect is not None:
                     abilities.append(ab)
                     # 「（このリーダー/キャラが）アタックした時かアタックされた時」は ON_ATTACK と
@@ -149,6 +151,90 @@ class EffectParser:
                 ab.trigger = TriggerType.TRIGGER
 
         return abilities
+
+    def _normalize_coreference(self, ability) -> None:
+        """『そのキャラ/そのカード』(ref_id='selected_card') の解決方針を静的に決める。
+
+        プレイヤー選択（save_id='selected_card'、または FIELD を CHOOSE で選ぶアクション）が
+        能力内に存在する場合、後続の ref_id 参照は「選んだカード」への厳密参照とみなす
+        （実行時に選択がスキップ/候補0で未保存なら resolver が対象なしを返す）。
+
+        そのような選択 producer が無い場合、『そのキャラ』は置換被害者や誘発の主体など
+        文脈的な指示なので、ref_id を外して自前クエリ（フォールスルー）で解決させる
+        （OP05-001 置換被害者・OP16-079 トラッシュ登場キャラ等）。
+        """
+        nodes = []
+
+        def walk(node):
+            if node is None:
+                return
+            nodes.append(node)
+            for f in ("if_true", "if_false", "sub_effect"):
+                walk(getattr(node, f, None))
+            for f in ("actions", "options"):
+                for child in (getattr(node, f, None) or []):
+                    walk(child)
+
+        walk(ability.cost)
+        walk(ability.effect)
+
+        def is_producer(n):
+            q = getattr(n, "target", None)
+            if q is None or q.ref_id is not None:
+                return False
+            if q.save_id == "selected_card":
+                return True
+            return q.select_mode == "CHOOSE" and q.zone == Zone.FIELD
+
+        def is_consumer(n):
+            q = getattr(n, "target", None)
+            return q is not None and q.ref_id == "selected_card"
+
+        if not any(is_producer(n) for n in nodes):
+            for n in nodes:
+                if is_consumer(n):
+                    n.target.ref_id = None
+
+    def _normalize_replacement_alternative(self, ability) -> None:
+        """『（先行効果）の代わりに（後続効果）』= 択一の整形。
+
+        Sequence 内で「A の代わりに B（できる）」という後続効果（B）は、A を *置き換える*。
+        独立 2 Branch に分解されると A と B が両方発動してしまう（OP04-040: ドローと HEAL の
+        二重発動）。後続 B の条件が成立する場合に先行 A を抑止するため、A の条件を
+        AND(A.cond, NOT(B.cond)) に書き換える（B 側の条件はそのまま）。
+
+        置換効果（「KOされる／場を離れる代わりに」= REPLACE_EFFECT）は別経路なので対象外。
+        """
+        seq = ability.effect
+        if not isinstance(seq, Sequence):
+            return
+        acts = seq.actions
+
+        def node_text(n):
+            parts = [getattr(n, "raw_text", "") or ""]
+            for f in ("if_true", "if_false"):
+                child = getattr(n, f, None)
+                if child is not None:
+                    parts.append(getattr(child, "raw_text", "") or "")
+            return _nfc(" ".join(parts))
+
+        for i in range(1, len(acts)):
+            cur = acts[i]
+            text = node_text(cur)
+            if _nfc("代わりに") not in text:
+                continue
+            # 「される／離れる代わりに」は置換効果（REPLACE_EFFECT）であり択一整形の対象外。
+            if _nfc("される代わり") in text or _nfc("離れる代わり") in text:
+                continue
+            cur_cond = getattr(cur, "condition", None)
+            prev = acts[i - 1]
+            prev_cond = getattr(prev, "condition", None)
+            if cur_cond is None or prev_cond is None:
+                continue
+            prev.condition = Condition(
+                type=ConditionType.AND,
+                args=[prev_cond, Condition(type=ConditionType.NOT, args=[cur_cond])],
+            )
 
     def parse_ability(self, text: str) -> Ability:
         log_event("DEBUG", "parser.input", f"Input text: {text[:50]}")
@@ -1100,6 +1186,11 @@ class EffectParser:
             thr = int(cost_sum_m.group(1))
             op = CompareOperator.GE if cost_sum_m.group(2) == _nfc('以上') else CompareOperator.LE
             return Condition(type=ConditionType.FIELD_COST_SUM, operator=op, value=thr, player=p, raw_text=norm_text)
+
+        # 「（このリーダー/キャラが）（相手のキャラと）バトルしている場合」(OP12-020): 進行中の
+        # バトル文脈の条件。FIELD_COUNT（「キャラ」+「いる」を含むため誤分類しうる）より先に捌く。
+        if _nfc("バトルしている") in norm_text:
+            return Condition(type=ConditionType.SOURCE_STATE, value="IN_BATTLE", player=p, raw_text=norm_text)
 
         # 盤面のキャラ枚数（「自分の（レストの／特徴《X》の／コストN以上の）キャラがM枚以上いる」
         # 「…キャラがいる」）。数値が「フィルタ(コストN以上)」と「枚数(M枚)」で混在し得るため、

@@ -256,7 +256,6 @@ def test_op04_040_condition_counts_hand_too():
     assert after["hand"] == before["hand"]   # 合計>4なのでドローしないのが正
 
 
-@pytest.mark.xfail(strict=True, reason="OP04-040バグ: 『代わりに』が独立2branchに分解され、ドローとHEALが両方発動する(本来は択一)")
 def test_op04_040_heal_replaces_draw_not_both():
     """OP04-040 アタック時: コスト8以上がいれば『ドローの代わりに』ライフ追加（両方は起きない）。"""
     gm, p1, p2, L = build("OP04-040")
