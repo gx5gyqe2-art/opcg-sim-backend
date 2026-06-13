@@ -987,7 +987,13 @@ class GameManager:
         （実行すると盤面操作のたびに本体効果が発動し、対話中断が他の解決を飲み込む）。"""
         first = self._find_first_action(ability.effect)
         raw = getattr(first, "raw_text", "") if first is not None else ""
-        return bool(self._REACTIVE_RE.search(unicodedata.normalize("NFC", raw or "")))
+        # 能力本体の raw_text も見る。先頭アクションの文（例「自分はゲームに勝利する」）に
+        # 「…した時、」が無くても、能力全体（例「相手が【ブロッカー】を発動した時、…」OP09-118）
+        # が反応型なら再計算ループで実行してはならない（PASSIVE+VICTORY が相手ライフ0だけで
+        # 誤って自動勝利するのを防ぐ。本来は相手のブロッカー発動が必要）。
+        ab_raw = getattr(ability, "raw_text", "") or ""
+        combined = unicodedata.normalize("NFC", (raw or "") + " " + ab_raw)
+        return bool(self._REACTIVE_RE.search(combined))
 
     def _find_first_action(self, node):
         if node is None:

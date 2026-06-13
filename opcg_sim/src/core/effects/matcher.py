@@ -262,10 +262,24 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if m_p:
         start_idx = m_p.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
-        if prefix_context not in ['+', '-', '\u2212', '\u2010', '\uff0b', '\uff0d']:
+        # \u300c\uff08\u5143\u3005\u306e\uff09\u30d1\u30ef\u30fcN\u306b\u3059\u308b/\u306b\u306a\u308b\u300d\u306f\u5bfe\u8c61\u306e\u30d1\u30ef\u30fc\u6761\u4ef6\u3067\u306f\u306a\u304f\u8a2d\u5b9a\u5024\uff08set_power/
+        # power_override\uff09\u3002\u3053\u308c\u3092\u5bfe\u8c61\u30d5\u30a3\u30eb\u30bf\u3068\u3057\u3066\u62fe\u3046\u3068\u8aa4\u3063\u3066\u5bfe\u8c61\u3092\u7d5e\u308b\uff08EB04-004
+        # \u300c\u5143\u3005\u306e\u30d1\u30ef\u30fc7000\u306b\u3059\u308b\u300d/ OP13-084\u300c\u30d1\u30ef\u30fc\u30927000\u306b\u3059\u308b\u300d\uff09\u3002\u9664\u5916\u3059\u308b\u3002
+        tail = tgt_text[m_p.end():]
+        is_set_value = (tail.startswith(_nfc("\u306b\u3059\u308b")) or tail.startswith(_nfc("\u306b\u306a\u308b"))
+                        or tail.startswith(_nfc("\u306b\u3057")))
+        if prefix_context not in ['+', '-', '\u2212', '\u2010', '\uff0b', '\uff0d'] and not is_set_value:
             val = int(m_p.group(1))
-            if m_p.group(2) == _nfc(ParserKeyword.ABOVE): tq.power_min = val
-            else: tq.power_max = val
+            if m_p.group(2) == _nfc(ParserKeyword.ABOVE):
+                tq.power_min = val
+            elif m_p.group(2) == _nfc(ParserKeyword.BELOW):
+                tq.power_max = val
+            else:
+                # \u300c\u30d1\u30ef\u30fcN\uff08\u306e\uff09\u300d\uff1d\u3061\u3087\u3046\u3069 N\uff08\u4ee5\u4e0a/\u4ee5\u4e0b\u306e\u660e\u793a\u306a\u3057\uff09\u3002\u5f93\u6765\u306f power_max=N \u306b
+                # \u5012\u308c\u300cN\u4ee5\u4e0b\u300d\u3092\u610f\u5473\u3057\u3001\u30d1\u30ef\u30fc8000\u6307\u5b9a\u306b\u30d1\u30ef\u30fc2000\u7b49\u307e\u3067\u8a72\u5f53\u3057\u3066\u3044\u305f
+                # \uff08OP16-118/OP16-003/OP16-010 \u7b49\u306e\u300c\u30d1\u30ef\u30fc8000\u306e\u30ad\u30e3\u30e9\u300d\u516c\u958b\u30fb\u53c2\u7167\uff09\u3002
+                tq.power_min = val
+                tq.power_max = val
     
     # 対象の状態修飾「レストの／アクティブの＜キャラ/カード/リーダー＞」は、アクション句
     # （「レストにする」「アクティブにならない」等）が同居していても独立に拾う。従来は

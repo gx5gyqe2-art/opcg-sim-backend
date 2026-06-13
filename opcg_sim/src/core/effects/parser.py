@@ -1209,11 +1209,15 @@ class EffectParser:
                 or _nfc("リーダーのパワー") in norm_text):
             # 特徴は《X》だけでなく『X』（『白ひげ海賊団』『B・W』等の名称系特徴）でも書かれる。
             trait_match = re.search(_nfc(r'[《<『]([^》>』]+)[》>』]'), norm_text)
-            name_match = re.search(_nfc(r'「([^」]+)」'), norm_text)
+            # リーダー名は複数併記され得る（「「サボ」か「エース」か「ルフィ」の場合」OP13-016）。
+            # findall で全て拾い、resolver はいずれか一致(OR)で判定する。re.search だと先頭名
+            # のみになり、他リーダー名のとき条件が常に不成立だった。
+            name_matches = re.findall(r'「([^」]+)」', norm_text)
             if trait_match:
                 return Condition(type=ConditionType.LEADER_TRAIT, value=trait_match.group(1), player=p, raw_text=norm_text)
-            if name_match:
-                return Condition(type=ConditionType.LEADER_NAME, value=name_match.group(1), player=p, raw_text=norm_text)
+            if name_matches:
+                val = name_matches[0] if len(name_matches) == 1 else name_matches
+                return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
             if _nfc("多色") in norm_text:
                 return Condition(type=ConditionType.LEADER_COLOR, value=_nfc("多色"), player=p, raw_text=norm_text)
             # 単色リーダー条件（「自分のリーダーが青を含む」等）

@@ -384,6 +384,17 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
             status="BATTLE_KO", duration=_duration_of(t), raw_text=t,
         )
         return Sequence(actions=[prevent, buff])
+    # 複合句「（対象）は【X】を得て、パワー±N」: キーワード付与とバフを両方生成する
+    # （grant_keyword はパワー増減を伴う句を本ルールに委ねるため、ここで拾わないと
+    #   キーワード付与が黙って脱落する。OP16-003「リーダーは【ダブルアタック】を得て、
+    #   パワー+2000」でダブルアタックが消えていた）。
+    km = _KEYWORD_GRANT_RE.search(t)
+    if km and _nfc("得") in t:
+        grant = GameAction(
+            type=ActionType.GRANT_KEYWORD, target=tq, status=km.group(1),
+            duration=_duration_of(t), raw_text=t,
+        )
+        return Sequence(actions=[grant, buff])
     return buff
 
 

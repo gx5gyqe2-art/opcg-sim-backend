@@ -639,8 +639,12 @@ class EffectResolver:
         elif condition.type == ConditionType.LEADER_NAME:
             if not target_player.leader: return False
             expected_name = condition.value
+            leader_master = target_player.leader.master
             if isinstance(expected_name, str):
-                return target_player.leader.master.matches_name(expected_name, partial=True)
+                return leader_master.matches_name(expected_name, partial=True)
+            if isinstance(expected_name, (list, tuple)):
+                # 複数リーダー名の OR（「サボ」か「エース」か「ルフィ」: OP13-016）。
+                return any(leader_master.matches_name(n, partial=True) for n in expected_name)
             return False
 
         elif condition.type == ConditionType.LEADER_COLOR:
