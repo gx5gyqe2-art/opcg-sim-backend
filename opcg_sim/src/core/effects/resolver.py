@@ -673,6 +673,13 @@ class EffectResolver:
                 return not source_card.is_rest
             if sv == "ENTERED_THIS_TURN":
                 return getattr(source_card, 'is_newly_played', False)
+            if sv == "IN_BATTLE":
+                # 「このリーダー/キャラが（相手のキャラと）バトルしている場合」(OP12-020): 進行中の
+                # バトル(active_battle)に source_card が攻撃側/防御側として関与しているか。
+                ab = self.game_manager.active_battle
+                if not ab:
+                    return False
+                return source_card in (ab.get("attacker"), ab.get("target"))
             if isinstance(sv, tuple) and sv[0] == "POWER":
                 is_my_turn = (player == self.game_manager.turn_player)
                 power = source_card.get_power(is_my_turn)

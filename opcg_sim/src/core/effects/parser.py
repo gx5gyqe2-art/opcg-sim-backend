@@ -1187,6 +1187,11 @@ class EffectParser:
             op = CompareOperator.GE if cost_sum_m.group(2) == _nfc('以上') else CompareOperator.LE
             return Condition(type=ConditionType.FIELD_COST_SUM, operator=op, value=thr, player=p, raw_text=norm_text)
 
+        # 「（このリーダー/キャラが）（相手のキャラと）バトルしている場合」(OP12-020): 進行中の
+        # バトル文脈の条件。FIELD_COUNT（「キャラ」+「いる」を含むため誤分類しうる）より先に捌く。
+        if _nfc("バトルしている") in norm_text:
+            return Condition(type=ConditionType.SOURCE_STATE, value="IN_BATTLE", player=p, raw_text=norm_text)
+
         # 盤面のキャラ枚数（「自分の（レストの／特徴《X》の／コストN以上の）キャラがM枚以上いる」
         # 「…キャラがいる」）。数値が「フィルタ(コストN以上)」と「枚数(M枚)」で混在し得るため、
         # 閾値は必ず「M枚」側から取り、フィルタは parse_target に委ねる（保守的な分類）。
