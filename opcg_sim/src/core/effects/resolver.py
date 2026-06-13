@@ -3,7 +3,7 @@ import json
 import os
 from dataclasses import asdict
 from ...models.effect_types import (
-    EffectNode, GameAction, Sequence, Branch, Choice, ValueSource, Condition, TargetQuery
+    EffectNode, GameAction, Sequence, Branch, Choice, ValueSource, Condition, TargetQuery, _nfc
 )
 from ...models.enums import ActionType, Zone, TriggerType, ConditionType, CompareOperator, Player, CardType
 from ...utils.logger_config import log_event
@@ -550,7 +550,15 @@ class EffectResolver:
         target_val = condition.value if isinstance(condition.value, int) else 0
         
         if condition.type == ConditionType.DON_COUNT:
-            current_val = len(target_player.don_active) + len(target_player.don_rested) + len(target_player.don_attached_cards)
+            # 「付与されているドン!!がある/ない/合計N枚以上」はプレイヤーの付与中ドン(attached)
+            # のみを数える（OP13-076 神避 / OP12-015 / OP12-024 / OP13-112）。場のドン総数ではない。
+            # ただし「選んだキャラのコストが…付与ドンの枚数と同じ」のような対象固有の動的比較
+            # （パーサ未対応で DON_COUNT に退化）は別物なので除外する（OP15-031）。
+            _raw = condition.raw_text or ""
+            if _nfc("付与") in _raw and _nfc("同じ") not in _raw:
+                current_val = len(target_player.don_attached_cards)
+            else:
+                current_val = len(target_player.don_active) + len(target_player.don_rested) + len(target_player.don_attached_cards)
             if target_val == 0 and isinstance(condition.value, str):
                 nums = re.findall(r'\d+', condition.raw_text)
                 target_val = int(nums[0]) if nums else 0

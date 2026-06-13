@@ -1111,13 +1111,28 @@ def _prevent_leave(ctx: ParseContext) -> Optional[GameAction]:
         return None
     # 主語の修飾（「自分の特徴《X》を持つキャラすべては」等）を保全する。
     # 従来は常に SOURCE 固定で、他カードを守る範囲保護が消失していた（EB04-057 等）。
-    return GameAction(
+    prevent = GameAction(
         type=ActionType.PREVENT_LEAVE,
         target=_subject_target(t),
         status=status,
         duration=_duration_of(t),
         raw_text=t,
     )
+    # 複合句「（このキャラは）相手の効果で場を離れず、パワー±N」: 除去保護とパワーバフを
+    # 両方生成する（エネル OP15-060/118 等）。power_buff は priority 60 で本ルール(64)に
+    # 負けるため、ここで拾わないと「、パワー±N」が黙って脱落していた。
+    pow_m = re.search(_nfc(rf"パワー({_SIGN}[\d０-９]+)"), t)
+    if pow_m and _nfc("にする") not in t:
+        x = _to_int(pow_m.group(1))
+        buff = GameAction(
+            type=ActionType.BUFF,
+            target=_buff_target(t),
+            value=_per_n_value(t, x) or ValueSource(base=x),
+            duration=_duration_of(t),
+            raw_text=t,
+        )
+        return Sequence(actions=[prevent, buff])
+    return prevent
 
 
 # ---------------------------------------------------------------------------
