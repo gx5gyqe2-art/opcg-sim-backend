@@ -1032,8 +1032,15 @@ def _rest_char_or_don(ctx: ParseContext) -> Optional[EffectNode]:
     if not m:
         return None
     char_part, don_part = m.group(1), m.group(2)
+    # 「（キャラかドン）合計N枚」の N は択一どちらの上限にも掛かる。従来はキャラ側が
+    # parse_target の既定 count=1 のままで、ドン側だけ N を拾っていた（OP12-037
+    # 「キャラかドン!!合計2枚」でキャラを2枚レストにできなかった）。N をキャラ側にも反映する。
+    n_match = re.search(_nfc(r'合計[ 　]*([\d０-９]+)[ 　]*枚'), t) or \
+        re.search(_nfc(r'([\d０-９]+)[ 　]*枚'), don_part)
+    total_n = _to_int(n_match.group(1)) if n_match else 1
     char_tq = parse_target(char_part)
     char_tq.is_rest = None
+    char_tq.count = total_n
     if _nfc("まで") in t:
         char_tq.is_up_to = True
     char_action = GameAction(type=ActionType.REST, target=char_tq, raw_text=char_part)
@@ -1041,7 +1048,7 @@ def _rest_char_or_don(ctx: ParseContext) -> Optional[EffectNode]:
     don_status = "OPPONENT" if _nfc("相手") in char_part else _don_opponent(t)
     don_action = GameAction(
         type=ActionType.REST_DON,
-        value=ValueSource(base=_don_count(don_part)),
+        value=ValueSource(base=total_n),
         status=don_status,
         raw_text=don_part,
     )
