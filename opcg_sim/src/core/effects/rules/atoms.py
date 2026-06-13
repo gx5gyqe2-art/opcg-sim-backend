@@ -328,8 +328,13 @@ def _per_n_value(t: str, x: int) -> Optional[ValueSource]:
     if re.search(_nfc(r"(捨てた|戻した|KOした|置いた|レストにした)"), counted):
         return ValueSource(base=0, dynamic_source="PREV_ACTION_COUNT",
                            divisor=n, multiplier=x)
-    # 「付与されているドンN枚につき」「カード名の異なる…」は別機構（対象固有/名前集合）のため未対応。
-    if re.search(_nfc(r"(付与されている|異なる)"), counted):
+    # 「付与されているドンN枚につき」は別機構（対象固有）のため未対応＝フラット値のまま。
+    # 「カード名の異なるキャラN枚につき」は parse_target が is_unique_name を立てるので
+    # COUNT_QUERY（重複名を除外して計数）で正しくスケールする（OP16-034 ルフィ）。
+    # それ以外の「異なる」（異なる色 等）は未対応のため None。
+    if re.search(_nfc(r"付与されている"), counted):
+        return None
+    if _nfc("異なる") in counted and not re.search(_nfc(r"カード名(?:の|が)異なる"), counted):
         return None
     if re.fullmatch(_nfc(r"(自分の)?トラッシュ(にあるカード)?"), counted):
         return ValueSource(base=0, dynamic_source="COUNT_REFERENCE",
