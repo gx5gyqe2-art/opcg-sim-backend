@@ -226,6 +226,8 @@ class ConditionType(Enum):
     OPPONENT_REMOVAL = auto()
     # C8「公開したカードが宣言したコストと同じ場合」: 宣言コスト＝公開カードのコスト
     DECLARED_COST_MATCH = auto()
+    # 「お互いのライフの合計枚数が N 以下/以上」: 自分＋相手のライフ合計（P-088 等）
+    LIFE_COUNT_BOTH = auto()
 
 class ParserKeyword(str, Enum):
     DON = "ドン"

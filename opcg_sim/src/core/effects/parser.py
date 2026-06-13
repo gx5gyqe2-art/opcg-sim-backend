@@ -1186,6 +1186,12 @@ class EffectParser:
         if _nfc("ライフと手札の合計") in norm_text or _nfc("手札とライフの合計") in norm_text:
             return Condition(type=ConditionType.LIFE_HAND_SUM, operator=operator, value=value, player=p, raw_text=norm_text)
 
+        # お互い（両者）のライフ合計（「お互いのライフの合計枚数が5枚以下の場合」P-088 等）。
+        # 「ライフ」を含むため LIFE_COUNT より先に判定する。従来は p=SELF の LIFE_COUNT に
+        # 退化し、自分のライフのみで判定して条件が緩くなっていた。
+        if _nfc("お互い") in norm_text and _nfc("ライフ") in norm_text and _nfc("合計") in norm_text:
+            return Condition(type=ConditionType.LIFE_COUNT_BOTH, operator=operator, value=value, player=Player.SELF, raw_text=norm_text)
+
         if _nfc("ライフ") in norm_text:
             return Condition(type=ConditionType.LIFE_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
@@ -1203,11 +1209,15 @@ class EffectParser:
                 or _nfc("リーダーのパワー") in norm_text):
             # 特徴は《X》だけでなく『X』（『白ひげ海賊団』『B・W』等の名称系特徴）でも書かれる。
             trait_match = re.search(_nfc(r'[《<『]([^》>』]+)[》>』]'), norm_text)
-            name_match = re.search(_nfc(r'「([^」]+)」'), norm_text)
+            # リーダー名は複数併記され得る（「「サボ」か「エース」か「ルフィ」の場合」OP13-016）。
+            # findall で全て拾い、resolver はいずれか一致(OR)で判定する。re.search だと先頭名
+            # のみになり、他リーダー名のとき条件が常に不成立だった。
+            name_matches = re.findall(r'「([^」]+)」', norm_text)
             if trait_match:
                 return Condition(type=ConditionType.LEADER_TRAIT, value=trait_match.group(1), player=p, raw_text=norm_text)
-            if name_match:
-                return Condition(type=ConditionType.LEADER_NAME, value=name_match.group(1), player=p, raw_text=norm_text)
+            if name_matches:
+                val = name_matches[0] if len(name_matches) == 1 else name_matches
+                return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
             if _nfc("多色") in norm_text:
                 return Condition(type=ConditionType.LEADER_COLOR, value=_nfc("多色"), player=p, raw_text=norm_text)
             # 単色リーダー条件（「自分のリーダーが青を含む」等）

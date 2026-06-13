@@ -328,8 +328,13 @@ def _per_n_value(t: str, x: int) -> Optional[ValueSource]:
     if re.search(_nfc(r"(捨てた|戻した|KOした|置いた|レストにした)"), counted):
         return ValueSource(base=0, dynamic_source="PREV_ACTION_COUNT",
                            divisor=n, multiplier=x)
-    # 「付与されているドンN枚につき」「カード名の異なる…」は別機構（対象固有/名前集合）のため未対応。
-    if re.search(_nfc(r"(付与されている|異なる)"), counted):
+    # 「付与されているドンN枚につき」は別機構（対象固有）のため未対応＝フラット値のまま。
+    # 「カード名の異なるキャラN枚につき」は parse_target が is_unique_name を立てるので
+    # COUNT_QUERY（重複名を除外して計数）で正しくスケールする（OP16-034 ルフィ）。
+    # それ以外の「異なる」（異なる色 等）は未対応のため None。
+    if re.search(_nfc(r"付与されている"), counted):
+        return None
+    if _nfc("異なる") in counted and not re.search(_nfc(r"カード名(?:の|が)異なる"), counted):
         return None
     if re.fullmatch(_nfc(r"(自分の)?トラッシュ(にあるカード)?"), counted):
         return ValueSource(base=0, dynamic_source="COUNT_REFERENCE",
@@ -384,6 +389,17 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
             status="BATTLE_KO", duration=_duration_of(t), raw_text=t,
         )
         return Sequence(actions=[prevent, buff])
+    # 複合句「（対象）は【X】を得て、パワー±N」: キーワード付与とバフを両方生成する
+    # （grant_keyword はパワー増減を伴う句を本ルールに委ねるため、ここで拾わないと
+    #   キーワード付与が黙って脱落する。OP16-003「リーダーは【ダブルアタック】を得て、
+    #   パワー+2000」でダブルアタックが消えていた）。
+    km = _KEYWORD_GRANT_RE.search(t)
+    if km and _nfc("得") in t:
+        grant = GameAction(
+            type=ActionType.GRANT_KEYWORD, target=tq, status=km.group(1),
+            duration=_duration_of(t), raw_text=t,
+        )
+        return Sequence(actions=[grant, buff])
     return buff
 
 

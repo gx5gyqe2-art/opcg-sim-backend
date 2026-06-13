@@ -601,6 +601,14 @@ class EffectResolver:
             current_val = sum(c.current_cost for c in target_player.field)
             return self._compare(current_val, condition.operator, target_val)
 
+        elif condition.type == ConditionType.LIFE_COUNT_BOTH:
+            # 「お互いのライフの合計枚数が N 以上/以下」（P-088 等）。両プレイヤーのライフ合計。
+            current_val = len(self.game_manager.p1.life) + len(self.game_manager.p2.life)
+            if target_val == 0 and isinstance(condition.value, str):
+                nums = re.findall(r'\d+', condition.raw_text)
+                target_val = int(nums[0]) if nums else 0
+            return self._compare(current_val, condition.operator, target_val)
+
         elif condition.type == ConditionType.LIFE_HAND_SUM:
             # 「（自分の）ライフと手札の合計枚数が N 以上/以下」（OP04-040）。
             current_val = len(target_player.life) + len(target_player.hand)
@@ -631,8 +639,12 @@ class EffectResolver:
         elif condition.type == ConditionType.LEADER_NAME:
             if not target_player.leader: return False
             expected_name = condition.value
+            leader_master = target_player.leader.master
             if isinstance(expected_name, str):
-                return expected_name in target_player.leader.master.name
+                return leader_master.matches_name(expected_name, partial=True)
+            if isinstance(expected_name, (list, tuple)):
+                # 複数リーダー名の OR（「サボ」か「エース」か「ルフィ」: OP13-016）。
+                return any(leader_master.matches_name(n, partial=True) for n in expected_name)
             return False
 
         elif condition.type == ConditionType.LEADER_COLOR:
@@ -699,7 +711,8 @@ class EffectResolver:
                 return self._compare(power, condition.operator, sv[1])
             if isinstance(sv, tuple) and sv[0] == "NAME":
                 # 置換の対象指定（「自分の「X」がKOされる場合」OP12-061）: 離れるカードが名前 X か。
-                return sv[1] in (source_card.master.name or "")
+                # 本来名だけでなくルール上の別名も照合（EB04-038 ロシナンテ&ロー=トラファルガー・ロー）。
+                return source_card.master.matches_name(sv[1], partial=True)
             if isinstance(sv, tuple) and sv[0] == "COST":
                 # 置換の対象指定（「元々のコストN以上のキャラがKOされる」EB03-001）: 離脱カードの
                 # 元々コスト（master.cost）を比較する。
@@ -726,8 +739,8 @@ class EffectResolver:
                 char_name, sub = char_val
                 if isinstance(sub, str) and sub in ("IS_RESTED", "IS_ACTIVE"):
                     # 状態付き: 「X」がレスト/アクティブ
-                    candidates = [c for c in target_player.field if char_name in c.master.name]
-                    if target_player.leader and char_name in target_player.leader.master.name:
+                    candidates = [c for c in target_player.field if c.master.matches_name(char_name, partial=True)]
+                    if target_player.leader and target_player.leader.master.matches_name(char_name, partial=True):
                         candidates.append(target_player.leader)
                     if not candidates:
                         return False
@@ -737,14 +750,14 @@ class EffectResolver:
                 else:
                     # 枚数指定: (char_name, count_thr)
                     count_thr = sub
-                    count = sum(1 for c in target_player.field if char_name in c.master.name)
-                    if target_player.leader and char_name in target_player.leader.master.name:
+                    count = sum(1 for c in target_player.field if c.master.matches_name(char_name, partial=True))
+                    if target_player.leader and target_player.leader.master.matches_name(char_name, partial=True):
                         count += 1
                     return self._compare(count, condition.operator, count_thr)
             elif isinstance(char_val, str):
                 char_name = char_val
-                count = sum(1 for c in target_player.field if char_name in c.master.name)
-                if target_player.leader and char_name in target_player.leader.master.name:
+                count = sum(1 for c in target_player.field if c.master.matches_name(char_name, partial=True))
+                if target_player.leader and target_player.leader.master.matches_name(char_name, partial=True):
                     count += 1
                 if condition.operator == CompareOperator.GE:
                     return count >= 1
@@ -855,8 +868,8 @@ class EffectResolver:
                 cost_op = val.get("cost_op", CompareOperator.LE)
                 if not self._compare(card.master.cost, cost_op, val["cost"]):
                     return False
-            # カード名チェック（完全一致）
-            if "name" in val and card.master.name != val["name"]:
+            # カード名チェック（本来名＋ルール上の別名）
+            if "name" in val and not card.master.matches_name(val["name"]):
                 return False
             # カードタイプチェック
             if "card_type" in val:

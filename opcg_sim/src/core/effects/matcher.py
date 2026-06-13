@@ -262,10 +262,24 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if m_p:
         start_idx = m_p.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
-        if prefix_context not in ['+', '-', '\u2212', '\u2010', '\uff0b', '\uff0d']:
+        # \u300c\uff08\u5143\u3005\u306e\uff09\u30d1\u30ef\u30fcN\u306b\u3059\u308b/\u306b\u306a\u308b\u300d\u306f\u5bfe\u8c61\u306e\u30d1\u30ef\u30fc\u6761\u4ef6\u3067\u306f\u306a\u304f\u8a2d\u5b9a\u5024\uff08set_power/
+        # power_override\uff09\u3002\u3053\u308c\u3092\u5bfe\u8c61\u30d5\u30a3\u30eb\u30bf\u3068\u3057\u3066\u62fe\u3046\u3068\u8aa4\u3063\u3066\u5bfe\u8c61\u3092\u7d5e\u308b\uff08EB04-004
+        # \u300c\u5143\u3005\u306e\u30d1\u30ef\u30fc7000\u306b\u3059\u308b\u300d/ OP13-084\u300c\u30d1\u30ef\u30fc\u30927000\u306b\u3059\u308b\u300d\uff09\u3002\u9664\u5916\u3059\u308b\u3002
+        tail = tgt_text[m_p.end():]
+        is_set_value = (tail.startswith(_nfc("\u306b\u3059\u308b")) or tail.startswith(_nfc("\u306b\u306a\u308b"))
+                        or tail.startswith(_nfc("\u306b\u3057")))
+        if prefix_context not in ['+', '-', '\u2212', '\u2010', '\uff0b', '\uff0d'] and not is_set_value:
             val = int(m_p.group(1))
-            if m_p.group(2) == _nfc(ParserKeyword.ABOVE): tq.power_min = val
-            else: tq.power_max = val
+            if m_p.group(2) == _nfc(ParserKeyword.ABOVE):
+                tq.power_min = val
+            elif m_p.group(2) == _nfc(ParserKeyword.BELOW):
+                tq.power_max = val
+            else:
+                # \u300c\u30d1\u30ef\u30fcN\uff08\u306e\uff09\u300d\uff1d\u3061\u3087\u3046\u3069 N\uff08\u4ee5\u4e0a/\u4ee5\u4e0b\u306e\u660e\u793a\u306a\u3057\uff09\u3002\u5f93\u6765\u306f power_max=N \u306b
+                # \u5012\u308c\u300cN\u4ee5\u4e0b\u300d\u3092\u610f\u5473\u3057\u3001\u30d1\u30ef\u30fc8000\u6307\u5b9a\u306b\u30d1\u30ef\u30fc2000\u7b49\u307e\u3067\u8a72\u5f53\u3057\u3066\u3044\u305f
+                # \uff08OP16-118/OP16-003/OP16-010 \u7b49\u306e\u300c\u30d1\u30ef\u30fc8000\u306e\u30ad\u30e3\u30e9\u300d\u516c\u958b\u30fb\u53c2\u7167\uff09\u3002
+                tq.power_min = val
+                tq.power_max = val
     
     # 対象の状態修飾「レストの／アクティブの＜キャラ/カード/リーダー＞」は、アクション句
     # （「レストにする」「アクティブにならない」等）が同居していても独立に拾う。従来は
@@ -276,7 +290,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if rest_mod:
         tq.is_rest = (rest_mod.group(1) == _nfc("レスト"))
     elif (_nfc("にする") not in tgt_text and _nfc("にし") not in tgt_text
-            and _nfc("ならない") not in tgt_text and _nfc("にできる") not in tgt_text):
+            and _nfc("ならない") not in tgt_text and _nfc("にでき") not in tgt_text
+            and _nfc("にされ") not in tgt_text):
+        # 「にでき(る/ない)」「にされ(る/ない)」も対象フィルタではなくアクション句。
+        # 「レストにできない/されない」(OP16-032 ハンコック)で is_rest=True が付き、
+        # レスト済みの相手キャラのみ対象になっていた（本来はアクティブなキャラを縛る）。
         if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
         elif _nfc("レスト") in tgt_text: tq.is_rest = True
         elif _nfc("アクティブ") in tgt_text: tq.is_rest = False
@@ -434,30 +452,28 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
         # 「《特徴》か「名前」」= 特徴 OR 名前（両者の AND ではない）。OP11-022「《海王類》かメガロ」が
         # trait∧name の AND になり対象が常に空になっていた。フラグ時は OR で照合する。
+        # 名前照合はカードの本来名＋ルール上の別名(matches_name)で行う。NAME_PARTIAL は
+        # 「「X」を含む」等の部分一致。_p*: 別名対応のローカルヘルパ。
+        _partial = "NAME_PARTIAL" in query.flags
+        def _name_in(names):  # noqa: E306
+            return bool(names) and any(card.master.matches_name(n, partial=_partial) for n in names)
+        def _excluded():  # noqa: E306
+            return query.exclude_names and any(card.master.matches_name(en) for en in query.exclude_names)
         if "NAME_OR_TYPE" in query.flags and query.names and query.card_type:
             type_ok = card.master.type.name in query.card_type
-            if "NAME_PARTIAL" in query.flags:
-                name_ok = any(n in card.master.name for n in query.names)
-            else:
-                name_ok = card.master.name in query.names
+            name_ok = _name_in(query.names)
             if not (type_ok or name_ok): continue
-            if query.exclude_names and card.master.name in query.exclude_names: continue
+            if _excluded(): continue
         elif "TRAIT_OR_NAME" in query.flags and (query.names or query.traits):
-            if "NAME_PARTIAL" in query.flags:
-                name_ok = bool(query.names) and any(n in card.master.name for n in query.names)
-            else:
-                name_ok = bool(query.names) and card.master.name in query.names
+            name_ok = _name_in(query.names)
             trait_ok = bool(query.traits) and any(t in card.master.traits for t in query.traits)
             if not (name_ok or trait_ok): continue
-            if query.exclude_names and card.master.name in query.exclude_names: continue
+            if _excluded(): continue
         else:
             if query.names:
-                if "NAME_PARTIAL" in query.flags:
-                    if not any(n in card.master.name for n in query.names): continue
-                else:
-                    if card.master.name not in query.names: continue
+                if not _name_in(query.names): continue
 
-            if query.exclude_names and card.master.name in query.exclude_names: continue
+            if _excluded(): continue
 
             if query.traits and not any(t in card.master.traits for t in query.traits):
                 # 「《特徴》か【トリガー】を持つ」は特徴 OR トリガー所持。特徴不一致でも
