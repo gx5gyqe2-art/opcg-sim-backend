@@ -42,7 +42,15 @@
 
 ## 2. 検出された候補（カテゴリ別・優先度順）
 
-### 2.1 【高・バグ確定】PER_TURN_LIMIT_GAP — 置換/保護系【ターン1回】が未 enforce（18枚）
+### 2.1 【高・バグ確定→修正済み】PER_TURN_LIMIT_GAP — 置換/保護系【ターン1回】が未 enforce（18枚）
+
+> **修正済み（このイテレーションで対応）**: 下記の根本原因 1・2 を両方修正。検証:
+> 新規テスト `tests/test_turn_limit_replacement.py`（置換3枚＋保護OP10-118）が緑、
+> 既存スイート 733 passed / 1 skipped / 2 xfailed、`full_card_audit` ゲート 0、
+> 挙動ベースライン（`full_card_baseline.json`）・golden 不変（初回発動は変わらないため）。
+> オラクル検出は **18 → 1**（残 1=OP10-118 の inline「ターンに1回」表記で AST 未付与だが、
+> 挙動は raw_text フォールバックで enforce 済み＝表現上の軽微な負債のみ）。
+
 
 **症状**: テキストに【ターン1回】があるが、パース済み能力の条件に `TURN_LIMIT` が無い。
 18 枚中 **15 枚が「代わりに…」置換効果**（KO/場を離れる の置換）、残り 3 枚も保護/リダイレクト系の常在。
@@ -60,6 +68,14 @@
 3. 置換/保護経路（`GameManager._active_replacement` `gamestate.py:1527` / `_active_protection`）は
    `resolve_ability` を通らず、`ability_used_this_turn` を**参照も加算もしない**。
 → 置換/保護系の【ターン1回】は**1ターンに何度でも発動**する（公式は1回まで）＝**実バグ**。
+
+**修正内容**:
+1. `parser.py:480-483`: 自己置換（「このキャラ」）で `final_condition = None` としていたのを
+   `final_condition = turn_limit_cond` に変更し、【ターン1回】の使用回数制限を保持する。
+2. `gamestate.py`: `_active_replacement` / `_active_protection` に per-turn 使用回数の enforce を追加
+   （`_ability_turn_limit` で条件 TURN_LIMIT または raw_text の【ターン1回】表記から上限を取得し、
+   `ability_used_this_turn` を参照/加算。ターン境界の `reset_turn_status(clear_usage=True)` でリセット）。
+   inline「ターンに1回」（parser が拾わない表記）も raw_text 併用でカバー。
 
 **該当カード（18）**:
 EB01-008 リトルオーズJr. / OP05-032 ピーカ / OP05-100 エネル / OP07-029 バジル・ホーキンス /
@@ -101,7 +117,7 @@ xfail で固定済み。
 
 | 優先 | カテゴリ | 件数 | 判定 | 次アクション |
 |---|---|---|---|---|
-| **高** | PER_TURN_LIMIT_GAP | 18 | **バグ確定**（置換/保護系【ターン1回】の未 enforce、代表3枚で再現） | enforce 実装＋パーサで TURN_LIMIT 付与 |
+| **高** | PER_TURN_LIMIT_GAP | 18→**修正済** | **バグ確定→修正**（置換/保護系【ターン1回】を enforce、検出 18→1） | 完了（残1は表現負債・挙動は正常） |
 | 中 | UP_TO_GAP（精査後） | ~49 | 要レビュー（カード選択の 0枚可 取りこぼし疑い） | 検出器改良→個別確認 |
 | 低 | MISSING_ACTION | 4 | **誤検知**（公開=LOOK_LIFE で実装済み） | 監査の動詞マップ補正 |
 | 低 | UP_TO_GAP（DON文言） | ~154 | **誤検知**（検出器ノイズ） | 検出器で除外 |

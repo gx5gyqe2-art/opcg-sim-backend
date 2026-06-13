@@ -478,7 +478,10 @@ class EffectParser:
                     raw_text=_nfc(text),
                 )
                 if _nfc("このキャラ") in _nfc(text):
-                    final_condition = None
+                    # 自己置換は除去ゲート（「KOされる場合」）が status に包含されるため
+                    # 条件は不要だが、【ターン1回】の使用回数制限だけは保持する
+                    # （None で捨てると per-turn 制限が落ちて同一ターンに複数回発動してしまう）。
+                    final_condition = turn_limit_cond
                 trigger = TriggerType.PASSIVE
 
             return Ability(
