@@ -188,6 +188,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if tq.traits and tq.names and re.search(_nfc(r'か[「『《]'), tgt_text):
         tq.flags.add("TRAIT_OR_NAME")
 
+    # 「「名前」か<種類>」= 名前 OR 種類（OP12-071「「サンジ」かイベント」）。従来は names と
+    # card_type が AND になり、両立しない条件（サンジという名のイベントは無い）で対象が常に
+    # 空になっていた。「」か」直後に種類語が続く場合に OR とみなす。
+    if tq.names and tq.card_type and re.search(_nfc(r'」か(?:イベント|キャラクター|キャラ|リーダー|ステージ)'), tgt_text):
+        tq.flags.add("NAME_OR_TYPE")
+
     attrs = re.findall(_nfc(ParserKeyword.ATTRIBUTE + r'[((]([^))]+)[))]'), tgt_text)
     tq.attributes.extend(attrs)
     
@@ -261,7 +267,15 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             if m_p.group(2) == _nfc(ParserKeyword.ABOVE): tq.power_min = val
             else: tq.power_max = val
     
-    if (_nfc("にする") not in tgt_text and _nfc("にし") not in tgt_text
+    # 対象の状態修飾「レストの／アクティブの＜キャラ/カード/リーダー＞」は、アクション句
+    # （「レストにする」「アクティブにならない」等）が同居していても独立に拾う。従来は
+    # 「ならない/にする/にし/にできる」を含むと丸ごと抑制され、OP15-077 雷龍
+    # 「相手のレストの…キャラ…アクティブにならない」でレスト対象制限が脱落し、
+    # アクティブなキャラも対象にできていた。
+    rest_mod = re.search(_nfc(r'(レスト|アクティブ)の[^。、]*?(?:キャラ|カード|リーダー)'), tgt_text)
+    if rest_mod:
+        tq.is_rest = (rest_mod.group(1) == _nfc("レスト"))
+    elif (_nfc("にする") not in tgt_text and _nfc("にし") not in tgt_text
             and _nfc("ならない") not in tgt_text and _nfc("にできる") not in tgt_text):
         if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
         elif _nfc("レスト") in tgt_text: tq.is_rest = True
@@ -381,7 +395,10 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             continue
         
         if query.card_type and card.master.type.name not in query.card_type:
-            continue
+            # NAME_OR_TYPE（「「名前」か<種類>」）は種類不一致でも名前一致なら通すため、
+            # ここでは弾かず下の OR 判定に委ねる。
+            if "NAME_OR_TYPE" not in query.flags:
+                continue
 
         # 【修正】card.master.colors (List[Color]) の各値を確認するように変更
         if query.colors:
@@ -417,7 +434,15 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
         # 「《特徴》か「名前」」= 特徴 OR 名前（両者の AND ではない）。OP11-022「《海王類》かメガロ」が
         # trait∧name の AND になり対象が常に空になっていた。フラグ時は OR で照合する。
-        if "TRAIT_OR_NAME" in query.flags and (query.names or query.traits):
+        if "NAME_OR_TYPE" in query.flags and query.names and query.card_type:
+            type_ok = card.master.type.name in query.card_type
+            if "NAME_PARTIAL" in query.flags:
+                name_ok = any(n in card.master.name for n in query.names)
+            else:
+                name_ok = card.master.name in query.names
+            if not (type_ok or name_ok): continue
+            if query.exclude_names and card.master.name in query.exclude_names: continue
+        elif "TRAIT_OR_NAME" in query.flags and (query.names or query.traits):
             if "NAME_PARTIAL" in query.flags:
                 name_ok = bool(query.names) and any(n in card.master.name for n in query.names)
             else:

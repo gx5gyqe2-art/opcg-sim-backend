@@ -8,9 +8,24 @@
 
 ## 1. テスト戦略・原則
 
-- **テキスト/公式ルール準拠の期待挙動をアサートする**（現実装に迎合しない）。
-- 期待と現挙動が一致 → 通常テスト。差異がある → `@pytest.mark.xfail`（解消で xpass→strict なら赤に転じ、マーカーを外して通常テスト化）。
-- **挙動を変えたら全カード挙動ベースライン（`full_card_baseline.json`）を再生成**し、差分をレビューして品質ゲートを通す。
+- **効果の意味的正しさ（テキスト準拠で正しく発動するか）は、自動テストではなく
+  「デッキ単位の手動検証」で担保する**（→ §8）。本書のテスト群は
+  「**壊れていないこと**」——クラッシュ／カード消失／場超過を起こさない、
+  既存挙動が退行しない——の保証に役割を絞る。
+- **挙動を変えたら全カード挙動ベースライン（`full_card_baseline.json`）を再生成**し、
+  差分をレビューして品質ゲートを通す。
+
+### ⚠️ 注意：「成功するが何もしない」効果の死角
+`RULE_PROCESSING`（「ルール上、〜になる」等の常在ルール注記）は**実行時 no-op** で、
+resolver は `success = True` を返す。エラー・フォールバック・OTHER のいずれにもならず、
+**構造監査も挙動ベースラインも素通りする**。「パースできた＝動く」ではない。
+
+- 実例：リーダー OP15-058 エネル「ルール上、自分のドン!!デッキは6枚になる」が
+  長期間 **未適用（10枚のまま）** だった。`RULE_PROCESSING` が no-op で、ドン!!デッキ
+  枚数は別経路（`GameManager` 構築時）で初期化し直さないと既定の10枚のままになるため。
+- 教訓：`RULE_PROCESSING` に落ちる能力は、**別経路でルールが強制されているかを必ず
+  実機で確認**する。セットアップ／経済ルール（ドン!!デッキ枚数等）は per-ability の
+  盤面差分の外側にあるので、**ゲーム不変条件として個別テストを足す**こと。
 
 ### 実行方法（重要）
 logger が `sys.stdout` を直接掴むため、pytest はキャプチャ無効で実行する。
@@ -40,21 +55,19 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 |---|---|
 | `tests/test_rule_online.py` | ルール対戦のルーム生成→デッキ選択→開始→アクションの WS 同期、開始の ready ガード（`load_deck_mixed` をモックし Firestore 非依存） |
 
-### カード効果（パーサ/ゴールデン/全カード）
+### カード効果（パーサ/ゴールデン/全カード・回帰/安定性）
 | ファイル | 役割 |
 |---|---|
 | `tests/test_parser.py` | レガシーパーサ単体 |
 | `tests/test_golden.py` / `tests/golden/*` | ゴールデンコーパス（AST 指紋の部分一致） |
 | `tests/test_full_card_audit.py` | 全カード構造不変条件ゲート（EXCEPTION/CARD_LOSS/TEMP_LEAK=0） |
 | `tests/test_full_card_baseline.py` | 全カード挙動ベースライン回帰（`full_card_baseline.json` と一致） |
-| `tests/test_mistarget_guard.py` | ミスターゲット/lift 検出器の回帰ガード |
-| `tests/test_quality_gates.py` | NO_CHANGE/WARN/SELECT_MISMATCH のラチェット |
 | `tests/test_cpu_selfplay.py` | CPU 対 CPU 自己対戦の完走・決定論・clone 非破壊・合法手適用・インバリアント検出 |
 
 ### リーダー効果（全137枚）
 | ファイル | 役割 |
 |---|---|
-| `tests/test_leader_*.py`（13本） | 全リーダーの挙動テスト。テキスト準拠の期待をアサートし、差異は xfail。方針は [`_TEST_GUIDE.md`](leader_specs/_TEST_GUIDE.md) |
+| `tests/test_leader_*.py`（13本） | 全リーダーの挙動テスト（既存の回帰アンカー）。方針は [`_TEST_GUIDE.md`](leader_specs/_TEST_GUIDE.md) |
 | `tests/leader_test_helpers.py` | リーダー挙動テスト用ヘルパ（盤面構築・対話駆動・観測） |
 | `tests/engine_helpers.py` | 最小 GameManager 構築ヘルパ（`make_game`/`make_instance`/`make_master`/`action`） |
 
@@ -64,39 +77,25 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 
 | ツール | 役割 |
 |---|---|
-| `tests/effect_diagnostics.py` | 未対応句/OTHER ランキングの可視化（`--top N`） |
-| `tests/mistarget_diagnostics.py` | ミスターゲット/lift 候補の検出（`--top N`） |
 | `tests/compare_parsers.py` | レガシー vs V2 の全カード差分（退行検知） |
-| `tests/effect_coverage.py` | 全カード実行カバレッジ（SKIP/ERROR/INTERACTIVE/EXECUTED/NO_CHANGE） |
-| `tests/text_execution_audit.py` | テキスト↔実行不一致の全カード監査（フラグ別） |
-| `tests/interactive_target_audit.py` | INTERACTIVE 対象と TargetQuery/テキストの照合 |
 | `tests/full_card_audit.py` | 全カード構造不変条件検証＋挙動ベースライン生成（`--regen` で更新） |
-| `tests/cpu_selfplay.py` | 決定論的 CPU 対 CPU 自己対戦（効果検証ハーネス）。`--seed N`/`--games K` で再現実行し、各ステップでインバリアント検出（FIELD_LIMIT/DON_CONSERVATION/UUID_DUPLICATE/STUCK/TEMP_ZONE_LEAK 等）、違反時はトレース末尾とリプロ seed を出力。`--out trace.jsonl` で機械可読トレース、`--verbose` で 1 手ずつ表示。`--p1-leader/--p2-leader` でリーダー指定 |
-| `tests/leader_spec_probe.py` | リーダー1枚のテキスト/AST要約/実行観測の出力（`<ID>`/`--set`/`--all`/`--json`） |
-| `tests/condition_synth.py` / `tests/battle_coverage.py` | 条件合成発動 / 戦闘発火カバレッジ |
+| `tests/cpu_selfplay.py` | 決定論的 CPU 対 CPU 自己対戦。`--seed N`/`--games K` で再現実行し、各ステップでインバリアント検出（FIELD_LIMIT/DON_CONSERVATION/UUID_DUPLICATE/STUCK/TEMP_ZONE_LEAK 等）、違反時はトレース末尾とリプロ seed を出力。`--out trace.jsonl` で機械可読トレース、`--verbose` で 1 手ずつ表示。`--p1-leader/--p2-leader` でリーダー指定 |
+| `tests/leader_spec_probe.py` | リーダー1枚のテキスト/AST要約/実行観測の出力（`<ID>`/`--set`/`--all`/`--json`）。手動検証（§8）の補助に使う |
 
 ---
 
-## 4. ルール追加・検証フロー
+## 4. 変更・回帰検証フロー
 
 ```bash
-# 1) 未対応句/ミスターゲット候補の確認
-OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py --top 40
-OPCG_LOG_SILENT=1 python tests/mistarget_diagnostics.py --top 40
-
-# 2) ゴールデンケース追加（tests/golden/golden_cases.py に text と期待 summary）
-OPCG_LOG_SILENT=1 python tests/test_golden.py
-
-# 3) ルール追加（opcg_sim/src/core/effects/rules/atoms.py に @rule）
+# 1) ルール追加（opcg_sim/src/core/effects/rules/atoms.py に @rule）
 #    エンジン実行が要るなら gamestate/resolver も実装し test_effects_engine に検証追加
 #    コアルール（ターン/戦闘等）の変更は gamestate.py を直接修正し test_rules_* に検証追加
 
-# 4) 回帰・退行・カバレッジ
+# 2) 回帰・退行
 OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 OPCG_LOG_SILENT=1 python tests/compare_parsers.py        # レガシー比の新規OTHER（退行）
-OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py     # 命中率 / OTHER 数
 
-# 5) 全カード構造不変条件・挙動ベースライン
+# 3) 全カード構造不変条件・挙動ベースライン
 OPCG_LOG_SILENT=1 python tests/full_card_audit.py
 OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的に変えた場合に更新
 ```
@@ -112,9 +111,6 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 | `tests/full_card_audit.py` | EXCEPTION / CARD_LOSS / TEMP_LEAK = 0 |
 | `tests/test_full_card_baseline.py` | `full_card_baseline.json` と一致 |
 | `tests/compare_parsers.py` | 新規 OTHER（退行）= 0 |
-| `tests/test_quality_gates.py` | 設定閾値以内 |
-| `tests/interactive_target_audit.py` | 疑い 0 |
-| `tests/condition_synth.py` / `tests/battle_coverage.py` / `tests/effect_coverage.py` | ERROR 0 |
 
 挙動を変更したら差分をレビューのうえ `full_card_audit.py --regen` でベースライン更新し、上記ゲートを通す。
 
@@ -126,10 +122,29 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 - **コアルール修正**: `tests/test_rules_summoning_field_limit.py`（9件）。召喚酔い/速攻、場5体上限（強制トラッシュ＝`FIELD_OVERFLOW_TRASH`）を検証。
 - これらの修正に伴い `full_card_baseline.json` を更新（`OP06-086`: ON_PLAY で場が6体になる挙動が5体上限により `INTERACTIVE`＝選択待ちへ変化）。
 
-全スイート基準値: **711 passed / 1 skipped / 2 xfailed**（既知差異 ISSUES.md の2件が xfail）。
-
 ---
 
 ## 7. 既知の挙動差異
 リーダー効果のテキスト準拠期待と現挙動の差異は [`docs/leader_specs/ISSUES.md`](leader_specs/ISSUES.md) に集約
 （各項目は対応する `tests/test_leader_*.py` の xfail で固定）。差異が解消されればマーカーを外して通常テスト化する。
+
+---
+
+## 8. 効果の正しさ検証（デッキ単位の手動方式）
+
+効果の意味的正しさ（テキスト準拠で正しく発動するか）は、自動オラクル／監査では検出
+しきれない細部が多い。そこで**実際に組んだデッキを起点に、カードを1枚ずつ実装と
+突合する手動方式**を採用する。
+
+手順:
+
+1. フロントの**デッキビルダーからデッキを「検証向け Markdown」でエクスポート**する
+   （リーダー＋各カードを「枚数 番号 名前 / 効果テキスト / トリガー」で列挙）。
+2. 各カードについて、効果テキストを実装（`parser.py` / `resolver.py` /
+   `rules/atoms.py` / `matcher.py` / `gamestate.py`）の挙動と突合する。
+   AST のダンプだけで判断せず、**実機（実効パワー・条件評価・対象選択・盤面差分）
+   まで確認**する（§1 の `RULE_PROCESSING` 死角に注意）。
+3. バグ確定なら修正し、可能なら同型テンプレートのカードへ横展開する。挙動を変えた
+   場合は §4・§5 の回帰フロー（ベースライン再生成・退行ゼロ・構造ゲート）を通す。
+4. リーダーの常在「ルール」効果（ドン!!デッキ枚数等）は per-ability 差分に現れない
+   ため、**ゲーム不変条件として個別テストを足す**。

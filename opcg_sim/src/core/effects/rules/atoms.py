@@ -279,7 +279,10 @@ def _duration_of(text: str) -> str:
     # 相手ターン終了＝自分ターン開始と同境界。「次の自分のターン終了時まで」(1枚のみ)
     # は厳密には1ターン長いが近似する）。従来は INSTANT に落ち、ターン境界処理で
     # 即消えていた。
-    if re.search(_nfc(r"次の(自分の|相手の)?ターン(開始|終了)時まで"), text):
+    # 「次の(自分の/相手の)エンドフェイズ終了時まで」も相手ターン明けの境界で失効するため
+    # UNTIL_NEXT_TURN_END に写像する。従来は「ターン」にしか一致せず INSTANT に落ち、
+    # 防御用の【ブロッカー】付与等(OP15-060 等)が相手ターンまで持続せず無意味化していた。
+    if re.search(_nfc(r"次の(自分の|相手の)?(ターン|エンドフェイズ)(開始|終了)時まで"), text):
         return "UNTIL_NEXT_TURN_END"
     return "INSTANT"
 
@@ -1111,13 +1114,28 @@ def _prevent_leave(ctx: ParseContext) -> Optional[GameAction]:
         return None
     # 主語の修飾（「自分の特徴《X》を持つキャラすべては」等）を保全する。
     # 従来は常に SOURCE 固定で、他カードを守る範囲保護が消失していた（EB04-057 等）。
-    return GameAction(
+    prevent = GameAction(
         type=ActionType.PREVENT_LEAVE,
         target=_subject_target(t),
         status=status,
         duration=_duration_of(t),
         raw_text=t,
     )
+    # 複合句「（このキャラは）相手の効果で場を離れず、パワー±N」: 除去保護とパワーバフを
+    # 両方生成する（エネル OP15-060/118 等）。power_buff は priority 60 で本ルール(64)に
+    # 負けるため、ここで拾わないと「、パワー±N」が黙って脱落していた。
+    pow_m = re.search(_nfc(rf"パワー({_SIGN}[\d０-９]+)"), t)
+    if pow_m and _nfc("にする") not in t:
+        x = _to_int(pow_m.group(1))
+        buff = GameAction(
+            type=ActionType.BUFF,
+            target=_buff_target(t),
+            value=_per_n_value(t, x) or ValueSource(base=x),
+            duration=_duration_of(t),
+            raw_text=t,
+        )
+        return Sequence(actions=[prevent, buff])
+    return prevent
 
 
 # ---------------------------------------------------------------------------

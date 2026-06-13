@@ -163,6 +163,11 @@ class GameManager:
         self.p2 = player2
         self.turn_player = self.p1
         self.opponent = self.p2
+        # リーダーの「ルール上、自分のドン!!デッキはN枚になる」(OP15-058 エネル等) を適用する。
+        # RULE_PROCESSING は実行時 no-op のため、ドン!!デッキ枚数はここで初期化し直さないと
+        # 既定の10枚のままになり、「ドン!!が6枚以下」シナジーが機能しなくなる。
+        self._apply_leader_don_deck_rule(self.p1)
+        self._apply_leader_don_deck_rule(self.p2)
         self.turn_count = 0
         # このターン中に発生したイベントの回数（EVENT_THIS_TURN 条件用）。ターン開始でクリア。
         # 例: "DON_RETURNED"（ドン!!デッキへ返却）/ "CHAR_LEFT_BY_OWN_EFFECT" / "NAVY_DISCARD" /
@@ -188,6 +193,19 @@ class GameManager:
         # RETURN_DON（ドン!!返却）でプレイヤーが選んだ戻すドン!!の uuid 一覧。
         # resolver が選択解決時にセットし、apply_action_to_engine が消費する。
         self._return_don_selection: Optional[List[str]] = None
+
+    def _apply_leader_don_deck_rule(self, player: Player) -> None:
+        """リーダーの「ルール上、自分のドン!!デッキはN枚になる」をドン!!デッキ枚数に反映する。
+        該当する常在ルールが無ければ既定（10枚）のまま。エネル OP15-058 = 6枚。"""
+        leader = getattr(player, "leader", None)
+        if not leader or not getattr(leader, "master", None):
+            return
+        text = _nfc(getattr(leader.master, "effect_text", "") or "")
+        m = re.search(_nfc(r"ドン(?:!!|‼)デッキは(\d+)枚"), text)
+        if not m:
+            return
+        n = int(m.group(1))
+        player.don_deck = [DonInstance(owner_id=player.name) for _ in range(n)]
 
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """

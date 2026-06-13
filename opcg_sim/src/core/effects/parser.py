@@ -1142,10 +1142,17 @@ class EffectParser:
                     _nfc('より少ない'): CompareOperator.LT,
                 }.get(op_m.group(1) if op_m else '', CompareOperator.GE)
                 return Condition(type=ConditionType.DON_COUNT_COMPARE, operator=cmp_op, player=Player.SELF, raw_text=norm_text)
+            # 「（自分の）付与されているドン‼がある／ない場合」= 付与ドン（attached）の存在条件。
+            # 場のドン総数ではなく付与中のドンのみを数える（resolver が raw_text の「付与」で分岐）。
+            # 従来は下の既定 EQ 0（場のドン==0）に落ち、神避 OP13-076 の主効果が常に不発だった。
+            if not nums and _nfc("付与") in norm_text:
+                if _nfc("ない") in norm_text:
+                    return Condition(type=ConditionType.DON_COUNT, operator=CompareOperator.EQ, value=0, player=p, raw_text=norm_text)
+                if _nfc("ある") in norm_text:
+                    return Condition(type=ConditionType.DON_COUNT, operator=CompareOperator.GE, value=1, player=p, raw_text=norm_text)
+
             # 明示の数値が無い存在条件「（場の）ドン‼がある場合」=1枚以上 /「ない場合」=0枚。
             # 既定（nums 空）の EQ 0 は「0枚と等しい」になり「ある場合」を逆転させていた（OP13-003）。
-            # 「付与されているドン‼がある場合」は場のドン枚数ではなく付与ドン（attached）の条件なので
-            # ここでは触らない（既存挙動を維持し、別途 HAS_DON 系で扱うべき領域）。
             if not nums and _nfc("付与") not in norm_text:
                 if _nfc("ない") in norm_text:
                     return Condition(type=ConditionType.DON_COUNT, operator=CompareOperator.EQ, value=0, player=p, raw_text=norm_text)
