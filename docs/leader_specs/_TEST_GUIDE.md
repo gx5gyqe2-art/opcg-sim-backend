@@ -1,27 +1,23 @@
 # リーダー効果 pytest 化ガイド
 
 仕様書(`docs/leader_specs/<SET>.md`)のテストケースを pytest に落として
-**リグレッションを固定**するためのルール。
+**挙動を固定**するためのルール。
 
 ## 基本方針
-- **常にテキスト準拠の「正しい挙動」をアサートする**（現実装に合わせない）。
-- 判定ラベルでマーカーを決める:
-  - ✅ 問題なし → 通常テスト（現状パスするはず）
-  - 🐛 バグ → `@pytest.mark.xfail(strict=True, reason="...")`
-    （現実装では失敗する＝xfailで緑。修正されると xpass→strictで赤になり、
-    マーカー除去を促せる＝バグ修正の検知器になる）
-  - ⚠️ 要確認 → まず通常テストで書いて実行する。
-    - パスすれば通常テストのまま残す。
-    - 現状失敗する/対話が複雑で安定検証できない場合は
-      `@pytest.mark.xfail(strict=False, reason="要確認: ...")` にする
-      （strict=False なので xpass でも緑。誤検知を避ける）。
+- **常にテキスト準拠の期待挙動をアサートする**（現実装に合わせない）。
+- 現挙動との関係でマーカーを決める:
+  - 期待挙動と現挙動が一致 → 通常テスト。
+  - 現挙動が期待と異なる → `@pytest.mark.xfail(strict=True, reason="差異の内容")`。
+    差異が解消されると xpass→strict で赤になるため、マーカーを外して通常テスト化できる。
+  - 汎用盤面で安定検証できない／対話が複雑な場合 → まず通常テストで書き、不安定なら
+    `@pytest.mark.xfail(strict=False, reason="要確認: ...")`（strict=False なので xpass でも緑）。
 
 ## 実行コマンド（**`-s` 必須**。付けないとログ干渉で I/O エラー）
 ```
 OPCG_LOG_SILENT=1 python -m pytest tests/test_leader_<set>.py -q -s -p no:cacheprovider
 ```
 **合格条件**: 出力が `passed` / `xfailed` のみ。`failed` や `xpassed` を残さない
-（xpassed が出たら、それは✅扱いにしてマーカーを外すか、strict=False に変える）。
+（xpassed が出たら、マーカーを外して通常テスト化するか、strict=False に変える）。
 
 ## ヘルパ API（`tests/leader_test_helpers.py`）
 ```python
@@ -60,13 +56,13 @@ assert leader_power(p1) == 7000
 ## 命名・構成
 - ファイル: `tests/test_leader_<set>.py`（例 `test_leader_op01.py`, `test_leader_st01_10.py`）
 - 関数: `test_<id小文字>_<能力概要>()`。1能力につき代表1〜数ケース。
-  条件分岐がある効果は「条件成立／不成立」を別ケースにすると 🐛 が明確になる。
+  条件分岐がある効果は「条件成立／不成立」を別ケースにすると差異が明確になる。
 - 各テストに docstring で「カードID / 能力 / 期待挙動」を1行。
-- `@pytest.mark.xfail` の reason には ISSUES.md 由来の原因（例「matcher.py:209 の不等号反転」）を書く。
+- `@pytest.mark.xfail` の reason には期待と現挙動の差異を具体的に書く。
 
-## 例（バグの xfail）
+## 例（期待と現挙動が異なる場合の xfail）
 ```python
-@pytest.mark.xfail(strict=True, reason="OP10-001: パワー条件『7000以上』がpower_max(以下)に反転(matcher.py:209)")
+@pytest.mark.xfail(strict=True, reason="OP10-001: パワー条件『7000以上』が現挙動では power_max(以下) として扱われる")
 def test_op10_001_active_don_requires_power_ge_7000():
     """OP10-001 起動メイン: 自パワー7000以上のキャラがいる場合のみドン2枚アクティブ。"""
     gm, p1, p2, L = build("OP10-001")
