@@ -15,10 +15,15 @@ def _char(name="キャラ", owner="P1", **kw):
 
 
 def _setup_main(gm, p1):
-    """MAIN フェイズで p1 が手番、検証はバイパス。"""
+    """MAIN フェイズで p1 が手番、検証はバイパス。
+
+    最初のターン(turn_count<=2)はアタック禁止のため、攻撃を伴う検証では
+    通常進行中のターン(turn_count=3)を既定とする。
+    """
     gm.turn_player = p1
     gm.opponent = gm.p2
     gm.phase = Phase.MAIN
+    gm.turn_count = 3
     gm._validate_action = lambda *a, **k: True
 
 
@@ -65,6 +70,53 @@ def test_leader_not_affected_by_summoning_sickness():
     p2.field.append(target)
     gm.declare_attack(p1.leader, target)
     assert gm.active_battle is not None
+
+
+# ──────────────── 最初のターンのアタック禁止 ────────────────
+
+def test_first_player_cannot_attack_on_turn1():
+    """先攻の最初のターン(turn_count=1)はリーダーでもアタックできない。"""
+    gm, p1, p2 = make_game()
+    _setup_main(gm, p1)
+    gm.turn_count = 1
+    with pytest.raises(ValueError, match="最初のターン"):
+        gm.declare_attack(p1.leader, p2.leader)
+
+
+def test_second_player_cannot_attack_on_turn2():
+    """後攻の最初のターン(turn_count=2)もリーダー・キャラともにアタックできない。"""
+    gm, p1, p2 = make_game()
+    gm.turn_player = p2
+    gm.opponent = p1
+    gm.phase = Phase.MAIN
+    gm.turn_count = 2
+    gm._validate_action = lambda *a, **k: True
+    with pytest.raises(ValueError, match="最初のターン"):
+        gm.declare_attack(p2.leader, p1.leader)
+
+
+def test_attack_allowed_from_turn3():
+    """先攻の2ターン目(turn_count=3)以降はアタックできる。"""
+    gm, p1, p2 = make_game()
+    _setup_main(gm, p1)  # turn_count=3 を設定
+    assert gm.turn_count == 3
+    gm.declare_attack(p1.leader, p2.leader)
+    assert gm.active_battle is not None
+
+
+def test_first_turn_attack_excluded_from_legal_actions():
+    """get_legal_actions は最初のターン(turn_count<=2)に ATTACK 手を列挙しない。"""
+    for tc in (1, 2):
+        gm, p1, p2 = make_game()
+        gm.turn_player = p1 if tc == 1 else p2
+        gm.opponent = p2 if tc == 1 else p1
+        gm.phase = Phase.MAIN
+        gm.turn_count = tc
+        actor = gm.turn_player
+        # MAIN フェイズ + 手番設定で get_pending_request() が MAIN_ACTION を返す。
+        moves = gm.get_legal_actions(actor)
+        assert all(m.get("action_type") != "ATTACK" for m in moves), \
+            f"turn_count={tc} で ATTACK 手が列挙された"
 
 
 # ──────────────── 場のキャラ5体上限（強制トラッシュ） ────────────────
