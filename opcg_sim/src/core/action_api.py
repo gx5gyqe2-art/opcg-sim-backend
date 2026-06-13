@@ -11,7 +11,7 @@
 from typing import Any, Dict, List, Optional
 
 from ..models.models import CONST
-from ..models.enums import TriggerType
+from ..models.enums import TriggerType, Phase
 from ..utils.logger_config import log_event
 
 _C_TO_S = CONST.get('c_to_s_interface', {})
@@ -147,7 +147,13 @@ def apply_battle_action(manager, player, action_type: str, card_uuid: Optional[s
         manager.apply_counter(player, counter_card)
     elif action_type == BACT_PASS:
         manager.action_events.append({"type": "PASS", "player": pid, "message": "パス"})
-        manager.apply_counter(player, None)
+        # パスはフェーズで意味が異なる。ブロックステップでのパスは「ブロックしない」であり、
+        # その後カウンターステップへ進む必要がある。従来は常に apply_counter(None) を呼んで
+        # 即 resolve_attack していたため、ブロックしないとカウンターステップが飛ばされていた。
+        if manager.phase == Phase.BLOCK_STEP:
+            manager.handle_block(None)        # ブロックしない → カウンターステップへ
+        else:
+            manager.apply_counter(player, None)  # カウンターしない → 攻撃解決
     else:
         raise ValueError(f"不明な戦闘アクションです: {action_type}")
     return manager.action_events
