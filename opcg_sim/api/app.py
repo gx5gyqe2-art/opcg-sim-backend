@@ -2,6 +2,7 @@ import os
 import uuid
 import sys
 import json
+import random
 import traceback
 import asyncio
 from datetime import datetime
@@ -273,6 +274,20 @@ def load_deck_mixed(source_str: str, owner_id: str):
 @app.options("/api/game/create")
 async def options_game_create(): return {"status": "ok"}
 
+def _resolve_first_player(value: Any, player1: Player, player2: Player) -> Optional[Player]:
+    """リクエストの first_player 指定を先行 Player に解決する。
+      "p1"/"p2" : 明示指定（ソロでプレイヤーが選択）
+      "random"  : ランダム（CPU/対戦のコイントス用。結果は turn_info に反映される）
+      その他/None: 従来通り既定（start_game 側で p1 先行）
+    """
+    if value == "random":
+        return random.choice([player1, player2])
+    if value == "p1":
+        return player1
+    if value == "p2":
+        return player2
+    return None
+
 @app.post("/api/game/create")
 async def game_create(req: Any = Body(...)):
     try:
@@ -286,7 +301,9 @@ async def game_create(req: Any = Body(...)):
             p2_source = req.get("cpu_deck")
         p1_leader, p1_cards = load_deck_mixed(p1_source, req.get("p1_name", "P1")); p2_leader, p2_cards = load_deck_mixed(p2_source, req.get("p2_name", "P2"))
         player1 = Player(req.get("p1_name", "P1"), p1_cards, p1_leader); player2 = Player(req.get("p2_name", "P2"), p2_cards, p2_leader)
-        manager = GameManager(player1, player2); manager.start_game(); GAMES[game_id] = manager
+        # 先行プレイヤー: ソロは "p1"/"p2"、CPU は "random"（コイントス）。未指定は既定。
+        first_player = _resolve_first_player(req.get("first_player"), player1, player2)
+        manager = GameManager(player1, player2); manager.start_game(first_player); GAMES[game_id] = manager
         if vs_cpu:
             difficulty = req.get("cpu_difficulty", "normal")
             if difficulty not in ("easy", "normal", "hard"):
@@ -611,9 +628,12 @@ async def rule_action(req: Dict[str, Any] = Body(...)):
             p1_leader, p1_cards = load_deck_mixed(room["decks"]["p1"], "p1")
             p2_leader, p2_cards = load_deck_mixed(room["decks"]["p2"], "p2")
             player1 = Player("p1", p1_cards, p1_leader); player2 = Player("p2", p2_cards, p2_leader)
-            manager = GameManager(player1, player2); manager.start_game()
+            # 対戦モードの先行はランダム（コイントス）。結果は turn_info で両クライアントへ broadcast。
+            first_player = random.choice([player1, player2])
+            manager = GameManager(player1, player2); manager.start_game(first_player)
             GAMES[game_id] = manager
             room["status"] = "PLAYING"
+            log_event("INFO", "rule.coin", f"First player: {first_player.name}", player="system")
             log_event("INFO", "rule.start", f"Rule game started: {game_id}", player="system")
         else:
             return {"success": False, "error": f"Unknown rule action: {act}"}

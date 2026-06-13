@@ -434,9 +434,11 @@ class GameManager:
         KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
         KEY_OPTIONS = pending_props.get('OPTIONS', 'options')
         
-        # マリガンフェーズ中は手番の決まっていないプレイヤー順に要求
+        # マリガンは先行プレイヤー(turn_player)から順に要求する。
         if self.phase == Phase.MULLIGAN:
-            for player in [self.p1, self.p2]:
+            mulligan_order = ([self.turn_player, self.opponent]
+                              if self.turn_player and self.opponent else [self.p1, self.p2])
+            for player in mulligan_order:
                 if player.name not in self.mulligan_done:
                     hand_candidates = [c.to_dict() for c in player.hand]
                     return {
