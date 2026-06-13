@@ -15,6 +15,10 @@ from .effects.matcher import get_target_cards
 
 Card = CardInstance
 
+# 場のキャラクター上限（公式ルール）。ステージ(owner.stage)・ドン!!は含まない。
+# 6体目を登場させた場合は自分のキャラ1体を選んでトラッシュして5体に戻す（強制トラッシュ）。
+FIELD_LIMIT = 5
+
 # 自己制限（self_cannot）の制限キー。parser が RULE_PROCESSING + status=これらで生成し、
 # apply_action_to_engine が player.restrictions に記録、各アクション地点で enforce する。
 SELF_RESTRICTION_KEYS = {
@@ -225,7 +229,7 @@ class GameManager:
 
         if self.active_interaction:
             action_type = self.active_interaction.get("action_type")
-            fe_action = "SEARCH_AND_SELECT" if action_type == "SELECT_TARGET" else action_type
+            fe_action = "SEARCH_AND_SELECT" if action_type in ("SELECT_TARGET", "FIELD_OVERFLOW_TRASH") else action_type
             
             candidates = self.active_interaction.get("candidates", [])
             candidate_dicts = [c.to_dict() for c in candidates] if candidates else []
@@ -308,6 +312,23 @@ class GameManager:
             if not self.active_interaction and self.active_battle \
                     and self.phase not in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER):
                 self._advance_battle_triggers()
+            return
+
+        # 場のキャラ上限超過の強制トラッシュ。発生源カードを持たない（ルール処理）ため、
+        # 汎用 source 解決より先に処理する。選んだキャラをトラッシュ（KOではないので
+        # 「KO時」誘発は起こさない）。
+        if action_type == "FIELD_OVERFLOW_TRASH":
+            owner = self.p1 if self.p1.name == continuation.get("owner_name") else self.p2
+            selected = payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])
+            self.active_interaction = None
+            for uid in selected:
+                card = next((c for c in owner.field if c.uuid == uid), None)
+                if card:
+                    self.move_card(card, Zone.TRASH, owner)
+            self.refresh_passive_state()
+            # 複数体同時超過などでまだ超過していれば再度要求する（保険）。
+            if len(owner.field) > FIELD_LIMIT:
+                self._suspend_for_field_overflow(owner)
             return
 
         source_uuid = continuation["source_card_uuid"]
@@ -470,6 +491,14 @@ class GameManager:
                 and self.phase not in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER)):
             self._advance_battle_triggers()
 
+        # ON_PLAY 等の対話が片付いた後で場のキャラ上限超過が残っていれば強制トラッシュ。
+        # 誘発/バトル進行（上記）を横取りしないよう最後に置き、1プレイヤーずつ逐次化する。
+        if not self.active_interaction:
+            for pl in (self.p1, self.p2):
+                if len(pl.field) > FIELD_LIMIT:
+                    self._enforce_field_limit(pl)
+                    break
+
     def refresh_passive_state(self) -> None:
         """盤面依存の常在効果（パワー/コスト/キーワード）を現在の盤面で再計算する。
         API のアクション境界や対話完了時に呼び、トラッシュ枚数等の変化を即時反映する
@@ -478,6 +507,32 @@ class GameManager:
             return
         if self.turn_player is not None:
             self._apply_passive_effects(self.turn_player)
+
+    def _enforce_field_limit(self, owner: Player) -> None:
+        """owner のキャラが上限(FIELD_LIMIT)を超えていれば、超過分を選んでトラッシュさせる。
+        他に進行中の対話があるときは起動しない（中断のネストを避ける）。"""
+        if self.active_interaction:
+            return
+        if len(owner.field) <= FIELD_LIMIT:
+            return
+        self._suspend_for_field_overflow(owner)
+
+    def _suspend_for_field_overflow(self, owner: Player) -> None:
+        """場のキャラ超過分をトラッシュさせる選択を中断要求として立てる。
+        candidates は新規登場分を含む owner の全キャラ（どれをトラッシュしてもよい）。"""
+        excess = len(owner.field) - FIELD_LIMIT  # 通常は 1
+        self.active_interaction = {
+            "player_id": owner.name,
+            "action_type": "FIELD_OVERFLOW_TRASH",
+            "message": f"場のキャラクターが上限({FIELD_LIMIT})を超えました。トラッシュするキャラを{excess}枚選んでください。",
+            "candidates": list(owner.field),
+            "selectable_uuids": [c.uuid for c in owner.field],
+            "constraints": {"min": excess, "max": excess},
+            "can_skip": False,
+            "continuation": {"owner_name": owner.name, "count": excess},
+        }
+        log_event("INFO", "game.field_overflow",
+                  f"Field overflow: {owner.name} must trash {excess} character(s)", player=owner.name)
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
@@ -890,6 +945,12 @@ class GameManager:
         if "ATTACK_DISABLE" in attacker.flags or "ATTACK_DISABLE" in attacker.timed_flags: raise ValueError("このカードは効果によりアタックできません。")
         if "CANNOT_REST" in attacker.timed_flags: raise ValueError("このカードは効果によりレストにできないためアタックできません。")
         if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
+        # 召喚酔い: 登場したターンのキャラは攻撃できない。ただし「速攻」を持てば可。
+        # リーダーは is_newly_played=False のため影響を受けない。
+        if (attacker.master.type == CardType.CHARACTER
+                and attacker.is_newly_played
+                and not attacker.has_keyword("速攻")):
+            raise ValueError("登場したターンのキャラクターは攻撃できません（速攻を除く）。")
         # 自己制限（self_cannot）:「リーダーにアタックできない」。相手リーダーへの攻撃宣言を弾く。
         if (target.master.type == CardType.LEADER
                 and attacker_owner is not None
@@ -1152,6 +1213,9 @@ class GameManager:
                     if ability.trigger == TriggerType.ON_PLAY:
                         self.resolve_ability(player, ability, source_card=card)
             self._apply_passive_effects(player)
+            # 場のキャラ上限超過なら強制トラッシュ。ON_PLAY が中断中(active_interaction)の
+            # ときは _enforce_field_limit が no-op し、対話完了時に resolve_interaction 末尾が拾う。
+            self._enforce_field_limit(player)
 
     def _has_rested_play(self, player: Player) -> bool:
         """player が「自分のキャラはレストで登場する」PASSIVE を持つか（RESTED_PLAY マーカー）。"""
@@ -1926,6 +1990,8 @@ class GameManager:
                         if ability.trigger == TriggerType.ON_PLAY:
                             self.resolve_ability(owner, ability, source_card=target)
                 self._apply_passive_effects(owner)
+                # 効果による登場でも場のキャラ上限超過なら強制トラッシュ（ガード付き）。
+                self._enforce_field_limit(owner)
                 success = True
             elif act_name == "DECK_BOTTOM":
                 # 並び替え/上下選択を要する場合は resolver が ARRANGE_DECK で先に中断するため、

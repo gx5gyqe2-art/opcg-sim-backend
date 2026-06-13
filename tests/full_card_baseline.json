@@ -1113,7 +1113,7 @@
 "OP06-083|PASSIVE": "- | pw0,kw0,rs0,co0",
 "OP06-084|ON_KO": "- | pw1000,kw0,rs0,co0",
 "OP06-085|YOUR_TURN": "- | pw0,kw0,rs0,co0",
-"OP06-086|ON_PLAY": "p1_hand:6→5, p1_field:3→6, p1_trash:10→8 | pw0,kw0,rs1,co0",
+"OP06-086|ON_PLAY": "INTERACTIVE",
 "OP06-088|PASSIVE": "- | pw0,kw0,rs0,co0",
 "OP06-089|ON_KO": "p1_trash:10→13, p1_deck:20→17 | pw0,kw0,rs0,co0",
 "OP06-089|ON_PLAY": "p1_hand:6→5, p1_field:3→4, p1_trash:10→13, p1_deck:20→17 | pw0,kw0,rs0,co0",
