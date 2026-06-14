@@ -332,3 +332,99 @@ def test_char_or_don_rest_end_to_end():
         else:
             break
     assert f1.is_rest and f2.is_rest  # 相手キャラ2枚がレスト
+
+
+# --- マルコ（白ひげ） -----------------------------------------------------
+
+def _all_actions(node, action_type):
+    """ノード木から指定 ActionType の GameAction をすべて返す。"""
+    from opcg_sim.src.models.effect_types import GameAction, Sequence, Branch, Choice
+    out = []
+    if isinstance(node, GameAction):
+        if node.type == action_type:
+            out.append(node)
+    elif isinstance(node, Sequence):
+        for a in node.actions:
+            out += _all_actions(a, action_type)
+    elif isinstance(node, Branch):
+        for a in (node.if_true, node.if_false):
+            if a is not None:
+                out += _all_actions(a, action_type)
+    elif isinstance(node, Choice):
+        for a in node.options:
+            out += _all_actions(a, action_type)
+    return out
+
+
+def test_marco_uta_hand_cost_reduction():
+    """ST23-001 ウタ: 「手札のこのカードは、パワー10000以上のキャラがいる場合、コスト-4」は
+    場に条件を満たすキャラがいる間だけ手札のコストが下がる（FIELD_COUNT 条件で評価）。"""
+    gm, p1, _ = game("OP08-002", "OP08-002")
+    uta = inst("ST23-001")
+    p1.hand.append(uta)
+    gm.refresh_passive_state()
+    assert uta.current_cost == 6  # 条件未成立では素のコスト
+    p1.field.append(inst("OP13-042"))  # パワー12000
+    gm.refresh_passive_state()
+    assert uta.current_cost == 2  # 6 - 4
+
+
+def test_marco_sacchi_hand_cost_reduction():
+    """OP16-005 サッチ: 「パワー8000以上の『白ひげ海賊団』キャラがいる場合、コスト-3」。"""
+    gm, p1, _ = game("OP08-002", "OP08-002")
+    sacchi = inst("OP16-005")
+    p1.hand.append(sacchi)
+    gm.refresh_passive_state()
+    assert sacchi.current_cost == 8
+    p1.field.append(inst("OP16-004"))  # クリエル＝8000・白ひげ海賊団
+    gm.refresh_passive_state()
+    assert sacchi.current_cost == 5  # 8 - 3
+
+
+def test_marco_namur_targets_original_power():
+    """OP16-010 ナミュール: 「相手の元々のパワー2000以下のキャラ」は印刷時パワーで判定し、
+    バフ/デバフ後の現在パワーでは絞らない（ORIGINAL_POWER フラグ）。"""
+    gm, p1, p2 = game("OP08-002", "OP08-002")
+    tq = inst("OP16-010").master.abilities[0].effect.target
+    assert "ORIGINAL_POWER" in tq.flags and tq.power_max == 2000
+    small = inst("OP16-010", "P2")   # 元々2000 → +7000 で現在9000
+    small.power_buff = 7000
+    big = inst("OP13-042", "P2")     # 元々12000 → -12000 で現在0
+    big.power_buff = -12000
+    p2.field = [small, big]
+    names = {c.master.name for c in get_target_cards(gm, tq, inst("OP16-010"))}
+    assert names == {"ナミュール"}  # 元々2000のみ該当・元々12000は現在0でも除外
+
+
+def test_marco_op13042_attaches_don_to_leader_and_char():
+    """OP13-042 エドワード: 「リーダーとキャラ1枚に…2枚ずつ」はリーダーとキャラの双方が
+    2枚ずつの受け手（従来は片方1体のみに縮退）。"""
+    eff = inst("OP13-042").master.abilities[0].effect
+    attaches = _all_actions(eff, ActionType.ATTACH_DON)
+    assert len(attaches) == 2
+    by_type = {tuple(a.target.card_type): a for a in attaches}
+    leader = by_type[("LEADER",)]
+    char = by_type[("CHARACTER",)]
+    assert leader.value.base == 2 and leader.target.count == 1
+    assert char.value.base == 2 and char.target.count == 1 and char.target.is_up_to is True
+    assert leader.status == "RESTED" and char.status == "RESTED"
+
+
+# --- ナミ（スリラーバーク） -----------------------------------------------
+
+def test_nami_slumber_revive_targets_trash_not_rest_filtered():
+    """OP14-102/110/111 スリラーバーク: 「トラッシュから…レストで登場させる」は登場状態
+    （status=RESTED）を表すだけで、対象フィルタ is_rest を立ててはならない。従来は素の
+    「レスト」部分一致で is_rest=True が立ち、トラッシュ蘇生候補（is_rest=False）が全除外
+    され蘇生が完全不発だった。"""
+    gm, p1, _ = game("OP11-041", "OP11-041")
+    p1.trash = [inst("OP14-110"), inst("OP14-111"), inst("OP14-102"),
+                inst("OP16-119")]  # 末尾は cost8/非スリラーバーク＝対象外
+    cases = [("OP14-102", 0), ("OP14-110", 1), ("OP14-111", 2)]  # 各カードの【トリガー】能力
+    for cid, idx in cases:
+        act = inst(cid).master.abilities[idx].effect
+        assert act.type == ActionType.PLAY_CARD
+        assert act.status == "RESTED"            # レスト登場は維持
+        assert act.target.is_rest is not True    # 状態フィルタは立たない
+        names = {c.master.name for c in get_target_cards(gm, act.target, inst(cid))}
+        assert names == {"ドクトル・ホグバック", "ペローナ", "クマシー"}

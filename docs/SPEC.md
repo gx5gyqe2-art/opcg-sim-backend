@@ -264,6 +264,12 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 - **全カード挙動ベースライン `full_card_baseline.json`** は現状挙動の凍結。挙動を変えたら差分をレビューして `tests/full_card_audit.py --regen` で更新する（テスト手順は TEST_SPEC §品質ゲート）。
 - **スコープ付き相手効果無効は `Player.negate_onplay_until`**（現状【登場時】(ON_PLAY)のみ）。
 - **`parser._parse_to_node` の split_pattern が Sequence 分割境界を定義**する（`。`/`その後、`/連用形 `(?<=置き)、` 等）。
+- **「手札のこのカードは、〈条件〉、コスト±N」は手札での自己コスト増減**。パーサ `_try_hand_self_cost` が
+  対象＝手札のこのカード自身（`zone=HAND`/`ref_id="self"`/flag `SELF_IN_HAND`）の COST_REDUCTION（PASSIVE）に組む。
+  場の PASSIVE 走査では手札カードを評価しないため、`_apply_passive_effects` の Step4（`_apply_hand_self_cost`）が
+  手札カードの当該能力の条件を評価し `cost_buff` を加算する（ウタ ST23-001 / サッチ OP16-005 ほか計13枚）。
+- **「元々のパワーN」指定は印刷時パワー（`master.power`）で対象を絞る**。matcher が `ORIGINAL_POWER` フラグを
+  立て、`get_power`（バフ込みの現在パワー）ではなく `master.power` と比較する（OP16-010 ナミュール等）。
 
 ### 6.1 既知の制約（エンジン・モデル化）
 

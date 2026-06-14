@@ -282,6 +282,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
                         or tail.startswith(_nfc("\u306b\u3057")))
         if prefix_context not in ['+', '-', '\u2212', '\u2010', '\uff0b', '\uff0d'] and not is_set_value:
             val = int(m_p.group(1))
+            # \u300c\u5143\u3005\u306e\u30d1\u30ef\u30fcN\u300d\u306f\u5370\u5237\u6642\u30d1\u30ef\u30fc\uff08master.power\uff09\u3067\u7d5e\u308b\u5bfe\u8c61\u6307\u5b9a\u3002\u30d0\u30d5/\u30c7\u30d0\u30d5
+            # \u3055\u308c\u305f\u73fe\u5728\u30d1\u30ef\u30fc\u3067\u306f\u306a\u304f\u539f\u5178\u5024\u3067\u5224\u5b9a\u3059\u308b\uff08OP16-010 \u30ca\u30df\u30e5\u30fc\u30eb\u300c\u76f8\u624b\u306e\u5143\u3005\u306e
+            # \u30d1\u30ef\u30fc2000\u4ee5\u4e0b\u300d/ ST23-002 \u30b7\u30e3\u30f3\u30af\u30b9 \u7b49\uff09\u3002\u30de\u30c3\u30c1\u30e3\u5074\u3067 ORIGINAL_POWER
+            # \u30d5\u30e9\u30b0\u3092\u898b\u3066 get_power \u3067\u306f\u306a\u304f master.power \u3068\u6bd4\u8f03\u3059\u308b\u3002
+            if _nfc("\u5143\u3005") in tgt_text[max(0, start_idx - 4):start_idx]:
+                tq.flags.add("ORIGINAL_POWER")
             if m_p.group(2) == _nfc(ParserKeyword.ABOVE):
                 tq.power_min = val
             elif m_p.group(2) == _nfc(ParserKeyword.BELOW):
@@ -303,10 +309,14 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.is_rest = (rest_mod.group(1) == _nfc("レスト"))
     elif (_nfc("にする") not in tgt_text and _nfc("にし") not in tgt_text
             and _nfc("ならない") not in tgt_text and _nfc("にでき") not in tgt_text
-            and _nfc("にされ") not in tgt_text):
+            and _nfc("にされ") not in tgt_text
+            and _nfc("レストで") not in tgt_text and _nfc("アクティブで") not in tgt_text):
         # 「にでき(る/ない)」「にされ(る/ない)」も対象フィルタではなくアクション句。
         # 「レストにできない/されない」(OP16-032 ハンコック)で is_rest=True が付き、
         # レスト済みの相手キャラのみ対象になっていた（本来はアクティブなキャラを縛る）。
+        # 「レストで登場/加える/追加」の「レストで」は登場状態を表すアクション修飾であり
+        # 対象フィルタではない。素の「レスト」部分一致で is_rest=True が立ち、トラッシュ等の
+        # 蘇生候補（is_rest は常に False）が全除外されていた（OP14-102/110/111 スリラーバーク蘇生）。
         if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
         elif _nfc("レスト") in tgt_text: tq.is_rest = True
         elif _nfc("アクティブ") in tgt_text: tq.is_rest = False
@@ -481,8 +491,10 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         
         if dynamic_cost_max is not None and card.current_cost > dynamic_cost_max: continue
 
-        if query.power_max is not None and card.get_power(True) > query.power_max: continue
-        if query.power_min is not None and card.get_power(True) < query.power_min: continue
+        # 「元々のパワー」指定は印刷時パワー（master.power）で判定。それ以外は現在パワー。
+        _pow = (card.master.power or 0) if "ORIGINAL_POWER" in query.flags else card.get_power(True)
+        if query.power_max is not None and _pow > query.power_max: continue
+        if query.power_min is not None and _pow < query.power_min: continue
 
         # 付与ドン枚数の下限（「ドン‼がN枚以上付与されているキャラ」OP15-001）。
         if query.min_attached_don is not None and getattr(card, "attached_don", 0) < query.min_attached_don:
