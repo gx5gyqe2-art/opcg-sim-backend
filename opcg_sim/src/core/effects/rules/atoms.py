@@ -1109,6 +1109,7 @@ def _rest_char_or_don(ctx: ParseContext) -> Optional[EffectNode]:
     # 「（キャラかドン）合計N枚」の N は択一どちらの上限にも掛かる。従来はキャラ側が
     # parse_target の既定 count=1 のままで、ドン側だけ N を拾っていた（OP12-037
     # 「キャラかドン!!合計2枚」でキャラを2枚レストにできなかった）。N をキャラ側にも反映する。
+    has_total = bool(re.search(_nfc(r'合計[ 　]*([\d０-９]+)[ 　]*枚'), t))
     n_match = re.search(_nfc(r'合計[ 　]*([\d０-９]+)[ 　]*枚'), t) or \
         re.search(_nfc(r'([\d０-９]+)[ 　]*枚'), don_part)
     total_n = _to_int(n_match.group(1)) if n_match else 1
@@ -1117,6 +1118,13 @@ def _rest_char_or_don(ctx: ParseContext) -> Optional[EffectNode]:
     char_tq.count = total_n
     if _nfc("まで") in t:
         char_tq.is_up_to = True
+    # 「（キャラかドン）合計N枚」(N≥2): キャラとドン!!の混在選択（1キャラ+1ドン 等）を許す。
+    # 単一の REST に CHAR_OR_DON フラグの混在候補を持たせる（matcher が候補プールを構築、
+    # resolver の SELECT_TARGET で最大N枚選択、REST ハンドラがキャラ/ドンを各々レストにする）。
+    # 「N枚まで」(合計でない・total=1) は混在の余地が無いため従来の Choice 近似のまま。
+    if has_total and total_n >= 2:
+        char_tq.flags = set(getattr(char_tq, "flags", set())) | {"CHAR_OR_DON"}
+        return GameAction(type=ActionType.REST, target=char_tq, raw_text=ctx.text)
     char_action = GameAction(type=ActionType.REST, target=char_tq, raw_text=char_part)
     # ドンの所有側: 「か」より前に「相手の」があれば相手のドン。
     don_status = "OPPONENT" if _nfc("相手") in char_part else _don_opponent(t)
