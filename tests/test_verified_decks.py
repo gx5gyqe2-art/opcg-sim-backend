@@ -1245,3 +1245,34 @@ def test_side_unspecified_removal_is_all():
     # 回帰防止: 「相手の…キャラ」FREEZE は OPPONENT のまま
     fr2 = actions("OP08-023", ActionType.FREEZE)
     assert fr2 and all(f.target.player == PEnum.OPPONENT for f in fr2)
+
+
+# --- G: 単発の取りこぼし（複合レストコスト / 自分か相手ライフOR） ----------
+
+def test_g_compound_self_rest_and_life_or():
+    """G残の個別取りこぼし。
+    OP06-117/OP05-089「このカード（キャラ）と〈X〉をレストにできる」は自身と X の両方をレスト
+    （従来は X だけで自身レストが脱落）。OP09-118「自分か相手のライフが0枚」は OR(自分0, 相手0)
+    （従来は相手0のみ）。"""
+    def rests(node):
+        out = []
+        def walk(n):
+            if getattr(n, "type", None) == ActionType.REST:
+                out.append(n)
+            for x in getattr(n, "actions", []) or []:
+                walk(x)
+        walk(node)
+        return out
+    # OP06-117: cost に SOURCE 自己レスト + 「エネル」レストの2つ
+    r = rests(inst("OP06-117").master.abilities[0].cost)
+    assert any(getattr(x.target, "ref_id", None) == "self" for x in r)
+    assert any("エネル" in (getattr(x.target, "names", []) or []) for x in r)
+    # OP05-089: cost に SOURCE 自己レスト + 自分キャラレスト
+    r2 = rests(inst("OP05-089").master.abilities[0].cost)
+    assert any(getattr(x.target, "ref_id", None) == "self" for x in r2)
+    assert any(x.target.card_type == ["CHARACTER"] for x in r2)
+    # OP09-118: 自分か相手のライフが0 → OR(SELF 0, OPPONENT 0)
+    c = inst("OP09-118").master.abilities[0].condition
+    assert c.type == ConditionType.OR
+    sides = {(a.player.name, a.value) for a in c.args}
+    assert ("SELF", 0) in sides and ("OPPONENT", 0) in sides

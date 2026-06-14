@@ -217,6 +217,19 @@ def _rest(ctx: ParseContext) -> Optional[GameAction]:
     # 句も対象（例:「相手の…をレストにし、このカードを手札に加える」→ 前段「…をレストにし」）。
     if not re.search(_nfc(r"レストに(する|できる|し[、。]|し$)"), t.strip()):
         return None
+    # 「この(カード/キャラ/リーダー)と〈X〉(1枚)をレストにできる」(OP06-117 方舟マクシム): 自身と X の
+    # 両方をレストにする複合コスト。従来は X（「エネル」等）だけが拾われ、自身のレストが脱落していた。
+    m_self_and = re.search(_nfc(r"この(?:カード|キャラ|リーダー)と(.+?をレストに)"), t)
+    if m_self_and:
+        other_tq = parse_target(m_self_and.group(1))
+        if _nfc("まで") in t:
+            other_tq.is_up_to = True
+        self_rest = GameAction(
+            type=ActionType.REST,
+            target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, count=1, ref_id="self"),
+            raw_text=t)
+        other_rest = GameAction(type=ActionType.REST, target=other_tq, raw_text=t)
+        return Sequence(actions=[self_rest, other_rest])
     if re.search(_nfc(r"このキャラをレスト|このリーダーをレスト"), t):
         return None  # 自己レストは rest_self_cost が担当
     # ドン!!が直接のレスト対象の場合のみ除外（「ドン!!が付与されている」等の修飾語は除外しない）

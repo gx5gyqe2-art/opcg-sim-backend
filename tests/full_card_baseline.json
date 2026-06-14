@@ -977,7 +977,7 @@
 "OP05-086|PASSIVE": "- | pw0,kw1,rs0,co0",
 "OP05-087|ON_ATTACK": "- | pw0,kw0,rs0,co0",
 "OP05-088|ACTIVATE_MAIN": "p1_trash:10→8, p1_deck:20→22 | pw0,kw0,rs1,co0",
-"OP05-089|ACTIVATE_MAIN": "- | pw0,kw0,rs1,co0",
+"OP05-089|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
 "OP05-090|ON_KO": "- | pw2000,kw0,rs0,co0",
 "OP05-090|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw2000,kw0,rs0,co0",
 "OP05-091|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
