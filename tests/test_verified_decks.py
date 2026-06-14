@@ -1205,3 +1205,43 @@ def test_power_sum_max_ko_constraint():
     got = res._resolve_targets(p1, ko.target, inst("OP09-018", "P1"))
     assert sum(c.master.power or 0 for c in got) <= 4000
     assert all((c.master.power or 0) <= 4000 for c in got)
+
+
+# --- 側未指定の「すべて」/KO スコープ --------------------------------------
+
+def test_side_unspecified_removal_is_all():
+    """側の明示が無い「コストN以下のキャラ(すべて)をKO」「お互いの…アクティブにならない」は
+    両プレイヤーが対象（ALL）。従来は KO が SELF 既定で自分のキャラだけ、FREEZE が OPPONENT 固定で
+    相手だけ、になっていた（OP05-040/OP06-081/ST08-005/ST27-005）。"""
+    from opcg_sim.src.models.enums import Player as PEnum
+
+    def actions(cid, atype):
+        out = []
+        def walk(n):
+            if getattr(n, "type", None) == atype:
+                out.append(n)
+            for x in getattr(n, "actions", []) or []:
+                walk(x)
+            for k in ("if_true", "if_false"):
+                s = getattr(n, k, None)
+                if s:
+                    walk(s)
+            for x in getattr(n, "options", []) or []:
+                walk(x)
+        for ab in inst(cid).master.abilities:
+            if ab.cost:
+                walk(ab.cost)
+            walk(ab.effect)
+        return out
+
+    for cid in ["OP06-081", "ST08-005", "ST27-005"]:
+        kos = actions(cid, ActionType.KO)
+        assert kos and all(k.target.player == PEnum.ALL for k in kos), cid
+    # OP05-040: お互いの FREEZE と 側未指定 KO は ALL
+    fr = actions("OP05-040", ActionType.FREEZE)
+    ko = actions("OP05-040", ActionType.KO)
+    assert fr and fr[0].target.player == PEnum.ALL
+    assert ko and ko[0].target.player == PEnum.ALL
+    # 回帰防止: 「相手の…キャラ」FREEZE は OPPONENT のまま
+    fr2 = actions("OP08-023", ActionType.FREEZE)
+    assert fr2 and all(f.target.player == PEnum.OPPONENT for f in fr2)

@@ -154,6 +154,13 @@ def _ko(ctx: ParseContext) -> Optional[GameAction]:
     tq = parse_target(t)
     if _nfc("まで") in t or re.search(r"\d+枚まで", t):
         tq.is_up_to = True
+    # 側未指定（相手/自分/このキャラ/味方/お互い/持ち主 いずれも無し）で対象キャラに絞りがある KO は、
+    # どちらのプレイヤーのキャラも対象（ALL）。parse_target 既定 SELF のままだと自分のキャラだけを
+    # KO する誤りになる（OP05-040/OP06-081/ST08-005/ST27-005「コストN以下のキャラ(すべて)をKO」）。
+    # 「そのキャラ/選んだキャラ」を指す素の「KOする」（対象記述なし）はここでは触れない（参照系は別）。
+    if (tq.player == Player.SELF and _nfc("キャラ") in t
+            and not re.search(_nfc(r"相手|自分|このキャラ|このカード|味方|お互い|持ち主"), t)):
+        tq.player = Player.ALL
     return GameAction(type=ActionType.KO, target=tq, raw_text=t)
 
 
@@ -2633,7 +2640,12 @@ def _freeze_target(ctx: ParseContext) -> Optional[EffectNode]:
         return Choice(message="アクティブにならない対象を選ぶ", option_labels=["キャラ", "ドン!!"],
                       options=[char_action, don_action])
     tq = parse_target(t)
-    tq.player = Player.OPPONENT
+    # 「お互いの（リフレッシュフェイズ）」や側未指定の「すべて」（鳥カゴ OP05-040 等）は両側が対象（ALL）。
+    # それ以外（多くは「相手の…キャラ」）は OPPONENT 既定を維持する。
+    if _nfc("お互い") in t or "BOTH_SIDES" in getattr(tq, "flags", set()):
+        tq.player = Player.ALL
+    else:
+        tq.player = Player.OPPONENT
     if _nfc("まで") in t:
         tq.is_up_to = True
     return GameAction(type=ActionType.FREEZE, target=tq, raw_text=t)
