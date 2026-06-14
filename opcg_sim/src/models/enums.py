@@ -82,6 +82,7 @@ class ActionType(Enum):
     COST_BUFF = auto()
     ATTACH_DON = auto()
     REST_DON = auto()
+    FREEZE_DON = auto()  # 「ドン!!は次の相手のリフレッシュフェイズでアクティブにならない」(OP07-026 ドン側)
     RAMP_DON = auto()
     RETURN_DON = auto()
     NEGATE_EFFECT = auto()

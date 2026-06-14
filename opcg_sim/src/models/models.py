@@ -249,6 +249,10 @@ class DonInstance:
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
     is_rest: bool = False
     attached_to: Optional[str] = None
+    # 「次の相手のリフレッシュフェイズでアクティブにならない」(OP07-026 ドン側)。
+    # refresh_all がレストのドン!!をアクティブに戻す際、これが立っていれば1回スキップし
+    # フラグを下ろす（キャラの flags["FREEZE"] と同じ1回限りのフリーズ）。
+    is_frozen: bool = False
 
     def to_dict(self):
         props = CONST.get('CARD_PROPERTIES', {})

@@ -2376,10 +2376,32 @@ def _attack_active(ctx: ParseContext) -> Optional[GameAction]:
 #   エンジンの refresh_all が card.flags に "FREEZE" があればアクティブ化をスキップする。
 # ---------------------------------------------------------------------------
 @rule("freeze_target", priority=65)
-def _freeze_target(ctx: ParseContext) -> Optional[GameAction]:
+def _freeze_target(ctx: ParseContext) -> Optional[EffectNode]:
     t = ctx.text
     if not re.search(_nfc(r"アクティブにならない"), t):
         return None
+    # 「（相手の、レストの）キャラかドン‼N枚までは、…アクティブにならない」(OP07-026):
+    # 「か」でキャラ/ドンの択一。従来はキャラ側のみ FREEZE され、ドン側（FREEZE_DON）が
+    # 脱落していた。rest_char_or_don と同様、どちらをフリーズするかの Choice にする。
+    m = re.search(_nfc(r'(.*?キャラ)か((?:レストの)?ドン[ 　]*(?:!!|‼)[^、。]*)'), t)
+    if m:
+        char_part, _don_part = m.group(1), m.group(2)
+        n_match = re.search(_nfc(r'合計[ 　]*([\d０-９]+)[ 　]*枚'), t) or \
+            re.search(_nfc(r'([\d０-９]+)[ 　]*枚'), t)
+        total_n = _to_int(n_match.group(1)) if n_match else 1
+        char_tq = parse_target(char_part)
+        char_tq.player = Player.OPPONENT
+        if _nfc("まで") in t:
+            char_tq.is_up_to = True
+        char_action = GameAction(type=ActionType.FREEZE, target=char_tq, raw_text=char_part)
+        don_action = GameAction(
+            type=ActionType.FREEZE_DON,
+            value=ValueSource(base=total_n),
+            status="OPPONENT",
+            raw_text=_don_part,
+        )
+        return Choice(message="アクティブにならない対象を選ぶ", option_labels=["キャラ", "ドン!!"],
+                      options=[char_action, don_action])
     tq = parse_target(t)
     tq.player = Player.OPPONENT
     if _nfc("まで") in t:

@@ -957,10 +957,18 @@ class GameManager:
                 card.reset_turn_status(clear_usage=True)
                 if not is_frozen: card.is_rest = False
         
+        # フリーズ中のドン!!（FREEZE_DON / OP07-026）は今回のリフレッシュではアクティブに
+        # 戻さず、レストのまま据え置いてフラグを下ろす（1回限りのフリーズ）。
+        still_frozen, to_activate = [], []
         for don in player.don_rested:
-            don.is_rest = False
-            player.don_active.append(don)
-        player.don_rested = []
+            if don.is_frozen:
+                don.is_frozen = False
+                still_frozen.append(don)
+            else:
+                don.is_rest = False
+                to_activate.append(don)
+        player.don_active.extend(to_activate)
+        player.don_rested = still_frozen
         
         for don in player.don_attached_cards:
             don.is_rest = False
@@ -2110,6 +2118,22 @@ class GameManager:
             # 「レストにしたドン!!1枚につき…」(§7-5) 用に実レスト枚数を記録する。ドンは targets を
             # 介さず枚数処理するため、resolver の len(targets) では 0 になる（OP13-001）。
             self._last_resource_count = rested
+            return True
+
+        if act_name == "FREEZE_DON":
+            # 「（相手の）ドン!!N枚までは、次の相手のリフレッシュフェイズでアクティブにならない」
+            # (OP07-026 ドン側)。レストのドン!!を value 枚まで is_frozen にする。refresh_all が
+            # フリーズ中のドン!!を1回スキップする（キャラの flags["FREEZE"] と同じ1回限り）。
+            tp = self._don_pool_player(player, action)
+            frozen = 0
+            for don in tp.don_rested:
+                if frozen >= value:
+                    break
+                if not don.is_frozen:
+                    don.is_frozen = True
+                    frozen += 1
+            log_event("INFO", "game.action_freeze_don", f"{tp.name} froze {frozen} rested DON!!", player=player.name)
+            self._last_resource_count = frozen
             return True
 
         if act_name == "ACTIVE_DON" and not getattr(action, 'target', None):
