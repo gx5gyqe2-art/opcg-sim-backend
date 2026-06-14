@@ -458,7 +458,7 @@ class EffectResolver:
     def _resolve_targets(self, player, query, source_card, action_node=None):
         if not query: return []
         
-        if "temp_resolved_targets" in self.context:
+        if "temp_resolved_targets" in self.context and "_both_sides_pending" not in self.context:
             resumed = self.context.pop("temp_resolved_targets")
             # 中断→再開で解決した対象も save_id 保存を行う（「公開したカードを…」等の
             # 後続参照が、再開経路だけ保存されず空振りしていた）。
@@ -506,26 +506,51 @@ class EffectResolver:
 
         from .matcher import get_target_cards
 
-        # 「お互いの〜」(BOTH_SIDES): 両プレイヤーへ独立・同時に適用する。連結候補の単一選択
-        # （片側のみ解決になるバグ）を避け、各サイドで候補・枚数を個別に解決して結合する。
-        # 対話は増やさず各サイド非中断で確定する（CHOOSE 等は既定選択＝候補の先頭から取る）。
+        # 「お互いの〜」(BOTH_SIDES): 両プレイヤーへ独立・同時に適用する。各サイドで候補・枚数を
+        # 個別に解決し結合する。選択を伴うサイド（候補>必要枚数の手札捨て等。OP05-058）は、その
+        # サイドのプレイヤーに**順に選ばせる**（相手→自分の順で SELECT_TARGET 中断）。選択の余地が
+        # 無いサイド（ALL/REMAINING・隠しゾーン=ライフ/デッキの位置確定・候補≤必要数）は非中断で
+        # 確定する（OP11-102 のライフ上トラッシュ等）。中断はスタック土台＋逐次再入で実現する。
         if "BOTH_SIDES" in getattr(query, "flags", set()) and query.player == Player.ALL:
-            result = []
-            for side in (Player.OPPONENT, Player.SELF):
+            owner_p = self.game_manager.p1 if self.game_manager.p1.name == source_card.owner_id else self.game_manager.p2
+            opp_p = self.game_manager.p2 if owner_p is self.game_manager.p1 else self.game_manager.p1
+            bs = self.context.setdefault("_both_sides", {})
+            # 再開で来た選択を、保留していたサイドへ割り当てる。
+            if "_both_sides_pending" in self.context and "temp_resolved_targets" in self.context:
+                bs[self.context.pop("_both_sides_pending")] = self.context.pop("temp_resolved_targets")
+            for side, side_name, side_player in ((Player.OPPONENT, "OPPONENT", opp_p),
+                                                 (Player.SELF, "SELF", owner_p)):
+                if side_name in bs:
+                    continue  # 解決済み
                 side_q = replace(query, player=side,
                                  flags=(set(getattr(query, "flags", set())) - {"BOTH_SIDES"}))
                 cand = get_target_cards(self.game_manager, side_q, source_card)
                 if not cand:
+                    bs[side_name] = []
                     continue
                 if side_q.select_mode in ("ALL", "REMAINING"):
-                    result.extend(cand)
+                    bs[side_name] = list(cand)
                     continue
                 req = getattr(side_q, "count", 1) or 0
                 if getattr(side_q, "count_dynamic", None) == "DOWN_TO_N":
                     req = max(0, len(cand) - max(req, 0))
                 if req <= 0:
+                    bs[side_name] = []
                     continue
-                result.extend(cand[:req])
+                # 隠しゾーン（ライフ/デッキ）は位置確定で自動取得（情報リーク回避・選択不可）。
+                hidden = side_q.zone in (Zone.DECK, Zone.LIFE) and "REVEAL_SELECT" not in getattr(side_q, "flags", set())
+                if hidden or len(cand) <= req:
+                    bs[side_name] = cand[:req]
+                    continue
+                # 選択の余地あり → このサイドのプレイヤーに選ばせる（逐次中断）。必要枚数 req は
+                # 確定済みのため、DOWN_TO_N 等を畳んだ固定 count のクエリで提示する（「N枚になる
+                # ように捨てる」=ちょうど req 枚＝min=max=req の選択）。
+                self.context["_both_sides_pending"] = side_name
+                suspend_q = replace(side_q, count=req, count_dynamic=None, is_up_to=False)
+                self._suspend_for_target_selection(side_player, cand, suspend_q, source_card, action_node)
+                return None
+            result = list(bs.get("OPPONENT", [])) + list(bs.get("SELF", []))
+            self.context.pop("_both_sides", None)
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = result
             return result
