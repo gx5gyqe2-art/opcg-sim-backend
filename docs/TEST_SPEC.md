@@ -140,6 +140,7 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 | `tests/full_card_audit.py` | EXCEPTION / CARD_LOSS / TEMP_LEAK = 0 |
 | `tests/test_full_card_baseline.py` | `full_card_baseline.json` と一致 |
 | `tests/compare_parsers.py` | 新規 OTHER（退行）= 0 |
+| `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER / PER_TURN_LIMIT_GAP / UP_TO_GAP = 0（**ラチェット**） |
 | `tests/test_verified_decks.py` | 検証済みデッキの効果回帰 = 全合格（**ラチェット**: 検証済みの挙動は減らさない） |
 
 挙動を変更したら差分をレビューのうえ `full_card_audit.py --regen` でベースライン更新し、上記ゲートを通す。
