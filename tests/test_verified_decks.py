@@ -536,6 +536,37 @@ def test_cost_0_or_ge_8_filter():
     assert has(["EB01-027", "EB04-023"]) is True  # cost8 を含む
 
 
+def test_dual_tier_removal_splits_two_targets():
+    """「<f1>のキャラ1枚までと<f2>のキャラ/ステージ1枚までを、KO/手札に戻す/デッキの下」は
+    2つの除去に分割される。従来は単一アクションで第2ティアが脱落していた
+    （OP13-077/OP07-017/OP07-118/OP03-018/OP04-044/OP06-056/OP05-093/OP10-098/EB03-021 等11枚）。"""
+    from opcg_sim.src.models.effect_types import GameAction, Sequence, Branch, Choice
+    def removals(cid):
+        out = []
+        def walk(n):
+            if isinstance(n, GameAction):
+                if n.type in (ActionType.KO, ActionType.BOUNCE, ActionType.DECK_BOTTOM):
+                    out.append(n)
+            elif isinstance(n, Sequence):
+                [walk(a) for a in n.actions]
+            elif isinstance(n, Branch):
+                walk(n.if_true); walk(n.if_false)
+            elif isinstance(n, Choice):
+                [walk(o) for o in n.options]
+        for ab in inst(cid).master.abilities:
+            walk(ab.cost); walk(ab.effect)
+        return out
+    # OP13-077: 元々パワー4000以下 と 3000以下 を2体KO（相手）
+    kos = [a for a in removals("OP13-077") if a.type == ActionType.KO]
+    assert sorted(a.target.power_max for a in kos if a.target.power_max) == [3000, 4000]
+    assert all("ORIGINAL_POWER" in a.target.flags for a in kos)
+    assert all(a.target.player.name == "OPPONENT" for a in kos)
+    # OP04-044: 無印（両者対象）の2体バウンス
+    b = [a for a in removals("OP04-044") if a.type == ActionType.BOUNCE]
+    assert len(b) == 2 and all(a.target.player.name == "ALL" for a in b)
+    assert sorted(a.target.cost_max for a in b) == [3, 8]
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")

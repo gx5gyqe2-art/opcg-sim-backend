@@ -2062,6 +2062,58 @@ def _remaining_deck_top_or_bottom(ctx: ParseContext) -> Optional[GameAction]:
 #   （どちらを active/rested にするかは選択だが、ティア対応で active=X側/rested=Y側に固定する
 #   近似）。後段の「残りをレストで登場させる」断片は TEMP 空につき no-op になる。OP06-086。
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# 二段ティアの除去: 「相手の(元々の) <f1>のキャラ1枚までと<f2>のキャラ/ステージ1枚までを、
+#   KOする／持ち主の手札に戻す／持ち主のデッキの下に置く」
+#   → Sequence[除去(f1), 除去(f2)]。従来は単一アクションになり第2ティアが脱落していた
+#   （OP13-077/OP07-017/OP07-118/OP03-018/OP04-044/OP06-056/EB03-021 ほか11枚）。
+# ---------------------------------------------------------------------------
+_DUAL_REMOVAL_RE = re.compile(_nfc(
+    r"(?P<f1>(?:コスト|パワー)\d+以下)の(?P<t1>キャラ|ステージ)[\d０-９]*枚まで(?:と、?|、と)"
+    r"\s*(?P<f2>(?:コスト|パワー)\d+以下)の(?P<t2>キャラ|ステージ)[\d０-９]*枚までを、?"
+    r"(?P<verb>KOする|持ち主の手札に戻す|手札に戻す|持ち主のデッキの下|デッキの下)"))
+
+
+@rule("dual_tier_removal", priority=74)
+def _dual_tier_removal(ctx: ParseContext) -> Optional[EffectNode]:
+    t = ctx.text
+    m = _DUAL_REMOVAL_RE.search(t)
+    if not m:
+        return None
+    # 側: 相手の→OPPONENT／自分の→SELF／無印→ALL（両者対象）。無印を SELF にすると
+    # 「コスト8以下のキャラ…持ち主の手札に戻す」(OP04-044) で自軍を除去してしまう。
+    if _nfc("相手") in t:
+        player = Player.OPPONENT
+    elif _nfc("自分") in t:
+        player = Player.SELF
+    else:
+        player = Player.ALL
+    original = _nfc("元々の") in t
+    verb = m.group("verb")
+    if verb == _nfc("KOする"):
+        act_type, dest = ActionType.KO, None
+    elif _nfc("手札に戻す") in verb:
+        act_type, dest = ActionType.BOUNCE, None
+    else:
+        act_type, dest = ActionType.DECK_BOTTOM, None
+
+    def _tier(crit: str, ctype: str) -> GameAction:
+        n = int(re.search(r"\d+", crit).group())
+        tq = TargetQuery(player=player, zone=Zone.FIELD,
+                         card_type=["STAGE" if ctype == _nfc("ステージ") else "CHARACTER"],
+                         count=1, is_up_to=True)
+        if _nfc("コスト") in crit:
+            tq.cost_max = n
+        else:
+            tq.power_max = n
+            if original:
+                tq.flags.add("ORIGINAL_POWER")
+        return GameAction(type=act_type, target=tq, destination=dest, raw_text=t)
+
+    return Sequence(actions=[_tier(m.group("f1"), m.group("t1")),
+                             _tier(m.group("f2"), m.group("t2"))])
+
+
 @rule("dual_tier_play_from_trash", priority=68)
 def _dual_tier_play_from_trash(ctx: ParseContext) -> Optional[EffectNode]:
     t = ctx.text

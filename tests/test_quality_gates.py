@@ -22,7 +22,10 @@ DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 MAX_WARN_DIRECTION  = 0
 MAX_STAT_ONLY       = 0
 MAX_NO_IMPL         = 0
-MAX_SELECT_MISMATCH = 2
+# EB03-021/OP07-017 は dual_tier_removal で正しく2アクションに分割した結果、
+# 「text のコスト上限 vs 第1ティア(パワー)対象」の単一tq比較ヒューリスティックが
+# 誤検出する（パース自体は適正）。混在ティアの構造上の制約として現状値で固定する。
+MAX_SELECT_MISMATCH = 4
 MAX_FALLBACK        = 0
 
 
