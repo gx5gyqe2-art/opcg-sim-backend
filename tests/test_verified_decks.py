@@ -1276,3 +1276,47 @@ def test_g_compound_self_rest_and_life_or():
     assert c.type == ConditionType.OR
     sides = {(a.player.name, a.value) for a in c.args}
     assert ("SELF", 0) in sides and ("OPPONENT", 0) in sides
+
+
+# --- ST10〜ST30 弾×色検証（§8.6・デッキ非依存の一巡）で確認した挙動の回帰 ---
+# 走査203枚／系統的な新規バグ0（OP05〜OP16 の横断修正＝カテゴリA〜G で網羅）。
+# ST はほぼ既存 OP カードのリプリントで、検出器の危険パターン17枚も精査の結果すべて
+# 健全（WARN はいずれも self-target ACTIVE/GRANT/RAMP/PLAY に対する分類器の方向ヒュー
+# リスティック誤検知）。代表的な「条件が後続を覆う」ゲートと「条件の退化なし」を固定する。
+
+def test_st29001_luffy_attack_draw_gated_by_life():
+    """ST29-001 ルフィ【アタック時】「自分のライフが2枚以下の場合、引き、捨てる」。
+    条件 LIFE_COUNT<=2 が能力全体（引く＋捨てる）を覆う（カテゴリA 同型・§8.3 節分割）。"""
+    gm, p1, _ = game("OP15-058")
+    res = EffectResolver(gm)
+    ab = inst("ST29-001").master.abilities[0]
+    assert ab.trigger == TriggerType.ON_ATTACK
+    assert ab.condition.type == ConditionType.LIFE_COUNT
+    p1.life = [inst("ST29-002") for _ in range(5)]
+    assert res._check_condition(p1, ab.condition, inst("ST29-001")) is False
+    p1.life = [inst("ST29-002") for _ in range(2)]
+    assert res._check_condition(p1, ab.condition, inst("ST29-001")) is True
+
+
+def test_st24001_blocker_draw_gated_by_rested_count():
+    """ST24-001【登場時】「自分のレストのカードが6枚以上ある場合、引き、捨てる」。
+    条件 RESTED_COUNT>=6 が後続（引く＋捨てる）を覆う＝常時真へ退化しない（§8.3 条件退化）。"""
+    gm, p1, _ = game("OP15-058")
+    res = EffectResolver(gm)
+    ab = inst("ST24-001").master.abilities[0]
+    assert ab.condition.type == ConditionType.RESTED_COUNT and ab.condition.value == 6
+    assert res._check_condition(p1, ab.condition, inst("ST24-001")) is False  # レスト0枚
+
+
+def test_st30001_dual_leader_passive_not_degenerate():
+    """ST30-001 ルフィ&エース（赤/緑）PASSIVE「自分の元々のパワー7000以上のキャラが
+    いる場合、このリーダーのパワー-2000」。FIELD_COUNT 条件が常時真へ退化しないこと
+    （元々パワー6000のキャラや空盤面では不成立＝§8.3 条件退化ガード）。"""
+    gm, p1, _ = game("OP15-058")
+    res = EffectResolver(gm)
+    ab = inst("ST30-001").master.abilities[0]
+    assert ab.trigger == TriggerType.PASSIVE
+    assert ab.condition.type == ConditionType.FIELD_COUNT
+    assert res._check_condition(p1, ab.condition, inst("ST30-001")) is False  # 空盤面
+    p1.field = [inst("ST30-003")]  # 元々パワー6000（7000未満）
+    assert res._check_condition(p1, ab.condition, inst("ST30-001")) is False
