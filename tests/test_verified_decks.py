@@ -1162,3 +1162,26 @@ def test_offset_relative_count_compare():
     # 自分4枚・相手6枚 → 4 <= 3 → False
     p1.hand = [inst("OP05-010", "P1") for _ in range(4)]
     assert res._check_condition(p1, cond, src) is False
+
+
+# --- 「リーダーとキャラを選ぶ」: リーダーを選択群に含める ------------------
+
+def test_select_leader_and_char_includes_leader():
+    """OP07-059（リーダー＋キャラを凍結）/ OP14-009（リーダー↔キャラのパワー入替）の
+    「（相手/自分の）リーダーとキャラN枚を選ぶ」で、SELECT がリーダーを含まず1枚しか選べず
+    効果が片側/不発になっていた回帰。SELECT を CHARACTER 選択＋INCLUDE_LEADER とし、解決時に
+    対象側リーダーを選択群へ常に含める。"""
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    for cid in ["OP07-059", "OP14-009"]:
+        sel = find_action(inst(cid).master.abilities[0].effect, ActionType.SELECT)
+        assert sel is not None and "INCLUDE_LEADER" in sel.target.flags, cid
+    # 意味: OP14-009 で SELECT がリーダー＋キャラの2枚を選ぶ（リーダーが先頭に入る）
+    gm, p1, p2 = game("OP01-001", "OP01-001")  # 実リーダー
+    res = EffectResolver(gm)
+    sel = find_action(inst("OP14-009").master.abilities[0].effect, ActionType.SELECT)
+    p1.field = [inst("OP05-010", "P1")]  # キャラ1枚
+    got = res._resolve_targets(p1, sel.target, inst("OP14-009", "P1"))
+    assert len(got) == 2
+    from opcg_sim.src.models.enums import CardType
+    assert any(c.master.type == CardType.LEADER for c in got)
+    assert any(c.master.type == CardType.CHARACTER for c in got)

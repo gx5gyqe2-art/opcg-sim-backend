@@ -467,11 +467,28 @@ class EffectResolver:
 
         return success
 
+    def _with_leader(self, query, player, selected):
+        """INCLUDE_LEADER フラグ付き選択（「リーダーとキャラN枚を選ぶ」）で、対象側のリーダーを
+        選択群へ常に含める。OP07-059（リーダー＋キャラを凍結）/ OP14-009（リーダー↔キャラの
+        パワー入替）等で、リーダーが選択に含まれず効果が片側/不発になっていたのを是正。"""
+        if "INCLUDE_LEADER" not in getattr(query, "flags", set()):
+            return selected
+        tp = player
+        qp = getattr(query, "player", None)
+        if qp is not None and getattr(qp, "name", None) == "OPPONENT":
+            tp = self.game_manager.p2 if player is self.game_manager.p1 else self.game_manager.p1
+        ldr = getattr(tp, "leader", None)
+        out = list(selected or [])
+        if ldr is not None and ldr not in out:
+            out = [ldr] + out
+        return out
+
     def _resolve_targets(self, player, query, source_card, action_node=None):
         if not query: return []
-        
+
         if "temp_resolved_targets" in self.context and "_both_sides_pending" not in self.context:
             resumed = self.context.pop("temp_resolved_targets")
+            resumed = self._with_leader(query, player, resumed)
             # 中断→再開で解決した対象も save_id 保存を行う（「公開したカードを…」等の
             # 後続参照が、再開経路だけ保存されず空振りしていた）。
             if query.save_id:
@@ -620,6 +637,7 @@ class EffectResolver:
             # REMAINING（「残り」）は意味的に対象=残り全部のため選択中断しない
             # （並び替え/上下は後段の ARRANGE_DECK 対話で扱う）。
             selected = candidates[:required_count] if required_count > 0 else candidates
+            selected = self._with_leader(query, player, selected)
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = selected
             if (query.select_mode == "CHOOSE" and not query.ref_id

@@ -2134,7 +2134,7 @@
 "OP14-004|PASSIVE": "- | pw0,kw0,rs0,co0",
 "OP14-005|ACTIVATE_MAIN": "p1_don:10→9 | pw0,kw0,rs0,co0",
 "OP14-006|ON_ATTACK": "- | pw0,kw0,rs0,co0",
-"OP14-009|ON_OPP_ATTACK": "p1_hand:5→3, p1_trash:10→12 | pw0,kw0,rs0,co0",
+"OP14-009|ON_OPP_ATTACK": "p1_hand:5→3, p1_trash:10→12 | pw2000,kw0,rs0,co0",
 "OP14-010|ON_KO": "- | pw0,kw0,rs0,co0",
 "OP14-011|PASSIVE": "- | pw0,kw0,rs0,co0",
 "OP14-012|ON_ATTACK": "- | pw0,kw0,rs0,co0",
