@@ -187,9 +187,10 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             
     tq.traits.extend(final_traits)
 
-    # 「《特徴》（を持つキャラカード）か「名前」」= 特徴 OR 名前。「か」が名前の開き括弧へ
-    # 直接かかる場合に OR とみなす（OP11-022「《海王類》を持つキャラカードか「メガロ」」）。
-    if tq.traits and tq.names and re.search(_nfc(r'か[「『《]'), tgt_text):
+    # 「《特徴》（を持つキャラカード）か「名前」」= 特徴 OR 名前。「か」が名前/特徴の開き括弧へ
+    # かかる場合に OR とみなす（OP11-022「《海王類》を持つキャラカードか「メガロ」」）。
+    # 「「名前」か特徴《X》を持つ」順（か→「特徴」→《）も OR（OP15-073/101）。
+    if tq.traits and tq.names and re.search(_nfc(r'か(?:を含む)?(?:特徴)?[「『《]'), tgt_text):
         tq.flags.add("TRAIT_OR_NAME")
 
     # 「「名前」か<種類>」= 名前 OR 種類（OP12-071「「サンジ」かイベント」）。従来は names と
@@ -218,13 +219,18 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if _nfc("異なる色") in tgt_text:
         tq.flags.add("EXCLUDE_SELECTED_COLOR")
 
+    # 「コスト0か8以上の…」= コスト0 または 8以上（離散2レンジ）。単一の cost_min/max では
+    #   表せないため専用フラグで matcher が OR 判定する（B・W の基幹条件。OP14-090/094/098/120 等。
+    #   従来は「コスト0」だけ拾い cost_min=cost_max=0 に縮退し「8以上」が脱落していた）。
+    if re.search(_nfc(r'コスト0か8以上'), tgt_text):
+        tq.flags.add("COST_0_OR_GE_8")
     # コスト範囲「コストNからM」（N以上M以下）。範囲表記は単一しきい値より先に判定する
     #   （従来は「コスト3」だけを拾い cost_max=3 に縮退していた: OP10-099）。
-    m_crange = re.search(_nfc(ParserKeyword.COST + r'(\d+)から(\d+)'), tgt_text)
+    m_crange = None if "COST_0_OR_GE_8" in tq.flags else re.search(_nfc(ParserKeyword.COST + r'(\d+)から(\d+)'), tgt_text)
     if m_crange:
         tq.cost_min = int(m_crange.group(1))
         tq.cost_max = int(m_crange.group(2))
-    m_c = None if m_crange else re.search(_nfc(ParserKeyword.COST + r'[^+＋\-－−‐\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    m_c = None if (m_crange or "COST_0_OR_GE_8" in tq.flags) else re.search(_nfc(ParserKeyword.COST + r'[^+＋\-－−‐\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
         start_idx = m_c.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
@@ -337,6 +343,13 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if m_adon:
         tq.min_attached_don = int(m_adon.group(1))
         count_text = tgt_text.replace(m_adon.group(0), '')
+    else:
+        # 枚数指定の無い「ドン‼が付与されている（パワー…の）キャラ」= 付与ドン1枚以上。
+        # 従来は下限フィルタが付かず、付与ドンの無いキャラまで対象に含めていた（OP15-018/015）。
+        m_adon1 = re.search(_nfc(r'ドン(?:!!|‼)?が付与されている'), tgt_text)
+        if m_adon1:
+            tq.min_attached_don = 1
+            count_text = tgt_text.replace(m_adon1.group(0), '')
 
     if _nfc(ParserKeyword.ALL_HIRAGANA) in count_text or _nfc(ParserKeyword.ALL) in count_text:
         tq.count = -1
@@ -486,9 +499,12 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
             if query.attributes and card.master.attribute.value not in query.attributes: continue
         
+        # 「コスト0か8以上」= 0 または 8以上の離散2レンジ（B・W）。
+        if "COST_0_OR_GE_8" in query.flags and not (card.current_cost == 0 or card.current_cost >= 8):
+            continue
         if query.cost_max is not None and card.current_cost > query.cost_max: continue
         if query.cost_min is not None and card.current_cost < query.cost_min: continue
-        
+
         if dynamic_cost_max is not None and card.current_cost > dynamic_cost_max: continue
 
         # 「元々のパワー」指定は印刷時パワー（master.power）で判定。それ以外は現在パワー。

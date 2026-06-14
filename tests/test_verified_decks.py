@@ -18,7 +18,7 @@ from opcg_sim.src.core.gamestate import GameManager, Player
 from opcg_sim.src.core.effects.resolver import EffectResolver
 from opcg_sim.src.core.effects.matcher import get_target_cards
 from opcg_sim.src.models.models import CardInstance, DonInstance
-from opcg_sim.src.models.enums import Zone, ActionType, TriggerType, ConditionType
+from opcg_sim.src.models.enums import Zone, ActionType, TriggerType, ConditionType, CompareOperator
 from opcg_sim.src.utils.loader import CardLoader
 
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -222,6 +222,318 @@ def test_leader_name_multi_or():
     assert res._check_condition(p1, cond, inst("OP13-016")) is True
     gm2, q1, _ = game("OP01-001")  # リーダー=ロロノア・ゾロ
     assert EffectResolver(gm2)._check_condition(q1, cond, inst("OP13-016")) is False
+
+
+def test_op16015_luffy_cost_reduction_requires_ace_leader_and_don():
+    """OP16-015 ルフィ: 手札コスト-2は「リーダー名に『エース』を含む」かつ「ドン!!6枚以上」の
+    AND。条件のAND分割で「カード名で、」連結が拾えず、リーダー名条件が脱落して
+    ドン!!枚数だけで誤発動していた回帰（§8.3 条件の退化）。"""
+    cond = inst("OP16-015").master.abilities[0].condition
+    assert cond.type == ConditionType.AND
+    types = {a.type for a in cond.args}
+    assert ConditionType.LEADER_NAME in types and ConditionType.DON_COUNT in types
+
+    def with_don(player, n):
+        for _ in range(n):
+            player.don_active.append(DonInstance(owner_id=player.name))
+
+    # エースリーダー + ドン!!6枚 → 成立
+    gm, p1, _ = game("OP13-002")
+    with_don(p1, 6)
+    assert EffectResolver(gm)._check_condition(p1, cond, inst("OP16-015")) is True
+    # エースリーダー + ドン!!5枚 → 不成立（ドン不足）
+    gm2, q1, _ = game("OP13-002")
+    with_don(q1, 5)
+    assert EffectResolver(gm2)._check_condition(q1, cond, inst("OP16-015")) is False
+    # 非エースリーダー + ドン!!6枚 → 不成立（脱落していたリーダー名条件）
+    gm3, r1, _ = game("OP01-001")
+    with_don(r1, 6)
+    assert EffectResolver(gm3)._check_condition(r1, cond, inst("OP16-015")) is False
+
+
+def test_op16024_inazuma_ko_trigger_requires_opponent_effect():
+    """OP16-024 イナズマ: 「相手の効果でKOされた時」は戦闘KO・自分の効果KOでは発火せず、
+    相手の効果KOでのみ発火する。書き下し形KO誘発の要因修飾（§8.3 実行系/条件の退化）。"""
+    gm, p1, p2 = game("OP16-022", "OP16-022")
+    ab = inst("OP16-024").master.abilities[0]
+    assert ab.trigger == TriggerType.ON_KO
+    # owner=p1, opp=p2
+    assert gm._ko_trigger_matches(ab, p1, "BATTLE", None) is False        # 戦闘KO
+    assert gm._ko_trigger_matches(ab, p1, "EFFECT", p1) is False          # 自分の効果KO
+    assert gm._ko_trigger_matches(ab, p1, "EFFECT", p2) is True           # 相手の効果KO
+
+
+def test_op02085_magellan_ko_trigger_opponent_turn_only():
+    """OP02-085 マゼラン: 【相手のターン中】KOは相手ターンのみ発火（要因は問わない）。"""
+    gm, p1, p2 = game("OP16-022", "OP16-022")
+    ab = [a for a in inst("OP02-085").master.abilities if a.trigger == TriggerType.ON_KO][0]
+    gm.turn_player = p2  # 相手ターン
+    assert gm._ko_trigger_matches(ab, p1, "BATTLE", None) is True
+    gm.turn_player = p1  # 自分ターン
+    assert gm._ko_trigger_matches(ab, p1, "EFFECT", p2) is False
+
+
+def test_bracket_ko_trigger_always_fires():
+    """ブラケット【KO時】（要因修飾なし）は戦闘KO・効果KOいずれでも発火する（退行防止）。"""
+    gm, p1, _ = game("OP16-022", "OP16-022")
+    ab = inst("OP16-013").master.abilities[0]  # マクガイ【KO時】
+    assert gm._ko_trigger_matches(ab, p1, "BATTLE", None) is True
+    assert gm._ko_trigger_matches(ab, p1, "EFFECT", p1) is True
+
+
+def test_op16047_opponent_chooses_own_discard():
+    """OP16-047 ドフラミンゴ「相手は自身の手札2枚を…デッキの下に置く」は相手が選ぶ。
+    既定（chooser=None→自分が選択）のままだと自分が相手の手札を選べてしまう退行。"""
+    from opcg_sim.src.models.enums import Player as P
+    # 構造: DECK_BOTTOM 対象の chooser=OPPONENT
+    eff = inst("OP16-047").master.abilities[0].effect
+    bottom = find_action(eff, ActionType.DECK_BOTTOM)
+    assert bottom is not None and bottom.target.chooser == P.OPPONENT
+    # 横展開: DISCARD 系も相手選択
+    disc = find_action(inst("OP16-094").master.abilities[0].effect, ActionType.DISCARD)
+    assert disc is not None and disc.target.chooser == P.OPPONENT
+    # 「相手の〜をレスト」（自分が選ぶ）は波及しない
+    rest = find_action(inst("OP16-035").master.abilities[0].effect, ActionType.REST)
+    assert rest is not None and rest.target.chooser is None
+    # end-to-end: 選択者が相手プレイヤーになる
+    gm, p1, p2 = game("OP16-041", "OP16-041")
+    dfl = inst("OP16-047", "P1"); p1.field = [dfl]
+    p2.hand = [inst("OP16-046", "P2") for _ in range(8)]
+    EffectResolver(gm).resolve_ability(p1, dfl.master.abilities[0], source_card=dfl)
+    assert gm.active_interaction is not None
+    assert gm.active_interaction.get("player_id") == p2.name
+
+
+def test_op16074_magellan_opponent_returns_own_don():
+    """OP16-074 マゼラン【KO時】「相手は自身の場のドン!!4枚をドン!!デッキに戻す」。
+    選択者＝相手だが、RETURN_DON の resume を応答者(相手)視点で再実行すると
+    _don_pool_player が相手の相手=自分プールを指し空振りしていた退行。責任者(発生源
+    の持ち主)視点で再開し、相手のドンが正しく戻ることを固定する。"""
+    gm, p1, p2 = game("OP16-022", "OP16-022")
+    for pl in (p1, p2):
+        pl.don_active = [DonInstance(owner_id=pl.name) for _ in range(5)]
+    maze = inst("OP16-074", "P1")
+    p1.trash = [maze]  # KO済み＝トラッシュに居る（resume の source 解決に必要）
+    ko = [a for a in maze.master.abilities if a.trigger == TriggerType.ON_KO][0]
+    EffectResolver(gm).resolve_ability(p1, ko, source_card=maze)
+    ia = gm.active_interaction
+    assert ia is not None and ia.get("player_id") == p2.name  # 相手が選ぶ
+    cands = [c.uuid for c in ia.get("candidates", [])]
+    assert all(c in {d.uuid for d in p2.don_active} for c in cands)  # 候補は相手のドン
+    gm.resolve_interaction(p2, {"selected_uuids": cands[:4], "index": 0})
+    assert len(p2.don_active) == 1            # 相手の場のドンが4枚戻った
+    assert len(p2.don_deck) == 14
+    assert len(p1.don_active) == 5            # 自分のドンは不変
+
+
+def test_op16100_requires_opponent_char_koed_this_turn():
+    """OP16-100 氷諸斬り: 起動の条件「このターン中、相手のキャラがKOされている場合」は
+    ターン内KOイベントで判定する。「KOされて<いる>」が FIELD_COUNT（相手の場キャラ存在）
+    に誤吸収され逆の意味に化けていた回帰（§8.3 条件の退化）。"""
+    c = inst("OP16-100").master.abilities[0].condition
+    assert c.type == ConditionType.CHAR_KOED_THIS_TURN
+    gm, p1, p2 = game("OP16-022", "OP16-022")
+    res = EffectResolver(gm)
+    assert res._check_condition(p1, c, inst("OP16-100")) is False     # まだKOなし
+    gm.record_turn_event(f"CHAR_KOED_{p2.name}", 1)
+    assert res._check_condition(p1, c, inst("OP16-100")) is True       # 相手キャラがKO済み
+    gm._turn_events = {}
+    gm.record_turn_event(f"CHAR_KOED_{p1.name}", 1)
+    assert res._check_condition(p1, c, inst("OP16-100")) is False      # 自分のKOでは不成立
+
+
+def test_op16102_play_from_hand_or_trash():
+    """OP16-102 アバロ・ピサロ【KO時】「自分の手札かトラッシュから『ハチノス』を登場」は
+    両ゾーンが登場元。play_card_from_zone ルールが has_trash で zone を TRASH 単一に
+    上書きし手札が脱落していた回帰（「手札かトラッシュ」系 ~13 枚に波及）。"""
+    from opcg_sim.src.models.enums import Zone
+    eff = inst("OP16-102").master.abilities[0].effect
+    pc = find_action(eff, ActionType.PLAY_CARD)
+    assert pc is not None
+    assert isinstance(pc.target.zone, list)
+    assert set(pc.target.zone) == {Zone.HAND, Zone.TRASH}
+    # 実機: 手札・トラッシュ双方の「ハチノス」が候補になる
+    gm, p1, _ = game("OP16-022", "OP16-022")
+    p1.hand = [inst("OP09-099", "P1")]   # ハチノス（手札）
+    p1.trash = [inst("OP09-099", "P1")]  # ハチノス（トラッシュ）
+    cands = get_target_cards(gm, pc.target, inst("OP16-102"))
+    assert len(cands) == 2
+
+
+def test_op15_name_or_trait_order_variant():
+    """OP15-073/101: 「「名前」か特徴《X》を持つ」順の name-or-trait が AND 化していた回帰。
+    か→「特徴」→《 の語順で TRAIT_OR_NAME が立たず、名前かつ特徴を要求して候補が空に
+    なっていた（OP16-001 の逆順は既存対応済み）。"""
+    from opcg_sim.src.models.enums import Zone
+    for cid, atype in [("OP15-073", ActionType.PLAY_CARD), ("OP15-101", ActionType.MOVE_CARD)]:
+        act = None
+        for ab in inst(cid).master.abilities:
+            act = find_action(ab.effect, atype) or act
+        assert act is not None and act.target.names and act.target.traits
+        assert "TRAIT_OR_NAME" in act.target.flags
+    # 実機: 名前一致（神兵=特徴空島）も特徴一致（オーム=神官・別名）も候補になる。
+    # AND 化バグでは「神兵という名前かつ神官特徴」を要求し候補が皆無だった。
+    gm, p1, _ = game("OP16-022", "OP16-022")
+    tq = find_action(inst("OP15-073").master.abilities[-1].effect, ActionType.PLAY_CARD).target
+    p1.hand = [inst("OP15-068", "P1"), inst("OP15-061", "P1")]  # 神兵(名前) / オーム(神官)
+    cands = {c.master.name for c in get_target_cards(gm, tq, inst("OP15-073"))}
+    assert "神兵" in cands and "オーム" in cands
+
+
+def test_op15_attached_don_filter_unnumbered():
+    """OP15-018/015/027: 「相手のドン‼が付与されているキャラ」（枚数指定なし=1枚以上）の
+    対象に min_attached_don=1 が付く。従来は数値明示時のみで、付与ドンの無いキャラまで
+    対象に含めていた（OP15-001 の『2枚以上』は min=2 のまま）。"""
+    def adon(cid, atype):
+        for ab in inst(cid).master.abilities:
+            a = find_action(ab.effect, atype)
+            if a and a.target and getattr(a.target.player, "name", "") == "OPPONENT":
+                return a
+        return None
+    assert adon("OP15-018", ActionType.KO).target.min_attached_don == 1
+    assert adon("OP15-015", ActionType.BUFF).target.min_attached_don == 1
+    assert adon("OP15-027", ActionType.REST).target.min_attached_don == 1
+    assert adon("OP15-001", ActionType.REST).target.min_attached_don == 2
+
+
+def test_op15005_opponent_attached_don_exists():
+    """OP15-005 カバジ: 「相手の付与されているドン‼がある場合」は相手の付与ドン≥1。
+    比較語が無いのに相互比較ブランチに誤吸収され DON_COUNT_COMPARE GE 0（常時真）・
+    player=SELF に化けていた回帰。"""
+    c = inst("OP15-005").master.abilities[0].condition
+    assert c.type == ConditionType.DON_COUNT
+    assert c.player.name == "OPPONENT" and c.value == 1
+
+
+def test_p107_either_player_don_count_is_or():
+    """P-107: 「自分か相手の場のドン‼が10枚ある場合」は OR(self==10, opp==10)。
+    「相手」を含むため相手基準/相互比較に化け、自分==10 の常用ケースを取りこぼしていた。"""
+    c = inst("P-107").master.abilities[0].condition
+    assert c.type == ConditionType.OR
+    sides = {(a.player.name, a.value) for a in c.args}
+    assert ("SELF", 10) in sides and ("OPPONENT", 10) in sides
+
+
+def test_op15024_usopp_rest_immunity_and_blocker():
+    """OP15-024 ウソップ【相手のターン中】「相手の効果でレストにされず、【ブロッカー】を得る」は
+    PREVENT_REST(自身)＋GRANT_KEYWORD(ブロッカー)の複合。連用形「されず」＋ブロッカー付与で
+    キーワード付与ルールが勝ち、レスト耐性が脱落していた回帰。"""
+    eff = inst("OP15-024").master.abilities[0].effect
+    assert find_action(eff, ActionType.PREVENT_REST) is not None
+    grant = find_action(eff, ActionType.GRANT_KEYWORD)
+    assert grant is not None and grant.status == "ブロッカー"
+
+
+def test_life_count_compare_self_less_than_opponent():
+    """「自分のライフ(の枚数)が相手より少ない/以下」は両者ライフの相対比較。
+    従来は LIFE_COUNT(OPPONENT, EQ, 0)（相手ライフ0＝ほぼ成立せず）に退化していた。
+    OP15-104/OP03-119/OP10-113/OP07-098/OP10-114 ほか12枚に波及。"""
+    def find_lcc(cid):
+        seen = []
+        def rec(c):
+            if c is None:
+                return
+            if c.type == ConditionType.LIFE_COUNT_COMPARE:
+                seen.append(c)
+            for a in (getattr(c, "args", None) or []):
+                rec(a)
+        from opcg_sim.src.models.effect_types import GameAction, Sequence, Branch, Choice
+        def walk(n):
+            if isinstance(n, Branch):
+                rec(n.condition); walk(n.if_true); walk(n.if_false)
+            elif isinstance(n, Sequence):
+                [walk(a) for a in n.actions]
+            elif isinstance(n, Choice):
+                [walk(o) for o in n.options]
+        for ab in inst(cid).master.abilities:
+            rec(ab.condition); walk(ab.effect)
+        return seen
+    assert find_lcc("OP15-104") and find_lcc("OP15-104")[0].operator == CompareOperator.LT
+    assert find_lcc("OP10-114") and find_lcc("OP10-114")[0].operator == CompareOperator.LE
+    # 実機: self<opp で成立、self>=opp で不成立
+    gm, p1, p2 = game("OP16-022", "OP16-022")
+    cond = find_lcc("OP15-104")[0]
+    p1.life = [inst("OP16-046") for _ in range(2)]
+    p2.life = [inst("OP16-046", "P2") for _ in range(4)]
+    assert EffectResolver(gm)._check_condition(p1, cond, inst("OP15-104")) is True
+    p1.life = [inst("OP16-046") for _ in range(5)]
+    assert EffectResolver(gm)._check_condition(p1, cond, inst("OP15-104")) is False
+
+
+def test_leader_trait_or_condition():
+    """「リーダーが特徴《X》か《Y》を持つ場合」は複数特徴のOR。従来は先頭《X》のみで、
+    第2特徴のリーダーで常に不成立だった（OP14-022/OP13-027/EB02-011 ほか12枚）。"""
+    cond = inst("OP14-022").master.abilities[0].condition
+    assert cond.type == ConditionType.LEADER_TRAIT
+    assert isinstance(cond.value, list) and set(cond.value) == {"FILM", "麦わらの一味"}
+    # 麦わらの一味を持つリーダーで成立（第2特徴のOR）、無関係特徴のリーダーで不成立。
+    gm2, q1, _ = game("ST10-002")  # モンキー・D・ルフィ＝麦わらの一味
+    assert EffectResolver(gm2)._check_condition(q1, cond, inst("OP14-022")) is True
+    gm3, r1, _ = game("OP13-002")  # ポートガス・D・エース（FILMも麦わらの一味も持たない）
+    assert EffectResolver(gm3)._check_condition(r1, cond, inst("OP14-022")) is False
+
+
+def test_leader_name_and_split_connector():
+    """「自分のリーダーが「X」で、〈B〉場合」のAND分割。連結「」で、」が拾えず
+    リーダー名条件が脱落していた（OP14-059/OP11-075/OP13-075/EB04-041 ほか6枚）。"""
+    c = inst("OP14-059").master.abilities[0].condition
+    assert c.type == ConditionType.AND
+    types = {a.type for a in c.args}
+    assert ConditionType.LEADER_NAME in types and ConditionType.HAND_COUNT in types
+    # EB04-041 は LEADER_NAME + DON_COUNT
+    c2 = inst("EB04-041").master.abilities[0].condition
+    assert c2.type == ConditionType.AND
+    assert {a.type for a in c2.args} >= {ConditionType.LEADER_NAME, ConditionType.DON_COUNT}
+
+
+def test_opponent_field_don_threshold_not_mutual():
+    """「相手の場のドン‼がN枚以上ある場合」は相手の場ドン枚数の閾値（DON_COUNT, OPPONENT）。
+    相互比較ブランチに誤吸収され DON_COUNT_COMPARE GE 0（自分≧相手＝ほぼ常時真）に化けていた
+    （OP14-063/OP08-060/PRB02-010）。複合「リーダーが多色で、相手のドンN枚以上」も分割。"""
+    def don_cond(cid):
+        seen = []
+        def rec(c):
+            if c is None:
+                return
+            if c.type in (ConditionType.DON_COUNT, ConditionType.DON_COUNT_COMPARE):
+                seen.append(c)
+            for a in (getattr(c, "args", None) or []):
+                rec(a)
+        for ab in inst(cid).master.abilities:
+            rec(ab.condition)
+            from opcg_sim.src.models.effect_types import Branch, Sequence, Choice
+            def walk(n):
+                if isinstance(n, Branch):
+                    rec(n.condition); walk(n.if_true); walk(n.if_false)
+                elif isinstance(n, Sequence):
+                    [walk(a) for a in n.actions]
+                elif isinstance(n, Choice):
+                    [walk(o) for o in n.options]
+            walk(ab.effect)
+        return seen
+    c = don_cond("OP14-063")[0]
+    assert c.type == ConditionType.DON_COUNT and c.player.name == "OPPONENT" and c.value == 6
+    # 複合: EB02-061 は AND[LEADER_COLOR 多色, DON_COUNT OPPONENT 5]
+    eb = inst("EB02-061").master.abilities[0].condition
+    assert eb.type == ConditionType.AND
+    sub = {a.type for a in eb.args}
+    assert ConditionType.LEADER_COLOR in sub and ConditionType.DON_COUNT in sub
+
+
+def test_cost_0_or_ge_8_filter():
+    """「コスト0か8以上のキャラがいる場合」（B・W基幹条件）は cost==0 OR cost>=8 の
+    離散2レンジ。従来は「コスト0」だけ拾い cost_min=cost_max=0 に縮退し「8以上」が
+    脱落していた（OP14-090/094/098/120 ほか5枚）。"""
+    cond = inst("OP14-090").master.abilities[0].condition
+    assert "COST_0_OR_GE_8" in cond.target.flags
+    assert cond.target.cost_min is None and cond.target.cost_max is None
+    # 実機: コスト8のキャラで成立、コスト5のみでは不成立
+    def has(cards):
+        gm, p1, _ = game("OP16-022", "OP16-022")
+        p1.field = [inst(c, "P1") for c in cards]
+        return EffectResolver(gm)._check_condition(p1, cond, inst("OP14-090"))
+    assert has(["EB01-027"]) is False           # cost5 のみ
+    assert has(["EB01-027", "EB04-023"]) is True  # cost8 を含む
 
 
 def test_roger_no_auto_win_on_zero_life():

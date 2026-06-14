@@ -528,6 +528,29 @@ def _prevent_leave_and_keyword(ctx: ParseContext):
     return Sequence(actions=[prevent, grant])
 
 
+@rule("prevent_rest_and_keyword", priority=71)
+def _prevent_rest_and_keyword(ctx: ParseContext):
+    """「このキャラは（相手の…効果で）レストにされず（ない）、【X】を得る」の複合。
+    PREVENT_REST(自身) と GRANT_KEYWORD の両方を Sequence で返す。従来は keyword 付与
+    ルールが勝ってレスト耐性が脱落していた（OP15-024 ウソップ）。"""
+    t = ctx.text
+    if not re.search(_nfc(r"レストにされ(?:ず|ない)"), t):
+        return None
+    if _nfc("得る") not in t:
+        return None
+    if not re.search(_nfc(r"この(カード|キャラ|リーダー)"), t):
+        return None
+    m = _KEYWORD_GRANT_RE.search(t)
+    if not m:
+        return None
+    src = TargetQuery(select_mode="SOURCE")
+    prevent = GameAction(type=ActionType.PREVENT_REST, target=TargetQuery(select_mode="SOURCE"),
+                         duration=_duration_of(t), raw_text=t)
+    grant = GameAction(type=ActionType.GRANT_KEYWORD, target=src, status=m.group(1),
+                       duration=_duration_of(t), raw_text=t)
+    return Sequence(actions=[prevent, grant])
+
+
 @rule("grant_keyword", priority=63)
 def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -2097,9 +2120,13 @@ def _play_card_from_zone(ctx: ParseContext) -> Optional[GameAction]:
     if not has_hand and not has_trash:
         return None  # 手札/トラッシュ以外からの登場（プレイ自体）は対象外
     tq = parse_target(t)
-    # parse_target は「手札から」「トラッシュから」を zone に反映するが、
-    # フィールドキャラ系（「場のキャラを」）と混在する場合に備えて上書き。
-    if has_trash:
+    # 源ゾーンを keyword から決定的に上書きする（parse_target の zone 推定は
+    # 「手札から…場のドン」の "から" の "か" 等で誤って複数ゾーン化し得るため信頼しない）。
+    # 「手札かトラッシュ／トラッシュか手札」の隣接並列のみ両ゾーン（OP16-102/OP06-060 等）。
+    # それ以外は従来どおりトラッシュ優先（混在時の安全側）。
+    if re.search(_nfc(r"手札かトラッシュ|トラッシュか手札"), t):
+        tq.zone = [Zone.HAND, Zone.TRASH]
+    elif has_trash:
         tq.zone = Zone.TRASH
     elif has_hand:
         tq.zone = Zone.HAND

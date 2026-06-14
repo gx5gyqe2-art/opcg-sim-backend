@@ -736,6 +736,19 @@ class EffectResolver:
             occurred = getattr(self.game_manager, "_turn_events", {}).get(ev_name, 0)
             return self._compare(occurred, condition.operator, ev_min)
 
+        elif condition.type == ConditionType.LIFE_COUNT_COMPARE:
+            # 「自分のライフが相手(のライフ)より少ない/以下/より多い/以上」: 自分 (op) 相手。
+            me = self.game_manager.p1 if player is self.game_manager.p1 else self.game_manager.p2
+            opp = self.game_manager.p2 if me is self.game_manager.p1 else self.game_manager.p1
+            return self._compare(len(me.life), condition.operator, len(opp.life))
+
+        elif condition.type == ConditionType.CHAR_KOED_THIS_TURN:
+            # 「このターン中、（相手/自分の）キャラがKOされている場合」: 当該プレイヤーの
+            # キャラがこのターンに KO された回数（gamestate が CHAR_KOED_<name> で記録）。
+            occurred = getattr(self.game_manager, "_turn_events", {}).get(
+                f"CHAR_KOED_{target_player.name}", 0)
+            return self._compare(occurred, condition.operator, target_val or 1)
+
         elif condition.type == ConditionType.HAS_DON:
             # 【ドン!!×N】: 能力保持カードに付与されたドン!!が N 枚以上か。コストエリアの active ドン
             # ではなく attached_don を見る。置換/除去保護では保持カード(host=protector)を見る
@@ -766,8 +779,12 @@ class EffectResolver:
         elif condition.type == ConditionType.LEADER_TRAIT:
             if not target_player.leader: return False
             expected_trait = condition.value
+            traits = target_player.leader.master.traits
             if isinstance(expected_trait, str):
-                return expected_trait in target_player.leader.master.traits
+                return expected_trait in traits
+            if isinstance(expected_trait, (list, tuple)):
+                # 複数特徴の OR（「リーダーが特徴《X》か《Y》を持つ場合」）。
+                return any(t in traits for t in expected_trait)
             return False
             
         elif condition.type in [ConditionType.HAS_TRAIT, ConditionType.HAS_ATTRIBUTE, ConditionType.HAS_UNIT]:

@@ -548,6 +548,13 @@ class EffectParser:
                     final_condition = turn_limit_cond
                 trigger = TriggerType.PASSIVE
 
+            # 「相手は自身の〜を捨てる/デッキの下に置く/戻す」等、相手が自分のカードを
+            # 処理する効果は、対象選択を相手プレイヤーに委ねる（chooser=OPPONENT）。
+            # 既定（chooser=None → 効果コントローラー=自分が選択）のままだと、自分が
+            # 相手の手札から捨てるカードを選べてしまう退行になる（OP16-047 等 ~20 枚）。
+            self._apply_opponent_self_chooser(effect_node)
+            self._apply_opponent_self_chooser(cost_node)
+
             return Ability(
                 trigger=trigger,
                 condition=final_condition,
@@ -559,6 +566,38 @@ class EffectParser:
         except Exception as e:
             log_event(level_key="ERROR", action="parser.parse_ability_error", msg=f"Failed to parse: {text[:20]} | Error: {str(e)}")
             return Ability(trigger=TriggerType.UNKNOWN, effect=None, raw_text=_nfc(text))
+
+    def _apply_opponent_self_chooser(self, node):
+        """effect/cost ツリーを走査し、「相手は自身の〜」（相手が自分のカードを処理する）
+        アクションの対象選択者を相手プレイヤー（chooser=OPPONENT）に設定する。
+
+        対象が相手側（player=OPPONENT）かつ未指定（chooser=None）で、アクションの
+        raw_text に「相手は自身の」を含む場合のみ適用する（「相手の〜をKO/レスト」など
+        自分が選ぶ効果には "自身の" が無いため波及しない）。
+        """
+        if node is None:
+            return
+        if isinstance(node, GameAction):
+            tq = getattr(node, "target", None)
+            raw = _nfc(getattr(node, "raw_text", "") or "")
+            if (tq is not None and getattr(tq, "player", None) == Player.OPPONENT
+                    and getattr(tq, "chooser", None) is None
+                    and _nfc("相手は自身の") in raw):
+                tq.chooser = Player.OPPONENT
+            self._apply_opponent_self_chooser(getattr(node, "sub_effect", None))
+            return
+        if isinstance(node, Sequence):
+            for a in node.actions:
+                self._apply_opponent_self_chooser(a)
+            return
+        if isinstance(node, Branch):
+            self._apply_opponent_self_chooser(node.if_true)
+            self._apply_opponent_self_chooser(node.if_false)
+            return
+        if isinstance(node, Choice):
+            for o in node.options:
+                self._apply_opponent_self_chooser(o)
+            return
 
     def _replacement_status(self, norm_text: str) -> Optional[str]:
         """置換効果（「代わりに〜」）の対象除去種別を返す。
@@ -1153,7 +1192,7 @@ class EffectParser:
         # （例「コスト8以上のキャラがいて、手札6枚以下」→ HAND_COUNT>=8 と誤読）。
         split_m = re.search(
             _nfc(r'^(?P<a>.+?(?:がい(?:て|る)|枚以上いて|枚以下いて|がいなくて|があり|がある|'
-                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち))、(?P<b>.+)$'),
+                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち|カード名で|多色で|[」》]で))、(?P<b>.+)$'),
             norm_text)
         if split_m:
             a_txt = split_m.group("a")
@@ -1165,6 +1204,14 @@ class EffectParser:
             a_norm = re.sub(_nfc(r'(以上|以下)で$'), r'\1', a_norm)
             # 「を持ち」連結（例「リーダーが特徴《X》を持ち、…の場合」）は終止形に正規化
             a_norm = re.sub(_nfc(r'を持ち$'), _nfc('を持つ'), a_norm)
+            # 「…カード名で、…」連結（例「リーダーが『エース』を含むカード名で、…」OP16-015）。
+            # 連結の「で」を落として体言止めに戻し、カード名条件として再帰解析する。
+            a_norm = re.sub(_nfc(r'カード名で$'), _nfc('カード名'), a_norm)
+            # 「リーダーが「X」で、…」「リーダーが特徴《X》で、…」連結（OP14-059 ほか6枚）。
+            # 閉じ括弧直後の連結「で」を落として体言止めに戻す。
+            a_norm = re.sub(_nfc(r'([」》])で$'), r'\1', a_norm)
+            # 「リーダーが多色で、…」連結（EB02-061/PRB02-005）。連結「で」を落とす。
+            a_norm = re.sub(_nfc(r'多色で$'), _nfc('多色'), a_norm)
             sub_a = self._parse_condition_obj(a_norm)
             sub_b = self._parse_condition_obj(b_txt)
             valid = [c for c in (sub_a, sub_b)
@@ -1197,9 +1244,27 @@ class EffectParser:
         # 対象プレイヤーの判定
         p = Player.OPPONENT if _nfc("相手") in norm_text else Player.SELF
 
+        # 「自分か相手の（場の）ドン‼がN枚ある」= いずれかが N 枚（OR）。P-107。
+        # 「相手」を含むため下の相互比較/相手基準に化けるのを防ぐ。
+        if (re.search(_nfc(r'自分か相手|相手か自分'), norm_text)
+                and re.search(_nfc(r'ドン[ 　]*(?:!!|‼)'), norm_text) and nums):
+            return Condition(type=ConditionType.OR, player=Player.SELF, raw_text=norm_text, args=[
+                Condition(type=ConditionType.DON_COUNT, operator=operator, value=value,
+                          player=Player.SELF, raw_text=norm_text),
+                Condition(type=ConditionType.DON_COUNT, operator=operator, value=value,
+                          player=Player.OPPONENT, raw_text=norm_text),
+            ])
+
         if re.search(_nfc(r'ドン[ 　]*(?:!!|‼)'), norm_text):
-            # 「自分のドン!!が相手より多い」等の相互比較条件
-            if (re.search(_nfc(r'相手.{0,20}ドン[ 　]*(?:!!|‼)'), norm_text)
+            # 「自分のドン!!が相手より多い」等の相互比較条件。自分と相手の両プールを比べる句に
+            # 限る＝「より」を含むか、「自分」と「相手」が両方現れる場合のみ。
+            # 「相手の場のドン‼が6枚以上ある」（単一プールの枚数閾値）や「相手の付与されている
+            # ドン‼がある」（存在条件）は相互比較ではないので下のハンドラへ落とす
+            # （従来は「相手…ドン‼」+比較語だけで誤吸収し GE 0＝常時真・player=SELF に化けていた。
+            # OP15-005／OP14-063/EB02-061/OP08-060/PRB02-005/010）。
+            _mutual = (_nfc("より") in norm_text
+                       or (_nfc("自分") in norm_text and _nfc("相手") in norm_text))
+            if _mutual and (re.search(_nfc(r'相手.{0,20}ドン[ 　]*(?:!!|‼)'), norm_text)
                     or re.search(_nfc(r'ドン[ 　]*(?:!!|‼).{0,20}(?:より|以上|以下)'), norm_text)
                     and _nfc("相手") in norm_text):
                 op_m = re.search(_nfc(r'(以下|以上|より多い|未満|より少ない)'), norm_text)
@@ -1261,6 +1326,18 @@ class EffectParser:
         if _nfc("お互い") in norm_text and _nfc("ライフ") in norm_text and _nfc("合計") in norm_text:
             return Condition(type=ConditionType.LIFE_COUNT_BOTH, operator=operator, value=value, player=Player.SELF, raw_text=norm_text)
 
+        # 「自分のライフ(の枚数)が相手(のライフ)より少ない/以下/より多い/以上」= 両者ライフの相対比較。
+        # 主語が「自分のライフ」で相手と比較する句のみ。既定の LIFE_COUNT（相手 EQ 0 等）に
+        # 化けて常時不成立になっていた（OP15-104/OP03-119/OP10-113/OP07-098 ほか12枚）。
+        if (_nfc("自分のライフ") in norm_text and _nfc("相手") in norm_text
+                and re.search(_nfc(r'より少ない|より多い|以下|以上|未満'), norm_text)):
+            cmp_op = (CompareOperator.LT if (_nfc("より少ない") in norm_text or _nfc("未満") in norm_text)
+                      else CompareOperator.LE if _nfc("以下") in norm_text
+                      else CompareOperator.GT if _nfc("より多い") in norm_text
+                      else CompareOperator.GE)
+            return Condition(type=ConditionType.LIFE_COUNT_COMPARE, operator=cmp_op,
+                             player=Player.SELF, raw_text=norm_text)
+
         if _nfc("ライフ") in norm_text:
             return Condition(type=ConditionType.LIFE_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
@@ -1277,13 +1354,25 @@ class EffectParser:
         if (_nfc("リーダーが") in norm_text or _nfc("リーダーの特徴") in norm_text
                 or _nfc("リーダーのパワー") in norm_text):
             # 特徴は《X》だけでなく『X』（『白ひげ海賊団』『B・W』等の名称系特徴）でも書かれる。
+            # 複数併記「特徴《X》か《Y》」は findall で全て拾い OR で判定する（先頭のみだと
+            # 第2特徴のリーダーで常に不成立だった。OP14-022/OP13-027/EB02-011 ほか12枚）。
+            trait_all = re.findall(_nfc(r'[《<『]([^》>』]+)[》>』]'), norm_text)
             trait_match = re.search(_nfc(r'[《<『]([^》>』]+)[》>』]'), norm_text)
             # リーダー名は複数併記され得る（「「サボ」か「エース」か「ルフィ」の場合」OP13-016）。
             # findall で全て拾い、resolver はいずれか一致(OR)で判定する。re.search だと先頭名
             # のみになり、他リーダー名のとき条件が常に不成立だった。
             name_matches = re.findall(r'「([^」]+)」', norm_text)
+            # 「『エース』を含むカード名」等は、『』表記でも“特徴”ではなく“カード名の部分一致”。
+            # カード名文脈では 『』／「」 の語をリーダー名（matches_name の部分一致）として扱う。
+            # これを LEADER_TRAIT に流すと leader.traits に無く常に不成立になる（OP16-015 ルフィ）。
+            if _nfc("カード名") in norm_text:
+                nm = re.findall(_nfc(r'[「『]([^」』]+)[」』]'), norm_text)
+                if nm:
+                    val = nm[0] if len(nm) == 1 else nm
+                    return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
             if trait_match:
-                return Condition(type=ConditionType.LEADER_TRAIT, value=trait_match.group(1), player=p, raw_text=norm_text)
+                tval = trait_all[0] if len(trait_all) == 1 else trait_all
+                return Condition(type=ConditionType.LEADER_TRAIT, value=tval, player=p, raw_text=norm_text)
             if name_matches:
                 val = name_matches[0] if len(name_matches) == 1 else name_matches
                 return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
@@ -1320,6 +1409,15 @@ class EffectParser:
         # バトル文脈の条件。FIELD_COUNT（「キャラ」+「いる」を含むため誤分類しうる）より先に捌く。
         if _nfc("バトルしている") in norm_text:
             return Condition(type=ConditionType.SOURCE_STATE, value="IN_BATTLE", player=p, raw_text=norm_text)
+
+        # 「このターン中、（相手/自分の）キャラがKOされている場合」: ターン内に当該プレイヤーの
+        # キャラが KO された回数で判定する（OP16-100）。「KOされて<いる>」が下の FIELD_COUNT
+        # 分岐（「いる」を含む）に誤吸収され、相手の場キャラ存在条件に化けるのを防ぐ。
+        if (_nfc("キャラ") in norm_text and _nfc("KOされている") in norm_text
+                and _nfc("このキャラ") not in norm_text):
+            kp = Player.SELF if _nfc("自分") in norm_text else Player.OPPONENT
+            return Condition(type=ConditionType.CHAR_KOED_THIS_TURN,
+                             operator=CompareOperator.GE, value=1, player=kp, raw_text=norm_text)
 
         # 盤面のキャラ枚数（「自分の（レストの／特徴《X》の／コストN以上の）キャラがM枚以上いる」
         # 「…キャラがいる」）。数値が「フィルタ(コストN以上)」と「枚数(M枚)」で混在し得るため、
