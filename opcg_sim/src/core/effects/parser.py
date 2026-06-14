@@ -258,6 +258,52 @@ class EffectParser:
                 args=[prev_cond, Condition(type=ConditionType.NOT, args=[cur_cond])],
             )
 
+    # 「手札のこのカードは、…コスト±N」の符号記号
+    _HAND_COST_RE = re.compile(
+        _nfc(r'^手札のこのカードは[、,]\s*(?P<cond>.+?)[、,]\s*コスト[ 　]*'
+             r'(?P<sign>[+＋\-－−‐])[ 　]*(?P<n>\d+)。?$')
+    )
+
+    def _try_hand_self_cost(self, norm_text: str):
+        """「手札のこのカードは、〈条件〉、コスト±N」を PASSIVE 自己コスト増減能力にする。
+
+        対象は手札のこのカード自身（zone=HAND / ref_id="self"）。条件は主語を除いた
+        「〈条件〉」部分のみを解析する（"手札"由来の HAND_COUNT 誤判定を避ける）。
+        条件が解釈不能な場合は None を返し、従来経路に委ねる（無条件の常時軽減化を防ぐ）。
+        """
+        m = self._HAND_COST_RE.match(norm_text)
+        if not m:
+            return None
+        cond_text = m.group("cond")
+        # 「の場合」「ターン中」等の語尾を落として状態条件本体を解析する。
+        cond_body = re.sub(_nfc(r'(の場合|ターン中)$'), '', cond_text).strip()
+        cond = self._parse_condition_obj(cond_body)
+        if cond is None or cond.type in (ConditionType.NONE, ConditionType.GENERIC,
+                                         ConditionType.OTHER):
+            return None
+        sign = -1 if m.group("sign") in "-－−‐" else 1
+        value = sign * int(m.group("n"))
+        target = TargetQuery(
+            zone=Zone.HAND, player=Player.SELF, count=1,
+            is_strict_count=True, ref_id="self",
+        )
+        target.flags.add("SELF_IN_HAND")
+        effect = GameAction(
+            type=ActionType.BUFF,
+            target=target,
+            value=ValueSource(base=value),
+            status="COST_REDUCTION",
+            duration="INSTANT",
+            raw_text=norm_text,
+        )
+        return Ability(
+            trigger=TriggerType.PASSIVE,
+            condition=cond,
+            cost=None,
+            effect=effect,
+            raw_text=norm_text,
+        )
+
     def parse_ability(self, text: str) -> Ability:
         log_event("DEBUG", "parser.input", f"Input text: {text[:50]}")
         try:
@@ -281,6 +327,16 @@ class EffectParser:
             # （EVENT/cost_min が混入）ため、ゲーム開始時節が続く場合のみ除去する。
             # 単独の「ルール上、…」節（他18枚）は rule_processing ルールが担当するため不変。
             norm_text = re.sub(_nfc(r'^ルール上、[^。]*?できず、(?=ゲーム開始時)'), '', norm_text)
+
+            # 「手札のこのカードは、〈条件〉場合、コスト±N」: 手札にある間の自己コスト増減。
+            # 主語「手札のこのカード」が条件パースを汚染し（"手札"→HAND_COUNT 誤判定）、対象も
+            # 既定 FIELD に縮退、さらに手札カードの PASSIVE は再計算で評価されないため、従来は
+            # コスト軽減が一切効かなかった（ウタ ST23-001/サッチ OP16-005 ほか計13枚）。専用に
+            # 条件を抽出し、対象=手札のこのカード自身（ref_id="self"）の COST_REDUCTION として
+            # PASSIVE 能力を組む。エンジンは _apply_passive_effects で手札カードを評価する。
+            hand_cost_ability = self._try_hand_self_cost(norm_text)
+            if hand_cost_ability is not None:
+                return hand_cost_ability
 
             # トリガー検出は前処理前のテキストで行う（コスト/制限タグ除去前に判定）
             trigger = self._detect_trigger(norm_text)

@@ -967,6 +967,50 @@ def _don_phase_routing(ctx: ParseContext) -> Optional[GameAction]:
     return None
 
 
+@rule("don_attach_leader_and_char", priority=85)
+def _don_attach_leader_and_char(ctx: ParseContext) -> Optional[EffectNode]:
+    """「自分のリーダーとキャラN枚に（レストの）ドン!!M枚ずつ（まで）を、付与する」→
+    リーダーへの付与 ＋ キャラへの付与の 2 アクション（Sequence）。
+
+    「リーダー**と**キャラ」（AND）は両方が受け手であり、「ずつ」は各受け手へ M 枚ずつ
+    付与する分配を表す。従来は generic `don_attach` が「リーダー/キャラのいずれか1枚」
+    （count=1 の単一対象）に縮退し、リーダーかキャラの片方にしか付かなかった
+    （OP13-042 エドワード・ニューゲート「リーダーとキャラ1枚に…2枚ずつ」）。
+    「リーダー**か**キャラ」（OR・単一対象）は generic 側に委ねる。
+    """
+    t = ctx.text
+    if _nfc("付与") not in t or _nfc("ドン") not in t:
+        return None
+    if not re.search(_nfc(r'付与(?:する|し|できる)'), t):
+        return None
+    # 「リーダーとキャラ（N枚／すべて）に…ドン…N枚ずつ」: AND 分配のみ対象。
+    m = re.search(_nfc(r'リーダーと(?:、)?(?:自分の)?キャラ(すべて|全て|\d+枚)?'), t)
+    if not m or _nfc("ずつ") not in t:
+        return None
+    # 受け手1体あたりの付与枚数（「ドン‼N枚ずつ」の N）。「キャラすべて」由来の
+    # _don_count=99 退化を避けるため、「枚ずつ」直前の数値を専用に拾う。
+    per_m = re.search(_nfc(r'(\d+)[ 　]*枚[ 　]*ずつ'), t)
+    per = int(per_m.group(1)) if per_m else 1
+    is_rested = _nfc("レストのドン") in t or _nfc("コストエリアのドン") in t
+    status = "RESTED" if is_rested else None
+    dur = _duration_of(t)
+
+    leader_tq = TargetQuery(zone=Zone.FIELD, player=Player.SELF, card_type=["LEADER"], count=1)
+    grp = m.group(1)
+    if grp in (_nfc("すべて"), _nfc("全て")):
+        char_tq = TargetQuery(zone=Zone.FIELD, player=Player.SELF, card_type=["CHARACTER"],
+                              count=-1, select_mode="ALL")
+    else:
+        char_count = int(grp[:-1]) if grp else 1  # "1枚" → 1
+        char_tq = TargetQuery(zone=Zone.FIELD, player=Player.SELF, card_type=["CHARACTER"],
+                              count=char_count, is_up_to=True, select_mode="CHOOSE")
+    mk = lambda tq: GameAction(
+        type=ActionType.ATTACH_DON, target=tq, value=ValueSource(base=per),
+        status=status, duration=dur, raw_text=t,
+    )
+    return Sequence(actions=[mk(leader_tq), mk(char_tq)])
+
+
 @rule("don_attach", priority=84)
 def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分の）リーダーかキャラ1枚に（レストの）ドン!!N枚までを付与する」→ ATTACH_DON。

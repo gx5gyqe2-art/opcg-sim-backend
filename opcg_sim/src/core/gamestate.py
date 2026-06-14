@@ -1159,6 +1159,33 @@ class GameManager:
         finally:
             self._in_passive_recalc = False
 
+        # Step 4: 手札カードの自己コスト増減 PASSIVE（「手札のこのカードは、〈条件〉、コスト±N」）。
+        #   手札の PASSIVE は Step2/3 の場走査では評価されないため、ここで個別に評価する。
+        #   対象は手札のこのカード自身（target.flags に "SELF_IN_HAND"）。条件成立時のみ
+        #   cost_buff を加算する（Step1 で 0 にリセット済み）。ウタ ST23-001/サッチ OP16-005 等。
+        self._apply_hand_self_cost(player, opponent)
+
+    def _apply_hand_self_cost(self, player: Player, opponent: Player):
+        resolver = None
+        for p in [player, opponent]:
+            for card in p.hand:
+                if not card or not card.master.abilities:
+                    continue
+                for ability in card.master.abilities:
+                    if ability.trigger != TriggerType.PASSIVE:
+                        continue
+                    eff = ability.effect
+                    tq = getattr(eff, "target", None)
+                    if (eff is None or getattr(eff, "status", None) != "COST_REDUCTION"
+                            or tq is None or "SELF_IN_HAND" not in getattr(tq, "flags", set())):
+                        continue
+                    if resolver is None:
+                        resolver = EffectResolver(self)
+                    if ability.condition is not None and not resolver._check_condition(
+                            p, ability.condition, card):
+                        continue
+                    card.cost_buff += eff.value.base
+
     def draw_card(self, player: Player, count: int = 1):
         for _ in range(count):
             if player.deck:
