@@ -1439,7 +1439,10 @@ class EffectParser:
         # 「…キャラがいる」）。数値が「フィルタ(コストN以上)」と「枚数(M枚)」で混在し得るため、
         # 閾値は必ず「M枚」側から取り、フィルタは parse_target に委ねる（保守的な分類）。
         # 「このキャラが…される/場を離れる/登場した」等の単体状態・置換条件は対象外。
-        if (_nfc("キャラ") in norm_text and _nfc("このキャラ") not in norm_text
+        # ただし「このキャラ以外の…キャラがいる」は他キャラの存在条件（FIELD_COUNT）なので
+        # SOURCE_STATE ではなくこちらで扱う（OP05-003: 自身のパワー条件に誤分類されていた）。
+        if (_nfc("キャラ") in norm_text
+                and (_nfc("このキャラ") not in norm_text or _nfc("このキャラ以外") in norm_text)
                 and (_nfc("いる") in norm_text or _nfc("いない") in norm_text or re.search(_nfc(r"\d+枚(以上|以下)"), norm_text))
                 and not re.search(_nfc(r"(される|場を離れる|登場した|公開)"), norm_text)
                 and _nfc("のみ") not in norm_text):
@@ -1467,8 +1470,9 @@ class EffectParser:
             return Condition(type=ConditionType.FIELD_COUNT, target=tq,
                              operator=cnt_op, value=thr, player=tq.player, raw_text=norm_text)
 
-        # SOURCE_STATE: このキャラ自身の状態条件（レスト/アクティブ/パワー/登場ターン）
-        if _nfc("このキャラ") in norm_text:
+        # SOURCE_STATE: このキャラ自身の状態条件（レスト/アクティブ/パワー/登場ターン）。
+        # 「このキャラ以外」は自身ではなく他キャラの条件なので除外（上の FIELD_COUNT が担当）。
+        if _nfc("このキャラ") in norm_text and _nfc("このキャラ以外") not in norm_text:
             if _nfc("登場したターン") in norm_text:
                 return Condition(type=ConditionType.SOURCE_STATE, value="ENTERED_THIS_TURN", player=p, raw_text=norm_text)
             if _nfc("アクティブ") in norm_text:
