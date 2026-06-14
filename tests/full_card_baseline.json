@@ -732,7 +732,7 @@
 "OP04-002|ACTIVATE_MAIN": "- | pw-5000,kw0,rs1,co0",
 "OP04-003|ON_KO": "p2_field:3→2, p2_trash:0→1 | pw0,kw0,rs0,co0",
 "OP04-004|ACTIVATE_MAIN": "p1_don:10→0 | pw0,kw0,rs1,co0",
-"OP04-005|PASSIVE": "- | pw0,kw1,rs0,co0",
+"OP04-005|PASSIVE": "- | pw0,kw0,rs0,co0",
 "OP04-006|ON_ATTACK": "- | pw-3000,kw0,rs0,co0",
 "OP04-008|ON_ATTACK": "- | pw0,kw0,rs0,co0",
 "OP04-009|ON_ATTACK": "- | pw-5000,kw0,rs0,co0",

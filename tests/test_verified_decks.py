@@ -1026,3 +1026,23 @@ def test_power_range_n_to_m():
     assert t is not None and t.power_min == 2000 and t.power_max == 5000
     t2 = play_target("PRB02-010")
     assert t2 is not None and t2.power_min == 6000 and t2.power_max == 8000
+
+
+# --- 「このキャラ以外の…パワーN以上のキャラがいる」 -----------------------
+
+def test_op05003_other_char_high_power_field_count():
+    """OP05-003 イナズマ「このキャラ以外の自分のパワー7000以上のキャラがいる場合、速攻を得る」は
+    他キャラの存在条件(FIELD_COUNT, power>=7000, 自身除外)。「このキャラ」を含むため SOURCE_STATE
+    (自身のパワー条件)に誤分類されていた回帰。「このキャラのパワーが…」(OP05-004)は SOURCE_STATE のまま。"""
+    c = inst("OP05-003").master.abilities[0].condition
+    assert c.type == ConditionType.FIELD_COUNT
+    assert c.operator == CompareOperator.GE and c.value == 1
+    assert c.target is not None and c.target.power_min == 7000
+    assert "EXCLUDE_SOURCE" in c.target.flags
+    # 「このキャラのパワーが7000以上」(自身) は SOURCE_STATE のまま
+    c4 = inst("OP05-004").master.abilities[0].condition
+    def has_source_state(cond):
+        if cond.type == ConditionType.SOURCE_STATE:
+            return True
+        return any(has_source_state(a) for a in (getattr(cond, "args", []) or []))
+    assert has_source_state(c4)
