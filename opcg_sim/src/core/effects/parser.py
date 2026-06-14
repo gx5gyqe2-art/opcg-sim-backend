@@ -1239,9 +1239,24 @@ class EffectParser:
         # 対象プレイヤーの判定
         p = Player.OPPONENT if _nfc("相手") in norm_text else Player.SELF
 
+        # 「自分か相手の（場の）ドン‼がN枚ある」= いずれかが N 枚（OR）。P-107。
+        # 「相手」を含むため下の相互比較/相手基準に化けるのを防ぐ。
+        if (re.search(_nfc(r'自分か相手|相手か自分'), norm_text)
+                and re.search(_nfc(r'ドン[ 　]*(?:!!|‼)'), norm_text) and nums):
+            return Condition(type=ConditionType.OR, player=Player.SELF, raw_text=norm_text, args=[
+                Condition(type=ConditionType.DON_COUNT, operator=operator, value=value,
+                          player=Player.SELF, raw_text=norm_text),
+                Condition(type=ConditionType.DON_COUNT, operator=operator, value=value,
+                          player=Player.OPPONENT, raw_text=norm_text),
+            ])
+
         if re.search(_nfc(r'ドン[ 　]*(?:!!|‼)'), norm_text):
-            # 「自分のドン!!が相手より多い」等の相互比較条件
-            if (re.search(_nfc(r'相手.{0,20}ドン[ 　]*(?:!!|‼)'), norm_text)
+            # 「自分のドン!!が相手より多い」等の相互比較条件。比較語（より/以上/以下/多い/少ない）
+            # を伴う場合のみ。比較語の無い存在条件「相手の付与されているドン‼がある」は下の
+            # 付与ドン存在ハンドラへ落とす（従来は「相手…ドン‼」だけで誤吸収し GE 0＝常時真・
+            # player=SELF に化けていた。OP15-005）。
+            _has_cmp = re.search(_nfc(r'より多い|より少ない|より|以上|以下|未満'), norm_text)
+            if _has_cmp and (re.search(_nfc(r'相手.{0,20}ドン[ 　]*(?:!!|‼)'), norm_text)
                     or re.search(_nfc(r'ドン[ 　]*(?:!!|‼).{0,20}(?:より|以上|以下)'), norm_text)
                     and _nfc("相手") in norm_text):
                 op_m = re.search(_nfc(r'(以下|以上|より多い|未満|より少ない)'), norm_text)

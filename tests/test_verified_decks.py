@@ -360,6 +360,60 @@ def test_op16102_play_from_hand_or_trash():
     assert len(cands) == 2
 
 
+def test_op15_name_or_trait_order_variant():
+    """OP15-073/101: 「「名前」か特徴《X》を持つ」順の name-or-trait が AND 化していた回帰。
+    か→「特徴」→《 の語順で TRAIT_OR_NAME が立たず、名前かつ特徴を要求して候補が空に
+    なっていた（OP16-001 の逆順は既存対応済み）。"""
+    from opcg_sim.src.models.enums import Zone
+    for cid, atype in [("OP15-073", ActionType.PLAY_CARD), ("OP15-101", ActionType.MOVE_CARD)]:
+        act = None
+        for ab in inst(cid).master.abilities:
+            act = find_action(ab.effect, atype) or act
+        assert act is not None and act.target.names and act.target.traits
+        assert "TRAIT_OR_NAME" in act.target.flags
+    # 実機: 名前一致（神兵=特徴空島）も特徴一致（オーム=神官・別名）も候補になる。
+    # AND 化バグでは「神兵という名前かつ神官特徴」を要求し候補が皆無だった。
+    gm, p1, _ = game("OP16-022", "OP16-022")
+    tq = find_action(inst("OP15-073").master.abilities[-1].effect, ActionType.PLAY_CARD).target
+    p1.hand = [inst("OP15-068", "P1"), inst("OP15-061", "P1")]  # 神兵(名前) / オーム(神官)
+    cands = {c.master.name for c in get_target_cards(gm, tq, inst("OP15-073"))}
+    assert "神兵" in cands and "オーム" in cands
+
+
+def test_op15_attached_don_filter_unnumbered():
+    """OP15-018/015/027: 「相手のドン‼が付与されているキャラ」（枚数指定なし=1枚以上）の
+    対象に min_attached_don=1 が付く。従来は数値明示時のみで、付与ドンの無いキャラまで
+    対象に含めていた（OP15-001 の『2枚以上』は min=2 のまま）。"""
+    def adon(cid, atype):
+        for ab in inst(cid).master.abilities:
+            a = find_action(ab.effect, atype)
+            if a and a.target and getattr(a.target.player, "name", "") == "OPPONENT":
+                return a
+        return None
+    assert adon("OP15-018", ActionType.KO).target.min_attached_don == 1
+    assert adon("OP15-015", ActionType.BUFF).target.min_attached_don == 1
+    assert adon("OP15-027", ActionType.REST).target.min_attached_don == 1
+    assert adon("OP15-001", ActionType.REST).target.min_attached_don == 2
+
+
+def test_op15005_opponent_attached_don_exists():
+    """OP15-005 カバジ: 「相手の付与されているドン‼がある場合」は相手の付与ドン≥1。
+    比較語が無いのに相互比較ブランチに誤吸収され DON_COUNT_COMPARE GE 0（常時真）・
+    player=SELF に化けていた回帰。"""
+    c = inst("OP15-005").master.abilities[0].condition
+    assert c.type == ConditionType.DON_COUNT
+    assert c.player.name == "OPPONENT" and c.value == 1
+
+
+def test_p107_either_player_don_count_is_or():
+    """P-107: 「自分か相手の場のドン‼が10枚ある場合」は OR(self==10, opp==10)。
+    「相手」を含むため相手基準/相互比較に化け、自分==10 の常用ケースを取りこぼしていた。"""
+    c = inst("P-107").master.abilities[0].condition
+    assert c.type == ConditionType.OR
+    sides = {(a.player.name, a.value) for a in c.args}
+    assert ("SELF", 10) in sides and ("OPPONENT", 10) in sides
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")

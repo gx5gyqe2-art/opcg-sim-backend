@@ -187,9 +187,10 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             
     tq.traits.extend(final_traits)
 
-    # 「《特徴》（を持つキャラカード）か「名前」」= 特徴 OR 名前。「か」が名前の開き括弧へ
-    # 直接かかる場合に OR とみなす（OP11-022「《海王類》を持つキャラカードか「メガロ」」）。
-    if tq.traits and tq.names and re.search(_nfc(r'か[「『《]'), tgt_text):
+    # 「《特徴》（を持つキャラカード）か「名前」」= 特徴 OR 名前。「か」が名前/特徴の開き括弧へ
+    # かかる場合に OR とみなす（OP11-022「《海王類》を持つキャラカードか「メガロ」」）。
+    # 「「名前」か特徴《X》を持つ」順（か→「特徴」→《）も OR（OP15-073/101）。
+    if tq.traits and tq.names and re.search(_nfc(r'か(?:を含む)?(?:特徴)?[「『《]'), tgt_text):
         tq.flags.add("TRAIT_OR_NAME")
 
     # 「「名前」か<種類>」= 名前 OR 種類（OP12-071「「サンジ」かイベント」）。従来は names と
@@ -337,6 +338,13 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if m_adon:
         tq.min_attached_don = int(m_adon.group(1))
         count_text = tgt_text.replace(m_adon.group(0), '')
+    else:
+        # 枚数指定の無い「ドン‼が付与されている（パワー…の）キャラ」= 付与ドン1枚以上。
+        # 従来は下限フィルタが付かず、付与ドンの無いキャラまで対象に含めていた（OP15-018/015）。
+        m_adon1 = re.search(_nfc(r'ドン(?:!!|‼)?が付与されている'), tgt_text)
+        if m_adon1:
+            tq.min_attached_don = 1
+            count_text = tgt_text.replace(m_adon1.group(0), '')
 
     if _nfc(ParserKeyword.ALL_HIRAGANA) in count_text or _nfc(ParserKeyword.ALL) in count_text:
         tq.count = -1
