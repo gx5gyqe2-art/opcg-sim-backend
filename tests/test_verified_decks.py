@@ -1089,3 +1089,46 @@ def test_conditional_clause_gates_all_trailing_actions():
             has_sibling_disc = any(find_action(k, ActionType.DISCARD) is not None
                                    and not isinstance(k, Branch) for k in kids)
             assert not (has_draw_only and has_sibling_disc), f"{cid}: DISCARD が分岐外"
+
+
+# --- 公開/トラッシュ済みカードの条件（GENERIC退化の解消） -------------------
+
+def test_revealed_placed_card_condition_not_generic():
+    """「公開したカードが〈特徴/コスト/パワー/種別〉の場合」「置いたカードが〈コスト〉の場合」が
+    GENERIC（常時真）に退化し、公開/トラッシュしたカードの内容を問わず効果が発動していた回帰
+    （OP08-049/096・EB01-029・OP01-063・OP04-011・OP15-065）。REVEALED_CARD_TRAIT で
+    last_revealed_card（LOOK/REVEAL/TRASH_FROM_DECK で記録）を評価する。"""
+    from opcg_sim.src.models.effect_types import Branch
+
+    def revealed_conds(cid):
+        out = []
+        def walk(n):
+            c = getattr(n, "condition", None)
+            if isinstance(n, Branch) and c is not None:
+                out.append(c)
+            for x in getattr(n, "actions", []) or []:
+                walk(x)
+            for x in getattr(n, "options", []) or []:
+                walk(x)
+            for k in ("if_true", "if_false"):
+                s = getattr(n, k, None)
+                if s:
+                    walk(s)
+        for ab in inst(cid).master.abilities:
+            walk(ab.effect)
+        return out
+
+    expect = {
+        "EB01-029": {"cost": 4},
+        "OP01-063": {"card_type": "イベント"},
+        "OP04-011": {"power": 6000, "card_type": "キャラ"},
+        "OP08-049": {"trait": "白ひげ海賊団"},
+        "OP08-096": {"cost": 6},
+        "OP15-065": {"cost": 2},
+    }
+    for cid, exp in expect.items():
+        rc = [c for c in revealed_conds(cid) if c.type == ConditionType.REVEALED_CARD_TRAIT]
+        assert rc, f"{cid}: REVEALED_CARD_TRAIT 条件が無い（GENERIC退化）"
+        val = rc[0].value
+        for k, v in exp.items():
+            assert val.get(k) == v, f"{cid}: {k}={val.get(k)} != {v}"

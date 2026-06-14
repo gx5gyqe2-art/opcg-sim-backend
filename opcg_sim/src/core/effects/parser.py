@@ -1571,7 +1571,11 @@ class EffectParser:
         # REVEALED_CARD_TRAIT: 公開したカードの特徴/コスト/タイプ条件。
         # 公開(LOOK)が独立クローズに分割される場合、条件側には「公開し」が残らないため
         # 「そのカード」を主たる手掛かりとする（filter が1つも取れなければ下へフォールスルー）。
-        if _nfc("そのカード") in norm_text:
+        # 「公開したカードが…」「（デッキの上から）置いたカードが…」も同じ公開カード条件
+        # （カードが既にデッキ/トラッシュへ移動済みでも last_revealed_card で参照する。
+        #  OP08-049/096・EB01-029・OP01-063・OP04-011・OP15-065 等）。
+        if (_nfc("そのカード") in norm_text or _nfc("公開したカード") in norm_text
+                or _nfc("置いたカード") in norm_text):
             val: dict = {}
             # 含む特徴: 『X』を含む特徴
             contains_m = re.search(_nfc(r'[『「]([^』」]+)[』」]を含む特徴'), norm_text)
@@ -1593,15 +1597,26 @@ class EffectParser:
                     val["cost_op"] = CompareOperator.LE
                 else:
                     val["cost_op"] = CompareOperator.EQ
+            # パワー条件（「パワー6000以上の」OP04-011）
+            pow_m = re.search(_nfc(r'パワー(\d+)(以上|以下)?'), norm_text)
+            if pow_m:
+                val["power"] = int(pow_m.group(1))
+                if pow_m.group(2) == _nfc('以下'):
+                    val["power_op"] = CompareOperator.LE
+                else:
+                    val["power_op"] = CompareOperator.GE
             # カード名条件（「サボ」等の完全一致。『X』を含む特徴 とは別）
             name_m = re.search(_nfc(r'「([^」]+)」'), norm_text)
             if name_m:
                 val["name"] = name_m.group(1)
-            # カードタイプ
-            if _nfc("キャラカード") in norm_text:
+            # カードタイプ（「キャラ(カード)」「イベント(カード)」「ステージ(カード)」。
+            # 「イベントの場合」のように "カード" を伴わない表記も拾う。OP01-063）
+            if _nfc("キャラ") in norm_text:
                 val["card_type"] = "キャラ"
-            elif _nfc("イベントカード") in norm_text:
+            elif _nfc("イベント") in norm_text:
                 val["card_type"] = "イベント"
+            elif _nfc("ステージ") in norm_text:
+                val["card_type"] = "ステージ"
             if val:
                 return Condition(type=ConditionType.REVEALED_CARD_TRAIT, value=val, player=p, raw_text=norm_text)
 
