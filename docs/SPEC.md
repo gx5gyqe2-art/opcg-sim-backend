@@ -303,12 +303,21 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
   **decline** で本来のKO（トラッシュ＋ON_KO）を実行し、いずれも `_finish_attack` で戦闘後処理を
   完了する。検出と実行は `_find_replacement`（適用可能な置換の検出のみ）/`_active_replacement`
   （実行）に分離した。ヘッドレス/CPU の既定応答（index0=accept）は従来の自動採用と一致するため
-  挙動ベースラインは不変。なお EB02-030（イベントで「自分のキャラ全てにこのターン中バトルKO置換を
-  付与」）は継続付与型で `_active_replacement` の `master.abilities` 走査では拾えず、別途の配線課題
-  （継続による置換能力付与）として残る。
+  挙動ベースラインは不変。
 
-  > 旧 accepted limitation（バトル KO 置換の拒否・多段 multi-source 継続）はいずれも解消済み。
-  > 残る既知の限界は EB02-030 の継続付与型置換の配線のみ。
+  **継続付与型の置換（配線済み）**: EB02-030「【カウンター】自分のキャラすべては、このターン中、
+  バトルでKOされる場合、代わりに自分の手札1枚を捨てることができる」のように、**場に残らない
+  発生源（イベント＝即トラッシュ）が「自分のキャラすべて」へ this-turn の置換を付与**するケースは、
+  `master.abilities` の場上 protector 走査では拾えない。カウンター解決時に
+  `_register_granted_replacements` が `Player.granted_replacements`（`{status, sub_effect,
+  is_optional, expire_turn}`、`turn_count <= expire_turn` の遅延失効）へ退避し、`_find_replacement`
+  が protector 走査の後にこれも参照する（被KOキャラが自分のキャラのときのみ）。付与する `sub` は
+  共有ノードを汚さないようコピーし、「できる／〜してもよい」から `is_optional` を確定するため
+  上記の任意確認（CONFIRM_OPTIONAL）で被KO側へ提示される。`granted_replacements` は `clone()` の
+  deepcopy で複製され CPU クローン安全。
+
+  > 旧 accepted limitation（バトル KO 置換の拒否・多段 multi-source 継続）および
+  > EB02-030 の継続付与型置換の配線は、いずれも解消済み。
 
 ---
 
