@@ -828,3 +828,140 @@ def test_hand_to_life_face_down_move():
     assert mv2 is not None
     assert mv2.target.zone == Zone.HAND and mv2.destination == Zone.LIFE
     assert mv2.dest_position == "TOP" and mv2.face_up is False
+
+
+# --- リーダーのパワー＋特徴 AND 条件 ----------------------------------------
+
+def test_op09017_leader_power_and_trait_condition():
+    """OP09-017 ワイヤー【ドン‼×1】「リーダーが、パワー7000以上でかつ特徴《キッド海賊団》を
+    持つ場合」は LEADER_STATE(POWER>=7000) ∧ LEADER_TRAIT(キッド海賊団) の AND。「でかつ」が
+    読点を伴わず AND 分割されず、特徴条件だけが返って**パワー7000以上が脱落**＝低パワーの
+    キッド海賊団リーダーでも速攻が付く退行だった。"""
+    c = inst("OP09-017").master.abilities[0].condition
+    # AND(HAS_DON, AND(LEADER_STATE POWER>=7000, LEADER_TRAIT キッド海賊団))
+    def flatten(cond):
+        out = []
+        if cond.type == ConditionType.AND:
+            for a in cond.args:
+                out += flatten(a)
+        else:
+            out.append(cond)
+        return out
+    leaves = flatten(c)
+    types = {x.type for x in leaves}
+    assert ConditionType.LEADER_STATE in types
+    assert ConditionType.LEADER_TRAIT in types
+    pw = next(x for x in leaves if x.type == ConditionType.LEADER_STATE)
+    assert pw.value == ("POWER", 7000) and pw.operator == CompareOperator.GE
+    tr = next(x for x in leaves if x.type == ConditionType.LEADER_TRAIT)
+    assert tr.value == "キッド海賊団"
+
+
+# --- 「キャラ1枚かドン‼1枚」レストの択一 -----------------------------------
+
+def test_op09036_rest_char_or_don_choice():
+    """OP09-036 ルフィ「相手のコスト6以下のキャラ1枚かドン‼1枚までを、レストにする」は
+    キャラREST と ドンREST の択一(Choice)。rest_char_or_don の正規表現が「キャラ」直後に
+    「か」を要求し、「キャラ1枚か…」の枚数を挟む形に不一致＝REST_DON だけ拾われ、相手キャラを
+    レストにする選択肢が脱落していた回帰。"""
+    from opcg_sim.src.models.effect_types import Choice
+    eff = inst("OP09-036").master.abilities[0].effect
+    # ON_PLAY 条件(レストキャラ2枚以上)の下に Choice がある
+    def find_choice(node):
+        if isinstance(node, Choice):
+            return node
+        for attr in ("actions", "options"):
+            for x in getattr(node, attr, []) or []:
+                r = find_choice(x)
+                if r:
+                    return r
+        for attr in ("if_true", "if_false"):
+            sub = getattr(node, attr, None)
+            if sub:
+                r = find_choice(sub)
+                if r:
+                    return r
+        return None
+    ch = find_choice(eff)
+    assert ch is not None
+    types = {o.type for o in ch.options}
+    assert ActionType.REST in types and ActionType.REST_DON in types
+    rest = next(o for o in ch.options if o.type == ActionType.REST)
+    assert rest.target.cost_max == 6
+    assert getattr(rest.target.player, "name", "") == "OPPONENT"
+
+
+# --- カウンターの「効果無効＋パワー減」連結 --------------------------------
+
+def test_op09097_counter_negate_then_buff():
+    """OP09-097 闇水【カウンター】「効果を無効にし、パワー-4000」は NEGATE + BUFF の複合。
+    「無効にし、」(連用) が negate_effect(終止形のみ) に拾われず、buff が全体を丸呑みして
+    効果無効が脱落し -4000 だけになっていた回帰。"""
+    eff = None
+    for ab in inst("OP09-097").master.abilities:
+        if ab.trigger == TriggerType.COUNTER:
+            eff = ab.effect
+    assert eff is not None
+    neg = find_action(eff, ActionType.NEGATE_EFFECT)
+    buf = find_action(eff, ActionType.BUFF)
+    assert neg is not None and buf is not None
+    assert buf.value.base == -4000
+    assert getattr(neg.target.player, "name", "") == "OPPONENT"
+
+
+# --- 「【A】か【B】か【C】を得る」キーワード択一 ---------------------------
+
+def test_op09084_keyword_choice():
+    """OP09-084 カタリーナ・デボン「【ダブルアタック】か【バニッシュ】か【ブロッカー】を得る」は
+    3択の Choice。grant_keyword が先頭キーワードのみ拾い、2番目以降が脱落していた回帰。"""
+    from opcg_sim.src.models.effect_types import Choice
+    eff = inst("OP09-084").master.abilities[0].effect
+    def find_choice(node):
+        if isinstance(node, Choice):
+            return node
+        for attr in ("actions", "options"):
+            for x in getattr(node, attr, []) or []:
+                r = find_choice(x)
+                if r:
+                    return r
+        for attr in ("if_true", "if_false"):
+            sub = getattr(node, attr, None)
+            if sub and (r := find_choice(sub)):
+                return r
+        return None
+    ch = find_choice(eff)
+    assert ch is not None
+    kws = {o.status for o in ch.options}
+    assert kws == {"ダブルアタック", "バニッシュ", "ブロッカー"}
+
+
+# --- 場のキャラを「ライフの上か下に置く」 ----------------------------------
+
+def test_op09101_field_char_to_life_via_oku():
+    """OP09-101 クザン / EB01-053 / OP06-103: 「（場の）キャラ…を、ライフの上か下に表向きで置く」は
+    場のキャラをライフへ移す MOVE_CARD(FIELD→LIFE)。field_char_to_life が「加える」しか許容せず
+    「置く」表記が life_face(FACE_UP_LIFE) に落ち、場のキャラのライフ送りが脱落していた回帰。"""
+    from opcg_sim.src.models.enums import Zone
+    from opcg_sim.src.models.effect_types import Choice
+    def life_moves(node):
+        out = []
+        def walk(a):
+            if getattr(a, "type", None) == ActionType.MOVE_CARD:
+                t = a.target
+                if t and t.zone == Zone.FIELD and a.destination == Zone.LIFE:
+                    out.append(a)
+            for x in getattr(a, "actions", []) or []:
+                walk(x)
+            for x in getattr(a, "options", []) or []:
+                walk(x)
+            for k in ("if_true", "if_false"):
+                s = getattr(a, k, None)
+                if s:
+                    walk(s)
+        walk(node)
+        return out
+    # OP09-101: cost 側に FIELD→LIFE 移動
+    cost = inst("OP09-101").master.abilities[0].cost
+    assert len(life_moves(cost)) >= 1
+    # EB01-053: 効果側に FIELD→LIFE 移動
+    assert len(life_moves(inst("EB01-053").master.abilities[0].effect)) >= 1
