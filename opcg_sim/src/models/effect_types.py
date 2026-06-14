@@ -72,6 +72,8 @@ class TargetQuery:
     cost_max_dynamic: Optional[str] = None
     power_min: Optional[int] = None
     power_max: Optional[int] = None
+    # 「（複数枚を）パワーの合計がN以下になるように〈KO等〉」: 選択集合の合計パワー上限（OP05-007/OP09-018）。
+    power_sum_max: Optional[int] = None
     # 「ドン‼がN枚以上付与されているキャラ」: 付与ドン枚数の下限フィルタ（OP15-001）。
     min_attached_don: Optional[int] = None
     # 「ライフの表向きの/裏向きのカード」: ライフ等の表裏フィルタ（True=表向き, ST13-002）。
