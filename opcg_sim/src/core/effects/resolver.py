@@ -433,6 +433,14 @@ class EffectResolver:
             elif action.type == ActionType.LOOK_LIFE and getattr(player, "temp_zone", None):
                 # LOOK_LIFE は temp 末尾に append するため、公開カードは末尾
                 self.context["last_revealed_card"] = player.temp_zone[-1]
+        # 「デッキの上からN枚をトラッシュに置く。置いたカードが〈条件〉の場合」(OP08-096)用:
+        # ミルした最後のカード（=トラッシュ末尾）を公開カードとして記録する。
+        elif success and action.type == ActionType.TRASH_FROM_DECK:
+            tp = player
+            if getattr(action, "status", None) == "OPPONENT":
+                tp = self.game_manager.p2 if player is self.game_manager.p1 else self.game_manager.p1
+            if getattr(tp, "trash", None):
+                self.context["last_revealed_card"] = tp.trash[-1]
 
         # 文脈依存スケーリング（§7-5「捨てたカード1枚につき」等）用に、直前アクションが
         # 対象にした枚数を記録する。SELECT 等のメタアクションは数えない。
@@ -992,6 +1000,11 @@ class EffectResolver:
             if "cost" in val:
                 cost_op = val.get("cost_op", CompareOperator.LE)
                 if not self._compare(card.master.cost, cost_op, val["cost"]):
+                    return False
+            # パワーチェック（公開カードのパワー条件。OP04-011「パワー6000以上のキャラ」等）
+            if "power" in val:
+                power_op = val.get("power_op", CompareOperator.GE)
+                if not self._compare(getattr(card.master, "power", 0) or 0, power_op, val["power"]):
                     return False
             # カード名チェック（本来名＋ルール上の別名）
             if "name" in val and not card.master.matches_name(val["name"]):
