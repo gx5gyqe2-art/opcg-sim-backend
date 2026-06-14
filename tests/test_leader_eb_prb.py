@@ -101,14 +101,29 @@ def test_eb01_001_on_attack_requires_don():
     assert L.timed_power == 0
 
 
-@pytest.mark.xfail(strict=False, reason="EB01-001: 要確認 — PASSIVE(RULE_PROCESSING)の『《ワノ国》カウンター非所持キャラにカウンター+1000』は汎用盤面で観測できず安定検証不可")
 def test_eb01_001_passive_grants_counter_to_wano():
-    """EB01-001 PASSIVE: 自分の《ワノ国》カウンター非所持キャラがカウンター+1000を獲得。"""
+    """EB01-001 PASSIVE: 自分の《ワノ国》カウンター非所持キャラは手札でカウンター+1000を持つ。
+
+    実ルール: カウンターを持たない《ワノ国》キャラを、手札からカウンターとして使える
+    +1000札にする（PASSIVE BUFF(COUNTER)→passive_counter、手札ゾーン対象）。
+    """
+    from leader_test_helpers import make_char
     gm, p1, p2, L = build("EB01-001")
     clear_field(p1)
-    c = add_char(p1, name="ワノ国兵", cost=3, power=3000, counter=0, traits=["ワノ国"])
+    wano0 = make_char(p1, name="ワノ国兵", cost=3, power=3000, counter=0, traits=["ワノ国"])
+    wano1k = make_char(p1, name="ワノ国剣士", cost=3, power=3000, counter=1000, traits=["ワノ国"])
+    other0 = make_char(p1, name="余所者", cost=3, power=3000, counter=0, traits=["その他"])
+    p1.hand = [wano0, wano1k, other0]
     gm._apply_passive_effects(p1)
-    assert c.current_counter == 1000
+    # カウンター非所持の《ワノ国》→ +1000 を得る
+    assert wano0.current_counter == 1000
+    # 既にカウンターを持つ《ワノ国》→ 据え置き（NO_COUNTER で対象外・二重加算しない）
+    assert wano1k.current_counter == 1000
+    # 非《ワノ国》→ 付与されない
+    assert other0.current_counter == 0
+    # 戦闘のカウンター候補（current_counter>0）に +1000 化した非所持キャラが現れる
+    counters = [c for c in p1.hand if c.current_counter > 0]
+    assert wano0 in counters
 
 
 # ===========================================================================

@@ -1,7 +1,7 @@
 from typing import List, Any, Dict, Optional, Union
 import json
 import os
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from ...models.effect_types import (
     EffectNode, GameAction, Sequence, Branch, Choice, ValueSource, Condition, TargetQuery, _nfc
 )
@@ -451,6 +451,31 @@ class EffectResolver:
                 return [c for c in group if c.uuid not in consumed]
 
         from .matcher import get_target_cards
+
+        # 「お互いの〜」(BOTH_SIDES): 両プレイヤーへ独立・同時に適用する。連結候補の単一選択
+        # （片側のみ解決になるバグ）を避け、各サイドで候補・枚数を個別に解決して結合する。
+        # 対話は増やさず各サイド非中断で確定する（CHOOSE 等は既定選択＝候補の先頭から取る）。
+        if "BOTH_SIDES" in getattr(query, "flags", set()) and query.player == Player.ALL:
+            result = []
+            for side in (Player.OPPONENT, Player.SELF):
+                side_q = replace(query, player=side,
+                                 flags=(set(getattr(query, "flags", set())) - {"BOTH_SIDES"}))
+                cand = get_target_cards(self.game_manager, side_q, source_card)
+                if not cand:
+                    continue
+                if side_q.select_mode in ("ALL", "REMAINING"):
+                    result.extend(cand)
+                    continue
+                req = getattr(side_q, "count", 1) or 0
+                if getattr(side_q, "count_dynamic", None) == "DOWN_TO_N":
+                    req = max(0, len(cand) - max(req, 0))
+                if req <= 0:
+                    continue
+                result.extend(cand[:req])
+            if query.save_id:
+                self.context["saved_targets"][query.save_id] = result
+            return result
+
         candidates = get_target_cards(self.game_manager, query, source_card)
 
         # 「（戻した／選んだ）キャラと異なる色の…」: selected_card と色が重なる候補を除外する
