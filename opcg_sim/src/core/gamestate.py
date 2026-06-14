@@ -179,8 +179,13 @@ class GameManager:
         # 中断（対話）はスタックで保持する。`active_interaction` プロパティが先頭を指す。
         # 通常は深さ≤1（単一スロット相当）で、置換ネスト等のみが push で深くする。
         self._interaction_stack: List[Dict[str, Any]] = []
-        # 置換 sub_effect の内側中断を UI 提示してよいか（resolver が除去アクション直前にセット）。
-        self._removal_can_suspend = False
+        # 除去置換の内側中断を提示した直後に立つシグナル（外側継続の退避要否を resolver が判定する）。
+        self._replacement_suspended = False
+        # 入れ子の除去置換が中断したとき、失われる外側の継続（後続アクション／残対象）を退避する
+        # スタック。内側中断が解決された後（active_interaction が無くなった後）に LIFO で再開する。
+        # これにより「除去が効果シーケンスの途中（後続あり）／複数対象」でも置換の内側選択を
+        # UI へ提示できる（accepted limitation B = multi-source continuation の解消）。
+        self._deferred_continuations: List[Dict[str, Any]] = []
         self.setup_phase_pending = False
         self.mulligan_done: Set[str] = set()
         from .effects.continuous import ContinuousEffectManager
@@ -766,6 +771,12 @@ class GameManager:
         if (not self.active_interaction and self.active_battle
                 and self.phase not in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER)):
             self._advance_battle_triggers()
+
+        # 入れ子の除去置換が中断したことで退避された外側継続（後続シーケンス／残対象）を、
+        # 中断が解消された後に再開する（accepted limitation B = 多段継続の対話化）。
+        # フィールド上限超過の処理より前に置き、継続完了後の最終盤面で超過判定する。
+        if not self.active_interaction and self._deferred_continuations:
+            self._resume_deferred_continuations()
 
         # ON_PLAY 等の対話が片付いた後で場のキャラ上限超過が残っていれば強制トラッシュ。
         # 誘発/バトル進行（上記）を横取りしないよう最後に置き、1プレイヤーずつ逐次化する。
@@ -1794,6 +1805,9 @@ class GameManager:
             protector.ability_used_this_turn[k] = protector.ability_used_this_turn.get(k, 0) + 1
         if suspended and can_suspend:
             # 内側中断を UI へ提示（自動解決しない）。除去はスキップ＝置換成立。
+            # 外側に後続継続（このシーケンスの残アクション／除去ループの残対象）があれば、
+            # 呼び出し側がそれを deferred フレームへ退避できるようシグナルを立てる（B）。
+            self._replacement_suspended = True
             log_event("INFO", "game.replacement_interactive",
                       f"Presenting nested replacement choice for {card.master.name}", player=owner.name)
             return True
@@ -1833,6 +1847,60 @@ class GameManager:
                           f"Auto-resolve of replacement interaction failed: {e}", player=owner.name)
                 self.active_interaction = None
                 break
+            n += 1
+
+    # ------------------------------------------------------------------
+    # 多段継続（deferred continuations）— accepted limitation B の解消
+    # 入れ子の除去置換が内側中断（対象選択／任意確認）を UI へ提示したとき、失われる外側の
+    # 継続（後続シーケンス／除去ループの残対象）を退避し、内側中断の解決後に LIFO で再開する。
+    # 退避順は「残対象（append=上）→ 後続シーケンス（insert(0)=下）」なので、pop() で
+    # 残対象 → 後続シーケンスの順に正しく再開される。
+    # ------------------------------------------------------------------
+    def _defer_resolver_stack(self, player: Player, source_card, execution_stack, context) -> None:
+        """除去置換の中断で失われる外側リゾルバの後続（execution_stack）を退避する（B1）。"""
+        self._deferred_continuations.insert(0, {
+            "kind": "RESOLVER_STACK",
+            "player_name": player.name,
+            "source_card_uuid": source_card.uuid if source_card else None,
+            "execution_stack": list(execution_stack),
+            "effect_context": context,
+        })
+
+    def _defer_removal_targets(self, player: Player, action, remaining_targets, value) -> None:
+        """複数対象除去で置換中断したとき、未処理の残対象を退避する（B2）。
+        再開時に apply_action_to_engine を残対象で再実行する（uuid で解決し直す）。"""
+        self._deferred_continuations.append({
+            "kind": "REMOVAL_TARGETS",
+            "player_name": player.name,
+            "action": action,
+            "remaining_target_uuids": [t.uuid for t in remaining_targets],
+            "value": value,
+        })
+
+    def _resume_deferred_continuations(self, limit: int = 64) -> None:
+        """中断が無くなった後、退避した外側継続を LIFO で再開する。
+        再開した継続が新たな中断を生んだら、active_interaction が立ってループは止まる
+        （残りは次の解決後に再びここで処理される）。"""
+        n = 0
+        while not self.active_interaction and self._deferred_continuations and n < limit:
+            frame = self._deferred_continuations.pop()
+            kind = frame.get("kind")
+            player = self.p1 if self.p1.name == frame.get("player_name") else self.p2
+            try:
+                if kind == "RESOLVER_STACK":
+                    src = frame.get("source_card_uuid")
+                    source_card = self._find_card_by_uuid(src) if src else None
+                    resolver = EffectResolver(self)
+                    resolver.resume_execution(player, source_card,
+                                              frame.get("execution_stack", []),
+                                              frame.get("effect_context", {}))
+                elif kind == "REMOVAL_TARGETS":
+                    remaining = [c for c in (self._find_card_by_uuid(u) for u in frame.get("remaining_target_uuids", [])) if c]
+                    if remaining:
+                        self.apply_action_to_engine(player, frame.get("action"), remaining, frame.get("value"))
+            except Exception as e:
+                log_event("WARNING", "game.deferred_resume_fail",
+                          f"Deferred continuation ({kind}) failed: {e}", player=player.name)
             n += 1
 
     def _resolve_on_ko(self, card: Card, owner: Player):
@@ -2336,11 +2404,21 @@ class GameManager:
                 if self._active_protection(target, guard_statuses, actor=player):
                     log_event("INFO", "game.leave_prevented", f"{target.master.name} is protected from leaving the field by opponent's effect", player=owner.name)
                     continue
-                # 内側中断の UI 提示は、後続継続が失われない場合のみ許可（外側 execution_stack
-                # 空＝resolver がセット、かつ単一対象＝この continue でループが残対象を捨てない）。
-                _can_suspend = getattr(self, "_removal_can_suspend", False) and len(targets) == 1
+                # 内側中断を UI 提示してよいか:
+                # 単一対象は常に許可（後続シーケンスが残れば resolver が deferred へ退避する=B1）。
+                # 複数対象は、置換中断時に残対象を deferred へ退避してから提示する（B2、下の分岐）。
+                _can_suspend = True
                 if self._active_replacement(target, guard_statuses, can_suspend=_can_suspend):
                     log_event("INFO", "game.leave_replaced", f"{target.master.name}'s removal was replaced by an alternative effect", player=owner.name)
+                    # 置換が内側中断を提示した（B2）: この時点で active_interaction が立つ。
+                    # 残りの対象をそのまま処理すると中断中に除去が走ってしまうため、残対象を
+                    # deferred フレームへ退避してループを抜ける（内側中断の解決後に再開する）。
+                    if self.active_interaction is not None:
+                        idx = targets.index(target)
+                        remaining = targets[idx + 1:]
+                        if remaining:
+                            self._defer_removal_targets(player, action, remaining, value)
+                        return success
                     continue
             if act_name == "PREVENT_LEAVE":
                 # PASSIVE 由来(INSTANT)はマーカーのみ（除去時に _active_protection が走査）。

@@ -280,15 +280,22 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
   （`_resolve_targets` が `_both_sides_pending` を立てて逐次 SELECT_TARGET 中断し、再開で各サイドの
   選択を結合する）。選択の余地が無いサイド（`select_mode=ALL`／位置確定の隠しゾーン=ライフ/デッキ／
   候補≤必要数。OP11-102 のライフ上トラッシュ等）は非中断で確定する。
-- **置換 sub_effect のネスト中断**: 置換（REPLACE_EFFECT）は除去解決の最中に走る入れ子の中断。
-  中断は `active_interaction`（= `_interaction_stack` 先頭の互換プロパティ）で表現する。
-  **失われる外側継続が無い場合**（除去アクションがリゾルバの実行スタック末尾＝後続なし、かつ
-  単一対象。resolver が `_removal_can_suspend` をセットし、除去側が単一対象を確認）には、
-  置換の内側選択（対象選択／任意確認）を**そのまま UI へ提示**して被保護側に選ばせ、`resume` で
-  `sub_effect` を完了させる（`_active_replacement(..., can_suspend=True)`）。**外側継続が残る
-  ケース**（除去の後続アクションあり・複数対象）では、継続消失を避けるため従来どおり
-  `_auto_resolve_replacement` が保守的に同期解決する（任意=採用／対象=有効候補先頭）。
-  どちらも置換は成立扱い（本来の除去はスキップ）。
+- **置換 sub_effect のネスト中断（多段継続を含めて対話化済み）**: 置換（REPLACE_EFFECT）は除去解決の
+  最中に走る入れ子の中断。中断は `active_interaction`（= `_interaction_stack` 先頭の互換プロパティ）で
+  表現する。置換の内側選択（対象選択／任意確認）は**そのまま UI へ提示**して被保護側に選ばせ、
+  `resume` で `sub_effect` を完了させる（`_active_replacement(..., can_suspend=True)`、現在は常に許可）。
+  **失われる外側継続（多段 / multi-source）**は退避して内側中断の解決後に再開する:
+  - **後続シーケンスの退避（B1）**: 除去アクションの後にこのリゾルバの実行スタックが残る場合、
+    `_defer_resolver_stack` が後続（execution_stack/context/source）を `_deferred_continuations` へ
+    退避し、`execution_stack` を空にして中断を提示する。
+  - **複数対象の残対象退避（B2）**: 複数対象除去で先頭対象の置換が中断したら、`_defer_removal_targets`
+    が未処理の残対象（uuid＋action＋value）を退避し、ループを抜ける。再開時に
+    `apply_action_to_engine` を残対象で再実行する。
+  - **再開**: 中断が解消された後（`resolve_interaction` 末尾）に `_resume_deferred_continuations` が
+    退避フレームを LIFO で再開する（退避順は「残対象=append→後続シーケンス=insert(0)」なので
+    pop() で残対象→後続の順に正しく再開）。`_deferred_continuations` は `clone()` の deepcopy で
+    複製され、uuid 解決で再開するため CPU クローン安全。ヘッドレス/CPU の既定応答は従来の
+    自動採用と同一結果のため挙動ベースラインは不変。
 
   **バトル KO 置換の任意確認（対話化済み）**: バトルでKOされる際の**任意**置換（「代わりに〜しても
   よい／できる」OP10-034 フランキー等）は、被KO側へ `CONFIRM_OPTIONAL` を提示して確認する
@@ -300,10 +307,8 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
   付与」）は継続付与型で `_active_replacement` の `master.abilities` 走査では拾えず、別途の配線課題
   （継続による置換能力付与）として残る。
 
-  **意図的に非対応のまま残す範囲（accepted limitations）**:
-  - **多段（multi-source）継続**: 除去が効果シーケンスの途中（後続あり）・複数対象の場合、外側効果の
-    継続は単一 source の continuation では表現できない。完全対話化には source 別の継続フレームを
-    積む大改修が要るが、安全範囲（終端・単一対象）で価値の大半は満たせるため未対応のまま残す。
+  > 旧 accepted limitation（バトル KO 置換の拒否・多段 multi-source 継続）はいずれも解消済み。
+  > 残る既知の限界は EB02-030 の継続付与型置換の配線のみ。
 
 ---
 
