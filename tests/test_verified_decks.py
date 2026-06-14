@@ -1046,3 +1046,46 @@ def test_op05003_other_char_high_power_field_count():
             return True
         return any(has_source_state(a) for a in (getattr(cond, "args", []) or []))
     assert has_source_state(c4)
+
+
+# --- 節分割: 「…の場合、AしてB」で B が分岐外に出る回帰 -------------------
+
+def test_conditional_clause_gates_all_trailing_actions():
+    """「〈条件〉場合、カードN枚を引き、自分の手札M枚を捨てる」等で、文内連用接続(引き、捨て)で
+    区切られた後続アクション(捨てる)が条件分岐の外へ出て、条件不成立でも実行されていた回帰
+    （OP09-005/024・OP08-086・OP15-104 ほか多数）。条件ゲートを含む文は一体で扱い、本体全体が
+    ゲート（能力条件へ lift／Branch）配下に入る。"""
+    from opcg_sim.src.models.effect_types import Branch
+    for cid in ["OP09-005", "OP09-024", "OP08-086", "OP15-104", "OP10-025"]:
+        ab = inst(cid).master.abilities[0]
+        draw = find_action(ab.effect, ActionType.DRAW)
+        disc = find_action(ab.effect, ActionType.DISCARD)
+        assert draw is not None and disc is not None, cid
+        # 条件は能力条件へ lift されているか、Branch が DRAW と DISCARD の両方を包む。
+        def branch_covers_both(node):
+            if isinstance(node, Branch):
+                t = node.if_true
+                return (find_action(t, ActionType.DRAW) is not None
+                        and find_action(t, ActionType.DISCARD) is not None)
+            for x in getattr(node, "actions", []) or []:
+                if branch_covers_both(x):
+                    return True
+            return False
+        gated = ab.condition is not None or branch_covers_both(ab.effect)
+        assert gated, f"{cid}: 後続アクションがゲート配下にない"
+        # DRAW だけを包んで DISCARD を外に残す Branch が無いこと
+        def draw_only_branch(node):
+            if isinstance(node, Branch):
+                t = node.if_true
+                if (find_action(t, ActionType.DRAW) is not None
+                        and find_action(t, ActionType.DISCARD) is None):
+                    # 同じ Sequence の兄弟に DISCARD があれば NG
+                    return True
+            return False
+        # 効果直下の Sequence で「DRAWだけBranch + 兄弟DISCARD」になっていないこと
+        if hasattr(ab.effect, "actions"):
+            kids = ab.effect.actions
+            has_draw_only = any(draw_only_branch(k) for k in kids)
+            has_sibling_disc = any(find_action(k, ActionType.DISCARD) is not None
+                                   and not isinstance(k, Branch) for k in kids)
+            assert not (has_draw_only and has_sibling_disc), f"{cid}: DISCARD が分岐外"
