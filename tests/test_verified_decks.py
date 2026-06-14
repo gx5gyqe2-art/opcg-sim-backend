@@ -965,3 +965,46 @@ def test_op09101_field_char_to_life_via_oku():
     assert len(life_moves(cost)) >= 1
     # EB01-053: 効果側に FIELD→LIFE 移動
     assert len(life_moves(inst("EB01-053").master.abilities[0].effect)) >= 1
+
+
+# --- 「リーダーとキャラ」両方への適用 --------------------------------------
+
+def test_leader_and_char_dual_application():
+    """OP07-075 ノロノロビーム「相手のリーダーとキャラ1枚までを…パワー-2000」/ OP10-098 解放
+    「リーダーとキャラ1枚ずつまで…効果を無効」は、リーダーとキャラの**両方**へ適用する。
+    「と」(両方)を「か」(択一)と同一視して単一 count=1 対象に潰し、片方しか掛からなかった回帰。
+    ドン付与(OP13-042)・選ぶ(OP07-059/OP14-009)は別構造のため対象外。"""
+    from opcg_sim.src.models.enums import Zone
+
+    def actions_of(cid, atype, trig=None):
+        out = []
+        for ab in inst(cid).master.abilities:
+            if trig is not None and ab.trigger != trig:
+                continue
+            def walk(n):
+                if getattr(n, "type", None) == atype:
+                    out.append(n)
+                for x in getattr(n, "actions", []) or []:
+                    walk(x)
+                for x in getattr(n, "options", []) or []:
+                    walk(x)
+                for k in ("if_true", "if_false"):
+                    s = getattr(n, k, None)
+                    if s:
+                        walk(s)
+            walk(ab.effect)
+        return out
+
+    # OP07-075: BUFF が LEADER 単独 と CHARACTER 単独 の2つに分かれる
+    buffs = actions_of("OP07-075", ActionType.BUFF, TriggerType.COUNTER)
+    cts = {tuple(b.target.card_type) for b in buffs}
+    assert ("LEADER",) in cts and ("CHARACTER",) in cts
+    assert all(b.value.base == -2000 for b in buffs)
+    # OP10-098 トリガー: NEGATE_EFFECT が LEADER と CHARACTER に分かれる
+    negs = actions_of("OP10-098", ActionType.NEGATE_EFFECT, TriggerType.TRIGGER)
+    nts = {tuple(n.target.card_type) for n in negs}
+    assert ("LEADER",) in nts and ("CHARACTER",) in nts
+    # 「リーダーかキャラ」(択一) は単一対象のまま（OP07-055）
+    or_buffs = actions_of("OP07-055", ActionType.BUFF, TriggerType.COUNTER)
+    assert any(set(b.target.card_type) == {"LEADER", "CHARACTER"} and b.target.count == 1
+               for b in or_buffs)
