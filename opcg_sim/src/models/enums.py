@@ -156,6 +156,7 @@ class TriggerType(Enum):
     ON_LEAVE = "場を離れた時"          # 自分/相手のキャラが場を離れた時
     ON_EVENT_PLAY = "イベント発動時"    # 自分がイベントを発動した時
     ON_OPP_PLAY = "相手登場時"          # 相手がキャラを登場させた時
+    ON_REST = "レストになった時"        # キャラがレストになった時（アタック宣言/効果。主語・要因は raw_text で判定）
     
     GAME_START = "ゲーム開始時"
     

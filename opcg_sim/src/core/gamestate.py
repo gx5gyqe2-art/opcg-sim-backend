@@ -1225,10 +1225,12 @@ class GameManager:
             for ability in attacker.master.abilities:
                 if ability.trigger == TriggerType.ON_ATTACK:
                     triggers.append((attacker_owner, ability, attacker))
-                # 「【自分のターン中】このキャラがレストになった時、…」はアタック宣言で自身が
-                # レストになった瞬間に誘発する（パーサは YOUR_TURN 反応型に写像し再計算では
-                # 実行しないため、ここで明示的に積む）。OP14-119/OP14-027/028/032/035 等。
-                elif _nfc("このキャラがレストになった時") in _nfc(ability.raw_text or ""):
+                # 「このキャラがレストになった時」(ON_REST) はアタック宣言で自身がレストになった
+                # 瞬間に誘発する（要因＝アタックなので「効果で」限定の能力は対象外）。
+                # OP14-119/027/028/032/035 等。CONTEXT/ターン1回条件は resolve_ability が評価。
+                elif (ability.trigger == TriggerType.ON_REST
+                      and self._rest_subject_matches(ability, attacker, attacker,
+                                                     attacker_owner, by_attack=True)):
                     triggers.append((attacker_owner, ability, attacker))
         opp_cards = ([target_owner.leader] if target_owner.leader else []) + target_owner.field
         for card in opp_cards:
@@ -1734,31 +1736,57 @@ class GameManager:
                 log_event("INFO", "game.trigger_ko", f"Resolving ON_KO for {card.master.name}", player=owner.name)
                 self.resolve_ability(owner, ability, source_card=card)
 
-    def _resolve_on_rest(self, card: Card, owner: Player):
-        """「（このキャラが）レストになった時」誘発を解決する（効果によるレスト）。
+    def _rest_subject_matches(self, ability: Ability, rested_card: Card, host: Card,
+                              host_owner: Player, by_attack: bool,
+                              effect_controller: Player = None) -> bool:
+        """ON_REST 誘発（「（この）キャラが（自分の/相手の効果で）レストになった時」）の
+        主語・要因フィルタ。条件には載らない修飾を raw_text から解釈する。
 
-        パーサはこの誘発を YOUR_TURN 反応型へ写像し（再計算では実行しない）、raw_text に
-        「このキャラがレストになった時」マーカーを残す。アタック宣言由来のレストは
-        declare_attack が発火するため、ここは効果（REST アクション）による
-        アクティブ→レスト遷移を担う（TEST_SPEC §8.2「効果でのレストは未対応」の解消）。
-        【自分のターン中】等の文脈条件は resolve_ability/_check_condition が評価するため、
-        相手ターン中の効果レストでは不発になる（OP14-027/028/032/035/119 等）。
+        - 主語: 「このキャラ」＝能力保持カード(host)自身がレストになった場合のみ。
+          「キャラ」(この無し)＝任意のキャラがレストになった場合（host 識別は問わない）。
+        - 要因: 「自分の効果で」＝host_owner の効果による効果レスト（アタック不可）。
+          「相手の(キャラの)効果で」＝host_owner の相手の効果による効果レスト（アタック不可）。
+          修飾無し＝アタック/効果どちらでも可。
         """
-        if not card.master.abilities: return
-        for ability in card.master.abilities:
-            raw = _nfc(getattr(ability, "raw_text", "") or "")
-            if _nfc("このキャラがレストになった時") not in raw:
-                continue
-            # ターン文脈ガード: パーサは「このキャラがレストになった時」を YOUR_TURN/
-            # OPPONENT_TURN へ写像し、文脈はトリガー種別が暗黙に表す（条件には載らない）。
-            # アタック宣言経路は常に自分ターンのため無問題だが、効果レストは相手ターンにも
-            # 起こりうるため、ここでタグに応じて発火ターンを限定する。
-            if _nfc("【自分のターン中】") in raw and self.turn_player is not owner:
-                continue
-            if _nfc("【相手のターン中】") in raw and self.turn_player is owner:
-                continue
-            log_event("INFO", "game.trigger_rest", f"Resolving on-rest for {card.master.name}", player=owner.name)
-            self.resolve_ability(owner, ability, source_card=card)
+        raw = _nfc(getattr(ability, "raw_text", "") or "")
+        pre = raw.split(_nfc("レストになった時"))[0]
+        # 主語フィルタ
+        if _nfc("このキャラ") in pre and rested_card is not host:
+            return False
+        # 要因フィルタ
+        if _nfc("自分の効果で") in pre:
+            if by_attack or effect_controller is not host_owner:
+                return False
+        elif _nfc("相手の") in pre and _nfc("効果で") in pre:
+            if by_attack or effect_controller is None or effect_controller is host_owner:
+                return False
+        return True
+
+    def _fire_on_rest_triggers(self, rested_card: Card, by_attack: bool,
+                               effect_controller: Player = None):
+        """キャラがレストになった時(ON_REST)の誘発を、両プレイヤーのリーダー/場から探して解決する。
+
+        要因（by_attack=アタック宣言 / effect_controller=効果でレストにした側）を主語・要因
+        フィルタ（_rest_subject_matches）へ渡す。発動可否・文脈（自分のターン中 等）・ターン1回は
+        resolve_ability/_check_condition が評価する。"""
+        pending = []
+        for p in (self.p1, self.p2):
+            hosts = ([p.leader] if p.leader else []) + list(p.field)
+            for host in hosts:
+                if host is None or not host.master.abilities:
+                    continue
+                for ability in host.master.abilities:
+                    if ability.trigger != TriggerType.ON_REST:
+                        continue
+                    if self._rest_subject_matches(ability, rested_card, host, p,
+                                                  by_attack=by_attack,
+                                                  effect_controller=effect_controller):
+                        pending.append((p, ability, host))
+        for owner, ability, host in pending:
+            log_event("INFO", "game.trigger_rest", f"Resolving on-rest for {host.master.name}", player=owner.name)
+            self.resolve_ability(owner, ability, source_card=host)
+            if self.active_interaction:
+                return
 
     def _leave_subject_matches(self, ability: Ability, leaving_card: Card,
                                ability_owner: Player, leaving_owner: Player) -> bool:
@@ -2339,10 +2367,10 @@ class GameManager:
                             owner.don_rested.append(target)
                             if hasattr(target, 'attached_to'): target.attached_to = None
                 success = True
-                # アクティブ→レスト遷移で「このキャラがレストになった時」を誘発する。
-                # ドン!!は対象外。既にレストだった場合は遷移なしで不発。
+                # アクティブ→レスト遷移で ON_REST（キャラがレストになった時）を誘発する。
+                # 要因＝効果（effect_controller=player）。ドン!!は対象外。既にレストなら不発。
                 if not _was_rested and not isinstance(target, DonInstance):
-                    self._resolve_on_rest(target, owner)
+                    self._fire_on_rest_triggers(target, by_attack=False, effect_controller=player)
             elif act_name == "PLAY_CARD":
                 # 「手札のこのカードは効果で登場できない」: 手札源かつ当該 PASSIVE を持つ対象は
                 # 効果による登場をスキップする（NO_EFFECT_PLAY）。

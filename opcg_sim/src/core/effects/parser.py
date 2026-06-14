@@ -374,7 +374,8 @@ class EffectParser:
             # 効果の対象に取り込んでしまう（OP14-041: 「…パワー5000以上の…キャラがKOされた時、相手の
             # ライフ1枚を手札に加える」で MOVE_CARD 対象にアマゾン・リリー/九蛇/power5000 が混入）。
             if trigger in (TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE,
-                           TriggerType.ON_LEAVE, TriggerType.ON_EVENT_PLAY, TriggerType.ON_OPP_PLAY):
+                           TriggerType.ON_LEAVE, TriggerType.ON_EVENT_PLAY, TriggerType.ON_OPP_PLAY,
+                           TriggerType.ON_REST):
                 effect_text = re.sub(
                     _nfc(r'^[^。：:]*?(?:された|なった|与えた|離れた|発動した|登場させた)時、'),
                     '', effect_text).strip()
@@ -657,7 +658,7 @@ class EffectParser:
         # （ON_KO/ON_DAMAGE_DEALT_TO_LIFE）でありターン中は CONTEXT 条件として後段で保全される。
         # コスト節の後（「手札2枚を捨てる：相手のキャラがKOされた時、〜」OP03-076）も含めて上書きする。
         primary_reactive = embedded if embedded in (
-            TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE) else None
+            TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE, TriggerType.ON_REST) else None
         if _nfc("【自分のターン中】") in norm_text: return primary_reactive or TriggerType.YOUR_TURN
         if _nfc("【相手のターン中】") in norm_text: return primary_reactive or TriggerType.OPPONENT_TURN
         if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER
@@ -719,6 +720,11 @@ class EffectParser:
         # 場を離れた誘発（「自分の…キャラが場を離れた時」）
         if re.search(_nfc(r'場を離れた時'), norm_text):
             return TriggerType.ON_LEAVE
+        # レスト誘発（「（この）キャラが（自分の/相手の効果で）レストになった時」）。
+        # 主語（このキャラ/キャラ）・要因（自分の効果で/相手の効果で/アタック）は raw_text から
+        # エンジン側で解釈する（_rest_subject_matches）。「レストの場合」等の状態参照は別物。
+        if re.search(_nfc(r'レストになった時'), norm_text):
+            return TriggerType.ON_REST
         # イベント発動誘発（「自分がイベントを発動した時」）
         if re.search(_nfc(r'イベントを発動した時'), norm_text):
             return TriggerType.ON_EVENT_PLAY
