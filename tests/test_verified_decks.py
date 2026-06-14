@@ -1008,3 +1008,21 @@ def test_leader_and_char_dual_application():
     or_buffs = actions_of("OP07-055", ActionType.BUFF, TriggerType.COUNTER)
     assert any(set(b.target.card_type) == {"LEADER", "CHARACTER"} and b.target.count == 1
                for b in or_buffs)
+
+
+# --- パワー範囲「パワーNからM」 -------------------------------------------
+
+def test_power_range_n_to_m():
+    """OP06-015 リリーカーネーション / EB02-039 / PRB02-010: 対象指定「パワーNからM」(N以上M以下)が
+    単一しきい値判定に落ち「パワーN」だけ拾って power_min=power_max=N に縮退し上限Mが脱落していた
+    回帰。matcher にパワー範囲判定を追加（コスト範囲と同型）。"""
+    def play_target(cid):
+        for ab in inst(cid).master.abilities:
+            a = find_action(ab.effect, ActionType.PLAY_CARD)
+            if a:
+                return a.target
+        return None
+    t = play_target("OP06-015")
+    assert t is not None and t.power_min == 2000 and t.power_max == 5000
+    t2 = play_target("PRB02-010")
+    assert t2 is not None and t2.power_min == 6000 and t2.power_max == 8000

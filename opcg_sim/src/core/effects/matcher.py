@@ -282,7 +282,16 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             # \u65e2\u5b9a\u306f\u76f8\u624b\u306e\u30e9\u30a4\u30d5\uff08\u300c\u76f8\u624b\u306e\u300d\u660e\u793a\uff0f\u7701\u7565\u6642\u3068\u3082\u76f8\u624b\u57fa\u6e96\u304c\u5927\u534a\uff09
             tq.cost_max_dynamic = "LIFE_COUNT_OPPONENT"
 
-    m_p = re.search(_nfc(ParserKeyword.POWER + r'[^+\uff0b\-\uff0d\u2212\u2010\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    # \u30d1\u30ef\u30fc\u7bc4\u56f2\u300c\u30d1\u30ef\u30fcN\u304b\u3089M\u300d\uff08N\u4ee5\u4e0aM\u4ee5\u4e0b\uff09\u3002\u7bc4\u56f2\u8868\u8a18\u306f\u5358\u4e00\u3057\u304d\u3044\u5024\u3088\u308a\u5148\u306b\u5224\u5b9a\u3059\u308b
+    #   \uff08\u5f93\u6765\u306f\u300c\u30d1\u30ef\u30fc2000\u300d\u3060\u3051\u3092\u62fe\u3044 power_min=power_max=2000 \u306b\u7e2e\u9000\u3057\u4e0a\u96505000\u304c\u8131\u843d:
+    #   OP06-015 \u30ea\u30ea\u30fc\u30ab\u30fc\u30cd\u30fc\u30b7\u30e7\u30f3\uff0fEB02-039\uff0fPRB02-010 \u306e\u300c\u30d1\u30ef\u30fc2000\u304b\u30895000\u300d\u7b49\uff09\u3002
+    m_prange = re.search(_nfc(ParserKeyword.POWER + r'(\d+)\u304b\u3089(\d+)'), tgt_text)
+    if m_prange:
+        if _nfc("\u5143\u3005") in tgt_text[max(0, m_prange.start() - 4):m_prange.start()]:
+            tq.flags.add("ORIGINAL_POWER")
+        tq.power_min = int(m_prange.group(1))
+        tq.power_max = int(m_prange.group(2))
+    m_p = None if m_prange else re.search(_nfc(ParserKeyword.POWER + r'[^+\uff0b\-\uff0d\u2212\u2010\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_p:
         start_idx = m_p.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
