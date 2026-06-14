@@ -334,6 +334,27 @@ async def game_action(req: Dict[str, Any] = Body(...)):
     except Exception as e:
         log_event(level_key="ERROR", action="game.action_fail", msg=traceback.format_exc(), player=player_id, payload=req); return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
 
+@app.options("/api/game/state")
+async def options_game_state(): return {"status": "ok"}
+
+@app.get("/api/game/state")
+async def game_state_fetch(game_id: str):
+    """現在の対局状態を読み取り専用で返す（盤面は一切変更しない）。
+
+    オンライン対戦は対局の進行を WS ブロードキャストのみで相手へ伝えるため、
+    片側が（モバイルのバックグラウンド化・通信瞬断などで）ブロードキャストを
+    取りこぼすと、古い「相手待ち」状態のまま自力復帰できず停止して見える。
+    待機側がこのエンドポイントを軽量ポーリングして最新状態へ再同期するための
+    フォールバック経路（冪等・副作用なし）。ルーム対局は WS と同形の
+    build_rule_message を返す。"""
+    error_codes = CONST.get('ERROR_CODES', {})
+    if game_id in RULE_ROOMS:
+        return build_rule_message(game_id)
+    manager = GAMES.get(game_id)
+    if not manager:
+        return build_game_result_hybrid(None, game_id, success=False, error_code=error_codes.get('GAME_NOT_FOUND', 'GAME_NOT_FOUND'), error_msg="指定されたゲームが見つかりません。")
+    return build_game_result_hybrid(manager, game_id, success=True)
+
 @app.options("/api/game/battle")
 async def options_game_battle(): return {"status": "ok"}
 

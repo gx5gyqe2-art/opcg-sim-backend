@@ -106,12 +106,14 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 | `GET /api/rule/list` | 募集中ルーム一覧（game_id/room_name/接続数/status/ready） |
 | `POST /api/rule/action` | ロビー操作：`SET_DECK`（デッキ選択＝当該プレイヤー ready）／`START`（両者 ready で対局生成）／`KICK_PLAYER` |
 | `WS /ws/game/{game_id}` | 対局/ルーム状態の購読。接続時に現在状態を送信 |
+| `GET /api/game/state?game_id=` | 現在状態を**読み取り専用**で返す（`build_rule_message` と同形）。WS 取りこぼし時の再同期フォールバック。冪等・副作用なし |
 
 ### 2.2 状態配信
 - `GameConnectionManager`（`game_ws_manager`）が `game_id` ごとの接続を保持し、全接続へ同一ペイロードをブロードキャストする（視点別シリアライズはしない）。
 - `build_rule_message(game_id)` がペイロードを生成：`{type:"STATE_UPDATE", game_id, room_name, status, ready_states, deck_preview, ...}`。`PLAYING/FINISHED` 時は `build_game_result_hybrid` の結果（`success/game_state/pending_request/action_events`）を内包。`WAITING` 時は `game_state=None`。
 - `broadcast_rule_state(game_id)` を、既存 `/api/game/action`・`/api/game/battle` の成功時と、`/api/rule/action` で呼ぶ（**ルーム対局のみ**。非ルーム＝ソロ対局には影響しない）。`manager.winner` が立てば `status=FINISHED`。
 - 切断時は `GameConnectionManager` が猶予期間後に `RULE_ROOMS`/`GAMES` を掃除する。
+- **取りこぼし耐性**: 対局進行は相手へ WS ブロードキャストでのみ伝わるため、モバイルのバックグラウンド化・通信瞬断で1回でも取りこぼすと、片側が古い「相手待ち」状態のまま自力復帰できず停止して見える（特にカウンター解決後に攻撃側の手番が戻らない）。フロントは**相手待ちの間だけ** `GET /api/game/state` を軽量ポーリング（約3秒）して最新状態へ再同期する（読み取り専用・冪等。自分の操作待ち中・決着後はポーリングしない）。再接続時の現在状態送信（`GameConnectionManager.connect`）と二重の安全網。
 
 ### 2.3 開始フロー
 1. ロビーでルーム作成/参加 → クライアントが `/ws/game/{id}` を購読。
