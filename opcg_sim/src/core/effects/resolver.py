@@ -736,6 +736,13 @@ class EffectResolver:
             occurred = getattr(self.game_manager, "_turn_events", {}).get(ev_name, 0)
             return self._compare(occurred, condition.operator, ev_min)
 
+        elif condition.type == ConditionType.CHAR_KOED_THIS_TURN:
+            # 「このターン中、（相手/自分の）キャラがKOされている場合」: 当該プレイヤーの
+            # キャラがこのターンに KO された回数（gamestate が CHAR_KOED_<name> で記録）。
+            occurred = getattr(self.game_manager, "_turn_events", {}).get(
+                f"CHAR_KOED_{target_player.name}", 0)
+            return self._compare(occurred, condition.operator, target_val or 1)
+
         elif condition.type == ConditionType.HAS_DON:
             # 【ドン!!×N】: 能力保持カードに付与されたドン!!が N 枚以上か。コストエリアの active ドン
             # ではなく attached_don を見る。置換/除去保護では保持カード(host=protector)を見る

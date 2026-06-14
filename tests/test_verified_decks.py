@@ -326,6 +326,22 @@ def test_op16074_magellan_opponent_returns_own_don():
     assert len(p1.don_active) == 5            # 自分のドンは不変
 
 
+def test_op16100_requires_opponent_char_koed_this_turn():
+    """OP16-100 氷諸斬り: 起動の条件「このターン中、相手のキャラがKOされている場合」は
+    ターン内KOイベントで判定する。「KOされて<いる>」が FIELD_COUNT（相手の場キャラ存在）
+    に誤吸収され逆の意味に化けていた回帰（§8.3 条件の退化）。"""
+    c = inst("OP16-100").master.abilities[0].condition
+    assert c.type == ConditionType.CHAR_KOED_THIS_TURN
+    gm, p1, p2 = game("OP16-022", "OP16-022")
+    res = EffectResolver(gm)
+    assert res._check_condition(p1, c, inst("OP16-100")) is False     # まだKOなし
+    gm.record_turn_event(f"CHAR_KOED_{p2.name}", 1)
+    assert res._check_condition(p1, c, inst("OP16-100")) is True       # 相手キャラがKO済み
+    gm._turn_events = {}
+    gm.record_turn_event(f"CHAR_KOED_{p1.name}", 1)
+    assert res._check_condition(p1, c, inst("OP16-100")) is False      # 自分のKOでは不成立
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")

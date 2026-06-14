@@ -2027,6 +2027,9 @@ class GameManager:
 
     def _resolve_on_ko(self, card: Card, owner: Player,
                        cause: str = "EFFECT", effect_controller: Player = None):
+        # このターンに当該プレイヤーのキャラが KO された事実を記録する
+        # （「このターン中、相手のキャラがKOされている場合」OP16-100 の判定用）。
+        self.record_turn_event(f"CHAR_KOED_{owner.name}", 1)
         if not card.master.abilities: return
         for ability in card.master.abilities:
             if ability.trigger == TriggerType.ON_KO:

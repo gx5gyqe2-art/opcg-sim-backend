@@ -1371,6 +1371,15 @@ class EffectParser:
         if _nfc("バトルしている") in norm_text:
             return Condition(type=ConditionType.SOURCE_STATE, value="IN_BATTLE", player=p, raw_text=norm_text)
 
+        # 「このターン中、（相手/自分の）キャラがKOされている場合」: ターン内に当該プレイヤーの
+        # キャラが KO された回数で判定する（OP16-100）。「KOされて<いる>」が下の FIELD_COUNT
+        # 分岐（「いる」を含む）に誤吸収され、相手の場キャラ存在条件に化けるのを防ぐ。
+        if (_nfc("キャラ") in norm_text and _nfc("KOされている") in norm_text
+                and _nfc("このキャラ") not in norm_text):
+            kp = Player.SELF if _nfc("自分") in norm_text else Player.OPPONENT
+            return Condition(type=ConditionType.CHAR_KOED_THIS_TURN,
+                             operator=CompareOperator.GE, value=1, player=kp, raw_text=norm_text)
+
         # 盤面のキャラ枚数（「自分の（レストの／特徴《X》の／コストN以上の）キャラがM枚以上いる」
         # 「…キャラがいる」）。数値が「フィルタ(コストN以上)」と「枚数(M枚)」で混在し得るため、
         # 閾値は必ず「M枚」側から取り、フィルタは parse_target に委ねる（保守的な分類）。
