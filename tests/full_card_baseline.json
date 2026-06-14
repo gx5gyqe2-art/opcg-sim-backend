@@ -1242,7 +1242,7 @@
 "OP07-072|ON_PLAY": "p1_hand:6→5, p1_field:3→4, p1_don:10→9 | pw0,kw0,rs0,co0",
 "OP07-073|ACTIVATE_MAIN": "p1_don:10→7 | pw0,kw0,rs0,co0",
 "OP07-074|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
-"OP07-075|COUNTER": "p1_don:10→9 | pw-2000,kw0,rs0,co0",
+"OP07-075|COUNTER": "p1_don:10→9 | pw-4000,kw0,rs0,co0",
 "OP07-076|COUNTER": "p1_don:10→9 | pw2000,kw0,rs1,co0",
 "OP07-076|TRIGGER": "p1_don:10→11 | pw0,kw0,rs0,co0",
 "OP07-077|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",

@@ -371,6 +371,49 @@ def _buff_target(t: str) -> TargetQuery:
     return parse_target(t)
 
 
+@rule("leader_and_char_dual", priority=67)
+def _leader_and_char_dual(ctx: ParseContext):
+    """「（相手/自分の）リーダーとキャラN枚(ずつ)?(まで)?を、…パワー±N／効果を無効にする」
+    → リーダー(1枚)とキャラ(N枚)それぞれへ同じ効果を適用する Sequence。
+
+    「と」(両方)を「か」(択一)と同一視して単一 count=1 対象に潰し、リーダー＋キャラの
+    双方へ掛かるべき効果が片方しか掛からなかった回帰（OP07-075 パワー減／OP10-098 効果無効）。
+    ドン付与（ATTACH_DON。OP13-042）や「選ぶ」(SELECT。OP07-059/OP14-009) は別ルール／別構造の
+    ため対象外（ここではパワー増減と効果無効のみ扱う）。"""
+    t = ctx.text
+    m = re.search(_nfc(r"リーダーとキャラ([\d０-９]+)?枚(ずつ)?(まで)?"), t)
+    if not m:
+        return None
+    if _nfc("ドン") in t or _nfc("付与") in t or _nfc("選ぶ") in t or _nfc("選び") in t:
+        return None
+    sign_m = re.search(_nfc(rf"パワー({_SIGN})([\d０-９]+)"), t)
+    is_negate = bool(re.search(_nfc(r"効果を無効に(?:する|し)"), t))
+    if not sign_m and not is_negate:
+        return None
+    player = Player.OPPONENT if _nfc("相手") in t else Player.SELF
+    n = _to_int(m.group(1)) if m.group(1) else 1
+    up_to = bool(m.group(3))
+    dur = _duration_of(t)
+
+    def _mk(card_type: str, count: int, is_up: bool) -> TargetQuery:
+        return TargetQuery(zone=Zone.FIELD, player=player, card_type=[card_type],
+                           count=count, is_up_to=is_up)
+
+    if sign_m:
+        sign = -1 if sign_m.group(1) in "-－−‐" else 1
+        val = sign * _to_int(sign_m.group(2))
+        leader = GameAction(type=ActionType.BUFF, target=_mk("LEADER", 1, False),
+                            value=ValueSource(base=val), duration=dur, raw_text=t)
+        char = GameAction(type=ActionType.BUFF, target=_mk("CHARACTER", n, up_to),
+                          value=ValueSource(base=val), duration=dur, raw_text=t)
+    else:
+        leader = GameAction(type=ActionType.NEGATE_EFFECT, target=_mk("LEADER", 1, False),
+                            duration=dur, raw_text=t)
+        char = GameAction(type=ActionType.NEGATE_EFFECT, target=_mk("CHARACTER", n, up_to),
+                          duration=dur, raw_text=t)
+    return Sequence(actions=[leader, char])
+
+
 @rule("power_buff", priority=60)
 def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
