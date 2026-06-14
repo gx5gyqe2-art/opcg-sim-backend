@@ -190,6 +190,18 @@ class EffectResolver:
                 # 「このカードの【メイン】効果を発動する」: 自身の ACTIVATE_MAIN
                 # 能力の効果を実行スタックに展開して再発動する（主にトリガー）。
                 if node.type == ActionType.EXECUTE_MAIN_EFFECT:
+                    # target 付き（「トラッシュの…イベントの【メイン】効果を発動する」EB03-031）:
+                    # 発生源自身ではなく、選んだカードの【メイン】効果を発動する。対象選択で
+                    # 中断したら return（resume 時にこのノードを再処理＝選択済み対象で続行）。
+                    if node.target is not None:
+                        chosen = self._resolve_targets(player, node.target, source_card, action_node=node)
+                        if self.game_manager.active_interaction:
+                            return
+                        if chosen:
+                            self._execute_selected_main(player, chosen, ref_trigger=node.status)
+                            if self.game_manager.active_interaction:
+                                return
+                        continue
                     self._expand_main_effect(source_card, ref_trigger=node.status)
                     continue
 
@@ -313,6 +325,39 @@ class EffectResolver:
         for ab in reversed(main_abilities):
             self.execution_stack.append(ab.effect)
         log_event("INFO", "resolver.execute_main", f"Expanded {len(main_abilities)} main effect(s) of {source_card.master.name}", player=source_card.owner_id)
+
+    def _execute_selected_main(self, player, cards, ref_trigger=None):
+        """選んだカード（トラッシュのイベント等）の【メイン】効果を、そのカードを source として発動する。
+
+        EB03-031「トラッシュのコスト7以下のイベント1枚までの【メイン】効果を発動する」用。
+        発生源（EB03-031）の効果ではなく、選んだイベント自身の効果として解決するため、
+        現スタックへ展開せず resolve_ability で別コンテキストを起こす（「このカード」参照が
+        正しくイベントを指す）。イベントの【メイン】は ACTIVATE_MAIN（無ければ COUNTER）に
+        格納される。コスト節は持たない（再コストは発生しない）。
+        """
+        ref_map = {
+            "ON_PLAY": TriggerType.ON_PLAY,
+            "ON_KO": TriggerType.ON_KO,
+            "ON_ATTACK": TriggerType.ON_ATTACK,
+            "ACTIVATE_MAIN": TriggerType.ACTIVATE_MAIN,
+        }
+        primary = ref_map.get(ref_trigger, TriggerType.ACTIVATE_MAIN)
+        for card in cards:
+            mains = [ab for ab in card.master.abilities
+                     if ab.trigger == primary and ab.effect is not None]
+            if not mains:
+                mains = [ab for ab in card.master.abilities
+                         if ab.trigger == TriggerType.COUNTER and ab.effect is not None]
+            if not mains:
+                log_event("WARNING", "resolver.execute_selected_missing",
+                          f"No {primary.name}/COUNTER ability on {card.master.name}", player=player.name)
+                continue
+            for ab in mains:
+                log_event("INFO", "resolver.execute_selected",
+                          f"Executing {primary.name} of {card.master.name} (from trash)", player=player.name)
+                self.game_manager.resolve_ability(player, ab, source_card=card)
+                if self.game_manager.active_interaction:
+                    return
 
     def _execute_game_action(self, player, action: GameAction, source_card) -> bool:
         targets = self._resolve_targets(player, action.target, source_card, action_node=action)

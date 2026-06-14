@@ -1503,7 +1503,18 @@ def _execute_main(ctx: ParseContext) -> Optional[GameAction]:
         if re.search(_nfc(rf"【?(?:{tag})】?効果"), ctx.text):
             ref = trig
             break
-    return GameAction(type=ActionType.EXECUTE_MAIN_EFFECT, status=ref, raw_text=ctx.text)
+    # 「（自分の）トラッシュにある…イベント…の【メイン】効果を発動する」(EB03-031):
+    # 発生源自身ではなく、選んだカードの【メイン】効果を発動する。発動するカードを選ぶ
+    # ターゲットを付与する（従来は target 無しで発生源を再展開し、選択が脱落していた）。
+    target = None
+    if re.search(_nfc(r'(トラッシュ|手札|デッキ).{0,30}効果を発動'), ctx.text):
+        sel = re.sub(_nfc(r'の[、,]?\s*【?(?:起動メイン|メイン)?】?効果を発動.*$'), '', ctx.text)
+        target = parse_target(sel)
+        if _nfc("トラッシュ") in sel:
+            target.zone = Zone.TRASH
+        if _nfc("まで") in sel:
+            target.is_up_to = True
+    return GameAction(type=ActionType.EXECUTE_MAIN_EFFECT, status=ref, target=target, raw_text=ctx.text)
 
 
 # ---------------------------------------------------------------------------
