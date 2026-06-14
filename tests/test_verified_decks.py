@@ -224,6 +224,33 @@ def test_leader_name_multi_or():
     assert EffectResolver(gm2)._check_condition(q1, cond, inst("OP13-016")) is False
 
 
+def test_op16015_luffy_cost_reduction_requires_ace_leader_and_don():
+    """OP16-015 ルフィ: 手札コスト-2は「リーダー名に『エース』を含む」かつ「ドン!!6枚以上」の
+    AND。条件のAND分割で「カード名で、」連結が拾えず、リーダー名条件が脱落して
+    ドン!!枚数だけで誤発動していた回帰（§8.3 条件の退化）。"""
+    cond = inst("OP16-015").master.abilities[0].condition
+    assert cond.type == ConditionType.AND
+    types = {a.type for a in cond.args}
+    assert ConditionType.LEADER_NAME in types and ConditionType.DON_COUNT in types
+
+    def with_don(player, n):
+        for _ in range(n):
+            player.don_active.append(DonInstance(owner_id=player.name))
+
+    # エースリーダー + ドン!!6枚 → 成立
+    gm, p1, _ = game("OP13-002")
+    with_don(p1, 6)
+    assert EffectResolver(gm)._check_condition(p1, cond, inst("OP16-015")) is True
+    # エースリーダー + ドン!!5枚 → 不成立（ドン不足）
+    gm2, q1, _ = game("OP13-002")
+    with_don(q1, 5)
+    assert EffectResolver(gm2)._check_condition(q1, cond, inst("OP16-015")) is False
+    # 非エースリーダー + ドン!!6枚 → 不成立（脱落していたリーダー名条件）
+    gm3, r1, _ = game("OP01-001")
+    with_don(r1, 6)
+    assert EffectResolver(gm3)._check_condition(r1, cond, inst("OP16-015")) is False
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")

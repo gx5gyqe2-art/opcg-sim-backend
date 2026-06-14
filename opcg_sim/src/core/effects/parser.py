@@ -1153,7 +1153,7 @@ class EffectParser:
         # （例「コスト8以上のキャラがいて、手札6枚以下」→ HAND_COUNT>=8 と誤読）。
         split_m = re.search(
             _nfc(r'^(?P<a>.+?(?:がい(?:て|る)|枚以上いて|枚以下いて|がいなくて|があり|がある|'
-                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち))、(?P<b>.+)$'),
+                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち|カード名で))、(?P<b>.+)$'),
             norm_text)
         if split_m:
             a_txt = split_m.group("a")
@@ -1165,6 +1165,9 @@ class EffectParser:
             a_norm = re.sub(_nfc(r'(以上|以下)で$'), r'\1', a_norm)
             # 「を持ち」連結（例「リーダーが特徴《X》を持ち、…の場合」）は終止形に正規化
             a_norm = re.sub(_nfc(r'を持ち$'), _nfc('を持つ'), a_norm)
+            # 「…カード名で、…」連結（例「リーダーが『エース』を含むカード名で、…」OP16-015）。
+            # 連結の「で」を落として体言止めに戻し、カード名条件として再帰解析する。
+            a_norm = re.sub(_nfc(r'カード名で$'), _nfc('カード名'), a_norm)
             sub_a = self._parse_condition_obj(a_norm)
             sub_b = self._parse_condition_obj(b_txt)
             valid = [c for c in (sub_a, sub_b)
@@ -1282,6 +1285,14 @@ class EffectParser:
             # findall で全て拾い、resolver はいずれか一致(OR)で判定する。re.search だと先頭名
             # のみになり、他リーダー名のとき条件が常に不成立だった。
             name_matches = re.findall(r'「([^」]+)」', norm_text)
+            # 「『エース』を含むカード名」等は、『』表記でも“特徴”ではなく“カード名の部分一致”。
+            # カード名文脈では 『』／「」 の語をリーダー名（matches_name の部分一致）として扱う。
+            # これを LEADER_TRAIT に流すと leader.traits に無く常に不成立になる（OP16-015 ルフィ）。
+            if _nfc("カード名") in norm_text:
+                nm = re.findall(_nfc(r'[「『]([^」』]+)[」』]'), norm_text)
+                if nm:
+                    val = nm[0] if len(nm) == 1 else nm
+                    return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
             if trait_match:
                 return Condition(type=ConditionType.LEADER_TRAIT, value=trait_match.group(1), player=p, raw_text=norm_text)
             if name_matches:
