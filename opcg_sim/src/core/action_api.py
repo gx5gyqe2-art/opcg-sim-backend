@@ -3,7 +3,7 @@
 `/api/game/action`・`/api/game/battle`（`opcg_sim/api/app.py`）のディスパッチ処理を
 純粋関数として切り出したもの。HTTP エンドポイント・CPU ドライバ・自己対戦ランナーが
 **同一コードパス** を通ることで、AI シミュレーション・自己対戦とルール本番の挙動が
-乖離しないことを保証する（docs/CPU_BATTLE_PLAN.md §2.1）。
+乖離しないことを保証する（docs/SPEC.md §0）。
 
 これらの関数は `manager.action_events` を変化させる（呼び出し側で事前にリセットする）。
 ゲーム状態はすべて引数の `manager`（GameManager）上で完結し、ネットワーク/HTTP には依存しない。

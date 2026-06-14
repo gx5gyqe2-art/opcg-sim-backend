@@ -1,6 +1,6 @@
 """CPU 対 CPU 自己対戦ハーネスのスモーク/不変条件テスト（PR1 基盤）。
 
-docs/CPU_BATTLE_PLAN.md §5 の検証項目:
+docs/TEST_SPEC.md §3.1 の検証項目:
   - CPU 対 CPU を seed 固定で完走（クラッシュ/無限ループ無し・必ず決着）。
   - clone() が本番状態を破壊しない。
   - get_legal_actions の生成手が適用可能（_validate_action を通る）。

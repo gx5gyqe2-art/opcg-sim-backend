@@ -246,7 +246,7 @@ class GameManager:
 
         `continuous` がマネージャへの後方参照を持つが deepcopy が循環を解決する。
         一時バッファ（action_events）はコピー後にリセットする。
-        本体（self）は一切変化させない（docs/CPU_BATTLE_PLAN.md §2.2）。
+        本体（self）は一切変化させない（docs/SPEC.md §2.5.2）。
         """
         import copy
         snapshot = copy.deepcopy(self)

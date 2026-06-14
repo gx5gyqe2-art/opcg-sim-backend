@@ -32,8 +32,10 @@
 カード効果は `GameManager`（ルールモード）でのみ解決される。フリーモードは盤面操作のみ。
 
 ルールモードのアクション適用ロジックは `core/action_api.py`（`apply_game_action`/`apply_battle_action`）に
-集約され、HTTP エンドポイント・CPU 対戦ドライバ・自己対戦ランナーが**同一コアパス**を通る。
-CPU（AI）・効果検証ハーネスの詳細は [`docs/CPU_BATTLE_PLAN.md`](CPU_BATTLE_PLAN.md)。
+集約され、HTTP エンドポイント・CPU 対戦ドライバ・自己対戦ランナーが**同一コアパス**を通る。これが
+ないと AI シミュレーション・自己対戦とルール本番の挙動が乖離するため、適用ロジックは必ずこの関数を
+経由する。CPU（AI）対戦の設計は §2.5、効果検証ハーネス（CPU 対 CPU 自己対戦）は
+[`docs/TEST_SPEC.md`](TEST_SPEC.md) §3.1 を参照。
 
 ---
 
@@ -125,19 +127,41 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 
 ---
 
-## 2.5 CPU 対戦（ルールモード・ソロ）
+## 2.5 CPU 対戦・AI（ルールモード・ソロ）
 
-人間（p1）が CPU（p2）と対戦する。AI はバックエンドの `core/cpu_ai.py` に置き、
-`GameManager.clone()` 上で各合法手を試して評価する 1-ply 先読みで意思決定する。
+人間（p1）が CPU（p2）と対戦する。AI はバックエンドの `core/cpu_ai.py` に置く。ルールエンジン・
+効果解決・勝敗判定がすべてサーバ側にあるため、先読み（状態を複製してシミュレート）も含めてサーバで
+完結する。フロントは人間=p1 を操作し、CPU の手はポーリングで 1 手ずつ受け取る。
 
+### 2.5.1 配線・逐次進行
 - **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（easy/normal/hard）/
   `cpu_deck`。CPU メタは `app.py` の `CPU_GAMES` に保持（`{cpu_player_id, difficulty}`）。
-- **逐次進行**: `POST /api/game/cpu/step {game_id}` が CPU の次の 1 手を `action_api` 経由で適用し、
-  `{cpu_acted, cpu_event, waiting_for}` を返す（`waiting_for`: `cpu`=継続/`human`/`human_decision`/`game_over`）。
-  フロントは `waiting_for!='cpu'` までポーリングして 1 手ずつ演出する。
-- **暴走防止**: ターン内の手総数キャップと起動効果/ドン付与の繰り返しキャップで CPU ターンが必ず終わる。
-- 合法手は `GameManager.get_legal_actions`、効果対話の既定解決は `default_interaction_payload`。
-- 詳細・効果検証ハーネス（CPU 対 CPU 自己対戦）は [`docs/CPU_BATTLE_PLAN.md`](CPU_BATTLE_PLAN.md)。
+- **逐次進行**: `POST /api/game/cpu/step {game_id}` が CPU の次の 1 手を `action_api`（§0 の共通
+  コアパス）経由で適用し、`{cpu_acted, cpu_event, waiting_for}` を返す
+  （`waiting_for`: `cpu`=継続 / `human` / `human_decision` / `game_over`）。フロントは
+  `waiting_for!='cpu'` までポーリングして 1 手ずつ演出する。毎回再計画するステートレス設計で desync に強い。
+
+### 2.5.2 AI 設計（`cpu_ai.py`）
+- **状態複製**: `GameManager.clone()`（`copy.deepcopy` ベース。WebSocket 等の非データ参照は持たない）。
+  本体（self）は一切変化させず、`action_events` 等の一時状態はリセットする。
+- **合法手列挙**: `GameManager.get_legal_actions(player)`（支払可能な手札・アクティブな攻撃者・有効な
+  攻撃対象・起動可能効果）。生成手は `_validate_action` を通る。
+- **評価関数** `evaluate(manager, me)→float`: ライフ差（最重要）・盤面総パワー / 枚数差・手札枚数差・
+  アクティブ DON 差・ブロッカー / KO 耐性・相手リーダーへの打点期待値を加重する。
+- **探索**: 各合法手を `clone()` 上で適用 → `evaluate` で採点する **1-ply 先読み**（貪欲）。`decide` が
+  最良手を返し、`decide_guarded` が暴走防止ガード（ターン内の手総数キャップ・起動 / ドン付与の繰り返し
+  キャップ）でターンの収束を保証する。per-turn 制限の付け忘れカードはこのガードで顕在化する。
+- **難易度**: `easy`=ランダム合法手 / `normal`=貪欲 1-ply / `hard`=評価関数つき貪欲 1-ply。
+- **sim 専用の対話自動解決** `default_interaction_payload`: 先読み中に `active_interaction` /
+  `pending_request` が立った場合の機械的な既定確定（対象=ヒューリスティック最良 or 先頭、CONFIRM=
+  有利なら使う 等）。**これはクローン上の先読み専用**であり、本番（実対局・自己対戦）の未解決中断は
+  握り潰さず [`docs/TEST_SPEC.md`](TEST_SPEC.md) §3.1 のインバリアントで表面化させる（AI が「とりあえず
+  動く」ことで効果バグを覆い隠さないための分離）。
+- **公平性**: 隠れ情報（相手手札の中身・裏向きライフ）は見ない前提でクローンをマスクできる設計とする
+  （チート防止）。
+
+効果検証ハーネス（CPU 対 CPU 自己対戦・決定論・インバリアント検出）は
+[`docs/TEST_SPEC.md`](TEST_SPEC.md) §3.1 を参照。
 
 ---
 

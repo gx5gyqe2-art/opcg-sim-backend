@@ -91,7 +91,7 @@ def test_condition_synth_no_change_ratchet():
     """H-5: 条件/コストを満たした盤面で発動しても一切動かない能力の上限。
 
     残存はリーダーへの特徴付与・既にアクティブな対象・遅延効果・色フィルタ等の
-    合成/測定限界（HANDOVER §7 残課題）。新規バグで増えたら気づけるよう固定する。"""
+    合成/測定限界による残存（品質ゲートの方針は docs/TEST_SPEC.md §5）。新規バグで増えたら気づけるよう固定する。"""
     import condition_synth
     buckets = condition_synth.collect()
     items = buckets.get("SATISFIED_NO_CHANGE", [])
