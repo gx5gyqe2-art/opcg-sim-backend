@@ -1419,6 +1419,9 @@ class GameManager:
                 if self._active_protection(target, ("BATTLE_KO",)):
                     log_event("INFO", "game.battle_ko_prevented", f"{target.master.name} is protected from battle KO", player=target_owner.name)
                 elif self._active_replacement(target, ("BATTLE_KO",)):
+                    # バトルKO置換は2枚のみ（OP10-034/EB02-030）で、いずれも任意（「〜してもよい/
+                    # できる」）。任意の拒否時は本来の KO を進める必要があり、KO 判定を先に skip する
+                    # 提示方式とは相性が悪い。対象も少なく価値が低いため、ここは自動解決のまま残す。
                     log_event("INFO", "game.battle_ko_replaced", f"{target.master.name}'s battle KO was replaced by an alternative effect", player=target_owner.name)
                 else:
                     self.move_card(target, Zone.TRASH, target_owner)
