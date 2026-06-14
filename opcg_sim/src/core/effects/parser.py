@@ -1159,6 +1159,25 @@ class EffectParser:
 
         return ActionType.OTHER
 
+    def _compare_op_offset(self, norm_text: str, default_op: CompareOperator):
+        """相対比較の演算子とオフセットを返す。「（相手より）N枚以上少ない/多い」は
+        オフセット N（少ない→LE, 多い→GE）。オフセットを含む「N枚以上」を先に判定し、
+        単独の「以上」（オフセット表記の一部）を方向と誤認しないようにする。
+        オフセットなしは より少ない/未満→LT・より多い→GT・以下→LE・以上→GE。"""
+        m = re.search(_nfc(r'(\d+)枚以上(少ない|多い)'), norm_text)
+        if m:
+            op = CompareOperator.LE if m.group(2) == _nfc('少ない') else CompareOperator.GE
+            return op, int(m.group(1))
+        if _nfc('より少ない') in norm_text or _nfc('未満') in norm_text:
+            return CompareOperator.LT, 0
+        if _nfc('より多い') in norm_text:
+            return CompareOperator.GT, 0
+        if _nfc('以下') in norm_text:
+            return CompareOperator.LE, 0
+        if _nfc('以上') in norm_text:
+            return CompareOperator.GE, 0
+        return default_op, 0
+
     def _parse_condition_obj(self, text: str) -> Condition:
         norm_text = _nfc(text)
 
@@ -1289,15 +1308,9 @@ class EffectParser:
             if _mutual and (re.search(_nfc(r'相手.{0,20}ドン[ 　]*(?:!!|‼)'), norm_text)
                     or re.search(_nfc(r'ドン[ 　]*(?:!!|‼).{0,20}(?:より|以上|以下)'), norm_text)
                     and _nfc("相手") in norm_text):
-                op_m = re.search(_nfc(r'(以下|以上|より多い|未満|より少ない)'), norm_text)
-                cmp_op = {
-                    _nfc('以上'): CompareOperator.GE,
-                    _nfc('以下'): CompareOperator.LE,
-                    _nfc('より多い'): CompareOperator.GT,
-                    _nfc('未満'): CompareOperator.LT,
-                    _nfc('より少ない'): CompareOperator.LT,
-                }.get(op_m.group(1) if op_m else '', CompareOperator.GE)
-                return Condition(type=ConditionType.DON_COUNT_COMPARE, operator=cmp_op, player=Player.SELF, raw_text=norm_text)
+                cmp_op, offset = self._compare_op_offset(norm_text, CompareOperator.GE)
+                return Condition(type=ConditionType.DON_COUNT_COMPARE, operator=cmp_op,
+                                 value=offset, player=Player.SELF, raw_text=norm_text)
             # 「（自分の）付与されているドン‼がある／ない場合」= 付与ドン（attached）の存在条件。
             # 場のドン総数ではなく付与中のドンのみを数える（resolver が raw_text の「付与」で分岐）。
             # 従来は下の既定 EQ 0（場のドン==0）に落ち、神避 OP13-076 の主効果が常に不発だった。
@@ -1352,13 +1365,17 @@ class EffectParser:
         # 主語が「自分のライフ」で相手と比較する句のみ。既定の LIFE_COUNT（相手 EQ 0 等）に
         # 化けて常時不成立になっていた（OP15-104/OP03-119/OP10-113/OP07-098 ほか12枚）。
         if (_nfc("自分のライフ") in norm_text and _nfc("相手") in norm_text
-                and re.search(_nfc(r'より少ない|より多い|以下|以上|未満'), norm_text)):
-            cmp_op = (CompareOperator.LT if (_nfc("より少ない") in norm_text or _nfc("未満") in norm_text)
-                      else CompareOperator.LE if _nfc("以下") in norm_text
-                      else CompareOperator.GT if _nfc("より多い") in norm_text
-                      else CompareOperator.GE)
+                and re.search(_nfc(r'より少ない|より多い|以下|以上|未満|枚以上(?:少ない|多い)'), norm_text)):
+            cmp_op, offset = self._compare_op_offset(norm_text, CompareOperator.GE)
             return Condition(type=ConditionType.LIFE_COUNT_COMPARE, operator=cmp_op,
-                             player=Player.SELF, raw_text=norm_text)
+                             value=offset, player=Player.SELF, raw_text=norm_text)
+
+        # 手札の相対比較「自分の手札が相手(の手札)より(N枚以上)少ない/多い」(OP09-092)。
+        if (_nfc("自分の手札") in norm_text and _nfc("相手") in norm_text
+                and re.search(_nfc(r'より\d*枚?以上?(?:少ない|多い)|より少ない|より多い'), norm_text)):
+            cmp_op, offset = self._compare_op_offset(norm_text, CompareOperator.LT)
+            return Condition(type=ConditionType.HAND_COUNT_COMPARE, operator=cmp_op,
+                             value=offset, player=Player.SELF, raw_text=norm_text)
 
         if _nfc("ライフ") in norm_text:
             return Condition(type=ConditionType.LIFE_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
@@ -1467,6 +1484,9 @@ class EffectParser:
                 and (_nfc("このキャラ") not in norm_text or _nfc("このキャラ以外") in norm_text)
                 and (_nfc("いる") in norm_text or _nfc("いない") in norm_text or re.search(_nfc(r"\d+枚(以上|以下)"), norm_text))
                 and not re.search(_nfc(r"(される|場を離れる|登場した|公開)"), norm_text)
+                # 「自分のキャラが相手のキャラより…少ない/多い」は相対比較（FIELD_COUNT_COMPARE）。
+                # 「2枚以上」が枚数閾値に誤吸収されないよう、ここでは扱わず下のハンドラへ落とす（OP10-098）。
+                and not re.search(_nfc(r"相手のキャラより"), norm_text)
                 and _nfc("のみ") not in norm_text):
             tq = parse_target(norm_text)
             # 側の明示が無い「（コスト0の）キャラがいる場合」は両プレイヤーを数える（OP02-093:
@@ -1562,11 +1582,12 @@ class EffectParser:
             if trait_m: val["trait"] = trait_m.group(1)
             return Condition(type=ConditionType.OPPONENT_REMOVAL, value=val, player=p, raw_text=norm_text)
 
-        # FIELD_COUNT_COMPARE: 自分と相手の場キャラ数の相対比較
-        fc_cmp_m = re.search(_nfc(r'キャラが相手のキャラより(少ない|多い)'), norm_text)
+        # FIELD_COUNT_COMPARE: 自分と相手の場キャラ数の相対比較（「N枚以上少ない/多い」も対応）
+        fc_cmp_m = re.search(_nfc(r'キャラが相手のキャラより(?:\d+枚以上)?(少ない|多い)'), norm_text)
         if fc_cmp_m:
-            op = CompareOperator.LT if fc_cmp_m.group(1) == _nfc('少ない') else CompareOperator.GT
-            return Condition(type=ConditionType.FIELD_COUNT_COMPARE, operator=op, player=Player.SELF, raw_text=norm_text)
+            cmp_op, offset = self._compare_op_offset(norm_text, CompareOperator.LT)
+            return Condition(type=ConditionType.FIELD_COUNT_COMPARE, operator=cmp_op,
+                             value=offset, player=Player.SELF, raw_text=norm_text)
 
         # REVEALED_CARD_TRAIT: 公開したカードの特徴/コスト/タイプ条件。
         # 公開(LOOK)が独立クローズに分割される場合、条件側には「公開し」が残らないため
