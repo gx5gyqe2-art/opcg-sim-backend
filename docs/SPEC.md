@@ -278,9 +278,15 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
   片側のみ解決される問題は解消した。**残る制約**: 対話を増やさないため、選択を伴う両側効果
   （例: お互いが手札を捨てる枚数選択）は各サイド**既定選択（候補先頭から）で非中断確定**する。
   人間が両側それぞれの選択を個別に行う完全な同時対話化は未実装（`active_interaction` 単一スロット）。
-- **置換 sub_effect のネスト中断**: 置換（REPLACE_EFFECT）は除去解決の最中に走るため、
-  `active_interaction` 単一スロット設計ではネストした対話を提示できず、`_auto_resolve_replacement`
-  が保守的に同期解決する（§3.4）。フロントへ選択を提示する完全な対話化は未実装。
+- **置換 sub_effect のネスト中断**: 置換（REPLACE_EFFECT）は除去解決の最中に走る入れ子の中断。
+  中断は `active_interaction`（= `_interaction_stack` 先頭の互換プロパティ）で表現する。
+  **失われる外側継続が無い場合**（除去アクションがリゾルバの実行スタック末尾＝後続なし、かつ
+  単一対象。resolver が `_removal_can_suspend` をセットし、除去側が単一対象を確認）には、
+  置換の内側選択（対象選択／任意確認）を**そのまま UI へ提示**して被保護側に選ばせ、`resume` で
+  `sub_effect` を完了させる（`_active_replacement(..., can_suspend=True)`）。**外側継続が残る
+  ケース**（除去の後続アクションあり・複数対象、バトル KO 経路）では、継続消失を避けるため従来
+  どおり `_auto_resolve_replacement` が保守的に同期解決する（任意=採用／対象=有効候補先頭）。
+  どちらも置換は成立扱い（本来の除去はスキップ）。バトル KO 経路と多段継続の完全対話化は今後の課題。
 
 ---
 
