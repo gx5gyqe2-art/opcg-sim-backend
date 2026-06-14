@@ -55,6 +55,11 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 |---|---|
 | `tests/test_rule_online.py` | ルール対戦のルーム生成→デッキ選択→開始→アクションの WS 同期、開始の ready ガード（`load_deck_mixed` をモックし Firestore 非依存） |
 
+### API 層（FastAPI・HTTP/WS スモーク）
+| ファイル | 役割 |
+|---|---|
+| `tests/test_api.py` | `opcg_sim/api/app.py` の **API 契約**を `fastapi.testclient.TestClient` で検証（エンジン挙動は他スイートが担保するためスモーク粒度）。対象: health／cards／log／対局生成→state→マリガン→TURN_END／CPU step の契約（`cpu_acted`・`waiting_for`）／sandbox 生成・list・WS ブロードキャスト（STATE_UPDATE）／rule ルーム生成→SET_DECK→START／未知 ID・DB 未初期化（デッキ CRUD）の整形済みエラー応答・`X-Session-ID` 往復。`load_deck_mixed` をローカルカード DB の stub に差し替え Firestore 非依存 |
+
 ### カード効果（パーサ/ゴールデン/全カード・回帰/安定性）
 | ファイル | 役割 |
 |---|---|
@@ -164,6 +169,7 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 
 ## 6. 直近の変更で追加されたテスト（参考）
 
+- **API 層スモーク**: `tests/test_api.py`（18件）。FastAPI の HTTP/WS 契約（対局生成→state→マリガン→TURN_END／CPU step／sandbox WS ブロードキャスト／rule ルーム→START／未知 ID・DB 未初期化のエラー応答・`X-Session-ID` 往復）を `TestClient` で検証。`fastapi`/`httpx` 導入により collection 可能になった層。
 - **オンライン対戦**: `tests/test_rule_online.py`（2件）。ルーム生成→WS購読→SET_DECK→START→`/api/game/action` のブロードキャスト同期、開始の両者 ready ガードを検証。
 - **コアルール修正**: `tests/test_rules_summoning_field_limit.py`（9件）。召喚酔い/速攻、場5体上限（強制トラッシュ＝`FIELD_OVERFLOW_TRASH`）を検証。
 - これらの修正に伴い `full_card_baseline.json` を更新（`OP06-086`: ON_PLAY で場が6体になる挙動が5体上限により `INTERACTIVE`＝選択待ちへ変化）。
