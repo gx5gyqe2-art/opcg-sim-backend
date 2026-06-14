@@ -80,8 +80,36 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 |---|---|
 | `tests/compare_parsers.py` | レガシー vs V2 の全カード差分（退行検知） |
 | `tests/full_card_audit.py` | 全カード構造不変条件検証＋挙動ベースライン生成（`--regen` で更新） |
-| `tests/cpu_selfplay.py` | 決定論的 CPU 対 CPU 自己対戦。`--seed N`/`--games K` で再現実行し、各ステップでインバリアント検出（FIELD_LIMIT/DON_CONSERVATION/UUID_DUPLICATE/STUCK/TEMP_ZONE_LEAK 等）、違反時はトレース末尾とリプロ seed を出力。`--out trace.jsonl` で機械可読トレース、`--verbose` で 1 手ずつ表示。`--p1-leader/--p2-leader` でリーダー指定 |
+| `tests/cpu_selfplay.py` | 決定論的 CPU 対 CPU 自己対戦（効果検証ハーネス）。詳細は §3.1 |
+| `tests/expected_effects.py` | 各カード×能力の「期待する動き」を AST から機械生成（`--regen`→`expected_effects.json`、`--card ID`）。効果オラクルの期待マニフェスト |
+| `tests/effect_oracle.py` | 期待 vs テキスト/AST の静的整合性コンパレータ（既存ゲートが拾わない高シグナル候補のみ抽出。`--category`/`--json`） |
 | `tests/leader_spec_probe.py` | リーダー1枚のテキスト/AST要約/実行観測の出力（`<ID>`/`--set`/`--all`/`--json`）。手動検証（§8）の補助に使う |
+
+### 3.1 効果検証ハーネス（CPU 対 CPU 自己対戦）
+
+`tests/cpu_selfplay.py` は「遊ぶ機能」と同じ AI（`core/cpu_ai.py`）を流用した**決定論的・自動異常検出
+付きの効果検証ツール**。弱い AI でも長時間の自己対戦で効果を踏めるため、検証品質と AI の強さは分離
+できる。長時間対戦で効果を踏ませ、実行時の破綻を fail-fast で炙り出す。
+
+- **決定論・再現性**: 全乱数を seed 付き RNG に集約（`--seed N` で完全再現）。適用した
+  `(player, action_type, payload)` を順序記録し、同 seed＋同手順で 1 ステップ単位に再現する。
+  バグ報告 ＝「seed＋手順＋停止ステップ」で完結する。
+- **方策・実行**: `--policy random|ai` / `--difficulty easy|normal|hard` / `--games K` /
+  `--p1-leader`/`--p2-leader`（リーダー指定）。特定カードを強制投入して効果を踏ませる用途にも使う。
+- **トレース**: `--out trace.jsonl`（1 行＝1 ステップ：step/turn/phase/player/action/events/
+  snapshot_diff/flags）。`grep`/`diff` で異常箇所へ直行できる。`--verbose` で 1 手ずつ表示。
+- **実行時インバリアント**（`core/invariants.py` の `check_invariants`/`check_turn_boundary`）: 各
+  ステップ後に検査し、破れたら**即停止＋リプロ出力**（fail-fast）。
+  - `SUSPEND_LEAK`（手番をまたいで未解決の `active_interaction` / `pending_request` / temp_zone が残る）
+  - `HIDDEN_LEAK`（隠しゾーンの中身露出）
+  - `FIELD_LIMIT`（場のキャラ ≤ 5）・DON 総数保存・パワー非負
+  - UUID ユニーク・ゾーン間の重複 / 消失なし・ライフ枚数とゾーンの整合
+  - `STUCK`（合法手が空＝詰み / スタック）・無限ループ（同状態反復・ステップ上限）
+
+これにより「効果が静かに失敗する（`OTHER` 化・no-op）」「中断が解決されない」を**進行中から**自動
+検出する（AI の自動解決が本番のバグを覆い隠さないよう、本番の中断は握り潰さず必ずここで表面化する）。
+`tests/test_cpu_selfplay.py` がスモーク（完走・決定論・`clone` 非破壊・合法手の `_validate_action` 適合・
+インバリアント検出）を回帰として固定する。
 
 ---
 

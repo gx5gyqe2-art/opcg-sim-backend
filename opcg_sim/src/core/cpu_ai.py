@@ -1,4 +1,4 @@
-"""ルールモード CPU（AI）の意思決定エンジン（docs/CPU_BATTLE_PLAN.md §2.3/2.4/2.5）。
+"""ルールモード CPU（AI）の意思決定エンジン（docs/SPEC.md §2.5.2）。
 
 設計:
   - 合法手は `GameManager.get_legal_actions` を単一の真実源として用いる。

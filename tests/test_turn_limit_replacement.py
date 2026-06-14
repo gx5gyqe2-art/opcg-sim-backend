@@ -2,7 +2,7 @@
 
 効果検証イテレーション1で確定したバグ:
   置換効果（「(このキャラが)KOされる場合、代わりに〜」）の【ターン1回】が enforce されず、
-  同一ターンに何度でも発動していた（docs/effect_verification/REPORT.md §2.1）。
+  同一ターンに何度でも発動していた（docs/reports/effect_verification_iter1.md §2.1）。
 
 根本原因（二重の取りこぼし）:
   1. parser が自己置換（「このキャラ」）の final_condition を None にし TURN_LIMIT を捨てる。
