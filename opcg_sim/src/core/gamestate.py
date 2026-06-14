@@ -98,6 +98,11 @@ class Player:
         # key=制限種別(CANNOT_PLAY_CHARACTER 等) → {"expire": turn_count, "min_cost": Optional[int]}。
         # turn_count <= expire の間だけ有効（negate_onplay_until と同じ遅延失効方式）。
         self.restrictions: Dict[str, Dict[str, Any]] = {}
+        # 継続付与型の置換（カウンターイベント等が「自分のキャラすべては、このターン中、
+        # …の場合、代わりに〜できる」を付与する）の保管。各要素 = {"status", "sub_effect",
+        # "is_optional", "expire_turn"}。turn_count <= expire_turn の間だけ有効（遅延失効）。
+        # 場に残らない発生源（イベント＝即トラッシュ）の置換を、被除去キャラ側から参照するため。
+        self.granted_replacements: List[Dict[str, Any]] = []
 
     def setup_game(self):
         random.shuffle(self.deck)
@@ -1411,6 +1416,10 @@ class GameManager:
             self.pay_cost(player, counter_card.master.cost, don_list)
             for ability in counter_card.master.abilities:
                 if ability.trigger == TriggerType.COUNTER: self.resolve_ability(player, ability, source_card=counter_card)
+            # 「自分のキャラすべては、このターン中、…代わりに〜できる」(EB02-030) のような
+            # 継続付与型の置換を登録する。イベントは即トラッシュで場に残らないため、
+            # _find_replacement の場上 protector 走査では拾えない。player へ this-turn 付与する。
+            self._register_granted_replacements(player, counter_card)
             self.move_card(counter_card, Zone.TRASH, player)
         else:
             counter_value = getattr(counter_card, "current_counter", counter_card.master.counter or 0); self.active_battle["counter_buff"] += counter_value
@@ -1772,6 +1781,53 @@ class GameManager:
                 if _limit is not None and protector.ability_used_this_turn.get(_ability_index(protector, ab), 0) >= _limit:
                     continue
                 return (protector, ab, eff, sub)
+
+        # 継続付与型の置換（EB02-030「自分のキャラすべては、このターン中、…代わりに〜できる」）。
+        # 場に残らないイベント由来のため owner.granted_replacements を参照する。付与対象は
+        # 自分のキャラ（除去されるカード自身が自分のキャラであること）。ab/eff は持たないので
+        # ターン制限・条件は付与時に消化済みとして None を返す。
+        if getattr(card, "master", None) and card.master.type == CardType.CHARACTER:
+            for g in getattr(owner, "granted_replacements", []):
+                if g.get("status") not in status_values:
+                    continue
+                if self.turn_count > g.get("expire_turn", 0):
+                    continue
+                sub = g.get("sub_effect")
+                if sub is None:
+                    continue
+                resolver = EffectResolver(self)
+                if not resolver._can_satisfy_node(owner, sub, card):
+                    continue
+                return (card, None, None, sub)
+        return None
+
+    def _register_granted_replacements(self, player: Player, source_card: Card) -> None:
+        """カウンターイベント等が持つ REPLACE_EFFECT を「このターン中」付与の置換として登録する。
+        イベントは場に残らないため、被除去キャラ側から参照できるよう player へ退避する
+        （EB02-030「自分のキャラすべては、このターン中、バトルでKOされる場合、代わりに〜できる」）。"""
+        import copy
+        for ability in source_card.master.abilities:
+            eff = self._find_action(ability.effect, ActionType.REPLACE_EFFECT)
+            if eff is None:
+                continue
+            sub = getattr(eff, "sub_effect", None)
+            if sub is None:
+                continue
+            # 「〜できる／〜してもよい」は任意。parser が sub.is_optional に載せ切れない場合に
+            # 備え raw_text からも判定し、付与する sub のコピーへ反映する（共有ノードを汚さない）。
+            raw = _nfc(getattr(eff, "raw_text", "") or getattr(ability, "raw_text", "") or "")
+            is_optional = bool(getattr(sub, "is_optional", False)) or ("できる" in raw) or ("てもよい" in raw)
+            sub_copy = copy.copy(sub)
+            sub_copy.is_optional = is_optional
+            player.granted_replacements.append({
+                "status": eff.status,
+                "sub_effect": sub_copy,
+                "is_optional": is_optional,
+                "expire_turn": self.turn_count,
+            })
+            log_event("INFO", "game.replacement_granted",
+                      f"{source_card.master.name} grants this-turn {eff.status} replacement to {player.name}'s characters",
+                      player=player.name)
         return None
 
     # 置換効果（REPLACE_EFFECT）の判定。除去の瞬間に対象の PASSIVE 能力を走査し、
