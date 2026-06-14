@@ -298,11 +298,12 @@ def test_on_rest_trigger_fires_on_attack():
 
 
 def test_char_or_don_rest_count():
-    """OP12-037: 「相手のキャラかドン!!合計2枚」はキャラ側も最大2枚レストにできる。"""
-    choice = inst("OP12-037").master.abilities[0].effect
-    char_opt = choice.options[0]
-    assert char_opt.type == ActionType.REST
-    assert char_opt.target.count == 2 and char_opt.target.is_up_to is True
+    """OP12-037: 「相手のキャラかドン!!合計2枚」は CHAR_OR_DON 混在選択（キャラ＋ドンを
+    合わせて最大2枚。1キャラ+1ドン 等の混在も可）。"""
+    rest = inst("OP12-037").master.abilities[0].effect
+    assert rest.type == ActionType.REST
+    assert "CHAR_OR_DON" in rest.target.flags
+    assert rest.target.count == 2 and rest.target.is_up_to is True
 
 
 def test_char_or_don_rest_end_to_end():

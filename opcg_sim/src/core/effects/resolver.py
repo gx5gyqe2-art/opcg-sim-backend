@@ -436,7 +436,11 @@ class EffectResolver:
             self.context["_last_action_count"] = cnt
 
         # ▼▼▼ 追加: 実行履歴を記録 ▼▼▼
-        target_names = [f"{t.master.name}({t.uuid[:4]})" for t in targets]
+        # ドン!!（master 無し。CHAR_OR_DON 混在選択 等）は "DON!!" 表記にする。
+        target_names = [
+            f"{t.master.name}({t.uuid[:4]})" if hasattr(t, "master") else f"DON!!({t.uuid[:4]})"
+            for t in targets
+        ]
         self.action_history.append({
             "action": action.type.name if hasattr(action.type, 'name') else str(action.type),
             "success": success,

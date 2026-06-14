@@ -371,6 +371,31 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
     elif query.player == Player.ALL: target_players = [opponent_player, owner_player]
     elif query.player == Player.OWNER: target_players = [owner_player]
 
+    # 「キャラかドン!!（合計N枚）」: キャラとドン!!を1つの候補プールにまとめ、混在選択
+    # （例 1キャラ+1ドン）を許す（OP06-035 / OP12-037）。キャラは場（リーダー/ステージ除く）、
+    # ドン!!はコストエリア（アクティブ＋レスト）。コスト/レスト状態フィルタはキャラ側のみ
+    # 適用する（ドン!!はコストを持たない）。N 枚の選択・中断は resolver が担う。
+    if "CHAR_OR_DON" in getattr(query, "flags", set()):
+        pool = []
+        for p in target_players:
+            if not p:
+                continue
+            for ch in p.field:
+                if ch is None:
+                    continue
+                if query.cost_max is not None and ch.current_cost > query.cost_max:
+                    continue
+                if query.cost_min is not None and ch.current_cost < query.cost_min:
+                    continue
+                if query.is_rest is not None and ch.is_rest != query.is_rest:
+                    continue
+                pool.append(ch)
+            for don in (p.don_active + p.don_rested):
+                if query.is_rest is not None and don.is_rest != query.is_rest:
+                    continue
+                pool.append(don)
+        return pool
+
     # zone はリスト（「手札かトラッシュから」EB03-049 / 「場か手札」OP13-079）も取り得る。
     zones = query.zone if isinstance(query.zone, list) else [query.zone]
 
