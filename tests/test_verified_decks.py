@@ -281,6 +281,29 @@ def test_bracket_ko_trigger_always_fires():
     assert gm._ko_trigger_matches(ab, p1, "EFFECT", p1) is True
 
 
+def test_op16047_opponent_chooses_own_discard():
+    """OP16-047 ドフラミンゴ「相手は自身の手札2枚を…デッキの下に置く」は相手が選ぶ。
+    既定（chooser=None→自分が選択）のままだと自分が相手の手札を選べてしまう退行。"""
+    from opcg_sim.src.models.enums import Player as P
+    # 構造: DECK_BOTTOM 対象の chooser=OPPONENT
+    eff = inst("OP16-047").master.abilities[0].effect
+    bottom = find_action(eff, ActionType.DECK_BOTTOM)
+    assert bottom is not None and bottom.target.chooser == P.OPPONENT
+    # 横展開: DISCARD 系も相手選択
+    disc = find_action(inst("OP16-094").master.abilities[0].effect, ActionType.DISCARD)
+    assert disc is not None and disc.target.chooser == P.OPPONENT
+    # 「相手の〜をレスト」（自分が選ぶ）は波及しない
+    rest = find_action(inst("OP16-035").master.abilities[0].effect, ActionType.REST)
+    assert rest is not None and rest.target.chooser is None
+    # end-to-end: 選択者が相手プレイヤーになる
+    gm, p1, p2 = game("OP16-041", "OP16-041")
+    dfl = inst("OP16-047", "P1"); p1.field = [dfl]
+    p2.hand = [inst("OP16-046", "P2") for _ in range(8)]
+    EffectResolver(gm).resolve_ability(p1, dfl.master.abilities[0], source_card=dfl)
+    assert gm.active_interaction is not None
+    assert gm.active_interaction.get("player_id") == p2.name
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")

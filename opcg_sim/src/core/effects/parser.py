@@ -548,6 +548,13 @@ class EffectParser:
                     final_condition = turn_limit_cond
                 trigger = TriggerType.PASSIVE
 
+            # 「相手は自身の〜を捨てる/デッキの下に置く/戻す」等、相手が自分のカードを
+            # 処理する効果は、対象選択を相手プレイヤーに委ねる（chooser=OPPONENT）。
+            # 既定（chooser=None → 効果コントローラー=自分が選択）のままだと、自分が
+            # 相手の手札から捨てるカードを選べてしまう退行になる（OP16-047 等 ~20 枚）。
+            self._apply_opponent_self_chooser(effect_node)
+            self._apply_opponent_self_chooser(cost_node)
+
             return Ability(
                 trigger=trigger,
                 condition=final_condition,
@@ -559,6 +566,38 @@ class EffectParser:
         except Exception as e:
             log_event(level_key="ERROR", action="parser.parse_ability_error", msg=f"Failed to parse: {text[:20]} | Error: {str(e)}")
             return Ability(trigger=TriggerType.UNKNOWN, effect=None, raw_text=_nfc(text))
+
+    def _apply_opponent_self_chooser(self, node):
+        """effect/cost ツリーを走査し、「相手は自身の〜」（相手が自分のカードを処理する）
+        アクションの対象選択者を相手プレイヤー（chooser=OPPONENT）に設定する。
+
+        対象が相手側（player=OPPONENT）かつ未指定（chooser=None）で、アクションの
+        raw_text に「相手は自身の」を含む場合のみ適用する（「相手の〜をKO/レスト」など
+        自分が選ぶ効果には "自身の" が無いため波及しない）。
+        """
+        if node is None:
+            return
+        if isinstance(node, GameAction):
+            tq = getattr(node, "target", None)
+            raw = _nfc(getattr(node, "raw_text", "") or "")
+            if (tq is not None and getattr(tq, "player", None) == Player.OPPONENT
+                    and getattr(tq, "chooser", None) is None
+                    and _nfc("相手は自身の") in raw):
+                tq.chooser = Player.OPPONENT
+            self._apply_opponent_self_chooser(getattr(node, "sub_effect", None))
+            return
+        if isinstance(node, Sequence):
+            for a in node.actions:
+                self._apply_opponent_self_chooser(a)
+            return
+        if isinstance(node, Branch):
+            self._apply_opponent_self_chooser(node.if_true)
+            self._apply_opponent_self_chooser(node.if_false)
+            return
+        if isinstance(node, Choice):
+            for o in node.options:
+                self._apply_opponent_self_chooser(o)
+            return
 
     def _replacement_status(self, norm_text: str) -> Optional[str]:
         """置換効果（「代わりに〜」）の対象除去種別を返す。

@@ -1258,7 +1258,7 @@
 "OP07-086|ON_PLAY": "p1_hand:6→5, p1_field:3→4, p1_trash:10→12, p1_deck:20→18 | pw0,kw0,rs0,co-2",
 "OP07-087|YOUR_TURN": "- | pw0,kw0,rs0,co0",
 "OP07-088|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
-"OP07-090|ON_PLAY": "p1_hand:6→5, p1_field:3→4, p2_trash:0→1, p2_deck:20→19 | pw0,kw0,rs0,co0",
+"OP07-090|ON_PLAY": "p1_field:3→4, p1_deck:20→19, p2_hand:3→2, p2_trash:0→1 | pw0,kw0,rs0,co0",
 "OP07-091|ON_ATTACK": "p2_field:3→2, p2_trash:0→1 | pw0,kw0,rs0,co0",
 "OP07-092|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
 "OP07-093|ON_PLAY": "p1_hand:6→5, p1_field:3→4, p1_trash:10→7, p1_deck:20→23, p2_hand:3→2, p2_deck:20→21 | pw0,kw0,rs0,co0",
