@@ -925,8 +925,30 @@ class EffectParser:
             r'|(?<=アクティブにし)、'
         )
 
-        parts = re.split(split_pattern, norm_text)
-        parts = [p.strip() for p in parts if p.strip()]
+        # 条件ゲート（「…場合、」「…なら、」）を含む文は、文内の連用接続（引く、捨て、…し 等）で
+        # 区切らず一体で扱う。区切ると後続アクションが Branch の外へ出て、条件不成立でも実行されて
+        # しまう（OP09-005/024・OP08-082/086 等の「…場合、AしてB」で B が無条件化する回帰）。
+        # 「。」「その後、」等の文／手順境界は従来どおり分割する（その後以降は別手順＝非ゲート）。
+        _HARD_DELIMS = (_nfc('。'), _nfc('その後、'), _nfc('発動できる、'), _nfc('させ、'))
+        _GATE_RE = re.compile(_nfc(r'(?:場合|なら)、'))
+        _toks = re.split('(' + split_pattern + ')', norm_text)
+        parts = []
+        _buf = _toks[0] if _toks else ''
+        _i = 1
+        while _i < len(_toks):
+            _delim = _toks[_i]
+            _nxt = _toks[_i + 1] if _i + 1 < len(_toks) else ''
+            if _buf.strip() and _GATE_RE.search(_buf) and _delim not in _HARD_DELIMS:
+                # 連用接続: ゲート本体に後続クローズを取り込む（_parse_logic_block の
+                # 「場合、〈本体〉」処理が本体を再帰 parse し、Branch 内で連用分割される）。
+                _buf = _buf + _delim + _nxt
+            else:
+                if _buf.strip():
+                    parts.append(_buf.strip())
+                _buf = _nxt
+            _i += 2
+        if _buf.strip():
+            parts.append(_buf.strip())
 
         if len(parts) > 1:
             return Sequence(actions=[self._parse_logic_block(p, is_cost) for p in parts])
