@@ -65,6 +65,18 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | `tests/test_verified_decks.py` | **手動検証済みデッキの効果回帰**（§8）。ベースラインが捕捉できない常在ルール（RULE_PROCESSING）・ON_LEAVE 誘発・勝利条件・ドンデッキ枚数・カード名別名・持続時間等を意味的に固定 |
 | `tests/test_cpu_selfplay.py` | CPU 対 CPU 自己対戦の完走・決定論・clone 非破壊・合法手適用・インバリアント検出 |
 
+### 効果メカニクス・対話モデル
+| ファイル | 役割 |
+|---|---|
+| `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER/PER_TURN_LIMIT_GAP/UP_TO_GAP = 0 のラチェット（§5） |
+| `tests/test_interaction_stack.py` | 中断スタック（`active_interaction` 互換プロパティ／`push_interaction`）のセマンティクス |
+| `tests/test_replacement_interactive.py` | 置換 sub_effect のネスト中断（終端=UI提示+resume／非終端=自動解決）。SPEC §6.1 |
+| `tests/test_both_sides_interactive.py` | 「お互いの〜」両側効果の各プレイヤー個別選択（相手→自分の逐次中断）。SPEC §6.1 |
+| `tests/test_freeze_don.py` | FREEZE_DON（OP07-026 ドン側）＝レストのドン!!を1回リフレッシュ据え置き |
+| `tests/test_on_rest_trigger.py` / `tests/test_on_rest_subject.py` | ON_REST 誘発（このキャラ／任意主語＋自分の/相手の効果で）。アタック宣言・効果レスト両経路 |
+| `tests/test_execute_trash_event_main.py` | EB03-031 トラッシュのイベント【メイン】効果の発動（EXECUTE_MAIN_EFFECT + 対象選択） |
+| `tests/test_char_or_don_mixed.py` | 「キャラかドン合計N枚」の混在選択（CHAR_OR_DON 候補プール） |
+
 ### リーダー効果（全137枚）
 | ファイル | 役割 |
 |---|---|
@@ -209,9 +221,11 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 | 青緑ルフィ（インペルダウン） | OP16-022 | 2026-06-13 | 2（レストにできない対象誤フィルタ / distinct-name スケール） | ✓ |
 | ミホーク（緑レスト） | OP14-020 | 2026-06-13 | 3（属性‖種類の跨ぎOR=ペローナ / on-restトリガー未実装 / キャラ‖ドン合計枚数） | ✓ |
 
-> 残課題（既知の限定対応）: on-rest 誘発のうち**ブロック宣言によるレスト**（ブロッカー自身の
-> レスト）と、相手効果の**発生源がキャラかリーダーかの区別**（「相手のキャラの効果で」を
-> 「相手の効果で」と同一視）は近似。
+> 残課題（既知の限定対応・優先度低）: on-rest 誘発のうち**ブロック宣言によるレスト**（ブロッカー
+> 自身のレスト）と、相手効果の**発生源がキャラかリーダーかの区別**（「相手のキャラの効果で」を
+> 「相手の効果で」と同一視）は近似。現行の on-rest カードは全て「自分のターン中」または「効果で」
+> 限定で、ブロック宣言（相手ターン・非効果）では発火条件を満たさず、発生源区別が効くのも OP14-070
+> の1枚のエッジのみ＝実カード影響がほぼ無いため未対応のまま残す。
 >
 > **解消済み**: 「キャラかドン!!**合計N枚**」（N≥2。OP06-035／OP12-037）の**混在選択**（1キャラ+1ドン
 > 等）は実装済み。パーサが単一 REST に `CHAR_OR_DON` フラグの混在候補（相手のキャラ＋ドン!!）を
