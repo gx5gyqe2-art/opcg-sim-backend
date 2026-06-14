@@ -528,6 +528,29 @@ def _prevent_leave_and_keyword(ctx: ParseContext):
     return Sequence(actions=[prevent, grant])
 
 
+@rule("prevent_rest_and_keyword", priority=71)
+def _prevent_rest_and_keyword(ctx: ParseContext):
+    """「このキャラは（相手の…効果で）レストにされず（ない）、【X】を得る」の複合。
+    PREVENT_REST(自身) と GRANT_KEYWORD の両方を Sequence で返す。従来は keyword 付与
+    ルールが勝ってレスト耐性が脱落していた（OP15-024 ウソップ）。"""
+    t = ctx.text
+    if not re.search(_nfc(r"レストにされ(?:ず|ない)"), t):
+        return None
+    if _nfc("得る") not in t:
+        return None
+    if not re.search(_nfc(r"この(カード|キャラ|リーダー)"), t):
+        return None
+    m = _KEYWORD_GRANT_RE.search(t)
+    if not m:
+        return None
+    src = TargetQuery(select_mode="SOURCE")
+    prevent = GameAction(type=ActionType.PREVENT_REST, target=TargetQuery(select_mode="SOURCE"),
+                         duration=_duration_of(t), raw_text=t)
+    grant = GameAction(type=ActionType.GRANT_KEYWORD, target=src, status=m.group(1),
+                       duration=_duration_of(t), raw_text=t)
+    return Sequence(actions=[prevent, grant])
+
+
 @rule("grant_keyword", priority=63)
 def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text

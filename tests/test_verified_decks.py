@@ -414,6 +414,16 @@ def test_p107_either_player_don_count_is_or():
     assert ("SELF", 10) in sides and ("OPPONENT", 10) in sides
 
 
+def test_op15024_usopp_rest_immunity_and_blocker():
+    """OP15-024 ウソップ【相手のターン中】「相手の効果でレストにされず、【ブロッカー】を得る」は
+    PREVENT_REST(自身)＋GRANT_KEYWORD(ブロッカー)の複合。連用形「されず」＋ブロッカー付与で
+    キーワード付与ルールが勝ち、レスト耐性が脱落していた回帰。"""
+    eff = inst("OP15-024").master.abilities[0].effect
+    assert find_action(eff, ActionType.PREVENT_REST) is not None
+    grant = find_action(eff, ActionType.GRANT_KEYWORD)
+    assert grant is not None and grant.status == "ブロッカー"
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")
