@@ -1192,7 +1192,7 @@ class EffectParser:
         # （例「コスト8以上のキャラがいて、手札6枚以下」→ HAND_COUNT>=8 と誤読）。
         split_m = re.search(
             _nfc(r'^(?P<a>.+?(?:がい(?:て|る)|枚以上いて|枚以下いて|がいなくて|があり|がある|'
-                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち|カード名で))、(?P<b>.+)$'),
+                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち|カード名で|[」》]で))、(?P<b>.+)$'),
             norm_text)
         if split_m:
             a_txt = split_m.group("a")
@@ -1207,6 +1207,9 @@ class EffectParser:
             # 「…カード名で、…」連結（例「リーダーが『エース』を含むカード名で、…」OP16-015）。
             # 連結の「で」を落として体言止めに戻し、カード名条件として再帰解析する。
             a_norm = re.sub(_nfc(r'カード名で$'), _nfc('カード名'), a_norm)
+            # 「リーダーが「X」で、…」「リーダーが特徴《X》で、…」連結（OP14-059 ほか6枚）。
+            # 閉じ括弧直後の連結「で」を落として体言止めに戻す。
+            a_norm = re.sub(_nfc(r'([」》])で$'), r'\1', a_norm)
             sub_a = self._parse_condition_obj(a_norm)
             sub_b = self._parse_condition_obj(b_txt)
             valid = [c for c in (sub_a, sub_b)

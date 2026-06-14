@@ -1800,7 +1800,7 @@
 "OP11-073|ON_OPP_ATTACK": "p1_don:10→5 | pw0,kw0,rs0,co0",
 "OP11-073|PASSIVE": "- | pw0,kw0,rs0,co0",
 "OP11-074|ACTIVATE_MAIN": "p1_don:10→9 | pw0,kw0,rs1,co0",
-"OP11-075|ON_PLAY": "p1_hand:6→7, p1_field:3→4, p1_deck:20→18 | pw0,kw0,rs0,co0",
+"OP11-075|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
 "OP11-075|TRIGGER": "p1_hand:5→7, p1_deck:20→18 | pw0,kw0,rs0,co0",
 "OP11-076|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
 "OP11-077|YOUR_TURN": "- | pw0,kw0,rs0,co0",

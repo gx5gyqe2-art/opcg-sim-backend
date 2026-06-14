@@ -473,6 +473,19 @@ def test_leader_trait_or_condition():
     assert EffectResolver(gm3)._check_condition(r1, cond, inst("OP14-022")) is False
 
 
+def test_leader_name_and_split_connector():
+    """「自分のリーダーが「X」で、〈B〉場合」のAND分割。連結「」で、」が拾えず
+    リーダー名条件が脱落していた（OP14-059/OP11-075/OP13-075/EB04-041 ほか6枚）。"""
+    c = inst("OP14-059").master.abilities[0].condition
+    assert c.type == ConditionType.AND
+    types = {a.type for a in c.args}
+    assert ConditionType.LEADER_NAME in types and ConditionType.HAND_COUNT in types
+    # EB04-041 は LEADER_NAME + DON_COUNT
+    c2 = inst("EB04-041").master.abilities[0].condition
+    assert c2.type == ConditionType.AND
+    assert {a.type for a in c2.args} >= {ConditionType.LEADER_NAME, ConditionType.DON_COUNT}
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")
