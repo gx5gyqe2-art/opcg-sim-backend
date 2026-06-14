@@ -957,10 +957,18 @@ class GameManager:
                 card.reset_turn_status(clear_usage=True)
                 if not is_frozen: card.is_rest = False
         
+        # フリーズ中のドン!!（FREEZE_DON / OP07-026）は今回のリフレッシュではアクティブに
+        # 戻さず、レストのまま据え置いてフラグを下ろす（1回限りのフリーズ）。
+        still_frozen, to_activate = [], []
         for don in player.don_rested:
-            don.is_rest = False
-            player.don_active.append(don)
-        player.don_rested = []
+            if don.is_frozen:
+                don.is_frozen = False
+                still_frozen.append(don)
+            else:
+                don.is_rest = False
+                to_activate.append(don)
+        player.don_active.extend(to_activate)
+        player.don_rested = still_frozen
         
         for don in player.don_attached_cards:
             don.is_rest = False
@@ -1726,6 +1734,32 @@ class GameManager:
                 log_event("INFO", "game.trigger_ko", f"Resolving ON_KO for {card.master.name}", player=owner.name)
                 self.resolve_ability(owner, ability, source_card=card)
 
+    def _resolve_on_rest(self, card: Card, owner: Player):
+        """「（このキャラが）レストになった時」誘発を解決する（効果によるレスト）。
+
+        パーサはこの誘発を YOUR_TURN 反応型へ写像し（再計算では実行しない）、raw_text に
+        「このキャラがレストになった時」マーカーを残す。アタック宣言由来のレストは
+        declare_attack が発火するため、ここは効果（REST アクション）による
+        アクティブ→レスト遷移を担う（TEST_SPEC §8.2「効果でのレストは未対応」の解消）。
+        【自分のターン中】等の文脈条件は resolve_ability/_check_condition が評価するため、
+        相手ターン中の効果レストでは不発になる（OP14-027/028/032/035/119 等）。
+        """
+        if not card.master.abilities: return
+        for ability in card.master.abilities:
+            raw = _nfc(getattr(ability, "raw_text", "") or "")
+            if _nfc("このキャラがレストになった時") not in raw:
+                continue
+            # ターン文脈ガード: パーサは「このキャラがレストになった時」を YOUR_TURN/
+            # OPPONENT_TURN へ写像し、文脈はトリガー種別が暗黙に表す（条件には載らない）。
+            # アタック宣言経路は常に自分ターンのため無問題だが、効果レストは相手ターンにも
+            # 起こりうるため、ここでタグに応じて発火ターンを限定する。
+            if _nfc("【自分のターン中】") in raw and self.turn_player is not owner:
+                continue
+            if _nfc("【相手のターン中】") in raw and self.turn_player is owner:
+                continue
+            log_event("INFO", "game.trigger_rest", f"Resolving on-rest for {card.master.name}", player=owner.name)
+            self.resolve_ability(owner, ability, source_card=card)
+
     def _leave_subject_matches(self, ability: Ability, leaving_card: Card,
                                ability_owner: Player, leaving_owner: Player) -> bool:
         """ON_LEAVE 誘発の主語フィルタ（「自分の特徴《X》を持つキャラが（相手の効果で）場を
@@ -2112,6 +2146,22 @@ class GameManager:
             self._last_resource_count = rested
             return True
 
+        if act_name == "FREEZE_DON":
+            # 「（相手の）ドン!!N枚までは、次の相手のリフレッシュフェイズでアクティブにならない」
+            # (OP07-026 ドン側)。レストのドン!!を value 枚まで is_frozen にする。refresh_all が
+            # フリーズ中のドン!!を1回スキップする（キャラの flags["FREEZE"] と同じ1回限り）。
+            tp = self._don_pool_player(player, action)
+            frozen = 0
+            for don in tp.don_rested:
+                if frozen >= value:
+                    break
+                if not don.is_frozen:
+                    don.is_frozen = True
+                    frozen += 1
+            log_event("INFO", "game.action_freeze_don", f"{tp.name} froze {frozen} rested DON!!", player=player.name)
+            self._last_resource_count = frozen
+            return True
+
         if act_name == "ACTIVE_DON" and not getattr(action, 'target', None):
             # 「ドン!!N枚をアクティブにする」: レスト→アクティブ（枚数ベース）。
             tp = self._don_pool_player(player, action)
@@ -2280,6 +2330,7 @@ class GameManager:
                 # ルール上の注記（カード名 alias、デッキ枚数ルール等）→ エンジン no-op
                 success = True
             elif act_name == "REST":
+                _was_rested = target.is_rest
                 target.is_rest = True
                 if isinstance(target, DonInstance) and source_list is not None:
                     if source_list is not owner.don_rested:
@@ -2288,6 +2339,10 @@ class GameManager:
                             owner.don_rested.append(target)
                             if hasattr(target, 'attached_to'): target.attached_to = None
                 success = True
+                # アクティブ→レスト遷移で「このキャラがレストになった時」を誘発する。
+                # ドン!!は対象外。既にレストだった場合は遷移なしで不発。
+                if not _was_rested and not isinstance(target, DonInstance):
+                    self._resolve_on_rest(target, owner)
             elif act_name == "PLAY_CARD":
                 # 「手札のこのカードは効果で登場できない」: 手札源かつ当該 PASSIVE を持つ対象は
                 # 効果による登場をスキップする（NO_EFFECT_PLAY）。
