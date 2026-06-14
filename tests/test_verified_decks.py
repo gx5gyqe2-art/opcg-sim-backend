@@ -486,6 +486,40 @@ def test_leader_name_and_split_connector():
     assert {a.type for a in c2.args} >= {ConditionType.LEADER_NAME, ConditionType.DON_COUNT}
 
 
+def test_opponent_field_don_threshold_not_mutual():
+    """「相手の場のドン‼がN枚以上ある場合」は相手の場ドン枚数の閾値（DON_COUNT, OPPONENT）。
+    相互比較ブランチに誤吸収され DON_COUNT_COMPARE GE 0（自分≧相手＝ほぼ常時真）に化けていた
+    （OP14-063/OP08-060/PRB02-010）。複合「リーダーが多色で、相手のドンN枚以上」も分割。"""
+    def don_cond(cid):
+        seen = []
+        def rec(c):
+            if c is None:
+                return
+            if c.type in (ConditionType.DON_COUNT, ConditionType.DON_COUNT_COMPARE):
+                seen.append(c)
+            for a in (getattr(c, "args", None) or []):
+                rec(a)
+        for ab in inst(cid).master.abilities:
+            rec(ab.condition)
+            from opcg_sim.src.models.effect_types import Branch, Sequence, Choice
+            def walk(n):
+                if isinstance(n, Branch):
+                    rec(n.condition); walk(n.if_true); walk(n.if_false)
+                elif isinstance(n, Sequence):
+                    [walk(a) for a in n.actions]
+                elif isinstance(n, Choice):
+                    [walk(o) for o in n.options]
+            walk(ab.effect)
+        return seen
+    c = don_cond("OP14-063")[0]
+    assert c.type == ConditionType.DON_COUNT and c.player.name == "OPPONENT" and c.value == 6
+    # 複合: EB02-061 は AND[LEADER_COLOR 多色, DON_COUNT OPPONENT 5]
+    eb = inst("EB02-061").master.abilities[0].condition
+    assert eb.type == ConditionType.AND
+    sub = {a.type for a in eb.args}
+    assert ConditionType.LEADER_COLOR in sub and ConditionType.DON_COUNT in sub
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")

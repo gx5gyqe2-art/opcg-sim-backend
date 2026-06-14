@@ -1192,7 +1192,7 @@ class EffectParser:
         # （例「コスト8以上のキャラがいて、手札6枚以下」→ HAND_COUNT>=8 と誤読）。
         split_m = re.search(
             _nfc(r'^(?P<a>.+?(?:がい(?:て|る)|枚以上いて|枚以下いて|がいなくて|があり|がある|'
-                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち|カード名で|[」》]で))、(?P<b>.+)$'),
+                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち|カード名で|多色で|[」》]で))、(?P<b>.+)$'),
             norm_text)
         if split_m:
             a_txt = split_m.group("a")
@@ -1210,6 +1210,8 @@ class EffectParser:
             # 「リーダーが「X」で、…」「リーダーが特徴《X》で、…」連結（OP14-059 ほか6枚）。
             # 閉じ括弧直後の連結「で」を落として体言止めに戻す。
             a_norm = re.sub(_nfc(r'([」》])で$'), r'\1', a_norm)
+            # 「リーダーが多色で、…」連結（EB02-061/PRB02-005）。連結「で」を落とす。
+            a_norm = re.sub(_nfc(r'多色で$'), _nfc('多色'), a_norm)
             sub_a = self._parse_condition_obj(a_norm)
             sub_b = self._parse_condition_obj(b_txt)
             valid = [c for c in (sub_a, sub_b)
@@ -1254,12 +1256,15 @@ class EffectParser:
             ])
 
         if re.search(_nfc(r'ドン[ 　]*(?:!!|‼)'), norm_text):
-            # 「自分のドン!!が相手より多い」等の相互比較条件。比較語（より/以上/以下/多い/少ない）
-            # を伴う場合のみ。比較語の無い存在条件「相手の付与されているドン‼がある」は下の
-            # 付与ドン存在ハンドラへ落とす（従来は「相手…ドン‼」だけで誤吸収し GE 0＝常時真・
-            # player=SELF に化けていた。OP15-005）。
-            _has_cmp = re.search(_nfc(r'より多い|より少ない|より|以上|以下|未満'), norm_text)
-            if _has_cmp and (re.search(_nfc(r'相手.{0,20}ドン[ 　]*(?:!!|‼)'), norm_text)
+            # 「自分のドン!!が相手より多い」等の相互比較条件。自分と相手の両プールを比べる句に
+            # 限る＝「より」を含むか、「自分」と「相手」が両方現れる場合のみ。
+            # 「相手の場のドン‼が6枚以上ある」（単一プールの枚数閾値）や「相手の付与されている
+            # ドン‼がある」（存在条件）は相互比較ではないので下のハンドラへ落とす
+            # （従来は「相手…ドン‼」+比較語だけで誤吸収し GE 0＝常時真・player=SELF に化けていた。
+            # OP15-005／OP14-063/EB02-061/OP08-060/PRB02-005/010）。
+            _mutual = (_nfc("より") in norm_text
+                       or (_nfc("自分") in norm_text and _nfc("相手") in norm_text))
+            if _mutual and (re.search(_nfc(r'相手.{0,20}ドン[ 　]*(?:!!|‼)'), norm_text)
                     or re.search(_nfc(r'ドン[ 　]*(?:!!|‼).{0,20}(?:より|以上|以下)'), norm_text)
                     and _nfc("相手") in norm_text):
                 op_m = re.search(_nfc(r'(以下|以上|より多い|未満|より少ない)'), norm_text)
