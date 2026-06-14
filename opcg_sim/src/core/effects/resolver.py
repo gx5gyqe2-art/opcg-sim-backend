@@ -597,6 +597,25 @@ class EffectResolver:
                 candidates = [c for c in candidates
                               if not (ref_colors & {col.value for col in (c.master.colors or [])})]
 
+        # 「（複数枚を）パワーの合計がN以下になるように〈KO等〉」: 選択集合の合計パワー上限を尊重する
+        # （OP05-007/OP09-018）。組み合わせ制約のためフロント対話に丸投げせず、ルール違反（合計超過）
+        # を起こさない有効な選択を確定する＝低パワー順に上限まで貪欲に取る（最大枚数を確保）。
+        psum_max = getattr(query, "power_sum_max", None)
+        if psum_max is not None and candidates:
+            cap_n = getattr(query, "count", 1) or len(candidates)
+            ordered = sorted(candidates, key=lambda c: c.master.power or 0)
+            chosen, total = [], 0
+            for c in ordered:
+                p = c.master.power or 0
+                if len(chosen) >= cap_n:
+                    break
+                if total + p <= psum_max:
+                    chosen.append(c)
+                    total += p
+            if query.save_id:
+                self.context["saved_targets"][query.save_id] = chosen
+            return chosen
+
         required_count = getattr(query, 'count', 1)
         is_up_to = getattr(query, 'is_up_to', False)
         is_strict = getattr(query, 'is_strict_count', False)

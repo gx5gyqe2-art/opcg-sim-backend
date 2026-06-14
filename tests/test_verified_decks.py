@@ -1185,3 +1185,23 @@ def test_select_leader_and_char_includes_leader():
     from opcg_sim.src.models.enums import CardType
     assert any(c.master.type == CardType.LEADER for c in got)
     assert any(c.master.type == CardType.CHARACTER for c in got)
+
+
+# --- 選択制約「パワーの合計がN以下になるようにKO」 -------------------------
+
+def test_power_sum_max_ko_constraint():
+    """OP05-007 サボ / OP09-018 失せろ「相手のキャラ2枚までを、パワーの合計が4000以下に
+    なるようにKOする」で、合計パワー上限の選択制約が脱落し合計超過でもKOできていた回帰。
+    target.power_sum_max を解析し、resolver が合計≤N の有効な選択（低パワー順に貪欲）に限定する。"""
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    for cid in ["OP05-007", "OP09-018"]:
+        ko = find_action(inst(cid).master.abilities[0].effect, ActionType.KO)
+        assert ko is not None and ko.target.power_sum_max == 4000, cid
+    # 意味: 相手 power [2000,5000,12000]、上限4000 → 2000のみ（2000+5000>4000）
+    gm, p1, p2 = game("OP01-001", "OP01-001")
+    res = EffectResolver(gm)
+    ko = find_action(inst("OP09-018").master.abilities[0].effect, ActionType.KO)
+    p2.field = [inst("OP05-010", "P2"), inst("OP09-003", "P2"), inst("OP06-007", "P2")]
+    got = res._resolve_targets(p1, ko.target, inst("OP09-018", "P1"))
+    assert sum(c.master.power or 0 for c in got) <= 4000
+    assert all((c.master.power or 0) <= 4000 for c in got)
