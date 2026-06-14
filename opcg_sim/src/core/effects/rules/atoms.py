@@ -893,12 +893,16 @@ def _life_to_hand(ctx: ParseContext) -> Optional[GameAction]:
 
 @rule("hand_to_life", priority=69)
 def _hand_to_life(ctx: ParseContext) -> Optional[GameAction]:
-    """「（自分の）手札／トラッシュ…を、ライフの上／下に（表向きで）加える」
-    → MOVE_CARD(dest=LIFE, dest_position=TOP/BOTTOM)。「表向きで」修飾とトラッシュ源も許容。"""
+    """「（自分の）手札／トラッシュ…を、ライフの上／下に（表向き／裏向きで）加える」
+    → MOVE_CARD(dest=LIFE, dest_position=TOP/BOTTOM)。「表向き／裏向きで」修飾とトラッシュ源も許容。
+
+    「裏向きで加える」（OP10-119 / ST13-005）も拾う。従来は「表向きで」しか許容せず、
+    「公開し、ライフの上に裏向きで加える」が reveal_hand(priority=59) に落ちて REVEAL だけが
+    残り、手札→ライフの移動そのものが脱落していた（本ルールは priority=69 で先取りする）。"""
     t = ctx.text
     if _nfc("手札") not in t and _nfc("トラッシュ") not in t:
         return None
-    if not re.search(_nfc(r"ライフの(上|下)に(?:表向きで)?加える"), t):
+    if not re.search(_nfc(r"ライフの(上|下)に(?:[表裏]向きで)?加える"), t):
         return None
     tq = parse_target(t)
     # 源ゾーン: parse_target が複数ゾーン（「手札かトラッシュ」ST13-003）を検出済みなら尊重する。

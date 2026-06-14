@@ -804,3 +804,27 @@ def test_nami_slumber_revive_targets_trash_not_rest_filtered():
         assert act.target.is_rest is not True    # 状態フィルタは立たない
         names = {c.master.name for c in get_target_cards(gm, act.target, inst(cid))}
         assert names == {"ドクトル・ホグバック", "ペローナ", "クマシー"}
+
+
+# --- 手札→ライフ「裏向きで加える」 ----------------------------------------
+
+def test_hand_to_life_face_down_move():
+    """OP10-119 ロー / ST13-005 イワンコフ: 「自分の手札から…公開し、ライフの上に裏向きで
+    加える」は手札→ライフ（上・裏向き）の移動。hand_to_life の正規表現が「表向きで」しか
+    許容せず「裏向きで加える」を取りこぼし、reveal_hand に落ちて REVEAL だけが残り、
+    手札→ライフの移動そのものが脱落していた回帰。"""
+    from opcg_sim.src.models.enums import Zone
+    # OP10-119: 登場時の効果側に手札→ライフ移動がある
+    eff = inst("OP10-119").master.abilities[0].effect
+    mv = find_action(eff, ActionType.MOVE_CARD)
+    assert mv is not None
+    assert mv.target.zone == Zone.HAND
+    assert mv.destination == Zone.LIFE
+    assert mv.dest_position == "TOP"
+    assert mv.face_up is False
+    # ST13-005: コスト（ライフ→トラッシュ）とは別に、効果側で手札→ライフ移動が残ること
+    eff2 = inst("ST13-005").master.abilities[0].effect
+    mv2 = find_action(eff2, ActionType.MOVE_CARD)
+    assert mv2 is not None
+    assert mv2.target.zone == Zone.HAND and mv2.destination == Zone.LIFE
+    assert mv2.dest_position == "TOP" and mv2.face_up is False
