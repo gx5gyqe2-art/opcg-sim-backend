@@ -286,11 +286,18 @@ class EffectParser:
             trigger = self._detect_trigger(norm_text)
             log_event("INFO", "parser.trigger", f"Detected trigger: {trigger.name}")
 
-            # 【ターン1回】を前処理で検出し条件として記憶
+            # 【ターン1回】を前処理で検出し条件として記憶。括弧無しの地の文「（主語）はターンに1回、…」
+            # （OP10-118「このキャラはターンに1回、相手の効果でKOされない」）も TURN_LIMIT として
+            # 拾う（保護経路は raw_text 由来で既に1回/ターンに enforce 済みだが、AST にも条件を載せて
+            # 静的監査=effect_oracle の PER_TURN_LIMIT_GAP を解消する）。括弧/角括弧形は明示の代替で除去。
             turn_limit_cond = None
-            if _nfc("【ターン1回】") in norm_text or _nfc("(ターンに1回)") in norm_text or _nfc("（ターンに1回）") in norm_text:
+            _bare_turn1 = re.search(_nfc(r'(?<![【（(])(?:1ターンに1回|ターンに1回|ターン1回)'), norm_text)
+            if (_nfc("【ターン1回】") in norm_text or _nfc("(ターンに1回)") in norm_text
+                    or _nfc("（ターンに1回）") in norm_text or _bare_turn1):
                 turn_limit_cond = Condition(type=ConditionType.TURN_LIMIT, value=1)
-                norm_text = re.sub(_nfc(r'【ターン1回】|\(ターンに1回\)|（ターンに1回）'), '', norm_text).strip()
+                norm_text = re.sub(
+                    _nfc(r'【ターン1回】|\(ターンに1回\)|（ターンに1回）|(?<![【（(])(?:1ターンに1回|ターンに1回|ターン1回)[、,]?'),
+                    '', norm_text).strip()
 
             # 【ドン!!×N】コストタグを前処理で検出（スペース有無・‼ 混在に対応）
             don_cost_value = 0
