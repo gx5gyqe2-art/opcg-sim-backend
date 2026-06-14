@@ -779,8 +779,12 @@ class EffectResolver:
         elif condition.type == ConditionType.LEADER_TRAIT:
             if not target_player.leader: return False
             expected_trait = condition.value
+            traits = target_player.leader.master.traits
             if isinstance(expected_trait, str):
-                return expected_trait in target_player.leader.master.traits
+                return expected_trait in traits
+            if isinstance(expected_trait, (list, tuple)):
+                # 複数特徴の OR（「リーダーが特徴《X》か《Y》を持つ場合」）。
+                return any(t in traits for t in expected_trait)
             return False
             
         elif condition.type in [ConditionType.HAS_TRAIT, ConditionType.HAS_ATTRIBUTE, ConditionType.HAS_UNIT]:

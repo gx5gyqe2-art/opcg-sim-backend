@@ -460,6 +460,19 @@ def test_life_count_compare_self_less_than_opponent():
     assert EffectResolver(gm)._check_condition(p1, cond, inst("OP15-104")) is False
 
 
+def test_leader_trait_or_condition():
+    """「リーダーが特徴《X》か《Y》を持つ場合」は複数特徴のOR。従来は先頭《X》のみで、
+    第2特徴のリーダーで常に不成立だった（OP14-022/OP13-027/EB02-011 ほか12枚）。"""
+    cond = inst("OP14-022").master.abilities[0].condition
+    assert cond.type == ConditionType.LEADER_TRAIT
+    assert isinstance(cond.value, list) and set(cond.value) == {"FILM", "麦わらの一味"}
+    # 麦わらの一味を持つリーダーで成立（第2特徴のOR）、無関係特徴のリーダーで不成立。
+    gm2, q1, _ = game("ST10-002")  # モンキー・D・ルフィ＝麦わらの一味
+    assert EffectResolver(gm2)._check_condition(q1, cond, inst("OP14-022")) is True
+    gm3, r1, _ = game("OP13-002")  # ポートガス・D・エース（FILMも麦わらの一味も持たない）
+    assert EffectResolver(gm3)._check_condition(r1, cond, inst("OP14-022")) is False
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")

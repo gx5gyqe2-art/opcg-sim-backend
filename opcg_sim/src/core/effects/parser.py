@@ -1346,6 +1346,9 @@ class EffectParser:
         if (_nfc("リーダーが") in norm_text or _nfc("リーダーの特徴") in norm_text
                 or _nfc("リーダーのパワー") in norm_text):
             # 特徴は《X》だけでなく『X』（『白ひげ海賊団』『B・W』等の名称系特徴）でも書かれる。
+            # 複数併記「特徴《X》か《Y》」は findall で全て拾い OR で判定する（先頭のみだと
+            # 第2特徴のリーダーで常に不成立だった。OP14-022/OP13-027/EB02-011 ほか12枚）。
+            trait_all = re.findall(_nfc(r'[《<『]([^》>』]+)[》>』]'), norm_text)
             trait_match = re.search(_nfc(r'[《<『]([^》>』]+)[》>』]'), norm_text)
             # リーダー名は複数併記され得る（「「サボ」か「エース」か「ルフィ」の場合」OP13-016）。
             # findall で全て拾い、resolver はいずれか一致(OR)で判定する。re.search だと先頭名
@@ -1360,7 +1363,8 @@ class EffectParser:
                     val = nm[0] if len(nm) == 1 else nm
                     return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
             if trait_match:
-                return Condition(type=ConditionType.LEADER_TRAIT, value=trait_match.group(1), player=p, raw_text=norm_text)
+                tval = trait_all[0] if len(trait_all) == 1 else trait_all
+                return Condition(type=ConditionType.LEADER_TRAIT, value=tval, player=p, raw_text=norm_text)
             if name_matches:
                 val = name_matches[0] if len(name_matches) == 1 else name_matches
                 return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
