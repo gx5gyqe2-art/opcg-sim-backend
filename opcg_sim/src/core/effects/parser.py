@@ -1285,6 +1285,17 @@ class EffectParser:
         # 対象プレイヤーの判定
         p = Player.OPPONENT if _nfc("相手") in norm_text else Player.SELF
 
+        # 「自分か相手のライフがN枚（の場合）」= いずれかが N 枚（OR）。OP09-118（ロジャー: 自分か
+        # 相手のライフが0枚なら勝利）。「相手」を含むため下の LIFE_COUNT(相手基準) に化けるのを防ぐ。
+        if (re.search(_nfc(r'自分か相手|相手か自分'), norm_text)
+                and _nfc("ライフ") in norm_text and nums):
+            return Condition(type=ConditionType.OR, player=Player.SELF, raw_text=norm_text, args=[
+                Condition(type=ConditionType.LIFE_COUNT, operator=operator, value=value,
+                          player=Player.SELF, raw_text=norm_text),
+                Condition(type=ConditionType.LIFE_COUNT, operator=operator, value=value,
+                          player=Player.OPPONENT, raw_text=norm_text),
+            ])
+
         # 「自分か相手の（場の）ドン‼がN枚ある」= いずれかが N 枚（OR）。P-107。
         # 「相手」を含むため下の相互比較/相手基準に化けるのを防ぐ。
         if (re.search(_nfc(r'自分か相手|相手か自分'), norm_text)
