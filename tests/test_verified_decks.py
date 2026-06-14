@@ -342,6 +342,24 @@ def test_op16100_requires_opponent_char_koed_this_turn():
     assert res._check_condition(p1, c, inst("OP16-100")) is False      # 自分のKOでは不成立
 
 
+def test_op16102_play_from_hand_or_trash():
+    """OP16-102 アバロ・ピサロ【KO時】「自分の手札かトラッシュから『ハチノス』を登場」は
+    両ゾーンが登場元。play_card_from_zone ルールが has_trash で zone を TRASH 単一に
+    上書きし手札が脱落していた回帰（「手札かトラッシュ」系 ~13 枚に波及）。"""
+    from opcg_sim.src.models.enums import Zone
+    eff = inst("OP16-102").master.abilities[0].effect
+    pc = find_action(eff, ActionType.PLAY_CARD)
+    assert pc is not None
+    assert isinstance(pc.target.zone, list)
+    assert set(pc.target.zone) == {Zone.HAND, Zone.TRASH}
+    # 実機: 手札・トラッシュ双方の「ハチノス」が候補になる
+    gm, p1, _ = game("OP16-022", "OP16-022")
+    p1.hand = [inst("OP09-099", "P1")]   # ハチノス（手札）
+    p1.trash = [inst("OP09-099", "P1")]  # ハチノス（トラッシュ）
+    cands = get_target_cards(gm, pc.target, inst("OP16-102"))
+    assert len(cands) == 2
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")

@@ -2097,9 +2097,13 @@ def _play_card_from_zone(ctx: ParseContext) -> Optional[GameAction]:
     if not has_hand and not has_trash:
         return None  # 手札/トラッシュ以外からの登場（プレイ自体）は対象外
     tq = parse_target(t)
-    # parse_target は「手札から」「トラッシュから」を zone に反映するが、
-    # フィールドキャラ系（「場のキャラを」）と混在する場合に備えて上書き。
-    if has_trash:
+    # 源ゾーンを keyword から決定的に上書きする（parse_target の zone 推定は
+    # 「手札から…場のドン」の "から" の "か" 等で誤って複数ゾーン化し得るため信頼しない）。
+    # 「手札かトラッシュ／トラッシュか手札」の隣接並列のみ両ゾーン（OP16-102/OP06-060 等）。
+    # それ以外は従来どおりトラッシュ優先（混在時の安全側）。
+    if re.search(_nfc(r"手札かトラッシュ|トラッシュか手札"), t):
+        tq.zone = [Zone.HAND, Zone.TRASH]
+    elif has_trash:
         tq.zone = Zone.TRASH
     elif has_hand:
         tq.zone = Zone.HAND
