@@ -184,6 +184,8 @@ class ConditionType(Enum):
                              # 当該プレイヤーのキャラがこのターンに KO された回数 ≥ value（OP16-100）
     LIFE_COUNT_COMPARE = auto() # 「自分のライフ(の枚数)が相手(のライフ)より少ない/以下/より多い/以上」:
                              # 自分のライフ枚数 (op) 相手のライフ枚数 を比較（OP15-104 ほか12枚）
+    HAND_COUNT_COMPARE = auto() # 「自分の手札が相手(の手札)より(N枚以上)少ない/多い」: 自分手札 (op) 相手手札。
+                             # value=オフセットN（「N枚以上少ない」=自分≤相手-N。OP09-092）
     TURN_COUNT = auto()      # 「自分の第Nターン以降の場合」: turn_count を value と比較（OP15-058）
     HAS_TRAIT = auto()
     HAS_ATTRIBUTE = auto()

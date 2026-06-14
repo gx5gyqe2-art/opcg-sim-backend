@@ -745,10 +745,17 @@ class EffectResolver:
             return self._compare(occurred, condition.operator, ev_min)
 
         elif condition.type == ConditionType.LIFE_COUNT_COMPARE:
-            # 「自分のライフが相手(のライフ)より少ない/以下/より多い/以上」: 自分 (op) 相手。
+            # 「自分のライフが相手(のライフ)より(N枚以上)少ない/以下/より多い/以上」: 自分 (op) 相手。
             me = self.game_manager.p1 if player is self.game_manager.p1 else self.game_manager.p2
             opp = self.game_manager.p2 if me is self.game_manager.p1 else self.game_manager.p1
-            return self._compare(len(me.life), condition.operator, len(opp.life))
+            return self._compare(len(me.life), condition.operator,
+                                 self._offset_threshold(len(opp.life), condition))
+
+        elif condition.type == ConditionType.HAND_COUNT_COMPARE:
+            # 「自分の手札が相手(の手札)より(N枚以上)少ない/多い」: 自分手札 (op) 相手手札±N（OP09-092）。
+            opp = self.game_manager.p2 if player is self.game_manager.p1 else self.game_manager.p1
+            return self._compare(len(player.hand), condition.operator,
+                                 self._offset_threshold(len(opp.hand), condition))
 
         elif condition.type == ConditionType.CHAR_KOED_THIS_TURN:
             # 「このターン中、（相手/自分の）キャラがKOされている場合」: 当該プレイヤーの
@@ -925,7 +932,8 @@ class EffectResolver:
             opp = self.game_manager.p2 if player == self.game_manager.p1 else self.game_manager.p1
             my_don = len(player.don_active) + len(player.don_rested) + len(player.don_attached_cards)
             opp_don = len(opp.don_active) + len(opp.don_rested) + len(opp.don_attached_cards)
-            return self._compare(my_don, condition.operator, opp_don)
+            return self._compare(my_don, condition.operator,
+                                 self._offset_threshold(opp_don, condition))
 
         elif condition.type == ConditionType.LEADER_STATE:
             leader = target_player.leader
@@ -963,7 +971,8 @@ class EffectResolver:
             opp = self.game_manager.p2 if player == self.game_manager.p1 else self.game_manager.p1
             my_count = len(player.field)
             opp_count = len(opp.field)
-            return self._compare(my_count, condition.operator, opp_count)
+            return self._compare(my_count, condition.operator,
+                                 self._offset_threshold(opp_count, condition))
 
         elif condition.type == ConditionType.DECLARED_COST_MATCH:
             # C8: 公開カードのコストが宣言コストと一致するか。
@@ -1039,6 +1048,15 @@ class EffectResolver:
             return True
 
         return True
+
+    def _offset_threshold(self, opp_count: int, condition) -> int:
+        """相対比較「相手より N枚以上 少ない/多い」のしきい値を相手枚数±N で返す。
+        condition.value=N（オフセット、既定0）。少ない方向(LE/LT)は相手-N、多い方向(GE/GT)は相手+N。
+        N=0 のとき従来の単純比較（相手枚数そのもの）に一致する。"""
+        offset = condition.value if isinstance(condition.value, int) else 0
+        if condition.operator in (CompareOperator.LE, CompareOperator.LT):
+            return opp_count - offset
+        return opp_count + offset
 
     def _compare(self, current: int, operator: CompareOperator, target: int) -> bool:
         if operator == CompareOperator.EQ: return current == target

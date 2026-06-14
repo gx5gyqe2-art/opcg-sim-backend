@@ -1132,3 +1132,33 @@ def test_revealed_placed_card_condition_not_generic():
         val = rc[0].value
         for k, v in exp.items():
             assert val.get(k) == v, f"{cid}: {k}={val.get(k)} != {v}"
+
+
+# --- オフセット相対比較「相手よりN枚以上少ない/多い」 ----------------------
+
+def test_offset_relative_count_compare():
+    """「自分の〈手札/場のドン/キャラ〉が相手より N枚以上少ない場合」を、オフセットN付きの
+    相対比較として解析・評価する。従来は「N枚以上」の『以上』を方向と誤認(GE)したり、
+    手札比較が HAND_COUNT(相手 GE N) に退化していた（OP09-092・OP07-064・OP06-072・OP10-098）。"""
+    # 構造: 正しい COMPARE 型 + LE + オフセット
+    assert inst("OP09-092").master.abilities[0].condition.type == ConditionType.HAND_COUNT_COMPARE
+    assert inst("OP09-092").master.abilities[0].condition.operator == CompareOperator.LE
+    assert inst("OP09-092").master.abilities[0].condition.value == 3
+    assert inst("OP07-064").master.abilities[0].condition.type == ConditionType.DON_COUNT_COMPARE
+    assert inst("OP07-064").master.abilities[0].condition.value == 2
+    assert inst("OP10-098").master.abilities[0].condition.type == ConditionType.FIELD_COUNT_COMPARE
+    assert inst("OP10-098").master.abilities[0].condition.value == 2
+
+    # 意味: OP09-092「手札が相手より3枚以上少ない」= 自分手札 ≤ 相手手札-3
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    gm, p1, p2 = game("OP09-092", "OP09-092")
+    res = EffectResolver(gm)
+    cond = inst("OP09-092").master.abilities[0].condition
+    src = inst("OP09-092", "P1")
+    # 自分2枚・相手6枚 → 2 <= 6-3=3 → True
+    p1.hand = [inst("OP05-010", "P1") for _ in range(2)]
+    p2.hand = [inst("OP05-010", "P2") for _ in range(6)]
+    assert res._check_condition(p1, cond, src) is True
+    # 自分4枚・相手6枚 → 4 <= 3 → False
+    p1.hand = [inst("OP05-010", "P1") for _ in range(4)]
+    assert res._check_condition(p1, cond, src) is False
