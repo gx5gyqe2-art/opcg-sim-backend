@@ -2019,6 +2019,13 @@ def _select_target(ctx: ParseContext) -> Optional[GameAction]:
     tq.save_id = "selected_card"
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # 「（相手/自分の）リーダーとキャラN枚(まで)を選ぶ」: リーダーは選択群に常に含め、
+    # キャラN枚を選ばせる（後続「選んだカード」(FREEZE/SWAP_POWER 等)が群全体を参照）。
+    # 従来は [LEADER,CHARACTER] count=N の単一選択で、リーダーが含まれず1枚しか選べなかった
+    # （OP07-059 FREEZE/OP14-009 SWAP_POWER）。
+    if re.search(_nfc(r'リーダーとキャラ'), t):
+        tq.card_type = ["CHARACTER"]
+        tq.flags = set(getattr(tq, "flags", set())) | {"INCLUDE_LEADER"}
     return GameAction(type=ActionType.SELECT, target=tq, raw_text=t)
 
 
