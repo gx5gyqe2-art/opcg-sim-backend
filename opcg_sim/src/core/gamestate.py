@@ -176,7 +176,9 @@ class GameManager:
         self.phase = Phase.SETUP
         self.winner: Optional[str] = None
         self.active_battle: Optional[Dict[str, Any]] = None
-        self.active_interaction: Optional[Dict[str, Any]] = None
+        # 中断（対話）はスタックで保持する。`active_interaction` プロパティが先頭を指す。
+        # 通常は深さ≤1（単一スロット相当）で、置換ネスト等のみが push で深くする。
+        self._interaction_stack: List[Dict[str, Any]] = []
         self.setup_phase_pending = False
         self.mulligan_done: Set[str] = set()
         from .effects.continuous import ContinuousEffectManager
@@ -193,6 +195,32 @@ class GameManager:
         # RETURN_DON（ドン!!返却）でプレイヤーが選んだ戻すドン!!の uuid 一覧。
         # resolver が選択解決時にセットし、apply_action_to_engine が消費する。
         self._return_don_selection: Optional[List[str]] = None
+
+    # --- 中断（対話）スタック ---------------------------------------------
+    # `active_interaction` は「いま UI へ提示すべき中断」＝スタック先頭を指す互換プロパティ。
+    # 既存コードの読み書き（getter=先頭、setter(None)=先頭を pop、setter(dict)=先頭を置換／
+    # 空なら push）はすべて単一スロット時代と同一挙動（深さ≤1）。置換ネスト等のネスト中断
+    # のみ `push_interaction` で深さ>1にし、resolve_interaction が先頭から順に解決する。
+    @property
+    def active_interaction(self) -> Optional[Dict[str, Any]]:
+        return self._interaction_stack[-1] if self._interaction_stack else None
+
+    @active_interaction.setter
+    def active_interaction(self, value: Optional[Dict[str, Any]]) -> None:
+        if value is None:
+            if self._interaction_stack:
+                self._interaction_stack.pop()
+        elif self._interaction_stack:
+            self._interaction_stack[-1] = value
+        else:
+            self._interaction_stack.append(value)
+
+    def push_interaction(self, interaction: Dict[str, Any]) -> None:
+        """既存の中断を残したまま、新たな中断を上に積む（ネスト中断用）。
+
+        通常の `active_interaction = {...}` は先頭を置換するが、置換 sub_effect のように
+        外側の中断を保ったまま内側の選択を提示したい場合はこちらを使う。"""
+        self._interaction_stack.append(interaction)
 
     def _apply_leader_don_deck_rule(self, player: Player) -> None:
         """リーダーの「ルール上、自分のドン!!デッキはN枚になる」をドン!!デッキ枚数に反映する。
