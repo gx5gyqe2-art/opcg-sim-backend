@@ -647,6 +647,24 @@ class GameManager:
                     accepted = False
                 else:
                     accepted = payload.get("index", 0) == 0
+            # 任意バトルKO置換（A）の確認: accept→置換実行（本来のKOをスキップ）、
+            # decline→本来のKOを実行。どちらも _finish_attack で戦闘後処理して return。
+            if continuation.get("kind") == "BATTLE_KO_REPLACE":
+                self.active_interaction = None
+                target = source_card
+                target_owner = self.p1 if self.p1.name == continuation.get("target_owner_name") else self.p2
+                life_lost = continuation.get("life_lost", 0)
+                if accepted and self._active_replacement(target, ("BATTLE_KO",)):
+                    log_event("INFO", "game.battle_ko_replaced",
+                              f"{target.master.name}'s battle KO was replaced by an alternative effect",
+                              player=target_owner.name)
+                else:
+                    # 拒否、または置換が成立しなくなった場合は本来の KO を進める。
+                    self.move_card(target, Zone.TRASH, target_owner)
+                    log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
+                    self._resolve_on_ko(target, target_owner)
+                self._finish_attack(target, target_owner, life_lost)
+                return
             self.active_interaction = None
             confirm_ability = continuation.get("confirm_ability")
             if confirm_ability is not None:
@@ -1418,16 +1436,29 @@ class GameManager:
             if attacker_pwr >= target_pwr:
                 if self._active_protection(target, ("BATTLE_KO",)):
                     log_event("INFO", "game.battle_ko_prevented", f"{target.master.name} is protected from battle KO", player=target_owner.name)
-                elif self._active_replacement(target, ("BATTLE_KO",)):
-                    # バトルKO置換は2枚のみ（OP10-034/EB02-030）で、いずれも任意（「〜してもよい/
-                    # できる」）。任意の拒否時は本来の KO を進める必要があり、KO 判定を先に skip する
-                    # 提示方式とは相性が悪い。対象も少なく価値が低いため、ここは自動解決のまま残す。
-                    log_event("INFO", "game.battle_ko_replaced", f"{target.master.name}'s battle KO was replaced by an alternative effect", player=target_owner.name)
                 else:
-                    self.move_card(target, Zone.TRASH, target_owner)
-                    log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
-                    self._resolve_on_ko(target, target_owner)
+                    repl = self._find_replacement(target, ("BATTLE_KO",))
+                    if repl is not None and getattr(repl[3], "is_optional", False):
+                        # 任意のバトルKO置換（「代わりに〜してもよい/できる」OP10-034 等）は、
+                        # 被KO側に「代わりの効果を使うか」を確認するため戦闘を中断する。
+                        # accept→置換実行（本来のKOをスキップ）、decline→本来のKOを実行。
+                        # どちらの分岐も resume 時に _finish_attack で戦闘後処理を行う。
+                        self._suspend_for_battle_ko_replacement(target, target_owner, life_lost)
+                        return
+                    elif repl is not None:
+                        # 任意でない置換は従来どおり即時実行（内側選択はヘッドレス自動解決）。
+                        self._active_replacement(target, ("BATTLE_KO",))
+                        log_event("INFO", "game.battle_ko_replaced", f"{target.master.name}'s battle KO was replaced by an alternative effect", player=target_owner.name)
+                    else:
+                        self.move_card(target, Zone.TRASH, target_owner)
+                        log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
+                        self._resolve_on_ko(target, target_owner)
 
+        self._finish_attack(target, target_owner, life_lost)
+
+    def _finish_attack(self, target: Card, target_owner: Player, life_lost: int):
+        """戦闘解決後の共通後処理。インラインのバトルKO判定からも、任意バトルKO置換の
+        確認(CONFIRM_OPTIONAL)からの resume からも呼ばれる。"""
         target.reset_turn_status(keep_don=True); self.active_battle = None; self.phase = Phase.MAIN; self.check_victory()
         self.continuous.expire("BATTLE_END", self.turn_count)
         if not self.winner:
@@ -1436,6 +1467,28 @@ class GameManager:
         if life_lost and not self.winner:
             self._enqueue_life_decrease(target_owner, life_lost)
         self._advance_pending_triggers()
+
+    def _suspend_for_battle_ko_replacement(self, target: Card, target_owner: Player, life_lost: int):
+        """任意のバトルKO置換を被KO側へ確認するため戦闘を中断する（CONFIRM_OPTIONAL）。
+        resume 時: accept→置換実行（KOスキップ）／decline→本来のKO、その後 _finish_attack。
+        ヘッドレス/CPU の既定応答(index0=accept)は従来の自動採用と一致する。"""
+        self.active_interaction = {
+            "player_id": target_owner.name,
+            "action_type": "CONFIRM_OPTIONAL",
+            "source_card_name": target.master.name,
+            "source_card_uuid": target.uuid,
+            "message": f"「{target.master.name}」がバトルでKOされます。代わりの効果を使用しますか？",
+            "can_skip": True,
+            "continuation": {
+                "kind": "BATTLE_KO_REPLACE",
+                "source_card_uuid": target.uuid,
+                "target_owner_name": target_owner.name,
+                "life_lost": life_lost,
+            },
+        }
+        log_event("INFO", "game.battle_ko_replace_confirm",
+                  f"Asking {target_owner.name} whether to replace battle KO of {target.master.name}",
+                  player=target_owner.name)
 
     def check_victory(self):
         # デッキアウト: 通常は本人の敗北（相手の勝利）。ただし C10「自分のデッキが0枚に
@@ -1659,13 +1712,13 @@ class GameManager:
                 return True
         return False
 
-    # 置換効果（REPLACE_EFFECT）の判定。除去の瞬間に対象の PASSIVE 能力を走査し、
-    # 「代わりに〜」の置換アクションを（条件・実行可能性を満たせば）実行して True を返す。
-    # True の場合、呼び出し側は本来の除去を行わずスキップする。
-    def _active_replacement(self, card: CardInstance, status_values: Tuple[str, ...],
-                            can_suspend: bool = False) -> bool:
+    # 置換効果（REPLACE_EFFECT）の検出。除去対象に適用可能な「代わりに〜」置換を1件、
+    # 条件・実行可能性・【ターン1回】の残数を満たすものに限り (protector, ability, eff, sub)
+    # として返す（実行はしない）。無ければ None。検出と実行を分離することで、バトルKO置換の
+    # ような「任意（〜してもよい/できる）の置換を被KO側へ確認してから実行/拒否する」経路を可能にする。
+    def _find_replacement(self, card: CardInstance, status_values: Tuple[str, ...]):
         if not card or not getattr(card, "master", None) or card.negated:
-            return False
+            return None
         owner = self.p1 if self.p1.name == card.owner_id else self.p2
 
         # 走査対象: 除去されるカード自身 → オーナーのリーダー → フィールドの他キャラ
@@ -1707,33 +1760,47 @@ class GameManager:
                 _limit = _ability_turn_limit(ab)
                 if _limit is not None and protector.ability_used_this_turn.get(_ability_index(protector, ab), 0) >= _limit:
                     continue
-                log_event("INFO", "game.replacement",
-                          f"Replacement by {protector.master.name} activated for {card.master.name}",
-                          player=owner.name)
-                # 置換は除去解決の最中に発生する「入れ子の中断」。失われる外側継続が無い
-                # （can_suspend=除去アクションの後続が空・単一対象）場合は、内側の中断
-                # （対象選択／任意確認）を**そのまま UI へ提示**し、被保護側に選ばせる
-                # （interaction はスタックに残し、resume で sub_effect を完了させる）。
-                # 外側継続が残るケースでは従来どおり保守的に自動解決して同期完了させる
-                # （任意=採用、対象=有効候補先頭）。どちらも置換は成立扱い（本来の除去はスキップ）。
-                outer_interaction = self.active_interaction
-                self.active_interaction = None
-                resolver.execution_stack = [sub]
-                resolver._process_stack(owner, card)
-                suspended = self.active_interaction is not None
-                if _limit is not None:  # 発動成立 → 【ターン1回】の使用回数を消費
-                    k = _ability_index(protector, ab)
-                    protector.ability_used_this_turn[k] = protector.ability_used_this_turn.get(k, 0) + 1
-                if suspended and can_suspend:
-                    # 内側中断を UI へ提示（自動解決しない）。除去はスキップ＝置換成立。
-                    log_event("INFO", "game.replacement_interactive",
-                              f"Presenting nested replacement choice for {card.master.name}", player=owner.name)
-                    return True
-                # 自動解決パス（外側継続あり、または中断なし）。
-                self._auto_resolve_replacement(owner)
-                self.active_interaction = outer_interaction
-                return True
-        return False
+                return (protector, ab, eff, sub)
+        return None
+
+    # 置換効果（REPLACE_EFFECT）の判定。除去の瞬間に対象の PASSIVE 能力を走査し、
+    # 「代わりに〜」の置換アクションを（条件・実行可能性を満たせば）実行して True を返す。
+    # True の場合、呼び出し側は本来の除去を行わずスキップする。
+    def _active_replacement(self, card: CardInstance, status_values: Tuple[str, ...],
+                            can_suspend: bool = False) -> bool:
+        found = self._find_replacement(card, status_values)
+        if found is None:
+            return False
+        owner = self.p1 if self.p1.name == card.owner_id else self.p2
+        protector, ab, eff, sub = found
+        resolver = EffectResolver(self)
+        _limit = _ability_turn_limit(ab)
+        log_event("INFO", "game.replacement",
+                  f"Replacement by {protector.master.name} activated for {card.master.name}",
+                  player=owner.name)
+        # 置換は除去解決の最中に発生する「入れ子の中断」。失われる外側継続が無い
+        # （can_suspend=除去アクションの後続が空・単一対象）場合は、内側の中断
+        # （対象選択／任意確認）を**そのまま UI へ提示**し、被保護側に選ばせる
+        # （interaction はスタックに残し、resume で sub_effect を完了させる）。
+        # 外側継続が残るケースでは従来どおり保守的に自動解決して同期完了させる
+        # （任意=採用、対象=有効候補先頭）。どちらも置換は成立扱い（本来の除去はスキップ）。
+        outer_interaction = self.active_interaction
+        self.active_interaction = None
+        resolver.execution_stack = [sub]
+        resolver._process_stack(owner, card)
+        suspended = self.active_interaction is not None
+        if _limit is not None:  # 発動成立 → 【ターン1回】の使用回数を消費
+            k = _ability_index(protector, ab)
+            protector.ability_used_this_turn[k] = protector.ability_used_this_turn.get(k, 0) + 1
+        if suspended and can_suspend:
+            # 内側中断を UI へ提示（自動解決しない）。除去はスキップ＝置換成立。
+            log_event("INFO", "game.replacement_interactive",
+                      f"Presenting nested replacement choice for {card.master.name}", player=owner.name)
+            return True
+        # 自動解決パス（外側継続あり、または中断なし）。
+        self._auto_resolve_replacement(owner)
+        self.active_interaction = outer_interaction
+        return True
 
     def _auto_resolve_replacement(self, owner: Player, limit: int = 16) -> None:
         """置換 sub_effect が残した中断（任意確認／対象選択）を保守的に同期解決する。
