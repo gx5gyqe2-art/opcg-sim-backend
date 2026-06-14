@@ -18,7 +18,7 @@ from opcg_sim.src.core.gamestate import GameManager, Player
 from opcg_sim.src.core.effects.resolver import EffectResolver
 from opcg_sim.src.core.effects.matcher import get_target_cards
 from opcg_sim.src.models.models import CardInstance, DonInstance
-from opcg_sim.src.models.enums import Zone, ActionType, TriggerType, ConditionType
+from opcg_sim.src.models.enums import Zone, ActionType, TriggerType, ConditionType, CompareOperator
 from opcg_sim.src.utils.loader import CardLoader
 
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -422,6 +422,42 @@ def test_op15024_usopp_rest_immunity_and_blocker():
     assert find_action(eff, ActionType.PREVENT_REST) is not None
     grant = find_action(eff, ActionType.GRANT_KEYWORD)
     assert grant is not None and grant.status == "ブロッカー"
+
+
+def test_life_count_compare_self_less_than_opponent():
+    """「自分のライフ(の枚数)が相手より少ない/以下」は両者ライフの相対比較。
+    従来は LIFE_COUNT(OPPONENT, EQ, 0)（相手ライフ0＝ほぼ成立せず）に退化していた。
+    OP15-104/OP03-119/OP10-113/OP07-098/OP10-114 ほか12枚に波及。"""
+    def find_lcc(cid):
+        seen = []
+        def rec(c):
+            if c is None:
+                return
+            if c.type == ConditionType.LIFE_COUNT_COMPARE:
+                seen.append(c)
+            for a in (getattr(c, "args", None) or []):
+                rec(a)
+        from opcg_sim.src.models.effect_types import GameAction, Sequence, Branch, Choice
+        def walk(n):
+            if isinstance(n, Branch):
+                rec(n.condition); walk(n.if_true); walk(n.if_false)
+            elif isinstance(n, Sequence):
+                [walk(a) for a in n.actions]
+            elif isinstance(n, Choice):
+                [walk(o) for o in n.options]
+        for ab in inst(cid).master.abilities:
+            rec(ab.condition); walk(ab.effect)
+        return seen
+    assert find_lcc("OP15-104") and find_lcc("OP15-104")[0].operator == CompareOperator.LT
+    assert find_lcc("OP10-114") and find_lcc("OP10-114")[0].operator == CompareOperator.LE
+    # 実機: self<opp で成立、self>=opp で不成立
+    gm, p1, p2 = game("OP16-022", "OP16-022")
+    cond = find_lcc("OP15-104")[0]
+    p1.life = [inst("OP16-046") for _ in range(2)]
+    p2.life = [inst("OP16-046", "P2") for _ in range(4)]
+    assert EffectResolver(gm)._check_condition(p1, cond, inst("OP15-104")) is True
+    p1.life = [inst("OP16-046") for _ in range(5)]
+    assert EffectResolver(gm)._check_condition(p1, cond, inst("OP15-104")) is False
 
 
 def test_roger_no_auto_win_on_zero_life():

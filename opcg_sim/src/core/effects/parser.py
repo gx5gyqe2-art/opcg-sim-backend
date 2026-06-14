@@ -1318,6 +1318,18 @@ class EffectParser:
         if _nfc("お互い") in norm_text and _nfc("ライフ") in norm_text and _nfc("合計") in norm_text:
             return Condition(type=ConditionType.LIFE_COUNT_BOTH, operator=operator, value=value, player=Player.SELF, raw_text=norm_text)
 
+        # 「自分のライフ(の枚数)が相手(のライフ)より少ない/以下/より多い/以上」= 両者ライフの相対比較。
+        # 主語が「自分のライフ」で相手と比較する句のみ。既定の LIFE_COUNT（相手 EQ 0 等）に
+        # 化けて常時不成立になっていた（OP15-104/OP03-119/OP10-113/OP07-098 ほか12枚）。
+        if (_nfc("自分のライフ") in norm_text and _nfc("相手") in norm_text
+                and re.search(_nfc(r'より少ない|より多い|以下|以上|未満'), norm_text)):
+            cmp_op = (CompareOperator.LT if (_nfc("より少ない") in norm_text or _nfc("未満") in norm_text)
+                      else CompareOperator.LE if _nfc("以下") in norm_text
+                      else CompareOperator.GT if _nfc("より多い") in norm_text
+                      else CompareOperator.GE)
+            return Condition(type=ConditionType.LIFE_COUNT_COMPARE, operator=cmp_op,
+                             player=Player.SELF, raw_text=norm_text)
+
         if _nfc("ライフ") in norm_text:
             return Condition(type=ConditionType.LIFE_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 

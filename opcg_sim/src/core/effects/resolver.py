@@ -736,6 +736,12 @@ class EffectResolver:
             occurred = getattr(self.game_manager, "_turn_events", {}).get(ev_name, 0)
             return self._compare(occurred, condition.operator, ev_min)
 
+        elif condition.type == ConditionType.LIFE_COUNT_COMPARE:
+            # 「自分のライフが相手(のライフ)より少ない/以下/より多い/以上」: 自分 (op) 相手。
+            me = self.game_manager.p1 if player is self.game_manager.p1 else self.game_manager.p2
+            opp = self.game_manager.p2 if me is self.game_manager.p1 else self.game_manager.p1
+            return self._compare(len(me.life), condition.operator, len(opp.life))
+
         elif condition.type == ConditionType.CHAR_KOED_THIS_TURN:
             # 「このターン中、（相手/自分の）キャラがKOされている場合」: 当該プレイヤーの
             # キャラがこのターンに KO された回数（gamestate が CHAR_KOED_<name> で記録）。
