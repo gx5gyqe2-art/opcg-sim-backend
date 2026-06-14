@@ -621,6 +621,39 @@ def test_perona_attribute_or_type_search():
     assert names == {"キッド&キラー", "鬼気 九刀流 阿修羅 抜剣 亡者戯"}
 
 
+def test_op12_name_or_colortype_search():
+    """OP12-006/014: 「「モンキー・Ｄ・ルフィ」か赤のイベント」は 名前 OR (色∧種類)。
+    従来は名前∧色∧種類の AND に縮退し候補ゼロだった（NAME_OR_COLORTYPE）。"""
+    from opcg_sim.src.models.effect_types import GameAction, Sequence
+    from opcg_sim.src.models.enums import Zone
+    def move_target(cid):
+        def walk(n):
+            if isinstance(n, GameAction):
+                if n.type == ActionType.MOVE_CARD:
+                    return n
+            elif isinstance(n, Sequence):
+                for a in n.actions:
+                    r = walk(a)
+                    if r:
+                        return r
+        for ab in inst(cid).master.abilities:
+            r = walk(ab.effect)
+            if r:
+                return r
+    tq = move_target("OP12-006").target
+    assert "NAME_OR_COLORTYPE" in tq.flags
+    gm, p1, _ = game("OP12-001", "OP12-001")
+    # 名前一致（モンキー・D・ルフィ＝青キャラ）/ 赤イベント / 緑イベント
+    mlu = [c for c in db().raw_db if db().raw_db[c]["name"] == "モンキー・D・ルフィ"
+           and db().raw_db[c]["種類"] == "キャラクター"][0]
+    revt = [c for c in db().raw_db if db().raw_db[c]["種類"] == "イベント" and db().raw_db[c]["色"] == "赤"][0]
+    gevt = [c for c in db().raw_db if db().raw_db[c]["種類"] == "イベント" and db().raw_db[c]["色"] == "緑"][0]
+    p1.temp_zone = [inst(mlu), inst(revt), inst(gevt)]
+    tq.zone = Zone.TEMP
+    got = {c.master.card_id for c in get_target_cards(gm, tq, inst("OP12-006"))}
+    assert mlu in got and revt in got and gevt not in got
+
+
 def test_on_rest_trigger_fires_on_attack():
     """OP14-119 ミホーク: 「このキャラがレストになった時」がアタックで誘発し、相手を
     レスト不可(CANNOT_REST)にする。"""

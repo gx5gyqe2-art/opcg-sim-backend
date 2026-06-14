@@ -199,6 +199,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if tq.names and tq.card_type and re.search(_nfc(r'」か(?:イベント|キャラクター|キャラ|リーダー|ステージ)'), tgt_text):
         tq.flags.add("NAME_OR_TYPE")
 
+    # 「「名前」か<色>の<種類>」= 名前 OR (色∧種類)（OP12-006/014「「モンキー・D・ルフィ」か
+    # 赤のイベント」）。「」か」の直後が色語のため上の NAME_OR_TYPE に該当せず、名前∧色∧種類の
+    # AND に縮退して候補ゼロになっていた。matcher が name_ok or (type∧color) で照合する。
+    if tq.names and re.search(_nfc(r'」か(?:赤|青|緑|黄|黒|紫)の(?:イベント|キャラクター|キャラ|リーダー|ステージ)'), tgt_text):
+        tq.flags.add("NAME_OR_COLORTYPE")
+
     attrs = re.findall(_nfc(ParserKeyword.ATTRIBUTE + r'[((]([^))]+)[))]'), tgt_text)
     tq.attributes.extend(attrs)
 
@@ -475,15 +481,19 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             results.append(card)
             continue
         
-        if "ATTR_OR_TYPE" in query.flags:
-            # 属性 OR (種類∧色): どちらかを満たせば通す（ペローナ OP12-034
-            # 「属性(斬)を持つカードか緑のイベント」）。個別の AND チェックは行わない。
+        if "ATTR_OR_TYPE" in query.flags or "NAME_OR_COLORTYPE" in query.flags:
+            # 属性/名前 OR (種類∧色): どちらかを満たせば通す（ペローナ OP12-034
+            # 「属性(斬)を持つカードか緑のイベント」／OP12-006「「モンキー・D・ルフィ」か赤のイベント」）。
+            # 個別の AND チェックは行わない。
             card_attr = card.master.attribute.value
             card_colors = [c.value for c in card.master.colors] if card.master.colors else []
-            attr_ok = bool(query.attributes) and card_attr in query.attributes
+            if "NAME_OR_COLORTYPE" in query.flags:
+                first_ok = bool(query.names) and any(card.master.matches_name(n) for n in query.names)
+            else:
+                first_ok = bool(query.attributes) and card_attr in query.attributes
             type_ok = (not query.card_type) or (card.master.type.name in query.card_type)
             color_ok = (not query.colors) or any(qc in card_colors for qc in query.colors)
-            if not (attr_ok or (type_ok and color_ok)):
+            if not (first_ok or (type_ok and color_ok)):
                 continue
         else:
             if query.card_type and card.master.type.name not in query.card_type:
@@ -542,7 +552,10 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             return bool(names) and any(card.master.matches_name(n, partial=_partial) for n in names)
         def _excluded():  # noqa: E306
             return query.exclude_names and any(card.master.matches_name(en) for en in query.exclude_names)
-        if "NAME_OR_TYPE" in query.flags and query.names and query.card_type:
+        if "NAME_OR_COLORTYPE" in query.flags:
+            # 上の合成OR（名前 OR 色∧種類）で判定済み。除外名のみここで適用。
+            if _excluded(): continue
+        elif "NAME_OR_TYPE" in query.flags and query.names and query.card_type:
             type_ok = card.master.type.name in query.card_type
             name_ok = _name_in(query.names)
             if not (type_ok or name_ok): continue
