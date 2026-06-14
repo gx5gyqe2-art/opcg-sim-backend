@@ -408,3 +408,23 @@ def test_marco_op13042_attaches_don_to_leader_and_char():
     assert leader.value.base == 2 and leader.target.count == 1
     assert char.value.base == 2 and char.target.count == 1 and char.target.is_up_to is True
     assert leader.status == "RESTED" and char.status == "RESTED"
+
+
+# --- ナミ（スリラーバーク） -----------------------------------------------
+
+def test_nami_slumber_revive_targets_trash_not_rest_filtered():
+    """OP14-102/110/111 スリラーバーク: 「トラッシュから…レストで登場させる」は登場状態
+    （status=RESTED）を表すだけで、対象フィルタ is_rest を立ててはならない。従来は素の
+    「レスト」部分一致で is_rest=True が立ち、トラッシュ蘇生候補（is_rest=False）が全除外
+    され蘇生が完全不発だった。"""
+    gm, p1, _ = game("OP11-041", "OP11-041")
+    p1.trash = [inst("OP14-110"), inst("OP14-111"), inst("OP14-102"),
+                inst("OP16-119")]  # 末尾は cost8/非スリラーバーク＝対象外
+    cases = [("OP14-102", 0), ("OP14-110", 1), ("OP14-111", 2)]  # 各カードの【トリガー】能力
+    for cid, idx in cases:
+        act = inst(cid).master.abilities[idx].effect
+        assert act.type == ActionType.PLAY_CARD
+        assert act.status == "RESTED"            # レスト登場は維持
+        assert act.target.is_rest is not True    # 状態フィルタは立たない
+        names = {c.master.name for c in get_target_cards(gm, act.target, inst(cid))}
+        assert names == {"ドクトル・ホグバック", "ペローナ", "クマシー"}

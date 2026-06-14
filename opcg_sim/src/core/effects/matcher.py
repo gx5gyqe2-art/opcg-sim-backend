@@ -309,10 +309,14 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.is_rest = (rest_mod.group(1) == _nfc("レスト"))
     elif (_nfc("にする") not in tgt_text and _nfc("にし") not in tgt_text
             and _nfc("ならない") not in tgt_text and _nfc("にでき") not in tgt_text
-            and _nfc("にされ") not in tgt_text):
+            and _nfc("にされ") not in tgt_text
+            and _nfc("レストで") not in tgt_text and _nfc("アクティブで") not in tgt_text):
         # 「にでき(る/ない)」「にされ(る/ない)」も対象フィルタではなくアクション句。
         # 「レストにできない/されない」(OP16-032 ハンコック)で is_rest=True が付き、
         # レスト済みの相手キャラのみ対象になっていた（本来はアクティブなキャラを縛る）。
+        # 「レストで登場/加える/追加」の「レストで」は登場状態を表すアクション修飾であり
+        # 対象フィルタではない。素の「レスト」部分一致で is_rest=True が立ち、トラッシュ等の
+        # 蘇生候補（is_rest は常に False）が全除外されていた（OP14-102/110/111 スリラーバーク蘇生）。
         if _nfc(ParserKeyword.REST) in tgt_text: tq.is_rest = True
         elif _nfc("レスト") in tgt_text: tq.is_rest = True
         elif _nfc("アクティブ") in tgt_text: tq.is_rest = False
