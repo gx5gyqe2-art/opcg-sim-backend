@@ -219,13 +219,18 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if _nfc("異なる色") in tgt_text:
         tq.flags.add("EXCLUDE_SELECTED_COLOR")
 
+    # 「コスト0か8以上の…」= コスト0 または 8以上（離散2レンジ）。単一の cost_min/max では
+    #   表せないため専用フラグで matcher が OR 判定する（B・W の基幹条件。OP14-090/094/098/120 等。
+    #   従来は「コスト0」だけ拾い cost_min=cost_max=0 に縮退し「8以上」が脱落していた）。
+    if re.search(_nfc(r'コスト0か8以上'), tgt_text):
+        tq.flags.add("COST_0_OR_GE_8")
     # コスト範囲「コストNからM」（N以上M以下）。範囲表記は単一しきい値より先に判定する
     #   （従来は「コスト3」だけを拾い cost_max=3 に縮退していた: OP10-099）。
-    m_crange = re.search(_nfc(ParserKeyword.COST + r'(\d+)から(\d+)'), tgt_text)
+    m_crange = None if "COST_0_OR_GE_8" in tq.flags else re.search(_nfc(ParserKeyword.COST + r'(\d+)から(\d+)'), tgt_text)
     if m_crange:
         tq.cost_min = int(m_crange.group(1))
         tq.cost_max = int(m_crange.group(2))
-    m_c = None if m_crange else re.search(_nfc(ParserKeyword.COST + r'[^+＋\-－−‐\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
+    m_c = None if (m_crange or "COST_0_OR_GE_8" in tq.flags) else re.search(_nfc(ParserKeyword.COST + r'[^+＋\-－−‐\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
     if m_c:
         start_idx = m_c.start()
         prefix_context = tgt_text[max(0, start_idx-1):start_idx]
@@ -494,9 +499,12 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
             if query.attributes and card.master.attribute.value not in query.attributes: continue
         
+        # 「コスト0か8以上」= 0 または 8以上の離散2レンジ（B・W）。
+        if "COST_0_OR_GE_8" in query.flags and not (card.current_cost == 0 or card.current_cost >= 8):
+            continue
         if query.cost_max is not None and card.current_cost > query.cost_max: continue
         if query.cost_min is not None and card.current_cost < query.cost_min: continue
-        
+
         if dynamic_cost_max is not None and card.current_cost > dynamic_cost_max: continue
 
         # 「元々のパワー」指定は印刷時パワー（master.power）で判定。それ以外は現在パワー。

@@ -520,6 +520,22 @@ def test_opponent_field_don_threshold_not_mutual():
     assert ConditionType.LEADER_COLOR in sub and ConditionType.DON_COUNT in sub
 
 
+def test_cost_0_or_ge_8_filter():
+    """「コスト0か8以上のキャラがいる場合」（B・W基幹条件）は cost==0 OR cost>=8 の
+    離散2レンジ。従来は「コスト0」だけ拾い cost_min=cost_max=0 に縮退し「8以上」が
+    脱落していた（OP14-090/094/098/120 ほか5枚）。"""
+    cond = inst("OP14-090").master.abilities[0].condition
+    assert "COST_0_OR_GE_8" in cond.target.flags
+    assert cond.target.cost_min is None and cond.target.cost_max is None
+    # 実機: コスト8のキャラで成立、コスト5のみでは不成立
+    def has(cards):
+        gm, p1, _ = game("OP16-022", "OP16-022")
+        p1.field = [inst(c, "P1") for c in cards]
+        return EffectResolver(gm)._check_condition(p1, cond, inst("OP14-090"))
+    assert has(["EB01-027"]) is False           # cost5 のみ
+    assert has(["EB01-027", "EB04-023"]) is True  # cost8 を含む
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")
