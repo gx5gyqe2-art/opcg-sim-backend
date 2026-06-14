@@ -672,7 +672,7 @@ class GameManager:
                     # 拒否、または置換が成立しなくなった場合は本来の KO を進める。
                     self.move_card(target, Zone.TRASH, target_owner)
                     log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
-                    self._resolve_on_ko(target, target_owner)
+                    self._resolve_on_ko(target, target_owner, cause="BATTLE")
                 self._finish_attack(target, target_owner, life_lost)
                 return
             self.active_interaction = None
@@ -1499,7 +1499,7 @@ class GameManager:
                     else:
                         self.move_card(target, Zone.TRASH, target_owner)
                         log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
-                        self._resolve_on_ko(target, target_owner)
+                        self._resolve_on_ko(target, target_owner, cause="BATTLE")
 
         self._finish_attack(target, target_owner, life_lost)
 
@@ -1986,10 +1986,49 @@ class GameManager:
                           f"Deferred continuation ({kind}) failed: {e}", player=player.name)
             n += 1
 
-    def _resolve_on_ko(self, card: Card, owner: Player):
+    def _ko_trigger_matches(self, ability: Ability, owner: Player,
+                            cause: str, effect_controller: Player = None) -> bool:
+        """このキャラ自身の【KO時】誘発の要因・タイミング修飾を判定する。
+
+        書き下し形「…KOされた時」の前段に出る修飾を raw_text から解釈し、修飾が
+        無ければ常に発火（従来挙動）。ブラケット【KO時】（"KOされた時" を含まない）は
+        要因を問わず発火する。
+        - cause: "BATTLE"（戦闘KO）/ "EFFECT"（効果KO）。
+        - effect_controller: 効果KOを引き起こした側（戦闘KOは None）。
+        修飾:
+        - 「相手の(キャラの)効果で」: 相手の効果KOのみ（戦闘KO・自分の効果KOを除外）。
+        - 「自分の効果で」: 自分の効果KOのみ。
+        - 「(単に)効果で」: 効果KOのみ（戦闘KOを除外）。
+        - 【相手のターン中】: 相手ターン中のみ。【自分のターン中】: 自分ターン中のみ。
+        """
+        raw = _nfc(getattr(ability, "raw_text", "") or "")
+        if _nfc("KOされた時") not in raw:
+            return True  # ブラケット【KO時】等：要因を問わず発火
+        # タイミングスコープ
+        if _nfc("相手のターン中") in raw and self.turn_player is owner:
+            return False
+        if _nfc("自分のターン中") in raw and self.turn_player is not owner:
+            return False
+        # 要因（「KOされた時」の前段の修飾を見る）
+        pre = raw.split(_nfc("KOされた時"))[0]
+        opp = self.p1 if owner is self.p2 else self.p2
+        if _nfc("相手の") in pre and _nfc("効果で") in pre:
+            return cause == "EFFECT" and effect_controller is opp
+        if _nfc("自分の効果で") in pre:
+            return cause == "EFFECT" and effect_controller is owner
+        if _nfc("効果で") in pre:
+            return cause == "EFFECT"
+        return True
+
+    def _resolve_on_ko(self, card: Card, owner: Player,
+                       cause: str = "EFFECT", effect_controller: Player = None):
         if not card.master.abilities: return
         for ability in card.master.abilities:
             if ability.trigger == TriggerType.ON_KO:
+                if not self._ko_trigger_matches(ability, owner, cause, effect_controller):
+                    log_event("INFO", "game.trigger_ko_skip",
+                              f"ON_KO for {card.master.name} skipped (cause={cause})", player=owner.name)
+                    continue
                 log_event("INFO", "game.trigger_ko", f"Resolving ON_KO for {card.master.name}", player=owner.name)
                 self.resolve_ability(owner, ability, source_card=card)
 
@@ -2518,7 +2557,7 @@ class GameManager:
             elif act_name == "KO":
                 self.move_card(target, Zone.TRASH, owner)
                 log_event("INFO", "game.action_ko", f"{target.master.name} was KO'd by effect", player=player.name)
-                self._resolve_on_ko(target, owner)
+                self._resolve_on_ko(target, owner, cause="EFFECT", effect_controller=player)
                 success = True
             elif act_name in ["DISCARD", "TRASH"]:
                 self.move_card(target, Zone.TRASH, owner); success = True

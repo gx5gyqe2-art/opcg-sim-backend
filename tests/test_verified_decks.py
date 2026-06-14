@@ -251,6 +251,36 @@ def test_op16015_luffy_cost_reduction_requires_ace_leader_and_don():
     assert EffectResolver(gm3)._check_condition(r1, cond, inst("OP16-015")) is False
 
 
+def test_op16024_inazuma_ko_trigger_requires_opponent_effect():
+    """OP16-024 イナズマ: 「相手の効果でKOされた時」は戦闘KO・自分の効果KOでは発火せず、
+    相手の効果KOでのみ発火する。書き下し形KO誘発の要因修飾（§8.3 実行系/条件の退化）。"""
+    gm, p1, p2 = game("OP16-022", "OP16-022")
+    ab = inst("OP16-024").master.abilities[0]
+    assert ab.trigger == TriggerType.ON_KO
+    # owner=p1, opp=p2
+    assert gm._ko_trigger_matches(ab, p1, "BATTLE", None) is False        # 戦闘KO
+    assert gm._ko_trigger_matches(ab, p1, "EFFECT", p1) is False          # 自分の効果KO
+    assert gm._ko_trigger_matches(ab, p1, "EFFECT", p2) is True           # 相手の効果KO
+
+
+def test_op02085_magellan_ko_trigger_opponent_turn_only():
+    """OP02-085 マゼラン: 【相手のターン中】KOは相手ターンのみ発火（要因は問わない）。"""
+    gm, p1, p2 = game("OP16-022", "OP16-022")
+    ab = [a for a in inst("OP02-085").master.abilities if a.trigger == TriggerType.ON_KO][0]
+    gm.turn_player = p2  # 相手ターン
+    assert gm._ko_trigger_matches(ab, p1, "BATTLE", None) is True
+    gm.turn_player = p1  # 自分ターン
+    assert gm._ko_trigger_matches(ab, p1, "EFFECT", p2) is False
+
+
+def test_bracket_ko_trigger_always_fires():
+    """ブラケット【KO時】（要因修飾なし）は戦闘KO・効果KOいずれでも発火する（退行防止）。"""
+    gm, p1, _ = game("OP16-022", "OP16-022")
+    ab = inst("OP16-013").master.abilities[0]  # マクガイ【KO時】
+    assert gm._ko_trigger_matches(ab, p1, "BATTLE", None) is True
+    assert gm._ko_trigger_matches(ab, p1, "EFFECT", p1) is True
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")
