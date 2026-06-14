@@ -1358,6 +1358,18 @@ class EffectParser:
             # 第2特徴のリーダーで常に不成立だった。OP14-022/OP13-027/EB02-011 ほか12枚）。
             trait_all = re.findall(_nfc(r'[《<『]([^》>』]+)[》>』]'), norm_text)
             trait_match = re.search(_nfc(r'[《<『]([^》>』]+)[》>』]'), norm_text)
+            # 「リーダーが、パワーN以上でかつ特徴《X》を持つ」(OP09-017): パワーと特徴の AND。
+            # 「でかつ」が読点を伴わず分割されないため、trait_match が単独で返り**パワー条件が脱落**
+            # していた。両方が同一リーダー節に現れる場合は AND として束ねる（下の単独 return より先に
+            # 合成判定する）。
+            pow_leader_m0 = re.search(_nfc(r'パワーが?(\d+)(以上|以下)'), norm_text)
+            _leader_pow_cond = None
+            if pow_leader_m0:
+                _thr = int(pow_leader_m0.group(1))
+                _op = CompareOperator.GE if pow_leader_m0.group(2) == _nfc('以上') else CompareOperator.LE
+                _leader_pow_cond = Condition(type=ConditionType.LEADER_STATE,
+                                             value=("POWER", _thr), operator=_op,
+                                             player=p, raw_text=norm_text)
             # リーダー名は複数併記され得る（「「サボ」か「エース」か「ルフィ」の場合」OP13-016）。
             # findall で全て拾い、resolver はいずれか一致(OR)で判定する。re.search だと先頭名
             # のみになり、他リーダー名のとき条件が常に不成立だった。
@@ -1372,7 +1384,11 @@ class EffectParser:
                     return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
             if trait_match:
                 tval = trait_all[0] if len(trait_all) == 1 else trait_all
-                return Condition(type=ConditionType.LEADER_TRAIT, value=tval, player=p, raw_text=norm_text)
+                trait_cond = Condition(type=ConditionType.LEADER_TRAIT, value=tval, player=p, raw_text=norm_text)
+                if _leader_pow_cond is not None:
+                    return Condition(type=ConditionType.AND, player=p,
+                                     args=[_leader_pow_cond, trait_cond], raw_text=norm_text)
+                return trait_cond
             if name_matches:
                 val = name_matches[0] if len(name_matches) == 1 else name_matches
                 return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)

@@ -551,6 +551,33 @@ def _prevent_rest_and_keyword(ctx: ParseContext):
     return Sequence(actions=[prevent, grant])
 
 
+@rule("grant_keyword_choice", priority=64)
+def _grant_keyword_choice(ctx: ParseContext):
+    """「（このキャラは）【A】か【B】か【C】を得る」→ Choice[GRANT_KEYWORD(A/B/C)]（OP09-084）。
+    grant_keyword は先頭キーワードしか拾わず、択一の2番目以降が脱落していた。"""
+    t = ctx.text
+    if _nfc("得る") not in t:
+        return None
+    if not re.search(_nfc(r"】か【"), t):
+        return None  # 「か」での択一に限定（「と」併記＝同時付与は対象外）
+    kws = _KEYWORD_GRANT_RE.findall(t)
+    if len(kws) < 2:
+        return None
+    if re.search(_nfc(rf"パワー{_SIGN}[\d０-９]+"), t):
+        return None
+    is_source = bool(re.search(_nfc(r"この(カード|キャラ|リーダー)"), t))
+    dur = _duration_of(t)
+
+    def _opt(kw):
+        tq = TargetQuery(select_mode="SOURCE") if is_source else parse_target(t)
+        return GameAction(type=ActionType.GRANT_KEYWORD, target=tq, status=kw,
+                          duration=dur, raw_text=t)
+
+    return Choice(message="得るキーワードを選ぶ",
+                  option_labels=list(kws),
+                  options=[_opt(k) for k in kws])
+
+
 @rule("grant_keyword", priority=63)
 def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -626,7 +653,11 @@ def _field_char_to_life(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if not re.search(_nfc(r"ライフの(上|下)"), t):
         return None
-    if _nfc("加える") not in t:
+    # 「（場の）キャラ…を…ライフの上か下に（表向き/裏向きで）置く」も移動として扱う
+    # （EB01-053/OP09-101/OP06-103）。scry の「（公開カードを）ライフの上か下に置く」は
+    # 下の「キャラ」分岐に入らない（キャラを含まない）ため誤爆しない。従来は「加える」のみ許容で、
+    # 「置く」表記が life_face(FACE_UP_LIFE) に落ちて場のキャラのライフ送りが脱落していた。
+    if _nfc("加える") not in t and _nfc("置く") not in t:
         return None
     # 源が手札／デッキ／トラッシュのものは別ルール（hand_to_life / life_recover）。
     if _nfc("手札") in t or _nfc("デッキ") in t or _nfc("トラッシュ") in t:
@@ -1173,7 +1204,10 @@ def _rest_char_or_don(ctx: ParseContext) -> Optional[EffectNode]:
     t = ctx.text
     if not re.search(_nfc(r"レストに(する|できる)"), t):
         return None
-    m = re.search(_nfc(r'(.+?キャラ)か((?:レストの)?ドン[ 　]*(?:!!|‼)[^、。]*?まで)'), t)
+    # キャラ句とドン句の間に枚数（「キャラ1枚かドン‼1枚まで」OP09-036）が入る形にも対応する。
+    # 従来は「キャラ」直後に「か」を要求し、「キャラ1枚か…」だと不一致→ REST_DON だけ拾われ
+    # キャラのレスト選択肢が脱落していた。
+    m = re.search(_nfc(r'(.+?キャラ(?:[\d０-９]+枚)?(?:まで)?)か((?:レストの)?ドン[ 　]*(?:!!|‼)[^、。]*?まで)'), t)
     if not m:
         return None
     char_part, don_part = m.group(1), m.group(2)
@@ -2637,6 +2671,36 @@ def _negate_then_attack_disable(ctx: ParseContext) -> Optional[Sequence]:
     return Sequence(actions=[
         GameAction(type=ActionType.NEGATE_EFFECT, target=tq1, duration=duration, raw_text=t),
         GameAction(type=ActionType.ATTACK_DISABLE, target=tq2, duration=duration, raw_text=t),
+    ])
+
+
+# ---------------------------------------------------------------------------
+# 効果無効＋パワー増減の連結: 「<対象>を、…、効果を無効にし、パワー±N」(OP09-097【カウンター】)
+#   negate_then_attack_disable と同型。区切らないと buff が全体を丸呑みし NEGATE_EFFECT が
+#   消失する（カウンターの「効果無効」が脱落し -4000 だけになっていた）。同一対象に
+#   NEGATE と BUFF を ref_id で連携した Sequence にする。
+# ---------------------------------------------------------------------------
+@rule("negate_then_buff", priority=66)
+def _negate_then_buff(ctx: ParseContext) -> Optional[Sequence]:
+    t = ctx.text
+    m = re.search(_nfc(r"効果を無効にし、.{0,8}?パワー([+＋\-－−‐])(\d+)"), t)
+    if not m:
+        return None
+    sign = -1 if m.group(1) in "-－−‐" else 1
+    value = sign * int(m.group(2))
+    head = t.split(_nfc("効果を無効にし"))[0]
+    tq1 = parse_target(head)
+    tq1.save_id = "negate_buff_char"
+    if _nfc("まで") in head:
+        tq1.is_up_to = True
+    duration = "UNTIL_NEXT_TURN_END" if _nfc("次の") in t else "THIS_TURN"
+    tq2 = TargetQuery(player=tq1.player, zone=Zone.FIELD,
+                      card_type=list(tq1.card_type) or ["LEADER", "CHARACTER"],
+                      count=1, ref_id="negate_buff_char")
+    return Sequence(actions=[
+        GameAction(type=ActionType.NEGATE_EFFECT, target=tq1, duration=duration, raw_text=t),
+        GameAction(type=ActionType.BUFF, target=tq2, value=ValueSource(base=value),
+                   duration=duration, raw_text=t),
     ])
 
 
