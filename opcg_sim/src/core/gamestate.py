@@ -179,6 +179,8 @@ class GameManager:
         # 中断（対話）はスタックで保持する。`active_interaction` プロパティが先頭を指す。
         # 通常は深さ≤1（単一スロット相当）で、置換ネスト等のみが push で深くする。
         self._interaction_stack: List[Dict[str, Any]] = []
+        # 置換 sub_effect の内側中断を UI 提示してよいか（resolver が除去アクション直前にセット）。
+        self._removal_can_suspend = False
         self.setup_phase_pending = False
         self.mulligan_done: Set[str] = set()
         from .effects.continuous import ContinuousEffectManager
@@ -1657,7 +1659,8 @@ class GameManager:
     # 置換効果（REPLACE_EFFECT）の判定。除去の瞬間に対象の PASSIVE 能力を走査し、
     # 「代わりに〜」の置換アクションを（条件・実行可能性を満たせば）実行して True を返す。
     # True の場合、呼び出し側は本来の除去を行わずスキップする。
-    def _active_replacement(self, card: CardInstance, status_values: Tuple[str, ...]) -> bool:
+    def _active_replacement(self, card: CardInstance, status_values: Tuple[str, ...],
+                            can_suspend: bool = False) -> bool:
         if not card or not getattr(card, "master", None) or card.negated:
             return False
         owner = self.p1 if self.p1.name == card.owner_id else self.p2
@@ -1704,23 +1707,28 @@ class GameManager:
                 log_event("INFO", "game.replacement",
                           f"Replacement by {protector.master.name} activated for {card.master.name}",
                           player=owner.name)
-                # 置換は除去の解決中（apply_action_to_engine 内）に発生する「入れ子の中断」で、
-                # 現行の単一 continuation 設計ではネスト中断を表現できない（doc §7-C E14/E15）。
-                # 完全な continuation スタック化は高リスクのため、置換 sub_effect が対象選択／
-                # 任意確認で中断した場合は、その場で保守的に自動解決して同期完了させる
-                # （任意=実行＝保護を採用、対象=有効候補を選択）。これにより置換は必ず完了し、
-                # ダングリング interaction（カードが KO もされず置換も未完了の宙吊り）を防ぐ。
+                # 置換は除去解決の最中に発生する「入れ子の中断」。失われる外側継続が無い
+                # （can_suspend=除去アクションの後続が空・単一対象）場合は、内側の中断
+                # （対象選択／任意確認）を**そのまま UI へ提示**し、被保護側に選ばせる
+                # （interaction はスタックに残し、resume で sub_effect を完了させる）。
+                # 外側継続が残るケースでは従来どおり保守的に自動解決して同期完了させる
+                # （任意=採用、対象=有効候補先頭）。どちらも置換は成立扱い（本来の除去はスキップ）。
                 outer_interaction = self.active_interaction
                 self.active_interaction = None
                 resolver.execution_stack = [sub]
                 resolver._process_stack(owner, card)
-                self._auto_resolve_replacement(owner)
-                # 置換解決で外側の interaction を壊していないことを保証（元の状態へ戻す）。
-                self.active_interaction = outer_interaction
-                # 発動成立 → 【ターン1回】の使用回数を消費する。
-                if _limit is not None:
+                suspended = self.active_interaction is not None
+                if _limit is not None:  # 発動成立 → 【ターン1回】の使用回数を消費
                     k = _ability_index(protector, ab)
                     protector.ability_used_this_turn[k] = protector.ability_used_this_turn.get(k, 0) + 1
+                if suspended and can_suspend:
+                    # 内側中断を UI へ提示（自動解決しない）。除去はスキップ＝置換成立。
+                    log_event("INFO", "game.replacement_interactive",
+                              f"Presenting nested replacement choice for {card.master.name}", player=owner.name)
+                    return True
+                # 自動解決パス（外側継続あり、または中断なし）。
+                self._auto_resolve_replacement(owner)
+                self.active_interaction = outer_interaction
                 return True
         return False
 
@@ -2258,7 +2266,10 @@ class GameManager:
                 if self._active_protection(target, guard_statuses, actor=player):
                     log_event("INFO", "game.leave_prevented", f"{target.master.name} is protected from leaving the field by opponent's effect", player=owner.name)
                     continue
-                if self._active_replacement(target, guard_statuses):
+                # 内側中断の UI 提示は、後続継続が失われない場合のみ許可（外側 execution_stack
+                # 空＝resolver がセット、かつ単一対象＝この continue でループが残対象を捨てない）。
+                _can_suspend = getattr(self, "_removal_can_suspend", False) and len(targets) == 1
+                if self._active_replacement(target, guard_statuses, can_suspend=_can_suspend):
                     log_event("INFO", "game.leave_replaced", f"{target.master.name}'s removal was replaced by an alternative effect", player=owner.name)
                     continue
             if act_name == "PREVENT_LEAVE":
