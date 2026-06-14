@@ -65,6 +65,18 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | `tests/test_verified_decks.py` | **手動検証済みデッキの効果回帰**（§8）。ベースラインが捕捉できない常在ルール（RULE_PROCESSING）・ON_LEAVE 誘発・勝利条件・ドンデッキ枚数・カード名別名・持続時間等を意味的に固定 |
 | `tests/test_cpu_selfplay.py` | CPU 対 CPU 自己対戦の完走・決定論・clone 非破壊・合法手適用・インバリアント検出 |
 
+### 効果メカニクス・対話モデル
+| ファイル | 役割 |
+|---|---|
+| `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER/PER_TURN_LIMIT_GAP/UP_TO_GAP = 0 のラチェット（§5） |
+| `tests/test_interaction_stack.py` | 中断スタック（`active_interaction` 互換プロパティ／`push_interaction`）のセマンティクス |
+| `tests/test_replacement_interactive.py` | 置換 sub_effect のネスト中断（終端=UI提示+resume／非終端=自動解決）。SPEC §6.1 |
+| `tests/test_both_sides_interactive.py` | 「お互いの〜」両側効果の各プレイヤー個別選択（相手→自分の逐次中断）。SPEC §6.1 |
+| `tests/test_freeze_don.py` | FREEZE_DON（OP07-026 ドン側）＝レストのドン!!を1回リフレッシュ据え置き |
+| `tests/test_on_rest_trigger.py` / `tests/test_on_rest_subject.py` | ON_REST 誘発（このキャラ／任意主語＋自分の/相手の効果で）。アタック宣言・効果レスト両経路 |
+| `tests/test_execute_trash_event_main.py` | EB03-031 トラッシュのイベント【メイン】効果の発動（EXECUTE_MAIN_EFFECT + 対象選択） |
+| `tests/test_char_or_don_mixed.py` | 「キャラかドン合計N枚」の混在選択（CHAR_OR_DON 候補プール） |
+
 ### リーダー効果（全137枚）
 | ファイル | 役割 |
 |---|---|
