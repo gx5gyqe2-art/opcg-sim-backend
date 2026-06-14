@@ -80,7 +80,8 @@ _VERB_ACTIONS = {
     "デッキの下に置": {"DECK_BOTTOM", "MOVE_CARD", "MOVE"},
     # 公開: FACE_UP_LIFE はライフを表向きで公開する動作、DECLARE_COST は公開+宣言の複合
     # MOVE_CARD: 「公開し手札に加える」はサーチ（MOVE_CARD）として実装されるケースも含む
-    "公開": {"REVEAL", "LOOK", "MOVE_TO_HAND", "SEARCH", "FACE_UP_LIFE", "DECLARE_COST", "MOVE_CARD"},
+    # LOOK_LIFE: 「ライフの上から1枚を公開」は engine が LOOK_LIFE で実装する（OP10-022/ST13-007 等）
+    "公開": {"REVEAL", "LOOK", "LOOK_LIFE", "MOVE_TO_HAND", "SEARCH", "FACE_UP_LIFE", "DECLARE_COST", "MOVE_CARD"},
 }
 
 # 動詞がトリガー条件（〜した時）としてのみ現れる場合はチェックをスキップする

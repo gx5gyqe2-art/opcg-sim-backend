@@ -46,7 +46,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # トリガー条件句「相手が…した時、」も対象側判定を汚すため除去する
     player_text = re.sub(_nfc(r'相手が[^、。]*した時、?'), '', player_text)
 
-    if _nfc(ParserKeyword.EACH_OTHER) in player_text: tq.player = Player.ALL
+    if _nfc(ParserKeyword.EACH_OTHER) in player_text:
+        # 「お互い(の)〜」= 両プレイヤーへ独立・同時に適用する効果。側無指定の ALL
+        # （「持ち主の〜手札に戻す」等の単一選択）と区別するため BOTH_SIDES を立てる。
+        tq.player = Player.ALL
+        tq.flags.add("BOTH_SIDES")
     elif _nfc(ParserKeyword.OPPONENT) in player_text: tq.player = Player.OPPONENT
     elif _nfc(ParserKeyword.OWNER) in tgt_text: 
         is_dest = False
@@ -461,6 +465,10 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
         # ライフの表裏（「ライフの表向きのカード」ST13-002）。裏向きライフを巻き込まないよう絞る。
         if query.is_face_up is not None and bool(getattr(card, "is_face_up", False)) != query.is_face_up:
+            continue
+
+        # 「カウンターを持たない」限定（EB01-001）: 基礎カウンター値を持つカードを除外する。
+        if "NO_COUNTER" in query.flags and (card.master.counter or 0) > 0:
             continue
 
         # 「【X】効果を持たないキャラ」: 指定トリガーを持つカードを除外（EB03-001/PRB01-001）。

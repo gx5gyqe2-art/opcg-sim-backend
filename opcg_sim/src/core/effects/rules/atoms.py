@@ -239,7 +239,15 @@ def _discard(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("手札") not in t:
         return None
     tq = parse_target(t)
-    if _nfc("まで") in t:
+    # 「手札がN枚になるように…捨てる」: N枚を残して残りを捨てる（DOWN_TO_N）。
+    # 「お互いは手札がN枚になるように、自身の手札を捨てる」(OP05-058) 等。
+    # 従来は「N枚」を枚数と誤読し N 枚だけ捨てていた（life_to_trash と同様の補正）。
+    m_down = re.search(_nfc(r"が([\d０-９]+)枚になるように"), t)
+    if m_down:
+        tq.count = _to_int(m_down.group(1))
+        tq.count_dynamic = "DOWN_TO_N"
+        tq.is_up_to = False
+    elif _nfc("まで") in t:
         tq.is_up_to = True
     # 「【トリガー】を持つカード」を捨てる: トリガー所持カードに限定する（matcher が絞り込む）。
     if re.search(_nfc(r"【トリガー】を持つ"), t):
@@ -2750,12 +2758,17 @@ def _revealed_to_deck_top(ctx: ParseContext) -> Optional[GameAction]:
 @rule("counter_buff", priority=64)
 def _counter_buff(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    m = re.search(_nfc(rf"カウンター({_SIGN}[\d０-９]+)になる"), t)
+    # 「カウンター+Nになる」に加え「カウンター+Nを持つ」も対象（EB01-001 のルール付与）。
+    m = re.search(_nfc(rf"カウンター({_SIGN}[\d０-９]+)(?:になる|を持つ)"), t)
     if not m:
         return None
     tq = _subject_target(t)
     if tq.select_mode != "SOURCE":
         tq.zone = Zone.HAND
+    # 「カウンターを持たない（キャラ）」限定: 既にカウンター値を持つカードは対象外
+    # （EB01-001「カウンターを持たないキャラ…はカウンター+1000を持つ」）。matcher が絞り込む。
+    if _nfc("カウンターを持たない") in t:
+        tq.flags.add("NO_COUNTER")
     return GameAction(
         type=ActionType.BUFF,
         status="COUNTER",

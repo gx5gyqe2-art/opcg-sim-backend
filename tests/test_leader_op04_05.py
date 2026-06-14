@@ -464,3 +464,30 @@ def test_op05_098_discards_one_hand():
     after = zone_counts(p1)
     assert after["hand"] == before["hand"] - 1
     assert after["trash"] == before["trash"] + 1
+
+
+# ===========================================================================
+# OP05-058 命がもったいだいっ!!!（イベント）
+#   「その後、お互いは手札が5枚になるように、自身の手札を捨てる」
+#   = 両者の手札がそれぞれ5枚になるまで捨てる（DOWN_TO_N・両側同時）。
+#   （旧: 「5枚」を枚数と誤読し DOWN_TO_N 未付与＋Player.ALL 片側のみ解決＝SPEC §6.1）
+# ===========================================================================
+
+def test_op05_058_mutual_discard_down_to_5_both_sides():
+    """OP05-058: 「お互いは手札が5枚になるように捨てる」→ 両者の手札が5枚になる。"""
+    from leader_test_helpers import db
+    from opcg_sim.src.models.models import CardInstance
+    gm, p1, p2, L = build("OP04-001")  # 任意リーダー（OP05-058 はイベント）
+    src = CardInstance(db().get_card("OP05-058"), p1.name)
+    # 両者の手札を 5 枚超に揃える（フィールドのキャラ落ち＝DECK_BOTTOM は別途）。
+    while len(p1.hand) < 7:
+        p1.hand.append(p1.deck.pop())
+    p1.hand = p1.hand[:7]
+    while len(p2.hand) < 8:
+        p2.hand.append(p2.deck.pop())
+    p2.hand = p2.hand[:8]
+    gm.resolve_ability(p1, get_ability(src.master, "ACTIVATE_MAIN"), src)
+    auto_resolve(gm, p1)
+    auto_resolve(gm, p2)  # 相手側の捨て札確定も駆動する
+    assert len(p1.hand) == 5, f"自分の手札が5枚になっていない: {len(p1.hand)}"
+    assert len(p2.hand) == 5, f"相手の手札が5枚になっていない: {len(p2.hand)}"

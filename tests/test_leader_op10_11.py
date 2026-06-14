@@ -528,3 +528,29 @@ def test_op11_062_no_fire_without_don():
     gm.resolve_ability(p1, get_ability(L.master, "ON_ATTACK"), L)
     auto_resolve(gm, p1)
     assert leader_power(p1) == base  # 不発
+
+
+# ===========================================================================
+# OP11-102 ケイミー
+#   【相手のイベント/トリガー発動時】相手ライフ2枚以上なら
+#   「お互いのライフの上から1枚をトラッシュに置く」= 両者のライフが各1枚減る。
+#   （旧: Player.ALL の単一選択で相手側のみ解決されていた＝SPEC §6.1 の既知制約）
+# ===========================================================================
+
+def test_op11_102_mutual_life_to_trash_both_sides():
+    """OP11-102: 「お互いのライフの上から1枚をトラッシュに置く」→ 両者のライフが各1枚減る。"""
+    from leader_test_helpers import set_life, db
+    from opcg_sim.src.models.models import CardInstance
+    gm, p1, p2, L = build("OP10-001")  # 任意リーダー（OP11-102 はキャラ）
+    src = CardInstance(db().get_card("OP11-102"), p1.name)
+    p1.field.append(src)
+    set_life(p1, 3)
+    set_life(p2, 3)
+    t1, t2 = len(p1.trash), len(p2.trash)
+    gm.resolve_ability(p1, get_ability(src.master, "YOUR_TURN"), src)
+    auto_resolve(gm, p1)
+    # 両側がそれぞれ 1 枚ずつライフを失う（片側のみではない）
+    assert len(p1.life) == 2, f"自分ライフが減っていない: {len(p1.life)}"
+    assert len(p2.life) == 2, f"相手ライフが減っていない: {len(p2.life)}"
+    assert len(p1.trash) == t1 + 1
+    assert len(p2.trash) == t2 + 1
