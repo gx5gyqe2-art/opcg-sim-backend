@@ -404,12 +404,16 @@ class EffectResolver:
             else:
                 self.game_manager._return_don_selection = pending
 
-        # 除去（KO/バウンス等）に対する置換 sub_effect の内側中断を UI へ提示してよいか:
-        # この除去アクションの後に続く処理（このリゾルバの execution_stack）が空＝失われる外側
-        # 継続が無いときのみ許可する。残っていれば従来どおり置換は同期自動解決する（_active_replacement）。
-        self.game_manager._removal_can_suspend = (len(self.execution_stack) == 0)
+        # 除去（KO/バウンス等）に対する置換 sub_effect の内側中断は常に UI へ提示してよい。
+        # 後続があっても、置換が中断したら下で外側継続を deferred へ退避して再開するため（B）。
+        self.game_manager._replacement_suspended = False
         success = self.game_manager.apply_action_to_engine(player, action, targets, value)
-        self.game_manager._removal_can_suspend = False
+        # 除去置換が内側中断を提示した（_replacement_suspended）かつ、このシーケンスに後続が
+        # 残る場合、後続を deferred フレームへ退避して execution_stack を空にする。内側中断が
+        # 解決された後に _resume_deferred_continuations が後続を再開する（B = 多段継続の対話化）。
+        if self.game_manager._replacement_suspended and self.execution_stack:
+            self.game_manager._defer_resolver_stack(player, source_card, self.execution_stack, self.context)
+            self.execution_stack = []
 
         # 「このターン中、このリーダーの効果で引いていない」(OP01-062) 用: リーダー能力由来の
         # ドローをターン内イベントに記録する（次回の同条件が false になり 1ターン複数ドローを防ぐ）。
