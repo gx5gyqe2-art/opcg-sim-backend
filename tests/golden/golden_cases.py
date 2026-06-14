@@ -1584,13 +1584,14 @@ CASES = [
             }
         ],
     },
-    # 非ディスパッチ timing × PASSIVE → ACTIVATE_MAIN（常時誤発動を避け手動発動可能に）。
+    # 「（この）キャラが（相手の効果で）レストになった時」→ ON_REST 誘発。
+    # 主語・要因（このキャラ／相手の効果で）はエンジン側 _rest_subject_matches が解釈する。
     {
-        "id": "text_trigger_passive_to_main",
+        "id": "text_trigger_on_rest",
         "text": "このキャラが相手の効果でレストになった時、発動できる。このキャラをトラッシュに置き、カード2枚を引くことができる。",
         "expect": [
             {
-                "trigger": "ACTIVATE_MAIN",
+                "trigger": "ON_REST",
                 "effect": {
                     "kind": "seq",
                     "actions": [
