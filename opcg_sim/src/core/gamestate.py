@@ -639,7 +639,12 @@ class GameManager:
             effect_context = continuation.get("effect_context", {})
             effect_context["_return_don_uuids"] = selected_uuids
             self.active_interaction = None
-            resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), effect_context)
+            # RETURN_DON は効果の責任者（source_card の持ち主）視点で再実行する。
+            # 「相手は自身の場のドン!!を戻す」（status=OPPONENT）では選択者＝相手だが、
+            # _don_pool_player は player を基準に相手プールを引くため、応答者(相手)で再開すると
+            # 相手の相手=自分のプールを指して空振りする。責任者基準なら選んだ相手ドンが正しく戻る。
+            controller = self.p1 if self.p1.name == source_card.owner_id else self.p2
+            resolver.resume_execution(controller, source_card, continuation.get("execution_stack", []), effect_context)
 
         elif action_type == "CHOICE":
             log_event("INFO", "game.resume_choice", f"Resuming choice for {source_card.master.name}", player=player.name)

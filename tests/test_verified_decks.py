@@ -304,6 +304,28 @@ def test_op16047_opponent_chooses_own_discard():
     assert gm.active_interaction.get("player_id") == p2.name
 
 
+def test_op16074_magellan_opponent_returns_own_don():
+    """OP16-074 マゼラン【KO時】「相手は自身の場のドン!!4枚をドン!!デッキに戻す」。
+    選択者＝相手だが、RETURN_DON の resume を応答者(相手)視点で再実行すると
+    _don_pool_player が相手の相手=自分プールを指し空振りしていた退行。責任者(発生源
+    の持ち主)視点で再開し、相手のドンが正しく戻ることを固定する。"""
+    gm, p1, p2 = game("OP16-022", "OP16-022")
+    for pl in (p1, p2):
+        pl.don_active = [DonInstance(owner_id=pl.name) for _ in range(5)]
+    maze = inst("OP16-074", "P1")
+    p1.trash = [maze]  # KO済み＝トラッシュに居る（resume の source 解決に必要）
+    ko = [a for a in maze.master.abilities if a.trigger == TriggerType.ON_KO][0]
+    EffectResolver(gm).resolve_ability(p1, ko, source_card=maze)
+    ia = gm.active_interaction
+    assert ia is not None and ia.get("player_id") == p2.name  # 相手が選ぶ
+    cands = [c.uuid for c in ia.get("candidates", [])]
+    assert all(c in {d.uuid for d in p2.don_active} for c in cands)  # 候補は相手のドン
+    gm.resolve_interaction(p2, {"selected_uuids": cands[:4], "index": 0})
+    assert len(p2.don_active) == 1            # 相手の場のドンが4枚戻った
+    assert len(p2.don_deck) == 14
+    assert len(p1.don_active) == 5            # 自分のドンは不変
+
+
 def test_roger_no_auto_win_on_zero_life():
     """OP09-118 ロジャー: 相手ライフ0でも（ブロッカー発動なしでは）自動勝利しない。"""
     gm, p1, p2 = game("ST10-002")
