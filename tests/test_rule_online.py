@@ -84,6 +84,33 @@ def test_rule_room_lifecycle_and_ws_sync(client):
         assert broadcast["pending_request"]["player_id"] == second
 
 
+def test_game_state_fetch_resync(client):
+    """/api/game/state はルーム対局の現在状態を読み取り専用で返す（WS取りこぼし時の
+    再同期フォールバック）。冪等で、盤面/手番を一切変えない。"""
+    gid = client.post("/api/rule/create", json={"room_name": "R"}).json()["game_id"]
+    client.post("/api/rule/action", json={"game_id": gid, "action_type": "SET_DECK", "player_id": "p1", "deck_id": "db:a"})
+    client.post("/api/rule/action", json={"game_id": gid, "action_type": "SET_DECK", "player_id": "p2", "deck_id": "db:b"})
+    client.post("/api/rule/action", json={"game_id": gid, "action_type": "START", "player_id": "p1"})
+
+    # 読み取り専用フェッチ: WS と同形（STATE_UPDATE / game_state / pending_request）。
+    s1 = client.get(f"/api/game/state?game_id={gid}").json()
+    assert s1["status"] == "PLAYING"
+    assert s1["game_state"] is not None
+    assert s1["pending_request"]["action"] == "MULLIGAN"
+    pid = s1["pending_request"]["player_id"]
+
+    # 冪等: 何度呼んでも手番（pending の宛先）は変化しない（副作用なし）。
+    s2 = client.get(f"/api/game/state?game_id={gid}").json()
+    assert s2["pending_request"]["player_id"] == pid
+    assert s2["game_state"]["turn_info"]["turn_count"] == s1["game_state"]["turn_info"]["turn_count"]
+
+
+def test_game_state_fetch_unknown_game(client):
+    """未知の game_id はエラー（success=False）を返す。"""
+    res = client.get("/api/game/state?game_id=nope").json()
+    assert res["success"] is False
+
+
 def test_rule_start_requires_both_ready(client):
     gid = client.post("/api/rule/create", json={"room_name": "R"}).json()["game_id"]
     # p1 のみ ready
