@@ -78,6 +78,32 @@ _NEAR_W = 200.0                   # 同上: 削り切るには足りないが届
 _MILE_DMG_W = 1200.0             # マイルストーン: 想定クロックより相手ライフが先行して減っている分
 _MILE_RES_W = 220.0             # マイルストーン: リソース差（手札＋場の枚数差）1 枚あたり
 
+# 脅威/キーワード資産の価値（§2.5.6・対面プランのルールベース実現）。場のキャラが持つ「除去すべき
+# 脅威性／温存すべき資産性」をカードデータから加点する。両側に対称適用するので、相手の脅威キャラは
+# opp 側スコアを押し上げ→除去すると自分の評価が大きく上がる→① の単一対象探索が最善の脅威を狙う。
+# ブロッカーは既に W_BLOCKER で計上済みなのでここには含めない。プラン供給時のみ作動（plan=None 不変）。
+W_KW_DOUBLE = 1200.0     # ダブルアタック: リーダー打点が2倍＝攻め脅威
+W_KW_RESIST = 900.0      # 効果耐性「KOされない」: 除去されにくい永続的な体
+W_KW_RUSH = 250.0        # 速攻: 即時の攻め圧（攻撃タイミングで一部反映済みのため小さめ）
+W_KW_BANISH = 300.0      # バニッシュ: KO時にライフ/トリガーを与えない攻め強化
+_RESIST_CUE = "KOされない"
+_KEYWORD_ASSETS = (("ダブルアタック", W_KW_DOUBLE), ("速攻", W_KW_RUSH), ("バニッシュ", W_KW_BANISH))
+
+
+def _threat_value(c) -> float:
+    """場のキャラ 1 体の脅威/資産価値（キーワード＋効果耐性）。カードデータから算出（§2.5.6）。"""
+    v = 0.0
+    for kw, w in _KEYWORD_ASSETS:
+        try:
+            if c.has_keyword(kw):
+                v += w
+        except Exception:
+            pass
+    m = getattr(c, "master", None)
+    if m is not None and _RESIST_CUE in (getattr(m, "effect_text", "") or ""):
+        v += W_KW_RESIST
+    return v
+
 
 def _other(manager, name: str):
     return manager.p2 if manager.p1.name == name else manager.p1
@@ -130,7 +156,7 @@ def _is_low_impact(c) -> bool:
 def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True,
                 hand_factor: float = 1.0, life_factor: float = 1.0,
                 body_factor: float = 1.0, attacker_factor: float = 1.0,
-                counter_factor: float = 1.0) -> float:
+                counter_factor: float = 1.0, threat_aware: bool = False) -> float:
     """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和＋白の境界リスク）。
 
     `power_cap` は対面の最硬防御パワー＝有効パワーの上限（`_effective_power`）。これにより
@@ -169,6 +195,9 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
         if body_factor != 1.0 and _is_low_impact(c):
             ev *= body_factor
         score += ev
+        # 脅威/キーワード資産（ダブルアタック・効果耐性・速攻・バニッシュ）。両側対称・プラン時のみ。
+        if threat_aware:
+            score += _threat_value(c)
         try:
             pw = c.get_power(is_turn)
         except Exception:
@@ -267,14 +296,17 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
         body_factor = plan.vanilla_body_mult
         attacker_factor = plan.attacker_mult
         counter_factor = plan.counter_mult
+    # 脅威/キーワード資産評価（§2.5.6）は両側対称に適用＝相手の脅威を押し上げ→① の単一対象探索が
+    # 最善の除去対象を狙う。プラン供給時のみ作動（plan=None では一切作動せず現行挙動と完全同値）。
+    threat_aware = plan is not None
     # 有効パワー上限は対面の最硬防御。自分のパワーは相手を、相手のパワーは自分を上回るまでが有効。
     my_cap = _power_cap(opp)
     opp_cap = _power_cap(me)
     return (_side_score(me, is_my_turn, my_cap, include_counter=True, life_factor=life_factor,
                         body_factor=body_factor, attacker_factor=attacker_factor,
-                        counter_factor=counter_factor)
+                        counter_factor=counter_factor, threat_aware=threat_aware)
             - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
-                          hand_factor=opp_hand_factor)
+                          hand_factor=opp_hand_factor, threat_aware=threat_aware)
             + _plan_progress(manager, me, opp, is_my_turn, plan))
 
 
