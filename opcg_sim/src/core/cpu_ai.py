@@ -2,35 +2,57 @@
 
 設計:
   - 合法手は `GameManager.get_legal_actions` を単一の真実源として用いる。
-  - 各候補手を `GameManager.clone()` 上で適用し、`evaluate` で盤面優劣を採点して選ぶ
-    （1-ply 先読み）。クローン上では自分側の効果対話を既定解決でドレインしてから採点する。
+  - 各候補手を `GameManager.clone()` 上で適用し、`evaluate` で盤面優劣を採点して選ぶ。
+    クローン上では自分側の効果対話を既定解決でドレインしてから採点する。
   - ステートレス（毎ステップ再計画）。ポーリング駆動でも desync に強い。
 
-難易度:
-  easy   : ランダム合法手
-  normal : 貪欲 1-ply（evaluate 最良）
-  hard   : 貪欲 1-ply ＋ 攻撃時の被カウンター/反撃を考慮した評価（より強い重み）
+評価関数（J値理論ベース・docs/SPEC.md §2.5.2）:
+  「J値 = 白の枚数 = デッキ残 + トラッシュ」を下げ、相手の J値を上げるゲーム、という
+  Jin 氏「J値理論」に整合する形で盤面を採点する。J値を下げる = 黒（手札・ライフ・場・ステージ）
+  にカードが多い状態なので、本評価は黒リソースの重み付き和を主軸に、理論の以下の機微を加える:
+    - ライフの非線形価値（薄いほど 1 枚の限界価値が跳ね上がる＝45[J] ラインの危険）。
+    - 手札のカウンター値（防御リソース＝相手の +1[J] をいなす力）。
+    - 場のアクティブキャラ（＝将来のアタック＝相手の J値を上げる圧力）とブロッカー（最終防御）。
+  KO・カウンター誘発・ハンデス等の「相手 +1[J]」は、相手側の枚数・パワーが下がることで自然に
+  差分へ反映される（明示の J値項は黒リソースと相補で二重計上になるため置かない）。
 
-公平性メモ: 現状クローンは相手手札も含むため理論上は隠れ情報を参照しうる。評価関数は
-公開情報（盤面・ライフ・手札枚数）主体にとどめ、相手手札の中身は読まない方針。完全な
-視点マスクは将来拡張（§2.2/§6）。
+難易度＝情報方針の 3 分化（API キー easy/normal/hard は維持し挙動を再定義・docs/SPEC.md §2.5.2）:
+  easy(かんたん)  : 正直な 1-ply 貪欲（ミスなし）。評価は公開情報のみ（相手手札は枚数だけ）。
+  normal(ふつう)  : 多 ply 先読み。公開情報のみ＋相手 min ノードは隠れ手札に依存する手
+                    （手札からの登場・カウンター）を使わない保守モデルで応答（リーダー推測の土台・
+                    §2.5.4 のテンプレ供給で想定手を補強）。
+  hard(つよい)    : フルクローン多 ply 先読み（α-β ＋ ビーム）。相手手札も読む「最強」。
+  いずれも `_search` の ply 割引付き winner 到達検出で最短リーサルを認識する。
+
+公平性メモ: easy/normal は隠れ情報（相手手札の中身・裏向きライフ）を読まない（evaluate の
+see_opp_hand=False ＋ 相手 min ノードの手札依存手を除外）＝チート防止。hard のみユーザ選択により
+相手手札を読む別方針（docs/SPEC.md §2.2/§6 参照）。
 """
 import random
-from typing import Any, Dict, List, Optional
-
-from ..models.enums import CardType
+from typing import Any, Dict, List, Optional, Tuple
 
 # 評価重み（盤面 1000=パワー1段相当に正規化）
-W_LIFE = 6000.0          # ライフ 1 枚の価値（最重要）
-W_HAND = 800.0           # 手札 1 枚
+W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（最重要）
+W_LIFE_LOW = 4000.0      # 希少域（最初の 2 枚）への上乗せ＝非線形・45[J] ラインの危険
+W_HAND = 700.0           # 手札 1 枚の基礎価値
+W_COUNTER = 0.6          # 手札のカウンター値 1 点あたり（防御リソース）
 W_FIELD_COUNT = 1500.0   # 場のキャラ 1 体の存在価値
 W_FIELD_POWER = 1.0      # 場の総パワー
 W_DON_ACTIVE = 200.0     # アクティブドン!! 1 枚
-W_BLOCKER = 1200.0       # ブロッカー 1 体
+W_BLOCKER = 1200.0       # ブロッカー 1 体（最終防御）
+W_ATTACKER = 400.0       # アクティブキャラ 1 体＝将来のアタック圧（相手 +1[J] 機会）
 W_WIN = 1.0e9            # 勝敗
+W_LIFE_AGGRO_K = 0.5     # リーダー推測: 相手の攻め寄り度 1.0 で自分ライフ重視を最大 +50%（§2.5.4）
 
 _EPS = 1.0  # これ未満の改善ならターンを畳む（無限ループ防止＋無意味手の抑制）
 _DRAIN_LIMIT = 12        # クローン上で自分側対話を解決する最大回数
+
+# 多 ply 先読みのパラメータ。clone（≈4-5ms）が支配的なので、1 手あたりのレイテンシ（≈1 秒）に
+# 収まるよう、ルート手は 1-ply で事前選別し上位のみを深掘りする（選別＋均等予算で公平に採点）。
+HARD_DEPTH = 5             # 探索する意思決定ノードの ply 数
+HARD_BEAM = 3              # 各ノードで展開する子の数（1-ply 評価上位 K）
+HARD_ROOT_BEAM = 6         # 深掘りするルート手の数（残りは 1-ply スコアのまま）
+HARD_PER_MOVE_BUDGET = 45  # 深掘り 1 手あたりのクローン上限（総数 ≈ root数 + ROOT_BEAM×これ）
 
 
 def _other(manager, name: str):
@@ -41,25 +63,56 @@ def _player_by_name(manager, name: str):
     return manager.p1 if manager.p1.name == name else manager.p2
 
 
-def _side_score(p, is_turn: bool) -> float:
-    """1 プレイヤー側の素点。"""
+def _side_score(p, is_turn: bool, include_counter: bool = True,
+                hand_factor: float = 1.0, life_factor: float = 1.0) -> float:
+    """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和）。
+
+    `include_counter=False` のとき手札はカウンター値を読まず枚数のみで評価する
+    （相手手札の中身を見ない「公開情報のみ」の情報方針＝easy/normal 用）。
+    `hand_factor`/`life_factor` はリーダー推測プロファイルによる手札防御価値・ライフ重視度の倍率
+    （§2.5.4。プロファイル無し時は 1.0）。
+    """
     score = 0.0
-    score += len(p.life) * W_LIFE
-    score += len(p.hand) * W_HAND
-    score += len(p.field) * W_FIELD_COUNT
+
+    # ライフ: 非線形（薄いほど 1 枚の限界価値が高い）。最初の 2 枚に厚く上乗せする。
+    life_n = len(p.life)
+    score += life_n * W_LIFE * life_factor
+    score += min(life_n, 2) * W_LIFE_LOW * life_factor
+
+    # 手札: 枚数 ＋（公開方針でなければ）カウンター値（防御に回せる力＝相手の +1[J] を打ち消す資源）。
+    score += len(p.hand) * W_HAND * hand_factor
+    if include_counter:
+        for c in p.hand:
+            try:
+                score += (c.current_counter or 0) * W_COUNTER
+            except Exception:
+                pass
+
+    # ドン!!（アクティブ）。
     score += len(p.don_active) * W_DON_ACTIVE
+
+    # 場のキャラ: 存在価値 ＋ パワー ＋ ブロッカー（最終防御）＋ アクティブ＝将来の攻め圧。
+    score += len(p.field) * W_FIELD_COUNT
     for c in p.field:
         try:
             score += c.get_power(is_turn) * W_FIELD_POWER
         except Exception:
             score += (c.master.power or 0) * W_FIELD_POWER
-        if c.has_keyword("ブロッカー") and not c.is_rest:
-            score += W_BLOCKER
+        if not c.is_rest:
+            score += W_ATTACKER
+            if c.has_keyword("ブロッカー"):
+                score += W_BLOCKER
     return score
 
 
-def evaluate(manager, me_name: str) -> float:
-    """`me_name` 視点の盤面優劣スコア（高いほど自分有利）。"""
+def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None) -> float:
+    """`me_name` 視点の盤面優劣スコア（高いほど自分有利）。
+
+    `see_opp_hand=False` のとき相手手札は枚数のみ評価する（中身＝カウンター値を読まない）。
+    自分の手札は常に full。難易度の情報方針: easy/normal=False（公開のみ）/ hard=True（チート）。
+    `profile`（リーダー推測の相手モデル・§2.5.4）があれば、相手手札の防御価値（defense_factor）と
+    自分のライフ重視度（aggro_lean）を補正する（normal のみ供給）。
+    """
     if manager.winner == me_name:
         return W_WIN
     if manager.winner is not None:
@@ -67,7 +120,21 @@ def evaluate(manager, me_name: str) -> float:
     me = _player_by_name(manager, me_name)
     opp = _other(manager, me_name)
     is_my_turn = manager.turn_player.name == me_name
-    return _side_score(me, is_my_turn) - _side_score(opp, not is_my_turn)
+    # リーダー推測補正: 相手の攻め寄り度が高いほど自分のライフを厚く見る／相手手札の防御価値を倍率補正。
+    life_factor = 1.0
+    opp_hand_factor = 1.0
+    if profile is not None:
+        life_factor = 1.0 + W_LIFE_AGGRO_K * profile.aggro_lean
+        if not see_opp_hand:  # 公開方針のときだけ構築推測で相手手札の防御価値を補う
+            opp_hand_factor = profile.defense_factor
+    return (_side_score(me, is_my_turn, include_counter=True, life_factor=life_factor)
+            - _side_score(opp, not is_my_turn, include_counter=see_opp_hand, hand_factor=opp_hand_factor))
+
+
+def _pending_keys():
+    from . import action_api
+    pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
+    return pending_props.get('PLAYER_ID', 'player_id'), pending_props.get('ACTION', 'action')
 
 
 def _drain_own_interactions(manager, actor_name: str) -> None:
@@ -76,9 +143,7 @@ def _drain_own_interactions(manager, actor_name: str) -> None:
     相手の意思決定（ブロック/カウンター等）は解決しない（相手に委ねる）。
     """
     from . import action_api
-    pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
-    KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
-    KEY_ACTION = pending_props.get('ACTION', 'action')
+    KEY_PID, KEY_ACTION = _pending_keys()
     for _ in range(_DRAIN_LIMIT):
         pending = manager.get_pending_request()
         if not pending or pending[KEY_PID] != actor_name:
@@ -96,10 +161,10 @@ def _drain_own_interactions(manager, actor_name: str) -> None:
             return
 
 
-def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any]) -> float:
-    """move をクローン上で適用し、actor 側の対話をドレインしてから評価する。
+def _apply_clone(manager, actor_name: str, move: Dict[str, Any]):
+    """move を新しいクローンへ適用し、actor 側の対話をドレインしたクローンを返す。
 
-    シミュレーションが例外を出す手は選ばない（-inf）。
+    シミュレーションが例外を出す手は None を返す（呼び出し側で除外する）。
     """
     from . import action_api
     clone = manager.clone()
@@ -112,8 +177,138 @@ def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any]) -> float:
             action_api.apply_game_action(clone, actor, move["action_type"], move.get("payload", {}))
         _drain_own_interactions(clone, actor_name)
     except Exception:
+        return None
+    return clone
+
+
+def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any],
+                       see_opp_hand: bool = True) -> float:
+    """move をクローン上で適用し、actor 側の対話をドレインしてから評価する（1-ply）。"""
+    clone = _apply_clone(manager, actor_name, move)
+    if clone is None:
         return float("-inf")
-    return evaluate(clone, actor_name)
+    return evaluate(clone, actor_name, see_opp_hand=see_opp_hand)
+
+
+def _consumes_hand_card(manager, actor_name: str, move: Dict[str, Any]) -> bool:
+    """move が actor の手札のカードを使う手か（手札からの登場 PLAY・手札からのカウンター等）。
+
+    公平モデル（opp_public_only）で相手 min ノードから除外するための判定。盤面カードを参照する
+    手（ATTACK/ATTACH_DON/ACTIVATE_MAIN/SELECT_BLOCKER）は手札 uuid に一致しないため残る。
+    """
+    payload = move.get("payload") or {}
+    uuid = payload.get("uuid") or move.get("card_uuid")
+    if not uuid:
+        return False
+    actor = _player_by_name(manager, actor_name)
+    return any(getattr(c, "uuid", None) == uuid for c in actor.hand)
+
+
+def _search(manager, root_name: str, depth: int, alpha: float, beta: float,
+            budget: List[int], see_opp_hand: bool, opp_public_only: bool,
+            profile=None, ply: int = 0) -> float:
+    """α-β ＋ ビームの多 ply 先読み。`root_name` 視点の最善到達値を返す。
+
+    手番が root のノードは max（自分の最善手）、相手のノードは min（相手の最善応答）。
+    探索木内で `winner` に到達した手順は ±(W_WIN − ply) となり、リーサル認識として機能する
+    （ply 割引により「より早く勝つ／より遅く負ける」手順が優先され、最短の止めを選ぶ）。
+
+    情報方針:
+      - `see_opp_hand`     : 葉の評価で相手手札の中身（カウンター値）を読むか（hard=True / 他=False）。
+      - `opp_public_only`  : 相手 min ノードで相手の隠れ手札に依存する手（PLAY/カウンター）を除外し、
+                             公開情報の手のみで応答させる保守モデル（normal=True / hard=False）。
+      - `profile`          : リーダー推測の相手モデル（§2.5.4・normal のみ）。評価補正に用いる。
+    """
+    if manager.winner is not None:
+        return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
+    if depth <= 0 or budget[0] <= 0:
+        return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile)
+
+    KEY_PID, _ = _pending_keys()
+    pending = manager.get_pending_request()
+    if not pending:
+        return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile)
+    actor_name = pending[KEY_PID]
+    actor = _player_by_name(manager, actor_name)
+    moves = manager.get_legal_actions(actor)
+    if not moves:
+        return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile)
+    is_max = (actor_name == root_name)
+
+    # 公平モデル: 相手 min ノードでは相手の隠れ手札に依存する手を読まない（公開情報のみで応答）。
+    if not is_max and opp_public_only:
+        filtered = [m for m in moves if not _consumes_hand_card(manager, actor_name, m)]
+        if filtered:
+            moves = filtered
+
+    # 子ノードを生成し、1-ply 評価でビーム選別（best-first で α-β の枝刈り効率を上げる）。
+    children: List[Tuple[float, Any]] = []
+    for m in moves:
+        if budget[0] <= 0:
+            break
+        budget[0] -= 1
+        child = _apply_clone(manager, actor_name, m)
+        if child is None:
+            continue
+        children.append((evaluate(child, root_name, see_opp_hand=see_opp_hand, profile=profile), child))
+    if not children:
+        return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile)
+    children.sort(key=lambda x: x[0], reverse=is_max)
+    children = children[:HARD_BEAM]
+
+    if is_max:
+        value = float("-inf")
+        for _leaf, child in children:
+            value = max(value, _search(child, root_name, depth - 1, alpha, beta,
+                                       budget, see_opp_hand, opp_public_only, profile, ply + 1))
+            alpha = max(alpha, value)
+            if alpha >= beta:
+                break
+        return value
+    else:
+        value = float("inf")
+        for _leaf, child in children:
+            value = min(value, _search(child, root_name, depth - 1, alpha, beta,
+                                       budget, see_opp_hand, opp_public_only, profile, ply + 1))
+            beta = min(beta, value)
+            if alpha >= beta:
+                break
+        return value
+
+
+def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
+                   see_opp_hand: bool, opp_public_only: bool,
+                   profile=None) -> List[Tuple[float, Dict[str, Any]]]:
+    """ルート手を 1-ply で事前選別し、上位 HARD_ROOT_BEAM 手だけを多 ply 先読みで深掘りする。
+
+    全手で予算を共有すると先に列挙された手ほど深く読まれて採点が不公平になるため、
+    深掘り対象には**手ごとに均等予算**（HARD_PER_MOVE_BUDGET）を与える。非対象は 1-ply スコアの
+    まま残す。事前選別で作った子クローンを深掘りに再利用するので無駄なクローンは作らない。
+    """
+    # 1) 全ルート手を 1-ply で採点（子クローンは深掘りに再利用）。
+    prelim: List[Tuple[float, Dict[str, Any], Any]] = []
+    for m in moves:
+        child = _apply_clone(manager, name, m)
+        if child is None:
+            prelim.append((float("-inf"), m, None))
+            continue
+        prelim.append((evaluate(child, name, see_opp_hand=see_opp_hand, profile=profile), m, child))
+
+    # 2) 1-ply 上位を深掘り対象に選ぶ。
+    order = sorted(range(len(prelim)), key=lambda i: prelim[i][0], reverse=True)
+    deepen = set(order[:HARD_ROOT_BEAM])
+
+    # 3) 対象は多 ply 先読み（ply=1 から＝早い勝ちを優先）、非対象は 1-ply スコアのまま。
+    out: List[Tuple[float, Dict[str, Any]]] = []
+    for i, (s1, m, child) in enumerate(prelim):
+        if child is not None and i in deepen:
+            budget = [HARD_PER_MOVE_BUDGET]
+            v = _search(child, name, HARD_DEPTH - 1, float("-inf"), float("inf"),
+                        budget, see_opp_hand, opp_public_only, profile, ply=1)
+            out.append((v, m))
+        else:
+            out.append((s1, m))
+    return out
 
 
 # 1 ターン内に CPU が取れる手の総数上限（暴走/無限ループの最終防壁）。
@@ -129,10 +324,11 @@ def _move_sig(move: Dict[str, Any]) -> tuple:
 
 
 def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Random] = None,
-           moves: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
+           moves: Optional[List[Dict[str, Any]]] = None, profile=None) -> Optional[Dict[str, Any]]:
     """`player` が取るべき次の 1 手を返す（合法手が無ければ None）。
 
     `moves` を渡すとその候補集合から選ぶ（ガード driver が絞り込んだ手を渡す用途）。
+    `profile` はリーダー推測の相手モデル（§2.5.4・normal でのみ使用）。
     """
     rng = rng or random
     if moves is None:
@@ -142,27 +338,34 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
     if len(moves) == 1:
         return moves[0]
 
-    if difficulty == "easy":
-        return rng.choice(moves)
-
     name = player.name
     end_move = next((m for m in moves if m.get("action_type") == "TURN_END"), None)
 
-    scored = [(_simulate_and_eval(manager, name, m), m) for m in moves]
+    # 難易度＝情報方針の 3 分化（docs/SPEC.md §2.5.2）:
+    #   easy   : 正直な 1-ply 貪欲（ミスなし・公開情報のみ）。
+    #   normal : 多 ply 先読み・公開情報のみ＋相手は隠れ手札を使わない保守モデル＋リーダー推測 profile。
+    #   hard   : 多 ply 先読み・相手手札も読むフルクローン（最強・チート）。
+    if difficulty == "easy":
+        scored = [(_simulate_and_eval(manager, name, m, see_opp_hand=False), m) for m in moves]
+    elif difficulty == "hard":
+        scored = _scored_search(manager, name, moves, see_opp_hand=True, opp_public_only=False)
+    else:  # normal
+        scored = _scored_search(manager, name, moves, see_opp_hand=False, opp_public_only=True,
+                                profile=profile)
     # 同点はランダムタイブレーク（決定論にしたい場合は呼び出し側で seed 済み rng を渡す）。
     rng.shuffle(scored)
     best_score, best_move = max(scored, key=lambda x: x[0])
 
-    if end_move is not None:
-        end_score = _simulate_and_eval(manager, name, end_move)
-        # 非ターン終了手が end を有意に上回らなければターンを畳む（進行保証）。
-        if best_move is end_move or best_score <= end_score + _EPS:
+    # 非ターン終了手が end を有意に上回らなければターンを畳む（進行保証）。
+    if end_move is not None and best_move is not end_move:
+        end_score = next((s for s, m in scored if m is end_move), None)
+        if end_score is not None and best_score <= end_score + _EPS:
             return end_move
     return best_move
 
 
 def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[random.Random] = None,
-                   mem: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+                   mem: Optional[Dict[str, Any]] = None, profile=None) -> Optional[Dict[str, Any]]:
     """ターン内メモリ `mem` を用いた暴走防止つきの意思決定。
 
     `mem` は呼び出し側が対局ごとに保持する dict（ステートレスな /cpu/step でも CPU_GAMES に
@@ -196,7 +399,7 @@ def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[ra
     if not filtered:
         filtered = [end_move] if end_move is not None else moves
 
-    move = decide(manager, player, difficulty, rng, moves=filtered)
+    move = decide(manager, player, difficulty, rng, moves=filtered, profile=profile)
     if move is not None:
         sig = _move_sig(move)
         counts[sig] = counts.get(sig, 0) + 1

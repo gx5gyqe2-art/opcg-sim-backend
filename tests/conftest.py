@@ -32,12 +32,19 @@ def _install_google_stub():
         def __init__(self, *a, **k):
             raise RuntimeError("google.cloud stubbed for tests")
 
+    class _Query:
+        ASCENDING = "ASCENDING"
+        DESCENDING = "DESCENDING"
+
     google = types.ModuleType("google")
     cloud = types.ModuleType("google.cloud")
     storage = types.ModuleType("google.cloud.storage")
     firestore = types.ModuleType("google.cloud.firestore")
     storage.Client = _FakeClient
     firestore.Client = _FakeClient
+    # 本番コードが参照する定数・列挙の最小スタブ（テストで fake db を差し込めるように）。
+    firestore.SERVER_TIMESTAMP = "SERVER_TIMESTAMP"
+    firestore.Query = _Query
     cloud.storage = storage
     cloud.firestore = firestore
     google.cloud = cloud
