@@ -1803,6 +1803,15 @@ class GameManager:
                     continue
                 if eff.status not in status_values:
                     continue
+                # 自己無効化（「キャラの「X」がいる場合、この効果は無効になる」OP05-100）。
+                # 指定名のキャラがいずれかの場にいれば、この置換は発動しない。
+                neg_m = re.search(_nfc(r'「([^」]+)」がい[るて][^。]*?この効果は無効'),
+                                  getattr(eff, "raw_text", "") or "")
+                if neg_m:
+                    neg_name = neg_m.group(1)
+                    if any(c.master.matches_name(neg_name, partial=True)
+                           for pl in (self.p1, self.p2) for c in pl.field):
+                        continue
                 sub = getattr(eff, "sub_effect", None)
                 if sub is None:
                     continue

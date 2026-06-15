@@ -116,6 +116,21 @@ def test_rairyu_targets_rested_only():
     assert freeze.target.is_rest is True
 
 
+def test_op05_100_replacement_negated_by_named_character():
+    """OP05-100 エネル: 「場を離れる場合、代わりにライフ1枚トラッシュ」の置換は、
+    キャラの「モンキー・D・ルフィ」が場にいると無効になる（自己無効化条件の是正）。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import CardType
+    gm, p1, p2 = game("OP01-001", "OP01-001")
+    enel = inst("OP05-100", "P1")
+    p1.field = [enel]
+    p1.life = [inst("OP01-016", "P1") for _ in range(3)]
+    assert gm._find_replacement(enel, ("LEAVE",)) is not None    # ルフィ不在＝置換有効
+    p2.field = [CardInstance(make_master(card_id="L", name="モンキー・D・ルフィ",
+                                         type=CardType.CHARACTER, power=5000), "P2")]
+    assert gm._find_replacement(enel, ("LEAVE",)) is None         # ルフィ在＝無効
+
+
 def test_op08_114_attribute_filtered_battle_ko_immunity():
     """OP08-114 S-ホーク: 「属性《斬》を持つカードとのバトルでKOされず」は、バトル相手の属性が
     《斬》のときだけ有効。条件（自分のライフが相手より少ない＋ドン!!1付与）成立時に評価する。"""
