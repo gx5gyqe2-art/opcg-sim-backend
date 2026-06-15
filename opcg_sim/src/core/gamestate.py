@@ -2074,7 +2074,7 @@ class GameManager:
 
     def _rest_subject_matches(self, ability: Ability, rested_card: Card, host: Card,
                               host_owner: Player, by_attack: bool,
-                              effect_controller: Player = None) -> bool:
+                              effect_controller: Player = None, cause_source: Card = None) -> bool:
         """ON_REST 誘発（「（この）キャラが（自分の/相手の効果で）レストになった時」）の
         主語・要因フィルタ。条件には載らない修飾を raw_text から解釈する。
 
@@ -2096,15 +2096,21 @@ class GameManager:
         elif _nfc("相手の") in pre and _nfc("効果で") in pre:
             if by_attack or effect_controller is None or effect_controller is host_owner:
                 return False
+            # 「相手のキャラの効果で」は発生源がキャラに限定（リーダーの効果では発火しない。OP14-070）。
+            # 発生源が判明している場合のみ厳密化する（不明＝従来どおり発火を許容）。
+            if _nfc("相手のキャラの効果で") in pre and cause_source is not None:
+                src_master = getattr(cause_source, "master", None)
+                if src_master is None or src_master.type != CardType.CHARACTER:
+                    return False
         return True
 
     def _fire_on_rest_triggers(self, rested_card: Card, by_attack: bool,
-                               effect_controller: Player = None):
+                               effect_controller: Player = None, cause_source: Card = None):
         """キャラがレストになった時(ON_REST)の誘発を、両プレイヤーのリーダー/場から探して解決する。
 
-        要因（by_attack=アタック宣言 / effect_controller=効果でレストにした側）を主語・要因
-        フィルタ（_rest_subject_matches）へ渡す。発動可否・文脈（自分のターン中 等）・ターン1回は
-        resolve_ability/_check_condition が評価する。"""
+        要因（by_attack=アタック宣言 / effect_controller=効果でレストにした側 /
+        cause_source=効果の発生源カード）を主語・要因フィルタ（_rest_subject_matches）へ渡す。
+        発動可否・文脈（自分のターン中 等）・ターン1回は resolve_ability/_check_condition が評価する。"""
         pending = []
         for p in (self.p1, self.p2):
             hosts = ([p.leader] if p.leader else []) + list(p.field)
@@ -2116,7 +2122,8 @@ class GameManager:
                         continue
                     if self._rest_subject_matches(ability, rested_card, host, p,
                                                   by_attack=by_attack,
-                                                  effect_controller=effect_controller):
+                                                  effect_controller=effect_controller,
+                                                  cause_source=cause_source):
                         pending.append((p, ability, host))
         for owner, ability, host in pending:
             log_event("INFO", "game.trigger_rest", f"Resolving on-rest for {host.master.name}", player=owner.name)
@@ -2215,7 +2222,7 @@ class GameManager:
             return opp
         return player
 
-    def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int) -> bool:
+    def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int, source_card: Optional[CardInstance] = None) -> bool:
         if not action: return False
         act_name = action.type.name if hasattr(action.type, 'name') else str(action.type)
         log_event("INFO", "game.apply_action", f"Applying {act_name} to {len(targets)} targets", player=player.name)
@@ -2724,7 +2731,8 @@ class GameManager:
                 # アクティブ→レスト遷移で ON_REST（キャラがレストになった時）を誘発する。
                 # 要因＝効果（effect_controller=player）。ドン!!は対象外。既にレストなら不発。
                 if not _was_rested and not isinstance(target, DonInstance):
-                    self._fire_on_rest_triggers(target, by_attack=False, effect_controller=player)
+                    self._fire_on_rest_triggers(target, by_attack=False, effect_controller=player,
+                                                cause_source=source_card)
             elif act_name == "PLAY_CARD":
                 # 「手札のこのカードは効果で登場できない」: 手札源かつ当該 PASSIVE を持つ対象は
                 # 効果による登場をスキップする（NO_EFFECT_PLAY）。

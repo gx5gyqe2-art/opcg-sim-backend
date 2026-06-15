@@ -407,7 +407,7 @@ class EffectResolver:
         # 除去（KO/バウンス等）に対する置換 sub_effect の内側中断は常に UI へ提示してよい。
         # 後続があっても、置換が中断したら下で外側継続を deferred へ退避して再開するため（B）。
         self.game_manager._replacement_suspended = False
-        success = self.game_manager.apply_action_to_engine(player, action, targets, value)
+        success = self.game_manager.apply_action_to_engine(player, action, targets, value, source_card=source_card)
         # 除去置換が内側中断を提示した（_replacement_suspended）かつ、このシーケンスに後続が
         # 残る場合、後続を deferred フレームへ退避して execution_stack を空にする。内側中断が
         # 解決された後に _resume_deferred_continuations が後続を再開する（B = 多段継続の対話化）。
