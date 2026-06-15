@@ -116,6 +116,17 @@ def test_rairyu_targets_rested_only():
     assert freeze.target.is_rest is True
 
 
+def test_st11_004_active_don_gated_by_uta_condition():
+    """ST11-004 新時代: 「リーダーがウタの場合…見て手札に加える。その後、…ドン1枚アクティブ」の
+    ACTIVE_DON は、カテゴリH 是正により先頭条件（ウタ）の支配下に入る（旧: 条件外へ漏れていた）。"""
+    from opcg_sim.src.models.effect_types import Sequence
+    ab = inst("ST11-004").master.abilities[0]
+    assert ab.condition is not None and ab.condition.type == ConditionType.LEADER_NAME
+    assert isinstance(ab.effect, Sequence)
+    types = [getattr(a, "type", None) for a in ab.effect.actions]
+    assert ActionType.ACTIVE_DON in types          # ドンアクティブも能力（=ウタ条件）配下
+
+
 def test_op08_043_attack_tax_discard():
     """OP08-043 エドワード・ニューゲート: 条件成立時、相手のキャラすべてに次の相手ターン終了時まで
     「アタックする際、手札2枚を捨てなければアタックできない」アタック税を付与する。
