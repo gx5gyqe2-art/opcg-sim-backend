@@ -307,6 +307,36 @@ def test_hard_recognizes_lethal(db):
     assert move["payload"]["target_ids"] == [gm.p2.leader.uuid]
 
 
+def test_b1_folds_unreachable_attack_to_turn_end(db):
+    """B1 単ターン探索: 攻撃側<リーダーで届かず、ドンで届かせる手段も無いとき、純損の非貫通アタックでは
+    なくターンを畳む（パスを一定の静止点＝相手ターン開始で公平に比較し、無意味手を採らない）。"""
+    random.seed(1)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    assert _fast_forward_to_p1_main(gm)
+    # 素<5000 のバニラを1体（確立済み・アクティブ）。リーダーは寝かせ正当な通る手を除外、ドン0で
+    # 「届かせる手段なし」、手札空・相手場空にして、残るのは非貫通アタックと TURN_END のみ。
+    sub = next((c for c in gm.p1.deck if c.master.type.name == "CHARACTER"
+                and 0 < (c.master.power or 0) < 5000
+                and not c.master.abilities and not (c.master.effect_text or "").strip()), None)
+    if sub is None:
+        pytest.skip("素<5000 のバニラキャラが見つからない")
+    gm.p1.deck.remove(sub)
+    gm.p1.field[:] = [sub]
+    sub.is_rest = False
+    sub.is_newly_played = False
+    gm.p1.hand.clear()
+    gm.p2.field.clear()
+    gm.p1.leader.is_rest = True       # リーダー攻撃（5000で通る正当手）を除外
+    gm.p1.don_active.clear()          # ドンで 5000 へ届かせる手段なし
+    moves = gm.get_legal_actions(gm.p1)
+    assert any(m["action_type"] == "ATTACK" for m in moves), "非貫通アタックが合法手に無い"
+    move = cpu_ai.decide(gm, gm.p1, "hard", random.Random(0))
+    assert move["action_type"] == "TURN_END", f"純損の非貫通アタックを採ってしまった: {move['action_type']}"
+
+
 def test_hard_selfplay_smoke_no_invariant_violation(db):
     """hard 方策で数十手進めてもインバリアント違反・例外が出ない（探索の実プレイ健全性）。
 
