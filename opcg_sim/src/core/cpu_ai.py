@@ -111,6 +111,15 @@ def _threat_value(c) -> float:
         v += W_KW_RESIST
     return v
 
+# 自デッキ勝ち筋プラン（cpu_self_plan・docs/SPEC.md §2.5.5）の評価項。プラン未指定（plan=None）では
+# 一切作動せず現行挙動と完全同値（乗数は既定 1.0／逆算項は plan が無ければ 0）。normal/hard でのみ供給。
+_LOW_IMPACT_POWER = 5000          # 素パワーがこの値未満＝素ではリーダー(5000)に打点が通らない置物
+_RELEVANT_KEYWORDS = ("ブロッカー", "速攻", "ダブルアタック")  # これらを持つ体は「置物」扱いしない
+_CLOSER_W = 2000.0                # 逆算リーサル: 相手を削り切れる本数を持つ盤面への加点
+_NEAR_W = 200.0                   # 同上: 削り切るには足りないが届く攻撃 1 本あたりの軽い加点
+_MILE_DMG_W = 1200.0             # マイルストーン: 想定クロックより相手ライフが先行して減っている分
+_MILE_RES_W = 220.0             # マイルストーン: リソース差（手札＋場の枚数差）1 枚あたり
+
 
 def _other(manager, name: str):
     return manager.p2 if manager.p1.name == name else manager.p1
