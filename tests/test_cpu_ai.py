@@ -11,8 +11,9 @@ from fastapi.testclient import TestClient
 
 from opcg_sim.api import app as appmod
 from opcg_sim.src.models.models import CardInstance
-from opcg_sim.src.core import cpu_ai
+from opcg_sim.src.core import action_api, cpu_ai
 from opcg_sim.src.core.gamestate import GameManager, Player
+from opcg_sim.src.core.invariants import check_invariants
 from cpu_selfplay import build_deck, _load_db
 
 
@@ -61,8 +62,24 @@ def test_evaluate_prefers_more_life(db):
     assert worse < base
 
 
-def test_decide_returns_legal_move(db):
-    """decide はその時点の合法手のいずれかを返す。"""
+def test_evaluate_values_hand_counter(db):
+    """J値理論: 同じ手札枚数でもカウンター値の高い手札ほど高評価（防御リソース）。"""
+    random.seed(0)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    # p1 の手札 1 枚のカウンター値を底上げ → 評価が上がる（枚数は不変）。
+    if gm.p1.hand:
+        before = cpu_ai.evaluate(gm, "p1")
+        gm.p1.hand[0].passive_counter += 2000
+        after = cpu_ai.evaluate(gm, "p1")
+        assert after > before
+
+
+@pytest.mark.parametrize("difficulty", ["normal", "hard"])
+def test_decide_returns_legal_move(db, difficulty):
+    """decide はその時点の合法手のいずれかを返す（normal/hard とも）。"""
     random.seed(1)
     l1, c1 = build_deck(db, "p1")
     l2, c2 = build_deck(db, "p2")
@@ -71,8 +88,85 @@ def test_decide_returns_legal_move(db):
     pending = gm.get_pending_request()
     actor = gm.p1 if gm.p1.name == pending["player_id"] else gm.p2
     legal = gm.get_legal_actions(actor)
-    move = cpu_ai.decide(gm, actor, "normal", random.Random(0))
+    move = cpu_ai.decide(gm, actor, difficulty, random.Random(0))
     assert move in legal
+
+
+def _fast_forward_to_p1_main(gm):
+    """マリガン〜数ターンを既定解決で進め、turn_count>2 の p1 メインまで進める。"""
+    for _ in range(80):
+        pend = gm.get_pending_request()
+        if pend and pend["player_id"] == "p1" and pend["action"] == "MAIN_ACTION" and gm.turn_count > 2:
+            return True
+        if not pend or gm.winner is not None:
+            return False
+        actor = gm.p1 if gm.p1.name == pend["player_id"] else gm.p2
+        gm.action_events = []
+        if pend["action"] == "MULLIGAN":
+            action_api.apply_game_action(gm, actor, "KEEP_HAND", {})
+        elif pend["action"] == "MAIN_ACTION":
+            action_api.apply_game_action(gm, actor, "TURN_END", {})
+        else:
+            payload = gm.default_interaction_payload(pend)
+            action_api.apply_game_action(gm, actor, action_api.ACT_RESOLVE_SELECTION, payload)
+    return False
+
+
+def test_hard_recognizes_lethal(db):
+    """hard は無防備な相手（ライフ0・手札0・場0）に対し、リーダーへの止めアタックを選ぶ。
+
+    探索木内で winner に到達する手順（リーサル）を最高評価とすることを確認する。
+    """
+    random.seed(0)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    assert _fast_forward_to_p1_main(gm), "p1 メインへ到達できなかった"
+    # 相手を無防備化（ライフ0・カウンター手札0・ブロッカー0）。
+    gm.p2.life.clear()
+    gm.p2.hand.clear()
+    gm.p2.field.clear()
+    moves = gm.get_legal_actions(gm.p1)
+    scored = cpu_ai._scored_hard(gm, "p1", moves)
+    best_score = max(s for s, _ in scored)
+    assert best_score >= cpu_ai.W_WIN - cpu_ai.HARD_DEPTH, "リーサルを認識できていない"
+    move = cpu_ai.decide(gm, gm.p1, "hard", random.Random(0))
+    # 最短の止め＝相手リーダーへのアタックを選ぶ。
+    assert move["action_type"] == "ATTACK"
+    assert move["payload"]["target_ids"] == [gm.p2.leader.uuid]
+
+
+def test_hard_selfplay_smoke_no_invariant_violation(db):
+    """hard 方策で数十手進めてもインバリアント違反・例外が出ない（探索の実プレイ健全性）。
+
+    フルゲームは低速なので NODE_BUDGET を小さくし、手数を区切ってスモークする。
+    """
+    random.seed(3)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    mem = {"p1": {}, "p2": {}}
+    orig_budget = cpu_ai.HARD_NODE_BUDGET
+    cpu_ai.HARD_NODE_BUDGET = 40  # スモーク用に探索を浅く（高速化）
+    try:
+        for _ in range(60):
+            if gm.winner is not None:
+                break
+            pend = gm.get_pending_request()
+            assert pend, "勝者未確定なのに pending が無い（スタック）"
+            actor = gm.p1 if gm.p1.name == pend["player_id"] else gm.p2
+            move = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), mem.setdefault(actor.name, {}))
+            assert move is not None
+            gm.action_events = []
+            if move["kind"] == "battle":
+                action_api.apply_battle_action(gm, actor, move["action_type"], move.get("card_uuid"))
+            else:
+                action_api.apply_game_action(gm, actor, move["action_type"], move.get("payload", {}))
+            assert not check_invariants(gm), "インバリアント違反"
+    finally:
+        cpu_ai.HARD_NODE_BUDGET = orig_budget
 
 
 # ---------------------------------------------------------------------------

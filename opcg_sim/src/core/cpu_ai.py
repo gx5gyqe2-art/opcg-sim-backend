@@ -2,35 +2,54 @@
 
 設計:
   - 合法手は `GameManager.get_legal_actions` を単一の真実源として用いる。
-  - 各候補手を `GameManager.clone()` 上で適用し、`evaluate` で盤面優劣を採点して選ぶ
-    （1-ply 先読み）。クローン上では自分側の効果対話を既定解決でドレインしてから採点する。
+  - 各候補手を `GameManager.clone()` 上で適用し、`evaluate` で盤面優劣を採点して選ぶ。
+    クローン上では自分側の効果対話を既定解決でドレインしてから採点する。
   - ステートレス（毎ステップ再計画）。ポーリング駆動でも desync に強い。
 
-難易度:
-  easy   : ランダム合法手
-  normal : 貪欲 1-ply（evaluate 最良）
-  hard   : 貪欲 1-ply ＋ 攻撃時の被カウンター/反撃を考慮した評価（より強い重み）
+評価関数（J値理論ベース・docs/SPEC.md §2.5.2）:
+  「J値 = 白の枚数 = デッキ残 + トラッシュ」を下げ、相手の J値を上げるゲーム、という
+  Jin 氏「J値理論」に整合する形で盤面を採点する。J値を下げる = 黒（手札・ライフ・場・ステージ）
+  にカードが多い状態なので、本評価は黒リソースの重み付き和を主軸に、理論の以下の機微を加える:
+    - ライフの非線形価値（薄いほど 1 枚の限界価値が跳ね上がる＝45[J] ラインの危険）。
+    - 手札のカウンター値（防御リソース＝相手の +1[J] をいなす力）。
+    - 場のアクティブキャラ（＝将来のアタック＝相手の J値を上げる圧力）とブロッカー（最終防御）。
+  KO・カウンター誘発・ハンデス等の「相手 +1[J]」は、相手側の枚数・パワーが下がることで自然に
+  差分へ反映される（明示の J値項は黒リソースと相補で二重計上になるため置かない）。
 
-公平性メモ: 現状クローンは相手手札も含むため理論上は隠れ情報を参照しうる。評価関数は
-公開情報（盤面・ライフ・手札枚数）主体にとどめ、相手手札の中身は読まない方針。完全な
-視点マスクは将来拡張（§2.2/§6）。
+難易度:
+  easy   : ランダム合法手。
+  normal : 貪欲 1-ply（evaluate 最良）。
+  hard   : フルクローン多 ply 先読み（α-β ＋ ビーム）。自分の連続手を読み、ターン終了後は
+           相手の最善応答（ブロック/カウンター/相手ターン）まで min ノードとして辿る。
+           探索木内で `winner` に到達する手順を最高評価とすることでリーサルを認識する。
+
+公平性メモ: hard はユーザ選択により「最強」設定で、先読みの相手応答シミュレーションに
+クローン上の相手手札（隠れ情報）も用いる。完全な視点マスクを敷く easy/normal とは別方針
+（docs/SPEC.md §2.2/§6 参照）。
 """
 import random
-from typing import Any, Dict, List, Optional
-
-from ..models.enums import CardType
+from typing import Any, Dict, List, Optional, Tuple
 
 # 評価重み（盤面 1000=パワー1段相当に正規化）
-W_LIFE = 6000.0          # ライフ 1 枚の価値（最重要）
-W_HAND = 800.0           # 手札 1 枚
+W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（最重要）
+W_LIFE_LOW = 4000.0      # 希少域（最初の 2 枚）への上乗せ＝非線形・45[J] ラインの危険
+W_HAND = 700.0           # 手札 1 枚の基礎価値
+W_COUNTER = 0.6          # 手札のカウンター値 1 点あたり（防御リソース）
 W_FIELD_COUNT = 1500.0   # 場のキャラ 1 体の存在価値
 W_FIELD_POWER = 1.0      # 場の総パワー
 W_DON_ACTIVE = 200.0     # アクティブドン!! 1 枚
-W_BLOCKER = 1200.0       # ブロッカー 1 体
+W_BLOCKER = 1200.0       # ブロッカー 1 体（最終防御）
+W_ATTACKER = 400.0       # アクティブキャラ 1 体＝将来のアタック圧（相手 +1[J] 機会）
 W_WIN = 1.0e9            # 勝敗
 
 _EPS = 1.0  # これ未満の改善ならターンを畳む（無限ループ防止＋無意味手の抑制）
 _DRAIN_LIMIT = 12        # クローン上で自分側対話を解決する最大回数
+
+# hard 先読みのパラメータ。clone（≈4-5ms）が支配的なので、1 手あたりのレイテンシ（≈1 秒）に
+# 収まるよう NODE_BUDGET でクローン総数を厳しく制限する（DEPTH/BEAM は探索の形を決める）。
+HARD_DEPTH = 5           # 探索する意思決定ノードの ply 数
+HARD_BEAM = 3            # 各ノードで展開する候補手の数（1-ply 評価上位 K）
+HARD_NODE_BUDGET = 250   # 1 回の decide で生成するクローン総数の上限（レイテンシ/暴走防止）
 
 
 def _other(manager, name: str):
@@ -42,19 +61,36 @@ def _player_by_name(manager, name: str):
 
 
 def _side_score(p, is_turn: bool) -> float:
-    """1 プレイヤー側の素点。"""
+    """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和）。"""
     score = 0.0
-    score += len(p.life) * W_LIFE
+
+    # ライフ: 非線形（薄いほど 1 枚の限界価値が高い）。最初の 2 枚に厚く上乗せする。
+    life_n = len(p.life)
+    score += life_n * W_LIFE
+    score += min(life_n, 2) * W_LIFE_LOW
+
+    # 手札: 枚数 ＋ カウンター値（防御に回せる力＝相手の +1[J] を打ち消す資源）。
     score += len(p.hand) * W_HAND
-    score += len(p.field) * W_FIELD_COUNT
+    for c in p.hand:
+        try:
+            score += (c.current_counter or 0) * W_COUNTER
+        except Exception:
+            pass
+
+    # ドン!!（アクティブ）。
     score += len(p.don_active) * W_DON_ACTIVE
+
+    # 場のキャラ: 存在価値 ＋ パワー ＋ ブロッカー（最終防御）＋ アクティブ＝将来の攻め圧。
+    score += len(p.field) * W_FIELD_COUNT
     for c in p.field:
         try:
             score += c.get_power(is_turn) * W_FIELD_POWER
         except Exception:
             score += (c.master.power or 0) * W_FIELD_POWER
-        if c.has_keyword("ブロッカー") and not c.is_rest:
-            score += W_BLOCKER
+        if not c.is_rest:
+            score += W_ATTACKER
+            if c.has_keyword("ブロッカー"):
+                score += W_BLOCKER
     return score
 
 
@@ -70,15 +106,19 @@ def evaluate(manager, me_name: str) -> float:
     return _side_score(me, is_my_turn) - _side_score(opp, not is_my_turn)
 
 
+def _pending_keys():
+    from . import action_api
+    pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
+    return pending_props.get('PLAYER_ID', 'player_id'), pending_props.get('ACTION', 'action')
+
+
 def _drain_own_interactions(manager, actor_name: str) -> None:
     """クローン上で actor 側の効果対話を既定解決でドレインする（採点を安定させるため）。
 
     相手の意思決定（ブロック/カウンター等）は解決しない（相手に委ねる）。
     """
     from . import action_api
-    pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
-    KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
-    KEY_ACTION = pending_props.get('ACTION', 'action')
+    KEY_PID, KEY_ACTION = _pending_keys()
     for _ in range(_DRAIN_LIMIT):
         pending = manager.get_pending_request()
         if not pending or pending[KEY_PID] != actor_name:
@@ -96,10 +136,10 @@ def _drain_own_interactions(manager, actor_name: str) -> None:
             return
 
 
-def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any]) -> float:
-    """move をクローン上で適用し、actor 側の対話をドレインしてから評価する。
+def _apply_clone(manager, actor_name: str, move: Dict[str, Any]):
+    """move を新しいクローンへ適用し、actor 側の対話をドレインしたクローンを返す。
 
-    シミュレーションが例外を出す手は選ばない（-inf）。
+    シミュレーションが例外を出す手は None を返す（呼び出し側で除外する）。
     """
     from . import action_api
     clone = manager.clone()
@@ -112,8 +152,90 @@ def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any]) -> float:
             action_api.apply_game_action(clone, actor, move["action_type"], move.get("payload", {}))
         _drain_own_interactions(clone, actor_name)
     except Exception:
+        return None
+    return clone
+
+
+def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any]) -> float:
+    """move をクローン上で適用し、actor 側の対話をドレインしてから評価する（1-ply）。"""
+    clone = _apply_clone(manager, actor_name, move)
+    if clone is None:
         return float("-inf")
     return evaluate(clone, actor_name)
+
+
+def _search(manager, root_name: str, depth: int, alpha: float, beta: float,
+            budget: List[int], ply: int = 0) -> float:
+    """α-β ＋ ビームのフルクローン先読み。`root_name` 視点の最善到達値を返す。
+
+    手番が root のノードは max（自分の最善手）、相手のノードは min（相手の最善応答）。
+    探索木内で `winner` に到達した手順は ±(W_WIN − ply) となり、リーサル認識として機能する
+    （ply 割引により「より早く勝つ／より遅く負ける」手順が優先され、最短の止めを選ぶ）。
+    相手応答にはクローン上の相手手札（隠れ情報）を用いる＝hard の「最強」方針。
+    """
+    if manager.winner is not None:
+        return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
+    if depth <= 0 or budget[0] <= 0:
+        return evaluate(manager, root_name)
+
+    KEY_PID, _ = _pending_keys()
+    pending = manager.get_pending_request()
+    if not pending:
+        return evaluate(manager, root_name)
+    actor_name = pending[KEY_PID]
+    actor = _player_by_name(manager, actor_name)
+    moves = manager.get_legal_actions(actor)
+    if not moves:
+        return evaluate(manager, root_name)
+    is_max = (actor_name == root_name)
+
+    # 子ノードを生成し、1-ply 評価でビーム選別（best-first で α-β の枝刈り効率を上げる）。
+    children: List[Tuple[float, Any]] = []
+    for m in moves:
+        if budget[0] <= 0:
+            break
+        budget[0] -= 1
+        child = _apply_clone(manager, actor_name, m)
+        if child is None:
+            continue
+        children.append((evaluate(child, root_name), child))
+    if not children:
+        return evaluate(manager, root_name)
+    children.sort(key=lambda x: x[0], reverse=is_max)
+    children = children[:HARD_BEAM]
+
+    if is_max:
+        value = float("-inf")
+        for _leaf, child in children:
+            value = max(value, _search(child, root_name, depth - 1, alpha, beta, budget, ply + 1))
+            alpha = max(alpha, value)
+            if alpha >= beta:
+                break
+        return value
+    else:
+        value = float("inf")
+        for _leaf, child in children:
+            value = min(value, _search(child, root_name, depth - 1, alpha, beta, budget, ply + 1))
+            beta = min(beta, value)
+            if alpha >= beta:
+                break
+        return value
+
+
+def _scored_hard(manager, name: str, moves: List[Dict[str, Any]]) -> List[Tuple[float, Dict[str, Any]]]:
+    """hard: 各ルート手を 1 手適用し、子局面から多 ply 先読みした値で採点する。"""
+    budget = [HARD_NODE_BUDGET]
+    out: List[Tuple[float, Dict[str, Any]]] = []
+    for m in moves:
+        child = _apply_clone(manager, name, m)
+        if child is None:
+            out.append((float("-inf"), m))
+            continue
+        budget[0] -= 1
+        # ルート手で 1 手消費しているので ply=1 から探索する（早い勝ちを優先）。
+        v = _search(child, name, HARD_DEPTH - 1, float("-inf"), float("inf"), budget, ply=1)
+        out.append((v, m))
+    return out
 
 
 # 1 ターン内に CPU が取れる手の総数上限（暴走/無限ループの最終防壁）。
@@ -148,15 +270,18 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
     name = player.name
     end_move = next((m for m in moves if m.get("action_type") == "TURN_END"), None)
 
-    scored = [(_simulate_and_eval(manager, name, m), m) for m in moves]
+    if difficulty == "hard":
+        scored = _scored_hard(manager, name, moves)
+    else:
+        scored = [(_simulate_and_eval(manager, name, m), m) for m in moves]
     # 同点はランダムタイブレーク（決定論にしたい場合は呼び出し側で seed 済み rng を渡す）。
     rng.shuffle(scored)
     best_score, best_move = max(scored, key=lambda x: x[0])
 
-    if end_move is not None:
-        end_score = _simulate_and_eval(manager, name, end_move)
-        # 非ターン終了手が end を有意に上回らなければターンを畳む（進行保証）。
-        if best_move is end_move or best_score <= end_score + _EPS:
+    # 非ターン終了手が end を有意に上回らなければターンを畳む（進行保証）。
+    if end_move is not None and best_move is not end_move:
+        end_score = next((s for s, m in scored if m is end_move), None)
+        if end_score is not None and best_score <= end_score + _EPS:
             return end_move
     return best_move
 

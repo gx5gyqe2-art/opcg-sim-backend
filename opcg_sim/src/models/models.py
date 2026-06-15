@@ -63,6 +63,13 @@ class CardMaster:
     # ここに保持した別名を all_names/matches_name 経由で参照して解決する。
     name_aliases: Tuple[str, ...] = field(default_factory=tuple)
 
+    def __deepcopy__(self, memo):
+        """カード定義は不変（frozen＝実行時状態は CardInstance 側のみ）なので、
+        deepcopy（CPU 先読みの GameManager.clone 等）では複製せず共有する。
+        効果木（abilities）まで毎回 deepcopy する重さを避けるための最適化。"""
+        memo[id(self)] = self
+        return self
+
     @property
     def all_names(self) -> List[str]:
         """カードが名乗る全カード名（本来名＋ルール上の別名）。"""
