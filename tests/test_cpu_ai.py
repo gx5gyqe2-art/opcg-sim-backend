@@ -77,9 +77,30 @@ def test_evaluate_values_hand_counter(db):
         assert after > before
 
 
-@pytest.mark.parametrize("difficulty", ["normal", "hard"])
+def test_evaluate_see_opp_hand_policy(db):
+    """情報方針: see_opp_hand=False では相手手札の中身（カウンター値）を読まない。
+
+    相手手札のカウンターを底上げしても public 評価（=False）は不変、full 評価（=True）は下がる。
+    """
+    random.seed(0)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    if not gm.p2.hand:
+        pytest.skip("相手手札が空")
+    pub_before = cpu_ai.evaluate(gm, "p1", see_opp_hand=False)
+    full_before = cpu_ai.evaluate(gm, "p1", see_opp_hand=True)
+    gm.p2.hand[0].passive_counter += 2000  # 相手手札のカウンターを底上げ
+    pub_after = cpu_ai.evaluate(gm, "p1", see_opp_hand=False)
+    full_after = cpu_ai.evaluate(gm, "p1", see_opp_hand=True)
+    assert pub_after == pub_before          # 公開方針は相手手札の中身を見ない
+    assert full_after < full_before         # full は相手の防御力増として自分有利度が下がる
+
+
+@pytest.mark.parametrize("difficulty", ["easy", "normal", "hard"])
 def test_decide_returns_legal_move(db, difficulty):
-    """decide はその時点の合法手のいずれかを返す（normal/hard とも）。"""
+    """decide はその時点の合法手のいずれかを返す（easy/normal/hard とも）。"""
     random.seed(1)
     l1, c1 = build_deck(db, "p1")
     l2, c2 = build_deck(db, "p2")
@@ -128,7 +149,7 @@ def test_hard_recognizes_lethal(db):
     gm.p2.hand.clear()
     gm.p2.field.clear()
     moves = gm.get_legal_actions(gm.p1)
-    scored = cpu_ai._scored_hard(gm, "p1", moves)
+    scored = cpu_ai._scored_search(gm, "p1", moves, see_opp_hand=True, opp_public_only=False)
     best_score = max(s for s, _ in scored)
     assert best_score >= cpu_ai.W_WIN - cpu_ai.HARD_DEPTH, "リーサルを認識できていない"
     move = cpu_ai.decide(gm, gm.p1, "hard", random.Random(0))
@@ -148,8 +169,8 @@ def test_hard_selfplay_smoke_no_invariant_violation(db):
     gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     gm.start_game()
     mem = {"p1": {}, "p2": {}}
-    orig_budget = cpu_ai.HARD_NODE_BUDGET
-    cpu_ai.HARD_NODE_BUDGET = 40  # スモーク用に探索を浅く（高速化）
+    orig_budget = cpu_ai.HARD_PER_MOVE_BUDGET
+    cpu_ai.HARD_PER_MOVE_BUDGET = 12  # スモーク用に探索を浅く（高速化）
     try:
         for _ in range(60):
             if gm.winner is not None:
@@ -166,7 +187,7 @@ def test_hard_selfplay_smoke_no_invariant_violation(db):
                 action_api.apply_game_action(gm, actor, move["action_type"], move.get("payload", {}))
             assert not check_invariants(gm), "インバリアント違反"
     finally:
-        cpu_ai.HARD_NODE_BUDGET = orig_budget
+        cpu_ai.HARD_PER_MOVE_BUDGET = orig_budget
 
 
 # ---------------------------------------------------------------------------
