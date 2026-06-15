@@ -211,6 +211,42 @@ def test_summoning_sick_char_not_counted_as_attacker(db):
     assert ready_off == sick_off
 
 
+def test_selection_moves_enumerates_single_target_candidates():
+    """単一対象選択は候補ごとの RESOLVE 手に展開する／多対象・別アクター・非選択は分岐しない。"""
+    props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
+    PID = props.get('PLAYER_ID', 'player_id'); ACT = props.get('ACTION', 'action')
+    UUIDS = props.get('SELECTABLE_UUIDS', 'selectable_uuids')
+    CON = props.get('CONSTRAINTS', 'constraints'); SKIP = props.get('CAN_SKIP', 'can_skip')
+
+    class _Stub:
+        def __init__(self, pending):
+            self._p = pending
+        def get_pending_request(self):
+            return self._p
+        def default_interaction_payload(self, pending=None):
+            return {"selected_uuids": [], "index": 0, "accepted": True}
+
+    base = {PID: "p1", ACT: cpu_ai._SELECT_ACTION, UUIDS: ["a", "b", "c"],
+            CON: {"min": 1, "max": 1}, SKIP: False}
+    # 必須・単一対象 → 候補3手（スキップ無し）
+    moves = cpu_ai._selection_moves(_Stub(base), "p1")
+    assert moves is not None
+    assert [m["payload"]["selected_uuids"] for m in moves] == [["a"], ["b"], ["c"]]
+    assert all(m["action_type"] == action_api.ACT_RESOLVE_SELECTION for m in moves)
+    # 任意・単一対象（min0/skip可）→ 「選ばない」を一級候補として追加
+    opt = cpu_ai._selection_moves(_Stub({**base, CON: {"min": 0, "max": 1}, SKIP: True}), "p1")
+    assert [m["payload"]["selected_uuids"] for m in opt] == [["a"], ["b"], ["c"], []]
+    # 多対象（max>=2）/min>1 は既定解決へ委ねる（None）
+    assert cpu_ai._selection_moves(_Stub({**base, CON: {"min": 1, "max": 2}}), "p1") is None
+    assert cpu_ai._selection_moves(_Stub({**base, CON: {"min": 2, "max": 1}}), "p1") is None
+    # 別アクター・非選択アクションは分岐しない
+    assert cpu_ai._selection_moves(_Stub(base), "p2") is None
+    assert cpu_ai._selection_moves(_Stub({**base, ACT: "MAIN_ACTION"}), "p1") is None
+    # 候補過多は安全上限で打ち切る
+    many = cpu_ai._selection_moves(_Stub({**base, UUIDS: [str(i) for i in range(20)]}), "p1")
+    assert len(many) == cpu_ai.HARD_SELECT_CAP
+
+
 @pytest.mark.parametrize("difficulty", ["easy", "normal", "hard"])
 def test_decide_returns_legal_move(db, difficulty):
     """decide はその時点の合法手のいずれかを返す（easy/normal/hard とも）。"""

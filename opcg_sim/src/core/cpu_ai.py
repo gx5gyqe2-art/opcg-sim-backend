@@ -284,10 +284,20 @@ def _pending_keys():
     return pending_props.get('PLAYER_ID', 'player_id'), pending_props.get('ACTION', 'action')
 
 
-def _drain_own_interactions(manager, actor_name: str) -> None:
+# 効果対象選択（KO/除去/バウンス/手札破壊/場溢れトラッシュ等）の対話アクション名。
+# get_pending_request が SELECT_TARGET / FIELD_OVERFLOW_TRASH をこの fe_action に正規化する。
+# 探索ではこの単一対象選択を「候補ごとの手」に分岐して最善対象を読み切る（docs/SPEC.md §2.5.2）。
+_SELECT_ACTION = "SEARCH_AND_SELECT"
+# 1 つの選択ノードで分岐する単一対象候補数の安全上限（クローン暴発防止。通常は盤面サイズ未満）。
+HARD_SELECT_CAP = 8
+
+
+def _drain_own_interactions(manager, actor_name: str, stop_at_select: bool = False) -> None:
     """クローン上で actor 側の効果対話を既定解決でドレインする（採点を安定させるため）。
 
     相手の意思決定（ブロック/カウンター等）は解決しない（相手に委ねる）。
+    `stop_at_select=True` のとき、分岐対象の単一対象選択（_SELECT_ACTION）はドレインせず残す
+    （探索側が候補ごとに分岐して最善対象を選ぶため・§2.5.2）。
     """
     from . import action_api
     KEY_PID, KEY_ACTION = _pending_keys()
@@ -299,6 +309,9 @@ def _drain_own_interactions(manager, actor_name: str) -> None:
         # メイン/マリガン/戦闘は「意思決定」なのでドレインしない（呼び出し側が1手として扱う）。
         if action in ("MAIN_ACTION", "MULLIGAN", "SELECT_BLOCKER", "SELECT_COUNTER"):
             return
+        # 探索モードでは分岐可能な単一対象選択もドレインしない（探索ノードとして残す）。
+        if stop_at_select and _selection_moves(manager, actor_name) is not None:
+            return
         payload = manager.default_interaction_payload(pending)
         actor = _player_by_name(manager, actor_name)
         manager.action_events = []
@@ -308,10 +321,11 @@ def _drain_own_interactions(manager, actor_name: str) -> None:
             return
 
 
-def _apply_clone(manager, actor_name: str, move: Dict[str, Any]):
+def _apply_clone(manager, actor_name: str, move: Dict[str, Any], stop_at_select: bool = False):
     """move を新しいクローンへ適用し、actor 側の対話をドレインしたクローンを返す。
 
     シミュレーションが例外を出す手は None を返す（呼び出し側で除外する）。
+    `stop_at_select=True` のとき、ドレインは分岐対象の単一対象選択で停止する（探索側が分岐する）。
     """
     from . import action_api
     clone = manager.clone()
@@ -322,7 +336,7 @@ def _apply_clone(manager, actor_name: str, move: Dict[str, Any]):
             action_api.apply_battle_action(clone, actor, move["action_type"], move.get("card_uuid"))
         else:
             action_api.apply_game_action(clone, actor, move["action_type"], move.get("payload", {}))
-        _drain_own_interactions(clone, actor_name)
+        _drain_own_interactions(clone, actor_name, stop_at_select=stop_at_select)
     except Exception:
         return None
     return clone
@@ -335,6 +349,51 @@ def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any],
     if clone is None:
         return float("-inf")
     return evaluate(clone, actor_name, see_opp_hand=see_opp_hand)
+
+
+def _selection_moves(manager, actor_name: str):
+    """actor の「単一対象選択」対話を候補ごとの RESOLVE 手として列挙する（無ければ None）。
+
+    対象は `_SELECT_ACTION`（SELECT_TARGET/FIELD_OVERFLOW_TRASH を正規化したもの）かつ **最大1体**
+    （max==1・min<=1）の選択に限る＝「どれを KO/除去/バウンス/手札破壊するか」。多対象（max>=2）や
+    min>1 は組合せ爆発を避けて既定解決へ委ねる（None を返す）。これにより探索が最善の単一対象を読む。
+    """
+    from . import action_api
+    pending = manager.get_pending_request()
+    if not pending:
+        return None
+    KEY_PID, KEY_ACTION = _pending_keys()
+    if pending.get(KEY_PID) != actor_name or pending.get(KEY_ACTION) != _SELECT_ACTION:
+        return None
+    props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
+    KEY_UUIDS = props.get('SELECTABLE_UUIDS', 'selectable_uuids')
+    KEY_CONSTRAINTS = props.get('CONSTRAINTS', 'constraints')
+    KEY_SKIP = props.get('CAN_SKIP', 'can_skip')
+    uuids = list(pending.get(KEY_UUIDS, []) or [])
+    constraints = pending.get(KEY_CONSTRAINTS) or {}
+    try:
+        min_n = int(constraints.get("min", 0))
+    except (TypeError, ValueError):
+        min_n = 0
+    try:
+        max_n = int(constraints.get("max", len(uuids)))
+    except (TypeError, ValueError):
+        max_n = len(uuids)
+    # 単一対象選択のみ分岐（v1）。0/複数対象は既定解決に委ねる。
+    if not uuids or max_n != 1 or min_n > 1:
+        return None
+    base = manager.default_interaction_payload(pending)
+    moves: List[Dict[str, Any]] = []
+    for uid in uuids[:HARD_SELECT_CAP]:
+        payload = dict(base)
+        payload["selected_uuids"] = [uid]
+        moves.append({"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": payload})
+    # 任意選択（min==0・スキップ可）なら「選ばない」も一級の候補にする。
+    if min_n == 0 and bool(pending.get(KEY_SKIP, False)):
+        payload = dict(base)
+        payload["selected_uuids"] = []
+        moves.append({"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": payload})
+    return moves
 
 
 def _consumes_hand_card(manager, actor_name: str, move: Dict[str, Any]) -> bool:
@@ -378,7 +437,10 @@ def _search(manager, root_name: str, depth: int, alpha: float, beta: float,
         return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
     actor_name = pending[KEY_PID]
     actor = _player_by_name(manager, actor_name)
-    moves = manager.get_legal_actions(actor)
+    # 単一対象選択ノードは候補ごとに分岐（最善対象を読み切る）。それ以外は通常の合法手列挙。
+    moves = _selection_moves(manager, actor_name)
+    if moves is None:
+        moves = manager.get_legal_actions(actor)
     if not moves:
         return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
     is_max = (actor_name == root_name)
@@ -395,7 +457,7 @@ def _search(manager, root_name: str, depth: int, alpha: float, beta: float,
         if budget[0] <= 0:
             break
         budget[0] -= 1
-        child = _apply_clone(manager, actor_name, m)
+        child = _apply_clone(manager, actor_name, m, stop_at_select=True)
         if child is None:
             continue
         children.append((evaluate(child, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan), child))
@@ -436,7 +498,7 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     # 1) 全ルート手を 1-ply で採点（子クローンは深掘りに再利用）。
     prelim: List[Tuple[float, Dict[str, Any], Any]] = []
     for m in moves:
-        child = _apply_clone(manager, name, m)
+        child = _apply_clone(manager, name, m, stop_at_select=True)
         if child is None:
             prelim.append((float("-inf"), m, None))
             continue
@@ -482,6 +544,11 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
     rng = rng or random
     if moves is None:
         moves = manager.get_legal_actions(player)
+    # normal/hard: 最上位が単一対象選択なら候補ごとに展開して最善対象を読み切る（easy は既定解決のまま）。
+    if difficulty != "easy":
+        sel = _selection_moves(manager, player.name)
+        if sel:
+            moves = sel
     if not moves:
         return None
     if len(moves) == 1:
