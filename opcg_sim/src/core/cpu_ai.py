@@ -74,6 +74,11 @@ HARD_PER_MOVE_BUDGET = 36  # 深掘り 1 手あたりのクローン上限（予
                            # ここはレイテンシ予算。自分のターン1回を~1秒で読める範囲に抑える）
 HARD_DEPTH = 5             # ply 割引の基準（最短リーサル認識のテスト境界・winner 到達 ply の上限目安）
 HARD_MAX_PLY = 30          # 総 ply の安全上限（自ターンの自由展開＋戦闘サブステップが暴走しない belt-and-suspenders）
+# 探索ホライズン（B2-lite・docs/SPEC.md §2.5.3）。深掘りで何ターン先まで読むか。horizon=2＝「自分のターン
+# 完了→相手のターンを丸ごと（攻撃まで）→自分の次ターン開始」の静止点で評価＝相手の反撃に対する守り
+# （ブロッカー/カウンター温存）を min/max で読む。横展開は重いので上位 K 手（HARD_ROOT_BEAM＋TURN_END）
+# のみに適用し、非対象は採用しない（評価ホライズンの一貫性を保つ）。
+HARD_HORIZON = 2
 _SETTLE_LIMIT = 16         # 打ち切り時にターン境界へ整流する最大手数（戦闘サブステップ込み）
 
 # 自デッキ勝ち筋プラン（cpu_self_plan・docs/SPEC.md §2.5.5）の評価項。プラン未指定（plan=None）では
@@ -491,13 +496,15 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, profile, plan) -> 
 
 def _search(manager, root_name: str, alpha: float, beta: float,
             budget: List[int], see_opp_hand: bool, opp_public_only: bool,
-            profile=None, ply: int = 0, plan=None) -> float:
-    """単ターン探索（α-β ＋ ビーム）。`root_name` 視点の最善到達値を返す。
+            profile=None, ply: int = 0, plan=None, start_turn: int = 0, horizon: int = 1) -> float:
+    """ターン境界評価の α-β ＋ ビーム探索。`root_name` 視点の最善到達値を返す。
 
-    **探索は自分のターン1回に限定**し、葉の評価点を「相手の MAIN_ACTION（相手のターン開始）」に固定する
-    （相手のターンへは潜らない）。自ターン内の自分のメイン手は max、自分のアタックへの相手のブロック/
-    カウンター応答は min として読む。これにより全候補が「自分のターン完了後の同じ静止点」で評価され、
-    手番パリティ／horizon による「常に何かする」バイアス（パスの不当な低評価）が消える。
+    **葉は `start_turn` から `horizon` ターン進んだ MAIN_ACTION（一定の静止点）に固定**する。
+      - `horizon=1`: 相手のターン開始（自分のターン完全解決後）で評価（B1・相手ターンへは潜らない）。
+      - `horizon=2`: 相手のターンを丸ごと（攻撃まで）読み、自分の次ターン開始で評価（B2-lite・守りの
+        深読み）。相手の攻撃は相手 min・自分のブロック/カウンターは root max として読まれる。
+    自ターン内（diff=0）の自分のメイン手は max、自分のアタックへの相手応答は min。全候補が同じ静止点で
+    評価されるため、手番パリティ／horizon による「常に何かする」バイアス（パスの不当な低評価）が消える。
     探索木内で `winner` に到達した手順は ±(W_WIN − ply) でリーサル認識として機能する（ply 割引で最短の止め）。
 
     情報方針:
@@ -514,8 +521,8 @@ def _search(manager, root_name: str, alpha: float, beta: float,
     if not pending:
         return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
     actor_name = pending[KEY_PID]
-    # 葉: 相手の MAIN_ACTION（相手のターンが始まった＝自分のターンが完全に解決した）。一定の静止点で評価。
-    if actor_name != root_name and pending.get(KEY_ACTION) == "MAIN_ACTION":
+    # 葉: start_turn から horizon ターン進んだ MAIN_ACTION（一定の静止点）で評価。
+    if pending.get(KEY_ACTION) == "MAIN_ACTION" and (manager.turn_count - start_turn) >= horizon:
         return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
     # 安全打ち切り: 予算/ply 上限。自分の手番途中ならターン境界へ整流してから評価（甘い途中評価を避ける）。
     if budget[0] <= 0 or ply >= HARD_MAX_PLY:
@@ -555,7 +562,8 @@ def _search(manager, root_name: str, alpha: float, beta: float,
         value = float("-inf")
         for _leaf, child in children:
             value = max(value, _search(child, root_name, alpha, beta,
-                                       budget, see_opp_hand, opp_public_only, profile, ply + 1, plan))
+                                       budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
+                                       start_turn, horizon))
             alpha = max(alpha, value)
             if alpha >= beta:
                 break
@@ -564,7 +572,8 @@ def _search(manager, root_name: str, alpha: float, beta: float,
         value = float("inf")
         for _leaf, child in children:
             value = min(value, _search(child, root_name, alpha, beta,
-                                       budget, see_opp_hand, opp_public_only, profile, ply + 1, plan))
+                                       budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
+                                       start_turn, horizon))
             beta = min(beta, value)
             if alpha >= beta:
                 break
@@ -597,16 +606,20 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
         if child is not None and m.get("action_type") == "TURN_END":
             deepen.add(i)
 
-    # 3) 対象は単ターン探索（ply=1 から＝早い勝ちを優先）、非対象は 1-ply スコアのまま。
+    # 3) 深掘り対象を horizon ターン先まで探索（ply=1 から＝早い勝ちを優先）し、**深掘り集合のみ**返す。
+    #    非対象（1-ply の甘い値）を混ぜると評価ホライズンが不一致になり誤選択するため返さない。深掘り集合は
+    #    1-ply 上位＋TURN_END なので最善手はここに含まれる。
+    start_turn = manager.turn_count
     out: List[Tuple[float, Dict[str, Any]]] = []
     for i, (s1, m, child) in enumerate(prelim):
         if child is not None and i in deepen:
             budget = [HARD_PER_MOVE_BUDGET]
             v = _search(child, name, float("-inf"), float("inf"),
-                        budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan)
+                        budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan,
+                        start_turn=start_turn, horizon=HARD_HORIZON)
             out.append((v, m))
-        else:
-            out.append((s1, m))
+    if not out:  # 念のため（全候補がクローン失敗）: 1-ply スコアにフォールバック
+        out = [(s1, m) for s1, m, _c in prelim]
     return out
 
 
