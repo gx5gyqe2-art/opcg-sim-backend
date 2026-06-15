@@ -337,6 +337,46 @@ def test_b1_folds_unreachable_attack_to_turn_end(db):
     assert move["action_type"] == "TURN_END", f"純損の非貫通アタックを採ってしまった: {move['action_type']}"
 
 
+def test_b2lite_values_keeping_blocker_for_defense(db):
+    """B2-lite（horizon=2）: 相手のターンを読むため、守りのブロッカーをアクティブで残す盤面を、
+    寝かせた盤面より高く評価する（B1=horizon1 は相手ターンを見ないので守りを区別できない）。"""
+    random.seed(2)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    assert _fast_forward_to_p1_main(gm)
+    # p1: 素<5000 のブロッカーを1体（確立済み）。手札空・ドン0で他にやることなし＝攻撃で寝かす誘惑なし。
+    blk = next((c for c in gm.p1.deck if c.master.type.name == "CHARACTER"
+                and c.has_keyword("ブロッカー") and 0 < (c.master.power or 0) < 5000), None)
+    if blk is None:
+        pytest.skip("素<5000 のブロッカーが見つからない")
+    gm.p1.deck.remove(blk)
+    gm.p1.field[:] = [blk]
+    blk.is_rest = False
+    blk.is_newly_played = False
+    gm.p1.hand.clear()
+    gm.p1.don_active.clear()
+    # p2: リーダーに通る攻撃者（素>=5000・確立済み・アクティブ）を1体。
+    atk = next((c for c in gm.p2.deck if c.master.type.name == "CHARACTER" and (c.master.power or 0) >= 5000), None)
+    if atk is None:
+        pytest.skip("p2 の攻撃者（>=5000）が見つからない")
+    gm.p2.deck.remove(atk)
+    gm.p2.field[:] = [atk]
+    atk.is_rest = False
+    atk.is_newly_played = False
+
+    def search_val(rest, horizon):
+        g = gm.clone()
+        g.p1.field[0].is_rest = rest
+        return cpu_ai._search(g, "p1", float("-inf"), float("inf"),
+                              [cpu_ai.HARD_PER_MOVE_BUDGET], True, False,
+                              plan=None, ply=0, start_turn=g.turn_count, horizon=horizon)
+
+    # horizon=2 は相手の攻撃を読むので、ブロッカーをアクティブで残す方を高く評価する。
+    assert search_val(False, 2) > search_val(True, 2)
+
+
 def test_hard_selfplay_smoke_no_invariant_violation(db):
     """hard 方策で数十手進めてもインバリアント違反・例外が出ない（探索の実プレイ健全性）。
 
