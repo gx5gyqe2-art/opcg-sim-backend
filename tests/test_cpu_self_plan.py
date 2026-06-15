@@ -11,6 +11,7 @@ import pytest
 
 from opcg_sim.src.core import cpu_ai, cpu_self_plan
 from opcg_sim.src.core.gamestate import GameManager, Player
+from opcg_sim.src.models.models import CardInstance
 from cpu_selfplay import build_deck, _load_db
 
 
@@ -136,6 +137,45 @@ def test_control_values_retained_counter_more(db):
         return after - before
 
     assert delta(_plan("control")) > delta(None) > 0
+
+
+def _find_char_master(db, pred):
+    for cid in db.raw_db:
+        m = db.get_card(cid)
+        if m and m.type.name == "CHARACTER" and pred(m):
+            return m
+    return None
+
+
+def test_threat_value_from_card_data(db):
+    """脅威値はカードデータ（キーワード/効果耐性）から算出され、バニラは 0。"""
+    da = _find_char_master(db, lambda m: "ダブルアタック" in (getattr(m, "keywords", None) or set()))
+    resist = _find_char_master(db, lambda m: cpu_ai._RESIST_CUE in (getattr(m, "effect_text", "") or ""))
+    vanilla = _find_char_master(db, lambda m: not (getattr(m, "keywords", None) or set())
+                                and not (getattr(m, "effect_text", "") or "").strip())
+    if da is not None:
+        assert cpu_ai._threat_value(CardInstance(da, "p1")) >= cpu_ai.W_KW_DOUBLE
+    if resist is not None:
+        assert cpu_ai._threat_value(CardInstance(resist, "p1")) >= cpu_ai.W_KW_RESIST
+    if vanilla is not None:
+        assert cpu_ai._threat_value(CardInstance(vanilla, "p1")) == 0.0
+
+
+def test_side_score_threat_term_only_when_threat_aware(db):
+    """脅威項は threat_aware=True のときだけ _threat_value 分を加点する（plan 無しでは不変）。"""
+    da = _find_char_master(db, lambda m: "ダブルアタック" in (getattr(m, "keywords", None) or set()))
+    if da is None:
+        pytest.skip("ダブルアタック持ちキャラが見つからない")
+    gm = _new_gm(db)
+    c = CardInstance(da, "p1")
+    c.is_rest = False
+    c.is_newly_played = False
+    gm.p1.field.append(c)
+    cap = cpu_ai._power_cap(gm.p2)
+    off = cpu_ai._side_score(gm.p1, True, cap, threat_aware=False)
+    on = cpu_ai._side_score(gm.p1, True, cap, threat_aware=True)
+    assert on - off == pytest.approx(cpu_ai._threat_value(c))
+    assert cpu_ai._threat_value(c) >= cpu_ai.W_KW_DOUBLE
 
 
 def test_plan_progress_rewards_lethal_board(db):

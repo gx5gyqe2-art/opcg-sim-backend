@@ -211,6 +211,42 @@ def test_summoning_sick_char_not_counted_as_attacker(db):
     assert ready_off == sick_off
 
 
+def test_selection_moves_enumerates_single_target_candidates():
+    """単一対象選択は候補ごとの RESOLVE 手に展開する／多対象・別アクター・非選択は分岐しない。"""
+    props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
+    PID = props.get('PLAYER_ID', 'player_id'); ACT = props.get('ACTION', 'action')
+    UUIDS = props.get('SELECTABLE_UUIDS', 'selectable_uuids')
+    CON = props.get('CONSTRAINTS', 'constraints'); SKIP = props.get('CAN_SKIP', 'can_skip')
+
+    class _Stub:
+        def __init__(self, pending):
+            self._p = pending
+        def get_pending_request(self):
+            return self._p
+        def default_interaction_payload(self, pending=None):
+            return {"selected_uuids": [], "index": 0, "accepted": True}
+
+    base = {PID: "p1", ACT: cpu_ai._SELECT_ACTION, UUIDS: ["a", "b", "c"],
+            CON: {"min": 1, "max": 1}, SKIP: False}
+    # 必須・単一対象 → 候補3手（スキップ無し）
+    moves = cpu_ai._selection_moves(_Stub(base), "p1")
+    assert moves is not None
+    assert [m["payload"]["selected_uuids"] for m in moves] == [["a"], ["b"], ["c"]]
+    assert all(m["action_type"] == action_api.ACT_RESOLVE_SELECTION for m in moves)
+    # 任意・単一対象（min0/skip可）→ 「選ばない」を一級候補として追加
+    opt = cpu_ai._selection_moves(_Stub({**base, CON: {"min": 0, "max": 1}, SKIP: True}), "p1")
+    assert [m["payload"]["selected_uuids"] for m in opt] == [["a"], ["b"], ["c"], []]
+    # 多対象（max>=2）/min>1 は既定解決へ委ねる（None）
+    assert cpu_ai._selection_moves(_Stub({**base, CON: {"min": 1, "max": 2}}), "p1") is None
+    assert cpu_ai._selection_moves(_Stub({**base, CON: {"min": 2, "max": 1}}), "p1") is None
+    # 別アクター・非選択アクションは分岐しない
+    assert cpu_ai._selection_moves(_Stub(base), "p2") is None
+    assert cpu_ai._selection_moves(_Stub({**base, ACT: "MAIN_ACTION"}), "p1") is None
+    # 候補過多は安全上限で打ち切る
+    many = cpu_ai._selection_moves(_Stub({**base, UUIDS: [str(i) for i in range(20)]}), "p1")
+    assert len(many) == cpu_ai.HARD_SELECT_CAP
+
+
 @pytest.mark.parametrize("difficulty", ["easy", "normal", "hard"])
 def test_decide_returns_legal_move(db, difficulty):
     """decide はその時点の合法手のいずれかを返す（easy/normal/hard とも）。"""
@@ -269,6 +305,36 @@ def test_hard_recognizes_lethal(db):
     # 最短の止め＝相手リーダーへのアタックを選ぶ。
     assert move["action_type"] == "ATTACK"
     assert move["payload"]["target_ids"] == [gm.p2.leader.uuid]
+
+
+def test_b1_folds_unreachable_attack_to_turn_end(db):
+    """B1 単ターン探索: 攻撃側<リーダーで届かず、ドンで届かせる手段も無いとき、純損の非貫通アタックでは
+    なくターンを畳む（パスを一定の静止点＝相手ターン開始で公平に比較し、無意味手を採らない）。"""
+    random.seed(1)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    assert _fast_forward_to_p1_main(gm)
+    # 素<5000 のバニラを1体（確立済み・アクティブ）。リーダーは寝かせ正当な通る手を除外、ドン0で
+    # 「届かせる手段なし」、手札空・相手場空にして、残るのは非貫通アタックと TURN_END のみ。
+    sub = next((c for c in gm.p1.deck if c.master.type.name == "CHARACTER"
+                and 0 < (c.master.power or 0) < 5000
+                and not c.master.abilities and not (c.master.effect_text or "").strip()), None)
+    if sub is None:
+        pytest.skip("素<5000 のバニラキャラが見つからない")
+    gm.p1.deck.remove(sub)
+    gm.p1.field[:] = [sub]
+    sub.is_rest = False
+    sub.is_newly_played = False
+    gm.p1.hand.clear()
+    gm.p2.field.clear()
+    gm.p1.leader.is_rest = True       # リーダー攻撃（5000で通る正当手）を除外
+    gm.p1.don_active.clear()          # ドンで 5000 へ届かせる手段なし
+    moves = gm.get_legal_actions(gm.p1)
+    assert any(m["action_type"] == "ATTACK" for m in moves), "非貫通アタックが合法手に無い"
+    move = cpu_ai.decide(gm, gm.p1, "hard", random.Random(0))
+    assert move["action_type"] == "TURN_END", f"純損の非貫通アタックを採ってしまった: {move['action_type']}"
 
 
 def test_hard_selfplay_smoke_no_invariant_violation(db):
