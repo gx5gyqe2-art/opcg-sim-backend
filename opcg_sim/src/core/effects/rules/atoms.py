@@ -402,7 +402,10 @@ def _leader_and_char_dual(ctx: ParseContext):
     ため対象外（ここではパワー増減と効果無効のみ扱う）。"""
     t = ctx.text
     m = re.search(_nfc(r"リーダーとキャラ([\d０-９]+)?枚(ずつ)?(まで)?"), t)
-    if not m:
+    # 数量詞なしの所有格「（特徴《X》を持つ）リーダーとキャラのパワー±N」= 該当する全リーダー＋
+    # 全キャラへ適用（ST02-014。count=1/CHOOSE に退化していた）。「と…枚」の択一/枚数形は m 側。
+    m_all = re.search(_nfc(r"リーダーとキャラ(?:の|は)"), t) if not m else None
+    if not m and not m_all:
         return None
     if _nfc("ドン") in t or _nfc("付与") in t or _nfc("選ぶ") in t or _nfc("選び") in t:
         return None
@@ -411,9 +414,35 @@ def _leader_and_char_dual(ctx: ParseContext):
     if not sign_m and not is_negate:
         return None
     player = Player.OPPONENT if _nfc("相手") in t else Player.SELF
-    n = _to_int(m.group(1)) if m.group(1) else 1
-    up_to = bool(m.group(3))
+    n = _to_int(m.group(1)) if (m and m.group(1)) else 1
+    up_to = bool(m.group(3)) if m else False
     dur = _duration_of(t)
+
+    if m_all:
+        # 特徴等のフィルタを保持するため parse_target を流用し、card_type ごとに ALL で分ける。
+        import dataclasses
+        base = _buff_target(t)
+        traits = list(getattr(base, "traits", []) or [])
+        colors = list(getattr(base, "colors", []) or [])
+        attrs = list(getattr(base, "attributes", []) or [])
+
+        def _mk_all(card_type: str) -> TargetQuery:
+            return TargetQuery(zone=Zone.FIELD, player=player, card_type=[card_type],
+                               traits=traits, colors=colors, attributes=attrs,
+                               count=-1, select_mode="ALL")
+        if sign_m:
+            sign = -1 if sign_m.group(1) in "-－−‐" else 1
+            val = sign * _to_int(sign_m.group(2))
+            leader = GameAction(type=ActionType.BUFF, target=_mk_all("LEADER"),
+                                value=ValueSource(base=val), duration=dur, raw_text=t)
+            char = GameAction(type=ActionType.BUFF, target=_mk_all("CHARACTER"),
+                              value=ValueSource(base=val), duration=dur, raw_text=t)
+        else:
+            leader = GameAction(type=ActionType.NEGATE_EFFECT, target=_mk_all("LEADER"),
+                                duration=dur, raw_text=t)
+            char = GameAction(type=ActionType.NEGATE_EFFECT, target=_mk_all("CHARACTER"),
+                              duration=dur, raw_text=t)
+        return Sequence(actions=[leader, char])
 
     def _mk(card_type: str, count: int, is_up: bool) -> TargetQuery:
         return TargetQuery(zone=Zone.FIELD, player=player, card_type=[card_type],
@@ -2697,6 +2726,29 @@ def _no_effect_play_passive(ctx: ParseContext) -> Optional[GameAction]:
     if not re.search(_nfc(r"効果で登場できない"), t):
         return None
     return GameAction(type=ActionType.RESTRICTION, status="NO_EFFECT_PLAY", raw_text=t)
+
+
+@rule("attack_tax_discard", priority=95)
+def _attack_tax_discard(ctx: ParseContext) -> Optional[GameAction]:
+    """「（相手のキャラすべては、…まで、）アタックする際、自身の手札N枚を捨てなければ
+    アタックすることができない」= アタック税（OP08-043）。対象キャラへ ATTACK_TAX_DISCARD_N の
+    継続フラグを付与し、declare_attack で手札N枚の支払い（不能なら不可）を強制する。"""
+    t = ctx.text
+    m = re.search(_nfc(r"アタックする際、.*?手札([\d０-９]+)枚を捨てなければ(?:アタック)?(?:する)?ことができない"), t)
+    if not m:
+        return None
+    n = _to_int(m.group(1))
+    # 主語（対象集合）は「アタックする際」より前。手札枚数句に汚染されないよう前半のみ解析する。
+    subject = t.split(_nfc("アタックする際"))[0]
+    tq = parse_target(subject)
+    duration = "UNTIL_NEXT_TURN_END" if _nfc("次の") in t else "THIS_TURN"
+    return GameAction(
+        type=ActionType.RESTRICTION,
+        status=f"ATTACK_TAX_DISCARD_{n}",
+        target=tq,
+        duration=duration,
+        raw_text=t,
+    )
 
 
 @rule("rest_restrict", priority=66)

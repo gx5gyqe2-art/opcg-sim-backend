@@ -226,7 +226,11 @@ def test_eb02_010_all_mugiwara_active_don_and_buff():
 
 
 def test_eb02_010_mixed_field_no_active_don_but_buff():
-    """EB02-010: 非《麦わらの一味》混在 → アクティブ化なし、ただし buff は無条件で +1000。"""
+    """EB02-010: 非《麦わらの一味》混在 → 条件不成立で能力全体が不発（アクティブ化も buff も無し）。
+
+    カテゴリH 是正前は「その後、…パワー+1000」が条件外に漏れて無条件適用されていたが、
+    先頭ゲート条件《麦わらの一味》のみは能力全体を支配するため、混在時は buff も発生しない。
+    """
     gm, p1, p2, L = build("EB02-010")
     clear_field(p1)
     add_char(p1, name="麦", cost=2, power=2000, traits=["麦わらの一味"])
@@ -237,7 +241,7 @@ def test_eb02_010_mixed_field_no_active_don_but_buff():
     gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
     auto_resolve(gm, p1)
     assert len(p1.don_rested) == rested_before          # アクティブ化は発生しない
-    assert L.timed_power == 1000                         # buff は無条件
+    assert L.timed_power == 0                            # buff も条件外には漏れない（H是正）
 
 
 # ===========================================================================

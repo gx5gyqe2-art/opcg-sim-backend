@@ -107,15 +107,20 @@ def test_op12_020_no_active_when_not_in_battle():
 
 
 def test_op12_020_attack_restriction_on_self_leader():
-    """OP12-020 起動メイン: アタック制限は自リーダーに付く（相手キャラに付くのは誤り）。"""
+    """OP12-020 起動メイン: アタック制限は自リーダーに付く（相手キャラに付くのは誤り）。
+
+    カテゴリH 是正で、先頭ゲート条件「リーダーが相手キャラとバトルしている場合」は
+    「その後」のアタック制限も支配する。よってバトル中（active_battle に関与）でのみ発動する。
+    """
     gm, p1, p2, L = build("OP12-020")
     _attach_don_to_leader(p1, L, 3)
     clear_field(p2)
     oc = add_char(p2, cost=3, power=1000)
+    gm.active_battle = {"attacker": L, "target": oc}   # IN_BATTLE 条件を満たす
     ab = get_ability(L.master, "ACTIVATE_MAIN")
     gm.resolve_ability(p1, ab, L)
     auto_resolve(gm, p1)
-    # 自リーダーにアタック制限が乗るのが正。現実装は相手キャラ側に乗るため失敗する。
+    # 自リーダーにアタック制限が乗るのが正（相手キャラ側に乗るのは誤り）。
     assert "ATTACK_DISABLE" in getattr(L, "timed_flags", set())
     assert "ATTACK_DISABLE" not in getattr(oc, "timed_flags", set())
 

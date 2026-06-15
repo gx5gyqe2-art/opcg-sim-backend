@@ -116,6 +116,186 @@ def test_rairyu_targets_rested_only():
     assert freeze.target.is_rest is True
 
 
+def test_st11_004_active_don_gated_by_uta_condition():
+    """ST11-004 新時代: 「リーダーがウタの場合…見て手札に加える。その後、…ドン1枚アクティブ」の
+    ACTIVE_DON は、カテゴリH 是正により先頭条件（ウタ）の支配下に入る（旧: 条件外へ漏れていた）。"""
+    from opcg_sim.src.models.effect_types import Sequence
+    ab = inst("ST11-004").master.abilities[0]
+    assert ab.condition is not None and ab.condition.type == ConditionType.LEADER_NAME
+    assert isinstance(ab.effect, Sequence)
+    types = [getattr(a, "type", None) for a in ab.effect.actions]
+    assert ActionType.ACTIVE_DON in types          # ドンアクティブも能力（=ウタ条件）配下
+
+
+def test_op08_043_attack_tax_discard():
+    """OP08-043 エドワード・ニューゲート: 条件成立時、相手のキャラすべてに次の相手ターン終了時まで
+    「アタックする際、手札2枚を捨てなければアタックできない」アタック税を付与する。
+    支払えれば（手札2枚捨て）アタック可、手札不足ならアタック不可。条件不成立なら付与なし。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import CardType, TriggerType
+    import effect_coverage as cov
+
+    def build(hand_n, life_n=2):
+        p1 = Player(name="P1", deck=[],
+                    leader=CardInstance(make_master(card_id="WB", name="wb", type=CardType.LEADER,
+                                                    traits=["白ひげ海賊団"], life=5), "P1"))
+        p2 = Player(name="P2", deck=[], leader=inst("OP01-001", "P2"))
+        gm = GameManager(player1=p1, player2=p2)
+        gm.turn_player = p1
+        gm.turn_count = 3
+        gm._validate_action = lambda pl, at: None       # ゲームフロー依存をバイパス（既存テスト慣例）
+        p1.life = [inst("OP01-016", "P1") for _ in range(life_n)]
+        oc = CardInstance(make_master(card_id="OC", name="oc", type=CardType.CHARACTER,
+                                      power=5000), "P2")
+        p2.field = [oc]
+        p2.hand = [inst("OP01-016", "P2") for _ in range(hand_n)]
+        src = inst("OP08-043", "P1")
+        p1.field = [src]
+        ab = [a for a in src.master.abilities if a.trigger == TriggerType.ON_PLAY][0]
+        gm.resolve_ability(p1, ab, src)
+        cov._smart_drain(gm)
+        return gm, p1, p2, oc
+
+    # 条件成立: 相手キャラにアタック税が付く。手札2枚で支払いアタック可。
+    gm, p1, p2, oc = build(hand_n=3)
+    assert any(str(f).startswith("ATTACK_TAX_DISCARD_") for f in (oc.flags | oc.timed_flags))
+    gm.turn_player = p2
+    oc.is_rest = False
+    oc.is_newly_played = False
+    gm.declare_attack(oc, p1.leader)
+    assert len(p2.hand) == 1 and len(p2.trash) == 2      # 手札2枚を支払った
+
+    # 手札不足ならアタック不可。
+    gm2, q1, q2, oc2 = build(hand_n=1)
+    gm2.turn_player = q2
+    oc2.is_rest = False
+    oc2.is_newly_played = False
+    try:
+        gm2.declare_attack(oc2, q1.leader)
+        assert False, "手札不足ではアタックできないはず"
+    except ValueError:
+        pass
+
+    # 条件不成立（ライフ4枚）なら付与しない。
+    gm3, _, _, oc3 = build(hand_n=3, life_n=4)
+    assert not any(str(f).startswith("ATTACK_TAX_DISCARD_") for f in (oc3.flags | oc3.timed_flags))
+
+
+def test_op05_100_replacement_negated_by_named_character():
+    """OP05-100 エネル: 「場を離れる場合、代わりにライフ1枚トラッシュ」の置換は、
+    キャラの「モンキー・D・ルフィ」が場にいると無効になる（自己無効化条件の是正）。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import CardType
+    gm, p1, p2 = game("OP01-001", "OP01-001")
+    enel = inst("OP05-100", "P1")
+    p1.field = [enel]
+    p1.life = [inst("OP01-016", "P1") for _ in range(3)]
+    assert gm._find_replacement(enel, ("LEAVE",)) is not None    # ルフィ不在＝置換有効
+    p2.field = [CardInstance(make_master(card_id="L", name="モンキー・D・ルフィ",
+                                         type=CardType.CHARACTER, power=5000), "P2")]
+    assert gm._find_replacement(enel, ("LEAVE",)) is None         # ルフィ在＝無効
+
+
+def test_op08_114_attribute_filtered_battle_ko_immunity():
+    """OP08-114 S-ホーク: 「属性《斬》を持つカードとのバトルでKOされず」は、バトル相手の属性が
+    《斬》のときだけ有効。条件（自分のライフが相手より少ない＋ドン!!1付与）成立時に評価する。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import Phase, CardType, Attribute
+
+    def battle(att_attr, p2_life=2):
+        p1 = Player(name="P1", deck=[], leader=inst("OP01-001", "P1"))
+        p2 = Player(name="P2", deck=[], leader=inst("OP01-001", "P2"))
+        gm = GameManager(player1=p1, player2=p2)
+        gm.turn_player = p1
+        gm.turn_count = 3
+        defender = inst("OP08-114", "P2")
+        defender.is_rest = True
+        defender.attached_don = 1                      # 【ドン!!×1】
+        p2.field = [defender]
+        p1.life = [inst("OP01-016", "P1") for _ in range(5)]
+        p2.life = [inst("OP01-016", "P2") for _ in range(p2_life)]
+        attacker = CardInstance(make_master(card_id="ATT", name="att", power=12000,
+                                            type=CardType.CHARACTER, attribute=att_attr), "P1")
+        gm.active_battle = {"attacker": attacker, "target": defender,
+                            "attacker_owner": p1, "target_owner": p2, "counter_buff": 0}
+        gm.phase = Phase.BATTLE_COUNTER
+        gm.resolve_attack()
+        return defender in p2.field                    # True=生存（保護された）
+
+    assert battle(Attribute.SLASH) is True             # 斬とのバトル＝保護
+    assert battle(Attribute.STRIKE) is False            # 打とのバトル＝保護なし→KO
+    assert battle(Attribute.SLASH, p2_life=5) is False  # 条件（ライフ少ない）不成立→保護なし
+
+
+def test_op08_101_delayed_life_at_turn_end():
+    """OP08-101 シャーロット・エンゼル: コストでライフ1枚をトラッシュ、条件成立なら
+    「このターン終了時」にデッキの上1枚をライフへ加える（遅延ライフ＝delay=TURN_END）。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import CardType
+    gm, p1, p2 = game("OP15-058")
+    p1.leader.master = make_master(card_id=p1.leader.master.card_id, name="BM",
+                                   type=CardType.LEADER, traits=["ビッグ・マム海賊団"], life=5)
+    # ライフ5・デッキ充分（game() は空デッキなのでダミーを積む）
+    p1.life = [inst("OP08-101") for _ in range(5)]
+    p1.deck = [inst("OP08-101") for _ in range(10)]
+    gm.turn_player = p1
+    src = inst("OP08-101")
+    ab = src.master.abilities[0]
+    gm.resolve_ability(p1, ab, src)
+    life_after_cost, deck_after_cost = len(p1.life), len(p1.deck)
+    assert life_after_cost == 4              # コストでライフ1枚トラッシュ
+    assert len(gm.pending_end_of_turn) == 1  # 効果は遅延キューへ
+    gm._flush_pending_end_of_turn()
+    assert len(p1.life) == 5                  # ターン終了時にデッキ上→ライフで+1
+    assert len(p1.deck) == deck_after_cost - 1
+
+
+def test_op08_006_trash_two_names_condition():
+    """OP08-006 チェスマーリモ: 「トラッシュに「クロマーリモ」と「チェス」がある場合」は
+    両名がトラッシュに存在する AND 条件（TRASH_COUNT==0 退化＝名前脱落の是正）。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import CardType
+    gm, p1, _ = game("OP15-058")
+    res = EffectResolver(gm)
+    cond = inst("OP08-006").master.abilities[0].condition
+    assert cond.type == ConditionType.AND and len(cond.args) == 2
+
+    def trash_card(name):
+        return CardInstance(make_master(card_id="Y", name=name, cost=1, power=1000,
+                                        type=CardType.CHARACTER), "P1")
+    src = inst("OP08-006")
+    p1.trash = []
+    assert res._check_condition(p1, cond, src) is False
+    p1.trash = [trash_card("クロマーリモ")]
+    assert res._check_condition(p1, cond, src) is False     # 片方だけでは不成立
+    p1.trash = [trash_card("クロマーリモ"), trash_card("チェス")]
+    assert res._check_condition(p1, cond, src) is True       # 両名でのみ成立
+
+
+def test_st02_014_buffs_all_matching_leader_and_chars():
+    """ST02-014 X・ドレーク: 「特徴《超新星》か《海軍》を持つリーダーとキャラのパワー+1000」は
+    **数量詞なし＝該当する全リーダー＋全キャラ**へ適用する（count=1/CHOOSE 退化の是正）。
+    継続効果（【自分のターン中】）なので passive 再計算で適用される。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import CardType
+    gm, p1, _ = game("OP15-058")
+    drake = inst("ST02-014")           # 発生源（場・レスト・ドン1）
+    drake.is_rest = True
+    drake.attached_don = 1
+
+    def char(name, traits):
+        return CardInstance(make_master(card_id="X", name=name, cost=2, power=2000,
+                                        type=CardType.CHARACTER, traits=traits), "P1")
+    nova = char("nova", ["超新星"])     # 該当
+    navy = char("navy", ["海軍"])       # 該当（か＝OR）
+    other = char("other", ["その他"])   # 非該当
+    p1.field = [drake, nova, navy, other]
+    gm.refresh_passive_state()
+    assert nova.get_power(True) == 3000      # +1000
+    assert navy.get_power(True) == 3000      # +1000（OR の片側一致でも掛かる）
+    assert other.get_power(True) == 2000     # 非該当は不変（count 退化なら誤って1枚化）
+
+
 def test_kamisake_requires_attached_don():
     """OP13-076 神避: 条件は「付与されているドンがある」＝attached のみで判定。"""
     gm, p1, _ = game("OP15-058")
@@ -214,8 +394,13 @@ def test_power_exact_match_counter():
 
 
 def test_leader_name_multi_or():
-    """OP13-016 ガープ: 「「サボ」か「エース」か「ルフィ」」はいずれか一致で発動。"""
-    cond = inst("OP13-016").master.abilities[0].effect.actions[0].condition
+    """OP13-016 ガープ: 「「サボ」か「エース」か「ルフィ」」はいずれか一致で発動。
+
+    カテゴリH 是正で、先頭ゲート条件「リーダーが〜の場合」は能力全体を支配するため
+    ability.condition へ引き上げられる（旧: effect.actions[0] の内部 Branch。「公開し手札に
+    加える」が条件外に漏れていた）。LEADER_NAME の多OR判定そのものは不変。
+    """
+    cond = inst("OP13-016").master.abilities[0].condition
     assert isinstance(cond.value, list) and len(cond.value) == 3
     gm, p1, _ = game("ST10-002")  # リーダー=モンキー・D・ルフィ
     res = EffectResolver(gm)

@@ -125,3 +125,26 @@ def test_attack_rest_does_not_match_effect_qualified():
     # 相手の効果（effect_controller≠host_owner）は「自分の効果で」に不一致
     assert gm._rest_subject_matches(ab, host, host, p1, by_attack=False,
                                     effect_controller=_p2) is False
+
+
+def test_op14_070_source_must_be_opponent_character_not_leader():
+    """OP14-070 バッファロー「相手のキャラの効果でレストになった時」は、レスト要因の発生源が
+    相手のキャラのときだけ発火し、相手のリーダーの効果では発火しない（発生源 キャラ vs リーダー区別）。
+    発生源が不明な場合は従来どおり発火を許容する（後方互換）。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import CardType
+    gm, p1, p2 = _game(turn="P2")
+    host = inst("OP14-070", "P1")
+    p1.field = [host]
+    ab = next(a for a in host.master.abilities if a.trigger.name == "ON_REST")
+    char_src = CardInstance(make_master(card_id="C", name="c", type=CardType.CHARACTER), "P2")
+    leader_src = p2.leader
+    # 相手のキャラの効果 → 発火
+    assert gm._rest_subject_matches(ab, host, host, p1, by_attack=False,
+                                    effect_controller=p2, cause_source=char_src) is True
+    # 相手のリーダーの効果 → 不発（発生源がキャラでない）
+    assert gm._rest_subject_matches(ab, host, host, p1, by_attack=False,
+                                    effect_controller=p2, cause_source=leader_src) is False
+    # 発生源不明 → 後方互換で発火許容
+    assert gm._rest_subject_matches(ab, host, host, p1, by_attack=False,
+                                    effect_controller=p2, cause_source=None) is True
