@@ -2728,6 +2728,29 @@ def _no_effect_play_passive(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(type=ActionType.RESTRICTION, status="NO_EFFECT_PLAY", raw_text=t)
 
 
+@rule("attack_tax_discard", priority=95)
+def _attack_tax_discard(ctx: ParseContext) -> Optional[GameAction]:
+    """「（相手のキャラすべては、…まで、）アタックする際、自身の手札N枚を捨てなければ
+    アタックすることができない」= アタック税（OP08-043）。対象キャラへ ATTACK_TAX_DISCARD_N の
+    継続フラグを付与し、declare_attack で手札N枚の支払い（不能なら不可）を強制する。"""
+    t = ctx.text
+    m = re.search(_nfc(r"アタックする際、.*?手札([\d０-９]+)枚を捨てなければ(?:アタック)?(?:する)?ことができない"), t)
+    if not m:
+        return None
+    n = _to_int(m.group(1))
+    # 主語（対象集合）は「アタックする際」より前。手札枚数句に汚染されないよう前半のみ解析する。
+    subject = t.split(_nfc("アタックする際"))[0]
+    tq = parse_target(subject)
+    duration = "UNTIL_NEXT_TURN_END" if _nfc("次の") in t else "THIS_TURN"
+    return GameAction(
+        type=ActionType.RESTRICTION,
+        status=f"ATTACK_TAX_DISCARD_{n}",
+        target=tq,
+        duration=duration,
+        raw_text=t,
+    )
+
+
 @rule("rest_restrict", priority=66)
 def _rest_restrict(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text

@@ -1308,6 +1308,19 @@ class GameManager:
         if (target.master.type == CardType.CHARACTER and not target.is_rest
                 and not attacker.has_keyword("ATTACK_ACTIVE")):
             raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
+        # アタック税（OP08-043「アタックする際、自身の手札N枚を捨てなければアタックできない」）。
+        # 付与された ATTACK_TAX_DISCARD_N フラグがあれば、手札N枚を支払えるときのみアタック可。
+        tax_flags = [f for f in (attacker.flags | attacker.timed_flags)
+                     if isinstance(f, str) and f.startswith("ATTACK_TAX_DISCARD_")]
+        if tax_flags:
+            need = max(int(f.rsplit("_", 1)[1]) for f in tax_flags)
+            if len(attacker_owner.hand) < need:
+                raise ValueError(f"アタックするには手札{need}枚を捨てる必要があり、手札が足りません。")
+            # コスト支払い: 手札N枚を捨てる。どの札を捨てるかは本来プレイヤー選択だが、宣言経路を
+            # 中断させないため先頭からN枚を捨てる（捨て札選択の対話化は今後の課題）。
+            for _ in range(need):
+                attacker_owner.trash.append(attacker_owner.hand.pop(0))
+            log_event("INFO", "game.attack_tax", f"{attacker.master.name} paid attack tax (discard {need})", player=attacker_owner.name)
         log_event("INFO", "game.attack_declare", f"{attacker.master.name} is attacking {target.master.name}", player=attacker_owner.name)
         attacker.is_rest = True
         self.active_battle = {"attacker": attacker, "target": target, "attacker_owner": attacker_owner, "target_owner": target_owner, "counter_buff": 0}
@@ -2652,12 +2665,17 @@ class GameManager:
                         log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name)
                 success = True
             elif act_name in ["ATTACK_DISABLE", "RESTRICTION"]:
-                # 「（このターン中／次の相手のターン終了時まで）アタックできない」
+                # 「（このターン中／次の相手のターン終了時まで）アタックできない」。
+                # アタック税（status=ATTACK_TAX_DISCARD_N）はアタック「不可」ではなく、
+                # アタック時に手札N枚の支払いを要求する継続フラグとして付与する（declare_attack で強制）。
                 dur = getattr(action, "duration", "INSTANT")
+                flag = getattr(action, "status", None) or "ATTACK_DISABLE"
+                if not (isinstance(flag, str) and flag.startswith("ATTACK_TAX_")):
+                    flag = "ATTACK_DISABLE"
                 if dur == "UNTIL_NEXT_TURN_END":
-                    self.continuous.apply(target, "FLAG", "UNTIL_NEXT_TURN_END", flag="ATTACK_DISABLE", expire_turn=self.turn_count + 1)
+                    self.continuous.apply(target, "FLAG", "UNTIL_NEXT_TURN_END", flag=flag, expire_turn=self.turn_count + 1)
                 else:
-                    self.continuous.apply(target, "FLAG", "THIS_TURN", flag="ATTACK_DISABLE")
+                    self.continuous.apply(target, "FLAG", "THIS_TURN", flag=flag)
                 success = True
             elif act_name == "PREVENT_REST":
                 # 「（相手の）キャラは…までレストにできない」: レスト不可＝そのキャラは

@@ -116,6 +116,60 @@ def test_rairyu_targets_rested_only():
     assert freeze.target.is_rest is True
 
 
+def test_op08_043_attack_tax_discard():
+    """OP08-043 エドワード・ニューゲート: 条件成立時、相手のキャラすべてに次の相手ターン終了時まで
+    「アタックする際、手札2枚を捨てなければアタックできない」アタック税を付与する。
+    支払えれば（手札2枚捨て）アタック可、手札不足ならアタック不可。条件不成立なら付与なし。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import CardType, TriggerType
+    import effect_coverage as cov
+
+    def build(hand_n, life_n=2):
+        p1 = Player(name="P1", deck=[],
+                    leader=CardInstance(make_master(card_id="WB", name="wb", type=CardType.LEADER,
+                                                    traits=["白ひげ海賊団"], life=5), "P1"))
+        p2 = Player(name="P2", deck=[], leader=inst("OP01-001", "P2"))
+        gm = GameManager(player1=p1, player2=p2)
+        gm.turn_player = p1
+        gm.turn_count = 3
+        gm._validate_action = lambda pl, at: None       # ゲームフロー依存をバイパス（既存テスト慣例）
+        p1.life = [inst("OP01-016", "P1") for _ in range(life_n)]
+        oc = CardInstance(make_master(card_id="OC", name="oc", type=CardType.CHARACTER,
+                                      power=5000), "P2")
+        p2.field = [oc]
+        p2.hand = [inst("OP01-016", "P2") for _ in range(hand_n)]
+        src = inst("OP08-043", "P1")
+        p1.field = [src]
+        ab = [a for a in src.master.abilities if a.trigger == TriggerType.ON_PLAY][0]
+        gm.resolve_ability(p1, ab, src)
+        cov._smart_drain(gm)
+        return gm, p1, p2, oc
+
+    # 条件成立: 相手キャラにアタック税が付く。手札2枚で支払いアタック可。
+    gm, p1, p2, oc = build(hand_n=3)
+    assert any(str(f).startswith("ATTACK_TAX_DISCARD_") for f in (oc.flags | oc.timed_flags))
+    gm.turn_player = p2
+    oc.is_rest = False
+    oc.is_newly_played = False
+    gm.declare_attack(oc, p1.leader)
+    assert len(p2.hand) == 1 and len(p2.trash) == 2      # 手札2枚を支払った
+
+    # 手札不足ならアタック不可。
+    gm2, q1, q2, oc2 = build(hand_n=1)
+    gm2.turn_player = q2
+    oc2.is_rest = False
+    oc2.is_newly_played = False
+    try:
+        gm2.declare_attack(oc2, q1.leader)
+        assert False, "手札不足ではアタックできないはず"
+    except ValueError:
+        pass
+
+    # 条件不成立（ライフ4枚）なら付与しない。
+    gm3, _, _, oc3 = build(hand_n=3, life_n=4)
+    assert not any(str(f).startswith("ATTACK_TAX_DISCARD_") for f in (oc3.flags | oc3.timed_flags))
+
+
 def test_op05_100_replacement_negated_by_named_character():
     """OP05-100 エネル: 「場を離れる場合、代わりにライフ1枚トラッシュ」の置換は、
     キャラの「モンキー・D・ルフィ」が場にいると無効になる（自己無効化条件の是正）。"""
