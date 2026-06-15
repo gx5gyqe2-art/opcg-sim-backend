@@ -98,6 +98,119 @@ def test_evaluate_see_opp_hand_policy(db):
     assert full_after < full_before         # full は相手の防御力増として自分有利度が下がる
 
 
+def _new_gm(db):
+    random.seed(0)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    return gm
+
+
+def _plain_char(gm):
+    """速攻を持たないキャラ CardInstance をデッキから 1 枚見つける（攻め圧/閾値テスト用）。"""
+    for c in list(gm.p1.deck):
+        if c.master.type.name == "CHARACTER" and not c.has_keyword("速攻"):
+            return c
+    return None
+
+
+# ---------------------------------------------------------------------------
+# 評価関数の改修（戦闘の閾値性 / J=デッキ切れ / 召喚酔い / 無意味手の抑制）
+# ---------------------------------------------------------------------------
+
+def test_effective_power_caps_excess():
+    """有効パワーは上限 cap までは等価、超過分は W_POWER_OVERCAP で強く減衰する。"""
+    cap = 5000.0
+    assert cpu_ai._effective_power(3000, cap) == 3000          # cap 未満は等価
+    assert cpu_ai._effective_power(5000, cap) == 5000          # ちょうど cap も等価
+    # 超過 4000 分はほぼ無価値（×W_POWER_OVERCAP）。
+    assert cpu_ai._effective_power(9000, cap) == cap + 4000 * cpu_ai.W_POWER_OVERCAP
+
+
+def test_overcap_power_barely_valued(db):
+    """対面の最硬防御を超えた過剰パワーは評価をほとんど上げない（届かせる必要のない強化を価値化しない）。"""
+    gm = _new_gm(db)
+    c = _plain_char(gm)
+    assert c is not None
+    gm.p1.deck.remove(c)
+    gm.p1.field.append(c)
+    c.is_rest = False
+    cap = cpu_ai._power_cap(gm.p2)
+    c.passive_power_override = int(cap)            # ちょうど cap
+    at_cap = cpu_ai.evaluate(gm, "p1")
+    c.passive_power_override = int(cap) + 4000     # cap を 4000 超過（≒ドン 4 枚分）
+    over_cap = cpu_ai.evaluate(gm, "p1")
+    delta = over_cap - at_cap
+    # 超過分の寄与は線形評価（4000×W_FIELD_POWER）よりはるかに小さい。
+    assert delta == pytest.approx(4000 * cpu_ai.W_POWER_OVERCAP * cpu_ai.W_FIELD_POWER)
+    assert delta < 4000 * cpu_ai.W_FIELD_POWER * 0.5
+
+
+def test_ineffective_don_attach_is_not_worth_acting(db):
+    """対面の防御を既に上回るキャラへのドン付与は、純減（アクティブドン喪失）で無意味手として畳まれる側。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p1  # 自ターン（付与ドンのパワーが乗る前提）
+    c = _plain_char(gm)
+    assert c is not None
+    gm.p1.deck.remove(c)
+    gm.p1.field.append(c)
+    c.is_rest = False
+    cap = cpu_ai._power_cap(gm.p2)
+    c.passive_power_override = int(cap) + 1000     # 既に cap 超過
+    gm.p1.don_active.append(gm.p1.don_deck.pop())  # 付与用のアクティブドンを 1 枚用意
+    before = cpu_ai.evaluate(gm, "p1")
+    # ATTACH_DON の盤面効果を再現: アクティブドン -1、対象キャラの付与ドン +1（自ターンは +1000 パワー）。
+    don = gm.p1.don_active.pop()
+    don.attached_to = c.uuid
+    gm.p1.don_attached_cards.append(don)
+    c.attached_don += 1
+    after = cpu_ai.evaluate(gm, "p1")
+    # 改善幅は行動採用しきい値（_ACT_MARGIN）未満、かつ実際は純減（過剰パワー化＋アクティブドン喪失）。
+    assert after - before < cpu_ai._ACT_MARGIN
+    assert after < before
+
+
+def test_deckout_danger_penalizes_low_own_deck(db):
+    """自デッキ残が危険域（DECK_DANGER 以下）に入ると非線形に減点される（J=0 デッキ切れの回避）。"""
+    gm = _new_gm(db)
+    base = cpu_ai.evaluate(gm, "p1")
+    saved = list(gm.p1.deck)
+    gm.p1.deck = saved[:2]                          # 残り 2 枚＝危険域
+    assert cpu_ai.evaluate(gm, "p1") < base
+    gm.p1.deck = saved                              # 復帰
+    # 相手のデッキ切れ接近は自分有利（相手を削り切る動機）。
+    gm.p2.deck = list(gm.p2.deck)[:1]
+    assert cpu_ai.evaluate(gm, "p1") > base
+
+
+def test_summoning_sick_char_not_counted_as_attacker(db):
+    """自ターンの召喚酔い（速攻なし）キャラは今ターン攻撃できないので攻め圧を加点しない。
+
+    確立済み（is_newly_played=False）になると W_ATTACKER 相当の加点が立つ。相手ターン視点
+    （is_turn=False）では将来の攻め圧として召喚酔いでも加点される（過小評価しない）。
+    """
+    gm = _new_gm(db)
+    c = _plain_char(gm)
+    assert c is not None
+    gm.p1.deck.remove(c)
+    gm.p1.field.append(c)
+    c.is_rest = False
+    cap = cpu_ai._power_cap(gm.p2)
+    # 自ターン視点: 召喚酔いは攻め圧なし → 確立済みとの差は W_ATTACKER。
+    c.is_newly_played = True
+    sick = cpu_ai._side_score(gm.p1, True, cap)
+    c.is_newly_played = False
+    ready = cpu_ai._side_score(gm.p1, True, cap)
+    assert ready - sick == cpu_ai.W_ATTACKER
+    # 相手ターン視点（is_turn=False）: 召喚酔いでも将来圧として加点（差が出ない）。
+    c.is_newly_played = True
+    sick_off = cpu_ai._side_score(gm.p1, False, cap)
+    c.is_newly_played = False
+    ready_off = cpu_ai._side_score(gm.p1, False, cap)
+    assert ready_off == sick_off
+
+
 @pytest.mark.parametrize("difficulty", ["easy", "normal", "hard"])
 def test_decide_returns_legal_move(db, difficulty):
     """decide はその時点の合法手のいずれかを返す（easy/normal/hard とも）。"""
