@@ -214,8 +214,13 @@ def test_power_exact_match_counter():
 
 
 def test_leader_name_multi_or():
-    """OP13-016 ガープ: 「「サボ」か「エース」か「ルフィ」」はいずれか一致で発動。"""
-    cond = inst("OP13-016").master.abilities[0].effect.actions[0].condition
+    """OP13-016 ガープ: 「「サボ」か「エース」か「ルフィ」」はいずれか一致で発動。
+
+    カテゴリH 是正で、先頭ゲート条件「リーダーが〜の場合」は能力全体を支配するため
+    ability.condition へ引き上げられる（旧: effect.actions[0] の内部 Branch。「公開し手札に
+    加える」が条件外に漏れていた）。LEADER_NAME の多OR判定そのものは不変。
+    """
+    cond = inst("OP13-016").master.abilities[0].condition
     assert isinstance(cond.value, list) and len(cond.value) == 3
     gm, p1, _ = game("ST10-002")  # リーダー=モンキー・D・ルフィ
     res = EffectResolver(gm)

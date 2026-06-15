@@ -2404,18 +2404,21 @@ CASES = [
     {
         "id": "op09_093_teach_negate",
         "text": "【ブロッカー】 / 【起動メイン】【ターン1回】自分のリーダーが特徴《黒ひげ海賊団》を持ち、このキャラが登場したターンの場合、相手のリーダー1枚までを、このターン中、効果を無効にする。その後、相手のキャラ1枚までを、次の相手のターン終了時まで、効果を無効にし、そのキャラはアタックできない。",
+        # カテゴリH 是正後: 先頭ゲート条件（黒ひげ ∧ 登場ターン）は能力全体を支配するため
+        # ability.condition へ引き上げられ、「その後」のキャラ無効＋アタック禁止も同条件下に入る。
         "expect": [
             {"trigger": "ACTIVATE_MAIN",
-             "condition": {"type": "TURN_LIMIT"},
+             "condition": {"type": "AND", "args": [
+                 {"type": "TURN_LIMIT"},
+                 {"type": "AND", "args": [
+                     {"type": "LEADER_TRAIT", "value": "黒ひげ海賊団"},
+                     {"type": "SOURCE_STATE", "value": "ENTERED_THIS_TURN"},
+                 ]},
+             ]},
              "effect": {"kind": "seq", "actions": [
-                 {"kind": "branch",
-                  "condition": {"type": "AND", "args": [
-                      {"type": "LEADER_TRAIT", "value": "黒ひげ海賊団"},
-                      {"type": "SOURCE_STATE", "value": "ENTERED_THIS_TURN"},
-                  ]},
-                  "if_true": {"type": "NEGATE_EFFECT",
-                              "target": {"player": "OPPONENT", "card_type": ["LEADER"]},
-                              "duration": "THIS_TURN"}},
+                 {"type": "NEGATE_EFFECT",
+                  "target": {"player": "OPPONENT", "card_type": ["LEADER"]},
+                  "duration": "THIS_TURN"},
                  {"kind": "seq", "actions": [
                      {"type": "NEGATE_EFFECT",
                       "target": {"player": "OPPONENT", "card_type": ["CHARACTER"],

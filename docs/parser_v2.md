@@ -38,6 +38,12 @@ tests/
 
 1. レガシーと同じ手順でカードテキストを能力単位に分割し、トリガー・コスト・条件・
    逐次(Sequence)・分岐(Branch)・選択肢(Choice) の **構造** を組み立てる。
+   - **先頭ゲート条件のスコープ（カテゴリH）**: 「〈条件〉場合、A。その後、B」では、先頭の条件は
+     OPCG ルール上**能力全体（その後 B を含む）を支配**する。`EffectParser._lift_h_gate` が、
+     先頭（または LOOK/REVEAL/宣言 等の無条件セットアップの直後）の `Branch(if_false=None)` に
+     続く非TEMPの兄弟アクションを同条件の配下へ畳み込み、`ability.condition` へ引き上げる。
+     旧実装は A だけを Branch で包み B が無条件化していた（`docs/reports/quality_postmortem_categoryH.md`）。
+     再混入は `tests/test_structural_gate.py`（構造不変条件＋条件偽パス）でラチェット検出する。
 2. 葉に当たる **原子句** の解釈時に `default_registry.apply()` を呼ぶ。
    - ルールが一致 → そのルールが構築した `GameAction` を採用（`rule_hits` に記録）
    - 不一致 → レガシー `_parse_atomic_action()` にフォールバック（`unmatched` に記録）

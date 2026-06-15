@@ -7,6 +7,44 @@ from ...models.enums import ActionType, TriggerType, ConditionType, Zone, Compar
 from .matcher import parse_target
 from ...utils.logger_config import log_event
 
+# カテゴリH（先頭ゲート条件が「。その後、」をまたぐ漏れ）の AST 是正・検出用の分類。
+# 無条件セットアップ＝先頭に来ても条件を構成しない準備行為（見る/公開/選ぶ/宣言/並べる）。
+_H_SETUP_ACTIONS = frozenset({
+    ActionType.LOOK, ActionType.LOOK_LIFE, ActionType.REVEAL,
+    ActionType.SELECT, ActionType.DECLARE_COST, ActionType.ORDER_LIFE,
+})
+# 「その後、残りをデッキへ戻す」型の無害なデッキ整理（見たカードの後始末）。
+_H_CLEANUP_ACTIONS = frozenset({
+    ActionType.DECK_BOTTOM, ActionType.DECK_TOP, ActionType.SHUFFLE,
+})
+
+
+def _h_iter_actions(node):
+    """ノード木中の GameAction を浅く列挙（Branch/Choice 内部は辿らない＝兄弟レベル判定用）。"""
+    if isinstance(node, GameAction):
+        yield node
+    elif isinstance(node, Sequence):
+        for a in node.actions:
+            yield from _h_iter_actions(a)
+
+
+def _h_is_genuine(node) -> bool:
+    """ノードが「実害ある実効果」を含むか（見たカードのデッキ整理だけなら False）。"""
+    if isinstance(node, Branch):
+        return _h_is_genuine(node.if_true) or _h_is_genuine(node.if_false)
+    if isinstance(node, Choice):
+        return any(_h_is_genuine(o) for o in node.options)
+    for a in _h_iter_actions(node):
+        if a.type == ActionType.OTHER:
+            continue
+        if a.type in _H_CLEANUP_ACTIONS:
+            continue
+        if a.type == ActionType.MOVE_CARD and a.destination in (Zone.DECK, Zone.TRASH):
+            continue  # 見たカードをデッキ/トラッシュへ戻すだけの後始末
+        return True
+    return False
+
+
 class EffectParser:
     def __init__(self):
         pass
@@ -460,6 +498,9 @@ class EffectParser:
 
             effect_node = self._parse_to_node(effect_text)
 
+            # カテゴリH: 先頭ゲート条件が「。その後、」をまたいで後続を無条件化する漏れを是正する。
+            effect_node = self._lift_h_gate(effect_node)
+
             # ゲーム開始時のデッキサーチはルール上シャッフルを伴う（OP13-079）。
             if (trigger == TriggerType.GAME_START and effect_node is not None
                     and _nfc("デッキから") in effect_text):
@@ -638,6 +679,51 @@ class EffectParser:
                              operator=CompareOperator.GE, player=Player.SELF, raw_text=t)
             return cond, rest
         return None, effect_text
+
+    def _lift_h_gate(self, effect_node):
+        """カテゴリH 是正: 先頭ゲート条件が「。その後、」をまたいで後続を無条件化する漏れを直す。
+
+        effect が Sequence で、(無条件セットアップの後)先頭が `Branch(if_false=None)` かつ、その後ろに
+        独立条件を持たない実効果（非TEMP）の兄弟があるとき、その先頭条件で後続兄弟ごとゲートし直す。
+        OPCG ルールでは先頭に置かれた条件は能力全体（「その後」B を含む）を支配するため。
+
+        セットアップ（見る/公開/宣言）は条件に関わらず実行されるため if_true には畳み込まない。
+        後続に独自条件の Branch がある場合（各文が独立条件＝別ゲート）は安全側で触らない。
+        """
+        if not isinstance(effect_node, Sequence):
+            return effect_node
+        acts = effect_node.actions
+        branch_idx = None
+        for i, a in enumerate(acts):
+            if isinstance(a, Branch) and a.if_false is None and a.condition is not None:
+                branch_idx = i
+                break
+            if isinstance(a, GameAction) and a.type in _H_SETUP_ACTIONS:
+                continue  # 無条件セットアップは飛ばす
+            return effect_node  # 分岐より前に実効果がある＝先頭ゲートではない
+        if branch_idx is None:
+            return effect_node
+        tail = acts[branch_idx + 1:]
+        # 後続に独立条件の Branch が混在するなら触らない（文ごとに別条件＝H ではない）。
+        if any(isinstance(t, Branch) for t in tail):
+            return effect_node
+        # 漏れている実効果（非TEMP）が無ければ何もしない（無害なデッキ整理のみは据え置き）。
+        if not any(_h_is_genuine(t) for t in tail):
+            return effect_node
+        branch = acts[branch_idx]
+        inner = []
+        if isinstance(branch.if_true, Sequence):
+            inner.extend(branch.if_true.actions)
+        elif branch.if_true is not None:
+            inner.append(branch.if_true)
+        inner.extend(tail)
+        new_if_true = inner[0] if len(inner) == 1 else Sequence(actions=inner)
+        new_branch = Branch(condition=branch.condition, if_true=new_if_true, if_false=None)
+        setup = acts[:branch_idx]
+        if not setup:
+            # セットアップ無し＝先頭分岐。bare Branch で返し、後段の ability.condition 引き上げに委ねる。
+            return new_branch
+        return Sequence(actions=setup + [new_branch])
 
     def _extract_leading_condition(self, text: str):
         """テキスト先頭のゲート条件「〜の場合、/〜なら、」を (Condition, 残りテキスト) に分離する。

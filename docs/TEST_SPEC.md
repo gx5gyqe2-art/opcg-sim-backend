@@ -74,6 +74,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | ファイル | 役割 |
 |---|---|
 | `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER/PER_TURN_LIMIT_GAP/UP_TO_GAP = 0 のラチェット（§5） |
+| `tests/test_structural_gate.py` | 構造不変条件4スキャン＋条件偽パスのラチェット（カテゴリH 再発防止。§5/§8.5） |
 | `tests/test_interaction_stack.py` | 中断スタック（`active_interaction` 互換プロパティ／`push_interaction`）のセマンティクス |
 | `tests/test_replacement_interactive.py` | 置換 sub_effect のネスト中断（終端=UI提示+resume／非終端=自動解決）。SPEC §6.1 |
 | `tests/test_both_sides_interactive.py` | 「お互いの〜」両側効果の各プレイヤー個別選択（相手→自分の逐次中断）。SPEC §6.1 |
@@ -100,6 +101,8 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | `tests/cpu_selfplay.py` | 決定論的 CPU 対 CPU 自己対戦（効果検証ハーネス）。詳細は §3.1 |
 | `tests/expected_effects.py` | 各カード×能力の「期待する動き」を AST から機械生成（`--regen`→`expected_effects.json`、`--card ID`）。効果オラクルの期待マニフェスト |
 | `tests/effect_oracle.py` | 期待 vs テキスト/AST の静的整合性コンパレータ（既存ゲートが拾わない高シグナル候補のみ抽出。`--category`/`--json`） |
+| `tests/structural_invariants.py` | 構造不変条件4スキャン（H先頭ゲート漏れ／Duration write-off／chooser欠落／「すべて」count退化）の一括検出（`--show`）。カテゴリH 横展開の回帰ツール化 |
+| `tests/false_path_coverage.py` | 条件を偽にして発動し、ゲートされた効果が走らない（盤面変化ゼロ）かを動的検証（`--show`/`--card`） |
 | `tests/leader_spec_probe.py` | リーダー1枚のテキスト/AST要約/実行観測の出力（`<ID>`/`--set`/`--all`/`--json`）。手動検証（§8）の補助に使う |
 | `tests/card_spec_probe.py` | 上記を非リーダー含む全カードに拡張し**弾×色**で絞る（`--set OP16 --color 赤`/`--buckets`/`--type`/`--json`）。デッキを跨いで弾×色バケット単位に検証する起点（§8） |
 
@@ -160,6 +163,8 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 | `tests/compare_parsers.py` | 新規 OTHER（退行）= 0 |
 | `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER / PER_TURN_LIMIT_GAP / UP_TO_GAP = 0（**ラチェット**） |
 | `tests/test_verified_decks.py` | 検証済みデッキの効果回帰 = 全合格（**ラチェット**: 検証済みの挙動は減らさない） |
+| `tests/test_structural_gate.py` | 構造不変条件4スキャン（H先頭ゲート漏れ／Duration write-off／chooser欠落／「すべて」count退化）= 0 ＋ 条件偽パスで盤面変化ゼロ（**ラチェット**。カテゴリH 再発防止） |
+| `tests/test_verified_buckets.py` | §8.2 台帳「✓」弾×色がベースライン全数登録・H違反0（ドキュメント主張の機械保証） |
 
 挙動を変更したら差分をレビューのうえ `full_card_audit.py --regen` でベースライン更新し、上記ゲートを通す。
 **検証済みデッキ（§8.2 台帳）の挙動を直したら `tests/test_verified_decks.py` にアサートを追記**し、
@@ -253,11 +258,11 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 | **OP16 × 紫**（弾×色, §8 デッキ非依存） | — | 2026-06-14 | 1（OP16-074 マゼラン「相手は自身の場のドン!!を戻す」が、RETURN_DON の対象選択 resume を応答者(相手)視点で再実行＝`_don_pool_player` が自分プールを指し空振り。`SELECT_RESOURCE` resume を発生源の持ち主＝効果責任者視点に修正。「相手は…ドン!!を戻す」系全般に波及） | ✓ |
 | **OP16 × 黒**（弾×色, §8 デッキ非依存） | — | 2026-06-14 | 1（OP16-100 氷諸斬り「このターン中、相手のキャラがKOされている場合」が、「KOされて<いる>」の "いる" で FIELD_COUNT（相手の場キャラ存在）に誤吸収され逆の意味に化けていた。ターン内KOイベント記録＋専用条件 `CHAR_KOED_THIS_TURN` を追加して是正） | ✓ |
 | **OP16 × 黄**（弾×色, §8 デッキ非依存） | — | 2026-06-14 | 1（OP16-102 アバロ・ピサロ「自分の**手札かトラッシュ**から登場」が、play_card_from_zone ルールの `has_trash` 上書きで zone=TRASH 単一に退化し手札からの登場が不可だった。「手札かトラッシュ／トラッシュか手札」の隣接並列を両ゾーンに。OP06-060/064/066/068・EB01-033・EB03-042・EB04-047・OP14-091・PRB02-018 ほか13枚に波及。併せて parse_target の「手札から…場」誤マルチゾーン検出を本ルールが上書きで吸収） | ✓ |
-| **EB01〜EB04 全色**（EX ブースター, §8 デッキ非依存） | — | 2026-06-15 | 0（独立新規バグなし・走査245枚。dual-tier 除去 EB03-021／leader+char の BUFF・ATTACH_DON EB02-007・EB03-026・EB03-037／name-or-type EB04-029 はいずれも既存横断修正でカバー、WARN 群は self-target ACTIVE/GRANT/RAMP/PLAY に対する分類器の方向ヒューリスティック誤検知で健全。**全弾横断の既知残＝カテゴリH**（先頭条件が「。その後、」をまたぐ漏れ）に該当: EB02-028/032・EB03-003/013/017/039/051/052・EB04-030/036 ほか22能力） | — H未修正 |
-| **PRB01・PRB02 全色**（プレミアムブースター, §8 デッキ非依存） | — | 2026-06-15 | 0（独立新規バグなし・走査19枚。PRB02-010/013 がカテゴリH に該当・他は健全） | — H未修正 |
-| **P（プロモ）全色**（§8 デッキ非依存） | — | 2026-06-15 | 0（独立新規バグなし・走査120枚。WARN 3枚 P-029/091/099 は self-target ACTIVE/GRANT の誤検知で健全。カテゴリH 該当: P-059/112） | — H未修正 |
+| **EB01〜EB04 全色**（EX ブースター, §8 デッキ非依存） | — | 2026-06-15 | 0（独立新規バグなし・走査245枚。dual-tier 除去 EB03-021／leader+char の BUFF・ATTACH_DON EB02-007・EB03-026・EB03-037／name-or-type EB04-029 はいずれも既存横断修正でカバー、WARN 群は self-target ACTIVE/GRANT/RAMP/PLAY に対する分類器の方向ヒューリスティック誤検知で健全。**全弾横断の既知残＝カテゴリH**（先頭条件が「。その後、」をまたぐ漏れ）に該当: EB02-028/032・EB03-003/013/017/039/051/052・EB04-030/036 ほか22能力） | ✓（H是正済） |
+| **PRB01・PRB02 全色**（プレミアムブースター, §8 デッキ非依存） | — | 2026-06-15 | 0（独立新規バグなし・走査19枚。PRB02-010/013 がカテゴリH に該当・他は健全） | ✓（H是正済） |
+| **P（プロモ）全色**（§8 デッキ非依存） | — | 2026-06-15 | 0（独立新規バグなし・走査120枚。WARN 3枚 P-029/091/099 は self-target ACTIVE/GRANT の誤検知で健全。カテゴリH 該当: P-059/112） | ✓（H是正済） |
 | **ST01〜ST09 全色**（スターターデッキ, §8 デッキ非依存） | — | 2026-06-15 | 0（系統的な新規バグなし・走査149枚。カテゴリH 該当0。WARN 群は self-target ACTIVE/KO/GRANT/BUFF の分類器誤検知で健全。**単発残（1枚）**: ST02-014 X・ドレーク「特徴《超新星》か《海軍》を持つリーダーとキャラ**の**（無印）パワー+1000」が数量詞なしで count=1/CHOOSE に退化＝本来は該当する全リーダー+キャラへ。「すべて」明記の OP02-120 等は正しく ALL。§8.3「対象フィルタ/count退化」型・低優先） | ✓ |
-| **OP01〜OP04 全色**（OP ブースター, §8 デッキ非依存） | — | 2026-06-15 | 0（独立新規バグなし・走査約480枚。dual-tier/leader+char合計/お互いライフ合計(LIFE_COUNT_BOTH)/FREEZE合計まで＝OP02-120・OP04-031・OP04-112・OP04-116 等はいずれも既存横断修正でカバー、WARN は self-target 誤検知。**全弾横断の既知残＝カテゴリH** 15能力: OP01:1/OP02:1/OP03:4/OP04:9） | — H未修正 |
+| **OP01〜OP04 全色**（OP ブースター, §8 デッキ非依存） | — | 2026-06-15 | 0（独立新規バグなし・走査約480枚。dual-tier/leader+char合計/お互いライフ合計(LIFE_COUNT_BOTH)/FREEZE合計まで＝OP02-120・OP04-031・OP04-112・OP04-116 等はいずれも既存横断修正でカバー、WARN は self-target 誤検知。**全弾横断の既知残＝カテゴリH** 15能力: OP01:1/OP02:1/OP03:4/OP04:9） | ✓（H是正済） |
 | **ST10〜ST30 全色**（スターターデッキ, §8 デッキ非依存） | — | 2026-06-15 | 0（走査203枚・系統的な新規バグなし。ST はほぼ既存 OP カードのリプリントで、横断修正カテゴリA〜G が網羅。`card_spec_probe` の classify＋§8.3 危険パターンで17枚を抽出し全数精査＝(a)「条件＋後続」10枚は条件が後続アクション全体を覆い健全（ST13-015/ST14-008/ST17-001/ST18-002/ST22-006/ST22-012/ST24-001/ST25-001/ST29-001）(b) WARN 6枚は self-target ACTIVE/GRANT_KEYWORD/RAMP_DON/PLAY_CARD に対する分類器の方向ヒューリスティック誤検知で全て正常。回帰 `test_st29001_*`/`test_st24001_*`/`test_st30001_*`）。**残（低優先・未対応1枚）**: ST11-004「新時代」（FILM イベント）の「リーダーがウタの場合、…見て手札に加える。**その後、**残りをデッキ下に置き、ドン!!1枚をアクティブにする」で ACTIVE_DON が「。その後、」の手順境界をまたいで条件外に出る（カテゴリA は手順境界を意図的に分割境界として保つ）。ウタデッキ専用カード＝リーダーは常にウタのため実害なし | ✓ |
 
 > 残課題（既知の限定対応・優先度低）: on-rest 誘発のうち**ブロック宣言によるレスト**（ブロッカー
@@ -313,12 +318,15 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 
 1. **発火**: トリガー種別がエンジンで実際に発火するか（§8.3「実行系が無い」を疑う）。
 2. **条件**: player / 比較 / 値 / 複数条件の AND-OR が正しいか（境界で真偽を実測）。
-3. **対象**: ゾーン・側・種類・特徴・名前（別名含む）・パワー/コスト範囲・レスト状態・除外が正しいか。
-4. **値**: 固定値か動的スケールか（「N枚につき」「同じパワー」等）。
-5. **持続時間**: INSTANT / THIS_TURN / THIS_BATTLE / UNTIL_NEXT_TURN_END の写像。
-6. **複合句**: 「〜得て」「〜ず、」で2アクションに割れているか（片方脱落していないか）。
-7. **コスト**: 任意（できる）か必須か、支払い不能時にスキップされるか。
-8. **副作用の安全性**: 誤って勝利/除去/無限ループ等を起こさないか。
+3. **条件“偽”パス**: **条件を偽にして発動し、ゲートされた効果が一切走らない（状態変化ゼロ）**か。
+   先頭ゲート条件は「。その後、」をまたいで能力全体を支配する（カテゴリH）。真パスだけ見ると
+   ベースラインが latent bug を凍結する死角がある（→ `tests/false_path_coverage.py`）。
+4. **対象**: ゾーン・側・種類・特徴・名前（別名含む）・パワー/コスト範囲・レスト状態・除外が正しいか。
+5. **値**: 固定値か動的スケールか（「N枚につき」「同じパワー」等）。
+6. **持続時間**: INSTANT / THIS_TURN / THIS_BATTLE / UNTIL_NEXT_TURN_END の写像。
+7. **複合句**: 「〜得て」「〜ず、」で2アクションに割れているか（片方脱落していないか）。
+8. **コスト**: 任意（できる）か必須か、支払い不能時にスキップされるか。
+9. **副作用の安全性**: 誤って勝利/除去/無限ループ等を起こさないか。
 
 ### 8.5 二層回帰モデル（責務分担）
 - **`full_card_baseline.json`**（構造・盤面差分）: 能力1つを単発の汎用盤面で動かした
@@ -327,6 +335,13 @@ OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的
 - **`tests/test_verified_decks.py`**（意味的）: 手動検証で確定した「あるべき挙動」を
   ゲーム不変条件として固定。ベースラインの死角（§8.3）を埋める。意味挙動を直したら
   **必ずここへ追記**し、以後割らない（§5 ラチェット）。
+- **`tests/test_structural_gate.py`**（構造不変条件・ランタイム偽パス）: ベースライン／オラクルが
+  測れない *条件スコープ／期間／選択者／全体性* の死角を埋めるラチェット（上限0）。
+  `tests/structural_invariants.py` の4スキャン（先頭ゲート漏れH／Duration write-off／chooser欠落／
+  「すべて」count退化）＋ `tests/false_path_coverage.py`（条件偽で盤面変化ゼロ）。
+  カテゴリH ポストモーテム（`docs/reports/quality_postmortem_categoryH.md` §6）の再発防止策の実装。
+- **`tests/test_verified_buckets.py`**（台帳の機械保証）: §8.2 台帳「✓」の弾×色バケットが
+  ベースライン指紋に全数登録され、カテゴリH 構造違反0であることを固定（ドキュメント主張→機械保証）。
 
 ### 8.6 未検証弾の弾×色検証計画
 OP05〜OP16 は弾×色の横断検証（§8.2 台帳「弾×色, §8 デッキ非依存」行）で一巡済み。
