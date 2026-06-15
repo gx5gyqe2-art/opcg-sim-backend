@@ -910,14 +910,19 @@ class EffectResolver:
             return all(any(trait == t for t in c.master.traits) for c in chars)
 
         elif condition.type == ConditionType.HAS_CHARACTER:
-            # 特定名前のキャラが場にいる/いない（枚数指定・状態指定あり/なし）
+            # 特定名前のキャラが場にいる/いない（枚数指定・状態指定あり/なし）。
+            # condition.target.zone が TRASH のときはトラッシュ内の存在を見る（OP08-006）。
             char_val = condition.value
+            in_trash = (condition.target is not None
+                        and getattr(condition.target, "zone", None) == Zone.TRASH)
+            pool = list(target_player.trash) if in_trash else list(target_player.field)
+            include_leader = (not in_trash) and target_player.leader is not None
             if isinstance(char_val, tuple):
                 char_name, sub = char_val
                 if isinstance(sub, str) and sub in ("IS_RESTED", "IS_ACTIVE"):
-                    # 状態付き: 「X」がレスト/アクティブ
-                    candidates = [c for c in target_player.field if c.master.matches_name(char_name, partial=True)]
-                    if target_player.leader and target_player.leader.master.matches_name(char_name, partial=True):
+                    # 状態付き: 「X」がレスト/アクティブ（トラッシュには状態が無いので場のみ）
+                    candidates = [c for c in pool if c.master.matches_name(char_name, partial=True)]
+                    if include_leader and target_player.leader.master.matches_name(char_name, partial=True):
                         candidates.append(target_player.leader)
                     if not candidates:
                         return False
@@ -927,14 +932,14 @@ class EffectResolver:
                 else:
                     # 枚数指定: (char_name, count_thr)
                     count_thr = sub
-                    count = sum(1 for c in target_player.field if c.master.matches_name(char_name, partial=True))
-                    if target_player.leader and target_player.leader.master.matches_name(char_name, partial=True):
+                    count = sum(1 for c in pool if c.master.matches_name(char_name, partial=True))
+                    if include_leader and target_player.leader.master.matches_name(char_name, partial=True):
                         count += 1
                     return self._compare(count, condition.operator, count_thr)
             elif isinstance(char_val, str):
                 char_name = char_val
-                count = sum(1 for c in target_player.field if c.master.matches_name(char_name, partial=True))
-                if target_player.leader and target_player.leader.master.matches_name(char_name, partial=True):
+                count = sum(1 for c in pool if c.master.matches_name(char_name, partial=True))
+                if include_leader and target_player.leader.master.matches_name(char_name, partial=True):
                     count += 1
                 if condition.operator == CompareOperator.GE:
                     return count >= 1

@@ -1481,6 +1481,22 @@ class EffectParser:
             return Condition(type=ConditionType.HAND_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
         if _nfc("トラッシュ") in norm_text:
+            # 「トラッシュに「X」(と「Y」…)がある／ない場合」= 各名前がトラッシュに存在する条件の
+            # AND（OP08-006「クロマーリモ」と「チェス」）。名前が「」で明示されるときのみ。枚数条件
+            # （「トラッシュが5枚以上」等）は名前を持たないので従来どおり TRASH_COUNT へ落とす。
+            trash_names = re.findall(_nfc(r'「([^」]+)」'), norm_text)
+            if trash_names and re.search(_nfc(r'(がある|がない)'), norm_text):
+                present = _nfc('がない') not in norm_text
+                name_op = CompareOperator.GE if present else CompareOperator.EQ
+                name_conds = [
+                    Condition(type=ConditionType.HAS_CHARACTER, value=nm, operator=name_op,
+                              player=p, target=TargetQuery(zone=Zone.TRASH, player=p),
+                              raw_text=norm_text)
+                    for nm in trash_names
+                ]
+                if len(name_conds) == 1:
+                    return name_conds[0]
+                return Condition(type=ConditionType.AND, args=name_conds, raw_text=norm_text)
             return Condition(type=ConditionType.TRASH_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
         # デッキ枚数（「自分のデッキが20枚以下の場合」等）。"デッキの上から…" は除外。

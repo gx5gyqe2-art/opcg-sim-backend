@@ -116,6 +116,51 @@ def test_rairyu_targets_rested_only():
     assert freeze.target.is_rest is True
 
 
+def test_op08_101_delayed_life_at_turn_end():
+    """OP08-101 シャーロット・エンゼル: コストでライフ1枚をトラッシュ、条件成立なら
+    「このターン終了時」にデッキの上1枚をライフへ加える（遅延ライフ＝delay=TURN_END）。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import CardType
+    gm, p1, p2 = game("OP15-058")
+    p1.leader.master = make_master(card_id=p1.leader.master.card_id, name="BM",
+                                   type=CardType.LEADER, traits=["ビッグ・マム海賊団"], life=5)
+    # ライフ5・デッキ充分（game() は空デッキなのでダミーを積む）
+    p1.life = [inst("OP08-101") for _ in range(5)]
+    p1.deck = [inst("OP08-101") for _ in range(10)]
+    gm.turn_player = p1
+    src = inst("OP08-101")
+    ab = src.master.abilities[0]
+    gm.resolve_ability(p1, ab, src)
+    life_after_cost, deck_after_cost = len(p1.life), len(p1.deck)
+    assert life_after_cost == 4              # コストでライフ1枚トラッシュ
+    assert len(gm.pending_end_of_turn) == 1  # 効果は遅延キューへ
+    gm._flush_pending_end_of_turn()
+    assert len(p1.life) == 5                  # ターン終了時にデッキ上→ライフで+1
+    assert len(p1.deck) == deck_after_cost - 1
+
+
+def test_op08_006_trash_two_names_condition():
+    """OP08-006 チェスマーリモ: 「トラッシュに「クロマーリモ」と「チェス」がある場合」は
+    両名がトラッシュに存在する AND 条件（TRASH_COUNT==0 退化＝名前脱落の是正）。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import CardType
+    gm, p1, _ = game("OP15-058")
+    res = EffectResolver(gm)
+    cond = inst("OP08-006").master.abilities[0].condition
+    assert cond.type == ConditionType.AND and len(cond.args) == 2
+
+    def trash_card(name):
+        return CardInstance(make_master(card_id="Y", name=name, cost=1, power=1000,
+                                        type=CardType.CHARACTER), "P1")
+    src = inst("OP08-006")
+    p1.trash = []
+    assert res._check_condition(p1, cond, src) is False
+    p1.trash = [trash_card("クロマーリモ")]
+    assert res._check_condition(p1, cond, src) is False     # 片方だけでは不成立
+    p1.trash = [trash_card("クロマーリモ"), trash_card("チェス")]
+    assert res._check_condition(p1, cond, src) is True       # 両名でのみ成立
+
+
 def test_st02_014_buffs_all_matching_leader_and_chars():
     """ST02-014 X・ドレーク: 「特徴《超新星》か《海軍》を持つリーダーとキャラのパワー+1000」は
     **数量詞なし＝該当する全リーダー＋全キャラ**へ適用する（count=1/CHOOSE 退化の是正）。
