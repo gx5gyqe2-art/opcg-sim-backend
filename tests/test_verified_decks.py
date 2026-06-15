@@ -116,6 +116,30 @@ def test_rairyu_targets_rested_only():
     assert freeze.target.is_rest is True
 
 
+def test_st02_014_buffs_all_matching_leader_and_chars():
+    """ST02-014 X・ドレーク: 「特徴《超新星》か《海軍》を持つリーダーとキャラのパワー+1000」は
+    **数量詞なし＝該当する全リーダー＋全キャラ**へ適用する（count=1/CHOOSE 退化の是正）。
+    継続効果（【自分のターン中】）なので passive 再計算で適用される。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import CardType
+    gm, p1, _ = game("OP15-058")
+    drake = inst("ST02-014")           # 発生源（場・レスト・ドン1）
+    drake.is_rest = True
+    drake.attached_don = 1
+
+    def char(name, traits):
+        return CardInstance(make_master(card_id="X", name=name, cost=2, power=2000,
+                                        type=CardType.CHARACTER, traits=traits), "P1")
+    nova = char("nova", ["超新星"])     # 該当
+    navy = char("navy", ["海軍"])       # 該当（か＝OR）
+    other = char("other", ["その他"])   # 非該当
+    p1.field = [drake, nova, navy, other]
+    gm.refresh_passive_state()
+    assert nova.get_power(True) == 3000      # +1000
+    assert navy.get_power(True) == 3000      # +1000（OR の片側一致でも掛かる）
+    assert other.get_power(True) == 2000     # 非該当は不変（count 退化なら誤って1枚化）
+
+
 def test_kamisake_requires_attached_don():
     """OP13-076 神避: 条件は「付与されているドンがある」＝attached のみで判定。"""
     gm, p1, _ = game("OP15-058")

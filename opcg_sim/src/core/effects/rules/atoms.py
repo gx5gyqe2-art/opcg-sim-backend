@@ -402,7 +402,10 @@ def _leader_and_char_dual(ctx: ParseContext):
     ため対象外（ここではパワー増減と効果無効のみ扱う）。"""
     t = ctx.text
     m = re.search(_nfc(r"リーダーとキャラ([\d０-９]+)?枚(ずつ)?(まで)?"), t)
-    if not m:
+    # 数量詞なしの所有格「（特徴《X》を持つ）リーダーとキャラのパワー±N」= 該当する全リーダー＋
+    # 全キャラへ適用（ST02-014。count=1/CHOOSE に退化していた）。「と…枚」の択一/枚数形は m 側。
+    m_all = re.search(_nfc(r"リーダーとキャラ(?:の|は)"), t) if not m else None
+    if not m and not m_all:
         return None
     if _nfc("ドン") in t or _nfc("付与") in t or _nfc("選ぶ") in t or _nfc("選び") in t:
         return None
@@ -411,9 +414,35 @@ def _leader_and_char_dual(ctx: ParseContext):
     if not sign_m and not is_negate:
         return None
     player = Player.OPPONENT if _nfc("相手") in t else Player.SELF
-    n = _to_int(m.group(1)) if m.group(1) else 1
-    up_to = bool(m.group(3))
+    n = _to_int(m.group(1)) if (m and m.group(1)) else 1
+    up_to = bool(m.group(3)) if m else False
     dur = _duration_of(t)
+
+    if m_all:
+        # 特徴等のフィルタを保持するため parse_target を流用し、card_type ごとに ALL で分ける。
+        import dataclasses
+        base = _buff_target(t)
+        traits = list(getattr(base, "traits", []) or [])
+        colors = list(getattr(base, "colors", []) or [])
+        attrs = list(getattr(base, "attributes", []) or [])
+
+        def _mk_all(card_type: str) -> TargetQuery:
+            return TargetQuery(zone=Zone.FIELD, player=player, card_type=[card_type],
+                               traits=traits, colors=colors, attributes=attrs,
+                               count=-1, select_mode="ALL")
+        if sign_m:
+            sign = -1 if sign_m.group(1) in "-－−‐" else 1
+            val = sign * _to_int(sign_m.group(2))
+            leader = GameAction(type=ActionType.BUFF, target=_mk_all("LEADER"),
+                                value=ValueSource(base=val), duration=dur, raw_text=t)
+            char = GameAction(type=ActionType.BUFF, target=_mk_all("CHARACTER"),
+                              value=ValueSource(base=val), duration=dur, raw_text=t)
+        else:
+            leader = GameAction(type=ActionType.NEGATE_EFFECT, target=_mk_all("LEADER"),
+                                duration=dur, raw_text=t)
+            char = GameAction(type=ActionType.NEGATE_EFFECT, target=_mk_all("CHARACTER"),
+                              duration=dur, raw_text=t)
+        return Sequence(actions=[leader, char])
 
     def _mk(card_type: str, count: int, is_up: bool) -> TargetQuery:
         return TargetQuery(zone=Zone.FIELD, player=player, card_type=[card_type],
