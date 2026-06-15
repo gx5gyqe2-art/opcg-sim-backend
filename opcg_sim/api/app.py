@@ -33,6 +33,7 @@ from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.core import cpu_opponent_model
+from opcg_sim.src.core import cpu_self_plan
 from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.models import CardInstance
 
@@ -335,8 +336,17 @@ async def game_create(req: Any = Body(...)):
             opp_profile = None
             if difficulty == "normal" and p1_leader is not None:
                 opp_profile = build_opp_profile_for_leader(p1_leader.master.card_id)
-            CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty, "opp_profile": opp_profile}
-            log_event("INFO", "game.cpu_create", f"CPU game {game_id} (difficulty={difficulty}, cpu={player2.name}, profile={'yes' if opp_profile else 'no'})", player="system")
+            # 自デッキ勝ち筋プラン（§2.5.5）: CPU(p2) の自デッキ構成から静的に分類して保持（normal/hard で使用）。
+            self_plan = None
+            if difficulty in ("normal", "hard"):
+                try:
+                    self_plan = cpu_self_plan.build_plan([ci.master for ci in p2_cards],
+                                                         leader=p2_leader.master if p2_leader else None)
+                except Exception:
+                    log_event("ERROR", "cpu_self_plan.fail", traceback.format_exc(), player="system")
+            CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty,
+                                  "opp_profile": opp_profile, "self_plan": self_plan}
+            log_event("INFO", "game.cpu_create", f"CPU game {game_id} (difficulty={difficulty}, cpu={player2.name}, profile={'yes' if opp_profile else 'no'}, plan={self_plan.archetype if self_plan else 'none'})", player="system")
         return build_game_result_hybrid(manager, game_id)
     except Exception as e:
         log_event(level_key="ERROR", action="game.create_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "game_id": "", "error": {"message": str(e)}}
@@ -443,7 +453,7 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
             if pending and pending.get("player_id") == cpu_pid:
                 turn_mem = meta.setdefault("turn_mem", {})
                 move = cpu_ai.decide_guarded(manager, cpu_player, difficulty, mem=turn_mem,
-                                             profile=meta.get("opp_profile"))
+                                             profile=meta.get("opp_profile"), plan=meta.get("self_plan"))
                 if move is not None:
                     if move["kind"] == "battle":
                         action_api.apply_battle_action(manager, cpu_player, move["action_type"], move.get("card_uuid"))
