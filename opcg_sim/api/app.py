@@ -32,6 +32,7 @@ from opcg_sim.src.utils.logger_config import session_id_ctx, log_event, save_bat
 from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
+from opcg_sim.src.core import cpu_opponent_model
 from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.models import CardInstance
 
@@ -271,6 +272,28 @@ def load_deck_mixed(source_str: str, owner_id: str):
     log_event("INFO", "loader.db_load", f"Loaded deck from DB: {deck_id}", player=owner_id)
     return leader_inst, cards_inst
 
+
+def build_opp_profile_for_leader(leader_id: Optional[str]):
+    """相手リーダーに紐づくテンプレートデッキ（cpu_templates）から相手プロファイルを作る（§2.5.4）。
+
+    normal（リーダー推測）でのみ使用。テンプレ未登録・DB 不在なら None（保守モデルへフォールバック）。
+    隠れ情報（相手の実デッキ・実手札）は読まず、リーダーに紐づくテンプレ構成のみを使う＝フェア。
+    """
+    if not leader_id or not db:
+        return None
+    try:
+        docs = (db.collection("cpu_templates").where("leader_id", "==", leader_id)
+                .order_by("created_at", direction=firestore.Query.DESCENDING).limit(1).stream())
+        data = next((d.to_dict() for d in docs), None)
+        if not data:
+            return None
+        masters = [card_db.get_card(cid) for cid in data.get("card_uuids", [])]
+        masters = [m for m in masters if m is not None]
+        return cpu_opponent_model.build_profile(masters)
+    except Exception:
+        log_event("ERROR", "cpu_template.profile_fail", traceback.format_exc(), player="system")
+        return None
+
 @app.options("/api/game/create")
 async def options_game_create(): return {"status": "ok"}
 
@@ -308,8 +331,12 @@ async def game_create(req: Any = Body(...)):
             difficulty = req.get("cpu_difficulty", "normal")
             if difficulty not in ("easy", "normal", "hard"):
                 difficulty = "normal"
-            CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty}
-            log_event("INFO", "game.cpu_create", f"CPU game {game_id} (difficulty={difficulty}, cpu={player2.name})", player="system")
+            # リーダー推測（normal）用: 人間(p1) のリーダーからテンプレ相手プロファイルを引き当てて保持（§2.5.4）。
+            opp_profile = None
+            if difficulty == "normal" and p1_leader is not None:
+                opp_profile = build_opp_profile_for_leader(p1_leader.master.card_id)
+            CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty, "opp_profile": opp_profile}
+            log_event("INFO", "game.cpu_create", f"CPU game {game_id} (difficulty={difficulty}, cpu={player2.name}, profile={'yes' if opp_profile else 'no'})", player="system")
         return build_game_result_hybrid(manager, game_id)
     except Exception as e:
         log_event(level_key="ERROR", action="game.create_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "game_id": "", "error": {"message": str(e)}}
@@ -415,7 +442,8 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
             pending = manager.get_pending_request()
             if pending and pending.get("player_id") == cpu_pid:
                 turn_mem = meta.setdefault("turn_mem", {})
-                move = cpu_ai.decide_guarded(manager, cpu_player, difficulty, mem=turn_mem)
+                move = cpu_ai.decide_guarded(manager, cpu_player, difficulty, mem=turn_mem,
+                                             profile=meta.get("opp_profile"))
                 if move is not None:
                     if move["kind"] == "battle":
                         action_api.apply_battle_action(manager, cpu_player, move["action_type"], move.get("card_uuid"))
@@ -492,6 +520,63 @@ async def list_decks():
         except Exception as e:
             log_event("ERROR", "deck.list_db_fail", traceback.format_exc(), player="system")
     return {"success": True, "decks": decks}
+
+# --- CPU 相手モデル（テンプレートデッキ）: deck と同形・leader_id 引き当て（docs/SPEC.md §2.5.4） ---
+
+@app.post("/api/cpu_template")
+async def save_cpu_template(tpl_data: Dict[str, Any] = Body(...)):
+    if not db: return {"success": False, "error": "Database not initialized"}
+    try:
+        doc_ref = (db.collection("cpu_templates").document(tpl_data["id"])
+                   if tpl_data.get("id") else db.collection("cpu_templates").document())
+        save_data = {"id": doc_ref.id, "name": tpl_data.get("name", "Untitled Template"),
+                     "leader_id": tpl_data.get("leader_id"), "card_uuids": tpl_data.get("card_uuids", []),
+                     "don_uuids": tpl_data.get("don_uuids", []), "created_at": firestore.SERVER_TIMESTAMP}
+        doc_ref.set(save_data)
+        log_event("INFO", "cpu_template.save", f"Template saved: {save_data['name']}", player="system", payload={"template_id": doc_ref.id})
+        return {"success": True, "template_id": doc_ref.id}
+    except Exception as e:
+        log_event("ERROR", "cpu_template.save_fail", traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
+
+@app.delete("/api/cpu_template/{template_id}")
+async def delete_cpu_template(template_id: str):
+    if not db: return {"success": False, "error": "Database not initialized"}
+    try:
+        db.collection("cpu_templates").document(template_id).delete()
+        log_event("INFO", "cpu_template.delete", f"Template deleted: {template_id}", player="system")
+        return {"success": True, "template_id": template_id}
+    except Exception as e:
+        log_event("ERROR", "cpu_template.delete_fail", traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/cpu_template/get")
+async def get_cpu_template(id: str):
+    if not db: return {"success": False, "error": "Database not initialized"}
+    try:
+        doc = db.collection("cpu_templates").document(id).get()
+        if not doc.exists:
+            return {"success": False, "error": f"Template not found: {id}"}
+        d = doc.to_dict()
+        if d.get("created_at"): d["created_at"] = str(d["created_at"])
+        return {"success": True, "template": d}
+    except Exception as e:
+        log_event("ERROR", "cpu_template.get_fail", traceback.format_exc(), player="system")
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/cpu_template/list")
+async def list_cpu_templates():
+    templates = []
+    if db:
+        try:
+            docs = db.collection("cpu_templates").order_by("created_at", direction=firestore.Query.DESCENDING).stream()
+            for doc in docs:
+                d = doc.to_dict()
+                if d.get("created_at"): d["created_at"] = str(d["created_at"])
+                templates.append(d)
+        except Exception as e:
+            log_event("ERROR", "cpu_template.list_db_fail", traceback.format_exc(), player="system")
+    return {"success": True, "templates": templates}
 
 @app.get("/api/sandbox/list")
 async def sandbox_list():

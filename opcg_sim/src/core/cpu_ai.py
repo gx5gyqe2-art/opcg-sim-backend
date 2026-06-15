@@ -42,6 +42,7 @@ W_DON_ACTIVE = 200.0     # アクティブドン!! 1 枚
 W_BLOCKER = 1200.0       # ブロッカー 1 体（最終防御）
 W_ATTACKER = 400.0       # アクティブキャラ 1 体＝将来のアタック圧（相手 +1[J] 機会）
 W_WIN = 1.0e9            # 勝敗
+W_LIFE_AGGRO_K = 0.5     # リーダー推測: 相手の攻め寄り度 1.0 で自分ライフ重視を最大 +50%（§2.5.4）
 
 _EPS = 1.0  # これ未満の改善ならターンを畳む（無限ループ防止＋無意味手の抑制）
 _DRAIN_LIMIT = 12        # クローン上で自分側対話を解決する最大回数
@@ -62,21 +63,24 @@ def _player_by_name(manager, name: str):
     return manager.p1 if manager.p1.name == name else manager.p2
 
 
-def _side_score(p, is_turn: bool, include_counter: bool = True) -> float:
+def _side_score(p, is_turn: bool, include_counter: bool = True,
+                hand_factor: float = 1.0, life_factor: float = 1.0) -> float:
     """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和）。
 
     `include_counter=False` のとき手札はカウンター値を読まず枚数のみで評価する
     （相手手札の中身を見ない「公開情報のみ」の情報方針＝easy/normal 用）。
+    `hand_factor`/`life_factor` はリーダー推測プロファイルによる手札防御価値・ライフ重視度の倍率
+    （§2.5.4。プロファイル無し時は 1.0）。
     """
     score = 0.0
 
     # ライフ: 非線形（薄いほど 1 枚の限界価値が高い）。最初の 2 枚に厚く上乗せする。
     life_n = len(p.life)
-    score += life_n * W_LIFE
-    score += min(life_n, 2) * W_LIFE_LOW
+    score += life_n * W_LIFE * life_factor
+    score += min(life_n, 2) * W_LIFE_LOW * life_factor
 
     # 手札: 枚数 ＋（公開方針でなければ）カウンター値（防御に回せる力＝相手の +1[J] を打ち消す資源）。
-    score += len(p.hand) * W_HAND
+    score += len(p.hand) * W_HAND * hand_factor
     if include_counter:
         for c in p.hand:
             try:
@@ -101,11 +105,13 @@ def _side_score(p, is_turn: bool, include_counter: bool = True) -> float:
     return score
 
 
-def evaluate(manager, me_name: str, see_opp_hand: bool = True) -> float:
+def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None) -> float:
     """`me_name` 視点の盤面優劣スコア（高いほど自分有利）。
 
     `see_opp_hand=False` のとき相手手札は枚数のみ評価する（中身＝カウンター値を読まない）。
     自分の手札は常に full。難易度の情報方針: easy/normal=False（公開のみ）/ hard=True（チート）。
+    `profile`（リーダー推測の相手モデル・§2.5.4）があれば、相手手札の防御価値（defense_factor）と
+    自分のライフ重視度（aggro_lean）を補正する（normal のみ供給）。
     """
     if manager.winner == me_name:
         return W_WIN
@@ -114,8 +120,15 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True) -> float:
     me = _player_by_name(manager, me_name)
     opp = _other(manager, me_name)
     is_my_turn = manager.turn_player.name == me_name
-    return (_side_score(me, is_my_turn, include_counter=True)
-            - _side_score(opp, not is_my_turn, include_counter=see_opp_hand))
+    # リーダー推測補正: 相手の攻め寄り度が高いほど自分のライフを厚く見る／相手手札の防御価値を倍率補正。
+    life_factor = 1.0
+    opp_hand_factor = 1.0
+    if profile is not None:
+        life_factor = 1.0 + W_LIFE_AGGRO_K * profile.aggro_lean
+        if not see_opp_hand:  # 公開方針のときだけ構築推測で相手手札の防御価値を補う
+            opp_hand_factor = profile.defense_factor
+    return (_side_score(me, is_my_turn, include_counter=True, life_factor=life_factor)
+            - _side_score(opp, not is_my_turn, include_counter=see_opp_hand, hand_factor=opp_hand_factor))
 
 
 def _pending_keys():
@@ -192,7 +205,8 @@ def _consumes_hand_card(manager, actor_name: str, move: Dict[str, Any]) -> bool:
 
 
 def _search(manager, root_name: str, depth: int, alpha: float, beta: float,
-            budget: List[int], see_opp_hand: bool, opp_public_only: bool, ply: int = 0) -> float:
+            budget: List[int], see_opp_hand: bool, opp_public_only: bool,
+            profile=None, ply: int = 0) -> float:
     """α-β ＋ ビームの多 ply 先読み。`root_name` 視点の最善到達値を返す。
 
     手番が root のノードは max（自分の最善手）、相手のノードは min（相手の最善応答）。
@@ -203,21 +217,22 @@ def _search(manager, root_name: str, depth: int, alpha: float, beta: float,
       - `see_opp_hand`     : 葉の評価で相手手札の中身（カウンター値）を読むか（hard=True / 他=False）。
       - `opp_public_only`  : 相手 min ノードで相手の隠れ手札に依存する手（PLAY/カウンター）を除外し、
                              公開情報の手のみで応答させる保守モデル（normal=True / hard=False）。
+      - `profile`          : リーダー推測の相手モデル（§2.5.4・normal のみ）。評価補正に用いる。
     """
     if manager.winner is not None:
         return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
     if depth <= 0 or budget[0] <= 0:
-        return evaluate(manager, root_name, see_opp_hand=see_opp_hand)
+        return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile)
 
     KEY_PID, _ = _pending_keys()
     pending = manager.get_pending_request()
     if not pending:
-        return evaluate(manager, root_name, see_opp_hand=see_opp_hand)
+        return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile)
     actor_name = pending[KEY_PID]
     actor = _player_by_name(manager, actor_name)
     moves = manager.get_legal_actions(actor)
     if not moves:
-        return evaluate(manager, root_name, see_opp_hand=see_opp_hand)
+        return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile)
     is_max = (actor_name == root_name)
 
     # 公平モデル: 相手 min ノードでは相手の隠れ手札に依存する手を読まない（公開情報のみで応答）。
@@ -235,9 +250,9 @@ def _search(manager, root_name: str, depth: int, alpha: float, beta: float,
         child = _apply_clone(manager, actor_name, m)
         if child is None:
             continue
-        children.append((evaluate(child, root_name, see_opp_hand=see_opp_hand), child))
+        children.append((evaluate(child, root_name, see_opp_hand=see_opp_hand, profile=profile), child))
     if not children:
-        return evaluate(manager, root_name, see_opp_hand=see_opp_hand)
+        return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile)
     children.sort(key=lambda x: x[0], reverse=is_max)
     children = children[:HARD_BEAM]
 
@@ -245,7 +260,7 @@ def _search(manager, root_name: str, depth: int, alpha: float, beta: float,
         value = float("-inf")
         for _leaf, child in children:
             value = max(value, _search(child, root_name, depth - 1, alpha, beta,
-                                       budget, see_opp_hand, opp_public_only, ply + 1))
+                                       budget, see_opp_hand, opp_public_only, profile, ply + 1))
             alpha = max(alpha, value)
             if alpha >= beta:
                 break
@@ -254,7 +269,7 @@ def _search(manager, root_name: str, depth: int, alpha: float, beta: float,
         value = float("inf")
         for _leaf, child in children:
             value = min(value, _search(child, root_name, depth - 1, alpha, beta,
-                                       budget, see_opp_hand, opp_public_only, ply + 1))
+                                       budget, see_opp_hand, opp_public_only, profile, ply + 1))
             beta = min(beta, value)
             if alpha >= beta:
                 break
@@ -262,7 +277,8 @@ def _search(manager, root_name: str, depth: int, alpha: float, beta: float,
 
 
 def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
-                   see_opp_hand: bool, opp_public_only: bool) -> List[Tuple[float, Dict[str, Any]]]:
+                   see_opp_hand: bool, opp_public_only: bool,
+                   profile=None) -> List[Tuple[float, Dict[str, Any]]]:
     """ルート手を 1-ply で事前選別し、上位 HARD_ROOT_BEAM 手だけを多 ply 先読みで深掘りする。
 
     全手で予算を共有すると先に列挙された手ほど深く読まれて採点が不公平になるため、
@@ -276,7 +292,7 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
         if child is None:
             prelim.append((float("-inf"), m, None))
             continue
-        prelim.append((evaluate(child, name, see_opp_hand=see_opp_hand), m, child))
+        prelim.append((evaluate(child, name, see_opp_hand=see_opp_hand, profile=profile), m, child))
 
     # 2) 1-ply 上位を深掘り対象に選ぶ。
     order = sorted(range(len(prelim)), key=lambda i: prelim[i][0], reverse=True)
@@ -288,7 +304,7 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
         if child is not None and i in deepen:
             budget = [HARD_PER_MOVE_BUDGET]
             v = _search(child, name, HARD_DEPTH - 1, float("-inf"), float("inf"),
-                        budget, see_opp_hand, opp_public_only, ply=1)
+                        budget, see_opp_hand, opp_public_only, profile, ply=1)
             out.append((v, m))
         else:
             out.append((s1, m))
@@ -308,10 +324,11 @@ def _move_sig(move: Dict[str, Any]) -> tuple:
 
 
 def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Random] = None,
-           moves: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
+           moves: Optional[List[Dict[str, Any]]] = None, profile=None) -> Optional[Dict[str, Any]]:
     """`player` が取るべき次の 1 手を返す（合法手が無ければ None）。
 
     `moves` を渡すとその候補集合から選ぶ（ガード driver が絞り込んだ手を渡す用途）。
+    `profile` はリーダー推測の相手モデル（§2.5.4・normal でのみ使用）。
     """
     rng = rng or random
     if moves is None:
@@ -326,14 +343,15 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
 
     # 難易度＝情報方針の 3 分化（docs/SPEC.md §2.5.2）:
     #   easy   : 正直な 1-ply 貪欲（ミスなし・公開情報のみ）。
-    #   normal : 多 ply 先読み・公開情報のみ＋相手は隠れ手札を使わない保守モデル（リーダー推測の土台）。
+    #   normal : 多 ply 先読み・公開情報のみ＋相手は隠れ手札を使わない保守モデル＋リーダー推測 profile。
     #   hard   : 多 ply 先読み・相手手札も読むフルクローン（最強・チート）。
     if difficulty == "easy":
         scored = [(_simulate_and_eval(manager, name, m, see_opp_hand=False), m) for m in moves]
     elif difficulty == "hard":
         scored = _scored_search(manager, name, moves, see_opp_hand=True, opp_public_only=False)
     else:  # normal
-        scored = _scored_search(manager, name, moves, see_opp_hand=False, opp_public_only=True)
+        scored = _scored_search(manager, name, moves, see_opp_hand=False, opp_public_only=True,
+                                profile=profile)
     # 同点はランダムタイブレーク（決定論にしたい場合は呼び出し側で seed 済み rng を渡す）。
     rng.shuffle(scored)
     best_score, best_move = max(scored, key=lambda x: x[0])
@@ -347,7 +365,7 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
 
 
 def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[random.Random] = None,
-                   mem: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+                   mem: Optional[Dict[str, Any]] = None, profile=None) -> Optional[Dict[str, Any]]:
     """ターン内メモリ `mem` を用いた暴走防止つきの意思決定。
 
     `mem` は呼び出し側が対局ごとに保持する dict（ステートレスな /cpu/step でも CPU_GAMES に
@@ -381,7 +399,7 @@ def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[ra
     if not filtered:
         filtered = [end_move] if end_move is not None else moves
 
-    move = decide(manager, player, difficulty, rng, moves=filtered)
+    move = decide(manager, player, difficulty, rng, moves=filtered, profile=profile)
     if move is not None:
         sig = _move_sig(move)
         counts[sig] = counts.get(sig, 0) + 1
