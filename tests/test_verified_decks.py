@@ -116,6 +116,22 @@ def test_rairyu_targets_rested_only():
     assert freeze.target.is_rest is True
 
 
+def test_leader_trait_or_name_condition():
+    """ST23-002 シャンクス／EB02-006 ヤマト: 「リーダーが特徴《X》を持つか「Y」の場合」は
+    特徴 OR リーダー名。従来は特徴のみ拾い、名前指定リーダー（ウタ/エース）で常に不成立だった
+    （§8.3 条件の退化）。サンプル精査で発見・是正。"""
+    from opcg_sim.src.models.enums import ConditionType as CT
+    # ST23-002: 登場時条件 = OR(LEADER_TRAIT 赤髪海賊団, LEADER_NAME ウタ)
+    cond = inst("ST23-002").master.abilities[1].condition
+    assert cond.type == CT.OR
+    kinds = {a.type for a in cond.args}
+    assert kinds == {CT.LEADER_TRAIT, CT.LEADER_NAME}
+    gm, p1, _ = game("ST11-001")                        # リーダー=ウタ（特徴 FILM・赤髪でない）
+    assert EffectResolver(gm)._check_condition(p1, cond, inst("ST23-002")) is True
+    gm2, q1, _ = game("OP01-001")                       # リーダー=ゾロ（不一致）
+    assert EffectResolver(gm2)._check_condition(q1, cond, inst("ST23-002")) is False
+
+
 def test_st11_004_active_don_gated_by_uta_condition():
     """ST11-004 新時代: 「リーダーがウタの場合…見て手札に加える。その後、…ドン1枚アクティブ」の
     ACTIVE_DON は、カテゴリH 是正により先頭条件（ウタ）の支配下に入る（旧: 条件外へ漏れていた）。"""
