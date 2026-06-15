@@ -1486,7 +1486,7 @@ class GameManager:
                     else: self.winner = attacker_owner.name; log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name); break
         else:
             if attacker_pwr >= target_pwr:
-                if self._active_protection(target, ("BATTLE_KO",)):
+                if self._active_protection(target, ("BATTLE_KO",), attacker=attacker):
                     log_event("INFO", "game.battle_ko_prevented", f"{target.master.name} is protected from battle KO", player=target_owner.name)
                 else:
                     repl = self._find_replacement(target, ("BATTLE_KO",))
@@ -1694,7 +1694,7 @@ class GameManager:
                     return found
         return None
 
-    def _active_protection(self, card: CardInstance, status_values: Tuple[str, ...], actor: Optional[Player] = None) -> bool:
+    def _active_protection(self, card: CardInstance, status_values: Tuple[str, ...], actor: Optional[Player] = None, attacker: Optional[CardInstance] = None) -> bool:
         if not card or not getattr(card, "master", None) or card.negated:
             return False
         owner = self.p1 if self.p1.name == card.owner_id else self.p2
@@ -1751,6 +1751,16 @@ class GameManager:
                         resolver = EffectResolver(self)
                     src = card if protector is card else protector
                     if not resolver._check_condition(owner, ab.condition, src):
+                        continue
+                # 属性限定のバトルKO耐性（「属性《斬》を持つカードとのバトルでKOされず」OP08-114）。
+                # 保護はバトル相手(attacker)が指定属性を持つ場合のみ有効。属性が不明（非バトル経路）や
+                # 不一致なら適用しない。
+                attr_m = re.search(_nfc(r'属性[(（《]([斬打射特知])[)）》]を持つ(?:カード|キャラ)?との(?:バトル|戦闘)'),
+                                   getattr(eff, "raw_text", "") or "")
+                if attr_m:
+                    req_attr = attr_m.group(1)
+                    if attacker is None or getattr(attacker.master, "attribute", None) is None \
+                            or attacker.master.attribute.value != req_attr:
                         continue
                 # 【ターン1回】保護（例:「このキャラはターンに1回、相手の効果でKOされない」）は
                 # 1ターンに1回まで。_check_condition の TURN_LIMIT は常時 True を返すため、ここで

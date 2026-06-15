@@ -116,6 +116,37 @@ def test_rairyu_targets_rested_only():
     assert freeze.target.is_rest is True
 
 
+def test_op08_114_attribute_filtered_battle_ko_immunity():
+    """OP08-114 S-ホーク: 「属性《斬》を持つカードとのバトルでKOされず」は、バトル相手の属性が
+    《斬》のときだけ有効。条件（自分のライフが相手より少ない＋ドン!!1付与）成立時に評価する。"""
+    from engine_helpers import make_master
+    from opcg_sim.src.models.enums import Phase, CardType, Attribute
+
+    def battle(att_attr, p2_life=2):
+        p1 = Player(name="P1", deck=[], leader=inst("OP01-001", "P1"))
+        p2 = Player(name="P2", deck=[], leader=inst("OP01-001", "P2"))
+        gm = GameManager(player1=p1, player2=p2)
+        gm.turn_player = p1
+        gm.turn_count = 3
+        defender = inst("OP08-114", "P2")
+        defender.is_rest = True
+        defender.attached_don = 1                      # 【ドン!!×1】
+        p2.field = [defender]
+        p1.life = [inst("OP01-016", "P1") for _ in range(5)]
+        p2.life = [inst("OP01-016", "P2") for _ in range(p2_life)]
+        attacker = CardInstance(make_master(card_id="ATT", name="att", power=12000,
+                                            type=CardType.CHARACTER, attribute=att_attr), "P1")
+        gm.active_battle = {"attacker": attacker, "target": defender,
+                            "attacker_owner": p1, "target_owner": p2, "counter_buff": 0}
+        gm.phase = Phase.BATTLE_COUNTER
+        gm.resolve_attack()
+        return defender in p2.field                    # True=生存（保護された）
+
+    assert battle(Attribute.SLASH) is True             # 斬とのバトル＝保護
+    assert battle(Attribute.STRIKE) is False            # 打とのバトル＝保護なし→KO
+    assert battle(Attribute.SLASH, p2_life=5) is False  # 条件（ライフ少ない）不成立→保護なし
+
+
 def test_op08_101_delayed_life_at_turn_end():
     """OP08-101 シャーロット・エンゼル: コストでライフ1枚をトラッシュ、条件成立なら
     「このターン終了時」にデッキの上1枚をライフへ加える（遅延ライフ＝delay=TURN_END）。"""
