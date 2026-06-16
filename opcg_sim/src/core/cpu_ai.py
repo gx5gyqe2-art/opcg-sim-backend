@@ -34,6 +34,11 @@ from typing import Any, Dict, List, Optional, Tuple
 # 評価重み（盤面 1000=パワー1段相当に正規化）
 W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（最重要）
 W_LIFE_LOW = 4000.0      # 希少域（最初の 2 枚）への上乗せ＝非線形・45[J] ラインの危険
+# C-3（§2.5.3）: ライフ薄域上乗せの膝位置（この枚数までを厚く守る）。自他で別カーブ＝既定 2、攻め寄りの
+# 相手と対面する自ライフ（守備）のみ 3 へ上げてレース耐性を厚く見る（profile 無し＝両側 2＝従来同値）。
+_LIFE_KNEE_DEFAULT = 2
+_LIFE_KNEE_AGGRO_MATCHUP = 3
+_AGGRO_MATCHUP_THRESHOLD = 0.6   # 相手プロファイルの aggro_lean がこれ以上で「攻め対面」と見なす
 W_HAND = 700.0           # 手札 1 枚の基礎価値
 W_COUNTER = 0.6          # 手札のカウンター値 1 点あたり（防御リソース）
 W_FIELD_COUNT = 1500.0   # 場のキャラ 1 体の存在価値
@@ -193,12 +198,23 @@ def _is_low_impact(c) -> bool:
     return (getattr(m, "power", 0) or 0) < _LOW_IMPACT_POWER
 
 
+def _own_life_knee(profile) -> int:
+    """自ライフ（守備）の非線形膝位置（C-3・§2.5.3）。攻め寄りの相手と対面するときだけ膝を 3 へ上げる。
+
+    対面想定は相手モデル `profile.aggro_lean`（リーダー推測・§2.5.4）から取る。profile 無し＝既定 2＝従来同値。
+    """
+    if profile is not None and getattr(profile, "aggro_lean", 0.0) >= _AGGRO_MATCHUP_THRESHOLD:
+        return _LIFE_KNEE_AGGRO_MATCHUP
+    return _LIFE_KNEE_DEFAULT
+
+
 def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True,
                 hand_factor: float = 1.0, life_factor: float = 1.0,
                 body_factor: float = 1.0, attacker_factor: float = 1.0,
                 counter_factor: float = 1.0, threat_aware: bool = False,
                 idle_don_factor: float = 1.0,
-                threat_atk_mult: float = 1.0, threat_def_mult: float = 1.0) -> float:
+                threat_atk_mult: float = 1.0, threat_def_mult: float = 1.0,
+                life_knee: int = _LIFE_KNEE_DEFAULT) -> float:
     """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和＋白の境界リスク）。
 
     `power_cap` は対面の最硬防御パワー＝有効パワーの上限（`_effective_power`）。これにより
@@ -207,13 +223,16 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
     （相手手札の中身を見ない「公開情報のみ」の情報方針＝easy/normal 用）。
     `hand_factor`/`life_factor` はリーダー推測プロファイルによる手札防御価値・ライフ重視度の倍率
     （§2.5.4。プロファイル無し時は 1.0）。
+    `life_knee`（C-3・§2.5.3）はライフ薄域上乗せ（`W_LIFE_LOW`）を立ち上げる枚数の上限＝非線形の膝位置。
+    既定 2＝従来。攻め寄りの相手と対面する自ライフ（守備）は膝を 3 へ上げ、レース下での 3 枚目までを
+    厚く守る（クロック側＝相手ライフは既定 2 のまま＝自他で別カーブ）。
     """
     score = 0.0
 
-    # ライフ: 非線形（薄いほど 1 枚の限界価値が高い）。最初の 2 枚に厚く上乗せする。
+    # ライフ: 非線形（薄いほど 1 枚の限界価値が高い）。膝位置（life_knee）までを厚く上乗せする。
     life_n = len(p.life)
     score += life_n * W_LIFE * life_factor
-    score += min(life_n, 2) * W_LIFE_LOW * life_factor
+    score += min(life_n, life_knee) * W_LIFE_LOW * life_factor
 
     # 手札: 枚数 ＋（公開方針でなければ）カウンター値（防御に回せる力＝相手の +1[J] を打ち消す資源）。
     score += len(p.hand) * W_HAND * hand_factor
@@ -379,11 +398,15 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
     # 有効パワー上限は対面の最硬防御。自分のパワーは相手を、相手のパワーは自分を上回るまでが有効。
     my_cap = _power_cap(opp)
     opp_cap = _power_cap(me)
+    # C-3: 自ライフ（守備）は攻め対面で膝を 3 へ（レース耐性重視）。クロック側＝相手ライフは既定 2 のまま
+    # ＝自他で別カーブ。profile 無し＝両側既定 2＝従来同値。
+    own_life_knee = _own_life_knee(profile)
     return (_side_score(me, is_my_turn, my_cap, include_counter=True, life_factor=life_factor,
                         body_factor=body_factor, attacker_factor=attacker_factor,
                         counter_factor=counter_factor, threat_aware=threat_aware,
                         idle_don_factor=idle_don_factor,
-                        threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult)
+                        threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
+                        life_knee=own_life_knee)
             - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
                           hand_factor=opp_hand_factor, threat_aware=threat_aware,
                           threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult)

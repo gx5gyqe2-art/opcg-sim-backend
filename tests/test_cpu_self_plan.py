@@ -250,3 +250,33 @@ def test_c1_counter_buffer_discounts_lethal_reach(db):
     thick = om.OpponentProfile(50, 4000.0, 0.8, 0.1, 0.1, 4.0, 1.6, 0.3)  # 緩衝大＝複数セーブ
     with_profile = cpu_ai._plan_progress(gm, me, opp, True, _plan("aggro"), profile=thick)
     assert with_profile < no_profile, "カウンター緩衝が reach を控除していない（false lethal）"
+
+
+# ---------------------------------------------------------------------------
+# バッチC-3: 自ライフ（守備）の非線形膝位置を対面（相手 aggro_lean）依存に
+# ---------------------------------------------------------------------------
+
+def test_c3_own_life_knee_depends_on_matchup():
+    """`_own_life_knee`: profile 無し＝既定 2、攻め対面（aggro_lean>=閾値）＝3、受け対面＝2。"""
+    from opcg_sim.src.core import cpu_opponent_model as om
+    assert cpu_ai._own_life_knee(None) == cpu_ai._LIFE_KNEE_DEFAULT == 2
+    aggro_opp = om.OpponentProfile(50, 200.0, 0.2, 0.0, 0.0, 2.0, 0.8, 0.8)   # aggro_lean=0.8
+    control_opp = om.OpponentProfile(50, 1500.0, 0.7, 0.2, 0.3, 5.0, 1.6, 0.2)  # aggro_lean=0.2
+    assert cpu_ai._own_life_knee(aggro_opp) == cpu_ai._LIFE_KNEE_AGGRO_MATCHUP == 3
+    assert cpu_ai._own_life_knee(control_opp) == 2
+
+
+def test_c3_side_score_knee_raises_low_life_bonus(db):
+    """`_side_score(life_knee=3)` はライフ 3 枚目にも薄域上乗せ（W_LIFE_LOW）を 1 段ぶん足す。
+
+    膝 2→3 の差は丁度 `W_LIFE_LOW * life_factor`（3 枚目以上のライフを持つとき）。"""
+    gm = _new_gm(db)
+    p = gm.p1
+    while len(p.life) < 3:
+        p.life.append(p.deck.pop())
+    cap = cpu_ai._power_cap(gm.p2)
+    knee2 = cpu_ai._side_score(p, True, cap, life_knee=2)
+    knee3 = cpu_ai._side_score(p, True, cap, life_knee=3)
+    assert knee3 - knee2 == pytest.approx(cpu_ai.W_LIFE_LOW)
+    # 膝既定は 2（従来）。
+    assert cpu_ai._side_score(p, True, cap) == pytest.approx(knee2)

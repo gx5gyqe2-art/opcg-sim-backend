@@ -30,10 +30,25 @@ from typing import Any, Dict, List, Optional
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai
+from opcg_sim.src.core import action_api, cpu_ai, cpu_self_plan
 from opcg_sim.src.core.invariants import check_invariants, check_turn_boundary
 
 from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS, InvariantError
+
+
+def _plan_for(difficulty: str, leader, cards):
+    """デプロイ（app.py /api/game/create）と同じく normal/hard は自デッキ構成からプランを作る。
+
+    easy はプラン無し（素の 1-ply）。プロファイル（相手テンプレ）は自己対戦では無いので None
+    （デプロイのテンプレ未登録フォールバックと同義）。
+    """
+    if difficulty in ("normal", "hard"):
+        try:
+            return cpu_self_plan.build_plan([c.master for c in cards],
+                                            leader=leader.master if leader else None)
+        except Exception:
+            return None
+    return None
 
 
 # --- Elo 変換 -----------------------------------------------------------------
@@ -54,12 +69,12 @@ def win_rate(wins: float, games: int) -> float:
 
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
 
-def _make_decider(difficulty: str):
-    """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き）。"""
+def _make_decider(difficulty: str, plan=None):
+    """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き・デプロイと同じプラン供給）。"""
     mem: Dict[str, Any] = {}
 
     def _decide(manager, actor):
-        return cpu_ai.decide_guarded(manager, actor, difficulty, random, mem)
+        return cpu_ai.decide_guarded(manager, actor, difficulty, random, mem, plan=plan)
     return _decide
 
 
@@ -68,14 +83,16 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     """p1/p2 に別難易度を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
-    （同じ action_api コアパス＋各ステップのインバリアント検出）。
+    （同じ action_api コアパス＋各ステップのインバリアント検出）。normal/hard はデプロイと同じく
+    自デッキ構成からプランを供給する（easy はプラン無し）。
     """
     random.seed(seed)
     l1, c1 = build_deck(db, "p1")
     l2, c2 = build_deck(db, "p2")
     manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     manager.start_game()
-    deciders = {"p1": _make_decider(p1_difficulty), "p2": _make_decider(p2_difficulty)}
+    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1)),
+                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2))}
 
     step = 0
     prev_turn = manager.turn_count
@@ -150,6 +167,8 @@ def regret_trace(db, seed: int, difficulty: str = "normal",
     l2, c2 = build_deck(db, "p2")
     manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     manager.start_game()
+    plans = {"p1": _plan_for(difficulty, l1, c1), "p2": _plan_for(difficulty, l2, c2)}
+    mems: Dict[str, Any] = {"p1": {}, "p2": {}}
     pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
     KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
     KEY_ACTION = pending_props.get('ACTION', 'action')
@@ -163,10 +182,12 @@ def regret_trace(db, seed: int, difficulty: str = "normal",
         req_pid = pending[KEY_PID]
         actor = manager.p1 if manager.p1.name == req_pid else manager.p2
         if pending.get(KEY_ACTION) == "MAIN_ACTION":
-            move, regret = cpu_ai.decide_with_regret(manager, actor, difficulty, random)
+            move, regret = cpu_ai.decide_with_regret(manager, actor, difficulty, random,
+                                                     plan=plans[req_pid])
             regrets.append(regret)
         else:
-            move = cpu_ai.decide_guarded(manager, actor, difficulty, random, {})
+            move = cpu_ai.decide_guarded(manager, actor, difficulty, random, mems[req_pid],
+                                         plan=plans[req_pid])
         if move is None:
             break
         manager.action_events = []
