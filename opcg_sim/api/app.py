@@ -258,18 +258,23 @@ card_db = CardLoader(CARD_DB_PATH); card_db.load()
 
 # NOTE: 効果定義はカードテキストの自動解析（EffectParserV2）に一本化されている。
 
-def load_deck_mixed(source_str: str, owner_id: str):
+def _load_deck_doc(source_str: str) -> Dict[str, Any]:
+    """`db:<id>` 形式のデッキIDから Firestore のデッキドキュメント(dict)を取得する。"""
     if not source_str.startswith("db:"):
         raise ValueError(f"Unknown deck id: {source_str}")
     if not db: raise ValueError("Firestore is not initialized.")
     deck_id = source_str[3:]; doc = db.collection("decks").document(deck_id).get()
     if not doc.exists: raise ValueError(f"Deck ID not found: {deck_id}")
-    data = doc.to_dict(); leader_id = data.get("leader_id"); card_uuids = data.get("card_uuids", [])
+    return doc.to_dict()
+
+def load_deck_mixed(source_str: str, owner_id: str):
+    deck_id = source_str[3:] if source_str.startswith("db:") else source_str
+    data = _load_deck_doc(source_str); leader_id = data.get("leader_id"); card_uuids = data.get("card_uuids", [])
     leader_inst = None
     if leader_id:
         master = card_db.get_card(leader_id)
         if master: leader_inst = CardInstance(master, owner_id)
-    cards_inst = [CardInstance(card_db.get_card(cid), owner_id) for cid in card_uuids if card_db.get_card(cid)]
+    cards_inst = [CardInstance(m, owner_id) for cid in card_uuids if (m := card_db.get_card(cid))]
     log_event("INFO", "loader.db_load", f"Loaded deck from DB: {deck_id}", player=owner_id)
     return leader_inst, cards_inst
 
@@ -701,11 +706,16 @@ async def rule_list():
     return {"success": True, "games": rooms}
 
 def _deck_preview(deck_id: str, owner_id: str) -> Dict[str, Any]:
-    """ロビー表示用にデッキのリーダー情報のみ抽出する。"""
+    """ロビー表示用にデッキのリーダー情報のみ抽出する。
+
+    デッキ全カードはロードせず、Firestore のメタデータ(leader_id)から
+    リーダー1枚だけを解決する（一覧表示のたびに50枚パースしない）。
+    """
     try:
-        leader, _cards = load_deck_mixed(deck_id, owner_id)
-        if leader:
-            return {"leader_id": leader.master.card_id, "leader_name": leader.master.name}
+        leader_id = _load_deck_doc(deck_id).get("leader_id")
+        master = card_db.get_card(leader_id) if leader_id else None
+        if master:
+            return {"leader_id": master.card_id, "leader_name": master.name}
     except Exception as e:
         log_event("WARNING", "rule.deck_preview_fail", f"{deck_id}: {e}", player="system")
     return None
