@@ -17,6 +17,11 @@ from opcg_sim.src.core.gamestate import GameManager, Player
 from cpu_selfplay import build_deck, _load_db
 
 
+def _aggro_plan():
+    """カウンター薄の攻め寄り（idle ドンを強く減価する）プラン。"""
+    return dataclasses.replace(cpu_self_plan.NEUTRAL, **cpu_self_plan._PRESETS["aggro"])
+
+
 @pytest.fixture(scope="module")
 def db():
     return _load_db()
@@ -102,6 +107,43 @@ def test_puzzle_active_don_valued_linearly_characterization(db):
     two = cpu_ai._side_score(gm.p1, True, cap)
     assert one - base == pytest.approx(cpu_ai.W_DON_ACTIVE)
     assert two - one == pytest.approx(cpu_ai.W_DON_ACTIVE)
+
+
+def test_puzzle_converts_excess_don_to_clock_at_decide_level(db):
+    """ドン→クロック変換（decide レベル・検証基盤の B-1 症状ピン・§2.5.3）。
+
+    余剰アクティブドンを持ち、リーダーに届く確立済み攻撃者がいて、相手が無防備（ブロッカー無し・
+    手札0）なとき、`decide` は **攻撃者でリーダーを殴る（＝ドンをクロックに変換）** ことを選ぶ。
+    『何もしない（TURN_END）で余剰ドンを握る』や『既に届く攻撃者へさらにドンを盛る（ATTACH_DON）』
+    ではない。`_side_score` 単体でなく **decide の出力**で固定する（B-1 の余剰ドン温存症状の終点）。"""
+    gm = _new_gm(db, seed=0)
+    assert _fast_forward_to_p1_main(gm), "p1 メインへ到達できなかった"
+    # 相手を無防備化（ブロッカー無し・手札0・ライフは 2 残して『致死で畳む』曖昧さを排除）。
+    gm.p2.field.clear()
+    gm.p2.hand.clear()
+    while len(gm.p2.life) > 2:
+        gm.p2.trash.append(gm.p2.life.pop())
+    if not gm.p2.life:
+        gm.p2.life.append(gm.p2.deck.pop())
+    opp_leader_pw = int(gm.p2.leader.get_power(False)) if gm.p2.leader else 5000
+    atk = _reaching_char(gm.p1.deck, 0)
+    if atk is None:
+        pytest.skip("攻撃者が見つからない")
+    gm.p1.deck.remove(atk)
+    gm.p1.field[:] = [atk]
+    atk.is_rest = False
+    atk.is_newly_played = False
+    atk.passive_power_override = opp_leader_pw + 1000   # リーダーに確実に届く
+    gm.p1.hand.clear()                                   # 局面を孤立（PLAY を除外＝ドン/攻撃/畳みのみ）
+    for _ in range(4):                                   # 余剰アクティブドンを持たせる
+        if gm.p1.don_deck:
+            gm.p1.don_active.append(gm.p1.don_deck.pop())
+    plan = _aggro_plan()
+    for difficulty in ("normal", "hard"):
+        g = gm.clone()
+        move = cpu_ai.decide(g, g.p1, difficulty, random.Random(0), plan=plan)
+        assert move["action_type"] == "ATTACK", f"{difficulty}: 余剰ドンを握って攻めない（ドン→クロック未変換）"
+        assert move["payload"]["target_ids"] == [g.p2.leader.uuid], f"{difficulty}: リーダーを殴っていない"
 
 
 # ---------------------------------------------------------------------------

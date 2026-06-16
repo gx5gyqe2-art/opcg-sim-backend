@@ -196,3 +196,144 @@ def test_plan_progress_rewards_lethal_board(db):
     c.passive_power_override = int(cpu_ai._power_cap(gm.p2)) + 1000
     with_reach = cpu_ai._plan_progress(gm, me, opp, True, _plan("aggro"))
     assert with_reach > base
+
+
+def _reaching_unit(gm, owner):
+    c = next((x for x in list(owner.deck) if x.master.type.name == "CHARACTER"), None)
+    assert c is not None
+    owner.deck.remove(c)
+    owner.field.append(c)
+    c.is_rest = False
+    c.is_newly_played = False
+    c.passive_power_override = int(cpu_ai._power_cap(gm.p2)) + 1000
+    return c
+
+
+def test_c1_visible_blocker_discounts_lethal_reach(db):
+    """C-1: 相手の可視ブロッカーは逆算リーサルの reach を 1 本控除する（false lethal 抑制）。
+
+    reach=1・相手ライフ 1 の『削り切れる盤面』でも、相手に**アクティブなブロッカーが 1 体**いれば
+    割引後 reach=0 となり、止め（_CLOSER_W）加点が消える。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p1
+    gm.p2.life[:] = gm.p2.life[:1]
+    me, opp = gm.p1, gm.p2
+    _reaching_unit(gm, me)
+    lethal = cpu_ai._plan_progress(gm, me, opp, True, _plan("aggro"))
+    # 相手にアクティブなブロッカーを 1 体置く。
+    blk = next((x for x in list(opp.deck)
+                if x.master.type.name == "CHARACTER" and x.has_keyword("ブロッカー")), None)
+    if blk is None:
+        pytest.skip("ブロッカー持ちキャラが見つからない")
+    opp.deck.remove(blk)
+    opp.field.append(blk)
+    blk.is_rest = False
+    blk.is_newly_played = False
+    discounted = cpu_ai._plan_progress(gm, me, opp, True, _plan("aggro"))
+    assert discounted < lethal, "可視ブロッカーが reach を控除していない（false lethal）"
+
+
+def test_c1_counter_buffer_discounts_lethal_reach(db):
+    """C-1: profile 由来の隠れカウンター緩衝も reach を控除する（profile 無しは控除 0＝従来）。
+
+    profile 無しでは『削り切れる盤面』のまま。厚いカウンター緩衝＋相手手札ありの profile を渡すと、
+    推定セーブ回数ぶん割引後 reach が減り、止め加点が下がる。"""
+    from opcg_sim.src.core import cpu_opponent_model as om
+    gm = _new_gm(db)
+    gm.turn_player = gm.p1
+    gm.p2.life[:] = gm.p2.life[:1]
+    me, opp = gm.p1, gm.p2
+    _reaching_unit(gm, me)
+    if not opp.hand:
+        opp.hand.append(opp.deck.pop())
+    no_profile = cpu_ai._plan_progress(gm, me, opp, True, _plan("aggro"), profile=None)
+    thick = om.OpponentProfile(50, 4000.0, 0.8, 0.1, 0.1, 4.0, 1.6, 0.3)  # 緩衝大＝複数セーブ
+    with_profile = cpu_ai._plan_progress(gm, me, opp, True, _plan("aggro"), profile=thick)
+    assert with_profile < no_profile, "カウンター緩衝が reach を控除していない（false lethal）"
+
+
+# ---------------------------------------------------------------------------
+# バッチC-3: 自ライフ（守備）の非線形膝位置を対面（相手 aggro_lean）依存に
+# ---------------------------------------------------------------------------
+
+def test_c3_own_life_knee_depends_on_matchup():
+    """`_own_life_knee`: profile 無し＝既定 2、攻め対面（aggro_lean>=閾値）＝3、受け対面＝2。"""
+    from opcg_sim.src.core import cpu_opponent_model as om
+    assert cpu_ai._own_life_knee(None) == cpu_ai._LIFE_KNEE_DEFAULT == 2
+    aggro_opp = om.OpponentProfile(50, 200.0, 0.2, 0.0, 0.0, 2.0, 0.8, 0.8)   # aggro_lean=0.8
+    control_opp = om.OpponentProfile(50, 1500.0, 0.7, 0.2, 0.3, 5.0, 1.6, 0.2)  # aggro_lean=0.2
+    assert cpu_ai._own_life_knee(aggro_opp) == cpu_ai._LIFE_KNEE_AGGRO_MATCHUP == 3
+    assert cpu_ai._own_life_knee(control_opp) == 2
+
+
+def test_c3_side_score_knee_raises_low_life_bonus(db):
+    """`_side_score(life_knee=3)` はライフ 3 枚目にも薄域上乗せ（W_LIFE_LOW）を 1 段ぶん足す。
+
+    膝 2→3 の差は丁度 `W_LIFE_LOW * life_factor`（3 枚目以上のライフを持つとき）。"""
+    gm = _new_gm(db)
+    p = gm.p1
+    while len(p.life) < 3:
+        p.life.append(p.deck.pop())
+    cap = cpu_ai._power_cap(gm.p2)
+    knee2 = cpu_ai._side_score(p, True, cap, life_knee=2)
+    knee3 = cpu_ai._side_score(p, True, cap, life_knee=3)
+    assert knee3 - knee2 == pytest.approx(cpu_ai.W_LIFE_LOW)
+    # 膝既定は 2（従来）。
+    assert cpu_ai._side_score(p, True, cap) == pytest.approx(knee2)
+
+
+# ---------------------------------------------------------------------------
+# バッチC-2: テレグラフ致死の減点（相手ターン開始の葉・プラン供給時のみ）
+# ---------------------------------------------------------------------------
+
+def test_c2_telegraph_lethal_detection(db):
+    """`_telegraph_lethal`: 相手の届く打点本数（割引後）≥ 自残ライフ で True。ブロッカーで控除される。"""
+    gm = _new_gm(db)
+    me, opp = gm.p1, gm.p2
+    while len(me.life) > 2:        # 自ライフ 2（相手リーダー＋攻撃者1体の計2打点で丁度致死）
+        me.trash.append(me.life.pop())
+    while len(me.life) < 2:
+        me.life.append(me.deck.pop())
+    opp.field.clear()
+    my_leader_pw = int(me.leader.get_power(False))
+    # 相手にリーダーへ届く攻撃者を 1 体（素パワー >= 自リーダー）。相手リーダー自身も 1 打点になる。
+    atk = next((c for c in list(opp.deck) if c.master.type.name == "CHARACTER"), None)
+    assert atk is not None
+    opp.deck.remove(atk)
+    opp.field.append(atk)
+    atk.is_rest = False
+    atk.passive_power_override = my_leader_pw + 1000
+    assert cpu_ai._telegraph_lethal(me, opp) is True   # reach 2（攻撃者＋相手リーダー）>= 自ライフ 2
+    # 自分にアクティブブロッカーを 1 体置くと打点が 1 本止まり（reach 1 < 2）telegraph 解消。
+    blk = next((c for c in list(me.deck)
+                if c.master.type.name == "CHARACTER" and c.has_keyword("ブロッカー")), None)
+    if blk is not None:
+        me.deck.remove(blk)
+        me.field.append(blk)
+        blk.is_rest = False
+        assert cpu_ai._telegraph_lethal(me, opp) is False
+
+
+def test_c2_telegraph_penalty_isolated(db, monkeypatch):
+    """C-2: telegraph 項は『相手ターン開始（is_my_turn=False）＋plan 供給』のときだけ `W_TELEGRAPH_LETHAL`
+    ぶん減点する。`_telegraph_lethal` を True/False で monkeypatch し、盤面同一のまま項だけを isolate する。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p2          # p1 視点で is_my_turn=False（相手ターン開始の静止点）
+    plan = _plan("aggro")
+    monkeypatch.setattr(cpu_ai, "_telegraph_lethal", lambda me, opp: False)
+    safe = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
+    monkeypatch.setattr(cpu_ai, "_telegraph_lethal", lambda me, opp: True)
+    danger = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
+    assert safe - danger == pytest.approx(cpu_ai.W_TELEGRAPH_LETHAL)
+    # plan=None は telegraph 項を作動させない（True にしても不変＝回帰）。
+    none_true = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=None)
+    monkeypatch.setattr(cpu_ai, "_telegraph_lethal", lambda me, opp: False)
+    none_false = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=None)
+    assert none_true == pytest.approx(none_false)
+    # is_my_turn=True（自分の手番）では telegraph 項は作動しない。
+    gm.turn_player = gm.p1
+    monkeypatch.setattr(cpu_ai, "_telegraph_lethal", lambda me, opp: True)
+    my_true = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
+    monkeypatch.setattr(cpu_ai, "_telegraph_lethal", lambda me, opp: False)
+    my_false = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
+    assert my_true == pytest.approx(my_false)
