@@ -471,14 +471,40 @@ def _consumes_hand_card(manager, actor_name: str, move: Dict[str, Any]) -> bool:
 # 相手 min ノードに「緩衝内なら攻撃を防ぐ（手札 1 枚を消費）／緩衝超なら貫通」という応答を PASS と並べて
 # 入れる。min が選ぶので、緩衝内に収まる盛りは無駄（相手が守り切る）・緩衝超の盛りは正の手（貫通）になる。
 # hard は opp_public_only=False で実カウンターを既に読むため本モデルは作動しない（profile も渡さない）。
-_COUNTER_HAND_EST = 4.0   # 守りに割けるカウンター札の見込み枚数（相手手札の代表値・power 換算の係数）
+_COUNTER_HAND_EST = 4.0   # 守りに割けるカウンター札の見込み枚数（コミット想定の上限・power 換算の係数）
 
 
-def _estimate_counter_buffer(profile) -> float:
-    """profile のカウンター密度から、相手が 1 防御ターンに積める総カウンター power を推定する（無ければ 0）。"""
+def _estimate_counter_buffer(profile, opp_hand_size: Optional[int] = None, opp_trash=None) -> float:
+    """profile のカウンター密度＋**公開情報ベリーフ**から、相手が 1 防御ターンに積める総カウンター power
+    を推定する（§2.5.3 belief update）。profile が無ければ 0。
+
+    静的なテンプレ密度（`counter_avg`）に、対局中に**公開された情報だけ**で belief を更新する:
+      - **手札枚数**（公開 count）: カウンターには手札が要る。コミット想定枚数を実手札枚数でキャップ
+        （少手札＝緩衝縮小・0 枚＝0）。手札の*中身*は読まない＝フェア。
+      - **トラッシュ**（公開）: 既に使われた（見えた）カウンター値ぶん、デッキ＋手札の残カウンター密度を
+        割り引く（消費が進むほど緩衝が縮む）。
+    引数省略時は静的既定（手札 `_COUNTER_HAND_EST` 枚・未消費）＝従来値（テスト/後方互換）。
+    """
     if profile is None:
         return 0.0
-    return max(0.0, float(getattr(profile, "counter_avg", 0.0) or 0.0) * _COUNTER_HAND_EST)
+    per_card = float(getattr(profile, "counter_avg", 0.0) or 0.0)
+    if per_card <= 0.0:
+        return 0.0
+    # 手札枚数ベリーフ: コミット想定を実手札枚数でキャップ（未供給時は静的既定 _COUNTER_HAND_EST）。
+    commit = _COUNTER_HAND_EST if opp_hand_size is None else float(max(0, min(int(opp_hand_size), int(_COUNTER_HAND_EST))))
+    # トラッシュ消費ベリーフ: 見えた消費カウンター値ぶん残密度を割り引く。
+    depletion = 1.0
+    if opp_trash:
+        n = max(1, int(getattr(profile, "n_cards", 0) or 0))
+        total_counter = per_card * n   # テンプレ基準のデッキ全体の総カウンター power
+        if total_counter > 0.0:
+            seen = 0.0
+            for c in opp_trash:
+                m = getattr(c, "master", None)
+                if m is not None:
+                    seen += float(getattr(m, "counter", 0) or 0)
+            depletion = max(0.0, 1.0 - seen / total_counter)
+    return max(0.0, per_card * commit * depletion)
 
 
 def _counter_needed(manager) -> Optional[float]:
@@ -696,7 +722,9 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     #    1-ply 上位＋TURN_END なので最善手はここに含まれる。
     start_turn = manager.turn_count
     # B-1(b): 相手の推定カウンター緩衝（normal の保守 min ノードでのみ作動。hard は実カウンターを読むため 0）。
-    cbudget = _estimate_counter_buffer(profile) if opp_public_only else 0.0
+    # #3: 公開情報ベリーフ＝相手の生の手札枚数＋トラッシュの消費カウンターで緩衝を動的更新（§2.5.3）。
+    opp = _other(manager, name)
+    cbudget = _estimate_counter_buffer(profile, len(opp.hand), opp.trash) if opp_public_only else 0.0
     out: List[Tuple[float, Dict[str, Any]]] = []
     for i, (s1, m, child) in enumerate(prelim):
         if child is not None and i in deepen:

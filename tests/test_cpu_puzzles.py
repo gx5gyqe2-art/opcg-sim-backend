@@ -170,6 +170,35 @@ def test_b1b_counter_buffer_estimate_scales_with_density(db):
     assert cpu_ai._estimate_counter_buffer(hi) > cpu_ai._estimate_counter_buffer(lo) > 0.0
 
 
+def test_b1b_counter_buffer_belief_hand_size(db):
+    """#3 公開情報ベリーフ: 緩衝は相手の生の手札枚数に追従する（0枚=0・少手札で縮小・上限でキャップ）。"""
+    from opcg_sim.src.core import cpu_opponent_model as om
+    prof = om.OpponentProfile(50, 800.0, 0.6, 0.1, 0.1, 4.0, 1.4, 0.3)
+    full = cpu_ai._estimate_counter_buffer(prof)                       # 既定（コミット上限枚）
+    assert cpu_ai._estimate_counter_buffer(prof, opp_hand_size=0) == 0.0   # 手札0=守れない
+    assert 0 < cpu_ai._estimate_counter_buffer(prof, opp_hand_size=1) < full  # 少手札=縮小
+    assert cpu_ai._estimate_counter_buffer(prof, opp_hand_size=99) == full    # 上限でキャップ（=既定）
+
+
+def test_b1b_counter_buffer_belief_trash_depletion(db):
+    """#3 公開情報ベリーフ: トラッシュに見えた消費カウンターぶん緩衝が割り引かれる。"""
+    from opcg_sim.src.core import cpu_opponent_model as om
+
+    class _Stub:  # master.counter だけ持つ最小スタブ
+        def __init__(self, counter):
+            self.master = type("M", (), {"counter": counter})()
+
+    prof = om.OpponentProfile(50, 800.0, 0.6, 0.1, 0.1, 4.0, 1.4, 0.3)  # total = 800*50 = 40000
+    base = cpu_ai._estimate_counter_buffer(prof, opp_hand_size=4, opp_trash=[])
+    # 消費カウンター 20000（40000 の半分）→ 緩衝はほぼ半減。
+    spent = [_Stub(2000) for _ in range(10)]
+    depleted = cpu_ai._estimate_counter_buffer(prof, opp_hand_size=4, opp_trash=spent)
+    assert depleted == pytest.approx(base * 0.5)
+    # 非カウンター札（counter=0）だけのトラッシュは緩衝を減らさない。
+    noncounter = cpu_ai._estimate_counter_buffer(prof, opp_hand_size=4, opp_trash=[_Stub(0) for _ in range(10)])
+    assert noncounter == pytest.approx(base)
+
+
 def _advance_to_select_counter(gm, attacker, target):
     """attacker→target のアタックを宣言し、SELECT_BLOCKER を PASS で流して SELECT_COUNTER まで進める。"""
     gm.action_events = []
