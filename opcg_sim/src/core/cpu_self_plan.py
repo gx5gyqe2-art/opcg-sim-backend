@@ -32,6 +32,11 @@ _CONTROL_THRESHOLD = 0.4
 #   lethal_mult       : 逆算リーサル項（削り切れる盤面加点）の倍率。aggro で攻めの止めを優先。
 #   milestone_mult    : マイルストーン項（クロック先行/リソース差）の倍率。
 #   clock_rate        : 想定ダメージクロック（相手ライフ/ターン）。aggro ほど速い。
+#   idle_don_mult     : 葉（自分の手番でない静止点）での**余剰アクティブドン**価値の倍率（B-1・§2.5.3）。
+#                       OPCG は防御にドンを付与できないので、ターン終了後に浮いたアクティブドンの保持
+#                       価値は本来低い。これを 1.0 のままにすると「両枝でクロック同値→ドンの床(200/枚)で
+#                       タイブレーク→握る」になり余剰ドン温存を招く。カウンターの薄い攻め寄りデッキほど
+#                       強く減価し、浮かせ得を消して攻めへ向ける（<1.0=減価）。`is_turn=False` の自分側のみ作動。
 @dataclass(frozen=True)
 class PlanProfile:
     n_cards: int
@@ -45,22 +50,26 @@ class PlanProfile:
     lethal_mult: float
     milestone_mult: float
     clock_rate: float
+    idle_don_mult: float
 
 
 # 中立プラン（テンプレ/構成が無いときのフォールバック＝ほぼ現行挙動）。
 NEUTRAL = PlanProfile(
     n_cards=0, archetype="midrange", aggro_lean=0.5, avg_cost=0.0,
     vanilla_body_mult=1.0, attacker_mult=1.0, life_mult=1.0, counter_mult=1.0,
-    lethal_mult=1.0, milestone_mult=1.0, clock_rate=0.8,
+    lethal_mult=1.0, milestone_mult=1.0, clock_rate=0.8, idle_don_mult=1.0,
 )
 
 _PRESETS = {
     "aggro": dict(vanilla_body_mult=1.10, attacker_mult=1.25, life_mult=1.0,
-                  counter_mult=0.85, lethal_mult=1.4, milestone_mult=1.2, clock_rate=1.2),
+                  counter_mult=0.85, lethal_mult=1.4, milestone_mult=1.2, clock_rate=1.2,
+                  idle_don_mult=0.4),
     "midrange": dict(vanilla_body_mult=1.0, attacker_mult=1.0, life_mult=1.0,
-                     counter_mult=1.0, lethal_mult=1.0, milestone_mult=1.0, clock_rate=0.8),
+                     counter_mult=1.0, lethal_mult=1.0, milestone_mult=1.0, clock_rate=0.8,
+                     idle_don_mult=0.7),
     "control": dict(vanilla_body_mult=0.45, attacker_mult=0.9, life_mult=1.15,
-                    counter_mult=1.4, lethal_mult=0.8, milestone_mult=1.0, clock_rate=0.5),
+                    counter_mult=1.4, lethal_mult=0.8, milestone_mult=1.0, clock_rate=0.5,
+                    idle_don_mult=0.85),
 }
 
 

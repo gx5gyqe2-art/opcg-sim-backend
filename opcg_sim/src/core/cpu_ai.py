@@ -168,7 +168,8 @@ def _is_low_impact(c) -> bool:
 def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True,
                 hand_factor: float = 1.0, life_factor: float = 1.0,
                 body_factor: float = 1.0, attacker_factor: float = 1.0,
-                counter_factor: float = 1.0, threat_aware: bool = False) -> float:
+                counter_factor: float = 1.0, threat_aware: bool = False,
+                idle_don_factor: float = 1.0) -> float:
     """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和＋白の境界リスク）。
 
     `power_cap` は対面の最硬防御パワー＝有効パワーの上限（`_effective_power`）。これにより
@@ -197,8 +198,14 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
     # 白（J）の決定境界: 自デッキ残がデッキ切れ（J=0・ドロー不能＝敗北）へ近づくほど非線形に減点。
     score -= max(0, DECK_DANGER - len(p.deck)) * W_DECK_DANGER
 
-    # ドン!!（アクティブ）。
-    score += len(p.don_active) * W_DON_ACTIVE
+    # ドン!!（アクティブ）。`is_turn=False`（自分の手番でない静止点＝葉）では、浮いたアクティブドンは
+    # 防御に使えない（OPCG はドンを防御に付与できない）ので、プラン由来の `idle_don_factor`(<1.0) で
+    # 減価する＝「両枝でクロック同値→ドンの床でタイブレーク→握る」という余剰ドン温存を断つ（B-1・§2.5.3）。
+    # 自分の手番中（is_turn=True）は付与でパワーに変換できる生きた資源なので減価しない。plan 無し時は 1.0。
+    don_score = len(p.don_active) * W_DON_ACTIVE
+    if not is_turn and idle_don_factor != 1.0:
+        don_score *= idle_don_factor
+    score += don_score
 
     # 場のキャラ: 存在価値 ＋ 有効パワー ＋ ブロッカー（最終防御）＋ 攻め圧（実際に攻撃できる体のみ）。
     # 存在価値はプランで「効果なし低パワーの置物」のみ割り引く（body_factor）＝デッキ依存の置物許容度。
@@ -303,11 +310,13 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
             opp_hand_factor = profile.defense_factor
     # 自デッキ勝ち筋プラン補正（自分側のみ。相手側は相手モデルが担当）。
     body_factor = attacker_factor = counter_factor = 1.0
+    idle_don_factor = 1.0
     if plan is not None:
         life_factor *= plan.life_mult
         body_factor = plan.vanilla_body_mult
         attacker_factor = plan.attacker_mult
         counter_factor = plan.counter_mult
+        idle_don_factor = plan.idle_don_mult
     # 脅威/キーワード資産評価（§2.5.6）は両側対称に適用＝相手の脅威を押し上げ→① の単一対象探索が
     # 最善の除去対象を狙う。プラン供給時のみ作動（plan=None では一切作動せず現行挙動と完全同値）。
     threat_aware = plan is not None
@@ -316,7 +325,8 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
     opp_cap = _power_cap(me)
     return (_side_score(me, is_my_turn, my_cap, include_counter=True, life_factor=life_factor,
                         body_factor=body_factor, attacker_factor=attacker_factor,
-                        counter_factor=counter_factor, threat_aware=threat_aware)
+                        counter_factor=counter_factor, threat_aware=threat_aware,
+                        idle_don_factor=idle_don_factor)
             - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
                           hand_factor=opp_hand_factor, threat_aware=threat_aware)
             + _plan_progress(manager, me, opp, is_my_turn, plan))

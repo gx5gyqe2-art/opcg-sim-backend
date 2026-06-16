@@ -6,12 +6,13 @@
 中身を一切読まない）を決定論的に固定する。B-1（アイドルドン末端減価）導入時に意図的に変わる箇所は
 「特性化（characterization）」として現状をピン留めし、変更時にここを更新する。
 """
+import dataclasses
 import random
 
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 import pytest
 
-from opcg_sim.src.core import action_api, cpu_ai
+from opcg_sim.src.core import action_api, cpu_ai, cpu_self_plan
 from opcg_sim.src.core.gamestate import GameManager, Player
 from cpu_selfplay import build_deck, _load_db
 
@@ -101,6 +102,59 @@ def test_puzzle_active_don_valued_linearly_characterization(db):
     two = cpu_ai._side_score(gm.p1, True, cap)
     assert one - base == pytest.approx(cpu_ai.W_DON_ACTIVE)
     assert two - one == pytest.approx(cpu_ai.W_DON_ACTIVE)
+
+
+# ---------------------------------------------------------------------------
+# B-1 (a): アイドルドン末端減価（plan 供給時のみ・自分の手番でない静止点でのみ）
+# ---------------------------------------------------------------------------
+
+def test_b1a_idle_don_decayed_only_when_idle(db):
+    """B-1(a): `idle_don_factor`(<1.0) は『自分の手番でない（idle＝葉）』ときだけアクティブドンを
+    減価する。自分の手番中（is_turn=True）は生きた資源なので減価しない。factor=1.0 は従来どおり線形。"""
+    gm = _new_gm(db, seed=0)
+    cap = cpu_ai._power_cap(gm.p2)
+    for _ in range(3):
+        assert gm.p1.don_deck, "ドンデッキが空（前提崩れ）"
+        gm.p1.don_active.append(gm.p1.don_deck.pop())
+    n = len(gm.p1.don_active)
+    assert n >= 3
+    # idle（is_turn=False）: factor 0.4 で n*W_DON_ACTIVE*(1-0.4) ぶん下がる。
+    full = cpu_ai._side_score(gm.p1, False, cap, idle_don_factor=1.0)
+    decayed = cpu_ai._side_score(gm.p1, False, cap, idle_don_factor=0.4)
+    assert full - decayed == pytest.approx(n * cpu_ai.W_DON_ACTIVE * 0.6)
+    # 自分の手番中（is_turn=True）は factor を無視＝減価しない（生きた資源）。
+    assert cpu_ai._side_score(gm.p1, True, cap, idle_don_factor=1.0) == \
+        cpu_ai._side_score(gm.p1, True, cap, idle_don_factor=0.4)
+
+
+def test_b1a_plan_decays_idle_don_in_evaluate(db):
+    """B-1(a) 配線: plan.idle_don_mult<1.0 は evaluate の葉（相手ターン＝自分は idle）で自分の余剰
+    アクティブドンを減価する。差は丁度ドン減価分（他の plan 乗数は同一の NEUTRAL で相殺）。
+
+    これが「両枝でクロック同値→ドンの床でタイブレーク→握る」（余剰ドン温存）の震源を断つ。"""
+    gm = _new_gm(db, seed=0)
+    gm.turn_player = gm.p2          # p1 視点で is_my_turn=False（idle な静止点＝葉）
+    for _ in range(3):
+        assert gm.p1.don_deck
+        gm.p1.don_active.append(gm.p1.don_deck.pop())
+    n = len(gm.p1.don_active)
+    plan_keep = cpu_self_plan.NEUTRAL                                       # idle_don_mult=1.0
+    plan_decay = dataclasses.replace(cpu_self_plan.NEUTRAL, idle_don_mult=0.4)
+    v_keep = cpu_ai.evaluate(gm, "p1", plan=plan_keep)
+    v_decay = cpu_ai.evaluate(gm, "p1", plan=plan_decay)
+    # 差は丁度ドン減価分（threat 項・_plan_progress は両 plan で同一なので相殺）。
+    assert v_keep - v_decay == pytest.approx(n * cpu_ai.W_DON_ACTIVE * 0.6)
+    # plan=None は idle_don_factor=1.0＝減価しない（NEUTRAL とは threat/_plan_progress 分だけ別物なので
+    # 等値ではない。減価しないことは test_b1a_idle_don_decayed_only_when_idle が _side_score で担保）。
+
+
+def test_b1a_aggro_plan_has_decay_preset():
+    """攻め寄り（カウンター薄）デッキほど idle_don_mult を強く減価するプリセット（aggro<midrange<control）。"""
+    a = cpu_self_plan._PRESETS["aggro"]["idle_don_mult"]
+    m = cpu_self_plan._PRESETS["midrange"]["idle_don_mult"]
+    c = cpu_self_plan._PRESETS["control"]["idle_don_mult"]
+    assert a < m < c <= 1.0
+    assert cpu_self_plan.NEUTRAL.idle_don_mult == 1.0   # 中立フォールバックは現行挙動
 
 
 # ---------------------------------------------------------------------------
