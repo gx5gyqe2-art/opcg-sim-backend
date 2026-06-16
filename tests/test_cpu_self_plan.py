@@ -3,6 +3,7 @@
 方針: プラン未指定（plan=None）では現行挙動と完全同値（回帰ガード）。プラン供給時のみ、自分側の
 評価重み（置物の存在価値・カウンター温存）と逆算項（リーサル誘導）がデッキ依存で作動することを検証。
 """
+import dataclasses
 import random
 import types
 
@@ -250,6 +251,64 @@ def test_c1_counter_buffer_discounts_lethal_reach(db):
     thick = om.OpponentProfile(50, 4000.0, 0.8, 0.1, 0.1, 4.0, 1.6, 0.3)  # 緩衝大＝複数セーブ
     with_profile = cpu_ai._plan_progress(gm, me, opp, True, _plan("aggro"), profile=thick)
     assert with_profile < no_profile, "カウンター緩衝が reach を控除していない（false lethal）"
+
+
+# ---------------------------------------------------------------------------
+# 理想ライン（J値スケジュール・§2.5.5 設計メモ 20260616）
+# ---------------------------------------------------------------------------
+
+def test_build_plan_derives_delta_schedule():
+    """build_plan は構成から J値差スケジュールを導出する（アグロは差を速く開く＝傾きが急）。"""
+    aggro = cpu_self_plan.build_plan([_master(counter=0, cost=1)] * 10 + [_master(counter=0, cost=2)] * 10)
+    control = cpu_self_plan.build_plan(
+        [_master(counter=2000, cost=5, keywords=["ブロッカー"], text="このキャラをKOする")] * 8
+        + [_master(counter=1000, cost=4)] * 12)
+    # 非空・単調非減少（ターンが進むほど開くべき差は増える）。
+    assert aggro.delta_schedule and control.delta_schedule
+    assert list(aggro.delta_schedule) == sorted(aggro.delta_schedule)
+    # アグロはコントロールより速く差を開く理想（終端ターンの目標差が大きい）。
+    assert aggro.delta_schedule[-1] > control.delta_schedule[-1]
+    # 中立フォールバック（空構成）は未導出＝空＝従来挙動。
+    assert cpu_self_plan.build_plan([]).delta_schedule == ()
+
+
+def test_plan_progress_rewards_schedule_adherence(db):
+    """J値スケジュール: 実測 (相手J値−自分J値) が理想差を上回るほどマイルストーンが加点される。
+
+    相手の黒（手札）をトラッシュへ移す＝相手 J値（白＝デッキ残＋トラッシュ）が上がり、差が開く。
+    コントロール寄り plan（aggro_lean 低＝J値項の比重大）で、ahead > base を確認。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p1
+    me, opp = gm.p1, gm.p2
+    # 既知のスケジュールを持つ control plan（_PRESETS は空なので明示注入）。
+    plan = dataclasses.replace(_plan("control"), delta_schedule=(0.0, 1.0, 2.0, 3.0, 4.0, 5.0))
+    base = cpu_ai._plan_progress(gm, me, opp, True, plan)
+    # 相手の手札 3 枚をトラッシュへ（相手 J値↑＝予定より差が開く＝先行）。
+    moved = 0
+    while opp.hand and moved < 3:
+        opp.trash.append(opp.hand.pop())
+        moved += 1
+    assert moved > 0, "相手手札が無くテストできない"
+    ahead = cpu_ai._plan_progress(gm, me, opp, True, plan)
+    assert ahead > base, "スケジュール先行（J値差拡大）が加点されていない"
+    # 逆に自分の手札をトラッシュへ（自分 J値↑＝差が縮む＝遅延）→ 減点。
+    me.trash.append(me.hand.pop()) if me.hand else None
+    behind = cpu_ai._plan_progress(gm, me, opp, True, plan)
+    assert behind < ahead, "スケジュール遅延（自 J値増）が減点されていない"
+
+
+def test_plan_progress_empty_schedule_is_legacy_resource_diff(db):
+    """delta_schedule 空（_PRESETS 構築）のときは従来の手札＋場リソース差採点＝回帰不変。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p1
+    me, opp = gm.p1, gm.p2
+    plan = _plan("control")           # _PRESETS 由来＝delta_schedule=()
+    assert plan.delta_schedule == ()
+    base = cpu_ai._plan_progress(gm, me, opp, True, plan)
+    # 自分の場キャラを 1 体増やす＝旧リソース差（手札＋場）が自分有利へ → 加点。
+    me.field.append(me.deck.pop())
+    after = cpu_ai._plan_progress(gm, me, opp, True, plan)
+    assert after > base, "従来の手札＋場リソース差採点が作動していない"
 
 
 # ---------------------------------------------------------------------------

@@ -112,6 +112,7 @@ _CLOSER_W = 2000.0                # 逆算リーサル: 相手を削り切れる
 _NEAR_W = 200.0                   # 同上: 削り切るには足りないが届く攻撃 1 本あたりの軽い加点
 _MILE_DMG_W = 1200.0             # マイルストーン: 想定クロックより相手ライフが先行して減っている分
 _MILE_RES_W = 220.0             # マイルストーン: リソース差（手札＋場の枚数差）1 枚あたり
+_J_SCHED_W = 200.0              # マイルストーン(J値版): スケジュール遵守度（実測 J値差 − 理想差）1 あたり（§2.5.5）
 
 # 脅威/キーワード資産の価値（§2.5.6・対面プランのルールベース実現）。場のキャラが持つ「除去すべき
 # 脅威性／温存すべき資産性」をカードデータから加点する。両側に対称適用するので、相手の脅威キャラは
@@ -504,7 +505,9 @@ def _plan_progress(manager, me, opp, is_my_turn: bool, plan, profile=None) -> fl
       でセーブ回数化・相手手札枚数で上限）を控除し、**割引後 reach** で止め/接近を判定する（false lethal の
       soft 精度改善）。`profile` 無しは控除 0＝従来どおり（plan 単体テストは不変）。
     - マイルストーン: アグロ＝想定クロックより相手ライフが先行して減っているほど加点／コントロール＝
-      手札＋場のリソース差で加点。攻め寄り度 aggro_lean で両者をブレンドする。
+      **J値スケジュール遵守度**（実測 (相手J値−自分J値) が構成由来の理想差 `plan.delta_schedule[t]` を
+      上回る分を加点。`delta_schedule` 空＝従来の手札＋場リソース差へフォールバック）。攻め寄り度
+      aggro_lean で両者をブレンドする。J値は白＝デッキ残＋トラッシュの枚数のみ参照＝フェア。
     """
     if plan is None:
         return 0.0
@@ -552,12 +555,22 @@ def _plan_progress(manager, me, opp, is_my_turn: bool, plan, profile=None) -> fl
             score += plan.lethal_mult * _CLOSER_W      # 割引後でも削り切れる盤面＝止めの形
         else:
             score += plan.lethal_mult * _NEAR_W * discounted_reach
-    # マイルストーン: クロック先行（aggro）とリソース差（control）を aggro_lean でブレンド。
+    # マイルストーン: クロック先行（aggro）と J値スケジュール遵守/リソース差（control）を aggro_lean でブレンド。
     init_life = int(getattr(getattr(opp.leader, "master", None), "life", 0) or 0) if opp.leader else 0
     expected = max(0.0, init_life - plan.clock_rate * max(0, manager.turn_count))
     aggro_comp = (expected - opp_life) * _MILE_DMG_W
-    res_diff = (len(me.hand) + len(me.field)) - (len(opp.hand) + len(opp.field))
-    control_comp = res_diff * _MILE_RES_W
+    sched = getattr(plan, "delta_schedule", ())
+    if sched:
+        # J値スケジュール遵守度: 実測 (相手J値 − 自分J値) が当ターンの理想差を上回る分を加点。
+        # J値＝白＝デッキ残＋トラッシュの**枚数のみ**参照（中身は読まない＝公開情報・フェア）。
+        my_j = len(me.deck) + len(getattr(me, "trash", None) or [])
+        opp_j = len(opp.deck) + len(getattr(opp, "trash", None) or [])
+        idx = min(max(0, manager.turn_count), len(sched) - 1)
+        control_comp = ((opp_j - my_j) - sched[idx]) * _J_SCHED_W
+    else:
+        # 従来: 手札＋場の枚数差（プラン未導出・NEUTRAL・単体テストの _PRESETS 構築時＝完全同値）。
+        res_diff = (len(me.hand) + len(me.field)) - (len(opp.hand) + len(opp.field))
+        control_comp = res_diff * _MILE_RES_W
     score += plan.milestone_mult * (plan.aggro_lean * aggro_comp + (1.0 - plan.aggro_lean) * control_comp)
     return score
 
