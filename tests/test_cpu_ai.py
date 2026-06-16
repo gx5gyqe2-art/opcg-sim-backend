@@ -377,6 +377,90 @@ def test_b2lite_values_keeping_blocker_for_defense(db):
     assert search_val(False, 2) > search_val(True, 2)
 
 
+# ---------------------------------------------------------------------------
+# バッチB-3: 重要手クラスの深掘り強制投入（§2.5.3）
+# ---------------------------------------------------------------------------
+
+class _FakeChar:
+    def __init__(self, blocker=False, rest=False):
+        self._blocker = blocker
+        self.is_rest = rest
+
+    def has_keyword(self, k):
+        return self._blocker and k == "ブロッカー"
+
+
+class _FakeP:
+    def __init__(self, name, field=(), life=(), leader=None):
+        self.name = name
+        self.field = list(field)
+        self.life = list(life)
+        self.leader = leader
+
+
+class _FakeMgr:
+    def __init__(self, p1, p2):
+        self.p1 = p1
+        self.p2 = p2
+
+
+def test_b3_importance_classifier():
+    """`_is_important_root_move`: 除去候補・ブロッカー設置・相手ライフ減 を重要手として拾い、
+    盤面に変化の無い手や child=None は重要としない。"""
+    base = _FakeMgr(_FakeP("p1", life=[1]), _FakeP("p2", life=[1, 1]))
+    # ① 除去候補（単一対象選択の RESOLVE）。
+    sel = {"action_type": action_api.ACT_RESOLVE_SELECTION}
+    assert cpu_ai._is_important_root_move(base, "p1", sel, child=base) is True
+    # ② ブロッカー設置（適用後に自分のアクティブブロッカーが増える）。
+    after_blk = _FakeMgr(_FakeP("p1", field=[_FakeChar(blocker=True)], life=[1]),
+                         _FakeP("p2", life=[1, 1]))
+    assert cpu_ai._is_important_root_move(base, "p1", {"action_type": "PLAY"}, child=after_blk) is True
+    # ③ 相手ライフ減（逆算リーサル/クロック手）。
+    after_dmg = _FakeMgr(_FakeP("p1", life=[1]), _FakeP("p2", life=[1]))
+    assert cpu_ai._is_important_root_move(base, "p1", {"action_type": "ATTACK"}, child=after_dmg) is True
+    # 変化なし＝重要でない。child=None も重要でない。
+    assert cpu_ai._is_important_root_move(base, "p1", {"action_type": "ATTACH_DON"}, child=base) is False
+    assert cpu_ai._is_important_root_move(base, "p1", {"action_type": "ATTACK"}, child=None) is False
+
+
+def test_b3_forces_clock_move_into_deepen_set(db):
+    """B-3 統合: 1-ply ビームから外れても、相手ライフを減らす止め/クロック手は深掘り集合に入り候補に残る。
+
+    `HARD_ROOT_BEAM=0`（＝1-ply 上位による深掘りを無効化）にしても、リーダーへ届くアタックは
+    `_is_important_root_move` で強制投入され `_scored_search` の返り値に含まれる。"""
+    random.seed(0)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    assert _fast_forward_to_p1_main(gm)
+    gm.p2.field.clear()
+    gm.p2.hand.clear()
+    if not gm.p2.life:
+        gm.p2.life.append(gm.p2.deck.pop())
+    opp_pw = int(gm.p2.leader.get_power(False)) if gm.p2.leader else 5000
+    atk = next((c for c in gm.p1.deck if c.master.type.name == "CHARACTER"), None)
+    if atk is None:
+        pytest.skip("攻撃者が見つからない")
+    gm.p1.deck.remove(atk)
+    gm.p1.field[:] = [atk]
+    atk.is_rest = False
+    atk.is_newly_played = False
+    atk.passive_power_override = opp_pw + 1000
+    moves = gm.get_legal_actions(gm.p1)
+    attack_leader = next((m for m in moves if m.get("action_type") == "ATTACK"
+                          and m.get("payload", {}).get("target_ids") == [gm.p2.leader.uuid]), None)
+    assert attack_leader is not None
+    old = cpu_ai.HARD_ROOT_BEAM
+    cpu_ai.HARD_ROOT_BEAM = 0
+    try:
+        scored = cpu_ai._scored_search(gm, "p1", moves, see_opp_hand=True, opp_public_only=False)
+    finally:
+        cpu_ai.HARD_ROOT_BEAM = old
+    sigs = {cpu_ai._move_sig(m) for _s, m in scored}
+    assert cpu_ai._move_sig(attack_leader) in sigs, "クロック手が強制投入されていない"
+
+
 def test_hard_selfplay_smoke_no_invariant_violation(db):
     """hard 方策で数十手進めてもインバリアント違反・例外が出ない（探索の実プレイ健全性）。
 
