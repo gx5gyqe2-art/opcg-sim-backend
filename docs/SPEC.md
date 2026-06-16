@@ -245,9 +245,14 @@ WBS（`gx5gyqe2-art/WBS` の `projects/opcg-sim-backend.md`）と同期。
 - **A-1 アンブロッカブル／「効果で選ばれない」の評価**（`_threat_value`／`_side_score`・§2.5.6）:
   アンブロッカブルは相手ブロッカーを壁とみなさずリーダー基準で有効パワー算定 or 定数 +800〜1000、
   「選ばれない」は KO 耐性同様 +900〜1200。語彙は `keywords`／`effect_text` から検出。重大度=高（実装極小）。
-- **A-2 `_threat_value`・`_ACT_MARGIN` のアーキタイプ依存スケール**（`cpu_self_plan`／`cpu_ai`・§2.5.5/§2.5.6）:
-  aggro＝ダブルアタック/速攻 増・`_ACT_MARGIN` 低（テンポ攻めを通す）／control＝ブロッカー/KO耐性 増・
-  `_ACT_MARGIN` 高。`PlanProfile` に係数を持たせ評価へ供給。重大度=中。
+- **A-2 `_threat_value`・`_ACT_MARGIN` のアーキタイプ依存スケール【実装済み】**（`cpu_self_plan`／`cpu_ai`・
+  §2.5.5/§2.5.6）: `PlanProfile` に係数 `threat_atk_mult`／`threat_def_mult`／`act_margin_mult` を追加し評価へ供給。
+  `_threat_value(c, atk_mult, def_mult)` は攻撃的キーワード（ダブルアタック/速攻/バニッシュ/アンブロッカブル）を
+  `threat_atk_mult`、防御的キーワード（効果耐性「KOされない」）を `threat_def_mult` でスケール（両側対称）。
+  `decide` は畳み判定マージン `_ACT_MARGIN` を `act_margin_mult` でスケール。プリセット: **aggro**＝攻め係数 1.30／
+  守り係数 0.85／マージン 0.6（テンポ攻めを通す）、**control**＝攻め 0.85／守り 1.25／マージン 1.5（曖昧な展開は
+  畳んで守りを残す）、**midrange/NEUTRAL**＝全 1.0（plan 無しと完全同値）。`tests/test_cpu_puzzles.py`
+  （脅威スケールの交差不変／プリセットの方向性）。
 - **A-3 フェア性ガード＋探索健全性テスト**（`tests/`）: normal 探索が相手の隠しゾーン（相手手札の中身・
   裏ライフ）を一切クエリしないことの assert/テスト、および min ノードが root最不利手をビームに残すことの
   回帰テスト。重大度=低（ヒュージン）。

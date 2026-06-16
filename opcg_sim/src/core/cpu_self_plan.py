@@ -37,6 +37,12 @@ _CONTROL_THRESHOLD = 0.4
 #                       価値は本来低い。これを 1.0 のままにすると「両枝でクロック同値→ドンの床(200/枚)で
 #                       タイブレーク→握る」になり余剰ドン温存を招く。カウンターの薄い攻め寄りデッキほど
 #                       強く減価し、浮かせ得を消して攻めへ向ける（<1.0=減価）。`is_turn=False` の自分側のみ作動。
+#   threat_atk_mult   : 攻撃的キーワード資産（ダブルアタック/速攻/バニッシュ/アンブロッカブル）の倍率（A-2・
+#                       §2.5.6）。aggro は攻め札を高く・control は低く見る。両側対称（自分の攻め札＝資産／
+#                       相手の攻め札＝除去すべき脅威 を同じレンズで評価）。
+#   threat_def_mult   : 防御的キーワード資産（効果耐性「KOされない」）の倍率（A-2）。control は高く・aggro は低く。
+#   act_margin_mult   : 「何もしない（ターンを畳む）」判定マージン `_ACT_MARGIN` の倍率（A-2）。aggro は小さく
+#                       （テンポ攻めを通す）・control は大きく（曖昧な展開は畳んで守りを残す）。
 @dataclass(frozen=True)
 class PlanProfile:
     n_cards: int
@@ -51,6 +57,9 @@ class PlanProfile:
     milestone_mult: float
     clock_rate: float
     idle_don_mult: float
+    threat_atk_mult: float = 1.0
+    threat_def_mult: float = 1.0
+    act_margin_mult: float = 1.0
 
 
 # 中立プラン（テンプレ/構成が無いときのフォールバック＝ほぼ現行挙動）。
@@ -63,13 +72,13 @@ NEUTRAL = PlanProfile(
 _PRESETS = {
     "aggro": dict(vanilla_body_mult=1.10, attacker_mult=1.25, life_mult=1.0,
                   counter_mult=0.85, lethal_mult=1.4, milestone_mult=1.2, clock_rate=1.2,
-                  idle_don_mult=0.4),
+                  idle_don_mult=0.4, threat_atk_mult=1.30, threat_def_mult=0.85, act_margin_mult=0.6),
     "midrange": dict(vanilla_body_mult=1.0, attacker_mult=1.0, life_mult=1.0,
                      counter_mult=1.0, lethal_mult=1.0, milestone_mult=1.0, clock_rate=0.8,
-                     idle_don_mult=0.7),
+                     idle_don_mult=0.7, threat_atk_mult=1.0, threat_def_mult=1.0, act_margin_mult=1.0),
     "control": dict(vanilla_body_mult=0.45, attacker_mult=0.9, life_mult=1.15,
                     counter_mult=1.4, lethal_mult=0.8, milestone_mult=1.0, clock_rate=0.5,
-                    idle_don_mult=0.85),
+                    idle_don_mult=0.85, threat_atk_mult=0.85, threat_def_mult=1.25, act_margin_mult=1.5),
 }
 
 

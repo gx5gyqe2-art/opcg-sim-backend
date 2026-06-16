@@ -242,6 +242,35 @@ def test_a1_unblockable_detector_matches_real_cards(db):
         assert m is not None and not cpu_ai._is_unblockable(_Body(m.effect_text), m.effect_text), num
 
 
+# ---------------------------------------------------------------------------
+# バッチA-2: 脅威キーワード／畳み判定マージンのアーキタイプ依存スケール
+# ---------------------------------------------------------------------------
+
+def test_a2_threat_value_archetype_scaling():
+    """攻撃的キーワードは atk_mult、防御的キーワード（KO耐性）は def_mult のみでスケールする。"""
+    atk_body = _Body("", kws={"ダブルアタック"})           # 攻撃的
+    def_body = _Body("このキャラはKOされない")              # 防御的（耐性）
+    base_a = cpu_ai._threat_value(atk_body)
+    base_d = cpu_ai._threat_value(def_body)
+    assert base_a > 0 and base_d > 0
+    # それぞれ対応する mult でのみ増減。
+    assert cpu_ai._threat_value(atk_body, atk_mult=1.3) == pytest.approx(base_a * 1.3)
+    assert cpu_ai._threat_value(def_body, def_mult=1.25) == pytest.approx(base_d * 1.25)
+    # 交差は効かない（攻めに def_mult・守りに atk_mult は不変）。
+    assert cpu_ai._threat_value(atk_body, def_mult=2.0) == pytest.approx(base_a)
+    assert cpu_ai._threat_value(def_body, atk_mult=2.0) == pytest.approx(base_d)
+
+
+def test_a2_archetype_presets_directional():
+    """プリセットの方向性: aggro は攻め重視・畳まない／control は守り重視・畳む／midrange=中立。"""
+    from opcg_sim.src.core import cpu_self_plan as p
+    aggro, control = p._PRESETS["aggro"], p._PRESETS["control"]
+    assert aggro["threat_atk_mult"] > 1.0 > control["threat_atk_mult"]
+    assert control["threat_def_mult"] > 1.0 > aggro["threat_def_mult"]
+    assert aggro["act_margin_mult"] < 1.0 < control["act_margin_mult"]
+    assert p.NEUTRAL.threat_atk_mult == p.NEUTRAL.threat_def_mult == p.NEUTRAL.act_margin_mult == 1.0
+
+
 def _advance_to_select_counter(gm, attacker, target):
     """attacker→target のアタックを宣言し、SELECT_BLOCKER を PASS で流して SELECT_COUNTER まで進める。"""
     gm.action_events = []

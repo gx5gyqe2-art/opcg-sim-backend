@@ -119,22 +119,26 @@ def _is_unblockable(c, etext: str) -> bool:
     return "【ブロック不可】(" in (etext or "").replace("（", "(")
 
 
-def _threat_value(c) -> float:
-    """場のキャラ 1 体の脅威/資産価値（キーワード＋効果耐性＋アンブロッカブル）。カードデータから算出（§2.5.6）。"""
-    v = 0.0
+def _threat_value(c, atk_mult: float = 1.0, def_mult: float = 1.0) -> float:
+    """場のキャラ 1 体の脅威/資産価値（キーワード＋効果耐性＋アンブロッカブル）。カードデータから算出（§2.5.6）。
+
+    A-2: 攻撃的キーワード（ダブルアタック/速攻/バニッシュ/アンブロッカブル）は `atk_mult`、防御的キーワード
+    （効果耐性「KOされない」）は `def_mult` でアーキタイプ依存にスケール（aggro=攻め重視／control=守り重視）。
+    既定 1.0＝従来値（plan 無し・midrange は完全同値）。
+    """
+    atk = 0.0  # 攻撃的キーワード資産（atk_mult でスケール）
     for kw, w in _KEYWORD_ASSETS:
         try:
             if c.has_keyword(kw):
-                v += w
+                atk += w
         except Exception:
             pass
     m = getattr(c, "master", None)
     etext = (getattr(m, "effect_text", "") or "") if m is not None else ""
-    if _RESIST_CUE in etext:
-        v += W_KW_RESIST
     if _is_unblockable(c, etext):
-        v += W_KW_UNBLOCK
-    return v
+        atk += W_KW_UNBLOCK
+    deff = W_KW_RESIST if _RESIST_CUE in etext else 0.0  # 防御的キーワード資産（def_mult でスケール）
+    return atk * atk_mult + deff * def_mult
 
 
 def _other(manager, name: str):
@@ -189,7 +193,8 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
                 hand_factor: float = 1.0, life_factor: float = 1.0,
                 body_factor: float = 1.0, attacker_factor: float = 1.0,
                 counter_factor: float = 1.0, threat_aware: bool = False,
-                idle_don_factor: float = 1.0) -> float:
+                idle_don_factor: float = 1.0,
+                threat_atk_mult: float = 1.0, threat_def_mult: float = 1.0) -> float:
     """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和＋白の境界リスク）。
 
     `power_cap` は対面の最硬防御パワー＝有効パワーの上限（`_effective_power`）。これにより
@@ -234,9 +239,10 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
         if body_factor != 1.0 and _is_low_impact(c):
             ev *= body_factor
         score += ev
-        # 脅威/キーワード資産（ダブルアタック・効果耐性・速攻・バニッシュ）。両側対称・プラン時のみ。
+        # 脅威/キーワード資産（ダブルアタック・効果耐性・速攻・バニッシュ・アンブロッカブル）。両側対称・
+        # プラン時のみ。A-2: 攻め/守りキーワードをアーキタイプ依存にスケール（aggro=攻め重視/control=守り重視）。
         if threat_aware:
-            score += _threat_value(c)
+            score += _threat_value(c, threat_atk_mult, threat_def_mult)
         try:
             pw = c.get_power(is_turn)
         except Exception:
@@ -331,12 +337,15 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
     # 自デッキ勝ち筋プラン補正（自分側のみ。相手側は相手モデルが担当）。
     body_factor = attacker_factor = counter_factor = 1.0
     idle_don_factor = 1.0
+    threat_atk_mult = threat_def_mult = 1.0   # A-2: 脅威キーワードのアーキタイプ依存スケール（両側対称）
     if plan is not None:
         life_factor *= plan.life_mult
         body_factor = plan.vanilla_body_mult
         attacker_factor = plan.attacker_mult
         counter_factor = plan.counter_mult
         idle_don_factor = plan.idle_don_mult
+        threat_atk_mult = getattr(plan, "threat_atk_mult", 1.0)
+        threat_def_mult = getattr(plan, "threat_def_mult", 1.0)
     # 脅威/キーワード資産評価（§2.5.6）は両側対称に適用＝相手の脅威を押し上げ→① の単一対象探索が
     # 最善の除去対象を狙う。プラン供給時のみ作動（plan=None では一切作動せず現行挙動と完全同値）。
     threat_aware = plan is not None
@@ -346,9 +355,11 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
     return (_side_score(me, is_my_turn, my_cap, include_counter=True, life_factor=life_factor,
                         body_factor=body_factor, attacker_factor=attacker_factor,
                         counter_factor=counter_factor, threat_aware=threat_aware,
-                        idle_don_factor=idle_don_factor)
+                        idle_don_factor=idle_don_factor,
+                        threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult)
             - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
-                          hand_factor=opp_hand_factor, threat_aware=threat_aware)
+                          hand_factor=opp_hand_factor, threat_aware=threat_aware,
+                          threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult)
             + _plan_progress(manager, me, opp, is_my_turn, plan))
 
 
@@ -815,7 +826,9 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
     # ドン付与（いずれも改修後の評価では end とほぼ同値）を採らない（進行保証も兼ねる）。
     if end_move is not None and best_move is not end_move:
         end_score = next((s for s, m in scored if m is end_move), None)
-        if end_score is not None and best_score <= end_score + _ACT_MARGIN:
+        # A-2: 畳み判定マージンをアーキタイプ依存にスケール（aggro=小さく攻めを通す／control=大きく畳む）。
+        margin = _ACT_MARGIN * (getattr(plan, "act_margin_mult", 1.0) if plan is not None else 1.0)
+        if end_score is not None and best_score <= end_score + margin:
             return end_move
     return best_move
 
