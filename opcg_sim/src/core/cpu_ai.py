@@ -724,12 +724,17 @@ def _search(manager, root_name: str, alpha: float, beta: float,
 
 def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
                    see_opp_hand: bool, opp_public_only: bool,
-                   profile=None, plan=None) -> List[Tuple[float, Dict[str, Any]]]:
+                   profile=None, plan=None, collect: Optional[Dict[str, Any]] = None
+                   ) -> List[Tuple[float, Dict[str, Any]]]:
     """ルート手を 1-ply で事前選別し、上位 HARD_ROOT_BEAM 手だけを多 ply 先読みで深掘りする。
 
     全手で予算を共有すると先に列挙された手ほど深く読まれて採点が不公平になるため、
     深掘り対象には**手ごとに均等予算**（HARD_PER_MOVE_BUDGET）を与える。非対象は 1-ply スコアの
     まま残す。事前選別で作った子クローンを深掘りに再利用するので無駄なクローンは作らない。
+
+    `collect`（任意・既定 None＝完全に無オーバーヘッド）が渡されると、regret ログ（検証基盤・§2.5.3）
+    用に 1-ply 事前スコアと深掘りスコアを `move_sig -> score` の dict で記録する:
+      collect["prelim"]={sig: 1-ply スコア}, collect["deep"]={sig: 深掘りスコア}。
     """
     # 1) 全ルート手を 1-ply で採点（子クローンは深掘りに再利用）。
     prelim: List[Tuple[float, Dict[str, Any], Any]] = []
@@ -756,6 +761,11 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     # #3: 公開情報ベリーフ＝相手の生の手札枚数＋トラッシュの消費カウンターで緩衝を動的更新（§2.5.3）。
     opp = _other(manager, name)
     cbudget = _estimate_counter_buffer(profile, len(opp.hand), opp.trash) if opp_public_only else 0.0
+    if collect is not None:
+        collect.setdefault("prelim", {})
+        collect.setdefault("deep", {})
+        for s1, m, child in prelim:
+            collect["prelim"][_move_sig(m)] = s1
     out: List[Tuple[float, Dict[str, Any]]] = []
     for i, (s1, m, child) in enumerate(prelim):
         if child is not None and i in deepen:
@@ -764,6 +774,8 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
                         budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan,
                         start_turn=start_turn, horizon=HARD_HORIZON, counter_budget=cbudget)
             out.append((v, m))
+            if collect is not None:
+                collect["deep"][_move_sig(m)] = v
     if not out:  # 念のため（全候補がクローン失敗）: 1-ply スコアにフォールバック
         out = [(s1, m) for s1, m, _c in prelim]
     return out
@@ -831,6 +843,49 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
         if end_score is not None and best_score <= end_score + margin:
             return end_move
     return best_move
+
+
+def decide_with_regret(manager, player, difficulty: str = "normal",
+                       rng: Optional[random.Random] = None, profile=None, plan=None
+                       ) -> Tuple[Optional[Dict[str, Any]], float]:
+    """`decide` と同じ手を返しつつ、**greedy regret**（崖エラーの安価な代理・検証基盤・§2.5.3）も返す。
+
+    regret = deep_value(深掘り最善手) − deep_value(1-ply 貪欲が選ぶ手)。
+      - deep_value は多 ply 先読みスコア（`_scored_search`）。
+      - 1-ply 貪欲手 = 事前選別スコア最大の手（＝浅い読みなら選ぶ手）。常に深掘り集合に入る（prelim 1位）。
+    深掘りが浅い読みより良い手を見つけた量＝「1-ply 先読みでは崖に落ちる」局面の信号。常に >= 0。
+    easy（1-ply 貪欲）や分岐の無い局面、深掘りスコアが取れない場合は regret=0.0 を返す。
+    """
+    rng = rng or random
+    moves = manager.get_legal_actions(player)
+    if difficulty != "easy":
+        sel = _selection_moves(manager, player.name)
+        if sel:
+            moves = sel
+    if not moves:
+        return None, 0.0
+    if len(moves) == 1 or difficulty == "easy":
+        return decide(manager, player, difficulty, rng, moves=moves, profile=profile, plan=plan), 0.0
+
+    name = player.name
+    collect: Dict[str, Any] = {}
+    if difficulty == "hard":
+        _scored_search(manager, name, moves, see_opp_hand=True, opp_public_only=False,
+                       plan=plan, collect=collect)
+    else:  # normal
+        _scored_search(manager, name, moves, see_opp_hand=False, opp_public_only=True,
+                       profile=profile, plan=plan, collect=collect)
+    move = decide(manager, player, difficulty, rng, moves=moves, profile=profile, plan=plan)
+    deep = collect.get("deep", {})
+    prelim = collect.get("prelim", {})
+    regret = 0.0
+    if deep and prelim:
+        deep_best = max(deep.values())
+        greedy_sig = max(prelim, key=lambda s: prelim[s])  # 1-ply 貪欲が選ぶ手
+        greedy_deep = deep.get(greedy_sig)
+        if greedy_deep is not None:
+            regret = max(0.0, deep_best - greedy_deep)
+    return move, regret
 
 
 def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[random.Random] = None,
