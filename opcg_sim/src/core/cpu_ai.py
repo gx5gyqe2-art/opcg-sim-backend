@@ -464,6 +464,65 @@ def _consumes_hand_card(manager, actor_name: str, move: Dict[str, Any]) -> bool:
     return any(getattr(c, "uuid", None) == uuid for c in actor.hand)
 
 
+# --- B-1(b) カウンター強要（推定カウンター応答・§2.5.3/§2.5.6） -----------------------------------
+# normal の保守 min ノードは手札カウンターを全除外＝相手は決してカウンターしない。これだと「余剰ドンを
+# 攻撃に振って相手のカウンターを強要する」価値が出ない。そこで**相手手札の中身は読まず**（フェア）、
+# リーダー推測 profile（§2.5.4）のカウンター密度から相手の「推定カウンター緩衝(power)」を見積もり、
+# 相手 min ノードに「緩衝内なら攻撃を防ぐ（手札 1 枚を消費）／緩衝超なら貫通」という応答を PASS と並べて
+# 入れる。min が選ぶので、緩衝内に収まる盛りは無駄（相手が守り切る）・緩衝超の盛りは正の手（貫通）になる。
+# hard は opp_public_only=False で実カウンターを既に読むため本モデルは作動しない（profile も渡さない）。
+_COUNTER_HAND_EST = 4.0   # 守りに割けるカウンター札の見込み枚数（相手手札の代表値・power 換算の係数）
+
+
+def _estimate_counter_buffer(profile) -> float:
+    """profile のカウンター密度から、相手が 1 防御ターンに積める総カウンター power を推定する（無ければ 0）。"""
+    if profile is None:
+        return 0.0
+    return max(0.0, float(getattr(profile, "counter_avg", 0.0) or 0.0) * _COUNTER_HAND_EST)
+
+
+def _counter_needed(manager) -> Optional[float]:
+    """現在の戦闘で相手が攻撃を防ぐ（防御側が攻撃側を上回る）のに必要なカウンター power。
+
+    攻撃が既に通らない／戦闘が無い場合は None。`resolve_attack` と同じパワー計算を用いる
+    （攻撃側=自ターンなら付与込み・防御側=素＋既存 counter_buff）。
+    """
+    ab = getattr(manager, "active_battle", None)
+    if not ab or ab.get("attacker") is None or ab.get("target") is None:
+        return None
+    atk = ab["attacker"]; tgt = ab["target"]
+    ao = ab.get("attacker_owner"); to = ab.get("target_owner")
+    try:
+        ap = float(atk.get_power(ao == manager.turn_player))
+        tp = float(tgt.get_power(to == manager.turn_player)) + float(ab.get("counter_buff", 0) or 0)
+    except Exception:
+        return None
+    needed = ap - tp + 1.0
+    return needed if needed > 0 else None
+
+
+def _apply_modeled_counter(manager, defender_name: str, needed: float):
+    """推定カウンターを適用したクローンを返す（`counter_buff` を needed 加算＋手札 1 枚を資源消費＋PASS で解決）。
+
+    相手手札の**中身は選ばない**（先頭 1 枚を消費＝枚数のみ＝公開情報・フェア）。手札が無い／戦闘が無いとき None。
+    """
+    from . import action_api
+    clone = manager.clone()
+    defender = _player_by_name(clone, defender_name)
+    if not defender.hand or not getattr(clone, "active_battle", None):
+        return None
+    clone.active_battle["counter_buff"] = clone.active_battle.get("counter_buff", 0) + needed
+    defender.hand.pop(0)   # カウンター札 1 枚の消費（枚数のみ＝公開情報。中身は参照しない＝フェア）
+    battle_actions = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+    ACT_PASS = battle_actions.get('PASS', 'PASS')
+    clone.action_events = []
+    try:
+        action_api.apply_battle_action(clone, defender, ACT_PASS, None)
+    except Exception:
+        return None
+    return clone
+
+
 def _settle_eval(manager, root_name: str, see_opp_hand: bool, profile, plan) -> float:
     """探索の打ち切り点を一定の静止点（相手のターン開始＝相手の MAIN_ACTION）へ整流してから評価する。
 
@@ -506,7 +565,8 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, profile, plan) -> 
 
 def _search(manager, root_name: str, alpha: float, beta: float,
             budget: List[int], see_opp_hand: bool, opp_public_only: bool,
-            profile=None, ply: int = 0, plan=None, start_turn: int = 0, horizon: int = 1) -> float:
+            profile=None, ply: int = 0, plan=None, start_turn: int = 0, horizon: int = 1,
+            counter_budget: float = 0.0) -> float:
     """ターン境界評価の α-β ＋ ビーム探索。`root_name` 視点の最善到達値を返す。
 
     **葉は `start_turn` から `horizon` ターン進んだ MAIN_ACTION（一定の静止点）に固定**する。
@@ -573,17 +633,32 @@ def _search(manager, root_name: str, alpha: float, beta: float,
         for _leaf, child in children:
             value = max(value, _search(child, root_name, alpha, beta,
                                        budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
-                                       start_turn, horizon))
+                                       start_turn, horizon, counter_budget))
             alpha = max(alpha, value)
             if alpha >= beta:
                 break
         return value
     else:
         value = float("inf")
+        # B-1(b): 相手の推定カウンター応答（normal 保守 min・SELECT_COUNTER・緩衝内で攻撃を防げる場合のみ）。
+        # PASS（=カウンターしない＝攻撃が通る）と並べて min が選ぶ＝相手にとって有利な方（=自分に不利な方）。
+        # 緩衝を needed ぶん消費して深掘り。これで「緩衝超まで盛ると貫通＝余剰ドンを攻撃に振るのが正」になる。
+        if (opp_public_only and profile is not None and counter_budget > 0
+                and pending.get(KEY_ACTION) == "SELECT_COUNTER"):
+            needed = _counter_needed(manager)
+            if needed is not None and needed <= counter_budget:
+                cc = _apply_modeled_counter(manager, actor_name, needed)
+                if cc is not None:
+                    value = min(value, _search(cc, root_name, alpha, beta,
+                                               budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
+                                               start_turn, horizon, counter_budget - needed))
+                    beta = min(beta, value)
         for _leaf, child in children:
+            if alpha >= beta:
+                break
             value = min(value, _search(child, root_name, alpha, beta,
                                        budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
-                                       start_turn, horizon))
+                                       start_turn, horizon, counter_budget))
             beta = min(beta, value)
             if alpha >= beta:
                 break
@@ -620,13 +695,15 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     #    非対象（1-ply の甘い値）を混ぜると評価ホライズンが不一致になり誤選択するため返さない。深掘り集合は
     #    1-ply 上位＋TURN_END なので最善手はここに含まれる。
     start_turn = manager.turn_count
+    # B-1(b): 相手の推定カウンター緩衝（normal の保守 min ノードでのみ作動。hard は実カウンターを読むため 0）。
+    cbudget = _estimate_counter_buffer(profile) if opp_public_only else 0.0
     out: List[Tuple[float, Dict[str, Any]]] = []
     for i, (s1, m, child) in enumerate(prelim):
         if child is not None and i in deepen:
             budget = [HARD_PER_MOVE_BUDGET]
             v = _search(child, name, float("-inf"), float("inf"),
                         budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan,
-                        start_turn=start_turn, horizon=HARD_HORIZON)
+                        start_turn=start_turn, horizon=HARD_HORIZON, counter_budget=cbudget)
             out.append((v, m))
     if not out:  # 念のため（全候補がクローン失敗）: 1-ply スコアにフォールバック
         out = [(s1, m) for s1, m, _c in prelim]

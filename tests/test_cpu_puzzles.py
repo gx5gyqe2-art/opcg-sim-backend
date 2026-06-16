@@ -158,6 +158,98 @@ def test_b1a_aggro_plan_has_decay_preset():
 
 
 # ---------------------------------------------------------------------------
+# B-1 (b): カウンター強要（normal 保守 min ノードの推定カウンター応答モデル）
+# ---------------------------------------------------------------------------
+
+def test_b1b_counter_buffer_estimate_scales_with_density(db):
+    """推定カウンター緩衝はカウンター密度（counter_avg）に比例し、profile 無しは 0。"""
+    from opcg_sim.src.core import cpu_opponent_model as om
+    assert cpu_ai._estimate_counter_buffer(None) == 0.0
+    lo = om.OpponentProfile(50, 200.0, 0.2, 0.0, 0.0, 3.0, 0.8, 0.6)
+    hi = om.OpponentProfile(50, 800.0, 0.6, 0.1, 0.1, 4.0, 1.4, 0.3)
+    assert cpu_ai._estimate_counter_buffer(hi) > cpu_ai._estimate_counter_buffer(lo) > 0.0
+
+
+def _advance_to_select_counter(gm, attacker, target):
+    """attacker→target のアタックを宣言し、SELECT_BLOCKER を PASS で流して SELECT_COUNTER まで進める。"""
+    gm.action_events = []
+    action_api.apply_game_action(gm, gm.p1, "ATTACK",
+                                 {"uuid": attacker.uuid, "target_ids": [target.uuid]})
+    battle_actions = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+    ACT_PASS = battle_actions.get('PASS', 'PASS')
+    for _ in range(6):
+        pend = gm.get_pending_request()
+        if not pend:
+            return False
+        if pend.get("action") == "SELECT_COUNTER":
+            return True
+        if pend.get("action") == "SELECT_BLOCKER":
+            gm.action_events = []
+            action_api.apply_battle_action(gm, gm.p2, ACT_PASS, None)
+            continue
+        return False
+    return False
+
+
+def test_b1b_modeled_counter_saves_target_and_spends_card(db):
+    """B-1(b): 相手 min ノードの推定カウンターは、`counter_buff` を needed 加算＋手札 1 枚消費で攻撃を
+    無効化する（ライフ温存・手札 -1）。一方 PASS（カウンターしない）はライフ -1（攻撃が通る）。
+
+    相手手札の**中身は読まない**（先頭 1 枚を消費＝枚数のみ＝公開情報・フェア）。"""
+    gm = _new_gm(db, seed=0)
+    assert _fast_forward_to_p1_main(gm)
+    # p1: リーダーに確実に届く攻撃者（リーダー素+1500）を確立済み・アクティブで1体。
+    opp_leader_pw = int(gm.p2.leader.get_power(False)) if gm.p2.leader else 5000
+    atk = _reaching_char(gm.p1.deck, 0)
+    if atk is None:
+        pytest.skip("攻撃者が見つからない")
+    gm.p1.deck.remove(atk)
+    gm.p1.field[:] = [atk]
+    atk.is_rest = False
+    atk.is_newly_played = False
+    atk.passive_power_override = opp_leader_pw + 1500
+    # p2: ブロッカー無し・手札は資源として最低1枚・ライフ最低1枚。
+    gm.p2.field.clear()
+    if not gm.p2.hand:
+        gm.p2.hand.append(gm.p2.deck.pop())
+    if not gm.p2.life:
+        gm.p2.life.append(gm.p2.deck.pop())
+    if not _advance_to_select_counter(gm, atk, gm.p2.leader):
+        pytest.skip("SELECT_COUNTER へ到達できない局面")
+
+    needed = cpu_ai._counter_needed(gm)
+    assert needed is not None and needed > 0  # 攻撃は通る＝防ぐのに正の緩衝が要る
+    life_before, hand_before = len(gm.p2.life), len(gm.p2.hand)
+
+    # 推定カウンター: ライフ温存＋手札 -1。
+    cc = cpu_ai._apply_modeled_counter(gm, "p2", needed)
+    assert cc is not None
+    assert len(cc.p2.life) == life_before, "推定カウンターでライフが守れていない"
+    assert len(cc.p2.hand) == hand_before - 1, "カウンター札 1 枚の資源消費が反映されていない"
+
+    # PASS（カウンターしない）: 攻撃が通りライフ -1。
+    passclone = gm.clone()
+    battle_actions = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+    passclone.action_events = []
+    action_api.apply_battle_action(passclone, passclone.p2, battle_actions.get('PASS', 'PASS'), None)
+    assert len(passclone.p2.life) == life_before - 1, "PASS なのに攻撃が通っていない"
+
+
+def test_b1b_normal_with_profile_runs_counter_model_cleanly(db):
+    """B-1(b) 配線スモーク: profile（緩衝>0）供給の normal decide が探索の推定カウンター経路を通っても
+    例外なく合法手を返す（counter_budget>0 で `_search` の min カウンター分岐が踏まれる）。"""
+    from opcg_sim.src.core import cpu_opponent_model as om
+    gm = _new_gm(db, seed=1)
+    assert _fast_forward_to_p1_main(gm)
+    prof = om.OpponentProfile(50, 800.0, 0.6, 0.1, 0.1, 4.0, 1.4, 0.3)  # 緩衝 = 800*4 > 0
+    assert cpu_ai._estimate_counter_buffer(prof) > 0
+    plan = cpu_self_plan.NEUTRAL
+    legal = gm.get_legal_actions(gm.p1)
+    move = cpu_ai.decide(gm, gm.p1, "normal", random.Random(0), profile=prof, plan=plan)
+    assert move in legal
+
+
+# ---------------------------------------------------------------------------
 # フェア性ガード（A-3）: normal は相手の隠れ手札の中身を一切読まない
 # ---------------------------------------------------------------------------
 
