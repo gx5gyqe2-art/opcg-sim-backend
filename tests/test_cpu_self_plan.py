@@ -433,3 +433,45 @@ def test_c4_plan_none_ignores_hand_cost(db):
         c.base_cost_override = 99               # 手出し不能級に上げる
     after = cpu_ai.evaluate(gm, "p1")
     assert before == pytest.approx(after)
+
+
+# ---------------------------------------------------------------------------
+# C-4 残（§2.5.3）: 打ち切り settle 葉の不確実性ディスカウント（既定解決の中立化）
+# ---------------------------------------------------------------------------
+
+def test_c4_settle_discount_shrinks_only_with_plan(db):
+    """非 lethal の settle 値は plan 供給時だけ `_SETTLE_CONFIDENCE` で中立へ寄る。plan=None は不変。"""
+    f = cpu_ai._SETTLE_CONFIDENCE
+    plan = _plan("midrange")
+    # plan 供給: 正負どちらも中立（0）方向へ係数倍。
+    assert cpu_ai._settle_discount(10000.0, plan) == pytest.approx(10000.0 * f)
+    assert cpu_ai._settle_discount(-4000.0, plan) == pytest.approx(-4000.0 * f)
+    assert cpu_ai._settle_discount(0.0, plan) == pytest.approx(0.0)
+    # plan=None: 従来どおり割り引かない。
+    assert cpu_ai._settle_discount(10000.0, None) == 10000.0
+    assert cpu_ai._settle_discount(-4000.0, None) == -4000.0
+
+
+def test_c4_settle_discount_exempts_lethal(db):
+    """lethal（|value| が W_WIN 近傍＝勝敗確定）は plan 供給でも割り引かない（確定事象）。"""
+    plan = _plan("aggro")
+    win = cpu_ai.W_WIN - 2          # 勝ち（ply 割引済み）
+    lose = -(cpu_ai.W_WIN - 5)      # 負け
+    assert cpu_ai._settle_discount(win, plan) == win
+    assert cpu_ai._settle_discount(lose, plan) == lose
+
+
+def test_c4_settle_eval_applies_discount(db, monkeypatch):
+    """配線: `_settle_eval` は（勝敗未確定の）整流後評価に `_settle_discount` を適用する。
+
+    既に静止点（相手 MAIN）に置いた局面で settle ループを空回りさせ、evaluate を固定値へ monkeypatch して
+    『plan 供給時は係数倍／plan=None は素通し』を観測する。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p2          # p1 視点で相手（p2）の手番開始＝settle の静止点
+    monkeypatch.setattr(cpu_ai, "evaluate",
+                        lambda manager, me, see_opp_hand=True, profile=None, plan=None: 8000.0)
+    plan = _plan("control")
+    with_plan = cpu_ai._settle_eval(gm, "p1", False, None, plan, ply=3)
+    no_plan = cpu_ai._settle_eval(gm, "p1", False, None, None, ply=3)
+    assert no_plan == pytest.approx(8000.0)
+    assert with_plan == pytest.approx(8000.0 * cpu_ai._SETTLE_CONFIDENCE)
