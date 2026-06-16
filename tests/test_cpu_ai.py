@@ -578,3 +578,130 @@ def test_cpu_full_game_progress(client):
         assert last["success"], last
         last = drain_cpu()
     assert turns_played >= 1
+
+
+# ---------------------------------------------------------------------------
+# B-2（§2.5.3）: ドン!!付与の手生成を「意味ある配分」だけに絞る
+# ---------------------------------------------------------------------------
+
+def _vanilla_attacker(gm, exclude=()):
+    """速攻なし・付与ドン条件なしのキャラ（B-2 の閾値テスト用＝条件で残されない素体）。"""
+    for c in list(gm.p1.deck):
+        if (c.master.type.name == "CHARACTER" and not c.has_keyword("速攻")
+                and not cpu_ai._has_don_conditional(c) and c not in exclude):
+            return c
+    return None
+
+
+def test_b2_attach_don_meaningful_threshold(db):
+    """付与が戦闘結果を変えうるか: 未踏破の防御をドンで新たに上回れるときだけ意味ある。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p1
+    gm.p2.field.clear()                         # 相手の防御はリーダーのみ
+    leader_pw = int(gm.p2.leader.get_power(False))
+    c = _vanilla_attacker(gm)
+    assert c is not None
+    gm.p1.deck.remove(c); gm.p1.field.append(c)
+    c.is_rest = False; c.is_newly_played = False
+    gm.p1.don_active.clear()
+    gm.p1.don_active.append(gm.p1.don_deck.pop())   # ドン 1 枚（+1000）
+    # 届かない（-500）が 1 枚で届く → 意味あり。
+    c.passive_power_override = leader_pw - 500
+    assert cpu_ai._attach_don_meaningful(gm, "p1", c) is True
+    # 既に超過（overcap）→ 無意味。
+    c.passive_power_override = leader_pw + 1000
+    assert cpu_ai._attach_don_meaningful(gm, "p1", c) is False
+    # 1 枚では届かない（-1500）→ 無意味。
+    c.passive_power_override = leader_pw - 1500
+    assert cpu_ai._attach_don_meaningful(gm, "p1", c) is False
+    # アクティブドンが無ければ常に False。
+    c.passive_power_override = leader_pw - 500
+    gm.p1.don_active.clear()
+    assert cpu_ai._attach_don_meaningful(gm, "p1", c) is False
+
+
+def test_b2_prune_keeps_meaningful_drops_overcap_and_passes_others(db):
+    """prune は閾値を跨げる付与を残し overcap を落とす。ATTACH_DON 以外（TURN_END 等）は素通し。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p1
+    gm.p2.field.clear()
+    leader_pw = int(gm.p2.leader.get_power(False))
+    a = _vanilla_attacker(gm)
+    b = _vanilla_attacker(gm, exclude=(a,))
+    assert a is not None and b is not None
+    for x in (a, b):
+        gm.p1.deck.remove(x); gm.p1.field.append(x)
+        x.is_rest = False; x.is_newly_played = False
+    a.passive_power_override = leader_pw - 500     # ドン 1 枚で届く → 残る
+    b.passive_power_override = leader_pw + 2000     # 既に超過 → 落ちる
+    gm.p1.don_active.clear()
+    gm.p1.don_active.append(gm.p1.don_deck.pop())
+    moves = [
+        {"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": a.uuid}},
+        {"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": b.uuid}},
+        {"kind": "game", "action_type": "TURN_END", "payload": {}},
+    ]
+    pruned = cpu_ai._prune_don_moves(gm, "p1", moves)
+    sigs = {(m["action_type"], (m.get("payload") or {}).get("uuid")) for m in pruned}
+    assert ("ATTACH_DON", a.uuid) in sigs
+    assert ("ATTACH_DON", b.uuid) not in sigs
+    assert ("TURN_END", None) in sigs
+
+
+def test_b2_prune_drops_rested_vanilla_target(db):
+    """付与先がレスト（今ターン攻撃に出ない）の素体は、閾値を跨げても無意味（純損）として落とす。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p1
+    gm.p2.field.clear()
+    leader_pw = int(gm.p2.leader.get_power(False))
+    c = _vanilla_attacker(gm)
+    assert c is not None
+    gm.p1.deck.remove(c); gm.p1.field.append(c)
+    c.is_rest = True                               # レスト＝今ターン攻撃できない
+    c.passive_power_override = leader_pw - 500      # 跨げる値だが付与は純損
+    gm.p1.don_active.clear()
+    gm.p1.don_active.append(gm.p1.don_deck.pop())
+    moves = [{"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": c.uuid}}]
+    assert cpu_ai._prune_don_moves(gm, "p1", moves) == []
+
+
+def test_b2_prune_keeps_don_conditional_even_if_overcap_or_rested(db):
+    """付与ドン条件【ドン!!×N】を持つカードは、overcap/レストでも付与で効果が開くため残す（保守的）。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p1
+    dc = next((c for c in gm.p1.deck
+               if c.master.type.name == "CHARACTER" and cpu_ai._has_don_conditional(c)), None)
+    if dc is None:
+        pytest.skip("付与ドン条件キャラがデッキに無い")
+    gm.p1.deck.remove(dc); gm.p1.field.append(dc)
+    dc.is_rest = True                              # レスト＋
+    dc.passive_power_override = 99999              # overcap でも
+    gm.p1.don_active.clear()
+    gm.p1.don_active.append(gm.p1.don_deck.pop())
+    moves = [{"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": dc.uuid}}]
+    assert cpu_ai._prune_don_moves(gm, "p1", moves) == moves   # 条件カードは残る
+
+
+def test_b2_prune_noop_without_attach_don(db):
+    """ATTACH_DON を含まない手集合はそのまま素通し（非ドン手は一切変えない）。"""
+    gm = _new_gm(db)
+    moves = [
+        {"kind": "game", "action_type": "TURN_END", "payload": {}},
+        {"kind": "game", "action_type": "PLAY", "payload": {"uuid": "x"}},
+        {"kind": "game", "action_type": "ATTACK", "payload": {"uuid": "y", "target_ids": ["z"]}},
+    ]
+    assert cpu_ai._prune_don_moves(gm, "p1", list(moves)) == moves
+
+
+def test_b2_don_conditional_detector_matches_real_cards(db):
+    """付与ドン条件の検出器が実カードの【ドン!!×N】を拾い、無条件カードは拾わない。"""
+    for num in ("OP01-060", "OP01-061", "EB01-026"):
+        m = db.get_card(num)
+        assert m is not None and cpu_ai._has_don_conditional(
+            type("C", (), {"master": m})()), num
+    # 効果テキストの無いバニラ寄りカードは非検出（検出器が万能マッチでないことの担保）。
+    plain = next((db.get_card(cid) for cid in db.raw_db
+                  if db.get_card(cid) and db.get_card(cid).type.name == "CHARACTER"
+                  and not (db.get_card(cid).effect_text or "").strip()), None)
+    if plain is not None:
+        assert not cpu_ai._has_don_conditional(type("C", (), {"master": plain})())
