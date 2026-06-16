@@ -271,6 +271,82 @@ def test_a2_archetype_presets_directional():
     assert p.NEUTRAL.threat_atk_mult == p.NEUTRAL.threat_def_mult == p.NEUTRAL.act_margin_mult == 1.0
 
 
+# ---------------------------------------------------------------------------
+# バッチA-3（残）: min ノードはビーム剪定後も root 最不利手を保持する
+# ---------------------------------------------------------------------------
+
+def _blocker_char(deck):
+    for c in list(deck):
+        if c.master.type.name == "CHARACTER" and c.has_keyword("ブロッカー"):
+            return c
+    return None
+
+
+def test_a3_min_node_keeps_root_worst_in_beam(db):
+    """min ノード（相手応答）のビーム剪定は **root 最不利側に偏る**（best-first の sort 方向が min では
+    「1-ply 評価が低い＝root 最不利」を先頭に残す）。`HARD_BEAM=1` でも、残る子は 2 応答のうち
+    **1-ply 評価キーが小さい方**＝root から見て最不利に見える応答であることを固定する（sort 方向が
+    optimistic 側に反転していないことの回帰）。深い値はビーム近似で前後し得るため、ここでは sort 方向＝
+    「どちらの子を残すか」を不変条件として locking する。"""
+    gm = _new_gm(db, seed=0)
+    assert _fast_forward_to_p1_main(gm)
+    opp_leader_pw = int(gm.p2.leader.get_power(False)) if gm.p2.leader else 5000
+    atk = _reaching_char(gm.p1.deck, 0)
+    blk = _blocker_char(gm.p2.deck)
+    if atk is None or blk is None:
+        pytest.skip("攻撃者/ブロッカーが見つからない")
+    gm.p1.deck.remove(atk); gm.p2.deck.remove(blk)
+    gm.p1.field[:] = [atk]; atk.is_rest = False; atk.is_newly_played = False
+    atk.passive_power_override = opp_leader_pw + 1000        # リーダーには届く
+    gm.p2.field[:] = [blk]; blk.is_rest = False; blk.is_newly_played = False
+    blk.passive_power_override = opp_leader_pw + 5000        # 攻撃者より硬い＝ブロックで完全に防ぐ（root 最不利）
+    if not gm.p2.life:
+        gm.p2.life.append(gm.p2.deck.pop())
+    # p1 が p2 リーダーへアタック → p2 の SELECT_BLOCKER min ノード。
+    gm.action_events = []
+    action_api.apply_game_action(gm, gm.p1, "ATTACK", {"uuid": atk.uuid, "target_ids": [gm.p2.leader.uuid]})
+    pend = gm.get_pending_request()
+    if not pend or pend.get("action") != "SELECT_BLOCKER" or pend.get("player_id") != "p2":
+        pytest.skip("SELECT_BLOCKER min ノードへ到達できない局面")
+    moves = gm.get_legal_actions(gm.p2)
+    block_move = next((m for m in moves if m.get("action_type") == "SELECT_BLOCKER" and m.get("card_uuid") == blk.uuid), None)
+    pass_move = next((m for m in moves if m.get("action_type") == "PASS"), None)
+    assert block_move and pass_move
+    # 判別性: ブロック/パスの 1-ply 評価キー（ビームの sort キー）が異なる＝剪定が結果を分け得る局面。
+    bc = cpu_ai._apply_clone(gm, "p2", block_move, stop_at_select=True)
+    pc = cpu_ai._apply_clone(gm, "p2", pass_move, stop_at_select=True)
+    assert bc is not None and pc is not None
+    kb = cpu_ai.evaluate(bc, "p1", see_opp_hand=False)
+    kp = cpu_ai.evaluate(pc, "p1", see_opp_hand=False)
+    assert kb != kp, "ブロック/パスが root から見て同値＝判別不能な局面"
+
+    st = gm.turn_count
+
+    def _search_beam(node, beam, ply):
+        old = cpu_ai.HARD_BEAM
+        cpu_ai.HARD_BEAM = beam
+        try:
+            return cpu_ai._search(node, "p1", float("-inf"), float("inf"),
+                                  [4000], False, True, profile=None, ply=ply, plan=None,
+                                  start_turn=st, horizon=1)
+        finally:
+            cpu_ai.HARD_BEAM = old
+
+    # min ノードのビーム先頭＝1-ply 評価キーが小さい（＝root 最不利に見える）方の子。
+    kept_child = bc if kb <= kp else pc        # argmin(1-ply key)
+    other_child = pc if kb <= kp else bc
+    # 不変条件: beam=1 の min 値 = 残った子（argmin キー）の部分木値。部分木も beam=1 で読むので同 beam で比較。
+    v_beam1 = _search_beam(gm.clone(), 1, ply=1)
+    assert v_beam1 == pytest.approx(_search_beam(kept_child.clone(), 1, ply=2)), \
+        "min ノードのビームが 1-ply 最不利側（argmin キー）を残していない＝sort 方向の反転"
+    assert v_beam1 != pytest.approx(_search_beam(other_child.clone(), 1, ply=2)), \
+        "判別不能（両子の beam=1 部分木値が同一）"
+    # full beam は両応答を見て真の min を返す。
+    v_full = _search_beam(gm.clone(), 10, ply=1)
+    assert v_full == pytest.approx(min(_search_beam(bc.clone(), 10, ply=2),
+                                       _search_beam(pc.clone(), 10, ply=2)))
+
+
 def _advance_to_select_counter(gm, attacker, target):
     """attacker→target のアタックを宣言し、SELECT_BLOCKER を PASS で流して SELECT_COUNTER まで進める。"""
     gm.action_events = []

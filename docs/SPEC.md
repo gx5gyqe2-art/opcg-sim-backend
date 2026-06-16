@@ -253,9 +253,14 @@ WBS（`gx5gyqe2-art/WBS` の `projects/opcg-sim-backend.md`）と同期。
   守り係数 0.85／マージン 0.6（テンポ攻めを通す）、**control**＝攻め 0.85／守り 1.25／マージン 1.5（曖昧な展開は
   畳んで守りを残す）、**midrange/NEUTRAL**＝全 1.0（plan 無しと完全同値）。`tests/test_cpu_puzzles.py`
   （脅威スケールの交差不変／プリセットの方向性）。
-- **A-3 フェア性ガード＋探索健全性テスト**（`tests/`）: normal 探索が相手の隠しゾーン（相手手札の中身・
-  裏ライフ）を一切クエリしないことの assert/テスト、および min ノードが root最不利手をビームに残すことの
-  回帰テスト。重大度=低（ヒュージン）。
+- **A-3 フェア性ガード＋探索健全性テスト【実装済み】**（`tests/test_cpu_puzzles.py`）: normal 探索が相手の
+  隠しゾーン（相手手札の中身・裏ライフ）を一切クエリしないことの assert/テスト（evaluate-spy で
+  `see_opp_hand=False` 固定＋相手手札の中身に選択不変）に加え、**min ノードのビーム剪定が root 最不利側に
+  偏る**（`children.sort(reverse=is_max)` ＝ min では 1-ply 評価キーの小さい＝root 最不利な子を先頭に残す）
+  ことの回帰を追加。**所見**: ビーム剪定は 1-ply 評価をプロキシに使うため、剪定で残るのは「1-ply で最不利に
+  見える」子であり、深い値での真の最不利とは前後し得る（min 応答数が `HARD_BEAM=3` を超えるとき＝主に
+  horizon=2 の相手フルターンで顕在）。実 min ノード（SELECT_BLOCKER/SELECT_COUNTER）は応答数が beam 以下で
+  剪定が起きず健全。sort 方向が optimistic 側へ反転していないことを locking した（重大度=低）。
 
 **バッチB（核心・最重要量＝5000/壁の閾値）**
 - **B-1(a) 余剰アクティブドンの末端減価【実装済み】**（`_side_score`／`W_DON_ACTIVE`／
