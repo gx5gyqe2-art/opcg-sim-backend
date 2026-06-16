@@ -494,7 +494,21 @@ CPU は**自分のデッキ構成は完全情報**で知っているので、構
     **削り切れる本数**を持つ盤面を加点（`lethal_mult`）。探索の最短リーサル認識を非終端ノードでも
     “止めの形”へ誘導する。
   - **マイルストーン**: アグロ＝想定ダメージクロック（`clock_rate`）より相手ライフが先行して減っている
-    分を加点／コントロール＝手札＋場のリソース差を加点。`aggro_lean` で両者をブレンド（`milestone_mult`）。
+    分を加点／コントロール＝**J値スケジュール遵守度**（`_J_SCHED_W`）を加点。`aggro_lean` で両者を
+    ブレンド（`milestone_mult`）。
+  - **J値スケジュール遵守度**（理想ライン・`build_plan._derive_delta_schedule`／`_plan_progress`）:
+    構成（攻め寄り度・除去密度）から「ターン t までに開くべき理想の **(相手J値 − 自分J値)**」を線形近似で
+    導出（`delta_schedule[t]`・攻め寄り/除去多いほど傾きが急）。`_plan_progress` は**実測 J値差**
+    （白＝デッキ残＋トラッシュの**枚数のみ**参照＝公開情報・中身は読まない）が当ターンの理想差を上回る分を
+    加点・下回る分を減点する＝「理想の勝ちペースに乗れているか」を中長期視点で評価。プランは手を強制せず
+    評価バイアスのみ＝手札的に理想手が打てない局面は**探索が理想差スコアの最も高く残る次善手を自然に選ぶ**。
+    `delta_schedule` 空（`NEUTRAL`・`_PRESETS` 直接構築の単体テスト）は**従来の手札＋場リソース差採点へ
+    フォールバック**＝回帰不変。詳細設計は `reports/cpu_plan_ideal_line_design_20260616.md`。
+  - **マッチアップ補正**（Phase 2・`_matchup_slope_mult`）: 相手リーダー推測 `OpponentProfile`（§2.5.4・
+    `normal` で供給・`POST /api/game/create` 配線）から理想ラインの傾きを補正する＝**速い相手（`aggro_lean`
+    高）は前倒し（傾き急＝レース前に差を作る）／受け・除去の厚い相手（`blocker_ratio`＋`removal_ratio`）は
+    後ろ倒し（傾き緩＝トレードで遅れる前提）**。参照は相手リーダー紐付けテンプレの集計のみ（実手札・実デッキ
+    は読まない＝フェア）。`opp_profile=None`（`hard`・テンプレ未登録・自己対戦）は補正なし＝Phase 1 同値。
 - **配線**: `POST /api/game/create` で CPU(p2) の自デッキ構成から `build_plan` し `CPU_GAMES[*].self_plan`
   に保持、`/api/game/cpu/step` が `decide_guarded(plan=...)` へ供給（`normal`/`hard` のみ。`easy` 非適用）。
 - **フェア性／回帰**: 参照は自分のデッキ構成のみ（相手の実手札・実デッキは読まない）。`plan=None` では
