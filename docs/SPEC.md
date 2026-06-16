@@ -504,6 +504,11 @@ CPU は**自分のデッキ構成は完全情報**で知っているので、構
     評価バイアスのみ＝手札的に理想手が打てない局面は**探索が理想差スコアの最も高く残る次善手を自然に選ぶ**。
     `delta_schedule` 空（`NEUTRAL`・`_PRESETS` 直接構築の単体テスト）は**従来の手札＋場リソース差採点へ
     フォールバック**＝回帰不変。詳細設計は `reports/cpu_plan_ideal_line_design_20260616.md`。
+  - **マッチアップ補正**（Phase 2・`_matchup_slope_mult`）: 相手リーダー推測 `OpponentProfile`（§2.5.4・
+    `normal` で供給・`POST /api/game/create` 配線）から理想ラインの傾きを補正する＝**速い相手（`aggro_lean`
+    高）は前倒し（傾き急＝レース前に差を作る）／受け・除去の厚い相手（`blocker_ratio`＋`removal_ratio`）は
+    後ろ倒し（傾き緩＝トレードで遅れる前提）**。参照は相手リーダー紐付けテンプレの集計のみ（実手札・実デッキ
+    は読まない＝フェア）。`opp_profile=None`（`hard`・テンプレ未登録・自己対戦）は補正なし＝Phase 1 同値。
 - **配線**: `POST /api/game/create` で CPU(p2) の自デッキ構成から `build_plan` し `CPU_GAMES[*].self_plan`
   に保持、`/api/game/cpu/step` が `decide_guarded(plan=...)` へ供給（`normal`/`hard` のみ。`easy` 非適用）。
 - **フェア性／回帰**: 参照は自分のデッキ構成のみ（相手の実手札・実デッキは読まない）。`plan=None` では

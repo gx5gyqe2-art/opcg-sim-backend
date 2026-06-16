@@ -341,7 +341,8 @@ async def game_create(req: Any = Body(...)):
             if difficulty in ("normal", "hard"):
                 try:
                     self_plan = cpu_self_plan.build_plan([ci.master for ci in p2_cards],
-                                                         leader=p2_leader.master if p2_leader else None)
+                                                         leader=p2_leader.master if p2_leader else None,
+                                                         opp_profile=opp_profile)
                 except Exception:
                     log_event("ERROR", "cpu_self_plan.fail", traceback.format_exc(), player="system")
             CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty,

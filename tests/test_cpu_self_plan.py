@@ -272,6 +272,21 @@ def test_build_plan_derives_delta_schedule():
     assert cpu_self_plan.build_plan([]).delta_schedule == ()
 
 
+def test_build_plan_matchup_adjusts_schedule_slope():
+    """Phase 2: 相手プロファイルで理想ラインの傾きを補正（速い相手＝前倒し／受け厚い相手＝後ろ倒し）。"""
+    from opcg_sim.src.core.cpu_opponent_model import OpponentProfile
+    cards = [_master(counter=0, cost=2)] * 20            # 自デッキは固定（補正の効果だけを見る）
+    fast = OpponentProfile(50, 0.0, 0.0, 0.0, 0.0, 2.0, 0.6, 0.9)        # 速い相手（aggro_lean 高）
+    grind = OpponentProfile(50, 2000.0, 0.8, 0.4, 0.4, 5.0, 1.6, 0.1)    # 受け・除去厚い相手
+    p_fast = cpu_self_plan.build_plan(cards, opp_profile=fast)
+    p_none = cpu_self_plan.build_plan(cards)
+    p_grind = cpu_self_plan.build_plan(cards, opp_profile=grind)
+    # 速い相手 > 補正なし > 受け厚い相手（終端ターンの理想差で比較）。
+    assert p_fast.delta_schedule[-1] > p_none.delta_schedule[-1] > p_grind.delta_schedule[-1]
+    # opp_profile=None は Phase 1 と完全同値（マッチアップ補正なし）。
+    assert cpu_self_plan._matchup_slope_mult(None) == 1.0
+
+
 def test_plan_progress_rewards_schedule_adherence(db):
     """J値スケジュール: 実測 (相手J値−自分J値) が理想差を上回るほどマイルストーンが加点される。
 
