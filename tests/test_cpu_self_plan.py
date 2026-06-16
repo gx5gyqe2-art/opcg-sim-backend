@@ -475,3 +475,85 @@ def test_c4_settle_eval_applies_discount(db, monkeypatch):
     no_plan = cpu_ai._settle_eval(gm, "p1", False, None, None, ply=3)
     assert no_plan == pytest.approx(8000.0)
     assert with_plan == pytest.approx(8000.0 * cpu_ai._SETTLE_CONFIDENCE)
+
+
+# ---------------------------------------------------------------------------
+# 時間割引（独立トラック・§2.5.3）: 地平線外の盤面価値（場の存在価値）の割引
+#   別検出器＝レース/テンポ・パズル（ドン症状とは機序が独立）。
+# ---------------------------------------------------------------------------
+
+def test_tempo_factor_curve(db):
+    """残ターン代理＝min(自,相手)ライフ。満額ターン以上で 1.0・短いほど割引・下限でクランプ・両側対称。"""
+    gm = _new_gm(db)
+    me, opp = gm.p1, gm.p2
+
+    def setlife(p, n):
+        p.life.clear()
+        for _ in range(n):
+            p.life.append(p.deck.pop() if p.deck else p.trash.pop())
+
+    full = int(cpu_ai._TEMPO_FULL_TURNS)
+    setlife(me, full + 2); setlife(opp, full + 2)
+    assert cpu_ai._board_tempo_factor(me, opp) == pytest.approx(1.0)         # ライフ高＝満額
+    setlife(me, 2); setlife(opp, full + 2)
+    assert cpu_ai._board_tempo_factor(me, opp) == pytest.approx(2.0 / full)  # 先に死ぬ側（自2）で律速
+    setlife(me, full + 2); setlife(opp, 2)
+    assert cpu_ai._board_tempo_factor(me, opp) == pytest.approx(2.0 / full)  # 対称（相手2でも同じ）
+    setlife(me, 0); setlife(opp, 0)
+    assert cpu_ai._board_tempo_factor(me, opp) == pytest.approx(cpu_ai._TEMPO_FLOOR)  # 下限クランプ
+
+
+def test_tempo_discounts_field_count_in_side_score(db):
+    """`field_count_factor` は場の存在価値（W_FIELD_COUNT）だけを割り引く（既定 1.0＝従来同値）。"""
+    gm = _new_gm(db)
+    c = next((x for x in list(gm.p1.deck) if x.master.type.name == "CHARACTER"
+              and not cpu_ai._is_low_impact(x)), None)
+    assert c is not None
+    gm.p1.deck.remove(c); gm.p1.field.append(c)
+    c.is_rest = False; c.is_newly_played = False
+    cap = cpu_ai._power_cap(gm.p2)
+    full = cpu_ai._side_score(gm.p1, True, cap)                          # field_count_factor=1.0（既定）
+    half = cpu_ai._side_score(gm.p1, True, cap, field_count_factor=0.5)
+    # 差は丁度 場1体ぶんの存在価値の割引（他項は同一なので相殺）。
+    assert full - half == pytest.approx(cpu_ai.W_FIELD_COUNT * 0.5)
+
+
+def test_race_tempo_puzzle_discounts_board_in_race(db):
+    """レース/テンポ・パズル（検出器）: 同じ置物を場に足したときの評価上昇は、レース終盤（両者ライフ薄）の
+    ほうが早期（両者ライフ厚）より**小さい**＝地平線外の盤面価値が残りターンで割り引かれる。
+
+    非到達の置物（リーダーに届かない）を使い逆算リーサル項を絡めず、純粋に存在価値の時間割引を観測する。
+    plan=None（割引なし）では早期＝レースで同じ（割引が起きないことの対照）。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p1
+    body = _low_impact_char(gm)                     # 効果なし低パワー＝リーダーに届かない置物
+    assert body is not None
+    gm.p1.deck.remove(body)
+
+    def add_delta(plan):
+        before = cpu_ai.evaluate(gm, "p1", plan=plan)
+        gm.p1.field.append(body); body.is_rest = False; body.is_newly_played = False
+        after = cpu_ai.evaluate(gm, "p1", plan=plan)
+        gm.p1.field.remove(body)
+        return after - before
+
+    def setlife(p, n):
+        while len(p.life) < n:
+            p.life.append(p.deck.pop())
+        while len(p.life) > n:
+            p.trash.append(p.life.pop())
+
+    plan = _plan("midrange")                        # vanilla_body_mult=1.0＝置物割引を絡めない
+    # 早期（両者ライフ厚＝満額）。
+    setlife(gm.p1, int(cpu_ai._TEMPO_FULL_TURNS) + 1)
+    setlife(gm.p2, int(cpu_ai._TEMPO_FULL_TURNS) + 1)
+    d_early = add_delta(plan)
+    d_early_noplan = add_delta(None)
+    # レース（両者ライフ薄）。
+    setlife(gm.p1, 1); setlife(gm.p2, 1)
+    d_race = add_delta(plan)
+    d_race_noplan = add_delta(None)
+    # 時間割引: レースのほうが存在価値の上乗せが小さい。
+    assert d_race < d_early
+    # 対照: plan=None は割引が作動しない＝早期とレースで同じ（盤面変化が同一なので一致）。
+    assert d_early_noplan == pytest.approx(d_race_noplan)

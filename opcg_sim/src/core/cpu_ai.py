@@ -307,6 +307,26 @@ def _is_low_impact(c) -> bool:
     return (getattr(m, "power", 0) or 0) < _LOW_IMPACT_POWER
 
 
+# 時間割引（独立トラック・§2.5.3）: 地平線外の盤面ポテンシャル（場の存在価値 W_FIELD_COUNT）は、残りターンで
+# 使い切れて初めて価値になる。静的重みは時間非依存なので、**残りゲーム長が短い（レース終盤）ほど場の存在価値を
+# 割り引く**。スコープは全項リスケールではなく**地平線外の盤面価値の割引**に限定（ライフ＝即時価値・逆算リーサル
+# /クロック＝実レース進捗・ブロッカー＝即時防御・カウンターは割り引かない）。残ターン代理＝先に死ぬ側のライフ
+# min(自,相手)。プラン供給時のみ作動（plan=None 完全同値）。
+_TEMPO_FULL_TURNS = 4.0   # 残ターン代理がこれ以上で場の存在価値を満額評価（未満は線形に割引）
+_TEMPO_FLOOR = 0.3        # 割引の下限（0 ライフでも存在価値を全否定しない＝盤面が無価値化して挙動が壊れるのを防ぐ）
+
+
+def _board_tempo_factor(me, opp) -> float:
+    """地平線外の盤面ポテンシャル（場の存在価値）の時間割引係数（§2.5.3）。
+
+    残りゲーム長の代理＝先に死ぬ側のライフ `min(len(me.life), len(opp.life))`。これが短い（レース終盤）ほど
+    場のキャラの「将来攻撃する潜在価値」は使い切れず、割引する。`_TEMPO_FULL_TURNS` 以上で満額（1.0）、未満で
+    線形に下げ、`_TEMPO_FLOOR` で下限を打つ。両者対称（ゲーム長はどちらの盤面にも共通）。
+    """
+    turns_left = min(len(me.life), len(opp.life))
+    return max(_TEMPO_FLOOR, min(1.0, turns_left / _TEMPO_FULL_TURNS))
+
+
 def _telegraph_lethal(me, opp) -> bool:
     """C-2（§2.5.3）: 相手の次ターンの有効打点が自残ライフ以上で、受け切れず負ける telegraph か。
 
@@ -351,7 +371,8 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
                 idle_don_factor: float = 1.0,
                 threat_atk_mult: float = 1.0, threat_def_mult: float = 1.0,
                 life_knee: int = _LIFE_KNEE_DEFAULT,
-                next_turn_don: Optional[int] = None) -> float:
+                next_turn_don: Optional[int] = None,
+                field_count_factor: float = 1.0) -> float:
     """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和＋白の境界リスク）。
 
     `power_cap` は対面の最硬防御パワー＝有効パワーの上限（`_effective_power`）。これにより
@@ -406,7 +427,8 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
     # 場のキャラ: 存在価値 ＋ 有効パワー ＋ ブロッカー（最終防御）＋ 攻め圧（実際に攻撃できる体のみ）。
     # 存在価値はプランで「効果なし低パワーの置物」のみ割り引く（body_factor）＝デッキ依存の置物許容度。
     for c in p.field:
-        ev = W_FIELD_COUNT
+        # 時間割引（§2.5.3）: 場の存在価値（地平線外の盤面ポテンシャル）は残りゲーム長で割り引く。
+        ev = W_FIELD_COUNT * field_count_factor
         if body_factor != 1.0 and _is_low_impact(c):
             ev *= body_factor
         score += ev
@@ -554,6 +576,9 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
     # ＝相手手札の中身を読まない normal のフェア性を保つ（plan 無しは両側 None＝従来同値）。
     me_next_don = _next_turn_don(me) if plan is not None else None
     opp_next_don = _next_turn_don(opp) if (plan is not None and see_opp_hand) else None
+    # 時間割引（§2.5.3）: 地平線外の盤面ポテンシャル（場の存在価値）を残りゲーム長で割り引く（両側共通の係数）。
+    # プラン供給時のみ作動（plan=None＝1.0＝従来同値）。ライフ高（早期）は 1.0＝割引なし。
+    tempo_factor = _board_tempo_factor(me, opp) if plan is not None else 1.0
     # C-2: テレグラフ致死の減点（相手ターン開始の静止点＝相手の攻撃が目前のときだけ・プラン供給時）。
     telegraph = 0.0
     if plan is not None and not is_my_turn and _telegraph_lethal(me, opp):
@@ -563,11 +588,12 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
                         counter_factor=counter_factor, threat_aware=threat_aware,
                         idle_don_factor=idle_don_factor,
                         threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
-                        life_knee=own_life_knee, next_turn_don=me_next_don)
+                        life_knee=own_life_knee, next_turn_don=me_next_don,
+                        field_count_factor=tempo_factor)
             - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
                           hand_factor=opp_hand_factor, threat_aware=threat_aware,
                           threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
-                          next_turn_don=opp_next_don)
+                          next_turn_don=opp_next_don, field_count_factor=tempo_factor)
             + _plan_progress(manager, me, opp, is_my_turn, plan, profile)
             - telegraph)
 
