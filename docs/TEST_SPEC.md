@@ -76,7 +76,8 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | `tests/test_cpu_ai.py` | 評価関数・α-βビーム探索・難易度情報方針（easy/normal/hard）・リーサル認識・有効パワー閾値・単一対象選択探索・horizon（B1/B2-lite）の保証テスト |
 | `tests/test_cpu_self_plan.py` | 自デッキ勝ち筋プラン（aggro/midrange/control 自動分類・置物/カウンター/ライフ/攻め圧の重み・逆算リーサル/マイルストーン・脅威キーワード資産） |
 | `tests/test_cpu_opponent_model.py` | リーダー推測の相手プロファイル（カウンター密度／ブロッカー比率／除去比率／defense_factor／aggro_lean）の集計 |
-| `tests/test_cpu_puzzles.py` | **CPU 検証基盤（フェーズ0・全変更のゲート）**: 正解手種が既知の局面（致死を取る）＋フェア性ガード（normal は相手隠しゾーンを読まない）＋特性化ピン。**2026-06 レビュー収束項**: B-1(a) アイドルドン末端減価／B-1(b) カウンター強要（推定カウンター応答モデル）／公開情報ベリーフ更新（手札枚数・トラッシュ）／A-1 アンブロッカブル評価／A-2 アーキタイプ依存スケール／A-3 min ビーム剪定の sort 方向 |
+| `tests/test_cpu_puzzles.py` | **CPU 検証基盤（フェーズ0・全変更のゲート）**: 正解手種が既知の局面（致死を取る／**ドン→クロック変換の decide レベル検出**）＋フェア性ガード（normal は相手隠しゾーンを読まない）＋特性化ピン。**2026-06 レビュー収束項**: B-1(a) アイドルドン末端減価／B-1(b) カウンター強要（推定カウンター応答モデル）／公開情報ベリーフ更新（手札枚数・トラッシュ）／A-1 アンブロッカブル評価／A-2 アーキタイプ依存スケール／A-3 min ビーム剪定の sort 方向 |
+| `tests/test_cpu_arena.py` | **検証基盤の絶対強度メトリクスの機械健全性**（`tests/cpu_arena.py`）: 凍結ベースライン Elo 変換（勝率→Elo の 0.5→0／単調／対称）・非対称対局＋席交互アリーナ・regret ログ（`cpu_ai.decide_with_regret`＝非負・有限・easy/単一手で 0）。実ゲームは低速なので機械健全性のみ高速・有界に固定 |
 
 ### 効果メカニクス・対話モデル
 | ファイル | 役割 |
@@ -107,6 +108,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | `tests/compare_parsers.py` | レガシー vs V2 の全カード差分（退行検知） |
 | `tests/full_card_audit.py` | 全カード構造不変条件検証＋挙動ベースライン生成（`--regen` で更新） |
 | `tests/cpu_selfplay.py` | 決定論的 CPU 対 CPU 自己対戦（効果検証ハーネス）。詳細は §3.1 |
+| `tests/cpu_arena.py` | **CPU 検証基盤の絶対強度メトリクス**（SPEC §2.5.3）: `arena`＝固定参照相手（既定 easy）への挑戦者勝率→**凍結ベースライン Elo**（席交互で先手有利相殺・normal/hard はデプロイ同様に自デッキプラン供給）／`regret`＝自己対戦 1 局の **greedy regret** 集計。実ゲームは低速なので本走は手動/定期実行（`python tests/cpu_arena.py arena --challenger normal --baseline easy --games 20`） |
 | `tests/expected_effects.py` | 各カード×能力の「期待する動き」を AST から機械生成（`--regen`→`expected_effects.json`、`--card ID`）。効果オラクルの期待マニフェスト |
 | `tests/effect_oracle.py` | 期待 vs テキスト/AST の静的整合性コンパレータ（既存ゲートが拾わない高シグナル候補のみ抽出。`--category`/`--json`） |
 | `tests/structural_invariants.py` | 構造不変条件4スキャン（H先頭ゲート漏れ／Duration write-off／chooser欠落／「すべて」count退化）の一括検出（`--show`）。カテゴリH 横展開の回帰ツール化 |
