@@ -337,3 +337,223 @@ def test_c2_telegraph_penalty_isolated(db, monkeypatch):
     monkeypatch.setattr(cpu_ai, "_telegraph_lethal", lambda me, opp: False)
     my_false = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
     assert my_true == pytest.approx(my_false)
+
+
+# ---------------------------------------------------------------------------
+# コスト低減の資源価値化（§2.5.3）: 次ターン手出し可（コスト≤次ターン見込みドン）への小ボーナス
+# ---------------------------------------------------------------------------
+
+def _total_don(p):
+    return len(p.don_active) + len(p.don_rested) + len(p.don_attached_cards)
+
+
+def test_c4_next_turn_don_estimate(db):
+    """次ターン見込みドン = 現在の全ドン（アクティブ＋レスト＋付与）＋ ドンデッキから補充 2（残でキャップ）。"""
+    gm = _new_gm(db)
+    p = gm.p1
+    assert cpu_ai._next_turn_don(p) == _total_don(p) + min(2, len(p.don_deck))
+    # ドンデッキが 1 枚しか残っていなければ補充は 1（残でキャップ）。
+    p.don_deck[:] = p.don_deck[:1]
+    assert cpu_ai._next_turn_don(p) == _total_don(p) + 1
+    # ドンデッキが空なら補充 0。
+    p.don_deck.clear()
+    assert cpu_ai._next_turn_don(p) == _total_don(p)
+
+
+def test_c4_playable_hand_bonus_in_side_score(db):
+    """`next_turn_don` 供給時、手札のうち『次ターン手出しできる（current_cost≤見込みドン）』枚数ぶん
+    `W_HAND_PLAYABLE` が上乗せされる。None（plan 無し）では一切上乗せされない＝従来同値。"""
+    gm = _new_gm(db)
+    p = gm.p1
+    if not p.hand:
+        pytest.skip("手札が空")
+    nd = cpu_ai._next_turn_don(p)
+    cap = cpu_ai._power_cap(gm.p2)
+    base = cpu_ai._side_score(p, True, cap)                          # next_turn_don=None＝従来
+    withd = cpu_ai._side_score(p, True, cap, next_turn_don=nd)
+    playable = sum(1 for c in p.hand if c.current_cost <= nd)
+    assert withd - base == pytest.approx(playable * cpu_ai.W_HAND_PLAYABLE)
+    # include_counter=False（相手手札の中身を読まない側）では手札を読まない＝ボーナスも作動しない（フェア）。
+    no_read = cpu_ai._side_score(p, True, cap, include_counter=False, next_turn_don=nd)
+    no_read_base = cpu_ai._side_score(p, True, cap, include_counter=False)
+    assert no_read == pytest.approx(no_read_base)
+
+
+def test_c4_cost_reduction_makes_card_playable(db):
+    """コスト低減が資源として価値化される: 手出し不能だった手札のコストを下げて手出し可能にすると、
+    評価が丁度 `W_HAND_PLAYABLE` ぶん増える（`current_cost` が cost_buff を含む＝低減が直に効く）。"""
+    gm = _new_gm(db)
+    p = gm.p1
+    if not p.hand:
+        pytest.skip("手札が空")
+    nd = cpu_ai._next_turn_don(p)
+    cap = cpu_ai._power_cap(gm.p2)
+    target = p.hand[0]
+    target.base_cost_override = nd + 2          # 次ターンでも手出し不能なコストに固定
+    assert target.current_cost > nd
+    before = cpu_ai._side_score(p, True, cap, next_turn_don=nd)
+    target.cost_buff = -(target.current_cost - nd)   # コスト低減で丁度手出し可能まで下げる
+    assert target.current_cost <= nd
+    after = cpu_ai._side_score(p, True, cap, next_turn_don=nd)
+    assert after - before == pytest.approx(cpu_ai.W_HAND_PLAYABLE)
+
+
+def test_c4_fairness_normal_hides_opp_cost_hard_reads(db):
+    """フェア性: normal（see_opp_hand=False）は相手手札のコストを読まない＝相手手札のコストを変えても
+    評価は不変。hard（see_opp_hand=True）は相手の手出し可能な脅威を織り込む＝相手コストを下げると
+    （相手の脅威が増えて）自分の評価は下がる。"""
+    plan = _plan("aggro")
+    # normal: 相手手札のコストを下げても不変（中身を読まない）。
+    gm = _new_gm(db)
+    if not gm.p2.hand:
+        pytest.skip("相手手札が空")
+    n_before = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
+    for c in gm.p2.hand:
+        c.cost_buff -= 20                       # 相手手札を全て手出し可能級に
+    n_after = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
+    assert n_before == pytest.approx(n_after), "normal が相手手札のコストを読んだ（フェア性違反）"
+    # hard: 相手手札を不能級→可能級にすると、相手の脅威が増えて自分の評価は下がる（≤）。
+    gm2 = _new_gm(db)
+    for c in gm2.p2.hand:
+        c.base_cost_override = 99               # まず全て手出し不能級
+    h_before = cpu_ai.evaluate(gm2, "p1", see_opp_hand=True, plan=plan)
+    for c in gm2.p2.hand:
+        c.base_cost_override = 0                # 全て手出し可能級
+    h_after = cpu_ai.evaluate(gm2, "p1", see_opp_hand=True, plan=plan)
+    assert h_after <= h_before
+
+
+def test_c4_plan_none_ignores_hand_cost(db):
+    """回帰: plan=None（プラン無し）は手札のコストを一切読まない＝コストを変えても評価は不変。"""
+    gm = _new_gm(db)
+    if not gm.p1.hand:
+        pytest.skip("手札が空")
+    before = cpu_ai.evaluate(gm, "p1")          # plan=None
+    for c in gm.p1.hand:
+        c.base_cost_override = 99               # 手出し不能級に上げる
+    after = cpu_ai.evaluate(gm, "p1")
+    assert before == pytest.approx(after)
+
+
+# ---------------------------------------------------------------------------
+# C-4 残（§2.5.3）: 打ち切り settle 葉の不確実性ディスカウント（既定解決の中立化）
+# ---------------------------------------------------------------------------
+
+def test_c4_settle_discount_shrinks_only_with_plan(db):
+    """非 lethal の settle 値は plan 供給時だけ `_SETTLE_CONFIDENCE` で中立へ寄る。plan=None は不変。"""
+    f = cpu_ai._SETTLE_CONFIDENCE
+    plan = _plan("midrange")
+    # plan 供給: 正負どちらも中立（0）方向へ係数倍。
+    assert cpu_ai._settle_discount(10000.0, plan) == pytest.approx(10000.0 * f)
+    assert cpu_ai._settle_discount(-4000.0, plan) == pytest.approx(-4000.0 * f)
+    assert cpu_ai._settle_discount(0.0, plan) == pytest.approx(0.0)
+    # plan=None: 従来どおり割り引かない。
+    assert cpu_ai._settle_discount(10000.0, None) == 10000.0
+    assert cpu_ai._settle_discount(-4000.0, None) == -4000.0
+
+
+def test_c4_settle_discount_exempts_lethal(db):
+    """lethal（|value| が W_WIN 近傍＝勝敗確定）は plan 供給でも割り引かない（確定事象）。"""
+    plan = _plan("aggro")
+    win = cpu_ai.W_WIN - 2          # 勝ち（ply 割引済み）
+    lose = -(cpu_ai.W_WIN - 5)      # 負け
+    assert cpu_ai._settle_discount(win, plan) == win
+    assert cpu_ai._settle_discount(lose, plan) == lose
+
+
+def test_c4_settle_eval_applies_discount(db, monkeypatch):
+    """配線: `_settle_eval` は（勝敗未確定の）整流後評価に `_settle_discount` を適用する。
+
+    既に静止点（相手 MAIN）に置いた局面で settle ループを空回りさせ、evaluate を固定値へ monkeypatch して
+    『plan 供給時は係数倍／plan=None は素通し』を観測する。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p2          # p1 視点で相手（p2）の手番開始＝settle の静止点
+    monkeypatch.setattr(cpu_ai, "evaluate",
+                        lambda manager, me, see_opp_hand=True, profile=None, plan=None: 8000.0)
+    plan = _plan("control")
+    with_plan = cpu_ai._settle_eval(gm, "p1", False, None, plan, ply=3)
+    no_plan = cpu_ai._settle_eval(gm, "p1", False, None, None, ply=3)
+    assert no_plan == pytest.approx(8000.0)
+    assert with_plan == pytest.approx(8000.0 * cpu_ai._SETTLE_CONFIDENCE)
+
+
+# ---------------------------------------------------------------------------
+# 時間割引（独立トラック・§2.5.3）: 地平線外の盤面価値（場の存在価値）の割引
+#   別検出器＝レース/テンポ・パズル（ドン症状とは機序が独立）。
+# ---------------------------------------------------------------------------
+
+def test_tempo_factor_curve(db):
+    """残ターン代理＝min(自,相手)ライフ。満額ターン以上で 1.0・短いほど割引・下限でクランプ・両側対称。"""
+    gm = _new_gm(db)
+    me, opp = gm.p1, gm.p2
+
+    def setlife(p, n):
+        p.life.clear()
+        for _ in range(n):
+            p.life.append(p.deck.pop() if p.deck else p.trash.pop())
+
+    full = int(cpu_ai._TEMPO_FULL_TURNS)
+    setlife(me, full + 2); setlife(opp, full + 2)
+    assert cpu_ai._board_tempo_factor(me, opp) == pytest.approx(1.0)         # ライフ高＝満額
+    setlife(me, 2); setlife(opp, full + 2)
+    assert cpu_ai._board_tempo_factor(me, opp) == pytest.approx(2.0 / full)  # 先に死ぬ側（自2）で律速
+    setlife(me, full + 2); setlife(opp, 2)
+    assert cpu_ai._board_tempo_factor(me, opp) == pytest.approx(2.0 / full)  # 対称（相手2でも同じ）
+    setlife(me, 0); setlife(opp, 0)
+    assert cpu_ai._board_tempo_factor(me, opp) == pytest.approx(cpu_ai._TEMPO_FLOOR)  # 下限クランプ
+
+
+def test_tempo_discounts_field_count_in_side_score(db):
+    """`field_count_factor` は場の存在価値（W_FIELD_COUNT）だけを割り引く（既定 1.0＝従来同値）。"""
+    gm = _new_gm(db)
+    c = next((x for x in list(gm.p1.deck) if x.master.type.name == "CHARACTER"
+              and not cpu_ai._is_low_impact(x)), None)
+    assert c is not None
+    gm.p1.deck.remove(c); gm.p1.field.append(c)
+    c.is_rest = False; c.is_newly_played = False
+    cap = cpu_ai._power_cap(gm.p2)
+    full = cpu_ai._side_score(gm.p1, True, cap)                          # field_count_factor=1.0（既定）
+    half = cpu_ai._side_score(gm.p1, True, cap, field_count_factor=0.5)
+    # 差は丁度 場1体ぶんの存在価値の割引（他項は同一なので相殺）。
+    assert full - half == pytest.approx(cpu_ai.W_FIELD_COUNT * 0.5)
+
+
+def test_race_tempo_puzzle_discounts_board_in_race(db):
+    """レース/テンポ・パズル（検出器）: 同じ置物を場に足したときの評価上昇は、レース終盤（両者ライフ薄）の
+    ほうが早期（両者ライフ厚）より**小さい**＝地平線外の盤面価値が残りターンで割り引かれる。
+
+    非到達の置物（リーダーに届かない）を使い逆算リーサル項を絡めず、純粋に存在価値の時間割引を観測する。
+    plan=None（割引なし）では早期＝レースで同じ（割引が起きないことの対照）。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p1
+    body = _low_impact_char(gm)                     # 効果なし低パワー＝リーダーに届かない置物
+    assert body is not None
+    gm.p1.deck.remove(body)
+
+    def add_delta(plan):
+        before = cpu_ai.evaluate(gm, "p1", plan=plan)
+        gm.p1.field.append(body); body.is_rest = False; body.is_newly_played = False
+        after = cpu_ai.evaluate(gm, "p1", plan=plan)
+        gm.p1.field.remove(body)
+        return after - before
+
+    def setlife(p, n):
+        while len(p.life) < n:
+            p.life.append(p.deck.pop())
+        while len(p.life) > n:
+            p.trash.append(p.life.pop())
+
+    plan = _plan("midrange")                        # vanilla_body_mult=1.0＝置物割引を絡めない
+    # 早期（両者ライフ厚＝満額）。
+    setlife(gm.p1, int(cpu_ai._TEMPO_FULL_TURNS) + 1)
+    setlife(gm.p2, int(cpu_ai._TEMPO_FULL_TURNS) + 1)
+    d_early = add_delta(plan)
+    d_early_noplan = add_delta(None)
+    # レース（両者ライフ薄）。
+    setlife(gm.p1, 1); setlife(gm.p2, 1)
+    d_race = add_delta(plan)
+    d_race_noplan = add_delta(None)
+    # 時間割引: レースのほうが存在価値の上乗せが小さい。
+    assert d_race < d_early
+    # 対照: plan=None は割引が作動しない＝早期とレースで同じ（盤面変化が同一なので一致）。
+    assert d_early_noplan == pytest.approx(d_race_noplan)

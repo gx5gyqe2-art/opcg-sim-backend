@@ -73,8 +73,8 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 ### CPU 対戦・AI（評価/探索/プラン/相手モデル・SPEC §2.5）
 | ファイル | 役割 |
 |---|---|
-| `tests/test_cpu_ai.py` | 評価関数・α-βビーム探索・難易度情報方針（easy/normal/hard）・リーサル認識・有効パワー閾値・単一対象選択探索・horizon（B1/B2-lite）の保証テスト |
-| `tests/test_cpu_self_plan.py` | 自デッキ勝ち筋プラン（aggro/midrange/control 自動分類・置物/カウンター/ライフ/攻め圧の重み・逆算リーサル/マイルストーン・脅威キーワード資産） |
+| `tests/test_cpu_ai.py` | 評価関数・α-βビーム探索・難易度情報方針（easy/normal/hard）・リーサル認識・有効パワー閾値・単一対象選択探索・horizon（B1/B2-lite）の保証テスト＋**B-2 ドン付与の手生成プルーニング**（意味ある配分のみ＝閾値跨ぎ／付与ドン条件残し・overcap/レスト除外・非ドン素通し） |
+| `tests/test_cpu_self_plan.py` | 自デッキ勝ち筋プラン（aggro/midrange/control 自動分類・置物/カウンター/ライフ/攻め圧の重み・逆算リーサル/マイルストーン・脅威キーワード資産）＋**コスト低減の資源価値化**（次ターン手出し可の手札ボーナス・フェア性）／**C-4 settle 打ち切り葉の不確実性ディスカウント**（既定解決の中立化・lethal 非割引）／**時間割引＝レース/テンポ・パズル**（地平線外の盤面価値を残りゲーム長で割引・別検出器）。いずれも plan=None 完全同値の回帰ガード付き |
 | `tests/test_cpu_opponent_model.py` | リーダー推測の相手プロファイル（カウンター密度／ブロッカー比率／除去比率／defense_factor／aggro_lean）の集計 |
 | `tests/test_cpu_puzzles.py` | **CPU 検証基盤（フェーズ0・全変更のゲート）**: 正解手種が既知の局面（致死を取る／**ドン→クロック変換の decide レベル検出**）＋フェア性ガード（normal は相手隠しゾーンを読まない）＋特性化ピン。**2026-06 レビュー収束項**: B-1(a) アイドルドン末端減価／B-1(b) カウンター強要（推定カウンター応答モデル）／公開情報ベリーフ更新（手札枚数・トラッシュ）／A-1 アンブロッカブル評価／A-2 アーキタイプ依存スケール／A-3 min ビーム剪定の sort 方向 |
 | `tests/test_cpu_arena.py` | **検証基盤の絶対強度メトリクスの機械健全性**（`tests/cpu_arena.py`）: 凍結ベースライン Elo 変換（勝率→Elo の 0.5→0／単調／対称）・非対称対局＋席交互アリーナ・regret ログ（`cpu_ai.decide_with_regret`＝非負・有限・easy/単一手で 0）。実ゲームは低速なので機械健全性のみ高速・有界に固定 |
