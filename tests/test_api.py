@@ -85,6 +85,17 @@ def test_get_cards(client):
     assert "uuid" in body["cards"][0] and "name" in body["cards"][0]
 
 
+def test_assets_version(client):
+    """画像キャッシュ版数を返す（非空文字列・カードDB由来で安定）。"""
+    r = client.get("/api/assets/version")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is True
+    assert isinstance(body["v"], str) and len(body["v"]) > 0
+    # 同一プロセス内では安定（リクエストごとに変わらない）
+    assert client.get("/api/assets/version").json()["v"] == body["v"]
+
+
 def test_log_single_and_batch(client):
     r1 = client.post("/api/log", json={"level": "info", "action": "t", "msg": "hi"})
     assert r1.status_code == 200 and r1.json()["mode"] == "single"

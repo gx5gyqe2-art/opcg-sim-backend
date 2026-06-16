@@ -256,6 +256,27 @@ CPU_GAMES: Dict[str, Dict[str, Any]] = {}
 
 card_db = CardLoader(CARD_DB_PATH); card_db.load()
 
+def _compute_image_version() -> str:
+    """カード画像のキャッシュ版数。
+
+    カードDB(opcg_cards.json)の内容ハッシュから自動導出する。新弾追加など
+    画像をまとめて更新する場面ではカードDBも更新されるため、人手で版数を
+    上げなくても版数が自動で切り替わる（＝古い画像キャッシュが確実に無効化される）。
+    カードデータを変えず画像のみ差し替える稀なケース用に IMAGE_VERSION_SALT で
+    手動上書きできる余地も残す。
+    """
+    import hashlib
+    h = hashlib.md5()
+    try:
+        with open(CARD_DB_PATH, "rb") as f:
+            h.update(f.read())
+    except OSError:
+        pass
+    h.update(os.getenv("IMAGE_VERSION_SALT", "").encode())
+    return h.hexdigest()[:8]
+
+IMAGE_VERSION = _compute_image_version()
+
 # NOTE: 効果定義はカードテキストの自動解析（EffectParserV2）に一本化されている。
 
 def _load_deck_doc(source_str: str) -> Dict[str, Any]:
@@ -476,6 +497,11 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
     except Exception as e:
         log_event("ERROR", "game.cpu_step_fail", traceback.format_exc(), player=cpu_pid)
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
+
+@app.get("/api/assets/version")
+async def get_assets_version():
+    """カード画像のキャッシュ版数を返す（フロントが ?v= に付与してキャッシュ無効化に使う）。"""
+    return {"success": True, "v": IMAGE_VERSION}
 
 @app.get("/api/cards")
 async def get_all_cards():
