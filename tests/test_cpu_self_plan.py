@@ -337,3 +337,99 @@ def test_c2_telegraph_penalty_isolated(db, monkeypatch):
     monkeypatch.setattr(cpu_ai, "_telegraph_lethal", lambda me, opp: False)
     my_false = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
     assert my_true == pytest.approx(my_false)
+
+
+# ---------------------------------------------------------------------------
+# コスト低減の資源価値化（§2.5.3）: 次ターン手出し可（コスト≤次ターン見込みドン）への小ボーナス
+# ---------------------------------------------------------------------------
+
+def _total_don(p):
+    return len(p.don_active) + len(p.don_rested) + len(p.don_attached_cards)
+
+
+def test_c4_next_turn_don_estimate(db):
+    """次ターン見込みドン = 現在の全ドン（アクティブ＋レスト＋付与）＋ ドンデッキから補充 2（残でキャップ）。"""
+    gm = _new_gm(db)
+    p = gm.p1
+    assert cpu_ai._next_turn_don(p) == _total_don(p) + min(2, len(p.don_deck))
+    # ドンデッキが 1 枚しか残っていなければ補充は 1（残でキャップ）。
+    p.don_deck[:] = p.don_deck[:1]
+    assert cpu_ai._next_turn_don(p) == _total_don(p) + 1
+    # ドンデッキが空なら補充 0。
+    p.don_deck.clear()
+    assert cpu_ai._next_turn_don(p) == _total_don(p)
+
+
+def test_c4_playable_hand_bonus_in_side_score(db):
+    """`next_turn_don` 供給時、手札のうち『次ターン手出しできる（current_cost≤見込みドン）』枚数ぶん
+    `W_HAND_PLAYABLE` が上乗せされる。None（plan 無し）では一切上乗せされない＝従来同値。"""
+    gm = _new_gm(db)
+    p = gm.p1
+    if not p.hand:
+        pytest.skip("手札が空")
+    nd = cpu_ai._next_turn_don(p)
+    cap = cpu_ai._power_cap(gm.p2)
+    base = cpu_ai._side_score(p, True, cap)                          # next_turn_don=None＝従来
+    withd = cpu_ai._side_score(p, True, cap, next_turn_don=nd)
+    playable = sum(1 for c in p.hand if c.current_cost <= nd)
+    assert withd - base == pytest.approx(playable * cpu_ai.W_HAND_PLAYABLE)
+    # include_counter=False（相手手札の中身を読まない側）では手札を読まない＝ボーナスも作動しない（フェア）。
+    no_read = cpu_ai._side_score(p, True, cap, include_counter=False, next_turn_don=nd)
+    no_read_base = cpu_ai._side_score(p, True, cap, include_counter=False)
+    assert no_read == pytest.approx(no_read_base)
+
+
+def test_c4_cost_reduction_makes_card_playable(db):
+    """コスト低減が資源として価値化される: 手出し不能だった手札のコストを下げて手出し可能にすると、
+    評価が丁度 `W_HAND_PLAYABLE` ぶん増える（`current_cost` が cost_buff を含む＝低減が直に効く）。"""
+    gm = _new_gm(db)
+    p = gm.p1
+    if not p.hand:
+        pytest.skip("手札が空")
+    nd = cpu_ai._next_turn_don(p)
+    cap = cpu_ai._power_cap(gm.p2)
+    target = p.hand[0]
+    target.base_cost_override = nd + 2          # 次ターンでも手出し不能なコストに固定
+    assert target.current_cost > nd
+    before = cpu_ai._side_score(p, True, cap, next_turn_don=nd)
+    target.cost_buff = -(target.current_cost - nd)   # コスト低減で丁度手出し可能まで下げる
+    assert target.current_cost <= nd
+    after = cpu_ai._side_score(p, True, cap, next_turn_don=nd)
+    assert after - before == pytest.approx(cpu_ai.W_HAND_PLAYABLE)
+
+
+def test_c4_fairness_normal_hides_opp_cost_hard_reads(db):
+    """フェア性: normal（see_opp_hand=False）は相手手札のコストを読まない＝相手手札のコストを変えても
+    評価は不変。hard（see_opp_hand=True）は相手の手出し可能な脅威を織り込む＝相手コストを下げると
+    （相手の脅威が増えて）自分の評価は下がる。"""
+    plan = _plan("aggro")
+    # normal: 相手手札のコストを下げても不変（中身を読まない）。
+    gm = _new_gm(db)
+    if not gm.p2.hand:
+        pytest.skip("相手手札が空")
+    n_before = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
+    for c in gm.p2.hand:
+        c.cost_buff -= 20                       # 相手手札を全て手出し可能級に
+    n_after = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
+    assert n_before == pytest.approx(n_after), "normal が相手手札のコストを読んだ（フェア性違反）"
+    # hard: 相手手札を不能級→可能級にすると、相手の脅威が増えて自分の評価は下がる（≤）。
+    gm2 = _new_gm(db)
+    for c in gm2.p2.hand:
+        c.base_cost_override = 99               # まず全て手出し不能級
+    h_before = cpu_ai.evaluate(gm2, "p1", see_opp_hand=True, plan=plan)
+    for c in gm2.p2.hand:
+        c.base_cost_override = 0                # 全て手出し可能級
+    h_after = cpu_ai.evaluate(gm2, "p1", see_opp_hand=True, plan=plan)
+    assert h_after <= h_before
+
+
+def test_c4_plan_none_ignores_hand_cost(db):
+    """回帰: plan=None（プラン無し）は手札のコストを一切読まない＝コストを変えても評価は不変。"""
+    gm = _new_gm(db)
+    if not gm.p1.hand:
+        pytest.skip("手札が空")
+    before = cpu_ai.evaluate(gm, "p1")          # plan=None
+    for c in gm.p1.hand:
+        c.base_cost_override = 99               # 手出し不能級に上げる
+    after = cpu_ai.evaluate(gm, "p1")
+    assert before == pytest.approx(after)

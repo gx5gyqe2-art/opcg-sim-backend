@@ -41,6 +41,13 @@ _LIFE_KNEE_AGGRO_MATCHUP = 3
 _AGGRO_MATCHUP_THRESHOLD = 0.6   # 相手プロファイルの aggro_lean がこれ以上で「攻め対面」と見なす
 W_HAND = 700.0           # 手札 1 枚の基礎価値
 W_COUNTER = 0.6          # 手札のカウンター値 1 点あたり（防御リソース）
+# コスト低減の資源価値化（§2.5.3・コスト低減を潜在資源として軽く価値化）。`evaluate` は素では手札の
+# コストを読まないため、コスト低減は「次ターン手出しできる脅威」という潜在資源として無価値だった。
+# 安価な代理として「次ターンに手出しできる（コスト ≤ 次ターン見込みドン）」手札に小ボーナスを与え、
+# 打てる脅威の期待値を軽く織り込む。`current_cost` は cost_buff/timed_cost を含む＝**コスト低減が
+# そのまま手出し可否に効く**＝低減の資源価値が拾える。W_HAND(700) より十分小さい＝既存の枚数価値を
+# 歪めない軽い上乗せ。プラン供給時のみ作動（plan=None では一切作動せず現行挙動と完全同値）。
+W_HAND_PLAYABLE = 150.0  # 次ターンに手出しできる手札 1 枚あたりの潜在資源ボーナス
 W_FIELD_COUNT = 1500.0   # 場のキャラ 1 体の存在価値
 W_FIELD_POWER = 0.3      # 場の有効パワー（戦闘で意味を持つ上限までを線形評価。素点でなく閾値性を尊重）
 W_DON_ACTIVE = 200.0     # アクティブドン!! 1 枚
@@ -188,6 +195,17 @@ def _effective_power(power: float, cap: float) -> float:
     return cap + (power - cap) * W_POWER_OVERCAP
 
 
+def _next_turn_don(p) -> int:
+    """`p` の次ターンに使える見込みドン!! 枚数（コスト低減の資源価値化・§2.5.3）。
+
+    次の自ターン開始では現在の全ドン（アクティブ＋レスト＋付与中）がアクティブに戻り、さらにドンデッキ
+    から 2 枚（ターン1のみ 1 枚だが中盤評価では常に 2）が補充される。ドンデッキ残でキャップ＝盤面の真値。
+    相手手札の中身は読まない＝ドン枚数は公開情報なのでフェア。
+    """
+    total = len(p.don_active) + len(p.don_rested) + len(p.don_attached_cards)
+    return total + min(2, len(p.don_deck))
+
+
 def _is_low_impact(c) -> bool:
     """「効果なし・素パワー<5000・関連キーワード無し」の置物キャラか（プラン重みの割引対象）。
 
@@ -247,7 +265,8 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
                 counter_factor: float = 1.0, threat_aware: bool = False,
                 idle_don_factor: float = 1.0,
                 threat_atk_mult: float = 1.0, threat_def_mult: float = 1.0,
-                life_knee: int = _LIFE_KNEE_DEFAULT) -> float:
+                life_knee: int = _LIFE_KNEE_DEFAULT,
+                next_turn_don: Optional[int] = None) -> float:
     """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和＋白の境界リスク）。
 
     `power_cap` は対面の最硬防御パワー＝有効パワーの上限（`_effective_power`）。これにより
@@ -259,6 +278,10 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
     `life_knee`（C-3・§2.5.3）はライフ薄域上乗せ（`W_LIFE_LOW`）を立ち上げる枚数の上限＝非線形の膝位置。
     既定 2＝従来。攻め寄りの相手と対面する自ライフ（守備）は膝を 3 へ上げ、レース下での 3 枚目までを
     厚く守る（クロック側＝相手ライフは既定 2 のまま＝自他で別カーブ）。
+    `next_turn_don`（コスト低減の資源価値化・§2.5.3）が与えられると、手札のうち「次ターン手出しできる
+    （`current_cost` ≤ `next_turn_don`）」枚数に `W_HAND_PLAYABLE` を上乗せする＝コスト低減を潜在資源として
+    軽く価値化する。手札の中身（コスト）を読むため `include_counter`（＝この手札を読んでよい側）のときだけ
+    作動する＝相手手札の中身を読まないフェア性を保つ。None（plan 無し）では作動しない＝従来同値。
     """
     score = 0.0
 
@@ -275,6 +298,13 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
                 score += (c.current_counter or 0) * W_COUNTER * counter_factor
             except Exception:
                 pass
+            # コスト低減の資源価値化: 次ターン手出しできる手札を潜在資源として軽く加点（plan 供給時のみ）。
+            if next_turn_don is not None:
+                try:
+                    if c.current_cost <= next_turn_don:
+                        score += W_HAND_PLAYABLE
+                except Exception:
+                    pass
 
     # 白（J）の決定境界: 自デッキ残がデッキ切れ（J=0・ドロー不能＝敗北）へ近づくほど非線形に減点。
     score -= max(0, DECK_DANGER - len(p.deck)) * W_DECK_DANGER
@@ -434,6 +464,11 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
     # C-3: 自ライフ（守備）は攻め対面で膝を 3 へ（レース耐性重視）。クロック側＝相手ライフは既定 2 のまま
     # ＝自他で別カーブ。profile 無し＝両側既定 2＝従来同値。
     own_life_knee = _own_life_knee(profile)
+    # コスト低減の資源価値化（§2.5.3）: 次ターン手出しできる手札を潜在資源として軽く加点（プラン供給時のみ）。
+    # 自分側は常に手札を読むので供給。相手側は手札の中身（コスト）を読む hard（see_opp_hand）のときだけ供給
+    # ＝相手手札の中身を読まない normal のフェア性を保つ（plan 無しは両側 None＝従来同値）。
+    me_next_don = _next_turn_don(me) if plan is not None else None
+    opp_next_don = _next_turn_don(opp) if (plan is not None and see_opp_hand) else None
     # C-2: テレグラフ致死の減点（相手ターン開始の静止点＝相手の攻撃が目前のときだけ・プラン供給時）。
     telegraph = 0.0
     if plan is not None and not is_my_turn and _telegraph_lethal(me, opp):
@@ -443,10 +478,11 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
                         counter_factor=counter_factor, threat_aware=threat_aware,
                         idle_don_factor=idle_don_factor,
                         threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
-                        life_knee=own_life_knee)
+                        life_knee=own_life_knee, next_turn_don=me_next_don)
             - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
                           hand_factor=opp_hand_factor, threat_aware=threat_aware,
-                          threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult)
+                          threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
+                          next_turn_don=opp_next_don)
             + _plan_progress(manager, me, opp, is_my_turn, plan, profile)
             - telegraph)
 
