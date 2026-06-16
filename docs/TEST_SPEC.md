@@ -70,6 +70,14 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | `tests/test_verified_decks.py` | **手動検証済みデッキの効果回帰**（§8）。ベースラインが捕捉できない常在ルール（RULE_PROCESSING）・ON_LEAVE 誘発・勝利条件・ドンデッキ枚数・カード名別名・持続時間等を意味的に固定 |
 | `tests/test_cpu_selfplay.py` | CPU 対 CPU 自己対戦の完走・決定論・clone 非破壊・合法手適用・インバリアント検出 |
 
+### CPU 対戦・AI（評価/探索/プラン/相手モデル・SPEC §2.5）
+| ファイル | 役割 |
+|---|---|
+| `tests/test_cpu_ai.py` | 評価関数・α-βビーム探索・難易度情報方針（easy/normal/hard）・リーサル認識・有効パワー閾値・単一対象選択探索・horizon（B1/B2-lite）の保証テスト |
+| `tests/test_cpu_self_plan.py` | 自デッキ勝ち筋プラン（aggro/midrange/control 自動分類・置物/カウンター/ライフ/攻め圧の重み・逆算リーサル/マイルストーン・脅威キーワード資産） |
+| `tests/test_cpu_opponent_model.py` | リーダー推測の相手プロファイル（カウンター密度／ブロッカー比率／除去比率／defense_factor／aggro_lean）の集計 |
+| `tests/test_cpu_puzzles.py` | **CPU 検証基盤（フェーズ0・全変更のゲート）**: 正解手種が既知の局面（致死を取る）＋フェア性ガード（normal は相手隠しゾーンを読まない）＋特性化ピン。**2026-06 レビュー収束項**: B-1(a) アイドルドン末端減価／B-1(b) カウンター強要（推定カウンター応答モデル）／公開情報ベリーフ更新（手札枚数・トラッシュ）／A-1 アンブロッカブル評価／A-2 アーキタイプ依存スケール／A-3 min ビーム剪定の sort 方向 |
+
 ### 効果メカニクス・対話モデル
 | ファイル | 役割 |
 |---|---|
