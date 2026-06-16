@@ -199,6 +199,49 @@ def test_b1b_counter_buffer_belief_trash_depletion(db):
     assert noncounter == pytest.approx(base)
 
 
+# ---------------------------------------------------------------------------
+# バッチA-1: アンブロッカブル（【ブロック不可】）を脅威評価に加点
+# ---------------------------------------------------------------------------
+
+class _Body:
+    """_threat_value 用の最小スタブ（has_keyword / master.effect_text のみ参照）。"""
+    def __init__(self, etext="", kws=()):
+        self.master = type("M", (), {"effect_text": etext})()
+        self._kws = set(kws)
+
+    def has_keyword(self, k):
+        return k in self._kws
+
+
+def test_a1_unblockable_threat_value():
+    """自前【ブロック不可】は加点、付与句（…を得る）は誤検出しない、キーワード付与も拾う。"""
+    vanilla = cpu_ai._threat_value(_Body(""))
+    # 自前キーワード（リマインダ括弧が直後）→ 加点。
+    self_ub = cpu_ai._threat_value(_Body("【ブロック不可】(このカードはブロックされない) / 【登場時】…"))
+    assert self_ub - vanilla == pytest.approx(cpu_ai.W_KW_UNBLOCK)
+    # 他者付与句（…を得る）→ 自身は加点しない（誤検出防止）。
+    grant = cpu_ai._threat_value(_Body("【登場時】自分のキャラ1枚までは、このターン中、【ブロック不可】を得る。"))
+    assert grant == vanilla
+    # 付与で timed_keywords に載った場合は has_keyword で拾う。
+    granted = cpu_ai._threat_value(_Body("", kws={"ブロック不可"}))
+    assert granted - vanilla == pytest.approx(cpu_ai.W_KW_UNBLOCK)
+    # 全角括弧でも検出。
+    zenkaku = cpu_ai._threat_value(_Body("【ブロック不可】（このカードはブロックされない）"))
+    assert zenkaku - vanilla == pytest.approx(cpu_ai.W_KW_UNBLOCK)
+
+
+def test_a1_unblockable_detector_matches_real_cards(db):
+    """実カードデータ: 自前【ブロック不可】キャラのみ検出（付与カード/イベントは非検出）。"""
+    # 自前アンブロッカブル（キャラ）。
+    for num in ("OP16-032", "OP16-033", "OP16-096"):
+        m = db.get_card(num)
+        assert m is not None and cpu_ai._is_unblockable(_Body(m.effect_text), m.effect_text), num
+    # 付与カード/イベントは自身は非アンブロッカブル。
+    for num in ("OP16-095", "ST29-016", "OP15-047"):
+        m = db.get_card(num)
+        assert m is not None and not cpu_ai._is_unblockable(_Body(m.effect_text), m.effect_text), num
+
+
 def _advance_to_select_counter(gm, attacker, target):
     """attacker→target のアタックを宣言し、SELECT_BLOCKER を PASS で流して SELECT_COUNTER まで進める。"""
     gm.action_events = []
