@@ -280,3 +280,60 @@ def test_c3_side_score_knee_raises_low_life_bonus(db):
     assert knee3 - knee2 == pytest.approx(cpu_ai.W_LIFE_LOW)
     # 膝既定は 2（従来）。
     assert cpu_ai._side_score(p, True, cap) == pytest.approx(knee2)
+
+
+# ---------------------------------------------------------------------------
+# バッチC-2: テレグラフ致死の減点（相手ターン開始の葉・プラン供給時のみ）
+# ---------------------------------------------------------------------------
+
+def test_c2_telegraph_lethal_detection(db):
+    """`_telegraph_lethal`: 相手の届く打点本数（割引後）≥ 自残ライフ で True。ブロッカーで控除される。"""
+    gm = _new_gm(db)
+    me, opp = gm.p1, gm.p2
+    while len(me.life) > 2:        # 自ライフ 2（相手リーダー＋攻撃者1体の計2打点で丁度致死）
+        me.trash.append(me.life.pop())
+    while len(me.life) < 2:
+        me.life.append(me.deck.pop())
+    opp.field.clear()
+    my_leader_pw = int(me.leader.get_power(False))
+    # 相手にリーダーへ届く攻撃者を 1 体（素パワー >= 自リーダー）。相手リーダー自身も 1 打点になる。
+    atk = next((c for c in list(opp.deck) if c.master.type.name == "CHARACTER"), None)
+    assert atk is not None
+    opp.deck.remove(atk)
+    opp.field.append(atk)
+    atk.is_rest = False
+    atk.passive_power_override = my_leader_pw + 1000
+    assert cpu_ai._telegraph_lethal(me, opp) is True   # reach 2（攻撃者＋相手リーダー）>= 自ライフ 2
+    # 自分にアクティブブロッカーを 1 体置くと打点が 1 本止まり（reach 1 < 2）telegraph 解消。
+    blk = next((c for c in list(me.deck)
+                if c.master.type.name == "CHARACTER" and c.has_keyword("ブロッカー")), None)
+    if blk is not None:
+        me.deck.remove(blk)
+        me.field.append(blk)
+        blk.is_rest = False
+        assert cpu_ai._telegraph_lethal(me, opp) is False
+
+
+def test_c2_telegraph_penalty_isolated(db, monkeypatch):
+    """C-2: telegraph 項は『相手ターン開始（is_my_turn=False）＋plan 供給』のときだけ `W_TELEGRAPH_LETHAL`
+    ぶん減点する。`_telegraph_lethal` を True/False で monkeypatch し、盤面同一のまま項だけを isolate する。"""
+    gm = _new_gm(db)
+    gm.turn_player = gm.p2          # p1 視点で is_my_turn=False（相手ターン開始の静止点）
+    plan = _plan("aggro")
+    monkeypatch.setattr(cpu_ai, "_telegraph_lethal", lambda me, opp: False)
+    safe = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
+    monkeypatch.setattr(cpu_ai, "_telegraph_lethal", lambda me, opp: True)
+    danger = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
+    assert safe - danger == pytest.approx(cpu_ai.W_TELEGRAPH_LETHAL)
+    # plan=None は telegraph 項を作動させない（True にしても不変＝回帰）。
+    none_true = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=None)
+    monkeypatch.setattr(cpu_ai, "_telegraph_lethal", lambda me, opp: False)
+    none_false = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=None)
+    assert none_true == pytest.approx(none_false)
+    # is_my_turn=True（自分の手番）では telegraph 項は作動しない。
+    gm.turn_player = gm.p1
+    monkeypatch.setattr(cpu_ai, "_telegraph_lethal", lambda me, opp: True)
+    my_true = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
+    monkeypatch.setattr(cpu_ai, "_telegraph_lethal", lambda me, opp: False)
+    my_false = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
+    assert my_true == pytest.approx(my_false)

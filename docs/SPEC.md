@@ -322,9 +322,14 @@ WBS（`gx5gyqe2-art/WBS` の `projects/opcg-sim-backend.md`）と同期。
   **割引後 reach** で止め（`_CLOSER_W`）/接近（`_NEAR_W`）を判定（false lethal の soft 精度改善）。`profile`
   無しは控除 0＝従来どおり（plan 単体テスト不変）。`evaluate` が opp 側 profile を `_plan_progress` へ供給。
   `tests/test_cpu_self_plan.py`（可視ブロッカー控除／カウンター緩衝控除）。重大度=中。
-- **C-2 テレグラフ致死の減点＋適応 horizon=3**（`evaluate`／`_search`・§2.5.2）: 葉評価に「相手の次ターン
-  有効打点 ≥ 自残ライフ価値」で大減点を追加。低ライフ（どちらか≤2）時のみ予算内で適応的に `horizon=3`。
-  horizon-2 の崖（2ターン先のテレグラフ致死）緩和。重大度=中〜高。
+- **C-2 テレグラフ致死の減点【減点は実装済み・適応 horizon=3 は予算待ち】**（`evaluate`／`_telegraph_lethal`・
+  §2.5.3）: 相手ターン開始の静止点（is_my_turn=False・相手の攻撃が目前）の葉で「相手の次ターン有効打点
+  （リーダー＋場の素パワーが自リーダーに届く本数 − 自アクティブブロッカー）≥ 自残ライフ」なら
+  `W_TELEGRAPH_LETHAL=6000` を減点。**W_WIN(1e9) に対し十分小さく、本物のリーサル発見（±W_WIN）は決して
+  上書きしない**＝引き分け帯で守り（ブロッカー温存・脅威除去・ライフ獲得）へ寄せるだけ。打点見積りは素パワー
+  （保守的＝過剰防御回避）。プラン供給時のみ作動（plan=None 完全同値）。**低ライフ時の適応 `horizon=3` は
+  予算（レイテンシ）増を伴うため未実施**（減点項のみ先取り）。`tests/test_cpu_self_plan.py`（検出ロジック／
+  項の isolate）。重大度=中〜高。
 - **C-3 自他ライフの別カーブ＋膝位置プラン依存【実装済み】**（`_side_score`／`_own_life_knee`・§2.5.3/§2.5.5）:
   ライフ薄域上乗せ（`W_LIFE_LOW`）を立ち上げる膝位置を `life_knee` で可変化。**自ライフ（守備）は攻め対面
   （相手 `profile.aggro_lean >= 0.6`）で膝を 3 へ**上げてレース下の 3 枚目まで厚く守り、**クロック側＝相手

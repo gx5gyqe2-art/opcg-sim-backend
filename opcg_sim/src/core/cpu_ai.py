@@ -111,6 +111,12 @@ W_KW_UNBLOCK = 900.0     # アンブロッカブル【ブロック不可】: ブ
 _RESIST_CUE = "KOされない"
 _KEYWORD_ASSETS = (("ダブルアタック", W_KW_DOUBLE), ("速攻", W_KW_RUSH), ("バニッシュ", W_KW_BANISH))
 
+# C-2（§2.5.3）: テレグラフ致死の減点。葉（相手ターン開始＝相手の攻撃が目前）で「相手の次ターンの有効打点
+# ≥ 自残ライフ」なら、受け切れず負ける telegraph として減点する。W_WIN(1e9) に対し十分小さい＝**本物の
+# リーサル発見（±W_WIN）は決して上書きしない**＝引き分け帯で守り（ブロッカー温存・脅威除去・ライフ獲得）へ
+# 寄せるだけ。プラン供給時のみ作動（plan=None 完全同値）。過剰防御を避けるため打点見積りは素パワー（保守的）。
+W_TELEGRAPH_LETHAL = 6000.0
+
 
 def _is_unblockable(c, etext: str) -> bool:
     """このキャラ自身が【ブロック不可】（アンブロッカブル）か（バッチA-1・§2.5.6）。
@@ -196,6 +202,33 @@ def _is_low_impact(c) -> bool:
     if any(c.has_keyword(k) for k in _RELEVANT_KEYWORDS):
         return False
     return (getattr(m, "power", 0) or 0) < _LOW_IMPACT_POWER
+
+
+def _telegraph_lethal(me, opp) -> bool:
+    """C-2（§2.5.3）: 相手の次ターンの有効打点が自残ライフ以上で、受け切れず負ける telegraph か。
+
+    相手の次ターンは場が全アクティブ化するので `is_rest` は無視し、リーダー＋場のうち**素パワーが自リーダー
+    に届く**体を数える（素パワー＝保守的＝don 付与での押し上げは数えない＝過剰防御を避ける）。自分の
+    アクティブブロッカー数（各 1 本を止める）を控除し、割引後の打点本数 ≥ 自残ライフ なら telegraph 致死。
+    """
+    my_life = len(me.life)
+    if my_life <= 0:
+        return False
+    try:
+        my_leader_pw = float(me.leader.get_power(False)) if me.leader is not None else 5000.0
+    except Exception:
+        my_leader_pw = 5000.0
+    reach = 0
+    units = list(opp.field) + ([opp.leader] if opp.leader is not None else [])
+    for c in units:
+        try:
+            pw = float(c.get_power(False))
+        except Exception:
+            pw = float(getattr(getattr(c, "master", None), "power", 0) or 0)
+        if my_leader_pw > 0 and pw >= my_leader_pw:
+            reach += 1
+    reach -= _active_blocker_count(me)
+    return reach >= my_life
 
 
 def _own_life_knee(profile) -> int:
@@ -401,6 +434,10 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
     # C-3: 自ライフ（守備）は攻め対面で膝を 3 へ（レース耐性重視）。クロック側＝相手ライフは既定 2 のまま
     # ＝自他で別カーブ。profile 無し＝両側既定 2＝従来同値。
     own_life_knee = _own_life_knee(profile)
+    # C-2: テレグラフ致死の減点（相手ターン開始の静止点＝相手の攻撃が目前のときだけ・プラン供給時）。
+    telegraph = 0.0
+    if plan is not None and not is_my_turn and _telegraph_lethal(me, opp):
+        telegraph = W_TELEGRAPH_LETHAL
     return (_side_score(me, is_my_turn, my_cap, include_counter=True, life_factor=life_factor,
                         body_factor=body_factor, attacker_factor=attacker_factor,
                         counter_factor=counter_factor, threat_aware=threat_aware,
@@ -410,7 +447,8 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
             - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
                           hand_factor=opp_hand_factor, threat_aware=threat_aware,
                           threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult)
-            + _plan_progress(manager, me, opp, is_my_turn, plan, profile))
+            + _plan_progress(manager, me, opp, is_my_turn, plan, profile)
+            - telegraph)
 
 
 def _pending_keys():
