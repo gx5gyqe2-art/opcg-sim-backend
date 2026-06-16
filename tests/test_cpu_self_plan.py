@@ -557,3 +557,90 @@ def test_race_tempo_puzzle_discounts_board_in_race(db):
     assert d_race < d_early
     # 対照: plan=None は割引が作動しない＝早期とレースで同じ（盤面変化が同一なので一致）。
     assert d_early_noplan == pytest.approx(d_race_noplan)
+
+
+# ---------------------------------------------------------------------------
+# 探索地平線を越える効果価値（§2.5.3・評価関数の期待値で補完）:
+#   毎ターン価値を生む能力（継続/起動/毎ターン誘発）の将来価値プレミアム（残ターンで期待値割引）
+# ---------------------------------------------------------------------------
+
+def test_recurring_engine_detector(db):
+    """毎ターン価値を生む能力（ACTIVATE_MAIN/PASSIVE/…）は engine、一度きり（ON_PLAY のみ）/バニラは非 engine。"""
+    from opcg_sim.src.models.enums import TriggerType
+    am = _find_char_master(db, lambda m: any(a.trigger == TriggerType.ACTIVATE_MAIN
+                                             for a in (getattr(m, "abilities", None) or [])))
+    if am is not None:
+        assert cpu_ai._recurring_engine(CardInstance(am, "p1")) is True
+    vanilla = _find_char_master(db, lambda m: not (getattr(m, "abilities", None) or []))
+    if vanilla is not None:
+        assert cpu_ai._recurring_engine(CardInstance(vanilla, "p1")) is False
+    onplay = _find_char_master(db, lambda m: (getattr(m, "abilities", None) or [])
+                               and all(a.trigger == TriggerType.ON_PLAY for a in m.abilities))
+    if onplay is not None:
+        assert cpu_ai._recurring_engine(CardInstance(onplay, "p1")) is False  # 一度きりは対象外
+
+
+def test_engine_premium_only_when_engine_aware(db):
+    """エンジン将来価値プレミアムは engine_aware=True のときだけ・engine 体にだけ加点する。"""
+    from opcg_sim.src.models.enums import TriggerType
+    am = _find_char_master(db, lambda m: any(a.trigger == TriggerType.ACTIVATE_MAIN
+                                             for a in (getattr(m, "abilities", None) or [])))
+    if am is None:
+        pytest.skip("起動メイン持ちキャラが見つからない")
+    gm = _new_gm(db)
+    c = CardInstance(am, "p1")
+    c.is_rest = False
+    c.is_newly_played = False
+    gm.p1.field.append(c)
+    cap = cpu_ai._power_cap(gm.p2)
+    off = cpu_ai._side_score(gm.p1, True, cap, engine_aware=False)
+    on = cpu_ai._side_score(gm.p1, True, cap, engine_aware=True)
+    assert on - off == pytest.approx(cpu_ai.W_RECUR_ENGINE)        # field_count_factor 既定 1.0
+
+
+def test_engine_premium_scales_with_remaining_turns(db):
+    """将来価値プレミアムは残ターン（field_count_factor＝time-discount のテンポ係数）でスケールする。"""
+    from opcg_sim.src.models.enums import TriggerType
+    am = _find_char_master(db, lambda m: any(a.trigger == TriggerType.ACTIVATE_MAIN
+                                             for a in (getattr(m, "abilities", None) or [])))
+    if am is None:
+        pytest.skip("起動メイン持ちキャラが見つからない")
+    gm = _new_gm(db)
+    c = CardInstance(am, "p1")
+    c.is_rest = False
+    c.is_newly_played = False
+    gm.p1.field.append(c)
+    cap = cpu_ai._power_cap(gm.p2)
+    full = cpu_ai._side_score(gm.p1, True, cap, engine_aware=True, field_count_factor=1.0)
+    race = cpu_ai._side_score(gm.p1, True, cap, engine_aware=True, field_count_factor=0.3)
+    # 場の存在価値の割引（W_FIELD_COUNT*0.7）＋エンジンプレミアムの割引（W_RECUR_ENGINE*0.7）の合計。
+    assert full - race == pytest.approx((cpu_ai.W_FIELD_COUNT + cpu_ai.W_RECUR_ENGINE) * 0.7)
+
+
+def test_engine_premium_wired_in_evaluate_plan_gated(db):
+    """配線: エンジン体を場に足したときの評価上昇は plan 供給時のほうが（将来価値プレミアム分だけ）大きい。"""
+    from opcg_sim.src.models.enums import TriggerType
+    am = _find_char_master(db, lambda m: any(a.trigger == TriggerType.ACTIVATE_MAIN
+                                             for a in (getattr(m, "abilities", None) or [])))
+    if am is None:
+        pytest.skip("起動メイン持ちキャラが見つからない")
+    gm = _new_gm(db)
+    gm.turn_player = gm.p1
+    c = CardInstance(am, "p1")
+    c.is_rest = False
+    c.is_newly_played = False
+
+    def add_delta(plan):
+        before = cpu_ai.evaluate(gm, "p1", plan=plan)
+        gm.p1.field.append(c)
+        after = cpu_ai.evaluate(gm, "p1", plan=plan)
+        gm.p1.field.remove(c)
+        return after - before
+
+    plan = _plan("midrange")
+    # ライフ厚（テンポ係数 1.0）でプレミアムが満額乗る局面に。
+    while len(gm.p1.life) < int(cpu_ai._TEMPO_FULL_TURNS) + 1:
+        gm.p1.life.append(gm.p1.deck.pop())
+    while len(gm.p2.life) < int(cpu_ai._TEMPO_FULL_TURNS) + 1:
+        gm.p2.life.append(gm.p2.deck.pop())
+    assert add_delta(plan) > add_delta(None)   # plan 供給時はエンジン将来価値ぶん高い

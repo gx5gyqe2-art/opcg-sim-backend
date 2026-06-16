@@ -32,6 +32,8 @@ import random
 from typing import Any, Dict, List, Optional, Tuple
 import re
 
+from ..models.enums import TriggerType
+
 # 評価重み（盤面 1000=パワー1段相当に正規化）
 W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（最重要）
 W_LIFE_LOW = 4000.0      # 希少域（最初の 2 枚）への上乗せ＝非線形・45[J] ラインの危険
@@ -123,6 +125,21 @@ W_KW_UNBLOCK = 900.0     # アンブロッカブル【ブロック不可】: ブ
 _RESIST_CUE = "KOされない"
 _KEYWORD_ASSETS = (("ダブルアタック", W_KW_DOUBLE), ("速攻", W_KW_RUSH), ("バニッシュ", W_KW_BANISH))
 
+# 探索地平線を越える効果価値（§2.5.3・期待値での補完）。場のキャラが持つ「毎ターン価値を生む」継続/起動/
+# 毎ターン誘発の能力は、探索ホライズン（HARD_HORIZON=2）より先のターンでも価値を生み続ける＝静的スナップ
+# ショット評価が取りこぼす**将来価値**。これを残りゲーム長で期待値割引した小プレミアムで補う（time-discount
+# の `field_count_factor` を流用＝残ターンが多いほど将来発動回数が多く価値が高い／レース終盤は小さい）。両側
+# 対称＝相手の価値エンジンは opp 側を押し上げ→除去が報われる（① の単一対象探索が狙う）。プラン供給時のみ作動。
+W_RECUR_ENGINE = 600.0   # 毎ターン価値を生む能力を持つ体 1 体あたりの将来価値プレミアム（W_FIELD_COUNT より小）
+_RECUR_TRIGGERS = frozenset({
+    TriggerType.ACTIVATE_MAIN,   # 起動メイン: 毎ターン使える価値エンジン
+    TriggerType.PASSIVE,         # 常時: 場にいる限り効く継続効果
+    TriggerType.YOUR_TURN,       # 自分のターン中: 毎自ターン効く
+    TriggerType.OPPONENT_TURN,   # 相手のターン中: 毎相手ターン効く
+    TriggerType.TURN_END,        # ターン終了時: 毎ターン誘発
+    TriggerType.OPP_TURN_END,    # 相手のターン終了時: 毎相手ターン誘発
+})
+
 # C-2（§2.5.3）: テレグラフ致死の減点。葉（相手ターン開始＝相手の攻撃が目前）で「相手の次ターンの有効打点
 # ≥ 自残ライフ」なら、受け切れず負ける telegraph として減点する。W_WIN(1e9) に対し十分小さい＝**本物の
 # リーサル発見（±W_WIN）は決して上書きしない**＝引き分け帯で守り（ブロッカー温存・脅威除去・ライフ獲得）へ
@@ -166,6 +183,21 @@ def _threat_value(c, atk_mult: float = 1.0, def_mult: float = 1.0) -> float:
         atk += W_KW_UNBLOCK
     deff = W_KW_RESIST if _RESIST_CUE in etext else 0.0  # 防御的キーワード資産（def_mult でスケール）
     return atk * atk_mult + deff * def_mult
+
+
+def _recurring_engine(c) -> bool:
+    """このキャラが「毎ターン価値を生む」能力（継続/起動/毎ターン誘発）を持つか（§2.5.3・地平線越え）。
+
+    `_RECUR_TRIGGERS` のいずれかのトリガーを持つ能力があれば True。ON_PLAY（一度きり）・ON_KO/TRIGGER/COUNTER
+    （反応型一回）等の一回限り効果は、発動時に探索が結果盤面で見るため将来価値プレミアムの対象にしない。
+    """
+    m = getattr(c, "master", None)
+    if m is None:
+        return False
+    for a in getattr(m, "abilities", None) or []:
+        if getattr(a, "trigger", None) in _RECUR_TRIGGERS:
+            return True
+    return False
 
 
 def _other(manager, name: str):
@@ -372,7 +404,8 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
                 threat_atk_mult: float = 1.0, threat_def_mult: float = 1.0,
                 life_knee: int = _LIFE_KNEE_DEFAULT,
                 next_turn_don: Optional[int] = None,
-                field_count_factor: float = 1.0) -> float:
+                field_count_factor: float = 1.0,
+                engine_aware: bool = False) -> float:
     """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和＋白の境界リスク）。
 
     `power_cap` は対面の最硬防御パワー＝有効パワーの上限（`_effective_power`）。これにより
@@ -436,6 +469,10 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
         # プラン時のみ。A-2: 攻め/守りキーワードをアーキタイプ依存にスケール（aggro=攻め重視/control=守り重視）。
         if threat_aware:
             score += _threat_value(c, threat_atk_mult, threat_def_mult)
+        # 地平線越え（§2.5.3）: 毎ターン価値を生む能力の将来価値を残りゲーム長で期待値割引して加点
+        # （field_count_factor＝time-discount のテンポ係数を流用＝残ターンが多いほど将来発動が多く価値大）。
+        if engine_aware and _recurring_engine(c):
+            score += W_RECUR_ENGINE * field_count_factor
         try:
             pw = c.get_power(is_turn)
         except Exception:
@@ -589,11 +626,12 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
                         idle_don_factor=idle_don_factor,
                         threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
                         life_knee=own_life_knee, next_turn_don=me_next_don,
-                        field_count_factor=tempo_factor)
+                        field_count_factor=tempo_factor, engine_aware=threat_aware)
             - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
                           hand_factor=opp_hand_factor, threat_aware=threat_aware,
                           threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
-                          next_turn_don=opp_next_don, field_count_factor=tempo_factor)
+                          next_turn_don=opp_next_don, field_count_factor=tempo_factor,
+                          engine_aware=threat_aware)
             + _plan_progress(manager, me, opp, is_my_turn, plan, profile)
             - telegraph)
 
