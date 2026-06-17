@@ -115,6 +115,18 @@ def test_trace_has_expected_fields(db):
     assert all(v <= cpu_ai.REPEAT_CAP for v in rep.values()), f"PV に繰り返し膨張: {rep}"
 
 
+def test_light_trace_omits_read_ahead(db):
+    """ライブ軽量トレース（trace_read_ahead=False）は read_ahead を省き、他は残す。"""
+    gm = _new_game(db, seed=2)
+    actor = _advance_to_multi_choice(gm)
+    assert actor is not None
+    tr = {}
+    cpu_ai.decide(gm, actor, "normal", random.Random(0), trace=tr, trace_read_ahead=False)
+    assert "read_ahead" not in tr               # 重い読み筋は省かれる
+    assert tr.get("chosen") and "candidates" in tr and "regret" in tr
+    assert "j_components" in tr                  # 安価な成分内訳は残す
+
+
 def test_replay_is_deterministic(db):
     """同一 seed の run_replay は同一の決定列（card_id 基準）を再現する（有界・部分再生・easy）。"""
     a = run_replay(5, db, p1_difficulty="easy", p2_difficulty="easy", stop_after_decisions=20)

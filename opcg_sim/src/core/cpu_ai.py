@@ -1304,11 +1304,16 @@ def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_onl
 def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: str,
                          moves: List[Dict[str, Any]], scored: List[Tuple[float, Dict[str, Any]]],
                          collect: Optional[Dict[str, Any]], chosen: Dict[str, Any], folded: bool,
-                         see_opp_hand: bool, opp_public_only: bool, profile, plan) -> None:
+                         see_opp_hand: bool, opp_public_only: bool, profile, plan,
+                         include_read_ahead: bool = True) -> None:
     """`decide` の意思決定結果を診断トレース dict に書き込む（trace 指定時のみ）。
 
     記録内容: 選んだ手・畳み判定・上位候補（1-ply prelim ／深掘り deep スコア）・regret・
     選んだ手の結果盤面の J値成分内訳・読み筋（貪欲 PV）。
+
+    `include_read_ahead=False`（ライブ/本番の軽量トレース）では、最も重い `read_ahead`（読み筋＝
+    各手番で全合法手をクローンする貪欲 PV）を省く。候補スコア・regret・J値成分は探索が出した値の回収＋
+    クローン1回でほぼ無コストなので残す。読み筋はオフライン解析（`cpu_replay.py`）でのみ採る。
     """
     sig2move = {_move_sig(m): m for m in moves}
     cands: List[Dict[str, Any]] = []
@@ -1357,14 +1362,15 @@ def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: 
         total = evaluate(child, name, see_opp_hand=see_opp_hand, profile=profile, plan=plan, out=comp)
         comp["total"] = round(total, 1)
         trace["j_components"] = comp
-        trace["read_ahead"] = _read_ahead_line(
-            child, name, see_opp_hand, opp_public_only, profile, plan,
-            manager.turn_count, HARD_HORIZON)
+        if include_read_ahead:
+            trace["read_ahead"] = _read_ahead_line(
+                child, name, see_opp_hand, opp_public_only, profile, plan,
+                manager.turn_count, HARD_HORIZON)
 
 
 def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Random] = None,
            moves: Optional[List[Dict[str, Any]]] = None, profile=None, plan=None,
-           trace: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+           trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True) -> Optional[Dict[str, Any]]:
     """`player` が取るべき次の 1 手を返す（合法手が無ければ None）。
 
     `moves` を渡すとその候補集合から選ぶ（ガード driver が絞り込んだ手を渡す用途）。
@@ -1440,7 +1446,8 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
         _rng_state = random.getstate()
         try:
             _fill_decision_trace(trace, manager, name, difficulty, moves, scored, collect,
-                                 chosen, folded, see_opp_hand, opp_public_only, profile, plan)
+                                 chosen, folded, see_opp_hand, opp_public_only, profile, plan,
+                                 include_read_ahead=trace_read_ahead)
         finally:
             random.setstate(_rng_state)
     return chosen
@@ -1492,7 +1499,7 @@ def decide_with_regret(manager, player, difficulty: str = "normal",
 
 def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[random.Random] = None,
                    mem: Optional[Dict[str, Any]] = None, profile=None, plan=None,
-                   trace: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+                   trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True) -> Optional[Dict[str, Any]]:
     """ターン内メモリ `mem` を用いた暴走防止つきの意思決定。
 
     `mem` は呼び出し側が対局ごとに保持する dict（ステートレスな /cpu/step でも CPU_GAMES に
@@ -1533,7 +1540,8 @@ def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[ra
     if not filtered:
         filtered = [end_move] if end_move is not None else moves
 
-    move = decide(manager, player, difficulty, rng, moves=filtered, profile=profile, plan=plan, trace=trace)
+    move = decide(manager, player, difficulty, rng, moves=filtered, profile=profile, plan=plan,
+                  trace=trace, trace_read_ahead=trace_read_ahead)
     if move is not None:
         sig = _move_sig(move)
         counts[sig] = counts.get(sig, 0) + 1

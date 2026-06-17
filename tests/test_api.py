@@ -230,12 +230,13 @@ def test_replay_capture_and_fetch(client):
     _drive_until_cpu_decides(client, gid, cpu_name="P2", human_name="P1")
     assert meta["decisions"], "CPU 思考トレースが記録されていない"
 
-    # 思考トレースの中身（4 項目）。
+    # 思考トレースの中身（ライブは軽量＝read_ahead は省く）。
     d0 = meta["decisions"][0]
     assert d0.get("chosen") and "action_type" in d0["chosen"]
     assert "candidates" in d0 and "regret" in d0
     assert "j_components" in d0 and "total" in d0["j_components"]
-    assert isinstance(d0.get("read_ahead"), list)
+    # ライブ採取は read_ahead（重い読み筋）を含まない＝CPU 思考のレイテンシを抑えるため。
+    assert "read_ahead" not in d0
     # 人間の操作も card_id 基準で記録される（KEEP_HAND/TURN_END 等）。
     assert any(a.get("src") == "human" for a in meta["actions"])
 
