@@ -164,9 +164,19 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
   RNG 中立化し、**トレース有無でゲーム進行が分岐しない**（評価関数の `evaluate(out=...)`／
   `_side_score(out=...)` も `out=None` 時は採点を一切変えない＝ベースライン不変）。
 - **リプレイ種**: `--record seed.json` で `{seed, リーダー, 難易度}` の極小記述子を残し、
-  `--descriptor seed.json` で完全再現する。**Phase 2** で実アプリ対局の人間操作列を種へ載せれば、
-  同じ仕組みで実対局を再生・回帰テスト化できる（崩れた局面はそのまま `test_cpu_puzzles.py` の
-  決定論ケースへ）。
+  `--descriptor seed.json` で完全再現する。
+
+#### 実アプリ対局の取得（Phase 2・`opcg_sim/api/app.py`）
+
+実アプリの CPU 対戦も、**GCS（本番テレメトリ）に撮りに行かずに**思考トレース＋リプレイ種を残せる。
+
+- **opt-in**: `POST /api/game/create` に `cpu_trace=true`（任意で `seed`）を渡した対局のみ記録する。
+  未指定の本番対局は seed も触らず追加処理ゼロ＝**従来挙動を完全維持**（トレースは観測専用）。
+- **記録内容**: create 時に seed を固定（コイントス＋シャッフルを再現可能化）し、
+  人間/CPU 双方のアクションを card_id 基準で、CPU の各意思決定の思考トレース（4 項目）をメモリに蓄積する。
+- **取得**: `GET /api/game/{game_id}/replay` が `{replay: 種(schema/seed/leaders/decks/difficulty/actions),
+  decisions: 思考トレース列}` を返す。対局はメモリ常駐（Cloud Run は揮発）なので、対局中〜終了直後に
+  取得して保存/共有する想定。崩れた局面はそのまま `test_cpu_puzzles.py` の決定論ケースへ落とせる。
 - **実行例**:
   ```bash
   OPCG_LOG_SILENT=1 python tests/cpu_replay.py --seed 7 --difficulty hard --out /tmp/replay.jsonl

@@ -344,6 +344,28 @@ def _resolve_first_player(value: Any, player1: Player, player2: Player) -> Optio
         return player2
     return None
 
+# === リプレイ種＋CPU思考トレース（実アプリ対局・Phase 2） ============================
+# すべて opt-in（create リクエストの cpu_trace=true）でのみ作動し、未指定の本番対局には
+# 一切の追加処理・レイテンシ・挙動変化を与えない（トレースは観測専用＝進行不変）。
+REPLAY_SCHEMA = "opcg-replay/v1"
+
+
+def _replay_enabled(meta) -> bool:
+    return bool(meta and meta.get("cpu_trace"))
+
+
+def _replay_record_action(meta, manager, src: str, player_id: str, movelike: Dict[str, Any]):
+    """traced CPU 対局のアクションを card_id 基準で記録する（再現用・例外安全・適用前に呼ぶ）。"""
+    if not _replay_enabled(meta):
+        return
+    try:
+        desc = cpu_ai._describe_move(manager, movelike) or {"action_type": movelike.get("action_type")}
+        meta.setdefault("actions", []).append(
+            {"src": src, "turn": manager.turn_count, "player": player_id, **desc})
+    except Exception:
+        pass
+
+
 @app.post("/api/game/create")
 async def game_create(req: Any = Body(...)):
     try:
@@ -357,6 +379,13 @@ async def game_create(req: Any = Body(...)):
             p2_source = req.get("cpu_deck")
         p1_leader, p1_cards = load_deck_mixed(p1_source, req.get("p1_name", "P1")); p2_leader, p2_cards = load_deck_mixed(p2_source, req.get("p2_name", "P2"))
         player1 = Player(req.get("p1_name", "P1"), p1_cards, p1_leader); player2 = Player(req.get("p2_name", "P2"), p2_cards, p2_leader)
+        # リプレイ種（opt-in）: cpu_trace 指定時のみ seed を固定し、コイントス＋シャッフルを再現可能にする。
+        # 未指定の本番対局は seed を触らない＝従来の乱数挙動を完全に維持する。
+        cpu_trace = bool(req.get("cpu_trace", False)) and vs_cpu
+        replay_seed = None
+        if cpu_trace:
+            replay_seed = int(req.get("seed")) if req.get("seed") is not None else random.randrange(2**63)
+            random.seed(replay_seed)
         # 先行プレイヤー: ソロは "p1"/"p2"、CPU は "random"（コイントス）。未指定は既定。
         first_player = _resolve_first_player(req.get("first_player"), player1, player2)
         manager = GameManager(player1, player2); manager.start_game(first_player); GAMES[game_id] = manager
@@ -379,7 +408,18 @@ async def game_create(req: Any = Body(...)):
                     log_event("ERROR", "cpu_self_plan.fail", traceback.format_exc(), player="system")
             CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty,
                                   "opp_profile": opp_profile, "self_plan": self_plan}
-            log_event("INFO", "game.cpu_create", f"CPU game {game_id} (difficulty={difficulty}, cpu={player2.name}, profile={'yes' if opp_profile else 'no'}, plan={self_plan.archetype if self_plan else 'none'})", player="system")
+            if cpu_trace:
+                # リプレイ種＋思考ログの器を用意する（opt-in 時のみ）。
+                CPU_GAMES[game_id].update({
+                    "cpu_trace": True, "seed": replay_seed,
+                    "first_player": first_player.name if first_player else None,
+                    "leaders": {"p1": p1_leader.master.card_id if p1_leader else None,
+                                "p2": p2_leader.master.card_id if p2_leader else None},
+                    "decks": {"p1": [ci.master.card_id for ci in p1_cards],
+                              "p2": [ci.master.card_id for ci in p2_cards]},
+                    "actions": [], "decisions": [],
+                })
+            log_event("INFO", "game.cpu_create", f"CPU game {game_id} (difficulty={difficulty}, cpu={player2.name}, profile={'yes' if opp_profile else 'no'}, plan={self_plan.archetype if self_plan else 'none'}, trace={'yes' if cpu_trace else 'no'})", player="system")
         return build_game_result_hybrid(manager, game_id)
     except Exception as e:
         log_event(level_key="ERROR", action="game.create_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "game_id": "", "error": {"message": str(e)}}
@@ -397,6 +437,9 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         manager.action_events = []
         # ディスパッチは action_api（CPU ドライバ・自己対戦ランナーと同一コアパス）へ委譲する。
         current_player = manager.p1 if player_id == manager.p1.name else manager.p2
+        _meta = CPU_GAMES.get(game_id)
+        _src = "cpu" if (_meta and player_id == _meta.get("cpu_player_id")) else "human"
+        _replay_record_action(_meta, manager, _src, player_id, {"action_type": action_type, "payload": payload})
         action_api.apply_game_action(manager, current_player, action_type, payload)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
@@ -437,6 +480,9 @@ async def game_battle(req: BattleActionRequest):
     try:
         manager.action_events = []
         # ディスパッチは action_api（CPU ドライバ・自己対戦ランナーと同一コアパス）へ委譲する。
+        _meta = CPU_GAMES.get(game_id)
+        _src = "cpu" if (_meta and player_id == _meta.get("cpu_player_id")) else "human"
+        _replay_record_action(_meta, manager, _src, player_id, {"action_type": action_type, "card_uuid": card_uuid})
         action_api.apply_battle_action(manager, player, action_type, card_uuid)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
@@ -485,9 +531,19 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
             pending = manager.get_pending_request()
             if pending and pending.get("player_id") == cpu_pid:
                 turn_mem = meta.setdefault("turn_mem", {})
+                trace_on = _replay_enabled(meta)
+                tr = {} if trace_on else None
                 move = cpu_ai.decide_guarded(manager, cpu_player, difficulty, mem=turn_mem,
-                                             profile=meta.get("opp_profile"), plan=meta.get("self_plan"))
+                                             profile=meta.get("opp_profile"), plan=meta.get("self_plan"),
+                                             trace=tr)
                 if move is not None:
+                    if trace_on:
+                        # 思考トレース＋アクションを適用前に記録（card_id 基準・進行には不参加）。
+                        meta.setdefault("decisions", []).append(
+                            {"turn": manager.turn_count, "player": cpu_pid, **tr})
+                        _replay_record_action(meta, manager, "cpu", cpu_pid, {
+                            "action_type": move["action_type"], "card_uuid": move.get("card_uuid"),
+                            "payload": move.get("payload")})
                     if move["kind"] == "battle":
                         action_api.apply_battle_action(manager, cpu_player, move["action_type"], move.get("card_uuid"))
                     else:
@@ -503,6 +559,34 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
     except Exception as e:
         log_event("ERROR", "game.cpu_step_fail", traceback.format_exc(), player=cpu_pid)
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
+
+@app.options("/api/game/{game_id}/replay")
+async def options_game_replay(game_id: str): return {"status": "ok"}
+
+
+@app.get("/api/game/{game_id}/replay")
+async def game_replay(game_id: str):
+    """traced CPU 対局の「リプレイ種＋CPU思考トレース」を返す（GCS 不要・メモリ常駐）。
+
+    create 時に `cpu_trace=true` を指定した対局のみ記録される。返す内容:
+      - 種（descriptor）: schema/seed/first_player/leaders/decks/difficulty/actions（card_id 基準）
+      - decisions: 各 CPU 意思決定の思考トレース（chosen/candidates/regret/j_components/read_ahead）
+    対局はメモリ常駐（Cloud Run は揮発）なので、対局中〜終了直後に取得して保存/共有する想定。
+    """
+    meta = CPU_GAMES.get(game_id)
+    if not _replay_enabled(meta):
+        return {"success": False, "error": {"code": "REPLAY_NOT_FOUND",
+                "message": "この対局のリプレイ記録がありません（cpu_trace 未指定 or 不明なゲーム）。"}}
+    descriptor = {
+        "schema": REPLAY_SCHEMA, "seed": meta.get("seed"),
+        "first_player": meta.get("first_player"), "difficulty": meta.get("difficulty"),
+        "cpu_player_id": meta.get("cpu_player_id"),
+        "leaders": meta.get("leaders"), "decks": meta.get("decks"),
+        "actions": meta.get("actions", []),
+    }
+    return {"success": True, "game_id": game_id,
+            "replay": descriptor, "decisions": meta.get("decisions", [])}
+
 
 @app.get("/api/assets/version")
 async def get_assets_version():
