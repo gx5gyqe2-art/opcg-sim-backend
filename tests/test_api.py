@@ -85,6 +85,21 @@ def test_get_cards(client):
     assert "uuid" in body["cards"][0] and "name" in body["cards"][0]
 
 
+def test_cards_etag_conditional_get(client):
+    """/api/cards は ETag を返し、If-None-Match 一致時は本体なしの 304 を返す。"""
+    r = client.get("/api/cards")
+    assert r.status_code == 200
+    etag = r.headers.get("ETag")
+    assert etag and len(etag) > 0
+    # 同じ ETag を提示すると 304（本体なし）
+    r304 = client.get("/api/cards", headers={"If-None-Match": etag})
+    assert r304.status_code == 304
+    assert not r304.content
+    # 異なる ETag なら通常どおり 200＋本体
+    r200 = client.get("/api/cards", headers={"If-None-Match": '"stale"'})
+    assert r200.status_code == 200 and r200.json()["success"] is True
+
+
 def test_assets_version(client):
     """画像キャッシュ版数を返す（非空文字列・カードDB由来で安定）。"""
     r = client.get("/api/assets/version")

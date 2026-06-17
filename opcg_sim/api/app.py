@@ -7,7 +7,7 @@ import traceback
 import asyncio
 from datetime import datetime
 from typing import Any, Dict, Optional, List, Union
-from fastapi import FastAPI, Body, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Body, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 try:
     from google.cloud import firestore
@@ -49,7 +49,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
 app = FastAPI(title="OPCG Simulator API v1.7")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["ETag"])
 
 db = None
 try: db = firestore.Client()
@@ -258,6 +258,9 @@ card_db = CardLoader(CARD_DB_PATH); card_db.load()
 # ビルド時に生成したパース済みキャッシュがあれば採用し、コールドスタート時の
 # 全件パース(~1.8s)を回避する。整合しない/無い場合は従来どおり遅延パースに劣化する。
 card_db.load_cache()
+
+# /api/cards の条件付きGET(ETag)用。カードDBの内容が変わると変化する。
+CARDS_ETAG = f'"{card_db.db_hash()}"'
 
 def _compute_image_version() -> str:
     """カード画像のキャッシュ版数。
@@ -507,11 +510,17 @@ async def get_assets_version():
     return {"success": True, "v": IMAGE_VERSION}
 
 @app.get("/api/cards")
-async def get_all_cards():
+async def get_all_cards(request: Request, response: Response):
     try:
         if len(card_db.cards) < len(card_db.raw_db):
             for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
-        cards_data = [c.to_dict() for c in card_db.cards.values()]; return {"success": True, "cards": cards_data}
+        # 内容に変化が無ければ本体を返さず 304（1.2MBの転送・再パースをスキップ）
+        if request.headers.get("if-none-match") == CARDS_ETAG:
+            return Response(status_code=304, headers={"ETag": CARDS_ETAG, "Cache-Control": "no-cache"})
+        cards_data = [c.to_dict() for c in card_db.cards.values()]
+        response.headers["ETag"] = CARDS_ETAG
+        response.headers["Cache-Control"] = "no-cache"
+        return {"success": True, "cards": cards_data}
     except Exception as e:
         log_event("ERROR", "api.get_cards_fail", traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
 
