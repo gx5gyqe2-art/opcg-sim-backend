@@ -186,6 +186,21 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 
 `tests/test_cpu_replay.py` が回帰（trace の挙動不変・RNG 中立・決定論再現・トレース 4 項目の存在）を固定する。
 
+### 3.3 一般ログのシンク分離（Phase 3・`opcg_sim/src/utils/logger_config.py`）
+
+`log_event` の「生成」と「転送先（シンク）」を分離し、環境変数で差し替える。これで一般ログも
+**GCS に行かず手元で読める**。
+
+- `OPCG_LOG_SINK`: カンマ区切りで `{stdout,file,gcs,slack}` を明示指定（指定時は最優先）。
+- **未指定（既定）の自動分岐**: GCS クライアントの有無で local/prod を判定し、
+  - **ローカル**（GCS 不可）→ `file`＋`stdout`＝`./logs/<session>.jsonl` に貯まる（GCS 往復なし）。
+  - **本番**（GCS 可）→ `gcs`＋`slack`＋`stdout`＝従来同値。
+  - **テスト**（`OPCG_LOG_SILENT=1`）→ `stdout`/`file` を外す（バッファ蓄積は維持）＝従来同値。
+- `OPCG_LOG_DIR`: `file` シンクの出力先（既定 `logs`）。1 セッション = 1 JSONL。バッチ（FE＋BE マージ）も
+  `file` 時は同ディレクトリへ保存する。
+- 未設定でも本番・テストの挙動は不変（GCS/Slack は各クライアント/トークンが在るときだけ作動）。
+  ローカルだけが追加で `./logs/*.jsonl` に残る。
+
 ---
 
 ## 4. 変更・回帰検証フロー
