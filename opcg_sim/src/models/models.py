@@ -5,7 +5,6 @@ import os
 import json
 from .enums import CardType, Color, Attribute, ActionType, Phase, Player
 from .effect_types import Ability
-from ..utils.logger_config import log_event
 
 def load_shared_constants():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -15,9 +14,9 @@ def load_shared_constants():
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            log_event("ERROR", "models.const_load_fail", f"Error: {e}")
+            pass
     else:
-        log_event("WARNING", "models.const_not_found", f"Path: {path}")
+        pass
     return {}
 
 CONST = load_shared_constants()

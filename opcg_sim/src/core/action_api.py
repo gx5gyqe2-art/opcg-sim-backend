@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional
 
 from ..models.models import CONST
 from ..models.enums import TriggerType, Phase
-from ..utils.logger_config import log_event
 
 _C_TO_S = CONST.get('c_to_s_interface', {})
 _GAME_ACTIONS = _C_TO_S.get('GAME_ACTIONS', {}).get('TYPES', {})
@@ -86,7 +85,6 @@ def apply_game_action(manager, player, action_type: str, payload: Optional[Dict[
         if not attack_target:
             raise ValueError("攻撃対象が見つかりません。")
         manager.action_events.append({"type": "ATTACK", "player": pid, "card_name": operating_card.master.name, "message": f"「{operating_card.master.name}」→「{attack_target.master.name}」攻撃"})
-        log_event("INFO", "api.attack_execute", f"Attacking: {operating_card.master.name} -> {attack_target.master.name}", player=pid)
         manager.declare_attack(operating_card, attack_target)
     elif action_type == ACT_ATTACH_DON:
         if not operating_card:

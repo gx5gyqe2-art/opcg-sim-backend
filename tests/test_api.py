@@ -67,15 +67,6 @@ def test_health(client):
     assert body["constants_loaded"] is True
 
 
-def test_session_header_roundtrip(client):
-    """ミドルウェアが X-Session-ID をレスポンスへ反映する（指定時はそのまま）。"""
-    r = client.get("/health", headers={"X-Session-ID": "test-sess-1"})
-    assert r.headers.get("X-Session-ID") == "test-sess-1"
-    # 未指定でも自動採番されて返る
-    r2 = client.get("/health")
-    assert r2.headers.get("X-Session-ID")
-
-
 def test_get_cards(client):
     r = client.get("/api/cards")
     assert r.status_code == 200
@@ -109,13 +100,6 @@ def test_assets_version(client):
     assert isinstance(body["v"], str) and len(body["v"]) > 0
     # 同一プロセス内では安定（リクエストごとに変わらない）
     assert client.get("/api/assets/version").json()["v"] == body["v"]
-
-
-def test_log_single_and_batch(client):
-    r1 = client.post("/api/log", json={"level": "info", "action": "t", "msg": "hi"})
-    assert r1.status_code == 200 and r1.json()["mode"] == "single"
-    r2 = client.post("/api/log", json=[{"sessionId": "s", "msg": "a"}])
-    assert r2.status_code == 200 and r2.json()["mode"] == "batch"
 
 
 # --- ルールゲーム（対局）フロー ---------------------------------------------

@@ -5,7 +5,6 @@ from ...models.effect_types import (
 )
 from ...models.enums import ActionType, TriggerType, ConditionType, Zone, CompareOperator, Player
 from .matcher import parse_target
-from ...utils.logger_config import log_event
 
 # カテゴリH（先頭ゲート条件が「。その後、」をまたぐ漏れ）の AST 是正・検出用の分類。
 # 無条件セットアップ＝先頭に来ても条件を構成しない準備行為（見る/公開/選ぶ/宣言/並べる）。
@@ -182,7 +181,7 @@ class EffectParser:
                         import dataclasses
                         abilities.append(dataclasses.replace(ab, trigger=TriggerType.ON_OPP_ATTACK))
             except Exception as e:
-                log_event("WARNING", "parser.segment_skip", f"Skipped segment: {seg[:30]} | {e}")
+                pass
 
         if as_trigger:
             for ab in abilities:
@@ -343,7 +342,6 @@ class EffectParser:
         )
 
     def parse_ability(self, text: str) -> Ability:
-        log_event("DEBUG", "parser.input", f"Input text: {text[:50]}")
         try:
             norm_text = _nfc(text)
 
@@ -378,7 +376,6 @@ class EffectParser:
 
             # トリガー検出は前処理前のテキストで行う（コスト/制限タグ除去前に判定）
             trigger = self._detect_trigger(norm_text)
-            log_event("INFO", "parser.trigger", f"Detected trigger: {trigger.name}")
 
             # 【ターン1回】を前処理で検出し条件として記憶。括弧無しの地の文「（主語）はターンに1回、…」
             # （OP10-118「このキャラはターンに1回、相手の効果でKOされない」）も TURN_LIMIT として
@@ -605,7 +602,6 @@ class EffectParser:
                 raw_text=_nfc(text)
             )
         except Exception as e:
-            log_event(level_key="ERROR", action="parser.parse_ability_error", msg=f"Failed to parse: {text[:20]} | Error: {str(e)}")
             return Ability(trigger=TriggerType.UNKNOWN, effect=None, raw_text=_nfc(text))
 
     def _apply_opponent_self_chooser(self, node):

@@ -3,7 +3,6 @@ import logging
 import unicodedata
 from ...models.effect_types  import TargetQuery, _nfc
 from ...models.enums import Player, Zone, ParserKeyword, Attribute, TriggerType
-from ...utils.logger_config import log_event
 
 def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQuery:
     tq = TargetQuery(raw_text=tgt_text, player=default_player)
@@ -617,6 +616,5 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         log_level = "WARNING"
         if query.select_mode in ["ALL", "REMAINING"] or query.is_up_to: log_level = "INFO"
         zone_name = ",".join(z.name for z in zones)
-        log_event(level_key=log_level, action="matcher.no_target", msg=f"No targets found for query: {query.raw_text}", player="system", payload={"query_raw": query.raw_text, "zone": zone_name, "target_player": query.player.name, "real_target_names": [p.name for p in target_players], "candidates_scanned": len(candidates)})
 
     return results

@@ -19,8 +19,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-from ...utils.logger_config import log_event
-
 # Duration 定数
 THIS_TURN = "THIS_TURN"               # 現在のターン終了時に失効
 THIS_BATTLE = "THIS_BATTLE"           # 現在のバトル解決時に失効
@@ -69,12 +67,6 @@ class ContinuousEffectManager:
         )
         self._apply_to_card(card, eff)
         self.effects.append(eff)
-        log_event(
-            "INFO",
-            "continuous.apply",
-            f"{kind} {amount or flag or keyword} on {card.master.name} ({duration})",
-            player=card.owner_id,
-        )
         return eff
 
     def _apply_to_card(self, card, eff: ContinuousEffect) -> None:
@@ -121,7 +113,7 @@ class ContinuousEffectManager:
                 remaining.append(eff)
         self.effects = remaining
         if removed:
-            log_event("INFO", "continuous.expire", f"{event}: expired {removed} effect(s)", player="system")
+            pass
 
     def drop_for(self, uuid: str) -> None:
         """カードが場を離れた等で、その uuid 宛ての継続効果を破棄する。"""

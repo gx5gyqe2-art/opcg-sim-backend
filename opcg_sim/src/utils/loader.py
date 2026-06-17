@@ -10,7 +10,6 @@ from ..core.effects.parser import EffectParser
 from ..models.effect_types import Ability
 
 from ..models.enums import CardType, Attribute, Color, TriggerType
-from ..utils.logger_config import log_event
 
 
 # カードが本来持つキーワード能力（タグ【X】が能力として記載されているもの）。
@@ -65,7 +64,6 @@ def make_parser():
         from ..core.effects.parser_v2 import EffectParserV2
         return EffectParserV2()
     except Exception as e:  # 念のため: V2 読み込み失敗時はレガシーへ退避
-        log_event("ERROR", "loader.parser_v2_fallback", f"V2 unavailable, using legacy: {e}", player="system")
         return EffectParser()
 
 def _nfc(text: str) -> str:
@@ -75,7 +73,6 @@ class RawDataLoader:
     # ... (変更なし) ...
     @staticmethod
     def load_json(file_path: str) -> Any:
-        log_event(level_key="DEBUG", action="loader.load_json", msg=f"Loading JSON from {file_path}...")
         encodings = ['utf-8-sig', 'utf-8', 'cp932']
         for enc in encodings:
             try:
@@ -83,7 +80,6 @@ class RawDataLoader:
                     return json.load(f)
             except (UnicodeDecodeError, json.JSONDecodeError):
                 continue
-        log_event(level_key="ERROR", action="loader.file_load_failed", msg=f"Failed to load {file_path}")
         return []
 
 class DataCleaner:
@@ -129,7 +125,6 @@ class DataCleaner:
                     ab.trigger = TriggerType.TRIGGER
             return abilities
         except Exception as e:
-            log_event(level_key="ERROR", action="loader.parse_error", msg=f"Text: {s_text[:20]}... Error: {e}")
             return []
 
     # 変更: 単一のColorではなくList[Color]を返すメソッドに変更
@@ -193,7 +188,6 @@ class CardLoader:
             card_id = DataCleaner.normalize_text(item.get("number", item.get("Number", "")))
             if card_id:
                 self.raw_db[card_id] = item
-        log_event(level_key="INFO", action="loader.db_initialized", msg=f"Database initialized with {len(self.raw_db)} entries.")
 
     def get_card(self, card_id: str) -> Optional[CardMaster]:
         if card_id in self.cards:
@@ -256,20 +250,13 @@ class CardLoader:
             if payload.get("v") != self.CACHE_VERSION:
                 return False
             if payload.get("hash") != self.db_hash():
-                log_event(level_key="WARNING", action="loader.cache_stale",
-                          msg="Card cache hash mismatch; falling back to fresh parse")
                 return False
             cards = payload.get("cards")
             if not isinstance(cards, dict) or not cards:
                 return False
             self.cards = cards
-            log_event(level_key="INFO", action="loader.cache_hit",
-                      msg=f"Loaded parsed card cache: {len(cards)} cards")
             return True
         except Exception:
-            # 壊れたキャッシュは無視してフルパースに劣化させる
-            log_event(level_key="WARNING", action="loader.cache_error",
-                      msg="Failed to load card cache; falling back to fresh parse")
             return False
 
     def _create_card_master(self, raw: Dict[str, Any]) -> Optional[CardMaster]:
