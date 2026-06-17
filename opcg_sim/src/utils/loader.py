@@ -2,6 +2,8 @@ import json
 import os
 import unicodedata
 import re
+import hashlib
+import pickle
 from typing import List, Dict, Any, Optional
 from ..models.models import CardMaster
 from ..core.effects.parser import EffectParser
@@ -204,6 +206,71 @@ class CardLoader:
         if master:
             self.cards[card_id] = master
         return master
+
+    # --- パース結果キャッシュ（ビルド時生成・起動高速化） -------------------
+    # CardMaster/パーサの構造を非互換に変えたら必ず +1 する（古いキャッシュを失効させる）。
+    CACHE_VERSION = 1
+
+    def db_hash(self) -> str:
+        """カードDB(json)の内容ハッシュ。キャッシュ整合性チェックに使う。"""
+        h = hashlib.md5()
+        try:
+            with open(self.json_path, "rb") as f:
+                h.update(f.read())
+        except OSError:
+            pass
+        return h.hexdigest()
+
+    def cache_default_path(self) -> str:
+        """既定のキャッシュパス（json と同じディレクトリ）。"""
+        return os.path.join(os.path.dirname(os.path.abspath(self.json_path)), "opcg_cards.cache.pkl")
+
+    def parse_all(self) -> int:
+        """全カードを事前パースして self.cards に載せる（キャッシュ生成・ウォーム用）。"""
+        for cid in list(self.raw_db.keys()):
+            self.get_card(cid)
+        return len(self.cards)
+
+    def save_cache(self, path: Optional[str] = None) -> str:
+        """パース済み self.cards を pickle 保存する（生成元 json のハッシュを同梱）。"""
+        path = path or self.cache_default_path()
+        payload = {"v": self.CACHE_VERSION, "hash": self.db_hash(), "cards": self.cards}
+        tmp = path + ".tmp"
+        with open(tmp, "wb") as f:
+            pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(tmp, path)
+        return path
+
+    def load_cache(self, path: Optional[str] = None) -> bool:
+        """キャッシュが現行 json と整合すれば self.cards に採用する。
+
+        version 不一致・ハッシュ不一致・破損時は False を返し、呼び出し側は
+        従来どおりの遅延パースに安全に劣化する（古いデータを出すことはない）。
+        """
+        path = path or self.cache_default_path()
+        try:
+            if not os.path.exists(path):
+                return False
+            with open(path, "rb") as f:
+                payload = pickle.load(f)
+            if payload.get("v") != self.CACHE_VERSION:
+                return False
+            if payload.get("hash") != self.db_hash():
+                log_event(level_key="WARNING", action="loader.cache_stale",
+                          msg="Card cache hash mismatch; falling back to fresh parse")
+                return False
+            cards = payload.get("cards")
+            if not isinstance(cards, dict) or not cards:
+                return False
+            self.cards = cards
+            log_event(level_key="INFO", action="loader.cache_hit",
+                      msg=f"Loaded parsed card cache: {len(cards)} cards")
+            return True
+        except Exception:
+            # 壊れたキャッシュは無視してフルパースに劣化させる
+            log_event(level_key="WARNING", action="loader.cache_error",
+                      msg="Failed to load card cache; falling back to fresh parse")
+            return False
 
     def _create_card_master(self, raw: Dict[str, Any]) -> Optional[CardMaster]:
         def get_val(target_keys: List[str], default=None):

@@ -255,6 +255,9 @@ SANDBOX_GAMES: Dict[str, 'SandboxManager'] = {}
 CPU_GAMES: Dict[str, Dict[str, Any]] = {}
 
 card_db = CardLoader(CARD_DB_PATH); card_db.load()
+# ビルド時に生成したパース済みキャッシュがあれば採用し、コールドスタート時の
+# 全件パース(~1.8s)を回避する。整合しない/無い場合は従来どおり遅延パースに劣化する。
+card_db.load_cache()
 
 def _compute_image_version() -> str:
     """カード画像のキャッシュ版数。
