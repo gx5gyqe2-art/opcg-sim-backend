@@ -4,7 +4,6 @@ import logging
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from opcg_sim.src.models.enums import CardType, Attribute
-from opcg_sim.src.utils.logger_config import log_event
 
 def load_shared_constants():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -89,7 +88,6 @@ class GameStateSchema(BaseModel):
     @field_validator('active_battle', mode='before')
     @classmethod
     def log_battle_input(cls, v):
-        log_event("DEBUG", "schema.battle_input", f"Input to active_battle: {v}", player="system")
         return v
 
 class PendingRequestSchema(BaseModel):

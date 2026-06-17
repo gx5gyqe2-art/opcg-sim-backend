@@ -20,7 +20,6 @@ from typing import List, Optional
 
 from ...models.effect_types import EffectNode, GameAction, Sequence, _nfc
 from ...models.enums import ActionType
-from ...utils.logger_config import log_event
 from .parser import EffectParser
 from .rules import ParseContext, RuleRegistry, default_registry
 
@@ -62,11 +61,6 @@ class EffectParserV2(EffectParser):
             self.rule_hits.append(result.rule_name)
             if delayed:
                 _mark_delay(result.node, "TURN_END")
-            log_event(
-                "DEBUG",
-                "parserv2.rule_hit",
-                f"[{result.rule_name}] {ctx.text[:40]}",
-            )
             return result.node
 
         # フォールバック（=未対応として記録）
@@ -76,11 +70,6 @@ class EffectParserV2(EffectParser):
             _mark_delay(node, "TURN_END")
         if isinstance(node, GameAction) and node.type == ActionType.OTHER:
             self.fallback_other.append(ctx.text)
-        log_event(
-            "DEBUG",
-            "parserv2.fallback",
-            f"No rule matched, using legacy: {ctx.text[:40]}",
-        )
         return node
 
     def reset_stats(self) -> None:

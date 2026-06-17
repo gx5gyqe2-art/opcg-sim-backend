@@ -67,15 +67,6 @@ def test_health(client):
     assert body["constants_loaded"] is True
 
 
-def test_session_header_roundtrip(client):
-    """ミドルウェアが X-Session-ID をレスポンスへ反映する（指定時はそのまま）。"""
-    r = client.get("/health", headers={"X-Session-ID": "test-sess-1"})
-    assert r.headers.get("X-Session-ID") == "test-sess-1"
-    # 未指定でも自動採番されて返る
-    r2 = client.get("/health")
-    assert r2.headers.get("X-Session-ID")
-
-
 def test_get_cards(client):
     r = client.get("/api/cards")
     assert r.status_code == 200
@@ -109,13 +100,6 @@ def test_assets_version(client):
     assert isinstance(body["v"], str) and len(body["v"]) > 0
     # 同一プロセス内では安定（リクエストごとに変わらない）
     assert client.get("/api/assets/version").json()["v"] == body["v"]
-
-
-def test_log_single_and_batch(client):
-    r1 = client.post("/api/log", json={"level": "info", "action": "t", "msg": "hi"})
-    assert r1.status_code == 200 and r1.json()["mode"] == "single"
-    r2 = client.post("/api/log", json=[{"sessionId": "s", "msg": "a"}])
-    assert r2.status_code == 200 and r2.json()["mode"] == "batch"
 
 
 # --- ルールゲーム（対局）フロー ---------------------------------------------
@@ -198,6 +182,71 @@ def test_cpu_step_on_non_cpu_game(client):
     gid = _create_game(client).json()["game_id"]  # 通常対局（CPU ではない）
     r = client.post("/api/game/cpu/step", json={"game_id": gid})
     assert r.status_code == 200 and r.json()["success"] is False
+
+
+# --- リプレイ種＋CPU思考トレース（Phase 2） --------------------------------------
+
+def test_replay_disabled_by_default(client):
+    """cpu_trace 未指定の CPU 対局はリプレイ記録を持たず、エンドポイントは整形エラーを返す。"""
+    gid = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="easy").json()["game_id"]
+    assert "cpu_trace" not in A.CPU_GAMES[gid]  # 既定では記録器を作らない＝本番無影響
+    r = client.get(f"/api/game/{gid}/replay")
+    assert r.status_code == 200 and r.json()["success"] is False
+    assert r.json()["error"]["code"] == "REPLAY_NOT_FOUND"
+
+
+def _drive_until_cpu_decides(client, gid, cpu_name, human_name, max_iter=80):
+    """マリガン→ターンを進め、CPU(p2) が意思決定を 1 つ以上行うまで駆動する。"""
+    for _ in range(max_iter):
+        if A.GAMES[gid].winner is not None:
+            break
+        if len(A.CPU_GAMES[gid].get("decisions", [])) >= 1:
+            break
+        state = client.get("/api/game/state", params={"game_id": gid}).json()
+        pending = state.get("pending_request")
+        if not pending:
+            break
+        pid = pending["player_id"]
+        if pid == cpu_name:
+            client.post("/api/game/cpu/step", json={"game_id": gid})
+        elif pending["action"] == "MULLIGAN":
+            client.post("/api/game/action", json={"game_id": gid, "player_id": pid, "action": "KEEP_HAND"})
+        elif pending["action"] == "MAIN_ACTION":
+            # 人間の手番はターンを畳んで CPU に手番を渡す。
+            client.post("/api/game/action", json={"game_id": gid, "player_id": pid, "action": "TURN_END"})
+        else:
+            break
+
+
+def test_replay_capture_and_fetch(client):
+    """cpu_trace=true の対局で CPU 思考トレース＋種が記録され、エンドポイントで取得できる。"""
+    body = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="easy",
+                        cpu_trace=True, seed=12345).json()
+    gid = body["game_id"]
+    meta = A.CPU_GAMES[gid]
+    assert meta.get("cpu_trace") is True and meta.get("seed") == 12345
+    assert meta["leaders"]["p1"] and meta["decks"]["p1"]  # 種にデッキ/リーダーが入る
+
+    _drive_until_cpu_decides(client, gid, cpu_name="P2", human_name="P1")
+    assert meta["decisions"], "CPU 思考トレースが記録されていない"
+
+    # 思考トレースの中身（4 項目）。
+    d0 = meta["decisions"][0]
+    assert d0.get("chosen") and "action_type" in d0["chosen"]
+    assert "candidates" in d0 and "regret" in d0
+    assert "j_components" in d0 and "total" in d0["j_components"]
+    assert isinstance(d0.get("read_ahead"), list)
+    # 人間の操作も card_id 基準で記録される（KEEP_HAND/TURN_END 等）。
+    assert any(a.get("src") == "human" for a in meta["actions"])
+
+    # エンドポイント取得。
+    r = client.get(f"/api/game/{gid}/replay")
+    assert r.status_code == 200
+    rb = r.json()
+    assert rb["success"] is True
+    assert rb["replay"]["schema"] == A.REPLAY_SCHEMA and rb["replay"]["seed"] == 12345
+    assert rb["replay"]["leaders"] and rb["replay"]["actions"]
+    assert len(rb["decisions"]) == len(meta["decisions"])
 
 
 # --- サンドボックス（フリーモード） -----------------------------------------

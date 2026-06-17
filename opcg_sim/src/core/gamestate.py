@@ -8,7 +8,6 @@ import json
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
 from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource, Sequence, Branch, Choice
-from ..utils.logger_config import log_event
 from .effects.resolver import EffectResolver
 from .effects.matcher import get_target_cards
 
@@ -525,7 +524,6 @@ class GameManager:
             return req
 
         if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
-            log_event("ERROR", "game.pending_request_error", f"Active battle missing in phase: {self.phase.name}")
             self.phase = Phase.MAIN
             
         request = None
@@ -550,7 +548,6 @@ class GameManager:
 
     def resolve_interaction(self, player: Player, payload: Dict[str, Any]):
         if not self.active_interaction:
-            log_event("WARNING", "game.resolve_interaction", "No active interaction found", player=player.name)
             return
             
         continuation = self.active_interaction.get("continuation")
@@ -602,14 +599,12 @@ class GameManager:
         source_uuid = continuation["source_card_uuid"]
         source_card = self._find_card_by_uuid(source_uuid)
         if not source_card:
-            log_event("ERROR", "game.resume_fail", f"Source card {source_uuid} not found")
             self.active_interaction = None
             return
 
         resolver = EffectResolver(self)
         
         if action_type == "SELECT_TARGET":
-            log_event("INFO", "game.resume_target", f"Resuming target selection for {source_card.master.name}", player=player.name)
             selected_uuids = payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])
             
             selected_cards = []
@@ -634,8 +629,6 @@ class GameManager:
             # ドン!!返却(RETURN_DON)の対象ドン!!選択。選んだ uuid を context に載せて再開すると、
             # RETURN_DON 再実行時に当該ドン!!を戻す。
             selected_uuids = payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])
-            log_event("INFO", "game.resume_select_resource",
-                      f"Resuming DON selection: {len(selected_uuids)} selected", player=player.name)
             effect_context = continuation.get("effect_context", {})
             effect_context["_return_don_uuids"] = selected_uuids
             self.active_interaction = None
@@ -647,7 +640,6 @@ class GameManager:
             resolver.resume_execution(controller, source_card, continuation.get("execution_stack", []), effect_context)
 
         elif action_type == "CHOICE":
-            log_event("INFO", "game.resume_choice", f"Resuming choice for {source_card.master.name}", player=player.name)
             selected_index = payload.get("index", payload.get("selected_option_index", 0))
 
             resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
@@ -670,13 +662,10 @@ class GameManager:
                 target_owner = self.p1 if self.p1.name == continuation.get("target_owner_name") else self.p2
                 life_lost = continuation.get("life_lost", 0)
                 if accepted and self._active_replacement(target, ("BATTLE_KO",)):
-                    log_event("INFO", "game.battle_ko_replaced",
-                              f"{target.master.name}'s battle KO was replaced by an alternative effect",
-                              player=target_owner.name)
+                    pass
                 else:
                     # 拒否、または置換が成立しなくなった場合は本来の KO を進める。
                     self.move_card(target, Zone.TRASH, target_owner)
-                    log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
                     self._resolve_on_ko(target, target_owner, cause="BATTLE")
                 self._finish_attack(target, target_owner, life_lost)
                 return
@@ -716,7 +705,6 @@ class GameManager:
                 tp = self.p1 if (owner_name and self.p1.name == owner_name) else (self.p2 if owner_name else player)
                 rest = [c for c in tp.life if c not in ordered]
                 tp.life = ordered + rest
-                log_event("INFO", "game.resume_order_life", f"{tp.name} reordered {len(ordered)} life card(s)", player=player.name)
             else:
                 # デッキ配置: BOTTOM は順に append（先頭が上）、TOP は逆順 insert(0) で
                 # ordered[0] が最上面になるようにする。
@@ -725,7 +713,6 @@ class GameManager:
                     owner, _ = self._find_card_location(c)
                     if owner:
                         self.move_card(c, Zone.DECK, owner, dest_position=position)
-                log_event("INFO", "game.resume_arrange_deck", f"Placed {len(ordered)} card(s) to deck {position}", player=player.name)
             resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
 
         elif action_type == "DECLARE_COST":
@@ -741,11 +728,8 @@ class GameManager:
             revealed = opponent.deck[0] if opponent.deck else None
             if revealed is not None:
                 effect_context["last_revealed_card"] = revealed
-                log_event("INFO", "game.declare_cost",
-                          f"{source_card.master.name}: declared {declared}, revealed {revealed.master.name}(cost {revealed.master.cost})",
-                          player=player.name)
             else:
-                log_event("INFO", "game.declare_cost", f"{source_card.master.name}: declared {declared}, opponent deck empty", player=player.name)
+                pass
             self.active_interaction = None
             resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), effect_context)
 
@@ -766,10 +750,8 @@ class GameManager:
         if not self.active_interaction and self.setup_phase_pending:
             self.finish_setup()
             self.setup_phase_pending = False
-            log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
             self.phase = Phase.MULLIGAN
             self.mulligan_done = set()
-            log_event("INFO", "game.mulligan_start", "Mulligan phase started")
 
         # ライフ公開【トリガー】/ON_LIFE_DECREASE 等のペンディング誘発が残っていれば消化する。
         if not self.active_interaction and self._pending_triggers:
@@ -828,8 +810,6 @@ class GameManager:
             "can_skip": False,
             "continuation": {"owner_name": owner.name, "count": excess},
         }
-        log_event("INFO", "game.field_overflow",
-                  f"Field overflow: {owner.name} must trash {excess} character(s)", player=owner.name)
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
@@ -856,7 +836,6 @@ class GameManager:
         return True
 
     def start_game(self, first_player: Optional[Player] = None):
-        log_event("INFO", "game.start", "Game initialization started")
         
         self.p1.shuffle_deck()
         self.p2.shuffle_deck()
@@ -865,7 +844,6 @@ class GameManager:
             if p.leader:
                 for ability in p.leader.master.abilities:
                     if ability.trigger == TriggerType.GAME_START:
-                        log_event("INFO", "game.trigger_gamestart", f"Resolving GAME_START for {p.leader.master.name}", player=p.name)
                         self.resolve_ability(p, ability, source_card=p.leader)
                         
                         if self.active_interaction:
@@ -878,11 +856,9 @@ class GameManager:
 
         if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
         else: self.turn_player = self.p1; self.opponent = self.p2
-        log_event("INFO", "game.turn_player", f"First Player: {self.turn_player.name}", player=self.turn_player.name)
         # マリガンフェーズへ移行（両プレイヤーの確定後にゲーム開始）
         self.phase = Phase.MULLIGAN
         self.mulligan_done = set()
-        log_event("INFO", "game.mulligan_start", "Mulligan phase started")
 
     def do_mulligan(self, player: 'Player') -> None:
         """手札5枚全てをデッキ底に戻してシャッフル→5枚引き直す（全交換・1回限り）"""
@@ -899,7 +875,6 @@ class GameManager:
             if player.deck:
                 player.hand.append(player.deck.pop(0))
         self.mulligan_done.add(player.name)
-        log_event("INFO", "game.mulligan", f"Mulligan: {player.name} returned all {hand_count} cards", player=player.name)
         self._check_mulligan_complete()
 
     def keep_hand(self, player: 'Player') -> None:
@@ -909,18 +884,15 @@ class GameManager:
         if player.name in self.mulligan_done:
             raise ValueError("既にマリガンを実施済みです。")
         self.mulligan_done.add(player.name)
-        log_event("INFO", "game.mulligan_keep", f"Keep hand: {player.name}", player=player.name)
         self._check_mulligan_complete()
 
     def _check_mulligan_complete(self) -> None:
         """両プレイヤーのマリガン確定後にゲーム開始"""
         if self.p1.name in self.mulligan_done and self.p2.name in self.mulligan_done:
-            log_event("INFO", "game.mulligan_complete", "Both players done — starting game", player="system")
             self.turn_count = 1
             self.refresh_phase()
 
     def finish_setup(self):
-        log_event("INFO", "game.setup_finish", "Finishing setup (Life/Hand)", player="system")
         self.p1.place_life()
         self.p1.draw_initial_hand()
         self.p2.place_life()
@@ -929,7 +901,6 @@ class GameManager:
     def end_turn(self):
         self._validate_action(self.turn_player, "MAIN_ACTION")
         self.phase = Phase.END
-        log_event("INFO", "game.phase_end", f"Turn {self.turn_count} ending", player=self.turn_player.name)
         self._fire_turn_end_triggers()
         # 「このターン終了時、〜」で予約された遅延アクションを解決する。
         self._flush_pending_end_of_turn()
@@ -965,7 +936,7 @@ class GameManager:
             try:
                 resolver._process_stack(player, source_card)
             except Exception as e:
-                log_event("WARNING", "game.delayed_action_error", f"Deferred action failed: {e}", player=player.name)
+                pass
             for ev in resolver.action_history:
                 self.action_events.append({
                     "type": "EFFECT", "player": player.name,
@@ -996,12 +967,10 @@ class GameManager:
         if getattr(self, "pending_extra_turn", None) == self.turn_player.name:
             self.pending_extra_turn = None
             self.turn_count += 1
-            log_event("INFO", "game.extra_turn", f"{self.turn_player.name} takes an extra turn", player=self.turn_player.name)
             self.refresh_phase()
             return
         self.turn_player, self.opponent = self.opponent, self.turn_player
         self.turn_count += 1
-        log_event("INFO", "game.turn_switch_end", f"After switch: turn_player={self.turn_player.name}, count={self.turn_count}", player="system")
         self.refresh_phase()
 
     def refresh_phase(self):
@@ -1134,7 +1103,6 @@ class GameManager:
                     if ability.trigger == TriggerType.YOUR_TURN:
                         if self._is_reactive_passive(ability):
                             continue  # 「【自分のターン中】…された時」型はイベント誘発（EB02-035 等）
-                        log_event("DEBUG", "game.passive_trigger", f"YOUR_TURN: {card.master.name}", player=player.name)
                         self.resolve_ability(player, ability, source_card=card)
 
             # Step 2': OPPONENT_TURN 効果（非アクティブプレイヤーのカードのみ）。
@@ -1148,7 +1116,6 @@ class GameManager:
                     if ability.trigger == TriggerType.OPPONENT_TURN:
                         if self._is_reactive_passive(ability):
                             continue  # 「【相手のターン中】…された時」型はイベント誘発
-                        log_event("DEBUG", "game.passive_trigger", f"OPPONENT_TURN: {card.master.name}", player=opponent.name)
                         self.resolve_ability(opponent, ability, source_card=card)
 
             # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）。ステージも含める。
@@ -1159,7 +1126,6 @@ class GameManager:
                         if ability.trigger == TriggerType.PASSIVE:
                             if self._is_reactive_passive(ability):
                                 continue  # 「…された時」型はイベント誘発であり再計算で実行しない
-                            log_event("DEBUG", "game.passive_trigger", f"PASSIVE: {card.master.name}", player=p.name)
                             self.resolve_ability(p, ability, source_card=card)
         finally:
             self._in_passive_recalc = False
@@ -1195,7 +1161,6 @@ class GameManager:
         for _ in range(count):
             if player.deck:
                 card = player.deck.pop(0); player.hand.append(card)
-                log_event("INFO", "game.draw", f"Player {player.name} drew a card", player=player.name)
         if not player.deck and not self.winner: self.check_victory()
 
     def _find_card_location(self, card: Card) -> Tuple[Optional[Player], Optional[List[Any]]]:
@@ -1320,8 +1285,6 @@ class GameManager:
             # 中断させないため先頭からN枚を捨てる（捨て札選択の対話化は今後の課題）。
             for _ in range(need):
                 attacker_owner.trash.append(attacker_owner.hand.pop(0))
-            log_event("INFO", "game.attack_tax", f"{attacker.master.name} paid attack tax (discard {need})", player=attacker_owner.name)
-        log_event("INFO", "game.attack_declare", f"{attacker.master.name} is attacking {target.master.name}", player=attacker_owner.name)
         attacker.is_rest = True
         self.active_battle = {"attacker": attacker, "target": target, "attacker_owner": attacker_owner, "target_owner": target_owner, "counter_buff": 0}
 
@@ -1357,7 +1320,6 @@ class GameManager:
             return
         while getattr(self, "_battle_triggers", None):
             player, ability, card = self._battle_triggers.pop(0)
-            log_event("INFO", "game.trigger_battle", f"Battle trigger: {card.master.name} ({ability.trigger.name})", player=player.name)
             self.resolve_ability(player, ability, source_card=card)
             if self.active_interaction:
                 return  # 中断: 解決後に resolve_interaction から再開される
@@ -1365,10 +1327,8 @@ class GameManager:
         target_owner = self.active_battle["target_owner"]
         if self.has_blocker(target_owner):
             self.phase = Phase.BLOCK_STEP
-            log_event("INFO", "game.phase_transition", f"Blockers detected. Moving to {self.phase.name}", player=target_owner.name)
         else:
             self.phase = Phase.BATTLE_COUNTER
-            log_event("INFO", "game.phase_transition", f"No blockers. Moving to {self.phase.name}", player=target_owner.name)
 
     # --- 誘発能力（ライフ公開【トリガー】/ON_LIFE_DECREASE 等）の汎用待ち行列 ---
     def _enqueue_trigger(self, player: Player, ability: Ability, card: CardInstance,
@@ -1412,9 +1372,6 @@ class GameManager:
             return  # ON_LIFE_DECREASE 等（場のカードの誘発）は対象外
         if card in player.hand:
             self.move_card(card, Zone.TRASH, player)
-            log_event("INFO", "game.trigger_card_to_trash",
-                      f"Trigger card moved to trash before resolving: {card.master.name}",
-                      player=player.name)
 
     def _suspend_for_trigger_confirm(self, item: Dict[str, Any]) -> None:
         """【トリガー】等の発動可否を yes/no で確認するため中断する。
@@ -1430,33 +1387,27 @@ class GameManager:
             "can_skip": True,
             "continuation": {"trigger_item": item},
         }
-        log_event("INFO", "game.suspend_trigger_confirm",
-                  f"Confirm trigger activation: {card.master.name}", player=player.name)
 
     def handle_block(self, blocker: Optional[Card] = None):
         if not self.active_battle: return
         target_owner = self.active_battle["target_owner"]; self._validate_action(target_owner, "SELECT_BLOCKER")
         if blocker:
-            log_event("INFO", "game.block_execute", f"{blocker.master.name} blocks the attack", player=target_owner.name)
             blocker.is_rest = True
             self.active_battle["target"] = blocker
             # 【ブロック時】効果を発動する（従来は未発火＝14枚が no-op だった）。
             if blocker.master.abilities and not blocker.is_effect_negated and not blocker.negated:
                 for ability in blocker.master.abilities:
                     if ability.trigger == TriggerType.ON_BLOCK:
-                        log_event("INFO", "game.trigger_block", f"ON_BLOCK: {blocker.master.name}", player=target_owner.name)
                         self.resolve_ability(target_owner, ability, source_card=blocker)
             if self.active_interaction:
                 # ブロック時効果が対象選択等で中断した場合はここで返す（resume が継続）。
                 return
-        else: log_event("INFO", "game.block_skip", "No block declared", player=target_owner.name)
-        self.phase = Phase.BATTLE_COUNTER; log_event("INFO", "game.phase_transition", f"Moving to {self.phase.name}", player=target_owner.name)
+        self.phase = Phase.BATTLE_COUNTER;
 
     def apply_counter(self, player: Player, counter_card: Optional[Card] = None, don_list: Optional[List[DonInstance]] = None):
         if not self.active_battle: return
-        if counter_card is None: log_event("INFO", "game.counter_pass", "Player passed counter step", player=player.name); self.resolve_attack(); return
+        if counter_card is None: self.resolve_attack(); return
         self._validate_action(player, "SELECT_COUNTER")
-        log_event("INFO", "game.counter_play", f"Playing counter card: {counter_card.master.name}", player=player.name)
         if counter_card.master.type == CardType.EVENT:
             self.pay_cost(player, counter_card.master.cost, don_list)
             for ability in counter_card.master.abilities:
@@ -1468,7 +1419,7 @@ class GameManager:
             self.move_card(counter_card, Zone.TRASH, player)
         else:
             counter_value = getattr(counter_card, "current_counter", counter_card.master.counter or 0); self.active_battle["counter_buff"] += counter_value
-            log_event("INFO", "game.counter_apply", f"Added {counter_value} power to target", player=player.name); self.move_card(counter_card, Zone.TRASH, player)
+            self.move_card(counter_card, Zone.TRASH, player)
 
     def resolve_attack(self):
         if not self.active_battle: return
@@ -1481,7 +1432,6 @@ class GameManager:
         if target == target_owner.leader:
             if attacker_pwr >= target_pwr:
                 damage_amount = 2 if attacker.has_keyword("ダブルアタック") else 1; is_banish = attacker.has_keyword("バニッシュ")
-                log_event("INFO", "game.damage_step", f"Dealing {damage_amount} damage (Banish: {is_banish})", player=attacker_owner.name)
                 for _ in range(damage_amount):
                     if target_owner.life:
                         life_card = target_owner.life.pop(0)
@@ -1490,17 +1440,16 @@ class GameManager:
                             (a for a in life_card.master.abilities if a.trigger == TriggerType.TRIGGER), None
                         )
                         self.move_card(life_card, dest_zone, target_owner)
-                        log_event("INFO", "game.damage_life", f"{target_owner.name} takes damage to {dest_zone.name}", player=target_owner.name)
                         life_lost += 1
                         # 【トリガー】は「発動できる」（任意）。即時解決せず確認付きで待ち行列へ。
                         # 複数枚（ダブルアタック等）でも確認/解決が中断を跨いで消失しない。
                         if trigger_ability:
                             self._enqueue_trigger(target_owner, trigger_ability, life_card, optional=True)
-                    else: self.winner = attacker_owner.name; log_event("INFO", "game.victory", f"{attacker_owner.name} wins the game", player=attacker_owner.name); break
+                    else: self.winner = attacker_owner.name; break
         else:
             if attacker_pwr >= target_pwr:
                 if self._active_protection(target, ("BATTLE_KO",), attacker=attacker):
-                    log_event("INFO", "game.battle_ko_prevented", f"{target.master.name} is protected from battle KO", player=target_owner.name)
+                    pass
                 else:
                     repl = self._find_replacement(target, ("BATTLE_KO",))
                     if repl is not None and getattr(repl[3], "is_optional", False):
@@ -1513,10 +1462,8 @@ class GameManager:
                     elif repl is not None:
                         # 任意でない置換は従来どおり即時実行（内側選択はヘッドレス自動解決）。
                         self._active_replacement(target, ("BATTLE_KO",))
-                        log_event("INFO", "game.battle_ko_replaced", f"{target.master.name}'s battle KO was replaced by an alternative effect", player=target_owner.name)
                     else:
                         self.move_card(target, Zone.TRASH, target_owner)
-                        log_event("INFO", "game.unit_ko", f"{target.master.name} was KO'd", player=target_owner.name)
                         self._resolve_on_ko(target, target_owner, cause="BATTLE")
 
         self._finish_attack(target, target_owner, life_lost)
@@ -1551,9 +1498,6 @@ class GameManager:
                 "life_lost": life_lost,
             },
         }
-        log_event("INFO", "game.battle_ko_replace_confirm",
-                  f"Asking {target_owner.name} whether to replace battle KO of {target.master.name}",
-                  player=target_owner.name)
 
     def check_victory(self):
         # デッキアウト: 通常は本人の敗北（相手の勝利）。ただし C10「自分のデッキが0枚に
@@ -1594,7 +1538,6 @@ class GameManager:
                 if min_cost is None or (card.master.cost is not None and card.master.cost >= min_cost):
                     suffix = f"コスト{min_cost}以上の" if min_cost else ""
                     raise ValueError(f"効果により、このターンは{suffix}キャラを登場できません。")
-        log_event("INFO", "game.play_card", f"Playing card: {card.master.name}", player=player.name, payload={"card_uuid": card.uuid})
         if card.master.type == CardType.EVENT:
             self._record_event_played(card)   # 「このターン中…イベントを発動」条件用（OP15-002）
             for ability in card.master.abilities:
@@ -1617,8 +1560,7 @@ class GameManager:
             # 「相手の登場時効果は無効になる」(OPP_ONPLAY) 期間中はこのプレイヤーの ON_PLAY を解決しない。
             onplay_negated = getattr(player, "negate_onplay_until", 0) >= self.turn_count
             if onplay_negated:
-                log_event("INFO", "game.onplay_negated",
-                          f"{card.master.name}'s ON_PLAY is negated by opponent's effect", player=player.name)
+                pass
             if not card.is_effect_negated and not onplay_negated:
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.ON_PLAY:
@@ -1889,9 +1831,6 @@ class GameManager:
                 "is_optional": is_optional,
                 "expire_turn": self.turn_count,
             })
-            log_event("INFO", "game.replacement_granted",
-                      f"{source_card.master.name} grants this-turn {eff.status} replacement to {player.name}'s characters",
-                      player=player.name)
         return None
 
     # 置換効果（REPLACE_EFFECT）の判定。除去の瞬間に対象の PASSIVE 能力を走査し、
@@ -1906,9 +1845,6 @@ class GameManager:
         protector, ab, eff, sub = found
         resolver = EffectResolver(self)
         _limit = _ability_turn_limit(ab)
-        log_event("INFO", "game.replacement",
-                  f"Replacement by {protector.master.name} activated for {card.master.name}",
-                  player=owner.name)
         # 置換は除去解決の最中に発生する「入れ子の中断」。失われる外側継続が無い
         # （can_suspend=除去アクションの後続が空・単一対象）場合は、内側の中断
         # （対象選択／任意確認）を**そのまま UI へ提示**し、被保護側に選ばせる
@@ -1928,8 +1864,6 @@ class GameManager:
             # 外側に後続継続（このシーケンスの残アクション／除去ループの残対象）があれば、
             # 呼び出し側がそれを deferred フレームへ退避できるようシグナルを立てる（B）。
             self._replacement_suspended = True
-            log_event("INFO", "game.replacement_interactive",
-                      f"Presenting nested replacement choice for {card.master.name}", player=owner.name)
             return True
         # 自動解決パス（外側継続あり、または中断なし）。
         self._auto_resolve_replacement(owner)
@@ -1963,8 +1897,6 @@ class GameManager:
             try:
                 self.resolve_interaction(actor, payload)
             except Exception as e:
-                log_event("WARNING", "game.replacement_autoresolve_fail",
-                          f"Auto-resolve of replacement interaction failed: {e}", player=owner.name)
                 self.active_interaction = None
                 break
             n += 1
@@ -2019,8 +1951,7 @@ class GameManager:
                     if remaining:
                         self.apply_action_to_engine(player, frame.get("action"), remaining, frame.get("value"))
             except Exception as e:
-                log_event("WARNING", "game.deferred_resume_fail",
-                          f"Deferred continuation ({kind}) failed: {e}", player=player.name)
+                pass
             n += 1
 
     def _ko_trigger_matches(self, ability: Ability, owner: Player,
@@ -2066,10 +1997,7 @@ class GameManager:
         for ability in card.master.abilities:
             if ability.trigger == TriggerType.ON_KO:
                 if not self._ko_trigger_matches(ability, owner, cause, effect_controller):
-                    log_event("INFO", "game.trigger_ko_skip",
-                              f"ON_KO for {card.master.name} skipped (cause={cause})", player=owner.name)
                     continue
-                log_event("INFO", "game.trigger_ko", f"Resolving ON_KO for {card.master.name}", player=owner.name)
                 self.resolve_ability(owner, ability, source_card=card)
 
     def _rest_subject_matches(self, ability: Ability, rested_card: Card, host: Card,
@@ -2126,7 +2054,6 @@ class GameManager:
                                                   cause_source=cause_source):
                         pending.append((p, ability, host))
         for owner, ability, host in pending:
-            log_event("INFO", "game.trigger_rest", f"Resolving on-rest for {host.master.name}", player=owner.name)
             self.resolve_ability(owner, ability, source_card=host)
             if self.active_interaction:
                 return
@@ -2225,7 +2152,6 @@ class GameManager:
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int, source_card: Optional[CardInstance] = None) -> bool:
         if not action: return False
         act_name = action.type.name if hasattr(action.type, 'name') else str(action.type)
-        log_event("INFO", "game.apply_action", f"Applying {act_name} to {len(targets)} targets", player=player.name)
         # 自己制限（「自分は、このターン中、…できない」= self_cannot）の登録。
         # parser が RULE_PROCESSING + status=制限キーで生成する。対象を持たないため、
         # 通常の `for target in targets` ループ前にここで処理して player に記録する。
@@ -2234,9 +2160,6 @@ class GameManager:
             if action.value and getattr(action.value, "base", None):
                 rec["min_cost"] = action.value.base
             player.restrictions[action.status] = rec
-            log_event("INFO", "game.self_restriction",
-                      f"{player.name} restricted: {action.status}{' (cost>=' + str(rec.get('min_cost')) + ')' if rec.get('min_cost') else ''} this turn",
-                      player=player.name)
             return True
         if act_name == "DRAW":
             target_player = player
@@ -2245,7 +2168,6 @@ class GameManager:
                     target_player = self.p2 if player == self.p1 else self.p1
             # 「自分の効果でカードを引くことができない」: 効果解決による DRAW を抑止する。
             if self._active_restriction(target_player, "CANNOT_DRAW_BY_EFFECT"):
-                log_event("INFO", "game.draw_restricted", f"{target_player.name} cannot draw by effect this turn", player=player.name)
                 return True
             self.draw_card(target_player, value)
             return True
@@ -2263,14 +2185,12 @@ class GameManager:
                     life_card = damaged.life.pop(0)
                     trig = next((a for a in life_card.master.abilities if a.trigger == TriggerType.TRIGGER), None)
                     self.move_card(life_card, Zone.HAND, damaged)
-                    log_event("INFO", "game.deal_damage", f"{damaged.name} takes 1 damage to HAND", player=player.name)
                     life_lost += 1
                     # 【トリガー】は任意。確認付きで待ち行列へ積む（即時解決しない）。
                     if trig:
                         self._enqueue_trigger(damaged, trig, life_card, optional=True)
                 else:
                     self.winner = player.name
-                    log_event("INFO", "game.victory", f"{player.name} wins (effect damage)", player=player.name)
                     break
             # ON_LIFE_DECREASE を積み、【トリガー】と共にこの場で消化する。
             if life_lost and not self.winner:
@@ -2283,7 +2203,6 @@ class GameManager:
                 if getattr(action.target.player, 'name', '') == 'OPPONENT':
                     target_player = self.p2 if player == self.p1 else self.p1
             random.shuffle(target_player.deck)
-            log_event("INFO", "game.action_shuffle", "Deck shuffled", player=target_player.name)
             return True
         if act_name == "LOOK":
             if getattr(action, "status", None) == "OPPONENT":
@@ -2291,12 +2210,10 @@ class GameManager:
                 # 後続消費が無いため temp_zone には載せない（TEMP リーク防止）。
                 opp = self.p2 if player == self.p1 else self.p1
                 count = min(value if value else 1, len(opp.deck))
-                log_event("INFO", "game.action_look_opp", f"Looking at {count} cards from OPPONENT DECK", player=player.name)
                 return True
             count = value
             deck = player.deck
             if len(deck) < count: count = len(deck)
-            log_event("INFO", "game.action_look", f"Looking at {count} cards from DECK", player=player.name)
             for _ in range(count):
                 card = deck.pop(0)
                 player.temp_zone.append(card)
@@ -2319,7 +2236,6 @@ class GameManager:
                 card_._temp_origin = "LIFE"
                 target_player.temp_zone.append(card_)
                 moved += 1
-            log_event("INFO", "game.action_look_life", f"{target_player.name} revealed {moved} life card(s)", player=player.name)
             return True
 
         if act_name == "MOVE_ATTACHED_DON":
@@ -2340,7 +2256,6 @@ class GameManager:
                     if tgt is not None and getattr(tgt, "attached_don", 0) > 0:
                         tgt.attached_don -= 1
                 moved += 1
-            log_event("INFO", "game.move_attached_don", f"{player.name} returned {moved} attached DON!! to cost area", player=player.name)
             # コストとして使われるため、要求枚数を戻せたかを成否で返す（付与ドン不足なら不成立）。
             return moved >= n
 
@@ -2351,8 +2266,6 @@ class GameManager:
                 new_target = targets[0]
                 self.active_battle["target"] = new_target
                 self.active_battle["target_owner"] = self.p1 if self.p1.name == new_target.owner_id else self.p2
-                log_event("INFO", "game.redirect_attack",
-                          f"Attack redirected to {new_target.master.name}", player=player.name)
             return True
 
         if act_name == "DISABLE_ABILITY" and getattr(action, "status", None) == "OPP_ONPLAY":
@@ -2361,14 +2274,11 @@ class GameManager:
             opp = self.p2 if player == self.p1 else self.p1
             dur = getattr(action, "duration", "INSTANT")
             opp.negate_onplay_until = self.turn_count + (1 if dur == "UNTIL_NEXT_TURN_END" else 0)
-            log_event("INFO", "game.negate_opp_onplay",
-                      f"{opp.name}'s ON_PLAY negated until turn {opp.negate_onplay_until}", player=player.name)
             return True
 
         if act_name == "EXTRA_TURN":
             # 「このターンの後に自分のターンを追加で得る」: switch_turn が消費する
             self.pending_extra_turn = player.name
-            log_event("INFO", "game.action_extra_turn", f"{player.name} will take an extra turn", player=player.name)
             return True
 
         if act_name == "VICTORY":
@@ -2378,7 +2288,6 @@ class GameManager:
             if getattr(action, "status", None) == "REPLACE_DECKOUT_LOSS":
                 return True
             self.winner = player.name
-            log_event("INFO", "game.victory", f"{player.name} wins (effect)", player=player.name)
             return True
 
         if act_name == "ORDER_LIFE":
@@ -2389,8 +2298,6 @@ class GameManager:
             target_player = player
             if getattr(action, "status", None) == "OPPONENT":
                 target_player = self.p2 if player == self.p1 else self.p1
-            log_event("INFO", "game.action_order_life",
-                      f"{target_player.name} reorders {len(target_player.life)} life card(s)", player=player.name)
             return True
 
         if act_name == "EXECUTE_EVENT":
@@ -2408,21 +2315,15 @@ class GameManager:
                 if ev_ability is not None:
                     self.resolve_ability(player, ev_ability, source_card=ev)
                 self.move_card(ev, Zone.TRASH, player)
-                log_event("INFO", "game.execute_event", f"Activated event {ev.master.name}", player=player.name)
             return True
 
         if act_name == "SELECT":
-            # 「（対象）を選ぶ」: 対象選択のみ（盤面は動かさない）。選択結果は
-            # _resolve_targets / resolve_interaction が target.save_id="selected_card" に
-            # 保存済み。後続の「選んだ／その（カード/キャラ/リーダー）」が ref_id で参照する。
-            log_event("INFO", "game.action_select", f"Selected {len(targets)} card(s)", player=player.name)
             return True
 
         if act_name in ["HEAL", "LIFE_RECOVER"]:
             for _ in range(value):
                 if player.deck:
                     player.life.append(player.deck.pop(0))
-                    log_event("INFO", "game.action_heal", f"{player.name} +1 life from deck top", player=player.name)
             return True
         if act_name == "TRASH_FROM_DECK":
             # 「（自分／相手の）デッキの上からN枚をトラッシュに置く」（mill）。
@@ -2436,7 +2337,6 @@ class GameManager:
                     break
                 target_player.trash.append(target_player.deck.pop(0))
                 milled += 1
-            log_event("INFO", "game.action_trash_from_deck", f"{target_player.name} milled {milled} card(s) from deck top", player=target_player.name)
             return True
         if act_name == "SWAP_POWER":
             # 「選んだキャラそれぞれの元々のパワーを、このターン中、入れ替える」（OP14-001）。
@@ -2449,8 +2349,6 @@ class GameManager:
                 pb = b.master.power or 0
                 a.base_power_override = pb
                 b.base_power_override = pa
-                log_event("INFO", "game.action_swap_power",
-                          f"Swapped original power: {a.master.name}<->{b.master.name}", player=player.name)
             return True
         if act_name == "RAMP_DON":
             # status=="RESTED" の場合はレスト状態でコストエリアへ（「レストで追加」）。
@@ -2463,7 +2361,6 @@ class GameManager:
                         player.don_rested.append(don)
                     else:
                         player.don_active.append(don)
-                    log_event("INFO", "game.action_ramp_don", f"{player.name} ramped 1 DON!! (rested={add_rested})", player=player.name)
             return True
 
         if act_name == "RETURN_DON":
@@ -2496,7 +2393,6 @@ class GameManager:
                         returned += 1
             if returned > 0:
                 self.record_turn_event("DON_RETURNED", returned)
-            log_event("INFO", "game.action_return_don", f"{tp.name} returned {returned} DON!! to don deck", player=tp.name)
             return True
 
         if act_name == "REST_DON":
@@ -2511,7 +2407,6 @@ class GameManager:
                 don.is_rest = True
                 tp.don_rested.append(don)
                 rested += 1
-            log_event("INFO", "game.action_rest_don", f"{tp.name} rested {rested} DON!!", player=tp.name)
             # 「レストにしたドン!!1枚につき…」(§7-5) 用に実レスト枚数を記録する。ドンは targets を
             # 介さず枚数処理するため、resolver の len(targets) では 0 になる（OP13-001）。
             self._last_resource_count = rested
@@ -2529,7 +2424,6 @@ class GameManager:
                 if not don.is_frozen:
                     don.is_frozen = True
                     frozen += 1
-            log_event("INFO", "game.action_freeze_don", f"{tp.name} froze {frozen} rested DON!!", player=player.name)
             self._last_resource_count = frozen
             return True
 
@@ -2538,7 +2432,6 @@ class GameManager:
             tp = self._don_pool_player(player, action)
             # 「キャラの効果でドン‼をアクティブにできない」: 効果によるアクティブ化を抑止。
             if self._active_restriction(tp, "CANNOT_ACTIVATE_DON"):
-                log_event("INFO", "game.active_don_restricted", f"{tp.name} cannot activate DON!! by effect this turn", player=player.name)
                 return True
             activated = 0
             for _ in range(value):
@@ -2548,7 +2441,6 @@ class GameManager:
                 don.is_rest = False
                 tp.don_active.append(don)
                 activated += 1
-            log_event("INFO", "game.action_active_don", f"{tp.name} activated {activated} DON!!", player=tp.name)
             self._last_resource_count = activated
             return True
 
@@ -2571,14 +2463,12 @@ class GameManager:
                     and source_list is owner.field):
                 guard_statuses = ("LEAVE", "EFFECT_KO") if act_name == "KO" else ("LEAVE",)
                 if self._active_protection(target, guard_statuses, actor=player):
-                    log_event("INFO", "game.leave_prevented", f"{target.master.name} is protected from leaving the field by opponent's effect", player=owner.name)
                     continue
                 # 内側中断を UI 提示してよいか:
                 # 単一対象は常に許可（後続シーケンスが残れば resolver が deferred へ退避する=B1）。
                 # 複数対象は、置換中断時に残対象を deferred へ退避してから提示する（B2、下の分岐）。
                 _can_suspend = True
                 if self._active_replacement(target, guard_statuses, can_suspend=_can_suspend):
-                    log_event("INFO", "game.leave_replaced", f"{target.master.name}'s removal was replaced by an alternative effect", player=owner.name)
                     # 置換が内側中断を提示した（B2）: この時点で active_interaction が立つ。
                     # 残りの対象をそのまま処理すると中断中に除去が走ってしまうため、残対象を
                     # deferred フレームへ退避してループを抜ける（内側中断の解決後に再開する）。
@@ -2598,19 +2488,14 @@ class GameManager:
                     flag = f"PREVENT_{action.status or 'LEAVE'}"
                     expire_turn = self.turn_count + 1 if dur == "UNTIL_NEXT_TURN_END" else 0
                     self.continuous.apply(target, "FLAG", dur, flag=flag, expire_turn=expire_turn)
-                    log_event("INFO", "game.action_prevent_leave",
-                              f"{target.master.name} protected ({action.status}, {dur})", player=player.name)
                 success = True
             elif act_name == "KO":
                 self.move_card(target, Zone.TRASH, owner)
-                log_event("INFO", "game.action_ko", f"{target.master.name} was KO'd by effect", player=player.name)
                 self._resolve_on_ko(target, owner, cause="EFFECT", effect_controller=player)
                 success = True
             elif act_name in ["DISCARD", "TRASH"]:
                 self.move_card(target, Zone.TRASH, owner); success = True
             elif act_name == "REVEAL":
-                # 公開: 盤面は動かさず、公開した事実をログに残す（条件成立の証明等）。
-                log_event("INFO", "game.action_reveal", f"{target.master.name} was revealed", player=owner.name)
                 success = True
             elif act_name in ["BOUNCE", "MOVE_TO_HAND"]:
                 self.move_card(target, Zone.HAND, owner); success = True
@@ -2623,12 +2508,10 @@ class GameManager:
                         target.passive_power_override = value
                     else:
                         target.base_power_override = value
-                    log_event("INFO", "game.action_override", f"{target.master.name}'s power set to {value}", player=player.name)
                 elif action.status == "COST_OVERRIDE":
                     # コスト絶対値セット（「このターン中、コスト0にする」等）。base_power_override
                     # と同様に reset_turn_status で失効する（passive 再計算では消えない）。
                     target.base_cost_override = value
-                    log_event("INFO", "game.action_cost_override", f"{target.master.name}'s cost set to {value}", player=player.name)
                 elif action.status == "COST_REDUCTION":
                     # 期間付き（このターン中／このバトル中 等）は継続効果(timed_cost)へ。
                     # cost_buff は _apply_passive_effects で毎回リセットされ消えるため。
@@ -2639,7 +2522,6 @@ class GameManager:
                         self.continuous.apply(target, "COST", dur, amount=value, expire_turn=expire_turn)
                     elif hasattr(target, 'cost_buff'):
                         target.cost_buff += value
-                    log_event("INFO", "game.action_cost_reduction", f"{target.master.name}'s cost changed by {value} ({dur})", player=player.name)
                 elif action.status == "COUNTER":
                     # 「カウンター+Nになる」: 手札カードのカウンター値修正。
                     # PASSIVE 再計算レイヤ（passive_counter）に載せる。
@@ -2647,12 +2529,10 @@ class GameManager:
                         target.passive_counter += value
                     else:
                         target.passive_counter += value  # 即時付与も同レイヤ（手札は recalc でリセット）
-                    log_event("INFO", "game.action_counter_buff", f"{target.master.name} counter {value:+d}", player=player.name)
                 elif action.status == "BLOCKER_DISABLE":
                     target.flags.add("BLOCKER_DISABLED")
                     target.current_keywords.discard("ブロッカー")
                     target.timed_keywords.discard("ブロッカー")  # 効果付与分の【ブロッカー】も無効化
-                    log_event("INFO", "game.action_blocker_disable", f"{target.master.name} blocker disabled", player=player.name)
                 else:
                     # 期間付きパワー増減は継続効果(timed_power)として管理する。
                     #  - THIS_BATTLE: バトル終了で失効（同一ターンの後続バトルへ持ち越さない）。
@@ -2666,10 +2546,8 @@ class GameManager:
                     elif getattr(self, "_in_passive_recalc", False):
                         # PASSIVE/YOUR_TURN 再計算中: 再計算レイヤに載せる（累積防止）
                         target.passive_power += value
-                        log_event("INFO", "game.action_buff", f"{target.master.name} passive power {value:+d}", player=player.name)
                     elif hasattr(target, 'power_buff'):
                         target.power_buff += value
-                        log_event("INFO", "game.action_buff", f"{target.master.name} gained {value} power", player=player.name)
                 success = True
             elif act_name in ["ATTACK_DISABLE", "RESTRICTION"]:
                 # 「（このターン中／次の相手のターン終了時まで）アタックできない」。
@@ -2694,14 +2572,12 @@ class GameManager:
                     self.continuous.apply(target, "FLAG", "UNTIL_NEXT_TURN_END", flag="CANNOT_REST", expire_turn=self.turn_count + 1)
                 else:
                     self.continuous.apply(target, "FLAG", "THIS_TURN", flag="CANNOT_REST")
-                log_event("INFO", "game.action_prevent_rest", f"{target.master.name} cannot be rested ({dur})", player=player.name)
                 success = True
             elif act_name == "FREEZE":
                 # 「次の相手のリフレッシュフェイズでアクティブにならない」
                 # refresh_all が flags["FREEZE"] を確認してからリセットするため、
                 # ターン境界を跨ぐ flags に直接書き込む（timed_flags でなく flags）。
                 target.flags.add("FREEZE")
-                log_event("INFO", "game.action_freeze", f"{target.master.name} frozen (won't activate next refresh)", player=player.name)
                 success = True
             elif act_name == "NEGATE_EFFECT":
                 # 「（このターン中／次の相手のターン終了時まで、）効果を無効にする」。
@@ -2713,7 +2589,6 @@ class GameManager:
                 expire_turn = self.turn_count + 1 if cdur == "UNTIL_NEXT_TURN_END" else 0
                 self.continuous.apply(target, "FLAG", cdur, flag="EFFECTS_DISABLED", expire_turn=expire_turn)
                 target._refresh_keywords()
-                log_event("INFO", "game.action_negate", f"{target.master.name} effects disabled ({cdur})", player=player.name)
                 success = True
             elif act_name == "RULE_PROCESSING":
                 # ルール上の注記（カード名 alias、デッキ枚数ルール等）→ エンジン no-op
@@ -2737,7 +2612,6 @@ class GameManager:
                 # 「手札のこのカードは効果で登場できない」: 手札源かつ当該 PASSIVE を持つ対象は
                 # 効果による登場をスキップする（NO_EFFECT_PLAY）。
                 if source_list is getattr(owner, "hand", None) and self._blocks_effect_play(target):
-                    log_event("INFO", "game.play_blocked", f"{target.master.name} cannot be played by effect", player=owner.name)
                     continue
                 self.move_card(target, Zone.FIELD, owner)
                 target.is_newly_played = True
@@ -2764,7 +2638,6 @@ class GameManager:
                     if target in owner.don_rested:
                         owner.don_rested.remove(target)
                         owner.don_active.append(target)
-                log_event("INFO", "game.action_active", f"Card activated for {owner.name}", player=player.name)
                 success = True
             elif act_name == "ATTACH_DON":
                 # value 枚のドン!!を付与する。status に "RESTED" を含めばレストのドンを
@@ -2788,7 +2661,6 @@ class GameManager:
                     don_owner.don_attached_cards.append(don)
                     target.attached_don += 1
                     attached += 1
-                log_event("INFO", "game.action_attach_don", f"{attached} DON!! attached to {target.master.name} (rested={from_rested}, opp_pool={from_opp})", player=player.name)
                 success = True
             elif act_name == "MOVE_CARD":
                 dest = action.destination if action.destination else Zone.HAND
@@ -2796,8 +2668,6 @@ class GameManager:
                 # 自分のライフ→自分の手札の移動のみ抑止する（相手への移動・他ゾーンは対象外）。
                 if (dest == Zone.HAND and source_list is owner.life and owner is player
                         and self._active_restriction(player, "CANNOT_LIFE_TO_HAND")):
-                    log_event("INFO", "game.life_to_hand_restricted",
-                              f"{player.name} cannot add life to hand by effect this turn", player=player.name)
                     continue
                 dest_pos = getattr(action, 'dest_position', 'BOTTOM') or 'BOTTOM'
                 self.move_card(target, dest, owner, dest_position=dest_pos)
@@ -2805,16 +2675,12 @@ class GameManager:
                 # ライフは既定で裏向き(is_face_up=False)なので、表向き指定を明示的に立てる。
                 if dest == Zone.LIFE and getattr(action, "face_up", None) is not None:
                     target.is_face_up = bool(action.face_up)
-                    log_event("INFO", "game.move_card_face",
-                              f"{target.master.name} added to LIFE face_up={target.is_face_up}", player=player.name)
                 success = True
             elif act_name == "DECK_TOP":
                 self.move_card(target, Zone.DECK, owner, dest_position="TOP"); success = True
             elif act_name == "FACE_UP_LIFE":
                 # 「ライフを表向き／裏向きにする」: status="DOWN" のみ裏向き、他は表向き。
                 target.is_face_up = (action.status != "DOWN")
-                log_event("INFO", "game.action_face_up_life",
-                          f"{target.master.name} life set face_up={target.is_face_up}", player=player.name)
                 success = True
             elif act_name == "GRANT_KEYWORD":
                 keyword = action.status
@@ -2830,14 +2696,13 @@ class GameManager:
                     cdur = dur if dur in ("THIS_TURN", "THIS_BATTLE", "UNTIL_NEXT_TURN_END") else "PERMANENT"
                     expire_turn = self.turn_count + 1 if cdur == "UNTIL_NEXT_TURN_END" else 0
                     self.continuous.apply(target, "KEYWORD", cdur, keyword=keyword, expire_turn=expire_turn)
-                    log_event("INFO", "game.action_grant_keyword", f"【{keyword}】→ {target.master.name} ({cdur})", player=player.name)
                 success = True
         return success
 
     def get_dynamic_value(self, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict) -> int:
         if not val_source: return 0
         if val_source.dynamic_source == "COUNT_REFERENCE":
-            log_event("INFO", "game.get_dynamic_value", "Calculating COUNT_REFERENCE", player=player.name); return len(player.trash)
+            return len(player.trash)
         # 文脈依存「直前アクションで捨てた/戻した/KOした…カードN枚につき」（§7-5）。
         # 生の枚数を返す（divisor/multiplier は _calculate_value が適用する）。
         if val_source.dynamic_source == "PREV_ACTION_COUNT":
@@ -2852,7 +2717,6 @@ class GameManager:
             if src is None:
                 src = player.leader
             n = len(get_target_cards(self, val_source.count_query, src))
-            log_event("INFO", "game.get_dynamic_value", f"COUNT_QUERY = {n}", player=player.name)
             return n
         # C9「（相手のリーダー／選んだキャラ／アタックしているキャラ）と同じパワーになる」。
         # 発動時スナップショット: 参照カードの現在パワーを固定値として返す（以後の変動に追随しない）。

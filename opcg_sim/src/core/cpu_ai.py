@@ -406,7 +406,8 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
                 life_knee: int = _LIFE_KNEE_DEFAULT,
                 next_turn_don: Optional[int] = None,
                 field_count_factor: float = 1.0,
-                engine_aware: bool = False) -> float:
+                engine_aware: bool = False,
+                out: Optional[Dict[str, float]] = None) -> float:
     """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和＋白の境界リスク）。
 
     `power_cap` は対面の最硬防御パワー＝有効パワーの上限（`_effective_power`）。これにより
@@ -424,18 +425,28 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
     作動する＝相手手札の中身を読まないフェア性を保つ。None（plan 無し）では作動しない＝従来同値。
     """
     score = 0.0
+    # out（任意・既定 None＝完全に無オーバーヘッド）が渡されると、成分内訳を `out[キー] += 値` で
+    # 記録する（CPU 思考トレース・診断用）。`score +=` 行は一切変えないので out=None 時の挙動・採点は
+    # 従来と完全同値（ベースライン不変）。
+    def _emit(k: str, v: float):
+        if out is not None:
+            out[k] = out.get(k, 0.0) + v
 
     # ライフ: 非線形（薄いほど 1 枚の限界価値が高い）。膝位置（life_knee）までを厚く上乗せする。
     life_n = len(p.life)
     score += life_n * W_LIFE * life_factor
+    _emit("life", life_n * W_LIFE * life_factor)
     score += min(life_n, life_knee) * W_LIFE_LOW * life_factor
+    _emit("life_low", min(life_n, life_knee) * W_LIFE_LOW * life_factor)
 
     # 手札: 枚数 ＋（公開方針でなければ）カウンター値（防御に回せる力＝相手の +1[J] を打ち消す資源）。
     score += len(p.hand) * W_HAND * hand_factor
+    _emit("hand", len(p.hand) * W_HAND * hand_factor)
     if include_counter:
         for c in p.hand:
             try:
                 score += (c.current_counter or 0) * W_COUNTER * counter_factor
+                _emit("hand_counter", (c.current_counter or 0) * W_COUNTER * counter_factor)
             except Exception:
                 pass
             # コスト低減の資源価値化: 次ターン手出しできる手札を潜在資源として軽く加点（plan 供給時のみ）。
@@ -443,11 +454,13 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
                 try:
                     if c.current_cost <= next_turn_don:
                         score += W_HAND_PLAYABLE
+                        _emit("hand_playable", W_HAND_PLAYABLE)
                 except Exception:
                     pass
 
     # 白（J）の決定境界: 自デッキ残がデッキ切れ（J=0・ドロー不能＝敗北）へ近づくほど非線形に減点。
     score -= max(0, DECK_DANGER - len(p.deck)) * W_DECK_DANGER
+    _emit("deck_danger", -max(0, DECK_DANGER - len(p.deck)) * W_DECK_DANGER)
 
     # ドン!!（アクティブ）。`is_turn=False`（自分の手番でない静止点＝葉）では、浮いたアクティブドンは
     # 防御に使えない（OPCG はドンを防御に付与できない）ので、プラン由来の `idle_don_factor`(<1.0) で
@@ -457,6 +470,7 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
     if not is_turn and idle_don_factor != 1.0:
         don_score *= idle_don_factor
     score += don_score
+    _emit("don", don_score)
 
     # 場のキャラ: 存在価値 ＋ 有効パワー ＋ ブロッカー（最終防御）＋ 攻め圧（実際に攻撃できる体のみ）。
     # 存在価値はプランで「効果なし低パワーの置物」のみ割り引く（body_factor）＝デッキ依存の置物許容度。
@@ -466,27 +480,34 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
         if body_factor != 1.0 and _is_low_impact(c):
             ev *= body_factor
         score += ev
+        _emit("field_count", ev)
         # 脅威/キーワード資産（ダブルアタック・効果耐性・速攻・バニッシュ・アンブロッカブル）。両側対称・
         # プラン時のみ。A-2: 攻め/守りキーワードをアーキタイプ依存にスケール（aggro=攻め重視/control=守り重視）。
         if threat_aware:
-            score += _threat_value(c, threat_atk_mult, threat_def_mult)
+            tv = _threat_value(c, threat_atk_mult, threat_def_mult)
+            score += tv
+            _emit("field_threat", tv)
         # 地平線越え（§2.5.3）: 毎ターン価値を生む能力の将来価値を残りゲーム長で期待値割引して加点
         # （field_count_factor＝time-discount のテンポ係数を流用＝残ターンが多いほど将来発動が多く価値大）。
         if engine_aware and _recurring_engine(c):
             score += W_RECUR_ENGINE * field_count_factor
+            _emit("field_engine", W_RECUR_ENGINE * field_count_factor)
         try:
             pw = c.get_power(is_turn)
         except Exception:
             pw = c.master.power or 0
         score += _effective_power(pw, power_cap) * W_FIELD_POWER
+        _emit("field_power", _effective_power(pw, power_cap) * W_FIELD_POWER)
         if not c.is_rest:
             # 攻め圧は「このターン実際に攻撃できる体」に限る。自ターンの召喚酔い（速攻なし）は
             # 今ターン攻撃できないので加点しない＝意味のない小型展開で攻め圧を水増ししない。
             sick = getattr(c, "is_newly_played", False) and not c.has_keyword("速攻")
             if not (is_turn and sick):
                 score += W_ATTACKER * attacker_factor
+                _emit("attacker", W_ATTACKER * attacker_factor)
             if c.has_keyword("ブロッカー"):
                 score += W_BLOCKER
+                _emit("blocker", W_BLOCKER)
     return score
 
 
@@ -575,7 +596,8 @@ def _plan_progress(manager, me, opp, is_my_turn: bool, plan, profile=None) -> fl
     return score
 
 
-def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, plan=None) -> float:
+def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, plan=None,
+             out: Optional[Dict[str, Any]] = None) -> float:
     """`me_name` 視点の盤面優劣スコア（高いほど自分有利）。
 
     `see_opp_hand=False` のとき相手手札は枚数のみ評価する（中身＝カウンター値を読まない）。
@@ -587,8 +609,12 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
     plan=None では一切作動せず現行挙動と完全同値。
     """
     if manager.winner == me_name:
+        if out is not None:
+            out["winner"] = me_name
         return W_WIN
     if manager.winner is not None:
+        if out is not None:
+            out["winner"] = manager.winner
         return -W_WIN
     me = _player_by_name(manager, me_name)
     opp = _other(manager, me_name)
@@ -633,20 +659,30 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
     telegraph = 0.0
     if plan is not None and not is_my_turn and _telegraph_lethal(me, opp):
         telegraph = W_TELEGRAPH_LETHAL
-    return (_side_score(me, is_my_turn, my_cap, include_counter=True, life_factor=life_factor,
-                        body_factor=body_factor, attacker_factor=attacker_factor,
-                        counter_factor=counter_factor, threat_aware=threat_aware,
-                        idle_don_factor=idle_don_factor,
-                        threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
-                        life_knee=own_life_knee, next_turn_don=me_next_don,
-                        field_count_factor=tempo_factor, engine_aware=threat_aware)
-            - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
-                          hand_factor=opp_hand_factor, threat_aware=threat_aware,
-                          threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
-                          next_turn_don=opp_next_don, field_count_factor=tempo_factor,
-                          engine_aware=threat_aware)
-            + _plan_progress(manager, me, opp, is_my_turn, plan, profile)
-            - telegraph)
+    # 成分内訳の収集（out 指定時のみ・採点には一切影響しない）。
+    out_me = {} if out is not None else None
+    out_opp = {} if out is not None else None
+    plan_progress = _plan_progress(manager, me, opp, is_my_turn, plan, profile)
+    total = (_side_score(me, is_my_turn, my_cap, include_counter=True, life_factor=life_factor,
+                         body_factor=body_factor, attacker_factor=attacker_factor,
+                         counter_factor=counter_factor, threat_aware=threat_aware,
+                         idle_don_factor=idle_don_factor,
+                         threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
+                         life_knee=own_life_knee, next_turn_don=me_next_don,
+                         field_count_factor=tempo_factor, engine_aware=threat_aware, out=out_me)
+             - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
+                           hand_factor=opp_hand_factor, threat_aware=threat_aware,
+                           threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
+                           next_turn_don=opp_next_don, field_count_factor=tempo_factor,
+                           engine_aware=threat_aware, out=out_opp)
+             + plan_progress
+             - telegraph)
+    if out is not None:
+        out["me"] = {k: round(v, 1) for k, v in out_me.items()}
+        out["opp"] = {k: round(v, 1) for k, v in out_opp.items()}
+        out["plan_progress"] = round(plan_progress, 1)
+        out["telegraph"] = round(-telegraph, 1)
+    return total
 
 
 def _pending_keys():
@@ -1155,13 +1191,187 @@ def _move_sig(move: Dict[str, Any]) -> tuple:
             tuple(payload.get("target_ids", []) or []))
 
 
+# === CPU 思考トレース（Phase 1・診断/挙動改善用） =====================================
+# すべて trace 指定時のみ作動し、本番（trace=None）には一切のオーバーヘッド・挙動変化を与えない。
+# トレースの手記述は uuid（実行ごとに変わる）でなく **card_id 基準** にして再現性を確保する
+# （同一 seed → 同一決定列の比較が card_id で安定して行える）。
+TRACE_TOPN = 6  # トレースに残す候補手の上限（deep スコア降順の上位）
+
+
+def _find_card(manager, uuid: Optional[str]):
+    """uuid からカードインスタンスを全ゾーン横断で引く（トレース記述用・低速で可）。"""
+    if not uuid:
+        return None
+    for p in (manager.p1, manager.p2):
+        leader = getattr(p, "leader", None)
+        zones = [getattr(p, z, None) or [] for z in ("field", "hand", "life", "deck", "trash")]
+        if leader is not None:
+            zones.append([leader])
+        for zone in zones:
+            for c in zone:
+                if getattr(c, "uuid", None) == uuid:
+                    return c
+    return None
+
+
+def _card_label(manager, uuid: Optional[str]) -> Optional[str]:
+    """uuid を card_id（無ければ名前・最後に uuid）へ解決した、再現性のある手記述ラベル。"""
+    if not uuid:
+        return None
+    c = _find_card(manager, uuid)
+    if c is None:
+        return uuid
+    return getattr(c.master, "card_id", None) or getattr(c.master, "name", None) or uuid
+
+
+def _describe_move(manager, move: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """手を card_id 基準の人間可読 dict に変換する（uuid 非依存＝再現性あり）。"""
+    if not move:
+        return None
+    payload = move.get("payload") or {}
+    uuid = payload.get("uuid") or move.get("card_uuid")
+    d: Dict[str, Any] = {"action_type": move.get("action_type")}
+    label = _card_label(manager, uuid)
+    if label:
+        d["card"] = label
+    tids = payload.get("target_ids") or []
+    if tids:
+        d["targets"] = [_card_label(manager, t) for t in tids]
+    return d
+
+
+def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_only: bool,
+                     profile, plan, start_turn: int, horizon: int,
+                     max_steps: int = 12) -> List[Dict[str, Any]]:
+    """貪欲 PV（読み筋）: 各手番で 1-ply 最善手（root=max / 相手=min）を辿った想定進行。
+
+    `_search` の探索木そのものではなく、その縮約版（各ノードでビーム1）の「想定される線」。
+    trace 指定時のみ呼ばれるためコストは問わない。`_search` 本体には一切触れない＝探索挙動は不変。
+    """
+    line: List[Dict[str, Any]] = []
+    cur = manager
+    KEY_PID, KEY_ACTION = _pending_keys()
+    repeatable = {"ACTIVATE_MAIN", "ATTACH_DON"}
+    counts: Dict[tuple, int] = {}   # decide_guarded と同じ繰り返しガード（無限起動効果で PV が膨れるのを防ぐ）
+    cur_turn = cur.turn_count
+    for _ in range(max_steps):
+        if cur.winner is not None:
+            line.append({"winner": cur.winner})
+            break
+        pending = cur.get_pending_request()
+        if not pending:
+            break
+        # 葉: start_turn から horizon ターン進んだ MAIN_ACTION（_search と同じ静止点）で打ち切る。
+        if pending.get(KEY_ACTION) == "MAIN_ACTION" and (cur.turn_count - start_turn) >= horizon:
+            break
+        if cur.turn_count != cur_turn:   # ターンが変わったら繰り返しカウントをリセット
+            cur_turn = cur.turn_count
+            counts = {}
+        actor_name = pending[KEY_PID]
+        is_max = (actor_name == root_name)
+        moves = _selection_moves(cur, actor_name)
+        if moves is None:
+            actor = _player_by_name(cur, actor_name)
+            moves = _prune_don_moves(cur, actor_name, cur.get_legal_actions(actor))
+        if not is_max and opp_public_only:
+            filt = [m for m in moves if not _consumes_hand_card(cur, actor_name, m)]
+            if filt:
+                moves = filt
+        # 繰り返しガード: 同一の起動効果/ドン付与を REPEAT_CAP 回使い切ったら候補から除外する。
+        moves = [m for m in moves
+                 if not (m.get("action_type") in repeatable and counts.get(_move_sig(m), 0) >= REPEAT_CAP)]
+        if not moves:
+            break
+        best = None
+        for m in moves:
+            child = _apply_clone(cur, actor_name, m, stop_at_select=True)
+            if child is None:
+                continue
+            sc = evaluate(child, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+            if best is None or (sc > best[0] if is_max else sc < best[0]):
+                best = (sc, m, child)
+        if best is None:
+            break
+        sc, m, child = best
+        if m.get("action_type") in repeatable:
+            counts[_move_sig(m)] = counts.get(_move_sig(m), 0) + 1
+        line.append({"turn": cur.turn_count, "actor": actor_name, "is_max": is_max,
+                     "move": _describe_move(cur, m), "eval": round(sc, 1)})
+        cur = child
+    return line
+
+
+def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: str,
+                         moves: List[Dict[str, Any]], scored: List[Tuple[float, Dict[str, Any]]],
+                         collect: Optional[Dict[str, Any]], chosen: Dict[str, Any], folded: bool,
+                         see_opp_hand: bool, opp_public_only: bool, profile, plan) -> None:
+    """`decide` の意思決定結果を診断トレース dict に書き込む（trace 指定時のみ）。
+
+    記録内容: 選んだ手・畳み判定・上位候補（1-ply prelim ／深掘り deep スコア）・regret・
+    選んだ手の結果盤面の J値成分内訳・読み筋（貪欲 PV）。
+    """
+    sig2move = {_move_sig(m): m for m in moves}
+    cands: List[Dict[str, Any]] = []
+    regret = 0.0
+    if collect:
+        prelim = collect.get("prelim", {})
+        deep = collect.get("deep", {})
+        sigs = list(deep.keys()) if deep else list(prelim.keys())
+        for sig in sigs:
+            m = sig2move.get(sig)
+            cands.append({
+                "move": _describe_move(manager, m) if m is not None else None,
+                "prelim": round(prelim[sig], 1) if sig in prelim else None,
+                "deep": round(deep[sig], 1) if sig in deep else None,
+            })
+
+        def _rank(c):
+            return c["deep"] if c["deep"] is not None else (
+                c["prelim"] if c["prelim"] is not None else float("-inf"))
+        cands.sort(key=_rank, reverse=True)
+        if deep and prelim:
+            deep_best = max(deep.values())
+            greedy_sig = max(prelim, key=lambda s: prelim[s])  # 1-ply 貪欲が選ぶ手
+            greedy_deep = deep.get(greedy_sig)
+            if greedy_deep is not None:
+                regret = max(0.0, deep_best - greedy_deep)
+    else:  # easy: scored は (score, move) の 1-ply 採点そのもの
+        for s, m in sorted(scored, key=lambda x: x[0], reverse=True):
+            cands.append({"move": _describe_move(manager, m), "prelim": round(s, 1), "deep": None})
+
+    trace["difficulty"] = difficulty
+    trace["turn"] = manager.turn_count
+    pending = manager.get_pending_request()
+    if pending:
+        _, key_action = _pending_keys()
+        trace["pending_action"] = pending.get(key_action)
+    trace["chosen"] = _describe_move(manager, chosen)
+    trace["folded"] = folded
+    trace["regret"] = round(regret, 1)
+    trace["candidates"] = cands[:TRACE_TOPN]
+
+    # 選んだ手の結果盤面で J値成分内訳＋読み筋を採る（trace 専用クローン・探索には不参加）。
+    child = _apply_clone(manager, name, chosen, stop_at_select=True)
+    if child is not None:
+        comp: Dict[str, Any] = {}
+        total = evaluate(child, name, see_opp_hand=see_opp_hand, profile=profile, plan=plan, out=comp)
+        comp["total"] = round(total, 1)
+        trace["j_components"] = comp
+        trace["read_ahead"] = _read_ahead_line(
+            child, name, see_opp_hand, opp_public_only, profile, plan,
+            manager.turn_count, HARD_HORIZON)
+
+
 def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Random] = None,
-           moves: Optional[List[Dict[str, Any]]] = None, profile=None, plan=None) -> Optional[Dict[str, Any]]:
+           moves: Optional[List[Dict[str, Any]]] = None, profile=None, plan=None,
+           trace: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     """`player` が取るべき次の 1 手を返す（合法手が無ければ None）。
 
     `moves` を渡すとその候補集合から選ぶ（ガード driver が絞り込んだ手を渡す用途）。
     `profile` はリーダー推測の相手モデル（§2.5.4・normal でのみ使用）。
     `plan` は自デッキ勝ち筋プラン（§2.5.5・normal/hard で使用。easy は素の 1-ply のまま）。
+    `trace`（任意・既定 None＝完全に無オーバーヘッド・挙動不変）を渡すと、意思決定の診断情報
+    （選んだ手・候補スコア・regret・J値成分内訳・読み筋）を書き込む（CPU 挙動改善用）。
     """
     rng = rng or random
     if moves is None:
@@ -1174,24 +1384,38 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
     if not moves:
         return None
     if len(moves) == 1:
+        if trace is not None:
+            trace["difficulty"] = difficulty
+            trace["turn"] = manager.turn_count
+            trace["chosen"] = _describe_move(manager, moves[0])
+            trace["forced"] = "only_move"
+            trace["candidates"] = [{"move": _describe_move(manager, moves[0]),
+                                    "prelim": None, "deep": None}]
+            trace["regret"] = 0.0
         return moves[0]
     moves = _prune_don_moves(manager, player.name, moves)  # B-2: 無意味なドン付与をルートから除外
 
     name = player.name
     end_move = next((m for m in moves if m.get("action_type") == "TURN_END"), None)
 
+    # トレース時のみ collect を渡して 1-ply prelim ／深掘り deep スコアを回収する（regret/候補表示用）。
+    collect = {} if trace is not None else None
+
     # 難易度＝情報方針の 3 分化（docs/SPEC.md §2.5.2）:
     #   easy   : 正直な 1-ply 貪欲（ミスなし・公開情報のみ）。
     #   normal : 多 ply 先読み・公開情報のみ＋相手は隠れ手札を使わない保守モデル＋リーダー推測 profile。
     #   hard   : 多 ply 先読み・相手手札も読むフルクローン（最強・チート）。
     if difficulty == "easy":
+        see_opp_hand, opp_public_only = False, False
         scored = [(_simulate_and_eval(manager, name, m, see_opp_hand=False), m) for m in moves]
     elif difficulty == "hard":
+        see_opp_hand, opp_public_only = True, False
         scored = _scored_search(manager, name, moves, see_opp_hand=True, opp_public_only=False,
-                                plan=plan)
+                                plan=plan, collect=collect)
     else:  # normal
+        see_opp_hand, opp_public_only = False, True
         scored = _scored_search(manager, name, moves, see_opp_hand=False, opp_public_only=True,
-                                profile=profile, plan=plan)
+                                profile=profile, plan=plan, collect=collect)
     # 同点はランダムタイブレーク（決定論にしたい場合は呼び出し側で seed 済み rng を渡す）。
     rng.shuffle(scored)
     best_score, best_move = max(scored, key=lambda x: x[0])
@@ -1199,13 +1423,27 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
     # 「何もしない（ターンを畳む）」を一級の選択肢として比較する。非ターン終了手が end を
     # _ACT_MARGIN を超えて上回らなければターンを畳む＝無意味な展開・不利アタック・効かない
     # ドン付与（いずれも改修後の評価では end とほぼ同値）を採らない（進行保証も兼ねる）。
+    chosen = best_move
+    folded = False
     if end_move is not None and best_move is not end_move:
         end_score = next((s for s, m in scored if m is end_move), None)
         # A-2: 畳み判定マージンをアーキタイプ依存にスケール（aggro=小さく攻めを通す／control=大きく畳む）。
         margin = _ACT_MARGIN * (getattr(plan, "act_margin_mult", 1.0) if plan is not None else 1.0)
         if end_score is not None and best_score <= end_score + margin:
-            return end_move
-    return best_move
+            chosen = end_move
+            folded = True
+
+    if trace is not None:
+        # トレース構築は追加クローンを作り、その効果解決がグローバル random を消費し得る。
+        # 採点後の RNG 状態を保存→復元し、トレース有無でゲーム進行が分岐しないようにする
+        # （決定論再現の保証。トレースはあくまで観測であって進行に影響させない）。
+        _rng_state = random.getstate()
+        try:
+            _fill_decision_trace(trace, manager, name, difficulty, moves, scored, collect,
+                                 chosen, folded, see_opp_hand, opp_public_only, profile, plan)
+        finally:
+            random.setstate(_rng_state)
+    return chosen
 
 
 def decide_with_regret(manager, player, difficulty: str = "normal",
@@ -1253,7 +1491,8 @@ def decide_with_regret(manager, player, difficulty: str = "normal",
 
 
 def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[random.Random] = None,
-                   mem: Optional[Dict[str, Any]] = None, profile=None, plan=None) -> Optional[Dict[str, Any]]:
+                   mem: Optional[Dict[str, Any]] = None, profile=None, plan=None,
+                   trace: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     """ターン内メモリ `mem` を用いた暴走防止つきの意思決定。
 
     `mem` は呼び出し側が対局ごとに保持する dict（ステートレスな /cpu/step でも CPU_GAMES に
@@ -1277,6 +1516,13 @@ def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[ra
 
     # 総数キャップ: 上限超過ならターンを畳む（畳めない＝対話中等なら通常選択）。
     if end_move is not None and mem.get("total", 0) >= TURN_ACTION_CAP:
+        if trace is not None:
+            trace["difficulty"] = difficulty
+            trace["turn"] = manager.turn_count
+            trace["chosen"] = _describe_move(manager, end_move)
+            trace["forced"] = "turn_action_cap"
+            trace["candidates"] = []
+            trace["regret"] = 0.0
         return end_move
 
     # 繰り返しキャップ: 起動効果/ドン付与の同一手を上限まで使い切ったら除外する。
@@ -1287,7 +1533,7 @@ def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[ra
     if not filtered:
         filtered = [end_move] if end_move is not None else moves
 
-    move = decide(manager, player, difficulty, rng, moves=filtered, profile=profile, plan=plan)
+    move = decide(manager, player, difficulty, rng, moves=filtered, profile=profile, plan=plan, trace=trace)
     if move is not None:
         sig = _move_sig(move)
         counts[sig] = counts.get(sig, 0) + 1

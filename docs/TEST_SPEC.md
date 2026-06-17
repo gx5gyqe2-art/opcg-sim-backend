@@ -78,6 +78,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | `tests/test_cpu_opponent_model.py` | リーダー推測の相手プロファイル（カウンター密度／ブロッカー比率／除去比率／defense_factor／aggro_lean）の集計 |
 | `tests/test_cpu_puzzles.py` | **CPU 検証基盤（フェーズ0・全変更のゲート）**: 正解手種が既知の局面（致死を取る／**ドン→クロック変換の decide レベル検出**）＋フェア性ガード（normal は相手隠しゾーンを読まない）＋特性化ピン。**2026-06 レビュー収束項**: B-1(a) アイドルドン末端減価／B-1(b) カウンター強要（推定カウンター応答モデル）／公開情報ベリーフ更新（手札枚数・トラッシュ）／A-1 アンブロッカブル評価／A-2 アーキタイプ依存スケール／A-3 min ビーム剪定の sort 方向 |
 | `tests/test_cpu_arena.py` | **検証基盤の絶対強度メトリクスの機械健全性**（`tests/cpu_arena.py`）: 凍結ベースライン Elo 変換（勝率→Elo の 0.5→0／単調／対称）・非対称対局＋席交互アリーナ・regret ログ（`cpu_ai.decide_with_regret`＝非負・有限・easy/単一手で 0）。実ゲームは低速なので機械健全性のみ高速・有界に固定 |
+| `tests/test_cpu_replay.py` | **CPU 思考トレースの健全性**（`tests/cpu_replay.py`）: trace は観測専用で手を変えない・RNG 中立（trace 有無で進行が分岐しない）・同一 seed の決定論再現・トレース 4 項目（候補スコア/regret/J値成分/読み筋）の存在と読み筋 PV の有界性 |
 
 ### 効果メカニクス・対話モデル
 | ファイル | 役割 |
@@ -109,6 +110,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | `tests/full_card_audit.py` | 全カード構造不変条件検証＋挙動ベースライン生成（`--regen` で更新） |
 | `tests/cpu_selfplay.py` | 決定論的 CPU 対 CPU 自己対戦（効果検証ハーネス）。詳細は §3.1 |
 | `tests/cpu_arena.py` | **CPU 検証基盤の絶対強度メトリクス**（SPEC §2.5.3）: `arena`＝固定参照相手（既定 easy）への挑戦者勝率→**凍結ベースライン Elo**（席交互で先手有利相殺・normal/hard はデプロイ同様に自デッキプラン供給）／`regret`＝自己対戦 1 局の **greedy regret** 集計。実ゲームは低速なので本走は手動/定期実行（`python tests/cpu_arena.py arena --challenger normal --baseline easy --games 20`） |
+| `tests/cpu_replay.py` | **CPU 思考トレース＋決定論リプレイ**（CPU 挙動改善用）。1 局を seed で再生し、各意思決定の「選んだ手・上位候補スコア（1-ply prelim／深掘り deep）・regret・J値成分内訳・読み筋（貪欲 PV）」をローカル JSONL へ出力する（GCS 不要）。詳細は §3.2 |
 | `tests/expected_effects.py` | 各カード×能力の「期待する動き」を AST から機械生成（`--regen`→`expected_effects.json`、`--card ID`）。効果オラクルの期待マニフェスト |
 | `tests/effect_oracle.py` | 期待 vs テキスト/AST の静的整合性コンパレータ（既存ゲートが拾わない高シグナル候補のみ抽出。`--category`/`--json`） |
 | `tests/structural_invariants.py` | 構造不変条件4スキャン（H先頭ゲート漏れ／Duration write-off／chooser欠落／「すべて」count退化）の一括検出（`--show`）。カテゴリH 横展開の回帰ツール化 |
@@ -142,6 +144,50 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 検出する（AI の自動解決が本番のバグを覆い隠さないよう、本番の中断は握り潰さず必ずここで表面化する）。
 `tests/test_cpu_selfplay.py` がスモーク（完走・決定論・`clone` 非破壊・合法手の `_validate_action` 適合・
 インバリアント検出）を回帰として固定する。
+
+### 3.2 CPU 思考トレース＋決定論リプレイ（挙動改善用・Phase 1）
+
+`tests/cpu_replay.py` は §3.1 と同じ決定論エンジン（全乱数を global random に集約・`action_api` で本番
+同一コアパス）の上に、**CPU の意思決定の中身**を 1 局ぶん 1 ファイルへローカル出力する。GCS（本番
+テレメトリ）に撮りに行かずに、手元で `grep`/`diff` して「なぜその手か」を読める。
+
+- **思考トレース（4 項目）**: 各意思決定（`type:"decision"` 行）に以下を記録する。
+  - `chosen`／`folded`: 選んだ手（card_id 基準）とターンを畳んだか。
+  - `candidates`: 上位候補（`prelim`＝1-ply 事前スコア／`deep`＝深掘りスコア。easy は prelim のみ）。
+  - `regret`: deep 最善 − 1-ply 貪欲手の deep 値（`decide_with_regret` と同義の崖エラー代理）。
+  - `j_components`: 選んだ手の結果盤面の **J値評価成分内訳**（`me`/`opp` のライフ・手札・場・ブロッカー
+    ・攻め圧・ドン等＋`plan_progress`/`telegraph`/`total`）。
+  - `read_ahead`: 読み筋（各手番で 1-ply 最善を辿った貪欲 PV。`REPEAT_CAP` ガードで膨張しない）。
+- **手記述は card_id 基準**（uuid は実行ごとに変わるため）＝同一 seed で安定再現・比較できる。
+- **トレースは観測専用**: `decide`/`decide_guarded` の `trace` 引数（既定 None＝**完全に無
+  オーバーヘッド・挙動不変**）で採取する。トレース構築の追加クローンは getstate/setstate で
+  RNG 中立化し、**トレース有無でゲーム進行が分岐しない**（評価関数の `evaluate(out=...)`／
+  `_side_score(out=...)` も `out=None` 時は採点を一切変えない＝ベースライン不変）。
+- **リプレイ種**: `--record seed.json` で `{seed, リーダー, 難易度}` の極小記述子を残し、
+  `--descriptor seed.json` で完全再現する。
+
+#### 実アプリ対局の取得（Phase 2・`opcg_sim/api/app.py`）
+
+実アプリの CPU 対戦も、**GCS（本番テレメトリ）に撮りに行かずに**思考トレース＋リプレイ種を残せる。
+
+- **opt-in**: `POST /api/game/create` に `cpu_trace=true`（任意で `seed`）を渡した対局のみ記録する。
+  未指定の本番対局は seed も触らず追加処理ゼロ＝**従来挙動を完全維持**（トレースは観測専用）。
+- **記録内容**: create 時に seed を固定（コイントス＋シャッフルを再現可能化）し、
+  人間/CPU 双方のアクションを card_id 基準で、CPU の各意思決定の思考トレース（4 項目）をメモリに蓄積する。
+- **取得**: `GET /api/game/{game_id}/replay` が `{replay: 種(schema/seed/leaders/decks/difficulty/actions),
+  decisions: 思考トレース列}` を返す。対局はメモリ常駐（Cloud Run は揮発）なので、対局中〜終了直後に
+  取得して保存/共有する想定。崩れた局面はそのまま `test_cpu_puzzles.py` の決定論ケースへ落とせる。
+- **実行例**:
+  ```bash
+  OPCG_LOG_SILENT=1 python tests/cpu_replay.py --seed 7 --difficulty hard --out /tmp/replay.jsonl
+  OPCG_LOG_SILENT=1 python tests/cpu_replay.py --seed 7 --difficulty hard --record /tmp/seed.json
+  OPCG_LOG_SILENT=1 python tests/cpu_replay.py --descriptor /tmp/seed.json --decisions-only --out -
+  ```
+
+`tests/test_cpu_replay.py` が回帰（trace の挙動不変・RNG 中立・決定論再現・トレース 4 項目の存在）を固定する。
+
+> 注: 汎用ログ（`log_event`／`logger_config.py`／`/api/log`／GCS/Slack 転送）は撤去済み。ログの扱いの
+> 正本は [`LOGGING.md`](LOGGING.md)。本番は Cloud Run の素の stdout 以外に明示的なアプリログを出さない。
 
 ---
 

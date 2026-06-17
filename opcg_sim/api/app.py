@@ -27,8 +27,6 @@ try:
     from opcg_sim.src.core.sandbox import SandboxManager
 except ImportError:
     pass
-
-from opcg_sim.src.utils.logger_config import session_id_ctx, log_event, save_batch_logs
 from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
@@ -78,7 +76,6 @@ class ConnectionManager:
                 self.active_connections[game_id].remove(websocket)
             if not self.active_connections[game_id]:
                 del self.active_connections[game_id]
-                log_event(level_key="INFO", action="sandbox.disconnect", msg=f"All connections closed for {game_id}. Starting 20-min grace period.", player="system")
                 asyncio.create_task(self.delayed_cleanup(game_id, 1200))
 
     async def delayed_cleanup(self, game_id: str, delay: int):
@@ -86,7 +83,6 @@ class ConnectionManager:
         if game_id not in self.active_connections or not self.active_connections[game_id]:
             if game_id in SANDBOX_GAMES:
                 del SANDBOX_GAMES[game_id]
-                log_event(level_key="INFO", action="sandbox.auto_delete", msg=f"Deleted sandbox {game_id} after grace period", player="system")
 
     async def broadcast(self, game_id: str, message: dict):
         if game_id in self.active_connections:
@@ -117,7 +113,7 @@ class GameConnectionManager:
             if game_id in RULE_ROOMS:
                 await websocket.send_json(build_rule_message(game_id))
         except Exception as e:
-            log_event("ERROR", "game_ws.initial_state_fail", f"Failed to send initial state: {e}", player="system")
+            pass
 
     def disconnect(self, websocket: WebSocket, game_id: str):
         conns = self.active_connections.get(game_id)
@@ -127,7 +123,6 @@ class GameConnectionManager:
             conns.remove(websocket)
         if not conns:
             del self.active_connections[game_id]
-            log_event("INFO", "game_ws.disconnect", f"All connections closed for rule game {game_id}. Grace period started.", player="system")
             asyncio.create_task(self.delayed_cleanup(game_id, 1200))
 
     async def delayed_cleanup(self, game_id: str, delay: int):
@@ -135,7 +130,6 @@ class GameConnectionManager:
         if not self.active_connections.get(game_id):
             RULE_ROOMS.pop(game_id, None)
             GAMES.pop(game_id, None)
-            log_event("INFO", "game_ws.auto_delete", f"Deleted rule game {game_id} after grace period", player="system")
 
     def count(self, game_id: str) -> int:
         return len(self.active_connections.get(game_id, []))
@@ -212,41 +206,16 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
     validated_state = None
     if success:
         try: validated_state = GameStateSchema(**raw_game_state).model_dump(by_alias=True)
-        except Exception as e: log_event(level_key="ERROR", action="api.validation", msg=f"Validation Error: {e}", player="system"); validated_state = raw_game_state 
+        except Exception: validated_state = raw_game_state
     pending_req_data = None
     if manager and success:
         pending_obj = manager.get_pending_request()
         if pending_obj:
             try: pending_req_data = PendingRequestSchema(**pending_obj).model_dump(by_alias=True)
-            except Exception as e: log_event(level_key="ERROR", action="api.pending_validation", msg=f"Pending Validation Error: {e}", player="system"); pending_req_data = pending_obj
+            except Exception: pending_req_data = pending_obj
     error_obj = None
     if not success: error_obj = {error_props.get('CODE', 'code'): error_code, error_props.get('MESSAGE', 'message'): error_msg}
     return {api_root_keys.get('SUCCESS', 'success'): success, "game_id": game_id, api_root_keys.get('GAME_STATE', 'game_state'): validated_state, api_root_keys.get('PENDING_REQUEST', 'pending_request'): pending_req_data, api_root_keys.get('ERROR', 'error'): error_obj, "action_events": getattr(manager, 'action_events', []) if manager else []}
-
-@app.middleware("http")
-async def trace_logging_middleware(request: Request, call_next):
-    s_id = request.headers.get("X-Session-ID") or request.query_params.get("sessionId")
-    if not s_id: s_id = f"gen-{uuid.uuid4().hex[:8]}"
-    token = session_id_ctx.set(s_id)
-    try:
-        response = await call_next(request); response.headers["X-Session-ID"] = s_id; return response
-    finally: session_id_ctx.reset(token)
-
-@app.options("/api/log")
-async def options_log(): return {"status": "ok"}
-
-@app.post("/api/log")
-async def receive_frontend_log(data: Union[Dict[str, Any], List[Dict[str, Any]]] = Body(...)):
-    if isinstance(data, list):
-        s_id = "unknown"
-        if len(data) > 0 and isinstance(data[0], dict): s_id = data[0].get("sessionId") or session_id_ctx.get()
-        token = session_id_ctx.set(s_id)
-        try: save_batch_logs(data, s_id); return {"status": "ok", "mode": "batch"}
-        finally: session_id_ctx.reset(token)
-    else:
-        s_id = data.get("sessionId") or session_id_ctx.get(); token = session_id_ctx.set(s_id)
-        try: log_event(level_key=data.get("level", "info"), action=data.get("action", "client.log"), msg=data.get("msg", ""), player=data.get("player", "system"), payload=data.get("payload"), source="FE"); return {"status": "ok", "mode": "single"}
-        finally: session_id_ctx.reset(token)
 
 GAMES: Dict[str, GameManager] = {}
 SANDBOX_GAMES: Dict[str, 'SandboxManager'] = {}
@@ -302,7 +271,6 @@ def load_deck_mixed(source_str: str, owner_id: str):
         master = card_db.get_card(leader_id)
         if master: leader_inst = CardInstance(master, owner_id)
     cards_inst = [CardInstance(m, owner_id) for cid in card_uuids if (m := card_db.get_card(cid))]
-    log_event("INFO", "loader.db_load", f"Loaded deck from DB: {deck_id}", player=owner_id)
     return leader_inst, cards_inst
 
 
@@ -324,7 +292,6 @@ def build_opp_profile_for_leader(leader_id: Optional[str]):
         masters = [m for m in masters if m is not None]
         return cpu_opponent_model.build_profile(masters)
     except Exception:
-        log_event("ERROR", "cpu_template.profile_fail", traceback.format_exc(), player="system")
         return None
 
 @app.options("/api/game/create")
@@ -344,10 +311,32 @@ def _resolve_first_player(value: Any, player1: Player, player2: Player) -> Optio
         return player2
     return None
 
+# === リプレイ種＋CPU思考トレース（実アプリ対局・Phase 2） ============================
+# すべて opt-in（create リクエストの cpu_trace=true）でのみ作動し、未指定の本番対局には
+# 一切の追加処理・レイテンシ・挙動変化を与えない（トレースは観測専用＝進行不変）。
+REPLAY_SCHEMA = "opcg-replay/v1"
+
+
+def _replay_enabled(meta) -> bool:
+    return bool(meta and meta.get("cpu_trace"))
+
+
+def _replay_record_action(meta, manager, src: str, player_id: str, movelike: Dict[str, Any]):
+    """traced CPU 対局のアクションを card_id 基準で記録する（再現用・例外安全・適用前に呼ぶ）。"""
+    if not _replay_enabled(meta):
+        return
+    try:
+        desc = cpu_ai._describe_move(manager, movelike) or {"action_type": movelike.get("action_type")}
+        meta.setdefault("actions", []).append(
+            {"src": src, "turn": manager.turn_count, "player": player_id, **desc})
+    except Exception:
+        pass
+
+
 @app.post("/api/game/create")
 async def game_create(req: Any = Body(...)):
     try:
-        game_id = str(uuid.uuid4()); log_event(level_key="INFO", action="game.create", msg=f"Creating game: {game_id}", payload=req, player="system")
+        game_id = str(uuid.uuid4()); 
         p1_source = req.get("p1_deck", ""); p2_source = req.get("p2_deck", "")
         if len(card_db.cards) < len(card_db.raw_db):
              for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
@@ -357,6 +346,13 @@ async def game_create(req: Any = Body(...)):
             p2_source = req.get("cpu_deck")
         p1_leader, p1_cards = load_deck_mixed(p1_source, req.get("p1_name", "P1")); p2_leader, p2_cards = load_deck_mixed(p2_source, req.get("p2_name", "P2"))
         player1 = Player(req.get("p1_name", "P1"), p1_cards, p1_leader); player2 = Player(req.get("p2_name", "P2"), p2_cards, p2_leader)
+        # リプレイ種（opt-in）: cpu_trace 指定時のみ seed を固定し、コイントス＋シャッフルを再現可能にする。
+        # 未指定の本番対局は seed を触らない＝従来の乱数挙動を完全に維持する。
+        cpu_trace = bool(req.get("cpu_trace", False)) and vs_cpu
+        replay_seed = None
+        if cpu_trace:
+            replay_seed = int(req.get("seed")) if req.get("seed") is not None else random.randrange(2**63)
+            random.seed(replay_seed)
         # 先行プレイヤー: ソロは "p1"/"p2"、CPU は "random"（コイントス）。未指定は既定。
         first_player = _resolve_first_player(req.get("first_player"), player1, player2)
         manager = GameManager(player1, player2); manager.start_game(first_player); GAMES[game_id] = manager
@@ -376,13 +372,23 @@ async def game_create(req: Any = Body(...)):
                                                          leader=p2_leader.master if p2_leader else None,
                                                          opp_profile=opp_profile)
                 except Exception:
-                    log_event("ERROR", "cpu_self_plan.fail", traceback.format_exc(), player="system")
+                    pass
             CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty,
                                   "opp_profile": opp_profile, "self_plan": self_plan}
-            log_event("INFO", "game.cpu_create", f"CPU game {game_id} (difficulty={difficulty}, cpu={player2.name}, profile={'yes' if opp_profile else 'no'}, plan={self_plan.archetype if self_plan else 'none'})", player="system")
+            if cpu_trace:
+                # リプレイ種＋思考ログの器を用意する（opt-in 時のみ）。
+                CPU_GAMES[game_id].update({
+                    "cpu_trace": True, "seed": replay_seed,
+                    "first_player": first_player.name if first_player else None,
+                    "leaders": {"p1": p1_leader.master.card_id if p1_leader else None,
+                                "p2": p2_leader.master.card_id if p2_leader else None},
+                    "decks": {"p1": [ci.master.card_id for ci in p1_cards],
+                              "p2": [ci.master.card_id for ci in p2_cards]},
+                    "actions": [], "decisions": [],
+                })
         return build_game_result_hybrid(manager, game_id)
     except Exception as e:
-        log_event(level_key="ERROR", action="game.create_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "game_id": "", "error": {"message": str(e)}}
+        return {"success": False, "game_id": "", "error": {"message": str(e)}}
 
 @app.options("/api/game/action")
 async def options_game_action(): return {"status": "ok"}
@@ -397,12 +403,15 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         manager.action_events = []
         # ディスパッチは action_api（CPU ドライバ・自己対戦ランナーと同一コアパス）へ委譲する。
         current_player = manager.p1 if player_id == manager.p1.name else manager.p2
+        _meta = CPU_GAMES.get(game_id)
+        _src = "cpu" if (_meta and player_id == _meta.get("cpu_player_id")) else "human"
+        _replay_record_action(_meta, manager, _src, player_id, {"action_type": action_type, "payload": payload})
         action_api.apply_game_action(manager, current_player, action_type, payload)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
         return result
     except Exception as e:
-        log_event(level_key="ERROR", action="game.action_fail", msg=traceback.format_exc(), player=player_id, payload=req); return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
+        return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
 
 @app.options("/api/game/state")
 async def options_game_state(): return {"status": "ok"}
@@ -432,17 +441,20 @@ async def options_game_battle(): return {"status": "ok"}
 async def game_battle(req: BattleActionRequest):
     game_id = req.game_id; player_id = req.player_id; action_type = req.action_type; card_uuid = req.card_uuid
     manager = GAMES.get(game_id); error_codes = CONST.get('ERROR_CODES', {}); battle_types = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
-    if not manager: log_event("ERROR", "api.battle_action", f"Game not found: {game_id}", player=player_id); return build_game_result_hybrid(None, game_id, success=False, error_code=error_codes.get('GAME_NOT_FOUND', 'GAME_NOT_FOUND'), error_msg="Game not found")
+    if not manager: return build_game_result_hybrid(None, game_id, success=False, error_code=error_codes.get('GAME_NOT_FOUND', 'GAME_NOT_FOUND'), error_msg="Game not found")
     player = manager.p1 if player_id == manager.p1.name else manager.p2
     try:
         manager.action_events = []
         # ディスパッチは action_api（CPU ドライバ・自己対戦ランナーと同一コアパス）へ委譲する。
+        _meta = CPU_GAMES.get(game_id)
+        _src = "cpu" if (_meta and player_id == _meta.get("cpu_player_id")) else "human"
+        _replay_record_action(_meta, manager, _src, player_id, {"action_type": action_type, "card_uuid": card_uuid})
         action_api.apply_battle_action(manager, player, action_type, card_uuid)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
         return result
     except Exception as e:
-        log_event("ERROR", "game.battle_fail", traceback.format_exc(), player=player_id); return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
+        return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
 
 @app.options("/api/game/cpu/step")
 async def options_game_cpu_step(): return {"status": "ok"}
@@ -485,9 +497,19 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
             pending = manager.get_pending_request()
             if pending and pending.get("player_id") == cpu_pid:
                 turn_mem = meta.setdefault("turn_mem", {})
+                trace_on = _replay_enabled(meta)
+                tr = {} if trace_on else None
                 move = cpu_ai.decide_guarded(manager, cpu_player, difficulty, mem=turn_mem,
-                                             profile=meta.get("opp_profile"), plan=meta.get("self_plan"))
+                                             profile=meta.get("opp_profile"), plan=meta.get("self_plan"),
+                                             trace=tr)
                 if move is not None:
+                    if trace_on:
+                        # 思考トレース＋アクションを適用前に記録（card_id 基準・進行には不参加）。
+                        meta.setdefault("decisions", []).append(
+                            {"turn": manager.turn_count, "player": cpu_pid, **tr})
+                        _replay_record_action(meta, manager, "cpu", cpu_pid, {
+                            "action_type": move["action_type"], "card_uuid": move.get("card_uuid"),
+                            "payload": move.get("payload")})
                     if move["kind"] == "battle":
                         action_api.apply_battle_action(manager, cpu_player, move["action_type"], move.get("card_uuid"))
                     else:
@@ -501,8 +523,35 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
         await broadcast_rule_state(game_id)
         return result
     except Exception as e:
-        log_event("ERROR", "game.cpu_step_fail", traceback.format_exc(), player=cpu_pid)
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
+
+@app.options("/api/game/{game_id}/replay")
+async def options_game_replay(game_id: str): return {"status": "ok"}
+
+
+@app.get("/api/game/{game_id}/replay")
+async def game_replay(game_id: str):
+    """traced CPU 対局の「リプレイ種＋CPU思考トレース」を返す（GCS 不要・メモリ常駐）。
+
+    create 時に `cpu_trace=true` を指定した対局のみ記録される。返す内容:
+      - 種（descriptor）: schema/seed/first_player/leaders/decks/difficulty/actions（card_id 基準）
+      - decisions: 各 CPU 意思決定の思考トレース（chosen/candidates/regret/j_components/read_ahead）
+    対局はメモリ常駐（Cloud Run は揮発）なので、対局中〜終了直後に取得して保存/共有する想定。
+    """
+    meta = CPU_GAMES.get(game_id)
+    if not _replay_enabled(meta):
+        return {"success": False, "error": {"code": "REPLAY_NOT_FOUND",
+                "message": "この対局のリプレイ記録がありません（cpu_trace 未指定 or 不明なゲーム）。"}}
+    descriptor = {
+        "schema": REPLAY_SCHEMA, "seed": meta.get("seed"),
+        "first_player": meta.get("first_player"), "difficulty": meta.get("difficulty"),
+        "cpu_player_id": meta.get("cpu_player_id"),
+        "leaders": meta.get("leaders"), "decks": meta.get("decks"),
+        "actions": meta.get("actions", []),
+    }
+    return {"success": True, "game_id": game_id,
+            "replay": descriptor, "decisions": meta.get("decisions", [])}
+
 
 @app.get("/api/assets/version")
 async def get_assets_version():
@@ -522,7 +571,7 @@ async def get_all_cards(request: Request, response: Response):
         response.headers["Cache-Control"] = "no-cache"
         return {"success": True, "cards": cards_data}
     except Exception as e:
-        log_event("ERROR", "api.get_cards_fail", traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
+        return {"success": False, "error": str(e)}
 
 @app.post("/api/deck")
 async def save_deck(deck_data: Dict[str, Any] = Body(...)):
@@ -530,9 +579,9 @@ async def save_deck(deck_data: Dict[str, Any] = Body(...)):
     try:
         doc_ref = db.collection("decks").document(deck_data["id"]) if "id" in deck_data and deck_data["id"] else db.collection("decks").document()
         save_data = {"id": doc_ref.id, "name": deck_data.get("name", "Untitled Deck"), "leader_id": deck_data.get("leader_id"), "card_uuids": deck_data.get("card_uuids", []), "don_uuids": deck_data.get("don_uuids", []), "created_at": firestore.SERVER_TIMESTAMP}
-        doc_ref.set(save_data); log_event("INFO", "deck.save", f"Deck saved: {save_data['name']}", player="system", payload={"deck_id": doc_ref.id}); return {"success": True, "deck_id": doc_ref.id}
+        doc_ref.set(save_data); return {"success": True, "deck_id": doc_ref.id}
     except Exception as e:
-        log_event("ERROR", "deck.save_fail", traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
+        return {"success": False, "error": str(e)}
 
 @app.delete("/api/deck/{deck_id}")
 async def delete_deck(deck_id: str):
@@ -540,10 +589,8 @@ async def delete_deck(deck_id: str):
         return {"success": False, "error": "Database not initialized"}
     try:
         db.collection("decks").document(deck_id).delete()
-        log_event("INFO", "deck.delete", f"Deck deleted: {deck_id}", player="system")
         return {"success": True, "deck_id": deck_id}
     except Exception as e:
-        log_event("ERROR", "deck.delete_fail", traceback.format_exc(), player="system")
         return {"success": False, "error": str(e)}
 
 @app.get("/api/deck/get")
@@ -558,7 +605,6 @@ async def get_deck(id: str):
             }
         }
     except Exception as e:
-        log_event(level_key="ERROR", action="api.get_deck_fail", msg=str(e), player="system")
         return {"success": False, "error": str(e)}
 
 @app.get("/api/deck/list")
@@ -572,7 +618,7 @@ async def list_decks():
                 if "created_at" in d and d["created_at"]: d["created_at"] = str(d["created_at"])
                 decks.append(d)
         except Exception as e:
-            log_event("ERROR", "deck.list_db_fail", traceback.format_exc(), player="system")
+            pass
     return {"success": True, "decks": decks}
 
 # --- CPU 相手モデル（テンプレートデッキ）: deck と同形・leader_id 引き当て（docs/SPEC.md §2.5.4） ---
@@ -587,10 +633,8 @@ async def save_cpu_template(tpl_data: Dict[str, Any] = Body(...)):
                      "leader_id": tpl_data.get("leader_id"), "card_uuids": tpl_data.get("card_uuids", []),
                      "don_uuids": tpl_data.get("don_uuids", []), "created_at": firestore.SERVER_TIMESTAMP}
         doc_ref.set(save_data)
-        log_event("INFO", "cpu_template.save", f"Template saved: {save_data['name']}", player="system", payload={"template_id": doc_ref.id})
         return {"success": True, "template_id": doc_ref.id}
     except Exception as e:
-        log_event("ERROR", "cpu_template.save_fail", traceback.format_exc(), player="system")
         return {"success": False, "error": str(e)}
 
 @app.delete("/api/cpu_template/{template_id}")
@@ -598,10 +642,8 @@ async def delete_cpu_template(template_id: str):
     if not db: return {"success": False, "error": "Database not initialized"}
     try:
         db.collection("cpu_templates").document(template_id).delete()
-        log_event("INFO", "cpu_template.delete", f"Template deleted: {template_id}", player="system")
         return {"success": True, "template_id": template_id}
     except Exception as e:
-        log_event("ERROR", "cpu_template.delete_fail", traceback.format_exc(), player="system")
         return {"success": False, "error": str(e)}
 
 @app.get("/api/cpu_template/get")
@@ -615,7 +657,6 @@ async def get_cpu_template(id: str):
         if d.get("created_at"): d["created_at"] = str(d["created_at"])
         return {"success": True, "template": d}
     except Exception as e:
-        log_event("ERROR", "cpu_template.get_fail", traceback.format_exc(), player="system")
         return {"success": False, "error": str(e)}
 
 @app.get("/api/cpu_template/list")
@@ -629,7 +670,7 @@ async def list_cpu_templates():
                 if d.get("created_at"): d["created_at"] = str(d["created_at"])
                 templates.append(d)
         except Exception as e:
-            log_event("ERROR", "cpu_template.list_db_fail", traceback.format_exc(), player="system")
+            pass
     return {"success": True, "templates": templates}
 
 @app.get("/api/sandbox/list")
@@ -654,14 +695,14 @@ async def sandbox_list():
 @app.post("/api/sandbox/create")
 async def sandbox_create(req: Any = Body(...)):
     try:
-        game_id = str(uuid.uuid4()); log_event(level_key="INFO", action="sandbox.create", msg=f"Creating sandbox: {game_id}", payload=req, player="system")
+        game_id = str(uuid.uuid4()); 
         p1_name = req.get("p1_name", "P1"); p2_name = req.get("p2_name", "P2")
         if "SandboxManager" not in globals(): raise ImportError("SandboxManager not loaded")
         manager = SandboxManager(p1_name=p1_name, p2_name=p2_name, room_name=req.get("room_name", "Custom Room"))
         SANDBOX_GAMES[manager.game_id] = manager
         return {"success": True, "game_id": manager.game_id, "game_state": manager.to_dict()}
     except Exception as e:
-        log_event(level_key="ERROR", action="sandbox.create_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
+        return {"success": False, "error": str(e)}
 
 @app.post("/api/sandbox/action")
 async def sandbox_action(req: Dict[str, Any] = Body(...)):
@@ -682,7 +723,7 @@ async def sandbox_action(req: Dict[str, Any] = Body(...)):
         await ws_manager.broadcast(game_id, broadcast_msg)
         return {"success": True, "game_id": game_id, "game_state": new_state}
     except Exception as e:
-        log_event(level_key="ERROR", action="sandbox.action_fail", msg=traceback.format_exc(), player="system"); return {"success": False, "error": str(e)}
+        return {"success": False, "error": str(e)}
 
 @app.websocket("/ws/sandbox/{game_id}")
 async def websocket_endpoint(websocket: WebSocket, game_id: str):
@@ -717,10 +758,8 @@ async def rule_create(req: Any = Body(...)):
             "deck_preview": {"p1": None, "p2": None},
         }
         RULE_ROOMS[game_id] = room
-        log_event("INFO", "rule.create", f"Creating rule room: {game_id}", payload=req, player="system")
         return {"success": True, "game_id": game_id, **_rule_room_meta(game_id), "game_state": None}
     except Exception as e:
-        log_event("ERROR", "rule.create_fail", traceback.format_exc(), player="system")
         return {"success": False, "error": str(e)}
 
 @app.get("/api/rule/list")
@@ -755,7 +794,7 @@ def _deck_preview(deck_id: str, owner_id: str) -> Dict[str, Any]:
         if master:
             return {"leader_id": master.card_id, "leader_name": master.name}
     except Exception as e:
-        log_event("WARNING", "rule.deck_preview_fail", f"{deck_id}: {e}", player="system")
+        pass
     return None
 
 @app.options("/api/rule/action")
@@ -798,15 +837,12 @@ async def rule_action(req: Dict[str, Any] = Body(...)):
             manager = GameManager(player1, player2); manager.start_game(first_player)
             GAMES[game_id] = manager
             room["status"] = "PLAYING"
-            log_event("INFO", "rule.coin", f"First player: {first_player.name}", player="system")
-            log_event("INFO", "rule.start", f"Rule game started: {game_id}", player="system")
         else:
             return {"success": False, "error": f"Unknown rule action: {act}"}
 
         await game_ws_manager.broadcast(game_id, build_rule_message(game_id))
         return {"success": True, "game_id": game_id, **build_rule_message(game_id)}
     except Exception as e:
-        log_event("ERROR", "rule.action_fail", traceback.format_exc(), player="system")
         return {"success": False, "error": str(e)}
 
 @app.websocket("/ws/game/{game_id}")
@@ -818,4 +854,4 @@ async def game_websocket_endpoint(websocket: WebSocket, game_id: str):
         game_ws_manager.disconnect(websocket, game_id)
 
 @app.get("/health")
-async def health(): return {"status": "ok", "constants_loaded": bool(CONST), "session_id": session_id_ctx.get()}
+async def health(): return {"status": "ok", "constants_loaded": bool(CONST)}

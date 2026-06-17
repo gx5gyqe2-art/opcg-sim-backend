@@ -6,7 +6,6 @@ from ...models.effect_types import (
     EffectNode, GameAction, Sequence, Branch, Choice, ValueSource, Condition, TargetQuery, _nfc
 )
 from ...models.enums import ActionType, Zone, TriggerType, ConditionType, CompareOperator, Player, CardType
-from ...utils.logger_config import log_event
 import re
 
 # 選択グループ分配（§7-1）で「N枚を選び」の選択集合を保存する save_id。
@@ -33,7 +32,6 @@ class EffectResolver:
         # 1. 条件チェック
         if ability.condition and not self._check_condition(player, ability.condition, source_card):
             self._log_failure_snapshot(player, source_card, ability, "CONDITION_MISMATCH", f"Condition type: {ability.condition.type.name}")
-            log_event("INFO", "resolver.condition_failed", f"Condition not met for {source_card.master.name}", player=player.name)
             return
 
         # 1.5 使用回数制限（【ターン1回】等）の enforce。
@@ -48,7 +46,6 @@ class EffectResolver:
             used_count = source_card.ability_used_this_turn.get(limit_key, 0)
             if used_count >= turn_limit:
                 self._log_failure_snapshot(player, source_card, ability, "TURN_LIMIT_REACHED", f"Used {used_count}/{turn_limit} this turn")
-                log_event("WARNING", "resolver.turn_limit", f"Ability already used {used_count}/{turn_limit} this turn: {source_card.master.name}", player=player.name)
                 return
 
         # 2. コストチェック
@@ -57,7 +54,6 @@ class EffectResolver:
         #   払えない ON_PLAY 等を持つカードを出すとゲームが落ちていた）。
         if ability.cost and not self._can_satisfy_node(player, ability.cost, source_card):
             self._log_failure_snapshot(player, source_card, ability, "COST_UNSATISFIED", "Insufficient resources or targets for cost")
-            log_event("INFO", "resolver.cost_skipped", f"Optional cost cannot be paid — ability skipped: {source_card.master.name}", player=player.name)
             return
 
         # 2.5 任意コストの使用確認（A-3）。「〜できる：効果」のコスト句は任意で、自動誘発
@@ -168,7 +164,6 @@ class EffectResolver:
             candidates = get_target_cards(self.game_manager, node.target, source_card)
             required = getattr(node.target, 'count', 1)
             if getattr(node.target, 'is_strict_count', False) and len(candidates) < required:
-                log_event("DEBUG", "resolver.satisfy_fail", f"Insufficient candidates for {node.type.name}: {len(candidates)}/{required}", player=player.name)
                 return False
             if not getattr(node.target, 'is_up_to', False) and len(candidates) == 0:
                 return False
@@ -215,7 +210,6 @@ class EffectResolver:
                 # 既に遅延フラッシュ中（_flushing_delayed）の再実行は通常どおり実行する。
                 if getattr(node, "delay", None) == "TURN_END" and not self.context.get("_flushing_delayed"):
                     self.game_manager.pending_end_of_turn.append((player, node, source_card))
-                    log_event("INFO", "resolver.defer_turn_end", f"Deferred to end of turn: {node.type.name}", player=player.name)
                     continue
 
                 # 任意効果（「〜してもよい」）: 発動するかを yes/no で確認する。未確認なら中断し、
@@ -233,7 +227,6 @@ class EffectResolver:
 
                 self.context["last_action_success"] = success
                 if not success and node.raw_text and ":" in (source_card.master.effect_text or ""):
-                    log_event("WARNING", "resolver.cost_failed", "Action failed, stopping execution", player=player.name)
                     self.execution_stack.clear()
                     return
 
@@ -281,8 +274,7 @@ class EffectResolver:
                 else:
                     p.deck.insert(0, card)
             if leftover:
-                log_event("INFO", "resolver.temp_reclaim",
-                          f"Returned {len(leftover)} revealed card(s) to origin zone top", player=p.name)
+                pass
 
     def _expand_main_effect(self, source_card, ref_trigger=None):
         """source_card 自身の参照先トリガー能力の効果を実行スタックへ展開する。
@@ -294,7 +286,6 @@ class EffectResolver:
         多段展開（自己参照）による無限ループを防ぐためフラグで1回に限定する。
         """
         if self.context.get("_main_expanded"):
-            log_event("WARNING", "resolver.execute_main_loop", "EXECUTE_MAIN_EFFECT re-entry blocked", player=source_card.owner_id)
             return
         self.context["_main_expanded"] = True
 
@@ -318,13 +309,11 @@ class EffectResolver:
                 if ab.trigger == TriggerType.COUNTER and ab.effect is not None
             ]
         if not main_abilities:
-            log_event("WARNING", "resolver.execute_main_missing", f"No {primary.name}/COUNTER ability on {source_card.master.name}", player=source_card.owner_id)
             return
 
         # 既存スタックの「後」に積む = 先に実行されるよう reversed で push
         for ab in reversed(main_abilities):
             self.execution_stack.append(ab.effect)
-        log_event("INFO", "resolver.execute_main", f"Expanded {len(main_abilities)} main effect(s) of {source_card.master.name}", player=source_card.owner_id)
 
     def _execute_selected_main(self, player, cards, ref_trigger=None):
         """選んだカード（トラッシュのイベント等）の【メイン】効果を、そのカードを source として発動する。
@@ -349,12 +338,8 @@ class EffectResolver:
                 mains = [ab for ab in card.master.abilities
                          if ab.trigger == TriggerType.COUNTER and ab.effect is not None]
             if not mains:
-                log_event("WARNING", "resolver.execute_selected_missing",
-                          f"No {primary.name}/COUNTER ability on {card.master.name}", player=player.name)
                 continue
             for ab in mains:
-                log_event("INFO", "resolver.execute_selected",
-                          f"Executing {primary.name} of {card.master.name} (from trash)", player=player.name)
                 self.game_manager.resolve_ability(player, ab, source_card=card)
                 if self.game_manager.active_interaction:
                     return
@@ -372,7 +357,6 @@ class EffectResolver:
             self.context["_last_had_targets"] = None
 
         if action.target and not targets and not getattr(action.target, 'is_up_to', False):
-            log_event("INFO", "resolver.no_targets", f"No targets found for action {action.type.name}", player=player.name)
             # ▼▼▼ 追加: 失敗履歴 ▼▼▼
             self.action_history.append({
                 "action": action.type.name if hasattr(action.type, 'name') else str(action.type),
@@ -632,7 +616,6 @@ class EffectResolver:
             return []
 
         if is_strict and len(candidates) < required_count:
-            log_event("INFO", "resolver.strict_count_fail", f"Insufficient targets for strict count: found {len(candidates)}, needed {required_count}", player=player.name)
             return []
 
         # 隠しゾーン（デッキ/ライフ）の直接ターゲットは「上から」位置指定で自動取得する。
@@ -696,8 +679,6 @@ class EffectResolver:
         target_player = player
         if condition.player == Player.OPPONENT:
             target_player = self.game_manager.p2 if player == self.game_manager.p1 else self.game_manager.p1
-        
-        log_event("DEBUG", "resolver.check_condition", f"Checking {condition.type.name} for {target_player.name}", player=player.name)
 
         current_val = 0
         target_val = condition.value if isinstance(condition.value, int) else 0
@@ -894,8 +875,6 @@ class EffectResolver:
                 # 置換の対象指定（「元々のコストN以上のキャラがKOされる」EB03-001）: 離脱カードの
                 # 元々コスト（master.cost）を比較する。
                 return self._compare(source_card.master.cost or 0, condition.operator, sv[1])
-            log_event("WARNING", "resolver.source_state_unknown",
-                      f"Unknown SOURCE_STATE subtype: {sv}", player=player.name)
             return False
 
         elif condition.type == ConditionType.FIELD_ALL_TRAIT:
@@ -1021,17 +1000,12 @@ class EffectResolver:
             card = self.context.get("last_revealed_card")
             declared = self.context.get("declared_cost")
             if card is None or declared is None:
-                log_event("INFO", "resolver.declared_cost_missing",
-                          "DECLARED_COST_MATCH: missing revealed card or declared cost", player=player.name)
                 return False  # 情報が無ければ不成立（誤発動防止）
             return card.master.cost == declared
 
         elif condition.type == ConditionType.REVEALED_CARD_TRAIT:
             card = self.context.get("last_revealed_card")
             if card is None:
-                log_event("WARNING", "resolver.revealed_card_missing",
-                          "REVEALED_CARD_TRAIT: no last_revealed_card in context",
-                          player=player.name)
                 return True  # コンテキスト未設定は permissive fallback
             val = condition.value
             if not isinstance(val, dict):
@@ -1075,18 +1049,12 @@ class EffectResolver:
 
         # 真に解釈不能な OTHER は fail-safe に倒す（誤発動を防ぐ）。
         if condition.type == ConditionType.OTHER:
-            log_event("WARNING", "resolver.condition_unhandled",
-                      f"Unparseable condition treated as False (fail-safe): {condition.raw_text[:40]}",
-                      player=player.name)
             return False
 
         # GENERIC は「実在するが未分類の条件」（例: リーダーが多色／レストのキャラが2枚以上）。
         # これらを False に倒すと多数の効果が永久に不発になり誤発動より有害なため、
         # 暫定的に許容(True)しつつ可視化する。分類拡充で個別に評価可能化していく。
         if condition.type == ConditionType.GENERIC:
-            log_event("INFO", "resolver.condition_generic",
-                      f"GENERIC condition permitted (unclassified): {condition.raw_text[:40]}",
-                      player=player.name)
             return True
 
         return True
@@ -1124,7 +1092,6 @@ class EffectResolver:
                 "node": node
             }
         }
-        log_event("INFO", "resolver.suspend", "Suspended for player choice", player=player.name)
 
     def _suspend_for_ability_cost_confirm(self, player, ability, source_card):
         """任意コスト能力（「〜できる：効果」）の使用可否を確認するため中断する。
@@ -1141,7 +1108,6 @@ class EffectResolver:
                 "confirm_ability": ability,
             },
         }
-        log_event("INFO", "resolver.suspend", "Suspended for optional cost confirmation", player=player.name)
 
     def _suspend_for_optional_confirmation(self, player, node, source_card):
         """任意効果（「〜してもよい」）の発動可否を yes/no で確認するため中断する。
@@ -1160,7 +1126,6 @@ class EffectResolver:
                 "optional_node": node,
             },
         }
-        log_event("INFO", "resolver.suspend", "Suspended for optional confirmation", player=player.name)
 
     def resume_optional(self, player, source_card, accepted, optional_node, execution_stack, effect_context):
         """任意効果確認からの再開。accepted=True なら確認済みにして再投入、False ならスキップ。"""
@@ -1231,9 +1196,6 @@ class EffectResolver:
                 "fixed_position": fixed_position,
             },
         }
-        log_event("INFO", "resolver.suspend",
-                  f"Suspended for deck/life arrange ({dest_kind}, reorder={needs_reorder}, pos={needs_pos})",
-                  player=player.name)
 
     def _suspend_for_cost_declaration(self, player, source_card):
         """C8: 数値（コスト）の宣言を待つインタラクションへ中断する。
@@ -1251,7 +1213,6 @@ class EffectResolver:
                 "source_card_uuid": source_card.uuid,
             },
         }
-        log_event("INFO", "resolver.suspend", "Suspended for cost declaration", player=player.name)
 
     def _suspend_for_target_selection(self, player, candidates, query, source_card, action_node=None):
         required_count = getattr(query, 'count', 1)
@@ -1310,7 +1271,6 @@ class EffectResolver:
         if selectable_uuids is not None:
             interaction["selectable_uuids"] = selectable_uuids
         self.game_manager.active_interaction = interaction
-        log_event("INFO", "resolver.suspend", f"Suspended for target selection (min:{min_select}, max:{required_count})", player=player.name)
 
     def _suspend_for_don_selection(self, player, action, source_card, value) -> bool:
         """RETURN_DON の対象ドン!!選択で中断する。戻せるドン!!が無ければ False を返し中断しない。
@@ -1341,8 +1301,6 @@ class EffectResolver:
                 "source_card_uuid": source_card.uuid if source_card else None,
             },
         }
-        log_event("INFO", "resolver.suspend",
-                  f"Suspended for DON selection (n:{to_return})", player=tp.name)
         return True
 
     def resume_choice(self, player, source_card, selected_index, execution_stack, effect_context):

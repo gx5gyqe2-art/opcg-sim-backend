@@ -5,7 +5,6 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from ..models.models import CardInstance, DonInstance
 from ..models.enums import Zone
-from ..utils.logger_config import log_event
 
 
 
@@ -39,12 +38,10 @@ class SandboxManager:
         p = self.state[pid]
         p["deck"] = deck
         p["leader"] = leader
-        log_event("INFO", "sandbox.set_deck", f"Set deck for {pid}", player="system")
 
     def toggle_ready(self, pid: str):
         if self.status != "WAITING": return
         self.ready_states[pid] = not self.ready_states[pid]
-        log_event("INFO", "sandbox.ready", f"Player {pid} ready: {self.ready_states[pid]}", player="system")
 
     def kick_player(self, pid: str):
         if self.status != "WAITING": return
@@ -52,7 +49,6 @@ class SandboxManager:
         p["deck"] = []
         p["leader"] = None
         self.ready_states[pid] = False
-        log_event("INFO", "sandbox.kick", f"Player {pid} kicked", player="system")
 
     def start_game(self):
         if self.status != "WAITING": return
@@ -63,7 +59,6 @@ class SandboxManager:
         self.mulligan_finished = {"p1": False, "p2": False}
         self.setup_initial_state()
         self.start_turn_process()
-        log_event("INFO", "sandbox.start", "Sandbox game started", player="system")
 
     def setup_initial_state(self):
         for pid in ["p1", "p2"]:
@@ -116,7 +111,6 @@ class SandboxManager:
 
         self.setup_initial_state()
         self.start_turn_process()
-        log_event("INFO", "sandbox.reset", "Game reset executed", player="system")
 
     def mulligan(self, pid: str):
         p = self.state[pid]
@@ -125,12 +119,10 @@ class SandboxManager:
         random.shuffle(p["deck"])
         for _ in range(5):
             if p["deck"]: p["hand"].append(p["deck"].pop(0))
-        log_event("INFO", "sandbox.mulligan", f"Player {pid} executed mulligan", player=pid)
 
     def shuffle_deck(self, pid: str):
         p = self.state[pid]
         random.shuffle(p["deck"])
-        log_event("INFO", "sandbox.shuffle", f"Player {pid} shuffled deck", player=pid)
 
     def refresh_phase(self):
         p = self.state[self.active_player_id]
@@ -177,10 +169,8 @@ class SandboxManager:
         spid, szone, sidx = self._find_card_location(card_uuid)
         if not spid: return False
         if spid != dest_pid:
-            log_event("WARNING", "sandbox.move_blocked", "Cannot move card to opponent's area.", player="system")
             return False
         if szone == "leader":
-            log_event("WARNING", "sandbox.move_blocked", "Leader card is immovable.", player="system")
             return False
         p_src, p_dest = self.state[spid], self.state[dest_pid]
         cost = 0
@@ -204,7 +194,6 @@ class SandboxManager:
         if cost > 0:
             for _ in range(min(cost, len(p_src["don_active"]))):
                 don = p_src["don_active"].pop(0); don.is_rest = True; p_src["don_rested"].append(don)
-        log_event("INFO", "sandbox.move_card", f"Moved {card_uuid} to {dest_zone} at index {index}", player="system")
         return True
 
     def attach_don(self, don_uuid: str, target_uuid: str):
@@ -245,7 +234,6 @@ class SandboxManager:
             pid = req.get("player_id")
             if pid in self.mulligan_finished:
                 self.mulligan_finished[pid] = True
-                log_event("INFO", "sandbox.mulligan_finish", f"Player {pid} finished mulligan", player=pid)
         elif at == "KICK_PLAYER":
             target = req.get("target_player_id")
             if target in ["p1", "p2"]:
