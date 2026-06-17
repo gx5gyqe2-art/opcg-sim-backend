@@ -499,9 +499,11 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                 turn_mem = meta.setdefault("turn_mem", {})
                 trace_on = _replay_enabled(meta)
                 tr = {} if trace_on else None
+                # ライブ採取は軽量トレース（read_ahead=読み筋は省く）＝CPU 思考の遅延を抑える。
+                # 読み筋はオフライン（cpu_replay.py／リプレイ種）でのみ採る。
                 move = cpu_ai.decide_guarded(manager, cpu_player, difficulty, mem=turn_mem,
                                              profile=meta.get("opp_profile"), plan=meta.get("self_plan"),
-                                             trace=tr)
+                                             trace=tr, trace_read_ahead=False)
                 if move is not None:
                     if trace_on:
                         # 思考トレース＋アクションを適用前に記録（card_id 基準・進行には不参加）。

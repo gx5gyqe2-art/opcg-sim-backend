@@ -177,6 +177,10 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 - **取得**: `GET /api/game/{game_id}/replay` が `{replay: 種(schema/seed/leaders/decks/difficulty/actions),
   decisions: 思考トレース列}` を返す。対局はメモリ常駐（Cloud Run は揮発）なので、対局中〜終了直後に
   取得して保存/共有する想定。崩れた局面はそのまま `test_cpu_puzzles.py` の決定論ケースへ落とせる。
+- **ライブは軽量トレース**（`trace_read_ahead=False`）: 最も重い `read_ahead`（読み筋＝各手番で全合法手を
+  クローンする貪欲 PV）を**省く**＝CPU 思考のレイテンシをトレース無しとほぼ同等に保つ（実測: light≒none、
+  full は約 +50%）。候補スコア・regret・J値成分は探索の回収＋クローン1回で安価なので残す。**読み筋は
+  オフライン（`cpu_replay.py`／リプレイ種の再生）でのみ**採る。
 - **実行例**:
   ```bash
   OPCG_LOG_SILENT=1 python tests/cpu_replay.py --seed 7 --difficulty hard --out /tmp/replay.jsonl
