@@ -3,3 +3,5 @@ __pycache__/
 .venv/
 .env
 .DS_Store
+# ビルド時生成のパース済みカードキャッシュ（image に焼くもの。リポジトリには含めない）
+opcg_sim/data/*.cache.pkl
