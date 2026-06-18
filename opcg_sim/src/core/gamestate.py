@@ -1182,6 +1182,11 @@ class GameManager:
         # 場を離れると新規状態になるため【ターン1回】の使用回数もリセットする。
         if dest_zone in [Zone.TRASH, Zone.HAND]:
             card.reset_turn_status(clear_usage=True)
+
+        # レスト（横向き）状態は場を離れたら必ず解除する。レストのキャラを手札/トラッシュ/
+        # デッキへ戻すと横向きのまま戻ってしまう不具合を防ぐ（is_rest は場でのみ意味を持つ）。
+        if dest_zone in [Zone.TRASH, Zone.HAND, Zone.DECK]:
+            card.is_rest = False
             
         # フィールドから離れる場合、付与されていたドン‼をレスト状態で持ち主に返す
         if current_owner and current_list is not None and current_list is current_owner.field:
