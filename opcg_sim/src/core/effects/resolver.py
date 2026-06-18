@@ -749,9 +749,14 @@ class EffectResolver:
             return self._compare(current_val, condition.operator, target_val)
 
         elif condition.type == ConditionType.TURN_COUNT:
-            # 「自分の第Nターン以降の場合」（OP15-058）。turn_count を N と比較する。
-            return self._compare(getattr(self.game_manager, "turn_count", 0),
-                                 condition.operator, target_val)
+            # 「自分の第Nターン以降の場合」（OP15-058）。turn_count はゲーム全体の通し番号で
+            # 先攻=1,3,5… / 後攻=2,4,6… と交互に進む（gamestate の turn 進行コメント参照）。
+            # そのため turn_count を直接 N と比較すると、後攻は自分の第1ターン(turn_count=2)で
+            # 「第2ターン以降」を満たし、1ターン早く撃ててしまう。手番プレイヤー自身の
+            # 「第何ターンか」へ変換してから比較する。own_turn = ceil(turn_count/2) は
+            # 先攻/後攻に依らず正しい（先攻 1,3,5→1,2,3 ／ 後攻 2,4,6→1,2,3）。
+            own_turn = (getattr(self.game_manager, "turn_count", 0) + 1) // 2
+            return self._compare(own_turn, condition.operator, target_val)
 
         elif condition.type == ConditionType.EVENT_THIS_TURN:
             # 「〈イベント〉した時」: このターン中に当該イベントが発生したか（value=(名前, しきい値)）。

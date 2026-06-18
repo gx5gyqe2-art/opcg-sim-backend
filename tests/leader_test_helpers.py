@@ -28,7 +28,7 @@ import conftest  # noqa: F401  (google スタブ & sys.path)
 
 import effect_coverage as cov
 from engine_helpers import make_master, make_instance
-from opcg_sim.src.models.models import CardInstance
+from opcg_sim.src.models.models import CardInstance, DonInstance
 from opcg_sim.src.models.enums import CardType, Color, Attribute
 from opcg_sim.src.utils.loader import CardLoader
 
@@ -207,6 +207,22 @@ def leader_power(player, my_turn=True):
 
 def don_total(player):
     return len(player.don_active) + len(player.don_rested)
+
+
+def set_don(player, *, active=0, rested=0):
+    """player のコストエリアを active 枚・rested 枚に作り直す（付与系テスト用）。
+
+    カード効果「レストのドン‼N枚まで付与」は“既にレスト状態のドン”のみを付与し、
+    アクティブのドンは巻き込まない（アクティブのドン付与は基本アクション側の役割）。
+    その検証用に、レスト/アクティブの枚数を明示セットする。付与中ドンはクリアする。"""
+    player.don_active = [DonInstance(owner_id=player.name) for _ in range(active)]
+    rd = []
+    for _ in range(rested):
+        d = DonInstance(owner_id=player.name)
+        d.is_rest = True
+        rd.append(d)
+    player.don_rested = rd
+    player.don_attached_cards = []
 
 
 def zone_counts(player):

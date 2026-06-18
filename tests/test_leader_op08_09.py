@@ -12,7 +12,7 @@ from leader_test_helpers import (
     build, get_ability, auto_resolve,
     select_uuids, confirm, choose,
     add_char, clear_field, set_life,
-    leader_power, don_total, zone_counts,
+    leader_power, don_total, zone_counts, set_don,
 )
 
 
@@ -26,6 +26,7 @@ def test_op08_001_attach_rested_don_to_animal_chars():
     """OP08-001 起動メイン: 《動物》キャラ3体それぞれにレストのドン1枚ずつ付与。"""
     gm, p1, p2, L = build("OP08-001")
     clear_field(p1)
+    set_don(p1, active=2, rested=3)            # レストのドン3枚を用意（各キャラに1枚ずつ付与）
     c1 = add_char(p1, name="動物1", traits=["動物"])
     c2 = add_char(p1, name="動物2", traits=["動物"])
     c3 = add_char(p1, name="動物3", traits=["ドラム王国"])
@@ -36,6 +37,8 @@ def test_op08_001_attach_rested_don_to_animal_chars():
     assert c1.attached_don == 1
     assert c2.attached_don == 1
     assert c3.attached_don == 1
+    assert len(p1.don_active) == 2             # アクティブは不変（レスト化しない）
+    assert len(p1.don_rested) == 0             # レストのドン3枚が付与へ移動
     # 付与されたドンはレスト状態
     assert all(d.is_rest for d in p1.don_attached_cards)
 

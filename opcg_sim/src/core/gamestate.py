@@ -2640,9 +2640,19 @@ class GameManager:
                         owner.don_active.append(target)
                 success = True
             elif act_name == "ATTACH_DON":
-                # value 枚のドン!!を付与する。status に "RESTED" を含めばレストのドンを
-                # レストのまま付与する（無ければもう一方のプールから補う）。status に "OPP" を
-                # 含めば相手のドンプールから付与する（OP15-015「相手のレストのドン‼を付与」）。
+                # value 枚のドン!!を付与する。status に "OPP" を含めば相手のドンプールから
+                # 付与する（OP15-015「相手のレストのドン‼を付与」）。
+                #
+                # status に "RESTED" を含む（テキスト「レストのドン‼N枚まで付与」。全98枚がこの
+                # 一文言で、「(ドンを)レストにして付与」型は0枚）効果は、コストエリアの“既にレスト
+                # 状態のドン”だけを付与する。アクティブのドンは絶対にレストにしない・巻き込まない。
+                # 「N枚まで」＝あるだけで可なので、レストが足りなければ少なく付与する。
+                #   理由: アクティブのドンを「レストにして付与」するのは基本アクションの『ドン付与』
+                #   （action_api ATTACH_DON＝don_active 由来。get_legal_actions も don_active>0 で提示）の
+                #   役割で、これらカード効果はそれとは別物＝既にレストのドン（コスト支払いで生じた／
+                #   エネルが ramp で追加した等）を再活用する。従来はレスト不足時にアクティブへ
+                #   フォールバックし、アクティブのドンまでレスト化して吸っていた＝全カード共通のバグ。
+                # status に "RESTED" を含まない汎用「ドン付与」は従来どおり active 優先・尽きたら rested。
                 st = action.status or ""
                 from_rested = ("RESTED" in st)
                 from_opp = ("OPP" in st)
@@ -2650,9 +2660,10 @@ class GameManager:
                 n = value if value and value > 0 else 1
                 attached = 0
                 for _ in range(n):
-                    pool = don_owner.don_rested if from_rested else don_owner.don_active
-                    if not pool:
-                        pool = don_owner.don_active if from_rested else don_owner.don_rested
+                    if from_rested:
+                        pool = don_owner.don_rested
+                    else:
+                        pool = don_owner.don_active or don_owner.don_rested
                     if not pool:
                         break
                     don = pool.pop(0)

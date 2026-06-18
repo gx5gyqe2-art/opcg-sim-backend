@@ -99,6 +99,46 @@ def test_enel_passive_grants_power_2000_at_don_le_6():
     assert c.get_power(True) == 10000
 
 
+def test_enel_leader_activate_gated_by_own_second_turn():
+    """OP15-058 起動メイン「自分の第2ターン以降」: turn_count はゲーム通し番号
+    （先攻 1,3,5… / 後攻 2,4,6…）。手番プレイヤー自身の第何ターンかへ補正して判定するため、
+    後攻の自分の第1ターン(turn_count=2)では不成立、第2ターン(turn_count=4)で成立する。
+    従来は turn_count を直接比較し、後攻が自分の第1ターンで「第2ターン以降」を満たして
+    1ターン早く撃てていた（off-by-one）。"""
+    gm, p1, _ = game("OP15-058")
+    ab = next(a for a in p1.leader.master.abilities
+              if a.trigger == TriggerType.ACTIVATE_MAIN)
+    r = EffectResolver(gm)
+    gm.turn_count = 1; assert r._check_condition(p1, ab.condition, p1.leader) is False  # 先攻 第1ターン
+    gm.turn_count = 2; assert r._check_condition(p1, ab.condition, p1.leader) is False  # 後攻 第1ターン
+    gm.turn_count = 3; assert r._check_condition(p1, ab.condition, p1.leader) is True   # 先攻 第2ターン
+    gm.turn_count = 4; assert r._check_condition(p1, ab.condition, p1.leader) is True   # 後攻 第2ターン
+
+
+def test_enel_attach_uses_only_rested_don_not_active():
+    """OP15-058 起動メイン「レストのドン‼4枚まで付与」: ドンデッキから追加したレストのドンだけを
+    付与し、アクティブのドンを巻き込まない。ドンデッキ6枚固定でアクティブ3・デッキ3だと、
+    ramp のレスト追加は2枚に留まり付与も2枚（アクティブ4枚は不変）。従来はアクティブへ
+    フォールバックし、アクティブのドンまでキャラに吸われていた。"""
+    gm, p1, _ = game("OP15-058")
+    gm.turn_count = 4
+    c = inst("OP15-061", "P1")  # オーム（付与先キャラ）
+    p1.field.append(c)
+    for pool in (p1.don_active, p1.don_rested, p1.don_attached_cards, p1.don_deck):
+        pool.clear()
+    p1.don_active = [DonInstance(owner_id="P1") for _ in range(3)]
+    p1.don_deck = [DonInstance(owner_id="P1") for _ in range(3)]  # アクティブ3＋デッキ3＝計6
+    ab = next(a for a in p1.leader.master.abilities
+              if a.trigger == TriggerType.ACTIVATE_MAIN)
+    from leader_test_helpers import auto_resolve, select_uuids
+    gm.resolve_ability(p1, ab, p1.leader)
+    auto_resolve(gm, p1, plan=[select_uuids([c.uuid])])  # 付与先キャラの選択を解決
+    assert c.attached_don == 2                 # 実在レスト2枚のみ付与
+    assert len(p1.don_active) == 4             # ramp で +1、付与では減らない（アクティブ非流用）
+    assert len(p1.don_rested) == 0
+    assert all(d.is_rest for d in p1.don_attached_cards)
+
+
 def test_prin_selects_sanji_or_event():
     """OP12-071 プリン: 「「サンジ」かイベント」は名前 OR 種類で、サンジ(キャラ)も選べる。"""
     gm, p1, _ = game("OP15-058")
