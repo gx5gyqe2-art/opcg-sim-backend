@@ -411,6 +411,7 @@ def test_op15_058_ramp_and_attach_when_active():
     """OP15-058 能力1: ドンランプ(アクティブ1)＋キャラにレストドン4付与。"""
     gm, p1, p2, L = build("OP15-058")
     gm._apply_passive_effects(p1)
+    gm.turn_count = 4  # 自分の第2ターン（条件「第2ターン以降」成立。既定 turn_count=2 は後攻の第1ターン）
     clear_field(p1)
     c = add_char(p1, name="付与先", power=1000)
     don_before = don_total(p1)
@@ -422,10 +423,10 @@ def test_op15_058_ramp_and_attach_when_active():
 
 
 def test_op15_058_blocked_on_first_turn():
-    """OP15-058 能力1: 第1ターンでは条件未達で発動しないはず（GENERIC常時Trueのバグ）。"""
+    """OP15-058 能力1: 第1ターン(先攻 turn_count=1)では条件未達で発動しない。"""
     gm, p1, p2, L = build("OP15-058")
     gm._apply_passive_effects(p1)
-    gm.turn_count = 1  # 自分の第1ターン
+    gm.turn_count = 1  # 先攻 p1 の自分の第1ターン
     clear_field(p1)
     c = add_char(p1, name="付与先", power=1000)
     don_before = don_total(p1)
@@ -434,6 +435,52 @@ def test_op15_058_blocked_on_first_turn():
     # 第1ターンなのでドンランプも付与も起きないはず
     assert don_total(p1) == don_before
     assert c.attached_don == 0
+
+
+def test_op15_058_blocked_on_second_player_first_turn():
+    """OP15-058 能力1: 後攻の自分の第1ターン(turn_count=2)でも『第2ターン以降』未達で発動しない。
+
+    turn_count はゲーム全体の通し番号（先攻=1,3,5… / 後攻=2,4,6…）。従来は turn_count を直接
+    N と比較していたため、後攻 p1 が turn_count=2（自分の第1ターン）で条件を満たし、1ターン早く
+    撃てていた。手番プレイヤー自身の第何ターンかへ補正することで正しく弾く。"""
+    gm, p1, p2, L = build("OP15-058")
+    gm._apply_passive_effects(p1)
+    gm.turn_count = 2  # 後攻 p1 の自分の第1ターン
+    clear_field(p1)
+    c = add_char(p1, name="付与先", power=1000)
+    don_before = don_total(p1)
+    gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
+    auto_resolve(gm, p1)
+    assert don_total(p1) == don_before
+    assert c.attached_don == 0
+
+
+def test_op15_058_attach_uses_only_rested_not_active_when_deck_short():
+    """OP15-058 付与は『レストのドン』だけ。レスト不足でもアクティブを巻き込まない。
+
+    エネルのドンデッキは6枚固定。アクティブ3・デッキ3の状態だと、起動メインの
+    「ドン1アクティブ＋4レスト追加」でデッキが枯渇しレストは2枚しか乗らない。その後の
+    「レストのドン‼4枚までを付与」は“まで”なので実在の2枚で打ち切るのが正しく、
+    アクティブのドンを流用して4枚付与してはならない（従来はアクティブへフォールバックしていた）。"""
+    from opcg_sim.src.models.models import DonInstance
+    gm, p1, p2, L = build("OP15-058")
+    gm._apply_passive_effects(p1)
+    gm.turn_count = 4  # 自分の第2ターン（条件成立）
+    clear_field(p1)
+    c = add_char(p1, name="付与先", power=1000)
+    # ドン総数6（エネル規則）: アクティブ3＋デッキ3、レスト/付与は0
+    for pool in (p1.don_active, p1.don_rested, p1.don_attached_cards, p1.don_deck):
+        pool.clear()
+    p1.don_active = [DonInstance(owner_id=p1.name) for _ in range(3)]
+    p1.don_deck = [DonInstance(owner_id=p1.name) for _ in range(3)]
+    gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
+    auto_resolve(gm, p1, plan=[select_uuids([c.uuid])])
+    # ramp: アクティブ+1(=4)・レスト+2(デッキ枯渇)。付与は実在レスト2枚のみ。
+    assert c.attached_don == 2, f"レスト2枚だけ付与されるべき (got {c.attached_don})"
+    assert len(p1.don_active) == 4, f"アクティブは巻き込まれない (got {len(p1.don_active)})"
+    assert len(p1.don_rested) == 0
+    assert len(p1.don_attached_cards) == 2
+    assert all(d.is_rest for d in p1.don_attached_cards)
 
 
 # ===========================================================================

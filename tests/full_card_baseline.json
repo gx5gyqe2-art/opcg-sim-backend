@@ -2375,7 +2375,7 @@
 "OP15-056|TRIGGER": "p1_hand:5→7, p1_deck:20→18 | pw0,kw0,rs0,co0",
 "OP15-057|ON_OPP_ATTACK": "- | pw0,kw0,rs0,co0",
 "OP15-057|ON_PLAY": "p1_hand:6→5, p1_stage:0→1 | pw0,kw0,rs0,co0",
-"OP15-058|ACTIVATE_MAIN": "p1_don:10→11 | pw0,kw0,rs0,co0",
+"OP15-058|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
 "OP15-058|PASSIVE": "- | pw0,kw0,rs0,co0",
 "OP15-059|ON_OPP_ATTACK": "- | pw0,kw0,rs1,co0",
 "OP15-060|ACTIVATE_MAIN": "p1_hand:5→4, p1_trash:10→11, p1_don:10→9 | pw0,kw1,rs0,co0",

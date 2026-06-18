@@ -1611,6 +1611,9 @@ class GameManager:
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance,
                         cost_confirmed: bool = False):
         if source_card.negated or source_card.is_effect_negated: return
+        # 効果ごとにリセット: 「ramp でレストのドンを追加→その後そのレストのドンを付与」
+        # （エネル OP15-058）の文脈印。前の効果からの漏れを防ぐ。
+        self._effect_ramped_rested_don = False
         resolver = EffectResolver(self)
         resolver.resolve_ability(player, ability, source_card, cost_confirmed=cost_confirmed)
         for ev in resolver.action_history:
@@ -2359,6 +2362,9 @@ class GameManager:
                     don.is_rest = add_rested
                     if add_rested:
                         player.don_rested.append(don)
+                        # 同一効果内の後続 ATTACH_DON(レスト) が「この追加したレストのドンだけ」を
+                        # 付与する（アクティブを巻き込まない）よう印を立てる。エネル OP15-058 用。
+                        self._effect_ramped_rested_don = True
                     else:
                         player.don_active.append(don)
             return True
@@ -2641,18 +2647,34 @@ class GameManager:
                 success = True
             elif act_name == "ATTACH_DON":
                 # value 枚のドン!!を付与する。status に "RESTED" を含めばレストのドンを
-                # レストのまま付与する（無ければもう一方のプールから補う）。status に "OPP" を
-                # 含めば相手のドンプールから付与する（OP15-015「相手のレストのドン‼を付与」）。
+                # レストのまま付与する。status に "OPP" を含めば相手のドンプールから付与する
+                # （OP15-015「相手のレストのドン‼を付与」）。
+                #
+                # レスト付与の供給元はカードで2種類ある（文言は同一「レストのドン‼N枚まで付与」）:
+                #   (1) エネル型: 同一効果内で直前に「ドンデッキからレストで追加」した“そのレストの
+                #       ドン”を付与する。レストが足りなくても（「まで」＝あるだけで可）アクティブを
+                #       巻き込まない。従来はアクティブへフォールバックし、ドンデッキ6枚固定で
+                #       レスト追加が不足するとアクティブのドンまでキャラに吸われていた（バグ）。
+                #   (2) ジンベエ型(OP14-040 ほか): ramp を伴わず、自分のアクティブのドンをレストに
+                #       して付与する（leader_specs 前提「アクティブドン2以上」）。レストが無ければ
+                #       アクティブから補う（従来どおり）。
+                # 同一効果内で RAMP_DON(レスト) を行った直後の付与だけを (1) と判定する
+                # （_effect_ramped_rested_don は resolve_ability 開始時にリセット）。
                 st = action.status or ""
                 from_rested = ("RESTED" in st)
                 from_opp = ("OPP" in st)
                 don_owner = (self.p2 if player == self.p1 else self.p1) if from_opp else player
+                skip_active_fallback = from_rested and getattr(self, "_effect_ramped_rested_don", False)
+                self._effect_ramped_rested_don = False  # 消費（1回の付与で使い切る）
                 n = value if value and value > 0 else 1
                 attached = 0
                 for _ in range(n):
-                    pool = don_owner.don_rested if from_rested else don_owner.don_active
-                    if not pool:
-                        pool = don_owner.don_active if from_rested else don_owner.don_rested
+                    if from_rested:
+                        pool = don_owner.don_rested
+                        if not pool and not skip_active_fallback:
+                            pool = don_owner.don_active
+                    else:
+                        pool = don_owner.don_active or don_owner.don_rested
                     if not pool:
                         break
                     don = pool.pop(0)
