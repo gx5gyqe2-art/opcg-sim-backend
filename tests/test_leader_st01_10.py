@@ -74,16 +74,31 @@ def _drive(gm, player, prefer_uuids=()):
 # ===========================================================================
 
 def test_st01_001_attach_rested_don_to_leader():
-    """ST01-001 起動メイン: このリーダーにレストのドン1枚付与でパワー+1000、ドンはレスト。"""
+    """ST01-001 起動メイン「レストのドン1枚まで付与」: 既にレスト状態のドンを付与して
+    パワー+1000。アクティブのドンはレストにしない（巻き込まない）。"""
     gm, p1, p2, L = build("ST01-001")
+    _set_field_don(p1, 2, 1)                   # アクティブ2・レスト1
     ab = get_ability(L.master, "ACTIVATE_MAIN")
-    don_before = don_total(p1)
     gm.resolve_ability(p1, ab, L)
     gm.resolve_interaction(p1, select_uuids([L.uuid]))
     assert leader_power(p1) == 6000           # +1000
     assert L.attached_don == 1
-    assert don_total(p1) == don_before - 1     # 場のドンが1枚付与へ移動
+    assert len(p1.don_active) == 2            # アクティブは不変（レスト化しない）
+    assert len(p1.don_rested) == 0            # レストのドンが付与へ移動
     assert all(d.is_rest for d in p1.don_attached_cards)  # レスト状態で付与
+
+
+def test_st01_001_attach_zero_when_no_rested_don():
+    """ST01-001「レストのドン1枚まで付与」: レストのドンが無ければ「〜枚まで」なので0枚付与。
+    アクティブのドンは基本アクション側の役割で、この効果では触らない（壊れではなくルール通り）。"""
+    gm, p1, p2, L = build("ST01-001")
+    _set_field_don(p1, 3, 0)                   # アクティブのみ
+    ab = get_ability(L.master, "ACTIVATE_MAIN")
+    gm.resolve_ability(p1, ab, L)
+    auto_resolve(gm, p1, plan=[select_uuids([L.uuid])])
+    assert L.attached_don == 0                # 0枚付与
+    assert leader_power(p1) == 5000
+    assert len(p1.don_active) == 3            # アクティブ不変
 
 
 def test_st01_001_attach_zero_is_allowed():
@@ -101,6 +116,7 @@ def test_st01_001_attach_zero_is_allowed():
 def test_st01_001_turn_once_blocks_second():
     """ST01-001 起動メイン: 【ターン1回】なので同一ターンの2回目は不発。"""
     gm, p1, p2, L = build("ST01-001")
+    _set_field_don(p1, 2, 2)                        # レストのドンを用意（付与で +1000）
     ab = get_ability(L.master, "ACTIVATE_MAIN")
     gm.resolve_ability(p1, ab, L)
     gm.resolve_interaction(p1, select_uuids([L.uuid]))
@@ -344,13 +360,14 @@ def test_st07_001_cost_unconditional_effect_gated_at_high_life():
 def test_st08_001_attach_rested_don_to_leader():
     """ST08-001: 自分ターン中のKO連動で、このリーダーにレストのドン1枚付与（+1000、レスト）。"""
     gm, p1, p2, L = build("ST08-001")
-    don_before = don_total(p1)
+    _set_field_don(p1, 2, 1)                          # アクティブ2・レスト1
     ab = get_ability(L.master, "ON_KO")
     gm.resolve_ability(p1, ab, L)
     _drive(gm, p1, prefer_uuids=[L.uuid])
     assert leader_power(p1) == 6000                  # +1000
     assert L.attached_don == 1
-    assert don_total(p1) == don_before - 1
+    assert len(p1.don_active) == 2                   # アクティブは不変（レスト化しない）
+    assert len(p1.don_rested) == 0                   # レストのドンが付与へ移動
     assert all(d.is_rest for d in p1.don_attached_cards)  # レスト状態
 
 

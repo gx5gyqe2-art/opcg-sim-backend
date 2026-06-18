@@ -14,7 +14,7 @@ from leader_test_helpers import (
     build, get_ability, auto_resolve,
     select_uuids, confirm, choose,
     add_char, make_char, clear_field, set_life,
-    leader_power, don_total, zone_counts,
+    leader_power, don_total, zone_counts, set_don,
 )
 
 
@@ -118,9 +118,11 @@ def test_op14_020_active_don_when_cost5_char_present():
 # ===========================================================================
 
 def test_op14_040_discard_then_attach_rested_don2():
-    """OP14-040 起動メイン: 手札1捨て→魚人族キャラにレストドン2枚付与。"""
+    """OP14-040 起動メイン: 手札1捨て→魚人族キャラに『レストのドン』2枚付与。
+    既にレスト状態のドンを付与し、アクティブのドンはレストにしない（巻き込まない）。"""
     gm, p1, p2, L = build("OP14-040")
     clear_field(p1)
+    set_don(p1, active=2, rested=2)            # アクティブ2・レスト2
     target = add_char(p1, name="魚人", power=5000, traits=["魚人族"])
     hand_before = zone_counts(p1)["hand"]
     trash_before = zone_counts(p1)["trash"]
@@ -131,8 +133,24 @@ def test_op14_040_discard_then_attach_rested_don2():
     assert zone_counts(p1)["hand"] == hand_before - 1
     assert zone_counts(p1)["trash"] == trash_before + 1
     assert target.attached_don == 2
+    assert len(p1.don_active) == 2            # アクティブは不変（レスト化しない）
+    assert len(p1.don_rested) == 0            # レストのドン2枚が付与へ移動
     # 付与されたドンはレスト状態
     assert all(d.is_rest for d in p1.don_attached_cards if d.attached_to == target.uuid)
+
+
+def test_op14_040_no_attach_when_no_rested_don():
+    """OP14-040「レストのドン2枚まで付与」: レストのドンが無ければ「〜枚まで」なので0枚付与。
+    アクティブのドンは巻き込まない（壊れではなくルール通り）。"""
+    gm, p1, p2, L = build("OP14-040")
+    clear_field(p1)
+    set_don(p1, active=3, rested=0)            # アクティブのみ
+    target = add_char(p1, name="魚人", power=5000, traits=["魚人族"])
+    discard = p1.hand[0]
+    gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
+    auto_resolve(gm, p1, plan=[select_uuids([discard.uuid]), select_uuids([target.uuid])])
+    assert target.attached_don == 0
+    assert len(p1.don_active) == 3            # アクティブ不変
 
 
 def test_op14_040_no_eligible_target_no_attach():
