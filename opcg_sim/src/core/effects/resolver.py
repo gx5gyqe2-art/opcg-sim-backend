@@ -162,6 +162,12 @@ class EffectResolver:
             if not node.target: return True
             from .matcher import get_target_cards
             candidates = get_target_cards(self.game_manager, node.target, source_card)
+            # 「このカード/ステージをレストにする」等のレストコストは、対象が現在アクティブ
+            # （未レスト）でなければ支払えない（レスト済みは再レストできない）。対象フィルタは
+            # レスト状態を問わない（is_rest=None）ため候補にレスト済みも含まれ、自己レストを伴う
+            # 起動メイン（ハチノス OP09-099 等）がレスト後も何度も撃てていた。
+            if node.type == ActionType.REST:
+                candidates = [c for c in candidates if not getattr(c, "is_rest", False)]
             required = getattr(node.target, 'count', 1)
             if getattr(node.target, 'is_strict_count', False) and len(candidates) < required:
                 return False
