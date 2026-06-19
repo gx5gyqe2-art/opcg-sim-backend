@@ -3,6 +3,7 @@ from typing import List, Optional, Any, Set, Dict, Tuple
 import uuid
 import os
 import json
+import copy as _copy
 from .enums import CardType, Color, Attribute, ActionType, Phase, Player
 from .effect_types import Ability
 
@@ -147,6 +148,30 @@ class CardInstance:
             self.uuid = str(uuid.uuid4())
         self._refresh_keywords()
 
+    def __deepcopy__(self, memo):
+        """高速 deepcopy（CPU 先読みの GameManager.clone が支配的コスト＝この複製。§2.5.2）。
+
+        汎用 deepcopy は __dict__ を内省して全フィールドを再帰コピーするため重い。CardInstance の
+        フィールドは **スカラ ＋ プリミティブ（str/int）だけを要素に持つ set/dict** と、不変共有の
+        `master`（CardMaster.__deepcopy__ が self を返す）に限られる。よって set/dict は浅コピーで
+        独立な深コピーになり、スカラ/master はそのまま共有してよい。想定外の可変属性のみ安全側で
+        汎用 deepcopy にフォールバックする（正しさを保ったまま再帰・内省コストを排除）。
+        """
+        new = CardInstance.__new__(CardInstance)
+        memo[id(self)] = new
+        nd = new.__dict__
+        for k, v in self.__dict__.items():
+            t = type(v)
+            if t is set:
+                nd[k] = set(v)
+            elif t is dict:
+                nd[k] = dict(v)
+            elif v is None or t is int or t is str or t is bool or t is float or t is CardMaster:
+                nd[k] = v
+            else:
+                nd[k] = _copy.deepcopy(v, memo)
+        return new
+
     def _refresh_keywords(self):
         if self.ability_disabled:
             self.current_keywords = set()
@@ -259,6 +284,13 @@ class DonInstance:
     # refresh_all がレストのドン!!をアクティブに戻す際、これが立っていれば1回スキップし
     # フラグを下ろす（キャラの flags["FREEZE"] と同じ1回限りのフリーズ）。
     is_frozen: bool = False
+
+    def __deepcopy__(self, memo):
+        """高速 deepcopy（CardInstance と同趣旨・§2.5.2）。全フィールドがスカラなので直接複製する。"""
+        new = DonInstance.__new__(DonInstance)
+        memo[id(self)] = new
+        new.__dict__.update(self.__dict__)
+        return new
 
     def to_dict(self):
         props = CONST.get('CARD_PROPERTIES', {})

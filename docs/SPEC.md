@@ -144,7 +144,12 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 
 ### 2.5.2 AI 設計（`cpu_ai.py`）
 - **状態複製**: `GameManager.clone()`（`copy.deepcopy` ベース。WebSocket 等の非データ参照は持たない）。
-  本体（self）は一切変化させず、`action_events` 等の一時状態はリセットする。
+  本体（self）は一切変化させず、`action_events` 等の一時状態はリセットする。**先読みの支配的コストは
+  この clone**（プロファイルで ~96%）。`CardMaster`（不変＝共有）に加え `CardInstance`／`DonInstance` に
+  **高速 `__deepcopy__`** を実装し、汎用 deepcopy の内省・再帰を排除（フィールドはスカラ＋プリミティブ要素の
+  set/dict＋共有 master に限られるので、set/dict は浅コピーで独立な深コピーになる。想定外の可変属性のみ
+  汎用 deepcopy へフォールバック）。clone が **~3 倍高速化**＝同レイテンシで探索ホライズンを深められる
+  （下記 `HARD_HORIZON=3`）。回帰=`tests/test_clone_fast.py`（独立性・master 共有・複数参照の同一性）。
 - **合法手列挙**: `GameManager.get_legal_actions(player)`（支払可能な手札・アクティブな攻撃者・有効な
   攻撃対象・起動可能効果）。生成手は `_validate_action` を通る。
 - **評価関数** `evaluate(manager, me, see_opp_hand=True)→float`: **J値理論**（J値＝白＝デッキ残＋
@@ -179,12 +184,15 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
   （自ターン途中の甘い局面で評価せず＝horizon の抜け道を塞ぐ）。`decide_guarded` が暴走防止ガード（手総数・
   繰り返しキャップ）で収束を保証する。
   - **ホライズン**: ルート手は 1-ply で事前選別し、上位 `HARD_ROOT_BEAM` 手＋`TURN_END`（パスの基準線）
-    のみを **`HARD_HORIZON`（既定=2）ターン先**まで深掘りする（深掘り集合のみ採用＝評価ホライズンを一致
+    のみを **`HARD_HORIZON`（既定=3）ターン先**まで深掘りする（深掘り集合のみ採用＝評価ホライズンを一致
     させ誤選択を防ぐ）。**horizon=1=B1**（相手ターン開始で評価・相手ターンへ潜らない）、**horizon=2=B2-lite**
     （相手のターンを丸ごと＝攻撃まで読み、自分の次ターン開始で評価）＝相手の反撃に対する守り（ブロッカー／
-    カウンター温存）を min/max で読む。手ごと均等予算 `HARD_PER_MOVE_BUDGET`・各ノード幅 `HARD_BEAM`・総
-    ply 上限 `HARD_MAX_PLY`。予算はレイテンシ予算（切れても settle で境界評価）で、1 手を実用域（平均 ~1 秒）
-    に保つ。`easy` は素の 1-ply のまま（探索なし）。
+    カウンター温存）を min/max で読む。**horizon=3**（さらに自分の次ターン→相手の次ターン開始まで）で
+    相手の反撃後の立て直しまで読む。手ごと均等予算 `HARD_PER_MOVE_BUDGET`（=90）・各ノード幅 `HARD_BEAM`・
+    総 ply 上限 `HARD_MAX_PLY`（=40）。**horizon だけ上げても予算切れで turn2 止まりになる**（予算が実深さの
+    律速）ため、clone の ~3 倍高速化（上記 `__deepcopy__`）と併せて予算 36→90 に増やし horizon 2→3 を実現。
+    予算はレイテンシ予算（切れても settle で境界評価）で、中盤 decide 実測 **平均 ~1.0s／最大 ~1.1s**
+    （高速化前の horizon=2/予算36 ~1.4s より速く、かつ 1 ターン深い）。`easy` は素の 1-ply のまま（探索なし）。
   - **効果ターゲット選択を探索分岐へ（`_selection_moves`）**: 効果の**単一対象選択**（KO／除去／バウンス／
     手札破壊／場溢れトラッシュ＝ `SEARCH_AND_SELECT`・最大1体）は、`_drain_own_interactions` で既定解決
     せず**候補ごとの手に展開して探索する**（`stop_at_select`）。これにより「相手のどのキャラを除去するか」
