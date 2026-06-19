@@ -319,6 +319,62 @@ def _prune_don_moves(manager, actor_name: str, moves: List[Dict[str, Any]]) -> L
     return out
 
 
+def _attacker_has_on_attack(card) -> bool:
+    """attacker が【アタック時】能力を持つか。持つ場合は対象を倒せ/貫けなくても発動自体が目的に
+    なり得る（カタリーナ OP16-104 等）ため、無駄攻撃の除外対象から外す（保守的に残す）。"""
+    for ab in getattr(getattr(card, "master", None), "abilities", ()) or ():
+        if getattr(ab, "trigger", None) == TriggerType.ON_ATTACK:
+            return True
+    return False
+
+
+def _prune_futile_attacks(manager, actor_name: str, moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """無駄攻撃（攻撃側の有効パワー < 対象の有効パワー＝KO も貫通もできない）を CPU 候補から除外する。
+
+    キャラ攻撃で対象を KO できない／リーダー攻撃で素通り（ライフを取れない）攻撃は、攻撃者をレストに
+    するだけで何も達成しない（しかも相手は防御不要なのでカウンターも強要できない）。にもかかわらず
+    探索は「自ターンが続く＝攻め圧 `W_ATTACKER` ぶん」TURN_END より高く評価し、相手リーダーが防御効果で
+    パワーを上げ自軍の小型が顔に届かない局面（OP11-041 ナミの【相手のアタック時】+2000 等）で、CPU が
+    倒せないキャラへ無駄攻撃していた（2026-06-19 報告）。**現在の有効パワーで届かない攻撃**を落とす。
+    届かせるためのドン付与は別手（ATTACH_DON）として残るので、付与→攻撃の貫通筋は損なわない。
+    【アタック時】持ちは効果が目的になり得るため除外しない。CPU の探索/方策のみで作用しエンジンの
+    合法手列挙は変えない（人間プレイは無駄攻撃も自由）。
+    """
+    if not moves:
+        return moves
+    actor = _player_by_name(manager, actor_name)
+    opp = _other(manager, actor_name)
+    atk_by_uuid = {}
+    for u in ([actor.leader] if actor.leader is not None else []) + list(actor.field):
+        uid = getattr(u, "uuid", None)
+        if uid is not None:
+            atk_by_uuid[uid] = u
+    tgt_by_uuid = {}
+    for u in ([opp.leader] if opp.leader is not None else []) + list(opp.field):
+        uid = getattr(u, "uuid", None)
+        if uid is not None:
+            tgt_by_uuid[uid] = u
+
+    def _pw(card, is_attacker):
+        try:
+            return float(card.get_power(is_attacker))
+        except Exception:
+            return float(getattr(getattr(card, "master", None), "power", 0) or 0)
+
+    out: List[Dict[str, Any]] = []
+    for m in moves:
+        if m.get("action_type") == "ATTACK":
+            payload = m.get("payload") or {}
+            a = atk_by_uuid.get(payload.get("uuid"))
+            tids = payload.get("target_ids") or []
+            t = tgt_by_uuid.get(tids[0]) if tids else None
+            if (a is not None and t is not None and not _attacker_has_on_attack(a)
+                    and _pw(a, True) < _pw(t, False)):
+                continue  # 無駄攻撃: 現在の有効パワーでは KO も貫通もできない
+        out.append(m)
+    return out
+
+
 def _next_turn_don(p) -> int:
     """`p` の次ターンに使える見込みドン!! 枚数（コスト低減の資源価値化・§2.5.3）。
 
@@ -1072,6 +1128,7 @@ def _search(manager, root_name: str, alpha: float, beta: float,
     if moves is None:
         moves = manager.get_legal_actions(actor)
         moves = _prune_don_moves(manager, actor_name, moves)  # B-2: 無意味なドン付与を手生成段で除外
+        moves = _prune_futile_attacks(manager, actor_name, moves)  # 倒せない/届かない無駄攻撃を除外
     if not moves:
         return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
     is_max = (actor_name == root_name)
@@ -1480,6 +1537,7 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
             trace["regret"] = 0.0
         return moves[0]
     moves = _prune_don_moves(manager, player.name, moves)  # B-2: 無意味なドン付与をルートから除外
+    moves = _prune_futile_attacks(manager, player.name, moves)  # 倒せない/届かない無駄攻撃を除外
 
     name = player.name
     end_move = next((m for m in moves if m.get("action_type") == "TURN_END"), None)
@@ -1574,6 +1632,7 @@ def decide_with_regret(manager, player, difficulty: str = "normal",
 
     name = player.name
     moves = _prune_don_moves(manager, name, moves)  # B-2: ルート手集合を decide と一致させる（regret 整合）
+    moves = _prune_futile_attacks(manager, name, moves)  # 倒せない/届かない無駄攻撃を除外（decide と一致）
     collect: Dict[str, Any] = {}
     if difficulty == "hard":
         _scored_search(manager, name, moves, see_opp_hand=True, opp_public_only=False,

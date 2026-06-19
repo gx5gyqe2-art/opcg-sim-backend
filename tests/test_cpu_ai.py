@@ -359,6 +359,37 @@ def test_cpu_declines_pointless_optional_cost(db, difficulty):
     assert len(p2.hand) == hand_before, f"{difficulty}: トリガー札を浪費している"
 
 
+def test_prune_futile_attacks_keeps_reachable_drops_unreachable():
+    """`_prune_futile_attacks`: 攻撃側パワー < 対象パワーの攻撃を落とし、KO/貫通できる攻撃は残す。
+    【アタック時】持ちは（効果が目的になり得るため）届かなくても残す。"""
+    from opcg_sim.src.models.models import DonInstance
+    from opcg_sim.src.models.enums import Phase
+
+    def mk(cid, owner):
+        return CardInstance(appmod.card_db.get_card(cid), owner)
+    appmod.card_db.load()
+    p2 = Player("p2", [mk("OP16-109", "p2") for _ in range(10)], mk("OP16-080", "p2"))
+    p1 = Player("p1", [mk("OP14-102", "p1") for _ in range(10)], mk("OP11-041", "p1"))
+    gm = GameManager(p1, p2)
+    basco = mk("OP16-110", "p2"); basco.is_newly_played = False; p2.field = [basco]   # 2000
+    p2.leader.is_rest = True   # 自リーダー(5000)はレスト＝アタッカーはバスコ(2000)のみに限定
+    weak = mk("OP14-102", "p1"); weak.is_newly_played = False; weak.is_rest = True      # クマシー 2000（倒せる）
+    strong = mk("EB03-055", "p1"); strong.is_newly_played = False; strong.is_rest = True  # ニコ・ロビン 8000（倒せない）
+    p1.field = [weak, strong]
+    gm.turn_count = 10; gm.current_player = p2; gm.turn_player = p2; gm.phase = Phase.MAIN
+    gm.refresh_passive_state()
+    moves = gm.get_legal_actions(p2)
+    # バスコ 2000: クマシー 2000（=同値で KO 可）は残し、ニコ・ロビン 8000・ナミ 5000（届かない）は落とす。
+    pruned = cpu_ai._prune_futile_attacks(gm, "p2", moves)
+    atk_targets = {gm._find_card_by_uuid(m["payload"]["target_ids"][0]).uuid
+                   for m in pruned if m.get("action_type") == "ATTACK"}
+    assert weak.uuid in atk_targets, "倒せるキャラ(クマシー2000)への攻撃が残っていない"
+    assert strong.uuid not in atk_targets, "倒せないキャラ(ニコ・ロビン8000)への無駄攻撃が残っている"
+    assert p1.leader.uuid not in atk_targets, "届かないリーダー(ナミ5000>バスコ2000)への無駄攻撃が残っている"
+    # TURN_END 等の非攻撃手は素通し。
+    assert any(m.get("action_type") == "TURN_END" for m in pruned)
+
+
 @pytest.mark.parametrize("difficulty", ["easy", "normal", "hard"])
 def test_decide_returns_legal_move(db, difficulty):
     """decide はその時点の合法手のいずれかを返す（easy/normal/hard とも）。"""
