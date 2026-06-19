@@ -391,15 +391,20 @@ class GameManager:
             if don_active > 0:
                 for c in attackers + [c for c in player.field if c.is_rest]:
                     moves.append({"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": c.uuid}})
-            # 起動メイン効果
-            from ..models.enums import TriggerType as _TT
+            # 起動メイン効果。能力を「持つ」だけでなく、実際に発動が成立する
+            # （条件成立・ターン使用回数未消費・コスト充足）ものだけを合法手に積む。
+            # resolve_ability と同じ三条件で判定するため、レスト済みハチノス(OP09-099)等の
+            # 「撃っても何も起きない no-op 起動メイン」を CPU 探索/プレイヤー双方から除外できる
+            # （従来はコスト/回数を見ずに列挙していたため、CPU が同一ステージの起動メインを
+            #   連打して 1 ターンを空費していた）。
             units = ([player.leader] if player.leader else []) + list(player.field)
             if player.stage:
                 units.append(player.stage)
+            _am_resolver = EffectResolver(self)
             for c in units:
                 if c.is_effect_negated or getattr(c, "negated", False):
                     continue
-                if any(a.trigger == _TT.ACTIVATE_MAIN for a in c.master.abilities):
+                if self._has_activatable_main(c, player, _am_resolver):
                     moves.append({"kind": "game", "action_type": "ACTIVATE_MAIN", "payload": {"uuid": c.uuid}})
             # ターン終了は常に合法
             moves.append({"kind": "game", "action_type": "TURN_END", "payload": {}})
@@ -410,6 +415,32 @@ class GameManager:
         payload = self.default_interaction_payload(pending)
         moves.append({"kind": "game", "action_type": RESOLVE, "payload": payload})
         return moves
+
+    def _has_activatable_main(self, card, player, resolver: Optional[EffectResolver] = None) -> bool:
+        """card が今「実際に発動成立する」起動メイン能力を 1 つ以上持つか。
+
+        resolve_ability(resolver.py) と同じ三条件で判定する:
+          1. 条件成立（ability.condition）
+          2. ターン使用回数が未消費（【ターン1回】等）
+          3. コスト充足（ability.cost。自己レスト等はレスト済みだと払えない）
+        いずれも満たさない起動メインは発動しても no-op になるため、合法手から除外する。
+        効果側の対象有無は resolve_ability も起動時には事前判定しないので、ここでも見ない
+        （正規の起動を過剰に削らないため、判定はコストまでに留める）。
+        """
+        if resolver is None:
+            resolver = EffectResolver(self)
+        for ab in card.master.abilities:
+            if ab.trigger != TriggerType.ACTIVATE_MAIN:
+                continue
+            if ab.condition is not None and not resolver._check_condition(player, ab.condition, card):
+                continue
+            lim = _condition_turn_limit(getattr(ab, "condition", None))
+            if lim is not None and card.ability_used_this_turn.get(_ability_index(card, ab), 0) >= lim:
+                continue
+            if ab.cost is not None and not resolver._can_satisfy_node(player, ab.cost, card):
+                continue
+            return True
+        return False
 
     def default_interaction_payload(self, pending: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """効果対話に対する「妥当な既定解決」のペイロードを構築する。

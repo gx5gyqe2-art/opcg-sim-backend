@@ -46,3 +46,38 @@ def test_self_rest_cost_unpayable_when_already_rested():
     stage.is_rest = True
     res = EffectResolver(gm)
     assert res._can_satisfy_node(p1, ability.cost, stage) is False
+
+
+def _setup_with_ability():
+    """abilities を載せたハチノスを場に置いた状態を返す（合法手ゲート検証用）。"""
+    ability = EffectParser().parse_card_text(HACHINOSU_TEXT)[0]
+    gm, p1, p2 = make_game()
+    stage = make_instance(
+        make_master(card_id="OP09-099", name="ハチノス", type=CardType.STAGE,
+                    traits=["黒ひげ海賊団"], abilities=(ability,)),
+        owner="P1",
+    )
+    p1.stage = stage
+    p1.hand = [make_instance(make_master(name="手札A"), owner="P1")]
+    return gm, p1, stage
+
+
+def test_has_activatable_main_true_when_active():
+    """アクティブなハチノス（手札あり）は起動メインが合法。"""
+    gm, p1, stage = _setup_with_ability()
+    assert gm._has_activatable_main(stage, p1) is True
+
+
+def test_has_activatable_main_false_when_rested():
+    """レスト済みハチノスはコスト不充足のため起動メインを合法手から除外する
+    （= CPU が同一ステージの起動メインを連打する no-op を防ぐ）。"""
+    gm, p1, stage = _setup_with_ability()
+    stage.is_rest = True
+    assert gm._has_activatable_main(stage, p1) is False
+
+
+def test_has_activatable_main_false_when_no_hand_to_discard():
+    """手札が無ければ「手札1枚を捨て」るコストを払えず、起動メインは合法手に出ない。"""
+    gm, p1, stage = _setup_with_ability()
+    p1.hand = []
+    assert gm._has_activatable_main(stage, p1) is False

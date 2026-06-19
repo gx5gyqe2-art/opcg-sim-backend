@@ -341,9 +341,11 @@ def test_c3_own_life_knee_depends_on_matchup():
 
 
 def test_c3_side_score_knee_raises_low_life_bonus(db):
-    """`_side_score(life_knee=3)` はライフ 3 枚目にも薄域上乗せ（W_LIFE_LOW）を 1 段ぶん足す。
+    """`_side_score(life_knee=3)` はライフ 3 枚目を薄域（膝以下）扱いに格上げする。
 
-    膝 2→3 の差は丁度 `W_LIFE_LOW * life_factor`（3 枚目以上のライフを持つとき）。"""
+    concave 化（高ライフは W_LIFE_HIGH に減額）後、膝 2→3 で 3 枚目のライフは
+    「高ライフ域（W_LIFE_HIGH・低ボーナス無し）」→「薄域（W_LIFE 満額＋W_LIFE_LOW 上乗せ）」へ移る。
+    差は 1 枚ぶんの `(W_LIFE - W_LIFE_HIGH) + W_LIFE_LOW`（3 枚目以上のライフを持つとき）。"""
     gm = _new_gm(db)
     p = gm.p1
     while len(p.life) < 3:
@@ -351,9 +353,33 @@ def test_c3_side_score_knee_raises_low_life_bonus(db):
     cap = cpu_ai._power_cap(gm.p2)
     knee2 = cpu_ai._side_score(p, True, cap, life_knee=2)
     knee3 = cpu_ai._side_score(p, True, cap, life_knee=3)
-    assert knee3 - knee2 == pytest.approx(cpu_ai.W_LIFE_LOW)
+    expected = (cpu_ai.W_LIFE - cpu_ai.W_LIFE_HIGH) + cpu_ai.W_LIFE_LOW
+    assert knee3 - knee2 == pytest.approx(expected)
     # 膝既定は 2（従来）。
     assert cpu_ai._side_score(p, True, cap) == pytest.approx(knee2)
+
+
+def test_life_value_is_concave_high_life_is_cheap(db):
+    """ライフ価値の concave 化: 膝超（高ライフ）の 1 枚は W_LIFE_HIGH＝安い／膝以下（薄域）は
+    W_LIFE+W_LIFE_LOW＝高い。これにより序盤の高ライフで 1 点を守るためのカウンター浪費を防ぐ。"""
+    gm = _new_gm(db)
+    p = gm.p1
+    cap = cpu_ai._power_cap(gm.p2)
+    knee = 2
+
+    def life_score_at(n):
+        while len(p.life) < n:
+            p.life.append(p.deck.pop())
+        while len(p.life) > n:
+            p.deck.append(p.life.pop())
+        return cpu_ai._side_score(p, True, cap, life_knee=knee)
+
+    # 高ライフ域（膝超）の限界価値＝W_LIFE_HIGH（安い＝受けてよい）。
+    assert life_score_at(4) - life_score_at(3) == pytest.approx(cpu_ai.W_LIFE_HIGH)
+    # 薄域（膝以下）の限界価値＝W_LIFE+W_LIFE_LOW（高い＝厚く守る）。
+    assert life_score_at(2) - life_score_at(1) == pytest.approx(cpu_ai.W_LIFE + cpu_ai.W_LIFE_LOW)
+    # 高ライフ 1 点（W_LIFE_HIGH=2500）は典型カウンター札の価値より十分小さい設計＝過剰防御を抑止。
+    assert cpu_ai.W_LIFE_HIGH < cpu_ai.W_LIFE
 
 
 # ---------------------------------------------------------------------------
