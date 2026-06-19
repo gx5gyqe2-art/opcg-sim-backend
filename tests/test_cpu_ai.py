@@ -359,6 +359,39 @@ def test_cpu_declines_pointless_optional_cost(db, difficulty):
     assert len(p2.hand) == hand_before, f"{difficulty}: トリガー札を浪費している"
 
 
+def test_don_return_penalty_scales_with_returned_and_early():
+    """`_don_return_penalty`: アクティブドンをドンデッキへ正味で戻した枚数×序盤係数で減点。
+    ランプ（ドンデッキから場へ足す＝正味増）や正味増減なしは 0。"""
+    from opcg_sim.src.models.models import DonInstance
+
+    def mk(cid, owner):
+        return CardInstance(appmod.card_db.get_card(cid), owner)
+    appmod.card_db.load()
+    p1 = Player("p1", [], mk("OP11-040", "p1"))
+    p2 = Player("p2", [], mk("OP11-040", "p2"))
+    gm = GameManager(p1, p2)
+    gm.p2.don_active = [DonInstance("p2") for _ in range(5)]
+    gm.p2.don_deck = [DonInstance("p2") for _ in range(5)]   # 序盤係数 = 5/10 = 0.5
+
+    # 2枚返却（ドンデッキ +2）→ 2 * _W_DON_RETURN * 0.5
+    child = gm.clone()
+    cp2 = child.p2 if child.p2.name == "p2" else child.p1
+    cp2.don_active = cp2.don_active[:3]
+    cp2.don_deck = cp2.don_deck + [DonInstance("p2"), DonInstance("p2")]
+    pen = cpu_ai._don_return_penalty(gm, "p2", child)
+    assert pen == pytest.approx(2 * cpu_ai._W_DON_RETURN * 0.5)
+    assert pen > 0
+
+    # 正味増減なし → 0
+    assert cpu_ai._don_return_penalty(gm, "p2", gm.clone()) == 0.0
+
+    # ランプ（ドンデッキ -2＝場へ追加）→ 0（減点しない）
+    ramp = gm.clone()
+    rp2 = ramp.p2 if ramp.p2.name == "p2" else ramp.p1
+    rp2.don_deck = rp2.don_deck[:3]
+    assert cpu_ai._don_return_penalty(gm, "p2", ramp) == 0.0
+
+
 def test_prune_futile_attacks_keeps_reachable_drops_unreachable():
     """`_prune_futile_attacks`: 攻撃側パワー < 対象パワーの攻撃を落とし、KO/貫通できる攻撃は残す。
     【アタック時】持ちは（効果が目的になり得るため）届かなくても残す。"""

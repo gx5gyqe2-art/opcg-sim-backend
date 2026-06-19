@@ -324,6 +324,15 @@ WBS（`gx5gyqe2-art/WBS` の `projects/opcg-sim-backend.md`）と同期。
   付与→攻撃の貫通筋は不変。【アタック時】持ち（カタリーナ OP16-104 等）は効果が目的になり得るため残す。
   CPU の探索/方策のみ（人間プレイは無駄攻撃も自由）。`tests/test_cpu_ai.py`
   （`test_prune_futile_attacks_keeps_reachable_drops_unreachable`）。重大度=中。
+- **ドン!!返却（ドン-N）のテンポ損を追加減点【実装済み】**（`_don_return_penalty`・`_scored_search`・§2.5.3）:
+  アクティブドンをドンデッキへ戻す手は当面の盤面形成力（将来の手出し・ドン付与の上限）を下げるテンポ損
+  だが、静的 eval の `W_DON_ACTIVE`(200) だけでは過小評価で、**序盤に 2 ドン戻して軽微な効果を撃つ**不自然手を
+  招いた（2026-06-19 報告: 万雷 OP15-078 の【メイン】ドン!!-2＝ドロー+相手キャラのレストを序盤に発動）。
+  root 手で actor が**正味で戻したドン枚数**（手の後にドンデッキが増えた分＝紫のドンランプ等の再追加で正味
+  増えない手や、ドンデッキから場へ足すランプ手は対象外）× `_W_DON_RETURN`(600) × 序盤係数（残ドンデッキ/10）で
+  prelim/deep 双方を減点。終盤ほど軽く、見返りの大きい返却（リーサル設定・強力除去）は eval 利得が上回るので
+  従来どおり選ぶ。CPU の手選択のみで eval/合法手列挙は不変。`tests/test_cpu_ai.py`
+  （`test_don_return_penalty_scales_with_returned_and_early`）。重大度=中。
   > **併せて lethal 認識の ply 割引を一貫化**（`_settle_eval(ply)`）: 予算切れ settle で勝者を観測した長い手順が、
   > winner 検出（`W_WIN-ply`）の直接の止めより生 `W_WIN` で高く見える不整合を修正（最短の止めを優先）。B-2 の
   > プルーニングでビームが lethal 手順を拾いやすくなり露見した潜在不整合。`tests/test_cpu_puzzles.py`

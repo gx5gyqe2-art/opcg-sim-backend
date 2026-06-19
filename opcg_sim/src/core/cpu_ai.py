@@ -375,6 +375,35 @@ def _prune_futile_attacks(manager, actor_name: str, moves: List[Dict[str, Any]])
     return out
 
 
+# ドン!!返却（ドン-N コスト）の追加減点（§2.5.3）。アクティブドンをドンデッキへ戻す手は、当面の盤面形成力
+# （将来の手出し・ドン付与の上限）を下げるテンポ損。静的 eval の `W_DON_ACTIVE`(200) だけでは過小評価で、
+# 序盤に 2 ドン戻して軽微な効果（万雷 OP15-078 のドロー+レスト等）を撃つ不自然手を招く。戻した正味枚数
+# （= 手の後にドンデッキが増えた分。紫のドンランプ等で再追加され正味増えない手は対象外）×序盤係数で減点。
+_W_DON_RETURN = 600.0
+_DON_DECK_FULL = 10.0
+
+
+def _don_return_penalty(manager, actor_name: str, child) -> float:
+    """root 手で actor がアクティブドンをドンデッキへ正味で戻した量に応じた追加減点（>=0）。
+
+    戻した枚数 = `child` の actor ドンデッキ − 現在の actor ドンデッキ（増分＝返却）。序盤（ドンデッキが
+    多く残る＝伸び代が大きい）ほど重く、終盤は軽い。ドンデッキから場へ足す手（ランプ＝増やす手）や
+    正味増減が無い手は 0。CPU の手選択のみで作用し eval/合法手列挙は変えない。
+    """
+    if child is None:
+        return 0.0
+    try:
+        before = _player_by_name(manager, actor_name)
+        after = _player_by_name(child, actor_name)
+        returned = len(after.don_deck) - len(before.don_deck)
+    except Exception:
+        return 0.0
+    if returned <= 0:
+        return 0.0
+    early = min(1.0, len(before.don_deck) / _DON_DECK_FULL)
+    return returned * _W_DON_RETURN * early
+
+
 def _next_turn_don(p) -> int:
     """`p` の次ターンに使える見込みドン!! 枚数（コスト低減の資源価値化・§2.5.3）。
 
@@ -1252,14 +1281,19 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     用に 1-ply 事前スコアと深掘りスコアを `move_sig -> score` の dict で記録する:
       collect["prelim"]={sig: 1-ply スコア}, collect["deep"]={sig: 深掘りスコア}。
     """
-    # 1) 全ルート手を 1-ply で採点（子クローンは深掘りに再利用）。
+    # 1) 全ルート手を 1-ply で採点（子クローンは深掘りに再利用）。アクティブドンをドンデッキへ戻す手は
+    #    将来の盤面形成力を下げるテンポ損なので追加減点する（prelim/deep の双方へ反映）。
     prelim: List[Tuple[float, Dict[str, Any], Any]] = []
-    for m in moves:
+    pen_by_idx: Dict[int, float] = {}
+    for idx, m in enumerate(moves):
         child = _apply_clone(manager, name, m, stop_at_select=True)
         if child is None:
             prelim.append((float("-inf"), m, None))
+            pen_by_idx[idx] = 0.0
             continue
-        prelim.append((evaluate(child, name, see_opp_hand=see_opp_hand, profile=profile, plan=plan), m, child))
+        pen = _don_return_penalty(manager, name, child)
+        pen_by_idx[idx] = pen
+        prelim.append((evaluate(child, name, see_opp_hand=see_opp_hand, profile=profile, plan=plan) - pen, m, child))
 
     # 2) 1-ply 上位を深掘り対象に選ぶ。TURN_END（パスの基準線）は必ず深掘りし、ターン境界で正しく採点する
     #    （非対象の 1-ply スコアは自ターン途中の甘い値になり得るため、パスの基準だけは確実に整える）。
@@ -1301,6 +1335,7 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
             v = _search(child, name, float("-inf"), float("inf"),
                         budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan,
                         start_turn=start_turn, horizon=HARD_HORIZON, counter_budget=cbudget)
+            v -= pen_by_idx.get(i, 0.0)  # ドン!!返却のテンポ損を深掘り値にも反映（prelim と一致）
             # 深掘り値が**同点**の手は 1-ply（即時盤面）スコアで割る＝有益な選択（相手キャラの除去等）が
             # 深掘りで washout（相手ターン中の自分の誘発除去は探索ホライズン内で価値が相殺され同点になり得る）
             # してもランダムタイブレークで取りこぼさない。寄与は ±_TIEBREAK_W*クランプ prelim（最大 ~0.005）で、
