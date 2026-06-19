@@ -592,6 +592,37 @@ class GameManager:
             request = {KEY_PID: self.turn_player.name, KEY_ACTION: "MAIN_ACTION", KEY_MSG: PendingMessage.MAIN_ACTION.value, KEY_UUIDS: selectable, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
         return request
 
+    def pending_actor_action(self) -> Optional[Tuple[str, str]]:
+        """`get_pending_request()` の (player_id, action) **だけ**を安価に返す（CPU 探索の葉/手番判定用）。
+
+        探索は各ノードでこの 2 値しか見ない（手は `get_legal_actions` から得る）一方、
+        `get_pending_request` は毎回 selectable 構築・候補 to_dict・`uuid4()` を作るため重い
+        （探索コストの ~12%）。本メソッドは**判定ロジックと副作用（BLOCK_STEP/BATTLE_COUNTER で
+        active_battle が無いときの phase→MAIN 正規化）を get_pending_request と一致**させたうえで、
+        重い payload を作らない。一致は `tests/test_cpu_make_unmake.py` で機械照合する。
+        """
+        if self.phase == Phase.MULLIGAN:
+            order = ([self.turn_player, self.opponent]
+                     if self.turn_player and self.opponent else [self.p1, self.p2])
+            for p in order:
+                if p.name not in self.mulligan_done:
+                    return (p.name, "MULLIGAN")
+            return None
+        if self.active_interaction:
+            at = self.active_interaction.get("action_type")
+            fe = "SEARCH_AND_SELECT" if at in ("SELECT_TARGET", "FIELD_OVERFLOW_TRASH") else at
+            return (self.active_interaction.get("player_id"), fe)
+        if not self.active_battle and self.phase in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER):
+            self.phase = Phase.MAIN  # get_pending_request と同じ副作用
+        battle_actions = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+        if self.phase == Phase.BLOCK_STEP and self.active_battle:
+            return (self.active_battle["target_owner"].name, battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER'))
+        if self.phase == Phase.BATTLE_COUNTER and self.active_battle:
+            return (self.active_battle["target_owner"].name, battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER'))
+        if self.phase == Phase.MAIN:
+            return (self.turn_player.name, "MAIN_ACTION")
+        return None
+
     def resolve_interaction(self, player: Player, payload: Dict[str, Any]):
         if not self.active_interaction:
             return

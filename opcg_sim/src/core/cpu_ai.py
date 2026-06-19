@@ -1230,13 +1230,14 @@ def _search(manager, root_name: str, alpha: float, beta: float,
     if manager.winner is not None:
         return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
 
-    KEY_PID, KEY_ACTION = _pending_keys()
-    pending = manager.get_pending_request()
-    if not pending:
+    # 探索は (手番, アクション) しか見ない（手は get_legal_actions から）。重い get_pending_request
+    # ではなく軽量な pending_actor_action を使う（payload/uuid4 を作らない・副作用は一致・§2.5.2 B-1）。
+    pa = manager.pending_actor_action()
+    if not pa:
         return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
-    actor_name = pending[KEY_PID]
+    actor_name, pend_action = pa
     # 葉: start_turn から horizon ターン進んだ MAIN_ACTION（一定の静止点）で評価。
-    if pending.get(KEY_ACTION) == "MAIN_ACTION" and (manager.turn_count - start_turn) >= horizon:
+    if pend_action == "MAIN_ACTION" and (manager.turn_count - start_turn) >= horizon:
         return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
     # 安全打ち切り: 予算/ply 上限。自分の手番途中ならターン境界へ整流してから評価（甘い途中評価を避ける）。
     if budget[0] <= 0 or ply >= HARD_MAX_PLY:
@@ -1298,7 +1299,7 @@ def _search(manager, root_name: str, alpha: float, beta: float,
         # PASS（=カウンターしない＝攻撃が通る）と並べて min が選ぶ＝相手にとって有利な方（=自分に不利な方）。
         # 緩衝を needed ぶん消費して深掘り。これで「緩衝超まで盛ると貫通＝余剰ドンを攻撃に振るのが正」になる。
         if (opp_public_only and profile is not None and counter_budget > 0
-                and pending.get(KEY_ACTION) == "SELECT_COUNTER"):
+                and pend_action == "SELECT_COUNTER"):
             needed = _counter_needed(manager)
             if needed is not None and needed <= counter_budget:
                 cc = _apply_modeled_counter(manager, actor_name, needed)

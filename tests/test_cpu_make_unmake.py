@@ -15,7 +15,7 @@ import random
 import conftest  # noqa: F401
 import pytest
 
-from opcg_sim.src.core import cpu_ai, journal
+from opcg_sim.src.core import cpu_ai, journal, action_api
 import cpu_arena
 import test_cpu_puzzles as P
 
@@ -81,6 +81,48 @@ def test_make_unmake_same_deep_scores(db):
             assert b == u, f"深掘りスコア不一致:\n base={b}\n mu  ={u}"
     finally:
         cpu_ai._USE_MAKE_UNMAKE = orig
+
+
+def test_pending_actor_action_matches_full(db):
+    """軽量 `pending_actor_action()` が `get_pending_request()` の (player_id, action) と一致する。
+
+    探索の手番/葉判定はこの軽量版に依存するので、フル版との (pid, action) 一致を実プレイ全手で照合
+    （副作用の phase 正規化も含め一致していること）。"""
+    props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
+    KP = props.get('PLAYER_ID', 'player_id')
+    KA = props.get('ACTION', 'action')
+    random.seed(11)
+    l1, c1 = cpu_arena.build_deck(db, "p1")
+    l2, c2 = cpu_arena.build_deck(db, "p2")
+    from opcg_sim.src.core.gamestate import GameManager, Player
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    deciders = {"p1": cpu_arena._make_decider("easy"), "p2": cpu_arena._make_decider("easy")}
+    checked = 0
+    for _ in range(150):
+        if gm.winner is not None:
+            break
+        # 軽量版は get_pending_request と同じ副作用（phase 正規化）を持つので、軽量版を先に呼んで
+        # フル版と突き合わせる（順序非依存にするため両者の返り値のみ比較）。
+        light = gm.pending_actor_action()
+        full = gm.get_pending_request()
+        if full is None:
+            assert light is None
+            break
+        assert light is not None, f"full={full[KP]}/{full[KA]} but light=None"
+        assert light == (full[KP], full[KA]), f"light={light} != full=({full[KP]},{full[KA]})"
+        checked += 1
+        pid = full[KP]
+        actor = gm.p1 if gm.p1.name == pid else gm.p2
+        move = deciders[pid](gm, actor)
+        if move is None:
+            break
+        gm.action_events = []
+        if move["kind"] == "battle":
+            action_api.apply_battle_action(gm, actor, move["action_type"], move.get("card_uuid"))
+        else:
+            action_api.apply_game_action(gm, actor, move["action_type"], move.get("payload", {}))
+    assert checked >= 20, f"照合数不足 ({checked})"
 
 
 def test_decide_leaves_manager_unchanged(db):
