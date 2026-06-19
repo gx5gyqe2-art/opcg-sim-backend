@@ -221,9 +221,19 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       ルート `_scored_search` も make/unmake 化済み（`_eval_root_move`・clone 版と完全同値）。**clone 除去の床に到達**:
       残クローンの内訳実測（hard decide）＝中断状態の再帰フォールバック ~90%（parked resolver 未 journaled）・
       ルート `_scored_search` ~5%（≈ decide の 0.7%・変換効果はノイズ内）。残コストは clone でなく **apply＋evaluate**。
-      **残（任意・効果小）**: parked 効果解決機構（resolver continuation／interaction dict）の journaled 化で中断再開手も
-      make/unmake 化（残 clone の ~14%＝decide の ~12% 上限）。`_apply_modeled_counter` は SELECT_COUNTER＝中断で
-      フォールバックのため変換無益。さらなる高速化は clone でなく apply/evaluate の最適化が本筋。
+      `_apply_modeled_counter` は SELECT_COUNTER＝中断でフォールバックのため変換無益。
+      **B-1 エンジン最適化（clone でない部分・2026-06）**: ②後の実測で残コストは clone でなく apply＋evaluate と判明し、
+      毎ノード走るエンジン本体を最適化した（方策不変・等価ゲート緑）。
+      (1) **`CardInstance`/`DonInstance` を同一性比較（`@dataclass(eq=False)`）**: dataclass 既定の値ベース __eq__（全 ~25
+      フィールドの逐次比較）が `card in zone`／`leader == card` を激重にし `_find_card_location` が探索の ~17% を占めていた。
+      カードは固有実体（同一 uuid＝同一オブジェクト）なので同一性比較（ポインタ・id ハッシュで hashable 化）に戻す＝盤面内は
+      オブジェクト同一性＝論理同一カード・盤面跨ぎは uuid で引く（`_find_card_by_uuid`）ため挙動不変。**hard decide 1.30x**。
+      (2) **軽量 `pending_actor_action()`**: `get_pending_request` は毎回 selectable 構築・候補 to_dict・`uuid4()` を作るが
+      探索は (player_id, action) しか見ない。軽量版を `_search` の手番/葉判定に使う（副作用の phase 正規化はフル版と一致・
+      `test_pending_actor_action_matches_full` で機械照合）。
+      **通算: hard decide ~1176ms→~278ms＝~4.2x**（make/unmake×eq×pending・全1033pass・構造監査0・カード挙動ベースライン不変）。
+      **残（任意）**: parked 効果解決機構の journaled 化で中断再開手も make/unmake 化（残 clone の大半＝~decide の 12〜30%）。
+      `_apply_passive_effects`（~14%）の差分/キャッシュ化は常在効果の正しさに直結し安全なキャッシュ無効化が難しい＝高リスク保留。
     - **③ 置換表（transposition table）= 実測で不採用（2026-06）**: ②後は**健全（完全一致キー）な転置率 ≤0.5%**（exact key
       ＝デッキ順／全カード状態／継続効果まで含むと手順違いでも byte 一致がほぼ起きない）に対し、健全な位置キー計算が
       **~3%/node** のオーバーヘッド＝**ネット負**。②が per-node clone を消したため「再探索を省く」価値自体が消えた
