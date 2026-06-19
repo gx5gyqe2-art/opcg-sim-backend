@@ -19,6 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
+from ..journal import JournaledList
+
 # Duration 定数
 THIS_TURN = "THIS_TURN"               # 現在のターン終了時に失効
 THIS_BATTLE = "THIS_BATTLE"           # 現在のバトル解決時に失効
@@ -42,9 +44,16 @@ class ContinuousEffect:
 
 
 class ContinuousEffectManager:
+    def __setattr__(self, name, value):
+        # 差分巻き戻し（journal.transaction 中のみ記録）。effects の付け替えを巻き戻すため。
+        from .. import journal
+        if journal._active is not None:
+            journal.record_attr(self, name, self.__dict__)
+        object.__setattr__(self, name, value)
+
     def __init__(self, game_manager):
         self.gm = game_manager
-        self.effects: List[ContinuousEffect] = []
+        self.effects: List[ContinuousEffect] = JournaledList()
 
     def apply(self, card, kind, duration, amount=0, flag="", keyword="", expire_turn=0) -> ContinuousEffect:
         # KEYWORD/FLAG は集合セマンティクス（重複付与は無意味）のため、同一内容の効果が
@@ -111,7 +120,7 @@ class ContinuousEffectManager:
                 removed += 1
             else:
                 remaining.append(eff)
-        self.effects = remaining
+        self.effects = JournaledList(remaining)
         if removed:
             pass
 
@@ -125,4 +134,4 @@ class ContinuousEffectManager:
                     self._remove_from_card(card, eff)
             else:
                 kept.append(eff)
-        self.effects = kept
+        self.effects = JournaledList(kept)

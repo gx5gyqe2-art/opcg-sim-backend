@@ -6,6 +6,8 @@ import json
 import copy as _copy
 from .enums import CardType, Color, Attribute, ActionType, Phase, Player
 from .effect_types import Ability
+from ..core import journal
+from ..core.journal import JournaledSet, JournaledDict, record_attr
 
 def load_shared_constants():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -126,22 +128,28 @@ class CardInstance:
     # 「このターン中、コスト0にする」等のコスト絶対値セット。base_power_override と対称で、
     # _apply_passive_effects ではリセットせず reset_turn_status のみで失効させる。
     base_cost_override: Optional[int] = None
-    current_keywords: Set[str] = field(default_factory=set)
-    flags: Set[str] = field(default_factory=set)
+    current_keywords: Set[str] = field(default_factory=JournaledSet)
+    flags: Set[str] = field(default_factory=JournaledSet)
     negated: bool = False
     ability_disabled: bool = False
-    ability_used_this_turn: Dict[int, int] = field(default_factory=dict)
+    ability_used_this_turn: Dict[int, int] = field(default_factory=JournaledDict)
     # ContinuousEffectManager 専用。reset_turn_status ではクリアしない
     # （ターン境界を跨いで存続する期間付き効果を保持するため）。
     timed_power: int = 0
-    timed_flags: Set[str] = field(default_factory=set)
+    timed_flags: Set[str] = field(default_factory=JournaledSet)
     # 期間付きのコスト増減（「このターン中、コスト-N」等）。cost_buff は
     # _apply_passive_effects で毎回 0 にリセットされるため、期間付き分はここに保持する。
     timed_cost: int = 0
     # 効果で付与されたキーワード（【ブロッカー】等）。current_keywords は
     # _apply_passive_effects で master のコピーに毎回リセットされるため、付与分は
     # ここに保持して消えないようにする。失効は ContinuousEffectManager が管理。
-    timed_keywords: Set[str] = field(default_factory=set)
+    timed_keywords: Set[str] = field(default_factory=JournaledSet)
+
+    def __setattr__(self, name, value):
+        # 差分巻き戻し（journal.transaction 中のみ記録）。不活性時はグローバル 1 読みで素通り。
+        if journal._active is not None:
+            record_attr(self, name, self.__dict__)
+        object.__setattr__(self, name, value)
 
     def __post_init__(self):
         if not self.uuid:
@@ -162,10 +170,11 @@ class CardInstance:
         nd = new.__dict__
         for k, v in self.__dict__.items():
             t = type(v)
-            if t is set:
-                nd[k] = set(v)
-            elif t is dict:
-                nd[k] = dict(v)
+            # set/dict は journaled 型を維持して複製する（root clone 上で make/unmake を効かせるため）。
+            if t is set or t is JournaledSet:
+                nd[k] = JournaledSet(v)
+            elif t is dict or t is JournaledDict:
+                nd[k] = JournaledDict(v)
             elif v is None or t is int or t is str or t is bool or t is float or t is CardMaster:
                 nd[k] = v
             else:
@@ -174,9 +183,9 @@ class CardInstance:
 
     def _refresh_keywords(self):
         if self.ability_disabled:
-            self.current_keywords = set()
+            self.current_keywords = JournaledSet()
             return
-        self.current_keywords = self.master.keywords.copy()
+        self.current_keywords = JournaledSet(self.master.keywords)
         for ability in self.master.abilities:
             if not hasattr(ability, 'actions'):
                 continue
@@ -284,6 +293,11 @@ class DonInstance:
     # refresh_all がレストのドン!!をアクティブに戻す際、これが立っていれば1回スキップし
     # フラグを下ろす（キャラの flags["FREEZE"] と同じ1回限りのフリーズ）。
     is_frozen: bool = False
+
+    def __setattr__(self, name, value):
+        if journal._active is not None:
+            record_attr(self, name, self.__dict__)
+        object.__setattr__(self, name, value)
 
     def __deepcopy__(self, memo):
         """高速 deepcopy（CardInstance と同趣旨・§2.5.2）。全フィールドがスカラなので直接複製する。"""
