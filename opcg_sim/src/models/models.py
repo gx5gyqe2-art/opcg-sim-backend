@@ -104,7 +104,12 @@ class CardMaster:
 
 
 
-@dataclass
+# eq=False: カードは固有実体（同一 uuid＝同一オブジェクトのみ「同じカード」）。dataclass 既定の
+# 値ベース __eq__（全 ~25 フィールドの逐次比較）は `card in zone`／`leader == card` を激重にし
+# （`_find_card_location` が探索コストの ~17%）、意味的にも不適。object 既定の同一性比較に戻す
+# （ポインタ比較＝高速・id ハッシュで hashable 化）。盤面内ではオブジェクト同一性＝論理的同一カード、
+# 盤面跨ぎ（clone）は uuid で引く（`_find_card_by_uuid`）ため挙動不変。
+@dataclass(eq=False)
 class CardInstance:
     master: CardMaster
     owner_id: str
@@ -283,7 +288,7 @@ class CardInstance:
             props.get('IS_FROZEN', 'is_frozen'): 'FREEZE' in self.flags,
         }
 
-@dataclass
+@dataclass(eq=False)  # CardInstance と同趣旨: ドン!!も固有実体＝同一性比較（高速・hashable）。
 class DonInstance:
     owner_id: str
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
