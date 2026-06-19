@@ -436,26 +436,29 @@ WBS（`gx5gyqe2-art/WBS` の `projects/opcg-sim-backend.md`）と同期。
   早期も 1.0＝割引なし）。**別検出器＝レース/テンポ・パズル**で独立検証（`tests/test_cpu_self_plan.py`
   `test_race_tempo_puzzle_discounts_board_in_race`＝同じ置物の評価上昇がレース終盤<早期／plan=None は対照で不変）。
   ドン症状とは機序が独立。重大度=中。
-- **自ライフの高ライフ逓減（concave）＝序盤の過剰カウンター是正【未実装・課題】**（`_side_score` ライフ項・
-  実プレイ報告 2026-06-19 ナミミラー）: 現状ライフ価値は **線形**（`W_LIFE`×枚数）＋低ライフ膝（`W_LIFE_LOW`・
-  `_LIFE_KNEE_DEFAULT`）で、**高ライフでも 1 枚＝6000 のまま**＝膝超のライフを割り引かない。このため
+- **自ライフの高ライフ逓減（concave）＝序盤の過剰カウンター是正【実装済み】**（`_side_score` ライフ項・
+  実プレイ報告 2026-06-19 ナミミラー）: 旧実装はライフ価値が **線形**（`W_LIFE`×枚数）＋低ライフ膝（`W_LIFE_LOW`・
+  `_LIFE_KNEE_DEFAULT`）で、**高ライフでも 1 枚＝6000 のまま**＝膝超のライフを割り引かなかった。このため
   `SELECT_COUNTER` の収支が「自ライフ1点（≈6000・control の `life_mult`=1.15 で ≈6900）＞ カウンター1枚
   （`W_HAND`700＋counter値×`W_COUNTER`0.6×`counter_mult`）」となり、**自ライフ5枚の序盤でも1点を守るために
-  カウンターを3枚浪費**する（ターン3で観測）。設計意図（「ライフは非線形＝薄いほど限界価値が高い」）に反し
-  高ライフを満額評価する不整合。→ 膝超のライフを減額レート（`W_LIFE_HIGH`≈2500〜3000）にする concave 化で、
-  序盤に1点を守るためのカード浪費を抑止。低ライフ域（膝以下）の厚い守りは不変。挙動グローバル変更＝
-  **ベースライン再生成（`--regen`）＋差分レビュー必須**。検証＝高ライフでの `SELECT_COUNTER`「受けて温存」
-  パズル回帰＋既存ゲート（低ライフの厚い守り維持・弱<強）。重大度=高。WBS 登録済み。
-- **control プリセットの受け身緩和（マナ余らせパス抑止）【未実装・課題】**（`cpu_self_plan._PRESETS["control"]`・
-  同報告）: グラインド寄りデッキが極端 control 分類（`aggro_lean`≈0）になると `vanilla_body_mult`=0.45（場の小型を
-  45%に割引）＋`counter_mult`=1.4（手札温存）で「1コスト体を場に出す価値（≈700）＜ 手札カウンター価値（≈2380）」
-  となり、**ターン2にマナ（2ドン）を余らせて何もせずパス**する（trace `folded:false`＝畳みでなく deep 探索が
-  真に「TURN_END＞1ドロー展開 PLAY」と評価）。→ `vanilla_body_mult`(0.45→~0.6)・`act_margin_mult`(1.5→~1.2) を
-  緩和し、control でも序盤の盤面形成を採る。併せて分類器の `removal_ratio` 誤検出（`cpu_opponent_model._REMOVAL_CUES`
-  の `KO` キューが「【KO時】＝自分が KO された時」の防御/リソース札＝ナミ/ホグバック/ペローナ/マルコ等を除去と
-  カウント）を是正（本デッキの control 化主因は avg_cost 4.32／counter 比 0.61 のため分類は変わらないが、
-  スケジュール傾き等の正確性のため）。挙動グローバル変更＝ベースライン再生成＋差分レビュー必須。検証＝マナ余り
-  局面で1ドロー展開を採る回帰＋弱<強の勝率順維持。重大度=高。WBS 登録済み。
+  カウンターを3枚浪費**する過剰防御を招いた（ターン3で観測）。設計意図（「ライフは非線形＝薄いほど限界価値が
+  高い」）に反する不整合。**是正**: 膝（`life_knee`）までは `W_LIFE`(6000) 満額・**膝超は `W_LIFE_HIGH`(2500) に
+  減額**する concave カーブにし（near/far 分割）、高ライフ 1 点の限界価値を ~2875（control・膝3）＝カウンター
+  1 枚相当まで下げて序盤のカード浪費を抑止。低ライフ域（膝以下）は `W_LIFE`＋`W_LIFE_LOW` 満額で厚く守る（不変）。
+  プラン非依存（全評価に作用）。検証＝`tests/test_cpu_self_plan.py`（`test_life_value_is_concave_high_life_is_cheap`＝
+  高ライフ限界=`W_LIFE_HIGH`／薄域限界=`W_LIFE`＋`W_LIFE_LOW`・膝格上げ差の更新）。全テスト pass・構造監査0。重大度=高。
+- **control プリセットの受け身緩和（マナ余らせパス抑止）＋ removal 誤検出是正【実装済み】**
+  （`cpu_self_plan._PRESETS["control"]`／`cpu_opponent_model._REMOVAL_CUES`・同報告）: グラインド寄りデッキが極端
+  control 分類（`aggro_lean`≈0）になると、旧 control プリセットの `vanilla_body_mult`=0.45（場の小型を45%に割引）
+  ＋`counter_mult`=1.4（手札温存）で「1コスト体を場に出す価値（≈700）＜ 手札カウンター価値（≈2380）」となり、
+  **ターン2にマナ（2ドン）を余らせて何もせずパス**した（trace `folded:false`＝畳みでなく deep 探索が真に
+  「TURN_END＞1ドロー展開 PLAY」と評価）。**是正**: `vanilla_body_mult` 0.45→**0.6**・`act_margin_mult` 1.5→**1.2**
+  に緩和（守りの厚さ＝`counter_mult`/`life_mult`/`threat_def_mult` は維持）。併せて分類器の `removal_ratio` 誤検出
+  （素の `KO` キューが「【KO時】＝自分が KO された時」の防御/リソース札＝ナミ/ホグバック/ペローナ/マルコ等を除去と
+  カウント・素の「デッキの下」が自己ディグも拾う）を、除去動詞 `KOする`/`KOできる` とバウンス `持ち主のデッキ`/
+  `手札に戻` に限定して是正（当該デッキは avg_cost 4.32／counter 比 0.61 で分類自体は control のままだが、
+  removal_ratio 0.63→0.20 でスケジュール傾き等が正確化）。検証＝`tests/test_cpu_opponent_model.py`
+  （`test_removal_cue_excludes_self_ko_triggers`）。全テスト pass・構造監査0。重大度=高。
 
 > 直近の改修（実装済み）: 戦闘の閾値性（有効パワー）・J=デッキ切れ境界・召喚酔いの攻め圧除外・
 > 「何もしない」を一級化・**効果の単一対象選択を探索分岐化**（§2.5.2）・キーワード資産（A-1/A-2）・

@@ -35,7 +35,13 @@ import re
 from ..models.enums import TriggerType
 
 # 評価重み（盤面 1000=パワー1段相当に正規化）
-W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（最重要）
+W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（膝＝薄域。最重要）
+# 高ライフ域（膝超）のライフ 1 枚の基礎価値（concave 化・§2.5.3）。OPCG ではライフは「序盤は能動的に
+# 受けてカウンターを温存する」資源で、薄いほど 1 枚の限界価値が高い（設計意図）。従来は線形（全枚数に
+# W_LIFE）で高ライフでも 1 枚＝6000＝満額だったため、自ライフ5枚の序盤でも1点を守るためにカウンターを
+# 3枚浪費する過剰防御を招いた。膝（life_knee）までは W_LIFE 満額・膝超は W_LIFE_HIGH（< W_LIFE）に減額し、
+# 「高ライフの 1 点は安い（受ける）／薄ライフの 1 点は高い（守る）」の正しいカーブにする。
+W_LIFE_HIGH = 2500.0
 W_LIFE_LOW = 4000.0      # 希少域（最初の 2 枚）への上乗せ＝非線形・45[J] ラインの危険
 # C-3（§2.5.3）: ライフ薄域上乗せの膝位置（この枚数までを厚く守る）。自他で別カーブ＝既定 2、攻め寄りの
 # 相手と対面する自ライフ（守備）のみ 3 へ上げてレース耐性を厚く見る（profile 無し＝両側 2＝従来同値）。
@@ -432,12 +438,17 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
         if out is not None:
             out[k] = out.get(k, 0.0) + v
 
-    # ライフ: 非線形（薄いほど 1 枚の限界価値が高い）。膝位置（life_knee）までを厚く上乗せする。
+    # ライフ: 非線形（薄いほど 1 枚の限界価値が高い）。膝位置（life_knee）までは W_LIFE 満額・膝超は
+    # W_LIFE_HIGH(<W_LIFE) に減額する concave カーブ＋膝までを W_LIFE_LOW で厚く上乗せ（二重の非線形）。
+    # 高ライフの 1 点を満額評価して序盤に過剰防御（カウンター浪費）するのを防ぐ（§2.5.3）。
     life_n = len(p.life)
-    score += life_n * W_LIFE * life_factor
-    _emit("life", life_n * W_LIFE * life_factor)
-    score += min(life_n, life_knee) * W_LIFE_LOW * life_factor
-    _emit("life_low", min(life_n, life_knee) * W_LIFE_LOW * life_factor)
+    near = min(life_n, life_knee)            # 薄域（膝以下）＝満額で厚く守る
+    far = max(0, life_n - life_knee)         # 高ライフ域（膝超）＝安い（受ける）
+    life_base = (near * W_LIFE + far * W_LIFE_HIGH) * life_factor
+    score += life_base
+    _emit("life", life_base)
+    score += near * W_LIFE_LOW * life_factor
+    _emit("life_low", near * W_LIFE_LOW * life_factor)
 
     # 手札: 枚数 ＋（公開方針でなければ）カウンター値（防御に回せる力＝相手の +1[J] を打ち消す資源）。
     score += len(p.hand) * W_HAND * hand_factor
