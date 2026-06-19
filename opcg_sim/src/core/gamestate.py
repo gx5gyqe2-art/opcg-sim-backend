@@ -1649,6 +1649,13 @@ class GameManager:
         if source_card.negated or source_card.is_effect_negated: return
         resolver = EffectResolver(self)
         resolver.resolve_ability(player, ability, source_card, cost_confirmed=cost_confirmed)
+        # PASSIVE 再計算（_apply_passive_effects）中の継続効果の再適用は、盤面操作のたびに
+        # 同じバフを何度も載せ直す内部処理にすぎない（結果はカードの cost/power に反映済み）。
+        # その都度 EFFECT イベントを積むと、ティーチ OP16-080 の【相手のターン中】コスト+1 等が
+        # eventLog/リプレイを同一イベントで膨張させる（挙動は不変＝コストはスタックしない）。
+        # 再計算中はイベント発行を抑制する（本物の発動＝非再計算経路は従来どおり記録）。
+        if getattr(self, "_in_passive_recalc", False):
+            return
         for ev in resolver.action_history:
             self.action_events.append({
                 "type": "EFFECT",

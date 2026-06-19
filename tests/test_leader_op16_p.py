@@ -211,6 +211,26 @@ def test_op16_080_opponent_turn_cost_plus_one():
     assert c.current_cost == before + 1
 
 
+def test_op16_080_opponent_turn_cost_does_not_spam_events():
+    """OP16-080 能力0（継続コスト+1）は PASSIVE 再計算の度に EFFECT イベントを積まない。
+
+    回帰: `_apply_passive_effects` が継続効果を毎リフレッシュ再適用→`resolve_ability` が
+    その都度 BUFF イベントを action_events へ積み、eventLog/リプレイが同一イベントで膨張していた
+    （2026-06-19 報告。コストはスタックせず挙動は不変＝純粋なログ重複）。再計算中は発行を抑制する。"""
+    gm, p1, p2, L = build("OP16-080")
+    c = add_char(p1, name="手下", cost=3)
+    base = c.master.cost
+    # p2 を手番にして p1 リーダーの【相手のターン中】を refresh で適用させる。
+    gm.turn_player = p2
+    gm.current_player = p2
+    gm.action_events = []
+    for _ in range(5):
+        gm.refresh_passive_state()
+    buff_events = [e for e in gm.action_events if e.get("action") == "BUFF"]
+    assert buff_events == [], "PASSIVE 再計算が BUFF イベントを重複発行している"
+    assert c.current_cost == base + 1, "継続コスト+1 が適用されていない（抑制し過ぎ）"
+
+
 def test_op16_080_redirect_discard_cost_requires_trigger_card():
     """OP16-080 能力1: 捨てコストは手札の【トリガー】を持つカードに限定される。
 
