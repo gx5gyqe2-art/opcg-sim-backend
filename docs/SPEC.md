@@ -422,6 +422,15 @@ WBS（`gx5gyqe2-art/WBS` の `projects/opcg-sim-backend.md`）と同期。
   併せて `_scored_search` は**深掘り同点手を 1-ply で割る**微小タイブレーク（`_TIEBREAK_W`・最大 ~0.005・
   実差>0.005 には不影響）を持つ。回帰=`tests/test_cpu_ai.py`（多対象累積列挙／相手ターン中の全除去・難易度×枚数）。
   **残**: min>1 の**強制**多対象で「どの組合せが最善か」（累積でなく任意部分集合）の網羅は組合せ抑制のため未実施。
+- **任意コスト/任意効果の発動可否（accept/decline を採点）【実装済み】**（`_selection_moves`・`decide` の
+  `is_selection` 分岐・§2.5.2）: 任意確認（`CONFIRM_OPTIONAL`＝「〜できる：効果」のコスト払いや「〜してもよい」）を
+  CPU が **発動する/見送る の2手に分岐して 1-ply で採点**する。従来は `get_legal_actions` が任意確認を**既定
+  (accept) の1手しか出さず**、CPU は任意コストを**必ず払って**いた（2026-06-19 報告: ティーチ OP16-080 の
+  【相手のアタック時】『トリガー1枚を捨ててアタック対象をリーダー/黒ひげキャラに変更』を、リーダーが既に対象＝
+  no-op でも毎回カードを浪費）。CPU 層のみの変更で `get_legal_actions`/`default_interaction_payload`（人間・自己対戦・
+  監査の既定解決）は不変＝カード挙動ベースライン不変。検証＝得な任意コスト（ニコ・ロビン EB03-055＝ライフ1枚捨て→
+  2枚追加＝純増）は accept・無意味リダイレクトは decline（`tests/test_cpu_ai.py`）。なお `ACTIVATE_MAIN` の任意コストは
+  起動自体が意思表示のため確認しない（resolver 既定）＝本分岐の対象外。
 - **探索地平線を越える効果価値【実装済み（評価関数の期待値で補完）】**（`_recurring_engine`／
   `_side_score(engine_aware=…)`・§2.5.3）: 場のキャラが持つ「毎ターン価値を生む」能力（`ACTIVATE_MAIN`＝起動
   エンジン・`PASSIVE`＝常時・`YOUR_TURN`/`OPPONENT_TURN`＝毎ターン・`TURN_END`/`OPP_TURN_END`＝毎ターン誘発）は、

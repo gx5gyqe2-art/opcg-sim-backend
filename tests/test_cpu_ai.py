@@ -275,6 +275,30 @@ def test_selection_moves_enumerates_up_to_n_cumulative():
     assert cpu_ai._selection_moves(_Stub({**base, CON: {"min": 2, "max": 1}}), "p1") is None
 
 
+def test_selection_moves_branches_optional_confirm_accept_decline():
+    """任意確認（CONFIRM_OPTIONAL・can_skip）は accept(発動)/decline(見送り) の2手へ分岐する
+    （従来は既定=accept の1手しか出ず CPU は任意コストを必ず払っていた）。"""
+    props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
+    PID = props.get('PLAYER_ID', 'player_id'); ACT = props.get('ACTION', 'action')
+    SKIP = props.get('CAN_SKIP', 'can_skip')
+
+    class _Stub:
+        def __init__(self, pending):
+            self._p = pending
+        def get_pending_request(self):
+            return self._p
+        def default_interaction_payload(self, pending=None):
+            return {"selected_uuids": [], "index": 0, "accepted": True}
+
+    pend = {PID: "p1", ACT: "CONFIRM_OPTIONAL", SKIP: True}
+    moves = cpu_ai._selection_moves(_Stub(pend), "p1")
+    assert moves is not None
+    assert [m["payload"].get("accepted") for m in moves] == [True, False]
+    assert all(m["action_type"] == action_api.ACT_RESOLVE_SELECTION for m in moves)
+    # 別アクターには出さない。
+    assert cpu_ai._selection_moves(_Stub(pend), "p2") is None
+
+
 @pytest.mark.parametrize("difficulty", ["hard", "normal"])
 @pytest.mark.parametrize("n_targets", [1, 2])
 def test_cpu_takes_beneficial_up_to_n_removal(db, difficulty, n_targets):
@@ -301,6 +325,38 @@ def test_cpu_takes_beneficial_up_to_n_removal(db, difficulty, n_targets):
     move = cpu_ai.decide_guarded(gm, p2, difficulty, rng=random.Random(0))
     action_api.apply_game_action(gm, p2, move["action_type"], move.get("payload", {}))
     assert len(p1.field) == 0, f"{difficulty}/n={n_targets}: 相手の1コストを全KOできていない"
+
+
+@pytest.mark.parametrize("difficulty", ["hard", "normal"])
+def test_cpu_declines_pointless_optional_cost(db, difficulty):
+    """ティーチ(OP16-080)の【相手のアタック時】『トリガー1枚を捨てて対象をリーダー/黒ひげキャラに変更』を、
+    リーダーが既に対象＝リダイレクトしても得が無い局面では CPU は**見送る（カードを浪費しない）**。
+
+    回帰: `get_legal_actions` が任意確認(CONFIRM_OPTIONAL)を既定=accept の1手しか出さず、CPU が
+    任意コストを必ず払って no-op リダイレクトにトリガー札を捨てていた不具合（2026-06-19 報告）。"""
+    def mk(cid, owner):
+        return CardInstance(appmod.card_db.get_card(cid), owner)
+    appmod.card_db.load()
+    from opcg_sim.src.models.enums import Phase
+    p1 = Player("p1", [mk("OP14-102", "p1") for _ in range(20)], mk("OP11-041", "p1"))
+    p2 = Player("p2", [mk("OP16-109", "p2") for _ in range(20)], mk("OP16-080", "p2"))  # 黒ひげリーダー
+    gm = GameManager(p1, p2)
+    p1.life = [mk("OP14-102", "p1") for _ in range(4)]
+    p2.life = [mk("OP16-109", "p2") for _ in range(4)]
+    p2.hand = [mk("OP16-109", "p2")]   # 【トリガー】持ち＝捨てコスト候補
+    gm.turn_count = 3; gm.current_player = p1; gm.phase = Phase.MAIN
+    p1.leader.is_rest = False
+    gm.refresh_passive_state()
+    # p1 のリーダーで p2 リーダーへアタック宣言 → ティーチの【相手のアタック時】任意コスト確認が保留
+    action_api.apply_game_action(gm, p1, "ATTACK",
+                                 {"uuid": p1.leader.uuid, "target_ids": [p2.leader.uuid]})
+    pr = gm.get_pending_request()
+    assert pr and pr.get("player_id") == "p2" and pr.get("action") == "CONFIRM_OPTIONAL"
+    hand_before = len(p2.hand)
+    move = cpu_ai.decide_guarded(gm, p2, difficulty, rng=random.Random(0))
+    assert move["payload"].get("accepted") is False, f"{difficulty}: 無意味なリダイレクトを払っている"
+    action_api.apply_game_action(gm, p2, move["action_type"], move.get("payload", {}))
+    assert len(p2.hand) == hand_before, f"{difficulty}: トリガー札を浪費している"
 
 
 @pytest.mark.parametrize("difficulty", ["easy", "normal", "hard"])

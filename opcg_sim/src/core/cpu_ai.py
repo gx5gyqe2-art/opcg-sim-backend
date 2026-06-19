@@ -796,26 +796,42 @@ def _rank_select_candidates(manager, uuids: List[str], actor_name: str) -> List[
 
 
 def _selection_moves(manager, actor_name: str):
-    """actor の対象選択対話を RESOLVE 手として列挙する（無ければ None）。
+    """actor の対象選択／任意確認対話を RESOLVE 手として列挙する（無ければ None）。
 
-    対象は `_SELECT_ACTION`（SELECT_TARGET/FIELD_OVERFLOW_TRASH を正規化したもの）。
+    対象は `_SELECT_ACTION`（SELECT_TARGET/FIELD_OVERFLOW_TRASH を正規化したもの）と
+    `CONFIRM_OPTIONAL`（任意コスト「〜できる：」／任意効果「〜してもよい」の発動可否）。
       - **単一対象（max==1）**: 候補ごとに 1 手へ分岐＝「どれを KO/除去/バウンス/手札破壊するか」を読む。
       - **多対象「N枚まで」（max>=2）**: 影響度順（`_rank_select_candidates`）に **min..max 枚の累積**選択を
         候補化し、探索に「何枚・どれを選ぶか」を読ませる（候補は max-min+1 手＝有界）。これにより
         『相手のコスト1以下のキャラ2枚までを KO』等の**有益な除去を 0 枚で取りこぼす**のを防ぐ
         （従来は max>=2 を既定解決＝最小数=0枚へ委ねていた）。
+      - **任意確認（CONFIRM_OPTIONAL・can_skip）**: 発動する(accept)／しない(decline) の2手へ分岐。
+        従来は `get_legal_actions` が既定(accept)の1手しか出さず、CPU は**任意コストを必ず払って**いた
+        （例: ティーチ OP16-080 が相手のアタック時にトリガー1枚を捨ててアタック対象を変更＝リーダーが
+        既に対象なら no-op なのに毎回カードを浪費）。両手を採点して、得なときだけ払う。
     """
     from . import action_api
     pending = manager.get_pending_request()
     if not pending:
         return None
     KEY_PID, KEY_ACTION = _pending_keys()
-    if pending.get(KEY_PID) != actor_name or pending.get(KEY_ACTION) != _SELECT_ACTION:
+    if pending.get(KEY_PID) != actor_name:
         return None
     props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
     KEY_UUIDS = props.get('SELECTABLE_UUIDS', 'selectable_uuids')
     KEY_CONSTRAINTS = props.get('CONSTRAINTS', 'constraints')
     KEY_SKIP = props.get('CAN_SKIP', 'can_skip')
+
+    # 任意確認（任意コスト/任意効果の発動可否）: accept(発動) / decline(見送り) を採点させる。
+    if pending.get(KEY_ACTION) == "CONFIRM_OPTIONAL" and bool(pending.get(KEY_SKIP, False)):
+        base = manager.default_interaction_payload(pending)
+        accept = dict(base); accept["accepted"] = True
+        decline = dict(base); decline["accepted"] = False
+        return [{"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": accept},
+                {"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": decline}]
+
+    if pending.get(KEY_ACTION) != _SELECT_ACTION:
+        return None
     uuids = list(pending.get(KEY_UUIDS, []) or [])
     constraints = pending.get(KEY_CONSTRAINTS) or {}
     try:
