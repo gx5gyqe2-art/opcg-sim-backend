@@ -2109,14 +2109,20 @@ class GameManager:
 
     def _enqueue_life_decrease(self, player: Player, count: int = 1) -> None:
         """「ライフが離れた時」(ON_LIFE_DECREASE) 能力を、離れた枚数ぶん待ち行列へ積む。
-        発動可否や条件（自分のターン中等）は resolve_ability/_check_condition が評価し、
-        各能力の効果（多くは「引くか/使わないか」の Choice）でプレイヤーが選ぶ。"""
-        cards = ([player.leader] if player.leader else []) + player.field
+
+        公式裁定: 「ライフが離れた時」は自分／相手どちらのライフが離れても、ダメージ／効果の
+        いずれでも条件成立する（例: OP11-041 ナミ）。よって離れたライフの持ち主（引数 player）に
+        依らず、両プレイヤーの場・リーダーを走査して積む。実際に発動するかは各能力の条件
+        （【自分のターン中】=CONTEXT SELF_TURN ／【ターン1回】=TURN_LIMIT ／ 手札枚数 等）が評価し、
+        結果としてターンプレイヤー側の能力のみが発動する。発動可否（引く/引かない）は各能力の
+        効果内の Choice でプレイヤーが選ぶ。"""
         for _ in range(max(1, count)):
-            for card in cards:
-                for ability in card.master.abilities:
-                    if ability.trigger == TriggerType.ON_LIFE_DECREASE:
-                        self._enqueue_trigger(player, ability, card, optional=False)
+            for owner in (self.p1, self.p2):
+                cards = ([owner.leader] if owner.leader else []) + owner.field
+                for card in cards:
+                    for ability in card.master.abilities:
+                        if ability.trigger == TriggerType.ON_LIFE_DECREASE:
+                            self._enqueue_trigger(owner, ability, card, optional=False)
 
     def _fire_on_life_decrease(self, player: Player, count: int = 1):
         """ライフ離脱の誘発を積んで即座に消化する（効果ダメージ等の単発経路用）。

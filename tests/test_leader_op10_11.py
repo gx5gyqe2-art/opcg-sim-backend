@@ -482,6 +482,40 @@ def test_op11_041_no_draw_when_hand_gt7():
     assert len(p1.hand) == 8
 
 
+def test_op11_041_draw_when_opponent_life_leaves_on_own_turn():
+    """OP11-041 能力0: 自分のターン中は「相手のライフが離れた時」でも1枚ドローする。
+
+    公式裁定: 「ライフが離れた時」は自分/相手どちらのライフが離れても、ダメージ/効果の
+    いずれでも発動する。青黄ナミの核（EB03-053 等で相手ライフを離れさせ、リーダーで引く）
+    の回帰防止。発火予約 _enqueue_life_decrease が両プレイヤーを走査し、SELF_TURN 条件で
+    ターンプレイヤー側のみ発動することを、誘発消化経路ごと検証する。
+    """
+    from opcg_sim.src.models.enums import Zone
+    gm, p1, p2, L = build("OP11-041")
+    gm.turn_player = p1
+    _fill_hand_to(p1, 5)
+    deck_before = len(p1.deck)
+    # 相手(p2)のライフ1枚を持ち主(p2)の手札へ＝相手のライフが離れる（自分のターン中）
+    gm.move_card(p2.life[0], Zone.HAND, p2)
+    gm._advance_pending_triggers()
+    auto_resolve(gm, p1)
+    assert len(p1.deck) == deck_before - 1  # 相手ライフ離脱でも自分が1枚ドロー
+
+
+def test_op11_041_draw_once_per_turn_on_multiple_life_leaves():
+    """OP11-041 能力0: 自ターンに相手ライフが複数枚離れても【ターン1回】で1枚のみ。"""
+    from opcg_sim.src.models.enums import Zone
+    gm, p1, p2, L = build("OP11-041")
+    gm.turn_player = p1
+    _fill_hand_to(p1, 5)
+    deck_before = len(p1.deck)
+    for _ in range(2):
+        gm.move_card(p2.life[0], Zone.HAND, p2)
+        gm._advance_pending_triggers()
+        auto_resolve(gm, p1)
+    assert len(p1.deck) == deck_before - 1  # ターン1回なので1枚だけ
+
+
 def test_op11_041_discard_buffs_leader_this_turn():
     """OP11-041 能力1: ドン1付与下、相手アタック時に手札1枚捨ててリーダー+2000。"""
     gm, p1, p2, L = build("OP11-041")
