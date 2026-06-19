@@ -196,13 +196,23 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
   - **探索高速化ロードマップ（horizon4＋へ・計画／未実装）**: 予算（=clone 回数）が実深さの律速で、その
     clone(deepcopy) が先読みコストの **~96%**（プロファイル）。さらに深くするには clone コストを下げるのが本筋。
     計測（2026-06-19・中盤6局面）では探索ノードの **転置率（手順違いで同一盤面の再出現）≈23%**（範囲15〜36%）。
-    - **② インクリメンタル clone（make/unmake・ジャーナリング＋スナップショット照合）**: 盤面を 1 つだけ持ち
-      「手を適用→再帰→巻き戻し(undo)」で per-node の deepcopy を排除する（最大レバー・理論上いちばん速い）。
-      最大リスク「undo 漏れで静かに盤面破壊」は、**適用前の盤面スナップショットを保持し undo 後に完全等価を
-      assert**（make/unmake 不変条件）して**テスト失敗に変換**し、全カード監査／自己対戦で undo の取りこぼしを
-      炙り出す（照合はフル等価比較＝デバッグ時のみ・本番 OFF）。実装は効果ごとの逆操作手書きでなく**ミューテー
-      ション・ジャーナリング**（カード移動／フラグ／ドン操作を薄いレイヤで記録→逆再生）で構造的に取りこぼしを
-      防ぐ。進め方＝1〜2 効果ぶんの最小 PoC＋スナップショット照合で監査グリーンを先に出してから横展開。
+    - **② インクリメンタル clone（make/unmake・ジャーナリング＋スナップショット照合）【PoC 実装済み**: 盤面を
+      1 つだけ持ち「手を適用→再帰→巻き戻し(undo)」で per-node の deepcopy を排除する（最大レバー）。最大リスク
+      「undo 漏れで静かに盤面破壊」は、**適用前の盤面スナップショットを保持し undo 後に完全等価を assert**
+      （make/unmake 不変条件）して**テスト失敗に変換**し、実プレイ全手で undo の取りこぼしを炙り出す（フル等価
+      比較 `deep_diff`＝デバッグ時のみ・本番 OFF）。実装は効果ごとの逆操作手書きでなく**ミューテーション・
+      ジャーナリング**（`opcg_sim/src/core/journal.py`：`transaction()`／`JournaledList・Set・Dict`／
+      `__setattr__` 旧値記録→逆順再生）で構造的に取りこぼしを防ぐ。**不活性時（transaction 外）は組み込み型・
+      素の __setattr__ と完全同一**（グローバル 1 読みで素通り）＝通常プレイ無影響。
+      **PoC 結果（2026-06）**: 基盤を `CardInstance/DonInstance/Player/GameManager/ContinuousEffectManager/
+      EffectResolver` に配線し、状態コンテナを journaled 型化。`tests/test_journal.py` が「適用→巻き戻し→開始
+      deepcopy と完全一致」を実プレイ全手で照合（**全 1028 pass・構造監査 0＝不活性時の挙動完全不変**）。
+      ベンチ＝**clone 1.02ms → make/unmake 0.24ms = 4.3x**（per-node コピーコスト）。
+      **現 PoC の boundary**: 「非中断＝resolver が parked でない静止点から適用する手」が対象（CPU 探索の根も
+      この静止点）。**中断（複数段効果解決の途中）を再開する手**は parked resolver 状態（`execution_stack`・
+      continuation の共有／ネスト構造）を持ち越すため対象外。**残＝横展開**: (a) parked 効果解決機構の journaled
+      化（resolver continuation／interaction dict の網羅）、または (b) **ハイブリッド**（非中断ノードは make/unmake・
+      中断保留ノードは clone へフォールバック）で大部分の高速化を低リスクに取り込む。次いで探索本体への統合。
     - **③ 置換表（transposition table）**: 同一盤面の再探索を省くキャッシュ（転置率 ≈23% が省ける上限）。
       **内容ベースの一意ハッシュ**（uuid は毎回変わるため不可・**デッキ順／継続効果／隠れ情報**まで漏れなく＝
       hard は相手手札も含む）→ `ハッシュ→(評価値, 深さ, 最善手)`。ノード入口で probe（同深さ以上ならカット）・
