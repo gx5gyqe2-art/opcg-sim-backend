@@ -7,6 +7,7 @@ from ...models.effect_types import (
 )
 from ...models.enums import ActionType, Zone, TriggerType, ConditionType, CompareOperator, Player, CardType
 import re
+from ..journal import JournaledList
 
 # 選択グループ分配（§7-1）で「N枚を選び」の選択集合を保存する save_id。
 # atoms._SEL_GROUP_ID と一致させる。
@@ -19,7 +20,7 @@ _UNSET = object()
 class EffectResolver:
     def __init__(self, game_manager):
         self.game_manager = game_manager
-        self.execution_stack: List[EffectNode] = []
+        self.execution_stack: List[EffectNode] = JournaledList()
         self.context: Dict[str, Any] = {
             "saved_targets": {},
             "saved_values": {},
@@ -403,7 +404,7 @@ class EffectResolver:
         # 解決された後に _resume_deferred_continuations が後続を再開する（B = 多段継続の対話化）。
         if self.game_manager._replacement_suspended and self.execution_stack:
             self.game_manager._defer_resolver_stack(player, source_card, self.execution_stack, self.context)
-            self.execution_stack = []
+            self.execution_stack = JournaledList()
 
         # 「このターン中、このリーダーの効果で引いていない」(OP01-062) 用: リーダー能力由来の
         # ドローをターン内イベントに記録する（次回の同条件が false になり 1ターン複数ドローを防ぐ）。

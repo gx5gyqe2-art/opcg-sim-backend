@@ -184,26 +184,67 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
   （自ターン途中の甘い局面で評価せず＝horizon の抜け道を塞ぐ）。`decide_guarded` が暴走防止ガード（手総数・
   繰り返しキャップ）で収束を保証する。
   - **ホライズン**: ルート手は 1-ply で事前選別し、上位 `HARD_ROOT_BEAM` 手＋`TURN_END`（パスの基準線）
-    のみを **`HARD_HORIZON`（既定=3）ターン先**まで深掘りする（深掘り集合のみ採用＝評価ホライズンを一致
+    のみを **`HARD_HORIZON`（既定=4）ターン先**まで深掘りする（深掘り集合のみ採用＝評価ホライズンを一致
     させ誤選択を防ぐ）。**horizon=1=B1**（相手ターン開始で評価・相手ターンへ潜らない）、**horizon=2=B2-lite**
     （相手のターンを丸ごと＝攻撃まで読み、自分の次ターン開始で評価）＝相手の反撃に対する守り（ブロッカー／
     カウンター温存）を min/max で読む。**horizon=3**（さらに自分の次ターン→相手の次ターン開始まで）で
-    相手の反撃後の立て直しまで読む。手ごと均等予算 `HARD_PER_MOVE_BUDGET`（=90）・各ノード幅 `HARD_BEAM`・
-    総 ply 上限 `HARD_MAX_PLY`（=40）。**horizon だけ上げても予算切れで turn2 止まりになる**（予算が実深さの
-    律速）ため、clone の ~3 倍高速化（上記 `__deepcopy__`）と併せて予算 36→90 に増やし horizon 2→3 を実現。
-    予算はレイテンシ予算（切れても settle で境界評価）で、中盤 decide 実測 **平均 ~1.0s／最大 ~1.1s**
-    （高速化前の horizon=2/予算36 ~1.4s より速く、かつ 1 ターン深い）。`easy` は素の 1-ply のまま（探索なし）。
+    相手の反撃後の立て直しまで読む。**horizon=4**（さらに相手の次ターン→自分の次々ターン付近）で相手の
+    再反撃まで読む。手ごと均等予算 `HARD_PER_MOVE_BUDGET`（=150）・各ノード幅 `HARD_BEAM`・総 ply 上限
+    `HARD_MAX_PLY`（=52）。**horizon だけ上げても予算切れで読み切れない**（予算が実深さの律速）ため、
+    horizon を上げるときは settle（予算切れ）率が同等になるよう予算も連動させる（horizon3→4 で 90→150）。
+    深さの拡張史: clone の ~3 倍高速化（`__deepcopy__`）で horizon 2→3（予算 36→90）、その後の make/unmake
+    ＋同一性比較等で探索 ~4.2x 高速化した余力で **horizon 3→4（予算 90→150・maxply 40→52）**。後者は
+    **A/B 自己対戦（horizon4 vs horizon3・both hard・席交互・独立2シード群 計60局）で 35/60＝58.3%＝+58 Elo**
+    （両群 >50%・戦術退行なし）と実測検証して採用（2026-06）。予算はレイテンシ予算（切れても settle で境界
+    評価）で、中盤 decide 実測 **~516ms**（高速化前 horizon=3 の ~1176ms より速く、かつ 1 ターン深い）。
+    `easy` は素の 1-ply のまま（探索なし）。
   - **探索高速化ロードマップ（horizon4＋へ・計画／未実装）**: 予算（=clone 回数）が実深さの律速で、その
     clone(deepcopy) が先読みコストの **~96%**（プロファイル）。さらに深くするには clone コストを下げるのが本筋。
     計測（2026-06-19・中盤6局面）では探索ノードの **転置率（手順違いで同一盤面の再出現）≈23%**（範囲15〜36%）。
-    - **② インクリメンタル clone（make/unmake・ジャーナリング＋スナップショット照合）**: 盤面を 1 つだけ持ち
-      「手を適用→再帰→巻き戻し(undo)」で per-node の deepcopy を排除する（最大レバー・理論上いちばん速い）。
-      最大リスク「undo 漏れで静かに盤面破壊」は、**適用前の盤面スナップショットを保持し undo 後に完全等価を
-      assert**（make/unmake 不変条件）して**テスト失敗に変換**し、全カード監査／自己対戦で undo の取りこぼしを
-      炙り出す（照合はフル等価比較＝デバッグ時のみ・本番 OFF）。実装は効果ごとの逆操作手書きでなく**ミューテー
-      ション・ジャーナリング**（カード移動／フラグ／ドン操作を薄いレイヤで記録→逆再生）で構造的に取りこぼしを
-      防ぐ。進め方＝1〜2 効果ぶんの最小 PoC＋スナップショット照合で監査グリーンを先に出してから横展開。
-    - **③ 置換表（transposition table）**: 同一盤面の再探索を省くキャッシュ（転置率 ≈23% が省ける上限）。
+    - **② インクリメンタル clone（make/unmake・ジャーナリング＋スナップショット照合）【PoC 実装済み**: 盤面を
+      1 つだけ持ち「手を適用→再帰→巻き戻し(undo)」で per-node の deepcopy を排除する（最大レバー）。最大リスク
+      「undo 漏れで静かに盤面破壊」は、**適用前の盤面スナップショットを保持し undo 後に完全等価を assert**
+      （make/unmake 不変条件）して**テスト失敗に変換**し、実プレイ全手で undo の取りこぼしを炙り出す（フル等価
+      比較 `deep_diff`＝デバッグ時のみ・本番 OFF）。実装は効果ごとの逆操作手書きでなく**ミューテーション・
+      ジャーナリング**（`opcg_sim/src/core/journal.py`：`transaction()`／`JournaledList・Set・Dict`／
+      `__setattr__` 旧値記録→逆順再生）で構造的に取りこぼしを防ぐ。**不活性時（transaction 外）は組み込み型・
+      素の __setattr__ と完全同一**（グローバル 1 読みで素通り）＝通常プレイ無影響。
+      **PoC 結果（2026-06）**: 基盤を `CardInstance/DonInstance/Player/GameManager/ContinuousEffectManager/
+      EffectResolver` に配線し、状態コンテナを journaled 型化。`tests/test_journal.py` が「適用→巻き戻し→開始
+      deepcopy と完全一致」を実プレイ全手で照合（**全 1028 pass・構造監査 0＝不活性時の挙動完全不変**）。
+      ベンチ＝**clone 1.02ms → make/unmake 0.24ms = 4.3x**（per-node コピーコスト）。
+      **boundary**: 「非中断＝resolver が parked でない静止点から適用する手」が対象（CPU 探索の根もこの静止点）。
+      **中断（複数段効果解決の途中）を再開する手**は parked resolver 状態（`execution_stack`・continuation の共有／
+      ネスト構造）を持ち越すため対象外＝clone へフォールバックする。
+      **実探索への統合済み（ハイブリッド・2026-06）**: `cpu_ai.py` の 1-ply 採点（ビーム選別＝`_score_move_1ply`）と
+      ビーム手の深掘り再帰（`_recurse_child`＝入れ子トランザクションで manager をその場適用→`_search` 再帰→巻き戻し）
+      を make/unmake 化し、`_mu_safe`（active_interaction が None）な静止点のみ適用・中断再開は clone。`_USE_MAKE_UNMAKE`
+      フラグで即時に従来挙動へ戻せる。**方策は clone 方式と完全同一**（内部最適化）＝`tests/test_cpu_make_unmake.py` が
+      (1)decide 選択手一致・(2)`_scored_search` 深掘りスコア一致・(3)decide が manager を無変更（巻き戻し完全）を機械照合。
+      **ベンチ＝hard decide 1312ms→367ms＝3.57x**（中盤5局面平均）。全1032pass・構造監査0・カード挙動ベースライン不変。
+      スレッド安全性: 探索は単一スレッド前提（FastAPI async ハンドラが decide を await 無しで同期実行＝原子的）。
+      ルート `_scored_search` も make/unmake 化済み（`_eval_root_move`・clone 版と完全同値）。**clone 除去の床に到達**:
+      残クローンの内訳実測（hard decide）＝中断状態の再帰フォールバック ~90%（parked resolver 未 journaled）・
+      ルート `_scored_search` ~5%（≈ decide の 0.7%・変換効果はノイズ内）。残コストは clone でなく **apply＋evaluate**。
+      `_apply_modeled_counter` は SELECT_COUNTER＝中断でフォールバックのため変換無益。
+      **B-1 エンジン最適化（clone でない部分・2026-06）**: ②後の実測で残コストは clone でなく apply＋evaluate と判明し、
+      毎ノード走るエンジン本体を最適化した（方策不変・等価ゲート緑）。
+      (1) **`CardInstance`/`DonInstance` を同一性比較（`@dataclass(eq=False)`）**: dataclass 既定の値ベース __eq__（全 ~25
+      フィールドの逐次比較）が `card in zone`／`leader == card` を激重にし `_find_card_location` が探索の ~17% を占めていた。
+      カードは固有実体（同一 uuid＝同一オブジェクト）なので同一性比較（ポインタ・id ハッシュで hashable 化）に戻す＝盤面内は
+      オブジェクト同一性＝論理同一カード・盤面跨ぎは uuid で引く（`_find_card_by_uuid`）ため挙動不変。**hard decide 1.30x**。
+      (2) **軽量 `pending_actor_action()`**: `get_pending_request` は毎回 selectable 構築・候補 to_dict・`uuid4()` を作るが
+      探索は (player_id, action) しか見ない。軽量版を `_search` の手番/葉判定に使う（副作用の phase 正規化はフル版と一致・
+      `test_pending_actor_action_matches_full` で機械照合）。
+      **通算: hard decide ~1176ms→~278ms＝~4.2x**（make/unmake×eq×pending・全1033pass・構造監査0・カード挙動ベースライン不変）。
+      **残（任意）**: parked 効果解決機構の journaled 化で中断再開手も make/unmake 化（残 clone の大半＝~decide の 12〜30%）。
+      `_apply_passive_effects`（~14%）の差分/キャッシュ化は常在効果の正しさに直結し安全なキャッシュ無効化が難しい＝高リスク保留。
+    - **③ 置換表（transposition table）= 実測で不採用（2026-06）**: ②後は**健全（完全一致キー）な転置率 ≤0.5%**（exact key
+      ＝デッキ順／全カード状態／継続効果まで含むと手順違いでも byte 一致がほぼ起きない）に対し、健全な位置キー計算が
+      **~3%/node** のオーバーヘッド＝**ネット負**。②が per-node clone を消したため「再探索を省く」価値自体が消えた
+      （clone が 86% だった頃の前提が無効化）。下記は不採用の経緯記録。
+    - **（不採用）③ 置換表（transposition table）**: 同一盤面の再探索を省くキャッシュ（**当時の粗いキーでの**転置率 ≈23% が
+      省ける上限と見積もったが、健全キーでは ≤0.5% と判明）。
       **内容ベースの一意ハッシュ**（uuid は毎回変わるため不可・**デッキ順／継続効果／隠れ情報**まで漏れなく＝
       hard は相手手札も含む）→ `ハッシュ→(評価値, 深さ, 最善手)`。ノード入口で probe（同深さ以上ならカット）・
       出口で store。リスク＝ハッシュ取りこぼし／衝突による**誤った値の再利用**（②の照合と同種の網羅性問題）→

@@ -6,6 +6,8 @@ import traceback
 import uuid
 import json
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
+from . import journal
+from .journal import JournaledList, JournaledDict, JournaledSet, record_attr
 from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
 from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource, Sequence, Branch, Choice
 from .effects.resolver import EffectResolver
@@ -76,32 +78,38 @@ def _ability_index(card, ab) -> Any:
     return id(ab)
 
 class Player:
+    def __setattr__(self, name, value):
+        # 差分巻き戻し（journal.transaction 中のみ記録）。不活性時は素通り。
+        if journal._active is not None:
+            record_attr(self, name, self.__dict__)
+        object.__setattr__(self, name, value)
+
     def __init__(self, name: str, deck: List[Card], leader: Optional[Card] = None):
         self.name = name
-        self.life: List[Card] = []
-        self.hand: List[Card] = []
-        self.field: List[Card] = []
-        self.trash: List[Card] = []
+        self.life: List[Card] = JournaledList()
+        self.hand: List[Card] = JournaledList()
+        self.field: List[Card] = JournaledList()
+        self.trash: List[Card] = JournaledList()
         self.stage: Optional[Card] = None
-        self.deck = deck
-        self.don_deck: List[DonInstance] = [DonInstance(owner_id=name) for _ in range(10)]
-        self.don_active: List[DonInstance] = []
-        self.don_rested: List[DonInstance] = []
-        self.don_attached_cards: List[DonInstance] = [] 
+        self.deck = JournaledList(deck)
+        self.don_deck: List[DonInstance] = JournaledList(DonInstance(owner_id=name) for _ in range(10))
+        self.don_active: List[DonInstance] = JournaledList()
+        self.don_rested: List[DonInstance] = JournaledList()
+        self.don_attached_cards: List[DonInstance] = JournaledList()
         self.leader: Optional[Card] = leader
-        self.temp_zone: List[Card] = []
+        self.temp_zone: List[Card] = JournaledList()
         # 「相手の登場時効果は無効になる」(スコープ付き相手効果無効) の期限。
         # turn_count <= negate_onplay_until の間、このプレイヤーの ON_PLAY 解決をスキップする。
         self.negate_onplay_until: int = 0
         # 自己制限（「自分は、このターン中、…できない」= self_cannot）の保管。
         # key=制限種別(CANNOT_PLAY_CHARACTER 等) → {"expire": turn_count, "min_cost": Optional[int]}。
         # turn_count <= expire の間だけ有効（negate_onplay_until と同じ遅延失効方式）。
-        self.restrictions: Dict[str, Dict[str, Any]] = {}
+        self.restrictions: Dict[str, Dict[str, Any]] = JournaledDict()
         # 継続付与型の置換（カウンターイベント等が「自分のキャラすべては、このターン中、
         # …の場合、代わりに〜できる」を付与する）の保管。各要素 = {"status", "sub_effect",
         # "is_optional", "expire_turn"}。turn_count <= expire_turn の間だけ有効（遅延失効）。
         # 場に残らない発生源（イベント＝即トラッシュ）の置換を、被除去キャラ側から参照するため。
-        self.granted_replacements: List[Dict[str, Any]] = []
+        self.granted_replacements: List[Dict[str, Any]] = JournaledList()
 
     def setup_game(self):
         random.shuffle(self.deck)
@@ -162,6 +170,13 @@ class Player:
         return d
 
 class GameManager:
+    def __setattr__(self, name, value):
+        # 差分巻き戻し（journal.transaction 中のみ記録）。object.__setattr__ 経由なので
+        # active_interaction 等の data descriptor（property）も従来どおり機能する。
+        if journal._active is not None:
+            record_attr(self, name, self.__dict__)
+        object.__setattr__(self, name, value)
+
     def __init__(self, player1: Player, player2: Player):
         self.p1 = player1
         self.p2 = player2
@@ -176,33 +191,33 @@ class GameManager:
         # このターン中に発生したイベントの回数（EVENT_THIS_TURN 条件用）。ターン開始でクリア。
         # 例: "DON_RETURNED"（ドン!!デッキへ返却）/ "CHAR_LEFT_BY_OWN_EFFECT" / "NAVY_DISCARD" /
         #     "TRIGGER_CHAR_PLAYED"。各イベント発生地点で record_turn_event() を呼ぶ。
-        self._turn_events: Dict[str, int] = {}
+        self._turn_events: Dict[str, int] = JournaledDict()
         self.phase = Phase.SETUP
         self.winner: Optional[str] = None
         self.active_battle: Optional[Dict[str, Any]] = None
         # 中断（対話）はスタックで保持する。`active_interaction` プロパティが先頭を指す。
         # 通常は深さ≤1（単一スロット相当）で、置換ネスト等のみが push で深くする。
-        self._interaction_stack: List[Dict[str, Any]] = []
+        self._interaction_stack: List[Dict[str, Any]] = JournaledList()
         # 除去置換の内側中断を提示した直後に立つシグナル（外側継続の退避要否を resolver が判定する）。
         self._replacement_suspended = False
         # 入れ子の除去置換が中断したとき、失われる外側の継続（後続アクション／残対象）を退避する
         # スタック。内側中断が解決された後（active_interaction が無くなった後）に LIFO で再開する。
         # これにより「除去が効果シーケンスの途中（後続あり）／複数対象」でも置換の内側選択を
         # UI へ提示できる（accepted limitation B = multi-source continuation の解消）。
-        self._deferred_continuations: List[Dict[str, Any]] = []
+        self._deferred_continuations: List[Dict[str, Any]] = JournaledList()
         self.setup_phase_pending = False
-        self.mulligan_done: Set[str] = set()
+        self.mulligan_done: Set[str] = JournaledSet()
         from .effects.continuous import ContinuousEffectManager
         self.continuous = ContinuousEffectManager(self)
-        self.action_events: List[Dict] = []  # per-request event buffer; reset in API handler
+        self.action_events: List[Dict] = JournaledList()  # per-request event buffer; reset in API handler
         # 「このターン終了時、〜」の遅延アクション待ち行列: (player, GameAction, source_card)。
         # resolver が積み、end_turn が解決する。
-        self.pending_end_of_turn: List[tuple] = []
+        self.pending_end_of_turn: List[tuple] = JournaledList()
         # ライフ公開【トリガー】・ON_LIFE_DECREASE 等の誘発能力の待ち行列。
         # 各要素 = {"player","ability","card","optional","_confirmed"}。
         # _advance_pending_triggers が1件ずつ確認/解決し、中断時は resolve_interaction が再開する。
         # _battle_triggers と同型だが、戦闘解決の外（ダメージ後・効果ダメージ）でも使う汎用版。
-        self._pending_triggers: List[Dict[str, Any]] = []
+        self._pending_triggers: List[Dict[str, Any]] = JournaledList()
         # RETURN_DON（ドン!!返却）でプレイヤーが選んだ戻すドン!!の uuid 一覧。
         # resolver が選択解決時にセットし、apply_action_to_engine が消費する。
         self._return_don_selection: Optional[List[str]] = None
@@ -244,7 +259,7 @@ class GameManager:
         if not m:
             return
         n = int(m.group(1))
-        player.don_deck = [DonInstance(owner_id=player.name) for _ in range(n)]
+        player.don_deck = JournaledList(DonInstance(owner_id=player.name) for _ in range(n))
 
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """
@@ -289,7 +304,7 @@ class GameManager:
         """
         import copy
         snapshot = copy.deepcopy(self)
-        snapshot.action_events = []
+        snapshot.action_events = JournaledList()
         return snapshot
 
     def get_legal_actions(self, player: Optional[Player] = None) -> List[Dict[str, Any]]:
@@ -577,6 +592,37 @@ class GameManager:
             request = {KEY_PID: self.turn_player.name, KEY_ACTION: "MAIN_ACTION", KEY_MSG: PendingMessage.MAIN_ACTION.value, KEY_UUIDS: selectable, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
         return request
 
+    def pending_actor_action(self) -> Optional[Tuple[str, str]]:
+        """`get_pending_request()` の (player_id, action) **だけ**を安価に返す（CPU 探索の葉/手番判定用）。
+
+        探索は各ノードでこの 2 値しか見ない（手は `get_legal_actions` から得る）一方、
+        `get_pending_request` は毎回 selectable 構築・候補 to_dict・`uuid4()` を作るため重い
+        （探索コストの ~12%）。本メソッドは**判定ロジックと副作用（BLOCK_STEP/BATTLE_COUNTER で
+        active_battle が無いときの phase→MAIN 正規化）を get_pending_request と一致**させたうえで、
+        重い payload を作らない。一致は `tests/test_cpu_make_unmake.py` で機械照合する。
+        """
+        if self.phase == Phase.MULLIGAN:
+            order = ([self.turn_player, self.opponent]
+                     if self.turn_player and self.opponent else [self.p1, self.p2])
+            for p in order:
+                if p.name not in self.mulligan_done:
+                    return (p.name, "MULLIGAN")
+            return None
+        if self.active_interaction:
+            at = self.active_interaction.get("action_type")
+            fe = "SEARCH_AND_SELECT" if at in ("SELECT_TARGET", "FIELD_OVERFLOW_TRASH") else at
+            return (self.active_interaction.get("player_id"), fe)
+        if not self.active_battle and self.phase in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER):
+            self.phase = Phase.MAIN  # get_pending_request と同じ副作用
+        battle_actions = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+        if self.phase == Phase.BLOCK_STEP and self.active_battle:
+            return (self.active_battle["target_owner"].name, battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER'))
+        if self.phase == Phase.BATTLE_COUNTER and self.active_battle:
+            return (self.active_battle["target_owner"].name, battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER'))
+        if self.phase == Phase.MAIN:
+            return (self.turn_player.name, "MAIN_ACTION")
+        return None
+
     def resolve_interaction(self, player: Player, payload: Dict[str, Any]):
         if not self.active_interaction:
             return
@@ -735,7 +781,7 @@ class GameManager:
                 owner_name = continuation.get("dest_owner")
                 tp = self.p1 if (owner_name and self.p1.name == owner_name) else (self.p2 if owner_name else player)
                 rest = [c for c in tp.life if c not in ordered]
-                tp.life = ordered + rest
+                tp.life = JournaledList(ordered + rest)
             else:
                 # デッキ配置: BOTTOM は順に append（先頭が上）、TOP は逆順 insert(0) で
                 # ordered[0] が最上面になるようにする。
@@ -782,7 +828,7 @@ class GameManager:
             self.finish_setup()
             self.setup_phase_pending = False
             self.phase = Phase.MULLIGAN
-            self.mulligan_done = set()
+            self.mulligan_done = JournaledSet()
 
         # ライフ公開【トリガー】/ON_LIFE_DECREASE 等のペンディング誘発が残っていれば消化する。
         if not self.active_interaction and self._pending_triggers:
@@ -889,7 +935,7 @@ class GameManager:
         else: self.turn_player = self.p1; self.opponent = self.p2
         # マリガンフェーズへ移行（両プレイヤーの確定後にゲーム開始）
         self.phase = Phase.MULLIGAN
-        self.mulligan_done = set()
+        self.mulligan_done = JournaledSet()
 
     def do_mulligan(self, player: 'Player') -> None:
         """手札5枚全てをデッキ底に戻してシャッフル→5枚引き直す（全交換・1回限り）"""
@@ -958,7 +1004,7 @@ class GameManager:
         if not self.pending_end_of_turn:
             return
         pending = self.pending_end_of_turn
-        self.pending_end_of_turn = []
+        self.pending_end_of_turn = JournaledList()
         for player, node, source_card in pending:
             # 場を離れたカードのソース由来でも、トラッシュ送り等は対象解決時に弾かれる。
             resolver = EffectResolver(self)
@@ -988,12 +1034,12 @@ class GameManager:
         """このターン中に発生したイベントを記録する（EVENT_THIS_TURN 条件で参照）。"""
         ev = getattr(self, "_turn_events", None)
         if ev is None:
-            ev = self._turn_events = {}
+            ev = self._turn_events = JournaledDict()
         ev[name] = ev.get(name, 0) + n
 
     def switch_turn(self):
         # ターンが切り替わる/追加ターンに入る = 新しいターン。ターン内イベント記録をクリアする。
-        self._turn_events = {}
+        self._turn_events = JournaledDict()
         # 追加ターン（EXTRA_TURN）: 予約したプレイヤーがターンプレイヤーのまま継続する
         if getattr(self, "pending_extra_turn", None) == self.turn_player.name:
             self.pending_extra_turn = None
@@ -1037,13 +1083,13 @@ class GameManager:
                 don.is_rest = False
                 to_activate.append(don)
         player.don_active.extend(to_activate)
-        player.don_rested = still_frozen
+        player.don_rested = JournaledList(still_frozen)
         
         for don in player.don_attached_cards:
             don.is_rest = False
             don.attached_to = None
             player.don_active.append(don)
-        player.don_attached_cards = []
+        player.don_attached_cards = JournaledList()
 
     def draw_phase(self):
         if self.turn_count > 1: self.draw_card(self.turn_player)
@@ -1322,7 +1368,7 @@ class GameManager:
             for _ in range(need):
                 attacker_owner.trash.append(attacker_owner.hand.pop(0))
         attacker.is_rest = True
-        self.active_battle = {"attacker": attacker, "target": target, "attacker_owner": attacker_owner, "target_owner": target_owner, "counter_buff": 0}
+        self.active_battle = JournaledDict({"attacker": attacker, "target": target, "attacker_owner": attacker_owner, "target_owner": target_owner, "counter_buff": 0})
 
         # アタック時/相手のアタック時トリガーを順に解決する。途中でいずれかが対象選択や
         # 選択(Choice)で中断した場合、解決前にブロッカー/カウンター段階へ進むと、未解決の
@@ -1345,14 +1391,14 @@ class GameManager:
             for ability in card.master.abilities:
                 if ability.trigger == TriggerType.ON_OPP_ATTACK:
                     triggers.append((target_owner, ability, card))
-        self._battle_triggers = triggers
+        self._battle_triggers = JournaledList(triggers)
         self._advance_battle_triggers()
 
     def _advance_battle_triggers(self):
         """積んだバトルトリガーを順に解決し、全て解決後に防御フェイズへ遷移する。
         途中で interaction が立ったら中断（resolve_interaction が解決後に再度呼ぶ）。"""
         if not self.active_battle:
-            self._battle_triggers = []
+            self._battle_triggers = JournaledList()
             return
         while getattr(self, "_battle_triggers", None):
             player, ability, card = self._battle_triggers.pop(0)

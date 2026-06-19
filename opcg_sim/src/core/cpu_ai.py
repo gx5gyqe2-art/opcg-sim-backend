@@ -33,6 +33,16 @@ from typing import Any, Dict, List, Optional, Tuple
 import re
 
 from ..models.enums import TriggerType
+from . import journal
+from .journal import JournaledList
+
+# ② make/unmake: 探索の 1-ply 採点（ビーム選別）を clone でなく「適用→採点→巻き戻し」で行い
+# per-node の deepcopy を消す（探索コストの ~86%＝clone）。**非中断（resolver が parked でない
+# 静止点）から適用する手にのみ適用**し、中断（複数段効果の途中）を再開する手は clone へフォールバック
+# する（parked resolver 状態は現状 journaled 化が未完＝docs/SPEC.md §2.5.2 の boundary）。
+# 探索結果（選ぶ手・評価値）は clone 方式と完全同一（内部最適化）＝tests/test_cpu_make_unmake.py で
+# 等価を機械照合。万一の取りこぼし時に即無効化できるようモジュールフラグで保持する。
+_USE_MAKE_UNMAKE = True
 
 # 評価重み（盤面 1000=パワー1段相当に正規化）
 W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（膝＝薄域。最重要）
@@ -96,17 +106,20 @@ HARD_ROOT_BEAM = 4         # 深掘りするルート手の数（残りは 1-ply
 # （SPEC）のため本数を絞り、取りこぼし是正だけを先取りする（1 手あたり HARD_PER_MOVE_BUDGET の追加読み）。
 HARD_FORCE_DEEPEN_CAP = 3
 # 深掘り 1 手あたりのクローン上限（予算切れは settle で境界評価＝正しいのでここはレイテンシ予算）。
-# `CardInstance`/`DonInstance` の高速 `__deepcopy__`（§2.5.2）で clone が ~3 倍速くなり、horizon=3 の
-# 深掘りを同等レイテンシで賄えるようになったため 36→90 に増量（horizon だけ上げても予算切れで turn2 止まり
-# になる＝予算が実深さの律速）。中盤 decide 実測 ~1.2s（高速化前の horizon=2/36 ~1.4s より速い）。
-HARD_PER_MOVE_BUDGET = 90
+# make/unmake（§2.5.2 ②）＋同一性比較等（B-1）で探索が ~4.2x 高速化した余力を**深さ**へ振り、
+# horizon=4 へ拡張（下記）。horizon=4 で settle（予算切れ）率を horizon=3 と同等（~15%）に保つには
+# budget を 90→150 に増量する必要がある（horizon だけ上げて budget 据置だと 4 ターン目が予算切れに
+# なり読み切れない＝予算が実深さの律速）。中盤 decide 実測 ~516ms（高速化前 horizon=3 の ~1176ms より速い）。
+HARD_PER_MOVE_BUDGET = 150
 HARD_DEPTH = 5             # ply 割引の基準（最短リーサル認識のテスト境界・winner 到達 ply の上限目安）
-HARD_MAX_PLY = 40          # 総 ply の安全上限（horizon=3 で 3 ターン分の自由展開＋戦闘サブステップを賄う）
-# 探索ホライズン（B2-lite・docs/SPEC.md §2.5.3）。深掘りで何ターン先まで読むか。horizon=3＝「自分のターン
-# 完了→相手のターン→自分の次ターン→相手の次ターン開始」付近の静止点で評価＝相手の反撃＋その後の自分の
-# 立て直しまで読む。clone 高速化で horizon=2→3 を同等レイテンシで実現（予算 HARD_PER_MOVE_BUDGET と対）。
+HARD_MAX_PLY = 52          # 総 ply の安全上限（horizon=4 で 4 ターン分の自由展開＋戦闘サブステップを賄う）
+# 探索ホライズン（B2-lite・docs/SPEC.md §2.5.3）。深掘りで何ターン先まで読むか。horizon=4＝「自分のターン
+# 完了→相手のターン→自分の次ターン→相手の次ターン→…」付近の静止点で評価＝相手の反撃＋自分の立て直し＋
+# さらに相手の再反撃まで読む。②③B の高速化（~4.2x）で生じた余力を深さへ振り、horizon=3→4 に拡張。
+# **A/B 自己対戦で検証**（horizon4 vs horizon3・both hard・席交互 60 局）: 35/60＝58.3%＝**+58 Elo**
+# （両独立シード群とも >50%・戦術退行なし）＝深く読む方が強いことを実測で確認して採用（2026-06）。
 # 横展開は重いので上位 K 手（HARD_ROOT_BEAM＋TURN_END）のみに適用し、非対象は採用しない（評価ホライズンの一貫性）。
-HARD_HORIZON = 3
+HARD_HORIZON = 4
 _SETTLE_LIMIT = 16         # 打ち切り時にターン境界へ整流する最大手数（戦闘サブステップ込み）
 # C-4（§2.5.3）: 打ち切り settle 葉の不確実性ディスカウント（信頼度）。settle は予算切れの局面を**既定解決**で
 # 無理に静止点へ整流して採点する＝探索で確かめた値ではない。勝敗未確定の settle 値はこの係数で中立（盤面差
@@ -404,6 +417,15 @@ def _don_return_penalty(manager, actor_name: str, child) -> float:
     if returned <= 0:
         return 0.0
     early = min(1.0, len(before.don_deck) / _DON_DECK_FULL)
+    return returned * _W_DON_RETURN * early
+
+
+def _don_return_penalty_vals(before_don: int, after_don: int) -> float:
+    """`_don_return_penalty` の値版（make/unmake 経路用＝適用前後のドンデッキ枚数だけで同値計算）。"""
+    returned = after_don - before_don
+    if returned <= 0:
+        return 0.0
+    early = min(1.0, before_don / _DON_DECK_FULL)
     return returned * _W_DON_RETURN * early
 
 
@@ -827,25 +849,95 @@ def _drain_own_interactions(manager, actor_name: str, stop_at_select: bool = Fal
             return
 
 
+def _apply_move_inplace(board, actor_name: str, move: Dict[str, Any], stop_at_select: bool = False):
+    """`board` に move を**その場で**適用し、actor 側の対話をドレインする（例外はそのまま送出）。
+
+    clone 経路（`_apply_clone`）と make/unmake 経路（`_score_move_1ply`）の共通コア。
+    """
+    from . import action_api
+    actor = _player_by_name(board, actor_name)
+    if move["kind"] == "battle":
+        action_api.apply_battle_action(board, actor, move["action_type"], move.get("card_uuid"))
+    else:
+        action_api.apply_game_action(board, actor, move["action_type"], move.get("payload", {}))
+    _drain_own_interactions(board, actor_name, stop_at_select=stop_at_select)
+
+
 def _apply_clone(manager, actor_name: str, move: Dict[str, Any], stop_at_select: bool = False):
     """move を新しいクローンへ適用し、actor 側の対話をドレインしたクローンを返す。
 
     シミュレーションが例外を出す手は None を返す（呼び出し側で除外する）。
     `stop_at_select=True` のとき、ドレインは分岐対象の単一対象選択で停止する（探索側が分岐する）。
     """
-    from . import action_api
     clone = manager.clone()
-    actor = _player_by_name(clone, actor_name)
     clone.action_events = []
     try:
-        if move["kind"] == "battle":
-            action_api.apply_battle_action(clone, actor, move["action_type"], move.get("card_uuid"))
-        else:
-            action_api.apply_game_action(clone, actor, move["action_type"], move.get("payload", {}))
-        _drain_own_interactions(clone, actor_name, stop_at_select=stop_at_select)
+        _apply_move_inplace(clone, actor_name, move, stop_at_select=stop_at_select)
     except Exception:
         return None
     return clone
+
+
+def _mu_safe(manager) -> bool:
+    """make/unmake を安全に使える局面か＝中断（parked resolver 状態）でない静止点か。
+
+    中断を**再開**する手は parked resolver 状態（execution_stack／continuation の共有・ネスト構造）を
+    持ち越し、現状その journaled 化が未完のため巻き戻しが不完全になり得る（docs/SPEC.md §2.5.2 boundary）。
+    探索の根・各ノードは中断でない静止点で意思決定するため、ここが True のときだけ make/unmake する。
+    """
+    return _USE_MAKE_UNMAKE and getattr(manager, "active_interaction", None) is None
+
+
+def _score_move_1ply(manager, actor_name: str, move: Dict[str, Any], eval_name: str,
+                     see_opp_hand: bool, profile, plan, stop_at_select: bool = False) -> Optional[float]:
+    """move 適用後の 1-ply 評価値（`eval_name` 視点）を返す。失敗（例外）は None。
+
+    `_mu_safe` な局面では **make/unmake**（manager をその場で適用→採点→巻き戻し＝clone 不要）、
+    それ以外（中断再開）は従来どおり clone で採点する。**clone 方式と完全同値**（同じ適用・同じ
+    evaluate を、複製の有無だけ替えて行う）。
+    """
+    if _mu_safe(manager):
+        saved_events = manager.action_events
+        with journal.transaction():
+            manager.action_events = JournaledList()
+            try:
+                _apply_move_inplace(manager, actor_name, move, stop_at_select=stop_at_select)
+            except Exception:
+                return None
+            val = evaluate(manager, eval_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+        # action_events は transient バッファ（探索値に無関係）。txn 内の付け替えも巻き戻るが念のため復元。
+        manager.action_events = saved_events
+        return val
+    clone = _apply_clone(manager, actor_name, move, stop_at_select=stop_at_select)
+    if clone is None:
+        return None
+    return evaluate(clone, eval_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+
+
+def _recurse_child(manager, actor_name: str, move: Dict[str, Any], search_fn) -> Optional[float]:
+    """move を適用した子局面で `search_fn(child) -> float` を評価して返す。失敗は None。
+
+    `_mu_safe` な局面では **make/unmake**（manager をその場で適用→`search_fn` で再帰→巻き戻し＝
+    再帰中だけ manager が子状態・抜けると無傷に戻る）。それ以外は clone で子を作って再帰する。
+    深い再帰は入れ子トランザクションで扱われ、各深さが順に巻き戻る（世代カウンタ）。
+    """
+    if _mu_safe(manager):
+        saved_events = manager.action_events
+        result: List[Optional[float]] = [None]
+        with journal.transaction():
+            manager.action_events = JournaledList()
+            try:
+                _apply_move_inplace(manager, actor_name, move, stop_at_select=True)
+            except Exception:
+                result[0] = None
+            else:
+                result[0] = search_fn(manager)
+        manager.action_events = saved_events
+        return result[0]
+    child = _apply_clone(manager, actor_name, move, stop_at_select=True)
+    if child is None:
+        return None
+    return search_fn(child)
 
 
 def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any],
@@ -854,10 +946,9 @@ def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any],
 
     `profile`/`plan`（任意・既定 None＝従来同値）を渡すと評価にプラン補正を反映する
     （対象選択の 1-ply 採点でプラン依存項を一致させる用途）。"""
-    clone = _apply_clone(manager, actor_name, move)
-    if clone is None:
-        return float("-inf")
-    return evaluate(clone, actor_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+    val = _score_move_1ply(manager, actor_name, move, actor_name,
+                           see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+    return float("-inf") if val is None else val
 
 
 def _rank_select_candidates(manager, uuids: List[str], actor_name: str) -> List[str]:
@@ -1142,13 +1233,14 @@ def _search(manager, root_name: str, alpha: float, beta: float,
     if manager.winner is not None:
         return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
 
-    KEY_PID, KEY_ACTION = _pending_keys()
-    pending = manager.get_pending_request()
-    if not pending:
+    # 探索は (手番, アクション) しか見ない（手は get_legal_actions から）。重い get_pending_request
+    # ではなく軽量な pending_actor_action を使う（payload/uuid4 を作らない・副作用は一致・§2.5.2 B-1）。
+    pa = manager.pending_actor_action()
+    if not pa:
         return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
-    actor_name = pending[KEY_PID]
+    actor_name, pend_action = pa
     # 葉: start_turn から horizon ターン進んだ MAIN_ACTION（一定の静止点）で評価。
-    if pending.get(KEY_ACTION) == "MAIN_ACTION" and (manager.turn_count - start_turn) >= horizon:
+    if pend_action == "MAIN_ACTION" and (manager.turn_count - start_turn) >= horizon:
         return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
     # 安全打ち切り: 予算/ply 上限。自分の手番途中ならターン境界へ整流してから評価（甘い途中評価を避ける）。
     if budget[0] <= 0 or ply >= HARD_MAX_PLY:
@@ -1172,15 +1264,19 @@ def _search(manager, root_name: str, alpha: float, beta: float,
             moves = filtered
 
     # 子ノードを生成し、1-ply 評価でビーム選別（best-first で α-β の枝刈り効率を上げる）。
+    # ② 1-ply 採点は make/unmake（_score_move_1ply）で行い、ビーム選別には**子クローンを保持しない**
+    #    （(値, 手) だけ持つ）。深掘り対象（上位 HARD_BEAM）だけを後段で改めて clone し直して再帰する。
+    #    これで「全候補ぶんの clone」→「ビーム HARD_BEAM 件の clone」に減らす（clone は探索コストの ~86%）。
     children: List[Tuple[float, Any]] = []
     for m in moves:
         if budget[0] <= 0:
             break
         budget[0] -= 1
-        child = _apply_clone(manager, actor_name, m, stop_at_select=True)
-        if child is None:
+        v = _score_move_1ply(manager, actor_name, m, root_name,
+                             see_opp_hand=see_opp_hand, profile=profile, plan=plan, stop_at_select=True)
+        if v is None:
             continue
-        children.append((evaluate(child, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan), child))
+        children.append((v, m))
     if not children:
         return _settle_eval(manager, root_name, see_opp_hand, profile, plan, ply)
     children.sort(key=lambda x: x[0], reverse=is_max)
@@ -1188,10 +1284,14 @@ def _search(manager, root_name: str, alpha: float, beta: float,
 
     if is_max:
         value = float("-inf")
-        for _leaf, child in children:
-            value = max(value, _search(child, root_name, alpha, beta,
-                                       budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
-                                       start_turn, horizon, counter_budget))
+        for _leaf, m in children:
+            cv = _recurse_child(manager, actor_name, m,
+                                lambda b, a=alpha, bt=beta: _search(b, root_name, a, bt,
+                                    budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
+                                    start_turn, horizon, counter_budget))
+            if cv is None:
+                continue
+            value = max(value, cv)
             alpha = max(alpha, value)
             if alpha >= beta:
                 break
@@ -1202,7 +1302,7 @@ def _search(manager, root_name: str, alpha: float, beta: float,
         # PASS（=カウンターしない＝攻撃が通る）と並べて min が選ぶ＝相手にとって有利な方（=自分に不利な方）。
         # 緩衝を needed ぶん消費して深掘り。これで「緩衝超まで盛ると貫通＝余剰ドンを攻撃に振るのが正」になる。
         if (opp_public_only and profile is not None and counter_budget > 0
-                and pending.get(KEY_ACTION) == "SELECT_COUNTER"):
+                and pend_action == "SELECT_COUNTER"):
             needed = _counter_needed(manager)
             if needed is not None and needed <= counter_budget:
                 cc = _apply_modeled_counter(manager, actor_name, needed)
@@ -1211,12 +1311,16 @@ def _search(manager, root_name: str, alpha: float, beta: float,
                                                budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
                                                start_turn, horizon, counter_budget - needed))
                     beta = min(beta, value)
-        for _leaf, child in children:
+        for _leaf, m in children:
             if alpha >= beta:
                 break
-            value = min(value, _search(child, root_name, alpha, beta,
-                                       budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
-                                       start_turn, horizon, counter_budget))
+            cv = _recurse_child(manager, actor_name, m,
+                                lambda b, a=alpha, bt=beta: _search(b, root_name, a, bt,
+                                    budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
+                                    start_turn, horizon, counter_budget))
+            if cv is None:
+                continue
+            value = min(value, cv)
             beta = min(beta, value)
             if alpha >= beta:
                 break
@@ -1263,6 +1367,65 @@ def _is_important_root_move(manager, name: str, move: Dict[str, Any], child) -> 
     return False
 
 
+def _is_important_root_move_post(manager, name: str, move: Dict[str, Any],
+                                 pre_block: int, pre_opp_life: int) -> bool:
+    """`_is_important_root_move` の make/unmake 版（child=適用後 manager・適用前スカラを受け取る）。
+
+    `_is_important_root_move` と**完全同値**（適用後の自ブロッカー数を pre_block と、適用後の相手
+    ライフ枚数を pre_opp_life と比較する）。相手リーダー uuid は適用で不変なので post の opp を使える。
+    """
+    from . import action_api
+    if move.get("action_type") == action_api.ACT_RESOLVE_SELECTION:
+        return True
+    opp = _other(manager, name)
+    if move.get("action_type") == "ATTACK" and opp.leader is not None:
+        target_ids = (move.get("payload") or {}).get("target_ids") or []
+        if getattr(opp.leader, "uuid", None) in target_ids:
+            return True
+    me_next = _player_by_name(manager, name)
+    if _active_blocker_count(me_next) > pre_block:
+        return True
+    if len(_other(manager, name).life) < pre_opp_life:
+        return True
+    return False
+
+
+def _eval_root_move(manager, name: str, move: Dict[str, Any], see_opp_hand: bool, profile, plan):
+    """ルート手の 1-ply 採点に必要な (評価値, ドン返却ペナルティ, 重要手フラグ) をまとめて返す。
+
+    `_mu_safe` な静止点では **make/unmake**（適用→3 値を txn 内で採点→巻き戻し＝子クローン不保持）、
+    それ以外は clone。**clone 方式と完全同値**（同じ evaluate／同じ penalty／同じ importance を、
+    複製の有無だけ替えて算出）。適用失敗（例外）は None。"""
+    me = _player_by_name(manager, name)
+    pre_don = len(me.don_deck)
+    pre_block = _active_blocker_count(me)
+    pre_opp_life = len(_other(manager, name).life)
+    if _mu_safe(manager):
+        saved_events = manager.action_events
+        res = [None]
+        with journal.transaction():
+            manager.action_events = JournaledList()
+            try:
+                _apply_move_inplace(manager, name, move, stop_at_select=True)
+            except Exception:
+                res[0] = None
+            else:
+                ev = evaluate(manager, name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+                pen = _don_return_penalty_vals(pre_don, len(_player_by_name(manager, name).don_deck))
+                imp = _is_important_root_move_post(manager, name, move, pre_block, pre_opp_life)
+                res[0] = (ev, pen, imp)
+        manager.action_events = saved_events
+        return res[0]
+    child = _apply_clone(manager, name, move, stop_at_select=True)
+    if child is None:
+        return None
+    ev = evaluate(child, name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+    pen = _don_return_penalty(manager, name, child)
+    imp = _is_important_root_move(manager, name, move, child)
+    return (ev, pen, imp)
+    return False
+
+
 # 深掘り同点手の 1-ply タイブレーク（§2.5.3）。寄与は _TIEBREAK_W×クランプ prelim（最大 ~0.005）で、
 # 実の深掘り差（典型 >0.3＝パワー1段ぶん）には影響せず、**厳密同点のみ**を即時盤面（1-ply）で割る。
 # prelim は勝ち(±W_WIN)で巨大化し得るため _TIEBREAK_CLAMP でクランプし、巨大値が実差を覆さないようにする。
@@ -1284,26 +1447,30 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     用に 1-ply 事前スコアと深掘りスコアを `move_sig -> score` の dict で記録する:
       collect["prelim"]={sig: 1-ply スコア}, collect["deep"]={sig: 深掘りスコア}。
     """
-    # 1) 全ルート手を 1-ply で採点（子クローンは深掘りに再利用）。アクティブドンをドンデッキへ戻す手は
-    #    将来の盤面形成力を下げるテンポ損なので追加減点する（prelim/deep の双方へ反映）。
-    prelim: List[Tuple[float, Dict[str, Any], Any]] = []
+    # 1) 全ルート手を 1-ply で採点。② make/unmake（`_eval_root_move`）で子クローンを保持せず
+    #    (評価値, ドン返却ペナルティ, 重要手フラグ) をまとめて算出する（深掘りは後段で再適用）。
+    #    アクティブドンをドンデッキへ戻す手は将来の盤面形成力を下げるテンポ損なので追加減点（prelim/deep 双方へ）。
+    prelim: List[Tuple[float, Dict[str, Any], bool]] = []
     pen_by_idx: Dict[int, float] = {}
+    imp_by_idx: Dict[int, bool] = {}
     for idx, m in enumerate(moves):
-        child = _apply_clone(manager, name, m, stop_at_select=True)
-        if child is None:
-            prelim.append((float("-inf"), m, None))
+        r = _eval_root_move(manager, name, m, see_opp_hand, profile, plan)
+        if r is None:
+            prelim.append((float("-inf"), m, False))
             pen_by_idx[idx] = 0.0
+            imp_by_idx[idx] = False
             continue
-        pen = _don_return_penalty(manager, name, child)
+        ev, pen, imp = r
         pen_by_idx[idx] = pen
-        prelim.append((evaluate(child, name, see_opp_hand=see_opp_hand, profile=profile, plan=plan) - pen, m, child))
+        imp_by_idx[idx] = imp
+        prelim.append((ev - pen, m, True))
 
     # 2) 1-ply 上位を深掘り対象に選ぶ。TURN_END（パスの基準線）は必ず深掘りし、ターン境界で正しく採点する
     #    （非対象の 1-ply スコアは自ターン途中の甘い値になり得るため、パスの基準だけは確実に整える）。
     order = sorted(range(len(prelim)), key=lambda i: prelim[i][0], reverse=True)
     deepen = set(order[:HARD_ROOT_BEAM])
-    for i, (_s, m, child) in enumerate(prelim):
-        if child is not None and m.get("action_type") == "TURN_END":
+    for i, (_s, m, ok) in enumerate(prelim):
+        if ok and m.get("action_type") == "TURN_END":
             deepen.add(i)
     # B-3: 重要手クラス（除去候補・ブロッカー設置・逆算リーサル/クロック）を 1-ply ランクに関係なく
     # 強制投入する（上限 HARD_FORCE_DEEPEN_CAP・1-ply 上位順＝レイテンシを絞りつつ取りこぼしを是正）。
@@ -1313,8 +1480,8 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
             break
         if i in deepen:
             continue
-        _s, m, child = prelim[i]
-        if _is_important_root_move(manager, name, m, child):
+        _s, m, ok = prelim[i]
+        if ok and imp_by_idx.get(i, False):
             deepen.add(i)
             forced += 1
 
@@ -1329,15 +1496,18 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     if collect is not None:
         collect.setdefault("prelim", {})
         collect.setdefault("deep", {})
-        for s1, m, child in prelim:
+        for s1, m, ok in prelim:
             collect["prelim"][_move_sig(m)] = s1
     out: List[Tuple[float, Dict[str, Any]]] = []
-    for i, (s1, m, child) in enumerate(prelim):
-        if child is not None and i in deepen:
+    for i, (s1, m, ok) in enumerate(prelim):
+        if ok and i in deepen:
             budget = [HARD_PER_MOVE_BUDGET]
-            v = _search(child, name, float("-inf"), float("inf"),
-                        budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan,
-                        start_turn=start_turn, horizon=HARD_HORIZON, counter_budget=cbudget)
+            v = _recurse_child(manager, name, m,
+                               lambda b: _search(b, name, float("-inf"), float("inf"),
+                                   budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan,
+                                   start_turn=start_turn, horizon=HARD_HORIZON, counter_budget=cbudget))
+            if v is None:  # 深掘りの適用失敗（pass-1 と整合・通常は起きない）
+                continue
             v -= pen_by_idx.get(i, 0.0)  # ドン!!返却のテンポ損を深掘り値にも反映（prelim と一致）
             # 深掘り値が**同点**の手は 1-ply（即時盤面）スコアで割る＝有益な選択（相手キャラの除去等）が
             # 深掘りで washout（相手ターン中の自分の誘発除去は探索ホライズン内で価値が相殺され同点になり得る）
@@ -1348,7 +1518,7 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
             if collect is not None:
                 collect["deep"][_move_sig(m)] = v
     if not out:  # 念のため（全候補がクローン失敗）: 1-ply スコアにフォールバック
-        out = [(s1, m) for s1, m, _c in prelim]
+        out = [(s1, m) for s1, m, _ok in prelim]
     return out
 
 
