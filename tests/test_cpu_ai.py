@@ -275,6 +275,30 @@ def test_selection_moves_enumerates_up_to_n_cumulative():
     assert cpu_ai._selection_moves(_Stub({**base, CON: {"min": 2, "max": 1}}), "p1") is None
 
 
+def test_selection_moves_branches_optional_confirm_accept_decline():
+    """任意確認（CONFIRM_OPTIONAL・can_skip）は accept(発動)/decline(見送り) の2手へ分岐する
+    （従来は既定=accept の1手しか出ず CPU は任意コストを必ず払っていた）。"""
+    props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
+    PID = props.get('PLAYER_ID', 'player_id'); ACT = props.get('ACTION', 'action')
+    SKIP = props.get('CAN_SKIP', 'can_skip')
+
+    class _Stub:
+        def __init__(self, pending):
+            self._p = pending
+        def get_pending_request(self):
+            return self._p
+        def default_interaction_payload(self, pending=None):
+            return {"selected_uuids": [], "index": 0, "accepted": True}
+
+    pend = {PID: "p1", ACT: "CONFIRM_OPTIONAL", SKIP: True}
+    moves = cpu_ai._selection_moves(_Stub(pend), "p1")
+    assert moves is not None
+    assert [m["payload"].get("accepted") for m in moves] == [True, False]
+    assert all(m["action_type"] == action_api.ACT_RESOLVE_SELECTION for m in moves)
+    # 別アクターには出さない。
+    assert cpu_ai._selection_moves(_Stub(pend), "p2") is None
+
+
 @pytest.mark.parametrize("difficulty", ["hard", "normal"])
 @pytest.mark.parametrize("n_targets", [1, 2])
 def test_cpu_takes_beneficial_up_to_n_removal(db, difficulty, n_targets):
@@ -301,6 +325,102 @@ def test_cpu_takes_beneficial_up_to_n_removal(db, difficulty, n_targets):
     move = cpu_ai.decide_guarded(gm, p2, difficulty, rng=random.Random(0))
     action_api.apply_game_action(gm, p2, move["action_type"], move.get("payload", {}))
     assert len(p1.field) == 0, f"{difficulty}/n={n_targets}: 相手の1コストを全KOできていない"
+
+
+@pytest.mark.parametrize("difficulty", ["hard", "normal"])
+def test_cpu_declines_pointless_optional_cost(db, difficulty):
+    """ティーチ(OP16-080)の【相手のアタック時】『トリガー1枚を捨てて対象をリーダー/黒ひげキャラに変更』を、
+    リーダーが既に対象＝リダイレクトしても得が無い局面では CPU は**見送る（カードを浪費しない）**。
+
+    回帰: `get_legal_actions` が任意確認(CONFIRM_OPTIONAL)を既定=accept の1手しか出さず、CPU が
+    任意コストを必ず払って no-op リダイレクトにトリガー札を捨てていた不具合（2026-06-19 報告）。"""
+    def mk(cid, owner):
+        return CardInstance(appmod.card_db.get_card(cid), owner)
+    appmod.card_db.load()
+    from opcg_sim.src.models.enums import Phase
+    p1 = Player("p1", [mk("OP14-102", "p1") for _ in range(20)], mk("OP11-041", "p1"))
+    p2 = Player("p2", [mk("OP16-109", "p2") for _ in range(20)], mk("OP16-080", "p2"))  # 黒ひげリーダー
+    gm = GameManager(p1, p2)
+    p1.life = [mk("OP14-102", "p1") for _ in range(4)]
+    p2.life = [mk("OP16-109", "p2") for _ in range(4)]
+    p2.hand = [mk("OP16-109", "p2")]   # 【トリガー】持ち＝捨てコスト候補
+    gm.turn_count = 3; gm.current_player = p1; gm.phase = Phase.MAIN
+    p1.leader.is_rest = False
+    gm.refresh_passive_state()
+    # p1 のリーダーで p2 リーダーへアタック宣言 → ティーチの【相手のアタック時】任意コスト確認が保留
+    action_api.apply_game_action(gm, p1, "ATTACK",
+                                 {"uuid": p1.leader.uuid, "target_ids": [p2.leader.uuid]})
+    pr = gm.get_pending_request()
+    assert pr and pr.get("player_id") == "p2" and pr.get("action") == "CONFIRM_OPTIONAL"
+    hand_before = len(p2.hand)
+    move = cpu_ai.decide_guarded(gm, p2, difficulty, rng=random.Random(0))
+    assert move["payload"].get("accepted") is False, f"{difficulty}: 無意味なリダイレクトを払っている"
+    action_api.apply_game_action(gm, p2, move["action_type"], move.get("payload", {}))
+    assert len(p2.hand) == hand_before, f"{difficulty}: トリガー札を浪費している"
+
+
+def test_don_return_penalty_scales_with_returned_and_early():
+    """`_don_return_penalty`: アクティブドンをドンデッキへ正味で戻した枚数×序盤係数で減点。
+    ランプ（ドンデッキから場へ足す＝正味増）や正味増減なしは 0。"""
+    from opcg_sim.src.models.models import DonInstance
+
+    def mk(cid, owner):
+        return CardInstance(appmod.card_db.get_card(cid), owner)
+    appmod.card_db.load()
+    p1 = Player("p1", [], mk("OP11-040", "p1"))
+    p2 = Player("p2", [], mk("OP11-040", "p2"))
+    gm = GameManager(p1, p2)
+    gm.p2.don_active = [DonInstance("p2") for _ in range(5)]
+    gm.p2.don_deck = [DonInstance("p2") for _ in range(5)]   # 序盤係数 = 5/10 = 0.5
+
+    # 2枚返却（ドンデッキ +2）→ 2 * _W_DON_RETURN * 0.5
+    child = gm.clone()
+    cp2 = child.p2 if child.p2.name == "p2" else child.p1
+    cp2.don_active = cp2.don_active[:3]
+    cp2.don_deck = cp2.don_deck + [DonInstance("p2"), DonInstance("p2")]
+    pen = cpu_ai._don_return_penalty(gm, "p2", child)
+    assert pen == pytest.approx(2 * cpu_ai._W_DON_RETURN * 0.5)
+    assert pen > 0
+
+    # 正味増減なし → 0
+    assert cpu_ai._don_return_penalty(gm, "p2", gm.clone()) == 0.0
+
+    # ランプ（ドンデッキ -2＝場へ追加）→ 0（減点しない）
+    ramp = gm.clone()
+    rp2 = ramp.p2 if ramp.p2.name == "p2" else ramp.p1
+    rp2.don_deck = rp2.don_deck[:3]
+    assert cpu_ai._don_return_penalty(gm, "p2", ramp) == 0.0
+
+
+def test_prune_futile_attacks_keeps_reachable_drops_unreachable():
+    """`_prune_futile_attacks`: 攻撃側パワー < 対象パワーの攻撃を落とし、KO/貫通できる攻撃は残す。
+    【アタック時】持ちは（効果が目的になり得るため）届かなくても残す。"""
+    from opcg_sim.src.models.models import DonInstance
+    from opcg_sim.src.models.enums import Phase
+
+    def mk(cid, owner):
+        return CardInstance(appmod.card_db.get_card(cid), owner)
+    appmod.card_db.load()
+    p2 = Player("p2", [mk("OP16-109", "p2") for _ in range(10)], mk("OP16-080", "p2"))
+    p1 = Player("p1", [mk("OP14-102", "p1") for _ in range(10)], mk("OP11-041", "p1"))
+    gm = GameManager(p1, p2)
+    basco = mk("OP16-110", "p2"); basco.is_newly_played = False; p2.field = [basco]   # 2000
+    p2.leader.is_rest = True   # 自リーダー(5000)はレスト＝アタッカーはバスコ(2000)のみに限定
+    weak = mk("OP14-102", "p1"); weak.is_newly_played = False; weak.is_rest = True      # クマシー 2000（倒せる）
+    strong = mk("EB03-055", "p1"); strong.is_newly_played = False; strong.is_rest = True  # ニコ・ロビン 8000（倒せない）
+    p1.field = [weak, strong]
+    gm.turn_count = 10; gm.current_player = p2; gm.turn_player = p2; gm.phase = Phase.MAIN
+    gm.refresh_passive_state()
+    moves = gm.get_legal_actions(p2)
+    # バスコ 2000: クマシー 2000（=同値で KO 可）は残し、ニコ・ロビン 8000・ナミ 5000（届かない）は落とす。
+    pruned = cpu_ai._prune_futile_attacks(gm, "p2", moves)
+    atk_targets = {gm._find_card_by_uuid(m["payload"]["target_ids"][0]).uuid
+                   for m in pruned if m.get("action_type") == "ATTACK"}
+    assert weak.uuid in atk_targets, "倒せるキャラ(クマシー2000)への攻撃が残っていない"
+    assert strong.uuid not in atk_targets, "倒せないキャラ(ニコ・ロビン8000)への無駄攻撃が残っている"
+    assert p1.leader.uuid not in atk_targets, "届かないリーダー(ナミ5000>バスコ2000)への無駄攻撃が残っている"
+    # TURN_END 等の非攻撃手は素通し。
+    assert any(m.get("action_type") == "TURN_END" for m in pruned)
 
 
 @pytest.mark.parametrize("difficulty", ["easy", "normal", "hard"])

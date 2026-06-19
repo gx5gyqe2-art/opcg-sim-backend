@@ -319,6 +319,91 @@ def _prune_don_moves(manager, actor_name: str, moves: List[Dict[str, Any]]) -> L
     return out
 
 
+def _attacker_has_on_attack(card) -> bool:
+    """attacker が【アタック時】能力を持つか。持つ場合は対象を倒せ/貫けなくても発動自体が目的に
+    なり得る（カタリーナ OP16-104 等）ため、無駄攻撃の除外対象から外す（保守的に残す）。"""
+    for ab in getattr(getattr(card, "master", None), "abilities", ()) or ():
+        if getattr(ab, "trigger", None) == TriggerType.ON_ATTACK:
+            return True
+    return False
+
+
+def _prune_futile_attacks(manager, actor_name: str, moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """無駄攻撃（攻撃側の有効パワー < 対象の有効パワー＝KO も貫通もできない）を CPU 候補から除外する。
+
+    キャラ攻撃で対象を KO できない／リーダー攻撃で素通り（ライフを取れない）攻撃は、攻撃者をレストに
+    するだけで何も達成しない（しかも相手は防御不要なのでカウンターも強要できない）。にもかかわらず
+    探索は「自ターンが続く＝攻め圧 `W_ATTACKER` ぶん」TURN_END より高く評価し、相手リーダーが防御効果で
+    パワーを上げ自軍の小型が顔に届かない局面（OP11-041 ナミの【相手のアタック時】+2000 等）で、CPU が
+    倒せないキャラへ無駄攻撃していた（2026-06-19 報告）。**現在の有効パワーで届かない攻撃**を落とす。
+    届かせるためのドン付与は別手（ATTACH_DON）として残るので、付与→攻撃の貫通筋は損なわない。
+    【アタック時】持ちは効果が目的になり得るため除外しない。CPU の探索/方策のみで作用しエンジンの
+    合法手列挙は変えない（人間プレイは無駄攻撃も自由）。
+    """
+    if not moves:
+        return moves
+    actor = _player_by_name(manager, actor_name)
+    opp = _other(manager, actor_name)
+    atk_by_uuid = {}
+    for u in ([actor.leader] if actor.leader is not None else []) + list(actor.field):
+        uid = getattr(u, "uuid", None)
+        if uid is not None:
+            atk_by_uuid[uid] = u
+    tgt_by_uuid = {}
+    for u in ([opp.leader] if opp.leader is not None else []) + list(opp.field):
+        uid = getattr(u, "uuid", None)
+        if uid is not None:
+            tgt_by_uuid[uid] = u
+
+    def _pw(card, is_attacker):
+        try:
+            return float(card.get_power(is_attacker))
+        except Exception:
+            return float(getattr(getattr(card, "master", None), "power", 0) or 0)
+
+    out: List[Dict[str, Any]] = []
+    for m in moves:
+        if m.get("action_type") == "ATTACK":
+            payload = m.get("payload") or {}
+            a = atk_by_uuid.get(payload.get("uuid"))
+            tids = payload.get("target_ids") or []
+            t = tgt_by_uuid.get(tids[0]) if tids else None
+            if (a is not None and t is not None and not _attacker_has_on_attack(a)
+                    and _pw(a, True) < _pw(t, False)):
+                continue  # 無駄攻撃: 現在の有効パワーでは KO も貫通もできない
+        out.append(m)
+    return out
+
+
+# ドン!!返却（ドン-N コスト）の追加減点（§2.5.3）。アクティブドンをドンデッキへ戻す手は、当面の盤面形成力
+# （将来の手出し・ドン付与の上限）を下げるテンポ損。静的 eval の `W_DON_ACTIVE`(200) だけでは過小評価で、
+# 序盤に 2 ドン戻して軽微な効果（万雷 OP15-078 のドロー+レスト等）を撃つ不自然手を招く。戻した正味枚数
+# （= 手の後にドンデッキが増えた分。紫のドンランプ等で再追加され正味増えない手は対象外）×序盤係数で減点。
+_W_DON_RETURN = 600.0
+_DON_DECK_FULL = 10.0
+
+
+def _don_return_penalty(manager, actor_name: str, child) -> float:
+    """root 手で actor がアクティブドンをドンデッキへ正味で戻した量に応じた追加減点（>=0）。
+
+    戻した枚数 = `child` の actor ドンデッキ − 現在の actor ドンデッキ（増分＝返却）。序盤（ドンデッキが
+    多く残る＝伸び代が大きい）ほど重く、終盤は軽い。ドンデッキから場へ足す手（ランプ＝増やす手）や
+    正味増減が無い手は 0。CPU の手選択のみで作用し eval/合法手列挙は変えない。
+    """
+    if child is None:
+        return 0.0
+    try:
+        before = _player_by_name(manager, actor_name)
+        after = _player_by_name(child, actor_name)
+        returned = len(after.don_deck) - len(before.don_deck)
+    except Exception:
+        return 0.0
+    if returned <= 0:
+        return 0.0
+    early = min(1.0, len(before.don_deck) / _DON_DECK_FULL)
+    return returned * _W_DON_RETURN * early
+
+
 def _next_turn_don(p) -> int:
     """`p` の次ターンに使える見込みドン!! 枚数（コスト低減の資源価値化・§2.5.3）。
 
@@ -796,26 +881,42 @@ def _rank_select_candidates(manager, uuids: List[str], actor_name: str) -> List[
 
 
 def _selection_moves(manager, actor_name: str):
-    """actor の対象選択対話を RESOLVE 手として列挙する（無ければ None）。
+    """actor の対象選択／任意確認対話を RESOLVE 手として列挙する（無ければ None）。
 
-    対象は `_SELECT_ACTION`（SELECT_TARGET/FIELD_OVERFLOW_TRASH を正規化したもの）。
+    対象は `_SELECT_ACTION`（SELECT_TARGET/FIELD_OVERFLOW_TRASH を正規化したもの）と
+    `CONFIRM_OPTIONAL`（任意コスト「〜できる：」／任意効果「〜してもよい」の発動可否）。
       - **単一対象（max==1）**: 候補ごとに 1 手へ分岐＝「どれを KO/除去/バウンス/手札破壊するか」を読む。
       - **多対象「N枚まで」（max>=2）**: 影響度順（`_rank_select_candidates`）に **min..max 枚の累積**選択を
         候補化し、探索に「何枚・どれを選ぶか」を読ませる（候補は max-min+1 手＝有界）。これにより
         『相手のコスト1以下のキャラ2枚までを KO』等の**有益な除去を 0 枚で取りこぼす**のを防ぐ
         （従来は max>=2 を既定解決＝最小数=0枚へ委ねていた）。
+      - **任意確認（CONFIRM_OPTIONAL・can_skip）**: 発動する(accept)／しない(decline) の2手へ分岐。
+        従来は `get_legal_actions` が既定(accept)の1手しか出さず、CPU は**任意コストを必ず払って**いた
+        （例: ティーチ OP16-080 が相手のアタック時にトリガー1枚を捨ててアタック対象を変更＝リーダーが
+        既に対象なら no-op なのに毎回カードを浪費）。両手を採点して、得なときだけ払う。
     """
     from . import action_api
     pending = manager.get_pending_request()
     if not pending:
         return None
     KEY_PID, KEY_ACTION = _pending_keys()
-    if pending.get(KEY_PID) != actor_name or pending.get(KEY_ACTION) != _SELECT_ACTION:
+    if pending.get(KEY_PID) != actor_name:
         return None
     props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
     KEY_UUIDS = props.get('SELECTABLE_UUIDS', 'selectable_uuids')
     KEY_CONSTRAINTS = props.get('CONSTRAINTS', 'constraints')
     KEY_SKIP = props.get('CAN_SKIP', 'can_skip')
+
+    # 任意確認（任意コスト/任意効果の発動可否）: accept(発動) / decline(見送り) を採点させる。
+    if pending.get(KEY_ACTION) == "CONFIRM_OPTIONAL" and bool(pending.get(KEY_SKIP, False)):
+        base = manager.default_interaction_payload(pending)
+        accept = dict(base); accept["accepted"] = True
+        decline = dict(base); decline["accepted"] = False
+        return [{"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": accept},
+                {"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": decline}]
+
+    if pending.get(KEY_ACTION) != _SELECT_ACTION:
+        return None
     uuids = list(pending.get(KEY_UUIDS, []) or [])
     constraints = pending.get(KEY_CONSTRAINTS) or {}
     try:
@@ -1056,6 +1157,7 @@ def _search(manager, root_name: str, alpha: float, beta: float,
     if moves is None:
         moves = manager.get_legal_actions(actor)
         moves = _prune_don_moves(manager, actor_name, moves)  # B-2: 無意味なドン付与を手生成段で除外
+        moves = _prune_futile_attacks(manager, actor_name, moves)  # 倒せない/届かない無駄攻撃を除外
     if not moves:
         return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
     is_max = (actor_name == root_name)
@@ -1179,14 +1281,19 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     用に 1-ply 事前スコアと深掘りスコアを `move_sig -> score` の dict で記録する:
       collect["prelim"]={sig: 1-ply スコア}, collect["deep"]={sig: 深掘りスコア}。
     """
-    # 1) 全ルート手を 1-ply で採点（子クローンは深掘りに再利用）。
+    # 1) 全ルート手を 1-ply で採点（子クローンは深掘りに再利用）。アクティブドンをドンデッキへ戻す手は
+    #    将来の盤面形成力を下げるテンポ損なので追加減点する（prelim/deep の双方へ反映）。
     prelim: List[Tuple[float, Dict[str, Any], Any]] = []
-    for m in moves:
+    pen_by_idx: Dict[int, float] = {}
+    for idx, m in enumerate(moves):
         child = _apply_clone(manager, name, m, stop_at_select=True)
         if child is None:
             prelim.append((float("-inf"), m, None))
+            pen_by_idx[idx] = 0.0
             continue
-        prelim.append((evaluate(child, name, see_opp_hand=see_opp_hand, profile=profile, plan=plan), m, child))
+        pen = _don_return_penalty(manager, name, child)
+        pen_by_idx[idx] = pen
+        prelim.append((evaluate(child, name, see_opp_hand=see_opp_hand, profile=profile, plan=plan) - pen, m, child))
 
     # 2) 1-ply 上位を深掘り対象に選ぶ。TURN_END（パスの基準線）は必ず深掘りし、ターン境界で正しく採点する
     #    （非対象の 1-ply スコアは自ターン途中の甘い値になり得るため、パスの基準だけは確実に整える）。
@@ -1228,6 +1335,7 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
             v = _search(child, name, float("-inf"), float("inf"),
                         budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan,
                         start_turn=start_turn, horizon=HARD_HORIZON, counter_budget=cbudget)
+            v -= pen_by_idx.get(i, 0.0)  # ドン!!返却のテンポ損を深掘り値にも反映（prelim と一致）
             # 深掘り値が**同点**の手は 1-ply（即時盤面）スコアで割る＝有益な選択（相手キャラの除去等）が
             # 深掘りで washout（相手ターン中の自分の誘発除去は探索ホライズン内で価値が相殺され同点になり得る）
             # してもランダムタイブレークで取りこぼさない。寄与は ±_TIEBREAK_W*クランプ prelim（最大 ~0.005）で、
@@ -1464,6 +1572,7 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
             trace["regret"] = 0.0
         return moves[0]
     moves = _prune_don_moves(manager, player.name, moves)  # B-2: 無意味なドン付与をルートから除外
+    moves = _prune_futile_attacks(manager, player.name, moves)  # 倒せない/届かない無駄攻撃を除外
 
     name = player.name
     end_move = next((m for m in moves if m.get("action_type") == "TURN_END"), None)
@@ -1558,6 +1667,7 @@ def decide_with_regret(manager, player, difficulty: str = "normal",
 
     name = player.name
     moves = _prune_don_moves(manager, name, moves)  # B-2: ルート手集合を decide と一致させる（regret 整合）
+    moves = _prune_futile_attacks(manager, name, moves)  # 倒せない/届かない無駄攻撃を除外（decide と一致）
     collect: Dict[str, Any] = {}
     if difficulty == "hard":
         _scored_search(manager, name, moves, see_opp_hand=True, opp_public_only=False,
