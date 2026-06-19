@@ -208,11 +208,18 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       EffectResolver` に配線し、状態コンテナを journaled 型化。`tests/test_journal.py` が「適用→巻き戻し→開始
       deepcopy と完全一致」を実プレイ全手で照合（**全 1028 pass・構造監査 0＝不活性時の挙動完全不変**）。
       ベンチ＝**clone 1.02ms → make/unmake 0.24ms = 4.3x**（per-node コピーコスト）。
-      **現 PoC の boundary**: 「非中断＝resolver が parked でない静止点から適用する手」が対象（CPU 探索の根も
-      この静止点）。**中断（複数段効果解決の途中）を再開する手**は parked resolver 状態（`execution_stack`・
-      continuation の共有／ネスト構造）を持ち越すため対象外。**残＝横展開**: (a) parked 効果解決機構の journaled
-      化（resolver continuation／interaction dict の網羅）、または (b) **ハイブリッド**（非中断ノードは make/unmake・
-      中断保留ノードは clone へフォールバック）で大部分の高速化を低リスクに取り込む。次いで探索本体への統合。
+      **boundary**: 「非中断＝resolver が parked でない静止点から適用する手」が対象（CPU 探索の根もこの静止点）。
+      **中断（複数段効果解決の途中）を再開する手**は parked resolver 状態（`execution_stack`・continuation の共有／
+      ネスト構造）を持ち越すため対象外＝clone へフォールバックする。
+      **実探索への統合済み（ハイブリッド・2026-06）**: `cpu_ai.py` の 1-ply 採点（ビーム選別＝`_score_move_1ply`）と
+      ビーム手の深掘り再帰（`_recurse_child`＝入れ子トランザクションで manager をその場適用→`_search` 再帰→巻き戻し）
+      を make/unmake 化し、`_mu_safe`（active_interaction が None）な静止点のみ適用・中断再開は clone。`_USE_MAKE_UNMAKE`
+      フラグで即時に従来挙動へ戻せる。**方策は clone 方式と完全同一**（内部最適化）＝`tests/test_cpu_make_unmake.py` が
+      (1)decide 選択手一致・(2)`_scored_search` 深掘りスコア一致・(3)decide が manager を無変更（巻き戻し完全）を機械照合。
+      **ベンチ＝hard decide 1312ms→367ms＝3.57x**（中盤5局面平均）。全1032pass・構造監査0・カード挙動ベースライン不変。
+      スレッド安全性: 探索は単一スレッド前提（FastAPI async ハンドラが decide を await 無しで同期実行＝原子的）。
+      **残（任意・さらなる高速化）**: ルート `_scored_search` の clone・`_apply_modeled_counter` の make/unmake 化、
+      parked 効果解決機構の journaled 化（中断再開手も make/unmake 化）、③ 置換表との相乗で horizon4＋へ。
     - **③ 置換表（transposition table）**: 同一盤面の再探索を省くキャッシュ（転置率 ≈23% が省ける上限）。
       **内容ベースの一意ハッシュ**（uuid は毎回変わるため不可・**デッキ順／継続効果／隠れ情報**まで漏れなく＝
       hard は相手手札も含む）→ `ハッシュ→(評価値, 深さ, 最善手)`。ノード入口で probe（同深さ以上ならカット）・
