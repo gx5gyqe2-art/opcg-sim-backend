@@ -218,9 +218,18 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       (1)decide 選択手一致・(2)`_scored_search` 深掘りスコア一致・(3)decide が manager を無変更（巻き戻し完全）を機械照合。
       **ベンチ＝hard decide 1312ms→367ms＝3.57x**（中盤5局面平均）。全1032pass・構造監査0・カード挙動ベースライン不変。
       スレッド安全性: 探索は単一スレッド前提（FastAPI async ハンドラが decide を await 無しで同期実行＝原子的）。
-      **残（任意・さらなる高速化）**: ルート `_scored_search` の clone・`_apply_modeled_counter` の make/unmake 化、
-      parked 効果解決機構の journaled 化（中断再開手も make/unmake 化）、③ 置換表との相乗で horizon4＋へ。
-    - **③ 置換表（transposition table）**: 同一盤面の再探索を省くキャッシュ（転置率 ≈23% が省ける上限）。
+      ルート `_scored_search` も make/unmake 化済み（`_eval_root_move`・clone 版と完全同値）。**clone 除去の床に到達**:
+      残クローンの内訳実測（hard decide）＝中断状態の再帰フォールバック ~90%（parked resolver 未 journaled）・
+      ルート `_scored_search` ~5%（≈ decide の 0.7%・変換効果はノイズ内）。残コストは clone でなく **apply＋evaluate**。
+      **残（任意・効果小）**: parked 効果解決機構（resolver continuation／interaction dict）の journaled 化で中断再開手も
+      make/unmake 化（残 clone の ~14%＝decide の ~12% 上限）。`_apply_modeled_counter` は SELECT_COUNTER＝中断で
+      フォールバックのため変換無益。さらなる高速化は clone でなく apply/evaluate の最適化が本筋。
+    - **③ 置換表（transposition table）= 実測で不採用（2026-06）**: ②後は**健全（完全一致キー）な転置率 ≤0.5%**（exact key
+      ＝デッキ順／全カード状態／継続効果まで含むと手順違いでも byte 一致がほぼ起きない）に対し、健全な位置キー計算が
+      **~3%/node** のオーバーヘッド＝**ネット負**。②が per-node clone を消したため「再探索を省く」価値自体が消えた
+      （clone が 86% だった頃の前提が無効化）。下記は不採用の経緯記録。
+    - **（不採用）③ 置換表（transposition table）**: 同一盤面の再探索を省くキャッシュ（**当時の粗いキーでの**転置率 ≈23% が
+      省ける上限と見積もったが、健全キーでは ≤0.5% と判明）。
       **内容ベースの一意ハッシュ**（uuid は毎回変わるため不可・**デッキ順／継続効果／隠れ情報**まで漏れなく＝
       hard は相手手札も含む）→ `ハッシュ→(評価値, 深さ, 最善手)`。ノード入口で probe（同深さ以上ならカット）・
       出口で store。リスク＝ハッシュ取りこぼし／衝突による**誤った値の再利用**（②の照合と同種の網羅性問題）→
