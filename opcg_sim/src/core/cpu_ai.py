@@ -33,6 +33,16 @@ from typing import Any, Dict, List, Optional, Tuple
 import re
 
 from ..models.enums import TriggerType
+from . import journal
+from .journal import JournaledList
+
+# ② make/unmake: 探索の 1-ply 採点（ビーム選別）を clone でなく「適用→採点→巻き戻し」で行い
+# per-node の deepcopy を消す（探索コストの ~86%＝clone）。**非中断（resolver が parked でない
+# 静止点）から適用する手にのみ適用**し、中断（複数段効果の途中）を再開する手は clone へフォールバック
+# する（parked resolver 状態は現状 journaled 化が未完＝docs/SPEC.md §2.5.2 の boundary）。
+# 探索結果（選ぶ手・評価値）は clone 方式と完全同一（内部最適化）＝tests/test_cpu_make_unmake.py で
+# 等価を機械照合。万一の取りこぼし時に即無効化できるようモジュールフラグで保持する。
+_USE_MAKE_UNMAKE = True
 
 # 評価重み（盤面 1000=パワー1段相当に正規化）
 W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（膝＝薄域。最重要）
@@ -827,25 +837,95 @@ def _drain_own_interactions(manager, actor_name: str, stop_at_select: bool = Fal
             return
 
 
+def _apply_move_inplace(board, actor_name: str, move: Dict[str, Any], stop_at_select: bool = False):
+    """`board` に move を**その場で**適用し、actor 側の対話をドレインする（例外はそのまま送出）。
+
+    clone 経路（`_apply_clone`）と make/unmake 経路（`_score_move_1ply`）の共通コア。
+    """
+    from . import action_api
+    actor = _player_by_name(board, actor_name)
+    if move["kind"] == "battle":
+        action_api.apply_battle_action(board, actor, move["action_type"], move.get("card_uuid"))
+    else:
+        action_api.apply_game_action(board, actor, move["action_type"], move.get("payload", {}))
+    _drain_own_interactions(board, actor_name, stop_at_select=stop_at_select)
+
+
 def _apply_clone(manager, actor_name: str, move: Dict[str, Any], stop_at_select: bool = False):
     """move を新しいクローンへ適用し、actor 側の対話をドレインしたクローンを返す。
 
     シミュレーションが例外を出す手は None を返す（呼び出し側で除外する）。
     `stop_at_select=True` のとき、ドレインは分岐対象の単一対象選択で停止する（探索側が分岐する）。
     """
-    from . import action_api
     clone = manager.clone()
-    actor = _player_by_name(clone, actor_name)
     clone.action_events = []
     try:
-        if move["kind"] == "battle":
-            action_api.apply_battle_action(clone, actor, move["action_type"], move.get("card_uuid"))
-        else:
-            action_api.apply_game_action(clone, actor, move["action_type"], move.get("payload", {}))
-        _drain_own_interactions(clone, actor_name, stop_at_select=stop_at_select)
+        _apply_move_inplace(clone, actor_name, move, stop_at_select=stop_at_select)
     except Exception:
         return None
     return clone
+
+
+def _mu_safe(manager) -> bool:
+    """make/unmake を安全に使える局面か＝中断（parked resolver 状態）でない静止点か。
+
+    中断を**再開**する手は parked resolver 状態（execution_stack／continuation の共有・ネスト構造）を
+    持ち越し、現状その journaled 化が未完のため巻き戻しが不完全になり得る（docs/SPEC.md §2.5.2 boundary）。
+    探索の根・各ノードは中断でない静止点で意思決定するため、ここが True のときだけ make/unmake する。
+    """
+    return _USE_MAKE_UNMAKE and getattr(manager, "active_interaction", None) is None
+
+
+def _score_move_1ply(manager, actor_name: str, move: Dict[str, Any], eval_name: str,
+                     see_opp_hand: bool, profile, plan, stop_at_select: bool = False) -> Optional[float]:
+    """move 適用後の 1-ply 評価値（`eval_name` 視点）を返す。失敗（例外）は None。
+
+    `_mu_safe` な局面では **make/unmake**（manager をその場で適用→採点→巻き戻し＝clone 不要）、
+    それ以外（中断再開）は従来どおり clone で採点する。**clone 方式と完全同値**（同じ適用・同じ
+    evaluate を、複製の有無だけ替えて行う）。
+    """
+    if _mu_safe(manager):
+        saved_events = manager.action_events
+        with journal.transaction():
+            manager.action_events = JournaledList()
+            try:
+                _apply_move_inplace(manager, actor_name, move, stop_at_select=stop_at_select)
+            except Exception:
+                return None
+            val = evaluate(manager, eval_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+        # action_events は transient バッファ（探索値に無関係）。txn 内の付け替えも巻き戻るが念のため復元。
+        manager.action_events = saved_events
+        return val
+    clone = _apply_clone(manager, actor_name, move, stop_at_select=stop_at_select)
+    if clone is None:
+        return None
+    return evaluate(clone, eval_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+
+
+def _recurse_child(manager, actor_name: str, move: Dict[str, Any], search_fn) -> Optional[float]:
+    """move を適用した子局面で `search_fn(child) -> float` を評価して返す。失敗は None。
+
+    `_mu_safe` な局面では **make/unmake**（manager をその場で適用→`search_fn` で再帰→巻き戻し＝
+    再帰中だけ manager が子状態・抜けると無傷に戻る）。それ以外は clone で子を作って再帰する。
+    深い再帰は入れ子トランザクションで扱われ、各深さが順に巻き戻る（世代カウンタ）。
+    """
+    if _mu_safe(manager):
+        saved_events = manager.action_events
+        result: List[Optional[float]] = [None]
+        with journal.transaction():
+            manager.action_events = JournaledList()
+            try:
+                _apply_move_inplace(manager, actor_name, move, stop_at_select=True)
+            except Exception:
+                result[0] = None
+            else:
+                result[0] = search_fn(manager)
+        manager.action_events = saved_events
+        return result[0]
+    child = _apply_clone(manager, actor_name, move, stop_at_select=True)
+    if child is None:
+        return None
+    return search_fn(child)
 
 
 def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any],
@@ -854,10 +934,9 @@ def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any],
 
     `profile`/`plan`（任意・既定 None＝従来同値）を渡すと評価にプラン補正を反映する
     （対象選択の 1-ply 採点でプラン依存項を一致させる用途）。"""
-    clone = _apply_clone(manager, actor_name, move)
-    if clone is None:
-        return float("-inf")
-    return evaluate(clone, actor_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+    val = _score_move_1ply(manager, actor_name, move, actor_name,
+                           see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+    return float("-inf") if val is None else val
 
 
 def _rank_select_candidates(manager, uuids: List[str], actor_name: str) -> List[str]:
@@ -1172,15 +1251,19 @@ def _search(manager, root_name: str, alpha: float, beta: float,
             moves = filtered
 
     # 子ノードを生成し、1-ply 評価でビーム選別（best-first で α-β の枝刈り効率を上げる）。
+    # ② 1-ply 採点は make/unmake（_score_move_1ply）で行い、ビーム選別には**子クローンを保持しない**
+    #    （(値, 手) だけ持つ）。深掘り対象（上位 HARD_BEAM）だけを後段で改めて clone し直して再帰する。
+    #    これで「全候補ぶんの clone」→「ビーム HARD_BEAM 件の clone」に減らす（clone は探索コストの ~86%）。
     children: List[Tuple[float, Any]] = []
     for m in moves:
         if budget[0] <= 0:
             break
         budget[0] -= 1
-        child = _apply_clone(manager, actor_name, m, stop_at_select=True)
-        if child is None:
+        v = _score_move_1ply(manager, actor_name, m, root_name,
+                             see_opp_hand=see_opp_hand, profile=profile, plan=plan, stop_at_select=True)
+        if v is None:
             continue
-        children.append((evaluate(child, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan), child))
+        children.append((v, m))
     if not children:
         return _settle_eval(manager, root_name, see_opp_hand, profile, plan, ply)
     children.sort(key=lambda x: x[0], reverse=is_max)
@@ -1188,10 +1271,14 @@ def _search(manager, root_name: str, alpha: float, beta: float,
 
     if is_max:
         value = float("-inf")
-        for _leaf, child in children:
-            value = max(value, _search(child, root_name, alpha, beta,
-                                       budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
-                                       start_turn, horizon, counter_budget))
+        for _leaf, m in children:
+            cv = _recurse_child(manager, actor_name, m,
+                                lambda b, a=alpha, bt=beta: _search(b, root_name, a, bt,
+                                    budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
+                                    start_turn, horizon, counter_budget))
+            if cv is None:
+                continue
+            value = max(value, cv)
             alpha = max(alpha, value)
             if alpha >= beta:
                 break
@@ -1211,12 +1298,16 @@ def _search(manager, root_name: str, alpha: float, beta: float,
                                                budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
                                                start_turn, horizon, counter_budget - needed))
                     beta = min(beta, value)
-        for _leaf, child in children:
+        for _leaf, m in children:
             if alpha >= beta:
                 break
-            value = min(value, _search(child, root_name, alpha, beta,
-                                       budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
-                                       start_turn, horizon, counter_budget))
+            cv = _recurse_child(manager, actor_name, m,
+                                lambda b, a=alpha, bt=beta: _search(b, root_name, a, bt,
+                                    budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
+                                    start_turn, horizon, counter_budget))
+            if cv is None:
+                continue
+            value = min(value, cv)
             beta = min(beta, value)
             if alpha >= beta:
                 break
