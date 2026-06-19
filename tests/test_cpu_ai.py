@@ -212,7 +212,7 @@ def test_summoning_sick_char_not_counted_as_attacker(db):
 
 
 def test_selection_moves_enumerates_single_target_candidates():
-    """単一対象選択は候補ごとの RESOLVE 手に展開する／多対象・別アクター・非選択は分岐しない。"""
+    """単一対象選択は候補ごとの RESOLVE 手に展開する／別アクター・非選択は分岐しない。"""
     props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
     PID = props.get('PLAYER_ID', 'player_id'); ACT = props.get('ACTION', 'action')
     UUIDS = props.get('SELECTABLE_UUIDS', 'selectable_uuids')
@@ -225,6 +225,8 @@ def test_selection_moves_enumerates_single_target_candidates():
             return self._p
         def default_interaction_payload(self, pending=None):
             return {"selected_uuids": [], "index": 0, "accepted": True}
+        def _find_card_by_uuid(self, uuid):
+            return None  # ランク付けはカード未解決→元順を保つ
 
     base = {PID: "p1", ACT: cpu_ai._SELECT_ACTION, UUIDS: ["a", "b", "c"],
             CON: {"min": 1, "max": 1}, SKIP: False}
@@ -236,15 +238,69 @@ def test_selection_moves_enumerates_single_target_candidates():
     # 任意・単一対象（min0/skip可）→ 「選ばない」を一級候補として追加
     opt = cpu_ai._selection_moves(_Stub({**base, CON: {"min": 0, "max": 1}, SKIP: True}), "p1")
     assert [m["payload"]["selected_uuids"] for m in opt] == [["a"], ["b"], ["c"], []]
-    # 多対象（max>=2）/min>1 は既定解決へ委ねる（None）
-    assert cpu_ai._selection_moves(_Stub({**base, CON: {"min": 1, "max": 2}}), "p1") is None
-    assert cpu_ai._selection_moves(_Stub({**base, CON: {"min": 2, "max": 1}}), "p1") is None
     # 別アクター・非選択アクションは分岐しない
     assert cpu_ai._selection_moves(_Stub(base), "p2") is None
     assert cpu_ai._selection_moves(_Stub({**base, ACT: "MAIN_ACTION"}), "p1") is None
     # 候補過多は安全上限で打ち切る
     many = cpu_ai._selection_moves(_Stub({**base, UUIDS: [str(i) for i in range(20)]}), "p1")
     assert len(many) == cpu_ai.HARD_SELECT_CAP
+
+
+def test_selection_moves_enumerates_up_to_n_cumulative():
+    """多対象「N枚まで」選択は影響度順に min..max 枚の**累積**選択を候補化する
+    （0/1/2 枚＝『2枚までKO』で 0 枚に取りこぼさないための分岐）。"""
+    props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
+    PID = props.get('PLAYER_ID', 'player_id'); ACT = props.get('ACTION', 'action')
+    UUIDS = props.get('SELECTABLE_UUIDS', 'selectable_uuids')
+    CON = props.get('CONSTRAINTS', 'constraints'); SKIP = props.get('CAN_SKIP', 'can_skip')
+
+    class _Stub:
+        def __init__(self, pending):
+            self._p = pending
+        def get_pending_request(self):
+            return self._p
+        def default_interaction_payload(self, pending=None):
+            return {"selected_uuids": [], "index": 0, "accepted": True}
+        def _find_card_by_uuid(self, uuid):
+            return None  # ランク付けはカード未解決→元順を保つ
+
+    base = {PID: "p1", ACT: cpu_ai._SELECT_ACTION, UUIDS: ["a", "b", "c"], SKIP: False}
+    # 0〜2枚まで → 0/1/2 枚の累積（スキップ=0枚も含む）。
+    up2 = cpu_ai._selection_moves(_Stub({**base, CON: {"min": 0, "max": 2}}), "p1")
+    assert [m["payload"]["selected_uuids"] for m in up2] == [[], ["a"], ["a", "b"]]
+    # 1〜2枚（最小1）→ 1/2 枚の累積（0枚＝取りこぼしは出さない）。
+    one_two = cpu_ai._selection_moves(_Stub({**base, CON: {"min": 1, "max": 2}}), "p1")
+    assert [m["payload"]["selected_uuids"] for m in one_two] == [["a"], ["a", "b"]]
+    # min>max（不整合）は分岐しない。
+    assert cpu_ai._selection_moves(_Stub({**base, CON: {"min": 2, "max": 1}}), "p1") is None
+
+
+@pytest.mark.parametrize("difficulty", ["hard", "normal"])
+@pytest.mark.parametrize("n_targets", [1, 2])
+def test_cpu_takes_beneficial_up_to_n_removal(db, difficulty, n_targets):
+    """相手ターン中に発火した自分の『相手のコスト1以下を2枚までKO』(ドクQ OP16-109)で、
+    CPU は**利用可能な相手キャラを全てKO**する（0枚に取りこぼさない・2枚KO可なら2枚取る）。
+
+    回帰: 多対象「N枚まで」が探索分岐されず既定解決(0枚)へ落ちていた＋深掘りが相手ターン中の
+    誘発除去の価値を washout して skip と同点になり取りこぼしていた不具合（2026-06-19 報告）。"""
+    def mk(cid, owner):
+        return CardInstance(appmod.card_db.get_card(cid), owner)
+    appmod.card_db.load()
+    from opcg_sim.src.models.enums import Phase
+    p1 = Player("p1", [mk("OP14-102", "p1") for _ in range(20)], mk("OP11-041", "p1"))
+    p2 = Player("p2", [mk("OP16-109", "p2") for _ in range(20)], mk("OP16-080", "p2"))  # 黒ひげリーダー
+    gm = GameManager(p1, p2)
+    p1.life = [mk("OP14-102", "p1") for _ in range(4)]
+    p2.life = [mk("OP16-109", "p2") for _ in range(4)]
+    p1.field = [mk("OP14-102", "p1") for _ in range(n_targets)]   # クマシー（コスト1）
+    docq = mk("OP16-109", "p2"); p2.trash = [docq]                # ドクQ は KO 済み＝トラッシュ
+    gm.turn_count = 3; gm.current_player = p1; gm.phase = Phase.MAIN
+    gm.refresh_passive_state()
+    gm._resolve_on_ko(docq, p2, cause="BATTLE")                   # ドクQのKO時誘発を発火
+    assert (gm.get_pending_request() or {}).get("player_id") == "p2"  # CPU 所有の対象選択が保留
+    move = cpu_ai.decide_guarded(gm, p2, difficulty, rng=random.Random(0))
+    action_api.apply_game_action(gm, p2, move["action_type"], move.get("payload", {}))
+    assert len(p1.field) == 0, f"{difficulty}/n={n_targets}: 相手の1コストを全KOできていない"
 
 
 @pytest.mark.parametrize("difficulty", ["easy", "normal", "hard"])

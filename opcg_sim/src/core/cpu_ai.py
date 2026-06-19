@@ -761,20 +761,49 @@ def _apply_clone(manager, actor_name: str, move: Dict[str, Any], stop_at_select:
 
 
 def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any],
-                       see_opp_hand: bool = True) -> float:
-    """move をクローン上で適用し、actor 側の対話をドレインしてから評価する（1-ply）。"""
+                       see_opp_hand: bool = True, profile=None, plan=None) -> float:
+    """move をクローン上で適用し、actor 側の対話をドレインしてから評価する（1-ply）。
+
+    `profile`/`plan`（任意・既定 None＝従来同値）を渡すと評価にプラン補正を反映する
+    （対象選択の 1-ply 採点でプラン依存項を一致させる用途）。"""
     clone = _apply_clone(manager, actor_name, move)
     if clone is None:
         return float("-inf")
-    return evaluate(clone, actor_name, see_opp_hand=see_opp_hand)
+    return evaluate(clone, actor_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+
+
+def _rank_select_candidates(manager, uuids: List[str], actor_name: str) -> List[str]:
+    """選択候補 uuid を「CPU にとって選ぶ価値の高い順」に並べる。
+
+    相手のカード（除去/弱体の対象）＝**脅威の大きい順**（パワー→コスト降順）に除去する。
+    自分のカード（コスト/犠牲としての対象）＝**価値の小さい順**（パワー→コスト昇順）に差し出す。
+    候補に対応するカードが見つからないものは末尾へ（順序のみのヒューリスティック）。"""
+    def _pw(c):
+        try:
+            return c.get_power(False)
+        except Exception:
+            return getattr(getattr(c, "master", None), "power", 0) or 0
+    def _cost(c):
+        return getattr(getattr(c, "master", None), "cost", 0) or 0
+    pairs = [(u, manager._find_card_by_uuid(u)) for u in uuids]
+    found = [(u, c) for u, c in pairs if c is not None]
+    missing = [u for u, c in pairs if c is None]
+    if found and all(getattr(c, "owner_id", None) == actor_name for _u, c in found):
+        found.sort(key=lambda uc: (_pw(uc[1]), _cost(uc[1])))            # 自分＝弱い順に差し出す
+    else:
+        found.sort(key=lambda uc: (-_pw(uc[1]), -_cost(uc[1])))          # 相手＝強い脅威から除去
+    return [u for u, _c in found] + missing
 
 
 def _selection_moves(manager, actor_name: str):
-    """actor の「単一対象選択」対話を候補ごとの RESOLVE 手として列挙する（無ければ None）。
+    """actor の対象選択対話を RESOLVE 手として列挙する（無ければ None）。
 
-    対象は `_SELECT_ACTION`（SELECT_TARGET/FIELD_OVERFLOW_TRASH を正規化したもの）かつ **最大1体**
-    （max==1・min<=1）の選択に限る＝「どれを KO/除去/バウンス/手札破壊するか」。多対象（max>=2）や
-    min>1 は組合せ爆発を避けて既定解決へ委ねる（None を返す）。これにより探索が最善の単一対象を読む。
+    対象は `_SELECT_ACTION`（SELECT_TARGET/FIELD_OVERFLOW_TRASH を正規化したもの）。
+      - **単一対象（max==1）**: 候補ごとに 1 手へ分岐＝「どれを KO/除去/バウンス/手札破壊するか」を読む。
+      - **多対象「N枚まで」（max>=2）**: 影響度順（`_rank_select_candidates`）に **min..max 枚の累積**選択を
+        候補化し、探索に「何枚・どれを選ぶか」を読ませる（候補は max-min+1 手＝有界）。これにより
+        『相手のコスト1以下のキャラ2枚までを KO』等の**有益な除去を 0 枚で取りこぼす**のを防ぐ
+        （従来は max>=2 を既定解決＝最小数=0枚へ委ねていた）。
     """
     from . import action_api
     pending = manager.get_pending_request()
@@ -797,21 +826,31 @@ def _selection_moves(manager, actor_name: str):
         max_n = int(constraints.get("max", len(uuids)))
     except (TypeError, ValueError):
         max_n = len(uuids)
-    # 単一対象選択のみ分岐（v1）。0/複数対象は既定解決に委ねる。
-    if not uuids or max_n != 1 or min_n > 1:
+    if not uuids:
         return None
     base = manager.default_interaction_payload(pending)
-    moves: List[Dict[str, Any]] = []
-    for uid in uuids[:HARD_SELECT_CAP]:
+
+    def _mk(sel):
         payload = dict(base)
-        payload["selected_uuids"] = [uid]
-        moves.append({"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": payload})
-    # 任意選択（min==0・スキップ可）なら「選ばない」も一級の候補にする。
-    if min_n == 0 and bool(pending.get(KEY_SKIP, False)):
-        payload = dict(base)
-        payload["selected_uuids"] = []
-        moves.append({"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": payload})
-    return moves
+        payload["selected_uuids"] = list(sel)
+        return {"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": payload}
+
+    # 単一対象選択: 候補ごとに分岐。
+    if max_n == 1 and min_n <= 1:
+        moves: List[Dict[str, Any]] = [_mk([uid]) for uid in uuids[:HARD_SELECT_CAP]]
+        # 任意選択（min==0・スキップ可）なら「選ばない」も一級の候補にする。
+        if min_n == 0 and bool(pending.get(KEY_SKIP, False)):
+            moves.append(_mk([]))
+        return moves
+
+    # 多対象「N枚まで」: 影響度順に min..max 枚の累積選択を候補化（探索に枚数を選ばせる）。
+    if max_n >= 2 and 0 <= min_n <= max_n:
+        ranked = _rank_select_candidates(manager, uuids, actor_name)
+        hi = min(max_n, len(ranked))
+        lo = max(min_n, 0)
+        moves = [_mk(ranked[:k]) for k in range(lo, hi + 1)]
+        return moves or None
+    return None
 
 
 def _consumes_hand_card(manager, actor_name: str, move: Dict[str, Any]) -> bool:
@@ -1119,6 +1158,13 @@ def _is_important_root_move(manager, name: str, move: Dict[str, Any], child) -> 
     return False
 
 
+# 深掘り同点手の 1-ply タイブレーク（§2.5.3）。寄与は _TIEBREAK_W×クランプ prelim（最大 ~0.005）で、
+# 実の深掘り差（典型 >0.3＝パワー1段ぶん）には影響せず、**厳密同点のみ**を即時盤面（1-ply）で割る。
+# prelim は勝ち(±W_WIN)で巨大化し得るため _TIEBREAK_CLAMP でクランプし、巨大値が実差を覆さないようにする。
+_TIEBREAK_W = 1e-6
+_TIEBREAK_CLAMP = 5000.0
+
+
 def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
                    see_opp_hand: bool, opp_public_only: bool,
                    profile=None, plan=None, collect: Optional[Dict[str, Any]] = None
@@ -1182,7 +1228,12 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
             v = _search(child, name, float("-inf"), float("inf"),
                         budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan,
                         start_turn=start_turn, horizon=HARD_HORIZON, counter_budget=cbudget)
-            out.append((v, m))
+            # 深掘り値が**同点**の手は 1-ply（即時盤面）スコアで割る＝有益な選択（相手キャラの除去等）が
+            # 深掘りで washout（相手ターン中の自分の誘発除去は探索ホライズン内で価値が相殺され同点になり得る）
+            # してもランダムタイブレークで取りこぼさない。寄与は ±_TIEBREAK_W*クランプ prelim（最大 ~0.005）で、
+            # 実差（>0.005）には一切影響しない＝従来採点をほぼ完全に保ったまま厳密同点のみを是正する。
+            v_ranked = v + _TIEBREAK_W * max(-_TIEBREAK_CLAMP, min(_TIEBREAK_CLAMP, s1))
+            out.append((v_ranked, m))
             if collect is not None:
                 collect["deep"][_move_sig(m)] = v
     if not out:  # 念のため（全候補がクローン失敗）: 1-ply スコアにフォールバック
@@ -1393,11 +1444,13 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
     rng = rng or random
     if moves is None:
         moves = manager.get_legal_actions(player)
-    # normal/hard: 最上位が単一対象選択なら候補ごとに展開して最善対象を読み切る（easy は既定解決のまま）。
+    # normal/hard: 最上位が対象選択なら候補ごとに展開して最善対象を読み切る（easy は既定解決のまま）。
+    is_selection = False
     if difficulty != "easy":
         sel = _selection_moves(manager, player.name)
         if sel:
             moves = sel
+            is_selection = True
     if not moves:
         return None
     if len(moves) == 1:
@@ -1427,12 +1480,29 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
         scored = [(_simulate_and_eval(manager, name, m, see_opp_hand=False), m) for m in moves]
     elif difficulty == "hard":
         see_opp_hand, opp_public_only = True, False
-        scored = _scored_search(manager, name, moves, see_opp_hand=True, opp_public_only=False,
-                                plan=plan, collect=collect)
     else:  # normal
         see_opp_hand, opp_public_only = False, True
-        scored = _scored_search(manager, name, moves, see_opp_hand=False, opp_public_only=True,
-                                profile=profile, plan=plan, collect=collect)
+    if difficulty != "easy":
+        if is_selection:
+            # 対象選択（自分の確定効果の対象/枚数決定）は**即時盤面(1-ply)**が信頼できる信号。
+            # 多 ply 先読みは「相手のターン中に発火した自分の誘発除去」等で価値が washout/逆転し
+            # （例『相手のコスト1以下を2枚までKO』で 0〜1 枚に取りこぼす）、深掘りはむしろ有害。
+            # 1-ply は除去/弱体で相手の盤面が減るほど高く付くので、最大限の有益除去を選ぶ。
+            if collect is not None:
+                collect.setdefault("prelim", {}); collect.setdefault("deep", {})
+            scored = []
+            for m in moves:
+                s = _simulate_and_eval(manager, name, m, see_opp_hand=see_opp_hand,
+                                       profile=profile, plan=plan)
+                scored.append((s, m))
+                if collect is not None:
+                    collect["prelim"][_move_sig(m)] = s
+                    collect["deep"][_move_sig(m)] = s
+        else:
+            scored = _scored_search(manager, name, moves, see_opp_hand=see_opp_hand,
+                                    opp_public_only=opp_public_only,
+                                    profile=(profile if difficulty == "normal" else None),
+                                    plan=plan, collect=collect)
     # 同点はランダムタイブレーク（決定論にしたい場合は呼び出し側で seed 済み rng を渡す）。
     rng.shuffle(scored)
     best_score, best_move = max(scored, key=lambda x: x[0])
