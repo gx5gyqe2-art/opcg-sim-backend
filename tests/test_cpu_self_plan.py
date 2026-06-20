@@ -440,99 +440,9 @@ def test_c2_telegraph_penalty_isolated(db, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# コスト低減の資源価値化（§2.5.3）: 次ターン手出し可（コスト≤次ターン見込みドン）への小ボーナス
+# 注（A2・2026-06）: 「コスト低減の資源価値化」= 次ターン手出し可ボーナス（W_HAND_PLAYABLE／_next_turn_don）は
+# ablation A/B で無寄与（勝率 0.500）と判明し撤去した。関連テストも併せて削除（docs/SPEC.md §2.5.3）。
 # ---------------------------------------------------------------------------
-
-def _total_don(p):
-    return len(p.don_active) + len(p.don_rested) + len(p.don_attached_cards)
-
-
-def test_c4_next_turn_don_estimate(db):
-    """次ターン見込みドン = 現在の全ドン（アクティブ＋レスト＋付与）＋ ドンデッキから補充 2（残でキャップ）。"""
-    gm = _new_gm(db)
-    p = gm.p1
-    assert cpu_ai._next_turn_don(p) == _total_don(p) + min(2, len(p.don_deck))
-    # ドンデッキが 1 枚しか残っていなければ補充は 1（残でキャップ）。
-    p.don_deck[:] = p.don_deck[:1]
-    assert cpu_ai._next_turn_don(p) == _total_don(p) + 1
-    # ドンデッキが空なら補充 0。
-    p.don_deck.clear()
-    assert cpu_ai._next_turn_don(p) == _total_don(p)
-
-
-def test_c4_playable_hand_bonus_in_side_score(db):
-    """`next_turn_don` 供給時、手札のうち『次ターン手出しできる（current_cost≤見込みドン）』枚数ぶん
-    `W_HAND_PLAYABLE` が上乗せされる。None（plan 無し）では一切上乗せされない＝従来同値。"""
-    gm = _new_gm(db)
-    p = gm.p1
-    if not p.hand:
-        pytest.skip("手札が空")
-    nd = cpu_ai._next_turn_don(p)
-    cap = cpu_ai._power_cap(gm.p2)
-    base = cpu_ai._side_score(p, True, cap)                          # next_turn_don=None＝従来
-    withd = cpu_ai._side_score(p, True, cap, next_turn_don=nd)
-    playable = sum(1 for c in p.hand if c.current_cost <= nd)
-    assert withd - base == pytest.approx(playable * cpu_ai.W_HAND_PLAYABLE)
-    # include_counter=False（相手手札の中身を読まない側）では手札を読まない＝ボーナスも作動しない（フェア）。
-    no_read = cpu_ai._side_score(p, True, cap, include_counter=False, next_turn_don=nd)
-    no_read_base = cpu_ai._side_score(p, True, cap, include_counter=False)
-    assert no_read == pytest.approx(no_read_base)
-
-
-def test_c4_cost_reduction_makes_card_playable(db):
-    """コスト低減が資源として価値化される: 手出し不能だった手札のコストを下げて手出し可能にすると、
-    評価が丁度 `W_HAND_PLAYABLE` ぶん増える（`current_cost` が cost_buff を含む＝低減が直に効く）。"""
-    gm = _new_gm(db)
-    p = gm.p1
-    if not p.hand:
-        pytest.skip("手札が空")
-    nd = cpu_ai._next_turn_don(p)
-    cap = cpu_ai._power_cap(gm.p2)
-    target = p.hand[0]
-    target.base_cost_override = nd + 2          # 次ターンでも手出し不能なコストに固定
-    assert target.current_cost > nd
-    before = cpu_ai._side_score(p, True, cap, next_turn_don=nd)
-    target.cost_buff = -(target.current_cost - nd)   # コスト低減で丁度手出し可能まで下げる
-    assert target.current_cost <= nd
-    after = cpu_ai._side_score(p, True, cap, next_turn_don=nd)
-    assert after - before == pytest.approx(cpu_ai.W_HAND_PLAYABLE)
-
-
-def test_c4_fairness_normal_hides_opp_cost_hard_reads(db):
-    """フェア性: normal（see_opp_hand=False）は相手手札のコストを読まない＝相手手札のコストを変えても
-    評価は不変。hard（see_opp_hand=True）は相手の手出し可能な脅威を織り込む＝相手コストを下げると
-    （相手の脅威が増えて）自分の評価は下がる。"""
-    plan = _plan("aggro")
-    # normal: 相手手札のコストを下げても不変（中身を読まない）。
-    gm = _new_gm(db)
-    if not gm.p2.hand:
-        pytest.skip("相手手札が空")
-    n_before = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
-    for c in gm.p2.hand:
-        c.cost_buff -= 20                       # 相手手札を全て手出し可能級に
-    n_after = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, plan=plan)
-    assert n_before == pytest.approx(n_after), "normal が相手手札のコストを読んだ（フェア性違反）"
-    # hard: 相手手札を不能級→可能級にすると、相手の脅威が増えて自分の評価は下がる（≤）。
-    gm2 = _new_gm(db)
-    for c in gm2.p2.hand:
-        c.base_cost_override = 99               # まず全て手出し不能級
-    h_before = cpu_ai.evaluate(gm2, "p1", see_opp_hand=True, plan=plan)
-    for c in gm2.p2.hand:
-        c.base_cost_override = 0                # 全て手出し可能級
-    h_after = cpu_ai.evaluate(gm2, "p1", see_opp_hand=True, plan=plan)
-    assert h_after <= h_before
-
-
-def test_c4_plan_none_ignores_hand_cost(db):
-    """回帰: plan=None（プラン無し）は手札のコストを一切読まない＝コストを変えても評価は不変。"""
-    gm = _new_gm(db)
-    if not gm.p1.hand:
-        pytest.skip("手札が空")
-    before = cpu_ai.evaluate(gm, "p1")          # plan=None
-    for c in gm.p1.hand:
-        c.base_cost_override = 99               # 手出し不能級に上げる
-    after = cpu_ai.evaluate(gm, "p1")
-    assert before == pytest.approx(after)
 
 
 # ---------------------------------------------------------------------------
@@ -702,92 +612,10 @@ def test_race_tempo_puzzle_discounts_board_in_race(db):
 
 
 # ---------------------------------------------------------------------------
-# 探索地平線を越える効果価値（§2.5.3・評価関数の期待値で補完）:
-#   毎ターン価値を生む能力（継続/起動/毎ターン誘発）の将来価値プレミアム（残ターンで期待値割引）
+# 注（A2・2026-06）: 地平線越えの「毎ターン価値エンジン」プレミアム（W_RECUR_ENGINE／_recurring_engine／
+# _RECUR_TRIGGERS）は ablation A/B で正味マイナス（勝率 0.452＝バイアス）と判明し撤去した。horizon=4 探索が
+# 将来発動を結果盤面で既に拾うため二重計上だった。関連テストも併せて削除（docs/SPEC.md §2.5.3）。
 # ---------------------------------------------------------------------------
-
-def test_recurring_engine_detector(db):
-    """毎ターン価値を生む能力（ACTIVATE_MAIN/PASSIVE/…）は engine、一度きり（ON_PLAY のみ）/バニラは非 engine。"""
-    from opcg_sim.src.models.enums import TriggerType
-    am = _find_char_master(db, lambda m: any(a.trigger == TriggerType.ACTIVATE_MAIN
-                                             for a in (getattr(m, "abilities", None) or [])))
-    if am is not None:
-        assert cpu_ai._recurring_engine(CardInstance(am, "p1")) is True
-    vanilla = _find_char_master(db, lambda m: not (getattr(m, "abilities", None) or []))
-    if vanilla is not None:
-        assert cpu_ai._recurring_engine(CardInstance(vanilla, "p1")) is False
-    onplay = _find_char_master(db, lambda m: (getattr(m, "abilities", None) or [])
-                               and all(a.trigger == TriggerType.ON_PLAY for a in m.abilities))
-    if onplay is not None:
-        assert cpu_ai._recurring_engine(CardInstance(onplay, "p1")) is False  # 一度きりは対象外
-
-
-def test_engine_premium_only_when_engine_aware(db):
-    """エンジン将来価値プレミアムは engine_aware=True のときだけ・engine 体にだけ加点する。"""
-    from opcg_sim.src.models.enums import TriggerType
-    am = _find_char_master(db, lambda m: any(a.trigger == TriggerType.ACTIVATE_MAIN
-                                             for a in (getattr(m, "abilities", None) or [])))
-    if am is None:
-        pytest.skip("起動メイン持ちキャラが見つからない")
-    gm = _new_gm(db)
-    c = CardInstance(am, "p1")
-    c.is_rest = False
-    c.is_newly_played = False
-    gm.p1.field.append(c)
-    cap = cpu_ai._power_cap(gm.p2)
-    off = cpu_ai._side_score(gm.p1, True, cap, engine_aware=False)
-    on = cpu_ai._side_score(gm.p1, True, cap, engine_aware=True)
-    # engine_aware で乗るのは engine 体のプレミアム＋リーダー有効パワー項（②）。リーダー項を加味。
-    leader_term = cpu_ai._effective_power(gm.p1.leader.get_power(True), cap) * cpu_ai.W_FIELD_POWER
-    assert on - off == pytest.approx(cpu_ai.W_RECUR_ENGINE + leader_term)  # field_count_factor 既定 1.0
-
-
-def test_engine_premium_scales_with_remaining_turns(db):
-    """将来価値プレミアムは残ターン（field_count_factor＝time-discount のテンポ係数）でスケールする。"""
-    from opcg_sim.src.models.enums import TriggerType
-    am = _find_char_master(db, lambda m: any(a.trigger == TriggerType.ACTIVATE_MAIN
-                                             for a in (getattr(m, "abilities", None) or [])))
-    if am is None:
-        pytest.skip("起動メイン持ちキャラが見つからない")
-    gm = _new_gm(db)
-    c = CardInstance(am, "p1")
-    c.is_rest = False
-    c.is_newly_played = False
-    gm.p1.field.append(c)
-    cap = cpu_ai._power_cap(gm.p2)
-    full = cpu_ai._side_score(gm.p1, True, cap, engine_aware=True, field_count_factor=1.0)
-    race = cpu_ai._side_score(gm.p1, True, cap, engine_aware=True, field_count_factor=0.3)
-    # 場の存在価値の割引（W_FIELD_COUNT*0.7）＋エンジンプレミアムの割引（W_RECUR_ENGINE*0.7）の合計。
-    assert full - race == pytest.approx((cpu_ai.W_FIELD_COUNT + cpu_ai.W_RECUR_ENGINE) * 0.7)
-
-
-def test_engine_premium_wired_in_evaluate_plan_gated(db):
-    """配線: エンジン体を場に足したときの評価上昇は plan 供給時のほうが（将来価値プレミアム分だけ）大きい。"""
-    from opcg_sim.src.models.enums import TriggerType
-    am = _find_char_master(db, lambda m: any(a.trigger == TriggerType.ACTIVATE_MAIN
-                                             for a in (getattr(m, "abilities", None) or [])))
-    if am is None:
-        pytest.skip("起動メイン持ちキャラが見つからない")
-    gm = _new_gm(db)
-    gm.turn_player = gm.p1
-    c = CardInstance(am, "p1")
-    c.is_rest = False
-    c.is_newly_played = False
-
-    def add_delta(plan):
-        before = cpu_ai.evaluate(gm, "p1", plan=plan)
-        gm.p1.field.append(c)
-        after = cpu_ai.evaluate(gm, "p1", plan=plan)
-        gm.p1.field.remove(c)
-        return after - before
-
-    plan = _plan("midrange")
-    # ライフ厚（テンポ係数 1.0）でプレミアムが満額乗る局面に。
-    while len(gm.p1.life) < int(cpu_ai._TEMPO_FULL_TURNS) + 1:
-        gm.p1.life.append(gm.p1.deck.pop())
-    while len(gm.p2.life) < int(cpu_ai._TEMPO_FULL_TURNS) + 1:
-        gm.p2.life.append(gm.p2.deck.pop())
-    assert add_delta(plan) > add_delta(None)   # plan 供給時はエンジン将来価値ぶん高い
 
 
 # ---------------------------------------------------------------------------
@@ -803,24 +631,23 @@ def _find_stage_master(db, pred=lambda m: True):
 
 
 def test_stage_term_only_when_engine_aware(db):
-    """ステージ項は engine_aware=True のときだけ存在価値(+エンジン)を加点する（plan 無しでは不変）。
+    """ステージ項は engine_aware=True のときだけ存在価値を加点する（plan 無しでは不変）。
 
-    開始直後は場（p.field）が空なので、engine_aware の差分は純粋にステージ項のみ（フィールドの
-    エンジン項に汚染されない）。差分＝W_STAGE_COUNT(+ エンジン持ちなら W_RECUR_ENGINE)。
+    開始直後は場（p.field）が空なので、engine_aware の差分は純粋にステージ存在価値＋リーダー有効パワー項
+    （②）のみ。差分＝leader_term + W_STAGE_COUNT（エンジンプレミアムは A2 で撤去）。
     """
     sm = _find_stage_master(db)
     if sm is None:
         pytest.skip("ステージカードが見つからない")
     gm = _new_gm(db)
-    assert not gm.p1.field  # 開始直後は場が空＝フィールドのエンジン項で汚染されない
+    assert not gm.p1.field  # 開始直後は場が空
     gm.p1.stage = CardInstance(sm, "p1")
     cap = cpu_ai._power_cap(gm.p2)
     off = cpu_ai._side_score(gm.p1, True, cap, engine_aware=False)
     on = cpu_ai._side_score(gm.p1, True, cap, engine_aware=True)
-    # engine_aware で乗るのはステージ項＋リーダー有効パワー項（②）。リーダー項を加味して検証。
+    # engine_aware で乗るのはステージ存在価値＋リーダー有効パワー項（②）。
     leader_term = cpu_ai._effective_power(gm.p1.leader.get_power(True), cap) * cpu_ai.W_FIELD_POWER
-    expected = leader_term + cpu_ai.W_STAGE_COUNT + (cpu_ai.W_RECUR_ENGINE
-                                                     if cpu_ai._recurring_engine(gm.p1.stage) else 0.0)
+    expected = leader_term + cpu_ai.W_STAGE_COUNT
     assert on - off == pytest.approx(expected)
 
 
@@ -835,14 +662,11 @@ def test_stage_not_scored_when_plan_none(db):
     assert cpu_ai.evaluate(gm, "p1") == base  # ステージを置いても plan=None の評価は不変
 
 
-def test_stage_engine_increases_eval_with_plan(db):
-    """エンジン持ちステージはプラン供給時に evaluate を押し上げる（存在＋将来価値）。"""
-    from opcg_sim.src.models.enums import TriggerType
-    sm = _find_stage_master(db, lambda m: any(
-        getattr(a, "trigger", None) in cpu_ai._RECUR_TRIGGERS
-        for a in (getattr(m, "abilities", None) or [])))
+def test_stage_increases_eval_with_plan(db):
+    """ステージはプラン供給時に evaluate を存在価値ぶん押し上げる（A2 後＝エンジンプレミアムなし）。"""
+    sm = _find_stage_master(db)
     if sm is None:
-        pytest.skip("エンジン持ちステージが見つからない")
+        pytest.skip("ステージカードが見つからない")
     gm = _new_gm(db)
     plan = _plan("midrange")
     base = cpu_ai.evaluate(gm, "p1", plan=plan)
@@ -882,22 +706,5 @@ def test_leader_power_not_scored_when_plan_none(db):
     assert cpu_ai.evaluate(gm, "p1") == cpu_ai.evaluate(gm, "p1", plan=None)
 
 
-# ---------------------------------------------------------------------------
-# Phase1.5 ④: 【アタック時】を継続価値エンジンとして扱う
-# ---------------------------------------------------------------------------
-
-def test_on_attack_counts_as_recurring_engine(db):
-    """【アタック時】(ON_ATTACK) 持ちキャラは毎ターン価値を生むエンジン扱い（Phase1.5・④）。"""
-    from opcg_sim.src.models.enums import TriggerType
-    onatk = _find_char_master(db, lambda m: any(
-        getattr(a, "trigger", None) == TriggerType.ON_ATTACK
-        for a in (getattr(m, "abilities", None) or [])))
-    if onatk is None:
-        pytest.skip("【アタック時】持ちキャラが見つからない")
-    assert cpu_ai._recurring_engine(CardInstance(onatk, "p1"))
-    # 一度きり（ON_PLAY のみ）はエンジン扱いしない（回帰）。
-    onplay = _find_char_master(db, lambda m: (getattr(m, "abilities", None) or [])
-                               and all(getattr(a, "trigger", None) == TriggerType.ON_PLAY
-                                       for a in m.abilities))
-    if onplay is not None:
-        assert not cpu_ai._recurring_engine(CardInstance(onplay, "p1"))
+# 注（A2・2026-06）: Phase1.5 ④「【アタック時】を継続価値エンジン扱い」は、エンジンプレミアム
+# （W_RECUR_ENGINE）撤去に伴い意味を失ったためテストごと削除（docs/SPEC.md §2.5.3）。
