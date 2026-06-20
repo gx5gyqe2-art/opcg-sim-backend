@@ -233,3 +233,239 @@ def test_cached_cpu_move_replays_and_legal(db):
         decide_client.plan_segment = orig
     assert m.winner is not None
     assert seg_calls["n"] < decides, f"replay が効いていない (plan_segment={seg_calls['n']} >= decides={decides})"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 ⑥-a 先行計画（pondering）: 人間の手番処理で制御が CPU へ移った瞬間に CPU セグメント計画を
+# 前倒しで温め、次の /cpu/step が即時 replay（CPU 初手の待ちを消す）。本番専用・既定 OFF。
+# ---------------------------------------------------------------------------
+
+def _setup_cpu_game(db, gid, difficulty="normal"):
+    """現 pending プレイヤーを CPU とみなした CPU ゲームを GAMES/CPU_GAMES に登録して返す。"""
+    import os
+    os.environ.setdefault("OPCG_PYPY_WORKER", "0")
+    from opcg_sim.api import app as _app
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    m.start_game()
+    name = m.pending_actor_action()[0]
+    _app.GAMES[gid] = m
+    _app.CPU_GAMES[gid] = {"cpu_player_id": name, "difficulty": difficulty, "turn_mem": {}}
+    return _app, m, name
+
+
+def test_ponder_prewarms_queue_and_cached_move_hits(db):
+    """_ponder_plan が CPU セグメント計画を前倒しで queue に充填し、後続 _cached_cpu_move が
+    **再計算なし（plan_segment 呼数 0）でヒット**して合法手を返す＝先行計画＝待ち消しの担保。"""
+    import asyncio
+    import random as _r
+    from opcg_sim.api import decide_client
+    _r.seed(0)
+    gid = "_ponder_t1"
+    _app, m, name = _setup_cpu_game(db, gid)
+    try:
+        asyncio.run(_app._ponder_plan(gid))
+        meta = _app.CPU_GAMES[gid]
+        cache = meta["plan_cache"]
+        assert cache.get("queue"), "先行計画で queue が温まっていない"
+        assert cache.get("task") is None, "タスクが片付いていない"
+        seg_calls = {"n": 0}
+        orig = decide_client.plan_segment
+        def _counting(*a, **k):
+            seg_calls["n"] += 1
+            return orig(*a, **k)
+        decide_client.plan_segment = _counting
+        try:
+            actor = cpu_ai._player_by_name(m, name)
+            legal = m.get_legal_actions(actor)
+            mv = _app._cached_cpu_move(m, actor, "normal", meta, meta["turn_mem"])
+            assert mv is not None
+            assert cpu_ai._move_sig(mv) in {cpu_ai._move_sig(x) for x in legal}
+            assert seg_calls["n"] == 0, "warm queue があるのに再計画した（前倒しが効いていない）"
+        finally:
+            decide_client.plan_segment = orig
+    finally:
+        _app.GAMES.pop(gid, None)
+        _app.CPU_GAMES.pop(gid, None)
+
+
+def test_kick_ponder_gated_and_starts_task(db):
+    """_kick_ponder は OPCG_PONDER 配下のオプトイン: 無効時は no-op、有効時は CPU 手番でタスクを起動し、
+    完走後に queue が温まる（合法性は _cached_cpu_move 側で担保）。"""
+    import asyncio
+    import os
+    import random as _r
+    _r.seed(0)
+    gid = "_ponder_t2"
+    _app, m, name = _setup_cpu_game(db, gid)
+    prev_pc = os.environ.get("OPCG_PLAN_CACHE")
+    prev_pd = os.environ.get("OPCG_PONDER")
+    try:
+        # 無効時（既定）は no-op＝タスク非起動。
+        os.environ["OPCG_PLAN_CACHE"] = "0"
+        os.environ["OPCG_PONDER"] = "0"
+        _app._kick_ponder(gid)
+        assert _app.CPU_GAMES[gid].get("plan_cache", {}).get("task") is None
+
+        # 有効時は CPU 手番でタスク起動→完走で queue 充填。
+        os.environ["OPCG_PLAN_CACHE"] = "1"
+        os.environ["OPCG_PONDER"] = "1"
+
+        async def _drive():
+            _app._kick_ponder(gid)
+            task = _app.CPU_GAMES[gid]["plan_cache"].get("task")
+            assert task is not None, "有効時に先行計画タスクが起動しない"
+            await task
+
+        asyncio.run(_drive())
+        assert _app.CPU_GAMES[gid]["plan_cache"].get("queue"), "タスク完走後に queue が温まっていない"
+        assert _app.CPU_GAMES[gid]["plan_cache"].get("task") is None
+    finally:
+        for k, v in (("OPCG_PLAN_CACHE", prev_pc), ("OPCG_PONDER", prev_pd)):
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        _app.GAMES.pop(gid, None)
+        _app.CPU_GAMES.pop(gid, None)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 ⑥-b 投機ポンダリング: 人間の MAIN 中に「今エンドしたら」の CPU 計画を投機し、実 TURN_END で
+# 合法なら昇格（CPU 初手の待ちすら消す）。本番専用・既定 OFF（OPCG_PONDER_SPEC=1）。
+# ---------------------------------------------------------------------------
+
+def _advance_to_main(m):
+    """マリガン等を既定方策で進め、いずれかのプレイヤーの MAIN_ACTION 決定点まで進める（pid を返す）。"""
+    for _ in range(40):
+        pa = m.pending_actor_action()
+        if not pa:
+            return None
+        pid, act = pa
+        if act == "MAIN_ACTION":
+            return pid
+        actor = cpu_ai._player_by_name(m, pid)
+        mv = cpu_ai.decide_guarded(m, actor, "normal", random.Random(0), mem={})
+        if mv is None:
+            return None
+        m.action_events = []
+        if mv.get("kind") == "battle":
+            action_api.apply_battle_action(m, actor, mv["action_type"], mv.get("card_uuid"))
+        else:
+            action_api.apply_game_action(m, actor, mv["action_type"], mv.get("payload", {}))
+    return None
+
+
+def test_speculate_compute_plans_cpu_turn_on_clone(db):
+    """⑥-b: _speculate_compute がクローン上で人間 TURN_END を仮適用し、CPU 手番へ移れば CPU 計画を返す。
+    渡したクローンのみ変異し、別インスタンス（live 相当）は不変＝live 盤面に触れない設計の担保。"""
+    import random as _r
+    from opcg_sim.api import app as _app
+    _r.seed(0)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    m.start_game()
+    pid = _advance_to_main(m)
+    if pid is None:
+        pytest.skip("MAIN_ACTION へ到達できない")
+    human_pid = pid
+    cpu_pid = "p2" if pid == "p1" else "p1"
+    live_turn = m.turn_count
+    clone = m.clone()
+    result = _app._speculate_compute(clone, human_pid, cpu_pid, "normal", None, None)
+    # live(=m) は不変（クローンのみ変異）。
+    assert m.turn_count == live_turn
+    assert m.pending_actor_action()[0] == human_pid
+    # 投機が成立すれば CPU 手のリスト（介在する人間決定がある盤面なら None も許容）。
+    assert result is None or (isinstance(result, list) and len(result) >= 1)
+
+
+def test_kick_ponder_promotes_valid_speculation(db):
+    """⑥-b: 実盤面で先頭が合法な spec_queue は _kick_ponder が queue へ昇格し spec_hits を計上（投機ヒット）。
+    ヒット時は再計画タスクを起動しない（待ちゼロ）。"""
+    import os
+    import random as _r
+    from opcg_sim.api import decide_client
+    _r.seed(0)
+    gid = "_spec_t1"
+    _app, m, name = _setup_cpu_game(db, gid)  # cpu_pid = 現 pending 側＝CPU 手番
+    prev_pc = os.environ.get("OPCG_PLAN_CACHE")
+    prev_pd = os.environ.get("OPCG_PONDER")
+    try:
+        os.environ["OPCG_PLAN_CACHE"] = "1"
+        os.environ["OPCG_PONDER"] = "1"
+        # 現 CPU 手番に対する実計画を「投機結果」として置く（先頭は当然合法）。
+        cpu_player = cpu_ai._player_by_name(m, name)
+        plan = decide_client.plan_segment(m, cpu_player, "normal", mem={})
+        assert plan, "計画が空"
+        meta = _app.CPU_GAMES[gid]
+        meta.setdefault("plan_cache", {})["spec_queue"] = list(plan)
+        _app._kick_ponder(gid)
+        cache = meta["plan_cache"]
+        assert cache.get("spec_hits") == 1, "投機ヒットが計上されていない"
+        assert cache.get("queue") == plan, "spec_queue が queue へ昇格していない"
+        assert cache.get("task") is None, "ヒット時は再計画タスクを起動しない"
+    finally:
+        for k, v in (("OPCG_PLAN_CACHE", prev_pc), ("OPCG_PONDER", prev_pd)):
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        _app.GAMES.pop(gid, None)
+        _app.CPU_GAMES.pop(gid, None)
+
+
+def test_kick_speculate_gated_and_clones_without_mutation(db):
+    """⑥-b: _kick_speculate は OPCG_PONDER_SPEC 配下のオプトイン。無効時 no-op、有効時は人間 MAIN で
+    投機タスクを起動し（live 盤面は不変）、完走で spec_queue を充填する。"""
+    import asyncio
+    import os
+    import random as _r
+    _r.seed(0)
+    from opcg_sim.api import app as _app
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    m.start_game()
+    pid = _advance_to_main(m)
+    if pid is None:
+        pytest.skip("MAIN_ACTION へ到達できない")
+    cpu_pid = "p2" if pid == "p1" else "p1"
+    gid = "_spec_t2"
+    _app.GAMES[gid] = m
+    _app.CPU_GAMES[gid] = {"cpu_player_id": cpu_pid, "difficulty": "normal", "turn_mem": {}}
+    prev = {k: os.environ.get(k) for k in ("OPCG_PLAN_CACHE", "OPCG_PONDER", "OPCG_PONDER_SPEC")}
+    live_turn = m.turn_count
+    try:
+        # 無効時は no-op。
+        os.environ["OPCG_PLAN_CACHE"] = "1"
+        os.environ["OPCG_PONDER"] = "1"
+        os.environ["OPCG_PONDER_SPEC"] = "0"
+        _app._kick_speculate(gid)
+        assert _app.CPU_GAMES[gid].get("plan_cache", {}).get("spec_task") is None
+
+        # 有効時は投機タスク起動→完走で spec_queue 充填。live 盤面は不変。
+        os.environ["OPCG_PONDER_SPEC"] = "1"
+
+        async def _drive():
+            _app._kick_speculate(gid)
+            t = _app.CPU_GAMES[gid]["plan_cache"].get("spec_task")
+            assert t is not None, "有効時に投機タスクが起動しない"
+            await t
+
+        asyncio.run(_drive())
+        assert m.turn_count == live_turn, "投機が live 盤面を変異させた"
+        assert m.pending_actor_action()[0] == pid, "投機が live の手番を進めた"
+        cache = _app.CPU_GAMES[gid]["plan_cache"]
+        # spec_queue は CPU 手のリスト or None（介在決定で投機不成立）。いずれも合法性ゲートが採否を担保。
+        assert cache.get("spec_queue") is None or isinstance(cache.get("spec_queue"), list)
+    finally:
+        for k, v in prev.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        _app.GAMES.pop(gid, None)
+        _app.CPU_GAMES.pop(gid, None)

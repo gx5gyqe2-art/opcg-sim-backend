@@ -349,15 +349,68 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       理由: 深掘りをスキップしても **prelim（全ルート手の 1-ply 事前採点＝`_eval_root_move`）は依然走る**ため節約に
       ならない（コストの大半は deepening でなく prelim＋eval）。中立×無利得×分岐の複雑性増＝割に合わずコードは revert。
       `decide` は単一合法手は従来どおり即答する。下記は不採用の経緯記録。
-    - **③ 相手 min 手番のビーム幅拡張**: 現状 `HARD_BEAM`(=3) は max/min 共通（`children[:HARD_BEAM]`）。相手応手を
-      広く読むため **min ノード専用の広いビーム**（`HARD_OPP_BEAM`・数行＋定数）を導入し contingency を厚くする
-      （相手の取りうる手を多く残す）。計算増は ①②④ で吸収。強さ×レイテンシを A/B。
+    - **③ 相手 min 手番のビーム幅拡張（E1・実装済み・2026-06）**: 従来 `HARD_BEAM`(=3) を max/min 共通で適用
+      （`children[:HARD_BEAM]`）していたのを、**min（相手）ノードだけ `HARD_OPP_BEAM`(=4) に拡げる**
+      （`children[:(HARD_BEAM if is_max else HARD_OPP_BEAM)]`）。自分(max)は最善へ収束させたいので狭く、相手(min)の
+      応手（ブロック/カウンター/除去応答/相手ターンの攻め手）を多く残して contingency（「相手がこう来たら」の枝）を
+      厚くする。**A/B 自己対戦（asymmetric arena・席交互・hard）**: beam=4 vs 3 で **24 局 14/24＝58.3%＝+58 Elo**
+      （別シード 8 局でも 5/8＝+89 Elo）＝広い相手ビームが明確に強いことを実測。**レイテンシ**: 値決めスイープで
+      beam=5 は深掘り clone 増で 1 秒目標を超過（p95 ~1009ms / max ~1285ms）＝不採用、**beam=4 を採用**（クリーン計測で
+      mean ~551ms / p95 ~1021ms / max ~1283ms / 1 秒超 ~7%＝目標 1 秒を稀に超える程度・体感は ④/⑤ で吸収予定として
+      現状許容）。回帰 `tests/test_cpu_puzzles.py::test_e1_opp_beam_widens_min_node_independently_of_max`（min 幅が
+      `HARD_OPP_BEAM` に従い max とは独立であることを決定論的に固定）。
     - **④ アニメーションと探索の重ね合わせ**: CPU の行動 N を演出している間に N+1 を計算＝思考を演出の裏に隠す
       （① があれば演出中はキャッシュ参照でほぼゼロ体感）。frontend/プロトコル連携。
     - **⑤「思考中」演出**: 速度に依らず意図的な間＋キャラ性で不快感を下げるクッション（安い・安全・常時有効）。
-    - **⑥ ポンダリング（相手の番に ① を前倒し）★最重量・最後**: 人間の手番中に ① の計画を先行構築（相手の取りうる
-      手ごとに最善計画）し、相手が確定したらルックアップ＝CPU 手番が即時。並行処理・相手手の不確定・予想外手での
-      キャッシュ破棄まで絡む最重量項＝①②④が固まってから着手。
+    - **⑥ ポンダリング（相手の番に ① を前倒し）★最重量・最後 — 設計（未実装・2026-06）**: 人間の手番中に ① の計画を
+      先行構築し、相手が確定したらルックアップ＝CPU 手番が即時。①（計画キャッシュ）が PoC＋API 配線済みのため、⑥は
+      「ゼロから」ではなく「**①の plan 計算を CPU 手番のポーリング時から、人間の手番処理時へ前倒し（lazy→eager）**」する
+      拡張＝決定性も合法性安全網も①から継承する。以下は実装前の設計。
+      - **足場（アーキ調査済み）**: API は FastAPI async・**1 手 1 HTTP のポーリング**（`/api/game/cpu/step`＝CPU 手を 1 つ
+        返す `game_cpu_step`／人間手は `/api/game/action`・`/api/game/battle`）。①は `app._cached_cpu_move` が
+        `CPU_GAMES[gid]["plan_cache"]={"queue":[...]}` を消費し、`_move_sig` の合法性ゲートで stale を安全に通常 `decide`
+        へ落とす。重い探索は **PyPy ワーカー（別プロセス・Unix ソケット）** にオフロード済み＝`asyncio.create_task` から
+        ワーカー往復すればイベントループを塞がず「人間の手番中に裏で計算」が成立する。
+      - **⑥-a 先行計画（eager・実装済み・2026-06）**: 契機＝人間アクション（`/api/game/action`・`/api/game/battle`）の処理末尾で
+        pending が CPU 手番へ移った瞬間（`_kick_ponder`）。そこで `asyncio.create_task(_ponder_plan(gid))` を起動し、
+        `plan_segment` を `asyncio.to_thread` で PyPy ワーカー（別プロセス）へオフロードしてイベントループを塞がずに計画、結果を
+        `meta["plan_cache"]["queue"]` へ充填する。frontend が次に `/cpu/step` を叩く頃には①の `_cached_cpu_move` が**ヒット
+        ＝CPU 初手が即時 replay**。①との差分は**起動タイミングのみ**（計算内容・合法性ゲート・決定性方針は同一）。**並行/競合回避**:
+        `game_cpu_step` は計算前に走行中の先行計画タスクを `await`（warm な queue を使い二重計算を避ける）／二重起動は
+        `plan_cache["task"]` で防止／イベントループ外（同期テスト）では `create_task` 不可＝no-op。フラグ
+        `OPCG_PONDER=1`（①の `OPCG_PLAN_CACHE=1` 配下・既定 OFF＝従来挙動完全同値）。検証
+        `tests/test_plan_cache.py`（`_ponder_plan` が queue を温め後続 `_cached_cpu_move` が再計算なしでヒット／
+        `_kick_ponder` のゲートとタスク起動→完走で queue 充填）。**残**: ⑥-b（投機）と体感 A/B（prewarm 有無で /cpu/step 応答時間）。
+      - **⑥-b 投機ポンダリング（実装済み・bounded v1・2026-06）**: 契機＝人間の MAIN 継続中（`/api/game/action`・
+        `/battle` 末尾で pending が人間の MAIN_ACTION のとき `_kick_speculate`）。人間 MAIN の分岐は巨大（PLAY×対象×ドン
+        配分×攻撃順…）＝全列挙不可なので、**「人間が今 TURN_END したら」の 1 本に限定**して投機する: `_speculate_compute`
+        が**クローン上で**人間の TURN_END を仮適用し、pending が素直に CPU 手番へ移れば CPU セグメントを `plan_segment`
+        （ワーカー）で計画して `plan_cache["spec_queue"]` に保持（介在する人間決定があれば None＝投機しない）。clone は
+        **メインスレッドで原子的**に取り（読み書き競合なし）、TURN_END 仮適用＋plan だけを `to_thread` へ逃がす。使い捨て
+        clone・使い捨て mem＝**live 盤面/turn_mem 不変**。人間がさらに動いたら世代トークン `spec_gen` を進めて旧投機を
+        **supersede**（1 ゲーム 1 タスク＝本数ゲート）。人間が実際に TURN_END したら `_kick_ponder` が `spec_queue` の先頭を
+        実盤面の合法手と照合し、**合法なら queue へ昇格＝投機ヒット（CPU 初手の待ちすら消える）**／外れは `spec_misses` を
+        計上して ⑥-a（実盤面の先行計画）へ。採否は①の合法性ゲートが最終担保＝**外れても事故らない**。`spec_hits`/`spec_misses`
+        で**当たり率を計測**できる（本採用＝既定 ON 化はこの実測を見て判断）。フラグ `OPCG_PONDER_SPEC=1`（⑥-a の
+        `OPCG_PONDER=1` 配下・既定 OFF＝従来挙動完全同値）。検証 `tests/test_plan_cache.py`（`_speculate_compute` が
+        clone 上で CPU 計画を返し live 不変／`_kick_ponder` が合法な spec_queue を昇格し `spec_hits` 計上／`_kick_speculate`
+        のゲートと live 非変異）。**残**: 複数候補盤面への拡張（出力ゲート前提）。
+      - **本番有効化と実測（2026-06）**: 計測ハーネス（p1=人間プロキシ・p2=CPU で本番フローを asyncio 駆動）で hard 自己
+        対戦を計測。**⑥-a 単独で CPU セグメント先頭の 100% が warm**（初手の待ち ~429ms/手をクリティカルパスから裏へ移す）・
+        **無駄打ちゼロ**（1 セグメント=1 計画＝総計算量は不変、置き場所だけが human 思考と重なる側へ移る）。**⑥-b 投機は当たり率
+        ~30% に対しプラン計算を ~28% 余分にワーカーへ投げる**（hidden を 93%→100% に上げるだけ）＝複数対局同時ではワーカーを
+        圧迫し割に合わない。よって**本番は ①＋⑥-a を ON（`OPCG_PLAN_CACHE=1`/`OPCG_PONDER=1` を Dockerfile に追加）、⑥-b
+        （`OPCG_PONDER_SPEC`）は既定 OFF**。テスト/自己対戦は env 非依存（同期 decide）で決定性を維持。
+      - **状態キー（`CPU_GAMES[gid]["plan_cache"]`）**: `queue`＝残り計画手／`task`＝進行中ポンダリングタスク（二重起動防止・
+        キャンセル用）／`base_sig`＝計画を立てた局面の指紋（人間が動いたら queue を無効化判定）。
+      - **並行・破棄**: 1 ゲーム 1 タスク。次の CPU 手番までに未完なら `/cpu/step` 側で**通常 decide にフォールバック**（待たない）。
+        人間ターン中に状態が変わる契機（追加アクション）が来たら旧タスクをキャンセルし queue を無効化（`base_sig` 不一致）。
+      - **決定性**: ①と同じく「**decide の決定的結果を前倒しで計算しておくだけ**」＝決める内容は不変。**本番のみ**作動し
+        （テスト/自己対戦は同期 `decide_guarded`・フラグ既定 OFF）、rng 消費の前後ズレは①の合法性ゲートが吸収（不正手は打たない）。
+      - **テスト戦略**: 単体＝`prewarm_plan` が queue を充填し後続 `_cached_cpu_move` がヒット（plan_segment 呼数 < decide）／
+        並行＝タスク未完時に合法 decide へフォールバック／破棄＝`base_sig` 不一致で queue 無効化→再計画／体感＝prewarm 有無で
+        「CPU 初手の `/cpu/step` 応答時間」を A/B（本番フラグ）。決定性経路（同期）は不変＝全既存テスト影響なし。
+      - **フラグ**: `OPCG_PONDER=1`（①の `OPCG_PLAN_CACHE` 配下・既定 OFF）。①②④が固まってから ⑥-a→⑥-b の順で着手。
     - **決定性の維持（設計制約）**: 前倒し/キャッシュ/ポンダリングは「**decide が出す決定的結果を先に計算しておく
       だけ**」に留め、決める内容は変えない＝テスト・自己対戦の再現性は不変（壁時計デッドラインのような非決定化は
       採らない）。WBS「Phase 3: 体感最適化」に課題登録済み。

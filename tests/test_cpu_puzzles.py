@@ -389,6 +389,73 @@ def test_a3_min_node_keeps_root_worst_in_beam(db):
                                        _search_beam(pc.clone(), 10, ply=2)))
 
 
+def test_e1_opp_beam_widens_min_node_independently_of_max(db):
+    """E1（Phase3 ③）: 相手 min ノードのビーム幅は **HARD_OPP_BEAM** に従い、max の HARD_BEAM とは独立。
+
+    同一の SELECT_BLOCKER min ノード（block/pass の 2 応答・root から見て別値）で、HARD_BEAM を 1 に
+    固定したまま HARD_OPP_BEAM を 1→2 に拡げると、min が見る応答数が 1→2 へ増える:
+      - HARD_OPP_BEAM=1: 1-ply 最不利キーの子（argmin）1 本だけ＝その部分木値
+      - HARD_OPP_BEAM=2: 両応答を見て真の min＝min(block 部分木, pass 部分木)
+    ＝「相手がこう来たら」の枝を厚く読む配線が効いていることを決定論的に固定する。
+    """
+    assert cpu_ai.HARD_OPP_BEAM >= cpu_ai.HARD_BEAM, "min ビームは max 以上に広い設計"
+    gm = _new_gm(db, seed=0)
+    assert _fast_forward_to_p1_main(gm)
+    opp_leader_pw = int(gm.p2.leader.get_power(False)) if gm.p2.leader else 5000
+    atk = _reaching_char(gm.p1.deck, 0)
+    blk = _blocker_char(gm.p2.deck)
+    if atk is None or blk is None:
+        pytest.skip("攻撃者/ブロッカーが見つからない")
+    gm.p1.deck.remove(atk); gm.p2.deck.remove(blk)
+    gm.p1.field[:] = [atk]; atk.is_rest = False; atk.is_newly_played = False
+    atk.passive_power_override = opp_leader_pw + 1000
+    gm.p2.field[:] = [blk]; blk.is_rest = False; blk.is_newly_played = False
+    blk.passive_power_override = opp_leader_pw + 5000
+    if not gm.p2.life:
+        gm.p2.life.append(gm.p2.deck.pop())
+    gm.action_events = []
+    action_api.apply_game_action(gm, gm.p1, "ATTACK", {"uuid": atk.uuid, "target_ids": [gm.p2.leader.uuid]})
+    pend = gm.get_pending_request()
+    if not pend or pend.get("action") != "SELECT_BLOCKER" or pend.get("player_id") != "p2":
+        pytest.skip("SELECT_BLOCKER min ノードへ到達できない局面")
+    moves = gm.get_legal_actions(gm.p2)
+    block_move = next((m for m in moves if m.get("action_type") == "SELECT_BLOCKER" and m.get("card_uuid") == blk.uuid), None)
+    pass_move = next((m for m in moves if m.get("action_type") == "PASS"), None)
+    assert block_move and pass_move
+    bc = cpu_ai._apply_clone(gm, "p2", block_move, stop_at_select=True)
+    pc = cpu_ai._apply_clone(gm, "p2", pass_move, stop_at_select=True)
+    assert bc is not None and pc is not None
+    kb = cpu_ai.evaluate(bc, "p1", see_opp_hand=False)
+    kp = cpu_ai.evaluate(pc, "p1", see_opp_hand=False)
+    if kb == kp:
+        pytest.skip("block/pass が 1-ply 同値＝ビーム剪定が結果を分けない局面")
+    st = gm.turn_count
+
+    def _search_beams(node, max_beam, opp_beam, ply):
+        old_b, old_o = cpu_ai.HARD_BEAM, cpu_ai.HARD_OPP_BEAM
+        cpu_ai.HARD_BEAM = max_beam
+        cpu_ai.HARD_OPP_BEAM = opp_beam
+        try:
+            return cpu_ai._search(node, "p1", float("-inf"), float("inf"),
+                                  [4000], False, True, profile=None, ply=ply, plan=None,
+                                  start_turn=st, horizon=1)
+        finally:
+            cpu_ai.HARD_BEAM = old_b
+            cpu_ai.HARD_OPP_BEAM = old_o
+
+    kept = bc if kb <= kp else pc        # min は 1-ply 最不利キー（argmin）を先頭に残す
+    # HARD_BEAM=1 固定で部分木（ply=2・max・幅1）を測る。min 幅だけを 1↔2 で動かす。
+    sub_kept = _search_beams(kept.clone(), 1, 1, ply=2)
+    sub_bc = _search_beams(bc.clone(), 1, 1, ply=2)
+    sub_pc = _search_beams(pc.clone(), 1, 1, ply=2)
+    # opp_beam=1: argmin キーの子 1 本だけ＝kept の部分木。
+    v_opp1 = _search_beams(gm.clone(), 1, 1, ply=1)
+    assert v_opp1 == pytest.approx(sub_kept), "HARD_OPP_BEAM=1 が argmin キーの応答 1 本に絞れていない"
+    # opp_beam=2: 両応答を見て真の min。
+    v_opp2 = _search_beams(gm.clone(), 1, 2, ply=1)
+    assert v_opp2 == pytest.approx(min(sub_bc, sub_pc)), "HARD_OPP_BEAM=2 が両応答の真の min を取れていない"
+
+
 def _advance_to_select_counter(gm, attacker, target):
     """attacker→target のアタックを宣言し、SELECT_BLOCKER を PASS で流して SELECT_COUNTER まで進める。"""
     gm.action_events = []
