@@ -444,7 +444,7 @@ WBS（`gx5gyqe2-art/WBS` の `projects/opcg-sim-backend.md`）と同期。
   既定解決頼みの甘い/辛い見積りに賭けすぎない。lethal（±(W_WIN-ply)）は確定事象なので非割引。プラン供給時のみ
   作動（plan=None 完全同値）。`tests/test_cpu_self_plan.py`（plan 限定で正負を中立へ係数倍／lethal 非割引／
   `_settle_eval` 配線）。重大度=中。→ **C-4 完了**。
-- **C-5 settle 楽観是正（受け手の地平線外打点の減点）【実装済み】**（`_settle_eval`／`_incoming_reach`／
+- **C-5 settle 楽観是正（受け手の地平線外打点の減点）【採用】**（`_settle_eval`／`_incoming_reach`／
   `W_SETTLE_PRESSURE`・§2.5.3）: 予算切れの打ち切り葉（settle）は相手のターン開始で止めて**静的**に採点する＝
   相手の反撃を読まない＝**動いた側に楽観バイアス**（殴られる直前でスナップショット）。これが「**手番頭で
   ドン/盤面に過剰コミットした手の深掘り値が楽観的に高く出る → 手番が進み代償が予算内に入って初めて崩落**」
@@ -458,7 +458,12 @@ WBS（`gx5gyqe2-art/WBS` の `projects/opcg-sim-backend.md`）と同期。
   未満のみ**扱い二重計上を避ける。`evaluate`/C-2 は不変＝真の地平線葉（読み切れた線）は触らず、**読み切れ
   なかった葉だけ**をペッシミ寄せ（C-4 と同系統＝既定解決頼みを信用しすぎない）。`tests/test_cpu_self_plan.py`
   （`test_b_settle_pressure_isolated`＝致死未満で reach×W 減点／reach0・致死・plan=None・自手番で不作動）。
-  重大度=中〜高。
+  重大度=中〜高。**A/B 検証（採用）**: B-on(`W_SETTLE_PRESSURE=2500`) vs B-off(0)・both hard・席交互・
+  **n=60＝39/60・wr0.650・+108 Elo（95%CI [+20,+211]＝0 を上回る）**で純利得を確認して採用（horizon3→4 の
+  +58 Elo と同等以上）。検証装置は `tests/elo_settle_ab.py`。なお実ケースの「ドン空振り」症状そのものは B の
+  評価地点（相手ターン開始の被打点）では捉えられない（付与ドンは手番終了で返るため空振りと有効活用が同一
+  盤面になる）＝B は集計で勝率を上げるが当該症状の体感修正は別項（行為帰属＝自手番クローズでの資源変換評価）
+  が必要。→ **C-5 採用（2026-06-20）**。
   > **value-realization gap 計測【実装済み】**（`tests/cpu_arena.py realize`／`decide_with_regret(out=…)`）:
   > regret（deep vs 1-ply 貪欲）は deep を正解とみなすため、**deep 自身が地平線外を楽観視する誤り**を構造的に
   > 検知できない。そこで「1 ターン内で採用手の深掘り値が `max → 最終決定` でどれだけ崩落したか」を gap として
