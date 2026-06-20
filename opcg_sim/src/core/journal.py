@@ -32,6 +32,12 @@ from contextlib import contextmanager
 # --- グローバル状態（探索は単一スレッド前提）---------------------------------
 _active = None          # 現在の StateJournal（None = 不活性 = 記録しない）
 _gen_counter = 0        # トランザクションごとの単調増加世代
+# 盤面変更の単調増加カウンタ（Phase2・継続効果再計算の dirty-flag 用）。journaled な全変更
+# （record_attr ＝属性 / JournaledList・Set・Dict の _touch ＝コンテナ）と、探索開始（top-level
+# transaction 入場）で +1 する＝**探索中(make/unmake)の入力変化を漏れなく捕捉**する。これにより
+# `_apply_passive_effects` は「前回再計算から _mut_count 不変＝入力不変」なら再計算を省ける。
+# 不活性時（正常プレイ・_active is None）は一切増えず作動しない＝従来挙動と完全同値。
+_mut_count = 0
 
 # 巻き戻しエントリのタグ
 _ATTR = 0   # (obj, name, old_value)      → object.__setattr__(obj, name, old)
@@ -79,8 +85,12 @@ def transaction():
     入れ子可。退出時は記録の再生中だけ `_active=None` にして二重記録を防ぎ、親トランザクション
     （あれば）を復帰させる。
     """
-    global _active
+    global _active, _mut_count
     prev = _active
+    if prev is None:
+        # 探索開始（top-level）。正常プレイ中は _mut_count が凍結するため、ここで +1 して
+        # 直前の正常プレイによる盤面変更を跨いだ dirty-flag の取り残しを無効化する（健全性）。
+        _mut_count += 1
     j = StateJournal()
     _active = j
     try:
@@ -101,6 +111,8 @@ def record_attr(obj, name, d):
     j = _active
     if j is None:
         return
+    global _mut_count
+    _mut_count += 1
     if name in d:
         j._undo.append((_ATTR, obj, name, d[name]))
     else:
@@ -116,9 +128,12 @@ class JournaledList(list):
 
     def _touch(self):
         j = _active
-        if j is not None and self._jgen != j.gen:
-            self._jgen = j.gen
-            j._undo.append((_LIST, self, self[:]))
+        if j is not None:
+            global _mut_count
+            _mut_count += 1
+            if self._jgen != j.gen:
+                self._jgen = j.gen
+                j._undo.append((_LIST, self, self[:]))
 
     def append(self, x):
         self._touch(); list.append(self, x)
@@ -162,9 +177,12 @@ class JournaledSet(set):
 
     def _touch(self):
         j = _active
-        if j is not None and self._jgen != j.gen:
-            self._jgen = j.gen
-            j._undo.append((_SET, self, set(self)))
+        if j is not None:
+            global _mut_count
+            _mut_count += 1
+            if self._jgen != j.gen:
+                self._jgen = j.gen
+                j._undo.append((_SET, self, set(self)))
 
     def add(self, x):
         self._touch(); set.add(self, x)
@@ -211,9 +229,12 @@ class JournaledDict(dict):
 
     def _touch(self):
         j = _active
-        if j is not None and self._jgen != j.gen:
-            self._jgen = j.gen
-            j._undo.append((_DICT, self, dict(self)))
+        if j is not None:
+            global _mut_count
+            _mut_count += 1
+            if self._jgen != j.gen:
+                self._jgen = j.gen
+                j._undo.append((_DICT, self, dict(self)))
 
     def __setitem__(self, k, v):
         self._touch(); dict.__setitem__(self, k, v)
@@ -272,6 +293,8 @@ def deep_diff(a, b, _path="", _seen=None):
     if isinstance(a, (set, frozenset)):
         return None if a == b else f"{_path}: set {a ^ b} differs"
     if isinstance(a, dict):
+        if not isinstance(b, dict):
+            return f"{_path}: dict vs {type(b).__name__}"
         if a.keys() != b.keys():
             return f"{_path}: dict keys {set(a) ^ set(b)} differ"
         for k in a:
@@ -286,9 +309,13 @@ def deep_diff(a, b, _path="", _seen=None):
         return None if a == b else f"{_path}: {a!r} != {b!r}"
     if type(a).__name__ != type(b).__name__:
         return f"{_path}: type {type(a).__name__} != {type(b).__name__}"
-    if da.keys() != db.keys():
+    # `_passive_mc`（Phase2・継続効果再計算の dirty-flag キャッシュ）はロールバック対象外
+    # （object.__setattr__ で更新・盤面状態でない）。両者から除外して比較する。
+    if (da.keys() - {"_passive_mc"}) != (db.keys() - {"_passive_mc"}):
         return f"{_path}: attrs {set(da) ^ set(db)} differ"
-    for k in da:
+    for k in da:   # 挿入順（決定的）で反復
+        if k == "_passive_mc":
+            continue   # dirty-flag キャッシュは盤面状態でない＝比較対象外
         if k == "gm" or k.startswith("__"):   # 後方参照はサイクル管理に任せる
             pass
         d = deep_diff(da[k], db[k], f"{_path}.{k}", _seen)

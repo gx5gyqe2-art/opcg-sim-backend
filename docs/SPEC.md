@@ -282,6 +282,20 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       > 逆にオーバーヘッド＝**ネット負**で撤回（再プロファイルで cumulative 悪化を確認）。
       **通算: PyPy(~2.1x) × passive 差分化(~1.12x) × parked journaled(~1.33x) × 軽量pending(~1.06x)**（局面依存）。
       残コストは clone でなく apply＋evaluate（rollback／_side_score／_apply_passive_effects）。
+      (6) **`_apply_passive_effects` の継続効果再計算 dirty-flag（Phase2・2026-06・~1.07x）**: 再プロファイルで
+      `_apply_passive_effects` が依然最大ホットスポット（cumulative ~26%・大半は継続効果 PASSIVE/YOUR_TURN の `resolve_ability`
+      再計算）と判明。**実測で呼び出しの ~38.5% が「前回再計算から盤面入力が不変」＝冗長**（同一入力で同一結果を再計算）。
+      `journal._mut_count`（**journaled な全変更＝`record_attr`／`JournaledList・Set・Dict._touch` ＋探索開始の top-level
+      transaction 入場で +1**＝探索中の入力変化を漏れなく捕捉）を導入し、`_apply_passive_effects` は「前回再計算時の
+      `_mut_count` と一致＝入力不変」なら再計算を**スキップ**する（バフ＝`cost_buff`/`passive_power`/`current_keywords` は前回値の
+      まま正しい）。**探索中(make/unmake)のみ作動**＝正常プレイ（`_active is None`）は一切作動せず常に再計算＝従来挙動と完全同値。
+      ロールバックはバフを正しく復元する＋`_mut_count ≥ _passive_mc` を保つため省略しても必要時は必ず再計算され安全
+      （`_passive_mc` は `object.__setattr__` で更新＝journaled せず＝`deep_diff` 比較対象外）。**正しさゲート**＝`test_journal`
+      の make/unmake round-trip（`deep_diff==None`）＋`test_cpu_make_unmake`（decide 選択手が clone 方式と一致＝方策不変）。
+      実測 `_apply_passive_effects` cumulative **11.2s→9.5s**・hard 思考手 decide **mean 380ms→354ms（~1.07x）**・全1045pass・
+      構造監査0・カード挙動ベースライン不変。残: top-level transaction 単位の保守的無効化のため冗長 38.5% を全ては取り切れて
+      おらず、decide スコープ無効化への精緻化で上積み余地あり（要・追加の健全性検証）。併せて `deep_diff` を型不一致
+      （dict-vs-非dict 等）でクラッシュせず差分文字列を返すよう堅牢化（テストユーティリティ・実差分は従来どおり検出）。
     - **③ 置換表（transposition table）= 実測で不採用（2026-06）**: ②後は**健全（完全一致キー）な転置率 ≤0.5%**（exact key
       ＝デッキ順／全カード状態／継続効果まで含むと手順違いでも byte 一致がほぼ起きない）に対し、健全な位置キー計算が
       **~3%/node** のオーバーヘッド＝**ネット負**。②が per-node clone を消したため「再探索を省く」価値自体が消えた

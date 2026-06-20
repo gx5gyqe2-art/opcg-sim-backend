@@ -195,6 +195,9 @@ class GameManager:
         self._apply_leader_don_deck_rule(self.p1)
         self._apply_leader_don_deck_rule(self.p2)
         self.turn_count = 0
+        # Phase2: 継続効果再計算（_apply_passive_effects）の dirty-flag。最後に再計算したときの
+        # journal._mut_count を保持し、探索中(make/unmake)に入力不変なら再計算を省く。-1=未計算。
+        self._passive_mc = -1
         # このターン中に発生したイベントの回数（EVENT_THIS_TURN 条件用）。ターン開始でクリア。
         # 例: "DON_RETURNED"（ドン!!デッキへ返却）/ "CHAR_LEFT_BY_OWN_EFFECT" / "NAVY_DISCARD" /
         #     "TRIGGER_CHAR_PLAYED"。各イベント発生地点で record_turn_event() を呼ぶ。
@@ -1154,6 +1157,13 @@ class GameManager:
         # 残って PASSIVE/YOUR_TURN バフが消えてしまうため（クザンのコスト-5 等）。
         if self.active_interaction:
             return
+        # Phase2 dirty-flag（探索中のみ）: 前回再計算から journal._mut_count が不変＝盤面入力が
+        # 不変なら、継続効果（cost_buff/passive_power/current_keywords）は前回値のまま正しい＝再計算
+        # を省く。_mut_count は journaled な全変更＋探索開始で増えるため取り残し無し。正常プレイ
+        # （_active is None）では作動せず常に再計算＝従来挙動と完全同値。ロールバックはバフを正しく
+        # 復元する＋_mut_count >= _passive_mc を保つため、省略しても必要時は必ず再計算され安全。
+        if journal._active is not None and journal._mut_count == self._passive_mc:
+            return
         # YOUR_TURN 効果は常にターンプレイヤー基準で適用する（呼び出し元が owner を
         # 渡しても誤適用しない）。
         if self.turn_player is not None:
@@ -1228,6 +1238,12 @@ class GameManager:
         #   対象は手札のこのカード自身（target.flags に "SELF_IN_HAND"）。条件成立時のみ
         #   cost_buff を加算する（Step1 で 0 にリセット済み）。ウタ ST23-001/サッチ OP16-005 等。
         self._apply_hand_self_cost(player, opponent)
+
+        # Phase2 dirty-flag: 再計算完了時点の _mut_count を記録（探索中のみ）。自身の書き込みを
+        # 含んだ後の値を object.__setattr__ で保持する（journaled せず _mut_count も増やさない＝
+        # 次回呼び出しで外部変更が無ければ一致してスキップできる）。
+        if journal._active is not None:
+            object.__setattr__(self, "_passive_mc", journal._mut_count)
 
     def _apply_hand_self_cost(self, player: Player, opponent: Player):
         resolver = None
