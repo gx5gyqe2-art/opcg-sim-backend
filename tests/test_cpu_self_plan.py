@@ -737,7 +737,9 @@ def test_engine_premium_only_when_engine_aware(db):
     cap = cpu_ai._power_cap(gm.p2)
     off = cpu_ai._side_score(gm.p1, True, cap, engine_aware=False)
     on = cpu_ai._side_score(gm.p1, True, cap, engine_aware=True)
-    assert on - off == pytest.approx(cpu_ai.W_RECUR_ENGINE)        # field_count_factor 既定 1.0
+    # engine_aware で乗るのは engine 体のプレミアム＋リーダー有効パワー項（②）。リーダー項を加味。
+    leader_term = cpu_ai._effective_power(gm.p1.leader.get_power(True), cap) * cpu_ai.W_FIELD_POWER
+    assert on - off == pytest.approx(cpu_ai.W_RECUR_ENGINE + leader_term)  # field_count_factor 既定 1.0
 
 
 def test_engine_premium_scales_with_remaining_turns(db):
@@ -815,8 +817,10 @@ def test_stage_term_only_when_engine_aware(db):
     cap = cpu_ai._power_cap(gm.p2)
     off = cpu_ai._side_score(gm.p1, True, cap, engine_aware=False)
     on = cpu_ai._side_score(gm.p1, True, cap, engine_aware=True)
-    expected = cpu_ai.W_STAGE_COUNT + (cpu_ai.W_RECUR_ENGINE
-                                       if cpu_ai._recurring_engine(gm.p1.stage) else 0.0)
+    # engine_aware で乗るのはステージ項＋リーダー有効パワー項（②）。リーダー項を加味して検証。
+    leader_term = cpu_ai._effective_power(gm.p1.leader.get_power(True), cap) * cpu_ai.W_FIELD_POWER
+    expected = leader_term + cpu_ai.W_STAGE_COUNT + (cpu_ai.W_RECUR_ENGINE
+                                                     if cpu_ai._recurring_engine(gm.p1.stage) else 0.0)
     assert on - off == pytest.approx(expected)
 
 
@@ -845,3 +849,55 @@ def test_stage_engine_increases_eval_with_plan(db):
     gm.p1.stage = CardInstance(sm, "p1")
     after = cpu_ai.evaluate(gm, "p1", plan=plan)
     assert after - base >= cpu_ai.W_STAGE_COUNT  # 存在価値ぶん以上は確実に増える
+
+
+# ---------------------------------------------------------------------------
+# Phase1.5 ②: リーダーの可変状態（有効パワー）の価値化
+# ---------------------------------------------------------------------------
+
+def test_leader_effective_power_only_when_engine_aware(db):
+    """リーダーの有効パワー項は engine_aware=True のときだけ加点（plan 無しでは不変）。
+
+    開始直後は場が空・ステージ無しなので、engine_aware の差分は純粋にリーダーの有効パワー項のみ。
+    差分＝_effective_power(リーダーパワー, cap) × W_FIELD_POWER。
+    """
+    gm = _new_gm(db)
+    assert not gm.p1.field and gm.p1.stage is None  # エンジン/ステージ項で汚染されない
+    cap = cpu_ai._power_cap(gm.p2)
+    off = cpu_ai._side_score(gm.p1, True, cap, engine_aware=False)
+    on = cpu_ai._side_score(gm.p1, True, cap, engine_aware=True)
+    lpw = gm.p1.leader.get_power(True)
+    expected = cpu_ai._effective_power(lpw, cap) * cpu_ai.W_FIELD_POWER
+    assert on - off == pytest.approx(expected)
+    assert expected > 0  # リーダーは素で 5000 前後＝正の戦闘価値
+
+
+def test_leader_power_not_scored_when_plan_none(db):
+    """plan=None（engine_aware=False）ではリーダー有効パワーは一切採点されない＝現行挙動と完全同値。"""
+    gm = _new_gm(db)
+    cap = cpu_ai._power_cap(gm.p2)
+    # engine_aware 既定（False）＝plan 無し相当ではリーダー項が乗らない。
+    base = cpu_ai._side_score(gm.p1, True, cap)
+    assert cpu_ai._side_score(gm.p1, True, cap, engine_aware=False) == base
+    assert cpu_ai.evaluate(gm, "p1") == cpu_ai.evaluate(gm, "p1", plan=None)
+
+
+# ---------------------------------------------------------------------------
+# Phase1.5 ④: 【アタック時】を継続価値エンジンとして扱う
+# ---------------------------------------------------------------------------
+
+def test_on_attack_counts_as_recurring_engine(db):
+    """【アタック時】(ON_ATTACK) 持ちキャラは毎ターン価値を生むエンジン扱い（Phase1.5・④）。"""
+    from opcg_sim.src.models.enums import TriggerType
+    onatk = _find_char_master(db, lambda m: any(
+        getattr(a, "trigger", None) == TriggerType.ON_ATTACK
+        for a in (getattr(m, "abilities", None) or [])))
+    if onatk is None:
+        pytest.skip("【アタック時】持ちキャラが見つからない")
+    assert cpu_ai._recurring_engine(CardInstance(onatk, "p1"))
+    # 一度きり（ON_PLAY のみ）はエンジン扱いしない（回帰）。
+    onplay = _find_char_master(db, lambda m: (getattr(m, "abilities", None) or [])
+                               and all(getattr(a, "trigger", None) == TriggerType.ON_PLAY
+                                       for a in m.abilities))
+    if onplay is not None:
+        assert not cpu_ai._recurring_engine(CardInstance(onplay, "p1"))

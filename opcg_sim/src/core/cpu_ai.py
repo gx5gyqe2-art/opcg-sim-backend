@@ -169,6 +169,7 @@ _RECUR_TRIGGERS = frozenset({
     TriggerType.OPPONENT_TURN,   # 相手のターン中: 毎相手ターン効く
     TriggerType.TURN_END,        # ターン終了時: 毎ターン誘発
     TriggerType.OPP_TURN_END,    # 相手のターン終了時: 毎相手ターン誘発
+    TriggerType.ON_ATTACK,       # アタック時: 攻撃のたび誘発＝攻撃体は毎ターン価値を生む（Phase1.5・④）
 })
 
 # C-2（§2.5.3）: テレグラフ致死の減点。葉（相手ターン開始＝相手の攻撃が目前）で「相手の次ターンの有効打点
@@ -229,6 +230,8 @@ def _recurring_engine(c) -> bool:
 
     `_RECUR_TRIGGERS` のいずれかのトリガーを持つ能力があれば True。ON_PLAY（一度きり）・ON_KO/TRIGGER/COUNTER
     （反応型一回）等の一回限り効果は、発動時に探索が結果盤面で見るため将来価値プレミアムの対象にしない。
+    【アタック時】(ON_ATTACK・Phase1.5・④) は攻撃のたび誘発＝攻撃体が毎ターン生む将来価値なので含める
+    （地平線内の発動は探索が結果で見るが、地平線を越える将来分をプレミアムで補う＝既存エンジン項と同趣旨）。
     """
     m = getattr(c, "master", None)
     if m is None:
@@ -653,6 +656,24 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
             if c.has_keyword("ブロッカー"):
                 score += W_BLOCKER
                 _emit("blocker", W_BLOCKER)
+
+    # リーダーの可変状態（Phase1.5・②・§2.5.3 評価観点の穴埋め）: リーダーの**有効パワー**を戦闘強度として
+    # 価値化する。リーダーは存在/能力はゲーム中**不変＝探索全ノードで定数＝手選択(argmax)に無影響**なので
+    # 加点しない（存在 W_FIELD_COUNT・攻め圧 W_ATTACKER も定数のため除外）。一方リーダーの有効パワーは
+    # **ドン!!付与/バフで変動する＝可変**。従来 `_side_score` はリーダーを一切読まず、リーダーへのドン付与
+    # （大型アタックを作る筋）が静的には「アクティブドンを失うだけの純損」に見えていた。場のキャラと同じく
+    # 有効パワー（対面最硬防御 `power_cap` までを線形・超過減衰）を `W_FIELD_POWER` で加点し、ドン付与/バフの
+    # 戦闘価値（相手の硬い体を KO/トレードできる）を拾う。クロック（ライフ削り）は `_plan_progress` の reach が
+    # 別軸で評価済み＝二重計上を避ける（こちらは戦闘 KO/トレード軸）。プラン供給時のみ作動（engine_aware＝
+    # plan is not None）＝plan=None では一切作動せず現行挙動と完全同値。
+    if engine_aware and getattr(p, "leader", None) is not None:
+        try:
+            lpw = p.leader.get_power(is_turn)
+        except Exception:
+            lpw = getattr(getattr(p.leader, "master", None), "power", 0) or 0
+        lev = _effective_power(lpw, power_cap) * W_FIELD_POWER
+        score += lev
+        _emit("leader_power", lev)
 
     # ステージ（Phase1.5・§2.5.3 評価観点の穴埋め）: 場の永続リソース（`p.stage`）。これまで `_side_score`
     # は `p.field`（キャラ）のみ評価しステージを一切採点していなかった。ステージはキャラと違い攻撃/ブロックに
