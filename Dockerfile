@@ -23,17 +23,16 @@ RUN python -m opcg_sim.tools.build_card_cache
 ENV PORT=8080
 # 探索オフロードを既定で有効化（無効化は OPCG_PYPY_WORKER=0 でインプロセス実行へ即ロールバック）。
 ENV OPCG_PYPY_WORKER=1
-# 体感最適化（Phase 3）。① 計画キャッシュは本番有効（イベントループ内・同期＝単一スレッドで安全）。
+# 体感最適化（Phase 3）。決定性は維持＝decide の決定的結果を前倒しするだけ・合法性ゲートで安全。
 #   OPCG_PLAN_CACHE=1 : ① 計画キャッシュ（セグメントを1回計画→以降は即時 replay。手・盤面・勝敗は不変）
-# ⑥ ポンダリング（OPCG_PONDER / OPCG_PONDER_SPEC）は **間欠クラッシュ（並行バグ）のため無効化**:
-#   `_ponder_plan`/`_speculate_plan` は `asyncio.to_thread`（本物のOSスレッド）で探索系を走らせるが、
-#   差分巻き戻し journal（`opcg_sim/src/core/journal.py`）は **プロセス共有のグローバル状態**（`_active`/
-#   `_mut_count`・「探索は単一スレッド前提」）。バックグラウンドスレッドが探索で `transaction()` を開いた瞬間に
-#   メインスレッドが新しい CardInstance を生成（`master` 初回セット）すると、そのセットがポンダリング側 journal
-#   に誤記録され、rollback が live カードから `master` を pop ＝ `CardInstance has no attribute 'master'` で
-#   間欠クラッシュ/フリーズ（ワーカー温まると探索が別プロセスへ出て窓が消える＝「時間が経つと治る」）。
-#   止血としてポンダリングを無効化（体感最適化のみ＝手・盤面・勝敗は不変）。journal のスレッド安全化後に再検討。
+#   OPCG_PONDER=1     : ⑥-a 先行計画（人間の TURN_END 直後に次手番計画を前倒し）
+#   OPCG_PONDER_SPEC=1: ⑥-b 投機ポンダリング（人間の MAIN 中に「今エンドしたら」を先回り計算＝体感の本命）
+# ⑥ は一度 **間欠クラッシュ（並行バグ）**で無効化していたが、根本原因（差分巻き戻し journal の状態が
+# プロセス共有グローバルで、ポンダリングの asyncio.to_thread と競合し live カードから属性が pop される）を
+# **journal のスレッドローカル化**で解消済み（各スレッドの記録が互いに漏れない）＋`_ponder_plan` は live 盤面を
+# メインスレッドで clone してから to_thread へ渡す（deepcopy 競合の防止）。並行回帰テスト
+# `tests/test_journal_concurrency.py` でガード。よって再有効化。即ロールバックは各フラグを 0 に。
 ENV OPCG_PLAN_CACHE=1
-ENV OPCG_PONDER=0
-ENV OPCG_PONDER_SPEC=0
+ENV OPCG_PONDER=1
+ENV OPCG_PONDER_SPEC=1
 CMD ["sh", "-c", "uvicorn opcg_sim.api.app:app --host 0.0.0.0 --port $PORT"]
