@@ -122,3 +122,51 @@ def test_plan_turn_stops_at_turn_end_or_opponent(db):
             action_api.apply_battle_action(m, actor, mv["action_type"], mv.get("card_uuid"))
         else:
             action_api.apply_game_action(m, actor, mv["action_type"], mv.get("payload", {}))
+
+
+def test_decide_cached_plays_legal_and_replays(db):
+    """decide_cached（計画キャッシュ配線）で対局が合法に進み、実際に replay（キャッシュヒット）が
+    起きる（plan_turn 呼び出し回数 < decide 回数＝多くの手番が即時 replay）。本番専用パスの健全性。"""
+    import random as _r
+    from opcg_sim.src.core import cpu_ai as _ai
+    _r.seed(0)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    m.start_game()
+    caches = {"p1": {}, "p2": {}}
+    mem = {"p1": {}, "p2": {}}
+
+    plan_calls = {"n": 0}
+    orig_plan = _ai.plan_turn
+    def _counting_plan(*a, **k):
+        plan_calls["n"] += 1
+        return orig_plan(*a, **k)
+    _ai.plan_turn = _counting_plan
+    try:
+        decides = 0
+        steps = 0
+        while m.winner is None and steps < 400:
+            pa = m.pending_actor_action()
+            if not pa:
+                break
+            actor = _ai._player_by_name(m, pa[0])
+            legal = m.get_legal_actions(actor)
+            mv = _ai.decide_cached(m, actor, "normal", _r, mem=mem[pa[0]], cache=caches[pa[0]])
+            assert mv is not None
+            # 返る手は必ず現局面で合法（合法性検証の担保）
+            assert _ai._move_sig(mv) in {_ai._move_sig(x) for x in legal}, \
+                f"step{steps}: 非合法手を返した {_ai._move_sig(mv)}"
+            decides += 1
+            m.action_events = []
+            if mv.get("kind") == "battle":
+                action_api.apply_battle_action(m, actor, mv["action_type"], mv.get("card_uuid"))
+            else:
+                action_api.apply_game_action(m, actor, mv["action_type"], mv.get("payload", {}))
+            steps += 1
+    finally:
+        _ai.plan_turn = orig_plan
+
+    assert m.winner is not None, "ゲームが完走しなかった"
+    # replay が効いている＝plan_turn 呼び出しは decide 回数より十分少ない（セグメント単位で1回）
+    assert plan_calls["n"] < decides, f"replay が効いていない (plan={plan_calls['n']} >= decides={decides})"

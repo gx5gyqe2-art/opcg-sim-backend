@@ -2037,3 +2037,45 @@ def plan_turn(manager, name: str, difficulty: str = "hard", rng=None,
         if mv.get("action_type") == "TURN_END":
             break
     return actions
+
+
+def decide_cached(manager, player, difficulty: str = "hard", rng=None,
+                  mem: Optional[Dict[str, Any]] = None, cache: Optional[Dict[str, Any]] = None,
+                  profile=None, plan=None) -> Optional[Dict[str, Any]]:
+    """Phase 3 ① 配線: 計画キャッシュ付き decide（**本番の体感最適化専用**）。
+
+    `cache` は対局ごとに保持する dict（`{"queue": [...残りの計画手...]}`）。
+      - **キャッシュヒット**: 次の計画手が現局面で**合法**なら即返す（探索なし＝即時 replay）。
+      - **キャッシュミス/前提崩れ**: `plan_turn` でセグメント（相手介入/TURN_END まで）を計画して
+        キャッシュし、先頭手を返す。計画手が現局面で不正なら破棄して通常の `decide_guarded` へ。
+
+    **合法性検証で常に安全**（rng がズレてもキャッシュ手が不正なら通常 decide に落ちる＝不正手は打たない）。
+    ただし `plan_turn` のクローン適用と本番 replay の実適用でシャッフル等の rng 消費が前後しうるため
+    **決定性は保証しない＝テスト/自己対戦は `decide_guarded` を使う**こと（本番は決定性不要）。
+    """
+    rng = rng or random
+    if cache is None:
+        cache = {}
+    legal = manager.get_legal_actions(player)
+    if not legal:
+        return None
+    legal_by_sig = {_move_sig(m): m for m in legal}
+
+    q = cache.get("queue")
+    if q:
+        nxt_sig = _move_sig(q[0])
+        if nxt_sig in legal_by_sig:
+            cache["queue"] = q[1:]
+            return legal_by_sig[nxt_sig]  # 現局面の move（uuid 整合）を返す
+        cache["queue"] = None  # 前提崩れ＝破棄して再計画
+
+    actions = plan_turn(manager, player.name, difficulty, rng, mem=mem, profile=profile, plan=plan)
+    if actions:
+        first_sig = _move_sig(actions[0])
+        if first_sig in legal_by_sig:
+            cache["queue"] = actions[1:]
+            return legal_by_sig[first_sig]
+    # 計画が空/先頭不正＝安全側で通常 decide（rng/mem は plan_turn で進行済みのため二重進行に注意だが
+    # 本番専用＝決定性非依存。guard は安全網なので軽微な前後は許容）。
+    cache["queue"] = None
+    return decide_guarded(manager, player, difficulty, rng, mem=mem, profile=profile, plan=plan)
