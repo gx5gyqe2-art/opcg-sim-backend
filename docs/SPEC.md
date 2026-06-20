@@ -325,7 +325,7 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       状態網羅テスト＋衝突対策が必須。②（安価な状態遷移）と相乗で **horizon4＋** へ踏み込む段階の本命。
       期待＝実効 ~1.2〜1.3 倍（上限23%−ハッシュ計算オーバーヘッド）。いずれも**挙動・カード挙動ベースライン
       不変が必須ゲート**（探索の内部最適化であって手の評価結果は変えない）。WBS に課題登録済み。
-    - **④ 着手順序の前回 PV 再利用（move ordering by principal variation／killer move）= 採用方針（2026-06・未実装）**:
+    - **④ 着手順序の前回 PV 再利用（move ordering by principal variation／killer move）= 実装済み（2026-06・粒度a）**:
       ③置換表が「同一**盤面の値**を使い回す」案で**健全キーのコスト>節約（≤0.5%）でネット負**だったのに対し、本案は
       「同一/類似局面で**良かった手（の順番）**を使い回す」案＝**盤面キー不要**（覚えるのは move の signature だけ）で
       置換表の致命的コストを回避する。狙いは α-β の枝刈り効率向上: α-β は**良い手から先に試すほど早くカット**でき、
@@ -346,6 +346,16 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
         （ノード削減で浮いた予算を深さに振った場合に ≥ 現状であること。退行が無ければ深く読める分だけ強くなる）。
         期待＝着手順序改善による α-β カット増＝ノード数 1.x 倍削減（局面依存）。raw 速度頭打ち後の主軸＝**前倒し（①⑥）と
         並ぶ「探索を安くする」レバー**で、②（安価なノード遷移）と相乗して horizon4＋ に踏み込む。
+      - **実装（2026-06・粒度a＝decide 内）**: `cpu_ai._USE_PV_ORDER`（既定 True・`_USE_MAKE_UNMAKE` と同型で即時 OFF 可）。
+        `_search` に ply→直近カット手 signature 列の `killers` 辞書を通し、ビーム選別**後**に `_pv_reorder` で killer 手を
+        先頭へ寄せ（集合不変・安定並べ替え）、`alpha>=beta` カット時に `_record_killer`（MRU・上限 `_KILLER_SLOTS=2`）で登録。
+        killer は ply 単位の汎用ヒントなので深掘りルート手間で共有（`_scored_search` が辞書を生成）。**正しさ＝挙動不変**を
+        `tests/test_cpu_pv_order.py` で機械照合: (1)`decide` 選択手が ON/OFF 一致（normal/hard・多 seed）・(2)`_scored_search`
+        深掘りスコアが ON/OFF 完全一致（既定予算300＋増量予算2000）・(3)ノード数が ON≤OFF かつ合計で削減・(4)killer/reorder の
+        単体不変条件（集合不変・MRU・上限）。**実測（中盤6局面・増量予算で純カット効果）= 探索ノード −2.4%（最大 −6.5%・悪化0）**。
+        全1056pass・構造監査0・カード挙動ベースライン不変。予算固定（=本番）では節約ノードが深さ（settle 回避）に回る形で効く。
+      - **残（粒度b＝連続 decide 間の引き継ぎ・未実装）**: 手 N の探索 PV を次手 N+1 の着手順序ヒントへ持ち越す（`decide` を
+        またいで killer/PV を保持）。本実装は単一 decide 内の killer 共有まで＝粒度a。粒度b は decide への状態受け渡しが要る。
   - **体感最適化（perceived latency・Phase 3・計画）**: 観点を per-call レイテンシ単体から「**ゲームを通して
     不快がない（体感）**」へ拡張する設計方針。相手の手を織り込む（「〜されたら〜する」＝contingency）ぶん
     計算は増えるため、**両面**（計算を前倒し/再利用して隠す＋相手分岐を広く読む）で攻める。

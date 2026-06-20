@@ -44,6 +44,17 @@ from .journal import JournaledList
 # 等価を機械照合。万一の取りこぼし時に即無効化できるようモジュールフラグで保持する。
 _USE_MAKE_UNMAKE = True
 
+# ④ 着手順序の前回PV/killer 再利用（move ordering・docs/SPEC.md §2.5.3）。
+# α-β は「良い手から先に試すほど早く β/α カットできる」＝探索ノードが減る。本最適化は探索木の各ノードで
+# 「同じ ply で直近にカット（alpha>=beta）を起こした手＝killer」を覚えておき、**ビーム選別後の子集合の中で**
+# その手を先頭へ寄せる（＝探索する子の集合は一切変えず、順序だけ入れ替える）。
+# **挙動不変の理屈**: α-β のカットは値を変えない（刈られる枝は結果に影響し得ない）ので、予算が拘束しない
+# フル探索では選ぶ手・深掘りスコアは順序に依らず**完全同値**（`tests/test_cpu_pv_order.py` で機械照合）。
+# 予算拘束時のみ、カットで節約したノードが深さ（settle 回避）に回って結果が改善し得る＝強化（A/B で検証）。
+# `_USE_MAKE_UNMAKE` と同じく**フラグで即時 OFF**（=従来の 1-ply スコア順）に戻せる内部最適化。
+_USE_PV_ORDER = True
+_KILLER_SLOTS = 2          # 各 ply で保持する killer 手の数（standard killer heuristic）
+
 # 評価重み（盤面 1000=パワー1段相当に正規化）
 W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（膝＝薄域。最重要）
 # 高ライフ域（膝超）のライフ 1 枚の基礎価値（concave 化・§2.5.3）。OPCG ではライフは「序盤は能動的に
@@ -1224,10 +1235,51 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, profile, plan, ply
     return _settle_discount(val, plan)
 
 
+def _record_killer(killers: Optional[Dict[int, List[tuple]]], ply: int, move: Dict[str, Any]) -> None:
+    """④ カット（alpha>=beta）を起こした手をこの ply の killer として記録（最近使用を先頭・上限 _KILLER_SLOTS）。
+
+    `killers` が None（PV 順序 OFF／外部呼び出し）なら no-op＝従来挙動。記録は move の signature のみ
+    （盤面キーは持たない＝置換表のような健全性リスク無し。衝突しても順序が変わるだけで誤った値は再利用しない）。
+    """
+    if killers is None:
+        return
+    sig = _move_sig(move)
+    lst = killers.get(ply)
+    if lst is None:
+        killers[ply] = [sig]
+    elif sig in lst:
+        lst.remove(sig)
+        lst.insert(0, sig)
+    else:
+        lst.insert(0, sig)
+        if len(lst) > _KILLER_SLOTS:
+            lst.pop()
+
+
+def _pv_reorder(children: List[Tuple[float, Any]],
+                kill_sigs: List[tuple]) -> List[Tuple[float, Any]]:
+    """④ ビーム選別後の子集合 `children` を、killer 手が先頭に来るよう**安定**に並べ替える。
+
+    集合（要素）は不変＝順序のみ変化（探索する子は変わらない）。killer 以外は元の best-first 順を保ち、
+    killer 同士は `kill_sigs`（最近使用が先頭）の順に並べる。killer がビーム内に無ければ元のまま返す。
+    """
+    if not kill_sigs:
+        return children
+    rank = {s: i for i, s in enumerate(kill_sigs)}
+    front: List[Tuple[float, Any]] = []
+    rest: List[Tuple[float, Any]] = []
+    for c in children:
+        (front if _move_sig(c[1]) in rank else rest).append(c)
+    if not front:
+        return children
+    front.sort(key=lambda c: rank[_move_sig(c[1])])  # 安定ソート＝同 rank は元順を保持
+    return front + rest
+
+
 def _search(manager, root_name: str, alpha: float, beta: float,
             budget: List[int], see_opp_hand: bool, opp_public_only: bool,
             profile=None, ply: int = 0, plan=None, start_turn: int = 0, horizon: int = 1,
-            counter_budget: float = 0.0) -> float:
+            counter_budget: float = 0.0, killers: Optional[Dict[int, List[tuple]]] = None) -> float:
     """ターン境界評価の α-β ＋ ビーム探索。`root_name` 視点の最善到達値を返す。
 
     **葉は `start_turn` から `horizon` ターン進んだ MAIN_ACTION（一定の静止点）に固定**する。
@@ -1296,6 +1348,10 @@ def _search(manager, root_name: str, alpha: float, beta: float,
     children.sort(key=lambda x: x[0], reverse=is_max)
     # E1（Phase3 ③）: 自分(max)は最善へ収束＝HARD_BEAM、相手(min)は応手を広く残す＝HARD_OPP_BEAM。
     children = children[:(HARD_BEAM if is_max else HARD_OPP_BEAM)]
+    # ④ PV/killer 順序付け（docs/SPEC.md §2.5.3）: ビーム選別**後**の集合の中で killer 手を先頭へ寄せて
+    # α-β カットを早める（集合は不変＝予算非拘束なら値・選択は完全同値・予算拘束時のみ深く読めて改善）。
+    if killers is not None:
+        children = _pv_reorder(children, killers.get(ply, ()))
 
     if is_max:
         value = float("-inf")
@@ -1303,12 +1359,13 @@ def _search(manager, root_name: str, alpha: float, beta: float,
             cv = _recurse_child(manager, actor_name, m,
                                 lambda b, a=alpha, bt=beta: _search(b, root_name, a, bt,
                                     budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
-                                    start_turn, horizon, counter_budget))
+                                    start_turn, horizon, counter_budget, killers))
             if cv is None:
                 continue
             value = max(value, cv)
             alpha = max(alpha, value)
             if alpha >= beta:
+                _record_killer(killers, ply, m)  # ④ この手がカットを起こした＝同 ply の killer に登録
                 break
         return value
     else:
@@ -1324,7 +1381,7 @@ def _search(manager, root_name: str, alpha: float, beta: float,
                 if cc is not None:
                     value = min(value, _search(cc, root_name, alpha, beta,
                                                budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
-                                               start_turn, horizon, counter_budget - needed))
+                                               start_turn, horizon, counter_budget - needed, killers))
                     beta = min(beta, value)
         for _leaf, m in children:
             if alpha >= beta:
@@ -1332,12 +1389,13 @@ def _search(manager, root_name: str, alpha: float, beta: float,
             cv = _recurse_child(manager, actor_name, m,
                                 lambda b, a=alpha, bt=beta: _search(b, root_name, a, bt,
                                     budget, see_opp_hand, opp_public_only, profile, ply + 1, plan,
-                                    start_turn, horizon, counter_budget))
+                                    start_turn, horizon, counter_budget, killers))
             if cv is None:
                 continue
             value = min(value, cv)
             beta = min(beta, value)
             if alpha >= beta:
+                _record_killer(killers, ply, m)  # ④ この手がカットを起こした＝同 ply の killer に登録
                 break
         return value
 
@@ -1513,6 +1571,10 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
         collect.setdefault("deep", {})
         for s1, m, ok in prelim:
             collect["prelim"][_move_sig(m)] = s1
+    # ④ killer 表（ply→直近カット手の signature 列）。深掘り対象のルート手で共有し、α-β カットを早める。
+    # 各ルート手は均等予算で独立に深掘りするが、killer は ply 単位の汎用ヒント＝木をまたいで再利用してよい
+    # （集合は変えず順序のみ＝予算非拘束なら値不変）。OFF（_USE_PV_ORDER=False）なら None＝従来挙動。
+    killers: Optional[Dict[int, List[tuple]]] = {} if _USE_PV_ORDER else None
     out: List[Tuple[float, Dict[str, Any]]] = []
     for i, (s1, m, ok) in enumerate(prelim):
         if ok and i in deepen:
@@ -1520,7 +1582,8 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
             v = _recurse_child(manager, name, m,
                                lambda b: _search(b, name, float("-inf"), float("inf"),
                                    budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan,
-                                   start_turn=start_turn, horizon=HARD_HORIZON, counter_budget=cbudget))
+                                   start_turn=start_turn, horizon=HARD_HORIZON, counter_budget=cbudget,
+                                   killers=killers))
             if v is None:  # 深掘りの適用失敗（pass-1 と整合・通常は起きない）
                 continue
             v -= pen_by_idx.get(i, 0.0)  # ドン!!返却のテンポ損を深掘り値にも反映（prelim と一致）
