@@ -277,6 +277,14 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       読み筋ループは **(pid, action) しか見ない**ので軽量 `pending_actor_action` で判定し、フル payload は実際に既定解決する
       ときだけ作る（呼数 12,302→7,018・−43%）。方策不変（`pending_actor_action` は get_pending_request と (pid,action)・
       副作用一致）。controlled A/B で **~1.06x**・全1039pass・構造監査0。
+      > **API 配線（Phase 3 ①-b・2026-06）**: `/api/game/cpu/step` に計画キャッシュを配線（`OPCG_PLAN_CACHE=1`・
+      > 本番体感最適化・既定 OFF＝従来挙動完全同値）。対局ごとの `meta["plan_cache"]={"queue":[...]}` を保持し、
+      > `_cached_cpu_move` が (a) 次の計画手が現局面で**合法なら即返す**（探索なし・**ワーカー往復なし**＝即時 replay）、
+      > (b) ミス/前提崩れなら PyPy ワーカーの **plan モード**（`decide_worker._handle` の 10要素目 `mode="plan"`／
+      > `decide_client.plan_segment`）で `plan_turn` を実行しセグメントを再計画してキャッシュ。先頭手が不正なら通常
+      > `decide` へフォールバック（合法性検証で常に安全）。トレース採取時は per-action を維持（読み筋記録）。これにより
+      > **セグメント先頭=1回のワーカー計画→残りは CPython 即時 replay**＝待ちを1回に集約。検証 `tests/test_plan_cache.py`
+      > （`plan_segment`==`plan_turn`・`_cached_cpu_move` の合法/replay）。残: A/B・⑥ ポンダリング（相手の番に前倒し）。
       > **不採用メモ（B）**: `_apply_passive_effects` Step2/3 の「常在トリガーを持つカードだけ走査」案は、既存の
       > `if not card.master.abilities` 空チェックで能力なしカードが既に安く弾かれており、per-card の判定関数呼び出しが
       > 逆にオーバーヘッド＝**ネット負**で撤回（再プロファイルで cumulative 悪化を確認）。

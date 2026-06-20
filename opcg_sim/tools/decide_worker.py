@@ -53,13 +53,18 @@ def _send(conn, obj):
 
 
 def _handle(req):
-    manager, cpu_pid, difficulty, mem, profile, plan, rng_state, want_trace, read_ahead = req
+    manager, cpu_pid, difficulty, mem, profile, plan, rng_state, want_trace, read_ahead = req[:9]
+    mode = req[9] if len(req) > 9 else "decide"  # 後方互換（10要素目=mode・既定 decide）
     # player は名前で解決（別 pickle すると盤面内カードと同一性が切れるため）。
     player = manager.p1 if manager.p1.name == cpu_pid else manager.p2
     # 決定性: CPython 側の RNG 状態を再現してタイブレークを一致させる。
     rng = random.Random()
     rng.setstate(rng_state)
     trace = {} if want_trace else None
+    if mode == "plan":
+        # Phase 3 ① 計画キャッシュ: 相手介入/TURN_END までの自分の連続手番を計画して action list を返す。
+        actions = cpu_ai.plan_turn(manager, cpu_pid, difficulty, rng=rng, mem=mem, profile=profile, plan=plan)
+        return (actions, trace, mem)
     move = cpu_ai.decide_guarded(
         manager, player, difficulty, rng=rng, mem=mem,
         profile=profile, plan=plan, trace=trace, trace_read_ahead=read_ahead,

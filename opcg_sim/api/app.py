@@ -469,6 +469,33 @@ async def game_battle(req: BattleActionRequest):
     except Exception as e:
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
 
+def _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem):
+    """Phase 3 ① 計画キャッシュ（本番体感最適化）: 対局ごとの `meta["plan_cache"]` を用い、
+    次の計画手が現局面で**合法なら即返す**（探索なし＝即時 replay・ワーカー往復なし）。ミス/前提崩れ
+    （相手の介入で前提が変わった等）なら `plan_segment` でセグメントを再計画してキャッシュ。先頭手が
+    現局面で不正なら None を返し、呼び出し側が通常 `decide` にフォールバック（**合法性検証で常に安全**）。
+    """
+    cache = meta.setdefault("plan_cache", {})
+    legal = manager.get_legal_actions(cpu_player)
+    legal_by_sig = {cpu_ai._move_sig(m): m for m in legal}
+    q = cache.get("queue")
+    if q:
+        sig = cpu_ai._move_sig(q[0])
+        if sig in legal_by_sig:
+            cache["queue"] = q[1:]
+            return legal_by_sig[sig]
+        cache["queue"] = None  # 前提崩れ＝破棄して再計画
+    actions = decide_client.plan_segment(manager, cpu_player, difficulty, mem=turn_mem,
+                                         profile=meta.get("opp_profile"), plan=meta.get("self_plan"))
+    if actions:
+        sig = cpu_ai._move_sig(actions[0])
+        if sig in legal_by_sig:
+            cache["queue"] = actions[1:]
+            return legal_by_sig[sig]
+    cache["queue"] = None
+    return None
+
+
 @app.options("/api/game/cpu/step")
 async def options_game_cpu_step(): return {"status": "ok"}
 
@@ -516,9 +543,16 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                 # 読み筋はオフライン（cpu_replay.py／リプレイ種）でのみ採る。
                 # 探索（decide）は方式B: OPCG_PYPY_WORKER=1 のとき PyPy ワーカーへ委譲（~2.1x）。
                 # 無効/失敗時はブリッジ内でインプロセス cpu_ai.decide_guarded にフォールバック（現行挙動）。
-                move = decide_client.decide(manager, cpu_player, difficulty, mem=turn_mem,
-                                            profile=meta.get("opp_profile"), plan=meta.get("self_plan"),
-                                            trace=tr, trace_read_ahead=False)
+                move = None
+                # Phase 3 ① 計画キャッシュ（OPCG_PLAN_CACHE=1・本番体感最適化）: セグメント内の手番を
+                # 即時 replay する（待ちを1回に集約）。トレース採取時は per-action を維持（読み筋記録のため）。
+                # 既定 OFF ＝従来挙動と完全同値。
+                if os.environ.get("OPCG_PLAN_CACHE", "0") == "1" and not trace_on:
+                    move = _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem)
+                if move is None:
+                    move = decide_client.decide(manager, cpu_player, difficulty, mem=turn_mem,
+                                                profile=meta.get("opp_profile"), plan=meta.get("self_plan"),
+                                                trace=tr, trace_read_ahead=False)
                 if move is not None:
                     if trace_on:
                         # 思考トレース＋アクションを適用前に記録（card_id 基準・進行には不参加）。

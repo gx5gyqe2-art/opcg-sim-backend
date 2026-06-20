@@ -170,3 +170,66 @@ def test_decide_cached_plays_legal_and_replays(db):
     assert m.winner is not None, "ゲームが完走しなかった"
     # replay が効いている＝plan_turn 呼び出しは decide 回数より十分少ない（セグメント単位で1回）
     assert plan_calls["n"] < decides, f"replay が効いていない (plan={plan_calls['n']} >= decides={decides})"
+
+
+def test_plan_segment_inprocess_matches_plan_turn(db):
+    """decide_client.plan_segment（USE_WORKER off=インプロセス）が cpu_ai.plan_turn と一致。"""
+    import random as _r
+    from opcg_sim.api import decide_client
+    import copy as _c
+    _r.seed(0)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    m.start_game()
+    name = m.pending_actor_action()[0]
+    st = _r.getstate()
+    a = decide_client.plan_segment(m, cpu_ai._player_by_name(m, name), "normal", mem={})
+    _r.setstate(st)
+    b = cpu_ai.plan_turn(m, name, "normal", rng=_r, mem={})
+    assert _sigs(a) == _sigs(b)
+
+
+def test_cached_cpu_move_replays_and_legal(db):
+    """app._cached_cpu_move（計画キャッシュ配線）が合法手を返し replay が効く（plan_segment 呼数 < decides）。"""
+    import os
+    os.environ.setdefault("OPCG_PYPY_WORKER", "0")
+    import random as _r
+    from opcg_sim.api import app as _app, decide_client
+    _r.seed(0)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    m.start_game()
+    meta = {}
+    turn_mem = {}
+    seg_calls = {"n": 0}
+    orig = decide_client.plan_segment
+    def _counting(*a, **k):
+        seg_calls["n"] += 1
+        return orig(*a, **k)
+    decide_client.plan_segment = _counting
+    try:
+        decides = 0
+        steps = 0
+        while m.winner is None and steps < 250:
+            pa = m.pending_actor_action()
+            if not pa:
+                break
+            actor = cpu_ai._player_by_name(m, pa[0])
+            legal = m.get_legal_actions(actor)
+            mv = _app._cached_cpu_move(m, actor, "normal", meta, turn_mem)
+            if mv is None:  # フォールバック（合法性検証で稀に起きる）＝通常 decide
+                mv = cpu_ai.decide_guarded(m, actor, "normal", _r, mem=turn_mem)
+            assert cpu_ai._move_sig(mv) in {cpu_ai._move_sig(x) for x in legal}
+            decides += 1
+            m.action_events = []
+            if mv.get("kind") == "battle":
+                action_api.apply_battle_action(m, actor, mv["action_type"], mv.get("card_uuid"))
+            else:
+                action_api.apply_game_action(m, actor, mv["action_type"], mv.get("payload", {}))
+            steps += 1
+    finally:
+        decide_client.plan_segment = orig
+    assert m.winner is not None
+    assert seg_calls["n"] < decides, f"replay が効いていない (plan_segment={seg_calls['n']} >= decides={decides})"
