@@ -268,7 +268,16 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       （素 list 代入でも巻き戻せる安全網）。`_mu_safe` を常時 `make/unmake` に解放。**正しさゲート**＝`tests/test_journal.py` の
       **parked round-trip**（中断再開手で「適用→巻き戻し→開始 deepcopy と完全一致」を実プレイで機械照合）＋全1039pass（任意コスト
       確認など parked 判断の decide 一致を含む）。controlled A/B で **hard decide ~1.33x**（同一手）。
-      **通算: PyPy(~2.1x) × passive 差分化(~1.12x) × parked journaled(~1.33x)**（局面依存）。残コストは clone でなく apply＋evaluate。
+      (5) **ドレイン/整流/読み筋ループの軽量 pending 化（2026-06・~1.06x）**: 再プロファイルで `get_pending_request`
+      （毎回 selectable 構築＋`uuid4()`）が探索の ~17%（12,302 回）と判明。`_drain_own_interactions`／`_settle_eval`／
+      読み筋ループは **(pid, action) しか見ない**ので軽量 `pending_actor_action` で判定し、フル payload は実際に既定解決する
+      ときだけ作る（呼数 12,302→7,018・−43%）。方策不変（`pending_actor_action` は get_pending_request と (pid,action)・
+      副作用一致）。controlled A/B で **~1.06x**・全1039pass・構造監査0。
+      > **不採用メモ（B）**: `_apply_passive_effects` Step2/3 の「常在トリガーを持つカードだけ走査」案は、既存の
+      > `if not card.master.abilities` 空チェックで能力なしカードが既に安く弾かれており、per-card の判定関数呼び出しが
+      > 逆にオーバーヘッド＝**ネット負**で撤回（再プロファイルで cumulative 悪化を確認）。
+      **通算: PyPy(~2.1x) × passive 差分化(~1.12x) × parked journaled(~1.33x) × 軽量pending(~1.06x)**（局面依存）。
+      残コストは clone でなく apply＋evaluate（rollback／_side_score／_apply_passive_effects）。
     - **③ 置換表（transposition table）= 実測で不採用（2026-06）**: ②後は**健全（完全一致キー）な転置率 ≤0.5%**（exact key
       ＝デッキ順／全カード状態／継続効果まで含むと手順違いでも byte 一致がほぼ起きない）に対し、健全な位置キー計算が
       **~3%/node** のオーバーヘッド＝**ネット負**。②が per-node clone を消したため「再探索を省く」価値自体が消えた
