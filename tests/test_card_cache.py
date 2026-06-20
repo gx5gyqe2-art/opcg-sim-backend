@@ -12,6 +12,28 @@ from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.tools.build_card_cache import CARD_DB_PATH
 
 
+def _canon(x, _seen=None):
+    """set/dict の順序に依存しない正準形（pickle 往復で set の repr 順が変わるフレーク対策）。
+
+    IR の back-reference 等による循環を、パスごとの訪問集合 `_seen` で打ち切る（journal.deep_diff 同様）。
+    """
+    if _seen is None:
+        _seen = frozenset()
+    if isinstance(x, (set, frozenset)):
+        return ("set", sorted(repr(e) for e in x))  # 要素は基本 str/enum＝repr で順序非依存
+    if isinstance(x, dict):
+        return ("dict", sorted((repr(k), _canon(v, _seen)) for k, v in x.items()))
+    if isinstance(x, (list, tuple)):
+        return (type(x).__name__, [_canon(e, _seen) for e in x])
+    d = getattr(x, "__dict__", None)
+    if d is not None:
+        if id(x) in _seen:
+            return ("cycle", type(x).__name__)
+        _seen = _seen | {id(x)}
+        return (type(x).__name__, sorted((k, _canon(v, _seen)) for k, v in d.items()))
+    return repr(x)
+
+
 def _fresh_parsed():
     db = CardLoader(CARD_DB_PATH)
     db.load()
@@ -36,9 +58,10 @@ def test_cache_roundtrip_is_identical(tmp_path):
         cm = cached.cards[cid]
         # データフィールドの一致
         assert cm.to_dict() == fm.to_dict()
-        # パース済み能力の一致（数・内容）
+        # パース済み能力の一致（数・内容）。set フィールド（TargetQuery.flags 等）の repr 順は
+        # pickle 往復で変わりフレークになるため、set/dict の順序に依存しない正準形で比較する。
         assert len(cm.abilities) == len(fm.abilities)
-        assert repr(cm.abilities) == repr(fm.abilities)
+        assert _canon(list(cm.abilities)) == _canon(list(fm.abilities))
 
 
 def test_cache_rejected_on_hash_mismatch(tmp_path):
