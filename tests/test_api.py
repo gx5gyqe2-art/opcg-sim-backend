@@ -331,3 +331,23 @@ def test_deck_list_without_db_is_empty_ok(client):
     assert r.status_code == 200
     body = r.json()
     assert body["success"] is True and body["decks"] == []
+
+
+# --- デッキコメント（DB 未初期化時の振る舞い） -----------------------------
+
+def test_deck_comments_list_without_db_is_empty_ok(client):
+    r = client.get("/api/deck/abc/comments")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is True and body["comments"] == []
+
+
+def test_deck_comment_add_without_db(client):
+    r = client.post("/api/deck/abc/comments", json={"name": "taro", "text": "強い"})
+    assert r.status_code == 200 and r.json()["success"] is False
+
+
+def test_deck_comment_add_rejects_empty_text(client):
+    # 本文が空なら DB 以前にバリデーションで弾く。
+    r = client.post("/api/deck/abc/comments", json={"name": "taro", "text": "   "})
+    assert r.status_code == 200 and r.json()["success"] is False

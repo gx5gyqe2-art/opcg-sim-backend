@@ -672,6 +672,56 @@ async def list_decks():
             pass
     return {"success": True, "decks": decks}
 
+# --- デッキコメント（みんなで感想を残すチャット機能） ---
+# decks/{deck_id}/comments サブコレクションに {name, text, created_at} を保存する。
+# 認証は無いので投稿者名はフロントが付ける任意の表示名（空なら「名無し」）。
+
+@app.get("/api/deck/{deck_id}/comments")
+async def list_deck_comments(deck_id: str):
+    comments = []
+    if db:
+        try:
+            docs = (db.collection("decks").document(deck_id)
+                      .collection("comments")
+                      .order_by("created_at", direction=firestore.Query.ASCENDING).stream())
+            for doc in docs:
+                c = doc.to_dict()
+                c["id"] = doc.id
+                if c.get("created_at"): c["created_at"] = str(c["created_at"])
+                comments.append(c)
+        except Exception:
+            pass
+    return {"success": True, "comments": comments}
+
+
+@app.post("/api/deck/{deck_id}/comments")
+async def add_deck_comment(deck_id: str, comment_data: Dict[str, Any] = Body(...)):
+    text = (comment_data.get("text") or "").strip()
+    if not text:
+        return {"success": False, "error": "Comment text is required"}
+    if not db: return {"success": False, "error": "Database not initialized"}
+    try:
+        name = (comment_data.get("name") or "").strip() or "名無し"
+        col = db.collection("decks").document(deck_id).collection("comments")
+        doc_ref = col.document()
+        save_data = {"id": doc_ref.id, "name": name[:40], "text": text[:1000],
+                     "created_at": firestore.SERVER_TIMESTAMP}
+        doc_ref.set(save_data)
+        return {"success": True, "comment_id": doc_ref.id}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/api/deck/{deck_id}/comments/{comment_id}")
+async def delete_deck_comment(deck_id: str, comment_id: str):
+    if not db: return {"success": False, "error": "Database not initialized"}
+    try:
+        (db.collection("decks").document(deck_id)
+           .collection("comments").document(comment_id).delete())
+        return {"success": True, "comment_id": comment_id}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 # --- CPU 相手モデル（テンプレートデッキ）: deck と同形・leader_id 引き当て（docs/SPEC.md §2.5.4） ---
 
 @app.post("/api/cpu_template")
