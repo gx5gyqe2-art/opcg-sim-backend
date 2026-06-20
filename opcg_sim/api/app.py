@@ -422,6 +422,7 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         action_api.apply_game_action(manager, current_player, action_type, payload)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
+        _kick_ponder(game_id)  # ⑥-a: 制御が CPU へ移ったら次手番の計画を前倒し（既定 OFF）
         return result
     except Exception as e:
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
@@ -465,9 +466,66 @@ async def game_battle(req: BattleActionRequest):
         action_api.apply_battle_action(manager, player, action_type, card_uuid)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
+        _kick_ponder(game_id)  # ⑥-a: 制御が CPU へ移ったら次手番の計画を前倒し（既定 OFF）
         return result
     except Exception as e:
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
+
+def _ponder_enabled() -> bool:
+    """Phase 3 ⑥-a 先行計画（pondering）の作動条件。①計画キャッシュ配下のオプトイン（既定 OFF・
+    本番体感最適化のみ）。OPCG_PLAN_CACHE=1（①の replay 経路）かつ OPCG_PONDER=1 のとき作動。"""
+    return (os.environ.get("OPCG_PLAN_CACHE", "0") == "1"
+            and os.environ.get("OPCG_PONDER", "0") == "1")
+
+
+async def _ponder_plan(game_id: str) -> None:
+    """Phase 3 ⑥-a: 人間の手番処理で制御が CPU へ移った瞬間、CPU セグメントの計画を**前倒し**で計算して
+    `meta["plan_cache"]["queue"]` を温める（次の /cpu/step で即時 replay＝CPU 初手の待ちを消す）。
+
+    計算は `plan_segment`（PyPy ワーカー＝別プロセス）へ `asyncio.to_thread` でオフロードし、イベント
+    ループを塞がない。①と同じ「decide の決定的結果の前倒し」に留め、合法性ゲート（`_cached_cpu_move`）が
+    stale を安全に弾く＝挙動不変。例外時は queue を空にして通常 decide へフォールバックさせる（安全側）。
+    """
+    manager = GAMES.get(game_id); meta = CPU_GAMES.get(game_id)
+    if not manager or not meta:
+        return
+    cache = meta.setdefault("plan_cache", {})
+    try:
+        cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "normal")
+        cpu_player = manager.p1 if manager.p1.name == cpu_pid else manager.p2
+        turn_mem = meta.setdefault("turn_mem", {})
+        actions = await asyncio.to_thread(
+            decide_client.plan_segment, manager, cpu_player, difficulty,
+            mem=turn_mem, profile=meta.get("opp_profile"), plan=meta.get("self_plan"))
+        cache["queue"] = actions or None
+    except Exception:
+        cache["queue"] = None
+    finally:
+        cache["task"] = None
+
+
+def _kick_ponder(game_id: str) -> None:
+    """人間アクション適用後、pending が CPU 手番なら先行計画タスクを起動する（二重起動防止・既定 OFF）。
+
+    旧 queue は前提が変わったので破棄してから焼き直す。イベントループ外（同期テスト等）では `create_task`
+    が起動できないため no-op（pondering は本番のみ＝決定性・既存テストへ影響なし）。"""
+    if not _ponder_enabled():
+        return
+    manager = GAMES.get(game_id); meta = CPU_GAMES.get(game_id)
+    if not manager or not meta or manager.winner is not None:
+        return
+    pending = manager.get_pending_request()
+    if not pending or pending.get("player_id") != meta.get("cpu_player_id"):
+        return
+    cache = meta.setdefault("plan_cache", {})
+    if cache.get("task") is not None:
+        return  # 既に先行計画が走行中
+    cache["queue"] = None
+    try:
+        cache["task"] = asyncio.create_task(_ponder_plan(game_id))
+    except RuntimeError:
+        cache["task"] = None  # 実行中のイベントループが無い（テスト等）＝起動しない
+
 
 def _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem):
     """Phase 3 ① 計画キャッシュ（本番体感最適化）: 対局ごとの `meta["plan_cache"]` を用い、
@@ -537,6 +595,13 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
             pending = manager.get_pending_request()
             if pending and pending.get("player_id") == cpu_pid:
                 turn_mem = meta.setdefault("turn_mem", {})
+                # ⑥-a: 先行計画（pondering）が走行中なら完了を待つ（warm な queue を使う＝二重計算/競合回避・既定 OFF）。
+                _ptask = meta.get("plan_cache", {}).get("task")
+                if _ptask is not None:
+                    try:
+                        await _ptask
+                    except Exception:
+                        pass
                 trace_on = _replay_enabled(meta)
                 tr = {} if trace_on else None
                 # ライブ採取は軽量トレース（read_ahead=読み筋は省く）＝CPU 思考の遅延を抑える。
