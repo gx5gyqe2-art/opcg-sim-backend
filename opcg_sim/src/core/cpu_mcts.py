@@ -20,6 +20,7 @@ import math
 import random
 from typing import Any, Dict, List, Optional
 
+from . import cpu_ai
 from .cpu_ai import (evaluate, _player_by_name, _selection_moves, _prune_don_moves,
                      _prune_futile_attacks, _apply_move_inplace, _score_move_1ply, _move_sig,
                      _settle_eval, TURN_ACTION_CAP)
@@ -413,17 +414,45 @@ def _macro_simulate(root: _MacroNode, root_state, root_name: str,
 # 世界は同一＝集約は無害（>1 でも単に反復が分散するだけ）。
 MCTS_WORLDS = 1
 
+# α-β PV シード（docs/SPEC.md §2.5.7・本番 hard を実際に超えるための要石）。macro 単体は本番（plan 付き）
+# hard と概ね互角（実測 macro+plan vs hard+plan ≈ 47%）。そこで **hard が読んだ 1 ターン（`cpu_ai.plan_turn`）
+# を macro 木に「保証された候補」として注入**する。MCTS は最多訪問子を選ぶので、シードより良い複数ターン計画が
+# 見つからなければ**シード（=hard の手）を選ぶ＝下限が hard に張り付く**。見つかれば上回る＝「hard 以上」を構造的に
+# 保証する。コスト＝plan_turn 1 回（≈hard の 1 ターン思考）を macro に上乗せ（要レイテンシ確認）。
+MCTS_SEED_ALPHABETA = False
+
 
 def _macro_search_root(root_state, name: str, iters: int, H: int,
-                       see_opp_hand: bool, rng, profile=None, plan=None) -> Optional["_MacroNode"]:
-    """`root_state`（`name` の手番境界・決定化済みでもよい）で 1 世界ぶん探索し、ルートノードを返す。"""
+                       see_opp_hand: bool, rng, profile=None, plan=None,
+                       seed_plan=None) -> Optional["_MacroNode"]:
+    """`root_state`（`name` の手番境界・決定化済みでもよい）で 1 世界ぶん探索し、ルートノードを返す。
+
+    `seed_plan`（α-β の 1 ターン計画）を渡すと、ルートの「保証された候補子」として先に注入する＝macro が
+    hard の手を必ず比較対象に持つ（下限 ≈ hard）。
+    """
     pa = root_state.pending_actor_action()
     if not pa or pa[0] != name:
         return None
     root = _MacroNode(None, name, terminal=False)
+    if seed_plan:
+        s = root_state.clone()
+        s.action_events = []
+        if _apply_turn_plan(s, name, seed_plan):
+            root.children.append(_macro_node_from_state(list(seed_plan), s))
     for _ in range(iters):
         _macro_simulate(root, root_state, name, H, see_opp_hand, rng, profile, plan)
     return root if root.children else None
+
+
+def _alphabeta_seed(root_state, name: str, rng, profile, plan):
+    """α-β（hard）が読むこのターンの計画を返す（macro 木のシード用）。失敗時は None。"""
+    if not MCTS_SEED_ALPHABETA:
+        return None
+    try:
+        sp = cpu_ai.plan_turn(root_state, name, "hard", rng, mem={}, profile=profile, plan=plan)
+        return sp or None
+    except Exception:
+        return None
 
 
 def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
@@ -452,7 +481,8 @@ def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[rand
     # 単一世界（既定 or 完全情報）: 1 世界探索して最多訪問プラン。
     if W <= 1 or not MCTS_DETERMINIZE:
         root_state = _determinize_opponent(manager, name, rng) if MCTS_DETERMINIZE else manager
-        root = _macro_search_root(root_state, name, iters, H, see_opp_hand, rng, profile, plan)
+        seed = _alphabeta_seed(root_state, name, rng, profile, plan)
+        root = _macro_search_root(root_state, name, iters, H, see_opp_hand, rng, profile, plan, seed)
         if root is None:
             return []
         best = max(root.children, key=lambda c: (c.N, c.W / c.N if c.N else 0.0, rng.random()))
@@ -463,7 +493,8 @@ def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[rand
     tally: Dict[tuple, List[float]] = {}        # first_sig -> [総訪問, 最良訪問, 最良プラン]
     for _ in range(W):
         det = _determinize_opponent(manager, name, rng)
-        root = _macro_search_root(det, name, per_world, H, see_opp_hand, rng, profile, plan)
+        seed = _alphabeta_seed(det, name, rng, profile, plan)
+        root = _macro_search_root(det, name, per_world, H, see_opp_hand, rng, profile, plan, seed)
         if root is None:
             continue
         for ch in root.children:
