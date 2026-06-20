@@ -413,9 +413,11 @@ def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[rand
     pa = manager.pending_actor_action()
     if not pa or pa[0] != name:
         return []
+    # Phase 2: 公平モードなら相手手札を1通り再サンプリングした世界で探索（自分の手は不変＝プランは実ゲーム合法）。
+    root_state = _determinize_opponent(manager, name, rng) if MCTS_DETERMINIZE else manager
     root = _MacroNode(None, name, terminal=False)
     for _ in range(iters):
-        _macro_simulate(root, manager, name, H, see_opp_hand, rng)
+        _macro_simulate(root, root_state, name, H, see_opp_hand, rng)
     if not root.children:
         return []
     best = max(root.children, key=lambda c: (c.N, c.W / c.N if c.N else 0.0, rng.random()))
@@ -459,3 +461,35 @@ def decide_mcts_macro(manager, player, difficulty: str = "hard", rng: Optional[r
     # 計画が空/先頭不正＝安全側で micro MCTS の 1 手にフォールバック。
     cache["queue"] = None
     return decide_mcts(manager, player, difficulty, rng, moves=legal)
+
+
+# ============================================================================
+# Phase 2: 決定化（ISMCTS-lite・公平化）— 相手手札を覗かず「ありえる手」を仮定して探索する
+# ----------------------------------------------------------------------------
+# Phase 1 は完全情報（相手の実手札を読む＝hard と同じ「カンニング」）。人間の相手として公平にするには、
+# 相手の伏せ手札を**公開情報から推定した1通り**に置き換えてから探索する（ルート決定化）。自分の手札・自分の
+# ターンプランは実物のままなので**返す手列は実ゲームで合法**＝そのまま使える。相手の手札だけを「相手の山札＋
+# 手札プールから同数を再サンプリング」して差し替える＝相手の防御/応手を“実際のカード”でなく“ありえる手”で
+# モデルする＝チート除去。完全な ISMCTS（反復ごとに別世界）は uuid 整合が崩れて木が壊れるため、本実装は
+# **探索1回につき1決定化（root determinization）**＝単純・正しい第一歩（複数世界平均は将来拡張）。
+MCTS_DETERMINIZE = False   # True で公平モード（相手手札を再サンプリング）。既定 OFF＝完全情報（+120 基準）。
+
+
+def _determinize_opponent(manager, me_name: str, rng):
+    """`manager` のクローンを返し、**相手の伏せ手札を相手の山札＋手札プールから再サンプリング**する。
+
+    自分（`me_name`）の手札・場・山札順は不変（自分の手は実物＝返すプランが実ゲームで合法）。相手の手札
+    枚数は保存し、中身だけ「相手のライブラリ（山札＋現手札）からランダムに同数」へ差し替える＝公開情報
+    （手札枚数・山札内容）と整合する“ありえる手”。journal 非作動の top-level で呼ぶ前提（plain mutation）。
+    """
+    clone = manager.clone()
+    opp = clone.p2 if clone.p1.name == me_name else clone.p1
+    pool = list(opp.hand) + list(opp.deck)
+    if not pool:
+        return clone
+    rng.shuffle(pool)
+    n_hand = len(opp.hand)
+    new_hand, new_deck = pool[:n_hand], pool[n_hand:]
+    opp.hand[:] = new_hand   # JournaledList のスライス代入（top-level＝journal 非作動）
+    opp.deck[:] = new_deck
+    return clone
