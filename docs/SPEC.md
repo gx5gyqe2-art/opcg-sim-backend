@@ -239,7 +239,16 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       フラグで即時に従来挙動へ戻せる。**方策は clone 方式と完全同一**（内部最適化）＝`tests/test_cpu_make_unmake.py` が
       (1)decide 選択手一致・(2)`_scored_search` 深掘りスコア一致・(3)decide が manager を無変更（巻き戻し完全）を機械照合。
       **ベンチ＝hard decide 1312ms→367ms＝3.57x**（中盤5局面平均）。全1032pass・構造監査0・カード挙動ベースライン不変。
-      スレッド安全性: 探索は単一スレッド前提（FastAPI async ハンドラが decide を await 無しで同期実行＝原子的）。
+      スレッド安全性【threadlocal 化済み・2026-06】: journal 状態（`_active`/`_gen_counter`/`_mut_count`）は当初
+      プロセス共有グローバルで「探索は単一スレッド」前提だった。だが本番ポンダリングが `asyncio.to_thread`（OS スレッド）
+      でも探索を走らせ、**あるスレッドの transaction 中に別スレッドが live オブジェクトの属性を初回セット→その set が
+      別スレッドの journal へ誤記録→rollback で live から属性が pop**＝間欠クラッシュ（`CardInstance has no attribute
+      'master'`）を起こした。対策として journal 状態を **`threading.local`** にし（各スレッドの記録が互いに漏れない・
+      単一スレッド時は従来同値）、外部参照（`journal._active` 等）は PEP 562 の `__getattr__` で後方互換、ホットパス
+      （各 `__setattr__`・passive dirty-flag）は `journal._TL.active` を直接読む。`_ponder_plan` も live 盤面を
+      メインスレッドで clone してから `to_thread` へ渡す（deepcopy 競合の防止）。並行回帰 `tests/test_journal_concurrency.py`
+      （スレッド 2 本を Event で同期し、旧グローバル実装なら必ず壊れるシナリオで live 属性が消えないことを固定）。
+      なお止血としてポンダリング自体も Dockerfile で無効化済み（再有効化は本 threadlocal 化により安全だが別途判断）。
       ルート `_scored_search` も make/unmake 化済み（`_eval_root_move`・clone 版と完全同値）。**clone 除去の床に到達**:
       残クローンの内訳実測（hard decide）＝中断状態の再帰フォールバック ~90%（parked resolver 未 journaled）・
       ルート `_scored_search` ~5%（≈ decide の 0.7%・変換効果はノイズ内）。残コストは clone でなく **apply＋evaluate**。
