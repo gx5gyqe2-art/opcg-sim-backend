@@ -343,13 +343,12 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       **決定性は保証しない＝テスト/自己対戦は `decide_guarded`（フラグ OFF 既定）・本番のみ `decide_cached`**（本番は決定性
       不要）。検証 `tests/test_plan_cache.py`（合法手のみ・対局完走・plan_turn 呼数 < decide 回数＝replay 実効）。
       **残**: API 層（`/cpu/step`・`CPU_GAMES`）と PyPy ワーカーへの cache 配線（保持＋シリアライズ）・A/B。
-    - **② 自明手の即答パス【実装済み・フラグ制・2026-06】**（`OPCG_TRIVIAL_FASTPATH=1`・既定 OFF）: 実質一択/明らかに
-      最善の手番を即答し、本当に競う局面だけ全力探索＝重い計画の発生回数を減らす。**実装**: `_scored_search` の
-      1-ply 事前採点後、**best が 2nd を `_TRIVIAL_MARGIN`(=12000≈1.5 ライフ) 以上に圧倒し、best が重要手(B-3)でも
-      TURN_END でもない**局面は、深掘りを省いて best を即返す（decide が max で選ぶ・fold は TURN_END 不在で非作動）。
-      1-ply は自ターン途中の楽観値で稀に深掘りが覆すため**挙動変化＝既定 OFF**（テスト/自己対戦は従来同値・`decide` の
-      単一合法手ショートカットは従来どおり）。本番は **A/B で強さ非退行を確認のうえ**有効化（保守的マージンで発火を
-      限定）。検証 `tests/test_trivial_fastpath.py`（既定 OFF・ON 時の合法/完走）。残: A/B 結果での margin 調整。
+    - **② 自明手の即答パス＝実測で不採用（2026-06）**: 「1-ply で best が 2nd を大差（≈12000）で圧倒する自明局面は
+      深掘りを省いて即答」を試作（`_scored_search`・`OPCG_TRIVIAL_FASTPATH` フラグ）。**A/B（hard・席交互24局）= ②ON
+      14-10（58.3%）＝強さは中立（ノイズ範囲）**だが、**思考手レイテンシ ON 368ms vs OFF 364ms ＝利得ゼロ**で不採用。
+      理由: 深掘りをスキップしても **prelim（全ルート手の 1-ply 事前採点＝`_eval_root_move`）は依然走る**ため節約に
+      ならない（コストの大半は deepening でなく prelim＋eval）。中立×無利得×分岐の複雑性増＝割に合わずコードは revert。
+      `decide` は単一合法手は従来どおり即答する。下記は不採用の経緯記録。
     - **③ 相手 min 手番のビーム幅拡張**: 現状 `HARD_BEAM`(=3) は max/min 共通（`children[:HARD_BEAM]`）。相手応手を
       広く読むため **min ノード専用の広いビーム**（`HARD_OPP_BEAM`・数行＋定数）を導入し contingency を厚くする
       （相手の取りうる手を多く残す）。計算増は ①②④ で吸収。強さ×レイテンシを A/B。
