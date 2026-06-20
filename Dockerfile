@@ -23,4 +23,12 @@ RUN python -m opcg_sim.tools.build_card_cache
 ENV PORT=8080
 # 探索オフロードを既定で有効化（無効化は OPCG_PYPY_WORKER=0 でインプロセス実行へ即ロールバック）。
 ENV OPCG_PYPY_WORKER=1
+# 体感最適化（Phase 3）を本番で有効化（決定性は維持＝decide の決定的結果を前倒しするだけ・合法性ゲートで安全）。
+#   OPCG_PLAN_CACHE=1: ① 計画キャッシュ（セグメントを1回計画→以降は即時 replay）
+#   OPCG_PONDER=1    : ⑥-a 先行計画（人間の手番処理で制御が CPU へ移った瞬間に次手番計画を前倒し）
+# 実測（hard 自己対戦）: ⑥-a 単独で CPU セグメント先頭の 100% が warm＝初手の待ち(~429ms/手)を裏へ移せる・
+# 無駄打ちゼロ。⑥-b 投機（OPCG_PONDER_SPEC）は当たり率 ~30% に対しワーカー負荷 ~28% 増で割に合わず既定 OFF。
+# 即ロールバックは各フラグを 0/未設定に。テスト/自己対戦は env 非依存（同期 decide）で決定性を維持。
+ENV OPCG_PLAN_CACHE=1
+ENV OPCG_PONDER=1
 CMD ["sh", "-c", "uvicorn opcg_sim.api.app:app --host 0.0.0.0 --port $PORT"]

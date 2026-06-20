@@ -394,7 +394,13 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
         で**当たり率を計測**できる（本採用＝既定 ON 化はこの実測を見て判断）。フラグ `OPCG_PONDER_SPEC=1`（⑥-a の
         `OPCG_PONDER=1` 配下・既定 OFF＝従来挙動完全同値）。検証 `tests/test_plan_cache.py`（`_speculate_compute` が
         clone 上で CPU 計画を返し live 不変／`_kick_ponder` が合法な spec_queue を昇格し `spec_hits` 計上／`_kick_speculate`
-        のゲートと live 非変異）。**残**: 当たり率の実測 A/B・複数候補盤面への拡張（出力ゲート前提）。
+        のゲートと live 非変異）。**残**: 複数候補盤面への拡張（出力ゲート前提）。
+      - **本番有効化と実測（2026-06）**: 計測ハーネス（p1=人間プロキシ・p2=CPU で本番フローを asyncio 駆動）で hard 自己
+        対戦を計測。**⑥-a 単独で CPU セグメント先頭の 100% が warm**（初手の待ち ~429ms/手をクリティカルパスから裏へ移す）・
+        **無駄打ちゼロ**（1 セグメント=1 計画＝総計算量は不変、置き場所だけが human 思考と重なる側へ移る）。**⑥-b 投機は当たり率
+        ~30% に対しプラン計算を ~28% 余分にワーカーへ投げる**（hidden を 93%→100% に上げるだけ）＝複数対局同時ではワーカーを
+        圧迫し割に合わない。よって**本番は ①＋⑥-a を ON（`OPCG_PLAN_CACHE=1`/`OPCG_PONDER=1` を Dockerfile に追加）、⑥-b
+        （`OPCG_PONDER_SPEC`）は既定 OFF**。テスト/自己対戦は env 非依存（同期 decide）で決定性を維持。
       - **状態キー（`CPU_GAMES[gid]["plan_cache"]`）**: `queue`＝残り計画手／`task`＝進行中ポンダリングタスク（二重起動防止・
         キャンセル用）／`base_sig`＝計画を立てた局面の指紋（人間が動いたら queue を無効化判定）。
       - **並行・破棄**: 1 ゲーム 1 タスク。次の CPU 手番までに未完なら `/cpu/step` 側で**通常 decide にフォールバック**（待たない）。
