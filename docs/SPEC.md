@@ -354,8 +354,14 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
         深掘りスコアが ON/OFF 完全一致（既定予算300＋増量予算2000）・(3)ノード数が ON≤OFF かつ合計で削減・(4)killer/reorder の
         単体不変条件（集合不変・MRU・上限）。**実測（中盤6局面・増量予算で純カット効果）= 探索ノード −2.4%（最大 −6.5%・悪化0）**。
         全1056pass・構造監査0・カード挙動ベースライン不変。予算固定（=本番）では節約ノードが深さ（settle 回避）に回る形で効く。
-      - **残（粒度b＝連続 decide 間の引き継ぎ・未実装）**: 手 N の探索 PV を次手 N+1 の着手順序ヒントへ持ち越す（`decide` を
-        またいで killer/PV を保持）。本実装は単一 decide 内の killer 共有まで＝粒度a。粒度b は decide への状態受け渡しが要る。
+      - **粒度b（連続 decide 間の引き継ぎ・実装済み＝既定 OFF・2026-06）**: `decide`／`_scored_search` に `killer_state`
+        を追加し、`decide_guarded` が `mem["killers"]`（ターン内で持ち越し・ターン跨ぎは破棄）を供給して **killer 表を
+        連続する decide 間で再利用**する。配線は挙動不変（reorder＝集合不変＝予算非拘束なら値不変＝
+        `tests/test_cpu_pv_order.py::test_pv_cross_decide_invariant` で手順一致を機械照合）。**だが実測で中立〜わずかに悪化**
+        （中盤6局面・増量予算でノード **-0.4%**＝悪化／ply を 1 ずらす整流でも ±0%）。原因＝killer は局面固有のヒントで、
+        decide をまたぐと探索ルート（盤面）が変わり同 ply の局面が一致しない（単一探索内の兄弟部分木のような構造類似が無い）。
+        よって **`_USE_PV_CROSS_DECIDE=False`（既定 OFF）**＝粒度a のみ本番有効。将来 **PV 継続**（最善応手列を次手の同一局面
+        ノードへ正しく対応付ける＝ply 整合の本質的解決）で正の利得が出れば有効化を再検討する（土台＝`killer_state` 配線は完了）。
   - **体感最適化（perceived latency・Phase 3・計画）**: 観点を per-call レイテンシ単体から「**ゲームを通して
     不快がない（体感）**」へ拡張する設計方針。相手の手を織り込む（「〜されたら〜する」＝contingency）ぶん
     計算は増えるため、**両面**（計算を前倒し/再利用して隠す＋相手分岐を広く読む）で攻める。

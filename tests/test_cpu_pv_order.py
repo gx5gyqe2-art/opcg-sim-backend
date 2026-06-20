@@ -141,6 +141,53 @@ def test_pv_order_reduces_or_equals_nodes(db):
         cpu_ai._USE_PV_ORDER = orig
 
 
+def test_pv_cross_decide_invariant(db):
+    """④粒度b: killer 表を連続 decide 間で持ち越しても（`_USE_PV_CROSS_DECIDE` ON/OFF）、増量予算では
+    選ばれる手の**列**が完全一致する（持ち越しは reorder＝集合不変＝予算非拘束なら値不変＝決定を変えない）。
+    """
+    from opcg_sim.src.core import action_api
+    states = _states(db, n=6)
+    assert states
+    orig_cross = cpu_ai._USE_PV_CROSS_DECIDE
+    orig_budget = cpu_ai.HARD_PER_MOVE_BUDGET
+    cpu_ai.HARD_PER_MOVE_BUDGET = 2000  # 予算非拘束領域＝カットのみが効く（値は順序不変）
+
+    def _play(gm):
+        g = copy.deepcopy(gm)
+        mem = {}
+        sigs = []
+        for _ in range(40):
+            pa = g.pending_actor_action()
+            if not pa or pa[0] != "p1":
+                break
+            mv = cpu_ai.decide_guarded(g, g.p1, "hard", random.Random(0), mem=mem)
+            if mv is None:
+                break
+            sigs.append(cpu_ai._move_sig(mv))
+            g.action_events = []
+            if mv.get("kind") == "battle":
+                action_api.apply_battle_action(g, g.p1, mv["action_type"], mv.get("card_uuid"))
+            else:
+                action_api.apply_game_action(g, g.p1, mv["action_type"], mv.get("payload", {}))
+            if mv.get("action_type") == "TURN_END":
+                break
+        return sigs
+
+    try:
+        diffs = []
+        for i, gm in enumerate(states):
+            cpu_ai._USE_PV_CROSS_DECIDE = False
+            off = _play(gm)
+            cpu_ai._USE_PV_CROSS_DECIDE = True
+            on = _play(gm)
+            if off != on:
+                diffs.append((i, off, on))
+        assert not diffs, f"粒度b 持ち越しで手順が変化: {diffs}"
+    finally:
+        cpu_ai._USE_PV_CROSS_DECIDE = orig_cross
+        cpu_ai.HARD_PER_MOVE_BUDGET = orig_budget
+
+
 def test_record_killer_mru_and_cap():
     """`_record_killer`: 最近使用が先頭・重複は前出し・上限 `_KILLER_SLOTS`・None は no-op。"""
     killers = {}

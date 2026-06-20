@@ -55,6 +55,14 @@ _USE_MAKE_UNMAKE = True
 _USE_PV_ORDER = True
 _KILLER_SLOTS = 2          # 各 ply で保持する killer 手の数（standard killer heuristic）
 
+# ④粒度b: killer 表を**連続する decide 間で持ち越す**（`decide_guarded` が `mem["killers"]` を供給）。
+# 配線は実装済みで挙動不変（reorder は集合不変＝予算非拘束なら値不変＝`tests/test_cpu_pv_order.py` で照合）だが、
+# **実測で中立〜わずかに悪化**（中盤6局面・増量予算でノード -0.4%＝悪化／ply を 1 ずらす整流でも ±0%）。
+# 原因＝killer は局面固有のヒントで、decide をまたぐと探索ルート（盤面）が変わり同 ply の局面が一致しない
+# （単一探索内の兄弟部分木のような構造類似が無い）。よって**既定 OFF**＝粒度a のみ本番有効。将来 PV 継続
+# （最善応手列を次手の同一局面ノードへ正しく対応付ける）で正の利得が出れば有効化を再検討する。
+_USE_PV_CROSS_DECIDE = False
+
 # 評価重み（盤面 1000=パワー1段相当に正規化）
 W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（膝＝薄域。最重要）
 # 高ライフ域（膝超）のライフ 1 枚の基礎価値（concave 化・§2.5.3）。OPCG ではライフは「序盤は能動的に
@@ -1508,7 +1516,8 @@ _TIEBREAK_CLAMP = 5000.0
 
 def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
                    see_opp_hand: bool, opp_public_only: bool,
-                   profile=None, plan=None, collect: Optional[Dict[str, Any]] = None
+                   profile=None, plan=None, collect: Optional[Dict[str, Any]] = None,
+                   killer_state: Optional[Dict[int, List[tuple]]] = None
                    ) -> List[Tuple[float, Dict[str, Any]]]:
     """ルート手を 1-ply で事前選別し、上位 HARD_ROOT_BEAM 手だけを多 ply 先読みで深掘りする。
 
@@ -1574,7 +1583,16 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     # ④ killer 表（ply→直近カット手の signature 列）。深掘り対象のルート手で共有し、α-β カットを早める。
     # 各ルート手は均等予算で独立に深掘りするが、killer は ply 単位の汎用ヒント＝木をまたいで再利用してよい
     # （集合は変えず順序のみ＝予算非拘束なら値不変）。OFF（_USE_PV_ORDER=False）なら None＝従来挙動。
-    killers: Optional[Dict[int, List[tuple]]] = {} if _USE_PV_ORDER else None
+    #   - 粒度a（killer_state=None）: この探索内だけの一時表（decide が終われば破棄）。
+    #   - 粒度b（killer_state あり）: 呼び出し側（`mem["killers"]`）が保持する表を使い、**連続する decide 間で
+    #     再利用**する。盤面が 1 手進んだだけの次手でも同 ply の良手（相手の応手/自分の続き）は刺さりやすい。
+    #     持ち越しても reorder は集合不変＝予算非拘束なら値不変なので安全（粒度a と同じ等価ゲートで担保）。
+    if not _USE_PV_ORDER:
+        killers: Optional[Dict[int, List[tuple]]] = None
+    elif killer_state is not None:
+        killers = killer_state
+    else:
+        killers = {}
     out: List[Tuple[float, Dict[str, Any]]] = []
     for i, (s1, m, ok) in enumerate(prelim):
         if ok and i in deepen:
@@ -1790,7 +1808,8 @@ def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: 
 
 def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Random] = None,
            moves: Optional[List[Dict[str, Any]]] = None, profile=None, plan=None,
-           trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True) -> Optional[Dict[str, Any]]:
+           trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True,
+           killer_state: Optional[Dict[int, List[tuple]]] = None) -> Optional[Dict[str, Any]]:
     """`player` が取るべき次の 1 手を返す（合法手が無ければ None）。
 
     `moves` を渡すとその候補集合から選ぶ（ガード driver が絞り込んだ手を渡す用途）。
@@ -1798,6 +1817,8 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
     `plan` は自デッキ勝ち筋プラン（§2.5.5・normal/hard で使用。easy は素の 1-ply のまま）。
     `trace`（任意・既定 None＝完全に無オーバーヘッド・挙動不変）を渡すと、意思決定の診断情報
     （選んだ手・候補スコア・regret・J値成分内訳・読み筋）を書き込む（CPU 挙動改善用）。
+    `killer_state`（任意・④粒度b）を渡すと α-β の killer 表を**連続 decide 間で持ち越す**（reorder は
+    集合不変＝予算非拘束なら値不変。`decide_guarded` が `mem["killers"]` を供給。未指定＝粒度a＝探索内のみ）。
     """
     rng = rng or random
     if moves is None:
@@ -1861,7 +1882,7 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
             scored = _scored_search(manager, name, moves, see_opp_hand=see_opp_hand,
                                     opp_public_only=opp_public_only,
                                     profile=(profile if difficulty == "normal" else None),
-                                    plan=plan, collect=collect)
+                                    plan=plan, collect=collect, killer_state=killer_state)
     # 同点はランダムタイブレーク（決定論にしたい場合は呼び出し側で seed 済み rng を渡す）。
     rng.shuffle(scored)
     best_score, best_move = max(scored, key=lambda x: x[0])
@@ -1967,6 +1988,7 @@ def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[ra
         mem["turn"] = manager.turn_count
         mem["counts"] = {}
         mem["total"] = 0
+        mem["killers"] = {}   # ④粒度b: killer 表はターン内でのみ持ち越す（ターン跨ぎの古い表は破棄）
 
     moves = manager.get_legal_actions(player)
     if not moves:
@@ -1992,8 +2014,11 @@ def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[ra
     if not filtered:
         filtered = [end_move] if end_move is not None else moves
 
+    # ④粒度b: killer 表を mem に保持して連続 decide 間で持ち越す（reorder は集合不変＝安全だが実測で
+    # 中立〜微減＝既定 OFF。`_USE_PV_CROSS_DECIDE` 有効時のみ供給。OFF は killer_state=None＝粒度a のみ）。
+    ks = mem.setdefault("killers", {}) if (_USE_PV_ORDER and _USE_PV_CROSS_DECIDE) else None
     move = decide(manager, player, difficulty, rng, moves=filtered, profile=profile, plan=plan,
-                  trace=trace, trace_read_ahead=trace_read_ahead)
+                  trace=trace, trace_read_ahead=trace_read_ahead, killer_state=ks)
     if move is not None:
         sig = _move_sig(move)
         counts[sig] = counts.get(sig, 0) + 1
