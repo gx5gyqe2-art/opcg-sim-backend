@@ -175,12 +175,10 @@ def test_real_playout_make_unmake_roundtrip(db):
         if move is None:
             break
 
-        # make/unmake は「非中断状態（resolver が parked でない静止点）から適用する手」を対象とする。
-        # CPU 探索の根もこの静止点で意思決定する。中断（複数段の効果解決の途中）を**再開**する手は、
-        # parked resolver 状態（execution_stack 等の共有・ネスト構造）を持ち越すため現 PoC の対象外
-        # ＝ここでは照合をスキップし、実適用のみで前進する（boundary は docs に明記）。
-        suspended = gm.active_interaction is not None
-        if not suspended:
+        # parked resolver 状態（中断再開）も journaled 化済み＝中断/非中断どちらの手も round-trip 照合する
+        # （resolver の journaled __setattr__／context・saved_targets の JournaledDict／execution_stack・
+        # saved_stack・退避スタックの JournaledList／誘発 item の JournaledDict 化。§2.5.2）。
+        if True:
             # (a) 退避（continuous の後方参照ごと deepcopy）。action_events は手ごとに
             #     リセットされる transient バッファなので、照合差を避けるため退避前に揃える。
             gm.action_events = JournaledList()
@@ -206,3 +204,48 @@ def test_real_playout_make_unmake_roundtrip(db):
 
     assert steps >= 20, f"ゲームが十分進まなかった (steps={steps})"
     assert checked >= 10, f"状態変化を伴う手の検証数が不足 (checked={checked})"
+
+
+def test_parked_resume_make_unmake_roundtrip(db):
+    """**中断再開（parked resolver）の手**を transaction で包んで適用→巻き戻しし、開始 deepcopy と
+    完全一致（deep_diff==None）を確認する。parked 状態の journaled 化（resolver の journaled
+    __setattr__／context・saved_targets の JournaledDict／execution_stack・saved_stack・退避スタックの
+    JournaledList／誘発 item の JournaledDict）の完全性ゲート。これが緑＝`_mu_safe` が中断局面でも
+    make/unmake できる（残 clone フォールバックの大半を解消・docs/SPEC.md §2.5.2）。
+    """
+    from opcg_sim.src.core.gamestate import GameManager, Player
+    KEY = _pid_key()
+    parked_checked = 0
+    for seed in range(0, 8):
+        random.seed(seed)
+        l1, c1 = cpu_arena.build_deck(db, "p1")
+        l2, c2 = cpu_arena.build_deck(db, "p2")
+        gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+        gm.start_game()
+        deciders = {"p1": cpu_arena._make_decider("easy"), "p2": cpu_arena._make_decider("easy")}
+        steps = 0
+        while gm.winner is None and steps < 150:
+            pending = gm.get_pending_request()
+            if not pending:
+                break
+            pid = pending[KEY]
+            actor = gm.p1 if gm.p1.name == pid else gm.p2
+            move = deciders[pid](gm, actor)
+            if move is None:
+                break
+            if gm.active_interaction is not None:  # 中断再開の手だけ照合
+                gm.action_events = JournaledList()
+                before = copy.deepcopy(gm)
+                with transaction():
+                    try:
+                        _apply(gm, actor, move)
+                    except Exception as e:
+                        pytest.fail(f"seed{seed} step{steps} parked apply raised: {type(e).__name__}: {e}")
+                diff = deep_diff(before, gm)
+                assert diff is None, (
+                    f"seed{seed} step{steps} ({move['action_type']}): parked rollback mismatch at {diff}")
+                parked_checked += 1
+            gm.action_events = JournaledList()
+            _apply(gm, actor, move)
+            steps += 1
+    assert parked_checked >= 20, f"中断再開の検証数が不足 (parked_checked={parked_checked})"

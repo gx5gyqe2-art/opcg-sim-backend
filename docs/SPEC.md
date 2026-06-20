@@ -259,8 +259,16 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       無条件代入と完全同一＝挙動・方策不変。実測 **__setattr__ 357k→85k（−76%）・record_attr 397k→125k（−69%）・
       rollback −55%・`_apply_passive_effects` cumulative −60%**＝controlled A/B で **hard decide ~1.12x**（同一手・全1038pass・
       構造監査0・ベースライン不変）。**PyPy オフロード（~2.1x）と乗算で対 CPython ~2.35x**。
-      **残（任意）**: parked 効果解決機構の journaled 化で中断再開手も make/unmake 化（残 clone の大半＝~decide の 12〜30%・
-      再プロファイルでも deepcopy が最大単一項＝次の本命レバー）。
+      (4) **parked resolver の journaled 化＝中断再開手も make/unmake（2026-06・~1.33x）**: (3)後の再プロファイルで
+      **最大の単一残項は deepcopy（残 clone フォールバック）**＝`_mu_safe` が `active_interaction is not None`（中断再開）で
+      clone へ退避していた（全ノードの ~4.3% だが時間では cumulative ~26%）。中断状態を **journaled 化**して make/unmake へ移した:
+      EffectResolver に journaled `__setattr__`、`context`・`saved_targets`・`saved_values`・`_grp_consumed`・`_both_sides`・
+      `_confirmed_optionals` を JournaledDict/Set 化、`execution_stack`・`saved_stack`・退避スタック（`_deferred_continuations`）を
+      JournaledList 化、誘発待ち item（`_pending_triggers`）を JournaledDict 化、`Player` のゾーン list 代入を JournaledList へ昇格
+      （素 list 代入でも巻き戻せる安全網）。`_mu_safe` を常時 `make/unmake` に解放。**正しさゲート**＝`tests/test_journal.py` の
+      **parked round-trip**（中断再開手で「適用→巻き戻し→開始 deepcopy と完全一致」を実プレイで機械照合）＋全1039pass（任意コスト
+      確認など parked 判断の decide 一致を含む）。controlled A/B で **hard decide ~1.33x**（同一手）。
+      **通算: PyPy(~2.1x) × passive 差分化(~1.12x) × parked journaled(~1.33x)**（局面依存）。残コストは clone でなく apply＋evaluate。
     - **③ 置換表（transposition table）= 実測で不採用（2026-06）**: ②後は**健全（完全一致キー）な転置率 ≤0.5%**（exact key
       ＝デッキ順／全カード状態／継続効果まで含むと手順違いでも byte 一致がほぼ起きない）に対し、健全な位置キー計算が
       **~3%/node** のオーバーヘッド＝**ネット負**。②が per-node clone を消したため「再探索を省く」価値自体が消えた

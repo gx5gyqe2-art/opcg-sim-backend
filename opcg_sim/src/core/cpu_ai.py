@@ -895,13 +895,15 @@ def _apply_clone(manager, actor_name: str, move: Dict[str, Any], stop_at_select:
 
 
 def _mu_safe(manager) -> bool:
-    """make/unmake を安全に使える局面か＝中断（parked resolver 状態）でない静止点か。
+    """make/unmake を安全に使える局面か。
 
-    中断を**再開**する手は parked resolver 状態（execution_stack／continuation の共有・ネスト構造）を
-    持ち越し、現状その journaled 化が未完のため巻き戻しが不完全になり得る（docs/SPEC.md §2.5.2 boundary）。
-    探索の根・各ノードは中断でない静止点で意思決定するため、ここが True のときだけ make/unmake する。
+    **parked resolver 状態（中断再開）も journaled 化済み**（resolver の journaled `__setattr__`／
+    `context`・`saved_targets` の JournaledDict 化／`execution_stack`・`saved_stack`・退避スタックの
+    JournaledList 化／誘発 item の JournaledDict 化）＝中断を再開する手も「適用→巻き戻し→開始状態と
+    完全一致」が成立する（`tests/test_journal.py` の parked round-trip が実プレイ全手で機械照合）。
+    よって中断局面でも clone へ退避せず make/unmake できる（残 clone フォールバックの大半を解消）。
     """
-    return _USE_MAKE_UNMAKE and getattr(manager, "active_interaction", None) is None
+    return _USE_MAKE_UNMAKE
 
 
 def _score_move_1ply(manager, actor_name: str, move: Dict[str, Any], eval_name: str,
