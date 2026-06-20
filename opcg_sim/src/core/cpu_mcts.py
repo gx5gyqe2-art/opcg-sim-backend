@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 from .cpu_ai import (evaluate, _player_by_name, _selection_moves, _prune_don_moves,
                      _prune_futile_attacks, _apply_move_inplace, _score_move_1ply, _move_sig,
-                     _settle_eval)
+                     _settle_eval, TURN_ACTION_CAP)
 
 # PUCT 探索定数。値は [0,1] 正規化なので AlphaZero の ~1.0-2.5 近傍から。自己対戦でチューニング予定。
 MCTS_CPUCT = 1.8
@@ -222,3 +222,240 @@ def decide_mcts(manager, player, difficulty: str = "hard", rng: Optional[random.
     # robust child = 最多訪問。同数は Q（root 視点）で割り、さらに同点は乱択。
     best = max(root.children, key=lambda c: (c.N, c.W / c.N if c.N else 0.0, rng.random()))
     return best.move
+
+
+# ============================================================================
+# Phase 1.5: ターン粒度マクロアクション MCTS（docs/SPEC.md §2.5.7・診断①②の本命解）
+# ----------------------------------------------------------------------------
+# micro 版（上）は「各ノード=1 手の決定点」で評価がターン途中＝甘い局面を過大評価し（診断①）、
+# それを直す `_settle_eval` は葉ごとに重い（診断②）。本マクロ版は **ノード=ターン境界の状態／
+# エッジ=1 ターン丸ごとのプレイ** とすることで:
+#   - 葉が常にターン境界 → `evaluate` が偏りなく・整流不要で安い（①②を同時に解決）。
+#   - 木の深さ=ターン数 → 激減し、少ない clone でも複数ターン先を読める。
+# ターン全体は全列挙不能なので**確率的サンプリング**（1-ply 評価のソフトマックス方策）で候補を生成し、
+# **progressive widening**（訪問が増えるほど子＝候補ターンを増やす）で木を広げる。葉の価値は境界での
+# `evaluate`（[0,1] 圧縮）。ルートの最善子=最多訪問のターンプラン＝**その手列を丸ごと返す**（計画キャッシュ
+# と同様に逐次 replay）。完全情報（Phase 1）＝相手手札も読む。決定化（ISMCTS）は Phase 2。
+MCTS_MACRO_HORIZON = 3       # 何ターン先まで読むか（自分→相手→自分…の境界数）。
+MCTS_MACRO_TEMP = 1800.0     # ターンサンプリングのソフトマックス温度（eval 単位・小さいほど最善寄り）。
+MCTS_MACRO_C = 1.4           # UCB 探索定数（[0,1] 正規化）。
+MCTS_PW_C = 2.0              # progressive widening 係数（子数 ≈ 1 + PW_C·N^PW_ALPHA）。
+MCTS_PW_ALPHA = 0.5
+MCTS_MACRO_ITERS = 160       # 既定反復回数（ターンあたり 1 回の探索＝手列全体を一括計画）。
+
+
+def _value_boundary(manager, root_name: str, see_opp_hand: bool) -> float:
+    """ターン境界状態の価値を `root_name` 視点 [0,1] へ（整流不要＝境界は元々静止点）。勝1/負0。"""
+    if manager.winner is not None:
+        return 1.0 if manager.winner == root_name else 0.0
+    ev = evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=None, plan=None)
+    return 0.5 * (1.0 + math.tanh(ev / MCTS_VALUE_SCALE))
+
+
+def _weighted_choice(items, weights, rng):
+    z = sum(weights)
+    if z <= 0:
+        return rng.choice(items)
+    r = rng.random() * z
+    acc = 0.0
+    for it, w in zip(items, weights):
+        acc += w
+        if r <= acc:
+            return it
+    return items[-1]
+
+
+def _sample_turn_plan(state, player_name: str, rng, see_opp_hand: bool) -> List[Dict[str, Any]]:
+    """`state`（`player_name` の手番境界）から**1 ターンを確率的にプレイ**し、適用した手列を返す。
+
+    各手番の決定は 1-ply 評価のソフトマックス（温度 `MCTS_MACRO_TEMP`）でサンプリング＝多様な候補ターンを
+    生む（最善付近に集中しつつ揺らす）。`state` は破壊的に進む（TURN_END／相手介入／キャップで停止）。
+    """
+    plan: List[Dict[str, Any]] = []
+    for _ in range(TURN_ACTION_CAP + 4):
+        pa = state.pending_actor_action()
+        if not pa or pa[0] != player_name:
+            break  # 相手の手番/介入点＝ターン境界
+        moves = _node_moves(state, player_name)
+        if not moves:
+            break
+        if len(moves) == 1:
+            mv = moves[0]
+        else:
+            scored = []
+            for m in moves:
+                v = _score_move_1ply(state, player_name, m, player_name,
+                                     see_opp_hand=see_opp_hand, profile=None, plan=None)
+                if v is not None:
+                    scored.append((m, v))
+            if not scored:
+                break
+            mx = max(v for _m, v in scored)
+            ws = [math.exp((v - mx) / MCTS_MACRO_TEMP) for _m, v in scored]
+            mv = _weighted_choice([m for m, _v in scored], ws, rng)
+        try:
+            _apply_move_inplace(state, player_name, mv, stop_at_select=True)
+        except Exception:
+            break
+        plan.append(mv)
+        if mv.get("action_type") == "TURN_END":
+            break
+    return plan
+
+
+def _apply_turn_plan(state, player_name: str, plan: List[Dict[str, Any]]) -> bool:
+    """記録済みのターンプランを `state` に**決定論的に再生**する（選択降下の再構成用）。
+
+    完全情報・同一開始状態なら手は合法に再現される。万一不一致（効果内 RNG 等）なら適用を止めて False。
+    """
+    for mv in plan:
+        pa = state.pending_actor_action()
+        if not pa or pa[0] != player_name:
+            return False
+        legal = {_move_sig(m) for m in _node_moves(state, player_name)}
+        if _move_sig(mv) not in legal:
+            return False
+        try:
+            _apply_move_inplace(state, player_name, mv, stop_at_select=True)
+        except Exception:
+            return False
+    return True
+
+
+class _MacroNode:
+    """マクロ木のノード（=ターン境界状態）。`plan`=ここへ至るターンプラン（ルートは None）。"""
+    __slots__ = ("plan", "actor", "children", "N", "W", "terminal")
+
+    def __init__(self, plan, actor, terminal):
+        self.plan = plan
+        self.actor: Optional[str] = actor   # この境界で手番を持つ側（terminal は None）
+        self.children: List["_MacroNode"] = []
+        self.N = 0
+        self.W = 0.0
+        self.terminal = terminal
+
+
+def _macro_node_from_state(plan, manager) -> _MacroNode:
+    if manager.winner is not None:
+        return _MacroNode(plan, None, terminal=True)
+    pa = manager.pending_actor_action()
+    if not pa:
+        return _MacroNode(plan, None, terminal=True)
+    return _MacroNode(plan, pa[0], terminal=False)
+
+
+def _ucb_select_macro(node: _MacroNode, root_name: str, rng) -> _MacroNode:
+    is_root_turn = (node.actor == root_name)
+    logN = math.log(node.N + 1.0)
+    best, best_score = None, -1e18
+    for ch in node.children:
+        q = ch.W / ch.N if ch.N > 0 else 0.5
+        exploit = q if is_root_turn else (1.0 - q)
+        explore = MCTS_MACRO_C * math.sqrt(logN / (ch.N + 1e-9))
+        s = exploit + explore
+        if s > best_score or (s == best_score and rng.random() < 0.5):
+            best, best_score = ch, s
+    return best
+
+
+def _macro_simulate(root: _MacroNode, root_state, root_name: str,
+                    horizon: int, see_opp_hand: bool, rng) -> None:
+    """1 反復: ルートを clone → progressive widening でターンプランを展開/選択しながら境界を下り、
+    horizon ターン先（or 終局）の境界を `evaluate` → 経路へ backup。"""
+    state = root_state.clone()
+    state.action_events = []
+    node = root
+    path = [node]
+    turns = 0
+
+    while (not node.terminal) and turns < horizon:
+        max_children = 1 + int(MCTS_PW_C * (node.N ** MCTS_PW_ALPHA))
+        if len(node.children) < max_children:
+            # 展開: 新しいターンプランをサンプリング（state は次境界まで進む）。
+            plan = _sample_turn_plan(state, node.actor, rng, see_opp_hand)
+            if not plan:
+                break
+            child = _macro_node_from_state(plan, state)
+            node.children.append(child)
+            node = child
+            path.append(node)
+            turns += 1
+            break  # 展開した子＝葉として評価
+        # 選択: 既存子を UCB で選び、そのターンプランを再生。
+        child = _ucb_select_macro(node, root_name, rng)
+        if child is None or not _apply_turn_plan(state, node.actor, child.plan):
+            break
+        node = child
+        path.append(node)
+        turns += 1
+
+    v = _value_boundary(state, root_name, see_opp_hand)
+    for nd in path:
+        nd.N += 1
+        nd.W += v
+
+
+def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
+                   iterations: Optional[int] = None, horizon: Optional[int] = None,
+                   see_opp_hand: Optional[bool] = None) -> List[Dict[str, Any]]:
+    """マクロ MCTS で `player` の**このターンの手列（ターンプラン）**を返す（計画キャッシュ的に逐次 replay 可）。
+
+    ルートは `player` の手番境界。子=候補ターンプラン。最善子（最多訪問）の手列を返す。
+    合法手が無ければ空リスト。
+    """
+    rng = rng or random
+    name = player.name
+    if see_opp_hand is None:
+        see_opp_hand = (difficulty == "hard")
+    iters = iterations if iterations is not None else MCTS_MACRO_ITERS
+    H = horizon if horizon is not None else MCTS_MACRO_HORIZON
+
+    pa = manager.pending_actor_action()
+    if not pa or pa[0] != name:
+        return []
+    root = _MacroNode(None, name, terminal=False)
+    for _ in range(iters):
+        _macro_simulate(root, manager, name, H, see_opp_hand, rng)
+    if not root.children:
+        return []
+    best = max(root.children, key=lambda c: (c.N, c.W / c.N if c.N else 0.0, rng.random()))
+    return best.plan
+
+
+def decide_mcts_macro(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
+                      cache: Optional[Dict[str, Any]] = None, iterations: Optional[int] = None,
+                      horizon: Optional[int] = None,
+                      moves: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
+    """マクロ MCTS の**逐次 1 手**インターフェース（`cpu_ai.decide_cached` と同型）。
+
+    `cache={"queue":[...]}` を対局ごとに保持する。queue の次手が現局面で合法なら即返す（replay）。
+    空/不正なら `mcts_plan_turn` でこのターンを一括計画して queue 化し先頭を返す。`moves` 指定時は
+    候補をそれに限定（guard driver 用・単一手はそのまま）。
+    """
+    rng = rng or random
+    name = player.name
+    if cache is None:
+        cache = {}
+    legal = moves if moves is not None else manager.get_legal_actions(player)
+    if not legal:
+        return None
+    if len(legal) == 1:
+        cache["queue"] = []
+        return legal[0]
+    legal_by_sig = {_move_sig(m): m for m in legal}
+
+    q = cache.get("queue")
+    if q:
+        nxt = q[0]
+        if _move_sig(nxt) in legal_by_sig:
+            cache["queue"] = q[1:]
+            return legal_by_sig[_move_sig(nxt)]
+        cache["queue"] = None  # 前提崩れ＝再計画
+
+    plan = mcts_plan_turn(manager, player, difficulty, rng, iterations=iterations, horizon=horizon)
+    if plan and _move_sig(plan[0]) in legal_by_sig:
+        cache["queue"] = plan[1:]
+        return legal_by_sig[_move_sig(plan[0])]
+    # 計画が空/先頭不正＝安全側で micro MCTS の 1 手にフォールバック。
+    cache["queue"] = None
+    return decide_mcts(manager, player, difficulty, rng, moves=legal)

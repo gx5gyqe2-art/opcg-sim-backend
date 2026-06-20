@@ -69,3 +69,36 @@ def test_mcts_single_move_shortcut(db):
     only = gm.get_legal_actions(gm.p1)[:1]
     mv = cpu_mcts.decide_mcts(gm, gm.p1, "hard", random.Random(0), iterations=80, moves=only)
     assert cpu_ai._move_sig(mv) == cpu_ai._move_sig(only[0])
+
+
+# --- マクロアクション（ターン粒度）MCTS の健全性 ----------------------------------
+
+def test_macro_plan_turn_legal_and_unchanged(db):
+    """mcts_plan_turn は合法な手列を返し（先頭手は現局面で合法）、入力 manager を変更しない。"""
+    states = _states(db)
+    for gm in states:
+        legal = {cpu_ai._move_sig(m) for m in gm.get_legal_actions(gm.p1)}
+        before = copy.deepcopy(gm)
+        plan = cpu_mcts.mcts_plan_turn(gm, gm.p1, "hard", random.Random(0), iterations=60, horizon=2)
+        assert journal.deep_diff(before, gm) is None, "mcts_plan_turn が manager を変更した"
+        if plan:
+            assert cpu_ai._move_sig(plan[0]) in legal
+
+
+def test_macro_decide_legal_and_replay(db):
+    """decide_mcts_macro は合法手を返し、計画を queue にキャッシュして逐次 replay する。"""
+    gm = _states(db, n=1)[0]
+    legal = {cpu_ai._move_sig(m) for m in gm.get_legal_actions(gm.p1)}
+    cache = {}
+    mv = cpu_mcts.decide_mcts_macro(gm, gm.p1, "hard", random.Random(0),
+                                    cache=cache, iterations=60, horizon=2)
+    assert mv is not None and cpu_ai._move_sig(mv) in legal
+    assert "queue" in cache  # 残り計画手をキャッシュ（replay 用）
+
+
+def test_macro_deterministic_with_seeded_rng(db):
+    """同一 seed・同一反復数ならマクロ計画も同じ手列を返す（再現性）。"""
+    gm = _states(db, n=1)[0]
+    a = cpu_mcts.mcts_plan_turn(copy.deepcopy(gm), gm.p1, "hard", random.Random(3), iterations=80, horizon=2)
+    b = cpu_mcts.mcts_plan_turn(copy.deepcopy(gm), gm.p1, "hard", random.Random(3), iterations=80, horizon=2)
+    assert [cpu_ai._move_sig(m) for m in a] == [cpu_ai._move_sig(m) for m in b]
