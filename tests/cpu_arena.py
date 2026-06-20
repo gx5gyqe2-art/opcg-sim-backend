@@ -208,6 +208,67 @@ def regret_trace(db, seed: int, difficulty: str = "normal",
     }
 
 
+# --- value-realization gap（ターン内 楽観崩落・§2.5.3） ----------------------
+
+def realize_trace(db, seed: int, difficulty: str = "hard",
+                  max_steps: int = DEFAULT_MAX_STEPS) -> Dict[str, Any]:
+    """1 ゲームを自己対戦し、**value-realization gap**（ターン内の楽観崩落）を集計する。
+
+    各 MAIN 意思決定で `decide_with_regret(out=...)` から採用手の深掘りスコア（`chosen_deep`）を取り、
+    (player, turn) ごとに時系列で並べる。ターン頭でドン/盤面に過剰コミットし、手番が進んで初めて
+    「読み切れなかった代償」が露見すると、採用手の深掘り値は**ターン内で単調に崩落**する（実ケース:
+    付与時 +4798 → 攻撃時 -91）。1 ターンの gap = max(そのターンの chosen_deep) − 最終決定の chosen_deep。
+    大きい gap が頻発する＝探索が予算地平線の外を楽観視して資源を溶かしている兆候（B が縮める対象）。
+    """
+    random.seed(seed)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    manager.start_game()
+    plans = {"p1": _plan_for(difficulty, l1, c1), "p2": _plan_for(difficulty, l2, c2)}
+    mems: Dict[str, Any] = {"p1": {}, "p2": {}}
+    pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
+    KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
+    KEY_ACTION = pending_props.get('ACTION', 'action')
+
+    series: Dict[tuple, List[float]] = {}   # (player, turn) -> [chosen_deep, ...]
+    step = 0
+    while manager.winner is None and step < max_steps:
+        pending = manager.get_pending_request()
+        if not pending:
+            break
+        req_pid = pending[KEY_PID]
+        actor = manager.p1 if manager.p1.name == req_pid else manager.p2
+        if pending.get(KEY_ACTION) == "MAIN_ACTION":
+            info: Dict[str, Any] = {}
+            move, _r = cpu_ai.decide_with_regret(manager, actor, difficulty, random,
+                                                 plan=plans[req_pid], out=info)
+            if "chosen_deep" in info:
+                series.setdefault((req_pid, manager.turn_count), []).append(info["chosen_deep"])
+        else:
+            move = cpu_ai.decide_guarded(manager, actor, difficulty, random, mems[req_pid],
+                                         plan=plans[req_pid])
+        if move is None:
+            break
+        manager.action_events = []
+        if move["kind"] == "battle":
+            action_api.apply_battle_action(manager, actor, move["action_type"], move.get("card_uuid"))
+        else:
+            action_api.apply_game_action(manager, actor, move["action_type"], move.get("payload", {}))
+        step += 1
+
+    gaps = [max(v) - v[-1] for v in series.values() if len(v) >= 2]
+    n = len(gaps)
+    s = sorted(gaps)
+    return {
+        "seed": seed, "difficulty": difficulty, "turns_scored": n,
+        "mean_gap": (sum(gaps) / n) if n else 0.0,
+        "max_gap": max(gaps) if n else 0.0,
+        "p95_gap": (s[min(n - 1, int(0.95 * n))] if n else 0.0),
+        "big_gaps": sum(1 for g in gaps if g >= 2000.0),   # ライフ ~1/3 相当以上の崩落ターン数
+    }
+
+
 # --- CLI ----------------------------------------------------------------------
 
 def main(argv=None):
@@ -227,6 +288,12 @@ def main(argv=None):
     pr.add_argument("--games", type=int, default=1)
     pr.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
 
+    pz = sub.add_parser("realize", help="自己対戦の value-realization gap（ターン内 楽観崩落）集計")
+    pz.add_argument("--difficulty", choices=["normal", "hard"], default="hard")
+    pz.add_argument("--seed", type=int, default=0)
+    pz.add_argument("--games", type=int, default=1)
+    pz.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
+
     args = ap.parse_args(argv)
     db = _load_db()
 
@@ -238,6 +305,14 @@ def main(argv=None):
         print(f"\narena: {rep['challenger']} vs {rep['baseline']}  "
               f"{rep['challenger_wins']:.1f}/{rep['games']}  win_rate={rep['win_rate']:.3f}  "
               f"Elo={rep['elo_delta']:+.0f}")
+        return 0
+
+    if args.cmd == "realize":
+        for i in range(args.games):
+            rep = realize_trace(db, args.seed + i, args.difficulty, args.max_steps)
+            print(f"realize seed={rep['seed']} {rep['difficulty']}: turns={rep['turns_scored']} "
+                  f"mean_gap={rep['mean_gap']:.1f} p95_gap={rep['p95_gap']:.1f} "
+                  f"max_gap={rep['max_gap']:.1f} big_gaps={rep['big_gaps']}")
         return 0
 
     # regret

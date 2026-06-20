@@ -565,9 +565,11 @@ def test_c4_settle_eval_applies_discount(db, monkeypatch):
     """配線: `_settle_eval` は（勝敗未確定の）整流後評価に `_settle_discount` を適用する。
 
     既に静止点（相手 MAIN）に置いた局面で settle ループを空回りさせ、evaluate を固定値へ monkeypatch して
-    『plan 供給時は係数倍／plan=None は素通し』を観測する。"""
+    『plan 供給時は係数倍／plan=None は素通し』を観測する。B（settle 楽観是正）の打点減点は本配線とは別項
+    なので 0 へ無効化して C-4 を isolate する（B 自体は `test_b_settle_pressure_*` で固定）。"""
     gm = _new_gm(db)
     gm.turn_player = gm.p2          # p1 視点で相手（p2）の手番開始＝settle の静止点
+    monkeypatch.setattr(cpu_ai, "_incoming_reach", lambda me, opp: 0)   # B 項を 0 へ（C-4 を isolate）
     monkeypatch.setattr(cpu_ai, "evaluate",
                         lambda manager, me, see_opp_hand=True, profile=None, plan=None: 8000.0)
     plan = _plan("control")
@@ -575,6 +577,46 @@ def test_c4_settle_eval_applies_discount(db, monkeypatch):
     no_plan = cpu_ai._settle_eval(gm, "p1", False, None, None, ply=3)
     assert no_plan == pytest.approx(8000.0)
     assert with_plan == pytest.approx(8000.0 * cpu_ai._SETTLE_CONFIDENCE)
+
+
+def test_b_settle_pressure_isolated(db, monkeypatch):
+    """B（settle 楽観是正）: `_settle_eval` は相手ターンの静止点で、相手の受け切れない打点本数
+    （`_incoming_reach`）×`W_SETTLE_PRESSURE` を**致死未満のみ**減点してから C-4 割引する。
+
+    evaluate を固定値・`_incoming_reach` を固定本数へ monkeypatch して、盤面同一のまま項だけ isolate する。
+    作動条件: plan 供給 ＋ 相手ターン静止点 ＋ 0<reach<自ライフ。致死(reach≥自ライフ)/plan=None/自手番では不作動。
+    """
+    gm = _new_gm(db)
+    gm.turn_player = gm.p2          # p1 視点で相手（p2）の手番開始＝settle の静止点
+    monkeypatch.setattr(cpu_ai, "evaluate",
+                        lambda manager, me, see_opp_hand=True, profile=None, plan=None: 8000.0)
+    plan = _plan("control")
+    my_life = len(gm.p1.life)
+    assert my_life >= 3              # 以降の reach=2 が「致死未満」である前提
+    c = cpu_ai._SETTLE_CONFIDENCE
+
+    # 致死未満（reach=2 < 自ライフ）: (8000 − 2×W_SETTLE_PRESSURE) を割引。
+    monkeypatch.setattr(cpu_ai, "_incoming_reach", lambda me, opp: 2)
+    sub_lethal = cpu_ai._settle_eval(gm, "p1", False, None, plan, ply=3)
+    assert sub_lethal == pytest.approx((8000.0 - 2 * cpu_ai.W_SETTLE_PRESSURE) * c)
+
+    # reach=0（受け切れる）: 減点なし＝C-4 割引のみ。
+    monkeypatch.setattr(cpu_ai, "_incoming_reach", lambda me, opp: 0)
+    no_reach = cpu_ai._settle_eval(gm, "p1", False, None, plan, ply=3)
+    assert no_reach == pytest.approx(8000.0 * c)
+
+    # 致死（reach≥自ライフ）: B は不作動（致死は C-2 telegraph が evaluate 内で計上＝二重計上回避）。
+    monkeypatch.setattr(cpu_ai, "_incoming_reach", lambda me, opp: my_life)
+    lethal = cpu_ai._settle_eval(gm, "p1", False, None, plan, ply=3)
+    assert lethal == pytest.approx(8000.0 * c)
+
+    # plan=None: B 項も C-4 も不作動＝素通し。
+    monkeypatch.setattr(cpu_ai, "_incoming_reach", lambda me, opp: 2)
+    assert cpu_ai._settle_eval(gm, "p1", False, None, None, ply=3) == pytest.approx(8000.0)
+
+    # 自分の手番（turn_player=p1）: 相手の反撃は目前でない＝B 不作動（C-4 割引のみ）。
+    gm.turn_player = gm.p1
+    assert cpu_ai._settle_eval(gm, "p1", False, None, plan, ply=3) == pytest.approx(8000.0 * c)
 
 
 # ---------------------------------------------------------------------------
