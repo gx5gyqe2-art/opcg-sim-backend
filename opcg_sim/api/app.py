@@ -422,7 +422,8 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         action_api.apply_game_action(manager, current_player, action_type, payload)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
-        _kick_ponder(game_id)  # ⑥-a: 制御が CPU へ移ったら次手番の計画を前倒し（既定 OFF）
+        _kick_ponder(game_id)     # ⑥-a: 制御が CPU へ移ったら次手番の計画を前倒し（既定 OFF）
+        _kick_speculate(game_id)  # ⑥-b: 人間 MAIN 継続中なら「今エンドしたら」を投機（既定 OFF）
         return result
     except Exception as e:
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
@@ -466,7 +467,8 @@ async def game_battle(req: BattleActionRequest):
         action_api.apply_battle_action(manager, player, action_type, card_uuid)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
-        _kick_ponder(game_id)  # ⑥-a: 制御が CPU へ移ったら次手番の計画を前倒し（既定 OFF）
+        _kick_ponder(game_id)     # ⑥-a: 制御が CPU へ移ったら次手番の計画を前倒し（既定 OFF）
+        _kick_speculate(game_id)  # ⑥-b: 人間 MAIN 継続中なら「今エンドしたら」を投機（既定 OFF）
         return result
     except Exception as e:
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))
@@ -515,9 +517,21 @@ def _kick_ponder(game_id: str) -> None:
     if not manager or not meta or manager.winner is not None:
         return
     pending = manager.get_pending_request()
-    if not pending or pending.get("player_id") != meta.get("cpu_player_id"):
+    cpu_pid = meta.get("cpu_player_id")
+    if not pending or pending.get("player_id") != cpu_pid:
         return
     cache = meta.setdefault("plan_cache", {})
+    # ⑥-b: 「人間が今エンドしたら」を投機済み（spec_queue）で、実盤面でも先頭が合法なら昇格＝投機ヒット
+    # （CPU 初手の待ちすら消える）。外れ/未完なら下の ⑥-a（実盤面の先行計画）へ。合法性ゲートが採否を担保。
+    spec = cache.pop("spec_queue", None)
+    if spec:
+        cpu_player = manager.p1 if manager.p1.name == cpu_pid else manager.p2
+        legal_sigs = {cpu_ai._move_sig(m) for m in manager.get_legal_actions(cpu_player)}
+        if cpu_ai._move_sig(spec[0]) in legal_sigs:
+            cache["queue"] = spec
+            cache["spec_hits"] = cache.get("spec_hits", 0) + 1
+            return  # 投機が当たった＝再計画不要
+        cache["spec_misses"] = cache.get("spec_misses", 0) + 1
     if cache.get("task") is not None:
         return  # 既に先行計画が走行中
     cache["queue"] = None
@@ -525,6 +539,81 @@ def _kick_ponder(game_id: str) -> None:
         cache["task"] = asyncio.create_task(_ponder_plan(game_id))
     except RuntimeError:
         cache["task"] = None  # 実行中のイベントループが無い（テスト等）＝起動しない
+
+
+def _speculate_enabled() -> bool:
+    """Phase 3 ⑥-b 投機ポンダリングの作動条件。⑥-a（OPCG_PONDER）配下のさらなるオプトイン
+    （OPCG_PONDER_SPEC=1）。既定 OFF＝従来挙動完全同値。当たり率を計測してから本採用を判断する。"""
+    return _ponder_enabled() and os.environ.get("OPCG_PONDER_SPEC", "0") == "1"
+
+
+def _speculate_compute(clone, human_pid, cpu_pid, difficulty, profile, plan):
+    """⑥-b 投機の本体（`to_thread` で別スレッド実行）。**クローン上で**人間の TURN_END を仮適用し、
+    pending が素直に CPU 手番へ移ったら CPU セグメントを計画して返す（介在する人間決定があれば None）。
+    live 盤面には一切触れない（呼び出し側がメインスレッドで原子的に clone 済み）。"""
+    human = clone.p1 if clone.p1.name == human_pid else clone.p2
+    clone.action_events = []
+    action_api.apply_game_action(clone, human, "TURN_END", {})
+    pa = clone.pending_actor_action()
+    if not pa or pa[0] != cpu_pid:
+        return None
+    cpu_player = clone.p1 if clone.p1.name == cpu_pid else clone.p2
+    return decide_client.plan_segment(clone, cpu_player, difficulty,
+                                      mem={}, profile=profile, plan=plan)
+
+
+async def _speculate_plan(game_id: str, clone, human_pid: str, gen: int) -> None:
+    """⑥-b: 「人間が今エンドしたら」の CPU 計画を投機して `spec_queue` に保持（次の TURN_END で昇格判定）。
+
+    計算は `_speculate_compute` を `to_thread` でオフロード（plan は別プロセスのワーカー）。世代 `gen` が
+    最新でなければ（人間がさらに動いて盤面が変わった＝supersede）結果は捨てる。使い捨て clone・使い捨て mem
+    ＝live 盤面/turn_mem 不変。採否は最終的に `_kick_ponder` の合法性ゲートが担保する。"""
+    meta = CPU_GAMES.get(game_id)
+    if not meta:
+        return
+    cache = meta.setdefault("plan_cache", {})
+    try:
+        cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "normal")
+        result = await asyncio.to_thread(
+            _speculate_compute, clone, human_pid, cpu_pid, difficulty,
+            meta.get("opp_profile"), meta.get("self_plan"))
+        if cache.get("spec_gen") == gen:        # まだ最新の投機なら採用
+            cache["spec_queue"] = result or None
+    except Exception:
+        if cache.get("spec_gen") == gen:
+            cache["spec_queue"] = None
+    finally:
+        if cache.get("spec_gen") == gen:
+            cache["spec_task"] = None
+
+
+def _kick_speculate(game_id: str) -> None:
+    """人間の MAIN 手番（TURN_END が合法）の最中に「今エンドしたら」を投機する（⑥-b・既定 OFF）。
+
+    新しい人間アクションのたびに世代 `spec_gen` を進めて旧投機を supersede（1 ゲーム 1 タスク＝本数ゲート）。
+    clone は**メインスレッドで原子的**に取り（読み書き競合なし）、重い計算だけを task へ逃がす。"""
+    if not _speculate_enabled():
+        return
+    manager = GAMES.get(game_id); meta = CPU_GAMES.get(game_id)
+    if not manager or not meta or manager.winner is not None:
+        return
+    pending = manager.get_pending_request()
+    cpu_pid = meta.get("cpu_player_id")
+    # 人間（=CPU でない側）の MAIN_ACTION 決定点のときだけ投機（TURN_END が合法な静止点）。
+    if not pending or pending.get("player_id") == cpu_pid or pending.get("action") != "MAIN_ACTION":
+        return
+    cache = meta.setdefault("plan_cache", {})
+    try:
+        clone = manager.clone()  # メインスレッドで原子的に隔離＝以降 task が触れても競合しない
+    except Exception:
+        return
+    gen = cache.get("spec_gen", 0) + 1
+    cache["spec_gen"] = gen
+    human_pid = manager.p1.name if manager.p1.name != cpu_pid else manager.p2.name
+    try:
+        cache["spec_task"] = asyncio.create_task(_speculate_plan(game_id, clone, human_pid, gen))
+    except RuntimeError:
+        cache["spec_task"] = None  # 実行中のイベントループが無い（テスト等）＝起動しない
 
 
 def _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem):

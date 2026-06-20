@@ -381,10 +381,20 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
         `OPCG_PONDER=1`（①の `OPCG_PLAN_CACHE=1` 配下・既定 OFF＝従来挙動完全同値）。検証
         `tests/test_plan_cache.py`（`_ponder_plan` が queue を温め後続 `_cached_cpu_move` が再計算なしでヒット／
         `_kick_ponder` のゲートとタスク起動→完走で queue 充填）。**残**: ⑥-b（投機）と体感 A/B（prewarm 有無で /cpu/step 応答時間）。
-      - **⑥-b 投機ポンダリング（最重量・後回し）**: 契機＝人間の MAIN 長考中。人間の「取りうる最終盤面」を投機して plan を
-        焼く。ただし人間 MAIN の分岐は巨大（PLAY×対象×ドン配分×攻撃順…）＝全列挙不可。現実解は「人間が即 TURN_END した
-        場合の盤面」など**数本に限定**して焼き、外れたら `_move_sig` で弾いて再計画（①の安全網）。当たり率が低いと無駄計算で
-        ワーカーを占有し他ゲームの decide を遅延させるため、**本数ゲート＋当たり率計測**を経てから本採用を判断する。
+      - **⑥-b 投機ポンダリング（実装済み・bounded v1・2026-06）**: 契機＝人間の MAIN 継続中（`/api/game/action`・
+        `/battle` 末尾で pending が人間の MAIN_ACTION のとき `_kick_speculate`）。人間 MAIN の分岐は巨大（PLAY×対象×ドン
+        配分×攻撃順…）＝全列挙不可なので、**「人間が今 TURN_END したら」の 1 本に限定**して投機する: `_speculate_compute`
+        が**クローン上で**人間の TURN_END を仮適用し、pending が素直に CPU 手番へ移れば CPU セグメントを `plan_segment`
+        （ワーカー）で計画して `plan_cache["spec_queue"]` に保持（介在する人間決定があれば None＝投機しない）。clone は
+        **メインスレッドで原子的**に取り（読み書き競合なし）、TURN_END 仮適用＋plan だけを `to_thread` へ逃がす。使い捨て
+        clone・使い捨て mem＝**live 盤面/turn_mem 不変**。人間がさらに動いたら世代トークン `spec_gen` を進めて旧投機を
+        **supersede**（1 ゲーム 1 タスク＝本数ゲート）。人間が実際に TURN_END したら `_kick_ponder` が `spec_queue` の先頭を
+        実盤面の合法手と照合し、**合法なら queue へ昇格＝投機ヒット（CPU 初手の待ちすら消える）**／外れは `spec_misses` を
+        計上して ⑥-a（実盤面の先行計画）へ。採否は①の合法性ゲートが最終担保＝**外れても事故らない**。`spec_hits`/`spec_misses`
+        で**当たり率を計測**できる（本採用＝既定 ON 化はこの実測を見て判断）。フラグ `OPCG_PONDER_SPEC=1`（⑥-a の
+        `OPCG_PONDER=1` 配下・既定 OFF＝従来挙動完全同値）。検証 `tests/test_plan_cache.py`（`_speculate_compute` が
+        clone 上で CPU 計画を返し live 不変／`_kick_ponder` が合法な spec_queue を昇格し `spec_hits` 計上／`_kick_speculate`
+        のゲートと live 非変異）。**残**: 当たり率の実測 A/B・複数候補盤面への拡張（出力ゲート前提）。
       - **状態キー（`CPU_GAMES[gid]["plan_cache"]`）**: `queue`＝残り計画手／`task`＝進行中ポンダリングタスク（二重起動防止・
         キャンセル用）／`base_sig`＝計画を立てた局面の指紋（人間が動いたら queue を無効化判定）。
       - **並行・破棄**: 1 ゲーム 1 タスク。次の CPU 手番までに未完なら `/cpu/step` 側で**通常 decide にフォールバック**（待たない）。
