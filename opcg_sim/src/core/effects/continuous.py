@@ -47,7 +47,7 @@ class ContinuousEffectManager:
     def __setattr__(self, name, value):
         # 差分巻き戻し（journal.transaction 中のみ記録）。effects の付け替えを巻き戻すため。
         from .. import journal
-        if journal._active is not None:
+        if journal._TL.active is not None:
             journal.record_attr(self, name, self.__dict__)
         object.__setattr__(self, name, value)
 

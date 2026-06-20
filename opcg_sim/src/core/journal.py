@@ -27,17 +27,41 @@
 検証用に `deep_diff()` を同梱する。`適用→巻き戻し` 後の盤面が開始時の deepcopy と完全一致するかを
 照合し、journaled 化の取りこぼし（未カバーの in-place 変更）を機械的に検出する（PoC のゲート）。
 """
+import threading
 from contextlib import contextmanager
 
-# --- グローバル状態（探索は単一スレッド前提）---------------------------------
-_active = None          # 現在の StateJournal（None = 不活性 = 記録しない）
-_gen_counter = 0        # トランザクションごとの単調増加世代
-# 盤面変更の単調増加カウンタ（Phase2・継続効果再計算の dirty-flag 用）。journaled な全変更
-# （record_attr ＝属性 / JournaledList・Set・Dict の _touch ＝コンテナ）と、探索開始（top-level
-# transaction 入場）で +1 する＝**探索中(make/unmake)の入力変化を漏れなく捕捉**する。これにより
-# `_apply_passive_effects` は「前回再計算から _mut_count 不変＝入力不変」なら再計算を省ける。
-# 不活性時（正常プレイ・_active is None）は一切増えず作動しない＝従来挙動と完全同値。
-_mut_count = 0
+# --- スレッドローカル状態（並行安全）-----------------------------------------
+# journal は make/unmake 探索の差分記録に使う。本番ではポンダリングが OS スレッド（asyncio.to_thread）でも
+# 探索を走らせ得るため、状態をプロセス共有グローバルにすると「あるスレッドの transaction 中に別スレッドが
+# 生きたオブジェクトの属性を初回セット→その set が誤記録され rollback で live から属性が消える」並行バグになる
+# （`CardInstance has no attribute 'master'`）。そこで active/gen/mut を**スレッドローカル**にし、各スレッドの
+# 記録が互いに漏れないようにする（単一スレッド時は従来と完全同値）。
+#   active     : 現在の StateJournal（None = 不活性 = 記録しない）
+#   gen_counter: トランザクションごとの単調増加世代（スレッド内）
+#   mut_count  : 盤面変更の単調増加カウンタ（Phase2・継続効果再計算の dirty-flag 用）。journaled な全変更
+#                （record_attr ＝属性 / コンテナの _touch）と探索開始（top-level transaction 入場）で +1。
+#                不活性時（正常プレイ・active is None）は一切増えず作動しない＝従来同値。
+class _ThreadState(threading.local):
+    def __init__(self):
+        self.active = None
+        self.gen_counter = 0
+        self.mut_count = 0
+
+
+_TL = _ThreadState()
+
+
+def __getattr__(name):
+    """後方互換（PEP 562）: 外部は `journal._active`/`_mut_count`/`_gen_counter` をモジュール属性として
+    読む（models.py・gamestate.py 等）。現スレッドのスレッドローカル値を返す（読み取り専用）。ホットパス
+    （`CardInstance.__setattr__` 等）は `journal._TL.active` を直接読んで関数呼び出しのオーバーヘッドを避ける。"""
+    if name == "_active":
+        return _TL.active
+    if name == "_mut_count":
+        return _TL.mut_count
+    if name == "_gen_counter":
+        return _TL.gen_counter
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # 巻き戻しエントリのタグ
 _ATTR = 0   # (obj, name, old_value)      → object.__setattr__(obj, name, old)
@@ -51,9 +75,8 @@ class StateJournal:
     __slots__ = ("gen", "_undo")
 
     def __init__(self):
-        global _gen_counter
-        _gen_counter += 1
-        self.gen = _gen_counter
+        _TL.gen_counter += 1
+        self.gen = _TL.gen_counter
         self._undo = []
 
     def rollback(self):
@@ -85,34 +108,32 @@ def transaction():
     入れ子可。退出時は記録の再生中だけ `_active=None` にして二重記録を防ぎ、親トランザクション
     （あれば）を復帰させる。
     """
-    global _active, _mut_count
-    prev = _active
+    prev = _TL.active
     if prev is None:
-        # 探索開始（top-level）。正常プレイ中は _mut_count が凍結するため、ここで +1 して
+        # 探索開始（top-level）。正常プレイ中は mut_count が凍結するため、ここで +1 して
         # 直前の正常プレイによる盤面変更を跨いだ dirty-flag の取り残しを無効化する（健全性）。
-        _mut_count += 1
+        _TL.mut_count += 1
     j = StateJournal()
-    _active = j
+    _TL.active = j
     try:
         yield j
     finally:
-        _active = None          # 再生中は記録しない
+        _TL.active = None       # 再生中は記録しない
         j.rollback()
-        _active = prev          # 親（または None）へ復帰
+        _TL.active = prev       # 親（または None）へ復帰
 
 
 def is_active() -> bool:
-    return _active is not None
+    return _TL.active is not None
 
 
 # --- 属性書き換えの記録（対象クラスの __setattr__ から呼ぶ）-------------------
 def record_attr(obj, name, d):
     """`obj.name` を書き換える直前に旧値（無ければ削除）を記録する。`d` は obj.__dict__。"""
-    j = _active
+    j = _TL.active
     if j is None:
         return
-    global _mut_count
-    _mut_count += 1
+    _TL.mut_count += 1
     if name in d:
         j._undo.append((_ATTR, obj, name, d[name]))
     else:
@@ -127,10 +148,9 @@ class JournaledList(list):
     _jgen = 0
 
     def _touch(self):
-        j = _active
+        j = _TL.active
         if j is not None:
-            global _mut_count
-            _mut_count += 1
+            _TL.mut_count += 1
             if self._jgen != j.gen:
                 self._jgen = j.gen
                 j._undo.append((_LIST, self, self[:]))
@@ -176,10 +196,9 @@ class JournaledSet(set):
     _jgen = 0
 
     def _touch(self):
-        j = _active
+        j = _TL.active
         if j is not None:
-            global _mut_count
-            _mut_count += 1
+            _TL.mut_count += 1
             if self._jgen != j.gen:
                 self._jgen = j.gen
                 j._undo.append((_SET, self, set(self)))
@@ -228,10 +247,9 @@ class JournaledDict(dict):
     _jgen = 0
 
     def _touch(self):
-        j = _active
+        j = _TL.active
         if j is not None:
-            global _mut_count
-            _mut_count += 1
+            _TL.mut_count += 1
             if self._jgen != j.gen:
                 self._jgen = j.gen
                 j._undo.append((_DICT, self, dict(self)))

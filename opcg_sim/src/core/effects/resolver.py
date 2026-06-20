@@ -23,7 +23,7 @@ class EffectResolver:
         # 差分巻き戻し（journal.transaction 中のみ記録）。中断再開の手（parked resolver を持ち越す手）も
         # make/unmake で扱えるよう、resolver の状態書き換え（context/execution_stack の再代入等）を記録する。
         # 不活性時（_active is None）はグローバル 1 読みで素通り＝通常プレイ無影響（§2.5.2 ②）。
-        if journal._active is not None:
+        if journal._TL.active is not None:
             record_attr(self, name, self.__dict__)
         object.__setattr__(self, name, value)
 

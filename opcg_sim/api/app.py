@@ -494,10 +494,14 @@ async def _ponder_plan(game_id: str) -> None:
     cache = meta.setdefault("plan_cache", {})
     try:
         cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "normal")
-        cpu_player = manager.p1 if manager.p1.name == cpu_pid else manager.p2
         turn_mem = meta.setdefault("turn_mem", {})
+        # live 盤面をそのまま OS スレッドへ渡すと、スレッド側の deepcopy（plan_turn 内 clone / ワーカーへの
+        # pickle）がメインスレッドの盤面変更と競合する（読み取り中の書き換え）。**メインスレッドで原子的に
+        # clone**してから渡し、スレッドは隔離されたスナップショットだけに触れる（_kick_speculate と同方針）。
+        snap = manager.clone()
+        cpu_player = snap.p1 if snap.p1.name == cpu_pid else snap.p2
         actions = await asyncio.to_thread(
-            decide_client.plan_segment, manager, cpu_player, difficulty,
+            decide_client.plan_segment, snap, cpu_player, difficulty,
             mem=turn_mem, profile=meta.get("opp_profile"), plan=meta.get("self_plan"))
         cache["queue"] = actions or None
     except Exception:

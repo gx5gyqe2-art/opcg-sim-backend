@@ -87,7 +87,7 @@ class Player:
         # 差分巻き戻し（journal.transaction 中のみ記録）。不活性時は素通り。
         if type(value) is list and name in Player._LIST_ZONES:
             value = JournaledList(value)
-        if journal._active is not None:
+        if journal._TL.active is not None:   # ホットパス: threadlocal を直接読む
             record_attr(self, name, self.__dict__)
         object.__setattr__(self, name, value)
 
@@ -180,7 +180,7 @@ class GameManager:
     def __setattr__(self, name, value):
         # 差分巻き戻し（journal.transaction 中のみ記録）。object.__setattr__ 経由なので
         # active_interaction 等の data descriptor（property）も従来どおり機能する。
-        if journal._active is not None:
+        if journal._TL.active is not None:   # ホットパス: threadlocal を直接読む
             record_attr(self, name, self.__dict__)
         object.__setattr__(self, name, value)
 
@@ -1162,7 +1162,7 @@ class GameManager:
         # を省く。_mut_count は journaled な全変更＋探索開始で増えるため取り残し無し。正常プレイ
         # （_active is None）では作動せず常に再計算＝従来挙動と完全同値。ロールバックはバフを正しく
         # 復元する＋_mut_count >= _passive_mc を保つため、省略しても必要時は必ず再計算され安全。
-        if journal._active is not None and journal._mut_count == self._passive_mc:
+        if journal._TL.active is not None and journal._TL.mut_count == self._passive_mc:
             return
         # YOUR_TURN 効果は常にターンプレイヤー基準で適用する（呼び出し元が owner を
         # 渡しても誤適用しない）。
@@ -1242,8 +1242,8 @@ class GameManager:
         # Phase2 dirty-flag: 再計算完了時点の _mut_count を記録（探索中のみ）。自身の書き込みを
         # 含んだ後の値を object.__setattr__ で保持する（journaled せず _mut_count も増やさない＝
         # 次回呼び出しで外部変更が無ければ一致してスキップできる）。
-        if journal._active is not None:
-            object.__setattr__(self, "_passive_mc", journal._mut_count)
+        if journal._TL.active is not None:
+            object.__setattr__(self, "_passive_mc", journal._TL.mut_count)
 
     def _apply_hand_self_cost(self, player: Player, opponent: Player):
         resolver = None

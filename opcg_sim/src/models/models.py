@@ -152,7 +152,7 @@ class CardInstance:
 
     def __setattr__(self, name, value):
         # 差分巻き戻し（journal.transaction 中のみ記録）。不活性時はグローバル 1 読みで素通り。
-        if journal._active is not None:
+        if journal._TL.active is not None:   # ホットパス: __getattr__ を避け threadlocal を直接読む
             record_attr(self, name, self.__dict__)
         object.__setattr__(self, name, value)
 
@@ -300,7 +300,7 @@ class DonInstance:
     is_frozen: bool = False
 
     def __setattr__(self, name, value):
-        if journal._active is not None:
+        if journal._TL.active is not None:   # ホットパス: __getattr__ を避け threadlocal を直接読む
             record_attr(self, name, self.__dict__)
         object.__setattr__(self, name, value)
 
