@@ -444,6 +444,31 @@ WBS（`gx5gyqe2-art/WBS` の `projects/opcg-sim-backend.md`）と同期。
   既定解決頼みの甘い/辛い見積りに賭けすぎない。lethal（±(W_WIN-ply)）は確定事象なので非割引。プラン供給時のみ
   作動（plan=None 完全同値）。`tests/test_cpu_self_plan.py`（plan 限定で正負を中立へ係数倍／lethal 非割引／
   `_settle_eval` 配線）。重大度=中。→ **C-4 完了**。
+- **C-5 settle 楽観是正（受け手の地平線外打点の減点）【採用】**（`_settle_eval`／`_incoming_reach`／
+  `W_SETTLE_PRESSURE`・§2.5.3）: 予算切れの打ち切り葉（settle）は相手のターン開始で止めて**静的**に採点する＝
+  相手の反撃を読まない＝**動いた側に楽観バイアス**（殴られる直前でスナップショット）。これが「**手番頭で
+  ドン/盤面に過剰コミットした手の深掘り値が楽観的に高く出る → 手番が進み代償が予算内に入って初めて崩落**」
+  という非定常（value-realization gap）を生む。実ケース: ナミ(OP11-041)対面で 2000 のバスコ・ショット
+  (OP16-110)に**ドン3枚を付与（付与時 deep ≈ +4798）→ ナミの【相手のアタック時】+2000 を静的層
+  （`_attach_don_meaningful`/`_prune_futile_attacks` は素パワーのみ）が見落とすため貫通すると誤認 → 攻撃の
+  決定まで来て初めて貫通不可が露見（attack deep ≈ −91〜−2050）→ 付与3枚を空振りで全返却**。対策: settle 葉
+  （相手ターン静止点・plan 供給時のみ）で、相手の次ターンの**受け切れない打点本数**（`_incoming_reach`＝
+  リーダー＋場の素パワーが自リーダーに届く本数 − 自アクティブブロッカー）× `W_SETTLE_PRESSURE`(=2500) を
+  減点して楽観を是正する。**致死（reach ≥ 自ライフ）は C-2 telegraph が `evaluate` 内で計上済みなので致死
+  未満のみ**扱い二重計上を避ける。`evaluate`/C-2 は不変＝真の地平線葉（読み切れた線）は触らず、**読み切れ
+  なかった葉だけ**をペッシミ寄せ（C-4 と同系統＝既定解決頼みを信用しすぎない）。`tests/test_cpu_self_plan.py`
+  （`test_b_settle_pressure_isolated`＝致死未満で reach×W 減点／reach0・致死・plan=None・自手番で不作動）。
+  重大度=中〜高。**A/B 検証（採用）**: B-on(`W_SETTLE_PRESSURE=2500`) vs B-off(0)・both hard・席交互・
+  **n=60＝39/60・wr0.650・+108 Elo（95%CI [+20,+211]＝0 を上回る）**で純利得を確認して採用（horizon3→4 の
+  +58 Elo と同等以上）。検証装置は `tests/elo_settle_ab.py`。なお実ケースの「ドン空振り」症状そのものは B の
+  評価地点（相手ターン開始の被打点）では捉えられない（付与ドンは手番終了で返るため空振りと有効活用が同一
+  盤面になる）＝B は集計で勝率を上げるが当該症状の体感修正は別項（行為帰属＝自手番クローズでの資源変換評価）
+  が必要。→ **C-5 採用（2026-06-20）**。
+  > **value-realization gap 計測【実装済み】**（`tests/cpu_arena.py realize`／`decide_with_regret(out=…)`）:
+  > regret（deep vs 1-ply 貪欲）は deep を正解とみなすため、**deep 自身が地平線外を楽観視する誤り**を構造的に
+  > 検知できない。そこで「1 ターン内で採用手の深掘り値が `max → 最終決定` でどれだけ崩落したか」を gap として
+  > 集計する別指標を追加（大きい gap = 予算地平線の外を楽観視して資源を溶かす兆候＝C-5 が縮める対象）。
+  > 実行例: `python tests/cpu_arena.py realize --difficulty hard --seed 0`。
 
 #### 2026-06 外部レビュー収束（再優先順位・新規項）
 外部AIレビューとの往復で確定した方針。WBS と同期。**進捗（2026-06）**: B-1(a)/(b)・公開情報ベリーフ更新・
