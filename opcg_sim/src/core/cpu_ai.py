@@ -2000,3 +2000,82 @@ def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[ra
         mem["counts"] = counts
         mem["total"] = mem.get("total", 0) + 1
     return move
+
+
+def plan_turn(manager, name: str, difficulty: str = "hard", rng=None,
+              mem: Optional[Dict[str, Any]] = None, profile=None, plan=None) -> List[Dict[str, Any]]:
+    """Phase 3 ①（計画キャッシュ）: 相手の介入（ブロック/カウンター等）が入るまで、または TURN_END
+    までの自分(`name`)の**連続行動列**をクローン上で計画する。
+
+    クローン上で `decide_guarded` を逐次適用して列を作るため、本物の per-action 流（同じ `rng`/`mem` を
+    渡す）と**ビット等価**になる: 介入の無い区切り内では各手番の (盤面, rng, mem) が完全一致するため、
+    計画の手列・rng/mem 消費は per-action と同一（前倒しで全部計算→以降は replay という時間配分だけが違う）。
+    「自分が連続で動ける区切り」（ターン開始や相手介入の直後）で 1 回計算してキャッシュし、以降の手番は
+    キャッシュ参照で即時化する＝**待ちを 1 回に集約**する（体感最適化）。相手の応手で前提が崩れる介入点で
+    区切るので、そこから先は実結果が出てから再計画する。
+
+    戻り値: 行動 move dict のリスト（末尾は TURN_END か、相手介入の直前まで）。`mem`/`rng` は per-action と
+    同じものを渡すと、計画適用後の状態が本物の逐次実行と一致する（呼び出し側で replay 時は decide を呼ばない）。
+    """
+    from . import action_api
+    rng = rng or random
+    clone = manager.clone()
+    actions: List[Dict[str, Any]] = []
+    for _ in range(TURN_ACTION_CAP + 8):  # 安全上限（decide_guarded のキャップと整合・暴走防止）
+        pa = clone.pending_actor_action()
+        if not pa or pa[0] != name:
+            break  # 相手の手番/介入点（SELECT_BLOCKER/SELECT_COUNTER 等）＝区切り
+        actor = _player_by_name(clone, name)
+        mv = decide_guarded(clone, actor, difficulty, rng, mem=mem, profile=profile, plan=plan)
+        if mv is None:
+            break
+        actions.append(mv)
+        if mv.get("kind") == "battle":
+            action_api.apply_battle_action(clone, actor, mv["action_type"], mv.get("card_uuid"))
+        else:
+            action_api.apply_game_action(clone, actor, mv["action_type"], mv.get("payload", {}))
+        if mv.get("action_type") == "TURN_END":
+            break
+    return actions
+
+
+def decide_cached(manager, player, difficulty: str = "hard", rng=None,
+                  mem: Optional[Dict[str, Any]] = None, cache: Optional[Dict[str, Any]] = None,
+                  profile=None, plan=None) -> Optional[Dict[str, Any]]:
+    """Phase 3 ① 配線: 計画キャッシュ付き decide（**本番の体感最適化専用**）。
+
+    `cache` は対局ごとに保持する dict（`{"queue": [...残りの計画手...]}`）。
+      - **キャッシュヒット**: 次の計画手が現局面で**合法**なら即返す（探索なし＝即時 replay）。
+      - **キャッシュミス/前提崩れ**: `plan_turn` でセグメント（相手介入/TURN_END まで）を計画して
+        キャッシュし、先頭手を返す。計画手が現局面で不正なら破棄して通常の `decide_guarded` へ。
+
+    **合法性検証で常に安全**（rng がズレてもキャッシュ手が不正なら通常 decide に落ちる＝不正手は打たない）。
+    ただし `plan_turn` のクローン適用と本番 replay の実適用でシャッフル等の rng 消費が前後しうるため
+    **決定性は保証しない＝テスト/自己対戦は `decide_guarded` を使う**こと（本番は決定性不要）。
+    """
+    rng = rng or random
+    if cache is None:
+        cache = {}
+    legal = manager.get_legal_actions(player)
+    if not legal:
+        return None
+    legal_by_sig = {_move_sig(m): m for m in legal}
+
+    q = cache.get("queue")
+    if q:
+        nxt_sig = _move_sig(q[0])
+        if nxt_sig in legal_by_sig:
+            cache["queue"] = q[1:]
+            return legal_by_sig[nxt_sig]  # 現局面の move（uuid 整合）を返す
+        cache["queue"] = None  # 前提崩れ＝破棄して再計画
+
+    actions = plan_turn(manager, player.name, difficulty, rng, mem=mem, profile=profile, plan=plan)
+    if actions:
+        first_sig = _move_sig(actions[0])
+        if first_sig in legal_by_sig:
+            cache["queue"] = actions[1:]
+            return legal_by_sig[first_sig]
+    # 計画が空/先頭不正＝安全側で通常 decide（rng/mem は plan_turn で進行済みのため二重進行に注意だが
+    # 本番専用＝決定性非依存。guard は安全網なので軽微な前後は許容）。
+    cache["queue"] = None
+    return decide_guarded(manager, player, difficulty, rng, mem=mem, profile=profile, plan=plan)

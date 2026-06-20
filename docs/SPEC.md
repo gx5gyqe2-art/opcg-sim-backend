@@ -277,6 +277,14 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       読み筋ループは **(pid, action) しか見ない**ので軽量 `pending_actor_action` で判定し、フル payload は実際に既定解決する
       ときだけ作る（呼数 12,302→7,018・−43%）。方策不変（`pending_actor_action` は get_pending_request と (pid,action)・
       副作用一致）。controlled A/B で **~1.06x**・全1039pass・構造監査0。
+      > **API 配線（Phase 3 ①-b・2026-06）**: `/api/game/cpu/step` に計画キャッシュを配線（`OPCG_PLAN_CACHE=1`・
+      > 本番体感最適化・既定 OFF＝従来挙動完全同値）。対局ごとの `meta["plan_cache"]={"queue":[...]}` を保持し、
+      > `_cached_cpu_move` が (a) 次の計画手が現局面で**合法なら即返す**（探索なし・**ワーカー往復なし**＝即時 replay）、
+      > (b) ミス/前提崩れなら PyPy ワーカーの **plan モード**（`decide_worker._handle` の 10要素目 `mode="plan"`／
+      > `decide_client.plan_segment`）で `plan_turn` を実行しセグメントを再計画してキャッシュ。先頭手が不正なら通常
+      > `decide` へフォールバック（合法性検証で常に安全）。トレース採取時は per-action を維持（読み筋記録）。これにより
+      > **セグメント先頭=1回のワーカー計画→残りは CPython 即時 replay**＝待ちを1回に集約。検証 `tests/test_plan_cache.py`
+      > （`plan_segment`==`plan_turn`・`_cached_cpu_move` の合法/replay）。残: A/B・⑥ ポンダリング（相手の番に前倒し）。
       > **不採用メモ（B）**: `_apply_passive_effects` Step2/3 の「常在トリガーを持つカードだけ走査」案は、既存の
       > `if not card.master.abilities` 空チェックで能力なしカードが既に安く弾かれており、per-card の判定関数呼び出しが
       > 逆にオーバーヘッド＝**ネット負**で撤回（再プロファイルで cumulative 悪化を確認）。
@@ -319,10 +327,28 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       読んでいる**（「相手がこう来たら自分はこう」が探索木に含まれる）。現状は 1 手選ぶと木を捨て**毎手再探索**して
       いるが、最善の**部分木（相手応手分岐込み）を抽出してキャッシュ**し、相手が実際に動いたら該当枝をルックアップ
       ＝即応する。ターン開始で 1 回深く考え以降は即時。メインフェイズ（相手介入なし）は完全キャッシュ可、攻撃は
-      相手のブロック/カウンターで前提が崩れた枝から再探索。**決定的結果の前倒し/再利用＝挙動不変**（毎手再探索との
-      微差は A/B で確認）。下記 ④⑥ が乗る土台。
-    - **② 自明手の即答パス**: 実質一択/明らかに最善の手番を軽い前段で検出して即答し、本当に競う局面だけ全力探索
-      ＝重い計画の発生回数を減らす（平均/総計算減）。誤判定で弱体化しない閾値設計＋A/B。
+      相手のブロック/カウンターで前提が崩れた枝から再探索。**決定的結果の前倒し/再利用＝挙動不変**。下記 ④⑥ が乗る土台。
+      **PoC 実装済み（`plan_turn`・2026-06）**: 相手の介入（ブロック/カウンター）が入るまで、または TURN_END までの
+      自分の連続手番を**クローン上で `decide_guarded` を逐次適用して計画**する。同じ単一 rng ストリーム・同じ mem を渡せば、
+      介入の無い区切り内では各手番の (盤面, rng, mem) が完全一致＝**per-action 流とビット等価**（同じ手列・同じ rng/mem
+      消費。前倒しで全部計算→以降 replay という時間配分だけが違う）。実測（hard 自己対戦・seed0-1）で **90/90 セグメントが
+      ビット等価・不一致 0**（`tests/test_plan_cache.py` で機械照合＝強さ・再現性を変えずに導入できる）。レイテンシ分布:
+      セグメント長 mean 2.1・複数手(≥2)セグメント平均 3.1 手で **plan_turn 平均 ~1054ms（=待ちを 1 回に集約）／最大 ~4.3s**＝
+      総計算は per-action と同じで**1 回の思考に前倒し**。長いセグメントの単発待ちは大きくなるため、**体感の本命は ④（演出
+      重ね）/⑥（ポンダリング）で前倒し分を隠すこと**＝計画キャッシュはその土台。
+      **配線（`decide_cached`・2026-06）**: 対局ごとに `cache={"queue":[...]}` を保持し、(a) 次の計画手が現局面で**合法なら
+      即返す**（探索なし＝即時 replay）、(b) ミス/前提崩れなら `plan_turn` で再計画。**合法性検証で常に安全**＝rng がズレても
+      キャッシュ手が不正なら通常 `decide_guarded` に落ちる（不正手は打たない）。ただし `plan_turn` のクローン適用と本番
+      replay の実適用で**シャッフル効果等の rng 消費が前後しうる**（`random.shuffle` ＝デッキ操作。`gamestate` 2334 等）ため
+      **決定性は保証しない＝テスト/自己対戦は `decide_guarded`（フラグ OFF 既定）・本番のみ `decide_cached`**（本番は決定性
+      不要）。検証 `tests/test_plan_cache.py`（合法手のみ・対局完走・plan_turn 呼数 < decide 回数＝replay 実効）。
+      **残**: API 層（`/cpu/step`・`CPU_GAMES`）と PyPy ワーカーへの cache 配線（保持＋シリアライズ）・A/B。
+    - **② 自明手の即答パス＝実測で不採用（2026-06）**: 「1-ply で best が 2nd を大差（≈12000）で圧倒する自明局面は
+      深掘りを省いて即答」を試作（`_scored_search`・`OPCG_TRIVIAL_FASTPATH` フラグ）。**A/B（hard・席交互24局）= ②ON
+      14-10（58.3%）＝強さは中立（ノイズ範囲）**だが、**思考手レイテンシ ON 368ms vs OFF 364ms ＝利得ゼロ**で不採用。
+      理由: 深掘りをスキップしても **prelim（全ルート手の 1-ply 事前採点＝`_eval_root_move`）は依然走る**ため節約に
+      ならない（コストの大半は deepening でなく prelim＋eval）。中立×無利得×分岐の複雑性増＝割に合わずコードは revert。
+      `decide` は単一合法手は従来どおり即答する。下記は不採用の経緯記録。
     - **③ 相手 min 手番のビーム幅拡張**: 現状 `HARD_BEAM`(=3) は max/min 共通（`children[:HARD_BEAM]`）。相手応手を
       広く読むため **min ノード専用の広いビーム**（`HARD_OPP_BEAM`・数行＋定数）を導入し contingency を厚くする
       （相手の取りうる手を多く残す）。計算増は ①②④ で吸収。強さ×レイテンシを A/B。

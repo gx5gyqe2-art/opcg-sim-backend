@@ -95,3 +95,25 @@ def decide(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[st
         manager, player, difficulty, mem=mem, profile=profile, plan=plan,
         trace=trace, trace_read_ahead=trace_read_ahead,
     )
+
+
+def plan_segment(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[str, Any]] = None,
+                 profile=None, plan=None):
+    """Phase 3 ① 計画キャッシュ: セグメント（相手介入/TURN_END まで）の自分の連続手番を計画して
+    action list を返す（ワーカー優先・失敗時インプロセス）。`mem` はワーカー側の進行を反映する。"""
+    if mem is None:
+        mem = {}
+    if USE_WORKER:
+        try:
+            req = (manager, player.name, difficulty, mem, profile, plan,
+                   random.getstate(), False, False, "plan")
+            actions, _tr, mem2 = _roundtrip(req)
+            mem.clear()
+            mem.update(mem2)
+            return actions
+        except Exception:
+            try:
+                spawn_worker()
+            except Exception:
+                pass
+    return cpu_ai.plan_turn(manager, player.name, difficulty, mem=mem, profile=profile, plan=plan)
