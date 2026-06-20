@@ -36,6 +36,7 @@
 | [`reports/cpu_precision_batch_20260616.md`](reports/cpu_precision_batch_20260616.md) | CPU 精度向上（2026-06-16）。検証基盤フェーズ0（凍結ベースライン Elo＋regret ログ＋ドン→クロック decide パズル）＋バッチ C-1/B-3/C-3/C-2 の実装記録と、アリーナで観測した normal<easy（独立の既存課題）の所見・A/B 結果 |
 | [`reports/cpu_plan_ideal_line_design_20260616.md`](reports/cpu_plan_ideal_line_design_20260616.md) | 設計メモ（2026-06-16）。自デッキ「理想ライン」自動導出プラン（A・構成からのヒューリスティック）＋J値（白＝デッキ残＋トラッシュ）差分スケジュールでの進捗採点・相手リーダー由来 `OpponentProfile` でのマッチアップ補正。`PlanProfile`/`_plan_progress` 拡張案・フェア性/回帰/段階導入計画 |
 | [`reports/cpu_plan_ideal_line_ab_20260616.md`](reports/cpu_plan_ideal_line_ab_20260616.md) | 計測報告（2026-06-16）。理想ライン（J値スケジュール）Phase 1/2 の A/B。normal vs easy（24局）−29Elo・ON vs OFF 直接対決（20局）+35Elo＝いずれもノイズ域・中立〜僅かプラス・退行なし。控えめ係数を維持し、確実なチューニングは計測刷新（数百局/Phase2 用テンプレ相手系）を継続テーマに |
+| [`reports/cpu_search_accel_pypy_20260620.md`](reports/cpu_search_accel_pypy_20260620.md) | CPU 探索 高速化 調査（2026-06-20）。「速くした分を horizon に回す」目的の手順と対照。PyPy 実測 ~2.1x（改変ゼロ・挙動ビット一致・同一337step/280decide）＝horizon +1 相当。エンジンは stdlib-only で PyPy 動作実証・配信スタック互換のみ課題。高速化手段の総覧対照表（差分評価/lazy/parked/LMR/mypyc/root並列/native）と推奨順序。ベンチ=`tests/bench_decide.py` |
 
 ## クイックスタート
 
