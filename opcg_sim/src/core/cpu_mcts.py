@@ -395,13 +395,36 @@ def _macro_simulate(root: _MacroNode, root_state, root_name: str,
         nd.W += v
 
 
+# Phase 2 強化: 複数世界アンサンブル（真の ISMCTS 近似）。1 世界（1 通りの相手手札仮定）では仮定の
+# 当たり外れに左右されるため、**K 通りの決定化世界で各々探索し、ルート子（=自分のターンプラン。自分の手は
+# 実物で世界をまたいで比較可能）を「先頭手」で集約**して最頻・最多訪問の先頭手のプランを返す＝単一世界の
+# 分散を平均で打ち消す。完全 ISMCTS（共有木）は相手 uuid の世界間不整合で木が壊れるため、独立世界の
+# ルート集約＝単純で正しい近似。`MCTS_WORLDS`（既定 1＝従来の単一世界）。完全情報モードでは決定化しないので
+# 世界は同一＝集約は無害（>1 でも単に反復が分散するだけ）。
+MCTS_WORLDS = 1
+
+
+def _macro_search_root(root_state, name: str, iters: int, H: int,
+                       see_opp_hand: bool, rng) -> Optional["_MacroNode"]:
+    """`root_state`（`name` の手番境界・決定化済みでもよい）で 1 世界ぶん探索し、ルートノードを返す。"""
+    pa = root_state.pending_actor_action()
+    if not pa or pa[0] != name:
+        return None
+    root = _MacroNode(None, name, terminal=False)
+    for _ in range(iters):
+        _macro_simulate(root, root_state, name, H, see_opp_hand, rng)
+    return root if root.children else None
+
+
 def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
                    iterations: Optional[int] = None, horizon: Optional[int] = None,
-                   see_opp_hand: Optional[bool] = None) -> List[Dict[str, Any]]:
+                   see_opp_hand: Optional[bool] = None,
+                   worlds: Optional[int] = None) -> List[Dict[str, Any]]:
     """マクロ MCTS で `player` の**このターンの手列（ターンプラン）**を返す（計画キャッシュ的に逐次 replay 可）。
 
-    ルートは `player` の手番境界。子=候補ターンプラン。最善子（最多訪問）の手列を返す。
-    合法手が無ければ空リスト。
+    ルートは `player` の手番境界。子=候補ターンプラン。最善子（最多訪問）の手列を返す。合法手が無ければ空。
+    `worlds`>1（公平モード時）は K 通りの決定化世界で探索し、先頭手で集約した最頻・最多訪問プランを返す
+    （単一世界の仮定ブレを平均で打ち消す＝真の ISMCTS 近似）。
     """
     rng = rng or random
     name = player.name
@@ -409,24 +432,51 @@ def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[rand
         see_opp_hand = (difficulty == "hard")
     iters = iterations if iterations is not None else MCTS_MACRO_ITERS
     H = horizon if horizon is not None else MCTS_MACRO_HORIZON
+    W = worlds if worlds is not None else MCTS_WORLDS
 
     pa = manager.pending_actor_action()
     if not pa or pa[0] != name:
         return []
-    # Phase 2: 公平モードなら相手手札を1通り再サンプリングした世界で探索（自分の手は不変＝プランは実ゲーム合法）。
-    root_state = _determinize_opponent(manager, name, rng) if MCTS_DETERMINIZE else manager
-    root = _MacroNode(None, name, terminal=False)
-    for _ in range(iters):
-        _macro_simulate(root, root_state, name, H, see_opp_hand, rng)
-    if not root.children:
+
+    # 単一世界（既定 or 完全情報）: 1 世界探索して最多訪問プラン。
+    if W <= 1 or not MCTS_DETERMINIZE:
+        root_state = _determinize_opponent(manager, name, rng) if MCTS_DETERMINIZE else manager
+        root = _macro_search_root(root_state, name, iters, H, see_opp_hand, rng)
+        if root is None:
+            return []
+        best = max(root.children, key=lambda c: (c.N, c.W / c.N if c.N else 0.0, rng.random()))
+        return best.plan
+
+    # 複数世界アンサンブル: 各世界で探索し、ルート子を先頭手 sig で集約（訪問数を合算）。
+    per_world = max(1, iters // W)
+    tally: Dict[tuple, List[float]] = {}        # first_sig -> [総訪問, 最良訪問, 最良プラン]
+    for _ in range(W):
+        det = _determinize_opponent(manager, name, rng)
+        root = _macro_search_root(det, name, per_world, H, see_opp_hand, rng)
+        if root is None:
+            continue
+        for ch in root.children:
+            if not ch.plan:
+                continue
+            fsig = _move_sig(ch.plan[0])
+            ent = tally.get(fsig)
+            if ent is None:
+                tally[fsig] = [ch.N, ch.N, ch.plan]
+            else:
+                ent[0] += ch.N
+                if ch.N > ent[1]:
+                    ent[1], ent[2] = ch.N, ch.plan
+    if not tally:
         return []
-    best = max(root.children, key=lambda c: (c.N, c.W / c.N if c.N else 0.0, rng.random()))
-    return best.plan
+    # 先頭手の総訪問が最大のものを採用＝世界をまたいで最も支持されたターン入り。プランはその先頭手の
+    # 最良単一世界プラン（一貫した手列）を返す。
+    best_first = max(tally.items(), key=lambda kv: (kv[1][0], kv[1][1], rng.random()))
+    return best_first[1][2]
 
 
 def decide_mcts_macro(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
                       cache: Optional[Dict[str, Any]] = None, iterations: Optional[int] = None,
-                      horizon: Optional[int] = None,
+                      horizon: Optional[int] = None, worlds: Optional[int] = None,
                       moves: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
     """マクロ MCTS の**逐次 1 手**インターフェース（`cpu_ai.decide_cached` と同型）。
 
@@ -454,7 +504,8 @@ def decide_mcts_macro(manager, player, difficulty: str = "hard", rng: Optional[r
             return legal_by_sig[_move_sig(nxt)]
         cache["queue"] = None  # 前提崩れ＝再計画
 
-    plan = mcts_plan_turn(manager, player, difficulty, rng, iterations=iterations, horizon=horizon)
+    plan = mcts_plan_turn(manager, player, difficulty, rng, iterations=iterations,
+                          horizon=horizon, worlds=worlds)
     if plan and _move_sig(plan[0]) in legal_by_sig:
         cache["queue"] = plan[1:]
         return legal_by_sig[_move_sig(plan[0])]

@@ -133,3 +133,20 @@ def test_macro_fair_mode_plan_legal(db):
             assert cpu_ai._move_sig(plan[0]) in legal
     finally:
         cpu_mcts.MCTS_DETERMINIZE = orig
+
+
+def test_macro_multiworld_plan_legal(db):
+    """複数世界アンサンブル（公平モード・worlds>1）でも返すプランは実ゲームで合法・manager 不変。"""
+    gm = _states(db, n=1)[0]
+    legal = {cpu_ai._move_sig(m) for m in gm.get_legal_actions(gm.p1)}
+    orig = cpu_mcts.MCTS_DETERMINIZE
+    try:
+        cpu_mcts.MCTS_DETERMINIZE = True
+        before = copy.deepcopy(gm)
+        plan = cpu_mcts.mcts_plan_turn(gm, gm.p1, "hard", random.Random(0),
+                                       iterations=90, horizon=2, worlds=3)
+        assert journal.deep_diff(before, gm) is None
+        if plan:
+            assert cpu_ai._move_sig(plan[0]) in legal
+    finally:
+        cpu_mcts.MCTS_DETERMINIZE = orig
