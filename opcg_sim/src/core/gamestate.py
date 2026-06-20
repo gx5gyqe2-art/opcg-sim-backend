@@ -78,8 +78,15 @@ def _ability_index(card, ab) -> Any:
     return id(ab)
 
 class Player:
+    # ゾーン（list）は JournaledList を保証する。本番は __init__＋append/remove で常に JournaledList だが、
+    # テスト等で `p.hand=[...]` と素 list を代入されると中断再開の make/unmake が巻き戻せない（plain list は
+    # 未 journaled）。代入時に素 list を JournaledList へ昇格させて make/unmake の健全性を担保する。
+    _LIST_ZONES = frozenset({"hand", "field", "life", "trash", "deck"})
+
     def __setattr__(self, name, value):
         # 差分巻き戻し（journal.transaction 中のみ記録）。不活性時は素通り。
+        if type(value) is list and name in Player._LIST_ZONES:
+            value = JournaledList(value)
         if journal._active is not None:
             record_attr(self, name, self.__dict__)
         object.__setattr__(self, name, value)
@@ -1425,10 +1432,12 @@ class GameManager:
     def _enqueue_trigger(self, player: Player, ability: Ability, card: CardInstance,
                          optional: bool = False) -> None:
         """誘発能力を待ち行列へ積む。optional=True は発動可否（使う/使わない）を確認する。"""
-        self._pending_triggers.append({
+        # JournaledDict 化＝中断中の item["_confirmed"]=True 等の in-place 変更を巻き戻せるように
+        # する（parked resolver の make/unmake 化・round-trip ゲートで照合）。
+        self._pending_triggers.append(JournaledDict({
             "player": player, "ability": ability, "card": card,
             "optional": optional, "_confirmed": False,
-        })
+        }))
 
     def _advance_pending_triggers(self) -> None:
         """積んだ誘発能力を順に消化する。中断（対話）が立ったら return し、
@@ -2012,7 +2021,7 @@ class GameManager:
             "kind": "RESOLVER_STACK",
             "player_name": player.name,
             "source_card_uuid": source_card.uuid if source_card else None,
-            "execution_stack": list(execution_stack),
+            "execution_stack": JournaledList(execution_stack),
             "effect_context": context,
         })
 

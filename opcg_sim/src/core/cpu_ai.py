@@ -844,18 +844,21 @@ def _drain_own_interactions(manager, actor_name: str, stop_at_select: bool = Fal
     （探索側が候補ごとに分岐して最善対象を選ぶため・§2.5.2）。
     """
     from . import action_api
-    KEY_PID, KEY_ACTION = _pending_keys()
     for _ in range(_DRAIN_LIMIT):
-        pending = manager.get_pending_request()
-        if not pending or pending[KEY_PID] != actor_name:
+        # 判定は軽量版（pid, action だけ）で行い、重い payload は実際にドレインするときだけ作る
+        # （get_pending_request は毎回 selectable 構築＋uuid4 で重い・§2.5.2）。pending_actor_action は
+        # get_pending_request と (pid, action)・副作用が一致（test_pending_actor_action_matches_full）。
+        pa = manager.pending_actor_action()
+        if not pa or pa[0] != actor_name:
             return
-        action = pending[KEY_ACTION]
+        action = pa[1]
         # メイン/マリガン/戦闘は「意思決定」なのでドレインしない（呼び出し側が1手として扱う）。
         if action in ("MAIN_ACTION", "MULLIGAN", "SELECT_BLOCKER", "SELECT_COUNTER"):
             return
         # 探索モードでは分岐可能な単一対象選択もドレインしない（探索ノードとして残す）。
         if stop_at_select and _selection_moves(manager, actor_name) is not None:
             return
+        pending = manager.get_pending_request()  # ドレイン確定時のみフル payload を構築
         payload = manager.default_interaction_payload(pending)
         actor = _player_by_name(manager, actor_name)
         manager.action_events = []
@@ -895,13 +898,15 @@ def _apply_clone(manager, actor_name: str, move: Dict[str, Any], stop_at_select:
 
 
 def _mu_safe(manager) -> bool:
-    """make/unmake を安全に使える局面か＝中断（parked resolver 状態）でない静止点か。
+    """make/unmake を安全に使える局面か。
 
-    中断を**再開**する手は parked resolver 状態（execution_stack／continuation の共有・ネスト構造）を
-    持ち越し、現状その journaled 化が未完のため巻き戻しが不完全になり得る（docs/SPEC.md §2.5.2 boundary）。
-    探索の根・各ノードは中断でない静止点で意思決定するため、ここが True のときだけ make/unmake する。
+    **parked resolver 状態（中断再開）も journaled 化済み**（resolver の journaled `__setattr__`／
+    `context`・`saved_targets` の JournaledDict 化／`execution_stack`・`saved_stack`・退避スタックの
+    JournaledList 化／誘発 item の JournaledDict 化）＝中断を再開する手も「適用→巻き戻し→開始状態と
+    完全一致」が成立する（`tests/test_journal.py` の parked round-trip が実プレイ全手で機械照合）。
+    よって中断局面でも clone へ退避せず make/unmake できる（残 clone フォールバックの大半を解消）。
     """
-    return _USE_MAKE_UNMAKE and getattr(manager, "active_interaction", None) is None
+    return _USE_MAKE_UNMAKE
 
 
 def _score_move_1ply(manager, actor_name: str, move: Dict[str, Any], eval_name: str,
@@ -1197,11 +1202,11 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, profile, plan, ply
     for _ in range(_SETTLE_LIMIT):
         if manager.winner is not None:
             break
-        pending = manager.get_pending_request()
-        if not pending:
+        # 判定は軽量版（pid, action）で。フル payload は既定選択を解決する else 枝でだけ作る。
+        pa = manager.pending_actor_action()
+        if not pa:
             break
-        pid = pending[KEY_PID]
-        action = pending.get(KEY_ACTION)
+        pid, action = pa
         if pid != root_name and action == "MAIN_ACTION":
             break  # 相手のターン開始＝静止点に到達
         actor = _player_by_name(manager, pid)
@@ -1212,6 +1217,7 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, profile, plan, ply
             elif action in ("SELECT_BLOCKER", "SELECT_COUNTER"):  # 戦闘応答 → 既定パスで解決
                 action_api.apply_battle_action(manager, actor, ACT_PASS, None)
             else:                                     # その他の選択 → 既定解決
+                pending = manager.get_pending_request()  # 既定解決時のみフル payload
                 payload = manager.default_interaction_payload(pending)
                 action_api.apply_game_action(manager, actor, action_api.ACT_RESOLVE_SELECTION, payload)
         except Exception:
@@ -1626,16 +1632,16 @@ def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_onl
         if cur.winner is not None:
             line.append({"winner": cur.winner})
             break
-        pending = cur.get_pending_request()
-        if not pending:
+        pa = cur.pending_actor_action()  # (pid, action) だけで足りる（軽量・§2.5.2）
+        if not pa:
             break
         # 葉: start_turn から horizon ターン進んだ MAIN_ACTION（_search と同じ静止点）で打ち切る。
-        if pending.get(KEY_ACTION) == "MAIN_ACTION" and (cur.turn_count - start_turn) >= horizon:
+        if pa[1] == "MAIN_ACTION" and (cur.turn_count - start_turn) >= horizon:
             break
         if cur.turn_count != cur_turn:   # ターンが変わったら繰り返しカウントをリセット
             cur_turn = cur.turn_count
             counts = {}
-        actor_name = pending[KEY_PID]
+        actor_name = pa[0]
         is_max = (actor_name == root_name)
         moves = _selection_moves(cur, actor_name)
         if moves is None:
@@ -1714,10 +1720,9 @@ def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: 
 
     trace["difficulty"] = difficulty
     trace["turn"] = manager.turn_count
-    pending = manager.get_pending_request()
-    if pending:
-        _, key_action = _pending_keys()
-        trace["pending_action"] = pending.get(key_action)
+    pa = manager.pending_actor_action()  # action だけ＝軽量
+    if pa:
+        trace["pending_action"] = pa[1]
     trace["chosen"] = _describe_move(manager, chosen)
     trace["folded"] = folded
     trace["regret"] = round(regret, 1)

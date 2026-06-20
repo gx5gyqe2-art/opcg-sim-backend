@@ -7,7 +7,8 @@ from ...models.effect_types import (
 )
 from ...models.enums import ActionType, Zone, TriggerType, ConditionType, CompareOperator, Player, CardType
 import re
-from ..journal import JournaledList
+from .. import journal
+from ..journal import JournaledList, JournaledDict, JournaledSet, record_attr
 
 # 選択グループ分配（§7-1）で「N枚を選び」の選択集合を保存する save_id。
 # atoms._SEL_GROUP_ID と一致させる。
@@ -18,16 +19,27 @@ _UNSET = object()
 
 
 class EffectResolver:
+    def __setattr__(self, name, value):
+        # 差分巻き戻し（journal.transaction 中のみ記録）。中断再開の手（parked resolver を持ち越す手）も
+        # make/unmake で扱えるよう、resolver の状態書き換え（context/execution_stack の再代入等）を記録する。
+        # 不活性時（_active is None）はグローバル 1 読みで素通り＝通常プレイ無影響（§2.5.2 ②）。
+        if journal._active is not None:
+            record_attr(self, name, self.__dict__)
+        object.__setattr__(self, name, value)
+
     def __init__(self, game_manager):
         self.game_manager = game_manager
         self.execution_stack: List[EffectNode] = JournaledList()
-        self.context: Dict[str, Any] = {
-            "saved_targets": {},
-            "saved_values": {},
+        # context とネスト（saved_targets/saved_values）を journaled 型化＝中断中の in-place 変更を
+        # 巻き戻せるようにする（parked resolver の make/unmake 化・正しさは test_journal の parked
+        # round-trip が機械照合）。
+        self.context: Dict[str, Any] = JournaledDict({
+            "saved_targets": JournaledDict(),
+            "saved_values": JournaledDict(),
             "last_action_success": True
-        }
+        })
         # ▼▼▼ 追加: 実行履歴を記録するリスト ▼▼▼
-        self.action_history: List[Dict[str, Any]] = []
+        self.action_history: List[Dict[str, Any]] = JournaledList()
 
     def resolve_ability(self, player, ability, source_card, cost_confirmed=False):
         # 1. 条件チェック
@@ -72,7 +84,7 @@ class EffectResolver:
         if turn_limit is not None:
             source_card.ability_used_this_turn[limit_key] = used_count + 1
 
-        self.execution_stack = []
+        self.execution_stack = JournaledList()
         if ability.effect:
             self.execution_stack.append(ability.effect)
         if ability.cost:
@@ -222,7 +234,7 @@ class EffectResolver:
                 # 任意効果（「〜してもよい」）: 発動するかを yes/no で確認する。未確認なら中断し、
                 # resume(yes) 時に id(node) を context の確認済み集合へ入れて同じノードを再投入する
                 # （no はスキップ）。共有ノード(CardMaster)を汚さないよう確認状態は context で持つ。
-                confirmed = self.context.setdefault("_confirmed_optionals", set())
+                confirmed = self.context.setdefault("_confirmed_optionals", JournaledSet())
                 if getattr(node, "is_optional", False) and id(node) not in confirmed:
                     self._suspend_for_optional_confirmation(player, node, source_card)
                     return
@@ -499,7 +511,7 @@ class EffectResolver:
         # （後続の「残り」が消費分を除いて参照する）。
         if getattr(query, "select_mode", None) == "GROUP_FIRST" and query.ref_id:
             group = self.context["saved_targets"].get(query.ref_id, [])
-            consumed = self.context.setdefault("_grp_consumed", {}).setdefault(query.ref_id, [])
+            consumed = self.context.setdefault("_grp_consumed", JournaledDict()).setdefault(query.ref_id, JournaledList())
             avail = [c for c in group if c.uuid not in consumed]
             n = query.count if query.count and query.count > 0 else 1
             picked = avail[:n]
@@ -521,7 +533,7 @@ class EffectResolver:
         if getattr(query, "select_mode", None) == "REMAINING":
             group = self.context["saved_targets"].get(_SEL_GROUP_ID)
             if group:
-                consumed = self.context.setdefault("_grp_consumed", {}).setdefault(_SEL_GROUP_ID, [])
+                consumed = self.context.setdefault("_grp_consumed", JournaledDict()).setdefault(_SEL_GROUP_ID, JournaledList())
                 return [c for c in group if c.uuid not in consumed]
 
         from .matcher import get_target_cards
@@ -534,7 +546,7 @@ class EffectResolver:
         if "BOTH_SIDES" in getattr(query, "flags", set()) and query.player == Player.ALL:
             owner_p = self.game_manager.p1 if self.game_manager.p1.name == source_card.owner_id else self.game_manager.p2
             opp_p = self.game_manager.p2 if owner_p is self.game_manager.p1 else self.game_manager.p1
-            bs = self.context.setdefault("_both_sides", {})
+            bs = self.context.setdefault("_both_sides", JournaledDict())
             # 再開で来た選択を、保留していたサイドへ割り当てる。
             if "_both_sides_pending" in self.context and "temp_resolved_targets" in self.context:
                 bs[self.context.pop("_both_sides_pending")] = self.context.pop("temp_resolved_targets")
@@ -1144,7 +1156,7 @@ class EffectResolver:
         self.execution_stack = execution_stack
         self.context = effect_context
         if accepted and optional_node is not None:
-            self.context.setdefault("_confirmed_optionals", set()).add(id(optional_node))
+            self.context.setdefault("_confirmed_optionals", JournaledSet()).add(id(optional_node))
             self.execution_stack.append(optional_node)
         self._process_stack(player, source_card)
 
@@ -1240,7 +1252,7 @@ class EffectResolver:
             if min_select < 1 and len(candidates) > 0:
                 min_select = 1
 
-        saved_stack = self.execution_stack.copy()
+        saved_stack = JournaledList(self.execution_stack)  # journaled 化（中断再開の巻き戻し対象）
         if action_node:
             saved_stack.append(action_node)
 
@@ -1298,7 +1310,7 @@ class EffectResolver:
         if to_return <= 0:
             return False
 
-        saved_stack = self.execution_stack.copy()
+        saved_stack = JournaledList(self.execution_stack)  # journaled 化（中断再開の巻き戻し対象）
         saved_stack.append(action)  # resume 時に RETURN_DON を再実行する
         gm.active_interaction = {
             "player_id": tp.name,
