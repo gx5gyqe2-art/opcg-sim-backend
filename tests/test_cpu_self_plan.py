@@ -786,3 +786,62 @@ def test_engine_premium_wired_in_evaluate_plan_gated(db):
     while len(gm.p2.life) < int(cpu_ai._TEMPO_FULL_TURNS) + 1:
         gm.p2.life.append(gm.p2.deck.pop())
     assert add_delta(plan) > add_delta(None)   # plan 供給時はエンジン将来価値ぶん高い
+
+
+# ---------------------------------------------------------------------------
+# Phase1.5: ステージ評価（_side_score がステージを採点する）
+# ---------------------------------------------------------------------------
+
+def _find_stage_master(db, pred=lambda m: True):
+    for cid in db.raw_db:
+        m = db.get_card(cid)
+        if m and m.type.name == "STAGE" and pred(m):
+            return m
+    return None
+
+
+def test_stage_term_only_when_engine_aware(db):
+    """ステージ項は engine_aware=True のときだけ存在価値(+エンジン)を加点する（plan 無しでは不変）。
+
+    開始直後は場（p.field）が空なので、engine_aware の差分は純粋にステージ項のみ（フィールドの
+    エンジン項に汚染されない）。差分＝W_STAGE_COUNT(+ エンジン持ちなら W_RECUR_ENGINE)。
+    """
+    sm = _find_stage_master(db)
+    if sm is None:
+        pytest.skip("ステージカードが見つからない")
+    gm = _new_gm(db)
+    assert not gm.p1.field  # 開始直後は場が空＝フィールドのエンジン項で汚染されない
+    gm.p1.stage = CardInstance(sm, "p1")
+    cap = cpu_ai._power_cap(gm.p2)
+    off = cpu_ai._side_score(gm.p1, True, cap, engine_aware=False)
+    on = cpu_ai._side_score(gm.p1, True, cap, engine_aware=True)
+    expected = cpu_ai.W_STAGE_COUNT + (cpu_ai.W_RECUR_ENGINE
+                                       if cpu_ai._recurring_engine(gm.p1.stage) else 0.0)
+    assert on - off == pytest.approx(expected)
+
+
+def test_stage_not_scored_when_plan_none(db):
+    """plan=None（engine_aware=False）ではステージは一切採点されない＝現行挙動と完全同値。"""
+    sm = _find_stage_master(db)
+    if sm is None:
+        pytest.skip("ステージカードが見つからない")
+    gm = _new_gm(db)
+    base = cpu_ai.evaluate(gm, "p1")  # plan=None
+    gm.p1.stage = CardInstance(sm, "p1")
+    assert cpu_ai.evaluate(gm, "p1") == base  # ステージを置いても plan=None の評価は不変
+
+
+def test_stage_engine_increases_eval_with_plan(db):
+    """エンジン持ちステージはプラン供給時に evaluate を押し上げる（存在＋将来価値）。"""
+    from opcg_sim.src.models.enums import TriggerType
+    sm = _find_stage_master(db, lambda m: any(
+        getattr(a, "trigger", None) in cpu_ai._RECUR_TRIGGERS
+        for a in (getattr(m, "abilities", None) or [])))
+    if sm is None:
+        pytest.skip("エンジン持ちステージが見つからない")
+    gm = _new_gm(db)
+    plan = _plan("midrange")
+    base = cpu_ai.evaluate(gm, "p1", plan=plan)
+    gm.p1.stage = CardInstance(sm, "p1")
+    after = cpu_ai.evaluate(gm, "p1", plan=plan)
+    assert after - base >= cpu_ai.W_STAGE_COUNT  # 存在価値ぶん以上は確実に増える
