@@ -169,6 +169,14 @@ _RECUR_TRIGGERS = frozenset({
 # 寄せるだけ。プラン供給時のみ作動（plan=None 完全同値）。過剰防御を避けるため打点見積りは素パワー（保守的）。
 W_TELEGRAPH_LETHAL = 6000.0
 
+# B（楽観是正・§2.5.3）: settle（予算切れの打ち切り葉）は相手のターン開始で止めて**静的**に採点する＝
+# 相手の反撃を読まない＝**動いた側に楽観バイアス**（殴られる直前でスナップショット）。読み切れなかった
+# 葉に限り、相手の次ターンの「自分が受け切れない打点（届く攻撃本数 − 自アクティブブロッカー）」1 本あたり
+# をこの重みで減点して楽観を是正する。致死（reach ≥ 自ライフ）は C-2 telegraph が `evaluate` 内で既に
+# W_TELEGRAPH_LETHAL を計上済みなので**致死未満のみ**ここで扱い二重計上を避ける。保守的に素パワーで測る。
+# プラン供給時かつ相手ターン静止点でのみ作動（plan=None / 自分の手番では完全に不作動＝従来同値）。
+W_SETTLE_PRESSURE = 2500.0
+
 
 def _is_unblockable(c, etext: str) -> bool:
     """このキャラ自身が【ブロック不可】（アンブロッカブル）か（バッチA-1・§2.5.6）。
@@ -476,16 +484,14 @@ def _board_tempo_factor(me, opp) -> float:
     return max(_TEMPO_FLOOR, min(1.0, turns_left / _TEMPO_FULL_TURNS))
 
 
-def _telegraph_lethal(me, opp) -> bool:
-    """C-2（§2.5.3）: 相手の次ターンの有効打点が自残ライフ以上で、受け切れず負ける telegraph か。
+def _incoming_reach(me, opp) -> int:
+    """相手の次ターンに自リーダーへ届く**受け切れない**打点本数（>=0）。C-2 telegraph と B（settle 楽観是正）
+    の共通土台。
 
     相手の次ターンは場が全アクティブ化するので `is_rest` は無視し、リーダー＋場のうち**素パワーが自リーダー
     に届く**体を数える（素パワー＝保守的＝don 付与での押し上げは数えない＝過剰防御を避ける）。自分の
-    アクティブブロッカー数（各 1 本を止める）を控除し、割引後の打点本数 ≥ 自残ライフ なら telegraph 致死。
+    アクティブブロッカー数（各 1 本を止める）を控除して 0 で床打ちする。
     """
-    my_life = len(me.life)
-    if my_life <= 0:
-        return False
     try:
         my_leader_pw = float(me.leader.get_power(False)) if me.leader is not None else 5000.0
     except Exception:
@@ -499,8 +505,18 @@ def _telegraph_lethal(me, opp) -> bool:
             pw = float(getattr(getattr(c, "master", None), "power", 0) or 0)
         if my_leader_pw > 0 and pw >= my_leader_pw:
             reach += 1
-    reach -= _active_blocker_count(me)
-    return reach >= my_life
+    return max(0, reach - _active_blocker_count(me))
+
+
+def _telegraph_lethal(me, opp) -> bool:
+    """C-2（§2.5.3）: 相手の次ターンの有効打点が自残ライフ以上で、受け切れず負ける telegraph か。
+
+    `_incoming_reach`（届く打点本数 − 自アクティブブロッカー）≥ 自残ライフ なら telegraph 致死。
+    """
+    my_life = len(me.life)
+    if my_life <= 0:
+        return False
+    return _incoming_reach(me, opp) >= my_life
 
 
 def _own_life_knee(profile) -> int:
@@ -1205,9 +1221,18 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, profile, plan, ply
     # 高く（生 W_WIN で）見えてしまう不整合を防ぐ＝lethal 認識の ply 割引を一貫させる。
     if manager.winner is not None:
         return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
+    val = evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+    # B（楽観是正・§2.5.3）: settle は相手のターン開始で止めて静的採点する＝相手の反撃を読まない＝動いた側に
+    # 楽観的。読み切れなかった葉に限り、相手の次ターンの「受け切れない打点本数」を保守的に減点して楽観を
+    # 是正する（致死は C-2 telegraph が `evaluate` 内で計上済みなので**致死未満のみ**＝二重計上を避ける）。
+    # 相手ターンの静止点（rectify 後に turn_player が相手）かつ plan 供給時のみ作動（plan=None 完全同値）。
+    if plan is not None and manager.turn_player.name != root_name:
+        me = _player_by_name(manager, root_name)
+        reach = _incoming_reach(me, _other(manager, root_name))
+        if 0 < reach < len(me.life):
+            val -= reach * W_SETTLE_PRESSURE
     # C-4: 既定解決で整流した打ち切り葉は不確実なので信頼度で中立へ寄せる（plan 供給時のみ・plan=None 同値）。
-    return _settle_discount(
-        evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan), plan)
+    return _settle_discount(val, plan)
 
 
 def _search(manager, root_name: str, alpha: float, beta: float,
@@ -1817,7 +1842,8 @@ def decide(manager, player, difficulty: str = "normal", rng: Optional[random.Ran
 
 
 def decide_with_regret(manager, player, difficulty: str = "normal",
-                       rng: Optional[random.Random] = None, profile=None, plan=None
+                       rng: Optional[random.Random] = None, profile=None, plan=None,
+                       out: Optional[Dict[str, Any]] = None
                        ) -> Tuple[Optional[Dict[str, Any]], float]:
     """`decide` と同じ手を返しつつ、**greedy regret**（崖エラーの安価な代理・検証基盤・§2.5.3）も返す。
 
@@ -1826,6 +1852,10 @@ def decide_with_regret(manager, player, difficulty: str = "normal",
       - 1-ply 貪欲手 = 事前選別スコア最大の手（＝浅い読みなら選ぶ手）。常に深掘り集合に入る（prelim 1位）。
     深掘りが浅い読みより良い手を見つけた量＝「1-ply 先読みでは崖に落ちる」局面の信号。常に >= 0。
     easy（1-ply 貪欲）や分岐の無い局面、深掘りスコアが取れない場合は regret=0.0 を返す。
+
+    `out`（任意・既定 None＝完全に無オーバーヘッド）が渡されると、**value-realization gap**（§2.5.3）の
+    計測用に `out["chosen_deep"]`＝採用手の深掘りスコア・`out["deep_best"]`＝深掘り最善値を記録する
+    （取れない＝単一手/easy/深掘り無し では未設定）。out=None 時は採点・返り値とも従来と完全同値。
     """
     rng = rng or random
     moves = manager.get_legal_actions(player)
@@ -1858,6 +1888,12 @@ def decide_with_regret(manager, player, difficulty: str = "normal",
         greedy_deep = deep.get(greedy_sig)
         if greedy_deep is not None:
             regret = max(0.0, deep_best - greedy_deep)
+        if out is not None:
+            out["deep_best"] = deep_best
+            if move is not None:
+                cd = deep.get(_move_sig(move))
+                if cd is not None:
+                    out["chosen_deep"] = cd
     return move, regret
 
 
