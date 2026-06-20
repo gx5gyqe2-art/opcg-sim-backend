@@ -379,7 +379,10 @@ def _macro_simulate(root: _MacroNode, root_state, root_name: str,
         max_children = 1 + int(MCTS_PW_C * (node.N ** MCTS_PW_ALPHA))
         if len(node.children) < max_children:
             # 展開: 新しいターンプランをサンプリング（state は次境界まで進む）。
-            tp = _sample_turn_plan(state, node.actor, rng, see_opp_hand, profile, plan)
+            # **plan/profile はサンプリング prior には渡さない**（候補手×決定×反復で 1-ply 評価が走り、
+            # plan 付き eval だと ~10x 遅くなる＝レイテンシ破綻。実測で 5 局すら回らず）。plan の主価値は
+            # 葉評価（ターン境界の telegraph 致死・逆算リーサル認識）なので _value_boundary 側だけに効かせる。
+            tp = _sample_turn_plan(state, node.actor, rng, see_opp_hand)
             if not tp:
                 break
             child = _macro_node_from_state(tp, state)
