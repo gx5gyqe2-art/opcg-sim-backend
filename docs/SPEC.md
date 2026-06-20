@@ -198,6 +198,19 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
     （両群 >50%・戦術退行なし）と実測検証して採用（2026-06）。予算はレイテンシ予算（切れても settle で境界
     評価）で、中盤 decide 実測 **~516ms**（高速化前 horizon=3 の ~1176ms より速く、かつ 1 ターン深い）。
     `easy` は素の 1-ply のまま（探索なし）。
+  - **PyPy 探索オフロード（方式B・プロセス分離・実装済み 2026-06）**: 探索（`decide`）の実行だけを **PyPy
+    ワーカープロセス**へ委譲し、JIT で高速化する（CPython 比 **~2.1x**・中盤 decide median 222.6ms→101.6ms・
+    改変ゼロ・**挙動ビット一致**＝同一337step/280decide を再生）。ランタイム差し替えであって**方策・評価・カード
+    挙動は一切変えない**（エンジン `src/**` は stdlib-only ゆえ PyPy でそのまま動く）。配信スタック
+    （`pydantic-core`＝Rust／`grpcio`＝C 拡張）は PyPy 非互換のため **CPython 側に据え置き**、探索だけを分離する
+    （Phase0 互換スパイクで A 単一プロセスは不成立と判定・`docs/reports/pypy_phase0_result_20260620.md`）。
+    配線: `api/app.py` の cpu/step が `api/decide_client.py` 経由で **盤面を pickle 送信**（`GameManager` は
+    `__getstate__` 不要で round-trip・~69KB／decide）、PyPy 側 `tools/decide_worker.py` が `cpu_ai.decide_guarded`
+    を実行し `(move, trace, mem)` を返す。**`OPCG_PYPY_WORKER=1` で有効・未起動/IPC 失敗/0 でインプロセス実行へ
+    自動フォールバック**（可用性・ロールバック）。決定性は RNG 状態を IPC で渡してタイブレークを一致させる。
+    回帰=`tests/test_pypy_worker_parity.py`（pickle round-trip 同一手・profile/plan/mem 往復・ブリッジ=インプロセス
+    同値）。実測・手順は `docs/reports/cpu_search_accel_pypy_20260620.md`／移行手順は同 `pypy_migration_runbook_20260620.md`。
+    PyPy の ~2.1x は下記の算法系高速化（差分評価・LMR 等）と**乗算**で効く（horizon +1〜2 の足場）。
   - **探索高速化ロードマップ（horizon4＋へ・計画／未実装）**: 予算（=clone 回数）が実深さの律速で、その
     clone(deepcopy) が先読みコストの **~96%**（プロファイル）。さらに深くするには clone コストを下げるのが本筋。
     計測（2026-06-19・中盤6局面）では探索ノードの **転置率（手順違いで同一盤面の再出現）≈23%**（範囲15〜36%）。
