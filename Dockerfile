@@ -23,16 +23,17 @@ RUN python -m opcg_sim.tools.build_card_cache
 ENV PORT=8080
 # 探索オフロードを既定で有効化（無効化は OPCG_PYPY_WORKER=0 でインプロセス実行へ即ロールバック）。
 ENV OPCG_PYPY_WORKER=1
-# 体感最適化（Phase 3）を本番で有効化（決定性は維持＝decide の決定的結果を前倒しするだけ・合法性ゲートで安全）。
-#   OPCG_PLAN_CACHE=1 : ① 計画キャッシュ（セグメントを1回計画→以降は即時 replay）
-#   OPCG_PONDER=1     : ⑥-a 先行計画（人間の TURN_END 直後に次手番計画を前倒し＝TURN_END→初回ポーリングの隙間を埋める）
-#   OPCG_PONDER_SPEC=1: ⑥-b 投機ポンダリング（人間の MAIN 中に「今エンドしたら」を先回り計算）
-# 体感の本命は ⑥-b: 実プレイでは TURN_END 直後にすぐポーリングが来る（思考の隙間が無い）ため ⑥-a 単独では
-# `/cpu/step` がタスクを待ってフル待ちになりがち。人間が実際に考えている MAIN 中（⑥-b）に先回りして初めて
-# CPU 手番の待ちが消える（自己対戦ベンチは TURN_END 後に思考時間を仮定したため ⑥-a を過大評価していた）。
-# トレードオフ: ⑥-b は人間アクションごとに投機を焼き直すためワーカー負荷が増える（当たり率 ~30%）。単一の
-# CPU 対戦では許容。即ロールバックは各フラグを 0/未設定に。テスト/自己対戦は env 非依存（同期 decide）で決定性維持。
+# 体感最適化（Phase 3）。① 計画キャッシュは本番有効（イベントループ内・同期＝単一スレッドで安全）。
+#   OPCG_PLAN_CACHE=1 : ① 計画キャッシュ（セグメントを1回計画→以降は即時 replay。手・盤面・勝敗は不変）
+# ⑥ ポンダリング（OPCG_PONDER / OPCG_PONDER_SPEC）は **間欠クラッシュ（並行バグ）のため無効化**:
+#   `_ponder_plan`/`_speculate_plan` は `asyncio.to_thread`（本物のOSスレッド）で探索系を走らせるが、
+#   差分巻き戻し journal（`opcg_sim/src/core/journal.py`）は **プロセス共有のグローバル状態**（`_active`/
+#   `_mut_count`・「探索は単一スレッド前提」）。バックグラウンドスレッドが探索で `transaction()` を開いた瞬間に
+#   メインスレッドが新しい CardInstance を生成（`master` 初回セット）すると、そのセットがポンダリング側 journal
+#   に誤記録され、rollback が live カードから `master` を pop ＝ `CardInstance has no attribute 'master'` で
+#   間欠クラッシュ/フリーズ（ワーカー温まると探索が別プロセスへ出て窓が消える＝「時間が経つと治る」）。
+#   止血としてポンダリングを無効化（体感最適化のみ＝手・盤面・勝敗は不変）。journal のスレッド安全化後に再検討。
 ENV OPCG_PLAN_CACHE=1
-ENV OPCG_PONDER=1
-ENV OPCG_PONDER_SPEC=1
+ENV OPCG_PONDER=0
+ENV OPCG_PONDER_SPEC=0
 CMD ["sh", "-c", "uvicorn opcg_sim.api.app:app --host 0.0.0.0 --port $PORT"]
