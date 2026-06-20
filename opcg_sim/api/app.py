@@ -5,6 +5,7 @@ import json
 import random
 import traceback
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Dict, Optional, List, Union
 from fastapi import FastAPI, Body, Request, Response, WebSocket, WebSocketDisconnect
@@ -32,6 +33,7 @@ from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.core import cpu_opponent_model
 from opcg_sim.src.core import cpu_self_plan
+from opcg_sim.api import decide_client
 from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.models import CardInstance
 
@@ -46,7 +48,18 @@ BASE_DIR = os.path.dirname(current_api_dir)
 DATA_DIR = os.path.join(BASE_DIR, "data")
 CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
-app = FastAPI(title="OPCG Simulator API v1.7")
+@asynccontextmanager
+async def _lifespan(_app):
+    # 方式B: PyPy 探索ワーカーを常駐起動（OPCG_PYPY_WORKER=1 のときのみ）。JIT を常にウォームに保つ。
+    # 未起動・失敗でも decide_client がインプロセス実行へフォールバックするので可用性は不変。
+    try:
+        decide_client.spawn_worker()
+    except Exception:
+        pass
+    yield
+
+
+app = FastAPI(title="OPCG Simulator API v1.7", lifespan=_lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["ETag"])
 
 db = None
@@ -501,9 +514,11 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                 tr = {} if trace_on else None
                 # ライブ採取は軽量トレース（read_ahead=読み筋は省く）＝CPU 思考の遅延を抑える。
                 # 読み筋はオフライン（cpu_replay.py／リプレイ種）でのみ採る。
-                move = cpu_ai.decide_guarded(manager, cpu_player, difficulty, mem=turn_mem,
-                                             profile=meta.get("opp_profile"), plan=meta.get("self_plan"),
-                                             trace=tr, trace_read_ahead=False)
+                # 探索（decide）は方式B: OPCG_PYPY_WORKER=1 のとき PyPy ワーカーへ委譲（~2.1x）。
+                # 無効/失敗時はブリッジ内でインプロセス cpu_ai.decide_guarded にフォールバック（現行挙動）。
+                move = decide_client.decide(manager, cpu_player, difficulty, mem=turn_mem,
+                                            profile=meta.get("opp_profile"), plan=meta.get("self_plan"),
+                                            trace=tr, trace_read_ahead=False)
                 if move is not None:
                     if trace_on:
                         # 思考トレース＋アクションを適用前に記録（card_id 基準・進行には不参加）。
