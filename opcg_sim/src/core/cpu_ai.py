@@ -60,16 +60,11 @@ _LIFE_KNEE_AGGRO_MATCHUP = 3
 _AGGRO_MATCHUP_THRESHOLD = 0.6   # 相手プロファイルの aggro_lean がこれ以上で「攻め対面」と見なす
 W_HAND = 700.0           # 手札 1 枚の基礎価値
 W_COUNTER = 0.6          # 手札のカウンター値 1 点あたり（防御リソース）
-# コスト低減の資源価値化（§2.5.3・コスト低減を潜在資源として軽く価値化）。`evaluate` は素では手札の
-# コストを読まないため、コスト低減は「次ターン手出しできる脅威」という潜在資源として無価値だった。
-# 安価な代理として「次ターンに手出しできる（コスト ≤ 次ターン見込みドン）」手札に小ボーナスを与え、
-# 打てる脅威の期待値を軽く織り込む。`current_cost` は cost_buff/timed_cost を含む＝**コスト低減が
-# そのまま手出し可否に効く**＝低減の資源価値が拾える。W_HAND(700) より十分小さい＝既存の枚数価値を
-# 歪めない軽い上乗せ。プラン供給時のみ作動（plan=None では一切作動せず現行挙動と完全同値）。
-W_HAND_PLAYABLE = 150.0  # 次ターンに手出しできる手札 1 枚あたりの潜在資源ボーナス
+# 注（A2・2026-06）: 「コスト低減の資源価値化」= 次ターン手出し可ボーナス（旧 W_HAND_PLAYABLE）は、
+# ablation A/B（フル vs 当該項なし・hard 42局）で勝率 0.500＝**無寄与**（探索が結果盤面で既に拾える）と
+# 判明したため撤去した。経緯は docs/SPEC.md §2.5.3。
 W_FIELD_COUNT = 1500.0   # 場のキャラ 1 体の存在価値
 W_STAGE_COUNT = 800.0    # ステージ 1 枚の存在価値（Phase1.5）。戦闘に出ない永続リソース＝キャラより軽い。
-                         # エンジン（毎ターン価値を生む能力）の価値は別途 W_RECUR_ENGINE で加算する。
 W_FIELD_POWER = 0.3      # 場の有効パワー（戦闘で意味を持つ上限までを線形評価。素点でなく閾値性を尊重）
 W_DON_ACTIVE = 200.0     # アクティブドン!! 1 枚
 W_BLOCKER = 1200.0       # ブロッカー 1 体（最終防御）
@@ -164,21 +159,10 @@ W_KW_UNBLOCK = 900.0     # アンブロッカブル【ブロック不可】: ブ
 _RESIST_CUE = "KOされない"
 _KEYWORD_ASSETS = (("ダブルアタック", W_KW_DOUBLE), ("速攻", W_KW_RUSH), ("バニッシュ", W_KW_BANISH))
 
-# 探索地平線を越える効果価値（§2.5.3・期待値での補完）。場のキャラが持つ「毎ターン価値を生む」継続/起動/
-# 毎ターン誘発の能力は、探索ホライズン（HARD_HORIZON=2）より先のターンでも価値を生み続ける＝静的スナップ
-# ショット評価が取りこぼす**将来価値**。これを残りゲーム長で期待値割引した小プレミアムで補う（time-discount
-# の `field_count_factor` を流用＝残ターンが多いほど将来発動回数が多く価値が高い／レース終盤は小さい）。両側
-# 対称＝相手の価値エンジンは opp 側を押し上げ→除去が報われる（① の単一対象探索が狙う）。プラン供給時のみ作動。
-W_RECUR_ENGINE = 600.0   # 毎ターン価値を生む能力を持つ体 1 体あたりの将来価値プレミアム（W_FIELD_COUNT より小）
-_RECUR_TRIGGERS = frozenset({
-    TriggerType.ACTIVATE_MAIN,   # 起動メイン: 毎ターン使える価値エンジン
-    TriggerType.PASSIVE,         # 常時: 場にいる限り効く継続効果
-    TriggerType.YOUR_TURN,       # 自分のターン中: 毎自ターン効く
-    TriggerType.OPPONENT_TURN,   # 相手のターン中: 毎相手ターン効く
-    TriggerType.TURN_END,        # ターン終了時: 毎ターン誘発
-    TriggerType.OPP_TURN_END,    # 相手のターン終了時: 毎相手ターン誘発
-    TriggerType.ON_ATTACK,       # アタック時: 攻撃のたび誘発＝攻撃体は毎ターン価値を生む（Phase1.5・④）
-})
+# 注（A2・2026-06）: 地平線越えの「毎ターン価値を生むエンジン能力」プレミアム（旧 W_RECUR_ENGINE／
+# _recurring_engine／_RECUR_TRIGGERS）は、ablation A/B（フル vs 当該項なし・hard 42局）で勝率 0.452＝
+# **正味マイナス（バイアス）**と判明したため撤去した。horizon=4 の探索が将来発動を結果盤面で既に拾えており、
+# 静的プレミアムは二重計上で評価を歪めていた。経緯は docs/SPEC.md §2.5.3。
 
 # C-2（§2.5.3）: テレグラフ致死の減点。葉（相手ターン開始＝相手の攻撃が目前）で「相手の次ターンの有効打点
 # ≥ 自残ライフ」なら、受け切れず負ける telegraph として減点する。W_WIN(1e9) に対し十分小さい＝**本物の
@@ -231,23 +215,6 @@ def _threat_value(c, atk_mult: float = 1.0, def_mult: float = 1.0) -> float:
         atk += W_KW_UNBLOCK
     deff = W_KW_RESIST if _RESIST_CUE in etext else 0.0  # 防御的キーワード資産（def_mult でスケール）
     return atk * atk_mult + deff * def_mult
-
-
-def _recurring_engine(c) -> bool:
-    """このキャラが「毎ターン価値を生む」能力（継続/起動/毎ターン誘発）を持つか（§2.5.3・地平線越え）。
-
-    `_RECUR_TRIGGERS` のいずれかのトリガーを持つ能力があれば True。ON_PLAY（一度きり）・ON_KO/TRIGGER/COUNTER
-    （反応型一回）等の一回限り効果は、発動時に探索が結果盤面で見るため将来価値プレミアムの対象にしない。
-    【アタック時】(ON_ATTACK・Phase1.5・④) は攻撃のたび誘発＝攻撃体が毎ターン生む将来価値なので含める
-    （地平線内の発動は探索が結果で見るが、地平線を越える将来分をプレミアムで補う＝既存エンジン項と同趣旨）。
-    """
-    m = getattr(c, "master", None)
-    if m is None:
-        return False
-    for a in getattr(m, "abilities", None) or []:
-        if getattr(a, "trigger", None) in _RECUR_TRIGGERS:
-            return True
-    return False
 
 
 def _other(manager, name: str):
@@ -456,17 +423,6 @@ def _don_return_penalty_vals(before_don: int, after_don: int) -> float:
     return returned * _W_DON_RETURN * early
 
 
-def _next_turn_don(p) -> int:
-    """`p` の次ターンに使える見込みドン!! 枚数（コスト低減の資源価値化・§2.5.3）。
-
-    次の自ターン開始では現在の全ドン（アクティブ＋レスト＋付与中）がアクティブに戻り、さらにドンデッキ
-    から 2 枚（ターン1のみ 1 枚だが中盤評価では常に 2）が補充される。ドンデッキ残でキャップ＝盤面の真値。
-    相手手札の中身は読まない＝ドン枚数は公開情報なのでフェア。
-    """
-    total = len(p.don_active) + len(p.don_rested) + len(p.don_attached_cards)
-    return total + min(2, len(p.don_deck))
-
-
 def _is_low_impact(c) -> bool:
     """「効果なし・素パワー<5000・関連キーワード無し」の置物キャラか（プラン重みの割引対象）。
 
@@ -555,7 +511,6 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
                 idle_don_factor: float = 1.0,
                 threat_atk_mult: float = 1.0, threat_def_mult: float = 1.0,
                 life_knee: int = _LIFE_KNEE_DEFAULT,
-                next_turn_don: Optional[int] = None,
                 field_count_factor: float = 1.0,
                 engine_aware: bool = False,
                 out: Optional[Dict[str, float]] = None) -> float:
@@ -570,10 +525,6 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
     `life_knee`（C-3・§2.5.3）はライフ薄域上乗せ（`W_LIFE_LOW`）を立ち上げる枚数の上限＝非線形の膝位置。
     既定 2＝従来。攻め寄りの相手と対面する自ライフ（守備）は膝を 3 へ上げ、レース下での 3 枚目までを
     厚く守る（クロック側＝相手ライフは既定 2 のまま＝自他で別カーブ）。
-    `next_turn_don`（コスト低減の資源価値化・§2.5.3）が与えられると、手札のうち「次ターン手出しできる
-    （`current_cost` ≤ `next_turn_don`）」枚数に `W_HAND_PLAYABLE` を上乗せする＝コスト低減を潜在資源として
-    軽く価値化する。手札の中身（コスト）を読むため `include_counter`（＝この手札を読んでよい側）のときだけ
-    作動する＝相手手札の中身を読まないフェア性を保つ。None（plan 無し）では作動しない＝従来同値。
     """
     score = 0.0
     # out（任意・既定 None＝完全に無オーバーヘッド）が渡されると、成分内訳を `out[キー] += 値` で
@@ -605,14 +556,6 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
                 _emit("hand_counter", (c.current_counter or 0) * W_COUNTER * counter_factor)
             except Exception:
                 pass
-            # コスト低減の資源価値化: 次ターン手出しできる手札を潜在資源として軽く加点（plan 供給時のみ）。
-            if next_turn_don is not None:
-                try:
-                    if c.current_cost <= next_turn_don:
-                        score += W_HAND_PLAYABLE
-                        _emit("hand_playable", W_HAND_PLAYABLE)
-                except Exception:
-                    pass
 
     # 白（J）の決定境界: 自デッキ残がデッキ切れ（J=0・ドロー不能＝敗北）へ近づくほど非線形に減点。
     score -= max(0, DECK_DANGER - len(p.deck)) * W_DECK_DANGER
@@ -643,11 +586,6 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
             tv = _threat_value(c, threat_atk_mult, threat_def_mult)
             score += tv
             _emit("field_threat", tv)
-        # 地平線越え（§2.5.3）: 毎ターン価値を生む能力の将来価値を残りゲーム長で期待値割引して加点
-        # （field_count_factor＝time-discount のテンポ係数を流用＝残ターンが多いほど将来発動が多く価値大）。
-        if engine_aware and _recurring_engine(c):
-            score += W_RECUR_ENGINE * field_count_factor
-            _emit("field_engine", W_RECUR_ENGINE * field_count_factor)
         try:
             pw = c.get_power(is_turn)
         except Exception:
@@ -683,23 +621,18 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
         score += lev
         _emit("leader_power", lev)
 
-    # ステージ（Phase1.5・§2.5.3 評価観点の穴埋め）: 場の永続リソース（`p.stage`）。これまで `_side_score`
-    # は `p.field`（キャラ）のみ評価しステージを一切採点していなかった。ステージはキャラと違い攻撃/ブロックに
-    # 出ない＝パワー/攻め圧/ブロッカーは持たないため、**存在価値＋毎ターン価値を生むエンジン能力**のみ加点する
+    # ステージ（Phase1.5・§2.5.3 評価観点の穴埋め）: 場の永続リソース（`p.stage`）の**存在価値**を加点する。
+    # ステージはキャラと違い攻撃/ブロックに出ない＝パワー/攻め圧/ブロッカーは持たないため存在価値のみ
     # （連続バフ＝聖地マリージョア等のコスト/パワー補正はキャラ側のパワー/コストに既に反映済み＝二重計上を避ける）。
-    # 存在は時間割引（field_count_factor）、エンジンは残ゲーム長で期待値割引（キャラのエンジンと同じ扱い）。
-    # ステージは可変・非対称（プレイ/除去/張替で増減）＝手選択に効く（プレイ/相手ステージ除去の価値を拾う）。
+    # 存在は時間割引（field_count_factor）。ステージは可変・非対称（プレイ/除去/張替で増減）＝手選択に効く。
     # プラン供給時のみ作動（engine_aware＝plan is not None）＝plan=None では一切作動せず現行挙動と完全同値。
+    # （エンジンプレミアムは A2 で撤去＝撤去理由は §2.5.3。）
     if engine_aware:
         st = getattr(p, "stage", None)
         if st is not None:
             sv = W_STAGE_COUNT * field_count_factor
             score += sv
             _emit("stage_count", sv)
-            if _recurring_engine(st):
-                se = W_RECUR_ENGINE * field_count_factor
-                score += se
-                _emit("stage_engine", se)
     return score
 
 
@@ -839,11 +772,6 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
     # C-3: 自ライフ（守備）は攻め対面で膝を 3 へ（レース耐性重視）。クロック側＝相手ライフは既定 2 のまま
     # ＝自他で別カーブ。profile 無し＝両側既定 2＝従来同値。
     own_life_knee = _own_life_knee(profile)
-    # コスト低減の資源価値化（§2.5.3）: 次ターン手出しできる手札を潜在資源として軽く加点（プラン供給時のみ）。
-    # 自分側は常に手札を読むので供給。相手側は手札の中身（コスト）を読む hard（see_opp_hand）のときだけ供給
-    # ＝相手手札の中身を読まない normal のフェア性を保つ（plan 無しは両側 None＝従来同値）。
-    me_next_don = _next_turn_don(me) if plan is not None else None
-    opp_next_don = _next_turn_don(opp) if (plan is not None and see_opp_hand) else None
     # 時間割引（§2.5.3）: 地平線外の盤面ポテンシャル（場の存在価値）を残りゲーム長で割り引く（両側共通の係数）。
     # プラン供給時のみ作動（plan=None＝1.0＝従来同値）。ライフ高（早期）は 1.0＝割引なし。
     tempo_factor = _board_tempo_factor(me, opp) if plan is not None else 1.0
@@ -860,12 +788,12 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
                          counter_factor=counter_factor, threat_aware=threat_aware,
                          idle_don_factor=idle_don_factor,
                          threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
-                         life_knee=own_life_knee, next_turn_don=me_next_don,
+                         life_knee=own_life_knee,
                          field_count_factor=tempo_factor, engine_aware=threat_aware, out=out_me)
              - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
                            hand_factor=opp_hand_factor, threat_aware=threat_aware,
                            threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
-                           next_turn_don=opp_next_don, field_count_factor=tempo_factor,
+                           field_count_factor=tempo_factor,
                            engine_aware=threat_aware, out=out_opp)
              + plan_progress
              - telegraph)
