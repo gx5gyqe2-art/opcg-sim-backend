@@ -244,11 +244,16 @@ MCTS_PW_ALPHA = 0.5
 MCTS_MACRO_ITERS = 160       # 既定反復回数（ターンあたり 1 回の探索＝手列全体を一括計画）。
 
 
-def _value_boundary(manager, root_name: str, see_opp_hand: bool) -> float:
-    """ターン境界状態の価値を `root_name` 視点 [0,1] へ（整流不要＝境界は元々静止点）。勝1/負0。"""
+def _value_boundary(manager, root_name: str, see_opp_hand: bool, profile=None, plan=None) -> float:
+    """ターン境界状態の価値を `root_name` 視点 [0,1] へ（整流不要＝境界は元々静止点）。勝1/負0。
+
+    `plan`/`profile` を供給すると `evaluate` の勝ち筋項（逆算リーサル `_plan_progress`・telegraph 致死・
+    脅威キーワード・engine_aware のリーダー有効パワー等）が作動する＝α-β `hard` と同じ賢さで葉を採点する
+    （macro は葉が常にターン境界＝telegraph 致死が理想的に効く）。未供給は素の J 値評価（従来同値）。
+    """
     if manager.winner is not None:
         return 1.0 if manager.winner == root_name else 0.0
-    ev = evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=None, plan=None)
+    ev = evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
     return 0.5 * (1.0 + math.tanh(ev / MCTS_VALUE_SCALE))
 
 
@@ -265,11 +270,13 @@ def _weighted_choice(items, weights, rng):
     return items[-1]
 
 
-def _sample_turn_plan(state, player_name: str, rng, see_opp_hand: bool) -> List[Dict[str, Any]]:
+def _sample_turn_plan(state, player_name: str, rng, see_opp_hand: bool,
+                      profile=None, plan_obj=None) -> List[Dict[str, Any]]:
     """`state`（`player_name` の手番境界）から**1 ターンを確率的にプレイ**し、適用した手列を返す。
 
     各手番の決定は 1-ply 評価のソフトマックス（温度 `MCTS_MACRO_TEMP`）でサンプリング＝多様な候補ターンを
-    生む（最善付近に集中しつつ揺らす）。`state` は破壊的に進む（TURN_END／相手介入／キャップで停止）。
+    生む（最善付近に集中しつつ揺らす）。`plan_obj`/`profile` 供給時は 1-ply 採点にも勝ち筋項が効く＝逆算
+    リーサルに寄与する攻撃などが高 prior になり**候補ターンの質が上がる**。`state` は破壊的に進む。
     """
     plan: List[Dict[str, Any]] = []
     for _ in range(TURN_ACTION_CAP + 4):
@@ -285,7 +292,7 @@ def _sample_turn_plan(state, player_name: str, rng, see_opp_hand: bool) -> List[
             scored = []
             for m in moves:
                 v = _score_move_1ply(state, player_name, m, player_name,
-                                     see_opp_hand=see_opp_hand, profile=None, plan=None)
+                                     see_opp_hand=see_opp_hand, profile=profile, plan=plan_obj)
                 if v is not None:
                     scored.append((m, v))
             if not scored:
@@ -359,7 +366,7 @@ def _ucb_select_macro(node: _MacroNode, root_name: str, rng) -> _MacroNode:
 
 
 def _macro_simulate(root: _MacroNode, root_state, root_name: str,
-                    horizon: int, see_opp_hand: bool, rng) -> None:
+                    horizon: int, see_opp_hand: bool, rng, profile=None, plan=None) -> None:
     """1 反復: ルートを clone → progressive widening でターンプランを展開/選択しながら境界を下り、
     horizon ターン先（or 終局）の境界を `evaluate` → 経路へ backup。"""
     state = root_state.clone()
@@ -372,10 +379,10 @@ def _macro_simulate(root: _MacroNode, root_state, root_name: str,
         max_children = 1 + int(MCTS_PW_C * (node.N ** MCTS_PW_ALPHA))
         if len(node.children) < max_children:
             # 展開: 新しいターンプランをサンプリング（state は次境界まで進む）。
-            plan = _sample_turn_plan(state, node.actor, rng, see_opp_hand)
-            if not plan:
+            tp = _sample_turn_plan(state, node.actor, rng, see_opp_hand, profile, plan)
+            if not tp:
                 break
-            child = _macro_node_from_state(plan, state)
+            child = _macro_node_from_state(tp, state)
             node.children.append(child)
             node = child
             path.append(node)
@@ -389,7 +396,7 @@ def _macro_simulate(root: _MacroNode, root_state, root_name: str,
         path.append(node)
         turns += 1
 
-    v = _value_boundary(state, root_name, see_opp_hand)
+    v = _value_boundary(state, root_name, see_opp_hand, profile, plan)
     for nd in path:
         nd.N += 1
         nd.W += v
@@ -405,26 +412,27 @@ MCTS_WORLDS = 1
 
 
 def _macro_search_root(root_state, name: str, iters: int, H: int,
-                       see_opp_hand: bool, rng) -> Optional["_MacroNode"]:
+                       see_opp_hand: bool, rng, profile=None, plan=None) -> Optional["_MacroNode"]:
     """`root_state`（`name` の手番境界・決定化済みでもよい）で 1 世界ぶん探索し、ルートノードを返す。"""
     pa = root_state.pending_actor_action()
     if not pa or pa[0] != name:
         return None
     root = _MacroNode(None, name, terminal=False)
     for _ in range(iters):
-        _macro_simulate(root, root_state, name, H, see_opp_hand, rng)
+        _macro_simulate(root, root_state, name, H, see_opp_hand, rng, profile, plan)
     return root if root.children else None
 
 
 def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
                    iterations: Optional[int] = None, horizon: Optional[int] = None,
-                   see_opp_hand: Optional[bool] = None,
-                   worlds: Optional[int] = None) -> List[Dict[str, Any]]:
+                   see_opp_hand: Optional[bool] = None, worlds: Optional[int] = None,
+                   profile=None, plan=None) -> List[Dict[str, Any]]:
     """マクロ MCTS で `player` の**このターンの手列（ターンプラン）**を返す（計画キャッシュ的に逐次 replay 可）。
 
     ルートは `player` の手番境界。子=候補ターンプラン。最善子（最多訪問）の手列を返す。合法手が無ければ空。
     `worlds`>1（公平モード時）は K 通りの決定化世界で探索し、先頭手で集約した最頻・最多訪問プランを返す
-    （単一世界の仮定ブレを平均で打ち消す＝真の ISMCTS 近似）。
+    （単一世界の仮定ブレを平均で打ち消す＝真の ISMCTS 近似）。`plan`/`profile`（§2.5.5/§2.5.4）を供給すると
+    葉評価とサンプリング prior に勝ち筋項（逆算リーサル・telegraph 致死・脅威キーワード等）が効く。
     """
     rng = rng or random
     name = player.name
@@ -441,7 +449,7 @@ def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[rand
     # 単一世界（既定 or 完全情報）: 1 世界探索して最多訪問プラン。
     if W <= 1 or not MCTS_DETERMINIZE:
         root_state = _determinize_opponent(manager, name, rng) if MCTS_DETERMINIZE else manager
-        root = _macro_search_root(root_state, name, iters, H, see_opp_hand, rng)
+        root = _macro_search_root(root_state, name, iters, H, see_opp_hand, rng, profile, plan)
         if root is None:
             return []
         best = max(root.children, key=lambda c: (c.N, c.W / c.N if c.N else 0.0, rng.random()))
@@ -452,7 +460,7 @@ def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[rand
     tally: Dict[tuple, List[float]] = {}        # first_sig -> [総訪問, 最良訪問, 最良プラン]
     for _ in range(W):
         det = _determinize_opponent(manager, name, rng)
-        root = _macro_search_root(det, name, per_world, H, see_opp_hand, rng)
+        root = _macro_search_root(det, name, per_world, H, see_opp_hand, rng, profile, plan)
         if root is None:
             continue
         for ch in root.children:
@@ -477,6 +485,7 @@ def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[rand
 def decide_mcts_macro(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
                       cache: Optional[Dict[str, Any]] = None, iterations: Optional[int] = None,
                       horizon: Optional[int] = None, worlds: Optional[int] = None,
+                      profile=None, plan=None,
                       moves: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
     """マクロ MCTS の**逐次 1 手**インターフェース（`cpu_ai.decide_cached` と同型）。
 
@@ -504,11 +513,11 @@ def decide_mcts_macro(manager, player, difficulty: str = "hard", rng: Optional[r
             return legal_by_sig[_move_sig(nxt)]
         cache["queue"] = None  # 前提崩れ＝再計画
 
-    plan = mcts_plan_turn(manager, player, difficulty, rng, iterations=iterations,
-                          horizon=horizon, worlds=worlds)
-    if plan and _move_sig(plan[0]) in legal_by_sig:
-        cache["queue"] = plan[1:]
-        return legal_by_sig[_move_sig(plan[0])]
+    tplan = mcts_plan_turn(manager, player, difficulty, rng, iterations=iterations,
+                           horizon=horizon, worlds=worlds, profile=profile, plan=plan)
+    if tplan and _move_sig(tplan[0]) in legal_by_sig:
+        cache["queue"] = tplan[1:]
+        return legal_by_sig[_move_sig(tplan[0])]
     # 計画が空/先頭不正＝安全側で micro MCTS の 1 手にフォールバック。
     cache["queue"] = None
     return decide_mcts(manager, player, difficulty, rng, moves=legal)
