@@ -250,8 +250,17 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       探索は (player_id, action) しか見ない。軽量版を `_search` の手番/葉判定に使う（副作用の phase 正規化はフル版と一致・
       `test_pending_actor_action_matches_full` で機械照合）。
       **通算: hard decide ~1176ms→~278ms＝~4.2x**（make/unmake×eq×pending・全1033pass・構造監査0・カード挙動ベースライン不変）。
-      **残（任意）**: parked 効果解決機構の journaled 化で中断再開手も make/unmake 化（残 clone の大半＝~decide の 12〜30%）。
-      `_apply_passive_effects`（~14%）の差分/キャッシュ化は常在効果の正しさに直結し安全なキャッシュ無効化が難しい＝高リスク保留。
+      (3) **`_apply_passive_effects` Step1 リセットの差分書き込み化（2026-06・~1.12x）**: PyPy オフロード後の再プロファイルで
+      **残コストの支配項は eval ではなく「make/unmake の journaled setattr 量」＋「passive 再計算」と判明**（`evaluate` は
+      cumulative ~10%）。両者は**同一の書き込み**＝`_apply_passive_effects` の Step1 が**毎ノード全カードのバフ
+      （`cost_buff`/`passive_power`/`passive_power_override`/`current_keywords`/`passive_counter`）を無条件リセット**し、
+      `__setattr__`→`record_attr` が探索の最大の self コストだった（実測 __setattr__ 357k 回・record_attr 397k 回）。
+      無条件代入を**「値が変わるときだけ書く」ガード**に変更（大半のカードはバフ 0＝no-op 代入を消す）。最終状態は
+      無条件代入と完全同一＝挙動・方策不変。実測 **__setattr__ 357k→85k（−76%）・record_attr 397k→125k（−69%）・
+      rollback −55%・`_apply_passive_effects` cumulative −60%**＝controlled A/B で **hard decide ~1.12x**（同一手・全1038pass・
+      構造監査0・ベースライン不変）。**PyPy オフロード（~2.1x）と乗算で対 CPython ~2.35x**。
+      **残（任意）**: parked 効果解決機構の journaled 化で中断再開手も make/unmake 化（残 clone の大半＝~decide の 12〜30%・
+      再プロファイルでも deepcopy が最大単一項＝次の本命レバー）。
     - **③ 置換表（transposition table）= 実測で不採用（2026-06）**: ②後は**健全（完全一致キー）な転置率 ≤0.5%**（exact key
       ＝デッキ順／全カード状態／継続効果まで含むと手順違いでも byte 一致がほぼ起きない）に対し、健全な位置キー計算が
       **~3%/node** のオーバーヘッド＝**ネット負**。②が per-node clone を消したため「再探索を省く」価値自体が消えた

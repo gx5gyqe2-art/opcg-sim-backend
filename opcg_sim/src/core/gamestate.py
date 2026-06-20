@@ -1154,17 +1154,26 @@ class GameManager:
         opponent = self.p2 if player == self.p1 else self.p1
 
         # Step 1: 両プレイヤーのバフ・一時キーワードをリセット
+        # 値が変わるときだけ書く（無条件代入は make/unmake の journaled 書き込みを毎ノード大量に生む＝
+        # 探索の支配コスト。大半のカードはバフ 0 ＝ no-op 代入なので、ガードで journaling 量を削る。
+        # 最終状態は無条件代入と完全同一＝挙動・方策不変）。
         for p in [player, opponent]:
             for c in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
                 if c:
-                    c.cost_buff = 0
-                    c.passive_power = 0
-                    c.passive_power_override = None
-                    c.current_keywords = c.master.keywords.copy()
+                    if c.cost_buff:
+                        c.cost_buff = 0
+                    if c.passive_power:
+                        c.passive_power = 0
+                    if c.passive_power_override is not None:
+                        c.passive_power_override = None
+                    if c.current_keywords != c.master.keywords:
+                        c.current_keywords = c.master.keywords.copy()
             for c in p.hand:
                 if c:
-                    c.cost_buff = 0
-                    c.passive_counter = 0
+                    if c.cost_buff:
+                        c.cost_buff = 0
+                    if c.passive_counter:
+                        c.passive_counter = 0
 
         # Step 2/3 で適用される INSTANT パワーバフは passive_power（再計算レイヤ）に
         # 載せる。power_buff に加えると _apply_passive_effects が呼ばれるたびに
