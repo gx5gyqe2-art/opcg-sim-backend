@@ -2000,3 +2000,40 @@ def decide_guarded(manager, player, difficulty: str = "normal", rng: Optional[ra
         mem["counts"] = counts
         mem["total"] = mem.get("total", 0) + 1
     return move
+
+
+def plan_turn(manager, name: str, difficulty: str = "hard", rng=None,
+              mem: Optional[Dict[str, Any]] = None, profile=None, plan=None) -> List[Dict[str, Any]]:
+    """Phase 3 ①（計画キャッシュ）: 相手の介入（ブロック/カウンター等）が入るまで、または TURN_END
+    までの自分(`name`)の**連続行動列**をクローン上で計画する。
+
+    クローン上で `decide_guarded` を逐次適用して列を作るため、本物の per-action 流（同じ `rng`/`mem` を
+    渡す）と**ビット等価**になる: 介入の無い区切り内では各手番の (盤面, rng, mem) が完全一致するため、
+    計画の手列・rng/mem 消費は per-action と同一（前倒しで全部計算→以降は replay という時間配分だけが違う）。
+    「自分が連続で動ける区切り」（ターン開始や相手介入の直後）で 1 回計算してキャッシュし、以降の手番は
+    キャッシュ参照で即時化する＝**待ちを 1 回に集約**する（体感最適化）。相手の応手で前提が崩れる介入点で
+    区切るので、そこから先は実結果が出てから再計画する。
+
+    戻り値: 行動 move dict のリスト（末尾は TURN_END か、相手介入の直前まで）。`mem`/`rng` は per-action と
+    同じものを渡すと、計画適用後の状態が本物の逐次実行と一致する（呼び出し側で replay 時は decide を呼ばない）。
+    """
+    from . import action_api
+    rng = rng or random
+    clone = manager.clone()
+    actions: List[Dict[str, Any]] = []
+    for _ in range(TURN_ACTION_CAP + 8):  # 安全上限（decide_guarded のキャップと整合・暴走防止）
+        pa = clone.pending_actor_action()
+        if not pa or pa[0] != name:
+            break  # 相手の手番/介入点（SELECT_BLOCKER/SELECT_COUNTER 等）＝区切り
+        actor = _player_by_name(clone, name)
+        mv = decide_guarded(clone, actor, difficulty, rng, mem=mem, profile=profile, plan=plan)
+        if mv is None:
+            break
+        actions.append(mv)
+        if mv.get("kind") == "battle":
+            action_api.apply_battle_action(clone, actor, mv["action_type"], mv.get("card_uuid"))
+        else:
+            action_api.apply_game_action(clone, actor, mv["action_type"], mv.get("payload", {}))
+        if mv.get("action_type") == "TURN_END":
+            break
+    return actions
