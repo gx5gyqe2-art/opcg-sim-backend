@@ -286,12 +286,13 @@ def _macro_search_root(root_state, name: str, iters: int, H: int,
 def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
                    iterations: Optional[int] = None, horizon: Optional[int] = None,
                    see_opp_hand: Optional[bool] = None, worlds: Optional[int] = None,
-                   profile=None, plan=None) -> List[Dict[str, Any]]:
+                   profile=None, plan=None, determinize: Optional[bool] = None) -> List[Dict[str, Any]]:
     """マクロ MCTS で `player` の**このターンの手列（ターンプラン）**を返す（計画キャッシュ的に逐次 replay 可）。
 
     ルートは `player` の手番境界。子=候補ターンプラン。最善子（最多訪問）の手列を返す。合法手が無ければ空。
     `worlds`>1（公平モード時）は K 通りの決定化世界で探索し、先頭手で集約した最頻・最多訪問プランを返す
     （単一世界の仮定ブレを平均で打ち消す＝真の ISMCTS 近似）。`plan`/`profile` は任意（葉評価の勝ち筋項）。
+    `determinize`（指定時はモジュール既定 `MCTS_DETERMINIZE` を上書き）＝公平モード（相手手札を覗かない）。
     """
     rng = rng or random
     name = player.name
@@ -300,14 +301,15 @@ def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[rand
     iters = iterations if iterations is not None else MCTS_MACRO_ITERS
     H = horizon if horizon is not None else MCTS_MACRO_HORIZON
     W = worlds if worlds is not None else MCTS_WORLDS
+    det_on = MCTS_DETERMINIZE if determinize is None else determinize
 
     pa = manager.pending_actor_action()
     if not pa or pa[0] != name:
         return []
 
     # 単一世界（既定 or 完全情報）: 1 世界探索して最多訪問プラン。
-    if W <= 1 or not MCTS_DETERMINIZE:
-        root_state = _determinize_opponent(manager, name, rng) if MCTS_DETERMINIZE else manager
+    if W <= 1 or not det_on:
+        root_state = _determinize_opponent(manager, name, rng) if det_on else manager
         root = _macro_search_root(root_state, name, iters, H, see_opp_hand, rng, profile, plan)
         if root is None:
             return []
