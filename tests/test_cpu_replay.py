@@ -48,7 +48,7 @@ def _advance_to_multi_choice(gm, max_steps=200):
         moves = gm.get_legal_actions(actor)
         if pending.get("action") == "MAIN_ACTION" and len(moves) > 1:
             return actor
-        move = cpu_ai.decide_guarded(gm, actor, "easy", random, mem.setdefault(pid, {}))
+        move = cpu_ai.decide_guarded(gm, actor, "hard", random, mem.setdefault(pid, {}))
         gm.action_events = []
         if move["kind"] == "battle":
             action_api.apply_battle_action(gm, actor, move["action_type"], move.get("card_uuid"))
@@ -63,9 +63,9 @@ def test_trace_does_not_change_decision(db):
     actor = _advance_to_multi_choice(gm)
     assert actor is not None, "複数候補の MAIN_ACTION 局面に到達できなかった"
 
-    move_plain = cpu_ai.decide(gm, actor, "normal", random.Random(0))
+    move_plain = cpu_ai.decide(gm, actor, "hard", random.Random(0))
     tr = {}
-    move_traced = cpu_ai.decide(gm, actor, "normal", random.Random(0), trace=tr)
+    move_traced = cpu_ai.decide(gm, actor, "hard", random.Random(0), trace=tr)
     assert cpu_ai._move_sig(move_plain) == cpu_ai._move_sig(move_traced)
 
 
@@ -80,10 +80,10 @@ def test_trace_is_rng_neutral(db):
     assert actor is not None
 
     random.seed(123)
-    cpu_ai.decide(gm, actor, "normal", random.Random(0))            # trace 無し
+    cpu_ai.decide(gm, actor, "hard", random.Random(0))            # trace 無し
     state_plain = random.getstate()
     random.seed(123)
-    cpu_ai.decide(gm, actor, "normal", random.Random(0), trace={})  # trace 有り
+    cpu_ai.decide(gm, actor, "hard", random.Random(0), trace={})  # trace 有り
     assert random.getstate() == state_plain, "trace 構築がグローバル random を余分に消費した"
 
 
@@ -94,7 +94,7 @@ def test_trace_has_expected_fields(db):
     assert actor is not None
 
     tr = {}
-    cpu_ai.decide(gm, actor, "normal", random.Random(0), trace=tr)
+    cpu_ai.decide(gm, actor, "hard", random.Random(0), trace=tr)
     assert tr.get("chosen") and "action_type" in tr["chosen"]
     assert isinstance(tr.get("candidates"), list) and 1 <= len(tr["candidates"]) <= cpu_ai.TRACE_TOPN
     assert "regret" in tr and tr["regret"] >= 0.0
@@ -121,7 +121,7 @@ def test_light_trace_omits_read_ahead(db):
     actor = _advance_to_multi_choice(gm)
     assert actor is not None
     tr = {}
-    cpu_ai.decide(gm, actor, "normal", random.Random(0), trace=tr, trace_read_ahead=False)
+    cpu_ai.decide(gm, actor, "hard", random.Random(0), trace=tr, trace_read_ahead=False)
     assert "read_ahead" not in tr               # 重い読み筋は省かれる
     assert tr.get("chosen") and "candidates" in tr and "regret" in tr
     assert "j_components" in tr                  # 安価な成分内訳は残す
@@ -129,7 +129,7 @@ def test_light_trace_omits_read_ahead(db):
 
 def test_replay_is_deterministic(db):
     """同一 seed の run_replay は同一の決定列（card_id 基準）を再現する（有界・部分再生・easy）。"""
-    a = run_replay(5, db, p1_difficulty="easy", p2_difficulty="easy", stop_after_decisions=20)
-    b = run_replay(5, db, p1_difficulty="easy", p2_difficulty="easy", stop_after_decisions=20)
+    a = run_replay(5, db, p1_difficulty="hard", p2_difficulty="hard", stop_after_decisions=20)
+    b = run_replay(5, db, p1_difficulty="hard", p2_difficulty="hard", stop_after_decisions=20)
     assert a["decisions"] == b["decisions"]
     assert len(a["decisions"]) == 20

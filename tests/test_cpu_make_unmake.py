@@ -39,7 +39,7 @@ def _decide_sig(gm, difficulty):
     return cpu_ai._move_sig(mv) if mv is not None else None
 
 
-@pytest.mark.parametrize("difficulty", ["normal", "hard"])
+@pytest.mark.parametrize("difficulty", ["hard"])
 def test_make_unmake_picks_same_move(db, difficulty):
     """make/unmake ON/OFF で decide の選択手が完全一致する（内部最適化＝方策不変）。"""
     states = _states(db)
@@ -97,7 +97,7 @@ def test_pending_actor_action_matches_full(db):
     from opcg_sim.src.core.gamestate import GameManager, Player
     gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     gm.start_game()
-    deciders = {"p1": cpu_arena._make_decider("easy"), "p2": cpu_arena._make_decider("easy")}
+    deciders = {"p1": cpu_arena._make_decider("hard"), "p2": cpu_arena._make_decider("hard")}
     checked = 0
     for _ in range(150):
         if gm.winner is not None:

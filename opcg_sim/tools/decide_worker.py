@@ -63,11 +63,11 @@ def _handle(req):
     trace = {} if want_trace else None
     if mode == "plan":
         # Phase 3 ① 計画キャッシュ: 相手介入/TURN_END までの自分の連続手番を計画して action list を返す。
-        actions = cpu_ai.plan_turn(manager, cpu_pid, difficulty, rng=rng, mem=mem, profile=profile, plan=plan)
+        actions = cpu_ai.plan_turn(manager, cpu_pid, difficulty, rng=rng, mem=mem, plan=plan)
         return (actions, trace, mem)
     move = cpu_ai.decide_guarded(
         manager, player, difficulty, rng=rng, mem=mem,
-        profile=profile, plan=plan, trace=trace, trace_read_ahead=read_ahead,
+        plan=plan, trace=trace, trace_read_ahead=read_ahead,
     )
     return (move, trace, mem)
 

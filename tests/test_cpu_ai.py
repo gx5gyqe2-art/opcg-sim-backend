@@ -299,7 +299,7 @@ def test_selection_moves_branches_optional_confirm_accept_decline():
     assert cpu_ai._selection_moves(_Stub(pend), "p2") is None
 
 
-@pytest.mark.parametrize("difficulty", ["hard", "normal"])
+@pytest.mark.parametrize("difficulty", ["hard"])
 @pytest.mark.parametrize("n_targets", [1, 2])
 def test_cpu_takes_beneficial_up_to_n_removal(db, difficulty, n_targets):
     """相手ターン中に発火した自分の『相手のコスト1以下を2枚までKO』(ドクQ OP16-109)で、
@@ -327,7 +327,7 @@ def test_cpu_takes_beneficial_up_to_n_removal(db, difficulty, n_targets):
     assert len(p1.field) == 0, f"{difficulty}/n={n_targets}: 相手の1コストを全KOできていない"
 
 
-@pytest.mark.parametrize("difficulty", ["hard", "normal"])
+@pytest.mark.parametrize("difficulty", ["hard"])
 def test_cpu_declines_pointless_optional_cost(db, difficulty):
     """ティーチ(OP16-080)の【相手のアタック時】『トリガー1枚を捨てて対象をリーダー/黒ひげキャラに変更』を、
     リーダーが既に対象＝リダイレクトしても得が無い局面では CPU は**見送る（カードを浪費しない）**。
@@ -423,7 +423,7 @@ def test_prune_futile_attacks_keeps_reachable_drops_unreachable():
     assert any(m.get("action_type") == "TURN_END" for m in pruned)
 
 
-@pytest.mark.parametrize("difficulty", ["easy", "normal", "hard"])
+@pytest.mark.parametrize("difficulty", ["hard"])
 def test_decide_returns_legal_move(db, difficulty):
     """decide はその時点の合法手のいずれかを返す（easy/normal/hard とも）。"""
     random.seed(1)
@@ -673,7 +673,7 @@ def test_hard_selfplay_smoke_no_invariant_violation(db):
 # /api/game/cpu/step エンドポイント
 # ---------------------------------------------------------------------------
 
-def _cpu_create(client, difficulty="normal"):
+def _cpu_create(client, difficulty="expert"):
     res = client.post("/api/game/create", json={
         "p1_deck": "db:a", "p2_deck": "db:b",
         "p1_name": "p1", "p2_name": "p2",
@@ -724,7 +724,7 @@ def test_cpu_step_drives_cpu_after_human(client):
 
 def test_cpu_full_game_progress(client):
     """人間=常にターン終了 + CPU step ポーリングで、数ターン安定して進行できる。"""
-    gid = _cpu_create(client, "normal")["game_id"]
+    gid = _cpu_create(client, "hard")["game_id"]
     client.post("/api/game/action", json={"game_id": gid, "action": "KEEP_HAND", "player_id": "p1", "payload": {}})
 
     def drain_cpu():

@@ -106,7 +106,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="価値関数の自己対戦データ収集")
     ap.add_argument("--games", type=int, default=100)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--difficulty", choices=["easy", "normal", "hard", "expert"], default="expert",
+    ap.add_argument("--difficulty", choices=["hard", "expert"], default="expert",
                     help="自己対戦の方策。expert=MCTS（価値葉を使う本番方策＝学習分布を一致）")
     ap.add_argument("--real-decks", action="store_true", help="deckgen の実デッキ（検証済リーダー巡回）で対戦")
     ap.add_argument("--iters", type=int, default=40, help="expert の反復数（速度↔質）")

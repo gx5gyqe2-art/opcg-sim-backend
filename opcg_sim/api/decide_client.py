@@ -92,7 +92,7 @@ def decide(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[st
             except Exception:
                 pass
     return cpu_ai.decide_guarded(
-        manager, player, difficulty, mem=mem, profile=profile, plan=plan,
+        manager, player, difficulty, mem=mem, plan=plan,
         trace=trace, trace_read_ahead=trace_read_ahead,
     )
 
@@ -116,4 +116,4 @@ def plan_segment(manager, player, difficulty: str = "normal", *, mem: Optional[D
                 spawn_worker()
             except Exception:
                 pass
-    return cpu_ai.plan_turn(manager, player.name, difficulty, mem=mem, profile=profile, plan=plan)
+    return cpu_ai.plan_turn(manager, player.name, difficulty, mem=mem, plan=plan)

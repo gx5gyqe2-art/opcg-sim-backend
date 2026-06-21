@@ -42,7 +42,7 @@ def _plan_for(difficulty: str, leader, cards):
     easy はプラン無し（素の 1-ply）。プロファイル（相手テンプレ）は自己対戦では無いので None
     （デプロイのテンプレ未登録フォールバックと同義）。
     """
-    if difficulty in ("normal", "hard"):
+    if difficulty == "hard":
         try:
             return cpu_self_plan.build_plan([c.master for c in cards],
                                             leader=leader.master if leader else None)
@@ -155,7 +155,7 @@ def arena(db, challenger: str, baseline: str, games: int, seed0: int = 0,
 
 # --- regret ログ --------------------------------------------------------------
 
-def regret_trace(db, seed: int, difficulty: str = "normal",
+def regret_trace(db, seed: int, difficulty: str = "hard",
                  max_steps: int = DEFAULT_MAX_STEPS) -> Dict[str, Any]:
     """1 ゲームを自己対戦し、各 MAIN 意思決定の greedy regret を集計する（mean/max/count/p95）。
 
@@ -276,20 +276,20 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     pa = sub.add_parser("arena", help="挑戦者 vs 固定ベースラインの勝率→Elo")
-    pa.add_argument("--challenger", choices=["easy", "normal", "hard"], default="normal")
-    pa.add_argument("--baseline", choices=["easy", "normal", "hard"], default="easy")
+    pa.add_argument("--challenger", choices=["hard"], default="hard")
+    pa.add_argument("--baseline", choices=["hard"], default="hard")
     pa.add_argument("--games", type=int, default=10)
     pa.add_argument("--seed", type=int, default=0)
     pa.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
 
     pr = sub.add_parser("regret", help="自己対戦 1 局の greedy regret 集計")
-    pr.add_argument("--difficulty", choices=["normal", "hard"], default="normal")
+    pr.add_argument("--difficulty", choices=["hard"], default="hard")
     pr.add_argument("--seed", type=int, default=0)
     pr.add_argument("--games", type=int, default=1)
     pr.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
 
     pz = sub.add_parser("realize", help="自己対戦の value-realization gap（ターン内 楽観崩落）集計")
-    pz.add_argument("--difficulty", choices=["normal", "hard"], default="hard")
+    pz.add_argument("--difficulty", choices=["hard"], default="hard")
     pz.add_argument("--seed", type=int, default=0)
     pz.add_argument("--games", type=int, default=1)
     pz.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)

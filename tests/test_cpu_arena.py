@@ -60,13 +60,13 @@ def test_win_rate_helper():
 # ---------------------------------------------------------------------------
 
 def test_play_game_finishes_with_winner(db):
-    res = cpu_arena.play_game(0, db, "easy", "easy")
+    res = cpu_arena.play_game(0, db, "hard", "hard")
     assert res["winner"] in ("p1", "p2")
     assert res["steps"] > 0 and res["turns"] > 0
 
 
 def test_arena_structure_and_seat_alternation(db):
-    rep = cpu_arena.arena(db, challenger="easy", baseline="easy", games=2, seed0=0)
+    rep = cpu_arena.arena(db, challenger="hard", baseline="hard", games=2, seed0=0)
     assert rep["games"] == 2
     assert 0.0 <= rep["win_rate"] <= 1.0
     assert math.isfinite(rep["elo_delta"])
@@ -82,26 +82,17 @@ def test_arena_structure_and_seat_alternation(db):
 # regret ログ（decide_with_regret）
 # ---------------------------------------------------------------------------
 
-def test_decide_with_regret_easy_is_zero(db):
-    """easy（1-ply 貪欲）は深掘りしないので regret=0、かつ合法手を返す。"""
-    gm = P._new_gm(db, seed=1)
-    assert P._fast_forward_to_p1_main(gm)
-    move, regret = cpu_ai.decide_with_regret(gm, gm.p1, "easy", random.Random(0))
-    assert move in gm.get_legal_actions(gm.p1)
-    assert regret == 0.0
-
-
 def test_decide_with_regret_normal_nonnegative_finite(db):
     """normal の regret は非負・有限、返す手は decide と一致（同一 seed）。"""
     gm = P._new_gm(db, seed=1)
     assert P._fast_forward_to_p1_main(gm)
     if len(gm.get_legal_actions(gm.p1)) <= 1:
         pytest.skip("分岐手が無い")
-    move, regret = cpu_ai.decide_with_regret(gm, gm.p1, "normal", random.Random(0))
+    move, regret = cpu_ai.decide_with_regret(gm, gm.p1, "hard", random.Random(0))
     assert move in gm.get_legal_actions(gm.p1)
     assert regret >= 0.0 and math.isfinite(regret)
     # 同一 seed の decide と同じ手（regret 計測が方策を変えない）。
-    expected = cpu_ai.decide(gm, gm.p1, "normal", random.Random(0))
+    expected = cpu_ai.decide(gm, gm.p1, "hard", random.Random(0))
     assert cpu_ai._move_sig(move) == cpu_ai._move_sig(expected)
 
 
@@ -112,4 +103,4 @@ def test_decide_with_regret_single_move_is_zero(db):
     only = gm.get_legal_actions(gm.p1)[:1]
     # moves を 1 手に絞った decide は regret 0（decide_with_regret は内部で legal を引くため、
     # ここでは decide 側の 1 手分岐を直接確認）。
-    assert cpu_ai.decide(gm, gm.p1, "normal", random.Random(0), moves=only) is only[0]
+    assert cpu_ai.decide(gm, gm.p1, "hard", random.Random(0), moves=only) is only[0]

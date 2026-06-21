@@ -32,7 +32,6 @@ from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.core import cpu_mcts
-from opcg_sim.src.core import cpu_opponent_model
 from opcg_sim.src.core import cpu_self_plan
 from opcg_sim.api import decide_client
 from opcg_sim.src.utils.loader import CardLoader
@@ -288,26 +287,6 @@ def load_deck_mixed(source_str: str, owner_id: str):
     return leader_inst, cards_inst
 
 
-def build_opp_profile_for_leader(leader_id: Optional[str]):
-    """相手リーダーに紐づくテンプレートデッキ（cpu_templates）から相手プロファイルを作る（§2.5.4）。
-
-    normal（リーダー推測）でのみ使用。テンプレ未登録・DB 不在なら None（保守モデルへフォールバック）。
-    隠れ情報（相手の実デッキ・実手札）は読まず、リーダーに紐づくテンプレ構成のみを使う＝フェア。
-    """
-    if not leader_id or not db:
-        return None
-    try:
-        docs = (db.collection("cpu_templates").where("leader_id", "==", leader_id)
-                .order_by("created_at", direction=firestore.Query.DESCENDING).limit(1).stream())
-        data = next((d.to_dict() for d in docs), None)
-        if not data:
-            return None
-        masters = [card_db.get_card(cid) for cid in data.get("card_uuids", [])]
-        masters = [m for m in masters if m is not None]
-        return cpu_opponent_model.build_profile(masters)
-    except Exception:
-        return None
-
 @app.options("/api/game/create")
 async def options_game_create(): return {"status": "ok"}
 
@@ -371,25 +350,20 @@ async def game_create(req: Any = Body(...)):
         first_player = _resolve_first_player(req.get("first_player"), player1, player2)
         manager = GameManager(player1, player2); manager.start_game(first_player); GAMES[game_id] = manager
         if vs_cpu:
-            difficulty = req.get("cpu_difficulty", "normal")
-            # expert = MCTS（ターン粒度マクロ木・公平モード・§2.5.7）。easy/normal/hard は従来の α-β。
-            if difficulty not in ("easy", "normal", "hard", "expert"):
-                difficulty = "normal"
-            # リーダー推測（normal）用: 人間(p1) のリーダーからテンプレ相手プロファイルを引き当てて保持（§2.5.4）。
-            opp_profile = None
-            if difficulty == "normal" and p1_leader is not None:
-                opp_profile = build_opp_profile_for_leader(p1_leader.master.card_id)
-            # 自デッキ勝ち筋プラン（§2.5.5）: CPU(p2) の自デッキ構成から静的に分類して保持（normal/hard で使用）。
+            # CPU は **hard（α-β＋ビーム）** と **expert（MCTS・§2.5.7）** の2系統のみ（easy/normal は廃止）。
+            difficulty = req.get("cpu_difficulty", "expert")
+            if difficulty not in ("hard", "expert"):
+                difficulty = "expert"
+            # 自デッキ勝ち筋プラン（§2.5.5）: CPU(p2) の自デッキ構成から静的に分類して保持（hard で使用）。
             self_plan = None
-            if difficulty in ("normal", "hard"):
+            if difficulty == "hard":
                 try:
                     self_plan = cpu_self_plan.build_plan([ci.master for ci in p2_cards],
-                                                         leader=p2_leader.master if p2_leader else None,
-                                                         opp_profile=opp_profile)
+                                                         leader=p2_leader.master if p2_leader else None)
                 except Exception:
                     pass
             CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty,
-                                  "opp_profile": opp_profile, "self_plan": self_plan}
+                                  "opp_profile": None, "self_plan": self_plan}
             if cpu_trace:
                 # リプレイ種＋思考ログの器を用意する（opt-in 時のみ）。
                 CPU_GAMES[game_id].update({
@@ -515,7 +489,7 @@ async def _ponder_plan(game_id: str) -> None:
         return
     cache = meta.setdefault("plan_cache", {})
     try:
-        cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "normal")
+        cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "expert")
         turn_mem = meta.setdefault("turn_mem", {})
         # live 盤面をそのまま OS スレッドへ渡すと、スレッド側の deepcopy（plan_turn 内 clone / ワーカーへの
         # pickle）がメインスレッドの盤面変更と競合する（読み取り中の書き換え）。**メインスレッドで原子的に
@@ -599,7 +573,7 @@ async def _speculate_plan(game_id: str, clone, human_pid: str, gen: int) -> None
         return
     cache = meta.setdefault("plan_cache", {})
     try:
-        cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "normal")
+        cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "expert")
         result = await asyncio.to_thread(
             _speculate_compute, clone, human_pid, cpu_pid, difficulty,
             meta.get("opp_profile"), meta.get("self_plan"))
@@ -689,7 +663,7 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
     if not meta:
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg="このゲームは CPU 対戦ではありません。")
 
-    cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "normal")
+    cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "expert")
     cpu_player = manager.p1 if manager.p1.name == cpu_pid else manager.p2
 
     def _waiting_for() -> str:
