@@ -219,9 +219,11 @@ def test_eb02_010_all_mugiwara_active_don_and_buff():
     rested_before = len(p1.don_rested)                  # 4
     gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
     auto_resolve(gm, p1)
-    # コスト ドン-2（active から2返却）＋ レスト2枚をアクティブ化 → active は差引同数、rested は-2
-    assert len(p1.don_active) == active_before
-    assert len(p1.don_rested) == rested_before - 2
+    # コスト「ドン!!-2」は**レスト優先で返却**（resolver._suspend_for_don_selection・既定解決＝損の少ない順）。
+    # rested 4→2（コスト2返却）→ さらに「レスト2枚をアクティブ化」で rested 2→0・active 6→8。
+    # ＝アクティブを温存したぶん最終 active が +2 多い（旧挙動はコストに active を返し active 据え置きだった）。
+    assert len(p1.don_active) == active_before + 2      # 8（アクティブ温存で増える＝正着）
+    assert len(p1.don_rested) == 0
     assert L.timed_power == 1000
 
 

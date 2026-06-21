@@ -491,8 +491,13 @@ def _plan_segment(manager, cpu_player, difficulty, mem=None, profile=None, plan=
     どちらも「手 dict のリスト（=このターンの連続手番）」を返す＝後段のキャッシュ/replay/ポンダリングは共通。
     """
     if difficulty == "expert":
+        # レイテンシ上限を壁時計デッドラインで保証（大盤面で MCTS が数十秒に膨らむのを防ぐ）。
+        # 既定 2000ms・OPCG_MCTS_DEADLINE_MS で調整可。horizon は OPCG_MCTS_HORIZON（既定2＝大盤面の発散抑制）。
+        deadline_ms = int(os.environ.get("OPCG_MCTS_DEADLINE_MS", "2000"))
+        horizon = int(os.environ.get("OPCG_MCTS_HORIZON", "2"))
         return cpu_mcts.mcts_plan_turn(manager, cpu_player, "hard", random,
-                                       profile=profile, plan=plan, determinize=True)
+                                       horizon=horizon, profile=profile, plan=plan,
+                                       determinize=True, deadline_ms=deadline_ms)
     return decide_client.plan_segment(manager, cpu_player, difficulty,
                                       mem=mem, profile=profile, plan=plan)
 

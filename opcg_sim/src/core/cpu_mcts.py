@@ -17,6 +17,7 @@
 """
 import math
 import random
+import time
 from typing import Any, Dict, List, Optional
 
 from .cpu_ai import (evaluate, _player_by_name, _selection_moves, _prune_don_moves,
@@ -40,6 +41,7 @@ MCTS_MACRO_C = 1.4           # UCB 探索定数（[0,1] 正規化）。
 MCTS_PW_C = 2.0              # progressive widening 係数（子数 ≈ 1 + PW_C·N^PW_ALPHA）。
 MCTS_PW_ALPHA = 0.5
 MCTS_MACRO_ITERS = 160       # 既定反復回数（ターンあたり 1 回の探索＝手列全体を一括計画）。
+MCTS_MIN_ITERS = 1           # 壁時計デッドライン使用時でも最低限回す反復数（最悪 overshoot を抑えるため小さく）。
 # Phase 2 公平化: 相手の伏せ手札を再サンプリングして探索（チート除去）。既定 OFF＝完全情報。
 MCTS_DETERMINIZE = False
 # 複数世界アンサンブル（真の ISMCTS 近似）の世界数。既定 1＝単一世界。
@@ -115,16 +117,73 @@ def _auto_resolve_opp(state, me: str) -> None:
             return
 
 
-def _sample_turn_plan(state, player_name: str, rng, see_opp_hand: bool) -> List[Dict[str, Any]]:
+def _settle_combat(state, me: str) -> None:
+    """進行中の戦闘を既定解決で安定境界まで畳む（`_auto_resolve_opp` の一般化＝**自分の応答も**畳む）。
+
+    `_auto_resolve_opp` は相手の戦闘応答だけを既定 PASS で畳むが（自分のターン中に攻撃宣言で止まらない
+    ため）、本関数は **`me` 自身の戦闘応答（カウンター/ブロック）も既定 PASS で畳む**。用途は防御手の採点：
+    カウンター宣言直後の「戦闘途中・解決前」の盤面（リーダーが一時的に強い・楽観）で評価せず、**戦闘を最後
+    まで解決した実結果**（ライフ増減・カード消費・トリガー）で採点するため（中盤戦闘の楽観排除＝Fix A の
+    防御側版）。MAIN_ACTION（ターン境界）に達したら停止。`MCTS_RESOLVE_COMBAT=False` で no-op（旧挙動）。
+    """
+    if not MCTS_RESOLVE_COMBAT:
+        return
+    for _ in range(24):
+        if state.winner is not None:
+            return
+        pa = state.pending_actor_action()
+        if not pa:
+            return
+        pid, act = pa
+        if act == "MAIN_ACTION":
+            return  # ターン境界＝安定静止点
+        actor = _player_by_name(state, pid)
+        state.action_events = []
+        try:
+            if act in ("SELECT_BLOCKER", "SELECT_COUNTER"):
+                action_api.apply_battle_action(state, actor, _ACT_PASS, None)
+            else:  # 戦闘に連なる選択（トリガー等・どちら側でも）は既定解決
+                pend = state.get_pending_request()
+                payload = state.default_interaction_payload(pend)
+                action_api.apply_game_action(state, actor, action_api.ACT_RESOLVE_SELECTION, payload)
+        except Exception:
+            return
+
+
+def _score_defense_move(state, player_name: str, move: Dict[str, Any], see_opp_hand: bool) -> Optional[float]:
+    """防御の戦闘応答手を、**適用後に戦闘を解決してから**評価した 1-ply 値（生 eval スケール）。
+
+    `_score_move_1ply` は手適用直後（戦闘解決前）の盤面を評価するため、届かない部分カウンター（例: +1000 で
+    必要 +3001 に届かない）でも「リーダーが一時的に +1000」で得に見え、サンプラがそれを生成してしまう。本関数は
+    クローンへ適用後 `_settle_combat` で戦闘を畳み、**実結果（ライフは結局減る・カードだけ損）**で採点する＝
+    無駄カウンターを正しく低評価し、サンプリングから締め出す。返り値は `_score_move_1ply` と同じ生 eval
+    スケール（ソフトマックス温度 `MCTS_MACRO_TEMP` と整合）。失敗（例外）は None。
+    """
+    clone = state.clone()
+    clone.action_events = []
+    try:
+        _apply_move_inplace(clone, player_name, move, stop_at_select=True)
+    except Exception:
+        return None
+    _settle_combat(clone, player_name)
+    return evaluate(clone, player_name, see_opp_hand=see_opp_hand, profile=None, plan=None)
+
+
+def _sample_turn_plan(state, player_name: str, rng, see_opp_hand: bool,
+                      deadline: Optional[float] = None) -> List[Dict[str, Any]]:
     """`state`（`player_name` の手番境界）から**1 ターンを確率的にプレイ**し、適用した手列を返す。
 
     各手番の決定は 1-ply 評価のソフトマックス（温度 `MCTS_MACRO_TEMP`）でサンプリング＝多様な候補ターンを
     生む（最善付近に集中しつつ揺らす）。`state` は破壊的に進む（TURN_END／相手介入／キャップで停止）。
     （prior 採点は plan/profile を渡さない＝候補手×決定×反復で 1-ply 評価が走るため、plan 付き eval だと
     レイテンシが破綻する。plan の価値は葉評価 `_value_boundary` 側だけに効かせる。）
+    `deadline`（壁時計）超過時は途中で打ち切る＝**1 反復が巨大盤面で数十秒に膨らむのを内側から防ぐ**
+    （上限保証の要。打ち切られた部分プランも合法な手列なので replay 可）。
     """
     plan: List[Dict[str, Any]] = []
     for _ in range(TURN_ACTION_CAP + 4):
+        if deadline is not None and time.time() >= deadline:
+            break  # 締切超過＝この手番サンプルを早期打ち切り（部分プランを返す）
         _auto_resolve_opp(state, player_name)   # 相手の戦闘応答を畳んで自分の手番へ戻す
         pa = state.pending_actor_action()
         if not pa or pa[0] != player_name:
@@ -132,13 +191,25 @@ def _sample_turn_plan(state, player_name: str, rng, see_opp_hand: bool) -> List[
         moves = _node_moves(state, player_name)
         if not moves:
             break
+        # 相手のターン中・自分が防御側で戦闘中の判断は**戦闘を解決してから**採点する＝届かない部分カウンター・
+        # 届かないリーダー能力（例: 【相手のアタック時】捨てて+2000）等の「戦闘途中の楽観」を排除する
+        # （Fix A の防御側版）。カウンター/ブロックだけでなく、カウンター段階の前に解決される**誘発能力の
+        # interaction やその対象選択も含めて全部**対象にするため、pending の種別ではなく「active_battle あり
+        # ＆相手の手番」で判定する（リーダー能力経由の無駄防御も締め出す＝凡ミスの別入口を塞ぐ）。
+        ab = getattr(state, "active_battle", None)
+        combat_resp = (ab is not None and state.turn_player is not None
+                       and state.turn_player.name != player_name) \
+                      or pa[1] in ("SELECT_COUNTER", "SELECT_BLOCKER")
         if len(moves) == 1:
             mv = moves[0]
         else:
             scored = []
             for m in moves:
-                v = _score_move_1ply(state, player_name, m, player_name,
-                                     see_opp_hand=see_opp_hand, profile=None, plan=None)
+                if combat_resp:
+                    v = _score_defense_move(state, player_name, m, see_opp_hand)
+                else:
+                    v = _score_move_1ply(state, player_name, m, player_name,
+                                         see_opp_hand=see_opp_hand, profile=None, plan=None)
                 if v is not None:
                     scored.append((m, v))
             if not scored:
@@ -215,9 +286,10 @@ def _ucb_select_macro(node: _MacroNode, root_name: str, rng) -> _MacroNode:
 
 
 def _macro_simulate(root: _MacroNode, root_state, root_name: str,
-                    horizon: int, see_opp_hand: bool, rng, profile=None, plan=None) -> None:
+                    horizon: int, see_opp_hand: bool, rng, profile=None, plan=None,
+                    deadline: Optional[float] = None) -> None:
     """1 反復: ルートを clone → progressive widening でターンプランを展開/選択しながら境界を下り、
-    horizon ターン先（or 終局）の境界を `evaluate` → 経路へ backup。"""
+    horizon ターン先（or 終局）の境界を `evaluate` → 経路へ backup。`deadline` はターンサンプリングへ伝播。"""
     state = root_state.clone()
     state.action_events = []
     node = root
@@ -228,7 +300,7 @@ def _macro_simulate(root: _MacroNode, root_state, root_name: str,
         max_children = 1 + int(MCTS_PW_C * (node.N ** MCTS_PW_ALPHA))
         if len(node.children) < max_children:
             # 展開: 新しいターンプランをサンプリング（state は次境界まで進む）。
-            tp = _sample_turn_plan(state, node.actor, rng, see_opp_hand)
+            tp = _sample_turn_plan(state, node.actor, rng, see_opp_hand, deadline)
             if not tp:
                 break
             child = _macro_node_from_state(tp, state)
@@ -272,27 +344,37 @@ def _determinize_opponent(manager, me_name: str, rng):
 
 
 def _macro_search_root(root_state, name: str, iters: int, H: int,
-                       see_opp_hand: bool, rng, profile=None, plan=None) -> Optional["_MacroNode"]:
-    """`root_state`（`name` の手番境界・決定化済みでもよい）で 1 世界ぶん探索し、ルートノードを返す。"""
+                       see_opp_hand: bool, rng, profile=None, plan=None,
+                       deadline: Optional[float] = None) -> Optional["_MacroNode"]:
+    """`root_state`（`name` の手番境界・決定化済みでもよい）で 1 世界ぶん探索し、ルートノードを返す。
+
+    `deadline`（time.time() の絶対時刻・本番のみ）を渡すと、最低 `MCTS_MIN_ITERS` を確保した上で時刻超過で
+    反復を打ち切る＝レイテンシ上限を保証する（決定性は壊れるので tests/自己対戦は None）。
+    """
     pa = root_state.pending_actor_action()
     if not pa or pa[0] != name:
         return None
     root = _MacroNode(None, name, terminal=False)
-    for _ in range(iters):
-        _macro_simulate(root, root_state, name, H, see_opp_hand, rng, profile, plan)
+    for i in range(iters):
+        if deadline is not None and i >= MCTS_MIN_ITERS and time.time() >= deadline:
+            break
+        _macro_simulate(root, root_state, name, H, see_opp_hand, rng, profile, plan, deadline)
     return root if root.children else None
 
 
 def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
                    iterations: Optional[int] = None, horizon: Optional[int] = None,
                    see_opp_hand: Optional[bool] = None, worlds: Optional[int] = None,
-                   profile=None, plan=None, determinize: Optional[bool] = None) -> List[Dict[str, Any]]:
+                   profile=None, plan=None, determinize: Optional[bool] = None,
+                   deadline_ms: Optional[int] = None) -> List[Dict[str, Any]]:
     """マクロ MCTS で `player` の**このターンの手列（ターンプラン）**を返す（計画キャッシュ的に逐次 replay 可）。
 
     ルートは `player` の手番境界。子=候補ターンプラン。最善子（最多訪問）の手列を返す。合法手が無ければ空。
     `worlds`>1（公平モード時）は K 通りの決定化世界で探索し、先頭手で集約した最頻・最多訪問プランを返す
     （単一世界の仮定ブレを平均で打ち消す＝真の ISMCTS 近似）。`plan`/`profile` は任意（葉評価の勝ち筋項）。
     `determinize`（指定時はモジュール既定 `MCTS_DETERMINIZE` を上書き）＝公平モード（相手手札を覗かない）。
+    `deadline_ms`（本番のみ）を渡すと壁時計で反復を打ち切りレイテンシ上限を保証する（決定性は壊れるので
+    tests/自己対戦は None＝固定反復で再現可能）。
     """
     rng = rng or random
     name = player.name
@@ -302,6 +384,7 @@ def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[rand
     H = horizon if horizon is not None else MCTS_MACRO_HORIZON
     W = worlds if worlds is not None else MCTS_WORLDS
     det_on = MCTS_DETERMINIZE if determinize is None else determinize
+    deadline = (time.time() + deadline_ms / 1000.0) if deadline_ms else None
 
     pa = manager.pending_actor_action()
     if not pa or pa[0] != name:
@@ -310,7 +393,7 @@ def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[rand
     # 単一世界（既定 or 完全情報）: 1 世界探索して最多訪問プラン。
     if W <= 1 or not det_on:
         root_state = _determinize_opponent(manager, name, rng) if det_on else manager
-        root = _macro_search_root(root_state, name, iters, H, see_opp_hand, rng, profile, plan)
+        root = _macro_search_root(root_state, name, iters, H, see_opp_hand, rng, profile, plan, deadline)
         if root is None:
             return []
         best = max(root.children, key=lambda c: (c.N, c.W / c.N if c.N else 0.0, rng.random()))
@@ -319,9 +402,11 @@ def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[rand
     # 複数世界アンサンブル: 各世界で探索し、ルート子を先頭手 sig で集約（訪問数を合算）。
     per_world = max(1, iters // W)
     tally: Dict[tuple, List[Any]] = {}        # first_sig -> [総訪問, 最良訪問, 最良プラン]
-    for _ in range(W):
+    for wi in range(W):
+        if deadline is not None and wi > 0 and time.time() >= deadline:
+            break
         det = _determinize_opponent(manager, name, rng)
-        root = _macro_search_root(det, name, per_world, H, see_opp_hand, rng, profile, plan)
+        root = _macro_search_root(det, name, per_world, H, see_opp_hand, rng, profile, plan, deadline)
         if root is None:
             continue
         for ch in root.children:
@@ -346,7 +431,7 @@ def mcts_plan_turn(manager, player, difficulty: str = "hard", rng: Optional[rand
 def decide_mcts_macro(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
                       cache: Optional[Dict[str, Any]] = None, iterations: Optional[int] = None,
                       horizon: Optional[int] = None, worlds: Optional[int] = None,
-                      profile=None, plan=None,
+                      profile=None, plan=None, deadline_ms: Optional[int] = None,
                       moves: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
     """マクロ MCTS の**逐次 1 手**インターフェース（`cpu_ai.decide_cached` と同型）。
 
@@ -374,7 +459,8 @@ def decide_mcts_macro(manager, player, difficulty: str = "hard", rng: Optional[r
         cache["queue"] = None  # 前提崩れ＝再計画
 
     tplan = mcts_plan_turn(manager, player, difficulty, rng, iterations=iterations,
-                           horizon=horizon, worlds=worlds, profile=profile, plan=plan)
+                           horizon=horizon, worlds=worlds, profile=profile, plan=plan,
+                           deadline_ms=deadline_ms)
     if tplan and _move_sig(tplan[0]) in legal_by_sig:
         cache["queue"] = tplan[1:]
         return legal_by_sig[_move_sig(tplan[0])]

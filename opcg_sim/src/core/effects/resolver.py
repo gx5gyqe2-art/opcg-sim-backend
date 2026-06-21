@@ -1304,7 +1304,12 @@ class EffectResolver:
         """
         gm = self.game_manager
         tp = gm._don_pool_player(player, action)
-        field_don = list(tp.don_active) + list(tp.don_rested) + list(tp.don_attached_cards)
+        # 候補の並び＝既定解決（`default_interaction_payload` が先頭から min 枚取る）の優先順位。
+        # ドン!!をデッキへ戻すなら **レスト（このターン既に消費済み＝戻しても今ターンの損が無い）を最優先**、
+        # 次にアクティブ（戻すと今ターン使えるドンを失う＝損）、最後に付与中（戻すと付与先の +1000 を失う）。
+        # 旧実装は active 先頭だったため、CPU（本選択は探索せず既定解決）が**レストが有るのにアクティブを戻す**
+        # 無駄をしていた（エネル等のドン返却ループで顕著）。レスト先頭で「戻すなら一番損の少ないドン」を既定化する。
+        field_don = list(tp.don_rested) + list(tp.don_active) + list(tp.don_attached_cards)
         n = value if value and value > 0 else 1
         to_return = min(n, len(field_don))
         if to_return <= 0:
