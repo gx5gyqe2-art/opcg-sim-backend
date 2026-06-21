@@ -49,8 +49,19 @@ def is_available() -> bool:
     return bool(_load())
 
 
+_ALPHA_OVERRIDE = None   # 自己対戦アリーナで「片側だけ α を変える」ための上書き（本番/テストは None）。
+
+
+def set_alpha_override(a):
+    """ブレンド率を一時的に上書き（評価アリーナ用）。None で env 既定に戻す。"""
+    global _ALPHA_OVERRIDE
+    _ALPHA_OVERRIDE = None if a is None else min(1.0, max(0.0, float(a)))
+
+
 def blend_alpha() -> float:
-    """葉評価へのブレンド率（0=OFF=現状同値）。本番のみ env で調整・tests/自己対戦は未設定=0。"""
+    """葉評価へのブレンド率（0=OFF=現状同値）。上書き>env>0 の優先。tests/本番は未設定=0。"""
+    if _ALPHA_OVERRIDE is not None:
+        return _ALPHA_OVERRIDE
     try:
         a = float(os.environ.get("OPCG_VALUE_BLEND", "0") or "0")
     except ValueError:

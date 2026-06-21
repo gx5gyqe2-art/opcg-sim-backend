@@ -16,22 +16,57 @@ from typing import Any, Dict, List
 import conftest  # noqa: F401
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai, cpu_features
+from opcg_sim.src.core import action_api, cpu_ai, cpu_features, cpu_mcts
 from opcg_sim.src.core.invariants import check_invariants
 
 from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS
+import deckgen
+
+_VERIFIED = list(deckgen.VERIFIED_LEADERS.values())
 
 
-def collect_game(seed: int, db, difficulty: str, max_steps: int) -> List[Dict[str, Any]]:
+def _build_decks(seed: int, db, real_decks: bool):
+    """合成（同色キャラ50）or 実デッキ（`deckgen`・検証済リーダーを巡回）でデッキを組む。"""
+    if not real_decks:
+        l1, c1 = build_deck(db, "p1")
+        l2, c2 = build_deck(db, "p2")
+        return l1, c1, l2, c2
+    l1id = _VERIFIED[seed % len(_VERIFIED)]
+    l2id = _VERIFIED[(seed + 1) % len(_VERIFIED)]
+    L1, c1 = deckgen.build_realistic_deck(db, "p1", l1id, random.Random(seed * 2))
+    L2, c2 = deckgen.build_realistic_deck(db, "p2", l2id, random.Random(seed * 2 + 1))
+    return L1, c1, L2, c2
+
+
+def _make_decider(policy: str, iters: int, horizon: int):
+    """policy に応じた1手決定関数を返す（局ごとに新規生成＝mem/cache をリセット）。
+
+    expert＝MCTS（`decide_mcts_macro`・価値葉を使う本番方策＝学習分布を一致させる）。
+    easy/normal/hard＝従来 α-β（`decide_guarded`）。
+    """
+    if policy == "expert":
+        caches: Dict[str, Dict[str, Any]] = {}
+        def decide(m, actor):
+            return cpu_mcts.decide_mcts_macro(m, actor, "hard", random,
+                                              cache=caches.setdefault(actor.name, {}),
+                                              iterations=iters, horizon=horizon)
+        return decide
+    mem: Dict[str, Dict[str, Any]] = {}
+    def decide(m, actor):
+        return cpu_ai.decide_guarded(m, actor, policy, random, mem.setdefault(actor.name, {}))
+    return decide
+
+
+def collect_game(seed: int, db, difficulty: str, max_steps: int,
+                 real_decks: bool = False, iters: int = 40, horizon: int = 2) -> List[Dict[str, Any]]:
     """1 局を自己対戦し、ターン境界の (特徴, プレイヤー) を集めて最終勝敗でラベル付けして返す。"""
     random.seed(seed)
-    l1, c1 = build_deck(db, "p1")
-    l2, c2 = build_deck(db, "p2")
+    l1, c1, l2, c2 = _build_decks(seed, db, real_decks)
     if not l1 or not l2:
         return []
     m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     m.start_game()
-    mem = {"p1": {}, "p2": {}}
+    decide = _make_decider(difficulty, iters, horizon)
     pid_key = action_api.CONST.get("PENDING_REQUEST_PROPERTIES", {}).get("PLAYER_ID", "player_id")
 
     samples: List[Dict[str, Any]] = []   # {"f":[...], "p":"p1"}
@@ -42,7 +77,7 @@ def collect_game(seed: int, db, difficulty: str, max_steps: int) -> List[Dict[st
         if not pending:
             break
         actor = m.p1 if m.p1.name == pending[pid_key] else m.p2
-        move = cpu_ai.decide_guarded(m, actor, difficulty, random, mem.setdefault(actor.name, {}))
+        move = decide(m, actor)
         if move is None:
             break
         m.action_events = []
@@ -71,7 +106,11 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="価値関数の自己対戦データ収集")
     ap.add_argument("--games", type=int, default=100)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--difficulty", choices=["easy", "normal", "hard"], default="normal")
+    ap.add_argument("--difficulty", choices=["easy", "normal", "hard", "expert"], default="expert",
+                    help="自己対戦の方策。expert=MCTS（価値葉を使う本番方策＝学習分布を一致）")
+    ap.add_argument("--real-decks", action="store_true", help="deckgen の実デッキ（検証済リーダー巡回）で対戦")
+    ap.add_argument("--iters", type=int, default=40, help="expert の反復数（速度↔質）")
+    ap.add_argument("--horizon", type=int, default=2)
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
     ap.add_argument("--out", default="/tmp/value_data.jsonl")
     args = ap.parse_args(argv)
@@ -80,7 +119,8 @@ def main(argv=None):
     n_rows = n_games = 0
     with open(args.out, "w", encoding="utf-8") as f:
         for g in range(args.games):
-            rows = collect_game(args.seed + g, db, args.difficulty, args.max_steps)
+            rows = collect_game(args.seed + g, db, args.difficulty, args.max_steps,
+                                real_decks=args.real_decks, iters=args.iters, horizon=args.horizon)
             if not rows:
                 continue
             n_games += 1
