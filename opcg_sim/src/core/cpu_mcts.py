@@ -117,6 +117,58 @@ def _auto_resolve_opp(state, me: str) -> None:
             return
 
 
+def _settle_combat(state, me: str) -> None:
+    """進行中の戦闘を既定解決で安定境界まで畳む（`_auto_resolve_opp` の一般化＝**自分の応答も**畳む）。
+
+    `_auto_resolve_opp` は相手の戦闘応答だけを既定 PASS で畳むが（自分のターン中に攻撃宣言で止まらない
+    ため）、本関数は **`me` 自身の戦闘応答（カウンター/ブロック）も既定 PASS で畳む**。用途は防御手の採点：
+    カウンター宣言直後の「戦闘途中・解決前」の盤面（リーダーが一時的に強い・楽観）で評価せず、**戦闘を最後
+    まで解決した実結果**（ライフ増減・カード消費・トリガー）で採点するため（中盤戦闘の楽観排除＝Fix A の
+    防御側版）。MAIN_ACTION（ターン境界）に達したら停止。`MCTS_RESOLVE_COMBAT=False` で no-op（旧挙動）。
+    """
+    if not MCTS_RESOLVE_COMBAT:
+        return
+    for _ in range(24):
+        if state.winner is not None:
+            return
+        pa = state.pending_actor_action()
+        if not pa:
+            return
+        pid, act = pa
+        if act == "MAIN_ACTION":
+            return  # ターン境界＝安定静止点
+        actor = _player_by_name(state, pid)
+        state.action_events = []
+        try:
+            if act in ("SELECT_BLOCKER", "SELECT_COUNTER"):
+                action_api.apply_battle_action(state, actor, _ACT_PASS, None)
+            else:  # 戦闘に連なる選択（トリガー等・どちら側でも）は既定解決
+                pend = state.get_pending_request()
+                payload = state.default_interaction_payload(pend)
+                action_api.apply_game_action(state, actor, action_api.ACT_RESOLVE_SELECTION, payload)
+        except Exception:
+            return
+
+
+def _score_defense_move(state, player_name: str, move: Dict[str, Any], see_opp_hand: bool) -> Optional[float]:
+    """防御の戦闘応答手を、**適用後に戦闘を解決してから**評価した 1-ply 値（生 eval スケール）。
+
+    `_score_move_1ply` は手適用直後（戦闘解決前）の盤面を評価するため、届かない部分カウンター（例: +1000 で
+    必要 +3001 に届かない）でも「リーダーが一時的に +1000」で得に見え、サンプラがそれを生成してしまう。本関数は
+    クローンへ適用後 `_settle_combat` で戦闘を畳み、**実結果（ライフは結局減る・カードだけ損）**で採点する＝
+    無駄カウンターを正しく低評価し、サンプリングから締め出す。返り値は `_score_move_1ply` と同じ生 eval
+    スケール（ソフトマックス温度 `MCTS_MACRO_TEMP` と整合）。失敗（例外）は None。
+    """
+    clone = state.clone()
+    clone.action_events = []
+    try:
+        _apply_move_inplace(clone, player_name, move, stop_at_select=True)
+    except Exception:
+        return None
+    _settle_combat(clone, player_name)
+    return evaluate(clone, player_name, see_opp_hand=see_opp_hand, profile=None, plan=None)
+
+
 def _sample_turn_plan(state, player_name: str, rng, see_opp_hand: bool,
                       deadline: Optional[float] = None) -> List[Dict[str, Any]]:
     """`state`（`player_name` の手番境界）から**1 ターンを確率的にプレイ**し、適用した手列を返す。
@@ -139,13 +191,19 @@ def _sample_turn_plan(state, player_name: str, rng, see_opp_hand: bool,
         moves = _node_moves(state, player_name)
         if not moves:
             break
+        # 防御の戦闘応答（カウンター/ブロック）は**戦闘を解決してから**採点する＝届かない部分カウンター等の
+        # 「戦闘途中の楽観」を排除（Fix A の防御側版・無駄カウンターをサンプリングから締め出す）。
+        combat_resp = pa[1] in ("SELECT_COUNTER", "SELECT_BLOCKER")
         if len(moves) == 1:
             mv = moves[0]
         else:
             scored = []
             for m in moves:
-                v = _score_move_1ply(state, player_name, m, player_name,
-                                     see_opp_hand=see_opp_hand, profile=None, plan=None)
+                if combat_resp:
+                    v = _score_defense_move(state, player_name, m, see_opp_hand)
+                else:
+                    v = _score_move_1ply(state, player_name, m, player_name,
+                                         see_opp_hand=see_opp_hand, profile=None, plan=None)
                 if v is not None:
                     scored.append((m, v))
             if not scored:
