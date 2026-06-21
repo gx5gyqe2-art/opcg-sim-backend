@@ -157,7 +157,7 @@ def run_one_game(
     trace_out=None,
     verbose: bool = False,
     policy: str = "random",
-    difficulty: str = "normal",
+    difficulty: str = "hard",
     oracle: bool = False,
 ) -> Dict[str, Any]:
     """1 ゲームを決定論的に完走させ、結果サマリを返す。
@@ -264,7 +264,7 @@ def main(argv=None):
     ap.add_argument("--out", default=None, help="トレース JSONL の出力先")
     ap.add_argument("--policy", choices=["random", "ai"], default="random",
                     help="手選択方策。random=高速ランダム / ai=評価関数ベース（効果トレース用・低速）")
-    ap.add_argument("--difficulty", choices=["easy", "normal", "hard"], default="normal",
+    ap.add_argument("--difficulty", choices=["hard"], default="hard",
                     help="--policy ai のときの CPU 難易度")
     ap.add_argument("--oracle", action="store_true",
                     help="効果検証: 各ステップに snapshot_diff（盤面前後差分）を記録する")

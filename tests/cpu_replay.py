@@ -55,8 +55,8 @@ def run_replay(
     db,
     p1_leader: Optional[str] = None,
     p2_leader: Optional[str] = None,
-    p1_difficulty: str = "normal",
-    p2_difficulty: str = "normal",
+    p1_difficulty: str = "hard",
+    p2_difficulty: str = "hard",
     max_steps: int = DEFAULT_MAX_STEPS,
     trace_out=None,
     emit_steps: bool = True,
@@ -184,10 +184,10 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--p1-leader", default=None)
     ap.add_argument("--p2-leader", default=None)
-    ap.add_argument("--difficulty", choices=["easy", "normal", "hard"], default="normal",
+    ap.add_argument("--difficulty", choices=["hard"], default="hard",
                     help="両者の既定難易度（--p1-difficulty/--p2-difficulty で個別上書き）")
-    ap.add_argument("--p1-difficulty", choices=["easy", "normal", "hard"], default=None)
-    ap.add_argument("--p2-difficulty", choices=["easy", "normal", "hard"], default=None)
+    ap.add_argument("--p1-difficulty", choices=["hard"], default=None)
+    ap.add_argument("--p2-difficulty", choices=["hard"], default=None)
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
     ap.add_argument("--out", default=None, help="トレース JSONL の出力先（'-' で stdout）")
     ap.add_argument("--record", default=None, help="リプレイ種（descriptor JSON）の出力先")
@@ -207,7 +207,7 @@ def main(argv=None):
             d = json.load(f)
         seed = d["seed"]
         p1_leader, p2_leader = d.get("p1_leader"), d.get("p2_leader")
-        p1_diff, p2_diff = d.get("p1_difficulty", "normal"), d.get("p2_difficulty", "normal")
+        p1_diff, p2_diff = d.get("p1_difficulty", "hard"), d.get("p2_difficulty", "hard")
 
     db = _load_db()
     trace_out, should_close = _open_out(args.out)

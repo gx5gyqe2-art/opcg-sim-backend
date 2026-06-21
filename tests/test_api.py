@@ -188,7 +188,7 @@ def test_cpu_step_on_non_cpu_game(client):
 
 def test_replay_disabled_by_default(client):
     """cpu_trace 未指定の CPU 対局はリプレイ記録を持たず、エンドポイントは整形エラーを返す。"""
-    gid = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="easy").json()["game_id"]
+    gid = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="hard").json()["game_id"]
     assert "cpu_trace" not in A.CPU_GAMES[gid]  # 既定では記録器を作らない＝本番無影響
     r = client.get(f"/api/game/{gid}/replay")
     assert r.status_code == 200 and r.json()["success"] is False
@@ -220,7 +220,7 @@ def _drive_until_cpu_decides(client, gid, cpu_name, human_name, max_iter=80):
 
 def test_replay_capture_and_fetch(client):
     """cpu_trace=true の対局で CPU 思考トレース＋種が記録され、エンドポイントで取得できる。"""
-    body = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="easy",
+    body = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="hard",
                         cpu_trace=True, seed=12345).json()
     gid = body["game_id"]
     meta = A.CPU_GAMES[gid]

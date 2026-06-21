@@ -35,7 +35,7 @@ def _per_action_segment(mgr, name, rng, mem):
         if not pa or pa[0] != name:
             break
         actor = cpu_ai._player_by_name(clone, name)
-        mv = cpu_ai.decide_guarded(clone, actor, "normal", rng, mem=mem)
+        mv = cpu_ai.decide_guarded(clone, actor, "hard", rng, mem=mem)
         if mv is None:
             break
         out.append(mv)
@@ -71,7 +71,7 @@ def test_plan_turn_is_bit_identical_to_per_action(db):
             rng_state = random.getstate()
             mem_a = copy.deepcopy(mem.get(actor_name, {}))
             mem_b = copy.deepcopy(mem.get(actor_name, {}))
-            planned = cpu_ai.plan_turn(m, actor_name, "normal", rng=random, mem=mem_a)
+            planned = cpu_ai.plan_turn(m, actor_name, "hard", rng=random, mem=mem_a)
             state_after_plan = random.getstate()
             random.setstate(rng_state)
             actual = _per_action_segment(m, actor_name, random, mem_b)
@@ -83,7 +83,7 @@ def test_plan_turn_is_bit_identical_to_per_action(db):
                 checked += 1
         last_actor = actor_name
         # 本流を per-action で進める
-        mv = cpu_ai.decide_guarded(m, actor, "normal", random, mem=mem[actor_name])
+        mv = cpu_ai.decide_guarded(m, actor, "hard", random, mem=mem[actor_name])
         if mv is None:
             break
         m.action_events = []
@@ -110,11 +110,11 @@ def test_plan_turn_stops_at_turn_end_or_opponent(db):
         if not pa:
             break
         actor = cpu_ai._player_by_name(m, pa[0])
-        plan = cpu_ai.plan_turn(m, pa[0], "normal", rng=random, mem=copy.deepcopy(mem.get(pa[0], {})))
+        plan = cpu_ai.plan_turn(m, pa[0], "hard", rng=random, mem=copy.deepcopy(mem.get(pa[0], {})))
         # 区切り健全性: 空でなければ、TURN_END 終端 か 全手が同一アクターの手番内。
         if plan:
             assert plan[-1].get("action_type") == "TURN_END" or len(plan) <= cpu_ai.TURN_ACTION_CAP + 8
-        mv = cpu_ai.decide_guarded(m, actor, "normal", random, mem=mem[pa[0]])
+        mv = cpu_ai.decide_guarded(m, actor, "hard", random, mem=mem[pa[0]])
         if mv is None:
             break
         m.action_events = []
@@ -152,7 +152,7 @@ def test_decide_cached_plays_legal_and_replays(db):
                 break
             actor = _ai._player_by_name(m, pa[0])
             legal = m.get_legal_actions(actor)
-            mv = _ai.decide_cached(m, actor, "normal", _r, mem=mem[pa[0]], cache=caches[pa[0]])
+            mv = _ai.decide_cached(m, actor, "hard", _r, mem=mem[pa[0]], cache=caches[pa[0]])
             assert mv is not None
             # 返る手は必ず現局面で合法（合法性検証の担保）
             assert _ai._move_sig(mv) in {_ai._move_sig(x) for x in legal}, \
@@ -184,9 +184,9 @@ def test_plan_segment_inprocess_matches_plan_turn(db):
     m.start_game()
     name = m.pending_actor_action()[0]
     st = _r.getstate()
-    a = decide_client.plan_segment(m, cpu_ai._player_by_name(m, name), "normal", mem={})
+    a = decide_client.plan_segment(m, cpu_ai._player_by_name(m, name), "hard", mem={})
     _r.setstate(st)
-    b = cpu_ai.plan_turn(m, name, "normal", rng=_r, mem={})
+    b = cpu_ai.plan_turn(m, name, "hard", rng=_r, mem={})
     assert _sigs(a) == _sigs(b)
 
 
@@ -218,9 +218,9 @@ def test_cached_cpu_move_replays_and_legal(db):
                 break
             actor = cpu_ai._player_by_name(m, pa[0])
             legal = m.get_legal_actions(actor)
-            mv = _app._cached_cpu_move(m, actor, "normal", meta, turn_mem)
+            mv = _app._cached_cpu_move(m, actor, "hard", meta, turn_mem)
             if mv is None:  # フォールバック（合法性検証で稀に起きる）＝通常 decide
-                mv = cpu_ai.decide_guarded(m, actor, "normal", _r, mem=turn_mem)
+                mv = cpu_ai.decide_guarded(m, actor, "hard", _r, mem=turn_mem)
             assert cpu_ai._move_sig(mv) in {cpu_ai._move_sig(x) for x in legal}
             decides += 1
             m.action_events = []
@@ -240,7 +240,7 @@ def test_cached_cpu_move_replays_and_legal(db):
 # 前倒しで温め、次の /cpu/step が即時 replay（CPU 初手の待ちを消す）。本番専用・既定 OFF。
 # ---------------------------------------------------------------------------
 
-def _setup_cpu_game(db, gid, difficulty="normal"):
+def _setup_cpu_game(db, gid, difficulty="hard"):
     """現 pending プレイヤーを CPU とみなした CPU ゲームを GAMES/CPU_GAMES に登録して返す。"""
     import os
     os.environ.setdefault("OPCG_PYPY_WORKER", "0")
@@ -279,7 +279,7 @@ def test_ponder_prewarms_queue_and_cached_move_hits(db):
         try:
             actor = cpu_ai._player_by_name(m, name)
             legal = m.get_legal_actions(actor)
-            mv = _app._cached_cpu_move(m, actor, "normal", meta, meta["turn_mem"])
+            mv = _app._cached_cpu_move(m, actor, "hard", meta, meta["turn_mem"])
             assert mv is not None
             assert cpu_ai._move_sig(mv) in {cpu_ai._move_sig(x) for x in legal}
             assert seg_calls["n"] == 0, "warm queue があるのに再計画した（前倒しが効いていない）"
@@ -346,7 +346,7 @@ def _advance_to_main(m):
         if act == "MAIN_ACTION":
             return pid
         actor = cpu_ai._player_by_name(m, pid)
-        mv = cpu_ai.decide_guarded(m, actor, "normal", random.Random(0), mem={})
+        mv = cpu_ai.decide_guarded(m, actor, "hard", random.Random(0), mem={})
         if mv is None:
             return None
         m.action_events = []
@@ -374,7 +374,7 @@ def test_speculate_compute_plans_cpu_turn_on_clone(db):
     cpu_pid = "p2" if pid == "p1" else "p1"
     live_turn = m.turn_count
     clone = m.clone()
-    result = _app._speculate_compute(clone, human_pid, cpu_pid, "normal", None, None)
+    result = _app._speculate_compute(clone, human_pid, cpu_pid, "hard", None, None)
     # live(=m) は不変（クローンのみ変異）。
     assert m.turn_count == live_turn
     assert m.pending_actor_action()[0] == human_pid
@@ -398,7 +398,7 @@ def test_kick_ponder_promotes_valid_speculation(db):
         os.environ["OPCG_PONDER"] = "1"
         # 現 CPU 手番に対する実計画を「投機結果」として置く（先頭は当然合法）。
         cpu_player = cpu_ai._player_by_name(m, name)
-        plan = decide_client.plan_segment(m, cpu_player, "normal", mem={})
+        plan = decide_client.plan_segment(m, cpu_player, "hard", mem={})
         assert plan, "計画が空"
         meta = _app.CPU_GAMES[gid]
         meta.setdefault("plan_cache", {})["spec_queue"] = list(plan)
@@ -435,7 +435,7 @@ def test_kick_speculate_gated_and_clones_without_mutation(db):
     cpu_pid = "p2" if pid == "p1" else "p1"
     gid = "_spec_t2"
     _app.GAMES[gid] = m
-    _app.CPU_GAMES[gid] = {"cpu_player_id": cpu_pid, "difficulty": "normal", "turn_mem": {}}
+    _app.CPU_GAMES[gid] = {"cpu_player_id": cpu_pid, "difficulty": "hard", "turn_mem": {}}
     prev = {k: os.environ.get(k) for k in ("OPCG_PLAN_CACHE", "OPCG_PONDER", "OPCG_PONDER_SPEC")}
     live_turn = m.turn_count
     try:

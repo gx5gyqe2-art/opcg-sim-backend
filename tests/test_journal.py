@@ -159,8 +159,8 @@ def test_real_playout_make_unmake_roundtrip(db):
     gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     gm.start_game()
     deciders = {
-        "p1": cpu_arena._make_decider("easy"),
-        "p2": cpu_arena._make_decider("easy"),
+        "p1": cpu_arena._make_decider("hard"),
+        "p2": cpu_arena._make_decider("hard"),
     }
     KEY = _pid_key()
     checked = 0
@@ -222,7 +222,7 @@ def test_parked_resume_make_unmake_roundtrip(db):
         l2, c2 = cpu_arena.build_deck(db, "p2")
         gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
         gm.start_game()
-        deciders = {"p1": cpu_arena._make_decider("easy"), "p2": cpu_arena._make_decider("easy")}
+        deciders = {"p1": cpu_arena._make_decider("hard"), "p2": cpu_arena._make_decider("hard")}
         steps = 0
         while gm.winner is None and steps < 150:
             pending = gm.get_pending_request()

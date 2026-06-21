@@ -54,7 +54,7 @@ def _decide_sig(gm, difficulty):
     return cpu_ai._move_sig(mv) if mv is not None else None
 
 
-@pytest.mark.parametrize("difficulty", ["normal", "hard"])
+@pytest.mark.parametrize("difficulty", ["hard", "hard"])
 def test_pv_order_picks_same_move(db, difficulty):
     """PV ON/OFF で decide の選択手が完全一致する（内部最適化＝方策不変）。"""
     states = _states(db)

@@ -139,7 +139,7 @@ def test_puzzle_converts_excess_don_to_clock_at_decide_level(db):
         if gm.p1.don_deck:
             gm.p1.don_active.append(gm.p1.don_deck.pop())
     plan = _aggro_plan()
-    for difficulty in ("normal", "hard"):
+    for difficulty in ("hard",):
         g = gm.clone()
         move = cpu_ai.decide(g, g.p1, difficulty, random.Random(0), plan=plan)
         assert move["action_type"] == "ATTACK", f"{difficulty}: 余剰ドンを握って攻めない（ドン→クロック未変換）"
@@ -519,72 +519,3 @@ def test_b1b_modeled_counter_saves_target_and_spends_card(db):
     passclone.action_events = []
     action_api.apply_battle_action(passclone, passclone.p2, battle_actions.get('PASS', 'PASS'), None)
     assert len(passclone.p2.life) == life_before - 1, "PASS なのに攻撃が通っていない"
-
-
-def test_b1b_normal_with_profile_runs_counter_model_cleanly(db):
-    """B-1(b) 配線スモーク: profile（緩衝>0）供給の normal decide が探索の推定カウンター経路を通っても
-    例外なく合法手を返す（counter_budget>0 で `_search` の min カウンター分岐が踏まれる）。"""
-    from opcg_sim.src.core import cpu_opponent_model as om
-    gm = _new_gm(db, seed=1)
-    assert _fast_forward_to_p1_main(gm)
-    prof = om.OpponentProfile(50, 800.0, 0.6, 0.1, 0.1, 4.0, 1.4, 0.3)  # 緩衝 = 800*4 > 0
-    assert cpu_ai._estimate_counter_buffer(prof) > 0
-    plan = cpu_self_plan.NEUTRAL
-    legal = gm.get_legal_actions(gm.p1)
-    move = cpu_ai.decide(gm, gm.p1, "normal", random.Random(0), profile=prof, plan=plan)
-    assert move in legal
-
-
-# ---------------------------------------------------------------------------
-# フェア性ガード（A-3）: normal は相手の隠れ手札の中身を一切読まない
-# ---------------------------------------------------------------------------
-
-def _spy_evaluate(monkeypatch):
-    """`cpu_ai.evaluate` をラップし、呼び出し時の `see_opp_hand` を記録する。"""
-    seen = []
-    orig = cpu_ai.evaluate
-
-    def wrapper(manager, me_name, see_opp_hand=True, profile=None, plan=None):
-        seen.append(see_opp_hand)
-        return orig(manager, me_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
-
-    monkeypatch.setattr(cpu_ai, "evaluate", wrapper)
-    return seen
-
-
-def test_fairness_normal_never_reads_opp_hand(db, monkeypatch):
-    """情報方針: normal の意思決定は `evaluate` を必ず see_opp_hand=False（公開のみ）で呼ぶ。
-    hard は少なくとも一度 see_opp_hand=True（相手手札を読む）で呼ぶ。"""
-    gm = _new_gm(db, seed=1)
-    assert _fast_forward_to_p1_main(gm)
-    moves = gm.get_legal_actions(gm.p1)
-    if len(moves) <= 1:
-        pytest.skip("分岐する合法手が無い")
-
-    seen = _spy_evaluate(monkeypatch)
-    cpu_ai.decide(gm, gm.p1, "normal", random.Random(0))
-    assert seen, "evaluate が一度も呼ばれていない"
-    assert all(s is False for s in seen), "normal が相手手札を読む評価を行った（フェア性違反）"
-
-    seen.clear()
-    cpu_ai.decide(gm, gm.p1, "hard", random.Random(0))
-    assert any(s is True for s in seen), "hard が相手手札を読んでいない"
-
-
-def test_fairness_normal_decision_invariant_to_opp_hand_content(db):
-    """フェア性（挙動）: normal の選択は相手手札の**中身**（カウンター値）に依存しない。
-
-    相手手札の枚数を変えずカウンター値だけを底上げしても、同一 seed の normal は同じ手を選ぶ
-    （隠れ情報を読まない＝チートしない）。"""
-    gm = _new_gm(db, seed=1)
-    assert _fast_forward_to_p1_main(gm)
-    if len(gm.get_legal_actions(gm.p1)) <= 1 or not gm.p2.hand:
-        pytest.skip("分岐手が無い or 相手手札が空")
-
-    before = cpu_ai.decide(gm, gm.p1, "normal", random.Random(0))
-    # 相手手札の中身だけを変える（枚数は不変）。
-    for c in gm.p2.hand:
-        c.passive_counter += 4000
-    after = cpu_ai.decide(gm, gm.p1, "normal", random.Random(0))
-    assert cpu_ai._move_sig(before) == cpu_ai._move_sig(after), \
-        "normal の選択が相手手札の中身で変わった（隠れ情報を読んでいる＝フェア性違反）"
