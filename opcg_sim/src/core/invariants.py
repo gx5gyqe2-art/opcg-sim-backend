@@ -7,11 +7,28 @@
 
 `check_invariants(manager)` は違反の (code, message) リストを返す。空ならクリーン。
 """
+import re
+import unicodedata
 from typing import Any, Dict, List, Tuple
 
 from .gamestate import FIELD_LIMIT
 
 Violation = Tuple[str, str]
+
+_DON_RULE_RE = re.compile(r"ドン!!デッキは(\d+)枚")
+
+
+def _expected_don_total(player) -> int:
+    """そのプレイヤーのドン!!総数の期待値（保存量）。
+
+    既定 10 枚だが、リーダーの常在ルール「ルール上、自分のドン!!デッキはN枚になる」（エネル OP15-058=6 等）が
+    あればその枚数。`gamestate._apply_leader_don_deck_rule` と同じテキストを読む（NFKC で ‼/全角数字も吸収）。
+    """
+    leader = getattr(player, "leader", None)
+    master = getattr(leader, "master", None) if leader else None
+    text = getattr(master, "effect_text", "") if master else ""
+    m = _DON_RULE_RE.search(unicodedata.normalize("NFKC", text or ""))
+    return int(m.group(1)) if m else 10
 
 
 def _all_card_zones(p) -> Dict[str, List]:
@@ -50,14 +67,15 @@ def check_invariants(manager) -> List[Violation]:
                 f"{p.name}: field has {len(p.field)} characters (> {FIELD_LIMIT}) without overflow interaction",
             ))
 
-        # --- ドン!! 総数保存（常に 10 枚） ---
+        # --- ドン!! 総数保存（既定 10 枚・リーダールールで調整: エネル OP15-058=6 等） ---
+        expected_don = _expected_don_total(p)
         don_total = (
             len(p.don_deck) + len(p.don_active) + len(p.don_rested) + len(p.don_attached_cards)
         )
-        if don_total != 10:
+        if don_total != expected_don:
             violations.append((
                 "DON_CONSERVATION",
-                f"{p.name}: total DON = {don_total} (expected 10)",
+                f"{p.name}: total DON = {don_total} (expected {expected_don})",
             ))
 
         # --- 付与ドン!! 数が非負・整合 ---
