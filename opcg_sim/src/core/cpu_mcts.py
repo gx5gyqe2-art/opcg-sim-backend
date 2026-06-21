@@ -22,6 +22,15 @@ from typing import Any, Dict, List, Optional
 from .cpu_ai import (evaluate, _player_by_name, _selection_moves, _prune_don_moves,
                      _prune_futile_attacks, _apply_move_inplace, _score_move_1ply, _move_sig,
                      TURN_ACTION_CAP)
+from . import action_api
+
+# 自分のターン中に割り込む相手の戦闘応答（ブロック/カウンター）を既定 PASS で畳んで自分のターンを
+# 最後まで続けるか。OFF だと攻撃宣言で相手応答待ち（SELECT_COUNTER/BLOCKER）の**戦闘途中の局面**が葉に
+# なり、評価が ±~1245(生eval) ブレる（実測・葉の ~20%）＝探索を増やすほど誤収束（optimizer's curse）。
+# ON で葉が常にきれいなターン境界（相手 MAIN）になり評価が健全化する。相手の防御は「相手の手番（次の
+# マクロノード）」で読まれるので、ここで PASS 既定にしても二重には無視しない（α-β の settle と同方針）。
+MCTS_RESOLVE_COMBAT = True
+_ACT_PASS = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {}).get('PASS', 'PASS')
 
 # 盤面評価値（数千スケール）を [0,1] へ圧縮する tanh のスケール（葉の価値用）。
 MCTS_VALUE_SCALE = 8000.0
@@ -75,6 +84,37 @@ def _weighted_choice(items, weights, rng):
     return items[-1]
 
 
+def _auto_resolve_opp(state, me: str) -> None:
+    """自分（`me`）のターン中に割り込む**相手の戦闘応答（ブロック/カウンター）＋それに連なる選択**を既定で
+    畳み、自分の手番に戻すか相手の本来のターン（相手 MAIN）/終局まで進める。
+
+    これで自分のターンプランが「攻撃→相手応答待ち」で止まらず最後まで流れ、葉が常にきれいなターン境界
+    （相手 MAIN）になる＝戦闘途中の楽観/ノイズ評価を排除する。`MCTS_RESOLVE_COMBAT=False` で no-op（旧挙動）。
+    """
+    if not MCTS_RESOLVE_COMBAT:
+        return
+    for _ in range(16):
+        if state.winner is not None:
+            return
+        pa = state.pending_actor_action()
+        if not pa:
+            return
+        pid, act = pa
+        if pid == me or act == "MAIN_ACTION":
+            return  # 自分の手番に戻った／相手の本来のターン＝境界
+        actor = _player_by_name(state, pid)
+        state.action_events = []
+        try:
+            if act in ("SELECT_BLOCKER", "SELECT_COUNTER"):
+                action_api.apply_battle_action(state, actor, _ACT_PASS, None)
+            else:  # 戦闘に連なる相手側の選択（トリガー等）は既定解決
+                pend = state.get_pending_request()
+                payload = state.default_interaction_payload(pend)
+                action_api.apply_game_action(state, actor, action_api.ACT_RESOLVE_SELECTION, payload)
+        except Exception:
+            return
+
+
 def _sample_turn_plan(state, player_name: str, rng, see_opp_hand: bool) -> List[Dict[str, Any]]:
     """`state`（`player_name` の手番境界）から**1 ターンを確率的にプレイ**し、適用した手列を返す。
 
@@ -85,9 +125,10 @@ def _sample_turn_plan(state, player_name: str, rng, see_opp_hand: bool) -> List[
     """
     plan: List[Dict[str, Any]] = []
     for _ in range(TURN_ACTION_CAP + 4):
+        _auto_resolve_opp(state, player_name)   # 相手の戦闘応答を畳んで自分の手番へ戻す
         pa = state.pending_actor_action()
         if not pa or pa[0] != player_name:
-            break  # 相手の手番/介入点＝ターン境界
+            break  # 相手の本来のターン/終局＝ターン境界
         moves = _node_moves(state, player_name)
         if not moves:
             break
@@ -119,8 +160,10 @@ def _apply_turn_plan(state, player_name: str, plan: List[Dict[str, Any]]) -> boo
     """記録済みのターンプランを `state` に**決定論的に再生**する（選択降下の再構成用）。
 
     完全情報・同一開始状態なら手は合法に再現される。万一不一致（効果内 RNG 等）なら適用を止めて False。
+    記録は自分の手のみ＝相手の戦闘応答は `_auto_resolve_opp` で各手の前後に既定再現する（サンプル時と一致）。
     """
     for mv in plan:
+        _auto_resolve_opp(state, player_name)
         pa = state.pending_actor_action()
         if not pa or pa[0] != player_name:
             return False
@@ -131,6 +174,7 @@ def _apply_turn_plan(state, player_name: str, plan: List[Dict[str, Any]]) -> boo
             _apply_move_inplace(state, player_name, mv, stop_at_select=True)
         except Exception:
             return False
+    _auto_resolve_opp(state, player_name)   # 末尾の戦闘も畳んで境界へ
     return True
 
 
