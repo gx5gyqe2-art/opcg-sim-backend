@@ -191,9 +191,15 @@ def _sample_turn_plan(state, player_name: str, rng, see_opp_hand: bool,
         moves = _node_moves(state, player_name)
         if not moves:
             break
-        # 防御の戦闘応答（カウンター/ブロック）は**戦闘を解決してから**採点する＝届かない部分カウンター等の
-        # 「戦闘途中の楽観」を排除（Fix A の防御側版・無駄カウンターをサンプリングから締め出す）。
-        combat_resp = pa[1] in ("SELECT_COUNTER", "SELECT_BLOCKER")
+        # 相手のターン中・自分が防御側で戦闘中の判断は**戦闘を解決してから**採点する＝届かない部分カウンター・
+        # 届かないリーダー能力（例: 【相手のアタック時】捨てて+2000）等の「戦闘途中の楽観」を排除する
+        # （Fix A の防御側版）。カウンター/ブロックだけでなく、カウンター段階の前に解決される**誘発能力の
+        # interaction やその対象選択も含めて全部**対象にするため、pending の種別ではなく「active_battle あり
+        # ＆相手の手番」で判定する（リーダー能力経由の無駄防御も締め出す＝凡ミスの別入口を塞ぐ）。
+        ab = getattr(state, "active_battle", None)
+        combat_resp = (ab is not None and state.turn_player is not None
+                       and state.turn_player.name != player_name) \
+                      or pa[1] in ("SELECT_COUNTER", "SELECT_BLOCKER")
         if len(moves) == 1:
             mv = moves[0]
         else:
