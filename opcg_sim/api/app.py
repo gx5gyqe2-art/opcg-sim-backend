@@ -841,58 +841,6 @@ async def list_decks():
             pass
     return {"success": True, "decks": decks}
 
-# --- CPU 相手モデル（テンプレートデッキ）: deck と同形・leader_id 引き当て（docs/SPEC.md §2.5.4） ---
-
-@app.post("/api/cpu_template")
-async def save_cpu_template(tpl_data: Dict[str, Any] = Body(...)):
-    if not db: return {"success": False, "error": "Database not initialized"}
-    try:
-        doc_ref = (db.collection("cpu_templates").document(tpl_data["id"])
-                   if tpl_data.get("id") else db.collection("cpu_templates").document())
-        save_data = {"id": doc_ref.id, "name": tpl_data.get("name", "Untitled Template"),
-                     "leader_id": tpl_data.get("leader_id"), "card_uuids": tpl_data.get("card_uuids", []),
-                     "don_uuids": tpl_data.get("don_uuids", []), "created_at": firestore.SERVER_TIMESTAMP}
-        doc_ref.set(save_data)
-        return {"success": True, "template_id": doc_ref.id}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@app.delete("/api/cpu_template/{template_id}")
-async def delete_cpu_template(template_id: str):
-    if not db: return {"success": False, "error": "Database not initialized"}
-    try:
-        db.collection("cpu_templates").document(template_id).delete()
-        return {"success": True, "template_id": template_id}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@app.get("/api/cpu_template/get")
-async def get_cpu_template(id: str):
-    if not db: return {"success": False, "error": "Database not initialized"}
-    try:
-        doc = db.collection("cpu_templates").document(id).get()
-        if not doc.exists:
-            return {"success": False, "error": f"Template not found: {id}"}
-        d = doc.to_dict()
-        if d.get("created_at"): d["created_at"] = str(d["created_at"])
-        return {"success": True, "template": d}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-@app.get("/api/cpu_template/list")
-async def list_cpu_templates():
-    templates = []
-    if db:
-        try:
-            docs = db.collection("cpu_templates").order_by("created_at", direction=firestore.Query.DESCENDING).stream()
-            for doc in docs:
-                d = doc.to_dict()
-                if d.get("created_at"): d["created_at"] = str(d["created_at"])
-                templates.append(d)
-        except Exception as e:
-            pass
-    return {"success": True, "templates": templates}
-
 @app.get("/api/sandbox/list")
 async def sandbox_list():
     games = []
