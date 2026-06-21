@@ -24,6 +24,8 @@ from .cpu_ai import (evaluate, _player_by_name, _selection_moves, _prune_don_mov
                      _prune_futile_attacks, _apply_move_inplace, _score_move_1ply, _move_sig,
                      TURN_ACTION_CAP)
 from . import action_api
+from . import cpu_features
+from . import cpu_value_model
 
 # 自分のターン中に割り込む相手の戦闘応答（ブロック/カウンター）を既定 PASS で畳んで自分のターンを
 # 最後まで続けるか。OFF だと攻撃宣言で相手応答待ち（SELECT_COUNTER/BLOCKER）の**戦闘途中の局面**が葉に
@@ -58,7 +60,19 @@ def _value_boundary(manager, root_name: str, see_opp_hand: bool, profile=None, p
     if manager.winner is not None:
         return 1.0 if manager.winner == root_name else 0.0
     ev = evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
-    return 0.5 * (1.0 + math.tanh(ev / MCTS_VALUE_SCALE))
+    base = 0.5 * (1.0 + math.tanh(ev / MCTS_VALUE_SCALE))
+    # 学習価値葉のブレンド（§2.5.7 残5・既定OFF）。`OPCG_VALUE_BLEND`>0 かつモデル同梱時のみ作動＝
+    # option value（手札の答え在庫×相手脅威）を学習価値で補う。α=0 では推論を一切走らせない＝現状同値。
+    a = cpu_value_model.blend_alpha()
+    if a > 0.0 and cpu_value_model.is_available():
+        try:
+            p = cpu_value_model.predict_winprob(
+                cpu_features.extract_features(manager, root_name, see_opp_hand=see_opp_hand))
+            if p is not None:
+                return (1.0 - a) * base + a * p
+        except Exception:
+            pass
+    return base
 
 
 def _node_moves(manager, actor_name: str) -> List[Dict[str, Any]]:
