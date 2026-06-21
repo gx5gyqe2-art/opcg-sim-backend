@@ -7,9 +7,8 @@ CPU（hard）思考の更なる高速化＝**「速くした分を horizon（思
 ## 0. 結論（要約）
 
 - **PyPy で実測 ~2.1x（コード改変ゼロ・挙動ビット一致）**。エンジン本体は **stdlib のみ**で PyPy 上で
-  そのまま動く（import・探索とも実証）。配信スタック（FastAPI/pydantic-core/grpcio）の PyPy 互換だけが採用前の課題。
+  そのまま動く（import・探索とも実証）。配信スタック（FastAPI/pydantic-core/grpcio）の PyPy 互換が課題。
 - 換算アンカー（過去実測）: **compute ~1.7x ≒ horizon +1 ≒ +58 Elo**（horizon 3→4・予算 90→150）。
-  → **PyPy 単体で horizon +1（=5手）を据え置きレイテンシで取れる**目算。算法系の策（差分評価/LMR 等）と**乗算**。
 
 ## 1. 前提：現状のコスト構造（既出・SPEC §2.5.2）
 
@@ -57,8 +56,8 @@ OPCG_LOG_SILENT=1 pypy3   tests/bench_decide.py
 
 - warm = 5 ゲーム暖機後。**本番サーバは常時稼働＝フルウォーム相当**なのでこの値が実効。
 - 暖機 2 ゲームでも median 117.5ms（~1.9x）＝暖機を増やすほど僅かに伸びる。
-- **正直な訂正**: 着手前の口頭見積り「3〜8x」に対し**実測は ~2.1x**。本エンジンは効果リゾルバの多態 dispatch が
-  多く JIT が最も得意な形ではないため、これが現実値。それでも**改変ゼロ・挙動不変で 2x** は高 ROI。
+- 着手前の口頭見積り「3〜8x」に対し**実測は ~2.1x**。本エンジンは効果リゾルバの多態 dispatch が
+  多く JIT が最も得意な形ではない。
 
 ## 4. 対照②：高速化手段の総覧
 
@@ -73,10 +72,10 @@ OPCG_LOG_SILENT=1 pypy3   tests/bench_decide.py
 | LMR / PVS / killer | 速度より **horizon +~1 相当** | node 削減・深さ増幅 | 近似（A/B 要） | 中〜低 | 未着手 |
 | mypyc（型付き→C拡張） | ~1.5〜4x（一般値） | 属性アクセス重 OOP | **不変** | 中（型注釈＋compile） | 未検証 |
 | root 並列化 | wall-clock ~2〜3x | レイテンシ直撃 | 不変だが**要決定性担保** | 高（pickle/GIL/再現性） | 未着手 |
-| native 部分書換（Rust/C++） | eval 数x／実効 ~1.5〜2x | eval/ordering を native 常駐 | **要差分オラクル** | 大（divergence risk） | 非推奨 |
+| native 部分書換（Rust/C++） | eval 数x／実効 ~1.5〜2x | eval/ordering を native 常駐 | **要差分オラクル** | 大（divergence risk） | 未検証 |
 | 置換表（transposition） | — | 同一盤面の再探索省略 | 不変 | — | **実測不採用** |
 
-**乗算性**: PyPy（ランタイム）× 差分評価/LMR（算法）は独立に効く＝積み上げで **horizon +2** が射程。
+**乗算性**: PyPy（ランタイム）× 差分評価/LMR（算法）は独立に効く（積み上げ可能）。
 
 ## 5. 採用前の課題（PyPy）
 
@@ -86,17 +85,10 @@ OPCG_LOG_SILENT=1 pypy3   tests/bench_decide.py
    pydantic-core は近年 PyPy wheel あり、**grpcio は PyPy で歴史的に難物**。
 2. **アーキテクチャ2択**:
    - **A. 単一プロセス**: pydantic-core/grpcio が PyPy で install できるか検証（pypi 到達可）。
-   - **B. プロセス分離（堅い）**: **探索エンジンを PyPy ワーカー**、FastAPI は CPython のまま IPC で `decide` を渡す。
-     エンジンが stdlib-only ゆえ分離が自然で、配信スタックの PyPy 互換問題を**完全回避**。
-3. **PyPy バージョン**: apt 版は 3.9（古め）。公式 PyPy 3.10/3.11 ならもう少し伸びる可能性。
+   - **B. プロセス分離**: 探索エンジンを PyPy ワーカー、FastAPI は CPython のまま IPC で `decide` を渡す。
+     エンジンが stdlib-only ゆえ分離でき、配信スタックの PyPy 互換問題を回避する。
+3. **PyPy バージョン**: apt 版は 3.9。公式 PyPy 3.10/3.11 で伸びる可能性。
    この環境は `downloads.python.org` が `host_not_allowed`＝whitelist か vendoring が必要。
-
-## 6. 推奨順序
-
-1. **PyPy 採否を決める**（最大 ROI・改変ゼロ・挙動不変）。配信は **B. プロセス分離**が安全本命。
-2. **差分評価**（方策不変ゲートで安全）＝現支配項 eval に直撃。
-3. 余力で **LMR / lazy eval** を A/B Elo（horizon 3→4 で使った枠組み）で「退行なし」確認しつつ horizon 拡大。
-4. **parked journaled 化**で残 clone を刈る（挙動不変・既存ゲート流用）。
 
 > 検証データの出所: `tests/bench_decide.py`（spike・本ブランチにコミット済み）。
 > 計測機: 本実行環境・CPython 3.11.15 / PyPy 7.3.15（3.9.18）。
