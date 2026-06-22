@@ -477,6 +477,110 @@ def _advance_to_select_counter(gm, attacker, target):
     return False
 
 
+# ---------------------------------------------------------------------------
+# Phase 0 物差し: null-move regret（戦闘解決後採点）と「変な手」監査の代表局面
+# （docs/reports/cpu_weird_move_remediation_plan §4・逸話→回帰テスト化）
+# ---------------------------------------------------------------------------
+
+def test_null_move_regret_settles_both_sides_and_observation_only(db):
+    """null-move regret = eval_settled(選択手) − eval_settled(TURN_END)。両辺とも `_settle_eval` 経由＝
+    戦闘解決後（相手 MAIN の静止点）で採点する。`_eval_move_settled` が `_settle_eval` の整流値と一致し、
+    かつ算出が live 局面・global RNG を一切変えない（観測専用）ことを固定する。"""
+    gm = _new_gm(db, seed=0)
+    assert _fast_forward_to_p1_main(gm)
+    moves = gm.get_legal_actions(gm.p1)
+    end_move = next((m for m in moves if m.get("action_type") == "TURN_END"), None)
+    assert end_move is not None, "p1 メインで TURN_END が合法手にあるはず"
+
+    # 観測専用: 算出前後で live 盤面の指紋（手札/場/ライフ/デッキ枚数）と RNG 状態が不変。
+    def _fingerprint(g):
+        return tuple((len(p.hand), len(p.field), len(p.life), len(p.deck), len(p.don_active))
+                     for p in (g.p1, g.p2))
+    fp_before = _fingerprint(gm)
+    rng_before = random.getstate()
+    nmr = cpu_ai.null_move_regret(gm, "p1", end_move, moves=moves, see_opp_hand=True)
+    assert _fingerprint(gm) == fp_before, "null_move_regret が live 盤面を変えた（観測専用違反）"
+    assert random.getstate() == rng_before, "null_move_regret が global RNG を消費した（決定論違反）"
+
+    # TURN_END 自身の regret は基準と同一手＝0。
+    assert nmr is not None and nmr["regret"] == pytest.approx(0.0)
+    # 両辺が _settle_eval 経由（戦闘解決後）であることの直接確認＝end_settled が clone+_settle_eval と一致。
+    clone = cpu_ai._apply_clone(gm, "p1", end_move, stop_at_select=False)
+    assert clone is not None
+    settled = cpu_ai._settle_eval(clone, "p1", True, None, None)
+    assert nmr["end_settled"] == pytest.approx(settled)
+
+
+def test_null_move_regret_none_when_no_turn_end_during_defense(db):
+    """防御応答中（SELECT_BLOCKER/SELECT_COUNTER 等で TURN_END が合法に無い局面）では「何もしない」基準が
+    定義できないため null-move regret は None を返す＝監査がそこを誤検出しない（計画 §4 の誤検出防止要件）。"""
+    gm = _new_gm(db, seed=0)
+    assert _fast_forward_to_p1_main(gm)
+    opp_leader_pw = int(gm.p2.leader.get_power(False)) if gm.p2.leader else 5000
+    atk = _reaching_char(gm.p1.deck, 0)
+    if atk is None:
+        pytest.skip("攻撃者が見つからない")
+    gm.p1.deck.remove(atk)
+    gm.p1.field[:] = [atk]
+    atk.is_rest = False
+    atk.is_newly_played = False
+    atk.passive_power_override = opp_leader_pw + 1500
+    if not gm.p2.life:
+        gm.p2.life.append(gm.p2.deck.pop())
+    # p1 が p2 リーダーへアタック → p2 は防御応答（SELECT_BLOCKER/SELECT_COUNTER）。TURN_END は無い。
+    gm.action_events = []
+    action_api.apply_game_action(gm, gm.p1, "ATTACK", {"uuid": atk.uuid, "target_ids": [gm.p2.leader.uuid]})
+    pend = gm.get_pending_request()
+    if not pend or pend.get("player_id") != "p2" or pend.get("action") not in ("SELECT_BLOCKER", "SELECT_COUNTER"):
+        pytest.skip("防御応答ノードへ到達できない局面")
+    moves = gm.get_legal_actions(gm.p2)
+    assert all(m.get("action_type") != "TURN_END" for m in moves), "防御応答中に TURN_END があるのは前提崩れ"
+    # 任意の防御手で None（基準が無い＝regret 定義不能）。
+    nmr = cpu_ai.null_move_regret(gm, "p2", moves[0], moves=moves, see_opp_hand=True)
+    assert nmr is None
+
+
+def test_weird_move_audit_flags_wasted_don_at_decide(db):
+    """変な手③無駄ドン（逸話→回帰）: 既にリーダーへ確実に届く攻撃者へさらにドンを付与する手は、戦闘結果を
+    変えない（相手は無防備）ため null-move regret ≤ 0 になり、監査が `wasted_don` としてフラグする。
+
+    監査ツール `cpu_weird_move_audit.classify_decision` の判定をそのまま使い、決定論の構築局面で固定する
+    （Phase 0 監査が ATTACH_DON の正味無改善を検出できることの回帰）。"""
+    import importlib
+    audit = importlib.import_module("cpu_weird_move_audit")
+
+    gm = _new_gm(db, seed=0)
+    assert _fast_forward_to_p1_main(gm)
+    # 相手を無防備化（ブロッカー無し・手札0・ライフ2）。
+    gm.p2.field.clear()
+    gm.p2.hand.clear()
+    while len(gm.p2.life) > 2:
+        gm.p2.trash.append(gm.p2.life.pop())
+    if not gm.p2.life:
+        gm.p2.life.append(gm.p2.deck.pop())
+    opp_leader_pw = int(gm.p2.leader.get_power(False)) if gm.p2.leader else 5000
+    atk = _reaching_char(gm.p1.deck, 0)
+    if atk is None:
+        pytest.skip("攻撃者が見つからない")
+    gm.p1.deck.remove(atk)
+    gm.p1.field[:] = [atk]
+    atk.is_rest = False
+    atk.is_newly_played = False
+    atk.passive_power_override = opp_leader_pw + 2000   # 既に確実に届く（付与しても戦闘結果は不変）
+    gm.p1.hand.clear()                                  # PLAY 除外＝攻撃/ドン/畳みのみに孤立
+    for _ in range(4):                                  # 余剰アクティブドンを持たせる（ATTACH_DON を合法化）
+        if gm.p1.don_deck:
+            gm.p1.don_active.append(gm.p1.don_deck.pop())
+    moves = gm.get_legal_actions(gm.p1)
+    don_move = next((m for m in moves if m.get("action_type") == "ATTACH_DON"
+                     and (m.get("payload") or {}).get("uuid") == atk.uuid), None)
+    if don_move is None:
+        pytest.skip("ATTACH_DON（既に届く攻撃者への付与）の合法手が無い局面")
+    rec = audit.classify_decision(gm, "p1", don_move, moves)
+    assert rec["regret"] is not None and rec["regret"] <= audit._NEUTRAL_EPS
+    assert "wasted_don" in rec["flags"] and "neutral_or_worse" in rec["flags"]
+
+
 def test_b1b_modeled_counter_saves_target_and_spends_card(db):
     """B-1(b): 相手 min ノードの推定カウンターは、`counter_buff` を needed 加算＋手札 1 枚消費で攻撃を
     無効化する（ライフ温存・手札 -1）。一方 PASS（カウンターしない）はライフ -1（攻撃が通る）。
@@ -519,3 +623,65 @@ def test_b1b_modeled_counter_saves_target_and_spends_card(db):
     passclone.action_events = []
     action_api.apply_battle_action(passclone, passclone.p2, battle_actions.get('PASS', 'PASS'), None)
     assert len(passclone.p2.life) == life_before - 1, "PASS なのに攻撃が通っていない"
+
+
+# ---------------------------------------------------------------------------
+# Phase 0 物差し 精緻化: AI探索 regret（第2指標・deep(選択手)−deep(TURN_END)）
+# （docs/reports/cpu_weird_move_remediation_plan §4 精緻化・観測専用・決定論不変）
+# ---------------------------------------------------------------------------
+
+def _advance_to_multi_choice_main(gm, max_steps=200):
+    """既定方策（hard）で進め、MAIN_ACTION かつ合法手が複数（TURN_END 以外も）ある意思決定点で止める。"""
+    mem = {"p1": {}, "p2": {}}
+    for _ in range(max_steps):
+        pending = gm.get_pending_request()
+        if not pending or gm.winner is not None:
+            return None
+        pid = pending["player_id"]
+        actor = gm.p1 if gm.p1.name == pid else gm.p2
+        moves = gm.get_legal_actions(actor)
+        if pending.get("action") == "MAIN_ACTION" and len(moves) > 1:
+            return actor
+        move = cpu_ai.decide_guarded(gm, actor, "hard", random, mem.setdefault(pid, {}))
+        gm.action_events = []
+        if move["kind"] == "battle":
+            action_api.apply_battle_action(gm, actor, move["action_type"], move.get("card_uuid"))
+        else:
+            action_api.apply_game_action(gm, actor, move["action_type"], move.get("payload", {}))
+    return None
+
+
+def test_search_regret_in_trace_deterministic_and_move_invariant(db):
+    """AI探索 regret（第2指標）の回帰: トレースに ``search_regret = deep(選択手) − deep(TURN_END)`` が
+    決定論で再現し、かつ **trace 有無で選ばれる手が不変**（観測専用＝手選択の決定論を変えない・計画 §4 精緻化）。
+
+    - search_regret は ``search_scores.chosen_deep − end_deep`` と一致（トレースからの純粋な引き算で取得）。
+    - 同一 seed の RNG で 2 回 decide → search_regret が同値（決定論再現）。
+    - trace を渡しても渡さなくても chosen の手 signature は同一（test_cpu_replay と同じ不変条件の本指標版）。
+    """
+    gm = _new_gm(db, seed=2)
+    actor = _advance_to_multi_choice_main(gm)
+    if actor is None:
+        pytest.skip("複数候補の MAIN_ACTION 局面に到達できなかった")
+
+    # trace 無しで選んだ手（基準）。
+    move_plain = cpu_ai.decide(gm, actor, "hard", random.Random(0))
+    # trace 有りで選んだ手＋探索 regret 回収。
+    tr1 = {}
+    move_traced = cpu_ai.decide(gm, actor, "hard", random.Random(0), trace=tr1)
+    # 観測専用: trace 有無で手選択が不変。
+    assert cpu_ai._move_sig(move_plain) == cpu_ai._move_sig(move_traced), \
+        "trace を渡すと選ばれる手が変わった（観測専用違反＝決定論破壊）"
+
+    if "search_regret" not in tr1:
+        pytest.skip("この局面では TURN_END が深掘り候補に無く search_regret が立たない")
+    # search_regret = chosen_deep − end_deep（トレースからの純粋な引き算）。
+    ss = tr1["search_scores"]
+    assert tr1["search_regret"] == pytest.approx(
+        round(ss["chosen_deep"] - ss["end_deep"], 1)), "search_regret が deep 差と一致しない"
+
+    # 決定論再現: 同一 RNG で再度 decide → 同値。
+    tr2 = {}
+    cpu_ai.decide(gm, actor, "hard", random.Random(0), trace=tr2)
+    assert tr2["search_regret"] == pytest.approx(tr1["search_regret"]), "search_regret が決定論で再現しない"
+    assert tr2["search_scores"] == tr1["search_scores"]

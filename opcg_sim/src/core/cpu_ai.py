@@ -1243,6 +1243,65 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, profile, plan, ply
     return _settle_discount(val, plan)
 
 
+def _eval_move_settled(manager, root_name: str, move: Dict[str, Any], see_opp_hand: bool,
+                       profile, plan) -> Optional[float]:
+    """`move` をクローン上で適用し、**相手 MAIN の静止点まで `_settle_eval` で整流してから**採点する
+    （Phase 0 物差し・観測専用）。
+
+    探索の葉と同じ静止点（相手のターン開始）で採点するため、戦闘途中の楽観評価ではなく**戦闘解決後**の
+    値が出る（null-move regret の両辺をここに揃える＝計画 §4 Phase 0 の要件）。`manager` はクローンして
+    使うので**呼び出し側の局面・global RNG・決定論を一切変えない**（observation-only）。適用に失敗した手
+    （例外）は None。
+    """
+    clone = _apply_clone(manager, root_name, move, stop_at_select=False)
+    if clone is None:
+        return None
+    return _settle_eval(clone, root_name, see_opp_hand, profile, plan)
+
+
+def null_move_regret(manager, root_name: str, chosen_move: Optional[Dict[str, Any]],
+                     moves: Optional[List[Dict[str, Any]]] = None,
+                     see_opp_hand: bool = True, profile=None, plan=None
+                     ) -> Optional[Dict[str, Any]]:
+    """null-move regret ＝ `eval_settled(chosen) − eval_settled(TURN_END)`（Phase 0 物差し・観測専用）。
+
+    両辺とも `_settle_eval` 経由で**戦闘解決後（相手 MAIN の静止点）**に採点する（戦闘途中の楽観評価では
+    測らない＝計画 §4）。`moves` が無ければ `manager.get_legal_actions` から取り、TURN_END を探す。
+
+    TURN_END が合法手に無い局面（防御応答中／対象選択中など＝「何もしない」基準が定義できない）では
+    regret 自体が意味を持たないため None を返す（呼び出し側でスキップ＝誤検出しない）。`chosen_move` が
+    TURN_END そのものなら regret=0.0（基準と同一手）。返り値は dict:
+      ``{"regret", "chosen_settled", "end_settled", "has_turn_end"}`` ／ 算出不能なら None。
+
+    **決定論不変**: 採点は全てクローン上で行い、live manager・global RNG を一切変えない（既存トレースの
+    save/restore 不変条件と同じ＝観測専用）。`plan=None`（既定）では `_settle_eval` の B/C-4 補正も作動
+    しないため、`decide(plan=None)` 経路と整合する。
+    """
+    if chosen_move is None:
+        return None
+    player = _player_by_name(manager, root_name)
+    if moves is None:
+        moves = manager.get_legal_actions(player)
+    end_move = next((m for m in (moves or []) if m.get("action_type") == "TURN_END"), None)
+    if end_move is None:
+        return None  # 「何もしない」基準が無い局面＝regret 定義不能（誤検出防止のためスキップ）
+    end_settled = _eval_move_settled(manager, root_name, end_move, see_opp_hand, profile, plan)
+    if end_settled is None:
+        return None
+    if chosen_move.get("action_type") == "TURN_END":
+        chosen_settled = end_settled
+    else:
+        chosen_settled = _eval_move_settled(manager, root_name, chosen_move, see_opp_hand, profile, plan)
+        if chosen_settled is None:
+            return None
+    return {
+        "regret": chosen_settled - end_settled,
+        "chosen_settled": chosen_settled,
+        "end_settled": end_settled,
+        "has_turn_end": True,
+    }
+
+
 def _record_killer(killers: Optional[Dict[int, List[tuple]]], ply: int, move: Dict[str, Any]) -> None:
     """④ カット（alpha>=beta）を起こした手をこの ply の killer として記録（最近使用を先頭・上限 _KILLER_SLOTS）。
 
@@ -1792,6 +1851,44 @@ def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: 
     trace["folded"] = folded
     trace["regret"] = round(regret, 1)
     trace["candidates"] = cands[:TRACE_TOPN]
+
+    # null-move regret（Phase 0 物差し・観測専用・docs/reports/cpu_weird_move_remediation_plan §4）:
+    # eval_settled(選んだ手) − eval_settled(TURN_END)。両辺とも `_settle_eval` 経由＝戦闘解決後（相手 MAIN の
+    # 静止点）で採点する＝「行動が do-nothing をどれだけ上回るか」の整流済み物差し。≤0 なのに行動を選んだ手
+    # （変な手①）の決定論的検出に使う。算出は全てクローン上＝live manager・RNG を一切変えない（observation-only。
+    # decide が _fill_decision_trace 全体を RNG save/restore で囲っているのと同じ不変条件）。TURN_END が合法に
+    # 無い局面（防御応答中など）は None＝項を立てない（誤検出防止）。
+    nmr = null_move_regret(manager, name, chosen, moves=moves,
+                           see_opp_hand=see_opp_hand, profile=profile, plan=plan)
+    if nmr is not None:
+        trace["null_move_regret"] = round(nmr["regret"], 1)
+        trace["null_move"] = {
+            "chosen_settled": round(nmr["chosen_settled"], 1),
+            "end_settled": round(nmr["end_settled"], 1),
+        }
+
+    # AI探索 regret（Phase 0 物差し・第2の指標・観測専用・計画 §4 精緻化）:
+    # deep(選んだ手) − deep(TURN_END)。＝**探索自身**が「その手は何もしない（畳む）をどれだけ上回ると
+    # 判断したか」。per-move settle regret（null_move_regret）が `_settle_eval` で手の直後にターンを畳むため
+    # ATTACH_DON/PLAY 等の**準備手を構造的に過小評価**する（付与価値が同ターンの攻撃で回収される前に畳まれる）
+    # のに対し、こちらは探索本体の多 ply 先読みスコアなので準備手の価値も拾える。両指標の食い違いが
+    # value-realization gap / 準備手 truncation の頭出しになる。`collect`（trace 時のみ供給）の **未切り詰めの**
+    # deep dict から回収する＝探索が出した値の純粋な引き算で追加コスト無し（TRACE_TOPN 切り詰め前の全候補）。
+    # easy（collect 無し）や深掘りが取れない局面・TURN_END が候補に無い局面では項を立てない。
+    if collect:
+        deep = collect.get("deep", {})
+        if deep:
+            chosen_deep = deep.get(_move_sig(chosen))
+            end_move = next((m for m in moves if m.get("action_type") == "TURN_END"), None)
+            end_deep = None
+            if end_move is not None:
+                end_deep = deep.get(_move_sig(end_move))
+            if chosen_deep is not None and end_deep is not None:
+                trace["search_regret"] = round(chosen_deep - end_deep, 1)
+                trace["search_scores"] = {
+                    "chosen_deep": round(chosen_deep, 1),
+                    "end_deep": round(end_deep, 1),
+                }
 
     # 選んだ手の結果盤面で J値成分内訳＋読み筋を採る（trace 専用クローン・探索には不参加）。
     child = _apply_clone(manager, name, chosen, stop_at_select=True)
