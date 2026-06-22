@@ -39,6 +39,7 @@
 | [`reports/cpu_search_accel_pypy_20260620.md`](reports/cpu_search_accel_pypy_20260620.md) | CPU 探索 高速化 調査（2026-06-20）。「速くした分を horizon に回す」目的の手順と対照。PyPy 実測 ~2.1x（改変ゼロ・挙動ビット一致・同一337step/280decide）＝horizon +1 相当。エンジンは stdlib-only で PyPy 動作実証・配信スタック互換のみ課題。高速化手段の総覧対照表（差分評価/lazy/parked/LMR/mypyc/root並列/native）。ベンチ=`tests/bench_decide.py` |
 | [`reports/pypy_migration_runbook_20260620.md`](reports/pypy_migration_runbook_20260620.md) | PyPy 移行 ランブック（2026-06-20）。方式選定（A 単一プロセス／B プロセス分離）→Phase0 互換スパイク→Phase1 移行→Phase2 Cloud Run デプロイ→Phase3 検証ゲート（CPython/PyPy 双方緑・挙動ビット一致）→Phase4 段階切替/ロールバック。配信スタック（pydantic-core/grpcio）の PyPy 非互換を方式Bで回避・`_USE_PYPY_WORKER` フラグで即ロールバック。リスク対照表つき |
 | [`reports/pypy_phase0_result_20260620.md`](reports/pypy_phase0_result_20260620.md) | PyPy 移行 Phase 0 互換スパイク 実行結果（2026-06-20）。pypi 実 install 判定：純依存（uvicorn/websockets/requests/h11）✅／**pydantic-core ❌（PyPy wheel 無し・PyO3 が 3.11 未満を拒否）**／**grpcio ❌（wheel 無し・ソースビルド長大）**。方式A（単一プロセス全 PyPy）の2大依存が PyPy で建たない |
+| [`reports/cpu_strength_roadmap_20260622.md`](reports/cpu_strength_roadmap_20260622.md) | CPU 強化（強さ=Elo 優先）ロードマップ メモ（2026-06-22）。主目的を Elo（凍結ベースライン hard 比）に置き直し、変な手カウンタは副指標へ格下げ。核＝**探索と評価は一緒に上げる**（バイアス評価のまま探索だけ深くすると horizon amplification で退行）。方針＝**測定の分散低減→探索/評価の切り分け1実験→勝った側に集中投資**。Phase0 分散低減（共通乱数/席固定/antithetic）→Phase1 切り分け（TT＋ビーム拡張＋horizon の A/B）→Phase2A 探索路線（置換表→反復深化）/2B 評価路線（学習値の容量増 or Elo ゲート手調整）→Phase3 ISMCTS/決定化→Phase4 ゲート＆SPEC吸収。進捗正本は WBS |
 
 ## クイックスタート
 
