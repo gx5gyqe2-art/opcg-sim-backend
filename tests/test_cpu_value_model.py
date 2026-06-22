@@ -129,3 +129,52 @@ def test_blend_on_changes_value_and_is_deterministic(db):
         assert 0.0 <= v1 <= 1.0
     finally:
         os.environ.pop("OPCG_VALUE_BLEND", None)
+
+
+# --- hard(α-β) 葉ブレンド（Phase 2 本体・既定OFF同値＝最重要ゲート） ---------------
+
+def test_hard_blend_off_by_default_is_bit_identical(db):
+    """`OPCG_VALUE_BLEND_HARD` 未設定なら `evaluate` は素 eval とビット一致（推論も tanh/atanh も通さない）。
+
+    これが Phase 2 の最重要不変条件＝既定 OFF で hard の挙動・決定論・カード挙動ベースラインが完全不変。
+    """
+    from opcg_sim.src.core.cpu_ai import evaluate, _hard_blend_alpha
+    os.environ.pop("OPCG_VALUE_BLEND_HARD", None)
+    cpu_value_model.set_alpha_override(None)
+    assert _hard_blend_alpha() == 0.0
+    for seed in (0, 1, 2):
+        m = _game(db, seed=seed)
+        # 数手進めて非自明な盤面でも一致を見る。
+        ev_a = evaluate(m, "p1", see_opp_hand=True)
+        ev_b = evaluate(m, "p1", see_opp_hand=True)
+        assert ev_a == ev_b               # 決定論
+        # α=0 override も素 eval とビット一致（推論経路を一切通さない）。
+        cpu_value_model.set_alpha_override(0.0)
+        ev_zero = evaluate(m, "p1", see_opp_hand=True)
+        cpu_value_model.set_alpha_override(None)
+        assert ev_zero == ev_a, "α=0 で素 eval とビット一致でない（既定OFF同値違反）"
+
+
+def test_hard_blend_on_changes_eval_uses_fair_features_and_deterministic(db):
+    """α>0 で `evaluate` が変わり・決定論・winprob は常にフェア特徴（see_opp_hand に依らず同一ブレンド）。"""
+    from opcg_sim.src.core.cpu_ai import evaluate
+    m = _game(db, seed=3)
+    ev_off = evaluate(m, "p1", see_opp_hand=True)
+    cpu_value_model.set_alpha_override(0.5)
+    try:
+        v1 = evaluate(m, "p1", see_opp_hand=True)
+        v2 = evaluate(m, "p1", see_opp_hand=True)
+        assert v1 == v2, "hard ブレンドが非決定論"
+        assert abs(v1 - ev_off) > 1e-9, "α>0 で値が変わっていない"
+        # winprob は常に see_opp_hand=False のフェア特徴で算出＝base のカンニング差はブレンド項に出るが
+        # winprob 項自体は see_opp_hand に依存しない（フェア）。
+        feat_fair = cpu_features.extract_features(m, "p1", see_opp_hand=False)
+        p = cpu_value_model.predict_winprob(feat_fair)
+        import math
+        from opcg_sim.src.core.cpu_ai import _HARD_BLEND_SCALE, _HARD_BLEND_CLIP
+        base = 0.5 * (1.0 + math.tanh(ev_off / _HARD_BLEND_SCALE))
+        blended = min(1.0 - _HARD_BLEND_CLIP, max(_HARD_BLEND_CLIP, 0.5 * base + 0.5 * p))
+        expected = _HARD_BLEND_SCALE * math.atanh(2.0 * blended - 1.0)
+        assert abs(v1 - expected) < 1e-6, "hard ブレンドの数式（tanh→混合→atanh）が設計どおりでない"
+    finally:
+        cpu_value_model.set_alpha_override(None)

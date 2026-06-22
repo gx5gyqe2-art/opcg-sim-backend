@@ -134,8 +134,9 @@ def main(argv=None):
             for r in rows:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
                 n_rows += 1
-            if (g + 1) % 20 == 0:
-                print(f"  {g+1}/{args.games} games … rows={n_rows}")
+            f.flush()   # 毎局フラッシュ＝長時間ランがタイムアウトしても途中までを回収（計画 §6）。
+            if (g + 1) % 5 == 0:
+                print(f"  {g+1}/{args.games} games … rows={n_rows}", flush=True)
     print(f"done: {n_games} valid games, {n_rows} rows → {args.out} "
           f"(features={cpu_features.N_FEATURES})")
     return 0

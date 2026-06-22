@@ -28,6 +28,8 @@
 see_opp_hand=False ＋ 相手 min ノードの手札依存手を除外）＝チート防止。hard のみユーザ選択により
 相手手札を読む別方針（docs/SPEC.md §2.2/§6 参照）。
 """
+import math
+import os
 import random
 from typing import Any, Dict, List, Optional, Tuple
 import re
@@ -35,6 +37,8 @@ import re
 from ..models.enums import TriggerType
 from . import journal
 from .journal import JournaledList
+from . import cpu_features
+from . import cpu_value_model
 
 # ② make/unmake: 探索の 1-ply 採点（ビーム選別）を clone でなく「適用→採点→巻き戻し」で行い
 # per-node の deepcopy を消す（探索コストの ~86%＝clone）。**非中断（resolver が parked でない
@@ -740,6 +744,52 @@ def _plan_progress(manager, me, opp, is_my_turn: bool, plan, profile=None) -> fl
     return score
 
 
+# --- 学習価値関数（winprob）を hard(α-β) 葉に効かせるブレンド（§2.5.7 残5・サブ0報告 §4）---------------
+# hard 専用の env（既定 0＝完全OFF＝現状とビット一致）。expert(MCTS) 葉の `OPCG_VALUE_BLEND` とは独立に
+# 段階導入できるよう env を分ける（hard だけ OFF のまま expert を上げる/その逆が安全）。
+# 設計（hard 統合点）:
+#   1. 素 eval `ev` を base = 0.5·(1+tanh(ev/SCALE)) で 0..1 へ（expert と同一スケール MCTS_VALUE_SCALE）。
+#   2. blended = (1-α)·base + α·winprob（winprob は **常にフェア特徴** see_opp_hand=False で算出）。
+#   3. 逆写像 ev' = SCALE·atanh(2·blended-1) で eval スケールへ戻す（α-β/ビーム/_ACT_MARGIN の整合維持）。
+# 勝敗（±W_WIN）はブレンド前に return 済み＝リーサル認識（ply 割引）を絶対に上書きしない。
+# α=0 or モデル未同梱（is_available()==False）では推論も tanh/atanh も一切通さず素 eval を return＝
+# 浮動小数の同値（ビット一致）・決定論不変。
+_HARD_BLEND_SCALE = 8000.0   # = cpu_mcts.MCTS_VALUE_SCALE（葉価値の tanh スケール・両経路で一致させる）。
+_HARD_BLEND_CLIP = 1e-6      # atanh の発散回避＝blended を (ε, 1-ε) にクリップ。
+
+
+def _hard_blend_alpha() -> float:
+    """hard(α-β) 葉のブレンド率（0=OFF=現状同値）。override>env>0 の優先。tests/本番は未設定=0。"""
+    ov = cpu_value_model._ALPHA_OVERRIDE   # アリーナで片側だけ α を変える上書き（None で env 既定）。
+    if ov is not None:
+        return ov
+    try:
+        a = float(os.environ.get("OPCG_VALUE_BLEND_HARD", "0") or "0")
+    except ValueError:
+        return 0.0
+    return min(1.0, max(0.0, a))
+
+
+def _hard_winprob_blend(manager, me_name: str, ev: float, alpha: float) -> float:
+    """素 eval `ev`（eval スケール）に winprob を α でブレンドし eval スケールへ戻す（α>0 のときのみ呼ぶ）。
+
+    winprob は **常にフェア特徴**（`extract_features(see_opp_hand=False)`＝公開情報・枚数のみ）で算出する
+    （学習分布＝フェア生成と一致／カンニング情報を勝率推定へ二重流入させない）。失敗時は素 `ev` を返す。
+    """
+    try:
+        p = cpu_value_model.predict_winprob(
+            cpu_features.extract_features(manager, me_name, see_opp_hand=False))
+    except Exception:
+        return ev
+    if p is None:
+        return ev
+    base = 0.5 * (1.0 + math.tanh(ev / _HARD_BLEND_SCALE))
+    blended = (1.0 - alpha) * base + alpha * p
+    # atanh の発散回避＝(ε, 1-ε) にクリップ。
+    blended = min(1.0 - _HARD_BLEND_CLIP, max(_HARD_BLEND_CLIP, blended))
+    return _HARD_BLEND_SCALE * math.atanh(2.0 * blended - 1.0)
+
+
 def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, plan=None,
              out: Optional[Dict[str, Any]] = None) -> float:
     """`me_name` 視点の盤面優劣スコア（高いほど自分有利）。
@@ -821,6 +871,11 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
         out["opp"] = {k: round(v, 1) for k, v in out_opp.items()}
         out["plan_progress"] = round(plan_progress, 1)
         out["telegraph"] = round(-telegraph, 1)
+    # 学習価値（winprob）ブレンド（hard 専用・既定OFF同値）。α=0／モデル未同梱では推論も tanh/atanh も
+    # 一切通さず素 `total` を return＝ビット一致・決定論不変（最重要ゲート）。winprob は常にフェア特徴。
+    alpha = _hard_blend_alpha()
+    if alpha > 0.0 and cpu_value_model.is_available():
+        total = _hard_winprob_blend(manager, me_name, total, alpha)
     return total
 
 
