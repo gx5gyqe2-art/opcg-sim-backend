@@ -23,6 +23,10 @@ _REMOVAL_TYPES = frozenset({
     ActionType.KO, ActionType.BOUNCE, ActionType.MOVE_TO_HAND, ActionType.DECK_BOTTOM,
 })
 _BLOCKER_KW = "ブロッカー"
+# 攻撃的キーワード脅威（手作り評価 `_threat_value` の `_KEYWORD_ASSETS`＋アンブロッカブルに対応）。
+# 場のキャラが持つ「攻め脅威性」を数で捉える＝学習が脅威キーワードの価値を表現できるようにする。
+_THREAT_KW = ("ダブルアタック", "速攻", "アンブロッカブル", "ブロック不可", "バニッシュ")
+_RUSH_KW = "速攻"
 
 # マスタ（card_id）単位の「除去効果を持つか」キャッシュ（テキスト走査は1回だけ）。
 _REMOVAL_CACHE: Dict[str, bool] = {}
@@ -72,6 +76,11 @@ def _other(manager, me_name: str):
 FEATURE_NAMES: List[str] = [
     # --- ライフ（最重要資源） ---
     "life_me", "life_opp", "life_diff",
+    # 非線形ライフ（薄域の高限界価値）。手作り評価の膝カーブ（W_LIFE_LOW・膝=2）に対応＝線形 life_* だけ
+    # では表現できない「薄いほど 1 枚が高い」を min(life,2) のバケットで近似（concave の片側区分）。
+    "life_thin_me", "life_thin_opp",
+    # --- デッキ危険域（デッキアウト近接・非線形）。手作り評価 W_DECK_DANGER/DECK_DANGER に対応。 ---
+    "deck_danger_me", "deck_danger_opp",      # max(0, 4 - deck_n)
     # --- ドン経済 ---
     "don_active_me", "don_rested_me", "don_deck_me", "turn_count", "is_my_turn",
     # --- 盤面 ---
@@ -80,6 +89,14 @@ FEATURE_NAMES: List[str] = [
     "leader_pow_me_k", "leader_pow_opp_k",    # 有効パワー /1000
     "blocker_n_me", "blocker_n_opp",
     "rested_n_me", "rested_n_opp",
+    # 実攻撃可能体数（召喚酔いを除く＝手作り評価 W_ATTACKER と同じ「このターン/次に攻撃できる体」）。
+    # 付与ドン/展開の「将来の攻め圧へ繋がる」準備手価値を表す土台。
+    "attacker_n_me", "attacker_n_opp",
+    # 脅威キーワード体数（攻め脅威）。手作り評価 _threat_value（ダブルアタック/速攻/アンブロッカブル/
+    # バニッシュ）に対応＝学習が脅威の価値を捉えられるようにする。
+    "threat_n_me", "threat_n_opp",
+    # ステージ（永続リソース）。手作り評価 W_STAGE_COUNT に対応。
+    "stage_me", "stage_opp",
     # --- 手札（答え在庫） ---
     "hand_n_me", "hand_n_opp",
     "hand_counter_total_me_k", "hand_counter_cards_me",
@@ -115,6 +132,31 @@ def extract_features(manager, me_name: str, see_opp_hand: bool = False) -> List[
     def rested(player):
         return sum(1 for c in player.field if c.is_rest)
 
+    def attackers(player, own_turn):
+        """このターン（own_turn=True）/次の攻撃で実際に攻撃できるアクティブ体数。
+
+        手作り評価 `W_ATTACKER` と同じく、自分の手番に出したばかりの体（召喚酔い・速攻なし）は
+        今攻撃できないので数えない。相手の手番（own_turn=False）から見た自分の体は酔いが解けている。
+        """
+        n = 0
+        for c in player.field:
+            if c.is_rest:
+                continue
+            sick = own_turn and getattr(c, "is_newly_played", False) and not c.has_keyword(_RUSH_KW)
+            if not sick:
+                n += 1
+        return n
+
+    def threats(player):
+        n = 0
+        for c in player.field:
+            try:
+                if any(c.has_keyword(kw) for kw in _THREAT_KW):
+                    n += 1
+            except Exception:
+                pass
+        return n
+
     life_me, life_opp = len(me.life), len(opp.life)
     field_n_me, field_n_opp = len(me.field), len(opp.field)
     field_pow_opp_k = field_pow(opp, not is_my_turn) / 1000.0
@@ -132,6 +174,10 @@ def extract_features(manager, me_name: str, see_opp_hand: bool = False) -> List[
         "life_me": float(life_me),
         "life_opp": float(life_opp),
         "life_diff": float(life_me - life_opp),
+        "life_thin_me": float(min(life_me, 2)),
+        "life_thin_opp": float(min(life_opp, 2)),
+        "deck_danger_me": float(max(0, 4 - len(me.deck))),
+        "deck_danger_opp": float(max(0, 4 - len(opp.deck))),
         "don_active_me": float(len(me.don_active)),
         "don_rested_me": float(len(me.don_rested)),
         "don_deck_me": float(len(me.don_deck)),
@@ -147,6 +193,12 @@ def extract_features(manager, me_name: str, see_opp_hand: bool = False) -> List[
         "blocker_n_opp": float(blockers(opp)),
         "rested_n_me": float(rested(me)),
         "rested_n_opp": float(rested(opp)),
+        "attacker_n_me": float(attackers(me, is_my_turn)),
+        "attacker_n_opp": float(attackers(opp, not is_my_turn)),
+        "threat_n_me": float(threats(me)),
+        "threat_n_opp": float(threats(opp)),
+        "stage_me": 1.0 if getattr(me, "stage", None) is not None else 0.0,
+        "stage_opp": 1.0 if getattr(opp, "stage", None) is not None else 0.0,
         "hand_n_me": float(len(me.hand)),
         "hand_n_opp": float(len(opp.hand)),
         "hand_counter_total_me_k": hand_counter_total / 1000.0,

@@ -38,11 +38,13 @@ def _build_decks(seed: int, db, real_decks: bool):
     return L1, c1, L2, c2
 
 
-def _make_decider(policy: str, iters: int, horizon: int):
+def _make_decider(policy: str, iters: int, horizon: int, info_policy: str = "fair"):
     """policy に応じた1手決定関数を返す（局ごとに新規生成＝mem/cache をリセット）。
 
     expert＝MCTS（`decide_mcts_macro`・価値葉を使う本番方策＝学習分布を一致させる）。
-    easy/normal/hard＝従来 α-β（`decide_guarded`）。
+    hard＝α-β（`decide_guarded`）。`info_policy`（既定 "fair"）で hard の探索情報方針を切替＝
+    Phase 2 のデータは**フェア hard 自己対戦**で生成する（相手手札透視を学習評価に混ぜない・計画 §6）。
+    "hard" を指定すると従来のカンニング（see_opp_hand=True）に戻る。
     """
     if policy == "expert":
         caches: Dict[str, Dict[str, Any]] = {}
@@ -53,12 +55,14 @@ def _make_decider(policy: str, iters: int, horizon: int):
         return decide
     mem: Dict[str, Dict[str, Any]] = {}
     def decide(m, actor):
-        return cpu_ai.decide_guarded(m, actor, policy, random, mem.setdefault(actor.name, {}))
+        return cpu_ai.decide_guarded(m, actor, policy, random, mem.setdefault(actor.name, {}),
+                                     info_policy=info_policy)
     return decide
 
 
 def collect_game(seed: int, db, difficulty: str, max_steps: int,
-                 real_decks: bool = False, iters: int = 40, horizon: int = 2) -> List[Dict[str, Any]]:
+                 real_decks: bool = False, iters: int = 40, horizon: int = 2,
+                 info_policy: str = "fair") -> List[Dict[str, Any]]:
     """1 局を自己対戦し、ターン境界の (特徴, プレイヤー) を集めて最終勝敗でラベル付けして返す。"""
     random.seed(seed)
     l1, c1, l2, c2 = _build_decks(seed, db, real_decks)
@@ -66,7 +70,7 @@ def collect_game(seed: int, db, difficulty: str, max_steps: int,
         return []
     m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     m.start_game()
-    decide = _make_decider(difficulty, iters, horizon)
+    decide = _make_decider(difficulty, iters, horizon, info_policy=info_policy)
     pid_key = action_api.CONST.get("PENDING_REQUEST_PROPERTIES", {}).get("PLAYER_ID", "player_id")
 
     samples: List[Dict[str, Any]] = []   # {"f":[...], "p":"p1"}
@@ -108,6 +112,8 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--difficulty", choices=["hard", "expert"], default="expert",
                     help="自己対戦の方策。expert=MCTS（価値葉を使う本番方策＝学習分布を一致）")
+    ap.add_argument("--info-policy", choices=["fair", "hard"], default="fair",
+                    help="hard 方策の探索情報方針（既定 fair＝相手手札透視なし・Phase 2 のデータ生成方針）")
     ap.add_argument("--real-decks", action="store_true", help="deckgen の実デッキ（検証済リーダー巡回）で対戦")
     ap.add_argument("--iters", type=int, default=40, help="expert の反復数（速度↔質）")
     ap.add_argument("--horizon", type=int, default=2)
@@ -120,7 +126,8 @@ def main(argv=None):
     with open(args.out, "w", encoding="utf-8") as f:
         for g in range(args.games):
             rows = collect_game(args.seed + g, db, args.difficulty, args.max_steps,
-                                real_decks=args.real_decks, iters=args.iters, horizon=args.horizon)
+                                real_decks=args.real_decks, iters=args.iters, horizon=args.horizon,
+                                info_policy=args.info_policy)
             if not rows:
                 continue
             n_games += 1

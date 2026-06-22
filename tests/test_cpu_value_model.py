@@ -50,6 +50,29 @@ def test_features_perspective_is_asymmetric(db):
     assert cpu_features.extract_features(m, "p1") != cpu_features.extract_features(m, "p2")
 
 
+def test_feature_schema_unique_and_includes_eval_concepts(db):
+    """特徴名は一意で、手作り評価の主要概念（非線形ライフ/攻め圧/脅威KW/デッキ危険域/ステージ）を含む。"""
+    names = cpu_features.FEATURE_NAMES
+    assert len(set(names)) == len(names) == cpu_features.N_FEATURES
+    for required in ("life_thin_me", "life_thin_opp", "deck_danger_me", "deck_danger_opp",
+                     "attacker_n_me", "attacker_n_opp", "threat_n_me", "threat_n_opp",
+                     "stage_me", "stage_opp"):
+        assert required in names, f"評価概念 {required} が特徴に無い"
+
+
+def test_new_features_deterministic_and_fair(db):
+    """追加特徴も決定論・非破壊・相手手札の中身に依存しない（公平）ことを固定する。"""
+    m = _game(db)
+    before = copy.deepcopy(m)
+    f1 = cpu_features.extract_features(m, "p1")
+    f2 = cpu_features.extract_features(m, "p1")
+    assert f1 == f2
+    assert journal.deep_diff(before, m) is None
+    # life_thin は min(life,2) のバケット＝薄域の非線形を表す。
+    idx = cpu_features.FEATURE_NAMES.index("life_thin_me")
+    assert f1[idx] == float(min(len(m.p1.life), 2))
+
+
 def test_features_do_not_leak_opponent_hand_contents(db):
     """see_opp_hand=False（既定）は相手手札の**中身**を読まない＝中身を入れ替えても枚数が同じなら不変。"""
     m = _game(db)
