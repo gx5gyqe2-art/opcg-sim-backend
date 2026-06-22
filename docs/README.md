@@ -39,6 +39,7 @@
 | [`reports/cpu_search_accel_pypy_20260620.md`](reports/cpu_search_accel_pypy_20260620.md) | CPU 探索 高速化 調査（2026-06-20）。「速くした分を horizon に回す」目的の手順と対照。PyPy 実測 ~2.1x（改変ゼロ・挙動ビット一致・同一337step/280decide）＝horizon +1 相当。エンジンは stdlib-only で PyPy 動作実証・配信スタック互換のみ課題。高速化手段の総覧対照表（差分評価/lazy/parked/LMR/mypyc/root並列/native）。ベンチ=`tests/bench_decide.py` |
 | [`reports/pypy_migration_runbook_20260620.md`](reports/pypy_migration_runbook_20260620.md) | PyPy 移行 ランブック（2026-06-20）。方式選定（A 単一プロセス／B プロセス分離）→Phase0 互換スパイク→Phase1 移行→Phase2 Cloud Run デプロイ→Phase3 検証ゲート（CPython/PyPy 双方緑・挙動ビット一致）→Phase4 段階切替/ロールバック。配信スタック（pydantic-core/grpcio）の PyPy 非互換を方式Bで回避・`_USE_PYPY_WORKER` フラグで即ロールバック。リスク対照表つき |
 | [`reports/pypy_phase0_result_20260620.md`](reports/pypy_phase0_result_20260620.md) | PyPy 移行 Phase 0 互換スパイク 実行結果（2026-06-20）。pypi 実 install 判定：純依存（uvicorn/websockets/requests/h11）✅／**pydantic-core ❌（PyPy wheel 無し・PyO3 が 3.11 未満を拒否）**／**grpcio ❌（wheel 無し・ソースビルド長大）**。方式A（単一プロセス全 PyPy）の2大依存が PyPy で建たない |
+| [`reports/cpu_weird_move_remediation_plan_20260622.md`](reports/cpu_weird_move_remediation_plan_20260622.md) | CPU「変な手」撲滅 計画メモ（2026-06-22）。実プレイの変な手（防御の歪み・リソース浪費・自殺攻撃）を測定駆動で評価の根から是正し補償パッチ（C）を安全撤去する5フェーズ計画。Phase0 物差し（null-move regret 監査＋凍結パズル）→Phase1 切り分け＆汚染源除去（評価/ホライズン/カンニングの ablation）→Phase2 評価キャリブレーション（2a＋確定＝教師あり学習＋1回再生成）→Phase3 C パッチ撤去→Phase4 ゲート＆SPEC吸収。進捗正本は WBS |
 
 ## クイックスタート
 
