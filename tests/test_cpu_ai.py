@@ -98,6 +98,56 @@ def test_evaluate_see_opp_hand_policy(db):
     assert full_after < full_before         # full は相手の防御力増として自分有利度が下がる
 
 
+def test_decide_info_policy_arg(db):
+    """情報方針の引数化（Phase -1・強さ=Elo優先/フェア制約ロードマップ §0/§4）。
+
+    旧実装は decide で `see_opp_hand, opp_public_only = True, False` をハードコード（出荷 CPU が
+    チート）。これを `info_policy` 引数化し**出荷デフォルトを fair に切替**た。fair=相手手札を読まない
+    （False, True）／cheat=旧 hard（True, False）／不正値は ValueError。両方針とも探索が機能して合法手を返す。
+    """
+    assert cpu_ai.DEFAULT_INFO_POLICY == "fair"            # 出荷デフォルト＝fair（固定値ハードコード撤去）
+    assert cpu_ai._resolve_info_policy("fair") == (False, True)
+    assert cpu_ai._resolve_info_policy("cheat") == (True, False)
+    with pytest.raises(ValueError):
+        cpu_ai._resolve_info_policy("bogus")
+
+    # 決定論で mid-game を作り、選択肢のある手番で fair/cheat 双方が合法手を返すことを確認。
+    KEY_PID = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('PLAYER_ID', 'player_id')
+    random.seed(3)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    mem = {}
+    checked = False
+    for _ in range(14):
+        if gm.winner:
+            break
+        pend = gm.get_pending_request()
+        if not pend:
+            break
+        pid = pend[KEY_PID]
+        actor = gm.p1 if gm.p1.name == pid else gm.p2
+        legal = gm.get_legal_actions(actor)
+        if len(legal) > 1:
+            sigs = {cpu_ai._move_sig(m) for m in legal}
+            for pol in ("fair", "cheat"):
+                mv = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0),
+                                           mem={}, info_policy=pol)
+                assert mv is not None and cpu_ai._move_sig(mv) in sigs
+            checked = True
+            break
+        mv = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), mem=mem)
+        if mv is None:
+            break
+        gm.action_events = []
+        if mv["kind"] == "battle":
+            action_api.apply_battle_action(gm, actor, mv["action_type"], mv.get("card_uuid"))
+        else:
+            action_api.apply_game_action(gm, actor, mv["action_type"], mv.get("payload", {}))
+    assert checked, "選択肢のある手番に到達しなかった（テスト前提の不成立）"
+
+
 def _new_gm(db):
     random.seed(0)
     l1, c1 = build_deck(db, "p1")

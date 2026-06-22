@@ -63,6 +63,25 @@ _KILLER_SLOTS = 2          # 各 ply で保持する killer 手の数（standard
 # （最善応手列を次手の同一局面ノードへ正しく対応付ける）で正の利得が出れば有効化を再検討する。
 _USE_PV_CROSS_DECIDE = False
 
+# 情報方針（フェア制約・docs/reports/cpu_strength_roadmap_20260622.md §0/§4 Phase -1）。
+# 旧実装は decide で `see_opp_hand, opp_public_only = True, False` を**ハードコード**＝出荷 CPU がチート
+# （相手手札/裏ライフを読む）だった。これを引数化し、**出荷デフォルトを fair に即切替**する（固定値撤廃）。
+#   "fair"  = 相手手札の中身（カウンター値）を読まず、相手 min ノードでも隠れ手札依存手を使わない保守
+#             モデル（see_opp_hand=False, opp_public_only=True）。＝出荷デフォルト。
+#   "cheat" = 相手手札も読むフルクローン（see_opp_hand=True, opp_public_only=False）。旧 hard＝最強だが
+#             不公平。凍結ベースライン/参考天井・診断用に明示指定で残す。
+# 値は (see_opp_hand, opp_public_only) のタプルへ解決する。
+_INFO_POLICIES = {"fair": (False, True), "cheat": (True, False)}
+DEFAULT_INFO_POLICY = "fair"
+
+
+def _resolve_info_policy(info_policy: str) -> Tuple[bool, bool]:
+    try:
+        return _INFO_POLICIES[info_policy]
+    except KeyError:
+        raise ValueError("unknown info_policy: %r (expected 'fair' or 'cheat')" % (info_policy,))
+
+
 # 評価重み（盤面 1000=パワー1段相当に正規化）
 W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（膝＝薄域。最重要）
 # 高ライフ域（膝超）のライフ 1 枚の基礎価値（concave 化・§2.5.3）。OPCG ではライフは「序盤は能動的に
@@ -1809,11 +1828,13 @@ def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: 
 def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
            moves: Optional[List[Dict[str, Any]]] = None, plan=None,
            trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True,
-           killer_state: Optional[Dict[int, List[tuple]]] = None) -> Optional[Dict[str, Any]]:
+           killer_state: Optional[Dict[int, List[tuple]]] = None,
+           info_policy: str = DEFAULT_INFO_POLICY) -> Optional[Dict[str, Any]]:
     """`player` が取るべき次の 1 手を返す（合法手が無ければ None）。
 
-    α-β＋ビーム（`hard` 方針＝相手手札も読むフルクローン）。**easy/normal は廃止**（最強の α-β＝hard と
-    MCTS＝expert の2系統に集約。`difficulty` 引数は互換のため残すが分岐しない）。
+    α-β＋ビーム。**easy/normal は廃止**（最強の α-β＝hard と MCTS＝expert の2系統に集約。`difficulty`
+    引数は互換のため残すが分岐しない）。情報方針は `info_policy`（既定 "fair"＝相手手札を読まない出荷
+    デフォルト／"cheat"＝旧 hard・相手手札も読む。`_INFO_POLICIES` 参照）で切り替える。
     `moves` を渡すとその候補集合から選ぶ（ガード driver が絞り込んだ手を渡す用途）。
     `plan` は自デッキ勝ち筋プラン（§2.5.5）。`trace`（任意・既定 None）で意思決定の診断情報を書き込む。
     `killer_state`（任意・④粒度b）で α-β killer 表を連続 decide 間で持ち越す。
@@ -1848,8 +1869,8 @@ def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Rando
     # トレース時のみ collect を渡して 1-ply prelim ／深掘り deep スコアを回収する（regret/候補表示用）。
     collect = {} if trace is not None else None
 
-    # α-β（相手手札も読むフルクローン＝最強）。
-    see_opp_hand, opp_public_only = True, False
+    # 情報方針（既定 fair＝相手手札を読まない出荷デフォルト・"cheat" で旧 hard のフルクローン）。
+    see_opp_hand, opp_public_only = _resolve_info_policy(info_policy)
     if is_selection:
         # 対象選択（自分の確定効果の対象/枚数決定）は**即時盤面(1-ply)**が信頼できる信号。
         # 多 ply 先読みは「相手のターン中に発火した自分の誘発除去」等で価値が washout/逆転し
@@ -1900,7 +1921,8 @@ def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Rando
 
 def decide_with_regret(manager, player, difficulty: str = "hard",
                        rng: Optional[random.Random] = None, plan=None,
-                       out: Optional[Dict[str, Any]] = None
+                       out: Optional[Dict[str, Any]] = None,
+                       info_policy: str = DEFAULT_INFO_POLICY
                        ) -> Tuple[Optional[Dict[str, Any]], float]:
     """`decide` と同じ手を返しつつ、**greedy regret**（崖エラーの安価な代理・検証基盤・§2.5.3）も返す。
 
@@ -1922,15 +1944,17 @@ def decide_with_regret(manager, player, difficulty: str = "hard",
     if not moves:
         return None, 0.0
     if len(moves) == 1:
-        return decide(manager, player, difficulty, rng, moves=moves, plan=plan), 0.0
+        return decide(manager, player, difficulty, rng, moves=moves, plan=plan,
+                      info_policy=info_policy), 0.0
 
     name = player.name
     moves = _prune_don_moves(manager, name, moves)  # B-2: ルート手集合を decide と一致させる（regret 整合）
     moves = _prune_futile_attacks(manager, name, moves)  # 倒せない/届かない無駄攻撃を除外（decide と一致）
+    see_opp_hand, opp_public_only = _resolve_info_policy(info_policy)
     collect: Dict[str, Any] = {}
-    _scored_search(manager, name, moves, see_opp_hand=True, opp_public_only=False,
+    _scored_search(manager, name, moves, see_opp_hand=see_opp_hand, opp_public_only=opp_public_only,
                    plan=plan, collect=collect)
-    move = decide(manager, player, difficulty, rng, moves=moves, plan=plan)
+    move = decide(manager, player, difficulty, rng, moves=moves, plan=plan, info_policy=info_policy)
     deep = collect.get("deep", {})
     prelim = collect.get("prelim", {})
     regret = 0.0
@@ -1951,7 +1975,8 @@ def decide_with_regret(manager, player, difficulty: str = "hard",
 
 def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
                    mem: Optional[Dict[str, Any]] = None, plan=None,
-                   trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True) -> Optional[Dict[str, Any]]:
+                   trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True,
+                   info_policy: str = DEFAULT_INFO_POLICY) -> Optional[Dict[str, Any]]:
     """ターン内メモリ `mem` を用いた暴走防止つきの意思決定。
 
     `mem` は呼び出し側が対局ごとに保持する dict（ステートレスな /cpu/step でも CPU_GAMES に
@@ -1997,7 +2022,8 @@ def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[rand
     # 中立〜微減＝既定 OFF。`_USE_PV_CROSS_DECIDE` 有効時のみ供給。OFF は killer_state=None＝粒度a のみ）。
     ks = mem.setdefault("killers", {}) if (_USE_PV_ORDER and _USE_PV_CROSS_DECIDE) else None
     move = decide(manager, player, difficulty, rng, moves=filtered, plan=plan,
-                  trace=trace, trace_read_ahead=trace_read_ahead, killer_state=ks)
+                  trace=trace, trace_read_ahead=trace_read_ahead, killer_state=ks,
+                  info_policy=info_policy)
     if move is not None:
         sig = _move_sig(move)
         counts[sig] = counts.get(sig, 0) + 1
@@ -2007,7 +2033,8 @@ def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[rand
 
 
 def plan_turn(manager, name: str, difficulty: str = "hard", rng=None,
-              mem: Optional[Dict[str, Any]] = None, plan=None) -> List[Dict[str, Any]]:
+              mem: Optional[Dict[str, Any]] = None, plan=None,
+              info_policy: str = DEFAULT_INFO_POLICY) -> List[Dict[str, Any]]:
     """Phase 3 ①（計画キャッシュ）: 相手の介入（ブロック/カウンター等）が入るまで、または TURN_END
     までの自分(`name`)の**連続行動列**をクローン上で計画する。
 
@@ -2030,7 +2057,7 @@ def plan_turn(manager, name: str, difficulty: str = "hard", rng=None,
         if not pa or pa[0] != name:
             break  # 相手の手番/介入点（SELECT_BLOCKER/SELECT_COUNTER 等）＝区切り
         actor = _player_by_name(clone, name)
-        mv = decide_guarded(clone, actor, difficulty, rng, mem=mem, plan=plan)
+        mv = decide_guarded(clone, actor, difficulty, rng, mem=mem, plan=plan, info_policy=info_policy)
         if mv is None:
             break
         actions.append(mv)
@@ -2045,7 +2072,7 @@ def plan_turn(manager, name: str, difficulty: str = "hard", rng=None,
 
 def decide_cached(manager, player, difficulty: str = "hard", rng=None,
                   mem: Optional[Dict[str, Any]] = None, cache: Optional[Dict[str, Any]] = None,
-                  plan=None) -> Optional[Dict[str, Any]]:
+                  plan=None, info_policy: str = DEFAULT_INFO_POLICY) -> Optional[Dict[str, Any]]:
     """Phase 3 ① 配線: 計画キャッシュ付き decide（**本番の体感最適化専用**）。
 
     `cache` は対局ごとに保持する dict（`{"queue": [...残りの計画手...]}`）。
@@ -2073,7 +2100,7 @@ def decide_cached(manager, player, difficulty: str = "hard", rng=None,
             return legal_by_sig[nxt_sig]  # 現局面の move（uuid 整合）を返す
         cache["queue"] = None  # 前提崩れ＝破棄して再計画
 
-    actions = plan_turn(manager, player.name, difficulty, rng, mem=mem, plan=plan)
+    actions = plan_turn(manager, player.name, difficulty, rng, mem=mem, plan=plan, info_policy=info_policy)
     if actions:
         first_sig = _move_sig(actions[0])
         if first_sig in legal_by_sig:
@@ -2082,4 +2109,4 @@ def decide_cached(manager, player, difficulty: str = "hard", rng=None,
     # 計画が空/先頭不正＝安全側で通常 decide（rng/mem は plan_turn で進行済みのため二重進行に注意だが
     # 本番専用＝決定性非依存。guard は安全網なので軽微な前後は許容）。
     cache["queue"] = None
-    return decide_guarded(manager, player, difficulty, rng, mem=mem, plan=plan)
+    return decide_guarded(manager, player, difficulty, rng, mem=mem, plan=plan, info_policy=info_policy)
