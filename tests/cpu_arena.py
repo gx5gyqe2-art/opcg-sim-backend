@@ -69,35 +69,42 @@ def win_rate(wins: float, games: int) -> float:
 
 # --- 信頼区間（Phase 0・分散低減アリーナの合否判定器） -------------------------
 
-def mean_ci(scores: List[float], z: float = 1.96) -> Dict[str, float]:
-    """標本（各局/各ペアの勝点 0/0.5/1）の平均と正規近似の信頼区間。
+def wilson_interval(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
+    """勝率の Wilson スコア信頼区間（小標本・連勝/連敗でも縮退しない）。
 
-    ペア（antithetic）スコアに対して使うと、席・配りの分散がペア内で相殺済みなので CI が締まる。
-    `half_width` は平均勝率まわりの片側幅。n<2 では分散不定として half_width=inf を返す。
+    正規近似（mean±z·SE）は連勝（分散 0）で半幅 0＝「完全確信」と誤報し、合否ゲートを lucky sweep で
+    自明に通してしまう。Wilson は p̂=0/1 でも有限の妥当な区間を返すのでゲートに適する。引き分けを 0.5 勝で
+    含む `wins`（端数可）も総試行 `games` に対する比率として扱う（厳密な二項ではないが保守的近似）。
+    games==0 は (0,1)・mean 0.5（無情報）。
     """
-    n = len(scores)
-    mean = (sum(scores) / n) if n else 0.5
-    if n < 2:
-        return {"mean": mean, "n": float(n), "sd": float("inf"),
-                "lo": 0.0, "hi": 1.0, "half_width": float("inf")}
-    var = sum((s - mean) ** 2 for s in scores) / (n - 1)
-    se = math.sqrt(var / n)
-    hw = z * se
-    return {"mean": mean, "n": float(n), "sd": math.sqrt(var),
-            "lo": max(0.0, mean - hw), "hi": min(1.0, mean + hw), "half_width": hw}
+    if games <= 0:
+        return {"mean": 0.5, "games": 0.0, "lo": 0.0, "hi": 1.0, "half_width": float("inf")}
+    n = float(games)
+    p = wins / n
+    z2 = z * z
+    denom = 1.0 + z2 / n
+    center = (p + z2 / (2.0 * n)) / denom
+    spread = (z / denom) * math.sqrt(p * (1.0 - p) / n + z2 / (4.0 * n * n))
+    lo, hi = max(0.0, center - spread), min(1.0, center + spread)
+    return {"mean": p, "games": n, "lo": lo, "hi": hi, "half_width": (hi - lo) / 2.0}
 
 
-def elo_ci(scores: List[float], z: float = 1.96) -> Dict[str, float]:
-    """勝点標本 → Elo 点推定と Elo 信頼区間（勝率 CI の端点を Elo へ写像）。
+def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
+    """勝率 Wilson CI → Elo 点推定と Elo 信頼区間（端点を Elo へ写像）。
 
-    Phase 0 合格ゲート（Elo CI 半幅 < 15）の判定に使う。半幅は (elo(hi)−elo(lo))/2。
+    elo_delta は非線形なので Elo 区間は点推定まわりに**非対称**。点推定 `elo`＝elo_delta(勝率)、区間は
+    [elo_lo, elo_hi]＝端点写像。`elo_half_width`＝(elo_hi−elo_lo)/2 は**区間幅の半分**（点推定からの片側
+    対称幅ではない＝非対称区間のため elo±half は [elo_lo,elo_hi] を再現しない）。Phase 0 合格ゲート
+    （Elo 区間幅 半分 < 15）の判定に使う。games<1 では半幅 inf。
     """
-    s = mean_ci(scores, z)
-    elo = elo_delta(s["mean"])
-    lo_e, hi_e = elo_delta(s["lo"]), elo_delta(s["hi"])
+    w = wilson_interval(wins, games, z)
+    if games <= 0:
+        return {"elo": 0.0, "elo_lo": elo_delta(0.0), "elo_hi": elo_delta(1.0),
+                "elo_half_width": float("inf"), "win_rate": 0.5, "games": 0.0}
+    elo = elo_delta(w["mean"])
+    lo_e, hi_e = elo_delta(w["lo"]), elo_delta(w["hi"])
     return {"elo": elo, "elo_lo": lo_e, "elo_hi": hi_e,
-            "elo_half_width": (hi_e - lo_e) / 2.0, "win_rate": s["mean"],
-            "games": s["n"], "wr_half_width": s["half_width"]}
+            "elo_half_width": (hi_e - lo_e) / 2.0, "win_rate": w["mean"], "games": w["games"]}
 
 
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
@@ -132,10 +139,11 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     自デッキ構成からプランを供給する（easy はプラン無し）。`p1_policy`/`p2_policy` は情報方針
     （fair/cheat・Phase -1）で、フェア化前後の強さ A/B に用いる。
 
-    `separate_policy_rng=True`（Phase 0・CRN）で**方策のタイブレーク乱数をゲーム乱数（global random）
-    から分離**する。`random.seed(seed)` 直後（デッキ構築/シャッフル＝global で消費）に各プレイヤーの
-    タイブレーク用に独立した `random.Random` を seed から決定的に派生させる。これで「方策を変えても
-    同一 game-seed なら配り/シャッフルが同一」になり、対戦間分散（運の差）が落ちる＝CRN の土台。
+    `separate_policy_rng=True`（Phase 0）で**方策のタイブレーク乱数を game 乱数（global random）から分離**
+    する（各プレイヤーに seed 派生の独立 `random.Random`）。これは方策タイブレークの決定性を game 乱数から
+    切り離すだけ＝**完全な配りレベル CRN ではない**: mulligan は対局ループ中に決まり、α-β 探索はクローン
+    上の効果解決で global `random` を方策依存に消費するため、方策が違えば mid-game 以降のシャッフルは
+    なお分岐する。配りレベル CRN には GameManager への乱数注入（クローンが独自 rng）が必要＝Phase 0b。
     """
     random.seed(seed)
     l1, c1 = build_deck(db, "p1")
@@ -218,19 +226,25 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
                  max_steps: int = DEFAULT_MAX_STEPS,
                  challenger_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                  baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY) -> Dict[str, Any]:
-    """分散低減アリーナ（Phase 0・antithetic + CRN）。各 seed を**両席で 1 回ずつ**戦わせ、挑戦者の
-    勝点をペア平均する＝**先手有利と配り運をペア内で相殺**してから集計する。
+    """分散低減アリーナ（Phase 0・antithetic 席ペアリング）。各 seed を**両席で 1 回ずつ**戦わせ、
+    挑戦者の 2 局の勝敗を集計する＝**先手有利（席順）をペア内で相殺**する。
 
-    デッキは決定論ミラー（両者同一構成）なので、同一 game-seed の両席対局は同じ初期シャッフルから始まる
-    （`separate_policy_rng=True` で方策タイブレークを global から分離＝配りが方策非依存）。1 ペアの勝点は
-    {0, 0.5, 1}（A=挑戦者 p1 勝＋B=挑戦者 p2 勝の平均）。CI は **ペア勝点標本**から算出（席分散が相殺済み
-    なので独立 N 局より締まる）。合格ゲート＝Elo CI 半幅 < 15。
+    範囲（正直な明記）: 相殺できるのは**席順のみ**。デッキは決定論ミラー（両者同一構成）だが、
+    `start_game` は p1→p2 の順に独立シャッフルするため、挑戦者が p1 の局と p2 の局では**引く山が異なる**
+    ＝配り運（ドロー分散）は相殺しない。さらに mulligan は対局ループ中に決まり、α-β 探索はクローン上の
+    効果解決で global `random` を方策依存に消費するため、**同一 game-seed でも方策が違えば配りは厳密には
+    一致しない**（`separate_policy_rng=True` が分離するのは方策タイブレーク乱数のみ）。完全な配りレベル
+    CRN は GameManager への乱数注入（クローンが独自 rng を持ち探索が本譜の乱数を汚さない）が必要＝
+    フォローアップ（Phase 0b）。それでも席相殺だけで独立 N 局よりは分散が落ちる。
+
+    CI は総試行（2×pairs 局）の挑戦者勝率に対する **Wilson 区間**（連勝でも縮退しない・小標本に頑健）。
+    合格ゲート＝Elo 区間幅 半分 < 15。1 ペアの勝点 {0,0.5,1} は (A=挑戦者 p1 勝 + B=挑戦者 p2 勝)/2。
     """
-    pair_scores: List[float] = []
+    wins = 0.0
     detail: List[Dict[str, Any]] = []
     for k in range(pairs):
         seed = seed0 + k
-        # 席A: 挑戦者=p1。席B: 同一 game-seed で挑戦者=p2（配りは同一・席だけ反転）。
+        # 席A: 挑戦者=p1。席B: 同一 game-seed で挑戦者=p2（席だけ反転）。
         a = play_game(seed, db, challenger, baseline, max_steps=max_steps,
                       p1_policy=challenger_policy, p2_policy=baseline_policy,
                       separate_policy_rng=True)
@@ -239,14 +253,14 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
                       separate_policy_rng=True)
         chal_a = 1.0 if a["winner"] == "p1" else 0.0
         chal_b = 1.0 if b["winner"] == "p2" else 0.0
-        score = (chal_a + chal_b) / 2.0
-        pair_scores.append(score)
+        wins += chal_a + chal_b
         detail.append({"seed": seed, "chal_as_p1_won": chal_a, "chal_as_p2_won": chal_b,
-                       "pair_score": score})
-    ci = elo_ci(pair_scores)
+                       "pair_score": (chal_a + chal_b) / 2.0})
+    games = 2 * pairs
+    ci = elo_ci(wins, games)
     return {"challenger": challenger, "baseline": baseline,
             "challenger_policy": challenger_policy, "baseline_policy": baseline_policy,
-            "pairs": pairs, "win_rate": ci["win_rate"], "elo_delta": ci["elo"],
+            "pairs": pairs, "games": games, "win_rate": ci["win_rate"], "elo_delta": ci["elo"],
             "elo_lo": ci["elo_lo"], "elo_hi": ci["elo_hi"],
             "elo_half_width": ci["elo_half_width"], "detail": detail}
 
