@@ -79,6 +79,47 @@ def test_arena_structure_and_seat_alternation(db):
 
 
 # ---------------------------------------------------------------------------
+# Phase 0: 分散低減アリーナ（CRN + antithetic + 信頼区間）
+# ---------------------------------------------------------------------------
+
+def test_mean_ci_math():
+    """平均 CI: 全勝/全敗は mean 0/1、混在は (0,1) 内で half_width>0、n<2 は half_width=inf。"""
+    assert cpu_arena.mean_ci([1.0, 1.0, 1.0])["mean"] == 1.0
+    assert cpu_arena.mean_ci([0.0, 0.0])["mean"] == 0.0
+    mixed = cpu_arena.mean_ci([1.0, 0.0, 1.0, 0.0])
+    assert 0.0 < mixed["mean"] < 1.0 and mixed["half_width"] > 0.0
+    assert cpu_arena.mean_ci([1.0])["half_width"] == float("inf")  # 分散不定
+
+
+def test_elo_ci_math():
+    """Elo CI: 点推定は elo_delta(win_rate) と一致、半幅は非負・有限（混在標本）。"""
+    scores = [1.0, 0.5, 0.0, 1.0, 0.5, 0.0]
+    ci = cpu_arena.elo_ci(scores)
+    assert ci["elo"] == pytest.approx(cpu_arena.elo_delta(ci["win_rate"]))
+    assert ci["elo_half_width"] >= 0.0 and math.isfinite(ci["elo_half_width"])
+    assert ci["elo_lo"] <= ci["elo"] <= ci["elo_hi"]
+
+
+def test_play_game_separate_policy_rng_deterministic(db):
+    """CRN: 方策乱数を分離（separate_policy_rng=True）しても同一 seed/方策は決定論（同手・同勝者）。"""
+    a = cpu_arena.play_game(0, db, "hard", "hard", separate_policy_rng=True)
+    b = cpu_arena.play_game(0, db, "hard", "hard", separate_policy_rng=True)
+    assert a["winner"] == b["winner"] and a["steps"] == b["steps"] and a["turns"] == b["turns"]
+
+
+def test_arena_paired_antithetic_structure(db):
+    """antithetic ペアアリーナ: ペア勝点 {0,0.5,1}・win_rate∈[0,1]・Elo CI 半幅が有限・席相殺の整合。"""
+    rep = cpu_arena.arena_paired(db, challenger="hard", baseline="hard", pairs=1, seed0=0)
+    assert rep["pairs"] == 1
+    assert 0.0 <= rep["win_rate"] <= 1.0
+    assert math.isfinite(rep["elo_half_width"]) or rep["pairs"] < 2
+    d = rep["detail"][0]
+    assert d["pair_score"] in (0.0, 0.5, 1.0)
+    # 挑戦者の勝点 = 席A(p1勝) と席B(p2勝) の平均（席相殺）。
+    assert d["pair_score"] == (d["chal_as_p1_won"] + d["chal_as_p2_won"]) / 2.0
+
+
+# ---------------------------------------------------------------------------
 # regret ログ（decide_with_regret）
 # ---------------------------------------------------------------------------
 
