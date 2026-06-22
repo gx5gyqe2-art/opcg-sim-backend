@@ -97,13 +97,15 @@ def _exposes_attacker(manager, actor_name: str, move: Dict[str, Any]) -> bool:
 
 def classify_decision(manager, actor_name: str, move: Dict[str, Any],
                       moves: List[Dict[str, Any]],
-                      search_regret: Optional[float] = None) -> Dict[str, Any]:
+                      search_regret: Optional[float] = None,
+                      see_opp_hand: bool = True) -> Dict[str, Any]:
     """1 意思決定を採点し、該当する「変な手」カテゴリ（複数可）と第2軸を返す（観測専用）。
 
     返り値: ``{"flags": set[str], "axes": set[str], "regret": float|None,
                "search_regret": float|None, "action_type": str, ...}``。
-    - `regret`（= (A) per-move settle regret）は本番 decide と同一条件（plan=None・hard＝see_opp_hand=True）
-      で算出する。①〜④はこの settle regret ベース。
+    - `regret`（= (A) per-move settle regret）は測定する方策の情報方針に**一致**させて算出する
+      （cheat 測定時＝see_opp_hand=True／fair 測定時＝see_opp_hand=False＝Phase 1 カンニング切り分け）。
+      ①〜④はこの settle regret ベース。既定 True＝従来の cheat 測定と同値。
     - `search_regret`（= (B) AI探索 regret = deep(選択手)−deep(TURN_END)）は呼び出し側が**選択手のトレース**
       から取り出して渡す（手選択を変えない観測値）。`None`（取れない局面/単一手/easy）なら第2軸は付かない。
       第2軸（settle regret が取れた ①②③ 候補にのみ付与）:
@@ -129,8 +131,9 @@ def classify_decision(manager, actor_name: str, move: Dict[str, Any],
         return rec
 
     # ①②③ は「自分のメイン手で TURN_END を基準に測れる」局面のみ。null-move regret を算出。
+    # see_opp_hand は測定する方策の情報方針に一致させる（cheat=True / fair=False＝Phase 1 切り分け）。
     nmr = cpu_ai.null_move_regret(manager, actor_name, move, moves=moves,
-                                  see_opp_hand=True, profile=None, plan=None)
+                                  see_opp_hand=see_opp_hand, profile=None, plan=None)
     if nmr is None:
         return rec  # TURN_END 基準が無い局面（防御応答中・対象選択中）＝regret 定義不能＝スキップ
     rec["has_turn_end"] = True
@@ -160,24 +163,26 @@ def classify_decision(manager, actor_name: str, move: Dict[str, Any],
     return rec
 
 
-def _decide_traced(manager, actor, difficulty, rng, mem) -> tuple:
+def _decide_traced(manager, actor, difficulty, rng, mem, info_policy="hard") -> tuple:
     """本番同一の `decide_guarded` で手を選びつつ、その**選択手のトレース**から AI探索 regret を回収する。
 
     手選択の決定論を変えないために `trace` 経路（RNG save/restore で囲われ観測専用）を使う。`trace_read_ahead`
     は重い読み筋（PV）クローンなので監査では不要＝False（候補スコア・regret はクローン少回で取れる）。
+    `info_policy`（既定 "hard"＝現状不変／"fair"＝公開情報のみ）で探索の情報方針を切り替える（Phase 1 切り分け）。
     返り値: ``(move, search_regret|None)``。search_regret は ``trace["search_regret"]``＝deep(選択手)−deep(TURN_END)
     （単一手/easy/TURN_END が候補に無い局面では None）。
     """
     trace: Dict[str, Any] = {}
     move = cpu_ai.decide_guarded(manager, actor, difficulty, rng, mem,
-                                 trace=trace, trace_read_ahead=False)
+                                 trace=trace, trace_read_ahead=False, info_policy=info_policy)
     return move, trace.get("search_regret")
 
 
-def _play_to_finish(manager, mem, difficulty_of, max_steps) -> Optional[str]:
+def _play_to_finish(manager, mem, difficulty_of, max_steps, info_policy="hard") -> Optional[str]:
     """`manager`（クローン）を既定方策（decide_guarded・本番同一）で最後まで進め勝者を返す（結果ラベル用）。
 
     決着しない/例外は None（不明扱い）。`mem` はクローン側の独立コピーを使う（live を汚さない）。
+    `info_policy`（既定 "hard"／"fair"）で完走方策の情報方針を測定対象に合わせる。
     """
     pending_props = action_api.CONST.get("PENDING_REQUEST_PROPERTIES", {})
     pid_key = pending_props.get("PLAYER_ID", "player_id")
@@ -192,7 +197,7 @@ def _play_to_finish(manager, mem, difficulty_of, max_steps) -> Optional[str]:
         if not moves:
             return None
         move = cpu_ai.decide_guarded(manager, actor, difficulty_of[req_pid], random,
-                                     mem.setdefault(req_pid, {}))
+                                     mem.setdefault(req_pid, {}), info_policy=info_policy)
         if move is None:
             return None
         manager.action_events = []
@@ -210,7 +215,8 @@ def _play_to_finish(manager, mem, difficulty_of, max_steps) -> Optional[str]:
 def audit_one_game(seed: int, db, p1_leader=None, p2_leader=None,
                    difficulty: str = "hard", max_steps: int = DEFAULT_MAX_STEPS,
                    label: bool = False, label_rate: float = 1.0,
-                   label_max_steps: int = 2000, rng_label=None) -> Dict[str, Any]:
+                   label_max_steps: int = 2000, rng_label=None,
+                   info_policy: str = "hard") -> Dict[str, Any]:
     """1 局を決定論再生し、各意思決定を採点して「変な手」を集計する（本番同一の手選択）。
 
     結果ラベル（`label=True`）: フラグした手について、その時点のクローンを既定方策で最後まで進め、
@@ -253,12 +259,14 @@ def audit_one_game(seed: int, db, p1_leader=None, p2_leader=None,
         # 本番同一の手選択をしつつ、選択手のトレースから AI探索 regret を回収する（trace は観測専用＝
         # RNG save/restore で囲われ手選択を変えない。同じ手が選ばれることは test_cpu_replay.py で担保）。
         move, search_regret = _decide_traced(manager, actor, difficulty_of[req_pid], random,
-                                             mem.setdefault(req_pid, {}))
+                                             mem.setdefault(req_pid, {}), info_policy=info_policy)
         if move is None:
             raise InvariantError([("NO_DECISION", f"decide returned None for {req_pid}")], step, [])
 
         # --- 採点（観測専用・live を変えない） ---
-        rec = classify_decision(manager, req_pid, move, moves, search_regret=search_regret)
+        # see_opp_hand は測定方策の情報方針に一致（cheat=True / fair=False＝Phase 1 切り分け）。
+        rec = classify_decision(manager, req_pid, move, moves, search_regret=search_regret,
+                                see_opp_hand=(info_policy != "fair"))
         if rec["regret"] is not None:
             decisions += 1
         flags = rec["flags"]
@@ -284,7 +292,8 @@ def audit_one_game(seed: int, db, p1_leader=None, p2_leader=None,
             # 結果ラベル: クローンを既定方策で最後まで進め、フラグした側が敗北したかを記録（サンプリング）。
             if label and (rng_label is None or rng_label.random() < label_rate):
                 lab_mem = {"p1": {}, "p2": {}}
-                outcome = _play_to_finish(manager.clone(), lab_mem, difficulty_of, label_max_steps)
+                outcome = _play_to_finish(manager.clone(), lab_mem, difficulty_of, label_max_steps,
+                                          info_policy=info_policy)
                 lost = (outcome is not None and outcome != req_pid)
                 ex["label_outcome"] = outcome
                 ex["label_lost"] = lost
@@ -327,13 +336,14 @@ def audit_one_game(seed: int, db, p1_leader=None, p2_leader=None,
 
 
 def _build_summary(games, finished, seed, difficulty, total_decisions, total_counts,
-                   total_axis_counts, total_suicidal_axis, label_stats, examples, failures) -> Dict[str, Any]:
+                   total_axis_counts, total_suicidal_axis, label_stats, examples, failures,
+                   info_policy="hard") -> Dict[str, Any]:
     per100 = {cat: (100.0 * total_counts[cat] / finished if finished else 0.0) for cat in CATEGORIES}
     axis_per100 = {ax: (100.0 * total_axis_counts[ax] / finished if finished else 0.0)
                    for ax in SECONDARY_AXES}
     return {
         "games_requested": games, "games_finished": finished, "seed": seed,
-        "difficulty": difficulty, "decisions_scored": total_decisions,
+        "difficulty": difficulty, "info_policy": info_policy, "decisions_scored": total_decisions,
         "counts": total_counts, "per_100_games": per100,
         "axis_counts": total_axis_counts, "axis_per_100_games": axis_per100,
         "suicidal_axis": total_suicidal_axis,
@@ -344,7 +354,7 @@ def _build_summary(games, finished, seed, difficulty, total_decisions, total_cou
 
 def run_audit(games: int, seed: int, db, difficulty="hard", max_steps=DEFAULT_MAX_STEPS,
               label=False, label_rate=1.0, label_max_steps=2000,
-              progress=False, json_path=None) -> Dict[str, Any]:
+              progress=False, json_path=None, info_policy="hard") -> Dict[str, Any]:
     """N 局の監査を回し、カテゴリ別の総件数・件数/100局・代表局面・結果ラベルを集約する。
 
     `progress=True` で 1 局完了ごとに途中集計を1行出力し、`json_path` 指定時は**毎局フラッシュ**する
@@ -363,7 +373,8 @@ def run_audit(games: int, seed: int, db, difficulty="hard", max_steps=DEFAULT_MA
     def _flush_json():
         if json_path:
             summ = _build_summary(games, finished, seed, difficulty, total_decisions, total_counts,
-                                  total_axis_counts, total_suicidal_axis, label_stats, examples, failures)
+                                  total_axis_counts, total_suicidal_axis, label_stats, examples, failures,
+                                  info_policy=info_policy)
             with open(json_path, "w", encoding="utf-8") as f:
                 json.dump(summ, f, ensure_ascii=False, indent=2,
                           default=lambda o: sorted(o) if isinstance(o, set) else str(o))
@@ -373,7 +384,8 @@ def run_audit(games: int, seed: int, db, difficulty="hard", max_steps=DEFAULT_MA
         try:
             res = audit_one_game(gseed, db, difficulty=difficulty, max_steps=max_steps,
                                  label=label, label_rate=label_rate,
-                                 label_max_steps=label_max_steps, rng_label=rng_label)
+                                 label_max_steps=label_max_steps, rng_label=rng_label,
+                                 info_policy=info_policy)
         except InvariantError as e:
             failures.append((gseed, e))
             print(f"audit seed={gseed}: FAILED step={e.step} violations={e.violations}", flush=True)
@@ -397,7 +409,8 @@ def run_audit(games: int, seed: int, db, difficulty="hard", max_steps=DEFAULT_MA
         _flush_json()
 
     return _build_summary(games, finished, seed, difficulty, total_decisions, total_counts,
-                          total_axis_counts, total_suicidal_axis, label_stats, examples, failures)
+                          total_axis_counts, total_suicidal_axis, label_stats, examples, failures,
+                          info_policy=info_policy)
 
 
 def print_report(summary: Dict[str, Any]) -> None:
@@ -405,7 +418,8 @@ def print_report(summary: Dict[str, Any]) -> None:
     print("CPU 変な手 監査レポート（Phase 0 ベースライン）")
     print("=" * 72)
     print(f"seed={summary['seed']}  games_finished={summary['games_finished']}/"
-          f"{summary['games_requested']}  difficulty={summary['difficulty']}")
+          f"{summary['games_requested']}  difficulty={summary['difficulty']}"
+          f"  info_policy={summary.get('info_policy', 'hard')}")
     print(f"decisions_scored (null-move regret 算出できた意思決定数)={summary['decisions_scored']}")
     print("-" * 72)
     print(f"{'カテゴリ':<22}{'総件数':>8}{'件数/100局':>14}")
@@ -483,13 +497,17 @@ def main(argv=None):
     ap.add_argument("--json", default=None, help="集計サマリ JSON の出力先（毎局フラッシュ＝途中回収可）")
     ap.add_argument("--progress", action="store_true",
                     help="1 局完了ごとに途中集計を1行出力（長時間ランの進捗確認）")
+    ap.add_argument("--fair", action="store_true",
+                    help="フェア hard で測定（info_policy=fair＝相手手札を読まない公開情報のみ）。"
+                         "既定 OFF＝従来 cheat（info_policy=hard・see_opp_hand=True）。Phase 1 切り分け用。")
     args = ap.parse_args(argv)
 
     db = _load_db()
+    info_policy = "fair" if args.fair else "hard"
     summary = run_audit(args.games, args.seed, db, difficulty=args.difficulty,
                         max_steps=args.max_steps, label=args.label,
                         label_rate=args.label_rate, label_max_steps=args.label_max_steps,
-                        progress=args.progress, json_path=args.json)
+                        progress=args.progress, json_path=args.json, info_policy=info_policy)
     print_report(summary)
     if args.json:
         print(f"wrote summary -> {args.json}")

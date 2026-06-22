@@ -69,17 +69,22 @@ def win_rate(wins: float, games: int) -> float:
 
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
 
-def _make_decider(difficulty: str, plan=None):
-    """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き・デプロイと同じプラン供給）。"""
+def _make_decider(difficulty: str, plan=None, info_policy: str = "hard"):
+    """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き・デプロイと同じプラン供給）。
+
+    `info_policy`（既定 "hard"＝現状不変／"fair"＝公開情報のみ）＝Phase 1 カンニング切り分けの観測専用切替。
+    """
     mem: Dict[str, Any] = {}
 
     def _decide(manager, actor):
-        return cpu_ai.decide_guarded(manager, actor, difficulty, random, mem, plan=plan)
+        return cpu_ai.decide_guarded(manager, actor, difficulty, random, mem, plan=plan,
+                                     info_policy=info_policy)
     return _decide
 
 
 def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
-              max_steps: int = DEFAULT_MAX_STEPS) -> Dict[str, Any]:
+              max_steps: int = DEFAULT_MAX_STEPS,
+              p1_info: str = "hard", p2_info: str = "hard") -> Dict[str, Any]:
     """p1/p2 に別難易度を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
@@ -91,8 +96,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     l2, c2 = build_deck(db, "p2")
     manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     manager.start_game()
-    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1)),
-                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2))}
+    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1), p1_info),
+                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2), p2_info)}
 
     step = 0
     prev_turn = manager.turn_count
@@ -129,10 +134,12 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
 
 
 def arena(db, challenger: str, baseline: str, games: int, seed0: int = 0,
-          max_steps: int = DEFAULT_MAX_STEPS) -> Dict[str, Any]:
+          max_steps: int = DEFAULT_MAX_STEPS,
+          challenger_info: str = "hard", baseline_info: str = "hard") -> Dict[str, Any]:
     """挑戦者 vs 固定ベースラインを `games` 局。**席を交互に入替**して先手有利を相殺し、勝率と Elo を返す。
 
     偶数 i: p1=挑戦者 / 奇数 i: p2=挑戦者。引き分け（あれば）は 0.5 勝で計上。
+    `challenger_info`/`baseline_info`（既定 "hard"／"fair"）＝Phase 1 切り分けの情報方針切替（席に追従）。
     """
     wins = 0.0
     decided = 0
@@ -141,7 +148,8 @@ def arena(db, challenger: str, baseline: str, games: int, seed0: int = 0,
         seed = seed0 + i
         chal_is_p1 = (i % 2 == 0)
         p1d, p2d = (challenger, baseline) if chal_is_p1 else (baseline, challenger)
-        res = play_game(seed, db, p1d, p2d, max_steps=max_steps)
+        p1i, p2i = (challenger_info, baseline_info) if chal_is_p1 else (baseline_info, challenger_info)
+        res = play_game(seed, db, p1d, p2d, max_steps=max_steps, p1_info=p1i, p2_info=p2i)
         chal_seat = "p1" if chal_is_p1 else "p2"
         won = (res["winner"] == chal_seat)
         wins += 1.0 if won else 0.0
@@ -281,6 +289,10 @@ def main(argv=None):
     pa.add_argument("--games", type=int, default=10)
     pa.add_argument("--seed", type=int, default=0)
     pa.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
+    pa.add_argument("--challenger-info", choices=["hard", "fair"], default="hard",
+                    help="挑戦者の情報方針（hard=相手手札透視／fair=公開情報のみ）＝Phase 1 切り分け")
+    pa.add_argument("--baseline-info", choices=["hard", "fair"], default="hard",
+                    help="ベースラインの情報方針（hard/fair）＝Phase 1 切り分け")
 
     pr = sub.add_parser("regret", help="自己対戦 1 局の greedy regret 集計")
     pr.add_argument("--difficulty", choices=["hard"], default="hard")
@@ -298,11 +310,13 @@ def main(argv=None):
     db = _load_db()
 
     if args.cmd == "arena":
-        rep = arena(db, args.challenger, args.baseline, args.games, args.seed, args.max_steps)
+        rep = arena(db, args.challenger, args.baseline, args.games, args.seed, args.max_steps,
+                    challenger_info=args.challenger_info, baseline_info=args.baseline_info)
         for d in rep["detail"]:
             print(f"  seed={d['seed']} challenger={d['challenger_seat']} winner={d['winner']} "
                   f"{'WIN' if d['challenger_won'] else 'loss'} turns={d['turns']}")
-        print(f"\narena: {rep['challenger']} vs {rep['baseline']}  "
+        print(f"\narena: {rep['challenger']}[{args.challenger_info}] vs "
+              f"{rep['baseline']}[{args.baseline_info}]  "
               f"{rep['challenger_wins']:.1f}/{rep['games']}  win_rate={rep['win_rate']:.3f}  "
               f"Elo={rep['elo_delta']:+.0f}")
         return 0

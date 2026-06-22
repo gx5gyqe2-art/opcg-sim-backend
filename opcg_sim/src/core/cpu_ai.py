@@ -1906,7 +1906,8 @@ def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: 
 def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
            moves: Optional[List[Dict[str, Any]]] = None, plan=None,
            trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True,
-           killer_state: Optional[Dict[int, List[tuple]]] = None) -> Optional[Dict[str, Any]]:
+           killer_state: Optional[Dict[int, List[tuple]]] = None,
+           info_policy: str = "hard") -> Optional[Dict[str, Any]]:
     """`player` が取るべき次の 1 手を返す（合法手が無ければ None）。
 
     α-β＋ビーム（`hard` 方針＝相手手札も読むフルクローン）。**easy/normal は廃止**（最強の α-β＝hard と
@@ -1914,6 +1915,12 @@ def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Rando
     `moves` を渡すとその候補集合から選ぶ（ガード driver が絞り込んだ手を渡す用途）。
     `plan` は自デッキ勝ち筋プラン（§2.5.5）。`trace`（任意・既定 None）で意思決定の診断情報を書き込む。
     `killer_state`（任意・④粒度b）で α-β killer 表を連続 decide 間で持ち越す。
+
+    `info_policy`（既定 "hard"＝現状不変＝観測専用フラグ・Phase 1 カンニング切り分け）: 探索の情報方針を
+    切り替える。"hard" は相手手札も読むフルクローン（see_opp_hand=True / opp_public_only=False＝従来）。
+    "fair" は公開情報のみ（see_opp_hand=False ＝相手手札の中身を読まない ＋ opp_public_only=True ＝相手 min
+    ノードで隠れ手札依存の手を除外する保守モデル）＝normal の情報方針を hard 探索深さで再利用する。
+    既定 "hard" では一切分岐せず従来と完全同値（experiments/A-B 測定でのみ "fair" を渡す）。
     """
     rng = rng or random
     if moves is None:
@@ -1945,8 +1952,12 @@ def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Rando
     # トレース時のみ collect を渡して 1-ply prelim ／深掘り deep スコアを回収する（regret/候補表示用）。
     collect = {} if trace is not None else None
 
-    # α-β（相手手札も読むフルクローン＝最強）。
-    see_opp_hand, opp_public_only = True, False
+    # α-β（相手手札も読むフルクローン＝最強）。info_policy="fair" は公開情報のみの保守方針へ切替
+    # （normal の情報方針を hard 探索で再利用＝Phase 1 カンニング切り分けの観測専用フラグ・既定 "hard" 不変）。
+    if info_policy == "fair":
+        see_opp_hand, opp_public_only = False, True
+    else:
+        see_opp_hand, opp_public_only = True, False
     if is_selection:
         # 対象選択（自分の確定効果の対象/枚数決定）は**即時盤面(1-ply)**が信頼できる信号。
         # 多 ply 先読みは「相手のターン中に発火した自分の誘発除去」等で価値が washout/逆転し
@@ -2048,7 +2059,8 @@ def decide_with_regret(manager, player, difficulty: str = "hard",
 
 def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
                    mem: Optional[Dict[str, Any]] = None, plan=None,
-                   trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True) -> Optional[Dict[str, Any]]:
+                   trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True,
+                   info_policy: str = "hard") -> Optional[Dict[str, Any]]:
     """ターン内メモリ `mem` を用いた暴走防止つきの意思決定。
 
     `mem` は呼び出し側が対局ごとに保持する dict（ステートレスな /cpu/step でも CPU_GAMES に
@@ -2094,7 +2106,8 @@ def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[rand
     # 中立〜微減＝既定 OFF。`_USE_PV_CROSS_DECIDE` 有効時のみ供給。OFF は killer_state=None＝粒度a のみ）。
     ks = mem.setdefault("killers", {}) if (_USE_PV_ORDER and _USE_PV_CROSS_DECIDE) else None
     move = decide(manager, player, difficulty, rng, moves=filtered, plan=plan,
-                  trace=trace, trace_read_ahead=trace_read_ahead, killer_state=ks)
+                  trace=trace, trace_read_ahead=trace_read_ahead, killer_state=ks,
+                  info_policy=info_policy)
     if move is not None:
         sig = _move_sig(move)
         counts[sig] = counts.get(sig, 0) + 1

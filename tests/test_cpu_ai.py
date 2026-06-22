@@ -915,3 +915,62 @@ def test_b2_don_conditional_detector_matches_real_cards(db):
                   and not (db.get_card(cid).effect_text or "").strip()), None)
     if plain is not None:
         assert not cpu_ai._has_don_conditional(type("C", (), {"master": plain})())
+
+
+# ---------------------------------------------------------------------------
+# Phase 1（カンニング切り分け）: フェア hard 情報方針フラグ（観測専用・既定 OFF＝現状不変）
+# ---------------------------------------------------------------------------
+def _spy_scored_search(monkeypatch):
+    """`_scored_search` の (see_opp_hand, opp_public_only) を捕捉しつつ本物を呼ぶスパイ。"""
+    captured = {}
+    orig = cpu_ai._scored_search
+
+    def _spy(manager, name, moves, *, see_opp_hand, opp_public_only, **kw):
+        captured["see_opp_hand"] = see_opp_hand
+        captured["opp_public_only"] = opp_public_only
+        return orig(manager, name, moves, see_opp_hand=see_opp_hand,
+                    opp_public_only=opp_public_only, **kw)
+
+    monkeypatch.setattr(cpu_ai, "_scored_search", _spy)
+    return captured
+
+
+def test_info_policy_default_is_hard_cheat(db, monkeypatch):
+    """既定（info_policy 省略＝"hard"）は従来どおり相手手札を読む（see_opp_hand=True / opp_public_only=False）。"""
+    gm = _new_gm(db)
+    actor = gm.p1 if gm.turn_player.name == "p1" else gm.p2
+    cap = _spy_scored_search(monkeypatch)
+    cpu_ai.decide(gm, actor, "hard", random.Random(0))
+    assert cap.get("see_opp_hand") is True
+    assert cap.get("opp_public_only") is False
+
+
+def test_info_policy_fair_switches_to_public_only(db, monkeypatch):
+    """info_policy="fair" は公開情報のみへ切替（see_opp_hand=False / opp_public_only=True）。"""
+    gm = _new_gm(db)
+    actor = gm.p1 if gm.turn_player.name == "p1" else gm.p2
+    cap = _spy_scored_search(monkeypatch)
+    cpu_ai.decide(gm, actor, "hard", random.Random(0), info_policy="fair")
+    assert cap.get("see_opp_hand") is False
+    assert cap.get("opp_public_only") is True
+
+
+def test_info_policy_default_decision_unchanged(db):
+    """既定 OFF（info_policy 省略）と明示 "hard" は同一手＝現状不変（観測専用フラグの非侵襲性）。"""
+    gm1 = _new_gm(db)
+    actor1 = gm1.p1 if gm1.turn_player.name == "p1" else gm1.p2
+    m_default = cpu_ai.decide(gm1, actor1, "hard", random.Random(0))
+    gm2 = _new_gm(db)
+    actor2 = gm2.p1 if gm2.turn_player.name == "p1" else gm2.p2
+    m_hard = cpu_ai.decide(gm2, actor2, "hard", random.Random(0), info_policy="hard")
+    assert cpu_ai._move_sig(m_default) == cpu_ai._move_sig(m_hard)
+
+
+def test_info_policy_guarded_threads_flag(db, monkeypatch):
+    """decide_guarded も info_policy を decide へ素通しする（既定 hard / fair 切替）。"""
+    gm = _new_gm(db)
+    actor = gm.p1 if gm.turn_player.name == "p1" else gm.p2
+    cap = _spy_scored_search(monkeypatch)
+    cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), {}, info_policy="fair")
+    assert cap.get("see_opp_hand") is False
+    assert cap.get("opp_public_only") is True

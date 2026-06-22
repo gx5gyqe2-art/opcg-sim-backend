@@ -40,6 +40,7 @@
 | [`reports/pypy_migration_runbook_20260620.md`](reports/pypy_migration_runbook_20260620.md) | PyPy 移行 ランブック（2026-06-20）。方式選定（A 単一プロセス／B プロセス分離）→Phase0 互換スパイク→Phase1 移行→Phase2 Cloud Run デプロイ→Phase3 検証ゲート（CPython/PyPy 双方緑・挙動ビット一致）→Phase4 段階切替/ロールバック。配信スタック（pydantic-core/grpcio）の PyPy 非互換を方式Bで回避・`_USE_PYPY_WORKER` フラグで即ロールバック。リスク対照表つき |
 | [`reports/pypy_phase0_result_20260620.md`](reports/pypy_phase0_result_20260620.md) | PyPy 移行 Phase 0 互換スパイク 実行結果（2026-06-20）。pypi 実 install 判定：純依存（uvicorn/websockets/requests/h11）✅／**pydantic-core ❌（PyPy wheel 無し・PyO3 が 3.11 未満を拒否）**／**grpcio ❌（wheel 無し・ソースビルド長大）**。方式A（単一プロセス全 PyPy）の2大依存が PyPy で建たない |
 | [`reports/cpu_weird_move_remediation_plan_20260622.md`](reports/cpu_weird_move_remediation_plan_20260622.md) | CPU「変な手」撲滅 計画メモ（2026-06-22）。実プレイの変な手（防御の歪み・リソース浪費・自殺攻撃）を測定駆動で評価の根から是正し補償パッチ（C）を安全撤去する5フェーズ計画。Phase0 物差し（null-move regret 監査＋凍結パズル）→Phase1 切り分け＆汚染源除去（評価/ホライズン/カンニングの ablation）→Phase2 評価キャリブレーション（2a＋確定＝教師あり学習＋1回再生成）→Phase3 C パッチ撤去→Phase4 ゲート＆SPEC吸収。進捗正本は WBS |
+| [`reports/cpu_cheat_carveout_ab_20260622.md`](reports/cpu_cheat_carveout_ab_20260622.md) | 計測報告（2026-06-22）。Phase 1 hard カンニング切り分け A/B。hard の相手手札透視（see_opp_hand=True）をフェア化（公開情報のみ＝normal 情報方針を hard 探索深さで再利用・観測専用フラグ `info_policy` 既定OFF）し、変な手（監査30局）と強さ（直接対決30局）を測定。結果: フェア化で①差≤0 −14%・③無駄ドン −13% だが**②自殺攻撃は減らず（+20%）・④届かないカウンターは両モード0**＝防御の歪みの核は eval_gap でカンニング無関係（search_dispreferred=0 維持）。強さは cheat +47 Elo（17/30＝ノイズ帯と同オーダーの小優位）。推奨: (a) hard フェア化は変な手を悪化させず納得感向上＝可、(b) Phase2 学習データはフェア生成すべき |
 
 ## クイックスタート
 
