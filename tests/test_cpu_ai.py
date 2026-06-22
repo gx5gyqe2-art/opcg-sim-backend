@@ -148,6 +148,23 @@ def test_decide_info_policy_arg(db):
     assert checked, "選択肢のある手番に到達しなかった（テスト前提の不成立）"
 
 
+def test_search_knob_env_override(monkeypatch):
+    """探索ノブの env 上書きヘルパ（Phase 1）: 未設定→default、整数→その値、不正→default。
+
+    本体定数（HARD_HORIZON 等）は import 時に `_env_int` で確定するので、env 未設定の本テスト
+    プロセスでは従来既定（horizon=4 等）であること＝挙動不変も確認する。
+    """
+    assert cpu_ai._env_int("OPCG_NONEXISTENT_KNOB_XYZ", 7) == 7        # 未設定→default
+    monkeypatch.setenv("OPCG_TEST_KNOB", "11")
+    assert cpu_ai._env_int("OPCG_TEST_KNOB", 7) == 11                  # 整数→その値
+    monkeypatch.setenv("OPCG_TEST_KNOB", "not-an-int")
+    assert cpu_ai._env_int("OPCG_TEST_KNOB", 7) == 7                   # 不正→default
+    # env 未設定（本プロセス）では従来既定＝挙動不変。
+    assert cpu_ai.HARD_HORIZON == 4 and cpu_ai.HARD_BEAM == 3
+    assert cpu_ai.HARD_OPP_BEAM == 4 and cpu_ai.HARD_ROOT_BEAM == 4
+    assert cpu_ai.HARD_PER_MOVE_BUDGET == 300
+
+
 def _new_gm(db):
     random.seed(0)
     l1, c1 = build_deck(db, "p1")
