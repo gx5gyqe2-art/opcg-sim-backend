@@ -210,6 +210,12 @@ def set_budget_override(b):
 
 def _effective_budget() -> int:
     return _BUDGET_OVERRIDE if _BUDGET_OVERRIDE is not None else HARD_PER_MOVE_BUDGET
+
+
+# Phase 4 本番配線: PIMC 既定世界数（OPCG_PIMC_WORLDS・既定 1＝休眠＝従来同値）。本番 Dockerfile で 4 を
+# 設定して出荷 fair CPU を「PIMC K=4・予算按分」へ切替（OPCG_HARD_PER_MOVE_BUDGET=75 併用＝合計≈300＝
+# 等倍計算量・1秒内・+53 Elo）。各 decide 系の pimc_worlds 既定値に使う＝env 未設定なら全経路で 1。
+PIMC_WORLDS_DEFAULT = _env_int("OPCG_PIMC_WORLDS", 1)
 HARD_DEPTH = 5             # ply 割引の基準（最短リーサル認識のテスト境界・winner 到達 ply の上限目安）
 HARD_MAX_PLY = 52          # 総 ply の安全上限（horizon=4 で 4 ターン分の自由展開＋戦闘サブステップを賄う）
 # 探索ホライズン（B2-lite・docs/SPEC.md §2.5.3）。深掘りで何ターン先まで読むか。horizon=4＝「自分のターン
@@ -1919,7 +1925,7 @@ def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Rando
            trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True,
            killer_state: Optional[Dict[int, List[tuple]]] = None,
            info_policy: str = DEFAULT_INFO_POLICY,
-           pimc_worlds: int = 1) -> Optional[Dict[str, Any]]:
+           pimc_worlds: int = PIMC_WORLDS_DEFAULT) -> Optional[Dict[str, Any]]:
     """`player` が取るべき次の 1 手を返す（合法手が無ければ None）。
 
     α-β＋ビーム。**easy/normal は廃止**（最強の α-β＝hard と MCTS＝expert の2系統に集約。`difficulty`
@@ -2071,7 +2077,7 @@ def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[rand
                    mem: Optional[Dict[str, Any]] = None, plan=None,
                    trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True,
                    info_policy: str = DEFAULT_INFO_POLICY,
-                   pimc_worlds: int = 1) -> Optional[Dict[str, Any]]:
+                   pimc_worlds: int = PIMC_WORLDS_DEFAULT) -> Optional[Dict[str, Any]]:
     """ターン内メモリ `mem` を用いた暴走防止つきの意思決定。
 
     `mem` は呼び出し側が対局ごとに保持する dict（ステートレスな /cpu/step でも CPU_GAMES に
@@ -2129,7 +2135,8 @@ def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[rand
 
 def plan_turn(manager, name: str, difficulty: str = "hard", rng=None,
               mem: Optional[Dict[str, Any]] = None, plan=None,
-              info_policy: str = DEFAULT_INFO_POLICY) -> List[Dict[str, Any]]:
+              info_policy: str = DEFAULT_INFO_POLICY,
+              pimc_worlds: int = PIMC_WORLDS_DEFAULT) -> List[Dict[str, Any]]:
     """Phase 3 ①（計画キャッシュ）: 相手の介入（ブロック/カウンター等）が入るまで、または TURN_END
     までの自分(`name`)の**連続行動列**をクローン上で計画する。
 
@@ -2152,7 +2159,8 @@ def plan_turn(manager, name: str, difficulty: str = "hard", rng=None,
         if not pa or pa[0] != name:
             break  # 相手の手番/介入点（SELECT_BLOCKER/SELECT_COUNTER 等）＝区切り
         actor = _player_by_name(clone, name)
-        mv = decide_guarded(clone, actor, difficulty, rng, mem=mem, plan=plan, info_policy=info_policy)
+        mv = decide_guarded(clone, actor, difficulty, rng, mem=mem, plan=plan, info_policy=info_policy,
+                            pimc_worlds=pimc_worlds)
         if mv is None:
             break
         actions.append(mv)
@@ -2167,7 +2175,8 @@ def plan_turn(manager, name: str, difficulty: str = "hard", rng=None,
 
 def decide_cached(manager, player, difficulty: str = "hard", rng=None,
                   mem: Optional[Dict[str, Any]] = None, cache: Optional[Dict[str, Any]] = None,
-                  plan=None, info_policy: str = DEFAULT_INFO_POLICY) -> Optional[Dict[str, Any]]:
+                  plan=None, info_policy: str = DEFAULT_INFO_POLICY,
+                  pimc_worlds: int = PIMC_WORLDS_DEFAULT) -> Optional[Dict[str, Any]]:
     """Phase 3 ① 配線: 計画キャッシュ付き decide（**本番の体感最適化専用**）。
 
     `cache` は対局ごとに保持する dict（`{"queue": [...残りの計画手...]}`）。
@@ -2195,7 +2204,8 @@ def decide_cached(manager, player, difficulty: str = "hard", rng=None,
             return legal_by_sig[nxt_sig]  # 現局面の move（uuid 整合）を返す
         cache["queue"] = None  # 前提崩れ＝破棄して再計画
 
-    actions = plan_turn(manager, player.name, difficulty, rng, mem=mem, plan=plan, info_policy=info_policy)
+    actions = plan_turn(manager, player.name, difficulty, rng, mem=mem, plan=plan, info_policy=info_policy,
+                        pimc_worlds=pimc_worlds)
     if actions:
         first_sig = _move_sig(actions[0])
         if first_sig in legal_by_sig:
@@ -2204,4 +2214,5 @@ def decide_cached(manager, player, difficulty: str = "hard", rng=None,
     # 計画が空/先頭不正＝安全側で通常 decide（rng/mem は plan_turn で進行済みのため二重進行に注意だが
     # 本番専用＝決定性非依存。guard は安全網なので軽微な前後は許容）。
     cache["queue"] = None
-    return decide_guarded(manager, player, difficulty, rng, mem=mem, plan=plan, info_policy=info_policy)
+    return decide_guarded(manager, player, difficulty, rng, mem=mem, plan=plan, info_policy=info_policy,
+                          pimc_worlds=pimc_worlds)
