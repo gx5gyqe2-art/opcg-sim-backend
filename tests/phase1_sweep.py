@@ -4,34 +4,70 @@
 切り分ける。探索ノブ（OPCG_HARD_HORIZON 等）は `cpu_ai` の import 時に確定するので、設定ごとに
 **別プロセス**で `cpu_arena.py arena-paired` を起動して掃引する（このスクリプトはその driver）。
 
-判定:
-  - fair の vs cheat 勝率が horizon とともに**単調増/上昇** → 深さが効く＝**探索が限界**
-    （→ Phase 2A 探索路線 / Phase 4 TF を前倒し）。
-  - **頭打ち/平坦** → 深く読んでも情報欠損を埋められない＝**情報/評価が限界**
+判定の核（option 1・確証強化）: 各 horizon は**同一 seed 群**で対戦するので、horizon 間の比較は
+**ペア化**される（同一 seed＝同一配り）。深い H と浅い H の **同一 seed ペア差**を取ると配り運の共通分散が
+相殺され、各点の広い周辺 CI（±100Elo 級）より遥かに鋭く「深さが効くか」を検定できる（符号検定＋ペア差 CI）。
+
+  - ペア差が**有意に正**（深い方が勝つ seed が多い） → 深さが効く＝**探索が限界**寄り
+    （→ Phase 2A 探索路線 / Phase 4 TT 前倒し）。
+  - ペア差が**0 近傍/非有意** → 深く読んでも情報欠損を埋められない＝**情報/評価が限界**
     （→ Phase 2 PIMC＝決定化で隠れ情報を補う／Phase 3 評価）。
 
 使い方（重い・実機本走は手動/定期）:
-    OPCG_LOG_SILENT=1 python tests/phase1_sweep.py --pairs 40 --horizons 2,3,4,6 --seed 0
-
-注: challenger=fair・baseline=cheat を同一プロセス（同一 global horizon）で対戦させるので、両者が
-同じ H で深くなる。よって信号は「H を上げると fair-vs-cheat の**差が縮むか**」＝深さが fair に
-相対的に効くか。完全な単独効果（fair の H だけ変える）には per-decider 探索設定が要る（将来）。
+    OPCG_LOG_SILENT=1 python tests/phase1_sweep.py --pairs 40 --horizons 2,4,6 --seed 0
 """
 import argparse
+import math
 import os
 import re
 import subprocess
 import sys
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_LINE = re.compile(r"win_rate=([0-9.]+)\s+Elo=([+-]?\d+)\s+\[([+-]?\d+),\s*([+-]?\d+)\]\s+half=(\d+)")
+_SUMMARY = re.compile(r"win_rate=([0-9.]+)\s+Elo=([+-]?\d+)\s+\[([+-]?\d+),\s*([+-]?\d+)\]\s+half=(\d+)")
+_DETAIL = re.compile(r"seed=(\d+)\s+p1won=([0-9.]+)\s+p2won=([0-9.]+)\s+pair=([0-9.]+)")
 
 
-def run_one(horizon: int, pairs: int, seed: int, max_steps: Optional[int]) -> Tuple[float, int, int]:
+def _sign_test_p(pos: int, neg: int) -> float:
+    """符号検定の両側 p 値（ties 無視・Binom(pos+neg, 0.5) の両側裾）。pos+neg==0 は 1.0。"""
+    m = pos + neg
+    if m == 0:
+        return 1.0
+    k = max(pos, neg)
+    tail = sum(math.comb(m, i) for i in range(k, m + 1)) * (0.5 ** m)
+    return min(1.0, 2.0 * tail)
+
+
+def paired_diff(scores_a: Dict[int, float], scores_b: Dict[int, float]) -> Optional[Dict[str, float]]:
+    """同一 seed の b−a ペア差（b=深い H / a=浅い H）。配り運を相殺した深さ効果の検定量。
+
+    勝点 ∈ {0,0.5,1} なので diff ∈ {−1,−0.5,0,0.5,1}。mean_diff の正規近似 CI（n−1 分散）＋符号検定 p。
+    共通 seed が無ければ None。
+    """
+    seeds = sorted(set(scores_a) & set(scores_b))
+    diffs = [scores_b[s] - scores_a[s] for s in seeds]
+    n = len(diffs)
+    if n == 0:
+        return None
+    mean = sum(diffs) / n
+    if n >= 2:
+        var = sum((d - mean) ** 2 for d in diffs) / (n - 1)
+        half = 1.96 * math.sqrt(var / n)
+    else:
+        half = float("inf")
+    pos = sum(1 for d in diffs if d > 0)
+    neg = sum(1 for d in diffs if d < 0)
+    return {"n": float(n), "mean_diff": mean, "ci_half": half,
+            "n_pos": float(pos), "n_neg": float(neg), "n_tie": float(n - pos - neg),
+            "sign_p": _sign_test_p(pos, neg)}
+
+
+def run_one(horizon: int, pairs: int, seed: int, max_steps: Optional[int]
+            ) -> Tuple[Tuple[float, int, int], Dict[int, float]]:
     """1 設定（global horizon=H）で fair[challenger] vs cheat[baseline] の arena-paired を別プロセス実行。
 
-    戻り値 (win_rate, elo, half_width)。出力末尾の集計行を正規表現で回収する。
+    戻り値 ((win_rate, elo, half_width), {seed: pair_score})。集計行と各 seed の detail 行を回収する。
     """
     env = dict(os.environ)
     env["OPCG_HARD_HORIZON"] = str(horizon)
@@ -43,37 +79,52 @@ def run_one(horizon: int, pairs: int, seed: int, max_steps: Optional[int]) -> Tu
     if max_steps is not None:
         cmd += ["--max-steps", str(max_steps)]
     out = subprocess.run(cmd, env=env, capture_output=True, text=True, cwd=_HERE)
-    m = None
+    summary, scores = None, {}
     for line in out.stdout.splitlines():
-        mm = _LINE.search(line)
-        if mm:
-            m = mm
-    if m is None:
+        md = _DETAIL.search(line)
+        if md:
+            scores[int(md.group(1))] = float(md.group(4))
+        ms = _SUMMARY.search(line)
+        if ms:
+            summary = (float(ms.group(1)), int(ms.group(2)), int(ms.group(5)))
+    if summary is None:
         raise RuntimeError(f"arena-paired 出力を解析できず (horizon={horizon}):\n{out.stdout}\n{out.stderr}")
-    return float(m.group(1)), int(m.group(2)), int(m.group(5))
+    return summary, scores
 
 
 def sweep(horizons: List[int], pairs: int, seed: int, max_steps: Optional[int]) -> None:
-    rows = []
+    rows, score_by_h = [], {}
     for h in horizons:
-        wr, elo, half = run_one(h, pairs, seed, max_steps)
+        (wr, elo, half), scores = run_one(h, pairs, seed, max_steps)
         rows.append((h, wr, elo, half))
-        print(f"  horizon={h:>2}  fair-vs-cheat win_rate={wr:.3f}  Elo={elo:+d}  half={half}", flush=True)
+        score_by_h[h] = scores
+        print(f"  horizon={h:>2}  fair-vs-cheat win_rate={wr:.3f}  Elo={elo:+d}  half=±{half}", flush=True)
+
+    print("\n--- ペア差検定（同一 seed・配り運相殺＝確証の核） ---")
+    lo, hi = horizons[0], horizons[-1]
+    pd = paired_diff(score_by_h[lo], score_by_h[hi])
+    significant = False
+    if pd:
+        print(f"  H{hi} − H{lo} ペア差: mean={pd['mean_diff']:+.3f} 勝点/局 "
+              f"(95%CI ±{pd['ci_half']:.3f})  深い方が良い seed {int(pd['n_pos'])}/"
+              f"{int(pd['n_pos'] + pd['n_neg'])}（tie {int(pd['n_tie'])}）  符号検定 p={pd['sign_p']:.3f}")
+        significant = (pd["sign_p"] < 0.05 and pd["mean_diff"] > 0)
+
     print("\n--- 切り分け判定 ---")
-    elos = [r[2] for r in rows]
-    rising = all(elos[i] <= elos[i + 1] + 5 for i in range(len(elos) - 1)) and (elos[-1] - elos[0] > 15)
-    if rising:
-        print("fair-vs-cheat Elo が horizon とともに上昇 → 深さが効く＝**探索が限界**寄り"
+    if significant:
+        print(f"H{lo}→H{hi} のペア差が**有意に正**（p<0.05）→ 深さが効く＝**探索が限界**寄り"
               "（Phase 2A 探索路線 / Phase 4 TT 前倒しを検討）。")
+    elif pd and pd["mean_diff"] > 0:
+        print(f"H{lo}→H{hi} のペア差は**正の傾向だが非有意**（p={pd['sign_p']:.3f}）→ pairs/seed を増やして再走。"
+              "点推定は探索路線寄りだが確証不足。")
     else:
-        print("fair-vs-cheat Elo は horizon を上げても頭打ち/平坦 → 深く読んでも情報欠損を埋められない"
+        print("H を上げてもペア差が 0 近傍/非正 → 深く読んでも情報欠損を埋められない"
               "＝**情報/評価が限界**寄り（Phase 2 PIMC＝決定化 / Phase 3 評価へ）。")
-    print("注: CI 半幅が大きいと判定不能。pairs を増やして再走すること。")
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Phase 1 切り分け実験: horizon 掃引で探索/情報の限界を切り分ける")
-    ap.add_argument("--horizons", default="2,3,4,6", help="カンマ区切りの horizon 値")
+    ap = argparse.ArgumentParser(description="Phase 1 切り分け実験: horizon 掃引＋ペア差検定")
+    ap.add_argument("--horizons", default="2,4,6", help="カンマ区切りの horizon 値")
     ap.add_argument("--pairs", type=int, default=40)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--max-steps", type=int, default=None)
