@@ -148,6 +148,44 @@ def test_decide_info_policy_arg(db):
     assert checked, "選択肢のある手番に到達しなかった（テスト前提の不成立）"
 
 
+def test_pimc_decide_legal_and_deterministic(db):
+    """Phase 2 PIMC: pimc_worlds>=2 で K 決定化世界の平均から合法手を返す・同一 rng で決定論。"""
+    KEY_PID = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('PLAYER_ID', 'player_id')
+    random.seed(5)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    mem = {}
+    checked = False
+    for _ in range(14):
+        if gm.winner:
+            break
+        pend = gm.get_pending_request()
+        if not pend:
+            break
+        pid = pend[KEY_PID]
+        actor = gm.p1 if gm.p1.name == pid else gm.p2
+        legal = gm.get_legal_actions(actor)
+        if len(legal) > 1:
+            sigs = {cpu_ai._move_sig(m) for m in legal}
+            m1 = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), mem={}, pimc_worlds=2)
+            m2 = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), mem={}, pimc_worlds=2)
+            assert m1 is not None and cpu_ai._move_sig(m1) in sigs   # 合法手
+            assert cpu_ai._move_sig(m1) == cpu_ai._move_sig(m2)      # 同一 rng→決定論
+            checked = True
+            break
+        mv = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), mem=mem)
+        if mv is None:
+            break
+        gm.action_events = []
+        if mv["kind"] == "battle":
+            action_api.apply_battle_action(gm, actor, mv["action_type"], mv.get("card_uuid"))
+        else:
+            action_api.apply_game_action(gm, actor, mv["action_type"], mv.get("payload", {}))
+    assert checked, "選択肢のある手番に到達しなかった（テスト前提の不成立）"
+
+
 def test_search_knob_env_override(monkeypatch):
     """探索ノブの env 上書きヘルパ（Phase 1）: 未設定→default、整数→その値、不正→default。
 

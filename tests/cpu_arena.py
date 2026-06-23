@@ -110,7 +110,7 @@ def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
 
 def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
-                  policy_rng=None):
+                  policy_rng=None, pimc_worlds: int = 1):
     """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き・デプロイと同じプラン供給）。
 
     `info_policy`（Phase -1）で情報方針を選ぶ＝凍結 fair-hard vs cheat-hard の A/B を席交互で測れる。
@@ -123,7 +123,7 @@ def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_
 
     def _decide(manager, actor):
         return cpu_ai.decide_guarded(manager, actor, difficulty, prng, mem, plan=plan,
-                                     info_policy=info_policy)
+                                     info_policy=info_policy, pimc_worlds=pimc_worlds)
     return _decide
 
 
@@ -131,7 +131,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               max_steps: int = DEFAULT_MAX_STEPS,
               p1_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
               p2_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
-              separate_policy_rng: bool = False) -> Dict[str, Any]:
+              separate_policy_rng: bool = False,
+              p1_pimc: int = 1, p2_pimc: int = 1) -> Dict[str, Any]:
     """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
@@ -153,8 +154,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
-    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1), p1_policy, p1_rng),
-                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2), p2_policy, p2_rng)}
+    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1), p1_policy, p1_rng, p1_pimc),
+                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2), p2_policy, p2_rng, p2_pimc)}
 
     step = 0
     prev_turn = manager.turn_count
@@ -225,7 +226,8 @@ def arena(db, challenger: str, baseline: str, games: int, seed0: int = 0,
 def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
                  max_steps: int = DEFAULT_MAX_STEPS,
                  challenger_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
-                 baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY) -> Dict[str, Any]:
+                 baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
+                 challenger_pimc: int = 1, baseline_pimc: int = 1) -> Dict[str, Any]:
     """分散低減アリーナ（Phase 0・antithetic 席ペアリング）。各 seed を**両席で 1 回ずつ**戦わせ、
     挑戦者の 2 局の勝敗を集計する＝**先手有利（席順）をペア内で相殺**する。
 
@@ -247,10 +249,10 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
         # 席A: 挑戦者=p1。席B: 同一 game-seed で挑戦者=p2（席だけ反転）。
         a = play_game(seed, db, challenger, baseline, max_steps=max_steps,
                       p1_policy=challenger_policy, p2_policy=baseline_policy,
-                      separate_policy_rng=True)
+                      separate_policy_rng=True, p1_pimc=challenger_pimc, p2_pimc=baseline_pimc)
         b = play_game(seed, db, baseline, challenger, max_steps=max_steps,
                       p1_policy=baseline_policy, p2_policy=challenger_policy,
-                      separate_policy_rng=True)
+                      separate_policy_rng=True, p1_pimc=baseline_pimc, p2_pimc=challenger_pimc)
         chal_a = 1.0 if a["winner"] == "p1" else 0.0
         chal_b = 1.0 if b["winner"] == "p2" else 0.0
         wins += chal_a + chal_b
@@ -402,6 +404,8 @@ def main(argv=None):
     pp.add_argument("--baseline", choices=["hard"], default="hard")
     pp.add_argument("--challenger-policy", choices=["fair", "cheat"], default="fair")
     pp.add_argument("--baseline-policy", choices=["fair", "cheat"], default="cheat")
+    pp.add_argument("--challenger-pimc", type=int, default=1, help="挑戦者の PIMC 世界数（>=2 で決定化）")
+    pp.add_argument("--baseline-pimc", type=int, default=1, help="ベースラインの PIMC 世界数")
     pp.add_argument("--pairs", type=int, default=50)
     pp.add_argument("--seed", type=int, default=0)
     pp.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
@@ -435,13 +439,16 @@ def main(argv=None):
 
     if args.cmd == "arena-paired":
         rep = arena_paired(db, args.challenger, args.baseline, args.pairs, args.seed, args.max_steps,
-                           challenger_policy=args.challenger_policy, baseline_policy=args.baseline_policy)
+                           challenger_policy=args.challenger_policy, baseline_policy=args.baseline_policy,
+                           challenger_pimc=args.challenger_pimc, baseline_pimc=args.baseline_pimc)
         for d in rep["detail"]:
             print(f"  seed={d['seed']} p1won={d['chal_as_p1_won']:.0f} p2won={d['chal_as_p2_won']:.0f} "
                   f"pair={d['pair_score']:.2f}")
         gate = "PASS" if rep["elo_half_width"] < 15.0 else "WIDE"
-        print(f"\narena-paired: {rep['challenger']}[{rep['challenger_policy']}] vs "
-              f"{rep['baseline']}[{rep['baseline_policy']}]  pairs={rep['pairs']}  "
+        cl = f"{rep['challenger_policy']}{'+pimc%d' % args.challenger_pimc if args.challenger_pimc > 1 else ''}"
+        bl = f"{rep['baseline_policy']}{'+pimc%d' % args.baseline_pimc if args.baseline_pimc > 1 else ''}"
+        print(f"\narena-paired: {rep['challenger']}[{cl}] vs "
+              f"{rep['baseline']}[{bl}]  pairs={rep['pairs']}  "
               f"win_rate={rep['win_rate']:.3f}  Elo={rep['elo_delta']:+.0f} "
               f"[{rep['elo_lo']:+.0f}, {rep['elo_hi']:+.0f}] half={rep['elo_half_width']:.0f} ({gate})")
         return 0

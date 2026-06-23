@@ -1841,11 +1841,51 @@ def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: 
                 manager.turn_count, HARD_HORIZON)
 
 
+def _pimc_scored(manager, name: str, moves: List[Dict[str, Any]], k_worlds: int, rng, plan,
+                 collect=None) -> List[Tuple[float, Dict[str, Any]]]:
+    """Phase 2 PIMC（決定化・docs/reports/cpu_strength_roadmap_20260622.md §4 Phase 2）。
+
+    フェア化（相手手札を読まない）は「相手はカウンターも登場もできない」超楽観モデルに退化し、止まる
+    攻撃を通ると誤読する別種の歪みを生む（Phase 1 計測＝損失は探索深さでなく情報限界）。PIMC は隠れ情報を
+    **K 通りの"ありえる手"でサンプリング**し、各サンプルを完全情報 α-β で採点→**世界平均**で手を選ぶ。
+    実手札は一度も見ない（`_determinize_opponent` が相手のライブラリから再サンプル）ので**チートせず**、
+    平均が相手の防御強度を確率的に正しく見積もる＝楽観バイアスを埋める。
+
+    決定論: 各世界の rng は親 `rng` から決定的に派生（同一 seed→同一手＝テスト/自己対戦の契約を維持）。
+    戻り値は `decide` と同形 `[(avg_score, move)]`（move は実 manager の合法手 dict＝そのまま適用可）。
+    """
+    from .cpu_mcts import _determinize_opponent  # 遅延 import（cpu_mcts→cpu_ai の循環回避）
+    agg: Dict[Any, List[Any]] = {}  # sig -> [score 合計, move]
+    order: List[Any] = []           # 初出順（決定論的な scored 順）
+    for _w in range(k_worlds):
+        wr = random.Random(rng.randrange(1 << 30))
+        world = _determinize_opponent(manager, name, wr)
+        # 各世界は「サンプルした相手手札」を完全情報として読む（see_opp_hand=True）＝実手札ではない＝フェア。
+        sc = _scored_search(world, name, moves, see_opp_hand=True, opp_public_only=False,
+                            plan=plan, collect=None, killer_state=None)
+        for s, m in sc:
+            sig = _move_sig(m)
+            e = agg.get(sig)
+            if e is None:
+                agg[sig] = [s, m]
+                order.append(sig)
+            else:
+                e[0] += s
+    scored = [(agg[sig][0] / k_worlds, agg[sig][1]) for sig in order]
+    if collect is not None:  # トレース用（PIMC では prelim=deep=世界平均）
+        collect.setdefault("prelim", {}); collect.setdefault("deep", {})
+        for avg, m in scored:
+            collect["deep"][_move_sig(m)] = avg
+            collect["prelim"].setdefault(_move_sig(m), avg)
+    return scored
+
+
 def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
            moves: Optional[List[Dict[str, Any]]] = None, plan=None,
            trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True,
            killer_state: Optional[Dict[int, List[tuple]]] = None,
-           info_policy: str = DEFAULT_INFO_POLICY) -> Optional[Dict[str, Any]]:
+           info_policy: str = DEFAULT_INFO_POLICY,
+           pimc_worlds: int = 1) -> Optional[Dict[str, Any]]:
     """`player` が取るべき次の 1 手を返す（合法手が無ければ None）。
 
     α-β＋ビーム。**easy/normal は廃止**（最強の α-β＝hard と MCTS＝expert の2系統に集約。`difficulty`
@@ -1900,6 +1940,10 @@ def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Rando
             if collect is not None:
                 collect["prelim"][_move_sig(m)] = s
                 collect["deep"][_move_sig(m)] = s
+    elif pimc_worlds >= 2:
+        # Phase 2 PIMC: K 決定化世界の完全情報採点を世界平均（チートせず隠れ情報を確率的に補う）。
+        # 情報方針に依らずフェア（実手札は見ない）＝決定化が情報を供給する。
+        scored = _pimc_scored(manager, name, moves, pimc_worlds, rng, plan, collect=collect)
     else:
         scored = _scored_search(manager, name, moves, see_opp_hand=see_opp_hand,
                                 opp_public_only=opp_public_only,
@@ -1992,7 +2036,8 @@ def decide_with_regret(manager, player, difficulty: str = "hard",
 def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[random.Random] = None,
                    mem: Optional[Dict[str, Any]] = None, plan=None,
                    trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True,
-                   info_policy: str = DEFAULT_INFO_POLICY) -> Optional[Dict[str, Any]]:
+                   info_policy: str = DEFAULT_INFO_POLICY,
+                   pimc_worlds: int = 1) -> Optional[Dict[str, Any]]:
     """ターン内メモリ `mem` を用いた暴走防止つきの意思決定。
 
     `mem` は呼び出し側が対局ごとに保持する dict（ステートレスな /cpu/step でも CPU_GAMES に
@@ -2039,7 +2084,7 @@ def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[rand
     ks = mem.setdefault("killers", {}) if (_USE_PV_ORDER and _USE_PV_CROSS_DECIDE) else None
     move = decide(manager, player, difficulty, rng, moves=filtered, plan=plan,
                   trace=trace, trace_read_ahead=trace_read_ahead, killer_state=ks,
-                  info_policy=info_policy)
+                  info_policy=info_policy, pimc_worlds=pimc_worlds)
     if move is not None:
         sig = _move_sig(move)
         counts[sig] = counts.get(sig, 0) + 1
