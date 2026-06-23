@@ -109,7 +109,8 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 | `tests/compare_parsers.py` | レガシー vs V2 の全カード差分（退行検知） |
 | `tests/full_card_audit.py` | 全カード構造不変条件検証＋挙動ベースライン生成（`--regen` で更新） |
 | `tests/cpu_selfplay.py` | 決定論的 CPU 対 CPU 自己対戦（効果検証ハーネス）。詳細は §3.1 |
-| `tests/cpu_arena.py` | **CPU 検証基盤の絶対強度メトリクス**（SPEC §2.5.3）: `arena`＝固定参照相手（既定 easy）への挑戦者勝率→**凍結ベースライン Elo**（席交互で先手有利相殺・normal/hard はデプロイ同様に自デッキプラン供給）／`regret`＝自己対戦 1 局の **greedy regret** 集計。実ゲームは低速なので本走は手動/定期実行（`python tests/cpu_arena.py arena --challenger normal --baseline easy --games 20`） |
+| `tests/cpu_arena.py` | **CPU 検証基盤の絶対強度メトリクス**（SPEC §2.5.3／強さ=Elo 優先は §2.5.8）: `arena`＝固定参照相手への挑戦者勝率→**凍結ベースライン Elo**（席交互）／`regret`＝greedy regret 集計／**`arena-paired`＝分散低減（antithetic 席ペアリング＋Wilson 区間）で per-decider に情報方針(`--challenger-policy fair/cheat`)・PIMC(`--challenger-pimc K`)・学習ブレンド(`--challenger-blend α`)・予算按分(`--challenger-budget`) を A/B**。実ゲームは低速なので本走は手動/定期実行 |
+| `tests/phase1_sweep.py` | **Phase 1 切り分け実験**（SPEC §2.5.8）: 探索ノブ env（`OPCG_HARD_HORIZON` 等）を設定ごとに別プロセスで `arena-paired`（fair vs cheat）起動し horizon 掃引＋**同一 seed ペア差の符号検定**で「深さが効くか（探索 vs 情報の限界）」を判定。純関数テスト＝`tests/test_phase1_sweep.py` |
 | `tests/cpu_replay.py` | **CPU 思考トレース＋決定論リプレイ**（CPU 挙動改善用）。1 局を seed で再生し、各意思決定の「選んだ手・上位候補スコア（1-ply prelim／深掘り deep）・regret・J値成分内訳・読み筋（貪欲 PV）」をローカル JSONL へ出力する（GCS 不要）。詳細は §3.2 |
 | `tests/expected_effects.py` | 各カード×能力の「期待する動き」を AST から機械生成（`--regen`→`expected_effects.json`、`--card ID`）。効果オラクルの期待マニフェスト |
 | `tests/effect_oracle.py` | 期待 vs テキスト/AST の静的整合性コンパレータ（既存ゲートが拾わない高シグナル候補のみ抽出。`--category`/`--json`） |
