@@ -209,6 +209,19 @@ def test_pimc_decide_legal_and_deterministic(db):
     assert checked, "選択肢のある手番に到達しなかった（テスト前提の不成立）"
 
 
+def test_budget_override():
+    """Phase 4 予算上書き: 既定は HARD_PER_MOVE_BUDGET・set で上書き・None で復帰。"""
+    assert cpu_ai._effective_budget() == cpu_ai.HARD_PER_MOVE_BUDGET
+    try:
+        cpu_ai.set_budget_override(75)
+        assert cpu_ai._effective_budget() == 75
+        cpu_ai.set_budget_override(0)            # 下限 1 にクランプ
+        assert cpu_ai._effective_budget() == 1
+    finally:
+        cpu_ai.set_budget_override(None)
+    assert cpu_ai._effective_budget() == cpu_ai.HARD_PER_MOVE_BUDGET
+
+
 def test_search_knob_env_override(monkeypatch):
     """探索ノブの env 上書きヘルパ（Phase 1）: 未設定→default、整数→その値、不正→default。
 

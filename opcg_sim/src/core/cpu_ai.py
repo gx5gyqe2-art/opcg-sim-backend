@@ -195,6 +195,21 @@ HARD_FORCE_DEEPEN_CAP = 3
 # さらなる深掘りは Phase 2（固定予算→壁時計デッドライン化＋_apply_passive_effects 最適化）で 1 秒以内
 # のまま到達率を伸ばす。横展開を増やすより深さ予算が費用対効果が高い（settle は信頼度 0.9 で割引済み）。
 HARD_PER_MOVE_BUDGET = _env_int("OPCG_HARD_PER_MOVE_BUDGET", 300)  # 深掘り1手あたり clone 上限（env 上書き可）
+
+# Phase 4: 探索予算の per-decider 上書き（PIMC の予算按分＝K 世界で合計を一定に保つ用）。
+# `set_budget_override(b)` で一時設定（評価アリーナ＝単一スレッドで安全・set_alpha_override と同型）。
+# None で env/既定（HARD_PER_MOVE_BUDGET）へ戻る＝本番/テストは未設定で従来同値。
+_BUDGET_OVERRIDE = None
+
+
+def set_budget_override(b):
+    """深掘り予算を一時上書き（評価アリーナ用・None で既定へ）。"""
+    global _BUDGET_OVERRIDE
+    _BUDGET_OVERRIDE = None if b is None else max(1, int(b))
+
+
+def _effective_budget() -> int:
+    return _BUDGET_OVERRIDE if _BUDGET_OVERRIDE is not None else HARD_PER_MOVE_BUDGET
 HARD_DEPTH = 5             # ply 割引の基準（最短リーサル認識のテスト境界・winner 到達 ply の上限目安）
 HARD_MAX_PLY = 52          # 総 ply の安全上限（horizon=4 で 4 ターン分の自由展開＋戦闘サブステップを賄う）
 # 探索ホライズン（B2-lite・docs/SPEC.md §2.5.3）。深掘りで何ターン先まで読むか。horizon=4＝「自分のターン
@@ -1650,7 +1665,7 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     out: List[Tuple[float, Dict[str, Any]]] = []
     for i, (s1, m, ok) in enumerate(prelim):
         if ok and i in deepen:
-            budget = [HARD_PER_MOVE_BUDGET]
+            budget = [_effective_budget()]
             v = _recurse_child(manager, name, m,
                                lambda b: _search(b, name, float("-inf"), float("inf"),
                                    budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan,
