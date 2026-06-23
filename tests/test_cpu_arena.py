@@ -79,6 +79,49 @@ def test_arena_structure_and_seat_alternation(db):
 
 
 # ---------------------------------------------------------------------------
+# Phase 0: 分散低減アリーナ（CRN + antithetic + 信頼区間）
+# ---------------------------------------------------------------------------
+
+def test_wilson_interval_math():
+    """Wilson: 連勝でも区間が縮退しない（half>0＝正規近似の var=0 縮退を回避）・games=0 は無情報・mean=wins/games。"""
+    sweep = cpu_arena.wilson_interval(3.0, 3)        # 3-0 のクリーンスイープ
+    assert sweep["mean"] == 1.0 and sweep["hi"] == pytest.approx(1.0)
+    assert sweep["lo"] < 1.0 and sweep["half_width"] > 0.0   # 正規近似なら half=0 で「完全確信」誤報
+    even = cpu_arena.wilson_interval(5.0, 10)
+    assert even["mean"] == 0.5 and 0.0 < even["lo"] < 0.5 < even["hi"] < 1.0
+    none = cpu_arena.wilson_interval(0.0, 0)
+    assert none["mean"] == 0.5 and none["half_width"] == float("inf")
+
+
+def test_elo_ci_math():
+    """Elo CI: 点推定=elo_delta(勝率)・端点写像で elo_lo<=elo<=elo_hi・半幅は有限非負・games=0 は inf。"""
+    ci = cpu_arena.elo_ci(6.0, 12)
+    assert ci["elo"] == pytest.approx(cpu_arena.elo_delta(ci["win_rate"]))
+    assert ci["elo_half_width"] >= 0.0 and math.isfinite(ci["elo_half_width"])
+    assert ci["elo_lo"] <= ci["elo"] <= ci["elo_hi"]
+    assert cpu_arena.elo_ci(0.0, 0)["elo_half_width"] == float("inf")
+
+
+def test_play_game_separate_policy_rng_deterministic(db):
+    """CRN: 方策乱数を分離（separate_policy_rng=True）しても同一 seed/方策は決定論（同手・同勝者）。"""
+    a = cpu_arena.play_game(0, db, "hard", "hard", separate_policy_rng=True)
+    b = cpu_arena.play_game(0, db, "hard", "hard", separate_policy_rng=True)
+    assert a["winner"] == b["winner"] and a["steps"] == b["steps"] and a["turns"] == b["turns"]
+
+
+def test_arena_paired_antithetic_structure(db):
+    """antithetic ペアアリーナ: ペア勝点 {0,0.5,1}・win_rate∈[0,1]・Elo CI 半幅が有限・席相殺の整合。"""
+    rep = cpu_arena.arena_paired(db, challenger="hard", baseline="hard", pairs=1, seed0=0)
+    assert rep["pairs"] == 1 and rep["games"] == 2
+    assert 0.0 <= rep["win_rate"] <= 1.0
+    assert math.isfinite(rep["elo_half_width"])  # Wilson は games>=1 で有限
+    d = rep["detail"][0]
+    assert d["pair_score"] in (0.0, 0.5, 1.0)
+    # 挑戦者の勝点 = 席A(p1勝) と席B(p2勝) の平均（席相殺）。
+    assert d["pair_score"] == (d["chal_as_p1_won"] + d["chal_as_p2_won"]) / 2.0
+
+
+# ---------------------------------------------------------------------------
 # regret ログ（decide_with_regret）
 # ---------------------------------------------------------------------------
 

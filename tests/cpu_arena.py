@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai, cpu_self_plan
+from opcg_sim.src.core import action_api, cpu_ai, cpu_self_plan, cpu_value_model
 from opcg_sim.src.core.invariants import check_invariants, check_turn_boundary
 
 from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS, InvariantError
@@ -67,32 +67,104 @@ def win_rate(wins: float, games: int) -> float:
     return 0.5 if games <= 0 else wins / games
 
 
+# --- 信頼区間（Phase 0・分散低減アリーナの合否判定器） -------------------------
+
+def wilson_interval(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
+    """勝率の Wilson スコア信頼区間（小標本・連勝/連敗でも縮退しない）。
+
+    正規近似（mean±z·SE）は連勝（分散 0）で半幅 0＝「完全確信」と誤報し、合否ゲートを lucky sweep で
+    自明に通してしまう。Wilson は p̂=0/1 でも有限の妥当な区間を返すのでゲートに適する。引き分けを 0.5 勝で
+    含む `wins`（端数可）も総試行 `games` に対する比率として扱う（厳密な二項ではないが保守的近似）。
+    games==0 は (0,1)・mean 0.5（無情報）。
+    """
+    if games <= 0:
+        return {"mean": 0.5, "games": 0.0, "lo": 0.0, "hi": 1.0, "half_width": float("inf")}
+    n = float(games)
+    p = wins / n
+    z2 = z * z
+    denom = 1.0 + z2 / n
+    center = (p + z2 / (2.0 * n)) / denom
+    spread = (z / denom) * math.sqrt(p * (1.0 - p) / n + z2 / (4.0 * n * n))
+    lo, hi = max(0.0, center - spread), min(1.0, center + spread)
+    return {"mean": p, "games": n, "lo": lo, "hi": hi, "half_width": (hi - lo) / 2.0}
+
+
+def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
+    """勝率 Wilson CI → Elo 点推定と Elo 信頼区間（端点を Elo へ写像）。
+
+    elo_delta は非線形なので Elo 区間は点推定まわりに**非対称**。点推定 `elo`＝elo_delta(勝率)、区間は
+    [elo_lo, elo_hi]＝端点写像。`elo_half_width`＝(elo_hi−elo_lo)/2 は**区間幅の半分**（点推定からの片側
+    対称幅ではない＝非対称区間のため elo±half は [elo_lo,elo_hi] を再現しない）。Phase 0 合格ゲート
+    （Elo 区間幅 半分 < 15）の判定に使う。games<1 では半幅 inf。
+    """
+    w = wilson_interval(wins, games, z)
+    if games <= 0:
+        return {"elo": 0.0, "elo_lo": elo_delta(0.0), "elo_hi": elo_delta(1.0),
+                "elo_half_width": float("inf"), "win_rate": 0.5, "games": 0.0}
+    elo = elo_delta(w["mean"])
+    lo_e, hi_e = elo_delta(w["lo"]), elo_delta(w["hi"])
+    return {"elo": elo, "elo_lo": lo_e, "elo_hi": hi_e,
+            "elo_half_width": (hi_e - lo_e) / 2.0, "win_rate": w["mean"], "games": w["games"]}
+
+
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
 
-def _make_decider(difficulty: str, plan=None):
-    """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き・デプロイと同じプラン供給）。"""
+def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
+                  policy_rng=None, pimc_worlds: int = 1, value_alpha=None, per_move_budget=None):
+    """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き・デプロイと同じプラン供給）。
+
+    `info_policy`（Phase -1）で情報方針を選ぶ＝凍結 fair-hard vs cheat-hard の A/B を席交互で測れる。
+    `policy_rng`（Phase 0・CRN）を渡すと**方策のタイブレーク乱数をゲーム乱数（global random）から分離**
+    する＝同一 game-seed なら方策に依らずデッキ配り/シャッフルが同一になり、対戦間分散が落ちる。
+    未指定時は従来どおり global `random`（後方互換）。
+    """
     mem: Dict[str, Any] = {}
+    prng = policy_rng if policy_rng is not None else random
 
     def _decide(manager, actor):
-        return cpu_ai.decide_guarded(manager, actor, difficulty, random, mem, plan=plan)
+        # Phase 3b/4: この decider のブレンド率・探索予算を一時設定（単一スレッド arena＝相手と干渉しない）。
+        cpu_value_model.set_alpha_override(value_alpha)
+        cpu_ai.set_budget_override(per_move_budget)
+        try:
+            return cpu_ai.decide_guarded(manager, actor, difficulty, prng, mem, plan=plan,
+                                         info_policy=info_policy, pimc_worlds=pimc_worlds)
+        finally:
+            cpu_value_model.set_alpha_override(None)
+            cpu_ai.set_budget_override(None)
     return _decide
 
 
 def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
-              max_steps: int = DEFAULT_MAX_STEPS) -> Dict[str, Any]:
-    """p1/p2 に別難易度を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
+              max_steps: int = DEFAULT_MAX_STEPS,
+              p1_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
+              p2_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
+              separate_policy_rng: bool = False,
+              p1_pimc: int = 1, p2_pimc: int = 1,
+              p1_alpha=None, p2_alpha=None,
+              p1_budget=None, p2_budget=None) -> Dict[str, Any]:
+    """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
     （同じ action_api コアパス＋各ステップのインバリアント検出）。normal/hard はデプロイと同じく
-    自デッキ構成からプランを供給する（easy はプラン無し）。
+    自デッキ構成からプランを供給する（easy はプラン無し）。`p1_policy`/`p2_policy` は情報方針
+    （fair/cheat・Phase -1）で、フェア化前後の強さ A/B に用いる。
+
+    `separate_policy_rng=True`（Phase 0）で**方策のタイブレーク乱数を game 乱数（global random）から分離**
+    する（各プレイヤーに seed 派生の独立 `random.Random`）。これは方策タイブレークの決定性を game 乱数から
+    切り離すだけ＝**完全な配りレベル CRN ではない**: mulligan は対局ループ中に決まり、α-β 探索はクローン
+    上の効果解決で global `random` を方策依存に消費するため、方策が違えば mid-game 以降のシャッフルは
+    なお分岐する。配りレベル CRN には GameManager への乱数注入（クローンが独自 rng）が必要＝Phase 0b。
     """
     random.seed(seed)
     l1, c1 = build_deck(db, "p1")
     l2, c2 = build_deck(db, "p2")
     manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     manager.start_game()
-    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1)),
-                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2))}
+    # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
+    p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
+    p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
+    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1), p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget),
+                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2), p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget)}
 
     step = 0
     prev_turn = manager.turn_count
@@ -129,10 +201,13 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
 
 
 def arena(db, challenger: str, baseline: str, games: int, seed0: int = 0,
-          max_steps: int = DEFAULT_MAX_STEPS) -> Dict[str, Any]:
+          max_steps: int = DEFAULT_MAX_STEPS,
+          challenger_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
+          baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY) -> Dict[str, Any]:
     """挑戦者 vs 固定ベースラインを `games` 局。**席を交互に入替**して先手有利を相殺し、勝率と Elo を返す。
 
     偶数 i: p1=挑戦者 / 奇数 i: p2=挑戦者。引き分け（あれば）は 0.5 勝で計上。
+    `challenger_policy`/`baseline_policy`（Phase -1・fair/cheat）で情報方針も A/B できる（席入替に追従）。
     """
     wins = 0.0
     decided = 0
@@ -141,7 +216,9 @@ def arena(db, challenger: str, baseline: str, games: int, seed0: int = 0,
         seed = seed0 + i
         chal_is_p1 = (i % 2 == 0)
         p1d, p2d = (challenger, baseline) if chal_is_p1 else (baseline, challenger)
-        res = play_game(seed, db, p1d, p2d, max_steps=max_steps)
+        p1p, p2p = ((challenger_policy, baseline_policy) if chal_is_p1
+                    else (baseline_policy, challenger_policy))
+        res = play_game(seed, db, p1d, p2d, max_steps=max_steps, p1_policy=p1p, p2_policy=p2p)
         chal_seat = "p1" if chal_is_p1 else "p2"
         won = (res["winner"] == chal_seat)
         wins += 1.0 if won else 0.0
@@ -149,8 +226,60 @@ def arena(db, challenger: str, baseline: str, games: int, seed0: int = 0,
         detail.append({"seed": seed, "challenger_seat": chal_seat, "winner": res["winner"],
                        "challenger_won": won, "turns": res["turns"]})
     wr = win_rate(wins, decided)
-    return {"challenger": challenger, "baseline": baseline, "games": decided,
-            "challenger_wins": wins, "win_rate": wr, "elo_delta": elo_delta(wr), "detail": detail}
+    return {"challenger": challenger, "baseline": baseline,
+            "challenger_policy": challenger_policy, "baseline_policy": baseline_policy,
+            "games": decided, "challenger_wins": wins, "win_rate": wr,
+            "elo_delta": elo_delta(wr), "detail": detail}
+
+
+def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
+                 max_steps: int = DEFAULT_MAX_STEPS,
+                 challenger_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
+                 baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
+                 challenger_pimc: int = 1, baseline_pimc: int = 1,
+                 challenger_alpha=None, baseline_alpha=None,
+                 challenger_budget=None, baseline_budget=None) -> Dict[str, Any]:
+    """分散低減アリーナ（Phase 0・antithetic 席ペアリング）。各 seed を**両席で 1 回ずつ**戦わせ、
+    挑戦者の 2 局の勝敗を集計する＝**先手有利（席順）をペア内で相殺**する。
+
+    範囲（正直な明記）: 相殺できるのは**席順のみ**。デッキは決定論ミラー（両者同一構成）だが、
+    `start_game` は p1→p2 の順に独立シャッフルするため、挑戦者が p1 の局と p2 の局では**引く山が異なる**
+    ＝配り運（ドロー分散）は相殺しない。さらに mulligan は対局ループ中に決まり、α-β 探索はクローン上の
+    効果解決で global `random` を方策依存に消費するため、**同一 game-seed でも方策が違えば配りは厳密には
+    一致しない**（`separate_policy_rng=True` が分離するのは方策タイブレーク乱数のみ）。完全な配りレベル
+    CRN は GameManager への乱数注入（クローンが独自 rng を持ち探索が本譜の乱数を汚さない）が必要＝
+    フォローアップ（Phase 0b）。それでも席相殺だけで独立 N 局よりは分散が落ちる。
+
+    CI は総試行（2×pairs 局）の挑戦者勝率に対する **Wilson 区間**（連勝でも縮退しない・小標本に頑健）。
+    合格ゲート＝Elo 区間幅 半分 < 15。1 ペアの勝点 {0,0.5,1} は (A=挑戦者 p1 勝 + B=挑戦者 p2 勝)/2。
+    """
+    wins = 0.0
+    detail: List[Dict[str, Any]] = []
+    for k in range(pairs):
+        seed = seed0 + k
+        # 席A: 挑戦者=p1。席B: 同一 game-seed で挑戦者=p2（席だけ反転）。
+        a = play_game(seed, db, challenger, baseline, max_steps=max_steps,
+                      p1_policy=challenger_policy, p2_policy=baseline_policy,
+                      separate_policy_rng=True, p1_pimc=challenger_pimc, p2_pimc=baseline_pimc,
+                      p1_alpha=challenger_alpha, p2_alpha=baseline_alpha,
+                      p1_budget=challenger_budget, p2_budget=baseline_budget)
+        b = play_game(seed, db, baseline, challenger, max_steps=max_steps,
+                      p1_policy=baseline_policy, p2_policy=challenger_policy,
+                      separate_policy_rng=True, p1_pimc=baseline_pimc, p2_pimc=challenger_pimc,
+                      p1_alpha=baseline_alpha, p2_alpha=challenger_alpha,
+                      p1_budget=baseline_budget, p2_budget=challenger_budget)
+        chal_a = 1.0 if a["winner"] == "p1" else 0.0
+        chal_b = 1.0 if b["winner"] == "p2" else 0.0
+        wins += chal_a + chal_b
+        detail.append({"seed": seed, "chal_as_p1_won": chal_a, "chal_as_p2_won": chal_b,
+                       "pair_score": (chal_a + chal_b) / 2.0})
+    games = 2 * pairs
+    ci = elo_ci(wins, games)
+    return {"challenger": challenger, "baseline": baseline,
+            "challenger_policy": challenger_policy, "baseline_policy": baseline_policy,
+            "pairs": pairs, "games": games, "win_rate": ci["win_rate"], "elo_delta": ci["elo"],
+            "elo_lo": ci["elo_lo"], "elo_hi": ci["elo_hi"],
+            "elo_half_width": ci["elo_half_width"], "detail": detail}
 
 
 # --- regret ログ --------------------------------------------------------------
@@ -278,9 +407,27 @@ def main(argv=None):
     pa = sub.add_parser("arena", help="挑戦者 vs 固定ベースラインの勝率→Elo")
     pa.add_argument("--challenger", choices=["hard"], default="hard")
     pa.add_argument("--baseline", choices=["hard"], default="hard")
+    # Phase -1: 情報方針の A/B（既定＝挑戦者 fair vs ベースライン cheat＝フェア化の損失量を測る）。
+    pa.add_argument("--challenger-policy", choices=["fair", "cheat"], default="fair")
+    pa.add_argument("--baseline-policy", choices=["fair", "cheat"], default="cheat")
     pa.add_argument("--games", type=int, default=10)
     pa.add_argument("--seed", type=int, default=0)
     pa.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
+
+    pp = sub.add_parser("arena-paired", help="分散低減アリーナ（antithetic+CRN・Elo CI つき）")
+    pp.add_argument("--challenger", choices=["hard"], default="hard")
+    pp.add_argument("--baseline", choices=["hard"], default="hard")
+    pp.add_argument("--challenger-policy", choices=["fair", "cheat"], default="fair")
+    pp.add_argument("--baseline-policy", choices=["fair", "cheat"], default="cheat")
+    pp.add_argument("--challenger-pimc", type=int, default=1, help="挑戦者の PIMC 世界数（>=2 で決定化）")
+    pp.add_argument("--baseline-pimc", type=int, default=1, help="ベースラインの PIMC 世界数")
+    pp.add_argument("--challenger-blend", type=float, default=None, help="挑戦者の学習価値ブレンド α（Phase 3b）")
+    pp.add_argument("--baseline-blend", type=float, default=None, help="ベースラインの学習価値ブレンド α")
+    pp.add_argument("--challenger-budget", type=int, default=None, help="挑戦者の深掘り予算（Phase 4 按分）")
+    pp.add_argument("--baseline-budget", type=int, default=None, help="ベースラインの深掘り予算")
+    pp.add_argument("--pairs", type=int, default=50)
+    pp.add_argument("--seed", type=int, default=0)
+    pp.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
 
     pr = sub.add_parser("regret", help="自己対戦 1 局の greedy regret 集計")
     pr.add_argument("--difficulty", choices=["hard"], default="hard")
@@ -298,13 +445,33 @@ def main(argv=None):
     db = _load_db()
 
     if args.cmd == "arena":
-        rep = arena(db, args.challenger, args.baseline, args.games, args.seed, args.max_steps)
+        rep = arena(db, args.challenger, args.baseline, args.games, args.seed, args.max_steps,
+                    challenger_policy=args.challenger_policy, baseline_policy=args.baseline_policy)
         for d in rep["detail"]:
             print(f"  seed={d['seed']} challenger={d['challenger_seat']} winner={d['winner']} "
                   f"{'WIN' if d['challenger_won'] else 'loss'} turns={d['turns']}")
-        print(f"\narena: {rep['challenger']} vs {rep['baseline']}  "
+        print(f"\narena: {rep['challenger']}[{rep['challenger_policy']}] vs "
+              f"{rep['baseline']}[{rep['baseline_policy']}]  "
               f"{rep['challenger_wins']:.1f}/{rep['games']}  win_rate={rep['win_rate']:.3f}  "
               f"Elo={rep['elo_delta']:+.0f}")
+        return 0
+
+    if args.cmd == "arena-paired":
+        rep = arena_paired(db, args.challenger, args.baseline, args.pairs, args.seed, args.max_steps,
+                           challenger_policy=args.challenger_policy, baseline_policy=args.baseline_policy,
+                           challenger_pimc=args.challenger_pimc, baseline_pimc=args.baseline_pimc,
+                           challenger_alpha=args.challenger_blend, baseline_alpha=args.baseline_blend,
+                           challenger_budget=args.challenger_budget, baseline_budget=args.baseline_budget)
+        for d in rep["detail"]:
+            print(f"  seed={d['seed']} p1won={d['chal_as_p1_won']:.0f} p2won={d['chal_as_p2_won']:.0f} "
+                  f"pair={d['pair_score']:.2f}")
+        gate = "PASS" if rep["elo_half_width"] < 15.0 else "WIDE"
+        cl = f"{rep['challenger_policy']}{'+pimc%d' % args.challenger_pimc if args.challenger_pimc > 1 else ''}"
+        bl = f"{rep['baseline_policy']}{'+pimc%d' % args.baseline_pimc if args.baseline_pimc > 1 else ''}"
+        print(f"\narena-paired: {rep['challenger']}[{cl}] vs "
+              f"{rep['baseline']}[{bl}]  pairs={rep['pairs']}  "
+              f"win_rate={rep['win_rate']:.3f}  Elo={rep['elo_delta']:+.0f} "
+              f"[{rep['elo_lo']:+.0f}, {rep['elo_hi']:+.0f}] half={rep['elo_half_width']:.0f} ({gate})")
         return 0
 
     if args.cmd == "realize":

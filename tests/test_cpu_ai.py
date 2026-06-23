@@ -98,6 +98,147 @@ def test_evaluate_see_opp_hand_policy(db):
     assert full_after < full_before         # full は相手の防御力増として自分有利度が下がる
 
 
+def test_decide_info_policy_arg(db):
+    """情報方針の引数化（Phase -1・強さ=Elo優先/フェア制約ロードマップ §0/§4）。
+
+    旧実装は decide で `see_opp_hand, opp_public_only = True, False` をハードコード（出荷 CPU が
+    チート）。これを `info_policy` 引数化し**出荷デフォルトを fair に切替**た。fair=相手手札を読まない
+    （False, True）／cheat=旧 hard（True, False）／不正値は ValueError。両方針とも探索が機能して合法手を返す。
+    """
+    assert cpu_ai.DEFAULT_INFO_POLICY == "fair"            # 出荷デフォルト＝fair（固定値ハードコード撤去）
+    assert cpu_ai._resolve_info_policy("fair") == (False, True)
+    assert cpu_ai._resolve_info_policy("cheat") == (True, False)
+    with pytest.raises(ValueError):
+        cpu_ai._resolve_info_policy("bogus")
+
+    # 決定論で mid-game を作り、選択肢のある手番で fair/cheat 双方が合法手を返すことを確認。
+    KEY_PID = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('PLAYER_ID', 'player_id')
+    random.seed(3)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    mem = {}
+    checked = False
+    for _ in range(14):
+        if gm.winner:
+            break
+        pend = gm.get_pending_request()
+        if not pend:
+            break
+        pid = pend[KEY_PID]
+        actor = gm.p1 if gm.p1.name == pid else gm.p2
+        legal = gm.get_legal_actions(actor)
+        if len(legal) > 1:
+            sigs = {cpu_ai._move_sig(m) for m in legal}
+            for pol in ("fair", "cheat"):
+                mv = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0),
+                                           mem={}, info_policy=pol)
+                assert mv is not None and cpu_ai._move_sig(mv) in sigs
+            checked = True
+            break
+        mv = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), mem=mem)
+        if mv is None:
+            break
+        gm.action_events = []
+        if mv["kind"] == "battle":
+            action_api.apply_battle_action(gm, actor, mv["action_type"], mv.get("card_uuid"))
+        else:
+            action_api.apply_game_action(gm, actor, mv["action_type"], mv.get("payload", {}))
+    assert checked, "選択肢のある手番に到達しなかった（テスト前提の不成立）"
+
+
+def test_value_blend_off_by_default_and_formula(db):
+    """Phase 3b 葉ブレンド: α=0（既定）で eval 不変・α>0 で base + α·SCALE·(winprob−0.5)。"""
+    from opcg_sim.src.core import cpu_value_model, cpu_features
+    random.seed(0)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    cpu_value_model.set_alpha_override(None)        # 既定 OFF
+    base = cpu_ai.evaluate(gm, "p1")
+    assert cpu_ai.evaluate(gm, "p1") == base        # 決定論・ブレンド無で不変
+    try:
+        cpu_value_model.set_alpha_override(0.0)
+        assert cpu_ai.evaluate(gm, "p1") == base     # α=0 は明示でも base 素通し
+        if cpu_value_model.is_available():
+            cpu_value_model.set_alpha_override(0.5)
+            p = cpu_value_model.predict_winprob(cpu_features.extract_features(gm, "p1"))
+            assert cpu_ai.evaluate(gm, "p1") == pytest.approx(
+                base + 0.5 * cpu_ai._VALUE_BLEND_SCALE * (p - 0.5))
+    finally:
+        cpu_value_model.set_alpha_override(None)
+
+
+def test_pimc_decide_legal_and_deterministic(db):
+    """Phase 2 PIMC: pimc_worlds>=2 で K 決定化世界の平均から合法手を返す・同一 rng で決定論。"""
+    KEY_PID = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('PLAYER_ID', 'player_id')
+    random.seed(5)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    mem = {}
+    checked = False
+    for _ in range(14):
+        if gm.winner:
+            break
+        pend = gm.get_pending_request()
+        if not pend:
+            break
+        pid = pend[KEY_PID]
+        actor = gm.p1 if gm.p1.name == pid else gm.p2
+        legal = gm.get_legal_actions(actor)
+        if len(legal) > 1:
+            sigs = {cpu_ai._move_sig(m) for m in legal}
+            m1 = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), mem={}, pimc_worlds=2)
+            m2 = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), mem={}, pimc_worlds=2)
+            assert m1 is not None and cpu_ai._move_sig(m1) in sigs   # 合法手
+            assert cpu_ai._move_sig(m1) == cpu_ai._move_sig(m2)      # 同一 rng→決定論
+            checked = True
+            break
+        mv = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), mem=mem)
+        if mv is None:
+            break
+        gm.action_events = []
+        if mv["kind"] == "battle":
+            action_api.apply_battle_action(gm, actor, mv["action_type"], mv.get("card_uuid"))
+        else:
+            action_api.apply_game_action(gm, actor, mv["action_type"], mv.get("payload", {}))
+    assert checked, "選択肢のある手番に到達しなかった（テスト前提の不成立）"
+
+
+def test_budget_override():
+    """Phase 4 予算上書き: 既定は HARD_PER_MOVE_BUDGET・set で上書き・None で復帰。"""
+    assert cpu_ai._effective_budget() == cpu_ai.HARD_PER_MOVE_BUDGET
+    try:
+        cpu_ai.set_budget_override(75)
+        assert cpu_ai._effective_budget() == 75
+        cpu_ai.set_budget_override(0)            # 下限 1 にクランプ
+        assert cpu_ai._effective_budget() == 1
+    finally:
+        cpu_ai.set_budget_override(None)
+    assert cpu_ai._effective_budget() == cpu_ai.HARD_PER_MOVE_BUDGET
+
+
+def test_search_knob_env_override(monkeypatch):
+    """探索ノブの env 上書きヘルパ（Phase 1）: 未設定→default、整数→その値、不正→default。
+
+    本体定数（HARD_HORIZON 等）は import 時に `_env_int` で確定するので、env 未設定の本テスト
+    プロセスでは従来既定（horizon=4 等）であること＝挙動不変も確認する。
+    """
+    assert cpu_ai._env_int("OPCG_NONEXISTENT_KNOB_XYZ", 7) == 7        # 未設定→default
+    monkeypatch.setenv("OPCG_TEST_KNOB", "11")
+    assert cpu_ai._env_int("OPCG_TEST_KNOB", 7) == 11                  # 整数→その値
+    monkeypatch.setenv("OPCG_TEST_KNOB", "not-an-int")
+    assert cpu_ai._env_int("OPCG_TEST_KNOB", 7) == 7                   # 不正→default
+    # env 未設定（本プロセス）では従来既定＝挙動不変。
+    assert cpu_ai.HARD_HORIZON == 4 and cpu_ai.HARD_BEAM == 3
+    assert cpu_ai.HARD_OPP_BEAM == 4 and cpu_ai.HARD_ROOT_BEAM == 4
+    assert cpu_ai.HARD_PER_MOVE_BUDGET == 300
+
+
 def _new_gm(db):
     random.seed(0)
     l1, c1 = build_deck(db, "p1")

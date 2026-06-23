@@ -35,4 +35,9 @@ ENV OPCG_PYPY_WORKER=1
 ENV OPCG_PLAN_CACHE=1
 ENV OPCG_PONDER=1
 ENV OPCG_PONDER_SPEC=1
+# Phase 4 本番配線: 出荷 fair CPU を「PIMC K=4・予算按分」へ（相手伏せ札を K=4 通り想像→平均＝フェアに
+# 隠れ情報を補う・+53 Elo）。予算 75/世界 × 4 = 合計≈300＝素 fair と等倍計算量・1秒内（実測 max~250ms/PyPy）。
+# 即ロールバックは OPCG_PIMC_WORLDS=1（PIMC 休眠）。docs/reports/cpu_phase4_pimc_budget_split_20260623.md。
+ENV OPCG_PIMC_WORLDS=4
+ENV OPCG_HARD_PER_MOVE_BUDGET=75
 CMD ["sh", "-c", "uvicorn opcg_sim.api.app:app --host 0.0.0.0 --port $PORT"]
