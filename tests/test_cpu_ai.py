@@ -148,6 +148,29 @@ def test_decide_info_policy_arg(db):
     assert checked, "選択肢のある手番に到達しなかった（テスト前提の不成立）"
 
 
+def test_value_blend_off_by_default_and_formula(db):
+    """Phase 3b 葉ブレンド: α=0（既定）で eval 不変・α>0 で base + α·SCALE·(winprob−0.5)。"""
+    from opcg_sim.src.core import cpu_value_model, cpu_features
+    random.seed(0)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    cpu_value_model.set_alpha_override(None)        # 既定 OFF
+    base = cpu_ai.evaluate(gm, "p1")
+    assert cpu_ai.evaluate(gm, "p1") == base        # 決定論・ブレンド無で不変
+    try:
+        cpu_value_model.set_alpha_override(0.0)
+        assert cpu_ai.evaluate(gm, "p1") == base     # α=0 は明示でも base 素通し
+        if cpu_value_model.is_available():
+            cpu_value_model.set_alpha_override(0.5)
+            p = cpu_value_model.predict_winprob(cpu_features.extract_features(gm, "p1"))
+            assert cpu_ai.evaluate(gm, "p1") == pytest.approx(
+                base + 0.5 * cpu_ai._VALUE_BLEND_SCALE * (p - 0.5))
+    finally:
+        cpu_value_model.set_alpha_override(None)
+
+
 def test_pimc_decide_legal_and_deterministic(db):
     """Phase 2 PIMC: pimc_worlds>=2 で K 決定化世界の平均から合法手を返す・同一 rng で決定論。"""
     KEY_PID = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('PLAYER_ID', 'player_id')

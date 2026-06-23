@@ -98,6 +98,25 @@ def _resolve_info_policy(info_policy: str) -> Tuple[bool, bool]:
         raise ValueError("unknown info_policy: %r (expected 'fair' or 'cheat')" % (info_policy,))
 
 
+# Phase 3b: 学習価値（勝率）の葉ブレンド（docs/reports/cpu_phase3a_fair_value_relearn_20260623.md）。
+# winprob(0..1) を eval 加点へ写す係数。α=1・winprob 0/1 で ±SCALE/2 ≈ ±4000 ≈ ライフ1枚相当の振れ。
+# ブレンド率 α は `cpu_value_model.blend_alpha()`（OPCG_VALUE_BLEND/override・既定 0）。α=0 or モデル無で
+# `_value_blend` は base 素通し＝**既定で完全に挙動不変**（葉で predict も呼ばない）。
+_VALUE_BLEND_SCALE = 8000.0
+
+
+def _value_blend(manager, me_name: str, base: float) -> float:
+    """評価値 `base` に学習勝率を α 比率で加点ブレンド（公開情報特徴→winprob）。α=0/モデル無は base 素通し。"""
+    from . import cpu_value_model, cpu_features
+    a = cpu_value_model.blend_alpha()
+    if a <= 0.0 or not cpu_value_model.is_available():
+        return base
+    p = cpu_value_model.predict_winprob(cpu_features.extract_features(manager, me_name))
+    if p is None:
+        return base
+    return base + a * _VALUE_BLEND_SCALE * (p - 0.5)
+
+
 # 評価重み（盤面 1000=パワー1段相当に正規化）
 W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（膝＝薄域。最重要）
 # 高ライフ域（膝超）のライフ 1 枚の基礎価値（concave 化・§2.5.3）。OPCG ではライフは「序盤は能動的に
@@ -856,7 +875,7 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
         out["opp"] = {k: round(v, 1) for k, v in out_opp.items()}
         out["plan_progress"] = round(plan_progress, 1)
         out["telegraph"] = round(-telegraph, 1)
-    return total
+    return _value_blend(manager, me_name, total)
 
 
 def _pending_keys():

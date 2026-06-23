@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai, cpu_self_plan
+from opcg_sim.src.core import action_api, cpu_ai, cpu_self_plan, cpu_value_model
 from opcg_sim.src.core.invariants import check_invariants, check_turn_boundary
 
 from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS, InvariantError
@@ -110,7 +110,7 @@ def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
 
 def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
-                  policy_rng=None, pimc_worlds: int = 1):
+                  policy_rng=None, pimc_worlds: int = 1, value_alpha=None):
     """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き・デプロイと同じプラン供給）。
 
     `info_policy`（Phase -1）で情報方針を選ぶ＝凍結 fair-hard vs cheat-hard の A/B を席交互で測れる。
@@ -122,8 +122,13 @@ def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_
     prng = policy_rng if policy_rng is not None else random
 
     def _decide(manager, actor):
-        return cpu_ai.decide_guarded(manager, actor, difficulty, prng, mem, plan=plan,
-                                     info_policy=info_policy, pimc_worlds=pimc_worlds)
+        # Phase 3b: この decider の学習価値ブレンド率を一時設定（単一スレッド arena＝相手と干渉しない）。
+        cpu_value_model.set_alpha_override(value_alpha)
+        try:
+            return cpu_ai.decide_guarded(manager, actor, difficulty, prng, mem, plan=plan,
+                                         info_policy=info_policy, pimc_worlds=pimc_worlds)
+        finally:
+            cpu_value_model.set_alpha_override(None)
     return _decide
 
 
@@ -132,7 +137,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p1_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
               p2_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
               separate_policy_rng: bool = False,
-              p1_pimc: int = 1, p2_pimc: int = 1) -> Dict[str, Any]:
+              p1_pimc: int = 1, p2_pimc: int = 1,
+              p1_alpha=None, p2_alpha=None) -> Dict[str, Any]:
     """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
@@ -154,8 +160,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
-    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1), p1_policy, p1_rng, p1_pimc),
-                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2), p2_policy, p2_rng, p2_pimc)}
+    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1), p1_policy, p1_rng, p1_pimc, p1_alpha),
+                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2), p2_policy, p2_rng, p2_pimc, p2_alpha)}
 
     step = 0
     prev_turn = manager.turn_count
@@ -227,7 +233,8 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
                  max_steps: int = DEFAULT_MAX_STEPS,
                  challenger_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                  baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
-                 challenger_pimc: int = 1, baseline_pimc: int = 1) -> Dict[str, Any]:
+                 challenger_pimc: int = 1, baseline_pimc: int = 1,
+                 challenger_alpha=None, baseline_alpha=None) -> Dict[str, Any]:
     """分散低減アリーナ（Phase 0・antithetic 席ペアリング）。各 seed を**両席で 1 回ずつ**戦わせ、
     挑戦者の 2 局の勝敗を集計する＝**先手有利（席順）をペア内で相殺**する。
 
@@ -249,10 +256,12 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
         # 席A: 挑戦者=p1。席B: 同一 game-seed で挑戦者=p2（席だけ反転）。
         a = play_game(seed, db, challenger, baseline, max_steps=max_steps,
                       p1_policy=challenger_policy, p2_policy=baseline_policy,
-                      separate_policy_rng=True, p1_pimc=challenger_pimc, p2_pimc=baseline_pimc)
+                      separate_policy_rng=True, p1_pimc=challenger_pimc, p2_pimc=baseline_pimc,
+                      p1_alpha=challenger_alpha, p2_alpha=baseline_alpha)
         b = play_game(seed, db, baseline, challenger, max_steps=max_steps,
                       p1_policy=baseline_policy, p2_policy=challenger_policy,
-                      separate_policy_rng=True, p1_pimc=baseline_pimc, p2_pimc=challenger_pimc)
+                      separate_policy_rng=True, p1_pimc=baseline_pimc, p2_pimc=challenger_pimc,
+                      p1_alpha=baseline_alpha, p2_alpha=challenger_alpha)
         chal_a = 1.0 if a["winner"] == "p1" else 0.0
         chal_b = 1.0 if b["winner"] == "p2" else 0.0
         wins += chal_a + chal_b
@@ -406,6 +415,8 @@ def main(argv=None):
     pp.add_argument("--baseline-policy", choices=["fair", "cheat"], default="cheat")
     pp.add_argument("--challenger-pimc", type=int, default=1, help="挑戦者の PIMC 世界数（>=2 で決定化）")
     pp.add_argument("--baseline-pimc", type=int, default=1, help="ベースラインの PIMC 世界数")
+    pp.add_argument("--challenger-blend", type=float, default=None, help="挑戦者の学習価値ブレンド α（Phase 3b）")
+    pp.add_argument("--baseline-blend", type=float, default=None, help="ベースラインの学習価値ブレンド α")
     pp.add_argument("--pairs", type=int, default=50)
     pp.add_argument("--seed", type=int, default=0)
     pp.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
@@ -440,7 +451,8 @@ def main(argv=None):
     if args.cmd == "arena-paired":
         rep = arena_paired(db, args.challenger, args.baseline, args.pairs, args.seed, args.max_steps,
                            challenger_policy=args.challenger_policy, baseline_policy=args.baseline_policy,
-                           challenger_pimc=args.challenger_pimc, baseline_pimc=args.baseline_pimc)
+                           challenger_pimc=args.challenger_pimc, baseline_pimc=args.baseline_pimc,
+                           challenger_alpha=args.challenger_blend, baseline_alpha=args.baseline_blend)
         for d in rep["detail"]:
             print(f"  seed={d['seed']} p1won={d['chal_as_p1_won']:.0f} p2won={d['chal_as_p2_won']:.0f} "
                   f"pair={d['pair_score']:.2f}")
