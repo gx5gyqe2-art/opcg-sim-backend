@@ -1,0 +1,5344 @@
+{
+  "capturedAt": "2026-06-24T17:37:06.982Z",
+  "turn_info": {
+    "turn_count": 10,
+    "current_phase": "MAIN",
+    "active_player_id": "p1",
+    "winner": "p1"
+  },
+  "game_id": "8f758658-6ab0-4983-84bb-e24ae685a35d",
+  "sessionId": "8f758658-6ab0-4983-84bb-e24ae685a35d",
+  "winner": "p1",
+  "eventLog": [
+    {
+      "type": "PASS",
+      "player": "p2",
+      "message": "パス"
+    },
+    {
+      "type": "COUNTER",
+      "player": "p2",
+      "card_name": "Mr.1(ダズ・ボーネス)",
+      "message": "「Mr.1(ダズ・ボーネス)」でカウンター(+1000)"
+    },
+    {
+      "type": "ATTACK",
+      "player": "p1",
+      "card_name": "ジーザス・バージェス",
+      "message": "「ジーザス・バージェス」→「モンキー・D・ルフィ」攻撃"
+    },
+    {
+      "type": "PASS",
+      "player": "p2",
+      "message": "パス"
+    },
+    {
+      "type": "ATTACK",
+      "player": "p1",
+      "card_name": "シリュウ",
+      "message": "「シリュウ」→「モンキー・D・ルフィ」攻撃"
+    },
+    {
+      "type": "PASS",
+      "player": "p2",
+      "message": "パス"
+    },
+    {
+      "type": "COUNTER",
+      "player": "p2",
+      "card_name": "ジンベエ",
+      "message": "「ジンベエ」でカウンター(+2000)"
+    },
+    {
+      "type": "COUNTER",
+      "player": "p2",
+      "card_name": "Mr.3(ギャルディーノ)",
+      "message": "「Mr.3(ギャルディーノ)」でカウンター(+2000)"
+    },
+    {
+      "type": "COUNTER",
+      "player": "p2",
+      "card_name": "モンキー・D・ルフィ",
+      "message": "「モンキー・D・ルフィ」でカウンター(+1000)"
+    },
+    {
+      "type": "COUNTER",
+      "player": "p2",
+      "card_name": "インペルダウンの囚人",
+      "message": "「インペルダウンの囚人」でカウンター(+2000)"
+    },
+    {
+      "type": "ATTACK",
+      "player": "p1",
+      "card_name": "マーシャル・D・ティーチ",
+      "message": "「マーシャル・D・ティーチ」→「モンキー・D・ルフィ」攻撃"
+    },
+    {
+      "type": "ATTACH_DON",
+      "player": "p1",
+      "card_name": "マーシャル・D・ティーチ",
+      "message": "「マーシャル・D・ティーチ」にドン!!付与"
+    },
+    {
+      "type": "ATTACH_DON",
+      "player": "p1",
+      "card_name": "マーシャル・D・ティーチ",
+      "message": "「マーシャル・D・ティーチ」にドン!!付与"
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "マーシャル・D・ティーチ",
+      "action": "NEGATE_EFFECT",
+      "targets": [
+        "ボア・ハンコック(c4fb)"
+      ],
+      "value": 0,
+      "success": true
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "マーシャル・D・ティーチ",
+      "action": "ATTACK_DISABLE",
+      "targets": [
+        "ボア・ハンコック(c4fb)"
+      ],
+      "value": 0,
+      "success": true
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "マーシャル・D・ティーチ",
+      "action": "NEGATE_EFFECT",
+      "targets": [
+        "モンキー・D・ルフィ(80e2)"
+      ],
+      "value": 0,
+      "success": true
+    },
+    {
+      "type": "ACTIVATE_MAIN",
+      "player": "p1",
+      "card_name": "マーシャル・D・ティーチ",
+      "message": "「マーシャル・D・ティーチ」の効果起動"
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "ゼハハハハハハ!!!",
+      "action": "PLAY_CARD",
+      "targets": [
+        "マーシャル・D・ティーチ(1f31)"
+      ],
+      "value": 0,
+      "success": true
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "ゼハハハハハハ!!!",
+      "action": "MOVE_CARD",
+      "targets": [
+        "強ェとわかってんだから... 始めから全開だ!!!(a061)"
+      ],
+      "value": 0,
+      "success": true
+    },
+    {
+      "type": "PLAY",
+      "player": "p1",
+      "card_name": "ゼハハハハハハ!!!",
+      "message": "「ゼハハハハハハ!!!」を登場"
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "ハチノス",
+      "action": "MOVE_CARD",
+      "targets": [
+        "ゼハハハハハハ!!!(9c33)"
+      ],
+      "value": 0,
+      "success": true
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "ハチノス",
+      "action": "DISCARD",
+      "targets": [
+        "マーシャル・D・ティーチ(8d7c)"
+      ],
+      "value": 0,
+      "success": true
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "ハチノス",
+      "action": "REST",
+      "targets": [
+        "ハチノス(310f)"
+      ],
+      "value": 0,
+      "success": true
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "ハチノス",
+      "action": "LOOK",
+      "targets": [],
+      "value": 3,
+      "success": true
+    },
+    {
+      "type": "ACTIVATE_MAIN",
+      "player": "p1",
+      "card_name": "ハチノス",
+      "message": "「ハチノス」の効果起動"
+    },
+    {
+      "type": "TURN_END",
+      "player": "p2",
+      "message": "ターン9終了"
+    },
+    {
+      "type": "PASS",
+      "player": "p1",
+      "message": "パス"
+    },
+    {
+      "type": "PASS",
+      "player": "p1",
+      "message": "パス"
+    },
+    {
+      "type": "COUNTER",
+      "player": "p1",
+      "card_name": "ベビー5",
+      "message": "「ベビー5」でカウンター(+2000)"
+    },
+    {
+      "type": "ATTACK",
+      "player": "p2",
+      "card_name": "クロコダイル",
+      "message": "「クロコダイル」→「マーシャル・D・ティーチ」攻撃"
+    },
+    {
+      "type": "PASS",
+      "player": "p1",
+      "message": "パス"
+    },
+    {
+      "type": "COUNTER",
+      "player": "p1",
+      "card_name": "カタリーナ・デボン",
+      "message": "「カタリーナ・デボン」でカウンター(+2000)"
+    },
+    {
+      "type": "ATTACK",
+      "player": "p2",
+      "card_name": "クロコダイル",
+      "message": "「クロコダイル」→「マーシャル・D・ティーチ」攻撃"
+    },
+    {
+      "type": "PASS",
+      "player": "p1",
+      "message": "パス"
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "ドクQ",
+      "action": "DRAW",
+      "targets": [],
+      "value": 1,
+      "success": true
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "ドクQ",
+      "action": "KO",
+      "targets": [],
+      "value": 0,
+      "success": true
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "マーシャル・D・ティーチ",
+      "action": "REDIRECT_ATTACK",
+      "targets": [
+        "ドクQ(d160)"
+      ],
+      "value": 0,
+      "success": true
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "マーシャル・D・ティーチ",
+      "action": "DISCARD",
+      "targets": [
+        "シリュウ(5700)"
+      ],
+      "value": 0,
+      "success": true
+    },
+    {
+      "type": "ATTACK",
+      "player": "p2",
+      "card_name": "バギー",
+      "message": "「バギー」→「マーシャル・D・ティーチ」攻撃"
+    },
+    {
+      "type": "EFFECT",
+      "player": "p1",
+      "card_name": "ベビー5",
+      "action": "DRAW",
+      "targets": [],
+      "value": 2,
+      "success": true
+    },
+    {
+      "type": "PASS",
+      "player": "p1",
+      "message": "パス"
+    },
+    {
+      "type": "ATTACK",
+      "player": "p2",
+      "card_name": "インペルダウンの囚人",
+      "message": "「インペルダウンの囚人」→「マーシャル・D・ティーチ」攻撃"
+    },
+    {
+      "type": "PASS",
+      "player": "p1",
+      "message": "パス"
+    },
+    {
+      "type": "COUNTER",
+      "player": "p1",
+      "card_name": "ヴァン・オーガー",
+      "message": "「ヴァン・オーガー」でカウンター(+1000)"
+    },
+    {
+      "type": "ATTACK",
+      "player": "p2",
+      "card_name": "モンキー・D・ルフィ",
+      "message": "「モンキー・D・ルフィ」→「マーシャル・D・ティーチ」攻撃"
+    },
+    {
+      "type": "PLAY",
+      "player": "p2",
+      "card_name": "Mr.2・ボン・クレー(ベンサム)",
+      "message": "「Mr.2・ボン・クレー(ベンサム)」を登場"
+    },
+    {
+      "type": "EFFECT",
+      "player": "p2",
+      "card_name": "Mr.2・ボン・クレー(ベンサム)",
+      "action": "DRAW",
+      "targets": [],
+      "value": 1,
+      "success": true
+    },
+    {
+      "type": "ACTIVATE_MAIN",
+      "player": "p2",
+      "card_name": "モンキー・D・ルフィ",
+      "message": "「モンキー・D・ルフィ」の効果起動"
+    },
+    {
+      "type": "EFFECT",
+      "player": "p2",
+      "card_name": "モンキー・D・ルフィ",
+      "action": "ACTIVE_DON",
+      "targets": [],
+      "value": 2,
+      "success": true
+    },
+    {
+      "type": "EFFECT",
+      "player": "p2",
+      "card_name": "ボア・ハンコック",
+      "action": "PREVENT_REST",
+      "targets": [
+        "ボルサリーノ(2154)"
+      ],
+      "value": 0,
+      "success": true
+    }
+  ],
+  "replay": {
+    "schema": "opcg-replay/v1",
+    "seed": 8181412201474161000,
+    "first_player": "p2",
+    "difficulty": "hard",
+    "cpu_player_id": "p2",
+    "leaders": {
+      "p1": "OP16-080",
+      "p2": "OP16-022"
+    },
+    "decks": {
+      "p1": [
+        "OP16-109",
+        "OP16-109",
+        "OP16-109",
+        "OP16-109",
+        "OP16-110",
+        "OP16-110",
+        "OP16-110",
+        "OP16-110",
+        "OP09-086",
+        "OP09-086",
+        "OP09-086",
+        "OP16-104",
+        "OP16-104",
+        "OP16-104",
+        "OP16-108",
+        "OP16-108",
+        "OP16-108",
+        "OP16-108",
+        "OP16-119",
+        "OP16-119",
+        "OP16-119",
+        "OP16-119",
+        "OP09-093",
+        "OP09-093",
+        "OP09-093",
+        "OP09-096",
+        "OP09-096",
+        "OP09-096",
+        "OP09-096",
+        "OP09-099",
+        "OP09-099",
+        "OP09-099",
+        "OP09-099",
+        "EB04-058",
+        "EB04-058",
+        "OP16-104",
+        "OP15-114",
+        "OP15-114",
+        "OP09-093",
+        "OP16-103",
+        "OP16-103",
+        "OP16-116",
+        "OP16-116",
+        "EB04-058",
+        "OP12-112",
+        "OP16-116",
+        "OP16-115",
+        "OP15-114",
+        "OP12-112",
+        "EB04-058"
+      ],
+      "p2": [
+        "OP16-054",
+        "OP16-054",
+        "OP16-054",
+        "OP16-054",
+        "OP16-055",
+        "OP16-055",
+        "OP16-055",
+        "OP16-055",
+        "ST30-014",
+        "ST30-014",
+        "OP16-026",
+        "OP16-026",
+        "OP16-045",
+        "OP16-045",
+        "OP16-045",
+        "OP16-045",
+        "OP16-048",
+        "OP16-048",
+        "OP16-048",
+        "OP16-048",
+        "OP16-056",
+        "OP16-056",
+        "OP16-056",
+        "OP16-056",
+        "OP16-042",
+        "OP16-042",
+        "OP16-042",
+        "OP16-042",
+        "OP16-042",
+        "OP16-042",
+        "OP16-042",
+        "OP16-042",
+        "OP16-032",
+        "OP16-038",
+        "OP16-038",
+        "OP16-038",
+        "OP16-034",
+        "OP16-034",
+        "OP16-034",
+        "OP16-034",
+        "OP16-027",
+        "OP16-027",
+        "OP16-032",
+        "ST30-014",
+        "OP16-027",
+        "OP13-040",
+        "OP13-040",
+        "OP13-040",
+        "OP12-037",
+        "OP12-037"
+      ]
+    },
+    "actions": [
+      {
+        "src": "cpu",
+        "turn": 0,
+        "player": "p2",
+        "action_type": "MULLIGAN"
+      },
+      {
+        "src": "human",
+        "turn": 0,
+        "player": "p1",
+        "action_type": "MULLIGAN"
+      },
+      {
+        "src": "cpu",
+        "turn": 1,
+        "player": "p2",
+        "action_type": "TURN_END"
+      },
+      {
+        "src": "human",
+        "turn": 2,
+        "player": "p1",
+        "action_type": "PLAY",
+        "card": "OP16-109"
+      },
+      {
+        "src": "human",
+        "turn": 2,
+        "player": "p1",
+        "action_type": "TURN_END"
+      },
+      {
+        "src": "cpu",
+        "turn": 3,
+        "player": "p2",
+        "action_type": "ATTACK",
+        "card": "OP16-022",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      {
+        "src": "human",
+        "turn": 3,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 3,
+        "player": "p1",
+        "action_type": "PASS"
+      },
+      {
+        "src": "human",
+        "turn": 3,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "cpu",
+        "turn": 3,
+        "player": "p2",
+        "action_type": "TURN_END"
+      },
+      {
+        "src": "human",
+        "turn": 4,
+        "player": "p1",
+        "action_type": "ATTACK_CONFIRM",
+        "card": "OP16-080"
+      },
+      {
+        "src": "cpu",
+        "turn": 4,
+        "player": "p2",
+        "action_type": "SELECT_COUNTER",
+        "card": "OP13-040"
+      },
+      {
+        "src": "cpu",
+        "turn": 4,
+        "player": "p2",
+        "action_type": "PASS"
+      },
+      {
+        "src": "human",
+        "turn": 4,
+        "player": "p1",
+        "action_type": "PLAY",
+        "card": "OP09-086"
+      },
+      {
+        "src": "human",
+        "turn": 4,
+        "player": "p1",
+        "action_type": "TURN_END"
+      },
+      {
+        "src": "cpu",
+        "turn": 5,
+        "player": "p2",
+        "action_type": "PLAY",
+        "card": "OP16-045"
+      },
+      {
+        "src": "cpu",
+        "turn": 5,
+        "player": "p2",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "cpu",
+        "turn": 5,
+        "player": "p2",
+        "action_type": "ATTACK",
+        "card": "OP16-022",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      {
+        "src": "human",
+        "turn": 5,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 5,
+        "player": "p1",
+        "action_type": "PASS"
+      },
+      {
+        "src": "human",
+        "turn": 5,
+        "player": "p1",
+        "action_type": "PASS"
+      },
+      {
+        "src": "cpu",
+        "turn": 5,
+        "player": "p2",
+        "action_type": "TURN_END"
+      },
+      {
+        "src": "human",
+        "turn": 6,
+        "player": "p1",
+        "action_type": "PLAY",
+        "card": "OP16-108"
+      },
+      {
+        "src": "human",
+        "turn": 6,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 6,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 6,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 6,
+        "player": "p1",
+        "action_type": "ATTACK_CONFIRM",
+        "card": "OP16-080"
+      },
+      {
+        "src": "cpu",
+        "turn": 6,
+        "player": "p2",
+        "action_type": "SELECT_BLOCKER",
+        "card": "OP16-045"
+      },
+      {
+        "src": "cpu",
+        "turn": 6,
+        "player": "p2",
+        "action_type": "PASS"
+      },
+      {
+        "src": "human",
+        "turn": 6,
+        "player": "p1",
+        "action_type": "TURN_END"
+      },
+      {
+        "src": "cpu",
+        "turn": 7,
+        "player": "p2",
+        "action_type": "PLAY",
+        "card": "OP16-048"
+      },
+      {
+        "src": "cpu",
+        "turn": 7,
+        "player": "p2",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "cpu",
+        "turn": 7,
+        "player": "p2",
+        "action_type": "ACTIVATE_MAIN",
+        "card": "OP16-022"
+      },
+      {
+        "src": "cpu",
+        "turn": 7,
+        "player": "p2",
+        "action_type": "PLAY",
+        "card": "OP16-045"
+      },
+      {
+        "src": "cpu",
+        "turn": 7,
+        "player": "p2",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "cpu",
+        "turn": 7,
+        "player": "p2",
+        "action_type": "ATTACK",
+        "card": "OP16-022",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      {
+        "src": "human",
+        "turn": 7,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 7,
+        "player": "p1",
+        "action_type": "PASS"
+      },
+      {
+        "src": "human",
+        "turn": 7,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "cpu",
+        "turn": 7,
+        "player": "p2",
+        "action_type": "TURN_END"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "PLAY",
+        "card": "OP09-099"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "ACTIVATE_MAIN",
+        "card": "310ff38f-2f3d-4bb4-81c4-ac7add9c1505"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "PLAY",
+        "card": "OP09-096"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "PLAY",
+        "card": "OP09-096"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "ATTACK_CONFIRM",
+        "card": "OP16-080"
+      },
+      {
+        "src": "cpu",
+        "turn": 8,
+        "player": "p2",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "cpu",
+        "turn": 8,
+        "player": "p2",
+        "action_type": "PASS"
+      },
+      {
+        "src": "cpu",
+        "turn": 8,
+        "player": "p2",
+        "action_type": "SELECT_COUNTER",
+        "card": "OP16-042"
+      },
+      {
+        "src": "cpu",
+        "turn": 8,
+        "player": "p2",
+        "action_type": "PASS"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "ATTACK_CONFIRM",
+        "card": "OP09-086"
+      },
+      {
+        "src": "cpu",
+        "turn": 8,
+        "player": "p2",
+        "action_type": "PASS"
+      },
+      {
+        "src": "cpu",
+        "turn": 8,
+        "player": "p2",
+        "action_type": "PASS"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "ATTACK_CONFIRM",
+        "card": "OP16-108"
+      },
+      {
+        "src": "cpu",
+        "turn": 8,
+        "player": "p2",
+        "action_type": "PASS"
+      },
+      {
+        "src": "cpu",
+        "turn": 8,
+        "player": "p2",
+        "action_type": "PASS"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "PLAY",
+        "card": "EB04-058"
+      },
+      {
+        "src": "human",
+        "turn": 8,
+        "player": "p1",
+        "action_type": "TURN_END"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "PLAY",
+        "card": "OP16-055"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "PLAY",
+        "card": "OP16-032"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "ACTIVATE_MAIN",
+        "card": "OP16-022"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "PLAY",
+        "card": "OP16-055"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "ATTACK",
+        "card": "OP16-022",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "SELECT_COUNTER",
+        "card": "OP16-103"
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "PASS"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "ATTACK",
+        "card": "OP16-042",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "PASS"
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "ATTACK",
+        "card": "OP16-048",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "PASS"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "ATTACK",
+        "card": "OP16-045",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "SELECT_COUNTER",
+        "card": "OP16-104"
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "PASS"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "ATTACK",
+        "card": "OP16-045",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "SELECT_COUNTER",
+        "card": "OP12-112"
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "PASS"
+      },
+      {
+        "src": "human",
+        "turn": 9,
+        "player": "p1",
+        "action_type": "PASS"
+      },
+      {
+        "src": "cpu",
+        "turn": 9,
+        "player": "p2",
+        "action_type": "TURN_END"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "ACTIVATE_MAIN",
+        "card": "310ff38f-2f3d-4bb4-81c4-ac7add9c1505"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "PLAY",
+        "card": "OP16-116"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "ACTIVATE_MAIN",
+        "card": "OP09-093"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "ATTACH_DON",
+        "card": "OP16-080"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "ATTACH_DON",
+        "card": "OP16-080"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "ATTACK_CONFIRM",
+        "card": "OP16-080"
+      },
+      {
+        "src": "cpu",
+        "turn": 10,
+        "player": "p2",
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      {
+        "src": "cpu",
+        "turn": 10,
+        "player": "p2",
+        "action_type": "SELECT_COUNTER",
+        "card": "OP16-042"
+      },
+      {
+        "src": "cpu",
+        "turn": 10,
+        "player": "p2",
+        "action_type": "SELECT_COUNTER",
+        "card": "OP16-034"
+      },
+      {
+        "src": "cpu",
+        "turn": 10,
+        "player": "p2",
+        "action_type": "SELECT_COUNTER",
+        "card": "ST30-014"
+      },
+      {
+        "src": "cpu",
+        "turn": 10,
+        "player": "p2",
+        "action_type": "SELECT_COUNTER",
+        "card": "OP16-027"
+      },
+      {
+        "src": "cpu",
+        "turn": 10,
+        "player": "p2",
+        "action_type": "PASS"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "ATTACK_CONFIRM",
+        "card": "OP16-108"
+      },
+      {
+        "src": "cpu",
+        "turn": 10,
+        "player": "p2",
+        "action_type": "PASS"
+      },
+      {
+        "src": "human",
+        "turn": 10,
+        "player": "p1",
+        "action_type": "ATTACK_CONFIRM",
+        "card": "OP09-086"
+      },
+      {
+        "src": "cpu",
+        "turn": 10,
+        "player": "p2",
+        "action_type": "SELECT_COUNTER",
+        "card": "OP16-054"
+      },
+      {
+        "src": "cpu",
+        "turn": 10,
+        "player": "p2",
+        "action_type": "PASS"
+      }
+    ],
+    "value_samples": [
+      {
+        "f": [
+          4,
+          4,
+          0,
+          0,
+          0,
+          10,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          5,
+          5,
+          0,
+          0,
+          0,
+          0,
+          5,
+          5,
+          3,
+          2,
+          0,
+          1,
+          1,
+          4,
+          0,
+          0,
+          0,
+          1
+        ],
+        "y": 1
+      },
+      {
+        "f": [
+          4,
+          4,
+          0,
+          1,
+          0,
+          9,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          5,
+          5,
+          0,
+          0,
+          0,
+          0,
+          5,
+          5,
+          3,
+          2,
+          1,
+          1,
+          1,
+          4,
+          0,
+          0,
+          0,
+          1
+        ],
+        "y": 0
+      },
+      {
+        "f": [
+          4,
+          4,
+          0,
+          2,
+          0,
+          8,
+          2,
+          1,
+          0,
+          0,
+          0,
+          0,
+          5,
+          5,
+          0,
+          0,
+          0,
+          0,
+          6,
+          5,
+          5,
+          3,
+          1,
+          1,
+          1,
+          5,
+          0,
+          0,
+          0,
+          1
+        ],
+        "y": 1
+      },
+      {
+        "f": [
+          4,
+          4,
+          0,
+          1,
+          0,
+          9,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          5,
+          5,
+          0,
+          0,
+          0,
+          0,
+          5,
+          6,
+          3,
+          2,
+          1,
+          1,
+          1,
+          4,
+          0,
+          0,
+          0,
+          1
+        ],
+        "y": 0
+      },
+      {
+        "f": [
+          4,
+          4,
+          0,
+          1,
+          1,
+          8,
+          3,
+          0,
+          1,
+          0,
+          0,
+          0,
+          5,
+          5,
+          0,
+          0,
+          0,
+          0,
+          5,
+          6,
+          3,
+          2,
+          0,
+          1,
+          1,
+          4,
+          0,
+          0,
+          0,
+          1
+        ],
+        "y": 1
+      },
+      {
+        "f": [
+          4,
+          4,
+          0,
+          3,
+          0,
+          7,
+          3,
+          1,
+          0,
+          1,
+          0,
+          0,
+          5,
+          5,
+          0,
+          0,
+          0,
+          0,
+          6,
+          5,
+          5,
+          3,
+          1,
+          1,
+          1,
+          5,
+          1,
+          1,
+          0,
+          1
+        ],
+        "y": 0
+      },
+      {
+        "f": [
+          3,
+          4,
+          -1,
+          4,
+          0,
+          6,
+          4,
+          1,
+          1,
+          0,
+          0,
+          0,
+          5,
+          5,
+          0,
+          0,
+          0,
+          0,
+          7,
+          6,
+          3,
+          2,
+          0,
+          2,
+          1,
+          6,
+          0,
+          0,
+          0,
+          1
+        ],
+        "y": 1
+      },
+      {
+        "f": [
+          4,
+          3,
+          1,
+          3,
+          0,
+          7,
+          4,
+          0,
+          0,
+          1,
+          0,
+          0,
+          5,
+          5,
+          0,
+          0,
+          0,
+          0,
+          6,
+          7,
+          5,
+          3,
+          1,
+          1,
+          1,
+          5,
+          1,
+          1,
+          0,
+          1
+        ],
+        "y": 0
+      },
+      {
+        "f": [
+          3,
+          4,
+          -1,
+          0,
+          4,
+          6,
+          5,
+          0,
+          2,
+          0,
+          5,
+          0,
+          5,
+          5,
+          0,
+          0,
+          0,
+          0,
+          6,
+          6,
+          2,
+          1,
+          0,
+          2,
+          1,
+          5,
+          0,
+          0,
+          0,
+          1
+        ],
+        "y": 1
+      },
+      {
+        "f": [
+          4,
+          3,
+          1,
+          5,
+          0,
+          5,
+          5,
+          1,
+          0,
+          2,
+          0,
+          5,
+          5,
+          5,
+          0,
+          0,
+          0,
+          0,
+          6,
+          6,
+          7,
+          4,
+          1,
+          1,
+          0,
+          6,
+          2,
+          2,
+          35,
+          1
+        ],
+        "y": 0
+      },
+      {
+        "f": [
+          2,
+          4,
+          -2,
+          6,
+          0,
+          4,
+          6,
+          1,
+          2,
+          1,
+          5,
+          6,
+          5,
+          5,
+          0,
+          1,
+          0,
+          0,
+          8,
+          5,
+          2,
+          1,
+          1,
+          2,
+          2,
+          5,
+          1,
+          2,
+          12,
+          1
+        ],
+        "y": 1
+      },
+      {
+        "f": [
+          4,
+          2,
+          2,
+          1,
+          4,
+          5,
+          6,
+          0,
+          1,
+          2,
+          6,
+          5,
+          5,
+          5,
+          1,
+          0,
+          0,
+          0,
+          5,
+          8,
+          7,
+          4,
+          0,
+          0,
+          0,
+          5,
+          0,
+          0,
+          35,
+          1
+        ],
+        "y": 0
+      },
+      {
+        "f": [
+          3,
+          4,
+          -1,
+          0,
+          6,
+          4,
+          7,
+          0,
+          3,
+          1,
+          13,
+          6,
+          5,
+          5,
+          0,
+          1,
+          0,
+          0,
+          6,
+          6,
+          2,
+          1,
+          1,
+          2,
+          2,
+          3,
+          1,
+          2,
+          12,
+          1
+        ],
+        "y": 1
+      },
+      {
+        "f": [
+          4,
+          3,
+          1,
+          7,
+          0,
+          3,
+          7,
+          1,
+          1,
+          3,
+          6,
+          13,
+          5,
+          5,
+          1,
+          0,
+          0,
+          0,
+          6,
+          6,
+          7,
+          4,
+          1,
+          1,
+          0,
+          6,
+          3,
+          3,
+          91,
+          1
+        ],
+        "y": 0
+      },
+      {
+        "f": [
+          2,
+          4,
+          -2,
+          8,
+          0,
+          2,
+          8,
+          1,
+          3,
+          4,
+          13,
+          24,
+          5,
+          5,
+          0,
+          2,
+          0,
+          0,
+          9,
+          4,
+          4,
+          3,
+          1,
+          4,
+          2,
+          6,
+          4,
+          16,
+          96,
+          1
+        ],
+        "y": 1
+      },
+      {
+        "f": [
+          4,
+          2,
+          2,
+          0,
+          7,
+          3,
+          8,
+          0,
+          4,
+          3,
+          24,
+          13,
+          5,
+          5,
+          2,
+          0,
+          0,
+          0,
+          4,
+          9,
+          4,
+          2,
+          0,
+          0,
+          0,
+          4,
+          0,
+          0,
+          52,
+          1
+        ],
+        "y": 0
+      },
+      {
+        "f": [
+          3,
+          2,
+          1,
+          0,
+          8,
+          2,
+          9,
+          0,
+          4,
+          4,
+          21,
+          24,
+          5,
+          5,
+          1,
+          2,
+          2,
+          0,
+          7,
+          6,
+          3,
+          2,
+          1,
+          2,
+          1,
+          6,
+          4,
+          8,
+          72,
+          1
+        ],
+        "y": 1
+      },
+      {
+        "f": [
+          2,
+          3,
+          -1,
+          9,
+          0,
+          1,
+          9,
+          1,
+          4,
+          4,
+          24,
+          21,
+          5,
+          5,
+          2,
+          1,
+          0,
+          2,
+          6,
+          7,
+          5,
+          3,
+          0,
+          0,
+          0,
+          6,
+          0,
+          0,
+          105,
+          1
+        ],
+        "y": 0
+      },
+      {
+        "f": [
+          2,
+          2,
+          0,
+          10,
+          0,
+          0,
+          10,
+          1,
+          3,
+          5,
+          22,
+          33,
+          5,
+          5,
+          1,
+          0,
+          0,
+          4,
+          7,
+          5,
+          3,
+          2,
+          3,
+          3,
+          1,
+          6,
+          15,
+          15,
+          99,
+          1
+        ],
+        "y": 1
+      },
+      {
+        "f": [
+          2,
+          2,
+          0,
+          0,
+          9,
+          1,
+          10,
+          0,
+          5,
+          3,
+          33,
+          22,
+          5,
+          5,
+          0,
+          1,
+          4,
+          0,
+          5,
+          7,
+          8,
+          5,
+          1,
+          0,
+          0,
+          5,
+          3,
+          0,
+          176,
+          1
+        ],
+        "y": 0
+      }
+    ]
+  },
+  "cpuDecisions": [
+    {
+      "turn": 0,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MULLIGAN",
+      "chosen": {
+        "action_type": "MULLIGAN"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "MULLIGAN"
+          },
+          "prelim": 716.6,
+          "deep": 716.6
+        },
+        {
+          "move": {
+            "action_type": "KEEP_HAND"
+          },
+          "prelim": 255.9,
+          "deep": 255.9
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 1680,
+          "deck_danger": 0,
+          "don": 0,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 17000,
+          "life_low": 8000,
+          "hand": 3500,
+          "deck_danger": 0,
+          "don": 0,
+          "leader_power": 1500
+        },
+        "plan_progress": 160,
+        "telegraph": 0,
+        "total": 5590
+      }
+    },
+    {
+      "turn": 1,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "TURN_END"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -426.5,
+          "deep": -426.5
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP13-040"
+          },
+          "prelim": -1525.5,
+          "deep": -1525.5
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 2520,
+          "deck_danger": 0,
+          "don": 170,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 17000,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 400,
+          "leader_power": 1500
+        },
+        "plan_progress": -348.5,
+        "telegraph": 0,
+        "total": 4991.5
+      }
+    },
+    {
+      "turn": 3,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "ATTACK",
+        "card": "OP16-022",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-022",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": 1061.1,
+          "deep": 1061.1
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP13-040"
+          },
+          "prelim": -1356.3,
+          "deep": -1356.3
+        },
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -2634.1,
+          "deep": -2634.1
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 4200,
+          "hand_counter": 4200,
+          "deck_danger": 0,
+          "don": 600,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 17000,
+          "life_low": 8000,
+          "hand": 3500,
+          "deck_danger": 0,
+          "don": 200,
+          "field_count": 1500,
+          "field_threat": 0,
+          "field_power": 0,
+          "attacker": 400,
+          "leader_power": 1500
+        },
+        "plan_progress": -510.8,
+        "telegraph": 0,
+        "total": 6639.2
+      }
+    },
+    {
+      "turn": 3,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "TURN_END"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -1223.6,
+          "deep": -1223.6
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP13-040"
+          },
+          "prelim": -2499.3,
+          "deep": -2499.3
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 4200,
+          "hand_counter": 4200,
+          "deck_danger": 0,
+          "don": 510,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4900,
+          "deck_danger": 0,
+          "don": 800,
+          "field_count": 1125,
+          "field_threat": 0,
+          "field_power": 0,
+          "attacker": 400,
+          "leader_power": 1500
+        },
+        "plan_progress": -657,
+        "telegraph": 0,
+        "total": 7278
+      }
+    },
+    {
+      "turn": 4,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "SELECT_COUNTER",
+        "card": "OP13-040"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP13-040"
+          },
+          "prelim": -286.4,
+          "deep": -286.4
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-048"
+          },
+          "prelim": -738.7,
+          "deep": -738.7
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-042"
+          },
+          "prelim": -1494.7,
+          "deep": -1494.7
+        },
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -1859.2,
+          "deep": -1859.2
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 4200,
+          "deck_danger": 0,
+          "don": 340,
+          "leader_power": 1590
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4900,
+          "deck_danger": 0,
+          "don": 800,
+          "field_count": 1125,
+          "field_threat": 0,
+          "field_power": 0,
+          "attacker": 400,
+          "leader_power": 1500
+        },
+        "plan_progress": -825,
+        "telegraph": 0,
+        "total": 6330
+      }
+    },
+    {
+      "turn": 4,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "PASS"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -835.9,
+          "deep": -835.9
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-048"
+          },
+          "prelim": -2012.6,
+          "deep": -2012.6
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-042"
+          },
+          "prelim": -2579.6,
+          "deep": -2579.6
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-042"
+          },
+          "prelim": -2579.6,
+          "deep": -2579.6
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 4200,
+          "deck_danger": 0,
+          "don": 340,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4900,
+          "deck_danger": 0,
+          "don": 800,
+          "field_count": 1125,
+          "field_threat": 0,
+          "field_power": 0,
+          "attacker": 400,
+          "leader_power": 1500
+        },
+        "plan_progress": -825,
+        "telegraph": 0,
+        "total": 6240
+      }
+    },
+    {
+      "turn": 5,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "PLAY",
+        "card": "OP16-045"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-045"
+          },
+          "prelim": 4029.7,
+          "deep": 4029.7
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-048"
+          },
+          "prelim": 1440.4,
+          "deep": 1440.4
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-022",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -915.8,
+          "deep": -915.8
+        },
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -8585.2,
+          "deep": -8585.2
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 5880,
+          "deck_danger": 0,
+          "don": 200,
+          "field_count": 1125,
+          "field_threat": 0,
+          "field_power": 1530,
+          "blocker": 1200,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 1500,
+          "attacker": 800,
+          "leader_power": 1500
+        },
+        "plan_progress": -667.3,
+        "telegraph": 0,
+        "total": 9142.7
+      }
+    },
+    {
+      "turn": 5,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "CONFIRM_OPTIONAL",
+      "chosen": {
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "RESOLVE_EFFECT_SELECTION"
+          },
+          "prelim": 9142.7,
+          "deep": 9142.7
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 5880,
+          "deck_danger": 0,
+          "don": 200,
+          "field_count": 1125,
+          "field_threat": 0,
+          "field_power": 1530,
+          "blocker": 1200,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 1500,
+          "attacker": 800,
+          "leader_power": 1500
+        },
+        "plan_progress": -667.3,
+        "telegraph": 0,
+        "total": 9142.7
+      }
+    },
+    {
+      "turn": 5,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "ATTACK",
+        "card": "OP16-022",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-022",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": 3894.7,
+          "deep": 3894.7
+        },
+        {
+          "move": {
+            "action_type": "ACTIVATE_MAIN",
+            "card": "OP16-022"
+          },
+          "prelim": 2956,
+          "deep": 2956
+        },
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -3280,
+          "deep": -3280
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 5880,
+          "deck_danger": 0,
+          "don": 200,
+          "field_count": 1125,
+          "field_threat": 0,
+          "field_power": 1530,
+          "blocker": 1200,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 1500,
+          "attacker": 800,
+          "leader_power": 1500
+        },
+        "plan_progress": -827.3,
+        "telegraph": 0,
+        "total": 8982.7
+      }
+    },
+    {
+      "turn": 5,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "TURN_END"
+      },
+      "folded": true,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "ACTIVATE_MAIN",
+            "card": "OP16-022"
+          },
+          "prelim": -3942.7,
+          "deep": -3942.7
+        },
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -4248.7,
+          "deep": -4248.7
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 5880,
+          "deck_danger": 0,
+          "don": 170,
+          "field_count": 750,
+          "field_threat": 0,
+          "field_power": 1530,
+          "attacker": 360,
+          "blocker": 1200,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 5600,
+          "deck_danger": 0,
+          "don": 1200,
+          "field_count": 1500,
+          "field_threat": 1125,
+          "field_power": 1500,
+          "attacker": 800,
+          "leader_power": 1500
+        },
+        "plan_progress": -813.5,
+        "telegraph": 0,
+        "total": 9601.5
+      }
+    },
+    {
+      "turn": 6,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_BLOCKER",
+      "chosen": {
+        "action_type": "SELECT_BLOCKER",
+        "card": "OP16-045"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "SELECT_BLOCKER",
+            "card": "OP16-045"
+          },
+          "prelim": -1926.9,
+          "deep": -1926.9
+        },
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -2435,
+          "deep": -2435
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 5880,
+          "deck_danger": 0,
+          "don": 170,
+          "field_count": 1125,
+          "field_threat": 0,
+          "field_power": 1800,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3375,
+          "field_threat": 1125,
+          "field_power": 3360,
+          "attacker": 800,
+          "leader_power": 1500
+        },
+        "plan_progress": -1165.5,
+        "telegraph": 0,
+        "total": 4699.5
+      }
+    },
+    {
+      "turn": 6,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "PASS"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -1926.9,
+          "deep": -1926.9
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-048"
+          },
+          "prelim": -3464.1,
+          "deep": -3464.1
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-042"
+          },
+          "prelim": -4220.1,
+          "deep": -4220.1
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-042"
+          },
+          "prelim": -4220.1,
+          "deep": -4220.1
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 5880,
+          "deck_danger": 0,
+          "don": 170,
+          "field_count": 1125,
+          "field_threat": 0,
+          "field_power": 1800,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3375,
+          "field_threat": 1125,
+          "field_power": 3360,
+          "attacker": 800,
+          "leader_power": 1500
+        },
+        "plan_progress": -1165.5,
+        "telegraph": 0,
+        "total": 4699.5
+      }
+    },
+    {
+      "turn": 7,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "PLAY",
+        "card": "OP16-048"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-048"
+          },
+          "prelim": 7379.5,
+          "deep": 7379.5
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-045"
+          },
+          "prelim": 4269.6,
+          "deep": 4269.6
+        },
+        {
+          "move": {
+            "action_type": "ATTACH_DON",
+            "card": "OP16-022"
+          },
+          "prelim": 4116.6,
+          "deep": 4116.6
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-032"
+          },
+          "prelim": 1927.8,
+          "deep": 1927.8
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-022",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -1333.4,
+          "deep": -1333.4
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -4987.4,
+          "deep": -4987.4
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 4200,
+          "hand_counter": 5040,
+          "deck_danger": 0,
+          "don": 400,
+          "field_count": 2250,
+          "field_threat": 0,
+          "field_power": 3600,
+          "attacker": 360,
+          "blocker": 1200,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3375,
+          "field_threat": 1125,
+          "field_power": 3360,
+          "attacker": 1200,
+          "leader_power": 1500
+        },
+        "plan_progress": -679.8,
+        "telegraph": 0,
+        "total": 9360.2
+      }
+    },
+    {
+      "turn": 7,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SEARCH_AND_SELECT",
+      "chosen": {
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "RESOLVE_EFFECT_SELECTION"
+          },
+          "prelim": 9905.2,
+          "deep": 9905.2
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 3360,
+          "deck_danger": 0,
+          "don": 400,
+          "field_count": 3375,
+          "field_threat": 0,
+          "field_power": 5400,
+          "attacker": 360,
+          "blocker": 1200,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3375,
+          "field_threat": 1125,
+          "field_power": 3360,
+          "attacker": 1200,
+          "leader_power": 1500
+        },
+        "plan_progress": -679.8,
+        "telegraph": 0,
+        "total": 9905.2
+      }
+    },
+    {
+      "turn": 7,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "ACTIVATE_MAIN",
+        "card": "OP16-022"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "ACTIVATE_MAIN",
+            "card": "OP16-022"
+          },
+          "prelim": 8676,
+          "deep": 8676
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-055"
+          },
+          "prelim": 7379.5,
+          "deep": 7379.5
+        },
+        {
+          "move": {
+            "action_type": "ATTACH_DON",
+            "card": "OP16-045"
+          },
+          "prelim": 5510.7,
+          "deep": 5510.7
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-022",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": 1962.9,
+          "deep": 1962.9
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -1691.1,
+          "deep": -1691.1
+        },
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -3632.4,
+          "deep": -3632.4
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 3360,
+          "deck_danger": 0,
+          "don": 800,
+          "field_count": 3375,
+          "field_threat": 0,
+          "field_power": 5400,
+          "attacker": 360,
+          "blocker": 1200,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3375,
+          "field_threat": 1125,
+          "field_power": 3360,
+          "attacker": 1200,
+          "leader_power": 1500
+        },
+        "plan_progress": -679.8,
+        "telegraph": 0,
+        "total": 10305.2
+      }
+    },
+    {
+      "turn": 7,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "PLAY",
+        "card": "OP16-045"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-045"
+          },
+          "prelim": 8676,
+          "deep": 8676
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-055"
+          },
+          "prelim": 7379.5,
+          "deep": 7379.5
+        },
+        {
+          "move": {
+            "action_type": "ATTACH_DON",
+            "card": "OP16-045"
+          },
+          "prelim": 5510.7,
+          "deep": 5510.7
+        },
+        {
+          "move": {
+            "action_type": "ATTACH_DON",
+            "card": "OP16-022"
+          },
+          "prelim": 3987,
+          "deep": 3987
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-022",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": 2268.9,
+          "deep": 2268.9
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -1385.1,
+          "deep": -1385.1
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 2800,
+          "hand_counter": 3360,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 4500,
+          "field_threat": 0,
+          "field_power": 7200,
+          "attacker": 360,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3375,
+          "field_threat": 1125,
+          "field_power": 3360,
+          "attacker": 1200,
+          "leader_power": 1500
+        },
+        "plan_progress": -679.8,
+        "telegraph": 0,
+        "total": 12930.2
+      }
+    },
+    {
+      "turn": 7,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "CONFIRM_OPTIONAL",
+      "chosen": {
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "RESOLVE_EFFECT_SELECTION"
+          },
+          "prelim": 12930.2,
+          "deep": 12930.2
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 2800,
+          "hand_counter": 3360,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 4500,
+          "field_threat": 0,
+          "field_power": 7200,
+          "attacker": 360,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3375,
+          "field_threat": 1125,
+          "field_power": 3360,
+          "attacker": 1200,
+          "leader_power": 1500
+        },
+        "plan_progress": -679.8,
+        "telegraph": 0,
+        "total": 12930.2
+      }
+    },
+    {
+      "turn": 7,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "ATTACK",
+        "card": "OP16-022",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-022",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": 4238.1,
+          "deep": 4238.1
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": 3321.9,
+          "deep": 3321.9
+        },
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": 676.3,
+          "deep": 676.3
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 2800,
+          "hand_counter": 3360,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 4500,
+          "field_threat": 0,
+          "field_power": 7200,
+          "attacker": 360,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3375,
+          "field_threat": 1125,
+          "field_power": 3360,
+          "attacker": 1200,
+          "leader_power": 1500
+        },
+        "plan_progress": -839.8,
+        "telegraph": 0,
+        "total": 12770.2
+      }
+    },
+    {
+      "turn": 7,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "TURN_END"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -669.6,
+          "deep": -669.6
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -4827.6,
+          "deep": -4827.6
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 2800,
+          "hand_counter": 3360,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 0,
+          "field_power": 7200,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 6300,
+          "deck_danger": 0,
+          "don": 1600,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 3360,
+          "attacker": 1200,
+          "leader_power": 1500
+        },
+        "plan_progress": 286,
+        "telegraph": 0,
+        "total": 13401
+      }
+    },
+    {
+      "turn": 8,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "CONFIRM_OPTIONAL",
+      "chosen": {
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "RESOLVE_EFFECT_SELECTION"
+          },
+          "prelim": 13971,
+          "deep": 13971
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 2800,
+          "hand_counter": 3360,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 0,
+          "field_power": 7200,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 5600,
+          "deck_danger": 0,
+          "don": 1000,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 3690,
+          "attacker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": 286,
+        "telegraph": 0,
+        "total": 13971
+      }
+    },
+    {
+      "turn": 8,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_BLOCKER",
+      "chosen": {
+        "action_type": "PASS"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": 3980.7,
+          "deep": 3980.7
+        },
+        {
+          "move": {
+            "action_type": "SELECT_BLOCKER",
+            "card": "OP16-045"
+          },
+          "prelim": 326.7,
+          "deep": 326.7
+        },
+        {
+          "move": {
+            "action_type": "SELECT_BLOCKER",
+            "card": "OP16-045"
+          },
+          "prelim": 326.7,
+          "deep": 326.7
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 2800,
+          "hand_counter": 3360,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 0,
+          "field_power": 7200,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 5600,
+          "deck_danger": 0,
+          "don": 1000,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 3690,
+          "attacker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": 286,
+        "telegraph": 0,
+        "total": 13971
+      }
+    },
+    {
+      "turn": 8,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "SELECT_COUNTER",
+        "card": "OP16-042"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-042"
+          },
+          "prelim": 1687.5,
+          "deep": 1687.5
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-042"
+          },
+          "prelim": 1687.5,
+          "deep": 1687.5
+        },
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -432.5,
+          "deep": -432.5
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 2100,
+          "hand_counter": 1680,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 0,
+          "field_power": 7200,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 5600,
+          "deck_danger": 0,
+          "don": 1000,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 3690,
+          "attacker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": 118,
+        "telegraph": 0,
+        "total": 11423
+      }
+    },
+    {
+      "turn": 8,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "PASS"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -1357.7,
+          "deep": -1357.7
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-042"
+          },
+          "prelim": -4331.3,
+          "deep": -4331.3
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 2100,
+          "hand_counter": 1680,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 0,
+          "field_power": 7200,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 5600,
+          "deck_danger": 0,
+          "don": 1000,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 3690,
+          "attacker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": 118,
+        "telegraph": 0,
+        "total": 11423
+      }
+    },
+    {
+      "turn": 8,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_BLOCKER",
+      "chosen": {
+        "action_type": "PASS"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": 470.2,
+          "deep": 470.2
+        },
+        {
+          "move": {
+            "action_type": "SELECT_BLOCKER",
+            "card": "OP16-045"
+          },
+          "prelim": -1759.5,
+          "deep": -1759.5
+        },
+        {
+          "move": {
+            "action_type": "SELECT_BLOCKER",
+            "card": "OP16-045"
+          },
+          "prelim": -1759.5,
+          "deep": -1759.5
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 19550,
+          "life_low": 9200,
+          "hand": 2100,
+          "hand_counter": 1680,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 0,
+          "field_power": 7200,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 5600,
+          "deck_danger": 0,
+          "don": 1000,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 3690,
+          "attacker": 800,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": 118,
+        "telegraph": 0,
+        "total": 11823
+      }
+    },
+    {
+      "turn": 8,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "PASS"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -1845.9,
+          "deep": -1845.9
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-042"
+          },
+          "prelim": -5130,
+          "deep": -5130
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 16675,
+          "life_low": 9200,
+          "hand": 2800,
+          "hand_counter": 1680,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 0,
+          "field_power": 7200,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 5600,
+          "deck_danger": 0,
+          "don": 1000,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 3690,
+          "attacker": 800,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": 118,
+        "telegraph": 0,
+        "total": 9648
+      }
+    },
+    {
+      "turn": 8,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_BLOCKER",
+      "chosen": {
+        "action_type": "PASS"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": 1223.1,
+          "deep": 1223.1
+        },
+        {
+          "move": {
+            "action_type": "SELECT_BLOCKER",
+            "card": "OP16-045"
+          },
+          "prelim": -3357,
+          "deep": -3357
+        },
+        {
+          "move": {
+            "action_type": "SELECT_BLOCKER",
+            "card": "OP16-045"
+          },
+          "prelim": -3357,
+          "deep": -3357
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 16675,
+          "life_low": 9200,
+          "hand": 2800,
+          "hand_counter": 1680,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 0,
+          "field_power": 7200,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 5600,
+          "deck_danger": 0,
+          "don": 1000,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 3690,
+          "attacker": 400,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": 118,
+        "telegraph": 0,
+        "total": 10048
+      }
+    },
+    {
+      "turn": 8,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "PASS"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -128.7,
+          "deep": -128.7
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-042"
+          },
+          "prelim": -2421.9,
+          "deep": -2421.9
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 3360,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 0,
+          "field_power": 7200,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 5600,
+          "deck_danger": 0,
+          "don": 1000,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 3690,
+          "attacker": 400,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": 118,
+        "telegraph": 0,
+        "total": 9553
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "PLAY",
+        "card": "OP16-055"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-032"
+          },
+          "prelim": -1269.9,
+          "deep": -1269.9
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-055"
+          },
+          "prelim": -1269.9,
+          "deep": -1269.9
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-055"
+          },
+          "prelim": -1269.9,
+          "deep": -1269.9
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-054"
+          },
+          "prelim": -2717.1,
+          "deep": -2717.1
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-022",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -5276.7,
+          "deep": -5276.7
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-048",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -5600.7,
+          "deep": -5600.7
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 4200,
+          "hand_counter": 5880,
+          "deck_danger": 0,
+          "don": 1400,
+          "field_count": 3750,
+          "field_threat": 0,
+          "field_power": 7500,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4900,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 1125,
+          "field_power": 5490,
+          "attacker": 800,
+          "blocker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": 94,
+        "telegraph": 0,
+        "total": 10249
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "PLAY",
+        "card": "OP16-032"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-032"
+          },
+          "prelim": -1307.3,
+          "deep": -1307.3
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-055"
+          },
+          "prelim": -1307.3,
+          "deep": -1307.3
+        },
+        {
+          "move": {
+            "action_type": "ACTIVATE_MAIN",
+            "card": "OP16-022"
+          },
+          "prelim": -1344.6,
+          "deep": -1344.6
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-022",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2650.5,
+          "deep": -2650.5
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-054"
+          },
+          "prelim": -2717.1,
+          "deep": -2717.1
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-048",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2974.5,
+          "deep": -2974.5
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 5880,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 4500,
+          "field_threat": 765,
+          "field_power": 9930,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4900,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 1125,
+          "field_power": 6300,
+          "attacker": 800,
+          "blocker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": 94,
+        "telegraph": 0,
+        "total": 11284
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SEARCH_AND_SELECT",
+      "chosen": {
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "RESOLVE_EFFECT_SELECTION"
+          },
+          "prelim": 7006,
+          "deep": 7006
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 5880,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 4500,
+          "field_threat": 765,
+          "field_power": 9930,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4900,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 1125,
+          "field_power": 6300,
+          "attacker": 800,
+          "blocker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": 94,
+        "telegraph": 0,
+        "total": 11284
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SEARCH_AND_SELECT",
+      "chosen": {
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "RESOLVE_EFFECT_SELECTION"
+          },
+          "prelim": 7981,
+          "deep": 7981
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 5880,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3750,
+          "field_threat": 765,
+          "field_power": 9630,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4900,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 1125,
+          "field_power": 6300,
+          "attacker": 800,
+          "blocker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": -74,
+        "telegraph": 0,
+        "total": 10066
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "ACTIVATE_MAIN",
+        "card": "OP16-022"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "ACTIVATE_MAIN",
+            "card": "OP16-022"
+          },
+          "prelim": -1307.3,
+          "deep": -1307.3
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-022",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2626.2,
+          "deep": -2626.2
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-048",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2950.2,
+          "deep": -2950.2
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-042",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2950.2,
+          "deep": -2950.2
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -4030.2,
+          "deep": -4030.2
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -4030.2,
+          "deep": -4030.2
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 5880,
+          "deck_danger": 0,
+          "don": 400,
+          "field_count": 3750,
+          "field_threat": 765,
+          "field_power": 9630,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4900,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 1125,
+          "field_power": 6300,
+          "attacker": 800,
+          "blocker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": -74,
+        "telegraph": 0,
+        "total": 10466
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "PLAY",
+        "card": "OP16-055"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-055"
+          },
+          "prelim": -1307.3,
+          "deep": -1307.3
+        },
+        {
+          "move": {
+            "action_type": "ATTACH_DON",
+            "card": "OP16-022"
+          },
+          "prelim": -1776.6,
+          "deep": -1776.6
+        },
+        {
+          "move": {
+            "action_type": "PLAY",
+            "card": "OP16-054"
+          },
+          "prelim": -2063.3,
+          "deep": -2063.3
+        },
+        {
+          "move": {
+            "action_type": "ATTACH_DON",
+            "card": "OP16-045"
+          },
+          "prelim": -2063.3,
+          "deep": -2063.3
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-022",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2320.2,
+          "deep": -2320.2
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-048",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2644.2,
+          "deep": -2644.2
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 6720,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 4500,
+          "field_threat": 765,
+          "field_power": 9930,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4900,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 1125,
+          "field_power": 6300,
+          "attacker": 800,
+          "blocker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": 94,
+        "telegraph": 0,
+        "total": 12124
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SEARCH_AND_SELECT",
+      "chosen": {
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "RESOLVE_EFFECT_SELECTION"
+          },
+          "prelim": 10906,
+          "deep": 10906
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 6720,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3750,
+          "field_threat": 765,
+          "field_power": 9630,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4900,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 1125,
+          "field_power": 6300,
+          "attacker": 800,
+          "blocker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": -74,
+        "telegraph": 0,
+        "total": 10906
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "ATTACK",
+        "card": "OP16-022",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-022",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -1992.2,
+          "deep": -1992.2
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-048",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2235.2,
+          "deep": -2235.2
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-042",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2235.2,
+          "deep": -2235.2
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -3315.2,
+          "deep": -3315.2
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -3315.2,
+          "deep": -3315.2
+        },
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -13101.3,
+          "deep": -13101.3
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 6720,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3750,
+          "field_threat": 765,
+          "field_power": 9630,
+          "attacker": 1440,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4900,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 1125,
+          "field_power": 6300,
+          "attacker": 800,
+          "blocker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": -74,
+        "telegraph": 0,
+        "total": 10906
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "ATTACK",
+        "card": "OP16-042",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-048",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -1335.6,
+          "deep": -1335.6
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-042",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -1335.6,
+          "deep": -1335.6
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2415.6,
+          "deep": -2415.6
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2415.6,
+          "deep": -2415.6
+        },
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -12075.3,
+          "deep": -12075.3
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 6720,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3750,
+          "field_threat": 765,
+          "field_power": 9630,
+          "attacker": 1080,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 14500,
+          "life_low": 8000,
+          "hand": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 1125,
+          "field_power": 6300,
+          "attacker": 800,
+          "blocker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": -1186,
+        "telegraph": 0,
+        "total": 10134
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "ATTACK",
+        "card": "OP16-048",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-048",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -1293.3,
+          "deep": -1293.3
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2373.3,
+          "deep": -2373.3
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -2373.3,
+          "deep": -2373.3
+        },
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -10550.7,
+          "deep": -10550.7
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 6720,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3750,
+          "field_threat": 765,
+          "field_power": 9630,
+          "attacker": 720,
+          "blocker": 2400,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 5600,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3000,
+          "field_threat": 1125,
+          "field_power": 6300,
+          "attacker": 800,
+          "blocker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": -1322,
+        "telegraph": 0,
+        "total": 10738
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "ATTACK",
+        "card": "OP16-045",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -789.3,
+          "deep": -789.3
+        },
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -789.3,
+          "deep": -789.3
+        },
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -13514.9,
+          "deep": -13514.9
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 6720,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3750,
+          "field_threat": 765,
+          "field_power": 9630,
+          "attacker": 360,
+          "blocker": 1200,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 5600,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 6600,
+          "attacker": 400,
+          "blocker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": -1314,
+        "telegraph": 0,
+        "total": 10036
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "MAIN_ACTION",
+      "chosen": {
+        "action_type": "ATTACK",
+        "card": "OP16-045",
+        "targets": [
+          "OP16-080"
+        ]
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "ATTACK",
+            "card": "OP16-045",
+            "targets": [
+              "OP16-080"
+            ]
+          },
+          "prelim": -11772,
+          "deep": -11772
+        },
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": -14162.4,
+          "deep": -14162.4
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 13800,
+          "life_low": 9200,
+          "hand": 3500,
+          "hand_counter": 6720,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 3750,
+          "field_threat": 765,
+          "field_power": 9630,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 4900,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 1125,
+          "field_power": 6600,
+          "attacker": 400,
+          "blocker": 1200,
+          "leader_power": 1500,
+          "stage_count": 400
+        },
+        "plan_progress": -1146,
+        "telegraph": 0,
+        "total": 9344
+      }
+    },
+    {
+      "turn": 9,
+      "player": "p2",
+      "difficulty": "hard",
+      "chosen": {
+        "action_type": "TURN_END"
+      },
+      "forced": "only_move",
+      "candidates": [
+        {
+          "move": {
+            "action_type": "TURN_END"
+          },
+          "prelim": null,
+          "deep": null
+        }
+      ],
+      "regret": 0
+    },
+    {
+      "turn": 10,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "CONFIRM_OPTIONAL",
+      "chosen": {
+        "action_type": "RESOLVE_EFFECT_SELECTION"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "RESOLVE_EFFECT_SELECTION"
+          },
+          "prelim": -11838,
+          "deep": -11838
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 6900,
+          "life_low": 4600,
+          "hand": 4200,
+          "hand_counter": 6720,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 765,
+          "field_power": 9900,
+          "attacker": 360,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 3500,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 1800,
+          "field_threat": 1125,
+          "field_power": 9690,
+          "attacker": 1200,
+          "blocker": 2400,
+          "leader_power": 2100,
+          "stage_count": 240
+        },
+        "plan_progress": -978,
+        "telegraph": -6000,
+        "total": -11838
+      }
+    },
+    {
+      "turn": 10,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "SELECT_COUNTER",
+        "card": "OP16-042"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-042"
+          },
+          "prelim": -15969.6,
+          "deep": -15969.6
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "ST30-014"
+          },
+          "prelim": -15969.6,
+          "deep": -15969.6
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-054"
+          },
+          "prelim": -15969.6,
+          "deep": -15969.6
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-034"
+          },
+          "prelim": -15969.6,
+          "deep": -15969.6
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 6900,
+          "life_low": 4600,
+          "hand": 3500,
+          "hand_counter": 5040,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 765,
+          "field_power": 9900,
+          "attacker": 360,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 3500,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 1800,
+          "field_threat": 1125,
+          "field_power": 9690,
+          "attacker": 1200,
+          "blocker": 2400,
+          "leader_power": 2100,
+          "stage_count": 240
+        },
+        "plan_progress": -1146,
+        "telegraph": -6000,
+        "total": -14386
+      }
+    },
+    {
+      "turn": 10,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "SELECT_COUNTER",
+        "card": "OP16-034"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-054"
+          },
+          "prelim": -17506.8,
+          "deep": -17506.8
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-034"
+          },
+          "prelim": -17506.8,
+          "deep": -17506.8
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "ST30-014"
+          },
+          "prelim": -18262.8,
+          "deep": -18262.8
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-027"
+          },
+          "prelim": -18262.8,
+          "deep": -18262.8
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 6900,
+          "life_low": 4600,
+          "hand": 2800,
+          "hand_counter": 4200,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 765,
+          "field_power": 9900,
+          "attacker": 360,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 3500,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 1800,
+          "field_threat": 1125,
+          "field_power": 9690,
+          "attacker": 1200,
+          "blocker": 2400,
+          "leader_power": 2100,
+          "stage_count": 240
+        },
+        "plan_progress": -1314,
+        "telegraph": -6000,
+        "total": -16094
+      }
+    },
+    {
+      "turn": 10,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "SELECT_COUNTER",
+        "card": "ST30-014"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "ST30-014"
+          },
+          "prelim": -19800,
+          "deep": -19800
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-054"
+          },
+          "prelim": -19800,
+          "deep": -19800
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-027"
+          },
+          "prelim": -19800,
+          "deep": -19800
+        },
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -21466.8,
+          "deep": -21466.8
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 6900,
+          "life_low": 4600,
+          "hand": 2100,
+          "hand_counter": 2520,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 765,
+          "field_power": 9900,
+          "attacker": 360,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 3500,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 1800,
+          "field_threat": 1125,
+          "field_power": 9690,
+          "attacker": 1200,
+          "blocker": 2400,
+          "leader_power": 2100,
+          "stage_count": 240
+        },
+        "plan_progress": -1482,
+        "telegraph": -6000,
+        "total": -18642
+      }
+    },
+    {
+      "turn": 10,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "SELECT_COUNTER",
+        "card": "OP16-027"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-054"
+          },
+          "prelim": -22093.2,
+          "deep": -22093.2
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-027"
+          },
+          "prelim": -22093.2,
+          "deep": -22093.2
+        },
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -22222.8,
+          "deep": -22222.8
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 6900,
+          "life_low": 4600,
+          "hand": 1400,
+          "hand_counter": 840,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 765,
+          "field_power": 9900,
+          "attacker": 360,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 3500,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 1800,
+          "field_threat": 1125,
+          "field_power": 9690,
+          "attacker": 1200,
+          "blocker": 2400,
+          "leader_power": 2100,
+          "stage_count": 240
+        },
+        "plan_progress": -1650,
+        "telegraph": -6000,
+        "total": -21190
+      }
+    },
+    {
+      "turn": 10,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "PASS"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -24516,
+          "deep": -24516
+        },
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-054"
+          },
+          "prelim": -999999994,
+          "deep": -999999994
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 6900,
+          "life_low": 4600,
+          "hand": 1400,
+          "hand_counter": 840,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 765,
+          "field_power": 9900,
+          "attacker": 360,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 3500,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 1800,
+          "field_threat": 1125,
+          "field_power": 9690,
+          "attacker": 1200,
+          "blocker": 2400,
+          "leader_power": 2100,
+          "stage_count": 240
+        },
+        "plan_progress": -1650,
+        "telegraph": -6000,
+        "total": -21190
+      }
+    },
+    {
+      "turn": 10,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "PASS"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-054"
+          },
+          "prelim": -999999996,
+          "deep": -999999996
+        },
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -999999996,
+          "deep": -999999996
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 0,
+          "life_low": 0,
+          "hand": 2100,
+          "hand_counter": 840,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 765,
+          "field_power": 9900,
+          "attacker": 360,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 3500,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 1800,
+          "field_threat": 1125,
+          "field_power": 9690,
+          "attacker": 800,
+          "blocker": 2400,
+          "leader_power": 2100,
+          "stage_count": 240
+        },
+        "plan_progress": -1650,
+        "telegraph": 0,
+        "total": -25590
+      }
+    },
+    {
+      "turn": 10,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "SELECT_COUNTER",
+        "card": "OP16-054"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "SELECT_COUNTER",
+            "card": "OP16-054"
+          },
+          "prelim": -999999998,
+          "deep": -999999998
+        },
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -999999999,
+          "deep": -999999999
+        }
+      ],
+      "j_components": {
+        "me": {
+          "life": 0,
+          "life_low": 0,
+          "hand": 1400,
+          "hand_counter": 0,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 2250,
+          "field_threat": 765,
+          "field_power": 9900,
+          "attacker": 360,
+          "leader_power": 1500
+        },
+        "opp": {
+          "life": 12000,
+          "life_low": 8000,
+          "hand": 3500,
+          "deck_danger": 0,
+          "don": 0,
+          "field_count": 1800,
+          "field_threat": 1125,
+          "field_power": 9690,
+          "attacker": 400,
+          "blocker": 2400,
+          "leader_power": 2100,
+          "stage_count": 240
+        },
+        "plan_progress": -1818,
+        "telegraph": 0,
+        "total": -26898
+      }
+    },
+    {
+      "turn": 10,
+      "player": "p2",
+      "difficulty": "hard",
+      "pending_action": "SELECT_COUNTER",
+      "chosen": {
+        "action_type": "PASS"
+      },
+      "folded": false,
+      "regret": 0,
+      "candidates": [
+        {
+          "move": {
+            "action_type": "PASS"
+          },
+          "prelim": -999999999,
+          "deep": -999999999
+        }
+      ],
+      "j_components": {
+        "winner": "p1",
+        "total": -1000000000
+      }
+    }
+  ]
+}
