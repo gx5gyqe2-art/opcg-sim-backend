@@ -20,6 +20,7 @@
 | [`LOGGING.md`](LOGGING.md) | **ログ仕様**。汎用ログ（`log_event`/GCS/Slack）は撤去済み。唯一のログ＝ CPU 思考トレース（ローカル自己対戦／実アプリ `/replay`）の正本 |
 | [`parser_v2.md`](parser_v2.md) | カード効果パーサ（EffectParserV2）の設計・ルール一覧・既知のパース制約 |
 | [`leader_specs/`](leader_specs/README.md) | 全137リーダーのカード個別仕様（テキスト／期待挙動／テストケース）。作成ガイド [`_GUIDE.md`](leader_specs/_GUIDE.md)、テスト方針 [`_TEST_GUIDE.md`](leader_specs/_TEST_GUIDE.md)、既知差異 [`ISSUES.md`](leader_specs/ISSUES.md) |
+| [`human_log_collection.md`](human_log_collection.md) | **人間ログ収集・学習フロー**。対 CPU 戦の采取 JSON → 価値関数（評価関数の学習化, SPEC §2.5.7）の教師データ化。ingest→train（候補）→eval→Elo 検証→昇格の手順。蓄積場所 `tests/human_captures/`、一括実行 `tests/human_value_pipeline.py` |
 
 フロントエンドの仕様は `opcg-sim-frontend/docs/`。
 

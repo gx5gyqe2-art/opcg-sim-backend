@@ -5,3 +5,6 @@ __pycache__/
 .DS_Store
 # ビルド時生成のパース済みカードキャッシュ（image に焼くもの。リポジトリには含めない）
 opcg_sim/data/*.cache.pkl
+# 人間ログ・パイプラインの中間物（采取 JSON 自体は tests/human_captures/ にコミットして蓄積）
+tests/human_value.jsonl
+tests/human_value_model.candidate.json
