@@ -120,8 +120,13 @@ class EffectResolver:
         return id(ability)
 
     def _log_execution_report(self, player, source_card, ability):
-        """効果処理の結果（何をしてどうなったか）をまとめて出力する。"""
-        if os.environ.get("OPCG_LOG_SILENT"):
+        """効果処理の結果（何をしてどうなったか）をまとめて出力する。
+        既定では無音（オプトイン）。OPCG_LOG_DEBUG=1 のときだけ出力する。
+        この整形 JSON は CPU 探索が resolve_ability を1手あたり数百回通るたびに出力され、
+        さらに indent=2 が Cloud Logging 上で「1行=1エントリ」に分割されて数百件に膨張するため、
+        本番では取り込み課金が高騰する。env/デプロイ反映漏れで再発しないよう、抑制フラグではなく
+        明示の有効化(OPCG_LOG_DEBUG)を必須とする。"""
+        if os.environ.get("OPCG_LOG_DEBUG") != "1" or os.environ.get("OPCG_LOG_SILENT"):
             return
         try:
             snapshot = self.game_manager.get_debug_snapshot()
@@ -139,7 +144,8 @@ class EffectResolver:
             print(f"Report generation failed: {e}")
 
     def _log_failure_snapshot(self, player, source_card, ability, error_code, detail_msg):
-        if os.environ.get("OPCG_LOG_SILENT"):
+        # 既定で無音（オプトイン）。OPCG_LOG_DEBUG=1 のときだけ出力。理由は _log_execution_report を参照。
+        if os.environ.get("OPCG_LOG_DEBUG") != "1" or os.environ.get("OPCG_LOG_SILENT"):
             return
         try:
             snapshot = self.game_manager.get_debug_snapshot()
