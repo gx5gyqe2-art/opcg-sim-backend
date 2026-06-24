@@ -25,6 +25,7 @@ from typing import Callable, List, Optional, Tuple
 import conftest  # noqa: F401
 import eval_value_on_set as E
 import human_log_ingest as ingest
+import train_gbdt
 import train_value
 from opcg_sim.src.core import cpu_features, cpu_value_model
 
@@ -66,6 +67,20 @@ def train_candidate(X: List[List[float]], Y: List[int], epochs=300, lr=0.1, l2=1
         "format": cpu_value_model.MODEL_FORMAT,
         "feature_names": cpu_features.FEATURE_NAMES,
         "weights": w, "intercept": b, "mean": mean, "std": std,
+    }
+
+
+def train_gbdt_candidate(X: List[List[float]], Y: List[int],
+                         trees=120, depth=3, lr=0.1) -> Optional[dict]:
+    """非線形（GBDT）候補を本番推論経路が読む gbdt-v1 dict で返す。単一クラスは None。"""
+    if len(set(Y)) < 2:
+        return None
+    m = train_gbdt.train(X, Y, trees=trees, depth=depth, lr=lr)
+    return {
+        "format": "gbdt-v1",
+        "feature_names": cpu_features.FEATURE_NAMES,
+        "n_features": cpu_features.N_FEATURES,
+        "base_score": m["base_score"], "learning_rate": m["learning_rate"], "trees": m["trees"],
     }
 
 
@@ -139,6 +154,10 @@ def main(argv=None) -> int:
     ap.add_argument("--epochs", type=int, default=300)
     ap.add_argument("--lr", type=float, default=0.1)
     ap.add_argument("--l2", type=float, default=1e-4)
+    ap.add_argument("--model", choices=("linear", "gbdt"), default="linear",
+                    help="候補モデルの種類（linear=ロジ回帰 / gbdt=非線形）")
+    ap.add_argument("--trees", type=int, default=120)
+    ap.add_argument("--depth", type=int, default=3)
     args = ap.parse_args(argv)
 
     groups = load_groups(expand_dir(args.inp))
@@ -149,10 +168,14 @@ def main(argv=None) -> int:
     total_rows = sum(len(Y) for _, _, Y in groups)
     pos = sum(sum(Y) for _, _, Y in groups) / total_rows
     print("=== 人間ログ Leave-One-Game-Out 検証（正直な汎化） ===")
-    print(f"  games={len(groups)}  rows={total_rows}  pos_rate={pos:.3f}")
+    print(f"  games={len(groups)}  rows={total_rows}  pos_rate={pos:.3f}  候補={args.model}")
 
-    def _train(X, Y):
-        return train_candidate(X, Y, epochs=args.epochs, lr=args.lr, l2=args.l2)
+    if args.model == "gbdt":
+        def _train(X, Y):
+            return train_gbdt_candidate(X, Y, trees=args.trees, depth=args.depth, lr=args.lr)
+    else:
+        def _train(X, Y):
+            return train_candidate(X, Y, epochs=args.epochs, lr=args.lr, l2=args.l2)
 
     # ① 候補モデル: LOGO out-of-fold（カンニングなし＝本指標）
     oof_probs, oof_ys, folds = logo_oof(groups, _train, _predict_with)
@@ -170,7 +193,7 @@ def main(argv=None) -> int:
     # ③ in-sample: 全行で学習し全行で採点（楽観値・参考）
     allX = [f for (_, X, _) in groups for f in X]
     allY = [y for (_, _, Y) in groups for y in Y]
-    insample = train_candidate(allX, allY, epochs=args.epochs, lr=args.lr, l2=args.l2)
+    insample = _train(allX, allY)
     if insample is not None:
         in_probs = [_predict_with(f, insample) for f in allX]
         in_m = metrics(in_probs, allY)

@@ -89,6 +89,18 @@ def test_train_candidate_schema_and_single_class():
     assert p is not None and 0.0 <= p <= 1.0
 
 
+def test_train_gbdt_candidate_schema_and_single_class():
+    assert H.train_gbdt_candidate([_vec(1)], [1]) is None    # 単一クラスは学習不能
+    X = [_vec(5)] * 8 + [_vec(-5)] * 8
+    Y = [1] * 8 + [0] * 8
+    model = H.train_gbdt_candidate(X, Y, trees=10, depth=2)
+    assert model is not None and model["format"] == "gbdt-v1"
+    # 本番ローダ（gbdt-v1）の検証を通り、推論経路で勝率が出る。
+    assert cpu_value_model._valid_model(model)
+    p = cpu_value_model.predict_winprob(_vec(5), model=model)
+    assert p is not None and 0.0 <= p <= 1.0
+
+
 # --- metrics の素性 ----------------------------------------------------------------
 
 def test_metrics_basic():
