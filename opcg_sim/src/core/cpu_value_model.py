@@ -20,7 +20,22 @@ _MODEL_PATH = os.path.join(os.path.dirname(__file__), "value_model.json")
 
 _MODEL = None          # 読込済みモデル（dict）or False（読込失敗/未同梱）
 _LOAD_TRIED = False
-MODEL_FORMAT = "logreg-standardized-v1"
+MODEL_FORMAT = "logreg-standardized-v1"          # 線形（後方互換）
+_FORMATS = (MODEL_FORMAT, "gbdt-v1")             # gbdt-v1＝非線形（勾配ブースティング木）
+
+
+def _valid_model(m) -> bool:
+    """特徴の順序/個数が現行と一致＋形式ごとの必須フィールドを検証。"""
+    if m.get("feature_names") != cpu_features.FEATURE_NAMES:
+        return False
+    fmt = m.get("format")
+    if fmt == MODEL_FORMAT:
+        return (len(m.get("weights", [])) == cpu_features.N_FEATURES
+                and len(m.get("mean", [])) == cpu_features.N_FEATURES
+                and len(m.get("std", [])) == cpu_features.N_FEATURES)
+    if fmt == "gbdt-v1":
+        return isinstance(m.get("trees"), list) and m.get("n_features") == cpu_features.N_FEATURES
+    return False
 
 
 def _load():
@@ -31,18 +46,17 @@ def _load():
     try:
         with open(_MODEL_PATH, "r", encoding="utf-8") as f:
             m = json.load(f)
-        # 特徴の順序/個数が現行と一致することを検証（不一致＝無効化してフォールバック）。
-        if (m.get("format") == MODEL_FORMAT
-                and m.get("feature_names") == cpu_features.FEATURE_NAMES
-                and len(m.get("weights", [])) == cpu_features.N_FEATURES
-                and len(m.get("mean", [])) == cpu_features.N_FEATURES
-                and len(m.get("std", [])) == cpu_features.N_FEATURES):
-            _MODEL = m
-        else:
-            _MODEL = False
+        _MODEL = m if _valid_model(m) else False
     except (OSError, ValueError):
         _MODEL = False
     return _MODEL
+
+
+def _tree_predict(node, x: List[float]) -> float:
+    """GBDT 木 1 本の予測（`v`=葉値／`f,t,l,r`=内部ノード・`train_gbdt.tree_predict` と同一規約）。"""
+    while "v" not in node:
+        node = node["l"] if x[node["f"]] <= node["t"] else node["r"]
+    return node["v"]
 
 
 def is_available() -> bool:
@@ -69,22 +83,29 @@ def blend_alpha() -> float:
     return min(1.0, max(0.0, a))
 
 
+def _sigmoid(z: float) -> float:
+    if z >= 0:
+        return 1.0 / (1.0 + math.exp(-z))
+    ez = math.exp(z)
+    return ez / (1.0 + ez)
+
+
 def predict_winprob(features: List[float]) -> Optional[float]:
-    """標準化＋ロジスティックで勝率 [0,1] を返す。モデル無/長さ不一致は None。"""
+    """勝率 [0,1] を返す。線形（標準化＋ロジスティック）/ GBDT（木の走査）両対応。モデル無/長さ不一致は None。"""
     m = _load()
-    if not m:
+    if not m or len(features) != cpu_features.N_FEATURES:
         return None
+    if m.get("format") == "gbdt-v1":
+        raw = float(m.get("base_score", 0.0))
+        lr = float(m.get("learning_rate", 1.0))
+        for t in m["trees"]:
+            raw += lr * _tree_predict(t, features)
+        return _sigmoid(raw)
+    # 線形（logreg-standardized-v1）。
     w = m["weights"]; mean = m["mean"]; std = m["std"]
-    if len(features) != len(w):
-        return None
     z = float(m.get("intercept", 0.0))
     for i, x in enumerate(features):
         s = std[i]
         xs = (x - mean[i]) / s if s > 1e-9 else (x - mean[i])
         z += w[i] * xs
-    # 数値安定なシグモイド。
-    if z >= 0:
-        ez = math.exp(-z)
-        return 1.0 / (1.0 + ez)
-    ez = math.exp(z)
-    return ez / (1.0 + ez)
+    return _sigmoid(z)

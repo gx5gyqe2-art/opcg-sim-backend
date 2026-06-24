@@ -171,6 +171,25 @@ def test_value_blend_off_by_default_and_formula(db):
         cpu_value_model.set_alpha_override(None)
 
 
+def test_evaluate_base_split(db):
+    """2層分離（最小）: evaluate(α=0)==evaluate_base（手書き素点）・α>0 で base にブレンド適用。"""
+    from opcg_sim.src.core import cpu_value_model
+    random.seed(0)
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
+    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+    gm.start_game()
+    base = cpu_ai.evaluate_base(gm, "p1")
+    cpu_value_model.set_alpha_override(None)
+    try:
+        assert cpu_ai.evaluate(gm, "p1") == base                 # α=0 既定→素通し＝evaluate_base
+        if cpu_value_model.is_available():
+            cpu_value_model.set_alpha_override(0.5)
+            assert cpu_ai.evaluate(gm, "p1") == pytest.approx(cpu_ai._value_blend(gm, "p1", base))
+    finally:
+        cpu_value_model.set_alpha_override(None)
+
+
 def test_pimc_decide_legal_and_deterministic(db):
     """Phase 2 PIMC: pimc_worlds>=2 で K 決定化世界の平均から合法手を返す・同一 rng で決定論。"""
     KEY_PID = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('PLAYER_ID', 'player_id')
