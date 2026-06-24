@@ -1032,6 +1032,24 @@ class EffectParser:
         if _buf.strip():
             parts.append(_buf.strip())
 
+        # 連用接続「このX…し、パワー/コスト±N」で後続が主語省略の裸の増減句になる場合、
+        # 先行句の主語「この(キャラ/リーダー/カード)」を継承させる。継承しないと parse_target が
+        # 「自分のキャラ1枚を選ぶ(CHOOSE)」へ誤フォールバックし、PASSIVE 自己バフが再計算中に
+        # 対象選択へ中断＝盤面が固まる（OP12-063 レイジュ / EB04-048 ルッチ）。パワー/コストで
+        # 始まる句のみ対象とし、独自の主語を持つ句（OP14-086「自分の…すべてを、コスト+2」=
+        # 始端が「自分の」）は巻き込まない。
+        if len(parts) > 1:
+            _bare_buff_re = re.compile(_nfc(r'^(?:パワー|コスト)[ 　]*[+＋\-－−‐]\d'))
+            _subj_re = re.compile(_nfc(r'(この(?:キャラ|リーダー|カード))(?:は|の)?'))
+            _carry_subj = None
+            for _pi, _p in enumerate(parts):
+                if _carry_subj and _bare_buff_re.match(_p):
+                    parts[_pi] = _carry_subj + 'の' + _p
+                else:
+                    _sm = _subj_re.search(_p)
+                    if _sm:
+                        _carry_subj = _sm.group(1)
+
         if len(parts) > 1:
             return Sequence(actions=[self._parse_logic_block(p, is_cost) for p in parts])
         elif parts:
