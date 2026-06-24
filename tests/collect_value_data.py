@@ -16,7 +16,7 @@ from typing import Any, Dict, List
 import conftest  # noqa: F401
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai, cpu_features, cpu_mcts
+from opcg_sim.src.core import action_api, cpu_ai, cpu_features, cpu_mcts, cpu_value_data
 from opcg_sim.src.core.invariants import check_invariants
 
 from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS
@@ -91,15 +91,15 @@ def collect_game(seed: int, db, difficulty: str, max_steps: int,
         if check_invariants(m):
             return []
         # ターン境界で両者視点のスナップショットを採る（葉=ターン境界と同じ観測点）。
+        # 実対局のライブ採取（api/app.py）と同一の観測点・ラベル規約を共有する（cpu_value_data）。
         if m.turn_count != prev_turn:
             prev_turn = m.turn_count
-            for name in ("p1", "p2"):
-                samples.append({"f": cpu_features.extract_features(m, name), "p": name})
+            samples.extend(cpu_value_data.turn_boundary_samples(m))
         step += 1
 
     if m.winner is None:
         return []   # 未決着は捨てる（ラベル付け不能）
-    return [{"f": s["f"], "y": 1 if m.winner == s["p"] else 0} for s in samples]
+    return cpu_value_data.label_samples(samples, m.winner)
 
 
 def main(argv=None):

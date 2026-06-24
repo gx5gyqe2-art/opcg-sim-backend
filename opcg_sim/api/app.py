@@ -33,6 +33,7 @@ from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.core import cpu_mcts
 from opcg_sim.src.core import cpu_self_plan
+from opcg_sim.src.core import cpu_value_data
 from opcg_sim.api import decide_client
 from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.models import CardInstance
@@ -326,6 +327,28 @@ def _replay_record_action(meta, manager, src: str, player_id: str, movelike: Dic
         pass
 
 
+def _capture_value_samples(meta, manager):
+    """traced 対局のターン境界で両者視点の特徴を貯める（価値学習データ・人間ログ活用(a)/(A)）。
+
+    opt-in（cpu_trace）時のみ作動＝本番対局には一切のオーバーヘッド・挙動変化なし。**アクション適用後**に
+    呼ぶ。ラベルは未確定のまま `{"f","p"}` で貯め、終局時に replay エンドポイントで勝者から確定する。
+    境界検出（turn_count 変化）はオフライン自己対戦（collect_value_data）と同一規約。例外安全。
+    """
+    if not _replay_enabled(meta):
+        return
+    try:
+        prev = meta.get("_value_prev_turn")
+        if prev is None:                       # 初回＝基準ターンを記録するだけ（まだ境界でない）
+            meta["_value_prev_turn"] = manager.turn_count
+            return
+        if manager.turn_count != prev:
+            meta["_value_prev_turn"] = manager.turn_count
+            meta.setdefault("value_samples", []).extend(
+                cpu_value_data.turn_boundary_samples(manager))
+    except Exception:
+        pass
+
+
 @app.post("/api/game/create")
 async def game_create(req: Any = Body(...)):
     try:
@@ -373,7 +396,7 @@ async def game_create(req: Any = Body(...)):
                                 "p2": p2_leader.master.card_id if p2_leader else None},
                     "decks": {"p1": [ci.master.card_id for ci in p1_cards],
                               "p2": [ci.master.card_id for ci in p2_cards]},
-                    "actions": [], "decisions": [],
+                    "actions": [], "decisions": [], "value_samples": [],
                 })
         return build_game_result_hybrid(manager, game_id)
     except Exception as e:
@@ -396,6 +419,7 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         _src = "cpu" if (_meta and player_id == _meta.get("cpu_player_id")) else "human"
         _replay_record_action(_meta, manager, _src, player_id, {"action_type": action_type, "payload": payload})
         action_api.apply_game_action(manager, current_player, action_type, payload)
+        _capture_value_samples(_meta, manager)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
         _kick_ponder(game_id)     # ⑥-a: 制御が CPU へ移ったら次手番の計画を前倒し（既定 OFF）
@@ -441,6 +465,7 @@ async def game_battle(req: BattleActionRequest):
         _src = "cpu" if (_meta and player_id == _meta.get("cpu_player_id")) else "human"
         _replay_record_action(_meta, manager, _src, player_id, {"action_type": action_type, "card_uuid": card_uuid})
         action_api.apply_battle_action(manager, player, action_type, card_uuid)
+        _capture_value_samples(_meta, manager)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
         _kick_ponder(game_id)     # ⑥-a: 制御が CPU へ移ったら次手番の計画を前倒し（既定 OFF）
@@ -734,6 +759,7 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                         action_api.apply_battle_action(manager, cpu_player, move["action_type"], move.get("card_uuid"))
                     else:
                         action_api.apply_game_action(manager, cpu_player, move["action_type"], move.get("payload", {}))
+                    _capture_value_samples(meta, manager)
                     cpu_acted = True
                     cpu_event = manager.action_events[0] if manager.action_events else {"action": move["action_type"]}
         result = build_game_result_hybrid(manager, game_id, success=True)
@@ -762,12 +788,18 @@ async def game_replay(game_id: str):
     if not _replay_enabled(meta):
         return {"success": False, "error": {"code": "REPLAY_NOT_FOUND",
                 "message": "この対局のリプレイ記録がありません（cpu_trace 未指定 or 不明なゲーム）。"}}
+    # 価値学習データ（人間ログ活用）: 終局していればターン境界サンプルを勝者でラベル確定して同梱する
+    # （`{"f":[...],"y":0/1}`）。未決着なら空（ラベル付け不能）。フロント采取は replay 全体を運ぶので追加配線不要。
+    manager = GAMES.get(game_id)
+    raw_samples = meta.get("value_samples", [])
+    value_samples = (cpu_value_data.label_samples(raw_samples, manager.winner)
+                     if manager is not None and manager.winner is not None and raw_samples else [])
     descriptor = {
         "schema": REPLAY_SCHEMA, "seed": meta.get("seed"),
         "first_player": meta.get("first_player"), "difficulty": meta.get("difficulty"),
         "cpu_player_id": meta.get("cpu_player_id"),
         "leaders": meta.get("leaders"), "decks": meta.get("decks"),
-        "actions": meta.get("actions", []),
+        "actions": meta.get("actions", []), "value_samples": value_samples,
     }
     return {"success": True, "game_id": game_id,
             "replay": descriptor, "decisions": meta.get("decisions", [])}
