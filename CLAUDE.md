@@ -23,7 +23,7 @@
 導入後に collection 可。
 
 ```bash
-OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider   # 全テスト
+OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -p no:cacheprovider   # 全テスト（-n auto=並列）
 OPCG_LOG_SILENT=1 python tests/full_card_audit.py                     # 構造不変条件 = 0
 ```
 

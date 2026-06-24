@@ -31,7 +31,7 @@ resolver は `success = True` を返す。エラー・フォールバック・OT
 logger が `sys.stdout` を直接掴むため、pytest はキャプチャ無効で実行する。
 
 ```bash
-OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
+OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -p no:cacheprovider
 # （旧表記の -p no:capture でも可。-s/-p no:capture を付けないと I/O error になる）
 ```
 
@@ -204,7 +204,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 #    コアルール（ターン/戦闘等）の変更は gamestate.py を直接修正し test_rules_* に検証追加
 
 # 2) 回帰・退行
-OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
+OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -p no:cacheprovider
 OPCG_LOG_SILENT=1 python tests/compare_parsers.py        # レガシー比の新規OTHER（退行）
 
 # 3) 全カード構造不変条件・挙動ベースライン
