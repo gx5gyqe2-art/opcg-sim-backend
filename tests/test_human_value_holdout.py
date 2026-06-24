@@ -143,3 +143,23 @@ def test_main_readonly_and_runs(tmp_path):
 def test_main_needs_two_games(tmp_path):
     _write_capture(str(tmp_path / "only.json"), [(_vec(1), 1), (_vec(-1), 0)])
     assert H.main(["--in", str(tmp_path)]) == 1     # 1 対局では LOGO 不可
+
+
+def test_compare_mode_readonly_and_runs(tmp_path):
+    # 分離可能な 3 対局で --compare（同梱/線形/非線形）が完走し同梱モデルを書かない。
+    for g in range(3):
+        rows = []
+        for _ in range(8):
+            rows.append((_vec(5), 1)); rows.append((_vec(-5), 0))
+        _write_capture(str(tmp_path / f"g{g}.json"), rows)
+    before = os.path.getmtime(cpu_value_model._MODEL_PATH)
+    rc = H.main(["--in", str(tmp_path), "--compare", "--epochs", "50", "--trees", "10", "--depth", "2"])
+    assert rc == 0
+    assert os.path.getmtime(cpu_value_model._MODEL_PATH) == before
+
+
+def test_logo_metrics_helper_separable(tmp_path):
+    # 分離可能データで LOGO ヘルパが定数予測超えの acc を返す。
+    groups = [(f"g{g}", [_vec(5)] * 6 + [_vec(-5)] * 6, [1] * 6 + [0] * 6) for g in range(3)]
+    m = H.logo_metrics(groups, H.train_candidate)
+    assert m is not None and m["acc"] >= 0.9

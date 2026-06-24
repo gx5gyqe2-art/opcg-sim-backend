@@ -65,6 +65,14 @@ OPCG_LOG_SILENT=1 python tests/human_value_holdout.py
 - 読み取り専用（同梱 `value_model.json` 不変）。少数対局では対局別 acc の分散が大きい＝**データ律速の可視化**。
   まず LOGO acc が定数予測・同梱モデルを安定して上回ることを確認してから ④ へ進む。
 
+**収集ループ用ダッシュボード**（采取を増やすたびに 1 発で「勝てているか」を見る）:
+```bash
+OPCG_LOG_SILENT=1 python tests/human_value_holdout.py --compare
+```
+**同梱（現行CPU・線形）/ 学習版・線形 / 学習版・非線形(GBDT)** の正直スコア（acc・logloss）を 1 表で並べる。
+線形が頭打ち（同梱と並ぶ）なら**非線形(GBDT)** が表現力で上回るか確認する（`--model gbdt` で詳細・対局別も出る）。
+非線形が同梱/線形を**安定して**上回り出したら ④ Elo へ。
+
 ### ④ Elo 検証（昇格の前提）
 `val_acc` が十分（過去の自己対戦学習は 0.645 で強さ未達だった＝**ここを上回るのが目安**）なら、自己対戦
 アリーナで `OPCG_VALUE_BLEND_HARD`/`OPCG_VALUE_BLEND` の α を上げた blend ON と OFF を A/B し、

@@ -147,6 +147,27 @@ def _fmt(label: str, m: dict) -> str:
             f"    → logloss 改善 {lift:+.4f}・判定: {verdict}")
 
 
+def bundled_metrics(groups: List[Group]) -> dict:
+    """同梱モデル（本番 value_model.json）を全行で採点（参照線）。"""
+    probs = [_predict_with(f, None) for (_, X, _) in groups for f in X]
+    ys = [y for (_, _, Y) in groups for y in Y]
+    return metrics(probs, ys)
+
+
+def logo_metrics(groups: List[Group], train_fn) -> Optional[dict]:
+    """LOGO out-of-fold のプール採点（カンニングなし）。学習不能なら None。"""
+    probs, ys, _ = logo_oof(groups, train_fn, _predict_with)
+    return metrics(probs, ys) if ys else None
+
+
+def _summary_line(label: str, m: Optional[dict]) -> str:
+    if m is None:
+        return f"    {label:<24} 学習不能（対局数/ラベル偏り）"
+    lift = m["base_logloss"] - m["logloss"]
+    mark = "✅" if lift > 0 and m["acc"] > m["base_acc"] else "－"
+    return f"    {label:<24} acc={m['acc']:.4f}  logloss={m['logloss']:.4f}  (Δll {lift:+.4f}) {mark}"
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="人間ログ Leave-One-Game-Out 汎化検証（読み取り専用）")
     ap.add_argument("--in", dest="inp", default=os.path.join(os.path.dirname(__file__), "human_captures"),
@@ -158,6 +179,8 @@ def main(argv=None) -> int:
                     help="候補モデルの種類（linear=ロジ回帰 / gbdt=非線形）")
     ap.add_argument("--trees", type=int, default=120)
     ap.add_argument("--depth", type=int, default=3)
+    ap.add_argument("--compare", action="store_true",
+                    help="同梱 / 線形 / 非線形(GBDT) の正直スコアを1発で並べる（収集ループ用ダッシュボード）")
     args = ap.parse_args(argv)
 
     groups = load_groups(expand_dir(args.inp))
@@ -167,6 +190,18 @@ def main(argv=None) -> int:
 
     total_rows = sum(len(Y) for _, _, Y in groups)
     pos = sum(sum(Y) for _, _, Y in groups) / total_rows
+
+    if args.compare:
+        print("=== 正直スコア比較（LOGO・カンニングなし） ===")
+        print(f"  games={len(groups)}  rows={total_rows}  pos_rate={pos:.3f}  (定数予測 acc=0.5)")
+        lin = logo_metrics(groups, lambda X, Y: train_candidate(X, Y, epochs=args.epochs, lr=args.lr, l2=args.l2))
+        gbd = logo_metrics(groups, lambda X, Y: train_gbdt_candidate(X, Y, trees=args.trees, depth=args.depth, lr=args.lr))
+        print(_summary_line("同梱（線形・現行CPU）", bundled_metrics(groups)))
+        print(_summary_line("学習版・線形", lin))
+        print(_summary_line("学習版・非線形(GBDT)", gbd))
+        print("  ※ acc が高く Δll が +（定数予測超え）ほど良い。非線形が同梱/線形を安定して上回り出したら昇格(Elo)検討。")
+        return 0
+
     print("=== 人間ログ Leave-One-Game-Out 検証（正直な汎化） ===")
     print(f"  games={len(groups)}  rows={total_rows}  pos_rate={pos:.3f}  候補={args.model}")
 
