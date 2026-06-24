@@ -337,6 +337,10 @@ def _capture_value_samples(meta, manager):
     if not _replay_enabled(meta):
         return
     try:
+        if manager.winner is not None:
+            # 終局勝者を meta に保持＝WS 切断後の delayed_cleanup が GAMES から manager を退避しても
+            # （CPU_GAMES の meta は残る）replay でラベル確定できる。
+            meta["_winner"] = manager.winner
         prev = meta.get("_value_prev_turn")
         if prev is None:                       # 初回＝基準ターンを記録するだけ（まだ境界でない）
             meta["_value_prev_turn"] = manager.turn_count
@@ -791,9 +795,11 @@ async def game_replay(game_id: str):
     # 価値学習データ（人間ログ活用）: 終局していればターン境界サンプルを勝者でラベル確定して同梱する
     # （`{"f":[...],"y":0/1}`）。未決着なら空（ラベル付け不能）。フロント采取は replay 全体を運ぶので追加配線不要。
     manager = GAMES.get(game_id)
+    # 勝者は live の manager から、無ければ採取時に保持した _winner から（cleanup で manager 退避後も確定可能）。
+    winner = manager.winner if manager is not None else meta.get("_winner")
     raw_samples = meta.get("value_samples", [])
-    value_samples = (cpu_value_data.label_samples(raw_samples, manager.winner)
-                     if manager is not None and manager.winner is not None and raw_samples else [])
+    value_samples = (cpu_value_data.label_samples(raw_samples, winner)
+                     if winner is not None and raw_samples else [])
     descriptor = {
         "schema": REPLAY_SCHEMA, "seed": meta.get("seed"),
         "first_player": meta.get("first_player"), "difficulty": meta.get("difficulty"),

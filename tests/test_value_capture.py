@@ -152,6 +152,26 @@ def test_replay_labels_when_finished(client):
     assert all(r["y"] == 1 for r in p1_rows), "勝者 P1 視点が y=1 になっていない"
 
 
+def test_replay_labels_survive_manager_eviction(client):
+    """delayed_cleanup で manager が GAMES から退避しても、保持した勝者で replay がラベル確定できる。"""
+    gid = _create(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="hard",
+                  cpu_trace=True, seed=777)["game_id"]
+    _drive_until_samples(client, gid)
+    meta = A.CPU_GAMES[gid]
+    if not meta["value_samples"]:
+        pytest.skip("サンプル未蓄積")
+    # 終局＝勝者を採取フックに通して meta へ保持させる（終局後は cpu/step が走らないので直接呼ぶ）。
+    A.GAMES[gid].winner = "P2"
+    A._capture_value_samples(meta, A.GAMES[gid])
+    assert meta.get("_winner") == "P2", "勝者が meta に保持されていない"
+    # WS 切断後の cleanup を模して manager を GAMES から退避。
+    A.GAMES.pop(gid, None)
+    rows = client.get(f"/api/game/{gid}/replay").json()["replay"]["value_samples"]
+    assert rows and all(set(r) == {"f", "y"} for r in rows), "manager 退避でサンプルが失われた"
+    p2_rows = [r for s, r in zip(meta["value_samples"], rows) if s["p"] == "P2"]
+    assert all(r["y"] == 1 for r in p2_rows)
+
+
 # --- 采取ログ取り込み ------------------------------------------------------------
 
 def test_ingest_extracts_labeled_rows_from_envelope(tmp_path):
