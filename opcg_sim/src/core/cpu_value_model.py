@@ -52,6 +52,20 @@ def _load():
     return _MODEL
 
 
+def load_model_file(path: str):
+    """外部モデル JSON を読みスキーマ検証して dict を返す（読込失敗/検証NG は None）。
+
+    本番経路（`predict_winprob` の既定）には影響しない。オフライン検証ハーネスが**同梱外の候補モデル**を
+    外部セットで採点するための入口（`predict_winprob(features, model=...)` に渡す）。
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            m = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return m if _valid_model(m) else None
+
+
 def _tree_predict(node, x: List[float]) -> float:
     """GBDT 木 1 本の予測（`v`=葉値／`f,t,l,r`=内部ノード・`train_gbdt.tree_predict` と同一規約）。"""
     while "v" not in node:
@@ -90,9 +104,13 @@ def _sigmoid(z: float) -> float:
     return ez / (1.0 + ez)
 
 
-def predict_winprob(features: List[float]) -> Optional[float]:
-    """勝率 [0,1] を返す。線形（標準化＋ロジスティック）/ GBDT（木の走査）両対応。モデル無/長さ不一致は None。"""
-    m = _load()
+def predict_winprob(features: List[float], model=None) -> Optional[float]:
+    """勝率 [0,1] を返す。線形（標準化＋ロジスティック）/ GBDT（木の走査）両対応。モデル無/長さ不一致は None。
+
+    `model` 省略時は同梱 `value_model.json`（本番経路・既定）。明示の dict を渡すと**そのモデル**で推論する
+    （オフライン検証ハーネスが候補モデルを外部セットで採点する用途・推論の単一情報源を保つ）。
+    """
+    m = model if model is not None else _load()
     if not m or len(features) != cpu_features.N_FEATURES:
         return None
     if m.get("format") == "gbdt-v1":
