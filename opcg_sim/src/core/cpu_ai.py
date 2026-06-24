@@ -817,14 +817,27 @@ def _plan_progress(manager, me, opp, is_my_turn: bool, plan, profile=None) -> fl
 
 def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, plan=None,
              out: Optional[Dict[str, Any]] = None) -> float:
-    """`me_name` 視点の盤面優劣スコア（高いほど自分有利）。
+    """`me_name` 視点の盤面評価＝**手書き J値評価（`evaluate_base`）に学習価値の葉ブレンドを被せた**薄いラッパー。
+
+    天井上げ（学習価値を葉評価の中心に育てる・§2.5.8）に向け、手書き評価と学習ブレンドを 2 層に分離した
+    差し込み口。`OPCG_VALUE_BLEND`/override の α=0（既定）では `_value_blend` が素通し＝`evaluate_base` と
+    完全同値（葉で predict も呼ばない）。引数・戻り値は `evaluate_base` と同一＝既存呼び出しは透過。
+    """
+    return _value_blend(manager, me_name,
+                        evaluate_base(manager, me_name, see_opp_hand=see_opp_hand,
+                                      profile=profile, plan=plan, out=out))
+
+
+def evaluate_base(manager, me_name: str, see_opp_hand: bool = True, profile=None, plan=None,
+                  out: Optional[Dict[str, Any]] = None) -> float:
+    """`me_name` 視点の**手書き J値評価**（学習ブレンドを含まない素のスコア・高いほど自分有利）。
 
     `see_opp_hand=False` のとき相手手札は枚数のみ評価する（中身＝カウンター値を読まない）。
-    自分の手札は常に full。難易度の情報方針: easy/normal=False（公開のみ）/ hard=True（チート）。
+    自分の手札は常に full。情報方針は呼び出し側（`decide`）が渡す（fair=False＝公開のみ／cheat=True）。
     `profile`（リーダー推測の相手モデル・§2.5.4）があれば、相手手札の防御価値（defense_factor）と
-    自分のライフ重視度（aggro_lean）を補正する（normal のみ供給）。
+    自分のライフ重視度（aggro_lean）を補正する。
     `plan`（自デッキ勝ち筋プラン・§2.5.5）があれば、自分側の評価重み（置物の存在価値・カウンター
-    温存・ライフ重視・攻め圧）を補正し、逆算リーサル/マイルストーン項を加える（normal/hard で供給）。
+    温存・ライフ重視・攻め圧）を補正し、逆算リーサル/マイルストーン項を加える。
     plan=None では一切作動せず現行挙動と完全同値。
     """
     if manager.winner == me_name:
@@ -896,7 +909,7 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
         out["opp"] = {k: round(v, 1) for k, v in out_opp.items()}
         out["plan_progress"] = round(plan_progress, 1)
         out["telegraph"] = round(-telegraph, 1)
-    return _value_blend(manager, me_name, total)
+    return total
 
 
 def _pending_keys():
