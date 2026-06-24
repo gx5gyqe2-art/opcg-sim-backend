@@ -106,3 +106,16 @@ def test_blend_on_changes_value_and_is_deterministic(db):
         assert 0.0 <= v1 <= 1.0
     finally:
         os.environ.pop("OPCG_VALUE_BLEND", None)
+
+
+def test_gbdt_tree_predict_and_format():
+    """GBDT 推論（最小）: 木の走査＝x[f]<=t で左/否右・葉値を返す。format/spec 検証も gbdt-v1 を許容。"""
+    tree = {"f": 0, "t": 1.5, "l": {"v": -2.0}, "r": {"v": 3.0}}
+    assert cpu_value_model._tree_predict(tree, [1.0]) == -2.0   # <= で左
+    assert cpu_value_model._tree_predict(tree, [2.0]) == 3.0    # > で右
+    assert cpu_value_model._tree_predict({"v": 0.5}, [9]) == 0.5  # 葉のみ
+    # gbdt-v1 のスキーマ検証が通る（trees=list・n_features 一致・feature_names 一致）。
+    ok = {"format": "gbdt-v1", "feature_names": cpu_features.FEATURE_NAMES,
+          "n_features": cpu_features.N_FEATURES, "trees": [{"v": 0.0}]}
+    assert cpu_value_model._valid_model(ok) is True
+    assert cpu_value_model._valid_model({**ok, "n_features": 999}) is False
