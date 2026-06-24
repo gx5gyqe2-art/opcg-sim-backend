@@ -31,8 +31,17 @@ resolver は `success = True` を返す。エラー・フォールバック・OT
 logger が `sys.stdout` を直接掴むため、pytest はキャプチャ無効で実行する。
 
 ```bash
-OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
+OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -m "not slow" -p no:cacheprovider
 # （旧表記の -p no:capture でも可。-s/-p no:capture を付けないと I/O error になる）
+# -n auto = pytest-xdist 並列。-m "not slow" = CI と同条件（最重量テストを除外）。
+```
+
+`slow` マーカー（`pytest_configure` で登録）は **CI から除外**する重テスト（手動実行前提）。現状の対象は
+`test_journal.py::test_parked_resume_make_unmake_roundtrip`（8 seed × 全手の make/unmake 照合 ~245s＝
+スイート単独最重量・並列でも壁時計上限を作る）。**make/unmake（journal）周辺を変更したら手動実行**する:
+
+```bash
+OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 重テストだけ
 ```
 
 合格条件: 出力が `passed` / `xfailed` / `skipped` のみ。`failed` / `xpassed` を残さない。
@@ -204,7 +213,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
 #    コアルール（ターン/戦闘等）の変更は gamestate.py を直接修正し test_rules_* に検証追加
 
 # 2) 回帰・退行
-OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
+OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -p no:cacheprovider
 OPCG_LOG_SILENT=1 python tests/compare_parsers.py        # レガシー比の新規OTHER（退行）
 
 # 3) 全カード構造不変条件・挙動ベースライン

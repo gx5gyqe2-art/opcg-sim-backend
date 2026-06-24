@@ -21,6 +21,11 @@ COPY . /app
 RUN python -m opcg_sim.tools.build_card_cache
 
 ENV PORT=8080
+# Cloud Logging 費用対策: 効果処理ごとの盤面ダンプ JSON（resolver._log_execution_report /
+# _log_failure_snapshot）を本番では全停止する。CPU 探索（PIMC×予算按分）が resolve_ability を
+# 1手あたり数百回通るため、これが無効だと数MB級/手のログが stdout→Cloud Logging へ流入し課金が嵩む。
+# フロント配信（to_dict / action_events）はこの print と別系統なので表示・通信には一切影響しない。
+ENV OPCG_LOG_SILENT=1
 # 探索オフロードを既定で有効化（無効化は OPCG_PYPY_WORKER=0 でインプロセス実行へ即ロールバック）。
 ENV OPCG_PYPY_WORKER=1
 # 体感最適化（Phase 3）。決定性は維持＝decide の決定的結果を前倒しするだけ・合法性ゲートで安全。
@@ -40,4 +45,5 @@ ENV OPCG_PONDER_SPEC=1
 # 即ロールバックは OPCG_PIMC_WORLDS=1（PIMC 休眠）。docs/reports/cpu_phase4_pimc_budget_split_20260623.md。
 ENV OPCG_PIMC_WORLDS=4
 ENV OPCG_HARD_PER_MOVE_BUDGET=75
-CMD ["sh", "-c", "uvicorn opcg_sim.api.app:app --host 0.0.0.0 --port $PORT"]
+# --no-access-log: リクエスト毎の uvicorn アクセスログを停止（Cloud Run のリクエストログとも重複するため）。
+CMD ["sh", "-c", "uvicorn opcg_sim.api.app:app --host 0.0.0.0 --port $PORT --no-access-log"]
