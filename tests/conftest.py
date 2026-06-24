@@ -55,3 +55,13 @@ def _install_google_stub():
 
 
 _install_google_stub()
+
+
+def pytest_configure(config):
+    """マーカー登録。`slow` = CI から除外する重テスト（手動実行前提）。
+    CI は `-m "not slow"` で実行し、`-m slow` で重テストだけを手動実行できる。
+    """
+    config.addinivalue_line(
+        "markers",
+        "slow: 実行が極端に長くCIから除外する重テスト（手動実行前提・例 test_journal の parked_resume ~245s）",
+    )

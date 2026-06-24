@@ -206,12 +206,17 @@ def test_real_playout_make_unmake_roundtrip(db):
     assert checked >= 10, f"状態変化を伴う手の検証数が不足 (checked={checked})"
 
 
+@pytest.mark.slow
 def test_parked_resume_make_unmake_roundtrip(db):
     """**中断再開（parked resolver）の手**を transaction で包んで適用→巻き戻しし、開始 deepcopy と
     完全一致（deep_diff==None）を確認する。parked 状態の journaled 化（resolver の journaled
     __setattr__／context・saved_targets の JournaledDict／execution_stack・saved_stack・退避スタックの
     JournaledList／誘発 item の JournaledDict）の完全性ゲート。これが緑＝`_mu_safe` が中断局面でも
     make/unmake できる（残 clone フォールバックの大半を解消・docs/SPEC.md §2.5.2）。
+
+    NOTE: 8 seed × 全手の make/unmake 照合で**約245秒**＝スイート最重量。CI（`-m "not slow"`）からは
+    除外し、make/unmake 周辺を触ったときに**手動実行**する前提:
+        OPCG_LOG_SILENT=1 python -m pytest tests/test_journal.py -q -s -m slow -p no:cacheprovider
     """
     from opcg_sim.src.core.gamestate import GameManager, Player
     KEY = _pid_key()
