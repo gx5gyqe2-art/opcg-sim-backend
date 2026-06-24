@@ -46,7 +46,7 @@
 
 ```bash
 # テスト（キャプチャ無効・ログ抑止が必須）
-OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
+OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -p no:cacheprovider
 
 # 全カード構造不変条件・挙動ベースライン
 OPCG_LOG_SILENT=1 python tests/full_card_audit.py

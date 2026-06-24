@@ -23,9 +23,13 @@
 導入後に collection 可。
 
 ```bash
-OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider   # 全テスト
+OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -m "not slow" -p no:cacheprovider  # 全テスト（CI同条件・並列／slow除外）
+OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider          # 重テスト（make/unmake変更時に手動）
 OPCG_LOG_SILENT=1 python tests/full_card_audit.py                     # 構造不変条件 = 0
 ```
+
+> `slow` マーカーの重テスト（現状 `test_journal.py::test_parked_resume_make_unmake_roundtrip` ~245s）は
+> CI から除外（`-m "not slow"`）。**make/unmake（journal）周辺を変更したときは上の `-m slow` を手動実行**する。
 
 - 全テスト pass（`test_full_card_baseline.py`＝挙動ベースライン一致、`test_effect_oracle_gate.py`＝
   HAS_OTHER/PER_TURN_LIMIT_GAP/UP_TO_GAP = 0 のラチェットを含む）

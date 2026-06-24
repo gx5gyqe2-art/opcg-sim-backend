@@ -28,10 +28,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install fastapi uvicorn websockets pydantic python-multipart requests
-          pip install pytest httpx
+          pip install pytest pytest-xdist httpx
 
       - name: Run tests, structural audits, and quality gates
         env:
           OPCG_LOG_SILENT: "1"
         # -s（キャプチャ無効）はこのスイートの必須フラグ（docs/README.md）。
-        run: python -m pytest tests/ -q -s -p no:cacheprovider
+        # -n auto は pytest-xdist の並列実行（コア数自動）。決定論テスト＝順序非依存で安全。
+        # -m "not slow" は最重量テスト（test_journal の parked_resume ~245s）を CI から除外
+        #   ＝make/unmake を触ったときに手動 `-m slow` で回す前提（docs/TEST_SPEC.md §実行方法）。
+        # ローカル4コアで全1113pass・約8分→約4分（parked_resume 除外で壁時計上限が解消）。
+        run: python -m pytest tests/ -q -s -n auto -m "not slow" -p no:cacheprovider
