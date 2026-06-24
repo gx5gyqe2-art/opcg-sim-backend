@@ -51,6 +51,20 @@ python tests/train_value.py --data tests/human_value.jsonl --out tests/human_val
 python tests/eval_value_on_set.py --data tests/human_value.jsonl --model tests/human_value_model.candidate.json
 ```
 
+### ③.5 正直な汎化を測る（Leave-One-Game-Out）
+`eval_value_on_set` / `train_value` の val は**行単位**の分割なので、同じ対局の相関した局面が学習側と採点側に
+分かれて混ざり**汎化が楽観化**する（1 対局＝多数の相関行）。昇格判断の前に、**対局単位**で抜く LOGO 検証で
+カンニングなしの数値を確認する:
+```bash
+OPCG_LOG_SILENT=1 python tests/human_value_holdout.py
+```
+- 1 采取ファイル=1 対局=1 グループとして「1 対局を抜いて残りで学習→抜いた対局で採点」を全対局で回し、
+  **out-of-fold 予測をプール**して採点（どの採点行もその対局を学習に使っていない）。
+- 同じ行に対する**同梱モデル**と、**in-sample（全行学習・全行採点）**＝楽観値を併記し、
+  **楽観バイアス = in-sample acc − LOGO acc** を表示する。対局別 OOF acc も出る。
+- 読み取り専用（同梱 `value_model.json` 不変）。少数対局では対局別 acc の分散が大きい＝**データ律速の可視化**。
+  まず LOGO acc が定数予測・同梱モデルを安定して上回ることを確認してから ④ へ進む。
+
 ### ④ Elo 検証（昇格の前提）
 `val_acc` が十分（過去の自己対戦学習は 0.645 で強さ未達だった＝**ここを上回るのが目安**）なら、自己対戦
 アリーナで `OPCG_VALUE_BLEND_HARD`/`OPCG_VALUE_BLEND` の α を上げた blend ON と OFF を A/B し、
