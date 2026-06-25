@@ -77,9 +77,8 @@ def _clock_of(p, opp, is_turn: bool) -> float:
             pw = c.get_power(is_turn)
         except Exception:
             pw = getattr(c.master, "power", 0) or 0
-        reach += _effective_power(pw, cap)
-    # リーダーの素の打点も概算で加える（有効パワー上限まで）。
-    return reach / 1000.0
+        reach += max(0.0, _effective_power(pw, cap))   # 有効パワーは非負（過剰減衰で負を返す経路を遮断）
+    return max(0.0, reach) / 1000.0
 
 
 def _board_value(p, opp, is_turn: bool, leaf_is_my_turn_end: bool) -> float:
@@ -186,12 +185,13 @@ def evaluate_v2(manager, me_name: str, see_opp_hand: bool = True,
     opp_clock = _clock_of(opp, me, not is_my_turn)
     my_life = max(len(me.life), 1)
     opp_life = max(len(opp.life), 1)
-    # γ_surv: あと何ターン生きて展開を使えるか（自ライフ / 相手clock）。
-    gamma = min(1.0, my_life / (opp_clock + _EPS)) ** V2_KAPPA
-    gamma_opp = min(1.0, opp_life / (my_clock + _EPS)) ** V2_KAPPA
+    # γ_surv: あと何ターン生きて展開を使えるか（自ライフ / 相手clock）。底は生存確率＝[0,1] にクランプ
+    # （clock が 0/負でも実数を保つ。負べき乗→複素数の回避）。
+    gamma = max(0.0, min(1.0, my_life / (opp_clock + _EPS))) ** V2_KAPPA
+    gamma_opp = max(0.0, min(1.0, opp_life / (my_clock + _EPS))) ** V2_KAPPA
     # amp: 即時圧力でカウンター価値を増幅。確殺接近で連続的に減衰（崖なし）。
-    pressure = opp_clock / my_life
-    pressure_opp = my_clock / opp_life
+    pressure = max(0.0, opp_clock) / my_life
+    pressure_opp = max(0.0, my_clock) / opp_life
     amp = 1.0 + V2_LAMBDA * _decay(pressure)
     amp_opp = 1.0 + V2_LAMBDA * _decay(pressure_opp)
     # Don 予算（概算）: アクティブドン枚数。

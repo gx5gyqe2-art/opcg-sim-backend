@@ -63,6 +63,20 @@ def test_evaluate_v2_winner_sign(db):
     assert cpu_eval_v2.evaluate_v2(gm, "p2") == -cpu_ai.W_WIN
 
 
+def test_evaluate_v2_real_finite_under_extreme_kappa(db):
+    """SPSA が係数を摂動しても実数・finite を保つ（gamma の底クランプ＝負べき乗→複素数の回帰防止）。"""
+    import math
+    orig = cpu_eval_v2.V2_KAPPA
+    try:
+        for kappa in (0.2, 0.5, 1.0, 3.0, 5.0):       # SPSA 乗数 [0.2,5] 相当
+            cpu_eval_v2.V2_KAPPA = kappa
+            for seed in range(6):
+                v = cpu_eval_v2.evaluate_v2(_new_gm(db, seed=seed), "p1")
+                assert isinstance(v, float) and math.isfinite(v), f"kappa={kappa} seed={seed} -> {v!r}"
+    finally:
+        cpu_eval_v2.V2_KAPPA = orig
+
+
 def test_evaluate_v2_out_trace(db):
     """out 指定時に v2 成分内訳（R_me/R_opp/tele/gamma/amp）を記録し、採点（戻り値）は不変。"""
     gm = _new_gm(db, seed=3)
