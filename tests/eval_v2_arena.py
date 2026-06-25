@@ -36,10 +36,9 @@ def _pair_level_ci(pair_scores):
 
 
 def run_paired(pairs, seed0, max_steps):
-    db = _load_db()
-    res = arena_paired(db, "hard", "hard", pairs, seed0=seed0, max_steps=max_steps,
-                       challenger_eval_v2=True, baseline_eval_v2=False)
-    pair_scores = [d["pair_score"] for d in res["detail"]]
+    from arena_parallel import paired_play
+    res = paired_play(pairs, seed0=seed0, max_steps=max_steps)   # コア並列・現行係数
+    pair_scores = res["pair_scores"]
     ci = _pair_level_ci(pair_scores)
     print(f"\n=== 評価v2 ON vs OFF（hard・{pairs}ペア={2*pairs}局・対照ペア） ===")
     print(f"v2 勝率 = {ci['win_rate']:.3f}  |  Elo = {ci['elo']:+.0f}")

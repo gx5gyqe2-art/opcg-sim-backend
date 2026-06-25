@@ -1,0 +1,96 @@
+"""自己対戦アリーナの**並列実行**（検証基盤の高速化・dev専用）。
+
+1 局 ~30-48s が律速。各局は独立（seed で決定論）なので、`multiprocessing` で**コア並列**して壁時計を縮める
+（4コアで ~3-4x）。方策・評価・結果は不変＝**純粋な高速化**（同 seed は同結果）。
+
+評価 v2 の係数は**ワーカープロセスごとに spec の `coeffs` から設定**する（プロセス分離なので相互汚染なし）。
+SPSA の f(θ) 評価では θ を coeffs として渡せば、その θ で並列対戦できる。
+
+対照ペア（antithetic）: 各 seed を両席で 1 回ずつ（同 game-seed・`separate_policy_rng=True`）。
+"""
+import multiprocessing as mp
+import os
+from typing import Any, Dict, List, Optional
+
+import conftest  # noqa: F401
+from cpu_arena import _load_db, play_game, DEFAULT_MAX_STEPS, elo_delta
+from opcg_sim.src.core import cpu_eval_v2
+
+_DB = None
+
+
+def _init_worker():
+    """ワーカー起動時に 1 回だけカード DB をロード（局ごとの再ロードを避ける）。"""
+    global _DB
+    _DB = _load_db()
+
+
+def _play_one(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """1 局を実行して勝者を返す。spec.coeffs があれば cpu_eval_v2 係数を上書きしてから対戦。"""
+    coeffs = spec.get("coeffs")
+    if coeffs:
+        for k, v in coeffs.items():
+            setattr(cpu_eval_v2, k, v)
+    res = play_game(spec["seed"], _DB, spec["p1d"], spec["p2d"],
+                    max_steps=spec.get("max_steps", DEFAULT_MAX_STEPS),
+                    p1_eval_v2=spec.get("p1_v2"), p2_eval_v2=spec.get("p2_v2"),
+                    separate_policy_rng=True)
+    return {"pair": spec["pair"], "seat": spec["seat"], "winner": res["winner"]}
+
+
+def _default_workers() -> int:
+    return max(1, (os.cpu_count() or 2) - 1)
+
+
+def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
+                coeffs: Optional[Dict[str, float]] = None, workers: Optional[int] = None,
+                challenger_eval_v2: bool = True, baseline_eval_v2: bool = False) -> Dict[str, Any]:
+    """対照ペアを**並列**で実行し、ペア単位スコア（{0,0.5,1}）と勝率を返す。
+
+    challenger = 評価v2 ON（既定）／baseline = 評価v2 OFF（成熟J値）。両者とも難易度 hard。
+    coeffs（任意）= 評価 v2 の係数上書き（SPSA の θ 評価用）。workers=1 で逐次（デバッグ用）。
+    """
+    workers = workers or _default_workers()
+    # 各ペア＝2 局（席A: challenger=p1 / 席B: challenger=p2・同 seed）。
+    specs: List[Dict[str, Any]] = []
+    for k in range(pairs):
+        seed = seed0 + k
+        specs.append({"pair": k, "seat": "A", "seed": seed, "p1d": "hard", "p2d": "hard",
+                      "p1_v2": challenger_eval_v2, "p2_v2": baseline_eval_v2,
+                      "max_steps": max_steps, "coeffs": coeffs})
+        specs.append({"pair": k, "seat": "B", "seed": seed, "p1d": "hard", "p2d": "hard",
+                      "p1_v2": baseline_eval_v2, "p2_v2": challenger_eval_v2,
+                      "max_steps": max_steps, "coeffs": coeffs})
+
+    if workers <= 1:
+        _init_worker()
+        results = [_play_one(s) for s in specs]
+    else:
+        with mp.Pool(workers, initializer=_init_worker) as pool:
+            results = pool.map(_play_one, specs)
+
+    # ペアごとに challenger の勝点を集計（席A: p1勝ち / 席B: p2勝ち）。
+    by_pair: Dict[int, float] = {}
+    for r in results:
+        chal_won = (r["winner"] == "p1") if r["seat"] == "A" else (r["winner"] == "p2")
+        by_pair[r["pair"]] = by_pair.get(r["pair"], 0.0) + (1.0 if chal_won else 0.0)
+    pair_scores = [by_pair[k] / 2.0 for k in range(pairs)]
+    wr = sum(pair_scores) / pairs
+    return {"win_rate": wr, "elo": elo_delta(wr), "pair_scores": pair_scores,
+            "pairs": pairs, "games": 2 * pairs, "workers": workers}
+
+
+if __name__ == "__main__":
+    import argparse
+    import time
+    ap = argparse.ArgumentParser(description="並列アリーナ（評価v2 ON vs OFF・対照ペア）")
+    ap.add_argument("--pairs", type=int, default=15)
+    ap.add_argument("--workers", type=int, default=0, help="0=自動（コア数-1）")
+    ap.add_argument("--seed0", type=int, default=0)
+    args = ap.parse_args()
+    t0 = time.time()
+    res = paired_play(args.pairs, seed0=args.seed0, workers=(args.workers or None))
+    dt = time.time() - t0
+    print(f"v2 勝率 = {res['win_rate']:.3f} (Elo {res['elo']:+.0f}) | "
+          f"{res['games']}局 / {res['workers']}並列 / {dt:.1f}s "
+          f"({dt/res['games']:.1f}s/局)")

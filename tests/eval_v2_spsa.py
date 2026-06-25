@@ -61,16 +61,16 @@ def set_params(init, m):
 
 
 def winrate_vs_base(db, games, seed0, max_steps):
-    """v2 ON vs 評価OFF（base）の勝率を**対照ペア（antithetic）**で測る＝分散低減（C・Phase0）。
+    """v2 ON vs 評価OFF（base）の勝率を**対照ペア（antithetic）＋コア並列**で測る（分散低減＋高速化）。
 
-    `arena_paired` を使い、各 seed を**両席で1回ずつ**（同一 game-seed・`separate_policy_rng=True`）戦わせて
-    席順（先手有利）とデッキ構成の非対称をペア内で相殺する。独立 N 局より同じ局数で CI が狭い。
-    games は総局数（pairs = games//2）。v2 側勝率を返す（SPSA の目的関数＝低ノイズ）。
+    `arena_parallel.paired_play` で各 seed を両席1回ずつ（同 game-seed・`separate_policy_rng`）並列実行。
+    現在の評価係数（set_params で設定済みの θ）をワーカーへ `coeffs` で渡す＝その θ で並列対戦。
+    games は総局数（pairs=games//2）。v2 側勝率を返す（SPSA の目的関数＝低ノイズ・高速）。
     """
-    from cpu_arena import arena_paired
+    from arena_parallel import paired_play
     pairs = max(1, games // 2)
-    res = arena_paired(db, "hard", "hard", pairs, seed0=seed0, max_steps=max_steps,
-                       challenger_eval_v2=True, baseline_eval_v2=False)
+    coeffs = {name: float(getattr(V2, name)) for name in PARAMS}   # 親の θ をワーカーへ
+    res = paired_play(pairs, seed0=seed0, max_steps=max_steps, coeffs=coeffs)
     return res["win_rate"]
 
 
