@@ -79,6 +79,11 @@ _KILLER_SLOTS = 2          # 各 ply で保持する killer 手の数（standard
 # （最善応手列を次手の同一局面ノードへ正しく対応付ける）で正の利得が出れば有効化を再検討する。
 _USE_PV_CROSS_DECIDE = False
 
+# 評価関数 v2（L1コア・単一通貨「カード」＋時間割引・設計 v0.4）の段階導入フラグ。
+# 既定 OFF＝`evaluate_base` は従来の手書き J値評価のまま（完全同値）。`OPCG_EVAL_V2=1` で v0.4 評価へ
+# 差し替わる（first cut・係数未チューニング）。正本: docs/reports/cpu_eval_redesign_card_currency_20260625.md。
+_USE_EVAL_V2 = os.environ.get("OPCG_EVAL_V2") not in (None, "", "0")
+
 # 情報方針（フェア制約・docs/reports/cpu_strength_roadmap_20260622.md §0/§4 Phase -1）。
 # 旧実装は decide で `see_opp_hand, opp_public_only = True, False` を**ハードコード**＝出荷 CPU がチート
 # （相手手札/裏ライフを読む）だった。これを引数化し、**出荷デフォルトを fair に即切替**する（固定値撤廃）。
@@ -840,6 +845,11 @@ def evaluate_base(manager, me_name: str, see_opp_hand: bool = True, profile=None
     温存・ライフ重視・攻め圧）を補正し、逆算リーサル/マイルストーン項を加える。
     plan=None では一切作動せず現行挙動と完全同値。
     """
+    # 評価 v2（L1コア・v0.4）への段階導入差し替え。既定 OFF＝以降の従来 J値評価を実行（完全同値）。
+    if _USE_EVAL_V2:
+        from . import cpu_eval_v2
+        return cpu_eval_v2.evaluate_v2(manager, me_name, see_opp_hand=see_opp_hand,
+                                       profile=profile, plan=plan, out=out)
     if manager.winner == me_name:
         if out is not None:
             out["winner"] = me_name
