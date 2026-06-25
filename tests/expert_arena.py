@@ -26,13 +26,19 @@ from cpu_arena import elo_ci
 from eval_v2_arena import _pair_level_ci
 
 
-def run(mode, pairs, seed0, max_steps, iters, worlds, horizon):
+def run(mode, pairs, seed0, max_steps, iters, worlds, horizon, alpha):
     from arena_parallel import paired_play
     base_mcts = {"iters": iters, "horizon": 2, "worlds": 1, "determinize": True}
     if mode == "vs-hard":
         kw = dict(challenger_difficulty="expert", baseline_difficulty="hard",
                   challenger_mcts=base_mcts)
         label = f"expert(iters={iters},h2,w1,det)  vs  hard(α-β)"
+    elif mode == "blend":
+        # MCTS×学習価値ブレンド: challenger α>0（学習葉混ぜる）vs baseline α=0（純eval）。両側 expert・同設定。
+        kw = dict(challenger_difficulty="expert", baseline_difficulty="expert",
+                  challenger_mcts=base_mcts, baseline_mcts=base_mcts,
+                  challenger_alpha=alpha, baseline_alpha=0.0)
+        label = f"expert blend α={alpha}  vs  α=0  (iters={iters}・h2・w1・det)"
     elif mode == "worlds":
         kw = dict(challenger_difficulty="expert", baseline_difficulty="expert",
                   challenger_mcts={**base_mcts, "worlds": worlds},
@@ -65,15 +71,16 @@ def run(mode, pairs, seed0, max_steps, iters, worlds, horizon):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="expert(MCTS) 側の伸びしろ A/B（対照ペア）")
-    ap.add_argument("--mode", choices=["vs-hard", "worlds", "horizon"], default="vs-hard")
+    ap.add_argument("--mode", choices=["vs-hard", "worlds", "horizon", "blend"], default="vs-hard")
     ap.add_argument("--pairs", type=int, default=20)
     ap.add_argument("--seed0", type=int, default=0)
     ap.add_argument("--max-steps", type=int, default=cpu_arena.DEFAULT_MAX_STEPS)
     ap.add_argument("--iters", type=int, default=160, help="MCTS 総反復（固定・再現性）")
     ap.add_argument("--worlds", type=int, default=4, help="worlds モードの challenger 世界数")
     ap.add_argument("--horizon", type=int, default=3, help="horizon モードの challenger ホライズン")
+    ap.add_argument("--alpha", type=float, default=0.3, help="blend モードの challenger 学習価値ブレンド率")
     args = ap.parse_args(argv)
-    run(args.mode, args.pairs, args.seed0, args.max_steps, args.iters, args.worlds, args.horizon)
+    run(args.mode, args.pairs, args.seed0, args.max_steps, args.iters, args.worlds, args.horizon, args.alpha)
     return 0
 
 

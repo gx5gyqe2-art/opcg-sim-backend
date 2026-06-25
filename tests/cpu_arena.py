@@ -138,9 +138,17 @@ def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_
         m_det = mk.get("determinize", True)     # 本番 expert は determinize=True（人間相手として公平）。
 
         def _decide_expert(manager, actor):
-            return cpu_mcts.decide_mcts_macro(manager, actor, "hard", prng, cache=cache,
-                                              iterations=m_iters, horizon=m_horizon, worlds=m_worlds,
-                                              determinize=m_det, plan=plan, deadline_ms=None)
+            # expert の葉（cpu_mcts._value_boundary）は evaluate(eval_v2 反映)＋学習価値ブレンド(α)を読む。
+            # → 席別に eval_v2／blend α を切替えて MCTS×eval v2×学習ブレンドの A/B を測れる（joint-SPSA 前段）。
+            cpu_value_model.set_alpha_override(value_alpha)
+            cpu_ai.set_eval_v2_override(eval_v2)
+            try:
+                return cpu_mcts.decide_mcts_macro(manager, actor, "hard", prng, cache=cache,
+                                                  iterations=m_iters, horizon=m_horizon, worlds=m_worlds,
+                                                  determinize=m_det, plan=plan, deadline_ms=None)
+            finally:
+                cpu_value_model.set_alpha_override(None)
+                cpu_ai.set_eval_v2_override(None)
         return _decide_expert
 
     def _decide(manager, actor):
