@@ -34,6 +34,8 @@ def _play_one(spec: Dict[str, Any]) -> Dict[str, Any]:
     res = play_game(spec["seed"], _DB, spec["p1d"], spec["p2d"],
                     max_steps=spec.get("max_steps", DEFAULT_MAX_STEPS),
                     p1_eval_v2=spec.get("p1_v2"), p2_eval_v2=spec.get("p2_v2"),
+                    p1_search=spec.get("p1_search"), p2_search=spec.get("p2_search"),
+                    p1_budget=spec.get("p1_budget"), p2_budget=spec.get("p2_budget"),
                     separate_policy_rng=True)
     return {"pair": spec["pair"], "seat": spec["seat"], "winner": res["winner"]}
 
@@ -44,11 +46,15 @@ def _default_workers() -> int:
 
 def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                 coeffs: Optional[Dict[str, float]] = None, workers: Optional[int] = None,
-                challenger_eval_v2: bool = True, baseline_eval_v2: bool = False) -> Dict[str, Any]:
+                challenger_eval_v2: bool = True, baseline_eval_v2: bool = False,
+                challenger_search=None, baseline_search=None,
+                challenger_budget=None, baseline_budget=None) -> Dict[str, Any]:
     """対照ペアを**並列**で実行し、ペア単位スコア（{0,0.5,1}）と勝率を返す。
 
     challenger = 評価v2 ON（既定）／baseline = 評価v2 OFF（成熟J値）。両者とも難易度 hard。
     coeffs（任意）= 評価 v2 の係数上書き（SPSA の θ 評価用）。workers=1 で逐次（デバッグ用）。
+    `challenger_search`/`baseline_search`（任意・L1外の深さA/B用）= `(horizon, max_ply)` で席別に探索深さを
+    上書き（None で既定）。eval_v2 を両側 OFF にして探索深さだけを振れば「深さの伸びしろ」を測れる。
     """
     workers = workers or _default_workers()
     # 各ペア＝2 局（席A: challenger=p1 / 席B: challenger=p2・同 seed）。
@@ -57,9 +63,13 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
         seed = seed0 + k
         specs.append({"pair": k, "seat": "A", "seed": seed, "p1d": "hard", "p2d": "hard",
                       "p1_v2": challenger_eval_v2, "p2_v2": baseline_eval_v2,
+                      "p1_search": challenger_search, "p2_search": baseline_search,
+                      "p1_budget": challenger_budget, "p2_budget": baseline_budget,
                       "max_steps": max_steps, "coeffs": coeffs})
         specs.append({"pair": k, "seat": "B", "seed": seed, "p1d": "hard", "p2d": "hard",
                       "p1_v2": baseline_eval_v2, "p2_v2": challenger_eval_v2,
+                      "p1_search": baseline_search, "p2_search": challenger_search,
+                      "p1_budget": baseline_budget, "p2_budget": challenger_budget,
                       "max_steps": max_steps, "coeffs": coeffs})
 
     if workers <= 1:

@@ -232,6 +232,28 @@ def _eval_v2_active() -> bool:
     return _EVAL_V2_OVERRIDE if _EVAL_V2_OVERRIDE is not None else _USE_EVAL_V2
 
 
+# 探索深さ／ply 上限の per-decide オーバーライド（L1 外の伸びしろ＝探索深さの A/B 用・set_*_override と同型）。
+# 席別に horizon/max_ply を切替えて「より深く読む方」を同一ゲーム内ペアで測る（評価アリーナ＝単一スレッドで安全）。
+# None で既定（HARD_HORIZON / HARD_MAX_PLY）へ戻る＝本番/テストは未設定で従来同値。
+_HORIZON_OVERRIDE = None
+_MAX_PLY_OVERRIDE = None
+
+
+def set_search_override(horizon=None, max_ply=None):
+    """探索 horizon／ply 上限を一時上書き（評価アリーナの深さA/B用・どちらも None で既定へ）。"""
+    global _HORIZON_OVERRIDE, _MAX_PLY_OVERRIDE
+    _HORIZON_OVERRIDE = None if horizon is None else max(1, int(horizon))
+    _MAX_PLY_OVERRIDE = None if max_ply is None else max(1, int(max_ply))
+
+
+def _effective_horizon() -> int:
+    return _HORIZON_OVERRIDE if _HORIZON_OVERRIDE is not None else HARD_HORIZON
+
+
+def _effective_max_ply() -> int:
+    return _MAX_PLY_OVERRIDE if _MAX_PLY_OVERRIDE is not None else HARD_MAX_PLY
+
+
 # Phase 4 本番配線: PIMC 既定世界数（OPCG_PIMC_WORLDS・既定 1＝休眠＝従来同値）。本番 Dockerfile で 4 を
 # 設定して出荷 fair CPU を「PIMC K=4・予算按分」へ切替（OPCG_HARD_PER_MOVE_BUDGET=75 併用＝合計≈300＝
 # 等倍計算量・1秒内・+53 Elo）。各 decide 系の pimc_worlds 既定値に使う＝env 未設定なら全経路で 1。
@@ -1294,7 +1316,7 @@ def _settle_discount(value: float, plan) -> float:
     """
     if plan is None:
         return value
-    if abs(value) >= W_WIN - HARD_MAX_PLY:   # 勝敗確定（±(W_WIN-ply)）は割り引かない
+    if abs(value) >= W_WIN - _effective_max_ply():   # 勝敗確定（±(W_WIN-ply)）は割り引かない
         return value
     return value * _SETTLE_CONFIDENCE
 
@@ -1430,7 +1452,7 @@ def _search(manager, root_name: str, alpha: float, beta: float,
     if pend_action == "MAIN_ACTION" and (manager.turn_count - start_turn) >= horizon:
         return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
     # 安全打ち切り: 予算/ply 上限。自分の手番途中ならターン境界へ整流してから評価（甘い途中評価を避ける）。
-    if budget[0] <= 0 or ply >= HARD_MAX_PLY:
+    if budget[0] <= 0 or ply >= _effective_max_ply():
         return _settle_eval(manager, root_name, see_opp_hand, profile, plan, ply)
 
     actor = _player_by_name(manager, actor_name)
@@ -1713,7 +1735,7 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
             v = _recurse_child(manager, name, m,
                                lambda b: _search(b, name, float("-inf"), float("inf"),
                                    budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan,
-                                   start_turn=start_turn, horizon=HARD_HORIZON, counter_budget=cbudget,
+                                   start_turn=start_turn, horizon=_effective_horizon(), counter_budget=cbudget,
                                    killers=killers))
             if v is None:  # 深掘りの適用失敗（pass-1 と整合・通常は起きない）
                 continue
