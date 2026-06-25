@@ -61,17 +61,17 @@ def set_params(init, m):
 
 
 def winrate_vs_base(db, games, seed0, max_steps):
-    """v2 ON vs 評価OFF（base）を席交互で games 局。v2 側の勝率を返す（CRN: seed0 固定で再現）。"""
-    wins = 0.0
-    for i in range(games):
-        seed = seed0 + i
-        chal_is_p1 = (i % 2 == 0)
-        p1_v2, p2_v2 = (True, False) if chal_is_p1 else (False, True)
-        res = play_game(seed, db, "hard", "hard", max_steps=max_steps,
-                        p1_eval_v2=p1_v2, p2_eval_v2=p2_v2)
-        chal_seat = "p1" if chal_is_p1 else "p2"
-        wins += 1.0 if res["winner"] == chal_seat else 0.0
-    return wins / games
+    """v2 ON vs 評価OFF（base）の勝率を**対照ペア（antithetic）**で測る＝分散低減（C・Phase0）。
+
+    `arena_paired` を使い、各 seed を**両席で1回ずつ**（同一 game-seed・`separate_policy_rng=True`）戦わせて
+    席順（先手有利）とデッキ構成の非対称をペア内で相殺する。独立 N 局より同じ局数で CI が狭い。
+    games は総局数（pairs = games//2）。v2 側勝率を返す（SPSA の目的関数＝低ノイズ）。
+    """
+    from cpu_arena import arena_paired
+    pairs = max(1, games // 2)
+    res = arena_paired(db, "hard", "hard", pairs, seed0=seed0, max_steps=max_steps,
+                       challenger_eval_v2=True, baseline_eval_v2=False)
+    return res["win_rate"]
 
 
 def spsa(iters, games, max_steps, seed0):

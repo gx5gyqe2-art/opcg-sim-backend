@@ -242,7 +242,8 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
                  baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                  challenger_pimc: int = 1, baseline_pimc: int = 1,
                  challenger_alpha=None, baseline_alpha=None,
-                 challenger_budget=None, baseline_budget=None) -> Dict[str, Any]:
+                 challenger_budget=None, baseline_budget=None,
+                 challenger_eval_v2=None, baseline_eval_v2=None) -> Dict[str, Any]:
     """分散低減アリーナ（Phase 0・antithetic 席ペアリング）。各 seed を**両席で 1 回ずつ**戦わせ、
     挑戦者の 2 局の勝敗を集計する＝**先手有利（席順）をペア内で相殺**する。
 
@@ -266,12 +267,14 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
                       p1_policy=challenger_policy, p2_policy=baseline_policy,
                       separate_policy_rng=True, p1_pimc=challenger_pimc, p2_pimc=baseline_pimc,
                       p1_alpha=challenger_alpha, p2_alpha=baseline_alpha,
-                      p1_budget=challenger_budget, p2_budget=baseline_budget)
+                      p1_budget=challenger_budget, p2_budget=baseline_budget,
+                      p1_eval_v2=challenger_eval_v2, p2_eval_v2=baseline_eval_v2)
         b = play_game(seed, db, baseline, challenger, max_steps=max_steps,
                       p1_policy=baseline_policy, p2_policy=challenger_policy,
                       separate_policy_rng=True, p1_pimc=baseline_pimc, p2_pimc=challenger_pimc,
                       p1_alpha=baseline_alpha, p2_alpha=challenger_alpha,
-                      p1_budget=baseline_budget, p2_budget=challenger_budget)
+                      p1_budget=baseline_budget, p2_budget=challenger_budget,
+                      p1_eval_v2=baseline_eval_v2, p2_eval_v2=challenger_eval_v2)
         chal_a = 1.0 if a["winner"] == "p1" else 0.0
         chal_b = 1.0 if b["winner"] == "p2" else 0.0
         wins += chal_a + chal_b
