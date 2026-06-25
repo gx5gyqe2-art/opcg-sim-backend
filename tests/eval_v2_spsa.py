@@ -18,6 +18,8 @@ SPSA = Simultaneous Perturbation Stochastic Approximation。**全係数を同時
     OPCG_LOG_SILENT=1 python tests/eval_v2_spsa.py --iters 1 --games 2   # スモーク
 """
 import argparse
+import json
+import os
 import random
 import sys
 
@@ -32,6 +34,20 @@ PARAMS = [
     "V2_KAPPA", "V2_LAMBDA", "V2_W_DON",
 ]
 M_LO, M_HI = 0.2, 5.0          # 乗数のクリップ（暴走防止）
+# チェックポイント（再起動耐性）: best 更新ごとに best 係数を書き出す（落ちても進捗が残る）。
+CKPT = os.environ.get("OPCG_SPSA_CKPT",
+                      os.path.join(os.path.dirname(os.path.abspath(__file__)), "eval_v2_spsa_best.json"))
+
+
+def _save_ckpt(init, best_m, best_wr, k):
+    try:
+        data = {"iter": k, "best_winrate": best_wr,
+                "multipliers": {n: m for n, m in zip(PARAMS, best_m)},
+                "absolute": {n: init[n] * m for n, m in zip(PARAMS, best_m)}}
+        with open(CKPT, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
 
 
 def _clip(x, lo, hi):
@@ -88,8 +104,9 @@ def spsa(iters, games, max_steps, seed0):
         tag = ""
         if wr > best_wr:
             best_wr, best_m = wr, list(m); tag = "  <- best"
+            _save_ckpt(init, best_m, best_wr, k)     # 再起動耐性: best をその都度保存
         print(f"[iter {k:2d}] f+={fp:.3f} f-={fm:.3f} -> winrate={wr:.3f} "
-              f"(Elo {elo_delta(wr):+.0f}){tag}")
+              f"(Elo {elo_delta(wr):+.0f}){tag}", flush=True)
 
     set_params(init, best_m)
     print(f"\n=== best: winrate={best_wr:.3f} (Elo {elo_delta(best_wr):+.0f}) ===")
