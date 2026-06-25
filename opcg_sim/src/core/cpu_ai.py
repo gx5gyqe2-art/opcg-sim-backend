@@ -217,6 +217,21 @@ def _effective_budget() -> int:
     return _BUDGET_OVERRIDE if _BUDGET_OVERRIDE is not None else HARD_PER_MOVE_BUDGET
 
 
+# 評価 v2 の per-decide オーバーライド（評価アリーナで v2 ON/OFF を席別に切替＝A/B 用・set_*_override と同型）。
+# None で env/既定（`_USE_EVAL_V2`）へ戻る＝本番/テストは未設定で従来同値。
+_EVAL_V2_OVERRIDE = None
+
+
+def set_eval_v2_override(on):
+    """評価 v2 を一時上書き（True/False/None）。None で既定（`OPCG_EVAL_V2`）へ戻る。"""
+    global _EVAL_V2_OVERRIDE
+    _EVAL_V2_OVERRIDE = None if on is None else bool(on)
+
+
+def _eval_v2_active() -> bool:
+    return _EVAL_V2_OVERRIDE if _EVAL_V2_OVERRIDE is not None else _USE_EVAL_V2
+
+
 # Phase 4 本番配線: PIMC 既定世界数（OPCG_PIMC_WORLDS・既定 1＝休眠＝従来同値）。本番 Dockerfile で 4 を
 # 設定して出荷 fair CPU を「PIMC K=4・予算按分」へ切替（OPCG_HARD_PER_MOVE_BUDGET=75 併用＝合計≈300＝
 # 等倍計算量・1秒内・+53 Elo）。各 decide 系の pimc_worlds 既定値に使う＝env 未設定なら全経路で 1。
@@ -846,7 +861,7 @@ def evaluate_base(manager, me_name: str, see_opp_hand: bool = True, profile=None
     plan=None では一切作動せず現行挙動と完全同値。
     """
     # 評価 v2（L1コア・v0.4）への段階導入差し替え。既定 OFF＝以降の従来 J値評価を実行（完全同値）。
-    if _USE_EVAL_V2:
+    if _eval_v2_active():
         from . import cpu_eval_v2
         return cpu_eval_v2.evaluate_v2(manager, me_name, see_opp_hand=see_opp_hand,
                                        profile=profile, plan=plan, out=out)

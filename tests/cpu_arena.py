@@ -110,7 +110,8 @@ def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
 
 def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
-                  policy_rng=None, pimc_worlds: int = 1, value_alpha=None, per_move_budget=None):
+                  policy_rng=None, pimc_worlds: int = 1, value_alpha=None, per_move_budget=None,
+                  eval_v2=None):
     """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き・デプロイと同じプラン供給）。
 
     `info_policy`（Phase -1）で情報方針を選ぶ＝凍結 fair-hard vs cheat-hard の A/B を席交互で測れる。
@@ -125,12 +126,14 @@ def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_
         # Phase 3b/4: この decider のブレンド率・探索予算を一時設定（単一スレッド arena＝相手と干渉しない）。
         cpu_value_model.set_alpha_override(value_alpha)
         cpu_ai.set_budget_override(per_move_budget)
+        cpu_ai.set_eval_v2_override(eval_v2)        # 評価 v2 ON/OFF を席別に切替（A/B 用）
         try:
             return cpu_ai.decide_guarded(manager, actor, difficulty, prng, mem, plan=plan,
                                          info_policy=info_policy, pimc_worlds=pimc_worlds)
         finally:
             cpu_value_model.set_alpha_override(None)
             cpu_ai.set_budget_override(None)
+            cpu_ai.set_eval_v2_override(None)
     return _decide
 
 
@@ -141,7 +144,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               separate_policy_rng: bool = False,
               p1_pimc: int = 1, p2_pimc: int = 1,
               p1_alpha=None, p2_alpha=None,
-              p1_budget=None, p2_budget=None) -> Dict[str, Any]:
+              p1_budget=None, p2_budget=None,
+              p1_eval_v2=None, p2_eval_v2=None) -> Dict[str, Any]:
     """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
@@ -163,8 +167,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
-    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1), p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget),
-                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2), p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget)}
+    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1), p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget, p1_eval_v2),
+                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2), p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget, p2_eval_v2)}
 
     step = 0
     prev_turn = manager.turn_count
