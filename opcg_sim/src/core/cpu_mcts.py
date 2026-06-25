@@ -446,6 +446,7 @@ def decide_mcts_macro(manager, player, difficulty: str = "hard", rng: Optional[r
                       cache: Optional[Dict[str, Any]] = None, iterations: Optional[int] = None,
                       horizon: Optional[int] = None, worlds: Optional[int] = None,
                       profile=None, plan=None, deadline_ms: Optional[int] = None,
+                      determinize: Optional[bool] = None,
                       moves: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict[str, Any]]:
     """マクロ MCTS の**逐次 1 手**インターフェース（`cpu_ai.decide_cached` と同型）。
 
@@ -474,7 +475,7 @@ def decide_mcts_macro(manager, player, difficulty: str = "hard", rng: Optional[r
 
     tplan = mcts_plan_turn(manager, player, difficulty, rng, iterations=iterations,
                            horizon=horizon, worlds=worlds, profile=profile, plan=plan,
-                           deadline_ms=deadline_ms)
+                           determinize=determinize, deadline_ms=deadline_ms)
     if tplan and _move_sig(tplan[0]) in legal_by_sig:
         cache["queue"] = tplan[1:]
         return legal_by_sig[_move_sig(tplan[0])]
