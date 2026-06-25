@@ -17,38 +17,48 @@
 """
 from typing import Any, Dict, Optional
 
-# ───────────────────────── 係数（未チューニング・placeholder） ─────────────────────────
-# いずれも docs §9 のとおりアリーナ計測で確定する。直交化のため少数に絞る。
-V2_W_LIFE   = 1.0      # ライフ1枚の基礎価値（カード1枚＝価値の単位）
-V2_W_LETHAL = 1.5      # lethal 近傍の非線形プレミアム（最後の T 枚に上乗せ）
-V2_LETHAL_T = 2        # 生存警戒の枚数閾値
-V2_W_DECK   = 0.2      # デッキ切れ側の敗北距離（ライフと同じ通貨・軽め）
+# ───────────────────────── 係数（first calibration・未SPSA） ─────────────────────────
+# 単位＝カード1枚。データ（life_diff 支配・+0.87）に合わせ**ライフを支配項**にする。最終確定は SPSA（§9）。
+# ライフは「単調増加・凹型」（薄いほど 1 枚が precious）＝ダメージレースの駆動源。
+V2_W_LIFE_PRECIOUS = 2.0   # 薄域（先頭 knee 枚）のライフ 1 枚＝守るべき・支配項
+V2_W_LIFE_HIGH     = 0.8   # 厚域（knee 超）のライフ 1 枚＝安い（受ける）
+V2_LIFE_KNEE       = 2     # 凹型の膝（lethal 警戒枚数）
+V2_W_DECK   = 0.5      # デッキ切れ側の敗北距離（ライフと同じ通貨・危険域1枚あたり）
 
-V2_W_DEV    = 0.7      # 展開可能なカード1枚の汎用価値（効果別にしない＝§4.1）
-V2_W_CTR    = 0.5      # カウンター1000あたりのカード換算
+V2_W_DEV    = 0.6      # 展開可能なカード1枚の汎用価値（効果別にしない＝§4.1）
+V2_W_CTR    = 0.4      # カウンター1000あたりのカード換算
 V2_KAPPA    = 1.0      # 展開割引 γ_surv の指数（生存ターン感応の強さ）
 V2_LAMBDA   = 1.0      # カウンター増幅 amp の係数
 V2_OPP_HAND_UPLIFT = 1.2  # 相手手札（枚数ベース）の上振れ補正（自分は貪欲最適＝楽観バイアス補正・§Q4b）
 
-V2_W_BODY   = 0.6      # 盤面の体（トレード価値の基準・パワーでスケール）
+V2_W_BODY   = 0.4      # 盤面の体＝トレード/制圧価値（パワーでスケール）。顔打点は持たない（相手ライフ減で反映）
 V2_REST_DISCOUNT = 0.5    # レスト体（露出リスク）の割引（自ターン終了が葉のときのみ・§Q3）
-V2_W_CLOCK  = 1.0      # 顔打点（Tele）1000あたり
 
-V2_W_DON    = 0.1      # アクティブドンの床（ランプ＋構え防御オプション・小）
+V2_W_TELE   = 0.5      # Tele（ホライズン端のリーサル番兵）の重み。主役は凹型ライフ＝控えめ
+
+V2_W_DON    = 0.2      # アクティブドンの床（ランプ＋構え防御オプション・小）
+
+# 全体スケール（カード単位 → base 評価と同オーダーへ）。探索側の閾値（_ACT_MARGIN=300・ビーム剪定・
+# settle 判定等）は base 評価のスケール（ライフ1枚=W_LIFE=6000 等・±数千）前提でハードコードされている。
+# v2 をカード単位（±10）のまま返すと _ACT_MARGIN が相対的に巨大化し「常に何もしない」になる。
+# 1 カード ≈ 数千 になるよう一律スケールして探索の閾値を相対的に小さくする（W_WIN=1e9 は終端で別格）。
+V2_SCALE = 2000.0
 
 _EPS = 1e-6
 
 
 def _life_value(p) -> float:
-    """R_life: ライフ枚数の基礎価値＋lethal 近傍の非線形プレミアム（デッキ切れ軸も同形で合流）。"""
+    """R_life: **単調増加・凹型**のライフ価値（薄域 knee 枚は precious・厚域は安い）＋デッキ切れ軸。
+
+    薄いほど 1 枚の限界価値が高い＝レース下で守られ、相手ライフを 0 へ詰める動機にもなる
+    （相手の R_life が凹型で減るほど eval が大きく上がる）。デッキ切れも同じ通貨で敗北距離として合流。
+    """
     L = len(p.life)
-    near = min(L, V2_LETHAL_T)
-    surv = (V2_LETHAL_T - L) if L < V2_LETHAL_T else 0
-    # 通常分 + 薄域上乗せ。さらにデッキ切れ（敗北距離の第2軸）を同じ通貨で軽く減点。
-    from .cpu_ai import DECK_DANGER  # 既存のしきい値を流用（遅延 import で循環回避）
+    near = min(L, V2_LIFE_KNEE)               # 薄域＝precious
+    far = max(0, L - V2_LIFE_KNEE)            # 厚域＝安い
+    from .cpu_ai import DECK_DANGER           # 既存のしきい値を流用（遅延 import で循環回避）
     deck_danger = max(0, DECK_DANGER - len(p.deck))
-    return V2_W_LIFE * L + V2_W_LETHAL * near * (1.0 if L >= V2_LETHAL_T else (1.0 + surv)) \
-        - V2_W_DECK * deck_danger
+    return near * V2_W_LIFE_PRECIOUS + far * V2_W_LIFE_HIGH - V2_W_DECK * deck_danger
 
 
 def _clock_of(p, opp, is_turn: bool) -> float:
@@ -73,26 +83,23 @@ def _clock_of(p, opp, is_turn: bool) -> float:
 
 
 def _board_value(p, opp, is_turn: bool, leaf_is_my_turn_end: bool) -> float:
-    """R_board: 各体を「顔打点 or トレード」の大きい方で一度だけ計上（1体1アクション・§Q4a）。
+    """R_board: 体の**トレード/制圧価値のみ**（顔打点は持たない）。
 
+    顔打点（相手ライフを削る）は、攻撃を打った結果盤面で相手 R_life が減ることで反映される＝探索が拾う
+    （静的に face 項を持つと二重計上・§4/§(C)）。よってここは「盤面を制圧する要員」としての価値だけ。
     レスト体は露出リスクで割引するが、**葉が自ターン終了のときのみ**（相手ターン終了が葉なら、残った
     レスト体は凌ぎ切った生存者なので割引しない・§Q3）。
     """
-    from .cpu_ai import _power_cap, _effective_power
-    cap = _power_cap(opp)
     total = 0.0
     for c in p.field:
         try:
             pw = c.get_power(is_turn)
         except Exception:
             pw = getattr(c.master, "power", 0) or 0
-        eff = _effective_power(pw, cap)
-        face = V2_W_CLOCK * (eff / 1000.0)        # 顔を詰める要員としての価値
-        trade = V2_W_BODY * (pw / 1000.0)         # 盤面を制圧する要員としての価値
-        v = max(face, trade)
+        trade = V2_W_BODY * (pw / 1000.0)
         if getattr(c, "is_rest", False) and leaf_is_my_turn_end:
-            v *= V2_REST_DISCOUNT
-        total += v
+            trade *= V2_REST_DISCOUNT
+        total += trade
     return total
 
 
@@ -145,8 +152,8 @@ def _telegraph(attacker, defender, is_turn: bool) -> float:
     counter_buffer = len(defender.hand) * 0.5   # 枚数×平均カウンター（~+1000の半分を枚数で・概算）
     eff_reach = max(0.0, reach - blockers - counter_buffer)
     life = len(defender.life)
-    # 届くほど（相手ライフに対して）大きい。lethal 到達で最大。
-    return V2_W_CLOCK * min(eff_reach, max(life, 1))
+    # 届くほど（相手ライフに対して）大きい。lethal 到達で最大。主役は凹型ライフ＝控えめ。
+    return V2_W_TELE * min(eff_reach, max(life, 1))
 
 
 def _is_blocker(c) -> bool:
@@ -200,7 +207,7 @@ def evaluate_v2(manager, me_name: str, see_opp_hand: bool = True,
              + _hand_value(opp, gamma_opp, amp_opp, opp_don_budget, full_info=see_opp_hand)
              + _don_value(opp))
     tele = _telegraph(me, opp, is_my_turn) - _telegraph(opp, me, not is_my_turn)
-    total = R_me - R_opp + tele
+    total = (R_me - R_opp + tele) * V2_SCALE      # 探索閾値（_ACT_MARGIN 等）と同オーダーへ
 
     if out is not None:
         out["v2"] = {
