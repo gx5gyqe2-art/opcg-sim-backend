@@ -36,6 +36,7 @@ def _play_one(spec: Dict[str, Any]) -> Dict[str, Any]:
                     p1_eval_v2=spec.get("p1_v2"), p2_eval_v2=spec.get("p2_v2"),
                     p1_search=spec.get("p1_search"), p2_search=spec.get("p2_search"),
                     p1_budget=spec.get("p1_budget"), p2_budget=spec.get("p2_budget"),
+                    p1_mcts=spec.get("p1_mcts"), p2_mcts=spec.get("p2_mcts"),
                     separate_policy_rng=True)
     return {"pair": spec["pair"], "seat": spec["seat"], "winner": res["winner"]}
 
@@ -48,28 +49,36 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                 coeffs: Optional[Dict[str, float]] = None, workers: Optional[int] = None,
                 challenger_eval_v2: bool = True, baseline_eval_v2: bool = False,
                 challenger_search=None, baseline_search=None,
-                challenger_budget=None, baseline_budget=None) -> Dict[str, Any]:
+                challenger_budget=None, baseline_budget=None,
+                challenger_difficulty: str = "hard", baseline_difficulty: str = "hard",
+                challenger_mcts=None, baseline_mcts=None) -> Dict[str, Any]:
     """対照ペアを**並列**で実行し、ペア単位スコア（{0,0.5,1}）と勝率を返す。
 
-    challenger = 評価v2 ON（既定）／baseline = 評価v2 OFF（成熟J値）。両者とも難易度 hard。
+    challenger = 評価v2 ON（既定）／baseline = 評価v2 OFF（成熟J値）。両者とも難易度 hard（既定）。
     coeffs（任意）= 評価 v2 の係数上書き（SPSA の θ 評価用）。workers=1 で逐次（デバッグ用）。
     `challenger_search`/`baseline_search`（任意・L1外の深さA/B用）= `(horizon, max_ply)` で席別に探索深さを
     上書き（None で既定）。eval_v2 を両側 OFF にして探索深さだけを振れば「深さの伸びしろ」を測れる。
+    `challenger_difficulty`/`baseline_difficulty`（既定 hard）と `challenger_mcts`/`baseline_mcts`（dict・
+    iters/horizon/worlds/determinize）で **expert(MCTS)** を片側/両側に置ける＝expert vs hard や
+    expert の worlds/horizon A/B（L1外・MCTS側の伸びしろ）を同じ対照ペア基盤で測る。
     """
     workers = workers or _default_workers()
-    # 各ペア＝2 局（席A: challenger=p1 / 席B: challenger=p2・同 seed）。
+    cd, bd = challenger_difficulty, baseline_difficulty
+    # 各ペア＝2 局（席A: challenger=p1 / 席B: challenger=p2・同 seed）。難易度も席で入れ替える。
     specs: List[Dict[str, Any]] = []
     for k in range(pairs):
         seed = seed0 + k
-        specs.append({"pair": k, "seat": "A", "seed": seed, "p1d": "hard", "p2d": "hard",
+        specs.append({"pair": k, "seat": "A", "seed": seed, "p1d": cd, "p2d": bd,
                       "p1_v2": challenger_eval_v2, "p2_v2": baseline_eval_v2,
                       "p1_search": challenger_search, "p2_search": baseline_search,
                       "p1_budget": challenger_budget, "p2_budget": baseline_budget,
+                      "p1_mcts": challenger_mcts, "p2_mcts": baseline_mcts,
                       "max_steps": max_steps, "coeffs": coeffs})
-        specs.append({"pair": k, "seat": "B", "seed": seed, "p1d": "hard", "p2d": "hard",
+        specs.append({"pair": k, "seat": "B", "seed": seed, "p1d": bd, "p2d": cd,
                       "p1_v2": baseline_eval_v2, "p2_v2": challenger_eval_v2,
                       "p1_search": baseline_search, "p2_search": challenger_search,
                       "p1_budget": baseline_budget, "p2_budget": challenger_budget,
+                      "p1_mcts": baseline_mcts, "p2_mcts": challenger_mcts,
                       "max_steps": max_steps, "coeffs": coeffs})
 
     if workers <= 1:
