@@ -26,9 +26,10 @@ from cpu_arena import elo_ci
 from eval_v2_arena import _pair_level_ci
 
 
-def run(mode, pairs, seed0, max_steps, iters, worlds, horizon, alpha):
+def run(mode, pairs, seed0, max_steps, iters, worlds, horizon, alpha, eval_v2=False):
     from arena_parallel import paired_play
     base_mcts = {"iters": iters, "horizon": 2, "worlds": 1, "determinize": True}
+    leaf = "L1(eval_v2)" if eval_v2 else "J値"
     if mode == "vs-hard":
         # 本番 hard = PIMC K=4・予算75/世界（Dockerfile OPCG_PIMC_WORLDS=4 / OPCG_HARD_PER_MOVE_BUDGET=75・+53Elo）。
         kw = dict(challenger_difficulty="expert", baseline_difficulty="hard",
@@ -53,9 +54,10 @@ def run(mode, pairs, seed0, max_steps, iters, worlds, horizon, alpha):
     else:
         raise SystemExit(f"unknown mode: {mode}")
 
+    label += f"  [葉={leaf}・両側]"
     t0 = time.time()
     res = paired_play(pairs, seed0=seed0, max_steps=max_steps,
-                      challenger_eval_v2=False, baseline_eval_v2=False, **kw)
+                      challenger_eval_v2=eval_v2, baseline_eval_v2=eval_v2, **kw)
     dt = time.time() - t0
     failed = res.get("failed_games", 0)
     print(f"\n=== expert 伸びしろ A/B [{mode}]（要求{pairs}ペア / 成立{res['pairs']}ペア={res['games']}局・対照ペア・葉=J値固定） ===")
@@ -86,8 +88,10 @@ def main(argv=None):
     ap.add_argument("--worlds", type=int, default=4, help="worlds モードの challenger 世界数")
     ap.add_argument("--horizon", type=int, default=3, help="horizon モードの challenger ホライズン")
     ap.add_argument("--alpha", type=float, default=0.3, help="blend モードの challenger 学習価値ブレンド率")
+    ap.add_argument("--eval-v2", action="store_true", help="両側の葉評価を L1(eval_v2) にする")
     args = ap.parse_args(argv)
-    run(args.mode, args.pairs, args.seed0, args.max_steps, args.iters, args.worlds, args.horizon, args.alpha)
+    run(args.mode, args.pairs, args.seed0, args.max_steps, args.iters, args.worlds, args.horizon, args.alpha,
+        eval_v2=args.eval_v2)
     return 0
 
 
