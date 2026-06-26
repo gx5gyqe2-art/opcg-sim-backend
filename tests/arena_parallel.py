@@ -43,6 +43,7 @@ def _play_one(spec: Dict[str, Any]) -> Dict[str, Any]:
                         p1_budget=spec.get("p1_budget"), p2_budget=spec.get("p2_budget"),
                         p1_mcts=spec.get("p1_mcts"), p2_mcts=spec.get("p2_mcts"),
                         p1_alpha=spec.get("p1_alpha"), p2_alpha=spec.get("p2_alpha"),
+                        p1_pimc=spec.get("p1_pimc", 1), p2_pimc=spec.get("p2_pimc", 1),
                         separate_policy_rng=True)
         return {"pair": spec["pair"], "seat": spec["seat"], "winner": res["winner"]}
     except Exception as e:
@@ -61,7 +62,8 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                 challenger_budget=None, baseline_budget=None,
                 challenger_difficulty: str = "hard", baseline_difficulty: str = "hard",
                 challenger_mcts=None, baseline_mcts=None,
-                challenger_alpha=None, baseline_alpha=None) -> Dict[str, Any]:
+                challenger_alpha=None, baseline_alpha=None,
+                challenger_pimc: int = 1, baseline_pimc: int = 1) -> Dict[str, Any]:
     """対照ペアを**並列**で実行し、ペア単位スコア（{0,0.5,1}）と勝率を返す。
 
     challenger = 評価v2 ON（既定）／baseline = 評価v2 OFF（成熟J値）。両者とも難易度 hard（既定）。
@@ -84,6 +86,7 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                       "p1_budget": challenger_budget, "p2_budget": baseline_budget,
                       "p1_mcts": challenger_mcts, "p2_mcts": baseline_mcts,
                       "p1_alpha": challenger_alpha, "p2_alpha": baseline_alpha,
+                      "p1_pimc": challenger_pimc, "p2_pimc": baseline_pimc,
                       "max_steps": max_steps, "coeffs": coeffs})
         specs.append({"pair": k, "seat": "B", "seed": seed, "p1d": bd, "p2d": cd,
                       "p1_v2": baseline_eval_v2, "p2_v2": challenger_eval_v2,
@@ -91,6 +94,7 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                       "p1_budget": baseline_budget, "p2_budget": challenger_budget,
                       "p1_mcts": baseline_mcts, "p2_mcts": challenger_mcts,
                       "p1_alpha": baseline_alpha, "p2_alpha": challenger_alpha,
+                      "p1_pimc": baseline_pimc, "p2_pimc": challenger_pimc,
                       "max_steps": max_steps, "coeffs": coeffs})
 
     if workers <= 1:

@@ -30,9 +30,10 @@ def run(mode, pairs, seed0, max_steps, iters, worlds, horizon, alpha):
     from arena_parallel import paired_play
     base_mcts = {"iters": iters, "horizon": 2, "worlds": 1, "determinize": True}
     if mode == "vs-hard":
+        # 本番 hard = PIMC K=4・予算75/世界（Dockerfile OPCG_PIMC_WORLDS=4 / OPCG_HARD_PER_MOVE_BUDGET=75・+53Elo）。
         kw = dict(challenger_difficulty="expert", baseline_difficulty="hard",
-                  challenger_mcts=base_mcts)
-        label = f"expert(iters={iters},h2,w1,det)  vs  hard(α-β)"
+                  challenger_mcts=base_mcts, baseline_pimc=4, baseline_budget=75)
+        label = f"expert(iters={iters},h2,w1,det)  vs  hard(α-β・本番PIMC K=4/予算75)"
     elif mode == "blend":
         # MCTS×学習価値ブレンド: challenger α>0（学習葉混ぜる）vs baseline α=0（純eval）。両側 expert・同設定。
         kw = dict(challenger_difficulty="expert", baseline_difficulty="expert",
