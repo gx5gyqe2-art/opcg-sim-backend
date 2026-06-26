@@ -12,3 +12,4 @@ tests/human_value_model.candidate.json
 tests/selfplay_value.jsonl
 tests/cand_*.json
 tests/eval_v2_spsa_best.json
+tests/value_*.jsonl

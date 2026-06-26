@@ -155,23 +155,27 @@ def main(argv=None):
     ap.add_argument("--out", default=_OUT)
     args = ap.parse_args(argv)
 
-    X, Y = _load_rows(args.data)
-    if len(X) < 50:
-        print(f"データ不足: {len(X)} 行（>=50 必要）"); return 1
-    cut = int(len(X) * 0.8)
-    m = train(X[:cut], Y[:cut], trees=args.trees, depth=args.depth, lr=args.lr,
+    from value_dataset import load_rows, split
+    rows = load_rows(args.data)
+    if len(rows) < 50:
+        print(f"データ不足: {len(rows)} 行（>=50 必要）"); return 1
+    # **試合単位 split**（リーク防止・全トレーナ共通の seed/val_frac＝同一 val 試合集合）。
+    Xtr, Ytr, Xva, Yva, meta = split(rows, val_frac=0.15, seed=0)
+    Ytr = [int(y) for y in Ytr]; Yva = [int(y) for y in Yva]
+    m = train(Xtr, Ytr, trees=args.trees, depth=args.depth, lr=args.lr,
               lam=args.lam, min_leaf=args.min_leaf, n_bins=args.bins)
-    tr_ll, tr_acc = _metrics(X[:cut], Y[:cut], m)
-    va_ll, va_acc = _metrics(X[cut:], Y[cut:], m) if len(X) - cut > 0 else (0.0, 0.0)
-    print(f"rows={len(X)} pos_rate={sum(Y)/len(Y):.3f} trees={args.trees} depth={args.depth} | "
-          f"train logloss={tr_ll:.4f} acc={tr_acc:.3f} | val logloss={va_ll:.4f} acc={va_acc:.3f}")
+    tr_ll, tr_acc = _metrics(Xtr, Ytr, m)
+    va_ll, va_acc = _metrics(Xva, Yva, m) if Xva else (0.0, 0.0)
+    print(f"[gbdt {args.trees}t/d{args.depth}] split={meta['mode']} games={meta['n_games']}(val {meta['val_games']}) "
+          f"train={meta['n_train']} val={meta['n_val']} | train acc={tr_acc:.3f} | "
+          f"val logloss={va_ll:.4f} acc={va_acc:.4f}")
 
     model = {
         "format": "gbdt-v1",
         "feature_names": cpu_features.FEATURE_NAMES,
         "n_features": cpu_features.N_FEATURES,
         "base_score": m["base_score"], "learning_rate": m["learning_rate"], "trees": m["trees"],
-        "trained_rows": len(X), "val_acc": va_acc, "val_logloss": va_ll,
+        "trained_rows": len(Xtr), "val_acc": va_acc, "val_logloss": va_ll,
         "params": {"trees": args.trees, "depth": args.depth, "lr": args.lr, "lam": args.lam},
     }
     with open(args.out, "w", encoding="utf-8") as f:

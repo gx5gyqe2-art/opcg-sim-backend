@@ -106,22 +106,26 @@ def main(argv=None):
     ap.add_argument("--out", default=_OUT)
     args = ap.parse_args(argv)
 
-    X, Y = _load_rows(args.data)
-    if len(X) < 50:
-        print(f"データ不足: {len(X)} 行（>=50 必要）"); return 1
-    # 8:2 ホールドアウトで汎化を見る。
-    cut = int(len(X) * 0.8)
-    w, b, mean, std = train(X[:cut], Y[:cut], epochs=args.epochs, lr=args.lr, l2=args.l2)
-    tr_ll, tr_acc = _metrics(X[:cut], Y[:cut], w, b, mean, std)
-    va_ll, va_acc = _metrics(X[cut:], Y[cut:], w, b, mean, std) if len(X) - cut > 0 else (0, 0)
-    print(f"rows={len(X)} pos_rate={sum(Y)/len(Y):.3f} | train logloss={tr_ll:.4f} acc={tr_acc:.3f}"
-          f" | val logloss={va_ll:.4f} acc={va_acc:.3f}")
+    from value_dataset import load_rows, split
+    rows = load_rows(args.data)
+    if len(rows) < 50:
+        print(f"データ不足: {len(rows)} 行（>=50 必要）"); return 1
+    # **試合単位 split**（リーク防止・全トレーナ共通の seed/val_frac＝同一 val 試合集合）。
+    Xtr, Ytr, Xva, Yva, meta = split(rows, val_frac=0.15, seed=0)
+    Ytr = [int(y) for y in Ytr]; Yva = [int(y) for y in Yva]
+    w, b, mean, std = train(Xtr, Ytr, epochs=args.epochs, lr=args.lr, l2=args.l2)
+    tr_ll, tr_acc = _metrics(Xtr, Ytr, w, b, mean, std)
+    va_ll, va_acc = _metrics(Xva, Yva, w, b, mean, std) if Xva else (0, 0)
+    pos = sum(Ytr + Yva) / max(1, len(Ytr) + len(Yva))
+    print(f"[logreg] split={meta['mode']} games={meta['n_games']}(val {meta['val_games']}) "
+          f"train={meta['n_train']} val={meta['n_val']} pos_rate={pos:.3f} | "
+          f"train acc={tr_acc:.3f} | val logloss={va_ll:.4f} acc={va_acc:.4f}")
 
     model = {
         "format": "logreg-standardized-v1",
         "feature_names": cpu_features.FEATURE_NAMES,
         "weights": w, "intercept": b, "mean": mean, "std": std,
-        "trained_rows": len(X), "val_acc": va_acc, "val_logloss": va_ll,
+        "trained_rows": len(Xtr), "val_acc": va_acc, "val_logloss": va_ll,
     }
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(model, f, ensure_ascii=False)

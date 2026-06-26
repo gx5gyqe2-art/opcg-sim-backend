@@ -79,12 +79,44 @@ def test_predict_in_unit_range_and_rejects_bad_length(db):
     assert cpu_value_model.predict_winprob([0.0, 1.0]) is None, "長さ不一致は None であるべき"
 
 
-# --- 価値ブレンドの素材（α-β 葉への将来配線用・現状は消費先なし） ----------------
+# --- α-β 葉ブレンド（`cpu_ai.evaluate` = `_value_blend(evaluate_base)`・NNUE路線の土台） ---------
 
 def test_blend_alpha_off_by_default(db):
     """`OPCG_VALUE_BLEND` 未設定なら blend_alpha()==0＝モデル推論を走らせない（現状の本番挙動）。"""
     os.environ.pop("OPCG_VALUE_BLEND", None)
     assert cpu_value_model.blend_alpha() == 0.0
+
+
+def test_hard_evaluate_blend_off_is_identical(db):
+    """α=0（既定）の `cpu_ai.evaluate` は `evaluate_base` と**ビット一致**＝本番挙動不変。"""
+    from opcg_sim.src.core import cpu_ai
+    cpu_value_model.set_alpha_override(0.0)
+    try:
+        for seed in (0, 1, 2):
+            m = _game(db, seed)
+            base = cpu_ai.evaluate_base(m, "p1", see_opp_hand=True)
+            assert cpu_ai.evaluate(m, "p1", see_opp_hand=True) == base
+    finally:
+        cpu_value_model.set_alpha_override(None)
+
+
+def test_hard_evaluate_blend_on_changes_value_deterministic(db):
+    """α>0・モデル有なら `evaluate` は base と差が出て、同一入力で決定論・有限。"""
+    from opcg_sim.src.core import cpu_ai
+    if not cpu_value_model.is_available():
+        import pytest
+        pytest.skip("value model unavailable")
+    m = _game(db, 3)
+    base = cpu_ai.evaluate_base(m, "p1", see_opp_hand=True)
+    cpu_value_model.set_alpha_override(0.5)
+    try:
+        v1 = cpu_ai.evaluate(m, "p1", see_opp_hand=True)
+        v2 = cpu_ai.evaluate(m, "p1", see_opp_hand=True)
+        assert v1 == v2, "ブレンド葉が非決定論"
+        assert abs(v1 - base) > 1e-9, "α>0 で値が変わっていない"
+        assert v1 == v1  # finite (NaN なら False)
+    finally:
+        cpu_value_model.set_alpha_override(None)
 
 
 def test_gbdt_tree_predict_and_format():
@@ -98,3 +130,24 @@ def test_gbdt_tree_predict_and_format():
           "n_features": cpu_features.N_FEATURES, "trees": [{"v": 0.0}]}
     assert cpu_value_model._valid_model(ok) is True
     assert cpu_value_model._valid_model({**ok, "n_features": 999}) is False
+
+
+def test_mlp_v1_forward_and_schema():
+    """mlp-v1: pure-Python forward（標準化→W·x+b＋relu→linear→sigmoid）＝手計算一致＋スキーマ検証。"""
+    import math
+    N = cpu_features.N_FEATURES
+    # 1特徴だけ効く隠れ1ユニット（relu）→出力1ユニット（linear）。標準化は恒等（mean0/std1）。
+    Wh = [[0.0] * N]; Wh[0][0] = 2.0           # hidden unit: 2*x0
+    m = {"format": "mlp-v1", "feature_names": cpu_features.FEATURE_NAMES, "n_features": N,
+         "mean": [0.0] * N, "std": [1.0] * N,
+         "layers": [{"W": Wh, "b": [0.5], "act": "relu"},
+                    {"W": [[3.0]], "b": [-1.0], "act": "linear"}]}
+    assert cpu_value_model._valid_model(m) is True
+    assert cpu_value_model._valid_model({**m, "n_features": 999}) is False
+    x = [0.0] * N; x[0] = 1.0
+    # 手計算: h=relu(2*1+0.5)=2.5 → z=3*2.5-1=6.5 → sigmoid(6.5)
+    expect = 1.0 / (1.0 + math.exp(-6.5))
+    assert abs(cpu_value_model._mlp_predict(m, x) - expect) < 1e-9
+    # relu のゼロ刈り: x0=-1 → h=relu(-1.5)=0 → z=-1 → sigmoid(-1)
+    x[0] = -1.0
+    assert abs(cpu_value_model._mlp_predict(m, x) - 1.0 / (1.0 + math.exp(1.0))) < 1e-9
