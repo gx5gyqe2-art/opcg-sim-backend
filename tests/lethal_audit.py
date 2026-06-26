@@ -18,6 +18,8 @@
     OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/lethal_audit.py --games 100 --real-decks --all-leaders --pimc 4
 """
 import argparse
+import multiprocessing as mp
+import os
 import random
 import sys
 from typing import Any, Dict, List, Optional
@@ -25,7 +27,7 @@ from typing import Any, Dict, List, Optional
 import conftest  # noqa: F401
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api
+from opcg_sim.src.core import action_api, cpu_ai
 from opcg_sim.src.core.invariants import check_invariants
 from collect_value_data import _build_decks, _make_decider
 from cpu_selfplay import _load_db, DEFAULT_MAX_STEPS
@@ -109,6 +111,25 @@ def audit_game(seed, db, difficulty, max_steps, real_decks, all_leaders, pimc):
     return {"records": records, "winner": m.winner, "final_turn": m.turn_count}
 
 
+_DB = None
+_CFG: Dict[str, Any] = {}
+
+
+def _init_worker(cfg: Dict[str, Any]):
+    global _DB, _CFG
+    _DB = _load_db()
+    _CFG = cfg
+    cpu_ai.set_budget_override(cfg.get("budget"))  # 収集と同じ予算75＝eval律速で強さ不変のまま4x速い
+
+
+def _audit_one(seed: int):
+    try:
+        return audit_game(seed, _DB, _CFG["difficulty"], _CFG["max_steps"],
+                          _CFG["real_decks"], _CFG["all_leaders"], _CFG["pimc"])
+    except Exception:
+        return None
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="リーサル監査（診断）")
     ap.add_argument("--games", type=int, default=100)
@@ -117,10 +138,17 @@ def main(argv=None):
     ap.add_argument("--real-decks", action="store_true")
     ap.add_argument("--all-leaders", action="store_true")
     ap.add_argument("--pimc", type=int, default=4)
+    ap.add_argument("--budget", type=int, default=75,
+                    help="探索予算/手（既定75＝収集と同じ・eval律速で強さ不変のまま高速）")
+    ap.add_argument("--workers", type=int, default=0, help="0=自動（コア数-1）")
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
     args = ap.parse_args(argv)
 
-    db = _load_db()
+    cfg = {"difficulty": args.difficulty, "max_steps": args.max_steps, "real_decks": args.real_decks,
+           "all_leaders": args.all_leaders, "pimc": args.pimc, "budget": args.budget}
+    workers = args.workers or max(1, (os.cpu_count() or 2) - 1)
+    seeds = [args.seed + g for g in range(args.games)]
+
     n_games = 0
     leth_turns = 0          # 盤面リーサルが立ったターン数
     converted = 0           # うち、そのターンに手番側が勝った
@@ -128,10 +156,11 @@ def main(argv=None):
     miss_won_later = 0      # 立ったが当ターン未勝利・ただし最終的には勝った（遅延）
     games_with_leth = 0
     games_leth_then_lost = 0
-    for g in range(args.games):
-        r = audit_game(args.seed + g, db, args.difficulty, args.max_steps,
-                       args.real_decks, args.all_leaders, args.pimc)
+    with mp.Pool(workers, initializer=_init_worker, initargs=(cfg,)) as pool:
+      for i, r in enumerate(pool.imap_unordered(_audit_one, seeds), 1):
         if r is None:
+            if i % 20 == 0:
+                print(f"  {i}/{args.games} … valid={n_games} leth_turns={leth_turns}", flush=True)
             continue
         n_games += 1
         winner, final_turn = r["winner"], r["final_turn"]
@@ -155,8 +184,8 @@ def main(argv=None):
             games_with_leth += 1
         if game_leth_loser:
             games_leth_then_lost += 1
-        if (g + 1) % 20 == 0:
-            print(f"  {g+1}/{args.games} … valid={n_games} leth_turns={leth_turns}", flush=True)
+        if i % 20 == 0:
+            print(f"  {i}/{args.games} … valid={n_games} leth_turns={leth_turns}", flush=True)
 
     print(f"\n=== リーサル監査: {n_games} 局（pimc={args.pimc}） ===")
     if leth_turns == 0:
