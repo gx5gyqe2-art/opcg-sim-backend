@@ -79,6 +79,11 @@ _KILLER_SLOTS = 2          # 各 ply で保持する killer 手の数（standard
 # （最善応手列を次手の同一局面ノードへ正しく対応付ける）で正の利得が出れば有効化を再検討する。
 _USE_PV_CROSS_DECIDE = False
 
+# 評価関数 v2（L1コア・単一通貨「カード」＋時間割引・設計 v0.4）の段階導入フラグ。
+# 既定 OFF＝`evaluate_base` は従来の手書き J値評価のまま（完全同値）。`OPCG_EVAL_V2=1` で v0.4 評価へ
+# 差し替わる（first cut・係数未チューニング）。正本: docs/reports/cpu_eval_redesign_card_currency_20260625.md。
+_USE_EVAL_V2 = os.environ.get("OPCG_EVAL_V2") not in (None, "", "0")
+
 # 情報方針（フェア制約・docs/reports/cpu_strength_roadmap_20260622.md §0/§4 Phase -1）。
 # 旧実装は decide で `see_opp_hand, opp_public_only = True, False` を**ハードコード**＝出荷 CPU がチート
 # （相手手札/裏ライフを読む）だった。これを引数化し、**出荷デフォルトを fair に即切替**する（固定値撤廃）。
@@ -210,6 +215,43 @@ def set_budget_override(b):
 
 def _effective_budget() -> int:
     return _BUDGET_OVERRIDE if _BUDGET_OVERRIDE is not None else HARD_PER_MOVE_BUDGET
+
+
+# 評価 v2 の per-decide オーバーライド（評価アリーナで v2 ON/OFF を席別に切替＝A/B 用・set_*_override と同型）。
+# None で env/既定（`_USE_EVAL_V2`）へ戻る＝本番/テストは未設定で従来同値。
+_EVAL_V2_OVERRIDE = None
+
+
+def set_eval_v2_override(on):
+    """評価 v2 を一時上書き（True/False/None）。None で既定（`OPCG_EVAL_V2`）へ戻る。"""
+    global _EVAL_V2_OVERRIDE
+    _EVAL_V2_OVERRIDE = None if on is None else bool(on)
+
+
+def _eval_v2_active() -> bool:
+    return _EVAL_V2_OVERRIDE if _EVAL_V2_OVERRIDE is not None else _USE_EVAL_V2
+
+
+# 探索深さ／ply 上限の per-decide オーバーライド（L1 外の伸びしろ＝探索深さの A/B 用・set_*_override と同型）。
+# 席別に horizon/max_ply を切替えて「より深く読む方」を同一ゲーム内ペアで測る（評価アリーナ＝単一スレッドで安全）。
+# None で既定（HARD_HORIZON / HARD_MAX_PLY）へ戻る＝本番/テストは未設定で従来同値。
+_HORIZON_OVERRIDE = None
+_MAX_PLY_OVERRIDE = None
+
+
+def set_search_override(horizon=None, max_ply=None):
+    """探索 horizon／ply 上限を一時上書き（評価アリーナの深さA/B用・どちらも None で既定へ）。"""
+    global _HORIZON_OVERRIDE, _MAX_PLY_OVERRIDE
+    _HORIZON_OVERRIDE = None if horizon is None else max(1, int(horizon))
+    _MAX_PLY_OVERRIDE = None if max_ply is None else max(1, int(max_ply))
+
+
+def _effective_horizon() -> int:
+    return _HORIZON_OVERRIDE if _HORIZON_OVERRIDE is not None else HARD_HORIZON
+
+
+def _effective_max_ply() -> int:
+    return _MAX_PLY_OVERRIDE if _MAX_PLY_OVERRIDE is not None else HARD_MAX_PLY
 
 
 # Phase 4 本番配線: PIMC 既定世界数（OPCG_PIMC_WORLDS・既定 1＝休眠＝従来同値）。本番 Dockerfile で 4 を
@@ -840,6 +882,11 @@ def evaluate_base(manager, me_name: str, see_opp_hand: bool = True, profile=None
     温存・ライフ重視・攻め圧）を補正し、逆算リーサル/マイルストーン項を加える。
     plan=None では一切作動せず現行挙動と完全同値。
     """
+    # 評価 v2（L1コア・v0.4）への段階導入差し替え。既定 OFF＝以降の従来 J値評価を実行（完全同値）。
+    if _eval_v2_active():
+        from . import cpu_eval_v2
+        return cpu_eval_v2.evaluate_v2(manager, me_name, see_opp_hand=see_opp_hand,
+                                       profile=profile, plan=plan, out=out)
     if manager.winner == me_name:
         if out is not None:
             out["winner"] = me_name
@@ -1269,7 +1316,7 @@ def _settle_discount(value: float, plan) -> float:
     """
     if plan is None:
         return value
-    if abs(value) >= W_WIN - HARD_MAX_PLY:   # 勝敗確定（±(W_WIN-ply)）は割り引かない
+    if abs(value) >= W_WIN - _effective_max_ply():   # 勝敗確定（±(W_WIN-ply)）は割り引かない
         return value
     return value * _SETTLE_CONFIDENCE
 
@@ -1405,7 +1452,7 @@ def _search(manager, root_name: str, alpha: float, beta: float,
     if pend_action == "MAIN_ACTION" and (manager.turn_count - start_turn) >= horizon:
         return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile, plan=plan)
     # 安全打ち切り: 予算/ply 上限。自分の手番途中ならターン境界へ整流してから評価（甘い途中評価を避ける）。
-    if budget[0] <= 0 or ply >= HARD_MAX_PLY:
+    if budget[0] <= 0 or ply >= _effective_max_ply():
         return _settle_eval(manager, root_name, see_opp_hand, profile, plan, ply)
 
     actor = _player_by_name(manager, actor_name)
@@ -1688,7 +1735,7 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
             v = _recurse_child(manager, name, m,
                                lambda b: _search(b, name, float("-inf"), float("inf"),
                                    budget, see_opp_hand, opp_public_only, profile, ply=1, plan=plan,
-                                   start_turn=start_turn, horizon=HARD_HORIZON, counter_budget=cbudget,
+                                   start_turn=start_turn, horizon=_effective_horizon(), counter_budget=cbudget,
                                    killers=killers))
             if v is None:  # 深掘りの適用失敗（pass-1 と整合・通常は起きない）
                 continue
@@ -1894,6 +1941,26 @@ def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: 
                 manager.turn_count, HARD_HORIZON)
 
 
+def _determinize_opponent(manager, me_name: str, rng):
+    """`manager` のクローンを返し、**相手の伏せ手札を相手の山札＋手札プールから再サンプリング**する（公平化）。
+
+    自分（`me_name`）の手札・場・山札順は不変（自分の手は実物＝返すプランが実ゲームで合法）。相手の手札枚数は
+    保存し、中身だけ「相手のライブラリ（山札＋現手札）からランダムに同数」へ差し替える＝公開情報と整合する
+    “ありえる手”＝チート除去。PIMC（§2.5.8）の各世界サンプリングが使う。journal 非作動の top-level 前提。
+    """
+    clone = manager.clone()
+    opp = clone.p2 if clone.p1.name == me_name else clone.p1
+    pool = list(opp.hand) + list(opp.deck)
+    if not pool:
+        return clone
+    rng.shuffle(pool)
+    n_hand = len(opp.hand)
+    new_hand, new_deck = pool[:n_hand], pool[n_hand:]
+    opp.hand[:] = new_hand
+    opp.deck[:] = new_deck
+    return clone
+
+
 def _pimc_scored(manager, name: str, moves: List[Dict[str, Any]], k_worlds: int, rng, plan,
                  collect=None) -> List[Tuple[float, Dict[str, Any]]]:
     """Phase 2 PIMC（決定化・docs/reports/cpu_strength_roadmap_20260622.md §4 Phase 2）。
@@ -1907,7 +1974,6 @@ def _pimc_scored(manager, name: str, moves: List[Dict[str, Any]], k_worlds: int,
     決定論: 各世界の rng は親 `rng` から決定的に派生（同一 seed→同一手＝テスト/自己対戦の契約を維持）。
     戻り値は `decide` と同形 `[(avg_score, move)]`（move は実 manager の合法手 dict＝そのまま適用可）。
     """
-    from .cpu_mcts import _determinize_opponent  # 遅延 import（cpu_mcts→cpu_ai の循環回避）
     agg: Dict[Any, List[Any]] = {}  # sig -> [score 合計, move]
     order: List[Any] = []           # 初出順（決定論的な scored 順）
     for _w in range(k_worlds):

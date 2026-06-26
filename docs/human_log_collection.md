@@ -1,6 +1,6 @@
 # 人間ログによる評価関数強化 — 収集・学習フロー
 
-対 CPU 戦の実プレイ（人間 vs CPU）から価値関数（評価関数の学習化, SPEC §2.5.7）の教師データを集め、
+対 CPU 戦の実プレイ（人間 vs CPU）から価値関数（`hard`／α-β の評価関数の学習化, SPEC §2.5.8）の教師データを集め、
 候補モデルを学習し、Elo で検証してから本番へ昇格するための運用手順。
 
 ## 全体像
@@ -14,7 +14,7 @@
   ③ eval     tests/eval_value_on_set.py       → 候補 vs 同梱の汎化を数値比較
         ▼ (ここまで一括 = tests/human_value_pipeline.py)
   ④ Elo検証  自己対戦アリーナで blend ON/OFF を A/B（合格時のみ昇格）
-  ⑤ 昇格     value_model.json 差し替え + OPCG_VALUE_BLEND_HARD/expert を有効化
+  ⑤ 昇格     value_model.json 差し替え + OPCG_VALUE_BLEND_HARD を有効化
 ```
 
 ①〜③は**安全**（同梱モデル・本番挙動を一切変えない・読み取りと候補生成のみ）。④⑤は**挙動を変える**ため
@@ -54,11 +54,11 @@ python tests/eval_value_on_set.py --data tests/human_value.jsonl --model tests/h
 ### ④ Elo 検証（昇格の前提）
 `val_acc` が十分（過去の自己対戦学習は 0.645 で強さ未達だった＝**ここを上回るのが目安**）なら、自己対戦
 アリーナで `OPCG_VALUE_BLEND_HARD`/`OPCG_VALUE_BLEND` の α を上げた blend ON と OFF を A/B し、
-**勝率非劣化＋「変な手」カウンタ非増加**を確認する（WBS「変な手撲滅」Phase0 監査・SPEC §2.5.7）。
+**勝率非劣化＋「変な手」カウンタ非増加**を確認する（WBS「変な手撲滅」Phase0 監査・SPEC §2.5.8）。
 
 ### ⑤ 昇格
 合格した候補のみ `opcg_sim/src/core/value_model.json` を差し替え、Dockerfile で
-`OPCG_VALUE_BLEND_HARD`（hard）/`OPCG_VALUE_BLEND`（expert 葉）を有効化する。
+`OPCG_VALUE_BLEND_HARD`（`hard`／α-β の葉ブレンド）を有効化する。
 **昇格はこのフロー外の明示操作**＝パイプラインは決して自動で同梱モデルを上書きしない。
 
 ## 注意

@@ -47,6 +47,10 @@ class InvariantError(Exception):
         self.trace_tail = trace_tail
         super().__init__(f"invariant violation(s) at step {step}: {violations}")
 
+    def __reduce__(self):
+        # multiprocessing でワーカー→親へ転送できるよう picklable に（既定は args=(message,) で復元不能）。
+        return (InvariantError, (self.violations, self.step, self.trace_tail))
+
 
 def _load_db() -> CardLoader:
     db = CardLoader(os.path.join(DATA, "opcg_cards.json"))

@@ -31,7 +31,6 @@ except ImportError:
 from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
-from opcg_sim.src.core import cpu_mcts
 from opcg_sim.src.core import cpu_self_plan
 from opcg_sim.src.core import cpu_value_data
 from opcg_sim.api import decide_client
@@ -377,10 +376,10 @@ async def game_create(req: Any = Body(...)):
         first_player = _resolve_first_player(req.get("first_player"), player1, player2)
         manager = GameManager(player1, player2); manager.start_game(first_player); GAMES[game_id] = manager
         if vs_cpu:
-            # CPU は **hard（α-β＋ビーム）** と **expert（MCTS・§2.5.7）** の2系統のみ（easy/normal は廃止）。
-            difficulty = req.get("cpu_difficulty", "expert")
-            if difficulty not in ("hard", "expert"):
-                difficulty = "expert"
+            # CPU は **hard（α-β＋ビーム＋PIMC）** のみ（easy/normal 廃止・expert(MCTS) も撤去＝強さ/速度で α-β に劣ると判明）。
+            difficulty = req.get("cpu_difficulty", "hard")
+            if difficulty != "hard":
+                difficulty = "hard"
             # 自デッキ勝ち筋プラン（§2.5.5）: CPU(p2) の自デッキ構成から静的に分類して保持（hard で使用）。
             self_plan = None
             if difficulty == "hard":
@@ -486,21 +485,11 @@ def _ponder_enabled() -> bool:
 
 
 def _plan_segment(manager, cpu_player, difficulty, mem=None, profile=None, plan=None):
-    """難易度に応じた「このターンの計画手列」を返す共通ディスパッチ（ポンダリング/計画キャッシュの単一の真実源）。
+    """「このターンの計画手列」を返す（ポンダリング/計画キャッシュの単一の真実源）。
 
-    - `expert`: **MCTS（ターン粒度マクロ木・公平モード）をインプロセスで実行**（`cpu_mcts.mcts_plan_turn`）。
-      相手手札を覗かない（determinize=True）＝人間相手として公平。PyPy ワーカーは α-β 用なので使わない。
-    - それ以外（easy/normal/hard）: 従来どおり α-β を `decide_client`（PyPy ワーカー）でセグメント計画。
-    どちらも「手 dict のリスト（=このターンの連続手番）」を返す＝後段のキャッシュ/replay/ポンダリングは共通。
+    hard（α-β）を `decide_client`（PyPy ワーカー）でセグメント計画する。「手 dict のリスト（=このターンの
+    連続手番）」を返す＝後段のキャッシュ/replay/ポンダリングが共通に乗る。
     """
-    if difficulty == "expert":
-        # レイテンシ上限を壁時計デッドラインで保証（大盤面で MCTS が数十秒に膨らむのを防ぐ）。
-        # 既定 2000ms・OPCG_MCTS_DEADLINE_MS で調整可。horizon は OPCG_MCTS_HORIZON（既定2＝大盤面の発散抑制）。
-        deadline_ms = int(os.environ.get("OPCG_MCTS_DEADLINE_MS", "2000"))
-        horizon = int(os.environ.get("OPCG_MCTS_HORIZON", "2"))
-        return cpu_mcts.mcts_plan_turn(manager, cpu_player, "hard", random,
-                                       horizon=horizon, profile=profile, plan=plan,
-                                       determinize=True, deadline_ms=deadline_ms)
     return decide_client.plan_segment(manager, cpu_player, difficulty,
                                       mem=mem, profile=profile, plan=plan)
 
@@ -518,7 +507,7 @@ async def _ponder_plan(game_id: str) -> None:
         return
     cache = meta.setdefault("plan_cache", {})
     try:
-        cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "expert")
+        cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "hard")
         turn_mem = meta.setdefault("turn_mem", {})
         # live 盤面をそのまま OS スレッドへ渡すと、スレッド側の deepcopy（plan_turn 内 clone / ワーカーへの
         # pickle）がメインスレッドの盤面変更と競合する（読み取り中の書き換え）。**メインスレッドで原子的に
@@ -602,7 +591,7 @@ async def _speculate_plan(game_id: str, clone, human_pid: str, gen: int) -> None
         return
     cache = meta.setdefault("plan_cache", {})
     try:
-        cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "expert")
+        cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "hard")
         result = await asyncio.to_thread(
             _speculate_compute, clone, human_pid, cpu_pid, difficulty,
             meta.get("opp_profile"), meta.get("self_plan"))
@@ -692,7 +681,7 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
     if not meta:
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg="このゲームは CPU 対戦ではありません。")
 
-    cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "expert")
+    cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "hard")
     cpu_player = manager.p1 if manager.p1.name == cpu_pid else manager.p2
 
     def _waiting_for() -> str:
@@ -727,30 +716,15 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                 # 探索（decide）は方式B: OPCG_PYPY_WORKER=1 のとき PyPy ワーカーへ委譲（~2.1x）。
                 # 無効/失敗時はブリッジ内でインプロセス cpu_ai.decide_guarded にフォールバック（現行挙動）。
                 move = None
-                if difficulty == "expert":
-                    # expert = MCTS（§2.5.7）。常に計画キャッシュ経路（_plan_segment→MCTS）で 1 ターンを計画し
-                    # queue から即時 replay。ポンダリング（⑥-a/-b）も _plan_segment 経由で MCTS を前倒し計算する
-                    # ので、人間の番に計画済みなら CPU 手番は即時。α-β/ワーカー/trace 経路は通らない。
+                # Phase 3 ① 計画キャッシュ（OPCG_PLAN_CACHE=1・本番体感最適化）: セグメント内の手番を
+                # 即時 replay する（待ちを1回に集約）。トレース採取時は per-action を維持（読み筋記録のため）。
+                # 既定 OFF ＝従来挙動と完全同値。
+                if os.environ.get("OPCG_PLAN_CACHE", "0") == "1" and not trace_on:
                     move = _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem)
-                    if move is None:  # 先頭手不正等＝MCTS で再計画して合法な先頭手を採る（稀）
-                        seg = _plan_segment(manager, cpu_player, difficulty, turn_mem,
-                                            meta.get("opp_profile"), meta.get("self_plan"))
-                        legal_by_sig = {cpu_ai._move_sig(m): m for m in manager.get_legal_actions(cpu_player)}
-                        for mv in (seg or []):
-                            hit = legal_by_sig.get(cpu_ai._move_sig(mv))
-                            if hit is not None:
-                                move = hit
-                                break
-                else:
-                    # Phase 3 ① 計画キャッシュ（OPCG_PLAN_CACHE=1・本番体感最適化）: セグメント内の手番を
-                    # 即時 replay する（待ちを1回に集約）。トレース採取時は per-action を維持（読み筋記録のため）。
-                    # 既定 OFF ＝従来挙動と完全同値。
-                    if os.environ.get("OPCG_PLAN_CACHE", "0") == "1" and not trace_on:
-                        move = _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem)
-                    if move is None:
-                        move = decide_client.decide(manager, cpu_player, difficulty, mem=turn_mem,
-                                                    profile=meta.get("opp_profile"), plan=meta.get("self_plan"),
-                                                    trace=tr, trace_read_ahead=False)
+                if move is None:
+                    move = decide_client.decide(manager, cpu_player, difficulty, mem=turn_mem,
+                                                profile=meta.get("opp_profile"), plan=meta.get("self_plan"),
+                                                trace=tr, trace_read_ahead=False)
                 if move is not None:
                     if trace_on:
                         # 思考トレース＋アクションを適用前に記録（card_id 基準・進行には不参加）。

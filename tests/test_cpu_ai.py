@@ -833,7 +833,7 @@ def test_hard_selfplay_smoke_no_invariant_violation(db):
 # /api/game/cpu/step エンドポイント
 # ---------------------------------------------------------------------------
 
-def _cpu_create(client, difficulty="expert"):
+def _cpu_create(client, difficulty="hard"):
     res = client.post("/api/game/create", json={
         "p1_deck": "db:a", "p2_deck": "db:b",
         "p1_name": "p1", "p2_name": "p2",
@@ -916,38 +916,11 @@ def test_cpu_full_game_progress(client):
     assert turns_played >= 1
 
 
-def test_cpu_expert_difficulty_uses_mcts(client, monkeypatch):
-    """expert 難易度が登録され、/cpu/step で MCTS（cpu_mcts）経由で CPU が手を進められる（配線スモーク・§2.5.7）。
-
-    expert は α-β でなく `cpu_mcts.mcts_plan_turn`（公平モード）でターン計画する。ここでは「登録される・
-    実際に CPU が行動して人間手番へ戻る・MCTS プランナが呼ばれる」ことを確認する（速度のため反復を絞る）。
-    """
-    import opcg_sim.src.core.cpu_mcts as mcts
-    monkeypatch.setattr(mcts, "MCTS_MACRO_ITERS", 30)  # テスト高速化
-    calls = {"n": 0}
-    real_plan = mcts.mcts_plan_turn
-    def spy(*a, **k):
-        calls["n"] += 1
-        return real_plan(*a, **k)
-    monkeypatch.setattr(mcts, "mcts_plan_turn", spy)
-    # app 側は `cpu_mcts.mcts_plan_turn` を属性参照で呼ぶのでこのパッチが効く。
-
-    gid = _cpu_create(client, "expert")["game_id"]
-    assert appmod.CPU_GAMES[gid]["difficulty"] == "expert"
-    client.post("/api/game/action", json={"game_id": gid, "action": "KEEP_HAND", "player_id": "p1", "payload": {}})
-
-    cpu_actions = 0
-    step = None
-    for _ in range(200):
-        step = client.post("/api/game/cpu/step", json={"game_id": gid}).json()
-        assert step["success"], step
-        if step["cpu_acted"]:
-            cpu_actions += 1
-        if step["waiting_for"] != "cpu":
-            break
-    assert cpu_actions >= 1, "expert(MCTS) CPU が一度も行動しなかった"
-    assert calls["n"] >= 1, "MCTS プランナ(mcts_plan_turn)が呼ばれていない＝配線されていない"
-    assert step["waiting_for"] in ("human", "human_decision", "game_over")
+def test_cpu_difficulty_only_hard(client):
+    """CPU 難易度は hard のみ＝expert/未知値は hard に正規化される（MCTS撤去・2026-06）。"""
+    for req_diff in ("hard", "expert", "normal", "unknown"):
+        gid = _cpu_create(client, req_diff)["game_id"]
+        assert appmod.CPU_GAMES[gid]["difficulty"] == "hard"
 
 
 # ---------------------------------------------------------------------------

@@ -1,8 +1,8 @@
-"""学習価値関数（§2.5.7 残5・GBDT/線形 価値葉）の健全性ゲート。
+"""学習価値関数（GBDT/線形 価値モデル）の健全性ゲート。
 
-特徴抽出（`cpu_features`）とモデル推論（`cpu_value_model`）・葉ブレンド（`cpu_mcts._value_boundary`）が
-「壊さない・決定論・manager 非破壊・既定OFFで現状同値・公平（相手手札の中身を読まない）」ことを固定する。
-**ブレンドは既定OFF（`OPCG_VALUE_BLEND` 未設定=0）**＝本番 `evaluate`/hard も MCTS 既定挙動も不変。
+特徴抽出（`cpu_features`）とモデル推論（`cpu_value_model`）が「壊さない・決定論・manager 非破壊・公平
+（相手手札の中身を読まない）」ことを固定する。**価値モデルは将来 α-β(hard) の葉へブレンドする土台**として
+残置（MCTS撤去後・現状の本番 `evaluate`/hard は不変＝モデルの消費先は未配線）。
 
 実行: OPCG_LOG_SILENT=1 python -m pytest tests/test_cpu_value_model.py -q -s -p no:cacheprovider
 """
@@ -14,7 +14,7 @@ import conftest  # noqa: F401
 import pytest
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import cpu_features, cpu_value_model, cpu_mcts, journal
+from opcg_sim.src.core import cpu_features, cpu_value_model, journal
 import cpu_selfplay
 
 
@@ -79,33 +79,12 @@ def test_predict_in_unit_range_and_rejects_bad_length(db):
     assert cpu_value_model.predict_winprob([0.0, 1.0]) is None, "長さ不一致は None であるべき"
 
 
-# --- 葉ブレンド（既定OFF＝現状同値） ---------------------------------------------
+# --- 価値ブレンドの素材（α-β 葉への将来配線用・現状は消費先なし） ----------------
 
-def test_blend_off_by_default_is_pure_eval(db):
-    """`OPCG_VALUE_BLEND` 未設定なら _value_boundary は従来の eval ベース値と同一（推論を走らせない）。"""
+def test_blend_alpha_off_by_default(db):
+    """`OPCG_VALUE_BLEND` 未設定なら blend_alpha()==0＝モデル推論を走らせない（現状の本番挙動）。"""
     os.environ.pop("OPCG_VALUE_BLEND", None)
-    m = _game(db)
-    import math
-    from opcg_sim.src.core.cpu_ai import evaluate
-    ev = evaluate(m, "p1", see_opp_hand=False)
-    base = 0.5 * (1.0 + math.tanh(ev / cpu_mcts.MCTS_VALUE_SCALE))
-    assert cpu_mcts._value_boundary(m, "p1", see_opp_hand=False) == base
     assert cpu_value_model.blend_alpha() == 0.0
-
-
-def test_blend_on_changes_value_and_is_deterministic(db):
-    """`OPCG_VALUE_BLEND>0` でブレンドが効き（値が変わり）・同一入力で決定論。"""
-    m = _game(db)
-    base = cpu_mcts._value_boundary(m, "p1", see_opp_hand=False)
-    os.environ["OPCG_VALUE_BLEND"] = "0.5"
-    try:
-        v1 = cpu_mcts._value_boundary(m, "p1", see_opp_hand=False)
-        v2 = cpu_mcts._value_boundary(m, "p1", see_opp_hand=False)
-        assert v1 == v2, "ブレンド葉が非決定論"
-        assert abs(v1 - base) > 1e-9, "ブレンドONで値が変わっていない"
-        assert 0.0 <= v1 <= 1.0
-    finally:
-        os.environ.pop("OPCG_VALUE_BLEND", None)
 
 
 def test_gbdt_tree_predict_and_format():

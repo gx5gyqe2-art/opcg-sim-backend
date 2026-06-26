@@ -8,3 +8,7 @@ opcg_sim/data/*.cache.pkl
 # 人間ログ・パイプラインの中間物（采取 JSON 自体は tests/human_captures/ にコミットして蓄積）
 tests/human_value.jsonl
 tests/human_value_model.candidate.json
+# 価値学習の dev 中間物（再生成可能・非同梱）: 自己対戦データ・候補モデル
+tests/selfplay_value.jsonl
+tests/cand_*.json
+tests/eval_v2_spsa_best.json
