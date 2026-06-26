@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai, cpu_mcts, cpu_self_plan, cpu_value_model
+from opcg_sim.src.core import action_api, cpu_ai, cpu_self_plan, cpu_value_model
 from opcg_sim.src.core.invariants import check_invariants, check_turn_boundary
 
 from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS, InvariantError
@@ -111,45 +111,18 @@ def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
 
 def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                   policy_rng=None, pimc_worlds: int = 1, value_alpha=None, per_move_budget=None,
-                  eval_v2=None, search=None, mcts=None):
+                  eval_v2=None, search=None):
     """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き・デプロイと同じプラン供給）。
 
     `info_policy`（Phase -1）で情報方針を選ぶ＝凍結 fair-hard vs cheat-hard の A/B を席交互で測れる。
     `policy_rng`（Phase 0・CRN）を渡すと**方策のタイブレーク乱数をゲーム乱数（global random）から分離**
     する＝同一 game-seed なら方策に依らずデッキ配り/シャッフルが同一になり、対戦間分散が落ちる。
-    未指定時は従来どおり global `random`（後方互換）。`search`（任意・L1外の深さA/B用）= `(horizon, max_ply)`
+    未指定時は従来どおり global `random`（後方互換）。`search`（任意・深さA/B用）= `(horizon, max_ply)`
     タプルでこの席だけ探索深さ／ply 上限を上書き（None で既定）。
-
-    `difficulty == "expert"` は **MCTS（マクロ木・本番 §2.5.7 と同経路）** で意思決定する。`mcts`（任意・dict）で
-    `iters`/`horizon`/`worlds`/`determinize` を席別に上書き（A/B用）。本番 expert は determinize=True・horizon=2・
-    worlds=1・壁時計デッドラインだが、アリーナは**固定反復**（再現性のため deadline_ms=None）で測る。
     """
     mem: Dict[str, Any] = {}
     prng = policy_rng if policy_rng is not None else random
     s_horizon, s_max_ply = (search if search is not None else (None, None))
-
-    if difficulty == "expert":
-        mk = mcts or {}
-        cache: Dict[str, Any] = {}
-        # 本番 §2.5.7 と同じく "hard"（see_opp_hand=True だが determinize で偽手札に差し替え＝公平）。
-        m_iters = mk.get("iters", cpu_mcts.MCTS_MACRO_ITERS)
-        m_horizon = mk.get("horizon", 2)        # 本番 expert の既定（OPCG_MCTS_HORIZON=2）。
-        m_worlds = mk.get("worlds", 1)
-        m_det = mk.get("determinize", True)     # 本番 expert は determinize=True（人間相手として公平）。
-
-        def _decide_expert(manager, actor):
-            # expert の葉（cpu_mcts._value_boundary）は evaluate(eval_v2 反映)＋学習価値ブレンド(α)を読む。
-            # → 席別に eval_v2／blend α を切替えて MCTS×eval v2×学習ブレンドの A/B を測れる（joint-SPSA 前段）。
-            cpu_value_model.set_alpha_override(value_alpha)
-            cpu_ai.set_eval_v2_override(eval_v2)
-            try:
-                return cpu_mcts.decide_mcts_macro(manager, actor, "hard", prng, cache=cache,
-                                                  iterations=m_iters, horizon=m_horizon, worlds=m_worlds,
-                                                  determinize=m_det, plan=plan, deadline_ms=None)
-            finally:
-                cpu_value_model.set_alpha_override(None)
-                cpu_ai.set_eval_v2_override(None)
-        return _decide_expert
 
     def _decide(manager, actor):
         # Phase 3b/4: この decider のブレンド率・探索予算を一時設定（単一スレッド arena＝相手と干渉しない）。
@@ -178,7 +151,6 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p1_budget=None, p2_budget=None,
               p1_eval_v2=None, p2_eval_v2=None,
               p1_search=None, p2_search=None,
-              p1_mcts=None, p2_mcts=None,
               p1_force_plan: bool = False, p2_force_plan: bool = False) -> Dict[str, Any]:
     """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
@@ -201,8 +173,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
-    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1, p1_force_plan), p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget, p1_eval_v2, p1_search, p1_mcts),
-                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2, p2_force_plan), p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget, p2_eval_v2, p2_search, p2_mcts)}
+    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1, p1_force_plan), p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget, p1_eval_v2, p1_search),
+                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2, p2_force_plan), p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget, p2_eval_v2, p2_search)}
 
     step = 0
     prev_turn = manager.turn_count

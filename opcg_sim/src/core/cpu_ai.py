@@ -1941,6 +1941,26 @@ def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: 
                 manager.turn_count, HARD_HORIZON)
 
 
+def _determinize_opponent(manager, me_name: str, rng):
+    """`manager` のクローンを返し、**相手の伏せ手札を相手の山札＋手札プールから再サンプリング**する（公平化）。
+
+    自分（`me_name`）の手札・場・山札順は不変（自分の手は実物＝返すプランが実ゲームで合法）。相手の手札枚数は
+    保存し、中身だけ「相手のライブラリ（山札＋現手札）からランダムに同数」へ差し替える＝公開情報と整合する
+    “ありえる手”＝チート除去。PIMC（§2.5.8）の各世界サンプリングが使う。journal 非作動の top-level 前提。
+    """
+    clone = manager.clone()
+    opp = clone.p2 if clone.p1.name == me_name else clone.p1
+    pool = list(opp.hand) + list(opp.deck)
+    if not pool:
+        return clone
+    rng.shuffle(pool)
+    n_hand = len(opp.hand)
+    new_hand, new_deck = pool[:n_hand], pool[n_hand:]
+    opp.hand[:] = new_hand
+    opp.deck[:] = new_deck
+    return clone
+
+
 def _pimc_scored(manager, name: str, moves: List[Dict[str, Any]], k_worlds: int, rng, plan,
                  collect=None) -> List[Tuple[float, Dict[str, Any]]]:
     """Phase 2 PIMC（決定化・docs/reports/cpu_strength_roadmap_20260622.md §4 Phase 2）。
@@ -1954,7 +1974,6 @@ def _pimc_scored(manager, name: str, moves: List[Dict[str, Any]], k_worlds: int,
     決定論: 各世界の rng は親 `rng` から決定的に派生（同一 seed→同一手＝テスト/自己対戦の契約を維持）。
     戻り値は `decide` と同形 `[(avg_score, move)]`（move は実 manager の合法手 dict＝そのまま適用可）。
     """
-    from .cpu_mcts import _determinize_opponent  # 遅延 import（cpu_mcts→cpu_ai の循環回避）
     agg: Dict[Any, List[Any]] = {}  # sig -> [score 合計, move]
     order: List[Any] = []           # 初出順（決定論的な scored 順）
     for _w in range(k_worlds):

@@ -16,7 +16,7 @@ from typing import Any, Dict, List
 import conftest  # noqa: F401
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai, cpu_features, cpu_mcts, cpu_value_data
+from opcg_sim.src.core import action_api, cpu_ai, cpu_features, cpu_value_data
 from opcg_sim.src.core.invariants import check_invariants
 
 from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS
@@ -39,18 +39,10 @@ def _build_decks(seed: int, db, real_decks: bool):
 
 
 def _make_decider(policy: str, iters: int, horizon: int):
-    """policy に応じた1手決定関数を返す（局ごとに新規生成＝mem/cache をリセット）。
+    """policy に応じた1手決定関数を返す（局ごとに新規生成＝mem をリセット）。
 
-    expert＝MCTS（`decide_mcts_macro`・価値葉を使う本番方策＝学習分布を一致させる）。
-    easy/normal/hard＝従来 α-β（`decide_guarded`）。
+    hard＝本番方策 α-β（`decide_guarded`）＝学習分布を本番に一致させる。`iters`/`horizon` は後方互換で残すが不使用。
     """
-    if policy == "expert":
-        caches: Dict[str, Dict[str, Any]] = {}
-        def decide(m, actor):
-            return cpu_mcts.decide_mcts_macro(m, actor, "hard", random,
-                                              cache=caches.setdefault(actor.name, {}),
-                                              iterations=iters, horizon=horizon)
-        return decide
     mem: Dict[str, Dict[str, Any]] = {}
     def decide(m, actor):
         return cpu_ai.decide_guarded(m, actor, policy, random, mem.setdefault(actor.name, {}))
@@ -106,10 +98,10 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="価値関数の自己対戦データ収集")
     ap.add_argument("--games", type=int, default=100)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--difficulty", choices=["hard", "expert"], default="expert",
-                    help="自己対戦の方策。expert=MCTS（価値葉を使う本番方策＝学習分布を一致）")
+    ap.add_argument("--difficulty", choices=["hard"], default="hard",
+                    help="自己対戦の方策（hard＝α-β＝本番方策）")
     ap.add_argument("--real-decks", action="store_true", help="deckgen の実デッキ（検証済リーダー巡回）で対戦")
-    ap.add_argument("--iters", type=int, default=40, help="expert の反復数（速度↔質）")
+    ap.add_argument("--iters", type=int, default=40, help="（後方互換・未使用）")
     ap.add_argument("--horizon", type=int, default=2)
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
     ap.add_argument("--out", default="/tmp/value_data.jsonl")
