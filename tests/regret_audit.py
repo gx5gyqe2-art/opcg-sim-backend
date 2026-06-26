@@ -34,23 +34,65 @@ from collect_value_data import _build_decks, _make_decider
 from cpu_selfplay import _load_db, DEFAULT_MAX_STEPS
 
 BLUNDER = 0.10  # regret がこの閾値超え＝崖（blunder）として率を出す
+_SETTLE_LIMIT = 60
 
 _DB = None
 _CFG: Dict[str, Any] = {}
 _JUDGE = None
+_SETTLE = False
 
 
 def _init_worker(cfg: Dict[str, Any]):
-    global _DB, _CFG, _JUDGE
+    global _DB, _CFG, _JUDGE, _SETTLE
     _DB = _load_db()
     _CFG = cfg
+    _SETTLE = cfg.get("settle", False)
     cpu_ai.set_budget_override(cfg.get("budget"))
     _JUDGE = cpu_value_model.load_model_file(cfg["judge"]) if cfg.get("judge") else None
 
 
+def _settle_to_stationary(board, root_name: str):
+    """board を相手ターン開始（相手 MAIN_ACTION）の静止点まで既定解決で畳む（`_settle_eval` と同じ整流）。
+
+    戦闘応答は既定PASS・root の MAIN は TURN_END・その他選択は既定 payload。これで守備手も
+    「戦闘解決後・ターン境界＝価値モデルの学習分布」で勝率評価でき、OOD（戦闘中採点）を排せる。
+    """
+    bo = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+    ACT_PASS = bo.get('PASS', 'PASS')
+    for _ in range(_SETTLE_LIMIT):
+        if board.winner is not None:
+            break
+        pa = board.pending_actor_action()
+        if not pa:
+            break
+        pid, action = pa
+        if pid != root_name and action == "MAIN_ACTION":
+            break
+        actor = board.p1 if board.p1.name == pid else board.p2
+        board.action_events = []
+        try:
+            if action == "MAIN_ACTION":
+                action_api.apply_game_action(board, actor, "TURN_END", {})
+            elif action in ("SELECT_BLOCKER", "SELECT_COUNTER"):
+                action_api.apply_battle_action(board, actor, ACT_PASS, None)
+            else:
+                pending = board.get_pending_request()
+                payload = board.default_interaction_payload(pending)
+                action_api.apply_game_action(board, actor, action_api.ACT_RESOLVE_SELECTION, payload)
+        except Exception:
+            break
+
+
 def _wp_after(manager, actor_name: str, move) -> float:
-    """move を適用した子局面の actor 視点 winprob（非破壊・判定者モデル）。失敗時 0.5。"""
+    """move を適用した子局面の actor 視点 winprob（非破壊・判定者モデル）。失敗時 0.5。
+
+    `_SETTLE` 時は静止点（相手ターン開始）まで畳んでから評価＝全バケツを分布内で評価し守備のOODを排す。
+    """
     def fn(board):
+        if _SETTLE:
+            _settle_to_stationary(board, actor_name)
+            if board.winner is not None:
+                return 1.0 if board.winner == actor_name else 0.0
         f = cpu_features.extract_features(board, actor_name, see_opp_hand=False)
         p = cpu_value_model.predict_winprob(f, model=_JUDGE)
         return 0.5 if p is None else float(p)
@@ -166,13 +208,15 @@ def main(argv=None):
     ap.add_argument("--pimc", type=int, default=4)
     ap.add_argument("--budget", type=int, default=75)
     ap.add_argument("--judge", default="", help="判定者の価値モデル JSON（未指定なら同梱モデル）")
+    ap.add_argument("--settle", action="store_true",
+                    help="各候補を静止点（相手ターン開始）まで畳んでから勝率評価＝守備のOOD排除")
     ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
     args = ap.parse_args(argv)
 
     cfg = {"difficulty": args.difficulty, "max_steps": args.max_steps, "real_decks": args.real_decks,
            "all_leaders": args.all_leaders, "pimc": args.pimc, "budget": args.budget,
-           "judge": args.judge or None}
+           "judge": args.judge or None, "settle": args.settle}
     workers = args.workers or max(1, (os.cpu_count() or 2) - 1)
     seeds = [args.seed + g for g in range(args.games)]
 
