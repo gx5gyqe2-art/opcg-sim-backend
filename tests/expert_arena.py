@@ -35,6 +35,13 @@ def run(mode, pairs, seed0, max_steps, iters, worlds, horizon, alpha, eval_v2=Fa
         kw = dict(challenger_difficulty="expert", baseline_difficulty="hard",
                   challenger_mcts=base_mcts, baseline_pimc=4, baseline_budget=75)
         label = f"expert(iters={iters},h2,w1,det)  vs  hard(α-β・本番PIMC K=4/予算75)"
+    elif mode == "equalize":
+        # 探索ロジック以外を揃える: 隠れ情報=両側単一世界（hard PIMC=1 / expert worlds=1）・plan=両側あり・
+        # 葉=両側 L1（--eval-v2 前提）。残る差分は α-β(h4) vs マクロMCTS(h2,160反復)＝探索ロジックのみ。
+        kw = dict(challenger_difficulty="expert", baseline_difficulty="hard",
+                  challenger_mcts=base_mcts, baseline_pimc=1,
+                  challenger_force_plan=True, baseline_force_plan=True)
+        label = f"expert(MCTS h2/{iters}反復・plan) vs hard(α-β h4・PIMC=1・plan)  ＝探索ロジックのみの差"
     elif mode == "blend":
         # MCTS×学習価値ブレンド: challenger α>0（学習葉混ぜる）vs baseline α=0（純eval）。両側 expert・同設定。
         kw = dict(challenger_difficulty="expert", baseline_difficulty="expert",
@@ -80,7 +87,7 @@ def run(mode, pairs, seed0, max_steps, iters, worlds, horizon, alpha, eval_v2=Fa
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="expert(MCTS) 側の伸びしろ A/B（対照ペア）")
-    ap.add_argument("--mode", choices=["vs-hard", "worlds", "horizon", "blend"], default="vs-hard")
+    ap.add_argument("--mode", choices=["vs-hard", "equalize", "worlds", "horizon", "blend"], default="vs-hard")
     ap.add_argument("--pairs", type=int, default=20)
     ap.add_argument("--seed0", type=int, default=0)
     ap.add_argument("--max-steps", type=int, default=cpu_arena.DEFAULT_MAX_STEPS)

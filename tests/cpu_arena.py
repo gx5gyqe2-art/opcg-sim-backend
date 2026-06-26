@@ -36,13 +36,13 @@ from opcg_sim.src.core.invariants import check_invariants, check_turn_boundary
 from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS, InvariantError
 
 
-def _plan_for(difficulty: str, leader, cards):
+def _plan_for(difficulty: str, leader, cards, force: bool = False):
     """デプロイ（app.py /api/game/create）と同じく normal/hard は自デッキ構成からプランを作る。
 
-    easy はプラン無し（素の 1-ply）。プロファイル（相手テンプレ）は自己対戦では無いので None
-    （デプロイのテンプレ未登録フォールバックと同義）。
+    easy/expert はプラン無し（本番同様）。`force=True` で難易度に依らずプランを作る＝「探索ロジック以外を
+    揃える」比較で expert にも plan を供給する用途（非探索の交絡を除去）。
     """
-    if difficulty == "hard":
+    if difficulty == "hard" or force:
         try:
             return cpu_self_plan.build_plan([c.master for c in cards],
                                             leader=leader.master if leader else None)
@@ -178,7 +178,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p1_budget=None, p2_budget=None,
               p1_eval_v2=None, p2_eval_v2=None,
               p1_search=None, p2_search=None,
-              p1_mcts=None, p2_mcts=None) -> Dict[str, Any]:
+              p1_mcts=None, p2_mcts=None,
+              p1_force_plan: bool = False, p2_force_plan: bool = False) -> Dict[str, Any]:
     """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
@@ -200,8 +201,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
-    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1), p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget, p1_eval_v2, p1_search, p1_mcts),
-                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2), p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget, p2_eval_v2, p2_search, p2_mcts)}
+    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1, p1_force_plan), p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget, p1_eval_v2, p1_search, p1_mcts),
+                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2, p2_force_plan), p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget, p2_eval_v2, p2_search, p2_mcts)}
 
     step = 0
     prev_turn = manager.turn_count
