@@ -56,9 +56,15 @@ def run(mode, pairs, seed0, max_steps, iters, worlds, horizon, alpha):
     res = paired_play(pairs, seed0=seed0, max_steps=max_steps,
                       challenger_eval_v2=False, baseline_eval_v2=False, **kw)
     dt = time.time() - t0
-    ci = _pair_level_ci(res["pair_scores"])
-    print(f"\n=== expert 伸びしろ A/B [{mode}]（{pairs}ペア={2*pairs}局・対照ペア・葉=J値固定） ===")
+    failed = res.get("failed_games", 0)
+    print(f"\n=== expert 伸びしろ A/B [{mode}]（要求{pairs}ペア / 成立{res['pairs']}ペア={res['games']}局・対照ペア・葉=J値固定） ===")
     print(f"{label}")
+    if failed:
+        print(f"⚠ 失敗局 {failed} 件（採点から除外）。例: " + " | ".join(res.get("errors", [])[:3]))
+    if not res["pair_scores"]:
+        print("有効ペアが 0＝全滅。エラーを確認。")
+        return None
+    ci = _pair_level_ci(res["pair_scores"])
     print(f"challenger 勝率 = {ci['win_rate']:.3f}  |  Elo = {ci['elo']:+.0f}")
     print(f"  ペア単位CI（分散低減・正）  : Elo95% [{ci['elo_lo']:+.0f}, {ci['elo_hi']:+.0f}]")
     naive = elo_ci(res["win_rate"] * res["games"], res["games"])
