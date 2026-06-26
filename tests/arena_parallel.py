@@ -26,20 +26,28 @@ def _init_worker():
 
 
 def _play_one(spec: Dict[str, Any]) -> Dict[str, Any]:
-    """1 局を実行して勝者を返す。spec.coeffs があれば cpu_eval_v2 係数を上書きしてから対戦。"""
+    """1 局を実行して勝者を返す。spec.coeffs があれば cpu_eval_v2 係数を上書きしてから対戦。
+
+    例外（InvariantError 等）はワーカー内で握り潰して error 文字列で返す＝1局の失敗でプール全体を
+    ハングさせない（pickle 不能例外の転送失敗対策）。失敗局は winner=None・error 付きで親が集計から除外。
+    """
     coeffs = spec.get("coeffs")
     if coeffs:
         for k, v in coeffs.items():
             setattr(cpu_eval_v2, k, v)
-    res = play_game(spec["seed"], _DB, spec["p1d"], spec["p2d"],
-                    max_steps=spec.get("max_steps", DEFAULT_MAX_STEPS),
-                    p1_eval_v2=spec.get("p1_v2"), p2_eval_v2=spec.get("p2_v2"),
-                    p1_search=spec.get("p1_search"), p2_search=spec.get("p2_search"),
-                    p1_budget=spec.get("p1_budget"), p2_budget=spec.get("p2_budget"),
-                    p1_mcts=spec.get("p1_mcts"), p2_mcts=spec.get("p2_mcts"),
-                    p1_alpha=spec.get("p1_alpha"), p2_alpha=spec.get("p2_alpha"),
-                    separate_policy_rng=True)
-    return {"pair": spec["pair"], "seat": spec["seat"], "winner": res["winner"]}
+    try:
+        res = play_game(spec["seed"], _DB, spec["p1d"], spec["p2d"],
+                        max_steps=spec.get("max_steps", DEFAULT_MAX_STEPS),
+                        p1_eval_v2=spec.get("p1_v2"), p2_eval_v2=spec.get("p2_v2"),
+                        p1_search=spec.get("p1_search"), p2_search=spec.get("p2_search"),
+                        p1_budget=spec.get("p1_budget"), p2_budget=spec.get("p2_budget"),
+                        p1_mcts=spec.get("p1_mcts"), p2_mcts=spec.get("p2_mcts"),
+                        p1_alpha=spec.get("p1_alpha"), p2_alpha=spec.get("p2_alpha"),
+                        separate_policy_rng=True)
+        return {"pair": spec["pair"], "seat": spec["seat"], "winner": res["winner"]}
+    except Exception as e:
+        return {"pair": spec["pair"], "seat": spec["seat"], "winner": None,
+                "error": f"seed={spec['seed']} {type(e).__name__}: {e}"}
 
 
 def _default_workers() -> int:
@@ -92,15 +100,27 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
         with mp.Pool(workers, initializer=_init_worker) as pool:
             results = pool.map(_play_one, specs)
 
+    # 失敗局（error）を抽出。両局が成功したペアだけを採点対象にする（片側失敗ペアは集計から除外）。
+    errors = [r["error"] for r in results if r.get("error")]
+    ok_by_pair: Dict[int, int] = {}
+    for r in results:
+        if not r.get("error"):
+            ok_by_pair[r["pair"]] = ok_by_pair.get(r["pair"], 0) + 1
+    scored_pairs = [k for k in range(pairs) if ok_by_pair.get(k, 0) == 2]
+
     # ペアごとに challenger の勝点を集計（席A: p1勝ち / 席B: p2勝ち）。
     by_pair: Dict[int, float] = {}
     for r in results:
+        if r.get("error"):
+            continue
         chal_won = (r["winner"] == "p1") if r["seat"] == "A" else (r["winner"] == "p2")
         by_pair[r["pair"]] = by_pair.get(r["pair"], 0.0) + (1.0 if chal_won else 0.0)
-    pair_scores = [by_pair[k] / 2.0 for k in range(pairs)]
-    wr = sum(pair_scores) / pairs
+    pair_scores = [by_pair[k] / 2.0 for k in scored_pairs]
+    n = len(pair_scores)
+    wr = (sum(pair_scores) / n) if n else 0.5
     return {"win_rate": wr, "elo": elo_delta(wr), "pair_scores": pair_scores,
-            "pairs": pairs, "games": 2 * pairs, "workers": workers}
+            "pairs": n, "games": 2 * n, "workers": workers,
+            "errors": errors, "failed_games": len(errors)}
 
 
 if __name__ == "__main__":
