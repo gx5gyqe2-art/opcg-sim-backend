@@ -53,13 +53,9 @@ def _forward(layers, X):
     return acts
 
 
-def _train(X, Y, hidden, epochs, lr, l2, batch, patience, seed=0):
+def _train(Xtr, Ytr, Xva, Yva, hidden, epochs, lr, l2, batch, patience, seed=0):
+    """事前 split 済み（試合単位）の train/val を受け取って学習＝全トレーナ共通の val 試合で公平比較。"""
     rng = np.random.default_rng(seed)
-    n = len(X)
-    idx = rng.permutation(n)
-    X, Y = X[idx], Y[idx]
-    nval = max(1, int(0.15 * n))
-    Xtr, Ytr, Xva, Yva = X[nval:], Y[nval:], X[:nval], Y[:nval]
     mean = Xtr.mean(0); std = Xtr.std(0); std[std < 1e-9] = 1.0
     Xtr = (Xtr - mean) / std; Xva = (Xva - mean) / std
 
@@ -145,12 +141,16 @@ def main(argv=None):
     ap.add_argument("--out", default="tests/cand_mlp.json")
     args = ap.parse_args(argv)
 
-    X, Y = _load(args.data)
-    print(f"data: {len(X)} rows, {cpu_features.N_FEATURES} features, pos_rate={Y.mean():.3f}")
-    best, mean, std = _train(X, Y, args.hidden, args.epochs, args.lr, args.l2, args.batch, args.patience)
+    from value_dataset import load_rows, split
+    rows = load_rows(args.data)
+    Xtr, Ytr, Xva, Yva, meta = split(rows, val_frac=0.15, seed=0)
+    Xtr = np.asarray(Xtr); Ytr = np.asarray(Ytr); Xva = np.asarray(Xva); Yva = np.asarray(Yva)
+    best, mean, std = _train(Xtr, Ytr, Xva, Yva, args.hidden, args.epochs, args.lr, args.l2,
+                             args.batch, args.patience)
     _export(best, mean, std, args.out)
-    print(f"MLP {args.hidden}: val_acc={best['acc']:.4f} val_logloss={best['loss']:.4f} "
-          f"(best ep {best['ep']}) → {args.out}")
+    print(f"[mlp {args.hidden}] split={meta['mode']} games={meta['n_games']}(val {meta['val_games']}) "
+          f"train={meta['n_train']} val={meta['n_val']} | val_acc={best['acc']:.4f} "
+          f"val_logloss={best['loss']:.4f} (best ep {best['ep']}) → {args.out}")
     return 0
 
 

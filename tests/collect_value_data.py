@@ -91,7 +91,10 @@ def collect_game(seed: int, db, difficulty: str, max_steps: int,
 
     if m.winner is None:
         return []   # 未決着は捨てる（ラベル付け不能）
-    return cpu_value_data.label_samples(samples, m.winner)
+    rows = cpu_value_data.label_samples(samples, m.winner)
+    for r in rows:
+        r["g"] = seed   # 試合ID（=seed）。試合単位 train/val split のリーク防止に使う。
+    return rows
 
 
 def main(argv=None):
