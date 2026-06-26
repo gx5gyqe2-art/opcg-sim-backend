@@ -38,19 +38,22 @@ def _build_decks(seed: int, db, real_decks: bool):
     return L1, c1, L2, c2
 
 
-def _make_decider(policy: str, iters: int, horizon: int):
+def _make_decider(policy: str, iters: int, horizon: int, pimc: int = 1):
     """policy に応じた1手決定関数を返す（局ごとに新規生成＝mem をリセット）。
 
-    hard＝本番方策 α-β（`decide_guarded`）＝学習分布を本番に一致させる。`iters`/`horizon` は後方互換で残すが不使用。
+    hard＝本番方策 α-β（`decide_guarded`）＝学習分布を本番に一致させる。`pimc`＝PIMC 世界数（本番hardは4＝
+    隠れ情報を4世界平均＝+53Elo。本番同等データには 4 を渡す）。`iters`/`horizon` は後方互換で残すが不使用。
     """
     mem: Dict[str, Dict[str, Any]] = {}
     def decide(m, actor):
-        return cpu_ai.decide_guarded(m, actor, policy, random, mem.setdefault(actor.name, {}))
+        return cpu_ai.decide_guarded(m, actor, policy, random, mem.setdefault(actor.name, {}),
+                                     pimc_worlds=pimc)
     return decide
 
 
 def collect_game(seed: int, db, difficulty: str, max_steps: int,
-                 real_decks: bool = False, iters: int = 40, horizon: int = 2) -> List[Dict[str, Any]]:
+                 real_decks: bool = False, iters: int = 40, horizon: int = 2,
+                 pimc: int = 1) -> List[Dict[str, Any]]:
     """1 局を自己対戦し、ターン境界の (特徴, プレイヤー) を集めて最終勝敗でラベル付けして返す。"""
     random.seed(seed)
     l1, c1, l2, c2 = _build_decks(seed, db, real_decks)
@@ -58,7 +61,7 @@ def collect_game(seed: int, db, difficulty: str, max_steps: int,
         return []
     m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     m.start_game()
-    decide = _make_decider(difficulty, iters, horizon)
+    decide = _make_decider(difficulty, iters, horizon, pimc)
     pid_key = action_api.CONST.get("PENDING_REQUEST_PROPERTIES", {}).get("PLAYER_ID", "player_id")
 
     samples: List[Dict[str, Any]] = []   # {"f":[...], "p":"p1"}

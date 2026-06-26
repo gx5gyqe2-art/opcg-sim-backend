@@ -2,10 +2,14 @@
 
 `collect_value_data.collect_game`（hard α-β 自己対戦＝本番方策）を `multiprocessing.Pool` で並列実行。
 各局は seed で決定論＝並列でも同結果。hard は1局 ~30-50s と重いので、コア並列で壁時計を縮める。
-出力は単一 JSONL（`{"f":[...],"y":0/1}`）＝`train_value.py`/`train_gbdt.py` がそのまま読む。
+出力は単一 JSONL（`{"f":[...],"y":0/1,"g":seed}`・"g"=試合ID）＝`value_dataset` が試合単位 split で読む。
 
-実行例:
-    OPCG_LOG_SILENT=1 python tests/collect_value_parallel.py --games 600 --real-decks --out tests/value_hard.jsonl
+既定は **本番同等（PIMC=4・予算75）**。PIMC=4 は重いので **PyPy 推奨**（~2x）。本番非同等で速くしたいなら `--pimc 1`。
+
+実行例（次回標準＝本番同等・PyPy）:
+    OPCG_LOG_SILENT=1 PYTHONPATH=tests pypy3 tests/collect_value_parallel.py --games 600 --real-decks --out tests/value_hard.jsonl
+高速・本番非同等（CPython・PIMC=1）:
+    OPCG_LOG_SILENT=1 python tests/collect_value_parallel.py --games 600 --real-decks --pimc 1 --out tests/value_hard.jsonl
 """
 import argparse
 import json
@@ -35,7 +39,7 @@ def _init_worker(cfg: Dict[str, Any]):
 def _collect_one(seed: int) -> List[Dict[str, Any]]:
     try:
         return collect_game(seed, _DB, _CFG["difficulty"], _CFG["max_steps"],
-                            real_decks=_CFG["real_decks"])
+                            real_decks=_CFG["real_decks"], pimc=_CFG.get("pimc", 4))
     except Exception:
         return []
 
@@ -53,12 +57,14 @@ def main(argv=None):
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
     ap.add_argument("--workers", type=int, default=0, help="0=自動（コア数-1）")
     ap.add_argument("--budget", type=int, default=75,
-                    help="探索予算/手（既定75＝本番相当・評価律速で強さ不変のまま~4x高速。Noneで既定300）")
+                    help="探索予算/手（既定75＝本番相当・評価律速で強さ不変のまま高速。Noneで既定300）")
+    ap.add_argument("--pimc", type=int, default=4,
+                    help="PIMC世界数（既定4＝本番hard同等＝隠れ情報を4世界平均。重いので PyPy 推奨。1で高速・本番非同等）")
     ap.add_argument("--out", default="tests/value_hard.jsonl")
     args = ap.parse_args(argv)
 
     cfg = {"difficulty": args.difficulty, "max_steps": args.max_steps, "real_decks": args.real_decks,
-           "budget": args.budget}
+           "budget": args.budget, "pimc": args.pimc}
     workers = args.workers or _default_workers()
     seeds = [args.seed + g for g in range(args.games)]
 
