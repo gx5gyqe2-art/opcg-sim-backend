@@ -28,6 +28,26 @@ MAX_COPIES = 4
 TARGET_EVENTS = 10      # イベント（カウンター/除去）目安
 TARGET_STAGES = 2       # ステージ目安
 
+_ALL_LEADERS: Optional[List[str]] = None
+
+
+def all_leader_ids(db: CardLoader) -> List[str]:
+    """DB 内の全リーダー card_id（ソート済み・キャッシュ）。自己対戦の分布多様化用プール。
+
+    検証済み5種（`VERIFIED_LEADERS`）は挙動を手動検証済みだが、本プールは未検証リーダーを含む。
+    自己対戦の**盤面分布を広げる**（人間ログ転移の改善狙い）用途で、効果バグで壊れた局は
+    `collect_game` 側で自動破棄される（学習データには混ざらない）。回帰テストには使わない。
+    """
+    global _ALL_LEADERS
+    if _ALL_LEADERS is None:
+        out = []
+        for cid in db.raw_db.keys():
+            c = db.get_card(cid)
+            if c is not None and c.type.name == "LEADER":
+                out.append(cid)
+        _ALL_LEADERS = sorted(out)
+    return _ALL_LEADERS
+
 
 def _curve_weight(cost: int) -> float:
     """低〜中コストを厚めにするカーブ重み（1〜5 を厚く・6+ は薄く・0 はそこそこ）。"""

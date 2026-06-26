@@ -5,11 +5,12 @@
 出力は単一 JSONL（`{"f":[...],"y":0/1,"g":seed}`・"g"=試合ID）＝`value_dataset` が試合単位 split で読む。
 
 既定は **本番同等（PIMC=4・予算75）**。PIMC=4 は重いので **PyPy 推奨**（~2x）。本番非同等で速くしたいなら `--pimc 1`。
+`--all-leaders` で全137リーダーをプール化＝**盤面分布の多様化**（人間ログ転移0.67の改善狙い・NNUE分布拡大）。
 
-実行例（次回標準＝本番同等・PyPy）:
-    OPCG_LOG_SILENT=1 PYTHONPATH=tests pypy3 tests/collect_value_parallel.py --games 600 --real-decks --out tests/value_hard.jsonl
+実行例（次回標準＝本番同等・分布多様化・PyPy）:
+    OPCG_LOG_SILENT=1 PYTHONPATH=tests pypy3 tests/collect_value_parallel.py --games 600 --real-decks --all-leaders --out tests/value_hard.jsonl
 高速・本番非同等（CPython・PIMC=1）:
-    OPCG_LOG_SILENT=1 python tests/collect_value_parallel.py --games 600 --real-decks --pimc 1 --out tests/value_hard.jsonl
+    OPCG_LOG_SILENT=1 python tests/collect_value_parallel.py --games 600 --real-decks --all-leaders --pimc 1 --out tests/value_hard.jsonl
 """
 import argparse
 import json
@@ -39,7 +40,8 @@ def _init_worker(cfg: Dict[str, Any]):
 def _collect_one(seed: int) -> List[Dict[str, Any]]:
     try:
         return collect_game(seed, _DB, _CFG["difficulty"], _CFG["max_steps"],
-                            real_decks=_CFG["real_decks"], pimc=_CFG.get("pimc", 4))
+                            real_decks=_CFG["real_decks"], pimc=_CFG.get("pimc", 4),
+                            all_leaders=_CFG.get("all_leaders", False))
     except Exception:
         return []
 
@@ -53,7 +55,9 @@ def main(argv=None):
     ap.add_argument("--games", type=int, default=600)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--difficulty", choices=["hard"], default="hard")
-    ap.add_argument("--real-decks", action="store_true", help="deckgen 実デッキ（検証済リーダー巡回）")
+    ap.add_argument("--real-decks", action="store_true", help="deckgen 実デッキで対戦（分布多様化）")
+    ap.add_argument("--all-leaders", action="store_true",
+                    help="全137リーダーをプールに（既定は検証済み5種）。未検証で壊れた局は自動破棄")
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
     ap.add_argument("--workers", type=int, default=0, help="0=自動（コア数-1）")
     ap.add_argument("--budget", type=int, default=75,
@@ -64,7 +68,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     cfg = {"difficulty": args.difficulty, "max_steps": args.max_steps, "real_decks": args.real_decks,
-           "budget": args.budget, "pimc": args.pimc}
+           "budget": args.budget, "pimc": args.pimc, "all_leaders": args.all_leaders}
     workers = args.workers or _default_workers()
     seeds = [args.seed + g for g in range(args.games)]
 
