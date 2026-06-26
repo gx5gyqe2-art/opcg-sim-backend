@@ -42,6 +42,14 @@ def run(mode, pairs, seed0, max_steps, iters, worlds, horizon, alpha, eval_v2=Fa
                   challenger_mcts=base_mcts, baseline_pimc=1,
                   challenger_force_plan=True, baseline_force_plan=True)
         label = f"expert(MCTS h2/{iters}反復・plan) vs hard(α-β h4・PIMC=1・plan)  ＝探索ロジックのみの差"
+    elif mode == "equalize-d":
+        # equalize に加え **深さも揃える**: hard の horizon を 2 に下げて expert(h2) と一致。
+        # 残差＝同一深さ2での α-β(厳密・ビーム) vs マクロMCTS(サンプリング)＝純粋なアルゴリズム形状の差。
+        kw = dict(challenger_difficulty="expert", baseline_difficulty="hard",
+                  challenger_mcts=base_mcts, baseline_pimc=1,
+                  baseline_search=(2, 52),   # hard を horizon=2 へ（max_ply は h2 で非拘束）
+                  challenger_force_plan=True, baseline_force_plan=True)
+        label = f"expert(MCTS h2/{iters}反復・plan) vs hard(α-β h2・PIMC=1・plan)  ＝同一深さ2・アルゴリズムのみの差"
     elif mode == "blend":
         # MCTS×学習価値ブレンド: challenger α>0（学習葉混ぜる）vs baseline α=0（純eval）。両側 expert・同設定。
         kw = dict(challenger_difficulty="expert", baseline_difficulty="expert",
@@ -87,7 +95,7 @@ def run(mode, pairs, seed0, max_steps, iters, worlds, horizon, alpha, eval_v2=Fa
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="expert(MCTS) 側の伸びしろ A/B（対照ペア）")
-    ap.add_argument("--mode", choices=["vs-hard", "equalize", "worlds", "horizon", "blend"], default="vs-hard")
+    ap.add_argument("--mode", choices=["vs-hard", "equalize", "equalize-d", "worlds", "horizon", "blend"], default="vs-hard")
     ap.add_argument("--pairs", type=int, default=20)
     ap.add_argument("--seed0", type=int, default=0)
     ap.add_argument("--max-steps", type=int, default=cpu_arena.DEFAULT_MAX_STEPS)
