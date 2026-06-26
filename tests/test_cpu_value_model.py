@@ -130,3 +130,24 @@ def test_gbdt_tree_predict_and_format():
           "n_features": cpu_features.N_FEATURES, "trees": [{"v": 0.0}]}
     assert cpu_value_model._valid_model(ok) is True
     assert cpu_value_model._valid_model({**ok, "n_features": 999}) is False
+
+
+def test_mlp_v1_forward_and_schema():
+    """mlp-v1: pure-Python forward（標準化→W·x+b＋relu→linear→sigmoid）＝手計算一致＋スキーマ検証。"""
+    import math
+    N = cpu_features.N_FEATURES
+    # 1特徴だけ効く隠れ1ユニット（relu）→出力1ユニット（linear）。標準化は恒等（mean0/std1）。
+    Wh = [[0.0] * N]; Wh[0][0] = 2.0           # hidden unit: 2*x0
+    m = {"format": "mlp-v1", "feature_names": cpu_features.FEATURE_NAMES, "n_features": N,
+         "mean": [0.0] * N, "std": [1.0] * N,
+         "layers": [{"W": Wh, "b": [0.5], "act": "relu"},
+                    {"W": [[3.0]], "b": [-1.0], "act": "linear"}]}
+    assert cpu_value_model._valid_model(m) is True
+    assert cpu_value_model._valid_model({**m, "n_features": 999}) is False
+    x = [0.0] * N; x[0] = 1.0
+    # 手計算: h=relu(2*1+0.5)=2.5 → z=3*2.5-1=6.5 → sigmoid(6.5)
+    expect = 1.0 / (1.0 + math.exp(-6.5))
+    assert abs(cpu_value_model._mlp_predict(m, x) - expect) < 1e-9
+    # relu のゼロ刈り: x0=-1 → h=relu(-1.5)=0 → z=-1 → sigmoid(-1)
+    x[0] = -1.0
+    assert abs(cpu_value_model._mlp_predict(m, x) - 1.0 / (1.0 + math.exp(1.0))) < 1e-9
