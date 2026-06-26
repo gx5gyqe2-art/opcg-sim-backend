@@ -17,7 +17,7 @@ from typing import Any, Dict, List
 import conftest  # noqa: F401
 from collect_value_data import collect_game
 from cpu_selfplay import _load_db, DEFAULT_MAX_STEPS
-from opcg_sim.src.core import cpu_features
+from opcg_sim.src.core import cpu_features, cpu_ai
 
 _DB = None
 _CFG: Dict[str, Any] = {}
@@ -27,6 +27,9 @@ def _init_worker(cfg: Dict[str, Any]):
     global _DB, _CFG
     _DB = _load_db()
     _CFG = cfg
+    # 高速化（既定で適用）: 探索予算を下げる。思考時間A/Bで予算75≈600＝**hard は評価律速で予算↓でも強さ不変**
+    # （docs/reports/... のレバー検証）＝データ品質を保ったまま ~4x 速い。set_budget_override で全 decide に適用。
+    cpu_ai.set_budget_override(cfg.get("budget"))
 
 
 def _collect_one(seed: int) -> List[Dict[str, Any]]:
@@ -49,10 +52,13 @@ def main(argv=None):
     ap.add_argument("--real-decks", action="store_true", help="deckgen 実デッキ（検証済リーダー巡回）")
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
     ap.add_argument("--workers", type=int, default=0, help="0=自動（コア数-1）")
+    ap.add_argument("--budget", type=int, default=75,
+                    help="探索予算/手（既定75＝本番相当・評価律速で強さ不変のまま~4x高速。Noneで既定300）")
     ap.add_argument("--out", default="tests/value_hard.jsonl")
     args = ap.parse_args(argv)
 
-    cfg = {"difficulty": args.difficulty, "max_steps": args.max_steps, "real_decks": args.real_decks}
+    cfg = {"difficulty": args.difficulty, "max_steps": args.max_steps, "real_decks": args.real_decks,
+           "budget": args.budget}
     workers = args.workers or _default_workers()
     seeds = [args.seed + g for g in range(args.games)]
 
