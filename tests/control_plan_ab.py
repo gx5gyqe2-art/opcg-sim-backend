@@ -12,6 +12,7 @@ midrange 側は常に build_plan() 由来の本番プランを使う（deployed 
     OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/control_plan_ab.py --games 300 --real-decks --all-leaders --pimc 1
 """
 import argparse
+import copy
 import dataclasses
 import math
 import multiprocessing as mp
@@ -109,17 +110,13 @@ def ab_game(seed: int):
 
     pimc = _CFG["pimc"]
 
-    def _factory():
-        random.seed(seed)
-        m = GameManager(Player("p1", c1[:], l1), Player("p2", c2[:], l2))
-        m.start_game()
-        return m, ctrl_side, mid_side
-
     pid_key = action_api.CONST.get("PENDING_REQUEST_PROPERTIES", {}).get("PLAYER_ID", "player_id")
 
     def _run(ctrl_plan_arg, mid_plan_arg):
         random.seed(seed)
-        m = GameManager(Player("p1", c1[:], l1), Player("p2", c2[:], l2))
+        c1f, c2f = copy.deepcopy(c1), copy.deepcopy(c2)
+        l1f, l2f = copy.deepcopy(l1), copy.deepcopy(l2)
+        m = GameManager(Player("p1", c1f, l1f), Player("p2", c2f, l2f))
         m.start_game()
         mems = {"p1": {}, "p2": {}}
         plans = {ctrl_side: ctrl_plan_arg, mid_side: mid_plan_arg}
