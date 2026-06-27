@@ -5,9 +5,10 @@
 自己対戦を回し、各意思決定で盤面の両陣営のキャラについて effect_impact を測ってログする。
 
   effect_impact(card, owner) =
-     clone 上で資源をステージ（自ターン文脈・ドン潤沢・相手場に代表対象を注入）してから、card の各
+     clone 上で資源を**現実的に**ステージ（自ターン文脈・現実的な次ターンのドン量）してから、card の各
      ACTIVATE_MAIN 能力を **条件/回数/コストを尊重して** resolve_ability で発火（条件付き効果は今の盤面で
-     条件成立時のみ発火＝文脈的に正しい脅威価値）。貪欲ドレイン後の evaluate_base(owner) の増分
+     条件成立時のみ発火＝文脈的に正しい脅威価値）。対象は**実盤面の本物のみ**（注入なし＝対象が無ければ
+     除去は 0＝今は脅威ゼロが正しい）。貪欲ドレイン後の evaluate_base(owner) の増分
      ＝ コスト差引後の純Δ（J単位＝evaluate_base と同単位で自動較正）。任意能力なので負Δは 0 にクランプ。
 
 これで「毎ターン仕事するエンジン＝高Δ／登場時済みバニラ＝Δ≒0」が出るかを確認する。登場時(ON_PLAY)は
@@ -29,15 +30,12 @@ from opcg_sim.src.core.gamestate import GameManager, Player
 from opcg_sim.src.core import action_api, cpu_ai
 from opcg_sim.src.core.invariants import check_invariants
 from opcg_sim.src.core.effects.resolver import EffectResolver
-from opcg_sim.src.core.journal import JournaledList
 from opcg_sim.src.models.enums import TriggerType
 from collect_value_data import _build_decks, _make_decider
 from cpu_selfplay import _load_db, DEFAULT_MAX_STEPS
 
 _DRAIN_LIMIT = 40
-# 対象注入用 vanilla（コスト帯別）＝KO/除去/デバフ効果の「コストN以下」等フィルタに合致させる代表対象。
-_TARGET_IDS = ("OP02-060", "EB01-025", "OP01-065")  # cost1 pw3000 / cost3 pw5000 / cost5 pw7000
-_MIN_TARGETS = 3
+_NEXT_TURN_DON_GAIN = 2  # 次ターンに供給されるドン枚数（現実的なステージング上限の基準）
 _DB = None
 _CFG: Dict[str, Any] = {}
 
@@ -79,33 +77,13 @@ def _drain_pending(board, owner_name: str):
             break
 
 
-def _inject_targets(clone, owner):
-    """owner の相手場が手薄なとき、代表的な vanilla（コスト帯別）を注入して除去/デバフの対象を保証する。
-
-    KO=空振り問題の対策（ステージ改良）。コスト/パワー条件の違う 3 体を相手場へ補充（場上限 5・現状の
-    実キャラがいればそれを優先＝文脈は保つ）。注入は throwaway クローン上のみ＝測定間で汚染しない。
-    注入で総カード数が変わるため不変条件（保存則）は effect_impact 側で検査しない。
-    """
-    from opcg_sim.src.models.models import CardInstance
-    opp = clone.p2 if clone.p1 is owner else clone.p1
-    n_char = sum(1 for c in opp.field if "CHARACTER" in str(getattr(c.master, "type", "")))
-    i = 0
-    while n_char < _MIN_TARGETS and len(opp.field) < 5 and i < len(_TARGET_IDS):
-        m = _DB.get_card(_TARGET_IDS[i]); i += 1
-        if m is None:
-            continue
-        inst = CardInstance(m, opp.name)
-        inst.is_rest = False
-        opp.field.append(inst)
-        n_char += 1
-
-
 def _stage_owner_turn(clone, owner, card):
-    """オーナーが自ターンに資源を揃えて発火できる文脈へ整える（方式1のポテンシャル測定）。
+    """オーナーが自分の次ターンに発火できる**現実的な**文脈へ整える（方式1のポテンシャル測定）。
 
-    ターン文脈をオーナーに・予備ドンをアクティブへ・リーダー/対象カードを起こす・使用回数リセット・
-    相手場に代表対象を注入（除去の空振り対策）。コストは実際に払われる（Δに自己較正で反映）。
-    staged ドン・注入対象は before/after で相殺し、効果が動かした分だけが Δ に残る。
+    ターン文脈をオーナーに・リーダー/対象カードを起こす・使用回数リセット・ドンを「現実的な次ターン量」へ
+    整える（場のドン active+rested を起こす＋次ターン供給ぶん +2、上限10）。**対象は実盤面の本物のみ**＝
+    相手場に対象が無ければ除去は空振り（＝今は脅威ゼロ）として 0 に出るのが文脈的に正しい（注入はしない）。
+    コストは実際に払われる（Δに自己較正で反映）。staged ドンは before/after で相殺。
     """
     clone.turn_player = owner
     if owner.leader is not None:
@@ -114,15 +92,17 @@ def _stage_owner_turn(clone, owner, card):
             owner.leader.ability_used_this_turn.clear()
         except Exception:
             pass
-    # 予備ドンをアクティブへ（最大 10 枚まで＝任意コストを払える状態に）。
-    while owner.don_deck and len(owner.don_active) < 10:
+    # 現実的な次ターンのドン: 場のドン（active+rested）を起こし、次ターン供給ぶん +2 を予備から足す（上限10）。
+    budget = min(10, len(owner.don_active) + len(owner.don_rested) + _NEXT_TURN_DON_GAIN)
+    while owner.don_rested and len(owner.don_active) < budget:
+        owner.don_active.append(owner.don_rested.pop())
+    while owner.don_deck and len(owner.don_active) < budget:
         owner.don_active.append(owner.don_deck.pop())
     card.is_rest = False
     try:
         card.ability_used_this_turn.clear()
     except Exception:
         pass
-    _inject_targets(clone, owner)
 
 
 def _action_types(node, out):
@@ -171,7 +151,6 @@ def effect_impact(manager, card_uuid: str, owner_name: str):
             # 除去は今は脅威ゼロ＝Δ0 が正解）。資源（自ターン・ドン）はステージ済みなのでコストは実払いされる。
             EffectResolver(clone).resolve_ability(owner, ab, cc)
             _drain_pending(clone, owner_name)
-            # 注入で総カード数が変わるため保存則は検査しない（try/except でクラッシュは保護済み）。
             after = cpu_ai.evaluate_base(clone, owner_name, see_opp_hand=False)
         except Exception:
             continue
