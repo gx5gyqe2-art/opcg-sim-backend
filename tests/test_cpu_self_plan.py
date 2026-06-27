@@ -47,8 +47,9 @@ def test_build_plan_counter_heavy_is_control():
     p = cpu_self_plan.build_plan(cards)
     assert p.archetype == "control"
     assert p.aggro_lean < 0.4
-    # コントロールは置物を割り引き・カウンター温存を重視。
-    assert p.vanilla_body_mult < 1.0 and p.counter_mult > 1.0 and p.life_mult >= 1.0
+    # control 補正は除去済み（2026-06-27: A/B 実験で補正が vs-midrange -5.7pp と判明）。
+    # アーキタイプ分類のみ保証し、multiplier は midrange と同値（1.0）。
+    assert p.vanilla_body_mult == 1.0 and p.counter_mult == 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +104,7 @@ def test_is_low_impact_detection(db):
 
 
 def test_control_discounts_vanilla_body_aggro_boosts(db):
-    """同じ置物キャラを場に足したときの評価上昇は control < none < aggro（デッキ依存の置物許容度）。"""
+    """aggro は置物評価を高める。control は補正除去済みで none と同値（2026-06-27 A/B 結果を受けフラット化）。"""
     gm = _new_gm(db)
     c = _low_impact_char(gm)
     assert c is not None
@@ -118,14 +119,13 @@ def test_control_discounts_vanilla_body_aggro_boosts(db):
         gm.p1.field.remove(c)
         return after - before
 
-    d_none = delta(None)
     d_aggro = delta(_plan("aggro"))
     d_control = delta(_plan("control"))
-    assert d_control < d_none < d_aggro
+    assert d_aggro > d_control   # aggro は control より置物を高く評価（vanilla_body_mult 1.10 vs 1.0）
 
 
 def test_control_values_retained_counter_more(db):
-    """control は自分の手札カウンター価値を高く見る（防御札の温存＝出し渋り）。"""
+    """counter_mult=1.0（補正除去）: control の手札カウンター評価は none と同値（2026-06-27 フラット化）。"""
     gm = _new_gm(db)
     if not gm.p1.hand:
         pytest.skip("手札が空")
@@ -137,7 +137,8 @@ def test_control_values_retained_counter_more(db):
         gm.p1.hand[0].passive_counter -= 2000
         return after - before
 
-    assert delta(_plan("control")) > delta(None) > 0
+    assert delta(_plan("control")) == delta(None)   # counter_mult=1.0 → none と同値
+    assert delta(None) > 0                          # カウンター追加で評価は上がる
 
 
 def _find_char_master(db, pred):

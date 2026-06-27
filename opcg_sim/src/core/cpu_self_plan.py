@@ -81,13 +81,11 @@ _PRESETS = {
     "midrange": dict(vanilla_body_mult=1.0, attacker_mult=1.0, life_mult=1.0,
                      counter_mult=1.0, lethal_mult=1.0, milestone_mult=1.0, clock_rate=0.8,
                      idle_don_mult=0.7, threat_atk_mult=1.0, threat_def_mult=1.0, act_margin_mult=1.0),
-    # control も序盤の盤面形成は採る（実プレイ報告 2026-06-19: マナを余らせてターンをパスする受け身
-    # すぎる挙動を緩和）。`vanilla_body_mult` を 0.45→0.6（小型の置物価値を過度に割引かない）・
-    # `act_margin_mult` を 1.5→1.2（曖昧でも展開を畳みにくくする）へ。守りの厚さ（counter/life/threat_def）
-    # は維持。詳細は `docs/SPEC.md §2.5.3/§2.5.5`。
-    "control": dict(vanilla_body_mult=0.6, attacker_mult=0.9, life_mult=1.15,
-                    counter_mult=1.4, lethal_mult=0.8, milestone_mult=1.0, clock_rate=0.5,
-                    idle_don_mult=0.85, threat_atk_mult=0.85, threat_def_mult=1.25, act_margin_mult=1.2),
+    # control 補正を全て除去（2026-06-27: A/B 実験で control 固有補正が vs-midrange -5.7pp の損失を
+    # 招くことが判明。フラットな状態で eval 改善を測定するため midrange と同一値に統一）。
+    "control": dict(vanilla_body_mult=1.0, attacker_mult=1.0, life_mult=1.0,
+                    counter_mult=1.0, lethal_mult=1.0, milestone_mult=1.0, clock_rate=0.8,
+                    idle_don_mult=0.7, threat_atk_mult=1.0, threat_def_mult=1.0, act_margin_mult=1.0),
 }
 
 

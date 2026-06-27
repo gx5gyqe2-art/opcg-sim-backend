@@ -191,11 +191,13 @@ def test_b1a_plan_decays_idle_don_in_evaluate(db):
 
 
 def test_b1a_aggro_plan_has_decay_preset():
-    """攻め寄り（カウンター薄）デッキほど idle_don_mult を強く減価するプリセット（aggro<midrange<control）。"""
+    """aggro は idle_don_mult を強く減価。control は補正除去で midrange と同値（2026-06-27 フラット化）。"""
     a = cpu_self_plan._PRESETS["aggro"]["idle_don_mult"]
     m = cpu_self_plan._PRESETS["midrange"]["idle_don_mult"]
     c = cpu_self_plan._PRESETS["control"]["idle_don_mult"]
-    assert a < m < c <= 1.0
+    assert a < m        # aggro は最も強く減価
+    assert m == c       # control は midrange と同値（補正除去）
+    assert c <= 1.0
     assert cpu_self_plan.NEUTRAL.idle_don_mult == 1.0   # 中立フォールバックは現行挙動
 
 
@@ -304,12 +306,13 @@ def test_a2_threat_value_archetype_scaling():
 
 
 def test_a2_archetype_presets_directional():
-    """プリセットの方向性: aggro は攻め重視・畳まない／control は守り重視・畳む／midrange=中立。"""
+    """プリセットの方向性: aggro は攻め重視・畳まない。control は補正除去で midrange と同値（2026-06-27）。"""
     from opcg_sim.src.core import cpu_self_plan as p
-    aggro, control = p._PRESETS["aggro"], p._PRESETS["control"]
-    assert aggro["threat_atk_mult"] > 1.0 > control["threat_atk_mult"]
-    assert control["threat_def_mult"] > 1.0 > aggro["threat_def_mult"]
-    assert aggro["act_margin_mult"] < 1.0 < control["act_margin_mult"]
+    aggro, control, mid = p._PRESETS["aggro"], p._PRESETS["control"], p._PRESETS["midrange"]
+    assert aggro["threat_atk_mult"] > 1.0     # aggro は攻め優先
+    assert aggro["threat_def_mult"] < 1.0     # aggro は守り軽視
+    assert aggro["act_margin_mult"] < 1.0     # aggro は畳まない
+    assert control == mid                      # control 補正除去 → midrange と全同値
     assert p.NEUTRAL.threat_atk_mult == p.NEUTRAL.threat_def_mult == p.NEUTRAL.act_margin_mult == 1.0
 
 
