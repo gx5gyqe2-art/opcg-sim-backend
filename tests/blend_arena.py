@@ -13,7 +13,7 @@ import sys
 import conftest  # noqa: F401
 import cpu_arena
 from cpu_arena import elo_ci
-from eval_v2_arena import _pair_level_ci
+from arena_parallel import _pair_level_ci
 
 
 def run(pairs, seed0, max_steps, alphas, pimc, budget):
@@ -21,7 +21,6 @@ def run(pairs, seed0, max_steps, alphas, pimc, budget):
     print(f"=== 葉ブレンド Elo A/B（hard・PIMC{pimc}/予算{budget}・α>0 vs α=0・{pairs}ペア） ===")
     for a in alphas:
         res = paired_play(pairs, seed0=seed0, max_steps=max_steps,
-                          challenger_eval_v2=False, baseline_eval_v2=False,
                           challenger_difficulty="hard", baseline_difficulty="hard",
                           challenger_alpha=a, baseline_alpha=0.0,
                           challenger_pimc=pimc, baseline_pimc=pimc,

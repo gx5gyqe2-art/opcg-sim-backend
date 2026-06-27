@@ -1,19 +1,14 @@
-"""リーダー推測の相手モデル（cpu_opponent_model）＋ cpu_templates エンドポイント/配線のテスト。
+"""リーダー推測の相手モデル（`cpu_opponent_model.build_profile`）の純関数テスト。
 
-docs/SPEC.md §2.5.4。Firestore はテストでは未初期化（conftest スタブ）なので、エンドポイントと
-プロファイル引き当ては最小の in-memory fake Firestore を appmod.db に差し込んで検証する。
+docs/SPEC.md §2.5.4。`build_profile` はテンプレートデッキから静的プロファイルを作る純関数で、
+評価器への配線（profile 補正・opponent-model）は撤去済み（CPU 評価は L1 単一系統）。本テストは
+`build_profile` の集計ロジックだけを固定する。
 """
-import random
 import types
 
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
-import pytest
-from fastapi.testclient import TestClient
 
-from opcg_sim.api import app as appmod
-from opcg_sim.src.core import cpu_ai, cpu_opponent_model
-from opcg_sim.src.core.gamestate import GameManager, Player
-from cpu_selfplay import build_deck, _load_db
+from opcg_sim.src.core import cpu_opponent_model
 
 
 # ---------------------------------------------------------------------------
@@ -65,116 +60,3 @@ def test_removal_cue_excludes_self_ko_triggers():
     real_removal = ([_master(text="相手のコスト5以下のキャラ1枚までを、KOする。")] * 5
                     + [_master(text="コスト6以下のキャラ2枚までを、持ち主のデッキの下に置く。")] * 5)
     assert cpu_opponent_model.build_profile(real_removal).removal_ratio == 1.0
-
-
-# ---------------------------------------------------------------------------
-# evaluate へのプロファイル影響
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def db():
-    return _load_db()
-
-
-def _profile(defense_factor=1.0, aggro_lean=0.0):
-    return cpu_opponent_model.OpponentProfile(
-        n_cards=50, counter_avg=0.0, counter_card_ratio=0.0, blocker_ratio=0.0,
-        removal_ratio=0.0, avg_cost=3.0, defense_factor=defense_factor, aggro_lean=aggro_lean)
-
-
-def test_profile_defense_factor_lowers_my_eval(db):
-    """defense_factor>1（相手の守りが厚い推測）→ 相手手札の価値が増し、自分視点の評価が下がる。"""
-    random.seed(0)
-    l1, c1 = build_deck(db, "p1")
-    l2, c2 = build_deck(db, "p2")
-    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
-    gm.start_game()
-    if not gm.p2.hand:
-        pytest.skip("相手手札が空")
-    base = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, profile=None)
-    defensive = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, profile=_profile(defense_factor=1.6))
-    assert defensive < base
-
-
-def test_profile_aggro_lean_raises_own_life_value(db):
-    """aggro_lean 高（相手が攻め寄り）→ 自分のライフ重視で、ライフを持つ自分視点の評価が上がる。"""
-    random.seed(0)
-    l1, c1 = build_deck(db, "p1")
-    l2, c2 = build_deck(db, "p2")
-    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
-    gm.start_game()
-    base = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, profile=_profile(aggro_lean=0.0))
-    aggro = cpu_ai.evaluate(gm, "p1", see_opp_hand=False, profile=_profile(aggro_lean=1.0))
-    assert aggro > base  # 自分のライフ価値が増す
-
-
-# ---------------------------------------------------------------------------
-# cpu_templates エンドポイント + プロファイル引き当て（in-memory fake Firestore）
-# ---------------------------------------------------------------------------
-
-class _FakeSnap:
-    def __init__(self, data):
-        self._data = data
-    @property
-    def exists(self):
-        return self._data is not None
-    def to_dict(self):
-        return dict(self._data) if self._data is not None else None
-
-
-class _FakeDoc:
-    def __init__(self, coll, doc_id):
-        self._coll = coll
-        self.id = doc_id
-    def set(self, data):
-        self._coll.store[self.id] = dict(data)
-    def get(self):
-        return _FakeSnap(self._coll.store.get(self.id))
-    def delete(self):
-        self._coll.store.pop(self.id, None)
-
-
-class _FakeQuery:
-    def __init__(self, rows):
-        self._rows = rows
-    def where(self, field, op, value):
-        return _FakeQuery([r for r in self._rows if r.get(field) == value])
-    def order_by(self, field, direction=None):
-        return _FakeQuery(list(reversed(self._rows)))  # 挿入順の逆＝新しい順の近似
-    def limit(self, n):
-        return _FakeQuery(self._rows[:n])
-    def stream(self):
-        return [_FakeSnap(r) for r in self._rows]
-
-
-class _FakeColl:
-    def __init__(self):
-        self.store = {}
-        self._auto = 0
-    def document(self, doc_id=None):
-        if not doc_id:
-            self._auto += 1
-            doc_id = f"auto{self._auto}"
-        return _FakeDoc(self, doc_id)
-    def _q(self):
-        return _FakeQuery(list(self.store.values()))
-    def where(self, *a, **k):
-        return self._q().where(*a, **k)
-    def order_by(self, *a, **k):
-        return self._q().order_by(*a, **k)
-    def stream(self):
-        return self._q().stream()
-
-
-class _FakeClient:
-    def __init__(self):
-        self._colls = {}
-    def collection(self, name):
-        return self._colls.setdefault(name, _FakeColl())
-
-
-@pytest.fixture
-def fake_db(monkeypatch):
-    client = _FakeClient()
-    monkeypatch.setattr(appmod, "db", client)
-    return client

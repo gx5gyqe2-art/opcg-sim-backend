@@ -90,11 +90,6 @@ _KILLER_SLOTS = 2          # 各 ply で保持する killer 手の数（standard
 # （最善応手列を次手の同一局面ノードへ正しく対応付ける）で正の利得が出れば有効化を再検討する。
 _USE_PV_CROSS_DECIDE = False
 
-# 評価関数 v2（L1コア・単一通貨「カード」＋時間割引・設計 v0.4）の段階導入フラグ。
-# 既定 OFF＝`evaluate_base` は従来の手書き J値評価のまま（完全同値）。`OPCG_EVAL_V2=1` で v0.4 評価へ
-# 差し替わる（first cut・係数未チューニング）。正本: docs/reports/cpu_eval_redesign_card_currency_20260625.md。
-_USE_EVAL_V2 = os.environ.get("OPCG_EVAL_V2") not in (None, "", "0")
-
 # 情報方針（フェア制約・docs/reports/cpu_strength_roadmap_20260622.md §0/§4 Phase -1）。
 # 旧実装は decide で `see_opp_hand, opp_public_only = True, False` を**ハードコード**＝出荷 CPU がチート
 # （相手手札/裏ライフを読む）だった。これを引数化し、**出荷デフォルトを fair に即切替**する（固定値撤廃）。
@@ -133,63 +128,12 @@ def _value_blend(manager, me_name: str, base: float) -> float:
     return base + a * _VALUE_BLEND_SCALE * (p - 0.5)
 
 
-# 評価重み（盤面 1000=パワー1段相当に正規化）
-W_LIFE = 6000.0          # ライフ 1 枚の基礎価値（膝＝薄域。最重要）
-# 高ライフ域（膝超）のライフ 1 枚の基礎価値（concave 化・§2.5.3）。OPCG ではライフは「序盤は能動的に
-# 受けてカウンターを温存する」資源で、薄いほど 1 枚の限界価値が高い（設計意図）。従来は線形（全枚数に
-# W_LIFE）で高ライフでも 1 枚＝6000＝満額だったため、自ライフ5枚の序盤でも1点を守るためにカウンターを
-# 3枚浪費する過剰防御を招いた。膝（life_knee）までは W_LIFE 満額・膝超は W_LIFE_HIGH（< W_LIFE）に減額し、
-# 「高ライフの 1 点は安い（受ける）／薄ライフの 1 点は高い（守る）」の正しいカーブにする。
-W_LIFE_HIGH = 2500.0
-W_LIFE_LOW = 4000.0      # 希少域（最初の 2 枚）への上乗せ＝非線形・45[J] ラインの危険
-# C-3（§2.5.3）: ライフ薄域上乗せの膝位置（この枚数までを厚く守る）。自他で別カーブ＝既定 2、攻め寄りの
-# 相手と対面する自ライフ（守備）のみ 3 へ上げてレース耐性を厚く見る（profile 無し＝両側 2＝従来同値）。
-_LIFE_KNEE_DEFAULT = 2
-_LIFE_KNEE_AGGRO_MATCHUP = 3
-_AGGRO_MATCHUP_THRESHOLD = 0.6   # 相手プロファイルの aggro_lean がこれ以上で「攻め対面」と見なす
-W_HAND = 700.0           # 手札 1 枚の基礎価値
-W_COUNTER = 0.6          # 手札のカウンター値 1 点あたり（防御リソース）
-# 注（A2・2026-06）: 「コスト低減の資源価値化」= 次ターン手出し可ボーナス（旧 W_HAND_PLAYABLE）は、
-# ablation A/B（フル vs 当該項なし・hard 42局）で勝率 0.500＝**無寄与**（探索が結果盤面で既に拾える）と
-# 判明したため撤去した。経緯は docs/SPEC.md §2.5.3。
-W_FIELD_COUNT = 1500.0   # 場のキャラ 1 体の存在価値
-W_FIELD_POWER = 0.3      # 場の有効パワー（戦闘で意味を持つ上限までを線形評価。素点でなく閾値性を尊重）
-W_DON_ACTIVE = 200.0     # アクティブドン!! 1 枚
-W_BLOCKER = 1200.0       # ブロッカー 1 体（最終防御）
-W_ATTACKER = 400.0       # 「このターン実際に攻撃できる」アクティブキャラ＝攻め圧（相手 +1[J] 機会）
+# 勝敗の決定値（L1・`cpu_eval_v2` が終端でこの符号を返す。探索の winner 割引もこの定数を使う）。
 W_WIN = 1.0e9            # 勝敗
-W_LIFE_AGGRO_K = 0.5     # リーダー推測: 相手の攻め寄り度 1.0 で自分ライフ重視を最大 +50%（§2.5.4）
 
-# 効果価値（§S2・実シミュレーション）: 場の各キャラの起動メイン効果を「自ターン文脈で発火」して測った
-# evaluate_base の純Δ（J単位・自己較正・負は0クランプ）をキャラ価値に上乗せする。手書き eval が判別でき
-# ない「効果の強い体」（除去エンジン/ドローエンジン）を持ち上げ、除去対象選択・脅威認識を改善する。
-# 決定ごとに root で1回測ってキャッシュし、探索の葉では読むだけ（条件は今の盤面で尊重＝文脈的に正しい）。
-# 既定 0=OFF=従来と完全同値（テスト/本番は env 未設定で一切不変）。Elo アリーナで効果を検証する。
-EFFECT_VALUE_WEIGHT = _env_float("OPCG_EFFECT_VALUE", 0.0)   # 効果価値Δの倍率（0=OFF・1.0=生J単位）
-W_EFFECT_COST = _env_float("OPCG_W_COST", 0.0)              # キャラのコスト1あたりの投資/スイング価値
-_EFFECT_NEXT_TURN_DON = 2   # 効果価値ステージングの「次ターン供給ドン」基準
-_EFFECT_DRAIN_LIMIT = 40    # 効果価値ステージングの対話ドレイン上限
-
-# 席別 A/B 用の一時上書き（(効果重み, コスト重み) or None）。None で env 既定へ。`set_eval_v2_override` と同方式。
-_EFFECT_OVERRIDE = None
-
-
-def set_effect_override(weights):
-    """効果価値/コストの重みを一時上書き（評価アリーナの席別 A/B 用）。None で env 既定へ戻す。"""
-    global _EFFECT_OVERRIDE
-    _EFFECT_OVERRIDE = None if weights is None else (float(weights[0]), float(weights[1]))
-
-
-def _effect_weights():
-    """現在有効な (効果重み, コスト重み)。上書き>env>0 の優先。"""
-    if _EFFECT_OVERRIDE is not None:
-        return _EFFECT_OVERRIDE
-    return (EFFECT_VALUE_WEIGHT, W_EFFECT_COST)
-
-# J値（白＝デッキ残＋トラッシュ）の決定境界。デッキ切れ（J=0）でドロー不能＝敗北なので、
-# 自デッキ残が危険域に入るほど非線形に減点する＝相手を削り切る／自滅ドローを避ける動機。
-# 黒リソース（ライフ/手札/場）は白の相補なので素点は据え置き、ここでは境界の非線形分だけを足す。
-W_DECK_DANGER = 1500.0   # 危険域のデッキ残 1 枚あたりの減点
+# J値（白＝デッキ残＋トラッシュ）の決定境界の立ち上げ枚数。デッキ切れ（J=0）でドロー不能＝敗北なので、
+# 自デッキ残が危険域に入るほど非線形に減点する＝相手を削り切る／自滅ドローを避ける動機。L1（`cpu_eval_v2`）が
+# この閾値を流用する（`DECK_DANGER - len(deck)` を敗北距離として加味）。
 DECK_DANGER = 4          # この枚数以下から減点を立ち上げる
 
 # 戦闘の閾値性: パワーは「最も硬い相手の防御（リーダー/場キャラ）を上回る」までが意味を持ち、
@@ -251,21 +195,6 @@ def set_budget_override(b):
 
 def _effective_budget() -> int:
     return _BUDGET_OVERRIDE if _BUDGET_OVERRIDE is not None else HARD_PER_MOVE_BUDGET
-
-
-# 評価 v2 の per-decide オーバーライド（評価アリーナで v2 ON/OFF を席別に切替＝A/B 用・set_*_override と同型）。
-# None で env/既定（`_USE_EVAL_V2`）へ戻る＝本番/テストは未設定で従来同値。
-_EVAL_V2_OVERRIDE = None
-
-
-def set_eval_v2_override(on):
-    """評価 v2 を一時上書き（True/False/None）。None で既定（`OPCG_EVAL_V2`）へ戻る。"""
-    global _EVAL_V2_OVERRIDE
-    _EVAL_V2_OVERRIDE = None if on is None else bool(on)
-
-
-def _eval_v2_active() -> bool:
-    return _EVAL_V2_OVERRIDE if _EVAL_V2_OVERRIDE is not None else _USE_EVAL_V2
 
 
 # 探索深さ／ply 上限の per-decide オーバーライド（L1 外の伸びしろ＝探索深さの A/B 用・set_*_override と同型）。
@@ -517,295 +446,28 @@ def _don_return_penalty_vals(before_don: int, after_don: int) -> float:
     return returned * _W_DON_RETURN * early
 
 
-def _own_life_knee(profile) -> int:
-    """自ライフ（守備）の非線形膝位置（C-3・§2.5.3）。攻め寄りの相手と対面するときだけ膝を 3 へ上げる。
-
-    対面想定は相手モデル `profile.aggro_lean`（リーダー推測・§2.5.4）から取る。profile 無し＝既定 2＝従来同値。
-    """
-    if profile is not None and getattr(profile, "aggro_lean", 0.0) >= _AGGRO_MATCHUP_THRESHOLD:
-        return _LIFE_KNEE_AGGRO_MATCHUP
-    return _LIFE_KNEE_DEFAULT
-
-
-def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True,
-                hand_factor: float = 1.0, life_factor: float = 1.0,
-                life_knee: int = _LIFE_KNEE_DEFAULT,
-                effect_weight: float = 0.0, cost_weight: float = 0.0,
-                effect_cache: Optional[Dict[str, float]] = None,
-                out: Optional[Dict[str, float]] = None) -> float:
-    """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和＋白の境界リスク）。
-
-    `power_cap` は対面の最硬防御パワー＝有効パワーの上限（`_effective_power`）。これにより
-    「届かない/過剰なドン付与」が静的にはほぼ無加点となる。
-    `include_counter=False` のとき手札はカウンター値を読まず枚数のみで評価する
-    （相手手札の中身を見ない「公開情報のみ」の情報方針＝easy/normal 用）。
-    `hand_factor`/`life_factor` はリーダー推測プロファイルによる手札防御価値・ライフ重視度の倍率
-    （§2.5.4。プロファイル無し時は 1.0）。
-    `life_knee`（C-3・§2.5.3）はライフ薄域上乗せ（`W_LIFE_LOW`）を立ち上げる枚数の上限＝非線形の膝位置。
-    既定 2＝従来。攻め寄りの相手と対面する自ライフ（守備）は膝を 3 へ上げ、レース下での 3 枚目までを
-    厚く守る（クロック側＝相手ライフは既定 2 のまま＝自他で別カーブ）。
-    """
-    score = 0.0
-    # out（任意・既定 None＝完全に無オーバーヘッド）が渡されると、成分内訳を `out[キー] += 値` で
-    # 記録する（CPU 思考トレース・診断用）。`score +=` 行は一切変えないので out=None 時の挙動・採点は
-    # 従来と完全同値（ベースライン不変）。
-    def _emit(k: str, v: float):
-        if out is not None:
-            out[k] = out.get(k, 0.0) + v
-
-    # ライフ: 非線形（薄いほど 1 枚の限界価値が高い）。膝位置（life_knee）までは W_LIFE 満額・膝超は
-    # W_LIFE_HIGH(<W_LIFE) に減額する concave カーブ＋膝までを W_LIFE_LOW で厚く上乗せ（二重の非線形）。
-    # 高ライフの 1 点を満額評価して序盤に過剰防御（カウンター浪費）するのを防ぐ（§2.5.3）。
-    life_n = len(p.life)
-    near = min(life_n, life_knee)            # 薄域（膝以下）＝満額で厚く守る
-    far = max(0, life_n - life_knee)         # 高ライフ域（膝超）＝安い（受ける）
-    life_base = (near * W_LIFE + far * W_LIFE_HIGH) * life_factor
-    score += life_base
-    _emit("life", life_base)
-    score += near * W_LIFE_LOW * life_factor
-    _emit("life_low", near * W_LIFE_LOW * life_factor)
-
-    # 手札: 枚数 ＋（公開方針でなければ）カウンター値（防御に回せる力＝相手の +1[J] を打ち消す資源）。
-    score += len(p.hand) * W_HAND * hand_factor
-    _emit("hand", len(p.hand) * W_HAND * hand_factor)
-    if include_counter:
-        for c in p.hand:
-            try:
-                score += (c.current_counter or 0) * W_COUNTER
-                _emit("hand_counter", (c.current_counter or 0) * W_COUNTER)
-            except Exception:
-                pass
-
-    # 白（J）の決定境界: 自デッキ残がデッキ切れ（J=0・ドロー不能＝敗北）へ近づくほど非線形に減点。
-    score -= max(0, DECK_DANGER - len(p.deck)) * W_DECK_DANGER
-    _emit("deck_danger", -max(0, DECK_DANGER - len(p.deck)) * W_DECK_DANGER)
-
-    # ドン!!（アクティブ）。
-    don_score = len(p.don_active) * W_DON_ACTIVE
-    score += don_score
-    _emit("don", don_score)
-
-    # 場のキャラ: 存在価値 ＋ 有効パワー ＋ ブロッカー（最終防御）＋ 攻め圧（実際に攻撃できる体のみ）。
-    for c in p.field:
-        ev = W_FIELD_COUNT
-        score += ev
-        _emit("field_count", ev)
-        try:
-            pw = c.get_power(is_turn)
-        except Exception:
-            pw = c.master.power or 0
-        score += _effective_power(pw, power_cap) * W_FIELD_POWER
-        _emit("field_power", _effective_power(pw, power_cap) * W_FIELD_POWER)
-        if not c.is_rest:
-            # 攻め圧は「このターン実際に攻撃できる体」に限る。自ターンの召喚酔い（速攻なし）は
-            # 今ターン攻撃できないので加点しない＝意味のない小型展開で攻め圧を水増ししない。
-            sick = getattr(c, "is_newly_played", False) and not c.has_keyword("速攻")
-            if not (is_turn and sick):
-                score += W_ATTACKER
-                _emit("attacker", W_ATTACKER)
-            if c.has_keyword("ブロッカー"):
-                score += W_BLOCKER
-                _emit("blocker", W_BLOCKER)
-        # 効果価値（§S2）＋コスト投資価値。両重み0（既定）なら作動せず完全同値。effect_cache はクランプ済み
-        # （>=0）の起動メイン効果Δ（J単位・自己較正）。コスト項は cache 不要（c.master.cost を直接読む）。
-        if effect_weight or cost_weight:
-            evv = cost_weight * float(getattr(c.master, "cost", 0) or 0)
-            if effect_weight and effect_cache is not None:
-                evv += effect_weight * effect_cache.get(getattr(c, "uuid", None), 0.0)
-            if evv:
-                score += evv
-                _emit("effect_value", evv)
-
-    return score
-
-
-def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None,
+def evaluate(manager, me_name: str, see_opp_hand: bool = True,
              out: Optional[Dict[str, Any]] = None) -> float:
-    """`me_name` 視点の盤面評価＝**手書き J値評価（`evaluate_base`）に学習価値の葉ブレンドを被せた**薄いラッパー。
+    """`me_name` 視点の盤面評価＝**L1 評価（`evaluate_base`）に学習価値の葉ブレンドを被せた**薄いラッパー。
 
-    天井上げ（学習価値を葉評価の中心に育てる・§2.5.8）に向け、手書き評価と学習ブレンドを 2 層に分離した
+    天井上げ（学習価値を葉評価の中心に育てる・§2.5.8）に向け、L1 評価と学習ブレンドを 2 層に分離した
     差し込み口。`OPCG_VALUE_BLEND`/override の α=0（既定）では `_value_blend` が素通し＝`evaluate_base` と
     完全同値（葉で predict も呼ばない）。引数・戻り値は `evaluate_base` と同一＝既存呼び出しは透過。
     """
     return _value_blend(manager, me_name,
-                        evaluate_base(manager, me_name, see_opp_hand=see_opp_hand,
-                                      profile=profile, out=out))
+                        evaluate_base(manager, me_name, see_opp_hand=see_opp_hand, out=out))
 
 
-def evaluate_base(manager, me_name: str, see_opp_hand: bool = True, profile=None,
-                  out: Optional[Dict[str, Any]] = None, include_effect: bool = True) -> float:
-    """`me_name` 視点の**手書き J値評価**（学習ブレンドを含まない素のスコア・高いほど自分有利）。
+def evaluate_base(manager, me_name: str, see_opp_hand: bool = True,
+                  out: Optional[Dict[str, Any]] = None) -> float:
+    """`me_name` 視点の L1 評価（学習ブレンドを含まない素のスコア・高いほど自分有利）。
 
-    `see_opp_hand=False` のとき相手手札は枚数のみ評価する（中身＝カウンター値を読まない）。
-    自分の手札は常に full。情報方針は呼び出し側（`decide`）が渡す（fair=False＝公開のみ／cheat=True）。
-    `profile`（リーダー推測の相手モデル・§2.5.4）があれば、相手手札の防御価値（defense_factor）と
-    自分のライフ重視度（aggro_lean）を補正する。
-    `include_effect=False` は効果価値項（`manager._effect_value_cache`）を読まない＝効果価値の測定中
-    （`_effect_impact_one` の内部 eval）の再帰回避用。既定 True でも `EFFECT_VALUE_WEIGHT==0`（既定）なら
-    キャッシュ参照自体せず従来と完全同値。
+    CPU 評価は単一系統（L1コア・`cpu_eval_v2.evaluate_v2`）に集約済み。winner 短絡を含む終端の符号も
+    `evaluate_v2` 側が扱う（重複ロジックを置かない）。`see_opp_hand=False` のとき相手手札は枚数のみ評価する
+    （中身＝カウンター値を読まない）。自分の手札は常に full。情報方針は呼び出し側（`decide`）が渡す。
     """
-    # 評価 v2（L1コア・v0.4）への段階導入差し替え。既定 OFF＝以降の従来 J値評価を実行（完全同値）。
-    if _eval_v2_active():
-        from . import cpu_eval_v2
-        return cpu_eval_v2.evaluate_v2(manager, me_name, see_opp_hand=see_opp_hand,
-                                       profile=profile, out=out)
-    if manager.winner == me_name:
-        if out is not None:
-            out["winner"] = me_name
-        return W_WIN
-    if manager.winner is not None:
-        if out is not None:
-            out["winner"] = manager.winner
-        return -W_WIN
-    me = _player_by_name(manager, me_name)
-    opp = _other(manager, me_name)
-    is_my_turn = manager.turn_player.name == me_name
-    # リーダー推測補正: 相手の攻め寄り度が高いほど自分のライフを厚く見る／相手手札の防御価値を倍率補正。
-    life_factor = 1.0
-    opp_hand_factor = 1.0
-    if profile is not None:
-        life_factor = 1.0 + W_LIFE_AGGRO_K * profile.aggro_lean
-        if not see_opp_hand:  # 公開方針のときだけ構築推測で相手手札の防御価値を補う
-            opp_hand_factor = profile.defense_factor
-    # 有効パワー上限は対面の最硬防御。自分のパワーは相手を、相手のパワーは自分を上回るまでが有効。
-    my_cap = _power_cap(opp)
-    opp_cap = _power_cap(me)
-    # C-3: 自ライフ（守備）は攻め対面で膝を 3 へ（レース耐性重視）。クロック側＝相手ライフは既定 2 のまま
-    # ＝自他で別カーブ。profile 無し＝両側既定 2＝従来同値。
-    own_life_knee = _own_life_knee(profile)
-    # 成分内訳の収集（out 指定時のみ・採点には一切影響しない）。
-    out_me = {} if out is not None else None
-    out_opp = {} if out is not None else None
-    # 効果価値（§S2）の重み。include_effect=False（測定中の再帰回避）or 両重み0（既定）なら一切作動せず
-    # 従来と完全同値。effect_weight!=0 のときだけ root で構築したキャッシュ（uuid→クランプΔ）を読む。
-    eff_w, cost_w = _effect_weights() if include_effect else (0.0, 0.0)
-    effect_cache = (getattr(manager, "_effect_value_cache", None)
-                    if eff_w != 0.0 else None)
-    total = (_side_score(me, is_my_turn, my_cap, include_counter=True, life_factor=life_factor,
-                         life_knee=own_life_knee,
-                         effect_weight=eff_w, cost_weight=cost_w, effect_cache=effect_cache, out=out_me)
-             - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
-                           hand_factor=opp_hand_factor,
-                           effect_weight=eff_w, cost_weight=cost_w, effect_cache=effect_cache, out=out_opp))
-    if out is not None:
-        out["me"] = {k: round(v, 1) for k, v in out_me.items()}
-        out["opp"] = {k: round(v, 1) for k, v in out_opp.items()}
-    return total
-
-
-def _effect_stage(clone, owner, card):
-    """効果価値測定の文脈整形（owner の自分の次ターンを現実的に再現）。`tests/effect_value_probe.py` と同方針。
-
-    ターン文脈を owner に・リーダー/対象カードを起こす・使用回数リセット・ドンを現実的な次ターン量へ
-    （場の active+rested を起こす＋次供給 `_EFFECT_NEXT_TURN_DON`・上限10）。対象は**実盤面の本物のみ**
-    （注入しない＝対象が無ければ除去は0＝今は脅威ゼロが文脈的に正しい）。
-    """
-    clone.turn_player = owner
-    if owner.leader is not None:
-        owner.leader.is_rest = False
-        try:
-            owner.leader.ability_used_this_turn.clear()
-        except Exception:
-            pass
-    budget = min(10, len(owner.don_active) + len(owner.don_rested) + _EFFECT_NEXT_TURN_DON)
-    while owner.don_rested and len(owner.don_active) < budget:
-        owner.don_active.append(owner.don_rested.pop())
-    while owner.don_deck and len(owner.don_active) < budget:
-        owner.don_active.append(owner.don_deck.pop())
-    card.is_rest = False
-    try:
-        card.ability_used_this_turn.clear()
-    except Exception:
-        pass
-
-
-def _effect_drain(board, owner_name):
-    """効果解決の対話（対象選択等）を**効果が空振りしないよう貪欲に**解消する（owner 側のみ・上限付き）。"""
-    from . import action_api
-    actor = board.p1 if board.p1.name == owner_name else board.p2
-    KEY_PID, _ = _pending_keys()
-    for _ in range(_EFFECT_DRAIN_LIMIT):
-        if board.winner is not None:
-            break
-        pending = board.get_pending_request()
-        if not pending or pending.get(KEY_PID) != owner_name:
-            break
-        board.action_events = []
-        try:
-            sel = _selection_moves(board, owner_name)
-            if sel:
-                def _rank(mv):
-                    pl = mv.get("payload", {})
-                    return (1 if pl.get("accepted") else 0, len(pl.get("selected_uuids", []) or []))
-                mv = max(sel, key=_rank)
-                action_api.apply_game_action(board, actor, mv["action_type"], mv.get("payload", {}))
-            else:
-                payload = board.default_interaction_payload(pending)
-                action_api.apply_game_action(board, actor, action_api.ACT_RESOLVE_SELECTION, payload)
-        except Exception:
-            break
-
-
-def _effect_impact_one(manager, card_uuid: str, owner_name: str) -> Optional[float]:
-    """card の起動メイン効果を実シミュレーション発火して evaluate_base の純Δ（owner視点・コスト差引）を返す。
-
-    起動メインが無ければ None。複数あれば最大Δ。条件/回数/コストを尊重して発火（条件付き効果は今の盤面で
-    条件成立時のみ＝文脈的に正しい）。内部 eval は `include_effect=False`（再帰回避）。負Δは呼び出し側で
-    クランプ。`manager.clone()` 上で測るので root は不変。
-    """
-    from .effects.resolver import EffectResolver
-    src = manager._find_card_by_uuid(card_uuid)
-    if src is None:
-        return None
-    ams = [ab for ab in src.master.abilities if getattr(ab, "trigger", None) == TriggerType.ACTIVATE_MAIN]
-    if not ams:
-        return None
-    best = None
-    for ab in ams:
-        try:
-            clone = manager.clone()
-        except Exception:
-            continue
-        owner = clone.p1 if clone.p1.name == owner_name else clone.p2
-        cc = clone._find_card_by_uuid(card_uuid)
-        if cc is None:
-            continue
-        try:
-            _effect_stage(clone, owner, cc)
-            before = evaluate_base(clone, owner_name, see_opp_hand=False, include_effect=False)
-            clone.action_events = []
-            EffectResolver(clone).resolve_ability(owner, ab, cc)
-            _effect_drain(clone, owner_name)
-            after = evaluate_base(clone, owner_name, see_opp_hand=False, include_effect=False)
-        except Exception:
-            continue
-        d = after - before
-        if best is None or d > best:
-            best = d
-    return best
-
-
-def _build_effect_value_cache(manager) -> Dict[str, float]:
-    """場の各キャラ（両陣営）の効果価値（クランプ済みΔ）を uuid→値で測る（決定ごとに root で1回）。
-
-    起動メイン持ちのキャラだけ実測（バニラ/登場時のみは効果価値0＝キャッシュに載せない）。両陣営を測るのは
-    相手の脅威（除去対象選択）も自分のエンジン保護も評価したいため。owner はそのキャラの持ち主視点。
-    """
-    cache: Dict[str, float] = {}
-    for pl in (manager.p1, manager.p2):
-        for c in list(getattr(pl, "field", []) or []):
-            uid = getattr(c, "uuid", None)
-            if uid is None:
-                continue
-            m = getattr(c, "master", None)
-            if m is None or not getattr(m, "abilities", None):
-                continue
-            if not any(getattr(ab, "trigger", None) == TriggerType.ACTIVATE_MAIN for ab in m.abilities):
-                continue
-            d = _effect_impact_one(manager, uid, pl.name)
-            if d is not None and d > 0.0:
-                cache[uid] = d   # 負は0クランプ＝載せない（任意能力は撃たなければ損しない）
-    return cache
+    from . import cpu_eval_v2
+    return cpu_eval_v2.evaluate_v2(manager, me_name, see_opp_hand=see_opp_hand, out=out)
 
 
 def _pending_keys():
@@ -896,7 +558,7 @@ def _mu_safe(manager) -> bool:
 
 
 def _score_move_1ply(manager, actor_name: str, move: Dict[str, Any], eval_name: str,
-                     see_opp_hand: bool, profile, stop_at_select: bool = False) -> Optional[float]:
+                     see_opp_hand: bool, stop_at_select: bool = False) -> Optional[float]:
     """move 適用後の 1-ply 評価値（`eval_name` 視点）を返す。失敗（例外）は None。
 
     `_mu_safe` な局面では **make/unmake**（manager をその場で適用→採点→巻き戻し＝clone 不要）、
@@ -911,14 +573,14 @@ def _score_move_1ply(manager, actor_name: str, move: Dict[str, Any], eval_name: 
                 _apply_move_inplace(manager, actor_name, move, stop_at_select=stop_at_select)
             except Exception:
                 return None
-            val = evaluate(manager, eval_name, see_opp_hand=see_opp_hand, profile=profile)
+            val = evaluate(manager, eval_name, see_opp_hand=see_opp_hand)
         # action_events は transient バッファ（探索値に無関係）。txn 内の付け替えも巻き戻るが念のため復元。
         manager.action_events = saved_events
         return val
     clone = _apply_clone(manager, actor_name, move, stop_at_select=stop_at_select)
     if clone is None:
         return None
-    return evaluate(clone, eval_name, see_opp_hand=see_opp_hand, profile=profile)
+    return evaluate(clone, eval_name, see_opp_hand=see_opp_hand)
 
 
 def _recurse_child(manager, actor_name: str, move: Dict[str, Any], search_fn) -> Optional[float]:
@@ -948,12 +610,10 @@ def _recurse_child(manager, actor_name: str, move: Dict[str, Any], search_fn) ->
 
 
 def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any],
-                       see_opp_hand: bool = True, profile=None) -> float:
-    """move をクローン上で適用し、actor 側の対話をドレインしてから評価する（1-ply）。
-
-    `profile`（任意・既定 None＝従来同値）を渡すと評価にプロファイル補正を反映する。"""
+                       see_opp_hand: bool = True) -> float:
+    """move をクローン上で適用し、actor 側の対話をドレインしてから評価する（1-ply）。"""
     val = _score_move_1ply(manager, actor_name, move, actor_name,
-                           see_opp_hand=see_opp_hand, profile=profile)
+                           see_opp_hand=see_opp_hand)
     return float("-inf") if val is None else val
 
 
@@ -1068,92 +728,7 @@ def _consumes_hand_card(manager, actor_name: str, move: Dict[str, Any]) -> bool:
     return any(getattr(c, "uuid", None) == uuid for c in actor.hand)
 
 
-# --- B-1(b) カウンター強要（推定カウンター応答・§2.5.3/§2.5.6） -----------------------------------
-# normal の保守 min ノードは手札カウンターを全除外＝相手は決してカウンターしない。これだと「余剰ドンを
-# 攻撃に振って相手のカウンターを強要する」価値が出ない。そこで**相手手札の中身は読まず**（フェア）、
-# リーダー推測 profile（§2.5.4）のカウンター密度から相手の「推定カウンター緩衝(power)」を見積もり、
-# 相手 min ノードに「緩衝内なら攻撃を防ぐ（手札 1 枚を消費）／緩衝超なら貫通」という応答を PASS と並べて
-# 入れる。min が選ぶので、緩衝内に収まる盛りは無駄（相手が守り切る）・緩衝超の盛りは正の手（貫通）になる。
-# hard は opp_public_only=False で実カウンターを既に読むため本モデルは作動しない（profile も渡さない）。
-_COUNTER_HAND_EST = 4.0   # 守りに割けるカウンター札の見込み枚数（コミット想定の上限・power 換算の係数）
-
-
-def _estimate_counter_buffer(profile, opp_hand_size: Optional[int] = None, opp_trash=None) -> float:
-    """profile のカウンター密度＋**公開情報ベリーフ**から、相手が 1 防御ターンに積める総カウンター power
-    を推定する（§2.5.3 belief update）。profile が無ければ 0。
-
-    静的なテンプレ密度（`counter_avg`）に、対局中に**公開された情報だけ**で belief を更新する:
-      - **手札枚数**（公開 count）: カウンターには手札が要る。コミット想定枚数を実手札枚数でキャップ
-        （少手札＝緩衝縮小・0 枚＝0）。手札の*中身*は読まない＝フェア。
-      - **トラッシュ**（公開）: 既に使われた（見えた）カウンター値ぶん、デッキ＋手札の残カウンター密度を
-        割り引く（消費が進むほど緩衝が縮む）。
-    引数省略時は静的既定（手札 `_COUNTER_HAND_EST` 枚・未消費）＝従来値（テスト/後方互換）。
-    """
-    if profile is None:
-        return 0.0
-    per_card = float(getattr(profile, "counter_avg", 0.0) or 0.0)
-    if per_card <= 0.0:
-        return 0.0
-    # 手札枚数ベリーフ: コミット想定を実手札枚数でキャップ（未供給時は静的既定 _COUNTER_HAND_EST）。
-    commit = _COUNTER_HAND_EST if opp_hand_size is None else float(max(0, min(int(opp_hand_size), int(_COUNTER_HAND_EST))))
-    # トラッシュ消費ベリーフ: 見えた消費カウンター値ぶん残密度を割り引く。
-    depletion = 1.0
-    if opp_trash:
-        n = max(1, int(getattr(profile, "n_cards", 0) or 0))
-        total_counter = per_card * n   # テンプレ基準のデッキ全体の総カウンター power
-        if total_counter > 0.0:
-            seen = 0.0
-            for c in opp_trash:
-                m = getattr(c, "master", None)
-                if m is not None:
-                    seen += float(getattr(m, "counter", 0) or 0)
-            depletion = max(0.0, 1.0 - seen / total_counter)
-    return max(0.0, per_card * commit * depletion)
-
-
-def _counter_needed(manager) -> Optional[float]:
-    """現在の戦闘で相手が攻撃を防ぐ（防御側が攻撃側を上回る）のに必要なカウンター power。
-
-    攻撃が既に通らない／戦闘が無い場合は None。`resolve_attack` と同じパワー計算を用いる
-    （攻撃側=自ターンなら付与込み・防御側=素＋既存 counter_buff）。
-    """
-    ab = getattr(manager, "active_battle", None)
-    if not ab or ab.get("attacker") is None or ab.get("target") is None:
-        return None
-    atk = ab["attacker"]; tgt = ab["target"]
-    ao = ab.get("attacker_owner"); to = ab.get("target_owner")
-    try:
-        ap = float(atk.get_power(ao == manager.turn_player))
-        tp = float(tgt.get_power(to == manager.turn_player)) + float(ab.get("counter_buff", 0) or 0)
-    except Exception:
-        return None
-    needed = ap - tp + 1.0
-    return needed if needed > 0 else None
-
-
-def _apply_modeled_counter(manager, defender_name: str, needed: float):
-    """推定カウンターを適用したクローンを返す（`counter_buff` を needed 加算＋手札 1 枚を資源消費＋PASS で解決）。
-
-    相手手札の**中身は選ばない**（先頭 1 枚を消費＝枚数のみ＝公開情報・フェア）。手札が無い／戦闘が無いとき None。
-    """
-    from . import action_api
-    clone = manager.clone()
-    defender = _player_by_name(clone, defender_name)
-    if not defender.hand or not getattr(clone, "active_battle", None):
-        return None
-    clone.active_battle["counter_buff"] = clone.active_battle.get("counter_buff", 0) + needed
-    defender.hand.pop(0)   # カウンター札 1 枚の消費（枚数のみ＝公開情報。中身は参照しない＝フェア）
-    battle_actions = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
-    ACT_PASS = battle_actions.get('PASS', 'PASS')
-    clone.action_events = []
-    try:
-        action_api.apply_battle_action(clone, defender, ACT_PASS, None)
-    except Exception:
-        return None
-    return clone
-
-
-def _settle_eval(manager, root_name: str, see_opp_hand: bool, profile, ply: int = 0) -> float:
+def _settle_eval(manager, root_name: str, see_opp_hand: bool, ply: int = 0) -> float:
     """探索の打ち切り点を一定の静止点（相手のターン開始＝相手の MAIN_ACTION）へ整流してから評価する。
 
     予算/ply 上限での打ち切りでも「自分のターン途中／戦闘途中の甘い局面」で評価せず、葉と同じ静止点で
@@ -1196,7 +771,7 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, profile, ply: int 
     # 高く（生 W_WIN で）見えてしまう不整合を防ぐ＝lethal 認識の ply 割引を一貫させる。
     if manager.winner is not None:
         return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
-    return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile)
+    return evaluate(manager, root_name, see_opp_hand=see_opp_hand)
 
 
 def _record_killer(killers: Optional[Dict[int, List[tuple]]], ply: int, move: Dict[str, Any]) -> None:
@@ -1242,8 +817,8 @@ def _pv_reorder(children: List[Tuple[float, Any]],
 
 def _search(manager, root_name: str, alpha: float, beta: float,
             budget: List[int], see_opp_hand: bool, opp_public_only: bool,
-            profile=None, ply: int = 0, start_turn: int = 0, horizon: int = 1,
-            counter_budget: float = 0.0, killers: Optional[Dict[int, List[tuple]]] = None) -> float:
+            ply: int = 0, start_turn: int = 0, horizon: int = 1,
+            killers: Optional[Dict[int, List[tuple]]] = None) -> float:
     """ターン境界評価の α-β ＋ ビーム探索。`root_name` 視点の最善到達値を返す。
 
     **葉は `start_turn` から `horizon` ターン進んだ MAIN_ACTION（一定の静止点）に固定**する。
@@ -1258,7 +833,6 @@ def _search(manager, root_name: str, alpha: float, beta: float,
       - `see_opp_hand`     : 葉の評価で相手手札の中身（カウンター値）を読むか（hard=True / 他=False）。
       - `opp_public_only`  : 相手 min ノードで相手の隠れ手札に依存する手（PLAY/カウンター）を除外する保守
                              モデル（normal=True / hard=False）。
-      - `profile`          : リーダー推測の相手モデル（§2.5.4）。
     """
     if manager.winner is not None:
         return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
@@ -1267,14 +841,14 @@ def _search(manager, root_name: str, alpha: float, beta: float,
     # ではなく軽量な pending_actor_action を使う（payload/uuid4 を作らない・副作用は一致・§2.5.2 B-1）。
     pa = manager.pending_actor_action()
     if not pa:
-        return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile)
+        return evaluate(manager, root_name, see_opp_hand=see_opp_hand)
     actor_name, pend_action = pa
     # 葉: start_turn から horizon ターン進んだ MAIN_ACTION（一定の静止点）で評価。
     if pend_action == "MAIN_ACTION" and (manager.turn_count - start_turn) >= horizon:
-        return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile)
+        return evaluate(manager, root_name, see_opp_hand=see_opp_hand)
     # 安全打ち切り: 予算/ply 上限。自分の手番途中ならターン境界へ整流してから評価（甘い途中評価を避ける）。
     if budget[0] <= 0 or ply >= _effective_max_ply():
-        return _settle_eval(manager, root_name, see_opp_hand, profile, ply)
+        return _settle_eval(manager, root_name, see_opp_hand, ply)
 
     actor = _player_by_name(manager, actor_name)
     # 単一対象選択ノードは候補ごとに分岐（最善対象を読み切る）。それ以外は通常の合法手列挙。
@@ -1284,7 +858,7 @@ def _search(manager, root_name: str, alpha: float, beta: float,
         moves = _prune_don_moves(manager, actor_name, moves)  # B-2: 無意味なドン付与を手生成段で除外
         moves = _prune_futile_attacks(manager, actor_name, moves)  # 倒せない/届かない無駄攻撃を除外
     if not moves:
-        return evaluate(manager, root_name, see_opp_hand=see_opp_hand, profile=profile)
+        return evaluate(manager, root_name, see_opp_hand=see_opp_hand)
     is_max = (actor_name == root_name)
 
     # 公平モデル: 相手 min ノードでは相手の隠れ手札に依存する手を読まない（公開情報のみで応答）。
@@ -1303,12 +877,12 @@ def _search(manager, root_name: str, alpha: float, beta: float,
             break
         budget[0] -= 1
         v = _score_move_1ply(manager, actor_name, m, root_name,
-                             see_opp_hand=see_opp_hand, profile=profile, stop_at_select=True)
+                             see_opp_hand=see_opp_hand, stop_at_select=True)
         if v is None:
             continue
         children.append((v, m))
     if not children:
-        return _settle_eval(manager, root_name, see_opp_hand, profile, ply)
+        return _settle_eval(manager, root_name, see_opp_hand, ply)
     children.sort(key=lambda x: x[0], reverse=is_max)
     # E1（Phase3 ③）: 自分(max)は最善へ収束＝HARD_BEAM、相手(min)は応手を広く残す＝HARD_OPP_BEAM。
     children = children[:(HARD_BEAM if is_max else HARD_OPP_BEAM)]
@@ -1322,8 +896,8 @@ def _search(manager, root_name: str, alpha: float, beta: float,
         for _leaf, m in children:
             cv = _recurse_child(manager, actor_name, m,
                                 lambda b, a=alpha, bt=beta: _search(b, root_name, a, bt,
-                                    budget, see_opp_hand, opp_public_only, profile, ply + 1,
-                                    start_turn, horizon, counter_budget, killers))
+                                    budget, see_opp_hand, opp_public_only, ply + 1,
+                                    start_turn, horizon, killers))
             if cv is None:
                 continue
             value = max(value, cv)
@@ -1334,26 +908,13 @@ def _search(manager, root_name: str, alpha: float, beta: float,
         return value
     else:
         value = float("inf")
-        # B-1(b): 相手の推定カウンター応答（normal 保守 min・SELECT_COUNTER・緩衝内で攻撃を防げる場合のみ）。
-        # PASS（=カウンターしない＝攻撃が通る）と並べて min が選ぶ＝相手にとって有利な方（=自分に不利な方）。
-        # 緩衝を needed ぶん消費して深掘り。これで「緩衝超まで盛ると貫通＝余剰ドンを攻撃に振るのが正」になる。
-        if (opp_public_only and profile is not None and counter_budget > 0
-                and pend_action == "SELECT_COUNTER"):
-            needed = _counter_needed(manager)
-            if needed is not None and needed <= counter_budget:
-                cc = _apply_modeled_counter(manager, actor_name, needed)
-                if cc is not None:
-                    value = min(value, _search(cc, root_name, alpha, beta,
-                                               budget, see_opp_hand, opp_public_only, profile, ply + 1,
-                                               start_turn, horizon, counter_budget - needed, killers))
-                    beta = min(beta, value)
         for _leaf, m in children:
             if alpha >= beta:
                 break
             cv = _recurse_child(manager, actor_name, m,
                                 lambda b, a=alpha, bt=beta: _search(b, root_name, a, bt,
-                                    budget, see_opp_hand, opp_public_only, profile, ply + 1,
-                                    start_turn, horizon, counter_budget, killers))
+                                    budget, see_opp_hand, opp_public_only, ply + 1,
+                                    start_turn, horizon, killers))
             if cv is None:
                 continue
             value = min(value, cv)
@@ -1427,7 +988,7 @@ def _is_important_root_move_post(manager, name: str, move: Dict[str, Any],
     return False
 
 
-def _eval_root_move(manager, name: str, move: Dict[str, Any], see_opp_hand: bool, profile):
+def _eval_root_move(manager, name: str, move: Dict[str, Any], see_opp_hand: bool):
     """ルート手の 1-ply 採点に必要な (評価値, ドン返却ペナルティ, 重要手フラグ) をまとめて返す。
 
     `_mu_safe` な静止点では **make/unmake**（適用→3 値を txn 内で採点→巻き戻し＝子クローン不保持）、
@@ -1447,7 +1008,7 @@ def _eval_root_move(manager, name: str, move: Dict[str, Any], see_opp_hand: bool
             except Exception:
                 res[0] = None
             else:
-                ev = evaluate(manager, name, see_opp_hand=see_opp_hand, profile=profile)
+                ev = evaluate(manager, name, see_opp_hand=see_opp_hand)
                 pen = _don_return_penalty_vals(pre_don, len(_player_by_name(manager, name).don_deck))
                 imp = _is_important_root_move_post(manager, name, move, pre_block, pre_opp_life)
                 res[0] = (ev, pen, imp)
@@ -1456,11 +1017,10 @@ def _eval_root_move(manager, name: str, move: Dict[str, Any], see_opp_hand: bool
     child = _apply_clone(manager, name, move, stop_at_select=True)
     if child is None:
         return None
-    ev = evaluate(child, name, see_opp_hand=see_opp_hand, profile=profile)
+    ev = evaluate(child, name, see_opp_hand=see_opp_hand)
     pen = _don_return_penalty(manager, name, child)
     imp = _is_important_root_move(manager, name, move, child)
     return (ev, pen, imp)
-    return False
 
 
 # 深掘り同点手の 1-ply タイブレーク（§2.5.3）。寄与は _TIEBREAK_W×クランプ prelim（最大 ~0.005）で、
@@ -1472,7 +1032,7 @@ _TIEBREAK_CLAMP = 5000.0
 
 def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
                    see_opp_hand: bool, opp_public_only: bool,
-                   profile=None, collect: Optional[Dict[str, Any]] = None,
+                   collect: Optional[Dict[str, Any]] = None,
                    killer_state: Optional[Dict[int, List[tuple]]] = None
                    ) -> List[Tuple[float, Dict[str, Any]]]:
     """ルート手を 1-ply で事前選別し、上位 HARD_ROOT_BEAM 手だけを多 ply 先読みで深掘りする。
@@ -1492,7 +1052,7 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     pen_by_idx: Dict[int, float] = {}
     imp_by_idx: Dict[int, bool] = {}
     for idx, m in enumerate(moves):
-        r = _eval_root_move(manager, name, m, see_opp_hand, profile)
+        r = _eval_root_move(manager, name, m, see_opp_hand)
         if r is None:
             prelim.append((float("-inf"), m, False))
             pen_by_idx[idx] = 0.0
@@ -1527,10 +1087,6 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     #    非対象（1-ply の甘い値）を混ぜると評価ホライズンが不一致になり誤選択するため返さない。深掘り集合は
     #    1-ply 上位＋TURN_END なので最善手はここに含まれる。
     start_turn = manager.turn_count
-    # B-1(b): 相手の推定カウンター緩衝（normal の保守 min ノードでのみ作動。hard は実カウンターを読むため 0）。
-    # #3: 公開情報ベリーフ＝相手の生の手札枚数＋トラッシュの消費カウンターで緩衝を動的更新（§2.5.3）。
-    opp = _other(manager, name)
-    cbudget = _estimate_counter_buffer(profile, len(opp.hand), opp.trash) if opp_public_only else 0.0
     if collect is not None:
         collect.setdefault("prelim", {})
         collect.setdefault("deep", {})
@@ -1555,8 +1111,8 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
             budget = [_effective_budget()]
             v = _recurse_child(manager, name, m,
                                lambda b: _search(b, name, float("-inf"), float("inf"),
-                                   budget, see_opp_hand, opp_public_only, profile, ply=1,
-                                   start_turn=start_turn, horizon=_effective_horizon(), counter_budget=cbudget,
+                                   budget, see_opp_hand, opp_public_only, ply=1,
+                                   start_turn=start_turn, horizon=_effective_horizon(),
                                    killers=killers))
             if v is None:  # 深掘りの適用失敗（pass-1 と整合・通常は起きない）
                 continue
@@ -1636,7 +1192,7 @@ def _describe_move(manager, move: Optional[Dict[str, Any]]) -> Optional[Dict[str
 
 
 def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_only: bool,
-                     profile, start_turn: int, horizon: int,
+                     start_turn: int, horizon: int,
                      max_steps: int = 12) -> List[Dict[str, Any]]:
     """貪欲 PV（読み筋）: 各手番で 1-ply 最善手（root=max / 相手=min）を辿った想定進行。
 
@@ -1682,7 +1238,7 @@ def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_onl
             child = _apply_clone(cur, actor_name, m, stop_at_select=True)
             if child is None:
                 continue
-            sc = evaluate(child, root_name, see_opp_hand=see_opp_hand, profile=profile)
+            sc = evaluate(child, root_name, see_opp_hand=see_opp_hand)
             if best is None or (sc > best[0] if is_max else sc < best[0]):
                 best = (sc, m, child)
         if best is None:
@@ -1699,7 +1255,7 @@ def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_onl
 def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: str,
                          moves: List[Dict[str, Any]], scored: List[Tuple[float, Dict[str, Any]]],
                          collect: Optional[Dict[str, Any]], chosen: Dict[str, Any], folded: bool,
-                         see_opp_hand: bool, opp_public_only: bool, profile,
+                         see_opp_hand: bool, opp_public_only: bool,
                          include_read_ahead: bool = True) -> None:
     """`decide` の意思決定結果を診断トレース dict に書き込む（trace 指定時のみ）。
 
@@ -1753,12 +1309,12 @@ def _fill_decision_trace(trace: Dict[str, Any], manager, name: str, difficulty: 
     child = _apply_clone(manager, name, chosen, stop_at_select=True)
     if child is not None:
         comp: Dict[str, Any] = {}
-        total = evaluate(child, name, see_opp_hand=see_opp_hand, profile=profile, out=comp)
+        total = evaluate(child, name, see_opp_hand=see_opp_hand, out=comp)
         comp["total"] = round(total, 1)
         trace["j_components"] = comp
         if include_read_ahead:
             trace["read_ahead"] = _read_ahead_line(
-                child, name, see_opp_hand, opp_public_only, profile,
+                child, name, see_opp_hand, opp_public_only,
                 manager.turn_count, HARD_HORIZON)
 
 
@@ -1859,15 +1415,6 @@ def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Rando
     moves = _prune_don_moves(manager, player.name, moves)  # B-2: 無意味なドン付与をルートから除外
     moves = _prune_futile_attacks(manager, player.name, moves)  # 倒せない/届かない無駄攻撃を除外
 
-    # 効果価値キャッシュ（§S2）を root で1回構築（決定ごと・盤面の各キャラの起動メイン効果を実測）。探索の
-    # 葉では evaluate_base がこれを読むだけ。効果重み0（既定）なら構築しない＝従来と完全同値（コストのみ重みは
-    # キャッシュ不要なので構築しない）。
-    if _effect_weights()[0] != 0.0:
-        try:
-            manager._effect_value_cache = _build_effect_value_cache(manager)
-        except Exception:
-            manager._effect_value_cache = {}
-
     name = player.name
     end_move = next((m for m in moves if m.get("action_type") == "TURN_END"), None)
 
@@ -1920,7 +1467,7 @@ def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Rando
         _rng_state = random.getstate()
         try:
             _fill_decision_trace(trace, manager, name, difficulty, moves, scored, collect,
-                                 chosen, folded, see_opp_hand, opp_public_only, None,
+                                 chosen, folded, see_opp_hand, opp_public_only,
                                  include_read_ahead=trace_read_ahead)
         finally:
             random.setstate(_rng_state)

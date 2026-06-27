@@ -379,8 +379,7 @@ async def game_create(req: Any = Body(...)):
             difficulty = req.get("cpu_difficulty", "hard")
             if difficulty != "hard":
                 difficulty = "hard"
-            CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty,
-                                  "opp_profile": None}
+            CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty}
             if cpu_trace:
                 # リプレイ種＋思考ログの器を用意する（opt-in 時のみ）。
                 CPU_GAMES[game_id].update({
@@ -475,14 +474,13 @@ def _ponder_enabled() -> bool:
             and os.environ.get("OPCG_PONDER", "0") == "1")
 
 
-def _plan_segment(manager, cpu_player, difficulty, mem=None, profile=None):
+def _plan_segment(manager, cpu_player, difficulty, mem=None):
     """「このターンの計画手列」を返す（ポンダリング/計画キャッシュの単一の真実源）。
 
     hard（α-β）を `decide_client`（PyPy ワーカー）でセグメント計画する。「手 dict のリスト（=このターンの
     連続手番）」を返す＝後段のキャッシュ/replay/ポンダリングが共通に乗る。
     """
-    return decide_client.plan_segment(manager, cpu_player, difficulty,
-                                      mem=mem, profile=profile)
+    return decide_client.plan_segment(manager, cpu_player, difficulty, mem=mem)
 
 
 async def _ponder_plan(game_id: str) -> None:
@@ -506,8 +504,7 @@ async def _ponder_plan(game_id: str) -> None:
         snap = manager.clone()
         cpu_player = snap.p1 if snap.p1.name == cpu_pid else snap.p2
         actions = await asyncio.to_thread(
-            _plan_segment, snap, cpu_player, difficulty,
-            mem=turn_mem, profile=meta.get("opp_profile"))
+            _plan_segment, snap, cpu_player, difficulty, mem=turn_mem)
         cache["queue"] = actions or None
     except Exception:
         cache["queue"] = None
@@ -556,7 +553,7 @@ def _speculate_enabled() -> bool:
     return _ponder_enabled() and os.environ.get("OPCG_PONDER_SPEC", "0") == "1"
 
 
-def _speculate_compute(clone, human_pid, cpu_pid, difficulty, profile):
+def _speculate_compute(clone, human_pid, cpu_pid, difficulty):
     """⑥-b 投機の本体（`to_thread` で別スレッド実行）。**クローン上で**人間の TURN_END を仮適用し、
     pending が素直に CPU 手番へ移ったら CPU セグメントを計画して返す（介在する人間決定があれば None）。
     live 盤面には一切触れない（呼び出し側がメインスレッドで原子的に clone 済み）。"""
@@ -567,8 +564,7 @@ def _speculate_compute(clone, human_pid, cpu_pid, difficulty, profile):
     if not pa or pa[0] != cpu_pid:
         return None
     cpu_player = clone.p1 if clone.p1.name == cpu_pid else clone.p2
-    return _plan_segment(clone, cpu_player, difficulty,
-                         mem={}, profile=profile)
+    return _plan_segment(clone, cpu_player, difficulty, mem={})
 
 
 async def _speculate_plan(game_id: str, clone, human_pid: str, gen: int) -> None:
@@ -584,8 +580,7 @@ async def _speculate_plan(game_id: str, clone, human_pid: str, gen: int) -> None
     try:
         cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "hard")
         result = await asyncio.to_thread(
-            _speculate_compute, clone, human_pid, cpu_pid, difficulty,
-            meta.get("opp_profile"))
+            _speculate_compute, clone, human_pid, cpu_pid, difficulty)
         if cache.get("spec_gen") == gen:        # まだ最新の投機なら採用
             cache["spec_queue"] = result or None
     except Exception:
@@ -641,8 +636,7 @@ def _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem):
             cache["queue"] = q[1:]
             return legal_by_sig[sig]
         cache["queue"] = None  # 前提崩れ＝破棄して再計画
-    actions = _plan_segment(manager, cpu_player, difficulty, mem=turn_mem,
-                            profile=meta.get("opp_profile"))
+    actions = _plan_segment(manager, cpu_player, difficulty, mem=turn_mem)
     if actions:
         sig = cpu_ai._move_sig(actions[0])
         if sig in legal_by_sig:
@@ -714,7 +708,6 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                     move = _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem)
                 if move is None:
                     move = decide_client.decide(manager, cpu_player, difficulty, mem=turn_mem,
-                                                profile=meta.get("opp_profile"),
                                                 trace=tr, trace_read_ahead=False)
                 if move is not None:
                     if trace_on:

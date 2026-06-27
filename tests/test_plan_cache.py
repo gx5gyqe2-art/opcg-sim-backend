@@ -374,7 +374,7 @@ def test_speculate_compute_plans_cpu_turn_on_clone(db):
     cpu_pid = "p2" if pid == "p1" else "p1"
     live_turn = m.turn_count
     clone = m.clone()
-    result = _app._speculate_compute(clone, human_pid, cpu_pid, "hard", None)
+    result = _app._speculate_compute(clone, human_pid, cpu_pid, "hard")
     # live(=m) は不変（クローンのみ変異）。
     assert m.turn_count == live_turn
     assert m.pending_actor_action()[0] == human_pid

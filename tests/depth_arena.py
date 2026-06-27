@@ -19,7 +19,7 @@ import time
 import conftest  # noqa: F401
 import cpu_arena
 from cpu_arena import elo_ci
-from eval_v2_arena import _pair_level_ci
+from arena_parallel import _pair_level_ci
 from opcg_sim.src.core import cpu_ai
 
 
@@ -30,7 +30,6 @@ def run(pairs, seed0, max_steps, horizon, max_ply, budget,
     base = (base_horizon, base_max_ply) if (base_horizon or base_max_ply) else None
     t0 = time.time()
     res = paired_play(pairs, seed0=seed0, max_steps=max_steps,
-                      challenger_eval_v2=False, baseline_eval_v2=False,   # 葉は両側 J値（固定）
                       challenger_search=chal, baseline_search=base,
                       challenger_budget=budget, baseline_budget=base_budget)
     dt = time.time() - t0

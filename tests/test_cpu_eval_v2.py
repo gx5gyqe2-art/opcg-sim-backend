@@ -1,8 +1,7 @@
-"""評価関数 v2（L1コア・v0.4）スケルトンのスモーク/不変条件テスト。
+"""評価関数 v2（L1コア・v0.4）のスモーク/不変条件テスト。
 
 設計: docs/reports/cpu_eval_redesign_card_currency_20260625.md（§4 v0.4）。
-段階導入の first cut。確認するのは「機械が正しく動くこと」だけ:
-  - 既定 OFF（`OPCG_EVAL_V2` 未設定）＝従来評価と完全同値（フラグが寝ている）。
+CPU 評価は L1 単一系統。確認するのは「機械が正しく動くこと」だけ:
   - `evaluate_v2` が実ゲームで finite な float を返し例外を出さない。
   - 終局視点の符号（勝者視点 > 0 > 敗者視点）と、自他対称（zero-sum 近傍）。
 係数は未チューニングのため**強さ/挙動の主張はしない**（それはアリーナ A/B の仕事・§9）。
@@ -32,9 +31,10 @@ def _new_gm(db, seed=0):
     return gm
 
 
-def test_flag_default_off():
-    """既定では評価 v2 フラグは寝ている（出荷挙動＝従来評価・完全同値の前提）。"""
-    assert cpu_ai._USE_EVAL_V2 is False
+def test_evaluate_base_is_l1(db):
+    """`cpu_ai.evaluate_base` は L1（`evaluate_v2`）をそのまま返す（CPU 評価は単一系統）。"""
+    gm = _new_gm(db, seed=0)
+    assert cpu_ai.evaluate_base(gm, "p1") == cpu_eval_v2.evaluate_v2(gm, "p1")
 
 
 def test_evaluate_v2_runs_and_is_finite(db):

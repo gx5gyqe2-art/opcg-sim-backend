@@ -99,7 +99,8 @@ def test_trace_has_expected_fields(db):
     assert isinstance(tr.get("candidates"), list) and 1 <= len(tr["candidates"]) <= cpu_ai.TRACE_TOPN
     assert "regret" in tr and tr["regret"] >= 0.0
     assert "j_components" in tr and "total" in tr["j_components"]
-    assert "me" in tr["j_components"] and "opp" in tr["j_components"]
+    # L1（evaluate_v2）の成分内訳は "v2"（R_me/R_opp/tele/gamma/amp）。
+    assert "v2" in tr["j_components"]
     # 候補は chosen を含む。
     sigs = {(c["move"] or {}).get("action_type") for c in tr["candidates"]}
     assert tr["chosen"]["action_type"] in sigs

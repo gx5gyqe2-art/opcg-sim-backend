@@ -85,62 +85,6 @@ def test_puzzle_takes_lethal_on_open_opponent(db):
     assert move["payload"]["target_ids"] == [gm.p2.leader.uuid]
 
 
-def test_puzzle_active_don_valued_linearly_characterization(db):
-    """特性化（現状ピン留め）: アイドルのアクティブドンは現状 `W_DON_ACTIVE`×枚数 で線形加点される。
-
-    これが B-1 で報告された「余剰ドン温存」の震源（両枝でクロック同値→ドンの床だけがタイブレーク・
-    SPEC §2.5.3 裏取り③/B-1）。B-1（守りにドンを使えない局面での余剰ドン末端減価）導入時に**意図的に
-    変わる**予定なので、その時点で本アサートを更新する（＝変更を可視化するための回帰固定）。"""
-    gm = _new_gm(db, seed=0)
-    cap = cpu_ai._power_cap(gm.p2)
-    base = cpu_ai._side_score(gm.p1, True, cap)
-    assert gm.p1.don_deck, "ドンデッキが空（前提崩れ）"
-    gm.p1.don_active.append(gm.p1.don_deck.pop())
-    one = cpu_ai._side_score(gm.p1, True, cap)
-    gm.p1.don_active.append(gm.p1.don_deck.pop())
-    two = cpu_ai._side_score(gm.p1, True, cap)
-    assert one - base == pytest.approx(cpu_ai.W_DON_ACTIVE)
-    assert two - one == pytest.approx(cpu_ai.W_DON_ACTIVE)
-
-
-def test_b1b_counter_buffer_estimate_scales_with_density(db):
-    """推定カウンター緩衝はカウンター密度（counter_avg）に比例し、profile 無しは 0。"""
-    from opcg_sim.src.core import cpu_opponent_model as om
-    assert cpu_ai._estimate_counter_buffer(None) == 0.0
-    lo = om.OpponentProfile(50, 200.0, 0.2, 0.0, 0.0, 3.0, 0.8, 0.6)
-    hi = om.OpponentProfile(50, 800.0, 0.6, 0.1, 0.1, 4.0, 1.4, 0.3)
-    assert cpu_ai._estimate_counter_buffer(hi) > cpu_ai._estimate_counter_buffer(lo) > 0.0
-
-
-def test_b1b_counter_buffer_belief_hand_size(db):
-    """#3 公開情報ベリーフ: 緩衝は相手の生の手札枚数に追従する（0枚=0・少手札で縮小・上限でキャップ）。"""
-    from opcg_sim.src.core import cpu_opponent_model as om
-    prof = om.OpponentProfile(50, 800.0, 0.6, 0.1, 0.1, 4.0, 1.4, 0.3)
-    full = cpu_ai._estimate_counter_buffer(prof)                       # 既定（コミット上限枚）
-    assert cpu_ai._estimate_counter_buffer(prof, opp_hand_size=0) == 0.0   # 手札0=守れない
-    assert 0 < cpu_ai._estimate_counter_buffer(prof, opp_hand_size=1) < full  # 少手札=縮小
-    assert cpu_ai._estimate_counter_buffer(prof, opp_hand_size=99) == full    # 上限でキャップ（=既定）
-
-
-def test_b1b_counter_buffer_belief_trash_depletion(db):
-    """#3 公開情報ベリーフ: トラッシュに見えた消費カウンターぶん緩衝が割り引かれる。"""
-    from opcg_sim.src.core import cpu_opponent_model as om
-
-    class _Stub:  # master.counter だけ持つ最小スタブ
-        def __init__(self, counter):
-            self.master = type("M", (), {"counter": counter})()
-
-    prof = om.OpponentProfile(50, 800.0, 0.6, 0.1, 0.1, 4.0, 1.4, 0.3)  # total = 800*50 = 40000
-    base = cpu_ai._estimate_counter_buffer(prof, opp_hand_size=4, opp_trash=[])
-    # 消費カウンター 20000（40000 の半分）→ 緩衝はほぼ半減。
-    spent = [_Stub(2000) for _ in range(10)]
-    depleted = cpu_ai._estimate_counter_buffer(prof, opp_hand_size=4, opp_trash=spent)
-    assert depleted == pytest.approx(base * 0.5)
-    # 非カウンター札（counter=0）だけのトラッシュは緩衝を減らさない。
-    noncounter = cpu_ai._estimate_counter_buffer(prof, opp_hand_size=4, opp_trash=[_Stub(0) for _ in range(10)])
-    assert noncounter == pytest.approx(base)
-
-
 # ---------------------------------------------------------------------------
 # バッチA-1: アンブロッカブル（【ブロック不可】）を脅威評価に加点
 # ---------------------------------------------------------------------------
@@ -197,7 +141,7 @@ def test_a3_min_node_keeps_root_worst_in_beam(db):
         cpu_ai.HARD_BEAM = beam
         try:
             return cpu_ai._search(node, "p1", float("-inf"), float("inf"),
-                                  [4000], False, True, profile=None, ply=ply,
+                                  [4000], False, True, ply=ply,
                                   start_turn=st, horizon=1)
         finally:
             cpu_ai.HARD_BEAM = old
@@ -265,7 +209,7 @@ def test_e1_opp_beam_widens_min_node_independently_of_max(db):
         cpu_ai.HARD_OPP_BEAM = opp_beam
         try:
             return cpu_ai._search(node, "p1", float("-inf"), float("inf"),
-                                  [4000], False, True, profile=None, ply=ply,
+                                  [4000], False, True, ply=ply,
                                   start_turn=st, horizon=1)
         finally:
             cpu_ai.HARD_BEAM = old_b
@@ -282,68 +226,3 @@ def test_e1_opp_beam_widens_min_node_independently_of_max(db):
     # opp_beam=2: 両応答を見て真の min。
     v_opp2 = _search_beams(gm.clone(), 1, 2, ply=1)
     assert v_opp2 == pytest.approx(min(sub_bc, sub_pc)), "HARD_OPP_BEAM=2 が両応答の真の min を取れていない"
-
-
-def _advance_to_select_counter(gm, attacker, target):
-    """attacker→target のアタックを宣言し、SELECT_BLOCKER を PASS で流して SELECT_COUNTER まで進める。"""
-    gm.action_events = []
-    action_api.apply_game_action(gm, gm.p1, "ATTACK",
-                                 {"uuid": attacker.uuid, "target_ids": [target.uuid]})
-    battle_actions = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
-    ACT_PASS = battle_actions.get('PASS', 'PASS')
-    for _ in range(6):
-        pend = gm.get_pending_request()
-        if not pend:
-            return False
-        if pend.get("action") == "SELECT_COUNTER":
-            return True
-        if pend.get("action") == "SELECT_BLOCKER":
-            gm.action_events = []
-            action_api.apply_battle_action(gm, gm.p2, ACT_PASS, None)
-            continue
-        return False
-    return False
-
-
-def test_b1b_modeled_counter_saves_target_and_spends_card(db):
-    """B-1(b): 相手 min ノードの推定カウンターは、`counter_buff` を needed 加算＋手札 1 枚消費で攻撃を
-    無効化する（ライフ温存・手札 -1）。一方 PASS（カウンターしない）はライフ -1（攻撃が通る）。
-
-    相手手札の**中身は読まない**（先頭 1 枚を消費＝枚数のみ＝公開情報・フェア）。"""
-    gm = _new_gm(db, seed=0)
-    assert _fast_forward_to_p1_main(gm)
-    # p1: リーダーに確実に届く攻撃者（リーダー素+1500）を確立済み・アクティブで1体。
-    opp_leader_pw = int(gm.p2.leader.get_power(False)) if gm.p2.leader else 5000
-    atk = _reaching_char(gm.p1.deck, 0)
-    if atk is None:
-        pytest.skip("攻撃者が見つからない")
-    gm.p1.deck.remove(atk)
-    gm.p1.field[:] = [atk]
-    atk.is_rest = False
-    atk.is_newly_played = False
-    atk.passive_power_override = opp_leader_pw + 1500
-    # p2: ブロッカー無し・手札は資源として最低1枚・ライフ最低1枚。
-    gm.p2.field.clear()
-    if not gm.p2.hand:
-        gm.p2.hand.append(gm.p2.deck.pop())
-    if not gm.p2.life:
-        gm.p2.life.append(gm.p2.deck.pop())
-    if not _advance_to_select_counter(gm, atk, gm.p2.leader):
-        pytest.skip("SELECT_COUNTER へ到達できない局面")
-
-    needed = cpu_ai._counter_needed(gm)
-    assert needed is not None and needed > 0  # 攻撃は通る＝防ぐのに正の緩衝が要る
-    life_before, hand_before = len(gm.p2.life), len(gm.p2.hand)
-
-    # 推定カウンター: ライフ温存＋手札 -1。
-    cc = cpu_ai._apply_modeled_counter(gm, "p2", needed)
-    assert cc is not None
-    assert len(cc.p2.life) == life_before, "推定カウンターでライフが守れていない"
-    assert len(cc.p2.hand) == hand_before - 1, "カウンター札 1 枚の資源消費が反映されていない"
-
-    # PASS（カウンターしない）: 攻撃が通りライフ -1。
-    passclone = gm.clone()
-    battle_actions = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
-    passclone.action_events = []
-    action_api.apply_battle_action(passclone, passclone.p2, battle_actions.get('PASS', 'PASS'), None)
-    assert len(passclone.p2.life) == life_before - 1, "PASS なのに攻撃が通っていない"

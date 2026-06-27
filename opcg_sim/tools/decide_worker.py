@@ -1,7 +1,7 @@
 """PyPy 常駐ワーカー: CPU の探索（decide）だけを別ランタイム（PyPy）で実行する。
 
 方式B（プロセス分離）の PyPy 側。CPython の FastAPI プロセスから Unix ドメインソケット経由で
-**pickle 化した盤面＋難易度＋mem/profile＋RNG 状態**を受け取り、`cpu_ai.decide_guarded` を
+**pickle 化した盤面＋難易度＋mem＋RNG 状態**を受け取り、`cpu_ai.decide_guarded` を
 実行して **(move, trace, mem)** を返す。
 
 - **依存は stdlib のみ**（`opcg_sim/src/**` も stdlib-only）＝PyPy で確実に動く。配信スタック
@@ -10,7 +10,7 @@
 - **方策・評価・カード挙動は一切変えない**（cpu_ai をそのまま呼ぶだけの実行オフロード）。
 
 プロトコル（1 リクエスト = 1 接続）:
-  client → worker : pickle((manager, cpu_pid, difficulty, mem, profile, rng_state, want_trace, read_ahead))
+  client → worker : pickle((manager, cpu_pid, difficulty, mem, rng_state, want_trace, read_ahead[, mode]))
   worker → client : pickle(("ok", (move, trace, mem)))  /  pickle(("err", repr))
 いずれも 4byte ビッグエンディアン長 + pickle 本体のフレーム。
 """
@@ -53,8 +53,8 @@ def _send(conn, obj):
 
 
 def _handle(req):
-    manager, cpu_pid, difficulty, mem, profile, rng_state, want_trace, read_ahead = req[:8]
-    mode = req[8] if len(req) > 8 else "decide"  # 後方互換（9要素目=mode・既定 decide）
+    manager, cpu_pid, difficulty, mem, rng_state, want_trace, read_ahead = req[:7]
+    mode = req[7] if len(req) > 7 else "decide"  # 後方互換（8要素目=mode・既定 decide）
     # player は名前で解決（別 pickle すると盤面内カードと同一性が切れるため）。
     player = manager.p1 if manager.p1.name == cpu_pid else manager.p2
     # 決定性: CPython 側の RNG 状態を再現してタイブレークを一致させる。

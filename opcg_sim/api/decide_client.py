@@ -69,14 +69,14 @@ def _roundtrip(req):
 
 
 def decide(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[str, Any]] = None,
-           profile=None, trace: Optional[Dict[str, Any]] = None,
+           trace: Optional[Dict[str, Any]] = None,
            trace_read_ahead: bool = False):
     """本番の decide。ワーカー有効時は PyPy へ委譲、失敗時はインプロセスへフォールバック。"""
     if mem is None:
         mem = {}
     if USE_WORKER:
         try:
-            req = (manager, player.name, difficulty, mem, profile,
+            req = (manager, player.name, difficulty, mem,
                    random.getstate(), trace is not None, trace_read_ahead)
             move, tr, mem2 = _roundtrip(req)
             # mem（turn_mem）はワーカー側で変異するので CPython 側へ完全反映。
@@ -97,15 +97,14 @@ def decide(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[st
     )
 
 
-def plan_segment(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[str, Any]] = None,
-                 profile=None):
+def plan_segment(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[str, Any]] = None):
     """Phase 3 ① 計画キャッシュ: セグメント（相手介入/TURN_END まで）の自分の連続手番を計画して
     action list を返す（ワーカー優先・失敗時インプロセス）。`mem` はワーカー側の進行を反映する。"""
     if mem is None:
         mem = {}
     if USE_WORKER:
         try:
-            req = (manager, player.name, difficulty, mem, profile,
+            req = (manager, player.name, difficulty, mem,
                    random.getstate(), False, False, "plan")
             actions, _tr, mem2 = _roundtrip(req)
             mem.clear()

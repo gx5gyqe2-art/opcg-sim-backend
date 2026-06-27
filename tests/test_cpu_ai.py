@@ -211,10 +211,15 @@ def test_pimc_decide_legal_and_deterministic(db):
         legal = gm.get_legal_actions(actor)
         if len(legal) > 1:
             sigs = {cpu_ai._move_sig(m) for m in legal}
+            # 決定論の契約は「渡す rng ＋ グローバル random 状態が同一 → 同一手」。PIMC は決定化クローンの
+            # 効果解決でグローバル random を消費するため、2 回目の比較前にグローバル状態も同一へ戻す
+            # （本番の各 decide は seed 済み・同一状態から呼ばれる前提＝この復元と等価）。
+            gstate = random.getstate()
             m1 = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), mem={}, pimc_worlds=2)
+            random.setstate(gstate)
             m2 = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), mem={}, pimc_worlds=2)
             assert m1 is not None and cpu_ai._move_sig(m1) in sigs   # 合法手
-            assert cpu_ai._move_sig(m1) == cpu_ai._move_sig(m2)      # 同一 rng→決定論
+            assert cpu_ai._move_sig(m1) == cpu_ai._move_sig(m2)      # 同一 rng＋同一グローバル状態→決定論
             checked = True
             break
         mv = cpu_ai.decide_guarded(gm, actor, "hard", random.Random(0), mem=mem)
@@ -289,22 +294,28 @@ def test_effective_power_caps_excess():
 
 
 def test_overcap_power_barely_valued(db):
-    """対面の最硬防御を超えた過剰パワーは評価をほとんど上げない（届かせる必要のない強化を価値化しない）。"""
+    """対面の最硬防御を超えた過剰パワーは評価をほとんど上げない（届かせる必要のない強化を価値化しない）。
+
+    overcap は L1 が `_effective_power`（KEEP）で減衰させる体価値（`V2_W_BODY`）として作用する。cap ちょうど
+    までの体価値増分と cap 超過分の体価値増分を比べ、超過分が cap 以下の付与より**強く減衰**することを固定する
+    （L1 の正確な数値はチューニング対象なので、不等号＝減衰の質的性質だけを locking する）。"""
     gm = _new_gm(db)
     c = _plain_char(gm)
     assert c is not None
     gm.p1.deck.remove(c)
     gm.p1.field.append(c)
     c.is_rest = False
-    cap = cpu_ai._power_cap(gm.p2)
-    c.passive_power_override = int(cap)            # ちょうど cap
+    cap = int(cpu_ai._power_cap(gm.p2))
+    c.passive_power_override = max(0, cap - 4000)  # cap より 4000 下（cap 以下＝有効）
+    below = cpu_ai.evaluate(gm, "p1")
+    c.passive_power_override = cap                 # ちょうど cap
     at_cap = cpu_ai.evaluate(gm, "p1")
-    c.passive_power_override = int(cap) + 4000     # cap を 4000 超過（≒ドン 4 枚分）
+    c.passive_power_override = cap + 4000          # cap を 4000 超過（≒ドン 4 枚分）
     over_cap = cpu_ai.evaluate(gm, "p1")
-    delta = over_cap - at_cap
-    # 超過分の寄与は線形評価（4000×W_FIELD_POWER）よりはるかに小さい。
-    assert delta == pytest.approx(4000 * cpu_ai.W_POWER_OVERCAP * cpu_ai.W_FIELD_POWER)
-    assert delta < 4000 * cpu_ai.W_FIELD_POWER * 0.5
+    gain_below = at_cap - below                    # cap 以下 4000 ぶんの価値増
+    gain_over = over_cap - at_cap                  # cap 超過 4000 ぶんの価値増
+    # 超過分は cap 以下の同量の付与より価値が小さい（過剰パワーの減衰）。
+    assert 0.0 <= gain_over < gain_below
 
 
 def test_ineffective_don_attach_is_not_worth_acting(db):
@@ -342,33 +353,6 @@ def test_deckout_danger_penalizes_low_own_deck(db):
     # 相手のデッキ切れ接近は自分有利（相手を削り切る動機）。
     gm.p2.deck = list(gm.p2.deck)[:1]
     assert cpu_ai.evaluate(gm, "p1") > base
-
-
-def test_summoning_sick_char_not_counted_as_attacker(db):
-    """自ターンの召喚酔い（速攻なし）キャラは今ターン攻撃できないので攻め圧を加点しない。
-
-    確立済み（is_newly_played=False）になると W_ATTACKER 相当の加点が立つ。相手ターン視点
-    （is_turn=False）では将来の攻め圧として召喚酔いでも加点される（過小評価しない）。
-    """
-    gm = _new_gm(db)
-    c = _plain_char(gm)
-    assert c is not None
-    gm.p1.deck.remove(c)
-    gm.p1.field.append(c)
-    c.is_rest = False
-    cap = cpu_ai._power_cap(gm.p2)
-    # 自ターン視点: 召喚酔いは攻め圧なし → 確立済みとの差は W_ATTACKER。
-    c.is_newly_played = True
-    sick = cpu_ai._side_score(gm.p1, True, cap)
-    c.is_newly_played = False
-    ready = cpu_ai._side_score(gm.p1, True, cap)
-    assert ready - sick == cpu_ai.W_ATTACKER
-    # 相手ターン視点（is_turn=False）: 召喚酔いでも将来圧として加点（差が出ない）。
-    c.is_newly_played = True
-    sick_off = cpu_ai._side_score(gm.p1, False, cap)
-    c.is_newly_played = False
-    ready_off = cpu_ai._side_score(gm.p1, False, cap)
-    assert ready_off == sick_off
 
 
 def test_selection_moves_enumerates_single_target_candidates():

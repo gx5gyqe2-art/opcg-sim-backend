@@ -84,8 +84,8 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 |---|---|
 | `tests/test_cpu_ai.py` | 評価関数・α-βビーム探索・難易度情報方針（easy/normal/hard）・リーサル認識・有効パワー閾値・単一対象選択探索・horizon（B1/B2-lite）の保証テスト＋**B-2 ドン付与の手生成プルーニング**（意味ある配分のみ＝閾値跨ぎ／付与ドン条件残し・overcap/レスト除外・非ドン素通し） |
 | ~~`tests/test_cpu_self_plan.py`~~ | **【削除 2026-06-27】** 自デッキ勝ち筋プラン／アーキタイプ・プリセット系の全廃（control 倍率が vs-midrange −5.7pp の A/B を受けたフラット評価ベースライン化）に伴い、テスト対象（`cpu_self_plan.py`・plan-gated 評価項）ごと削除。旧内容＝aggro/midrange/control 自動分類・plan 限定の置物/カウンター/ライフ/攻め圧重み・逆算リーサル/マイルストーン・脅威キーワード資産・C-4 settle 不確実性ディスカウント・時間割引・探索地平線越え価値（いずれも plan=None 完全同値の回帰ガード）。**注**: plan 非依存で存続した concave ライフ（`test_life_value_is_concave_*`）は本ファイル削除に伴い回帰ガードを失う＝再カバーは未整備 |
-| `tests/test_cpu_opponent_model.py` | リーダー推測の相手プロファイル（カウンター密度／ブロッカー比率／除去比率／defense_factor／aggro_lean）の集計 |
-| `tests/test_cpu_puzzles.py` | **CPU 検証基盤（フェーズ0・全変更のゲート）**: 正解手種が既知の局面（致死を取る）＋アクティブドンの線形評価ピン。**2026-06 レビュー収束項（存続）**: B-1(b) カウンター強要（推定カウンター応答モデル）／公開情報ベリーフ更新（手札枚数・トラッシュ）／A-3・E-1 min ビーム剪定の sort 方向。**【撤去 2026-06-27】** plan-gated 機能のテスト（B-1(a) アイドルドン末端減価／A-1 アンブロッカブル評価／A-2 アーキタイプ依存スケール）は自デッキ勝ち筋プラン全廃に伴い削除 |
+| `tests/test_cpu_opponent_model.py` | **`build_profile`（純関数）のみの単体テスト**＝リーダー推測の相手プロファイル（カウンター密度／ブロッカー比率／除去比率／defense_factor／aggro_lean）の集計。**【2026-06-27】** CPU 評価の L1 単一系統化で profile ベースの eval 補正が撤去され `cpu_opponent_model.py` は本番から孤児化＝profile を消費する評価系テストは廃止し、`build_profile` の集計ロジック検証だけが残る |
+| `tests/test_cpu_puzzles.py` | **CPU 検証基盤（フェーズ0・全変更のゲート）**: 正解手種が既知の局面（致死を取る）＋アクティブドンの線形評価ピン。**2026-06 レビュー収束項（存続）**: A-3・E-1 min ビーム剪定の sort 方向。**【撤去 2026-06-27】** plan-gated 機能のテスト（B-1(a) アイドルドン末端減価／A-1 アンブロッカブル評価／A-2 アーキタイプ依存スケール）は自デッキ勝ち筋プラン全廃に伴い、**B-1(b) カウンター強要（推定カウンター応答モデル）／公開情報ベリーフ更新（手札枚数・トラッシュ）は CPU 評価の L1 単一系統化（profile ベース eval 補正の撤去）に伴い**削除 |
 | `tests/test_cpu_arena.py` | **検証基盤の絶対強度メトリクスの機械健全性**（`tests/cpu_arena.py`）: 凍結ベースライン Elo 変換（勝率→Elo の 0.5→0／単調／対称）・非対称対局＋席交互アリーナ・regret ログ（`cpu_ai.decide_with_regret`＝非負・有限・easy/単一手で 0）。実ゲームは低速なので機械健全性のみ高速・有界に固定 |
 | `tests/test_cpu_replay.py` | **CPU 思考トレースの健全性**（`tests/cpu_replay.py`）: trace は観測専用で手を変えない・RNG 中立（trace 有無で進行が分岐しない）・同一 seed の決定論再現・トレース 4 項目（候補スコア/regret/J値成分/読み筋）の存在と読み筋 PV の有界性 |
 
@@ -165,14 +165,15 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
   - `chosen`／`folded`: 選んだ手（card_id 基準）とターンを畳んだか。
   - `candidates`: 上位候補（`prelim`＝1-ply 事前スコア／`deep`＝深掘りスコア。easy は prelim のみ）。
   - `regret`: deep 最善 − 1-ply 貪欲手の deep 値（`decide_with_regret` と同義の崖エラー代理）。
-  - `j_components`: 選んだ手の結果盤面の **J値評価成分内訳**（`me`/`opp` のライフ・手札・場・ブロッカー
-    ・攻め圧・ドン等＋`total`）。<!-- `plan_progress`/`telegraph` 成分は 2026-06-27 の plan 全廃で削除 -->
+  - `j_components`: 選んだ手の結果盤面の **L1 評価成分内訳**（`evaluate(out=…)` が L1 評価の内訳を `out["v2"]`
+    キーに格納したもの＝カード通貨ベースの内訳＋`total`）。<!-- 旧 `_side_score` 由来の me/opp 別ライフ/手札/場…成分は 2026-06-27 の CPU 評価 L1 単一系統化で撤去。`plan_progress`/`telegraph` 成分は同日 plan 全廃で削除 -->
   - `read_ahead`: 読み筋（各手番で 1-ply 最善を辿った貪欲 PV。`REPEAT_CAP` ガードで膨張しない）。
 - **手記述は card_id 基準**（uuid は実行ごとに変わるため）＝同一 seed で安定再現・比較できる。
 - **トレースは観測専用**: `decide`/`decide_guarded` の `trace` 引数（既定 None＝**完全に無
   オーバーヘッド・挙動不変**）で採取する。トレース構築の追加クローンは getstate/setstate で
-  RNG 中立化し、**トレース有無でゲーム進行が分岐しない**（評価関数の `evaluate(out=...)`／
-  `_side_score(out=...)` も `out=None` 時は採点を一切変えない＝ベースライン不変）。
+  RNG 中立化し、**トレース有無でゲーム進行が分岐しない**（評価関数の `evaluate(out=...)`／L1 評価
+  `cpu_eval_v2.evaluate_v2(out=...)` も `out=None` 時は採点を一切変えない＝ベースライン不変。`_side_score(out=...)`
+  は手書き J値評価の撤去〔2026-06-27〕で消滅）。
 - **リプレイ種**: `--record seed.json` で `{seed, リーダー, 難易度}` の極小記述子を残し、
   `--descriptor seed.json` で完全再現する。
 
