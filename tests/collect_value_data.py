@@ -25,14 +25,24 @@ import deckgen
 _VERIFIED = list(deckgen.VERIFIED_LEADERS.values())
 
 
-def _build_decks(seed: int, db, real_decks: bool):
-    """合成（同色キャラ50）or 実デッキ（`deckgen`・検証済リーダーを巡回）でデッキを組む。"""
+def _build_decks(seed: int, db, real_decks: bool, all_leaders: bool = False):
+    """合成（同色キャラ50）or 実デッキ（`deckgen`）でデッキを組む。
+
+    分布多様化（NNUE・人間転移狙い）:
+    - **リーダー全ペア**: 巡回固定でなく seed 由来 RNG で 2 体サンプル＝隣接固定の5組でなく
+      プール全体から組み合わせを引く（`all_leaders=True` で全137種、既定は検証済み5種）。
+    - **デッキ毎局ランダム**: 各局 `seed*2`/`seed*2+1` でデッキ構成を振る（既存挙動を踏襲）。
+    """
     if not real_decks:
         l1, c1 = build_deck(db, "p1")
         l2, c2 = build_deck(db, "p2")
         return l1, c1, l2, c2
-    l1id = _VERIFIED[seed % len(_VERIFIED)]
-    l2id = _VERIFIED[(seed + 1) % len(_VERIFIED)]
+    pool = deckgen.all_leader_ids(db) if all_leaders else _VERIFIED
+    rl = random.Random(seed * 7 + 11)
+    if len(pool) >= 2:
+        l1id, l2id = rl.sample(pool, 2)
+    else:
+        l1id = l2id = pool[0]
     L1, c1 = deckgen.build_realistic_deck(db, "p1", l1id, random.Random(seed * 2))
     L2, c2 = deckgen.build_realistic_deck(db, "p2", l2id, random.Random(seed * 2 + 1))
     return L1, c1, L2, c2
@@ -53,10 +63,10 @@ def _make_decider(policy: str, iters: int, horizon: int, pimc: int = 1):
 
 def collect_game(seed: int, db, difficulty: str, max_steps: int,
                  real_decks: bool = False, iters: int = 40, horizon: int = 2,
-                 pimc: int = 1) -> List[Dict[str, Any]]:
+                 pimc: int = 1, all_leaders: bool = False) -> List[Dict[str, Any]]:
     """1 局を自己対戦し、ターン境界の (特徴, プレイヤー) を集めて最終勝敗でラベル付けして返す。"""
     random.seed(seed)
-    l1, c1, l2, c2 = _build_decks(seed, db, real_decks)
+    l1, c1, l2, c2 = _build_decks(seed, db, real_decks, all_leaders=all_leaders)
     if not l1 or not l2:
         return []
     m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
@@ -106,7 +116,9 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--difficulty", choices=["hard"], default="hard",
                     help="自己対戦の方策（hard＝α-β＝本番方策）")
-    ap.add_argument("--real-decks", action="store_true", help="deckgen の実デッキ（検証済リーダー巡回）で対戦")
+    ap.add_argument("--real-decks", action="store_true", help="deckgen の実デッキで対戦（分布多様化）")
+    ap.add_argument("--all-leaders", action="store_true",
+                    help="全137リーダーをプールに（既定は検証済み5種）。未検証リーダーで壊れた局は自動破棄")
     ap.add_argument("--iters", type=int, default=40, help="（後方互換・未使用）")
     ap.add_argument("--horizon", type=int, default=2)
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
@@ -118,7 +130,8 @@ def main(argv=None):
     with open(args.out, "w", encoding="utf-8") as f:
         for g in range(args.games):
             rows = collect_game(args.seed + g, db, args.difficulty, args.max_steps,
-                                real_decks=args.real_decks, iters=args.iters, horizon=args.horizon)
+                                real_decks=args.real_decks, iters=args.iters, horizon=args.horizon,
+                                all_leaders=args.all_leaders)
             if not rows:
                 continue
             n_games += 1

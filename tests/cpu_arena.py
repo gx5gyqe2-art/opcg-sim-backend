@@ -111,7 +111,7 @@ def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
 
 def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                   policy_rng=None, pimc_worlds: int = 1, value_alpha=None, per_move_budget=None,
-                  eval_v2=None, search=None):
+                  eval_v2=None, search=None, effect=None):
     """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き・デプロイと同じプラン供給）。
 
     `info_policy`（Phase -1）で情報方針を選ぶ＝凍結 fair-hard vs cheat-hard の A/B を席交互で測れる。
@@ -130,6 +130,7 @@ def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_
         cpu_ai.set_budget_override(per_move_budget)
         cpu_ai.set_eval_v2_override(eval_v2)        # 評価 v2 ON/OFF を席別に切替（A/B 用）
         cpu_ai.set_search_override(s_horizon, s_max_ply)  # 探索深さ／ply 上限を席別に切替（深さA/B用）
+        cpu_ai.set_effect_override(effect)          # 効果価値/コスト重みを席別に切替（§S2 A/B 用）
         try:
             return cpu_ai.decide_guarded(manager, actor, difficulty, prng, mem, plan=plan,
                                          info_policy=info_policy, pimc_worlds=pimc_worlds)
@@ -138,6 +139,7 @@ def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_
             cpu_ai.set_budget_override(None)
             cpu_ai.set_eval_v2_override(None)
             cpu_ai.set_search_override(None, None)
+            cpu_ai.set_effect_override(None)
     return _decide
 
 
@@ -151,6 +153,7 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p1_budget=None, p2_budget=None,
               p1_eval_v2=None, p2_eval_v2=None,
               p1_search=None, p2_search=None,
+              p1_effect=None, p2_effect=None,
               p1_force_plan: bool = False, p2_force_plan: bool = False) -> Dict[str, Any]:
     """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
@@ -173,8 +176,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
-    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1, p1_force_plan), p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget, p1_eval_v2, p1_search),
-                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2, p2_force_plan), p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget, p2_eval_v2, p2_search)}
+    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1, p1_force_plan), p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget, p1_eval_v2, p1_search, p1_effect),
+                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2, p2_force_plan), p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget, p2_eval_v2, p2_search, p2_effect)}
 
     step = 0
     prev_turn = manager.turn_count

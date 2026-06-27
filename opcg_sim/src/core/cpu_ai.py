@@ -52,6 +52,17 @@ def _env_int(name: str, default: int) -> int:
     except (TypeError, ValueError):
         return default
 
+
+def _env_float(name: str, default: float) -> float:
+    """float 版 `_env_int`（未設定・不正値は default＝従来挙動と完全同値）。"""
+    v = os.environ.get(name)
+    if v is None:
+        return default
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return default
+
 # ② make/unmake: 探索の 1-ply 採点（ビーム選別）を clone でなく「適用→採点→巻き戻し」で行い
 # per-node の deepcopy を消す（探索コストの ~86%＝clone）。**非中断（resolver が parked でない
 # 静止点）から適用する手にのみ適用**し、中断（複数段効果の途中）を再開する手は clone へフォールバック
@@ -149,6 +160,32 @@ W_BLOCKER = 1200.0       # ブロッカー 1 体（最終防御）
 W_ATTACKER = 400.0       # 「このターン実際に攻撃できる」アクティブキャラ＝攻め圧（相手 +1[J] 機会）
 W_WIN = 1.0e9            # 勝敗
 W_LIFE_AGGRO_K = 0.5     # リーダー推測: 相手の攻め寄り度 1.0 で自分ライフ重視を最大 +50%（§2.5.4）
+
+# 効果価値（§S2・実シミュレーション）: 場の各キャラの起動メイン効果を「自ターン文脈で発火」して測った
+# evaluate_base の純Δ（J単位・自己較正・負は0クランプ）をキャラ価値に上乗せする。手書き eval が判別でき
+# ない「効果の強い体」（除去エンジン/ドローエンジン）を持ち上げ、除去対象選択・脅威認識を改善する。
+# 決定ごとに root で1回測ってキャッシュし、探索の葉では読むだけ（条件は今の盤面で尊重＝文脈的に正しい）。
+# 既定 0=OFF=従来と完全同値（テスト/本番は env 未設定で一切不変）。Elo アリーナで効果を検証する。
+EFFECT_VALUE_WEIGHT = _env_float("OPCG_EFFECT_VALUE", 0.0)   # 効果価値Δの倍率（0=OFF・1.0=生J単位）
+W_EFFECT_COST = _env_float("OPCG_W_COST", 0.0)              # キャラのコスト1あたりの投資/スイング価値
+_EFFECT_NEXT_TURN_DON = 2   # 効果価値ステージングの「次ターン供給ドン」基準
+_EFFECT_DRAIN_LIMIT = 40    # 効果価値ステージングの対話ドレイン上限
+
+# 席別 A/B 用の一時上書き（(効果重み, コスト重み) or None）。None で env 既定へ。`set_eval_v2_override` と同方式。
+_EFFECT_OVERRIDE = None
+
+
+def set_effect_override(weights):
+    """効果価値/コストの重みを一時上書き（評価アリーナの席別 A/B 用）。None で env 既定へ戻す。"""
+    global _EFFECT_OVERRIDE
+    _EFFECT_OVERRIDE = None if weights is None else (float(weights[0]), float(weights[1]))
+
+
+def _effect_weights():
+    """現在有効な (効果重み, コスト重み)。上書き>env>0 の優先。"""
+    if _EFFECT_OVERRIDE is not None:
+        return _EFFECT_OVERRIDE
+    return (EFFECT_VALUE_WEIGHT, W_EFFECT_COST)
 
 # J値（白＝デッキ残＋トラッシュ）の決定境界。デッキ切れ（J=0）でドロー不能＝敗北なので、
 # 自デッキ残が危険域に入るほど非線形に減点する＝相手を削り切る／自滅ドローを避ける動機。
@@ -649,6 +686,8 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
                 life_knee: int = _LIFE_KNEE_DEFAULT,
                 field_count_factor: float = 1.0,
                 engine_aware: bool = False,
+                effect_weight: float = 0.0, cost_weight: float = 0.0,
+                effect_cache: Optional[Dict[str, float]] = None,
                 out: Optional[Dict[str, float]] = None) -> float:
     """1 プレイヤー側の素点（J値理論ベース：黒リソースの重み付き和＋白の境界リスク）。
 
@@ -738,6 +777,15 @@ def _side_score(p, is_turn: bool, power_cap: float, include_counter: bool = True
             if c.has_keyword("ブロッカー"):
                 score += W_BLOCKER
                 _emit("blocker", W_BLOCKER)
+        # 効果価値（§S2）＋コスト投資価値。両重み0（既定）なら作動せず完全同値。effect_cache はクランプ済み
+        # （>=0）の起動メイン効果Δ（J単位・自己較正）。コスト項は cache 不要（c.master.cost を直接読む）。
+        if effect_weight or cost_weight:
+            evv = cost_weight * float(getattr(c.master, "cost", 0) or 0)
+            if effect_weight and effect_cache is not None:
+                evv += effect_weight * effect_cache.get(getattr(c, "uuid", None), 0.0)
+            if evv:
+                score += evv
+                _emit("effect_value", evv)
 
     # リーダーの可変状態（Phase1.5・②・§2.5.3 評価観点の穴埋め）: リーダーの**有効パワー**を戦闘強度として
     # 価値化する。リーダーは存在/能力はゲーム中**不変＝探索全ノードで定数＝手選択(argmax)に無影響**なので
@@ -871,7 +919,7 @@ def evaluate(manager, me_name: str, see_opp_hand: bool = True, profile=None, pla
 
 
 def evaluate_base(manager, me_name: str, see_opp_hand: bool = True, profile=None, plan=None,
-                  out: Optional[Dict[str, Any]] = None) -> float:
+                  out: Optional[Dict[str, Any]] = None, include_effect: bool = True) -> float:
     """`me_name` 視点の**手書き J値評価**（学習ブレンドを含まない素のスコア・高いほど自分有利）。
 
     `see_opp_hand=False` のとき相手手札は枚数のみ評価する（中身＝カウンター値を読まない）。
@@ -881,6 +929,9 @@ def evaluate_base(manager, me_name: str, see_opp_hand: bool = True, profile=None
     `plan`（自デッキ勝ち筋プラン・§2.5.5）があれば、自分側の評価重み（置物の存在価値・カウンター
     温存・ライフ重視・攻め圧）を補正し、逆算リーサル/マイルストーン項を加える。
     plan=None では一切作動せず現行挙動と完全同値。
+    `include_effect=False` は効果価値項（`manager._effect_value_cache`）を読まない＝効果価値の測定中
+    （`_effect_impact_one` の内部 eval）の再帰回避用。既定 True でも `EFFECT_VALUE_WEIGHT==0`（既定）なら
+    キャッシュ参照自体せず従来と完全同値。
     """
     # 評価 v2（L1コア・v0.4）への段階導入差し替え。既定 OFF＝以降の従来 J値評価を実行（完全同値）。
     if _eval_v2_active():
@@ -936,6 +987,11 @@ def evaluate_base(manager, me_name: str, see_opp_hand: bool = True, profile=None
     # 成分内訳の収集（out 指定時のみ・採点には一切影響しない）。
     out_me = {} if out is not None else None
     out_opp = {} if out is not None else None
+    # 効果価値（§S2）の重み。include_effect=False（測定中の再帰回避）or 両重み0（既定）なら一切作動せず
+    # 従来と完全同値。effect_weight!=0 のときだけ root で構築したキャッシュ（uuid→クランプΔ）を読む。
+    eff_w, cost_w = _effect_weights() if include_effect else (0.0, 0.0)
+    effect_cache = (getattr(manager, "_effect_value_cache", None)
+                    if eff_w != 0.0 else None)
     plan_progress = _plan_progress(manager, me, opp, is_my_turn, plan, profile)
     total = (_side_score(me, is_my_turn, my_cap, include_counter=True, life_factor=life_factor,
                          body_factor=body_factor, attacker_factor=attacker_factor,
@@ -943,12 +999,14 @@ def evaluate_base(manager, me_name: str, see_opp_hand: bool = True, profile=None
                          idle_don_factor=idle_don_factor,
                          threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
                          life_knee=own_life_knee,
-                         field_count_factor=tempo_factor, engine_aware=threat_aware, out=out_me)
+                         field_count_factor=tempo_factor, engine_aware=threat_aware,
+                         effect_weight=eff_w, cost_weight=cost_w, effect_cache=effect_cache, out=out_me)
              - _side_score(opp, not is_my_turn, opp_cap, include_counter=see_opp_hand,
                            hand_factor=opp_hand_factor, threat_aware=threat_aware,
                            threat_atk_mult=threat_atk_mult, threat_def_mult=threat_def_mult,
                            field_count_factor=tempo_factor,
-                           engine_aware=threat_aware, out=out_opp)
+                           engine_aware=threat_aware,
+                           effect_weight=eff_w, cost_weight=cost_w, effect_cache=effect_cache, out=out_opp)
              + plan_progress
              - telegraph)
     if out is not None:
@@ -957,6 +1015,121 @@ def evaluate_base(manager, me_name: str, see_opp_hand: bool = True, profile=None
         out["plan_progress"] = round(plan_progress, 1)
         out["telegraph"] = round(-telegraph, 1)
     return total
+
+
+def _effect_stage(clone, owner, card):
+    """効果価値測定の文脈整形（owner の自分の次ターンを現実的に再現）。`tests/effect_value_probe.py` と同方針。
+
+    ターン文脈を owner に・リーダー/対象カードを起こす・使用回数リセット・ドンを現実的な次ターン量へ
+    （場の active+rested を起こす＋次供給 `_EFFECT_NEXT_TURN_DON`・上限10）。対象は**実盤面の本物のみ**
+    （注入しない＝対象が無ければ除去は0＝今は脅威ゼロが文脈的に正しい）。
+    """
+    clone.turn_player = owner
+    if owner.leader is not None:
+        owner.leader.is_rest = False
+        try:
+            owner.leader.ability_used_this_turn.clear()
+        except Exception:
+            pass
+    budget = min(10, len(owner.don_active) + len(owner.don_rested) + _EFFECT_NEXT_TURN_DON)
+    while owner.don_rested and len(owner.don_active) < budget:
+        owner.don_active.append(owner.don_rested.pop())
+    while owner.don_deck and len(owner.don_active) < budget:
+        owner.don_active.append(owner.don_deck.pop())
+    card.is_rest = False
+    try:
+        card.ability_used_this_turn.clear()
+    except Exception:
+        pass
+
+
+def _effect_drain(board, owner_name):
+    """効果解決の対話（対象選択等）を**効果が空振りしないよう貪欲に**解消する（owner 側のみ・上限付き）。"""
+    from . import action_api
+    actor = board.p1 if board.p1.name == owner_name else board.p2
+    KEY_PID, _ = _pending_keys()
+    for _ in range(_EFFECT_DRAIN_LIMIT):
+        if board.winner is not None:
+            break
+        pending = board.get_pending_request()
+        if not pending or pending.get(KEY_PID) != owner_name:
+            break
+        board.action_events = []
+        try:
+            sel = _selection_moves(board, owner_name)
+            if sel:
+                def _rank(mv):
+                    pl = mv.get("payload", {})
+                    return (1 if pl.get("accepted") else 0, len(pl.get("selected_uuids", []) or []))
+                mv = max(sel, key=_rank)
+                action_api.apply_game_action(board, actor, mv["action_type"], mv.get("payload", {}))
+            else:
+                payload = board.default_interaction_payload(pending)
+                action_api.apply_game_action(board, actor, action_api.ACT_RESOLVE_SELECTION, payload)
+        except Exception:
+            break
+
+
+def _effect_impact_one(manager, card_uuid: str, owner_name: str) -> Optional[float]:
+    """card の起動メイン効果を実シミュレーション発火して evaluate_base の純Δ（owner視点・コスト差引）を返す。
+
+    起動メインが無ければ None。複数あれば最大Δ。条件/回数/コストを尊重して発火（条件付き効果は今の盤面で
+    条件成立時のみ＝文脈的に正しい）。内部 eval は `include_effect=False`（再帰回避）。負Δは呼び出し側で
+    クランプ。`manager.clone()` 上で測るので root は不変。
+    """
+    from .effects.resolver import EffectResolver
+    src = manager._find_card_by_uuid(card_uuid)
+    if src is None:
+        return None
+    ams = [ab for ab in src.master.abilities if getattr(ab, "trigger", None) == TriggerType.ACTIVATE_MAIN]
+    if not ams:
+        return None
+    best = None
+    for ab in ams:
+        try:
+            clone = manager.clone()
+        except Exception:
+            continue
+        owner = clone.p1 if clone.p1.name == owner_name else clone.p2
+        cc = clone._find_card_by_uuid(card_uuid)
+        if cc is None:
+            continue
+        try:
+            _effect_stage(clone, owner, cc)
+            before = evaluate_base(clone, owner_name, see_opp_hand=False, include_effect=False)
+            clone.action_events = []
+            EffectResolver(clone).resolve_ability(owner, ab, cc)
+            _effect_drain(clone, owner_name)
+            after = evaluate_base(clone, owner_name, see_opp_hand=False, include_effect=False)
+        except Exception:
+            continue
+        d = after - before
+        if best is None or d > best:
+            best = d
+    return best
+
+
+def _build_effect_value_cache(manager) -> Dict[str, float]:
+    """場の各キャラ（両陣営）の効果価値（クランプ済みΔ）を uuid→値で測る（決定ごとに root で1回）。
+
+    起動メイン持ちのキャラだけ実測（バニラ/登場時のみは効果価値0＝キャッシュに載せない）。両陣営を測るのは
+    相手の脅威（除去対象選択）も自分のエンジン保護も評価したいため。owner はそのキャラの持ち主視点。
+    """
+    cache: Dict[str, float] = {}
+    for pl in (manager.p1, manager.p2):
+        for c in list(getattr(pl, "field", []) or []):
+            uid = getattr(c, "uuid", None)
+            if uid is None:
+                continue
+            m = getattr(c, "master", None)
+            if m is None or not getattr(m, "abilities", None):
+                continue
+            if not any(getattr(ab, "trigger", None) == TriggerType.ACTIVATE_MAIN for ab in m.abilities):
+                continue
+            d = _effect_impact_one(manager, uid, pl.name)
+            if d is not None and d > 0.0:
+                cache[uid] = d   # 負は0クランプ＝載せない（任意能力は撃たなければ損しない）
+    return cache
 
 
 def _pending_keys():
@@ -2037,6 +2210,15 @@ def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Rando
         return moves[0]
     moves = _prune_don_moves(manager, player.name, moves)  # B-2: 無意味なドン付与をルートから除外
     moves = _prune_futile_attacks(manager, player.name, moves)  # 倒せない/届かない無駄攻撃を除外
+
+    # 効果価値キャッシュ（§S2）を root で1回構築（決定ごと・盤面の各キャラの起動メイン効果を実測）。探索の
+    # 葉では evaluate_base がこれを読むだけ。効果重み0（既定）なら構築しない＝従来と完全同値（コストのみ重みは
+    # キャッシュ不要なので構築しない）。
+    if _effect_weights()[0] != 0.0:
+        try:
+            manager._effect_value_cache = _build_effect_value_cache(manager)
+        except Exception:
+            manager._effect_value_cache = {}
 
     name = player.name
     end_move = next((m for m in moves if m.get("action_type") == "TURN_END"), None)
