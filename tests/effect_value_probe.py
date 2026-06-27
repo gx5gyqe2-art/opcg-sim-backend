@@ -105,6 +105,134 @@ def _stage_owner_turn(clone, owner, card):
         pass
 
 
+_ATTACK_CAP = 12
+
+
+def _pname(board, name):
+    return board.p1 if board.p1.name == name else board.p2
+
+
+def _settle_to_opp(board, owner_name):
+    """owner のターンを畳んで相手ターン開始（相手 MAIN_ACTION）の静止点へ。戦闘応答は既定PASS・選択は既定解決。"""
+    pid_key = action_api.CONST.get("PENDING_REQUEST_PROPERTIES", {}).get("PLAYER_ID", "player_id")
+    bo = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+    ACT_PASS = bo.get('PASS', 'PASS')
+    for _ in range(_DRAIN_LIMIT):
+        if board.winner is not None:
+            break
+        pa = board.pending_actor_action()
+        if not pa:
+            break
+        pid, action = pa
+        if pid != owner_name and action == "MAIN_ACTION":
+            break
+        actor = _pname(board, pid)
+        board.action_events = []
+        try:
+            if action == "MAIN_ACTION":
+                action_api.apply_game_action(board, actor, "TURN_END", {})
+            elif action in ("SELECT_BLOCKER", "SELECT_COUNTER"):
+                action_api.apply_battle_action(board, actor, ACT_PASS, None)
+            else:
+                pending = board.get_pending_request()
+                payload = board.default_interaction_payload(pending)
+                action_api.apply_game_action(board, actor, action_api.ACT_RESOLVE_SELECTION, payload)
+        except Exception:
+            break
+
+
+def _combat_drain(board, owner_name):
+    """戦闘中の対話を解消: 相手は貪欲ブロック（buffの価値を顕在化）・相手カウンターはPASS・owner選択は貪欲。"""
+    opp_name = board.p2.name if board.p1.name == owner_name else board.p1.name
+    bo = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
+    ACT_PASS = bo.get('PASS', 'PASS')
+    ACT_BLOCK = bo.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
+    for _ in range(_DRAIN_LIMIT):
+        if board.winner is not None:
+            break
+        pending = board.get_pending_request()
+        if not pending:
+            break
+        pid = pending.get("player_id"); action = pending.get("action")
+        actor = _pname(board, pid)
+        board.action_events = []
+        try:
+            if action == "SELECT_BLOCKER" and pid == opp_name:
+                uuids = list(pending.get("selectable_uuids", []) or [])
+                if uuids:
+                    # 最大パワーのブロッカーで受ける＝攻撃を止められる体で防御。base攻撃は止まり、buff攻撃は
+                    # 上から討ち取る（＝差が出る）。これで before/after の差が buff の戦闘価値を顕在化する。
+                    def _pw(u):
+                        c = board._find_card_by_uuid(u)
+                        try:
+                            return c.get_power(False)
+                        except Exception:
+                            return 0
+                    action_api.apply_battle_action(board, actor, ACT_BLOCK, max(uuids, key=_pw))
+                else:
+                    action_api.apply_battle_action(board, actor, ACT_PASS, None)
+            elif action in ("SELECT_BLOCKER", "SELECT_COUNTER"):
+                action_api.apply_battle_action(board, actor, ACT_PASS, None)
+            elif pid == owner_name:
+                sel = cpu_ai._selection_moves(board, owner_name)
+                if sel:
+                    def _rank(mv):
+                        pl = mv.get("payload", {})
+                        return (1 if pl.get("accepted") else 0, len(pl.get("selected_uuids", []) or []))
+                    mv = max(sel, key=_rank)
+                    action_api.apply_game_action(board, actor, mv["action_type"], mv.get("payload", {}))
+                else:
+                    payload = board.default_interaction_payload(pending)
+                    action_api.apply_game_action(board, actor, action_api.ACT_RESOLVE_SELECTION, payload)
+            else:
+                break   # owner手番（MAIN_ACTION）へ戻った＝攻撃宣言ループへ
+        except Exception:
+            break
+
+
+def _pick_attack(board, owner, attacks):
+    """貪欲攻撃選択: 相手リーダーを最強攻撃者で殴る（相手にブロックを強い、buffの価値を顕在化させる）。"""
+    opp = board.p2 if board.p1 is owner else board.p1
+    leader_uuid = opp.leader.uuid if opp.leader is not None else None
+    def _atk_pw(mv):
+        c = board._find_card_by_uuid(mv["payload"]["uuid"])
+        try:
+            return c.get_power(True)
+        except Exception:
+            return 0
+    lead = [m for m in attacks if leader_uuid and leader_uuid in (m["payload"].get("target_ids") or [])]
+    pool = lead or attacks
+    return max(pool, key=_atk_pw) if pool else None
+
+
+def _combat_rollout(board, owner_name):
+    """owner の攻撃フェイズを貪欲に展開（相手は貪欲ブロック）→ 相手ターン開始の静止点へ。"""
+    for _ in range(_ATTACK_CAP):
+        _combat_drain(board, owner_name)
+        if board.winner is not None:
+            break
+        pa = board.pending_actor_action()
+        if not pa:
+            break
+        pid, action = pa
+        if pid != owner_name or action != "MAIN_ACTION":
+            break
+        owner = _pname(board, owner_name)
+        legal = board.get_legal_actions(owner)
+        attacks = [m for m in legal if m.get("action_type") == "ATTACK"]
+        if not attacks:
+            break
+        mv = _pick_attack(board, owner, attacks)
+        if mv is None:
+            break
+        board.action_events = []
+        try:
+            action_api.apply_game_action(board, owner, "ATTACK", mv["payload"])
+        except Exception:
+            break
+    _settle_to_opp(board, owner_name)
+
+
 def _action_types(node, out):
     """効果ツリー中の GameAction.type 名を収集（Sequence/Branch/Choice/sub_effect を再帰）。"""
     if node is None:
@@ -134,24 +262,45 @@ def effect_impact(manager, card_uuid: str, owner_name: str):
     ams = [ab for ab in src.master.abilities if ab.trigger == TriggerType.ACTIVATE_MAIN]
     if not ams:
         return None
+    combat = _CFG.get("combat", False)
     best = None
     best_acts = ""
     for ab in ams:
-        clone = manager.clone()
-        owner = clone.p1 if clone.p1.name == owner_name else clone.p2
-        cc = clone._find_card_by_uuid(card_uuid)
-        if cc is None:
-            continue
         try:
-            _stage_owner_turn(clone, owner, cc)
-            before = cpu_ai.evaluate_base(clone, owner_name, see_opp_hand=False)
-            clone.action_events = []
-            # 条件/回数/コストを尊重して発火（resolve_ability）。条件付き効果（「自分のライフ≤2なら」等）は
-            # **今の盤面で条件が成立するときだけ**発火＝文脈的に正しい脅威価値を測る（高ライフ相手の条件付き
-            # 除去は今は脅威ゼロ＝Δ0 が正解）。資源（自ターン・ドン）はステージ済みなのでコストは実払いされる。
-            EffectResolver(clone).resolve_ability(owner, ab, cc)
-            _drain_pending(clone, owner_name)
-            after = cpu_ai.evaluate_base(clone, owner_name, see_opp_hand=False)
+            if combat:
+                # 戦闘込み: before/after とも「ステージ→（after は発火）→攻撃フェイズ貪欲展開→相手ターン静止点」
+                # まで進めてから採点＝Δが効果の**戦闘への限界寄与**（buff/テンポ）を捉える。相手貪欲ブロックの
+                # 過大評価は before/after で相殺。before は別クローン（攻撃で破壊的に進むため）。
+                cb = manager.clone()
+                ob = cb.p1 if cb.p1.name == owner_name else cb.p2
+                _stage_owner_turn(cb, ob, cb._find_card_by_uuid(card_uuid))
+                _combat_rollout(cb, owner_name)
+                before = cpu_ai.evaluate_base(cb, owner_name, see_opp_hand=False)
+
+                clone = manager.clone()
+                owner = clone.p1 if clone.p1.name == owner_name else clone.p2
+                cc = clone._find_card_by_uuid(card_uuid)
+                if cc is None:
+                    continue
+                _stage_owner_turn(clone, owner, cc)
+                clone.action_events = []
+                EffectResolver(clone).resolve_ability(owner, ab, cc)
+                _drain_pending(clone, owner_name)
+                _combat_rollout(clone, owner_name)
+                after = cpu_ai.evaluate_base(clone, owner_name, see_opp_hand=False)
+            else:
+                clone = manager.clone()
+                owner = clone.p1 if clone.p1.name == owner_name else clone.p2
+                cc = clone._find_card_by_uuid(card_uuid)
+                if cc is None:
+                    continue
+                _stage_owner_turn(clone, owner, cc)
+                before = cpu_ai.evaluate_base(clone, owner_name, see_opp_hand=False)
+                clone.action_events = []
+                # 条件/回数/コストを尊重して発火（条件付き効果は今の盤面で条件成立時のみ＝文脈的に正しい）。
+                EffectResolver(clone).resolve_ability(owner, ab, cc)
+                _drain_pending(clone, owner_name)
+                after = cpu_ai.evaluate_base(clone, owner_name, see_opp_hand=False)
         except Exception:
             continue
         d = after - before
@@ -228,6 +377,8 @@ def main(argv=None):
     ap.add_argument("--all-leaders", action="store_true")
     ap.add_argument("--pimc", type=int, default=1)
     ap.add_argument("--max-probes-per-game", type=int, default=8)
+    ap.add_argument("--combat", action="store_true",
+                    help="効果発火後に攻撃フェイズ（相手貪欲ブロック）まで展開してΔを測る＝buff/テンポも捉える")
     ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
     ap.add_argument("--top", type=int, default=25)
@@ -235,7 +386,7 @@ def main(argv=None):
 
     cfg = {"difficulty": args.difficulty, "max_steps": args.max_steps, "real_decks": args.real_decks,
            "all_leaders": args.all_leaders, "pimc": args.pimc,
-           "max_probes_per_game": args.max_probes_per_game}
+           "max_probes_per_game": args.max_probes_per_game, "combat": args.combat}
     workers = args.workers or max(1, (os.cpu_count() or 2) - 1)
     seeds = [args.seed + g for g in range(args.games)]
 
