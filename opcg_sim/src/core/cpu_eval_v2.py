@@ -170,7 +170,7 @@ def _is_blocker(c) -> bool:
 
 
 def evaluate_v2(manager, me_name: str, see_opp_hand: bool = True,
-                profile=None, plan=None, out: Optional[Dict[str, Any]] = None) -> float:
+                profile=None, out: Optional[Dict[str, Any]] = None) -> float:
     """v0.4 L1 評価（`cpu_ai.evaluate_base` と同一シグネチャ）。
 
     first cut＝構造は v0.4 に忠実・係数は未チューニング。既定 OFF（`OPCG_EVAL_V2` 未設定）では呼ばれない。

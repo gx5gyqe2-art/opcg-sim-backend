@@ -30,25 +30,10 @@ from typing import Any, Dict, List, Optional
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai, cpu_self_plan, cpu_value_model
+from opcg_sim.src.core import action_api, cpu_ai, cpu_value_model
 from opcg_sim.src.core.invariants import check_invariants, check_turn_boundary
 
 from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS, InvariantError
-
-
-def _plan_for(difficulty: str, leader, cards, force: bool = False):
-    """デプロイ（app.py /api/game/create）と同じく normal/hard は自デッキ構成からプランを作る。
-
-    easy/expert はプラン無し（本番同様）。`force=True` で難易度に依らずプランを作る＝「探索ロジック以外を
-    揃える」比較で expert にも plan を供給する用途（非探索の交絡を除去）。
-    """
-    if difficulty == "hard" or force:
-        try:
-            return cpu_self_plan.build_plan([c.master for c in cards],
-                                            leader=leader.master if leader else None)
-        except Exception:
-            return None
-    return None
 
 
 # --- Elo 変換 -----------------------------------------------------------------
@@ -109,10 +94,10 @@ def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
 
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
 
-def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
+def _make_decider(difficulty: str, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                   policy_rng=None, pimc_worlds: int = 1, value_alpha=None, per_move_budget=None,
                   eval_v2=None, search=None, effect=None):
-    """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き・デプロイと同じプラン供給）。
+    """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き）。
 
     `info_policy`（Phase -1）で情報方針を選ぶ＝凍結 fair-hard vs cheat-hard の A/B を席交互で測れる。
     `policy_rng`（Phase 0・CRN）を渡すと**方策のタイブレーク乱数をゲーム乱数（global random）から分離**
@@ -132,7 +117,7 @@ def _make_decider(difficulty: str, plan=None, info_policy: str = cpu_ai.DEFAULT_
         cpu_ai.set_search_override(s_horizon, s_max_ply)  # 探索深さ／ply 上限を席別に切替（深さA/B用）
         cpu_ai.set_effect_override(effect)          # 効果価値/コスト重みを席別に切替（§S2 A/B 用）
         try:
-            return cpu_ai.decide_guarded(manager, actor, difficulty, prng, mem, plan=plan,
+            return cpu_ai.decide_guarded(manager, actor, difficulty, prng, mem,
                                          info_policy=info_policy, pimc_worlds=pimc_worlds)
         finally:
             cpu_value_model.set_alpha_override(None)
@@ -153,8 +138,7 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p1_budget=None, p2_budget=None,
               p1_eval_v2=None, p2_eval_v2=None,
               p1_search=None, p2_search=None,
-              p1_effect=None, p2_effect=None,
-              p1_force_plan: bool = False, p2_force_plan: bool = False) -> Dict[str, Any]:
+              p1_effect=None, p2_effect=None) -> Dict[str, Any]:
     """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
@@ -176,8 +160,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
-    deciders = {"p1": _make_decider(p1_difficulty, _plan_for(p1_difficulty, l1, c1, p1_force_plan), p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget, p1_eval_v2, p1_search, p1_effect),
-                "p2": _make_decider(p2_difficulty, _plan_for(p2_difficulty, l2, c2, p2_force_plan), p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget, p2_eval_v2, p2_search, p2_effect)}
+    deciders = {"p1": _make_decider(p1_difficulty, p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget, p1_eval_v2, p1_search, p1_effect),
+                "p2": _make_decider(p2_difficulty, p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget, p2_eval_v2, p2_search, p2_effect)}
 
     step = 0
     prev_turn = manager.turn_count
@@ -312,7 +296,6 @@ def regret_trace(db, seed: int, difficulty: str = "hard",
     l2, c2 = build_deck(db, "p2")
     manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     manager.start_game()
-    plans = {"p1": _plan_for(difficulty, l1, c1), "p2": _plan_for(difficulty, l2, c2)}
     mems: Dict[str, Any] = {"p1": {}, "p2": {}}
     pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
     KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
@@ -327,12 +310,10 @@ def regret_trace(db, seed: int, difficulty: str = "hard",
         req_pid = pending[KEY_PID]
         actor = manager.p1 if manager.p1.name == req_pid else manager.p2
         if pending.get(KEY_ACTION) == "MAIN_ACTION":
-            move, regret = cpu_ai.decide_with_regret(manager, actor, difficulty, random,
-                                                     plan=plans[req_pid])
+            move, regret = cpu_ai.decide_with_regret(manager, actor, difficulty, random)
             regrets.append(regret)
         else:
-            move = cpu_ai.decide_guarded(manager, actor, difficulty, random, mems[req_pid],
-                                         plan=plans[req_pid])
+            move = cpu_ai.decide_guarded(manager, actor, difficulty, random, mems[req_pid])
         if move is None:
             break
         manager.action_events = []
@@ -370,7 +351,6 @@ def realize_trace(db, seed: int, difficulty: str = "hard",
     l2, c2 = build_deck(db, "p2")
     manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     manager.start_game()
-    plans = {"p1": _plan_for(difficulty, l1, c1), "p2": _plan_for(difficulty, l2, c2)}
     mems: Dict[str, Any] = {"p1": {}, "p2": {}}
     pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
     KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
@@ -387,12 +367,11 @@ def realize_trace(db, seed: int, difficulty: str = "hard",
         if pending.get(KEY_ACTION) == "MAIN_ACTION":
             info: Dict[str, Any] = {}
             move, _r = cpu_ai.decide_with_regret(manager, actor, difficulty, random,
-                                                 plan=plans[req_pid], out=info)
+                                                 out=info)
             if "chosen_deep" in info:
                 series.setdefault((req_pid, manager.turn_count), []).append(info["chosen_deep"])
         else:
-            move = cpu_ai.decide_guarded(manager, actor, difficulty, random, mems[req_pid],
-                                         plan=plans[req_pid])
+            move = cpu_ai.decide_guarded(manager, actor, difficulty, random, mems[req_pid])
         if move is None:
             break
         manager.action_events = []

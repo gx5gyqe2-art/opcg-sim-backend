@@ -31,7 +31,6 @@ except ImportError:
 from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
-from opcg_sim.src.core import cpu_self_plan
 from opcg_sim.src.core import cpu_value_data
 from opcg_sim.api import decide_client
 from opcg_sim.src.utils.loader import CardLoader
@@ -380,16 +379,8 @@ async def game_create(req: Any = Body(...)):
             difficulty = req.get("cpu_difficulty", "hard")
             if difficulty != "hard":
                 difficulty = "hard"
-            # 自デッキ勝ち筋プラン（§2.5.5）: CPU(p2) の自デッキ構成から静的に分類して保持（hard で使用）。
-            self_plan = None
-            if difficulty == "hard":
-                try:
-                    self_plan = cpu_self_plan.build_plan([ci.master for ci in p2_cards],
-                                                         leader=p2_leader.master if p2_leader else None)
-                except Exception:
-                    pass
             CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty,
-                                  "opp_profile": None, "self_plan": self_plan}
+                                  "opp_profile": None}
             if cpu_trace:
                 # リプレイ種＋思考ログの器を用意する（opt-in 時のみ）。
                 CPU_GAMES[game_id].update({
@@ -484,14 +475,14 @@ def _ponder_enabled() -> bool:
             and os.environ.get("OPCG_PONDER", "0") == "1")
 
 
-def _plan_segment(manager, cpu_player, difficulty, mem=None, profile=None, plan=None):
+def _plan_segment(manager, cpu_player, difficulty, mem=None, profile=None):
     """「このターンの計画手列」を返す（ポンダリング/計画キャッシュの単一の真実源）。
 
     hard（α-β）を `decide_client`（PyPy ワーカー）でセグメント計画する。「手 dict のリスト（=このターンの
     連続手番）」を返す＝後段のキャッシュ/replay/ポンダリングが共通に乗る。
     """
     return decide_client.plan_segment(manager, cpu_player, difficulty,
-                                      mem=mem, profile=profile, plan=plan)
+                                      mem=mem, profile=profile)
 
 
 async def _ponder_plan(game_id: str) -> None:
@@ -516,7 +507,7 @@ async def _ponder_plan(game_id: str) -> None:
         cpu_player = snap.p1 if snap.p1.name == cpu_pid else snap.p2
         actions = await asyncio.to_thread(
             _plan_segment, snap, cpu_player, difficulty,
-            mem=turn_mem, profile=meta.get("opp_profile"), plan=meta.get("self_plan"))
+            mem=turn_mem, profile=meta.get("opp_profile"))
         cache["queue"] = actions or None
     except Exception:
         cache["queue"] = None
@@ -565,7 +556,7 @@ def _speculate_enabled() -> bool:
     return _ponder_enabled() and os.environ.get("OPCG_PONDER_SPEC", "0") == "1"
 
 
-def _speculate_compute(clone, human_pid, cpu_pid, difficulty, profile, plan):
+def _speculate_compute(clone, human_pid, cpu_pid, difficulty, profile):
     """⑥-b 投機の本体（`to_thread` で別スレッド実行）。**クローン上で**人間の TURN_END を仮適用し、
     pending が素直に CPU 手番へ移ったら CPU セグメントを計画して返す（介在する人間決定があれば None）。
     live 盤面には一切触れない（呼び出し側がメインスレッドで原子的に clone 済み）。"""
@@ -577,13 +568,13 @@ def _speculate_compute(clone, human_pid, cpu_pid, difficulty, profile, plan):
         return None
     cpu_player = clone.p1 if clone.p1.name == cpu_pid else clone.p2
     return _plan_segment(clone, cpu_player, difficulty,
-                         mem={}, profile=profile, plan=plan)
+                         mem={}, profile=profile)
 
 
 async def _speculate_plan(game_id: str, clone, human_pid: str, gen: int) -> None:
     """⑥-b: 「人間が今エンドしたら」の CPU 計画を投機して `spec_queue` に保持（次の TURN_END で昇格判定）。
 
-    計算は `_speculate_compute` を `to_thread` でオフロード（plan は別プロセスのワーカー）。世代 `gen` が
+    計算は `_speculate_compute` を `to_thread` でオフロード（別プロセスのワーカー）。世代 `gen` が
     最新でなければ（人間がさらに動いて盤面が変わった＝supersede）結果は捨てる。使い捨て clone・使い捨て mem
     ＝live 盤面/turn_mem 不変。採否は最終的に `_kick_ponder` の合法性ゲートが担保する。"""
     meta = CPU_GAMES.get(game_id)
@@ -594,7 +585,7 @@ async def _speculate_plan(game_id: str, clone, human_pid: str, gen: int) -> None
         cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "hard")
         result = await asyncio.to_thread(
             _speculate_compute, clone, human_pid, cpu_pid, difficulty,
-            meta.get("opp_profile"), meta.get("self_plan"))
+            meta.get("opp_profile"))
         if cache.get("spec_gen") == gen:        # まだ最新の投機なら採用
             cache["spec_queue"] = result or None
     except Exception:
@@ -651,7 +642,7 @@ def _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem):
             return legal_by_sig[sig]
         cache["queue"] = None  # 前提崩れ＝破棄して再計画
     actions = _plan_segment(manager, cpu_player, difficulty, mem=turn_mem,
-                            profile=meta.get("opp_profile"), plan=meta.get("self_plan"))
+                            profile=meta.get("opp_profile"))
     if actions:
         sig = cpu_ai._move_sig(actions[0])
         if sig in legal_by_sig:
@@ -723,7 +714,7 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                     move = _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem)
                 if move is None:
                     move = decide_client.decide(manager, cpu_player, difficulty, mem=turn_mem,
-                                                profile=meta.get("opp_profile"), plan=meta.get("self_plan"),
+                                                profile=meta.get("opp_profile"),
                                                 trace=tr, trace_read_ahead=False)
                 if move is not None:
                     if trace_on:

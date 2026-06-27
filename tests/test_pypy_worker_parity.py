@@ -98,21 +98,11 @@ def test_decide_same_move_after_pickle_roundtrip():
     assert _decide_key(move_orig) == _decide_key(move_round)
 
 
-def test_profile_plan_mem_roundtrip():
-    """profile/plan/mem（採点補助・turn-memory）が pickle を跨いで等価に往復する。"""
-    import cpu_arena
-    random.seed(7)
-    db = _load_db()
-    l1, c1 = build_deck(db, "p1")
-    plan = cpu_arena._plan_for("hard", l1, c1)  # PlanProfile（None もあり得る）
+def test_mem_roundtrip():
+    """mem（turn-memory）が pickle を跨いで等価に往復する。"""
     mem = {"acted": 3, "repeat": {"X": 2}}
-    payload = (plan, mem)
-    plan2, mem2 = pickle.loads(pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL))
+    mem2 = pickle.loads(pickle.dumps(mem, protocol=pickle.HIGHEST_PROTOCOL))
     assert mem2 == mem
-    # plan は dataclass 等。pickle 往復で型・主要属性が保たれる（None なら None）。
-    assert (plan is None) == (plan2 is None)
-    if plan is not None:
-        assert type(plan2) is type(plan)
 
 
 def test_bridge_inprocess_equals_decide_guarded():

@@ -12,7 +12,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from opcg_sim.src.core.gamestate import GameManager, Player
 from opcg_sim.src.core import action_api, cpu_ai
 from cpu_selfplay import _load_db, build_deck, check_invariants
-import cpu_arena
 
 
 def timed_game(seed, db, diff="hard", max_steps=400, collect=None):
@@ -21,7 +20,6 @@ def timed_game(seed, db, diff="hard", max_steps=400, collect=None):
     l2, c2 = build_deck(db, "p2")
     mgr = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     mgr.start_game()
-    plans = {"p1": cpu_arena._plan_for(diff, l1, c1), "p2": cpu_arena._plan_for(diff, l2, c2)}
     mem = {}
     props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
     KEY_PID = props.get('PLAYER_ID', 'player_id')

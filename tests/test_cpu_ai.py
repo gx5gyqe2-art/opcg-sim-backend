@@ -707,7 +707,7 @@ def test_b2lite_values_keeping_blocker_for_defense(db):
         g.p1.field[0].is_rest = rest
         return cpu_ai._search(g, "p1", float("-inf"), float("inf"),
                               [cpu_ai.HARD_PER_MOVE_BUDGET], True, False,
-                              plan=None, ply=0, start_turn=g.turn_count, horizon=horizon)
+                              ply=0, start_turn=g.turn_count, horizon=horizon)
 
     # horizon=2 は相手の攻撃を読むので、ブロッカーをアクティブで残す方を高く評価する。
     assert search_val(False, 2) > search_val(True, 2)
