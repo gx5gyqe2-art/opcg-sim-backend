@@ -148,46 +148,18 @@ def test_decide_info_policy_arg(db):
     assert checked, "選択肢のある手番に到達しなかった（テスト前提の不成立）"
 
 
-def test_value_blend_off_by_default_and_formula(db):
-    """Phase 3b 葉ブレンド: α=0（既定）で eval 不変・α>0 で base + α·SCALE·(winprob−0.5)。"""
-    from opcg_sim.src.core import cpu_value_model, cpu_features
+def test_evaluate_deterministic(db):
+    """L1 評価は決定論（学習価値ブレンド撤去後・evaluate は evaluate_base の別名）。"""
     random.seed(0)
     l1, c1 = build_deck(db, "p1")
     l2, c2 = build_deck(db, "p2")
     gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     gm.start_game()
-    cpu_value_model.set_alpha_override(None)        # 既定 OFF
     base = cpu_ai.evaluate(gm, "p1")
-    assert cpu_ai.evaluate(gm, "p1") == base        # 決定論・ブレンド無で不変
-    try:
-        cpu_value_model.set_alpha_override(0.0)
-        assert cpu_ai.evaluate(gm, "p1") == base     # α=0 は明示でも base 素通し
-        if cpu_value_model.is_available():
-            cpu_value_model.set_alpha_override(0.5)
-            p = cpu_value_model.predict_winprob(cpu_features.extract_features(gm, "p1"))
-            assert cpu_ai.evaluate(gm, "p1") == pytest.approx(
-                base + 0.5 * cpu_ai._VALUE_BLEND_SCALE * (p - 0.5))
-    finally:
-        cpu_value_model.set_alpha_override(None)
+    assert cpu_ai.evaluate(gm, "p1") == base
+    assert cpu_ai.evaluate_base(gm, "p1") == base    # evaluate は evaluate_base と同値
 
 
-def test_evaluate_base_split(db):
-    """2層分離（最小）: evaluate(α=0)==evaluate_base（手書き素点）・α>0 で base にブレンド適用。"""
-    from opcg_sim.src.core import cpu_value_model
-    random.seed(0)
-    l1, c1 = build_deck(db, "p1")
-    l2, c2 = build_deck(db, "p2")
-    gm = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
-    gm.start_game()
-    base = cpu_ai.evaluate_base(gm, "p1")
-    cpu_value_model.set_alpha_override(None)
-    try:
-        assert cpu_ai.evaluate(gm, "p1") == base                 # α=0 既定→素通し＝evaluate_base
-        if cpu_value_model.is_available():
-            cpu_value_model.set_alpha_override(0.5)
-            assert cpu_ai.evaluate(gm, "p1") == pytest.approx(cpu_ai._value_blend(gm, "p1", base))
-    finally:
-        cpu_value_model.set_alpha_override(None)
 
 
 def test_pimc_decide_legal_and_deterministic(db):

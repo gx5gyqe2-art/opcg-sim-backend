@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai, cpu_value_model, cpu_eval_v2
+from opcg_sim.src.core import action_api, cpu_ai, cpu_eval_v2
 from opcg_sim.src.core.invariants import check_invariants, check_turn_boundary
 
 # L1（cpu_eval_v2）係数の席別上書き用: 出荷時の既定値を一度だけ退避し、各 decide 前に
@@ -117,8 +117,8 @@ def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
 
 def _make_decider(difficulty: str, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
-                  policy_rng=None, pimc_worlds: int = 1, value_alpha=None, per_move_budget=None,
-                  search=None, coeffs=None, mulligan=None, settle_neutralize=None):
+                  policy_rng=None, pimc_worlds: int = 1, per_move_budget=None,
+                  search=None, coeffs=None):
     """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き）。
 
     `info_policy`（Phase -1）で情報方針を選ぶ＝凍結 fair-hard vs cheat-hard の A/B を席交互で測れる。
@@ -132,22 +132,16 @@ def _make_decider(difficulty: str, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY
     s_horizon, s_max_ply = (search if search is not None else (None, None))
 
     def _decide(manager, actor):
-        # Phase 3b/4: この decider のブレンド率・探索予算を一時設定（単一スレッド arena＝相手と干渉しない）。
-        cpu_value_model.set_alpha_override(value_alpha)
+        # この decider の探索予算/深さ/L1係数を一時設定（単一スレッド arena＝相手と干渉しない）。
         cpu_ai.set_budget_override(per_move_budget)
         cpu_ai.set_search_override(s_horizon, s_max_ply)  # 探索深さ／ply 上限を席別に切替（深さA/B用）
-        cpu_ai.set_mulligan_override(mulligan)  # ① マリガン方策の ON/OFF を席別に切替（None=既定）
-        cpu_ai.set_settle_neutralize(settle_neutralize)  # ④ settle-PASS生成勝者の中立化を席別に切替（None=既定）
-        _apply_v2_coeffs(coeffs)  # この席の L1 係数を適用（席別 A/B＝SPSA 用。None＝既定）
+        _apply_v2_coeffs(coeffs)  # この席の L1 係数を適用（席別 A/B。None＝既定）
         try:
             return cpu_ai.decide_guarded(manager, actor, difficulty, prng, mem,
                                          info_policy=info_policy, pimc_worlds=pimc_worlds)
         finally:
-            cpu_value_model.set_alpha_override(None)
             cpu_ai.set_budget_override(None)
             cpu_ai.set_search_override(None, None)
-            cpu_ai.set_mulligan_override(None)
-            cpu_ai.set_settle_neutralize(None)
             _apply_v2_coeffs(None)  # 既定へ戻す（相手席が None でも汚染しない）
     return _decide
 
@@ -158,13 +152,9 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p2_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
               separate_policy_rng: bool = False,
               p1_pimc: int = 1, p2_pimc: int = 1,
-              p1_alpha=None, p2_alpha=None,
               p1_budget=None, p2_budget=None,
               p1_search=None, p2_search=None,
-              p1_coeffs=None, p2_coeffs=None,
-              p1_mulligan=None, p2_mulligan=None,
-              p1_settle_neutralize=None, p2_settle_neutralize=None,
-              realistic_leaders=None) -> Dict[str, Any]:
+              p1_coeffs=None, p2_coeffs=None) -> Dict[str, Any]:
     """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
@@ -179,23 +169,15 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     なお分岐する。配りレベル CRN には GameManager への乱数注入（クローンが独自 rng）が必要＝Phase 0b。
     """
     random.seed(seed)
-    if realistic_leaders is not None:
-        # 実構築デッキ（イベント含む・4枚積み・カーブあり）で対戦＝マリガン等カーブ依存方策の正当な計測基盤。
-        # CRN: 同 seed なら両席同一デッキ（リーダーIDタプルで席別指定可）。deckgen のカーブ重み生成。
-        import deckgen
-        l1id, l2id = realistic_leaders
-        l1, c1 = deckgen.build_realistic_deck(db, "p1", l1id, random.Random(seed * 2))
-        l2, c2 = deckgen.build_realistic_deck(db, "p2", l2id, random.Random(seed * 2 + 1))
-    else:
-        l1, c1 = build_deck(db, "p1")
-        l2, c2 = build_deck(db, "p2")
+    l1, c1 = build_deck(db, "p1")
+    l2, c2 = build_deck(db, "p2")
     manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     manager.start_game()
     # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
-    deciders = {"p1": _make_decider(p1_difficulty, p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget, p1_search, p1_coeffs, p1_mulligan, p1_settle_neutralize),
-                "p2": _make_decider(p2_difficulty, p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget, p2_search, p2_coeffs, p2_mulligan, p2_settle_neutralize)}
+    deciders = {"p1": _make_decider(p1_difficulty, p1_policy, p1_rng, p1_pimc, p1_budget, p1_search, p1_coeffs),
+                "p2": _make_decider(p2_difficulty, p2_policy, p2_rng, p2_pimc, p2_budget, p2_search, p2_coeffs)}
 
     step = 0
     prev_turn = manager.turn_count
@@ -268,7 +250,6 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
                  challenger_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                  baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                  challenger_pimc: int = 1, baseline_pimc: int = 1,
-                 challenger_alpha=None, baseline_alpha=None,
                  challenger_budget=None, baseline_budget=None) -> Dict[str, Any]:
     """分散低減アリーナ（Phase 0・antithetic 席ペアリング）。各 seed を**両席で 1 回ずつ**戦わせ、
     挑戦者の 2 局の勝敗を集計する＝**先手有利（席順）をペア内で相殺**する。
@@ -292,12 +273,10 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
         a = play_game(seed, db, challenger, baseline, max_steps=max_steps,
                       p1_policy=challenger_policy, p2_policy=baseline_policy,
                       separate_policy_rng=True, p1_pimc=challenger_pimc, p2_pimc=baseline_pimc,
-                      p1_alpha=challenger_alpha, p2_alpha=baseline_alpha,
                       p1_budget=challenger_budget, p2_budget=baseline_budget)
         b = play_game(seed, db, baseline, challenger, max_steps=max_steps,
                       p1_policy=baseline_policy, p2_policy=challenger_policy,
                       separate_policy_rng=True, p1_pimc=baseline_pimc, p2_pimc=challenger_pimc,
-                      p1_alpha=baseline_alpha, p2_alpha=challenger_alpha,
                       p1_budget=baseline_budget, p2_budget=challenger_budget)
         chal_a = 1.0 if a["winner"] == "p1" else 0.0
         chal_b = 1.0 if b["winner"] == "p2" else 0.0
@@ -447,8 +426,6 @@ def main(argv=None):
     pp.add_argument("--baseline-policy", choices=["fair", "cheat"], default="cheat")
     pp.add_argument("--challenger-pimc", type=int, default=1, help="挑戦者の PIMC 世界数（>=2 で決定化）")
     pp.add_argument("--baseline-pimc", type=int, default=1, help="ベースラインの PIMC 世界数")
-    pp.add_argument("--challenger-blend", type=float, default=None, help="挑戦者の学習価値ブレンド α（Phase 3b）")
-    pp.add_argument("--baseline-blend", type=float, default=None, help="ベースラインの学習価値ブレンド α")
     pp.add_argument("--challenger-budget", type=int, default=None, help="挑戦者の深掘り予算（Phase 4 按分）")
     pp.add_argument("--baseline-budget", type=int, default=None, help="ベースラインの深掘り予算")
     pp.add_argument("--pairs", type=int, default=50)
@@ -486,7 +463,6 @@ def main(argv=None):
         rep = arena_paired(db, args.challenger, args.baseline, args.pairs, args.seed, args.max_steps,
                            challenger_policy=args.challenger_policy, baseline_policy=args.baseline_policy,
                            challenger_pimc=args.challenger_pimc, baseline_pimc=args.baseline_pimc,
-                           challenger_alpha=args.challenger_blend, baseline_alpha=args.baseline_blend,
                            challenger_budget=args.challenger_budget, baseline_budget=args.baseline_budget)
         for d in rep["detail"]:
             print(f"  seed={d['seed']} p1won={d['chal_as_p1_won']:.0f} p2won={d['chal_as_p2_won']:.0f} "

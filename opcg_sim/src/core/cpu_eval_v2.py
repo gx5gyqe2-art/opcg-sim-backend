@@ -38,9 +38,6 @@ V2_W_TELE   = 0.5      # Tele（ホライズン端のリーサル番兵）の重
 
 V2_W_DON  = 0.1     # アクティブドンの床（ランプ＋構え防御オプション・小・SPSA x0.91）
 
-V2_W_SETTLE_THREAT = 0.15  # #4 settle 悲観項: 未読相手手番の脅威/ドン1枚あたり（card単位・SPSA 調整対象）。
-                           # 設計 docs/reports/cpu_strength_plan_20260628.md §3.1。0.0 で完全無効。
-
 # 上記は SPSA 第2パス（16iter/12games・対照ペア＋コア並列の改善基盤）の best を **30ペア(60局)・低ノイズで
 # 検証して確定**した値。検証: v2 ON vs 評価OFF(成熟J値) ＝ 0.550・**Elo +35**（ペア単位CI[-54,+129]＝
 # 互角〜やや優勢寄り・有意差なし）。第1パス(-23)から名目 +58Elo。SPSA上の 0.833(+280) は12局＝過大評価で実値0.550。
@@ -237,36 +234,3 @@ def _decay(pressure: float) -> float:
     # pressure ~1 付近で増幅最大、それ以上（守り切れない）では緩やかに減衰させる逆U字。
     import math
     return pressure * math.exp(-max(0.0, pressure - 1.0))
-
-
-def settle_threat_penalty(manager, me_name: str) -> float:
-    """#4 settle 悲観項: **打ち切り（settle＝相手ターン境界へ整流した葉）限定**の、未読相手手番の脅威見積り。
-    `_settle_eval` からのみ呼び、返り値を root スコアから**減算**する（eval と同じ ×V2_SCALE 単位）。
-
-    設計: docs/reports/cpu_strength_plan_20260628.md §3.1。要点:
-      penalty = V2_W_SETTLE_THREAT × 予測アクティブドン × danger × V2_SCALE
-      - 予測アクティブドン: settle は相手のターン開始（ドンフェイズ）を通過するので opp の don は既に補充済み
-        ＝ total_don（active+rested+attached, 上限10）を読めば +2 を二重に足さない（メモの「+2」は root 手番末
-        前提の式・本実装は settle 通過後の実 don を読む方が正確）。
-      - danger = (1 − γ_surv): **メモの「× γ_surv」は本文意図（ピンチ＝γ_surv 低いほど悲観を深める）と
-        逆**（× γ_surv だとピンチで penalty が縮む）。意図どおり danger=(1−γ_surv) を掛ける。
-    全葉には適用しない（horizon 内で相手手番を読んだ葉では二重悲観）。盤面の現打点は R_board(opp)/Tele で
-    計上済み＝ここは「未読手番でドンを使う上乗せ」を扱い二重計上にならない（Tele=致死番兵／本項=致死未満）。
-    RNG 不使用＝決定的（CRN/決定論リプレイを壊さない）。
-    """
-    if V2_W_SETTLE_THREAT == 0.0:
-        return 0.0
-    from .cpu_ai import _player_by_name, _other
-    me = _player_by_name(manager, me_name)
-    opp = _other(manager, me_name)
-    total_don = (len(getattr(opp, "don_active", []))
-                 + len(getattr(opp, "don_rested", []))
-                 + len(getattr(opp, "don_attached_cards", [])))
-    pred_don = min(10, total_don)
-    if pred_don <= 0:
-        return 0.0
-    opp_clock = _clock_of(opp, me, True)              # 相手手番の素クロック
-    my_life = max(len(me.life), 1)
-    gamma = max(0.0, min(1.0, my_life / (opp_clock + _EPS))) ** V2_KAPPA
-    danger = 1.0 - gamma                              # ピンチ（γ低）ほど大きい
-    return V2_W_SETTLE_THREAT * pred_don * danger * V2_SCALE

@@ -109,23 +109,6 @@ def _resolve_info_policy(info_policy: str) -> Tuple[bool, bool]:
         raise ValueError("unknown info_policy: %r (expected 'fair' or 'cheat')" % (info_policy,))
 
 
-# Phase 3b: 学習価値（勝率）の葉ブレンド（docs/reports/cpu_phase3a_fair_value_relearn_20260623.md）。
-# winprob(0..1) を eval 加点へ写す係数。α=1・winprob 0/1 で ±SCALE/2 ≈ ±4000 ≈ ライフ1枚相当の振れ。
-# ブレンド率 α は `cpu_value_model.blend_alpha()`（OPCG_VALUE_BLEND/override・既定 0）。α=0 or モデル無で
-# `_value_blend` は base 素通し＝**既定で完全に挙動不変**（葉で predict も呼ばない）。
-_VALUE_BLEND_SCALE = 8000.0
-
-
-def _value_blend(manager, me_name: str, base: float) -> float:
-    """評価値 `base` に学習勝率を α 比率で加点ブレンド（公開情報特徴→winprob）。α=0/モデル無は base 素通し。"""
-    from . import cpu_value_model, cpu_features
-    a = cpu_value_model.blend_alpha()
-    if a <= 0.0 or not cpu_value_model.is_available():
-        return base
-    p = cpu_value_model.predict_winprob(cpu_features.extract_features(manager, me_name))
-    if p is None:
-        return base
-    return base + a * _VALUE_BLEND_SCALE * (p - 0.5)
 
 
 # 勝敗の決定値（L1・`cpu_eval_v2` が終端でこの符号を返す。探索の winner 割引もこの定数を使う）。
@@ -182,7 +165,7 @@ HARD_FORCE_DEEPEN_CAP = 3
 HARD_PER_MOVE_BUDGET = _env_int("OPCG_HARD_PER_MOVE_BUDGET", 300)  # 深掘り1手あたり clone 上限（env 上書き可）
 
 # Phase 4: 探索予算の per-decider 上書き（PIMC の予算按分＝K 世界で合計を一定に保つ用）。
-# `set_budget_override(b)` で一時設定（評価アリーナ＝単一スレッドで安全・set_alpha_override と同型）。
+# `set_budget_override(b)` で一時設定（評価アリーナ＝単一スレッドで安全）。
 # None で env/既定（HARD_PER_MOVE_BUDGET）へ戻る＝本番/テストは未設定で従来同値。
 _BUDGET_OVERRIDE = None
 
@@ -217,57 +200,6 @@ def _effective_horizon() -> int:
 
 def _effective_max_ply() -> int:
     return _MAX_PLY_OVERRIDE if _MAX_PLY_OVERRIDE is not None else HARD_MAX_PLY
-
-
-# ① マリガン方策（deck非依存カーブ規則・docs/reports/cpu_strength_plan_20260628.md §H）。
-# 初手は盤面が空＝L1 評価が最も平坦で、汎用探索では MULLIGAN/KEEP に有意差が付かず実質ほぼ KEEP
-# （勝率を捨てている）。そこで「序盤に動けるか」だけを deck非依存の軽量ルールで判定し、明らかな
-# 事故初手のみ引き直す。アーキタイプ依存（plan/profile 復活）は持ち込まない（全廃済みの憲法）。
-# 決定的（盤面のみ参照・RNG 不使用）＝CRN／決定論リプレイを壊さない。
-# 【既定 OFF（2026-06-28）】A/B 実測で Elo 中立（合成 -28／実構築デッキ -11・いずれも非有意）＝本アーキでは
-# マリガンは伸びしろの無いレバー（幽霊）と確定。憲法（計測ゲート＝有意な+Eloの無い変更は出荷しない）に従い
-# 既定 OFF。コードはフラグで温存（OPCG_MULLIGAN_POLICY=1 or set_mulligan_override(True) で有効化＝検証/再測定用）。
-# 別件: baseline（generic eval）は turn0 が平坦で初手を ~52% ランダムにマリガンする潜在不具合があるが、
-# それは Elo に出ない（本方策で置換しても中立）＝挙動是正が要るなら別途判断（§H 追補）。
-_USE_MULLIGAN_POLICY = _env_int("OPCG_MULLIGAN_POLICY", 0) != 0
-MULL_EARLY_COST_MAX = 3     # 「序盤に出せるキャラ」のコスト上限（1..この値）
-MULL_MIN_EARLY = 1          # 序盤キャラがこの数未満なら引き直し（初動が無い＝動けない事故初手）
-MULL_HIGH_COST_MIN = 5      # 「重い」と見なすコスト下限
-MULL_MAX_HIGH = 2           # 重いカードがこの数を超えたら引き直し（高コストに偏った手詰まり初手）
-
-# 席別 A/B 用の per-decide オーバーライド（None=モジュール既定・set_*_override と同型）。
-_MULLIGAN_OVERRIDE = None
-
-
-def set_mulligan_override(flag):
-    """マリガン方策の ON/OFF を一時上書き（評価アリーナの席別 A/B 用・None で既定へ）。"""
-    global _MULLIGAN_OVERRIDE
-    _MULLIGAN_OVERRIDE = None if flag is None else bool(flag)
-
-
-def _mulligan_policy_on() -> bool:
-    return _USE_MULLIGAN_POLICY if _MULLIGAN_OVERRIDE is None else _MULLIGAN_OVERRIDE
-
-
-def _mulligan_keep(manager, name: str) -> bool:
-    """deck非依存のカーブ規則で初手をキープすべきか（True=KEEP / False=MULLIGAN）。
-
-    保守的: 「序盤に展開できるキャラが居ない」または「高コストに偏った」明らかな事故初手のみ引き直す。
-    それ以外はキープ（引き直しは賭けなので、明確に悪い手に限る）。printed cost（master.cost）で判定。
-    """
-    from ..models.enums import CardType
-    me = _player_by_name(manager, name)
-    hand = list(getattr(me, "hand", []))
-    if not hand:
-        return True
-    early = sum(1 for c in hand if c.master.type == CardType.CHARACTER
-                and 1 <= c.master.cost <= MULL_EARLY_COST_MAX)
-    highs = sum(1 for c in hand if c.master.cost >= MULL_HIGH_COST_MIN)
-    if early < MULL_MIN_EARLY:
-        return False   # 序盤に動けない初手＝引き直し（新規の5枚が平均的に勝る）
-    if highs > MULL_MAX_HIGH:
-        return False   # 重さに偏った初手＝引き直し
-    return True
 
 
 # Phase 4 本番配線: PIMC 既定世界数（OPCG_PIMC_WORLDS・既定 1＝休眠＝従来同値）。本番 Dockerfile で 4 を
@@ -499,14 +431,12 @@ def _don_return_penalty_vals(before_don: int, after_don: int) -> float:
 
 def evaluate(manager, me_name: str, see_opp_hand: bool = True,
              out: Optional[Dict[str, Any]] = None) -> float:
-    """`me_name` 視点の盤面評価＝**L1 評価（`evaluate_base`）に学習価値の葉ブレンドを被せた**薄いラッパー。
+    """`me_name` 視点の盤面評価（L1 単一系統＝`evaluate_base`）。高いほど自分有利。
 
-    天井上げ（学習価値を葉評価の中心に育てる・§2.5.8）に向け、L1 評価と学習ブレンドを 2 層に分離した
-    差し込み口。`OPCG_VALUE_BLEND`/override の α=0（既定）では `_value_blend` が素通し＝`evaluate_base` と
-    完全同値（葉で predict も呼ばない）。引数・戻り値は `evaluate_base` と同一＝既存呼び出しは透過。
+    かつては学習価値（winprob）の葉ブレンドを被せる 2 層構成だったが、ブレンドは α=0（既定）で常に素通し＝
+    Elo 中立と実測され、学習価値サブシステムごと撤去した（2026-06-28）。本関数は `evaluate_base` の別名。
     """
-    return _value_blend(manager, me_name,
-                        evaluate_base(manager, me_name, see_opp_hand=see_opp_hand, out=out))
+    return evaluate_base(manager, me_name, see_opp_hand=see_opp_hand, out=out)
 
 
 def evaluate_base(manager, me_name: str, see_opp_hand: bool = True,
@@ -779,44 +709,6 @@ def _consumes_hand_card(manager, actor_name: str, move: Dict[str, Any]) -> bool:
     return any(getattr(c, "uuid", None) == uuid for c in actor.hand)
 
 
-# ④ settle-PASS 自己リーサル過大検出（§H/§I・計装＋A/B 用）。
-# settle は戦闘応答を両側 PASS で畳む（_settle_eval）。地平線外で「相手が無防備な前提」のまま勝者が
-# 確定する＝攻め側は自分のリーサルを過大検出（ノーガード特攻の温床）、守り側は自分の死を過大検出しうる。
-# まず計装で「settle ループが勝者を生成した頻度」を実測し、neutralize フラグで A/B（生成勝者を W_WIN で
-# 信用する現状 vs 静的評価へ中立化）して、この過大検出が Elo に効くか（=有害な実ギャップか幽霊か）を測る。
-_SETTLE_STATS_ON = False
-_SETTLE_STATS = {
-    "calls": 0,            # _settle_eval 呼び出し総数
-    "entry_winner": 0,     # settle 開始時点で既に勝敗確定（探索が読み切った真の勝敗＝中立化対象外）
-    "loop_winner_me": 0,   # settle ループ（PASS整流）が root 勝利を生成（攻め側の過大検出 suspect）
-    "loop_winner_opp": 0,  # settle ループが相手勝利を生成（守り側の過大検出 suspect）
-    "loop_winner_passdef": 0,  # うち、敗者側の戦闘応答(BLOCKER/COUNTER)を PASS で畳んだ局面
-}
-# neutralize: settle ループが生成した勝者を ±W_WIN で信用せず静的評価へフォールバック（A/B の challenger）。
-_SETTLE_NEUTRALIZE = None   # None=既定(信用する=現状)／True=中立化／False=明示的に現状
-
-
-def set_settle_stats(on: bool):
-    """settle 計装の ON/OFF（計測スクリプト用・既定 OFF＝ホットパスに無負荷）。ON で _SETTLE_STATS を積算。"""
-    global _SETTLE_STATS_ON
-    _SETTLE_STATS_ON = bool(on)
-
-
-def reset_settle_stats():
-    for k in _SETTLE_STATS:
-        _SETTLE_STATS[k] = 0
-
-
-def get_settle_stats() -> Dict[str, int]:
-    return dict(_SETTLE_STATS)
-
-
-def set_settle_neutralize(flag):
-    """settle ループ生成勝者の扱いを一時上書き（A/B 用・None=既定=信用する）。"""
-    global _SETTLE_NEUTRALIZE
-    _SETTLE_NEUTRALIZE = None if flag is None else bool(flag)
-
-
 def _settle_eval(manager, root_name: str, see_opp_hand: bool, ply: int = 0) -> float:
     """探索の打ち切り点を一定の静止点（相手のターン開始＝相手の MAIN_ACTION）へ整流してから評価する。
 
@@ -832,10 +724,6 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, ply: int = 0) -> f
     KEY_PID, KEY_ACTION = _pending_keys()
     battle_actions = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
     ACT_PASS = battle_actions.get('PASS', 'PASS')
-    entry_winner = manager.winner            # 計装/中立化: settle 開始時点で既に確定していた勝敗（真の勝敗）
-    passed_defense = False                    # settle ループで戦闘応答(BLOCKER/COUNTER)を PASS で畳んだか
-    if _SETTLE_STATS_ON:
-        _SETTLE_STATS["calls"] += 1
     for _ in range(_SETTLE_LIMIT):
         if manager.winner is not None:
             break
@@ -852,7 +740,6 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, ply: int = 0) -> f
             if action == "MAIN_ACTION":              # root の手番 → ターンを畳む
                 action_api.apply_game_action(manager, actor, "TURN_END", {})
             elif action in ("SELECT_BLOCKER", "SELECT_COUNTER"):  # 戦闘応答 → 既定パスで解決
-                passed_defense = True
                 action_api.apply_battle_action(manager, actor, ACT_PASS, None)
             else:                                     # その他の選択 → 既定解決
                 pending = manager.get_pending_request()  # 既定解決時のみフル payload
@@ -864,26 +751,8 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, ply: int = 0) -> f
     # 止めを優先）。予算切れ settle で勝者を観測した長い手順が、winner 検出（W_WIN-ply）の直接の止めより
     # 高く（生 W_WIN で）見えてしまう不整合を防ぐ＝lethal 認識の ply 割引を一貫させる。
     if manager.winner is not None:
-        loop_created = entry_winner is None   # settle の PASS 整流が新たに生成した勝者（過大検出 suspect）
-        if _SETTLE_STATS_ON:
-            if not loop_created:
-                _SETTLE_STATS["entry_winner"] += 1
-            else:
-                if manager.winner == root_name:
-                    _SETTLE_STATS["loop_winner_me"] += 1
-                else:
-                    _SETTLE_STATS["loop_winner_opp"] += 1
-                if passed_defense:
-                    _SETTLE_STATS["loop_winner_passdef"] += 1
-        # 中立化（A/B challenger）: ループ生成勝者は「無防備前提」なので W_WIN で信用せず静的評価へ落とす。
-        # entry_winner（探索が読み切った真の勝敗）は常に信用する。
-        if not (loop_created and _SETTLE_NEUTRALIZE):
-            return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
-    # #4 settle 悲観項（settle 限定）: 未読の相手手番の脅威を root スコアから減算する。
-    # 全葉でなくここ（打ち切り＝相手手番を読めていない葉）だけに適用＝二重悲観を避ける。
-    from . import cpu_eval_v2
-    base = evaluate(manager, root_name, see_opp_hand=see_opp_hand)
-    return base - cpu_eval_v2.settle_threat_penalty(manager, root_name)
+        return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
+    return evaluate(manager, root_name, see_opp_hand=see_opp_hand)
 
 
 def _record_killer(killers: Optional[Dict[int, List[tuple]]], ply: int, move: Dict[str, Any]) -> None:
@@ -1518,28 +1387,6 @@ def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Rando
                                     "prelim": None, "deep": None}]
             trace["regret"] = 0.0
         return moves[0]
-    # ① マリガン方策（deck非依存・§H）: 初手の MULLIGAN/KEEP は L1 が平坦で探索は無力＝専用ルールで判定。
-    if _mulligan_policy_on():
-        mull = next((m for m in moves if m.get("action_type") == "MULLIGAN"), None)
-        keep = next((m for m in moves if m.get("action_type") == "KEEP_HAND"), None)
-        if mull is not None and keep is not None:
-            chosen = keep if _mulligan_keep(manager, player.name) else mull
-            if trace is not None:
-                trace["difficulty"] = difficulty
-                trace["turn"] = manager.turn_count
-                trace["chosen"] = _describe_move(manager, chosen)
-                trace["forced"] = "mulligan_policy"
-                trace["candidates"] = [{"move": _describe_move(manager, m), "prelim": None, "deep": None}
-                                       for m in moves]
-                trace["regret"] = 0.0
-                # J値成分内訳（トレース契約の維持）: 選んだ手の結果盤面を評価して内訳を採る。
-                see_opp_hand, _ = _resolve_info_policy(info_policy)
-                child = _apply_clone(manager, player.name, chosen, stop_at_select=True)
-                if child is not None:
-                    comp: Dict[str, Any] = {}
-                    comp["total"] = round(evaluate(child, player.name, see_opp_hand=see_opp_hand, out=comp), 1)
-                    trace["j_components"] = comp
-            return chosen
     moves = _prune_don_moves(manager, player.name, moves)  # B-2: 無意味なドン付与をルートから除外
     moves = _prune_futile_attacks(manager, player.name, moves)  # 倒せない/届かない無駄攻撃を除外
 

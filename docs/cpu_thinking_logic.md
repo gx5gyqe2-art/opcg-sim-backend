@@ -122,24 +122,22 @@ _search(manager, root_name, alpha, beta, ply, budget, is_max...)
 
 _settle_eval: TURN_END/既定解決で相手ターン開始まで整流 → 静的 evaluate。
               戦闘応答（SELECT_BLOCKER/SELECT_COUNTER・どちら側でも）は**既定 PASS で解決**。
-              整流中に勝敗確定なら ±(W_WIN − ply)（ply 割引＝最短の止めを優先）。
-              未確定の葉には settle_threat_penalty（#4・未読相手手番の悲観項＝予測ドン×danger×W_SETTLE_THREAT）を減算。
-              ※ 旧 _SETTLE_CONFIDENCE/_settle_discount（楽観是正）は plan 全廃（2026-06-27）で削除済み＝#4 が deck非依存の代替。
+              整流中に勝敗確定なら ±(W_WIN − ply)（ply 割引＝最短の止めを優先）。未確定なら静的 evaluate。
+              ※ 旧 _SETTLE_CONFIDENCE/_settle_discount（楽観是正・plan 由来）／#4 settle_threat_penalty
+                （Elo中立で撤去・2026-06-28）はいずれも削除済み＝settle は純粋な静止点採点のみ。
 ```
 
 ---
 
-## 4. 評価ラッパー  ── evaluate → _value_blend → evaluate_base → L1
+## 4. 評価ラッパー  ── evaluate → evaluate_base → L1
 
 ```
 evaluate(manager, me_name, see_opp_hand)
-   │
-   └─ _value_blend( manager, me_name, evaluate_base(...) )
-         │   学習価値ブレンド層。OPCG_VALUE_BLEND の α=0（既定）で **素通し**（predict も呼ばない）
-         ▼
-      evaluate_base(manager, me_name, see_opp_hand)
-         │   （手書きJ値・評価フラグ・profile は全撤去。分岐なし）
-         └─ return cpu_eval_v2.evaluate_v2(...)     ◀── 唯一の評価 = L1（§5）
+   │   （旧・学習価値ブレンド層 _value_blend は Elo中立で撤去・2026-06-28＝evaluate は evaluate_base の別名）
+   ▼
+evaluate_base(manager, me_name, see_opp_hand)
+   │   （手書きJ値・評価フラグ・profile・学習価値は全撤去。分岐なし）
+   └─ return cpu_eval_v2.evaluate_v2(...)     ◀── 唯一の評価 = L1（§5）
 ```
 
 ---
@@ -226,7 +224,7 @@ evaluate_v2(manager, me_name, see_opp_hand) -> float
    → decide（候補生成・枝刈り・方式分岐）
    → _scored_search/_pimc_scored（α-β+ビーム / K世界平均）
    → _search 再帰（深さ・ビーム・αβカット）→ 葉/打ち切り
-   → evaluate → _value_blend(素通し) → evaluate_base → evaluate_v2(L1)
+   → evaluate（=evaluate_base）→ evaluate_v2(L1)
    → スカラー評価値（R_me−R_opp+Tele）×scale
    → 逆伝播で root 手のスコア確定 → max → TURN_END fold → 採用手
 ```
