@@ -160,7 +160,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p1_budget=None, p2_budget=None,
               p1_search=None, p2_search=None,
               p1_coeffs=None, p2_coeffs=None,
-              p1_mulligan=None, p2_mulligan=None) -> Dict[str, Any]:
+              p1_mulligan=None, p2_mulligan=None,
+              realistic_leaders=None) -> Dict[str, Any]:
     """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
@@ -175,8 +176,16 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     なお分岐する。配りレベル CRN には GameManager への乱数注入（クローンが独自 rng）が必要＝Phase 0b。
     """
     random.seed(seed)
-    l1, c1 = build_deck(db, "p1")
-    l2, c2 = build_deck(db, "p2")
+    if realistic_leaders is not None:
+        # 実構築デッキ（イベント含む・4枚積み・カーブあり）で対戦＝マリガン等カーブ依存方策の正当な計測基盤。
+        # CRN: 同 seed なら両席同一デッキ（リーダーIDタプルで席別指定可）。deckgen のカーブ重み生成。
+        import deckgen
+        l1id, l2id = realistic_leaders
+        l1, c1 = deckgen.build_realistic_deck(db, "p1", l1id, random.Random(seed * 2))
+        l2, c2 = deckgen.build_realistic_deck(db, "p2", l2id, random.Random(seed * 2 + 1))
+    else:
+        l1, c1 = build_deck(db, "p1")
+        l2, c2 = build_deck(db, "p2")
     manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
     manager.start_game()
     # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
