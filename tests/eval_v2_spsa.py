@@ -33,6 +33,7 @@ PARAMS = [
     "V2_W_LIFE_PRECIOUS", "V2_W_LIFE_HIGH", "V2_W_DECK",
     "V2_W_DEV", "V2_W_CTR", "V2_W_BODY", "V2_W_TELE",
     "V2_KAPPA", "V2_LAMBDA", "V2_W_DON",
+    "V2_W_SETTLE_THREAT",   # #4 settle 悲観項の重み（Phase 0 で追加・SPSA で較正）
 ]
 M_LO, M_HI = 0.2, 5.0          # 乗数のクリップ（暴走防止）
 # チェックポイント（再起動耐性）: best 更新ごとに best 係数を書き出す（落ちても進捗が残る）。
@@ -124,7 +125,9 @@ def main(argv=None):
     ap.add_argument("--iters", type=int, default=12)
     ap.add_argument("--games", type=int, default=8, help="1 評価あたりの自己対戦局数（多いほど低ノイズ・遅い）")
     ap.add_argument("--seed0", type=int, default=0)
-    ap.add_argument("--max-steps", type=int, default=400)
+    ap.add_argument("--max-steps", type=int, default=4000,
+                    help="局の最大ステップ。正当な長期戦を人為タイムアウトさせない値（census 最長~24T）。"
+                         "旧既定400は低すぎて膠着誘発係数を破棄＝バイアス源だった（計画 §3.3）")
     args = ap.parse_args(argv)
     spsa(args.iters, args.games, args.max_steps, args.seed0)
     return 0

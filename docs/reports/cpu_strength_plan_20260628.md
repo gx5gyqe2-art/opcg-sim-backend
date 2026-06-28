@@ -55,9 +55,14 @@
 - **目的**：探索打ち切り（settle＝相手ターン境界へ整流した葉）で「未読の相手手番」の脅威を悲観的に見積もる。
   plan 撤去で消した `W_SETTLE_PRESSURE`／telegraph 悲観の deck非依存な代替。
 - **定式化**：settle 葉のスコアから次を**減算**（root 視点）。
-  `penalty = W_SETTLE_THREAT × 予測アクティブドン × γ_surv`
-  - 予測アクティブドン ＝ `min(10, opp_total_don + 2)`（ターン開始でレストドンも全アクティブ化＋ドンデッキ2枚補充・上限10。`opp_total_don = active + rested + attached`）
-  - γ_surv ＝ L1 と同じ生存割引（`clamp(my_life/(opp_clock+ε),0,1)^κ`）＝自分がピンチほど悲観を深める
+  `penalty = W_SETTLE_THREAT × 予測アクティブドン × danger × V2_SCALE`
+  - 予測アクティブドン ＝ `min(10, opp_total_don)`（`opp_total_don = active + rested + attached`・上限10）。
+    **実装時の修正**：settle は相手のターン開始（ドンフェイズ＝レスト全アクティブ化＋2枚補充）を**通過してから**
+    停止するため、停止点の opp ドンは既に補充済み。よって `+2` を別途足さず total_don をそのまま読む方が正確
+    （当初案の `+2` は root 手番末＝ドンフェイズ前を前提とした式だった）。
+  - danger ＝ `1 − γ_surv`（γ_surv ＝ L1 と同じ生存割引 `clamp(my_life/(opp_clock+ε),0,1)^κ`）。
+    **実装時の修正**：当初案の「× γ_surv」は本文意図（**ピンチ＝γ_surv 低いほど悲観を深める**）と**逆**
+    （× γ_surv だとピンチで penalty が縮む）。意図どおり `danger = 1 − γ_surv` を掛ける（γ低＝危険ほど大）。
 - **スコープ**：**`_settle_eval` 限定**（全葉に適用しない）。horizon 内で相手手番を実読した葉では不要＝二重悲観回避。
 - **二重計上の回避**：ドンを「未読手番での上乗せ脅威」として扱う（盤面の現打点は R_board(opp)/Tele で計上済み）。
   Tele(opp→me) は**致死**の番兵、settle pressure は**致死未満の被クロック/妨害ポテンシャル**、と棲み分ける。

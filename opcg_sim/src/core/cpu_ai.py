@@ -771,7 +771,11 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, ply: int = 0) -> f
     # 高く（生 W_WIN で）見えてしまう不整合を防ぐ＝lethal 認識の ply 割引を一貫させる。
     if manager.winner is not None:
         return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
-    return evaluate(manager, root_name, see_opp_hand=see_opp_hand)
+    # #4 settle 悲観項（settle 限定）: 未読の相手手番の脅威を root スコアから減算する。
+    # 全葉でなくここ（打ち切り＝相手手番を読めていない葉）だけに適用＝二重悲観を避ける。
+    from . import cpu_eval_v2
+    base = evaluate(manager, root_name, see_opp_hand=see_opp_hand)
+    return base - cpu_eval_v2.settle_threat_penalty(manager, root_name)
 
 
 def _record_killer(killers: Optional[Dict[int, List[tuple]]], ply: int, move: Dict[str, Any]) -> None:
