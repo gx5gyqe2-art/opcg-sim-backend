@@ -223,8 +223,13 @@ def _effective_max_ply() -> int:
 # 初手は盤面が空＝L1 評価が最も平坦で、汎用探索では MULLIGAN/KEEP に有意差が付かず実質ほぼ KEEP
 # （勝率を捨てている）。そこで「序盤に動けるか」だけを deck非依存の軽量ルールで判定し、明らかな
 # 事故初手のみ引き直す。アーキタイプ依存（plan/profile 復活）は持ち込まない（全廃済みの憲法）。
-# 決定的（盤面のみ参照・RNG 不使用）＝CRN／決定論リプレイを壊さない。OPCG_MULLIGAN_POLICY=0 で従来へ。
-_USE_MULLIGAN_POLICY = _env_int("OPCG_MULLIGAN_POLICY", 1) != 0
+# 決定的（盤面のみ参照・RNG 不使用）＝CRN／決定論リプレイを壊さない。
+# 【既定 OFF（2026-06-28）】A/B 実測で Elo 中立（合成 -28／実構築デッキ -11・いずれも非有意）＝本アーキでは
+# マリガンは伸びしろの無いレバー（幽霊）と確定。憲法（計測ゲート＝有意な+Eloの無い変更は出荷しない）に従い
+# 既定 OFF。コードはフラグで温存（OPCG_MULLIGAN_POLICY=1 or set_mulligan_override(True) で有効化＝検証/再測定用）。
+# 別件: baseline（generic eval）は turn0 が平坦で初手を ~52% ランダムにマリガンする潜在不具合があるが、
+# それは Elo に出ない（本方策で置換しても中立）＝挙動是正が要るなら別途判断（§H 追補）。
+_USE_MULLIGAN_POLICY = _env_int("OPCG_MULLIGAN_POLICY", 0) != 0
 MULL_EARLY_COST_MAX = 3     # 「序盤に出せるキャラ」のコスト上限（1..この値）
 MULL_MIN_EARLY = 1          # 序盤キャラがこの数未満なら引き直し（初動が無い＝動けない事故初手）
 MULL_HIGH_COST_MIN = 5      # 「重い」と見なすコスト下限
