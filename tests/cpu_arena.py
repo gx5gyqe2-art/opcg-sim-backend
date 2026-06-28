@@ -30,8 +30,30 @@ from typing import Any, Dict, List, Optional
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 
 from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai, cpu_value_model
+from opcg_sim.src.core import action_api, cpu_ai, cpu_value_model, cpu_eval_v2
 from opcg_sim.src.core.invariants import check_invariants, check_turn_boundary
+
+# L1（cpu_eval_v2）係数の席別上書き用: 出荷時の既定値を一度だけ退避し、各 decide 前に
+# 「既定へ戻す→その席の coeffs を適用」する（席別 A/B＝SPSA で候補θ vs 凍結基準を測る）。
+_V2_DEFAULTS: Optional[Dict[str, float]] = None
+
+
+def _v2_defaults() -> Dict[str, float]:
+    global _V2_DEFAULTS
+    if _V2_DEFAULTS is None:
+        _V2_DEFAULTS = {k: getattr(cpu_eval_v2, k) for k in dir(cpu_eval_v2)
+                        if k.startswith("V2_") and isinstance(getattr(cpu_eval_v2, k), (int, float))}
+    return _V2_DEFAULTS
+
+
+def _apply_v2_coeffs(coeffs: Optional[Dict[str, float]]) -> None:
+    """L1 係数を「既定へリセット→coeffs を上書き」。coeffs=None なら既定のまま。"""
+    base = _v2_defaults()
+    for k, v in base.items():
+        setattr(cpu_eval_v2, k, v)
+    if coeffs:
+        for k, v in coeffs.items():
+            setattr(cpu_eval_v2, k, v)
 
 from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS, InvariantError
 
@@ -96,7 +118,7 @@ def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
 
 def _make_decider(difficulty: str, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                   policy_rng=None, pimc_worlds: int = 1, value_alpha=None, per_move_budget=None,
-                  search=None):
+                  search=None, coeffs=None):
     """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き）。
 
     `info_policy`（Phase -1）で情報方針を選ぶ＝凍結 fair-hard vs cheat-hard の A/B を席交互で測れる。
@@ -114,6 +136,7 @@ def _make_decider(difficulty: str, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY
         cpu_value_model.set_alpha_override(value_alpha)
         cpu_ai.set_budget_override(per_move_budget)
         cpu_ai.set_search_override(s_horizon, s_max_ply)  # 探索深さ／ply 上限を席別に切替（深さA/B用）
+        _apply_v2_coeffs(coeffs)  # この席の L1 係数を適用（席別 A/B＝SPSA 用。None＝既定）
         try:
             return cpu_ai.decide_guarded(manager, actor, difficulty, prng, mem,
                                          info_policy=info_policy, pimc_worlds=pimc_worlds)
@@ -121,6 +144,7 @@ def _make_decider(difficulty: str, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY
             cpu_value_model.set_alpha_override(None)
             cpu_ai.set_budget_override(None)
             cpu_ai.set_search_override(None, None)
+            _apply_v2_coeffs(None)  # 既定へ戻す（相手席が None でも汚染しない）
     return _decide
 
 
@@ -132,7 +156,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p1_pimc: int = 1, p2_pimc: int = 1,
               p1_alpha=None, p2_alpha=None,
               p1_budget=None, p2_budget=None,
-              p1_search=None, p2_search=None) -> Dict[str, Any]:
+              p1_search=None, p2_search=None,
+              p1_coeffs=None, p2_coeffs=None) -> Dict[str, Any]:
     """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
@@ -154,8 +179,8 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
-    deciders = {"p1": _make_decider(p1_difficulty, p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget, p1_search),
-                "p2": _make_decider(p2_difficulty, p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget, p2_search)}
+    deciders = {"p1": _make_decider(p1_difficulty, p1_policy, p1_rng, p1_pimc, p1_alpha, p1_budget, p1_search, p1_coeffs),
+                "p2": _make_decider(p2_difficulty, p2_policy, p2_rng, p2_pimc, p2_alpha, p2_budget, p2_search, p2_coeffs)}
 
     step = 0
     prev_turn = manager.turn_count

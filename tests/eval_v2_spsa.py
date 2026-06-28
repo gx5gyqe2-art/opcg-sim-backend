@@ -7,7 +7,8 @@ SPSA = Simultaneous Perturbation Stochastic Approximation。**全係数を同時
 
 - 対象パラメータ＝`cpu_eval_v2.V2_*`（≈10個）。各を初期値まわりの**乗数 m_i（初期1.0）**で表し、
   m を最適化（スケール差を吸収・`m∈[0.2,5]` にクリップ）。
-- 目的 f(m) ＝ v2(m) を ON にした側 vs ベースライン（評価OFF＝成熟J値評価）の**勝率**（席交互）。
+- 目的 f(m) ＝ 候補 L1(m) vs **凍結基準 L1(init)** の**勝率**（席別係数・席交互）。手書きeval 撤去後は
+  両側 L1 なので、係数差を席別に与えて比較する（同係数＝50%）。init=SPSA 開始時の出荷係数。
 - CRN: 1 イテレーション内の f(m+) と f(m−) は**同一ゲームseed集合**で測り、勾配の分散を落とす。
 
 注意: モジュール定数を直接書き換える（単一スレッド arena＝相手と干渉しない）。プロセス内のみ・出荷物не変更。
@@ -60,17 +61,19 @@ def set_params(init, m):
         setattr(V2, name, init[name] * _clip(mi, M_LO, M_HI))
 
 
-def winrate_vs_base(db, games, seed0, max_steps):
-    """v2 ON vs 評価OFF（base）の勝率を**対照ペア（antithetic）＋コア並列**で測る（分散低減＋高速化）。
+def winrate_vs_ref(db, games, seed0, max_steps, init):
+    """候補θ（現在の V2.* ＝set_params 済み）vs **凍結基準 init** の勝率を対照ペア＋並列で測る。
 
-    `arena_parallel.paired_play` で各 seed を両席1回ずつ（同 game-seed・`separate_policy_rng`）並列実行。
-    現在の評価係数（set_params で設定済みの θ）をワーカーへ `coeffs` で渡す＝その θ で並列対戦。
-    games は総局数（pairs=games//2）。v2 側勝率を返す（SPSA の目的関数＝低ノイズ・高速）。
+    手書きeval 撤去後は両側 L1 なので、係数差を**席別**に与えないと A/B にならない（同係数＝50%）。
+    challenger=候補θ／baseline=init（SPSA 開始時の出荷係数）を席別に渡し、各 seed を両席1回ずつ
+    （同 game-seed・`separate_policy_rng`）で測る。games は総局数（pairs=games//2）。candidate 側勝率を返す。
     """
     from arena_parallel import paired_play
     pairs = max(1, games // 2)
-    coeffs = {name: float(getattr(V2, name)) for name in PARAMS}   # 親の θ をワーカーへ
-    res = paired_play(pairs, seed0=seed0, max_steps=max_steps, coeffs=coeffs)
+    cand = {name: float(getattr(V2, name)) for name in PARAMS}   # 現在の候補θ
+    ref = {name: float(init[name]) for name in PARAMS}           # 凍結基準（init）
+    res = paired_play(pairs, seed0=seed0, max_steps=max_steps,
+                      challenger_coeffs=cand, baseline_coeffs=ref)
     return res["win_rate"]
 
 
@@ -83,7 +86,7 @@ def spsa(iters, games, max_steps, seed0):
     a, c, A, alpha, gamma = 0.20, 0.15, max(1.0, iters / 10.0), 0.602, 0.101
 
     set_params(init, m)
-    base_wr = winrate_vs_base(db, games, seed0, max_steps)
+    base_wr = winrate_vs_ref(db, games, seed0, max_steps, init)
     best_m, best_wr = list(m), base_wr
     print(f"[init] winrate={base_wr:.3f} (Elo {elo_delta(base_wr):+.0f})")
 
@@ -95,12 +98,12 @@ def spsa(iters, games, max_steps, seed0):
         gseed = seed0 + 1000 * k                       # イテレーションごとに別のゲーム集合
         mp = [m[i] + ck * delta[i] for i in range(n)]
         mm = [m[i] - ck * delta[i] for i in range(n)]
-        set_params(init, mp); fp = winrate_vs_base(db, games, gseed, max_steps)
-        set_params(init, mm); fm = winrate_vs_base(db, games, gseed, max_steps)
+        set_params(init, mp); fp = winrate_vs_ref(db, games, gseed, max_steps, init)
+        set_params(init, mm); fm = winrate_vs_ref(db, games, gseed, max_steps, init)
         # 勝率を最大化（+方向へ更新）。ghat_i = (fp-fm)/(2 ck delta_i)。
         m = [_clip(m[i] + ak * (fp - fm) / (2 * ck * delta[i]), M_LO, M_HI) for i in range(n)]
         # この m を別 seed で評価（過適合監視）。
-        set_params(init, m); wr = winrate_vs_base(db, games, gseed + 7, max_steps)
+        set_params(init, m); wr = winrate_vs_ref(db, games, gseed + 7, max_steps, init)
         tag = ""
         if wr > best_wr:
             best_wr, best_m = wr, list(m); tag = "  <- best"

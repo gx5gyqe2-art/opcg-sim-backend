@@ -47,10 +47,6 @@ def _play_one(spec: Dict[str, Any]) -> Dict[str, Any]:
     例外（InvariantError 等）はワーカー内で握り潰して error 文字列で返す＝1局の失敗でプール全体を
     ハングさせない（pickle 不能例外の転送失敗対策）。失敗局は winner=None・error 付きで親が集計から除外。
     """
-    coeffs = spec.get("coeffs")
-    if coeffs:
-        for k, v in coeffs.items():
-            setattr(cpu_eval_v2, k, v)
     try:
         res = play_game(spec["seed"], _DB, spec["p1d"], spec["p2d"],
                         max_steps=spec.get("max_steps", DEFAULT_MAX_STEPS),
@@ -58,6 +54,7 @@ def _play_one(spec: Dict[str, Any]) -> Dict[str, Any]:
                         p1_budget=spec.get("p1_budget"), p2_budget=spec.get("p2_budget"),
                         p1_alpha=spec.get("p1_alpha"), p2_alpha=spec.get("p2_alpha"),
                         p1_pimc=spec.get("p1_pimc", 1), p2_pimc=spec.get("p2_pimc", 1),
+                        p1_coeffs=spec.get("p1_coeffs"), p2_coeffs=spec.get("p2_coeffs"),
                         separate_policy_rng=True)
         return {"pair": spec["pair"], "seat": spec["seat"], "winner": res["winner"]}
     except Exception as e:
@@ -70,16 +67,19 @@ def _default_workers() -> int:
 
 
 def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
-                coeffs: Optional[Dict[str, float]] = None, workers: Optional[int] = None,
+                challenger_coeffs: Optional[Dict[str, float]] = None,
+                baseline_coeffs: Optional[Dict[str, float]] = None,
+                workers: Optional[int] = None,
                 challenger_search=None, baseline_search=None,
                 challenger_budget=None, baseline_budget=None,
                 challenger_difficulty: str = "hard", baseline_difficulty: str = "hard",
                 challenger_alpha=None, baseline_alpha=None,
                 challenger_pimc: int = 1, baseline_pimc: int = 1) -> Dict[str, Any]:
-    """対照ペアを**並列**で実行し、ペア単位スコア（{0,0.5,1}）と勝率を返す。
+    """対照ペアを**並列**で実行し、ペア単位スコア（{0,0.5,1}）と勝率（challenger 視点）を返す。
 
     評価は L1 単一系統（`cpu_eval_v2`）。両者とも難易度 hard（既定）。
-    coeffs（任意）= L1（`cpu_eval_v2`）の係数上書き（SPSA の θ 評価用）。workers=1 で逐次（デバッグ用）。
+    `challenger_coeffs`/`baseline_coeffs`（任意）= L1 係数の**席別**上書き（SPSA の候補θ vs 凍結基準）。
+    手書きeval 撤去後は両側 L1 なので、係数差を席別に与えないと有意な A/B にならない（同係数＝50%）。
     `challenger_search`/`baseline_search`（任意・深さA/B用）= `(horizon, max_ply)` で席別に探索深さを
     上書き（None で既定）。探索深さだけを振れば「深さの伸びしろ」を測れる。
     `challenger_pimc`/`baseline_pimc`・`challenger_budget`/`baseline_budget` で hard の
@@ -96,13 +96,15 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                       "p1_budget": challenger_budget, "p2_budget": baseline_budget,
                       "p1_alpha": challenger_alpha, "p2_alpha": baseline_alpha,
                       "p1_pimc": challenger_pimc, "p2_pimc": baseline_pimc,
-                      "max_steps": max_steps, "coeffs": coeffs})
+                      "p1_coeffs": challenger_coeffs, "p2_coeffs": baseline_coeffs,
+                      "max_steps": max_steps})
         specs.append({"pair": k, "seat": "B", "seed": seed, "p1d": bd, "p2d": cd,
                       "p1_search": baseline_search, "p2_search": challenger_search,
                       "p1_budget": baseline_budget, "p2_budget": challenger_budget,
                       "p1_alpha": baseline_alpha, "p2_alpha": challenger_alpha,
                       "p1_pimc": baseline_pimc, "p2_pimc": challenger_pimc,
-                      "max_steps": max_steps, "coeffs": coeffs})
+                      "p1_coeffs": baseline_coeffs, "p2_coeffs": challenger_coeffs,
+                      "max_steps": max_steps})
 
     if workers <= 1:
         _init_worker()
