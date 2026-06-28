@@ -55,6 +55,7 @@ def _play_one(spec: Dict[str, Any]) -> Dict[str, Any]:
                         p1_alpha=spec.get("p1_alpha"), p2_alpha=spec.get("p2_alpha"),
                         p1_pimc=spec.get("p1_pimc", 1), p2_pimc=spec.get("p2_pimc", 1),
                         p1_coeffs=spec.get("p1_coeffs"), p2_coeffs=spec.get("p2_coeffs"),
+                        p1_mulligan=spec.get("p1_mulligan"), p2_mulligan=spec.get("p2_mulligan"),
                         separate_policy_rng=True)
         return {"pair": spec["pair"], "seat": spec["seat"], "winner": res["winner"]}
     except Exception as e:
@@ -74,7 +75,8 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                 challenger_budget=None, baseline_budget=None,
                 challenger_difficulty: str = "hard", baseline_difficulty: str = "hard",
                 challenger_alpha=None, baseline_alpha=None,
-                challenger_pimc: int = 1, baseline_pimc: int = 1) -> Dict[str, Any]:
+                challenger_pimc: int = 1, baseline_pimc: int = 1,
+                challenger_mulligan=None, baseline_mulligan=None) -> Dict[str, Any]:
     """対照ペアを**並列**で実行し、ペア単位スコア（{0,0.5,1}）と勝率（challenger 視点）を返す。
 
     評価は L1 単一系統（`cpu_eval_v2`）。両者とも難易度 hard（既定）。
@@ -97,6 +99,7 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                       "p1_alpha": challenger_alpha, "p2_alpha": baseline_alpha,
                       "p1_pimc": challenger_pimc, "p2_pimc": baseline_pimc,
                       "p1_coeffs": challenger_coeffs, "p2_coeffs": baseline_coeffs,
+                      "p1_mulligan": challenger_mulligan, "p2_mulligan": baseline_mulligan,
                       "max_steps": max_steps})
         specs.append({"pair": k, "seat": "B", "seed": seed, "p1d": bd, "p2d": cd,
                       "p1_search": baseline_search, "p2_search": challenger_search,
@@ -104,6 +107,7 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                       "p1_alpha": baseline_alpha, "p2_alpha": challenger_alpha,
                       "p1_pimc": baseline_pimc, "p2_pimc": challenger_pimc,
                       "p1_coeffs": baseline_coeffs, "p2_coeffs": challenger_coeffs,
+                      "p1_mulligan": baseline_mulligan, "p2_mulligan": challenger_mulligan,
                       "max_steps": max_steps})
 
     if workers <= 1:

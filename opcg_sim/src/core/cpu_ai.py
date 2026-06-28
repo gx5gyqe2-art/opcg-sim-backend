@@ -219,6 +219,52 @@ def _effective_max_ply() -> int:
     return _MAX_PLY_OVERRIDE if _MAX_PLY_OVERRIDE is not None else HARD_MAX_PLY
 
 
+# ① マリガン方策（deck非依存カーブ規則・docs/reports/cpu_strength_plan_20260628.md §H）。
+# 初手は盤面が空＝L1 評価が最も平坦で、汎用探索では MULLIGAN/KEEP に有意差が付かず実質ほぼ KEEP
+# （勝率を捨てている）。そこで「序盤に動けるか」だけを deck非依存の軽量ルールで判定し、明らかな
+# 事故初手のみ引き直す。アーキタイプ依存（plan/profile 復活）は持ち込まない（全廃済みの憲法）。
+# 決定的（盤面のみ参照・RNG 不使用）＝CRN／決定論リプレイを壊さない。OPCG_MULLIGAN_POLICY=0 で従来へ。
+_USE_MULLIGAN_POLICY = _env_int("OPCG_MULLIGAN_POLICY", 1) != 0
+MULL_EARLY_COST_MAX = 3     # 「序盤に出せるキャラ」のコスト上限（1..この値）
+MULL_MIN_EARLY = 1          # 序盤キャラがこの数未満なら引き直し（初動が無い＝動けない事故初手）
+MULL_HIGH_COST_MIN = 5      # 「重い」と見なすコスト下限
+MULL_MAX_HIGH = 2           # 重いカードがこの数を超えたら引き直し（高コストに偏った手詰まり初手）
+
+# 席別 A/B 用の per-decide オーバーライド（None=モジュール既定・set_*_override と同型）。
+_MULLIGAN_OVERRIDE = None
+
+
+def set_mulligan_override(flag):
+    """マリガン方策の ON/OFF を一時上書き（評価アリーナの席別 A/B 用・None で既定へ）。"""
+    global _MULLIGAN_OVERRIDE
+    _MULLIGAN_OVERRIDE = None if flag is None else bool(flag)
+
+
+def _mulligan_policy_on() -> bool:
+    return _USE_MULLIGAN_POLICY if _MULLIGAN_OVERRIDE is None else _MULLIGAN_OVERRIDE
+
+
+def _mulligan_keep(manager, name: str) -> bool:
+    """deck非依存のカーブ規則で初手をキープすべきか（True=KEEP / False=MULLIGAN）。
+
+    保守的: 「序盤に展開できるキャラが居ない」または「高コストに偏った」明らかな事故初手のみ引き直す。
+    それ以外はキープ（引き直しは賭けなので、明確に悪い手に限る）。printed cost（master.cost）で判定。
+    """
+    from ..models.enums import CardType
+    me = _player_by_name(manager, name)
+    hand = list(getattr(me, "hand", []))
+    if not hand:
+        return True
+    early = sum(1 for c in hand if c.master.type == CardType.CHARACTER
+                and 1 <= c.master.cost <= MULL_EARLY_COST_MAX)
+    highs = sum(1 for c in hand if c.master.cost >= MULL_HIGH_COST_MIN)
+    if early < MULL_MIN_EARLY:
+        return False   # 序盤に動けない初手＝引き直し（新規の5枚が平均的に勝る）
+    if highs > MULL_MAX_HIGH:
+        return False   # 重さに偏った初手＝引き直し
+    return True
+
+
 # Phase 4 本番配線: PIMC 既定世界数（OPCG_PIMC_WORLDS・既定 1＝休眠＝従来同値）。本番 Dockerfile で 4 を
 # 設定して出荷 fair CPU を「PIMC K=4・予算按分」へ切替（OPCG_HARD_PER_MOVE_BUDGET=75 併用＝合計≈300＝
 # 等倍計算量・1秒内・+53 Elo）。各 decide 系の pimc_worlds 既定値に使う＝env 未設定なら全経路で 1。
@@ -1410,6 +1456,28 @@ def decide(manager, player, difficulty: str = "hard", rng: Optional[random.Rando
                                     "prelim": None, "deep": None}]
             trace["regret"] = 0.0
         return moves[0]
+    # ① マリガン方策（deck非依存・§H）: 初手の MULLIGAN/KEEP は L1 が平坦で探索は無力＝専用ルールで判定。
+    if _mulligan_policy_on():
+        mull = next((m for m in moves if m.get("action_type") == "MULLIGAN"), None)
+        keep = next((m for m in moves if m.get("action_type") == "KEEP_HAND"), None)
+        if mull is not None and keep is not None:
+            chosen = keep if _mulligan_keep(manager, player.name) else mull
+            if trace is not None:
+                trace["difficulty"] = difficulty
+                trace["turn"] = manager.turn_count
+                trace["chosen"] = _describe_move(manager, chosen)
+                trace["forced"] = "mulligan_policy"
+                trace["candidates"] = [{"move": _describe_move(manager, m), "prelim": None, "deep": None}
+                                       for m in moves]
+                trace["regret"] = 0.0
+                # J値成分内訳（トレース契約の維持）: 選んだ手の結果盤面を評価して内訳を採る。
+                see_opp_hand, _ = _resolve_info_policy(info_policy)
+                child = _apply_clone(manager, player.name, chosen, stop_at_select=True)
+                if child is not None:
+                    comp: Dict[str, Any] = {}
+                    comp["total"] = round(evaluate(child, player.name, see_opp_hand=see_opp_hand, out=comp), 1)
+                    trace["j_components"] = comp
+            return chosen
     moves = _prune_don_moves(manager, player.name, moves)  # B-2: 無意味なドン付与をルートから除外
     moves = _prune_futile_attacks(manager, player.name, moves)  # 倒せない/届かない無駄攻撃を除外
 
