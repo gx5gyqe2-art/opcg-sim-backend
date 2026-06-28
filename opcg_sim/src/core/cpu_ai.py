@@ -1130,10 +1130,10 @@ def _scored_search(manager, name: str, moves: List[Dict[str, Any]],
     return out
 
 
-# 1 ターン内に CPU が取れる手の総数上限（暴走/無限ループの最終防壁）。
+# 1 ターン内に CPU が取れる手の総数上限（無限ループの最終防壁＝終了保証）。
+# 正当なターンが到達しない大きさ＝思考に干渉しない。起動効果の繰り返しはエンジンの正規ゲート
+# （コスト充足・ターン使用回数）で自己制限するため、旧 REPEAT_CAP は撤去した（2026-06-27）。
 TURN_ACTION_CAP = 60
-# 同一の起動効果/ドン付与をこのターン内に繰り返してよい回数の上限。
-REPEAT_CAP = 3
 
 
 def _move_sig(move: Dict[str, Any]) -> tuple:
@@ -1202,9 +1202,8 @@ def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_onl
     line: List[Dict[str, Any]] = []
     cur = manager
     KEY_PID, KEY_ACTION = _pending_keys()
-    repeatable = {"ACTIVATE_MAIN"}  # ATTACH_DON は除外: アクティブドン(≤10)で自然に有界＝無限ループ不能。含めると1体への4枚目以降のドン付与を誤って弾きリーサル/テンポを損なう（2026-06-27計測で発火の約9割がこれ）
-    counts: Dict[tuple, int] = {}   # decide_guarded と同じ繰り返しガード（無限起動効果で PV が膨れるのを防ぐ）
-    cur_turn = cur.turn_count
+    # 繰り返しガードは不要（起動メインはエンジンの正規ゲートで自己制限・REPEAT_CAP 撤去済み）。
+    # PV は `max_steps` で有界。
     for _ in range(max_steps):
         if cur.winner is not None:
             line.append({"winner": cur.winner})
@@ -1215,9 +1214,6 @@ def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_onl
         # 葉: start_turn から horizon ターン進んだ MAIN_ACTION（_search と同じ静止点）で打ち切る。
         if pa[1] == "MAIN_ACTION" and (cur.turn_count - start_turn) >= horizon:
             break
-        if cur.turn_count != cur_turn:   # ターンが変わったら繰り返しカウントをリセット
-            cur_turn = cur.turn_count
-            counts = {}
         actor_name = pa[0]
         is_max = (actor_name == root_name)
         moves = _selection_moves(cur, actor_name)
@@ -1228,9 +1224,6 @@ def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_onl
             filt = [m for m in moves if not _consumes_hand_card(cur, actor_name, m)]
             if filt:
                 moves = filt
-        # 繰り返しガード: 同一の起動効果/ドン付与を REPEAT_CAP 回使い切ったら候補から除外する。
-        moves = [m for m in moves
-                 if not (m.get("action_type") in repeatable and counts.get(_move_sig(m), 0) >= REPEAT_CAP)]
         if not moves:
             break
         best = None
@@ -1244,8 +1237,6 @@ def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_onl
         if best is None:
             break
         sc, m, child = best
-        if m.get("action_type") in repeatable:
-            counts[_move_sig(m)] = counts.get(_move_sig(m), 0) + 1
         line.append({"turn": cur.turn_count, "actor": actor_name, "is_max": is_max,
                      "move": _describe_move(cur, m), "eval": round(sc, 1)})
         cur = child
@@ -1533,21 +1524,22 @@ def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[rand
                    trace: Optional[Dict[str, Any]] = None, trace_read_ahead: bool = True,
                    info_policy: str = DEFAULT_INFO_POLICY,
                    pimc_worlds: int = PIMC_WORLDS_DEFAULT) -> Optional[Dict[str, Any]]:
-    """ターン内メモリ `mem` を用いた暴走防止つきの意思決定。
+    """ターン内メモリ `mem` を用いた終了保証つきの意思決定。
 
     `mem` は呼び出し側が対局ごとに保持する dict（ステートレスな /cpu/step でも CPU_GAMES に
-    保持して渡す）。同一ターン内で:
-      - 取った手の総数が TURN_ACTION_CAP を超えたら強制 TURN_END
-      - 同じ起動効果（ACTIVATE_MAIN）を REPEAT_CAP 回行ったら候補から除外（イガラム等の無限ループ防止）
-    これにより「効果に per-turn 制限が無い/付け忘れ」のカードでも CPU ターンが必ず終わる。
-    ドン付与（ATTACH_DON）はアクティブドン(≤10)で自然に有界なのでキャップ対象外（誤打ち切り回避）。
+    保持して渡す）。同一ターン内で **取った手の総数が TURN_ACTION_CAP を超えたら強制 TURN_END** とし、
+    「効果に per-turn 制限が無い/付け忘れ」のカードでも CPU ターンが必ず終わることを最終保証する。
+
+    かつては同一起動効果の繰り返しを REPEAT_CAP で除外していたが、根因（自己レストコストの
+    `cost_optional` 誤判定＋`ref_id='self'` 充足の食い違い）をエンジン側で修正し、起動メインが
+    エンジンの正規ゲート（コスト充足・ターン使用回数）で自己制限するようになったため撤去した
+    （2026-06-27 計測で REPEAT_CAP 発火 0/2231）。`mem["killers"]`（探索の手順序）は存続。
     """
     rng = rng or random
     if mem is None:
         mem = {}
     if mem.get("turn") != manager.turn_count:
         mem["turn"] = manager.turn_count
-        mem["counts"] = {}
         mem["total"] = 0
         mem["killers"] = {}   # ④粒度b: killer 表はターン内でのみ持ち越す（ターン跨ぎの古い表は破棄）
 
@@ -1556,7 +1548,7 @@ def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[rand
         return None
     end_move = next((m for m in moves if m.get("action_type") == "TURN_END"), None)
 
-    # 総数キャップ: 上限超過ならターンを畳む（畳めない＝対話中等なら通常選択）。
+    # 総数キャップ（最終的な終了保証）: 上限超過ならターンを畳む（畳めない＝対話中等なら通常選択）。
     if end_move is not None and mem.get("total", 0) >= TURN_ACTION_CAP:
         if trace is not None:
             trace["difficulty"] = difficulty
@@ -1567,24 +1559,13 @@ def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[rand
             trace["regret"] = 0.0
         return end_move
 
-    # 繰り返しキャップ: 同一の起動効果（ACTIVATE_MAIN）を上限まで使い切ったら除外する。
-    counts = mem.get("counts", {})
-    repeatable = {"ACTIVATE_MAIN"}  # ATTACH_DON は除外: アクティブドン(≤10)で自然に有界＝無限ループ不能。含めると1体への4枚目以降のドン付与を誤って弾きリーサル/テンポを損なう（2026-06-27計測で発火の約9割がこれ）
-    filtered = [m for m in moves
-                if not (m.get("action_type") in repeatable and counts.get(_move_sig(m), 0) >= REPEAT_CAP)]
-    if not filtered:
-        filtered = [end_move] if end_move is not None else moves
-
     # ④粒度b: killer 表を mem に保持して連続 decide 間で持ち越す（reorder は集合不変＝安全だが実測で
     # 中立〜微減＝既定 OFF。`_USE_PV_CROSS_DECIDE` 有効時のみ供給。OFF は killer_state=None＝粒度a のみ）。
     ks = mem.setdefault("killers", {}) if (_USE_PV_ORDER and _USE_PV_CROSS_DECIDE) else None
-    move = decide(manager, player, difficulty, rng, moves=filtered,
+    move = decide(manager, player, difficulty, rng, moves=moves,
                   trace=trace, trace_read_ahead=trace_read_ahead, killer_state=ks,
                   info_policy=info_policy, pimc_worlds=pimc_worlds)
     if move is not None:
-        sig = _move_sig(move)
-        counts[sig] = counts.get(sig, 0) + 1
-        mem["counts"] = counts
         mem["total"] = mem.get("total", 0) + 1
     return move
 

@@ -166,7 +166,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
   - `regret`: deep 最善 − 1-ply 貪欲手の deep 値（`decide_with_regret` と同義の崖エラー代理）。
   - `j_components`: 選んだ手の結果盤面の **L1 評価成分内訳**（`evaluate(out=…)` が L1 評価の内訳を `out["v2"]`
     キーに格納したもの＝カード通貨ベースの内訳＋`total`）。<!-- 旧 `_side_score` 由来の me/opp 別ライフ/手札/場…成分は 2026-06-27 の CPU 評価 L1 単一系統化で撤去。`plan_progress`/`telegraph` 成分は同日 plan 全廃で削除 -->
-  - `read_ahead`: 読み筋（各手番で 1-ply 最善を辿った貪欲 PV。`REPEAT_CAP` ガードで膨張しない）。
+  - `read_ahead`: 読み筋（各手番で 1-ply 最善を辿った貪欲 PV。`max_steps` で有界。`REPEAT_CAP` は 2026-06-27 撤去）。
 - **手記述は card_id 基準**（uuid は実行ごとに変わるため）＝同一 seed で安定再現・比較できる。
 - **トレースは観測専用**: `decide`/`decide_guarded` の `trace` 引数（既定 None＝**完全に無
   オーバーヘッド・挙動不変**）で採取する。トレース構築の追加クローンは getstate/setstate で
