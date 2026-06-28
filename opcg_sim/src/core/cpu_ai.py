@@ -1202,7 +1202,7 @@ def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_onl
     line: List[Dict[str, Any]] = []
     cur = manager
     KEY_PID, KEY_ACTION = _pending_keys()
-    repeatable = {"ACTIVATE_MAIN", "ATTACH_DON"}
+    repeatable = {"ACTIVATE_MAIN"}  # ATTACH_DON は除外: アクティブドン(≤10)で自然に有界＝無限ループ不能。含めると1体への4枚目以降のドン付与を誤って弾きリーサル/テンポを損なう（2026-06-27計測で発火の約9割がこれ）
     counts: Dict[tuple, int] = {}   # decide_guarded と同じ繰り返しガード（無限起動効果で PV が膨れるのを防ぐ）
     cur_turn = cur.turn_count
     for _ in range(max_steps):
@@ -1538,8 +1538,9 @@ def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[rand
     `mem` は呼び出し側が対局ごとに保持する dict（ステートレスな /cpu/step でも CPU_GAMES に
     保持して渡す）。同一ターン内で:
       - 取った手の総数が TURN_ACTION_CAP を超えたら強制 TURN_END
-      - 同じ起動効果/ドン付与を REPEAT_CAP 回行ったら候補から除外（イガラム等の無限ループ防止）
+      - 同じ起動効果（ACTIVATE_MAIN）を REPEAT_CAP 回行ったら候補から除外（イガラム等の無限ループ防止）
     これにより「効果に per-turn 制限が無い/付け忘れ」のカードでも CPU ターンが必ず終わる。
+    ドン付与（ATTACH_DON）はアクティブドン(≤10)で自然に有界なのでキャップ対象外（誤打ち切り回避）。
     """
     rng = rng or random
     if mem is None:
@@ -1566,9 +1567,9 @@ def decide_guarded(manager, player, difficulty: str = "hard", rng: Optional[rand
             trace["regret"] = 0.0
         return end_move
 
-    # 繰り返しキャップ: 起動効果/ドン付与の同一手を上限まで使い切ったら除外する。
+    # 繰り返しキャップ: 同一の起動効果（ACTIVATE_MAIN）を上限まで使い切ったら除外する。
     counts = mem.get("counts", {})
-    repeatable = {"ACTIVATE_MAIN", "ATTACH_DON"}
+    repeatable = {"ACTIVATE_MAIN"}  # ATTACH_DON は除外: アクティブドン(≤10)で自然に有界＝無限ループ不能。含めると1体への4枚目以降のドン付与を誤って弾きリーサル/テンポを損なう（2026-06-27計測で発火の約9割がこれ）
     filtered = [m for m in moves
                 if not (m.get("action_type") in repeatable and counts.get(_move_sig(m), 0) >= REPEAT_CAP)]
     if not filtered:
