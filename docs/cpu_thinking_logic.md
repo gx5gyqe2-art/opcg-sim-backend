@@ -122,6 +122,7 @@ _search(manager, root_name, alpha, beta, ply, budget, is_max...)
 
 _settle_eval: TURN_END/既定解決で相手ターン開始まで整流 → 静的 evaluate。
               勝敗未確定の settle 値は _SETTLE_CONFIDENCE で中立寄せ（既定解決の楽観是正）。
+              さらに settle_threat_penalty（#4・未読相手手番の悲観項＝予測ドン×danger×W_SETTLE_THREAT）を減算。
 ```
 
 ---

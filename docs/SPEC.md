@@ -266,7 +266,8 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       （各 `__setattr__`・passive dirty-flag）は `journal._TL.active` を直接読む。`_ponder_plan` も live 盤面を
       メインスレッドで clone してから `to_thread` へ渡す（deepcopy 競合の防止）。並行回帰 `tests/test_journal_concurrency.py`
       （スレッド 2 本を Event で同期し、旧グローバル実装なら必ず壊れるシナリオで live 属性が消えないことを固定）。
-      なお止血としてポンダリング自体も Dockerfile で無効化済み（再有効化は本 threadlocal 化により安全だが別途判断）。
+      なお当初は止血としてポンダリングを Dockerfile で無効化していたが、**本 threadlocal 化で安全化済みのため再有効化済み**
+      （現行 Dockerfile は `OPCG_PONDER=1`／`OPCG_PONDER_SPEC=1`＝⑥-a 先行計画・⑥-b 投機ポンダリングともに既定 ON）。
       ルート `_scored_search` も make/unmake 化済み（`_eval_root_move`・clone 版と完全同値）。**clone 除去の床に到達**:
       残クローンの内訳実測（hard decide）＝中断状態の再帰フォールバック ~90%（parked resolver 未 journaled）・
       ルート `_scored_search` ~5%（≈ decide の 0.7%・変換効果はノイズ内）。残コストは clone でなく **apply＋evaluate**。
