@@ -154,7 +154,10 @@ def _telegraph(attacker, defender, is_turn: bool) -> float:
     reach = _clock_of(attacker, defender, is_turn)
     blockers = sum(1 for c in defender.field
                    if not getattr(c, "is_rest", False) and _is_blocker(c))
-    counter_buffer = len(defender.hand) * 0.5   # 枚数×平均カウンター（~+1000の半分を枚数で・概算）
+    # 枚数×平均カウンター（~+1000の半分を枚数で・概算）。**意図的に枚数ベース**＝相手手札の中身
+    # （実カウンター値）は読まない。よって fair/cheat 情報方針に依らず telegraph は不変（隠れ情報を
+    # 覗かないフェア設計・§4.2）。中身を読む実装へ「修正」しないこと。
+    counter_buffer = len(defender.hand) * 0.5
     eff_reach = max(0.0, reach - blockers - counter_buffer)
     life = len(defender.life)
     # 届くほど（相手ライフに対して）大きい。lethal 到達で最大。主役は凹型ライフ＝控えめ。

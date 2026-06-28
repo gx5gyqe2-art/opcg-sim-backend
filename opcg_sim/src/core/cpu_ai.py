@@ -1358,6 +1358,9 @@ def _pimc_scored(manager, name: str, moves: List[Dict[str, Any]], k_worlds: int,
                 order.append(sig)
             else:
                 e[0] += s
+    # 除数が k_worlds なのは、各世界が同一のルート手集合（`_scored_search` は入力 moves と同一の
+    # 全 root sig を返す）を採点するため＝全 sig が全世界に現れる前提。`_scored_search` の返却集合を
+    # 部分集合化するなら、ここを「その sig が出た世界数」で割る形へ直す必要がある。
     scored = [(agg[sig][0] / k_worlds, agg[sig][1]) for sig in order]
     if collect is not None:  # トレース用（PIMC では prelim=deep=世界平均）
         collect.setdefault("prelim", {}); collect.setdefault("deep", {})
