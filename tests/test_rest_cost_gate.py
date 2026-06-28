@@ -48,6 +48,26 @@ def test_activate_main_rest_other_stays_optional():
     ab = _ability("【起動メイン】自分のキャラ1枚をレストにできる：カード1枚を引く。")
     assert ab.cost_optional is True
 
+
+# --- ref_id='self' の self-rest コスト充足は source 限定（2026-06-27） ---------------
+# satisfiability（_can_satisfy_node）は ref_id='self' を解決せず zone/player で全候補を返していたため、
+# レスト済み source でも「他にアクティブなキャラがいれば払える」と化け、自己レストの起動メインが
+# 無限再起動していた（OP01-063/EB04-024）。解決側（ref_id='self'→source）と整合させ source 限定にする。
+
+def test_self_rest_unactivatable_when_rested_even_with_other_active_char():
+    from engine_helpers import make_game, make_master, make_instance
+    from opcg_sim.src.models.enums import CardType
+    ab = _ability("【起動メイン】このキャラをレストにできる：相手の手札を1枚見る。")
+    gm, p1, _p2 = make_game()
+    src = make_instance(make_master(card_id="OP01-063", name="アーロン",
+                                    type=CardType.CHARACTER, abilities=(ab,)), owner="P1")
+    other = make_instance(make_master(card_id="X", name="別キャラ", type=CardType.CHARACTER), owner="P1")
+    p1.field = [src, other]
+    src.is_rest = False
+    assert gm._has_activatable_main(src, p1) is True       # アクティブなら起動可
+    src.is_rest = True                                     # 起動でレスト後を想定
+    assert gm._has_activatable_main(src, p1) is False      # 他がアクティブでも再起動不可（自己制限）
+
 HACHINOSU_TEXT = (
     "【起動メイン】自分の手札1枚を捨て、このステージをレストにできる："
     "自分のデッキの上から3枚を見て、特徴《黒ひげ海賊団》を持つカード1枚までを公開し、"
