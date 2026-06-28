@@ -56,6 +56,8 @@ def _play_one(spec: Dict[str, Any]) -> Dict[str, Any]:
                         p1_pimc=spec.get("p1_pimc", 1), p2_pimc=spec.get("p2_pimc", 1),
                         p1_coeffs=spec.get("p1_coeffs"), p2_coeffs=spec.get("p2_coeffs"),
                         p1_mulligan=spec.get("p1_mulligan"), p2_mulligan=spec.get("p2_mulligan"),
+                        p1_settle_neutralize=spec.get("p1_settle_neutralize"),
+                        p2_settle_neutralize=spec.get("p2_settle_neutralize"),
                         realistic_leaders=spec.get("realistic_leaders"),
                         separate_policy_rng=True)
         return {"pair": spec["pair"], "seat": spec["seat"], "winner": res["winner"]}
@@ -78,6 +80,7 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                 challenger_alpha=None, baseline_alpha=None,
                 challenger_pimc: int = 1, baseline_pimc: int = 1,
                 challenger_mulligan=None, baseline_mulligan=None,
+                challenger_settle_neutralize=None, baseline_settle_neutralize=None,
                 realistic_leaders=None) -> Dict[str, Any]:
     """対照ペアを**並列**で実行し、ペア単位スコア（{0,0.5,1}）と勝率（challenger 視点）を返す。
 
@@ -105,6 +108,8 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
         rl = _leaders_for(k)
         specs.append({"pair": k, "seat": "A", "seed": seed, "p1d": cd, "p2d": bd,
                       "realistic_leaders": rl,
+                      "p1_settle_neutralize": challenger_settle_neutralize,
+                      "p2_settle_neutralize": baseline_settle_neutralize,
                       "p1_search": challenger_search, "p2_search": baseline_search,
                       "p1_budget": challenger_budget, "p2_budget": baseline_budget,
                       "p1_alpha": challenger_alpha, "p2_alpha": baseline_alpha,
@@ -114,6 +119,8 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                       "max_steps": max_steps})
         specs.append({"pair": k, "seat": "B", "seed": seed, "p1d": bd, "p2d": cd,
                       "realistic_leaders": rl,
+                      "p1_settle_neutralize": baseline_settle_neutralize,
+                      "p2_settle_neutralize": challenger_settle_neutralize,
                       "p1_search": baseline_search, "p2_search": challenger_search,
                       "p1_budget": baseline_budget, "p2_budget": challenger_budget,
                       "p1_alpha": baseline_alpha, "p2_alpha": challenger_alpha,

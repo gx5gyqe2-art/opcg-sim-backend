@@ -779,6 +779,44 @@ def _consumes_hand_card(manager, actor_name: str, move: Dict[str, Any]) -> bool:
     return any(getattr(c, "uuid", None) == uuid for c in actor.hand)
 
 
+# ④ settle-PASS 自己リーサル過大検出（§H/§I・計装＋A/B 用）。
+# settle は戦闘応答を両側 PASS で畳む（_settle_eval）。地平線外で「相手が無防備な前提」のまま勝者が
+# 確定する＝攻め側は自分のリーサルを過大検出（ノーガード特攻の温床）、守り側は自分の死を過大検出しうる。
+# まず計装で「settle ループが勝者を生成した頻度」を実測し、neutralize フラグで A/B（生成勝者を W_WIN で
+# 信用する現状 vs 静的評価へ中立化）して、この過大検出が Elo に効くか（=有害な実ギャップか幽霊か）を測る。
+_SETTLE_STATS_ON = False
+_SETTLE_STATS = {
+    "calls": 0,            # _settle_eval 呼び出し総数
+    "entry_winner": 0,     # settle 開始時点で既に勝敗確定（探索が読み切った真の勝敗＝中立化対象外）
+    "loop_winner_me": 0,   # settle ループ（PASS整流）が root 勝利を生成（攻め側の過大検出 suspect）
+    "loop_winner_opp": 0,  # settle ループが相手勝利を生成（守り側の過大検出 suspect）
+    "loop_winner_passdef": 0,  # うち、敗者側の戦闘応答(BLOCKER/COUNTER)を PASS で畳んだ局面
+}
+# neutralize: settle ループが生成した勝者を ±W_WIN で信用せず静的評価へフォールバック（A/B の challenger）。
+_SETTLE_NEUTRALIZE = None   # None=既定(信用する=現状)／True=中立化／False=明示的に現状
+
+
+def set_settle_stats(on: bool):
+    """settle 計装の ON/OFF（計測スクリプト用・既定 OFF＝ホットパスに無負荷）。ON で _SETTLE_STATS を積算。"""
+    global _SETTLE_STATS_ON
+    _SETTLE_STATS_ON = bool(on)
+
+
+def reset_settle_stats():
+    for k in _SETTLE_STATS:
+        _SETTLE_STATS[k] = 0
+
+
+def get_settle_stats() -> Dict[str, int]:
+    return dict(_SETTLE_STATS)
+
+
+def set_settle_neutralize(flag):
+    """settle ループ生成勝者の扱いを一時上書き（A/B 用・None=既定=信用する）。"""
+    global _SETTLE_NEUTRALIZE
+    _SETTLE_NEUTRALIZE = None if flag is None else bool(flag)
+
+
 def _settle_eval(manager, root_name: str, see_opp_hand: bool, ply: int = 0) -> float:
     """探索の打ち切り点を一定の静止点（相手のターン開始＝相手の MAIN_ACTION）へ整流してから評価する。
 
@@ -794,6 +832,10 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, ply: int = 0) -> f
     KEY_PID, KEY_ACTION = _pending_keys()
     battle_actions = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
     ACT_PASS = battle_actions.get('PASS', 'PASS')
+    entry_winner = manager.winner            # 計装/中立化: settle 開始時点で既に確定していた勝敗（真の勝敗）
+    passed_defense = False                    # settle ループで戦闘応答(BLOCKER/COUNTER)を PASS で畳んだか
+    if _SETTLE_STATS_ON:
+        _SETTLE_STATS["calls"] += 1
     for _ in range(_SETTLE_LIMIT):
         if manager.winner is not None:
             break
@@ -810,6 +852,7 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, ply: int = 0) -> f
             if action == "MAIN_ACTION":              # root の手番 → ターンを畳む
                 action_api.apply_game_action(manager, actor, "TURN_END", {})
             elif action in ("SELECT_BLOCKER", "SELECT_COUNTER"):  # 戦闘応答 → 既定パスで解決
+                passed_defense = True
                 action_api.apply_battle_action(manager, actor, ACT_PASS, None)
             else:                                     # その他の選択 → 既定解決
                 pending = manager.get_pending_request()  # 既定解決時のみフル payload
@@ -821,7 +864,21 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, ply: int = 0) -> f
     # 止めを優先）。予算切れ settle で勝者を観測した長い手順が、winner 検出（W_WIN-ply）の直接の止めより
     # 高く（生 W_WIN で）見えてしまう不整合を防ぐ＝lethal 認識の ply 割引を一貫させる。
     if manager.winner is not None:
-        return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
+        loop_created = entry_winner is None   # settle の PASS 整流が新たに生成した勝者（過大検出 suspect）
+        if _SETTLE_STATS_ON:
+            if not loop_created:
+                _SETTLE_STATS["entry_winner"] += 1
+            else:
+                if manager.winner == root_name:
+                    _SETTLE_STATS["loop_winner_me"] += 1
+                else:
+                    _SETTLE_STATS["loop_winner_opp"] += 1
+                if passed_defense:
+                    _SETTLE_STATS["loop_winner_passdef"] += 1
+        # 中立化（A/B challenger）: ループ生成勝者は「無防備前提」なので W_WIN で信用せず静的評価へ落とす。
+        # entry_winner（探索が読み切った真の勝敗）は常に信用する。
+        if not (loop_created and _SETTLE_NEUTRALIZE):
+            return (W_WIN - ply) if manager.winner == root_name else -(W_WIN - ply)
     # #4 settle 悲観項（settle 限定）: 未読の相手手番の脅威を root スコアから減算する。
     # 全葉でなくここ（打ち切り＝相手手番を読めていない葉）だけに適用＝二重悲観を避ける。
     from . import cpu_eval_v2
