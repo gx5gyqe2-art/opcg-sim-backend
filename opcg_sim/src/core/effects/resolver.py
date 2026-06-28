@@ -175,6 +175,13 @@ class EffectResolver:
             if not node.target: return True
             from .matcher import get_target_cards
             candidates = get_target_cards(self.game_manager, node.target, source_card)
+            # ref_id='self'（「このキャラ」等）は解決時に source へ限定される（resolver._resolve_targets）。
+            # 充足判定も同じく source 限定にする。これをしないと、レスト済み source でも他のアクティブ
+            # キャラを候補に数えて「払える」と化け、自己レストコストの起動メインが無限再起動していた
+            # （OP01-063/EB04-024）。matcher.get_target_cards は ref_id='self' を解決せず zone/player で
+            # 全候補を返すため＝satisfiability と解決の食い違いが根因。
+            if getattr(node.target, "ref_id", None) == "self":
+                candidates = [c for c in candidates if c is source_card]
             # 「このカード/ステージをレストにする」等のレストコストは、対象が現在アクティブ
             # （未レスト）でなければ支払えない（レスト済みは再レストできない）。対象フィルタは
             # レスト状態を問わない（is_rest=None）ため候補にレスト済みも含まれ、自己レストを伴う

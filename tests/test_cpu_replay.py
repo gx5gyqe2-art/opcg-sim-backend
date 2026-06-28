@@ -11,7 +11,6 @@
   - 局面到達と再現性比較は easy（1-ply・高速）＋少手数で有界化する。
 """
 import random
-from collections import Counter
 
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 import pytest
@@ -99,20 +98,16 @@ def test_trace_has_expected_fields(db):
     assert isinstance(tr.get("candidates"), list) and 1 <= len(tr["candidates"]) <= cpu_ai.TRACE_TOPN
     assert "regret" in tr and tr["regret"] >= 0.0
     assert "j_components" in tr and "total" in tr["j_components"]
-    assert "me" in tr["j_components"] and "opp" in tr["j_components"]
+    # L1（evaluate_v2）の成分内訳は "v2"（R_me/R_opp/tele/gamma/amp）。
+    assert "v2" in tr["j_components"]
     # 候補は chosen を含む。
     sigs = {(c["move"] or {}).get("action_type") for c in tr["candidates"]}
     assert tr["chosen"]["action_type"] in sigs
 
-    # 読み筋 PV: 有界（max_steps 以内）で、同一の繰り返し手が REPEAT_CAP を超えて並ばない。
+    # 読み筋 PV: 有界（max_steps 以内）。REPEAT_CAP は撤去済み（起動効果はエンジンの正規ゲートで
+    # 自己制限）＝PV が無限膨張しないことだけを確認する。
     ra = tr.get("read_ahead") or []
     assert isinstance(ra, list) and len(ra) <= 12
-    rep = Counter()
-    for entry in ra:
-        mv = entry.get("move") or {}
-        if mv.get("action_type") in ("ACTIVATE_MAIN", "ATTACH_DON"):
-            rep[(mv.get("action_type"), mv.get("card"), tuple(mv.get("targets") or []))] += 1
-    assert all(v <= cpu_ai.REPEAT_CAP for v in rep.values()), f"PV に繰り返し膨張: {rep}"
 
 
 def test_light_trace_omits_read_ahead(db):

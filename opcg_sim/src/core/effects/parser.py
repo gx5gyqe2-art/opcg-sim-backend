@@ -438,6 +438,14 @@ class EffectParser:
                 # 自動誘発トリガーでは発動前に使用確認を挟むためのフラグ（resolver が参照）。
                 if _nfc("できる") in cost_text or _nfc("してもよい") in cost_text:
                     cost_optional = True
+                # ただし起動メインで「源自身を消費する」コスト（このキャラ/リーダー/ステージ/カードを
+                # rest/trash/手札に戻す/デッキ下 等）は**必須**＝「できる」は起動の任意性であってコストの
+                # 任意性ではない（2026-06-27: パーサが一律 optional 化していたため、レストを断って無制限
+                # 起動できる不具合があった＝REPEAT_CAP が覆い隠していた）。源を消費するので自己制限が効く。
+                if (cost_optional and trigger == TriggerType.ACTIVATE_MAIN
+                        and any(_nfc(s) in cost_text for s in
+                                ("このキャラ", "このリーダー", "このステージ", "このカード"))):
+                    cost_optional = False
 
             # 【ドン!!×N】は「このカードにドン!!がN枚以上付与されている」発動条件であり、
             # コストエリアのドンをレストにする支払いではない（従来は REST_DON コストに誤変換し、

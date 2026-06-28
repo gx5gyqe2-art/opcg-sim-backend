@@ -17,7 +17,7 @@ import time
 import conftest  # noqa: F401
 import cpu_arena
 from cpu_arena import elo_ci
-from eval_v2_arena import _pair_level_ci
+from arena_parallel import _pair_level_ci
 
 PROD_BUDGET = 75   # 本番 hard の予算/世界（OPCG_HARD_PER_MOVE_BUDGET）
 PROD_PIMC = 4      # 本番 hard の PIMC 世界数（OPCG_PIMC_WORLDS）
@@ -29,7 +29,6 @@ def run(pairs, seed0, max_steps, mult, horizon):
     chal_search = (horizon, 13 * horizon + 4) if horizon and horizon != 4 else None
     t0 = time.time()
     res = paired_play(pairs, seed0=seed0, max_steps=max_steps,
-                      challenger_eval_v2=False, baseline_eval_v2=False,
                       challenger_difficulty="hard", baseline_difficulty="hard",
                       challenger_pimc=PROD_PIMC, baseline_pimc=PROD_PIMC,
                       challenger_budget=chal_budget, baseline_budget=PROD_BUDGET,

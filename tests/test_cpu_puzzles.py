@@ -6,20 +6,14 @@
 中身を一切読まない）を決定論的に固定する。B-1（アイドルドン末端減価）導入時に意図的に変わる箇所は
 「特性化（characterization）」として現状をピン留めし、変更時にここを更新する。
 """
-import dataclasses
 import random
 
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 import pytest
 
-from opcg_sim.src.core import action_api, cpu_ai, cpu_self_plan
+from opcg_sim.src.core import action_api, cpu_ai
 from opcg_sim.src.core.gamestate import GameManager, Player
 from cpu_selfplay import build_deck, _load_db
-
-
-def _aggro_plan():
-    """カウンター薄の攻め寄り（idle ドンを強く減価する）プラン。"""
-    return dataclasses.replace(cpu_self_plan.NEUTRAL, **cpu_self_plan._PRESETS["aggro"])
 
 
 @pytest.fixture(scope="module")
@@ -91,230 +85,8 @@ def test_puzzle_takes_lethal_on_open_opponent(db):
     assert move["payload"]["target_ids"] == [gm.p2.leader.uuid]
 
 
-def test_puzzle_active_don_valued_linearly_characterization(db):
-    """特性化（現状ピン留め）: アイドルのアクティブドンは現状 `W_DON_ACTIVE`×枚数 で線形加点される。
-
-    これが B-1 で報告された「余剰ドン温存」の震源（両枝でクロック同値→ドンの床だけがタイブレーク・
-    SPEC §2.5.3 裏取り③/B-1）。B-1（守りにドンを使えない局面での余剰ドン末端減価）導入時に**意図的に
-    変わる**予定なので、その時点で本アサートを更新する（＝変更を可視化するための回帰固定）。"""
-    gm = _new_gm(db, seed=0)
-    cap = cpu_ai._power_cap(gm.p2)
-    base = cpu_ai._side_score(gm.p1, True, cap)
-    assert gm.p1.don_deck, "ドンデッキが空（前提崩れ）"
-    gm.p1.don_active.append(gm.p1.don_deck.pop())
-    one = cpu_ai._side_score(gm.p1, True, cap)
-    gm.p1.don_active.append(gm.p1.don_deck.pop())
-    two = cpu_ai._side_score(gm.p1, True, cap)
-    assert one - base == pytest.approx(cpu_ai.W_DON_ACTIVE)
-    assert two - one == pytest.approx(cpu_ai.W_DON_ACTIVE)
-
-
-def test_puzzle_converts_excess_don_to_clock_at_decide_level(db):
-    """ドン→クロック変換（decide レベル・検証基盤の B-1 症状ピン・§2.5.3）。
-
-    余剰アクティブドンを持ち、リーダーに届く確立済み攻撃者がいて、相手が無防備（ブロッカー無し・
-    手札0）なとき、`decide` は **攻撃者でリーダーを殴る（＝ドンをクロックに変換）** ことを選ぶ。
-    『何もしない（TURN_END）で余剰ドンを握る』や『既に届く攻撃者へさらにドンを盛る（ATTACH_DON）』
-    ではない。`_side_score` 単体でなく **decide の出力**で固定する（B-1 の余剰ドン温存症状の終点）。"""
-    gm = _new_gm(db, seed=0)
-    assert _fast_forward_to_p1_main(gm), "p1 メインへ到達できなかった"
-    # 相手を無防備化（ブロッカー無し・手札0・ライフは 2 残して『致死で畳む』曖昧さを排除）。
-    gm.p2.field.clear()
-    gm.p2.hand.clear()
-    while len(gm.p2.life) > 2:
-        gm.p2.trash.append(gm.p2.life.pop())
-    if not gm.p2.life:
-        gm.p2.life.append(gm.p2.deck.pop())
-    opp_leader_pw = int(gm.p2.leader.get_power(False)) if gm.p2.leader else 5000
-    atk = _reaching_char(gm.p1.deck, 0)
-    if atk is None:
-        pytest.skip("攻撃者が見つからない")
-    gm.p1.deck.remove(atk)
-    gm.p1.field[:] = [atk]
-    atk.is_rest = False
-    atk.is_newly_played = False
-    atk.passive_power_override = opp_leader_pw + 1000   # リーダーに確実に届く
-    gm.p1.hand.clear()                                   # 局面を孤立（PLAY を除外＝ドン/攻撃/畳みのみ）
-    for _ in range(4):                                   # 余剰アクティブドンを持たせる
-        if gm.p1.don_deck:
-            gm.p1.don_active.append(gm.p1.don_deck.pop())
-    plan = _aggro_plan()
-    for difficulty in ("hard",):
-        g = gm.clone()
-        move = cpu_ai.decide(g, g.p1, difficulty, random.Random(0), plan=plan)
-        assert move["action_type"] == "ATTACK", f"{difficulty}: 余剰ドンを握って攻めない（ドン→クロック未変換）"
-        assert move["payload"]["target_ids"] == [g.p2.leader.uuid], f"{difficulty}: リーダーを殴っていない"
-
-
-# ---------------------------------------------------------------------------
-# B-1 (a): アイドルドン末端減価（plan 供給時のみ・自分の手番でない静止点でのみ）
-# ---------------------------------------------------------------------------
-
-def test_b1a_idle_don_decayed_only_when_idle(db):
-    """B-1(a): `idle_don_factor`(<1.0) は『自分の手番でない（idle＝葉）』ときだけアクティブドンを
-    減価する。自分の手番中（is_turn=True）は生きた資源なので減価しない。factor=1.0 は従来どおり線形。"""
-    gm = _new_gm(db, seed=0)
-    cap = cpu_ai._power_cap(gm.p2)
-    for _ in range(3):
-        assert gm.p1.don_deck, "ドンデッキが空（前提崩れ）"
-        gm.p1.don_active.append(gm.p1.don_deck.pop())
-    n = len(gm.p1.don_active)
-    assert n >= 3
-    # idle（is_turn=False）: factor 0.4 で n*W_DON_ACTIVE*(1-0.4) ぶん下がる。
-    full = cpu_ai._side_score(gm.p1, False, cap, idle_don_factor=1.0)
-    decayed = cpu_ai._side_score(gm.p1, False, cap, idle_don_factor=0.4)
-    assert full - decayed == pytest.approx(n * cpu_ai.W_DON_ACTIVE * 0.6)
-    # 自分の手番中（is_turn=True）は factor を無視＝減価しない（生きた資源）。
-    assert cpu_ai._side_score(gm.p1, True, cap, idle_don_factor=1.0) == \
-        cpu_ai._side_score(gm.p1, True, cap, idle_don_factor=0.4)
-
-
-def test_b1a_plan_decays_idle_don_in_evaluate(db):
-    """B-1(a) 配線: plan.idle_don_mult<1.0 は evaluate の葉（相手ターン＝自分は idle）で自分の余剰
-    アクティブドンを減価する。差は丁度ドン減価分（他の plan 乗数は同一の NEUTRAL で相殺）。
-
-    これが「両枝でクロック同値→ドンの床でタイブレーク→握る」（余剰ドン温存）の震源を断つ。"""
-    gm = _new_gm(db, seed=0)
-    gm.turn_player = gm.p2          # p1 視点で is_my_turn=False（idle な静止点＝葉）
-    for _ in range(3):
-        assert gm.p1.don_deck
-        gm.p1.don_active.append(gm.p1.don_deck.pop())
-    n = len(gm.p1.don_active)
-    plan_keep = cpu_self_plan.NEUTRAL                                       # idle_don_mult=1.0
-    plan_decay = dataclasses.replace(cpu_self_plan.NEUTRAL, idle_don_mult=0.4)
-    v_keep = cpu_ai.evaluate(gm, "p1", plan=plan_keep)
-    v_decay = cpu_ai.evaluate(gm, "p1", plan=plan_decay)
-    # 差は丁度ドン減価分（threat 項・_plan_progress は両 plan で同一なので相殺）。
-    assert v_keep - v_decay == pytest.approx(n * cpu_ai.W_DON_ACTIVE * 0.6)
-    # plan=None は idle_don_factor=1.0＝減価しない（NEUTRAL とは threat/_plan_progress 分だけ別物なので
-    # 等値ではない。減価しないことは test_b1a_idle_don_decayed_only_when_idle が _side_score で担保）。
-
-
-def test_b1a_aggro_plan_has_decay_preset():
-    """攻め寄り（カウンター薄）デッキほど idle_don_mult を強く減価するプリセット（aggro<midrange<control）。"""
-    a = cpu_self_plan._PRESETS["aggro"]["idle_don_mult"]
-    m = cpu_self_plan._PRESETS["midrange"]["idle_don_mult"]
-    c = cpu_self_plan._PRESETS["control"]["idle_don_mult"]
-    assert a < m < c <= 1.0
-    assert cpu_self_plan.NEUTRAL.idle_don_mult == 1.0   # 中立フォールバックは現行挙動
-
-
-# ---------------------------------------------------------------------------
-# B-1 (b): カウンター強要（normal 保守 min ノードの推定カウンター応答モデル）
-# ---------------------------------------------------------------------------
-
-def test_b1b_counter_buffer_estimate_scales_with_density(db):
-    """推定カウンター緩衝はカウンター密度（counter_avg）に比例し、profile 無しは 0。"""
-    from opcg_sim.src.core import cpu_opponent_model as om
-    assert cpu_ai._estimate_counter_buffer(None) == 0.0
-    lo = om.OpponentProfile(50, 200.0, 0.2, 0.0, 0.0, 3.0, 0.8, 0.6)
-    hi = om.OpponentProfile(50, 800.0, 0.6, 0.1, 0.1, 4.0, 1.4, 0.3)
-    assert cpu_ai._estimate_counter_buffer(hi) > cpu_ai._estimate_counter_buffer(lo) > 0.0
-
-
-def test_b1b_counter_buffer_belief_hand_size(db):
-    """#3 公開情報ベリーフ: 緩衝は相手の生の手札枚数に追従する（0枚=0・少手札で縮小・上限でキャップ）。"""
-    from opcg_sim.src.core import cpu_opponent_model as om
-    prof = om.OpponentProfile(50, 800.0, 0.6, 0.1, 0.1, 4.0, 1.4, 0.3)
-    full = cpu_ai._estimate_counter_buffer(prof)                       # 既定（コミット上限枚）
-    assert cpu_ai._estimate_counter_buffer(prof, opp_hand_size=0) == 0.0   # 手札0=守れない
-    assert 0 < cpu_ai._estimate_counter_buffer(prof, opp_hand_size=1) < full  # 少手札=縮小
-    assert cpu_ai._estimate_counter_buffer(prof, opp_hand_size=99) == full    # 上限でキャップ（=既定）
-
-
-def test_b1b_counter_buffer_belief_trash_depletion(db):
-    """#3 公開情報ベリーフ: トラッシュに見えた消費カウンターぶん緩衝が割り引かれる。"""
-    from opcg_sim.src.core import cpu_opponent_model as om
-
-    class _Stub:  # master.counter だけ持つ最小スタブ
-        def __init__(self, counter):
-            self.master = type("M", (), {"counter": counter})()
-
-    prof = om.OpponentProfile(50, 800.0, 0.6, 0.1, 0.1, 4.0, 1.4, 0.3)  # total = 800*50 = 40000
-    base = cpu_ai._estimate_counter_buffer(prof, opp_hand_size=4, opp_trash=[])
-    # 消費カウンター 20000（40000 の半分）→ 緩衝はほぼ半減。
-    spent = [_Stub(2000) for _ in range(10)]
-    depleted = cpu_ai._estimate_counter_buffer(prof, opp_hand_size=4, opp_trash=spent)
-    assert depleted == pytest.approx(base * 0.5)
-    # 非カウンター札（counter=0）だけのトラッシュは緩衝を減らさない。
-    noncounter = cpu_ai._estimate_counter_buffer(prof, opp_hand_size=4, opp_trash=[_Stub(0) for _ in range(10)])
-    assert noncounter == pytest.approx(base)
-
-
 # ---------------------------------------------------------------------------
 # バッチA-1: アンブロッカブル（【ブロック不可】）を脅威評価に加点
-# ---------------------------------------------------------------------------
-
-class _Body:
-    """_threat_value 用の最小スタブ（has_keyword / master.effect_text のみ参照）。"""
-    def __init__(self, etext="", kws=()):
-        self.master = type("M", (), {"effect_text": etext})()
-        self._kws = set(kws)
-
-    def has_keyword(self, k):
-        return k in self._kws
-
-
-def test_a1_unblockable_threat_value():
-    """自前【ブロック不可】は加点、付与句（…を得る）は誤検出しない、キーワード付与も拾う。"""
-    vanilla = cpu_ai._threat_value(_Body(""))
-    # 自前キーワード（リマインダ括弧が直後）→ 加点。
-    self_ub = cpu_ai._threat_value(_Body("【ブロック不可】(このカードはブロックされない) / 【登場時】…"))
-    assert self_ub - vanilla == pytest.approx(cpu_ai.W_KW_UNBLOCK)
-    # 他者付与句（…を得る）→ 自身は加点しない（誤検出防止）。
-    grant = cpu_ai._threat_value(_Body("【登場時】自分のキャラ1枚までは、このターン中、【ブロック不可】を得る。"))
-    assert grant == vanilla
-    # 付与で timed_keywords に載った場合は has_keyword で拾う。
-    granted = cpu_ai._threat_value(_Body("", kws={"ブロック不可"}))
-    assert granted - vanilla == pytest.approx(cpu_ai.W_KW_UNBLOCK)
-    # 全角括弧でも検出。
-    zenkaku = cpu_ai._threat_value(_Body("【ブロック不可】（このカードはブロックされない）"))
-    assert zenkaku - vanilla == pytest.approx(cpu_ai.W_KW_UNBLOCK)
-
-
-def test_a1_unblockable_detector_matches_real_cards(db):
-    """実カードデータ: 自前【ブロック不可】キャラのみ検出（付与カード/イベントは非検出）。"""
-    # 自前アンブロッカブル（キャラ）。
-    for num in ("OP16-032", "OP16-033", "OP16-096"):
-        m = db.get_card(num)
-        assert m is not None and cpu_ai._is_unblockable(_Body(m.effect_text), m.effect_text), num
-    # 付与カード/イベントは自身は非アンブロッカブル。
-    for num in ("OP16-095", "ST29-016", "OP15-047"):
-        m = db.get_card(num)
-        assert m is not None and not cpu_ai._is_unblockable(_Body(m.effect_text), m.effect_text), num
-
-
-# ---------------------------------------------------------------------------
-# バッチA-2: 脅威キーワード／畳み判定マージンのアーキタイプ依存スケール
-# ---------------------------------------------------------------------------
-
-def test_a2_threat_value_archetype_scaling():
-    """攻撃的キーワードは atk_mult、防御的キーワード（KO耐性）は def_mult のみでスケールする。"""
-    atk_body = _Body("", kws={"ダブルアタック"})           # 攻撃的
-    def_body = _Body("このキャラはKOされない")              # 防御的（耐性）
-    base_a = cpu_ai._threat_value(atk_body)
-    base_d = cpu_ai._threat_value(def_body)
-    assert base_a > 0 and base_d > 0
-    # それぞれ対応する mult でのみ増減。
-    assert cpu_ai._threat_value(atk_body, atk_mult=1.3) == pytest.approx(base_a * 1.3)
-    assert cpu_ai._threat_value(def_body, def_mult=1.25) == pytest.approx(base_d * 1.25)
-    # 交差は効かない（攻めに def_mult・守りに atk_mult は不変）。
-    assert cpu_ai._threat_value(atk_body, def_mult=2.0) == pytest.approx(base_a)
-    assert cpu_ai._threat_value(def_body, atk_mult=2.0) == pytest.approx(base_d)
-
-
-def test_a2_archetype_presets_directional():
-    """プリセットの方向性: aggro は攻め重視・畳まない／control は守り重視・畳む／midrange=中立。"""
-    from opcg_sim.src.core import cpu_self_plan as p
-    aggro, control = p._PRESETS["aggro"], p._PRESETS["control"]
-    assert aggro["threat_atk_mult"] > 1.0 > control["threat_atk_mult"]
-    assert control["threat_def_mult"] > 1.0 > aggro["threat_def_mult"]
-    assert aggro["act_margin_mult"] < 1.0 < control["act_margin_mult"]
-    assert p.NEUTRAL.threat_atk_mult == p.NEUTRAL.threat_def_mult == p.NEUTRAL.act_margin_mult == 1.0
-
-
-# ---------------------------------------------------------------------------
-# バッチA-3（残）: min ノードはビーム剪定後も root 最不利手を保持する
 # ---------------------------------------------------------------------------
 
 def _blocker_char(deck):
@@ -369,7 +141,7 @@ def test_a3_min_node_keeps_root_worst_in_beam(db):
         cpu_ai.HARD_BEAM = beam
         try:
             return cpu_ai._search(node, "p1", float("-inf"), float("inf"),
-                                  [4000], False, True, profile=None, ply=ply, plan=None,
+                                  [4000], False, True, ply=ply,
                                   start_turn=st, horizon=1)
         finally:
             cpu_ai.HARD_BEAM = old
@@ -437,7 +209,7 @@ def test_e1_opp_beam_widens_min_node_independently_of_max(db):
         cpu_ai.HARD_OPP_BEAM = opp_beam
         try:
             return cpu_ai._search(node, "p1", float("-inf"), float("inf"),
-                                  [4000], False, True, profile=None, ply=ply, plan=None,
+                                  [4000], False, True, ply=ply,
                                   start_turn=st, horizon=1)
         finally:
             cpu_ai.HARD_BEAM = old_b
@@ -454,68 +226,3 @@ def test_e1_opp_beam_widens_min_node_independently_of_max(db):
     # opp_beam=2: 両応答を見て真の min。
     v_opp2 = _search_beams(gm.clone(), 1, 2, ply=1)
     assert v_opp2 == pytest.approx(min(sub_bc, sub_pc)), "HARD_OPP_BEAM=2 が両応答の真の min を取れていない"
-
-
-def _advance_to_select_counter(gm, attacker, target):
-    """attacker→target のアタックを宣言し、SELECT_BLOCKER を PASS で流して SELECT_COUNTER まで進める。"""
-    gm.action_events = []
-    action_api.apply_game_action(gm, gm.p1, "ATTACK",
-                                 {"uuid": attacker.uuid, "target_ids": [target.uuid]})
-    battle_actions = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
-    ACT_PASS = battle_actions.get('PASS', 'PASS')
-    for _ in range(6):
-        pend = gm.get_pending_request()
-        if not pend:
-            return False
-        if pend.get("action") == "SELECT_COUNTER":
-            return True
-        if pend.get("action") == "SELECT_BLOCKER":
-            gm.action_events = []
-            action_api.apply_battle_action(gm, gm.p2, ACT_PASS, None)
-            continue
-        return False
-    return False
-
-
-def test_b1b_modeled_counter_saves_target_and_spends_card(db):
-    """B-1(b): 相手 min ノードの推定カウンターは、`counter_buff` を needed 加算＋手札 1 枚消費で攻撃を
-    無効化する（ライフ温存・手札 -1）。一方 PASS（カウンターしない）はライフ -1（攻撃が通る）。
-
-    相手手札の**中身は読まない**（先頭 1 枚を消費＝枚数のみ＝公開情報・フェア）。"""
-    gm = _new_gm(db, seed=0)
-    assert _fast_forward_to_p1_main(gm)
-    # p1: リーダーに確実に届く攻撃者（リーダー素+1500）を確立済み・アクティブで1体。
-    opp_leader_pw = int(gm.p2.leader.get_power(False)) if gm.p2.leader else 5000
-    atk = _reaching_char(gm.p1.deck, 0)
-    if atk is None:
-        pytest.skip("攻撃者が見つからない")
-    gm.p1.deck.remove(atk)
-    gm.p1.field[:] = [atk]
-    atk.is_rest = False
-    atk.is_newly_played = False
-    atk.passive_power_override = opp_leader_pw + 1500
-    # p2: ブロッカー無し・手札は資源として最低1枚・ライフ最低1枚。
-    gm.p2.field.clear()
-    if not gm.p2.hand:
-        gm.p2.hand.append(gm.p2.deck.pop())
-    if not gm.p2.life:
-        gm.p2.life.append(gm.p2.deck.pop())
-    if not _advance_to_select_counter(gm, atk, gm.p2.leader):
-        pytest.skip("SELECT_COUNTER へ到達できない局面")
-
-    needed = cpu_ai._counter_needed(gm)
-    assert needed is not None and needed > 0  # 攻撃は通る＝防ぐのに正の緩衝が要る
-    life_before, hand_before = len(gm.p2.life), len(gm.p2.hand)
-
-    # 推定カウンター: ライフ温存＋手札 -1。
-    cc = cpu_ai._apply_modeled_counter(gm, "p2", needed)
-    assert cc is not None
-    assert len(cc.p2.life) == life_before, "推定カウンターでライフが守れていない"
-    assert len(cc.p2.hand) == hand_before - 1, "カウンター札 1 枚の資源消費が反映されていない"
-
-    # PASS（カウンターしない）: 攻撃が通りライフ -1。
-    passclone = gm.clone()
-    battle_actions = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
-    passclone.action_events = []
-    action_api.apply_battle_action(passclone, passclone.p2, battle_actions.get('PASS', 'PASS'), None)
-    assert len(passclone.p2.life) == life_before - 1, "PASS なのに攻撃が通っていない"

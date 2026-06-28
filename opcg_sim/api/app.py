@@ -31,8 +31,6 @@ except ImportError:
 from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
-from opcg_sim.src.core import cpu_self_plan
-from opcg_sim.src.core import cpu_value_data
 from opcg_sim.api import decide_client
 from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.models import CardInstance
@@ -326,28 +324,17 @@ def _replay_record_action(meta, manager, src: str, player_id: str, movelike: Dic
         pass
 
 
-def _capture_value_samples(meta, manager):
-    """traced 対局のターン境界で両者視点の特徴を貯める（価値学習データ・人間ログ活用(a)/(A)）。
+def _capture_final_winner(meta, manager):
+    """traced 対局の終局勝者を meta に保持する（WS 切断後の cleanup が manager を退避しても replay で参照可能）。
 
-    opt-in（cpu_trace）時のみ作動＝本番対局には一切のオーバーヘッド・挙動変化なし。**アクション適用後**に
-    呼ぶ。ラベルは未確定のまま `{"f","p"}` で貯め、終局時に replay エンドポイントで勝者から確定する。
-    境界検出（turn_count 変化）はオフライン自己対戦（collect_value_data）と同一規約。例外安全。
+    opt-in（cpu_trace）時のみ作動＝本番対局にはオーバーヘッド・挙動変化なし。**アクション適用後**に呼ぶ。
+    （旧 _capture_value_samples の価値学習データ採取は学習価値サブシステムごと撤去・2026-06-28。）
     """
     if not _replay_enabled(meta):
         return
     try:
         if manager.winner is not None:
-            # 終局勝者を meta に保持＝WS 切断後の delayed_cleanup が GAMES から manager を退避しても
-            # （CPU_GAMES の meta は残る）replay でラベル確定できる。
             meta["_winner"] = manager.winner
-        prev = meta.get("_value_prev_turn")
-        if prev is None:                       # 初回＝基準ターンを記録するだけ（まだ境界でない）
-            meta["_value_prev_turn"] = manager.turn_count
-            return
-        if manager.turn_count != prev:
-            meta["_value_prev_turn"] = manager.turn_count
-            meta.setdefault("value_samples", []).extend(
-                cpu_value_data.turn_boundary_samples(manager))
     except Exception:
         pass
 
@@ -380,16 +367,7 @@ async def game_create(req: Any = Body(...)):
             difficulty = req.get("cpu_difficulty", "hard")
             if difficulty != "hard":
                 difficulty = "hard"
-            # 自デッキ勝ち筋プラン（§2.5.5）: CPU(p2) の自デッキ構成から静的に分類して保持（hard で使用）。
-            self_plan = None
-            if difficulty == "hard":
-                try:
-                    self_plan = cpu_self_plan.build_plan([ci.master for ci in p2_cards],
-                                                         leader=p2_leader.master if p2_leader else None)
-                except Exception:
-                    pass
-            CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty,
-                                  "opp_profile": None, "self_plan": self_plan}
+            CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty}
             if cpu_trace:
                 # リプレイ種＋思考ログの器を用意する（opt-in 時のみ）。
                 CPU_GAMES[game_id].update({
@@ -399,7 +377,7 @@ async def game_create(req: Any = Body(...)):
                                 "p2": p2_leader.master.card_id if p2_leader else None},
                     "decks": {"p1": [ci.master.card_id for ci in p1_cards],
                               "p2": [ci.master.card_id for ci in p2_cards]},
-                    "actions": [], "decisions": [], "value_samples": [],
+                    "actions": [], "decisions": [],
                 })
         return build_game_result_hybrid(manager, game_id)
     except Exception as e:
@@ -422,7 +400,7 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         _src = "cpu" if (_meta and player_id == _meta.get("cpu_player_id")) else "human"
         _replay_record_action(_meta, manager, _src, player_id, {"action_type": action_type, "payload": payload})
         action_api.apply_game_action(manager, current_player, action_type, payload)
-        _capture_value_samples(_meta, manager)
+        _capture_final_winner(_meta, manager)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
         _kick_ponder(game_id)     # ⑥-a: 制御が CPU へ移ったら次手番の計画を前倒し（既定 OFF）
@@ -468,7 +446,7 @@ async def game_battle(req: BattleActionRequest):
         _src = "cpu" if (_meta and player_id == _meta.get("cpu_player_id")) else "human"
         _replay_record_action(_meta, manager, _src, player_id, {"action_type": action_type, "card_uuid": card_uuid})
         action_api.apply_battle_action(manager, player, action_type, card_uuid)
-        _capture_value_samples(_meta, manager)
+        _capture_final_winner(_meta, manager)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
         _kick_ponder(game_id)     # ⑥-a: 制御が CPU へ移ったら次手番の計画を前倒し（既定 OFF）
@@ -484,14 +462,13 @@ def _ponder_enabled() -> bool:
             and os.environ.get("OPCG_PONDER", "0") == "1")
 
 
-def _plan_segment(manager, cpu_player, difficulty, mem=None, profile=None, plan=None):
+def _plan_segment(manager, cpu_player, difficulty, mem=None):
     """「このターンの計画手列」を返す（ポンダリング/計画キャッシュの単一の真実源）。
 
     hard（α-β）を `decide_client`（PyPy ワーカー）でセグメント計画する。「手 dict のリスト（=このターンの
     連続手番）」を返す＝後段のキャッシュ/replay/ポンダリングが共通に乗る。
     """
-    return decide_client.plan_segment(manager, cpu_player, difficulty,
-                                      mem=mem, profile=profile, plan=plan)
+    return decide_client.plan_segment(manager, cpu_player, difficulty, mem=mem)
 
 
 async def _ponder_plan(game_id: str) -> None:
@@ -515,8 +492,7 @@ async def _ponder_plan(game_id: str) -> None:
         snap = manager.clone()
         cpu_player = snap.p1 if snap.p1.name == cpu_pid else snap.p2
         actions = await asyncio.to_thread(
-            _plan_segment, snap, cpu_player, difficulty,
-            mem=turn_mem, profile=meta.get("opp_profile"), plan=meta.get("self_plan"))
+            _plan_segment, snap, cpu_player, difficulty, mem=turn_mem)
         cache["queue"] = actions or None
     except Exception:
         cache["queue"] = None
@@ -565,7 +541,7 @@ def _speculate_enabled() -> bool:
     return _ponder_enabled() and os.environ.get("OPCG_PONDER_SPEC", "0") == "1"
 
 
-def _speculate_compute(clone, human_pid, cpu_pid, difficulty, profile, plan):
+def _speculate_compute(clone, human_pid, cpu_pid, difficulty):
     """⑥-b 投機の本体（`to_thread` で別スレッド実行）。**クローン上で**人間の TURN_END を仮適用し、
     pending が素直に CPU 手番へ移ったら CPU セグメントを計画して返す（介在する人間決定があれば None）。
     live 盤面には一切触れない（呼び出し側がメインスレッドで原子的に clone 済み）。"""
@@ -576,14 +552,13 @@ def _speculate_compute(clone, human_pid, cpu_pid, difficulty, profile, plan):
     if not pa or pa[0] != cpu_pid:
         return None
     cpu_player = clone.p1 if clone.p1.name == cpu_pid else clone.p2
-    return _plan_segment(clone, cpu_player, difficulty,
-                         mem={}, profile=profile, plan=plan)
+    return _plan_segment(clone, cpu_player, difficulty, mem={})
 
 
 async def _speculate_plan(game_id: str, clone, human_pid: str, gen: int) -> None:
     """⑥-b: 「人間が今エンドしたら」の CPU 計画を投機して `spec_queue` に保持（次の TURN_END で昇格判定）。
 
-    計算は `_speculate_compute` を `to_thread` でオフロード（plan は別プロセスのワーカー）。世代 `gen` が
+    計算は `_speculate_compute` を `to_thread` でオフロード（別プロセスのワーカー）。世代 `gen` が
     最新でなければ（人間がさらに動いて盤面が変わった＝supersede）結果は捨てる。使い捨て clone・使い捨て mem
     ＝live 盤面/turn_mem 不変。採否は最終的に `_kick_ponder` の合法性ゲートが担保する。"""
     meta = CPU_GAMES.get(game_id)
@@ -593,8 +568,7 @@ async def _speculate_plan(game_id: str, clone, human_pid: str, gen: int) -> None
     try:
         cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "hard")
         result = await asyncio.to_thread(
-            _speculate_compute, clone, human_pid, cpu_pid, difficulty,
-            meta.get("opp_profile"), meta.get("self_plan"))
+            _speculate_compute, clone, human_pid, cpu_pid, difficulty)
         if cache.get("spec_gen") == gen:        # まだ最新の投機なら採用
             cache["spec_queue"] = result or None
     except Exception:
@@ -650,8 +624,7 @@ def _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem):
             cache["queue"] = q[1:]
             return legal_by_sig[sig]
         cache["queue"] = None  # 前提崩れ＝破棄して再計画
-    actions = _plan_segment(manager, cpu_player, difficulty, mem=turn_mem,
-                            profile=meta.get("opp_profile"), plan=meta.get("self_plan"))
+    actions = _plan_segment(manager, cpu_player, difficulty, mem=turn_mem)
     if actions:
         sig = cpu_ai._move_sig(actions[0])
         if sig in legal_by_sig:
@@ -723,7 +696,6 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                     move = _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem)
                 if move is None:
                     move = decide_client.decide(manager, cpu_player, difficulty, mem=turn_mem,
-                                                profile=meta.get("opp_profile"), plan=meta.get("self_plan"),
                                                 trace=tr, trace_read_ahead=False)
                 if move is not None:
                     if trace_on:
@@ -737,7 +709,7 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                         action_api.apply_battle_action(manager, cpu_player, move["action_type"], move.get("card_uuid"))
                     else:
                         action_api.apply_game_action(manager, cpu_player, move["action_type"], move.get("payload", {}))
-                    _capture_value_samples(meta, manager)
+                    _capture_final_winner(meta, manager)
                     cpu_acted = True
                     cpu_event = manager.action_events[0] if manager.action_events else {"action": move["action_type"]}
         result = build_game_result_hybrid(manager, game_id, success=True)
@@ -766,20 +738,12 @@ async def game_replay(game_id: str):
     if not _replay_enabled(meta):
         return {"success": False, "error": {"code": "REPLAY_NOT_FOUND",
                 "message": "この対局のリプレイ記録がありません（cpu_trace 未指定 or 不明なゲーム）。"}}
-    # 価値学習データ（人間ログ活用）: 終局していればターン境界サンプルを勝者でラベル確定して同梱する
-    # （`{"f":[...],"y":0/1}`）。未決着なら空（ラベル付け不能）。フロント采取は replay 全体を運ぶので追加配線不要。
-    manager = GAMES.get(game_id)
-    # 勝者は live の manager から、無ければ採取時に保持した _winner から（cleanup で manager 退避後も確定可能）。
-    winner = manager.winner if manager is not None else meta.get("_winner")
-    raw_samples = meta.get("value_samples", [])
-    value_samples = (cpu_value_data.label_samples(raw_samples, winner)
-                     if winner is not None and raw_samples else [])
     descriptor = {
         "schema": REPLAY_SCHEMA, "seed": meta.get("seed"),
         "first_player": meta.get("first_player"), "difficulty": meta.get("difficulty"),
         "cpu_player_id": meta.get("cpu_player_id"),
         "leaders": meta.get("leaders"), "decks": meta.get("decks"),
-        "actions": meta.get("actions", []), "value_samples": value_samples,
+        "actions": meta.get("actions", []),
     }
     return {"success": True, "game_id": game_id,
             "replay": descriptor, "decisions": meta.get("decisions", [])}
