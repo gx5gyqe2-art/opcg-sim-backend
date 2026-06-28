@@ -128,7 +128,15 @@ def main(argv=None):
     ap.add_argument("--max-steps", type=int, default=4000,
                     help="局の最大ステップ。正当な長期戦を人為タイムアウトさせない値（census 最長~24T）。"
                          "旧既定400は低すぎて膠着誘発係数を破棄＝バイアス源だった（計画 §3.3）")
+    ap.add_argument("--params", default=None,
+                    help="調整する係数をカンマ区切りで指定（既定=全PARAMS）。次元削減で他次元の cross-dim "
+                         "ノイズを遮断し高レバレッジ次元の勾配をクリアにする（計画 §3.3）。指定外の係数は"
+                         "モジュール既定値で固定（両席同値＝較正に影響しない）")
     args = ap.parse_args(argv)
+    if args.params:
+        global PARAMS
+        PARAMS = [p.strip() for p in args.params.split(",") if p.strip()]
+        print(f"[params] 調整対象 {len(PARAMS)}次元: {PARAMS}（他係数は既定で固定）", flush=True)
     spsa(args.iters, args.games, args.max_steps, args.seed0)
     return 0
 
