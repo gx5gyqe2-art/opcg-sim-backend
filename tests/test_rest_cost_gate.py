@@ -12,7 +12,41 @@ import conftest  # noqa: F401
 from engine_helpers import make_game, make_master, make_instance
 from opcg_sim.src.core.effects.parser import EffectParser
 from opcg_sim.src.core.effects.resolver import EffectResolver
-from opcg_sim.src.models.enums import CardType
+from opcg_sim.src.models.enums import CardType, TriggerType
+
+
+# --- cost_optional の正しい解釈（2026-06-27） -----------------------------------
+# 起動メインの「このキャラ/リーダー/ステージ/カードを rest/trash/… できる：」の「できる」は
+# **起動の任意性**であって**コストの任意性ではない**＝源自身を消費するコストは必須。
+# 旧パーサは一律 optional 化しており、レストを断って無制限起動できる不具合があった
+# （REPEAT_CAP が覆い隠していた）。自動誘発（登場時等）の「できる」は本当にコスト任意なので温存する。
+
+def _ability(text):
+    return EffectParser().parse_card_text(text)[0]
+
+
+def test_activate_main_self_rest_cost_is_mandatory():
+    ab = _ability("【起動メイン】このキャラをレストにできる：相手の手札を1枚見る。")
+    assert ab.trigger == TriggerType.ACTIVATE_MAIN
+    assert ab.cost_optional is False   # 源自身レスト＝起動するなら必須
+
+
+def test_activate_main_self_trash_cost_is_mandatory():
+    ab = _ability("【起動メイン】このキャラをトラッシュに置くことができる：カード1枚を引く。")
+    assert ab.cost_optional is False   # 源自身トラッシュ＝必須（自己消費で自然に1回制限）
+
+
+def test_on_play_self_rest_cost_stays_optional():
+    """自動誘発（登場時）の「このキャラをレストにできる」は本当にコスト任意＝温存。"""
+    ab = _ability("【登場時】このキャラをレストにできる：カード1枚を引く。")
+    assert ab.trigger == TriggerType.ON_PLAY
+    assert ab.cost_optional is True
+
+
+def test_activate_main_rest_other_stays_optional():
+    """源自身でない（自分の別キャラを）レストは今回のスコープ外＝従来通り optional のまま。"""
+    ab = _ability("【起動メイン】自分のキャラ1枚をレストにできる：カード1枚を引く。")
+    assert ab.cost_optional is True
 
 HACHINOSU_TEXT = (
     "【起動メイン】自分の手札1枚を捨て、このステージをレストにできる："
