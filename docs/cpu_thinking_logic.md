@@ -121,8 +121,10 @@ _search(manager, root_name, alpha, beta, ply, budget, is_max...)
    └─【葉】evaluate(node, root_name, see_opp_hand)   ◀── §4 へ
 
 _settle_eval: TURN_END/既定解決で相手ターン開始まで整流 → 静的 evaluate。
-              勝敗未確定の settle 値は _SETTLE_CONFIDENCE で中立寄せ（既定解決の楽観是正）。
-              さらに settle_threat_penalty（#4・未読相手手番の悲観項＝予測ドン×danger×W_SETTLE_THREAT）を減算。
+              戦闘応答（SELECT_BLOCKER/SELECT_COUNTER・どちら側でも）は**既定 PASS で解決**。
+              整流中に勝敗確定なら ±(W_WIN − ply)（ply 割引＝最短の止めを優先）。
+              未確定の葉には settle_threat_penalty（#4・未読相手手番の悲観項＝予測ドン×danger×W_SETTLE_THREAT）を減算。
+              ※ 旧 _SETTLE_CONFIDENCE/_settle_discount（楽観是正）は plan 全廃（2026-06-27）で削除済み＝#4 が deck非依存の代替。
 ```
 
 ---
