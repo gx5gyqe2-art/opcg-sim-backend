@@ -28,7 +28,7 @@ def _apply(m, actor, mv):
 
 def generate(db, vocab, n_games, eps, max_steps, seed0, sample_every=1):
     """ノイズ付き自己対戦で (encoding, to_move, value) を集める。返り値は stack 済み dict。"""
-    S, F, I, Y = [], [], [], []
+    S, F, I, Y, L, GM = [], [], [], [], [], []   # L=L1 eval, GM=game id（group split 用＝局面間リーク防止）
     cpu_ai.set_budget_override(40)
     try:
         for g in range(n_games):
@@ -50,7 +50,8 @@ def generate(db, vocab, n_games, eps, max_steps, seed0, sample_every=1):
                 # 意思決定局面のみ採取（マリガン等の自明手も含むが害は小）。
                 if step % sample_every == 0:
                     enc = E.encode(m, pid, vocab)
-                    snaps.append((enc["scalars"], enc["field"], enc["card_idx"], pid))
+                    l1 = float(cpu_ai.evaluate(m, pid, see_opp_hand=False))   # fair な L1 評価（比較基準）
+                    snaps.append((enc["scalars"], enc["field"], enc["card_idx"], pid, l1))
                 # ノイズ注入: eps でランダム合法手・残りは教師(CPU)。
                 if prng.random() < eps:
                     moves = m.get_legal_actions(actor)
@@ -71,15 +72,16 @@ def generate(db, vocab, n_games, eps, max_steps, seed0, sample_every=1):
                 step += 1
             if m.winner is None:
                 continue   # 未決着（max_steps）＝ラベル付け不能で破棄
-            for sc, fl, ix, who in snaps:
-                S.append(sc); F.append(fl); I.append(ix)
+            for sc, fl, ix, who, l1 in snaps:
+                S.append(sc); F.append(fl); I.append(ix); L.append(l1); GM.append(g)
                 Y.append(1.0 if who == m.winner else -1.0)
     finally:
         cpu_ai.set_budget_override(None)
     if not S:
         return None
     return {"scalars": np.stack(S), "field": np.stack(F),
-            "card_idx": np.stack(I), "value": np.array(Y, dtype=np.float32)}
+            "card_idx": np.stack(I), "value": np.array(Y, dtype=np.float32),
+            "l1": np.array(L, dtype=np.float32), "game": np.array(GM, dtype=np.int32)}
 
 
 def main():
