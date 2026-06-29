@@ -34,7 +34,7 @@ class _Node:
 
 class TreeMCTS:
     def __init__(self, game, value_fn, priors_fn=None, c_puct=1.5, n_sims=100,
-                 determinize_fn=None, rng=None):
+                 determinize_fn=None, rng=None, dirichlet_alpha=0.3, dirichlet_eps=0.0):
         self.game = game
         self.value_fn = value_fn
         self.priors_fn = priors_fn         # (state, legal)->np.array|None（None=一様）
@@ -42,6 +42,10 @@ class TreeMCTS:
         self.n_sims = n_sims
         self.determinize_fn = determinize_fn
         self.rng = rng or np.random.default_rng(0)
+        # ルートDirichletノイズ＝自己対戦の探索多様化（eps>0で有効）。eval は eps=0 で決定的。
+        # 小シャードのオンライン化で経験バッファを失う設計の「忘却防止の生命線」（レビュー指摘）。
+        self.da = dirichlet_alpha
+        self.de = dirichlet_eps
 
     def run(self, real_state):
         """探索し (最良move, 訪問数N[K], ルート合法手list) を返す。N と legal は同順。"""
@@ -51,6 +55,9 @@ class TreeMCTS:
         self._expand(root)
         if not root.legal:
             return None, None, []
+        if self.de > 0.0 and len(root.legal) > 1:   # ルートに探索ノイズを混ぜる（自己対戦時）
+            noise = self.rng.dirichlet([self.da] * len(root.legal))
+            root.P = (1 - self.de) * root.P + self.de * noise
         for _ in range(self.n_sims):
             self._simulate(root)
         best = int(np.argmax(root.N))
