@@ -42,6 +42,6 @@ def test_mcts_returns_legal_move():
     mcts = TreeMCTS(g, value_fn=g.value, n_sims=12,
                     determinize_fn=lambda s, r: g.determinize(s, name, r),
                     rng=np.random.default_rng(0))
-    move, N = mcts.run(m)
+    move, N, _ = mcts.run(m)
     assert move in legal, "返り値が合法手でない"
     assert N is not None and int(np.sum(N)) > 0, "訪問が記録されていない"

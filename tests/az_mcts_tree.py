@@ -44,17 +44,17 @@ class TreeMCTS:
         self.rng = rng or np.random.default_rng(0)
 
     def run(self, real_state):
-        """探索し、ルート合法手のうち最良の move を返す（訪問最大）。"""
+        """探索し (最良move, 訪問数N[K], ルート合法手list) を返す。N と legal は同順。"""
         state = self.determinize_fn(real_state, self.rng) if self.determinize_fn else real_state
         to_move = self.game.current_player(state)
         root = _Node(state, to_move, self.game.is_terminal(state), 0.0)
         self._expand(root)
         if not root.legal:
-            return None, None
+            return None, None, []
         for _ in range(self.n_sims):
             self._simulate(root)
         best = int(np.argmax(root.N))
-        return root.legal[best], root.N
+        return root.legal[best], root.N, root.legal
 
     def _expand(self, node):
         if node.terminal:

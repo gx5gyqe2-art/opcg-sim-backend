@@ -56,7 +56,7 @@ def mcts_sl_agent(game, value_fn, sims, c_puct=1.5):
     def act(state, name, rng):
         mcts = TreeMCTS(game, value_fn=value_fn, c_puct=c_puct, n_sims=sims,
                         determinize_fn=lambda s, r: game.determinize(s, name, r), rng=rng)
-        move, _ = mcts.run(state)
+        move, _, _ = mcts.run(state)
         if move is None:
             legal = game.legal_actions(state)
             move = legal[0] if legal else None

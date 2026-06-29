@@ -42,7 +42,7 @@ def test_tree_mcts_takes_winning_move():
     game = _TTTTree()
     state = ((1, 1, 0, 2, 2, 0, 0, 0, 0), 0)   # player0 が cell2 で勝ち
     mcts = TreeMCTS(game, value_fn=game.value, n_sims=300, rng=np.random.default_rng(0))
-    move, N = mcts.run(state)
+    move, N, _ = mcts.run(state)
     assert move == 2, f"即勝ち手(2)を選べない: move={move} N={N}"
 
 
@@ -50,5 +50,5 @@ def test_tree_mcts_blocks_opponent_win():
     game = _TTTTree()
     state = ((1, 1, 0, 2, 0, 0, 0, 0, 0), 1)   # player1 は cell2 でブロック
     mcts = TreeMCTS(game, value_fn=game.value, n_sims=400, rng=np.random.default_rng(0))
-    move, _ = mcts.run(state)
+    move, _, _ = mcts.run(state)
     assert move == 2, f"相手の即勝ちをブロックできない: {move}"
