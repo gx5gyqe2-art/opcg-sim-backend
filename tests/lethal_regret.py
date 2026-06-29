@@ -208,6 +208,36 @@ def _build_suite_positions(db, n, rng):
     return out
 
 
+def _build_hard_positions(db, n, rng):
+    """**ハード near-lethal**（don配分＋play-around-counter を要する・隠れ情報あり W>1）。
+
+    攻撃者の素パワーを相手リーダー未満にし、**don を盛らないとリーダーに届かない**。相手手札（=counter,
+    決定化world で可変）が +power 防御するので、リーサルには「どの攻撃者にどれだけ don を盛るか」の
+    正しい配分が要る。Greedy（don を盛らず素殴り）は届かず Regret>0、CPU が配分できれば Regret 0。
+    ＝戦術の"深い"部分を弁別する。
+    """
+    from test_turn_solver import _gm_at_p1_main
+    out = []
+    for i in range(n):
+        gm = _gm_at_p1_main(db, seed=i)
+        lp = int(gm.p2.leader.get_power(False)) if gm.p2.leader else 5000
+        gm.p2.life.clear()
+        gm.p2.life.append(gm.p2.deck.pop(0))            # ライフ1（2打点要）
+        while len(gm.p2.hand) < 2 and gm.p2.deck:       # 相手手札2枚（counter源・world で可変）
+            gm.p2.hand.append(gm.p2.deck.pop(0))
+        gm.p2.hand[:] = gm.p2.hand[:2]
+        gm.p2.field.clear()
+        # 攻撃者2体・素パワー = リーダー−1000（don 1個で届く／counter には更に要る）。
+        gm.p1.field[:] = [_vanilla(f"H{i}_{j}", "p1", max(1000, lp - 1000)) for j in range(2)]
+        gm.p1.hand.clear()
+        gm.p1.don_active.clear(); gm.p1.don_rested.clear()
+        for _ in range(4):                              # don 4（配分の余地）
+            if gm.p1.don_deck:
+                gm.p1.don_active.append(gm.p1.don_deck.pop(0))
+        out.append(gm)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--positions", type=int, default=10, help="採点する決定局面数の上限")
@@ -221,6 +251,8 @@ def main():
                     help="構成済みの『選択が結果を分ける』リーサル局面で計器の弁別力を検証（高速）")
     ap.add_argument("--suite", action="store_true",
                     help="多様な near-lethal 構成スイート(相手手札空=決定的W=1)で戦術実行 Regret を実測")
+    ap.add_argument("--hard", action="store_true",
+                    help="ハード難局面(don配分+play-around-counter・隠れ情報W>1)で深い戦術を弁別")
     args = ap.parse_args()
     db = _load_db()
     rng = random.Random(99)
@@ -234,6 +266,9 @@ def main():
         snaps = _build_suite_positions(db, args.positions, random.Random(2026))
         print(f"near-lethal 構成スイート: {len(snaps)}（相手手札空=決定的W=1）", flush=True)
         deterministic = True
+    elif args.hard:
+        snaps = _build_hard_positions(db, args.positions, random.Random(7))
+        print(f"ハード難局面: {len(snaps)}（don配分+counter・隠れ情報W={args.worlds}）", flush=True)
     else:
         snaps = _gen_positions(db, args.games, args.max_plies, args.seed0)
         print(f"採取した p1 決定局面: {len(snaps)}（{args.games}局）", flush=True)
