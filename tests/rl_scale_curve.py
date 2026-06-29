@@ -26,7 +26,8 @@ def sign_acc(pred, y):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", default=None, help="既存 npz（無ければ生成）")
+    ap.add_argument("--data", default=None, nargs="+",
+                    help="既存 npz（複数可・game id はチャンク跨ぎで一意化して結合）。無ければ生成")
     ap.add_argument("--games", type=int, default=60)
     ap.add_argument("--eps", type=float, default=0.3)
     ap.add_argument("--sample-every", type=int, default=2)
@@ -40,8 +41,15 @@ def main():
     db = _load_db()
     vocab = E.build_vocab(db)
     if args.data:
-        z = np.load(args.data)
-        data = {k: z[k] for k in z.files}
+        chunks = []
+        goff = 0
+        for path in args.data:
+            z = np.load(path)
+            d = {k: z[k] for k in z.files}
+            d["game"] = d["game"].astype(np.int64) + goff   # チャンク跨ぎで game id を一意化
+            goff = int(d["game"].max()) + 1
+            chunks.append(d)
+        data = {k: np.concatenate([c[k] for c in chunks]) for k in chunks[0]}
     else:
         data = G.generate(db, vocab, args.games, args.eps, 400, args.seed0, args.sample_every)
     if data is None:
