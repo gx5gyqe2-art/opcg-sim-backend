@@ -175,6 +175,39 @@ def _build_validation_positions(db, n):
     return out
 
 
+def _build_suite_positions(db, n, rng):
+    """多様な **near-lethal 構成局面**（相手手札=空＝隠れ情報なし・決定的・リーサル被覆を保証）。
+
+    自己対戦の決定局面には強制リーサルがほぼ無い（温室問題・実測）ため、戦術実行を測るには
+    リーサルを含む局面を構成的に作る（レビュー論点4）。攻撃者数/パワー/ブロッカー/囮/ライフを振り、
+    一部はリーサル有・一部は無し（best<LETHAL_MIN は採点対象外で自然に除外）。don は空（手札counter無で
+    don は打点に無関係＝木を小さく保つ）。リーサル実行(don無し)＝攻撃順/対象選択の正しさを測る。
+    """
+    from test_turn_solver import _gm_at_p1_main
+    out = []
+    for i in range(n):
+        gm = _gm_at_p1_main(db, seed=i)
+        gm.p2.hand.clear()                       # counter 無し＝決定的(W=1)
+        life = rng.choice([1, 2])
+        gm.p2.life.clear()
+        for _ in range(life):
+            if gm.p2.deck:
+                gm.p2.life.append(gm.p2.deck.pop(0))
+        natk = rng.randint(1, 3)
+        gm.p1.field[:] = [_vanilla(f"ATK{i}_{j}", "p1", rng.choice([3000, 5000, 7000]))
+                          for j in range(natk)]
+        gm.p1.hand.clear()
+        gm.p1.don_active.clear(); gm.p1.don_rested.clear()
+        opp = []
+        for j in range(rng.randint(0, 2)):       # ブロッカー
+            opp.append(_vanilla(f"BLK{i}_{j}", "p2", rng.choice([3000, 5000]), keywords={"ブロッカー"}))
+        for j in range(rng.randint(0, 2)):       # 囮（レスト＝攻撃対象になるが防御はしない）
+            opp.append(_vanilla(f"DEC{i}_{j}", "p2", 3000, rest=True))
+        gm.p2.field[:] = opp
+        out.append(gm)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--positions", type=int, default=10, help="採点する決定局面数の上限")
@@ -186,13 +219,21 @@ def main():
     ap.add_argument("--seed0", type=int, default=0)
     ap.add_argument("--validate", action="store_true",
                     help="構成済みの『選択が結果を分ける』リーサル局面で計器の弁別力を検証（高速）")
+    ap.add_argument("--suite", action="store_true",
+                    help="多様な near-lethal 構成スイート(相手手札空=決定的W=1)で戦術実行 Regret を実測")
     args = ap.parse_args()
     db = _load_db()
     rng = random.Random(99)
 
+    deterministic = False
     if args.validate:
         snaps = _build_validation_positions(db, args.positions)
         print(f"検証局面（構成済み・囮あり）: {len(snaps)}", flush=True)
+        deterministic = True
+    elif args.suite:
+        snaps = _build_suite_positions(db, args.positions, random.Random(2026))
+        print(f"near-lethal 構成スイート: {len(snaps)}（相手手札空=決定的W=1）", flush=True)
+        deterministic = True
     else:
         snaps = _gen_positions(db, args.games, args.max_plies, args.seed0)
         print(f"採取した p1 決定局面: {len(snaps)}（{args.games}局）", flush=True)
@@ -208,7 +249,10 @@ def main():
     regrets = {k: [] for k in agents}
     scored = 0
     for S in snaps:
-        worlds = _make_worlds(S, "p1", args.worlds, random.Random(12345))  # 全エージェント同一世界(CRN)
+        if deterministic:
+            worlds = [S.clone()]   # 相手手札空＝隠れ情報なし＝真の盤面1つで決定的に採点
+        else:
+            worlds = _make_worlds(S, "p1", args.worlds, random.Random(12345))  # 全エージェント同一世界(CRN)
         res = score_position(S, "p1", agents, worlds, args.budget)          # テーブルは局面ごと1回
         if any(v is not None for v in res.values()):
             scored += 1
