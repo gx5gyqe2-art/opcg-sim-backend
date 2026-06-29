@@ -119,8 +119,13 @@ def _gen_positions(db, n_games, max_plies, seed0):
                     break
                 pid, action = pa
                 actor = m.p1 if m.p1.name == pid else m.p2
+                # リーサル機会が見込める局面に絞る（相手ライフ低＝solver も短絡で速く済む・無益局面の
+                # 全探索コストを避ける）。攻撃手数(場のアクティブ + リーダー) ≥ 相手ライフ も必要条件。
                 if pid == "p1" and action == "MAIN_ACTION":
-                    snaps.append(m.clone())
+                    opp_life = len(m.p2.life)
+                    atk_ct = sum(1 for c in m.p1.field if not c.is_rest) + 1
+                    if opp_life <= 2 and atk_ct >= max(1, opp_life):
+                        snaps.append(m.clone())
                 try:
                     mv = cpu_ai.decide_guarded(m, actor, "hard", rng, pimc_worlds=1)
                     if mv is None:
