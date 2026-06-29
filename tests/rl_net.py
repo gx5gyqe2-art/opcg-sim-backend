@@ -86,6 +86,22 @@ class ValueNet:
     def predict(self, batch):
         return self.forward(batch)[0]
 
+    def save(self, path):
+        np.savez(path, Emb=self.Emb, W1=self.W1, b1=self.b1, W2=self.W2, b2=self.b2,
+                 d_emb=np.array(self.d_emb))
+
+    @classmethod
+    def load(cls, path):
+        z = np.load(path)
+        vocab_size = z["Emb"].shape[0] - 1
+        hidden = z["W1"].shape[1]
+        feat_dim = z["W1"].shape[0] - int(z["d_emb"])
+        net = cls(vocab_size, d_emb=int(z["d_emb"]), hidden=hidden, feat_dim=feat_dim)
+        for k in ("Emb", "W1", "b1", "W2", "b2"):
+            setattr(net, k, z[k])
+        net._init_adam()
+        return net
+
 
 def _slice(data, i, j):
     return {k: data[k][i:j] for k in ("scalars", "field", "card_idx")}
