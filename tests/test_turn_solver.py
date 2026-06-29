@@ -13,7 +13,7 @@ from opcg_sim.src.core.gamestate import GameManager, Player
 from opcg_sim.src.models.enums import CardType
 from cpu_selfplay import build_deck, _load_db
 from engine_helpers import make_master, make_instance
-from turn_solver import is_lethal
+from turn_solver import is_lethal, is_lethal_ref
 
 
 @pytest.fixture(scope="module")
@@ -126,3 +126,50 @@ def test_lethal_two_hits_one_blocker(db):
     _make_attacker_board(gm, 1)   # 2打点
     _give_blocker(gm)
     assert is_lethal(gm, "p1") is True
+
+
+def _vanilla_attackers(n, power):
+    out = []
+    for i in range(n):
+        m = make_master(card_id=f"V-{i}", name=f"バニラ{i}", type=CardType.CHARACTER,
+                        cost=2, power=power, counter=1000, abilities=(), effect_text="")
+        inst = make_instance(m, owner="p1")
+        inst.is_rest = False
+        inst.is_newly_played = False
+        out.append(inst)
+    return out
+
+
+def test_fuzz_primary_matches_reference(db):
+    """tier-2 二重実装 fuzz: ランダム小局面で 本実装 == 参照実装(短絡なし) == 本実装(手順シャッフル)。
+
+    ラベル(正解)は不要＝3経路の一致だけで、短絡/any-all取り違え/手順依存のバグを検出する。
+    予算超過(None)が出た局面は両者スキップ。十分件数の resolved 局面で一致を固定。
+    """
+    import random as _r
+    base = _gm_at_p1_main(db)
+    rng = _r.Random(20260628)
+    checked = 0
+    for _ in range(60):
+        gm = base.clone()
+        gm.p1.hand.clear(); gm.p2.hand.clear()
+        gm.p1.don_active.clear(); gm.p1.don_rested.clear()
+        # ランダム小構成: ライフ0-2 / 攻撃者0-2(power可変) / ブロッカー0-1。
+        nlife = rng.randint(0, 2)
+        gm.p2.life.clear()
+        for _i in range(nlife):
+            if gm.p2.deck:
+                gm.p2.life.append(gm.p2.deck.pop(0))
+        gm.p1.field[:] = _vanilla_attackers(rng.randint(0, 2), rng.choice([3000, 5000, 7000]))
+        gm.p2.field.clear()
+        if rng.random() < 0.5:
+            _give_blocker(gm)
+        BUD = 40000
+        a = is_lethal(gm, "p1", node_budget=BUD)
+        b = is_lethal_ref(gm, "p1", node_budget=BUD)
+        c = is_lethal(gm, "p1", node_budget=BUD, rng=_r.Random(rng.randint(0, 10**9)))
+        if a is None or b is None or c is None:
+            continue
+        assert a == b == c, f"solver不一致: primary={a} ref={b} shuffled={c} (life={nlife})"
+        checked += 1
+    assert checked >= 25, f"resolved 局面が少なすぎる（{checked}）＝fuzz が成立していない"

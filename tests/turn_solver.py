@@ -33,7 +33,8 @@ def _apply(m, actor, mv):
         action_api.apply_game_action(m, actor, mv["action_type"], mv.get("payload", {}))
 
 
-def _solve(m, attacker, defender, budget):
+def _solve(m, attacker, defender, budget, rng=None):
+    """本実装（短絡あり minimax）。rng を渡すと合法手をシャッフル（順序不変性 fuzz 用）。"""
     # 葉: 勝敗確定。
     if m.winner is not None:
         return m.winner == attacker
@@ -51,6 +52,9 @@ def _solve(m, attacker, defender, budget):
     moves = m.get_legal_actions(actor)
     if not moves:
         return False
+    if rng is not None:
+        moves = list(moves)
+        rng.shuffle(moves)
     is_max = (pid == attacker)   # 攻撃側=MAX(勝ちを探す)／守備側=MIN(生存を探す)
     saw = False
     for mv in moves:
@@ -60,7 +64,7 @@ def _solve(m, attacker, defender, budget):
             _apply(c, ca, mv)
         except Exception:
             continue
-        r = _solve(c, attacker, defender, budget)
+        r = _solve(c, attacker, defender, budget, rng)
         saw = True
         if is_max and r:
             return True      # 攻撃側: 強制勝ち手を1つ見つけた＝lethal
@@ -72,14 +76,60 @@ def _solve(m, attacker, defender, budget):
     return not is_max
 
 
-def is_lethal(manager, attacker_name, node_budget=200000):
+def _solve_ref(m, attacker, defender, budget):
+    """**独立した参照実装（tier-2 二重実装・短絡なしの全展開DFS）**。
+
+    本実装(`_solve`)と意図的に別コードにし、短絡/any-all の取り違え等のバグを fuzz 一致で検出する。
+    全子の真偽を集めてから `any`(攻撃側MAX)／`all`(守備側MIN) で畳む＝構成上明らかに正しい（遅い）。
+    """
+    if m.winner is not None:
+        return m.winner == attacker
+    pa = m.pending_actor_action()
+    if pa is None:
+        return False
+    pid, action = pa
+    if pid == defender and action == "MAIN_ACTION":
+        return False
+    budget[0] -= 1
+    if budget[0] <= 0:
+        raise _BudgetExceeded()
+    actor = _player_by_name(m, pid)
+    moves = m.get_legal_actions(actor)
+    if not moves:
+        return False
+    child_results = []
+    for mv in moves:
+        c = m.clone()
+        ca = _player_by_name(c, pid)
+        try:
+            _apply(c, ca, mv)
+        except Exception:
+            continue
+        child_results.append(_solve_ref(c, attacker, defender, budget))
+    if not child_results:
+        return False
+    return any(child_results) if pid == attacker else all(child_results)
+
+
+def is_lethal(manager, attacker_name, node_budget=200000, rng=None):
     """完全情報盤面 `manager` で、`attacker_name` が**このターンにリーサルを強制できる**なら True。
 
     予算 `node_budget` を超えたら None（=解けない局面・上位で別集計）。盤面は破壊しない（毎ノード clone）。
+    `rng` を渡すと合法手をシャッフルして解く（手順不変性の検証用・結果は不変であるべき）。
     """
     other = manager.p2.name if manager.p1.name == attacker_name else manager.p1.name
     budget = [node_budget]
     try:
-        return _solve(manager.clone(), attacker_name, other, budget)
+        return _solve(manager.clone(), attacker_name, other, budget, rng)
+    except _BudgetExceeded:
+        return None
+
+
+def is_lethal_ref(manager, attacker_name, node_budget=200000):
+    """参照実装（短絡なし全展開）による is_lethal。tier-2 fuzz で本実装との一致を固定する。"""
+    other = manager.p2.name if manager.p1.name == attacker_name else manager.p1.name
+    budget = [node_budget]
+    try:
+        return _solve_ref(manager.clone(), attacker_name, other, budget)
     except _BudgetExceeded:
         return None
