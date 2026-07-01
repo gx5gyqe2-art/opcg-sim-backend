@@ -30,14 +30,32 @@ YELLOW = "黄"
 E_SCALARS = 14   # encoder.encode の scalars 次元（両表現の共有先頭ブロック）
 
 
-def _leaders_by_color(db):
-    train, held = [], []
+def _all_leaders(db):
+    out = []
     for cid in db.raw_db.keys():
         m = db.get_card(cid)
-        if m is None or m.type.name != "LEADER":
-            continue
-        cols = {getattr(x, "value", x) for x in (getattr(m, "colors", []) or [])}
-        (held if YELLOW in cols else train).append(cid)
+        if m is not None and m.type.name == "LEADER":
+            cols = {getattr(x, "value", x) for x in (getattr(m, "colors", []) or [])}
+            out.append((cid, cols))
+    return out
+
+
+def _leaders_split(db, mode, k, rng):
+    """held-out の切り方を選ぶ。
+      color : 黄を丸ごと訓練から除外（＝未見領域の被覆ゼロ。pre-flight①の設定）
+      leader: 黄リーダーの一部だけ held-out・残りの黄は訓練に残す
+              （＝ドメインランダム化の代理: 未見“領域”ではなく未見“個体”への転移）
+    """
+    leaders = _all_leaders(db)
+    yellow = [cid for cid, cols in leaders if YELLOW in cols]
+    if mode == "color":
+        train = [cid for cid, cols in leaders if YELLOW not in cols]
+        return train, list(yellow)
+    # leader mode: 黄から k 個を held-out、それ以外（他色＋残り黄）は訓練
+    ysh = list(yellow); rng.shuffle(ysh)
+    held = ysh[:k]
+    held_set = set(held)
+    train = [cid for cid, _ in leaders if cid not in held_set]
     return train, held
 
 
@@ -149,14 +167,17 @@ def main():
     ap.add_argument("--sample-every", type=int, default=4)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--lam", type=float, default=1.0)
+    ap.add_argument("--holdout", choices=["color", "leader"], default="color",
+                    help="color=黄を丸ごと除外(被覆ゼロ) / leader=黄の一部だけ除外(被覆あり)")
+    ap.add_argument("--holdout-k", type=int, default=8)
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
     db = _load_db()
     vocab = E.build_vocab(db)
     fps = FP.build_fingerprints(db)
-    train_leaders, held_leaders = _leaders_by_color(db)
-    print(f"leaders: train(非黄)={len(train_leaders)}  held-out(黄)={len(held_leaders)}")
+    train_leaders, held_leaders = _leaders_split(db, args.holdout, args.holdout_k, rng)
+    print(f"holdout={args.holdout}  leaders: train={len(train_leaders)}  held-out={len(held_leaders)}")
     if not held_leaders or not train_leaders:
         print("色分割に失敗"); sys.exit(1)
 
