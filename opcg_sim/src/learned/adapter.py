@@ -41,7 +41,11 @@ class OPCGGame:
         name = self.current_player(state)
         if name is None:
             return []
-        return state.get_legal_actions(self._actor(state, name))
+        base = state.get_legal_actions(self._actor(state, name))
+        # 効果選択対話では get_legal_actions は既定解決1手のみ。L1 と同じ候補ごと／
+        # accept・decline の代替手を併合し、MCTS が選択肢を評価できるようにする
+        # （併合しないと任意効果を常に発動・up-to効果を常に見送る配線バグになる）。
+        return cpu_ai.merged_search_actions(state, name, base)
 
     def apply(self, state, move, actor_name):
         """move を新クローンへ適用（対話ドレイン込み）。例外手は None（呼び出し側で除外）。"""

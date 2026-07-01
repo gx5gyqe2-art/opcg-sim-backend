@@ -695,6 +695,39 @@ def _selection_moves(manager, actor_name: str):
     return None
 
 
+def merged_search_actions(manager, actor_name: str, base_moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """学習型CPU(MCTS)用の合法手併合。
+
+    `manager.get_legal_actions` は効果選択対話（SELECT_TARGET/CONFIRM_OPTIONAL 等）に対して
+    組合せ爆発回避のため「機械的既定解決」1手しか返さない（CONFIRM_OPTIONAL=必ず accept・
+    SELECT_TARGET min0=必ず0枚）。これを MCTS に渡すと**選択そのものを探索できず**、
+    任意効果を常に発動（OP16-080 リダイレクトを毎回浪費）・up-to効果を常に見送る
+    （OP16-119 のライフ追加を絶対使わない）という配線起因の系統的悪手になる。
+
+    L1 が探索する候補ごと／accept・decline の代替手（`_selection_moves`）を base_moves に併合し、
+    学習 MCTS が各選択の結果局面を value ネットで評価できるようにする。選択対話でない局面
+    （MAIN_ACTION 等）は `_selection_moves` が None を返すため base_moves をそのまま返す。
+    """
+    alts = _selection_moves(manager, actor_name)
+    if not alts:
+        return base_moves
+
+    def _k(m):
+        p = m.get("payload") or {}
+        su = p.get("selected_uuids")
+        su = tuple(su) if isinstance(su, (list, tuple)) else su
+        return (m.get("action_type"), su, p.get("accepted"), p.get("index"))
+
+    out = list(base_moves)
+    seen = {_k(m) for m in out}
+    for m in alts:
+        k = _k(m)
+        if k not in seen:
+            seen.add(k)
+            out.append(m)
+    return out
+
+
 def _consumes_hand_card(manager, actor_name: str, move: Dict[str, Any]) -> bool:
     """move が actor の手札のカードを使う手か（手札からの登場 PLAY・手札からのカウンター等）。
 
