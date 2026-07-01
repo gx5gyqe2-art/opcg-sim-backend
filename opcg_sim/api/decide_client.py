@@ -79,12 +79,9 @@ def decide(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[st
     if mem is None:
         mem = {}
     if difficulty == "learned":
-        try:
-            from opcg_sim.src.core import cpu_learned
-            if cpu_learned.available():
-                return cpu_learned.decide_learned(manager, player)
-        except Exception:
-            pass   # 学習型が失敗しても対局を止めない＝L1 へフォールバック
+        # learned-only（L1 フォールバック無し）＝観測する手は必ず学習型。本番は numpy 必須。
+        from opcg_sim.src.core import cpu_learned
+        return cpu_learned.decide_learned(manager, player)
     if USE_WORKER:
         try:
             req = (manager, player.name, difficulty, mem,
@@ -113,17 +110,13 @@ def plan_segment(manager, player, difficulty: str = "normal", *, mem: Optional[D
     action list を返す（ワーカー優先・失敗時インプロセス）。`mem` はワーカー側の進行を反映する。
 
     difficulty=="learned" は先読み計画をせず、学習型CPUの1手だけを返す（毎手 MCTS で決める）。
-    例外/未同梱時は従来 L1 計画へ安全フォールバック。"""
+    learned-only（L1 フォールバック無し）。"""
     if mem is None:
         mem = {}
     if difficulty == "learned":
-        try:
-            from opcg_sim.src.core import cpu_learned
-            if cpu_learned.available():
-                mv = cpu_learned.decide_learned(manager, player)
-                return [mv] if mv else []
-        except Exception:
-            pass
+        from opcg_sim.src.core import cpu_learned
+        mv = cpu_learned.decide_learned(manager, player)
+        return [mv] if mv else []
     if USE_WORKER:
         try:
             req = (manager, player.name, difficulty, mem,
