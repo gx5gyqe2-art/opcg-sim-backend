@@ -99,6 +99,9 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--mask", choices=["none", "color", "behavior"], default="none",
                     help="脱もつれ: color=raw色6次元を除去(①b) / behavior=trigger+actionのみ")
+    ap.add_argument("--holdout", choices=["color", "leader"], default="color",
+                    help="②被覆: color=黄を全除外(被覆ゼロ) / leader=黄一部だけ除外(被覆あり)")
+    ap.add_argument("--holdout-k", type=int, default=8)
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
@@ -110,8 +113,9 @@ def main():
         fps = mask_fps(fps, [COLOR])
     elif args.mask == "behavior":
         fps = mask_fps(fps, [NON_BEHAVIOR])
-    train_leaders, held_leaders = _leaders_split(db, "color", 0, rng)
-    print(f"DIM={DIM} sims={args.sims} mask={args.mask} train={len(train_leaders)} held-out(黄)={len(held_leaders)}")
+    train_leaders, held_leaders = _leaders_split(db, args.holdout, args.holdout_k, rng)
+    print(f"DIM={DIM} sims={args.sims} mask={args.mask} holdout={args.holdout} "
+          f"train={len(train_leaders)} held-out(黄)={len(held_leaders)}")
 
     print(f"boot: L1評価ラベル {args.boot_games} games ...")
     Xb, Yb = gen_dataset(train_leaders, db, vocab, fps, args.boot_games, args.ply_cap, args.every, rng)
