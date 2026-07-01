@@ -80,8 +80,9 @@ def decide(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[st
         mem = {}
     if difficulty == "learned":
         # learned-only（L1 フォールバック無し）＝観測する手は必ず学習型。本番は numpy 必須。
+        # cpu_trace 時は trace に手の分析（regret/候補/L1第二意見）を書き込む。
         from opcg_sim.src.core import cpu_learned
-        return cpu_learned.decide_learned(manager, player)
+        return cpu_learned.decide_learned(manager, player, trace=trace)
     if USE_WORKER:
         try:
             req = (manager, player.name, difficulty, mem,
