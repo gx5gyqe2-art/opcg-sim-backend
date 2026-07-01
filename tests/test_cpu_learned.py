@@ -56,6 +56,18 @@ def test_learned_only_no_l1_fallback():
     assert isinstance(seg, list) and (not seg or seg[0] in legal), "plan_segment(learned) が不正"
 
 
+def test_decision_trace_populated():
+    """cpu_trace 相当: trace dict を渡すと手の分析(chosen/candidates/L1第二意見)が入る。"""
+    m = _game(7); name, actor = _actor(m)
+    tr = {}
+    mv = cpu_learned.decide_learned(m, actor, sims=20, trace=tr)
+    assert mv is not None
+    assert tr.get("difficulty") == "learned"
+    assert tr.get("chosen") and "candidates" in tr and len(tr["candidates"]) >= 1
+    assert "visit_pct" in tr["candidates"][0] and "q" in tr["candidates"][0]
+    assert "l1_move" in tr and "l1_disagrees" in tr
+
+
 def test_encoder_no_drift():
     """製品コピーの符号化が訓練時(tests)と厳密一致＝netへ同じ入力を与える。"""
     m = _game(5); name, _ = _actor(m)

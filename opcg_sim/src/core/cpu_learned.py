@@ -70,8 +70,14 @@ def _priors_fn(pnet, vocab):
 
 
 def decide_learned(manager, player, sims: int = 160, c_puct: float = 1.5,
-                   rng=None) -> Optional[Dict[str, Any]]:
-    """学習型CPUの1手決定。返り値は `decide_guarded` 互換（move 辞書 or None）。"""
+                   rng=None, trace=None) -> Optional[Dict[str, Any]]:
+    """学習型CPUの1手決定。返り値は `decide_guarded` 互換（move 辞書 or None）。
+
+    `trace`（dict）が渡された時（cpu_trace ON）は、その手の分析を書き込む＝変な手の検証用ログ:
+      chosen（選んだ手）/ value（選手の行動価値Q）/ candidates（訪問上位・visit%・Q）/
+      l1_move（独立評価器L1の推奨手）/ l1_disagrees（L1と食い違うか）。
+    分析は挙動に影響しない（例外は握り潰し、手は必ず返す）。
+    """
     _lazy_init()
     vocab, vnet, pnet, game = _STATE["vocab"], _STATE["vnet"], _STATE["pnet"], _STATE["game"]
     name = player.name
@@ -82,4 +88,43 @@ def decide_learned(manager, player, sims: int = 160, c_puct: float = 1.5,
     move, _, legal = mcts.run(manager)
     if move is None:
         move = legal[0] if legal else None
+    if trace is not None:
+        try:
+            _fill_trace(trace, manager, player, move, getattr(mcts, "last_stats", None))
+        except Exception:
+            pass   # 分析失敗で対局を止めない
     return move
+
+
+def _fill_trace(trace, manager, player, chosen, stats):
+    """トレース dict に learned の意思決定分析を書き込む（cpu_trace 時のみ呼ばれる）。"""
+    from opcg_sim.src.core import cpu_ai
+    import random as _random
+    trace["difficulty"] = "learned"
+    trace["turn"] = getattr(manager, "turn_count", None)
+    trace["chosen"] = cpu_ai._describe_move(manager, chosen) if chosen else None
+    # ① 自分の探索の内訳（訪問上位・visit%・行動価値Q）。
+    if stats and stats.get("legal"):
+        legal, N, Q = stats["legal"], stats["N"], stats["Q"]
+        tot = float(N.sum()) or 1.0
+        order = sorted(range(len(legal)), key=lambda i: -N[i])[:5]
+        trace["candidates"] = [{
+            "move": cpu_ai._describe_move(manager, legal[i]),
+            "visit_pct": round(100.0 * float(N[i]) / tot, 1),
+            "q": round(float(Q[i]), 3),
+        } for i in order]
+        # 選んだ手の Q（＝net が見込む行動価値）。
+        for i, mv in enumerate(legal):
+            if mv is chosen:
+                trace["value"] = round(float(Q[i]), 3)
+                break
+    # ② 独立評価器 L1 の第二意見（分布外での net 系統誤差を拾う・evalは信じ過ぎない）。
+    try:
+        clone = manager.clone()
+        cp = clone.p1 if clone.p1.name == player.name else clone.p2
+        l1 = cpu_ai.decide_guarded(clone, cp, "hard", _random.Random(0), {}, pimc_worlds=1)
+        trace["l1_move"] = cpu_ai._describe_move(clone, l1) if l1 else None
+        trace["l1_disagrees"] = bool(l1 and chosen and
+                                     l1.get("action_type") != chosen.get("action_type"))
+    except Exception:
+        pass

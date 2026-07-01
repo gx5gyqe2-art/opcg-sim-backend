@@ -61,6 +61,9 @@ class TreeMCTS:
         for _ in range(self.n_sims):
             self._simulate(root)
         best = int(np.argmax(root.N))
+        # トレース用の root 統計（訪問数・行動価値 Q=W/N）を残す（decide_learned が読む）。
+        self.last_stats = {"legal": root.legal, "N": root.N.copy(),
+                           "Q": root.W / np.maximum(root.N, 1.0)}
         return root.legal[best], root.N, root.legal
 
     def _expand(self, node):
