@@ -28,8 +28,9 @@ from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.learned.adapter import OPCGGame
 
 
-def gen_dataset_parametric(gen, db, vocab, fps, n_games, ply_cap, every, rng):
-    """パラメトリック生成デッキ同士のランダムプレイで (encode_v2, L1評価) を収集。"""
+def gen_dataset_parametric(gen, db, vocab, fps, n_games, ply_cap, every, rng, encode_fn=None):
+    """パラメトリック生成デッキ同士のランダムプレイで (encode, L1評価) を収集。"""
+    encode_fn = encode_fn or encode_v2
     X, Y = [], []
     for _g in range(n_games):
         lid1, d1 = gen.generate(rng); lid2, d2 = gen.generate(rng)
@@ -47,7 +48,7 @@ def gen_dataset_parametric(gen, db, vocab, fps, n_games, ply_cap, every, rng):
                 break
             if ply % every == 0 and m.turn_count >= 2:
                 try:
-                    X.append(encode_v2(m, nm, vocab, fps))
+                    X.append(encode_fn(m, nm, vocab, fps))
                     Y.append(float(cpu_ai.evaluate(m, nm)))
                 except Exception:
                     pass
@@ -136,6 +137,8 @@ def main():
     ap.add_argument("--p1", type=float, default=0.65)
     ap.add_argument("--player", choices=["mcts", "l1"], default="mcts",
                     help="p1: mcts=生成訓練value+MCTS(ゲート) / l1=greedy-L1(先手ベースライン)")
+    ap.add_argument("--encoder", choices=["v2", "v3"], default="v2",
+                    help="v3=実効状態特徴14次元を追加（実効コスト/防御リソース/無効化フラグ等）")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
@@ -146,15 +149,19 @@ def main():
     fps = mask_fps(FP.build_fingerprints(db), [COLOR])   # 脱もつれ（raw色除去）
     _GEN["gen"] = DeckGenerator(db, seed=args.seed)
 
+    from rl_effective_state import encode_v3, DIM_V3, make_value_fn_for
+    encode_fn, dim = (encode_v3, DIM_V3) if args.encoder == "v3" else (encode_v2, DIM)
+
     vf = None
     if args.player == "mcts":
-        print(f"boot: パラメトリック生成デッキ {args.boot_games} games（L1評価・脱もつれ表現）...")
+        print(f"boot: パラメトリック生成デッキ {args.boot_games} games"
+              f"（L1評価・脱もつれ表現・encoder={args.encoder}, dim={dim}）...")
         X, Y = gen_dataset_parametric(_GEN["gen"], db, vocab, fps, args.boot_games,
-                                      args.ply_cap, args.every, rng)
-        net = MLP(DIM, seed=args.seed); net.fit_norm(X, Y)
+                                      args.ply_cap, args.every, rng, encode_fn=encode_fn)
+        net = MLP(dim, seed=args.seed); net.fit_norm(X, Y)
         net.train(X, Y, epochs=args.epochs, rng=nrng)
         print(f"  states={len(X)}")
-        vf = make_value_fn(net, vocab, fps)
+        vf = make_value_fn_for(net, vocab, fps, encode_fn)
 
     tag = f"生成訓練value+MCTS({args.sims}sims)" if args.player == "mcts" else "greedy-L1(先手ベースライン)"
     print(f"\n=== ゲート[p1={tag}] vs greedy-L1 / held-out実デッキ・ミラー ===")
