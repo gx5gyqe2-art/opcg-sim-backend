@@ -68,6 +68,66 @@ def test_decision_trace_populated():
     assert "l1_move" in tr and "l1_disagrees" in tr
 
 
+def test_learned_enumerates_optional_confirm():
+    """配線バグ回帰(#1): 任意効果(CONFIRM_OPTIONAL)で学習CPUに accept/decline 両方を提示する。
+
+    以前は adapter が raw get_legal_actions を使い既定(accept)1手のみ＝OP16-080 の
+    【相手のアタック時】任意リダイレクトを対象がリーダーだけでも毎回発動＝トリガーを浪費していた。
+    """
+    from engine_helpers import make_game, make_instance, make_master
+    from opcg_sim.src.models.effect_types import GameAction, ValueSource, Ability
+    from opcg_sim.src.models.enums import TriggerType, ActionType
+    from opcg_sim.src.learned.adapter import OPCGGame
+    gm, p1, _ = make_game()
+    for i in range(3):
+        p1.deck.append(make_instance(make_master(card_id=f"D-{i}"), owner=p1.name))
+    opt = GameAction(type=ActionType.DRAW, value=ValueSource(base=1), is_optional=True)
+    src = make_instance(make_master(card_id="OPT"), owner=p1.name)
+    p1.field.append(src)
+    gm.resolve_ability(p1, Ability(trigger=TriggerType.ON_PLAY, effect=opt), source_card=src)
+    assert gm.active_interaction["action_type"] == "CONFIRM_OPTIONAL"
+    assert len(gm.get_legal_actions(p1)) == 1, "raw は既定(accept)1手のはず"
+    moves = OPCGGame().legal_actions(gm)
+    accepted = sorted(bool(m["payload"].get("accepted")) for m in moves)
+    assert accepted == [False, True], f"accept/decline 両方が必要: {accepted}"
+
+
+def test_learned_enumerates_up_to_life_selection():
+    """配線バグ回帰(#2): up-to選択(SELECT_TARGET min0/max1)で候補ごと＋見送りを提示する。
+
+    OP16-119 の【登場時】「上3枚を見て1枚までをライフの上に加える」。以前は raw が既定
+    (0枚=見送り)1手のみ＝学習CPUは構造的に絶対ライフ追加できなかった。併合後は
+    「加えない」＋各候補「加える」を探索できる。
+    """
+    from engine_helpers import make_game, make_instance, make_master
+    from opcg_sim.src.utils.loader import CardLoader
+    from opcg_sim.src.learned.adapter import OPCGGame
+    db = CardLoader("opcg_sim/data/opcg_cards.json"); db.load()
+    teach = db.get_card("OP16-119")
+    onplay = [ab for ab in teach.abilities if ab.trigger.name == "ON_PLAY"][0]
+    gm, p1, _ = make_game()
+    p1.deck = [make_instance(make_master(card_id=f"D-{i}", cost=i + 1), owner=p1.name)
+               for i in range(6)]
+    src = make_instance(teach, owner=p1.name)
+    gm.resolve_ability(p1, onplay, source_card=src)
+    assert gm.active_interaction["action_type"] == "SELECT_TARGET"
+    assert len(gm.get_legal_actions(p1)) == 1, "raw は既定(0枚=見送り)1手のはず"
+    moves = OPCGGame().legal_actions(gm)
+    n_add = sum(1 for m in moves if m["payload"].get("selected_uuids"))
+    n_decline = sum(1 for m in moves if not m["payload"].get("selected_uuids"))
+    assert n_add >= 1, "ライフに加える候補が1つも提示されていない"
+    assert n_decline >= 1, "見送り(加えない)が提示されていない"
+
+
+def test_merged_search_actions_noop_on_main_action():
+    """非選択局面(MAIN_ACTION)では併合が何も足さない＝PLAY/ATTACK 列挙を壊さない。"""
+    from opcg_sim.src.core import cpu_ai
+    m = _game(11); name, actor = _actor(m)
+    base = m.get_legal_actions(actor)
+    merged = cpu_ai.merged_search_actions(m, name, base)
+    assert merged == base, "選択対話でない局面で合法手が変化してはいけない"
+
+
 def test_encoder_no_drift():
     """製品コピーの符号化が訓練時(tests)と厳密一致＝netへ同じ入力を与える。"""
     m = _game(5); name, _ = _actor(m)
