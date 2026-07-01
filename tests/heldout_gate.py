@@ -85,28 +85,23 @@ class SPRT:
         return None            # 継続
 
 
-def play_vs_l1(value_fn, deck_builder, db, vocab, fps, sims, c_puct, ply_cap, rng, nrng,
-               sprt: SPRT, max_games, p1_kind="mcts"):
-    """ミラー対局: 両者とも同じ held-out 実デッキを操縦。p2=greedy-L1、p1 は p1_kind:
-    "mcts"=生成訓練value+MCTS（本ゲート）／"l1"=greedy-L1（先手ベースラインのコントロール）。
-    デッキ強度の交絡を消し「未見の実デッキをどちらが上手く操縦するか」だけを測る。SPRTで早期終了。"""
-    game = OPCGGame()
+def play_match(learned_move, deck_builder, db, vocab, fps, ply_cap, rng, sprt: SPRT, max_games):
+    """ミラー＋**席替え**: 同じ held-out 実デッキを両者操縦し、learned を p1/p2 半々で座らせる。
+    先手有利が両者に等しく配られ相殺 → learned勝率 > 0.5 = 純粋に操縦が上手い（デッキ強度・
+    先手の交絡なし）。learned_move(m, me)=学習側の着手、相手は greedy-L1。SPRTで早期終了。"""
     l1_score = lambda mm, me: _score_l1(mm, me, vocab, fps)
+    gi = 0
     while sprt.n < max_games:
-        l1, c1 = deck_builder("p1")                       # held-out 実デッキ（player側）
-        l2, c2 = deck_builder("p2")                       # 同じ held-out 実デッキ（相手側＝ミラー）
-        m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2)); m.start_game()
+        learned_seat = "p1" if gi % 2 == 0 else "p2"
+        _l1, c1 = deck_builder("p1"); _l2, c2 = deck_builder("p2")
+        m = GameManager(Player("p1", c1, _l1), Player("p2", c2, _l2)); m.start_game()
         ply = 0
         while ply < ply_cap and m.winner is None:
             pa = m.pending_actor_action()
             if pa is None:
                 break
             nm = pa[0]
-            if nm == "p1":
-                mv = (mcts_move(game, value_fn, m, "p1", sims, c_puct, nrng)
-                      if p1_kind == "mcts" else greedy_by(l1_score, m, "p1", rng))
-            else:
-                mv = greedy_by(l1_score, m, nm, rng)
+            mv = learned_move(m, nm) if nm == learned_seat else greedy_by(l1_score, m, nm, rng)
             if mv is None:
                 break
             try:
@@ -114,9 +109,10 @@ def play_vs_l1(value_fn, deck_builder, db, vocab, fps, sims, c_puct, ply_cap, rn
             except Exception:
                 break
             ply += 1
+        gi += 1
         if m.winner is None:
             continue
-        sprt.update(m.winner == "p1")
+        sprt.update(m.winner == learned_seat)
         if sprt.decision() is not None:
             break
     return sprt
@@ -139,6 +135,9 @@ def main():
                     help="p1: mcts=生成訓練value+MCTS(ゲート) / l1=greedy-L1(先手ベースライン)")
     ap.add_argument("--encoder", choices=["v2", "v3"], default="v2",
                     help="v3=実効状態特徴14次元を追加（実効コスト/防御リソース/無効化フラグ等）")
+    ap.add_argument("--prior", choices=["uniform", "policy"], default="uniform",
+                    help="policy=L1模倣warm-startのポインタ方策を prior に（探索効率）")
+    ap.add_argument("--policy-games", type=int, default=100)
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
@@ -150,26 +149,40 @@ def main():
     _GEN["gen"] = DeckGenerator(db, seed=args.seed)
 
     from rl_effective_state import encode_v3, DIM_V3, make_value_fn_for
+    from policy_bootstrap import train_policy_prior, make_priors_fn
     encode_fn, dim = (encode_v3, DIM_V3) if args.encoder == "v3" else (encode_v2, DIM)
+    game = OPCGGame()
 
-    vf = None
-    if args.player == "mcts":
-        print(f"boot: パラメトリック生成デッキ {args.boot_games} games"
-              f"（L1評価・脱もつれ表現・encoder={args.encoder}, dim={dim}）...")
+    l1_score = lambda mm, me: _score_l1(mm, me, vocab, fps)
+    if args.player == "l1":
+        learned_move = lambda m, me: greedy_by(l1_score, m, me, rng)
+        tag = "greedy-L1(席替えベースライン)"
+    else:
+        print(f"boot value: 生成デッキ {args.boot_games} games（encoder={args.encoder}, dim={dim}）...")
         X, Y = gen_dataset_parametric(_GEN["gen"], db, vocab, fps, args.boot_games,
                                       args.ply_cap, args.every, rng, encode_fn=encode_fn)
         net = MLP(dim, seed=args.seed); net.fit_norm(X, Y)
         net.train(X, Y, epochs=args.epochs, rng=nrng)
-        print(f"  states={len(X)}")
         vf = make_value_fn_for(net, vocab, fps, encode_fn)
+        priors_fn = None
+        if args.prior == "policy":
+            print(f"boot policy: 生成デッキ {args.policy_games} games（L1模倣・soft target）...")
+            pnet, npol = train_policy_prior(_GEN["gen"], db, vocab, args.policy_games,
+                                            args.ply_cap, args.every, rng, seed=args.seed)
+            priors_fn = make_priors_fn(pnet, vocab)
+            print(f"  value states={len(X)} / policy samples={npol}")
+        else:
+            print(f"  value states={len(X)} / prior=uniform")
+        learned_move = lambda m, me: mcts_move(game, vf, m, me, args.sims, 1.5, nrng,
+                                               priors_fn=priors_fn)
+        tag = f"生成訓練value+MCTS({args.sims}sims, prior={args.prior})"
 
-    tag = f"生成訓練value+MCTS({args.sims}sims)" if args.player == "mcts" else "greedy-L1(先手ベースライン)"
-    print(f"\n=== ゲート[p1={tag}] vs greedy-L1 / held-out実デッキ・ミラー ===")
+    print(f"\n=== ゲート[learned={tag}] vs greedy-L1 / held-out実デッキ・ミラー席替え ===")
     print(f"  SPRT: H0 p<={args.p0} vs H1 p>={args.p1} (α=β=0.05, max {args.max_games}戦)\n")
     for did in HD.deck_ids():
         sprt = SPRT(args.p0, args.p1)
-        play_vs_l1(vf, lambda owner, _d=did: HD.build(db, _d, owner), db, vocab, fps,
-                   args.sims, 1.5, args.ply_cap, rng, nrng, sprt, args.max_games, args.player)
+        play_match(learned_move, lambda owner, _d=did: HD.build(db, _d, owner),
+                   db, vocab, fps, args.ply_cap, rng, sprt, args.max_games)
         wr = sprt.w / sprt.n if sprt.n else float("nan")
         dec = sprt.decision() or "INCONCLUSIVE"
         print(f"  {did:26s} 勝率={wr:.3f} (n={sprt.n})  SPRT={dec}")

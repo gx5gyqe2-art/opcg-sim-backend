@@ -50,8 +50,8 @@ def make_value_fn(net, vocab, fps):
     return vf
 
 
-def mcts_move(game, value_fn, m, me, sims, c_puct, rng):
-    mcts = TreeMCTS(game, value_fn=value_fn, priors_fn=None, c_puct=c_puct, n_sims=sims,
+def mcts_move(game, value_fn, m, me, sims, c_puct, rng, priors_fn=None):
+    mcts = TreeMCTS(game, value_fn=value_fn, priors_fn=priors_fn, c_puct=c_puct, n_sims=sims,
                     determinize_fn=lambda s, r: game.determinize(s, me, r), rng=rng)
     move, _, legal = mcts.run(m)
     return move if move is not None else (legal[0] if legal else None)
