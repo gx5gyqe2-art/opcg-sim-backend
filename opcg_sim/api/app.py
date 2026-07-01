@@ -363,9 +363,10 @@ async def game_create(req: Any = Body(...)):
         first_player = _resolve_first_player(req.get("first_player"), player1, player2)
         manager = GameManager(player1, player2); manager.start_game(first_player); GAMES[game_id] = manager
         if vs_cpu:
-            # CPU は **hard（α-β＋ビーム＋PIMC）** のみ（easy/normal 廃止・expert(MCTS) も撤去＝強さ/速度で α-β に劣ると判明）。
+            # CPU は **hard（α-β＋ビーム＋PIMC）** が既定。**learned**（Gen2 学習型・NN誘導MCTS）も選択可
+            # （docs/reports/cpu_rl_pilot_p3_results_20260630.md・製品L1に0.925かつ高速・未同梱時はL1へ自動フォールバック）。
             difficulty = req.get("cpu_difficulty", "hard")
-            if difficulty != "hard":
+            if difficulty not in ("hard", "learned"):
                 difficulty = "hard"
             CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty}
             if cpu_trace:

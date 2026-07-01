@@ -71,9 +71,20 @@ def _roundtrip(req):
 def decide(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[str, Any]] = None,
            trace: Optional[Dict[str, Any]] = None,
            trace_read_ahead: bool = False):
-    """本番の decide。ワーカー有効時は PyPy へ委譲、失敗時はインプロセスへフォールバック。"""
+    """本番の decide。ワーカー有効時は PyPy へ委譲、失敗時はインプロセスへフォールバック。
+
+    difficulty=="learned" は学習型CPU（Gen2 value+policy+MCTS）へインプロセスで分岐する
+    （docs/reports/cpu_rl_pilot_p3_results_20260630.md）。例外/未同梱時は従来 L1 へ安全フォールバック。
+    """
     if mem is None:
         mem = {}
+    if difficulty == "learned":
+        try:
+            from opcg_sim.src.core import cpu_learned
+            if cpu_learned.available():
+                return cpu_learned.decide_learned(manager, player)
+        except Exception:
+            pass   # 学習型が失敗しても対局を止めない＝L1 へフォールバック
     if USE_WORKER:
         try:
             req = (manager, player.name, difficulty, mem,
@@ -99,9 +110,20 @@ def decide(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[st
 
 def plan_segment(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[str, Any]] = None):
     """Phase 3 ① 計画キャッシュ: セグメント（相手介入/TURN_END まで）の自分の連続手番を計画して
-    action list を返す（ワーカー優先・失敗時インプロセス）。`mem` はワーカー側の進行を反映する。"""
+    action list を返す（ワーカー優先・失敗時インプロセス）。`mem` はワーカー側の進行を反映する。
+
+    difficulty=="learned" は先読み計画をせず、学習型CPUの1手だけを返す（毎手 MCTS で決める）。
+    例外/未同梱時は従来 L1 計画へ安全フォールバック。"""
     if mem is None:
         mem = {}
+    if difficulty == "learned":
+        try:
+            from opcg_sim.src.core import cpu_learned
+            if cpu_learned.available():
+                mv = cpu_learned.decide_learned(manager, player)
+                return [mv] if mv else []
+        except Exception:
+            pass
     if USE_WORKER:
         try:
             req = (manager, player.name, difficulty, mem,
