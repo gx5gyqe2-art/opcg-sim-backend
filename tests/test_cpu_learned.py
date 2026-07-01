@@ -45,14 +45,15 @@ def test_decide_client_routes_learned():
     assert mv in legal, "decide_client 経由の learned が合法手を返さない"
 
 
-def test_fallback_when_unavailable(monkeypatch):
-    """重み未同梱でも例外にせず L1 へフォールバック（対局を止めない）。"""
+def test_learned_only_no_l1_fallback():
+    """learned-only: decide/plan_segment とも常に学習型が手を返す（L1へ落ちない）。"""
     from opcg_sim.api import decide_client
-    monkeypatch.setattr(cpu_learned, "available", lambda: False)
     m = _game(4); name, actor = _actor(m)
     legal = m.get_legal_actions(actor)
     mv = decide_client.decide(m, actor, "learned", mem={})
-    assert mv in legal, "フォールバックが合法手を返さない"
+    assert mv in legal, "learned が合法手を返さない"
+    seg = decide_client.plan_segment(m, actor, "learned", mem={})
+    assert isinstance(seg, list) and (not seg or seg[0] in legal), "plan_segment(learned) が不正"
 
 
 def test_encoder_no_drift():
