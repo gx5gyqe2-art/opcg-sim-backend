@@ -27,6 +27,21 @@ from opcg_sim.src.learned.mcts import TreeMCTS
 from opcg_sim.src.learned.adapter import OPCGGame
 
 
+COLOR = (7, 13)          # fingerprint の色6次元 [7:13]
+NON_BEHAVIOR = (0, 21)   # trigger/action[21:50] の前まで（static/色/type/keyword）
+
+
+def mask_fps(fps, zero_slices):
+    """fingerprint の指定スライスをゼロマスク（脱もつれ用）。"""
+    out = {}
+    for k, v in fps.items():
+        v2 = v.copy()
+        for a, b in zero_slices:
+            v2[a:b] = 0.0
+        out[k] = v2
+    return out
+
+
 def make_value_fn(net, vocab, fps):
     def vf(state, to_move):
         if state.winner is not None:
@@ -82,6 +97,8 @@ def main():
     ap.add_argument("--every", type=int, default=8)
     ap.add_argument("--epochs", type=int, default=80)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--mask", choices=["none", "color", "behavior"], default="none",
+                    help="脱もつれ: color=raw色6次元を除去(①b) / behavior=trigger+actionのみ")
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
@@ -89,8 +106,12 @@ def main():
     db = _load_db()
     vocab = E.build_vocab(db)
     fps = FP.build_fingerprints(db)
+    if args.mask == "color":
+        fps = mask_fps(fps, [COLOR])
+    elif args.mask == "behavior":
+        fps = mask_fps(fps, [NON_BEHAVIOR])
     train_leaders, held_leaders = _leaders_split(db, "color", 0, rng)
-    print(f"DIM={DIM} sims={args.sims} train={len(train_leaders)} held-out(黄)={len(held_leaders)}")
+    print(f"DIM={DIM} sims={args.sims} mask={args.mask} train={len(train_leaders)} held-out(黄)={len(held_leaders)}")
 
     print(f"boot: L1評価ラベル {args.boot_games} games ...")
     Xb, Yb = gen_dataset(train_leaders, db, vocab, fps, args.boot_games, args.ply_cap, args.every, rng)
