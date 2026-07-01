@@ -29,6 +29,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install fastapi uvicorn websockets pydantic python-multipart requests
           pip install pytest pytest-xdist httpx
+          pip install numpy   # 学習型CPU(opcg_sim/src/learned)＋RL検証ハーネスの依存
 
       - name: Run tests, structural audits, and quality gates
         env:
