@@ -13,3 +13,4 @@ tests/selfplay_value.jsonl
 tests/cand_*.json
 tests/eval_v2_spsa_best.json
 tests/value_*.jsonl
+tests/p2_sl_net.npz
