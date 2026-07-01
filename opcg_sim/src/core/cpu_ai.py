@@ -1343,6 +1343,54 @@ def _determinize_opponent(manager, me_name: str, rng):
     return clone
 
 
+def _resample_hidden(pl, rng, include_hand: bool):
+    """プレイヤー pl の**隠匿ゾーンだけ**を再サンプル（公開情報は不変）。
+
+    隠匿 = 山札順 ＋ 裏向きライフ（＋ include_hand なら手札）。これらは同一プレイヤーから見ても
+    中身/順序が不明なので、既知カード集合の**ありえる分割**へ差し替える。表向きライフ・場・
+    リーダー・トラッシュ・ドン・（自分の）手札は公開/既知なので触らない。枚数は各ゾーン保存。
+    """
+    life = pl.life
+    fd_idx = [i for i, c in enumerate(life) if not getattr(c, "is_face_up", False)]
+    pool = list(pl.deck) + [life[i] for i in fd_idx]
+    if include_hand:
+        pool += list(pl.hand)
+    if not pool:
+        return
+    rng.shuffle(pool)
+    k = 0
+    if include_hand:
+        n_hand = len(pl.hand)
+        pl.hand[:] = pool[k:k + n_hand]; k += n_hand
+    for i in fd_idx:                      # 裏向きライフ枠を差し替え（向きは裏向きのまま）
+        c = pool[k]; k += 1
+        try:
+            c.is_face_up = False
+        except Exception:
+            pass
+        life[i] = c
+    pl.deck[:] = pool[k:]
+
+
+def _determinize_hidden(manager, me_name: str, rng):
+    """学習型CPU/自己対戦の PIMC 決定化（**両者の隠匿情報を再サンプル＝探索の透視を禁止**）。
+
+    `_determinize_opponent`（L1用・相手手札のみ）と別物。self-play で value を学習する際、
+    探索がライフ内トリガーや自山札順を透視すると「踏まない前提」の楽観 value を学び、探索外で
+    不完全情報下のリスク評価が崩壊する（レビュー第7巡 Blocker）。よって:
+      - 相手: 手札＋山札＋裏向きライフ を合同再サンプル（枚数保存）
+      - 自分: 山札順＋裏向き自ライフ を再サンプル（手札・場は既知/実物のまま＝手の合法性は不変）
+      - 表向き（公開）ライフ・場・リーダー・トラッシュ・ドン は不変
+    L1 の PIMC は従来どおり（ゲート基準・製品挙動を campaign 中に動かさない）。
+    """
+    clone = manager.clone()
+    me = clone.p1 if clone.p1.name == me_name else clone.p2
+    opp = clone.p2 if clone.p1.name == me_name else clone.p1
+    _resample_hidden(me, rng, include_hand=False)
+    _resample_hidden(opp, rng, include_hand=True)
+    return clone
+
+
 def _pimc_scored(manager, name: str, moves: List[Dict[str, Any]], k_worlds: int, rng,
                  collect=None) -> List[Tuple[float, Dict[str, Any]]]:
     """Phase 2 PIMC（決定化・docs/reports/cpu_strength_roadmap_20260622.md §4 Phase 2）。
