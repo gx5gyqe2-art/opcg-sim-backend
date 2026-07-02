@@ -80,7 +80,7 @@ def diag_A(net, rows_tr, rows_h):
 
 def diag_B(net, leaders, db, vocab, fps, n_games, sims, ply_cap, rng, nrng):
     print("\n=== 診断B: 黄・敗戦ゲームの value 軌跡（MCTS手番で記録） ===")
-    game = OPCGGame(); vf = make_value_fn(net, vocab, fps)
+    game = OPCGGame(fair_determinize=True); vf = make_value_fn(net, vocab, fps)
     shown = 0
     for _g in range(n_games):
         m = _random_game(leaders, db, rng)

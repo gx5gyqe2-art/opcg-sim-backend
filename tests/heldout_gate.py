@@ -151,7 +151,7 @@ def main():
     from rl_effective_state import encode_v3, DIM_V3, make_value_fn_for
     from policy_bootstrap import train_policy_prior, make_priors_fn
     encode_fn, dim = (encode_v3, DIM_V3) if args.encoder == "v3" else (encode_v2, DIM)
-    game = OPCGGame()
+    game = OPCGGame(fair_determinize=True)
 
     l1_score = lambda mm, me: _score_l1(mm, me, vocab, fps)
     if args.player == "l1":

@@ -46,7 +46,7 @@ def test_selfplay_game_and_train_and_gate_smoke():
     vocab = E.build_vocab(db)
     fps = mask_fps(FP.build_fingerprints(db), [COLOR])
     gen = DeckGenerator(db, seed=0)
-    game = OPCGGame()
+    game = OPCGGame(fair_determinize=True)
     rng = random.Random(0); nrng = np.random.default_rng(0)
     vnet = MLP(DIM_V3, seed=0)
     vnet.fit_norm(np.zeros((4, DIM_V3), np.float32), np.array([-1., 1., -1., 1.], np.float32))  # 実ループの warm-start 相当（norm初期化）

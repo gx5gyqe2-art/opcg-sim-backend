@@ -59,7 +59,7 @@ def mcts_move(game, value_fn, m, me, sims, c_puct, rng, priors_fn=None):
 
 def match_mcts_vs_l1(value_fn, leaders, db, vocab, fps, n_games, sims, c_puct, ply_cap, rng, nrng):
     """MCTS(player, p1) vs greedy-L1(p2)。player 側勝率を返す。"""
-    game = OPCGGame()
+    game = OPCGGame(fair_determinize=True)
     wins = done = 0
     for _g in range(n_games):
         m = _random_game(leaders, db, rng)

@@ -200,7 +200,7 @@ def main():
     vocab = E.build_vocab(db)
     fps = mask_fps(FP.build_fingerprints(db), [COLOR])
     gen = DeckGenerator(db, seed=args.seed)
-    game = OPCGGame()
+    game = OPCGGame(fair_determinize=True)
 
     ck = load_ckpt(args.ckpt)
     if ck is not None:

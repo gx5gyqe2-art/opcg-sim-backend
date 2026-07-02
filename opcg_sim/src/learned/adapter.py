@@ -17,9 +17,13 @@ from opcg_sim.src.core.gamestate import GameManager, Player
 class OPCGGame:
     # L1 生スコアは card-currency で桁が大きい（実測 中央 ~-5800・範囲[-11920,7091]）。
     # scale=10000 で tanh 飽和率0%・std0.25＝探索が勾配を使える値域（GATE B 診断で較正）。
-    def __init__(self, value_scale=10000.0, see_opp_hand=False):
+    def __init__(self, value_scale=10000.0, see_opp_hand=False, fair_determinize=False):
         self.value_scale = value_scale
         self.see_opp_hand = see_opp_hand
+        # fair_determinize=True で両者の隠匿情報を再サンプル（透視禁止・v4b Blocker・研究/新系統用）。
+        # 既定 False は従来の相手手札のみ再サンプル＝**本番 Gen2 の推論を変えない**（Gen2 は旧determinize
+        # で訓練済みゆえ inference も一致させる。新 lineage が検証を通るまで本番挙動は据え置き）。
+        self.fair_determinize = fair_determinize
 
     # 注: 研究用の new_game(deck構築) は製品版では除外（本番は既存 manager を駆動するため不要）。
 
@@ -52,9 +56,11 @@ class OPCGGame:
         return cpu_ai._apply_clone(state, actor_name, move)
 
     def determinize(self, state, me_name, rng):
-        """探索の世界線を固定＝**両者の隠匿情報**（相手手札／両者の山札順・裏向きライフ）を
-        再サンプリングしたクローンを返す（PIMC・透視禁止＝self-play value 汚染の防止・v4b Blocker）。"""
-        return cpu_ai._determinize_hidden(state, me_name, rng)
+        """探索の世界線を固定（PIMC）。fair_determinize=True なら両者の隠匿情報を再サンプル
+        （透視禁止・v4b Blocker・新系統/研究用）、既定 False は相手手札のみ（従来＝本番 Gen2 据え置き）。"""
+        if self.fair_determinize:
+            return cpu_ai._determinize_hidden(state, me_name, rng)
+        return cpu_ai._determinize_opponent(state, me_name, rng)
 
     def value(self, state, to_move):
         """葉価値∈[-1,1]（to_move 視点）。終局は ±1。途中は L1 を tanh で圧縮。"""
