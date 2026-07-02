@@ -14,3 +14,6 @@ tests/cand_*.json
 tests/eval_v2_spsa_best.json
 tests/value_*.jsonl
 tests/p2_sl_net.npz
+# RL 汎化調査の使い捨て診断スクリプト（scratchpad パス直書き・非同梱）
+tests/_diag_*.py
+tests/_confirm_*.py
