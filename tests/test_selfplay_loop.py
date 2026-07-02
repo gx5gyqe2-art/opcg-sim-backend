@@ -19,6 +19,22 @@ from cpu_selfplay import _load_db
 from opcg_sim.src.learned.adapter import OPCGGame
 
 
+def test_ckpt_roundtrip(tmp_path):
+    """チェックポイントの save→load で nets/buffer/世代/RNG が復元される（再起動耐性）。"""
+    vnet = MLP(DIM_V3, seed=1)
+    vnet.fit_norm(np.zeros((2, DIM_V3), np.float32), np.array([-1., 1.], np.float32))
+    st = dict(vnet=vnet, pnet=None, v_buf=[[("x", 1)]], p_buf=[],
+              next_gen=2, best_avg=0.55, best=1,
+              py_rng=random.Random(3).getstate(),
+              np_rng=np.random.default_rng(3).bit_generator.state)
+    path = str(tmp_path / "ck.pkl")
+    SL.save_ckpt(path, st)
+    ck = SL.load_ckpt(path)
+    assert ck["next_gen"] == 2 and ck["best_avg"] == 0.55 and ck["v_buf"] == [[("x", 1)]]
+    assert np.array_equal(ck["vnet"].W1, vnet.W1) and ck["vnet"].xmu is not None
+    assert SL.load_ckpt(str(tmp_path / "missing.pkl")) is None
+
+
 def test_wilson_bounds():
     p, lo, hi = SL.wilson(6, 10)
     assert 0.0 <= lo <= p <= hi <= 1.0
