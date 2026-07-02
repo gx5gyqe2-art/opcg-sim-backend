@@ -174,6 +174,7 @@ def pair_gate(learned_move, db, vocab, fps, n_pairs, ply_cap, rng):
                         w += 1
         p, lo, hi = wilson(w, n)
         out[did] = (p, lo, n)
+        print(f"    [gate] {did}: {w}/{n}", flush=True)
     return out
 
 
@@ -239,10 +240,13 @@ def main():
         priors_fn = make_priors_fn(pnet, vocab) if pnet is not None else None
         # self-play（PCR）
         vr_gen, pr_gen = [], []
-        for _ in range(args.sp_games):
+        for gi in range(args.sp_games):
             vr, pr = selfplay_game(game, value_fn, priors_fn, gen, db, vocab, fps, rng, nrng,
                                    args.fast_sims, args.full_sims)
             vr_gen += vr; pr_gen += pr
+            if (gi + 1) % 25 == 0:
+                print(f"    [sp] gen{g}: {gi + 1}/{args.sp_games} games "
+                      f"(v={len(vr_gen)} p={len(pr_gen)})", flush=True)
         v_buf.append(vr_gen); p_buf.append(pr_gen)
         v_buf, p_buf = v_buf[-args.buffer_gens:], p_buf[-args.buffer_gens:]
         vflat = [x for gg in v_buf for x in gg]; pflat = [x for gg in p_buf for x in gg]
