@@ -223,6 +223,17 @@ def main():
                                   next_gen=0, best_avg=best_avg, best=best,
                                   py_rng=rng.getstate(), np_rng=nrng.bit_generator.state))
 
+    # gen0 アンカー: self-play 前に warm-start value（prior=uniform）を本走と同じ N で held-out 測定。
+    # 「世代で改善したか」の足場（gen1 がこれより明確に悪化＝低品質 policy の害→即停止判断）。
+    if start_gen == 0:
+        vf0 = make_value_fn_for(vnet, vocab, fps, encode_v3)
+        lm0 = lambda m, me: _run_mcts(game, vf0, None, m, me, args.full_sims, 0.0, nrng)[0]
+        res0 = pair_gate(lm0, db, vocab, fps, args.gate_pairs, args.ply_cap, rng)
+        avg0 = float(np.mean([p for p, lo, n in res0.values()]))
+        minlo0 = min(lo for p, lo, n in res0.values())
+        print(f"  anchor gen0(uniform): " + "  ".join(f"{d}={p:.2f}(lo{lo:.2f})" for d, (p, lo, n) in res0.items())
+              + f"  | avg={avg0:.3f} minCIlo={minlo0:.3f}")
+
     for g in range(start_gen, args.gens):
         value_fn = make_value_fn_for(vnet, vocab, fps, encode_v3)
         priors_fn = make_priors_fn(pnet, vocab) if pnet is not None else None
