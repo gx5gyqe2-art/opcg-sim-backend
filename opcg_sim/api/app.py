@@ -5,6 +5,7 @@ import json
 import random
 import traceback
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Dict, Optional, List, Union
@@ -38,6 +39,8 @@ from opcg_sim.src.utils.shared_constants import load_shared_constants, constants
 
 # 共有定数はローダ一本化（utils/shared_constants.py）。従来の get_const と同一挙動（失敗時 空 dict）。
 CONST = load_shared_constants()
+
+_logger = logging.getLogger("opcg.api")
 
 BASE_DIR = os.path.dirname(current_api_dir)
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -75,8 +78,9 @@ class ConnectionManager:
         if manager_inst:
             try:
                 await websocket.send_json({"type": "STATE_UPDATE", "state": manager_inst.to_dict()})
-            except Exception as e:
-                print(f"Failed to send initial state: {e}")
+            except Exception:
+                # 接続直後の初期状態送信失敗（切断直後等）。正常系寄りのため debug で痕跡のみ残す。
+                _logger.debug("Failed to send initial sandbox state", exc_info=True)
 
     async def disconnect(self, websocket: WebSocket, game_id: str):
         if game_id in self.active_connections:

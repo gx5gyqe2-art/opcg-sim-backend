@@ -7,8 +7,13 @@ from ...models.effect_types import (
 )
 from ...models.enums import ActionType, Zone, TriggerType, ConditionType, CompareOperator, Player, CardType
 import re
+import logging
 from .. import journal
 from ..journal import JournaledList, JournaledDict, JournaledSet, record_attr
+
+# 効果解決のデバッグスナップショット（EXECUTION_REPORT/DEBUG_SNAPSHOT）用ロガー。
+# OPCG_LOG_SILENT=1 のとき logging_setup が opcg.* を抑止する（従来の print ゲートと同一挙動）。
+_debug_logger = logging.getLogger("opcg.debug")
 
 # 選択グループ分配（§7-1）で「N枚を選び」の選択集合を保存する save_id。
 # atoms._SEL_GROUP_ID と一致させる。
@@ -134,9 +139,13 @@ class EffectResolver:
             }
             
             json_str = json.dumps(report, ensure_ascii=False, indent=2)
-            print(f"\n======== [EXECUTION_REPORT_START] ========\nAI_PROMPT: 以下のJSONは効果発動の実行結果レポートです。意図通りにアクションが実行されたか、対象選択や数値計算に間違いがないか確認してください。\n\n{json_str}\n======== [EXECUTION_REPORT_END] ========\n")
-        except Exception as e:
-            print(f"Report generation failed: {e}")
+            _debug_logger.debug(
+                "\n======== [EXECUTION_REPORT_START] ========\n"
+                "AI_PROMPT: 以下のJSONは効果発動の実行結果レポートです。"
+                "意図通りにアクションが実行されたか、対象選択や数値計算に間違いがないか確認してください。\n\n"
+                "%s\n======== [EXECUTION_REPORT_END] ========\n", json_str)
+        except Exception:
+            _debug_logger.debug("Report generation failed", exc_info=True)
 
     def _log_failure_snapshot(self, player, source_card, ability, error_code, detail_msg):
         if os.environ.get("OPCG_LOG_SILENT"):
@@ -144,20 +153,23 @@ class EffectResolver:
         try:
             snapshot = self.game_manager.get_debug_snapshot()
             try:
-                ability_dump = str(asdict(ability)) 
-            except:
+                ability_dump = str(asdict(ability))
+            except Exception:
                 ability_dump = str(ability)
 
             debug_data = {
                 "error_code": error_code,
                 "detail": detail_msg,
                 "source_card": source_card.master.name,
-                "failed_ability": ability_dump, 
+                "failed_ability": ability_dump,
                 "game_state": snapshot
             }
             json_str = json.dumps(debug_data, ensure_ascii=False, indent=2)
-            print(f"\n======== [DEBUG_SNAPSHOT_START] ========\n{json_str}\n======== [DEBUG_SNAPSHOT_END] ========\n")
-        except: pass
+            _debug_logger.debug(
+                "\n======== [DEBUG_SNAPSHOT_START] ========\n"
+                "%s\n======== [DEBUG_SNAPSHOT_END] ========\n", json_str)
+        except Exception:
+            _debug_logger.debug("failure snapshot generation failed", exc_info=True)
 
     def _can_satisfy_node(self, player, node: EffectNode, source_card) -> bool:
         if isinstance(node, GameAction):
