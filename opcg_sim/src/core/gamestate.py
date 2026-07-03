@@ -5,6 +5,7 @@ import re
 import traceback
 import uuid
 import json
+import hashlib
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from . import journal
 from .journal import JournaledList, JournaledDict, JournaledSet, record_attr
@@ -526,7 +527,17 @@ class GameManager:
         KEY_CANDIDATES = pending_props.get('CANDIDATES', 'candidates')
         KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
         KEY_OPTIONS = pending_props.get('OPTIONS', 'options')
-        
+
+        def _rid(d: Dict[str, Any]) -> str:
+            # request_id は「同一の要求なら安定・要求が変われば変化」する決定的ハッシュにする。
+            # 従来は get のたびに uuid4 を再生成しており、フロントの『request_id 変化＝新要求』検知が
+            # 毎ポーリング/WS更新で誤発火していた（機能バグ）。入力側で request_id は未使用＝安全に変更可。
+            key = "|".join([
+                str(d.get(KEY_PID)), str(d.get(KEY_ACTION)), str(d.get(KEY_MSG)),
+                str(self.turn_count), ",".join(d.get(KEY_UUIDS, []) or []),
+            ])
+            return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
+
         # マリガンは先行プレイヤー(turn_player)から順に要求する。
         if self.phase == Phase.MULLIGAN:
             mulligan_order = ([self.turn_player, self.opponent]
@@ -534,7 +545,7 @@ class GameManager:
             for player in mulligan_order:
                 if player.name not in self.mulligan_done:
                     hand_candidates = [c.to_dict() for c in player.hand]
-                    return {
+                    _mreq = {
                         KEY_PID: player.name,
                         KEY_ACTION: "MULLIGAN",
                         KEY_MSG: "マリガンするカードを選んでください（交換なし＝キープ）",
@@ -542,8 +553,9 @@ class GameManager:
                         KEY_UUIDS: [c.uuid for c in player.hand],
                         KEY_CONSTRAINTS: {"min": 0, "max": len(player.hand)},
                         KEY_SKIP: True,
-                        "request_id": str(uuid.uuid4()),
                     }
+                    _mreq["request_id"] = _rid(_mreq)
+                    return _mreq
             return None
 
         if self.active_interaction:
@@ -563,7 +575,6 @@ class GameManager:
                 KEY_CANDIDATES: candidate_dicts,
                 KEY_CONSTRAINTS: self.active_interaction.get("constraints"),
                 "options": self.active_interaction.get("options"),
-                "request_id": str(uuid.uuid4())
             }
             # 効果の発生源カードを UI で表示できるよう uuid を併せて渡す。
             src_uuid = self.active_interaction.get("source_card_uuid")
@@ -573,6 +584,7 @@ class GameManager:
             if action_type == "ARRANGE_DECK":
                 req["allow_position"] = self.active_interaction.get("allow_position", False)
                 req["allow_reorder"] = self.active_interaction.get("allow_reorder", False)
+            req["request_id"] = _rid(req)
             return req
 
         if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
@@ -585,17 +597,19 @@ class GameManager:
         if self.phase == Phase.BLOCK_STEP and self.active_battle:
             target_owner = self.active_battle["target_owner"]
             blockers = [c.uuid for c in target_owner.field if not c.is_rest and c.has_keyword("ブロッカー") and "CANNOT_REST" not in c.timed_flags]
-            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
+            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True}
         elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
             target_owner = self.active_battle["target_owner"]
             counters = [c.uuid for c in target_owner.hand if c.current_counter > 0 or (c.master.type == CardType.EVENT and any(abil.trigger == TriggerType.COUNTER for abil in c.master.abilities))]
-            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_COUNTER, KEY_MSG: PendingMessage.SELECT_COUNTER.value, KEY_UUIDS: counters, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
+            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_COUNTER, KEY_MSG: PendingMessage.SELECT_COUNTER.value, KEY_UUIDS: counters, KEY_SKIP: True}
         elif self.phase == Phase.MAIN:
             selectable = [c.uuid for c in self.turn_player.hand]
             selectable += [c.uuid for c in self.turn_player.field if not c.is_rest]
             if self.turn_player.leader and not self.turn_player.leader.is_rest:
                 selectable.append(self.turn_player.leader.uuid)
-            request = {KEY_PID: self.turn_player.name, KEY_ACTION: "MAIN_ACTION", KEY_MSG: PendingMessage.MAIN_ACTION.value, KEY_UUIDS: selectable, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
+            request = {KEY_PID: self.turn_player.name, KEY_ACTION: "MAIN_ACTION", KEY_MSG: PendingMessage.MAIN_ACTION.value, KEY_UUIDS: selectable, KEY_SKIP: True}
+        if request is not None:
+            request["request_id"] = _rid(request)
         return request
 
     def pending_actor_action(self) -> Optional[Tuple[str, str]]:
