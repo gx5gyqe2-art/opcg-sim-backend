@@ -19,6 +19,23 @@ CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 REPLAY_SCHEMA = "opcg-replay/v1"
 
 
+def _load_schema_hash() -> str:
+    """契約生成物（contract/manifest.json）の schema_sha256 を読む（/health の契約照合用）。
+
+    生成物が無い/壊れている場合は空文字（照合はスキップ扱い）。
+    """
+    import json as _json
+    path = os.path.join(os.path.dirname(BASE_DIR), "contract", "manifest.json")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return _json.load(f).get("schema_sha256", "")
+    except (OSError, ValueError):
+        return ""
+
+
+SCHEMA_HASH = _load_schema_hash()
+
+
 def _compute_image_version() -> str:
     """カード画像のキャッシュ版数。
 

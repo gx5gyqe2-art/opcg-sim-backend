@@ -43,6 +43,11 @@ OPCG_LOG_SILENT=1 python tests/harness/full_card_audit.py                     # 
 > ライブラリ、`tests/scripts/`＝単体実行の実験/計測/監査 CLI、`tests/fixtures/`＝データ資産。
 > 共通ブートは `tests/_bootstrap.py`（sys.path＋google スタブ）。
 
+> API 契約: `shared_constants.json` または `opcg_sim/api/schemas.py` を変更したら
+> `python -m opcg_sim.tools.export_contract` を実行し `contract/`（api_schema.json / manifest.json）を
+> **同じ作業単位でコミット**する。`test_contract_export.py` が再生成差分ゼロをラチェットする
+> （生成物が古いと CI が落ちる）。フロント側の型生成・定数同期は別リポジトリの PR で追従する。
+
 ## ドキュメントの更新
 
 - 仕様（正本: `docs/SPEC.md` / `TEST_SPEC.md` / `parser_v2.md` / `leader_specs/`）は実装変更に追従して最新に保つ。

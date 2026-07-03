@@ -22,7 +22,7 @@ from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.api import decide_client
 # 設定・定数／常駐リソース／対局レジストリ／サービスは分離済みモジュールから取り込む（後方互換の名前で再公開）。
-from .config import CONST, constants_hash, IMAGE_VERSION, REPLAY_SCHEMA
+from .config import CONST, constants_hash, IMAGE_VERSION, REPLAY_SCHEMA, SCHEMA_HASH
 from .resources import db, card_db, CARDS_ETAG, materialize_all_cards
 from .state import GAMES, SANDBOX_GAMES, CPU_GAMES, RULE_ROOMS
 from .presenters import build_game_result_hybrid, build_rule_message, _rule_room_meta
@@ -524,6 +524,7 @@ async def game_websocket_endpoint(websocket: WebSocket, game_id: str):
 
 @app.get("/health")
 async def health():
-    # constants_hash: フロントが埋め込みハッシュと照合して定数の乖離（同期漏れ）を検出する契約照合用。
-    # （schema_hash は API スキーマ生成物の導入時＝契約一本化 D-4 で追加予定。）
-    return {"status": "ok", "constants_loaded": bool(CONST), "constants_hash": constants_hash()}
+    # constants_hash / schema_hash: フロントが埋め込みハッシュと照合して定数・APIスキーマの乖離
+    # （同期漏れ deploy）を検出する契約照合用。schema_hash は contract/manifest.json 由来。
+    return {"status": "ok", "constants_loaded": bool(CONST),
+            "constants_hash": constants_hash(), "schema_hash": SCHEMA_HASH}
