@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from opcg_sim.api import app as A
+from opcg_sim.api.services import decks as deck_svc
 from opcg_sim.src.models.models import CardInstance
 
 
@@ -31,7 +32,7 @@ def client(monkeypatch):
     def _stub_load_deck_mixed(source_str, owner_id):
         return CardInstance(leader_master, owner_id), [CardInstance(char_master, owner_id) for _ in range(50)]
 
-    monkeypatch.setattr(A, "load_deck_mixed", _stub_load_deck_mixed)
+    monkeypatch.setattr(deck_svc, "load_deck_mixed", _stub_load_deck_mixed)
     for reg in (A.GAMES, A.SANDBOX_GAMES, A.RULE_ROOMS, A.CPU_GAMES):
         reg.clear()
     with TestClient(A.app) as c:
