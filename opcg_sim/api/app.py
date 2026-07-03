@@ -1,6 +1,5 @@
 import os
 import uuid
-import sys
 import json
 import random
 import traceback
@@ -16,35 +15,19 @@ try:
 except Exception:
     firestore = None
 
-current_api_dir = os.path.dirname(os.path.abspath(__file__))
-if current_api_dir not in sys.path:
-    sys.path.append(current_api_dir)
-
-try:
-    from schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
-except ImportError:
-    from .schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
-
-try:
-    from opcg_sim.src.core.sandbox import SandboxManager
-except ImportError:
-    pass
+from .schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
+from opcg_sim.src.core.sandbox import SandboxManager
 from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.api import decide_client
-from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.models import CardInstance
-from opcg_sim.src.utils.shared_constants import load_shared_constants, constants_hash
-
-# 共有定数はローダ一本化（utils/shared_constants.py）。従来の get_const と同一挙動（失敗時 空 dict）。
-CONST = load_shared_constants()
+# 設定・定数／常駐リソース／対局レジストリは分離済みモジュールから取り込む（後方互換の名前で再公開）。
+from .config import CONST, constants_hash, IMAGE_VERSION, REPLAY_SCHEMA
+from .resources import db, card_db, CARDS_ETAG, materialize_all_cards
+from .state import GAMES, SANDBOX_GAMES, CPU_GAMES, RULE_ROOMS
 
 _logger = logging.getLogger("opcg.api")
-
-BASE_DIR = os.path.dirname(current_api_dir)
-DATA_DIR = os.path.join(BASE_DIR, "data")
-CARD_DB_PATH = os.path.join(DATA_DIR, "opcg_cards.json")
 
 @asynccontextmanager
 async def _lifespan(_app):
@@ -53,16 +36,13 @@ async def _lifespan(_app):
     try:
         decide_client.spawn_worker()
     except Exception:
-        pass
+        _logger.warning("PyPy ワーカー起動に失敗（インプロセス実行へフォールバック）", exc_info=True)
     yield
 
 
 app = FastAPI(title="OPCG Simulator API v1.7", lifespan=_lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["ETag"])
 
-db = None
-try: db = firestore.Client()
-except Exception: pass
 
 class ConnectionManager:
     def __init__(self):
@@ -156,13 +136,6 @@ class GameConnectionManager:
 
 game_ws_manager = GameConnectionManager()
 
-# ルールモード・オンライン対戦のルーム（ロビー）レジストリ。
-# 各値: {game_id, room_name, created_at, status(WAITING/PLAYING/FINISHED),
-#        ready{p1,p2}, decks{p1,p2:deck_id}, deck_preview{p1,p2:{leader_id,leader_name}}}
-# 対局開始後の GameManager 本体は GAMES[game_id] に格納し、進行は既存の
-# /api/game/action・/api/game/battle を共用する（差分は WS ブロードキャストのみ）。
-RULE_ROOMS: Dict[str, Dict[str, Any]] = {}
-
 
 def _rule_room_meta(game_id: str) -> Dict[str, Any]:
     """WS メッセージへ付与するルーム メタ情報。"""
@@ -229,40 +202,6 @@ def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool =
     if not success: error_obj = {error_props.get('CODE', 'code'): error_code, error_props.get('MESSAGE', 'message'): error_msg}
     return {api_root_keys.get('SUCCESS', 'success'): success, "game_id": game_id, api_root_keys.get('GAME_STATE', 'game_state'): validated_state, api_root_keys.get('PENDING_REQUEST', 'pending_request'): pending_req_data, api_root_keys.get('ERROR', 'error'): error_obj, "action_events": getattr(manager, 'action_events', []) if manager else []}
 
-GAMES: Dict[str, GameManager] = {}
-SANDBOX_GAMES: Dict[str, 'SandboxManager'] = {}
-# CPU 対戦のメタ情報レジストリ: {game_id: {"cpu_player_id": "p2", "difficulty": "hard"}}。
-# GAMES[game_id] に GameManager 本体を、ここに CPU 側の識別子と難易度を保持する。
-CPU_GAMES: Dict[str, Dict[str, Any]] = {}
-
-card_db = CardLoader(CARD_DB_PATH); card_db.load()
-# ビルド時に生成したパース済みキャッシュがあれば採用し、コールドスタート時の
-# 全件パース(~1.8s)を回避する。整合しない/無い場合は従来どおり遅延パースに劣化する。
-card_db.load_cache()
-
-# /api/cards の条件付きGET(ETag)用。カードDBの内容が変わると変化する。
-CARDS_ETAG = f'"{card_db.db_hash()}"'
-
-def _compute_image_version() -> str:
-    """カード画像のキャッシュ版数。
-
-    カードDB(opcg_cards.json)の内容ハッシュから自動導出する。新弾追加など
-    画像をまとめて更新する場面ではカードDBも更新されるため、人手で版数を
-    上げなくても版数が自動で切り替わる（＝古い画像キャッシュが確実に無効化される）。
-    カードデータを変えず画像のみ差し替える稀なケース用に IMAGE_VERSION_SALT で
-    手動上書きできる余地も残す。
-    """
-    import hashlib
-    h = hashlib.md5()
-    try:
-        with open(CARD_DB_PATH, "rb") as f:
-            h.update(f.read())
-    except OSError:
-        pass
-    h.update(os.getenv("IMAGE_VERSION_SALT", "").encode())
-    return h.hexdigest()[:8]
-
-IMAGE_VERSION = _compute_image_version()
 
 # NOTE: 効果定義はカードテキストの自動解析（EffectParserV2）に一本化されている。
 
@@ -306,7 +245,6 @@ def _resolve_first_player(value: Any, player1: Player, player2: Player) -> Optio
 # === リプレイ種＋CPU思考トレース（実アプリ対局・Phase 2） ============================
 # すべて opt-in（create リクエストの cpu_trace=true）でのみ作動し、未指定の本番対局には
 # 一切の追加処理・レイテンシ・挙動変化を与えない（トレースは観測専用＝進行不変）。
-REPLAY_SCHEMA = "opcg-replay/v1"
 
 
 def _replay_enabled(meta) -> bool:
@@ -345,8 +283,7 @@ async def game_create(req: Any = Body(...)):
     try:
         game_id = str(uuid.uuid4()); 
         p1_source = req.get("p1_deck", ""); p2_source = req.get("p2_deck", "")
-        if len(card_db.cards) < len(card_db.raw_db):
-             for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
+        materialize_all_cards()
         vs_cpu = bool(req.get("vs_cpu", False))
         # CPU 対戦時は p2 を CPU とし、デッキは cpu_deck（無指定なら p2_deck）を使う。
         if vs_cpu and req.get("cpu_deck"):
@@ -759,8 +696,7 @@ async def get_assets_version():
 @app.get("/api/cards")
 async def get_all_cards(request: Request, response: Response):
     try:
-        if len(card_db.cards) < len(card_db.raw_db):
-            for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
+        materialize_all_cards()
         # 内容に変化が無ければ本体を返さず 304（1.2MBの転送・再パースをスキップ）
         if request.headers.get("if-none-match") == CARDS_ETAG:
             return Response(status_code=304, headers={"ETag": CARDS_ETAG, "Cache-Control": "no-cache"})
@@ -973,8 +909,7 @@ async def rule_action(req: Dict[str, Any] = Body(...)):
                 return {"success": False, "error": "Game already started"}
             if not (room["ready"]["p1"] and room["ready"]["p2"]):
                 return {"success": False, "error": "Both players must be ready"}
-            if len(card_db.cards) < len(card_db.raw_db):
-                for card_id in card_db.raw_db.keys(): card_db.get_card(card_id)
+            materialize_all_cards()
             p1_leader, p1_cards = load_deck_mixed(room["decks"]["p1"], "p1")
             p2_leader, p2_cards = load_deck_mixed(room["decks"]["p2"], "p2")
             player1 = Player("p1", p1_cards, p1_leader); player2 = Player("p2", p2_cards, p2_leader)
