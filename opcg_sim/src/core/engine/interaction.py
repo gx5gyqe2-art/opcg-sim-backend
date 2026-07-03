@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import json
 import hashlib
+import logging
 
 from ..journal import JournaledList, JournaledSet
 from ..rules_constants import FIELD_LIMIT
 from ...models.models import CONST
 from ...models.enums import Phase, Zone, CardType, TriggerType, PendingMessage
 from ..effects.resolver import EffectResolver
+
+_logger = logging.getLogger("opcg.engine")
 
 
 def resolve_interaction(gm, player: Player, payload: Dict[str, Any]):
@@ -456,5 +459,7 @@ def _resume_deferred_continuations(gm, limit: int = 64) -> None:
                 if remaining:
                     gm.apply_action_to_engine(player, frame.get("action"), remaining, frame.get("value"))
         except Exception as e:
-            pass
+            # 退避した継続フレームの1件が再開に失敗しても、残りのフレームの再開は続行する
+            # （置換中断の解決後に外側継続をまとめて再開する経路。1件破綻で全体を止めない）。診断のみ残す。
+            _logger.debug("deferred 継続フレームの再開で1件失敗（続行）: %r", e, exc_info=True)
         n += 1

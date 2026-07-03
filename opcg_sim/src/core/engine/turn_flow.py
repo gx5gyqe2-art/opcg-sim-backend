@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import random
+import logging
 
 from ..journal import JournaledDict, JournaledList, JournaledSet
 from ...models.enums import Phase, TriggerType
 from ..effects.resolver import EffectResolver
+
+_logger = logging.getLogger("opcg.engine")
 
 
 def start_game(gm, first_player: Optional[Player] = None):
@@ -109,7 +112,9 @@ def _flush_pending_end_of_turn(gm):
         try:
             resolver._process_stack(player, source_card)
         except Exception as e:
-            pass
+            # 遅延効果（ターン終了時フラッシュ）の1件が失敗しても、残りの pending の
+            # フラッシュは続行する（1件の破綻で全体を止めない）。診断のみ残す。
+            _logger.debug("遅延効果のフラッシュで1件失敗（続行）: %r", e, exc_info=True)
         for ev in resolver.action_history:
             gm.action_events.append({
                 "type": "EFFECT", "player": player.name,

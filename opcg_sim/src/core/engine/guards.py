@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import re
+import logging
 
 from ...models.enums import TriggerType, ActionType, CardType
 from ..effects.resolver import EffectResolver
 from ..effects.matcher import get_target_cards
 from ._helpers import _nfc, _ability_turn_limit, _ability_index
+
+_logger = logging.getLogger("opcg.engine")
 
 
 def _has_rested_play(gm, player: Player) -> bool:
@@ -288,6 +291,10 @@ def _auto_resolve_replacement(gm, owner: Player, limit: int = 16) -> None:
         try:
             gm.resolve_interaction(actor, payload)
         except Exception as e:
+            # headless 自動解決の防御網: 置換 sub_effect の解決が想定外に失敗しても、宙吊り
+            # （active_interaction 残置）を防ぐため安全側に打ち切る。除去は成立扱いのまま。
+            # 到達し得る例外は多岐（対象不整合/内部状態）のため広く捕捉し、診断だけ残す。
+            _logger.debug("置換の自動解決を中断（safe fallback）: %r", e, exc_info=True)
             gm.active_interaction = None
             break
         n += 1
