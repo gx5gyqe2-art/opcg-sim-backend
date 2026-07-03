@@ -28,7 +28,10 @@ def _load_schema_hash() -> str:
     path = os.path.join(os.path.dirname(BASE_DIR), "contract", "manifest.json")
     try:
         with open(path, "r", encoding="utf-8") as f:
-            return _json.load(f).get("schema_sha256", "")
+            data = _json.load(f)
+        # 有効な JSON でも dict でない（壊れ/誤マージ）場合に .get で AttributeError を出さない。
+        # ここは import 時に評価されるため、例外を漏らすとアプリ全体が起動不能になる。
+        return data.get("schema_sha256", "") if isinstance(data, dict) else ""
     except (OSError, ValueError):
         return ""
 
@@ -56,4 +59,18 @@ def _compute_image_version() -> str:
     return h.hexdigest()[:8]
 
 
-IMAGE_VERSION = _compute_image_version()
+_IMAGE_VERSION_CACHE = None
+
+
+def __getattr__(name):
+    # IMAGE_VERSION は import 時ではなく初回参照時に計算する（カードDB ~1.2MB の md5）。
+    # C-2 で schemas.py が `.config` から CONST を取り込むようになり、schemas 経由で config を
+    # import するだけの軽量な消費者（契約 export ツール等）まで無関係なカードDB読込を払っていた。
+    # 遅延化で、実際に IMAGE_VERSION を参照する API 経路だけがコストを払う（PEP 562 module __getattr__）。
+    # `from .config import IMAGE_VERSION` は import 時に一度だけ __getattr__ を呼んで束縛する。
+    global _IMAGE_VERSION_CACHE
+    if name == "IMAGE_VERSION":
+        if _IMAGE_VERSION_CACHE is None:
+            _IMAGE_VERSION_CACHE = _compute_image_version()
+        return _IMAGE_VERSION_CACHE
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

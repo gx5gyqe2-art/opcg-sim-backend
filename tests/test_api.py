@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from opcg_sim.api import app as A
+from opcg_sim.api import state
 from opcg_sim.api.services import decks as deck_svc
 from opcg_sim.src.models.models import CardInstance
 
@@ -48,14 +49,10 @@ def client(monkeypatch):
 
     monkeypatch.setattr(deck_svc, "load_deck_mixed", _stub_load_deck_mixed)
 
-    for reg in (A.GAMES, A.SANDBOX_GAMES, A.RULE_ROOMS, A.CPU_GAMES):
-        reg.clear()
-
+    state.clear_all()
     with TestClient(A.app) as c:
         yield c
-
-    for reg in (A.GAMES, A.SANDBOX_GAMES, A.RULE_ROOMS, A.CPU_GAMES):
-        reg.clear()
+    state.clear_all()
 
 
 # --- 基盤 -------------------------------------------------------------------

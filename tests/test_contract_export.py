@@ -28,9 +28,19 @@ def test_api_schema_up_to_date():
 
 
 def test_manifest_hashes_match():
-    """manifest の schema_sha256 が現行スキーマのハッシュと一致する（tool と同一算出）。"""
+    """manifest の schema_sha256 / constants_sha256 が現行の算出値と一致する（tool と同一算出）。
+
+    schema_sha256 だけでなく constants_sha256 も検証する。前者はスキーマ（api/schemas.py）変更を、
+    後者は shared_constants.json の値・キー変更（スキーマ別名に出ない差分）を捕捉する。
+    後者を欠くと『共有定数を変えて export を忘れた PR を落とす』というラチェットの目的に穴が空く。
+    """
     import hashlib
+    from opcg_sim.src.utils.shared_constants import constants_hash
+
     schema_text = EC._canon(EC.build_schema())
-    expect = hashlib.sha256(schema_text.encode("utf-8")).hexdigest()[:12]
+    expect_schema = hashlib.sha256(schema_text.encode("utf-8")).hexdigest()[:12]
     manifest = json.load(open(os.path.join(_CONTRACT, "manifest.json"), encoding="utf-8"))
-    assert manifest["schema_sha256"] == expect, "manifest の schema_sha256 が api_schema と不一致（再 export が必要）"
+    assert manifest["schema_sha256"] == expect_schema, "manifest の schema_sha256 が api_schema と不一致（再 export が必要）"
+    assert manifest["constants_sha256"] == constants_hash(), (
+        "manifest の constants_sha256 が現行の共有定数と不一致（shared_constants.json を変えたら再 export が必要）"
+    )

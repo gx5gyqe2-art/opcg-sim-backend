@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from opcg_sim.api import app as A
+from opcg_sim.api import state
 from opcg_sim.api.services import decks as deck_svc
 from opcg_sim.src.models.models import CardInstance
 
@@ -33,12 +34,10 @@ def client(monkeypatch):
         return CardInstance(leader_master, owner_id), [CardInstance(char_master, owner_id) for _ in range(50)]
 
     monkeypatch.setattr(deck_svc, "load_deck_mixed", _stub_load_deck_mixed)
-    for reg in (A.GAMES, A.SANDBOX_GAMES, A.RULE_ROOMS, A.CPU_GAMES):
-        reg.clear()
+    state.clear_all()
     with TestClient(A.app) as c:
         yield c
-    for reg in (A.GAMES, A.SANDBOX_GAMES, A.RULE_ROOMS, A.CPU_GAMES):
-        reg.clear()
+    state.clear_all()
 
 
 def _create_game(client) -> str:
@@ -69,3 +68,44 @@ def test_pending_request_id_is_stable(client):
         "request_id must be stable across identical requests "
         f"(got {p1['request_id']} vs {p2['request_id']})"
     )
+
+
+def test_pending_request_id_changes_when_only_unlisted_field_differs(client):
+    """selectable_uuids が同一でも、識別に効く他フィールド（source_card_uuid / options）だけ
+    異なる別要求は request_id が変わる（同名カード2枚の連続確認などの衝突回帰ガード）。
+
+    フロントは request_id 変化を『新要求』検知に使うため、内容が違えば必ず変わる必要がある。
+    selectable_uuids だけをキーにしていた旧実装ではこれらが衝突していた。"""
+    from opcg_sim.src.core.gamestate import Phase
+
+    gid = _create_game(client)
+    mgr = A.GAMES[gid]
+    mgr.phase = Phase.MAIN  # MULLIGAN ゲートを越えて active_interaction 分岐へ
+
+    base = {
+        "action_type": "CONFIRM_OPTIONAL",
+        "player_id": mgr.p1.name,
+        "message": "「X」の効果を使用しますか？（コストを払う）",
+        "selectable_uuids": [],
+        "can_skip": True,
+        "candidates": [],
+        "constraints": None,
+        "options": None,
+        "source_card_uuid": "card-A",
+    }
+    mgr.active_interaction = dict(base)
+    rid_a = mgr.get_pending_request()["request_id"]
+    rid_a2 = mgr.get_pending_request()["request_id"]
+    assert rid_a == rid_a2, "同一要求は安定していること"
+
+    # source_card_uuid だけ異なる別要求（同名カード2枚目）→ rid が変わる。
+    mgr.active_interaction = dict(base, source_card_uuid="card-B")
+    rid_b = mgr.get_pending_request()["request_id"]
+    assert rid_a != rid_b, "source_card_uuid が違えば request_id も変わること"
+
+    # options だけ異なる CHOICE → rid が変わる。
+    mgr.active_interaction = dict(base, options=["A", "B"])
+    rid_opt1 = mgr.get_pending_request()["request_id"]
+    mgr.active_interaction = dict(base, options=["A", "C"])
+    rid_opt2 = mgr.get_pending_request()["request_id"]
+    assert rid_opt1 != rid_opt2, "options が違えば request_id も変わること"

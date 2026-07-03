@@ -1,8 +1,9 @@
 """デッキ読込サービス（Firestore デッキドキュメント→CardInstance／ロビー用プレビュー）。
 
-Firestore 依存はこの1モジュールに閉じる。`load_deck_mixed` はテストが app モジュール属性を
-monkeypatch する対象なので、app.py はこれを**再公開**し、ルートは app レベルの名前で呼ぶ
-（＝patch がルートに効く）。
+Firestore 依存はこの1モジュールに閉じる。ルート（routers.py）は `deck_svc.load_deck_mixed(...)` の
+ように**このモジュール属性経由**で呼ぶ。DB 非依存にしたいテスト・スタブは
+`opcg_sim.api.services.decks` の `load_deck_mixed` / `_deck_preview` を monkeypatch する
+（app モジュール属性を差し替えても効かない：C-5 でルートを本モジュール経由に移行済み）。
 """
 from typing import Any, Dict
 

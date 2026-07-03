@@ -12,7 +12,7 @@ import json
 import hashlib
 
 from opcg_sim.api import schemas as S
-from opcg_sim.src.utils.shared_constants import constants_hash
+from opcg_sim.src.utils.shared_constants import constants_hash, load_shared_constants
 
 # 契約に含める公開モデル（フロントの受信型生成の対象）。
 _MODELS = [
@@ -37,6 +37,13 @@ def _canon(obj) -> str:
 
 
 def main() -> None:
+    # 共有定数が読めない環境では、schemas の別名がフォールバック既定に化け、constants_sha256 が
+    # 空 dict のハッシュになる＝「もっともらしく間違った契約」を成功終了で書いてしまう。明示的に落とす。
+    if not load_shared_constants():
+        raise SystemExit(
+            "shared_constants.json を読めませんでした（契約が誤生成されるため中断）。"
+            "作業ディレクトリ／パッケージ配置を確認してください。"
+        )
     os.makedirs(_OUT_DIR, exist_ok=True)
     schema_text = _canon(build_schema())
     schema_hash = hashlib.sha256(schema_text.encode("utf-8")).hexdigest()[:12]

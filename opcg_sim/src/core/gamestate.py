@@ -532,10 +532,17 @@ class GameManager:
             # request_id は「同一の要求なら安定・要求が変われば変化」する決定的ハッシュにする。
             # 従来は get のたびに uuid4 を再生成しており、フロントの『request_id 変化＝新要求』検知が
             # 毎ポーリング/WS更新で誤発火していた（機能バグ）。入力側で request_id は未使用＝安全に変更可。
-            key = "|".join([
-                str(d.get(KEY_PID)), str(d.get(KEY_ACTION)), str(d.get(KEY_MSG)),
-                str(self.turn_count), ",".join(d.get(KEY_UUIDS, []) or []),
-            ])
+            #
+            # ハッシュは**要求の全内容（request_id 自身を除く）＋turn_count**を正規化 JSON で取る。
+            # player_id/action/message/selectable_uuids だけでは、同一ターン内に連続する
+            # 別要求（同名カード2枚が各々出す同文の確認、options だけ異なる CHOICE、
+            # revealed view だけ異なる探索など）が衝突し、フロントが 2 件目を新要求と認識できず
+            # モーダル再マウント/選択リセットが起きない。source_card_uuid・options・constraints・
+            # candidates など識別に効く全フィールドを取り込むことでこれを防ぐ。
+            # 盤面不変なら d は各 to_dict()/スカラが決定的なので同一 → rid も安定（＝元の修正意図を維持）。
+            payload = {k: v for k, v in d.items() if k != "request_id"}
+            key = json.dumps([self.turn_count, payload],
+                             sort_keys=True, ensure_ascii=False, default=str)
             return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
 
         # マリガンは先行プレイヤー(turn_player)から順に要求する。
@@ -616,8 +623,9 @@ class GameManager:
         """`get_pending_request()` の (player_id, action) **だけ**を安価に返す（CPU 探索の葉/手番判定用）。
 
         探索は各ノードでこの 2 値しか見ない（手は `get_legal_actions` から得る）一方、
-        `get_pending_request` は毎回 selectable 構築・候補 to_dict・`uuid4()` を作るため重い
-        （探索コストの ~12%）。本メソッドは**判定ロジックと副作用（BLOCK_STEP/BATTLE_COUNTER で
+        `get_pending_request` は毎回 selectable 構築・候補 to_dict・request_id ハッシュ（要求全体の
+        正規化 JSON を sha1）を作るため重い（探索コストの ~12%）。本メソッドは**判定ロジックと
+        副作用（BLOCK_STEP/BATTLE_COUNTER で
         active_battle が無いときの phase→MAIN 正規化）を get_pending_request と一致**させたうえで、
         重い payload を作らない。一致は `tests/test_cpu_make_unmake.py` で機械照合する。
         """

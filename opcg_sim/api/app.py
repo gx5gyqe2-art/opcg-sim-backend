@@ -27,7 +27,9 @@ from .resources import db, card_db, CARDS_ETAG, materialize_all_cards
 from .state import GAMES, SANDBOX_GAMES, CPU_GAMES, RULE_ROOMS
 from .presenters import build_game_result_hybrid, build_rule_message, _rule_room_meta
 from .ws import ws_manager, game_ws_manager, broadcast_rule_state
-from .services.decks import _load_deck_doc, load_deck_mixed, _deck_preview
+# 注意: デッキ読込（load_deck_mixed / _deck_preview / _load_deck_doc）はここで**再エクスポートしない**。
+# ルート（routers.py）はサービスモジュール属性経由（deck_svc.load_deck_mixed）で解決するため、
+# app モジュール属性を差し替えても効かない。テスト・スタブは `opcg_sim.api.services.decks` を patch する。
 from .services.replay import _replay_enabled, _replay_record_action, _capture_final_winner
 from .services.games import _resolve_first_player
 from .services.cpu_driver import (
