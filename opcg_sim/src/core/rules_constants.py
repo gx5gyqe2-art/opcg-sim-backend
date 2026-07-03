@@ -14,3 +14,7 @@ SELF_RESTRICTION_KEYS = {
     "CANNOT_ATTACK_LEADER",       # リーダーにアタックできない
     "CANNOT_ACTIVATE_DON",        # キャラの効果でドン‼をアクティブにできない
 }
+
+# 場のキャラクター上限（公式ルール）。ステージ・ドン!!は含まない。6体目登場時は1体を選んで
+# トラッシュし5体へ戻す（強制）。gamestate/engine が共有＝循環回避のためここ（葉）に置く。
+FIELD_LIMIT = 5

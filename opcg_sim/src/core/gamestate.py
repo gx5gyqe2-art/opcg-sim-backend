@@ -15,19 +15,19 @@ from .effects.resolver import EffectResolver
 from .effects.matcher import get_target_cards
 from .actions import apply_action as _apply_action
 from .engine import values as _values, guards as _guards
+from .engine import card_moves as _card_moves, passives as _passives
 
 
 Card = CardInstance
 
 # 場のキャラクター上限（公式ルール）。ステージ(owner.stage)・ドン!!は含まない。
 # 6体目を登場させた場合は自分のキャラ1体を選んでトラッシュして5体に戻す（強制トラッシュ）。
-FIELD_LIMIT = 5
 
 # 自己制限（self_cannot）の制限キーの正本は rules_constants.py（actions と共有＝循環回避の葉）。
 # ここは後方互換の再エクスポート（恒久・公開エイリアス）。新規参照は rules_constants から import する
 # こと（gamestate は resolver/matcher/atoms より下流なので、それら上流から本エイリアスを import すると
 # 循環する）。
-from .rules_constants import SELF_RESTRICTION_KEYS  # noqa: E402,F401
+from .rules_constants import SELF_RESTRICTION_KEYS, FIELD_LIMIT  # noqa: E402,F401
 
 
 from .engine._helpers import _nfc, _TURN1_RE, _condition_turn_limit, _ability_turn_limit, _ability_index  # noqa: F401
@@ -215,17 +215,7 @@ class GameManager:
         self._interaction_stack.append(interaction)
 
     def _apply_leader_don_deck_rule(self, player: Player) -> None:
-        """リーダーの「ルール上、自分のドン!!デッキはN枚になる」をドン!!デッキ枚数に反映する。
-        該当する常在ルールが無ければ既定（10枚）のまま。エネル OP15-058 = 6枚。"""
-        leader = getattr(player, "leader", None)
-        if not leader or not getattr(leader, "master", None):
-            return
-        text = _nfc(getattr(leader.master, "effect_text", "") or "")
-        m = re.search(_nfc(r"ドン(?:!!|‼)デッキは(\d+)枚"), text)
-        if not m:
-            return
-        n = int(m.group(1))
-        player.don_deck = JournaledList(DonInstance(owner_id=player.name) for _ in range(n))
+        return _card_moves._apply_leader_don_deck_rule(self, player)
 
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """
@@ -459,21 +449,7 @@ class GameManager:
         }
 
     def _find_card_by_uuid(self, uuid: str) -> Optional[CardInstance]:
-        all_players = [self.p1, self.p2]
-        for p in all_players:
-            candidates = []
-            if p.leader: candidates.append(p.leader)
-            if p.stage: candidates.append(p.stage)
-            candidates.extend(p.hand)
-            candidates.extend(p.field)
-            candidates.extend(p.trash)
-            candidates.extend(p.life)
-            candidates.extend(p.deck)
-            candidates.extend(p.temp_zone)
-            for c in candidates:
-                if c.uuid == uuid:
-                    return c
-        return None
+        return _card_moves._find_card_by_uuid(self, uuid)
 
     def get_pending_request(self) -> Optional[Dict[str, Any]]:
         pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
@@ -843,37 +819,13 @@ class GameManager:
                     break
 
     def refresh_passive_state(self) -> None:
-        """盤面依存の常在効果（パワー/コスト/キーワード）を現在の盤面で再計算する。
-        API のアクション境界や対話完了時に呼び、トラッシュ枚数等の変化を即時反映する
-        （「自分のトラッシュN枚につき+1000」OP09-086 等のリアルタイム反映）。"""
-        if self.active_interaction or getattr(self, "_in_passive_recalc", False):
-            return
-        if self.turn_player is not None:
-            self._apply_passive_effects(self.turn_player)
+        return _passives.refresh_passive_state(self)
 
     def _enforce_field_limit(self, owner: Player) -> None:
-        """owner のキャラが上限(FIELD_LIMIT)を超えていれば、超過分を選んでトラッシュさせる。
-        他に進行中の対話があるときは起動しない（中断のネストを避ける）。"""
-        if self.active_interaction:
-            return
-        if len(owner.field) <= FIELD_LIMIT:
-            return
-        self._suspend_for_field_overflow(owner)
+        return _card_moves._enforce_field_limit(self, owner)
 
     def _suspend_for_field_overflow(self, owner: Player) -> None:
-        """場のキャラ超過分をトラッシュさせる選択を中断要求として立てる。
-        candidates は新規登場分を含む owner の全キャラ（どれをトラッシュしてもよい）。"""
-        excess = len(owner.field) - FIELD_LIMIT  # 通常は 1
-        self.active_interaction = {
-            "player_id": owner.name,
-            "action_type": "FIELD_OVERFLOW_TRASH",
-            "message": f"場のキャラクターが上限({FIELD_LIMIT})を超えました。トラッシュするキャラを{excess}枚選んでください。",
-            "candidates": list(owner.field),
-            "selectable_uuids": [c.uuid for c in owner.field],
-            "constraints": {"min": excess, "max": excess},
-            "can_skip": False,
-            "continuation": {"owner_name": owner.name, "count": excess},
-        }
+        return _card_moves._suspend_for_field_overflow(self, owner)
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
@@ -1096,239 +1048,31 @@ class GameManager:
     _REACTIVE_RE = re.compile(r'(された|した|受けた|なった)時、')
 
     def _is_reactive_passive(self, ability) -> bool:
-        """無タグの反応型（「…が登場した時、」「…が戻された時、」等）でトリガー写像が
-        まだ無い PASSIVE 能力か。常時効果ではないため再計算ループで実行してはならない
-        （実行すると盤面操作のたびに本体効果が発動し、対話中断が他の解決を飲み込む）。"""
-        first = self._find_first_action(ability.effect)
-        raw = getattr(first, "raw_text", "") if first is not None else ""
-        # 能力本体の raw_text も見る。先頭アクションの文（例「自分はゲームに勝利する」）に
-        # 「…した時、」が無くても、能力全体（例「相手が【ブロッカー】を発動した時、…」OP09-118）
-        # が反応型なら再計算ループで実行してはならない（PASSIVE+VICTORY が相手ライフ0だけで
-        # 誤って自動勝利するのを防ぐ。本来は相手のブロッカー発動が必要）。
-        ab_raw = getattr(ability, "raw_text", "") or ""
-        combined = unicodedata.normalize("NFC", (raw or "") + " " + ab_raw)
-        return bool(self._REACTIVE_RE.search(combined))
+        return _passives._is_reactive_passive(self, ability)
 
     def _find_first_action(self, node):
-        if node is None:
-            return None
-        if isinstance(node, GameAction):
-            return node
-        if isinstance(node, Sequence):
-            for a in node.actions:
-                found = self._find_first_action(a)
-                if found is not None:
-                    return found
-        elif isinstance(node, Branch):
-            return self._find_first_action(node.if_true) or self._find_first_action(node.if_false)
-        elif isinstance(node, Choice):
-            for o in node.options:
-                found = self._find_first_action(o)
-                if found is not None:
-                    return found
-        return None
+        return _passives._find_first_action(self, node)
 
     def _apply_passive_effects(self, player: Player):
         # 対話中断中は再計算しない。Step1 のリセットは無条件に走る一方、Step2/3 の
         # resolve_ability は active_interaction ガードで何も実行できず、リセットだけが
         # 残って PASSIVE/YOUR_TURN バフが消えてしまうため（クザンのコスト-5 等）。
-        if self.active_interaction:
-            return
-        # Phase2 dirty-flag（探索中のみ）: 前回再計算から journal._mut_count が不変＝盤面入力が
-        # 不変なら、継続効果（cost_buff/passive_power/current_keywords）は前回値のまま正しい＝再計算
-        # を省く。_mut_count は journaled な全変更＋探索開始で増えるため取り残し無し。正常プレイ
-        # （_active is None）では作動せず常に再計算＝従来挙動と完全同値。ロールバックはバフを正しく
-        # 復元する＋_mut_count >= _passive_mc を保つため、省略しても必要時は必ず再計算され安全。
-        if journal._TL.active is not None and journal._TL.mut_count == self._passive_mc:
-            return
-        # YOUR_TURN 効果は常にターンプレイヤー基準で適用する（呼び出し元が owner を
-        # 渡しても誤適用しない）。
-        if self.turn_player is not None:
-            player = self.turn_player
-        opponent = self.p2 if player == self.p1 else self.p1
-
-        # Step 1: 両プレイヤーのバフ・一時キーワードをリセット
-        # 値が変わるときだけ書く（無条件代入は make/unmake の journaled 書き込みを毎ノード大量に生む＝
-        # 探索の支配コスト。大半のカードはバフ 0 ＝ no-op 代入なので、ガードで journaling 量を削る。
-        # 最終状態は無条件代入と完全同一＝挙動・方策不変）。
-        for p in [player, opponent]:
-            for c in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
-                if c:
-                    if c.cost_buff:
-                        c.cost_buff = 0
-                    if c.passive_power:
-                        c.passive_power = 0
-                    if c.passive_power_override is not None:
-                        c.passive_power_override = None
-                    if c.current_keywords != c.master.keywords:
-                        c.current_keywords = c.master.keywords.copy()
-            for c in p.hand:
-                if c:
-                    if c.cost_buff:
-                        c.cost_buff = 0
-                    if c.passive_counter:
-                        c.passive_counter = 0
-
-        # Step 2/3 で適用される INSTANT パワーバフは passive_power（再計算レイヤ）に
-        # 載せる。power_buff に加えると _apply_passive_effects が呼ばれるたびに
-        # 累積し、PASSIVE「パワー+1000」が盤面操作のたびに際限なく増えていた。
-        self._in_passive_recalc = True
-        try:
-            # Step 2: YOUR_TURN 効果（アクティブプレイヤーのカードのみ）
-            #   ステージ（player.stage）も対象に含める。聖地マリージョア(コスト軽減)・
-            #   虚の玉座(リーダー+1000) 等の STAGE の YOUR_TURN 効果が従来発動していなかった。
-            for card in ([player.leader] if player.leader else []) + player.field + ([player.stage] if player.stage else []):
-                if not card or not card.master.abilities: continue
-                for ability in card.master.abilities:
-                    if ability.trigger == TriggerType.YOUR_TURN:
-                        if self._is_reactive_passive(ability):
-                            continue  # 「【自分のターン中】…された時」型はイベント誘発（EB02-035 等）
-                        self.resolve_ability(player, ability, source_card=card)
-
-            # Step 2': OPPONENT_TURN 効果（非アクティブプレイヤーのカードのみ）。
-            #   「【相手のターン中】自分のキャラすべてをコスト+1」(OP16-080) 等の継続効果。
-            #   コントローラから見て「相手のターン」＝非ターンプレイヤーのカードが該当する。
-            #   YOUR_TURN と同じく再計算レイヤ（cost_buff/passive_power）へ載るため、
-            #   ターンが替われば自然に消える。
-            for card in ([opponent.leader] if opponent.leader else []) + opponent.field + ([opponent.stage] if opponent.stage else []):
-                if not card or not card.master.abilities: continue
-                for ability in card.master.abilities:
-                    if ability.trigger == TriggerType.OPPONENT_TURN:
-                        if self._is_reactive_passive(ability):
-                            continue  # 「【相手のターン中】…された時」型はイベント誘発
-                        self.resolve_ability(opponent, ability, source_card=card)
-
-            # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）。ステージも含める。
-            for p in [player, opponent]:
-                for card in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
-                    if not card or not card.master.abilities: continue
-                    for ability in card.master.abilities:
-                        if ability.trigger == TriggerType.PASSIVE:
-                            if self._is_reactive_passive(ability):
-                                continue  # 「…された時」型はイベント誘発であり再計算で実行しない
-                            self.resolve_ability(p, ability, source_card=card)
-        finally:
-            self._in_passive_recalc = False
-
-        # Step 4: 手札カードの自己コスト増減 PASSIVE（「手札のこのカードは、〈条件〉、コスト±N」）。
-        #   手札の PASSIVE は Step2/3 の場走査では評価されないため、ここで個別に評価する。
-        #   対象は手札のこのカード自身（target.flags に "SELF_IN_HAND"）。条件成立時のみ
-        #   cost_buff を加算する（Step1 で 0 にリセット済み）。ウタ ST23-001/サッチ OP16-005 等。
-        self._apply_hand_self_cost(player, opponent)
-
-        # Phase2 dirty-flag: 再計算完了時点の _mut_count を記録（探索中のみ）。自身の書き込みを
-        # 含んだ後の値を object.__setattr__ で保持する（journaled せず _mut_count も増やさない＝
-        # 次回呼び出しで外部変更が無ければ一致してスキップできる）。
-        if journal._TL.active is not None:
-            object.__setattr__(self, "_passive_mc", journal._TL.mut_count)
+        return _passives._apply_passive_effects(self, player)
 
     def _apply_hand_self_cost(self, player: Player, opponent: Player):
-        resolver = None
-        for p in [player, opponent]:
-            for card in p.hand:
-                if not card or not card.master.abilities:
-                    continue
-                for ability in card.master.abilities:
-                    if ability.trigger != TriggerType.PASSIVE:
-                        continue
-                    eff = ability.effect
-                    tq = getattr(eff, "target", None)
-                    if (eff is None or getattr(eff, "status", None) != "COST_REDUCTION"
-                            or tq is None or "SELF_IN_HAND" not in getattr(tq, "flags", set())):
-                        continue
-                    if resolver is None:
-                        resolver = EffectResolver(self)
-                    if ability.condition is not None and not resolver._check_condition(
-                            p, ability.condition, card):
-                        continue
-                    card.cost_buff += eff.value.base
+        return _passives._apply_hand_self_cost(self, player, opponent)
 
     def draw_card(self, player: Player, count: int = 1):
-        for _ in range(count):
-            if player.deck:
-                card = player.deck.pop(0); player.hand.append(card)
-        if not player.deck and not self.winner: self.check_victory()
+        return _card_moves.draw_card(self, player, count)
 
     def _find_card_location(self, card: Card) -> Tuple[Optional[Player], Optional[List[Any]]]:
-        for p in [self.p1, self.p2]:
-            zones = [
-                p.hand, p.field, p.life, p.trash, p.deck, p.temp_zone,
-                p.don_active, p.don_rested, p.don_attached_cards
-            ]
-            if p.leader == card: return p, None
-            if p.stage == card: return p, None
-            for zone in zones:
-                if card in zone: return p, zone
-        return None, None
+        return _card_moves._find_card_location(self, card)
 
     def move_card(self, card: Card, dest_zone: Zone, dest_player: Player, dest_position: str = "BOTTOM"):
-        current_owner, current_list = self._find_card_location(card)
-        
-        # 領域移動時はステータスをリセット（特にトラッシュ/手札へ戻る場合）。
-        # 場を離れると新規状態になるため【ターン1回】の使用回数もリセットする。
-        if dest_zone in [Zone.TRASH, Zone.HAND]:
-            card.reset_turn_status(clear_usage=True)
-
-        # レスト（横向き）状態は場を離れたら必ず解除する。レストのキャラを手札/トラッシュ/
-        # デッキへ戻すと横向きのまま戻ってしまう不具合を防ぐ（is_rest は場でのみ意味を持つ）。
-        if dest_zone in [Zone.TRASH, Zone.HAND, Zone.DECK]:
-            card.is_rest = False
-            
-        # フィールドから離れる場合、付与されていたドン‼をレスト状態で持ち主に返す
-        if current_owner and current_list is not None and current_list is current_owner.field:
-            attached_dons = [d for d in current_owner.don_attached_cards if d.attached_to == card.uuid]
-            for don in attached_dons:
-                current_owner.don_attached_cards.remove(don)
-                don.attached_to = None
-                don.is_rest = True
-                current_owner.don_rested.append(don)
-            card.attached_don = 0
-            # 場を離れたら継続効果（timed_power/flags/keywords）を破棄する。
-            self.continuous.drop_for(card.uuid)
-
-        # ライフ領域から離れる場合（手札/トラッシュ/デッキへ移す効果等）、「ライフが離れた時」
-        # (ON_LIFE_DECREASE) を待ち行列へ積む。戦闘/効果ダメージは life.pop 済みでここを通らず、
-        # それぞれの経路が別途積むため二重計上しない。実際の解決は安全な境界
-        # （resolve_ability 完了時 / 対話完了時 / アクション境界）でまとめて行う。
-        left_life = (current_owner is not None and current_list is not None
-                     and current_list is current_owner.life)
-        # 場（フィールド）からの離脱判定。キャラが場を離れた時(ON_LEAVE)誘発に使う。
-        left_field = (current_owner is not None and current_list is not None
-                      and current_list is current_owner.field
-                      and dest_zone != Zone.FIELD)
-
-        if current_list is not None and card in current_list: current_list.remove(card)
-        elif current_owner and current_owner.stage == card: current_owner.stage = None
-
-        if left_life:
-            self._enqueue_life_decrease(current_owner, 1)
-        if left_field and card.master.type == CardType.CHARACTER:
-            self._enqueue_on_leave(card, current_owner)
-
-        target_list = None
-        if dest_zone == Zone.FIELD and card.master.type == CardType.STAGE:
-            if dest_player.stage is not None: self.move_card(dest_player.stage, Zone.TRASH, dest_player)
-            dest_player.stage = card
-        elif dest_zone == Zone.HAND: target_list = dest_player.hand
-        elif dest_zone == Zone.FIELD: target_list = dest_player.field
-        elif dest_zone == Zone.TRASH: target_list = dest_player.trash
-        elif dest_zone == Zone.LIFE: target_list = dest_player.life
-        elif dest_zone == Zone.DECK: target_list = dest_player.deck
-        elif dest_zone == Zone.TEMP: target_list = dest_player.temp_zone
-        
-        if target_list is not None:
-            if dest_position == "TOP": target_list.insert(0, card)
-            else: target_list.append(card)
+        return _card_moves.move_card(self, card, dest_zone, dest_player, dest_position)
 
     def pay_cost(self, player: Player, cost: int, don_list: Optional[List[DonInstance]] = None):
-        if don_list is not None:
-            if len(don_list) < cost: raise ValueError("指定されたドン!!の数が不足しています。")
-            for don in don_list:
-                if don in player.don_active: player.don_active.remove(don); player.don_rested.append(don); don.is_rest = True
-                elif don in player.don_attached_cards: player.don_attached_cards.remove(don); player.don_rested.append(don); don.is_rest = True; don.attached_to = None
-        else:
-            if len(player.don_active) < cost: raise ValueError("ドン!!が不足しています。")
-            for _ in range(cost): don = player.don_active.pop(0); player.don_rested.append(don); don.is_rest = True
+        return _card_moves.pay_cost(self, player, cost, don_list)
 
     def has_blocker(self, player: Player) -> bool:
         for card in player.field:
@@ -1968,34 +1712,10 @@ class GameManager:
         self._advance_pending_triggers()
 
     def _return_one_don(self, tp: Player, don: DonInstance) -> bool:
-        """ドン!!1枚を tp の場（アクティブ/レスト/付与中）から外しドン!!デッキへ戻す。
-        付与中だった場合は付与先キャラの attached_don を減らしてパワー上昇を解除する。"""
-        if don in tp.don_rested:
-            tp.don_rested.remove(don)
-        elif don in tp.don_active:
-            tp.don_active.remove(don)
-        elif don in tp.don_attached_cards:
-            tp.don_attached_cards.remove(don)
-            host = self._find_card_by_uuid(don.attached_to) if don.attached_to else None
-            if host is not None and getattr(host, "attached_don", 0) > 0:
-                host.attached_don -= 1
-        else:
-            return False
-        don.is_rest = False
-        don.attached_to = None
-        tp.don_deck.append(don)
-        return True
+        return _card_moves._return_one_don(self, tp, don)
 
     def _don_pool_player(self, player: Player, action: GameAction) -> Player:
-        """ドン操作の対象プレイヤー。「相手は…」は status="OPPONENT"、
-        対象クエリの player=OPPONENT でも相手を指す。既定は効果の実行者。"""
-        opp = self.p2 if player == self.p1 else self.p1
-        if getattr(action, 'status', None) == "OPPONENT":
-            return opp
-        tgt = getattr(action, 'target', None)
-        if tgt is not None and getattr(getattr(tgt, 'player', None), 'name', '') == 'OPPONENT':
-            return opp
-        return player
+        return _card_moves._don_pool_player(self, player, action)
 
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int, source_card: Optional[CardInstance] = None) -> bool:
         # アクション適用はレジストリ・ディスパッチ（core/actions）へ委譲する。プレイヤーレベル・
