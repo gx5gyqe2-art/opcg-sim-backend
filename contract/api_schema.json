@@ -1,0 +1,1192 @@
+{
+  "models": {
+    "BattleActionRequest": {
+      "additionalProperties": true,
+      "properties": {
+        "action_type": {
+          "title": "Action Type",
+          "type": "string"
+        },
+        "card_uuid": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Card Uuid"
+        },
+        "game_id": {
+          "title": "Game Id",
+          "type": "string"
+        },
+        "player_id": {
+          "title": "Player Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "game_id",
+        "player_id",
+        "action_type"
+      ],
+      "title": "BattleActionRequest",
+      "type": "object"
+    },
+    "BattleStateSchema": {
+      "properties": {
+        "attacker_uuid": {
+          "title": "Attacker Uuid",
+          "type": "string"
+        },
+        "counter_buff": {
+          "default": 0,
+          "title": "Counter Buff",
+          "type": "integer"
+        },
+        "target_uuid": {
+          "title": "Target Uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attacker_uuid",
+        "target_uuid"
+      ],
+      "title": "BattleStateSchema",
+      "type": "object"
+    },
+    "CardSchema": {
+      "additionalProperties": true,
+      "properties": {
+        "attached_don": {
+          "default": 0,
+          "title": "Attached Don",
+          "type": "integer"
+        },
+        "attribute": {
+          "title": "Attribute",
+          "type": "string"
+        },
+        "cost": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Cost",
+          "type": "integer"
+        },
+        "counter": {
+          "default": 0,
+          "title": "Counter",
+          "type": "integer"
+        },
+        "is_face_up": {
+          "default": true,
+          "title": "Is Face Up",
+          "type": "boolean"
+        },
+        "is_rest": {
+          "default": false,
+          "title": "Is Rest",
+          "type": "boolean"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "owner_id": {
+          "title": "Owner Id",
+          "type": "string"
+        },
+        "power": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Power",
+          "type": "integer"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "uuid": {
+          "title": "Uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uuid",
+        "name",
+        "type",
+        "attribute",
+        "owner_id"
+      ],
+      "title": "CardSchema",
+      "type": "object"
+    },
+    "GameActionResultSchema": {
+      "$defs": {
+        "BattleStateSchema": {
+          "properties": {
+            "attacker_uuid": {
+              "title": "Attacker Uuid",
+              "type": "string"
+            },
+            "counter_buff": {
+              "default": 0,
+              "title": "Counter Buff",
+              "type": "integer"
+            },
+            "target_uuid": {
+              "title": "Target Uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "attacker_uuid",
+            "target_uuid"
+          ],
+          "title": "BattleStateSchema",
+          "type": "object"
+        },
+        "CardSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "attached_don": {
+              "default": 0,
+              "title": "Attached Don",
+              "type": "integer"
+            },
+            "attribute": {
+              "title": "Attribute",
+              "type": "string"
+            },
+            "cost": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Cost",
+              "type": "integer"
+            },
+            "counter": {
+              "default": 0,
+              "title": "Counter",
+              "type": "integer"
+            },
+            "is_face_up": {
+              "default": true,
+              "title": "Is Face Up",
+              "type": "boolean"
+            },
+            "is_rest": {
+              "default": false,
+              "title": "Is Rest",
+              "type": "boolean"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "owner_id": {
+              "title": "Owner Id",
+              "type": "string"
+            },
+            "power": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Power",
+              "type": "integer"
+            },
+            "type": {
+              "title": "Type",
+              "type": "string"
+            },
+            "uuid": {
+              "title": "Uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "uuid",
+            "name",
+            "type",
+            "attribute",
+            "owner_id"
+          ],
+          "title": "CardSchema",
+          "type": "object"
+        },
+        "GameStateSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "active_battle": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BattleStateSchema"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "game_id": {
+              "title": "Game Id",
+              "type": "string"
+            },
+            "players": {
+              "additionalProperties": {
+                "$ref": "#/$defs/PlayerSchema"
+              },
+              "title": "Players",
+              "type": "object"
+            },
+            "turn_info": {
+              "additionalProperties": true,
+              "title": "Turn Info",
+              "type": "object"
+            }
+          },
+          "required": [
+            "game_id",
+            "turn_info",
+            "players"
+          ],
+          "title": "GameStateSchema",
+          "type": "object"
+        },
+        "PendingRequestSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "action": {
+              "title": "Action",
+              "type": "string"
+            },
+            "can_skip": {
+              "default": false,
+              "title": "Can Skip",
+              "type": "boolean"
+            },
+            "candidates": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/CardSchema"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Candidates"
+            },
+            "constraints": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Constraints"
+            },
+            "message": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Message"
+            },
+            "options": {
+              "anyOf": [
+                {
+                  "items": {},
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Options"
+            },
+            "player_id": {
+              "title": "Player Id",
+              "type": "string"
+            },
+            "selectable_uuids": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Selectable Uuids",
+              "type": "array"
+            }
+          },
+          "required": [
+            "player_id",
+            "action"
+          ],
+          "title": "PendingRequestSchema",
+          "type": "object"
+        },
+        "PlayerSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "don_active": {
+              "items": {},
+              "title": "Don Active",
+              "type": "array"
+            },
+            "don_deck_count": {
+              "default": 10,
+              "title": "Don Deck Count",
+              "type": "integer"
+            },
+            "don_rested": {
+              "items": {},
+              "title": "Don Rested",
+              "type": "array"
+            },
+            "leader": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CardSchema"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "life_count": {
+              "title": "Life Count",
+              "type": "integer"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "player_id": {
+              "title": "Player Id",
+              "type": "string"
+            },
+            "zones": {
+              "$ref": "#/$defs/ZoneSchema"
+            }
+          },
+          "required": [
+            "player_id",
+            "name",
+            "life_count",
+            "zones"
+          ],
+          "title": "PlayerSchema",
+          "type": "object"
+        },
+        "ZoneSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "deck": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Deck",
+              "type": "array"
+            },
+            "field": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Field",
+              "type": "array"
+            },
+            "hand": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Hand",
+              "type": "array"
+            },
+            "life": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Life",
+              "type": "array"
+            },
+            "stage": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CardSchema"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "trash": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Trash",
+              "type": "array"
+            }
+          },
+          "title": "ZoneSchema",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "game_id": {
+          "title": "Game Id",
+          "type": "string"
+        },
+        "game_state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GameStateSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "pending_request": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PendingRequestSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "success": {
+          "title": "Success",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "success",
+        "game_id"
+      ],
+      "title": "GameActionResultSchema",
+      "type": "object"
+    },
+    "GameStateSchema": {
+      "$defs": {
+        "BattleStateSchema": {
+          "properties": {
+            "attacker_uuid": {
+              "title": "Attacker Uuid",
+              "type": "string"
+            },
+            "counter_buff": {
+              "default": 0,
+              "title": "Counter Buff",
+              "type": "integer"
+            },
+            "target_uuid": {
+              "title": "Target Uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "attacker_uuid",
+            "target_uuid"
+          ],
+          "title": "BattleStateSchema",
+          "type": "object"
+        },
+        "CardSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "attached_don": {
+              "default": 0,
+              "title": "Attached Don",
+              "type": "integer"
+            },
+            "attribute": {
+              "title": "Attribute",
+              "type": "string"
+            },
+            "cost": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Cost",
+              "type": "integer"
+            },
+            "counter": {
+              "default": 0,
+              "title": "Counter",
+              "type": "integer"
+            },
+            "is_face_up": {
+              "default": true,
+              "title": "Is Face Up",
+              "type": "boolean"
+            },
+            "is_rest": {
+              "default": false,
+              "title": "Is Rest",
+              "type": "boolean"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "owner_id": {
+              "title": "Owner Id",
+              "type": "string"
+            },
+            "power": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Power",
+              "type": "integer"
+            },
+            "type": {
+              "title": "Type",
+              "type": "string"
+            },
+            "uuid": {
+              "title": "Uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "uuid",
+            "name",
+            "type",
+            "attribute",
+            "owner_id"
+          ],
+          "title": "CardSchema",
+          "type": "object"
+        },
+        "PlayerSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "don_active": {
+              "items": {},
+              "title": "Don Active",
+              "type": "array"
+            },
+            "don_deck_count": {
+              "default": 10,
+              "title": "Don Deck Count",
+              "type": "integer"
+            },
+            "don_rested": {
+              "items": {},
+              "title": "Don Rested",
+              "type": "array"
+            },
+            "leader": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CardSchema"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "life_count": {
+              "title": "Life Count",
+              "type": "integer"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "player_id": {
+              "title": "Player Id",
+              "type": "string"
+            },
+            "zones": {
+              "$ref": "#/$defs/ZoneSchema"
+            }
+          },
+          "required": [
+            "player_id",
+            "name",
+            "life_count",
+            "zones"
+          ],
+          "title": "PlayerSchema",
+          "type": "object"
+        },
+        "ZoneSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "deck": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Deck",
+              "type": "array"
+            },
+            "field": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Field",
+              "type": "array"
+            },
+            "hand": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Hand",
+              "type": "array"
+            },
+            "life": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Life",
+              "type": "array"
+            },
+            "stage": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CardSchema"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "trash": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Trash",
+              "type": "array"
+            }
+          },
+          "title": "ZoneSchema",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "active_battle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BattleStateSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "game_id": {
+          "title": "Game Id",
+          "type": "string"
+        },
+        "players": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PlayerSchema"
+          },
+          "title": "Players",
+          "type": "object"
+        },
+        "turn_info": {
+          "additionalProperties": true,
+          "title": "Turn Info",
+          "type": "object"
+        }
+      },
+      "required": [
+        "game_id",
+        "turn_info",
+        "players"
+      ],
+      "title": "GameStateSchema",
+      "type": "object"
+    },
+    "PendingRequestSchema": {
+      "$defs": {
+        "CardSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "attached_don": {
+              "default": 0,
+              "title": "Attached Don",
+              "type": "integer"
+            },
+            "attribute": {
+              "title": "Attribute",
+              "type": "string"
+            },
+            "cost": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Cost",
+              "type": "integer"
+            },
+            "counter": {
+              "default": 0,
+              "title": "Counter",
+              "type": "integer"
+            },
+            "is_face_up": {
+              "default": true,
+              "title": "Is Face Up",
+              "type": "boolean"
+            },
+            "is_rest": {
+              "default": false,
+              "title": "Is Rest",
+              "type": "boolean"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "owner_id": {
+              "title": "Owner Id",
+              "type": "string"
+            },
+            "power": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Power",
+              "type": "integer"
+            },
+            "type": {
+              "title": "Type",
+              "type": "string"
+            },
+            "uuid": {
+              "title": "Uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "uuid",
+            "name",
+            "type",
+            "attribute",
+            "owner_id"
+          ],
+          "title": "CardSchema",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "action": {
+          "title": "Action",
+          "type": "string"
+        },
+        "can_skip": {
+          "default": false,
+          "title": "Can Skip",
+          "type": "boolean"
+        },
+        "candidates": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidates"
+        },
+        "constraints": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Constraints"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "items": {},
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options"
+        },
+        "player_id": {
+          "title": "Player Id",
+          "type": "string"
+        },
+        "selectable_uuids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Selectable Uuids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "player_id",
+        "action"
+      ],
+      "title": "PendingRequestSchema",
+      "type": "object"
+    },
+    "PlayerSchema": {
+      "$defs": {
+        "CardSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "attached_don": {
+              "default": 0,
+              "title": "Attached Don",
+              "type": "integer"
+            },
+            "attribute": {
+              "title": "Attribute",
+              "type": "string"
+            },
+            "cost": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Cost",
+              "type": "integer"
+            },
+            "counter": {
+              "default": 0,
+              "title": "Counter",
+              "type": "integer"
+            },
+            "is_face_up": {
+              "default": true,
+              "title": "Is Face Up",
+              "type": "boolean"
+            },
+            "is_rest": {
+              "default": false,
+              "title": "Is Rest",
+              "type": "boolean"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "owner_id": {
+              "title": "Owner Id",
+              "type": "string"
+            },
+            "power": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Power",
+              "type": "integer"
+            },
+            "type": {
+              "title": "Type",
+              "type": "string"
+            },
+            "uuid": {
+              "title": "Uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "uuid",
+            "name",
+            "type",
+            "attribute",
+            "owner_id"
+          ],
+          "title": "CardSchema",
+          "type": "object"
+        },
+        "ZoneSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "deck": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Deck",
+              "type": "array"
+            },
+            "field": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Field",
+              "type": "array"
+            },
+            "hand": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Hand",
+              "type": "array"
+            },
+            "life": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Life",
+              "type": "array"
+            },
+            "stage": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CardSchema"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "trash": {
+              "items": {
+                "$ref": "#/$defs/CardSchema"
+              },
+              "title": "Trash",
+              "type": "array"
+            }
+          },
+          "title": "ZoneSchema",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "don_active": {
+          "items": {},
+          "title": "Don Active",
+          "type": "array"
+        },
+        "don_deck_count": {
+          "default": 10,
+          "title": "Don Deck Count",
+          "type": "integer"
+        },
+        "don_rested": {
+          "items": {},
+          "title": "Don Rested",
+          "type": "array"
+        },
+        "leader": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CardSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "life_count": {
+          "title": "Life Count",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "player_id": {
+          "title": "Player Id",
+          "type": "string"
+        },
+        "zones": {
+          "$ref": "#/$defs/ZoneSchema"
+        }
+      },
+      "required": [
+        "player_id",
+        "name",
+        "life_count",
+        "zones"
+      ],
+      "title": "PlayerSchema",
+      "type": "object"
+    },
+    "ZoneSchema": {
+      "$defs": {
+        "CardSchema": {
+          "additionalProperties": true,
+          "properties": {
+            "attached_don": {
+              "default": 0,
+              "title": "Attached Don",
+              "type": "integer"
+            },
+            "attribute": {
+              "title": "Attribute",
+              "type": "string"
+            },
+            "cost": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Cost",
+              "type": "integer"
+            },
+            "counter": {
+              "default": 0,
+              "title": "Counter",
+              "type": "integer"
+            },
+            "is_face_up": {
+              "default": true,
+              "title": "Is Face Up",
+              "type": "boolean"
+            },
+            "is_rest": {
+              "default": false,
+              "title": "Is Rest",
+              "type": "boolean"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "owner_id": {
+              "title": "Owner Id",
+              "type": "string"
+            },
+            "power": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Power",
+              "type": "integer"
+            },
+            "type": {
+              "title": "Type",
+              "type": "string"
+            },
+            "uuid": {
+              "title": "Uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "uuid",
+            "name",
+            "type",
+            "attribute",
+            "owner_id"
+          ],
+          "title": "CardSchema",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "deck": {
+          "items": {
+            "$ref": "#/$defs/CardSchema"
+          },
+          "title": "Deck",
+          "type": "array"
+        },
+        "field": {
+          "items": {
+            "$ref": "#/$defs/CardSchema"
+          },
+          "title": "Field",
+          "type": "array"
+        },
+        "hand": {
+          "items": {
+            "$ref": "#/$defs/CardSchema"
+          },
+          "title": "Hand",
+          "type": "array"
+        },
+        "life": {
+          "items": {
+            "$ref": "#/$defs/CardSchema"
+          },
+          "title": "Life",
+          "type": "array"
+        },
+        "stage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CardSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "trash": {
+          "items": {
+            "$ref": "#/$defs/CardSchema"
+          },
+          "title": "Trash",
+          "type": "array"
+        }
+      },
+      "title": "ZoneSchema",
+      "type": "object"
+    }
+  },
+  "schema_version": "opcg-api/v1"
+}

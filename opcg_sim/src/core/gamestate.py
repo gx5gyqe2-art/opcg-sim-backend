@@ -5,6 +5,7 @@ import re
 import traceback
 import uuid
 import json
+import hashlib
 from ..models.models import CardInstance, CardMaster, DonInstance, CONST
 from . import journal
 from .journal import JournaledList, JournaledDict, JournaledSet, record_attr
@@ -526,7 +527,24 @@ class GameManager:
         KEY_CANDIDATES = pending_props.get('CANDIDATES', 'candidates')
         KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
         KEY_OPTIONS = pending_props.get('OPTIONS', 'options')
-        
+
+        def _rid(d: Dict[str, Any]) -> str:
+            # request_id は「同一の要求なら安定・要求が変われば変化」する決定的ハッシュにする。
+            # 従来は get のたびに uuid4 を再生成しており、フロントの『request_id 変化＝新要求』検知が
+            # 毎ポーリング/WS更新で誤発火していた（機能バグ）。入力側で request_id は未使用＝安全に変更可。
+            #
+            # ハッシュは**要求の全内容（request_id 自身を除く）＋turn_count**を正規化 JSON で取る。
+            # player_id/action/message/selectable_uuids だけでは、同一ターン内に連続する
+            # 別要求（同名カード2枚が各々出す同文の確認、options だけ異なる CHOICE、
+            # revealed view だけ異なる探索など）が衝突し、フロントが 2 件目を新要求と認識できず
+            # モーダル再マウント/選択リセットが起きない。source_card_uuid・options・constraints・
+            # candidates など識別に効く全フィールドを取り込むことでこれを防ぐ。
+            # 盤面不変なら d は各 to_dict()/スカラが決定的なので同一 → rid も安定（＝元の修正意図を維持）。
+            payload = {k: v for k, v in d.items() if k != "request_id"}
+            key = json.dumps([self.turn_count, payload],
+                             sort_keys=True, ensure_ascii=False, default=str)
+            return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
+
         # マリガンは先行プレイヤー(turn_player)から順に要求する。
         if self.phase == Phase.MULLIGAN:
             mulligan_order = ([self.turn_player, self.opponent]
@@ -534,7 +552,7 @@ class GameManager:
             for player in mulligan_order:
                 if player.name not in self.mulligan_done:
                     hand_candidates = [c.to_dict() for c in player.hand]
-                    return {
+                    _mreq = {
                         KEY_PID: player.name,
                         KEY_ACTION: "MULLIGAN",
                         KEY_MSG: "マリガンするカードを選んでください（交換なし＝キープ）",
@@ -542,8 +560,9 @@ class GameManager:
                         KEY_UUIDS: [c.uuid for c in player.hand],
                         KEY_CONSTRAINTS: {"min": 0, "max": len(player.hand)},
                         KEY_SKIP: True,
-                        "request_id": str(uuid.uuid4()),
                     }
+                    _mreq["request_id"] = _rid(_mreq)
+                    return _mreq
             return None
 
         if self.active_interaction:
@@ -563,7 +582,6 @@ class GameManager:
                 KEY_CANDIDATES: candidate_dicts,
                 KEY_CONSTRAINTS: self.active_interaction.get("constraints"),
                 "options": self.active_interaction.get("options"),
-                "request_id": str(uuid.uuid4())
             }
             # 効果の発生源カードを UI で表示できるよう uuid を併せて渡す。
             src_uuid = self.active_interaction.get("source_card_uuid")
@@ -573,6 +591,7 @@ class GameManager:
             if action_type == "ARRANGE_DECK":
                 req["allow_position"] = self.active_interaction.get("allow_position", False)
                 req["allow_reorder"] = self.active_interaction.get("allow_reorder", False)
+            req["request_id"] = _rid(req)
             return req
 
         if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
@@ -585,25 +604,28 @@ class GameManager:
         if self.phase == Phase.BLOCK_STEP and self.active_battle:
             target_owner = self.active_battle["target_owner"]
             blockers = [c.uuid for c in target_owner.field if not c.is_rest and c.has_keyword("ブロッカー") and "CANNOT_REST" not in c.timed_flags]
-            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
+            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True}
         elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
             target_owner = self.active_battle["target_owner"]
             counters = [c.uuid for c in target_owner.hand if c.current_counter > 0 or (c.master.type == CardType.EVENT and any(abil.trigger == TriggerType.COUNTER for abil in c.master.abilities))]
-            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_COUNTER, KEY_MSG: PendingMessage.SELECT_COUNTER.value, KEY_UUIDS: counters, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
+            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_COUNTER, KEY_MSG: PendingMessage.SELECT_COUNTER.value, KEY_UUIDS: counters, KEY_SKIP: True}
         elif self.phase == Phase.MAIN:
             selectable = [c.uuid for c in self.turn_player.hand]
             selectable += [c.uuid for c in self.turn_player.field if not c.is_rest]
             if self.turn_player.leader and not self.turn_player.leader.is_rest:
                 selectable.append(self.turn_player.leader.uuid)
-            request = {KEY_PID: self.turn_player.name, KEY_ACTION: "MAIN_ACTION", KEY_MSG: PendingMessage.MAIN_ACTION.value, KEY_UUIDS: selectable, KEY_SKIP: True, "request_id": str(uuid.uuid4())}
+            request = {KEY_PID: self.turn_player.name, KEY_ACTION: "MAIN_ACTION", KEY_MSG: PendingMessage.MAIN_ACTION.value, KEY_UUIDS: selectable, KEY_SKIP: True}
+        if request is not None:
+            request["request_id"] = _rid(request)
         return request
 
     def pending_actor_action(self) -> Optional[Tuple[str, str]]:
         """`get_pending_request()` の (player_id, action) **だけ**を安価に返す（CPU 探索の葉/手番判定用）。
 
         探索は各ノードでこの 2 値しか見ない（手は `get_legal_actions` から得る）一方、
-        `get_pending_request` は毎回 selectable 構築・候補 to_dict・`uuid4()` を作るため重い
-        （探索コストの ~12%）。本メソッドは**判定ロジックと副作用（BLOCK_STEP/BATTLE_COUNTER で
+        `get_pending_request` は毎回 selectable 構築・候補 to_dict・request_id ハッシュ（要求全体の
+        正規化 JSON を sha1）を作るため重い（探索コストの ~12%）。本メソッドは**判定ロジックと
+        副作用（BLOCK_STEP/BATTLE_COUNTER で
         active_battle が無いときの phase→MAIN 正規化）を get_pending_request と一致**させたうえで、
         重い payload を作らない。一致は `tests/test_cpu_make_unmake.py` で機械照合する。
         """

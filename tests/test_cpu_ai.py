@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from opcg_sim.api import app as appmod
+from opcg_sim.api.services import decks as deck_svc
 from opcg_sim.src.models.models import CardInstance
 from opcg_sim.src.core import action_api, cpu_ai
 from opcg_sim.src.core.gamestate import GameManager, Player
@@ -34,7 +35,7 @@ def _build_deck(owner_id):
 
 @pytest.fixture
 def client(monkeypatch):
-    monkeypatch.setattr(appmod, "load_deck_mixed", lambda src, owner: _build_deck(owner))
+    monkeypatch.setattr(deck_svc, "load_deck_mixed", lambda src, owner: _build_deck(owner))
     appmod.GAMES.clear()
     appmod.CPU_GAMES.clear()
     return TestClient(appmod.app)
