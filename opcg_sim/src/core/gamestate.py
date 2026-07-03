@@ -14,6 +14,7 @@ from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource,
 from .effects.resolver import EffectResolver
 from .effects.matcher import get_target_cards
 from .actions import apply_action as _apply_action
+from .engine import values as _values, guards as _guards
 
 
 Card = CardInstance
@@ -29,50 +30,8 @@ FIELD_LIMIT = 5
 from .rules_constants import SELF_RESTRICTION_KEYS  # noqa: E402,F401
 
 
-def _nfc(text: str) -> str:
-    return unicodedata.normalize('NFC', text)
-
-
-# 【ターン1回】系の表記（置換/保護能力は parser が TURN_LIMIT 条件を落とすため raw_text からも拾う）。
-_TURN1_RE = re.compile(r'ターン1回|ターンに1回|1ターンに1回')
-
-
-def _condition_turn_limit(cond) -> Optional[int]:
-    """条件ツリー中の TURN_LIMIT 上限値を返す（無ければ None）。AND/OR の入れ子も探索。"""
-    if cond is None:
-        return None
-    if cond.type == ConditionType.TURN_LIMIT:
-        v = cond.value
-        return v if isinstance(v, int) and v > 0 else 1
-    if cond.type in (ConditionType.AND, ConditionType.OR):
-        for a in (cond.args or []):
-            r = _condition_turn_limit(a)
-            if r is not None:
-                return r
-    return None
-
-
-def _ability_turn_limit(ab) -> Optional[int]:
-    """能力の per-turn 使用上限。条件の TURN_LIMIT を優先し、無ければ raw_text の【ターン1回】表記から 1。
-
-    置換/保護能力（_active_replacement / _active_protection 経由）は parser が TURN_LIMIT を
-    ab.condition へ載せない（自己置換は final_condition=None）ため、raw_text を併用する。
-    """
-    lim = _condition_turn_limit(getattr(ab, "condition", None))
-    if lim is not None:
-        return lim
-    if _TURN1_RE.search(_nfc(getattr(ab, "raw_text", "") or "")):
-        return 1
-    return None
-
-
-def _ability_index(card, ab) -> Any:
-    """ability_used_this_turn のキー（master.abilities 内の位置。resolver._ability_key と整合）。"""
-    abilities = getattr(getattr(card, "master", None), "abilities", ()) or ()
-    for i, a in enumerate(abilities):
-        if a is ab:
-            return i
-    return id(ab)
+from .engine._helpers import _nfc, _TURN1_RE, _condition_turn_limit, _ability_turn_limit, _ability_index  # noqa: F401
+# ↑ 後方互換の再エクスポート（正本は engine/_helpers.py。gamestate/engine の双方が使う葉ヘルパ）。
 
 class Player:
     # ゾーン（list）は JournaledList を保証する。本番は __init__＋append/remove で常に JournaledList だが、
@@ -1705,42 +1664,13 @@ class GameManager:
             self._enforce_field_limit(player)
 
     def _has_rested_play(self, player: Player) -> bool:
-        """player が「自分のキャラはレストで登場する」PASSIVE を持つか（RESTED_PLAY マーカー）。"""
-        cards = ([player.leader] if player.leader else []) + list(player.field)
-        for c in cards:
-            if not c or getattr(c, "is_effect_negated", False) or not getattr(c, "master", None):
-                continue
-            for ab in c.master.abilities:
-                if ab.trigger != TriggerType.PASSIVE:
-                    continue
-                act = self._find_action(ab.effect, ActionType.RESTRICTION)
-                if act is not None and getattr(act, "status", None) == "RESTED_PLAY":
-                    return True
-        return False
+        return _guards._has_rested_play(self, player)
 
     def _active_restriction(self, player: Player, key: str) -> Optional[Dict[str, Any]]:
-        """player に有効な自己制限（self_cannot）があれば、そのパラメータ dict を返す。
-        turn_count <= expire の間だけ有効。期限切れエントリは掃除して None を返す。"""
-        rec = getattr(player, "restrictions", {}).get(key)
-        if not rec:
-            return None
-        if self.turn_count <= rec.get("expire", -1):
-            return rec
-        # 期限切れは破棄
-        player.restrictions.pop(key, None)
-        return None
+        return _guards._active_restriction(self, player, key)
 
     def _blocks_effect_play(self, card: CardInstance) -> bool:
-        """card が「手札のこのカードは効果で登場できない」PASSIVE を持つか（NO_EFFECT_PLAY）。"""
-        if not card or not getattr(card, "master", None):
-            return False
-        for ab in card.master.abilities:
-            if ab.trigger != TriggerType.PASSIVE:
-                continue
-            act = self._find_action(ab.effect, ActionType.RESTRICTION)
-            if act is not None and getattr(act, "status", None) == "NO_EFFECT_PLAY":
-                return True
-        return False
+        return _guards._blocks_effect_play(self, card)
 
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance,
                         cost_confirmed: bool = False):
@@ -1791,256 +1721,27 @@ class GameManager:
         return None
 
     def _active_protection(self, card: CardInstance, status_values: Tuple[str, ...], actor: Optional[Player] = None, attacker: Optional[CardInstance] = None) -> bool:
-        if not card or not getattr(card, "master", None) or card.negated:
-            return False
-        owner = self.p1 if self.p1.name == card.owner_id else self.p2
-
-        # トリガー効果が継続効果として付与した期間付き保護（timed_flags）。
-        # 例: 「このキャラは、次の自分のターン開始時まで、バトルでKOされない」(ON_ATTACK)
-        for s in status_values:
-            if f"PREVENT_{s}" in (card.flags | card.timed_flags):
-                return True
-
-        resolver = None
-        # 走査対象: 自身に加え、オーナーのリーダー/フィールド/ステージの範囲保護
-        # （「自分の特徴《X》を持つキャラすべては…場を離れない」等。従来は自身のみ走査で
-        #   他カードを守る保護が機能しなかった）。
-        protectors = [card]
-        if owner.leader and owner.leader is not card:
-            protectors.append(owner.leader)
-        protectors.extend(fc for fc in owner.field if fc is not card)
-        if getattr(owner, "stage", None) and owner.stage is not card:
-            protectors.append(owner.stage)
-        # 除去を行うプレイヤー(actor)側の範囲保護も走査する。「相手のキャラすべては、自分の効果で
-        # 場を離れない」(OP14-079) のように、保護能力の持ち主(actor)と被保護カード(owner=相手)が
-        # 別プレイヤーのケースに対応する。range クエリの照合で actor の相手側＝owner 側のカードのみ
-        # 一致するため、自分側を守る保護は誤適用されない。
-        if actor is not None and actor is not owner:
-            if actor.leader and actor.leader is not card:
-                protectors.append(actor.leader)
-            protectors.extend(fc for fc in actor.field if fc is not card)
-            if getattr(actor, "stage", None) and actor.stage is not card:
-                protectors.append(actor.stage)
-
-        for protector in protectors:
-            if getattr(protector, "is_effect_negated", False) or getattr(protector, "negated", False):
-                continue
-            for ab in protector.master.abilities:
-                if ab.trigger != TriggerType.PASSIVE:
-                    continue
-                eff = self._find_action(ab.effect, ActionType.PREVENT_LEAVE)
-                if eff is None:
-                    continue
-                if eff.status not in status_values:
-                    continue
-                # 保護対象クエリの照合: SOURCE は protector 自身のみを守る。
-                # 範囲クエリは card が範囲に含まれるかを実体化して確認する。
-                tgt = getattr(eff, "target", None)
-                if tgt is None or getattr(tgt, "select_mode", "SOURCE") == "SOURCE":
-                    if protector is not card:
-                        continue
-                else:
-                    if card not in get_target_cards(self, tgt, protector):
-                        continue
-                if ab.condition is not None:
-                    if resolver is None:
-                        resolver = EffectResolver(self)
-                    src = card if protector is card else protector
-                    if not resolver._check_condition(owner, ab.condition, src):
-                        continue
-                # 属性限定のバトルKO耐性（「属性《斬》を持つカードとのバトルでKOされず」OP08-114）。
-                # 保護はバトル相手(attacker)が指定属性を持つ場合のみ有効。属性が不明（非バトル経路）や
-                # 不一致なら適用しない。
-                attr_m = re.search(_nfc(r'属性[(（《]([斬打射特知])[)）》]を持つ(?:カード|キャラ)?との(?:バトル|戦闘)'),
-                                   getattr(eff, "raw_text", "") or "")
-                if attr_m:
-                    req_attr = attr_m.group(1)
-                    if attacker is None or getattr(attacker.master, "attribute", None) is None \
-                            or attacker.master.attribute.value != req_attr:
-                        continue
-                # 【ターン1回】保護（例:「このキャラはターンに1回、相手の効果でKOされない」）は
-                # 1ターンに1回まで。_check_condition の TURN_LIMIT は常時 True を返すため、ここで
-                # 使用回数を直接 enforce する（resolve_ability を経由しない保護経路のため）。
-                limit = _ability_turn_limit(ab)
-                if limit is not None:
-                    key = _ability_index(protector, ab)
-                    if protector.ability_used_this_turn.get(key, 0) >= limit:
-                        continue
-                    protector.ability_used_this_turn[key] = protector.ability_used_this_turn.get(key, 0) + 1
-                return True
-        return False
+        return _guards._active_protection(self, card, status_values, actor, attacker)
 
     # 置換効果（REPLACE_EFFECT）の検出。除去対象に適用可能な「代わりに〜」置換を1件、
     # 条件・実行可能性・【ターン1回】の残数を満たすものに限り (protector, ability, eff, sub)
     # として返す（実行はしない）。無ければ None。検出と実行を分離することで、バトルKO置換の
     # ような「任意（〜してもよい/できる）の置換を被KO側へ確認してから実行/拒否する」経路を可能にする。
     def _find_replacement(self, card: CardInstance, status_values: Tuple[str, ...]):
-        if not card or not getattr(card, "master", None) or card.negated:
-            return None
-        owner = self.p1 if self.p1.name == card.owner_id else self.p2
-
-        # 走査対象: 除去されるカード自身 → オーナーのリーダー → フィールドの他キャラ
-        # （自身の置換効果と、他キャラを守る OPPONENT_REMOVAL 型置換効果の両方をカバー）
-        candidates = [card]
-        if owner.leader and owner.leader is not card:
-            candidates.append(owner.leader)
-        for fc in owner.field:
-            if fc is not card:
-                candidates.append(fc)
-
-        for protector in candidates:
-            if getattr(protector, 'is_effect_negated', False):
-                continue
-            for ab in protector.master.abilities:
-                if ab.trigger != TriggerType.PASSIVE:
-                    continue
-                eff = self._find_action(ab.effect, ActionType.REPLACE_EFFECT)
-                if eff is None:
-                    continue
-                if eff.status not in status_values:
-                    continue
-                # 自己無効化（「キャラの「X」がいる場合、この効果は無効になる」OP05-100）。
-                # 指定名のキャラがいずれかの場にいれば、この置換は発動しない。
-                neg_m = re.search(_nfc(r'「([^」]+)」がい[るて][^。]*?この効果は無効'),
-                                  getattr(eff, "raw_text", "") or "")
-                if neg_m:
-                    neg_name = neg_m.group(1)
-                    if any(c.master.matches_name(neg_name, partial=True)
-                           for pl in (self.p1, self.p2) for c in pl.field):
-                        continue
-                sub = getattr(eff, "sub_effect", None)
-                if sub is None:
-                    continue
-                resolver = EffectResolver(self)
-                # 条件チェック: source_card=除去されるカード（OPPONENT_REMOVAL/名称フィルタ評価用）、
-                # host_card=保護者（HAS_DON 等の「能力保持カードの付与ドン」評価用。OP05-001 はリーダー）。
-                if ab.condition is not None and not resolver._check_condition(owner, ab.condition, card, host_card=protector):
-                    continue
-                # 代わりの行動が取れない場合は置換不成立。
-                # sub_effect の source は「離れるカード」(card) とする。置換文の「代わりに
-                # （そのカードを）〜」は離れるカード自身を対象に取り得るため（OP11-101 の
-                # 「代わりに自分のライフの上に裏向きで加える」= 離れるカードをライフへ）。
-                if not resolver._can_satisfy_node(owner, sub, card):
-                    continue
-                # 【ターン1回】置換は1ターンに1回まで enforce する（parser が自己置換の TURN_LIMIT を
-                # 落とすため raw_text 併用。resolve_ability を経由しない置換経路のため直接管理）。
-                _limit = _ability_turn_limit(ab)
-                if _limit is not None and protector.ability_used_this_turn.get(_ability_index(protector, ab), 0) >= _limit:
-                    continue
-                return (protector, ab, eff, sub)
-
-        # 継続付与型の置換（EB02-030「自分のキャラすべては、このターン中、…代わりに〜できる」）。
-        # 場に残らないイベント由来のため owner.granted_replacements を参照する。付与対象は
-        # 自分のキャラ（除去されるカード自身が自分のキャラであること）。ab/eff は持たないので
-        # ターン制限・条件は付与時に消化済みとして None を返す。
-        if getattr(card, "master", None) and card.master.type == CardType.CHARACTER:
-            for g in getattr(owner, "granted_replacements", []):
-                if g.get("status") not in status_values:
-                    continue
-                if self.turn_count > g.get("expire_turn", 0):
-                    continue
-                sub = g.get("sub_effect")
-                if sub is None:
-                    continue
-                resolver = EffectResolver(self)
-                if not resolver._can_satisfy_node(owner, sub, card):
-                    continue
-                return (card, None, None, sub)
-        return None
+        return _guards._find_replacement(self, card, status_values)
 
     def _register_granted_replacements(self, player: Player, source_card: Card) -> None:
-        """カウンターイベント等が持つ REPLACE_EFFECT を「このターン中」付与の置換として登録する。
-        イベントは場に残らないため、被除去キャラ側から参照できるよう player へ退避する
-        （EB02-030「自分のキャラすべては、このターン中、バトルでKOされる場合、代わりに〜できる」）。"""
-        import copy
-        for ability in source_card.master.abilities:
-            eff = self._find_action(ability.effect, ActionType.REPLACE_EFFECT)
-            if eff is None:
-                continue
-            sub = getattr(eff, "sub_effect", None)
-            if sub is None:
-                continue
-            # 「〜できる／〜してもよい」は任意。parser が sub.is_optional に載せ切れない場合に
-            # 備え raw_text からも判定し、付与する sub のコピーへ反映する（共有ノードを汚さない）。
-            raw = _nfc(getattr(eff, "raw_text", "") or getattr(ability, "raw_text", "") or "")
-            is_optional = bool(getattr(sub, "is_optional", False)) or ("できる" in raw) or ("てもよい" in raw)
-            sub_copy = copy.copy(sub)
-            sub_copy.is_optional = is_optional
-            player.granted_replacements.append({
-                "status": eff.status,
-                "sub_effect": sub_copy,
-                "is_optional": is_optional,
-                "expire_turn": self.turn_count,
-            })
-        return None
+        return _guards._register_granted_replacements(self, player, source_card)
 
     # 置換効果（REPLACE_EFFECT）の判定。除去の瞬間に対象の PASSIVE 能力を走査し、
     # 「代わりに〜」の置換アクションを（条件・実行可能性を満たせば）実行して True を返す。
     # True の場合、呼び出し側は本来の除去を行わずスキップする。
     def _active_replacement(self, card: CardInstance, status_values: Tuple[str, ...],
                             can_suspend: bool = False) -> bool:
-        found = self._find_replacement(card, status_values)
-        if found is None:
-            return False
-        owner = self.p1 if self.p1.name == card.owner_id else self.p2
-        protector, ab, eff, sub = found
-        resolver = EffectResolver(self)
-        _limit = _ability_turn_limit(ab)
-        # 置換は除去解決の最中に発生する「入れ子の中断」。失われる外側継続が無い
-        # （can_suspend=除去アクションの後続が空・単一対象）場合は、内側の中断
-        # （対象選択／任意確認）を**そのまま UI へ提示**し、被保護側に選ばせる
-        # （interaction はスタックに残し、resume で sub_effect を完了させる）。
-        # 外側継続が残るケースでは従来どおり保守的に自動解決して同期完了させる
-        # （任意=採用、対象=有効候補先頭）。どちらも置換は成立扱い（本来の除去はスキップ）。
-        outer_interaction = self.active_interaction
-        self.active_interaction = None
-        resolver.execution_stack = [sub]
-        resolver._process_stack(owner, card)
-        suspended = self.active_interaction is not None
-        if _limit is not None:  # 発動成立 → 【ターン1回】の使用回数を消費
-            k = _ability_index(protector, ab)
-            protector.ability_used_this_turn[k] = protector.ability_used_this_turn.get(k, 0) + 1
-        if suspended and can_suspend:
-            # 内側中断を UI へ提示（自動解決しない）。除去はスキップ＝置換成立。
-            # 外側に後続継続（このシーケンスの残アクション／除去ループの残対象）があれば、
-            # 呼び出し側がそれを deferred フレームへ退避できるようシグナルを立てる（B）。
-            self._replacement_suspended = True
-            return True
-        # 自動解決パス（外側継続あり、または中断なし）。
-        self._auto_resolve_replacement(owner)
-        self.active_interaction = outer_interaction
-        return True
+        return _guards._active_replacement(self, card, status_values, can_suspend)
 
     def _auto_resolve_replacement(self, owner: Player, limit: int = 16) -> None:
-        """置換 sub_effect が残した中断（任意確認／対象選択）を保守的に同期解決する。
-
-        単一 continuation 設計ではネストした中断を UI へ伝播できないため、置換は headless で
-        完結させる: 任意確認(CONFIRM_OPTIONAL)は accept（保護を実行）、対象選択(SELECT_TARGET)は
-        有効候補から必要数を自動選択する。選択 UI のフロント連携は E14/E15 の将来課題。"""
-        n = 0
-        while self.active_interaction and n < limit:
-            ia = self.active_interaction
-            atype = ia.get("action_type")
-            pid = ia.get("player_id")
-            actor = self.p1 if self.p1.name == pid else self.p2
-            if atype == "SELECT_TARGET":
-                cand = ia.get("selectable_uuids") or [c.uuid for c in ia.get("candidates", [])]
-                mx = (ia.get("constraints") or {}).get("max", 1) or 1
-                payload = {"selected_uuids": cand[:mx], "index": 0}
-            elif atype == "CONFIRM_OPTIONAL":
-                payload = {"accepted": True}
-            elif atype == "CHOICE":
-                payload = {"index": 0}
-            else:
-                # 想定外の中断種別は安全側に倒して打ち切る（宙吊り防止のため interaction を解除）。
-                self.active_interaction = None
-                break
-            try:
-                self.resolve_interaction(actor, payload)
-            except Exception as e:
-                self.active_interaction = None
-                break
-            n += 1
+        return _guards._auto_resolve_replacement(self, owner, limit)
 
     # ------------------------------------------------------------------
     # 多段継続（deferred continuations）— accepted limitation B の解消
@@ -2303,54 +2004,7 @@ class GameManager:
         return _apply_action(self, player, action, targets, value, source_card)
 
     def get_dynamic_value(self, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict) -> int:
-        if not val_source: return 0
-        if val_source.dynamic_source == "COUNT_REFERENCE":
-            return len(player.trash)
-        # 文脈依存「直前アクションで捨てた/戻した/KOした…カードN枚につき」（§7-5）。
-        # 生の枚数を返す（divisor/multiplier は _calculate_value が適用する）。
-        if val_source.dynamic_source == "PREV_ACTION_COUNT":
-            return int((context or {}).get("_last_action_count", 0) or 0)
-        # 「<範囲>N枚につき」の汎用カウント（RC-4）。範囲クエリを毎回実体化して数える
-        # （PASSIVE 再計算で盤面に追随する）。
-        if val_source.dynamic_source == "COUNT_QUERY" and getattr(val_source, "count_query", None) is not None:
-            src = None
-            src_uuid = (context or {}).get("_source_card_uuid")
-            if src_uuid:
-                src = self._find_card_by_uuid(src_uuid)
-            if src is None:
-                src = player.leader
-            n = len(get_target_cards(self, val_source.count_query, src))
-            return n
-        # C9「（相手のリーダー／選んだキャラ／アタックしているキャラ）と同じパワーになる」。
-        # 発動時スナップショット: 参照カードの現在パワーを固定値として返す（以後の変動に追随しない）。
-        if val_source.dynamic_source == "REFERENCE_POWER":
-            ref = self._resolve_power_reference(player, val_source.ref_id, context)
-            if ref is None:
-                return val_source.base
-            ref_owner, _ = self._find_card_location(ref)
-            is_ref_turn = bool(ref_owner) and ref_owner.name == self.turn_player.name
-            return ref.get_power(is_ref_turn)
-        # 「元々のパワーと同じ」: 参照カードの基礎値（master.power）を写す（バフ非追随）
-        if val_source.dynamic_source == "REFERENCE_BASE_POWER":
-            ref = self._resolve_power_reference(player, val_source.ref_id, context)
-            if ref is None:
-                return val_source.base
-            return ref.master.power
-        return val_source.base
+        return _values.get_dynamic_value(self, player, val_source, targets, context)
 
     def _resolve_power_reference(self, player, ref_id, context):
-        """C9 の同値パワー参照カードを解決する。ref_id: selected/opp_leader/attacker。"""
-        opponent = self.p2 if player == self.p1 else self.p1
-        if ref_id == "opp_leader":
-            return opponent.leader
-        if ref_id == "self_leader":
-            return player.leader
-        if ref_id == "attacker":
-            return (self.active_battle or {}).get("attacker")
-        if ref_id == "selected":
-            saved = (context or {}).get("saved_targets", {})
-            sel = saved.get("selected_card") or saved.get("selected")
-            if isinstance(sel, list):
-                return sel[0] if sel else None
-            return sel
-        return None
+        return _values._resolve_power_reference(self, player, ref_id, context)
