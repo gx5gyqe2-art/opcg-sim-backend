@@ -6,6 +6,8 @@
 """
 from .registry import _GAME_HANDLERS, normalize
 from . import player_level  # noqa: F401  (import 時にデコレータでハンドラを登録する)
+from . import per_target    # noqa: F401  (import 時に対象ハンドラを登録する)
+from .target_loop import run_target_loop
 
 
 def apply_action(gm, player, action, targets, value, source_card=None) -> bool:
@@ -18,4 +20,4 @@ def apply_action(gm, player, action, targets, value, source_card=None) -> bool:
         if guard is None or guard(action):
             return fn(gm, player, action, targets, value, source_card)
     # プレイヤーレベル・ハンドラに該当しない（または guard 不成立）→ 対象ループへフォールスルー。
-    return gm._apply_action_target_loop(player, action, targets, value, source_card)
+    return run_target_loop(gm, player, action, atype, targets, value, source_card)

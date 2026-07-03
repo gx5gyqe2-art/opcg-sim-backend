@@ -13,12 +13,26 @@ from ...models.enums import ActionType
 # guard が False のアクションは対象ループへフォールスルーする（現行の条件付き分岐を保存）。
 _GAME_HANDLERS: Dict[ActionType, Tuple[Callable, Optional[Callable]]] = {}
 
+# ActionType -> 1対象への適用ハンドラ（対象ループが per-target に呼ぶ）。
+_TARGET_HANDLERS: Dict[ActionType, Callable] = {}
+
 
 def game_handler(*types: ActionType, when: Optional[Callable] = None):
     """プレイヤーレベル・ハンドラを登録するデコレータ。"""
     def deco(fn):
         for t in types:
             _GAME_HANDLERS[t] = (fn, when)
+        return fn
+    return deco
+
+
+def target_handler(*types: ActionType):
+    """対象ループ・ハンドラを登録するデコレータ。
+    シグネチャ: (gm, player, action, target, owner, source_list, value, source_card) -> None
+    """
+    def deco(fn):
+        for t in types:
+            _TARGET_HANDLERS[t] = fn
         return fn
     return deco
 
