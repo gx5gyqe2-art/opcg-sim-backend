@@ -21,13 +21,15 @@ from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.api import decide_client
-from opcg_sim.src.models.models import CardInstance
-# 設定・定数／常駐リソース／対局レジストリは分離済みモジュールから取り込む（後方互換の名前で再公開）。
+# 設定・定数／常駐リソース／対局レジストリ／サービスは分離済みモジュールから取り込む（後方互換の名前で再公開）。
 from .config import CONST, constants_hash, IMAGE_VERSION, REPLAY_SCHEMA
 from .resources import db, card_db, CARDS_ETAG, materialize_all_cards
 from .state import GAMES, SANDBOX_GAMES, CPU_GAMES, RULE_ROOMS
 from .presenters import build_game_result_hybrid, build_rule_message, _rule_room_meta
 from .ws import ws_manager, game_ws_manager, broadcast_rule_state
+from .services.decks import _load_deck_doc, load_deck_mixed, _deck_preview
+from .services.replay import _replay_enabled, _replay_record_action, _capture_final_winner
+from .services.games import _resolve_first_player
 
 _logger = logging.getLogger("opcg.api")
 
@@ -49,78 +51,9 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 # NOTE: 効果定義はカードテキストの自動解析（EffectParserV2）に一本化されている。
 
-def _load_deck_doc(source_str: str) -> Dict[str, Any]:
-    """`db:<id>` 形式のデッキIDから Firestore のデッキドキュメント(dict)を取得する。"""
-    if not source_str.startswith("db:"):
-        raise ValueError(f"Unknown deck id: {source_str}")
-    if not db: raise ValueError("Firestore is not initialized.")
-    deck_id = source_str[3:]; doc = db.collection("decks").document(deck_id).get()
-    if not doc.exists: raise ValueError(f"Deck ID not found: {deck_id}")
-    return doc.to_dict()
-
-def load_deck_mixed(source_str: str, owner_id: str):
-    deck_id = source_str[3:] if source_str.startswith("db:") else source_str
-    data = _load_deck_doc(source_str); leader_id = data.get("leader_id"); card_uuids = data.get("card_uuids", [])
-    leader_inst = None
-    if leader_id:
-        master = card_db.get_card(leader_id)
-        if master: leader_inst = CardInstance(master, owner_id)
-    cards_inst = [CardInstance(m, owner_id) for cid in card_uuids if (m := card_db.get_card(cid))]
-    return leader_inst, cards_inst
-
 
 @app.options("/api/game/create")
 async def options_game_create(): return {"status": "ok"}
-
-def _resolve_first_player(value: Any, player1: Player, player2: Player) -> Optional[Player]:
-    """リクエストの first_player 指定を先行 Player に解決する。
-      "p1"/"p2" : 明示指定（ソロでプレイヤーが選択）
-      "random"  : ランダム（CPU/対戦のコイントス用。結果は turn_info に反映される）
-      その他/None: 従来通り既定（start_game 側で p1 先行）
-    """
-    if value == "random":
-        return random.choice([player1, player2])
-    if value == "p1":
-        return player1
-    if value == "p2":
-        return player2
-    return None
-
-# === リプレイ種＋CPU思考トレース（実アプリ対局・Phase 2） ============================
-# すべて opt-in（create リクエストの cpu_trace=true）でのみ作動し、未指定の本番対局には
-# 一切の追加処理・レイテンシ・挙動変化を与えない（トレースは観測専用＝進行不変）。
-
-
-def _replay_enabled(meta) -> bool:
-    return bool(meta and meta.get("cpu_trace"))
-
-
-def _replay_record_action(meta, manager, src: str, player_id: str, movelike: Dict[str, Any]):
-    """traced CPU 対局のアクションを card_id 基準で記録する（再現用・例外安全・適用前に呼ぶ）。"""
-    if not _replay_enabled(meta):
-        return
-    try:
-        desc = cpu_ai._describe_move(manager, movelike) or {"action_type": movelike.get("action_type")}
-        meta.setdefault("actions", []).append(
-            {"src": src, "turn": manager.turn_count, "player": player_id, **desc})
-    except Exception:
-        pass
-
-
-def _capture_final_winner(meta, manager):
-    """traced 対局の終局勝者を meta に保持する（WS 切断後の cleanup が manager を退避しても replay で参照可能）。
-
-    opt-in（cpu_trace）時のみ作動＝本番対局にはオーバーヘッド・挙動変化なし。**アクション適用後**に呼ぶ。
-    （旧 _capture_value_samples の価値学習データ採取は学習価値サブシステムごと撤去・2026-06-28。）
-    """
-    if not _replay_enabled(meta):
-        return
-    try:
-        if manager.winner is not None:
-            meta["_winner"] = manager.winner
-    except Exception:
-        pass
-
 
 @app.post("/api/game/create")
 async def game_create(req: Any = Body(...)):
@@ -707,21 +640,6 @@ async def rule_list():
         except Exception:
             continue
     return {"success": True, "games": rooms}
-
-def _deck_preview(deck_id: str, owner_id: str) -> Dict[str, Any]:
-    """ロビー表示用にデッキのリーダー情報のみ抽出する。
-
-    デッキ全カードはロードせず、Firestore のメタデータ(leader_id)から
-    リーダー1枚だけを解決する（一覧表示のたびに50枚パースしない）。
-    """
-    try:
-        leader_id = _load_deck_doc(deck_id).get("leader_id")
-        master = card_db.get_card(leader_id) if leader_id else None
-        if master:
-            return {"leader_id": master.card_id, "leader_name": master.name}
-    except Exception as e:
-        pass
-    return None
 
 @app.options("/api/rule/action")
 async def options_rule_action(): return {"status": "ok"}
