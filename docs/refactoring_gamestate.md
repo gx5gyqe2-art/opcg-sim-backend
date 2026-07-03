@@ -2,8 +2,13 @@
 
 - 対象: `opcg_sim/src/core/gamestate.py`（2,893行 / GameManager 2,715行・約90メソッド）
 - 目的: 挙動を **一切変えずに** 構造だけを改善する（pure refactoring）。
-- ステータス: 設計（実装は本書承認後に別PRで段階実施）
+- ステータス: **Phase A（ディスパッチ化）実装済み**（A-1/A-2/A-3・PR #157）。Phase B（GameManager 分割）は未着手。
 - 関連: `docs/SPEC.md` §2.5（クローン/シミュレーション）、`docs/TEST_SPEC.md` §4–5（品質ゲート）
+
+> 実装時の設計差分（Phase A）: `FIELD_LIMIT` は `rules_constants.py` へ移さず `gamestate.py` に残置した。
+> actions パッケージからは参照されず（循環回避の必要がない）、gamestate 内部で多用され外部
+> （`invariants.py`／テスト）からも `gamestate` 経由で import されるため。`SELF_RESTRICTION_KEYS`
+> のみ `rules_constants.py` へ集約した（actions が参照＝循環回避が必要なため）。
 
 ---
 
