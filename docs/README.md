@@ -34,7 +34,7 @@
 | [`reports/effect_verification_iter1.md`](reports/effect_verification_iter1.md) | 効果検証イテレーション1（2026-06）のトリアージ報告 |
 | [`reports/effect_verification_iter2.md`](reports/effect_verification_iter2.md) | 効果検証イテレーション2（2026-06）の修正報告（EB01-001／お互い同時両側／検出器精度） |
 | [`reports/quality_postmortem_categoryH.md`](reports/quality_postmortem_categoryH.md) | 品質ポストモーテム（2026-06）。カテゴリH（先頭条件が「。その後、」をまたぐ漏れ・~119能力/全弾）の見逃し原因分析と横展開調査（Duration/chooser/すべては健全） |
-| [`reports/cpu_search_accel_pypy_20260620.md`](reports/cpu_search_accel_pypy_20260620.md) | CPU 探索 高速化 調査（2026-06-20）。「速くした分を horizon に回す」目的の手順と対照。PyPy 実測 ~2.1x（改変ゼロ・挙動ビット一致・同一337step/280decide）＝horizon +1 相当。エンジンは stdlib-only で PyPy 動作実証・配信スタック互換のみ課題。高速化手段の総覧対照表（差分評価/lazy/parked/LMR/mypyc/root並列/native）。ベンチ=`tests/bench_decide.py` |
+| [`reports/cpu_search_accel_pypy_20260620.md`](reports/cpu_search_accel_pypy_20260620.md) | CPU 探索 高速化 調査（2026-06-20）。「速くした分を horizon に回す」目的の手順と対照。PyPy 実測 ~2.1x（改変ゼロ・挙動ビット一致・同一337step/280decide）＝horizon +1 相当。エンジンは stdlib-only で PyPy 動作実証・配信スタック互換のみ課題。高速化手段の総覧対照表（差分評価/lazy/parked/LMR/mypyc/root並列/native）。ベンチ=`tests/scripts/bench_decide.py` |
 | [`reports/pypy_migration_runbook_20260620.md`](reports/pypy_migration_runbook_20260620.md) | PyPy 移行 ランブック（2026-06-20）。方式選定（A 単一プロセス／B プロセス分離）→Phase0 互換スパイク→Phase1 移行→Phase2 Cloud Run デプロイ→Phase3 検証ゲート（CPython/PyPy 双方緑・挙動ビット一致）→Phase4 段階切替/ロールバック。配信スタック（pydantic-core/grpcio）の PyPy 非互換を方式Bで回避・`_USE_PYPY_WORKER` フラグで即ロールバック。リスク対照表つき |
 | [`reports/pypy_phase0_result_20260620.md`](reports/pypy_phase0_result_20260620.md) | PyPy 移行 Phase 0 互換スパイク 実行結果（2026-06-20）。pypi 実 install 判定：純依存（uvicorn/websockets/requests/h11）✅／**pydantic-core ❌（PyPy wheel 無し・PyO3 が 3.11 未満を拒否）**／**grpcio ❌（wheel 無し・ソースビルド長大）**。方式A（単一プロセス全 PyPy）の2大依存が PyPy で建たない |
 | [`reports/cpu_strength_plan_20260628.md`](reports/cpu_strength_plan_20260628.md) | CPU 強化 計画・設計＋**実測結論**（2026-06-28）。L1 単一系統化後、強化レバーを順に実装・計測した記録と総括（§K）。**結論＝検討した全レバーが「出荷済み／失敗済み／既出／幽霊」**で、現アーキ（L1 eval＋α-β/ビーム horizon=4＋PIMC K=4）の CPU は**達成可能上限に近い**。内訳: 速度系(PyPy/計画キャッシュ/ポンダリング/PV ordering/PIMC按分)=出荷済み／TT・地平線外静的項=失敗／L1係数SPSA=Elo余地≈0／①マリガン方策・④settle-PASS過大検出=幽霊(Elo中立・実測)／②隠れ情報サンプラ=既出(超幾何分布)／③動的時間配分=棄却。さらなる伸びは NNUE/ISMCTS 級の質的転換が要るが Python 1秒予算では棄却。**幽霊/失敗レバーの実装は §K の結論を受けて撤去済み（2026-06-28）** |
@@ -46,7 +46,7 @@
 OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -p no:cacheprovider
 
 # 全カード構造不変条件・挙動ベースライン
-OPCG_LOG_SILENT=1 python tests/full_card_audit.py
+OPCG_LOG_SILENT=1 python tests/harness/full_card_audit.py
 ```
 
 詳細な検証フローは [`TEST_SPEC.md`](TEST_SPEC.md) を参照。

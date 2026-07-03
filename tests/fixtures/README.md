@@ -4,8 +4,8 @@
 
 | ファイル | 生成/更新元 | 用途 |
 |---|---|---|
-| `full_card_baseline.json` | `python tests/full_card_audit.py --regen` | 全カード挙動ベースライン（`test_full_card_baseline.py` / `test_verified_buckets.py` が照合） |
-| `expected_effects.json` | `python tests/expected_effects.py --regen` | 期待挙動マニフェスト（`effect_oracle` が突き合わせ） |
+| `full_card_baseline.json` | `python tests/harness/full_card_audit.py --regen` | 全カード挙動ベースライン（`test_full_card_baseline.py` / `test_verified_buckets.py` が照合） |
+| `expected_effects.json` | `python tests/harness/expected_effects.py --regen` | 期待挙動マニフェスト（`effect_oracle` が突き合わせ） |
 | `heldout_decks.json` | 手動（ユーザ実対局リプレイの凍結入力） | held-out 実デッキ集合（`test_heldout_decks.py` が凍結検証） |
 
 > 配置規約（`docs/refactoring_tests_and_errors.md` 参照）: テストが読むデータは本ディレクトリ、
