@@ -34,13 +34,10 @@ from opcg_sim.src.core import cpu_ai
 from opcg_sim.api import decide_client
 from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.models import CardInstance
+from opcg_sim.src.utils.shared_constants import load_shared_constants, constants_hash
 
-def get_const():
-    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared_constants.json")
-    if os.path.exists(p):
-        with open(p, "r", encoding="utf-8") as f: return json.load(f)
-    return {}
-CONST = get_const()
+# 共有定数はローダ一本化（utils/shared_constants.py）。従来の get_const と同一挙動（失敗時 空 dict）。
+CONST = load_shared_constants()
 
 BASE_DIR = os.path.dirname(current_api_dir)
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -999,4 +996,7 @@ async def game_websocket_endpoint(websocket: WebSocket, game_id: str):
         game_ws_manager.disconnect(websocket, game_id)
 
 @app.get("/health")
-async def health(): return {"status": "ok", "constants_loaded": bool(CONST)}
+async def health():
+    # constants_hash: フロントが埋め込みハッシュと照合して定数の乖離（同期漏れ）を検出する契約照合用。
+    # （schema_hash は API スキーマ生成物の導入時＝契約一本化 D-4 で追加予定。）
+    return {"status": "ok", "constants_loaded": bool(CONST), "constants_hash": constants_hash()}
