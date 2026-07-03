@@ -60,7 +60,8 @@ def main():
                     src_id = at = None
                     if pend:
                         at = pend.get("action_type")
-                        src_id = card_id_of(m, pend.get("source_card_uuid"))
+                        src_id = (pend.get("source_card_name")
+                                  or card_id_of(m, pend.get("source_card_uuid")))
                     mv = cpu_learned.decide_learned(m, actor, sims=args.sims, rng=nrng)
                     if pend and mv and at in ("CONFIRM_OPTIONAL", "SELECT_TARGET", "FIELD_OVERFLOW_TRASH"):
                         pl = mv.get("payload") or {}
