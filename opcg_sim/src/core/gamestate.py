@@ -15,6 +15,7 @@ from .effects.resolver import EffectResolver
 from .effects.matcher import get_target_cards
 from .actions import apply_action as _apply_action
 from .engine import values as _values, guards as _guards
+from .engine import battle as _battle, turn_flow as _turn_flow
 from .engine import triggers as _triggers
 from .engine import card_moves as _card_moves, passives as _passives
 
@@ -854,113 +855,28 @@ class GameManager:
 
     def start_game(self, first_player: Optional[Player] = None):
         
-        self.p1.shuffle_deck()
-        self.p2.shuffle_deck()
-        
-        for p in [self.p1, self.p2]:
-            if p.leader:
-                for ability in p.leader.master.abilities:
-                    if ability.trigger == TriggerType.GAME_START:
-                        self.resolve_ability(p, ability, source_card=p.leader)
-                        
-                        if self.active_interaction:
-                            self.setup_phase_pending = True
-                            if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
-                            else: self.turn_player = self.p1; self.opponent = self.p2
-                            return
-
-        self.finish_setup()
-
-        if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
-        else: self.turn_player = self.p1; self.opponent = self.p2
-        # マリガンフェーズへ移行（両プレイヤーの確定後にゲーム開始）
-        self.phase = Phase.MULLIGAN
-        self.mulligan_done = JournaledSet()
+        return _turn_flow.start_game(self, first_player)
 
     def do_mulligan(self, player: 'Player') -> None:
-        """手札5枚全てをデッキ底に戻してシャッフル→5枚引き直す（全交換・1回限り）"""
-        if self.phase != Phase.MULLIGAN:
-            raise ValueError("マリガンフェーズではありません。")
-        if player.name in self.mulligan_done:
-            raise ValueError("既にマリガンを実施済みです。")
-        # 手札を全てデッキ底に戻す
-        hand_count = len(player.hand)
-        player.deck.extend(player.hand)
-        player.hand.clear()
-        random.shuffle(player.deck)
-        for _ in range(5):
-            if player.deck:
-                player.hand.append(player.deck.pop(0))
-        self.mulligan_done.add(player.name)
-        self._check_mulligan_complete()
+        return _turn_flow.do_mulligan(self, player)
 
     def keep_hand(self, player: 'Player') -> None:
-        """手札をキープしてマリガンをスキップ"""
-        if self.phase != Phase.MULLIGAN:
-            raise ValueError("マリガンフェーズではありません。")
-        if player.name in self.mulligan_done:
-            raise ValueError("既にマリガンを実施済みです。")
-        self.mulligan_done.add(player.name)
-        self._check_mulligan_complete()
+        return _turn_flow.keep_hand(self, player)
 
     def _check_mulligan_complete(self) -> None:
-        """両プレイヤーのマリガン確定後にゲーム開始"""
-        if self.p1.name in self.mulligan_done and self.p2.name in self.mulligan_done:
-            self.turn_count = 1
-            self.refresh_phase()
+        return _turn_flow._check_mulligan_complete(self)
 
     def finish_setup(self):
-        self.p1.place_life()
-        self.p1.draw_initial_hand()
-        self.p2.place_life()
-        self.p2.draw_initial_hand()
+        return _turn_flow.finish_setup(self)
 
     def end_turn(self):
-        self._validate_action(self.turn_player, "MAIN_ACTION")
-        self.phase = Phase.END
-        self._fire_turn_end_triggers()
-        # 「このターン終了時、〜」で予約された遅延アクションを解決する。
-        self._flush_pending_end_of_turn()
-        self.continuous.expire("TURN_END", self.turn_count)
-        self.switch_turn()
+        return _turn_flow.end_turn(self)
 
     def _fire_turn_end_triggers(self):
-        """ターン終了時トリガーを発火する。ターンプレイヤーの【自分のターン終了時】
-        (TURN_END) と、非ターンプレイヤーの【相手のターン終了時】(OPP_TURN_END)。"""
-        def _units(pl):
-            us = [pl.leader] + pl.field
-            if pl.stage: us.append(pl.stage)
-            return us
-        for pl, trig in ((self.turn_player, TriggerType.TURN_END),
-                         (self.opponent, TriggerType.OPP_TURN_END)):
-            for card in _units(pl):
-                if card and card.master.abilities:
-                    for ability in card.master.abilities:
-                        if ability.trigger == trig:
-                            self.resolve_ability(pl, ability, source_card=card)
+        return _turn_flow._fire_turn_end_triggers(self)
 
     def _flush_pending_end_of_turn(self):
-        """end_turn フックで、予約された遅延アクション（このターン終了時、〜）を解決する。"""
-        if not self.pending_end_of_turn:
-            return
-        pending = self.pending_end_of_turn
-        self.pending_end_of_turn = JournaledList()
-        for player, node, source_card in pending:
-            # 場を離れたカードのソース由来でも、トラッシュ送り等は対象解決時に弾かれる。
-            resolver = EffectResolver(self)
-            resolver.context["_flushing_delayed"] = True
-            resolver.execution_stack = [node]
-            try:
-                resolver._process_stack(player, source_card)
-            except Exception as e:
-                pass
-            for ev in resolver.action_history:
-                self.action_events.append({
-                    "type": "EFFECT", "player": player.name,
-                    "card_name": source_card.master.name,
-                    "action": ev.get("action", ""), "targets": ev.get("targets", []),
-                    "value": ev.get("value"), "success": ev.get("success", True),
-                })
+        return _turn_flow._flush_pending_end_of_turn(self)
 
     def _record_event_played(self, card):
         """イベントカード発動をターン内イベントとして記録する（「コストN以上のイベントを発動している」
@@ -979,72 +895,27 @@ class GameManager:
 
     def switch_turn(self):
         # ターンが切り替わる/追加ターンに入る = 新しいターン。ターン内イベント記録をクリアする。
-        self._turn_events = JournaledDict()
-        # 追加ターン（EXTRA_TURN）: 予約したプレイヤーがターンプレイヤーのまま継続する
-        if getattr(self, "pending_extra_turn", None) == self.turn_player.name:
-            self.pending_extra_turn = None
-            self.turn_count += 1
-            self.refresh_phase()
-            return
-        self.turn_player, self.opponent = self.opponent, self.turn_player
-        self.turn_count += 1
-        self.refresh_phase()
+        return _turn_flow.switch_turn(self)
 
     def refresh_phase(self):
-        self._reset_player_status(self.opponent); self.refresh_all(self.turn_player); self.draw_phase()
+        return _turn_flow.refresh_phase(self)
 
     def _reset_player_status(self, player: Player):
         # 相手ターン開始時に直前のターンプレイヤー(=現opponent)の一時効果を解除するが、
         # 付与ドン!!は剥がさない（持ち主の次のリフレッシュフェイズまでカードに残る）。
-        all_units = [player.leader] + player.field
-        if player.stage: all_units.append(player.stage)
-        for card in all_units:
-            # ターン境界のリセット。【ターン1回】の使用回数もここで戻す。
-            if card: card.reset_turn_status(keep_don=True, clear_usage=True)
+        return _turn_flow._reset_player_status(self, player)
 
     def refresh_all(self, player: Player):
-        all_units = [player.leader] + player.field
-        if player.stage: all_units.append(player.stage)
-        for card in all_units:
-            if card:
-                is_frozen = "FREEZE" in card.flags
-                # ターン境界のリセット。【ターン1回】の使用回数もここで戻す。
-                card.reset_turn_status(clear_usage=True)
-                if not is_frozen: card.is_rest = False
-        
-        # フリーズ中のドン!!（FREEZE_DON / OP07-026）は今回のリフレッシュではアクティブに
-        # 戻さず、レストのまま据え置いてフラグを下ろす（1回限りのフリーズ）。
-        still_frozen, to_activate = [], []
-        for don in player.don_rested:
-            if don.is_frozen:
-                don.is_frozen = False
-                still_frozen.append(don)
-            else:
-                don.is_rest = False
-                to_activate.append(don)
-        player.don_active.extend(to_activate)
-        player.don_rested = JournaledList(still_frozen)
-        
-        for don in player.don_attached_cards:
-            don.is_rest = False
-            don.attached_to = None
-            player.don_active.append(don)
-        player.don_attached_cards = JournaledList()
+        return _turn_flow.refresh_all(self, player)
 
     def draw_phase(self):
-        if self.turn_count > 1: self.draw_card(self.turn_player)
-        self.don_phase()
+        return _turn_flow.draw_phase(self)
 
     def don_phase(self):
-        cards_to_add = 1 if self.turn_count == 1 else 2
-        for _ in range(cards_to_add):
-            if self.turn_player.don_deck:
-                don = self.turn_player.don_deck.pop(0); self.turn_player.don_active.append(don)
-        self.main_phase()
+        return _turn_flow.don_phase(self)
 
     def main_phase(self): 
-        self.phase = Phase.MAIN
-        self._apply_passive_effects(self.turn_player)
+        return _turn_flow.main_phase(self)
 
     _REACTIVE_RE = re.compile(r'(された|した|受けた|なった)時、')
 
@@ -1076,95 +947,13 @@ class GameManager:
         return _card_moves.pay_cost(self, player, cost, don_list)
 
     def has_blocker(self, player: Player) -> bool:
-        for card in player.field:
-            if (not card.is_rest and card.has_keyword("ブロッカー")
-                    and "BLOCKER_DISABLED" not in card.flags
-                    and "CANNOT_REST" not in card.timed_flags):
-                return True
-        return False
+        return _battle.has_blocker(self, player)
 
     def declare_attack(self, attacker: Card, target: Card):
-        attacker_owner, _ = self._find_card_location(attacker)
-        target_owner, _ = self._find_card_location(target)
-        self._validate_action(attacker_owner, "MAIN_ACTION")
-        # 先攻・後攻ともに「自分の最初のターン」はリーダー・キャラのいずれもアタックできない（公式準拠）。
-        # ターンは先攻=turn_count 1、後攻=turn_count 2 と交互に進むため、turn_count <= 2 が
-        # 両プレイヤーの最初のターンを覆う。
-        if self.turn_count <= 2:
-            raise ValueError("最初のターンはアタックできません。")
-        if "ATTACK_DISABLE" in attacker.flags or "ATTACK_DISABLE" in attacker.timed_flags: raise ValueError("このカードは効果によりアタックできません。")
-        if "CANNOT_REST" in attacker.timed_flags: raise ValueError("このカードは効果によりレストにできないためアタックできません。")
-        if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
-        # 召喚酔い: 登場したターンのキャラは攻撃できない。ただし「速攻」を持てば可。
-        # リーダーは is_newly_played=False のため影響を受けない。
-        if (attacker.master.type == CardType.CHARACTER
-                and attacker.is_newly_played
-                and not attacker.has_keyword("速攻")):
-            raise ValueError("登場したターンのキャラクターは攻撃できません（速攻を除く）。")
-        # 自己制限（self_cannot）:「リーダーにアタックできない」。相手リーダーへの攻撃宣言を弾く。
-        if (target.master.type == CardType.LEADER
-                and attacker_owner is not None
-                and self._active_restriction(attacker_owner, "CANNOT_ATTACK_LEADER")):
-            raise ValueError("効果により、このターンはリーダーにアタックできません。")
-        if (target.master.type == CardType.CHARACTER and not target.is_rest
-                and not attacker.has_keyword("ATTACK_ACTIVE")):
-            raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
-        # アタック税（OP08-043「アタックする際、自身の手札N枚を捨てなければアタックできない」）。
-        # 付与された ATTACK_TAX_DISCARD_N フラグがあれば、手札N枚を支払えるときのみアタック可。
-        tax_flags = [f for f in (attacker.flags | attacker.timed_flags)
-                     if isinstance(f, str) and f.startswith("ATTACK_TAX_DISCARD_")]
-        if tax_flags:
-            need = max(int(f.rsplit("_", 1)[1]) for f in tax_flags)
-            if len(attacker_owner.hand) < need:
-                raise ValueError(f"アタックするには手札{need}枚を捨てる必要があり、手札が足りません。")
-            # コスト支払い: 手札N枚を捨てる。どの札を捨てるかは本来プレイヤー選択だが、宣言経路を
-            # 中断させないため先頭からN枚を捨てる（捨て札選択の対話化は今後の課題）。
-            for _ in range(need):
-                attacker_owner.trash.append(attacker_owner.hand.pop(0))
-        attacker.is_rest = True
-        self.active_battle = JournaledDict({"attacker": attacker, "target": target, "attacker_owner": attacker_owner, "target_owner": target_owner, "counter_buff": 0})
-
-        # アタック時/相手のアタック時トリガーを順に解決する。途中でいずれかが対象選択や
-        # 選択(Choice)で中断した場合、解決前にブロッカー/カウンター段階へ進むと、未解決の
-        # interaction とカウンター操作が衝突する（"期待:CHOICE" エラー）。トリガーを待ち行列に
-        # 積み、_advance_battle_triggers で1つずつ解決し、全て片付いてからフェイズ遷移する。
-        triggers = []
-        if attacker.master.abilities:
-            for ability in attacker.master.abilities:
-                if ability.trigger == TriggerType.ON_ATTACK:
-                    triggers.append((attacker_owner, ability, attacker))
-                # 「このキャラがレストになった時」(ON_REST) はアタック宣言で自身がレストになった
-                # 瞬間に誘発する（要因＝アタックなので「効果で」限定の能力は対象外）。
-                # OP14-119/027/028/032/035 等。CONTEXT/ターン1回条件は resolve_ability が評価。
-                elif (ability.trigger == TriggerType.ON_REST
-                      and self._rest_subject_matches(ability, attacker, attacker,
-                                                     attacker_owner, by_attack=True)):
-                    triggers.append((attacker_owner, ability, attacker))
-        opp_cards = ([target_owner.leader] if target_owner.leader else []) + target_owner.field
-        for card in opp_cards:
-            for ability in card.master.abilities:
-                if ability.trigger == TriggerType.ON_OPP_ATTACK:
-                    triggers.append((target_owner, ability, card))
-        self._battle_triggers = JournaledList(triggers)
-        self._advance_battle_triggers()
+        return _battle.declare_attack(self, attacker, target)
 
     def _advance_battle_triggers(self):
-        """積んだバトルトリガーを順に解決し、全て解決後に防御フェイズへ遷移する。
-        途中で interaction が立ったら中断（resolve_interaction が解決後に再度呼ぶ）。"""
-        if not self.active_battle:
-            self._battle_triggers = JournaledList()
-            return
-        while getattr(self, "_battle_triggers", None):
-            player, ability, card = self._battle_triggers.pop(0)
-            self.resolve_ability(player, ability, source_card=card)
-            if self.active_interaction:
-                return  # 中断: 解決後に resolve_interaction から再開される
-        # 全トリガー解決 → ブロッカー/カウンター段階へ
-        target_owner = self.active_battle["target_owner"]
-        if self.has_blocker(target_owner):
-            self.phase = Phase.BLOCK_STEP
-        else:
-            self.phase = Phase.BATTLE_COUNTER
+        return _battle._advance_battle_triggers(self)
 
     # --- 誘発能力（ライフ公開【トリガー】/ON_LIFE_DECREASE 等）の汎用待ち行列 ---
     def _enqueue_trigger(self, player: Player, ability: Ability, card: CardInstance,
@@ -1181,140 +970,28 @@ class GameManager:
         return _triggers._suspend_for_trigger_confirm(self, item)
 
     def handle_block(self, blocker: Optional[Card] = None):
-        if not self.active_battle: return
-        target_owner = self.active_battle["target_owner"]; self._validate_action(target_owner, "SELECT_BLOCKER")
-        if blocker:
-            blocker.is_rest = True
-            self.active_battle["target"] = blocker
-            # 【ブロック時】効果を発動する（従来は未発火＝14枚が no-op だった）。
-            if blocker.master.abilities and not blocker.is_effect_negated and not blocker.negated:
-                for ability in blocker.master.abilities:
-                    if ability.trigger == TriggerType.ON_BLOCK:
-                        self.resolve_ability(target_owner, ability, source_card=blocker)
-            if self.active_interaction:
-                # ブロック時効果が対象選択等で中断した場合はここで返す（resume が継続）。
-                return
-        self.phase = Phase.BATTLE_COUNTER;
+        return _battle.handle_block(self, blocker)
 
     def apply_counter(self, player: Player, counter_card: Optional[Card] = None, don_list: Optional[List[DonInstance]] = None):
-        if not self.active_battle: return
-        if counter_card is None: self.resolve_attack(); return
-        self._validate_action(player, "SELECT_COUNTER")
-        if counter_card.master.type == CardType.EVENT:
-            self.pay_cost(player, counter_card.master.cost, don_list)
-            for ability in counter_card.master.abilities:
-                if ability.trigger == TriggerType.COUNTER: self.resolve_ability(player, ability, source_card=counter_card)
-            # 「自分のキャラすべては、このターン中、…代わりに〜できる」(EB02-030) のような
-            # 継続付与型の置換を登録する。イベントは即トラッシュで場に残らないため、
-            # _find_replacement の場上 protector 走査では拾えない。player へ this-turn 付与する。
-            self._register_granted_replacements(player, counter_card)
-            self.move_card(counter_card, Zone.TRASH, player)
-        else:
-            counter_value = getattr(counter_card, "current_counter", counter_card.master.counter or 0); self.active_battle["counter_buff"] += counter_value
-            self.move_card(counter_card, Zone.TRASH, player)
+        return _battle.apply_counter(self, player, counter_card, don_list)
 
     def resolve_attack(self):
-        if not self.active_battle: return
-        attacker = self.active_battle["attacker"]; target = self.active_battle["target"]
-        attacker_owner = self.active_battle["attacker_owner"]; target_owner = self.active_battle["target_owner"]
-        counter_buff = self.active_battle.get("counter_buff", 0)
-        is_my_turn = (attacker_owner == self.turn_player); is_target_turn = (target_owner == self.turn_player)
-        attacker_pwr = attacker.get_power(is_my_turn); target_pwr = target.get_power(is_target_turn) + counter_buff
-        life_lost = 0
-        if target == target_owner.leader:
-            if attacker_pwr >= target_pwr:
-                damage_amount = 2 if attacker.has_keyword("ダブルアタック") else 1; is_banish = attacker.has_keyword("バニッシュ")
-                for _ in range(damage_amount):
-                    if target_owner.life:
-                        life_card = target_owner.life.pop(0)
-                        dest_zone = Zone.TRASH if is_banish else Zone.HAND
-                        trigger_ability = None if is_banish else next(
-                            (a for a in life_card.master.abilities if a.trigger == TriggerType.TRIGGER), None
-                        )
-                        self.move_card(life_card, dest_zone, target_owner)
-                        life_lost += 1
-                        # 【トリガー】は「発動できる」（任意）。即時解決せず確認付きで待ち行列へ。
-                        # 複数枚（ダブルアタック等）でも確認/解決が中断を跨いで消失しない。
-                        if trigger_ability:
-                            self._enqueue_trigger(target_owner, trigger_ability, life_card, optional=True)
-                    else: self.winner = attacker_owner.name; break
-        else:
-            if attacker_pwr >= target_pwr:
-                if self._active_protection(target, ("BATTLE_KO",), attacker=attacker):
-                    pass
-                else:
-                    repl = self._find_replacement(target, ("BATTLE_KO",))
-                    if repl is not None and getattr(repl[3], "is_optional", False):
-                        # 任意のバトルKO置換（「代わりに〜してもよい/できる」OP10-034 等）は、
-                        # 被KO側に「代わりの効果を使うか」を確認するため戦闘を中断する。
-                        # accept→置換実行（本来のKOをスキップ）、decline→本来のKOを実行。
-                        # どちらの分岐も resume 時に _finish_attack で戦闘後処理を行う。
-                        self._suspend_for_battle_ko_replacement(target, target_owner, life_lost)
-                        return
-                    elif repl is not None:
-                        # 任意でない置換は従来どおり即時実行（内側選択はヘッドレス自動解決）。
-                        self._active_replacement(target, ("BATTLE_KO",))
-                    else:
-                        self.move_card(target, Zone.TRASH, target_owner)
-                        self._resolve_on_ko(target, target_owner, cause="BATTLE")
-
-        self._finish_attack(target, target_owner, life_lost)
+        return _battle.resolve_attack(self)
 
     def _finish_attack(self, target: Card, target_owner: Player, life_lost: int):
-        """戦闘解決後の共通後処理。インラインのバトルKO判定からも、任意バトルKO置換の
-        確認(CONFIRM_OPTIONAL)からの resume からも呼ばれる。"""
-        target.reset_turn_status(keep_don=True); self.active_battle = None; self.phase = Phase.MAIN; self.check_victory()
-        self.continuous.expire("BATTLE_END", self.turn_count)
-        if not self.winner:
-            self._apply_passive_effects(self.turn_player)
-        # ライフが離れた回数ぶん ON_LIFE_DECREASE を待ち行列へ積み、【トリガー】と共に消化する。
-        if life_lost and not self.winner:
-            self._enqueue_life_decrease(target_owner, life_lost)
-        self._advance_pending_triggers()
+        return _battle._finish_attack(self, target, target_owner, life_lost)
 
     def _suspend_for_battle_ko_replacement(self, target: Card, target_owner: Player, life_lost: int):
-        """任意のバトルKO置換を被KO側へ確認するため戦闘を中断する（CONFIRM_OPTIONAL）。
-        resume 時: accept→置換実行（KOスキップ）／decline→本来のKO、その後 _finish_attack。
-        ヘッドレス/CPU の既定応答(index0=accept)は従来の自動採用と一致する。"""
-        self.active_interaction = {
-            "player_id": target_owner.name,
-            "action_type": "CONFIRM_OPTIONAL",
-            "source_card_name": target.master.name,
-            "source_card_uuid": target.uuid,
-            "message": f"「{target.master.name}」がバトルでKOされます。代わりの効果を使用しますか？",
-            "can_skip": True,
-            "continuation": {
-                "kind": "BATTLE_KO_REPLACE",
-                "source_card_uuid": target.uuid,
-                "target_owner_name": target_owner.name,
-                "life_lost": life_lost,
-            },
-        }
+        return _battle._suspend_for_battle_ko_replacement(self, target, target_owner, life_lost)
 
     def check_victory(self):
         # デッキアウト: 通常は本人の敗北（相手の勝利）。ただし C10「自分のデッキが0枚に
         # なった場合、敗北する代わりに勝利する」(VICTORY/REPLACE_DECKOUT_LOSS) を持つ場合は
         # 本人の勝利へ置換する（OP03-040 ナミ等）。
-        if not self.p1.deck:
-            self.winner = self.p1.name if self._has_deckout_win_replace(self.p1) else self.p2.name
-        elif not self.p2.deck:
-            self.winner = self.p2.name if self._has_deckout_win_replace(self.p2) else self.p1.name
+        return _battle.check_victory(self)
 
     def _has_deckout_win_replace(self, player) -> bool:
-        """player がデッキアウト時の敗北→勝利の置換能力(PASSIVE)を持つか。"""
-        units = [player.leader] + list(player.field)
-        for card in units:
-            if not card or not getattr(card, "master", None) or getattr(card, "negated", False):
-                continue
-            if getattr(card, "is_effect_negated", False):
-                continue
-            for ab in card.master.abilities:
-                if ab.trigger != TriggerType.PASSIVE:
-                    continue
-                eff = self._find_action(ab.effect, ActionType.VICTORY)
-                if eff is not None and eff.status == "REPLACE_DECKOUT_LOSS":
-                    return True
-        return False
+        return _battle._has_deckout_win_replace(self, player)
 
     def play_card_action(self, player: Player, card: Card):
         if card not in player.hand: return
