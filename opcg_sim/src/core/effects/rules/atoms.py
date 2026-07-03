@@ -2988,7 +2988,7 @@ def _scoped_negate_opp_onplay(ctx: ParseContext) -> Optional[GameAction]:
 # ---------------------------------------------------------------------------
 # 自己制限: 「自分は、（このターン中、）...できない/られない」
 #   → RULE_PROCESSING + status=制限キー。
-#   述語を判別して具体的な制限キーを付け、エンジン(gamestate.SELF_RESTRICTION_KEYS)が
+#   述語を判別して具体的な制限キーを付け、エンジン(rules_constants.SELF_RESTRICTION_KEYS)が
 #   player.restrictions に記録して各アクション地点で enforce する。
 #   「自分の効果でライフを手札に加えられない」「キャラ（コストN以上）を登場できない」
 #   「リーダーにアタックできない」「カードを引けない」「ドン‼をアクティブにできない」等。

@@ -3,6 +3,7 @@ import os, sys, cProfile, pstats, io, random
 os.environ.setdefault("OPCG_LOG_SILENT", "1")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+import _bootstrap  # noqa: E402,F401  (tests/harness を path に載せる＝cpu_selfplay 等を解決)
 from opcg_sim.src.core.gamestate import GameManager, Player
 from opcg_sim.src.core import action_api, cpu_ai
 from cpu_selfplay import _load_db, build_deck
