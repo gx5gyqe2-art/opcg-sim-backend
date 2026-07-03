@@ -23,7 +23,7 @@ from opcg_sim.src.utils.loader import CardLoader
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "opcg_sim", "data", "opcg_cards.json")
 BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "full_card_baseline.json")
+                        "fixtures", "full_card_baseline.json")
 
 # §8.2 台帳で「✓（一巡済み）」とした弾の接頭辞。これらは弾×色で検証済み。
 VERIFIED_SET_RE = re.compile(r'^(OP\d{2}|EB\d{2}|PRB\d{2}|ST\d{2}|P)-')
