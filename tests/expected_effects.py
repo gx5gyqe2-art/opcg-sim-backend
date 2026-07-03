@@ -29,8 +29,8 @@ from opcg_sim.src.utils.loader import CardLoader
 from golden.summarize import summarize_ability, _enum_name
 
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "opcg_sim", "data")
-OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "expected_effects.json")
-OVERRIDES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "expected_overrides.json")
+OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "expected_effects.json")
+OVERRIDES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "expected_overrides.json")
 
 
 def _walk_actions(node):

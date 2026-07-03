@@ -32,7 +32,7 @@ from opcg_sim.src.utils.loader import CardLoader
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                     "opcg_sim", "data")
 BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "full_card_baseline.json")
+                        "fixtures", "full_card_baseline.json")
 
 
 def _total_cards(p) -> int:

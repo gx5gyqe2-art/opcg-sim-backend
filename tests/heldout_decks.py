@@ -10,7 +10,7 @@ import os
 from opcg_sim.src.models.models import CardInstance
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-PATH = os.path.join(_HERE, "heldout_decks.json")
+PATH = os.path.join(_HERE, "fixtures", "heldout_decks.json")
 
 
 def load_spec():
