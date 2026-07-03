@@ -1,11 +1,9 @@
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from opcg_sim.src.models.enums import CardType, Attribute
-from opcg_sim.src.utils.shared_constants import load_shared_constants
-
-# 共有定数はローダ一本化（utils/shared_constants.py）。従来どおり失敗時は空 dict＝
+# 共有定数は config へ委譲（ローダは utils/shared_constants.py に一本化）。失敗時は空 dict＝
 # 各 Field の alias 既定値（'uuid' 等）にフォールバックする。
-CONST = load_shared_constants()
+from .config import CONST
 
 TYPE_MAP = {e.value: e.name for e in CardType}
 ATTR_MAP = {e.value: e.name for e in Attribute}
