@@ -1,5 +1,5 @@
 """検証①堅牢化: 出荷Gen2 vs 本番L1(PIMC4) を全3 held-out実デッキで測る。
---fair で決定化の透視を止め（fair_determinize=True）、勝ちが探索カンニング由来か切り分ける。
+出荷設定（決定化=相手手札のみ再サンプル）での勝率を席替えで測定する。
 """
 import argparse
 import random
@@ -9,7 +9,6 @@ import heldout_decks as HD
 from cpu_selfplay import _load_db
 from opcg_sim.src.core.gamestate import GameManager, Player
 from opcg_sim.src.core import cpu_ai, cpu_learned
-from opcg_sim.src.learned.adapter import OPCGGame
 
 
 def main():
@@ -19,7 +18,6 @@ def main():
     ap.add_argument("--pimc", type=int, default=4)
     ap.add_argument("--ply-cap", type=int, default=550)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--fair", action="store_true", help="公平決定化（透視禁止）に差し替え")
     args = ap.parse_args()
 
     db = _load_db()
@@ -27,11 +25,7 @@ def main():
     nrng = np.random.default_rng(args.seed)
 
     cpu_learned._lazy_init()
-    det = "opponent-only(出荷=透視疑い)"
-    if args.fair:
-        cpu_learned._STATE["game"] = OPCGGame(fair_determinize=True)
-        det = "fair(透視禁止)"
-    print(f"determinize={det} sims={args.sims} pimc={args.pimc} pairs={args.pairs}\n", flush=True)
+    print(f"determinize=出荷(相手手札のみ) sims={args.sims} pimc={args.pimc} pairs={args.pairs}\n", flush=True)
 
     for did in HD.deck_ids():
         w = n = 0

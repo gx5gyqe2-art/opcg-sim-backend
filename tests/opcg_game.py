@@ -61,8 +61,7 @@ class OPCGGame:
         return cpu_ai._apply_clone(state, actor_name, move)
 
     def determinize(self, state, me_name, rng):
-        """探索の世界線を固定＝相手の伏せ手札を再サンプリングしたクローンを返す（PIMC・GATE B〜P3 の
-        レガシー研究用。v4b の透視禁止は本番 adapter の fair_determinize と selfplay_loop 側で扱う）。"""
+        """探索の世界線を固定＝相手の伏せ手札を再サンプリングしたクローンを返す（PIMC）。"""
         return cpu_ai._determinize_opponent(state, me_name, rng)
 
     def value(self, state, to_move):
