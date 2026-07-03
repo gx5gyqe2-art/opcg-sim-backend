@@ -4,7 +4,17 @@
 ActionType をキーにしたハンドラ表へ置き換える。ハンドラは import 時に登録され、以後不変。
 
 ホットパス（make/unmake 探索）配慮のため context オブジェクトは作らず、位置引数で渡す:
-    game_handler:  (gm, player, action, targets, value, source_card) -> bool
+    game_handler:   (gm, player, action, targets, value, source_card) -> bool
+    target_handler: (gm, player, action, target, owner, source_list, value, source_card) -> None
+
+戻り値の契約（重要）:
+  - game_handler は **必ず明示的に `bool` を返す**。resolver が戻り値（success）で後続処理を
+    ゲートする（例: resolver.py の LEADER_DREW_BY_EFFECT 記録・TRASH_FROM_DECK の公開カード記録・
+    §7-5「1枚につき」スケーリング）。暗黙の `return None` は success を falsy にし、これらを
+    無言でスキップさせるバグになる（例外は出ない）。`False` はコスト不払い等の失敗時のみ
+    （現状 MOVE_ATTACHED_DON のみ）。
+  - target_handler は 1 対象への適用（`None` 返し）。成否は run_target_loop が常に True で集約する
+    （対象ループ側で失敗シグナルは持たない）。未登録 ActionType は no-op（ランナーがフォールスルー）。
 """
 from typing import Callable, Dict, Optional, Tuple
 from ...models.enums import ActionType

@@ -21,7 +21,10 @@ Card = CardInstance
 # 6体目を登場させた場合は自分のキャラ1体を選んでトラッシュして5体に戻す（強制トラッシュ）。
 FIELD_LIMIT = 5
 
-# 自己制限（self_cannot）の制限キーは rules_constants に集約（actions と共有）。後方互換で再エクスポート。
+# 自己制限（self_cannot）の制限キーの正本は rules_constants.py（actions と共有＝循環回避の葉）。
+# ここは後方互換の再エクスポート（恒久・公開エイリアス）。新規参照は rules_constants から import する
+# こと（gamestate は resolver/matcher/atoms より下流なので、それら上流から本エイリアスを import すると
+# 循環する）。
 from .rules_constants import SELF_RESTRICTION_KEYS  # noqa: E402,F401
 
 
@@ -2273,8 +2276,8 @@ class GameManager:
 
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int, source_card: Optional[CardInstance] = None) -> bool:
         # アクション適用はレジストリ・ディスパッチ（core/actions）へ委譲する。プレイヤーレベル・
-        # アクションは actions.player_level のハンドラ、対象ループは _apply_action_target_loop が担う
-        # （公開シグネチャ・挙動は不変）。
+        # アクションは actions.player_level のハンドラ、対象ループは actions.target_loop.run_target_loop
+        # が担う（公開シグネチャ・挙動は不変）。
         return _apply_action(self, player, action, targets, value, source_card)
 
     def get_dynamic_value(self, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict) -> int:
