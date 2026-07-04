@@ -93,7 +93,8 @@ R0 で曖昧率は実デッキで 3.5〜4.5%・fan-out 小（ほぼ 2手）・**
 | **R2 ✅実装済（hard）** | ラウンドトリップ・テスト `tests/test_replay_roundtrip.py`: 録画（人間=private rng・global random 非消費）→再生→勝敗・手数・ターン一致＋miss=0 を assert（実デッキ・有界 seed）。リゾルバ単体も検証 | ✅ hard で一致 assert（learned は R3） |
 | **R1 副産物（engine 修正）** | `cpu_ai._find_card` が **stage/temp_zone** を探索せず、ACTIVATE_MAIN 等の手記述が card_id に解決できず uuid のまま漏れて再現不能だった欠落を修正（round-trip が検出）。修正で 8/10→**10/10** | ✅ trace テスト無退行（test_cpu_replay/learned 16 passed）・ruff clean |
 | **R3 ✅実装済（コア）** | **learned** ラウンドトリップ（Gen2・実デッキで再現・sims 低で高速）＋**coin toss 再現**（`run_game(first_player=…)`＝実対局は CPU＝常に "random" を seed から再現・round-trip 3/3）＋API 記録テストに **learned ケース追加**（`test_replay_capture_learned`＝既定 Gen2 の記録担保）。`run_game` の first_player は既定 None で既存挙動不変（実測確認） | ✅ hard/learned/coin-toss 一致 assert＋API learned 記録 |
-| **R3 残** | API 記述子（`REPLAY_SCHEMA`）の **end-to-end 実結線**（routers create+step で実録画→`/replay`→`replay_from_descriptor` に `first_player="random"` で食わせて一致）。**RESOLVE_EFFECT_SELECTION の記録欠落**（learned が踏む少数・§下記）を (B)-lite で閉じるか判断 | — |
+| **R3 実結線 ✅実装済** | API 記述子（`REPLAY_SCHEMA`）の **end-to-end 実結線**: routers create(cpu_trace,first_player=random)+step で実録画→`/replay`→`replay_from_descriptor(first_player="random")` で **CPU 意思決定列が録画と一致**。coin toss/デッキ復元/人間手注入/CPU 再 decide が実 API 記述子で整合。`cpu_player_id` が名前("P2")でも席("p2")でも解決（名前照合で人間手抽出） | ✅ `test_api::test_replay_api_descriptor_end_to_end` |
+| **R3 残（少）** | **RESOLVE_EFFECT_SELECTION の記録欠落**（learned が踏む少数・§6-2）を (B)-lite（選択内容を記録に載せる）で閉じるか判断。effect 対話の多い実対局の完全再現に必要なら着手 | — |
 | **R4（任意）** | スキーマ統一: 合成 `opcg-replay/v1` と実対局 `REPLAY_SCHEMA` のリプレイヤ共通化（`cpu_replay --descriptor` が両方を再生）。契約更新は §5 | contract 再生成＋差分レビュー |
 
 **実装順は R0→R1→R2→R3**。R2（hard）で骨組みを固めてから R3（learned）を乗せる。

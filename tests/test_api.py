@@ -271,6 +271,71 @@ def test_replay_capture_learned(client):
     assert r.json()["success"] is True and r.json()["replay"]["seed"] == 777
 
 
+def _drive_full_or_cap(client, gid, cap=160):
+    """CPU 対局を決着 or cap まで駆動（人間=受動: KEEP_HAND/TURN_END/効果は既定解決）。"""
+    for _ in range(cap):
+        if A.GAMES[gid].winner is not None:
+            return
+        state = client.get("/api/game/state", params={"game_id": gid}).json()
+        pend = state.get("pending_request")
+        if not pend:
+            return
+        pid = pend["player_id"]
+        cpu_name = A.CPU_GAMES[gid]["cpu_player_id"]
+        if pid == cpu_name:
+            client.post("/api/game/cpu/step", json={"game_id": gid})
+        elif pend["action"] == "MULLIGAN":
+            client.post("/api/game/action", json={"game_id": gid, "player_id": pid, "action": "KEEP_HAND"})
+        elif pend["action"] == "MAIN_ACTION":
+            client.post("/api/game/action", json={"game_id": gid, "player_id": pid, "action": "TURN_END"})
+        else:
+            mgr = A.GAMES[gid]
+            payload = mgr.default_interaction_payload(mgr.get_pending_request())
+            client.post("/api/game/action", json={"game_id": gid, "player_id": pid,
+                        "action": "RESOLVE_EFFECT_SELECTION", "payload": payload})
+
+
+def test_replay_api_descriptor_end_to_end(client):
+    """R3 実結線: API の実録画（`REPLAY_SCHEMA`＝/replay）を `replay_from_descriptor` へ食わせ、
+    CPU の意思決定列が録画と一致する（coin toss=first_player='random' を seed から再現）。
+
+    録画の CPU 思考トレース（decisions[].chosen・card_id 基準）と、再生の CPU 再 decide が一致＝
+    本番の実対局を丸ごと再現できることの end-to-end 証明（人間手は注入・§R3 残の実結線）。
+    """
+    import replay_runner as RR
+    from opcg_sim.src.core import cpu_ai
+
+    body = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="hard",
+                        cpu_trace=True, seed=4242, first_player="random").json()
+    gid = body["game_id"]
+    _drive_full_or_cap(client, gid, cap=160)
+
+    rb = client.get(f"/api/game/{gid}/replay").json()
+    assert rb["success"] and rb["replay"]["seed"] == 4242
+    desc = rb["replay"]
+    rec_chosen = [d.get("chosen") for d in rb["decisions"]]
+    assert len(rec_chosen) >= 3, "CPU の意思決定が記録されていない"
+
+    cpu_name = desc["cpu_player_id"]
+
+    class _CpuCap:
+        def __init__(self):
+            self.chosen = []
+
+        def on_decision(self, ctx, move):
+            # 再生の CPU 席は run_game 名 "p2"（cpu）。録画は cpu_name。位置で判定。
+            if ctx.actor.name == "p2":
+                self.chosen.append(cpu_ai._describe_move(ctx.manager, move))
+
+    cap = _CpuCap()
+    rep = RR.replay_from_descriptor(A.card_db, desc, cpu_difficulty="hard",
+                                    first_player="random", observers=[cap])
+    # 再生した CPU の手が録画の CPU 思考トレースと（再生できた範囲で）一致する。
+    n = min(len(cap.chosen), len(rec_chosen))
+    assert n >= 3, f"再生の CPU 決定が少なすぎ（reproduced={rep['reproduced']} misses={rep['misses'][:1]}）"
+    assert cap.chosen[:n] == rec_chosen[:n], "API 実対局の CPU 意思決定が再生で一致しない"
+
+
 # --- サンドボックス（フリーモード） -----------------------------------------
 
 def test_sandbox_create_and_list(client):

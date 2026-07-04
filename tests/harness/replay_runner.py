@@ -104,20 +104,23 @@ def replay_from_descriptor(db, descriptor: Dict[str, Any], cpu_difficulty: Optio
     """
     seed = descriptor["seed"]
     fp_mode = first_player if first_player is not None else descriptor.get("first_player_mode")
-    cpu_pid = descriptor["cpu_player_id"]
+    # cpu_player_id は API 実対局では**プレイヤー名**（"P2" 等）・合成録画では席キー（"p2"）。
+    # run_game の席は常に "p1"/"p2"。API 慣習で CPU=player2＝席 "p2"（名前が p1/p2 ならそれを採用）。
+    # 人間手の抽出は**名前 != cpu_name** で行う（席キーでなく記録の player 名で照合）。
+    cpu_name = descriptor["cpu_player_id"]
+    cpu_pid = cpu_name if cpu_name in ("p1", "p2") else "p2"
     human_pid = "p1" if cpu_pid == "p2" else "p2"
     diff = cpu_difficulty or descriptor.get("difficulty", "hard")
     leaders = descriptor.get("leaders", {})
     decks = descriptor["decks"]
 
     def _deck_builder(_db, _seed):
-        hl = human_pid
         l_p1, c_p1 = build_deck_from_ids(_db, leaders.get("p1"), decks["p1"], "p1")
         l_p2, c_p2 = build_deck_from_ids(_db, leaders.get("p2"), decks["p2"], "p2")
         return l_p1, c_p1, l_p2, c_p2
 
     human_actions = [a for a in descriptor.get("actions", [])
-                     if a.get("player") == human_pid]
+                     if a.get("player") != cpu_name]
     human_seat = _HumanReplaySeat(human_actions)
     seats = {human_pid: human_seat, cpu_pid: _cpu_seat(diff, sims)}
 
