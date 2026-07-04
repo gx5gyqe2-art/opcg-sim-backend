@@ -301,7 +301,8 @@ def run_game(seed: int, db, *, seats: Dict[str, Callable],
              legal_moves: str = "check",
              invariants: str = "raise",
              stop_after_decisions: Optional[int] = None,
-             trace_tail: Optional[List] = None) -> Optional[GameResult]:
+             trace_tail: Optional[List] = None,
+             first_player: Optional[str] = None) -> Optional[GameResult]:
     """1 局を決定論的に進める統一ループ。observer で観測し、seat で意思決定する。
 
     seats: {"p1": seat_fn, "p2": seat_fn}（`seat_fn(ctx) -> move`）。
@@ -329,7 +330,16 @@ def run_game(seed: int, db, *, seats: Dict[str, Callable],
         raise RuntimeError("リーダーを含むデッキを構築できませんでした。")
 
     manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
-    manager.start_game()
+    # first_player の再現（実対局リプレイ）: "random"＝コイントス（global random を 1 消費＝API と同順）／
+    # "p1"/"p2"＝明示（消費なし）／None＝既定（`start_game()` 相当・既存ハーネスは全てこれ＝挙動不変）。
+    # デッキ復元は乱数を消費しないので、seed 直後のこの位置が API の coin toss と同じ乱数位置。
+    if first_player == "random":
+        fp = random.choice([manager.p1, manager.p2])
+        manager.start_game(fp)
+    elif first_player in ("p1", "p2"):
+        manager.start_game(manager.p1 if first_player == "p1" else manager.p2)
+    else:
+        manager.start_game()
 
     pending_props = action_api.CONST.get("PENDING_REQUEST_PROPERTIES", {})
     KEY_PID = pending_props.get("PLAYER_ID", "player_id")

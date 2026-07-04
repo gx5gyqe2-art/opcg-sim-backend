@@ -61,6 +61,13 @@ def _key(desc: Optional[Dict[str, Any]]):
     return (desc.get("action_type"), desc.get("card"), tuple(desc.get("targets") or ()))
 
 
+def _cpu_seat(difficulty: str, sims: int = 160):
+    """再生・録画の CPU 席を作る（learned=Gen2 席／それ以外=L1 arena 席）。record/replay で共通。"""
+    if difficulty == "learned":
+        return make_seat(kind="learned", sims=sims)
+    return make_seat(difficulty, kind="arena")
+
+
 class _HumanReplaySeat:
     """記録された人間アクション列を順に注入する席（`seat(ctx)->move`）。"""
 
@@ -84,14 +91,19 @@ class _HumanReplaySeat:
 # --- 再生本体 ----------------------------------------------------------------
 
 def replay_from_descriptor(db, descriptor: Dict[str, Any], cpu_difficulty: Optional[str] = None,
-                           sims: int = 160, observers=()) -> Dict[str, Any]:
+                           sims: int = 160, observers=(),
+                           first_player: Optional[str] = None) -> Dict[str, Any]:
     """記述子から実対局を再構築・再生し、勝敗・思考トレース・診断を返す。
 
     `descriptor`: {seed, first_player, cpu_player_id, leaders:{p1,p2}, decks:{p1,p2}, actions:[...]}。
     人間＝`cpu_player_id` 以外の席（記録アクション注入）、CPU＝`cpu_player_id`（再 decide）。
     `cpu_difficulty` 省略時は descriptor の difficulty（learned/hard）。
+    `first_player`（コイントス再現）: 省略時は `descriptor["first_player_mode"]`（合成録画が保存）。
+    API 実対局は CPU 対局＝常に "random"（`RealGame.tsx` は `vsCpu ? 'random' : …`）なので、
+    API 記述子を食うときは `first_player="random"` を渡す（seed から coin toss を再現＝乱数列一致）。
     """
     seed = descriptor["seed"]
+    fp_mode = first_player if first_player is not None else descriptor.get("first_player_mode")
     cpu_pid = descriptor["cpu_player_id"]
     human_pid = "p1" if cpu_pid == "p2" else "p2"
     diff = cpu_difficulty or descriptor.get("difficulty", "hard")
@@ -107,16 +119,15 @@ def replay_from_descriptor(db, descriptor: Dict[str, Any], cpu_difficulty: Optio
     human_actions = [a for a in descriptor.get("actions", [])
                      if a.get("player") == human_pid]
     human_seat = _HumanReplaySeat(human_actions)
-    cpu_seat = (make_seat(kind="learned", sims=sims) if diff == "learned"
-                else make_seat(diff, kind="arena"))
-    seats = {human_pid: human_seat, cpu_pid: cpu_seat}
+    seats = {human_pid: human_seat, cpu_pid: _cpu_seat(diff, sims)}
 
     # 人間手の逆写像失敗（場複製の分岐など・R0 §5 の残差）は run_game が NO_LEGAL_MOVE を上げる。
     # これは「再生できなかった局」＝**分岐検出**なので、クラッシュさせず結果に記録する
     # （真の再生成功＝reproduced True・misses 空。分岐＝reproduced False・misses 非空）。
     try:
         result: GameResult = run_game(seed, db, seats=seats, deck_builder=_deck_builder,
-                                      observers=list(observers), legal_moves="skip", invariants="raise")
+                                      observers=list(observers), legal_moves="skip", invariants="raise",
+                                      first_player=fp_mode)
         return {
             "seed": seed, "reproduced": True, "winner": result.winner,
             "steps": result.steps, "turns": result.turns,
@@ -171,11 +182,14 @@ def _human_record_seat(rng):
 
 
 def record_descriptor(db, seed: int, deck_ids_builder, cpu_pid: str = "p2",
-                      difficulty: str = "hard") -> Dict[str, Any]:
+                      difficulty: str = "hard", sims: int = 160,
+                      first_player: Optional[str] = None) -> Dict[str, Any]:
     """1 局を録画して記述子（seed/leaders/decks/actions）を作る（round-trip テスト用の合成録画）。
 
-    人間席（`cpu_pid` 以外）＝private rng の合成人間（global random 非消費）、CPU席＝`difficulty`。
-    `deck_ids_builder(db, seed) -> (l1,c1,l2,c2)` で対局デッキを与える（実デッキ等）。
+    人間席（`cpu_pid` 以外）＝private rng の合成人間（global random 非消費）、CPU席＝`difficulty`
+    （learned=Gen2・`sims` 指定可）。`first_player`（"random"/"p1"/"p2"/None）でコイントス再現を試験できる
+    （`first_player_mode` として記述子へ保存＝replay が同じモードで coin toss を再現する）。
+    `deck_ids_builder(db, seed) -> (l1,c1,l2,c2)` で対局デッキを与える。
     """
     import random as _random
     built = deck_ids_builder(db, seed)
@@ -188,13 +202,14 @@ def record_descriptor(db, seed: int, deck_ids_builder, cpu_pid: str = "p2",
     rec = _RecordObserver()
     seats = {
         human_pid: _human_record_seat(_random.Random(seed * 7 + 1)),
-        cpu_pid: make_seat(difficulty, kind="arena"),
+        cpu_pid: _cpu_seat(difficulty, sims),
     }
     res: GameResult = run_game(seed, db, seats=seats,
                                deck_builder=_fixed_builder, observers=[rec],
-                               legal_moves="skip", invariants="raise")
+                               legal_moves="skip", invariants="raise", first_player=first_player)
     return {
-        "seed": seed, "first_player": None, "cpu_player_id": cpu_pid, "difficulty": difficulty,
+        "seed": seed, "first_player": None, "first_player_mode": first_player,
+        "cpu_player_id": cpu_pid, "difficulty": difficulty,
         "leaders": {"p1": l1.master.card_id if l1 else None, "p2": l2.master.card_id if l2 else None},
         "decks": {"p1": [ci.master.card_id for ci in c1], "p2": [ci.master.card_id for ci in c2]},
         "actions": rec.actions,

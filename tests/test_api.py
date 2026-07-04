@@ -248,6 +248,29 @@ def test_replay_capture_and_fetch(client):
     assert len(rb["decisions"]) == len(meta["decisions"])
 
 
+def test_replay_capture_learned(client):
+    """本番既定 CPU＝learned(Gen2) の cpu_trace 対局でも思考トレース＋種が記録される（R3）。
+
+    learned のトレースは L1 の regret/j_components でなく **MCTS root 統計**（chosen/candidates=訪問%・Q・
+    L1第二意見）。既定=learned の実対局リプレイ記録の担保（従来テストは hard 固定だった穴を閉じる）。
+    """
+    body = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="learned",
+                        cpu_trace=True, seed=777).json()
+    gid = body["game_id"]
+    meta = A.CPU_GAMES[gid]
+    assert meta.get("difficulty") == "learned" and meta.get("cpu_trace") is True
+
+    _drive_until_cpu_decides(client, gid, cpu_name="P2", human_name="P1")
+    assert meta["decisions"], "learned CPU の思考トレースが記録されていない"
+    d0 = meta["decisions"][0]
+    assert d0.get("difficulty") == "learned"
+    assert d0.get("chosen") and "candidates" in d0 and len(d0["candidates"]) >= 1
+    assert "visit_pct" in d0["candidates"][0] and "q" in d0["candidates"][0]  # MCTS root 統計
+    assert "l1_move" in d0                                                    # L1 第二意見
+    r = client.get(f"/api/game/{gid}/replay")
+    assert r.json()["success"] is True and r.json()["replay"]["seed"] == 777
+
+
 # --- サンドボックス（フリーモード） -----------------------------------------
 
 def test_sandbox_create_and_list(client):

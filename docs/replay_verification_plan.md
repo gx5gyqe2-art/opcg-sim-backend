@@ -92,7 +92,8 @@ R0 で曖昧率は実デッキで 3.5〜4.5%・fan-out 小（ほぼ 2手）・**
 | **R1 ✅実装済** | リプレイヤ中核 `replay_runner.replay_from_descriptor`: デッキ復元（`build_deck_from_ids`・pre-shuffle 順確認済）＋`random.seed`＋人間手注入（R0 確定の (A) 決定論タイブレーク逆引き `resolve_recorded_action`）＋CPU 再 decide。ループは `game_driver.run_game` 共有（人間席＝注入・CPU席＝learned/hard）。分岐は crash させず記録（`reproduced`/`misses`） | ✅ **実デッキ 10 seed で 10/10 完全一致**（勝敗+手数+ターン・人間手30〜50/局を tie-break で復元） |
 | **R2 ✅実装済（hard）** | ラウンドトリップ・テスト `tests/test_replay_roundtrip.py`: 録画（人間=private rng・global random 非消費）→再生→勝敗・手数・ターン一致＋miss=0 を assert（実デッキ・有界 seed）。リゾルバ単体も検証 | ✅ hard で一致 assert（learned は R3） |
 | **R1 副産物（engine 修正）** | `cpu_ai._find_card` が **stage/temp_zone** を探索せず、ACTIVATE_MAIN 等の手記述が card_id に解決できず uuid のまま漏れて再現不能だった欠落を修正（round-trip が検出）。修正で 8/10→**10/10** | ✅ trace テスト無退行（test_cpu_replay/learned 16 passed）・ruff clean |
-| **R3** | **learned** 対応＋ラウンドトリップ（learned）＋API 記録テスト（`test_replay_capture_and_fetch`）に learned ケース追加。PR-D2 の seed 再現が「実対局丸ごと再現」まで通ることを固定。**API 記述子の実結線**（coin toss=first_player 再現・`REPLAY_SCHEMA` 直食い）もここ | learned 一致 assert |
+| **R3 ✅実装済（コア）** | **learned** ラウンドトリップ（Gen2・実デッキで再現・sims 低で高速）＋**coin toss 再現**（`run_game(first_player=…)`＝実対局は CPU＝常に "random" を seed から再現・round-trip 3/3）＋API 記録テストに **learned ケース追加**（`test_replay_capture_learned`＝既定 Gen2 の記録担保）。`run_game` の first_player は既定 None で既存挙動不変（実測確認） | ✅ hard/learned/coin-toss 一致 assert＋API learned 記録 |
+| **R3 残** | API 記述子（`REPLAY_SCHEMA`）の **end-to-end 実結線**（routers create+step で実録画→`/replay`→`replay_from_descriptor` に `first_player="random"` で食わせて一致）。**RESOLVE_EFFECT_SELECTION の記録欠落**（learned が踏む少数・§下記）を (B)-lite で閉じるか判断 | — |
 | **R4（任意）** | スキーマ統一: 合成 `opcg-replay/v1` と実対局 `REPLAY_SCHEMA` のリプレイヤ共通化（`cpu_replay --descriptor` が両方を再生）。契約更新は §5 | contract 再生成＋差分レビュー |
 
 **実装順は R0→R1→R2→R3**。R2（hard）で骨組みを固めてから R3（learned）を乗せる。
@@ -108,7 +109,11 @@ R0 で曖昧率は実デッキで 3.5〜4.5%・fan-out 小（ほぼ 2手）・**
 
 1. ~~**人間手の曖昧性対策**~~ → **R0 で確定**: (A) 逆引き＋決定論タイブレーク主。曖昧率 3.5〜4.5%・fan-out 小。
    場複製の残差だけ round-trip で検出し必要時のみ (B)-lite（§3）。
-2. ~~**effect 選択の再現粒度**~~ → **R0 で確定**: 現行記録で足りる（`RESOLVE_EFFECT_SELECTION` は 0/515 で完全一意）。
+2. **effect 選択の再現粒度（R0 → R3 で更新）**: R0（hard/random）では `RESOLVE_EFFECT_SELECTION` 0/515＝
+   足りると見えたが、**R3 の learned 対局で稀に分岐**（learned は hard/random が踏まない effect 選択状態に
+   到達し、選択内容が `_describe_move` に載らず bare `{RESOLVE_EFFECT_SELECTION}` で一意化できない）。
+   → 大半は現行記録で足りるが、learned 完全再現には `RESOLVE_EFFECT_SELECTION` の選択内容を記録に載せる
+   (B)-lite が要る（残作業・§R3 残）。round-trip がこの分岐を検出する（サイレント誤再生は出ない）。
 3. **不一致時の扱い（要確認）**: 再 decide した CPU 手が録画と食い違ったら「テスト失敗（回帰）」か「記録が古い（許容）」か。
    → 原則テスト失敗（決定論契約の破れ）。ただし net 更新等で learned の手が変わる場合は録画を撮り直す運用にする。
 4. **CI 負荷**: learned のラウンドトリップは MCTS で重い。低 sims＋短対局＋少 seed で有界化（決定論検証が目的で強さ無関係）。
