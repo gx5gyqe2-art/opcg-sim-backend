@@ -145,13 +145,26 @@ def switch_turn(gm):
     if getattr(gm, "pending_extra_turn", None) == gm.turn_player.name:
         gm.pending_extra_turn = None
         gm.turn_count += 1
-        gm._fire_turn_start_triggers()
-        gm.refresh_phase()
+        _begin_turn(gm)
         return
     gm.turn_player, gm.opponent = gm.opponent, gm.turn_player
     gm.turn_count += 1
+    _begin_turn(gm)
+
+def _begin_turn(gm):
+    """ターン開始処理。ターン開始時誘発（TURN_START）はリフレッシュフェイズ**前**に
+    解決する（OP11-040 の山札5枚は通常ドロー前の5枚）。誘発の確認/効果解決が対話で
+    中断する間（先行するターン終了時誘発の中断も含む）はリフレッシュ以降を保留し、
+    全対話の完了時に resolve_interaction が refresh_phase を再開する。"""
     gm._fire_turn_start_triggers()
-    gm.refresh_phase()
+    if not gm.active_interaction and not gm._pending_triggers:
+        gm.refresh_phase()
+        return
+    gm._advance_pending_triggers()
+    if gm.active_interaction or gm._pending_triggers:
+        gm.turn_start_pending = True
+    else:
+        gm.refresh_phase()
 
 def _fire_turn_start_triggers(gm):
     """【自分のターン開始時】誘発（TURN_START。OP11-040）を待ち行列へ積む。

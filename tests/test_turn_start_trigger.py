@@ -41,38 +41,41 @@ def _accept_and_drive(gm, p1, pick_uuid=None, limit=6):
         steps += 1
 
 
-def test_op11_040_fires_confirmation_at_turn_start_with_8_don():
-    """場のドン8枚でターン開始 → 発動確認（CONFIRM_TRIGGER）が立つ。"""
+def test_op11_040_fires_confirmation_before_refresh_phase():
+    """場のドン8枚でターン開始 → リフレッシュフェイズ**前**に発動確認が立つ
+    （確認中はまだ通常ドローもドン!!展開もされていない）。"""
     gm, p1, p2, L = _setup(8)
+    hand_before = len(p1.hand)
+    don_before = len(p1.don_active) + len(p1.don_rested)
     gm.end_turn()
-    gm._advance_pending_triggers()
     ia = gm.active_interaction
     assert ia is not None and ia["action_type"] == "CONFIRM_TRIGGER"
     assert "モンキー・D・ルフィ" in ia.get("message", "")
+    assert len(p1.hand) == hand_before                              # ドロー前
+    assert len(p1.don_active) + len(p1.don_rested) == don_before    # ドン!!展開前
 
 
-def test_op11_040_accept_recovers_strawhat_from_top5():
-    """受諾 → デッキ上5枚から《麦わらの一味》1枚を手札に加え、残りをデッキへ。"""
+def test_op11_040_accept_recovers_strawhat_from_predraw_top5():
+    """受諾 → **通常ドロー前**のデッキ上5枚から《麦わらの一味》1枚を回収し、
+    解決完了後にリフレッシュ以降（ドロー/ドン!!展開）が走る。"""
     gm, p1, p2, L = _setup(8)
     zoro = make_char(p1, name="ロロノア・ゾロ", traits=["麦わらの一味"])
-    p1.deck.insert(2, zoro)  # 通常ドロー(トップ1枚)で引かれない位置
+    p1.deck.insert(0, zoro)  # デッキトップ＝ドロー後解決なら通常ドローで引かれ効果は空振りする位置
     hand_before = len(p1.hand)
     deck_before = len(p1.deck)
     gm.end_turn()
-    gm._advance_pending_triggers()
     _accept_and_drive(gm, p1, pick_uuid=zoro.uuid)
-    assert zoro in p1.hand
-    assert len(p1.hand) == hand_before + 2      # 通常ドロー+1、回収+1
-    assert len(p1.deck) == deck_before - 2      # ドロー-1、回収-1（残り4枚はデッキへ戻る）
+    assert zoro in p1.hand                       # 効果でトップのゾロを回収できた（ドロー前解決）
+    assert len(p1.hand) == hand_before + 2       # 回収+1、通常ドロー+1
+    assert len(p1.deck) == deck_before - 2       # 回収-1、ドロー-1（残り4枚はデッキへ戻る）
     assert gm.active_interaction is None
 
 
-def test_op11_040_decline_does_nothing():
-    """拒否 → 通常ドロー以外は何も起きない。"""
+def test_op11_040_decline_resumes_refresh():
+    """拒否 → 保留していたリフレッシュ以降が走り、通常ドローだけ行われる。"""
     gm, p1, p2, L = _setup(8)
     hand_before = len(p1.hand)
     gm.end_turn()
-    gm._advance_pending_triggers()
     gm.resolve_interaction(p1, {"accepted": False})
     assert gm.active_interaction is None
     assert len(p1.hand) == hand_before + 1      # 通常ドローのみ

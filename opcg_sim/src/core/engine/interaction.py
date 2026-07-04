@@ -42,6 +42,11 @@ def resolve_interaction(gm, player: Player, payload: Dict[str, Any]):
             elif item in gm._pending_triggers:
                 gm._pending_triggers.remove(item)
         gm._advance_pending_triggers()
+        # ターン開始時誘発の解決で保留していたリフレッシュフェイズ以降を再開する。
+        if (not gm.active_interaction and not gm._pending_triggers
+                and getattr(gm, "turn_start_pending", False)):
+            gm.turn_start_pending = False
+            gm.refresh_phase()
         if not gm.active_interaction and gm.active_battle \
                 and gm.phase not in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER):
             gm._advance_battle_triggers()
@@ -236,6 +241,13 @@ def resolve_interaction(gm, player: Player, payload: Dict[str, Any]):
     if (not gm.active_interaction and gm.active_battle
             and gm.phase not in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER)):
         gm._advance_battle_triggers()
+
+    # ターン開始時誘発の解決（対象選択/並び替え等の共通経路）で保留していた
+    # リフレッシュフェイズ以降を再開する。
+    if (not gm.active_interaction and not gm._pending_triggers
+            and getattr(gm, "turn_start_pending", False)):
+        gm.turn_start_pending = False
+        gm.refresh_phase()
 
     # 入れ子の除去置換が中断したことで退避された外側継続（後続シーケンス／残対象）を、
     # 中断が解消された後に再開する（accepted limitation B = 多段継続の対話化）。

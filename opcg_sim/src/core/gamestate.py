@@ -169,6 +169,9 @@ class GameManager:
         # UI へ提示できる（accepted limitation B = multi-source continuation の解消）。
         self._deferred_continuations: List[Dict[str, Any]] = JournaledList()
         self.setup_phase_pending = False
+        # ターン開始時誘発（TURN_START）の解決が終わるまでリフレッシュフェイズ以降を
+        # 保留するフラグ。解決完了時に resolve_interaction が refresh_phase を再開する。
+        self.turn_start_pending = False
         self.mulligan_done: Set[str] = JournaledSet()
         from .effects.continuous import ContinuousEffectManager
         self.continuous = ContinuousEffectManager(self)
