@@ -24,40 +24,24 @@ import argparse
 import math
 import random
 import sys
-import traceback
 from typing import Any, Dict, List, Optional
 
 import os as _os, sys as _sys  # noqa: E402  test bootstrap (sys.path + google stub)
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
 
-from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai, cpu_eval_v2
-from opcg_sim.src.core.invariants import check_invariants, check_turn_boundary
+from opcg_sim.src.core import action_api, cpu_ai  # regret/realize が CONST 参照＋decide_* を使う
 
-# L1（cpu_eval_v2）係数の席別上書き用: 出荷時の既定値を一度だけ退避し、各 decide 前に
-# 「既定へ戻す→その席の coeffs を適用」する（席別 A/B＝SPSA で候補θ vs 凍結基準を測る）。
-_V2_DEFAULTS: Optional[Dict[str, float]] = None
-
-
-def _v2_defaults() -> Dict[str, float]:
-    global _V2_DEFAULTS
-    if _V2_DEFAULTS is None:
-        _V2_DEFAULTS = {k: getattr(cpu_eval_v2, k) for k in dir(cpu_eval_v2)
-                        if k.startswith("V2_") and isinstance(getattr(cpu_eval_v2, k), (int, float))}
-    return _V2_DEFAULTS
-
-
-def _apply_v2_coeffs(coeffs: Optional[Dict[str, float]]) -> None:
-    """L1 係数を「既定へリセット→coeffs を上書き」。coeffs=None なら既定のまま。"""
-    base = _v2_defaults()
-    for k, v in base.items():
-        setattr(cpu_eval_v2, k, v)
-    if coeffs:
-        for k, v in coeffs.items():
-            setattr(cpu_eval_v2, k, v)
-
-from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS, InvariantError
+# 対局ループ・席生成・共有部品は game_driver（設計⑥）へ集約。play_game/regret/realize はこれを差し込む。
+# `_load_db`/`build_deck`/`DEFAULT_MAX_STEPS`/`InvariantError` は arena_parallel 等の後方互換のため再エクスポート。
+from game_driver import (  # noqa: F401
+    load_db as _load_db,
+    build_deck,
+    DEFAULT_MAX_STEPS,
+    InvariantError,
+    make_seat,
+    run_game,
+)
 
 
 # --- Elo 変換 -----------------------------------------------------------------
@@ -118,36 +102,6 @@ def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
 
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
 
-def _make_decider(difficulty: str, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
-                  policy_rng=None, pimc_worlds: int = 1, per_move_budget=None,
-                  search=None, coeffs=None):
-    """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き）。
-
-    `info_policy`（Phase -1）で情報方針を選ぶ＝凍結 fair-hard vs cheat-hard の A/B を席交互で測れる。
-    `policy_rng`（Phase 0・CRN）を渡すと**方策のタイブレーク乱数をゲーム乱数（global random）から分離**
-    する＝同一 game-seed なら方策に依らずデッキ配り/シャッフルが同一になり、対戦間分散が落ちる。
-    未指定時は従来どおり global `random`（後方互換）。`search`（任意・深さA/B用）= `(horizon, max_ply)`
-    タプルでこの席だけ探索深さ／ply 上限を上書き（None で既定）。
-    """
-    mem: Dict[str, Any] = {}
-    prng = policy_rng if policy_rng is not None else random
-    s_horizon, s_max_ply = (search if search is not None else (None, None))
-
-    def _decide(manager, actor):
-        # この decider の探索予算/深さ/L1係数を一時設定（単一スレッド arena＝相手と干渉しない）。
-        cpu_ai.set_budget_override(per_move_budget)
-        cpu_ai.set_search_override(s_horizon, s_max_ply)  # 探索深さ／ply 上限を席別に切替（深さA/B用）
-        _apply_v2_coeffs(coeffs)  # この席の L1 係数を適用（席別 A/B。None＝既定）
-        try:
-            return cpu_ai.decide_guarded(manager, actor, difficulty, prng, mem,
-                                         info_policy=info_policy, pimc_worlds=pimc_worlds)
-        finally:
-            cpu_ai.set_budget_override(None)
-            cpu_ai.set_search_override(None, None)
-            _apply_v2_coeffs(None)  # 既定へ戻す（相手席が None でも汚染しない）
-    return _decide
-
-
 def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               max_steps: int = DEFAULT_MAX_STEPS,
               p1_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
@@ -159,60 +113,30 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p1_coeffs=None, p2_coeffs=None) -> Dict[str, Any]:
     """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
-    `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
-    （同じ action_api コアパス＋各ステップのインバリアント検出）。normal/hard はデプロイと同じく
-    自デッキ構成からプランを供給する（easy はプラン無し）。`p1_policy`/`p2_policy` は情報方針
-    （fair/cheat・Phase -1）で、フェア化前後の強さ A/B に用いる。
+    対局ループは `game_driver.run_game`（全ハーネス共通）で回し、席（seat）だけ非対称にする。
+    `p1_policy`/`p2_policy` は情報方針（fair/cheat・Phase -1）で、フェア化前後の強さ A/B に用いる。
 
     `separate_policy_rng=True`（Phase 0）で**方策のタイブレーク乱数を game 乱数（global random）から分離**
     する（各プレイヤーに seed 派生の独立 `random.Random`）。これは方策タイブレークの決定性を game 乱数から
     切り離すだけ＝**完全な配りレベル CRN ではない**: mulligan は対局ループ中に決まり、α-β 探索はクローン
     上の効果解決で global `random` を方策依存に消費するため、方策が違えば mid-game 以降のシャッフルは
     なお分岐する。配りレベル CRN には GameManager への乱数注入（クローンが独自 rng）が必要＝Phase 0b。
+
+    `random.Random(seed*…)` は独立生成器で global random を消費しないため、席を run_game 前に構築しても
+    「配り/シャッフルを確定させてから方策乱数を分離する」旧挙動と決定論的に等価（乱数消費順は不変）。
     """
-    random.seed(seed)
-    l1, c1 = build_deck(db, "p1")
-    l2, c2 = build_deck(db, "p2")
-    manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
-    manager.start_game()
-    # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
-    deciders = {"p1": _make_decider(p1_difficulty, p1_policy, p1_rng, p1_pimc, p1_budget, p1_search, p1_coeffs),
-                "p2": _make_decider(p2_difficulty, p2_policy, p2_rng, p2_pimc, p2_budget, p2_search, p2_coeffs)}
-
-    step = 0
-    prev_turn = manager.turn_count
-    pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
-    KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
-    while manager.winner is None and step < max_steps:
-        pending = manager.get_pending_request()
-        if not pending:
-            raise InvariantError([("STUCK", "no pending request and no winner")], step, [])
-        req_pid = pending[KEY_PID]
-        actor = manager.p1 if manager.p1.name == req_pid else manager.p2
-        move = deciders[req_pid](manager, actor)
-        if move is None:
-            raise InvariantError([("NO_LEGAL_MOVE", f"no move for {req_pid}")], step, [])
-        manager.action_events = []
-        try:
-            if move["kind"] == "battle":
-                action_api.apply_battle_action(manager, actor, move["action_type"], move.get("card_uuid"))
-            else:
-                action_api.apply_game_action(manager, actor, move["action_type"], move.get("payload", {}))
-        except Exception as e:
-            raise InvariantError([("ACTION_EXCEPTION", f"{type(e).__name__}: {e}\n{traceback.format_exc()}")],
-                                 step, [])
-        violations = check_invariants(manager)
-        if manager.turn_count != prev_turn:
-            violations += check_turn_boundary(manager)
-            prev_turn = manager.turn_count
-        if violations:
-            raise InvariantError(violations, step, [])
-        step += 1
-    if manager.winner is None:
-        raise InvariantError([("MAX_STEPS", f"unfinished within {max_steps}")], step, [])
-    return {"seed": seed, "winner": manager.winner, "steps": step, "turns": manager.turn_count}
+    seats = {
+        "p1": make_seat(p1_difficulty, kind="arena", info_policy=p1_policy, policy_rng=p1_rng,
+                        pimc_worlds=p1_pimc, budget=p1_budget, search=p1_search, coeffs=p1_coeffs),
+        "p2": make_seat(p2_difficulty, kind="arena", info_policy=p2_policy, policy_rng=p2_rng,
+                        pimc_worlds=p2_pimc, budget=p2_budget, search=p2_search, coeffs=p2_coeffs),
+    }
+    # arena は各手番で get_legal_actions を事前呼びしない（seat 内で解決＝乱数消費順の保存）。
+    result = run_game(seed, db, seats=seats, max_steps=max_steps,
+                      legal_moves="skip", invariants="raise")
+    return {"seed": seed, "winner": result.winner, "steps": result.steps, "turns": result.turns}
 
 
 def arena(db, challenger: str, baseline: str, games: int, seed0: int = 0,
@@ -302,38 +226,22 @@ def regret_trace(db, seed: int, difficulty: str = "hard",
 
     regret は `cpu_ai.decide_with_regret`（deep_value(深掘り最善) − deep_value(1-ply 貪欲)）。
     実際に手を進めるのは返り値の move（＝通常の対局と同じ進行）なので、トレースは本番方策の軌跡上で取る。
+    対局ループは `run_game`（invariants="skip"＝インバリアント検査なし・スタック/None で break・
+    apply 例外は素通し）で回し、seat が MAIN_ACTION のみ `decide_with_regret` へ差し替えて regret を集める。
     """
-    random.seed(seed)
-    l1, c1 = build_deck(db, "p1")
-    l2, c2 = build_deck(db, "p2")
-    manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
-    manager.start_game()
+    KEY_ACTION = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('ACTION', 'action')
     mems: Dict[str, Any] = {"p1": {}, "p2": {}}
-    pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
-    KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
-    KEY_ACTION = pending_props.get('ACTION', 'action')
-
     regrets: List[float] = []
-    step = 0
-    while manager.winner is None and step < max_steps:
-        pending = manager.get_pending_request()
-        if not pending:
-            break
-        req_pid = pending[KEY_PID]
-        actor = manager.p1 if manager.p1.name == req_pid else manager.p2
-        if pending.get(KEY_ACTION) == "MAIN_ACTION":
-            move, regret = cpu_ai.decide_with_regret(manager, actor, difficulty, random)
+
+    def seat(ctx):
+        if ctx.pending.get(KEY_ACTION) == "MAIN_ACTION":
+            move, regret = cpu_ai.decide_with_regret(ctx.manager, ctx.actor, difficulty, random)
             regrets.append(regret)
-        else:
-            move = cpu_ai.decide_guarded(manager, actor, difficulty, random, mems[req_pid])
-        if move is None:
-            break
-        manager.action_events = []
-        if move["kind"] == "battle":
-            action_api.apply_battle_action(manager, actor, move["action_type"], move.get("card_uuid"))
-        else:
-            action_api.apply_game_action(manager, actor, move["action_type"], move.get("payload", {}))
-        step += 1
+            return move
+        return cpu_ai.decide_guarded(ctx.manager, ctx.actor, difficulty, random, mems[ctx.actor.name])
+
+    run_game(seed, db, seats={"p1": seat, "p2": seat}, max_steps=max_steps,
+             legal_moves="skip", invariants="skip")
 
     n = len(regrets)
     s = sorted(regrets)
@@ -357,41 +265,23 @@ def realize_trace(db, seed: int, difficulty: str = "hard",
     「読み切れなかった代償」が露見すると、採用手の深掘り値は**ターン内で単調に崩落**する（実ケース:
     付与時 +4798 → 攻撃時 -91）。1 ターンの gap = max(そのターンの chosen_deep) − 最終決定の chosen_deep。
     大きい gap が頻発する＝探索が予算地平線の外を楽観視して資源を溶かしている兆候（B が縮める対象）。
+    対局ループは `run_game`（invariants="skip"）で回し、seat が MAIN_ACTION の採用手深掘り値を収穫する。
     """
-    random.seed(seed)
-    l1, c1 = build_deck(db, "p1")
-    l2, c2 = build_deck(db, "p2")
-    manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
-    manager.start_game()
+    KEY_ACTION = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('ACTION', 'action')
     mems: Dict[str, Any] = {"p1": {}, "p2": {}}
-    pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
-    KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
-    KEY_ACTION = pending_props.get('ACTION', 'action')
-
     series: Dict[tuple, List[float]] = {}   # (player, turn) -> [chosen_deep, ...]
-    step = 0
-    while manager.winner is None and step < max_steps:
-        pending = manager.get_pending_request()
-        if not pending:
-            break
-        req_pid = pending[KEY_PID]
-        actor = manager.p1 if manager.p1.name == req_pid else manager.p2
-        if pending.get(KEY_ACTION) == "MAIN_ACTION":
+
+    def seat(ctx):
+        if ctx.pending.get(KEY_ACTION) == "MAIN_ACTION":
             info: Dict[str, Any] = {}
-            move, _r = cpu_ai.decide_with_regret(manager, actor, difficulty, random,
-                                                 out=info)
+            move, _r = cpu_ai.decide_with_regret(ctx.manager, ctx.actor, difficulty, random, out=info)
             if "chosen_deep" in info:
-                series.setdefault((req_pid, manager.turn_count), []).append(info["chosen_deep"])
-        else:
-            move = cpu_ai.decide_guarded(manager, actor, difficulty, random, mems[req_pid])
-        if move is None:
-            break
-        manager.action_events = []
-        if move["kind"] == "battle":
-            action_api.apply_battle_action(manager, actor, move["action_type"], move.get("card_uuid"))
-        else:
-            action_api.apply_game_action(manager, actor, move["action_type"], move.get("payload", {}))
-        step += 1
+                series.setdefault((ctx.actor.name, ctx.manager.turn_count), []).append(info["chosen_deep"])
+            return move
+        return cpu_ai.decide_guarded(ctx.manager, ctx.actor, difficulty, random, mems[ctx.actor.name])
+
+    run_game(seed, db, seats={"p1": seat, "p2": seat}, max_steps=max_steps,
+             legal_moves="skip", invariants="skip")
 
     gaps = [max(v) - v[-1] for v in series.values() if len(v) >= 2]
     n = len(gaps)
