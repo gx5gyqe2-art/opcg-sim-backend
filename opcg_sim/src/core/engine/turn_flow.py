@@ -7,6 +7,7 @@ import logging
 from ..journal import JournaledDict, JournaledList, JournaledSet
 from ...models.enums import Phase, TriggerType
 from ..effects.resolver import EffectResolver
+from ._helpers import _nfc
 
 _logger = logging.getLogger("opcg.engine")
 
@@ -144,11 +145,40 @@ def switch_turn(gm):
     if getattr(gm, "pending_extra_turn", None) == gm.turn_player.name:
         gm.pending_extra_turn = None
         gm.turn_count += 1
+        gm._fire_turn_start_triggers()
         gm.refresh_phase()
         return
     gm.turn_player, gm.opponent = gm.opponent, gm.turn_player
     gm.turn_count += 1
+    gm._fire_turn_start_triggers()
     gm.refresh_phase()
+
+def _fire_turn_start_triggers(gm):
+    """【自分のターン開始時】誘発（TURN_START。OP11-040）を待ち行列へ積む。
+
+    公式裁定に合わせ、条件（「自分の場のドン!!が8枚以上ある場合」等）は**ドン!!展開前**
+    （ターン開始時点）で判定する。ここで満たさなければ積まない。任意（「発動できる」）は
+    CONFIRM_TRIGGER の確認を挟む（_advance_pending_triggers が処理）。確認・効果解決の
+    対話はリフレッシュ/ドロー/ドン!!展開の完了後（アクション境界/対話完了時）に立つ。"""
+    pl = gm.turn_player
+    units = [pl.leader] + list(pl.field)
+    if pl.stage:
+        units.append(pl.stage)
+    for card in units:
+        if not card or not card.master.abilities:
+            continue
+        for ability in card.master.abilities:
+            if ability.trigger != TriggerType.TURN_START:
+                continue
+            if ability.condition is not None:
+                try:
+                    if not EffectResolver(gm)._check_condition(pl, ability.condition, card):
+                        continue
+                except Exception:
+                    _logger.debug("TURN_START 条件評価に失敗（スキップ）", exc_info=True)
+                    continue
+            optional = _nfc("発動できる") in _nfc(getattr(ability, "raw_text", "") or "")
+            gm._enqueue_trigger(pl, ability, card, optional=optional)
 
 def refresh_phase(gm):
     gm._reset_player_status(gm.opponent); gm.refresh_all(gm.turn_player); gm.draw_phase()

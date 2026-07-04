@@ -57,12 +57,17 @@ def _suspend_for_trigger_confirm(gm, item: Dict[str, Any]) -> None:
     resolve_interaction が CONFIRM_TRIGGER を処理して同じ item を再投入/破棄する。"""
     player = item["player"]
     card = item["card"]
+    # 【トリガー】接頭辞はライフ公開トリガーのみ。任意の誘発（ターン開始時/場を離れた時
+    # 等の「発動できる」）では誘発名を出さず汎用文言にする。
+    ability = item.get("ability")
+    is_life_trigger = getattr(ability, "trigger", None) == TriggerType.TRIGGER
+    prefix = "【トリガー】" if is_life_trigger else ""
     gm.active_interaction = {
         "player_id": player.name,
         "action_type": "CONFIRM_TRIGGER",
         "source_card_name": card.master.name,
         "source_card_uuid": card.uuid,
-        "message": f"【トリガー】「{card.master.name}」の効果を発動しますか？",
+        "message": f"{prefix}「{card.master.name}」の効果を発動しますか？",
         "can_skip": True,
         "continuation": {"trigger_item": item},
     }

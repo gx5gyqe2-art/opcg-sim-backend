@@ -793,6 +793,9 @@ class GameManager:
     def _enqueue_ko_listeners(self, koed_card: Card, koed_owner: Player) -> None:
         return _triggers._enqueue_ko_listeners(self, koed_card, koed_owner)
 
+    def _fire_turn_start_triggers(self) -> None:
+        return _turn_flow._fire_turn_start_triggers(self)
+
     def _enqueue_life_decrease(self, player: Player, count: int = 1) -> None:
         return _triggers._enqueue_life_decrease(self, player, count)
 
