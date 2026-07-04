@@ -24,40 +24,44 @@ import argparse
 import math
 import random
 import sys
-import traceback
 from typing import Any, Dict, List, Optional
 
 import os as _os, sys as _sys  # noqa: E402  test bootstrap (sys.path + google stub)
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
 
-from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai, cpu_eval_v2
-from opcg_sim.src.core.invariants import check_invariants, check_turn_boundary
+from opcg_sim.src.core import action_api, cpu_ai  # regret/realize が CONST 参照＋decide_* を使う
 
-# L1（cpu_eval_v2）係数の席別上書き用: 出荷時の既定値を一度だけ退避し、各 decide 前に
-# 「既定へ戻す→その席の coeffs を適用」する（席別 A/B＝SPSA で候補θ vs 凍結基準を測る）。
-_V2_DEFAULTS: Optional[Dict[str, float]] = None
-
-
-def _v2_defaults() -> Dict[str, float]:
-    global _V2_DEFAULTS
-    if _V2_DEFAULTS is None:
-        _V2_DEFAULTS = {k: getattr(cpu_eval_v2, k) for k in dir(cpu_eval_v2)
-                        if k.startswith("V2_") and isinstance(getattr(cpu_eval_v2, k), (int, float))}
-    return _V2_DEFAULTS
+# 対局ループ・席生成・共有部品は game_driver（設計⑥）へ集約。play_game/regret/realize はこれを差し込む。
+# `_load_db`/`build_deck`/`DEFAULT_MAX_STEPS`/`InvariantError` は arena_parallel 等の後方互換のため再エクスポート。
+from game_driver import (  # noqa: F401
+    load_db as _load_db,
+    build_deck,
+    DEFAULT_MAX_STEPS,
+    InvariantError,
+    make_seat,
+    run_game,
+    StepCtx,
+)
 
 
-def _apply_v2_coeffs(coeffs: Optional[Dict[str, float]]) -> None:
-    """L1 係数を「既定へリセット→coeffs を上書き」。coeffs=None なら既定のまま。"""
-    base = _v2_defaults()
-    for k, v in base.items():
-        setattr(cpu_eval_v2, k, v)
-    if coeffs:
-        for k, v in coeffs.items():
-            setattr(cpu_eval_v2, k, v)
+def _make_decider(difficulty: str, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
+                  policy_rng=None, pimc_worlds: int = 1, per_move_budget=None,
+                  search=None, coeffs=None):
+    """後方互換: `(manager, actor) -> move` の decider を返す（`make_seat` の arena 席をラップ）。
 
-from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS, InvariantError
+    設計⑥で対局ループは `run_game`（席は `seat(ctx)->move`）へ移行したが、make/unmake 等価性テスト
+    （`test_cpu_make_unmake` / `test_journal`）は席を直接駆動して `(manager, actor)` で呼ぶため、その
+    署名のシムを残す。中身は arena 席と同一＝挙動不変。
+    """
+    seat = make_seat(difficulty, kind="arena", info_policy=info_policy, policy_rng=policy_rng,
+                     pimc_worlds=pimc_worlds, budget=per_move_budget, search=search, coeffs=coeffs)
+
+    def _decide(manager, actor):
+        ctx = StepCtx(manager)
+        ctx._update(0, actor, None, None)
+        return seat(ctx)
+    return _decide
 
 
 # --- Elo 変換 -----------------------------------------------------------------
@@ -118,34 +122,16 @@ def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
 
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
 
-def _make_decider(difficulty: str, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
-                  policy_rng=None, pimc_worlds: int = 1, per_move_budget=None,
-                  search=None, coeffs=None):
-    """プレイヤー1人分のターン内メモリ付き意思決定関数を返す（暴走防止ガード付き）。
-
-    `info_policy`（Phase -1）で情報方針を選ぶ＝凍結 fair-hard vs cheat-hard の A/B を席交互で測れる。
-    `policy_rng`（Phase 0・CRN）を渡すと**方策のタイブレーク乱数をゲーム乱数（global random）から分離**
-    する＝同一 game-seed なら方策に依らずデッキ配り/シャッフルが同一になり、対戦間分散が落ちる。
-    未指定時は従来どおり global `random`（後方互換）。`search`（任意・深さA/B用）= `(horizon, max_ply)`
-    タプルでこの席だけ探索深さ／ply 上限を上書き（None で既定）。
+def _arena_seat(difficulty, policy, rng, pimc, budget, search, coeffs, sims, engine=None):
+    """arena の 1 席を作る。`difficulty=="learned"` は Gen2 学習型（本番既定 CPU）＝L1 の席別ノブは持たず
+    `sims`（MCTS 探索数）のみ。`engine`（`cpu_learned.LearnedEngine`）を渡すとそのネットで決める
+    ＝net-vs-net（新Gen vs 凍結Gen2・A3）。CRN（`rng`）は L1 席専用（learned は global random 由来＝PR-D2）。
+    それ以外（hard 等）は L1（α-β＋ビーム＋PIMC）席で、情報方針/CRN/PIMC/予算/深さ/L1係数を席別に掛ける。
     """
-    mem: Dict[str, Any] = {}
-    prng = policy_rng if policy_rng is not None else random
-    s_horizon, s_max_ply = (search if search is not None else (None, None))
-
-    def _decide(manager, actor):
-        # この decider の探索予算/深さ/L1係数を一時設定（単一スレッド arena＝相手と干渉しない）。
-        cpu_ai.set_budget_override(per_move_budget)
-        cpu_ai.set_search_override(s_horizon, s_max_ply)  # 探索深さ／ply 上限を席別に切替（深さA/B用）
-        _apply_v2_coeffs(coeffs)  # この席の L1 係数を適用（席別 A/B。None＝既定）
-        try:
-            return cpu_ai.decide_guarded(manager, actor, difficulty, prng, mem,
-                                         info_policy=info_policy, pimc_worlds=pimc_worlds)
-        finally:
-            cpu_ai.set_budget_override(None)
-            cpu_ai.set_search_override(None, None)
-            _apply_v2_coeffs(None)  # 既定へ戻す（相手席が None でも汚染しない）
-    return _decide
+    if difficulty == "learned":
+        return make_seat(kind="learned", sims=sims, engine=engine)
+    return make_seat(difficulty, kind="arena", info_policy=policy, policy_rng=rng,
+                     pimc_worlds=pimc, budget=budget, search=search, coeffs=coeffs)
 
 
 def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
@@ -156,73 +142,47 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p1_pimc: int = 1, p2_pimc: int = 1,
               p1_budget=None, p2_budget=None,
               p1_search=None, p2_search=None,
-              p1_coeffs=None, p2_coeffs=None) -> Dict[str, Any]:
-    """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
+              p1_coeffs=None, p2_coeffs=None,
+              p1_sims: int = 160, p2_sims: int = 160,
+              p1_engine=None, p2_engine=None) -> Dict[str, Any]:
+    """p1/p2 に別難易度を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
-    `cpu_selfplay.run_one_game` は単一 policy 前提なので、非対称対局用に最小実装する
-    （同じ action_api コアパス＋各ステップのインバリアント検出）。normal/hard はデプロイと同じく
-    自デッキ構成からプランを供給する（easy はプラン無し）。`p1_policy`/`p2_policy` は情報方針
-    （fair/cheat・Phase -1）で、フェア化前後の強さ A/B に用いる。
+    対局ループは `game_driver.run_game`（全ハーネス共通）で回し、席（seat）だけ非対称にする。
+    `difficulty` は L1 系（hard）と **learned（Gen2 学習型・本番既定 CPU）** を混在できる（A1: 強度 A/B の
+    learned 対応）。learned 席は `p1_sims`/`p2_sims`（MCTS 探索数・既定=本番 160）を使い、L1 の席別ノブ
+    （policy/pimc/budget/search/coeffs・CRN rng）は無視する。`p1_policy`/`p2_policy` は L1 の情報方針（fair/cheat）。
+    `p1_engine`/`p2_engine`（`cpu_learned.LearnedEngine`）で learned 席の**ネットを席別指定**できる
+    ＝net-vs-net（新Gen vs 凍結Gen2・A3）。未指定は出荷 Gen2 既定エンジン。
 
     `separate_policy_rng=True`（Phase 0）で**方策のタイブレーク乱数を game 乱数（global random）から分離**
-    する（各プレイヤーに seed 派生の独立 `random.Random`）。これは方策タイブレークの決定性を game 乱数から
-    切り離すだけ＝**完全な配りレベル CRN ではない**: mulligan は対局ループ中に決まり、α-β 探索はクローン
-    上の効果解決で global `random` を方策依存に消費するため、方策が違えば mid-game 以降のシャッフルは
-    なお分岐する。配りレベル CRN には GameManager への乱数注入（クローンが独自 rng）が必要＝Phase 0b。
+    する（各 L1 席に seed 派生の独立 `random.Random`）。これは方策タイブレークの決定性を game 乱数から
+    切り離すだけ＝**完全な配りレベル CRN ではない**（learned 席には未適用＝global random 由来）。
+    どちらも同一 seed なら決定論再現する（learned は PR-D2、L1 は既存の決定論）。
     """
-    random.seed(seed)
-    l1, c1 = build_deck(db, "p1")
-    l2, c2 = build_deck(db, "p2")
-    manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
-    manager.start_game()
-    # CRN: デッキ配り/シャッフル（上の random.seed 経由＝global）を確定させた後に方策乱数を分離する。
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
-    deciders = {"p1": _make_decider(p1_difficulty, p1_policy, p1_rng, p1_pimc, p1_budget, p1_search, p1_coeffs),
-                "p2": _make_decider(p2_difficulty, p2_policy, p2_rng, p2_pimc, p2_budget, p2_search, p2_coeffs)}
-
-    step = 0
-    prev_turn = manager.turn_count
-    pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
-    KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
-    while manager.winner is None and step < max_steps:
-        pending = manager.get_pending_request()
-        if not pending:
-            raise InvariantError([("STUCK", "no pending request and no winner")], step, [])
-        req_pid = pending[KEY_PID]
-        actor = manager.p1 if manager.p1.name == req_pid else manager.p2
-        move = deciders[req_pid](manager, actor)
-        if move is None:
-            raise InvariantError([("NO_LEGAL_MOVE", f"no move for {req_pid}")], step, [])
-        manager.action_events = []
-        try:
-            if move["kind"] == "battle":
-                action_api.apply_battle_action(manager, actor, move["action_type"], move.get("card_uuid"))
-            else:
-                action_api.apply_game_action(manager, actor, move["action_type"], move.get("payload", {}))
-        except Exception as e:
-            raise InvariantError([("ACTION_EXCEPTION", f"{type(e).__name__}: {e}\n{traceback.format_exc()}")],
-                                 step, [])
-        violations = check_invariants(manager)
-        if manager.turn_count != prev_turn:
-            violations += check_turn_boundary(manager)
-            prev_turn = manager.turn_count
-        if violations:
-            raise InvariantError(violations, step, [])
-        step += 1
-    if manager.winner is None:
-        raise InvariantError([("MAX_STEPS", f"unfinished within {max_steps}")], step, [])
-    return {"seed": seed, "winner": manager.winner, "steps": step, "turns": manager.turn_count}
+    seats = {
+        "p1": _arena_seat(p1_difficulty, p1_policy, p1_rng, p1_pimc, p1_budget, p1_search, p1_coeffs,
+                          p1_sims, engine=p1_engine),
+        "p2": _arena_seat(p2_difficulty, p2_policy, p2_rng, p2_pimc, p2_budget, p2_search, p2_coeffs,
+                          p2_sims, engine=p2_engine),
+    }
+    # arena は各手番で get_legal_actions を事前呼びしない（seat 内で解決＝乱数消費順の保存）。
+    result = run_game(seed, db, seats=seats, max_steps=max_steps,
+                      legal_moves="skip", invariants="raise")
+    return {"seed": seed, "winner": result.winner, "steps": result.steps, "turns": result.turns}
 
 
 def arena(db, challenger: str, baseline: str, games: int, seed0: int = 0,
           max_steps: int = DEFAULT_MAX_STEPS,
           challenger_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
-          baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY) -> Dict[str, Any]:
+          baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
+          challenger_sims: int = 160, baseline_sims: int = 160) -> Dict[str, Any]:
     """挑戦者 vs 固定ベースラインを `games` 局。**席を交互に入替**して先手有利を相殺し、勝率と Elo を返す。
 
     偶数 i: p1=挑戦者 / 奇数 i: p2=挑戦者。引き分け（あれば）は 0.5 勝で計上。
-    `challenger_policy`/`baseline_policy`（Phase -1・fair/cheat）で情報方針も A/B できる（席入替に追従）。
+    `challenger`/`baseline` は `learned`（Gen2）も可（A1）。`challenger_sims`/`baseline_sims` は learned の MCTS 探索数。
+    `challenger_policy`/`baseline_policy`（Phase -1・fair/cheat）は L1 の情報方針 A/B（席入替に追従）。
     """
     wins = 0.0
     decided = 0
@@ -233,7 +193,9 @@ def arena(db, challenger: str, baseline: str, games: int, seed0: int = 0,
         p1d, p2d = (challenger, baseline) if chal_is_p1 else (baseline, challenger)
         p1p, p2p = ((challenger_policy, baseline_policy) if chal_is_p1
                     else (baseline_policy, challenger_policy))
-        res = play_game(seed, db, p1d, p2d, max_steps=max_steps, p1_policy=p1p, p2_policy=p2p)
+        p1s, p2s = (challenger_sims, baseline_sims) if chal_is_p1 else (baseline_sims, challenger_sims)
+        res = play_game(seed, db, p1d, p2d, max_steps=max_steps, p1_policy=p1p, p2_policy=p2p,
+                        p1_sims=p1s, p2_sims=p2s)
         chal_seat = "p1" if chal_is_p1 else "p2"
         won = (res["winner"] == chal_seat)
         wins += 1.0 if won else 0.0
@@ -252,7 +214,8 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
                  challenger_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                  baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                  challenger_pimc: int = 1, baseline_pimc: int = 1,
-                 challenger_budget=None, baseline_budget=None) -> Dict[str, Any]:
+                 challenger_budget=None, baseline_budget=None,
+                 challenger_sims: int = 160, baseline_sims: int = 160) -> Dict[str, Any]:
     """分散低減アリーナ（Phase 0・antithetic 席ペアリング）。各 seed を**両席で 1 回ずつ**戦わせ、
     挑戦者の 2 局の勝敗を集計する＝**先手有利（席順）をペア内で相殺**する。
 
@@ -275,11 +238,13 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
         a = play_game(seed, db, challenger, baseline, max_steps=max_steps,
                       p1_policy=challenger_policy, p2_policy=baseline_policy,
                       separate_policy_rng=True, p1_pimc=challenger_pimc, p2_pimc=baseline_pimc,
-                      p1_budget=challenger_budget, p2_budget=baseline_budget)
+                      p1_budget=challenger_budget, p2_budget=baseline_budget,
+                      p1_sims=challenger_sims, p2_sims=baseline_sims)
         b = play_game(seed, db, baseline, challenger, max_steps=max_steps,
                       p1_policy=baseline_policy, p2_policy=challenger_policy,
                       separate_policy_rng=True, p1_pimc=baseline_pimc, p2_pimc=challenger_pimc,
-                      p1_budget=baseline_budget, p2_budget=challenger_budget)
+                      p1_budget=baseline_budget, p2_budget=challenger_budget,
+                      p1_sims=baseline_sims, p2_sims=challenger_sims)
         chal_a = 1.0 if a["winner"] == "p1" else 0.0
         chal_b = 1.0 if b["winner"] == "p2" else 0.0
         wins += chal_a + chal_b
@@ -302,38 +267,22 @@ def regret_trace(db, seed: int, difficulty: str = "hard",
 
     regret は `cpu_ai.decide_with_regret`（deep_value(深掘り最善) − deep_value(1-ply 貪欲)）。
     実際に手を進めるのは返り値の move（＝通常の対局と同じ進行）なので、トレースは本番方策の軌跡上で取る。
+    対局ループは `run_game`（invariants="skip"＝インバリアント検査なし・スタック/None で break・
+    apply 例外は素通し）で回し、seat が MAIN_ACTION のみ `decide_with_regret` へ差し替えて regret を集める。
     """
-    random.seed(seed)
-    l1, c1 = build_deck(db, "p1")
-    l2, c2 = build_deck(db, "p2")
-    manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
-    manager.start_game()
+    KEY_ACTION = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('ACTION', 'action')
     mems: Dict[str, Any] = {"p1": {}, "p2": {}}
-    pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
-    KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
-    KEY_ACTION = pending_props.get('ACTION', 'action')
-
     regrets: List[float] = []
-    step = 0
-    while manager.winner is None and step < max_steps:
-        pending = manager.get_pending_request()
-        if not pending:
-            break
-        req_pid = pending[KEY_PID]
-        actor = manager.p1 if manager.p1.name == req_pid else manager.p2
-        if pending.get(KEY_ACTION) == "MAIN_ACTION":
-            move, regret = cpu_ai.decide_with_regret(manager, actor, difficulty, random)
+
+    def seat(ctx):
+        if ctx.pending.get(KEY_ACTION) == "MAIN_ACTION":
+            move, regret = cpu_ai.decide_with_regret(ctx.manager, ctx.actor, difficulty, random)
             regrets.append(regret)
-        else:
-            move = cpu_ai.decide_guarded(manager, actor, difficulty, random, mems[req_pid])
-        if move is None:
-            break
-        manager.action_events = []
-        if move["kind"] == "battle":
-            action_api.apply_battle_action(manager, actor, move["action_type"], move.get("card_uuid"))
-        else:
-            action_api.apply_game_action(manager, actor, move["action_type"], move.get("payload", {}))
-        step += 1
+            return move
+        return cpu_ai.decide_guarded(ctx.manager, ctx.actor, difficulty, random, mems[ctx.actor.name])
+
+    run_game(seed, db, seats={"p1": seat, "p2": seat}, max_steps=max_steps,
+             legal_moves="skip", invariants="skip")
 
     n = len(regrets)
     s = sorted(regrets)
@@ -357,41 +306,23 @@ def realize_trace(db, seed: int, difficulty: str = "hard",
     「読み切れなかった代償」が露見すると、採用手の深掘り値は**ターン内で単調に崩落**する（実ケース:
     付与時 +4798 → 攻撃時 -91）。1 ターンの gap = max(そのターンの chosen_deep) − 最終決定の chosen_deep。
     大きい gap が頻発する＝探索が予算地平線の外を楽観視して資源を溶かしている兆候（B が縮める対象）。
+    対局ループは `run_game`（invariants="skip"）で回し、seat が MAIN_ACTION の採用手深掘り値を収穫する。
     """
-    random.seed(seed)
-    l1, c1 = build_deck(db, "p1")
-    l2, c2 = build_deck(db, "p2")
-    manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
-    manager.start_game()
+    KEY_ACTION = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {}).get('ACTION', 'action')
     mems: Dict[str, Any] = {"p1": {}, "p2": {}}
-    pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
-    KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
-    KEY_ACTION = pending_props.get('ACTION', 'action')
-
     series: Dict[tuple, List[float]] = {}   # (player, turn) -> [chosen_deep, ...]
-    step = 0
-    while manager.winner is None and step < max_steps:
-        pending = manager.get_pending_request()
-        if not pending:
-            break
-        req_pid = pending[KEY_PID]
-        actor = manager.p1 if manager.p1.name == req_pid else manager.p2
-        if pending.get(KEY_ACTION) == "MAIN_ACTION":
+
+    def seat(ctx):
+        if ctx.pending.get(KEY_ACTION) == "MAIN_ACTION":
             info: Dict[str, Any] = {}
-            move, _r = cpu_ai.decide_with_regret(manager, actor, difficulty, random,
-                                                 out=info)
+            move, _r = cpu_ai.decide_with_regret(ctx.manager, ctx.actor, difficulty, random, out=info)
             if "chosen_deep" in info:
-                series.setdefault((req_pid, manager.turn_count), []).append(info["chosen_deep"])
-        else:
-            move = cpu_ai.decide_guarded(manager, actor, difficulty, random, mems[req_pid])
-        if move is None:
-            break
-        manager.action_events = []
-        if move["kind"] == "battle":
-            action_api.apply_battle_action(manager, actor, move["action_type"], move.get("card_uuid"))
-        else:
-            action_api.apply_game_action(manager, actor, move["action_type"], move.get("payload", {}))
-        step += 1
+                series.setdefault((ctx.actor.name, ctx.manager.turn_count), []).append(info["chosen_deep"])
+            return move
+        return cpu_ai.decide_guarded(ctx.manager, ctx.actor, difficulty, random, mems[ctx.actor.name])
+
+    run_game(seed, db, seats={"p1": seat, "p2": seat}, max_steps=max_steps,
+             legal_moves="skip", invariants="skip")
 
     gaps = [max(v) - v[-1] for v in series.values() if len(v) >= 2]
     n = len(gaps)
@@ -412,24 +343,28 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     pa = sub.add_parser("arena", help="挑戦者 vs 固定ベースラインの勝率→Elo")
-    pa.add_argument("--challenger", choices=["hard"], default="hard")
-    pa.add_argument("--baseline", choices=["hard"], default="hard")
+    pa.add_argument("--challenger", choices=["hard", "learned"], default="hard")
+    pa.add_argument("--baseline", choices=["hard", "learned"], default="hard")
     # Phase -1: 情報方針の A/B（既定＝挑戦者 fair vs ベースライン cheat＝フェア化の損失量を測る）。
     pa.add_argument("--challenger-policy", choices=["fair", "cheat"], default="fair")
     pa.add_argument("--baseline-policy", choices=["fair", "cheat"], default="cheat")
+    pa.add_argument("--challenger-sims", type=int, default=160, help="learned 挑戦者の MCTS 探索数")
+    pa.add_argument("--baseline-sims", type=int, default=160, help="learned ベースラインの MCTS 探索数")
     pa.add_argument("--games", type=int, default=10)
     pa.add_argument("--seed", type=int, default=0)
     pa.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
 
-    pp = sub.add_parser("arena-paired", help="分散低減アリーナ（antithetic+CRN・Elo CI つき）")
-    pp.add_argument("--challenger", choices=["hard"], default="hard")
-    pp.add_argument("--baseline", choices=["hard"], default="hard")
+    pp = sub.add_parser("arena-paired", help="分散低減アリーナ（antithetic+CRN・Elo CI つき。learned=Gen2 可）")
+    pp.add_argument("--challenger", choices=["hard", "learned"], default="hard")
+    pp.add_argument("--baseline", choices=["hard", "learned"], default="hard")
     pp.add_argument("--challenger-policy", choices=["fair", "cheat"], default="fair")
     pp.add_argument("--baseline-policy", choices=["fair", "cheat"], default="cheat")
-    pp.add_argument("--challenger-pimc", type=int, default=1, help="挑戦者の PIMC 世界数（>=2 で決定化）")
-    pp.add_argument("--baseline-pimc", type=int, default=1, help="ベースラインの PIMC 世界数")
-    pp.add_argument("--challenger-budget", type=int, default=None, help="挑戦者の深掘り予算（Phase 4 按分）")
-    pp.add_argument("--baseline-budget", type=int, default=None, help="ベースラインの深掘り予算")
+    pp.add_argument("--challenger-pimc", type=int, default=1, help="挑戦者の PIMC 世界数（>=2 で決定化・L1のみ）")
+    pp.add_argument("--baseline-pimc", type=int, default=1, help="ベースラインの PIMC 世界数（L1のみ）")
+    pp.add_argument("--challenger-budget", type=int, default=None, help="挑戦者の深掘り予算（L1のみ）")
+    pp.add_argument("--baseline-budget", type=int, default=None, help="ベースラインの深掘り予算（L1のみ）")
+    pp.add_argument("--challenger-sims", type=int, default=160, help="learned 挑戦者の MCTS 探索数")
+    pp.add_argument("--baseline-sims", type=int, default=160, help="learned ベースラインの MCTS 探索数")
     pp.add_argument("--pairs", type=int, default=50)
     pp.add_argument("--seed", type=int, default=0)
     pp.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
@@ -451,7 +386,8 @@ def main(argv=None):
 
     if args.cmd == "arena":
         rep = arena(db, args.challenger, args.baseline, args.games, args.seed, args.max_steps,
-                    challenger_policy=args.challenger_policy, baseline_policy=args.baseline_policy)
+                    challenger_policy=args.challenger_policy, baseline_policy=args.baseline_policy,
+                    challenger_sims=args.challenger_sims, baseline_sims=args.baseline_sims)
         for d in rep["detail"]:
             print(f"  seed={d['seed']} challenger={d['challenger_seat']} winner={d['winner']} "
                   f"{'WIN' if d['challenger_won'] else 'loss'} turns={d['turns']}")
@@ -465,7 +401,8 @@ def main(argv=None):
         rep = arena_paired(db, args.challenger, args.baseline, args.pairs, args.seed, args.max_steps,
                            challenger_policy=args.challenger_policy, baseline_policy=args.baseline_policy,
                            challenger_pimc=args.challenger_pimc, baseline_pimc=args.baseline_pimc,
-                           challenger_budget=args.challenger_budget, baseline_budget=args.baseline_budget)
+                           challenger_budget=args.challenger_budget, baseline_budget=args.baseline_budget,
+                           challenger_sims=args.challenger_sims, baseline_sims=args.baseline_sims)
         for d in rep["detail"]:
             print(f"  seed={d['seed']} p1won={d['chal_as_p1_won']:.0f} p2won={d['chal_as_p2_won']:.0f} "
                   f"pair={d['pair_score']:.2f}")

@@ -38,6 +38,10 @@
 | [`reports/pypy_migration_runbook_20260620.md`](reports/pypy_migration_runbook_20260620.md) | PyPy 移行 ランブック（2026-06-20）。方式選定（A 単一プロセス／B プロセス分離）→Phase0 互換スパイク→Phase1 移行→Phase2 Cloud Run デプロイ→Phase3 検証ゲート（CPython/PyPy 双方緑・挙動ビット一致）→Phase4 段階切替/ロールバック。配信スタック（pydantic-core/grpcio）の PyPy 非互換を方式Bで回避・`_USE_PYPY_WORKER` フラグで即ロールバック。リスク対照表つき |
 | [`reports/pypy_phase0_result_20260620.md`](reports/pypy_phase0_result_20260620.md) | PyPy 移行 Phase 0 互換スパイク 実行結果（2026-06-20）。pypi 実 install 判定：純依存（uvicorn/websockets/requests/h11）✅／**pydantic-core ❌（PyPy wheel 無し・PyO3 が 3.11 未満を拒否）**／**grpcio ❌（wheel 無し・ソースビルド長大）**。方式A（単一プロセス全 PyPy）の2大依存が PyPy で建たない |
 | [`reports/cpu_strength_plan_20260628.md`](reports/cpu_strength_plan_20260628.md) | CPU 強化 計画・設計＋**実測結論**（2026-06-28）。L1 単一系統化後、強化レバーを順に実装・計測した記録と総括（§K）。**結論＝検討した全レバーが「出荷済み／失敗済み／既出／幽霊」**で、現アーキ（L1 eval＋α-β/ビーム horizon=4＋PIMC K=4）の CPU は**達成可能上限に近い**。内訳: 速度系(PyPy/計画キャッシュ/ポンダリング/PV ordering/PIMC按分)=出荷済み／TT・地平線外静的項=失敗／L1係数SPSA=Elo余地≈0／①マリガン方策・④settle-PASS過大検出=幽霊(Elo中立・実測)／②隠れ情報サンプラ=既出(超幾何分布)／③動的時間配分=棄却。さらなる伸びは NNUE/ISMCTS 級の質的転換が要るが Python 1秒予算では棄却。**幽霊/失敗レバーの実装は §K の結論を受けて撤去済み（2026-06-28）** |
+| [`reports/cpu_replay_ambiguity_r0_20260704.md`](reports/cpu_replay_ambiguity_r0_20260704.md) | 実対局リプレイ R0（2026-07-04）。記録アクション（card_id 基準）の一意復元可否を実デッキで計測＝曖昧率 3.5〜4.5%・fan-out 小・effect 選択は 0/515。判断＝(A) 決定論タイブレーク逆引きを主とする。計器 `tests/scripts/replay_ambiguity_probe.py` |
+| [`reports/cpu_replay_roundtrip_r1_20260704.md`](reports/cpu_replay_roundtrip_r1_20260704.md) | 実対局リプレイ R1/R2（2026-07-04）。リプレイヤ＋ラウンドトリップで実デッキ 10/10 完全一致。副産物＝`cpu_ai._find_card` が stage/temp_zone 未探索で ACTIVATE_MAIN 等の記述が uuid 漏れ→修正で 8/10→10/10。(A) タイブレークは R0 見積りより頑健（場複製由来の分岐 0） |
+
+> 実装中の設計計画（一部未完・実装完了後に SPEC/TEST_SPEC へ吸収）: [`replay_verification_plan.md`](replay_verification_plan.md)（実対局リプレイ検証 R0-R3 実装済＋残少）／[`cpu_perf_testing_plan.md`](cpu_perf_testing_plan.md)（CPU 性能テスト運用 A1-A3 実装済）／[`refactoring_harness_driver.md`](refactoring_harness_driver.md)（検証ハーネス共通ドライバ化 ⑥）。
 
 ## クイックスタート
 

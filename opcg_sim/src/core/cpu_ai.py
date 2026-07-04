@@ -1169,9 +1169,15 @@ def _find_card(manager, uuid: Optional[str]):
         return None
     for p in (manager.p1, manager.p2):
         leader = getattr(p, "leader", None)
-        zones = [getattr(p, z, None) or [] for z in ("field", "hand", "life", "deck", "trash")]
+        stage = getattr(p, "stage", None)
+        # field/hand/life/deck/trash に加え **temp_zone**（解決中の一時ゾーン）と **stage** も探索する。
+        # これらが漏れると ACTIVATE_MAIN 等の手記述が card_id に解決できず uuid のまま残り、
+        # card_id 基準の記録が再現不能になる（実対局リプレイ・R1 round-trip で検出した欠落）。
+        zones = [getattr(p, z, None) or [] for z in ("field", "hand", "life", "deck", "trash", "temp_zone")]
         if leader is not None:
             zones.append([leader])
+        if stage is not None:
+            zones.append([stage])
         for zone in zones:
             for c in zone:
                 if getattr(c, "uuid", None) == uuid:
@@ -1202,6 +1208,18 @@ def _describe_move(manager, move: Optional[Dict[str, Any]]) -> Optional[Dict[str
     tids = payload.get("target_ids") or []
     if tids:
         d["targets"] = [_card_label(manager, t) for t in tids]
+    # 効果対話（RESOLVE_EFFECT_SELECTION 等）の選択内容も card_id 基準で載せる＝同種の選択肢を
+    # 一意に区別できる（実対局リプレイの再現性。載せないと bare {action_type} で複数手が同記述になる）。
+    extra = payload.get("extra") or {}
+    sel = payload.get("selected_uuids") or extra.get("selected_uuids") or []
+    if sel:
+        d["selected"] = [_card_label(manager, u) for u in sel]
+    for k in ("index", "position"):
+        v = payload.get(k)
+        if v is None:
+            v = extra.get(k)
+        if v is not None:
+            d[k] = v
     return d
 
 

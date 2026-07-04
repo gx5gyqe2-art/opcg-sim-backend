@@ -337,7 +337,16 @@ def get_pending_request(gm) -> Optional[Dict[str, Any]]:
         request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True}
     elif gm.phase == Phase.BATTLE_COUNTER and gm.active_battle:
         target_owner = gm.active_battle["target_owner"]
-        counters = [c.uuid for c in target_owner.hand if c.current_counter > 0 or (c.master.type == CardType.EVENT and any(abil.trigger == TriggerType.COUNTER for abil in c.master.abilities))]
+        # カウンター候補: (a) counter 値を持つカード（手札から捨てるだけ＝コスト不要）／
+        # (b) COUNTER トリガのイベント。ただしイベントは発動コストを active ドン!! で払える分だけ
+        # 提示する（MAIN_ACTION の PLAY と同じ支払可能性フィルタ）。払えないイベントを出すと
+        # apply_counter → pay_cost で「ドン!!が不足」例外になる（合法手生成のバグ・要調査で発見）。
+        _don_active = len(target_owner.don_active)
+        counters = [c.uuid for c in target_owner.hand
+                    if c.current_counter > 0
+                    or (c.master.type == CardType.EVENT
+                        and any(abil.trigger == TriggerType.COUNTER for abil in c.master.abilities)
+                        and (c.master.cost or 0) <= _don_active)]
         request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_COUNTER, KEY_MSG: PendingMessage.SELECT_COUNTER.value, KEY_UUIDS: counters, KEY_SKIP: True}
     elif gm.phase == Phase.MAIN:
         selectable = [c.uuid for c in gm.turn_player.hand]

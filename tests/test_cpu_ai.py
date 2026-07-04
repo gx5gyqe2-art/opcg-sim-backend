@@ -808,6 +808,15 @@ def test_cpu_create_registers_metadata(client):
     assert appmod.CPU_GAMES[gid]["difficulty"] == "hard"
 
 
+def test_cpu_default_difficulty_is_learned(client):
+    """cpu_difficulty 未指定なら既定は learned（Gen2）。モデル同梱環境（リポジトリ内 gen2_*.npz）前提。"""
+    res = client.post("/api/game/create", json={
+        "p1_deck": "db:a", "p2_deck": "db:b", "p1_name": "p1", "p2_name": "p2", "vs_cpu": True,
+    }).json()
+    assert res["success"]
+    assert appmod.CPU_GAMES[res["game_id"]]["difficulty"] == "learned"
+
+
 def test_cpu_step_noop_when_human_to_act(client):
     """人間(p1)のマリガン待ちでは CPU は行動しない（cpu_acted=False, waiting_for=human_decision）。"""
     gid = _cpu_create(client)["game_id"]
@@ -873,11 +882,13 @@ def test_cpu_full_game_progress(client):
     assert turns_played >= 1
 
 
-def test_cpu_difficulty_only_hard(client):
-    """CPU 難易度は hard のみ＝expert/未知値は hard に正規化される（MCTS撤去・2026-06）。"""
-    for req_diff in ("hard", "expert", "normal", "unknown"):
+def test_cpu_difficulty_normalization(client):
+    """有効値（hard/learned）はそのまま・未知値は既定 learned へ正規化される（2026-07 既定=Gen2）。"""
+    assert appmod.CPU_GAMES[_cpu_create(client, "hard")["game_id"]]["difficulty"] == "hard"
+    assert appmod.CPU_GAMES[_cpu_create(client, "learned")["game_id"]]["difficulty"] == "learned"
+    for req_diff in ("expert", "normal", "unknown"):
         gid = _cpu_create(client, req_diff)["game_id"]
-        assert appmod.CPU_GAMES[gid]["difficulty"] == "hard"
+        assert appmod.CPU_GAMES[gid]["difficulty"] == "learned"
 
 
 # ---------------------------------------------------------------------------

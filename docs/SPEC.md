@@ -135,8 +135,9 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 完結する。フロントは人間=p1 を操作し、CPU の手はポーリングで 1 手ずつ受け取る。
 
 ### 2.5.1 配線・逐次進行
-- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（easy/normal/hard）/
-  `cpu_deck`。CPU メタは `app.py` の `CPU_GAMES` に保持（`{cpu_player_id, difficulty}`）。
+- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（`learned`＝既定・Gen2学習型／
+  `hard`＝α-β）/ `cpu_deck`。未指定・未知値は `learned` に正規化。モデル未同梱環境（`cpu_learned.available()`
+  が False）では `learned`→`hard` に安全フォールバック。CPU メタは `CPU_GAMES` に保持（`{cpu_player_id, difficulty}`）。
 - **逐次進行**: `POST /api/game/cpu/step {game_id}` が CPU の次の 1 手を `action_api`（§0 の共通
   コアパス）経由で適用し、`{cpu_acted, cpu_event, waiting_for}` を返す
   （`waiting_for`: `cpu`=継続 / `human` / `human_decision` / `game_over`）。フロントは

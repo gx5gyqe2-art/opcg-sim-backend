@@ -42,6 +42,9 @@ OPCG_LOG_SILENT=1 python tests/harness/full_card_audit.py                     # 
 > tests/ 配置規約: `tests/test_*.py`＝pytest テスト、`tests/harness/`＝テストが import する基盤
 > ライブラリ、`tests/scripts/`＝単体実行の実験/計測/監査 CLI、`tests/fixtures/`＝データ資産。
 > 共通ブートは `tests/_bootstrap.py`（sys.path＋google スタブ）。
+> **1トピック=1ファイルを維持し、ファイル数削減のための統合はしない**（ユーザ決定 2026-07-04・
+> ファイル名を索引として使う方針）。見通しは `docs/TEST_SPEC.md` §2/§3 のスイート一覧（正本索引）で
+> 確保する＝**テスト/計器を追加したら同表へ1行追記**する。
 
 > API 契約: `shared_constants.json` または `opcg_sim/api/schemas.py` を変更したら
 > `python -m opcg_sim.tools.export_contract` を実行し `contract/`（api_schema.json / manifest.json）を

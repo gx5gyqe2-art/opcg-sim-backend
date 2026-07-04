@@ -65,6 +65,21 @@ def test_play_game_finishes_with_winner(db):
     assert res["steps"] > 0 and res["turns"] > 0
 
 
+def test_play_game_supports_learned_seat(db):
+    """A1: play_game が difficulty="learned"（Gen2 席）を受け、決着＋同一 seed で再現する。
+
+    強度A/B を learned へ拡張する配線の機械健全性。強さは無関係なので低 sims で高速化
+    （実測: 本番 sims=160 は重い＝強度測定は perf_gate/arena の手動運用）。
+    """
+    a = cpu_arena.play_game(1, db, "learned", "learned", p1_sims=6, p2_sims=6)
+    b = cpu_arena.play_game(1, db, "learned", "learned", p1_sims=6, p2_sims=6)
+    assert a["winner"] in ("p1", "p2")
+    assert a == b
+    # 席混在（learned vs hard）も決着すること＝アンカー測定の土台。
+    mixed = cpu_arena.play_game(2, db, "learned", "hard", p1_sims=6)
+    assert mixed["winner"] in ("p1", "p2")
+
+
 def test_arena_structure_and_seat_alternation(db):
     rep = cpu_arena.arena(db, challenger="hard", baseline="hard", games=2, seed0=0)
     assert rep["games"] == 2

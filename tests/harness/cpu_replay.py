@@ -24,21 +24,22 @@
 """
 import argparse
 import json
-import os
-import random
 import sys
-import traceback
 from typing import Any, Dict, List, Optional
 
 import os as _os, sys as _sys  # noqa: E402  test bootstrap (sys.path + google stub)
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
 
-from opcg_sim.src.core.gamestate import GameManager, Player
-from opcg_sim.src.core import action_api, cpu_ai
-from opcg_sim.src.core.invariants import check_invariants, check_turn_boundary
-
-from cpu_selfplay import _load_db, build_deck, DEFAULT_MAX_STEPS, InvariantError
+from game_driver import (
+    load_db as _load_db,
+    build_deck,  # noqa: F401  (再エクスポート互換)
+    DEFAULT_MAX_STEPS,
+    InvariantError,
+    make_seat,
+    leader_deck_builder,
+    run_game,
+)
 
 SCHEMA = "opcg-replay/v1"
 
@@ -50,6 +51,48 @@ def _open_out(path: Optional[str]):
     if path == "-":
         return sys.stdout, False
     return open(path, "w", encoding="utf-8"), True
+
+
+class _ReplayObserver:
+    """CPU の思考トレース（decision）と盤面ステップ（step）を JSONL へ書き出す観測子。
+
+    decision 行は decide 直後（apply 前）に seat が書いた `ctx.trace` を載せる。step 行は apply 後の
+    盤面（turn/phase/events）で構成する。手記述は card_id 基準＝同一 seed で安定再現する。
+    """
+
+    def __init__(self, emit, decisions, emit_steps: bool, emit_decisions: bool, verbose: bool):
+        self.emit = emit
+        self.decisions = decisions
+        self.emit_steps = emit_steps
+        self.emit_decisions = emit_decisions
+        self.verbose = verbose
+
+    def on_decision(self, ctx, move):
+        tr = ctx.trace
+        decision_rec = {
+            "type": "decision", "step": ctx.step, "turn": ctx.turn,
+            "phase": ctx.phase, "player": ctx.actor.name, **tr,
+        }
+        self.decisions.append({"step": ctx.step, "turn": ctx.turn, "player": ctx.actor.name,
+                               "chosen": tr.get("chosen")})
+        if self.emit_decisions:
+            self.emit(decision_rec)
+        if self.verbose:
+            ch = tr.get("chosen") or {}
+            print(f"[{ctx.step:04d}] t{ctx.turn} {ctx.actor.name} DECIDE {ch.get('action_type','?'):<14} "
+                  f"{ch.get('card','')} regret={tr.get('regret',0)} folded={tr.get('folded',False)}")
+
+    def on_step(self, ctx, move, events):
+        if not self.emit_steps:
+            return
+        m = ctx.manager
+        self.emit({
+            "type": "step", "step": ctx.step, "turn": m.turn_count,
+            "phase": m.phase.name, "player": ctx.actor.name,
+            "action": move["action_type"],
+            "payload": move.get("payload") or {"card_uuid": move.get("card_uuid")},
+            "events": events,
+        })
 
 
 def run_replay(
@@ -72,21 +115,8 @@ def run_replay(
     `stop_after_decisions` を指定すると、その数の意思決定で打ち切る（決着前で `winner=None` のまま
     返す＝テストの有界化用。再現性比較には決着不要なため）。
     """
-    random.seed(seed)
-    l1, c1 = build_deck(db, "p1", p1_leader)
-    l2, c2 = build_deck(db, "p2", p2_leader)
-    if not l1 or not l2:
-        raise RuntimeError("リーダーを含むデッキを構築できませんでした。")
-    manager = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
-    manager.start_game()
-
-    difficulty_of = {"p1": p1_difficulty, "p2": p2_difficulty}
-    mem: Dict[str, Dict[str, Any]] = {"p1": {}, "p2": {}}
-
     decisions: List[Dict[str, Any]] = []   # card_id 基準の決定列（再現比較・回帰用）
     trace_tail: List[Dict[str, Any]] = []
-    step = 0
-    prev_turn = manager.turn_count
 
     def emit(line: Dict[str, Any]):
         trace_tail.append(line)
@@ -95,78 +125,26 @@ def run_replay(
         if trace_out is not None:
             trace_out.write(json.dumps(line, ensure_ascii=False) + "\n")
 
-    pending_props = action_api.CONST.get("PENDING_REQUEST_PROPERTIES", {})
-    pid_key = pending_props.get("PLAYER_ID", "player_id")
+    # 席別難易度（trace 採取 ON）。全乱数は global random（決定論契約）。
+    # difficulty="learned"＝Gen2 学習型（本番既定 CPU）。他は L1（hard 等）。どちらも思考トレースを採る。
+    mem: Dict[str, Dict[str, Any]] = {"p1": {}, "p2": {}}
 
-    while manager.winner is None and step < max_steps:
-        pending = manager.get_pending_request()
-        if not pending:
-            raise InvariantError([("STUCK", "no pending request and no winner")], step, trace_tail)
-        req_pid = pending[pid_key]
-        actor = manager.p1 if manager.p1.name == req_pid else manager.p2
+    def _seat(difficulty, m):
+        if difficulty == "learned":
+            return make_seat(kind="learned", want_trace=True)
+        return make_seat(difficulty, kind="ai", mem=m, want_trace=True)
 
-        moves = manager.get_legal_actions(actor)
-        if not moves:
-            raise InvariantError([("NO_LEGAL_MOVE", f"no legal moves for {req_pid}")], step, trace_tail)
-
-        # 思考トレースを採りつつ手を決める（trace は観測専用＝進行に影響しない）。
-        difficulty = difficulty_of[req_pid]
-        tr: Dict[str, Any] = {}
-        move = cpu_ai.decide_guarded(manager, actor, difficulty, random,
-                                     mem.setdefault(req_pid, {}), trace=tr)
-        if move is None:
-            raise InvariantError([("NO_DECISION", f"decide returned None for {req_pid}")], step, trace_tail)
-
-        decision_rec = {
-            "type": "decision", "step": step, "turn": manager.turn_count,
-            "phase": manager.phase.name, "player": req_pid, **tr,
-        }
-        decisions.append({"step": step, "turn": manager.turn_count, "player": req_pid,
-                          "chosen": tr.get("chosen")})
-        if emit_decisions:
-            emit(decision_rec)
-        if verbose:
-            ch = tr.get("chosen") or {}
-            print(f"[{step:04d}] t{manager.turn_count} {req_pid} DECIDE {ch.get('action_type','?'):<14} "
-                  f"{ch.get('card','')} regret={tr.get('regret',0)} folded={tr.get('folded',False)}")
-
-        manager.action_events = []
-        try:
-            if move["kind"] == "battle":
-                action_api.apply_battle_action(manager, actor, move["action_type"], move.get("card_uuid"))
-            else:
-                action_api.apply_game_action(manager, actor, move["action_type"], move.get("payload", {}))
-        except Exception as e:
-            raise InvariantError(
-                [("ACTION_EXCEPTION", f"{type(e).__name__}: {e}\n{traceback.format_exc()}")],
-                step, trace_tail,
-            )
-
-        if emit_steps:
-            emit({
-                "type": "step", "step": step, "turn": manager.turn_count,
-                "phase": manager.phase.name, "player": req_pid,
-                "action": move["action_type"],
-                "payload": move.get("payload") or {"card_uuid": move.get("card_uuid")},
-                "events": list(manager.action_events),
-            })
-
-        violations = check_invariants(manager)
-        if manager.turn_count != prev_turn:
-            violations += check_turn_boundary(manager)
-            prev_turn = manager.turn_count
-        if violations:
-            raise InvariantError(violations, step, trace_tail)
-        step += 1
-        if stop_after_decisions is not None and len(decisions) >= stop_after_decisions:
-            break
-
-    if manager.winner is None and stop_after_decisions is None:
-        raise InvariantError([("MAX_STEPS", f"game did not finish within {max_steps} steps")], step, trace_tail)
+    seats = {"p1": _seat(p1_difficulty, mem["p1"]), "p2": _seat(p2_difficulty, mem["p2"])}
+    obs = _ReplayObserver(emit, decisions, emit_steps, emit_decisions, verbose)
+    result = run_game(seed, db, seats=seats,
+                      deck_builder=leader_deck_builder(p1_leader, p2_leader),
+                      observers=[obs], max_steps=max_steps,
+                      legal_moves="check", invariants="raise",
+                      stop_after_decisions=stop_after_decisions, trace_tail=trace_tail)
 
     return {
-        "seed": seed, "winner": manager.winner, "steps": step, "turns": manager.turn_count,
-        "p1_leader": l1.master.card_id, "p2_leader": l2.master.card_id,
+        "seed": seed, "winner": result.winner, "steps": result.steps, "turns": result.turns,
+        "p1_leader": result.p1_leader, "p2_leader": result.p2_leader,
         "p1_difficulty": p1_difficulty, "p2_difficulty": p2_difficulty,
         "decisions": decisions,
     }
@@ -186,10 +164,10 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--p1-leader", default=None)
     ap.add_argument("--p2-leader", default=None)
-    ap.add_argument("--difficulty", choices=["hard"], default="hard",
-                    help="両者の既定難易度（--p1-difficulty/--p2-difficulty で個別上書き）")
-    ap.add_argument("--p1-difficulty", choices=["hard"], default=None)
-    ap.add_argument("--p2-difficulty", choices=["hard"], default=None)
+    ap.add_argument("--difficulty", choices=["hard", "learned"], default="hard",
+                    help="両者の既定難易度（learned=Gen2 学習型・本番既定／--p1-/--p2-difficulty で個別上書き）")
+    ap.add_argument("--p1-difficulty", choices=["hard", "learned"], default=None)
+    ap.add_argument("--p2-difficulty", choices=["hard", "learned"], default=None)
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
     ap.add_argument("--out", default=None, help="トレース JSONL の出力先（'-' で stdout）")
     ap.add_argument("--record", default=None, help="リプレイ種（descriptor JSON）の出力先")
