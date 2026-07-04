@@ -13,6 +13,7 @@
 | ③ | frontend `refactoring_realgame.md` | F-1〜F-6 | `RealGame.tsx`（フック分割＋盤面レイアウト共通化） |
 | ④ | `refactoring_shared_contract.md` | D-1〜D-6 | 契約一本化（shared_constants 同期＋API型生成） |
 | ⑤ | `refactoring_tests_and_errors.md` | E-1〜E-7 | tests/ 再編＋例外ログ化 |
+| ⑥ | `refactoring_harness_driver.md` | G-1〜G-4 | CPU検証ハーネスの共通対局ドライバ化＋使い捨てスクリプト整理 |
 
 ## 計画原則
 
@@ -44,6 +45,11 @@ A-1 ─▶ A-2 ─▶ A-3 ─▶ B-1..B-6 ─▶ E-6 ─▶ E-7
 ```
 
 **クリティカルパス**: `D-2/E-5 → ①A → ②C → ④D → ①B → E-7`。
+
+## ⑥ハーネストラック（tests/ 側のみ・①〜④とファイル衝突なし）
+
+`G-1`(スクリプト削除・独立) → `G-2` → `G-3` → `G-4`。いつでも着手可だが、`harness/cpu_*` を
+CPU 機能開発と共有するため同時進行させない（単一オーナー制）。⑤E-2/E-3（tests 再編）完了が前提。
 
 ## フロント並行トラック（backend と独立）
 
