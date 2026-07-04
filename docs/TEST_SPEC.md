@@ -96,6 +96,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 | ファイル | 役割 |
 |---|---|
 | `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER/PER_TURN_LIMIT_GAP/UP_TO_GAP = 0 のラチェット（§5） |
+| `tests/test_effect_event_dest.py` | **EFFECT イベントの行き先（dest）記録**: 移動系（MOVE_CARD 等）の eventLog に dest（"LIFE" 等）が additive に載る／非移動系（LOOK）には載せない。実カード OP16-119 のライフ追加で固定（フロントの効果表示の根拠） |
 | `tests/test_structural_gate.py` | 構造不変条件4スキャン＋条件偽パスのラチェット（カテゴリH 再発防止。§5/§8.5） |
 | `tests/test_interaction_stack.py` | 中断スタック（`active_interaction` 互換プロパティ／`push_interaction`）のセマンティクス |
 | `tests/test_replacement_interactive.py` | 置換 sub_effect のネスト中断（終端=UI提示+resume／非終端=自動解決）。SPEC §6.1 |

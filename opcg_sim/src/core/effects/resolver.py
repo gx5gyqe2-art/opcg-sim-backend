@@ -480,12 +480,18 @@ class EffectResolver:
             f"{t.master.name}({t.uuid[:4]})" if hasattr(t, "master") else f"DON!!({t.uuid[:4]})"
             for t in targets
         ]
-        self.action_history.append({
+        entry = {
             "action": action.type.name if hasattr(action.type, 'name') else str(action.type),
             "success": success,
             "targets": target_names,
             "value": value
-        })
+        }
+        # 移動系は行き先も記録する。無いと eventLog 上で MOVE_CARD の意味が読めない
+        # （例: OP16-119 のライフ追加が素の MOVE_CARD 表示になり「発動していない」ように見えた）。
+        dest = getattr(action, "destination", None)
+        if dest is not None:
+            entry["dest"] = getattr(dest, "name", None) or str(dest)
+        self.action_history.append(entry)
 
         return success
 

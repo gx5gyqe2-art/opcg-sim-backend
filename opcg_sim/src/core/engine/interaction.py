@@ -213,6 +213,7 @@ def resolve_interaction(gm, player: Player, payload: Dict[str, Any]):
             "targets": ev.get("targets", []),
             "value": ev.get("value"),
             "success": ev.get("success", True),
+            **({"dest": ev["dest"]} if ev.get("dest") else {}),   # 移動系の行き先（additive）
         })
 
     if not gm.active_interaction and gm.setup_phase_pending:
