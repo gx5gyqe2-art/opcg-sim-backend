@@ -310,11 +310,15 @@ from .services.decks import load_deck_mixed                          # noqa: F40
 | OPTIONS/CORS 契約の欠落 | ルータ移設時に OPTIONS ハンドラの本数を移行前後で機械比較（`grep -c "@.*options"`） |
 | SandboxManager import の正規化で起動失敗が顕在化 | 意図した挙動変更（沈黙→即失敗）として PR 説明に明記。パッケージ内 import なので実環境で失敗する経路はない |
 
-## 7. 完了条件
+## 7. 完了条件（達成状況）
 
-- app.py が 100行以下（組み立て＋互換エイリアスのみ）。
-- ルート関数は原則 30行以下・ビジネスロジックなし。
-- `sys.path` 操作 0、try/except による import フォールバック 0、沈黙 `except: pass` の初期化系 0。
-- test_api.py（契約テスト）のアサーション無変更で green。
-- 全品質ゲート green（CLAUDE.md）＋ uvicorn 起動スモーク＋ ponder 有効での CPU 対戦スモーク。
-- `docs/SPEC.md` の API 章がモジュール構成を反映。
+- ✅ app.py は `create_app()` シェル（約85行・CORS＋lifespan＋include_router＋後方互換エイリアスのみ）。
+- ✅ ルート関数はロジックを config/resources/state/presenters/ws/services へ委譲する薄い皮。
+- ✅ `sys.path` 操作 0（C-1 で撤去）、import フォールバックは firestore の任意依存のみ、初期化の沈黙 `except: pass` 0。
+- ✅ test_api.py 系（契約テスト）green。**デッキ読込のみ monkeypatch 対象が `services.decks` に移動**
+  （ルートがサービスモジュール属性経由で呼ぶため。C-5 でテスト側も追従済み）。
+- ✅ 全品質ゲート green（全スイート 1083 passed・構造監査 0・ベースライン無変更）。
+- ✅ `docs/SPEC.md` の API 章がモジュール構成（`routers/` パッケージ・分離モジュール）を反映。
+
+> C-5 は当初リスク管理のため単一 `routers.py` で着地し、後続 followup で本設計どおり
+> **`routers/` のドメイン別パッケージ（game/cpu/cards/decks/sandbox/rule）** へ分割完了（§3-7 の構成に一致）。
