@@ -11,9 +11,9 @@ import rl_encoder as E
 from opcg_action import ACTION_DIM, legal_action_matrix
 
 
-def state_context(manager, me_name, vocab):
-    """policy の状態文脈＝scalars(14) ++ field flatten(80) = feature_dim(94)。"""
-    enc = E.encode(manager, me_name, vocab)
+def state_context(manager, me_name, vocab, version=1):
+    """policy の状態文脈＝scalars ++ field flatten = feature_dim(version)。"""
+    enc = E.encode(manager, me_name, vocab, version=version)
     return np.concatenate([enc["scalars"].astype(np.float64),
                            enc["field"].astype(np.float64).reshape(-1)])
 

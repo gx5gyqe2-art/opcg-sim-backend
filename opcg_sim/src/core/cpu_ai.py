@@ -656,6 +656,36 @@ def _selection_moves(manager, actor_name: str):
         return [{"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": accept},
                 {"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": decline}]
 
+    # 並び替え/上下選択（ARRANGE_DECK）: 従来は既定解決1手のみ＝底送りの順番・scry の上/下を
+    # 探索できなかった。全順列は爆発するため「どのカードを先頭（＝配置順の1枚目）にするか」の
+    # 回転 × 上/下（allow_position 時）だけを候補化する。返り値は**既定解決を含む完全な集合**
+    # （L1 経路は本関数の返りで合法手を置換するため）。既定の組は base と同一 payload にする＝
+    # merged_search_actions のキー重複除去で二重 edge にならない（訪問数を分裂させない）。
+    if pending.get(KEY_ACTION) == "ARRANGE_DECK":
+        uuids = list(pending.get(KEY_UUIDS, []) or [])
+        allow_pos = bool(pending.get("allow_position", False))
+        allow_reorder = bool(pending.get("allow_reorder", False))
+        if not uuids or not (allow_pos or (allow_reorder and len(uuids) >= 2)):
+            return None
+        base = manager.default_interaction_payload(pending)
+
+        def _mk_arr(order, position):
+            payload = dict(base)
+            if order is not None:            # None＝既定の並び（base の selected をそのまま）
+                payload["selected_uuids"] = list(order)
+            if position is not None:
+                payload["position"] = position
+            return {"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": payload}
+
+        orders: List[Optional[List[str]]] = [None]
+        if allow_reorder and len(uuids) >= 2:
+            # 先頭カードの回転のみ（uuids[0] 先頭＝既定の並びは None が代表）。
+            orders += [[u] + [v for v in uuids if v != u] for u in uuids[1:HARD_SELECT_CAP]]
+        # 既定 payload の position は "BOTTOM"（上下選択なしの効果は resolve 側が fixed を適用）。
+        positions = ["BOTTOM", "TOP"] if allow_pos else [None]
+        moves = [_mk_arr(o, p) for o in orders for p in positions]
+        return moves if len(moves) >= 2 else None
+
     if pending.get(KEY_ACTION) != _SELECT_ACTION:
         return None
     uuids = list(pending.get(KEY_UUIDS, []) or [])

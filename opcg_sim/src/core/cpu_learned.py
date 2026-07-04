@@ -53,26 +53,39 @@ def available() -> bool:
     return os.path.exists(_DEFAULT_VALUE)
 
 
-def _value_fn(vnet, vocab):
+def _value_fn(vnet, vocab, enc_version=1):
     def value(state, to_move):
         if state.winner is not None:
             return 1.0 if state.winner == to_move else -1.0
-        enc = E.encode(state, to_move, vocab)
+        enc = E.encode(state, to_move, vocab, version=enc_version)
         batch = {k: enc[k][None, ...] for k in ("scalars", "field", "card_idx")}
         return float(vnet.predict(batch)[0])
     return value
 
 
-def _priors_fn(pnet, vocab):
+def _priors_fn(pnet, vocab, enc_version=1):
     if pnet is None:
         return None
     def priors(state, legal):
         me = state.pending_actor_action()[0]
-        ctx = state_context(state, me, vocab)
+        ctx = state_context(state, me, vocab, version=enc_version)
         am = legal_action_matrix(state, legal, me)
         p = pnet.priors(ctx, am)
         return p if p.shape[0] == len(legal) else None
     return priors
+
+
+def _net_enc_version(vnet) -> int:
+    """ロード済み value ネットの入力次元から符号化世代（encoder version）を判別する。
+
+    v1=Gen2 出荷ネット（scalars 14）・v2=リーダー付与ドン追加（scalars 16）。重み側の
+    次元が真実源＝コードのデフォルトに依存しない（v2 ネットへ差し替えた時点で自動有効）。
+    """
+    feat = int(vnet.W1.shape[0]) - int(vnet.d_emb)
+    for v in (1, 2):
+        if feat == E.feature_dim(v):
+            return v
+    raise ValueError(f"value ネットの入力次元が未知（feat_dim={feat}）: encoder と重みの対応を確認")
 
 
 class LearnedEngine:
@@ -92,8 +105,17 @@ class LearnedEngine:
         self.vocab = vocab
         self.game = game
         self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
+        # 符号化世代は重みの入力次元から自動判別（v1=出荷Gen2・v2=リーダー付与ドン特徴）。
+        self.enc_version = _net_enc_version(self.vnet)
         pp = policy_path or _DEFAULT_POLICY
         self.pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
+        if self.pnet is not None:
+            from opcg_sim.src.learned.action import ACTION_DIM
+            pv = int(self.pnet.in_dim) - ACTION_DIM
+            if pv != E.feature_dim(self.enc_version):
+                raise ValueError(
+                    f"value/policy の符号化世代が不一致（value=v{self.enc_version}, "
+                    f"policy ctx_dim={pv}）: 同一世代の npz ペアを配置してください")
 
     def decide(self, manager, player, sims: int = 160, c_puct: float = 1.5,
                rng=None, trace=None) -> Optional[Dict[str, Any]]:
@@ -104,8 +126,8 @@ class LearnedEngine:
         if not isinstance(rng, np.random.Generator):
             import random as _random
             rng = np.random.default_rng(_random.getrandbits(64))
-        mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab),
-                        priors_fn=_priors_fn(self.pnet, self.vocab),
+        mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab, self.enc_version),
+                        priors_fn=_priors_fn(self.pnet, self.vocab, self.enc_version),
                         c_puct=c_puct, n_sims=sims,
                         determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=rng)
         move, _, legal = mcts.run(manager)

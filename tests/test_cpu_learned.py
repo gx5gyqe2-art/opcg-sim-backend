@@ -238,15 +238,116 @@ def test_selection_merge_key_distinguishes_position():
     assert _selection_merge_key(a) != _selection_merge_key(b)
 
 
+def _arrange_pending_game(n_cards=2, allow_position=False, allow_reorder=True):
+    """ARRANGE_DECK の active_interaction を持つ合成盤面（並び替え n_cards 枚）。"""
+    from engine_helpers import make_game, make_instance, make_master
+    gm, p1, _ = make_game()
+    cards = [make_instance(make_master(card_id=f"A-{i}"), owner=p1.name) for i in range(n_cards)]
+    src = make_instance(make_master(card_id="SRC"), owner=p1.name)
+    p1.field.append(src)
+    gm.active_interaction = {
+        "player_id": p1.name,
+        "action_type": "ARRANGE_DECK",
+        "source_card_name": src.master.name,
+        "message": "順番を決めてください",
+        "candidates": cards,
+        "constraints": {"min": 0, "max": -1 if allow_reorder else 0},
+        "allow_position": allow_position,
+        "allow_reorder": allow_reorder,
+        "continuation": {"execution_stack": [], "effect_context": {},
+                         "source_card_uuid": src.uuid,
+                         "arrange_targets": cards, "dest_kind": "DECK",
+                         "dest_owner": None, "fixed_position": "BOTTOM"},
+    }
+    return gm, p1, cards
+
+
+def test_arrange_deck_enumerates_reorder_alternatives():
+    """配線バグ回帰(#6): ARRANGE_DECK（並び替え）で既定順以外も候補化される。
+
+    従来は既定解決1手のみ＝底送りの順番を探索できなかった（OP16-119 の残り2枚が
+    100% 単一候補だった実対局T9）。回転（どれを先頭にするか）を候補化し、既定の並びは
+    base と同一 payload（キー重複除去）で二重 edge にしない。
+    """
+    from opcg_sim.src.core import cpu_ai
+    from opcg_sim.src.learned.adapter import OPCGGame
+    gm, p1, cards = _arrange_pending_game(n_cards=3, allow_reorder=True)
+    assert len(gm.get_legal_actions(p1)) == 1, "raw は既定1手のはず"
+    moves = OPCGGame().legal_actions(gm)
+    assert len(moves) == 3, f"既定＋回転2 の3候補のはず: {len(moves)}"
+    keys = {cpu_ai._selection_merge_key(m) for m in moves}
+    assert len(keys) == 3, "候補のキーが重複（等価 edge の分裂）"
+    # L1 経路（置換）でも既定を含む完全な集合が返る。
+    sel = cpu_ai._selection_moves(gm, p1.name)
+    assert sel is not None and len(sel) == 3
+
+
+def test_arrange_deck_enumerates_top_bottom_choice():
+    """配線バグ回帰(#7): 上/下選択（allow_position）で TOP/BOTTOM 両方を候補化する。
+
+    scry（「デッキの上か下に置く」）の置き先は次ドローに直結する戦略判断だが、
+    従来は既定（BOTTOM）しか探索できなかった。
+    """
+    from opcg_sim.src.core import cpu_ai
+    from opcg_sim.src.learned.adapter import OPCGGame
+    gm, p1, cards = _arrange_pending_game(n_cards=1, allow_position=True, allow_reorder=False)
+    moves = OPCGGame().legal_actions(gm)
+    positions = sorted(m["payload"].get("position") for m in moves)
+    assert positions == ["BOTTOM", "TOP"], f"TOP/BOTTOM 両方が候補化されるはず: {positions}"
+
+
 def test_encoder_no_drift():
-    """製品コピーの符号化が訓練時(tests)と厳密一致＝netへ同じ入力を与える。"""
+    """製品コピーの符号化が訓練時(tests)と厳密一致＝netへ同じ入力を与える（v1/v2 とも）。"""
     m = _game(5); name, _ = _actor(m)
     vocab_t = TEST_E.build_vocab(_load_db())
     vocab_p = PROD_E.build_vocab(_load_db())
-    et = TEST_E.encode(m, name, vocab_t)
-    ep = PROD_E.encode(m, name, vocab_p)
-    for k in ("scalars", "field", "card_idx"):
-        assert np.array_equal(et[k], ep[k]), f"encoder ドリフト: {k}"
+    for ver in (1, 2):
+        et = TEST_E.encode(m, name, vocab_t, version=ver)
+        ep = PROD_E.encode(m, name, vocab_p, version=ver)
+        for k in ("scalars", "field", "card_idx"):
+            assert np.array_equal(et[k], ep[k]), f"encoder ドリフト(v{ver}): {k}"
+    assert TEST_E.feature_dim(2) == PROD_E.feature_dim(2)
+
+
+def test_encoder_v2_sees_leader_attached_don():
+    """符号化世代 v2: リーダー付与ドンが scalars に載る（v1 は不可視＝従来互換）。
+
+    v1 の盲点（リーダー付与ドンが完全に不可視）が「ATTACH_DON(リーダー)＝ドンを失うだけの手」
+    という系統的過小評価の根因だった（実対局分析 2026-07-04）。v2 で自/相手リーダーの
+    attached_don を /5 正規化で追加。v1 出力は完全不変＝出荷 Gen2 の入力を壊さない。
+    """
+    m = _game(8); name, _ = _actor(m)
+    vocab = PROD_E.build_vocab(_load_db())
+    me = m.p1 if m.p1.name == name else m.p2
+    v1_before = PROD_E.encode(m, name, vocab, version=1)
+    v2_before = PROD_E.encode(m, name, vocab, version=2)
+    assert v1_before["scalars"].shape[0] == PROD_E.SCALARS_V1
+    assert v2_before["scalars"].shape[0] == PROD_E.SCALARS_V2
+    assert np.array_equal(v2_before["scalars"][:PROD_E.SCALARS_V1], v1_before["scalars"]),\
+        "v2 の先頭は v1 と同一（追加のみ）のはず"
+    me.leader.attached_don = 2
+    v1_after = PROD_E.encode(m, name, vocab, version=1)
+    v2_after = PROD_E.encode(m, name, vocab, version=2)
+    assert np.array_equal(v1_before["scalars"], v1_after["scalars"]), "v1 は不変（互換維持）のはず"
+    assert v2_after["scalars"][PROD_E.SCALARS_V1] == 2 / 5.0, "v2 に自リーダー付与ドンが載るはず"
+
+
+def test_enc_version_autodetect_from_weights():
+    """符号化世代はロードした npz の入力次元から自動判別（コード既定に依存しない）。
+
+    出荷 Gen2＝v1 で挙動不変。v2 で訓練した npz を置いた時点で新特徴が自動有効になる
+    （デプロイはファイル差し替えのみ・フラグ不要）。
+    """
+    import os, tempfile
+    from opcg_sim.src.learned.value_net import ValueNet
+    assert cpu_learned._net_enc_version(cpu_learned._default_engine().vnet) == 1,\
+        "出荷 Gen2 は v1 のはず"
+    v2 = ValueNet(vocab_size=10, d_emb=4, hidden=8, feat_dim=PROD_E.feature_dim(2), seed=0)
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "v2_value.npz")
+        v2.save(path)
+        loaded = ValueNet.load(path)
+    assert cpu_learned._net_enc_version(loaded) == 2, "v2 ネットの入力次元から v2 と判別されるはず"
 
 
 def test_action_features_no_drift():

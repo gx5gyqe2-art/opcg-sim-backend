@@ -90,7 +90,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 | `tests/test_game_driver.py` | **共通対局ドライバ**（`tests/harness/game_driver.py`・設計⑥）の機械健全性: 同一 seed の決定論・observer 不干渉（観測専用の契約）・席の写像等価（run_one_game/play_game と一致）・`stop_after_decisions` 有界化・**learned(Gen2) 自己対戦の seed 再現** |
 | `tests/test_replay_roundtrip.py` | **実対局リプレイのラウンドトリップ**（`tests/harness/replay_runner.py`）: 録画（人間=private rng・card_id 基準記録）→記述子から再生（人間手注入＋CPU 再 decide）→勝敗・手数・ターン一致＋逆写像 miss=0。hard／**learned(Gen2)**／**coin toss（first_player=random）** の3系統＋リゾルバ単体 |
 | `tests/test_perf_gate.py` | **CPU 性能ゲートの判定ロジック**（`tests/scripts/perf_gate.py`・§5.1）: `evaluate_gate` 純関数（強度不足/レイテンシ超過/失敗局/データ不足→FAIL・理由の蓄積）＋ gen2_*.npz ハッシュの安定性。実対局は回さず高速固定 |
-| `tests/test_cpu_learned.py` | **学習型CPU（Gen2）本番配線**（`opcg_sim/src/core/cpu_learned.py`／`opcg_sim/src/learned/`）: 合法手・decide_client ルーティング・seed 決定論・席別エンジン（net-vs-net 等価）・**符号化/行動特徴の訓練時ドリフト検知**・選択対話の併合（CONFIRM_OPTIONAL accept/decline・up-to ライフ追加・position キー）・**ルート等価手マージ**（同名複製の訪問数分裂で PASS に負ける実害の反転ケース＋複製なし恒等）・トレース記述（decline の accepted 明示・dialog 種別） |
+| `tests/test_cpu_learned.py` | **学習型CPU（Gen2）本番配線**（`opcg_sim/src/core/cpu_learned.py`／`opcg_sim/src/learned/`）: 合法手・decide_client ルーティング・seed 決定論・席別エンジン（net-vs-net 等価）・**符号化/行動特徴の訓練時ドリフト検知（v1/v2）**・選択対話の併合（CONFIRM_OPTIONAL accept/decline・up-to ライフ追加・**ARRANGE_DECK の並び替え/上下選択**・position キー）・**ルート等価手マージ**（同名複製の訪問数分裂で PASS に負ける実害の反転ケース＋複製なし恒等）・トレース記述（decline の accepted 明示・dialog 種別）・**符号化世代 v2**（リーダー付与ドン特徴＝v1 では不可視・v1 出力不変・npz 入力次元からの自動判別） |
 
 ### 効果メカニクス・対話モデル
 | ファイル | 役割 |

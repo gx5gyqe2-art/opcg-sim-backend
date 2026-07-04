@@ -30,22 +30,22 @@ from cpu_selfplay import _load_db
 
 
 # ---- ネットを MCTS の value_fn / priors_fn に変換 ----
-def value_fn_of(net, vocab):
+def value_fn_of(net, vocab, enc_version=1):
     def value(state, to_move):
         if state.winner is not None:
             return 1.0 if state.winner == to_move else -1.0
-        enc = E.encode(state, to_move, vocab)
+        enc = E.encode(state, to_move, vocab, version=enc_version)
         batch = {k: enc[k][None, ...] for k in ("scalars", "field", "card_idx")}
         return float(net.predict(batch)[0])
     return value
 
 
-def priors_fn_of(policy, vocab):
+def priors_fn_of(policy, vocab, enc_version=1):
     if policy is None:
         return None
     def priors(state, legal):
         me = state.pending_actor_action()[0]
-        ctx = state_context(state, me, vocab)
+        ctx = state_context(state, me, vocab, version=enc_version)
         am = legal_action_matrix(state, legal, me)
         p = policy.priors(ctx, am)
         return p if p.shape[0] == len(legal) else None
@@ -61,7 +61,8 @@ def _sample(counts, rng, temp):
 
 
 # ---- 自己対戦でデータ採取 ----
-def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_moves=8, max_steps=400):
+def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_moves=8, max_steps=400,
+                  enc_version=1):
     m = game.new_game(db=_DB, seed=int(rng.integers(1 << 30)))
     val_recs, pol_recs = [], []   # (enc, who) / (ctx, am, visit, who)
     steps = 0
@@ -75,9 +76,9 @@ def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_move
         if move is None or N is None or N.sum() == 0:
             break
         visit = N.astype(np.float64) / N.sum()
-        enc = E.encode(m, name, vocab)
+        enc = E.encode(m, name, vocab, version=enc_version)
         val_recs.append((enc, name))
-        ctx = state_context(m, name, vocab)
+        ctx = state_context(m, name, vocab, version=enc_version)
         am = legal_action_matrix(m, legal, name)
         pol_recs.append((ctx, am, visit, name))
         a = _sample(N, rng, temp=1.0 if steps < temp_moves else 0.0)
@@ -90,11 +91,12 @@ def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_move
     return val_recs, pol_recs, winner
 
 
-def generate(game, value_fn, priors_fn, vocab, n_games, sims, c_puct, rng, log=print):
+def generate(game, value_fn, priors_fn, vocab, n_games, sims, c_puct, rng, log=print, enc_version=1):
     S, F, I, Y = [], [], [], []
     pol = []
     for g in range(n_games):
-        vr, pr, w = selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng)
+        vr, pr, w = selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng,
+                                  enc_version=enc_version)
         if w is None:
             continue
         for enc, who in vr:
@@ -111,18 +113,19 @@ def generate(game, value_fn, priors_fn, vocab, n_games, sims, c_puct, rng, log=p
     return vdata, pol
 
 
-def train_generation(vocab, vdata, pol, d_emb=24, hidden=128, v_epochs=20, p_epochs=4, seed=0, log=print):
-    vnet = RN.ValueNet(len(vocab), d_emb=d_emb, hidden=hidden, feat_dim=E.feature_dim(), seed=seed)
+def train_generation(vocab, vdata, pol, d_emb=24, hidden=128, v_epochs=20, p_epochs=4, seed=0, log=print,
+                     enc_version=1):
+    vnet = RN.ValueNet(len(vocab), d_emb=d_emb, hidden=hidden, feat_dim=E.feature_dim(enc_version), seed=seed)
     tm, vm = RN.train(vnet, vdata, epochs=v_epochs, lr=2e-3, batch=256, val_frac=0.05)
-    pnet = PolicyScorer(hidden=hidden, seed=seed)
+    pnet = PolicyScorer(ctx_dim=E.feature_dim(enc_version), hidden=hidden, seed=seed)
     ce = train_policy(pnet, pol, epochs=p_epochs, lr=2e-3)
     log(f"  train: value mse={tm:.3f}/{vm:.3f}  policy ce={ce:.3f}", flush=True)
     return vnet, pnet
 
 
 # ---- クロス評価（CRN・先後交互） ----
-def _agent(game, vnet, pnet, vocab, sims, c_puct):
-    vf = value_fn_of(vnet, vocab); pf = priors_fn_of(pnet, vocab)
+def _agent(game, vnet, pnet, vocab, sims, c_puct, enc_version=1):
+    vf = value_fn_of(vnet, vocab, enc_version); pf = priors_fn_of(pnet, vocab, enc_version)
     def act(state, name, rng):
         mcts = TreeMCTS(game, value_fn=vf, priors_fn=pf, c_puct=c_puct, n_sims=sims,
                         determinize_fn=lambda s, r: game.determinize(s, name, r), rng=rng)
@@ -176,6 +179,8 @@ def main():
     ap.add_argument("--eval-pairs", type=int, default=3)
     ap.add_argument("--sl-net", default=None, help="Gen0 value net（無ければ乱数初期化）")
     ap.add_argument("--c-puct", type=float, default=1.5)
+    ap.add_argument("--enc-version", type=int, default=1, choices=(1, 2),
+                    help="符号化世代（2=リーダー付与ドン特徴。v2 は Gen0 から学習し直す）")
     args = ap.parse_args()
 
     _DB = _load_db()
@@ -186,8 +191,13 @@ def main():
     # Gen0: value=SL net(or 乱数)・policy=uniform(None)。
     if args.sl_net:
         v0 = RN.ValueNet.load(args.sl_net); print(f"Gen0 value net: {args.sl_net}", flush=True)
+        loaded_feat = int(v0.W1.shape[0]) - int(v0.d_emb)
+        if loaded_feat != E.feature_dim(args.enc_version):
+            print(f"ERROR: --sl-net の入力次元 {loaded_feat} が enc-version={args.enc_version} "
+                  f"(feat_dim={E.feature_dim(args.enc_version)}) と不一致", flush=True)
+            return 1
     else:
-        v0 = RN.ValueNet(len(vocab), d_emb=24, hidden=128, feat_dim=E.feature_dim(), seed=0)
+        v0 = RN.ValueNet(len(vocab), d_emb=24, hidden=128, feat_dim=E.feature_dim(args.enc_version), seed=0)
     gens = [(v0, None)]   # (value_net, policy or None)
 
     print(f"=== P3 {'SMOKE' if args.smoke else 'RUN'}: gens={args.gens} games/gen={args.games} "
@@ -195,15 +205,17 @@ def main():
     for g in range(args.gens):
         vnet, pnet = gens[-1]
         t0 = time.perf_counter()
-        vdata, pol = generate(game, value_fn_of(vnet, vocab), priors_fn_of(pnet, vocab),
-                              vocab, args.games, args.sims, args.c_puct, rng)
+        vdata, pol = generate(game, value_fn_of(vnet, vocab, args.enc_version),
+                              priors_fn_of(pnet, vocab, args.enc_version),
+                              vocab, args.games, args.sims, args.c_puct, rng,
+                              enc_version=args.enc_version)
         if vdata is None:
             print("データ0（全局未決着）"); return 1
-        nv, npnet = train_generation(vocab, vdata, pol, seed=g)
+        nv, npnet = train_generation(vocab, vdata, pol, seed=g, enc_version=args.enc_version)
         gens.append((nv, npnet))
         # クロス評価: 新世代 vs 直前世代。
-        a_new = _agent(game, nv, npnet, vocab, args.sims, args.c_puct)
-        a_old = _agent(game, vnet, pnet, vocab, args.sims, args.c_puct)
+        a_new = _agent(game, nv, npnet, vocab, args.sims, args.c_puct, args.enc_version)
+        a_old = _agent(game, vnet, pnet, vocab, args.sims, args.c_puct, args.enc_version)
         r = cross_eval(game, a_new, a_old, args.eval_pairs)
         wr = (r["a_win"] + 0.5 * r["draw"]) / r["games"]
         print(f"Gen{g+1} vs Gen{g}: 勝率={wr:.3f} {r}  ({time.perf_counter()-t0:.0f}s)", flush=True)
