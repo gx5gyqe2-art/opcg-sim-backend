@@ -30,6 +30,12 @@ jobs:
           pip install fastapi uvicorn websockets pydantic python-multipart requests
           pip install pytest pytest-xdist httpx
           pip install numpy   # 学習型CPU(opcg_sim/src/learned)＋RL検証ハーネスの依存
+          pip install ruff    # ⑤E-7: 裸 except（E722）ラチェット
+
+      - name: Lint (ruff E722 ratchet)
+        # ⑤E-7: 裸 except の再混入を機械的に止める。設定は pyproject.toml（select=["E722"]）。
+        # tests/ は対象外から開始（本番コードのみ）。違反 0 で即 green。
+        run: ruff check opcg_sim/
 
       - name: Run tests, structural audits, and quality gates
         env:

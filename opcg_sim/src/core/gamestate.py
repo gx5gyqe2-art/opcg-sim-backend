@@ -1,78 +1,34 @@
 from typing import List, Optional, Any, Tuple, Dict, Set
 import random
-import unicodedata
 import re
-import traceback
-import uuid
-import json
-import hashlib
-from ..models.models import CardInstance, CardMaster, DonInstance, CONST
+from ..models.models import CardInstance, DonInstance, CONST
 from . import journal
 from .journal import JournaledList, JournaledDict, JournaledSet, record_attr
-from ..models.enums import CardType, Attribute, Color, Phase, Zone, TriggerType, ConditionType, CompareOperator, ActionType, PendingMessage
-from ..models.effect_types import TargetQuery, Ability, GameAction, ValueSource, Sequence, Branch, Choice
+from ..models.enums import CardType, Phase, Zone, TriggerType, ActionType
+from ..models.effect_types import Ability, GameAction, ValueSource, Sequence, Branch, Choice
 from .effects.resolver import EffectResolver
-from .effects.matcher import get_target_cards
 from .actions import apply_action as _apply_action
+from .engine import values as _values, guards as _guards
+from .engine import interaction as _interaction
+from .engine import battle as _battle, turn_flow as _turn_flow
+from .engine import triggers as _triggers
+from .engine import card_moves as _card_moves, passives as _passives
 
 
 Card = CardInstance
 
 # 場のキャラクター上限（公式ルール）。ステージ(owner.stage)・ドン!!は含まない。
 # 6体目を登場させた場合は自分のキャラ1体を選んでトラッシュして5体に戻す（強制トラッシュ）。
-FIELD_LIMIT = 5
 
 # 自己制限（self_cannot）の制限キーの正本は rules_constants.py（actions と共有＝循環回避の葉）。
 # ここは後方互換の再エクスポート（恒久・公開エイリアス）。新規参照は rules_constants から import する
 # こと（gamestate は resolver/matcher/atoms より下流なので、それら上流から本エイリアスを import すると
 # 循環する）。
-from .rules_constants import SELF_RESTRICTION_KEYS  # noqa: E402,F401
+from .rules_constants import SELF_RESTRICTION_KEYS, FIELD_LIMIT  # noqa: E402,F401
 
 
-def _nfc(text: str) -> str:
-    return unicodedata.normalize('NFC', text)
-
-
-# 【ターン1回】系の表記（置換/保護能力は parser が TURN_LIMIT 条件を落とすため raw_text からも拾う）。
-_TURN1_RE = re.compile(r'ターン1回|ターンに1回|1ターンに1回')
-
-
-def _condition_turn_limit(cond) -> Optional[int]:
-    """条件ツリー中の TURN_LIMIT 上限値を返す（無ければ None）。AND/OR の入れ子も探索。"""
-    if cond is None:
-        return None
-    if cond.type == ConditionType.TURN_LIMIT:
-        v = cond.value
-        return v if isinstance(v, int) and v > 0 else 1
-    if cond.type in (ConditionType.AND, ConditionType.OR):
-        for a in (cond.args or []):
-            r = _condition_turn_limit(a)
-            if r is not None:
-                return r
-    return None
-
-
-def _ability_turn_limit(ab) -> Optional[int]:
-    """能力の per-turn 使用上限。条件の TURN_LIMIT を優先し、無ければ raw_text の【ターン1回】表記から 1。
-
-    置換/保護能力（_active_replacement / _active_protection 経由）は parser が TURN_LIMIT を
-    ab.condition へ載せない（自己置換は final_condition=None）ため、raw_text を併用する。
-    """
-    lim = _condition_turn_limit(getattr(ab, "condition", None))
-    if lim is not None:
-        return lim
-    if _TURN1_RE.search(_nfc(getattr(ab, "raw_text", "") or "")):
-        return 1
-    return None
-
-
-def _ability_index(card, ab) -> Any:
-    """ability_used_this_turn のキー（master.abilities 内の位置。resolver._ability_key と整合）。"""
-    abilities = getattr(getattr(card, "master", None), "abilities", ()) or ()
-    for i, a in enumerate(abilities):
-        if a is ab:
-            return i
-    return id(ab)
+from .engine._helpers import _nfc, _TURN1_RE, _condition_turn_limit, _ability_turn_limit, _ability_index  # noqa: F401
+# ↑ 後方互換の再エクスポート（正本は engine/_helpers.py。gamestate/engine の双方が使う葉ヘルパ）。
 
 class Player:
     # ゾーン（list）は JournaledList を保証する。本番は __init__＋append/remove で常に JournaledList だが、
@@ -256,17 +212,7 @@ class GameManager:
         self._interaction_stack.append(interaction)
 
     def _apply_leader_don_deck_rule(self, player: Player) -> None:
-        """リーダーの「ルール上、自分のドン!!デッキはN枚になる」をドン!!デッキ枚数に反映する。
-        該当する常在ルールが無ければ既定（10枚）のまま。エネル OP15-058 = 6枚。"""
-        leader = getattr(player, "leader", None)
-        if not leader or not getattr(leader, "master", None):
-            return
-        text = _nfc(getattr(leader.master, "effect_text", "") or "")
-        m = re.search(_nfc(r"ドン(?:!!|‼)デッキは(\d+)枚"), text)
-        if not m:
-            return
-        n = int(m.group(1))
-        player.don_deck = JournaledList(DonInstance(owner_id=player.name) for _ in range(n))
+        return _card_moves._apply_leader_don_deck_rule(self, player)
 
     def get_debug_snapshot(self) -> Dict[str, Any]:
         """
@@ -465,456 +411,28 @@ class GameManager:
         return False
 
     def default_interaction_payload(self, pending: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """効果対話に対する「妥当な既定解決」のペイロードを構築する。
-
-        本番（自己対戦/CPU）でも使える機械的な既定選択:
-          - 必要最小数 (constraints.min) を満たすよう候補の先頭から選ぶ
-          - can_skip なら 0 件選択（スキップ）も可だが、min>0 のときは min 件選ぶ
-          - CHOICE/CONFIRM 系は index=0（最初の選択肢/発動する）
-        AI（PR2）は本メソッドを評価関数で上書きして最良選択を選ぶ。
-        """
-        if pending is None:
-            pending = self.get_pending_request() or {}
-        pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
-        KEY_UUIDS = pending_props.get('SELECTABLE_UUIDS', 'selectable_uuids')
-        KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
-        uuids = list(pending.get(KEY_UUIDS, []) or [])
-        constraints = pending.get(KEY_CONSTRAINTS) or {}
-        try:
-            min_n = int(constraints.get("min", 0))
-        except (TypeError, ValueError):
-            min_n = 0
-        try:
-            max_n = int(constraints.get("max", len(uuids)))
-        except (TypeError, ValueError):
-            max_n = len(uuids)
-        take = max(min_n, 0)
-        take = min(take, max_n, len(uuids))
-        selected = uuids[:take]
-        return {
-            "selected_uuids": selected,
-            "index": 0,
-            "accepted": True,
-            "position": "BOTTOM",
-            "declared_value": 0,
-        }
+        return _interaction.default_interaction_payload(self, pending)
 
     def _find_card_by_uuid(self, uuid: str) -> Optional[CardInstance]:
-        all_players = [self.p1, self.p2]
-        for p in all_players:
-            candidates = []
-            if p.leader: candidates.append(p.leader)
-            if p.stage: candidates.append(p.stage)
-            candidates.extend(p.hand)
-            candidates.extend(p.field)
-            candidates.extend(p.trash)
-            candidates.extend(p.life)
-            candidates.extend(p.deck)
-            candidates.extend(p.temp_zone)
-            for c in candidates:
-                if c.uuid == uuid:
-                    return c
-        return None
+        return _card_moves._find_card_by_uuid(self, uuid)
 
     def get_pending_request(self) -> Optional[Dict[str, Any]]:
-        pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
-        battle_actions = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
-        KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
-        KEY_ACTION = pending_props.get('ACTION', 'action')
-        KEY_MSG = pending_props.get('MESSAGE', 'message')
-        KEY_UUIDS = pending_props.get('SELECTABLE_UUIDS', 'selectable_uuids')
-        KEY_SKIP = pending_props.get('CAN_SKIP', 'can_skip')
-        KEY_CANDIDATES = pending_props.get('CANDIDATES', 'candidates')
-        KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
-        KEY_OPTIONS = pending_props.get('OPTIONS', 'options')
-
-        def _rid(d: Dict[str, Any]) -> str:
-            # request_id は「同一の要求なら安定・要求が変われば変化」する決定的ハッシュにする。
-            # 従来は get のたびに uuid4 を再生成しており、フロントの『request_id 変化＝新要求』検知が
-            # 毎ポーリング/WS更新で誤発火していた（機能バグ）。入力側で request_id は未使用＝安全に変更可。
-            #
-            # ハッシュは**要求の全内容（request_id 自身を除く）＋turn_count**を正規化 JSON で取る。
-            # player_id/action/message/selectable_uuids だけでは、同一ターン内に連続する
-            # 別要求（同名カード2枚が各々出す同文の確認、options だけ異なる CHOICE、
-            # revealed view だけ異なる探索など）が衝突し、フロントが 2 件目を新要求と認識できず
-            # モーダル再マウント/選択リセットが起きない。source_card_uuid・options・constraints・
-            # candidates など識別に効く全フィールドを取り込むことでこれを防ぐ。
-            # 盤面不変なら d は各 to_dict()/スカラが決定的なので同一 → rid も安定（＝元の修正意図を維持）。
-            payload = {k: v for k, v in d.items() if k != "request_id"}
-            key = json.dumps([self.turn_count, payload],
-                             sort_keys=True, ensure_ascii=False, default=str)
-            return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
-
-        # マリガンは先行プレイヤー(turn_player)から順に要求する。
-        if self.phase == Phase.MULLIGAN:
-            mulligan_order = ([self.turn_player, self.opponent]
-                              if self.turn_player and self.opponent else [self.p1, self.p2])
-            for player in mulligan_order:
-                if player.name not in self.mulligan_done:
-                    hand_candidates = [c.to_dict() for c in player.hand]
-                    _mreq = {
-                        KEY_PID: player.name,
-                        KEY_ACTION: "MULLIGAN",
-                        KEY_MSG: "マリガンするカードを選んでください（交換なし＝キープ）",
-                        KEY_CANDIDATES: hand_candidates,
-                        KEY_UUIDS: [c.uuid for c in player.hand],
-                        KEY_CONSTRAINTS: {"min": 0, "max": len(player.hand)},
-                        KEY_SKIP: True,
-                    }
-                    _mreq["request_id"] = _rid(_mreq)
-                    return _mreq
-            return None
-
-        if self.active_interaction:
-            action_type = self.active_interaction.get("action_type")
-            fe_action = "SEARCH_AND_SELECT" if action_type in ("SELECT_TARGET", "FIELD_OVERFLOW_TRASH") else action_type
-            
-            candidates = self.active_interaction.get("candidates", [])
-            candidate_dicts = [c.to_dict() for c in candidates] if candidates else []
-            candidate_uuids = [c.uuid for c in candidates] if candidates else []
-            
-            req = {
-                KEY_PID: self.active_interaction.get("player_id"),
-                KEY_ACTION: fe_action,
-                KEY_MSG: self.active_interaction.get("message", "選択してください"),
-                KEY_UUIDS: self.active_interaction.get("selectable_uuids", candidate_uuids),
-                KEY_SKIP: self.active_interaction.get("can_skip", False),
-                KEY_CANDIDATES: candidate_dicts,
-                KEY_CONSTRAINTS: self.active_interaction.get("constraints"),
-                "options": self.active_interaction.get("options"),
-            }
-            # 効果の発生源カードを UI で表示できるよう uuid を併せて渡す。
-            src_uuid = self.active_interaction.get("source_card_uuid")
-            if src_uuid:
-                req[pending_props.get('SOURCE_CARD_UUID', 'source_card_uuid')] = src_uuid
-            # ARRANGE_DECK(並び替え/上下選択)はフロントの UI 切替フラグを併せて渡す。
-            if action_type == "ARRANGE_DECK":
-                req["allow_position"] = self.active_interaction.get("allow_position", False)
-                req["allow_reorder"] = self.active_interaction.get("allow_reorder", False)
-            req["request_id"] = _rid(req)
-            return req
-
-        if not self.active_battle and self.phase in [Phase.BLOCK_STEP, Phase.BATTLE_COUNTER]:
-            self.phase = Phase.MAIN
-            
-        request = None
-        ACT_BLOCKER = battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER')
-        ACT_COUNTER = battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER')
-        
-        if self.phase == Phase.BLOCK_STEP and self.active_battle:
-            target_owner = self.active_battle["target_owner"]
-            blockers = [c.uuid for c in target_owner.field if not c.is_rest and c.has_keyword("ブロッカー") and "CANNOT_REST" not in c.timed_flags]
-            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_BLOCKER, KEY_MSG: PendingMessage.SELECT_BLOCKER.value, KEY_UUIDS: blockers, KEY_SKIP: True}
-        elif self.phase == Phase.BATTLE_COUNTER and self.active_battle:
-            target_owner = self.active_battle["target_owner"]
-            counters = [c.uuid for c in target_owner.hand if c.current_counter > 0 or (c.master.type == CardType.EVENT and any(abil.trigger == TriggerType.COUNTER for abil in c.master.abilities))]
-            request = {KEY_PID: target_owner.name, KEY_ACTION: ACT_COUNTER, KEY_MSG: PendingMessage.SELECT_COUNTER.value, KEY_UUIDS: counters, KEY_SKIP: True}
-        elif self.phase == Phase.MAIN:
-            selectable = [c.uuid for c in self.turn_player.hand]
-            selectable += [c.uuid for c in self.turn_player.field if not c.is_rest]
-            if self.turn_player.leader and not self.turn_player.leader.is_rest:
-                selectable.append(self.turn_player.leader.uuid)
-            request = {KEY_PID: self.turn_player.name, KEY_ACTION: "MAIN_ACTION", KEY_MSG: PendingMessage.MAIN_ACTION.value, KEY_UUIDS: selectable, KEY_SKIP: True}
-        if request is not None:
-            request["request_id"] = _rid(request)
-        return request
+        return _interaction.get_pending_request(self)
 
     def pending_actor_action(self) -> Optional[Tuple[str, str]]:
-        """`get_pending_request()` の (player_id, action) **だけ**を安価に返す（CPU 探索の葉/手番判定用）。
-
-        探索は各ノードでこの 2 値しか見ない（手は `get_legal_actions` から得る）一方、
-        `get_pending_request` は毎回 selectable 構築・候補 to_dict・request_id ハッシュ（要求全体の
-        正規化 JSON を sha1）を作るため重い（探索コストの ~12%）。本メソッドは**判定ロジックと
-        副作用（BLOCK_STEP/BATTLE_COUNTER で
-        active_battle が無いときの phase→MAIN 正規化）を get_pending_request と一致**させたうえで、
-        重い payload を作らない。一致は `tests/test_cpu_make_unmake.py` で機械照合する。
-        """
-        if self.phase == Phase.MULLIGAN:
-            order = ([self.turn_player, self.opponent]
-                     if self.turn_player and self.opponent else [self.p1, self.p2])
-            for p in order:
-                if p.name not in self.mulligan_done:
-                    return (p.name, "MULLIGAN")
-            return None
-        if self.active_interaction:
-            at = self.active_interaction.get("action_type")
-            fe = "SEARCH_AND_SELECT" if at in ("SELECT_TARGET", "FIELD_OVERFLOW_TRASH") else at
-            return (self.active_interaction.get("player_id"), fe)
-        if not self.active_battle and self.phase in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER):
-            self.phase = Phase.MAIN  # get_pending_request と同じ副作用
-        battle_actions = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
-        if self.phase == Phase.BLOCK_STEP and self.active_battle:
-            return (self.active_battle["target_owner"].name, battle_actions.get('SELECT_BLOCKER', 'SELECT_BLOCKER'))
-        if self.phase == Phase.BATTLE_COUNTER and self.active_battle:
-            return (self.active_battle["target_owner"].name, battle_actions.get('SELECT_COUNTER', 'SELECT_COUNTER'))
-        if self.phase == Phase.MAIN:
-            return (self.turn_player.name, "MAIN_ACTION")
-        return None
+        return _interaction.pending_actor_action(self)
 
     def resolve_interaction(self, player: Player, payload: Dict[str, Any]):
-        if not self.active_interaction:
-            return
-            
-        continuation = self.active_interaction.get("continuation")
-        if not continuation:
-            self.active_interaction = None
-            return
-
-        action_type = self.active_interaction.get("action_type")
-
-        # 誘発能力の発動確認（CONFIRM_TRIGGER）: continuation は trigger_item のみで
-        # source_card_uuid を持たないため、汎用 source 解決より先に処理する。
-        if action_type == "CONFIRM_TRIGGER":
-            item = continuation.get("trigger_item")
-            accepted = payload.get("accepted")
-            if accepted is None:
-                if payload.get("skip") is True or payload.get("declined") is True:
-                    accepted = False
-                else:
-                    accepted = payload.get("index", 0) == 0
-            self.active_interaction = None
-            if item is not None:
-                if accepted:
-                    item["_confirmed"] = True  # 先頭のまま再投入 → 解決へ
-                elif item in self._pending_triggers:
-                    self._pending_triggers.remove(item)
-            self._advance_pending_triggers()
-            if not self.active_interaction and self.active_battle \
-                    and self.phase not in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER):
-                self._advance_battle_triggers()
-            return
-
-        # 場のキャラ上限超過の強制トラッシュ。発生源カードを持たない（ルール処理）ため、
-        # 汎用 source 解決より先に処理する。選んだキャラをトラッシュ（KOではないので
-        # 「KO時」誘発は起こさない）。
-        if action_type == "FIELD_OVERFLOW_TRASH":
-            owner = self.p1 if self.p1.name == continuation.get("owner_name") else self.p2
-            selected = payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])
-            self.active_interaction = None
-            for uid in selected:
-                card = next((c for c in owner.field if c.uuid == uid), None)
-                if card:
-                    self.move_card(card, Zone.TRASH, owner)
-            self.refresh_passive_state()
-            # 複数体同時超過などでまだ超過していれば再度要求する（保険）。
-            if len(owner.field) > FIELD_LIMIT:
-                self._suspend_for_field_overflow(owner)
-            return
-
-        source_uuid = continuation["source_card_uuid"]
-        source_card = self._find_card_by_uuid(source_uuid)
-        if not source_card:
-            self.active_interaction = None
-            return
-
-        resolver = EffectResolver(self)
-        
-        if action_type == "SELECT_TARGET":
-            selected_uuids = payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])
-            
-            selected_cards = []
-            candidates = self.active_interaction.get("candidates", [])
-            for uid in selected_uuids:
-                card = next((c for c in candidates if c.uuid == uid), None)
-                if card: selected_cards.append(card)
-            
-            query = continuation.get("query")
-
-            # ▼▼▼ 修正: save_idがなくても、一時的に選択結果を渡せるようにする ▼▼▼
-            if "effect_context" in continuation:
-                continuation["effect_context"]["temp_resolved_targets"] = selected_cards
-
-            if query and getattr(query, 'save_id', None):
-                 continuation["effect_context"]["saved_targets"][query.save_id] = selected_cards
-            
-            self.active_interaction = None
-            resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
-
-        elif action_type == "SELECT_RESOURCE":
-            # ドン!!返却(RETURN_DON)の対象ドン!!選択。選んだ uuid を context に載せて再開すると、
-            # RETURN_DON 再実行時に当該ドン!!を戻す。
-            selected_uuids = payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])
-            effect_context = continuation.get("effect_context", {})
-            effect_context["_return_don_uuids"] = selected_uuids
-            self.active_interaction = None
-            # RETURN_DON は効果の責任者（source_card の持ち主）視点で再実行する。
-            # 「相手は自身の場のドン!!を戻す」（status=OPPONENT）では選択者＝相手だが、
-            # _don_pool_player は player を基準に相手プールを引くため、応答者(相手)で再開すると
-            # 相手の相手=自分のプールを指して空振りする。責任者基準なら選んだ相手ドンが正しく戻る。
-            controller = self.p1 if self.p1.name == source_card.owner_id else self.p2
-            resolver.resume_execution(controller, source_card, continuation.get("execution_stack", []), effect_context)
-
-        elif action_type == "CHOICE":
-            selected_index = payload.get("index", payload.get("selected_option_index", 0))
-
-            resolver.resume_choice(player, source_card, selected_index, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
-
-        elif action_type == "CONFIRM_OPTIONAL":
-            # 任意効果（「〜してもよい」）/ 任意コスト能力（「〜できる：」）の発動可否。
-            # accepted=False（パス/拒否）ならスキップ。
-            accepted = payload.get("accepted")
-            if accepted is None:
-                # selected_uuids 非空 / index>0 / skip フラグ等から推定（既定は発動=True）
-                if payload.get("skip") is True or payload.get("declined") is True:
-                    accepted = False
-                else:
-                    accepted = payload.get("index", 0) == 0
-            # 任意バトルKO置換（A）の確認: accept→置換実行（本来のKOをスキップ）、
-            # decline→本来のKOを実行。どちらも _finish_attack で戦闘後処理して return。
-            if continuation.get("kind") == "BATTLE_KO_REPLACE":
-                self.active_interaction = None
-                target = source_card
-                target_owner = self.p1 if self.p1.name == continuation.get("target_owner_name") else self.p2
-                life_lost = continuation.get("life_lost", 0)
-                if accepted and self._active_replacement(target, ("BATTLE_KO",)):
-                    pass
-                else:
-                    # 拒否、または置換が成立しなくなった場合は本来の KO を進める。
-                    self.move_card(target, Zone.TRASH, target_owner)
-                    self._resolve_on_ko(target, target_owner, cause="BATTLE")
-                self._finish_attack(target, target_owner, life_lost)
-                return
-            self.active_interaction = None
-            confirm_ability = continuation.get("confirm_ability")
-            if confirm_ability is not None:
-                # 任意コスト能力（A-3）の使用確認: accept で cost_confirmed=True で再入。
-                # decline は何もしない（使用回数も未消費）。gamestate 経由で action_events を記録。
-                if accepted:
-                    self.resolve_ability(player, confirm_ability, source_card, cost_confirmed=True)
-            else:
-                optional_node = continuation.get("optional_node")
-                resolver.resume_optional(player, source_card, bool(accepted), optional_node,
-                                         continuation.get("execution_stack", []), continuation.get("effect_context", {}))
-
-        elif action_type == "ARRANGE_DECK":
-            # (2a)(2b) 並び替え/上下選択の確定。selected_uuids が配置順、position が上下。
-            # ヘッドレス(drain)は selected_uuids=[] / position 無し → 現状順・fixed_position。
-            ordered_uuids = payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])
-            position = (payload.get("position") or payload.get("extra", {}).get("position")
-                        or continuation.get("fixed_position", "BOTTOM"))
-            position = "TOP" if str(position).upper() == "TOP" else "BOTTOM"
-            cards = continuation.get("arrange_targets", [])
-            if ordered_uuids:
-                by_uuid = {c.uuid: c for c in cards}
-                ordered = [by_uuid[u] for u in ordered_uuids if u in by_uuid]
-                for c in cards:  # 指定漏れは元の順序で末尾に補う
-                    if c not in ordered:
-                        ordered.append(c)
-            else:
-                ordered = list(cards)
-            dest_kind = continuation.get("dest_kind", "DECK")
-            self.active_interaction = None
-            if dest_kind == "LIFE":
-                # ライフ並べ替え: ordered を新しいライフ順とする（life[0]=一番上）。
-                owner_name = continuation.get("dest_owner")
-                tp = self.p1 if (owner_name and self.p1.name == owner_name) else (self.p2 if owner_name else player)
-                rest = [c for c in tp.life if c not in ordered]
-                tp.life = JournaledList(ordered + rest)
-            else:
-                # デッキ配置: BOTTOM は順に append（先頭が上）、TOP は逆順 insert(0) で
-                # ordered[0] が最上面になるようにする。
-                seq = ordered if position == "BOTTOM" else list(reversed(ordered))
-                for c in seq:
-                    owner, _ = self._find_card_location(c)
-                    if owner:
-                        self.move_card(c, Zone.DECK, owner, dest_position=position)
-            resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), continuation.get("effect_context", {}))
-
-        elif action_type == "DECLARE_COST":
-            # C8: 宣言コストを記録し、相手デッキトップを公開して context に保存してから再開。
-            declared = payload.get("declared_value", payload.get("index", 0))
-            try:
-                declared = int(declared)
-            except (TypeError, ValueError):
-                declared = 0
-            effect_context = continuation.get("effect_context", {})
-            effect_context["declared_cost"] = declared
-            opponent = self.p2 if player == self.p1 else self.p1
-            revealed = opponent.deck[0] if opponent.deck else None
-            if revealed is not None:
-                effect_context["last_revealed_card"] = revealed
-            else:
-                pass
-            self.active_interaction = None
-            resolver.resume_execution(player, source_card, continuation.get("execution_stack", []), effect_context)
-
-        # 再開経路（resume_execution/resume_choice/resume_optional）で実行された
-        # アクションも action_events へ記録する（resolve_ability 経由と同じ扱い。
-        # 記録しないと中断を挟んだ効果が「何も実行していない」ように見える）。
-        for ev in resolver.action_history:
-            self.action_events.append({
-                "type": "EFFECT",
-                "player": player.name,
-                "card_name": source_card.master.name,
-                "action": ev.get("action", ""),
-                "targets": ev.get("targets", []),
-                "value": ev.get("value"),
-                "success": ev.get("success", True),
-            })
-
-        if not self.active_interaction and self.setup_phase_pending:
-            self.finish_setup()
-            self.setup_phase_pending = False
-            self.phase = Phase.MULLIGAN
-            self.mulligan_done = JournaledSet()
-
-        # ライフ公開【トリガー】/ON_LIFE_DECREASE 等のペンディング誘発が残っていれば消化する。
-        if not self.active_interaction and self._pending_triggers:
-            self._advance_pending_triggers()
-
-        # バトルトリガー(ON_ATTACK/ON_OPP_ATTACK)解決中の中断から復帰した場合:
-        # バトルが進行中(active_battle あり)でまだ防御フェイズへ遷移していなければ、
-        # 残りトリガーの解決＋フェイズ遷移を再開する（カウンター衝突エラーの防止）。
-        if (not self.active_interaction and self.active_battle
-                and self.phase not in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER)):
-            self._advance_battle_triggers()
-
-        # 入れ子の除去置換が中断したことで退避された外側継続（後続シーケンス／残対象）を、
-        # 中断が解消された後に再開する（accepted limitation B = 多段継続の対話化）。
-        # フィールド上限超過の処理より前に置き、継続完了後の最終盤面で超過判定する。
-        if not self.active_interaction and self._deferred_continuations:
-            self._resume_deferred_continuations()
-
-        # ON_PLAY 等の対話が片付いた後で場のキャラ上限超過が残っていれば強制トラッシュ。
-        # 誘発/バトル進行（上記）を横取りしないよう最後に置き、1プレイヤーずつ逐次化する。
-        if not self.active_interaction:
-            for pl in (self.p1, self.p2):
-                if len(pl.field) > FIELD_LIMIT:
-                    self._enforce_field_limit(pl)
-                    break
+        return _interaction.resolve_interaction(self, player, payload)
 
     def refresh_passive_state(self) -> None:
-        """盤面依存の常在効果（パワー/コスト/キーワード）を現在の盤面で再計算する。
-        API のアクション境界や対話完了時に呼び、トラッシュ枚数等の変化を即時反映する
-        （「自分のトラッシュN枚につき+1000」OP09-086 等のリアルタイム反映）。"""
-        if self.active_interaction or getattr(self, "_in_passive_recalc", False):
-            return
-        if self.turn_player is not None:
-            self._apply_passive_effects(self.turn_player)
+        return _passives.refresh_passive_state(self)
 
     def _enforce_field_limit(self, owner: Player) -> None:
-        """owner のキャラが上限(FIELD_LIMIT)を超えていれば、超過分を選んでトラッシュさせる。
-        他に進行中の対話があるときは起動しない（中断のネストを避ける）。"""
-        if self.active_interaction:
-            return
-        if len(owner.field) <= FIELD_LIMIT:
-            return
-        self._suspend_for_field_overflow(owner)
+        return _card_moves._enforce_field_limit(self, owner)
 
     def _suspend_for_field_overflow(self, owner: Player) -> None:
-        """場のキャラ超過分をトラッシュさせる選択を中断要求として立てる。
-        candidates は新規登場分を含む owner の全キャラ（どれをトラッシュしてもよい）。"""
-        excess = len(owner.field) - FIELD_LIMIT  # 通常は 1
-        self.active_interaction = {
-            "player_id": owner.name,
-            "action_type": "FIELD_OVERFLOW_TRASH",
-            "message": f"場のキャラクターが上限({FIELD_LIMIT})を超えました。トラッシュするキャラを{excess}枚選んでください。",
-            "candidates": list(owner.field),
-            "selectable_uuids": [c.uuid for c in owner.field],
-            "constraints": {"min": excess, "max": excess},
-            "can_skip": False,
-            "continuation": {"owner_name": owner.name, "count": excess},
-        }
+        return _card_moves._suspend_for_field_overflow(self, owner)
 
     def _validate_action(self, player: Player, action_type: str):
         pending = self.get_pending_request()
@@ -942,113 +460,28 @@ class GameManager:
 
     def start_game(self, first_player: Optional[Player] = None):
         
-        self.p1.shuffle_deck()
-        self.p2.shuffle_deck()
-        
-        for p in [self.p1, self.p2]:
-            if p.leader:
-                for ability in p.leader.master.abilities:
-                    if ability.trigger == TriggerType.GAME_START:
-                        self.resolve_ability(p, ability, source_card=p.leader)
-                        
-                        if self.active_interaction:
-                            self.setup_phase_pending = True
-                            if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
-                            else: self.turn_player = self.p1; self.opponent = self.p2
-                            return
-
-        self.finish_setup()
-
-        if first_player: self.turn_player = first_player; self.opponent = self.p2 if first_player == self.p1 else self.p1
-        else: self.turn_player = self.p1; self.opponent = self.p2
-        # マリガンフェーズへ移行（両プレイヤーの確定後にゲーム開始）
-        self.phase = Phase.MULLIGAN
-        self.mulligan_done = JournaledSet()
+        return _turn_flow.start_game(self, first_player)
 
     def do_mulligan(self, player: 'Player') -> None:
-        """手札5枚全てをデッキ底に戻してシャッフル→5枚引き直す（全交換・1回限り）"""
-        if self.phase != Phase.MULLIGAN:
-            raise ValueError("マリガンフェーズではありません。")
-        if player.name in self.mulligan_done:
-            raise ValueError("既にマリガンを実施済みです。")
-        # 手札を全てデッキ底に戻す
-        hand_count = len(player.hand)
-        player.deck.extend(player.hand)
-        player.hand.clear()
-        random.shuffle(player.deck)
-        for _ in range(5):
-            if player.deck:
-                player.hand.append(player.deck.pop(0))
-        self.mulligan_done.add(player.name)
-        self._check_mulligan_complete()
+        return _turn_flow.do_mulligan(self, player)
 
     def keep_hand(self, player: 'Player') -> None:
-        """手札をキープしてマリガンをスキップ"""
-        if self.phase != Phase.MULLIGAN:
-            raise ValueError("マリガンフェーズではありません。")
-        if player.name in self.mulligan_done:
-            raise ValueError("既にマリガンを実施済みです。")
-        self.mulligan_done.add(player.name)
-        self._check_mulligan_complete()
+        return _turn_flow.keep_hand(self, player)
 
     def _check_mulligan_complete(self) -> None:
-        """両プレイヤーのマリガン確定後にゲーム開始"""
-        if self.p1.name in self.mulligan_done and self.p2.name in self.mulligan_done:
-            self.turn_count = 1
-            self.refresh_phase()
+        return _turn_flow._check_mulligan_complete(self)
 
     def finish_setup(self):
-        self.p1.place_life()
-        self.p1.draw_initial_hand()
-        self.p2.place_life()
-        self.p2.draw_initial_hand()
+        return _turn_flow.finish_setup(self)
 
     def end_turn(self):
-        self._validate_action(self.turn_player, "MAIN_ACTION")
-        self.phase = Phase.END
-        self._fire_turn_end_triggers()
-        # 「このターン終了時、〜」で予約された遅延アクションを解決する。
-        self._flush_pending_end_of_turn()
-        self.continuous.expire("TURN_END", self.turn_count)
-        self.switch_turn()
+        return _turn_flow.end_turn(self)
 
     def _fire_turn_end_triggers(self):
-        """ターン終了時トリガーを発火する。ターンプレイヤーの【自分のターン終了時】
-        (TURN_END) と、非ターンプレイヤーの【相手のターン終了時】(OPP_TURN_END)。"""
-        def _units(pl):
-            us = [pl.leader] + pl.field
-            if pl.stage: us.append(pl.stage)
-            return us
-        for pl, trig in ((self.turn_player, TriggerType.TURN_END),
-                         (self.opponent, TriggerType.OPP_TURN_END)):
-            for card in _units(pl):
-                if card and card.master.abilities:
-                    for ability in card.master.abilities:
-                        if ability.trigger == trig:
-                            self.resolve_ability(pl, ability, source_card=card)
+        return _turn_flow._fire_turn_end_triggers(self)
 
     def _flush_pending_end_of_turn(self):
-        """end_turn フックで、予約された遅延アクション（このターン終了時、〜）を解決する。"""
-        if not self.pending_end_of_turn:
-            return
-        pending = self.pending_end_of_turn
-        self.pending_end_of_turn = JournaledList()
-        for player, node, source_card in pending:
-            # 場を離れたカードのソース由来でも、トラッシュ送り等は対象解決時に弾かれる。
-            resolver = EffectResolver(self)
-            resolver.context["_flushing_delayed"] = True
-            resolver.execution_stack = [node]
-            try:
-                resolver._process_stack(player, source_card)
-            except Exception as e:
-                pass
-            for ev in resolver.action_history:
-                self.action_events.append({
-                    "type": "EFFECT", "player": player.name,
-                    "card_name": source_card.master.name,
-                    "action": ev.get("action", ""), "targets": ev.get("targets", []),
-                    "value": ev.get("value"), "success": ev.get("success", True),
-                })
+        return _turn_flow._flush_pending_end_of_turn(self)
 
     def _record_event_played(self, card):
         """イベントカード発動をターン内イベントとして記録する（「コストN以上のイベントを発動している」
@@ -1067,596 +500,103 @@ class GameManager:
 
     def switch_turn(self):
         # ターンが切り替わる/追加ターンに入る = 新しいターン。ターン内イベント記録をクリアする。
-        self._turn_events = JournaledDict()
-        # 追加ターン（EXTRA_TURN）: 予約したプレイヤーがターンプレイヤーのまま継続する
-        if getattr(self, "pending_extra_turn", None) == self.turn_player.name:
-            self.pending_extra_turn = None
-            self.turn_count += 1
-            self.refresh_phase()
-            return
-        self.turn_player, self.opponent = self.opponent, self.turn_player
-        self.turn_count += 1
-        self.refresh_phase()
+        return _turn_flow.switch_turn(self)
 
     def refresh_phase(self):
-        self._reset_player_status(self.opponent); self.refresh_all(self.turn_player); self.draw_phase()
+        return _turn_flow.refresh_phase(self)
 
     def _reset_player_status(self, player: Player):
         # 相手ターン開始時に直前のターンプレイヤー(=現opponent)の一時効果を解除するが、
         # 付与ドン!!は剥がさない（持ち主の次のリフレッシュフェイズまでカードに残る）。
-        all_units = [player.leader] + player.field
-        if player.stage: all_units.append(player.stage)
-        for card in all_units:
-            # ターン境界のリセット。【ターン1回】の使用回数もここで戻す。
-            if card: card.reset_turn_status(keep_don=True, clear_usage=True)
+        return _turn_flow._reset_player_status(self, player)
 
     def refresh_all(self, player: Player):
-        all_units = [player.leader] + player.field
-        if player.stage: all_units.append(player.stage)
-        for card in all_units:
-            if card:
-                is_frozen = "FREEZE" in card.flags
-                # ターン境界のリセット。【ターン1回】の使用回数もここで戻す。
-                card.reset_turn_status(clear_usage=True)
-                if not is_frozen: card.is_rest = False
-        
-        # フリーズ中のドン!!（FREEZE_DON / OP07-026）は今回のリフレッシュではアクティブに
-        # 戻さず、レストのまま据え置いてフラグを下ろす（1回限りのフリーズ）。
-        still_frozen, to_activate = [], []
-        for don in player.don_rested:
-            if don.is_frozen:
-                don.is_frozen = False
-                still_frozen.append(don)
-            else:
-                don.is_rest = False
-                to_activate.append(don)
-        player.don_active.extend(to_activate)
-        player.don_rested = JournaledList(still_frozen)
-        
-        for don in player.don_attached_cards:
-            don.is_rest = False
-            don.attached_to = None
-            player.don_active.append(don)
-        player.don_attached_cards = JournaledList()
+        return _turn_flow.refresh_all(self, player)
 
     def draw_phase(self):
-        if self.turn_count > 1: self.draw_card(self.turn_player)
-        self.don_phase()
+        return _turn_flow.draw_phase(self)
 
     def don_phase(self):
-        cards_to_add = 1 if self.turn_count == 1 else 2
-        for _ in range(cards_to_add):
-            if self.turn_player.don_deck:
-                don = self.turn_player.don_deck.pop(0); self.turn_player.don_active.append(don)
-        self.main_phase()
+        return _turn_flow.don_phase(self)
 
     def main_phase(self): 
-        self.phase = Phase.MAIN
-        self._apply_passive_effects(self.turn_player)
+        return _turn_flow.main_phase(self)
 
     _REACTIVE_RE = re.compile(r'(された|した|受けた|なった)時、')
 
     def _is_reactive_passive(self, ability) -> bool:
-        """無タグの反応型（「…が登場した時、」「…が戻された時、」等）でトリガー写像が
-        まだ無い PASSIVE 能力か。常時効果ではないため再計算ループで実行してはならない
-        （実行すると盤面操作のたびに本体効果が発動し、対話中断が他の解決を飲み込む）。"""
-        first = self._find_first_action(ability.effect)
-        raw = getattr(first, "raw_text", "") if first is not None else ""
-        # 能力本体の raw_text も見る。先頭アクションの文（例「自分はゲームに勝利する」）に
-        # 「…した時、」が無くても、能力全体（例「相手が【ブロッカー】を発動した時、…」OP09-118）
-        # が反応型なら再計算ループで実行してはならない（PASSIVE+VICTORY が相手ライフ0だけで
-        # 誤って自動勝利するのを防ぐ。本来は相手のブロッカー発動が必要）。
-        ab_raw = getattr(ability, "raw_text", "") or ""
-        combined = unicodedata.normalize("NFC", (raw or "") + " " + ab_raw)
-        return bool(self._REACTIVE_RE.search(combined))
+        return _passives._is_reactive_passive(self, ability)
 
     def _find_first_action(self, node):
-        if node is None:
-            return None
-        if isinstance(node, GameAction):
-            return node
-        if isinstance(node, Sequence):
-            for a in node.actions:
-                found = self._find_first_action(a)
-                if found is not None:
-                    return found
-        elif isinstance(node, Branch):
-            return self._find_first_action(node.if_true) or self._find_first_action(node.if_false)
-        elif isinstance(node, Choice):
-            for o in node.options:
-                found = self._find_first_action(o)
-                if found is not None:
-                    return found
-        return None
+        return _passives._find_first_action(self, node)
 
     def _apply_passive_effects(self, player: Player):
         # 対話中断中は再計算しない。Step1 のリセットは無条件に走る一方、Step2/3 の
         # resolve_ability は active_interaction ガードで何も実行できず、リセットだけが
         # 残って PASSIVE/YOUR_TURN バフが消えてしまうため（クザンのコスト-5 等）。
-        if self.active_interaction:
-            return
-        # Phase2 dirty-flag（探索中のみ）: 前回再計算から journal._mut_count が不変＝盤面入力が
-        # 不変なら、継続効果（cost_buff/passive_power/current_keywords）は前回値のまま正しい＝再計算
-        # を省く。_mut_count は journaled な全変更＋探索開始で増えるため取り残し無し。正常プレイ
-        # （_active is None）では作動せず常に再計算＝従来挙動と完全同値。ロールバックはバフを正しく
-        # 復元する＋_mut_count >= _passive_mc を保つため、省略しても必要時は必ず再計算され安全。
-        if journal._TL.active is not None and journal._TL.mut_count == self._passive_mc:
-            return
-        # YOUR_TURN 効果は常にターンプレイヤー基準で適用する（呼び出し元が owner を
-        # 渡しても誤適用しない）。
-        if self.turn_player is not None:
-            player = self.turn_player
-        opponent = self.p2 if player == self.p1 else self.p1
-
-        # Step 1: 両プレイヤーのバフ・一時キーワードをリセット
-        # 値が変わるときだけ書く（無条件代入は make/unmake の journaled 書き込みを毎ノード大量に生む＝
-        # 探索の支配コスト。大半のカードはバフ 0 ＝ no-op 代入なので、ガードで journaling 量を削る。
-        # 最終状態は無条件代入と完全同一＝挙動・方策不変）。
-        for p in [player, opponent]:
-            for c in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
-                if c:
-                    if c.cost_buff:
-                        c.cost_buff = 0
-                    if c.passive_power:
-                        c.passive_power = 0
-                    if c.passive_power_override is not None:
-                        c.passive_power_override = None
-                    if c.current_keywords != c.master.keywords:
-                        c.current_keywords = c.master.keywords.copy()
-            for c in p.hand:
-                if c:
-                    if c.cost_buff:
-                        c.cost_buff = 0
-                    if c.passive_counter:
-                        c.passive_counter = 0
-
-        # Step 2/3 で適用される INSTANT パワーバフは passive_power（再計算レイヤ）に
-        # 載せる。power_buff に加えると _apply_passive_effects が呼ばれるたびに
-        # 累積し、PASSIVE「パワー+1000」が盤面操作のたびに際限なく増えていた。
-        self._in_passive_recalc = True
-        try:
-            # Step 2: YOUR_TURN 効果（アクティブプレイヤーのカードのみ）
-            #   ステージ（player.stage）も対象に含める。聖地マリージョア(コスト軽減)・
-            #   虚の玉座(リーダー+1000) 等の STAGE の YOUR_TURN 効果が従来発動していなかった。
-            for card in ([player.leader] if player.leader else []) + player.field + ([player.stage] if player.stage else []):
-                if not card or not card.master.abilities: continue
-                for ability in card.master.abilities:
-                    if ability.trigger == TriggerType.YOUR_TURN:
-                        if self._is_reactive_passive(ability):
-                            continue  # 「【自分のターン中】…された時」型はイベント誘発（EB02-035 等）
-                        self.resolve_ability(player, ability, source_card=card)
-
-            # Step 2': OPPONENT_TURN 効果（非アクティブプレイヤーのカードのみ）。
-            #   「【相手のターン中】自分のキャラすべてをコスト+1」(OP16-080) 等の継続効果。
-            #   コントローラから見て「相手のターン」＝非ターンプレイヤーのカードが該当する。
-            #   YOUR_TURN と同じく再計算レイヤ（cost_buff/passive_power）へ載るため、
-            #   ターンが替われば自然に消える。
-            for card in ([opponent.leader] if opponent.leader else []) + opponent.field + ([opponent.stage] if opponent.stage else []):
-                if not card or not card.master.abilities: continue
-                for ability in card.master.abilities:
-                    if ability.trigger == TriggerType.OPPONENT_TURN:
-                        if self._is_reactive_passive(ability):
-                            continue  # 「【相手のターン中】…された時」型はイベント誘発
-                        self.resolve_ability(opponent, ability, source_card=card)
-
-            # Step 3: PASSIVE 効果（両プレイヤーのカードを評価）。ステージも含める。
-            for p in [player, opponent]:
-                for card in ([p.leader] if p.leader else []) + p.field + ([p.stage] if p.stage else []):
-                    if not card or not card.master.abilities: continue
-                    for ability in card.master.abilities:
-                        if ability.trigger == TriggerType.PASSIVE:
-                            if self._is_reactive_passive(ability):
-                                continue  # 「…された時」型はイベント誘発であり再計算で実行しない
-                            self.resolve_ability(p, ability, source_card=card)
-        finally:
-            self._in_passive_recalc = False
-
-        # Step 4: 手札カードの自己コスト増減 PASSIVE（「手札のこのカードは、〈条件〉、コスト±N」）。
-        #   手札の PASSIVE は Step2/3 の場走査では評価されないため、ここで個別に評価する。
-        #   対象は手札のこのカード自身（target.flags に "SELF_IN_HAND"）。条件成立時のみ
-        #   cost_buff を加算する（Step1 で 0 にリセット済み）。ウタ ST23-001/サッチ OP16-005 等。
-        self._apply_hand_self_cost(player, opponent)
-
-        # Phase2 dirty-flag: 再計算完了時点の _mut_count を記録（探索中のみ）。自身の書き込みを
-        # 含んだ後の値を object.__setattr__ で保持する（journaled せず _mut_count も増やさない＝
-        # 次回呼び出しで外部変更が無ければ一致してスキップできる）。
-        if journal._TL.active is not None:
-            object.__setattr__(self, "_passive_mc", journal._TL.mut_count)
+        return _passives._apply_passive_effects(self, player)
 
     def _apply_hand_self_cost(self, player: Player, opponent: Player):
-        resolver = None
-        for p in [player, opponent]:
-            for card in p.hand:
-                if not card or not card.master.abilities:
-                    continue
-                for ability in card.master.abilities:
-                    if ability.trigger != TriggerType.PASSIVE:
-                        continue
-                    eff = ability.effect
-                    tq = getattr(eff, "target", None)
-                    if (eff is None or getattr(eff, "status", None) != "COST_REDUCTION"
-                            or tq is None or "SELF_IN_HAND" not in getattr(tq, "flags", set())):
-                        continue
-                    if resolver is None:
-                        resolver = EffectResolver(self)
-                    if ability.condition is not None and not resolver._check_condition(
-                            p, ability.condition, card):
-                        continue
-                    card.cost_buff += eff.value.base
+        return _passives._apply_hand_self_cost(self, player, opponent)
 
     def draw_card(self, player: Player, count: int = 1):
-        for _ in range(count):
-            if player.deck:
-                card = player.deck.pop(0); player.hand.append(card)
-        if not player.deck and not self.winner: self.check_victory()
+        return _card_moves.draw_card(self, player, count)
 
     def _find_card_location(self, card: Card) -> Tuple[Optional[Player], Optional[List[Any]]]:
-        for p in [self.p1, self.p2]:
-            zones = [
-                p.hand, p.field, p.life, p.trash, p.deck, p.temp_zone,
-                p.don_active, p.don_rested, p.don_attached_cards
-            ]
-            if p.leader == card: return p, None
-            if p.stage == card: return p, None
-            for zone in zones:
-                if card in zone: return p, zone
-        return None, None
+        return _card_moves._find_card_location(self, card)
 
     def move_card(self, card: Card, dest_zone: Zone, dest_player: Player, dest_position: str = "BOTTOM"):
-        current_owner, current_list = self._find_card_location(card)
-        
-        # 領域移動時はステータスをリセット（特にトラッシュ/手札へ戻る場合）。
-        # 場を離れると新規状態になるため【ターン1回】の使用回数もリセットする。
-        if dest_zone in [Zone.TRASH, Zone.HAND]:
-            card.reset_turn_status(clear_usage=True)
-
-        # レスト（横向き）状態は場を離れたら必ず解除する。レストのキャラを手札/トラッシュ/
-        # デッキへ戻すと横向きのまま戻ってしまう不具合を防ぐ（is_rest は場でのみ意味を持つ）。
-        if dest_zone in [Zone.TRASH, Zone.HAND, Zone.DECK]:
-            card.is_rest = False
-            
-        # フィールドから離れる場合、付与されていたドン‼をレスト状態で持ち主に返す
-        if current_owner and current_list is not None and current_list is current_owner.field:
-            attached_dons = [d for d in current_owner.don_attached_cards if d.attached_to == card.uuid]
-            for don in attached_dons:
-                current_owner.don_attached_cards.remove(don)
-                don.attached_to = None
-                don.is_rest = True
-                current_owner.don_rested.append(don)
-            card.attached_don = 0
-            # 場を離れたら継続効果（timed_power/flags/keywords）を破棄する。
-            self.continuous.drop_for(card.uuid)
-
-        # ライフ領域から離れる場合（手札/トラッシュ/デッキへ移す効果等）、「ライフが離れた時」
-        # (ON_LIFE_DECREASE) を待ち行列へ積む。戦闘/効果ダメージは life.pop 済みでここを通らず、
-        # それぞれの経路が別途積むため二重計上しない。実際の解決は安全な境界
-        # （resolve_ability 完了時 / 対話完了時 / アクション境界）でまとめて行う。
-        left_life = (current_owner is not None and current_list is not None
-                     and current_list is current_owner.life)
-        # 場（フィールド）からの離脱判定。キャラが場を離れた時(ON_LEAVE)誘発に使う。
-        left_field = (current_owner is not None and current_list is not None
-                      and current_list is current_owner.field
-                      and dest_zone != Zone.FIELD)
-
-        if current_list is not None and card in current_list: current_list.remove(card)
-        elif current_owner and current_owner.stage == card: current_owner.stage = None
-
-        if left_life:
-            self._enqueue_life_decrease(current_owner, 1)
-        if left_field and card.master.type == CardType.CHARACTER:
-            self._enqueue_on_leave(card, current_owner)
-
-        target_list = None
-        if dest_zone == Zone.FIELD and card.master.type == CardType.STAGE:
-            if dest_player.stage is not None: self.move_card(dest_player.stage, Zone.TRASH, dest_player)
-            dest_player.stage = card
-        elif dest_zone == Zone.HAND: target_list = dest_player.hand
-        elif dest_zone == Zone.FIELD: target_list = dest_player.field
-        elif dest_zone == Zone.TRASH: target_list = dest_player.trash
-        elif dest_zone == Zone.LIFE: target_list = dest_player.life
-        elif dest_zone == Zone.DECK: target_list = dest_player.deck
-        elif dest_zone == Zone.TEMP: target_list = dest_player.temp_zone
-        
-        if target_list is not None:
-            if dest_position == "TOP": target_list.insert(0, card)
-            else: target_list.append(card)
+        return _card_moves.move_card(self, card, dest_zone, dest_player, dest_position)
 
     def pay_cost(self, player: Player, cost: int, don_list: Optional[List[DonInstance]] = None):
-        if don_list is not None:
-            if len(don_list) < cost: raise ValueError("指定されたドン!!の数が不足しています。")
-            for don in don_list:
-                if don in player.don_active: player.don_active.remove(don); player.don_rested.append(don); don.is_rest = True
-                elif don in player.don_attached_cards: player.don_attached_cards.remove(don); player.don_rested.append(don); don.is_rest = True; don.attached_to = None
-        else:
-            if len(player.don_active) < cost: raise ValueError("ドン!!が不足しています。")
-            for _ in range(cost): don = player.don_active.pop(0); player.don_rested.append(don); don.is_rest = True
+        return _card_moves.pay_cost(self, player, cost, don_list)
 
     def has_blocker(self, player: Player) -> bool:
-        for card in player.field:
-            if (not card.is_rest and card.has_keyword("ブロッカー")
-                    and "BLOCKER_DISABLED" not in card.flags
-                    and "CANNOT_REST" not in card.timed_flags):
-                return True
-        return False
+        return _battle.has_blocker(self, player)
 
     def declare_attack(self, attacker: Card, target: Card):
-        attacker_owner, _ = self._find_card_location(attacker)
-        target_owner, _ = self._find_card_location(target)
-        self._validate_action(attacker_owner, "MAIN_ACTION")
-        # 先攻・後攻ともに「自分の最初のターン」はリーダー・キャラのいずれもアタックできない（公式準拠）。
-        # ターンは先攻=turn_count 1、後攻=turn_count 2 と交互に進むため、turn_count <= 2 が
-        # 両プレイヤーの最初のターンを覆う。
-        if self.turn_count <= 2:
-            raise ValueError("最初のターンはアタックできません。")
-        if "ATTACK_DISABLE" in attacker.flags or "ATTACK_DISABLE" in attacker.timed_flags: raise ValueError("このカードは効果によりアタックできません。")
-        if "CANNOT_REST" in attacker.timed_flags: raise ValueError("このカードは効果によりレストにできないためアタックできません。")
-        if attacker.is_rest: raise ValueError("アタックするカードはアクティブ状態でなければなりません。")
-        # 召喚酔い: 登場したターンのキャラは攻撃できない。ただし「速攻」を持てば可。
-        # リーダーは is_newly_played=False のため影響を受けない。
-        if (attacker.master.type == CardType.CHARACTER
-                and attacker.is_newly_played
-                and not attacker.has_keyword("速攻")):
-            raise ValueError("登場したターンのキャラクターは攻撃できません（速攻を除く）。")
-        # 自己制限（self_cannot）:「リーダーにアタックできない」。相手リーダーへの攻撃宣言を弾く。
-        if (target.master.type == CardType.LEADER
-                and attacker_owner is not None
-                and self._active_restriction(attacker_owner, "CANNOT_ATTACK_LEADER")):
-            raise ValueError("効果により、このターンはリーダーにアタックできません。")
-        if (target.master.type == CardType.CHARACTER and not target.is_rest
-                and not attacker.has_keyword("ATTACK_ACTIVE")):
-            raise ValueError("レスト状態のキャラクターのみ攻撃可能です。")
-        # アタック税（OP08-043「アタックする際、自身の手札N枚を捨てなければアタックできない」）。
-        # 付与された ATTACK_TAX_DISCARD_N フラグがあれば、手札N枚を支払えるときのみアタック可。
-        tax_flags = [f for f in (attacker.flags | attacker.timed_flags)
-                     if isinstance(f, str) and f.startswith("ATTACK_TAX_DISCARD_")]
-        if tax_flags:
-            need = max(int(f.rsplit("_", 1)[1]) for f in tax_flags)
-            if len(attacker_owner.hand) < need:
-                raise ValueError(f"アタックするには手札{need}枚を捨てる必要があり、手札が足りません。")
-            # コスト支払い: 手札N枚を捨てる。どの札を捨てるかは本来プレイヤー選択だが、宣言経路を
-            # 中断させないため先頭からN枚を捨てる（捨て札選択の対話化は今後の課題）。
-            for _ in range(need):
-                attacker_owner.trash.append(attacker_owner.hand.pop(0))
-        attacker.is_rest = True
-        self.active_battle = JournaledDict({"attacker": attacker, "target": target, "attacker_owner": attacker_owner, "target_owner": target_owner, "counter_buff": 0})
-
-        # アタック時/相手のアタック時トリガーを順に解決する。途中でいずれかが対象選択や
-        # 選択(Choice)で中断した場合、解決前にブロッカー/カウンター段階へ進むと、未解決の
-        # interaction とカウンター操作が衝突する（"期待:CHOICE" エラー）。トリガーを待ち行列に
-        # 積み、_advance_battle_triggers で1つずつ解決し、全て片付いてからフェイズ遷移する。
-        triggers = []
-        if attacker.master.abilities:
-            for ability in attacker.master.abilities:
-                if ability.trigger == TriggerType.ON_ATTACK:
-                    triggers.append((attacker_owner, ability, attacker))
-                # 「このキャラがレストになった時」(ON_REST) はアタック宣言で自身がレストになった
-                # 瞬間に誘発する（要因＝アタックなので「効果で」限定の能力は対象外）。
-                # OP14-119/027/028/032/035 等。CONTEXT/ターン1回条件は resolve_ability が評価。
-                elif (ability.trigger == TriggerType.ON_REST
-                      and self._rest_subject_matches(ability, attacker, attacker,
-                                                     attacker_owner, by_attack=True)):
-                    triggers.append((attacker_owner, ability, attacker))
-        opp_cards = ([target_owner.leader] if target_owner.leader else []) + target_owner.field
-        for card in opp_cards:
-            for ability in card.master.abilities:
-                if ability.trigger == TriggerType.ON_OPP_ATTACK:
-                    triggers.append((target_owner, ability, card))
-        self._battle_triggers = JournaledList(triggers)
-        self._advance_battle_triggers()
+        return _battle.declare_attack(self, attacker, target)
 
     def _advance_battle_triggers(self):
-        """積んだバトルトリガーを順に解決し、全て解決後に防御フェイズへ遷移する。
-        途中で interaction が立ったら中断（resolve_interaction が解決後に再度呼ぶ）。"""
-        if not self.active_battle:
-            self._battle_triggers = JournaledList()
-            return
-        while getattr(self, "_battle_triggers", None):
-            player, ability, card = self._battle_triggers.pop(0)
-            self.resolve_ability(player, ability, source_card=card)
-            if self.active_interaction:
-                return  # 中断: 解決後に resolve_interaction から再開される
-        # 全トリガー解決 → ブロッカー/カウンター段階へ
-        target_owner = self.active_battle["target_owner"]
-        if self.has_blocker(target_owner):
-            self.phase = Phase.BLOCK_STEP
-        else:
-            self.phase = Phase.BATTLE_COUNTER
+        return _battle._advance_battle_triggers(self)
 
     # --- 誘発能力（ライフ公開【トリガー】/ON_LIFE_DECREASE 等）の汎用待ち行列 ---
     def _enqueue_trigger(self, player: Player, ability: Ability, card: CardInstance,
                          optional: bool = False) -> None:
-        """誘発能力を待ち行列へ積む。optional=True は発動可否（使う/使わない）を確認する。"""
-        # JournaledDict 化＝中断中の item["_confirmed"]=True 等の in-place 変更を巻き戻せるように
-        # する（parked resolver の make/unmake 化・round-trip ゲートで照合）。
-        self._pending_triggers.append(JournaledDict({
-            "player": player, "ability": ability, "card": card,
-            "optional": optional, "_confirmed": False,
-        }))
+        return _triggers._enqueue_trigger(self, player, ability, card, optional)
 
     def _advance_pending_triggers(self) -> None:
-        """積んだ誘発能力を順に消化する。中断（対話）が立ったら return し、
-        resolve_interaction が解決後に再度呼ぶ。optional は未確認なら確認対話へ中断する。"""
-        while self._pending_triggers:
-            if self.active_interaction:
-                return  # 別の対話が進行中: 解決後に再開される
-            item = self._pending_triggers[0]
-            if item.get("optional") and not item.get("_confirmed"):
-                self._suspend_for_trigger_confirm(item)
-                return
-            self._pending_triggers.pop(0)
-            self._relocate_activated_trigger_card(item)
-            self.resolve_ability(item["player"], item["ability"], source_card=item["card"])
-            if self.active_interaction:
-                return  # 効果解決が対象選択等で中断 → resolve_interaction が再開
+        return _triggers._advance_pending_triggers(self)
 
     def _relocate_activated_trigger_card(self, item: Dict[str, Any]) -> None:
-        """発動が確定したライフ公開【トリガー】のカードを、効果解決前に手札からトラッシュへ移す。
-
-        ライフのカードはダメージ時に一旦手札へ置かれるが、【トリガー】を「発動する」場合は
-        手札に残らず、効果解決後にトラッシュへ置かれる（OPCG ルール）。効果が自身を登場させる
-        /手札に加える場合は、その効果の move_card が（トラッシュにある）当該カードを再配置する
-        ため、最終的な置き場所は効果に従う。発動しない（パス）場合はこの関数を通らず手札に残る。
-        """
-        ability = item.get("ability")
-        card = item.get("card")
-        player = item.get("player")
-        if ability is None or card is None or player is None:
-            return
-        if getattr(ability, "trigger", None) != TriggerType.TRIGGER:
-            return  # ON_LIFE_DECREASE 等（場のカードの誘発）は対象外
-        if card in player.hand:
-            self.move_card(card, Zone.TRASH, player)
+        return _triggers._relocate_activated_trigger_card(self, item)
 
     def _suspend_for_trigger_confirm(self, item: Dict[str, Any]) -> None:
-        """【トリガー】等の発動可否を yes/no で確認するため中断する。
-        resolve_interaction が CONFIRM_TRIGGER を処理して同じ item を再投入/破棄する。"""
-        player = item["player"]
-        card = item["card"]
-        self.active_interaction = {
-            "player_id": player.name,
-            "action_type": "CONFIRM_TRIGGER",
-            "source_card_name": card.master.name,
-            "source_card_uuid": card.uuid,
-            "message": f"【トリガー】「{card.master.name}」の効果を発動しますか？",
-            "can_skip": True,
-            "continuation": {"trigger_item": item},
-        }
+        return _triggers._suspend_for_trigger_confirm(self, item)
 
     def handle_block(self, blocker: Optional[Card] = None):
-        if not self.active_battle: return
-        target_owner = self.active_battle["target_owner"]; self._validate_action(target_owner, "SELECT_BLOCKER")
-        if blocker:
-            blocker.is_rest = True
-            self.active_battle["target"] = blocker
-            # 【ブロック時】効果を発動する（従来は未発火＝14枚が no-op だった）。
-            if blocker.master.abilities and not blocker.is_effect_negated and not blocker.negated:
-                for ability in blocker.master.abilities:
-                    if ability.trigger == TriggerType.ON_BLOCK:
-                        self.resolve_ability(target_owner, ability, source_card=blocker)
-            if self.active_interaction:
-                # ブロック時効果が対象選択等で中断した場合はここで返す（resume が継続）。
-                return
-        self.phase = Phase.BATTLE_COUNTER;
+        return _battle.handle_block(self, blocker)
 
     def apply_counter(self, player: Player, counter_card: Optional[Card] = None, don_list: Optional[List[DonInstance]] = None):
-        if not self.active_battle: return
-        if counter_card is None: self.resolve_attack(); return
-        self._validate_action(player, "SELECT_COUNTER")
-        if counter_card.master.type == CardType.EVENT:
-            self.pay_cost(player, counter_card.master.cost, don_list)
-            for ability in counter_card.master.abilities:
-                if ability.trigger == TriggerType.COUNTER: self.resolve_ability(player, ability, source_card=counter_card)
-            # 「自分のキャラすべては、このターン中、…代わりに〜できる」(EB02-030) のような
-            # 継続付与型の置換を登録する。イベントは即トラッシュで場に残らないため、
-            # _find_replacement の場上 protector 走査では拾えない。player へ this-turn 付与する。
-            self._register_granted_replacements(player, counter_card)
-            self.move_card(counter_card, Zone.TRASH, player)
-        else:
-            counter_value = getattr(counter_card, "current_counter", counter_card.master.counter or 0); self.active_battle["counter_buff"] += counter_value
-            self.move_card(counter_card, Zone.TRASH, player)
+        return _battle.apply_counter(self, player, counter_card, don_list)
 
     def resolve_attack(self):
-        if not self.active_battle: return
-        attacker = self.active_battle["attacker"]; target = self.active_battle["target"]
-        attacker_owner = self.active_battle["attacker_owner"]; target_owner = self.active_battle["target_owner"]
-        counter_buff = self.active_battle.get("counter_buff", 0)
-        is_my_turn = (attacker_owner == self.turn_player); is_target_turn = (target_owner == self.turn_player)
-        attacker_pwr = attacker.get_power(is_my_turn); target_pwr = target.get_power(is_target_turn) + counter_buff
-        life_lost = 0
-        if target == target_owner.leader:
-            if attacker_pwr >= target_pwr:
-                damage_amount = 2 if attacker.has_keyword("ダブルアタック") else 1; is_banish = attacker.has_keyword("バニッシュ")
-                for _ in range(damage_amount):
-                    if target_owner.life:
-                        life_card = target_owner.life.pop(0)
-                        dest_zone = Zone.TRASH if is_banish else Zone.HAND
-                        trigger_ability = None if is_banish else next(
-                            (a for a in life_card.master.abilities if a.trigger == TriggerType.TRIGGER), None
-                        )
-                        self.move_card(life_card, dest_zone, target_owner)
-                        life_lost += 1
-                        # 【トリガー】は「発動できる」（任意）。即時解決せず確認付きで待ち行列へ。
-                        # 複数枚（ダブルアタック等）でも確認/解決が中断を跨いで消失しない。
-                        if trigger_ability:
-                            self._enqueue_trigger(target_owner, trigger_ability, life_card, optional=True)
-                    else: self.winner = attacker_owner.name; break
-        else:
-            if attacker_pwr >= target_pwr:
-                if self._active_protection(target, ("BATTLE_KO",), attacker=attacker):
-                    pass
-                else:
-                    repl = self._find_replacement(target, ("BATTLE_KO",))
-                    if repl is not None and getattr(repl[3], "is_optional", False):
-                        # 任意のバトルKO置換（「代わりに〜してもよい/できる」OP10-034 等）は、
-                        # 被KO側に「代わりの効果を使うか」を確認するため戦闘を中断する。
-                        # accept→置換実行（本来のKOをスキップ）、decline→本来のKOを実行。
-                        # どちらの分岐も resume 時に _finish_attack で戦闘後処理を行う。
-                        self._suspend_for_battle_ko_replacement(target, target_owner, life_lost)
-                        return
-                    elif repl is not None:
-                        # 任意でない置換は従来どおり即時実行（内側選択はヘッドレス自動解決）。
-                        self._active_replacement(target, ("BATTLE_KO",))
-                    else:
-                        self.move_card(target, Zone.TRASH, target_owner)
-                        self._resolve_on_ko(target, target_owner, cause="BATTLE")
-
-        self._finish_attack(target, target_owner, life_lost)
+        return _battle.resolve_attack(self)
 
     def _finish_attack(self, target: Card, target_owner: Player, life_lost: int):
-        """戦闘解決後の共通後処理。インラインのバトルKO判定からも、任意バトルKO置換の
-        確認(CONFIRM_OPTIONAL)からの resume からも呼ばれる。"""
-        target.reset_turn_status(keep_don=True); self.active_battle = None; self.phase = Phase.MAIN; self.check_victory()
-        self.continuous.expire("BATTLE_END", self.turn_count)
-        if not self.winner:
-            self._apply_passive_effects(self.turn_player)
-        # ライフが離れた回数ぶん ON_LIFE_DECREASE を待ち行列へ積み、【トリガー】と共に消化する。
-        if life_lost and not self.winner:
-            self._enqueue_life_decrease(target_owner, life_lost)
-        self._advance_pending_triggers()
+        return _battle._finish_attack(self, target, target_owner, life_lost)
 
     def _suspend_for_battle_ko_replacement(self, target: Card, target_owner: Player, life_lost: int):
-        """任意のバトルKO置換を被KO側へ確認するため戦闘を中断する（CONFIRM_OPTIONAL）。
-        resume 時: accept→置換実行（KOスキップ）／decline→本来のKO、その後 _finish_attack。
-        ヘッドレス/CPU の既定応答(index0=accept)は従来の自動採用と一致する。"""
-        self.active_interaction = {
-            "player_id": target_owner.name,
-            "action_type": "CONFIRM_OPTIONAL",
-            "source_card_name": target.master.name,
-            "source_card_uuid": target.uuid,
-            "message": f"「{target.master.name}」がバトルでKOされます。代わりの効果を使用しますか？",
-            "can_skip": True,
-            "continuation": {
-                "kind": "BATTLE_KO_REPLACE",
-                "source_card_uuid": target.uuid,
-                "target_owner_name": target_owner.name,
-                "life_lost": life_lost,
-            },
-        }
+        return _battle._suspend_for_battle_ko_replacement(self, target, target_owner, life_lost)
 
     def check_victory(self):
         # デッキアウト: 通常は本人の敗北（相手の勝利）。ただし C10「自分のデッキが0枚に
         # なった場合、敗北する代わりに勝利する」(VICTORY/REPLACE_DECKOUT_LOSS) を持つ場合は
         # 本人の勝利へ置換する（OP03-040 ナミ等）。
-        if not self.p1.deck:
-            self.winner = self.p1.name if self._has_deckout_win_replace(self.p1) else self.p2.name
-        elif not self.p2.deck:
-            self.winner = self.p2.name if self._has_deckout_win_replace(self.p2) else self.p1.name
+        return _battle.check_victory(self)
 
     def _has_deckout_win_replace(self, player) -> bool:
-        """player がデッキアウト時の敗北→勝利の置換能力(PASSIVE)を持つか。"""
-        units = [player.leader] + list(player.field)
-        for card in units:
-            if not card or not getattr(card, "master", None) or getattr(card, "negated", False):
-                continue
-            if getattr(card, "is_effect_negated", False):
-                continue
-            for ab in card.master.abilities:
-                if ab.trigger != TriggerType.PASSIVE:
-                    continue
-                eff = self._find_action(ab.effect, ActionType.VICTORY)
-                if eff is not None and eff.status == "REPLACE_DECKOUT_LOSS":
-                    return True
-        return False
+        return _battle._has_deckout_win_replace(self, player)
 
     def play_card_action(self, player: Player, card: Card):
         if card not in player.hand: return
@@ -1705,42 +645,13 @@ class GameManager:
             self._enforce_field_limit(player)
 
     def _has_rested_play(self, player: Player) -> bool:
-        """player が「自分のキャラはレストで登場する」PASSIVE を持つか（RESTED_PLAY マーカー）。"""
-        cards = ([player.leader] if player.leader else []) + list(player.field)
-        for c in cards:
-            if not c or getattr(c, "is_effect_negated", False) or not getattr(c, "master", None):
-                continue
-            for ab in c.master.abilities:
-                if ab.trigger != TriggerType.PASSIVE:
-                    continue
-                act = self._find_action(ab.effect, ActionType.RESTRICTION)
-                if act is not None and getattr(act, "status", None) == "RESTED_PLAY":
-                    return True
-        return False
+        return _guards._has_rested_play(self, player)
 
     def _active_restriction(self, player: Player, key: str) -> Optional[Dict[str, Any]]:
-        """player に有効な自己制限（self_cannot）があれば、そのパラメータ dict を返す。
-        turn_count <= expire の間だけ有効。期限切れエントリは掃除して None を返す。"""
-        rec = getattr(player, "restrictions", {}).get(key)
-        if not rec:
-            return None
-        if self.turn_count <= rec.get("expire", -1):
-            return rec
-        # 期限切れは破棄
-        player.restrictions.pop(key, None)
-        return None
+        return _guards._active_restriction(self, player, key)
 
     def _blocks_effect_play(self, card: CardInstance) -> bool:
-        """card が「手札のこのカードは効果で登場できない」PASSIVE を持つか（NO_EFFECT_PLAY）。"""
-        if not card or not getattr(card, "master", None):
-            return False
-        for ab in card.master.abilities:
-            if ab.trigger != TriggerType.PASSIVE:
-                continue
-            act = self._find_action(ab.effect, ActionType.RESTRICTION)
-            if act is not None and getattr(act, "status", None) == "NO_EFFECT_PLAY":
-                return True
-        return False
+        return _guards._blocks_effect_play(self, card)
 
     def resolve_ability(self, player: Player, ability: Ability, source_card: CardInstance,
                         cost_confirmed: bool = False):
@@ -1791,256 +702,27 @@ class GameManager:
         return None
 
     def _active_protection(self, card: CardInstance, status_values: Tuple[str, ...], actor: Optional[Player] = None, attacker: Optional[CardInstance] = None) -> bool:
-        if not card or not getattr(card, "master", None) or card.negated:
-            return False
-        owner = self.p1 if self.p1.name == card.owner_id else self.p2
-
-        # トリガー効果が継続効果として付与した期間付き保護（timed_flags）。
-        # 例: 「このキャラは、次の自分のターン開始時まで、バトルでKOされない」(ON_ATTACK)
-        for s in status_values:
-            if f"PREVENT_{s}" in (card.flags | card.timed_flags):
-                return True
-
-        resolver = None
-        # 走査対象: 自身に加え、オーナーのリーダー/フィールド/ステージの範囲保護
-        # （「自分の特徴《X》を持つキャラすべては…場を離れない」等。従来は自身のみ走査で
-        #   他カードを守る保護が機能しなかった）。
-        protectors = [card]
-        if owner.leader and owner.leader is not card:
-            protectors.append(owner.leader)
-        protectors.extend(fc for fc in owner.field if fc is not card)
-        if getattr(owner, "stage", None) and owner.stage is not card:
-            protectors.append(owner.stage)
-        # 除去を行うプレイヤー(actor)側の範囲保護も走査する。「相手のキャラすべては、自分の効果で
-        # 場を離れない」(OP14-079) のように、保護能力の持ち主(actor)と被保護カード(owner=相手)が
-        # 別プレイヤーのケースに対応する。range クエリの照合で actor の相手側＝owner 側のカードのみ
-        # 一致するため、自分側を守る保護は誤適用されない。
-        if actor is not None and actor is not owner:
-            if actor.leader and actor.leader is not card:
-                protectors.append(actor.leader)
-            protectors.extend(fc for fc in actor.field if fc is not card)
-            if getattr(actor, "stage", None) and actor.stage is not card:
-                protectors.append(actor.stage)
-
-        for protector in protectors:
-            if getattr(protector, "is_effect_negated", False) or getattr(protector, "negated", False):
-                continue
-            for ab in protector.master.abilities:
-                if ab.trigger != TriggerType.PASSIVE:
-                    continue
-                eff = self._find_action(ab.effect, ActionType.PREVENT_LEAVE)
-                if eff is None:
-                    continue
-                if eff.status not in status_values:
-                    continue
-                # 保護対象クエリの照合: SOURCE は protector 自身のみを守る。
-                # 範囲クエリは card が範囲に含まれるかを実体化して確認する。
-                tgt = getattr(eff, "target", None)
-                if tgt is None or getattr(tgt, "select_mode", "SOURCE") == "SOURCE":
-                    if protector is not card:
-                        continue
-                else:
-                    if card not in get_target_cards(self, tgt, protector):
-                        continue
-                if ab.condition is not None:
-                    if resolver is None:
-                        resolver = EffectResolver(self)
-                    src = card if protector is card else protector
-                    if not resolver._check_condition(owner, ab.condition, src):
-                        continue
-                # 属性限定のバトルKO耐性（「属性《斬》を持つカードとのバトルでKOされず」OP08-114）。
-                # 保護はバトル相手(attacker)が指定属性を持つ場合のみ有効。属性が不明（非バトル経路）や
-                # 不一致なら適用しない。
-                attr_m = re.search(_nfc(r'属性[(（《]([斬打射特知])[)）》]を持つ(?:カード|キャラ)?との(?:バトル|戦闘)'),
-                                   getattr(eff, "raw_text", "") or "")
-                if attr_m:
-                    req_attr = attr_m.group(1)
-                    if attacker is None or getattr(attacker.master, "attribute", None) is None \
-                            or attacker.master.attribute.value != req_attr:
-                        continue
-                # 【ターン1回】保護（例:「このキャラはターンに1回、相手の効果でKOされない」）は
-                # 1ターンに1回まで。_check_condition の TURN_LIMIT は常時 True を返すため、ここで
-                # 使用回数を直接 enforce する（resolve_ability を経由しない保護経路のため）。
-                limit = _ability_turn_limit(ab)
-                if limit is not None:
-                    key = _ability_index(protector, ab)
-                    if protector.ability_used_this_turn.get(key, 0) >= limit:
-                        continue
-                    protector.ability_used_this_turn[key] = protector.ability_used_this_turn.get(key, 0) + 1
-                return True
-        return False
+        return _guards._active_protection(self, card, status_values, actor, attacker)
 
     # 置換効果（REPLACE_EFFECT）の検出。除去対象に適用可能な「代わりに〜」置換を1件、
     # 条件・実行可能性・【ターン1回】の残数を満たすものに限り (protector, ability, eff, sub)
     # として返す（実行はしない）。無ければ None。検出と実行を分離することで、バトルKO置換の
     # ような「任意（〜してもよい/できる）の置換を被KO側へ確認してから実行/拒否する」経路を可能にする。
     def _find_replacement(self, card: CardInstance, status_values: Tuple[str, ...]):
-        if not card or not getattr(card, "master", None) or card.negated:
-            return None
-        owner = self.p1 if self.p1.name == card.owner_id else self.p2
-
-        # 走査対象: 除去されるカード自身 → オーナーのリーダー → フィールドの他キャラ
-        # （自身の置換効果と、他キャラを守る OPPONENT_REMOVAL 型置換効果の両方をカバー）
-        candidates = [card]
-        if owner.leader and owner.leader is not card:
-            candidates.append(owner.leader)
-        for fc in owner.field:
-            if fc is not card:
-                candidates.append(fc)
-
-        for protector in candidates:
-            if getattr(protector, 'is_effect_negated', False):
-                continue
-            for ab in protector.master.abilities:
-                if ab.trigger != TriggerType.PASSIVE:
-                    continue
-                eff = self._find_action(ab.effect, ActionType.REPLACE_EFFECT)
-                if eff is None:
-                    continue
-                if eff.status not in status_values:
-                    continue
-                # 自己無効化（「キャラの「X」がいる場合、この効果は無効になる」OP05-100）。
-                # 指定名のキャラがいずれかの場にいれば、この置換は発動しない。
-                neg_m = re.search(_nfc(r'「([^」]+)」がい[るて][^。]*?この効果は無効'),
-                                  getattr(eff, "raw_text", "") or "")
-                if neg_m:
-                    neg_name = neg_m.group(1)
-                    if any(c.master.matches_name(neg_name, partial=True)
-                           for pl in (self.p1, self.p2) for c in pl.field):
-                        continue
-                sub = getattr(eff, "sub_effect", None)
-                if sub is None:
-                    continue
-                resolver = EffectResolver(self)
-                # 条件チェック: source_card=除去されるカード（OPPONENT_REMOVAL/名称フィルタ評価用）、
-                # host_card=保護者（HAS_DON 等の「能力保持カードの付与ドン」評価用。OP05-001 はリーダー）。
-                if ab.condition is not None and not resolver._check_condition(owner, ab.condition, card, host_card=protector):
-                    continue
-                # 代わりの行動が取れない場合は置換不成立。
-                # sub_effect の source は「離れるカード」(card) とする。置換文の「代わりに
-                # （そのカードを）〜」は離れるカード自身を対象に取り得るため（OP11-101 の
-                # 「代わりに自分のライフの上に裏向きで加える」= 離れるカードをライフへ）。
-                if not resolver._can_satisfy_node(owner, sub, card):
-                    continue
-                # 【ターン1回】置換は1ターンに1回まで enforce する（parser が自己置換の TURN_LIMIT を
-                # 落とすため raw_text 併用。resolve_ability を経由しない置換経路のため直接管理）。
-                _limit = _ability_turn_limit(ab)
-                if _limit is not None and protector.ability_used_this_turn.get(_ability_index(protector, ab), 0) >= _limit:
-                    continue
-                return (protector, ab, eff, sub)
-
-        # 継続付与型の置換（EB02-030「自分のキャラすべては、このターン中、…代わりに〜できる」）。
-        # 場に残らないイベント由来のため owner.granted_replacements を参照する。付与対象は
-        # 自分のキャラ（除去されるカード自身が自分のキャラであること）。ab/eff は持たないので
-        # ターン制限・条件は付与時に消化済みとして None を返す。
-        if getattr(card, "master", None) and card.master.type == CardType.CHARACTER:
-            for g in getattr(owner, "granted_replacements", []):
-                if g.get("status") not in status_values:
-                    continue
-                if self.turn_count > g.get("expire_turn", 0):
-                    continue
-                sub = g.get("sub_effect")
-                if sub is None:
-                    continue
-                resolver = EffectResolver(self)
-                if not resolver._can_satisfy_node(owner, sub, card):
-                    continue
-                return (card, None, None, sub)
-        return None
+        return _guards._find_replacement(self, card, status_values)
 
     def _register_granted_replacements(self, player: Player, source_card: Card) -> None:
-        """カウンターイベント等が持つ REPLACE_EFFECT を「このターン中」付与の置換として登録する。
-        イベントは場に残らないため、被除去キャラ側から参照できるよう player へ退避する
-        （EB02-030「自分のキャラすべては、このターン中、バトルでKOされる場合、代わりに〜できる」）。"""
-        import copy
-        for ability in source_card.master.abilities:
-            eff = self._find_action(ability.effect, ActionType.REPLACE_EFFECT)
-            if eff is None:
-                continue
-            sub = getattr(eff, "sub_effect", None)
-            if sub is None:
-                continue
-            # 「〜できる／〜してもよい」は任意。parser が sub.is_optional に載せ切れない場合に
-            # 備え raw_text からも判定し、付与する sub のコピーへ反映する（共有ノードを汚さない）。
-            raw = _nfc(getattr(eff, "raw_text", "") or getattr(ability, "raw_text", "") or "")
-            is_optional = bool(getattr(sub, "is_optional", False)) or ("できる" in raw) or ("てもよい" in raw)
-            sub_copy = copy.copy(sub)
-            sub_copy.is_optional = is_optional
-            player.granted_replacements.append({
-                "status": eff.status,
-                "sub_effect": sub_copy,
-                "is_optional": is_optional,
-                "expire_turn": self.turn_count,
-            })
-        return None
+        return _guards._register_granted_replacements(self, player, source_card)
 
     # 置換効果（REPLACE_EFFECT）の判定。除去の瞬間に対象の PASSIVE 能力を走査し、
     # 「代わりに〜」の置換アクションを（条件・実行可能性を満たせば）実行して True を返す。
     # True の場合、呼び出し側は本来の除去を行わずスキップする。
     def _active_replacement(self, card: CardInstance, status_values: Tuple[str, ...],
                             can_suspend: bool = False) -> bool:
-        found = self._find_replacement(card, status_values)
-        if found is None:
-            return False
-        owner = self.p1 if self.p1.name == card.owner_id else self.p2
-        protector, ab, eff, sub = found
-        resolver = EffectResolver(self)
-        _limit = _ability_turn_limit(ab)
-        # 置換は除去解決の最中に発生する「入れ子の中断」。失われる外側継続が無い
-        # （can_suspend=除去アクションの後続が空・単一対象）場合は、内側の中断
-        # （対象選択／任意確認）を**そのまま UI へ提示**し、被保護側に選ばせる
-        # （interaction はスタックに残し、resume で sub_effect を完了させる）。
-        # 外側継続が残るケースでは従来どおり保守的に自動解決して同期完了させる
-        # （任意=採用、対象=有効候補先頭）。どちらも置換は成立扱い（本来の除去はスキップ）。
-        outer_interaction = self.active_interaction
-        self.active_interaction = None
-        resolver.execution_stack = [sub]
-        resolver._process_stack(owner, card)
-        suspended = self.active_interaction is not None
-        if _limit is not None:  # 発動成立 → 【ターン1回】の使用回数を消費
-            k = _ability_index(protector, ab)
-            protector.ability_used_this_turn[k] = protector.ability_used_this_turn.get(k, 0) + 1
-        if suspended and can_suspend:
-            # 内側中断を UI へ提示（自動解決しない）。除去はスキップ＝置換成立。
-            # 外側に後続継続（このシーケンスの残アクション／除去ループの残対象）があれば、
-            # 呼び出し側がそれを deferred フレームへ退避できるようシグナルを立てる（B）。
-            self._replacement_suspended = True
-            return True
-        # 自動解決パス（外側継続あり、または中断なし）。
-        self._auto_resolve_replacement(owner)
-        self.active_interaction = outer_interaction
-        return True
+        return _guards._active_replacement(self, card, status_values, can_suspend)
 
     def _auto_resolve_replacement(self, owner: Player, limit: int = 16) -> None:
-        """置換 sub_effect が残した中断（任意確認／対象選択）を保守的に同期解決する。
-
-        単一 continuation 設計ではネストした中断を UI へ伝播できないため、置換は headless で
-        完結させる: 任意確認(CONFIRM_OPTIONAL)は accept（保護を実行）、対象選択(SELECT_TARGET)は
-        有効候補から必要数を自動選択する。選択 UI のフロント連携は E14/E15 の将来課題。"""
-        n = 0
-        while self.active_interaction and n < limit:
-            ia = self.active_interaction
-            atype = ia.get("action_type")
-            pid = ia.get("player_id")
-            actor = self.p1 if self.p1.name == pid else self.p2
-            if atype == "SELECT_TARGET":
-                cand = ia.get("selectable_uuids") or [c.uuid for c in ia.get("candidates", [])]
-                mx = (ia.get("constraints") or {}).get("max", 1) or 1
-                payload = {"selected_uuids": cand[:mx], "index": 0}
-            elif atype == "CONFIRM_OPTIONAL":
-                payload = {"accepted": True}
-            elif atype == "CHOICE":
-                payload = {"index": 0}
-            else:
-                # 想定外の中断種別は安全側に倒して打ち切る（宙吊り防止のため interaction を解除）。
-                self.active_interaction = None
-                break
-            try:
-                self.resolve_interaction(actor, payload)
-            except Exception as e:
-                self.active_interaction = None
-                break
-            n += 1
+        return _guards._auto_resolve_replacement(self, owner, limit)
 
     # ------------------------------------------------------------------
     # 多段継続（deferred continuations）— accepted limitation B の解消
@@ -2050,251 +732,51 @@ class GameManager:
     # 残対象 → 後続シーケンスの順に正しく再開される。
     # ------------------------------------------------------------------
     def _defer_resolver_stack(self, player: Player, source_card, execution_stack, context) -> None:
-        """除去置換の中断で失われる外側リゾルバの後続（execution_stack）を退避する（B1）。"""
-        self._deferred_continuations.insert(0, {
-            "kind": "RESOLVER_STACK",
-            "player_name": player.name,
-            "source_card_uuid": source_card.uuid if source_card else None,
-            "execution_stack": JournaledList(execution_stack),
-            "effect_context": context,
-        })
+        return _interaction._defer_resolver_stack(self, player, source_card, execution_stack, context)
 
     def _defer_removal_targets(self, player: Player, action, remaining_targets, value) -> None:
-        """複数対象除去で置換中断したとき、未処理の残対象を退避する（B2）。
-        再開時に apply_action_to_engine を残対象で再実行する（uuid で解決し直す）。"""
-        self._deferred_continuations.append({
-            "kind": "REMOVAL_TARGETS",
-            "player_name": player.name,
-            "action": action,
-            "remaining_target_uuids": [t.uuid for t in remaining_targets],
-            "value": value,
-        })
+        return _interaction._defer_removal_targets(self, player, action, remaining_targets, value)
 
     def _resume_deferred_continuations(self, limit: int = 64) -> None:
-        """中断が無くなった後、退避した外側継続を LIFO で再開する。
-        再開した継続が新たな中断を生んだら、active_interaction が立ってループは止まる
-        （残りは次の解決後に再びここで処理される）。"""
-        n = 0
-        while not self.active_interaction and self._deferred_continuations and n < limit:
-            frame = self._deferred_continuations.pop()
-            kind = frame.get("kind")
-            player = self.p1 if self.p1.name == frame.get("player_name") else self.p2
-            try:
-                if kind == "RESOLVER_STACK":
-                    src = frame.get("source_card_uuid")
-                    source_card = self._find_card_by_uuid(src) if src else None
-                    resolver = EffectResolver(self)
-                    resolver.resume_execution(player, source_card,
-                                              frame.get("execution_stack", []),
-                                              frame.get("effect_context", {}))
-                elif kind == "REMOVAL_TARGETS":
-                    remaining = [c for c in (self._find_card_by_uuid(u) for u in frame.get("remaining_target_uuids", [])) if c]
-                    if remaining:
-                        self.apply_action_to_engine(player, frame.get("action"), remaining, frame.get("value"))
-            except Exception as e:
-                pass
-            n += 1
+        return _interaction._resume_deferred_continuations(self, limit)
 
     def _ko_trigger_matches(self, ability: Ability, owner: Player,
                             cause: str, effect_controller: Player = None) -> bool:
-        """このキャラ自身の【KO時】誘発の要因・タイミング修飾を判定する。
-
-        書き下し形「…KOされた時」の前段に出る修飾を raw_text から解釈し、修飾が
-        無ければ常に発火（従来挙動）。ブラケット【KO時】（"KOされた時" を含まない）は
-        要因を問わず発火する。
-        - cause: "BATTLE"（戦闘KO）/ "EFFECT"（効果KO）。
-        - effect_controller: 効果KOを引き起こした側（戦闘KOは None）。
-        修飾:
-        - 「相手の(キャラの)効果で」: 相手の効果KOのみ（戦闘KO・自分の効果KOを除外）。
-        - 「自分の効果で」: 自分の効果KOのみ。
-        - 「(単に)効果で」: 効果KOのみ（戦闘KOを除外）。
-        - 【相手のターン中】: 相手ターン中のみ。【自分のターン中】: 自分ターン中のみ。
-        """
-        raw = _nfc(getattr(ability, "raw_text", "") or "")
-        if _nfc("KOされた時") not in raw:
-            return True  # ブラケット【KO時】等：要因を問わず発火
-        # タイミングスコープ
-        if _nfc("相手のターン中") in raw and self.turn_player is owner:
-            return False
-        if _nfc("自分のターン中") in raw and self.turn_player is not owner:
-            return False
-        # 要因（「KOされた時」の前段の修飾を見る）
-        pre = raw.split(_nfc("KOされた時"))[0]
-        opp = self.p1 if owner is self.p2 else self.p2
-        if _nfc("相手の") in pre and _nfc("効果で") in pre:
-            return cause == "EFFECT" and effect_controller is opp
-        if _nfc("自分の効果で") in pre:
-            return cause == "EFFECT" and effect_controller is owner
-        if _nfc("効果で") in pre:
-            return cause == "EFFECT"
-        return True
+        return _triggers._ko_trigger_matches(self, ability, owner, cause, effect_controller)
 
     def _resolve_on_ko(self, card: Card, owner: Player,
                        cause: str = "EFFECT", effect_controller: Player = None):
         # このターンに当該プレイヤーのキャラが KO された事実を記録する
         # （「このターン中、相手のキャラがKOされている場合」OP16-100 の判定用）。
-        self.record_turn_event(f"CHAR_KOED_{owner.name}", 1)
-        if not card.master.abilities: return
-        for ability in card.master.abilities:
-            if ability.trigger == TriggerType.ON_KO:
-                if not self._ko_trigger_matches(ability, owner, cause, effect_controller):
-                    continue
-                self.resolve_ability(owner, ability, source_card=card)
+        return _triggers._resolve_on_ko(self, card, owner, cause, effect_controller)
 
     def _rest_subject_matches(self, ability: Ability, rested_card: Card, host: Card,
                               host_owner: Player, by_attack: bool,
                               effect_controller: Player = None, cause_source: Card = None) -> bool:
-        """ON_REST 誘発（「（この）キャラが（自分の/相手の効果で）レストになった時」）の
-        主語・要因フィルタ。条件には載らない修飾を raw_text から解釈する。
-
-        - 主語: 「このキャラ」＝能力保持カード(host)自身がレストになった場合のみ。
-          「キャラ」(この無し)＝任意のキャラがレストになった場合（host 識別は問わない）。
-        - 要因: 「自分の効果で」＝host_owner の効果による効果レスト（アタック不可）。
-          「相手の(キャラの)効果で」＝host_owner の相手の効果による効果レスト（アタック不可）。
-          修飾無し＝アタック/効果どちらでも可。
-        """
-        raw = _nfc(getattr(ability, "raw_text", "") or "")
-        pre = raw.split(_nfc("レストになった時"))[0]
-        # 主語フィルタ
-        if _nfc("このキャラ") in pre and rested_card is not host:
-            return False
-        # 要因フィルタ
-        if _nfc("自分の効果で") in pre:
-            if by_attack or effect_controller is not host_owner:
-                return False
-        elif _nfc("相手の") in pre and _nfc("効果で") in pre:
-            if by_attack or effect_controller is None or effect_controller is host_owner:
-                return False
-            # 「相手のキャラの効果で」は発生源がキャラに限定（リーダーの効果では発火しない。OP14-070）。
-            # 発生源が判明している場合のみ厳密化する（不明＝従来どおり発火を許容）。
-            if _nfc("相手のキャラの効果で") in pre and cause_source is not None:
-                src_master = getattr(cause_source, "master", None)
-                if src_master is None or src_master.type != CardType.CHARACTER:
-                    return False
-        return True
+        return _triggers._rest_subject_matches(self, ability, rested_card, host, host_owner, by_attack, effect_controller, cause_source)
 
     def _fire_on_rest_triggers(self, rested_card: Card, by_attack: bool,
                                effect_controller: Player = None, cause_source: Card = None):
-        """キャラがレストになった時(ON_REST)の誘発を、両プレイヤーのリーダー/場から探して解決する。
-
-        要因（by_attack=アタック宣言 / effect_controller=効果でレストにした側 /
-        cause_source=効果の発生源カード）を主語・要因フィルタ（_rest_subject_matches）へ渡す。
-        発動可否・文脈（自分のターン中 等）・ターン1回は resolve_ability/_check_condition が評価する。"""
-        pending = []
-        for p in (self.p1, self.p2):
-            hosts = ([p.leader] if p.leader else []) + list(p.field)
-            for host in hosts:
-                if host is None or not host.master.abilities:
-                    continue
-                for ability in host.master.abilities:
-                    if ability.trigger != TriggerType.ON_REST:
-                        continue
-                    if self._rest_subject_matches(ability, rested_card, host, p,
-                                                  by_attack=by_attack,
-                                                  effect_controller=effect_controller,
-                                                  cause_source=cause_source):
-                        pending.append((p, ability, host))
-        for owner, ability, host in pending:
-            self.resolve_ability(owner, ability, source_card=host)
-            if self.active_interaction:
-                return
+        return _triggers._fire_on_rest_triggers(self, rested_card, by_attack, effect_controller, cause_source)
 
     def _leave_subject_matches(self, ability: Ability, leaving_card: Card,
                                ability_owner: Player, leaving_owner: Player) -> bool:
-        """ON_LEAVE 誘発の主語フィルタ（「自分の特徴《X》を持つキャラが（相手の効果で）場を
-        離れた時」）が、実際に離れたカードに一致するか。条件には載らない主語修飾を raw_text
-        から解釈する（側＝自分/相手、特徴、カード名、「相手の効果で」限定）。"""
-        raw = _nfc(getattr(ability, "raw_text", "") or "")
-        pre = raw.split(_nfc("場を離れ"))[0]
-        # 側（自分/相手）: 既定は自分。
-        if _nfc("相手の") in pre and _nfc("自分の") not in pre:
-            if leaving_owner is ability_owner:
-                return False
-        else:
-            if leaving_owner is not ability_owner:
-                return False
-        # 「相手の効果で場を離れた時」限定: 相手のターン中（＝相手の効果による除去）でなければ不発。
-        # 自分のターン中の自己バウンス等では誘発しない（OP13-078）。
-        if _nfc("相手の効果で") in pre and self.turn_player is leaving_owner:
-            return False
-        # 特徴フィルタ（《X》/『X』。「X を含む特徴」も部分一致で拾う）。
-        traits = re.findall(r'[《<『]([^》>』]+)[》>』]', pre)
-        if traits and not any(any(t in ct for ct in leaving_card.master.traits) for t in traits):
-            return False
-        # カード名フィルタ（「X」）。
-        names = re.findall(r'「([^」]+)」', pre)
-        if names and not any(leaving_card.master.matches_name(n, partial=True) for n in names):
-            return False
-        return True
+        return _triggers._leave_subject_matches(self, ability, leaving_card, ability_owner, leaving_owner)
 
     def _enqueue_on_leave(self, leaving_card: Card, leaving_owner: Player) -> None:
-        """キャラが場を離れた時(ON_LEAVE)の誘発を、両プレイヤーのリーダー/場から探して積む。
-        主語フィルタ（側・特徴・名前）に一致する能力のみを対象とする（バギー OP16-041 等）。"""
-        for owner in (self.p1, self.p2):
-            holders = ([owner.leader] if owner.leader else []) + list(owner.field)
-            for holder in holders:
-                if holder is leaving_card:
-                    continue
-                for ability in getattr(holder.master, "abilities", ()):
-                    if ability.trigger != TriggerType.ON_LEAVE:
-                        continue
-                    if not self._leave_subject_matches(ability, leaving_card, owner, leaving_owner):
-                        continue
-                    optional = _nfc("発動できる") in _nfc(getattr(ability, "raw_text", "") or "")
-                    self._enqueue_trigger(owner, ability, holder, optional=optional)
+        return _triggers._enqueue_on_leave(self, leaving_card, leaving_owner)
 
     def _enqueue_life_decrease(self, player: Player, count: int = 1) -> None:
-        """「ライフが離れた時」(ON_LIFE_DECREASE) 能力を、離れた枚数ぶん待ち行列へ積む。
-
-        公式裁定: 「ライフが離れた時」は自分／相手どちらのライフが離れても、ダメージ／効果の
-        いずれでも条件成立する（例: OP11-041 ナミ）。よって離れたライフの持ち主（引数 player）に
-        依らず、両プレイヤーの場・リーダーを走査して積む。実際に発動するかは各能力の条件
-        （【自分のターン中】=CONTEXT SELF_TURN ／【ターン1回】=TURN_LIMIT ／ 手札枚数 等）が評価し、
-        結果としてターンプレイヤー側の能力のみが発動する。発動可否（引く/引かない）は各能力の
-        効果内の Choice でプレイヤーが選ぶ。"""
-        for _ in range(max(1, count)):
-            for owner in (self.p1, self.p2):
-                cards = ([owner.leader] if owner.leader else []) + owner.field
-                for card in cards:
-                    for ability in card.master.abilities:
-                        if ability.trigger == TriggerType.ON_LIFE_DECREASE:
-                            self._enqueue_trigger(owner, ability, card, optional=False)
+        return _triggers._enqueue_life_decrease(self, player, count)
 
     def _fire_on_life_decrease(self, player: Player, count: int = 1):
-        """ライフ離脱の誘発を積んで即座に消化する（効果ダメージ等の単発経路用）。
-        戦闘ダメージ経路は resolve_attack 末尾でまとめて積む。"""
-        self._enqueue_life_decrease(player, count)
-        self._advance_pending_triggers()
+        return _triggers._fire_on_life_decrease(self, player, count)
 
     def _return_one_don(self, tp: Player, don: DonInstance) -> bool:
-        """ドン!!1枚を tp の場（アクティブ/レスト/付与中）から外しドン!!デッキへ戻す。
-        付与中だった場合は付与先キャラの attached_don を減らしてパワー上昇を解除する。"""
-        if don in tp.don_rested:
-            tp.don_rested.remove(don)
-        elif don in tp.don_active:
-            tp.don_active.remove(don)
-        elif don in tp.don_attached_cards:
-            tp.don_attached_cards.remove(don)
-            host = self._find_card_by_uuid(don.attached_to) if don.attached_to else None
-            if host is not None and getattr(host, "attached_don", 0) > 0:
-                host.attached_don -= 1
-        else:
-            return False
-        don.is_rest = False
-        don.attached_to = None
-        tp.don_deck.append(don)
-        return True
+        return _card_moves._return_one_don(self, tp, don)
 
     def _don_pool_player(self, player: Player, action: GameAction) -> Player:
-        """ドン操作の対象プレイヤー。「相手は…」は status="OPPONENT"、
-        対象クエリの player=OPPONENT でも相手を指す。既定は効果の実行者。"""
-        opp = self.p2 if player == self.p1 else self.p1
-        if getattr(action, 'status', None) == "OPPONENT":
-            return opp
-        tgt = getattr(action, 'target', None)
-        if tgt is not None and getattr(getattr(tgt, 'player', None), 'name', '') == 'OPPONENT':
-            return opp
-        return player
+        return _card_moves._don_pool_player(self, player, action)
 
     def apply_action_to_engine(self, player: Player, action: GameAction, targets: List[CardInstance], value: int, source_card: Optional[CardInstance] = None) -> bool:
         # アクション適用はレジストリ・ディスパッチ（core/actions）へ委譲する。プレイヤーレベル・
@@ -2303,54 +785,7 @@ class GameManager:
         return _apply_action(self, player, action, targets, value, source_card)
 
     def get_dynamic_value(self, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict) -> int:
-        if not val_source: return 0
-        if val_source.dynamic_source == "COUNT_REFERENCE":
-            return len(player.trash)
-        # 文脈依存「直前アクションで捨てた/戻した/KOした…カードN枚につき」（§7-5）。
-        # 生の枚数を返す（divisor/multiplier は _calculate_value が適用する）。
-        if val_source.dynamic_source == "PREV_ACTION_COUNT":
-            return int((context or {}).get("_last_action_count", 0) or 0)
-        # 「<範囲>N枚につき」の汎用カウント（RC-4）。範囲クエリを毎回実体化して数える
-        # （PASSIVE 再計算で盤面に追随する）。
-        if val_source.dynamic_source == "COUNT_QUERY" and getattr(val_source, "count_query", None) is not None:
-            src = None
-            src_uuid = (context or {}).get("_source_card_uuid")
-            if src_uuid:
-                src = self._find_card_by_uuid(src_uuid)
-            if src is None:
-                src = player.leader
-            n = len(get_target_cards(self, val_source.count_query, src))
-            return n
-        # C9「（相手のリーダー／選んだキャラ／アタックしているキャラ）と同じパワーになる」。
-        # 発動時スナップショット: 参照カードの現在パワーを固定値として返す（以後の変動に追随しない）。
-        if val_source.dynamic_source == "REFERENCE_POWER":
-            ref = self._resolve_power_reference(player, val_source.ref_id, context)
-            if ref is None:
-                return val_source.base
-            ref_owner, _ = self._find_card_location(ref)
-            is_ref_turn = bool(ref_owner) and ref_owner.name == self.turn_player.name
-            return ref.get_power(is_ref_turn)
-        # 「元々のパワーと同じ」: 参照カードの基礎値（master.power）を写す（バフ非追随）
-        if val_source.dynamic_source == "REFERENCE_BASE_POWER":
-            ref = self._resolve_power_reference(player, val_source.ref_id, context)
-            if ref is None:
-                return val_source.base
-            return ref.master.power
-        return val_source.base
+        return _values.get_dynamic_value(self, player, val_source, targets, context)
 
     def _resolve_power_reference(self, player, ref_id, context):
-        """C9 の同値パワー参照カードを解決する。ref_id: selected/opp_leader/attacker。"""
-        opponent = self.p2 if player == self.p1 else self.p1
-        if ref_id == "opp_leader":
-            return opponent.leader
-        if ref_id == "self_leader":
-            return player.leader
-        if ref_id == "attacker":
-            return (self.active_battle or {}).get("attacker")
-        if ref_id == "selected":
-            saved = (context or {}).get("saved_targets", {})
-            sel = saved.get("selected_card") or saved.get("selected")
-            if isinstance(sel, list):
-                return sel[0] if sel else None
-            return sel
-        return None
+        return _values._resolve_power_reference(self, player, ref_id, context)
