@@ -158,15 +158,19 @@ def choose_move(manager: GameManager, moves: List[Dict[str, Any]]) -> Dict[str, 
 def make_seat(difficulty: str = "hard", *, kind: str = "ai", mem: Optional[Dict] = None,
               want_trace: bool = False,
               info_policy: str = cpu_ai.DEFAULT_INFO_POLICY, policy_rng=None,
-              pimc_worlds: int = 1, budget=None, search=None, coeffs=None):
+              pimc_worlds: int = 1, budget=None, search=None, coeffs=None,
+              sims: int = 160):
     """1 席ぶんの意思決定関数 `seat(ctx) -> move` を返す。
 
     kind:
-      'random' — `choose_move`（軽バイアス付きランダム・高速。cpu_selfplay の既定）。
-      'ai'     — `cpu_ai.decide_guarded`（評価関数ベース。cpu_selfplay --policy ai / cpu_replay 用）。
-                 `want_trace` 指定時のみ trace を採り `ctx.trace` へ書く（進行不変・観測専用）。
-      'arena'  — `decide_guarded` に席別の情報方針/CRN rng/PIMC/予算/深さ/L1係数を掛ける（cpu_arena 用）。
-                 呼び出しごとに一時オーバーライドを適用→finally で既定へ戻す（単一スレッド前提）。
+      'random'  — `choose_move`（軽バイアス付きランダム・高速。cpu_selfplay の既定）。
+      'ai'      — `cpu_ai.decide_guarded`（評価関数ベース。cpu_selfplay --policy ai / cpu_replay 用）。
+                  `want_trace` 指定時のみ trace を採り `ctx.trace` へ書く（進行不変・観測専用）。
+      'arena'   — `decide_guarded` に席別の情報方針/CRN rng/PIMC/予算/深さ/L1係数を掛ける（cpu_arena 用）。
+                  呼び出しごとに一時オーバーライドを適用→finally で既定へ戻す（単一スレッド前提）。
+      'learned' — `cpu_learned.decide_learned`（Gen2 学習型・NN誘導MCTS＝本番既定 CPU）。numpy 必須なので
+                  遅延 import。rng は global random 由来（PR-D2）＝run_game の seed で決定論再生できる。
+                  `want_trace` 時は MCTS root 統計（訪問%・Q値・L1第二意見）を `ctx.trace` へ書く。
     """
     mem = mem if mem is not None else {}
 
@@ -174,6 +178,14 @@ def make_seat(difficulty: str = "hard", *, kind: str = "ai", mem: Optional[Dict]
         def _random(ctx):
             return choose_move(ctx.manager, ctx.moves)
         return _random
+
+    if kind == "learned":
+        from opcg_sim.src.core import cpu_learned
+
+        def _learned(ctx):
+            tr = ctx.trace if want_trace else None
+            return cpu_learned.decide_learned(ctx.manager, ctx.actor, sims=sims, trace=tr)
+        return _learned
 
     if kind == "ai":
         def _ai(ctx):

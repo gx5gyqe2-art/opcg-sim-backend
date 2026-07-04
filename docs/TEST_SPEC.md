@@ -175,6 +175,12 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
   は手書き J値評価の撤去〔2026-06-27〕で消滅）。
 - **リプレイ種**: `--record seed.json` で `{seed, リーダー, 難易度}` の極小記述子を残し、
   `--descriptor seed.json` で完全再現する。
+- **learned（Gen2・本番既定 CPU）のトレース**: `--difficulty learned`（席別 `--p1-/--p2-difficulty learned`）で
+  Gen2 学習型（`game_driver.make_seat(kind="learned")`）を再生する。思考トレースは L1 の 4 項目に代わり
+  **MCTS root 統計**を記録する（`candidates`＝訪問%＋行動価値Q／`value`＝採用手のQ／`l1_move`・`l1_disagrees`
+  ＝独立評価器 L1 の第二意見）。learned の numpy rng は global random 由来（PR-D2）なので **seed から
+  決定論再生できる**（本番既定 CPU の「なぜその手か」を手元で読める）。`tests/test_game_driver.py` が
+  learned 自己対戦の決定論を、`tests/test_cpu_learned.py` が単発意思決定の seed 再現を固定する。
 
 #### 実アプリ対局の取得（Phase 2・`opcg_sim/api/app.py`）
 

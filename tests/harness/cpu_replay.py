@@ -125,12 +125,16 @@ def run_replay(
         if trace_out is not None:
             trace_out.write(json.dumps(line, ensure_ascii=False) + "\n")
 
-    # 席別難易度の AI（trace 採取 ON）。全乱数は global random（決定論契約）。
+    # 席別難易度（trace 採取 ON）。全乱数は global random（決定論契約）。
+    # difficulty="learned"＝Gen2 学習型（本番既定 CPU）。他は L1（hard 等）。どちらも思考トレースを採る。
     mem: Dict[str, Dict[str, Any]] = {"p1": {}, "p2": {}}
-    seats = {
-        "p1": make_seat(p1_difficulty, kind="ai", mem=mem["p1"], want_trace=True),
-        "p2": make_seat(p2_difficulty, kind="ai", mem=mem["p2"], want_trace=True),
-    }
+
+    def _seat(difficulty, m):
+        if difficulty == "learned":
+            return make_seat(kind="learned", want_trace=True)
+        return make_seat(difficulty, kind="ai", mem=m, want_trace=True)
+
+    seats = {"p1": _seat(p1_difficulty, mem["p1"]), "p2": _seat(p2_difficulty, mem["p2"])}
     obs = _ReplayObserver(emit, decisions, emit_steps, emit_decisions, verbose)
     result = run_game(seed, db, seats=seats,
                       deck_builder=leader_deck_builder(p1_leader, p2_leader),
@@ -160,10 +164,10 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--p1-leader", default=None)
     ap.add_argument("--p2-leader", default=None)
-    ap.add_argument("--difficulty", choices=["hard"], default="hard",
-                    help="両者の既定難易度（--p1-difficulty/--p2-difficulty で個別上書き）")
-    ap.add_argument("--p1-difficulty", choices=["hard"], default=None)
-    ap.add_argument("--p2-difficulty", choices=["hard"], default=None)
+    ap.add_argument("--difficulty", choices=["hard", "learned"], default="hard",
+                    help="両者の既定難易度（learned=Gen2 学習型・本番既定／--p1-/--p2-difficulty で個別上書き）")
+    ap.add_argument("--p1-difficulty", choices=["hard", "learned"], default=None)
+    ap.add_argument("--p2-difficulty", choices=["hard", "learned"], default=None)
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
     ap.add_argument("--out", default=None, help="トレース JSONL の出力先（'-' で stdout）")
     ap.add_argument("--record", default=None, help="リプレイ種（descriptor JSON）の出力先")

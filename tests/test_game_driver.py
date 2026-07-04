@@ -105,3 +105,17 @@ def test_regret_and_realize_traces_are_deterministic(db):
     """regret / realize トレース（invariants=skip の集計系）が同一 seed で完全再現する。"""
     assert regret_trace(db, 3, "hard") == regret_trace(db, 3, "hard")
     assert realize_trace(db, 3, "hard") == realize_trace(db, 3, "hard")
+
+
+def test_learned_seat_selfplay_is_deterministic(db):
+    """learned(Gen2)席の自己対戦が run_game の seed から決定論再現する（PR-D2 rng 結線＋PR-D3 席）。
+
+    Gen2 は本番既定 CPU。numpy MCTS を含む対局が seed で完全再生できる＝思考トレース検証・回帰の土台。
+    低 sims で高速化（決定論の検証が目的で強さは無関係）。
+    """
+    def seats():
+        return {pid: make_seat(kind="learned", sims=8) for pid in ("p1", "p2")}
+    a = run_game(11, db, seats=seats())
+    b = run_game(11, db, seats=seats())
+    assert a.winner in ("p1", "p2")
+    assert (a.winner, a.steps, a.turns) == (b.winner, b.steps, b.turns)
