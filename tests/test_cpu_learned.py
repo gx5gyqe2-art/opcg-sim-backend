@@ -37,6 +37,19 @@ def test_available_and_decides_legal_move():
     assert mv in legal, "学習型CPUが合法手を返さない"
 
 
+def test_learned_decision_is_deterministic_from_global_seed():
+    """learned の rng は global random 由来＝同一 seed で同一手を再現する（cpu_trace リプレイの土台・PR-D2）。
+
+    numpy rng を毎回 os エントロピーで引いていた頃は再現不能だった。routers が cpu_trace 時に
+    random.seed(replay_seed) するので、seed を固定すれば MCTS 決定化・dirichlet も含めて決定論再生できる。
+    """
+    import random
+    m = _game(7); _, actor = _actor(m)   # decide_learned は manager を変異させない（探索はクローン上）
+    random.seed(4242); mv1 = cpu_learned.decide_learned(m, actor, sims=40)
+    random.seed(4242); mv2 = cpu_learned.decide_learned(m, actor, sims=40)
+    assert mv1 == mv2, "同一 global seed で learned の手が再現しない"
+
+
 def test_decide_client_routes_learned():
     from opcg_sim.api import decide_client
     m = _game(3); name, actor = _actor(m)

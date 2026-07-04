@@ -81,7 +81,11 @@ def decide_learned(manager, player, sims: int = 160, c_puct: float = 1.5,
     _lazy_init()
     vocab, vnet, pnet, game = _STATE["vocab"], _STATE["vnet"], _STATE["pnet"], _STATE["game"]
     name = player.name
-    rng = rng if isinstance(rng, np.random.Generator) else np.random.default_rng()
+    # numpy rng の種を **global random** から引く＝リプレイ種（routers が cpu_trace 時に random.seed）で
+    # learned 対局も決定論再生できる。通常対局は global random 未 seed（プロセス由来）＝従来どおり実質ランダム。
+    if not isinstance(rng, np.random.Generator):
+        import random as _random
+        rng = np.random.default_rng(_random.getrandbits(64))
     mcts = TreeMCTS(game, value_fn=_value_fn(vnet, vocab), priors_fn=_priors_fn(pnet, vocab),
                     c_puct=c_puct, n_sims=sims,
                     determinize_fn=lambda s, r: game.determinize(s, name, r), rng=rng)
