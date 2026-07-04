@@ -54,6 +54,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 | ファイル | 役割 |
 |---|---|
 | `tests/test_rules_summoning_field_limit.py` | **召喚酔い/速攻**（登場ターン攻撃不可・速攻例外・リーダー非対象）と**場5体上限**（6体目で `FIELD_OVERFLOW_TRASH` 強制トラッシュ／効果登場でも発火／境界／**押し出し確定が【登場時】解決より先**）の検証 |
+| `tests/test_power_filter_don.py` | **パワー参照対象と付与ドン**（+1000/枚は持ち主のターン中のみ＝相手ターン残置ドンは「パワーN以下」判定に乗らない。matcher 単体＋神の裁き OP15-075 の KO e2e） |
 | `tests/test_trigger_cost_confirm.py` | **自動誘発のコスト使用確認**（コスト句の支払いは常に任意＝`CONFIRM_OPTIONAL`。拒否で未払い・受諾で支払い解決／同時複数の誘発が中断で消えない／起動メインは確認なし。OP16-073/065） |
 | `tests/test_effects_engine.py` | エンジン実行系の盤面変化（プレイ/アタック/ブロック/カウンター/効果解決） |
 | `tests/test_realdeck_play.py` | 実カードでの盤面変化・除去保護・対話 |
