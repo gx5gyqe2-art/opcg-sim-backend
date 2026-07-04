@@ -41,7 +41,27 @@ from game_driver import (  # noqa: F401
     InvariantError,
     make_seat,
     run_game,
+    StepCtx,
 )
+
+
+def _make_decider(difficulty: str, info_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
+                  policy_rng=None, pimc_worlds: int = 1, per_move_budget=None,
+                  search=None, coeffs=None):
+    """後方互換: `(manager, actor) -> move` の decider を返す（`make_seat` の arena 席をラップ）。
+
+    設計⑥で対局ループは `run_game`（席は `seat(ctx)->move`）へ移行したが、make/unmake 等価性テスト
+    （`test_cpu_make_unmake` / `test_journal`）は席を直接駆動して `(manager, actor)` で呼ぶため、その
+    署名のシムを残す。中身は arena 席と同一＝挙動不変。
+    """
+    seat = make_seat(difficulty, kind="arena", info_policy=info_policy, policy_rng=policy_rng,
+                     pimc_worlds=pimc_worlds, budget=per_move_budget, search=search, coeffs=coeffs)
+
+    def _decide(manager, actor):
+        ctx = StepCtx(manager)
+        ctx._update(0, actor, None, None)
+        return seat(ctx)
+    return _decide
 
 
 # --- Elo 変換 -----------------------------------------------------------------
