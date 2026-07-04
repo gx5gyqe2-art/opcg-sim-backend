@@ -50,6 +50,25 @@ def test_learned_decision_is_deterministic_from_global_seed():
     assert mv1 == mv2, "同一 global seed で learned の手が再現しない"
 
 
+def test_learned_engine_instances_and_net_vs_net():
+    """A3: LearnedEngine を席別インスタンスで持てる＝net-vs-net（新Gen vs 凍結Gen2）の土台。
+
+    同一プロセスで2エンジン同居（vocab/game はネット非依存で共有・vnet は独立）。play_game に席別 engine を
+    渡して net-vs-net が決着＋決定論。同じネットなら既定エンジン経路（decide_learned）と一致する
+    ＝engine 経路がラッパと等価（本番挙動不変の裏取り）。低 sims で高速化。
+    """
+    from cpu_arena import play_game, _load_db
+    _db = _load_db()
+    eng_a, eng_b = cpu_learned.LearnedEngine(), cpu_learned.LearnedEngine()
+    assert eng_a.vocab is eng_b.vocab and eng_a.game is eng_b.game   # ネット非依存＝共有
+    assert eng_a.vnet is not eng_b.vnet                              # ネットは独立インスタンス
+    a = play_game(1, _db, "learned", "learned", p1_sims=6, p2_sims=6, p1_engine=eng_a, p2_engine=eng_b)
+    b = play_game(1, _db, "learned", "learned", p1_sims=6, p2_sims=6, p1_engine=eng_a, p2_engine=eng_b)
+    assert a["winner"] in ("p1", "p2") and a == b                    # 決着＋決定論
+    d = play_game(1, _db, "learned", "learned", p1_sims=6, p2_sims=6)  # 既定エンジン経路
+    assert a == d, "同一ネットで engine 経路と decide_learned 経路が食い違う（本番挙動不変の破れ）"
+
+
 def test_decide_client_routes_learned():
     from opcg_sim.api import decide_client
     m = _game(3); name, actor = _actor(m)

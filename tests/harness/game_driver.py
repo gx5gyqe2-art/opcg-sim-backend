@@ -159,7 +159,7 @@ def make_seat(difficulty: str = "hard", *, kind: str = "ai", mem: Optional[Dict]
               want_trace: bool = False,
               info_policy: str = cpu_ai.DEFAULT_INFO_POLICY, policy_rng=None,
               pimc_worlds: int = 1, budget=None, search=None, coeffs=None,
-              sims: int = 160):
+              sims: int = 160, engine=None):
     """1 席ぶんの意思決定関数 `seat(ctx) -> move` を返す。
 
     kind:
@@ -168,9 +168,10 @@ def make_seat(difficulty: str = "hard", *, kind: str = "ai", mem: Optional[Dict]
                   `want_trace` 指定時のみ trace を採り `ctx.trace` へ書く（進行不変・観測専用）。
       'arena'   — `decide_guarded` に席別の情報方針/CRN rng/PIMC/予算/深さ/L1係数を掛ける（cpu_arena 用）。
                   呼び出しごとに一時オーバーライドを適用→finally で既定へ戻す（単一スレッド前提）。
-      'learned' — `cpu_learned.decide_learned`（Gen2 学習型・NN誘導MCTS＝本番既定 CPU）。numpy 必須なので
-                  遅延 import。rng は global random 由来（PR-D2）＝run_game の seed で決定論再生できる。
-                  `want_trace` 時は MCTS root 統計（訪問%・Q値・L1第二意見）を `ctx.trace` へ書く。
+      'learned' — Gen2 学習型・NN誘導MCTS（本番既定 CPU）。numpy 必須なので遅延 import。rng は global random
+                  由来（PR-D2）＝run_game の seed で決定論再生できる。`want_trace` 時は MCTS root 統計
+                  （訪問%・Q値・L1第二意見）を `ctx.trace` へ書く。`engine`（`cpu_learned.LearnedEngine`）を渡すと
+                  **そのネット**で決める＝net-vs-net（新Gen vs 凍結Gen2・A3）用。未指定は出荷 Gen2 既定エンジン。
     """
     mem = mem if mem is not None else {}
 
@@ -184,6 +185,8 @@ def make_seat(difficulty: str = "hard", *, kind: str = "ai", mem: Optional[Dict]
 
         def _learned(ctx):
             tr = ctx.trace if want_trace else None
+            if engine is not None:
+                return engine.decide(ctx.manager, ctx.actor, sims=sims, trace=tr)
             return cpu_learned.decide_learned(ctx.manager, ctx.actor, sims=sims, trace=tr)
         return _learned
 

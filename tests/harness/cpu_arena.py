@@ -102,13 +102,14 @@ def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
 
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
 
-def _arena_seat(difficulty, policy, rng, pimc, budget, search, coeffs, sims):
+def _arena_seat(difficulty, policy, rng, pimc, budget, search, coeffs, sims, engine=None):
     """arena の 1 席を作る。`difficulty=="learned"` は Gen2 学習型（本番既定 CPU）＝L1 の席別ノブは持たず
-    `sims`（MCTS 探索数）のみ。CRN（`rng`）は L1 席専用（learned は global random 由来＝PR-D2 で seed 再現）。
+    `sims`（MCTS 探索数）のみ。`engine`（`cpu_learned.LearnedEngine`）を渡すとそのネットで決める
+    ＝net-vs-net（新Gen vs 凍結Gen2・A3）。CRN（`rng`）は L1 席専用（learned は global random 由来＝PR-D2）。
     それ以外（hard 等）は L1（α-β＋ビーム＋PIMC）席で、情報方針/CRN/PIMC/予算/深さ/L1係数を席別に掛ける。
     """
     if difficulty == "learned":
-        return make_seat(kind="learned", sims=sims)
+        return make_seat(kind="learned", sims=sims, engine=engine)
     return make_seat(difficulty, kind="arena", info_policy=policy, policy_rng=rng,
                      pimc_worlds=pimc, budget=budget, search=search, coeffs=coeffs)
 
@@ -122,13 +123,16 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p1_budget=None, p2_budget=None,
               p1_search=None, p2_search=None,
               p1_coeffs=None, p2_coeffs=None,
-              p1_sims: int = 160, p2_sims: int = 160) -> Dict[str, Any]:
+              p1_sims: int = 160, p2_sims: int = 160,
+              p1_engine=None, p2_engine=None) -> Dict[str, Any]:
     """p1/p2 に別難易度を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     対局ループは `game_driver.run_game`（全ハーネス共通）で回し、席（seat）だけ非対称にする。
     `difficulty` は L1 系（hard）と **learned（Gen2 学習型・本番既定 CPU）** を混在できる（A1: 強度 A/B の
     learned 対応）。learned 席は `p1_sims`/`p2_sims`（MCTS 探索数・既定=本番 160）を使い、L1 の席別ノブ
     （policy/pimc/budget/search/coeffs・CRN rng）は無視する。`p1_policy`/`p2_policy` は L1 の情報方針（fair/cheat）。
+    `p1_engine`/`p2_engine`（`cpu_learned.LearnedEngine`）で learned 席の**ネットを席別指定**できる
+    ＝net-vs-net（新Gen vs 凍結Gen2・A3）。未指定は出荷 Gen2 既定エンジン。
 
     `separate_policy_rng=True`（Phase 0）で**方策のタイブレーク乱数を game 乱数（global random）から分離**
     する（各 L1 席に seed 派生の独立 `random.Random`）。これは方策タイブレークの決定性を game 乱数から
@@ -138,8 +142,10 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
     seats = {
-        "p1": _arena_seat(p1_difficulty, p1_policy, p1_rng, p1_pimc, p1_budget, p1_search, p1_coeffs, p1_sims),
-        "p2": _arena_seat(p2_difficulty, p2_policy, p2_rng, p2_pimc, p2_budget, p2_search, p2_coeffs, p2_sims),
+        "p1": _arena_seat(p1_difficulty, p1_policy, p1_rng, p1_pimc, p1_budget, p1_search, p1_coeffs,
+                          p1_sims, engine=p1_engine),
+        "p2": _arena_seat(p2_difficulty, p2_policy, p2_rng, p2_pimc, p2_budget, p2_search, p2_coeffs,
+                          p2_sims, engine=p2_engine),
     }
     # arena は各手番で get_legal_actions を事前呼びしない（seat 内で解決＝乱数消費順の保存）。
     result = run_game(seed, db, seats=seats, max_steps=max_steps,

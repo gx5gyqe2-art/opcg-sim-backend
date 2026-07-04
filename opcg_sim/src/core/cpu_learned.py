@@ -6,6 +6,11 @@ docs/reports/cpu_rl_pilot_p3_results_20260630.md。P3本走で得た Gen2 ネッ
 
 - 葉価値 = 学習 value ネット、事前確率 = 学習 pointer policy、探索 = ノード型 PUCT MCTS。
 - 不完全情報は探索ごとに1世界へ決定化（PIMC・チート防止）。net/vocab はプロセス内で1回だけロード。
+
+**ネットの持ち方（perf計画 A3）**: `LearnedEngine` が1つのネットを**明示ハンドル**で保持する
+（arena の net-vs-net＝新Gen vs 凍結Gen2 を同一プロセスで戦わせるため）。本番既定 CPU が通る
+`decide_learned` は既定ネットの**プロセス共有シングルトン**（`_default_engine()`）を使う薄いラッパ
+＝**挙動不変**（vocab/game はネット非依存なので複数エンジンで共有ロード可能）。
 """
 import os
 from typing import Any, Dict, Optional
@@ -25,26 +30,27 @@ _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "data")
 
-_STATE: Dict[str, Any] = {}   # {vocab, vnet, pnet, game} をプロセス内キャッシュ
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen2_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen2_policy.npz")
+
+# vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
+_SHARED: Dict[str, Any] = {}
 
 
-def _lazy_init():
-    if _STATE:
-        return
-    db = CardLoader(os.path.join(_DATA, "opcg_cards.json"))
-    db.load()
-    for cid in list(db.raw_db.keys()):
-        db.get_card(cid)
-    _STATE["vocab"] = E.build_vocab(db)
-    _STATE["vnet"] = ValueNet.load(os.path.join(_MODELS, "gen2_value.npz"))
-    pp = os.path.join(_MODELS, "gen2_policy.npz")
-    _STATE["pnet"] = PolicyScorer.load(pp) if os.path.exists(pp) else None
-    _STATE["game"] = OPCGGame()
+def _shared_vocab_game():
+    if not _SHARED:
+        db = CardLoader(os.path.join(_DATA, "opcg_cards.json"))
+        db.load()
+        for cid in list(db.raw_db.keys()):
+            db.get_card(cid)
+        _SHARED["vocab"] = E.build_vocab(db)
+        _SHARED["game"] = OPCGGame()
+    return _SHARED["vocab"], _SHARED["game"]
 
 
 def available() -> bool:
     """モデル重みが同梱されているか（未同梱環境ではフォールバックさせる）。"""
-    return os.path.exists(os.path.join(_MODELS, "gen2_value.npz"))
+    return os.path.exists(_DEFAULT_VALUE)
 
 
 def _value_fn(vnet, vocab):
@@ -69,35 +75,77 @@ def _priors_fn(pnet, vocab):
     return priors
 
 
+class LearnedEngine:
+    """1つの Gen2 ネット（value+policy）を明示ハンドルで保持し 1 手を決める。
+
+    net-vs-net（arena で新Gen vs 凍結Gen2）用に、ネットを**席ごとに別インスタンス**で持てるようにする。
+    `value_path`/`policy_path` 省略時は出荷 Gen2（`gen2_*.npz`）＝本番既定 CPU と同一。vocab/game は
+    ネット非依存なので既定では共有ロード（`_shared_vocab_game`）を使う。
+    """
+
+    def __init__(self, value_path: Optional[str] = None, policy_path: Optional[str] = None,
+                 vocab=None, game=None):
+        if vocab is None or game is None:
+            svocab, sgame = _shared_vocab_game()
+            vocab = vocab if vocab is not None else svocab
+            game = game if game is not None else sgame
+        self.vocab = vocab
+        self.game = game
+        self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
+        pp = policy_path or _DEFAULT_POLICY
+        self.pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
+
+    def decide(self, manager, player, sims: int = 160, c_puct: float = 1.5,
+               rng=None, trace=None) -> Optional[Dict[str, Any]]:
+        """このエンジンのネットで 1 手決定する（`decide_learned` と同一契約・同一探索）。"""
+        name = player.name
+        # numpy rng の種を **global random** から引く＝リプレイ種（routers が cpu_trace 時に random.seed）で
+        # learned 対局も決定論再生できる。通常対局は global random 未 seed（プロセス由来）＝実質ランダム。
+        if not isinstance(rng, np.random.Generator):
+            import random as _random
+            rng = np.random.default_rng(_random.getrandbits(64))
+        mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab),
+                        priors_fn=_priors_fn(self.pnet, self.vocab),
+                        c_puct=c_puct, n_sims=sims,
+                        determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=rng)
+        move, _, legal = mcts.run(manager)
+        if move is None:
+            move = legal[0] if legal else None
+        if trace is not None:
+            try:
+                _fill_trace(trace, manager, player, move, getattr(mcts, "last_stats", None))
+            except Exception:
+                pass   # 分析失敗で対局を止めない
+        return move
+
+
+_DEFAULT_ENGINE: Optional[LearnedEngine] = None
+
+
+def _default_engine() -> LearnedEngine:
+    """本番既定 CPU（出荷 Gen2）のプロセス共有シングルトンエンジン。"""
+    global _DEFAULT_ENGINE
+    if _DEFAULT_ENGINE is None:
+        _DEFAULT_ENGINE = LearnedEngine()
+    return _DEFAULT_ENGINE
+
+
+def _lazy_init():
+    """後方互換のウォームアップ（既定エンジンを1回ロード）。perf 計測等が初回ロードを計測から外すのに使う。"""
+    _default_engine()
+
+
 def decide_learned(manager, player, sims: int = 160, c_puct: float = 1.5,
                    rng=None, trace=None) -> Optional[Dict[str, Any]]:
-    """学習型CPUの1手決定。返り値は `decide_guarded` 互換（move 辞書 or None）。
+    """学習型CPUの1手決定（本番既定 CPU 経路）。返り値は `decide_guarded` 互換（move 辞書 or None）。
 
+    出荷 Gen2 のシングルトンエンジンへ委譲する薄いラッパ＝A3 のリファクタで**挙動不変**。
     `trace`（dict）が渡された時（cpu_trace ON）は、その手の分析を書き込む＝変な手の検証用ログ:
       chosen（選んだ手）/ value（選手の行動価値Q）/ candidates（訪問上位・visit%・Q）/
       l1_move（独立評価器L1の推奨手）/ l1_disagrees（L1と食い違うか）。
     分析は挙動に影響しない（例外は握り潰し、手は必ず返す）。
     """
-    _lazy_init()
-    vocab, vnet, pnet, game = _STATE["vocab"], _STATE["vnet"], _STATE["pnet"], _STATE["game"]
-    name = player.name
-    # numpy rng の種を **global random** から引く＝リプレイ種（routers が cpu_trace 時に random.seed）で
-    # learned 対局も決定論再生できる。通常対局は global random 未 seed（プロセス由来）＝従来どおり実質ランダム。
-    if not isinstance(rng, np.random.Generator):
-        import random as _random
-        rng = np.random.default_rng(_random.getrandbits(64))
-    mcts = TreeMCTS(game, value_fn=_value_fn(vnet, vocab), priors_fn=_priors_fn(pnet, vocab),
-                    c_puct=c_puct, n_sims=sims,
-                    determinize_fn=lambda s, r: game.determinize(s, name, r), rng=rng)
-    move, _, legal = mcts.run(manager)
-    if move is None:
-        move = legal[0] if legal else None
-    if trace is not None:
-        try:
-            _fill_trace(trace, manager, player, move, getattr(mcts, "last_stats", None))
-        except Exception:
-            pass   # 分析失敗で対局を止めない
-    return move
+    return _default_engine().decide(manager, player, sims=sims, c_puct=c_puct, rng=rng, trace=trace)
 
 
 def _fill_trace(trace, manager, player, chosen, stats):
