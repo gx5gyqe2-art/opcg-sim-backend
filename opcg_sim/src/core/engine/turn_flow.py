@@ -96,7 +96,14 @@ def _fire_turn_end_triggers(gm):
             if card and card.master.abilities:
                 for ability in card.master.abilities:
                     if ability.trigger == trig:
-                        gm.resolve_ability(pl, ability, source_card=card)
+                        # 先行トリガーが確認/選択で中断中は即時解決できない（resolver は
+                        # 中断中1ステップも実行せず return し、能力が無言で消える）。
+                        # コスト付きターン終了時は使用確認(CONFIRM_OPTIONAL)で中断するのが
+                        # 常態のため、中断中は誘発待ち行列へ積み、対話完了時に消化する。
+                        if gm.active_interaction:
+                            gm._enqueue_trigger(pl, ability, card, optional=False)
+                        else:
+                            gm.resolve_ability(pl, ability, source_card=card)
 
 def _flush_pending_end_of_turn(gm):
     """end_turn フックで、予約された遅延アクション（このターン終了時、〜）を解決する。"""
@@ -105,6 +112,13 @@ def _flush_pending_end_of_turn(gm):
     pending = gm.pending_end_of_turn
     gm.pending_end_of_turn = JournaledList()
     for player, node, source_card in pending:
+        # ターン終了時トリガーの確認等で中断中は直接実行できない（resolver が中断中は
+        # 1ステップも実行せず return し、遅延アクションが無言で消える）。deferred 継続へ
+        # 退避し、中断解決後に resolve_interaction 末尾が再開する。
+        if gm.active_interaction:
+            gm._defer_resolver_stack(player, source_card, [node],
+                                     {"_flushing_delayed": True})
+            continue
         # 場を離れたカードのソース由来でも、トラッシュ送り等は対象解決時に弾かれる。
         resolver = EffectResolver(gm)
         resolver.context["_flushing_delayed"] = True

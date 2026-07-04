@@ -631,6 +631,10 @@ class GameManager:
             self._apply_passive_effects(self.turn_player)
             if self._has_rested_play(player):  # 「自分のキャラはレストで登場する」PASSIVE
                 card.is_rest = True
+            # 場のキャラ上限超過の押し出しは ON_PLAY 解決より前に確定する（実ルールでは
+            # 6枚目のキャラは並存しない）。押し出し選択で中断した場合、ON_PLAY は誘発待ち
+            # 行列へ積まれ、押し出し確定後（FIELD_OVERFLOW_TRASH 解決時）に消化される。
+            self._enforce_field_limit(player)
             # 「相手の登場時効果は無効になる」(OPP_ONPLAY) 期間中はこのプレイヤーの ON_PLAY を解決しない。
             onplay_negated = getattr(player, "negate_onplay_until", 0) >= self.turn_count
             if onplay_negated:
@@ -638,10 +642,13 @@ class GameManager:
             if not card.is_effect_negated and not onplay_negated:
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.ON_PLAY:
-                        self.resolve_ability(player, ability, source_card=card)
+                        if self.active_interaction:
+                            self._enqueue_trigger(player, ability, card, optional=False)
+                        else:
+                            self.resolve_ability(player, ability, source_card=card)
             self._apply_passive_effects(player)
-            # 場のキャラ上限超過なら強制トラッシュ。ON_PLAY が中断中(active_interaction)の
-            # ときは _enforce_field_limit が no-op し、対話完了時に resolve_interaction 末尾が拾う。
+            # ON_PLAY がさらにキャラを登場させた場合の超過はここで拾う（中断中は no-op し、
+            # 対話完了時に resolve_interaction 末尾が拾う）。
             self._enforce_field_limit(player)
 
     def _has_rested_play(self, player: Player) -> bool:

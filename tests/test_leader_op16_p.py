@@ -178,6 +178,34 @@ def test_op16_060_distinct_name_constraint_limits_same_name():
     assert sum(1 for c in (a, b) if c in p1.field) <= 1
 
 
+def test_op16_060_onplay_of_later_characters_survives_suspension():
+    """OP16-060: 同時登場3体（実カード 073/065/063）の【登場時】がすべて解決される。
+
+    回帰: 先に解決した登場時（サカズキのドン!!-1コスト/対象選択）が選択待ちで中断すると、
+    後続キャラ（クザン）の【登場時】が resolver._process_stack の中断ガードで1ステップも
+    実行されずに消失していた。中断中は誘発待ち行列（_pending_triggers）へ積んで、
+    対話完了後に消化されることを検証する。"""
+    from leader_test_helpers import db
+    from opcg_sim.src.models.models import CardInstance
+
+    gm, p1, p2, L = build("OP16-060")
+    insts = [CardInstance(db().get_card(cid), p1.name)
+             for cid in ("OP16-073", "OP16-065", "OP16-063")]  # ボルサリーノ/サカズキ/クザン
+    p1.hand += insts
+    don_before = len(p1.don_active) + len(p1.don_rested)
+
+    gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
+    _drive(gm, p1, targets=[c.uuid for c in insts])
+
+    assert not gm.active_interaction and not gm._pending_triggers
+    # クザン【登場時】ドン!!2枚レスト追加 が発動している（従来はイベントごと消失していた）
+    kuzan_ramps = [e for e in gm.action_events
+                   if e.get("card_name") == "クザン" and e.get("action") == "RAMP_DON"]
+    assert kuzan_ramps, "クザンの【登場時】(RAMP_DON) が解決されていない"
+    # ドン!!収支: センゴク-8、ボルサリーノ+2(1A/1R)、クザン+2(R)、サカズキのコスト-1 = -5
+    assert (len(p1.don_active) + len(p1.don_rested)) - don_before == -5
+
+
 # ===========================================================================
 # OP16-079 ヤマト
 #   自分のトラッシュから《ワノ国》キャラが登場した時、そのキャラはこのターン【速攻】。

@@ -62,6 +62,11 @@ def resolve_interaction(gm, player: Player, payload: Dict[str, Any]):
         # 複数体同時超過などでまだ超過していれば再度要求する（保険）。
         if len(owner.field) > FIELD_LIMIT:
             gm._suspend_for_field_overflow(owner)
+        # 超過対話の背後に積まれた誘発（効果登場の【登場時】等）を消化する。この分岐は
+        # 共通末尾（下の _advance_pending_triggers）を通らず return するため、ここで
+        # 消化しないと次のアクション境界まで滞留する。
+        if not gm.active_interaction and gm._pending_triggers:
+            gm._advance_pending_triggers()
         return
 
     source_uuid = continuation["source_card_uuid"]
