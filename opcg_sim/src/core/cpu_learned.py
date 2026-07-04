@@ -109,6 +109,15 @@ class LearnedEngine:
                         c_puct=c_puct, n_sims=sims,
                         determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=rng)
         move, _, legal = mcts.run(manager)
+        # 同名カードの別実体（手札の複製等）は探索木で別 edge になり訪問数が分裂する。
+        # 素の argmax(N) は分裂した等価手を系統的に不利にする（例: EB03-053×2 のカウンターが
+        # 30.6%+30.6% に割れ、38.8% の PASS に負ける）ため、等価キーで訪問数を合算した
+        # グループの多数決で選ぶ。探索（TreeMCTS）自体は不変＝ルートの読み出しのみ補正。
+        stats = getattr(mcts, "last_stats", None)
+        if stats and stats.get("legal"):
+            groups = _merge_root_stats(manager, stats["legal"], stats["N"], stats["Q"])
+            if groups:
+                move = stats["legal"][groups[0]["rep"]]
         if move is None:
             move = legal[0] if legal else None
         if trace is not None:
@@ -148,6 +157,36 @@ def decide_learned(manager, player, sims: int = 160, c_puct: float = 1.5,
     return _default_engine().decide(manager, player, sims=sims, c_puct=c_puct, rng=rng, trace=trace)
 
 
+def _merge_root_stats(manager, legal, N, Q):
+    """ルート合法手を挙動等価キー（`cpu_ai._move_equiv_key`）でグループ化し訪問数を合算する。
+
+    返り値: [{"rep": 代表index(グループ内N最大), "idxs": [...], "n": N合算, "q": N加重平均Q}]
+    を n 降順（同数は legal 列挙順＝安定）で。等価手が無い局面では全グループが単独＝
+    先頭グループの rep が従来の argmax(N) と一致し**挙動不変**。
+
+    等価判定は card_id 基準＝リプレイ逆写像（`replay_runner._key`）と同じ同一視。場の複製
+    （同名キャラで付与ドン数が違う等）は厳密には非等価だが、その残差はリプレイ側と同じ
+    許容（R0 §5）に揃える。
+    """
+    from opcg_sim.src.core import cpu_ai
+    order, groups = [], {}
+    for i, mv in enumerate(legal):
+        k = cpu_ai._move_equiv_key(manager, mv)
+        if k not in groups:
+            groups[k] = []
+            order.append(k)
+        groups[k].append(i)
+    out = []
+    for k in order:
+        idxs = groups[k]
+        n = float(sum(float(N[i]) for i in idxs))
+        q = (sum(float(N[i]) * float(Q[i]) for i in idxs) / n) if n > 0 else 0.0
+        rep = max(idxs, key=lambda i: float(N[i]))
+        out.append({"rep": rep, "idxs": idxs, "n": n, "q": q})
+    out.sort(key=lambda g: -g["n"])   # sort は安定＝同数なら列挙順を保つ
+    return out
+
+
 def _fill_trace(trace, manager, player, chosen, stats):
     """トレース dict に learned の意思決定分析を書き込む（cpu_trace 時のみ呼ばれる）。"""
     from opcg_sim.src.core import cpu_ai
@@ -155,20 +194,28 @@ def _fill_trace(trace, manager, player, chosen, stats):
     trace["difficulty"] = "learned"
     trace["turn"] = getattr(manager, "turn_count", None)
     trace["chosen"] = cpu_ai._describe_move(manager, chosen) if chosen else None
-    # ① 自分の探索の内訳（訪問上位・visit%・行動価値Q）。
+    # 対話種別（SEARCH_AND_SELECT / ARRANGE_DECK / CONFIRM_OPTIONAL 等）。無いと
+    # 「ライフ追加の選択」か「底送りの順番」かがトレースから読めない。
+    pend = manager.get_pending_request() or {}
+    if pend.get("action"):
+        trace["dialog"] = pend.get("action")
+    # ① 自分の探索の内訳（等価手マージ後の訪問上位・visit%・行動価値Q）。decide の選択と
+    #    同じ集計（`_merge_root_stats`）で出す＝「分裂した同名手が別行に出て PASS に負けて
+    #    見える」ログ上の錯覚も消す。copies>1 は複製がマージされた印。
     if stats and stats.get("legal"):
         legal, N, Q = stats["legal"], stats["N"], stats["Q"]
         tot = float(N.sum()) or 1.0
-        order = sorted(range(len(legal)), key=lambda i: -N[i])[:5]
+        groups = _merge_root_stats(manager, legal, N, Q)
         trace["candidates"] = [{
-            "move": cpu_ai._describe_move(manager, legal[i]),
-            "visit_pct": round(100.0 * float(N[i]) / tot, 1),
-            "q": round(float(Q[i]), 3),
-        } for i in order]
-        # 選んだ手の Q（＝net が見込む行動価値）。
-        for i, mv in enumerate(legal):
-            if mv is chosen:
-                trace["value"] = round(float(Q[i]), 3)
+            "move": cpu_ai._describe_move(manager, legal[g["rep"]]),
+            "visit_pct": round(100.0 * g["n"] / tot, 1),
+            "q": round(g["q"], 3),
+            **({"copies": len(g["idxs"])} if len(g["idxs"]) > 1 else {}),
+        } for g in groups[:5]]
+        # 選んだ手の Q（＝net が見込む行動価値・所属グループの加重平均）。
+        for g in groups:
+            if any(legal[i] is chosen for i in g["idxs"]):
+                trace["value"] = round(g["q"], 3)
                 break
     # ② 独立評価器 L1 の第二意見（分布外での net 系統誤差を拾う・evalは信じ過ぎない）。
     try:

@@ -58,8 +58,10 @@ def resolve_recorded_action(manager, actor, recorded: Dict[str, Any]):
 def _key(desc: Optional[Dict[str, Any]]):
     if not desc:
         return None
+    # accepted: 任意効果の decline のみ False が載る（accept・旧録画は欠落=None で同キー＝互換）。
     return (desc.get("action_type"), desc.get("card"), tuple(desc.get("targets") or ()),
-            tuple(desc.get("selected") or ()), desc.get("index"), desc.get("position"))
+            tuple(desc.get("selected") or ()), desc.get("index"), desc.get("position"),
+            desc.get("accepted"))
 
 
 def _cpu_seat(difficulty: str, sims: int = 160):

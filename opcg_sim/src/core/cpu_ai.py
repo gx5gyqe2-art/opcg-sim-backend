@@ -712,20 +712,26 @@ def merged_search_actions(manager, actor_name: str, base_moves: List[Dict[str, A
     if not alts:
         return base_moves
 
-    def _k(m):
-        p = m.get("payload") or {}
-        su = p.get("selected_uuids")
-        su = tuple(su) if isinstance(su, (list, tuple)) else su
-        return (m.get("action_type"), su, p.get("accepted"), p.get("index"))
-
     out = list(base_moves)
-    seen = {_k(m) for m in out}
+    seen = {_selection_merge_key(m) for m in out}
     for m in alts:
-        k = _k(m)
+        k = _selection_merge_key(m)
         if k not in seen:
             seen.add(k)
             out.append(m)
     return out
+
+
+def _selection_merge_key(move: Dict[str, Any]):
+    """`merged_search_actions` の重複判定キー（uuid 基準・同一 payload の二重併合を防ぐ）。
+
+    position を含める: TOP/BOTTOM だけが違う代替手を将来生成したとき、誤って同一視して
+    間引かないため（従来キーは position 欠落＝潜在の取りこぼし地雷だった）。
+    """
+    p = move.get("payload") or {}
+    su = p.get("selected_uuids")
+    su = tuple(su) if isinstance(su, (list, tuple)) else su
+    return (move.get("action_type"), su, p.get("accepted"), p.get("index"), p.get("position"))
 
 
 def _consumes_hand_card(manager, actor_name: str, move: Dict[str, Any]) -> bool:
@@ -1220,7 +1226,27 @@ def _describe_move(manager, move: Optional[Dict[str, Any]]) -> Optional[Dict[str
             v = extra.get(k)
         if v is not None:
             d[k] = v
+    # 任意効果の「見送り」(accepted=False) を明示する。accept 側は既定（多くの選択 payload が
+    # accepted=True を機械的に含む）ため出力しない＝旧録画（accepted 無し）と同キーで照合できる。
+    # 載せないと CONFIRM_OPTIONAL の accept/decline が同一記述に潰れ、トレースで区別不能だった。
+    acc = payload.get("accepted")
+    if acc is None:
+        acc = extra.get("accepted")
+    if acc is False:
+        d["accepted"] = False
     return d
+
+
+def _move_equiv_key(manager, move: Optional[Dict[str, Any]]):
+    """手の挙動等価キー（`_describe_move` と同じ card_id 基準の同一視）。
+
+    同名カードの別実体（手札の複製など）は同キー＝等価とみなす。リプレイの逆写像
+    （`replay_runner._key`）と同じ仮定で、学習CPUのルート訪問数マージが使う。
+    """
+    d = _describe_move(manager, move) or {}
+    return (d.get("action_type"), d.get("card"), tuple(d.get("targets") or ()),
+            tuple(d.get("selected") or ()), d.get("index"), d.get("position"),
+            d.get("accepted"))
 
 
 def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_only: bool,
