@@ -646,6 +646,9 @@ class GameManager:
                             self._enqueue_trigger(player, ability, card, optional=False)
                         else:
                             self.resolve_ability(player, ability, source_card=card)
+            # 他カードの「…が登場した時」リスナー（OP14-041 等）。登場時無効(OPP_ONPLAY)は
+            # 登場カード自身の【登場時】のみを無効にするため、リスナーは無効化に関わらず積む。
+            self._enqueue_char_played_listeners(card, player, from_zone="HAND")
             self._apply_passive_effects(player)
             # ON_PLAY がさらにキャラを登場させた場合の超過はここで拾う（中断中は no-op し、
             # 対話完了時に resolve_interaction 末尾が拾う）。
@@ -772,6 +775,23 @@ class GameManager:
 
     def _enqueue_on_leave(self, leaving_card: Card, leaving_owner: Player) -> None:
         return _triggers._enqueue_on_leave(self, leaving_card, leaving_owner)
+
+    def _played_subject_matches(self, ability: Ability, holder_owner: Player,
+                                played_card: Card, played_owner: Player,
+                                from_zone: str = None) -> bool:
+        return _triggers._played_subject_matches(self, ability, holder_owner,
+                                                 played_card, played_owner, from_zone)
+
+    def _enqueue_char_played_listeners(self, played_card: Card, played_owner: Player,
+                                       from_zone: str = None) -> None:
+        return _triggers._enqueue_char_played_listeners(self, played_card, played_owner, from_zone)
+
+    def _ko_listener_matches(self, ability: Ability, holder_owner: Player,
+                             koed_card: Card, koed_owner: Player) -> bool:
+        return _triggers._ko_listener_matches(self, ability, holder_owner, koed_card, koed_owner)
+
+    def _enqueue_ko_listeners(self, koed_card: Card, koed_owner: Player) -> None:
+        return _triggers._enqueue_ko_listeners(self, koed_card, koed_owner)
 
     def _enqueue_life_decrease(self, player: Player, count: int = 1) -> None:
         return _triggers._enqueue_life_decrease(self, player, count)

@@ -106,6 +106,8 @@ def _resolve_on_ko(gm, card: Card, owner: Player,
     # このターンに当該プレイヤーのキャラが KO された事実を記録する
     # （「このターン中、相手のキャラがKOされている場合」OP16-100 の判定用）。
     gm.record_turn_event(f"CHAR_KOED_{owner.name}", 1)
+    # 他カードの「…キャラがKOされた時」リスナーを積む（自身の【KO時】とは独立）。
+    gm._enqueue_ko_listeners(card, owner)
     if not card.master.abilities: return
     for ability in card.master.abilities:
         if ability.trigger == TriggerType.ON_KO:
@@ -211,6 +213,140 @@ def _enqueue_on_leave(gm, leaving_card: Card, leaving_owner: Player) -> None:
                 if ability.trigger != TriggerType.ON_LEAVE:
                     continue
                 if not gm._leave_subject_matches(ability, leaving_card, owner, leaving_owner):
+                    continue
+                optional = _nfc("発動できる") in _nfc(getattr(ability, "raw_text", "") or "")
+                gm._enqueue_trigger(owner, ability, holder, optional=optional)
+
+# ---------------------------------------------------------------------------
+# キャラ登場イベントのリスナー（「…が登場した時」を持つ他カードの誘発）
+# パーサはタイミングタグから PASSIVE/YOUR_TURN/OPPONENT_TURN に写像するが、これらは
+# 継続効果の再計算ループでは反応型（_is_reactive_passive）としてスキップされるため、
+# 登場イベントの発生地点からここで発火させる（OP14-041/OP13-100/OP16-079）。
+# ---------------------------------------------------------------------------
+
+_CHAR_PLAYED_LISTENER_TRIGGERS = (TriggerType.PASSIVE, TriggerType.YOUR_TURN,
+                                  TriggerType.OPPONENT_TURN)
+
+def _played_subject_matches(gm, ability: Ability, holder_owner: Player,
+                            played_card: Card, played_owner: Player,
+                            from_zone: str = None) -> bool:
+    """「…が登場した時」リスナーの主語・タイミングフィルタ。
+
+    - タイミング: YOUR_TURN（【自分のターン中】）は保持者のターンのみ、
+      OPPONENT_TURN（【相手のターン中】）は保持者の相手のターンのみ。PASSIVE は常時。
+    - 主語の側: 「相手の…」＝保持者の相手のキャラ登場のみ。既定（「自分の」/無指定）＝自分。
+    - 出所ゾーン: 「トラッシュから」等は from_zone（登場元）と一致した時のみ。
+    - 特徴《X》・カード名「X」・「【トリガー】を持つ」を登場カードに適用する。
+    """
+    raw = _nfc(getattr(ability, "raw_text", "") or "")
+    if _nfc("登場した時") not in raw or _nfc("このキャラが登場した時") in raw:
+        return False
+    pre = raw.split(_nfc("登場した時"))[0]
+    # 【相手のターン中】等のタイミングタグ内の「相手の/自分の」を主語判定に混ぜない。
+    pre = re.sub(r'【[^】]*】', '', pre)
+    if ability.trigger == TriggerType.YOUR_TURN and gm.turn_player is not holder_owner:
+        return False
+    if ability.trigger == TriggerType.OPPONENT_TURN and gm.turn_player is holder_owner:
+        return False
+    if _nfc("相手の") in pre:
+        if played_owner is holder_owner:
+            return False
+    elif played_owner is not holder_owner:
+        return False
+    for key, zone in ((_nfc("トラッシュから"), "TRASH"), (_nfc("手札から"), "HAND"),
+                      (_nfc("デッキから"), "DECK"), (_nfc("ライフから"), "LIFE")):
+        if key in pre and from_zone != zone:
+            return False
+    if _nfc("【トリガー】を持つ") in pre:
+        has_trig = bool(getattr(played_card.master, "trigger_text", "")) or any(
+            ab.trigger == TriggerType.TRIGGER for ab in (played_card.master.abilities or ()))
+        if not has_trig:
+            return False
+    traits = re.findall(r'[《<『]([^》>』]+)[》>』]', pre)
+    if traits and not any(any(t in ct for ct in played_card.master.traits) for t in traits):
+        return False
+    names = re.findall(r'「([^」]+)」', pre)
+    if names and not any(played_card.master.matches_name(n, partial=True) for n in names):
+        return False
+    return True
+
+def _enqueue_char_played_listeners(gm, played_card: Card, played_owner: Player,
+                                   from_zone: str = None) -> None:
+    """キャラ登場時に、両プレイヤーのリーダー/場/ステージから「…が登場した時」
+    リスナーを探して誘発待ち行列へ積む。登場カード自身は対象外（自身の【登場時】は
+    ON_PLAY 経路が担う）。"""
+    if played_card.master.type != CardType.CHARACTER:
+        return
+    for owner in (gm.p1, gm.p2):
+        holders = ([owner.leader] if owner.leader else []) + list(owner.field)
+        if owner.stage:
+            holders.append(owner.stage)
+        for holder in holders:
+            if holder is None or holder is played_card:
+                continue
+            for ability in (holder.master.abilities or ()):
+                if ability.trigger not in _CHAR_PLAYED_LISTENER_TRIGGERS:
+                    continue
+                if not gm._played_subject_matches(ability, owner, played_card,
+                                                  played_owner, from_zone):
+                    continue
+                optional = _nfc("発動できる") in _nfc(getattr(ability, "raw_text", "") or "")
+                gm._enqueue_trigger(owner, ability, holder, optional=optional)
+
+# ---------------------------------------------------------------------------
+# 第三者KOリスナー（「自分の/相手の…キャラがKOされた時」を持つ他カードの誘発）
+# _resolve_on_ko はKOされたカード自身の【KO時】しか解決しないため、リーダー等が持つ
+# 「…キャラがKOされた時」はここで走査して積む（OP14-041/OP01-061/OP13-002 等）。
+# ---------------------------------------------------------------------------
+
+def _ko_listener_matches(gm, ability: Ability, holder_owner: Player,
+                         koed_card: Card, koed_owner: Player) -> bool:
+    """他カードのKOを監視するリスナーの主語フィルタ。
+
+    主語が「このキャラ」（＝自身KO・既存の self 経路が担う）のものは対象外。
+    側（自分の/相手の。無指定=両方）・特徴《X》・カード名「X」・
+    「（元々の）パワーN以上」をKOされたカードに適用する。タイミング
+    （【自分のターン中】等）・【ドン!!×N】・【ターン1回】は条件として
+    resolve_ability が評価する。"""
+    raw = _nfc(getattr(ability, "raw_text", "") or "")
+    if _nfc("KOされた時") not in raw:
+        return False
+    pre = raw.split(_nfc("KOされた時"))[0]
+    # 【自分のターン中】等のタイミングタグ内の「自分の/相手の」を主語判定に混ぜない。
+    pre = re.sub(r'【[^】]*】', '', pre)
+    if _nfc("このキャラが") in pre or _nfc("キャラが") not in pre:
+        return False
+    if _nfc("相手の") in pre and _nfc("自分の") not in pre:
+        if koed_owner is holder_owner:
+            return False
+    elif _nfc("自分の") in pre:
+        if koed_owner is not holder_owner:
+            return False
+    m = re.search(_nfc(r'(?:元々の)?パワー(\d+)以上'), pre)
+    if m and (koed_card.master.power or 0) < int(m.group(1)):
+        return False
+    traits = re.findall(r'[《<『]([^》>』]+)[》>』]', pre)
+    if traits and not any(any(t in ct for ct in koed_card.master.traits) for t in traits):
+        return False
+    names = re.findall(r'「([^」]+)」', pre)
+    if names and not any(koed_card.master.matches_name(n, partial=True) for n in names):
+        return False
+    return True
+
+def _enqueue_ko_listeners(gm, koed_card: Card, koed_owner: Player) -> None:
+    """KO発生時に、両プレイヤーのリーダー/場/ステージから第三者KOリスナーを探して
+    誘発待ち行列へ積む（KOされたカード自身の【KO時】は _resolve_on_ko の self 経路）。"""
+    for owner in (gm.p1, gm.p2):
+        holders = ([owner.leader] if owner.leader else []) + list(owner.field)
+        if owner.stage:
+            holders.append(owner.stage)
+        for holder in holders:
+            if holder is None or holder is koed_card:
+                continue
+            for ability in (holder.master.abilities or ()):
+                if ability.trigger != TriggerType.ON_KO:
+                    continue
+                if not gm._ko_listener_matches(ability, owner, koed_card, koed_owner):
                     continue
                 optional = _nfc("発動できる") in _nfc(getattr(ability, "raw_text", "") or "")
                 gm._enqueue_trigger(owner, ability, holder, optional=optional)
