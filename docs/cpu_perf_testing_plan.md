@@ -49,7 +49,7 @@
 
 | PR | 内容 | ゲート |
 |---|---|---|
-| **A1** | play_game/paired_play を **learned 席対応**（difficulty="learned"・sims 席別）。learned vs L1 と sims 振りを測れる。`cpu_arena arena-paired --challenger learned` 相当の CLI | learned vs L1 が決着・同一 seed で再現（`test_cpu_arena` に learned 対戦の機械健全性ケース追加） |
+| **A1 ✅実装済** | play_game/arena/arena_paired/paired_play を **learned 席対応**（`_arena_seat` が difficulty="learned"→Gen2席・`p1_sims`/`p2_sims` 席別）。CLI: `cpu_arena arena-paired --challenger learned [--challenger-sims N]`／`arena_parallel --challenger-difficulty learned`（並列）。learned は L1 の席別ノブ（policy/pimc/budget/search/coeffs・CRN）を持たず sims のみ | ✅ learned vs L1/learned が決着・同一 seed 再現（`test_cpu_arena::test_play_game_supports_learned_seat`） |
 | **A2** | **`perf_gate.py`（運用ワンコマンド）**: 凍結ベースライン（npz ハッシュ固定）に対する Gen2 の勝率→Elo・ペア単位 CI・latency・（learned の Q ではなく）決着率/手数の非退行を1コマンドで PASS/FAIL 出力。`--quick`（少ペア）/`--full`（本走） | 自己対戦で PASS/FAIL が安定・TEST_SPEC §5 へ運用追記 |
 | **A3** | **net-vs-net**: `cpu_learned` にインスタンス API（`LearnedEngine`）を足し（シングルトンはラッパで温存＝本番不変）、arena が「凍結Gen2 vs 新Gen」を戦わせる。昇格ゲート＝elo_lo>0（強い）or 非退行なら elo_hi>−15 | 同一ネット同士で ≈50%・凍結 vs 凍結が対称・全テスト |
 | **A4（任意）** | learned 用の正しさ計器（Q値ギャップ＝learned版 regret、net 単調性）。regret/realize/monotonicity の learned アナログ | 別設計（本計画のスコープ外だが将来枠として明記） |

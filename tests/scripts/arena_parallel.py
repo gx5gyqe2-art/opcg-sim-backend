@@ -56,6 +56,7 @@ def _play_one(spec: Dict[str, Any]) -> Dict[str, Any]:
                         p1_budget=spec.get("p1_budget"), p2_budget=spec.get("p2_budget"),
                         p1_pimc=spec.get("p1_pimc", 1), p2_pimc=spec.get("p2_pimc", 1),
                         p1_coeffs=spec.get("p1_coeffs"), p2_coeffs=spec.get("p2_coeffs"),
+                        p1_sims=spec.get("p1_sims", 160), p2_sims=spec.get("p2_sims", 160),
                         separate_policy_rng=True)
         return {"pair": spec["pair"], "seat": spec["seat"], "winner": res["winner"]}
     except Exception as e:
@@ -74,10 +75,13 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                 challenger_search=None, baseline_search=None,
                 challenger_budget=None, baseline_budget=None,
                 challenger_difficulty: str = "hard", baseline_difficulty: str = "hard",
-                challenger_pimc: int = 1, baseline_pimc: int = 1) -> Dict[str, Any]:
+                challenger_pimc: int = 1, baseline_pimc: int = 1,
+                challenger_sims: int = 160, baseline_sims: int = 160) -> Dict[str, Any]:
     """対照ペアを**並列**で実行し、ペア単位スコア（{0,0.5,1}）と勝率（challenger 視点）を返す。
 
-    評価は L1 単一系統（`cpu_eval_v2`）。両者とも難易度 hard（既定）。
+    難易度は hard(L1) と **learned(Gen2)** を混在可（A1）。`challenger_difficulty="learned"` で Gen2 の強度 A/B。
+    `challenger_sims`/`baseline_sims` は learned の MCTS 探索数（既定=本番 160）。以下 L1 系ノブ:
+    両者とも難易度 hard（既定）。
     `challenger_coeffs`/`baseline_coeffs`（任意）= L1 係数の**席別**上書き（SPSA の候補θ vs 凍結基準）。
     手書きeval 撤去後は両側 L1 なので、係数差を席別に与えないと有意な A/B にならない（同係数＝50%）。
     `challenger_search`/`baseline_search`（任意・深さA/B用）= `(horizon, max_ply)` で席別に探索深さを
@@ -96,12 +100,14 @@ def paired_play(pairs: int, seed0: int = 0, max_steps: int = DEFAULT_MAX_STEPS,
                       "p1_budget": challenger_budget, "p2_budget": baseline_budget,
                       "p1_pimc": challenger_pimc, "p2_pimc": baseline_pimc,
                       "p1_coeffs": challenger_coeffs, "p2_coeffs": baseline_coeffs,
+                      "p1_sims": challenger_sims, "p2_sims": baseline_sims,
                       "max_steps": max_steps})
         specs.append({"pair": k, "seat": "B", "seed": seed, "p1d": bd, "p2d": cd,
                       "p1_search": baseline_search, "p2_search": challenger_search,
                       "p1_budget": baseline_budget, "p2_budget": challenger_budget,
                       "p1_pimc": baseline_pimc, "p2_pimc": challenger_pimc,
                       "p1_coeffs": baseline_coeffs, "p2_coeffs": challenger_coeffs,
+                      "p1_sims": baseline_sims, "p2_sims": challenger_sims,
                       "max_steps": max_steps})
 
     if workers <= 1:
@@ -157,6 +163,11 @@ if __name__ == "__main__":
     ap.add_argument("--baseline-max-ply", type=int, default=None, help="ベースラインの ply上限")
     ap.add_argument("--baseline-budget", type=int, default=None, help="ベースラインの予算（既定=本番hard）")
     ap.add_argument("--baseline-pimc", type=int, default=1, help="ベースラインの PIMC 世界数")
+    # A1: learned(Gen2) の強度 A/B。例: --challenger-difficulty learned で「Gen2 vs 出荷hard」を測る。
+    ap.add_argument("--challenger-difficulty", choices=["hard", "learned"], default="hard")
+    ap.add_argument("--baseline-difficulty", choices=["hard", "learned"], default="hard")
+    ap.add_argument("--challenger-sims", type=int, default=160, help="learned 挑戦者の MCTS 探索数")
+    ap.add_argument("--baseline-sims", type=int, default=160, help="learned ベースラインの MCTS 探索数")
     ap.add_argument("--time", action="store_true", help="壁時計 latency を併記（深さ／思考時間のコスト可視化）")
     args = ap.parse_args()
 
@@ -168,6 +179,9 @@ if __name__ == "__main__":
     t0 = time.time()
     res = paired_play(args.pairs, seed0=args.seed0, max_steps=args.max_steps,
                       workers=(args.workers or None),
+                      challenger_difficulty=args.challenger_difficulty,
+                      baseline_difficulty=args.baseline_difficulty,
+                      challenger_sims=args.challenger_sims, baseline_sims=args.baseline_sims,
                       challenger_search=chal_search, baseline_search=base_search,
                       challenger_budget=args.challenger_budget, baseline_budget=args.baseline_budget,
                       challenger_pimc=args.challenger_pimc, baseline_pimc=args.baseline_pimc)

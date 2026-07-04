@@ -102,6 +102,17 @@ def elo_ci(wins: float, games: int, z: float = 1.96) -> Dict[str, float]:
 
 # --- 非対称（挑戦者 vs ベースライン）対局ランナー -----------------------------
 
+def _arena_seat(difficulty, policy, rng, pimc, budget, search, coeffs, sims):
+    """arena の 1 席を作る。`difficulty=="learned"` は Gen2 学習型（本番既定 CPU）＝L1 の席別ノブは持たず
+    `sims`（MCTS 探索数）のみ。CRN（`rng`）は L1 席専用（learned は global random 由来＝PR-D2 で seed 再現）。
+    それ以外（hard 等）は L1（α-β＋ビーム＋PIMC）席で、情報方針/CRN/PIMC/予算/深さ/L1係数を席別に掛ける。
+    """
+    if difficulty == "learned":
+        return make_seat(kind="learned", sims=sims)
+    return make_seat(difficulty, kind="arena", info_policy=policy, policy_rng=rng,
+                     pimc_worlds=pimc, budget=budget, search=search, coeffs=coeffs)
+
+
 def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               max_steps: int = DEFAULT_MAX_STEPS,
               p1_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
@@ -110,28 +121,25 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p1_pimc: int = 1, p2_pimc: int = 1,
               p1_budget=None, p2_budget=None,
               p1_search=None, p2_search=None,
-              p1_coeffs=None, p2_coeffs=None) -> Dict[str, Any]:
-    """p1/p2 に別難易度・別情報方針を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
+              p1_coeffs=None, p2_coeffs=None,
+              p1_sims: int = 160, p2_sims: int = 160) -> Dict[str, Any]:
+    """p1/p2 に別難易度を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     対局ループは `game_driver.run_game`（全ハーネス共通）で回し、席（seat）だけ非対称にする。
-    `p1_policy`/`p2_policy` は情報方針（fair/cheat・Phase -1）で、フェア化前後の強さ A/B に用いる。
+    `difficulty` は L1 系（hard）と **learned（Gen2 学習型・本番既定 CPU）** を混在できる（A1: 強度 A/B の
+    learned 対応）。learned 席は `p1_sims`/`p2_sims`（MCTS 探索数・既定=本番 160）を使い、L1 の席別ノブ
+    （policy/pimc/budget/search/coeffs・CRN rng）は無視する。`p1_policy`/`p2_policy` は L1 の情報方針（fair/cheat）。
 
     `separate_policy_rng=True`（Phase 0）で**方策のタイブレーク乱数を game 乱数（global random）から分離**
-    する（各プレイヤーに seed 派生の独立 `random.Random`）。これは方策タイブレークの決定性を game 乱数から
-    切り離すだけ＝**完全な配りレベル CRN ではない**: mulligan は対局ループ中に決まり、α-β 探索はクローン
-    上の効果解決で global `random` を方策依存に消費するため、方策が違えば mid-game 以降のシャッフルは
-    なお分岐する。配りレベル CRN には GameManager への乱数注入（クローンが独自 rng）が必要＝Phase 0b。
-
-    `random.Random(seed*…)` は独立生成器で global random を消費しないため、席を run_game 前に構築しても
-    「配り/シャッフルを確定させてから方策乱数を分離する」旧挙動と決定論的に等価（乱数消費順は不変）。
+    する（各 L1 席に seed 派生の独立 `random.Random`）。これは方策タイブレークの決定性を game 乱数から
+    切り離すだけ＝**完全な配りレベル CRN ではない**（learned 席には未適用＝global random 由来）。
+    どちらも同一 seed なら決定論再現する（learned は PR-D2、L1 は既存の決定論）。
     """
     p1_rng = random.Random(seed * 2 + 1) if separate_policy_rng else None
     p2_rng = random.Random(seed * 2 + 2) if separate_policy_rng else None
     seats = {
-        "p1": make_seat(p1_difficulty, kind="arena", info_policy=p1_policy, policy_rng=p1_rng,
-                        pimc_worlds=p1_pimc, budget=p1_budget, search=p1_search, coeffs=p1_coeffs),
-        "p2": make_seat(p2_difficulty, kind="arena", info_policy=p2_policy, policy_rng=p2_rng,
-                        pimc_worlds=p2_pimc, budget=p2_budget, search=p2_search, coeffs=p2_coeffs),
+        "p1": _arena_seat(p1_difficulty, p1_policy, p1_rng, p1_pimc, p1_budget, p1_search, p1_coeffs, p1_sims),
+        "p2": _arena_seat(p2_difficulty, p2_policy, p2_rng, p2_pimc, p2_budget, p2_search, p2_coeffs, p2_sims),
     }
     # arena は各手番で get_legal_actions を事前呼びしない（seat 内で解決＝乱数消費順の保存）。
     result = run_game(seed, db, seats=seats, max_steps=max_steps,
@@ -142,11 +150,13 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
 def arena(db, challenger: str, baseline: str, games: int, seed0: int = 0,
           max_steps: int = DEFAULT_MAX_STEPS,
           challenger_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
-          baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY) -> Dict[str, Any]:
+          baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
+          challenger_sims: int = 160, baseline_sims: int = 160) -> Dict[str, Any]:
     """挑戦者 vs 固定ベースラインを `games` 局。**席を交互に入替**して先手有利を相殺し、勝率と Elo を返す。
 
     偶数 i: p1=挑戦者 / 奇数 i: p2=挑戦者。引き分け（あれば）は 0.5 勝で計上。
-    `challenger_policy`/`baseline_policy`（Phase -1・fair/cheat）で情報方針も A/B できる（席入替に追従）。
+    `challenger`/`baseline` は `learned`（Gen2）も可（A1）。`challenger_sims`/`baseline_sims` は learned の MCTS 探索数。
+    `challenger_policy`/`baseline_policy`（Phase -1・fair/cheat）は L1 の情報方針 A/B（席入替に追従）。
     """
     wins = 0.0
     decided = 0
@@ -157,7 +167,9 @@ def arena(db, challenger: str, baseline: str, games: int, seed0: int = 0,
         p1d, p2d = (challenger, baseline) if chal_is_p1 else (baseline, challenger)
         p1p, p2p = ((challenger_policy, baseline_policy) if chal_is_p1
                     else (baseline_policy, challenger_policy))
-        res = play_game(seed, db, p1d, p2d, max_steps=max_steps, p1_policy=p1p, p2_policy=p2p)
+        p1s, p2s = (challenger_sims, baseline_sims) if chal_is_p1 else (baseline_sims, challenger_sims)
+        res = play_game(seed, db, p1d, p2d, max_steps=max_steps, p1_policy=p1p, p2_policy=p2p,
+                        p1_sims=p1s, p2_sims=p2s)
         chal_seat = "p1" if chal_is_p1 else "p2"
         won = (res["winner"] == chal_seat)
         wins += 1.0 if won else 0.0
@@ -176,7 +188,8 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
                  challenger_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                  baseline_policy: str = cpu_ai.DEFAULT_INFO_POLICY,
                  challenger_pimc: int = 1, baseline_pimc: int = 1,
-                 challenger_budget=None, baseline_budget=None) -> Dict[str, Any]:
+                 challenger_budget=None, baseline_budget=None,
+                 challenger_sims: int = 160, baseline_sims: int = 160) -> Dict[str, Any]:
     """分散低減アリーナ（Phase 0・antithetic 席ペアリング）。各 seed を**両席で 1 回ずつ**戦わせ、
     挑戦者の 2 局の勝敗を集計する＝**先手有利（席順）をペア内で相殺**する。
 
@@ -199,11 +212,13 @@ def arena_paired(db, challenger: str, baseline: str, pairs: int, seed0: int = 0,
         a = play_game(seed, db, challenger, baseline, max_steps=max_steps,
                       p1_policy=challenger_policy, p2_policy=baseline_policy,
                       separate_policy_rng=True, p1_pimc=challenger_pimc, p2_pimc=baseline_pimc,
-                      p1_budget=challenger_budget, p2_budget=baseline_budget)
+                      p1_budget=challenger_budget, p2_budget=baseline_budget,
+                      p1_sims=challenger_sims, p2_sims=baseline_sims)
         b = play_game(seed, db, baseline, challenger, max_steps=max_steps,
                       p1_policy=baseline_policy, p2_policy=challenger_policy,
                       separate_policy_rng=True, p1_pimc=baseline_pimc, p2_pimc=challenger_pimc,
-                      p1_budget=baseline_budget, p2_budget=challenger_budget)
+                      p1_budget=baseline_budget, p2_budget=challenger_budget,
+                      p1_sims=baseline_sims, p2_sims=challenger_sims)
         chal_a = 1.0 if a["winner"] == "p1" else 0.0
         chal_b = 1.0 if b["winner"] == "p2" else 0.0
         wins += chal_a + chal_b
@@ -302,24 +317,28 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     pa = sub.add_parser("arena", help="挑戦者 vs 固定ベースラインの勝率→Elo")
-    pa.add_argument("--challenger", choices=["hard"], default="hard")
-    pa.add_argument("--baseline", choices=["hard"], default="hard")
+    pa.add_argument("--challenger", choices=["hard", "learned"], default="hard")
+    pa.add_argument("--baseline", choices=["hard", "learned"], default="hard")
     # Phase -1: 情報方針の A/B（既定＝挑戦者 fair vs ベースライン cheat＝フェア化の損失量を測る）。
     pa.add_argument("--challenger-policy", choices=["fair", "cheat"], default="fair")
     pa.add_argument("--baseline-policy", choices=["fair", "cheat"], default="cheat")
+    pa.add_argument("--challenger-sims", type=int, default=160, help="learned 挑戦者の MCTS 探索数")
+    pa.add_argument("--baseline-sims", type=int, default=160, help="learned ベースラインの MCTS 探索数")
     pa.add_argument("--games", type=int, default=10)
     pa.add_argument("--seed", type=int, default=0)
     pa.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
 
-    pp = sub.add_parser("arena-paired", help="分散低減アリーナ（antithetic+CRN・Elo CI つき）")
-    pp.add_argument("--challenger", choices=["hard"], default="hard")
-    pp.add_argument("--baseline", choices=["hard"], default="hard")
+    pp = sub.add_parser("arena-paired", help="分散低減アリーナ（antithetic+CRN・Elo CI つき。learned=Gen2 可）")
+    pp.add_argument("--challenger", choices=["hard", "learned"], default="hard")
+    pp.add_argument("--baseline", choices=["hard", "learned"], default="hard")
     pp.add_argument("--challenger-policy", choices=["fair", "cheat"], default="fair")
     pp.add_argument("--baseline-policy", choices=["fair", "cheat"], default="cheat")
-    pp.add_argument("--challenger-pimc", type=int, default=1, help="挑戦者の PIMC 世界数（>=2 で決定化）")
-    pp.add_argument("--baseline-pimc", type=int, default=1, help="ベースラインの PIMC 世界数")
-    pp.add_argument("--challenger-budget", type=int, default=None, help="挑戦者の深掘り予算（Phase 4 按分）")
-    pp.add_argument("--baseline-budget", type=int, default=None, help="ベースラインの深掘り予算")
+    pp.add_argument("--challenger-pimc", type=int, default=1, help="挑戦者の PIMC 世界数（>=2 で決定化・L1のみ）")
+    pp.add_argument("--baseline-pimc", type=int, default=1, help="ベースラインの PIMC 世界数（L1のみ）")
+    pp.add_argument("--challenger-budget", type=int, default=None, help="挑戦者の深掘り予算（L1のみ）")
+    pp.add_argument("--baseline-budget", type=int, default=None, help="ベースラインの深掘り予算（L1のみ）")
+    pp.add_argument("--challenger-sims", type=int, default=160, help="learned 挑戦者の MCTS 探索数")
+    pp.add_argument("--baseline-sims", type=int, default=160, help="learned ベースラインの MCTS 探索数")
     pp.add_argument("--pairs", type=int, default=50)
     pp.add_argument("--seed", type=int, default=0)
     pp.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
@@ -341,7 +360,8 @@ def main(argv=None):
 
     if args.cmd == "arena":
         rep = arena(db, args.challenger, args.baseline, args.games, args.seed, args.max_steps,
-                    challenger_policy=args.challenger_policy, baseline_policy=args.baseline_policy)
+                    challenger_policy=args.challenger_policy, baseline_policy=args.baseline_policy,
+                    challenger_sims=args.challenger_sims, baseline_sims=args.baseline_sims)
         for d in rep["detail"]:
             print(f"  seed={d['seed']} challenger={d['challenger_seat']} winner={d['winner']} "
                   f"{'WIN' if d['challenger_won'] else 'loss'} turns={d['turns']}")
@@ -355,7 +375,8 @@ def main(argv=None):
         rep = arena_paired(db, args.challenger, args.baseline, args.pairs, args.seed, args.max_steps,
                            challenger_policy=args.challenger_policy, baseline_policy=args.baseline_policy,
                            challenger_pimc=args.challenger_pimc, baseline_pimc=args.baseline_pimc,
-                           challenger_budget=args.challenger_budget, baseline_budget=args.baseline_budget)
+                           challenger_budget=args.challenger_budget, baseline_budget=args.baseline_budget,
+                           challenger_sims=args.challenger_sims, baseline_sims=args.baseline_sims)
         for d in rep["detail"]:
             print(f"  seed={d['seed']} p1won={d['chal_as_p1_won']:.0f} p2won={d['chal_as_p2_won']:.0f} "
                   f"pair={d['pair_score']:.2f}")
