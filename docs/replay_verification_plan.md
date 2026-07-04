@@ -89,9 +89,10 @@ R0 で曖昧率は実デッキで 3.5〜4.5%・fan-out 小（ほぼ 2手）・**
 | PR | 内容 | ゲート |
 |---|---|---|
 | **R0 ✅完了** | 記録の曖昧性を実測（`replay_ambiguity_probe.py`・実デッキ）→ **曖昧率 3.5〜4.5%・fan-out 小・effect 選択は 0/515**。(A) 主で確定。詳細 `docs/reports/cpu_replay_ambiguity_r0_20260704.md` | ✅ 計測レポート |
-| **R1** | リプレイヤ中核 `replay_from_descriptor(descriptor) -> {winner, decisions, board}`: デッキ復元＋`start_game(first_player)`＋`random.seed`＋人間手注入（§3 リゾルバ）＋CPU 再 decide。合成用 `cpu_replay` と実対局用でループ本体は `game_driver.run_game` を共有（席＝learned/hard、人間席＝注入リゾルバ、observer＝trace 収集）。**§2.0 の調査用途**を満たす: (a) `--full`＝read_ahead 込みで再取得、(b) 採取ボタン JSON をそのまま入力、(c) 崩れ局面を決定論パズルへ書き出し | 単体（デッキ復元一致・単純手の注入が合法）＋採取 JSON の食い込み |
-| **R2** | ラウンドトリップ・テスト（**hard**）: create(cpu_trace,seed) で短対局を録画→`replay_from_descriptor`→勝敗・decisions(card_id 基準)一致を assert。`tests/test_replay_roundtrip.py`（CI 内・有界 seed） | 一致 assert＋全テスト |
-| **R3** | **learned** 対応＋ラウンドトリップ（learned）＋記録テスト（`test_replay_capture_and_fetch`）に learned ケース追加。PR-D2 の seed 再現が「実対局丸ごと再現」まで通ることを固定 | learned 一致 assert |
+| **R1 ✅実装済** | リプレイヤ中核 `replay_runner.replay_from_descriptor`: デッキ復元（`build_deck_from_ids`・pre-shuffle 順確認済）＋`random.seed`＋人間手注入（R0 確定の (A) 決定論タイブレーク逆引き `resolve_recorded_action`）＋CPU 再 decide。ループは `game_driver.run_game` 共有（人間席＝注入・CPU席＝learned/hard）。分岐は crash させず記録（`reproduced`/`misses`） | ✅ **実デッキ 10 seed で 10/10 完全一致**（勝敗+手数+ターン・人間手30〜50/局を tie-break で復元） |
+| **R2 ✅実装済（hard）** | ラウンドトリップ・テスト `tests/test_replay_roundtrip.py`: 録画（人間=private rng・global random 非消費）→再生→勝敗・手数・ターン一致＋miss=0 を assert（実デッキ・有界 seed）。リゾルバ単体も検証 | ✅ hard で一致 assert（learned は R3） |
+| **R1 副産物（engine 修正）** | `cpu_ai._find_card` が **stage/temp_zone** を探索せず、ACTIVATE_MAIN 等の手記述が card_id に解決できず uuid のまま漏れて再現不能だった欠落を修正（round-trip が検出）。修正で 8/10→**10/10** | ✅ trace テスト無退行（test_cpu_replay/learned 16 passed）・ruff clean |
+| **R3** | **learned** 対応＋ラウンドトリップ（learned）＋API 記録テスト（`test_replay_capture_and_fetch`）に learned ケース追加。PR-D2 の seed 再現が「実対局丸ごと再現」まで通ることを固定。**API 記述子の実結線**（coin toss=first_player 再現・`REPLAY_SCHEMA` 直食い）もここ | learned 一致 assert |
 | **R4（任意）** | スキーマ統一: 合成 `opcg-replay/v1` と実対局 `REPLAY_SCHEMA` のリプレイヤ共通化（`cpu_replay --descriptor` が両方を再生）。契約更新は §5 | contract 再生成＋差分レビュー |
 
 **実装順は R0→R1→R2→R3**。R2（hard）で骨組みを固めてから R3（learned）を乗せる。

@@ -1169,9 +1169,15 @@ def _find_card(manager, uuid: Optional[str]):
         return None
     for p in (manager.p1, manager.p2):
         leader = getattr(p, "leader", None)
-        zones = [getattr(p, z, None) or [] for z in ("field", "hand", "life", "deck", "trash")]
+        stage = getattr(p, "stage", None)
+        # field/hand/life/deck/trash に加え **temp_zone**（解決中の一時ゾーン）と **stage** も探索する。
+        # これらが漏れると ACTIVATE_MAIN 等の手記述が card_id に解決できず uuid のまま残り、
+        # card_id 基準の記録が再現不能になる（実対局リプレイ・R1 round-trip で検出した欠落）。
+        zones = [getattr(p, z, None) or [] for z in ("field", "hand", "life", "deck", "trash", "temp_zone")]
         if leader is not None:
             zones.append([leader])
+        if stage is not None:
+            zones.append([stage])
         for zone in zones:
             for c in zone:
                 if getattr(c, "uuid", None) == uuid:
