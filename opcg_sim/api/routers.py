@@ -39,6 +39,20 @@ _logger = logging.getLogger("opcg.api")
 router = APIRouter()
 
 
+def _learned_available() -> bool:
+    """Gen2 学習型CPU（difficulty="learned"）が使える環境か。
+
+    モデル重み（`gen2_value.npz`）の同梱有無を確認する（`available()` は os.path.exists のみ・
+    net ロードや numpy 推論はしない）。numpy 未導入等で import 自体が失敗する環境では False を返し、
+    呼び出し側は hard へ安全フォールバックする。
+    """
+    try:
+        from opcg_sim.src.core import cpu_learned
+        return cpu_learned.available()
+    except Exception:
+        return False
+
+
 # ---- ルールモード対局 -------------------------------------------------------
 
 @router.options("/api/game/create")
@@ -67,9 +81,12 @@ async def game_create(req: Any = Body(...)):
         first_player = _resolve_first_player(req.get("first_player"), player1, player2)
         manager = GameManager(player1, player2); manager.start_game(first_player); GAMES[game_id] = manager
         if vs_cpu:
-            # CPU は **hard（α-β＋ビーム＋PIMC）** が既定。**learned**（Gen2 学習型・NN誘導MCTS）も選択可。
-            difficulty = req.get("cpu_difficulty", "hard")
+            # CPU は **learned（Gen2 学習型・NN誘導MCTS）** が既定。**hard**（α-β＋ビーム＋PIMC）も選択可。
+            # モデル未同梱環境（`cpu_learned.available()` が False）では learned を hard へ安全フォールバック。
+            difficulty = req.get("cpu_difficulty", "learned")
             if difficulty not in ("hard", "learned"):
+                difficulty = "learned"
+            if difficulty == "learned" and not _learned_available():
                 difficulty = "hard"
             CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty}
             if cpu_trace:

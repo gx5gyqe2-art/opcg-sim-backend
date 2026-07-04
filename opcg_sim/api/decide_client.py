@@ -73,8 +73,10 @@ def decide(manager, player, difficulty: str = "normal", *, mem: Optional[Dict[st
            trace_read_ahead: bool = False):
     """本番の decide。ワーカー有効時は PyPy へ委譲、失敗時はインプロセスへフォールバック。
 
-    difficulty=="learned" は学習型CPU（Gen2 value+policy+MCTS）へインプロセスで分岐する
-    （docs/reports/cpu_rl_pilot_p3_results_20260630.md）。例外/未同梱時は従来 L1 へ安全フォールバック。
+    difficulty=="learned"（本番既定）は学習型CPU（Gen2 value+policy+MCTS）へインプロセスで分岐する
+    （docs/reports/cpu_rl_pilot_p3_results_20260630.md）。モデル未同梱環境での hard フォールバックは
+    **ゲーム生成時**（routers `_learned_available()` ゲート）で確定済みなので、ここへ到達する learned は
+    **learned-only（per-move の L1 フォールバック無し）**＝観測する手は必ず学習型。
     """
     if mem is None:
         mem = {}

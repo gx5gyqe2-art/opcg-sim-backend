@@ -12,8 +12,8 @@ from opcg_sim.src.core.gamestate import GameManager
 GAMES: Dict[str, GameManager] = {}
 # フリーモード（サンドボックス）の SandboxManager。
 SANDBOX_GAMES: Dict[str, Any] = {}
-# CPU 対戦のメタ情報: {game_id: {"cpu_player_id": "p2", "difficulty": "hard", ...}}。
-# GAMES[game_id] に GameManager 本体を、ここに CPU 側の識別子と難易度を保持する。
+# CPU 対戦のメタ情報: {game_id: {"cpu_player_id": "p2", "difficulty": "learned", ...}}。
+# GAMES[game_id] に GameManager 本体を、ここに CPU 側の識別子と難易度（既定=learned・Gen2）を保持する。
 CPU_GAMES: Dict[str, Dict[str, Any]] = {}
 # ルールモード・オンライン対戦のルーム（ロビー）レジストリ。
 # 各値: {game_id, room_name, created_at, status(WAITING/PLAYING/FINISHED),
