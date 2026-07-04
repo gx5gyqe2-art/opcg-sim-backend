@@ -105,7 +105,7 @@ def replay_from_descriptor(db, descriptor: Dict[str, Any], cpu_difficulty: Optio
     API 実対局は CPU 対局＝常に "random"（`RealGame.tsx` は `vsCpu ? 'random' : …`）なので、
     API 記述子を食うときは `first_player="random"` を渡す（seed から coin toss を再現＝乱数列一致）。
     """
-    seed = descriptor["seed"]
+    seed = int(descriptor["seed"])   # API は 2^53 超対策で文字列化して返す（旧録画の int も可）
     fp_mode = first_player if first_player is not None else descriptor.get("first_player_mode")
     # cpu_player_id は API 実対局では**プレイヤー名**（"P2" 等）・合成録画では席キー（"p2"）。
     # run_game の席は常に "p1"/"p2"。API 慣習で CPU=player2＝席 "p2"（名前が p1/p2 ならそれを採用）。

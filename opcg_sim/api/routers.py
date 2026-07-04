@@ -254,7 +254,9 @@ async def game_replay(game_id: str):
         return {"success": False, "error": {"code": "REPLAY_NOT_FOUND",
                 "message": "この対局のリプレイ記録がありません（cpu_trace 未指定 or 不明なゲーム）。"}}
     descriptor = {
-        "schema": REPLAY_SCHEMA, "seed": meta.get("seed"),
+        # seed は randrange(2**63) ＝ JS の安全整数(2^53)を超えるため**文字列**で返す。
+        # 数値のまま返すとフロントの JSON.parse で末尾が丸まり、キャプチャからの再現が壊れる。
+        "schema": REPLAY_SCHEMA, "seed": str(meta["seed"]) if meta.get("seed") is not None else None,
         "first_player": meta.get("first_player"), "difficulty": meta.get("difficulty"),
         "cpu_player_id": meta.get("cpu_player_id"),
         "leaders": meta.get("leaders"), "decks": meta.get("decks"),

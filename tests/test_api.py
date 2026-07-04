@@ -243,7 +243,7 @@ def test_replay_capture_and_fetch(client):
     assert r.status_code == 200
     rb = r.json()
     assert rb["success"] is True
-    assert rb["replay"]["schema"] == A.REPLAY_SCHEMA and rb["replay"]["seed"] == 12345
+    assert rb["replay"]["schema"] == A.REPLAY_SCHEMA and rb["replay"]["seed"] == "12345"  # 2^53超対策で文字列
     assert rb["replay"]["leaders"] and rb["replay"]["actions"]
     assert len(rb["decisions"]) == len(meta["decisions"])
 
@@ -268,7 +268,24 @@ def test_replay_capture_learned(client):
     assert "visit_pct" in d0["candidates"][0] and "q" in d0["candidates"][0]  # MCTS root 統計
     assert "l1_move" in d0                                                    # L1 第二意見
     r = client.get(f"/api/game/{gid}/replay")
-    assert r.json()["success"] is True and r.json()["replay"]["seed"] == 777
+    assert r.json()["success"] is True and r.json()["replay"]["seed"] == "777"
+
+
+def test_replay_seed_survives_js_precision(client):
+    """R4: 2^53 超の seed が /replay で**文字列**として返り、往復で値が保存される。
+
+    seed は `random.randrange(2**63)` ＝ JS の Number.MAX_SAFE_INTEGER(2^53-1) を超え得る。
+    数値のまま JSON で返すとフロントの JSON.parse で末尾が丸まり（実対局キャプチャで
+    `…398000` に丸まった実例あり）、リプレイ再現が silently 壊れる。文字列化で桁落ちを塞ぐ。
+    """
+    big = 4792842739303397891               # > 2^53（実対局で丸まった帯域の値）
+    assert big > 2**53
+    body = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="hard",
+                        cpu_trace=True, seed=big).json()
+    rb = client.get(f"/api/game/{body['game_id']}/replay").json()
+    assert rb["success"] is True
+    assert rb["replay"]["seed"] == str(big), "seed が文字列で桁落ちなく返っていない"
+    assert int(rb["replay"]["seed"]) == big  # 再生側は int() で戻す（replay_runner と同じ）
 
 
 def _drive_full_or_cap(client, gid, cap=160):
@@ -311,7 +328,7 @@ def test_replay_api_descriptor_end_to_end(client):
     _drive_full_or_cap(client, gid, cap=160)
 
     rb = client.get(f"/api/game/{gid}/replay").json()
-    assert rb["success"] and rb["replay"]["seed"] == 4242
+    assert rb["success"] and rb["replay"]["seed"] == "4242"
     desc = rb["replay"]
     rec_chosen = [d.get("chosen") for d in rb["decisions"]]
     assert len(rec_chosen) >= 3, "CPU の意思決定が記録されていない"
