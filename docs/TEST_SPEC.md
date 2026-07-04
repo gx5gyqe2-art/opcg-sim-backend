@@ -87,6 +87,9 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 | `tests/test_cpu_puzzles.py` | **CPU 検証基盤（フェーズ0・全変更のゲート）**: 正解手種が既知の局面（致死を取る）＋アクティブドンの線形評価ピン。**2026-06 レビュー収束項（存続）**: A-3・E-1 min ビーム剪定の sort 方向。**【撤去 2026-06-27】** plan-gated 機能のテスト（B-1(a) アイドルドン末端減価／A-1 アンブロッカブル評価／A-2 アーキタイプ依存スケール）は自デッキ勝ち筋プラン全廃に伴い、**B-1(b) カウンター強要（推定カウンター応答モデル）／公開情報ベリーフ更新（手札枚数・トラッシュ）は CPU 評価の L1 単一系統化（profile ベース eval 補正の撤去）に伴い**削除 |
 | `tests/test_cpu_arena.py` | **検証基盤の絶対強度メトリクスの機械健全性**（`tests/harness/cpu_arena.py`）: 凍結ベースライン Elo 変換（勝率→Elo の 0.5→0／単調／対称）・非対称対局＋席交互アリーナ・regret ログ（`cpu_ai.decide_with_regret`＝非負・有限・easy/単一手で 0）。実ゲームは低速なので機械健全性のみ高速・有界に固定 |
 | `tests/test_cpu_replay.py` | **CPU 思考トレースの健全性**（`tests/harness/cpu_replay.py`）: trace は観測専用で手を変えない・RNG 中立（trace 有無で進行が分岐しない）・同一 seed の決定論再現・トレース 4 項目（候補スコア/regret/J値成分/読み筋）の存在と読み筋 PV の有界性 |
+| `tests/test_game_driver.py` | **共通対局ドライバ**（`tests/harness/game_driver.py`・設計⑥）の機械健全性: 同一 seed の決定論・observer 不干渉（観測専用の契約）・席の写像等価（run_one_game/play_game と一致）・`stop_after_decisions` 有界化・**learned(Gen2) 自己対戦の seed 再現** |
+| `tests/test_replay_roundtrip.py` | **実対局リプレイのラウンドトリップ**（`tests/harness/replay_runner.py`）: 録画（人間=private rng・card_id 基準記録）→記述子から再生（人間手注入＋CPU 再 decide）→勝敗・手数・ターン一致＋逆写像 miss=0。hard／**learned(Gen2)**／**coin toss（first_player=random）** の3系統＋リゾルバ単体 |
+| `tests/test_perf_gate.py` | **CPU 性能ゲートの判定ロジック**（`tests/scripts/perf_gate.py`・§5.1）: `evaluate_gate` 純関数（強度不足/レイテンシ超過/失敗局/データ不足→FAIL・理由の蓄積）＋ gen2_*.npz ハッシュの安定性。実対局は回さず高速固定 |
 
 ### 効果メカニクス・対話モデル
 | ファイル | 役割 |
@@ -100,6 +103,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 | `tests/test_on_rest_trigger.py` / `tests/test_on_rest_subject.py` | ON_REST 誘発（このキャラ／任意主語＋自分の/相手の効果で）。アタック宣言・効果レスト両経路 |
 | `tests/test_execute_trash_event_main.py` | EB03-031 トラッシュのイベント【メイン】効果の発動（EXECUTE_MAIN_EFFECT + 対象選択） |
 | `tests/test_char_or_don_mixed.py` | 「キャラかドン合計N枚」の混在選択（CHAR_OR_DON 候補プール） |
+| `tests/test_counter_affordability.py` | **カウンター合法手の支払い可能性**: SELECT_COUNTER がコストを払えないイベントカウンターを提示しない（実デッキ×ランダム自己対戦の property・「ドン!!不足」クラッシュの回帰） |
 
 ### リーダー効果（全137枚）
 | ファイル | 役割 |
@@ -116,6 +120,8 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 |---|---|
 | `tests/scripts/compare_parsers.py` | レガシー vs V2 の全カード差分（退行検知） |
 | `tests/harness/full_card_audit.py` | 全カード構造不変条件検証＋挙動ベースライン生成（`--regen` で更新） |
+| `tests/harness/game_driver.py` | **共通対局ドライバ**（設計⑥ `docs/refactoring_harness_driver.md`）: 統一対局ループ `run_game`（決定論契約＝global random の消費順保存・`first_player` 再現）＋席生成 `make_seat`（random/ai/arena/**learned**・engine 注入で net-vs-net）＋観測専用 observer。全 CPU 検証ハーネスの土台（新計器の追加＝observer 1 個） |
+| `tests/harness/replay_runner.py` | **実対局リプレイヤ**（`docs/replay_verification_plan.md` R1-R3）: 記録記述子（seed＋leaders＋decks＋人間アクション列）から対局を再構築・再生。人間手＝決定論タイブレーク逆引き（`resolve_recorded_action`）・CPU＝再 decide・分岐は `reproduced`/`misses` に記録（サイレント誤再生なし）。API `/replay` 記述子を直接食える |
 | `tests/harness/cpu_selfplay.py` | 決定論的 CPU 対 CPU 自己対戦（効果検証ハーネス）。詳細は §3.1 |
 | `tests/harness/cpu_arena.py` | **CPU 検証基盤の絶対強度メトリクス**（SPEC §2.5.3／強さ=Elo 優先は §2.5.8）: `arena`＝固定参照相手への挑戦者勝率→**凍結ベースライン Elo**（席交互）／`regret`＝greedy regret 集計／**`arena-paired`＝分散低減（antithetic 席ペアリング＋Wilson 区間）で per-decider に情報方針(`--challenger-policy fair/cheat`)・PIMC(`--challenger-pimc K`)・学習ブレンド(`--challenger-blend α`)・予算按分(`--challenger-budget`) を A/B**。実ゲームは低速なので本走は手動/定期実行 |
 | `tests/harness/phase1_sweep.py` | **Phase 1 切り分け実験**（SPEC §2.5.8）: 探索ノブ env（`OPCG_HARD_HORIZON` 等）を設定ごとに別プロセスで `arena-paired`（fair vs cheat）起動し horizon 掃引＋**同一 seed ペア差の符号検定**で「深さが効くか（探索 vs 情報の限界）」を判定。純関数テスト＝`tests/test_phase1_sweep.py` |
@@ -124,6 +130,9 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 | `tests/harness/effect_oracle.py` | 期待 vs テキスト/AST の静的整合性コンパレータ（既存ゲートが拾わない高シグナル候補のみ抽出。`--category`/`--json`） |
 | `tests/harness/structural_invariants.py` | 構造不変条件4スキャン（H先頭ゲート漏れ／Duration write-off／chooser欠落／「すべて」count退化）の一括検出（`--show`）。カテゴリH 横展開の回帰ツール化 |
 | `tests/harness/false_path_coverage.py` | 条件を偽にして発動し、ゲートされた効果が走らない（盤面変化ゼロ）かを動的検証（`--show`/`--card`） |
+| `tests/scripts/arena_parallel.py` | **並列アリーナ**（対照ペア×コア並列・旧 depth/thinktime_arena を統合）: 挑戦者の探索深さ/予算/PIMC/L1係数/**難易度（--challenger-difficulty learned＝Gen2）/sims** を席別に振って Elo A/B。SPSA の f(θ) 評価にも使う |
+| `tests/scripts/perf_gate.py` | **CPU 性能ゲート**（§5.1）: learned(Gen2) vs 凍結 hard(L1) の Elo＋ペア単位 CI・1手レイテンシ・失敗局0・npz ハッシュを1コマンドで PASS/FAIL（`--quick`/`--full`） |
+| `tests/scripts/replay_ambiguity_probe.py` | **実対局リプレイの曖昧性計測**（R0）: 記録アクション（card_id 基準）の一意復元可否を実デッキで実測（`--real-decks`・アクション種別ごとの曖昧率）。報告は `docs/reports/cpu_replay_ambiguity_r0_20260704.md` |
 | `tests/scripts/sample_audit.py` | 各弾から決定的ランダム抽出＋自動スクリーニング＋精査素材出力（§8.4 ✓信頼度の実測。`--per-set`/`--seed`/`--dump`）。報告は `docs/reports/sample_audit_*.md` |
 | `tests/scripts/leader_spec_probe.py` | リーダー1枚のテキスト/AST要約/実行観測の出力（`<ID>`/`--set`/`--all`/`--json`）。手動検証（§8）の補助に使う |
 | `tests/scripts/card_spec_probe.py` | 上記を非リーダー含む全カードに拡張し**弾×色**で絞る（`--set OP16 --color 赤`/`--buckets`/`--type`/`--json`）。デッキを跨いで弾×色バケット単位に検証する起点（§8） |
