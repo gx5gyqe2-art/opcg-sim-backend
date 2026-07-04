@@ -432,13 +432,16 @@ def test_op11_022_leader_cannot_attack():
 # ===========================================================================
 
 def test_op11_040_don8_looks_and_arranges():
-    """OP11-040: 場ドン8枚以上なら上5枚を見て並べ替え（ARRANGE_DECK 対話に入る）。"""
+    """OP11-040: 場ドン8枚以上なら上5枚を見て並べ替え（ARRANGE_DECK 対話に入る）。
+
+    トリガーは TURN_START（ターン開始時誘発）。ここでは能力単体を直接解決して
+    効果本体を検証する（ターン開始時の発火経路は test_turn_start_trigger.py）。"""
     gm, p1, p2, L = build("OP11-040")
     while len(p1.don_active) < 8 and p1.don_rested:
         p1.don_active.append(p1.don_rested.pop())
     while len(p1.don_active) > 8:
         p1.don_active.pop()
-    gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
+    gm.resolve_ability(p1, get_ability(L.master, "TURN_START"), L)
     assert gm.active_interaction is not None
     assert gm.active_interaction.get("action_type") == "ARRANGE_DECK"
     auto_resolve(gm, p1)
@@ -450,7 +453,7 @@ def test_op11_040_don7_no_look():
     while len(p1.don_active) > 7:
         p1.don_active.pop()
     zb = zone_counts(p1)
-    gm.resolve_ability(p1, get_ability(L.master, "ACTIVATE_MAIN"), L)
+    gm.resolve_ability(p1, get_ability(L.master, "TURN_START"), L)
     auto_resolve(gm, p1)
     za = zone_counts(p1)
     # LOOK が走らないので手札は増えない（条件外に出た MOVE_CARD/DECK_BOTTOM は temp 空で no-op）
