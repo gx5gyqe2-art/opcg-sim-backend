@@ -147,6 +147,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 | `tests/scripts/leader_spec_probe.py` | リーダー1枚のテキスト/AST要約/実行観測の出力（`<ID>`/`--set`/`--all`/`--json`）。手動検証（§8）の補助に使う |
 | `tests/scripts/card_spec_probe.py` | 上記を非リーダー含む全カードに拡張し**弾×色**で絞る（`--set OP16 --color 赤`/`--buckets`/`--type`/`--json`）。デッキを跨いで弾×色バケット単位に検証する起点（§8） |
 | `tests/scripts/rl_purepy_probe.py` | **PyPy自己対戦ワーカー投資可否の判定プローブ**: MCTSホットループ（value/policy forward・PUCT選択）を numpy版と純Python版で同型実装し正しさ照合＋CPython計時。1手あたり合成コストの py/np 比から「numpy剥がし＋PyPy で現行を逆転できるか」を数字で判定（`--sims`/`--legal`/`--depth`）。結論=NN行列積は numpy/BLAS が純Pythonを71〜592×圧倒しPyPyでは届かない＝④見送りの根拠 |
+| `tests/scripts/mu_mcts_probe.py` | **make/unmake版MCTS（`tests/harness/az_mcts_tree_mu.py`）の実測プローブ**: ①clone版 `TreeMCTS` とのパリティ（同手・訪問数 max\|ΔN\|=0）②自己対戦の壁時計 ③`GameManager.clone` 呼び出し数を比較（`--sims`/`--positions`/`--bench-games`）。実測=パリティ8/8・sims60で 3.11×高速・clone 98.4%減（探索中0・determinizeの1手1回のみ）。cProfile で自己対戦の79%がcloneだった件（`_apply_move_inplace`＋journal巻き戻しで消す）の効果検証 |
 
 ### 3.1 効果検証ハーネス（CPU 対 CPU 自己対戦）
 
