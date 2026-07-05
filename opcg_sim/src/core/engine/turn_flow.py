@@ -7,6 +7,7 @@ import logging
 from ..journal import JournaledDict, JournaledList, JournaledSet
 from ...models.enums import Phase, TriggerType
 from ..effects.resolver import EffectResolver
+from ._helpers import _nfc
 
 _logger = logging.getLogger("opcg.engine")
 
@@ -96,7 +97,14 @@ def _fire_turn_end_triggers(gm):
             if card and card.master.abilities:
                 for ability in card.master.abilities:
                     if ability.trigger == trig:
-                        gm.resolve_ability(pl, ability, source_card=card)
+                        # 先行トリガーが確認/選択で中断中は即時解決できない（resolver は
+                        # 中断中1ステップも実行せず return し、能力が無言で消える）。
+                        # コスト付きターン終了時は使用確認(CONFIRM_OPTIONAL)で中断するのが
+                        # 常態のため、中断中は誘発待ち行列へ積み、対話完了時に消化する。
+                        if gm.active_interaction:
+                            gm._enqueue_trigger(pl, ability, card, optional=False)
+                        else:
+                            gm.resolve_ability(pl, ability, source_card=card)
 
 def _flush_pending_end_of_turn(gm):
     """end_turn フックで、予約された遅延アクション（このターン終了時、〜）を解決する。"""
@@ -105,6 +113,13 @@ def _flush_pending_end_of_turn(gm):
     pending = gm.pending_end_of_turn
     gm.pending_end_of_turn = JournaledList()
     for player, node, source_card in pending:
+        # ターン終了時トリガーの確認等で中断中は直接実行できない（resolver が中断中は
+        # 1ステップも実行せず return し、遅延アクションが無言で消える）。deferred 継続へ
+        # 退避し、中断解決後に resolve_interaction 末尾が再開する。
+        if gm.active_interaction:
+            gm._defer_resolver_stack(player, source_card, [node],
+                                     {"_flushing_delayed": True})
+            continue
         # 場を離れたカードのソース由来でも、トラッシュ送り等は対象解決時に弾かれる。
         resolver = EffectResolver(gm)
         resolver.context["_flushing_delayed"] = True
@@ -130,11 +145,53 @@ def switch_turn(gm):
     if getattr(gm, "pending_extra_turn", None) == gm.turn_player.name:
         gm.pending_extra_turn = None
         gm.turn_count += 1
-        gm.refresh_phase()
+        _begin_turn(gm)
         return
     gm.turn_player, gm.opponent = gm.opponent, gm.turn_player
     gm.turn_count += 1
-    gm.refresh_phase()
+    _begin_turn(gm)
+
+def _begin_turn(gm):
+    """ターン開始処理。ターン開始時誘発（TURN_START）はリフレッシュフェイズ**前**に
+    解決する（OP11-040 の山札5枚は通常ドロー前の5枚）。誘発の確認/効果解決が対話で
+    中断する間（先行するターン終了時誘発の中断も含む）はリフレッシュ以降を保留し、
+    全対話の完了時に resolve_interaction が refresh_phase を再開する。"""
+    gm._fire_turn_start_triggers()
+    if not gm.active_interaction and not gm._pending_triggers:
+        gm.refresh_phase()
+        return
+    gm._advance_pending_triggers()
+    if gm.active_interaction or gm._pending_triggers:
+        gm.turn_start_pending = True
+    else:
+        gm.refresh_phase()
+
+def _fire_turn_start_triggers(gm):
+    """【自分のターン開始時】誘発（TURN_START。OP11-040）を待ち行列へ積む。
+
+    公式裁定に合わせ、条件（「自分の場のドン!!が8枚以上ある場合」等）は**ドン!!展開前**
+    （ターン開始時点）で判定する。ここで満たさなければ積まない。任意（「発動できる」）は
+    CONFIRM_TRIGGER の確認を挟む（_advance_pending_triggers が処理）。確認・効果解決の
+    対話はリフレッシュ/ドロー/ドン!!展開の完了後（アクション境界/対話完了時）に立つ。"""
+    pl = gm.turn_player
+    units = [pl.leader] + list(pl.field)
+    if pl.stage:
+        units.append(pl.stage)
+    for card in units:
+        if not card or not card.master.abilities:
+            continue
+        for ability in card.master.abilities:
+            if ability.trigger != TriggerType.TURN_START:
+                continue
+            if ability.condition is not None:
+                try:
+                    if not EffectResolver(gm)._check_condition(pl, ability.condition, card):
+                        continue
+                except Exception:
+                    _logger.debug("TURN_START 条件評価に失敗（スキップ）", exc_info=True)
+                    continue
+            optional = _nfc("発動できる") in _nfc(getattr(ability, "raw_text", "") or "")
+            gm._enqueue_trigger(pl, ability, card, optional=optional)
 
 def refresh_phase(gm):
     gm._reset_player_status(gm.opponent); gm.refresh_all(gm.turn_player); gm.draw_phase()

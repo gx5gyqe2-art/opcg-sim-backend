@@ -203,7 +203,7 @@ class CardLoader:
 
     # --- パース結果キャッシュ（ビルド時生成・起動高速化） -------------------
     # CardMaster/パーサの構造を非互換に変えたら必ず +1 する（古いキャッシュを失効させる）。
-    CACHE_VERSION = 1
+    CACHE_VERSION = 2  # 2: ターン開始時トリガー（TURN_START）の写像追加（OP11-040）
 
     def db_hash(self) -> str:
         """カードDB(json)の内容ハッシュ。キャッシュ整合性チェックに使う。"""

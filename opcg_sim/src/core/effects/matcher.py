@@ -532,7 +532,12 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         if dynamic_cost_max is not None and card.current_cost > dynamic_cost_max: continue
 
         # 「元々のパワー」指定は印刷時パワー（master.power）で判定。それ以外は現在パワー。
-        _pow = (card.master.power or 0) if "ORIGINAL_POWER" in query.flags else card.get_power(True)
+        # 付与ドン!!の +1000/枚 はそのカードの持ち主のターン中のみ有効（get_power の
+        # is_my_turn）。従来は一律 True で、相手ターン中に付与ドンを持つキャラが
+        # 「パワーN以下」の対象から誤って外れていた（神の裁き OP15-075 の KO 等）。
+        _don_turn = (game_manager.turn_player is not None
+                     and card.owner_id == game_manager.turn_player.name)
+        _pow = (card.master.power or 0) if "ORIGINAL_POWER" in query.flags else card.get_power(_don_turn)
         if query.power_max is not None and _pow > query.power_max: continue
         if query.power_min is not None and _pow < query.power_min: continue
 

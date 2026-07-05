@@ -903,6 +903,10 @@ class EffectParser:
         置換条件「KOされる時/場合」は『された』(過去) と区別され誤検出しない。
         「登場した時」は OP13-100/OP14-041 等が YOUR_TURN ロック挙動を前提にするため対象外。
         """
+        # ターン開始時誘発（「自分のターン開始時、発動できる。」OP11-040）。文頭のみ＝
+        # 「次の自分のターン開始時まで」（期間表現）を誤検出しない。
+        if re.match(_nfc(r'(自分の)?ターン開始時、'), norm_text):
+            return TriggerType.TURN_START
         # 相手ライフへのダメージ誘発（「このリーダーのアタックによって、相手のライフにダメージを与えた時」）
         if re.search(_nfc(r'ライフに.{0,8}ダメージを与えた時'), norm_text):
             return TriggerType.ON_DAMAGE_DEALT_TO_LIFE
