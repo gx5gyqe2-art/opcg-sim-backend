@@ -297,7 +297,14 @@ def test_arrange_deck_enumerates_top_bottom_choice():
 
 
 def test_encoder_no_drift():
-    """製品コピーの符号化が訓練時(tests)と厳密一致＝netへ同じ入力を与える（v1/v2 とも）。"""
+    """製品コピーの符号化が訓練時(tests)と厳密一致＝netへ同じ入力を与える（v1/v2 とも）。
+
+    注（重複解消後）: `tests/harness/rl_encoder.py` は本番 `opcg_sim.src.learned.encoder` への
+    委譲shim（`sys.modules[__name__] = _m`）＝ TEST_E は PROD_E と**同一オブジェクト**になり、
+    ドリフトは構造的に不可能。本テストの意図は「ドリフト検出」から「ドリフト不能（=単一の正に
+    統一されている）ことの確認」に変わったが、退行検知（誰かが再度2コピー化した場合に落ちる）
+    の回帰ガードとして意味があるため削除しない。
+    """
     m = _game(5); name, _ = _actor(m)
     vocab_t = TEST_E.build_vocab(_load_db())
     vocab_p = PROD_E.build_vocab(_load_db())
@@ -408,6 +415,10 @@ def test_warm_start_rejects_shrink_and_supports_future_versions():
 
 
 def test_action_features_no_drift():
+    """注（重複解消後）: `opcg_action.py` は本番 `opcg_sim.src.learned.action` への委譲shim＝
+    TEST_A と本番は同一オブジェクトでドリフトは構造的に不可能。退行検知として残す（上の
+    test_encoder_no_drift と同じ理由）。
+    """
     m = _game(6); name, actor = _actor(m)
     legal = m.get_legal_actions(actor)
     at = TEST_A.legal_action_matrix(m, legal, name)

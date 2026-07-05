@@ -29,10 +29,11 @@ _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)
 import _bootstrap  # noqa: E402,F401
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.core.cpu_learned import warm_start_value, warm_start_policy, _net_enc_version
+from opcg_sim.src.learned.config import SELFPLAY_SIMS, SELFPLAY_DIRICHLET_EPS, SELFPLAY_TEMP_MOVES
 import rl_encoder as E
 import rl_net as RN
 from az_policy import PolicyScorer, state_context, train_policy
-from az_mcts_tree import TreeMCTS
+from az_mcts_tree import TreeMCTS   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
 from opcg_action import legal_action_matrix, ACTION_DIM
 from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
@@ -162,7 +163,7 @@ def _gen_task(payload):
             enc = E.encode(m, name, vocab, version=ev)
             rv.append((enc, name))
             rp.append((state_context(m, name, vocab, version=ev), legal_action_matrix(m, legal, name), N / N.sum()))
-            a = int(np.argmax(N)) if steps >= 8 else int(rng.choice(len(N), p=(N / N.sum())))
+            a = int(np.argmax(N)) if steps >= SELFPLAY_TEMP_MOVES else int(rng.choice(len(N), p=(N / N.sum())))
             try:
                 cpu_ai._apply_move_inplace(m, name, legal[a])
             except Exception:
@@ -201,13 +202,13 @@ def selfplay_shard(pool, workers, n_games, sims, eps, vpath, ppath, base_seed, e
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--shard-games", type=int, default=60)
-    ap.add_argument("--sims", type=int, default=40)
+    ap.add_argument("--sims", type=int, default=SELFPLAY_SIMS)
     ap.add_argument("--max-shards", type=int, default=4)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--target", type=int, default=TARGET_DEFAULT)
     ap.add_argument("--lr", type=float, default=5e-4)
     ap.add_argument("--buffer", type=int, default=30000)
-    ap.add_argument("--dirichlet-eps", type=float, default=0.25)
+    ap.add_argument("--dirichlet-eps", type=float, default=SELFPLAY_DIRICHLET_EPS)
     ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2),
                     help="符号化世代（必須・版はこの引数のみで決まる。1=出荷Gen2互換／"
                          "2=リーダー付与ドン特徴）")

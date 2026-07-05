@@ -21,8 +21,9 @@ import os as _os, sys as _sys  # noqa: E402  test bootstrap (sys.path + google s
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
 from opcg_sim.src.core import cpu_ai
+from opcg_sim.src.learned.config import SELFPLAY_TEMP_MOVES
 from opcg_game import OPCGGame
-from az_mcts_tree import TreeMCTS
+from az_mcts_tree import TreeMCTS   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
 import rl_encoder as E
 import rl_net as RN
 from az_policy import PolicyScorer, state_context, train_policy
@@ -62,8 +63,8 @@ def _sample(counts, rng, temp):
 
 
 # ---- 自己対戦でデータ採取 ----
-def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_moves=8, max_steps=400,
-                  enc_version=1, leaders=None):
+def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_moves=SELFPLAY_TEMP_MOVES,
+                  max_steps=400, enc_version=1, leaders=None):
     m = game.new_game(db=_DB, seed=int(rng.integers(1 << 30)), leaders=leaders)
     val_recs, pol_recs = [], []   # (enc, who) / (ctx, am, visit, who)
     steps = 0
