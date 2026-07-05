@@ -96,13 +96,17 @@ def play_one(game, m, agentA_is_p1, sl_act, l1_factory, rng, max_steps=400):
     return game.winner(m)
 
 
-def match(game, db, sl_act, l1_factory, pairs, seed0=2000, log=print):
-    """CRN: 各seedで SL=p1/L1=p2 と SL=p2/L1=p1 の2戦。SL視点 W/D/L。"""
+def match(game, db, sl_act, l1_factory, pairs, seed0=2000, log=print, leaders=None):
+    """CRN: 各seedで SL=p1/L1=p2 と SL=p2/L1=p1 の2戦。SL視点 W/D/L。
+
+    `leaders` 指定時は new_game のリーダーローテーション（全リーダー抽選＋リアルデッキ）を使う。
+    未指定は従来の固定リーダー＝後方互換。
+    """
     res = {"sl_win": 0, "draw": 0, "sl_loss": 0}
     for i in range(pairs):
         seed = seed0 + i
         for sl_is_p1 in (True, False):
-            m = game.new_game(db, seed)
+            m = game.new_game(db, seed, leaders=leaders)
             rng = np.random.default_rng(seed * 7 + (0 if sl_is_p1 else 1))
             w = play_one(game, m, sl_is_p1, sl_act, l1_factory, rng)
             if w is None:
