@@ -70,3 +70,36 @@ def test_state_context_dim():
     m = game.new_game(db, 4)
     ctx = state_context(m, game.current_player(m), vocab)
     assert ctx.shape == (E.feature_dim(),), "状態文脈の次元が feature_dim と不一致"
+
+
+def test_new_game_leader_rotation_uses_pool_and_realistic_decks():
+    """穴B: new_game(leaders=...) は指定プールから両席のリーダーを抽選し、リアルデッキで組む。
+
+    固定1リーダーのミラー戦だと【ドン‼×1】系リーダー効果（OP11-041 ナミの防御+2000 等）が
+    自己対戦データに一度も現れず、v2 再学習でも学べない。ローテーションで盤面分布を広げる。
+    """
+    from deckgen import all_leader_ids
+    db = _load_db(); game = OPCGGame()
+    pool = all_leader_ids(db)
+    assert len(pool) > 1
+    # 同一 seed は決定論（CRN）。
+    m_a = game.new_game(db, 7, leaders=pool)
+    m_b = game.new_game(db, 7, leaders=pool)
+    assert m_a.p1.leader.master.card_id == m_b.p1.leader.master.card_id
+    assert m_a.p2.leader.master.card_id == m_b.p2.leader.master.card_id
+    # 抽選されたリーダーはプール内。デッキは50枚（リアルデッキ）。
+    assert m_a.p1.leader.master.card_id in pool
+    assert m_a.p2.leader.master.card_id in pool
+    # seed を変えるとリーダー組み合わせが分布する（複数 seed で2種以上の p1 リーダー）。
+    seen = {game.new_game(db, s, leaders=pool).p1.leader.master.card_id for s in range(12)}
+    assert len(seen) >= 2, "リーダーが分布していない（ローテーション不発）"
+
+
+def test_new_game_default_is_backward_compatible():
+    """leaders 未指定は従来挙動（build_deck・先頭リーダー固定）＝既存テスト/スモーク互換。"""
+    db = _load_db(); game = OPCGGame()
+    a = game.new_game(db, 3)
+    b = game.new_game(db, 3)
+    assert a.p1.leader.master.card_id == b.p1.leader.master.card_id
+    # 未指定では両席とも同一（先頭）リーダー＝従来のミラー。
+    assert a.p1.leader.master.card_id == a.p2.leader.master.card_id

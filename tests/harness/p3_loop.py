@@ -62,8 +62,8 @@ def _sample(counts, rng, temp):
 
 # ---- 自己対戦でデータ採取 ----
 def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_moves=8, max_steps=400,
-                  enc_version=1):
-    m = game.new_game(db=_DB, seed=int(rng.integers(1 << 30)))
+                  enc_version=1, leaders=None):
+    m = game.new_game(db=_DB, seed=int(rng.integers(1 << 30)), leaders=leaders)
     val_recs, pol_recs = [], []   # (enc, who) / (ctx, am, visit, who)
     steps = 0
     while game.winner(m) is None and not game.is_terminal(m) and steps < max_steps:
@@ -91,12 +91,13 @@ def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_move
     return val_recs, pol_recs, winner
 
 
-def generate(game, value_fn, priors_fn, vocab, n_games, sims, c_puct, rng, log=print, enc_version=1):
+def generate(game, value_fn, priors_fn, vocab, n_games, sims, c_puct, rng, log=print, enc_version=1,
+             leaders=None):
     S, F, I, Y = [], [], [], []
     pol = []
     for g in range(n_games):
         vr, pr, w = selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng,
-                                  enc_version=enc_version)
+                                  enc_version=enc_version, leaders=leaders)
         if w is None:
             continue
         for enc, who in vr:
@@ -137,11 +138,11 @@ def _agent(game, vnet, pnet, vocab, sims, c_puct, enc_version=1):
     return act
 
 
-def cross_eval(game, agentA, agentB, pairs, seed0=3000):
+def cross_eval(game, agentA, agentB, pairs, seed0=3000, leaders=None):
     res = {"a_win": 0, "draw": 0, "a_loss": 0}
     for i in range(pairs):
         for a_is_p1 in (True, False):
-            m = game.new_game(_DB, seed0 + i)
+            m = game.new_game(_DB, seed0 + i, leaders=leaders)
             rng = np.random.default_rng((seed0 + i) * 7 + (0 if a_is_p1 else 1))
             steps = 0
             while game.winner(m) is None and not game.is_terminal(m) and steps < 400:
@@ -181,12 +182,20 @@ def main():
     ap.add_argument("--c-puct", type=float, default=1.5)
     ap.add_argument("--enc-version", type=int, default=1, choices=(1, 2),
                     help="符号化世代（2=リーダー付与ドン特徴。v2 は Gen0 から学習し直す）")
+    ap.add_argument("--rotate-leaders", action="store_true",
+                    help="自己対戦のリーダーを全リーダーから抽選＋リアルデッキ化（穴B: 分布多様化）")
     args = ap.parse_args()
 
     _DB = _load_db()
     vocab = E.build_vocab(_DB)
     game = OPCGGame()
     rng = np.random.default_rng(0)
+
+    leaders = None
+    if args.rotate_leaders:
+        from deckgen import all_leader_ids
+        leaders = all_leader_ids(_DB)
+        print(f"リーダーローテーション ON: {len(leaders)} 種から抽選", flush=True)
 
     # Gen0: value=SL net(or 乱数)・policy=uniform(None)。
     if args.sl_net:
@@ -208,7 +217,7 @@ def main():
         vdata, pol = generate(game, value_fn_of(vnet, vocab, args.enc_version),
                               priors_fn_of(pnet, vocab, args.enc_version),
                               vocab, args.games, args.sims, args.c_puct, rng,
-                              enc_version=args.enc_version)
+                              enc_version=args.enc_version, leaders=leaders)
         if vdata is None:
             print("データ0（全局未決着）"); return 1
         nv, npnet = train_generation(vocab, vdata, pol, seed=g, enc_version=args.enc_version)
@@ -216,7 +225,7 @@ def main():
         # クロス評価: 新世代 vs 直前世代。
         a_new = _agent(game, nv, npnet, vocab, args.sims, args.c_puct, args.enc_version)
         a_old = _agent(game, vnet, pnet, vocab, args.sims, args.c_puct, args.enc_version)
-        r = cross_eval(game, a_new, a_old, args.eval_pairs)
+        r = cross_eval(game, a_new, a_old, args.eval_pairs, leaders=leaders)
         wr = (r["a_win"] + 0.5 * r["draw"]) / r["games"]
         print(f"Gen{g+1} vs Gen{g}: 勝率={wr:.3f} {r}  ({time.perf_counter()-t0:.0f}s)", flush=True)
     if args.smoke:
