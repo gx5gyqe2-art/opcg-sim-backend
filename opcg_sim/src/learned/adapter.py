@@ -12,12 +12,13 @@ import math
 
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.core.gamestate import GameManager, Player
+from .config import VALUE_SCALE
 
 
 class OPCGGame:
     # L1 生スコアは card-currency で桁が大きい（実測 中央 ~-5800・範囲[-11920,7091]）。
     # scale=10000 で tanh 飽和率0%・std0.25＝探索が勾配を使える値域（GATE B 診断で較正）。
-    def __init__(self, value_scale=10000.0, see_opp_hand=False):
+    def __init__(self, value_scale=VALUE_SCALE, see_opp_hand=False):
         self.value_scale = value_scale
         self.see_opp_hand = see_opp_hand
 

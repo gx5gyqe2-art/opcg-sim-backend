@@ -23,6 +23,7 @@ from opcg_sim.src.learned.policy import PolicyScorer, state_context
 from opcg_sim.src.learned.action import legal_action_matrix
 from opcg_sim.src.learned.adapter import OPCGGame
 from opcg_sim.src.learned.mcts import TreeMCTS
+from opcg_sim.src.learned.config import C_PUCT, SERVE_SIMS, SERVE_DIRICHLET_EPS
 from opcg_sim.src.utils.loader import CardLoader
 
 _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -139,7 +140,7 @@ class LearnedEngine:
                     f"value/policy の符号化世代が不一致（value=v{self.enc_version}, "
                     f"policy ctx_dim={pv}）: 同一世代の npz ペアを配置してください")
 
-    def decide(self, manager, player, sims: int = 160, c_puct: float = 1.5,
+    def decide(self, manager, player, sims: int = SERVE_SIMS, c_puct: float = C_PUCT,
                rng=None, trace=None) -> Optional[Dict[str, Any]]:
         """このエンジンのネットで 1 手決定する（`decide_learned` と同一契約・同一探索）。"""
         name = player.name
@@ -150,7 +151,7 @@ class LearnedEngine:
             rng = np.random.default_rng(_random.getrandbits(64))
         mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab, self.enc_version),
                         priors_fn=_priors_fn(self.pnet, self.vocab, self.enc_version),
-                        c_puct=c_puct, n_sims=sims,
+                        c_puct=c_puct, n_sims=sims, dirichlet_eps=SERVE_DIRICHLET_EPS,
                         determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=rng)
         move, _, legal = mcts.run(manager)
         # 同名カードの別実体（手札の複製等）は探索木で別 edge になり訪問数が分裂する。
@@ -188,7 +189,7 @@ def _lazy_init():
     _default_engine()
 
 
-def decide_learned(manager, player, sims: int = 160, c_puct: float = 1.5,
+def decide_learned(manager, player, sims: int = SERVE_SIMS, c_puct: float = C_PUCT,
                    rng=None, trace=None) -> Optional[Dict[str, Any]]:
     """学習型CPUの1手決定（本番既定 CPU 経路）。返り値は `decide_guarded` 互換（move 辞書 or None）。
 

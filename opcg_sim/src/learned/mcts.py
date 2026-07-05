@@ -14,6 +14,8 @@ import math
 
 import numpy as np
 
+from .config import C_PUCT, DIRICHLET_ALPHA
+
 
 class _Node:
     __slots__ = ("state", "to_move", "legal", "P", "N", "W",
@@ -33,8 +35,8 @@ class _Node:
 
 
 class TreeMCTS:
-    def __init__(self, game, value_fn, priors_fn=None, c_puct=1.5, n_sims=100,
-                 determinize_fn=None, rng=None, dirichlet_alpha=0.3, dirichlet_eps=0.0):
+    def __init__(self, game, value_fn, priors_fn=None, c_puct=C_PUCT, n_sims=100,
+                 determinize_fn=None, rng=None, dirichlet_alpha=DIRICHLET_ALPHA, dirichlet_eps=0.0):
         self.game = game
         self.value_fn = value_fn
         self.priors_fn = priors_fn         # (state, legal)->np.array|None（None=一様）

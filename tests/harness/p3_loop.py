@@ -21,6 +21,7 @@ import os as _os, sys as _sys  # noqa: E402  test bootstrap (sys.path + google s
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
 from opcg_sim.src.core import cpu_ai
+from opcg_sim.src.learned.config import SELFPLAY_TEMP_MOVES
 from opcg_game import OPCGGame
 # 探索実装の選択（OPCG_MU_MCTS=1 で make/unmake版＝clone廃止・自己対戦~3×高速／既定は従来clone版）。
 # 両者 run(state)->(move,N,legal) 同一API のドロップイン。パリティ/coherence は mu_mcts_probe.py 参照。
@@ -67,8 +68,8 @@ def _sample(counts, rng, temp):
 
 
 # ---- 自己対戦でデータ採取 ----
-def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_moves=8, max_steps=400,
-                  enc_version=1, leaders=None):
+def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_moves=SELFPLAY_TEMP_MOVES,
+                  max_steps=400, enc_version=1, leaders=None):
     m = game.new_game(db=_DB, seed=int(rng.integers(1 << 30)), leaders=leaders)
     val_recs, pol_recs = [], []   # (enc, who) / (ctx, am, visit, who)
     steps = 0
