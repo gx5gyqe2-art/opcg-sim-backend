@@ -22,7 +22,12 @@ _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)
 import _bootstrap  # noqa: E402,F401
 from opcg_sim.src.core import cpu_ai
 from opcg_game import OPCGGame
-from az_mcts_tree import TreeMCTS
+# 探索実装の選択（OPCG_MU_MCTS=1 で make/unmake版＝clone廃止・自己対戦~3×高速／既定は従来clone版）。
+# 両者 run(state)->(move,N,legal) 同一API のドロップイン。パリティ/coherence は mu_mcts_probe.py 参照。
+if _os.environ.get("OPCG_MU_MCTS") == "1":
+    from az_mcts_tree_mu import TreeMCTSMakeUnmake as TreeMCTS
+else:
+    from az_mcts_tree import TreeMCTS
 import rl_encoder as E
 import rl_net as RN
 from az_policy import PolicyScorer, state_context, train_policy

@@ -6,9 +6,18 @@
 （製品α-βの `cpu_ai._recurse_child` と同一パターン＝`test_cpu_make_unmake.py` で clone 同値を実証済み）。
 クローンは determinize の 1手1回だけ（探索中は0）。訪問数 N/W はゲーム状態外の numpy 配列なので巻き戻し不変。
 
-API は `TreeMCTS` と同じ（drop-in 比較用）: run(real_state) -> (best_move, N[K], legal[K])。
+RNG 一貫性（重要）: 確率効果（デッキ再シャッフル等）は探索中の apply でグローバル `random` を消費するが
+journal は RNG を巻き戻さない。素の再適用だと「訪問ごとに引き直し」でノード統計が崩れる。そこで run() が
+**各シミュレーション冒頭でグローバル `random` を基準状態へ戻す**ため、木では経路が一意→ノードのエッジ apply は
+毎回同一 RNG から始まり**エッジごと固定（coherent）**＝clone版（子状態キャッシュ）と同一意味論になる。
+検証: 確率を消費しない局面では clone版と **bit 一致**（`mu_mcts_probe.py` パリティ max|ΔN|=0）、確率局面でも
+**エッジ単位の apply 後盤面が探索内で一貫**（不一致 0）。確率遷移の乱数実現は clone版と独立（同一サンプリング
+方式・別 seed 相当）＝分布は同一で bit 一致ではない。
+
+API は `TreeMCTS` と同じ（drop-in 差し替え可）: run(real_state) -> (best_move, N[K], legal[K])。
 """
 import math
+import random
 
 import numpy as np
 
@@ -54,8 +63,17 @@ class TreeMCTSMakeUnmake:
         if self.de > 0.0 and len(root.legal) > 1:
             noise = self.rng.dirichlet([self.da] * len(root.legal))
             root.P = (1 - self.de) * root.P + self.de * noise
+        # 確率効果（デッキ再シャッフル等）は探索中の apply でグローバル `random` を消費するが、
+        # journal はゲーム状態しか巻き戻さない（RNG は戻らない）。素の再適用だと「訪問ごとに引き直し」
+        # になりノード統計の意味が崩れる（clone版は子状態をキャッシュ＝エッジごと固定）。そこで
+        # **各シミュレーションの冒頭でグローバル `random` を基準状態へ戻す**と、あるノードに至る経路は
+        # 木では一意なので、そのノードから出るエッジの apply は毎回同一 RNG から始まる＝**エッジごと固定**
+        # （coherent・clone版と同一意味論）。確率を消費しない局面ではリセットは no-op＝clone と bit 一致。
+        base_rng_state = random.getstate()
         for _ in range(self.n_sims):
+            random.setstate(base_rng_state)
             self._simulate(root, mgr)
+        random.setstate(base_rng_state)   # 探索の RNG 消費を実ゲームへ漏らさない（決定論・再現性）
         best = int(np.argmax(root.N))
         return root.legal[best], root.N, root.legal
 

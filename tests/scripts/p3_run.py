@@ -32,7 +32,12 @@ from opcg_sim.src.core.cpu_learned import warm_start_value, warm_start_policy, _
 import rl_encoder as E
 import rl_net as RN
 from az_policy import PolicyScorer, state_context, train_policy
-from az_mcts_tree import TreeMCTS
+# 探索実装の選択（OPCG_MU_MCTS=1 で make/unmake版＝clone廃止・自己対戦~3×高速／既定は従来clone版）。
+# 両者 run(state)->(move,N,legal) 同一API のドロップイン。パリティ/coherence は mu_mcts_probe.py 参照。
+if _os.environ.get("OPCG_MU_MCTS") == "1":
+    from az_mcts_tree_mu import TreeMCTSMakeUnmake as TreeMCTS
+else:
+    from az_mcts_tree import TreeMCTS
 from opcg_action import legal_action_matrix, ACTION_DIM
 from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
