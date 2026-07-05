@@ -136,6 +136,7 @@ def _flush_pending_end_of_turn(gm):
                 "card_name": source_card.master.name,
                 "action": ev.get("action", ""), "targets": ev.get("targets", []),
                 "value": ev.get("value"), "success": ev.get("success", True),
+                **({"dest": ev["dest"]} if ev.get("dest") else {}),   # 移動系の行き先（additive）
             })
 
 def switch_turn(gm):

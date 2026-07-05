@@ -703,6 +703,9 @@ class GameManager:
                 "targets": ev.get("targets", []),
                 "value": ev.get("value"),
                 "success": ev.get("success", True),
+                # 移動系の行き先（"LIFE"/"HAND" 等・無い action は省略）。フロントの
+                # eventLog が「ライフに加えた」等の意味を表示するために使う（additive）。
+                **({"dest": ev["dest"]} if ev.get("dest") else {}),
             })
 
     # 除去保護（PREVENT_LEAVE）の判定。除去が起こる瞬間に、対象カードの

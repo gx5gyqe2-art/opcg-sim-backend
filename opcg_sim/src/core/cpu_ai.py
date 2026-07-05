@@ -656,6 +656,36 @@ def _selection_moves(manager, actor_name: str):
         return [{"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": accept},
                 {"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": decline}]
 
+    # 並び替え/上下選択（ARRANGE_DECK）: 従来は既定解決1手のみ＝底送りの順番・scry の上/下を
+    # 探索できなかった。全順列は爆発するため「どのカードを先頭（＝配置順の1枚目）にするか」の
+    # 回転 × 上/下（allow_position 時）だけを候補化する。返り値は**既定解決を含む完全な集合**
+    # （L1 経路は本関数の返りで合法手を置換するため）。既定の組は base と同一 payload にする＝
+    # merged_search_actions のキー重複除去で二重 edge にならない（訪問数を分裂させない）。
+    if pending.get(KEY_ACTION) == "ARRANGE_DECK":
+        uuids = list(pending.get(KEY_UUIDS, []) or [])
+        allow_pos = bool(pending.get("allow_position", False))
+        allow_reorder = bool(pending.get("allow_reorder", False))
+        if not uuids or not (allow_pos or (allow_reorder and len(uuids) >= 2)):
+            return None
+        base = manager.default_interaction_payload(pending)
+
+        def _mk_arr(order, position):
+            payload = dict(base)
+            if order is not None:            # None＝既定の並び（base の selected をそのまま）
+                payload["selected_uuids"] = list(order)
+            if position is not None:
+                payload["position"] = position
+            return {"kind": "game", "action_type": action_api.ACT_RESOLVE_SELECTION, "payload": payload}
+
+        orders: List[Optional[List[str]]] = [None]
+        if allow_reorder and len(uuids) >= 2:
+            # 先頭カードの回転のみ（uuids[0] 先頭＝既定の並びは None が代表）。
+            orders += [[u] + [v for v in uuids if v != u] for u in uuids[1:HARD_SELECT_CAP]]
+        # 既定 payload の position は "BOTTOM"（上下選択なしの効果は resolve 側が fixed を適用）。
+        positions = ["BOTTOM", "TOP"] if allow_pos else [None]
+        moves = [_mk_arr(o, p) for o in orders for p in positions]
+        return moves if len(moves) >= 2 else None
+
     if pending.get(KEY_ACTION) != _SELECT_ACTION:
         return None
     uuids = list(pending.get(KEY_UUIDS, []) or [])
@@ -712,20 +742,26 @@ def merged_search_actions(manager, actor_name: str, base_moves: List[Dict[str, A
     if not alts:
         return base_moves
 
-    def _k(m):
-        p = m.get("payload") or {}
-        su = p.get("selected_uuids")
-        su = tuple(su) if isinstance(su, (list, tuple)) else su
-        return (m.get("action_type"), su, p.get("accepted"), p.get("index"))
-
     out = list(base_moves)
-    seen = {_k(m) for m in out}
+    seen = {_selection_merge_key(m) for m in out}
     for m in alts:
-        k = _k(m)
+        k = _selection_merge_key(m)
         if k not in seen:
             seen.add(k)
             out.append(m)
     return out
+
+
+def _selection_merge_key(move: Dict[str, Any]):
+    """`merged_search_actions` の重複判定キー（uuid 基準・同一 payload の二重併合を防ぐ）。
+
+    position を含める: TOP/BOTTOM だけが違う代替手を将来生成したとき、誤って同一視して
+    間引かないため（従来キーは position 欠落＝潜在の取りこぼし地雷だった）。
+    """
+    p = move.get("payload") or {}
+    su = p.get("selected_uuids")
+    su = tuple(su) if isinstance(su, (list, tuple)) else su
+    return (move.get("action_type"), su, p.get("accepted"), p.get("index"), p.get("position"))
 
 
 def _consumes_hand_card(manager, actor_name: str, move: Dict[str, Any]) -> bool:
@@ -1220,7 +1256,27 @@ def _describe_move(manager, move: Optional[Dict[str, Any]]) -> Optional[Dict[str
             v = extra.get(k)
         if v is not None:
             d[k] = v
+    # 任意効果の「見送り」(accepted=False) を明示する。accept 側は既定（多くの選択 payload が
+    # accepted=True を機械的に含む）ため出力しない＝旧録画（accepted 無し）と同キーで照合できる。
+    # 載せないと CONFIRM_OPTIONAL の accept/decline が同一記述に潰れ、トレースで区別不能だった。
+    acc = payload.get("accepted")
+    if acc is None:
+        acc = extra.get("accepted")
+    if acc is False:
+        d["accepted"] = False
     return d
+
+
+def _move_equiv_key(manager, move: Optional[Dict[str, Any]]):
+    """手の挙動等価キー（`_describe_move` と同じ card_id 基準の同一視）。
+
+    同名カードの別実体（手札の複製など）は同キー＝等価とみなす。リプレイの逆写像
+    （`replay_runner._key`）と同じ仮定で、学習CPUのルート訪問数マージが使う。
+    """
+    d = _describe_move(manager, move) or {}
+    return (d.get("action_type"), d.get("card"), tuple(d.get("targets") or ()),
+            tuple(d.get("selected") or ()), d.get("index"), d.get("position"),
+            d.get("accepted"))
 
 
 def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_only: bool,
