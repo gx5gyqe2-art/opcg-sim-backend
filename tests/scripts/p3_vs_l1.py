@@ -23,6 +23,7 @@ import rl_net as RN
 from az_policy import PolicyScorer
 from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
+from opcg_sim.src.core.cpu_learned import _net_enc_version
 import p3_loop as P
 import p2_gen0 as P2
 
@@ -55,6 +56,9 @@ def main():
     ap.add_argument("--sims", type=int, default=160)
     ap.add_argument("--pimc", type=int, default=4)
     ap.add_argument("--c-puct", type=float, default=1.5)
+    ap.add_argument("--rotate-leaders", action="store_true",
+                    help="評価対局のリーダーを全リーダーから抽選＋リアルデッキ化"
+                         "（p3_run --rotate-leaders で学習した場合は分布を揃えるため指定推奨）")
     args = ap.parse_args()
 
     ensure_wt()
@@ -64,15 +68,24 @@ def main():
     vnet = RN.ValueNet.load(CK + f"/gen{args.gen}_value.npz")
     pnet_path = CK + f"/gen{args.gen}_policy.npz"
     pnet = PolicyScorer.load(pnet_path) if os.path.exists(pnet_path) else None
-    print(f"Gen{args.gen} net ロード（policy={'あり' if pnet else 'なし(uniform)'}）", flush=True)
+    # 符号化世代はロードした重みの入力次元から自動判別する（p3_run.load_nets/LearnedEngine と
+    # 同じ真実源）。CLIフラグにしない＝チェックポイントの実際の次元と食い違えない。
+    ev = _net_enc_version(vnet)
+    print(f"Gen{args.gen} net ロード（enc=v{ev}・policy={'あり' if pnet else 'なし(uniform)'}）", flush=True)
 
-    gen_act = P._agent(game, vnet, pnet, vocab, args.sims, args.c_puct)
+    leaders = None
+    if args.rotate_leaders:
+        from deckgen import all_leader_ids
+        leaders = all_leader_ids(db)
+        print(f"リーダーローテーション ON: {len(leaders)} 種", flush=True)
+
+    gen_act = P._agent(game, vnet, pnet, vocab, args.sims, args.c_puct, ev)
     l1_factory = lambda: P2.l1_agent_factory("hard", args.pimc)
     print(f"=== Gen{args.gen}+MCTS(sims={args.sims}) vs 製品L1+α-β(pimc={args.pimc}) "
           f"CRN {args.pairs}ペア×2={args.pairs*2}戦 ===", flush=True)
     print(f"（比較基準: P2の SL/Gen0 vs L1 = 0.450）", flush=True)
     t0 = time.perf_counter()
-    r = P2.match(game, db, gen_act, l1_factory, args.pairs)
+    r = P2.match(game, db, gen_act, l1_factory, args.pairs, leaders=leaders)
     n = r["games"]
     p = (r["sl_win"] + 0.5 * r["draw"]) / n
     lo, hi = wilson(p, n)

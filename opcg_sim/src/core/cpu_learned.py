@@ -82,10 +82,32 @@ def _net_enc_version(vnet) -> int:
     次元が真実源＝コードのデフォルトに依存しない（v2 ネットへ差し替えた時点で自動有効）。
     """
     feat = int(vnet.W1.shape[0]) - int(vnet.d_emb)
-    for v in (1, 2):
+    for v in E.known_versions():
         if feat == E.feature_dim(v):
             return v
     raise ValueError(f"value ネットの入力次元が未知（feat_dim={feat}）: encoder と重みの対応を確認")
+
+
+def warm_start_value(vnet, from_version, to_version):
+    """value ネットを from_version→to_version へ温スタート拡張する（append-only 前提・恒等保存）。
+
+    増えたスカラー（末尾 append）ぶんのゼロ行を W1 に挿入するだけ＝拡張後の出力は from 版と恒等。
+    版の知識はここ（`E.scalars_dim`）に集約＝ネットは offset だけ受け取る。任意の版差（v1→v2, v2→v3,
+    v1→v3…）に同一コードで対応する。to<from（縮小）は append-only に反するため拒否。"""
+    insert_at = E.scalars_dim(from_version)
+    n_new = E.scalars_dim(to_version) - insert_at
+    if n_new < 0:
+        raise ValueError(f"温スタートは拡張方向のみ（from=v{from_version} → to=v{to_version} は縮小）")
+    return vnet.expanded(insert_at, n_new)
+
+
+def warm_start_policy(pnet, from_version, to_version):
+    """policy ネットの温スタート拡張（`warm_start_value` と同契約・挿入 offset は ctx 末尾＝scalars_dim）。"""
+    insert_at = E.scalars_dim(from_version)
+    n_new = E.scalars_dim(to_version) - insert_at
+    if n_new < 0:
+        raise ValueError(f"温スタートは拡張方向のみ（from=v{from_version} → to=v{to_version} は縮小）")
+    return pnet.expanded(insert_at, n_new)
 
 
 class LearnedEngine:

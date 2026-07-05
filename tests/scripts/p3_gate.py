@@ -31,6 +31,7 @@ import rl_net as RN
 from az_policy import PolicyScorer
 from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
+from opcg_sim.src.core.cpu_learned import _net_enc_version
 import p3_loop as P
 
 WT, CK, BR = "/tmp/p3ckpt-wt", "/tmp/p3ckpt-wt/p3ckpt", "claude/p3-checkpoints"
@@ -74,6 +75,9 @@ def main():
     ap.add_argument("--sims", type=int, default=40)
     ap.add_argument("--vs-gen0", action="store_true", help="累積判定: Gen_cur vs Gen0")
     ap.add_argument("--release", action="store_true", help="GO確定: status を解除し次世代へ")
+    ap.add_argument("--rotate-leaders", action="store_true",
+                    help="評価対局のリーダーを全リーダーから抽選＋リアルデッキ化"
+                         "（p3_run --rotate-leaders で学習した場合は分布を揃えるため指定推奨）")
     args = ap.parse_args()
 
     ensure_wt()
@@ -93,16 +97,31 @@ def main():
     if cur == 0:
         print("まだ Gen1 が無い（gen=0）。積み上げ未完。"); return 1
     opp = 0 if args.vs_gen0 else cur - 1
-    vocab = E.build_vocab(_load_db())
+    db = _load_db()
+    vocab = E.build_vocab(db)
     game = OPCGGame()
     va, pa = _load_gen(cur, vocab)
     vb, pb = _load_gen(opp, vocab)
-    a_new = P._agent(game, va, pa, vocab, args.sims, 1.5)
-    a_old = P._agent(game, vb, pb, vocab, args.sims, 1.5)
-    P._DB = _load_db()
+    # 符号化世代はロードした重みの入力次元から自動判別する（p3_run.load_nets/LearnedEngine と
+    # 同じ真実源＝重みの次元。CLIフラグではなくファイル自身が版を語る）。両エージェントは
+    # 独立に自分の版でエンコードするため、版の異なる世代同士（例: v1→v2 移行境界）を跨いでも
+    # 比較として成立する。
+    ev_cur, ev_opp = _net_enc_version(va), _net_enc_version(vb)
+    print(f"符号化世代: Gen{cur}=v{ev_cur}  Gen{opp}=v{ev_opp}"
+          + ("（異なる版の比較）" if ev_cur != ev_opp else ""), flush=True)
+    a_new = P._agent(game, va, pa, vocab, args.sims, 1.5, ev_cur)
+    a_old = P._agent(game, vb, pb, vocab, args.sims, 1.5, ev_opp)
+    P._DB = db
+
+    leaders = None
+    if args.rotate_leaders:
+        from deckgen import all_leader_ids
+        leaders = all_leader_ids(db)
+        print(f"リーダーローテーション ON: {len(leaders)} 種", flush=True)
+
     print(f"=== ゲート: Gen{cur} vs Gen{opp}  N={args.pairs*2} CRN（sims={args.sims}） ===", flush=True)
     t0 = time.perf_counter()
-    r = P.cross_eval(game, a_new, a_old, args.pairs)
+    r = P.cross_eval(game, a_new, a_old, args.pairs, leaders=leaders)
     n = r["games"]; p = (r["a_win"] + 0.5 * r["draw"]) / n
     lo, hi = wilson(p, n)
     print(f"勝率={p:.3f}  95%CI=[{lo:.3f},{hi:.3f}]  {r}  ({time.perf_counter()-t0:.0f}s)")

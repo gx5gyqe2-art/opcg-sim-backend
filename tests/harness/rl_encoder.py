@@ -22,8 +22,28 @@ MAX_HAND = 10          # 自分の手札 ID を載せる上限（相手手札は
 KEYWORDS = ["ブロッカー", "速攻", "ダブルアタック", "バニッシュ"]
 PER_CHAR = 4 + len(KEYWORDS)   # [cost, power, is_rest, attached_don] + keyword flags
 PAD = 0                # card_idx の PAD/UNK
+
+# --- スカラー特徴の版マップ（拡張の唯一の seam） ------------------------------
+# **不変条件（APPEND-ONLY）**: 新しい版は scalars を**末尾に追加**するだけ。既存の並びは
+# 絶対に変更・並べ替えしない。これを守る限り、任意の版 old→new の温スタート（重み拡張）は
+# 「old の重みをコピー＋末尾に増えたぶんゼロ行を挿入」で機械的に決まる（ValueNet/PolicyScorer
+# .expanded()）。将来 v3 を足すときは (1) SCALARS_V3 を定義、(2) 下の dict に 1 行、(3) encode の
+# version 分岐に append を足す——の3点だけで、拡張・温スタート・ドリフト検知が自動追従する。
 SCALARS_V1 = 14        # v1 のグローバル数値特徴数（Gen2 出荷ネット）
 SCALARS_V2 = 16        # v2 = v1 + [自リーダー付与ドン, 相手リーダー付与ドン]
+_SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2}
+
+
+def scalars_dim(version=1):
+    """符号化世代 version のグローバル数値特徴数（append-only ＝ version が上がるほど単調増加）。"""
+    if version not in _SCALARS_BY_VERSION:
+        raise ValueError(f"未知の符号化世代 version={version}（_SCALARS_BY_VERSION に未登録）")
+    return _SCALARS_BY_VERSION[version]
+
+
+def known_versions():
+    """登録済みの符号化世代（昇順）。次元→版の逆引き・拡張ループが版をハードコードしないため。"""
+    return sorted(_SCALARS_BY_VERSION)
 
 
 def build_vocab(db):
@@ -116,7 +136,11 @@ def encode(manager, me_name, vocab, version=1):
     return {"scalars": scalars, "field": field, "card_idx": idx}
 
 
+def field_dim():
+    """場キャラ特徴 flatten の次元（自場+相手場・版に依らず一定）。温スタートの挿入位置計算に使う。"""
+    return 2 * MAX_FIELD * PER_CHAR
+
+
 def feature_dim(version=1):
     """flatten したときの次元（scalars + field）。card_idx は別経路（Embedding）。"""
-    scalars = SCALARS_V2 if version >= 2 else SCALARS_V1
-    return scalars + 2 * MAX_FIELD * PER_CHAR
+    return scalars_dim(version) + field_dim()

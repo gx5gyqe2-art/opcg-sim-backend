@@ -8,7 +8,8 @@
 - 1世代分(target局)で frozen スナップショット＋status=AWAITING_GATEで**停止**（世代跨ぎは人間ゲート）。
 - 再開: 起動時に checkpoint ブランチへ同期し最新netからレジューム。
 
-実行: OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/p3_run.py --shard-games 60 --sims 40 --max-shards 4 --workers 4
+実行: OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/p3_run.py --enc-version 2 --rotate-leaders --shard-games 60 --sims 40 --max-shards 4 --workers 4
+     （--enc-version は必須。版はこの引数のみで決まる）
 """
 import os
 # numpy/BLAS インポート前にスレッドを1に固定（4プロセス×各全コア=スラッシングを防ぐ）。
@@ -27,11 +28,12 @@ import os as _os, sys as _sys  # noqa: E402  test bootstrap (sys.path + google s
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
 from opcg_sim.src.core import cpu_ai
+from opcg_sim.src.core.cpu_learned import warm_start_value, warm_start_policy, _net_enc_version
 import rl_encoder as E
 import rl_net as RN
 from az_policy import PolicyScorer, state_context, train_policy
 from az_mcts_tree import TreeMCTS
-from opcg_action import legal_action_matrix
+from opcg_action import legal_action_matrix, ACTION_DIM
 from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
 import p3_loop as P
@@ -73,16 +75,54 @@ def write_manifest(m):
     json.dump(m, open(CK + "/manifest.json", "w"))
 
 
-def load_nets(vocab):
+def load_nets(vocab, enc_version):
+    """符号化世代 `enc_version`（＝**引数が唯一の版指定**）のネットをロード/新規作成する。
+
+    版はロード先の重み次元ではなく `enc_version` が決める。既存チェックポイントの入力次元が
+    `enc_version` と食い違う場合は**黙って引き継がず即エラー**にする（共有チェックポイント
+    ブランチに別版の残骸があると、v2 実行で v1 ネットを拾ってエンコード次元不一致で落ちる
+    footgun を、明示エラーへ変える）。異版を混ぜたいときはチェックポイントを掃除して再実行。
+    """
     vp, pp, g0 = CK + "/value.npz", CK + "/policy.npz", CK + "/gen0_value.npz"
+    want = E.feature_dim(enc_version)
+
+    def _vguard(vnet, src):
+        feat = int(vnet.W1.shape[0]) - int(vnet.d_emb)
+        if feat != want:
+            raise SystemExit(
+                f"ERROR: {src} の入力次元(feat_dim={feat}) が --enc-version {enc_version}"
+                f"(feat_dim={want}) と不一致。版は引数で決まります＝別版のチェックポイントは"
+                f"掃除してから再実行してください（origin/{BR} をクリーンにする）。")
+        return vnet
+
+    prod_v = os.path.join(REPO, "opcg_sim", "data", "learned", "gen2_value.npz")
+    prod_p = os.path.join(REPO, "opcg_sim", "data", "learned", "gen2_policy.npz")
     if os.path.exists(vp):
-        vnet = RN.ValueNet.load(vp)
+        vnet = _vguard(RN.ValueNet.load(vp), vp)
+        pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
     elif os.path.exists(g0):
-        vnet = RN.ValueNet.load(g0)
+        vnet = _vguard(RN.ValueNet.load(g0), g0)
+        pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
+    elif enc_version >= 2:
+        # v2 Gen0 は出荷 v1 Gen2 から**温スタート**する（乱数より圧倒的に筋が良い：出荷の
+        # 実力を引き継ぎ、増えた特徴の使い方だけを学ぶ）。append-only 拡張＝拡張直後の出力は
+        # 出荷 v1 と恒等。旧版(v1)出荷から現行(ev)への差分を warm_start_* が自動計算する。
+        base_v = _net_enc_version(RN.ValueNet.load(prod_v))   # 出荷ネットの版（＝1）
+        vnet = warm_start_value(RN.ValueNet.load(prod_v), base_v, enc_version)
+        pnet = warm_start_policy(PolicyScorer.load(prod_p), base_v, enc_version) \
+            if os.path.exists(prod_p) else None
+        vnet.save(g0); vnet.save(vp)
+        if pnet is not None:
+            pnet.save(pp)
     else:
         src = os.path.join(REPO, "tests", "p2_sl_net.npz")
-        vnet = RN.ValueNet.load(src); vnet.save(g0); vnet.save(vp)
-    pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
+        vnet = _vguard(RN.ValueNet.load(src), src); vnet.save(g0); vnet.save(vp)
+        pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
+
+    if pnet is not None and int(pnet.in_dim) - ACTION_DIM != want:
+        raise SystemExit(
+            f"ERROR: {pp} の policy ctx 次元 が --enc-version {enc_version}(feat_dim={want}) と"
+            f"不一致。別版のチェックポイントを掃除してから再実行してください。")
     return vnet, pnet
 
 
@@ -99,15 +139,15 @@ def _init_worker():
 
 
 def _gen_task(payload):
-    seed, n_games, sims, eps, vpath, ppath = payload
+    seed, n_games, sims, eps, vpath, ppath, ev, leaders = payload
     db, vocab, game = _W["db"], _W["vocab"], _W["game"]
     vnet = RN.ValueNet.load(vpath)
     pnet = PolicyScorer.load(ppath) if ppath else None
-    vf = P.value_fn_of(vnet, vocab); pf = P.priors_fn_of(pnet, vocab)
+    vf = P.value_fn_of(vnet, vocab, ev); pf = P.priors_fn_of(pnet, vocab, ev)
     rng = np.random.default_rng(seed)
     S, F, I, Y, pol = [], [], [], [], []
     for _ in range(n_games):
-        m = game.new_game(db, int(rng.integers(1 << 30)))
+        m = game.new_game(db, int(rng.integers(1 << 30)), leaders=leaders)
         rv, rp, steps = [], [], 0
         while game.winner(m) is None and not game.is_terminal(m) and steps < 400:
             name = game.current_player(m)
@@ -119,9 +159,9 @@ def _gen_task(payload):
             move, N, legal = mc.run(m)
             if move is None or N is None or N.sum() == 0:
                 break
-            enc = E.encode(m, name, vocab)
+            enc = E.encode(m, name, vocab, version=ev)
             rv.append((enc, name))
-            rp.append((state_context(m, name, vocab), legal_action_matrix(m, legal, name), N / N.sum()))
+            rp.append((state_context(m, name, vocab, version=ev), legal_action_matrix(m, legal, name), N / N.sum()))
             a = int(np.argmax(N)) if steps >= 8 else int(rng.choice(len(N), p=(N / N.sum())))
             try:
                 cpu_ai._apply_move_inplace(m, name, legal[a])
@@ -140,10 +180,11 @@ def _gen_task(payload):
     return (np.stack(S), np.stack(F), np.stack(I), np.array(Y, dtype=np.float32), pol)
 
 
-def selfplay_shard(pool, workers, n_games, sims, eps, vpath, ppath, base_seed):
+def selfplay_shard(pool, workers, n_games, sims, eps, vpath, ppath, base_seed, ev=1, leaders=None):
     """n_games を workers 個に分割して並列生成→マージ。"""
     per = max(1, n_games // workers)
-    tasks = [(base_seed * 131 + w * 977 + 1, per, sims, eps, vpath, ppath) for w in range(workers)]
+    tasks = [(base_seed * 131 + w * 977 + 1, per, sims, eps, vpath, ppath, ev, leaders)
+             for w in range(workers)]
     parts = pool.map(_gen_task, tasks)
     S, F, I, Y, pol = [], [], [], [], []
     for p in parts:
@@ -167,17 +208,29 @@ def main():
     ap.add_argument("--lr", type=float, default=5e-4)
     ap.add_argument("--buffer", type=int, default=30000)
     ap.add_argument("--dirichlet-eps", type=float, default=0.25)
+    ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2),
+                    help="符号化世代（必須・版はこの引数のみで決まる。1=出荷Gen2互換／"
+                         "2=リーダー付与ドン特徴）")
+    ap.add_argument("--rotate-leaders", action="store_true",
+                    help="自己対戦のリーダーを全リーダーから抽選＋リアルデッキ化（穴B）")
     args = ap.parse_args()
+    ev = args.enc_version
 
-    vocab = E.build_vocab(_load_db())
+    _db0 = _load_db()
+    vocab = E.build_vocab(_db0)
+    leaders = None
+    if args.rotate_leaders:
+        from deckgen import all_leader_ids
+        leaders = all_leader_ids(_db0)
+        print(f"リーダーローテーション ON: {len(leaders)} 種", flush=True)
     ensure_wt()
     man = read_manifest()
     if man.get("status") == "AWAITING_GATE":
         print(f"⛔ AWAITING_GATE: Gen{man['gen']} 完成。人間クロス評価ゲート待ち"
               f"（Gen{man['gen']} vs Gen{man['gen']-1} を評価し GO なら status を解除して再開）。")
         return 0
-    vnet, pnet = load_nets(vocab)
-    print(f"再開: gen={man['gen']} cum_games={man['cum_games']} shards={man['shards']} "
+    vnet, pnet = load_nets(vocab, enc_version=ev)
+    print(f"再開: gen={man['gen']} cum_games={man['cum_games']} shards={man['shards']} enc=v{ev} "
           f"target={args.target} workers={args.workers}", flush=True)
 
     buf_v = {"scalars": [], "field": [], "card_idx": [], "value": []}
@@ -191,7 +244,8 @@ def main():
             if pnet is not None:
                 pnet.save(CK + "/_cur_p.npz"); ppath = CK + "/_cur_p.npz"
             vdata, pol = selfplay_shard(pool, args.workers, args.shard_games, args.sims,
-                                        args.dirichlet_eps, CK + "/_cur_v.npz", ppath, man["shards"])
+                                        args.dirichlet_eps, CK + "/_cur_v.npz", ppath, man["shards"],
+                                        ev=ev, leaders=leaders)
             if vdata is None:
                 print("  採取0スキップ"); continue
             for k in buf_v:
@@ -201,7 +255,7 @@ def main():
             buf_p[:] = buf_p[-args.buffer:]
             RN.train(vnet, vb, epochs=2, lr=args.lr, batch=256, val_frac=0.05)
             if pnet is None:
-                pnet = PolicyScorer(hidden=128, seed=0)
+                pnet = PolicyScorer(ctx_dim=E.feature_dim(ev), hidden=128, seed=0)
             ce = train_policy(pnet, buf_p, epochs=2, lr=args.lr)
             man["cum_games"] += args.shard_games; man["shards"] += 1
             vnet.save(CK + "/value.npz"); pnet.save(CK + "/policy.npz")

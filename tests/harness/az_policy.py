@@ -81,6 +81,22 @@ class PolicyScorer:
             vhat = self._v[k] / (1 - b2 ** self._t)
             setattr(self, k, getattr(self, k) - lr * mhat / (np.sqrt(vhat) + eps))
 
+    def expanded(self, insert_at, n_new):
+        """W1 の入力に `n_new` 個のゼロ行を row-offset `insert_at` へ挿入した新 PolicyScorer を返す。
+
+        温スタート/次元拡張の汎用プリミティブ（ValueNet.expanded と同契約）。in_dim=[ctx | action]
+        で、新スカラーは ctx の末尾＝offset=scalars_dim(old) に挿入する。挿入行の重みが 0 なので
+        softmax 出力は拡張前と恒等。b1/W2/b2 は不変コピー。`n_new<=0` は同一構造の複製。"""
+        if n_new <= 0:
+            W1n = self.W1.copy()
+        else:
+            top, bot = self.W1[:insert_at], self.W1[insert_at:]
+            W1n = np.concatenate([top, np.zeros((n_new, self.W1.shape[1])), bot], axis=0)
+        net = PolicyScorer(ctx_dim=W1n.shape[0] - ACTION_DIM, hidden=self.W1.shape[1])
+        net.W1 = W1n; net.b1 = self.b1.copy(); net.W2 = self.W2.copy(); net.b2 = self.b2.copy()
+        net._init_adam()
+        return net
+
     def save(self, path):
         np.savez(path, W1=self.W1, b1=self.b1, W2=self.W2, b2=self.b2)
 
