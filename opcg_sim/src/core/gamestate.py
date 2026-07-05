@@ -327,6 +327,9 @@ class GameManager:
                     continue
                 if cannot_play_hand:
                     continue
+                # 【メイン】効果を持たないイベント（カウンター/トリガー専用）はメインで発動不可。
+                if c.master.type == CardType.EVENT and not self._event_has_main_play(c):
+                    continue
                 if c.master.type == CardType.CHARACTER and char_rec is not None:
                     min_cost = char_rec.get("min_cost")
                     if min_cost is None or (c.master.cost is not None and c.master.cost >= min_cost):
@@ -601,6 +604,13 @@ class GameManager:
     def _has_deckout_win_replace(self, player) -> bool:
         return _battle._has_deckout_win_replace(self, player)
 
+    def _event_has_main_play(self, card: Card) -> bool:
+        """イベントがメインフェイズに手札から発動できるか＝【メイン】効果
+        （ON_PLAY/ACTIVATE_MAIN トリガー）を1つ以上持つか。【カウンター】/【トリガー】
+        のみのイベントは False（メインでは発動不可）。"""
+        return any(ab.trigger in (TriggerType.ON_PLAY, TriggerType.ACTIVATE_MAIN)
+                   for ab in (card.master.abilities or ()))
+
     def play_card_action(self, player: Player, card: Card):
         if card not in player.hand: return
         self._validate_action(player, "MAIN_ACTION")
@@ -616,6 +626,12 @@ class GameManager:
                     suffix = f"コスト{min_cost}以上の" if min_cost else ""
                     raise ValueError(f"効果により、このターンは{suffix}キャラを登場できません。")
         if card.master.type == CardType.EVENT:
+            # 【メイン】効果を持たないイベント（【カウンター】/【トリガー】のみ）は
+            # メインフェイズに手札から発動できない（カウンターは防御時の SELECT_COUNTER、
+            # トリガーはライフ公開時のみ）。従来はコストさえ払えれば列挙・実行され、
+            # ゴムゴムの巨人 OP09-078（カウンター専用）等を自ターンに空撃ちできていた。
+            if not self._event_has_main_play(card):
+                raise ValueError("このイベントはメインフェイズに発動できません（【メイン】効果を持ちません）。")
             self._record_event_played(card)   # 「このターン中…イベントを発動」条件用（OP15-002）
             for ability in card.master.abilities:
                 if ability.trigger in [TriggerType.ON_PLAY, TriggerType.ACTIVATE_MAIN]:
