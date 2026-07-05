@@ -8,7 +8,8 @@
 - 1世代分(target局)で frozen スナップショット＋status=AWAITING_GATEで**停止**（世代跨ぎは人間ゲート）。
 - 再開: 起動時に checkpoint ブランチへ同期し最新netからレジューム。
 
-実行: OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/p3_run.py --shard-games 60 --sims 40 --max-shards 4 --workers 4
+実行: OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/p3_run.py --enc-version 2 --rotate-leaders --shard-games 60 --sims 40 --max-shards 4 --workers 4
+     （--enc-version は必須。版はこの引数のみで決まる）
 """
 import os
 # numpy/BLAS インポート前にスレッドを1に固定（4プロセス×各全コア=スラッシングを防ぐ）。
@@ -31,7 +32,7 @@ import rl_encoder as E
 import rl_net as RN
 from az_policy import PolicyScorer, state_context, train_policy
 from az_mcts_tree import TreeMCTS
-from opcg_action import legal_action_matrix
+from opcg_action import legal_action_matrix, ACTION_DIM
 from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
 import p3_loop as P
@@ -73,21 +74,44 @@ def write_manifest(m):
     json.dump(m, open(CK + "/manifest.json", "w"))
 
 
-def load_nets(vocab, enc_version=1):
+def load_nets(vocab, enc_version):
+    """符号化世代 `enc_version`（＝**引数が唯一の版指定**）のネットをロード/新規作成する。
+
+    版はロード先の重み次元ではなく `enc_version` が決める。既存チェックポイントの入力次元が
+    `enc_version` と食い違う場合は**黙って引き継がず即エラー**にする（共有チェックポイント
+    ブランチに別版の残骸があると、v2 実行で v1 ネットを拾ってエンコード次元不一致で落ちる
+    footgun を、明示エラーへ変える）。異版を混ぜたいときはチェックポイントを掃除して再実行。
+    """
     vp, pp, g0 = CK + "/value.npz", CK + "/policy.npz", CK + "/gen0_value.npz"
+    want = E.feature_dim(enc_version)
+
+    def _vguard(vnet, src):
+        feat = int(vnet.W1.shape[0]) - int(vnet.d_emb)
+        if feat != want:
+            raise SystemExit(
+                f"ERROR: {src} の入力次元(feat_dim={feat}) が --enc-version {enc_version}"
+                f"(feat_dim={want}) と不一致。版は引数で決まります＝別版のチェックポイントは"
+                f"掃除してから再実行してください（origin/{BR} をクリーンにする）。")
+        return vnet
+
     if os.path.exists(vp):
-        vnet = RN.ValueNet.load(vp)
+        vnet = _vguard(RN.ValueNet.load(vp), vp)
     elif os.path.exists(g0):
-        vnet = RN.ValueNet.load(g0)
+        vnet = _vguard(RN.ValueNet.load(g0), g0)
     elif enc_version >= 2:
         # v2 は v1 SL ネット（p2_sl_net.npz＝入力次元 v1）から resume できない。Gen0 を
-        # 新規乱数 v2 ネットで開始する（穴A/穴B と同じく本走のみ・スモークは p3_loop）。
-        vnet = RN.ValueNet(len(vocab), d_emb=24, hidden=128, feat_dim=E.feature_dim(2), seed=0)
+        # 新規乱数 v2 ネットで開始する（本走のみ・スモークは p3_loop）。
+        vnet = RN.ValueNet(len(vocab), d_emb=24, hidden=128, feat_dim=want, seed=0)
         vnet.save(g0); vnet.save(vp)
     else:
         src = os.path.join(REPO, "tests", "p2_sl_net.npz")
-        vnet = RN.ValueNet.load(src); vnet.save(g0); vnet.save(vp)
+        vnet = _vguard(RN.ValueNet.load(src), src); vnet.save(g0); vnet.save(vp)
+
     pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
+    if pnet is not None and int(pnet.in_dim) - ACTION_DIM != want:
+        raise SystemExit(
+            f"ERROR: {pp} の policy ctx 次元 が --enc-version {enc_version}(feat_dim={want}) と"
+            f"不一致。別版のチェックポイントを掃除してから再実行してください。")
     return vnet, pnet
 
 
@@ -173,8 +197,9 @@ def main():
     ap.add_argument("--lr", type=float, default=5e-4)
     ap.add_argument("--buffer", type=int, default=30000)
     ap.add_argument("--dirichlet-eps", type=float, default=0.25)
-    ap.add_argument("--enc-version", type=int, default=1, choices=(1, 2),
-                    help="符号化世代（2=リーダー付与ドン特徴・穴A/B の v2 本走）")
+    ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2),
+                    help="符号化世代（必須・版はこの引数のみで決まる。1=出荷Gen2互換／"
+                         "2=リーダー付与ドン特徴）")
     ap.add_argument("--rotate-leaders", action="store_true",
                     help="自己対戦のリーダーを全リーダーから抽選＋リアルデッキ化（穴B）")
     args = ap.parse_args()
