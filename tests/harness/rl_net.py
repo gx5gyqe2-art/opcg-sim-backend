@@ -86,6 +86,25 @@ class ValueNet:
     def predict(self, batch):
         return self.forward(batch)[0]
 
+    def expanded(self, insert_at, n_new):
+        """W1 の入力に `n_new` 個のゼロ行を row-offset `insert_at` へ挿入した新 ValueNet を返す。
+
+        温スタート/次元拡張の汎用プリミティブ（版の知識は持たない＝呼び出し側が offset を渡す）。
+        Emb/b1/W2/b2 は不変コピー。挿入行の重みが 0 なので、**拡張前と出力は恒等**（新入力に 0 が
+        掛かる）。append-only 不変条件の下では insert_at=scalars_dim(old)・n_new=Δscalars で、任意の
+        版 old→new の温スタートに使える。`n_new<=0` は同一構造の複製を返す。"""
+        if n_new <= 0:
+            W1n = self.W1.copy()
+        else:
+            top, bot = self.W1[:insert_at], self.W1[insert_at:]
+            W1n = np.concatenate([top, np.zeros((n_new, self.W1.shape[1])), bot], axis=0)
+        net = ValueNet(vocab_size=self.Emb.shape[0] - 1, d_emb=self.d_emb,
+                       hidden=self.W1.shape[1], feat_dim=W1n.shape[0] - self.d_emb, seed=0)
+        net.Emb = self.Emb.copy(); net.W1 = W1n
+        net.b1 = self.b1.copy(); net.W2 = self.W2.copy(); net.b2 = self.b2.copy()
+        net._init_adam()
+        return net
+
     def save(self, path):
         np.savez(path, Emb=self.Emb, W1=self.W1, b1=self.b1, W2=self.W2, b2=self.b2,
                  d_emb=np.array(self.d_emb))

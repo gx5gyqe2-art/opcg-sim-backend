@@ -350,6 +350,63 @@ def test_enc_version_autodetect_from_weights():
     assert cpu_learned._net_enc_version(loaded) == 2, "v2 ネットの入力次元から v2 と判別されるはず"
 
 
+def test_warm_start_value_is_identity_on_shipped_state():
+    """温スタート（v1→v2 拡張）は恒等: 拡張ネット×v2符号化 == 出荷ネット×v1符号化（実局面）。
+
+    増えたスカラーの重みが 0 なので、リーダー付与ドンが載っても value 出力は出荷 v1 と一致する
+    ＝v2 Gen0 は出荷の実力そのものから学習を始められる。実局面（付与ドンあり/なし両方）で確認。
+    """
+    v1 = cpu_learned._default_engine().vnet
+    assert cpu_learned._net_enc_version(v1) == 1
+    v2 = cpu_learned.warm_start_value(v1, 1, 2)
+    assert cpu_learned._net_enc_version(v2) == 2, "拡張後は v2 次元のはず"
+    vocab = PROD_E.build_vocab(_load_db())
+    for seed in (7, 8):
+        m = _game(seed); name, _ = _actor(m)
+        me = m.p1 if m.p1.name == name else m.p2
+        if me.leader is not None:
+            me.leader.attached_don = 2   # v2 でのみ効く新特徴を立てる
+        b1 = {k: PROD_E.encode(m, name, vocab, version=1)[k][None, ...] for k in ("scalars", "field", "card_idx")}
+        b2 = {k: PROD_E.encode(m, name, vocab, version=2)[k][None, ...] for k in ("scalars", "field", "card_idx")}
+        assert np.allclose(v1.predict(b1), v2.predict(b2), atol=1e-9),\
+            "温スタート拡張が恒等でない（増えた重みが0でない/挿入位置ズレ）"
+
+
+def test_warm_start_policy_is_identity():
+    """policy の温スタートも恒等（合法手上の事前確率が拡張前後で一致）。"""
+    from opcg_sim.src.learned.policy import PolicyScorer, state_context
+    from opcg_sim.src.learned.action import legal_action_matrix
+    pnet = cpu_learned._default_engine().pnet
+    if pnet is None:
+        import pytest; pytest.skip("policy net 未同梱")
+    p2 = cpu_learned.warm_start_policy(pnet, 1, 2)
+    vocab = PROD_E.build_vocab(_load_db())
+    m = _game(9); name, actor = _actor(m)
+    me = m.p1 if m.p1.name == name else m.p2
+    if me.leader is not None:
+        me.leader.attached_don = 1
+    legal = m.get_legal_actions(actor)
+    am = legal_action_matrix(m, legal, name)
+    pr1 = pnet.priors(state_context(m, name, vocab, version=1), am)
+    pr2 = p2.priors(state_context(m, name, vocab, version=2), am)
+    assert np.allclose(pr1, pr2, atol=1e-9), "policy 温スタートが恒等でない"
+
+
+def test_warm_start_rejects_shrink_and_supports_future_versions():
+    """拡張性: warm_start は scalars_dim の版差だけを見る＝将来の版追加に同一コードで対応。縮小は拒否。"""
+    v1 = cpu_learned._default_engine().vnet
+    # 恒等（v1→v1・n_new=0）は同一出力の複製。
+    same = cpu_learned.warm_start_value(v1, 1, 1)
+    assert cpu_learned._net_enc_version(same) == 1
+    # 縮小方向（v2→v1）は append-only 違反で拒否。
+    import pytest
+    with pytest.raises(ValueError):
+        cpu_learned.warm_start_value(v1, 2, 1)
+    # 版マップだけが seam＝既知版が単調増加（次元→版の逆引きが一意）。
+    dims = [PROD_E.feature_dim(v) for v in PROD_E.known_versions()]
+    assert dims == sorted(dims) and len(set(dims)) == len(dims)
+
+
 def test_action_features_no_drift():
     m = _game(6); name, actor = _actor(m)
     legal = m.get_legal_actions(actor)

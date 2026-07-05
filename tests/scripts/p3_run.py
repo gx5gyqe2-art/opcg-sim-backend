@@ -28,6 +28,7 @@ import os as _os, sys as _sys  # noqa: E402  test bootstrap (sys.path + google s
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
 from opcg_sim.src.core import cpu_ai
+from opcg_sim.src.core.cpu_learned import warm_start_value, warm_start_policy, _net_enc_version
 import rl_encoder as E
 import rl_net as RN
 from az_policy import PolicyScorer, state_context, train_policy
@@ -94,20 +95,30 @@ def load_nets(vocab, enc_version):
                 f"掃除してから再実行してください（origin/{BR} をクリーンにする）。")
         return vnet
 
+    prod_v = os.path.join(REPO, "opcg_sim", "data", "learned", "gen2_value.npz")
+    prod_p = os.path.join(REPO, "opcg_sim", "data", "learned", "gen2_policy.npz")
     if os.path.exists(vp):
         vnet = _vguard(RN.ValueNet.load(vp), vp)
+        pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
     elif os.path.exists(g0):
         vnet = _vguard(RN.ValueNet.load(g0), g0)
+        pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
     elif enc_version >= 2:
-        # v2 は v1 SL ネット（p2_sl_net.npz＝入力次元 v1）から resume できない。Gen0 を
-        # 新規乱数 v2 ネットで開始する（本走のみ・スモークは p3_loop）。
-        vnet = RN.ValueNet(len(vocab), d_emb=24, hidden=128, feat_dim=want, seed=0)
+        # v2 Gen0 は出荷 v1 Gen2 から**温スタート**する（乱数より圧倒的に筋が良い：出荷の
+        # 実力を引き継ぎ、増えた特徴の使い方だけを学ぶ）。append-only 拡張＝拡張直後の出力は
+        # 出荷 v1 と恒等。旧版(v1)出荷から現行(ev)への差分を warm_start_* が自動計算する。
+        base_v = _net_enc_version(RN.ValueNet.load(prod_v))   # 出荷ネットの版（＝1）
+        vnet = warm_start_value(RN.ValueNet.load(prod_v), base_v, enc_version)
+        pnet = warm_start_policy(PolicyScorer.load(prod_p), base_v, enc_version) \
+            if os.path.exists(prod_p) else None
         vnet.save(g0); vnet.save(vp)
+        if pnet is not None:
+            pnet.save(pp)
     else:
         src = os.path.join(REPO, "tests", "p2_sl_net.npz")
         vnet = _vguard(RN.ValueNet.load(src), src); vnet.save(g0); vnet.save(vp)
+        pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
 
-    pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
     if pnet is not None and int(pnet.in_dim) - ACTION_DIM != want:
         raise SystemExit(
             f"ERROR: {pp} の policy ctx 次元 が --enc-version {enc_version}(feat_dim={want}) と"
