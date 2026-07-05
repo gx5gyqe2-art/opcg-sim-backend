@@ -169,6 +169,9 @@ class GameManager:
         # UI へ提示できる（accepted limitation B = multi-source continuation の解消）。
         self._deferred_continuations: List[Dict[str, Any]] = JournaledList()
         self.setup_phase_pending = False
+        # ターン開始時誘発（TURN_START）の解決が終わるまでリフレッシュフェイズ以降を
+        # 保留するフラグ。解決完了時に resolve_interaction が refresh_phase を再開する。
+        self.turn_start_pending = False
         self.mulligan_done: Set[str] = JournaledSet()
         from .effects.continuous import ContinuousEffectManager
         self.continuous = ContinuousEffectManager(self)
@@ -323,6 +326,9 @@ class GameManager:
                 if c.current_cost > don_active:
                     continue
                 if cannot_play_hand:
+                    continue
+                # 【メイン】効果を持たないイベント（カウンター/トリガー専用）はメインで発動不可。
+                if c.master.type == CardType.EVENT and not self._event_has_main_play(c):
                     continue
                 if c.master.type == CardType.CHARACTER and char_rec is not None:
                     min_cost = char_rec.get("min_cost")
@@ -598,6 +604,13 @@ class GameManager:
     def _has_deckout_win_replace(self, player) -> bool:
         return _battle._has_deckout_win_replace(self, player)
 
+    def _event_has_main_play(self, card: Card) -> bool:
+        """イベントがメインフェイズに手札から発動できるか＝【メイン】効果
+        （ON_PLAY/ACTIVATE_MAIN トリガー）を1つ以上持つか。【カウンター】/【トリガー】
+        のみのイベントは False（メインでは発動不可）。"""
+        return any(ab.trigger in (TriggerType.ON_PLAY, TriggerType.ACTIVATE_MAIN)
+                   for ab in (card.master.abilities or ()))
+
     def play_card_action(self, player: Player, card: Card):
         if card not in player.hand: return
         self._validate_action(player, "MAIN_ACTION")
@@ -613,6 +626,12 @@ class GameManager:
                     suffix = f"コスト{min_cost}以上の" if min_cost else ""
                     raise ValueError(f"効果により、このターンは{suffix}キャラを登場できません。")
         if card.master.type == CardType.EVENT:
+            # 【メイン】効果を持たないイベント（【カウンター】/【トリガー】のみ）は
+            # メインフェイズに手札から発動できない（カウンターは防御時の SELECT_COUNTER、
+            # トリガーはライフ公開時のみ）。従来はコストさえ払えれば列挙・実行され、
+            # ゴムゴムの巨人 OP09-078（カウンター専用）等を自ターンに空撃ちできていた。
+            if not self._event_has_main_play(card):
+                raise ValueError("このイベントはメインフェイズに発動できません（【メイン】効果を持ちません）。")
             self._record_event_played(card)   # 「このターン中…イベントを発動」条件用（OP15-002）
             for ability in card.master.abilities:
                 if ability.trigger in [TriggerType.ON_PLAY, TriggerType.ACTIVATE_MAIN]:
@@ -631,6 +650,10 @@ class GameManager:
             self._apply_passive_effects(self.turn_player)
             if self._has_rested_play(player):  # 「自分のキャラはレストで登場する」PASSIVE
                 card.is_rest = True
+            # 場のキャラ上限超過の押し出しは ON_PLAY 解決より前に確定する（実ルールでは
+            # 6枚目のキャラは並存しない）。押し出し選択で中断した場合、ON_PLAY は誘発待ち
+            # 行列へ積まれ、押し出し確定後（FIELD_OVERFLOW_TRASH 解決時）に消化される。
+            self._enforce_field_limit(player)
             # 「相手の登場時効果は無効になる」(OPP_ONPLAY) 期間中はこのプレイヤーの ON_PLAY を解決しない。
             onplay_negated = getattr(player, "negate_onplay_until", 0) >= self.turn_count
             if onplay_negated:
@@ -638,10 +661,16 @@ class GameManager:
             if not card.is_effect_negated and not onplay_negated:
                 for ability in card.master.abilities:
                     if ability.trigger == TriggerType.ON_PLAY:
-                        self.resolve_ability(player, ability, source_card=card)
+                        if self.active_interaction:
+                            self._enqueue_trigger(player, ability, card, optional=False)
+                        else:
+                            self.resolve_ability(player, ability, source_card=card)
+            # 他カードの「…が登場した時」リスナー（OP14-041 等）。登場時無効(OPP_ONPLAY)は
+            # 登場カード自身の【登場時】のみを無効にするため、リスナーは無効化に関わらず積む。
+            self._enqueue_char_played_listeners(card, player, from_zone="HAND")
             self._apply_passive_effects(player)
-            # 場のキャラ上限超過なら強制トラッシュ。ON_PLAY が中断中(active_interaction)の
-            # ときは _enforce_field_limit が no-op し、対話完了時に resolve_interaction 末尾が拾う。
+            # ON_PLAY がさらにキャラを登場させた場合の超過はここで拾う（中断中は no-op し、
+            # 対話完了時に resolve_interaction 末尾が拾う）。
             self._enforce_field_limit(player)
 
     def _has_rested_play(self, player: Player) -> bool:
@@ -768,6 +797,26 @@ class GameManager:
 
     def _enqueue_on_leave(self, leaving_card: Card, leaving_owner: Player) -> None:
         return _triggers._enqueue_on_leave(self, leaving_card, leaving_owner)
+
+    def _played_subject_matches(self, ability: Ability, holder_owner: Player,
+                                played_card: Card, played_owner: Player,
+                                from_zone: str = None) -> bool:
+        return _triggers._played_subject_matches(self, ability, holder_owner,
+                                                 played_card, played_owner, from_zone)
+
+    def _enqueue_char_played_listeners(self, played_card: Card, played_owner: Player,
+                                       from_zone: str = None) -> None:
+        return _triggers._enqueue_char_played_listeners(self, played_card, played_owner, from_zone)
+
+    def _ko_listener_matches(self, ability: Ability, holder_owner: Player,
+                             koed_card: Card, koed_owner: Player) -> bool:
+        return _triggers._ko_listener_matches(self, ability, holder_owner, koed_card, koed_owner)
+
+    def _enqueue_ko_listeners(self, koed_card: Card, koed_owner: Player) -> None:
+        return _triggers._enqueue_ko_listeners(self, koed_card, koed_owner)
+
+    def _fire_turn_start_triggers(self) -> None:
+        return _turn_flow._fire_turn_start_triggers(self)
 
     def _enqueue_life_decrease(self, player: Player, count: int = 1) -> None:
         return _triggers._enqueue_life_decrease(self, player, count)

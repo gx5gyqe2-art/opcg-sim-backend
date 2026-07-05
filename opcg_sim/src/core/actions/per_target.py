@@ -186,13 +186,32 @@ def play_card(gm, player, action, target, owner, source_list, value, source_card
     # 効果の明示 RESTED、または owner の「キャラはレストで登場する」PASSIVE のいずれか。
     if getattr(action, "status", None) == "RESTED" or gm._has_rested_play(owner):
         target.is_rest = True
+    gm._apply_passive_effects(owner)
+    # 場のキャラ上限超過の押し出しは【登場時】等の効果解決より前に確定する（実ルールでは
+    # 6枚目のキャラは並存しない）。押し出し選択で中断した場合、この後の ON_PLAY は
+    # 誘発待ち行列へ積まれ、押し出し確定後に消化される。
+    gm._enforce_field_limit(owner)
     if not target.is_effect_negated:
         for ability in target.master.abilities:
             if ability.trigger == TriggerType.ON_PLAY:
-                gm.resolve_ability(owner, ability, source_card=target)
+                # 中断中（押し出し選択、または先行して解決した登場時効果の選択待ち）は
+                # 即時解決できない（resolver._process_stack が中断中は1ステップも実行せず
+                # return するため、能力が無言で消える）。複数体同時登場（センゴク OP16-060
+                # 等）で2体目以降の【登場時】が消失していた根因。中断中は誘発待ち行列へ
+                # 積み、対話完了時に resolve_interaction / アクション境界が消化する。
+                if gm.active_interaction:
+                    gm._enqueue_trigger(owner, ability, target, optional=False)
+                else:
+                    gm.resolve_ability(owner, ability, source_card=target)
+    # 他カードの「…が登場した時」リスナー（OP14-041 等）。出所ゾーンは移動前の source_list
+    # から判定する（「トラッシュから登場した時」OP16-079 等の出所限定フィルタ用）。
+    _from_zone = ("HAND" if source_list is getattr(owner, "hand", None)
+                  else "TRASH" if source_list is getattr(owner, "trash", None)
+                  else "DECK" if source_list is getattr(owner, "deck", None)
+                  else "LIFE" if source_list is getattr(owner, "life", None)
+                  else None)
+    gm._enqueue_char_played_listeners(target, owner, from_zone=_from_zone)
     gm._apply_passive_effects(owner)
-    # 効果による登場でも場のキャラ上限超過なら強制トラッシュ（ガード付き）。
-    gm._enforce_field_limit(owner)
 
 
 @target_handler(ActionType.DECK_BOTTOM)

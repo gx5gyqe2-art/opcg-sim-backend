@@ -74,14 +74,22 @@ class EffectResolver:
             self._log_failure_snapshot(player, source_card, ability, "COST_UNSATISFIED", "Insufficient resources or targets for cost")
             return
 
-        # 2.5 任意コストの使用確認（A-3）。「〜できる：効果」のコスト句は任意で、自動誘発
-        #   （相手のアタック時/登場時/アタック時 等）では発動するかをプレイヤーに確認する。
-        #   ACTIVATE_MAIN（起動メイン=自発起動）は起動自体が意思表示のため確認しない。
+        # 2.5 コストの使用確認（A-3）。OPCG ではコスト句（「X：Y」の X）の支払いは常に任意
+        #   （払わなければ効果が発生しないだけ）で、「できる/してもよい」表記の有無に依らない。
+        #   よって自動誘発（登場時/KO時/ターン終了時/アタック時 等）はコストが有る限り
+        #   発動するかをプレイヤーに確認する（従来は cost_optional=表記依存で、ボルサリーノ
+        #   OP16-073 の【自分のターン終了時】ドン!!-2 等が強制発動していた）。
+        #   確認を挟まない例外＝発動自体が既に意思表示のもの:
+        #   - ACTIVATE_MAIN（起動メイン=自発起動）
+        #   - TRIGGER（【トリガー】は CONFIRM_TRIGGER で発動可否を確認済み）
+        #   - COUNTER（カウンターとしての使用宣言が意思表示）
+        #   - イベントカード（手札からのプレイが意思表示）
         #   未確認で中断 → resume(accept) が cost_confirmed=True で再入。decline は何もせず
         #   使用回数も消費しない（払わなければ「使った」ことにならない）。
+        _cost_confirm_exempt = (TriggerType.ACTIVATE_MAIN, TriggerType.TRIGGER, TriggerType.COUNTER)
         if (not cost_confirmed and ability.cost is not None
-                and getattr(ability, "cost_optional", False)
-                and ability.trigger != TriggerType.ACTIVATE_MAIN):
+                and ability.trigger not in _cost_confirm_exempt
+                and source_card.master.type != CardType.EVENT):
             self._suspend_for_ability_cost_confirm(player, ability, source_card)
             return
 

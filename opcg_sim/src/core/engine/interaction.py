@@ -42,6 +42,11 @@ def resolve_interaction(gm, player: Player, payload: Dict[str, Any]):
             elif item in gm._pending_triggers:
                 gm._pending_triggers.remove(item)
         gm._advance_pending_triggers()
+        # ターン開始時誘発の解決で保留していたリフレッシュフェイズ以降を再開する。
+        if (not gm.active_interaction and not gm._pending_triggers
+                and getattr(gm, "turn_start_pending", False)):
+            gm.turn_start_pending = False
+            gm.refresh_phase()
         if not gm.active_interaction and gm.active_battle \
                 and gm.phase not in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER):
             gm._advance_battle_triggers()
@@ -62,6 +67,11 @@ def resolve_interaction(gm, player: Player, payload: Dict[str, Any]):
         # 複数体同時超過などでまだ超過していれば再度要求する（保険）。
         if len(owner.field) > FIELD_LIMIT:
             gm._suspend_for_field_overflow(owner)
+        # 超過対話の背後に積まれた誘発（効果登場の【登場時】等）を消化する。この分岐は
+        # 共通末尾（下の _advance_pending_triggers）を通らず return するため、ここで
+        # 消化しないと次のアクション境界まで滞留する。
+        if not gm.active_interaction and gm._pending_triggers:
+            gm._advance_pending_triggers()
         return
 
     source_uuid = continuation["source_card_uuid"]
@@ -232,6 +242,13 @@ def resolve_interaction(gm, player: Player, payload: Dict[str, Any]):
     if (not gm.active_interaction and gm.active_battle
             and gm.phase not in (Phase.BLOCK_STEP, Phase.BATTLE_COUNTER)):
         gm._advance_battle_triggers()
+
+    # ターン開始時誘発の解決（対象選択/並び替え等の共通経路）で保留していた
+    # リフレッシュフェイズ以降を再開する。
+    if (not gm.active_interaction and not gm._pending_triggers
+            and getattr(gm, "turn_start_pending", False)):
+        gm.turn_start_pending = False
+        gm.refresh_phase()
 
     # 入れ子の除去置換が中断したことで退避された外側継続（後続シーケンス／残対象）を、
     # 中断が解消された後に再開する（accepted limitation B = 多段継続の対話化）。
