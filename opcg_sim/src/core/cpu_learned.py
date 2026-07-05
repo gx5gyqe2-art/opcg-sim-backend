@@ -23,16 +23,8 @@ from opcg_sim.src.learned.policy import PolicyScorer, state_context
 from opcg_sim.src.learned.action import legal_action_matrix
 from opcg_sim.src.learned.adapter import OPCGGame
 from opcg_sim.src.learned.config import C_PUCT, SERVE_SIMS, SERVE_DIRICHLET_EPS
+from opcg_sim.src.learned.mcts import TreeMCTS   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
 from opcg_sim.src.utils.loader import CardLoader
-
-# 探索実装の選択（既定＝clone版 mcts.TreeMCTS＝現行出荷挙動を維持）。環境変数 OPCG_MU_MCTS=1 で
-# make/unmake版（mcts_mu）へ切替＝自己対戦と同じ高速探索を本番でも使う。両者 run(state)->(move,N,legal)
-# 同一 API。mu 版は clone版と「同一分布・別乱数実現」＝出荷挙動の変更になるため**オプトイン**にする
-# （決定性/強度の検証を経て既定化する。学習側 p3_run/p3_loop の同フラグと意味を揃える）。
-if os.environ.get("OPCG_MU_MCTS") == "1":
-    from opcg_sim.src.learned.mcts_mu import TreeMCTSMakeUnmake as TreeMCTS
-else:
-    from opcg_sim.src.learned.mcts import TreeMCTS
 
 _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "data", "learned")
