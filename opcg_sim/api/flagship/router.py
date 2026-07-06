@@ -3,17 +3,22 @@
 `APIRouter(prefix="/api/flagship")`。リーダー辞書はカードDB（`resources.card_db`）の
 `種類=リーダー` を配信する。結果の永続化は `db.py`（SQLite・遅延初期化）。
 """
+import html
 import logging
+import re
 import unicodedata
 from contextlib import closing
 from typing import Dict, Optional
 
+import requests
 from fastapi import APIRouter, HTTPException
 
 from ..resources import card_db
 from . import db as fdb
+from . import extract as fextract
 from .schemas import (
-    EventResultsOut, LeaderOut, ResultEntryOut, ResultsPutRequest,
+    EventResultsOut, ExtractedEntryOut, ExtractRequest, ExtractResponse,
+    LeaderOut, OembedOut, ResultEntryOut, ResultsPutRequest,
     SeriesSummaryItem, SeriesSummaryOut,
 )
 
@@ -126,3 +131,61 @@ async def delete_event_results(event_id: int) -> dict:
     with closing(fdb.connect()) as conn:
         deleted = fdb.delete_event_results(conn, event_id)
     return {"status": "ok", "deleted": deleted}
+
+
+# ---- P3: 結果抽出（LLM不使用・辞書マッチング、設計 §13） ----------------------
+
+@router.post("/extract")
+async def extract(req: ExtractRequest) -> ExtractResponse:
+    """本文から順位×リーダーの候補をサジェストする（純粋関数・DB書き込みなし）。
+
+    確定は `PUT /events/{id}/results`。card_number が一意化できたリーダーは辞書情報を付ける。
+    """
+    entries, unmatched = fextract.extract_results(req.text)
+    leaders = _leaders_index()
+    out = [
+        ExtractedEntryOut(
+            placement=e.placement,
+            leader_card_number=e.card_number,
+            leader_raw=e.leader_raw,
+            leader=leaders.get(e.card_number) if e.card_number else None,
+            confidence=round(e.confidence, 3),
+        )
+        for e in entries
+    ]
+    return ExtractResponse(results=out, unmatched=unmatched)
+
+
+_OEMBED_URL = "https://publish.twitter.com/oembed"
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+@router.get("/oembed")
+async def oembed(url: str) -> OembedOut:
+    """X の oEmbed を backend 代理取得して本文だけ返す（ベストエフォート）。
+
+    X の公開 oEmbed は制限が強く、取得できない環境がある（その場合 404 → フロントは手貼りへ）。
+    画像は取得できない（設計 §5.2）。取れた HTML からタグを除いた本文テキストを返す。
+    """
+    if not re.match(r"^https?://", url):
+        raise HTTPException(status_code=400, detail="url が不正です")
+    try:
+        res = requests.get(
+            _OEMBED_URL,
+            params={"url": url, "omit_script": "1", "dnt": "true"},
+            timeout=8,
+        )
+    except requests.RequestException:
+        raise HTTPException(status_code=404, detail="oEmbed を取得できませんでした（手貼りしてください）")
+    if res.status_code != 200:
+        raise HTTPException(status_code=404, detail="oEmbed を取得できませんでした（手貼りしてください）")
+    try:
+        body_html = str(res.json().get("html", ""))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="oEmbed 応答が不正です（手貼りしてください）")
+    # <blockquote> 内の本文を素朴に抽出: <br> を改行にし、残りのタグを除去。
+    text = re.sub(r"<br\s*/?>", "\n", body_html, flags=re.IGNORECASE)
+    text = html.unescape(_TAG_RE.sub("", text)).strip()
+    if not text:
+        raise HTTPException(status_code=404, detail="本文が空でした（手貼りしてください）")
+    return OembedOut(body_text=text)

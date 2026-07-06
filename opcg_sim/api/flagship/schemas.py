@@ -96,3 +96,28 @@ class SeriesSummaryItem(BaseModel):
 class SeriesSummaryOut(BaseModel):
     series_id: int
     items: List[SeriesSummaryItem]
+
+
+class ExtractRequest(BaseModel):
+    """`POST /api/flagship/extract` の body。結果ポスト本文を渡す（設計 §13）。"""
+    text: str
+
+
+class ExtractedEntryOut(BaseModel):
+    """抽出候補 1 件（フォームの 1 行に対応）。確定ではなくサジェスト。"""
+    placement: int
+    leader_card_number: Optional[str] = None
+    leader_raw: Optional[str] = None
+    leader: Optional[LeaderOut] = None
+    confidence: float
+
+
+class ExtractResponse(BaseModel):
+    """抽出結果。`results` を登録フォームへ流し込み、人が確認・修正して保存する。"""
+    results: List[ExtractedEntryOut]
+    unmatched: List[str] = []
+
+
+class OembedOut(BaseModel):
+    """oEmbed 代理取得の本文（取れなければエンドポイントは 404）。"""
+    body_text: str
