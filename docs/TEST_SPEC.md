@@ -78,6 +78,9 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 | `tests/test_flagship_xfetch.py` | X ポスト本文取得（`opcg_sim/api/flagship/xfetch.py`、syndication API 主軸・oEmbed フォールバック、設計 docs/design.md §15）。URL→tweet id 抽出／決定的トークン算出／syndication JSON の本文組み立て（note_tweet 優先＝長文対応）／oEmbed フォールバック／取得不可時 None／`/ingest`（取得+抽出の一気通貫）・`/oembed` の API 契約。ネットワークは monkeypatch で遮断（ヘルメティック） |
 | `tests/test_flagship_xsearch.py` | X recent search による結果ポスト発見（`opcg_sim/api/flagship/xsearch.py`、有料 X API v2、設計 docs/design.md §16）。クエリ構築（ハッシュタグ×アカウントの OR＋`-is:retweet`/`lang`）／@handle・URL からの username 抽出／v2 レスポンス整形（author 突き合わせ・note_tweet 優先・url 生成・空本文除外）／`X_BEARER_TOKEN` 無効時の graceful degrade／`/discover`・`/discover/status` の API 契約（無効=503・上流エラー=502・空指定=400）。ネットワークは monkeypatch で遮断 |
 | `tests/test_flagship_store.py` | flagship 結果永続化ストア（`opcg_sim/api/flagship/store.py`、設計 docs/design.md §17）。`get_store()` の選択（Firestore 有→FirestoreStore／無→SqliteStore の graceful degrade）／FirestoreStore の全置換・取得・削除（スナップショット保持）・シリーズサマリ・URL 重複判定を**インメモリ Fake Firestore** で検証／`resources.db` を差し替えて API 全経路（PUT→サマリ→詳細→409→DELETE）が Firestore バックエンドでも SQLite と同挙動になることを確認 |
+| `tests/test_flagship_trend.py` | 全国の優勝リーダー傾向集計（`opcg_sim/api/flagship/trend.py`、設計 docs/design.md §16.6）。(投稿者×日) 重複除去／集計アカウント除外／キャラ単位正規化（card 解決・未解決別名の合流）／`/trend` の API 契約（既定トレンドクエリ・503）。実リーダー辞書使用・ネットワークは monkeypatch 遮断 |
+| `tests/test_flagship_match.py` | 収集ポスト × TCG+開催 の照合（`opcg_sim/api/flagship/match.py`、設計 docs/design.md §16.7）。handle 一致（自動確定候補）／表示名ファジー一致（要承認・閾値0.6）／同チェーン別店の誤爆除外／日付近接での絞り込み／個人ポスト=候補ゼロを実データ実例で検証（純粋関数） |
+| `tests/test_flagship_winnerstore.py` | 収集優勝ポストの永続化（`opcg_sim/api/flagship/winnerstore.py`、設計 docs/design.md §16.7）。tweet_id 重複除去／再収集で event_id（承認）保持／未紐付け抽出／開催割り当てを SQLite（tmp）と Fake Firestore の両実装で検証・`get_winner_store()` 選択 |
 
 ### カード効果（パーサ/ゴールデン/全カード・回帰/安定性）
 | ファイル | 役割 |
