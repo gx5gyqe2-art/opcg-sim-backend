@@ -37,6 +37,7 @@ from .services.cpu_driver import (
     _speculate_enabled, _speculate_compute, _speculate_plan, _kick_speculate, _cached_cpu_move,
 )
 from .routers import router as _api_router
+from .flagship.router import router as _flagship_router
 
 _logger = logging.getLogger("opcg.api")
 
@@ -61,6 +62,9 @@ def create_app() -> FastAPI:
     )
     # NOTE: 効果定義はカードテキストの自動解析（EffectParserV2）に一本化されている。
     _app.include_router(_api_router)
+    # フラッグシップ結果集計（設計: flagship リポジトリ docs/design.md §12）。SQLite は遅延初期化のため
+    # このドメインを使わない限りファイルは作られない（既存デプロイへの影響なし）。
+    _app.include_router(_flagship_router)
     return _app
 
 
