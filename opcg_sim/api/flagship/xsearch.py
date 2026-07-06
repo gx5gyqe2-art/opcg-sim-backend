@@ -32,6 +32,9 @@ _MIN_RESULTS, _MAX_RESULTS = 10, 100
 _URL_HANDLE_RE = re.compile(r"(?:twitter\.com|x\.com)/@?([A-Za-z0-9_]{1,15})", re.IGNORECASE)
 _BARE_HANDLE_RE = re.compile(r"^@?([A-Za-z0-9_]{1,15})$")
 
+# 物販・買取ポストを既定で除外する（結果報告ではまず使われない語）。精度改善（設計 §16.5）。
+_DEFAULT_EXCLUDE = ["買取", "販売", "在庫", "予約", "入荷", "景品", "セール", "値下"]
+
 
 class SearchDisabled(RuntimeError):
     """`X_BEARER_TOKEN` 未設定で検索できない（→ router は 503）。"""
@@ -74,40 +77,67 @@ def parse_handle(value: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
+def _or_group(items: List[str]) -> Optional[str]:
+    if not items:
+        return None
+    return f"({' OR '.join(items)})" if len(items) > 1 else items[0]
+
+
+def _term(t: str) -> str:
+    """空白を含む語はフレーズとして引用符で括る（CJK単語は素のまま）。"""
+    t = t.strip()
+    return f'"{t}"' if " " in t else t
+
+
 def build_query(
     hashtags: Optional[List[str]] = None,
     accounts: Optional[List[str]] = None,
+    keywords: Optional[List[str]] = None,
+    any_terms: Optional[List[str]] = None,
     extra: Optional[str] = None,
     lang: str = "ja",
     exclude_retweets: bool = True,
+    exclude_terms: Optional[List[str]] = None,
 ) -> str:
-    """ハッシュタグ／アカウントから recent search クエリを組む。
+    """recent search クエリを組む（設計 §16.5 / §16.6）。
 
-    ハッシュタグ群とアカウント群（`from:`）を **OR** でまとめ（＝どちらかに該当）、`-is:retweet` と
-    `lang:` を **AND** で絞る。`extra` はそのまま AND 連結（高度な演算子の追い込み用）。
+    - **傾向集計（本命）**: `keywords`（AND 連結の素キーワード）＋`any_terms`（OR 群）で
+      「フラッグシップ (優勝 OR 全勝 …)」を全国横断で拾う。素キーワードはハッシュタグの中身にも
+      当たるためタグ有無・店舗不問（設計 §16.6）。
+    - **開催単位（任意）**: `accounts`（`from:`）と `hashtags` を AND で店舗スコープに絞る。
+    物販語（`_DEFAULT_EXCLUDE`）を `-語` で既定除外。`exclude_terms=[]` で無効化。
     """
-    clauses: List[str] = []
-    for h in hashtags or []:
-        h = h.strip().lstrip("#")
-        if h:
-            clauses.append(f"#{h}")
-    for a in accounts or []:
-        handle = parse_handle(a)
-        if handle:
-            clauses.append(f"from:{handle}")
-    if not clauses and not (extra and extra.strip()):
-        raise ValueError("hashtags か accounts を少なくとも1つ指定してください")
+    tags = [f"#{t}" for t in (h.strip().lstrip('#') for h in (hashtags or [])) if t]
+    accts = [f"from:{h}" for h in (parse_handle(a) for a in (accounts or [])) if h]
+    kws = [_term(k) for k in (keywords or []) if k.strip()]
+    anys = [_term(k) for k in (any_terms or []) if k.strip()]
+    if not (tags or accts or kws or anys or (extra and extra.strip())):
+        raise ValueError("hashtags/accounts/keywords/any_terms のいずれかを指定してください")
 
     parts: List[str] = []
-    if clauses:
-        parts.append(f"({' OR '.join(clauses)})" if len(clauses) > 1 else clauses[0])
+    for group in (_or_group(accts), _or_group(tags)):  # 店舗 AND タグ（任意）
+        if group:
+            parts.append(group)
+    parts.extend(kws)                                   # 素キーワード（AND）
+    any_group = _or_group(anys)
+    if any_group:
+        parts.append(any_group)                        # OR 群（優勝/全勝/準優勝 等）
     if extra and extra.strip():
         parts.append(extra.strip())
+    for term in (_DEFAULT_EXCLUDE if exclude_terms is None else exclude_terms):
+        term = term.strip().lstrip("-")
+        if term:
+            parts.append(f"-{term}")
     if exclude_retweets:
         parts.append("-is:retweet")
     if lang:
         parts.append(f"lang:{lang}")
     return " ".join(parts)
+
+
+# 全国の優勝ポストを拾う既定の傾向集計クエリ材料（設計 §16.6）。
+TREND_KEYWORDS = ["フラッグシップ"]
+TREND_ANY_TERMS = ["優勝", "全勝", "準優勝"]
 
 
 def _hit_from(item: dict, users: dict) -> Optional[SearchHit]:
@@ -133,18 +163,11 @@ def _hit_from(item: dict, users: dict) -> Optional[SearchHit]:
     )
 
 
-def search_recent(
-    query: str,
-    start_time: Optional[str] = None,
-    end_time: Optional[str] = None,
-    max_results: int = 10,
-) -> List[SearchHit]:
-    """recent search を1ページ叩いてヒットを返す。無効時 `SearchDisabled`、失敗時 `SearchError`。"""
-    token = _bearer()
-    if token is None:
-        raise SearchDisabled("X_BEARER_TOKEN が未設定です（検索は無効）")
+_MAX_PAGES = 5  # ページング上限（read 消費の暴走防止）。
 
-    n = max(_MIN_RESULTS, min(_MAX_RESULTS, int(max_results)))
+
+def _search_page(token, query, start_time, end_time, n, next_token):
+    """recent search を1ページ取得し (hits, next_token) を返す。"""
     params = {
         "query": query,
         "max_results": n,
@@ -156,6 +179,8 @@ def search_recent(
         params["start_time"] = start_time
     if end_time:
         params["end_time"] = end_time
+    if next_token:
+        params["next_token"] = next_token
     try:
         res = requests.get(
             f"{_API_BASE}{_SEARCH_PATH}",
@@ -166,7 +191,6 @@ def search_recent(
     except requests.RequestException as e:
         raise SearchError(f"検索 API に到達できませんでした: {e}") from e
     if res.status_code != 200:
-        detail = ""
         try:
             detail = str((res.json() or {}).get("title") or res.text[:200])
         except ValueError:
@@ -176,7 +200,36 @@ def search_recent(
         data = res.json() or {}
     except ValueError as e:
         raise SearchError("検索 API 応答が不正（JSON でない）") from e
-
     users = {u.get("id"): u for u in (data.get("includes", {}) or {}).get("users", [])}
-    hits = [_hit_from(it, users) for it in (data.get("data") or [])]
-    return [h for h in hits if h is not None]
+    hits = [h for h in (_hit_from(it, users) for it in (data.get("data") or [])) if h]
+    return hits, (data.get("meta", {}) or {}).get("next_token")
+
+
+def search_recent(
+    query: str,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    max_results: int = 10,
+    pages: int = 1,
+) -> List[SearchHit]:
+    """recent search を叩いてヒットを返す（`pages` ページまで next_token で追う）。
+
+    無効時 `SearchDisabled`、失敗時 `SearchError`。tweet_id で重複を除く（ページ跨ぎの保険）。
+    """
+    token = _bearer()
+    if token is None:
+        raise SearchDisabled("X_BEARER_TOKEN が未設定です（検索は無効）")
+
+    n = max(_MIN_RESULTS, min(_MAX_RESULTS, int(max_results)))
+    out: List[SearchHit] = []
+    seen = set()
+    next_token = None
+    for _ in range(max(1, min(_MAX_PAGES, int(pages)))):
+        hits, next_token = _search_page(token, query, start_time, end_time, n, next_token)
+        for h in hits:
+            if h.tweet_id not in seen:
+                seen.add(h.tweet_id)
+                out.append(h)
+        if not next_token:
+            break
+    return out

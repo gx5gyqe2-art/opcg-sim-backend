@@ -150,17 +150,22 @@ class DiscoverStatusOut(BaseModel):
 
 
 class DiscoverRequest(BaseModel):
-    """`POST /api/flagship/discover` の body（設計 §16）。
+    """`POST /api/flagship/discover` の body（設計 §16 / §16.6）。
 
-    `hashtags`／`accounts`（@handle・URL・handle いずれも可）の少なくとも一方を渡す。
-    `query` を渡せばそれを優先（高度な演算子の直接指定）。`start_time`/`end_time` は RFC3339。
+    - 全部未指定なら**傾向集計モード**（全国の「フラッグシップ 優勝/全勝/準優勝」を収集）。
+    - `keywords`（AND の素キーワード）/`any_terms`（OR 群）で任意のキーワード収集。
+    - `hashtags`/`accounts` で開催単位に絞る（任意）。`query` を渡せばそれを優先。
+    `start_time`/`end_time` は RFC3339。`pages` は next_token で追う最大ページ数（read 消費）。
     """
     hashtags: List[str] = []
     accounts: List[str] = []
+    keywords: List[str] = []
+    any_terms: List[str] = []
     query: Optional[str] = None
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     max_results: int = 10
+    pages: int = 1
 
 
 class DiscoveredCandidate(BaseModel):
@@ -179,3 +184,78 @@ class DiscoverResponse(BaseModel):
     enabled: bool = True
     query: str
     candidates: List[DiscoveredCandidate]
+
+
+class TrendRequest(BaseModel):
+    """`POST /api/flagship/trend` の body（設計 §16.6・全国優勝リーダー傾向）。"""
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    max_results: int = 100
+    pages: int = 3
+
+
+class TrendItemOut(BaseModel):
+    """キャラ別の優勝件数（重複除去済み）。"""
+    character: str
+    count: int
+    pct: int
+    colors: List[str] = []
+    sample_url: str = ""
+
+
+class TrendResponse(BaseModel):
+    """全国の優勝リーダー分布（(投稿者×日)重複除去・キャラ単位）。"""
+    enabled: bool = True
+    query: str
+    collected: int          # 収集した優勝ポスト数
+    tournaments: int        # 重複除去後の大会数（＝集計母数）
+    items: List[TrendItemOut]
+
+
+class CollectResponse(BaseModel):
+    """`POST /api/flagship/collect`。全国の優勝ポストを収集して DB に貯めた件数（設計 §16.7）。"""
+    enabled: bool = True
+    query: str
+    collected: int          # 収集して upsert した優勝ポスト数
+
+
+class ReviewCandidateOut(BaseModel):
+    """収集ポストに対する開催候補（handle=自動確定候補／name=要承認）。"""
+    event_id: int
+    method: str
+    score: float
+    day_gap: int
+    auto: bool
+
+
+class ReviewPostOut(BaseModel):
+    """未紐付けの収集ポスト1件＋開催候補（レビュー表の1行）。"""
+    tweet_id: str
+    author: Optional[str] = None
+    author_name: Optional[str] = None
+    date: Optional[str] = None
+    char_name: Optional[str] = None
+    card_number: Optional[str] = None
+    tweet_url: Optional[str] = None
+    candidates: List[ReviewCandidateOut] = []
+
+
+class LinkReviewResponse(BaseModel):
+    """紐付けレビュー（開催×収集ポストの突き合わせ）。フロントで一括選択承認する。"""
+    series_id: int
+    events: int             # 照合対象にした TCG+ 開催数
+    posts: List[ReviewPostOut]
+
+
+class LinkApproveItem(BaseModel):
+    tweet_id: str
+    event_id: Optional[int] = None   # null で紐付け解除
+
+
+class LinkApproveRequest(BaseModel):
+    """`POST /api/flagship/link/approve`。承認した (ポスト→開催) をまとめて保存。"""
+    links: List[LinkApproveItem]
+
+
+class LinkApproveResponse(BaseModel):
+    updated: int
