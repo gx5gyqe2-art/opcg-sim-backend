@@ -73,6 +73,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 | ファイル | 役割 |
 |---|---|
 | `tests/test_api.py` | `opcg_sim/api/app.py` の **API 契約**を `fastapi.testclient.TestClient` で検証（エンジン挙動は他スイートが担保するためスモーク粒度）。対象: health／cards／log／対局生成→state→マリガン→TURN_END／CPU step の契約（`cpu_acted`・`waiting_for`）／sandbox 生成・list・WS ブロードキャスト（STATE_UPDATE）／rule ルーム生成→SET_DECK→START／未知 ID・DB 未初期化（デッキ CRUD）の整形済みエラー応答・`X-Session-ID` 往復。`load_deck_mixed` をローカルカード DB の stub に差し替え Firestore 非依存 |
+| `tests/test_flagship_api.py` | フラッグシップ結果集計 API（`opcg_sim/api/flagship/`、設計は flagship リポジトリ docs/design.md §12）。リーダー辞書（カードDB `種類=リーダー` 137件）配信／結果の登録（開催単位の全置換・冪等 PUT）→サマリ→詳細→削除の一連／ポストURL重複 409／placement・リーダーのバリデーション／SQLite 遅延作成（`OPCG_FLAGSHIP_DB` を tmp に向ける） |
 
 ### カード効果（パーサ/ゴールデン/全カード・回帰/安定性）
 | ファイル | 役割 |

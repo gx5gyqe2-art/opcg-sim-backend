@@ -1,0 +1,128 @@
+"""flagship ドメインのルート定義（設計 §12.4）。
+
+`APIRouter(prefix="/api/flagship")`。リーダー辞書はカードDB（`resources.card_db`）の
+`種類=リーダー` を配信する。結果の永続化は `db.py`（SQLite・遅延初期化）。
+"""
+import logging
+import unicodedata
+from contextlib import closing
+from typing import Dict, Optional
+
+from fastapi import APIRouter, HTTPException
+
+from ..resources import card_db
+from . import db as fdb
+from .schemas import (
+    EventResultsOut, LeaderOut, ResultEntryOut, ResultsPutRequest,
+    SeriesSummaryItem, SeriesSummaryOut,
+)
+
+_logger = logging.getLogger("opcg.api.flagship")
+
+router = APIRouter(prefix="/api/flagship", tags=["flagship"])
+
+_LEADER_TYPE = unicodedata.normalize("NFC", "リーダー")
+
+
+def _leaders_index() -> Dict[str, LeaderOut]:
+    """カードDBからリーダー辞書（card_number → LeaderOut）を構築する（プロセス内キャッシュ）。"""
+    cached = getattr(_leaders_index, "_cache", None)
+    if cached is not None:
+        return cached
+    index: Dict[str, LeaderOut] = {}
+    for number, item in card_db.raw_db.items():
+        norm = {unicodedata.normalize("NFC", str(k)): v for k, v in item.items()}
+        if unicodedata.normalize("NFC", str(norm.get("種類", ""))) != _LEADER_TYPE:
+            continue
+        index[number] = LeaderOut(
+            card_number=number,
+            name=str(norm.get("name", "")),
+            color=str(norm.get("色", "")),
+            life=str(norm.get("ライフ", "")),
+        )
+    _leaders_index._cache = index
+    return index
+
+
+def _resolve_entry(row: dict) -> ResultEntryOut:
+    number = row.get("leader_card_number")
+    return ResultEntryOut(
+        placement=row["placement"],
+        leader_card_number=number,
+        leader_raw=row.get("leader_raw"),
+        leader=_leaders_index().get(number) if number else None,
+    )
+
+
+def _detail_or_404(conn, event_id: int) -> EventResultsOut:
+    doc = fdb.get_event_results(conn, event_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="event not found")
+    doc["results"] = [_resolve_entry(r) for r in doc["results"]]
+    return EventResultsOut(**doc)
+
+
+@router.get("/leaders")
+async def list_leaders() -> list[LeaderOut]:
+    """リーダー辞書（137件）。手入力フォームの選択肢・名寄せの正本。"""
+    return sorted(_leaders_index().values(), key=lambda l: l.card_number)
+
+
+@router.put("/events/{event_id}/results")
+async def put_event_results(event_id: int, req: ResultsPutRequest) -> EventResultsOut:
+    """結果登録（開催単位の全置換・冪等）。開催スナップショットを UPSERT して結果を差し替える。"""
+    if req.event.id != event_id:
+        raise HTTPException(status_code=400, detail="event.id がパスの event_id と一致しません")
+    leaders = _leaders_index()
+    for r in req.results:
+        if r.leader_card_number and r.leader_card_number not in leaders:
+            raise HTTPException(status_code=422, detail=f"未知のリーダー: {r.leader_card_number}")
+    with closing(fdb.connect()) as conn:
+        url = req.post.url if req.post else None
+        if url:
+            owner = fdb.find_url_owner(conn, url)
+            if owner is not None and owner != event_id:
+                raise HTTPException(status_code=409, detail=f"このポストURLは開催 #{owner} に登録済みです")
+        fdb.replace_event_results(
+            conn,
+            event=req.event.model_dump(),
+            post=req.post.model_dump() if req.post else None,
+            results=[r.model_dump() for r in req.results],
+        )
+        return _detail_or_404(conn, event_id)
+
+
+@router.get("/results")
+async def series_summary(series_id: int) -> SeriesSummaryOut:
+    """シリーズ内で結果を持つ開催のサマリ（一覧の優勝リーダー/回収バッジ用オーバーレイ）。"""
+    with closing(fdb.connect()) as conn:
+        rows = fdb.get_series_summary(conn, series_id)
+    items = []
+    for row in rows:
+        winner: Optional[ResultEntryOut] = None
+        if row.get("winner_card_number") or row.get("winner_raw"):
+            winner = _resolve_entry({
+                "placement": 1,
+                "leader_card_number": row.get("winner_card_number"),
+                "leader_raw": row.get("winner_raw"),
+            })
+        items.append(SeriesSummaryItem(
+            event_id=row["event_id"], result_count=row["result_count"],
+            post_url=row.get("post_url"), winner=winner,
+        ))
+    return SeriesSummaryOut(series_id=series_id, items=items)
+
+
+@router.get("/events/{event_id}/results")
+async def event_results(event_id: int) -> EventResultsOut:
+    """開催詳細（スナップショット + ポスト + 全 placement）。"""
+    with closing(fdb.connect()) as conn:
+        return _detail_or_404(conn, event_id)
+
+
+@router.delete("/events/{event_id}/results")
+async def delete_event_results(event_id: int) -> dict:
+    """結果の取り消し（誤登録の削除）。開催スナップショット行は残す。"""
+    with closing(fdb.connect()) as conn:
+        deleted = fdb.delete_event_results(conn, event_id)
+    return {"status": "ok", "deleted": deleted}
