@@ -12,15 +12,20 @@ from fastapi import APIRouter, HTTPException
 
 from ..resources import card_db
 from . import extract as fextract
+from . import match as fmatch
 from . import store as fstore
+from . import tcgplus
 from . import trend as ftrend
+from . import winnerstore as fwinner
 from . import xfetch
 from . import xsearch
 from .schemas import (
-    DiscoveredCandidate, DiscoverRequest, DiscoverResponse, DiscoverStatusOut,
+    CollectResponse, DiscoveredCandidate, DiscoverRequest, DiscoverResponse, DiscoverStatusOut,
     EventResultsOut, ExtractedEntryOut, ExtractRequest, ExtractResponse,
     IngestRequest, IngestResponse,
+    LinkApproveRequest, LinkApproveResponse, LinkReviewResponse,
     LeaderOut, OembedOut, ResultEntryOut, ResultsPutRequest,
+    ReviewCandidateOut, ReviewPostOut,
     SeriesSummaryItem, SeriesSummaryOut,
     TrendItemOut, TrendRequest, TrendResponse,
 )
@@ -305,3 +310,79 @@ async def trend(req: TrendRequest) -> TrendResponse:
         items=[TrendItemOut(character=i.character, count=i.count, pct=i.pct,
                             colors=i.colors, sample_url=i.sample_url) for i in items],
     )
+
+
+# ---- P7: 収集の蓄積と 開催紐付け（設計 §16.7・案1） ---------------------------
+
+@router.post("/collect")
+async def collect(req: TrendRequest) -> CollectResponse:
+    """全国の優勝ポストを収集して DB（winner_posts）へ貯める（重複除去・event_id 保持）。
+
+    再収集で既存の紐付け（人の承認）は消えない。定期ジョブは無く、手動でこれを呼んで蓄積する。
+    """
+    if not xsearch.is_enabled():
+        raise HTTPException(status_code=503, detail="検索は未設定です（X_BEARER_TOKEN 未設定）")
+    query = xsearch.build_query(keywords=xsearch.TREND_KEYWORDS, any_terms=xsearch.TREND_ANY_TERMS)
+    try:
+        hits = xsearch.search_recent(
+            query, start_time=req.start_time, end_time=req.end_time,
+            max_results=req.max_results, pages=req.pages,
+        )
+    except xsearch.SearchDisabled:
+        raise HTTPException(status_code=503, detail="検索は未設定です（X_BEARER_TOKEN 未設定）")
+    except xsearch.SearchError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    names, _ = _leader_names_colors()
+    index = fextract._index()
+    rows = []
+    for h in hits:
+        entries, _ = fextract.extract_results(h.text)
+        win = next((e for e in entries if e.placement == 1), None)
+        if win is None or not (win.card_number or win.leader_raw):
+            continue
+        wp = ftrend.WinnerPost(
+            author=h.author, date=(h.created_at or "")[:10],
+            card_number=win.card_number, leader_raw=win.leader_raw,
+            leader_name=names.get(win.card_number) if win.card_number else None,
+            tweet_url=h.tweet_url,
+        )
+        rows.append({
+            "tweet_id": h.tweet_id, "author": h.author, "author_name": h.author_name,
+            "date": (h.created_at or "")[:10], "char_name": ftrend.character_of(wp, names, index),
+            "card_number": win.card_number, "leader_raw": win.leader_raw, "tweet_url": h.tweet_url,
+        })
+    fwinner.get_winner_store().upsert(rows)
+    return CollectResponse(enabled=True, query=query, collected=len(rows))
+
+
+@router.get("/link/review")
+async def link_review(series_id: int) -> LinkReviewResponse:
+    """未紐付けの収集ポストを、指定シリーズの TCG+ 開催へ照合したレビュー表を返す（設計 §16.7）。
+
+    handle 一致は `auto=true`（自動確定候補）、表示名一致は要承認。候補ゼロのポストも含める。
+    """
+    try:
+        events = tcgplus.fetch_events(series_id)
+    except tcgplus.TcgPlusError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    posts = fwinner.get_winner_store().list(only_unlinked=True)
+    out = []
+    for p in posts:
+        cands = fmatch.match_post(p.get("author"), p.get("author_name"), p.get("date"), events)
+        out.append(ReviewPostOut(
+            tweet_id=p["tweet_id"], author=p.get("author"), author_name=p.get("author_name"),
+            date=p.get("date"), char_name=p.get("char_name"), card_number=p.get("card_number"),
+            tweet_url=p.get("tweet_url"),
+            candidates=[ReviewCandidateOut(event_id=c.event_id, method=c.method, score=c.score,
+                                           day_gap=c.day_gap, auto=c.auto) for c in cands],
+        ))
+    return LinkReviewResponse(series_id=series_id, events=len(events), posts=out)
+
+
+@router.post("/link/approve")
+async def link_approve(req: LinkApproveRequest) -> LinkApproveResponse:
+    """承認した (ポスト→開催) をまとめて保存する（event_id=null で解除）。"""
+    store = fwinner.get_winner_store()
+    updated = sum(store.set_event(x.tweet_id, x.event_id) for x in req.links)
+    return LinkApproveResponse(updated=updated)

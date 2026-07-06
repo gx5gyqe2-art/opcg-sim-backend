@@ -210,3 +210,52 @@ class TrendResponse(BaseModel):
     collected: int          # 収集した優勝ポスト数
     tournaments: int        # 重複除去後の大会数（＝集計母数）
     items: List[TrendItemOut]
+
+
+class CollectResponse(BaseModel):
+    """`POST /api/flagship/collect`。全国の優勝ポストを収集して DB に貯めた件数（設計 §16.7）。"""
+    enabled: bool = True
+    query: str
+    collected: int          # 収集して upsert した優勝ポスト数
+
+
+class ReviewCandidateOut(BaseModel):
+    """収集ポストに対する開催候補（handle=自動確定候補／name=要承認）。"""
+    event_id: int
+    method: str
+    score: float
+    day_gap: int
+    auto: bool
+
+
+class ReviewPostOut(BaseModel):
+    """未紐付けの収集ポスト1件＋開催候補（レビュー表の1行）。"""
+    tweet_id: str
+    author: Optional[str] = None
+    author_name: Optional[str] = None
+    date: Optional[str] = None
+    char_name: Optional[str] = None
+    card_number: Optional[str] = None
+    tweet_url: Optional[str] = None
+    candidates: List[ReviewCandidateOut] = []
+
+
+class LinkReviewResponse(BaseModel):
+    """紐付けレビュー（開催×収集ポストの突き合わせ）。フロントで一括選択承認する。"""
+    series_id: int
+    events: int             # 照合対象にした TCG+ 開催数
+    posts: List[ReviewPostOut]
+
+
+class LinkApproveItem(BaseModel):
+    tweet_id: str
+    event_id: Optional[int] = None   # null で紐付け解除
+
+
+class LinkApproveRequest(BaseModel):
+    """`POST /api/flagship/link/approve`。承認した (ポスト→開催) をまとめて保存。"""
+    links: List[LinkApproveItem]
+
+
+class LinkApproveResponse(BaseModel):
+    updated: int
