@@ -15,7 +15,9 @@ from ..resources import card_db
 from . import db as fdb
 from . import extract as fextract
 from . import xfetch
+from . import xsearch
 from .schemas import (
+    DiscoveredCandidate, DiscoverRequest, DiscoverResponse, DiscoverStatusOut,
     EventResultsOut, ExtractedEntryOut, ExtractRequest, ExtractResponse,
     IngestRequest, IngestResponse,
     LeaderOut, OembedOut, ResultEntryOut, ResultsPutRequest,
@@ -203,3 +205,47 @@ async def ingest(req: IngestRequest) -> IngestResponse:
         results=results,
         unmatched=unmatched,
     )
+
+
+# ---- P6: 結果ポストの発見（recent search・有料 X API v2、設計 §16） --------------
+
+@router.get("/discover/status")
+async def discover_status() -> DiscoverStatusOut:
+    """検索（発見）が使えるか。フロントは無効なら導線を隠す（graceful degrade）。"""
+    return DiscoverStatusOut(enabled=xsearch.is_enabled())
+
+
+@router.post("/discover")
+async def discover(req: DiscoverRequest) -> DiscoverResponse:
+    """ハッシュタグ／店舗アカウントから結果ポストを検索し、各候補を P3 抽出して返す。
+
+    DB には書かない（サジェスト）。確定は従来どおり `PUT /events/{id}/results`。検索は有料 read を
+    消費するので候補の本文抽出まで一度に済ませ、以降の本文取得（無料の syndication）を増やさない。
+    `X_BEARER_TOKEN` 未設定なら 503（フロントは status で事前に導線を隠す）。
+    """
+    if not xsearch.is_enabled():
+        raise HTTPException(status_code=503, detail="検索は未設定です（X_BEARER_TOKEN 未設定）")
+    try:
+        query = req.query.strip() if req.query and req.query.strip() else xsearch.build_query(
+            hashtags=req.hashtags, accounts=req.accounts,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    try:
+        hits = xsearch.search_recent(
+            query, start_time=req.start_time, end_time=req.end_time, max_results=req.max_results,
+        )
+    except xsearch.SearchDisabled:
+        raise HTTPException(status_code=503, detail="検索は未設定です（X_BEARER_TOKEN 未設定）")
+    except xsearch.SearchError as e:
+        # 上流（401/403/429/到達不可）はそのまま伝える（フロントで案内）。
+        raise HTTPException(status_code=502, detail=str(e))
+
+    candidates = []
+    for h in hits:
+        results, unmatched = _extract_from_text(h.text)
+        candidates.append(DiscoveredCandidate(
+            tweet_url=h.tweet_url, author=h.author, author_name=h.author_name,
+            created_at=h.created_at, body_text=h.text, results=results, unmatched=unmatched,
+        ))
+    return DiscoverResponse(enabled=True, query=query, candidates=candidates)
