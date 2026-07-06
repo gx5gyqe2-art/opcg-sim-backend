@@ -59,19 +59,26 @@ def main():
     ap.add_argument("--rotate-leaders", action="store_true",
                     help="評価対局のリーダーを全リーダーから抽選＋リアルデッキ化"
                          "（p3_run --rotate-leaders で学習した場合は分布を揃えるため指定推奨）")
+    ap.add_argument("--value-path", default=None,
+                    help="value npz を明示指定（--gen より優先）。出荷 data/learned/gen2 等を直接評価する用")
+    ap.add_argument("--policy-path", default=None,
+                    help="policy npz を明示指定（--gen より優先）。未指定かつ --value-path 指定時は uniform")
+    ap.add_argument("--label", default=None, help="表示ラベル（既定=Gen{gen}）")
     args = ap.parse_args()
 
     ensure_wt()
     db = _load_db()
     vocab = E.build_vocab(db)
     game = OPCGGame()
-    vnet = RN.ValueNet.load(CK + f"/gen{args.gen}_value.npz")
-    pnet_path = CK + f"/gen{args.gen}_policy.npz"
-    pnet = PolicyScorer.load(pnet_path) if os.path.exists(pnet_path) else None
+    vpath = args.value_path or (CK + f"/gen{args.gen}_value.npz")
+    ppath = args.policy_path or (CK + f"/gen{args.gen}_policy.npz")
+    label = args.label or f"Gen{args.gen}"
+    vnet = RN.ValueNet.load(vpath)
+    pnet = PolicyScorer.load(ppath) if os.path.exists(ppath) else None
     # 符号化世代はロードした重みの入力次元から自動判別する（p3_run.load_nets/LearnedEngine と
     # 同じ真実源）。CLIフラグにしない＝チェックポイントの実際の次元と食い違えない。
     ev = _net_enc_version(vnet)
-    print(f"Gen{args.gen} net ロード（enc=v{ev}・policy={'あり' if pnet else 'なし(uniform)'}）", flush=True)
+    print(f"{label} net ロード（enc=v{ev}・policy={'あり' if pnet else 'なし(uniform)'}）", flush=True)
 
     leaders = None
     if args.rotate_leaders:
@@ -81,7 +88,7 @@ def main():
 
     gen_act = P._agent(game, vnet, pnet, vocab, args.sims, args.c_puct, ev)
     l1_factory = lambda: P2.l1_agent_factory("hard", args.pimc)
-    print(f"=== Gen{args.gen}+MCTS(sims={args.sims}) vs 製品L1+α-β(pimc={args.pimc}) "
+    print(f"=== {label}+MCTS(sims={args.sims}) vs 製品L1+α-β(pimc={args.pimc}) "
           f"CRN {args.pairs}ペア×2={args.pairs*2}戦 ===", flush=True)
     print(f"（比較基準: P2の SL/Gen0 vs L1 = 0.450）", flush=True)
     t0 = time.perf_counter()
@@ -89,7 +96,7 @@ def main():
     n = r["games"]
     p = (r["sl_win"] + 0.5 * r["draw"]) / n
     lo, hi = wilson(p, n)
-    print(f"\nGen{args.gen} 勝率={p:.3f}  95%CI=[{lo:.3f},{hi:.3f}]  {r}  ({time.perf_counter()-t0:.0f}s)")
+    print(f"\n{label} 勝率={p:.3f}  95%CI=[{lo:.3f},{hi:.3f}]  {r}  ({time.perf_counter()-t0:.0f}s)")
     print(f"→ {'製品CPUを上回る' if lo > 0.5 else ('互角圏' if p > 0.42 else '製品CPUに及ばず')}"
           f"（P2/Gen0の0.450と比較）。※参考値・water-oil注意。")
     return 0
