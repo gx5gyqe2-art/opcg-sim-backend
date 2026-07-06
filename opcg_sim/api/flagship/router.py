@@ -3,21 +3,21 @@
 `APIRouter(prefix="/api/flagship")`。リーダー辞書はカードDB（`resources.card_db`）の
 `種類=リーダー` を配信する。結果の永続化は `db.py`（SQLite・遅延初期化）。
 """
-import html
 import logging
 import re
 import unicodedata
 from contextlib import closing
 from typing import Dict, Optional
 
-import requests
 from fastapi import APIRouter, HTTPException
 
 from ..resources import card_db
 from . import db as fdb
 from . import extract as fextract
+from . import xfetch
 from .schemas import (
     EventResultsOut, ExtractedEntryOut, ExtractRequest, ExtractResponse,
+    IngestRequest, IngestResponse,
     LeaderOut, OembedOut, ResultEntryOut, ResultsPutRequest,
     SeriesSummaryItem, SeriesSummaryOut,
 )
@@ -141,7 +141,13 @@ async def extract(req: ExtractRequest) -> ExtractResponse:
 
     確定は `PUT /events/{id}/results`。card_number が一意化できたリーダーは辞書情報を付ける。
     """
-    entries, unmatched = fextract.extract_results(req.text)
+    out, unmatched = _extract_from_text(req.text)
+    return ExtractResponse(results=out, unmatched=unmatched)
+
+
+def _extract_from_text(text: str) -> tuple[list[ExtractedEntryOut], list[str]]:
+    """本文 → 抽出候補（辞書解決済み）。/extract と /ingest で共有する。"""
+    entries, unmatched = fextract.extract_results(text)
     leaders = _leaders_index()
     out = [
         ExtractedEntryOut(
@@ -153,39 +159,47 @@ async def extract(req: ExtractRequest) -> ExtractResponse:
         )
         for e in entries
     ]
-    return ExtractResponse(results=out, unmatched=unmatched)
+    return out, unmatched
 
 
-_OEMBED_URL = "https://publish.twitter.com/oembed"
-_TAG_RE = re.compile(r"<[^>]+>")
+_NOT_FETCHED = "本文を取得できませんでした（URL を確認するか、手貼りしてください）"
+
+
+def _fetch_or_400(url: str) -> xfetch.FetchedPost:
+    """URL 検証 → 本文取得。不正 URL は 400、取得不可は 404。"""
+    if not re.match(r"^https?://", url or ""):
+        raise HTTPException(status_code=400, detail="url が不正です")
+    post = xfetch.fetch_post(url)
+    if post is None:
+        raise HTTPException(status_code=404, detail=_NOT_FETCHED)
+    return post
 
 
 @router.get("/oembed")
 async def oembed(url: str) -> OembedOut:
-    """X の oEmbed を backend 代理取得して本文だけ返す（ベストエフォート）。
+    """X ポスト URL から本文だけ取得する（後方互換のフロント配線用）。
 
-    X の公開 oEmbed は制限が強く、取得できない環境がある（その場合 404 → フロントは手貼りへ）。
-    画像は取得できない（設計 §5.2）。取れた HTML からタグを除いた本文テキストを返す。
+    取得は syndication API 主軸・oEmbed フォールバック（設計 §15、`xfetch`）。取れなければ
+    404（→ フロントは手貼りへ）。画像は取得できない（設計 §5.2）。
     """
-    if not re.match(r"^https?://", url):
-        raise HTTPException(status_code=400, detail="url が不正です")
-    try:
-        res = requests.get(
-            _OEMBED_URL,
-            params={"url": url, "omit_script": "1", "dnt": "true"},
-            timeout=8,
-        )
-    except requests.RequestException:
-        raise HTTPException(status_code=404, detail="oEmbed を取得できませんでした（手貼りしてください）")
-    if res.status_code != 200:
-        raise HTTPException(status_code=404, detail="oEmbed を取得できませんでした（手貼りしてください）")
-    try:
-        body_html = str(res.json().get("html", ""))
-    except ValueError:
-        raise HTTPException(status_code=404, detail="oEmbed 応答が不正です（手貼りしてください）")
-    # <blockquote> 内の本文を素朴に抽出: <br> を改行にし、残りのタグを除去。
-    text = re.sub(r"<br\s*/?>", "\n", body_html, flags=re.IGNORECASE)
-    text = html.unescape(_TAG_RE.sub("", text)).strip()
-    if not text:
-        raise HTTPException(status_code=404, detail="本文が空でした（手貼りしてください）")
-    return OembedOut(body_text=text)
+    return OembedOut(body_text=_fetch_or_400(url).body_text)
+
+
+@router.post("/ingest")
+async def ingest(req: IngestRequest) -> IngestResponse:
+    """X ポスト URL から本文取得 → P3 抽出を一気通貫で返す（設計 §15）。
+
+    DB には書かない（サジェスト）。確定は `PUT /events/{id}/results`。取得不可は 404。
+    """
+    post = _fetch_or_400(req.url)
+    results, unmatched = _extract_from_text(post.body_text)
+    return IngestResponse(
+        tweet_url=post.tweet_url,
+        body_text=post.body_text,
+        author=post.author,
+        author_name=post.author_name,
+        created_at=post.created_at,
+        source=post.source,
+        results=results,
+        unmatched=unmatched,
+    )

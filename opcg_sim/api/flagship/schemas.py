@@ -121,3 +121,24 @@ class ExtractResponse(BaseModel):
 class OembedOut(BaseModel):
     """oEmbed 代理取得の本文（取れなければエンドポイントは 404）。"""
     body_text: str
+
+
+class IngestRequest(BaseModel):
+    """`POST /api/flagship/ingest` の body。X ポスト URL を渡す（設計 §15）。"""
+    url: str
+
+
+class IngestResponse(BaseModel):
+    """URL からの取得 + 抽出をまとめて返す（取得できなければエンドポイントは 404）。
+
+    `body_text` は取得できた本文（人が確認・修正できるよう返す）。`results` は P3 抽出候補。
+    確定は従来どおり `PUT /events/{id}/results`。
+    """
+    tweet_url: str
+    body_text: str
+    author: Optional[str] = None
+    author_name: Optional[str] = None
+    created_at: Optional[str] = None
+    source: str = "syndication"
+    results: List[ExtractedEntryOut]
+    unmatched: List[str] = []

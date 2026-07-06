@@ -75,6 +75,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 | `tests/test_api.py` | `opcg_sim/api/app.py` の **API 契約**を `fastapi.testclient.TestClient` で検証（エンジン挙動は他スイートが担保するためスモーク粒度）。対象: health／cards／log／対局生成→state→マリガン→TURN_END／CPU step の契約（`cpu_acted`・`waiting_for`）／sandbox 生成・list・WS ブロードキャスト（STATE_UPDATE）／rule ルーム生成→SET_DECK→START／未知 ID・DB 未初期化（デッキ CRUD）の整形済みエラー応答・`X-Session-ID` 往復。`load_deck_mixed` をローカルカード DB の stub に差し替え Firestore 非依存 |
 | `tests/test_flagship_api.py` | フラッグシップ結果集計 API（`opcg_sim/api/flagship/`、設計は flagship リポジトリ docs/design.md §12）。リーダー辞書（カードDB `種類=リーダー` 137件）配信／結果の登録（開催単位の全置換・冪等 PUT）→サマリ→詳細→削除の一連／ポストURL重複 409／placement・リーダーのバリデーション／SQLite 遅延作成（`OPCG_FLAGSHIP_DB` を tmp に向ける） |
 | `tests/test_flagship_extract.py` | フラッグシップ結果抽出（`opcg_sim/api/flagship/extract.py`、LLM不使用の辞書マッチング、設計 docs/design.md §13）。137リーダーのエイリアス生成（正規名・短縮名・色略称）／順位パターン写像（優勝/準優勝/N位/ベストN）／色略称の card_number 一意化／同名（クロコダイル等）の曖昧化／confidence／NFKC正規化／`/extract`・`/oembed` の API 契約 |
+| `tests/test_flagship_xfetch.py` | X ポスト本文取得（`opcg_sim/api/flagship/xfetch.py`、syndication API 主軸・oEmbed フォールバック、設計 docs/design.md §15）。URL→tweet id 抽出／決定的トークン算出／syndication JSON の本文組み立て（note_tweet 優先＝長文対応）／oEmbed フォールバック／取得不可時 None／`/ingest`（取得+抽出の一気通貫）・`/oembed` の API 契約。ネットワークは monkeypatch で遮断（ヘルメティック） |
 
 ### カード効果（パーサ/ゴールデン/全カード・回帰/安定性）
 | ファイル | 役割 |
