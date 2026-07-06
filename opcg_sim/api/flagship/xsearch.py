@@ -32,6 +32,9 @@ _MIN_RESULTS, _MAX_RESULTS = 10, 100
 _URL_HANDLE_RE = re.compile(r"(?:twitter\.com|x\.com)/@?([A-Za-z0-9_]{1,15})", re.IGNORECASE)
 _BARE_HANDLE_RE = re.compile(r"^@?([A-Za-z0-9_]{1,15})$")
 
+# 物販・買取ポストを既定で除外する（結果報告ではまず使われない語）。精度改善（設計 §16.5）。
+_DEFAULT_EXCLUDE = ["買取", "販売", "在庫", "予約", "入荷", "景品", "セール", "値下"]
+
 
 class SearchDisabled(RuntimeError):
     """`X_BEARER_TOKEN` 未設定で検索できない（→ router は 503）。"""
@@ -74,35 +77,46 @@ def parse_handle(value: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
+def _or_group(items: List[str]) -> Optional[str]:
+    if not items:
+        return None
+    return f"({' OR '.join(items)})" if len(items) > 1 else items[0]
+
+
 def build_query(
     hashtags: Optional[List[str]] = None,
     accounts: Optional[List[str]] = None,
     extra: Optional[str] = None,
     lang: str = "ja",
     exclude_retweets: bool = True,
+    exclude_terms: Optional[List[str]] = None,
 ) -> str:
-    """ハッシュタグ／アカウントから recent search クエリを組む。
+    """ハッシュタグ／アカウントから recent search クエリを組む（精度優先、設計 §16.5）。
 
-    ハッシュタグ群とアカウント群（`from:`）を **OR** でまとめ（＝どちらかに該当）、`-is:retweet` と
-    `lang:` を **AND** で絞る。`extra` はそのまま AND 連結（高度な演算子の追い込み用）。
+    **アカウント群とハッシュタグ群を AND**（`(from:a OR from:b) (#x OR #y)`）で結び、
+    アカウント指定時はその店舗の対象タグ投稿だけに絞る（他店の買取/景品ポストを排除）。
+    さらに物販語（`_DEFAULT_EXCLUDE`）を `-語` で既定除外。`-is:retweet`/`lang:` を AND。
+    `extra` はそのまま AND 連結（高度な演算子の追い込み用）。`exclude_terms=[]` で除外無効。
     """
-    clauses: List[str] = []
-    for h in hashtags or []:
-        h = h.strip().lstrip("#")
-        if h:
-            clauses.append(f"#{h}")
+    tags = [f"#{t}" for t in (h.strip().lstrip('#') for h in (hashtags or [])) if t]
+    accts = []
     for a in accounts or []:
         handle = parse_handle(a)
         if handle:
-            clauses.append(f"from:{handle}")
-    if not clauses and not (extra and extra.strip()):
+            accts.append(f"from:{handle}")
+    if not tags and not accts and not (extra and extra.strip()):
         raise ValueError("hashtags か accounts を少なくとも1つ指定してください")
 
     parts: List[str] = []
-    if clauses:
-        parts.append(f"({' OR '.join(clauses)})" if len(clauses) > 1 else clauses[0])
+    for group in (_or_group(accts), _or_group(tags)):  # 店舗 AND タグ
+        if group:
+            parts.append(group)
     if extra and extra.strip():
         parts.append(extra.strip())
+    for term in (_DEFAULT_EXCLUDE if exclude_terms is None else exclude_terms):
+        term = term.strip().lstrip("-")
+        if term:
+            parts.append(f"-{term}")
     if exclude_retweets:
         parts.append("-is:retweet")
     if lang:

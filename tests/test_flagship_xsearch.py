@@ -49,17 +49,28 @@ def test_parse_handle(value, expected):
     assert S.parse_handle(value) == expected
 
 
-def test_build_query_hashtags_and_accounts():
+def test_build_query_scopes_account_and_hashtag():
+    # 店舗群 AND タグ群（(from:...) (#...)）で店舗の対象タグ投稿に絞る（精度）。
     q = S.build_query(hashtags=["フラッグシップ", "#フラッグシップバトル"], accounts=["@shopA", "https://x.com/shopB"])
-    assert "#フラッグシップ" in q and "#フラッグシップバトル" in q
-    assert "from:shopA" in q and "from:shopB" in q
-    assert " OR " in q and "-is:retweet" in q and "lang:ja" in q
+    assert "(from:shopA OR from:shopB)" in q
+    assert "(#フラッグシップ OR #フラッグシップバトル)" in q
+    # 店舗群がタグ群より前＝AND スコープ
+    assert q.index("from:shopA") < q.index("#フラッグシップ")
+    # 物販語の既定除外・RT除外・言語
+    assert "-買取" in q and "-景品" in q and "-is:retweet" in q and "lang:ja" in q
 
 
-def test_build_query_single_clause_no_parens():
+def test_build_query_single_hashtag_has_exclusions_no_parens():
     q = S.build_query(hashtags=["フラッグシップ"])
     assert q.startswith("#フラッグシップ")
-    assert "(" not in q
+    assert "(" not in q          # 単一なので群の括弧なし
+    assert "-買取" in q           # 除外は付く
+
+
+def test_build_query_exclusions_can_be_disabled():
+    q = S.build_query(hashtags=["フラッグシップ"], exclude_terms=[])
+    assert "-買取" not in q and "-景品" not in q
+    assert q.startswith("#フラッグシップ") and "-is:retweet" in q
 
 
 def test_build_query_requires_something():
