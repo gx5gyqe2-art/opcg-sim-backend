@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException
 from ..resources import card_db
 from . import extract as fextract
 from . import store as fstore
+from . import trend as ftrend
 from . import xfetch
 from . import xsearch
 from .schemas import (
@@ -21,6 +22,7 @@ from .schemas import (
     IngestRequest, IngestResponse,
     LeaderOut, OembedOut, ResultEntryOut, ResultsPutRequest,
     SeriesSummaryItem, SeriesSummaryOut,
+    TrendItemOut, TrendRequest, TrendResponse,
 )
 
 _logger = logging.getLogger("opcg.api.flagship")
@@ -220,15 +222,22 @@ async def discover(req: DiscoverRequest) -> DiscoverResponse:
     """
     if not xsearch.is_enabled():
         raise HTTPException(status_code=503, detail="検索は未設定です（X_BEARER_TOKEN 未設定）")
-    try:
-        query = req.query.strip() if req.query and req.query.strip() else xsearch.build_query(
-            hashtags=req.hashtags, accounts=req.accounts,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    if req.query and req.query.strip():
+        query = req.query.strip()
+    else:
+        kw, anys = list(req.keywords), list(req.any_terms)
+        if not (req.hashtags or req.accounts or kw or anys):
+            kw, anys = xsearch.TREND_KEYWORDS, xsearch.TREND_ANY_TERMS  # 既定＝傾向集計
+        try:
+            query = xsearch.build_query(
+                hashtags=req.hashtags, accounts=req.accounts, keywords=kw, any_terms=anys,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     try:
         hits = xsearch.search_recent(
-            query, start_time=req.start_time, end_time=req.end_time, max_results=req.max_results,
+            query, start_time=req.start_time, end_time=req.end_time,
+            max_results=req.max_results, pages=req.pages,
         )
     except xsearch.SearchDisabled:
         raise HTTPException(status_code=503, detail="検索は未設定です（X_BEARER_TOKEN 未設定）")
@@ -244,3 +253,55 @@ async def discover(req: DiscoverRequest) -> DiscoverResponse:
             created_at=h.created_at, body_text=h.text, results=results, unmatched=unmatched,
         ))
     return DiscoverResponse(enabled=True, query=query, candidates=candidates)
+
+
+def _leader_names_colors():
+    """card_number → キャラ名／色リスト（傾向集計の正規化用）。"""
+    leaders = _leaders_index()
+    names = {n: lo.name for n, lo in leaders.items()}
+    colors = {n: [c for c in re.split(r"[/／・]", lo.color or "") if c] for n, lo in leaders.items()}
+    return names, colors
+
+
+@router.post("/trend")
+async def trend(req: TrendRequest) -> TrendResponse:
+    """全国の優勝リーダー傾向を集計する（設計 §16.6）。
+
+    `フラッグシップ (優勝 OR 全勝 OR 準優勝)` を全国横断で収集 → 各ポストの優勝リーダーを抽出 →
+    (投稿者×日) で重複除去・集計アカウント除外 → キャラ単位で分布を返す。DB 書き込みなし。
+    """
+    if not xsearch.is_enabled():
+        raise HTTPException(status_code=503, detail="検索は未設定です（X_BEARER_TOKEN 未設定）")
+    query = xsearch.build_query(
+        keywords=xsearch.TREND_KEYWORDS, any_terms=xsearch.TREND_ANY_TERMS,
+    )
+    try:
+        hits = xsearch.search_recent(
+            query, start_time=req.start_time, end_time=req.end_time,
+            max_results=req.max_results, pages=req.pages,
+        )
+    except xsearch.SearchDisabled:
+        raise HTTPException(status_code=503, detail="検索は未設定です（X_BEARER_TOKEN 未設定）")
+    except xsearch.SearchError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    names, colors = _leader_names_colors()
+    posts = []
+    for h in hits:
+        entries, _ = fextract.extract_results(h.text)
+        win = next((e for e in entries if e.placement == 1), None)
+        if win is None or not (win.card_number or win.leader_raw):
+            continue
+        posts.append(ftrend.WinnerPost(
+            author=h.author, date=(h.created_at or "")[:10],
+            card_number=win.card_number, leader_raw=win.leader_raw,
+            leader_name=names.get(win.card_number) if win.card_number else None,
+            tweet_url=h.tweet_url,
+        ))
+    items = ftrend.aggregate(posts, names, fextract._index(), colors_by_number=colors)
+    return TrendResponse(
+        enabled=True, query=query, collected=len(posts),
+        tournaments=sum(i.count for i in items),
+        items=[TrendItemOut(character=i.character, count=i.count, pct=i.pct,
+                            colors=i.colors, sample_url=i.sample_url) for i in items],
+    )

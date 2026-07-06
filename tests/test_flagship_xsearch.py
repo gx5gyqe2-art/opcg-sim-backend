@@ -197,7 +197,10 @@ def test_discover_upstream_error_is_502(client, monkeypatch):
     assert res.status_code == 502
 
 
-def test_discover_bad_request_when_empty(client, monkeypatch):
+def test_discover_empty_defaults_to_trend(client, monkeypatch):
+    # 全部未指定なら傾向集計モード（フラッグシップ 優勝…）を既定クエリにする（設計 §16.6）。
     monkeypatch.setenv("X_BEARER_TOKEN", "tok")
+    monkeypatch.setattr(R.xsearch, "search_recent", lambda *a, **k: [])
     res = client.post("/api/flagship/discover", json={})
-    assert res.status_code == 400
+    assert res.status_code == 200
+    assert "フラッグシップ" in res.json()["query"] and "優勝" in res.json()["query"]
