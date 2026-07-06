@@ -121,3 +121,61 @@ class ExtractResponse(BaseModel):
 class OembedOut(BaseModel):
     """oEmbed 代理取得の本文（取れなければエンドポイントは 404）。"""
     body_text: str
+
+
+class IngestRequest(BaseModel):
+    """`POST /api/flagship/ingest` の body。X ポスト URL を渡す（設計 §15）。"""
+    url: str
+
+
+class IngestResponse(BaseModel):
+    """URL からの取得 + 抽出をまとめて返す（取得できなければエンドポイントは 404）。
+
+    `body_text` は取得できた本文（人が確認・修正できるよう返す）。`results` は P3 抽出候補。
+    確定は従来どおり `PUT /events/{id}/results`。
+    """
+    tweet_url: str
+    body_text: str
+    author: Optional[str] = None
+    author_name: Optional[str] = None
+    created_at: Optional[str] = None
+    source: str = "syndication"
+    results: List[ExtractedEntryOut]
+    unmatched: List[str] = []
+
+
+class DiscoverStatusOut(BaseModel):
+    """`GET /api/flagship/discover/status`。検索機能が使えるか（Bearer Token 有無）。"""
+    enabled: bool
+
+
+class DiscoverRequest(BaseModel):
+    """`POST /api/flagship/discover` の body（設計 §16）。
+
+    `hashtags`／`accounts`（@handle・URL・handle いずれも可）の少なくとも一方を渡す。
+    `query` を渡せばそれを優先（高度な演算子の直接指定）。`start_time`/`end_time` は RFC3339。
+    """
+    hashtags: List[str] = []
+    accounts: List[str] = []
+    query: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    max_results: int = 10
+
+
+class DiscoveredCandidate(BaseModel):
+    """検索で見つかったポスト 1 件＋P3 抽出結果。人が確認して開催へ紐付ける。"""
+    tweet_url: str
+    author: Optional[str] = None
+    author_name: Optional[str] = None
+    created_at: Optional[str] = None
+    body_text: str
+    results: List[ExtractedEntryOut]
+    unmatched: List[str] = []
+
+
+class DiscoverResponse(BaseModel):
+    """検索結果（候補ポスト一覧）。DB には書かない（サジェスト）。"""
+    enabled: bool = True
+    query: str
+    candidates: List[DiscoveredCandidate]
