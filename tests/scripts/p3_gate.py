@@ -78,11 +78,18 @@ def main():
     ap.add_argument("--rotate-leaders", action="store_true",
                     help="評価対局のリーダーを全リーダーから抽選＋リアルデッキ化"
                          "（p3_run --rotate-leaders で学習した場合は分布を揃えるため指定推奨）")
+    ap.add_argument("--cur", type=int, default=None,
+                    help="比較する世代を明示指定（既定=manifestのgen）。任意世代ペアの事後再測用")
+    ap.add_argument("--opp", type=int, default=None,
+                    help="対戦相手の世代を明示指定（既定=--vs-gen0なら0・でなければcur-1）")
+    ap.add_argument("--opp-sims", type=int, default=None,
+                    help="相手側だけ別sims（既定=--simsと同じ）。同一世代で深さ差の強度寄与を測る用"
+                         "（例: --cur 1 --opp 1 --sims 320 --opp-sims 160）")
     args = ap.parse_args()
 
     ensure_wt()
     man = json.load(open(CK + "/manifest.json"))
-    cur = man["gen"]
+    cur = man["gen"] if args.cur is None else args.cur
 
     if args.release:
         if man.get("status") != "AWAITING_GATE":
@@ -96,7 +103,7 @@ def main():
 
     if cur == 0:
         print("まだ Gen1 が無い（gen=0）。積み上げ未完。"); return 1
-    opp = 0 if args.vs_gen0 else cur - 1
+    opp = args.opp if args.opp is not None else (0 if args.vs_gen0 else cur - 1)
     db = _load_db()
     vocab = E.build_vocab(db)
     game = OPCGGame()
@@ -109,8 +116,9 @@ def main():
     ev_cur, ev_opp = _net_enc_version(va), _net_enc_version(vb)
     print(f"符号化世代: Gen{cur}=v{ev_cur}  Gen{opp}=v{ev_opp}"
           + ("（異なる版の比較）" if ev_cur != ev_opp else ""), flush=True)
+    opp_sims = args.opp_sims if args.opp_sims is not None else args.sims
     a_new = P._agent(game, va, pa, vocab, args.sims, 1.5, ev_cur)
-    a_old = P._agent(game, vb, pb, vocab, args.sims, 1.5, ev_opp)
+    a_old = P._agent(game, vb, pb, vocab, opp_sims, 1.5, ev_opp)
     P._DB = db
 
     leaders = None
@@ -119,7 +127,8 @@ def main():
         leaders = all_leader_ids(db)
         print(f"リーダーローテーション ON: {len(leaders)} 種", flush=True)
 
-    print(f"=== ゲート: Gen{cur} vs Gen{opp}  N={args.pairs*2} CRN（sims={args.sims}） ===", flush=True)
+    sims_label = f"sims={args.sims}" if opp_sims == args.sims else f"sims={args.sims} vs {opp_sims}"
+    print(f"=== ゲート: Gen{cur} vs Gen{opp}  N={args.pairs*2} CRN（{sims_label}） ===", flush=True)
     t0 = time.perf_counter()
     r = P.cross_eval(game, a_new, a_old, args.pairs, leaders=leaders)
     n = r["games"]; p = (r["a_win"] + 0.5 * r["draw"]) / n
