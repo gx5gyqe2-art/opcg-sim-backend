@@ -6,14 +6,13 @@
 import logging
 import re
 import unicodedata
-from contextlib import closing
 from typing import Dict, Optional
 
 from fastapi import APIRouter, HTTPException
 
 from ..resources import card_db
-from . import db as fdb
 from . import extract as fextract
+from . import store as fstore
 from . import xfetch
 from . import xsearch
 from .schemas import (
@@ -61,8 +60,8 @@ def _resolve_entry(row: dict) -> ResultEntryOut:
     )
 
 
-def _detail_or_404(conn, event_id: int) -> EventResultsOut:
-    doc = fdb.get_event_results(conn, event_id)
+def _detail_or_404(store, event_id: int) -> EventResultsOut:
+    doc = store.get_event_results(event_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="event not found")
     doc["results"] = [_resolve_entry(r) for r in doc["results"]]
@@ -84,26 +83,24 @@ async def put_event_results(event_id: int, req: ResultsPutRequest) -> EventResul
     for r in req.results:
         if r.leader_card_number and r.leader_card_number not in leaders:
             raise HTTPException(status_code=422, detail=f"未知のリーダー: {r.leader_card_number}")
-    with closing(fdb.connect()) as conn:
-        url = req.post.url if req.post else None
-        if url:
-            owner = fdb.find_url_owner(conn, url)
-            if owner is not None and owner != event_id:
-                raise HTTPException(status_code=409, detail=f"このポストURLは開催 #{owner} に登録済みです")
-        fdb.replace_event_results(
-            conn,
-            event=req.event.model_dump(),
-            post=req.post.model_dump() if req.post else None,
-            results=[r.model_dump() for r in req.results],
-        )
-        return _detail_or_404(conn, event_id)
+    store = fstore.get_store()
+    url = req.post.url if req.post else None
+    if url:
+        owner = store.find_url_owner(url)
+        if owner is not None and owner != event_id:
+            raise HTTPException(status_code=409, detail=f"このポストURLは開催 #{owner} に登録済みです")
+    store.replace_event_results(
+        event=req.event.model_dump(),
+        post=req.post.model_dump() if req.post else None,
+        results=[r.model_dump() for r in req.results],
+    )
+    return _detail_or_404(store, event_id)
 
 
 @router.get("/results")
 async def series_summary(series_id: int) -> SeriesSummaryOut:
     """シリーズ内で結果を持つ開催のサマリ（一覧の優勝リーダー/回収バッジ用オーバーレイ）。"""
-    with closing(fdb.connect()) as conn:
-        rows = fdb.get_series_summary(conn, series_id)
+    rows = fstore.get_store().get_series_summary(series_id)
     items = []
     for row in rows:
         winner: Optional[ResultEntryOut] = None
@@ -123,15 +120,13 @@ async def series_summary(series_id: int) -> SeriesSummaryOut:
 @router.get("/events/{event_id}/results")
 async def event_results(event_id: int) -> EventResultsOut:
     """開催詳細（スナップショット + ポスト + 全 placement）。"""
-    with closing(fdb.connect()) as conn:
-        return _detail_or_404(conn, event_id)
+    return _detail_or_404(fstore.get_store(), event_id)
 
 
 @router.delete("/events/{event_id}/results")
 async def delete_event_results(event_id: int) -> dict:
     """結果の取り消し（誤登録の削除）。開催スナップショット行は残す。"""
-    with closing(fdb.connect()) as conn:
-        deleted = fdb.delete_event_results(conn, event_id)
+    deleted = fstore.get_store().delete_event_results(event_id)
     return {"status": "ok", "deleted": deleted}
 
 

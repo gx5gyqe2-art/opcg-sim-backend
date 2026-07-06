@@ -77,6 +77,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 | `tests/test_flagship_extract.py` | フラッグシップ結果抽出（`opcg_sim/api/flagship/extract.py`、LLM不使用の辞書マッチング、設計 docs/design.md §13）。137リーダーのエイリアス生成（正規名・短縮名・色略称）／順位パターン写像（優勝/準優勝/N位/ベストN）／色略称の card_number 一意化／同名（クロコダイル等）の曖昧化／confidence／NFKC正規化／`/extract`・`/oembed` の API 契約 |
 | `tests/test_flagship_xfetch.py` | X ポスト本文取得（`opcg_sim/api/flagship/xfetch.py`、syndication API 主軸・oEmbed フォールバック、設計 docs/design.md §15）。URL→tweet id 抽出／決定的トークン算出／syndication JSON の本文組み立て（note_tweet 優先＝長文対応）／oEmbed フォールバック／取得不可時 None／`/ingest`（取得+抽出の一気通貫）・`/oembed` の API 契約。ネットワークは monkeypatch で遮断（ヘルメティック） |
 | `tests/test_flagship_xsearch.py` | X recent search による結果ポスト発見（`opcg_sim/api/flagship/xsearch.py`、有料 X API v2、設計 docs/design.md §16）。クエリ構築（ハッシュタグ×アカウントの OR＋`-is:retweet`/`lang`）／@handle・URL からの username 抽出／v2 レスポンス整形（author 突き合わせ・note_tweet 優先・url 生成・空本文除外）／`X_BEARER_TOKEN` 無効時の graceful degrade／`/discover`・`/discover/status` の API 契約（無効=503・上流エラー=502・空指定=400）。ネットワークは monkeypatch で遮断 |
+| `tests/test_flagship_store.py` | flagship 結果永続化ストア（`opcg_sim/api/flagship/store.py`、設計 docs/design.md §17）。`get_store()` の選択（Firestore 有→FirestoreStore／無→SqliteStore の graceful degrade）／FirestoreStore の全置換・取得・削除（スナップショット保持）・シリーズサマリ・URL 重複判定を**インメモリ Fake Firestore** で検証／`resources.db` を差し替えて API 全経路（PUT→サマリ→詳細→409→DELETE）が Firestore バックエンドでも SQLite と同挙動になることを確認 |
 
 ### カード効果（パーサ/ゴールデン/全カード・回帰/安定性）
 | ファイル | 役割 |
