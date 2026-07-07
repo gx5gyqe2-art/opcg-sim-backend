@@ -36,6 +36,7 @@ class _Ref:
             self._col._docs[self.id] = dict(data)
     def update(self, patch): self._col._docs.setdefault(self.id, {}).update(patch)
     def get(self): return _Snap(self.id, self._col._docs.get(self.id))
+    def delete(self): self._col._docs.pop(self.id, None)
 
 class _Col:
     def __init__(self): self._docs = {}
@@ -95,3 +96,10 @@ def test_reupsert_preserves_event_id(store):
 
 def test_set_event_missing_returns_zero(store):
     assert store.set_event("nope", 1) == 0
+
+
+def test_delete_removes_rows(store):
+    # 承認時の掃除（§16.7）: 指定 tweet を完全削除。存在しない ID は数えない。
+    store.upsert([_post("1"), _post("2", author="b"), _post("3", author="c")])
+    assert store.delete(["1", "3", "nope"]) == 2
+    assert {r["tweet_id"] for r in store.list()} == {"2"}

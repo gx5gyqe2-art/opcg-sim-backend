@@ -1,9 +1,10 @@
-"""収集した優勝ポストの永続化（設計 §16.7・案1）。
+"""収集した優勝ポストの一時保管（設計 §16.7）。
 
-X から収集した優勝ポスト（tweet 単位）と、その TCG+ 開催への紐付け（`event_id`）を貯める。
-Firestore（コレクション `flagship_winner_posts`・doc=tweet_id）を第一候補に、未設定なら SQLite
-へフォールバック（`store.py` と同方針）。**tweet_id で重複除去**し、**再収集で既存の `event_id`
-（人の承認結果）は上書きしない**。定期ジョブは無く、手動収集をここに貯めて月次トレンド/紐付けを伸ばす。
+X から収集した優勝ポスト（tweet 単位）を、開催への紐付けレビュー用に**一時的に**貯める。
+Firestore（コレクション `flagship_winner_posts`・doc=tweet_id）第一・未設定なら SQLite フォールバック
+（`store.py` と同方針）。**tweet_id で重複除去**。**承認（紐付け確定）した収集ポストは削除**する
+＝ポスト内容は恒久保持しない（結果は `flagship_events` に別途保存済み・ユーザ決定 2026-07-06）。
+定期ジョブは無く手動収集をここに貯める。
 """
 import sqlite3
 from contextlib import closing
@@ -81,6 +82,13 @@ class SqliteWinnerStore:
             cur = c.execute("UPDATE winner_posts SET event_id=? WHERE tweet_id=?", (event_id, str(tweet_id)))
             return cur.rowcount
 
+    def delete(self, tweet_ids: List[str]) -> int:
+        n = 0
+        with closing(self._connect()) as c, c:
+            for t in tweet_ids:
+                n += c.execute("DELETE FROM winner_posts WHERE tweet_id=?", (str(t),)).rowcount
+        return n
+
 
 class FirestoreWinnerStore:
     def __init__(self, client):
@@ -116,6 +124,15 @@ class FirestoreWinnerStore:
             return 0
         ref.update({"event_id": event_id})
         return 1
+
+    def delete(self, tweet_ids: List[str]) -> int:
+        n = 0
+        for t in tweet_ids:
+            ref = self._col().document(str(t))
+            if getattr(ref.get(), "exists", False):
+                ref.delete()
+                n += 1
+        return n
 
 
 def get_winner_store():

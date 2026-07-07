@@ -14,6 +14,7 @@ from opcg_sim.api import app as A
 from opcg_sim.api import resources
 from opcg_sim.api.flagship import match as M
 from opcg_sim.api.flagship import router as R
+from opcg_sim.api.flagship import winnerstore as W
 from opcg_sim.api.flagship import xsearch as S
 
 
@@ -54,17 +55,27 @@ def test_review_matches_by_handle_and_lists_unlinked(client, monkeypatch):
     assert by["222"]["candidates"] == []          # 個人ポストは未紐付けのまま
 
 
-def test_approve_persists_and_removes_from_unlinked(client, monkeypatch):
+def test_approve_deletes_collected_post(client, monkeypatch):
+    # 結果はフロントが別途 PUT 済みの想定。承認＝紐付け確定で収集ポストを掃除する（§16.7）。
     _seed_collect(client, monkeypatch)
     events = [M.StoreEvent(1, "ゲームスペース鶴岡", "2026-07-05", "https://x.com/shopA")]
     monkeypatch.setattr(R.tcgplus, "fetch_events", lambda sid: events)
-    # 承認
     res = client.post("/api/flagship/link/approve", json={"links": [{"tweet_id": "111", "event_id": 1}]})
     assert res.status_code == 200 and res.json()["updated"] == 1
-    # 承認後、111 はレビュー（未紐付け）から消える
+    # 承認した収集ポストは winner_posts から完全に削除（ポスト内容は恒久保持しない）
+    all_ids = {p["tweet_id"] for p in W.get_winner_store().list()}
+    assert "111" not in all_ids and "222" in all_ids
+    # レビュー（未紐付け）にも当然出ない
     body = client.get("/api/flagship/link/review", params={"series_id": 7395}).json()
     assert "111" not in {p["tweet_id"] for p in body["posts"]}
-    assert "222" in {p["tweet_id"] for p in body["posts"]}
+
+
+def test_approve_null_unlinks_and_keeps_row(client, monkeypatch):
+    # event_id=null は紐付け解除＝行は残す（未紐付けへ戻すだけ・削除しない）。
+    _seed_collect(client, monkeypatch)
+    res = client.post("/api/flagship/link/approve", json={"links": [{"tweet_id": "222", "event_id": None}]})
+    assert res.status_code == 200
+    assert "222" in {p["tweet_id"] for p in W.get_winner_store().list()}
 
 
 def test_review_tcgplus_error_falls_back_to_master(client, monkeypatch):

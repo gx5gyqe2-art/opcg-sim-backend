@@ -276,3 +276,17 @@ class EventListOut(BaseModel):
     """`GET /api/flagship/events?series_id=`。永続化した開催マスター（過去含む）。"""
     series_id: int
     events: List[EventOut]
+
+
+class StoreSnsRequest(BaseModel):
+    """`POST /api/flagship/stores/sns`（設計 §16.9）。店名 → 店舗X を手動登録。
+
+    `sns_url` は URL でも `@handle` でも可（サーバーで URL 正規化）。空/None で登録解除。
+    """
+    store: str = Field(min_length=1)
+    sns_url: Optional[str] = None
+
+
+class StoreSnsResponse(BaseModel):
+    store: str
+    sns_url: Optional[str] = None
