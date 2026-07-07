@@ -42,14 +42,26 @@ def all_leader_ids(db: CardLoader) -> List[str]:
     ブロック・40種）は除外＝137→97。1リーダーあたりの学習/評価データ希釈を減らす目的。訓練も評価も
     本関数を共用するため除外は train/eval で自動一致する（分布ずれを作らない）。フラッグシップ機能の
     リーダー辞書（全137件）は別ソースで本除外の影響を受けない。
+
+    **クラスタ学習（案B）**: 環境変数 `OPCG_LEADER_COLORS`（色名カンマ区切り・例 `赤` / `赤,紫`）を
+    セットすると、指定色を**1つでも含む**リーダーだけに絞る（狭い分布＝v1的な速い climb を狙う）。
+    未設定なら従来どおり97種全部。プロセス起動時の env で決まる（1プロセス=1クラスタ）。
     """
     global _ALL_LEADERS
     if _ALL_LEADERS is None:
+        import os
+        want = os.environ.get("OPCG_LEADER_COLORS")
+        want_set = set(s.strip() for s in want.split(",") if s.strip()) if want else None
         out = []
         for cid in db.raw_db.keys():
             c = db.get_card(cid)
-            if c is not None and c.type.name == "LEADER" and str(getattr(c, "block_icon", "")) != "1":
-                out.append(cid)
+            if c is None or c.type.name != "LEADER" or str(getattr(c, "block_icon", "")) == "1":
+                continue
+            if want_set is not None:
+                cols = {getattr(col, "value", str(col)) for col in (getattr(c, "colors", None) or [])}
+                if not (cols & want_set):
+                    continue
+            out.append(cid)
         _ALL_LEADERS = sorted(out)
     return _ALL_LEADERS
 

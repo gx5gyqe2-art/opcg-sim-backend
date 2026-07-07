@@ -39,9 +39,11 @@ from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
 import p3_loop as P
 
-WT = "/tmp/p3ckpt-wt"
+# checkpoint の worktree/枝は環境変数で上書き可（案B: クラスタ別に別 checkpoint 枝へ隔離し、
+# 案A の /tmp/p3ckpt-wt・claude/p3-checkpoints と衝突させない）。未設定なら従来の既定。
+WT = os.environ.get("OPCG_P3_WT", "/tmp/p3ckpt-wt")
 CK = WT + "/p3ckpt"
-BR = "claude/p3-checkpoints"
+BR = os.environ.get("OPCG_P3_BRANCH", "claude/p3-checkpoints")
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TARGET_DEFAULT = 10000
 
