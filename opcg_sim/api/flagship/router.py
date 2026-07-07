@@ -417,7 +417,14 @@ async def link_review(series_id: int) -> LinkReviewResponse:
 
 @router.post("/link/approve")
 async def link_approve(req: LinkApproveRequest) -> LinkApproveResponse:
-    """承認した (ポスト→開催) をまとめて保存する（event_id=null で解除）。"""
+    """承認した (ポスト→開催) を確定する（設計 §16.7）。
+
+    結果は別途 `PUT /events/{id}/results` で保存済みのため、**承認した収集ポストは winner_posts
+    から削除**する（ポスト内容は恒久保持しない）。`event_id=null` は紐付け解除（未紐付けへ戻す）。
+    """
     store = fwinner.get_winner_store()
-    updated = sum(store.set_event(x.tweet_id, x.event_id) for x in req.links)
+    approved = [x.tweet_id for x in req.links if x.event_id is not None]
+    unlinked = [x.tweet_id for x in req.links if x.event_id is None]
+    updated = store.delete(approved)
+    updated += sum(store.set_event(t, None) for t in unlinked)
     return LinkApproveResponse(updated=updated)
