@@ -32,18 +32,23 @@ _ALL_LEADERS: Optional[List[str]] = None
 
 
 def all_leader_ids(db: CardLoader) -> List[str]:
-    """DB 内の全リーダー card_id（ソート済み・キャッシュ）。自己対戦の分布多様化用プール。
+    """自己対戦/評価の rotate-leaders プール（ソート済み・キャッシュ）。分布多様化用。
 
     検証済み5種（`VERIFIED_LEADERS`）は挙動を手動検証済みだが、本プールは未検証リーダーを含む。
     自己対戦の**盤面分布を広げる**（人間ログ転移の改善狙い）用途で、効果バグで壊れた局は
     `collect_game` 側で自動破棄される（学習データには混ざらない）。回帰テストには使わない。
+
+    **プール範囲（ユーザ決定 2026-07-06）**: `block_icon==1`（OP01〜OP02 世代の旧ローテーション
+    ブロック・40種）は除外＝137→97。1リーダーあたりの学習/評価データ希釈を減らす目的。訓練も評価も
+    本関数を共用するため除外は train/eval で自動一致する（分布ずれを作らない）。フラッグシップ機能の
+    リーダー辞書（全137件）は別ソースで本除外の影響を受けない。
     """
     global _ALL_LEADERS
     if _ALL_LEADERS is None:
         out = []
         for cid in db.raw_db.keys():
             c = db.get_card(cid)
-            if c is not None and c.type.name == "LEADER":
+            if c is not None and c.type.name == "LEADER" and str(getattr(c, "block_icon", "")) != "1":
                 out.append(cid)
         _ALL_LEADERS = sorted(out)
     return _ALL_LEADERS
