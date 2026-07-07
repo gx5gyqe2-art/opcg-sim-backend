@@ -259,3 +259,20 @@ class LinkApproveRequest(BaseModel):
 
 class LinkApproveResponse(BaseModel):
     updated: int
+
+
+class EventOut(BaseModel):
+    """開催マスターの1件（設計 §16.8・TCG+スナップショット）。"""
+    id: int
+    series_id: int
+    start_datetime: str = ""
+    store: str = ""
+    pref: str = ""
+    capacity: Optional[int] = None
+    sns_url: Optional[str] = None
+
+
+class EventListOut(BaseModel):
+    """`GET /api/flagship/events?series_id=`。永続化した開催マスター（過去含む）。"""
+    series_id: int
+    events: List[EventOut]

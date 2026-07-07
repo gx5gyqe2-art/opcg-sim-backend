@@ -3,9 +3,10 @@
 フロントは表示用に TCG+ を直取得するが、収集ポストとの照合（`match.py`）はサーバー側で行うため
 ここでも開催（店×日・snsUrl）を取得する。`api.bandai-tcg-plus.com` は公開・認証不要（CORS開放）。
 """
+import time
 import requests
 
-from typing import List
+from typing import Dict, List, Tuple
 
 from .match import StoreEvent
 
@@ -14,6 +15,8 @@ _UA = "opcg-sim-flagship/1.0"
 _TIMEOUT = 15
 _PAGE = 100
 _MAX_PAGES = 40   # 暴走防止（1シリーズ ~1100件 = 11ページ）。
+_CACHE_TTL = 120  # 秒。/events と /link/review が TCG+ を叩き直さないよう共有キャッシュ。
+_cache: Dict[int, Tuple[float, List[StoreEvent]]] = {}
 
 
 class TcgPlusError(RuntimeError):
@@ -21,7 +24,17 @@ class TcgPlusError(RuntimeError):
 
 
 def fetch_events(series_id: int) -> List[StoreEvent]:
-    """シリーズの全開催を StoreEvent（照合対象）で返す。失敗時 `TcgPlusError`。"""
+    """シリーズの全開催を StoreEvent（照合対象）で返す。短時間キャッシュ付き。失敗時 `TcgPlusError`。"""
+    hit = _cache.get(series_id)
+    now = time.time()
+    if hit and hit[0] > now:
+        return hit[1]
+    events = _fetch_events_uncached(series_id)
+    _cache[series_id] = (now + _CACHE_TTL, events)
+    return events
+
+
+def _fetch_events_uncached(series_id: int) -> List[StoreEvent]:
     out: List[StoreEvent] = []
     offset = 0
     total = 1
@@ -55,6 +68,8 @@ def fetch_events(series_id: int) -> List[StoreEvent]:
                 date=sd[:10],
                 sns_url=e.get("organizer_sns_url") or "",
                 pref=e.get("place") or "",
+                start_datetime=sd,
+                capacity=e.get("max_join_count"),
             ))
         offset += _PAGE
     return out
