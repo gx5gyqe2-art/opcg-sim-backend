@@ -15,6 +15,7 @@ from . import eventmaster as feventmaster
 from . import extract as fextract
 from . import match as fmatch
 from . import store as fstore
+from . import storesns as fstoresns
 from . import tcgplus
 from . import trend as ftrend
 from . import winnerstore as fwinner
@@ -28,6 +29,7 @@ from .schemas import (
     LeaderOut, OembedOut, ResultEntryOut, ResultsPutRequest,
     ReviewCandidateOut, ReviewPostOut,
     SeriesSummaryItem, SeriesSummaryOut,
+    StoreSnsRequest, StoreSnsResponse,
     TrendItemOut, TrendRequest, TrendResponse,
 )
 
@@ -373,7 +375,8 @@ def _sync_event_master(series_id: int) -> list:
             "start_datetime": e.start_datetime or e.date, "store": e.store,
             "pref": e.pref, "capacity": e.capacity, "sns_url": e.sns_url,
         } for e in current if e.event_id is not None])
-    return master.list(series_id)
+    # 手動店舗X（§16.9）を上書き優先でかぶせる（TCG+ が未登録でも残る）。
+    return fstoresns.overlay(master.list(series_id))
 
 
 def _storeevent_of(d: dict) -> "fmatch.StoreEvent":
@@ -392,6 +395,23 @@ async def events(series_id: int) -> EventListOut:
     """
     rows = _sync_event_master(series_id)
     return EventListOut(series_id=series_id, events=[EventOut(**r) for r in rows])
+
+
+@router.post("/stores/sns")
+async def set_store_sns(req: StoreSnsRequest) -> StoreSnsResponse:
+    """店名 → 店舗X を手動登録する（設計 §16.9）。開催マスターへ上書き優先でかぶさる。
+
+    `sns_url` は URL でも `@handle` でも可（URL へ正規化）。空/None で登録解除。TCG+ 再同期でも消えない。
+    """
+    store = req.store.strip()
+    if not store:
+        raise HTTPException(status_code=400, detail="store は必須です")
+    sns = (req.sns_url or "").strip()
+    if sns:
+        handle = xsearch.parse_handle(sns)
+        sns = f"https://x.com/{handle}" if handle else sns
+    fstoresns.get_store_sns().set(store, sns or None)
+    return StoreSnsResponse(store=store, sns_url=sns or None)
 
 
 @router.get("/link/review")
