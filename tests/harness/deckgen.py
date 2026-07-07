@@ -45,24 +45,45 @@ def all_leader_ids(db: CardLoader) -> List[str]:
 
     **クラスタ学習（案B）**: 環境変数 `OPCG_LEADER_COLORS`（色名カンマ区切り・例 `赤` / `赤,紫`）を
     セットすると、指定色を**1つでも含む**リーダーだけに絞る（狭い分布＝v1的な速い climb を狙う）。
-    未設定なら従来どおり97種全部。プロセス起動時の env で決まる（1プロセス=1クラスタ）。
+
+    **リーダー数スケーリング分析**: `OPCG_LEADER_POOL_SIZE=N` をセットすると、97を**6色ラウンドロビンで
+    交互取り**した先頭 N リーダーに絞る＝**色構成が常に均等（色差の交絡を除去）・小プール⊂大プール（入れ子）**。
+    「1リーダーあたり対局数 → 強度」曲線を N を変えて描く用（`OPCG_LEADER_COLORS` より優先）。
+
+    優先順位: POOL_SIZE > COLORS > 全97。プロセス起動時の env で決まる（1プロセス=1プール）。
     """
     global _ALL_LEADERS
     if _ALL_LEADERS is None:
         import os
-        want = os.environ.get("OPCG_LEADER_COLORS")
-        want_set = set(s.strip() for s in want.split(",") if s.strip()) if want else None
-        out = []
-        for cid in db.raw_db.keys():
-            c = db.get_card(cid)
-            if c is None or c.type.name != "LEADER" or str(getattr(c, "block_icon", "")) == "1":
-                continue
-            if want_set is not None:
-                cols = {getattr(col, "value", str(col)) for col in (getattr(c, "colors", None) or [])}
-                if not (cols & want_set):
-                    continue
-            out.append(cid)
-        _ALL_LEADERS = sorted(out)
+        # ベース＝block_icon==1 を除いた 97（card_id ソート＝決定的）。
+        base = sorted(cid for cid in db.raw_db.keys()
+                      if (lambda c: c is not None and c.type.name == "LEADER"
+                          and str(getattr(c, "block_icon", "")) != "1")(db.get_card(cid)))
+
+        def _primary(cid):
+            cols = [getattr(x, "value", str(x)) for x in (getattr(db.get_card(cid), "colors", None) or [])]
+            return cols[0] if cols else "?"
+
+        size = os.environ.get("OPCG_LEADER_POOL_SIZE")
+        colors = os.environ.get("OPCG_LEADER_COLORS")
+        if size:
+            # 色バランス入れ子プール: 6色を card_id 順にラウンドロビンで交互取り→先頭 N。
+            order = ["赤", "緑", "青", "紫", "黒", "黄", "?"]
+            by = {col: [cid for cid in base if _primary(cid) == col] for col in order}
+            interleaved, i = [], 0
+            while len(interleaved) < len(base):
+                for col in order:
+                    if i < len(by[col]):
+                        interleaved.append(by[col][i])
+                i += 1
+            _ALL_LEADERS = interleaved[: int(size)]
+        elif colors:
+            want_set = set(s.strip() for s in colors.split(",") if s.strip())
+            _ALL_LEADERS = [cid for cid in base
+                            if {getattr(x, "value", str(x))
+                                for x in (getattr(db.get_card(cid), "colors", None) or [])} & want_set]
+        else:
+            _ALL_LEADERS = base
     return _ALL_LEADERS
 
 
