@@ -53,12 +53,14 @@ def extract_handle(url: str) -> Optional[str]:
 
 @dataclass
 class StoreEvent:
-    """照合対象の TCG+ 開催（店×日）。"""
+    """照合対象の TCG+ 開催（店×日）。開催マスター永続化にも使う（設計 §16.8）。"""
     event_id: int
     store: str
     date: str                 # YYYY-MM-DD
     sns_url: Optional[str] = None
     pref: str = ""
+    start_datetime: str = ""
+    capacity: Optional[int] = None
 
     @property
     def handle(self) -> Optional[str]:

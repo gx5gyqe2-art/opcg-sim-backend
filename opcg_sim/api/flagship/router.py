@@ -11,6 +11,7 @@ from typing import Dict, Optional
 from fastapi import APIRouter, HTTPException
 
 from ..resources import card_db
+from . import eventmaster as feventmaster
 from . import extract as fextract
 from . import match as fmatch
 from . import store as fstore
@@ -21,7 +22,7 @@ from . import xfetch
 from . import xsearch
 from .schemas import (
     CollectResponse, DiscoveredCandidate, DiscoverRequest, DiscoverResponse, DiscoverStatusOut,
-    EventResultsOut, ExtractedEntryOut, ExtractRequest, ExtractResponse,
+    EventListOut, EventOut, EventResultsOut, ExtractedEntryOut, ExtractRequest, ExtractResponse,
     IngestRequest, IngestResponse,
     LinkApproveRequest, LinkApproveResponse, LinkReviewResponse,
     LeaderOut, OembedOut, ResultEntryOut, ResultsPutRequest,
@@ -356,16 +357,50 @@ async def collect(req: TrendRequest) -> CollectResponse:
     return CollectResponse(enabled=True, query=query, collected=len(rows))
 
 
-@router.get("/link/review")
-async def link_review(series_id: int) -> LinkReviewResponse:
-    """未紐付けの収集ポストを、指定シリーズの TCG+ 開催へ照合したレビュー表を返す（設計 §16.7）。
+def _sync_event_master(series_id: int) -> list:
+    """TCG+ 最新を開催マスターへ upsert し、マスター（過去含む）を dict で返す（設計 §16.8）。
 
-    handle 一致は `auto=true`（自動確定候補）、表示名一致は要承認。候補ゼロのポストも含める。
+    TCG+ が過去開催を消しても、once スナップショットした分は残る。TCG+ 不達でもマスターを返す。
     """
     try:
-        events = tcgplus.fetch_events(series_id)
-    except tcgplus.TcgPlusError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        current = tcgplus.fetch_events(series_id)
+    except tcgplus.TcgPlusError:
+        current = []
+    master = feventmaster.get_event_master()
+    if current:
+        master.upsert([{
+            "id": e.event_id, "series_id": series_id,
+            "start_datetime": e.start_datetime or e.date, "store": e.store,
+            "pref": e.pref, "capacity": e.capacity, "sns_url": e.sns_url,
+        } for e in current if e.event_id is not None])
+    return master.list(series_id)
+
+
+def _storeevent_of(d: dict) -> "fmatch.StoreEvent":
+    sd = d.get("start_datetime") or ""
+    return fmatch.StoreEvent(
+        event_id=d["id"], store=d.get("store") or "", date=sd[:10],
+        sns_url=d.get("sns_url"), pref=d.get("pref") or "", start_datetime=sd, capacity=d.get("capacity"),
+    )
+
+
+@router.get("/events")
+async def events(series_id: int) -> EventListOut:
+    """開催マスター（TCG+ 最新を upsert 済み・過去含む）を返す（設計 §16.8）。
+
+    フロントはこれを唯一の開催取得元にする。TCG+ が過去開催を消しても保持分は残る。
+    """
+    rows = _sync_event_master(series_id)
+    return EventListOut(series_id=series_id, events=[EventOut(**r) for r in rows])
+
+
+@router.get("/link/review")
+async def link_review(series_id: int) -> LinkReviewResponse:
+    """未紐付けの収集ポストを、指定シリーズの開催へ照合したレビュー表を返す（設計 §16.7）。
+
+    照合は開催マスター（過去含む）に対して行う。handle 一致は `auto=true`、表示名一致は要承認。
+    """
+    events = [_storeevent_of(r) for r in _sync_event_master(series_id)]
     posts = fwinner.get_winner_store().list(only_unlinked=True)
     out = []
     for p in posts:

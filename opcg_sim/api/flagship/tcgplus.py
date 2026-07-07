@@ -55,6 +55,8 @@ def fetch_events(series_id: int) -> List[StoreEvent]:
                 date=sd[:10],
                 sns_url=e.get("organizer_sns_url") or "",
                 pref=e.get("place") or "",
+                start_datetime=sd,
+                capacity=e.get("max_join_count"),
             ))
         offset += _PAGE
     return out

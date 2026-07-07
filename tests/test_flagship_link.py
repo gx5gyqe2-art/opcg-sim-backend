@@ -67,14 +67,17 @@ def test_approve_persists_and_removes_from_unlinked(client, monkeypatch):
     assert "222" in {p["tweet_id"] for p in body["posts"]}
 
 
-def test_review_tcgplus_error_is_502(client, monkeypatch):
+def test_review_tcgplus_error_falls_back_to_master(client, monkeypatch):
     _seed_collect(client, monkeypatch)
 
     def boom(sid):
         raise R.tcgplus.TcgPlusError("TCG+ down")
 
     monkeypatch.setattr(R.tcgplus, "fetch_events", boom)
-    assert client.get("/api/flagship/link/review", params={"series_id": 7395}).status_code == 502
+    res = client.get("/api/flagship/link/review", params={"series_id": 7395})
+    # TCG+ 不達でもマスターを使う（今回はマスター空→候補なし・200）。
+    assert res.status_code == 200
+    assert all(not p["candidates"] for p in res.json()["posts"])
 
 
 def test_collect_disabled_is_503(client, monkeypatch):
