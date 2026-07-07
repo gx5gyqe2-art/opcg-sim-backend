@@ -135,9 +135,24 @@ def build_query(
     return " ".join(parts)
 
 
-# 全国の優勝ポストを拾う既定の傾向集計クエリ材料（設計 §16.6）。
-TREND_KEYWORDS = ["フラッグシップ"]
+# 全国の優勝ポストを拾う既定の傾向集計クエリ材料（設計 §16.6 / §16.10）。
+# イベント語は **OR で広げる**: 実結果ポストの多くは「フラッグシップバトル」と一語で書き、
+# X の日本語検索はトークン単位のため素の「フラッグシップ」ではマッチしない（実データ 2026-07-07）。
+TREND_EVENT_TERMS = ["フラッグシップ", "フラッグシップバトル", "#フラッグシップバトル", "#フラッグシップ", "フラバ"]
 TREND_ANY_TERMS = ["優勝", "全勝", "準優勝"]
+# 後方互換（旧: 単一素キーワード）。既定の収集/発見は build_trend_query を使う。
+TREND_KEYWORDS = ["フラッグシップ"]
+
+
+def build_trend_query(exclude_terms: Optional[List[str]] = None) -> str:
+    """全国傾向・収集・既定発見の共通クエリ（設計 §16.6 / §16.10）。
+
+    `(フラッグシップ OR フラッグシップバトル OR #フラッグシップバトル OR #フラッグシップ OR フラバ)
+    (優勝 OR 全勝 OR 準優勝)` に物販語除外・RT除外・`lang:ja` を付ける。イベント語を OR で広げ、
+    「フラッグシップバトル」一語表記の結果ポストの取りこぼしを防ぐ。
+    """
+    event = _or_group([_term(t) for t in TREND_EVENT_TERMS])
+    return build_query(any_terms=TREND_ANY_TERMS, extra=event, exclude_terms=exclude_terms)
 
 
 def _hit_from(item: dict, users: dict) -> Optional[SearchHit]:
