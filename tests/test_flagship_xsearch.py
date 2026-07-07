@@ -78,6 +78,15 @@ def test_build_query_requires_something():
         S.build_query()
 
 
+def test_build_trend_query_ors_event_synonyms():
+    # イベント語は OR で広げる（「フラッグシップバトル」一語表記の取りこぼし防止・§16.10）。
+    q = S.build_trend_query()
+    assert "フラッグシップ OR フラッグシップバトル" in q   # 素の語＋一語表記の両方を OR
+    assert "#フラッグシップバトル" in q                    # ハッシュタグ表記も OR に含む
+    assert "(優勝 OR 全勝 OR 準優勝)" in q                  # 勝利語の OR 群
+    assert "-買取" in q and "-is:retweet" in q and "lang:ja" in q
+
+
 # --- 有効/無効 --------------------------------------------------------------
 
 def test_is_enabled_reflects_token(monkeypatch):

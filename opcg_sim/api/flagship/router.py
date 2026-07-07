@@ -232,13 +232,13 @@ async def discover(req: DiscoverRequest) -> DiscoverResponse:
         raise HTTPException(status_code=503, detail="検索は未設定です（X_BEARER_TOKEN 未設定）")
     if req.query and req.query.strip():
         query = req.query.strip()
+    elif not (req.hashtags or req.accounts or req.keywords or req.any_terms):
+        query = xsearch.build_trend_query()  # 既定＝傾向集計（イベント語を OR で拡張・§16.10）
     else:
-        kw, anys = list(req.keywords), list(req.any_terms)
-        if not (req.hashtags or req.accounts or kw or anys):
-            kw, anys = xsearch.TREND_KEYWORDS, xsearch.TREND_ANY_TERMS  # 既定＝傾向集計
         try:
             query = xsearch.build_query(
-                hashtags=req.hashtags, accounts=req.accounts, keywords=kw, any_terms=anys,
+                hashtags=req.hashtags, accounts=req.accounts,
+                keywords=req.keywords, any_terms=req.any_terms,
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -280,9 +280,7 @@ async def trend(req: TrendRequest) -> TrendResponse:
     """
     if not xsearch.is_enabled():
         raise HTTPException(status_code=503, detail="検索は未設定です（X_BEARER_TOKEN 未設定）")
-    query = xsearch.build_query(
-        keywords=xsearch.TREND_KEYWORDS, any_terms=xsearch.TREND_ANY_TERMS,
-    )
+    query = xsearch.build_trend_query()  # イベント語を OR で拡張（§16.10）
     try:
         hits = xsearch.search_recent(
             query, start_time=req.start_time, end_time=req.end_time,
@@ -325,7 +323,7 @@ async def collect(req: TrendRequest) -> CollectResponse:
     """
     if not xsearch.is_enabled():
         raise HTTPException(status_code=503, detail="検索は未設定です（X_BEARER_TOKEN 未設定）")
-    query = xsearch.build_query(keywords=xsearch.TREND_KEYWORDS, any_terms=xsearch.TREND_ANY_TERMS)
+    query = xsearch.build_trend_query()  # イベント語を OR で拡張（§16.10）
     try:
         hits = xsearch.search_recent(
             query, start_time=req.start_time, end_time=req.end_time,
