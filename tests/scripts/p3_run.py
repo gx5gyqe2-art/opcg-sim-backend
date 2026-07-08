@@ -39,9 +39,9 @@ from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
 import p3_loop as P
 
-WT = "/tmp/p3ckpt-wt"
+WT = os.environ.get("OPCG_P3_WT", "/tmp/p3ckpt-wt")
 CK = WT + "/p3ckpt"
-BR = "claude/p3-checkpoints"
+BR = os.environ.get("OPCG_P3_BRANCH", "claude/p3-checkpoints")
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TARGET_DEFAULT = 10000
 
