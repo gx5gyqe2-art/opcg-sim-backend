@@ -79,7 +79,7 @@ def test_register_summary_detail_roundtrip(client):
     items = res.json()["items"]
     assert len(items) == 1
     assert items[0]["event_id"] == 7516027 and items[0]["result_count"] == 2
-    assert items[0]["winner"]["leader"]["name"] == "ロロノア・ゾロ"
+    assert [w["leader"]["name"] for w in items[0]["winners"]] == ["ロロノア・ゾロ"]
     assert items[0]["post_url"] == "https://x.com/foo/status/1"
 
     # 別シリーズのサマリには出ない
@@ -133,11 +133,17 @@ def test_url_conflict_409(client):
 
 
 def test_validation_errors(client):
-    # placement 重複
+    # 定員32では優勝は1件のみ（2優勝は不可）
     assert _put(client, results=[
         {"placement": 1, "leader_card_number": "OP01-001"},
         {"placement": 1, "leader_card_number": "OP01-002"},
-    ]).status_code == 422
+    ], capacity=32).status_code == 422
+    # 入賞(placement≥2)の重複は不可
+    assert _put(client, results=[
+        {"placement": 1, "leader_card_number": "OP01-001"},
+        {"placement": 2, "leader_card_number": "OP01-002"},
+        {"placement": 2, "leader_card_number": "OP01-003"},
+    ], capacity=64).status_code == 422
     # 優勝(1)なし
     assert _put(client, results=[{"placement": 2, "leader_card_number": "OP01-001"}]).status_code == 422
     # リーダー情報なし
@@ -152,6 +158,25 @@ def test_validation_errors(client):
         json={"event": _snapshot(2), "results": [{"placement": 1, "leader_card_number": "OP01-001"}]},
     )
     assert res.status_code == 400
+
+
+def test_two_winners_for_capacity_64(client):
+    """定員64の2ブロック開催は優勝2人を登録でき、サマリも2件返す（§16.11）。"""
+    res = _put(client, results=[
+        {"placement": 1, "leader_card_number": "OP01-001"},
+        {"placement": 1, "leader_card_number": "OP01-002"},
+        {"placement": 2, "leader_card_number": "OP02-001"},
+    ], capacity=64)
+    assert res.status_code == 200
+    # 詳細に優勝2件が入る
+    detail = client.get("/api/flagship/events/7516027/results").json()
+    assert [r["placement"] for r in detail["results"]] == [1, 1, 2]
+    # サマリの winners は2件
+    items = client.get("/api/flagship/results", params={"series_id": 7664}).json()["items"]
+    assert len(items) == 1
+    assert len(items[0]["winners"]) == 2
+    names = {w["leader"]["card_number"] for w in items[0]["winners"]}
+    assert names == {"OP01-001", "OP01-002"}
 
 
 # --- SQLite 遅延初期化 --------------------------------------------------------

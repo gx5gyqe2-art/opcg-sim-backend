@@ -116,12 +116,15 @@ class FirestoreStore:
             results = d.get("results") or []
             if not results:  # 結果を持つ開催のみ（SQLite の JOIN results と同じ）
                 continue
-            winner = next((r for r in results if r.get("placement") == 1), None)
+            # 優勝は定員64の2ブロック開催で2件になり得るため winners はリスト（§16.11）。
+            winners = [
+                {"leader_card_number": r.get("leader_card_number"), "leader_raw": r.get("leader_raw")}
+                for r in results if r.get("placement") == 1
+            ]
             out.append({
                 "event_id": int(snap.id),
                 "result_count": len(results),
-                "winner_card_number": (winner or {}).get("leader_card_number"),
-                "winner_raw": (winner or {}).get("leader_raw"),
+                "winners": winners,
                 "post_url": d.get("post_url"),
             })
         return out

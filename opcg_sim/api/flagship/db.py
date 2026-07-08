@@ -45,10 +45,11 @@ CREATE TABLE IF NOT EXISTS results (
   placement          INTEGER NOT NULL,
   leader_card_number TEXT,
   leader_raw         TEXT,
-  created_at         TEXT NOT NULL,
-  UNIQUE(event_id, placement)
+  created_at         TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_results_event ON results(event_id);
+-- 優勝(placement=1)は定員64の2ブロック開催で最大2件（§16.11）。入賞(≥2)は開催内で一意。
+CREATE UNIQUE INDEX IF NOT EXISTS idx_results_place ON results(event_id, placement) WHERE placement > 1;
 """
 
 
@@ -147,16 +148,29 @@ def get_event_results(conn: sqlite3.Connection, event_id: int) -> Optional[Dict[
 
 
 def get_series_summary(conn: sqlite3.Connection, series_id: int) -> List[Dict[str, Any]]:
-    """一覧オーバーレイ用: シリーズ内で結果を持つ開催のサマリ（優勝・件数・ポストURL）。"""
+    """一覧オーバーレイ用: シリーズ内で結果を持つ開催のサマリ（優勝・件数・ポストURL）。
+
+    優勝（placement=1）は定員64の2ブロック開催で2件になり得るため `winners` はリストで返す（§16.11）。
+    """
     rows = conn.execute(
-        """SELECT e.id AS event_id,
-                  COUNT(r.id) AS result_count,
-                  MAX(CASE WHEN r.placement = 1 THEN r.leader_card_number END) AS winner_card_number,
-                  MAX(CASE WHEN r.placement = 1 THEN r.leader_raw END) AS winner_raw,
+        """SELECT e.id AS event_id, r.placement, r.leader_card_number, r.leader_raw,
                   (SELECT url FROM result_posts p WHERE p.event_id = e.id ORDER BY p.id DESC LIMIT 1) AS post_url
            FROM events e JOIN results r ON r.event_id = e.id
            WHERE e.series_id = ?
-           GROUP BY e.id""",
+           ORDER BY e.id, r.placement, r.id""",
         (series_id,),
     ).fetchall()
-    return [dict(r) for r in rows]
+    agg: Dict[int, Dict[str, Any]] = {}
+    order: List[int] = []
+    for r in rows:
+        eid = r["event_id"]
+        a = agg.get(eid)
+        if a is None:
+            a = agg[eid] = {"event_id": eid, "result_count": 0, "winners": [], "post_url": r["post_url"]}
+            order.append(eid)
+        a["result_count"] += 1
+        if r["placement"] == 1:
+            a["winners"].append({
+                "leader_card_number": r["leader_card_number"], "leader_raw": r["leader_raw"],
+            })
+    return [agg[eid] for eid in order]

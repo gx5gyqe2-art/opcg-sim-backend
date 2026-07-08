@@ -59,11 +59,17 @@ class ResultsPutRequest(BaseModel):
 
     @model_validator(mode="after")
     def _placements_valid(self):
-        seen = [r.placement for r in self.results]
-        if len(set(seen)) != len(seen):
-            raise ValueError("placement が重複しています")
-        if 1 not in seen:
+        placements = [r.placement for r in self.results]
+        if 1 not in placements:
             raise ValueError("優勝（placement=1）は必須です")
+        # 2優勝は定員 64 の大規模開催（2ブロック制）でのみ許容（§16.11）。定員は TCG+ の
+        # max_join_count（実測 32 か 64 の2区分）で、64 が 2 ブロック＝優勝2人の枠。
+        max_winners = 2 if (self.event.capacity or 0) >= 64 else 1
+        if placements.count(1) > max_winners:
+            raise ValueError(f"優勝（placement=1）は最大 {max_winners} 件です（この開催の定員）")
+        non_winner = [p for p in placements if p != 1]
+        if len(set(non_winner)) != len(non_winner):
+            raise ValueError("入賞順位（placement≥2）が重複しています")
         return self
 
 
@@ -86,11 +92,14 @@ class EventResultsOut(BaseModel):
 
 
 class SeriesSummaryItem(BaseModel):
-    """一覧オーバーレイ用サマリの1開催分。"""
+    """一覧オーバーレイ用サマリの1開催分。
+
+    `winners` は優勝（placement=1）のリスト。通常1件、定員64の2ブロック開催は最大2件（§16.11）。
+    """
     event_id: int
     result_count: int
     post_url: Optional[str] = None
-    winner: Optional[ResultEntryOut] = None
+    winners: List[ResultEntryOut] = []
 
 
 class SeriesSummaryOut(BaseModel):

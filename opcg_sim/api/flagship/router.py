@@ -113,16 +113,19 @@ async def series_summary(series_id: int) -> SeriesSummaryOut:
     rows = fstore.get_store().get_series_summary(series_id)
     items = []
     for row in rows:
-        winner: Optional[ResultEntryOut] = None
-        if row.get("winner_card_number") or row.get("winner_raw"):
-            winner = _resolve_entry({
+        # 優勝は定員64の2ブロック開催で2件になり得る（§16.11）。
+        winners = [
+            _resolve_entry({
                 "placement": 1,
-                "leader_card_number": row.get("winner_card_number"),
-                "leader_raw": row.get("winner_raw"),
+                "leader_card_number": w.get("leader_card_number"),
+                "leader_raw": w.get("leader_raw"),
             })
+            for w in row.get("winners", [])
+            if w.get("leader_card_number") or w.get("leader_raw")
+        ]
         items.append(SeriesSummaryItem(
             event_id=row["event_id"], result_count=row["result_count"],
-            post_url=row.get("post_url"), winner=winner,
+            post_url=row.get("post_url"), winners=winners,
         ))
     return SeriesSummaryOut(series_id=series_id, items=items)
 
