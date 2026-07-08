@@ -20,6 +20,8 @@ _CONF = {"color_full": 0.95, "color_short": 0.9, "full": 0.8, "short": 0.7}
 _CONF_AMBIGUOUS = 0.4
 # 種別の具体度ランク（重なり解消・タイブレークに使う）。
 _SPEC_RANK = {"color_full": 3, "color_short": 2, "full": 1, "short": 0}
+# 優勝(placement=1)の最大数。定員64の2ブロック開催は優勝2人（§16.11）。
+_MAX_WINNERS = 2
 
 
 def _norm(s: str) -> str:
@@ -182,20 +184,38 @@ def extract_results(text: str) -> Tuple[List[ExtractedEntry], List[str]]:
     markers = list(_MARKER_RE.finditer(norm))
 
     by_placement: Dict[int, ExtractedEntry] = {}
+    # 優勝(placement=1)は定員64の2ブロック開催で2人出るため最大2件まで拾う（§16.11）。
+    # 「優勝は A使用の◯◯さん、B使用の△△さん」のような連名ポストで両優勝を候補化する。
+    winners: List[ExtractedEntry] = []
     unmatched: List[str] = []
 
+    def _add_winner(entry: ExtractedEntry) -> None:
+        for i, w in enumerate(winners):  # 同一リーダーは重複させない（高 confidence を残す）
+            same = ((entry.card_number and w.card_number == entry.card_number)
+                    or (not entry.card_number and not w.card_number
+                        and w.leader_raw == entry.leader_raw))
+            if same:
+                if entry.confidence > w.confidence:
+                    winners[i] = entry
+                return
+        if len(winners) < _MAX_WINNERS:
+            winners.append(entry)
+
     def consider(entry: ExtractedEntry) -> None:
+        if entry.placement == 1:
+            _add_winner(entry)
+            return
         prev = by_placement.get(entry.placement)
         if prev is None or entry.confidence > prev.confidence:
             by_placement[entry.placement] = entry
 
     if not markers:
-        # マーカー無し: 本文全体から最有力を優勝候補に。
+        # マーカー無し: 本文全体から最有力を優勝候補に（マーカー無しでは2人目は推測しない）。
         hits = _match_all(norm)
         if hits:
             _pos, alias, number, conf = hits[0]
             consider(ExtractedEntry(1, number, alias, conf))
-        return _finalize(by_placement, unmatched)
+        return _finalize(winners, by_placement, unmatched)
 
     for i, m in enumerate(markers):
         base, is_group = _marker_placement(m)
@@ -210,14 +230,19 @@ def extract_results(text: str) -> Tuple[List[ExtractedEntry], List[str]]:
             # ベストN 等: 見つかったリーダーを base から連番で割り当て。
             for offset, (_pos, alias, number, conf) in enumerate(hits):
                 consider(ExtractedEntry(base + offset, number, alias, conf * 0.9))
+        elif base == 1:
+            # 優勝マーカー近傍のリーダーを最大2件（2ブロックの連名優勝）。
+            for _pos, alias, number, conf in hits[:_MAX_WINNERS]:
+                consider(ExtractedEntry(1, number, alias, conf))
         else:
             _pos, alias, number, conf = hits[0]
             consider(ExtractedEntry(base, number, alias, conf))
 
-    return _finalize(by_placement, unmatched)
+    return _finalize(winners, by_placement, unmatched)
 
 
-def _finalize(by_placement: Dict[int, ExtractedEntry],
+def _finalize(winners: List[ExtractedEntry], by_placement: Dict[int, ExtractedEntry],
               unmatched: List[str]) -> Tuple[List[ExtractedEntry], List[str]]:
-    entries = [by_placement[p] for p in sorted(by_placement)]
+    # 優勝(placement=1)を先頭に、以降は placement 昇順。
+    entries = list(winners) + [by_placement[p] for p in sorted(by_placement)]
     return entries, unmatched

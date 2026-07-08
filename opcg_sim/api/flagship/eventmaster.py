@@ -28,12 +28,13 @@ CREATE TABLE IF NOT EXISTS event_master (
   pref           TEXT,
   capacity       INTEGER,
   sns_url        TEXT,
+  apply_end      TEXT,
   updated_at     TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_event_master_series ON event_master(series_id);
 """
 
-_FIELDS = ("series_id", "start_datetime", "store", "pref", "capacity", "sns_url")
+_FIELDS = ("series_id", "start_datetime", "store", "pref", "capacity", "sns_url", "apply_end")
 
 
 def _now() -> str:
@@ -49,6 +50,7 @@ def _out(event_id, d: Dict[str, Any]) -> Dict[str, Any]:
         "pref": d.get("pref") or "",
         "capacity": d.get("capacity"),
         "sns_url": d.get("sns_url"),
+        "apply_end": d.get("apply_end") or "",
     }
 
 
@@ -58,6 +60,11 @@ class SqliteEventMaster:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(_SCHEMA)
+        # 既存DBへの後方互換マイグレーション（§16.13 で apply_end 追加）。
+        try:
+            conn.execute("ALTER TABLE event_master ADD COLUMN apply_end TEXT")
+        except sqlite3.OperationalError:
+            pass  # 既に存在
         return conn
 
     def upsert(self, events: List[Dict[str, Any]]) -> int:
@@ -65,12 +72,12 @@ class SqliteEventMaster:
         with closing(self._connect()) as c, c:
             for e in events:
                 c.execute(
-                    """INSERT INTO event_master (id, series_id, start_datetime, store, pref, capacity, sns_url, updated_at)
-                       VALUES (:id, :series_id, :start_datetime, :store, :pref, :capacity, :sns_url, :now)
+                    """INSERT INTO event_master (id, series_id, start_datetime, store, pref, capacity, sns_url, apply_end, updated_at)
+                       VALUES (:id, :series_id, :start_datetime, :store, :pref, :capacity, :sns_url, :apply_end, :now)
                        ON CONFLICT(id) DO UPDATE SET
                          series_id=excluded.series_id, start_datetime=excluded.start_datetime,
                          store=excluded.store, pref=excluded.pref, capacity=excluded.capacity,
-                         sns_url=excluded.sns_url, updated_at=excluded.updated_at""",
+                         sns_url=excluded.sns_url, apply_end=excluded.apply_end, updated_at=excluded.updated_at""",
                     {"id": int(e["id"]), "now": now, **{k: e.get(k) for k in _FIELDS}},
                 )
         return len(events)

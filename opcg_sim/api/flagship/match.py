@@ -61,6 +61,7 @@ class StoreEvent:
     pref: str = ""
     start_datetime: str = ""
     capacity: Optional[int] = None
+    apply_end: str = ""       # 応募締切（RFC3339）。募集中＝now < apply_end の判定に使う（§16.13）。
 
     @property
     def handle(self) -> Optional[str]:
