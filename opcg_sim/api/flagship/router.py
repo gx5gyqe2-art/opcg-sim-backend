@@ -320,13 +320,20 @@ async def trend(req: TrendRequest) -> TrendResponse:
 
 @router.post("/collect")
 async def collect(req: TrendRequest) -> CollectResponse:
-    """全国の優勝ポストを収集して DB（winner_posts）へ貯める（重複除去・event_id 保持）。
+    """優勝ポストを**店アカウントに絞って**収集し DB（winner_posts）へ貯める（トークン節約・§16.12）。
 
-    再収集で既存の紐付け（人の承認）は消えない。定期ジョブは無く、手動でこれを呼んで蓄積する。
+    `accounts`（未登録・開催済み開催の店 X）を必須にし、**`(from:店…) (優勝 OR …)`** で検索する。
+    全国キーワード収集は廃止（ユーザ決定 2026-07-08）。重複除去・event_id 保持。再収集で既存の
+    紐付け（人の承認）は消えない。定期ジョブは無く、手動でこれを呼んで蓄積する。
     """
     if not xsearch.is_enabled():
         raise HTTPException(status_code=503, detail="検索は未設定です（X_BEARER_TOKEN 未設定）")
-    query = xsearch.build_trend_query()  # イベント語を OR で拡張（§16.10）
+    if not req.accounts:
+        raise HTTPException(status_code=400, detail="accounts（店アカウント）が必要です（未登録・開催済みの店に絞って収集）")
+    try:
+        query = xsearch.build_query(accounts=req.accounts, any_terms=xsearch.TREND_ANY_TERMS)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     try:
         hits = xsearch.search_recent(
             query, start_time=req.start_time, end_time=req.end_time,

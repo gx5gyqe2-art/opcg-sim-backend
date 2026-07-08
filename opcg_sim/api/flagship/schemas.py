@@ -196,7 +196,12 @@ class DiscoverResponse(BaseModel):
 
 
 class TrendRequest(BaseModel):
-    """`POST /api/flagship/trend` の body（設計 §16.6・全国優勝リーダー傾向）。"""
+    """`POST /api/flagship/trend`・`/collect` の body。
+
+    `accounts` を渡すと `/collect` は全国キーワードではなく **`(from:店…) (優勝 OR …)`** で
+    店アカウントに絞って収集する（トークン節約・§16.12）。`/trend` は accounts を無視して全国集計。
+    """
+    accounts: List[str] = []
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     max_results: int = 100

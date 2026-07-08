@@ -35,12 +35,22 @@ def _seed_collect(client, monkeypatch):
                     "gokuu_08", "孫悟空", "2026-07-05T11:00:00.000Z"),  # 個人
     ]
     monkeypatch.setattr(R.xsearch, "search_recent", lambda *a, **k: hits)
-    return client.post("/api/flagship/collect", json={"pages": 1})
+    # 収集は店アカウント(from:)に絞る（トークン節約・§16.12）。accounts 必須。
+    return client.post("/api/flagship/collect",
+                       json={"accounts": ["https://x.com/shopA"], "pages": 1})
 
 
 def test_collect_stores_posts(client, monkeypatch):
     res = _seed_collect(client, monkeypatch)
     assert res.status_code == 200 and res.json()["collected"] == 2
+    # from: スコープのクエリで検索している
+    assert "from:shopA" in res.json()["query"] and "全国" not in res.json()["query"]
+
+
+def test_collect_requires_accounts(client, monkeypatch):
+    # 全国収集は廃止。accounts 未指定は 400（§16.12）。
+    monkeypatch.setattr(R.xsearch, "search_recent", lambda *a, **k: [])
+    assert client.post("/api/flagship/collect", json={"pages": 1}).status_code == 400
 
 
 def test_review_matches_by_handle_and_lists_unlinked(client, monkeypatch):
