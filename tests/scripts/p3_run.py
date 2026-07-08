@@ -90,7 +90,7 @@ def load_nets(vocab, enc_version):
     want = E.feature_dim(enc_version)
 
     def _vguard(vnet, src):
-        feat = int(vnet.W1.shape[0]) - int(vnet.d_emb)
+        feat = vnet.feat_dim
         if feat != want:
             raise SystemExit(
                 f"ERROR: {src} の入力次元(feat_dim={feat}) が --enc-version {enc_version}"

@@ -81,8 +81,9 @@ def _net_enc_version(vnet) -> int:
 
     v1=Gen2 出荷ネット（scalars 14）・v2=リーダー付与ドン追加（scalars 16）。重み側の
     次元が真実源＝コードのデフォルトに依存しない（v2 ネットへ差し替えた時点で自動有効）。
+    `vnet.feat_dim` は lead_slots（リーダー条件付け専用枠）を自動的に除外する＝LC net でも誤判定しない。
     """
-    feat = int(vnet.W1.shape[0]) - int(vnet.d_emb)
+    feat = vnet.feat_dim
     for v in E.known_versions():
         if feat == E.feature_dim(v):
             return v

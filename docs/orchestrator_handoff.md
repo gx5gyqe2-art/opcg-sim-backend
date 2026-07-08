@@ -221,6 +221,12 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/p3_run.py \
 - グラフが「濃くすれば届く」形なら、**per-leader級の極端な濃縮**（≒v1条件）まで詰める価値を再評価。
 - **【2026-07-08 更新】原因分析の帰結として、次の一手は LC-ValueNet（リーダー条件付け・アーキ第一レバーの最小実装）の
   青パイロットに決定（ユーザ合意）。設計・判定基準は `docs/reports/lc_value_net_plan_20260708.md`。**
+- **【実装完了・2026-07-08】** `ValueNet.lead_slots`／`to_leader_conditioned()` を実装（`opcg_sim/src/learned/value_net.py`）。
+  `_net_enc_version`／`p3_run._vguard`／`p3_loop` の次元計算を `vnet.feat_dim` プロパティへ集約（lead_slots対応）。
+  新規 `tests/test_value_net_leader_slots.py`（7件）・全品質ゲート green（既存1091件・fastapi/httpx起因の既知失敗のみ・
+  構造監査0）。**§4-1のオフライン事前確認も実測で通過**: 実装したLC net（lead_slots=2）で青データ11,000局面を
+  ゲーム単位分割fitすると、legacy比 **val_mse -25.1%**（設計時プローブの-28%とほぼ一致）。実データでの恒等性は
+  max|Δ|=0.00e+00（完全一致）。**次は §4-2 の selfplay 起動**（`claude/p3-lc-blue-checkpoints`）。
 
 ---
 
