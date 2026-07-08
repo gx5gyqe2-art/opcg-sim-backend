@@ -240,6 +240,11 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/p3_run.py \
     --enc-version 2 --rotate-leaders --shard-games 60 --sims 40 --workers 4 --target 100000000 --max-shards 100000000
   ```
   legacy青バー: gen0=0.417 / 訓練後(538局)=0.208。**LCがこの下降を止める/反転すれば「アーキが効いた」**（§4-5判定表）。
+- **【効果セマンティクスv3 設計完了・2026-07-08】** LCの一般化＝EffFeat（AST由来の決定的効果特徴 ~92次元）＋スロット別
+  条件付け＋scalars v3（山札/トラッシュ/今ターンKO）＋turn1フラグ＋hidden256。恒等温スタート連鎖で弱gen0の実力を保って移行。
+  設計書 `docs/reports/effect_semantics_v3_plan_20260708.md`・特徴空間の一次資料 `effect_feature_inventory_20260708.md`
+  （未決事項は解決済み・残りは間接参照の1bit妥協のみ）。検証はオフラインfit（ゼロショット検証込み・数分）→青パイロット
+  （LC本判定との4点比較）→ v3≥LC なら97汎用へ。
 - **【LC青 1点目測定・2026-07-08】** cum=9,840（364局/リーダー・lead_slots=2確認済）を青デッキで対L1（sims160/pimc4・N=24・
   value+policy＝legacy青と同条件）: **勝率 0.396 [.228,.592]**（9-1-14）。
   | net | 局/リーダー | 対L1 | 対gen0 |
