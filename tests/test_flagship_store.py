@@ -127,7 +127,7 @@ def test_firestore_roundtrip_and_summary():
     summary = st.get_series_summary(7664)
     assert len(summary) == 1
     assert summary[0]["result_count"] == 2
-    assert summary[0]["winner_card_number"] == "OP01-001"
+    assert [w["leader_card_number"] for w in summary[0]["winners"]] == ["OP01-001"]
 
 
 def test_firestore_full_replace_overwrites():
@@ -181,7 +181,7 @@ def test_api_full_flow_on_firestore(fs_client):
     # サマリ（オーバーレイ）
     summ = fs_client.get("/api/flagship/results", params={"series_id": 7664}).json()
     assert summ["items"][0]["event_id"] == 7516027
-    assert summ["items"][0]["winner"]["leader"]["name"] == "ロロノア・ゾロ"
+    assert [w["leader"]["name"] for w in summ["items"][0]["winners"]] == ["ロロノア・ゾロ"]
     # 詳細
     detail = fs_client.get("/api/flagship/events/7516027/results").json()
     assert detail["post_url"] == "https://x.com/foo/status/1"
