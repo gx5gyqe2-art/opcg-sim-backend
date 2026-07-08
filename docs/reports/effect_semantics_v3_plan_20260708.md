@@ -18,43 +18,61 @@ LC-ValueNet（`lc_value_net_plan_20260708.md`）の一般化＝**「リーダー
 - **やらないこと（§8）**: torch移行・attention・手札スロットのEffFeat・自デッキリスト特徴・policy条件付け・
   能力単位のtrigger×actionクロス（v3.1候補）。
 
-## 1. EffFeat テーブル設計（F≈88の内訳・棚卸し§4準拠）
+## 1. EffFeat テーブル設計（改訂1・F≈116・棚卸し§4準拠）
 
-カード1枚→固定長ベクトル。**能力（99.5%が2つ以下）はOR/加算で集約**（trigger×actionの対応関係は失われる＝既知の妥協・§8）。
+> **改訂1（同日・実装前レビュー）**: カード単位OR集約 → **能力スロット別**へ変更（「COUNTER能力+TRIGGER能力を持つイベント」等で
+> trigger×action の対応が消える曖昧さを、ほぼ同次元のまま解消）。＋カード静的ブロック（手札プーリング用）を追加。
 
-| ブロック | 次元 | 内容（実測頻度に基づく） |
+カード1枚 → `[能力スロット1 (51) | 能力スロット2 (51) | カード静的 (14)]` ≈ **116次元**。
+能力はパース順で slot1/slot2 へ（99.5%が2能力以下・3つ目はslot2へOR併合）。
+
+**能力スロット（51次元）**:
+| ブロック | 次元 | 内容 |
 |---|---|---|
-| trigger | 13 | 上位12（ON_PLAY/ACTIVATE_MAIN/TRIGGER/PASSIVE/ON_ATTACK/COUNTER/ON_KO/YOUR_TURN/OPPONENT_TURN/ON_OPP_ATTACK/TURN_END/ON_BLOCK）+ OTHER |
-| action（効果） | 26 | 上位24 + OTHER + **VICTORY独立枠**（勝利条件変更＝頻度3でも符号反転級） |
-| BUFF細分 | 8 | パワーバフ{+1k/+2k/+3k+/負}4 ＋ コスト操作{増/減}2 ＋ ブロッカー無効1 ＋ パワー上書き1（判別= status×値スケール、棚卸し§5-1） |
-| action（コスト） | 6 | ドン返却/手札捨て/レスト系/トラッシュ系/ライフ公開/他 |
-| 数値バケット | 8 | DRAW{1,2+} RAMP_DON{1,2} ATTACH_DON{1,2,3,**ALL**(=99センチネル)} |
-| condition | 12 | HAS_DON/TURN_LIMIT/LIFE≤/HAND≤/FIELD数/TRASH数/DECK数/TRAIT・NAMEロック/履歴系/比較系/CONTEXT/他 |
-| duration | 4 | THIS_TURN/THIS_BATTLE/UNTIL_NEXT_TURN_END/PERMANENT |
-| target | 8 | player{自/相手} × zone{場/手札/ライフ/ドン} の主要組合せ |
-| キーワード付与 | 6 | 既存4種 + ATTACK_ACTIVE + ブロック不可（棚卸し§5-4） |
-| 間接参照 | 1 | EXECUTE_MAIN_EFFECT / REPLACE_EFFECT を持つ（**未決③の決定: v3.0は1bitで妥協**・展開はv3.1） |
-| **計** | **~92** | PAD行(idx=0)は全ゼロ。値は0/1中心＋一部カウント（/正規化） |
+| trigger | 13 | 上位12 one-hot + OTHER |
+| action（効果連鎖のOR） | 18 | KO/PLAY_CARD/DRAW/BOUNCE/DECK_BOTTOM/REST/ACTIVE/RAMP_DON/ATTACH_DON/GRANT_KEYWORD/DISCARD/TRASH_FROM_DECK/HEAL系/ATTACK_DISABLE/PREVENT_LEAVE/NEGATE系/**VICTORY独立**/OTHER |
+| BUFF細分 | 6 | パワーバフ{+1k/2k/3k+}3・パワーデバフ1・コスト操作1・パワー上書き1（判別= status×値スケール、棚卸し§5-1） |
+| 数値misc | 2 | DRAW2枚以上・ATTACH_DON全体(=99センチネル) |
+| condition | 6 | HAS_DON／TURN_LIMIT／リソース閾値(LIFE/HAND/FIELD/TRASH/DECK/DON)／ロック(TRAIT/NAME/COLOR)／履歴系／他 |
+| duration | 1 | 持続効果あり（THIS_TURN以上） |
+| target | 2 | 対象に相手を含む／自分を含む |
+| cost | 3 | ドン系コスト／手札系コスト／その他コスト |
 
-実装: 新モジュール `opcg_sim/src/learned/effect_features.py` — `build_efffeat(db, vocab) -> np.ndarray[vocab+1, F]`。
-決定的（ASTのみ参照・RNG不使用）＝ vocab と同様に db スナップショットと対で固定。
+**カード静的（14次元）**: カード種別 one-hot 4（LEADER/CHARACTER/EVENT/STAGE）＋ カウンター印刷値{1000,2000} 2
+＋ コスト帯{0-2,3-4,5-6,7+} 4 ＋ 印刷キーワード4種（手札プーリングで効く＝盤面は数値特徴が既に持つ）。
+※ 間接参照（EXECUTE_MAIN_EFFECT/REPLACE_EFFECT）は action の OTHER に含める（**未決③の決定: v3.0は展開しない**）。
 
-## 2. ネット統合（入力レイアウト）
+実装: 新モジュール `opcg_sim/src/learned/effect_features.py` — `build_efffeat(db, vocab) -> np.ndarray[vocab+1, F]`（float32）。
+決定的（ASTのみ参照・RNG不使用）＝ vocab と同様に db スナップショットと対で固定。PAD行(idx=0)=全ゼロ。
+**テーブルは npz に保存**（~1MB・netと特徴の対を固定＝DBドリフトでのサイレント破壊を防ぐ）。
+
+## 2. ネット統合（入力レイアウト・改訂1）
 
 ```
-H_in = [ scalars_v3 22 | field 80 | pooled_emb 24 | lead_me_emb 24 | lead_opp_emb 24 |   ← ここまで v2+LC 互換
-         lead_me_eff 92 | lead_opp_eff 92 | char_eff 10×16=160 | turn1_flags 12 ]        ← v3 追加（全て末尾append）
-din ≈ 530・hidden 256 → W1 ≈ 136k param（＋W_eff 92×16・Emb 64k）＝numpyで訓練可能な規模
+H_in = [ scalars_v3 46 | field 80 | pooled_emb 24 | lead_me_emb 24 | lead_opp_emb 24 |   ← ここまで v2+LC 互換（scalarsのみ拡張）
+         lead_me_eff 116 | lead_opp_eff 116 | char_eff 10×16=160 | hand_eff 16 ]         ← v3 追加（全て末尾append）
+din ≈ 606・hidden 256 → W1 ≈ 155k param（＋W_eff 116×16・Emb 64k）＝numpyで訓練可能な規模
 ```
 
-- **リーダー2枠**: EffFeat **フル直結**（92×2）。**埋め込み枠（LC）も残す**——ASTに現れない「メタ的な強さ・使われ方」は
+- **リーダー2枠**: EffFeat **フル直結**（116×2）。**埋め込み枠（LC）も残す**——ASTに現れない「メタ的な強さ・使われ方」は
   埋め込みが拾い、意味はEffFeatが運ぶ（役割分担・ゼロショット時は埋め込みゼロでもEffFeatが効く）。
-- **場キャラ10枠**: `char_eff[i] = W_eff @ EffFeat[card_idx[場i]]`（**共有学習射影** 92→16）。10枠が同じW_effを共有
+- **場キャラ10枠**: `char_eff[i] = EffFeat[card_idx[場i]] @ W_eff`（**共有学習射影** 116→16）。10枠が同じW_effを共有
   ＝カード数でなく「効果の意味→価値への写像」を1つ学ぶ（データ効率）。
-- **turn1_flags 12**: [自L, 相L, 自場5, 相場5] 各1bit＝「TURN_LIMIT付き能力を今ターン使用済みか」。
-  出典: `CardInstance.ability_used_this_turn`（JournaledDict＝make/unmake安全・棚卸し§5-2）。
-- **scalars v3 (16→22)**: 追加6個 = 山札残数（自/相手・/50）・トラッシュ枚数（自/相手・/20）・今ターンKOされたキャラ数
-  （自/相手・/3、出典 `GameManager._turn_events`）。append-only seam（SCALARS_V3=22）に載せる。
+- **手札プーリング（改訂1で追加）**: `hand_eff = mean(EffFeat[自手札10枠・PAD除外]) @ W_eff`（16次元・射影共有）。
+  **カウンター密度・除去持ち・コスト帯**が見える＝OPCGの攻防（カウンター読み合い）の核心情報。相手手札は枚数のみ（公平性）。
+- **⚠️ W_eff の初期化（実装注意・改訂1）**: W_eff を**乱数**・W1側のeffブロック行を**ゼロ**にする。両方ゼロだと勾配が
+  相互にゼロで**デッドロック**（W1行ゼロ→dW_eff=0・char_eff=0→dW1行=0）。乱数W_eff×ゼロW1行なら恒等を保ちつつ
+  W1行→W_eff の順に学習が立ち上がる。
+- **scalars v3 (16→46)（改訂1: フラグ類をscalarsに畳む）**: 追加30個＝
+  - 状態変数6: 山札残数（自/相手・/50）・トラッシュ枚数（自/相手・/20）・今ターンKOされたキャラ数（自/相手・/3、
+    出典 `GameManager._turn_events` の `CHAR_KOED_<player>`）
+  - **ターン1使用済みフラグ12**: [自L,相L,自場5,相場5]＝「TURN_LIMIT付き能力を今ターン使用済み」
+    （出典 `CardInstance.ability_used_this_turn`・JournaledDict＝make/unmake安全）
+  - **召喚酔いフラグ12**: [自L,相L,自場5,相場5]＝`is_newly_played`（リーダーは常に0・スロット整合のため保持）。
+    「このキャラは今ターン攻撃できる体か」＝盤面価値の基本情報（改訂1で追加・`battle.py` の攻撃可否判定と同源）。
+  - フラグをscalarsに畳む理由: **新しい入力キーを増やすとハーネス全体（バッチ組立・S/F/I配列・value_fn）の配管改修が
+    必要になる**。scalars末尾追加なら既存のappend-only温スタート機構（`expanded(insert_at=16, n_new=30)`）と全配管が
+    そのまま動く。MLPは全結合なのでスロット対応は位置に依存しない。
 
 ### 恒等温スタートの連鎖（実力を失わず v3 へ）
 
@@ -68,12 +86,13 @@ din ≈ 530・hidden 256 → W1 ≈ 136k param（＋W_eff 92×16・Emb 64k）＝
 - 版判定: enc_version は scalars 次元（22=v3）から既存機構で自動判別。`feat_dim` プロパティは
   eff ブロック分も除外するよう拡張（`_net_enc_version` は無修正で動く）。
 
-## 3. エンコーダ変更（encoder.py）
+## 3. エンコーダ変更（encoder.py・改訂1）
 
-- `SCALARS_V3 = 22` を版マップに追加（append-only 3点セット・コメント既定の手順どおり）。
-- `encode(version=3)`: scalars 6個追加 ＋ 新出力キー `"turn1"`（int8[12]）。既存キーの形は不変
-  （EffFeat は card_idx 経由でネット側が引くためエンコーダ出力に含めない＝テーブルはネットの一部として保存/ロード）。
+- `SCALARS_V3 = 46` を版マップに追加（append-only 3点セット・コメント既定の手順どおり）。**新出力キーは増やさない**
+  （フラグ類はscalarsに畳む・EffFeat は card_idx 経由でネット側が引く＝既存の3キー構成のまま）。
+- `encode(version=3)`: §2の30個を既存 vals の末尾に追加するだけ。
 - 決定的原則は維持（全て盤面/履歴状態・RNG不使用）。
+- 恒等連鎖の該当段: v2→v3 は既存 `warm_start_value(vnet, 2, 3)`＝`expanded(insert_at=16, n_new=30)` がそのまま動く。
 
 ## 4. ガード（事故対策の継承）
 
