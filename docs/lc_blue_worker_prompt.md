@@ -13,7 +13,10 @@
 
 ## プロンプト本文（ここから貼る）
 
-あなたは LC青パイロットの訓練ワーカーです。以下を順に実行してください。
+あなたは LC青パイロットの訓練ワーカーです。以下を**順に・省略せず**実行してください。
+**重要（2026-07-08 の事故対策）**: 前回、LCコード枝に居ないワーカーが次元不一致エラーで checkpoint を掃除し、
+legacy net を silently 訓練して実験が無効になりました。今回は下記のガードを必ず守ること＝
+**checkpoint を勝手に掃除しない・`OPCG_P3_LEAD_SLOTS=2` を必ず付ける・LCコード枝を検証してから起動する**。
 
 ### 1. リポジトリ準備（LCコード枝が必須）
 種netは lead_slots=2 なので、**LC実装が入った枝で回さないと読めません**。必ずこの枝に切り替えること。
@@ -21,19 +24,34 @@
 cd /home/user/opcg-sim-backend
 git fetch origin claude/opcg-cluster-learning -q && git checkout claude/opcg-cluster-learning && git pull -q
 python -m pip install -q numpy
+rm -rf /tmp/lc-blue-wt          # 前回の残骸worktreeを掃除（古い状態を掴まないため）
 ```
 
-### 2. 種の健全性を確認（起動前チェック）
-checkpoint 枝 `claude/p3-lc-blue-checkpoints` に LC種（lead_slots=2・cum=0）が仕込んであるはず。
+### 2. LCコード枝であることを自己検証（ここで失敗したら起動しない）
+`lead_slots` 実装が入っていること・種が LC（lead_slots=2）であることを機械的に確認する。
 ```bash
-git fetch origin claude/p3-lc-blue-checkpoints -q
-git show origin/claude/p3-lc-blue-checkpoints:p3ckpt/manifest.json   # {"gen":0,"cum_games":0,...,"status":"INIT"} のはず
+PYTHONPATH=tests python3 - <<'PY'
+import sys; sys.path.insert(0,"tests")
+import _bootstrap  # noqa
+import rl_net as RN
+assert hasattr(RN.ValueNet(10,4,8,96), "lead_slots"), "❌ LCコード枝に居ない（value_net に lead_slots が無い）"
+import subprocess, io
+subprocess.run(["git","fetch","origin","claude/p3-lc-blue-checkpoints","-q"])
+raw = subprocess.check_output(["git","show","origin/claude/p3-lc-blue-checkpoints:p3ckpt/value.npz"])
+v = RN.ValueNet.load(io.BytesIO(raw))
+assert v.lead_slots == 2, f"❌ 種が LC でない (lead_slots={v.lead_slots})＝司令塔に報告"
+print("✅ LCコード枝＋LC種を確認（value.npz lead_slots=2）")
+PY
+git show origin/claude/p3-lc-blue-checkpoints:p3ckpt/manifest.json   # {"gen":0,"cum_games":0,...} のはず
 ```
-`cum_games` が 0 でなければ**既に誰かが回している**＝二重起動しないこと（司令塔に確認）。
+- `❌` が出たら**起動せず司令塔に報告**する。`cum_games` が 0 でなければ二重起動＝止めて確認。
+- **どんなエラーが出ても checkpoint 枝を掃除・リセットしない**（種を消すと事故が再発する）。
 
-### 3. 連続学習を起動（バックグラウンド）
+### 3. 連続学習を起動（LC ガード付き）
+`OPCG_P3_LEAD_SLOTS=2` を**必ず**付ける（legacy を読んだら黙って走らずエラー停止する安全弁）。
 ```bash
 OPCG_LEADER_COLORS=青 \
+OPCG_P3_LEAD_SLOTS=2 \
 OPCG_P3_WT=/tmp/lc-blue-wt \
 OPCG_P3_BRANCH=claude/p3-lc-blue-checkpoints \
 OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/p3_run.py \
@@ -46,15 +64,17 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/p3_run.py \
 5分以内に manifest.shards が増える（=走り出した）ことを確認:
 ```bash
 cat /tmp/lc-blue-wt/p3ckpt/manifest.json
+python3 -c "import sys;sys.path.insert(0,'tests');import _bootstrap,rl_net;print('走行中netの lead_slots=', rl_net.ValueNet.load('/tmp/lc-blue-wt/p3ckpt/value.npz').lead_slots)"
 ```
-- 起動直後の1発目のログに `再開: gen=0 cum_games=0 ... enc=v2` が出て、**次元不一致エラーが出ないこと**を確認
-  （出たら LCコード枝に居ないか、種が壊れている＝司令塔に報告）。
-- 確認できたら「**LC青、学習開始（shards進行中・cum=◯◯）**」と報告する。
+- 起動ログに `再開: gen=0 cum_games=0 ... enc=v2` が出て、**エラーで止まっていないこと**を確認。
+- `走行中netの lead_slots= 2` を確認（**0 なら legacy＝即停止して司令塔に報告**）。
+- 確認できたら「**LC青、学習開始（shards進行中・cum=◯◯・lead_slots=2）**」と報告する。
 
 ### 5. 運用（走り続ける）
 - 連続モード（target/max-shards 実質無限）＝世代境界で止まらない。各shardで value.npz を checkpoint 枝へ
   約2.5分ごとに force-push＝回収耐性あり。**強度測定は司令塔がやる**ので、あなたは測定しなくてよい。
-- **プロセスが死んだら同じ起動コマンドで resume**（checkpoint から自動継続）。停止検知ウォッチャを仕掛けておくとよい。
+- **プロセスが死んだら同じ起動コマンドで resume**（checkpoint から自動継続・`OPCG_P3_LEAD_SLOTS=2` を忘れず）。
+  停止検知ウォッチャを仕掛けておくとよい。**checkpoint 枝の掃除・force リセットは絶対にしない**。
 - 司令塔から「cum=14,520 まで到達したら/判定が出たら止めて」と言われたら停止する。**それまでは回し続ける**。
 
 ---
