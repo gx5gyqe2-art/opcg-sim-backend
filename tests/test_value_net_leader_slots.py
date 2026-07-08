@@ -124,6 +124,22 @@ def test_backward_gradient_matches_numerical_finite_difference():
         assert abs(num - grads["W1"][r, c]) < 1e-4, f"W1[{r},{c}] 勾配不一致: num={num} analytic={grads['W1'][r,c]}"
 
 
+def test_lead_slots_guard_logic_catches_legacy_under_lc_expectation():
+    """p3_run の LC ガード相当ロジック: OPCG_P3_LEAD_SLOTS=2 期待で legacy(0) net を読むと停止判定。
+
+    2026-07-08 の事故（LCコード枝に居ないワーカーが checkpoint を掃除→legacy を silently 訓練）の
+    再発防止。ガード本体は `tests/scripts/p3_run.load_nets` にあるが、その分岐条件をここで固定する。
+    """
+    def guard_stops(net, want_lead):
+        return want_lead is not None and int(getattr(net, "lead_slots", 0)) != want_lead
+
+    legacy = ValueNet(vocab_size=10, d_emb=4, hidden=8, feat_dim=16 + 80, seed=0)
+    lc = legacy.to_leader_conditioned()
+    assert guard_stops(legacy, 2) is True, "legacy net を LC 期待で読んだら停止すべき"
+    assert guard_stops(lc, 2) is False, "正しい LC net は通す"
+    assert guard_stops(legacy, None) is False, "OPCG_P3_LEAD_SLOTS 未設定の従来 run は無影響"
+
+
 def test_leader_conditioned_net_fits_leader_only_target_legacy_cannot():
     """リーダーIDだけで決まる合成ターゲットを lead_slots=2 は fit でき、legacy(0)は fit できない。
 

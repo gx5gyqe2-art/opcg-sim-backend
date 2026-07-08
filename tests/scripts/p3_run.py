@@ -88,6 +88,11 @@ def load_nets(vocab, enc_version):
     """
     vp, pp, g0 = CK + "/value.npz", CK + "/policy.npz", CK + "/gen0_value.npz"
     want = E.feature_dim(enc_version)
+    # OPCG_P3_LEAD_SLOTS: リーダー条件付け(LC)実験のガード。セットすると「読んだ/作った net の lead_slots が
+    # この値でなければ黙って走らずエラー停止」＝legacy net を LCパイロットで訓練する事故（サイレント汚染）を
+    # 構造的に封じる。未設定＝制約なし＝従来（legacy=lead_slots0）の全runは無影響。
+    _wl = os.environ.get("OPCG_P3_LEAD_SLOTS")
+    want_lead = int(_wl) if _wl not in (None, "") else None
 
     def _vguard(vnet, src):
         feat = vnet.feat_dim
@@ -112,6 +117,9 @@ def load_nets(vocab, enc_version):
         # 出荷 v1 と恒等。旧版(v1)出荷から現行(ev)への差分を warm_start_* が自動計算する。
         base_v = _net_enc_version(RN.ValueNet.load(prod_v))   # 出荷ネットの版（＝1）
         vnet = warm_start_value(RN.ValueNet.load(prod_v), base_v, enc_version)
+        if want_lead == 2:
+            # 種なし起動でも LC で始める（防御的＝空 checkpoint から legacy を作らない）。
+            vnet = vnet.to_leader_conditioned()
         pnet = warm_start_policy(PolicyScorer.load(prod_p), base_v, enc_version) \
             if os.path.exists(prod_p) else None
         vnet.save(g0); vnet.save(vp)
@@ -121,6 +129,14 @@ def load_nets(vocab, enc_version):
         src = os.path.join(REPO, "tests", "p2_sl_net.npz")
         vnet = _vguard(RN.ValueNet.load(src), src); vnet.save(g0); vnet.save(vp)
         pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
+
+    # LC ガード（全経路の最終チェック）: 期待 lead_slots と実物が食い違えば停止＝サイレント汚染防止。
+    if want_lead is not None and int(getattr(vnet, "lead_slots", 0)) != want_lead:
+        raise SystemExit(
+            f"ERROR: 読み込んだ value net の lead_slots={getattr(vnet, 'lead_slots', 0)} が "
+            f"OPCG_P3_LEAD_SLOTS={want_lead} と不一致。legacy net を LC 実験で訓練する事故を防ぐため停止。"
+            f"→ checkpoint枝({BR})に正しいLC種があるか／このセッションがLC対応コード枝(lead_slots実装入り)"
+            f"に居るかを確認してください。")
 
     if pnet is not None and int(pnet.in_dim) - ACTION_DIM != want:
         raise SystemExit(
