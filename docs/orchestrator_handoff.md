@@ -240,6 +240,16 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/p3_run.py \
     --enc-version 2 --rotate-leaders --shard-games 60 --sims 40 --workers 4 --target 100000000 --max-shards 100000000
   ```
   legacy青バー: gen0=0.417 / 訓練後(538局)=0.208。**LCがこの下降を止める/反転すれば「アーキが効いた」**（§4-5判定表）。
+- **【LC青 1点目測定・2026-07-08】** cum=9,840（364局/リーダー・lead_slots=2確認済）を青デッキで対L1（sims160/pimc4・N=24・
+  value+policy＝legacy青と同条件）: **勝率 0.396 [.228,.592]**（9-1-14）。
+  | net | 局/リーダー | 対L1 | 対gen0 |
+  |---|---|---|---|
+  | legacy青 gen0 | — | 0.417 | — |
+  | legacy青 訓練後 | 538 | 0.208 | −0.21（劣化） |
+  | **LC青（1点目）** | 364 | **0.396** | **−0.02（ほぼ維持）** |
+  → **期待どおりの向き**: legacy が gen0 から −0.21 崩れたのに対し、LCは 364局時点で gen0 水準を維持＝negative transfer が
+  止まっている可能性。**ただし測定点が違う（LC364 vs legacy538）・CI広（N=24）＝断定は cum=14,520（538局）の本判定待ち**。
+  legacy@364 の値は未測なので「同一点でLCが上」はまだ示せていない点に注意。本判定測定を 14,520 到達時に実施予定。
 
 ---
 
