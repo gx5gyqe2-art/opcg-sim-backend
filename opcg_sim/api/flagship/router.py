@@ -382,6 +382,7 @@ def _sync_event_master(series_id: int) -> list:
             "id": e.event_id, "series_id": series_id,
             "start_datetime": e.start_datetime or e.date, "store": e.store,
             "pref": e.pref, "capacity": e.capacity, "sns_url": e.sns_url,
+            "apply_end": e.apply_end,
         } for e in current if e.event_id is not None])
     # 手動店舗X（§16.9）を上書き優先でかぶせる（TCG+ が未登録でも残る）。
     return fstoresns.overlay(master.list(series_id))

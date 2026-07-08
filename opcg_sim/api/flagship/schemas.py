@@ -284,6 +284,7 @@ class EventOut(BaseModel):
     pref: str = ""
     capacity: Optional[int] = None
     sns_url: Optional[str] = None
+    apply_end: str = ""       # 応募締切（RFC3339）。募集中＝now < apply_end（申込人数表示の判定・§16.13）。
 
 
 class EventListOut(BaseModel):

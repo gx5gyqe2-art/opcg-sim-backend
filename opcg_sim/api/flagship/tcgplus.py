@@ -70,6 +70,7 @@ def _fetch_events_uncached(series_id: int) -> List[StoreEvent]:
                 pref=e.get("place") or "",
                 start_datetime=sd,
                 capacity=e.get("max_join_count"),
+                apply_end=str(e.get("apply_end_datetime") or ""),
             ))
         offset += _PAGE
     return out

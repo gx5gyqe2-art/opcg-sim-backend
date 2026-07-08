@@ -120,6 +120,7 @@ def test_events_returns_manual_sns_over_tcgplus(client, monkeypatch):
     body = client.get("/api/flagship/events", params={"series_id": 7396}).json()
     ev0 = next(e for e in body["events"] if e["id"] == 7236374)
     assert ev0["sns_url"] == "https://x.com/kame"
+    assert ev0["apply_end"] == "2026-06-14T14:59:00+00:00"  # 募集締切（申込人数表示の判定用・§16.13）
 
 
 class _FakeEvent:
@@ -131,3 +132,4 @@ class _FakeEvent:
         self.start_datetime = "2026-07-07T12:30:00"
         self.capacity = 32
         self.sns_url = None
+        self.apply_end = "2026-06-14T14:59:00+00:00"
