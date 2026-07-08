@@ -94,13 +94,25 @@ OPPONENT_TURN 10 / ON_KO 6 / ON_DAMAGE_DEALT_TO_LIFE 2。
   リーダー2枠はフル80。入力 ~16+4+240+160+pooled24 ≈ **~450次元**・hidden 256 で ~12万param＝numpyで回る規模。
 - **案c（将来）**: torch移行＋スロットattention。案bが頭打ちになったら。
 
-## 5. 未決事項（設計前に潰す）
+## 5. 未決事項（設計前の解決結果・同日調査で確定）
 
-1. **パーサ値の異常系**: BUFF=792000・-7〜-4、ATTACH_DON=99 の意味確認と正規化（動的値 ValueSource.dynamic_source の扱い込み）。
-2. **動的状態の追加**: TURN_LIMIT使用済みフラグ（参照300回）と今ターン履歴（~41回）を GameManager から引けるか。
-   エンコーダの決定的原則（盤面のみ・RNG不使用）とは両立可能（どちらも盤面状態の一部）だが、**journal/make-unmake との整合**を要確認。
-3. EXECUTE_MAIN_EFFECT（78件・「メイン効果を実行」の間接参照）と REPLACE_EFFECT（65件）の特徴化方針（展開するか間接フラグで済ますか）。
-4. GRANT_KEYWORD の対象キーワード種別（現行エンコーダのキーワード4種で足りるか）。
+1. **パーサ値の異常系 → 解決（バグではない・機械分離可能）**:
+   - 小さいBUFF値（±1〜7）＝**コスト増減**。判別子は `status`＝`COST_REDUCTION`（99件）ほか。status=None の小値9件は
+     「コスト+N」（増加方向）＝**(status, |値|<100) の組で機械分離できる**。BUFF status の全分布:
+     None/power 397・COST_REDUCTION 99・BLOCKER_DISABLE 17・POWER_OVERRIDE 19・COUNTER 2・COST_OVERRIDE 1。
+   - **BUFF=792000 は実在カード**（OP02-082 バーンディ・ワールドのネタ数値）＝パース忠実。バケット「3000+」が吸収。
+   - **ATTACH_DON=99 は「すべてに1枚ずつ」の全体対象センチネル**（OP04-004 原文確認）＝ {1,2,3,ALL} の4バケットで扱う。
+   → 特徴化ルール: BUFF は (status×値スケール) で **パワーバフ／コスト操作／ブロッカー無効／パワー上書き** に分けて枠を持つ。
+2. **動的状態の追加 → 両方とも取得可能・journal安全（確認済み）**:
+   - TURN_LIMIT使用済み: `CardInstance.ability_used_this_turn`（**JournaledDict**・`models.py:113`）＝スロット別
+     「ターン1能力を使用済み」フラグとして符号化可能。ターン境界と場離れでのみクリア（`resolver.py:55-66` のコメント準拠）。
+   - 今ターン履歴: `GameManager._turn_events`（**JournaledDict**・`gamestate.py:157`・ターン開始で再生成 `turn_flow.py:144`）
+     ＝ CHAR_KOED_(SELF/OPP) やイベント発動回数を scalars として符号化可能。
+   - どちらも盤面/履歴状態でRNG不使用＝エンコーダの決定的原則と両立。JournaledDict なので make/unmake でも整合。
+3. **EXECUTE_MAIN_EFFECT（78件）/ REPLACE_EFFECT（65件）の特徴化方針** → 設計書で決める（残る唯一の未決）。
+   推奨: 初版は間接フラグ（「参照型効果を持つ」1bit）で妥協し、効果内容の展開は次版。
+4. **GRANT_KEYWORD の対象 → ほぼ既存4種で被覆**: 速攻53・ブロッカー39・ダブルアタック13・バニッシュ9（以上は
+   エンコーダのキーワード4種と一致）＋ **ATTACK_ACTIVE 13・ブロック不可 5 の2種を追加すれば完全**。
 
 ## 6. 再現方法
 
