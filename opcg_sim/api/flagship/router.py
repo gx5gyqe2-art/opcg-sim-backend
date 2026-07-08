@@ -22,6 +22,7 @@ from . import winnerstore as fwinner
 from . import xfetch
 from . import xsearch
 from .schemas import (
+    ApplicantsSyncRequest, ApplicantsSyncResponse,
     CollectResponse, DiscoveredCandidate, DiscoverRequest, DiscoverResponse, DiscoverStatusOut,
     EventListOut, EventOut, EventResultsOut, ExtractedEntryOut, ExtractRequest, ExtractResponse,
     IngestRequest, IngestResponse,
@@ -404,6 +405,18 @@ async def events(series_id: int) -> EventListOut:
     """
     rows = _sync_event_master(series_id)
     return EventListOut(series_id=series_id, events=[EventOut(**r) for r in rows])
+
+
+@router.post("/events/applicants")
+async def sync_applicants(req: ApplicantsSyncRequest) -> ApplicantsSyncResponse:
+    """フロントが TCG+ から取得した申込人数を開催マスターへ保存する（§16.14）。
+
+    申込人数は一覧APIに無く開催ごとの取得が要るため、取得役はフロント（募集中のみ・並列）に置き、
+    その結果をここで永続化する。以降は `/events` の `count_applicants` として全端末で共有される。
+    """
+    counts = {it.event_id: it.count_applicants for it in req.items}
+    updated = feventmaster.get_event_master().update_applicants(counts)
+    return ApplicantsSyncResponse(updated=updated)
 
 
 @router.post("/stores/sns")
