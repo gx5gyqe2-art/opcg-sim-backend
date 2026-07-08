@@ -26,14 +26,17 @@ CREATE TABLE IF NOT EXISTS event_master (
   start_datetime TEXT,
   store          TEXT,
   pref           TEXT,
-  capacity       INTEGER,
-  sns_url        TEXT,
-  apply_end      TEXT,
-  updated_at     TEXT NOT NULL
+  capacity         INTEGER,
+  sns_url          TEXT,
+  apply_end        TEXT,
+  count_applicants INTEGER,
+  updated_at       TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_event_master_series ON event_master(series_id);
 """
 
+# TCG+ 同期で upsert するフィールド。count_applicants は含めない（フロントが別途 sync するため、
+# 開催同期で上書き（NULL 化）しない・§16.14）。
 _FIELDS = ("series_id", "start_datetime", "store", "pref", "capacity", "sns_url", "apply_end")
 
 
@@ -51,6 +54,7 @@ def _out(event_id, d: Dict[str, Any]) -> Dict[str, Any]:
         "capacity": d.get("capacity"),
         "sns_url": d.get("sns_url"),
         "apply_end": d.get("apply_end") or "",
+        "count_applicants": d.get("count_applicants"),
     }
 
 
@@ -60,11 +64,12 @@ class SqliteEventMaster:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(_SCHEMA)
-        # 既存DBへの後方互換マイグレーション（§16.13 で apply_end 追加）。
-        try:
-            conn.execute("ALTER TABLE event_master ADD COLUMN apply_end TEXT")
-        except sqlite3.OperationalError:
-            pass  # 既に存在
+        # 既存DBへの後方互換マイグレーション（§16.13 apply_end / §16.14 count_applicants）。
+        for col, decl in (("apply_end", "TEXT"), ("count_applicants", "INTEGER")):
+            try:
+                conn.execute(f"ALTER TABLE event_master ADD COLUMN {col} {decl}")
+            except sqlite3.OperationalError:
+                pass  # 既に存在
         return conn
 
     def upsert(self, events: List[Dict[str, Any]]) -> int:
@@ -81,6 +86,19 @@ class SqliteEventMaster:
                     {"id": int(e["id"]), "now": now, **{k: e.get(k) for k in _FIELDS}},
                 )
         return len(events)
+
+    def update_applicants(self, counts: Dict[int, Any]) -> int:
+        """フロントが取得した申込人数を既存の開催行へ反映する（§16.14）。開催同期とは独立。"""
+        now = _now()
+        n = 0
+        with closing(self._connect()) as c, c:
+            for eid, cnt in counts.items():
+                cur = c.execute(
+                    "UPDATE event_master SET count_applicants = ?, updated_at = ? WHERE id = ?",
+                    (cnt, now, int(eid)),
+                )
+                n += cur.rowcount
+        return n
 
     def list(self, series_id: int) -> List[Dict[str, Any]]:
         with closing(self._connect()) as c:
@@ -101,10 +119,20 @@ class FirestoreEventMaster:
     def upsert(self, events: List[Dict[str, Any]]) -> int:
         now = _now()
         for e in events:
+            # merge=True で既存の count_applicants（フロント sync 分・§16.14）を消さない。
             self._col().document(str(e["id"])).set(
-                {**{k: e.get(k) for k in _FIELDS}, "updated_at": now}
+                {**{k: e.get(k) for k in _FIELDS}, "updated_at": now}, merge=True
             )
         return len(events)
+
+    def update_applicants(self, counts: Dict[int, Any]) -> int:
+        """申込人数だけを既存ドキュメントへマージ更新する（§16.14）。"""
+        now = _now()
+        for eid, cnt in counts.items():
+            self._col().document(str(eid)).set(
+                {"count_applicants": cnt, "updated_at": now}, merge=True
+            )
+        return len(counts)
 
     def list(self, series_id: int) -> List[Dict[str, Any]]:
         out = [_out(snap.id, snap.to_dict() or {})

@@ -285,6 +285,22 @@ class EventOut(BaseModel):
     capacity: Optional[int] = None
     sns_url: Optional[str] = None
     apply_end: str = ""       # 応募締切（RFC3339）。募集中＝now < apply_end（申込人数表示の判定・§16.13）。
+    count_applicants: Optional[int] = None  # 申込人数（フロントが sync・§16.14）。未取得は None。
+
+
+class ApplicantItem(BaseModel):
+    """申込人数の1件（フロントが TCG+ から取得した値）。"""
+    event_id: int
+    count_applicants: Optional[int] = None
+
+
+class ApplicantsSyncRequest(BaseModel):
+    """`POST /api/flagship/events/applicants` の body（申込人数の backend 保存・§16.14）。"""
+    items: List[ApplicantItem]
+
+
+class ApplicantsSyncResponse(BaseModel):
+    updated: int
 
 
 class EventListOut(BaseModel):
