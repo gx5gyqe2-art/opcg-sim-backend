@@ -226,7 +226,20 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/p3_run.py \
   新規 `tests/test_value_net_leader_slots.py`（7件）・全品質ゲート green（既存1091件・fastapi/httpx起因の既知失敗のみ・
   構造監査0）。**§4-1のオフライン事前確認も実測で通過**: 実装したLC net（lead_slots=2）で青データ11,000局面を
   ゲーム単位分割fitすると、legacy比 **val_mse -25.1%**（設計時プローブの-28%とほぼ一致）。実データでの恒等性は
-  max|Δ|=0.00e+00（完全一致）。**次は §4-2 の selfplay 起動**（`claude/p3-lc-blue-checkpoints`）。
+  max|Δ|=0.00e+00（完全一致）。
+- **【枝を種付け済み・起動待ち・2026-07-08】** `claude/p3-lc-blue-checkpoints`（commit a14477d）を作成。共通弱Gen0を
+  LC化(lead_slots=2)した net を value/gen0_value に配置（policyなし=uniform・cum=0・status=INIT）。LC net の
+  自己対戦→学習→保存→再読込の全経路をスモーク確認済（lead_slots=2 維持）。**訓練は別セッションで起動（ユーザ決定＝競合ゼロ）。
+  司令塔（本セッション）は §4-4 を軌跡サンプリング（cum≈3k/6k/10k/14.5k で凍結測定）で早期判定する。**
+  起動コマンド（別セッションで・LCコード枝で回すのが必須）:
+  ```bash
+  git fetch origin claude/opcg-cluster-learning && git checkout claude/opcg-cluster-learning
+  python -m pip install -q numpy
+  OPCG_LEADER_COLORS=青 OPCG_P3_WT=/tmp/lc-blue-wt OPCG_P3_BRANCH=claude/p3-lc-blue-checkpoints \
+  OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/p3_run.py \
+    --enc-version 2 --rotate-leaders --shard-games 60 --sims 40 --workers 4 --target 100000000 --max-shards 100000000
+  ```
+  legacy青バー: gen0=0.417 / 訓練後(538局)=0.208。**LCがこの下降を止める/反転すれば「アーキが効いた」**（§4-5判定表）。
 
 ---
 
