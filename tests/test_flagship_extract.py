@@ -135,6 +135,21 @@ def test_prize_word_is_not_a_win_marker():
     assert all(not h.startswith("優勝") for h in hits)
 
 
+def test_two_winners_are_extracted():
+    # 定員64の2ブロック開催（連名優勝）は優勝を2件抽出する（§16.11）。
+    entries, _ = E.extract_results("優勝は紫エネル使用のシャーキーさん、青緑ルフィ使用のらぼたさんです")
+    winners = [e for e in entries if e.placement == 1]
+    assert len(winners) == 2
+    assert {w.card_number for w in winners} == {"OP15-058", "OP16-022"}  # エネル / 青緑ルフィ
+
+
+def test_single_winner_stays_single():
+    # 通常（1優勝）は優勝1件のまま（2件目を勝手に増やさない）。
+    entries, _ = E.extract_results("優勝 赤ゾロ ベスト4 緑ボニー 緑ウタ")
+    winners = [e for e in entries if e.placement == 1]
+    assert len(winners) == 1 and winners[0].card_number == "OP01-001"
+
+
 # --- API 契約 ---------------------------------------------------------------
 
 @pytest.fixture
