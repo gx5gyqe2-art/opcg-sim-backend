@@ -105,6 +105,7 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 | `tests/test_cpu_replay.py` | **CPU 思考トレースの健全性**（`tests/harness/cpu_replay.py`）: trace は観測専用で手を変えない・RNG 中立（trace 有無で進行が分岐しない）・同一 seed の決定論再現・トレース 4 項目（候補スコア/regret/J値成分/読み筋）の存在と読み筋 PV の有界性 |
 | `tests/test_game_driver.py` | **共通対局ドライバ**（`tests/harness/game_driver.py`・設計⑥）の機械健全性: 同一 seed の決定論・observer 不干渉（観測専用の契約）・席の写像等価（run_one_game/play_game と一致）・`stop_after_decisions` 有界化・**learned(Gen2) 自己対戦の seed 再現** |
 | `tests/test_replay_roundtrip.py` | **実対局リプレイのラウンドトリップ**（`tests/harness/replay_runner.py`）: 録画（人間=private rng・card_id 基準記録）→記述子から再生（人間手注入＋CPU 再 decide）→勝敗・手数・ターン一致＋逆写像 miss=0。hard／**learned(Gen2)**／**coin toss（first_player=random）** の3系統＋リゾルバ単体 |
+| `tests/test_replay_frames.py` | **リプレイ盤面フレーム**（`services/replay.py::_replay_record_frame`＋`GET /replay/frames`・リプレイビューアのデータ供給契約）: frames↔actions↔decisions の action_index 整合（フレーム0＝初期盤面のみ None）・フレームカードは動的状態のみ（マスター情報を持たない＝サイズ抑制）・`_FRAME_CAP` 超過で記録停止＋`frames_truncated`・非 traced 対局は記録なし＋整形エラー |
 | `tests/test_perf_gate.py` | **CPU 性能ゲートの判定ロジック**（`tests/scripts/perf_gate.py`・§5.1）: `evaluate_gate` 純関数（強度不足/レイテンシ超過/失敗局/データ不足→FAIL・理由の蓄積）＋ gen2_*.npz ハッシュの安定性。実対局は回さず高速固定 |
 | `tests/test_cpu_learned.py` | **学習型CPU（Gen2）本番配線**（`opcg_sim/src/core/cpu_learned.py`／`opcg_sim/src/learned/`）: 合法手・decide_client ルーティング・seed 決定論・席別エンジン（net-vs-net 等価）・**符号化/行動特徴の訓練時ドリフト検知（v1/v2）**（`tests/harness/{rl_encoder,opcg_action,rl_net,az_policy,az_mcts_tree}.py` は本番 `opcg_sim/src/learned/{encoder,action,value_net,policy,mcts}.py` への委譲shim＝TEST_E/TEST_A は本番と同一オブジェクトでドリフトは構造的に不可能・退行検知として存続。`tests/harness/opcg_game.py` は本番 `adapter.OPCGGame` の薄い継承＋研究専用 `new_game` のみ追加）・選択対話の併合（CONFIRM_OPTIONAL accept/decline・up-to ライフ追加・**ARRANGE_DECK の並び替え/上下選択**・position キー）・**ルート等価手マージ**（同名複製の訪問数分裂で PASS に負ける実害の反転ケース＋複製なし恒等）・トレース記述（decline の accepted 明示・dialog 種別）・**符号化世代 v2**（リーダー付与ドン特徴＝v1 では不可視・v1 出力不変・npz 入力次元からの自動判別）・**温スタート拡張**（v1→v2 の重み拡張が恒等＝拡張ネット×v2符号化 == 出荷×v1符号化・policy も恒等・縮小拒否・版差は scalars_dim のみが seam＝将来版に同一コード対応） |
 | `tests/test_p3_components.py` | **P3学習ループ部品の高速単体**（重い loop は `p3_loop.py --smoke --enc-version 1`）: action 特徴 one-hot・action_key の区別・policy 学習・**自己対戦のリーダーローテーション**（`OPCGGame.new_game(leaders=…)` が全リーダープールから両席を抽選＋リアルデッキ化＝【ドン‼×1】系リーダー効果を学習データに載せる「穴B」対策・seed 決定論／leaders 未指定は build_deck 固定＝後方互換） |
@@ -224,6 +225,10 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider   # 
 - **取得**: `GET /api/game/{game_id}/replay` が `{replay: 種(schema/seed/leaders/decks/difficulty/actions),
   decisions: 思考トレース列}` を返す。対局はメモリ常駐（Cloud Run は揮発）なので、対局中〜終了直後に
   取得して保存/共有する想定。崩れた局面はそのまま `test_cpu_puzzles.py` の決定論ケースへ落とせる。
+- **盤面フレーム**（リプレイビューア用）: traced 対局は各アクション適用後の盤面スナップショット
+  （コンパクト形＝動的状態のみ）も蓄積し、`GET /api/game/{game_id}/replay/frames` が
+  `/replay` の内容＋`frames`（`action_index` で actions/decisions と整合）を一括で返す。
+  詳細は [`LOGGING.md`](LOGGING.md)「盤面フレーム」、回帰は `tests/test_replay_frames.py`。
 - **ライブは軽量トレース**（`trace_read_ahead=False`）: 最も重い `read_ahead`（読み筋＝各手番で全合法手を
   クローンする貪欲 PV）を**省く**＝CPU 思考のレイテンシをトレース無しとほぼ同等に保つ（実測: light≒none、
   full は約 +50%）。候補スコア・regret・J値成分は探索の回収＋クローン1回で安価なので残す。**読み筋は
