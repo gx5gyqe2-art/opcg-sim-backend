@@ -260,6 +260,13 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/p3_run.py \
   → **判定確定: LCは劣化（negative transfer）を止めた**（legacy同地点0.208との差は歴然）。ただし gen0(0.417) を超えて
   **登ってはいない**＝§4-5でいう「0.42≤X<0.55」の下端相当（CI考慮）。干渉はアーキ起因と実証・climb には効果セマンティクス
   v3 等の次レバーが必要、の整理で**v3実装へGO**（ユーザ承認済み・実装開始 2026-07-08）。LC青の訓練ワーカーは停止してよい。
+- **【v3実装完了・オフライン検証クリア・種付け済み・2026-07-09】** コミット `83c69e2`（effect_features.py・value_net v3・
+  encoder v3・EFF_DIMガード・テスト14件・全ゲートgreen）。オフライン検証（§6-1）: (a)未見ゲームMSE **legacy -31.8%**
+  （LCの-25.1%を上回る・ゲート通過） (b)未見リーダー（同色holdout）でも v3 1.431 < LC 1.493（同色内は差が出にくい条件・
+  真価は97リーダー空間）。**v3青パイロット種付け済み**: `claude/p3-v3-blue-checkpoints`（`dc3e76b`・恒等連鎖
+  gen0→scalars46→LC→EffFeat116→hidden256・実局面で max|Δ|=4e-16・selfplay全経路スモークOK）。
+  起動は別セッション（ワーカープロンプト: `docs/v3_blue_worker_prompt.md`）。判定: 537局/リーダーで凍結測定し
+  gen0 0.417 / legacy 0.208 / LC 0.396 との4点比較（v3>LC で97汎用へ）。
 
 ---
 
