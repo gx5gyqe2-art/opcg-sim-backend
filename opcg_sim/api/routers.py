@@ -30,7 +30,8 @@ from .state import GAMES, SANDBOX_GAMES, CPU_GAMES, RULE_ROOMS
 from .presenters import build_game_result_hybrid, build_rule_message, _rule_room_meta
 from .ws import ws_manager, game_ws_manager, broadcast_rule_state
 from .services import decks as deck_svc
-from .services.replay import _replay_enabled, _replay_record_action, _capture_final_winner
+from .services.replay import (_replay_enabled, _replay_record_action, _capture_final_winner,
+                              _replay_record_frame)
 from .services.games import _resolve_first_player
 from .services.cpu_driver import _kick_ponder, _kick_speculate, _cached_cpu_move
 
@@ -100,6 +101,7 @@ async def game_create(req: Any = Body(...)):
                               "p2": [ci.master.card_id for ci in p2_cards]},
                     "actions": [], "decisions": [],
                 })
+                _replay_record_frame(CPU_GAMES[game_id], manager)  # フレーム0＝セットアップ直後の初期盤面
         return build_game_result_hybrid(manager, game_id)
     except Exception as e:
         return {"success": False, "game_id": "", "error": {"message": str(e)}}
@@ -122,6 +124,7 @@ async def game_action(req: Dict[str, Any] = Body(...)):
         _replay_record_action(_meta, manager, _src, player_id, {"action_type": action_type, "payload": payload})
         action_api.apply_game_action(manager, current_player, action_type, payload)
         _capture_final_winner(_meta, manager)
+        _replay_record_frame(_meta, manager)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
         _kick_ponder(game_id)     # ⑥-a: 制御が CPU へ移ったら次手番の計画を前倒し（既定 OFF）
@@ -160,6 +163,7 @@ async def game_battle(req: BattleActionRequest):
         _replay_record_action(_meta, manager, _src, player_id, {"action_type": action_type, "card_uuid": card_uuid})
         action_api.apply_battle_action(manager, player, action_type, card_uuid)
         _capture_final_winner(_meta, manager)
+        _replay_record_frame(_meta, manager)
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
         _kick_ponder(game_id)
@@ -222,8 +226,10 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                                                 trace=tr, trace_read_ahead=False)
                 if move is not None:
                     if trace_on:
+                        # action_index＝直後に記録する actions のインデックス（決定↔アクションの明示対応）。
                         meta.setdefault("decisions", []).append(
-                            {"turn": manager.turn_count, "player": cpu_pid, **tr})
+                            {"turn": manager.turn_count, "player": cpu_pid,
+                             "action_index": len(meta.get("actions", [])), **tr})
                         _replay_record_action(meta, manager, "cpu", cpu_pid, {
                             "action_type": move["action_type"], "card_uuid": move.get("card_uuid"),
                             "payload": move.get("payload")})
@@ -232,6 +238,7 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                     else:
                         action_api.apply_game_action(manager, cpu_player, move["action_type"], move.get("payload", {}))
                     _capture_final_winner(meta, manager)
+                    _replay_record_frame(meta, manager)
                     cpu_acted = True
                     cpu_event = manager.action_events[0] if manager.action_events else {"action": move["action_type"]}
         result = build_game_result_hybrid(manager, game_id, success=True)
@@ -264,6 +271,25 @@ async def game_replay(game_id: str):
     }
     return {"success": True, "game_id": game_id,
             "replay": descriptor, "decisions": meta.get("decisions", [])}
+
+@router.options("/api/game/{game_id}/replay/frames")
+async def options_game_replay_frames(game_id: str): return {"status": "ok"}
+
+@router.get("/api/game/{game_id}/replay/frames")
+async def game_replay_frames(game_id: str):
+    """traced CPU 対局の「種＋アクション列＋CPU思考トレース＋盤面フレーム列」を返す（リプレイビューア用）。
+
+    frames[i].action_index＝そのフレーム直前の actions インデックス（初期盤面のみ None）、
+    decisions[k].action_index＝その決定が指した actions インデックス。整合はインデックスで明示する。
+    """
+    meta = CPU_GAMES.get(game_id)
+    if not _replay_enabled(meta):
+        return {"success": False, "error": {"code": "REPLAY_NOT_FOUND",
+                "message": "この対局のリプレイ記録がありません（cpu_trace 未指定 or 不明なゲーム）。"}}
+    base = await game_replay(game_id)
+    base["frames"] = meta.get("frames", [])
+    base["frames_truncated"] = bool(meta.get("frames_truncated"))
+    return base
 
 
 # ---- カード／アセット／ヘルス ----------------------------------------------
