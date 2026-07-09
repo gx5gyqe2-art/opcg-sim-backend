@@ -238,7 +238,7 @@ def main():
     ap.add_argument("--lr", type=float, default=5e-4)
     ap.add_argument("--buffer", type=int, default=30000)
     ap.add_argument("--dirichlet-eps", type=float, default=SELFPLAY_DIRICHLET_EPS)
-    ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2),
+    ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2, 3),
                     help="符号化世代（必須・版はこの引数のみで決まる。1=出荷Gen2互換／"
                          "2=リーダー付与ドン特徴）")
     ap.add_argument("--rotate-leaders", action="store_true",
