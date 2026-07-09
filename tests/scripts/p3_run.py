@@ -138,6 +138,17 @@ def load_nets(vocab, enc_version):
             f"→ checkpoint枝({BR})に正しいLC種があるか／このセッションがLC対応コード枝(lead_slots実装入り)"
             f"に居るかを確認してください。")
 
+    # EffFeat ガード（v3 実験用・LCガードと同型）: OPCG_P3_EFF_DIM=期待する eff_dim（例 116）。
+    _we = os.environ.get("OPCG_P3_EFF_DIM")
+    if _we not in (None, ""):
+        want_eff = int(_we)
+        have_eff = int(getattr(vnet, "eff_dim", 0))
+        if have_eff != want_eff:
+            raise SystemExit(
+                f"ERROR: 読み込んだ value net の eff_dim={have_eff} が OPCG_P3_EFF_DIM={want_eff} と"
+                f"不一致。EffFeat 無しの net を v3 実験で訓練する事故を防ぐため停止。"
+                f"→ checkpoint枝({BR})に正しい v3 種があるか／v3 対応コード枝に居るかを確認してください。")
+
     if pnet is not None and int(pnet.in_dim) - ACTION_DIM != want:
         raise SystemExit(
             f"ERROR: {pp} の policy ctx 次元 が --enc-version {enc_version}(feat_dim={want}) と"
