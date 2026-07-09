@@ -267,6 +267,9 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/p3_run.py \
   gen0→scalars46→LC→EffFeat116→hidden256・実局面で max|Δ|=4e-16・selfplay全経路スモークOK）。
   起動は別セッション（ワーカープロンプト: `docs/v3_blue_worker_prompt.md`）。判定: 537局/リーダーで凍結測定し
   gen0 0.417 / legacy 0.208 / LC 0.396 との4点比較（v3>LC で97汎用へ）。
+- **【v3青 中間測定・2026-07-09】** cum=9,840（364局/リーダー＝LC1点目と同一点）: **勝率 0.438 [.262,.631]**（10-1-13）。
+  同一点比較: LC 0.396 / v3 0.438 ＝ **訓練青netとして初の出発点(gen0 0.417)超え**。legacy崩壊→LC維持→v3上昇の
+  一貫したはしご＝効果セマンティクスがclimbを可能にする方向のシグナル（CI広のため確定は本判定の4点比較で）。
 
 ---
 
