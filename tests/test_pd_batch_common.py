@@ -48,6 +48,23 @@ def test_update_consumed_monotonic():
     assert out2["w1"] == 5
 
 
+def test_updates_for_scales_with_inflow_and_preserves_ratio():
+    """薄まり防止: 学習回数が新規games に比例＝並列でも1局あたりの勾配露出が一定。"""
+    gpu = 128
+    # K=1（1バッチ128局）→ 1ラウンド（従来と同一・後方互換）
+    assert C.updates_for(128, gpu, 16) == 1
+    # K=6（6バッチ768局）→ 6ラウンド（直列の games:updates 比を維持）
+    assert C.updates_for(768, gpu, 16) == 6
+    # 端数は四捨五入（192局→1.5→2）だが最低1
+    assert C.updates_for(192, gpu, 16) == 2
+    assert C.updates_for(10, gpu, 16) == 1        # 新規僅少でも最低1
+    assert C.updates_for(0, gpu, 16) == 1
+    # 暴発上限（大量流入でも max で頭打ち）
+    assert C.updates_for(100000, gpu, 16) == 16
+    # 不正 gpu は 1
+    assert C.updates_for(500, 0, 16) == 1
+
+
 def test_ring_append_caps_and_bootstraps():
     a = {"x": np.arange(10), "y": np.arange(10) * 2}
     b = {"x": np.arange(10, 16), "y": np.arange(10, 16) * 2}

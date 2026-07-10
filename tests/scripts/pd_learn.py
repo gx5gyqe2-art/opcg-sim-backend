@@ -70,9 +70,13 @@ def main():
     ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2, 3))
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--epochs", type=int, default=2)
-    ap.add_argument("--buffer", type=int, default=60000)
+    ap.add_argument("--buffer", type=int, default=120000)
     ap.add_argument("--min-new", type=int, default=200, help="この局面数が新規に貯まるまで学習しない")
     ap.add_argument("--max-staleness", type=int, default=3, help="round-これ より古い against_round は捨てる")
+    ap.add_argument("--games-per-update", type=int, default=128,
+                    help="この games 数ごとに学習1ラウンド＝並列でも1局あたりの勾配露出を一定に保つ"
+                         "（薄まり防止・既定=1バッチの games＝K=1で従来と同一）")
+    ap.add_argument("--max-updates-per-round", type=int, default=16, help="1波で回す最大学習ラウンド（暴発防止）")
     ap.add_argument("--target-round", type=int, default=10 ** 9)
     ap.add_argument("--poll", type=int, default=30, help="新データが無いときの待機秒")
     args = ap.parse_args()
@@ -109,21 +113,28 @@ def main():
             _ensure_wt(NET_WT, NET_BR)   # 他は無いが将来の安全のため再同期
             continue
 
+        new_games = sum(m["games"] for m in accepted)
+        if new_states > args.buffer:
+            print(f"  [warn] 1波の新規{new_states}局面 > buffer{args.buffer}＝一部が学習前に溢れる。"
+                  f"buffer を上げるか generator 数/バッチを下げること。", flush=True)
         for m in accepted:
             buf_v = C.ring_append(buf_v, cache[m["worker"]], args.buffer)
-        RN.train(vnet, buf_v, epochs=args.epochs, lr=args.lr, batch=256, val_frac=0.05)
+        # 薄まり防止: 新規games に比例して学習回数(epoch)をスケール＝games:updates 比を直列と一致。
+        n_up = C.updates_for(new_games, args.games_per_update, args.max_updates_per_round)
+        RN.train(vnet, buf_v, epochs=args.epochs * n_up, lr=args.lr, batch=256, val_frac=0.05)
         consumed = C.update_consumed(consumed, accepted)
-        man["round"] = man.get("round", 0) + 1
-        man["cum_games"] = man.get("cum_games", 0) + sum(m["games"] for m in accepted)
+        man["round"] = man.get("round", 0) + 1   # round=netバージョン数（staleness基準・1push=1版）
+        man["cum_games"] = man.get("cum_games", 0) + new_games
+        man["updates"] = man.get("updates", 0) + args.epochs * n_up   # 累積勾配パス（学習量の真の指標）
         man["consumed"] = consumed
         vnet.save(ck + "/value.npz"); pnet.save(ck + "/policy.npz")
         json.dump(man, open(ck + "/manifest.json", "w"))
         _git(NET_WT, "add", "p3ckpt")
         _git(NET_WT, "commit", "--amend", "-m",
-             f"pd-net round{man['round']} cum{man['cum_games']} buf{len(buf_v['value'])}")
+             f"pd-net round{man['round']} cum{man['cum_games']} upd{man['updates']} buf{len(buf_v['value'])}")
         ok = _git(NET_WT, "push", "--force", "origin", "HEAD:refs/heads/" + NET_BR).returncode == 0
-        print(f"  round{man['round']} 採用{len(accepted)}枝/{new_states}局面 "
-              f"buf{len(buf_v['value'])} push={'OK' if ok else 'FAIL'}", flush=True)
+        print(f"  round{man['round']} 採用{len(accepted)}枝/{new_states}局面 x{n_up}回学習 "
+              f"buf{len(buf_v['value'])} cum{man['cum_games']} push={'OK' if ok else 'FAIL'}", flush=True)
     print("LEARN_DONE", flush=True)
     return 0
 

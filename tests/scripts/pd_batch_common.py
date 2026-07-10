@@ -56,6 +56,22 @@ def update_consumed(consumed, accepted):
     return out
 
 
+def updates_for(new_games, games_per_update, max_updates):
+    """1波の新規 games 数 → その波で回すべき学習ラウンド数（勾配パスの倍率）。
+
+    **薄まり防止の核**（docs/reports/batched_selfplay_design_20260710.md §「off-policy 逓減」）:
+    並列で K 本ぶんのデータが一度に来ても、1波1ラウンドだと「1局あたりの勾配露出」が K 分の1に薄まる。
+    新規局数に比例して学習回数をスケール＝games:updates 比を直列(1バッチ:1ラウンド)と一致させる。
+    - games_per_update: この局数ごとに1ラウンド（既定=1バッチの games＝K=1で従来と同一・後方互換）。
+    - max_updates: 暴発防止の上限（1波で回す最大ラウンド数）。
+    返り値は 1..max_updates の整数（新規0でも最低1）。
+    """
+    if games_per_update <= 0:
+        return 1
+    n = int(round(new_games / games_per_update))
+    return max(1, min(int(max_updates), max(1, n)))
+
+
 def ring_append(buf, new_arrays, cap):
     """リプレイバッファ（dict of np arrays）へ連結し末尾 cap 件に切る（相関緩和・忘却対策）。
 

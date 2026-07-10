@@ -73,6 +73,21 @@ OPCG_PD_WT=/tmp/pd-learn OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts
 
 **測定**: net枝 `p3ckpt/value.npz`+`policy.npz` を凍結し `p3_vs_l1`（従来どおり）。cum_games は manifest 参照。
 
+## 4b. 薄まり防止（1局あたりの勾配露出を K に依らず一定に保つ）
+
+学習を決めるのは**局数でなく更新回数(勾配ステップ)**。素朴に「1波=1ラウンド」だと、並列で K 本ぶんの
+データが一度に来ても更新1回＝**1局あたりの勾配露出が K 分の1に薄まる**（さらに buffer cap を超えた
+ぶんは学習前に溢れる）。これを防ぐため learner は:
+- **`--games-per-update`（既定128＝1バッチの games）ごとに学習1ラウンド**を回す＝新規games に比例して
+  学習回数(epoch)をスケール（`pd_batch_common.updates_for`・単体テスト済）。K=1 なら 1ラウンド＝従来と同一、
+  K=6 なら 6ラウンド＝直列の games:updates 比を維持。`--max-updates-per-round`(既定16)で暴発を抑止。
+- **`round` は net バージョン数（1push=1版・staleness基準）**、学習量の真の指標は manifest の
+  **`updates`（累積勾配パス）**。監視は cum_games と updates の両方を見る。
+- buffer 既定を 120,000 に拡大（K≈8バッチを収容）。1波が buffer を超えたら warn（generator数/バッチを下げる合図）。
+
+**結論**: この scaling を入れると、並列は「速いが薄い」ではなく**「直列と同じ per-game 学習量のまま K 倍速い」**に
+なる。逆に scaling 無しだと到達点が変わらない（or 悪化）＝並列の意味が消える。
+
 ## 5. スループット
 
 generator 1本 = コンテナ内4コア = 現行 p3_run 1本と同等（sims160 で ~1 g/s級）。generator を K 本並列に
