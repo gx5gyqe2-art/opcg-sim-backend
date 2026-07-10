@@ -10,10 +10,11 @@
   全ゾーンのcard_id・レスト・付与ドン・ドン数・山札数を持つ＝**マーク地点だけを局所復元すれば、そこに
   至る経路の乱数を一切必要としない**。これがネット評価には十分（ネットは盤面スナップのみ参照）。
 
-対象と限界:
-  - MAIN_ACTION のマーク（メイン手番の意思決定）＝直前フレームは通常の盤面＝復元して decide できる。
-  - SELECT_COUNTER/SELECT_BLOCKER 等の**戦闘中**マークは active_battle・カウンター文脈の復元が必要で
-    静的フレームからは再構成しない（未対応と明示・将来拡張）。
+対象:
+  - MAIN_ACTION のマーク＝直前フレーム(i-1)から盤面を復元して decide。
+  - SELECT_COUNTER/SELECT_BLOCKER 等の**戦闘中**マーク＝攻撃前フレーム(i-2)から復元し、記録された攻撃
+    (action i-1)を declare_attack で再宣言してカウンター待ちを engine に正しく作らせてから decide。
+  限界: ごく早い巡目は passive 状態等の微差で復元が近似的（recorded_is_legal で自己診断）。
 
 実行例:
   OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/replay_reeval.py \
@@ -118,6 +119,74 @@ def _describe(m, mv):
         return {"action_type": mv.get("action_type")}
 
 
+def _uuid_to_cardid(fr, uuid):
+    """フレーム内の全ゾーンから uuid→card_id を引く（元対局の uuid をcard_idへ翻訳）。"""
+    for pid in ("p1", "p2"):
+        s = fr["players"][pid]
+        for zone in ("hand", "field", "life", "trash"):
+            for c in s.get(zone) or []:
+                if c.get("uuid") == uuid:
+                    return pid, c.get("card_id")
+        for key in ("leader", "stage"):
+            c = s.get(key)
+            if c and c.get("uuid") == uuid:
+                return pid, c.get("card_id")
+    return None, None
+
+
+def _find_unit(pl, card_id, active_only=False):
+    units = ([pl.leader] if pl.leader else []) + list(pl.field) + ([pl.stage] if pl.stage else [])
+    cands = [u for u in units if u.master.card_id == card_id and (not active_only or not u.is_rest)]
+    return cands[0] if cands else None
+
+
+def _board_for_counter_mark(db, rec, frames_by_idx, actions, i):
+    """カウンター系マーク(action i)の盤面を復元する。
+
+    action i-1=攻撃宣言(ATTACK/ATTACK_CONFIRM)。frame[i-2]（攻撃前）から盤面を復元し、記録された攻撃を
+    再宣言して SELECT_COUNTER 待ちを engine に正しく作らせる（ブロッカー段があれば PASS で進める）。
+    返り値 (manager, defender) または理由文字列。
+    """
+    from opcg_sim.src.core import action_api
+    atk_act = actions[i - 1]
+    if atk_act.get("action_type") not in ("ATTACK", "ATTACK_CONFIRM"):
+        return f"直前手が攻撃宣言でない（{atk_act.get('action_type')}）"
+    pre = frames_by_idx.get(i - 2)
+    postatk = frames_by_idx.get(i - 1)
+    if pre is None or postatk is None:
+        return "攻撃前/後フレームが欠落"
+    atk_pid = atk_act["player"]
+    m = _board_from_frame(db, rec, pre, atk_pid)
+    atk_pl = m.turn_player
+    defender = m.opponent
+    attacker = _find_unit(atk_pl, atk_act.get("card"), active_only=True)
+    if attacker is None:
+        return f"攻撃者 {atk_act.get('card')} が復元盤面に見つからない"
+    # 対象: 記録の targets（card_id）優先、無ければ frame の battle.target_uuid を翻訳
+    tgt_cid = (atk_act.get("targets") or [None])[0]
+    if tgt_cid is None:
+        b = postatk.get("battle") or {}
+        _, tgt_cid = _uuid_to_cardid(postatk, b.get("target_uuid"))
+    target = _find_unit(defender, tgt_cid)
+    if target is None:
+        return f"攻撃対象 {tgt_cid} が復元盤面に見つからない"
+    try:
+        m.declare_attack(attacker, target)
+    except Exception as e:
+        return f"declare_attack 失敗: {e}"
+    # ブロッカー段が立ったら PASS（記録ストリームに block が無い＝ブロックしない選択）で進める
+    pend = m.get_pending_request() or {}
+    if pend.get("action") == "SELECT_BLOCKER":
+        try:
+            action_api.apply_battle_action(m, defender, "PASS", None)
+            pend = m.get_pending_request() or {}
+        except Exception as e:
+            return f"ブロッカー段の PASS 失敗: {e}"
+    if pend.get("action") != "SELECT_COUNTER" or pend.get("player_id") != defender.name:
+        return f"カウンター待ちに到達しない（pending={pend.get('action')}/{pend.get('player_id')}）"
+    return m, defender
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--replay", required=True)
@@ -153,18 +222,22 @@ def main():
         pid = act["player"]
         rec_move = {k: v for k, v in act.items() if k not in MATCH_KEYS_IGNORE}
         at = rec_move.get("action_type")
-        pre = frames_by_idx.get(i - 1)
         print(f"\n=== mark@{i} T{mk.get('turn')} [{pid}] 記録手={rec_move}", flush=True)
         print(f"    指摘: {mk.get('note')}", flush=True)
         if at in ("SELECT_COUNTER", "SELECT_BLOCKER", "PASS"):
-            print("    → 戦闘中の意思決定＝静的フレームからは復元対象外（active_battle未再構成・未対応）",
-                  flush=True)
-            continue
-        if pre is None:
-            print("    → 直前フレームが無い＝スキップ", flush=True)
-            continue
-        m = _board_from_frame(db, rec, pre, pid)
-        actor = m.turn_player
+            built = _board_for_counter_mark(db, rec, frames_by_idx, actions, i)
+            if isinstance(built, str):
+                print(f"    → 戦闘状態の復元に失敗（{built}）＝スキップ", flush=True)
+                continue
+            m, actor = built
+            print(f"    （攻撃再現: {actions[i-1].get('card')} → カウンター待ちを復元）", flush=True)
+        else:
+            pre = frames_by_idx.get(i - 1)
+            if pre is None:
+                print("    → 直前フレームが無い＝スキップ", flush=True)
+                continue
+            m = _board_from_frame(db, rec, pre, pid)
+            actor = m.turn_player
         legal = m.get_legal_actions(actor)
         rec_legal = any(all(_describe(m, x).get(k) == v for k, v in rec_move.items()) for x in legal)
         supported += 1
@@ -192,7 +265,7 @@ def main():
                 print(f"                  上位候補: {cand}", flush=True)
         results.append(row)
 
-    print(f"\n完了: マーク{len(marks)}件中 復元評価{supported}件（戦闘中マークは未対応）", flush=True)
+    print(f"\n完了: マーク{len(marks)}件中 復元評価{supported}件（MAIN手番＋カウンター戦闘マーク対応）", flush=True)
     if args.json_out:
         json.dump(results, open(args.json_out, "w"), ensure_ascii=False, indent=1)
         print(f"JSON出力: {args.json_out}", flush=True)
