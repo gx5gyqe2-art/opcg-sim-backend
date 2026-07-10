@@ -21,6 +21,7 @@ import json
 import multiprocessing as mp
 import subprocess
 import time
+import zlib
 
 import numpy as np
 
@@ -116,9 +117,12 @@ def main():
             ppath = None
             if pnet is not None:
                 pnet.save(ck + "/_cur_p.npz"); ppath = ck + "/_cur_p.npz"
+            # シードに**ワーカーIDを混ぜる**（2026-07-10バグ修正）: batch_id だけだと同round・同batch_id の
+            # ワーカー同士が完全に同一のゲーム列を生成する（w1/w2 が終始重複していた実害）。crc32(WID) で分離。
+            seed_base = (zlib.crc32(WID.encode()) % 100000) * 1000003 + batch_id * 131 + 7
             vdata, pol = R.selfplay_shard(pool, args.workers, args.games, args.sims,
                                           args.dirichlet_eps, ck + "/_cur_v.npz", ppath,
-                                          batch_id * 131 + 7, ev=ev, leaders=leaders)
+                                          seed_base, ev=ev, leaders=leaders)
             if vdata is None:
                 print("  採取0スキップ", flush=True); continue
             # data枝へ push（自分が単独writer＝amend+force で安全）。policy教師も同梱（直列とのパリティ）。
