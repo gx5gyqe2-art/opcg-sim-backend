@@ -307,6 +307,20 @@ def _slice(data, i, j):
     return {k: data[k][i:j] for k in ("scalars", "field", "card_idx")}
 
 
+def _predict_chunked(net, d, batch=8192):
+    """net.predict を chunk 分割で実行（フル一括だと EffF gather 等の中間配列が
+    データ件数×eff_dim に比例して肥大化し、大規模データセットで OOM するため）。
+    forward はサンプル間で独立（batchnorm 等の相互作用なし）＝chunk 化しても
+    フル一括と bit-identical な結果になる。"""
+    n = len(d["scalars"])
+    out = np.empty(n, dtype=np.float64)
+    for s in range(0, n, batch):
+        e = s + batch
+        mb = {k: d[k][s:e] for k in ("scalars", "field", "card_idx")}
+        out[s:e] = net.predict(mb)
+    return out
+
+
 def train(net, data, epochs=20, lr=1e-3, batch=128, val_frac=0.2, seed=0, verbose=False):
     """value 回帰を訓練。返り値 (train_mse, val_mse)。"""
     n = len(data["value"]); rng = np.random.default_rng(seed)
@@ -326,9 +340,9 @@ def train(net, data, epochs=20, lr=1e-3, batch=128, val_frac=0.2, seed=0, verbos
             grads = net.backward(cache, ytr[bi])
             net.step(grads, lr=lr)
         if verbose:
-            tm = float(((net.predict(tr) - ytr) ** 2).mean())
-            vm = float(((net.predict(va) - yv) ** 2).mean())
+            tm = float(((_predict_chunked(net, tr) - ytr) ** 2).mean())
+            vm = float(((_predict_chunked(net, va) - yv) ** 2).mean())
             print(f"  ep{ep:02d} train_mse={tm:.4f} val_mse={vm:.4f}", flush=True)
-    tm = float(((net.predict(tr) - ytr) ** 2).mean())
-    vm = float(((net.predict(va) - yv) ** 2).mean())
+    tm = float(((_predict_chunked(net, tr) - ytr) ** 2).mean())
+    vm = float(((_predict_chunked(net, va) - yv) ** 2).mean())
     return tm, vm
