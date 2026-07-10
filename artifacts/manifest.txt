@@ -1,0 +1,1 @@
+shards=40 states=1027238 val_mse=0.00555
