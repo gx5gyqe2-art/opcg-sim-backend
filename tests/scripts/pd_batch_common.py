@@ -72,6 +72,44 @@ def updates_for(new_games, games_per_update, max_updates):
     return max(1, min(int(max_updates), max(1, n)))
 
 
+def should_generate(next_batch_id, consumed_id, depth):
+    """バックプレッシャ: 未消費バッチが depth 本を超えるなら生成を止めて待つ。
+
+    data枝は amend+force で**最新1バッチしか持たない**ため、learner が止まっている間に生成を続けると
+    前のバッチが上書き消滅＝全損する。未消費の深さ（next_batch_id - consumed_id）が depth 以下のとき
+    だけ生成を許可（learner未稼働=consumed_id=-1 でも depth 本までは先行生成できる）。
+    """
+    return (next_batch_id - consumed_id) <= depth
+
+
+def pack_policy(pol):
+    """policy教師 [(ctx[C], am[L,A], visit[L]), ...]（Lは可変）→ npz保存できる固定キーのdict。
+
+    直列 p3_run は毎シャード policy も学習する。並列版で pol を捨てると「policyが凍る」＝直列と
+    挙動が乖離するため、バッチに同梱して learner 側で学習する（unpack_policy が逆変換）。
+    """
+    if not pol:
+        return {"pol_ctx": np.zeros((0, 0), np.float32), "pol_am": np.zeros((0, 0), np.float32),
+                "pol_visit": np.zeros((0,), np.float32), "pol_len": np.zeros((0,), np.int32)}
+    ctx = np.stack([p[0] for p in pol]).astype(np.float32)
+    am = np.concatenate([p[1] for p in pol]).astype(np.float32)
+    visit = np.concatenate([np.asarray(p[2]) for p in pol]).astype(np.float32)
+    lens = np.array([len(p[2]) for p in pol], dtype=np.int32)
+    return {"pol_ctx": ctx, "pol_am": am, "pol_visit": visit, "pol_len": lens}
+
+
+def unpack_policy(z):
+    """pack_policy の逆変換（npz/dict → list of (ctx, am, visit)）。キー無し/空は []（旧バッチ互換）。"""
+    if "pol_len" not in z or len(z["pol_len"]) == 0:
+        return []
+    lens = np.asarray(z["pol_len"])
+    cuts = np.cumsum(lens)[:-1]
+    ams = np.split(np.asarray(z["pol_am"]), cuts)
+    visits = np.split(np.asarray(z["pol_visit"]), cuts)
+    ctx = np.asarray(z["pol_ctx"])
+    return [(ctx[i], ams[i], visits[i]) for i in range(len(lens))]
+
+
 def ring_append(buf, new_arrays, cap):
     """リプレイバッファ（dict of np arrays）へ連結し末尾 cap 件に切る（相関緩和・忘却対策）。
 

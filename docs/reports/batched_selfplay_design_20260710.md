@@ -103,10 +103,27 @@ generator 1本 = コンテナ内4コア = 現行 p3_run 1本と同等（sims160 
 - 冪等性: 新データ無しで再実行→round=1のまま（消費済み再学習せず）
 - 鮮度追従: learner が round1 に進んだ後、generator w2 は against_round=1 で生成（更新に追従）
 
+## 6b. 運用前レビューで塞いだ穴（2026-07-10・全てe2e検証済み）
+
+1. **generator再起動で batch_id が0に戻る** → consumed 未満のIDが全部「seen」で黙って捨てられ生成が無駄に。
+   → 起動時に自分の data枝 meta.json から **batch_id を復元**（`再開batch_id=N` ログ）。
+2. **learner停止中の上書き全損**: data枝は最新1バッチのみ保持＝learnerが止まると amend+force で前バッチが消える。
+   → **バックプレッシャ**（`--pipeline-depth` 既定2）: 未消費バッチが depth 本を超えたら生成を待機
+   （`should_generate`・待機ログあり）。learner未稼働でも depth 本までは先行生成できる。
+3. **policyの凍結**（旧実装は pol を捨てていた＝直列と挙動乖離）→ バッチに同梱し learner が毎ラウンド学習
+   （pack/unpack_policy・往復単体テスト＋net枝の policy.npz ハッシュ変化で確認）。
+4. 軽微: net ロード時の db/vocab 再構築を排除（vocab をループ外でキャッシュ）。
+
+**受容したリスク（把握済み・実害小）**:
+- learner 再起動でメモリ上のリプレイバッファは失われる（consumed は manifest で永続＝二重学習はしない。
+  バッファは新規バッチで再構築される＝数ラウンドだけ学習の質が薄い）。
+- generator の push 失敗時は batch_id を進めて続行（IDに欠番＝learnerは単調性で問題なく処理・そのバッチは損失）。
+- data枝サフィックス（w1/w2…）の一意性は運用規約（重複させると衝突）＝ワーカープロンプトで番号を司令塔が配布。
+
 ## 7. スコープ外・注意
 
 - learner は1本厳守（net枝の単独writer）。2本立てると force-push で衝突する。
 - data枝は generator と1:1。使い回すと衝突。
-- 現状 policy はバッファ内 value データのみで学習（p3_run と同様の簡易版）。policy教師の精緻化は別途。
+- policy は generator がバッチに同梱（pack_policy）し learner が毎ラウンド学習＝**直列(p3_run)とパリティ**。
 - 極端な staleness（generatorが大量遅延）時は stale 破棄ログが増える＝learner を一時停止して generator を
   追いつかせるか、max-staleness を上げる。

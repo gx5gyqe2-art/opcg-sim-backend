@@ -54,7 +54,7 @@ def _ensure_wt(wt, br):
 
 
 def _read_data_branch(br):
-    """data枝を fetch し (meta, arrays) を返す（無ければ None）。"""
+    """data枝を fetch し (meta, value配列dict, policy教師list) を返す（無ければ None）。"""
     _ensure_wt(DATA_WT, br)
     d = DATA_WT + "/p3data"
     if not os.path.exists(d + "/meta.json") or not os.path.exists(d + "/batch.npz"):
@@ -62,7 +62,8 @@ def _read_data_branch(br):
     meta = json.load(open(d + "/meta.json"))
     z = np.load(d + "/batch.npz")
     arrays = {k: z[k] for k in ("scalars", "field", "card_idx", "value")}
-    return meta, arrays
+    pol = C.unpack_policy(z)   # 旧形式（policy無し）は [] ＝後方互換
+    return meta, arrays, pol
 
 
 def main():
@@ -97,11 +98,11 @@ def main():
     buf_v, buf_p = None, []
     while man.get("round", 0) < args.target_round:
         metas = []
-        cache = {}
+        cache, cache_p = {}, {}
         for br in DATA_BRS:
             r = _read_data_branch(br)
             if r is not None:
-                metas.append(r[0]); cache[r[0]["worker"]] = r[1]
+                metas.append(r[0]); cache[r[0]["worker"]] = r[1]; cache_p[r[0]["worker"]] = r[2]
         accepted, skipped = C.plan_consumption(metas, consumed, man.get("round", 0), args.max_staleness)
         if skipped:
             stale = [w for w, why in skipped.items() if why == "stale"]
@@ -119,9 +120,14 @@ def main():
                   f"buffer を上げるか generator 数/バッチを下げること。", flush=True)
         for m in accepted:
             buf_v = C.ring_append(buf_v, cache[m["worker"]], args.buffer)
+            buf_p.extend(cache_p[m["worker"]])
+        buf_p[:] = buf_p[-args.buffer:]
         # 薄まり防止: 新規games に比例して学習回数(epoch)をスケール＝games:updates 比を直列と一致。
         n_up = C.updates_for(new_games, args.games_per_update, args.max_updates_per_round)
         RN.train(vnet, buf_v, epochs=args.epochs * n_up, lr=args.lr, batch=256, val_frac=0.05)
+        # policy も直列(p3_run)と同じく毎ラウンド学習（凍結だと直列と挙動が乖離＝比較が汚れる）。
+        if buf_p:
+            train_policy(pnet, buf_p, epochs=args.epochs * n_up, lr=args.lr)
         consumed = C.update_consumed(consumed, accepted)
         man["round"] = man.get("round", 0) + 1   # round=netバージョン数（staleness基準・1push=1版）
         man["cum_games"] = man.get("cum_games", 0) + new_games

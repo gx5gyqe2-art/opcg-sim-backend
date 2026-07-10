@@ -32,6 +32,7 @@ import rl_encoder as E
 from deckgen import all_leader_ids
 from cpu_selfplay import _load_db
 import p3_run as R
+import pd_batch_common as C
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 NET_BR = os.environ.get("OPCG_PD_NET_BRANCH", "claude/p3-pd-net")
@@ -55,14 +56,27 @@ def _ensure_wt(wt, br):
     _git(wt, "reset", "--hard", "origin/" + br)
 
 
-def _load_current_net():
-    """net枝から現 value/policy をロードしローカル凍結コピーを返す（guard付き）。round も返す。"""
+def _load_current_net(vocab, ev):
+    """net枝から現 value/policy をロード（guard付き）。(vnet, pnet, round, 自分の消費済みbatch_id) を返す。"""
     _ensure_wt(NET_WT, NET_BR)
     ck = NET_WT + "/p3ckpt"
     man = json.load(open(ck + "/manifest.json"))
     R.CK = ck  # p3_run のガード群が参照する定数を差し替え
-    vnet, pnet = R.load_nets(E.build_vocab(_load_db()), enc_version=int(os.environ.get("_EV", 3)))
-    return vnet, pnet, man.get("round", 0)
+    vnet, pnet = R.load_nets(vocab, enc_version=ev)
+    consumed_mine = int(man.get("consumed", {}).get(WID, -1))
+    return vnet, pnet, man.get("round", 0), consumed_mine
+
+
+def _resume_batch_id():
+    """自分の data枝の meta.json から次の batch_id を復元（再起動対応）。
+
+    穴対策: 再起動で 0 に戻すと learner の consumed[wid] 未満のIDが全部「seen」扱いで
+    黙って捨てられ、生成が無駄になる。枝上の最終ID ＋1 から再開する。"""
+    _ensure_wt(DATA_WT, DATA_BR)
+    p = DATA_WT + "/p3data/meta.json"
+    if os.path.exists(p):
+        return int(json.load(open(p)).get("batch_id", -1)) + 1
+    return 0
 
 
 def main():
@@ -73,22 +87,31 @@ def main():
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--dirichlet-eps", type=float, default=0.15)
     ap.add_argument("--max-batches", type=int, default=10 ** 9)
+    ap.add_argument("--pipeline-depth", type=int, default=2,
+                    help="未消費バッチがこの本数を超えたら生成を待つ（learner停止中の上書き全損を防ぐ）")
+    ap.add_argument("--poll", type=int, default=30, help="バックプレッシャ待機の秒数")
     args = ap.parse_args()
-    os.environ["_EV"] = str(args.enc_version)
     ev = args.enc_version
 
     db = _load_db(); vocab = E.build_vocab(db)
     leaders = all_leader_ids(db)
-    print(f"generator {WID}: net枝={NET_BR} data枝={DATA_BR} リーダー={len(leaders)} sims={args.sims}", flush=True)
-    os.makedirs(DATA_WT.rsplit("/", 1)[0], exist_ok=True)
+    batch_id = _resume_batch_id()
+    print(f"generator {WID}: net枝={NET_BR} data枝={DATA_BR} リーダー={len(leaders)} sims={args.sims} "
+          f"再開batch_id={batch_id}", flush=True)
 
     ck = NET_WT + "/p3ckpt"
     pool = mp.Pool(args.workers, initializer=R._init_worker)
-    batch_id = 0
+    done = 0
     try:
-        for _ in range(args.max_batches):
+        while done < args.max_batches:
             t0 = time.perf_counter()
-            vnet, pnet, rnd = _load_current_net()
+            vnet, pnet, rnd, consumed_mine = _load_current_net(vocab, ev)
+            if not C.should_generate(batch_id, consumed_mine, args.pipeline_depth):
+                # learner が追いつくまで待つ（生成しても amend で上書き消滅するだけ＝全損防止）。
+                print(f"  [backpressure] 未消費 batch{consumed_mine + 1}..{batch_id - 1} が滞留中"
+                      f"（depth>{args.pipeline_depth}）。{args.poll}s 待機", flush=True)
+                time.sleep(args.poll)
+                continue
             vnet.save(ck + "/_cur_v.npz")
             ppath = None
             if pnet is not None:
@@ -98,11 +121,11 @@ def main():
                                           batch_id * 131 + 7, ev=ev, leaders=leaders)
             if vdata is None:
                 print("  採取0スキップ", flush=True); continue
-            # data枝へ push（自分が単独writer＝amend+force で安全）
+            # data枝へ push（自分が単独writer＝amend+force で安全）。policy教師も同梱（直列とのパリティ）。
             _ensure_wt(DATA_WT, DATA_BR)
             d = DATA_WT + "/p3data"; os.makedirs(d, exist_ok=True)
             np.savez(d + "/batch.npz", scalars=vdata["scalars"], field=vdata["field"],
-                     card_idx=vdata["card_idx"], value=vdata["value"])
+                     card_idx=vdata["card_idx"], value=vdata["value"], **C.pack_policy(pol))
             meta = {"worker": WID, "batch_id": batch_id, "against_round": rnd,
                     "games": args.games, "states": int(len(vdata["value"]))}
             json.dump(meta, open(d + "/meta.json", "w"))
@@ -114,6 +137,7 @@ def main():
             print(f"  batch{batch_id} r{rnd} {len(vdata['value'])}局面 push={'OK' if ok else 'FAIL'} "
                   f"{dt:.0f}s ({args.games/dt:.2f} g/s)", flush=True)
             batch_id += 1
+            done += 1
     finally:
         pool.close(); pool.join()
     return 0

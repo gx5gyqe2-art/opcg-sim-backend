@@ -65,6 +65,37 @@ def test_updates_for_scales_with_inflow_and_preserves_ratio():
     assert C.updates_for(500, 0, 16) == 1
 
 
+def test_should_generate_backpressure_boundaries():
+    """バックプレッシャ: 未消費が depth 本以下なら生成可・超えたら待機（learner停止中の上書き全損防止）。"""
+    # learner未稼働（consumed=-1）でも depth 本までは先行生成できる
+    assert C.should_generate(0, -1, 2) is True    # 未消費1本目
+    assert C.should_generate(1, -1, 2) is True    # 2本目
+    assert C.should_generate(2, -1, 2) is False   # 3本目=depth超え→待つ
+    # learnerが追いつけば再開
+    assert C.should_generate(2, 0, 2) is True
+    # depth=0 は「前バッチ消費まで次を作らない」完全同期
+    assert C.should_generate(5, 4, 0) is False
+    assert C.should_generate(5, 5, 0) is True
+
+
+def test_pack_unpack_policy_roundtrip():
+    """policy教師（可変長L）のnpzパック往復＝直列とのパリティ（policy凍結バグの回帰）。"""
+    rng = np.random.default_rng(0)
+    pol = [(rng.standard_normal(6).astype(np.float32),
+            rng.standard_normal((L, 4)).astype(np.float32),
+            (np.ones(L) / L).astype(np.float32)) for L in (3, 1, 5)]
+    packed = C.pack_policy(pol)
+    # npz 保存/読込を模す（np.savez→np.load 相当のdict渡し）
+    out = C.unpack_policy(packed)
+    assert len(out) == 3
+    for (c0, a0, v0), (c1, a1, v1) in zip(pol, out):
+        assert np.allclose(c0, c1) and np.allclose(a0, a1) and np.allclose(v0, v1)
+        assert a1.shape[0] == len(v1)
+    # 空は空・旧形式（キー無し）は []（後方互換）
+    assert C.unpack_policy(C.pack_policy([])) == []
+    assert C.unpack_policy({"scalars": np.zeros(3)}) == []
+
+
 def test_ring_append_caps_and_bootstraps():
     a = {"x": np.arange(10), "y": np.arange(10) * 2}
     b = {"x": np.arange(10, 16), "y": np.arange(10, 16) * 2}
