@@ -24,6 +24,7 @@ API テストは `fastapi`/`httpx` 導入後に collection 可。
 ```bash
 make test        # 全テスト（並列／slow除外。構造監査 EXCEPTION/CARD_LOSS/TEMP_LEAK=0 も含む）
 make test-slow    # 重テスト（make/unmake=journal変更時のみ手動）
+make test-fast    # 開発中のイテレーション用（slow・cpu_infra除外）
 ```
 
 > `slow` マーカーの重テスト（現状 `test_journal.py::test_parked_resume_make_unmake_roundtrip` ~245s）は
@@ -31,6 +32,18 @@ make test-slow    # 重テスト（make/unmake=journal変更時のみ手動）
 > 構造監査（`tests/harness/full_card_audit.py` の EXCEPTION/CARD_LOSS/TEMP_LEAK）は
 > `tests/test_full_card_audit.py` が `make test` の中で実行するため、**単体スクリプトを別途走らせる必要はない**
 > （`make audit` は異常カード一覧を見たいときの診断専用、ゲートの必須手順ではない）。
+
+> テストは**重要度**で3階層に分ける（時間ではない。詳細は `docs/TEST_SPEC.md` §重要度分類）。**基盤健全性**
+> （探索/自己対戦/学習パイプラインの内部機構の健全性のみを見る。ゲームプレイの正しさ自体は
+> 必須/標準テストが別途担保）は `cpu_infra` マーカーを付け、`make test-fast` で除外する。
+> **push前は必ず `make test`（cpu_infra を含むフルスコープ）をgreenにする**——
+> `make test-fast` はイテレーション用の速い一次チェックであり、push前ゲートを代替しない。
+>
+> **新しいテストを追加するとき**: 「無ければ実プレイのゲームプレイ退行（誤った効果解決／クラッシュ／
+> カード消失／API契約破壊）を見逃すか」で判定する。Yes＝必須/標準（マーカー不要・常時実行）。No＝
+> 探索/自己対戦/学習パイプラインの内部機構の健全性のみを見る基盤健全性＝`@pytest.mark.cpu_infra`
+> （module-level `pytestmark` 可）を明示する（迷ったら必須/標準側に倒す）。`docs/TEST_SPEC.md` §2 への
+> 追記時、基盤健全性はその旨を明記する。
 
 - 全テスト pass（`test_full_card_baseline.py`＝挙動ベースライン一致、`test_effect_oracle_gate.py`＝
   HAS_OTHER/PER_TURN_LIMIT_GAP/UP_TO_GAP = 0 のラチェットを含む）

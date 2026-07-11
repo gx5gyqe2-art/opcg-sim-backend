@@ -6,6 +6,8 @@ from cpu_selfplay import _load_db
 import rl_encoder as E
 import rl_datagen as G
 
+pytestmark = pytest.mark.cpu_infra
+
 
 @pytest.fixture(scope="module")
 def db():
