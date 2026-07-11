@@ -10,7 +10,8 @@
 3. **CI 結果はユーザに聞かれたら確認**して返信する。この環境には GitHub API トークンが無く、
    裏での自動ポーリングはできない（`api.github.com` は未認証・共有IPでレート制限）。
    **失敗は Webhook で自動的にチャットへ届く**ので、届いたら調査・修正する。
-4. **マージはユーザの明示の指示があるまで実行しない**（CI が緑でも勝手にマージしない）。
+4. **マージはユーザの明示の指示があるまで実行しない**（CI が緑でも勝手にマージしない。
+   `enable_pr_auto_merge` 等の自動マージ機能も同様に使わない）。
 5. マージすると PR 購読は自動解除される。マージ済み PR は再オープンしない。
 
 > 補足: 「CI 完了（成功）の瞬間に自動通知」だけは現状の権限では不可。実現するには `repo` スコープの
@@ -19,22 +20,24 @@
 
 ## マージ前に緑であるべき品質ゲート
 
-`OPCG_LOG_SILENT=1` と `-s`（キャプチャ無効）は本スイートの必須フラグ。API テストは `fastapi`/`httpx`
-導入後に collection 可。
+コマンドの正本は `Makefile`（CLAUDE.md / CI / README 系はここを参照する。生コマンドを
+個別に書き換えない）。`OPCG_LOG_SILENT=1` と `-s`（キャプチャ無効）は本スイートの必須フラグ。
+API テストは `fastapi`/`httpx` 導入後に collection 可。
 
 ```bash
-OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -m "not slow" -p no:cacheprovider  # 全テスト（CI同条件・並列／slow除外）
-OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -m slow -p no:cacheprovider          # 重テスト（make/unmake変更時に手動）
-OPCG_LOG_SILENT=1 python tests/harness/full_card_audit.py                     # 構造不変条件 = 0
+make test        # 全テスト（CI同条件・並列／slow除外。構造監査 EXCEPTION/CARD_LOSS/TEMP_LEAK=0 も含む）
+make test-slow    # 重テスト（make/unmake=journal変更時のみ手動）
 ```
 
 > `slow` マーカーの重テスト（現状 `test_journal.py::test_parked_resume_make_unmake_roundtrip` ~245s）は
-> CI から除外（`-m "not slow"`）。**make/unmake（journal）周辺を変更したときは上の `-m slow` を手動実行**する。
+> CI から除外（`-m "not slow"`）。**make/unmake（journal）周辺を変更したときは `make test-slow` を手動実行**する。
+> 構造監査（`tests/harness/full_card_audit.py` の EXCEPTION/CARD_LOSS/TEMP_LEAK）は
+> `tests/test_full_card_audit.py` が `make test` の中で実行するため、**単体スクリプトを別途走らせる必要はない**
+> （`make audit` は異常カード一覧を見たいときの診断専用、ゲートの必須手順ではない）。
 
 - 全テスト pass（`test_full_card_baseline.py`＝挙動ベースライン一致、`test_effect_oracle_gate.py`＝
   HAS_OTHER/PER_TURN_LIMIT_GAP/UP_TO_GAP = 0 のラチェットを含む）
-- 構造監査 `EXCEPTION/CARD_LOSS/TEMP_LEAK = 0`
-- **挙動を意図的に変えた場合のみ** `python tests/harness/full_card_audit.py --regen` でベースライン再生成し、
+- **挙動を意図的に変えた場合のみ** `make regen-baseline` でベースライン再生成し、
   差分をレビューする。検証済みデッキの挙動を直したら `tests/test_verified_decks.py` にアサート追記。
 
 詳細は `docs/TEST_SPEC.md`（§4 検証フロー／§5 品質ゲート）、`docs/README.md`（文書索引）を参照。

@@ -15,9 +15,5 @@
 ## クイックスタート
 
 ```bash
-# テスト（ログ抑止・キャプチャ無効が必須）
-OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -p no:cacheprovider
-
-# 全カード構造不変条件・挙動ベースライン
-OPCG_LOG_SILENT=1 python tests/full_card_audit.py
+make test    # テスト（全カード構造不変条件・挙動ベースラインも含む。コマンドの正本は Makefile）
 ```
