@@ -31,8 +31,10 @@ _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "data")
 
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen2_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen2_policy.npz")
+# Gen3 = 蒸留(ship v1=Gen2)→実効10,112局の追い学習で得た LC+EffFeat v3 net（対L1多様97=0.854）。
+# Gen2 は録画リプレイの再現・A/B比較用に同梱を維持する。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen3_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen3_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}
@@ -81,8 +83,9 @@ def _net_enc_version(vnet) -> int:
 
     v1=Gen2 出荷ネット（scalars 14）・v2=リーダー付与ドン追加（scalars 16）。重み側の
     次元が真実源＝コードのデフォルトに依存しない（v2 ネットへ差し替えた時点で自動有効）。
+    `vnet.feat_dim` は lead_slots（リーダー条件付け専用枠）を自動的に除外する＝LC net でも誤判定しない。
     """
-    feat = int(vnet.W1.shape[0]) - int(vnet.d_emb)
+    feat = vnet.feat_dim
     for v in E.known_versions():
         if feat == E.feature_dim(v):
             return v

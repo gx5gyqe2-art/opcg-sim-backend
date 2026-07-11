@@ -339,16 +339,25 @@ def test_encoder_v2_sees_leader_attached_don():
     assert v2_after["scalars"][PROD_E.SCALARS_V1] == 2 / 5.0, "v2 に自リーダー付与ドンが載るはず"
 
 
+def _gen2_vnet():
+    """同梱 Gen2（旧出荷・v1）を明示ロード。温スタート機構の検証素材は v1 net
+    （既定エンジンは Gen3=v3 に切替済みのため、既定依存だと素材の版が変わる）。"""
+    import os
+    from opcg_sim.src.learned.value_net import ValueNet
+    return ValueNet.load(os.path.join(cpu_learned._MODELS, "gen2_value.npz"))
+
+
 def test_enc_version_autodetect_from_weights():
     """符号化世代はロードした npz の入力次元から自動判別（コード既定に依存しない）。
 
-    出荷 Gen2＝v1 で挙動不変。v2 で訓練した npz を置いた時点で新特徴が自動有効になる
-    （デプロイはファイル差し替えのみ・フラグ不要）。
+    同梱 Gen2＝v1・既定 Gen3＝v3（2026-07-11採用）。訓練済み npz を置いた時点で新特徴が
+    自動有効になる（デプロイはファイル差し替えのみ・フラグ不要）。
     """
     import os, tempfile
     from opcg_sim.src.learned.value_net import ValueNet
-    assert cpu_learned._net_enc_version(cpu_learned._default_engine().vnet) == 1,\
-        "出荷 Gen2 は v1 のはず"
+    assert cpu_learned._net_enc_version(_gen2_vnet()) == 1, "同梱 Gen2 は v1 のはず"
+    assert cpu_learned._net_enc_version(cpu_learned._default_engine().vnet) == 3,\
+        "既定 Gen3 は v3 のはず"
     v2 = ValueNet(vocab_size=10, d_emb=4, hidden=8, feat_dim=PROD_E.feature_dim(2), seed=0)
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, "v2_value.npz")
@@ -363,7 +372,7 @@ def test_warm_start_value_is_identity_on_shipped_state():
     増えたスカラーの重みが 0 なので、リーダー付与ドンが載っても value 出力は出荷 v1 と一致する
     ＝v2 Gen0 は出荷の実力そのものから学習を始められる。実局面（付与ドンあり/なし両方）で確認。
     """
-    v1 = cpu_learned._default_engine().vnet
+    v1 = _gen2_vnet()
     assert cpu_learned._net_enc_version(v1) == 1
     v2 = cpu_learned.warm_start_value(v1, 1, 2)
     assert cpu_learned._net_enc_version(v2) == 2, "拡張後は v2 次元のはず"
@@ -381,11 +390,13 @@ def test_warm_start_value_is_identity_on_shipped_state():
 
 def test_warm_start_policy_is_identity():
     """policy の温スタートも恒等（合法手上の事前確率が拡張前後で一致）。"""
+    import os
     from opcg_sim.src.learned.policy import PolicyScorer, state_context
     from opcg_sim.src.learned.action import legal_action_matrix
-    pnet = cpu_learned._default_engine().pnet
-    if pnet is None:
-        import pytest; pytest.skip("policy net 未同梱")
+    p_path = os.path.join(cpu_learned._MODELS, "gen2_policy.npz")
+    if not os.path.exists(p_path):
+        import pytest; pytest.skip("gen2 policy net 未同梱")
+    pnet = PolicyScorer.load(p_path)   # v1素材（既定はGen3=v3のため明示ロード）
     p2 = cpu_learned.warm_start_policy(pnet, 1, 2)
     vocab = PROD_E.build_vocab(_load_db())
     m = _game(9); name, actor = _actor(m)
@@ -401,7 +412,7 @@ def test_warm_start_policy_is_identity():
 
 def test_warm_start_rejects_shrink_and_supports_future_versions():
     """拡張性: warm_start は scalars_dim の版差だけを見る＝将来の版追加に同一コードで対応。縮小は拒否。"""
-    v1 = cpu_learned._default_engine().vnet
+    v1 = _gen2_vnet()
     # 恒等（v1→v1・n_new=0）は同一出力の複製。
     same = cpu_learned.warm_start_value(v1, 1, 1)
     assert cpu_learned._net_enc_version(same) == 1

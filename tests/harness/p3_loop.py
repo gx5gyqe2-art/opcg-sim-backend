@@ -203,7 +203,7 @@ def main():
     # Gen0: value=SL net(or 乱数)・policy=uniform(None)。
     if args.sl_net:
         v0 = RN.ValueNet.load(args.sl_net); print(f"Gen0 value net: {args.sl_net}", flush=True)
-        loaded_feat = int(v0.W1.shape[0]) - int(v0.d_emb)
+        loaded_feat = v0.feat_dim
         if loaded_feat != E.feature_dim(args.enc_version):
             print(f"ERROR: --sl-net の入力次元 {loaded_feat} が enc-version={args.enc_version} "
                   f"(feat_dim={E.feature_dim(args.enc_version)}) と不一致", flush=True)

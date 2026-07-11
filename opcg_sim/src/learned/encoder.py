@@ -31,7 +31,8 @@ PAD = 0                # card_idx の PAD/UNK
 # version 分岐に append を足す——の3点だけで、拡張・温スタート・ドリフト検知が自動追従する。
 SCALARS_V1 = 14        # v1 のグローバル数値特徴数（Gen2 出荷ネット）
 SCALARS_V2 = 16        # v2 = v1 + [自リーダー付与ドン, 相手リーダー付与ドン]
-_SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2}
+SCALARS_V3 = 46        # v3 = v2 + [山札/トラッシュ/今ターンKO数 6] + [ターン1使用済み 12] + [召喚酔い 12]
+_SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3}
 
 
 def scalars_dim(version=1):
@@ -112,6 +113,26 @@ def encode(manager, me_name, vocab, version=1):
                 return 0.0
             return float(getattr(pl.leader, "attached_don", 0) or 0) / 5.0
         vals += [ldon(me), ldon(opp)]
+    if version >= 3:
+        # v3（docs/reports/effect_semantics_v3_plan_20260708.md §2）:
+        # (a) 効果が参照するのに未符号化だった状態変数（棚卸し§3: TRASH_COUNT 29件・DECK_COUNT=OP03ナミの勝利条件変数）
+        ev = getattr(manager, "_turn_events", None) or {}
+        vals += [len(me.deck) / 50.0, len(opp.deck) / 50.0,
+                 len(me.trash) / 20.0, len(opp.trash) / 20.0,
+                 float(ev.get(f"CHAR_KOED_{me.name}", 0)) / 3.0,
+                 float(ev.get(f"CHAR_KOED_{opp.name}", 0)) / 3.0]
+        # (b) スロット別フラグ（[自L, 相L, 自場5, 相場5] の12枠×2種）。scalars に畳む＝新入力キーを
+        #     増やさない（既存の append-only 温スタートと全配管がそのまま動く・MLPは位置に依存しない）。
+        slots = [me.leader, opp.leader] + \
+            (list(me.field)[:MAX_FIELD] + [None] * MAX_FIELD)[:MAX_FIELD] + \
+            (list(opp.field)[:MAX_FIELD] + [None] * MAX_FIELD)[:MAX_FIELD]
+        # ターン1使用済み（TURN_LIMIT=最頻の効果条件・出典 ability_used_this_turn=JournaledDict）
+        vals += [1.0 if (c is not None and any(
+            v > 0 for v in getattr(c, "ability_used_this_turn", {}).values())) else 0.0
+            for c in slots]
+        # 召喚酔い（battle.py の攻撃可否と同源・リーダーは is_newly_played=False）
+        vals += [1.0 if (c is not None and getattr(c, "is_newly_played", False)) else 0.0
+                 for c in slots]
     scalars = np.array(vals, dtype=np.float32)
 
     field = np.zeros((2 * MAX_FIELD, PER_CHAR), dtype=np.float32)
@@ -120,7 +141,8 @@ def encode(manager, me_name, vocab, version=1):
     for i, c in enumerate(list(opp.field)[:MAX_FIELD]):
         field[MAX_FIELD + i] = _char_feats(c)
 
-    idx = np.zeros(2 + 2 * MAX_FIELD + MAX_HAND, dtype=np.int32)
+    n_idx = 2 + 2 * MAX_FIELD + MAX_HAND + (2 if version >= 3 else 0)
+    idx = np.zeros(n_idx, dtype=np.int32)
     idx[0] = _vidx(vocab, me.leader) if me.leader else PAD
     idx[1] = _vidx(vocab, opp.leader) if opp.leader else PAD
     base = 2
@@ -132,6 +154,12 @@ def encode(manager, me_name, vocab, version=1):
     base += MAX_FIELD
     for i, c in enumerate(list(me.hand)[:MAX_HAND]):   # 自分の手札のみ（公平）
         idx[base + i] = _vidx(vocab, c)
+    if version >= 3:
+        # v3: ステージ2枠を**末尾**に追加（ネット側はプール対象を先頭22枠に固定＝恒等温スタート維持。
+        #     ステージは EffFeat 射影経路でのみ効く）。ステージ盲目の解消（設計書 改訂1）。
+        base = 2 + 2 * MAX_FIELD + MAX_HAND
+        idx[base] = _vidx(vocab, me.stage) if getattr(me, "stage", None) else PAD
+        idx[base + 1] = _vidx(vocab, opp.stage) if getattr(opp, "stage", None) else PAD
 
     return {"scalars": scalars, "field": field, "card_idx": idx}
 

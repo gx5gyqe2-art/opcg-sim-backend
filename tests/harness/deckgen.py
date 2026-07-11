@@ -32,20 +32,58 @@ _ALL_LEADERS: Optional[List[str]] = None
 
 
 def all_leader_ids(db: CardLoader) -> List[str]:
-    """DB 内の全リーダー card_id（ソート済み・キャッシュ）。自己対戦の分布多様化用プール。
+    """自己対戦/評価の rotate-leaders プール（ソート済み・キャッシュ）。分布多様化用。
 
     検証済み5種（`VERIFIED_LEADERS`）は挙動を手動検証済みだが、本プールは未検証リーダーを含む。
     自己対戦の**盤面分布を広げる**（人間ログ転移の改善狙い）用途で、効果バグで壊れた局は
     `collect_game` 側で自動破棄される（学習データには混ざらない）。回帰テストには使わない。
+
+    **プール範囲（ユーザ決定 2026-07-06）**: `block_icon==1`（OP01〜OP02 世代の旧ローテーション
+    ブロック・40種）は除外＝137→97。1リーダーあたりの学習/評価データ希釈を減らす目的。訓練も評価も
+    本関数を共用するため除外は train/eval で自動一致する（分布ずれを作らない）。フラッグシップ機能の
+    リーダー辞書（全137件）は別ソースで本除外の影響を受けない。
+
+    **クラスタ学習（案B）**: 環境変数 `OPCG_LEADER_COLORS`（色名カンマ区切り・例 `赤` / `赤,紫`）を
+    セットすると、指定色を**1つでも含む**リーダーだけに絞る（狭い分布＝v1的な速い climb を狙う）。
+
+    **リーダー数スケーリング分析**: `OPCG_LEADER_POOL_SIZE=N` をセットすると、97を**6色ラウンドロビンで
+    交互取り**した先頭 N リーダーに絞る＝**色構成が常に均等（色差の交絡を除去）・小プール⊂大プール（入れ子）**。
+    「1リーダーあたり対局数 → 強度」曲線を N を変えて描く用（`OPCG_LEADER_COLORS` より優先）。
+
+    優先順位: POOL_SIZE > COLORS > 全97。プロセス起動時の env で決まる（1プロセス=1プール）。
     """
     global _ALL_LEADERS
     if _ALL_LEADERS is None:
-        out = []
-        for cid in db.raw_db.keys():
-            c = db.get_card(cid)
-            if c is not None and c.type.name == "LEADER":
-                out.append(cid)
-        _ALL_LEADERS = sorted(out)
+        import os
+        # ベース＝block_icon==1 を除いた 97（card_id ソート＝決定的）。
+        base = sorted(cid for cid in db.raw_db.keys()
+                      if (lambda c: c is not None and c.type.name == "LEADER"
+                          and str(getattr(c, "block_icon", "")) != "1")(db.get_card(cid)))
+
+        def _primary(cid):
+            cols = [getattr(x, "value", str(x)) for x in (getattr(db.get_card(cid), "colors", None) or [])]
+            return cols[0] if cols else "?"
+
+        size = os.environ.get("OPCG_LEADER_POOL_SIZE")
+        colors = os.environ.get("OPCG_LEADER_COLORS")
+        if size:
+            # 色バランス入れ子プール: 6色を card_id 順にラウンドロビンで交互取り→先頭 N。
+            order = ["赤", "緑", "青", "紫", "黒", "黄", "?"]
+            by = {col: [cid for cid in base if _primary(cid) == col] for col in order}
+            interleaved, i = [], 0
+            while len(interleaved) < len(base):
+                for col in order:
+                    if i < len(by[col]):
+                        interleaved.append(by[col][i])
+                i += 1
+            _ALL_LEADERS = interleaved[: int(size)]
+        elif colors:
+            want_set = set(s.strip() for s in colors.split(",") if s.strip())
+            _ALL_LEADERS = [cid for cid in base
+                            if {getattr(x, "value", str(x))
+                                for x in (getattr(db.get_card(cid), "colors", None) or [])} & want_set]
+        else:
+            _ALL_LEADERS = base
     return _ALL_LEADERS
 
 
