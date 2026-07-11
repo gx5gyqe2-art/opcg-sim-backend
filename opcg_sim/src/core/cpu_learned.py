@@ -12,7 +12,9 @@ docs/reports/cpu_rl_pilot_p3_results_20260630.md。P3本走で得た Gen2 ネッ
 `decide_learned` は既定ネットの**プロセス共有シングルトン**（`_default_engine()`）を使う薄いラッパ
 ＝**挙動不変**（vocab/game はネット非依存なので複数エンジンで共有ロード可能）。
 """
+import math
 import os
+import weakref
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -22,7 +24,9 @@ from opcg_sim.src.learned.value_net import ValueNet
 from opcg_sim.src.learned.policy import PolicyScorer, state_context
 from opcg_sim.src.learned.action import legal_action_matrix
 from opcg_sim.src.learned.adapter import OPCGGame
-from opcg_sim.src.learned.config import C_PUCT, SERVE_SIMS, SERVE_DIRICHLET_EPS
+from opcg_sim.src.learned.config import (
+    C_PUCT, SERVE_SIMS, SERVE_DIRICHLET_EPS,
+    SERVE_ROOT_LCB_Z, SERVE_ROOT_LCB_MIN_FRAC, SERVE_STICKY_WORLD)
 from opcg_sim.src.learned.mcts import TreeMCTS   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
 from opcg_sim.src.utils.loader import CardLoader
 
@@ -130,6 +134,8 @@ class LearnedEngine:
             game = game if game is not None else sgame
         self.vocab = vocab
         self.game = game
+        # ターン内 sticky 世界線の seed キャッシュ {(id(manager), turn, player): (weakref, seed)}（§_world_rng）。
+        self._world_seeds: Dict[Any, Any] = {}
         self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
         # 符号化世代は重みの入力次元から自動判別（v1=出荷Gen2・v2=リーダー付与ドン特徴）。
         self.enc_version = _net_enc_version(self.vnet)
@@ -143,6 +149,34 @@ class LearnedEngine:
                     f"value/policy の符号化世代が不一致（value=v{self.enc_version}, "
                     f"policy ctx_dim={pv}）: 同一世代の npz ペアを配置してください")
 
+    def _world_rng(self, manager, name: str, rng) -> np.random.Generator:
+        """ターン内 sticky な PIMC 決定化 rng を返す（SERVE_STICKY_WORLD）。
+
+        1 ターンは「ドン付与→攻撃→…」の連続 decide で構成されるが、decide ごとに世界線
+        （相手伏せ手札のサンプル）を引き直すと、付与を正当化した攻撃プランが次の decide の
+        別世界で棄却され「付与だけして攻撃しない」無駄ドンが出る（マークレビュー F3）。
+        同一 (game, turn, player) の間は決定化 seed を固定し、ターン内の計画を同一世界で
+        一貫させる。seed は初回 decide の rng から引く＝global random の消費量は従来と同一
+        （リプレイ決定論を保つ）。キャッシュは挿入順で刈る（同時進行ゲーム数 ≪ 上限）。
+        """
+        key = (id(manager), int(getattr(manager, "turn_count", 0) or 0), name)
+        hit = self._world_seeds.get(key)
+        # id() は解放後に再利用されうる＝別ゲームの stale seed を拾うと「同一 seed 対局の
+        # プロセス間再現」が破れる。weakref で同一オブジェクトであることを検証して排除する。
+        seed = hit[1] if (hit is not None and hit[0]() is manager) else None
+        if seed is None:
+            seed = int(rng.integers(0, 2 ** 63 - 1))
+            if len(self._world_seeds) >= 256:
+                for k in list(self._world_seeds)[:128]:
+                    del self._world_seeds[k]
+            try:
+                self._world_seeds[key] = (weakref.ref(manager), seed)
+            except TypeError:
+                pass   # weakref 不可の manager は毎 decide 新世界（従来挙動に退化・安全側）
+        # 毎 decide 新しい Generator を同一 seed から作る＝ターン内のどの decide でも
+        # determinize の shuffle が同じ乱数列から始まる（公開情報の更新は盤面側から反映される）。
+        return np.random.default_rng(seed)
+
     def decide(self, manager, player, sims: int = SERVE_SIMS, c_puct: float = C_PUCT,
                rng=None, trace=None) -> Optional[Dict[str, Any]]:
         """このエンジンのネットで 1 手決定する（`decide_learned` と同一契約・同一探索）。"""
@@ -152,20 +186,23 @@ class LearnedEngine:
         if not isinstance(rng, np.random.Generator):
             import random as _random
             rng = np.random.default_rng(_random.getrandbits(64))
+        det_rng = self._world_rng(manager, name, rng) if SERVE_STICKY_WORLD else rng
         mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab, self.enc_version),
                         priors_fn=_priors_fn(self.pnet, self.vocab, self.enc_version),
                         c_puct=c_puct, n_sims=sims, dirichlet_eps=SERVE_DIRICHLET_EPS,
-                        determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=rng)
+                        determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=det_rng)
         move, _, legal = mcts.run(manager)
         # 同名カードの別実体（手札の複製等）は探索木で別 edge になり訪問数が分裂する。
         # 素の argmax(N) は分裂した等価手を系統的に不利にする（例: EB03-053×2 のカウンターが
         # 30.6%+30.6% に割れ、38.8% の PASS に負ける）ため、等価キーで訪問数を合算した
-        # グループの多数決で選ぶ。探索（TreeMCTS）自体は不変＝ルートの読み出しのみ補正。
+        # グループから選ぶ。さらに読み出しは argmax(N) でなく LCB 乗り換え
+        # （`_select_root_group`）＝訪問が貼り付いたまま Q で劣後した手を採らない。
+        # 探索（TreeMCTS）自体は不変＝ルートの読み出しのみ補正。
         stats = getattr(mcts, "last_stats", None)
         if stats and stats.get("legal"):
             groups = _merge_root_stats(manager, stats["legal"], stats["N"], stats["Q"])
             if groups:
-                move = stats["legal"][groups[0]["rep"]]
+                move = stats["legal"][_select_root_group(groups)["rep"]]
         if move is None:
             move = legal[0] if legal else None
         if trace is not None:
@@ -203,6 +240,32 @@ def decide_learned(manager, player, sims: int = SERVE_SIMS, c_puct: float = C_PU
     分析は挙動に影響しない（例外は握り潰し、手は必ず返す）。
     """
     return _default_engine().decide(manager, player, sims=sims, c_puct=c_puct, rng=rng, trace=trace)
+
+
+def _select_root_group(groups, z: float = SERVE_ROOT_LCB_Z,
+                       min_frac: float = SERVE_ROOT_LCB_MIN_FRAC):
+    """root 読み出し: 最多訪問グループを基準に、十分訪問された代替の LCB が上回れば乗り換える。
+
+    素の argmax(N) は PUCT の訪問が prior／先行 Q に貼り付く性質上、探索後半に Q で逆転した
+    代替を拾えない（マーク@12: ATTACK 56%/q=-0.127 が ATTACH_DON 31%/q=-0.043 に選ばれる）。
+    低訪問の Q は楽観ノイズを含むため素の argmax(Q) にはせず、LCB = q − z/√n（q∈[-1,1] の
+    悲観補正）と最低訪問率ゲート（n ≥ min_frac·n_top）で「確度のある逆転」だけ採る。
+    z=0 は従来の argmax(N)（=groups[0]）に一致。探索・トレース統計は不変＝読み出しのみ。
+
+    `groups`: `_merge_root_stats` の返り値（n 降順・{"rep","idxs","n","q"}）。返り値は選んだグループ。
+    """
+    best = groups[0]
+    if z <= 0.0 or len(groups) == 1 or best["n"] <= 0:
+        return best
+    gate = max(1.0, min_frac * best["n"])
+    best_lcb = best["q"] - z / math.sqrt(best["n"])
+    for g in groups[1:]:
+        if g["n"] < gate:
+            continue
+        lcb = g["q"] - z / math.sqrt(g["n"])
+        if lcb > best_lcb:
+            best, best_lcb = g, lcb
+    return best
 
 
 def _merge_root_stats(manager, legal, N, Q):

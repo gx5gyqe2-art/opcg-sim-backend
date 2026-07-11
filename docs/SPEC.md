@@ -139,6 +139,13 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
   ＝LC+EffFeat v3・2026-07-11採用（PR #177・旧Gen2はリプレイ再現/A/B用に同梱維持）／
   `hard`＝α-β）/ `cpu_deck`。未指定・未知値は `learned` に正規化。モデル未同梱環境（`cpu_learned.available()`
   が False）では `learned`→`hard` に安全フォールバック。CPU メタは `CPU_GAMES` に保持（`{cpu_player_id, difficulty}`）。
+  - **learned の serve 探索**（`cpu_learned.LearnedEngine.decide`・net 非依存の探索層＝net を差し替えても有効）:
+    NN誘導 PUCT MCTS（`learned/mcts.py`・SERVE_SIMS=160）＋ (a) **終局値の深さ減衰**
+    ±max(TERM_FLOOR, 1−TERM_DECAY·depth)（L1 の ±(W_WIN−ply) と同原理＝最短リーサル優先・敗勢では
+    粘る側を選ぶ）、(b) **root 読み出しの LCB 乗り換え**（等価手マージ後、十分訪問の代替の q−z/√n が
+    上回れば argmax(N) から乗り換え・z=0 で従来一致）、(c) **ターン内 sticky 世界線**（PIMC 決定化 seed を
+    (game, turn, player) 単位で固定＝「ドン付与→別世界で攻撃取り止め」の計画非一貫を防ぐ・serve 専用）。
+    経緯・マーク回帰は `docs/reports/cpu_learned_mark_review_20260711.md`。
 - **逐次進行**: `POST /api/game/cpu/step {game_id}` が CPU の次の 1 手を `action_api`（§0 の共通
   コアパス）経由で適用し、`{cpu_acted, cpu_event, waiting_for}` を返す
   （`waiting_for`: `cpu`=継続 / `human` / `human_decision` / `game_over`）。フロントは
