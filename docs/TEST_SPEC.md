@@ -31,12 +31,13 @@ resolver は `success = True` を返す。エラー・フォールバック・OT
 logger が `sys.stdout` を直接掴むため、pytest はキャプチャ無効で実行する。
 
 ```bash
-make test    # -n auto = pytest-xdist 並列。-m "not slow" = CI と同条件（最重量テストを除外）
+make test    # -n auto = pytest-xdist 並列。-m "not slow" = 通常ゲートの既定条件（最重量テストを除外）
 ```
 
-コマンドの正本は `Makefile`。`-s/-p no:capture` を付けないと I/O error になる。
+コマンドの正本は `Makefile`。`-s/-p no:capture` を付けないと I/O error になる。CI は無く、
+`make test` がマージ前の唯一の確認手段（2026-07-11 廃止・詳細は `CLAUDE.md`）。
 
-`slow` マーカー（`pytest_configure` で登録）は **CI から除外**する重テスト（手動実行前提）。現状の対象は
+`slow` マーカー（`pytest_configure` で登録）は **`make test` から除外**する重テスト（手動実行前提）。現状の対象は
 `test_journal.py::test_parked_resume_make_unmake_roundtrip`（8 seed × 全手の make/unmake 照合 ~245s＝
 スイート単独最重量・並列でも壁時計上限を作る）。**make/unmake（journal）周辺を変更したら手動実行**する:
 
@@ -109,7 +110,7 @@ make test-slow   # 重テストだけ
 | `tests/test_perf_gate.py` | **CPU 性能ゲートの判定ロジック**（`tests/scripts/perf_gate.py`・§5.1）: `evaluate_gate` 純関数（強度不足/レイテンシ超過/失敗局/データ不足→FAIL・理由の蓄積）＋ gen2_*.npz ハッシュの安定性。実対局は回さず高速固定 |
 | `tests/test_cpu_learned.py` | **学習型CPU（Gen2）本番配線**（`opcg_sim/src/core/cpu_learned.py`／`opcg_sim/src/learned/`）: 合法手・decide_client ルーティング・seed 決定論・席別エンジン（net-vs-net 等価）・**符号化/行動特徴の訓練時ドリフト検知（v1/v2）**（`tests/harness/{rl_encoder,opcg_action,rl_net,az_policy,az_mcts_tree}.py` は本番 `opcg_sim/src/learned/{encoder,action,value_net,policy,mcts}.py` への委譲shim＝TEST_E/TEST_A は本番と同一オブジェクトでドリフトは構造的に不可能・退行検知として存続。`tests/harness/opcg_game.py` は本番 `adapter.OPCGGame` の薄い継承＋研究専用 `new_game` のみ追加）・選択対話の併合（CONFIRM_OPTIONAL accept/decline・up-to ライフ追加・**ARRANGE_DECK の並び替え/上下選択**・position キー）・**ルート等価手マージ**（同名複製の訪問数分裂で PASS に負ける実害の反転ケース＋複製なし恒等）・トレース記述（decline の accepted 明示・dialog 種別）・**符号化世代 v2**（リーダー付与ドン特徴＝v1 では不可視・v1 出力不変・npz 入力次元からの自動判別）・**温スタート拡張**（v1→v2 の重み拡張が恒等＝拡張ネット×v2符号化 == 出荷×v1符号化・policy も恒等・縮小拒否・版差は scalars_dim のみが seam＝将来版に同一コード対応） |
 | `tests/test_p3_components.py` | **P3学習ループ部品の高速単体**（重い loop は `p3_loop.py --smoke --enc-version 1`）: action 特徴 one-hot・action_key の区別・policy 学習・**自己対戦のリーダーローテーション**（`OPCGGame.new_game(leaders=…)` が全リーダープールから両席を抽選＋リアルデッキ化＝【ドン‼×1】系リーダー効果を学習データに載せる「穴B」対策・seed 決定論／leaders 未指定は build_deck 固定＝後方互換） |
-| `tests/test_p3_loop.py` | **P3学習ループの疎通**（slow・CI除外）: 自己対戦→value/policy 学習→クロス評価が例外なく完走（勝率シグナルは見ない）。`p3_loop.py`／`p3_run.py` は `--enc-version 2`（必須・符号化v2）・`--rotate-leaders`（穴B）を配管。p3_run の v2 Gen0 は出荷 v1 Gen2 から**温スタート**（乱数初期化しない） |
+| `tests/test_p3_loop.py` | **P3学習ループの疎通**（slow・`make test`除外）: 自己対戦→value/policy 学習→クロス評価が例外なく完走（勝率シグナルは見ない）。`p3_loop.py`／`p3_run.py` は `--enc-version 2`（必須・符号化v2）・`--rotate-leaders`（穴B）を配管。p3_run の v2 Gen0 は出荷 v1 Gen2 から**温スタート**（乱数初期化しない） |
 | `tests/test_p2_harness.py` | **P2 harness（`tests/harness/p2_gen0.py`）の高速単体**: SL価値の配線（encode→net→[-1,1]）・SL-MCTSエージェントの合法手・save/loadラウンドトリップ・**`match()` のリーダーローテーション配管**（`leaders=…` が `new_game` へ伝播＝`p3_vs_l1.py --rotate-leaders` の土台。未指定は従来の固定リーダーで後方互換）。世代ゲート本体（`p3_gate.py`＝Gen_k vs Gen_{k-1} 損切り判定）と直接対戦参考測定（`p3_vs_l1.py`＝vs 製品L1）は、符号化世代をロード重みの入力次元から自動判別（`cpu_learned._net_enc_version`）してエージェントを構築＝チェックポイントの実際の版とズレない |
 
 ### 効果メカニクス・対話モデル
@@ -284,7 +285,7 @@ make regen-baseline
 
 ### 5.1 CPU 性能ゲート（Gen2 非退行・手動/定期）
 
-本番既定 CPU＝**Gen2(learned)** の強度・非退行を測る運用ツール（実対局は重いので CI 外・手動/定期）:
+本番既定 CPU＝**Gen2(learned)** の強度・非退行を測る運用ツール（実対局は重いので `make test` 外・手動/定期）:
 
 ```bash
 OPCG_LOG_SILENT=1 python tests/scripts/perf_gate.py --quick     # 疎通/軽い確認（pairs6・sims40）
