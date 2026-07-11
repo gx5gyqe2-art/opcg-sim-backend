@@ -143,16 +143,20 @@ def _find_unit(pl, card_id, active_only=False):
 def _board_for_counter_mark(db, rec, frames_by_idx, actions, i):
     """カウンター系マーク(action i)の盤面を復元する。
 
-    action i-1=攻撃宣言(ATTACK/ATTACK_CONFIRM)。frame[i-2]（攻撃前）から盤面を復元し、記録された攻撃を
-    再宣言して SELECT_COUNTER 待ちを engine に正しく作らせる（ブロッカー段があれば PASS で進める）。
+    直近の攻撃宣言(ATTACK/ATTACK_CONFIRM)を i-1 から後方に探す（間の PASS＝ブロッカー段の
+    見送り等・同一戦闘内の応答は飛ばす）。攻撃前フレームから盤面を復元して記録された攻撃を
+    再宣言し、SELECT_COUNTER 待ちを engine に正しく作らせる（ブロッカー段があれば PASS で進める）。
     返り値 (manager, defender) または理由文字列。
     """
     from opcg_sim.src.core import action_api
-    atk_act = actions[i - 1]
+    j = i - 1
+    while j >= 0 and actions[j].get("action_type") in ("PASS", "SELECT_BLOCKER"):
+        j -= 1   # 同一戦闘の応答（ブロッカー見送り等）を遡って攻撃宣言に着地する
+    atk_act = actions[j] if j >= 0 else {}
     if atk_act.get("action_type") not in ("ATTACK", "ATTACK_CONFIRM"):
-        return f"直前手が攻撃宣言でない（{atk_act.get('action_type')}）"
-    pre = frames_by_idx.get(i - 2)
-    postatk = frames_by_idx.get(i - 1)
+        return f"直近の攻撃宣言が見つからない（直前手={actions[i-1].get('action_type')}）"
+    pre = frames_by_idx.get(j - 1)
+    postatk = frames_by_idx.get(j)
     if pre is None or postatk is None:
         return "攻撃前/後フレームが欠落"
     atk_pid = atk_act["player"]
