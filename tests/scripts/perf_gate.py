@@ -60,9 +60,9 @@ def evaluate_gate(ci: Optional[Dict[str, float]], latency: Dict[str, float],
 
 
 def model_hash() -> Dict[str, str]:
-    """測ったネットの同定用に gen2_*.npz の SHA1（先頭12桁）を返す。"""
+    """測ったネットの同定用に同梱 gen*_*.npz の SHA1（先頭12桁）を返す。"""
     out: Dict[str, str] = {}
-    for name in ("gen2_value.npz", "gen2_policy.npz"):
+    for name in ("gen2_value.npz", "gen2_policy.npz", "gen3_value.npz", "gen3_policy.npz"):
         p = os.path.join(_MODELS, name)
         if os.path.exists(p):
             with open(p, "rb") as f:
