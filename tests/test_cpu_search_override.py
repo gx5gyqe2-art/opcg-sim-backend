@@ -16,6 +16,8 @@ from opcg_sim.src.core import action_api
 from opcg_sim.src.core.gamestate import GameManager, Player
 from cpu_selfplay import build_deck, _load_db
 
+pytestmark = pytest.mark.cpu_infra
+
 
 @pytest.fixture(scope="module")
 def db():

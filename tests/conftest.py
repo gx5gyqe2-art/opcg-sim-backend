@@ -12,10 +12,17 @@ import _bootstrap  # noqa: E402,F401  (sys.path 設定＋google スタブ)
 
 
 def pytest_configure(config):
-    """マーカー登録。`slow` = CI から除外する重テスト（手動実行前提）。
-    CI は `-m "not slow"` で実行し、`-m slow` で重テストだけを手動実行できる。
+    """マーカー登録。`slow` = 極端に重くルーチンから除外する重テスト（手動実行前提）。
+    `cpu_infra` = 探索/自己対戦/学習パイプラインの内部機構の健全性のみを見るテスト
+    （ゲームプレイの正しさ自体は必須/標準テストが別途担保。分類基準は docs/TEST_SPEC.md
+    §重要度分類）。`make test` は `-m "not slow"`、`make test-fast` は
+    `-m "not slow and not cpu_infra"` で実行する。
     """
     config.addinivalue_line(
         "markers",
-        "slow: 実行が極端に長くCIから除外する重テスト（手動実行前提・例 test_journal の parked_resume ~245s）",
+        "slow: 実行が極端に長くルーチンから除外する重テスト（手動実行前提・例 test_journal の parked_resume ~245s）",
+    )
+    config.addinivalue_line(
+        "markers",
+        "cpu_infra: 探索/自己対戦/学習パイプラインの内部機構の健全性のみを見る基盤健全性テスト（make test-fast で除外）",
     )

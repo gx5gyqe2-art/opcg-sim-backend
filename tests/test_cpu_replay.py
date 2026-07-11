@@ -20,6 +20,8 @@ from opcg_sim.src.core import action_api, cpu_ai
 from cpu_selfplay import build_deck, _load_db
 from cpu_replay import run_replay
 
+pytestmark = pytest.mark.cpu_infra
+
 
 @pytest.fixture(scope="module")
 def db():

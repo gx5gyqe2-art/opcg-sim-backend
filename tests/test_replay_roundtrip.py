@@ -4,7 +4,7 @@
 （人間手は注入・R0 確定の決定論タイブレーク逆引き／CPU は再 decide）→ **勝敗・手数が録画と一致**を固定する。
 実デッキ（4-of 複製あり）＝曖昧ケースを踏ませた上での一致を保証する。
 
-速度: hard の record+replay は重いので CI では少 seed に絞る（決定論検証が目的で強さ無関係）。
+速度: hard の record+replay は重いので少 seed に絞る（決定論検証が目的で強さ無関係）。
 """
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 import pytest
@@ -12,6 +12,8 @@ import pytest
 import replay_runner as RR
 from game_driver import load_db
 import heldout_decks as HD
+
+pytestmark = pytest.mark.cpu_infra
 
 
 @pytest.fixture(scope="module")
