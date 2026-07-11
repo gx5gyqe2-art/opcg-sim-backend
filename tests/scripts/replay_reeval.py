@@ -39,6 +39,7 @@ from opcg_sim.src.core.gamestate import GameManager, Player, Phase
 from opcg_sim.src.core.cpu_learned import LearnedEngine
 from opcg_sim.src.models.models import CardInstance, DonInstance
 from cpu_selfplay import _load_db
+from replay_runner import resolve_recorded_action
 
 MATCH_KEYS_IGNORE = {"src", "turn", "player"}
 
@@ -144,14 +145,16 @@ def _board_for_counter_mark(db, rec, frames_by_idx, actions, i):
     """カウンター系マーク(action i)の盤面を復元する。
 
     直近の攻撃宣言(ATTACK/ATTACK_CONFIRM)を i-1 から後方に探す（間の PASS＝ブロッカー段の
-    見送り等・同一戦闘内の応答は飛ばす）。攻撃前フレームから盤面を復元して記録された攻撃を
-    再宣言し、SELECT_COUNTER 待ちを engine に正しく作らせる（ブロッカー段があれば PASS で進める）。
+    見送り・RESOLVE_EFFECT_SELECTION＝【アタック時】効果の選択など、同一戦闘内の応答は飛ばす）。
+    攻撃前フレームから盤面を復元して記録された攻撃を再宣言し、**宣言〜マークの間に記録された
+    応答（j+1..i-1）を順に再生**して SELECT_COUNTER 待ちを engine に正しく作らせる。
     返り値 (manager, defender) または理由文字列。
     """
     from opcg_sim.src.core import action_api
+    _SKIP = ("PASS", "SELECT_BLOCKER", "RESOLVE_EFFECT_SELECTION")
     j = i - 1
-    while j >= 0 and actions[j].get("action_type") in ("PASS", "SELECT_BLOCKER"):
-        j -= 1   # 同一戦闘の応答（ブロッカー見送り等）を遡って攻撃宣言に着地する
+    while j >= 0 and actions[j].get("action_type") in _SKIP:
+        j -= 1   # 同一戦闘の応答を遡って攻撃宣言に着地する
     atk_act = actions[j] if j >= 0 else {}
     if atk_act.get("action_type") not in ("ATTACK", "ATTACK_CONFIRM"):
         return f"直近の攻撃宣言が見つからない（直前手={actions[i-1].get('action_type')}）"
@@ -178,7 +181,24 @@ def _board_for_counter_mark(db, rec, frames_by_idx, actions, i):
         m.declare_attack(attacker, target)
     except Exception as e:
         return f"declare_attack 失敗: {e}"
-    # ブロッカー段が立ったら PASS（記録ストリームに block が無い＝ブロックしない選択）で進める
+    # 宣言〜マークの間の記録応答（【アタック時】効果の選択・ブロッカー段の見送り等）を順に再生し、
+    # SELECT_COUNTER 待ちまで進める。記録が尽きた後にブロッカー段が残れば PASS で畳む（記録に
+    # block が無い＝ブロックしない選択）。
+    for k in range(j + 1, i):
+        pend = m.get_pending_request() or {}
+        if pend.get("action") == "SELECT_COUNTER":
+            break
+        act_pl = m.p1 if m.p1.name == actions[k].get("player") else m.p2
+        mv = resolve_recorded_action(m, act_pl, actions[k])
+        if mv is None:
+            return f"戦闘中の記録応答 {actions[k].get('action_type')}@{k} を逆写像できない"
+        try:
+            if mv.get("kind") == "battle":
+                action_api.apply_battle_action(m, act_pl, mv["action_type"], mv.get("card_uuid"))
+            else:
+                action_api.apply_game_action(m, act_pl, mv["action_type"], mv.get("payload", {}))
+        except Exception as e:
+            return f"戦闘中の記録応答 {mv.get('action_type')}@{k} の適用失敗: {e}"
     pend = m.get_pending_request() or {}
     if pend.get("action") == "SELECT_BLOCKER":
         try:
@@ -234,7 +254,9 @@ def main():
                 print(f"    → 戦闘状態の復元に失敗（{built}）＝スキップ", flush=True)
                 continue
             m, actor = built
-            print(f"    （攻撃再現: {actions[i-1].get('card')} → カウンター待ちを復元）", flush=True)
+            atk = (m.active_battle or {}).get("attacker")
+            atk_id = getattr(getattr(atk, "master", None), "card_id", "?")
+            print(f"    （攻撃再現: {atk_id} → カウンター待ちを復元）", flush=True)
         else:
             pre = frames_by_idx.get(i - 1)
             if pre is None:

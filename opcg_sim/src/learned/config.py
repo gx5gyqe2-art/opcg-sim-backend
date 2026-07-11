@@ -30,11 +30,14 @@ SELFPLAY_DIRICHLET_EPS = 0.25    # 自己対戦は探索ノイズ
 SELFPLAY_TEMP_MOVES = 8          # 序盤サンプリング手数
 
 # --- serve 専用: root 読み出し・PIMC 世界線（探索・自己対戦データ生成は不変）---
-# root 読み出しの LCB 乗り換え（cpu_learned._select_root_group）: 最多訪問グループを基準に、
-# 訪問数が SERVE_ROOT_LCB_MIN_FRAC·n_top 以上の代替の LCB(q − z/√n) が上回れば乗り換える。
-# z=0 で従来の argmax(N) に一致（マーク回帰: @12/@24 の Q 劣後手への貼り付きを解消）。
-SERVE_ROOT_LCB_Z = 1.0
-SERVE_ROOT_LCB_MIN_FRAC = 0.2
+# root 読み出しの Q 乗り換え（cpu_learned._select_root_group）: 最多訪問グループを基準に、
+# 「十分競った訪問（n ≥ MIN_FRAC·n_top）」かつ「明確な Q 差（q ≥ q_top + MIN_GAP）」の代替
+# だけへ乗り換える（二重ゲート）。MIN_GAP=inf で従来の argmax(N) に一致（ロールバック）。
+# 較正: 実対局2局×16人間マークに対する回帰（cpu_learned_mark_review2_20260711.md §S1）。
+# 初版 LCB(z=1, frac=0.2) は低訪問 Q の楽観バイアス（実測 +0.14〜+0.54 ≫ 1/√n）に対して
+# 甘く、ドン付与へ誤って乗り換える退行を起こしたため、この二重ゲートへ置換した。
+SERVE_ROOT_SWITCH_MIN_FRAC = 0.4
+SERVE_ROOT_SWITCH_MIN_GAP = 0.05
 # ターン内 sticky 世界線: 同一 (game, turn, player) の連続 decide で PIMC 決定化 seed を固定し、
 # 「ドン付与→（別世界を引いて）攻撃取り止め」型の計画非一貫（無駄ドン）を抑える。
 SERVE_STICKY_WORLD = True

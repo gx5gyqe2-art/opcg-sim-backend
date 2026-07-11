@@ -52,6 +52,15 @@ def resolve_recorded_action(manager, actor, recorded: Dict[str, Any]):
     for mv in manager.get_legal_actions(actor):
         if _key(cpu_ai._describe_move(manager, mv)) == want:
             return mv
+    # 素の合法手に無い記述子＝決定層だけが持つ代替手（任意効果の decline: accepted=False や
+    # up-to の見送り等）は merged_search_actions の展開候補から逆写像する（一致時のみ・挙動追加）。
+    try:
+        base = manager.get_legal_actions(actor)
+        for mv in cpu_ai.merged_search_actions(manager, actor.name, base):
+            if _key(cpu_ai._describe_move(manager, mv)) == want:
+                return mv
+    except Exception:
+        pass
     return None
 
 

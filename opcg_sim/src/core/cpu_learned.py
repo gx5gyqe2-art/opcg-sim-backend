@@ -26,7 +26,7 @@ from opcg_sim.src.learned.action import legal_action_matrix
 from opcg_sim.src.learned.adapter import OPCGGame
 from opcg_sim.src.learned.config import (
     C_PUCT, SERVE_SIMS, SERVE_DIRICHLET_EPS,
-    SERVE_ROOT_LCB_Z, SERVE_ROOT_LCB_MIN_FRAC, SERVE_STICKY_WORLD)
+    SERVE_ROOT_SWITCH_MIN_FRAC, SERVE_ROOT_SWITCH_MIN_GAP, SERVE_STICKY_WORLD)
 from opcg_sim.src.learned.mcts import TreeMCTS   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
 from opcg_sim.src.utils.loader import CardLoader
 
@@ -242,29 +242,31 @@ def decide_learned(manager, player, sims: int = SERVE_SIMS, c_puct: float = C_PU
     return _default_engine().decide(manager, player, sims=sims, c_puct=c_puct, rng=rng, trace=trace)
 
 
-def _select_root_group(groups, z: float = SERVE_ROOT_LCB_Z,
-                       min_frac: float = SERVE_ROOT_LCB_MIN_FRAC):
-    """root 読み出し: 最多訪問グループを基準に、十分訪問された代替の LCB が上回れば乗り換える。
+def _select_root_group(groups, min_frac: float = SERVE_ROOT_SWITCH_MIN_FRAC,
+                       min_gap: float = SERVE_ROOT_SWITCH_MIN_GAP):
+    """root 読み出し: 最多訪問グループを基準に、二重ゲートを満たす代替の Q が上回れば乗り換える。
 
     素の argmax(N) は PUCT の訪問が prior／先行 Q に貼り付く性質上、探索後半に Q で逆転した
-    代替を拾えない（マーク@12: ATTACK 56%/q=-0.127 が ATTACH_DON 31%/q=-0.043 に選ばれる）。
-    低訪問の Q は楽観ノイズを含むため素の argmax(Q) にはせず、LCB = q − z/√n（q∈[-1,1] の
-    悲観補正）と最低訪問率ゲート（n ≥ min_frac·n_top）で「確度のある逆転」だけ採る。
-    z=0 は従来の argmax(N)（=groups[0]）に一致。探索・トレース統計は不変＝読み出しのみ。
+    代替を拾えない（g1@12: ATTACK 56%/q=-0.127 が ATTACH_DON 31%/q=-0.043 に選ばれる）。
+    一方、低訪問の Q は PUCT の選択バイアスで**楽観方向に大きく歪む**（連続 decide の実測で
+    +0.14〜+0.54・g2@20-23＝1/√n の悲観補正では不足）。そこで乗り換えは
+      ① 訪問が競っている: n ≥ min_frac·n_top（浅い読みの楽観を除外）
+      ② Q 差が明確:       q ≥ q_top + min_gap（同格ノイズでの乗り換えを除外）
+    の両方を満たす代替に限る（該当複数なら最大 Q）。min_gap=inf で従来の argmax(N) に一致。
+    較正は実対局2局×16人間マークへの回帰（mark_review2 §S1・`test_learned_root_readout.py`）。
+    探索・トレース統計は不変＝読み出しのみ。
 
     `groups`: `_merge_root_stats` の返り値（n 降順・{"rep","idxs","n","q"}）。返り値は選んだグループ。
     """
     best = groups[0]
-    if z <= 0.0 or len(groups) == 1 or best["n"] <= 0:
+    if len(groups) == 1 or best["n"] <= 0 or not math.isfinite(min_gap):
         return best
     gate = max(1.0, min_frac * best["n"])
-    best_lcb = best["q"] - z / math.sqrt(best["n"])
+    bar = best["q"] + min_gap
     for g in groups[1:]:
-        if g["n"] < gate:
-            continue
-        lcb = g["q"] - z / math.sqrt(g["n"])
-        if lcb > best_lcb:
-            best, best_lcb = g, lcb
+        if g["n"] >= gate and g["q"] >= bar and g["q"] > best["q"]:
+            best = g
+            bar = best["q"]   # 以降はさらに高い Q のみ（該当複数なら最大 Q・n 降順で安定）
     return best
 
 
