@@ -136,10 +136,26 @@ def main():
             _git(DATA_WT, "add", "p3data")
             _git(DATA_WT, "commit", "--amend", "-m",
                  f"pd-data {WID} batch{batch_id} r{rnd} {len(vdata['value'])}st")
-            ok = _git(DATA_WT, "push", "--force", "origin", "HEAD:refs/heads/" + DATA_BR).returncode == 0
+            # push失敗時はリトライし、**配達できるまで batch_id を進めない**（2026-07-11修正）:
+            # 失敗のまま +1 するとローカルIDだけ先行→learner の consumed が凍結→バックプレッシャが
+            # 「learner待機」で永久停止する（実際は未配達なのに滞留と誤診・w2/w3が1h停止した実害）。
+            ok = False
+            for wait in (0, 2, 4, 8, 16):
+                if wait:
+                    time.sleep(wait)
+                r = _git(DATA_WT, "push", "--force", "origin", "HEAD:refs/heads/" + DATA_BR)
+                if r.returncode == 0:
+                    ok = True
+                    break
+                print(f"  [push失敗] {(r.stderr or '').strip()[:200]} → リトライ", flush=True)
             dt = time.perf_counter() - t0
             print(f"  batch{batch_id} r{rnd} {len(vdata['value'])}局面 push={'OK' if ok else 'FAIL'} "
                   f"{dt:.0f}s ({args.games/dt:.2f} g/s)", flush=True)
+            if not ok:
+                # 未配達バッチはIDを消費しない＝次周回で同IDを最新netで再生成して再配達を試みる。
+                print(f"  [警告] batch{batch_id} 未配達（{args.poll}s後に再生成）", flush=True)
+                time.sleep(args.poll)
+                continue
             batch_id += 1
             done += 1
     finally:

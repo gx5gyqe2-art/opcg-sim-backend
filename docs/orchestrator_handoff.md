@@ -409,6 +409,12 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/p3_run.py \
   直接対戦では検出されない＝water-oil測定が写経を過小評価していた可能性、②蒸留の忠実度が改めて確認
   （写経≒shipは狙い通り）、③pdの弱点は「同一特徴空間の出発点（写経）にだけ突かれる癖」に局在し、
   異種net（ship）との実戦では教師等価＝**追い学習の実害は限定的、獲得（@47型判断）は本物**。
+- **【w2/w3停止インシデント＝push失敗デッドロック・2026-07-11】** w2/w3が「learner待機」表示のまま1h+停止。
+  真因: `pd_gen.py` が **push失敗でも batch_id を +1** していた→未配達のままローカルIDが先行→learnerの
+  consumed が凍結→`should_generate` が「未消費滞留」と誤診し永久バックプレッシャ。修正: push を
+  2/4/8/16sバックオフで4回リトライ＋**配達成功まで batch_id を進めない**（未配達分は次周回で同IDを
+  最新netで再生成）。ワーカー再起動は `_resume_batch_id`（枝meta+1）で無操作合流＝**再起動時に最新の
+  code枝を pull すること**（修正を取り込むため）。
 
 ---
 
