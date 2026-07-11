@@ -15,6 +15,8 @@ from cpu_selfplay import build_deck, _load_db
 from engine_helpers import make_master, make_instance
 from turn_solver import is_lethal, is_lethal_ref
 
+pytestmark = pytest.mark.cpu_infra
+
 
 @pytest.fixture(scope="module")
 def db():

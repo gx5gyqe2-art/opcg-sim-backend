@@ -1,15 +1,18 @@
-"""P2 harness の高速単体検証（CI内）。重い対L1対戦は p2_gen0.py（手動・外部規模）。
+"""P2 harness の単体検証。重い対L1対戦は p2_gen0.py（手動・外部規模）。
 
 学習や対戦はせず、SL価値の配線（encode→net→[-1,1]）と SL-MCTSエージェントが合法手を返すことを確認。
 """
 import numpy as np
 
 import conftest  # noqa: F401
+import pytest
 import rl_encoder as E
 import rl_net as RN
 from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
 from p2_gen0 import sl_value, mcts_sl_agent, match, l1_agent_factory
+
+pytestmark = pytest.mark.cpu_infra
 
 
 def test_sl_value_in_range():

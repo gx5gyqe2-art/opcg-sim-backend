@@ -4,7 +4,11 @@
 モデルハッシュの健全性だけを高速に固定する。実強度の本走は `perf_gate.py --full` の手動/定期運用。
 """
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
+import pytest
+
 import perf_gate as PG
+
+pytestmark = pytest.mark.cpu_infra
 
 
 def _lat(median=300.0, mx=800.0):

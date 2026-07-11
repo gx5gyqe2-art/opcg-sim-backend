@@ -62,10 +62,10 @@ tests/
 3. **ルールを追加** — `opcg_sim/src/core/effects/rules/atoms.py` に `@rule(...)`
 4. **回帰確認＋カバレッジ確認**
    ```bash
-   python -m pytest tests/ -p no:capture -q
+   make test   # コマンドの正本は Makefile
    OPCG_LOG_SILENT=1 python tests/compare_parsers.py
    OPCG_LOG_SILENT=1 python tests/effect_diagnostics.py
-   OPCG_LOG_SILENT=1 python tests/full_card_audit.py --regen   # 挙動を意図的に変えた場合
+   make regen-baseline   # 挙動を意図的に変えた場合
    ```
 
 ルールは `matches→build` を兼ねた関数として書ける（`@rule` デコレータ）。

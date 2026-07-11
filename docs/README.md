@@ -24,8 +24,9 @@
 
 フロントエンドの仕様は `opcg-sim-frontend/docs/`。
 
-> エージェント（Claude）の運用ルール（開発・CI・マージのリズム／品質ゲート／文書更新方針）は
-> リポジトリ直下の [`../CLAUDE.md`](../CLAUDE.md) に定義する（毎セッション自動読込）。
+> エージェント（Claude）の運用ルール（開発・PR・マージのリズム／品質ゲート／文書更新方針）は
+> リポジトリ直下の [`../CLAUDE.md`](../CLAUDE.md) に定義する（毎セッション自動読込）。CI は無く、
+> 品質ゲートはローカル実行のみ（2026-07-11 廃止）。
 
 ## 報告（点）— `docs/reports/`
 
@@ -47,11 +48,7 @@
 ## クイックスタート
 
 ```bash
-# テスト（キャプチャ無効・ログ抑止が必須）
-OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -p no:cacheprovider
-
-# 全カード構造不変条件・挙動ベースライン
-OPCG_LOG_SILENT=1 python tests/harness/full_card_audit.py
+make test    # テスト（全カード構造不変条件・挙動ベースラインも含む。コマンドの正本は Makefile）
 ```
 
 詳細な検証フローは [`TEST_SPEC.md`](TEST_SPEC.md) を参照。

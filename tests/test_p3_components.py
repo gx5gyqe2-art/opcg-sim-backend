@@ -1,12 +1,15 @@
-"""P3部品（opcg_action / az_policy）の高速単体検証（CI内）。重い loop は p3_loop.py --smoke。"""
+"""P3部品（opcg_action / az_policy）の単体検証。重い loop は p3_loop.py --smoke。"""
 import numpy as np
 
 import conftest  # noqa: F401
+import pytest
 import rl_encoder as E
 from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
 import opcg_action as A
 from az_policy import PolicyScorer, state_context, train_policy
+
+pytestmark = pytest.mark.cpu_infra
 
 
 def test_action_features_shape_and_onehot():

@@ -7,9 +7,12 @@
 """
 import json
 import conftest  # noqa: F401  (sys.path 設定)
+import pytest
 
 from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.tools.build_card_cache import CARD_DB_PATH
+
+pytestmark = pytest.mark.cpu_infra
 
 
 def _canon(x, _seen=None):
