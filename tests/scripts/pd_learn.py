@@ -124,7 +124,7 @@ def main():
     # 生成側が --games を小さくしてもバッチ到着ごとに即 consume（amend 上書きによる全損を防ぐ）し、
     # 学習は pending_games が games_per_update 貯まってから＝games:updates 比を粒度に依らず一定に保つ。
     buf_v, buf_p = None, []
-    pending_games = 0
+    pending_games = int(man.get("pending_games", 0))   # manifest 永続化＝learner 再起動で未学習分を失わない
     while man.get("round", 0) < args.target_round:
         metas = []
         cache, cache_p = {}, {}
@@ -150,6 +150,7 @@ def main():
             pending_games += sum(m["games"] for m in accepted)
             man["cum_games"] = man.get("cum_games", 0) + sum(m["games"] for m in accepted)
             man["consumed"] = consumed
+            man["pending_games"] = pending_games
             # consume-only push: round は進めない（バックプレッシャ解除＝generator を止めない）。
             ok = _push_ckpt(f"pd-net round{man.get('round',0)} cum{man['cum_games']} "
                             f"pend{pending_games} (consume)")
@@ -168,17 +169,27 @@ def main():
         data_eff["value"] = C.mixed_value_label(buf_v["value"], buf_v["q_root"], args.label_alpha)
         with np.errstate(invalid="ignore"):
             data_eff["aux"] = np.clip(buf_v["turns_left"], 0, args.turns_scale) / args.turns_scale
-        RN.train(vnet, data_eff, epochs=args.epochs * n_up, lr=args.lr, batch=256, val_frac=0.05,
-                 aux_weight=args.aux_weight)
+        tm, vm = RN.train(vnet, data_eff, epochs=args.epochs * n_up, lr=args.lr, batch=256,
+                          val_frac=0.05, aux_weight=args.aux_weight)
+        # 残りターン補助ヘッドの検証誤差（±ターン換算・時計学習の直接指標＝run 監視の主要計器）。
+        aux_txt = ""
+        fin = np.flatnonzero(np.isfinite(buf_v["turns_left"]))[-4000:]
+        if args.aux_weight > 0 and fin.size:
+            sub = {k: buf_v[k][fin] for k in ("scalars", "field", "card_idx")}
+            pred_t = vnet.predict_aux(sub) * args.turns_scale
+            true_t = np.clip(buf_v["turns_left"][fin], 0, args.turns_scale)
+            aux_txt = f" aux±{float(np.abs(pred_t - true_t).mean()):.2f}T"
         # policy も直列(p3_run)と同じく毎ラウンド学習（凍結だと直列と挙動が乖離＝比較が汚れる）。
         if buf_p:
             train_policy(pnet, buf_p, epochs=args.epochs * n_up, lr=args.lr)
         man["round"] = man.get("round", 0) + 1   # round=netバージョン数（staleness基準・1push=1版）
         man["updates"] = man.get("updates", 0) + args.epochs * n_up   # 累積勾配パス（学習量の真の指標）
+        man["pending_games"] = pending_games
         ok = _push_ckpt(f"pd-net round{man['round']} cum{man['cum_games']} upd{man['updates']} "
                         f"buf{len(buf_v['value'])}")
-        print(f"  round{man['round']} x{n_up}回学習 buf{len(buf_v['value'])} "
-              f"cum{man['cum_games']} pend={pending_games}g push={'OK' if ok else 'FAIL'}", flush=True)
+        print(f"  round{man['round']} x{n_up}回学習 vmse={tm:.4f}/{vm:.4f}{aux_txt} "
+              f"buf{len(buf_v['value'])} cum{man['cum_games']} pend={pending_games}g "
+              f"push={'OK' if ok else 'FAIL'}", flush=True)
     print("LEARN_DONE", flush=True)
     return 0
 
