@@ -43,7 +43,7 @@
 | [`reports/cpu_replay_roundtrip_r1_20260704.md`](reports/cpu_replay_roundtrip_r1_20260704.md) | 実対局リプレイ R1/R2（2026-07-04）。リプレイヤ＋ラウンドトリップで実デッキ 10/10 完全一致。副産物＝`cpu_ai._find_card` が stage/temp_zone 未探索で ACTIVATE_MAIN 等の記述が uuid 漏れ→修正で 8/10→10/10。(A) タイブレークは R0 見積りより頑健（場複製由来の分岐 0） |
 | [`reports/cpu_rl_pilot_p3_v2_ephemeral_session_20260705.md`](reports/cpu_rl_pilot_p3_v2_ephemeral_session_20260705.md) | P3 v2本走 実行記録（2026-07-05）。**常設CPU VMではなくエフェメラルなClaude Codeセッション**でも本走が完遂できることを実証（v1本走の遺構調査＋v2本走で確認）。温スタート・チャンク分割運用・別セッション由来の3改修（mu-mcts/重複解消/config集約）を隔離worktreeで検証しチャンク境界でfast-forward投入・コンテナ再起動からの回復（shard単位checkpointで進捗無傷）を記録。実測: クローン版245秒/shard→mu-mcts版126〜134秒/shard（約1.9〜2.2倍） |
 
-> 実装中の設計計画（一部未完・実装完了後に SPEC/TEST_SPEC へ吸収）: [`cpu_gen4_plan.md`](cpu_gen4_plan.md)（**Gen4 学習計画**＝人間マーク2局×16件で特定したネット起因課題の解消。sticky自己対戦移植→混合ラベル学習→3層ゲート）／[`replay_verification_plan.md`](replay_verification_plan.md)（実対局リプレイ検証 R0-R3 実装済＋残少）／[`cpu_perf_testing_plan.md`](cpu_perf_testing_plan.md)（CPU 性能テスト運用 A1-A3 実装済）／[`refactoring_harness_driver.md`](refactoring_harness_driver.md)（検証ハーネス共通ドライバ化 ⑥）。
+> 実装中の設計計画（一部未完・実装完了後に SPEC/TEST_SPEC へ吸収）: [`cpu_v4_plan.md`](cpu_v4_plan.md)（**v4 学習計画**＝人間マーク2局×16件で特定したネット起因課題の解消。根因仮説「2つの時計」・sticky自己対戦移植→混合ラベル＋残りターン補助ターゲット→3層ゲート。呼称: v1=旧Gen2・v3=現本番=v1蒸留・v4=次期）／[`replay_verification_plan.md`](replay_verification_plan.md)（実対局リプレイ検証 R0-R3 実装済＋残少）／[`cpu_perf_testing_plan.md`](cpu_perf_testing_plan.md)（CPU 性能テスト運用 A1-A3 実装済）／[`refactoring_harness_driver.md`](refactoring_harness_driver.md)（検証ハーネス共通ドライバ化 ⑥）。
 
 ## クイックスタート
 
