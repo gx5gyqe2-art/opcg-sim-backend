@@ -47,6 +47,16 @@ def test_mixed_label_math():
     assert np.allclose(C.mixed_value_label(z, q, 0.5), 0.5 * z + 0.5 * q)
 
 
+def test_wave_plan_preserves_games_updates_ratio():
+    """小バッチ運用: 学習は games_per_update 貯まるまで見送り（n_up=0）・端数は持ち越し＝
+    バッチ粒度に依らず games:updates 比が一定。max_updates で暴発防止。"""
+    assert C.wave_plan(32, 128, 16) == (0, 32)        # まだ学習しない
+    assert C.wave_plan(128, 128, 16) == (1, 0)        # ちょうど1ラウンド
+    assert C.wave_plan(96 + 64, 128, 16) == (1, 32)   # 端数の持ち越し
+    assert C.wave_plan(128 * 20, 128, 16) == (16, 128 * 4)   # 上限で刈って残りは持ち越し
+    assert C.wave_plan(50, 0, 16) == (1, 0)           # games_per_update<=0 は互換（常に1）
+
+
 def test_ring_append_with_v2_keys_and_v1_mix():
     """v2 キーを含むバッファ連結＋cap 切り。v1 バッチも normalize 後なら混在できる。"""
     b1 = C.normalize_batch_v2(_arrays(n=4, v2=True, seed=1))

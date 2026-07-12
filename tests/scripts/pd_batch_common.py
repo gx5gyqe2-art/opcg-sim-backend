@@ -72,6 +72,21 @@ def updates_for(new_games, games_per_update, max_updates):
     return max(1, min(int(max_updates), max(1, n)))
 
 
+def wave_plan(pending_games, games_per_update, max_updates):
+    """蓄積した未学習 games → (今回回す学習ラウンド数, 持ち越す残 games)。
+
+    小バッチ運用（セッション断のロス縮小で --games を小さくする）では updates_for の
+    「1波最低1ラウンド」が過剰露出になる。consume（バッファ連結・consumed 更新）と学習を分離し、
+    games_per_update 貯まるまで学習を見送る＝games:updates 比をバッチ粒度に依らず一定に保つ。
+    返り値 n_up は 0..max_updates（0=まだ学習しない）。remainder は端数の持ち越し。
+    """
+    if games_per_update <= 0:
+        return 1, 0
+    n = int(pending_games // games_per_update)
+    n_up = min(int(max_updates), n)
+    return n_up, int(pending_games - n_up * games_per_update)
+
+
 def should_generate(next_batch_id, consumed_id, depth):
     """バックプレッシャ: 未消費バッチが depth 本を超えるなら生成を止めて待つ。
 
