@@ -1,0 +1,1 @@
+{"round": 40, "cum_games": 5248, "consumed": {"w3": 60, "w1": 8, "w2": 10, "w5": 45, "w4": 55}, "status": "RUN", "seed_net": "v3 (gen3_*.npz round60)", "plan": "docs/cpu_v4_plan.md", "updates": 80, "pending_games": 128}
