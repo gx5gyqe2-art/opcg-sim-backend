@@ -171,18 +171,24 @@ def _init_worker():
 
 def _gen_task(payload):
     """1ワーカー分の自己対戦生成。ゲームループ本体は `p3_loop.selfplay_game`（共通コア・v4拡張＝
-    sticky世界線/防御応答温度/q_root/turns_left もそこで付与）へ委譲する。"""
-    seed, n_games, sims, eps, vpath, ppath, ev, leaders = payload
+    sticky世界線/防御応答温度/q_root/turns_left/L1混合 もそこで付与）へ委譲する。"""
+    seed, n_games, sims, eps, vpath, ppath, ev, leaders, l1_mix = payload
     db, vocab, game = _W["db"], _W["vocab"], _W["game"]
     vnet = RN.ValueNet.load(vpath)
     pnet = PolicyScorer.load(ppath) if ppath else None
     vf = P.value_fn_of(vnet, vocab, ev); pf = P.priors_fn_of(pnet, vocab, ev)
     rng = np.random.default_rng(seed)
     sinks = {"S": [], "F": [], "I": [], "Y": [], "Q": [], "T": []}
-    pol, game_turns = [], []
-    for _ in range(n_games):
+    pol, game_turns, l1_games = [], [], 0
+    for g in range(n_games):
+        # (d) 対戦相手の混合: 配合比 l1_mix で片席を L1-hard に（席は交互ローテーション）。
+        l1_seat = None
+        if l1_mix > 0.0 and rng.random() < l1_mix:
+            l1_seat = "p1" if (g % 2 == 0) else "p2"
+            l1_games += 1
         rv, rp, w = P.selfplay_game(game, vf, pf, vocab, sims, C_PUCT, rng,
-                                    enc_version=ev, leaders=leaders, dirichlet_eps=eps, db=db)
+                                    enc_version=ev, leaders=leaders, dirichlet_eps=eps, db=db,
+                                    l1_seat=l1_seat)
         if w is None:
             continue
         P.merge_val_recs(rv, w, sinks)
@@ -192,29 +198,31 @@ def _gen_task(payload):
     vdata = P.pack_vdata(sinks)
     if vdata is None:
         return None
-    return (vdata, pol, game_turns)
+    return (vdata, pol, game_turns, l1_games)
 
 
-def selfplay_shard(pool, workers, n_games, sims, eps, vpath, ppath, base_seed, ev=1, leaders=None):
-    """n_games を workers 個に分割して並列生成→マージ。返り値 (vdata, pol, game_turns)。
+def selfplay_shard(pool, workers, n_games, sims, eps, vpath, ppath, base_seed, ev=1, leaders=None,
+                   l1_mix=0.0):
+    """n_games を workers 個に分割して並列生成→マージ。返り値 (vdata, pol, game_turns, l1_games)。
 
     vdata は batch スキーマ v2（value に加え q_root / turns_left・docs/cpu_v4_plan.md §4-1/4-2）。
     game_turns は対局ごとのターン数（ゲーム長分布の監視用・§4-3 補助指標）。
+    l1_mix は §4-1(d) の L1-hard 混合比（0=従来の純自己対戦）・l1_games は実際の混合局数。
     """
     per = max(1, n_games // workers)
-    tasks = [(base_seed * 131 + w * 977 + 1, per, sims, eps, vpath, ppath, ev, leaders)
+    tasks = [(base_seed * 131 + w * 977 + 1, per, sims, eps, vpath, ppath, ev, leaders, l1_mix)
              for w in range(workers)]
     parts = pool.map(_gen_task, tasks)
-    vds, pol, game_turns = [], [], []
+    vds, pol, game_turns, l1_games = [], [], [], 0
     for p in parts:
         if p is None:
             continue
-        vds.append(p[0]); pol.extend(p[1]); game_turns.extend(p[2])
+        vds.append(p[0]); pol.extend(p[1]); game_turns.extend(p[2]); l1_games += p[3]
     if not vds:
-        return None, None, []
+        return None, None, [], 0
     keys = ("scalars", "field", "card_idx", "value", "q_root", "turns_left")
     vdata = {k: np.concatenate([v[k] for v in vds]) for k in keys}
-    return vdata, pol, game_turns
+    return vdata, pol, game_turns, l1_games
 
 
 def main():
@@ -262,9 +270,9 @@ def main():
             ppath = None
             if pnet is not None:
                 pnet.save(CK + "/_cur_p.npz"); ppath = CK + "/_cur_p.npz"
-            vdata, pol, _turns = selfplay_shard(pool, args.workers, args.shard_games, args.sims,
-                                                args.dirichlet_eps, CK + "/_cur_v.npz", ppath, man["shards"],
-                                                ev=ev, leaders=leaders)
+            vdata, pol, _turns, _l1 = selfplay_shard(pool, args.workers, args.shard_games, args.sims,
+                                                     args.dirichlet_eps, CK + "/_cur_v.npz", ppath, man["shards"],
+                                                     ev=ev, leaders=leaders)
             if vdata is None:
                 print("  採取0スキップ"); continue
             for k in buf_v:

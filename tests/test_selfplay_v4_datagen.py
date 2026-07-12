@@ -93,6 +93,24 @@ def test_sticky_world_fixed_within_turn():
     assert len(set(fingerprints)) > 1, "全ターンが同一世界＝sticky が過剰（seed 更新が効いていない）"
 
 
+def test_l1_mixed_opponent_seat():
+    """(d) 対戦相手の混合: L1 席の決定は policy 教師に入らず、value は q_root=NaN で記録→
+    merge で勝敗ラベルへ退化（全有限）。決定論も維持。"""
+    import math
+    vr, pr, w = _run(21, dirichlet_eps=0.1, l1_seat="p2")
+    assert w is not None
+    assert all(who == "p1" for _, _, _, who in pr), "L1席の決定が policy 教師に混入"
+    p2_vals = [r for r in vr if r[1] == "p2"]
+    assert p2_vals and all(math.isnan(r[2]) for r in p2_vals), "L1席の q_root が NaN でない"
+    assert any(r[1] == "p1" and math.isfinite(r[2]) for r in vr), "net席の q_root が欠落"
+    sinks = {"S": [], "F": [], "I": [], "Y": [], "Q": [], "T": []}
+    P.merge_val_recs(vr, w, sinks)
+    vd = P.pack_vdata(sinks)
+    assert np.isfinite(vd["q_root"]).all(), "merge 後に NaN が残っている（勝敗退化が効いていない）"
+    b = _run(21, dirichlet_eps=0.1, l1_seat="p2")
+    assert w == b[2] and len(vr) == len(b[0])
+
+
 def test_battle_response_sampled_with_temperature():
     """steps>=temp_moves でも戦闘応答（SELECT_BLOCKER/SELECT_COUNTER）は温度1でサンプリングされる。"""
     temps = []

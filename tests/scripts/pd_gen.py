@@ -87,6 +87,8 @@ def main():
     ap.add_argument("--games", type=int, default=128)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--dirichlet-eps", type=float, default=0.15)
+    ap.add_argument("--l1-mix", type=float, default=0.0,
+                    help="L1-hard 混合比（v4 §4-1(d)・0=純自己対戦。配合比は meta の turns 分布を見て調整）")
     ap.add_argument("--max-batches", type=int, default=10 ** 9)
     ap.add_argument("--pipeline-depth", type=int, default=2,
                     help="未消費バッチがこの本数を超えたら生成を待つ（learner停止中の上書き全損を防ぐ）")
@@ -120,9 +122,10 @@ def main():
             # シードに**ワーカーIDを混ぜる**（2026-07-10バグ修正）: batch_id だけだと同round・同batch_id の
             # ワーカー同士が完全に同一のゲーム列を生成する（w1/w2 が終始重複していた実害）。crc32(WID) で分離。
             seed_base = (zlib.crc32(WID.encode()) % 100000) * 1000003 + batch_id * 131 + 7
-            vdata, pol, game_turns = R.selfplay_shard(pool, args.workers, args.games, args.sims,
-                                                      args.dirichlet_eps, ck + "/_cur_v.npz", ppath,
-                                                      seed_base, ev=ev, leaders=leaders)
+            vdata, pol, game_turns, l1_games = R.selfplay_shard(
+                pool, args.workers, args.games, args.sims,
+                args.dirichlet_eps, ck + "/_cur_v.npz", ppath,
+                seed_base, ev=ev, leaders=leaders, l1_mix=args.l1_mix)
             if vdata is None:
                 print("  採取0スキップ", flush=True); continue
             # data枝へ push（自分が単独writer＝amend+force で安全）。policy教師も同梱（直列とのパリティ）。
@@ -135,7 +138,7 @@ def main():
             gt = np.asarray(game_turns, dtype=np.float64)
             meta = {"worker": WID, "batch_id": batch_id, "against_round": rnd,
                     "games": args.games, "states": int(len(vdata["value"])),
-                    "schema_version": 2,
+                    "schema_version": 2, "l1_games": int(l1_games),
                     # ゲーム長分布の監視（v4計画 §4-3 補助指標）: 防御が報われる長期戦がデータに
                     # 現れているかを run 中に見る。
                     "turns_mean": (round(float(gt.mean()), 2) if gt.size else None),
