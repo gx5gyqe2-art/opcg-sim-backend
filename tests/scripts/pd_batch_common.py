@@ -82,6 +82,28 @@ def should_generate(next_batch_id, consumed_id, depth):
     return (next_batch_id - consumed_id) <= depth
 
 
+def normalize_batch_v2(arrays):
+    """value配列dict を batch スキーマ v2 のキー集合に正規化する（pure・docs/cpu_v4_plan.md §4-2）。
+
+    旧形式（v1＝q_root/turns_left 無し）は q_root←value（混合ラベルが勝敗単独に退化）・
+    turns_left←NaN（残りターン補助損失から除外）で埋める＝リプレイバッファのキー集合を一定に保つ。
+    v2 はそのまま返す。入力 dict を変異させず新 dict を返す。
+    """
+    out = dict(arrays)
+    n = len(out["value"])
+    if "q_root" not in out:
+        out["q_root"] = np.asarray(out["value"]).copy()
+    if "turns_left" not in out:
+        out["turns_left"] = np.full(n, np.nan, dtype=np.float32)
+    return out
+
+
+def mixed_value_label(value, q_root, alpha):
+    """v4 混合ラベル y = α·勝敗 + (1−α)·q_root（pure・α=1 で従来の勝敗単独と一致）。"""
+    return (alpha * np.asarray(value, dtype=np.float32)
+            + (1.0 - alpha) * np.asarray(q_root, dtype=np.float32)).astype(np.float32)
+
+
 def pack_policy(pol):
     """policy教師 [(ctx[C], am[L,A], visit[L]), ...]（Lは可変）→ npz保存できる固定キーのdict。
 

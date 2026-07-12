@@ -29,6 +29,7 @@ import rl_net as RN
 import rl_encoder as E
 from az_policy import PolicyScorer, train_policy
 from cpu_selfplay import _load_db
+from opcg_sim.src.learned.config import V4_LABEL_ALPHA, V4_AUX_TURNS_WEIGHT, V4_TURNS_SCALE
 import p3_run as R
 import pd_batch_common as C
 
@@ -54,7 +55,12 @@ def _ensure_wt(wt, br):
 
 
 def _read_data_branch(br):
-    """data枝を fetch し (meta, value配列dict, policy教師list) を返す（無ければ None）。"""
+    """data枝を fetch し (meta, value配列dict, policy教師list) を返す（無ければ None）。
+
+    batch スキーマ v2（q_root/turns_left・docs/cpu_v4_plan.md §4-1/4-2）は追加列も読む。
+    旧形式（v1）は q_root←value（混合が勝敗単独に退化）・turns_left←NaN（補助損失から除外）で
+    埋めて後方互換＝バッファのキー集合を一定に保つ。
+    """
     _ensure_wt(DATA_WT, br)
     d = DATA_WT + "/p3data"
     if not os.path.exists(d + "/meta.json") or not os.path.exists(d + "/batch.npz"):
@@ -62,6 +68,10 @@ def _read_data_branch(br):
     meta = json.load(open(d + "/meta.json"))
     z = np.load(d + "/batch.npz")
     arrays = {k: z[k] for k in ("scalars", "field", "card_idx", "value")}
+    for k in ("q_root", "turns_left"):
+        if k in z.files:
+            arrays[k] = z[k]
+    arrays = C.normalize_batch_v2(arrays)
     pol = C.unpack_policy(z)   # 旧形式（policy無し）は [] ＝後方互換
     return meta, arrays, pol
 
@@ -80,6 +90,13 @@ def main():
     ap.add_argument("--max-updates-per-round", type=int, default=16, help="1波で回す最大学習ラウンド（暴発防止）")
     ap.add_argument("--target-round", type=int, default=10 ** 9)
     ap.add_argument("--poll", type=int, default=30, help="新データが無いときの待機秒")
+    # v4 学習仕様（docs/cpu_v4_plan.md §4-2）。--label-alpha 1.0 --aux-weight 0 で従来（勝敗単独）と一致。
+    ap.add_argument("--label-alpha", type=float, default=V4_LABEL_ALPHA,
+                    help="value 混合ラベル y = α·勝敗 + (1−α)·q_root の α")
+    ap.add_argument("--aux-weight", type=float, default=V4_AUX_TURNS_WEIGHT,
+                    help="残りターン補助損失の重み（0で無効）")
+    ap.add_argument("--turns-scale", type=float, default=V4_TURNS_SCALE,
+                    help="turns_left の正規化スケール（clip 上限）")
     args = ap.parse_args()
     assert DATA_BRS, "OPCG_PD_DATA_BRANCHES が空"
     ev = args.enc_version
@@ -124,7 +141,13 @@ def main():
         buf_p[:] = buf_p[-args.buffer:]
         # 薄まり防止: 新規games に比例して学習回数(epoch)をスケール＝games:updates 比を直列と一致。
         n_up = C.updates_for(new_games, args.games_per_update, args.max_updates_per_round)
-        RN.train(vnet, buf_v, epochs=args.epochs * n_up, lr=args.lr, batch=256, val_frac=0.05)
+        # v4: 混合ラベル（学習時合成＝α変更にデータ再生成不要）＋残りターン補助ターゲット。
+        data_eff = dict(buf_v)
+        data_eff["value"] = C.mixed_value_label(buf_v["value"], buf_v["q_root"], args.label_alpha)
+        with np.errstate(invalid="ignore"):
+            data_eff["aux"] = np.clip(buf_v["turns_left"], 0, args.turns_scale) / args.turns_scale
+        RN.train(vnet, data_eff, epochs=args.epochs * n_up, lr=args.lr, batch=256, val_frac=0.05,
+                 aux_weight=args.aux_weight)
         # policy も直列(p3_run)と同じく毎ラウンド学習（凍結だと直列と挙動が乖離＝比較が汚れる）。
         if buf_p:
             train_policy(pnet, buf_p, epochs=args.epochs * n_up, lr=args.lr)

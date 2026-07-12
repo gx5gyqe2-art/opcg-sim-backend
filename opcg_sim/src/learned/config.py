@@ -41,3 +41,12 @@ SERVE_ROOT_SWITCH_MIN_GAP = 0.05
 # ターン内 sticky 世界線: 同一 (game, turn, player) の連続 decide で PIMC 決定化 seed を固定し、
 # 「ドン付与→（別世界を引いて）攻撃取り止め」型の計画非一貫（無駄ドン）を抑える。
 SERVE_STICKY_WORLD = True
+
+# --- v4 学習（docs/cpu_v4_plan.md §4）---
+# value 混合ラベル: y = α·z(勝敗±1) + (1−α)·q_root(探索後 root Q・終局減衰込み)。
+# 勝敗単独（α=1）は v3 で忘却を実証済み・q_root が「何手で負けるか」の距離を持ち込む。
+V4_LABEL_ALPHA = 0.5
+# 残りターン数の補助損失（ValueNet の aux ヘッド・「2つの時計」をラベルで明示的に教える）。
+V4_AUX_TURNS_WEIGHT = 0.25
+# turns_left の正規化: min(turns_left, V4_TURNS_SCALE) / V4_TURNS_SCALE ∈ [0,1]。
+V4_TURNS_SCALE = 15.0

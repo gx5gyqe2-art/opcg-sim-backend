@@ -120,18 +120,26 @@ def main():
             # シードに**ワーカーIDを混ぜる**（2026-07-10バグ修正）: batch_id だけだと同round・同batch_id の
             # ワーカー同士が完全に同一のゲーム列を生成する（w1/w2 が終始重複していた実害）。crc32(WID) で分離。
             seed_base = (zlib.crc32(WID.encode()) % 100000) * 1000003 + batch_id * 131 + 7
-            vdata, pol = R.selfplay_shard(pool, args.workers, args.games, args.sims,
-                                          args.dirichlet_eps, ck + "/_cur_v.npz", ppath,
-                                          seed_base, ev=ev, leaders=leaders)
+            vdata, pol, game_turns = R.selfplay_shard(pool, args.workers, args.games, args.sims,
+                                                      args.dirichlet_eps, ck + "/_cur_v.npz", ppath,
+                                                      seed_base, ev=ev, leaders=leaders)
             if vdata is None:
                 print("  採取0スキップ", flush=True); continue
             # data枝へ push（自分が単独writer＝amend+force で安全）。policy教師も同梱（直列とのパリティ）。
+            # schema v2（docs/cpu_v4_plan.md §4-1/4-2）: q_root / turns_left を追加。
             _ensure_wt(DATA_WT, DATA_BR)
             d = DATA_WT + "/p3data"; os.makedirs(d, exist_ok=True)
             np.savez(d + "/batch.npz", scalars=vdata["scalars"], field=vdata["field"],
-                     card_idx=vdata["card_idx"], value=vdata["value"], **C.pack_policy(pol))
+                     card_idx=vdata["card_idx"], value=vdata["value"],
+                     q_root=vdata["q_root"], turns_left=vdata["turns_left"], **C.pack_policy(pol))
+            gt = np.asarray(game_turns, dtype=np.float64)
             meta = {"worker": WID, "batch_id": batch_id, "against_round": rnd,
-                    "games": args.games, "states": int(len(vdata["value"]))}
+                    "games": args.games, "states": int(len(vdata["value"])),
+                    "schema_version": 2,
+                    # ゲーム長分布の監視（v4計画 §4-3 補助指標）: 防御が報われる長期戦がデータに
+                    # 現れているかを run 中に見る。
+                    "turns_mean": (round(float(gt.mean()), 2) if gt.size else None),
+                    "turns_p90": (round(float(np.percentile(gt, 90)), 1) if gt.size else None)}
             json.dump(meta, open(d + "/meta.json", "w"))
             _git(DATA_WT, "add", "p3data")
             _git(DATA_WT, "commit", "--amend", "-m",

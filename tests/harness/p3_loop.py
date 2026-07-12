@@ -63,57 +63,107 @@ def _sample(counts, rng, temp):
 
 
 # ---- 自己対戦でデータ採取 ----
+_BATTLE_RESPONSES = ("SELECT_BLOCKER", "SELECT_COUNTER")
+
+
 def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_moves=SELFPLAY_TEMP_MOVES,
-                  max_steps=400, enc_version=1, leaders=None):
-    m = game.new_game(db=_DB, seed=int(rng.integers(1 << 30)), leaders=leaders)
-    val_recs, pol_recs = [], []   # (enc, who) / (ctx, am, visit, who)
+                  max_steps=400, enc_version=1, leaders=None, dirichlet_eps=0.0, db=None):
+    """1局の自己対戦データを採取する（直列/pd並列生成の共通コア・v4計画 §4-1）。
+
+    v4 での拡張（docs/cpu_v4_plan.md）:
+    - **(a) sticky 世界線**: PIMC 決定化 seed を (turn, 手番) 単位で固定＝ターン内の連続 decide が
+      同一世界でプランを評価する（本番 `cpu_learned._world_rng` と同じ規約）。dirichlet ノイズは
+      従来どおり毎 decide 新鮮（探索多様性は維持）。
+    - **(c) 防御応答の温度延長**: SELECT_BLOCKER/SELECT_COUNTER は steps に依らず温度サンプリング＝
+      「カウンターを切って延命した対局」を分布に入れる（prior が PASS 寄りでも実際に切られる）。
+    - **q_root/turns_left の記録**: 混合ラベル（§4-2）と残りターン補助ターゲット用。
+      q_root = 探索後 root の ΣN·Q/ΣN（to-move 視点・終局減衰込み）。
+
+    返り値: (val_recs, pol_recs, winner)。val_recs は (enc, who, q_root, turns_left)。
+    """
+    m = game.new_game(db=(db if db is not None else _DB), seed=int(rng.integers(1 << 30)),
+                      leaders=leaders)
+    val_recs, pol_recs = [], []   # (enc, who, q_root, turn_no) / (ctx, am, visit, who)
     steps = 0
+    world_seeds = {}   # (turn, name) -> 決定化 seed。dict＝戦闘応答で手番が交互に挟まっても sticky
     while game.winner(m) is None and not game.is_terminal(m) and steps < max_steps:
         name = game.current_player(m)
         if name is None:
             break
+        turn_no = int(getattr(m, "turn_count", 0) or 0)
+        key = (turn_no, name)
+        det_seed = world_seeds.get(key)           # (a) sticky: 同一 (turn, 手番) は同一世界
+        if det_seed is None:
+            det_seed = world_seeds[key] = int(rng.integers(2 ** 63 - 1))
         mcts = TreeMCTS(game, value_fn=value_fn, priors_fn=priors_fn, c_puct=c_puct,
-                        n_sims=sims, determinize_fn=lambda s, r: game.determinize(s, name, r), rng=rng)
+                        n_sims=sims, dirichlet_eps=dirichlet_eps,
+                        determinize_fn=lambda s, r, _sd=det_seed:
+                            game.determinize(s, name, np.random.default_rng(_sd)),
+                        rng=rng)
         move, N, legal = mcts.run(m)
         if move is None or N is None or N.sum() == 0:
             break
+        stats = mcts.last_stats
+        q_root = float((stats["N"] * stats["Q"]).sum() / max(float(stats["N"].sum()), 1.0))
         visit = N.astype(np.float64) / N.sum()
         enc = E.encode(m, name, vocab, version=enc_version)
-        val_recs.append((enc, name))
+        val_recs.append((enc, name, q_root, turn_no))
         ctx = state_context(m, name, vocab, version=enc_version)
         am = legal_action_matrix(m, legal, name)
         pol_recs.append((ctx, am, visit, name))
-        a = _sample(N, rng, temp=1.0 if steps < temp_moves else 0.0)
+        pend = m.get_pending_request() or {}
+        is_battle_resp = pend.get("action") in _BATTLE_RESPONSES
+        a = _sample(N, rng, temp=1.0 if (steps < temp_moves or is_battle_resp) else 0.0)
         try:
             cpu_ai._apply_move_inplace(m, name, legal[a])
         except Exception:
             break
         steps += 1
     winner = game.winner(m)
+    end_turn = int(getattr(m, "turn_count", 0) or 0)
+    # turns_left = 終局ターン − 記録時ターン（対局終了後に逆算・v4 §4-2 の補助ターゲット）。
+    val_recs = [(enc, who, q, max(0, end_turn - t)) for enc, who, q, t in val_recs]
     return val_recs, pol_recs, winner
+
+
+def merge_val_recs(val_recs, winner, sinks):
+    """val_recs（selfplay_game の返り値）を配列バッファ dict へ展開する（直列/並列生成の共通処理）。
+
+    sinks: {"S":[], "F":[], "I":[], "Y":[], "Q":[], "T":[]}（呼び出し側で用意・複数局で使い回し）。
+    """
+    for enc, who, q_root, turns_left in val_recs:
+        sinks["S"].append(enc["scalars"]); sinks["F"].append(enc["field"])
+        sinks["I"].append(enc["card_idx"])
+        sinks["Y"].append(1.0 if who == winner else -1.0)
+        sinks["Q"].append(q_root)
+        sinks["T"].append(turns_left)
+
+
+def pack_vdata(sinks):
+    """sinks（merge_val_recs で充填）→ vdata dict（batch.npz スキーマ v2 のvalue側）。空なら None。"""
+    if not sinks["S"]:
+        return None
+    return {"scalars": np.stack(sinks["S"]), "field": np.stack(sinks["F"]),
+            "card_idx": np.stack(sinks["I"]), "value": np.array(sinks["Y"], dtype=np.float32),
+            "q_root": np.array(sinks["Q"], dtype=np.float32),
+            "turns_left": np.array(sinks["T"], dtype=np.float32)}
 
 
 def generate(game, value_fn, priors_fn, vocab, n_games, sims, c_puct, rng, log=print, enc_version=1,
              leaders=None):
-    S, F, I, Y = [], [], [], []
+    sinks = {"S": [], "F": [], "I": [], "Y": [], "Q": [], "T": []}
     pol = []
     for g in range(n_games):
         vr, pr, w = selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng,
                                   enc_version=enc_version, leaders=leaders)
         if w is None:
             continue
-        for enc, who in vr:
-            S.append(enc["scalars"]); F.append(enc["field"]); I.append(enc["card_idx"])
-            Y.append(1.0 if who == w else -1.0)
+        merge_val_recs(vr, w, sinks)
         for ctx, am, visit, who in pr:
             pol.append((ctx, am, visit))
         if (g + 1) % 5 == 0:
-            log(f"  selfplay {g+1}/{n_games}（value局面{len(Y)} policy{len(pol)}）", flush=True)
-    if not S:
-        return None, None
-    vdata = {"scalars": np.stack(S), "field": np.stack(F),
-             "card_idx": np.stack(I), "value": np.array(Y, dtype=np.float32)}
-    return vdata, pol
+            log(f"  selfplay {g+1}/{n_games}（value局面{len(sinks['Y'])} policy{len(pol)}）", flush=True)
+    return pack_vdata(sinks), (pol if sinks["S"] else None)
 
 
 def train_generation(vocab, vdata, pol, d_emb=24, hidden=128, v_epochs=20, p_epochs=4, seed=0, log=print,

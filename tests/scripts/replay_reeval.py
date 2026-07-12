@@ -44,6 +44,15 @@ from replay_runner import resolve_recorded_action
 MATCH_KEYS_IGNORE = {"src", "turn", "player"}
 
 
+def load_replay_json(path):
+    """リプレイ JSON をロードする（`.gz` はそのまま読める＝fixtures はサイズ節約で gzip 格納）。"""
+    if str(path).endswith(".gz"):
+        import gzip
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            return json.load(f)
+    return json.load(open(path))
+
+
 def _ci(db, cid, owner, spec=None):
     c = CardInstance(db.get_card(cid), owner)
     if spec:
@@ -220,10 +229,10 @@ def main():
     ap.add_argument("--json-out", default=None)
     args = ap.parse_args()
 
-    raw = json.load(open(args.replay))
+    raw = load_replay_json(args.replay)
     rec = raw.get("replay", raw)
     frames = raw.get("frames") or []
-    marks = (json.load(open(args.marks)) if args.marks else raw).get("marks") or []
+    marks = (load_replay_json(args.marks) if args.marks else raw).get("marks") or []
     frames_by_idx = {f.get("action_index"): f for f in frames}
     actions = rec["actions"]
 

@@ -49,6 +49,12 @@ class ValueNet:
         self.b1 = np.zeros(hidden)
         self.W2 = (rng.standard_normal((hidden, 1)) * np.sqrt(1.0 / hidden))
         self.b2 = np.zeros(1)
+        # 残りターン補助ヘッド（v4・docs/cpu_v4_plan.md §4-2）: A1 → 線形 → 正規化残りターン数。
+        # **ゼロ初期化＝value 出力経路に一切影響しない**（旧 npz ロード時もゼロ＝恒等温スタート）。
+        # 推論（serve）では使わない＝表現学習の誘導専用。勾配は gW2t = A1ᵀdZ2t が非ゼロなので
+        # ゼロ初期化でもデッドロックしない（W_eff のケースと異なり片側が学習済み活性）。
+        self.W2t = np.zeros((hidden, 1))
+        self.b2t = np.zeros(1)
         self._init_adam()
 
     @property
@@ -70,7 +76,7 @@ class ValueNet:
         return self.W1.shape[0] - self.d_emb * (1 + self.lead_slots) - self._eff_extra_dims()
 
     def _param_names(self):
-        names = ["Emb", "W1", "b1", "W2", "b2"]
+        names = ["Emb", "W1", "b1", "W2", "b2", "W2t", "b2t"]
         if self.W_eff is not None:
             names.append("W_eff")
         return names
@@ -132,13 +138,34 @@ class ValueNet:
         cache = (X, idx, pool_idx, pooled, mask, cnt, H_in, Z1, A1, Z2, pred, eff_cache)
         return pred, cache
 
-    def backward(self, cache, y):
+    def aux_from_cache(self, cache):
+        """forward の cache から残りターン補助ヘッドの予測（正規化残りターン・線形）を返す。"""
+        A1 = cache[8]
+        return (A1 @ self.W2t + self.b2t)[:, 0]
+
+    def predict_aux(self, batch):
+        """補助ヘッド単体の予測（正規化残りターン数）。監視・テスト用＝serve 経路では未使用。"""
+        _, cache = self.forward(batch)
+        return self.aux_from_cache(cache)
+
+    def backward(self, cache, y, y_aux=None, aux_weight=0.0):
+        """MSE 勾配。`y_aux`（正規化残りターン・NaN=ラベル無し）と `aux_weight`>0 を渡すと
+        補助ヘッド（W2t/b2t）の勾配と、共有層への補助損失の寄与（dA1 経由）を追加する。"""
         X, idx, pool_idx, pooled, mask, cnt, H_in, Z1, A1, Z2, pred, eff_cache = cache
         B = len(y)
         dpred = (2.0 / B) * (pred - y)                    # MSE grad
         dZ2 = (dpred * (1 - pred ** 2))[:, None]          # tanh'
         gW2 = A1.T @ dZ2; gb2 = dZ2.sum(0)
         dA1 = dZ2 @ self.W2.T
+        gW2t = gb2t = None
+        if y_aux is not None and aux_weight > 0.0:
+            amask = np.isfinite(y_aux)                    # NaN＝旧スキーマ由来のラベル欠損を除外
+            if amask.any():
+                t_pred = (A1 @ self.W2t + self.b2t)[:, 0]
+                diff = np.where(amask, t_pred - np.where(amask, y_aux, 0.0), 0.0)
+                dZ2t = ((2.0 * aux_weight / max(int(amask.sum()), 1)) * diff)[:, None]
+                gW2t = A1.T @ dZ2t; gb2t = dZ2t.sum(0)
+                dA1 = dA1 + dZ2t @ self.W2t.T             # 共有層へも補助信号を流す（表現学習の誘導）
         dZ1 = dA1 * (Z1 > 0)
         gW1 = H_in.T @ dZ1; gb1 = dZ1.sum(0)
         dH_in = dZ1 @ self.W1.T
@@ -156,6 +183,8 @@ class ValueNet:
             off2 += 2 * self.d_emb
         gEmb[0] = 0.0
         grads = {"Emb": gEmb, "W1": gW1, "b1": gb1, "W2": gW2, "b2": gb2}
+        if gW2t is not None:
+            grads["W2t"] = gW2t; grads["b2t"] = gb2t
         if self.EffF is not None:
             char, hand_pool, stage = eff_cache
             F, P = self.eff_dim, self.eff_proj
@@ -202,6 +231,7 @@ class ValueNet:
                        eff_table=self.EffF, eff_proj=self.eff_proj or 16)
         net.Emb = self.Emb.copy(); net.W1 = W1n
         net.b1 = self.b1.copy(); net.W2 = self.W2.copy(); net.b2 = self.b2.copy()
+        net.W2t = self.W2t.copy(); net.b2t = self.b2t.copy()
         if self.W_eff is not None:
             net.W_eff = self.W_eff.copy()
         net._init_adam()
@@ -224,6 +254,7 @@ class ValueNet:
                        hidden=self.W1.shape[1], feat_dim=self.feat_dim, seed=0, lead_slots=2)
         net.Emb = self.Emb.copy(); net.W1 = W1n
         net.b1 = self.b1.copy(); net.W2 = self.W2.copy(); net.b2 = self.b2.copy()
+        net.W2t = self.W2t.copy(); net.b2t = self.b2t.copy()
         net._init_adam()
         return net
 
@@ -248,6 +279,7 @@ class ValueNet:
                        lead_slots=2, eff_table=eff_table, eff_proj=P)
         net.Emb = self.Emb.copy(); net.W1 = W1n
         net.b1 = self.b1.copy(); net.W2 = self.W2.copy(); net.b2 = self.b2.copy()
+        net.W2t = self.W2t.copy(); net.b2t = self.b2t.copy()
         net._init_adam()
         return net
 
@@ -269,6 +301,8 @@ class ValueNet:
                        eff_table=self.EffF, eff_proj=self.eff_proj or 16)
         net.Emb = self.Emb.copy(); net.W1 = W1n
         net.b1 = b1n; net.W2 = W2n; net.b2 = self.b2.copy()
+        net.W2t = np.concatenate([self.W2t, np.zeros((new_hidden - hidden, 1))], axis=0)
+        net.b2t = self.b2t.copy()
         if self.W_eff is not None:
             net.W_eff = self.W_eff.copy()
         net._init_adam()
@@ -276,6 +310,7 @@ class ValueNet:
 
     def save(self, path):
         payload = dict(Emb=self.Emb, W1=self.W1, b1=self.b1, W2=self.W2, b2=self.b2,
+                       W2t=self.W2t, b2t=self.b2t,
                        d_emb=np.array(self.d_emb), lead_slots=np.array(self.lead_slots))
         if self.EffF is not None:
             payload.update(EffF=self.EffF.astype(np.float32), W_eff=self.W_eff,
@@ -297,6 +332,9 @@ class ValueNet:
                   lead_slots=lead_slots, eff_table=eff_table, eff_proj=eff_proj)
         for k in ("Emb", "W1", "b1", "W2", "b2"):
             setattr(net, k, z[k])
+        for k in ("W2t", "b2t"):      # 補助ヘッド（v4）: 旧 npz は欠落＝ゼロのまま（恒等）
+            if k in z.files:
+                setattr(net, k, z[k])
         if eff_table is not None:
             net.W_eff = z["W_eff"]
         net._init_adam()
@@ -321,8 +359,13 @@ def _predict_chunked(net, d, batch=8192):
     return out
 
 
-def train(net, data, epochs=20, lr=1e-3, batch=128, val_frac=0.2, seed=0, verbose=False):
-    """value 回帰を訓練。返り値 (train_mse, val_mse)。"""
+def train(net, data, epochs=20, lr=1e-3, batch=128, val_frac=0.2, seed=0, verbose=False,
+          aux_weight=0.0):
+    """value 回帰を訓練。返り値 (train_mse, val_mse)。
+
+    `aux_weight`>0 かつ data に "aux"（正規化残りターン・NaN=欠損可）がある場合、残りターン
+    補助損失（v4・docs/cpu_v4_plan.md §4-2）を併せて最適化する（返り値の mse は value のみ）。
+    """
     n = len(data["value"]); rng = np.random.default_rng(seed)
     perm = rng.permutation(n)
     nval = max(1, int(n * val_frac))
@@ -331,13 +374,18 @@ def train(net, data, epochs=20, lr=1e-3, batch=128, val_frac=0.2, seed=0, verbos
     def take(ix): return {k: data[k][ix] for k in ("scalars", "field", "card_idx")}
     tr, va = take(ti), take(vi)
     ytr = data["value"][ti]
+    aux_tr = None
+    if aux_weight > 0.0 and "aux" in data:
+        aux_tr = np.asarray(data["aux"], dtype=np.float64)[ti]
     for ep in range(epochs):
         order = rng.permutation(len(ytr))
         for s in range(0, len(order), batch):
             bi = order[s:s + batch]
             mb = {k: tr[k][bi] for k in tr}
             pred, cache = net.forward(mb)
-            grads = net.backward(cache, ytr[bi])
+            grads = net.backward(cache, ytr[bi],
+                                 y_aux=(aux_tr[bi] if aux_tr is not None else None),
+                                 aux_weight=aux_weight)
             net.step(grads, lr=lr)
         if verbose:
             tm = float(((_predict_chunked(net, tr) - ytr) ** 2).mean())
