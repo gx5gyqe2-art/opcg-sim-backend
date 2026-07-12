@@ -41,9 +41,13 @@
 | [`reports/cpu_strength_plan_20260628.md`](reports/cpu_strength_plan_20260628.md) | CPU 強化 計画・設計＋**実測結論**（2026-06-28）。L1 単一系統化後、強化レバーを順に実装・計測した記録と総括（§K）。**結論＝検討した全レバーが「出荷済み／失敗済み／既出／幽霊」**で、現アーキ（L1 eval＋α-β/ビーム horizon=4＋PIMC K=4）の CPU は**達成可能上限に近い**。内訳: 速度系(PyPy/計画キャッシュ/ポンダリング/PV ordering/PIMC按分)=出荷済み／TT・地平線外静的項=失敗／L1係数SPSA=Elo余地≈0／①マリガン方策・④settle-PASS過大検出=幽霊(Elo中立・実測)／②隠れ情報サンプラ=既出(超幾何分布)／③動的時間配分=棄却。さらなる伸びは NNUE/ISMCTS 級の質的転換が要るが Python 1秒予算では棄却。**幽霊/失敗レバーの実装は §K の結論を受けて撤去済み（2026-06-28）** |
 | [`reports/cpu_replay_ambiguity_r0_20260704.md`](reports/cpu_replay_ambiguity_r0_20260704.md) | 実対局リプレイ R0（2026-07-04）。記録アクション（card_id 基準）の一意復元可否を実デッキで計測＝曖昧率 3.5〜4.5%・fan-out 小・effect 選択は 0/515。判断＝(A) 決定論タイブレーク逆引きを主とする。計器 `tests/scripts/replay_ambiguity_probe.py` |
 | [`reports/cpu_replay_roundtrip_r1_20260704.md`](reports/cpu_replay_roundtrip_r1_20260704.md) | 実対局リプレイ R1/R2（2026-07-04）。リプレイヤ＋ラウンドトリップで実デッキ 10/10 完全一致。副産物＝`cpu_ai._find_card` が stage/temp_zone 未探索で ACTIVATE_MAIN 等の記述が uuid 漏れ→修正で 8/10→10/10。(A) タイブレークは R0 見積りより頑健（場複製由来の分岐 0） |
+| [`reports/gen3_adoption_20260711.md`](reports/gen3_adoption_20260711.md) | v3（旧称Gen3）採用報告（2026-07-11）。蒸留→分散追い学習・round60凍結・対L1多様97=0.854・15k追跡で過ピーク忘却を実証 |
+| [`reports/cpu_learned_mark_review_20260711.md`](reports/cpu_learned_mark_review_20260711.md) | 人間マークレビュー第1回（2026-07-11）。8指摘→探索/読み出しの一般機構3修正（LCB読み出し・終局深さ減衰・sticky世界線）＋net起因(F4)の切り分け |
+| [`reports/cpu_learned_mark_review2_20260711.md`](reports/cpu_learned_mark_review2_20260711.md) | 人間マークレビュー第2回（2026-07-11）。初版LCB読み出しの楽観乗り換え退行を発見→二重ゲート則へ再較正（2局×16マーク全数回帰）・「2つの時計」根因仮説へ接続 |
+| [`reports/v4_adoption_20260712.md`](reports/v4_adoption_20260712.md) | **v4採用報告（2026-07-12）**。混合ラベル×残りターン補助×防御データ被覆の10k run・ピークround40凍結・対L1=0.812/対v3=0.583・防御マーク獲得・既知の限界（攻め付与ニュアンス）と運用知見 |
 | [`reports/cpu_rl_pilot_p3_v2_ephemeral_session_20260705.md`](reports/cpu_rl_pilot_p3_v2_ephemeral_session_20260705.md) | P3 v2本走 実行記録（2026-07-05）。**常設CPU VMではなくエフェメラルなClaude Codeセッション**でも本走が完遂できることを実証（v1本走の遺構調査＋v2本走で確認）。温スタート・チャンク分割運用・別セッション由来の3改修（mu-mcts/重複解消/config集約）を隔離worktreeで検証しチャンク境界でfast-forward投入・コンテナ再起動からの回復（shard単位checkpointで進捗無傷）を記録。実測: クローン版245秒/shard→mu-mcts版126〜134秒/shard（約1.9〜2.2倍） |
 
-> 実装中の設計計画（一部未完・実装完了後に SPEC/TEST_SPEC へ吸収）: [`cpu_v4_plan.md`](cpu_v4_plan.md)（**v4 学習計画**＝人間マーク2局×16件で特定したネット起因課題の解消。根因仮説「2つの時計」・sticky自己対戦移植→混合ラベル＋残りターン補助ターゲット→3層ゲート。呼称: v1=旧Gen2・v3=現本番=v1蒸留・v4=次期）／[`replay_verification_plan.md`](replay_verification_plan.md)（実対局リプレイ検証 R0-R3 実装済＋残少）／[`cpu_perf_testing_plan.md`](cpu_perf_testing_plan.md)（CPU 性能テスト運用 A1-A3 実装済）／[`refactoring_harness_driver.md`](refactoring_harness_driver.md)（検証ハーネス共通ドライバ化 ⑥）。
+> 実装中の設計計画（一部未完・実装完了後に SPEC/TEST_SPEC へ吸収）: [`replay_verification_plan.md`](replay_verification_plan.md)（実対局リプレイ検証 R0-R3 実装済＋残少）／[`cpu_perf_testing_plan.md`](cpu_perf_testing_plan.md)（CPU 性能テスト運用 A1-A3 実装済）／[`refactoring_harness_driver.md`](refactoring_harness_driver.md)（検証ハーネス共通ドライバ化 ⑥）。
 
 ## クイックスタート
 

@@ -35,10 +35,12 @@ _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "data")
 
-# Gen3 = 蒸留(ship v1=Gen2)→実効10,112局の追い学習で得た LC+EffFeat v3 net（対L1多様97=0.854）。
-# Gen2 は録画リプレイの再現・A/B比較用に同梱を維持する。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen3_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen3_policy.npz")
+# v4(gen4) = v3(gen3) からの温スタート＋混合ラベル（勝敗×root Q）＋残りターン補助ヘッド＋
+# 防御データ被覆（sticky/防御温度/L1混合）で実効10,208局を学習し、ピーク round40（cum5248）を凍結
+# （docs/reports/v4_adoption_20260712.md・対L1多様97=0.812・対v3直接対戦=0.583・防御マーク獲得）。
+# gen3/gen2 は録画リプレイの再現・A/B・ロールバック用に同梱を維持する。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen4_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen4_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}
