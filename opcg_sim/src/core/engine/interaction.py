@@ -326,8 +326,11 @@ def get_pending_request(gm, with_request_id: bool = True) -> Optional[Dict[str, 
         fe_action = "SEARCH_AND_SELECT" if action_type in ("SELECT_TARGET", "FIELD_OVERFLOW_TRASH") else action_type
         
         candidates = gm.active_interaction.get("candidates", [])
-        candidate_dicts = [c.to_dict() for c in candidates] if candidates else []
         candidate_uuids = [c.uuid for c in candidates] if candidates else []
+        # candidate_dicts（各候補の to_dict）は**フロント表示専用**（既定解決＝default_interaction_payload
+        # は selectable_uuids/constraints しか読まない）。候補が多い盤面では c.to_dict() のリスト構築が
+        # MCTS のドレイン経路で CPU を占有するため、request_id 不要の高速パスでは丸ごと省く。
+        candidate_dicts = ([c.to_dict() for c in candidates] if candidates else []) if with_request_id else []
         
         req = {
             KEY_PID: gm.active_interaction.get("player_id"),
