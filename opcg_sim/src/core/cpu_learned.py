@@ -24,9 +24,11 @@ from opcg_sim.src.learned.value_net import ValueNet
 from opcg_sim.src.learned.policy import PolicyScorer, state_context
 from opcg_sim.src.learned.action import legal_action_matrix
 from opcg_sim.src.learned.adapter import OPCGGame
+from opcg_sim.src.learned import config as CFG
 from opcg_sim.src.learned.config import (
     C_PUCT, SERVE_SIMS, SERVE_DIRICHLET_EPS,
-    SERVE_ROOT_SWITCH_MIN_FRAC, SERVE_ROOT_SWITCH_MIN_GAP, SERVE_STICKY_WORLD)
+    SERVE_ROOT_SWITCH_MIN_FRAC, SERVE_ROOT_SWITCH_MIN_GAP, SERVE_STICKY_WORLD,
+    AUX_TIE_DECAY, AUX_SAT_START, TERM_FLOOR, V4_TURNS_SCALE)
 from opcg_sim.src.learned.mcts import TreeMCTS   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
 from opcg_sim.src.utils.loader import CardLoader
 
@@ -62,13 +64,35 @@ def available() -> bool:
     return os.path.exists(_DEFAULT_VALUE)
 
 
-def _value_fn(vnet, vocab, enc_version=1):
+def _aux_tie_scale(v: float, t_hat: float,
+                   decay: float = AUX_TIE_DECAY, sat_start: float = AUX_SAT_START,
+                   floor: float = TERM_FLOOR) -> float:
+    """aux 粘り項（config.SERVE_AUX_TIEBREAK・v5 §4-1）: 飽和域の葉価値を予測残りターン t̂ で減衰する。
+
+    v' = v · max(floor, 1 − decay·t̂·sat),  sat = clip((|v|−sat_start)/(1−sat_start), 0, 1)。
+    終局の深さ減衰（TERM_DECAY・「速い勝ち＞遅い勝ち／遅い負け＞速い負け」）を「終局に届かない
+    飽和した葉」へ拡張＝敗勢では本当に延命する手（t̂ が伸びる）を、優勢では速い勝ち（t̂ が短い）を
+    選好する。非飽和域（|v| < sat_start）は sat=0 で恒等＝中間域の較正は不変。純関数（テスト対象）。"""
+    a = abs(v)
+    if a <= sat_start:
+        return v
+    sat = min((a - sat_start) / (1.0 - sat_start), 1.0)
+    return v * max(floor, 1.0 - decay * max(t_hat, 0.0) * sat)
+
+
+def _value_fn(vnet, vocab, enc_version=1, aux_tiebreak=None):
+    """葉価値関数。aux_tiebreak=None は config.SERVE_AUX_TIEBREAK に従う（A/B 用に明示上書き可）。"""
     def value(state, to_move):
         if state.winner is not None:
             return 1.0 if state.winner == to_move else -1.0
         enc = E.encode(state, to_move, vocab, version=enc_version)
         batch = {k: enc[k][None, ...] for k in ("scalars", "field", "card_idx")}
-        return float(vnet.predict(batch)[0])
+        use_aux = CFG.SERVE_AUX_TIEBREAK if aux_tiebreak is None else aux_tiebreak
+        if not use_aux:
+            return float(vnet.predict(batch)[0])
+        pred, aux = vnet.predict_with_aux(batch)   # forward 1回を共有（二重計算しない）
+        t_hat = float(aux[0]) * V4_TURNS_SCALE     # 正規化残りターン → ターン数
+        return _aux_tie_scale(float(pred[0]), t_hat)
     return value
 
 
@@ -129,13 +153,16 @@ class LearnedEngine:
     """
 
     def __init__(self, value_path: Optional[str] = None, policy_path: Optional[str] = None,
-                 vocab=None, game=None):
+                 vocab=None, game=None, aux_tiebreak: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
             game = game if game is not None else sgame
         self.vocab = vocab
         self.game = game
+        # aux 粘り項のエンジン別上書き（None=config.SERVE_AUX_TIEBREAK に従う）。ON/OFF を
+        # 同一プロセスで対戦させる A/B（net-vs-net arena）用＝本番既定は None。
+        self.aux_tiebreak = aux_tiebreak
         # ターン内 sticky 世界線の seed キャッシュ {(id(manager), turn, player): (weakref, seed)}（§_world_rng）。
         self._world_seeds: Dict[Any, Any] = {}
         self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
@@ -189,7 +216,8 @@ class LearnedEngine:
             import random as _random
             rng = np.random.default_rng(_random.getrandbits(64))
         det_rng = self._world_rng(manager, name, rng) if SERVE_STICKY_WORLD else rng
-        mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab, self.enc_version),
+        mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab, self.enc_version,
+                                                      aux_tiebreak=self.aux_tiebreak),
                         priors_fn=_priors_fn(self.pnet, self.vocab, self.enc_version),
                         c_puct=c_puct, n_sims=sims, dirichlet_eps=SERVE_DIRICHLET_EPS,
                         determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=det_rng)

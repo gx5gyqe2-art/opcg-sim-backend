@@ -50,7 +50,8 @@ resolver は `success = True` を返す。エラー・フォールバック・OT
 `test_cpu_replay.py` / `test_perf_gate.py` / `test_p2_harness.py` / `test_p3_components.py` /
 `test_rl_datagen.py` / `test_turn_solver.py` / `test_learned_root_readout.py` /
 `test_mcts_terminal_decay.py` / `test_selfplay_v4_datagen.py` / `test_value_net_aux_turns.py` /
-`test_pd_mixed_label.py` / `test_journal.py`（`test_real_playout_make_unmake_roundtrip`のみ）。
+`test_pd_mixed_label.py` / `test_learned_candidate_prune.py` / `test_learned_aux_tiebreak.py` /
+`test_journal.py`（`test_real_playout_make_unmake_roundtrip`のみ）。
 
 ### 実行方法（重要）
 logger が `sys.stdout` を直接掴むため、pytest はキャプチャ無効で実行する。
@@ -145,6 +146,7 @@ make test-slow   # 重テストだけ
 | `tests/scripts/clock_error_by_leader.py` | **時計誤差の対面別分解CLI**（v4監視 diagnostics・`docs/reports/v4_adoption_20260712.md` §3/§6）: batch.npz（スキーマv2）の局面を自リーダー/対面ペアでグループ化し、残りターン補助ヘッドの MAE・bias（ターン換算）を分解。平均誤差が隠す対面別の系統偏りを可視化＝§5.5-2（自デッキ残特徴）の切り分け材料。読み取り専用 |
 | `tests/scripts/mark_gate.py` | **v4 マーク回帰ゲートCLI**（`docs/reports/v4_adoption_20260712.md` §5＝v4採用ゲート）: `tests/fixtures/replays/` の2局×16人間マークを復元し、challenger / baseline（既定=v3）ネットで各Kシード decide→「人間指摘方向率」を比較。判定＝F4代表6件の過半で改善 かつ 既存正着ガード3件（g1@12/@24・g2@20）非退行で PASS（exit 0）。v3 vs v3 で「改善0/6・非退行OK・FAIL」を確認済み（＝ゲート感度の基準線） |
 | `tests/test_learned_candidate_prune.py` | **基盤健全性**（`cpu_infra`）。**learned 候補の無駄手枝刈り**（`adapter.OPCGGame.legal_actions`・v5 §4補）: L1/α-β と同じ `_prune_futile_attacks`/`_prune_don_moves` を learned MCTS 候補にも適用（`SERVE_PRUNE_FUTILE`）。枝刈りON が _prune_* 適用後と一致・OFF で merged 素集合へ復帰（ゲート）・候補を空にしない（TURN_END 常在） |
+| `tests/test_learned_aux_tiebreak.py` | **基盤健全性**（`cpu_infra`）。**aux 粘り項**（`cpu_learned._aux_tie_scale`・`SERVE_AUX_TIEBREAK`・v5 §4-1）: 飽和域の葉価値を残りターン予測 t̂ で減衰 `v·max(TERM_FLOOR, 1−AUX_TIE_DECAY·t̂·sat)`。非飽和域は恒等・敗勢は t̂ 大（延命）を選好・優勢は t̂ 小（速い勝ち）を選好・床で下げ止まり・t̂<0 クランプ（増幅しない）・`predict_with_aux`＝分離呼び出しと一致・ゲート OFF/終局 ±1 は従来どおり |
 | `tests/test_selfplay_v4_datagen.py` | **基盤健全性**（`cpu_infra`）。**v4 自己対戦データ生成**（`p3_loop.selfplay_game` 拡張・`docs/reports/v4_adoption_20260712.md` §1）: q_root∈[-1,1]/turns_left（非負・終局で0）の記録・batch スキーマ v2（pack_vdata のキー/形状）・同一seed決定論・**sticky世界線**（同一(turn,手番)で決定化seed固定＝戦闘応答の交互手番でも dict で保持・ターンが変われば引き直す）・**防御応答の温度延長**（temp_moves=0 でも SELECT_BLOCKER/COUNTER は温度1でサンプリング）・**L1混合席**（policy教師はnet席のみ・L1席のvalueはq_root=NaN→mergeで勝敗へ退化・決定論維持） |
 | `tests/test_value_net_aux_turns.py` | **基盤健全性**（`cpu_infra`）。**ValueNet 残りターン補助ヘッド**（W2t/b2t・v4 §4-2）: 補助ヘッドの value 出力からの独立性（＝恒等温スタートの根拠）・旧npz（v3=gen3）ロードで aux ゼロ＋save/load往復・解析勾配=数値微分一致（W2t/b2t＋共有層への寄与・NaNラベルのマスク）・構造拡張4種（expanded/LC/to_v3/widened）の aux 引き継ぎ・合成ターゲットの学習可能性（NaN混在可） |
 | `tests/test_pd_mixed_label.py` | **基盤健全性**（`cpu_infra`）。**v4 混合ラベルとスキーマv2後方互換**（`pd_batch_common`）: normalize_batch_v2（v1バッチ→q_root=value/turns_left=NaN の退化規則・v2素通し）・mixed_value_label（α=1で勝敗単独と一致・線形補間）・ring_append の v2キー連結と v1/v2 混在 |
