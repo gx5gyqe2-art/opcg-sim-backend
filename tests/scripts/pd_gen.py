@@ -82,7 +82,7 @@ def _resume_batch_id():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2, 3))
+    ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2, 3, 4))
     ap.add_argument("--sims", type=int, default=160)
     ap.add_argument("--games", type=int, default=128)
     ap.add_argument("--workers", type=int, default=4)

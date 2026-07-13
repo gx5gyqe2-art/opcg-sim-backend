@@ -78,7 +78,7 @@ def _read_data_branch(br):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2, 3))
+    ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2, 3, 4))
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--epochs", type=int, default=2)
     ap.add_argument("--buffer", type=int, default=120000)
