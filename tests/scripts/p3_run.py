@@ -172,11 +172,19 @@ def _init_worker():
 def _gen_task(payload):
     """1ワーカー分の自己対戦生成。ゲームループ本体は `p3_loop.selfplay_game`（共通コア・v4拡張＝
     sticky世界線/防御応答温度/q_root/turns_left/L1混合 もそこで付与）へ委譲する。"""
-    seed, n_games, sims, eps, vpath, ppath, ev, leaders, l1_mix = payload
+    seed, n_games, sims, eps, vpath, ppath, ev, leaders, l1_mix, mark_frac = payload
     db, vocab, game = _W["db"], _W["vocab"], _W["game"]
     vnet = RN.ValueNet.load(vpath)
     pnet = PolicyScorer.load(ppath) if ppath else None
     vf = P.value_fn_of(vnet, vocab, ev); pf = P.priors_fn_of(pnet, vocab, ev)
+    # (e) マーク局面シード（v5 §4-2）: frac>0 のときだけプールを1回復元してワーカーに載せる。
+    seed_boards = None
+    if mark_frac > 0.0:
+        sb = _W.get("seed_boards")
+        if sb is None:
+            from mark_seeds import load_mark_boards
+            sb = _W["seed_boards"] = load_mark_boards(db)
+        seed_boards = sb
     rng = np.random.default_rng(seed)
     sinks = {"S": [], "F": [], "I": [], "Y": [], "Q": [], "T": []}
     pol, game_turns, l1_games = [], [], 0
@@ -188,7 +196,7 @@ def _gen_task(payload):
             l1_games += 1
         rv, rp, w = P.selfplay_game(game, vf, pf, vocab, sims, C_PUCT, rng,
                                     enc_version=ev, leaders=leaders, dirichlet_eps=eps, db=db,
-                                    l1_seat=l1_seat)
+                                    l1_seat=l1_seat, seed_boards=seed_boards, seed_frac=mark_frac)
         if w is None:
             continue
         P.merge_val_recs(rv, w, sinks)
@@ -202,15 +210,16 @@ def _gen_task(payload):
 
 
 def selfplay_shard(pool, workers, n_games, sims, eps, vpath, ppath, base_seed, ev=1, leaders=None,
-                   l1_mix=0.0):
+                   l1_mix=0.0, mark_frac=0.0):
     """n_games を workers 個に分割して並列生成→マージ。返り値 (vdata, pol, game_turns, l1_games)。
 
     vdata は batch スキーマ v2（value に加え q_root / turns_left・docs/cpu_v4_plan.md §4-1/4-2）。
     game_turns は対局ごとのターン数（ゲーム長分布の監視用・§4-3 補助指標）。
     l1_mix は §4-1(d) の L1-hard 混合比（0=従来の純自己対戦）・l1_games は実際の混合局数。
+    mark_frac は §4-2(e) のマーク局面シード比（0=従来の turn1 開始のみ）。
     """
     per = max(1, n_games // workers)
-    tasks = [(base_seed * 131 + w * 977 + 1, per, sims, eps, vpath, ppath, ev, leaders, l1_mix)
+    tasks = [(base_seed * 131 + w * 977 + 1, per, sims, eps, vpath, ppath, ev, leaders, l1_mix, mark_frac)
              for w in range(workers)]
     parts = pool.map(_gen_task, tasks)
     vds, pol, game_turns, l1_games = [], [], [], 0
@@ -240,6 +249,8 @@ def main():
                          "2=リーダー付与ドン特徴）")
     ap.add_argument("--rotate-leaders", action="store_true",
                     help="自己対戦のリーダーを全リーダーから抽選＋リアルデッキ化（穴B）")
+    ap.add_argument("--mark-seed-frac", type=float, default=0.0,
+                    help="マーク局面シード比（v5 §4-2(e)・0=turn1開始のみ）")
     args = ap.parse_args()
     ev = args.enc_version
 
@@ -272,7 +283,7 @@ def main():
                 pnet.save(CK + "/_cur_p.npz"); ppath = CK + "/_cur_p.npz"
             vdata, pol, _turns, _l1 = selfplay_shard(pool, args.workers, args.shard_games, args.sims,
                                                      args.dirichlet_eps, CK + "/_cur_v.npz", ppath, man["shards"],
-                                                     ev=ev, leaders=leaders)
+                                                     ev=ev, leaders=leaders, mark_frac=args.mark_seed_frac)
             if vdata is None:
                 print("  採取0スキップ"); continue
             for k in buf_v:

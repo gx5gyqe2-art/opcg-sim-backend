@@ -134,6 +134,21 @@ gen4→v4 温スタート net で自己対戦1局が enc_version=4 で完走（n
 > `load_nets` は checkpoint があればそれを優先するので、cold-fallback（出荷 gen2 から v1→v4 温スタート）とは
 > 別に、明示シードで gen4 の実力を引き継ぐ。
 
+### 4-2補. マーク局面シード【実装済み・2026-07-13】
+
+§4-2 を実装。人間が悪手をマークした実対局の**失敗局面**（MAIN 手番マーク）を静的フレームから復元し
+（`tests/harness/mark_seeds.py`・replay_reeval の復元を流用・決定論）、自己対戦の開始局面プールにする。
+`selfplay_game(seed_boards=, seed_frac=)` が各局を確率 `seed_frac` でプールから開始（残りは従来の
+turn1 `new_game`）＝観測された失敗モードそのものを in-distribution 化する。中盤開始でも軌跡・ラベル
+（勝敗/q_root/turns_left）は通常経路と同一（turns_left は終局ターンから逆算＝開始ターンに依らず正しい）。
+
+配線: `pd_gen`/`p3_run` に `--mark-seed-frac`（既定 0＝OFF）・ワーカーは frac>0 のとき1回だけプール復元
+（`_W["seed_boards"]`）。カウンター/戦闘マークは戦闘途中の再開が近似的なため除外＝MAIN 手番のみ
+（現状 fixtures 3局から 26 局面）。**`seed_frac=0` は rng 消費順まで従来と完全一致**（seed 判定の乱数を
+引かない）＝シード OFF の本走は v4 生成と bit 単位で同一データ。検証: `test_mark_seeds.py`
+（プレイ可能・決定論・シード開始で完走・frac=0 の挙動不変ゲート）・ワーカー経路スモーク（frac=1.0 で
+26 盤面ロード・生成完動）。
+
 ### 4.補. learned 候補の無駄手枝刈り【実装済み・2026-07-12】
 
 C3過大（@19/@102 無駄攻撃）・C2過大（@38 無駄ドン）の一部は**学習不要の探索側で直った**。
