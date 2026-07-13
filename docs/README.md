@@ -47,7 +47,7 @@
 | [`reports/v4_adoption_20260712.md`](reports/v4_adoption_20260712.md) | **v4採用報告（2026-07-12）**。混合ラベル×残りターン補助×防御データ被覆の10k run・ピークround40凍結・対L1=0.812/対v3=0.583・防御マーク獲得・既知の限界（攻め付与ニュアンス）と運用知見 |
 | [`reports/cpu_rl_pilot_p3_v2_ephemeral_session_20260705.md`](reports/cpu_rl_pilot_p3_v2_ephemeral_session_20260705.md) | P3 v2本走 実行記録（2026-07-05）。**常設CPU VMではなくエフェメラルなClaude Codeセッション**でも本走が完遂できることを実証（v1本走の遺構調査＋v2本走で確認）。温スタート・チャンク分割運用・別セッション由来の3改修（mu-mcts/重複解消/config集約）を隔離worktreeで検証しチャンク境界でfast-forward投入・コンテナ再起動からの回復（shard単位checkpointで進捗無傷）を記録。実測: クローン版245秒/shard→mu-mcts版126〜134秒/shard（約1.9〜2.2倍） |
 
-> 実装中の設計計画（一部未完・実装完了後に SPEC/TEST_SPEC へ吸収）: [`replay_verification_plan.md`](replay_verification_plan.md)（実対局リプレイ検証 R0-R3 実装済＋残少）／[`cpu_perf_testing_plan.md`](cpu_perf_testing_plan.md)（CPU 性能テスト運用 A1-A3 実装済）／[`cpu_v5_plan.md`](cpu_v5_plan.md)（**v5 学習計画**＝v4実測14マークの分析。攻守の程度較正・守りすぎの過補正/ドン付与双方向誤り/負けq飽和。防御温度の条件化＋マーク局面シード＋v4温スタート）／[`refactoring_harness_driver.md`](refactoring_harness_driver.md)（検証ハーネス共通ドライバ化 ⑥）。
+> 実装中の設計計画（一部未完・実装完了後に SPEC/TEST_SPEC へ吸収）: [`replay_verification_plan.md`](replay_verification_plan.md)（実対局リプレイ検証 R0-R3 実装済＋残少）／[`cpu_perf_testing_plan.md`](cpu_perf_testing_plan.md)（CPU 性能テスト運用 A1-A3 実装済）／[`cpu_v5_plan.md`](cpu_v5_plan.md)（**v5 学習計画**＝v4実測14マーク＋v4採用報告§3残課題(D1-D3)の統合。攻守の程度較正・守りすぎ過補正・ドン付与双方向誤り・負けq飽和。防御温度の条件化＋マーク局面シード＋忘却抑制(KL蒸留)＋自デッキ残encoder拡張＋v4温スタート）／[`refactoring_harness_driver.md`](refactoring_harness_driver.md)（検証ハーネス共通ドライバ化 ⑥）。
 
 ## クイックスタート
 
