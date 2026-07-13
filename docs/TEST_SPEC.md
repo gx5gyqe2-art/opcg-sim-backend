@@ -51,6 +51,7 @@ resolver は `success = True` を返す。エラー・フォールバック・OT
 `test_rl_datagen.py` / `test_turn_solver.py` / `test_learned_root_readout.py` /
 `test_mcts_terminal_decay.py` / `test_selfplay_v4_datagen.py` / `test_value_net_aux_turns.py` /
 `test_pd_mixed_label.py` / `test_learned_candidate_prune.py` / `test_learned_aux_tiebreak.py` /
+`test_rl_encoder_v4.py` / `test_mark_seeds.py` / `test_value_net_distill.py` / `test_peak_alert.py` /
 `test_journal.py`（`test_real_playout_make_unmake_roundtrip`のみ）。
 
 ### 実行方法（重要）
@@ -153,6 +154,8 @@ make test-slow   # 重テストだけ
 | `tests/test_pd_batch_common.py` | **バッチ式アクター/ラーナー分離の純粋協調ロジック**（`tests/scripts/pd_batch_common.py`・`docs/reports/batched_selfplay_design_20260710.md`）: 鮮度フィルタ is_fresh（accept/seen/stale の境界＝未消費かつ against_round>=round-staleness）・plan_consumption の採用/スキップ内訳・update_consumed の単調性と非破壊・ring_append のcap切りとキー整合。git入出力を含むe2eはpd_*スモークで別途疎通確認済み |
 | `tests/test_mark_seeds.py` | **基盤健全性**（`cpu_infra`）。**マーク局面シード**（`mark_seeds.load_mark_boards`・`p3_loop.selfplay_game` の `seed_boards`/`seed_frac`・`docs/cpu_v5_plan.md` §4-2）: 実対局の失敗局面（MAIN手番マーク）を静的フレームから復元し自己対戦の開始局面プールにする。復元プールが非空・非終局・合法手あり・中盤（turn≥2）・決定論（同一プール）・シード開始で完走しラベル採取・**seed_frac=0 は seed_boards を渡しても turn1開始と完全一致**（rng消費順不変＝シードOFFの本走が v4生成とbit同一）のゲート |
 | `tests/test_rl_encoder_v4.py` | **基盤健全性**（`cpu_infra`）。**符号化世代 v4（自デッキ残の集約特徴）**（`rl_encoder` version=4・`docs/cpu_v5_plan.md` §4-3）: v3(scalars46)末尾に自ライブラリの守り/資源集約5値（残カウンター総量/密度・ブロッカー残・イベント残・高コストキャラ残）を append-only 追加（51）。版マップ単調増加・先頭46がv3と一致（並び不変）・集約値の定義一致・**自デッキのみ**（相手デッキ改変で不変＝公平性契約）・空デッキ安全・**恒等温スタート必達**（v3→v4 拡張で value/aux 出力が数値的完全一致＝新5行ゼロ） |
+| `tests/test_value_net_distill.py` | **基盤健全性**（`cpu_infra`）。**value 蒸留（忘却抑制・教師アンカー）**（`ValueNet.backward`/`train` の `distill_weight`・`docs/cpu_v5_plan.md` §4-4b）: 凍結v4教師の value 予測へ引く MSE アンカーを value ヘッドに加算。distill_weight=0 は素の MSE 勾配と完全一致（挙動不変ゲート）・合成損失の解析勾配=数値微分一致（W2/b2/W1/Emb）・強めの蒸留で予測が教師値へ寄る（ラベルとのバランスで暴走しない） |
+| `tests/test_peak_alert.py` | **基盤健全性**（`cpu_infra`）。**ピーク自動アラート**（`peak_alert.detect_peak`・`docs/cpu_v5_plan.md` §4-4a）: 本走の checkpoint 評価系列（mark_improved・arena_wr）から忘却開始を検知。改善中はアラートせず凍結候補=best round・2指標の同時後退が patience 回連続でアラート・単一指標後退や許容内ノイズでは誤報しない・空/単一入力の安全性 |
 | `tests/test_value_net_v3.py` | **ValueNet v3（EffFeat組み込み）**（設計 §2/§5）: 恒等温スタート連鎖（scalars拡張→LC→to_v3→widened で出力完全一致・22/24幅idx双方）・順序ガード（LC前to_v3拒否/二重適用拒否/eff後LC拒否/widened縮小拒否）・W_eff含む勾配=数値微分一致・save/load往復＋旧形式後方互換（eff_dim=0）・**ゼロショット回帰**（効果特徴で決まるターゲットを未見リーダーへ汎化できるのはv3のみ＝LC埋め込みは不可）・encoder v3（scalars46/card_idx24/ステージ末尾・v2不変）とのe2e結線 |
 | `tests/test_p3_components.py` | **基盤健全性**（`cpu_infra`）。**P3学習ループ部品の高速単体**（重い loop は `p3_loop.py --smoke --enc-version 1`）: action 特徴 one-hot・action_key の区別・policy 学習・**自己対戦のリーダーローテーション**（`OPCGGame.new_game(leaders=…)` が全リーダープールから両席を抽選＋リアルデッキ化＝【ドン‼×1】系リーダー効果を学習データに載せる「穴B」対策・seed 決定論／leaders 未指定は build_deck 固定＝後方互換） |
 | `tests/test_p3_loop.py` | **P3学習ループの疎通**（slow・`make test`除外）: 自己対戦→value/policy 学習→クロス評価が例外なく完走（勝率シグナルは見ない）。`p3_loop.py`／`p3_run.py` は `--enc-version 2`（必須・符号化v2）・`--rotate-leaders`（穴B）を配管。p3_run の v2 Gen0 は出荷 v1 Gen2 から**温スタート**（乱数初期化しない） |

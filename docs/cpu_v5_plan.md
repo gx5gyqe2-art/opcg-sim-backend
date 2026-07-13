@@ -149,6 +149,21 @@ turn1 `new_game`）＝観測された失敗モードそのものを in-distribut
 （プレイ可能・決定論・シード開始で完走・frac=0 の挙動不変ゲート）・ワーカー経路スモーク（frac=1.0 で
 26 盤面ロード・生成完動）。
 
+### 4-4補. 忘却抑制（value 蒸留＋ピーク自動アラート）【実装済み・2026-07-13】
+
+§4-4 を実装。(a) **ピーク自動アラート**（`tests/scripts/peak_alert.py`）: 本走の checkpoint 評価系列
+（mark_gate 改善数・対v4 arena 勝率）を読み、2指標が**同時に**ピークから後退したら「ピーク通過」を
+報せる（単一指標のノイズでは誤報しない・凍結候補 round を提示）。v4 の手動ピーク凍結を自動化する監視計器。
+(b) **value 蒸留正則化**（`pd_learn --distill-weight`・`ValueNet.backward/train` の distill 経路）: 凍結 v4 教師
+（gen4→ev 温スタート＝gen4 の value 意見）へ引く MSE アンカーを value 損失に加算＝「v4 の知識から
+離れ過ぎない」軽量正則化（EWC より実装が軽い KL蒸留の回帰版）。0 で無効。解析勾配=数値微分一致を単体固定。
+
+### 4-5補. 温スタート種ネット【実装済み・2026-07-13】
+
+`tests/scripts/v5_seed_net.py`: 出荷 gen4（v3）を v4 符号化へ温スタート拡張し value/policy 種を出力する。
+恒等自己検証（Δ<1e-6）付き。本走はこの種を checkpoint 枝（`p3ckpt/{value,policy}.npz`・`gen0_value.npz`）に
+置いて起動＝cold-fallback（gen2 から v1）でなく **gen4 の実力を引き継ぐ**（学習前は v4 と挙動恒等）。
+
 ### 4.補. learned 候補の無駄手枝刈り【実装済み・2026-07-12】
 
 C3過大（@19/@102 無駄攻撃）・C2過大（@38 無駄ドン）の一部は**学習不要の探索側で直った**。
