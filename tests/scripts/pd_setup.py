@@ -3,10 +3,19 @@
 net枝（seed net から round=0）＋ 空の data枝を N 本作る。以後 generator/learner は既存枝を
 fetch/reset するだけ（worktree add が origin/<br> を解決できる）。
 
-実行例:
+種は既存 git ref（--seed-ref）か、新規生成したローカルディレクトリ（--seed-dir・v5_seed_net の
+--out 出力）のどちらからでも取れる。gen0_value.npz が無ければ value.npz のコピーで補完する。
+
+実行例（既存 ref から）:
   OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/pd_setup.py \
     --net-branch claude/p3-pd-net --seed-ref origin/claude/p3-postdistill97-checkpoints:p3ckpt \
     --data-branches claude/p3-pd-data-w1,claude/p3-pd-data-w2,claude/p3-pd-data-w3
+
+実行例（v5・新規生成した種から）:
+  OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/v5_seed_net.py --enc-version 4 --out /tmp/v5seed
+  OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/pd_setup.py \
+    --net-branch claude/v5-net --seed-dir /tmp/v5seed \
+    --data-branches claude/v5-data-w1,claude/v5-data-w2,claude/v5-data-w3
 """
 import argparse
 import json
@@ -50,23 +59,36 @@ def _orphan_push(branch, populate):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--net-branch", required=True)
-    ap.add_argument("--seed-ref", required=True,
+    ap.add_argument("--seed-ref", default=None,
                     help="net の種 p3ckpt を指す git ref（例 origin/<枝>:p3ckpt）。value/policy/gen0 を含む想定")
+    ap.add_argument("--seed-dir", default=None,
+                    help="net の種を含むローカルディレクトリ（v5_seed_net の --out 出力＝value.npz/policy.npz）。"
+                         "--seed-ref の代替＝新規生成した種からそのまま種付けできる")
     ap.add_argument("--data-branches", required=True, help="カンマ区切りの data枝名")
     args = ap.parse_args()
+    if not (args.seed_ref or args.seed_dir):
+        ap.error("--seed-ref か --seed-dir のどちらかが必要")
 
-    seed_br = args.seed_ref.split(":")[0].replace("origin/", "")
-    _run("git", "-C", REPO, "fetch", "origin", seed_br, "-q")
+    if args.seed_ref:
+        seed_br = args.seed_ref.split(":")[0].replace("origin/", "")
+        _run("git", "-C", REPO, "fetch", "origin", seed_br, "-q")
 
     def populate_net(wt):
         ck = os.path.join(wt, "p3ckpt"); os.makedirs(ck, exist_ok=True)
         for f in ("value.npz", "gen0_value.npz", "policy.npz"):
-            # npz はバイナリ＝bytes で取得（text=True は壊す）。存在しない ref は returncode!=0。
-            r = subprocess.run(["git", "-C", REPO, "show", f"{args.seed_ref}/{f}"],
-                               capture_output=True)
-            if r.returncode == 0:
-                open(os.path.join(ck, f), "wb").write(r.stdout)
-        json.dump({"round": 0, "cum_games": 0, "consumed": {}, "status": "INIT"},
+            if args.seed_dir:
+                src = os.path.join(args.seed_dir, f)
+                if os.path.exists(src):
+                    shutil.copyfile(src, os.path.join(ck, f))
+                elif f == "gen0_value.npz" and os.path.exists(os.path.join(args.seed_dir, "value.npz")):
+                    shutil.copyfile(os.path.join(args.seed_dir, "value.npz"), os.path.join(ck, f))
+            else:
+                # npz はバイナリ＝bytes で取得（text=True は壊す）。存在しない ref は returncode!=0。
+                r = subprocess.run(["git", "-C", REPO, "show", f"{args.seed_ref}/{f}"],
+                                   capture_output=True)
+                if r.returncode == 0:
+                    open(os.path.join(ck, f), "wb").write(r.stdout)
+        json.dump({"round": 0, "cum_games": 0, "consumed": {}, "pending_games": 0, "status": "INIT"},
                   open(os.path.join(ck, "manifest.json"), "w"))
 
     ok = _orphan_push(args.net_branch, populate_net)
