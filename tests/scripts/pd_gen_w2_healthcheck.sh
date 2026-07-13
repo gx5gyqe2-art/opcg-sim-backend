@@ -24,7 +24,9 @@ while true; do
   [ "$sup" = RESTARTED ] && flag="ALERT "
   [ "${recentfail:-0}" -ge 3 ] && flag="ALERT "
   [ "${tb:-0}" -ge 3 ] && flag="ALERT "
-  [ "${stale:-0}" -gt 1800 ] && flag="ALERT "
+  # L1-mix games (--l1-mix) can make a single batch legitimately long, and
+  # pd_gen prints nothing mid-batch; only alarm on a truly pathological stall.
+  [ "${stale:-0}" -gt 5400 ] && flag="ALERT "
   echo "${flag}HB $now proc=$proc sup=$sup okBatches=${ok:-0} last=${lastid:-none} recentFAIL=${recentfail:-0} tb=${tb:-0} stale=${stale}s | $last"
   sleep 600
 done
