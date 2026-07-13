@@ -422,8 +422,8 @@ class GameManager:
     def _find_card_by_uuid(self, uuid: str) -> Optional[CardInstance]:
         return _card_moves._find_card_by_uuid(self, uuid)
 
-    def get_pending_request(self) -> Optional[Dict[str, Any]]:
-        return _interaction.get_pending_request(self)
+    def get_pending_request(self, with_request_id: bool = True) -> Optional[Dict[str, Any]]:
+        return _interaction.get_pending_request(self, with_request_id)
 
     def pending_actor_action(self) -> Optional[Tuple[str, str]]:
         return _interaction.pending_actor_action(self)

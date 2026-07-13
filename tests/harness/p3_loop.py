@@ -147,7 +147,7 @@ def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_move
         ctx = state_context(m, name, vocab, version=enc_version)
         am = legal_action_matrix(m, legal, name)
         pol_recs.append((ctx, am, visit, name))
-        pend = m.get_pending_request() or {}
+        pend = m.get_pending_request(with_request_id=False) or {}  # action だけ読む＝request_id 不要
         is_battle_resp = pend.get("action") in _BATTLE_RESPONSES
         a = _sample(N, rng, temp=1.0 if (steps < temp_moves or is_battle_resp) else 0.0)
         try:

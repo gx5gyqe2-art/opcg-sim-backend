@@ -487,7 +487,9 @@ def _drain_own_interactions(manager, actor_name: str, stop_at_select: bool = Fal
         # 探索モードでは分岐可能な単一対象選択もドレインしない（探索ノードとして残す）。
         if stop_at_select and _selection_moves(manager, actor_name) is not None:
             return
-        pending = manager.get_pending_request()  # ドレイン確定時のみフル payload を構築
+        # request_id はフロント専用でここでは読まない。MCTS の _simulate ごとに大量に呼ばれる
+        # 経路なので、高価な request_id ハッシュ（候補 to_dict を含む JSON+sha1）を省く高速パス。
+        pending = manager.get_pending_request(with_request_id=False)  # ドレイン確定時のみフル payload を構築
         payload = manager.default_interaction_payload(pending)
         actor = _player_by_name(manager, actor_name)
         manager.action_events = []
@@ -811,7 +813,7 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, ply: int = 0) -> f
             elif action in ("SELECT_BLOCKER", "SELECT_COUNTER"):  # 戦闘応答 → 既定パスで解決
                 action_api.apply_battle_action(manager, actor, ACT_PASS, None)
             else:                                     # その他の選択 → 既定解決
-                pending = manager.get_pending_request()  # 既定解決時のみフル payload
+                pending = manager.get_pending_request(with_request_id=False)  # 既定解決時のみフル payload
                 payload = manager.default_interaction_payload(pending)
                 action_api.apply_game_action(manager, actor, action_api.ACT_RESOLVE_SELECTION, payload)
         except Exception:
