@@ -42,6 +42,20 @@ SERVE_ROOT_SWITCH_MIN_GAP = 0.05
 # 「ドン付与→（別世界を引いて）攻撃取り止め」型の計画非一貫（無駄ドン）を抑える。
 SERVE_STICKY_WORLD = True
 
+# learned MCTS の候補生成で無駄攻撃（倒せない/届かない）・無意味なドン付与を除外する（L1/α-β と同じ
+# 枝刈りを learned 候補にも適用）。False で従来（v4 まで）＝枝刈り無し。docs/cpu_v5_plan.md §4-1補。
+# serve・自己対戦の双方（OPCGGame.legal_actions 経由）に効く＝v5 学習データからも無駄手が除かれる。
+SERVE_PRUNE_FUTILE = True
+
+# aux 粘り項（v5 §4-1・C4 負けq飽和の緩和）: 葉評価が飽和域（|v| ≥ SAT_START）のとき、残りターン
+# 補助ヘッドの予測 t̂ で振幅を減衰 v' = v·max(TERM_FLOOR, 1 − AUX_TIE_DECAY·t̂·sat) する。
+# 終局の深さ減衰（TERM_DECAY）の「終局に届かない葉」への拡張＝敗勢では『本当に延命する手』を、
+# 優勢では『速い勝ち』を選好。sat = clip((|v|−SAT_START)/(1−SAT_START), 0, 1)＝非飽和域は不変。
+# 再学習不要（v4 学習済みの aux ヘッドを手選択に初活用）。False で従来（v4）＝減衰なし。
+SERVE_AUX_TIEBREAK = True
+AUX_TIE_DECAY = 0.02      # 1予測ターンあたりの減衰（TERM_DECAY と同スケール）
+AUX_SAT_START = 0.8       # この |v| から減衰を線形に効かせ始める（中間域の較正は不変）
+
 # --- v4 学習（docs/cpu_v4_plan.md §4）---
 # value 混合ラベル: y = α·z(勝敗±1) + (1−α)·q_root(探索後 root Q・終局減衰込み)。
 # 勝敗単独（α=1）は v3 で忘却を実証済み・q_root が「何手で負けるか」の距離を持ち込む。

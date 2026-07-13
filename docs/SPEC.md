@@ -146,8 +146,14 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
     粘る側を選ぶ）、(b) **root 読み出しの二重ゲート乗り換え**（等価手マージ後、「訪問比 ≥ 0.4 かつ
     Q 差 ≥ 0.05」の代替のみ argmax(N) から乗り換え・min_gap=inf で従来一致。低訪問 Q の楽観バイアス対策＝
     `cpu_learned_mark_review2_20260711.md` §S1）、(c) **ターン内 sticky 世界線**（PIMC 決定化 seed を
-    (game, turn, player) 単位で固定＝「ドン付与→別世界で攻撃取り止め」の計画非一貫を防ぐ・serve 専用）。
-    経緯・マーク回帰は `docs/reports/cpu_learned_mark_review_20260711.md`。
+    (game, turn, player) 単位で固定＝「ドン付与→別世界で攻撃取り止め」の計画非一貫を防ぐ・serve 専用）、
+    (d) **候補の無駄手枝刈り**（`adapter.OPCGGame.legal_actions`・`SERVE_PRUNE_FUTILE`＝L1/α-β と同じ
+    `_prune_futile_attacks`/`_prune_don_moves` を learned 候補にも適用・serve と自己対戦の両方・
+    v5 §4補）、(e) **aux 粘り項**（`SERVE_AUX_TIEBREAK`＝葉評価が飽和域 |v|≥AUX_SAT_START のとき残りターン
+    補助ヘッドの予測 t̂ で振幅を減衰 v·max(TERM_FLOOR, 1−AUX_TIE_DECAY·t̂·sat)。(a) の「終局に届かない
+    飽和葉」への拡張＝敗勢は延命する手・優勢は速い勝ちを選好。非飽和域は恒等・再学習不要＝v4 の
+    学習済み aux ヘッドを手選択に初活用・serve 専用）。
+    経緯・マーク回帰は `docs/reports/cpu_learned_mark_review_20260711.md`、v5 分は `docs/cpu_v5_plan.md` §4。
 - **逐次進行**: `POST /api/game/cpu/step {game_id}` が CPU の次の 1 手を `action_api`（§0 の共通
   コアパス）経由で適用し、`{cpu_acted, cpu_event, waiting_for}` を返す
   （`waiting_for`: `cpu`=継続 / `human` / `human_decision` / `game_over`）。フロントは

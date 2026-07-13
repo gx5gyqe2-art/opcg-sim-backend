@@ -148,6 +148,12 @@ class ValueNet:
         _, cache = self.forward(batch)
         return self.aux_from_cache(cache)
 
+    def predict_with_aux(self, batch):
+        """value と残りターン補助の同時予測 (pred, aux_pred)。1回の forward を共有する
+        （serve の aux 粘り項＝config.SERVE_AUX_TIEBREAK 用。二重 forward を避ける）。"""
+        pred, cache = self.forward(batch)
+        return pred, self.aux_from_cache(cache)
+
     def backward(self, cache, y, y_aux=None, aux_weight=0.0):
         """MSE 勾配。`y_aux`（正規化残りターン・NaN=ラベル無し）と `aux_weight`>0 を渡すと
         補助ヘッド（W2t/b2t）の勾配と、共有層への補助損失の寄与（dA1 経由）を追加する。"""
