@@ -46,7 +46,16 @@ class OPCGGame:
         # 効果選択対話では get_legal_actions は既定解決1手のみ。L1 と同じ候補ごと／
         # accept・decline の代替手を併合し、MCTS が選択肢を評価できるようにする
         # （併合しないと任意効果を常に発動・up-to効果を常に見送る配線バグになる）。
-        return cpu_ai.merged_search_actions(state, name, base)
+        moves = cpu_ai.merged_search_actions(state, name, base)
+        # v5: 無駄攻撃（倒せない/届かない）・無意味なドン付与を候補から除外する（L1/α-β と同じ枝刈り）。
+        # 学習型 MCTS の候補生成は従来これを掛けておらず、net が無駄手に visit を割いて選ぶ実害が
+        # あった（v4 実測マーク @19/@102/@38＝枝刈りで直る・docs/cpu_v5_plan.md §4-1補）。
+        # CPU の探索/方策のみで作用しエンジンの合法手列挙は変えない。TURN_END 等は常に残る。
+        from opcg_sim.src.learned.config import SERVE_PRUNE_FUTILE
+        if SERVE_PRUNE_FUTILE:
+            moves = cpu_ai._prune_don_moves(state, name, moves)
+            moves = cpu_ai._prune_futile_attacks(state, name, moves)
+        return moves
 
     def apply(self, state, move, actor_name):
         """move を新クローンへ適用（対話ドレイン込み）。例外手は None（呼び出し側で除外）。"""

@@ -42,6 +42,11 @@ SERVE_ROOT_SWITCH_MIN_GAP = 0.05
 # 「ドン付与→（別世界を引いて）攻撃取り止め」型の計画非一貫（無駄ドン）を抑える。
 SERVE_STICKY_WORLD = True
 
+# learned MCTS の候補生成で無駄攻撃（倒せない/届かない）・無意味なドン付与を除外する（L1/α-β と同じ
+# 枝刈りを learned 候補にも適用）。False で従来（v4 まで）＝枝刈り無し。docs/cpu_v5_plan.md §4-1補。
+# serve・自己対戦の双方（OPCGGame.legal_actions 経由）に効く＝v5 学習データからも無駄手が除かれる。
+SERVE_PRUNE_FUTILE = True
+
 # --- v4 学習（docs/cpu_v4_plan.md §4）---
 # value 混合ラベル: y = α·z(勝敗±1) + (1−α)·q_root(探索後 root Q・終局減衰込み)。
 # 勝敗単独（α=1）は v3 で忘却を実証済み・q_root が「何手で負けるか」の距離を持ち込む。
