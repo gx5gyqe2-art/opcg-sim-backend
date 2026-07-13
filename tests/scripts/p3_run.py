@@ -29,7 +29,8 @@ _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)
 import _bootstrap  # noqa: E402,F401
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.core.cpu_learned import warm_start_value, warm_start_policy, _net_enc_version
-from opcg_sim.src.learned.config import SELFPLAY_SIMS, SELFPLAY_DIRICHLET_EPS, SELFPLAY_TEMP_MOVES
+from opcg_sim.src.learned.config import (
+    C_PUCT, SELFPLAY_SIMS, SELFPLAY_DIRICHLET_EPS, SELFPLAY_TEMP_MOVES)
 import rl_encoder as E
 import rl_net as RN
 from az_policy import PolicyScorer, state_context, train_policy
@@ -169,63 +170,59 @@ def _init_worker():
 
 
 def _gen_task(payload):
-    seed, n_games, sims, eps, vpath, ppath, ev, leaders = payload
+    """1ワーカー分の自己対戦生成。ゲームループ本体は `p3_loop.selfplay_game`（共通コア・v4拡張＝
+    sticky世界線/防御応答温度/q_root/turns_left/L1混合 もそこで付与）へ委譲する。"""
+    seed, n_games, sims, eps, vpath, ppath, ev, leaders, l1_mix = payload
     db, vocab, game = _W["db"], _W["vocab"], _W["game"]
     vnet = RN.ValueNet.load(vpath)
     pnet = PolicyScorer.load(ppath) if ppath else None
     vf = P.value_fn_of(vnet, vocab, ev); pf = P.priors_fn_of(pnet, vocab, ev)
     rng = np.random.default_rng(seed)
-    S, F, I, Y, pol = [], [], [], [], []
-    for _ in range(n_games):
-        m = game.new_game(db, int(rng.integers(1 << 30)), leaders=leaders)
-        rv, rp, steps = [], [], 0
-        while game.winner(m) is None and not game.is_terminal(m) and steps < 400:
-            name = game.current_player(m)
-            if name is None:
-                break
-            mc = TreeMCTS(game, value_fn=vf, priors_fn=pf, n_sims=sims,
-                          determinize_fn=lambda s, r: game.determinize(s, name, r),
-                          rng=rng, dirichlet_eps=eps)
-            move, N, legal = mc.run(m)
-            if move is None or N is None or N.sum() == 0:
-                break
-            enc = E.encode(m, name, vocab, version=ev)
-            rv.append((enc, name))
-            rp.append((state_context(m, name, vocab, version=ev), legal_action_matrix(m, legal, name), N / N.sum()))
-            a = int(np.argmax(N)) if steps >= SELFPLAY_TEMP_MOVES else int(rng.choice(len(N), p=(N / N.sum())))
-            try:
-                cpu_ai._apply_move_inplace(m, name, legal[a])
-            except Exception:
-                break
-            steps += 1
-        w = game.winner(m)
+    sinks = {"S": [], "F": [], "I": [], "Y": [], "Q": [], "T": []}
+    pol, game_turns, l1_games = [], [], 0
+    for g in range(n_games):
+        # (d) 対戦相手の混合: 配合比 l1_mix で片席を L1-hard に（席は交互ローテーション）。
+        l1_seat = None
+        if l1_mix > 0.0 and rng.random() < l1_mix:
+            l1_seat = "p1" if (g % 2 == 0) else "p2"
+            l1_games += 1
+        rv, rp, w = P.selfplay_game(game, vf, pf, vocab, sims, C_PUCT, rng,
+                                    enc_version=ev, leaders=leaders, dirichlet_eps=eps, db=db,
+                                    l1_seat=l1_seat)
         if w is None:
             continue
-        for enc, who in rv:
-            S.append(enc["scalars"]); F.append(enc["field"]); I.append(enc["card_idx"])
-            Y.append(1.0 if who == w else -1.0)
-        pol.extend(rp)
-    if not S:
+        P.merge_val_recs(rv, w, sinks)
+        pol.extend((ctx, am, visit) for ctx, am, visit, _who in rp)
+        if rv:
+            game_turns.append(int(rv[0][3]))   # 先頭局面の turns_left ≒ 対局のターン数（分布監視用）
+    vdata = P.pack_vdata(sinks)
+    if vdata is None:
         return None
-    return (np.stack(S), np.stack(F), np.stack(I), np.array(Y, dtype=np.float32), pol)
+    return (vdata, pol, game_turns, l1_games)
 
 
-def selfplay_shard(pool, workers, n_games, sims, eps, vpath, ppath, base_seed, ev=1, leaders=None):
-    """n_games を workers 個に分割して並列生成→マージ。"""
+def selfplay_shard(pool, workers, n_games, sims, eps, vpath, ppath, base_seed, ev=1, leaders=None,
+                   l1_mix=0.0):
+    """n_games を workers 個に分割して並列生成→マージ。返り値 (vdata, pol, game_turns, l1_games)。
+
+    vdata は batch スキーマ v2（value に加え q_root / turns_left・docs/cpu_v4_plan.md §4-1/4-2）。
+    game_turns は対局ごとのターン数（ゲーム長分布の監視用・§4-3 補助指標）。
+    l1_mix は §4-1(d) の L1-hard 混合比（0=従来の純自己対戦）・l1_games は実際の混合局数。
+    """
     per = max(1, n_games // workers)
-    tasks = [(base_seed * 131 + w * 977 + 1, per, sims, eps, vpath, ppath, ev, leaders)
+    tasks = [(base_seed * 131 + w * 977 + 1, per, sims, eps, vpath, ppath, ev, leaders, l1_mix)
              for w in range(workers)]
     parts = pool.map(_gen_task, tasks)
-    S, F, I, Y, pol = [], [], [], [], []
+    vds, pol, game_turns, l1_games = [], [], [], 0
     for p in parts:
         if p is None:
             continue
-        S.append(p[0]); F.append(p[1]); I.append(p[2]); Y.append(p[3]); pol.extend(p[4])
-    if not S:
-        return None, None
-    vdata = {"scalars": np.concatenate(S), "field": np.concatenate(F),
-             "card_idx": np.concatenate(I), "value": np.concatenate(Y)}
-    return vdata, pol
+        vds.append(p[0]); pol.extend(p[1]); game_turns.extend(p[2]); l1_games += p[3]
+    if not vds:
+        return None, None, [], 0
+    keys = ("scalars", "field", "card_idx", "value", "q_root", "turns_left")
+    vdata = {k: np.concatenate([v[k] for v in vds]) for k in keys}
+    return vdata, pol, game_turns, l1_games
 
 
 def main():
@@ -263,7 +260,7 @@ def main():
     print(f"再開: gen={man['gen']} cum_games={man['cum_games']} shards={man['shards']} enc=v{ev} "
           f"target={args.target} workers={args.workers}", flush=True)
 
-    buf_v = {"scalars": [], "field": [], "card_idx": [], "value": []}
+    buf_v = {"scalars": [], "field": [], "card_idx": [], "value": [], "q_root": [], "turns_left": []}
     buf_p = []
     pool = mp.Pool(args.workers, initializer=_init_worker)
     try:
@@ -273,9 +270,9 @@ def main():
             ppath = None
             if pnet is not None:
                 pnet.save(CK + "/_cur_p.npz"); ppath = CK + "/_cur_p.npz"
-            vdata, pol = selfplay_shard(pool, args.workers, args.shard_games, args.sims,
-                                        args.dirichlet_eps, CK + "/_cur_v.npz", ppath, man["shards"],
-                                        ev=ev, leaders=leaders)
+            vdata, pol, _turns, _l1 = selfplay_shard(pool, args.workers, args.shard_games, args.sims,
+                                                     args.dirichlet_eps, CK + "/_cur_v.npz", ppath, man["shards"],
+                                                     ev=ev, leaders=leaders)
             if vdata is None:
                 print("  採取0スキップ"); continue
             for k in buf_v:

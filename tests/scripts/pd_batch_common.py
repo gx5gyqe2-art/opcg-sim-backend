@@ -72,6 +72,21 @@ def updates_for(new_games, games_per_update, max_updates):
     return max(1, min(int(max_updates), max(1, n)))
 
 
+def wave_plan(pending_games, games_per_update, max_updates):
+    """蓄積した未学習 games → (今回回す学習ラウンド数, 持ち越す残 games)。
+
+    小バッチ運用（セッション断のロス縮小で --games を小さくする）では updates_for の
+    「1波最低1ラウンド」が過剰露出になる。consume（バッファ連結・consumed 更新）と学習を分離し、
+    games_per_update 貯まるまで学習を見送る＝games:updates 比をバッチ粒度に依らず一定に保つ。
+    返り値 n_up は 0..max_updates（0=まだ学習しない）。remainder は端数の持ち越し。
+    """
+    if games_per_update <= 0:
+        return 1, 0
+    n = int(pending_games // games_per_update)
+    n_up = min(int(max_updates), n)
+    return n_up, int(pending_games - n_up * games_per_update)
+
+
 def should_generate(next_batch_id, consumed_id, depth):
     """バックプレッシャ: 未消費バッチが depth 本を超えるなら生成を止めて待つ。
 
@@ -80,6 +95,28 @@ def should_generate(next_batch_id, consumed_id, depth):
     だけ生成を許可（learner未稼働=consumed_id=-1 でも depth 本までは先行生成できる）。
     """
     return (next_batch_id - consumed_id) <= depth
+
+
+def normalize_batch_v2(arrays):
+    """value配列dict を batch スキーマ v2 のキー集合に正規化する（pure・docs/cpu_v4_plan.md §4-2）。
+
+    旧形式（v1＝q_root/turns_left 無し）は q_root←value（混合ラベルが勝敗単独に退化）・
+    turns_left←NaN（残りターン補助損失から除外）で埋める＝リプレイバッファのキー集合を一定に保つ。
+    v2 はそのまま返す。入力 dict を変異させず新 dict を返す。
+    """
+    out = dict(arrays)
+    n = len(out["value"])
+    if "q_root" not in out:
+        out["q_root"] = np.asarray(out["value"]).copy()
+    if "turns_left" not in out:
+        out["turns_left"] = np.full(n, np.nan, dtype=np.float32)
+    return out
+
+
+def mixed_value_label(value, q_root, alpha):
+    """v4 混合ラベル y = α·勝敗 + (1−α)·q_root（pure・α=1 で従来の勝敗単独と一致）。"""
+    return (alpha * np.asarray(value, dtype=np.float32)
+            + (1.0 - alpha) * np.asarray(q_root, dtype=np.float32)).astype(np.float32)
 
 
 def pack_policy(pol):

@@ -7,6 +7,7 @@
 | `full_card_baseline.json` | `python tests/harness/full_card_audit.py --regen` | 全カード挙動ベースライン（`test_full_card_baseline.py` / `test_verified_buckets.py` が照合） |
 | `expected_effects.json` | `python tests/harness/expected_effects.py --regen` | 期待挙動マニフェスト（`effect_oracle` が突き合わせ） |
 | `heldout_decks.json` | 手動（ユーザ実対局リプレイの凍結入力） | held-out 実デッキ集合（`test_heldout_decks.py` が凍結検証） |
+| `replays/*.json.gz` | 手動（リプレイビューア「リプレイ保存」出力を gzip） | **人間マーク付き実対局リプレイ**（frames+marks 同梱・現2局×16マーク）。`replay_reeval.py`/`mark_gate.py` が盤面復元して人間フィードバック回帰に使う（`docs/cpu_v4_plan.md` §4-3/§6） |
 
 > 配置規約（`docs/refactoring_tests_and_errors.md` 参照）: テストが読むデータは本ディレクトリ、
 > テストが import する基盤ライブラリは `tests/harness/`、単体実行の実験/計測 CLI は
