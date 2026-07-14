@@ -197,3 +197,61 @@ def test_field_limit_via_effect_play():
     assert gm.active_interaction is not None
     assert gm.active_interaction["action_type"] == "FIELD_OVERFLOW_TRASH"
     assert len(p1.field) == 6
+
+
+# ──────────────── 押し出し（超過トラッシュ）と【登場時】の順序 ────────────────
+# 実ルールでは6枚目のキャラは並存しない＝押し出しの確定が先、【登場時】等の効果解決は後。
+# 押し出し選択で中断中の ON_PLAY は誘発待ち行列（_pending_triggers）へ積まれ、
+# FIELD_OVERFLOW_TRASH の解決時に消化される。
+
+def _onplay_draw_char(name="6体目"):
+    """【登場時】カード1枚を引く を持つテストキャラ。"""
+    from opcg_sim.src.models.effect_types import Ability, GameAction, ValueSource
+    from opcg_sim.src.models.enums import TriggerType
+    onplay = Ability(trigger=TriggerType.ON_PLAY,
+                     effect=GameAction(type=ActionType.DRAW, value=ValueSource(base=1)),
+                     raw_text="【登場時】カード1枚を引く。")
+    master = make_master(card_id=f"C-{name}", name=name, type=CardType.CHARACTER,
+                         power=5000, abilities=(onplay,))
+    return make_instance(master)
+
+
+def test_field_limit_prompt_precedes_on_play_effect():
+    """手札からの登場: 押し出し選択が【登場時】より先に立ち、効果は押し出し確定後に解決される。"""
+    gm, p1, p2 = make_game()
+    _setup_main(gm, p1)
+    existing = _fill_field(p1, 5)
+    p1.deck.extend(_char(f"山{i}") for i in range(3))
+    newcard = _onplay_draw_char()
+    p1.hand.append(newcard)
+    hand_before = len(p1.hand) - 1  # newcard がプレイで手札を離れた後の枚数
+    gm.play_card_action(p1, newcard)
+    # 押し出し選択が先。【登場時】ドローはまだ解決されていない（待ち行列に退避）。
+    assert gm.active_interaction["action_type"] == "FIELD_OVERFLOW_TRASH"
+    assert len(p1.hand) == hand_before
+    assert len(gm._pending_triggers) == 1
+    gm.resolve_interaction(p1, {"selected_uuids": [existing[0].uuid]})
+    # 押し出し確定後に【登場時】が解決される。
+    assert gm.active_interaction is None
+    assert not gm._pending_triggers
+    assert len(p1.hand) == hand_before + 1
+    assert len(p1.field) == 5 and newcard in p1.field
+
+
+def test_field_limit_prompt_precedes_on_play_effect_via_effect_play():
+    """効果による登場（PLAY_CARD）でも押し出し選択が先、【登場時】は押し出し確定後。"""
+    gm, p1, p2 = make_game()
+    _setup_main(gm, p1)
+    existing = _fill_field(p1, 5)
+    p1.deck.extend(_char(f"山{i}") for i in range(3))
+    newcard = _onplay_draw_char("効果登場6体目")
+    p1.hand.append(newcard)
+    hand_before = len(p1.hand) - 1
+    gm.apply_action_to_engine(p1, action(ActionType.PLAY_CARD), [newcard], 0)
+    assert gm.active_interaction["action_type"] == "FIELD_OVERFLOW_TRASH"
+    assert len(p1.hand) == hand_before
+    assert len(gm._pending_triggers) == 1
+    gm.resolve_interaction(p1, {"selected_uuids": [existing[0].uuid]})
+    assert not gm._pending_triggers
+    assert len(p1.hand) == hand_before + 1
+    assert len(p1.field) == 5 and newcard in p1.field

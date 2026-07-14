@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from opcg_sim.api import app as appmod
+from opcg_sim.api.services import decks as deck_svc
 from opcg_sim.src.models.models import CardInstance
 
 
@@ -28,8 +29,8 @@ def _build_deck(owner_id):
 
 @pytest.fixture
 def client(monkeypatch):
-    monkeypatch.setattr(appmod, "load_deck_mixed", lambda src, owner: _build_deck(owner))
-    monkeypatch.setattr(appmod, "_deck_preview", lambda deck_id, owner: {"leader_id": "L", "leader_name": "Leader"})
+    monkeypatch.setattr(deck_svc, "load_deck_mixed", lambda src, owner: _build_deck(owner))
+    monkeypatch.setattr(deck_svc, "_deck_preview", lambda deck_id, owner: {"leader_id": "L", "leader_name": "Leader"})
     # 各テストでレジストリを汚さないようにクリア
     appmod.RULE_ROOMS.clear()
     appmod.GAMES.clear()

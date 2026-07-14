@@ -8,37 +8,10 @@ from .enums import CardType, Color, Attribute, ActionType, Phase, Player
 from .effect_types import Ability
 from ..core import journal
 from ..core.journal import JournaledSet, JournaledDict, record_attr
+from ..utils.shared_constants import load_shared_constants, FALLBACK_CONSTANTS
 
-def load_shared_constants():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.abspath(os.path.join(current_dir, "..", "..", "..", "shared_constants.json"))
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            pass
-    else:
-        pass
-    return {}
-
-CONST = load_shared_constants()
-
-if not CONST:
-    # フォールバック
-    CONST = {
-        "CARD_PROPERTIES": {
-            "UUID": "uuid", 
-            "CARD_ID": "card_id",
-            "NAME": "name", 
-            "POWER": "power", 
-            "COUNTER": "counter",
-            "ATTRIBUTE": "attribute",
-            "ATTACHED_DON": "attached_don", 
-            "IS_REST": "is_rest", 
-            "OWNER_ID": "owner_id"
-        }
-    }
+# 共有定数はローダ一本化（utils/shared_constants.py）。読めなければ従来どおり最小フォールバック。
+CONST = load_shared_constants() or dict(FALLBACK_CONSTANTS)
 
 
 # opcg_sim/src/models/models.py

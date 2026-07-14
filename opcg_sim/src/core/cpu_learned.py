@@ -1,0 +1,372 @@
+"""学習型CPU（Gen2 value+policy + NN誘導MCTS）の本番エントリ。
+
+docs/reports/cpu_rl_pilot_p3_results_20260630.md。P3本走で得た Gen2 ネット（自己対戦2世代・
+製品L1+α-βに 0.925・かつ製品より高速）を実ゲームに配線する。返り値は `decide_guarded` と同一契約
+（単一 move 辞書 or None）＝decide 経路にドロップイン可能。
+
+- 葉価値 = 学習 value ネット、事前確率 = 学習 pointer policy、探索 = ノード型 PUCT MCTS。
+- 不完全情報は探索ごとに1世界へ決定化（PIMC・チート防止）。net/vocab はプロセス内で1回だけロード。
+
+**ネットの持ち方（perf計画 A3）**: `LearnedEngine` が1つのネットを**明示ハンドル**で保持する
+（arena の net-vs-net＝新Gen vs 凍結Gen2 を同一プロセスで戦わせるため）。本番既定 CPU が通る
+`decide_learned` は既定ネットの**プロセス共有シングルトン**（`_default_engine()`）を使う薄いラッパ
+＝**挙動不変**（vocab/game はネット非依存なので複数エンジンで共有ロード可能）。
+"""
+import math
+import os
+import weakref
+from typing import Any, Dict, Optional
+
+import numpy as np
+
+from opcg_sim.src.learned import encoder as E
+from opcg_sim.src.learned.value_net import ValueNet
+from opcg_sim.src.learned.policy import PolicyScorer, state_context
+from opcg_sim.src.learned.action import legal_action_matrix
+from opcg_sim.src.learned.adapter import OPCGGame
+from opcg_sim.src.learned import config as CFG
+from opcg_sim.src.learned.config import (
+    C_PUCT, SERVE_SIMS, SERVE_DIRICHLET_EPS,
+    SERVE_ROOT_SWITCH_MIN_FRAC, SERVE_ROOT_SWITCH_MIN_GAP, SERVE_STICKY_WORLD,
+    AUX_TIE_DECAY, AUX_SAT_START, TERM_FLOOR, V4_TURNS_SCALE)
+from opcg_sim.src.learned.mcts import TreeMCTS   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
+from opcg_sim.src.utils.loader import CardLoader
+
+_MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))), "data", "learned")
+_DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))), "data")
+
+# v4(gen4) = v3(gen3) からの温スタート＋混合ラベル（勝敗×root Q）＋残りターン補助ヘッド＋
+# 防御データ被覆（sticky/防御温度/L1混合）で実効10,208局を学習し、ピーク round40（cum5248）を凍結
+# （docs/reports/v4_adoption_20260712.md・対L1多様97=0.812・対v3直接対戦=0.583・防御マーク獲得）。
+# gen3/gen2 は録画リプレイの再現・A/B・ロールバック用に同梱を維持する。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen4_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen4_policy.npz")
+
+# vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
+_SHARED: Dict[str, Any] = {}
+
+
+def _shared_vocab_game():
+    if not _SHARED:
+        db = CardLoader(os.path.join(_DATA, "opcg_cards.json"))
+        db.load()
+        for cid in list(db.raw_db.keys()):
+            db.get_card(cid)
+        _SHARED["vocab"] = E.build_vocab(db)
+        _SHARED["game"] = OPCGGame()
+    return _SHARED["vocab"], _SHARED["game"]
+
+
+def available() -> bool:
+    """モデル重みが同梱されているか（未同梱環境ではフォールバックさせる）。"""
+    return os.path.exists(_DEFAULT_VALUE)
+
+
+def _aux_tie_scale(v: float, t_hat: float,
+                   decay: float = AUX_TIE_DECAY, sat_start: float = AUX_SAT_START,
+                   floor: float = TERM_FLOOR) -> float:
+    """aux 粘り項（config.SERVE_AUX_TIEBREAK・v5 §4-1）: 飽和域の葉価値を予測残りターン t̂ で減衰する。
+
+    v' = v · max(floor, 1 − decay·t̂·sat),  sat = clip((|v|−sat_start)/(1−sat_start), 0, 1)。
+    終局の深さ減衰（TERM_DECAY・「速い勝ち＞遅い勝ち／遅い負け＞速い負け」）を「終局に届かない
+    飽和した葉」へ拡張＝敗勢では本当に延命する手（t̂ が伸びる）を、優勢では速い勝ち（t̂ が短い）を
+    選好する。非飽和域（|v| < sat_start）は sat=0 で恒等＝中間域の較正は不変。純関数（テスト対象）。"""
+    a = abs(v)
+    if a <= sat_start:
+        return v
+    sat = min((a - sat_start) / (1.0 - sat_start), 1.0)
+    return v * max(floor, 1.0 - decay * max(t_hat, 0.0) * sat)
+
+
+def _value_fn(vnet, vocab, enc_version=1, aux_tiebreak=None):
+    """葉価値関数。aux_tiebreak=None は config.SERVE_AUX_TIEBREAK に従う（A/B 用に明示上書き可）。"""
+    def value(state, to_move):
+        if state.winner is not None:
+            return 1.0 if state.winner == to_move else -1.0
+        enc = E.encode(state, to_move, vocab, version=enc_version)
+        batch = {k: enc[k][None, ...] for k in ("scalars", "field", "card_idx")}
+        use_aux = CFG.SERVE_AUX_TIEBREAK if aux_tiebreak is None else aux_tiebreak
+        if not use_aux:
+            return float(vnet.predict(batch)[0])
+        pred, aux = vnet.predict_with_aux(batch)   # forward 1回を共有（二重計算しない）
+        t_hat = float(aux[0]) * V4_TURNS_SCALE     # 正規化残りターン → ターン数
+        return _aux_tie_scale(float(pred[0]), t_hat)
+    return value
+
+
+def _priors_fn(pnet, vocab, enc_version=1):
+    if pnet is None:
+        return None
+    def priors(state, legal):
+        me = state.pending_actor_action()[0]
+        ctx = state_context(state, me, vocab, version=enc_version)
+        am = legal_action_matrix(state, legal, me)
+        p = pnet.priors(ctx, am)
+        return p if p.shape[0] == len(legal) else None
+    return priors
+
+
+def _net_enc_version(vnet) -> int:
+    """ロード済み value ネットの入力次元から符号化世代（encoder version）を判別する。
+
+    v1=Gen2 出荷ネット（scalars 14）・v2=リーダー付与ドン追加（scalars 16）。重み側の
+    次元が真実源＝コードのデフォルトに依存しない（v2 ネットへ差し替えた時点で自動有効）。
+    `vnet.feat_dim` は lead_slots（リーダー条件付け専用枠）を自動的に除外する＝LC net でも誤判定しない。
+    """
+    feat = vnet.feat_dim
+    for v in E.known_versions():
+        if feat == E.feature_dim(v):
+            return v
+    raise ValueError(f"value ネットの入力次元が未知（feat_dim={feat}）: encoder と重みの対応を確認")
+
+
+def warm_start_value(vnet, from_version, to_version):
+    """value ネットを from_version→to_version へ温スタート拡張する（append-only 前提・恒等保存）。
+
+    増えたスカラー（末尾 append）ぶんのゼロ行を W1 に挿入するだけ＝拡張後の出力は from 版と恒等。
+    版の知識はここ（`E.scalars_dim`）に集約＝ネットは offset だけ受け取る。任意の版差（v1→v2, v2→v3,
+    v1→v3…）に同一コードで対応する。to<from（縮小）は append-only に反するため拒否。"""
+    insert_at = E.scalars_dim(from_version)
+    n_new = E.scalars_dim(to_version) - insert_at
+    if n_new < 0:
+        raise ValueError(f"温スタートは拡張方向のみ（from=v{from_version} → to=v{to_version} は縮小）")
+    return vnet.expanded(insert_at, n_new)
+
+
+def warm_start_policy(pnet, from_version, to_version):
+    """policy ネットの温スタート拡張（`warm_start_value` と同契約・挿入 offset は ctx 末尾＝scalars_dim）。"""
+    insert_at = E.scalars_dim(from_version)
+    n_new = E.scalars_dim(to_version) - insert_at
+    if n_new < 0:
+        raise ValueError(f"温スタートは拡張方向のみ（from=v{from_version} → to=v{to_version} は縮小）")
+    return pnet.expanded(insert_at, n_new)
+
+
+class LearnedEngine:
+    """1つの Gen2 ネット（value+policy）を明示ハンドルで保持し 1 手を決める。
+
+    net-vs-net（arena で新Gen vs 凍結Gen2）用に、ネットを**席ごとに別インスタンス**で持てるようにする。
+    `value_path`/`policy_path` 省略時は出荷 Gen2（`gen2_*.npz`）＝本番既定 CPU と同一。vocab/game は
+    ネット非依存なので既定では共有ロード（`_shared_vocab_game`）を使う。
+    """
+
+    def __init__(self, value_path: Optional[str] = None, policy_path: Optional[str] = None,
+                 vocab=None, game=None, aux_tiebreak: Optional[bool] = None):
+        if vocab is None or game is None:
+            svocab, sgame = _shared_vocab_game()
+            vocab = vocab if vocab is not None else svocab
+            game = game if game is not None else sgame
+        self.vocab = vocab
+        self.game = game
+        # aux 粘り項のエンジン別上書き（None=config.SERVE_AUX_TIEBREAK に従う）。ON/OFF を
+        # 同一プロセスで対戦させる A/B（net-vs-net arena）用＝本番既定は None。
+        self.aux_tiebreak = aux_tiebreak
+        # ターン内 sticky 世界線の seed キャッシュ {(id(manager), turn, player): (weakref, seed)}（§_world_rng）。
+        self._world_seeds: Dict[Any, Any] = {}
+        self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
+        # 符号化世代は重みの入力次元から自動判別（v1=出荷Gen2・v2=リーダー付与ドン特徴）。
+        self.enc_version = _net_enc_version(self.vnet)
+        pp = policy_path or _DEFAULT_POLICY
+        self.pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
+        if self.pnet is not None:
+            from opcg_sim.src.learned.action import ACTION_DIM
+            pv = int(self.pnet.in_dim) - ACTION_DIM
+            if pv != E.feature_dim(self.enc_version):
+                raise ValueError(
+                    f"value/policy の符号化世代が不一致（value=v{self.enc_version}, "
+                    f"policy ctx_dim={pv}）: 同一世代の npz ペアを配置してください")
+
+    def _world_rng(self, manager, name: str, rng) -> np.random.Generator:
+        """ターン内 sticky な PIMC 決定化 rng を返す（SERVE_STICKY_WORLD）。
+
+        1 ターンは「ドン付与→攻撃→…」の連続 decide で構成されるが、decide ごとに世界線
+        （相手伏せ手札のサンプル）を引き直すと、付与を正当化した攻撃プランが次の decide の
+        別世界で棄却され「付与だけして攻撃しない」無駄ドンが出る（マークレビュー F3）。
+        同一 (game, turn, player) の間は決定化 seed を固定し、ターン内の計画を同一世界で
+        一貫させる。seed は初回 decide の rng から引く＝global random の消費量は従来と同一
+        （リプレイ決定論を保つ）。キャッシュは挿入順で刈る（同時進行ゲーム数 ≪ 上限）。
+        """
+        key = (id(manager), int(getattr(manager, "turn_count", 0) or 0), name)
+        hit = self._world_seeds.get(key)
+        # id() は解放後に再利用されうる＝別ゲームの stale seed を拾うと「同一 seed 対局の
+        # プロセス間再現」が破れる。weakref で同一オブジェクトであることを検証して排除する。
+        seed = hit[1] if (hit is not None and hit[0]() is manager) else None
+        if seed is None:
+            seed = int(rng.integers(0, 2 ** 63 - 1))
+            if len(self._world_seeds) >= 256:
+                for k in list(self._world_seeds)[:128]:
+                    del self._world_seeds[k]
+            try:
+                self._world_seeds[key] = (weakref.ref(manager), seed)
+            except TypeError:
+                pass   # weakref 不可の manager は毎 decide 新世界（従来挙動に退化・安全側）
+        # 毎 decide 新しい Generator を同一 seed から作る＝ターン内のどの decide でも
+        # determinize の shuffle が同じ乱数列から始まる（公開情報の更新は盤面側から反映される）。
+        return np.random.default_rng(seed)
+
+    def decide(self, manager, player, sims: int = SERVE_SIMS, c_puct: float = C_PUCT,
+               rng=None, trace=None) -> Optional[Dict[str, Any]]:
+        """このエンジンのネットで 1 手決定する（`decide_learned` と同一契約・同一探索）。"""
+        name = player.name
+        # numpy rng の種を **global random** から引く＝リプレイ種（routers が cpu_trace 時に random.seed）で
+        # learned 対局も決定論再生できる。通常対局は global random 未 seed（プロセス由来）＝実質ランダム。
+        if not isinstance(rng, np.random.Generator):
+            import random as _random
+            rng = np.random.default_rng(_random.getrandbits(64))
+        det_rng = self._world_rng(manager, name, rng) if SERVE_STICKY_WORLD else rng
+        mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab, self.enc_version,
+                                                      aux_tiebreak=self.aux_tiebreak),
+                        priors_fn=_priors_fn(self.pnet, self.vocab, self.enc_version),
+                        c_puct=c_puct, n_sims=sims, dirichlet_eps=SERVE_DIRICHLET_EPS,
+                        determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=det_rng)
+        move, _, legal = mcts.run(manager)
+        # 同名カードの別実体（手札の複製等）は探索木で別 edge になり訪問数が分裂する。
+        # 素の argmax(N) は分裂した等価手を系統的に不利にする（例: EB03-053×2 のカウンターが
+        # 30.6%+30.6% に割れ、38.8% の PASS に負ける）ため、等価キーで訪問数を合算した
+        # グループから選ぶ。さらに読み出しは argmax(N) でなく LCB 乗り換え
+        # （`_select_root_group`）＝訪問が貼り付いたまま Q で劣後した手を採らない。
+        # 探索（TreeMCTS）自体は不変＝ルートの読み出しのみ補正。
+        stats = getattr(mcts, "last_stats", None)
+        if stats and stats.get("legal"):
+            groups = _merge_root_stats(manager, stats["legal"], stats["N"], stats["Q"])
+            if groups:
+                move = stats["legal"][_select_root_group(groups)["rep"]]
+        if move is None:
+            move = legal[0] if legal else None
+        if trace is not None:
+            try:
+                _fill_trace(trace, manager, player, move, getattr(mcts, "last_stats", None))
+            except Exception:
+                pass   # 分析失敗で対局を止めない
+        return move
+
+
+_DEFAULT_ENGINE: Optional[LearnedEngine] = None
+
+
+def _default_engine() -> LearnedEngine:
+    """本番既定 CPU（出荷 Gen2）のプロセス共有シングルトンエンジン。"""
+    global _DEFAULT_ENGINE
+    if _DEFAULT_ENGINE is None:
+        _DEFAULT_ENGINE = LearnedEngine()
+    return _DEFAULT_ENGINE
+
+
+def _lazy_init():
+    """後方互換のウォームアップ（既定エンジンを1回ロード）。perf 計測等が初回ロードを計測から外すのに使う。"""
+    _default_engine()
+
+
+def decide_learned(manager, player, sims: int = SERVE_SIMS, c_puct: float = C_PUCT,
+                   rng=None, trace=None) -> Optional[Dict[str, Any]]:
+    """学習型CPUの1手決定（本番既定 CPU 経路）。返り値は `decide_guarded` 互換（move 辞書 or None）。
+
+    出荷 Gen2 のシングルトンエンジンへ委譲する薄いラッパ＝A3 のリファクタで**挙動不変**。
+    `trace`（dict）が渡された時（cpu_trace ON）は、その手の分析を書き込む＝変な手の検証用ログ:
+      chosen（選んだ手）/ value（選手の行動価値Q）/ candidates（訪問上位・visit%・Q）/
+      l1_move（独立評価器L1の推奨手）/ l1_disagrees（L1と食い違うか）。
+    分析は挙動に影響しない（例外は握り潰し、手は必ず返す）。
+    """
+    return _default_engine().decide(manager, player, sims=sims, c_puct=c_puct, rng=rng, trace=trace)
+
+
+def _select_root_group(groups, min_frac: float = SERVE_ROOT_SWITCH_MIN_FRAC,
+                       min_gap: float = SERVE_ROOT_SWITCH_MIN_GAP):
+    """root 読み出し: 最多訪問グループを基準に、二重ゲートを満たす代替の Q が上回れば乗り換える。
+
+    素の argmax(N) は PUCT の訪問が prior／先行 Q に貼り付く性質上、探索後半に Q で逆転した
+    代替を拾えない（g1@12: ATTACK 56%/q=-0.127 が ATTACH_DON 31%/q=-0.043 に選ばれる）。
+    一方、低訪問の Q は PUCT の選択バイアスで**楽観方向に大きく歪む**（連続 decide の実測で
+    +0.14〜+0.54・g2@20-23＝1/√n の悲観補正では不足）。そこで乗り換えは
+      ① 訪問が競っている: n ≥ min_frac·n_top（浅い読みの楽観を除外）
+      ② Q 差が明確:       q ≥ q_top + min_gap（同格ノイズでの乗り換えを除外）
+    の両方を満たす代替に限る（該当複数なら最大 Q）。min_gap=inf で従来の argmax(N) に一致。
+    較正は実対局2局×16人間マークへの回帰（mark_review2 §S1・`test_learned_root_readout.py`）。
+    探索・トレース統計は不変＝読み出しのみ。
+
+    `groups`: `_merge_root_stats` の返り値（n 降順・{"rep","idxs","n","q"}）。返り値は選んだグループ。
+    """
+    best = groups[0]
+    if len(groups) == 1 or best["n"] <= 0 or not math.isfinite(min_gap):
+        return best
+    gate = max(1.0, min_frac * best["n"])
+    bar = best["q"] + min_gap
+    for g in groups[1:]:
+        if g["n"] >= gate and g["q"] >= bar and g["q"] > best["q"]:
+            best = g
+            bar = best["q"]   # 以降はさらに高い Q のみ（該当複数なら最大 Q・n 降順で安定）
+    return best
+
+
+def _merge_root_stats(manager, legal, N, Q):
+    """ルート合法手を挙動等価キー（`cpu_ai._move_equiv_key`）でグループ化し訪問数を合算する。
+
+    返り値: [{"rep": 代表index(グループ内N最大), "idxs": [...], "n": N合算, "q": N加重平均Q}]
+    を n 降順（同数は legal 列挙順＝安定）で。等価手が無い局面では全グループが単独＝
+    先頭グループの rep が従来の argmax(N) と一致し**挙動不変**。
+
+    等価判定は card_id 基準＝リプレイ逆写像（`replay_runner._key`）と同じ同一視。場の複製
+    （同名キャラで付与ドン数が違う等）は厳密には非等価だが、その残差はリプレイ側と同じ
+    許容（R0 §5）に揃える。
+    """
+    from opcg_sim.src.core import cpu_ai
+    order, groups = [], {}
+    for i, mv in enumerate(legal):
+        k = cpu_ai._move_equiv_key(manager, mv)
+        if k not in groups:
+            groups[k] = []
+            order.append(k)
+        groups[k].append(i)
+    out = []
+    for k in order:
+        idxs = groups[k]
+        n = float(sum(float(N[i]) for i in idxs))
+        q = (sum(float(N[i]) * float(Q[i]) for i in idxs) / n) if n > 0 else 0.0
+        rep = max(idxs, key=lambda i: float(N[i]))
+        out.append({"rep": rep, "idxs": idxs, "n": n, "q": q})
+    out.sort(key=lambda g: -g["n"])   # sort は安定＝同数なら列挙順を保つ
+    return out
+
+
+def _fill_trace(trace, manager, player, chosen, stats):
+    """トレース dict に learned の意思決定分析を書き込む（cpu_trace 時のみ呼ばれる）。"""
+    from opcg_sim.src.core import cpu_ai
+    import random as _random
+    trace["difficulty"] = "learned"
+    trace["turn"] = getattr(manager, "turn_count", None)
+    trace["chosen"] = cpu_ai._describe_move(manager, chosen) if chosen else None
+    # 対話種別（SEARCH_AND_SELECT / ARRANGE_DECK / CONFIRM_OPTIONAL 等）。無いと
+    # 「ライフ追加の選択」か「底送りの順番」かがトレースから読めない。
+    pend = manager.get_pending_request() or {}
+    if pend.get("action"):
+        trace["dialog"] = pend.get("action")
+    # ① 自分の探索の内訳（等価手マージ後の訪問上位・visit%・行動価値Q）。decide の選択と
+    #    同じ集計（`_merge_root_stats`）で出す＝「分裂した同名手が別行に出て PASS に負けて
+    #    見える」ログ上の錯覚も消す。copies>1 は複製がマージされた印。
+    if stats and stats.get("legal"):
+        legal, N, Q = stats["legal"], stats["N"], stats["Q"]
+        tot = float(N.sum()) or 1.0
+        groups = _merge_root_stats(manager, legal, N, Q)
+        trace["candidates"] = [{
+            "move": cpu_ai._describe_move(manager, legal[g["rep"]]),
+            "visit_pct": round(100.0 * g["n"] / tot, 1),
+            "q": round(g["q"], 3),
+            **({"copies": len(g["idxs"])} if len(g["idxs"]) > 1 else {}),
+        } for g in groups[:5]]
+        # 選んだ手の Q（＝net が見込む行動価値・所属グループの加重平均）。
+        for g in groups:
+            if any(legal[i] is chosen for i in g["idxs"]):
+                trace["value"] = round(g["q"], 3)
+                break
+    # ② 独立評価器 L1 の第二意見（分布外での net 系統誤差を拾う・evalは信じ過ぎない）。
+    try:
+        clone = manager.clone()
+        cp = clone.p1 if clone.p1.name == player.name else clone.p2
+        l1 = cpu_ai.decide_guarded(clone, cp, "hard", _random.Random(0), {}, pimc_worlds=1)
+        trace["l1_move"] = cpu_ai._describe_move(clone, l1) if l1 else None
+        trace["l1_disagrees"] = bool(l1 and chosen and
+                                     l1.get("action_type") != chosen.get("action_type"))
+    except Exception:
+        pass

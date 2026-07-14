@@ -141,6 +141,7 @@ class TriggerType(Enum):
     ACTIVATE_MAIN = "起動メイン"
     TURN_END = "ターン終了時"
     OPP_TURN_END = "相手のターン終了時"
+    TURN_START = "自分のターン開始時"   # 自分のターン開始時（ドン!!展開前）に誘発（OP11-040）
     ON_OPP_ATTACK = "相手のアタック時"
     TRIGGER = "トリガー"
     COUNTER = "カウンター"

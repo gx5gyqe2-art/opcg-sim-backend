@@ -145,6 +145,7 @@ def _apply(manager, actor, move):
         action_api.apply_game_action(manager, actor, move["action_type"], move.get("payload", {}))
 
 
+@pytest.mark.cpu_infra
 def test_real_playout_make_unmake_roundtrip(db):
     """実ゲームを進めつつ、各手を transaction で包んで適用→巻き戻しし、開始 deepcopy と完全一致を確認。
 

@@ -1,67 +1,28 @@
-"""
-テスト共通セットアップ。
+"""pytest 共通セットアップ。
 
-ローカル/CI 環境では google-cloud (cffi/cryptography) が利用できない場合があるため、
-本番コードを変更せずに google.cloud.{storage,firestore} をスタブ化してから
-プロジェクトモジュールを import 可能にする。
+sys.path 設定と google.cloud スタブ注入は `_bootstrap`（tests/harness/scripts 共通）へ集約した。
+本 conftest はそれを読み込み、pytest マーカーを登録する。
 """
 import os
 import sys
-import types
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-
-
-def _install_google_stub():
-    """google.cloud が import できない環境向けの最小スタブを注入する。
-
-    名前空間パッケージ google.cloud 自体は import できても、深い import
-    (storage/firestore) が cffi/cryptography 不在で失敗する場合がある。
-    pyo3 の PanicException は BaseException なので BaseException で捕捉する。
-    """
-    try:
-        from google.cloud import storage  # noqa: F401
-        from google.cloud import firestore  # noqa: F401
-        return  # 本物が使えるなら何もしない
-    except BaseException:
-        pass
-
-    class _FakeClient:
-        def __init__(self, *a, **k):
-            raise RuntimeError("google.cloud stubbed for tests")
-
-    class _Query:
-        ASCENDING = "ASCENDING"
-        DESCENDING = "DESCENDING"
-
-    google = types.ModuleType("google")
-    cloud = types.ModuleType("google.cloud")
-    storage = types.ModuleType("google.cloud.storage")
-    firestore = types.ModuleType("google.cloud.firestore")
-    storage.Client = _FakeClient
-    firestore.Client = _FakeClient
-    # 本番コードが参照する定数・列挙の最小スタブ（テストで fake db を差し込めるように）。
-    firestore.SERVER_TIMESTAMP = "SERVER_TIMESTAMP"
-    firestore.Query = _Query
-    cloud.storage = storage
-    cloud.firestore = firestore
-    google.cloud = cloud
-    sys.modules.setdefault("google", google)
-    sys.modules["google.cloud"] = cloud
-    sys.modules["google.cloud.storage"] = storage
-    sys.modules["google.cloud.firestore"] = firestore
-
-
-_install_google_stub()
+# _bootstrap（同ディレクトリ）を解決できるよう tests/ を path に載せてから読み込む。
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _bootstrap  # noqa: E402,F401  (sys.path 設定＋google スタブ)
 
 
 def pytest_configure(config):
-    """マーカー登録。`slow` = CI から除外する重テスト（手動実行前提）。
-    CI は `-m "not slow"` で実行し、`-m slow` で重テストだけを手動実行できる。
+    """マーカー登録。`slow` = 極端に重くルーチンから除外する重テスト（手動実行前提）。
+    `cpu_infra` = 探索/自己対戦/学習パイプラインの内部機構の健全性のみを見るテスト
+    （ゲームプレイの正しさ自体は必須/標準テストが別途担保。分類基準は docs/TEST_SPEC.md
+    §重要度分類）。`make test` は `-m "not slow"`、`make test-fast` は
+    `-m "not slow and not cpu_infra"` で実行する。
     """
     config.addinivalue_line(
         "markers",
-        "slow: 実行が極端に長くCIから除外する重テスト（手動実行前提・例 test_journal の parked_resume ~245s）",
+        "slow: 実行が極端に長くルーチンから除外する重テスト（手動実行前提・例 test_journal の parked_resume ~245s）",
+    )
+    config.addinivalue_line(
+        "markers",
+        "cpu_infra: 探索/自己対戦/学習パイプラインの内部機構の健全性のみを見る基盤健全性テスト（make test-fast で除外）",
     )

@@ -1,27 +1,9 @@
-import os
-import json
-import logging
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from opcg_sim.src.models.enums import CardType, Attribute
-
-def load_shared_constants():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates = [
-        os.path.join(current_dir, "..", "..", "shared_constants.json"),
-        os.path.join(current_dir, "..", "shared_constants.json"),
-        "/app/shared_constants.json"
-    ]
-    for path in candidates:
-        if os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except:
-                continue
-    return {}
-
-CONST = load_shared_constants()
+# 共有定数は config へ委譲（ローダは utils/shared_constants.py に一本化）。失敗時は空 dict＝
+# 各 Field の alias 既定値（'uuid' 等）にフォールバックする。
+from .config import CONST
 
 TYPE_MAP = {e.value: e.name for e in CardType}
 ATTR_MAP = {e.value: e.name for e in Attribute}

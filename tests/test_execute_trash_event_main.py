@@ -62,7 +62,9 @@ def _fire(gm, p1, src, target_uuids):
     while gm.active_interaction and guard < 6:
         guard += 1
         at = gm.active_interaction.get("action_type")
-        if at == "SELECT_RESOURCE":           # ドン!!-1 コスト
+        if at == "CONFIRM_OPTIONAL":          # コスト使用確認（自動誘発のコスト句は常に任意）
+            gm.resolve_interaction(p1, {"accepted": True})
+        elif at == "SELECT_RESOURCE":         # ドン!!-1 コスト
             gm.resolve_interaction(p1, {"selected_uuids": [p1.don_active[0].uuid]})
         elif at == "SELECT_TARGET":            # トラッシュのイベント選択
             gm.resolve_interaction(p1, {"selected_uuids": list(target_uuids)})

@@ -7,8 +7,13 @@ from ...models.effect_types import (
 )
 from ...models.enums import ActionType, Zone, TriggerType, ConditionType, CompareOperator, Player, CardType
 import re
+import logging
 from .. import journal
 from ..journal import JournaledList, JournaledDict, JournaledSet, record_attr
+
+# 効果解決のデバッグスナップショット（EXECUTION_REPORT/DEBUG_SNAPSHOT）用ロガー。
+# OPCG_LOG_SILENT=1 のとき logging_setup が opcg.* を抑止する（従来の print ゲートと同一挙動）。
+_debug_logger = logging.getLogger("opcg.debug")
 
 # 選択グループ分配（§7-1）で「N枚を選び」の選択集合を保存する save_id。
 # atoms._SEL_GROUP_ID と一致させる。
@@ -69,14 +74,22 @@ class EffectResolver:
             self._log_failure_snapshot(player, source_card, ability, "COST_UNSATISFIED", "Insufficient resources or targets for cost")
             return
 
-        # 2.5 任意コストの使用確認（A-3）。「〜できる：効果」のコスト句は任意で、自動誘発
-        #   （相手のアタック時/登場時/アタック時 等）では発動するかをプレイヤーに確認する。
-        #   ACTIVATE_MAIN（起動メイン=自発起動）は起動自体が意思表示のため確認しない。
+        # 2.5 コストの使用確認（A-3）。OPCG ではコスト句（「X：Y」の X）の支払いは常に任意
+        #   （払わなければ効果が発生しないだけ）で、「できる/してもよい」表記の有無に依らない。
+        #   よって自動誘発（登場時/KO時/ターン終了時/アタック時 等）はコストが有る限り
+        #   発動するかをプレイヤーに確認する（従来は cost_optional=表記依存で、ボルサリーノ
+        #   OP16-073 の【自分のターン終了時】ドン!!-2 等が強制発動していた）。
+        #   確認を挟まない例外＝発動自体が既に意思表示のもの:
+        #   - ACTIVATE_MAIN（起動メイン=自発起動）
+        #   - TRIGGER（【トリガー】は CONFIRM_TRIGGER で発動可否を確認済み）
+        #   - COUNTER（カウンターとしての使用宣言が意思表示）
+        #   - イベントカード（手札からのプレイが意思表示）
         #   未確認で中断 → resume(accept) が cost_confirmed=True で再入。decline は何もせず
         #   使用回数も消費しない（払わなければ「使った」ことにならない）。
+        _cost_confirm_exempt = (TriggerType.ACTIVATE_MAIN, TriggerType.TRIGGER, TriggerType.COUNTER)
         if (not cost_confirmed and ability.cost is not None
-                and getattr(ability, "cost_optional", False)
-                and ability.trigger != TriggerType.ACTIVATE_MAIN):
+                and ability.trigger not in _cost_confirm_exempt
+                and source_card.master.type != CardType.EVENT):
             self._suspend_for_ability_cost_confirm(player, ability, source_card)
             return
 
@@ -134,9 +147,13 @@ class EffectResolver:
             }
             
             json_str = json.dumps(report, ensure_ascii=False, indent=2)
-            print(f"\n======== [EXECUTION_REPORT_START] ========\nAI_PROMPT: 以下のJSONは効果発動の実行結果レポートです。意図通りにアクションが実行されたか、対象選択や数値計算に間違いがないか確認してください。\n\n{json_str}\n======== [EXECUTION_REPORT_END] ========\n")
-        except Exception as e:
-            print(f"Report generation failed: {e}")
+            _debug_logger.debug(
+                "\n======== [EXECUTION_REPORT_START] ========\n"
+                "AI_PROMPT: 以下のJSONは効果発動の実行結果レポートです。"
+                "意図通りにアクションが実行されたか、対象選択や数値計算に間違いがないか確認してください。\n\n"
+                "%s\n======== [EXECUTION_REPORT_END] ========\n", json_str)
+        except Exception:
+            _debug_logger.debug("Report generation failed", exc_info=True)
 
     def _log_failure_snapshot(self, player, source_card, ability, error_code, detail_msg):
         if os.environ.get("OPCG_LOG_SILENT"):
@@ -144,20 +161,23 @@ class EffectResolver:
         try:
             snapshot = self.game_manager.get_debug_snapshot()
             try:
-                ability_dump = str(asdict(ability)) 
-            except:
+                ability_dump = str(asdict(ability))
+            except Exception:
                 ability_dump = str(ability)
 
             debug_data = {
                 "error_code": error_code,
                 "detail": detail_msg,
                 "source_card": source_card.master.name,
-                "failed_ability": ability_dump, 
+                "failed_ability": ability_dump,
                 "game_state": snapshot
             }
             json_str = json.dumps(debug_data, ensure_ascii=False, indent=2)
-            print(f"\n======== [DEBUG_SNAPSHOT_START] ========\n{json_str}\n======== [DEBUG_SNAPSHOT_END] ========\n")
-        except: pass
+            _debug_logger.debug(
+                "\n======== [DEBUG_SNAPSHOT_START] ========\n"
+                "%s\n======== [DEBUG_SNAPSHOT_END] ========\n", json_str)
+        except Exception:
+            _debug_logger.debug("failure snapshot generation failed", exc_info=True)
 
     def _can_satisfy_node(self, player, node: EffectNode, source_card) -> bool:
         if isinstance(node, GameAction):
@@ -175,6 +195,13 @@ class EffectResolver:
             if not node.target: return True
             from .matcher import get_target_cards
             candidates = get_target_cards(self.game_manager, node.target, source_card)
+            # ref_id='self'（「このキャラ」等）は解決時に source へ限定される（resolver._resolve_targets）。
+            # 充足判定も同じく source 限定にする。これをしないと、レスト済み source でも他のアクティブ
+            # キャラを候補に数えて「払える」と化け、自己レストコストの起動メインが無限再起動していた
+            # （OP01-063/EB04-024）。matcher.get_target_cards は ref_id='self' を解決せず zone/player で
+            # 全候補を返すため＝satisfiability と解決の食い違いが根因。
+            if getattr(node.target, "ref_id", None) == "self":
+                candidates = [c for c in candidates if c is source_card]
             # 「このカード/ステージをレストにする」等のレストコストは、対象が現在アクティブ
             # （未レスト）でなければ支払えない（レスト済みは再レストできない）。対象フィルタは
             # レスト状態を問わない（is_rest=None）ため候補にレスト済みも含まれ、自己レストを伴う
@@ -461,12 +488,18 @@ class EffectResolver:
             f"{t.master.name}({t.uuid[:4]})" if hasattr(t, "master") else f"DON!!({t.uuid[:4]})"
             for t in targets
         ]
-        self.action_history.append({
+        entry = {
             "action": action.type.name if hasattr(action.type, 'name') else str(action.type),
             "success": success,
             "targets": target_names,
             "value": value
-        })
+        }
+        # 移動系は行き先も記録する。無いと eventLog 上で MOVE_CARD の意味が読めない
+        # （例: OP16-119 のライフ追加が素の MOVE_CARD 表示になり「発動していない」ように見えた）。
+        dest = getattr(action, "destination", None)
+        if dest is not None:
+            entry["dest"] = getattr(dest, "name", None) or str(dest)
+        self.action_history.append(entry)
 
         return success
 
