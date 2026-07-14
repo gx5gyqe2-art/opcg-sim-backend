@@ -338,7 +338,7 @@ def test_selection_moves_enumerates_single_target_candidates():
     class _Stub:
         def __init__(self, pending):
             self._p = pending
-        def get_pending_request(self):
+        def get_pending_request(self, with_request_id=True):
             return self._p
         def default_interaction_payload(self, pending=None):
             return {"selected_uuids": [], "index": 0, "accepted": True}
@@ -374,7 +374,7 @@ def test_selection_moves_enumerates_up_to_n_cumulative():
     class _Stub:
         def __init__(self, pending):
             self._p = pending
-        def get_pending_request(self):
+        def get_pending_request(self, with_request_id=True):
             return self._p
         def default_interaction_payload(self, pending=None):
             return {"selected_uuids": [], "index": 0, "accepted": True}
@@ -402,7 +402,7 @@ def test_selection_moves_branches_optional_confirm_accept_decline():
     class _Stub:
         def __init__(self, pending):
             self._p = pending
-        def get_pending_request(self):
+        def get_pending_request(self, with_request_id=True):
             return self._p
         def default_interaction_payload(self, pending=None):
             return {"selected_uuids": [], "index": 0, "accepted": True}

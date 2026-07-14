@@ -639,7 +639,10 @@ def _selection_moves(manager, actor_name: str):
         既に対象なら no-op なのに毎回カードを浪費）。両手を採点して、得なときだけ払う。
     """
     from . import action_api
-    pending = manager.get_pending_request()
+    # request_id はここでは読まない（player_id/action/selectable_uuids/constraints のみ）。
+    # _selection_moves は探索の分岐生成で make/unmake 探索（_score_move_1ply→_search）と
+    # ドレインの両方から高頻度に呼ばれるため、request_id ハッシュ／候補 to_dict を省く高速パス。
+    pending = manager.get_pending_request(with_request_id=False)
     if not pending:
         return None
     KEY_PID, KEY_ACTION = _pending_keys()

@@ -339,7 +339,7 @@ def _fill_trace(trace, manager, player, chosen, stats):
     trace["chosen"] = cpu_ai._describe_move(manager, chosen) if chosen else None
     # 対話種別（SEARCH_AND_SELECT / ARRANGE_DECK / CONFIRM_OPTIONAL 等）。無いと
     # 「ライフ追加の選択」か「底送りの順番」かがトレースから読めない。
-    pend = manager.get_pending_request() or {}
+    pend = manager.get_pending_request(with_request_id=False) or {}  # action だけ読む＝request_id 不要
     if pend.get("action"):
         trace["dialog"] = pend.get("action")
     # ① 自分の探索の内訳（等価手マージ後の訪問上位・visit%・行動価値Q）。decide の選択と
