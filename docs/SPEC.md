@@ -149,8 +149,9 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
     `cpu_learned_mark_review2_20260711.md` §S1）、(c) **ターン内 sticky 世界線**（PIMC 決定化 seed を
     (game, turn, player) 単位で固定＝「ドン付与→別世界で攻撃取り止め」の計画非一貫を防ぐ・serve 専用）、
     (d) **候補の無駄手枝刈り**（`adapter.OPCGGame.legal_actions`・`SERVE_PRUNE_FUTILE`＝L1/α-β と同じ
-    `_prune_futile_attacks`/`_prune_don_moves` を learned 候補にも適用・serve と自己対戦の両方・
-    v5 §4補）、(e) **aux 粘り項**（`SERVE_AUX_TIEBREAK`＝葉評価が飽和域 |v|≥AUX_SAT_START のとき残りターン
+    `_prune_futile_attacks`/`_prune_don_moves` を learned 候補にも適用・v5 §4補。**serve のみ**＝
+    自己対戦生成は v6 柱⑤で分離し `GEN_PRUNE_FUTILE=False`（`OPCGGame(prune_futile=...)` の
+    インスタンス指定が config より優先）——刈った枝の反例が学習データから消える自己強化盲点を断つ）、(e) **aux 粘り項**（`SERVE_AUX_TIEBREAK`＝葉評価が飽和域 |v|≥AUX_SAT_START のとき残りターン
     補助ヘッドの予測 t̂ で振幅を減衰 v·max(TERM_FLOOR, 1−AUX_TIE_DECAY·t̂·sat)。(a) の「終局に届かない
     飽和葉」への拡張＝敗勢は延命する手・優勢は速い勝ちを選好。非飽和域は恒等・再学習不要＝v4 の
     学習済み aux ヘッドを手選択に初活用・serve 専用）。

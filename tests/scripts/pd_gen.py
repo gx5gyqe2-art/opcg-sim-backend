@@ -106,6 +106,11 @@ def main():
                     help="L1-hard 混合比（v4 §4-1(d)・0=純自己対戦。配合比は meta の turns 分布を見て調整）")
     ap.add_argument("--mark-seed-frac", type=float, default=0.0,
                     help="マーク局面シード比（v5 §4-2(e)・0=turn1開始のみ。失敗局面を開始局面に混ぜる）")
+    ap.add_argument("--relabel-frac", type=float, default=0.0,
+                    help="v6 深探索再ラベル比（v5採用報告 §4-2）: 各決定点をこの確率で prior平坦化の"
+                         "教師探索にかけ policy 教師を差し替える（0=無効。コスト≒ frac×relabel_sims/sims 増）")
+    ap.add_argument("--relabel-sims", type=int, default=1600,
+                    help="再ラベル教師探索の sims（生成 sims の10倍目安・prior平坦化＋ノイズ無し）")
     ap.add_argument("--max-batches", type=int, default=10 ** 9)
     ap.add_argument("--gen-from", choices=("best", "candidate"), default="best",
                     help="生成に使うネット（v6 柱①）: best=p3best があればベストから（既定）／"
@@ -145,7 +150,8 @@ def main():
             vdata, pol, game_turns, l1_games = R.selfplay_shard(
                 pool, args.workers, args.games, args.sims,
                 args.dirichlet_eps, ck + "/_cur_v.npz", ppath,
-                seed_base, ev=ev, leaders=leaders, l1_mix=args.l1_mix, mark_frac=args.mark_seed_frac)
+                seed_base, ev=ev, leaders=leaders, l1_mix=args.l1_mix, mark_frac=args.mark_seed_frac,
+                relabel_frac=args.relabel_frac, relabel_sims=args.relabel_sims)
             if vdata is None:
                 print("  採取0スキップ", flush=True); continue
             # data枝へ push（自分が単独writer＝amend+force で安全）。policy教師も同梱（直列とのパリティ）。

@@ -163,16 +163,20 @@ _W = {}
 
 def _init_worker():
     """ワーカー1プロセスにつき1回 db/vocab/game をロード（タスク毎の再ロードを避ける）。"""
+    from opcg_sim.src.learned.config import GEN_PRUNE_FUTILE
     db = _load_db()
     _W["db"] = db
     _W["vocab"] = E.build_vocab(db)
-    _W["game"] = OPCGGame()
+    # v6 柱⑤: 生成は枝刈りを外す（GEN_PRUNE_FUTILE・serve の SERVE_PRUNE_FUTILE とは独立）＝
+    # 刈った枝の反例が学習データから消える自己強化盲点を断つ。
+    _W["game"] = OPCGGame(prune_futile=GEN_PRUNE_FUTILE)
 
 
 def _gen_task(payload):
     """1ワーカー分の自己対戦生成。ゲームループ本体は `p3_loop.selfplay_game`（共通コア・v4拡張＝
     sticky世界線/防御応答温度/q_root/turns_left/L1混合 もそこで付与）へ委譲する。"""
-    seed, n_games, sims, eps, vpath, ppath, ev, leaders, l1_mix, mark_frac = payload
+    (seed, n_games, sims, eps, vpath, ppath, ev, leaders, l1_mix, mark_frac,
+     relabel_frac, relabel_sims) = payload
     db, vocab, game = _W["db"], _W["vocab"], _W["game"]
     vnet = RN.ValueNet.load(vpath)
     pnet = PolicyScorer.load(ppath) if ppath else None
@@ -196,7 +200,8 @@ def _gen_task(payload):
             l1_games += 1
         rv, rp, w = P.selfplay_game(game, vf, pf, vocab, sims, C_PUCT, rng,
                                     enc_version=ev, leaders=leaders, dirichlet_eps=eps, db=db,
-                                    l1_seat=l1_seat, seed_boards=seed_boards, seed_frac=mark_frac)
+                                    l1_seat=l1_seat, seed_boards=seed_boards, seed_frac=mark_frac,
+                                    relabel_frac=relabel_frac, relabel_sims=relabel_sims)
         if w is None:
             continue
         P.merge_val_recs(rv, w, sinks)
@@ -210,16 +215,18 @@ def _gen_task(payload):
 
 
 def selfplay_shard(pool, workers, n_games, sims, eps, vpath, ppath, base_seed, ev=1, leaders=None,
-                   l1_mix=0.0, mark_frac=0.0):
+                   l1_mix=0.0, mark_frac=0.0, relabel_frac=0.0, relabel_sims=0):
     """n_games を workers 個に分割して並列生成→マージ。返り値 (vdata, pol, game_turns, l1_games)。
 
     vdata は batch スキーマ v2（value に加え q_root / turns_left・docs/cpu_v4_plan.md §4-1/4-2）。
     game_turns は対局ごとのターン数（ゲーム長分布の監視用・§4-3 補助指標）。
     l1_mix は §4-1(d) の L1-hard 混合比（0=従来の純自己対戦）・l1_games は実際の混合局数。
     mark_frac は §4-2(e) のマーク局面シード比（0=従来の turn1 開始のみ）。
+    relabel_frac/relabel_sims は v6 深探索再ラベル（prior平坦化・p3_loop.selfplay_game 参照・0=無効）。
     """
     per = max(1, n_games // workers)
-    tasks = [(base_seed * 131 + w * 977 + 1, per, sims, eps, vpath, ppath, ev, leaders, l1_mix, mark_frac)
+    tasks = [(base_seed * 131 + w * 977 + 1, per, sims, eps, vpath, ppath, ev, leaders, l1_mix,
+              mark_frac, relabel_frac, relabel_sims)
              for w in range(workers)]
     parts = pool.map(_gen_task, tasks)
     vds, pol, game_turns, l1_games = [], [], [], 0
