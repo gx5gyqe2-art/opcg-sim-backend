@@ -18,9 +18,14 @@ from .config import VALUE_SCALE
 class OPCGGame:
     # L1 生スコアは card-currency で桁が大きい（実測 中央 ~-5800・範囲[-11920,7091]）。
     # scale=10000 で tanh 飽和率0%・std0.25＝探索が勾配を使える値域（GATE B 診断で較正）。
-    def __init__(self, value_scale=VALUE_SCALE, see_opp_hand=False):
+    def __init__(self, value_scale=VALUE_SCALE, see_opp_hand=False, prune_futile=None):
         self.value_scale = value_scale
         self.see_opp_hand = see_opp_hand
+        # v6 柱⑤（生成/serve の探索設定分離・docs/reports/v5_adoption_20260715.md §4-5）:
+        # None=config の SERVE_PRUNE_FUTILE に従う（serve 既定）。自己対戦生成は False を渡して
+        # 枝刈りを外す＝「刈った枝は学習データに現れない→枝刈りの誤りが学習で固定化される」
+        # 自己強化盲点を断つ（探索が訪れない枝は学習できない、というループの性質への対策）。
+        self.prune_futile = prune_futile
 
     # 注: 研究用の new_game(deck構築) は製品版では除外（本番は既存 manager を駆動するため不要）。
 
@@ -51,8 +56,11 @@ class OPCGGame:
         # 学習型 MCTS の候補生成は従来これを掛けておらず、net が無駄手に visit を割いて選ぶ実害が
         # あった（v4 実測マーク @19/@102/@38＝枝刈りで直る・docs/cpu_v5_plan.md §4-1補）。
         # CPU の探索/方策のみで作用しエンジンの合法手列挙は変えない。TURN_END 等は常に残る。
-        from opcg_sim.src.learned.config import SERVE_PRUNE_FUTILE
-        if SERVE_PRUNE_FUTILE:
+        pf = self.prune_futile
+        if pf is None:   # インスタンス未指定＝config（serve 既定）に従う
+            from opcg_sim.src.learned.config import SERVE_PRUNE_FUTILE
+            pf = SERVE_PRUNE_FUTILE
+        if pf:
             moves = cpu_ai._prune_don_moves(state, name, moves)
             moves = cpu_ai._prune_futile_attacks(state, name, moves)
         return moves

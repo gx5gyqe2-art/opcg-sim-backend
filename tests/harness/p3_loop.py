@@ -69,7 +69,8 @@ _BATTLE_RESPONSES = ("SELECT_BLOCKER", "SELECT_COUNTER")
 
 def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_moves=SELFPLAY_TEMP_MOVES,
                   max_steps=400, enc_version=1, leaders=None, dirichlet_eps=0.0, db=None,
-                  l1_seat=None, seed_boards=None, seed_frac=0.0):
+                  l1_seat=None, seed_boards=None, seed_frac=0.0,
+                  relabel_frac=0.0, relabel_sims=0):
     """1局の自己対戦データを採取する（直列/pd並列生成の共通コア・v4計画 §4-1）。
 
     v4 での拡張（docs/cpu_v4_plan.md）:
@@ -91,6 +92,15 @@ def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_move
       失敗モードそのものを in-distribution 化する。中盤開始でも軌跡・ラベル採取は通常経路と同一
       （turns_left は終局ターンから逆算＝開始ターンに依らず正しい）。`seed_frac=0`（既定）で挙動不変
       （rng 消費順も従来どおり＝seed_boards 未指定 or frac=0 のとき seed 判定の乱数を引かない）。
+
+    v6 での拡張（docs/reports/v5_adoption_20260715.md §4-2・mark_deep_probe_20260715.md）:
+    - **深探索再ラベル（expert iteration・prior 平坦化）**: 各決定点を確率 `relabel_frac` で
+      「`relabel_sims` × **priors_fn=None（一様 prior）** × dirichlet 0」の教師探索でやり直し、
+      **その訪問分布を policy 教師に差し替える**（対局の軌跡・value ラベルは通常探索のまま＝
+      分布は変えず教師だけ深くする）。prior 平坦化が必須なのは PRIOR_BOUND 対策＝現 policy の
+      prior に誘導された深探索は盲点の枝（無駄ドン回避等の正着）に到達できないことが計測で確定
+      しているため。教師探索は同じ sticky 世界（det_seed 共有）で行う。`relabel_frac=0`（既定）で
+      挙動不変（rng 消費順も従来どおり＝frac=0 のとき判定の乱数を引かない）。
 
     返り値: (val_recs, pol_recs, winner)。val_recs は (enc, who, q_root, turns_left)。
     """
@@ -143,6 +153,17 @@ def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_move
         stats = mcts.last_stats
         q_root = float((stats["N"] * stats["Q"]).sum() / max(float(stats["N"].sum()), 1.0))
         visit = N.astype(np.float64) / N.sum()
+        if relabel_frac > 0.0 and relabel_sims > 0 and float(rng.random()) < float(relabel_frac):
+            # v6 深探索再ラベル: prior 平坦化（priors_fn=None＝一様）・ノイズ無しの教師探索。
+            # 合法手列挙は同一状態から決定論＝legal の並びは本探索と一致する（不一致は安全側で棄却）。
+            deep = TreeMCTS(game, value_fn=value_fn, priors_fn=None, c_puct=c_puct,
+                            n_sims=relabel_sims, dirichlet_eps=0.0,
+                            determinize_fn=lambda s, r, _sd=det_seed:
+                                game.determinize(s, name, np.random.default_rng(_sd)),
+                            rng=rng)
+            _, Nd, legald = deep.run(m)
+            if Nd is not None and Nd.sum() > 0 and len(legald) == len(legal):
+                visit = Nd.astype(np.float64) / Nd.sum()
         val_recs.append((enc, name, q_root, turn_no))
         ctx = state_context(m, name, vocab, version=enc_version)
         am = legal_action_matrix(m, legal, name)

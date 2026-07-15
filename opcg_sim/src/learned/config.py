@@ -44,8 +44,14 @@ SERVE_STICKY_WORLD = True
 
 # learned MCTS の候補生成で無駄攻撃（倒せない/届かない）・無意味なドン付与を除外する（L1/α-β と同じ
 # 枝刈りを learned 候補にも適用）。False で従来（v4 まで）＝枝刈り無し。docs/cpu_v5_plan.md §4-1補。
-# serve・自己対戦の双方（OPCGGame.legal_actions 経由）に効く＝v5 学習データからも無駄手が除かれる。
+# serve に効く（OPCGGame.legal_actions 経由・インスタンス未指定時の既定）。
 SERVE_PRUNE_FUTILE = True
+
+# v6 柱⑤（生成/serve の探索設定分離・docs/reports/v5_adoption_20260715.md §4-5）: 自己対戦**生成**の
+# 枝刈り既定。生成側は枝刈りを外す＝探索が訪れない枝は学習できないため、serve 用ヒューリスティクスを
+# 生成に入れると「刈った枝の反例をネットが二度と見ない」自己強化盲点になる（v5 は serve と生成の両方に
+# 掛けていた）。生成ハーネス（p3_run）が OPCGGame(prune_futile=GEN_PRUNE_FUTILE) で適用する。
+GEN_PRUNE_FUTILE = False
 
 # aux 粘り項（v5 §4-1・C4 負けq飽和の緩和）: 葉評価が飽和域（|v| ≥ SAT_START）のとき、残りターン
 # 補助ヘッドの予測 t̂ で振幅を減衰 v' = v·max(TERM_FLOOR, 1 − AUX_TIE_DECAY·t̂·sat) する。

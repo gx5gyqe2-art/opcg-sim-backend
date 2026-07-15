@@ -74,3 +74,39 @@ def test_prune_never_empties_candidates():
     m = _game(5)
     name = m.pending_actor_action()[0]
     assert len(game.legal_actions(m)) >= 1
+
+
+def test_instance_override_beats_config():
+    """v6 柱⑤（生成/serve 分離）: `OPCGGame(prune_futile=...)` のインスタンス指定は config より優先。
+
+    生成ハーネスは prune_futile=GEN_PRUNE_FUTILE(=False) で構築＝config の serve 設定
+    （SERVE_PRUNE_FUTILE=True）に依らず枝刈り無し。None（未指定）は従来どおり config に従う。"""
+    m = _game(3)
+    for _ in range(12):
+        name = m.pending_actor_action()[0] if m.pending_actor_action() else None
+        if name is None or m.winner is not None:
+            break
+        actor = m.p1 if m.p1.name == name else m.p2
+        legal = m.get_legal_actions(actor)
+        if not legal:
+            break
+        cpu_ai._apply_move_inplace(m, name, legal[0])
+    name = m.pending_actor_action()[0] if m.pending_actor_action() else None
+    if name is None:
+        pytest.skip("盤面が終局（合成局面の都合）")
+    base = m.get_legal_actions(m.p1 if m.p1.name == name else m.p2)
+    merged = cpu_ai.merged_search_actions(m, name, base)
+    expect_on = cpu_ai._prune_futile_attacks(m, name, cpu_ai._prune_don_moves(m, name, list(merged)))
+
+    old = CFG.SERVE_PRUNE_FUTILE
+    try:
+        CFG.SERVE_PRUNE_FUTILE = True   # serve 設定は ON のまま…
+        gen_game = OPCGGame(prune_futile=False)   # …でも生成用インスタンスは枝刈り無し
+        assert len(gen_game.legal_actions(m)) == len(merged)
+        CFG.SERVE_PRUNE_FUTILE = False   # 逆向き: config OFF でもインスタンス ON は刈る
+        srv_game = OPCGGame(prune_futile=True)
+        assert len(srv_game.legal_actions(m)) == len(expect_on)
+        default_game = OPCGGame()        # None＝config（OFF）に従う
+        assert len(default_game.legal_actions(m)) == len(merged)
+    finally:
+        CFG.SERVE_PRUNE_FUTILE = old
