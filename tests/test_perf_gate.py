@@ -55,10 +55,11 @@ def test_multiple_reasons_accumulate():
 
 
 def test_model_hash_is_stable_and_present():
-    """gen2/gen3/gen4 の npz が同梱され、ハッシュが安定（2回一致）。gen4(v4)=本番既定（2026-07-12採用）。"""
+    """gen2/gen3/gen4/gen5 の npz が同梱され、ハッシュが安定（2回一致）。gen5(v5)=本番既定（2026-07-15採用）。"""
     h1, h2 = PG.model_hash(), PG.model_hash()
     assert h1 == h2
     assert h1.get("gen2_value.npz") and h1["gen2_value.npz"] != "<missing>"
     assert h1.get("gen3_value.npz") and h1["gen3_value.npz"] != "<missing>"
     assert h1.get("gen4_value.npz") and h1["gen4_value.npz"] != "<missing>"
-    assert h1.get("gen4_policy.npz") and h1["gen4_policy.npz"] != "<missing>"
+    assert h1.get("gen5_value.npz") and h1["gen5_value.npz"] != "<missing>"
+    assert h1.get("gen5_policy.npz") and h1["gen5_policy.npz"] != "<missing>"

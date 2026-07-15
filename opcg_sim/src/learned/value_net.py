@@ -154,12 +154,18 @@ class ValueNet:
         pred, cache = self.forward(batch)
         return pred, self.aux_from_cache(cache)
 
-    def backward(self, cache, y, y_aux=None, aux_weight=0.0):
+    def backward(self, cache, y, y_aux=None, aux_weight=0.0, y_distill=None, distill_weight=0.0):
         """MSE 勾配。`y_aux`（正規化残りターン・NaN=ラベル無し）と `aux_weight`>0 を渡すと
-        補助ヘッド（W2t/b2t）の勾配と、共有層への補助損失の寄与（dA1 経由）を追加する。"""
+        補助ヘッド（W2t/b2t）の勾配と、共有層への補助損失の寄与（dA1 経由）を追加する。
+
+        `y_distill`（凍結教師の value 予測 tanh∈[-1,1]）と `distill_weight`>0 を渡すと、value ヘッドに
+        教師アンカー MSE(pred, teacher) を加算する（忘却抑制＝v4 の知識から離れ過ぎない・KL蒸留の
+        回帰版・docs/cpu_v5_plan.md §4-4b）。ラベル MSE と同じ tanh 経路＝追加項として素直に足す。"""
         X, idx, pool_idx, pooled, mask, cnt, H_in, Z1, A1, Z2, pred, eff_cache = cache
         B = len(y)
         dpred = (2.0 / B) * (pred - y)                    # MSE grad
+        if y_distill is not None and distill_weight > 0.0:
+            dpred = dpred + (2.0 * distill_weight / B) * (pred - y_distill)   # 教師アンカー（忘却抑制）
         dZ2 = (dpred * (1 - pred ** 2))[:, None]          # tanh'
         gW2 = A1.T @ dZ2; gb2 = dZ2.sum(0)
         dA1 = dZ2 @ self.W2.T
@@ -366,11 +372,13 @@ def _predict_chunked(net, d, batch=8192):
 
 
 def train(net, data, epochs=20, lr=1e-3, batch=128, val_frac=0.2, seed=0, verbose=False,
-          aux_weight=0.0):
+          aux_weight=0.0, distill_weight=0.0):
     """value 回帰を訓練。返り値 (train_mse, val_mse)。
 
     `aux_weight`>0 かつ data に "aux"（正規化残りターン・NaN=欠損可）がある場合、残りターン
     補助損失（v4・docs/cpu_v4_plan.md §4-2）を併せて最適化する（返り値の mse は value のみ）。
+    `distill_weight`>0 かつ data に "distill"（凍結教師の value 予測 tanh∈[-1,1]）がある場合、
+    教師アンカー MSE を加える（忘却抑制・v5 §4-4b）。
     """
     n = len(data["value"]); rng = np.random.default_rng(seed)
     perm = rng.permutation(n)
@@ -383,6 +391,9 @@ def train(net, data, epochs=20, lr=1e-3, batch=128, val_frac=0.2, seed=0, verbos
     aux_tr = None
     if aux_weight > 0.0 and "aux" in data:
         aux_tr = np.asarray(data["aux"], dtype=np.float64)[ti]
+    dis_tr = None
+    if distill_weight > 0.0 and "distill" in data:
+        dis_tr = np.asarray(data["distill"], dtype=np.float64)[ti]
     for ep in range(epochs):
         order = rng.permutation(len(ytr))
         for s in range(0, len(order), batch):
@@ -391,7 +402,9 @@ def train(net, data, epochs=20, lr=1e-3, batch=128, val_frac=0.2, seed=0, verbos
             pred, cache = net.forward(mb)
             grads = net.backward(cache, ytr[bi],
                                  y_aux=(aux_tr[bi] if aux_tr is not None else None),
-                                 aux_weight=aux_weight)
+                                 aux_weight=aux_weight,
+                                 y_distill=(dis_tr[bi] if dis_tr is not None else None),
+                                 distill_weight=distill_weight)
             net.step(grads, lr=lr)
         if verbose:
             tm = float(((_predict_chunked(net, tr) - ytr) ** 2).mean())

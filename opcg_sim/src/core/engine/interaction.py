@@ -264,7 +264,13 @@ def resolve_interaction(gm, player: Player, payload: Dict[str, Any]):
                 gm._enforce_field_limit(pl)
                 break
 
-def get_pending_request(gm) -> Optional[Dict[str, Any]]:
+def get_pending_request(gm, with_request_id: bool = True) -> Optional[Dict[str, Any]]:
+    # with_request_id=False: CPU 探索/自己対戦のドレイン経路など request_id を読まない呼び出し用の
+    # 高速パス。request_id は**フロント専用**（入力側で未使用・下記 _rid コメント参照）なので、
+    # 使わない側では正規化 JSON + sha1（候補 to_dict を含む要求全体のハッシュ）を丸ごと省く。
+    # MCTS は _simulate ごとに _drain_own_interactions→get_pending_request を大量に呼ぶため、
+    # 候補が多い盤面ではこのハッシュが CPU を占有し 1 バッチが病的に遅くなる（w3 実測: 通常 ~300s の
+    # バッチが >13min 停滞）。既定 True で従来挙動・API 契約（test_api_contract の request_id 安定性）は不変。
     pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
     battle_actions = CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
     KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
@@ -288,6 +294,8 @@ def get_pending_request(gm) -> Optional[Dict[str, Any]]:
         # モーダル再マウント/選択リセットが起きない。source_card_uuid・options・constraints・
         # candidates など識別に効く全フィールドを取り込むことでこれを防ぐ。
         # 盤面不変なら d は各 to_dict()/スカラが決定的なので同一 → rid も安定（＝元の修正意図を維持）。
+        if not with_request_id:
+            return ""  # 高速パス: 呼び出し側が request_id を読まない（フロント専用フィールド）ときは省略。
         payload = {k: v for k, v in d.items() if k != "request_id"}
         key = json.dumps([gm.turn_count, payload],
                          sort_keys=True, ensure_ascii=False, default=str)
@@ -318,8 +326,11 @@ def get_pending_request(gm) -> Optional[Dict[str, Any]]:
         fe_action = "SEARCH_AND_SELECT" if action_type in ("SELECT_TARGET", "FIELD_OVERFLOW_TRASH") else action_type
         
         candidates = gm.active_interaction.get("candidates", [])
-        candidate_dicts = [c.to_dict() for c in candidates] if candidates else []
         candidate_uuids = [c.uuid for c in candidates] if candidates else []
+        # candidate_dicts（各候補の to_dict）は**フロント表示専用**（既定解決＝default_interaction_payload
+        # は selectable_uuids/constraints しか読まない）。候補が多い盤面では c.to_dict() のリスト構築が
+        # MCTS のドレイン経路で CPU を占有するため、request_id 不要の高速パスでは丸ごと省く。
+        candidate_dicts = ([c.to_dict() for c in candidates] if candidates else []) if with_request_id else []
         
         req = {
             KEY_PID: gm.active_interaction.get("player_id"),

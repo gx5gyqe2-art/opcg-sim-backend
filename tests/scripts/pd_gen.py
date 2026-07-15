@@ -82,13 +82,15 @@ def _resume_batch_id():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2, 3))
+    ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2, 3, 4))
     ap.add_argument("--sims", type=int, default=160)
     ap.add_argument("--games", type=int, default=128)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--dirichlet-eps", type=float, default=0.15)
     ap.add_argument("--l1-mix", type=float, default=0.0,
                     help="L1-hard 混合比（v4 §4-1(d)・0=純自己対戦。配合比は meta の turns 分布を見て調整）")
+    ap.add_argument("--mark-seed-frac", type=float, default=0.0,
+                    help="マーク局面シード比（v5 §4-2(e)・0=turn1開始のみ。失敗局面を開始局面に混ぜる）")
     ap.add_argument("--max-batches", type=int, default=10 ** 9)
     ap.add_argument("--pipeline-depth", type=int, default=2,
                     help="未消費バッチがこの本数を超えたら生成を待つ（learner停止中の上書き全損を防ぐ）")
@@ -125,7 +127,7 @@ def main():
             vdata, pol, game_turns, l1_games = R.selfplay_shard(
                 pool, args.workers, args.games, args.sims,
                 args.dirichlet_eps, ck + "/_cur_v.npz", ppath,
-                seed_base, ev=ev, leaders=leaders, l1_mix=args.l1_mix)
+                seed_base, ev=ev, leaders=leaders, l1_mix=args.l1_mix, mark_frac=args.mark_seed_frac)
             if vdata is None:
                 print("  採取0スキップ", flush=True); continue
             # data枝へ push（自分が単独writer＝amend+force で安全）。policy教師も同梱（直列とのパリティ）。

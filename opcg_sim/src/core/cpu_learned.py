@@ -37,12 +37,12 @@ _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "data")
 
-# v4(gen4) = v3(gen3) からの温スタート＋混合ラベル（勝敗×root Q）＋残りターン補助ヘッド＋
-# 防御データ被覆（sticky/防御温度/L1混合）で実効10,208局を学習し、ピーク round40（cum5248）を凍結
-# （docs/reports/v4_adoption_20260712.md・対L1多様97=0.812・対v3直接対戦=0.583・防御マーク獲得）。
-# gen3/gen2 は録画リプレイの再現・A/B・ロールバック用に同梱を維持する。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen4_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen4_policy.npz")
+# v5(gen5) = v4(gen4) からの温スタート（符号化 v3→v4 拡張・恒等）＋マーク局面シード＋value蒸留で
+# 学習した run のピーク round15（cum2048）を凍結（docs/reports/v5_adoption_20260715.md・
+# 対v4直接対戦=0.610 [0.512,0.700] 100局＝有意勝ち）。符号化は v4（51スカラー・自デッキ残集約）で、
+# net の feat_dim から自動判別される。gen4/gen3/gen2 はリプレイ再現・A/B・ロールバック用に同梱を維持する。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen5_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen5_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}
@@ -339,7 +339,7 @@ def _fill_trace(trace, manager, player, chosen, stats):
     trace["chosen"] = cpu_ai._describe_move(manager, chosen) if chosen else None
     # 対話種別（SEARCH_AND_SELECT / ARRANGE_DECK / CONFIRM_OPTIONAL 等）。無いと
     # 「ライフ追加の選択」か「底送りの順番」かがトレースから読めない。
-    pend = manager.get_pending_request() or {}
+    pend = manager.get_pending_request(with_request_id=False) or {}  # action だけ読む＝request_id 不要
     if pend.get("action"):
         trace["dialog"] = pend.get("action")
     # ① 自分の探索の内訳（等価手マージ後の訪問上位・visit%・行動価値Q）。decide の選択と

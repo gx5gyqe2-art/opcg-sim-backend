@@ -69,7 +69,7 @@ _BATTLE_RESPONSES = ("SELECT_BLOCKER", "SELECT_COUNTER")
 
 def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_moves=SELFPLAY_TEMP_MOVES,
                   max_steps=400, enc_version=1, leaders=None, dirichlet_eps=0.0, db=None,
-                  l1_seat=None):
+                  l1_seat=None, seed_boards=None, seed_frac=0.0):
     """1局の自己対戦データを採取する（直列/pd並列生成の共通コア・v4計画 §4-1）。
 
     v4 での拡張（docs/cpu_v4_plan.md）:
@@ -85,10 +85,22 @@ def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_move
     - **q_root/turns_left の記録**: 混合ラベル（§4-2）と残りターン補助ターゲット用。
       q_root = 探索後 root の ΣN·Q/ΣN（to-move 視点・終局減衰込み）。
 
+    v5 での拡張（cpu_v5_plan.md §4-2）:
+    - **(e) マーク局面シード**: `seed_boards`（復元済み失敗局面 GameManager のリスト）を渡し、
+      各局を確率 `seed_frac` でそのプールから開始する（残りは通常の turn1 new_game）。観測された
+      失敗モードそのものを in-distribution 化する。中盤開始でも軌跡・ラベル採取は通常経路と同一
+      （turns_left は終局ターンから逆算＝開始ターンに依らず正しい）。`seed_frac=0`（既定）で挙動不変
+      （rng 消費順も従来どおり＝seed_boards 未指定 or frac=0 のとき seed 判定の乱数を引かない）。
+
     返り値: (val_recs, pol_recs, winner)。val_recs は (enc, who, q_root, turns_left)。
     """
-    m = game.new_game(db=(db if db is not None else _DB), seed=int(rng.integers(1 << 30)),
-                      leaders=leaders)
+    if seed_boards and seed_frac > 0.0 and float(rng.random()) < float(seed_frac):
+        # マーク局面から開始（プールから決定論抽選＝rng で再現可能）。開始盤面は毎局クローン
+        # （selfplay は m を破壊的に進めるため・プール本体は不変で使い回す）。
+        m = seed_boards[int(rng.integers(len(seed_boards)))].clone()
+    else:
+        m = game.new_game(db=(db if db is not None else _DB), seed=int(rng.integers(1 << 30)),
+                          leaders=leaders)
     val_recs, pol_recs = [], []   # (enc, who, q_root, turn_no) / (ctx, am, visit, who)
     steps = 0
     world_seeds = {}   # (turn, name) -> 決定化 seed。dict＝戦闘応答で手番が交互に挟まっても sticky
@@ -135,7 +147,7 @@ def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_move
         ctx = state_context(m, name, vocab, version=enc_version)
         am = legal_action_matrix(m, legal, name)
         pol_recs.append((ctx, am, visit, name))
-        pend = m.get_pending_request() or {}
+        pend = m.get_pending_request(with_request_id=False) or {}  # action だけ読む＝request_id 不要
         is_battle_resp = pend.get("action") in _BATTLE_RESPONSES
         a = _sample(N, rng, temp=1.0 if (steps < temp_moves or is_battle_resp) else 0.0)
         try:

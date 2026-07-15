@@ -78,7 +78,7 @@ def _read_data_branch(br):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2, 3))
+    ap.add_argument("--enc-version", type=int, required=True, choices=(1, 2, 3, 4))
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--epochs", type=int, default=2)
     ap.add_argument("--buffer", type=int, default=120000)
@@ -98,6 +98,8 @@ def main():
                     help="残りターン補助損失の重み（0で無効）")
     ap.add_argument("--turns-scale", type=float, default=V4_TURNS_SCALE,
                     help="turns_left の正規化スケール（clip 上限）")
+    ap.add_argument("--distill-weight", type=float, default=0.0,
+                    help="忘却抑制: 凍結v4教師への value アンカー MSE の重み（v5 §4-4b・0で無効）")
     args = ap.parse_args()
     assert DATA_BRS, "OPCG_PD_DATA_BRANCHES が空"
     ev = args.enc_version
@@ -110,8 +112,14 @@ def main():
     if pnet is None:
         pnet = PolicyScorer(ctx_dim=E.feature_dim(ev), hidden=vnet.W1.shape[1], seed=0)
     consumed = {k: int(v) for k, v in man.get("consumed", {}).items()}
+    # 忘却抑制（v5 §4-4b）: 凍結 v4 教師（gen4→ev 温スタート・恒等＝gen4 の value 意見そのもの）。
+    # 学習しない参照。buf の value 予測をアンカー先にして「v4 の知識から離れ過ぎない」正則化を掛ける。
+    teacher = None
+    if args.distill_weight > 0.0:
+        _tv = RN.ValueNet.load(os.path.join(REPO, "opcg_sim", "data", "learned", "gen4_value.npz"))
+        teacher = R.warm_start_value(_tv, R._net_enc_version(_tv), ev)
     print(f"learner: net枝={NET_BR} round={man.get('round',0)} data枝={len(DATA_BRS)}本 "
-          f"consumed={consumed}", flush=True)
+          f"consumed={consumed} distill={args.distill_weight}", flush=True)
 
     def _push_ckpt(msg):
         vnet.save(ck + "/value.npz"); pnet.save(ck + "/policy.npz")
@@ -169,8 +177,12 @@ def main():
         data_eff["value"] = C.mixed_value_label(buf_v["value"], buf_v["q_root"], args.label_alpha)
         with np.errstate(invalid="ignore"):
             data_eff["aux"] = np.clip(buf_v["turns_left"], 0, args.turns_scale) / args.turns_scale
+        if teacher is not None:
+            # 教師アンカー先＝凍結 v4 の現バッファ上の value 予測（波ごとに再計算＝バッファ更新に追従）。
+            data_eff["distill"] = RN._predict_chunked(teacher, buf_v)
         tm, vm = RN.train(vnet, data_eff, epochs=args.epochs * n_up, lr=args.lr, batch=256,
-                          val_frac=0.05, aux_weight=args.aux_weight)
+                          val_frac=0.05, aux_weight=args.aux_weight,
+                          distill_weight=args.distill_weight)
         # 残りターン補助ヘッドの検証誤差（±ターン換算・時計学習の直接指標＝run 監視の主要計器）。
         aux_txt = ""
         fin = np.flatnonzero(np.isfinite(buf_v["turns_left"]))[-4000:]

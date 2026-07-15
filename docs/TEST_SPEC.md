@@ -51,6 +51,7 @@ resolver は `success = True` を返す。エラー・フォールバック・OT
 `test_rl_datagen.py` / `test_turn_solver.py` / `test_learned_root_readout.py` /
 `test_mcts_terminal_decay.py` / `test_selfplay_v4_datagen.py` / `test_value_net_aux_turns.py` /
 `test_pd_mixed_label.py` / `test_learned_candidate_prune.py` / `test_learned_aux_tiebreak.py` /
+`test_rl_encoder_v4.py` / `test_mark_seeds.py` / `test_value_net_distill.py` / `test_peak_alert.py` /
 `test_journal.py`（`test_real_playout_make_unmake_roundtrip`のみ）。
 
 ### 実行方法（重要）
@@ -131,11 +132,11 @@ make test-slow   # 重テストだけ
 | `tests/test_cpu_puzzles.py` | **CPU 検証基盤（フェーズ0・全変更のゲート）**: 正解手種が既知の局面（致死を取る）＋アクティブドンの線形評価ピン。**2026-06 レビュー収束項（存続）**: A-3・E-1 min ビーム剪定の sort 方向。**【撤去 2026-06-27】** plan-gated 機能のテスト（B-1(a) アイドルドン末端減価／A-1 アンブロッカブル評価／A-2 アーキタイプ依存スケール）は自デッキ勝ち筋プラン全廃に伴い、**B-1(b) カウンター強要（推定カウンター応答モデル）／公開情報ベリーフ更新（手札枚数・トラッシュ）は CPU 評価の L1 単一系統化（profile ベース eval 補正の撤去）に伴い**削除 |
 | `tests/test_cpu_arena.py` | **基盤健全性**（`cpu_infra`）。**検証基盤の絶対強度メトリクスの機械健全性**（`tests/harness/cpu_arena.py`）: 凍結ベースライン Elo 変換（勝率→Elo の 0.5→0／単調／対称）・非対称対局＋席交互アリーナ・regret ログ（`cpu_ai.decide_with_regret`＝非負・有限・easy/単一手で 0）。実ゲームは低速なので機械健全性のみ高速・有界に固定 |
 | `tests/test_cpu_replay.py` | **基盤健全性**（`cpu_infra`）。**CPU 思考トレースの健全性**（`tests/harness/cpu_replay.py`）: trace は観測専用で手を変えない・RNG 中立（trace 有無で進行が分岐しない）・同一 seed の決定論再現・トレース 4 項目（候補スコア/regret/J値成分/読み筋）の存在と読み筋 PV の有界性 |
-| `tests/test_game_driver.py` | **基盤健全性**（`cpu_infra`）。**共通対局ドライバ**（`tests/harness/game_driver.py`・設計⑥)の機械健全性: 同一 seed の決定論・observer 不干渉（観測専用の契約）・席の写像等価（run_one_game/play_game と一致）・`stop_after_decisions` 有界化・**learned(既定Gen＝現v4/gen4) 自己対戦の seed 再現** |
-| `tests/test_replay_roundtrip.py` | **基盤健全性**（`cpu_infra`）。**実対局リプレイのラウンドトリップ**（`tests/harness/replay_runner.py`）: 録画（人間=private rng・card_id 基準記録）→記述子から再生（人間手注入＋CPU 再 decide）→勝敗・手数・ターン一致＋逆写像 miss=0。hard／**learned(既定Gen＝現v4/gen4)**／**coin toss（first_player=random）** の3系統＋リゾルバ単体 |
+| `tests/test_game_driver.py` | **基盤健全性**（`cpu_infra`）。**共通対局ドライバ**（`tests/harness/game_driver.py`・設計⑥)の機械健全性: 同一 seed の決定論・observer 不干渉（観測専用の契約）・席の写像等価（run_one_game/play_game と一致）・`stop_after_decisions` 有界化・**learned(既定Gen＝現v5/gen5) 自己対戦の seed 再現** |
+| `tests/test_replay_roundtrip.py` | **基盤健全性**（`cpu_infra`）。**実対局リプレイのラウンドトリップ**（`tests/harness/replay_runner.py`）: 録画（人間=private rng・card_id 基準記録）→記述子から再生（人間手注入＋CPU 再 decide）→勝敗・手数・ターン一致＋逆写像 miss=0。hard／**learned(既定Gen＝現v5/gen5)**／**coin toss（first_player=random）** の3系統＋リゾルバ単体 |
 | `tests/test_replay_frames.py` | **リプレイ盤面フレーム**（`services/replay.py::_replay_record_frame`＋`GET /replay/frames`・リプレイビューアのデータ供給契約）: frames↔actions↔decisions の action_index 整合（フレーム0＝初期盤面のみ None）・フレームカードは動的状態のみ（マスター情報を持たない＝サイズ抑制）・`_FRAME_CAP` 超過で記録停止＋`frames_truncated`・非 traced 対局は記録なし＋整形エラー |
-| `tests/test_perf_gate.py` | **基盤健全性**（`cpu_infra`）。**CPU 性能ゲートの判定ロジック**（`tests/scripts/perf_gate.py`・§5.1）: `evaluate_gate` 純関数（強度不足/レイテンシ超過/失敗局/データ不足→FAIL・理由の蓄積）＋ gen2/gen3/gen4_*.npz ハッシュの安定性（gen4(v4)＝本番既定・2026-07-12採用）。実対局は回さず高速固定 |
-| `tests/test_cpu_learned.py` | **学習型CPU本番配線**（既定＝v4(gen4)・温スタート検証は v1(gen2) を明示ロード。`opcg_sim/src/core/cpu_learned.py`／`opcg_sim/src/learned/`）: 合法手・decide_client ルーティング・seed 決定論・席別エンジン（net-vs-net 等価）・**符号化/行動特徴の訓練時ドリフト検知（v1/v2）**（`tests/harness/{rl_encoder,opcg_action,rl_net,az_policy,az_mcts_tree}.py` は本番 `opcg_sim/src/learned/{encoder,action,value_net,policy,mcts}.py` への委譲shim＝TEST_E/TEST_A は本番と同一オブジェクトでドリフトは構造的に不可能・退行検知として存続。`tests/harness/opcg_game.py` は本番 `adapter.OPCGGame` の薄い継承＋研究専用 `new_game` のみ追加）・選択対話の併合（CONFIRM_OPTIONAL accept/decline・up-to ライフ追加・**ARRANGE_DECK の並び替え/上下選択**・position キー）・**ルート等価手マージ**（同名複製の訪問数分裂で PASS に負ける実害の反転ケース＋複製なし恒等）・トレース記述（decline の accepted 明示・dialog 種別）・**符号化世代 v2**（リーダー付与ドン特徴＝v1 では不可視・v1 出力不変・npz 入力次元からの自動判別）・**温スタート拡張**（v1→v2 の重み拡張が恒等＝拡張ネット×v2符号化 == 出荷×v1符号化・policy も恒等・縮小拒否・版差は scalars_dim のみが seam＝将来版に同一コード対応） |
+| `tests/test_perf_gate.py` | **基盤健全性**（`cpu_infra`）。**CPU 性能ゲートの判定ロジック**（`tests/scripts/perf_gate.py`・§5.1）: `evaluate_gate` 純関数（強度不足/レイテンシ超過/失敗局/データ不足→FAIL・理由の蓄積）＋ gen2/gen3/gen4/gen5_*.npz ハッシュの安定性（gen5(v5)＝本番既定・2026-07-15採用）。実対局は回さず高速固定 |
+| `tests/test_cpu_learned.py` | **学習型CPU本番配線**（既定＝v5(gen5)・温スタート検証は v1(gen2) を明示ロード。`opcg_sim/src/core/cpu_learned.py`／`opcg_sim/src/learned/`）: 合法手・decide_client ルーティング・seed 決定論・席別エンジン（net-vs-net 等価）・**符号化/行動特徴の訓練時ドリフト検知（v1/v2）**（`tests/harness/{rl_encoder,opcg_action,rl_net,az_policy,az_mcts_tree}.py` は本番 `opcg_sim/src/learned/{encoder,action,value_net,policy,mcts}.py` への委譲shim＝TEST_E/TEST_A は本番と同一オブジェクトでドリフトは構造的に不可能・退行検知として存続。`tests/harness/opcg_game.py` は本番 `adapter.OPCGGame` の薄い継承＋研究専用 `new_game` のみ追加）・選択対話の併合（CONFIRM_OPTIONAL accept/decline・up-to ライフ追加・**ARRANGE_DECK の並び替え/上下選択**・position キー）・**ルート等価手マージ**（同名複製の訪問数分裂で PASS に負ける実害の反転ケース＋複製なし恒等）・トレース記述（decline の accepted 明示・dialog 種別）・**符号化世代 v2**（リーダー付与ドン特徴＝v1 では不可視・v1 出力不変・npz 入力次元からの自動判別）・**温スタート拡張**（v1→v2 の重み拡張が恒等＝拡張ネット×v2符号化 == 出荷×v1符号化・policy も恒等・縮小拒否・版差は scalars_dim のみが seam＝将来版に同一コード対応） |
 | `tests/test_learned_root_readout.py` | **基盤健全性**（`cpu_infra`）。**learned root 読み出しの二重ゲート乗り換え規則**（`cpu_learned._select_root_group`・`docs/reports/cpu_learned_mark_review2_20260711.md` §S1）: 実対局2局×16人間マークの記録統計（visit%/Q）を固定入力とした全数回帰＝g1@12/@24 は乗り換え（人間指摘と一致）・g2@20 の低訪問楽観 Q（次decideで−0.54崩落）は訪問比ゲートで棄却・g2@22/@23 の微小 Q 差（同格ノイズ）は Q差ゲートで棄却・Q同値（−1飽和）は訪問トップ維持・min_gap=inf は argmax(N) と一致（ロールバック経路） |
 | `tests/test_mcts_terminal_decay.py` | **基盤健全性**（`cpu_infra`）。**TreeMCTS 終局値の深さ減衰**（`±max(TERM_FLOOR, 1−TERM_DECAY·depth)`・同レポート §F2）: 決定的グラフゲーム（汎用 make/unmake IF）で「負け確定なら終局が遠い方（粘る手）」「勝ち確定なら近い方（最短リーサル）」を選ぶ・終局直行 edge の backup 値が正確に ±scale・減衰0=従来の −1 飽和・床で下げ止まり |
 | `tests/test_value_net_leader_slots.py` | **ValueNet のリーダー条件付け専用枠**（`lead_slots`・`docs/reports/lc_value_net_plan_20260708.md`）: `to_leader_conditioned()` の恒等性（追加ゼロ行＝拡張直後は旧net予測と一致）・二重適用拒否・save/load 往復（旧形式npz=lead_slots無しの後方互換込み）・`expanded()`（enc版温スタート）との直交併用・解析勾配=数値微分一致・**リーダーIDのみで決まる合成ターゲットを lead_slots=2 だけが fit できる**回帰 |
@@ -151,6 +152,10 @@ make test-slow   # 重テストだけ
 | `tests/test_value_net_aux_turns.py` | **基盤健全性**（`cpu_infra`）。**ValueNet 残りターン補助ヘッド**（W2t/b2t・v4 §4-2）: 補助ヘッドの value 出力からの独立性（＝恒等温スタートの根拠）・旧npz（v3=gen3）ロードで aux ゼロ＋save/load往復・解析勾配=数値微分一致（W2t/b2t＋共有層への寄与・NaNラベルのマスク）・構造拡張4種（expanded/LC/to_v3/widened）の aux 引き継ぎ・合成ターゲットの学習可能性（NaN混在可） |
 | `tests/test_pd_mixed_label.py` | **基盤健全性**（`cpu_infra`）。**v4 混合ラベルとスキーマv2後方互換**（`pd_batch_common`）: normalize_batch_v2（v1バッチ→q_root=value/turns_left=NaN の退化規則・v2素通し）・mixed_value_label（α=1で勝敗単独と一致・線形補間）・ring_append の v2キー連結と v1/v2 混在 |
 | `tests/test_pd_batch_common.py` | **バッチ式アクター/ラーナー分離の純粋協調ロジック**（`tests/scripts/pd_batch_common.py`・`docs/reports/batched_selfplay_design_20260710.md`）: 鮮度フィルタ is_fresh（accept/seen/stale の境界＝未消費かつ against_round>=round-staleness）・plan_consumption の採用/スキップ内訳・update_consumed の単調性と非破壊・ring_append のcap切りとキー整合。git入出力を含むe2eはpd_*スモークで別途疎通確認済み |
+| `tests/test_mark_seeds.py` | **基盤健全性**（`cpu_infra`）。**マーク局面シード**（`mark_seeds.load_mark_boards`・`p3_loop.selfplay_game` の `seed_boards`/`seed_frac`・`docs/cpu_v5_plan.md` §4-2）: 実対局の失敗局面（MAIN手番マーク）を静的フレームから復元し自己対戦の開始局面プールにする。復元プールが非空・非終局・合法手あり・中盤（turn≥2）・決定論（同一プール）・シード開始で完走しラベル採取・**seed_frac=0 は seed_boards を渡しても turn1開始と完全一致**（rng消費順不変＝シードOFFの本走が v4生成とbit同一）のゲート |
+| `tests/test_rl_encoder_v4.py` | **基盤健全性**（`cpu_infra`）。**符号化世代 v4（自デッキ残の集約特徴）**（`rl_encoder` version=4・`docs/cpu_v5_plan.md` §4-3）: v3(scalars46)末尾に自ライブラリの守り/資源集約5値（残カウンター総量/密度・ブロッカー残・イベント残・高コストキャラ残）を append-only 追加（51）。版マップ単調増加・先頭46がv3と一致（並び不変）・集約値の定義一致・**自デッキのみ**（相手デッキ改変で不変＝公平性契約）・空デッキ安全・**恒等温スタート必達**（v3→v4 拡張で value/aux 出力が数値的完全一致＝新5行ゼロ） |
+| `tests/test_value_net_distill.py` | **基盤健全性**（`cpu_infra`）。**value 蒸留（忘却抑制・教師アンカー）**（`ValueNet.backward`/`train` の `distill_weight`・`docs/cpu_v5_plan.md` §4-4b）: 凍結v4教師の value 予測へ引く MSE アンカーを value ヘッドに加算。distill_weight=0 は素の MSE 勾配と完全一致（挙動不変ゲート）・合成損失の解析勾配=数値微分一致（W2/b2/W1/Emb）・強めの蒸留で予測が教師値へ寄る（ラベルとのバランスで暴走しない） |
+| `tests/test_peak_alert.py` | **基盤健全性**（`cpu_infra`）。**ピーク自動アラート**（`peak_alert.detect_peak`・`docs/cpu_v5_plan.md` §4-4a）: 本走の checkpoint 評価系列（mark_improved・arena_wr）から忘却開始を検知。改善中はアラートせず凍結候補=best round・2指標の同時後退が patience 回連続でアラート・単一指標後退や許容内ノイズでは誤報しない・空/単一入力の安全性 |
 | `tests/test_value_net_v3.py` | **ValueNet v3（EffFeat組み込み）**（設計 §2/§5）: 恒等温スタート連鎖（scalars拡張→LC→to_v3→widened で出力完全一致・22/24幅idx双方）・順序ガード（LC前to_v3拒否/二重適用拒否/eff後LC拒否/widened縮小拒否）・W_eff含む勾配=数値微分一致・save/load往復＋旧形式後方互換（eff_dim=0）・**ゼロショット回帰**（効果特徴で決まるターゲットを未見リーダーへ汎化できるのはv3のみ＝LC埋め込みは不可）・encoder v3（scalars46/card_idx24/ステージ末尾・v2不変）とのe2e結線 |
 | `tests/test_p3_components.py` | **基盤健全性**（`cpu_infra`）。**P3学習ループ部品の高速単体**（重い loop は `p3_loop.py --smoke --enc-version 1`）: action 特徴 one-hot・action_key の区別・policy 学習・**自己対戦のリーダーローテーション**（`OPCGGame.new_game(leaders=…)` が全リーダープールから両席を抽選＋リアルデッキ化＝【ドン‼×1】系リーダー効果を学習データに載せる「穴B」対策・seed 決定論／leaders 未指定は build_deck 固定＝後方互換） |
 | `tests/test_p3_loop.py` | **P3学習ループの疎通**（slow・`make test`除外）: 自己対戦→value/policy 学習→クロス評価が例外なく完走（勝率シグナルは見ない）。`p3_loop.py`／`p3_run.py` は `--enc-version 2`（必須・符号化v2）・`--rotate-leaders`（穴B）を配管。p3_run の v2 Gen0 は出荷 v1 Gen2 から**温スタート**（乱数初期化しない） |
@@ -196,8 +201,8 @@ make test-slow   # 重テストだけ
 | `tests/harness/effect_oracle.py` | 期待 vs テキスト/AST の静的整合性コンパレータ（既存ゲートが拾わない高シグナル候補のみ抽出。`--category`/`--json`） |
 | `tests/harness/structural_invariants.py` | 構造不変条件4スキャン（H先頭ゲート漏れ／Duration write-off／chooser欠落／「すべて」count退化）の一括検出（`--show`）。カテゴリH 横展開の回帰ツール化 |
 | `tests/harness/false_path_coverage.py` | 条件を偽にして発動し、ゲートされた効果が走らない（盤面変化ゼロ）かを動的検証（`--show`/`--card`） |
-| `tests/scripts/arena_parallel.py` | **並列アリーナ**（対照ペア×コア並列・旧 depth/thinktime_arena を統合）: 挑戦者の探索深さ/予算/PIMC/L1係数/**難易度（--challenger-difficulty learned＝既定Gen＝現Gen3）/sims** を席別に振って Elo A/B。SPSA の f(θ) 評価にも使う |
-| `tests/scripts/perf_gate.py` | **CPU 性能ゲート**（§5.1）: learned(既定Gen＝現Gen3) vs 凍結 hard(L1) の Elo＋ペア単位 CI・1手レイテンシ・失敗局0・npz ハッシュを1コマンドで PASS/FAIL（`--quick`/`--full`） |
+| `tests/scripts/arena_parallel.py` | **並列アリーナ**（対照ペア×コア並列・旧 depth/thinktime_arena を統合）: 挑戦者の探索深さ/予算/PIMC/L1係数/**難易度（--challenger-difficulty learned＝既定Gen＝現v5/gen5）/sims** を席別に振って Elo A/B。SPSA の f(θ) 評価にも使う |
+| `tests/scripts/perf_gate.py` | **CPU 性能ゲート**（§5.1）: learned(既定Gen＝現v5/gen5) vs 凍結 hard(L1) の Elo＋ペア単位 CI・1手レイテンシ・失敗局0・npz ハッシュを1コマンドで PASS/FAIL（`--quick`/`--full`） |
 | `tests/scripts/replay_ambiguity_probe.py` | **実対局リプレイの曖昧性計測**（R0）: 記録アクション（card_id 基準）の一意復元可否を実デッキで実測（`--real-decks`・アクション種別ごとの曖昧率）。報告は `docs/reports/cpu_replay_ambiguity_r0_20260704.md` |
 | `tests/scripts/sample_audit.py` | 各弾から決定的ランダム抽出＋自動スクリーニング＋精査素材出力（§8.4 ✓信頼度の実測。`--per-set`/`--seed`/`--dump`）。報告は `docs/reports/sample_audit_*.md` |
 | `tests/scripts/leader_spec_probe.py` | リーダー1枚のテキスト/AST要約/実行観測の出力（`<ID>`/`--set`/`--all`/`--json`）。手動検証（§8）の補助に使う |
@@ -251,7 +256,7 @@ make test-slow   # 重テストだけ
   は手書き J値評価の撤去〔2026-06-27〕で消滅）。
 - **リプレイ種**: `--record seed.json` で `{seed, リーダー, 難易度}` の極小記述子を残し、
   `--descriptor seed.json` で完全再現する。
-- **learned（Gen2・本番既定 CPU）のトレース**: `--difficulty learned`（席別 `--p1-/--p2-difficulty learned`）で
+- **learned（本番既定 CPU＝現v5/gen5）のトレース**: `--difficulty learned`（席別 `--p1-/--p2-difficulty learned`）で
   Gen2 学習型（`game_driver.make_seat(kind="learned")`）を再生する。思考トレースは L1 の 4 項目に代わり
   **MCTS root 統計**を記録する（`candidates`＝訪問%＋行動価値Q／`value`＝採用手のQ／`l1_move`・`l1_disagrees`
   ＝独立評価器 L1 の第二意見）。learned の numpy rng は global random 由来（PR-D2）なので **seed から
@@ -328,7 +333,7 @@ make regen-baseline
 
 ### 5.1 CPU 性能ゲート（Gen2 非退行・手動/定期）
 
-本番既定 CPU＝**Gen2(learned)** の強度・非退行を測る運用ツール（実対局は重いので `make test` 外・手動/定期）:
+本番既定 CPU＝**learned（現v5/gen5）** の強度・非退行を測る運用ツール（実対局は重いので `make test` 外・手動/定期）:
 
 ```bash
 OPCG_LOG_SILENT=1 python tests/scripts/perf_gate.py --quick     # 疎通/軽い確認（pairs6・sims40）

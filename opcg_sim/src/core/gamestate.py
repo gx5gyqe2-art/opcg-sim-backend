@@ -276,7 +276,7 @@ class GameManager:
         `default_interaction_payload` による「妥当な既定解決」を1手として返す（PR1）。
         生成手はすべて `_validate_action` を通過することをテストで保証する。
         """
-        pending = self.get_pending_request()
+        pending = self.get_pending_request(with_request_id=False)  # 合法手列挙は request_id を読まない
         if not pending:
             return []
         pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
@@ -422,8 +422,8 @@ class GameManager:
     def _find_card_by_uuid(self, uuid: str) -> Optional[CardInstance]:
         return _card_moves._find_card_by_uuid(self, uuid)
 
-    def get_pending_request(self) -> Optional[Dict[str, Any]]:
-        return _interaction.get_pending_request(self)
+    def get_pending_request(self, with_request_id: bool = True) -> Optional[Dict[str, Any]]:
+        return _interaction.get_pending_request(self, with_request_id)
 
     def pending_actor_action(self) -> Optional[Tuple[str, str]]:
         return _interaction.pending_actor_action(self)
@@ -441,7 +441,7 @@ class GameManager:
         return _card_moves._suspend_for_field_overflow(self, owner)
 
     def _validate_action(self, player: Player, action_type: str):
-        pending = self.get_pending_request()
+        pending = self.get_pending_request(with_request_id=False)  # 検証は request_id を読まない
         if not pending: raise ValueError("現在実行可能なアクションはありません。")
         
         pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
