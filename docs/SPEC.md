@@ -141,6 +141,10 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
   `docs/reports/v5_adoption_20260715.md`。旧 v4=gen4／v3=gen3／v1=gen2 はリプレイ再現/A/B/ロールバック用に同梱維持）／
   `hard`＝α-β）/ `cpu_deck`。未指定・未知値は `learned` に正規化。モデル未同梱環境（`cpu_learned.available()`
   が False）では `learned`→`hard` に安全フォールバック。CPU メタは `CPU_GAMES` に保持（`{cpu_player_id, difficulty}`）。
+  - **符号化の対応表はネットが持つ**（`ValueNet.vocab_ids`・2026-07-15 事故対応）: カードDBが増えても
+    訓練時の card_id→idx が固定され、ネットが知らない新カードは UNK=0 に落ちる（ズレ・範囲外なし）。
+    学習側は `value_net.extend_to_vocab`（末尾追記・出力恒等）で新カードを取り込む。
+    経緯は `docs/reports/net_vocab_pinning_20260715.md`。
   - **learned の serve 探索**（`cpu_learned.LearnedEngine.decide`・net 非依存の探索層＝net を差し替えても有効）:
     NN誘導 PUCT MCTS（`learned/mcts.py`・SERVE_SIMS=160）＋ (a) **終局値の深さ減衰**
     ±max(TERM_FLOOR, 1−TERM_DECAY·depth)（L1 の ±(W_WIN−ply) と同原理＝最短リーサル優先・敗勢では

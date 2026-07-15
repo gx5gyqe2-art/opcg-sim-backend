@@ -154,7 +154,25 @@ def load_nets(vocab, enc_version):
         raise SystemExit(
             f"ERROR: {pp} の policy ctx 次元 が --enc-version {enc_version}(feat_dim={want}) と"
             f"不一致。別版のチェックポイントを掃除してから再実行してください。")
+
+    # ネット付属 vocab への整列（RN.extend_to_vocab・2026-07-15 実害の恒久対策）: 訓練/生成の符号化は
+    # 「既存 idx 不変＋新カードは末尾追記」のネット付属 vocab で行う。呼び出し側が build_vocab で
+    # 作った dict を **in-place で差し替え**＝全経路が同じ対応で符号化する（途中挿入ズレを排除）。
+    merged = RN.extend_to_vocab(vnet, _db_cached())
+    if merged != vocab:
+        vocab.clear(); vocab.update(merged)
     return vnet, pnet
+
+
+_DB1 = None
+
+
+def _db_cached():
+    """load_nets 用の DB キャッシュ（pd_gen はループ毎に load_nets を呼ぶため毎回ロードしない）。"""
+    global _DB1
+    if _DB1 is None:
+        _DB1 = _load_db()
+    return _DB1
 
 
 # ---- 並列自己対戦ワーカー ----
@@ -180,6 +198,10 @@ def _gen_task(payload):
     db, vocab, game = _W["db"], _W["vocab"], _W["game"]
     vnet = RN.ValueNet.load(vpath)
     pnet = PolicyScorer.load(ppath) if ppath else None
+    if getattr(vnet, "vocab_ids", None):
+        # 符号化はネット付属 vocab（訓練時の card_id→idx）で行う＝現行DBソート（_W["vocab"]）とは
+        # 途中挿入でズレうる。ネットの知らない新カードは encode 側で UNK=0（安全）。
+        vocab = E.vocab_from_ids(vnet.vocab_ids)
     vf = P.value_fn_of(vnet, vocab, ev); pf = P.priors_fn_of(pnet, vocab, ev)
     # (e) マーク局面シード（v5 §4-2）: frac>0 のときだけプールを1回復元してワーカーに載せる。
     seed_boards = None

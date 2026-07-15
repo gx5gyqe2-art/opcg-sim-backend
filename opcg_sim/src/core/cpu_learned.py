@@ -166,6 +166,18 @@ class LearnedEngine:
         # ターン内 sticky 世界線の seed キャッシュ {(id(manager), turn, player): (weakref, seed)}（§_world_rng）。
         self._world_seeds: Dict[Any, Any] = {}
         self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
+        # 符号化は**ネット付属 vocab を最優先**（訓練時の card_id→idx を固定）。カードDBが増えても
+        # 既存カードの idx がズレず（build_vocab は途中挿入でズレる・2026-07-15 実害）、ネットが
+        # 知らない新カードは encode 側で UNK=0 に落ちる＝範囲外クラッシュも起きない。
+        # vocab_ids の無い旧 npz のみ、共有 build_vocab（現行DBソート）へフォールバックする。
+        # dict は ids 単位のプロセス内キャッシュで共有＝同一ネットのエンジン同士は同一オブジェクト
+        # （net-vs-net の複数エンジン同居でも重複を作らない・従来の共有前提を保つ）。
+        if getattr(self.vnet, "vocab_ids", None):
+            ids = tuple(self.vnet.vocab_ids)
+            hit = _SHARED.setdefault("net_vocabs", {}).get(ids)
+            if hit is None:
+                hit = _SHARED["net_vocabs"][ids] = E.vocab_from_ids(ids)
+            self.vocab = hit
         # 符号化世代は重みの入力次元から自動判別（v1=出荷Gen2・v2=リーダー付与ドン特徴）。
         self.enc_version = _net_enc_version(self.vnet)
         pp = policy_path or _DEFAULT_POLICY
