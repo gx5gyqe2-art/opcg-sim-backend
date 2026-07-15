@@ -30,6 +30,7 @@ _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)
 import _bootstrap  # noqa: E402,F401
 import rl_net as RN
 import rl_encoder as E
+from az_policy import PolicyScorer
 from deckgen import all_leader_ids
 from cpu_selfplay import _load_db
 import p3_run as R
@@ -57,13 +58,27 @@ def _ensure_wt(wt, br):
     _git(wt, "reset", "--hard", "origin/" + br)
 
 
-def _load_current_net(vocab, ev):
-    """net枝から現 value/policy をロード（guard付き）。(vnet, pnet, round, 自分の消費済みbatch_id) を返す。"""
+def _load_current_net(vocab, ev, gen_from="best"):
+    """net枝から生成用 value/policy をロード（guard付き）。(vnet, pnet, round, 自分の消費済みbatch_id) を返す。
+
+    v6 柱①（昇格ゲート・docs/reports/v5_adoption_20260715.md §4-1）: `p3best/`（昇格済みベスト）が
+    あればそこから生成する＝劣化中の candidate のデータでバッファを汚さない。p3best 不在（ゲート無効
+    run・初回昇格前）は従来どおり p3ckpt（最新）＝後方互換。--gen-from candidate で明示的に旧挙動。"""
     _ensure_wt(NET_WT, NET_BR)
     ck = NET_WT + "/p3ckpt"
     man = json.load(open(ck + "/manifest.json"))
     R.CK = ck  # p3_run のガード群が参照する定数を差し替え
     vnet, pnet = R.load_nets(vocab, enc_version=ev)
+    best_v = NET_WT + "/p3best/value.npz"
+    if gen_from == "best" and os.path.exists(best_v):
+        bv = RN.ValueNet.load(best_v)
+        if bv.feat_dim == vnet.feat_dim:   # 別版の残骸は黙って使わない（load_nets と同じ思想）
+            vnet = bv
+            bp = NET_WT + "/p3best/policy.npz"
+            pnet = PolicyScorer.load(bp) if os.path.exists(bp) else pnet
+        else:
+            print(f"  [warn] p3best の feat_dim={bv.feat_dim} が enc_version と不一致＝無視して candidate 生成",
+                  flush=True)
     consumed_mine = int(man.get("consumed", {}).get(WID, -1))
     return vnet, pnet, man.get("round", 0), consumed_mine
 
@@ -92,6 +107,9 @@ def main():
     ap.add_argument("--mark-seed-frac", type=float, default=0.0,
                     help="マーク局面シード比（v5 §4-2(e)・0=turn1開始のみ。失敗局面を開始局面に混ぜる）")
     ap.add_argument("--max-batches", type=int, default=10 ** 9)
+    ap.add_argument("--gen-from", choices=("best", "candidate"), default="best",
+                    help="生成に使うネット（v6 柱①）: best=p3best があればベストから（既定）／"
+                         "candidate=常に p3ckpt 最新（旧挙動・p3best 不在時は同じ）")
     ap.add_argument("--pipeline-depth", type=int, default=2,
                     help="未消費バッチがこの本数を超えたら生成を待つ（learner停止中の上書き全損を防ぐ）")
     ap.add_argument("--poll", type=int, default=30, help="バックプレッシャ待機の秒数")
@@ -110,7 +128,7 @@ def main():
     try:
         while done < args.max_batches:
             t0 = time.perf_counter()
-            vnet, pnet, rnd, consumed_mine = _load_current_net(vocab, ev)
+            vnet, pnet, rnd, consumed_mine = _load_current_net(vocab, ev, args.gen_from)
             if not C.should_generate(batch_id, consumed_mine, args.pipeline_depth):
                 # learner が追いつくまで待つ（生成しても amend で上書き消滅するだけ＝全損防止）。
                 print(f"  [backpressure] 未消費 batch{consumed_mine + 1}..{batch_id - 1} が滞留中"

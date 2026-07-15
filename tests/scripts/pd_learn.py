@@ -100,6 +100,14 @@ def main():
                     help="turns_left の正規化スケール（clip 上限）")
     ap.add_argument("--distill-weight", type=float, default=0.0,
                     help="忘却抑制: 凍結v4教師への value アンカー MSE の重み（v5 §4-4b・0で無効）")
+    # v6 柱①（昇格ゲート・docs/reports/v5_adoption_20260715.md §4-1）: 最新ネットは candidate
+    # （p3ckpt）に留め、この games 間隔で promotion_gate に挑戦→勝った場合のみ best（p3best）を更新。
+    # 生成側（pd_gen）は p3best があればそこから生成する＝run をいつ止めても best が残る。
+    ap.add_argument("--promote-every", type=int, default=0,
+                    help="この cum_games 間隔で昇格ゲートを実行（0=無効＝v5 以前の挙動）")
+    ap.add_argument("--gate-pairs1", type=int, default=12)
+    ap.add_argument("--gate-pairs2", type=int, default=38)
+    ap.add_argument("--gate-workers", type=int, default=3)
     args = ap.parse_args()
     assert DATA_BRS, "OPCG_PD_DATA_BRANCHES が空"
     ev = args.enc_version
@@ -125,8 +133,47 @@ def main():
         vnet.save(ck + "/value.npz"); pnet.save(ck + "/policy.npz")
         json.dump(man, open(ck + "/manifest.json", "w"))
         _git(NET_WT, "add", "p3ckpt")
+        if os.path.exists(NET_WT + "/p3best"):
+            _git(NET_WT, "add", "p3best")
         _git(NET_WT, "commit", "--amend", "-m", msg)
         return _git(NET_WT, "push", "--force", "origin", "HEAD:refs/heads/" + NET_BR).returncode == 0
+
+    def _run_gate():
+        """昇格ゲート（v6 柱①）: candidate(p3ckpt) vs best(p3best・無ければ出荷既定gen5)。
+
+        subprocess 実行＝arena の multiprocessing/メモリを learner 本体から隔離。判定・履歴は
+        manifest に記録し、昇格時は p3best を candidate で上書きする（次の _push_ckpt が拾う）。"""
+        import shutil
+        best_dir = NET_WT + "/p3best"
+        best = (best_dir + "/value.npz," + best_dir + "/policy.npz"
+                if os.path.exists(best_dir + "/value.npz") else "")
+        cmd = [_sys.executable, os.path.join(REPO, "tests", "scripts", "promotion_gate.py"),
+               "--candidate", ck + "/value.npz," + ck + "/policy.npz",
+               "--pairs1", str(args.gate_pairs1), "--pairs2", str(args.gate_pairs2),
+               "--workers", str(args.gate_workers),
+               "--seed-base", str(21000 + man.get("round", 0) * 1009)]
+        if best:
+            cmd += ["--best", best]
+        env = dict(os.environ, OPCG_LOG_SILENT="1", PYTHONPATH=os.path.join(REPO, "tests"))
+        r = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        line = next((l for l in reversed((r.stdout or "").splitlines())
+                     if l.startswith("GATE_RESULT ")), None)
+        if line is None:   # ゲート自体の失敗は昇格失敗として扱う（学習は止めない）
+            print(f"  [gate] 実行失敗 rc={r.returncode}: {(r.stderr or '')[-300:]}", flush=True)
+            res = {"promoted": False, "error": True}
+        else:
+            res = json.loads(line[len("GATE_RESULT "):])
+        if res.get("promoted"):
+            os.makedirs(best_dir, exist_ok=True)
+            shutil.copy(ck + "/value.npz", best_dir + "/value.npz")
+            shutil.copy(ck + "/policy.npz", best_dir + "/policy.npz")
+            man["gate_best_round"] = man.get("round", 0)
+        hist = man.setdefault("gate_history", [])
+        hist.append({"round": man.get("round", 0), "cum": man.get("cum_games", 0), **res})
+        man["gate_history"] = hist[-30:]
+        man["gate_last_cum"] = man.get("cum_games", 0)
+        print(f"  [gate] round{man.get('round',0)} cum{man.get('cum_games',0)}: "
+              f"{'昇格' if res.get('promoted') else '棄却'} {res}", flush=True)
 
     # consume（バッファ連結・consumed 更新）と学習を分離する（小バッチ運用・v4）:
     # 生成側が --games を小さくしてもバッチ到着ごとに即 consume（amend 上書きによる全損を防ぐ）し、
@@ -197,6 +244,10 @@ def main():
         man["round"] = man.get("round", 0) + 1   # round=netバージョン数（staleness基準・1push=1版）
         man["updates"] = man.get("updates", 0) + args.epochs * n_up   # 累積勾配パス（学習量の真の指標）
         man["pending_games"] = pending_games
+        if (args.promote_every > 0 and
+                man.get("cum_games", 0) - man.get("gate_last_cum", 0) >= args.promote_every):
+            vnet.save(ck + "/value.npz"); pnet.save(ck + "/policy.npz")   # gate は保存済み candidate を読む
+            _run_gate()
         ok = _push_ckpt(f"pd-net round{man['round']} cum{man['cum_games']} upd{man['updates']} "
                         f"buf{len(buf_v['value'])}")
         print(f"  round{man['round']} x{n_up}回学習 vmse={tm:.4f}/{vm:.4f}{aux_txt} "
