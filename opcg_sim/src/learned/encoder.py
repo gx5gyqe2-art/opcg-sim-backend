@@ -52,8 +52,21 @@ def known_versions():
 
 
 def build_vocab(db):
-    """card_id → idx（1..N）。0=PAD/UNK。決定的（card_id ソート）。"""
+    """card_id → idx（1..N）。0=PAD/UNK。決定的（card_id ソート）。
+
+    **注意（2026-07-15 実害）**: カードDBが増えるとソートの**途中挿入**で既存カードの idx がズレ、
+    学習済みネットの Emb/EffF 行との対応が壊れる。学習済みネットと組む符号化は本関数でなく
+    **ネット付属の vocab**（`ValueNet.vocab_ids` → `vocab_from_ids`）を使うこと。本関数は
+    「新規ネットの初期 vocab を切る」用途のみ。"""
     ids = sorted(cid for cid in db.raw_db.keys() if db.get_card(cid) is not None)
+    return {cid: i + 1 for i, cid in enumerate(ids)}
+
+
+def vocab_from_ids(ids):
+    """ネット付属の card_id 列（index 順）→ vocab dict（card_id → idx・0=PAD/UNK）。
+
+    列に無いカード（ネットの訓練後に追加された新カード）は encode 側（`_vidx` の
+    `vocab.get(..., PAD)`）で UNK=0 に落ちる＝範囲外参照もズレも起きない。"""
     return {cid: i + 1 for i, cid in enumerate(ids)}
 
 

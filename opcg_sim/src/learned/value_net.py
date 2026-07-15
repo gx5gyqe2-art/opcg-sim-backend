@@ -55,6 +55,11 @@ class ValueNet:
         # ゼロ初期化でもデッドロックしない（W_eff のケースと異なり片側が学習済み活性）。
         self.W2t = np.zeros((hidden, 1))
         self.b2t = np.zeros(1)
+        # ネット付属 vocab（card_id の index 順リスト・idx=位置+1・0=PAD/UNK）。カードDBが増えると
+        # `encoder.build_vocab`（card_id ソート）は**途中挿入**で既存カードの idx がズレ、学習済み
+        # Emb/EffF 行との対応が壊れる（2026-07-15 実害: DB+32枚で既存371枚が+2ズレ＋範囲外クラッシュ）。
+        # 訓練時の対応をネット自身が持ち、serve は常にこれで符号化する（無いカード=UNK 0 で安全）。
+        self.vocab_ids = None
         self._init_adam()
 
     @property
@@ -267,6 +272,7 @@ class ValueNet:
         net.Emb = self.Emb.copy(); net.W1 = W1n
         net.b1 = self.b1.copy(); net.W2 = self.W2.copy(); net.b2 = self.b2.copy()
         net.W2t = self.W2t.copy(); net.b2t = self.b2t.copy()
+        net.vocab_ids = list(self.vocab_ids) if self.vocab_ids else None
         net._init_adam()
         return net
 
@@ -292,6 +298,7 @@ class ValueNet:
         net.Emb = self.Emb.copy(); net.W1 = W1n
         net.b1 = self.b1.copy(); net.W2 = self.W2.copy(); net.b2 = self.b2.copy()
         net.W2t = self.W2t.copy(); net.b2t = self.b2t.copy()
+        net.vocab_ids = list(self.vocab_ids) if self.vocab_ids else None
         net._init_adam()
         return net
 
@@ -317,6 +324,7 @@ class ValueNet:
         net.b2t = self.b2t.copy()
         if self.W_eff is not None:
             net.W_eff = self.W_eff.copy()
+        net.vocab_ids = list(self.vocab_ids) if self.vocab_ids else None
         net._init_adam()
         return net
 
@@ -327,6 +335,8 @@ class ValueNet:
         if self.EffF is not None:
             payload.update(EffF=self.EffF.astype(np.float32), W_eff=self.W_eff,
                            eff_proj=np.array(self.eff_proj))
+        if self.vocab_ids is not None:
+            payload["vocab_ids"] = np.array(self.vocab_ids, dtype=np.str_)
         np.savez(path, **payload)
 
     @classmethod
@@ -349,8 +359,47 @@ class ValueNet:
                 setattr(net, k, z[k])
         if eff_table is not None:
             net.W_eff = z["W_eff"]
+        if "vocab_ids" in z.files:
+            net.vocab_ids = [str(x) for x in z["vocab_ids"]]
         net._init_adam()
         return net
+
+
+def extend_to_vocab(net, db):
+    """net の vocab をカードDBの現行集合へ**末尾追記**で拡張し、拡張後の vocab dict を返す（学習側の入口）。
+
+    既存 card_id → 行の対応は不変（append-only）＝拡張後も既存カードだけの盤面では出力が完全恒等。
+    新カードの Emb 行はゼロ初期化（UNK と同じ寄与0から学習で育つ）、EffF 行は効果ASTから決定的に
+    再計算して差し込む（既存行は訓練時のまま bit 不変＝DB側で既存カードの効果が直っていても
+    学習済み対応を優先する）。`vocab_ids` の無い旧 npz は、行数が現行DBと一致する場合のみ
+    「現行DBで訓練された」とみなして現行ソート順を焼き込む。不一致は復元不能（どのDB世代で
+    訓練されたか npz から分からない）ため明示エラーにする。"""
+    from opcg_sim.src.learned import encoder as _E
+    cur = sorted(cid for cid in db.raw_db.keys() if db.get_card(cid) is not None)
+    if net.vocab_ids is None:
+        if net.Emb.shape[0] - 1 != len(cur):
+            raise ValueError(
+                f"vocab_ids の無いネット（Emb行={net.Emb.shape[0] - 1}）が現行DB（{len(cur)}枚）と"
+                f"行数不一致＝訓練時DB世代が不明で対応を復元できません。訓練時DBの card_id 列を"
+                f"焼き込んでから使ってください（docs/reports/net_vocab_pinning_20260715.md）")
+        net.vocab_ids = list(cur)
+        return _E.vocab_from_ids(net.vocab_ids)
+    new_ids = sorted(set(cur) - set(net.vocab_ids))
+    if new_ids:
+        merged = list(net.vocab_ids) + new_ids
+        vocab = _E.vocab_from_ids(merged)
+        net.Emb = np.concatenate(
+            [net.Emb, np.zeros((len(new_ids), net.Emb.shape[1]), dtype=net.Emb.dtype)])
+        if net.EffF is not None:
+            from opcg_sim.src.learned.effect_features import build_efffeat
+            full = np.asarray(build_efffeat(db, vocab), dtype=net.EffF.dtype)
+            eff = np.zeros((len(merged) + 1, net.EffF.shape[1]), dtype=net.EffF.dtype)
+            eff[:net.EffF.shape[0]] = net.EffF          # 既存行は訓練時のまま
+            eff[net.EffF.shape[0]:] = full[net.EffF.shape[0]:]   # 新カード行のみ AST から補充
+            net.EffF = eff
+        net.vocab_ids = merged
+        net._init_adam()
+    return _E.vocab_from_ids(net.vocab_ids)
 
 
 def _slice(data, i, j):
