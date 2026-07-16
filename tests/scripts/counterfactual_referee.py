@@ -53,8 +53,11 @@ def _mark_table():
     return t
 
 
-def rollout(game_serve, vf, pf, state, world_seed, rng_seed):
-    """state から終局まで両者同一エンジンで打つ（temp0・sticky世界線）。勝者名 or None。"""
+def rollout(game_serve, vf, pf, state, mover, world_seed, rng_seed):
+    """state から終局まで両者同一エンジンで打つ（temp0・sticky世界線）。
+
+    返り値 (winner, life_diff, end_turn): life_diff は mover 視点の残ライフ差（勝ち方の質・
+    タイブレーク用）。end_turn は決着ターン（速い勝ち／粘る負けの判別用）。"""
     m = state
     world = {}
     steps = 0
@@ -81,7 +84,10 @@ def rollout(game_serve, vf, pf, state, world_seed, rng_seed):
         except Exception:
             break
         steps += 1
-    return m.winner
+    me = m.p1 if m.p1.name == mover else m.p2
+    opp = m.p2 if m.p1.name == mover else m.p1
+    life_diff = len(getattr(me, "life", []) or []) - len(getattr(opp, "life", []) or [])
+    return m.winner, life_diff, int(getattr(m, "turn_count", 0) or 0)
 
 
 def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, log=print):
@@ -100,6 +106,8 @@ def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, lo
             d = {"action_type": (mv or {}).get("action_type")}
         descs.append(d)
     wins = np.zeros(len(legal))
+    life = np.zeros(len(legal))     # mover 視点の残ライフ差の合計（勝ち方の質）
+    turns = np.zeros(len(legal))    # 決着ターン合計（速い勝ちの判別・参考）
     t0 = time.time()
     for w in range(worlds):
         # 世界線 w: 隠れ情報を再サンプルした「ありえた現実」。全 root 手で共有（CRN）。
@@ -108,23 +116,36 @@ def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, lo
             child = game_serve.apply(world, mv, name)
             if child is None:
                 continue
-            winner = rollout(game_serve, vf, pf, child, world_seed=90000 + w * 97,
-                             rng_seed=w * 7919 + k)
+            winner, ld, et = rollout(game_serve, vf, pf, child, name,
+                                     world_seed=90000 + w * 97, rng_seed=w * 7919 + k)
             if winner == name:
                 wins[k] += 1
-    order = np.argsort(-wins)
+            life[k] += ld
+            turns[k] += et
+    lifem = life / max(worlds, 1)
+    # 順位 = (勝ち数, 残ライフ差) の辞書式。飽和局面（全手同勝敗）でも「勝ち方の質」で判別する。
+    score = wins * 1000 + lifem
+    order = np.argsort(-score)
     human = np.array([bool(pred(d)) for d in descs])
-    best_h = float(wins[human].max()) if human.any() else float("nan")
-    best_n = float(wins[~human].max()) if (~human).any() else float("nan")
-    agree = human.any() and (not (~human).any() or best_h >= best_n)
+
+    def _best(mask):
+        if not mask.any():
+            return None
+        j = int(np.argmax(np.where(mask, score, -1e18)))
+        return wins[j], lifem[j]
+    bh, bn = _best(human), _best(~human)
+    agree = bh is not None and (bn is None or (bh[0], round(bh[1], 3)) >= (bn[0], round(bn[1], 3)))
+    wm = (bh[0] - bn[0]) if (bh and bn) else float("nan")
+    lm = (bh[1] - bn[1]) if (bh and bn) else float("nan")
     log(f"\n=== {tag}@{i}（{len(legal)}手 × {worlds}世界・{time.time()-t0:.0f}s）"
-        f" 人間一致={'○' if agree else '✗'}  margin={best_h - best_n:+.0f}/{worlds} ===")
+        f" 人間一致={'○' if agree else '✗'}  margin: 勝ち{wm:+.0f}/{worlds}・ライフ{lm:+.2f} ===")
     for k in order:
         d = descs[k]
         mark = "◆人間" if human[k] else "  "
-        log(f"  {mark} {wins[k]:.0f}/{worlds}  {d.get('action_type')}"
+        log(f"  {mark} {wins[k]:.0f}/{worlds} L{lifem[k]:+.2f} T{turns[k]/max(worlds,1):.1f}"
+            f"  {d.get('action_type')}"
             f"{'/' + str(d.get('card')) if d.get('card') else ''}")
-    return {"mark": f"{tag}@{i}", "agree": bool(agree), "margin": best_h - best_n,
+    return {"mark": f"{tag}@{i}", "agree": bool(agree), "win_margin": wm, "life_margin": lm,
             "n_moves": len(legal)}
 
 
@@ -173,7 +194,8 @@ def main():
             results.append(r)
     n_ok = sum(1 for r in results if r["agree"])
     print(f"\nREFEREE_RESULT 一致 {n_ok}/{len(results)}: "
-          + ", ".join(f"{r['mark']}={'○' if r['agree'] else '✗'}({r['margin']:+.0f})" for r in results),
+          + ", ".join(f"{r['mark']}={'○' if r['agree'] else '✗'}"
+                      f"(勝{r['win_margin']:+.0f}/L{r['life_margin']:+.2f})" for r in results),
           flush=True)
     return 0
 
