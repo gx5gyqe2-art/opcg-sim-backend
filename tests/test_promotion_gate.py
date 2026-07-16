@@ -45,3 +45,16 @@ def test_final_float_boundary_is_stable():
         # need 勝ちちょうどが「wr >= frac」を満たすときは必ず昇格側
         if need / games >= PG.STAGE2_FRAC - 1e-9:
             assert PG.final_decision(need, games), (need, games)
+
+
+def test_anchor_requires_non_regression():
+    """アンカー判定（v7・血統過適合の検出）: 固定アンカーに勝率 ≥ 0.5 で OK・未満は NG。
+
+    実測根拠: v6 で対best 連鎖3段昇格の r99 が対gen5 直接 8/24（0.333）＝この判定が
+    あれば弾けていた。五分（12/24）は非退行として許容（アンカー超えまでは要求しない）。"""
+    assert PG.anchor_decision(12, 24)          # 五分＝非退行 OK
+    assert PG.anchor_decision(13, 24)
+    assert not PG.anchor_decision(11, 24)      # 負け越し NG
+    assert not PG.anchor_decision(8, 24)       # r99 実測ケース
+    assert not PG.anchor_decision(14, 24, frac=0.6)   # 14/24=0.583 < 0.6
+    assert PG.anchor_decision(14, 24, frac=0.55)      # 0.583 ≥ 0.55（frac 可変）

@@ -43,6 +43,15 @@ def final_decision(wins: float, games: int, frac: float = STAGE2_FRAC) -> bool:
     return wins + 1e-9 >= frac * games
 
 
+def anchor_decision(wins: float, games: int, frac: float = 0.5) -> bool:
+    """アンカー判定（v7・血統過適合の検出）: 固定アンカー（出荷 gen5 等）に**非退行**（勝率 ≥ frac）。
+
+    v6 run の実測: 対best 連鎖で3段昇格した r99 が、祖先 gen5 との直接対戦で 0.33 と負け越した
+    （閉じた血統内の「親に勝つ特化」が祖先への強さに転移しない＝じゃんけん構造）。昇格には
+    「対best で勝ち越え」に加えて本判定を課し、血統内だけの見かけの前進を弾く。"""
+    return wins + 1e-9 >= frac * games
+
+
 # --- arena 実行（multiprocessing・席入替CRNペア）------------------------------
 _G = {}
 
@@ -85,6 +94,12 @@ def main():
     ap.add_argument("--pairs1", type=int, default=12, help="stage1 のペア数（局数はx2）")
     ap.add_argument("--pairs2", type=int, default=38, help="stage2 で追加するペア数")
     ap.add_argument("--frac", type=float, default=STAGE2_FRAC)
+    ap.add_argument("--anchor", default=None,
+                    help="固定アンカー value.npz[,policy.npz]（空文字=出荷既定 gen5）。指定時、"
+                         "対best 通過後に candidate vs anchor を --anchor-pairs で測り、"
+                         "非退行（勝率 ≥ --anchor-frac）でなければ昇格させない（v7・血統過適合の検出）")
+    ap.add_argument("--anchor-pairs", type=int, default=12)
+    ap.add_argument("--anchor-frac", type=float, default=0.5)
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--seed-base", type=int, default=21000,
                     help="ペアseedの基点（学習roundを混ぜて呼び出し側が変える＝毎回同じ開幕で測らない）")
@@ -92,6 +107,7 @@ def main():
 
     t0 = time.time()
     pool = mp.Pool(args.workers, initializer=_init_pool, initargs=(args.candidate, args.best))
+    result = {}
     try:
         wins = run_stage(pool, [args.seed_base + k for k in range(args.pairs1)])
         games = args.pairs1 * 2
@@ -105,8 +121,21 @@ def main():
             print(f"stage2: 累計 {wins}/{games} (要{args.frac:.2f}) ({time.time()-t0:.0f}s)", flush=True)
     finally:
         pool.terminate(); pool.join()
-    result = {"promoted": promoted, "wins": wins, "games": games,
-              "wr": round(wins / games, 4), "stage1": d1, "sec": round(time.time() - t0)}
+    if promoted and args.anchor is not None:
+        # アンカー段: 対best を超えた candidate だけが来る（稀）＝追加コストは昇格候補時のみ。
+        pool = mp.Pool(args.workers, initializer=_init_pool, initargs=(args.candidate, args.anchor))
+        try:
+            aw = run_stage(pool, [args.seed_base + 500 + k for k in range(args.anchor_pairs)])
+        finally:
+            pool.terminate(); pool.join()
+        ag = args.anchor_pairs * 2
+        a_ok = anchor_decision(aw, ag, args.anchor_frac)
+        print(f"anchor: {aw}/{ag} (要{args.anchor_frac:.2f}) → {'OK' if a_ok else 'NG=血統過適合'} "
+              f"({time.time()-t0:.0f}s)", flush=True)
+        result.update(anchor_wins=aw, anchor_games=ag, anchor_ok=a_ok)
+        promoted = promoted and a_ok
+    result.update(promoted=promoted, wins=wins, games=games,
+                  wr=round(wins / games, 4), stage1=d1, sec=round(time.time() - t0))
     print("GATE_RESULT " + json.dumps(result), flush=True)
     return 0 if promoted else 1
 

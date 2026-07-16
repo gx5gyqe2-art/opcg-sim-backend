@@ -111,6 +111,9 @@ def main():
     ap.add_argument("--policy-smooth", type=float, default=0.0,
                     help="v7 案E: policy 教師のラベル平滑化 α（t'=(1−α)t+α/K・0=従来。"
                          "prior が 0 に沈む盲点の不可逆化を防ぐ床。推奨 0.03）")
+    ap.add_argument("--gate-anchor", default=None,
+                    help="v7: 昇格の固定アンカー value.npz[,policy.npz]（'bundled'=出荷既定 gen5）。"
+                         "対best 通過後に非退行を要求＝血統過適合（対bestだけ強い偽の前進）を弾く")
     args = ap.parse_args()
     assert DATA_BRS, "OPCG_PD_DATA_BRANCHES が空"
     ev = args.enc_version
@@ -157,6 +160,9 @@ def main():
                "--seed-base", str(21000 + man.get("round", 0) * 1009)]
         if best:
             cmd += ["--best", best]
+        if args.gate_anchor is not None:
+            # 'bundled' は出荷既定（gen5）＝ promotion_gate 側の空文字指定に写像する。
+            cmd += ["--anchor", "" if args.gate_anchor == "bundled" else args.gate_anchor]
         env = dict(os.environ, OPCG_LOG_SILENT="1", PYTHONPATH=os.path.join(REPO, "tests"))
         r = subprocess.run(cmd, capture_output=True, text=True, env=env)
         line = next((l for l in reversed((r.stdout or "").splitlines())
