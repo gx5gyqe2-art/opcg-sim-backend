@@ -42,8 +42,12 @@ def _fetch(ref, out):
 
 
 def echo_stats(pol, pnet):
-    """[(ctx, am, visit)] × policy → (全体stats, 付与サブセットstats)。stats=(corrs list, top1 list)。"""
-    allc, allt, attc, attt = [], [], [], []
+    """[(ctx, am, visit)] × policy → (全体stats, 付与サブセットstats)。
+
+    stats = (corrs, top1一致, KL(teacher‖prior))。**注意（設計教訓）**: Pearson corr は
+    アフィン変換に不変＝生成側の prior 部分平坦化（p′=(1−λ)p+λ/K）を原理的に検出できない。
+    平坦化・Q補正の効果は **KL** と top1 不一致で見る（v7 §4 の合否も KL 基準）。"""
+    allc, allt, allk, attc, attt, attk = [], [], [], [], [], []
     for ctx, am, visit in pol:
         k = am.shape[0]
         if k < 3:
@@ -55,21 +59,25 @@ def echo_stats(pol, pnet):
         if v.std() < 1e-9 or p.std() < 1e-9:
             continue
         c = float(np.corrcoef(p, v)[0, 1]); t = int(np.argmax(p) == np.argmax(v))
-        allc.append(c); allt.append(t)
+        pe = np.clip(p, 1e-6, None); pe = pe / pe.sum()
+        vv = np.clip(v, 0.0, None); vv = vv / max(vv.sum(), 1e-9)
+        kl = float(np.sum(np.where(vv > 0, vv * np.log(vv / pe), 0.0)))
+        allc.append(c); allt.append(t); allk.append(kl)
         types = am[:, :len(ACTION_TYPES)].argmax(axis=1)
         if any(ACTION_TYPES[ty] == "ATTACH_DON" and am[j, :len(ACTION_TYPES)].max() > 0
                for j, ty in enumerate(types)):
-            attc.append(c); attt.append(t)
-    return (allc, allt), (attc, attt)
+            attc.append(c); attt.append(t); attk.append(kl)
+    return (allc, allt, allk), (attc, attt, attk)
 
 
-def _report(label, corrs, top1):
+def _report(label, corrs, top1, kls):
     if not corrs:
         print(f"{label}: 決定点なし"); return
     a = np.array(corrs)
     q = np.percentile(a, [10, 25, 50, 75, 90])
     print(f"{label}: n={len(a)} corr中央値={np.median(a):.3f} 平均={a.mean():.3f} "
-          f"top1一致={np.mean(top1):.1%} 分位(10/25/50/75/90)={[round(float(x),3) for x in q]}",
+          f"top1一致={np.mean(top1):.1%} KL中央値={np.median(kls):.3f} KL平均={np.mean(kls):.3f} "
+          f"corr分位={[round(float(x),3) for x in q]}",
           flush=True)
 
 
@@ -95,14 +103,15 @@ def main():
 
     pol = C.unpack_policy(np.load(bpath))
     pnet = PolicyScorer.load(ppath)
-    (ac, at), (tc, tt) = echo_stats(pol, pnet)
-    _report("全決定点     ", ac, at)
-    _report("付与決定点   ", tc, tt)
+    (ac, at, ak), (tc, tt, tk) = echo_stats(pol, pnet)
+    _report("全決定点     ", ac, at, ak)
+    _report("付与決定点   ", tc, tt, tk)
     med = float(np.median(tc)) if tc else float("nan")
-    ok = med < args.threshold
-    print(f"\nECHO_RESULT median_attach={med:.3f} threshold={args.threshold} "
-          f"→ {'PASS（エコー減衰）' if ok else 'FAIL（エコー残存）'}", flush=True)
-    return 0 if ok else 1
+    klm = float(np.median(tk)) if tk else float("nan")
+    print(f"\nECHO_RESULT corr_attach={med:.3f} kl_attach={klm:.3f} "
+          f"(corr はアフィン不変＝平坦化を検出できない参考値。判定は KL と top1 の v6 比較で行う)",
+          flush=True)
+    return 0
 
 
 if __name__ == "__main__":
