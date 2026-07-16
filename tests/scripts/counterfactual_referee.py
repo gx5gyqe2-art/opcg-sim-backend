@@ -151,10 +151,14 @@ def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, lo
     lm = (bh[1] - bn[1]) if (bh and bn) else float("nan")
     log(f"\n=== {tag}@{i}（{len(legal)}手 × {worlds}世界・{time.time()-t0:.0f}s）"
         f" 人間一致={'○' if agree else '✗'}  margin: 勝ち{wm:+.0f}/{worlds}・ライフ{lm:+.2f} ===")
+    top = order[0]
     for k in order:
         d = descs[k]
         mark = "◆人間" if human[k] else "  "
-        log(f"  {mark} {wins[k]:.0f}/{worlds} L{lifem[k]:+.2f} T{turns[k]/max(worlds,1):.1f}"
+        # 同価値バンド（v8 柱B）: 最善と勝ち数が同じ かつ ライフ差の差 < band は ≈（同価値圏）。
+        tie = "≈" if (k != top and wins[k] == wins[top]
+                      and lifem[top] - lifem[k] < ARGS.band) else " "
+        log(f"  {mark}{tie} {wins[k]:.0f}/{worlds} L{lifem[k]:+.2f} T{turns[k]/max(worlds,1):.1f}"
             f"  {d.get('action_type')}"
             f"{'/' + str(d.get('card')) if d.get('card') else ''}")
     return {"mark": f"{tag}@{i}", "agree": bool(agree), "win_margin": wm, "life_margin": lm,
@@ -174,26 +178,138 @@ def _match_move(state, legal, step):
     return None
 
 
-def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds, log=print):
-    """プランモード（v7 教師CPU §ターンプラン）: 手順列を**固定して**適用→以降ロールアウト。
+def _match_move_by_key(state, legal, key):
+    """equiv キー（`cpu_ai._move_equiv_key`）に一致する合法手を返す（自動列挙プランの再適用用）。"""
+    for mv in legal:
+        try:
+            if cpu_ai._move_equiv_key(state, mv) == key:
+                return mv
+        except Exception:
+            continue
+    return None
+
+
+def _step_label(d):
+    s = f"{d.get('action_type')}"
+    if d.get("card"):
+        s += f":{d['card']}"
+    if d.get("targets"):
+        s += "→" + ",".join(str(t) for t in d["targets"])
+    return s
+
+
+def enumerate_turn_plans(game_root, vf, m0, name, max_len=4, beam=12, max_plans=16, log=print):
+    """自ターン内のプラン（手順列）を自動列挙する（v8 柱A・docs/cpu_v8_plan.md §1）。
+
+    プラン終端 = **手番が自分から離れた瞬間**（攻撃宣言→防御応答へ／TURN_END→相手ターンへ）。
+    以降はロールアウトの領分、という境界を action_type の列挙でなく手番遷移で判定する
+    （カード非依存・汎用）。
+      - 等価除去: 同一手集合の並べ替え（sorted equivキー多重集合）は最初の順序のみ残す。
+      - ビーム: 各深さの継続候補を value（固定 gen5）で評価し上位 beam 本のみ展開。
+      - プラン上限 max_plans も value 順。**切り捨ては必ずログ**（無言の縮約禁止）。
+    返り値: [(keys, descs)]（keys=equivキー列＝世界線への再適用用、descs=表示用）。
+    """
+    plans = []                      # (keys, descs, 終端盤面value)
+    seen_sets = set()               # sorted(keys) の多重集合＝並べ替え等価の除去
+    frontier = [([], [], m0)]
+    for _depth in range(max_len):
+        nxt = []
+        for keys, descs, st in frontier:
+            for mv in game_root.legal_actions(st):
+                try:
+                    d = cpu_ai._describe_move(st, mv) or {}
+                    k = cpu_ai._move_equiv_key(st, mv)
+                except Exception:
+                    continue
+                sig = tuple(sorted(map(repr, keys + [k])))
+                if sig in seen_sets:
+                    continue
+                child = game_root.apply(st, mv, name)
+                if child is None:
+                    continue
+                seen_sets.add(sig)
+                if game_root.current_player(child) != name:
+                    plans.append((keys + [k], descs + [d], vf(child, name)))
+                else:
+                    nxt.append((keys + [k], descs + [d], child))
+        if not nxt:
+            break
+        if len(nxt) > beam:
+            nxt.sort(key=lambda t: -vf(t[2], name))
+            log(f"  [beam] 深さ{_depth + 1}: 継続 {len(nxt)}→{beam} 本に縮約")
+            nxt = nxt[:beam]
+        frontier = nxt
+    else:
+        if frontier:
+            log(f"  [len] 長さ上限 {max_len} で未終端 {len(frontier)} 本を破棄")
+    if len(plans) > max_plans:
+        # 上限は**コミットメント（最終手＝攻撃宣言/TURN_END）別のラウンドロビン**で選ぶ。
+        # 素朴な value 順は gen5 の盲点（付与→TURN_END を過大評価）でプラン一覧が埋まり、
+        # 攻撃プランが全滅する（@64 実測）。レフェリーはネットの予断を**正す**計器なので、
+        # 異なるコミットメントを必ず代表させ、同一コミットメント内の順位だけ value に任せる。
+        groups: dict = {}
+        for t in plans:
+            groups.setdefault(repr(t[0][-1]), []).append(t)
+        def _self_touch(t):
+            # 準備手のうち最終コミット手と同じカードに触れる数（例: 攻撃者自身へのドン付与）。
+            # 同長プランでは自己強化系を優先——「他ユニットに付与→攻撃」より「攻撃者に付与→攻撃」が
+            # 比較の本命（equiv キーの card 欄＝構造のみ・カード非依存）。
+            final_card = t[0][-1][1]
+            return sum(1 for k in t[0][:-1] if k[1] is not None and k[1] == final_card)
+        for g in groups.values():
+            # 種内は**短いプラン優先**（素形→装飾の順・同長は自己強化→value）。value 単独だと
+            # ネットの付与バイアスで素の攻撃/素の TURN_END が押し出される（@64 実測）。
+            g.sort(key=lambda t: (len(t[0]), -_self_touch(t), -t[2]))
+        order = sorted(groups.values(), key=lambda g: -g[0][2])
+        kept = []
+        r = 0
+        while len(kept) < max_plans and any(len(g) > r for g in order):
+            for g in order:
+                if len(g) > r and len(kept) < max_plans:
+                    kept.append(g[r])
+            r += 1
+        log(f"  [cap] プラン {len(plans)}→{len(kept)} 本に縮約"
+            f"（コミットメント{len(groups)}種のラウンドロビン・種内は短さ→自己強化→value）")
+        plans = kept
+    return [(keys, descs) for keys, descs, _v in plans]
+
+
+def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds,
+                 band=0.5, log=print):
+    """プランモード（教師CPU §ターンプラン）: 手順列を**固定して**適用→以降ロールアウト。
 
     root prefix 比較はロールアウト役の盲点（例: 付与後に攻撃しない）に後半の実行を委ねてしまい、
     「付与→攻撃」のようなプランの価値を系統的に取りこぼす（g3@64 のトレースで実証）。
-    プラン全体を固定すれば、比較対象は純粋に「プラン間の因果差」になる。"""
+    プラン全体を固定すれば、比較対象は純粋に「プラン間の因果差」になる。
+
+    `plans`: 手指定リスト（'ACTION:card>...' 文字列）または "auto"（v8 柱A・自動列挙）。
+    `band`: 同価値バンド（v8 柱B）。最善と勝ち数が同じ かつ ライフ差の差 < band の
+    プランは「≈同価値」と申告し、バンド外の差だけを序列として断定する。"""
     built = _restore_board(db, tag, i)
     if isinstance(built, str):
         log(f"{tag}@{i}: 復元不可 ({built})"); return None
     m0, actor = built
     name = actor.name if hasattr(actor, "name") else actor
-    stats = {p: [0.0, 0.0] for p in plans}   # wins, life合計
+    if plans == "auto":
+        auto = enumerate_turn_plans(game_root, vf, m0, name, max_len=ARGS.plan_len,
+                                    beam=ARGS.beam, max_plans=ARGS.max_plans, log=log)
+        entries = [{"label": ">".join(_step_label(d) for d in descs), "keys": keys}
+                   for keys, descs in auto]
+    else:
+        entries = [{"label": p, "steps": p.split(">")} for p in plans]
+    if not entries:
+        log(f"{tag}@{i}: プラン0本"); return None
+    for e in entries:
+        e["wins"] = 0.0; e["life"] = 0.0; e["ok"] = 0
     for w in range(worlds):
         world = game_serve.determinize(m0, name, np.random.default_rng(90000 + w * 97))
-        for p in plans:
+        for n_e, e in enumerate(entries):
             m = world
             ok = True
-            for step in p.split(">"):
+            for step in (e.get("keys") or e["steps"]):
                 legal = game_root.legal_actions(m)
-                mv = _match_move(m, legal, step)
+                mv = (_match_move_by_key(m, legal, step) if "keys" in e else
+                      _match_move(m, legal, step))
                 if mv is None:
                     ok = False; break
                 m = game_serve.apply(m, mv, name)
@@ -202,15 +318,22 @@ def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds, log=p
             if not ok:
                 continue   # この世界ではプラン不成立（勝ち加算なし）
             winner, ld, _et = rollout(game_serve, vf, pf, m, name,
-                                      world_seed=90000 + w * 97, rng_seed=w * 7919 + hash(p) % 997)
+                                      world_seed=90000 + w * 97, rng_seed=w * 7919 + n_e)
             if winner == name:
-                stats[p][0] += 1
-            stats[p][1] += ld
-    log(f"\n=== プラン比較 {tag}@{i}（{worlds}世界）===")
-    for p in plans:
-        wn, lf = stats[p]
-        log(f"  {wn:.0f}/{worlds} L{lf / max(worlds, 1):+.2f}  {p}")
-    return stats
+                e["wins"] += 1
+            e["life"] += ld
+            e["ok"] += 1
+    for e in entries:
+        e["lifem"] = e["life"] / max(e["ok"], 1)
+    entries.sort(key=lambda e: (-e["wins"], -e["lifem"]))
+    best = entries[0]
+    log(f"\n=== プラン比較 {tag}@{i}（{len(entries)}プラン × {worlds}世界・band={band}）===")
+    for e in entries:
+        tie = (e["wins"] == best["wins"] and best["lifem"] - e["lifem"] < band)
+        mark = "≈" if tie and e is not best else ("★" if e is best else " ")
+        miss = f" (不成立{worlds - e['ok']})" if e["ok"] < worlds else ""
+        log(f"  {mark} {e['wins']:.0f}/{worlds} L{e['lifem']:+.2f}  {e['label']}{miss}")
+    return entries
 
 
 def main():
@@ -219,8 +342,14 @@ def main():
     ap.add_argument("--marks", default="g3:64,g3:68,g1:12,g3:82,g3:93,g1:16",
                     help="tag:index のカンマ区切り")
     ap.add_argument("--plans", default=None,
-                    help="プランモード: 'A|B' 形式（各プランは 'ACTION:card>ACTION:card' の手順列）。"
+                    help="プランモード: 'A|B' 形式（各プランは 'ACTION:card>ACTION:card' の手順列）"
+                         "または 'auto'（v8 柱A・自ターン内プランの自動列挙）。"
                          "指定時は --marks の最初の1件でプラン同士を比較する")
+    ap.add_argument("--band", type=float, default=0.5,
+                    help="同価値バンド（v8 柱B）: 勝ち数同一かつライフ差の差がこれ未満は同価値と申告")
+    ap.add_argument("--plan-len", type=int, default=4, help="自動列挙の手順長上限")
+    ap.add_argument("--beam", type=int, default=12, help="自動列挙のビーム幅（value順）")
+    ap.add_argument("--max-plans", type=int, default=16, help="自動列挙のプラン上限（value順）")
     ap.add_argument("--worlds", type=int, default=6, help="世界線数 K（CRN で全手に共有）")
     ap.add_argument("--sims", type=int, default=64, help="ロールアウト中の decide sims")
     ap.add_argument("--net", default=None,
@@ -259,8 +388,9 @@ def main():
                           rec["actions"])
     if ARGS.plans:
         tag, i = marks[0]
+        plans = "auto" if ARGS.plans == "auto" else ARGS.plans.split("|")
         plan_referee(db, game_root, game_serve, vf, pf, tag, i,
-                     ARGS.plans.split("|"), ARGS.worlds)
+                     plans, ARGS.worlds, band=ARGS.band)
         return 0
     for tag, i in marks:
         pred = table[(tag, i)][1]
