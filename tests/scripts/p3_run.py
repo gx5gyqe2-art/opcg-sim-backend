@@ -194,7 +194,7 @@ def _gen_task(payload):
     """1ワーカー分の自己対戦生成。ゲームループ本体は `p3_loop.selfplay_game`（共通コア・v4拡張＝
     sticky世界線/防御応答温度/q_root/turns_left/L1混合 もそこで付与）へ委譲する。"""
     (seed, n_games, sims, eps, vpath, ppath, ev, leaders, l1_mix, mark_frac,
-     relabel_frac, relabel_sims) = payload
+     relabel_frac, relabel_sims, prior_flatten, q_beta) = payload
     db, vocab, game = _W["db"], _W["vocab"], _W["game"]
     vnet = RN.ValueNet.load(vpath)
     pnet = PolicyScorer.load(ppath) if ppath else None
@@ -202,7 +202,8 @@ def _gen_task(payload):
         # 符号化はネット付属 vocab（訓練時の card_id→idx）で行う＝現行DBソート（_W["vocab"]）とは
         # 途中挿入でズレうる。ネットの知らない新カードは encode 側で UNK=0（安全）。
         vocab = E.vocab_from_ids(vnet.vocab_ids)
-    vf = P.value_fn_of(vnet, vocab, ev); pf = P.priors_fn_of(pnet, vocab, ev)
+    vf = P.value_fn_of(vnet, vocab, ev)
+    pf = P.priors_fn_of(pnet, vocab, ev, flatten=prior_flatten)   # v7 案D（生成専用の部分平坦化）
     # (e) マーク局面シード（v5 §4-2）: frac>0 のときだけプールを1回復元してワーカーに載せる。
     seed_boards = None
     if mark_frac > 0.0:
@@ -223,7 +224,8 @@ def _gen_task(payload):
         rv, rp, w = P.selfplay_game(game, vf, pf, vocab, sims, C_PUCT, rng,
                                     enc_version=ev, leaders=leaders, dirichlet_eps=eps, db=db,
                                     l1_seat=l1_seat, seed_boards=seed_boards, seed_frac=mark_frac,
-                                    relabel_frac=relabel_frac, relabel_sims=relabel_sims)
+                                    relabel_frac=relabel_frac, relabel_sims=relabel_sims,
+                                    q_teacher_beta=q_beta)
         if w is None:
             continue
         P.merge_val_recs(rv, w, sinks)
@@ -237,7 +239,8 @@ def _gen_task(payload):
 
 
 def selfplay_shard(pool, workers, n_games, sims, eps, vpath, ppath, base_seed, ev=1, leaders=None,
-                   l1_mix=0.0, mark_frac=0.0, relabel_frac=0.0, relabel_sims=0):
+                   l1_mix=0.0, mark_frac=0.0, relabel_frac=0.0, relabel_sims=0,
+                   prior_flatten=0.0, q_beta=0.0):
     """n_games を workers 個に分割して並列生成→マージ。返り値 (vdata, pol, game_turns, l1_games)。
 
     vdata は batch スキーマ v2（value に加え q_root / turns_left・docs/cpu_v4_plan.md §4-1/4-2）。
@@ -245,10 +248,11 @@ def selfplay_shard(pool, workers, n_games, sims, eps, vpath, ppath, base_seed, e
     l1_mix は §4-1(d) の L1-hard 混合比（0=従来の純自己対戦）・l1_games は実際の混合局数。
     mark_frac は §4-2(e) のマーク局面シード比（0=従来の turn1 開始のみ）。
     relabel_frac/relabel_sims は v6 深探索再ラベル（prior平坦化・p3_loop.selfplay_game 参照・0=無効）。
+    prior_flatten/q_beta は v7 案D/F（教師エコー対策・p3_loop.priors_fn_of / q_reweight 参照・0=無効）。
     """
     per = max(1, n_games // workers)
     tasks = [(base_seed * 131 + w * 977 + 1, per, sims, eps, vpath, ppath, ev, leaders, l1_mix,
-              mark_frac, relabel_frac, relabel_sims)
+              mark_frac, relabel_frac, relabel_sims, prior_flatten, q_beta)
              for w in range(workers)]
     parts = pool.map(_gen_task, tasks)
     vds, pol, game_turns, l1_games = [], [], [], 0

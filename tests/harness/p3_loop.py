@@ -43,7 +43,13 @@ def value_fn_of(net, vocab, enc_version=1):
     return value
 
 
-def priors_fn_of(policy, vocab, enc_version=1):
+def priors_fn_of(policy, vocab, enc_version=1, flatten=0.0):
+    """policy → 探索用 priors_fn。
+
+    flatten > 0（v7 案D・生成専用）: p' = (1−λ)·p + λ/K の**部分平坦化**。教師（訪問分布）が
+    prior の再生産になるエコー（実測相関 0.93・docs/reports/seesaw_probe_20260716.md）を断つため、
+    生成探索に常時「prior 非依存の探索成分」を混ぜる。root の Dirichlet と違い**木の深部まで**効く。
+    λ=0 は恒等（従来・serve 側 `cpu_learned._priors_fn` は別実装で不変）。"""
     if policy is None:
         return None
     def priors(state, legal):
@@ -51,8 +57,27 @@ def priors_fn_of(policy, vocab, enc_version=1):
         ctx = state_context(state, me, vocab, version=enc_version)
         am = legal_action_matrix(state, legal, me)
         p = policy.priors(ctx, am)
-        return p if p.shape[0] == len(legal) else None
+        if p is None or p.shape[0] != len(legal):
+            return None
+        if flatten > 0.0:
+            p = (1.0 - flatten) * p + flatten / len(legal)
+        return p
     return priors
+
+
+def q_reweight(N, Q, beta):
+    """訪問分布教師の Q 補正（v7 案F）: t_i ∝ N_i · exp(β·(Q_i − max Q))。
+
+    エコー教師の下では value の意見が policy に伝わらない（@82: value は正着支持なのに prior が
+    誤誘導のまま）。訪問数に root Q の指数重みを掛け、**探索が感じた良し悪しを教師に注入**する。
+    β=0 は恒等（従来の N 正規化）。N_i=0 の手は 0 のまま（読んでいない手を持ち上げない）。"""
+    N = np.asarray(N, dtype=np.float64)
+    if beta <= 0.0 or N.sum() <= 0:
+        return N / max(N.sum(), 1e-9)
+    Q = np.asarray(Q, dtype=np.float64)
+    w = N * np.exp(beta * (Q - Q.max()))
+    s = w.sum()
+    return w / s if s > 0 else N / N.sum()
 
 
 def _sample(counts, rng, temp):
@@ -70,7 +95,7 @@ _BATTLE_RESPONSES = ("SELECT_BLOCKER", "SELECT_COUNTER")
 def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_moves=SELFPLAY_TEMP_MOVES,
                   max_steps=400, enc_version=1, leaders=None, dirichlet_eps=0.0, db=None,
                   l1_seat=None, seed_boards=None, seed_frac=0.0,
-                  relabel_frac=0.0, relabel_sims=0):
+                  relabel_frac=0.0, relabel_sims=0, q_teacher_beta=0.0):
     """1局の自己対戦データを採取する（直列/pd並列生成の共通コア・v4計画 §4-1）。
 
     v4 での拡張（docs/cpu_v4_plan.md）:
@@ -152,7 +177,8 @@ def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_move
             break
         stats = mcts.last_stats
         q_root = float((stats["N"] * stats["Q"]).sum() / max(float(stats["N"].sum()), 1.0))
-        visit = N.astype(np.float64) / N.sum()
+        # v7 案F: 教師 = N の正規化 → Q 補正付き（β=0 で従来と同一・`q_reweight` 参照）。
+        visit = q_reweight(N, stats["Q"], q_teacher_beta)
         if relabel_frac > 0.0 and relabel_sims > 0 and float(rng.random()) < float(relabel_frac):
             # v6 深探索再ラベル: prior 平坦化（priors_fn=None＝一様）・ノイズ無しの教師探索。
             # 合法手列挙は同一状態から決定論＝legal の並びは本探索と一致する（不一致は安全側で棄却）。

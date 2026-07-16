@@ -111,6 +111,12 @@ def main():
                          "教師探索にかけ policy 教師を差し替える（0=無効。コスト≒ frac×relabel_sims/sims 増）")
     ap.add_argument("--relabel-sims", type=int, default=1600,
                     help="再ラベル教師探索の sims（生成 sims の10倍目安・prior平坦化＋ノイズ無し）")
+    ap.add_argument("--prior-flatten", type=float, default=0.0,
+                    help="v7 案D: 生成探索の prior 部分平坦化 λ（p'=(1−λ)p+λ/K・0=従来。"
+                         "教師=priorエコー（実測corr0.93）を断つ。推奨 0.2）")
+    ap.add_argument("--q-teacher-beta", type=float, default=0.0,
+                    help="v7 案F: 訪問分布教師の Q 補正 β（t∝N·exp(βQ)・0=従来。"
+                         "value の意見を教師に注入する。推奨 2.0）")
     ap.add_argument("--max-batches", type=int, default=10 ** 9)
     ap.add_argument("--gen-from", choices=("best", "candidate"), default="best",
                     help="生成に使うネット（v6 柱①）: best=p3best があればベストから（既定）／"
@@ -151,7 +157,8 @@ def main():
                 pool, args.workers, args.games, args.sims,
                 args.dirichlet_eps, ck + "/_cur_v.npz", ppath,
                 seed_base, ev=ev, leaders=leaders, l1_mix=args.l1_mix, mark_frac=args.mark_seed_frac,
-                relabel_frac=args.relabel_frac, relabel_sims=args.relabel_sims)
+                relabel_frac=args.relabel_frac, relabel_sims=args.relabel_sims,
+                prior_flatten=args.prior_flatten, q_beta=args.q_teacher_beta)
             if vdata is None:
                 print("  採取0スキップ", flush=True); continue
             # data枝へ push（自分が単独writer＝amend+force で安全）。policy教師も同梱（直列とのパリティ）。
