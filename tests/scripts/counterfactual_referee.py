@@ -96,7 +96,7 @@ def _restore_board(db, tag, i):
     パワー修正・一時効果込みの真盤面。既定はフレーム復元（従来挙動・公開情報のみ）。"""
     rec, fbi, actions = GAMES[tag]
     if ARGS.true_board:
-        m, who = RR.state_at_action(db, rec, i)
+        m, who = RR.state_at_action(db, rec, i, frames=fbi)
         if m is None:
             return f"true-board 再生不能: {who}"
         return m, who

@@ -52,6 +52,18 @@ def test_state_at_action_reaches_mark(board64):
     assert m.turn_player.name == "p2"
 
 
+def test_state_at_action_replays_full_game_with_frames(db, g3):
+    """フレーム差分による対象特定（対象欠落 ATTACK_CONFIRM）込みで全159手を最後まで再生できる。
+
+    フレーム無しだと「リーダー優先」推測が g3@86 のキャラ攻撃をライフ攻撃に化けさせ、
+    幻のトリガー対話（菊之丞）で step 88 が分岐する（実測）。"""
+    fbi = {f.get("action_index"): f for f in g3["frames"]}
+    n = len(g3["replay"]["actions"])
+    m, who = RR.state_at_action(db, g3["replay"], n - 1, frames=fbi)
+    assert m is not None, f"全手再生が分岐: {who}"
+    assert m.turn_count >= 13
+
+
 def test_true_board_matches_frame_public_info(g3, board64):
     """公開情報（ライフ/手札枚数/ドン/場の構成とレスト状態）が直前フレームと一致する。"""
     m, _ = board64

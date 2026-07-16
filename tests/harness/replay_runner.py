@@ -101,12 +101,17 @@ class _HumanReplaySeat:
         return mv
 
 
-def resolve_api_action(manager, actor, recorded: Dict[str, Any]):
+def resolve_api_action(manager, actor, recorded: Dict[str, Any],
+                       frames: Optional[Dict[int, Dict[str, Any]]] = None,
+                       actions: Optional[List[Dict[str, Any]]] = None):
     """API 実対局の記録語彙をエンジン合法手へ逆写像する（`state_at_action` 用の拡張リゾルバ）。
 
     標準リゾルバで一致しない API 固有の表現を追加で写像する:
       - `ATTACK_CONFIRM/攻撃者X`（対象欠落あり）→ エンジン `ATTACK/X`。対象は記録があればそれ、
-        無ければ合法対象が一意ならそれ、複数なら相手リーダー優先（API の主経路）。
+        無ければ合法対象が一意ならそれ。複数候補は**録画フレーム差分**で特定する
+        （ライフ減=リーダー・場から消えた札=その対象。g3@86 で「リーダー優先」の推測が
+        キャラ攻撃をライフ攻撃に化けさせ、幻のトリガー対話で分岐した実測に基づく）。
+        フレームで判定できないときのみ相手リーダー優先（API の主経路）に落ちる。
       - `RESOLVE_EFFECT_SELECTION`＝効果対話の人間解決。`get_legal_actions` は既定解決
         （`default_interaction_payload`＝min 件先頭選択）の**1手しか列挙しない**ため、人間の実選択
         （`selected` の card_id 列）は合法手列挙に現れない。pending request の候補
@@ -131,6 +136,9 @@ def resolve_api_action(manager, actor, recorded: Dict[str, Any]):
                 cands.append((m2, d))
         if len(cands) == 1:
             return cands[0][0]
+        mv = _attack_target_from_frames(manager, actor, recorded, cands, frames, actions)
+        if mv is not None:
+            return mv
         opp = manager.p2 if actor.name == manager.p1.name else manager.p1
         lid = getattr(getattr(opp.leader, "master", None), "card_id", None)
         for m2, d in cands:
@@ -138,6 +146,45 @@ def resolve_api_action(manager, actor, recorded: Dict[str, Any]):
                 return m2
         if cands:
             return cands[0][0]
+    return None
+
+
+def _attack_target_from_frames(manager, actor, recorded, cands, frames, actions):
+    """対象欠落の ATTACK_CONFIRM を録画フレーム差分で特定する。
+
+    宣言 i の戦闘は、次に攻撃側の記録アクションが来る直前（防御側応答の最後 j）までに解決する。
+    frame[i]（宣言直後）と frame[j]（解決後）の相手側差分が対象を決める:
+      - ライフ減 → リーダー対象
+      - 場から消えた札 → その card_id を対象に持つ候補（同 card_id の複製は挙動等価＝先頭）
+      - 差分なし（攻撃不成立＝どの対象でも盤面不変） → None（呼び出し側の既定へ）
+    """
+    i = recorded.get("_idx")
+    if i is None or not frames or not actions:
+        return None
+    j, k = i, i + 1
+    while k < len(actions) and actions[k].get("player") != recorded.get("player"):
+        j = k; k += 1
+    pre = frames.get(i) or frames.get(i - 1)
+    post = frames.get(j)
+    if not pre or not post:
+        return None
+    opp_pid = "p2" if recorded.get("player") == "p1" else "p1"
+    pre_o = (pre.get("players") or {}).get(opp_pid) or {}
+    post_o = (post.get("players") or {}).get(opp_pid) or {}
+    if len(post_o.get("life") or []) < len(pre_o.get("life") or []):
+        opp = manager.p2 if actor.name == manager.p1.name else manager.p1
+        lid = getattr(getattr(opp.leader, "master", None), "card_id", None)
+        for m2, d in cands:
+            if lid and lid in (d.get("targets") or ()):
+                return m2
+        return None
+    post_uuids = {c.get("uuid") for c in (post_o.get("field") or [])}
+    gone_ids = {c.get("card_id") for c in (pre_o.get("field") or [])
+                if c.get("uuid") not in post_uuids}
+    if gone_ids:
+        for m2, d in cands:
+            if gone_ids & set(d.get("targets") or ()):
+                return m2
     return None
 
 
@@ -203,7 +250,8 @@ class _ManagerCapture:
 
 
 def state_at_action(db, descriptor: Dict[str, Any], upto: int,
-                    first_player: Optional[str] = None):
+                    first_player: Optional[str] = None,
+                    frames: Optional[Any] = None):
     """記録済み対局を**両席とも記録アクションどおり**に再実行し、action index `upto` の直前で
     停止した真の GameManager を返す（(manager, actor_pid) or (None, 診断dict)）。
 
@@ -222,8 +270,14 @@ def state_at_action(db, descriptor: Dict[str, Any], upto: int,
         return l_p1, c_p1, l_p2, c_p2
 
     acts = descriptor.get("actions", [])
-    seats = {pid: _HumanReplaySeat([a for a in acts if a.get("player") == pid],
-                                   resolver=resolve_api_action)
+    # フレーム差分による対象特定（`_attack_target_from_frames`）用に全体 index を焼き込む。
+    acts_idx = [dict(a, _idx=n) for n, a in enumerate(acts)]
+    fmap = (frames if isinstance(frames, dict) else
+            {f.get("action_index"): f for f in frames}) if frames else None
+    def _resolver(m, a, r):
+        return resolve_api_action(m, a, r, frames=fmap, actions=acts_idx)
+    seats = {pid: _HumanReplaySeat([a for a in acts_idx if a.get("player") == pid],
+                                   resolver=_resolver)
              for pid in ("p1", "p2")}
     cap = _ManagerCapture()
     # API 実対局はコイントスが乱数を消費する＝"random" を渡して seed から再現（結果 "p1" を
