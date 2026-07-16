@@ -83,9 +83,10 @@ def _cpu_seat(difficulty: str, sims: int = 160):
 class _HumanReplaySeat:
     """記録された人間アクション列を順に注入する席（`seat(ctx)->move`）。"""
 
-    def __init__(self, actions: List[Dict[str, Any]]):
+    def __init__(self, actions: List[Dict[str, Any]], resolver=None):
         self._actions = list(actions)
         self._i = 0
+        self._resolve = resolver or resolve_recorded_action   # 既定＝従来（roundtrip 挙動不変）
         self.misses: List[Dict[str, Any]] = []   # 逆写像不能・列消尽を記録（round-trip 診断）
 
     def __call__(self, ctx):
@@ -94,10 +95,97 @@ class _HumanReplaySeat:
             return None
         rec = self._actions[self._i]
         self._i += 1
-        mv = resolve_recorded_action(ctx.manager, ctx.actor, rec)
+        mv = self._resolve(ctx.manager, ctx.actor, rec)
         if mv is None:
             self.misses.append({"reason": "no_match", "step": ctx.step, "recorded": rec})
         return mv
+
+
+def resolve_api_action(manager, actor, recorded: Dict[str, Any]):
+    """API 実対局の記録語彙をエンジン合法手へ逆写像する（`state_at_action` 用の拡張リゾルバ）。
+
+    標準リゾルバで一致しない API 固有の表現を追加で写像する:
+      - `ATTACK_CONFIRM/攻撃者X`（対象欠落あり）→ エンジン `ATTACK/X`。対象は記録があればそれ、
+        無ければ合法対象が一意ならそれ、複数なら相手リーダー優先（API の主経路）。
+    合成録画の roundtrip（`resolve_recorded_action` 既定）には手を入れない＝挙動不変。"""
+    mv = resolve_recorded_action(manager, actor, recorded)
+    if mv is not None:
+        return mv
+    if recorded.get("action_type") == "ATTACK_CONFIRM":
+        rec2 = dict(recorded); rec2["action_type"] = "ATTACK"
+        mv = resolve_recorded_action(manager, actor, rec2)
+        if mv is not None:
+            return mv
+        cands = []
+        for m2 in manager.get_legal_actions(actor):
+            d = cpu_ai._describe_move(manager, m2) or {}
+            if d.get("action_type") == "ATTACK" and d.get("card") == recorded.get("card"):
+                cands.append((m2, d))
+        if len(cands) == 1:
+            return cands[0][0]
+        opp = manager.p2 if actor.name == manager.p1.name else manager.p1
+        lid = getattr(getattr(opp.leader, "master", None), "card_id", None)
+        for m2, d in cands:
+            if lid and lid in (d.get("targets") or ()):
+                return m2
+        if cands:
+            return cands[0][0]
+    return None
+
+
+# --- 真盤面の再構築（両席とも記録どおりに再実行して途中停止） -----------------
+
+class _ManagerCapture:
+    """run_game の manager 参照を捕まえる観測専用 observer（状態は一切変更しない）。"""
+
+    def __init__(self):
+        self.manager = None
+
+    def on_decision(self, ctx, move):
+        self.manager = ctx.manager
+
+
+def state_at_action(db, descriptor: Dict[str, Any], upto: int,
+                    first_player: Optional[str] = None):
+    """記録済み対局を**両席とも記録アクションどおり**に再実行し、action index `upto` の直前で
+    停止した真の GameManager を返す（(manager, actor_pid) or (None, 診断dict)）。
+
+    フレーム復元（`replay_reeval._board_from_frame`）はパワー修正・一時効果などの内部状態を
+    持たない（実測: デバフで 1000 のキャラが素の 7000 で復元される）。本関数は seed から
+    デッキ構築→start_game→記録アクションを順に適用するので、その時点の**全内部状態**が正確。
+    CPU 再 decide を一切しない（両席 scripted）＝現ビルドとの方策ドリフトの影響を受けない。
+    ルール解決が録画時ビルドと変わっていた場合のみ miss（分岐）として検出・報告する。"""
+    seed = int(descriptor["seed"])
+    leaders = descriptor.get("leaders", {})
+    decks = descriptor["decks"]
+
+    def _deck_builder(_db, _seed):
+        l_p1, c_p1 = build_deck_from_ids(_db, leaders.get("p1"), decks["p1"], "p1")
+        l_p2, c_p2 = build_deck_from_ids(_db, leaders.get("p2"), decks["p2"], "p2")
+        return l_p1, c_p1, l_p2, c_p2
+
+    acts = descriptor.get("actions", [])
+    seats = {pid: _HumanReplaySeat([a for a in acts if a.get("player") == pid],
+                                   resolver=resolve_api_action)
+             for pid in ("p1", "p2")}
+    cap = _ManagerCapture()
+    # API 実対局はコイントスが乱数を消費する＝"random" を渡して seed から再現（結果 "p1" を
+    # 直接渡すと以後のシャッフル/ドローの乱数列がズレる）。合成録画は first_player_mode 保存値。
+    fp = first_player if first_player is not None else \
+        descriptor.get("first_player_mode") or "random"
+    try:
+        run_game(seed, db, seats=seats, deck_builder=_deck_builder, observers=[cap],
+                 legal_moves="skip", invariants="raise", stop_after_decisions=upto,
+                 first_player=fp)
+    except InvariantError as e:
+        misses = seats["p1"].misses + seats["p2"].misses
+        return None, {"reason": "invariant", "step": getattr(e, "step", None), "misses": misses}
+    misses = seats["p1"].misses + seats["p2"].misses
+    if misses:
+        return None, {"reason": "miss", "misses": misses}
+    if cap.manager is None:
+        return None, {"reason": "no_decision"}
+    return cap.manager, acts[upto].get("player") if upto < len(acts) else None
 
 
 # --- 再生本体 ----------------------------------------------------------------
