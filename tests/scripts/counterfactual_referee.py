@@ -149,11 +149,64 @@ def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, lo
             "n_moves": len(legal)}
 
 
+def _match_move(state, legal, step):
+    """プラン1歩（'ACTION_TYPE:card' または 'ACTION_TYPE'）に合致する合法手を返す（無ければ None）。"""
+    at, _, card = step.partition(":")
+    for mv in legal:
+        try:
+            d = cpu_ai._describe_move(state, mv) or {}
+        except Exception:
+            continue
+        if d.get("action_type") == at and (not card or d.get("card") == card):
+            return mv
+    return None
+
+
+def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds, log=print):
+    """プランモード（v7 教師CPU §ターンプラン）: 手順列を**固定して**適用→以降ロールアウト。
+
+    root prefix 比較はロールアウト役の盲点（例: 付与後に攻撃しない）に後半の実行を委ねてしまい、
+    「付与→攻撃」のようなプランの価値を系統的に取りこぼす（g3@64 のトレースで実証）。
+    プラン全体を固定すれば、比較対象は純粋に「プラン間の因果差」になる。"""
+    rec, fbi, actions = GAMES[tag]
+    m0, actor = MG._restore(db, rec, fbi, actions, i)
+    name = actor.name if hasattr(actor, "name") else actor
+    stats = {p: [0.0, 0.0] for p in plans}   # wins, life合計
+    for w in range(worlds):
+        world = game_serve.determinize(m0, name, np.random.default_rng(90000 + w * 97))
+        for p in plans:
+            m = world
+            ok = True
+            for step in p.split(">"):
+                legal = game_root.legal_actions(m)
+                mv = _match_move(m, legal, step)
+                if mv is None:
+                    ok = False; break
+                m = game_serve.apply(m, mv, name)
+                if m is None:
+                    ok = False; break
+            if not ok:
+                continue   # この世界ではプラン不成立（勝ち加算なし）
+            winner, ld, _et = rollout(game_serve, vf, pf, m, name,
+                                      world_seed=90000 + w * 97, rng_seed=w * 7919 + hash(p) % 997)
+            if winner == name:
+                stats[p][0] += 1
+            stats[p][1] += ld
+    log(f"\n=== プラン比較 {tag}@{i}（{worlds}世界）===")
+    for p in plans:
+        wn, lf = stats[p]
+        log(f"  {wn:.0f}/{worlds} L{lf / max(worlds, 1):+.2f}  {p}")
+    return stats
+
+
 def main():
     global ARGS, GAMES
     ap = argparse.ArgumentParser()
     ap.add_argument("--marks", default="g3:64,g3:68,g1:12,g3:82,g3:93,g1:16",
                     help="tag:index のカンマ区切り")
+    ap.add_argument("--plans", default=None,
+                    help="プランモード: 'A|B' 形式（各プランは 'ACTION:card>ACTION:card' の手順列）。"
+                         "指定時は --marks の最初の1件でプラン同士を比較する")
     ap.add_argument("--worlds", type=int, default=6, help="世界線数 K（CRN で全手に共有）")
     ap.add_argument("--sims", type=int, default=64, help="ロールアウト中の decide sims")
     ap.add_argument("--net", default=None,
@@ -187,6 +240,11 @@ def main():
             raw = RE.load_replay_json(MG.REPLAYS[tag]); rec = raw.get("replay", raw)
             GAMES[tag] = (rec, {f.get("action_index"): f for f in raw.get("frames") or []},
                           rec["actions"])
+    if ARGS.plans:
+        tag, i = marks[0]
+        plan_referee(db, game_root, game_serve, vf, pf, tag, i,
+                     ARGS.plans.split("|"), ARGS.worlds)
+        return 0
     for tag, i in marks:
         pred = table[(tag, i)][1]
         r = referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, ARGS.worlds)
