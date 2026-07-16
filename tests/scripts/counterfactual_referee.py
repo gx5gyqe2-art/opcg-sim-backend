@@ -54,8 +54,25 @@ def _mark_table():
     return t
 
 
-def rollout(game_serve, vf, pf, state, mover, world_seed, rng_seed):
-    """state から終局まで両者同一エンジンで打つ（temp0・sticky世界線）。
+def _sample_by_visits(legal, N, temp, rng):
+    """訪問数比例（p ∝ N^(1/τ)）で手をサンプルする（捲りモードの相手不完全性モデル）。"""
+    n = np.asarray(N, dtype=float)
+    if n.sum() <= 0 or len(legal) <= 1:
+        return legal[0] if legal else None
+    logits = np.log(np.maximum(n, 1e-9)) / max(temp, 1e-6)
+    logits -= logits.max()
+    p = np.exp(logits)
+    p /= p.sum()
+    return legal[int(rng.choice(len(p), p=p))]
+
+
+def rollout(game_serve, vf, pf, state, mover, world_seed, rng_seed, opp_temp=0.0):
+    """state から終局まで両者同一エンジンで打つ（sticky世界線・既定 temp0）。
+
+    `opp_temp` > 0 は**捲りモード**: mover 以外の手番を訪問数比例（温度 τ）でサンプルする＝
+    相手の不完全性をモデル化する。相手も完璧（temp0）の前提では「相手が最善なら負け」の
+    飽和局面で捲り率が構造的に 0 になり、捲り筋（相手のミスと引きの偏りをどう最大化するか）が
+    測れないため。mover 側は常に temp0（自分は最善を尽くす前提）。
 
     返り値 (winner, life_diff, end_turn): life_diff は mover 視点の残ライフ差（勝ち方の質・
     タイブレーク用）。end_turn は決着ターン（速い勝ち／粘る負けの判別用）。"""
@@ -80,6 +97,8 @@ def rollout(game_serve, vf, pf, state, mover, world_seed, rng_seed):
         mv, N, legal = mcts.run(m)
         if mv is None:
             break
+        if opp_temp > 0 and name != mover:
+            mv = _sample_by_visits(legal, N, opp_temp, rng) or mv
         try:
             cpu_ai._apply_move_inplace(m, name, mv)
         except Exception:
@@ -322,6 +341,37 @@ def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds,
         entries = [{"label": p, "steps": p.split(">")} for p in plans]
     if not entries:
         log(f"{tag}@{i}: プラン0本"); return None
+    _eval_entries(entries, game_root, game_serve, vf, pf, m0, name, worlds)
+    entries.sort(key=lambda e: (-e["wins"], -e["lifem"]))
+    best = entries[0]
+    log(f"\n=== プラン比較 {tag}@{i}（{len(entries)}プラン × {worlds}世界・band={band}）===")
+    for e in entries:
+        mark = "★" if e is best else ("≈" if same_value(best, e, band) else " ")
+        miss = f" (不成立{worlds - e['ok']})" if e["ok"] < worlds else ""
+        log(f"  {mark} {e['wins']:.0f}/{worlds} L{e['lifem']:+.2f}  {e['label']}{miss}")
+    # 捲りモード（--comeback）: 飽和負け（最善でも勝ち ≤1）は temp0 の相対比較に勾配が無い。
+    # 上位プランに絞って世界数を増やし、相手手番に温度を入れて「相手の不完全性・引きの偏りを
+    # どう最大化するか＝捲り率」で再判定する。
+    if getattr(ARGS, "comeback", 0.0) > 0 and best["wins"] <= 1:
+        top = entries[:min(6, len(entries))]
+        w2 = worlds * 4
+        log(f"\n--- 捲りモード: 飽和負け → 上位{len(top)}プランを {w2}世界 × 相手温度"
+            f" τ={ARGS.comeback} で再判定 ---")
+        cb = [{"label": e["label"], **({"keys": e["keys"]} if "keys" in e else
+                                       {"steps": e["steps"]})} for e in top]
+        _eval_entries(cb, game_root, game_serve, vf, pf, m0, name, w2,
+                      opp_temp=ARGS.comeback)
+        cb.sort(key=lambda e: (-e["wins"], -e["lifem"]))
+        cbest = cb[0]
+        for e in cb:
+            mark = "★" if e is cbest else ("≈" if same_value(cbest, e, band) else " ")
+            log(f"  {mark} 捲り {e['wins']:.0f}/{w2} L{e['lifem']:+.2f}  {e['label']}")
+        return cb
+    return entries
+
+
+def _eval_entries(entries, game_root, game_serve, vf, pf, m0, name, worlds, opp_temp=0.0):
+    """プラン集合を CRN 世界線で評価する（plan_referee/捲りモード共用の内側ループ）。"""
     for e in entries:
         e["wins"] = 0.0; e["life"] = 0.0; e["ok"] = 0; e["outcomes"] = {}
     for w in range(worlds):
@@ -341,7 +391,8 @@ def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds,
             if not ok:
                 continue   # この世界ではプラン不成立（勝ち加算なし）
             winner, ld, _et = rollout(game_serve, vf, pf, m, name,
-                                      world_seed=90000 + w * 97, rng_seed=w * 7919 + n_e)
+                                      world_seed=90000 + w * 97, rng_seed=w * 7919 + n_e,
+                                      opp_temp=opp_temp)
             e["outcomes"][w] = (winner == name)
             if winner == name:
                 e["wins"] += 1
@@ -349,13 +400,6 @@ def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds,
             e["ok"] += 1
     for e in entries:
         e["lifem"] = e["life"] / max(e["ok"], 1)
-    entries.sort(key=lambda e: (-e["wins"], -e["lifem"]))
-    best = entries[0]
-    log(f"\n=== プラン比較 {tag}@{i}（{len(entries)}プラン × {worlds}世界・band={band}）===")
-    for e in entries:
-        mark = "★" if e is best else ("≈" if same_value(best, e, band) else " ")
-        miss = f" (不成立{worlds - e['ok']})" if e["ok"] < worlds else ""
-        log(f"  {mark} {e['wins']:.0f}/{worlds} L{e['lifem']:+.2f}  {e['label']}{miss}")
     return entries
 
 
@@ -370,6 +414,10 @@ def main():
                          "指定時は --marks の最初の1件でプラン同士を比較する")
     ap.add_argument("--band", type=float, default=0.5,
                     help="同価値バンド（v8 柱B）: 勝ち数同一かつライフ差の差がこれ未満は同価値と申告")
+    ap.add_argument("--comeback", type=float, default=0.0,
+                    help="捲りモードの相手温度 τ（>0 で有効）: プラン比較が飽和負け"
+                         "（最善でも勝ち≤1）のとき、上位プランを世界数×4＋相手手番の"
+                         "訪問数比例サンプル（τ）で再判定し捲り率を測る")
     ap.add_argument("--plan-len", type=int, default=4, help="自動列挙の手順長上限")
     ap.add_argument("--beam", type=int, default=12, help="自動列挙のビーム幅（value順）")
     ap.add_argument("--max-plans", type=int, default=16, help="自動列挙のプラン上限（value順）")
