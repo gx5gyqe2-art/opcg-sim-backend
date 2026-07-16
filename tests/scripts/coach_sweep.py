@@ -97,7 +97,7 @@ def sweep(db, game_root, game_serve, vf, pf, tag, indices, worlds, band, log=pri
             auto.append((akeys, adescs))   # 実プランが列挙から漏れていたら必ず加える
         entries = [{"label": ">".join(CR._step_label(d) for d in descs), "keys": keys,
                     "actual": tuple(map(repr, keys)) == sig,
-                    "wins": 0.0, "life": 0.0, "ok": 0}
+                    "wins": 0.0, "life": 0.0, "ok": 0, "outcomes": {}}
                    for keys, descs in auto]
         for w in range(worlds):
             world = game_serve.determinize(m0, name, np.random.default_rng(90000 + w * 97))
@@ -115,6 +115,7 @@ def sweep(db, game_root, game_serve, vf, pf, tag, indices, worlds, band, log=pri
                     continue
                 winner, ld, _et = CR.rollout(game_serve, vf, pf, m, name,
                                              world_seed=90000 + w * 97, rng_seed=w * 7919 + n_e)
+                e["outcomes"][w] = (winner == name)
                 if winner == name:
                     e["wins"] += 1
                 e["life"] += ld
@@ -130,7 +131,8 @@ def sweep(db, game_root, game_serve, vf, pf, tag, indices, worlds, band, log=pri
             continue
         dw = best["wins"] - act["wins"]
         dl = best["lifem"] - act["lifem"]
-        tie = (dw == 0 and dl < band)
+        # 同価値バンド v2（対判定）: 世界別勝敗の正味不一致 < 3 かつ ライフ差 < band は同価値。
+        tie = CR.same_value(best, act, band)
         verdict = "OK（最良）" if act is best else ("同価値" if tie else "損失")
         log(f"@{i} T{m0.turn_count} {verdict}  実際: {act['label']} "
             f"{act['wins']:.0f}/{worlds} L{act['lifem']:+.2f}  ({time.time()-t0:.0f}s)")

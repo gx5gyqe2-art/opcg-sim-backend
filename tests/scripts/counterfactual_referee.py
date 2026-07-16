@@ -120,6 +120,7 @@ def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, lo
     wins = np.zeros(len(legal))
     life = np.zeros(len(legal))     # mover 視点の残ライフ差の合計（勝ち方の質）
     turns = np.zeros(len(legal))    # 決着ターン合計（速い勝ちの判別・参考）
+    outcomes = [dict() for _ in legal]   # 世界別勝敗（同価値バンド v2 の対判定用）
     t0 = time.time()
     for w in range(worlds):
         # 世界線 w: 隠れ情報を再サンプルした「ありえた現実」。全 root 手で共有（CRN）。
@@ -130,6 +131,7 @@ def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, lo
                 continue
             winner, ld, et = rollout(game_serve, vf, pf, child, name,
                                      world_seed=90000 + w * 97, rng_seed=w * 7919 + k)
+            outcomes[k][w] = (winner == name)
             if winner == name:
                 wins[k] += 1
             life[k] += ld
@@ -152,12 +154,14 @@ def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, lo
     log(f"\n=== {tag}@{i}（{len(legal)}手 × {worlds}世界・{time.time()-t0:.0f}s）"
         f" 人間一致={'○' if agree else '✗'}  margin: 勝ち{wm:+.0f}/{worlds}・ライフ{lm:+.2f} ===")
     top = order[0]
+    top_e = {"outcomes": outcomes[top], "lifem": float(lifem[top])}
     for k in order:
         d = descs[k]
         mark = "◆人間" if human[k] else "  "
-        # 同価値バンド（v8 柱B）: 最善と勝ち数が同じ かつ ライフ差の差 < band は ≈（同価値圏）。
-        tie = "≈" if (k != top and wins[k] == wins[top]
-                      and lifem[top] - lifem[k] < ARGS.band) else " "
+        # 同価値バンド v2（v8 柱B・対判定）: 最善との世界別勝敗の正味不一致 < 3 かつ
+        # ライフ差 < band は ≈（同価値圏）。
+        tie = "≈" if (k != top and same_value(
+            top_e, {"outcomes": outcomes[k], "lifem": float(lifem[k])}, ARGS.band)) else " "
         log(f"  {mark}{tie} {wins[k]:.0f}/{worlds} L{lifem[k]:+.2f} T{turns[k]/max(worlds,1):.1f}"
             f"  {d.get('action_type')}"
             f"{'/' + str(d.get('card')) if d.get('card') else ''}")
@@ -176,6 +180,25 @@ def _match_move(state, legal, step):
         if d.get("action_type") == at and (not card or d.get("card") == card):
             return mv
     return None
+
+
+def same_value(best, e, band=0.5, min_discord=3):
+    """同価値バンド v2（v8 柱B・対判定）: CRN＝全プランが同じ世界線を共有する構造を活かし、
+    **同じ世界で勝敗が割れたペアの正味差**（符号検定風）で断定/同価値を分ける。
+
+    素朴な「勝ち数差」は ±1 勝のノイズで断定が揺れる（@64 実測: 6世界=同値・12世界=素攻撃+1・
+    16世界=付与+1 と符号が往復）。対判定なら運の共通項が消えた純粋な差だけが残る:
+      - 正味不一致 (n10−n01) ≥ min_discord → 実差＝断定
+      - それ未満 かつ 平均残ライフ差 < band → 同価値
+      - それ未満 でも ライフ差 ≥ band → 勝ち方の質での序列（断定はしない・表示順のみ）
+    best/e は {"outcomes": {world: bool}, "lifem": float}。"""
+    b, o = best.get("outcomes") or {}, e.get("outcomes") or {}
+    common = [w for w in b if w in o]
+    n10 = sum(1 for w in common if b[w] and not o[w])
+    n01 = sum(1 for w in common if o[w] and not b[w])
+    if n10 - n01 >= min_discord:
+        return False
+    return abs(best.get("lifem", 0.0) - e.get("lifem", 0.0)) < band
 
 
 def _match_move_by_key(state, legal, key):
@@ -300,7 +323,7 @@ def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds,
     if not entries:
         log(f"{tag}@{i}: プラン0本"); return None
     for e in entries:
-        e["wins"] = 0.0; e["life"] = 0.0; e["ok"] = 0
+        e["wins"] = 0.0; e["life"] = 0.0; e["ok"] = 0; e["outcomes"] = {}
     for w in range(worlds):
         world = game_serve.determinize(m0, name, np.random.default_rng(90000 + w * 97))
         for n_e, e in enumerate(entries):
@@ -319,6 +342,7 @@ def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds,
                 continue   # この世界ではプラン不成立（勝ち加算なし）
             winner, ld, _et = rollout(game_serve, vf, pf, m, name,
                                       world_seed=90000 + w * 97, rng_seed=w * 7919 + n_e)
+            e["outcomes"][w] = (winner == name)
             if winner == name:
                 e["wins"] += 1
             e["life"] += ld
@@ -329,8 +353,7 @@ def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds,
     best = entries[0]
     log(f"\n=== プラン比較 {tag}@{i}（{len(entries)}プラン × {worlds}世界・band={band}）===")
     for e in entries:
-        tie = (e["wins"] == best["wins"] and best["lifem"] - e["lifem"] < band)
-        mark = "≈" if tie and e is not best else ("★" if e is best else " ")
+        mark = "★" if e is best else ("≈" if same_value(best, e, band) else " ")
         miss = f" (不成立{worlds - e['ok']})" if e["ok"] < worlds else ""
         log(f"  {mark} {e['wins']:.0f}/{worlds} L{e['lifem']:+.2f}  {e['label']}{miss}")
     return entries
