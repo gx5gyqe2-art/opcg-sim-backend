@@ -108,6 +108,9 @@ def main():
     ap.add_argument("--gate-pairs1", type=int, default=12)
     ap.add_argument("--gate-pairs2", type=int, default=38)
     ap.add_argument("--gate-workers", type=int, default=3)
+    ap.add_argument("--policy-smooth", type=float, default=0.0,
+                    help="v7 案E: policy 教師のラベル平滑化 α（t'=(1−α)t+α/K・0=従来。"
+                         "prior が 0 に沈む盲点の不可逆化を防ぐ床。推奨 0.03）")
     args = ap.parse_args()
     assert DATA_BRS, "OPCG_PD_DATA_BRANCHES が空"
     ev = args.enc_version
@@ -240,7 +243,8 @@ def main():
             aux_txt = f" aux±{float(np.abs(pred_t - true_t).mean()):.2f}T"
         # policy も直列(p3_run)と同じく毎ラウンド学習（凍結だと直列と挙動が乖離＝比較が汚れる）。
         if buf_p:
-            train_policy(pnet, buf_p, epochs=args.epochs * n_up, lr=args.lr)
+            train_policy(pnet, buf_p, epochs=args.epochs * n_up, lr=args.lr,
+                         smooth=args.policy_smooth)
         man["round"] = man.get("round", 0) + 1   # round=netバージョン数（staleness基準・1push=1版）
         man["updates"] = man.get("updates", 0) + args.epochs * n_up   # 累積勾配パス（学習量の真の指標）
         man["pending_games"] = pending_games

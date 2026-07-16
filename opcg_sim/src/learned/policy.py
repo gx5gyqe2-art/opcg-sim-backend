@@ -112,8 +112,22 @@ class PolicyScorer:
         return net
 
 
-def train_policy(net, samples, epochs=4, lr=2e-3, seed=0):
-    """samples = [(ctx, action_mat, target)]。返り値 平均CE。"""
+def smooth_target(tg, smooth):
+    """policy 教師のラベル平滑化（v7 案E・docs/cpu_v7_plan.md）: t' = (1−α)·t + α/K。
+
+    エコー教師（訪問分布≒prior の再生産）の下で prior が 0 に沈む「盲点の不可逆化」を防ぐ床。
+    α=0 は恒等（従来）。正規化は保存される（Σt=1 → Σt'=1）。"""
+    if smooth <= 0.0:
+        return tg
+    k = len(tg)
+    return (1.0 - smooth) * np.asarray(tg, dtype=np.float64) + smooth / max(k, 1)
+
+
+def train_policy(net, samples, epochs=4, lr=2e-3, seed=0, smooth=0.0):
+    """samples = [(ctx, action_mat, target)]。返り値 平均CE。
+
+    smooth > 0 で教師にラベル平滑化（`smooth_target`・v7 案E）を適用＝データは生のまま
+    学習時にだけ床を敷く（記録側の互換を保つ・α調整に再生成不要）。"""
     rng = np.random.default_rng(seed)
     last = 0.0
     for _ in range(epochs):
@@ -121,6 +135,6 @@ def train_policy(net, samples, epochs=4, lr=2e-3, seed=0):
         tot = 0.0
         for i in order:
             ctx, am, tg = samples[i]
-            tot += net.train_sample(ctx, am, tg, lr=lr)
+            tot += net.train_sample(ctx, am, smooth_target(tg, smooth), lr=lr)
         last = tot / max(1, len(samples))
     return last
