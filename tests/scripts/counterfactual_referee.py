@@ -32,6 +32,7 @@ _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)
 import _bootstrap  # noqa: E402,F401
 import mark_gate as MG
 import replay_reeval as RE
+import replay_runner as RR
 import p3_loop as P
 import rl_net as RN
 import rl_encoder as E
@@ -90,9 +91,20 @@ def rollout(game_serve, vf, pf, state, mover, world_seed, rng_seed):
     return m.winner, life_diff, int(getattr(m, "turn_count", 0) or 0)
 
 
-def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, log=print):
+def _restore_board(db, tag, i):
+    """マーク局面の盤面を用意する。--true-board 時は記録全手順の再実行（`state_at_action`）＝
+    パワー修正・一時効果込みの真盤面。既定はフレーム復元（従来挙動・公開情報のみ）。"""
     rec, fbi, actions = GAMES[tag]
-    built = MG._restore(db, rec, fbi, actions, i)
+    if ARGS.true_board:
+        m, who = RR.state_at_action(db, rec, i)
+        if m is None:
+            return f"true-board 再生不能: {who}"
+        return m, who
+    return MG._restore(db, rec, fbi, actions, i)
+
+
+def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, log=print):
+    built = _restore_board(db, tag, i)
     if isinstance(built, str):
         log(f"{tag}@{i}: 復元不可 ({built})"); return None
     m0, actor = built
@@ -168,8 +180,10 @@ def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds, log=p
     root prefix 比較はロールアウト役の盲点（例: 付与後に攻撃しない）に後半の実行を委ねてしまい、
     「付与→攻撃」のようなプランの価値を系統的に取りこぼす（g3@64 のトレースで実証）。
     プラン全体を固定すれば、比較対象は純粋に「プラン間の因果差」になる。"""
-    rec, fbi, actions = GAMES[tag]
-    m0, actor = MG._restore(db, rec, fbi, actions, i)
+    built = _restore_board(db, tag, i)
+    if isinstance(built, str):
+        log(f"{tag}@{i}: 復元不可 ({built})"); return None
+    m0, actor = built
     name = actor.name if hasattr(actor, "name") else actor
     stats = {p: [0.0, 0.0] for p in plans}   # wins, life合計
     for w in range(worlds):
@@ -211,6 +225,9 @@ def main():
     ap.add_argument("--sims", type=int, default=64, help="ロールアウト中の decide sims")
     ap.add_argument("--net", default=None,
                     help="value.npz[,policy.npz]（既定=出荷 gen5＝固定教師・ドリフトしない錨）")
+    ap.add_argument("--true-board", action="store_true",
+                    help="盤面をフレーム復元でなく記録全手順の再実行（真盤面＝パワー修正・"
+                         "一時効果込み）で用意する")
     ARGS = ap.parse_args()
 
     db = _load_db()

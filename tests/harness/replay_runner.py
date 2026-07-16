@@ -107,10 +107,18 @@ def resolve_api_action(manager, actor, recorded: Dict[str, Any]):
     標準リゾルバで一致しない API 固有の表現を追加で写像する:
       - `ATTACK_CONFIRM/攻撃者X`（対象欠落あり）→ エンジン `ATTACK/X`。対象は記録があればそれ、
         無ければ合法対象が一意ならそれ、複数なら相手リーダー優先（API の主経路）。
+      - `RESOLVE_EFFECT_SELECTION`＝効果対話の人間解決。`get_legal_actions` は既定解決
+        （`default_interaction_payload`＝min 件先頭選択）の**1手しか列挙しない**ため、人間の実選択
+        （`selected` の card_id 列）は合法手列挙に現れない。pending request の候補
+        （selectable_uuids）へ card_id を列挙順・重複消費で写像し、payload を直接構築する。
     合成録画の roundtrip（`resolve_recorded_action` 既定）には手を入れない＝挙動不変。"""
     mv = resolve_recorded_action(manager, actor, recorded)
     if mv is not None:
         return mv
+    if recorded.get("action_type") == "RESOLVE_EFFECT_SELECTION":
+        mv = _resolve_dialog_action(manager, actor, recorded)
+        if mv is not None:
+            return mv
     if recorded.get("action_type") == "ATTACK_CONFIRM":
         rec2 = dict(recorded); rec2["action_type"] = "ATTACK"
         mv = resolve_recorded_action(manager, actor, rec2)
@@ -131,6 +139,55 @@ def resolve_api_action(manager, actor, recorded: Dict[str, Any]):
         if cands:
             return cands[0][0]
     return None
+
+
+def _resolve_dialog_action(manager, actor, recorded: Dict[str, Any]):
+    """効果対話の記録（card_id 基準の `selected`／`index`／`accepted`）から解決 payload を直接構築する。
+
+    既定 payload（`default_interaction_payload`）をベースに記録値で上書きするので、
+    エンジンのハンドラが読む全キー（selected_uuids/index/accepted/position/declared_value）が
+    常に揃う。card_id→uuid は pending の selectable 候補への**列挙順・重複消費**写像
+    （同名複数候補は先頭から順に割り当て＝録画側 `_describe_move` と同じ card_id 同一視）。
+    候補に無い card_id が要求されたら None（＝ルール分岐として miss 検出に回す）。"""
+    pending = manager.get_pending_request()
+    if not pending or pending.get("player_id") != actor.name:
+        return None
+    payload = dict(manager.default_interaction_payload(pending))
+    want = list(recorded.get("selected") or [])
+    if want:
+        by_uuid = {c.get("uuid"): c.get("card_id")
+                   for c in (pending.get("candidates") or []) if c.get("uuid")}
+        pool = [(u, by_uuid.get(u) or cpu_ai._card_label(manager, u))
+                for u in (pending.get("selectable_uuids") or [])]
+        uuids: List[str] = []
+        unmatched = 0
+        for cid in want:
+            for i, (u, label) in enumerate(pool):
+                if label == cid:
+                    uuids.append(u)
+                    pool.pop(i)
+                    break
+            else:
+                unmatched += 1
+        if unmatched:
+            # 録画側 `_card_label` が uuid フォールバックした候補（ドン!!・非公開ゾーンの札）は
+            # 再生側 uuid と一致しない。残候補が**同一 card_id のみ**（挙動等価＝どれを選んでも
+            # 同じ）のときに限り先頭から充当する。異種が混じる場合は特定不能＝miss に回す
+            # （黙って誤対応させない）。
+            labels = {label for _, label in pool}
+            if len(labels) != 1 or len(pool) < unmatched:
+                return None
+            for _ in range(unmatched):
+                uuids.append(pool.pop(0)[0])
+        payload["selected_uuids"] = uuids
+    else:
+        payload["selected_uuids"] = []
+    for k in ("index", "position"):
+        if recorded.get(k) is not None:
+            payload[k] = recorded[k]
+    if recorded.get("accepted") is not None:
+        payload["accepted"] = recorded["accepted"]
+    return {"kind": "game", "action_type": "RESOLVE_EFFECT_SELECTION", "payload": payload}
 
 
 # --- 真盤面の再構築（両席とも記録どおりに再実行して途中停止） -----------------
