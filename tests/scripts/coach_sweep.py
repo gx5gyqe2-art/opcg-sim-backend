@@ -19,8 +19,6 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXP
 import argparse
 import time
 
-import numpy as np
-
 import os as _os, sys as _sys  # noqa: E402  test bootstrap
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
@@ -82,8 +80,12 @@ def sweep(db, game_root, game_serve, vf, pf, tag, indices, worlds, band, log=pri
             log(f"@{i}: 再生不能（スキップ）: {str(who)[:100]}")
             continue
         pending = m0.get_pending_request()
-        if not pending or pending.get("action") != "MAIN_ACTION":
-            continue   # プラン比較は自ターンの主導権局面のみ（防御応答・対話は対象外）
+        # 攻撃側（MAIN_ACTION）に加え、防御側（ブロッカー/カウンター窓）もプラン比較する。
+        # 防御プランも「手番が自分から離れるまで」の終端規約がそのまま成立する（PASS＝戦闘解決・
+        # カウンター連打＝窓が続く限り自分の手番・被弾トリガー対話も自分の選択＝プランの一部）。
+        if not pending or pending.get("action") not in (
+                "MAIN_ACTION", "SELECT_COUNTER", "SELECT_BLOCKER"):
+            continue
         name = who
         akeys, adescs = actual_plan_keys(game_root, m0, name, actions, i, fbi)
         if akeys is None:
@@ -95,33 +97,12 @@ def sweep(db, game_root, game_serve, vf, pf, tag, indices, worlds, band, log=pri
         sig = tuple(map(repr, akeys))
         if not any(tuple(map(repr, k)) == sig for k, _d in auto):
             auto.append((akeys, adescs))   # 実プランが列挙から漏れていたら必ず加える
+        if len(auto) <= 1:
+            continue   # 選択肢が1つ（強制手）＝比較の意味なし
         entries = [{"label": ">".join(CR._step_label(d) for d in descs), "keys": keys,
-                    "actual": tuple(map(repr, keys)) == sig,
-                    "wins": 0.0, "life": 0.0, "ok": 0, "outcomes": {}}
+                    "actual": tuple(map(repr, keys)) == sig}
                    for keys, descs in auto]
-        for w in range(worlds):
-            world = game_serve.determinize(m0, name, np.random.default_rng(90000 + w * 97))
-            for n_e, e in enumerate(entries):
-                m = world
-                ok = True
-                for k in e["keys"]:
-                    mv = CR._match_move_by_key(m, game_root.legal_actions(m), k)
-                    if mv is None:
-                        ok = False; break
-                    m = game_serve.apply(m, mv, name)
-                    if m is None:
-                        ok = False; break
-                if not ok:
-                    continue
-                winner, ld, _et = CR.rollout(game_serve, vf, pf, m, name,
-                                             world_seed=90000 + w * 97, rng_seed=w * 7919 + n_e)
-                e["outcomes"][w] = (winner == name)
-                if winner == name:
-                    e["wins"] += 1
-                e["life"] += ld
-                e["ok"] += 1
-        for e in entries:
-            e["lifem"] = e["life"] / max(e["ok"], 1)
+        CR._eval_entries(entries, game_root, game_serve, vf, pf, m0, name, worlds)
         entries.sort(key=lambda e: (-e["wins"], -e["lifem"]))
         best = entries[0]
         act = next((e for e in entries if e["actual"]), None)
@@ -129,22 +110,35 @@ def sweep(db, game_root, game_serve, vf, pf, tag, indices, worlds, band, log=pri
         if act is None or act["ok"] == 0:
             log(f"@{i}: 実プランが全世界で不成立（判定不能）")
             continue
+        mode = ""
+        if ARGS.comeback > 0 and best["wins"] <= 1:
+            # 捲りモード: 飽和負けは temp0 の相対比較に勾配が無い。上位＋実プランに絞り、
+            # 世界数×4＋相手温度で「捲り率」を測り直す（counterfactual_referee と同規約）。
+            sub = entries[:min(6, len(entries))]
+            if act not in sub:
+                sub.append(act)
+            CR._eval_entries(sub, game_root, game_serve, vf, pf, m0, name, worlds * 4,
+                             opp_temp=ARGS.comeback)
+            sub.sort(key=lambda e: (-e["wins"], -e["lifem"]))
+            best = sub[0]
+            mode = f"捲り({worlds * 4}世界)"
+        n_w = worlds * 4 if mode else worlds
         dw = best["wins"] - act["wins"]
         dl = best["lifem"] - act["lifem"]
         # 同価値バンド v2（対判定）: 世界別勝敗の正味不一致 < 3 かつ ライフ差 < band は同価値。
         tie = CR.same_value(best, act, band)
         verdict = "OK（最良）" if act is best else ("同価値" if tie else "損失")
-        log(f"@{i} T{m0.turn_count} {verdict}  実際: {act['label']} "
-            f"{act['wins']:.0f}/{worlds} L{act['lifem']:+.2f}  ({time.time()-t0:.0f}s)")
+        log(f"@{i} T{m0.turn_count} {mode}{verdict}  実際: {act['label']} "
+            f"{act['wins']:.0f}/{n_w} L{act['lifem']:+.2f}  ({time.time()-t0:.0f}s)")
         if not tie and act is not best:
-            log(f"      最良: {best['label']} {best['wins']:.0f}/{worlds} L{best['lifem']:+.2f}"
+            log(f"      最良: {best['label']} {best['wins']:.0f}/{n_w} L{best['lifem']:+.2f}"
                 f"  （勝{dw:+.0f}・ライフ{dl:+.2f}）")
             losses.append({"i": i, "turn": m0.turn_count, "actual": act["label"],
-                           "best": best["label"], "dw": dw, "dl": dl})
+                           "best": best["label"], "dw": dw, "dl": dl, "mode": mode})
     log(f"\nCOACH_RESULT {tag}: 判定 {judged} 決定・損失 {len(losses)} 件")
     for r in losses:
-        log(f"  @{r['i']} T{r['turn']}: {r['actual']} → {r['best']}"
-            f"（勝{r['dw']:+.0f}・ライフ{r['dl']:+.2f}）")
+        log(f"  @{r['i']} T{r['turn']}{'（' + r['mode'] + '）' if r.get('mode') else ''}: "
+            f"{r['actual']} → {r['best']}（勝{r['dw']:+.0f}・ライフ{r['dl']:+.2f}）")
     return losses
 
 
@@ -158,6 +152,9 @@ def main():
     ap.add_argument("--worlds", type=int, default=4)
     ap.add_argument("--sims", type=int, default=32)
     ap.add_argument("--band", type=float, default=0.5)
+    ap.add_argument("--comeback", type=float, default=0.7,
+                    help="捲りモードの相手温度 τ（0で無効）: 飽和負け（最善でも勝ち≤1）の決定は"
+                         "上位＋実プランを世界数×4＋相手温度で再判定し捲り率で採点する")
     ap.add_argument("--plan-len", type=int, default=4)
     ap.add_argument("--beam", type=int, default=12)
     ap.add_argument("--max-plans", type=int, default=16)
