@@ -83,9 +83,10 @@ def _cpu_seat(difficulty: str, sims: int = 160):
 class _HumanReplaySeat:
     """記録された人間アクション列を順に注入する席（`seat(ctx)->move`）。"""
 
-    def __init__(self, actions: List[Dict[str, Any]]):
+    def __init__(self, actions: List[Dict[str, Any]], resolver=None):
         self._actions = list(actions)
         self._i = 0
+        self._resolve = resolver or resolve_recorded_action   # 既定＝従来（roundtrip 挙動不変）
         self.misses: List[Dict[str, Any]] = []   # 逆写像不能・列消尽を記録（round-trip 診断）
 
     def __call__(self, ctx):
@@ -94,10 +95,208 @@ class _HumanReplaySeat:
             return None
         rec = self._actions[self._i]
         self._i += 1
-        mv = resolve_recorded_action(ctx.manager, ctx.actor, rec)
+        mv = self._resolve(ctx.manager, ctx.actor, rec)
         if mv is None:
             self.misses.append({"reason": "no_match", "step": ctx.step, "recorded": rec})
         return mv
+
+
+def resolve_api_action(manager, actor, recorded: Dict[str, Any],
+                       frames: Optional[Dict[int, Dict[str, Any]]] = None,
+                       actions: Optional[List[Dict[str, Any]]] = None):
+    """API 実対局の記録語彙をエンジン合法手へ逆写像する（`state_at_action` 用の拡張リゾルバ）。
+
+    標準リゾルバで一致しない API 固有の表現を追加で写像する:
+      - `ATTACK_CONFIRM/攻撃者X`（対象欠落あり）→ エンジン `ATTACK/X`。対象は記録があればそれ、
+        無ければ合法対象が一意ならそれ。複数候補は**録画フレーム差分**で特定する
+        （ライフ減=リーダー・場から消えた札=その対象。g3@86 で「リーダー優先」の推測が
+        キャラ攻撃をライフ攻撃に化けさせ、幻のトリガー対話で分岐した実測に基づく）。
+        フレームで判定できないときのみ相手リーダー優先（API の主経路）に落ちる。
+      - `RESOLVE_EFFECT_SELECTION`＝効果対話の人間解決。`get_legal_actions` は既定解決
+        （`default_interaction_payload`＝min 件先頭選択）の**1手しか列挙しない**ため、人間の実選択
+        （`selected` の card_id 列）は合法手列挙に現れない。pending request の候補
+        （selectable_uuids）へ card_id を列挙順・重複消費で写像し、payload を直接構築する。
+    合成録画の roundtrip（`resolve_recorded_action` 既定）には手を入れない＝挙動不変。"""
+    mv = resolve_recorded_action(manager, actor, recorded)
+    if mv is not None:
+        return mv
+    if recorded.get("action_type") == "RESOLVE_EFFECT_SELECTION":
+        mv = _resolve_dialog_action(manager, actor, recorded)
+        if mv is not None:
+            return mv
+    if recorded.get("action_type") == "ATTACK_CONFIRM":
+        rec2 = dict(recorded); rec2["action_type"] = "ATTACK"
+        mv = resolve_recorded_action(manager, actor, rec2)
+        if mv is not None:
+            return mv
+        cands = []
+        for m2 in manager.get_legal_actions(actor):
+            d = cpu_ai._describe_move(manager, m2) or {}
+            if d.get("action_type") == "ATTACK" and d.get("card") == recorded.get("card"):
+                cands.append((m2, d))
+        if len(cands) == 1:
+            return cands[0][0]
+        mv = _attack_target_from_frames(manager, actor, recorded, cands, frames, actions)
+        if mv is not None:
+            return mv
+        opp = manager.p2 if actor.name == manager.p1.name else manager.p1
+        lid = getattr(getattr(opp.leader, "master", None), "card_id", None)
+        for m2, d in cands:
+            if lid and lid in (d.get("targets") or ()):
+                return m2
+        if cands:
+            return cands[0][0]
+    return None
+
+
+def _attack_target_from_frames(manager, actor, recorded, cands, frames, actions):
+    """対象欠落の ATTACK_CONFIRM を録画フレーム差分で特定する。
+
+    宣言 i の戦闘は、次に攻撃側の記録アクションが来る直前（防御側応答の最後 j）までに解決する。
+    frame[i]（宣言直後）と frame[j]（解決後）の相手側差分が対象を決める:
+      - ライフ減 → リーダー対象
+      - 場から消えた札 → その card_id を対象に持つ候補（同 card_id の複製は挙動等価＝先頭）
+      - 差分なし（攻撃不成立＝どの対象でも盤面不変） → None（呼び出し側の既定へ）
+    """
+    i = recorded.get("_idx")
+    if i is None or not frames or not actions:
+        return None
+    j, k = i, i + 1
+    while k < len(actions) and actions[k].get("player") != recorded.get("player"):
+        j = k; k += 1
+    pre = frames.get(i) or frames.get(i - 1)
+    post = frames.get(j)
+    if not pre or not post:
+        return None
+    opp_pid = "p2" if recorded.get("player") == "p1" else "p1"
+    pre_o = (pre.get("players") or {}).get(opp_pid) or {}
+    post_o = (post.get("players") or {}).get(opp_pid) or {}
+    if len(post_o.get("life") or []) < len(pre_o.get("life") or []):
+        opp = manager.p2 if actor.name == manager.p1.name else manager.p1
+        lid = getattr(getattr(opp.leader, "master", None), "card_id", None)
+        for m2, d in cands:
+            if lid and lid in (d.get("targets") or ()):
+                return m2
+        return None
+    post_uuids = {c.get("uuid") for c in (post_o.get("field") or [])}
+    gone_ids = {c.get("card_id") for c in (pre_o.get("field") or [])
+                if c.get("uuid") not in post_uuids}
+    if gone_ids:
+        for m2, d in cands:
+            if gone_ids & set(d.get("targets") or ()):
+                return m2
+    return None
+
+
+def _resolve_dialog_action(manager, actor, recorded: Dict[str, Any]):
+    """効果対話の記録（card_id 基準の `selected`／`index`／`accepted`）から解決 payload を直接構築する。
+
+    既定 payload（`default_interaction_payload`）をベースに記録値で上書きするので、
+    エンジンのハンドラが読む全キー（selected_uuids/index/accepted/position/declared_value）が
+    常に揃う。card_id→uuid は pending の selectable 候補への**列挙順・重複消費**写像
+    （同名複数候補は先頭から順に割り当て＝録画側 `_describe_move` と同じ card_id 同一視）。
+    候補に無い card_id が要求されたら None（＝ルール分岐として miss 検出に回す）。"""
+    pending = manager.get_pending_request()
+    if not pending or pending.get("player_id") != actor.name:
+        return None
+    payload = dict(manager.default_interaction_payload(pending))
+    want = list(recorded.get("selected") or [])
+    if want:
+        by_uuid = {c.get("uuid"): c.get("card_id")
+                   for c in (pending.get("candidates") or []) if c.get("uuid")}
+        pool = [(u, by_uuid.get(u) or cpu_ai._card_label(manager, u))
+                for u in (pending.get("selectable_uuids") or [])]
+        uuids: List[str] = []
+        unmatched = 0
+        for cid in want:
+            for i, (u, label) in enumerate(pool):
+                if label == cid:
+                    uuids.append(u)
+                    pool.pop(i)
+                    break
+            else:
+                unmatched += 1
+        if unmatched:
+            # 録画側 `_card_label` が uuid フォールバックした候補（ドン!!・非公開ゾーンの札）は
+            # 再生側 uuid と一致しない。残候補が**同一 card_id のみ**（挙動等価＝どれを選んでも
+            # 同じ）のときに限り先頭から充当する。異種が混じる場合は特定不能＝miss に回す
+            # （黙って誤対応させない）。
+            labels = {label for _, label in pool}
+            if len(labels) != 1 or len(pool) < unmatched:
+                return None
+            for _ in range(unmatched):
+                uuids.append(pool.pop(0)[0])
+        payload["selected_uuids"] = uuids
+    else:
+        payload["selected_uuids"] = []
+    for k in ("index", "position"):
+        if recorded.get(k) is not None:
+            payload[k] = recorded[k]
+    if recorded.get("accepted") is not None:
+        payload["accepted"] = recorded["accepted"]
+    return {"kind": "game", "action_type": "RESOLVE_EFFECT_SELECTION", "payload": payload}
+
+
+# --- 真盤面の再構築（両席とも記録どおりに再実行して途中停止） -----------------
+
+class _ManagerCapture:
+    """run_game の manager 参照を捕まえる観測専用 observer（状態は一切変更しない）。"""
+
+    def __init__(self):
+        self.manager = None
+
+    def on_decision(self, ctx, move):
+        self.manager = ctx.manager
+
+
+def state_at_action(db, descriptor: Dict[str, Any], upto: int,
+                    first_player: Optional[str] = None,
+                    frames: Optional[Any] = None):
+    """記録済み対局を**両席とも記録アクションどおり**に再実行し、action index `upto` の直前で
+    停止した真の GameManager を返す（(manager, actor_pid) or (None, 診断dict)）。
+
+    フレーム復元（`replay_reeval._board_from_frame`）はパワー修正・一時効果などの内部状態を
+    持たない（実測: デバフで 1000 のキャラが素の 7000 で復元される）。本関数は seed から
+    デッキ構築→start_game→記録アクションを順に適用するので、その時点の**全内部状態**が正確。
+    CPU 再 decide を一切しない（両席 scripted）＝現ビルドとの方策ドリフトの影響を受けない。
+    ルール解決が録画時ビルドと変わっていた場合のみ miss（分岐）として検出・報告する。"""
+    seed = int(descriptor["seed"])
+    leaders = descriptor.get("leaders", {})
+    decks = descriptor["decks"]
+
+    def _deck_builder(_db, _seed):
+        l_p1, c_p1 = build_deck_from_ids(_db, leaders.get("p1"), decks["p1"], "p1")
+        l_p2, c_p2 = build_deck_from_ids(_db, leaders.get("p2"), decks["p2"], "p2")
+        return l_p1, c_p1, l_p2, c_p2
+
+    acts = descriptor.get("actions", [])
+    # フレーム差分による対象特定（`_attack_target_from_frames`）用に全体 index を焼き込む。
+    acts_idx = [dict(a, _idx=n) for n, a in enumerate(acts)]
+    fmap = (frames if isinstance(frames, dict) else
+            {f.get("action_index"): f for f in frames}) if frames else None
+    def _resolver(m, a, r):
+        return resolve_api_action(m, a, r, frames=fmap, actions=acts_idx)
+    seats = {pid: _HumanReplaySeat([a for a in acts_idx if a.get("player") == pid],
+                                   resolver=_resolver)
+             for pid in ("p1", "p2")}
+    cap = _ManagerCapture()
+    # API 実対局はコイントスが乱数を消費する＝"random" を渡して seed から再現（結果 "p1" を
+    # 直接渡すと以後のシャッフル/ドローの乱数列がズレる）。合成録画は first_player_mode 保存値。
+    fp = first_player if first_player is not None else \
+        descriptor.get("first_player_mode") or "random"
+    try:
+        run_game(seed, db, seats=seats, deck_builder=_deck_builder, observers=[cap],
+                 legal_moves="skip", invariants="raise", stop_after_decisions=upto,
+                 first_player=fp)
+    except InvariantError as e:
+        misses = seats["p1"].misses + seats["p2"].misses
+        return None, {"reason": "invariant", "step": getattr(e, "step", None), "misses": misses}
+    misses = seats["p1"].misses + seats["p2"].misses
+    if misses:
+        return None, {"reason": "miss", "misses": misses}
+    if cap.manager is None:
+        return None, {"reason": "no_decision"}
+    return cap.manager, acts[upto].get("player") if upto < len(acts) else None
 
 
 # --- 再生本体 ----------------------------------------------------------------
@@ -194,6 +393,49 @@ def _human_record_seat(rng):
             return end[0]
         return rng.choice(moves)
     return seat
+
+
+def record_selfplay_descriptor(db, seed: int, deck_ids_builder, sims: int = 120,
+                               first_player: Optional[str] = None,
+                               observers=()) -> Dict[str, Any]:
+    """両席 learned（同梱既定ネット=gen5）の自己対戦を録画して記述子を作る（v9 再ラベル用）。
+
+    `record_descriptor` の CPU-vs-CPU 版。再生（`state_at_action`）は両席とも記録手を
+    scripted で再適用するので、生成側の決定論は再生可能性の前提ではない（記録が正）。
+    追加 observers（採掘の観測など・読み取り専用）を録画 observer に併設できる。"""
+    built = deck_ids_builder(db, seed)
+    l1, c1, l2, c2 = built
+
+    def _fixed_builder(_db, _seed):
+        return built
+
+    rec = _RecordObserver()
+
+    def _rng_isolated(seat):
+        # 席の decide（探索）が global random を消費すると、scripted 再生（decide なし）で
+        # エンジン乱数列がズレる（_human_record_seat の private rng と同じ理屈）。decide の
+        # 前後で乱数状態を退避/復元し、録画対局を「decide が乱数を消費しない」形にする。
+        import random as _random
+        def s(ctx):
+            st = _random.getstate()
+            try:
+                return seat(ctx)
+            finally:
+                _random.setstate(st)
+        return s
+
+    seats = {pid: _rng_isolated(_cpu_seat("learned", sims)) for pid in ("p1", "p2")}
+    res: GameResult = run_game(seed, db, seats=seats,
+                               deck_builder=_fixed_builder, observers=[rec, *observers],
+                               legal_moves="skip", invariants="raise", first_player=first_player)
+    return {
+        "seed": seed, "first_player": None, "first_player_mode": first_player,
+        "cpu_player_id": None, "difficulty": "learned",
+        "leaders": {"p1": l1.master.card_id if l1 else None, "p2": l2.master.card_id if l2 else None},
+        "decks": {"p1": [ci.master.card_id for ci in c1], "p2": [ci.master.card_id for ci in c2]},
+        "actions": rec.actions,
+        "_winner": res.winner, "_steps": res.steps, "_turns": res.turns,
+    }
 
 
 def record_descriptor(db, seed: int, deck_ids_builder, cpu_pid: str = "p2",
