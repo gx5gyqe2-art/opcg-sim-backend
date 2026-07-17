@@ -28,6 +28,18 @@ def test_is_fresh_accept_seen_stale():
     assert C.is_fresh(_meta("w9", 0, 10), consumed, 10, 3) == "accept"
 
 
+def test_is_fresh_referee_label_exempt_from_staleness():
+    """レフェリー再ラベル（source="referee_label"・v9）は gen5 固定アンカー由来＝腐らないため
+    staleness 免除（against_round=-1 が学習4ラウンド目以降に全棄却される事故の回帰）。
+    未消費チェック（seen）は免除しない。"""
+    consumed = {"ref": 2}
+    ref = dict(_meta("ref", 3, -1), source="referee_label")
+    assert C.is_fresh(ref, consumed, 100, 3) == "accept"
+    assert C.is_fresh(dict(ref, batch_id=2), consumed, 100, 3) == "seen"
+    # source 無し（通常自己対戦バッチ）は従来どおり stale
+    assert C.is_fresh(_meta("w1", 9, -1), {}, 100, 3) == "stale"
+
+
 def test_plan_consumption_mixed():
     consumed = {"w1": 2, "w2": 0}
     metas = [_meta("w1", 3, 10), _meta("w2", 0, 10), _meta("w3", 5, 4)]

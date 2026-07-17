@@ -54,6 +54,9 @@ class _MineObserver:
         self.cands = []   # (action_index, kind, metric)
         self._i = 0
 
+    TOP_M = 4   # blind 判定は上位M手の spread（v7 実測＝候補間の差 0.01〜0.05 が対象。
+                # 全手 spread だと明確な悪手1つで閾値を超え @64 型を取り逃す・レビュー指摘#4）
+
     def on_decision(self, ctx, move):
         i = self._i
         self._i += 1
@@ -67,7 +70,7 @@ class _MineObserver:
         except Exception:
             return
         if v < self.sat:
-            self.cands.append((i, "sat", float(v)))
+            self.cands.append((i, "sat", float(v), name, pend.get("action")))
             return
         legal = self.game_root.legal_actions(m)
         if len(legal) < 3:
@@ -78,25 +81,38 @@ class _MineObserver:
             if child is None:
                 continue
             vals.append(self.vf(child, name))
-        if len(vals) >= 3 and (max(vals) - min(vals)) < self.eps:
-            self.cands.append((i, "blind", float(max(vals) - min(vals))))
+        if len(vals) >= 3:
+            top = sorted(vals, reverse=True)[:self.TOP_M]
+            spread = top[0] - top[-1]
+            if spread < self.eps:
+                self.cands.append((i, "blind", float(spread), name, pend.get("action")))
 
 
 def select_candidates(cands, max_per_game):
     """採掘候補から1局分の採点対象を選ぶ（pure）。
 
-    飽和負け（捲りラベル）を優先し（value が低い順）、残り枠を効率盲点（spread が小さい＝
-    より無差別な順）で埋める。同種の隣接 index（同一ターンの連鎖）は間引く（index 差 < 2）。"""
+    **sat/blind 半々のクォータ**（レビュー指摘#3）: 決着局の敗者側終盤は sat 候補が豊富で、
+    素朴な sat 優先だと効率盲点（v7 で確定した根本原因の側）が構造的に飢える。各種
+    ⌈K/2⌉ 枠で選び（sat=value 低い順・blind=spread 小さい順）、余り枠は相互に融通する。
+    同種の隣接 index（同一ターンの連鎖）は間引く（index 差 < 2）。"""
     sat = sorted([c for c in cands if c[1] == "sat"], key=lambda c: c[2])
     blind = sorted([c for c in cands if c[1] == "blind"], key=lambda c: c[2])
+    quota = (max_per_game + 1) // 2
     picked = []
-    for pool in (sat, blind):
+
+    def _take(pool, limit):
+        n = 0
         for c in pool:
-            if len(picked) >= max_per_game:
+            if n >= limit or len(picked) >= max_per_game:
                 break
             if any(abs(c[0] - p[0]) < 2 for p in picked):
                 continue
             picked.append(c)
+            n += 1
+
+    _take(sat, quota)
+    _take(blind, max_per_game - len(picked))   # blind はクォータ+sat余り分まで
+    _take(sat, max_per_game - len(picked))     # blind が足りなければ sat で埋め戻し
     return sorted(picked)
 
 
@@ -121,9 +137,12 @@ def plan_teacher_visit(legal_keys, entries, band):
     return visit / visit.sum()
 
 
-def label_decision(db, game_root, game_serve, vf, pf, vocab, ev, desc, idx, log=print):
+def label_decision(db, game_root, game_serve, vf, pf, vocab, ev, desc, idx, log=print,
+                   expect=None):
     """決定点 idx を真盤面再生してレフェリー教師サンプルを作る。
 
+    `expect=(actor名, pend種)`（採掘時の観測）があれば再生結果と照合し、不一致は棄却＝
+    採掘と再生の index ズレで**黙って別局面をラベルする**最悪モードを防ぐ（レビュー指摘#9）。
     返り値 (val_sample, pol_sample) or (None, None)（再生不能・強制手・教師構築不能）。
     val_sample = (enc, z)・pol_sample = (ctx, am, visit)。"""
     m0, who = RR.state_at_action(db, desc, idx)
@@ -131,6 +150,9 @@ def label_decision(db, game_root, game_serve, vf, pf, vocab, ev, desc, idx, log=
         return None, None
     pend = m0.get_pending_request(with_request_id=False) or {}
     if pend.get("action") not in _WINDOWS:
+        return None, None
+    if expect is not None and (who, pend.get("action")) != tuple(expect):
+        log(f"    @{idx} 照合不一致（採掘{expect} vs 再生{(who, pend.get('action'))}）＝棄却")
         return None, None
     name = who
     plans = CR.enumerate_turn_plans(game_root, vf, m0, name, max_len=ARGS.plan_len,
@@ -218,8 +240,9 @@ def main():
         picked = select_candidates(miner.cands, ARGS.max_per_game)
         print(f"game {g + 1}/{ARGS.games} seed={seed}: {len(desc['actions'])}手 "
               f"候補{len(miner.cands)}→採掘{len(picked)} ({time.time() - t0:.0f}s)", flush=True)
-        for idx, kind, metric in picked:
-            vs, ps = label_decision(db, game_root, game_serve, vf, pf, vocab, ev, desc, idx)
+        for idx, kind, metric, actor, pend_kind in picked:
+            vs, ps = label_decision(db, game_root, game_serve, vf, pf, vocab, ev, desc, idx,
+                                    expect=(actor, pend_kind))
             if vs is None:
                 continue
             enc, z = vs
@@ -238,9 +261,12 @@ def main():
                   "turns_left": np.array(sinks["T"], dtype=np.float32)}
         arrays.update(pack_policy(pol))
         np.savez_compressed(os.path.join(ARGS.out, "batch.npz"), **arrays)
+        # worker はワーカー運用時に label_worker が w1 等へ上書きする（枝と consumed の単位）。
+        # ref バッチの判別は source 欄が正（is_fresh の staleness 免除もこれを見る）。
         meta = {"worker": "ref", "batch_id": int(time.time()), "against_round": -1,
                 "games": ARGS.games, "states": n_labeled, "schema_version": 2,
-                "source": "referee_label", "worlds": ARGS.worlds, "comeback": ARGS.comeback}
+                "source": "referee_label", "worlds": ARGS.worlds, "comeback": ARGS.comeback,
+                "miner": 2}   # 採掘条件の版: 2=sat/blindクォータ＋上位M手spread（レビュー反映）
         with open(os.path.join(ARGS.out, "meta.json"), "w") as f:
             json.dump(meta, f, ensure_ascii=False)
         print(f"saved: {ARGS.out}/batch.npz ({n_labeled} states)", flush=True)

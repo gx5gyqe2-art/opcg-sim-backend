@@ -22,12 +22,16 @@ def is_fresh(meta, consumed, current_round, max_staleness):
     採用条件（両方満たす）:
       1. 未消費: meta.batch_id が consumed[wid] より新しい（重複学習を防ぐ）。
       2. 十分新鮮: against_round >= current_round - max_staleness（古すぎる off-policy データを捨てる）。
+         **例外**: レフェリー再ラベル（source="referee_label"・v9）は gen5 固定アンカー由来＝
+         生成 net のラウンドに依存せず腐らないため staleness を免除する（against_round=-1 が
+         学習4ラウンド目以降に全バッチ無言棄却される事故の防止・PR#188 レビュー指摘#1）。
     返り値: ("accept" | "stale" | "seen")。
     """
     wid = meta["worker"]
     if meta["batch_id"] <= consumed.get(wid, -1):
         return "seen"
-    if meta["against_round"] < current_round - max_staleness:
+    if (meta.get("source") != "referee_label"
+            and meta["against_round"] < current_round - max_staleness):
         return "stale"
     return "accept"
 

@@ -40,6 +40,20 @@ def test_select_candidates_cap_and_order():
     assert [c[0] for c in picked] == sorted(c[0] for c in picked)
 
 
+def test_select_candidates_quota_prevents_blind_starvation():
+    """sat が豊富でも blind 枠（⌈K/2⌉）は確保される（レビュー指摘#3: 敗者側終盤の sat 洪水で
+    効率盲点＝v7 の根本原因側が飢える構造の防止）。blind 不足時は sat で埋め戻す。"""
+    sats = [(i, "sat", -0.9) for i in (10, 20, 30, 40, 50, 60)]
+    blinds = [(100, "blind", 0.02), (110, "blind", 0.03)]
+    picked = select_candidates(sats + blinds, 4)
+    kinds = [c[1] for c in picked]
+    assert kinds.count("sat") == 2 and kinds.count("blind") == 2
+    # blind が1つしか無ければ sat が3枠に埋め戻される。
+    picked = select_candidates(sats + blinds[:1], 4)
+    kinds = [c[1] for c in picked]
+    assert kinds.count("blind") == 1 and kinds.count("sat") == 3
+
+
 def _entry(first_key, outcomes, lifem):
     return {"keys": [first_key, ("PASS",)], "outcomes": dict(enumerate(outcomes)),
             "lifem": lifem, "wins": float(sum(outcomes)), "ok": len(outcomes)}
