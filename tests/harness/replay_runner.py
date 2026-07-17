@@ -395,6 +395,49 @@ def _human_record_seat(rng):
     return seat
 
 
+def record_selfplay_descriptor(db, seed: int, deck_ids_builder, sims: int = 120,
+                               first_player: Optional[str] = None,
+                               observers=()) -> Dict[str, Any]:
+    """両席 learned（同梱既定ネット=gen5）の自己対戦を録画して記述子を作る（v9 再ラベル用）。
+
+    `record_descriptor` の CPU-vs-CPU 版。再生（`state_at_action`）は両席とも記録手を
+    scripted で再適用するので、生成側の決定論は再生可能性の前提ではない（記録が正）。
+    追加 observers（採掘の観測など・読み取り専用）を録画 observer に併設できる。"""
+    built = deck_ids_builder(db, seed)
+    l1, c1, l2, c2 = built
+
+    def _fixed_builder(_db, _seed):
+        return built
+
+    rec = _RecordObserver()
+
+    def _rng_isolated(seat):
+        # 席の decide（探索）が global random を消費すると、scripted 再生（decide なし）で
+        # エンジン乱数列がズレる（_human_record_seat の private rng と同じ理屈）。decide の
+        # 前後で乱数状態を退避/復元し、録画対局を「decide が乱数を消費しない」形にする。
+        import random as _random
+        def s(ctx):
+            st = _random.getstate()
+            try:
+                return seat(ctx)
+            finally:
+                _random.setstate(st)
+        return s
+
+    seats = {pid: _rng_isolated(_cpu_seat("learned", sims)) for pid in ("p1", "p2")}
+    res: GameResult = run_game(seed, db, seats=seats,
+                               deck_builder=_fixed_builder, observers=[rec, *observers],
+                               legal_moves="skip", invariants="raise", first_player=first_player)
+    return {
+        "seed": seed, "first_player": None, "first_player_mode": first_player,
+        "cpu_player_id": None, "difficulty": "learned",
+        "leaders": {"p1": l1.master.card_id if l1 else None, "p2": l2.master.card_id if l2 else None},
+        "decks": {"p1": [ci.master.card_id for ci in c1], "p2": [ci.master.card_id for ci in c2]},
+        "actions": rec.actions,
+        "_winner": res.winner, "_steps": res.steps, "_turns": res.turns,
+    }
+
+
 def record_descriptor(db, seed: int, deck_ids_builder, cpu_pid: str = "p2",
                       difficulty: str = "hard", sims: int = 160,
                       first_player: Optional[str] = None) -> Dict[str, Any]:

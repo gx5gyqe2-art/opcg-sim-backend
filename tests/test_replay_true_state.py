@@ -87,6 +87,26 @@ def test_true_board_recovers_power_modifiers(board64):
     assert luffy.get_power(True) == 1000
 
 
+def test_selfplay_recording_replays_scripted(db):
+    """記録つき自己対戦（`record_selfplay_descriptor`・v9 再ラベルの生成側）が任意 index で
+    真盤面再生できる。回帰の核: 席の decide（探索）が global random を消費すると scripted 再生
+    （decide なし）でエンジン乱数列がズレる＝rng 隔離（decide 前後の乱数状態復元）を固定する。"""
+    import heldout_decks as HD
+    ids = HD.deck_ids()
+
+    def deckb(_db, seed):
+        l1, c1 = HD.build(_db, ids[seed % len(ids)], "p1")
+        l2, c2 = HD.build(_db, ids[(seed + 1) % len(ids)], "p2")
+        return l1, c1, l2, c2
+
+    desc = RR.record_selfplay_descriptor(db, 9100, deckb, sims=24, first_player="random")
+    n = len(desc["actions"])
+    assert n >= 20
+    for upto in (10, n - 1):
+        m, who = RR.state_at_action(db, desc, upto)
+        assert m is not None, f"upto={upto} 再生分岐: {who}"
+
+
 class _StubMgr:
     def __init__(self, pending):
         self._pending = pending
