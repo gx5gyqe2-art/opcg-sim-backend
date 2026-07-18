@@ -27,6 +27,8 @@ _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)
 import _bootstrap  # noqa: E402,F401
 import rl_net as RN
 from az_policy import PolicyScorer, train_policy
+from opcg_sim.src.learned.action import ACTION_DIM
+from opcg_sim.src.learned.policy import extend_action_dim
 from pd_batch_common import unpack_policy
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -112,9 +114,14 @@ def main():
 
     tr_vdata = {k: vdata[k][tr] for k in vdata}
     tr_pol = [pol[j] for j in tr]
+    ctx_dim = len(pol[0][0])
     for lr in [float(x) for x in args.lrs.split(",")]:
         vnet = RN.ValueNet.load(gen5_v)
         pnet = PolicyScorer.load(gen5_p)
+        if pnet.in_dim < ctx_dim + ACTION_DIM:
+            # v9 行動特徴拡張の温スタート（零行追加＝出力恒等）。新特徴（カウンター値等）は
+            # 新形式で記録されたバッチからのみ学習される（旧22次元記録はゼロ埋め）。
+            extend_action_dim(pnet, ctx_dim + ACTION_DIM - pnet.in_dim)
         tm, vm = RN.train(vnet, tr_vdata, epochs=args.epochs, lr=lr, batch=64, val_frac=0.1)
         ce = train_policy(pnet, tr_pol, epochs=args.epochs, lr=lr,
                           smooth=args.policy_smooth)

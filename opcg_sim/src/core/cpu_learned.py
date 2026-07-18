@@ -184,11 +184,15 @@ class LearnedEngine:
         self.pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
         if self.pnet is not None:
             from opcg_sim.src.learned.action import ACTION_DIM
-            pv = int(self.pnet.in_dim) - ACTION_DIM
-            if pv != E.feature_dim(self.enc_version):
+            # 行動特徴は append-only で拡張される（v9: +カウンター値/対象=リーダー）。旧 net の
+            # 行動次元は現 ACTION_DIM 以下でありうる（新列は PolicyScorer._fit_actions が切詰＝
+            # 出力恒等）。ここでは「状態 ctx の世代一致」だけを検査する: 行動次元
+            # = in_dim − feature_dim(世代) が (0, ACTION_DIM] を外れたら世代不一致。
+            ad = int(self.pnet.in_dim) - E.feature_dim(self.enc_version)
+            if not (0 < ad <= ACTION_DIM):
                 raise ValueError(
                     f"value/policy の符号化世代が不一致（value=v{self.enc_version}, "
-                    f"policy ctx_dim={pv}）: 同一世代の npz ペアを配置してください")
+                    f"policy in_dim={self.pnet.in_dim}）: 同一世代の npz ペアを配置してください")
 
     def _world_rng(self, manager, name: str, rng) -> np.random.Generator:
         """ターン内 sticky な PIMC 決定化 rng を返す（SERVE_STICKY_WORLD）。

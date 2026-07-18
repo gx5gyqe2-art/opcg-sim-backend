@@ -20,7 +20,11 @@ ACTION_TYPES = [
 _AT_IDX = {t: i for i, t in enumerate(ACTION_TYPES)}
 _CARD_FEAT = E.PER_CHAR        # _char_feats の次元
 # [type one-hot] + [card feats] + [owner_mine, has_card, has_target]
-ACTION_DIM = len(ACTION_TYPES) + _CARD_FEAT + 3
+#   + v9 追加（append-only・PR#188 レビュー#7）: [counter値/2000, 対象=リーダー]
+#   カウンター値なしでは @82 型（「切るなら105・EB03温存」）の区別を policy が原理的に
+#   吸収できない（1.9k 教師の微調整で支持一致 60→62% 頭打ちの実測）。旧ネット/旧記録との
+#   互換は PolicyScorer 側の幅適合（新列は旧netで無視・旧記録は新netでゼロ埋め）で吸収する。
+ACTION_DIM = len(ACTION_TYPES) + _CARD_FEAT + 3 + 2
 
 
 def action_key(move):
@@ -64,8 +68,17 @@ def action_features(manager, move, me_name):
             pass
         f[base + _CARD_FEAT] = 1.0 if (owner_pl is not None and owner_pl.name == me_name) else 0.0
         f[base + _CARD_FEAT + 1] = 1.0   # has_card
-    if payload.get("target_ids"):
+        # v9: 関与カードのカウンター値（0/1000/2000 → 0/0.5/1.0）。カウンター温存の学習素地。
+        cv = float(getattr(card.master, "counter", 0) or 0)
+        f[base + _CARD_FEAT + 3] = min(cv / 2000.0, 1.0)
+    tids = payload.get("target_ids") or []
+    if tids:
         f[base + _CARD_FEAT + 2] = 1.0   # has_target
+        # v9: 対象=リーダー（ライフ攻撃かキャラ除去かの区別）。
+        leaders = {getattr(pl.leader, "uuid", None)
+                   for pl in (manager.p1, manager.p2) if pl.leader is not None}
+        if any(t in leaders for t in tids):
+            f[base + _CARD_FEAT + 4] = 1.0
     return f
 
 
