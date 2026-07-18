@@ -29,6 +29,22 @@ def _git(wt, *a):
     return subprocess.run(["git", "-C", wt] + list(a), capture_output=True, text=True)
 
 
+def next_seed0(base, metas, batch_id, games):
+    """seed 空間の割当て（pure）: 過去バッチの**累計局数**の次から割り当てる。
+
+    旧式 `base + batch_id × games` は `--games` を途中で変えると過去帯と重複した
+    （w1 運用報告 2026-07-18: games 16→4 で batch7 が batch1 の帯を再割当て）。
+    メタの games 合計＝消費済み seed 数なので games 設定に依らず連続・無重複。
+    メタに games が無い場合（想定外の欠損）のみ旧式へフォールバック。"""
+    tot = 0
+    for m in metas:
+        g = m.get("games")
+        if g is None:
+            return base + batch_id * games
+        tot += int(g)
+    return base + tot
+
+
 def _ensure_wt(wt, br):
     """データ枝の worktree を用意する（枝が無ければ現 HEAD から新規作成）。"""
     if not os.path.exists(wt + "/.git"):
@@ -70,7 +86,13 @@ def main():
         _ensure_wt(wt, br)
         os.makedirs(wt + "/p9label", exist_ok=True)
         batch_id = len(glob.glob(wt + "/p9label/batch_*.npz"))
-        seed0 = 10_000_000 * (widx + 1) + batch_id * args.games
+        metas = []
+        for mf in sorted(glob.glob(wt + "/p9label/meta_*.json")):
+            try:
+                metas.append(json.load(open(mf)))
+            except Exception:
+                metas.append({})   # 壊れたメタ＝games欠損扱い→旧式フォールバック
+        seed0 = next_seed0(10_000_000 * (widx + 1), metas, batch_id, args.games)
         out = tempfile.mkdtemp(prefix="reflabel_")
         t0 = time.time()
         env = dict(os.environ, PYTHONPATH=os.path.join(REPO, "tests"), OPCG_LOG_SILENT="1")
