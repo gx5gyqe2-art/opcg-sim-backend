@@ -95,6 +95,11 @@ def main():
     ap.add_argument("--epochs", type=int, default=8)
     ap.add_argument("--policy-smooth", type=float, default=0.05,
                     help="policy 教師の床（v7 案E・未評価ハードゼロの緩和）")
+    ap.add_argument("--distill-weight", type=float, default=0.0,
+                    help="value の忘却対策: 凍結 gen5 予測への distill MSE（v5 §4-4b 機構を流用）")
+    ap.add_argument("--policy-selfdistill", type=float, default=0.0,
+                    help="policy の忘却対策: gen5 prior を教師とする自己蒸留サンプルを"
+                         "ref 教師1件あたりこの比率で混合（mark ガード退行の抑制）")
     ap.add_argument("--val-frac", type=float, default=0.15)
     ap.add_argument("--out", default=None, help="候補ネットの保存先（lr ごとのサブ名で保存）")
     args = ap.parse_args()
@@ -115,6 +120,25 @@ def main():
     tr_vdata = {k: vdata[k][tr] for k in vdata}
     tr_pol = [pol[j] for j in tr]
     ctx_dim = len(pol[0][0])
+    base_v = RN.ValueNet.load(gen5_v)
+    base_p = PolicyScorer.load(gen5_p)
+    if args.distill_weight > 0:
+        # 忘却対策（value）: 凍結 gen5 の予測を distill アンカーに（v5 §4-4b の機構を流用）。
+        tr_vdata = dict(tr_vdata)
+        tr_vdata["distill"] = base_v.predict(
+            {k: tr_vdata[k] for k in ("scalars", "field", "card_idx")}).astype(np.float32)
+    if args.policy_selfdistill > 0:
+        # 忘却対策（policy）: gen5 prior を教師とする自己蒸留サンプルを混合＝ref 教師が
+        # 押す場所以外は gen5 の挙動に留める（mark ガード退行の抑制）。
+        import math
+        n_sd = int(math.ceil(len(tr_pol) * args.policy_selfdistill))
+        rng = np.random.default_rng(11)
+        idxs = rng.choice(len(tr_pol), size=n_sd, replace=n_sd > len(tr_pol))
+        sd = []
+        for j in idxs:
+            ctx, am, _t = tr_pol[j]
+            sd.append((ctx, am, base_p.priors(ctx, am)))
+        tr_pol = tr_pol + sd
     for lr in [float(x) for x in args.lrs.split(",")]:
         vnet = RN.ValueNet.load(gen5_v)
         pnet = PolicyScorer.load(gen5_p)
@@ -122,7 +146,8 @@ def main():
             # v9 行動特徴拡張の温スタート（零行追加＝出力恒等）。新特徴（カウンター値等）は
             # 新形式で記録されたバッチからのみ学習される（旧22次元記録はゼロ埋め）。
             extend_action_dim(pnet, ctx_dim + ACTION_DIM - pnet.in_dim)
-        tm, vm = RN.train(vnet, tr_vdata, epochs=args.epochs, lr=lr, batch=64, val_frac=0.1)
+        tm, vm = RN.train(vnet, tr_vdata, epochs=args.epochs, lr=lr, batch=64, val_frac=0.1,
+                          distill_weight=args.distill_weight)
         ce = train_policy(pnet, tr_pol, epochs=args.epochs, lr=lr,
                           smooth=args.policy_smooth)
         after = eval_nets(vnet, pnet, vdata, pol, va)
