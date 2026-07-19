@@ -24,7 +24,10 @@ _CARD_FEAT = E.PER_CHAR        # _char_feats の次元
 #   カウンター値なしでは @82 型（「切るなら105・EB03温存」）の区別を policy が原理的に
 #   吸収できない（1.9k 教師の微調整で支持一致 60→62% 頭打ちの実測）。旧ネット/旧記録との
 #   互換は PolicyScorer 側の幅適合（新列は旧netで無視・旧記録は新netでゼロ埋め）で吸収する。
-ACTION_DIM = len(ACTION_TYPES) + _CARD_FEAT + 3 + 2
+#   + v9.2 追加（append-only）: [攻撃マージン (攻撃側パワー−対象パワー)/1e4]
+#   これが無いと「5000 で 7000 に届かない攻撃」と「7000 で 7000 に届く攻撃」を区別できず、
+#   候補ネットが @64 でリーダー攻撃（レフェリー判定 2/12 の悪手）を選び続けた（実測）。
+ACTION_DIM = len(ACTION_TYPES) + _CARD_FEAT + 3 + 2 + 1
 
 
 def action_key(move):
@@ -79,7 +82,25 @@ def action_features(manager, move, me_name):
                    for pl in (manager.p1, manager.p2) if pl.leader is not None}
         if any(t in leaders for t in tids):
             f[base + _CARD_FEAT + 4] = 1.0
+        # v9.2: 攻撃マージン＝(攻撃側実効パワー − 対象実効パワー)/1e4（±1にクリップ）。
+        # 「届く攻撃」と「届かない攻撃」の区別はこの相対量でしか表せない。
+        if card is not None:
+            tgt = _find_target(manager, tids[0])
+            if tgt is not None:
+                f[base + _CARD_FEAT + 5] = float(np.clip(
+                    (E._power(card) - E._power(tgt)) / 10000.0, -1.0, 1.0))
     return f
+
+
+def _find_target(manager, uuid):
+    """対象 uuid をリーダー含む全ゾーンから引く（攻撃マージン用）。"""
+    if not uuid:
+        return None
+    for pl in (manager.p1, manager.p2):
+        for c in ([pl.leader] if pl.leader is not None else []) + list(pl.field):
+            if c is not None and getattr(c, "uuid", None) == uuid:
+                return c
+    return None
 
 
 def legal_action_matrix(manager, moves, me_name):

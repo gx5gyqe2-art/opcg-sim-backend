@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 import numpy as np
+import pytest
 
 from opcg_sim.src.learned.action import ACTION_DIM, ACTION_TYPES, action_features, _CARD_FEAT
 from opcg_sim.src.learned.policy import PolicyScorer, extend_action_dim, train_policy
@@ -43,7 +44,7 @@ def test_counter_value_feature():
 
 
 def test_target_is_leader_feature():
-    """ATTACK の対象がリーダーなら末尾-1 が 1（キャラ対象なら 0）。"""
+    """ATTACK の対象がリーダーなら末尾-2 が 1（キャラ対象なら 0）。"""
     ldr = _card("L2")
     atk = _card("a1")
     m = _mgr(p1_hand=[atk], p2_leader=ldr)
@@ -54,6 +55,21 @@ def test_target_is_leader_feature():
     f = action_features(m, mv, "p1")
     assert f[BASE + _CARD_FEAT + 4] == 0.0
     assert f[BASE + _CARD_FEAT + 2] == 1.0   # has_target は従来どおり
+
+
+def test_attack_margin_feature():
+    """攻撃マージン＝(攻撃側パワー−対象パワー)/1e4。5000→7000 は −0.2・7000→7000 は 0。
+    これが無いと「届かない攻撃」を区別できず @64 でリーダー攻撃を選び続けた（実測）。"""
+    ldr = _card("L2", power=7000)
+    weak = _card("a1", power=5000)
+    even = _card("a2", power=7000)
+    m = _mgr(p1_hand=[weak, even], p2_leader=ldr)
+    f = action_features(m, {"action_type": "ATTACK",
+                            "payload": {"uuid": "a1", "target_ids": ["L2"]}}, "p1")
+    assert f[BASE + _CARD_FEAT + 5] == pytest.approx(-0.2)
+    f = action_features(m, {"action_type": "ATTACK",
+                            "payload": {"uuid": "a2", "target_ids": ["L2"]}}, "p1")
+    assert f[BASE + _CARD_FEAT + 5] == pytest.approx(0.0)
 
 
 def test_old_net_ignores_new_columns_identity():
