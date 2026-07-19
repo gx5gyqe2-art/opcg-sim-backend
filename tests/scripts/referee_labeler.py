@@ -49,9 +49,11 @@ _WINDOWS = ("MAIN_ACTION", "SELECT_COUNTER", "SELECT_BLOCKER")
 class _MineObserver:
     """生成中の各決定点で採掘条件を観測する（読み取り専用・record と同順で index が揃う）。"""
 
-    def __init__(self, game_root, vf, eps, sat):
+    def __init__(self, game_root, vf, eps, sat, pf=None, disagree_margin=None):
         self.game_root, self.vf, self.eps, self.sat = game_root, vf, eps, sat
-        self.cands = []   # (action_index, kind, metric)
+        self.pf = pf   # policy priors_fn(state, legal)→配列（反例採掘用・None で無効）
+        self.disagree_margin = disagree_margin if disagree_margin is not None else eps
+        self.cands = []   # (action_index, kind, metric, actor, pend種)
         self._i = 0
 
     TOP_M = 4   # blind 判定は上位M手の spread（v7 実測＝候補間の差 0.01〜0.05 が対象。
@@ -75,44 +77,64 @@ class _MineObserver:
         legal = self.game_root.legal_actions(m)
         if len(legal) < 3:
             return
+        # 各手の1-ply後 value（legal と同順・不成立手は −∞ で除外扱い）。
         vals = []
         for mv in legal:
             child = self.game_root.apply(m, mv, name)
-            if child is None:
-                continue
-            vals.append(self.vf(child, name))
-        if len(vals) >= 3:
-            top = sorted(vals, reverse=True)[:self.TOP_M]
-            spread = top[0] - top[-1]
-            if spread < self.eps:
-                self.cands.append((i, "blind", float(spread), name, pend.get("action")))
+            vals.append(self.vf(child, name) if child is not None else -1e9)
+        vals = np.asarray(vals, dtype=np.float64)
+        top = np.sort(vals)[::-1][:self.TOP_M]
+        if top[0] - top[-1] < self.eps:
+            self.cands.append((i, "blind", float(top[0] - top[-1]), name, pend.get("action")))
+            return
+        # 反例採掘（disagree）: policy top1 が 1-ply value 最善と食い違い、かつ policy が推す手が
+        # value で明確に劣る点。@82（policy=カウンター切る／value=温存）・@68（policy=TURN_END／
+        # value=攻撃）型の「policy を矯正すべき点」を能動的に拾う。採掘はノイジーでよい
+        # （最終ラベルはレフェリー＝真実源が付ける・採掘は「どこを見るか」だけ）。
+        if self.pf is not None:
+            try:
+                pri = self.pf(m, legal)
+            except Exception:
+                pri = None
+            if pri is not None and len(pri) == len(legal):
+                vi = int(np.argmax(vals))
+                pi = int(np.argmax(pri))
+                loss = float(vals[vi] - vals[pi])
+                if pi != vi and loss > self.disagree_margin:
+                    self.cands.append((i, "disagree", loss, name, pend.get("action")))
+
+
+# 採掘カテゴリと、metric の「優先向き」（昇順=小さいほど優先／降順=大きいほど優先）。
+#   sat:   飽和負け＝value が低いほど優先（捲りラベルの主戦場・昇順）
+#   disagree: policy 損失が大きいほど優先（反例＝policy 矯正の主戦場・降順）
+#   blind: 1-ply spread が小さいほど優先（効率盲点・昇順）
+_MINE_CATS = ("sat", "disagree", "blind")
+_MINE_ASC = {"sat": True, "disagree": False, "blind": True}
 
 
 def select_candidates(cands, max_per_game):
     """採掘候補から1局分の採点対象を選ぶ（pure）。
 
-    **sat/blind 半々のクォータ**（レビュー指摘#3）: 決着局の敗者側終盤は sat 候補が豊富で、
-    素朴な sat 優先だと効率盲点（v7 で確定した根本原因の側）が構造的に飢える。各種
-    ⌈K/2⌉ 枠で選び（sat=value 低い順・blind=spread 小さい順）、余り枠は相互に融通する。
+    **カテゴリ round-robin**（sat/disagree/blind を交互に採る）: どのカテゴリも飢えさせない
+    （決着局終盤の sat 洪水で効率盲点/反例が枯れる構造の防止・レビュー指摘#3 の一般化）。
+    各カテゴリは優先向き（`_MINE_ASC`）でソートし、上位から1つずつ回して max_per_game 個選ぶ。
     同種の隣接 index（同一ターンの連鎖）は間引く（index 差 < 2）。"""
-    sat = sorted([c for c in cands if c[1] == "sat"], key=lambda c: c[2])
-    blind = sorted([c for c in cands if c[1] == "blind"], key=lambda c: c[2])
-    quota = (max_per_game + 1) // 2
+    pools = {}
+    for cat in _MINE_CATS:
+        pools[cat] = sorted([c for c in cands if c[1] == cat],
+                            key=lambda c: c[2], reverse=not _MINE_ASC[cat])
+    active = [cat for cat in _MINE_CATS if pools[cat]]
     picked = []
-
-    def _take(pool, limit):
-        n = 0
-        for c in pool:
-            if n >= limit or len(picked) >= max_per_game:
+    r = 0
+    while len(picked) < max_per_game and any(len(pools[cat]) > r for cat in active):
+        for cat in active:
+            if len(picked) >= max_per_game:
                 break
-            if any(abs(c[0] - p[0]) < 2 for p in picked):
-                continue
-            picked.append(c)
-            n += 1
-
-    _take(sat, quota)
-    _take(blind, max_per_game - len(picked))   # blind はクォータ+sat余り分まで
-    _take(sat, max_per_game - len(picked))     # blind が足りなければ sat で埋め戻し
+            if len(pools[cat]) > r:
+                c = pools[cat][r]
+                if not any(abs(c[0] - p[0]) < 2 for p in picked):
+                    picked.append(c)
+        r += 1
     return sorted(picked)
 
 
@@ -233,7 +255,7 @@ def main():
     n_labeled = 0
     for g in range(ARGS.games):
         seed = ARGS.seed0 + g
-        miner = _MineObserver(game_root, vf, ARGS.eps, ARGS.sat)
+        miner = _MineObserver(game_root, vf, ARGS.eps, ARGS.sat, pf=pf)
         t0 = time.time()
         desc = RR.record_selfplay_descriptor(db, seed, _deckb, sims=ARGS.sims_play,
                                              first_player="random", observers=[miner])
@@ -266,7 +288,8 @@ def main():
         meta = {"worker": "ref", "batch_id": int(time.time()), "against_round": -1,
                 "games": ARGS.games, "states": n_labeled, "schema_version": 2,
                 "source": "referee_label", "worlds": ARGS.worlds, "comeback": ARGS.comeback,
-                "miner": 2}   # 採掘条件の版: 2=sat/blindクォータ＋上位M手spread（レビュー反映）
+                "miner": 3}   # 採掘条件の版: 3=sat/disagree/blind の3カテゴリround-robin
+                              #（disagree=policy vs 1-ply value 最善の乖離＝反例採掘・v9.3）
         with open(os.path.join(ARGS.out, "meta.json"), "w") as f:
             json.dump(meta, f, ensure_ascii=False)
         print(f"saved: {ARGS.out}/batch.npz ({n_labeled} states)", flush=True)
