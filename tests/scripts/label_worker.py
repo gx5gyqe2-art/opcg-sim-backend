@@ -68,7 +68,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--worker", default="w1", help="ワーカー名（w1/w2/…・枝と seed 空間を分ける）")
     ap.add_argument("--games", type=int, default=16, help="1バッチの生成局数")
-    ap.add_argument("--batches", type=int, default=10 ** 6, help="回すバッチ数（実質∞・停止で中断）")
+    ap.add_argument("--batches", type=int, default=20,
+                    help="1起動で回すバッチ数。**有限**にして while ループの git pull へ定期的に"
+                         "戻る＝本体コード更新（新特徴等）を自動追従する（無限ループだと追従不能・"
+                         "2026-07-18 の25次元切替遅延の教訓）。0/負で実質∞")
     ap.add_argument("--sims-play", type=int, default=120)
     ap.add_argument("--sims", type=int, default=32)
     ap.add_argument("--worlds", type=int, default=4)
@@ -82,7 +85,8 @@ def main():
     widx = int("".join(c for c in args.worker if c.isdigit()) or 0)
     labeler = os.path.join(REPO, "tests", "scripts", "referee_labeler.py")
 
-    for _ in range(args.batches):
+    n_batches = args.batches if args.batches > 0 else 10 ** 9
+    for _ in range(n_batches):
         _ensure_wt(wt, br)
         os.makedirs(wt + "/p9label", exist_ok=True)
         batch_id = len(glob.glob(wt + "/p9label/batch_*.npz"))
