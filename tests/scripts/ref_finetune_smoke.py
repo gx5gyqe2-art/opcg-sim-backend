@@ -100,6 +100,11 @@ def main():
     ap.add_argument("--policy-selfdistill", type=float, default=0.0,
                     help="policy の忘却対策: gen5 prior を教師とする自己蒸留サンプルを"
                          "ref 教師1件あたりこの比率で混合（mark ガード退行の抑制）")
+    ap.add_argument("--skip-policy", action="store_true",
+                    help="policy を微調整せず gen5 のまま保存する（v9 既定推奨）。ablation で "
+                         "policy 微調整が @64 等の正しい点を壊す犯人と確定（value のみ学習で "
+                         "コーチPASS・arena 非退行・2026-07-18）。value は decide の主役で "
+                         "素直に学べるため、policy を据え置くのが v9 の正しい形。")
     ap.add_argument("--val-frac", type=float, default=0.15)
     ap.add_argument("--out", default=None, help="候補ネットの保存先（lr ごとのサブ名で保存）")
     args = ap.parse_args()
@@ -148,8 +153,11 @@ def main():
             extend_action_dim(pnet, ctx_dim + ACTION_DIM - pnet.in_dim)
         tm, vm = RN.train(vnet, tr_vdata, epochs=args.epochs, lr=lr, batch=64, val_frac=0.1,
                           distill_weight=args.distill_weight)
-        ce = train_policy(pnet, tr_pol, epochs=args.epochs, lr=lr,
-                          smooth=args.policy_smooth)
+        if args.skip_policy:
+            ce = float("nan")   # policy は gen5 のまま（据え置き＝v9 既定）
+        else:
+            ce = train_policy(pnet, tr_pol, epochs=args.epochs, lr=lr,
+                              smooth=args.policy_smooth)
         after = eval_nets(vnet, pnet, vdata, pol, va)
         print(f"[lr={lr:g}] train: value mse {tm:.3f}→val {vm:.3f}・policy CE {ce:.3f}")
         print(f"          val: value MAE={after['mae']:.3f} corr={after['corr']:.3f}  "
