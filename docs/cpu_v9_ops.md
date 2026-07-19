@@ -79,11 +79,13 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/ref_finetune_smoke.py \
   --lrs 1e-4,5e-5 --epochs 8 --distill-weight 0.5 --skip-policy --out <出力dir>
 ```
 
-- **既定レシピ（v9 確定・2026-07-18）: `--skip-policy`＝value のみ学習・policy は gen5 据え置き。**
-  ablation で **policy 微調整が @64 等の「gen5 が既に正しい点」を壊す犯人と確定**（value 微調整は
-  @64 を 0.8→1.0 に強化・policy 微調整は TURN_END に破壊）。value のみ学習で**コーチゲート初 PASS**
-  （3.2 vs gen5 3.0・退行ゼロ）・arena 非退行（0.5）。value は decide の主役で「盤面勝率」という
-  素直な回帰目標なので安定して学べる。policy は局面文脈に敏感で微調整が過汎化する。
+- **既定レシピ（v9・2026-07-18）: `--skip-policy`＝value のみ学習・policy は gen5 据え置き（暫定）。**
+  ablation で **現状の policy 教師（反例不足）では policy 微調整が @64 等の「gen5 が既に正しい点」を
+  壊す**と判明（value 微調整は @64 を 0.8→1.0 に強化・policy 微調整は TURN_END に破壊）。**policy
+  ネット自体の問題ではなく教師カバレッジの問題**: value 教師は各盤面固有のスカラー回帰で干渉しにくいが、
+  policy 教師は合法手分布のため、似た特徴の別局面の教師が @64 のスコアに干渉する（汎化の負の側面＝
+  反例不足）。value のみ学習で**コーチゲート初 PASS**（3.2 vs gen5 3.0・退行ゼロ）・arena 非退行（0.5）。
+  **policy 据え置きは暫定**——反例（disagree 採掘）が十分蓄積したら policy 学習を解禁する。
 - value の忘却対策は `--distill-weight 0.5`（凍結 gen5 予測への distill）。lr は 5e-5〜1e-4
   （穏やかなほど arena 維持・実測 5e-5=0.50 / 1e-4=0.46）。
 - 行動特徴が増えている場合は自動で温スタート拡張（零行＝恒等）される。旧形式ラベルはゼロ埋めで
