@@ -36,7 +36,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), log=print):
     """v9-label 枝から全教師バッチを収集して (vdata dict, pol list) に連結する。"""
-    S, F, I, Y = [], [], [], []
+    S, F, I, Y, K = [], [], [], [], []
     pol = []
     n_batches = 0
     for w in workers:
@@ -51,13 +51,17 @@ def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), log=print):
             z = np.load(io.BytesIO(raw))
             S.append(z["scalars"]); F.append(z["field"]); I.append(z["card_idx"])
             Y.append(z["value"])
+            # kind（disagree/sat/blind）: kind 修正前の旧バッチは "" 埋め（重み付け対象外）
+            K.append(z["kind"] if "kind" in z.files
+                     else np.array([""] * len(z["value"]), dtype="<U8"))
             pol.extend(unpack_policy({k: z[k] for k in z.files if k.startswith("pol_")}))
             n_batches += 1
     if not S:
         return None, None
     vdata = {"scalars": np.concatenate(S), "field": np.concatenate(F),
              "card_idx": np.concatenate(I),
-             "value": np.concatenate(Y).astype(np.float32)}
+             "value": np.concatenate(Y).astype(np.float32),
+             "kind": np.concatenate(K)}
     log(f"収集: {n_batches}バッチ・教師 {len(vdata['value'])} 決定")
     return vdata, pol
 
@@ -106,6 +110,8 @@ def main():
                          "コーチPASS・arena 非退行・2026-07-18）。value は decide の主役で "
                          "素直に学べるため、policy を据え置くのが v9 の正しい形。")
     ap.add_argument("--val-frac", type=float, default=0.15)
+    ap.add_argument("--disagree-weight", type=float, default=1.0,
+                    help="kind=disagree（反例）サンプルの policy 学習での複製倍率。1=無効")
     ap.add_argument("--out", default=None, help="候補ネットの保存先（lr ごとのサブ名で保存）")
     args = ap.parse_args()
 
@@ -122,8 +128,18 @@ def main():
     print(f"\n[gen5 基準] val: value MAE={base['mae']:.3f} corr={base['corr']:.3f}  "
           f"policy 支持一致={base['agree']*100:.0f}% KL={base['kl']:.3f}")
 
-    tr_vdata = {k: vdata[k][tr] for k in vdata}
+    tr_kind = vdata["kind"][tr]
+    tr_vdata = {k: vdata[k][tr] for k in vdata if k != "kind"}   # kind は train へ渡さない
     tr_pol = [pol[j] for j in tr]
+    if args.disagree_weight > 1:
+        # 反例（disagree）を複製して policy 学習で重く効かせる（policy_selfdistill と同じ手法）。
+        # kind 付きの新バッチのみ対象＝旧バッチ（"" 埋め）は等倍。
+        reps = int(round(args.disagree_weight)) - 1
+        extra = [tr_pol[j] for j in range(len(tr_pol))
+                 if tr_kind[j] == "disagree" for _ in range(reps)]
+        n_dis = int((tr_kind == "disagree").sum())
+        tr_pol = tr_pol + extra
+        print(f"disagree 重み付け: {n_dis} 反例 ×{args.disagree_weight:g} → +{len(extra)} 複製")
     ctx_dim = len(pol[0][0])
     base_v = RN.ValueNet.load(gen5_v)
     base_p = PolicyScorer.load(gen5_p)
