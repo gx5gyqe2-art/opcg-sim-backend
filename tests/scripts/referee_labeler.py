@@ -250,7 +250,7 @@ def main():
         l2, c2 = HD.build(_db, ids[(seed + 1) % len(ids)], "p2")
         return l1, c1, l2, c2
 
-    sinks = {"S": [], "F": [], "I": [], "Y": [], "Q": [], "T": []}
+    sinks = {"S": [], "F": [], "I": [], "Y": [], "Q": [], "T": [], "K": []}
     pol = []
     n_labeled = 0
     for g in range(ARGS.games):
@@ -271,6 +271,8 @@ def main():
             sinks["S"].append(enc["scalars"]); sinks["F"].append(enc["field"])
             sinks["I"].append(enc["card_idx"])
             sinks["Y"].append(z); sinks["Q"].append(z); sinks["T"].append(np.nan)
+            sinks["K"].append(kind)   # 採掘カテゴリ（disagree/sat/blind）。policy 学習で
+                                      # disagree を重み付けるための追跡タグ（append-only）
             pol.append(ps)
             n_labeled += 1
     print(f"\nLABEL_RESULT: {ARGS.games}局 → 教師 {n_labeled} 決定", flush=True)
@@ -280,7 +282,8 @@ def main():
                   "card_idx": np.stack(sinks["I"]),
                   "value": np.array(sinks["Y"], dtype=np.float32),
                   "q_root": np.array(sinks["Q"], dtype=np.float32),
-                  "turns_left": np.array(sinks["T"], dtype=np.float32)}
+                  "turns_left": np.array(sinks["T"], dtype=np.float32),
+                  "kind": np.array(sinks["K"])}   # 読み手は "kind" in z.files で判定（append-only）
         arrays.update(pack_policy(pol))
         np.savez_compressed(os.path.join(ARGS.out, "batch.npz"), **arrays)
         # worker はワーカー運用時に label_worker が w1 等へ上書きする（枝と consumed の単位）。
