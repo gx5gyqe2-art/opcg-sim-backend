@@ -237,10 +237,12 @@ def main():
     vnet = RN.ValueNet.load(os.path.join(REPO, "opcg_sim", "data", "learned", "gen5_value.npz"))
     pnet = PolicyScorer.load(os.path.join(REPO, "opcg_sim", "data", "learned", "gen5_policy.npz"))
     from opcg_sim.src.core.cpu_learned import _net_enc_version
-    ev = _net_enc_version(vnet)
+    ev_eval = _net_enc_version(vnet)           # 生成CPUの盤面評価に使う版（gen5=v4）
+    ev_rec = max(E.known_versions())           # 教師の記録は最新版＝新特徴(v5)を必ず含める（cpu_v10）。
+    # 記録と評価を分離しないと、gen5(51入力)に v5(55) を渡してクラッシュする／新特徴が教師に入らない。
     vocab = E.vocab_from_ids(vnet.vocab_ids) if vnet.vocab_ids else E.build_vocab(db)
-    vf = P.value_fn_of(vnet, vocab, ev)
-    pf = P.priors_fn_of(pnet, vocab, ev)
+    vf = P.value_fn_of(vnet, vocab, ev_eval)
+    pf = P.priors_fn_of(pnet, vocab, ev_eval)
     game_root = OPCGGame(prune_futile=False)
     game_serve = OPCGGame()
     ids = HD.deck_ids()
@@ -263,7 +265,7 @@ def main():
         print(f"game {g + 1}/{ARGS.games} seed={seed}: {len(desc['actions'])}手 "
               f"候補{len(miner.cands)}→採掘{len(picked)} ({time.time() - t0:.0f}s)", flush=True)
         for idx, kind, metric, actor, pend_kind in picked:
-            vs, ps = label_decision(db, game_root, game_serve, vf, pf, vocab, ev, desc, idx,
+            vs, ps = label_decision(db, game_root, game_serve, vf, pf, vocab, ev_rec, desc, idx,
                                     expect=(actor, pend_kind))
             if vs is None:
                 continue

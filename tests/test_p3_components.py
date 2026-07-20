@@ -68,6 +68,18 @@ def test_policy_overfits_single_sample():
     assert -np.log(p[3] + 1e-9) < ce0, "CE が下がっていない"
 
 
+def test_v10_appendonly_dims():
+    """cpu_v10 append-only ラチェット: encoder v5=55（v4=51 は不変）・action ACTION_DIM=26。
+    既存版の次元が変わる＝並べ替え/削除＝温スタートの恒等性が壊れるので検出する。"""
+    assert E.scalars_dim(4) == 51, "v4 の次元が変わった（append-only 違反）"
+    assert E.scalars_dim(5) == 55, "v5 = v4 + 相手場集約3 + 展開余力1"
+    assert A.ACTION_DIM == 26, "v10 = 既存25 + ATTACH_DON 付与後パワー1"
+    assert E._opp_field_aggregate([]) == [0.0, 0.0, 0.0], "空場は脅威ゼロ"
+    db = _load_db(); game = OPCGGame(); m = game.new_game(db, 1)
+    name = game.current_player(m); vocab = E.build_vocab(db)
+    assert E.encode(m, name, vocab, version=5)["scalars"].shape[0] == 55
+
+
 def test_state_context_dim():
     db = _load_db(); game = OPCGGame(); vocab = E.build_vocab(db)
     m = game.new_game(db, 4)

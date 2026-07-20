@@ -27,7 +27,10 @@ _CARD_FEAT = E.PER_CHAR        # _char_feats の次元
 #   + v9.2 追加（append-only）: [攻撃マージン (攻撃側パワー−対象パワー)/1e4]
 #   これが無いと「5000 で 7000 に届かない攻撃」と「7000 で 7000 に届く攻撃」を区別できず、
 #   候補ネットが @64 でリーダー攻撃（レフェリー判定 2/12 の悪手）を選び続けた（実測）。
-ACTION_DIM = len(ACTION_TYPES) + _CARD_FEAT + 3 + 2 + 1
+#   + v10 追加（append-only）: [ATTACH_DON 付与後到達パワー (対象パワー+残ドン×1000)/1e4]
+#   これが無いと弱キャラ（ゼウス P2000）への付与＝リーサル準備（@68）を policy が候補にできず、
+#   「今のパワーが低い」だけで付与を捨てていた（真盤面診断 cpu_v10）。
+ACTION_DIM = len(ACTION_TYPES) + _CARD_FEAT + 3 + 2 + 1 + 1
 
 
 def action_key(move):
@@ -89,6 +92,13 @@ def action_features(manager, move, me_name):
             if tgt is not None:
                 f[base + _CARD_FEAT + 5] = float(np.clip(
                     (E._power(card) - E._power(tgt)) / 10000.0, -1.0, 1.0))
+    # v10: ATTACH_DON の付与後到達パワー（残ドンを全部この対象に付与した場合の上限）。弱キャラへの
+    # 付与＝リーサル準備（@68）を候補化する素地。攻撃行動でないため上のマージンとは別枠で持つ。
+    if at == "ATTACH_DON" and card is not None:
+        me = manager.p1 if manager.p1.name == me_name else manager.p2
+        nd = len(getattr(me, "don_active", ()) or ())
+        f[base + _CARD_FEAT + 6] = float(np.clip(
+            (E._power(card) + nd * 1000.0) / 10000.0, 0.0, 2.0))
     return f
 
 
