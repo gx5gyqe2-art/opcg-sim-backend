@@ -30,12 +30,46 @@ from az_policy import PolicyScorer, train_policy
 from opcg_sim.src.learned.action import ACTION_DIM
 from opcg_sim.src.learned.policy import extend_action_dim
 from pd_batch_common import unpack_policy
+from opcg_sim.src.learned.encoder import scalars_dim, field_dim, known_versions
+from opcg_sim.src.core.cpu_learned import _net_enc_version
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def _pad_cols(a, cols):
+    """行列/ベクトルを末尾ゼロ埋めで cols 幅に（append-only 特徴＝末尾追加なので単純末尾埋め）。"""
+    if a.ndim == 1:
+        return a if a.shape[0] >= cols else np.concatenate(
+            [a, np.zeros(cols - a.shape[0], a.dtype)])
+    return a if a.shape[1] >= cols else np.concatenate(
+        [a, np.zeros((len(a), cols - a.shape[1]), a.dtype)], axis=1)
+
+
+def _pad_ctx(ctx, target_sc):
+    """policy ctx=[scalars | field_flat]。旧版 ctx を最新版へ＝scalars 部分の末尾（field の直前）へ
+    ゼロ挿入（末尾埋めは field 特徴を汚染するため不可）。"""
+    fd = field_dim()
+    old_sc = len(ctx) - fd
+    if old_sc >= target_sc:
+        return ctx
+    return np.concatenate([ctx[:old_sc], np.zeros(target_sc - old_sc, ctx.dtype), ctx[old_sc:]])
+
+
+def _warm_expand(vnet, pnet):
+    """gen5（旧符号化版）を教師の最新版へ温スタート拡張。scalars 差を value 入力と policy ctx の
+    scalars 末尾へゼロ挿入（恒等）。action 差は呼び出し側の extend_action_dim が担う。"""
+    at = scalars_dim(_net_enc_version(vnet))
+    d_sc = scalars_dim(max(known_versions())) - at
+    if d_sc > 0:
+        vnet = vnet.expanded(at, d_sc)
+        pnet = pnet.expanded(at, d_sc)
+    return vnet, pnet
+
+
 def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), log=print):
-    """v9-label 枝から全教師バッチを収集して (vdata dict, pol list) に連結する。"""
+    """v9-label 枝から全教師バッチを収集して (vdata dict, pol list) に連結する。版が混在
+    （旧 v4=51 / 新 v5=55）しても最新版へゼロ埋め統一する（append-only 恒等・cpu_v10）。"""
+    tsc = scalars_dim(max(known_versions()))
     S, F, I, Y, K = [], [], [], [], []
     pol = []
     n_batches = 0
@@ -49,12 +83,13 @@ def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), log=print):
             raw = subprocess.run(["git", "-C", REPO, "show", f"{br}:p9label/{f}"],
                                  capture_output=True).stdout
             z = np.load(io.BytesIO(raw))
-            S.append(z["scalars"]); F.append(z["field"]); I.append(z["card_idx"])
+            S.append(_pad_cols(z["scalars"], tsc)); F.append(z["field"]); I.append(z["card_idx"])
             Y.append(z["value"])
             # kind（disagree/sat/blind）: kind 修正前の旧バッチは "" 埋め（重み付け対象外）
             K.append(z["kind"] if "kind" in z.files
                      else np.array([""] * len(z["value"]), dtype="<U8"))
-            pol.extend(unpack_policy({k: z[k] for k in z.files if k.startswith("pol_")}))
+            for ctx, am, t in unpack_policy({k: z[k] for k in z.files if k.startswith("pol_")}):
+                pol.append((_pad_ctx(ctx, tsc), _pad_cols(am, ACTION_DIM), t))
             n_batches += 1
     if not S:
         return None, None
@@ -124,7 +159,8 @@ def main():
 
     gen5_v = os.path.join(REPO, "opcg_sim", "data", "learned", "gen5_value.npz")
     gen5_p = os.path.join(REPO, "opcg_sim", "data", "learned", "gen5_policy.npz")
-    base = eval_nets(RN.ValueNet.load(gen5_v), PolicyScorer.load(gen5_p), vdata, pol, va)
+    base = eval_nets(*_warm_expand(RN.ValueNet.load(gen5_v), PolicyScorer.load(gen5_p)),
+                     vdata, pol, va)
     print(f"\n[gen5 基準] val: value MAE={base['mae']:.3f} corr={base['corr']:.3f}  "
           f"policy 支持一致={base['agree']*100:.0f}% KL={base['kl']:.3f}")
 
@@ -141,8 +177,7 @@ def main():
         tr_pol = tr_pol + extra
         print(f"disagree 重み付け: {n_dis} 反例 ×{args.disagree_weight:g} → +{len(extra)} 複製")
     ctx_dim = len(pol[0][0])
-    base_v = RN.ValueNet.load(gen5_v)
-    base_p = PolicyScorer.load(gen5_p)
+    base_v, base_p = _warm_expand(RN.ValueNet.load(gen5_v), PolicyScorer.load(gen5_p))
     if args.distill_weight > 0:
         # 忘却対策（value）: 凍結 gen5 の予測を distill アンカーに（v5 §4-4b の機構を流用）。
         tr_vdata = dict(tr_vdata)
@@ -161,8 +196,7 @@ def main():
             sd.append((ctx, am, base_p.priors(ctx, am)))
         tr_pol = tr_pol + sd
     for lr in [float(x) for x in args.lrs.split(",")]:
-        vnet = RN.ValueNet.load(gen5_v)
-        pnet = PolicyScorer.load(gen5_p)
+        vnet, pnet = _warm_expand(RN.ValueNet.load(gen5_v), PolicyScorer.load(gen5_p))
         if pnet.in_dim < ctx_dim + ACTION_DIM:
             # v9 行動特徴拡張の温スタート（零行追加＝出力恒等）。新特徴（カウンター値等）は
             # 新形式で記録されたバッチからのみ学習される（旧22次元記録はゼロ埋め）。
