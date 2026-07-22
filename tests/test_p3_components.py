@@ -4,6 +4,7 @@ import numpy as np
 import conftest  # noqa: F401
 import pytest
 import rl_encoder as E
+import rl_net as RN
 from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
 import opcg_action as A
@@ -78,6 +79,12 @@ def test_v10_appendonly_dims():
     db = _load_db(); game = OPCGGame(); m = game.new_game(db, 1)
     name = game.current_player(m); vocab = E.build_vocab(db)
     assert E.encode(m, name, vocab, version=5)["scalars"].shape[0] == 55
+    # 温スタート拡張は焼き込み vocab を引き継ぐ（欠落すると serve が build_vocab へ
+    # フォールバックし、DB 増加の途中挿入で index がズレ＝候補評価が壊れる・2026-07-22 実害）
+    v = RN.ValueNet.load("opcg_sim/data/learned/gen5_value.npz")
+    assert v.vocab_ids, "gen5 は vocab 焼き込み済みのはず"
+    assert v.expanded(E.scalars_dim(4), 4).vocab_ids == list(v.vocab_ids), \
+        "expanded() が vocab_ids を落としている（serve で index ズレ）"
 
 
 def test_state_context_dim():
