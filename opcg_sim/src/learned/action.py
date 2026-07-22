@@ -20,7 +20,17 @@ ACTION_TYPES = [
 _AT_IDX = {t: i for i, t in enumerate(ACTION_TYPES)}
 _CARD_FEAT = E.PER_CHAR        # _char_feats の次元
 # [type one-hot] + [card feats] + [owner_mine, has_card, has_target]
-ACTION_DIM = len(ACTION_TYPES) + _CARD_FEAT + 3
+#   + v9 追加（append-only・PR#188 レビュー#7）: [counter値/2000, 対象=リーダー]
+#   カウンター値なしでは @82 型（「切るなら105・EB03温存」）の区別を policy が原理的に
+#   吸収できない（1.9k 教師の微調整で支持一致 60→62% 頭打ちの実測）。旧ネット/旧記録との
+#   互換は PolicyScorer 側の幅適合（新列は旧netで無視・旧記録は新netでゼロ埋め）で吸収する。
+#   + v9.2 追加（append-only）: [攻撃マージン (攻撃側パワー−対象パワー)/1e4]
+#   これが無いと「5000 で 7000 に届かない攻撃」と「7000 で 7000 に届く攻撃」を区別できず、
+#   候補ネットが @64 でリーダー攻撃（レフェリー判定 2/12 の悪手）を選び続けた（実測）。
+#   + v10 追加（append-only）: [ATTACH_DON 付与後到達パワー (対象パワー+残ドン×1000)/1e4]
+#   これが無いと弱キャラ（ゼウス P2000）への付与＝リーサル準備（@68）を policy が候補にできず、
+#   「今のパワーが低い」だけで付与を捨てていた（真盤面診断 cpu_v10）。
+ACTION_DIM = len(ACTION_TYPES) + _CARD_FEAT + 3 + 2 + 1 + 1
 
 
 def action_key(move):
@@ -64,9 +74,43 @@ def action_features(manager, move, me_name):
             pass
         f[base + _CARD_FEAT] = 1.0 if (owner_pl is not None and owner_pl.name == me_name) else 0.0
         f[base + _CARD_FEAT + 1] = 1.0   # has_card
-    if payload.get("target_ids"):
+        # v9: 関与カードのカウンター値（0/1000/2000 → 0/0.5/1.0）。カウンター温存の学習素地。
+        cv = float(getattr(card.master, "counter", 0) or 0)
+        f[base + _CARD_FEAT + 3] = min(cv / 2000.0, 1.0)
+    tids = payload.get("target_ids") or []
+    if tids:
         f[base + _CARD_FEAT + 2] = 1.0   # has_target
+        # v9: 対象=リーダー（ライフ攻撃かキャラ除去かの区別）。
+        leaders = {getattr(pl.leader, "uuid", None)
+                   for pl in (manager.p1, manager.p2) if pl.leader is not None}
+        if any(t in leaders for t in tids):
+            f[base + _CARD_FEAT + 4] = 1.0
+        # v9.2: 攻撃マージン＝(攻撃側実効パワー − 対象実効パワー)/1e4（±1にクリップ）。
+        # 「届く攻撃」と「届かない攻撃」の区別はこの相対量でしか表せない。
+        if card is not None:
+            tgt = _find_target(manager, tids[0])
+            if tgt is not None:
+                f[base + _CARD_FEAT + 5] = float(np.clip(
+                    (E._power(card) - E._power(tgt)) / 10000.0, -1.0, 1.0))
+    # v10: ATTACH_DON の付与後到達パワー（残ドンを全部この対象に付与した場合の上限）。弱キャラへの
+    # 付与＝リーサル準備（@68）を候補化する素地。攻撃行動でないため上のマージンとは別枠で持つ。
+    if at == "ATTACH_DON" and card is not None:
+        me = manager.p1 if manager.p1.name == me_name else manager.p2
+        nd = len(getattr(me, "don_active", ()) or ())
+        f[base + _CARD_FEAT + 6] = float(np.clip(
+            (E._power(card) + nd * 1000.0) / 10000.0, 0.0, 2.0))
     return f
+
+
+def _find_target(manager, uuid):
+    """対象 uuid をリーダー含む全ゾーンから引く（攻撃マージン用）。"""
+    if not uuid:
+        return None
+    for pl in (manager.p1, manager.p2):
+        for c in ([pl.leader] if pl.leader is not None else []) + list(pl.field):
+            if c is not None and getattr(c, "uuid", None) == uuid:
+                return c
+    return None
 
 
 def legal_action_matrix(manager, moves, me_name):

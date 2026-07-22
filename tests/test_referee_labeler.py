@@ -20,16 +20,26 @@ from referee_labeler import plan_teacher_visit, select_candidates  # noqa: E402
 pytestmark = pytest.mark.cpu_infra
 
 
-def test_select_candidates_sat_first_and_dedupe():
-    """飽和負けが効率盲点より優先・隣接 index（差<2）は間引き・上限で切る。"""
+def test_select_candidates_roundrobin_and_dedupe():
+    """3カテゴリ round-robin＝各カテゴリの最良から1つずつ・隣接 index（差<2）は間引き・上限で切る。"""
     cands = [(10, "blind", 0.02), (40, "sat", -0.95), (41, "sat", -0.9),
-             (70, "blind", 0.01), (90, "sat", -0.85)]
+             (70, "blind", 0.01), (90, "sat", -0.85), (55, "disagree", 0.4)]
     picked = select_candidates(cands, 3)
+    kinds = sorted(c[1] for c in picked)
+    assert kinds == ["blind", "disagree", "sat"], "各カテゴリ1つずつ回っていない"
     idxs = [c[0] for c in picked]
     assert 40 in idxs and 41 not in idxs, "隣接する飽和候補が間引かれていない"
-    assert 90 in idxs
-    assert len(picked) == 3
-    assert 70 in idxs, "残り枠は spread 最小の効率盲点で埋める"
+    assert 70 in idxs and 55 in idxs         # blind 最良(spread最小)・disagree 最良
+
+
+def test_select_candidates_disagree_priority_desc():
+    """disagree は損失（metric）が大きいほど優先（降順）。sat/blind は昇順。"""
+    cands = [(10, "disagree", 0.2), (20, "disagree", 0.8),
+             (30, "sat", -0.9), (40, "sat", -0.5)]
+    picked = select_candidates(cands, 2)
+    idxs = sorted(c[0] for c in picked)
+    assert 20 in idxs, "disagree は損失最大を先に採る"
+    assert 30 in idxs, "sat は value 最小を先に採る"
 
 
 def test_select_candidates_cap_and_order():
@@ -38,6 +48,19 @@ def test_select_candidates_cap_and_order():
     picked = select_candidates(cands, 4)
     assert len(picked) == 4
     assert [c[0] for c in picked] == sorted(c[0] for c in picked)
+
+
+def test_select_candidates_no_category_starvation():
+    """sat が豊富でも他カテゴリ枠は round-robin で確保される（敗者側終盤の sat 洪水で
+    効率盲点/反例が飢える構造の防止）。あるカテゴリが尽きれば残りで埋める。"""
+    sats = [(i, "sat", -0.9) for i in (10, 20, 30, 40, 50, 60)]
+    mix = [(100, "blind", 0.02), (110, "disagree", 0.5)]
+    picked = select_candidates(sats + mix, 4)
+    kinds = sorted(c[1] for c in picked)
+    assert kinds == ["blind", "disagree", "sat", "sat"], "round-robin 後に sat 余剰で埋める"
+    # 他カテゴリが空なら sat だけで埋まる。
+    picked = select_candidates(sats, 3)
+    assert [c[1] for c in picked] == ["sat", "sat", "sat"]
 
 
 def _entry(first_key, outcomes, lifem):

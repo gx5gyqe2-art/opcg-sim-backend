@@ -47,10 +47,27 @@ class PolicyScorer:
         logits = (A1 @ self.W2 + self.b2)[:, 0]
         return logits, (X, Z1, A1)
 
+    def _fit_actions(self, ctx, action_mat):
+        """行動特徴の幅を net の期待（in_dim − ctx次元）へ適合させる（v9 append-only 拡張の互換層）。
+
+        - 旧 net × 新特徴（ACTION_DIM 拡張後の行列）→ 末尾の新列を無視（切詰）＝**出力恒等**
+        - 新 net × 旧記録（22次元 pol_am 等）→ ゼロ埋め＝新特徴の重みに勾配が流れないだけ
+        これで serve/学習の全経路が版混在でも壊れない（次元不一致で落とさない・黙って
+        別解釈もしない: ズレは末尾 append 分に限る前提＝特徴は append-only が規約）。"""
+        want = self.in_dim - len(ctx)
+        have = action_mat.shape[1]
+        if have == want:
+            return action_mat
+        if have > want:
+            return action_mat[:, :want]
+        pad = np.zeros((action_mat.shape[0], want - have), dtype=action_mat.dtype)
+        return np.concatenate([action_mat, pad], axis=1)
+
     def priors(self, ctx, action_mat):
         """ctx[ctx_dim], action_mat[K,ACTION_DIM] → 合法手上の事前確率[K]。"""
         if action_mat.shape[0] == 0:
             return np.zeros(0)
+        action_mat = self._fit_actions(ctx, action_mat)
         X = np.concatenate([np.repeat(ctx[None, :], action_mat.shape[0], axis=0), action_mat], axis=1)
         logits, _ = self._forward(X)
         return _softmax(logits)
@@ -60,6 +77,7 @@ class PolicyScorer:
         K = action_mat.shape[0]
         if K == 0:
             return 0.0
+        action_mat = self._fit_actions(ctx, action_mat)
         X = np.concatenate([np.repeat(ctx[None, :], K, axis=0), action_mat], axis=1)
         logits, (X, Z1, A1) = self._forward(X)
         p = _softmax(logits)
@@ -121,6 +139,17 @@ def smooth_target(tg, smooth):
         return tg
     k = len(tg)
     return (1.0 - smooth) * np.asarray(tg, dtype=np.float64) + smooth / max(k, 1)
+
+
+def extend_action_dim(net, add):
+    """行動特徴の append-only 拡張の温スタート: W1 末尾へ零行を `add` 本追加＝**出力恒等**。
+
+    （value 側の `extend_to_vocab`/温スタート拡張と同じ思想。追加行の重みは 0 なので
+    旧挙動そのまま・新特徴は学習で初めて効き始める。Adam モーメントはリセット。）"""
+    net.W1 = np.concatenate([net.W1, np.zeros((add, net.W1.shape[1]))], axis=0)
+    net.in_dim += add
+    net._init_adam()
+    return net
 
 
 def train_policy(net, samples, epochs=4, lr=2e-3, seed=0, smooth=0.0):

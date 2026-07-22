@@ -37,12 +37,15 @@ _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "data")
 
-# v5(gen5) = v4(gen4) からの温スタート（符号化 v3→v4 拡張・恒等）＋マーク局面シード＋value蒸留で
-# 学習した run のピーク round15（cum2048）を凍結（docs/reports/v5_adoption_20260715.md・
-# 対v4直接対戦=0.610 [0.512,0.700] 100局＝有意勝ち）。符号化は v4（51スカラー・自デッキ残集約）で、
-# net の feat_dim から自動判別される。gen4/gen3/gen2 はリプレイ再現・A/B・ロールバック用に同梱を維持する。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen5_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen5_policy.npz")
+# v6(gen6) = gen5 からの温スタート（符号化 v4→v5 拡張・恒等＝相手場の脅威集約＋展開余力・
+# 行動特徴に ATTACH_DON 付与後パワー）＋レフェリー教師 10159 決定（v9 採掘 sat/blind/disagree・
+# disagree×4 重み・policy 自己蒸留 0.85・value 蒸留 0.5・lr5e-5/8ep）の微調整を凍結
+# （docs/reports/v10_gen6_adoption_20260722.md・コーチゲート 3.8>3.0 PASS＝@33 0→1.0 と @64 0.8
+# 維持の両立・対gen5 直接対戦 204局 wr=0.564）。符号化は v5（55スカラー）で net の feat_dim から
+# 自動判別される。gen5 以前はリプレイ再現・A/B・ロールバック用に同梱を維持する
+# （レフェリー教師の錨は gen5 固定のまま＝referee_labeler は明示ロード）。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen6_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen6_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}
@@ -184,11 +187,15 @@ class LearnedEngine:
         self.pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
         if self.pnet is not None:
             from opcg_sim.src.learned.action import ACTION_DIM
-            pv = int(self.pnet.in_dim) - ACTION_DIM
-            if pv != E.feature_dim(self.enc_version):
+            # 行動特徴は append-only で拡張される（v9: +カウンター値/対象=リーダー）。旧 net の
+            # 行動次元は現 ACTION_DIM 以下でありうる（新列は PolicyScorer._fit_actions が切詰＝
+            # 出力恒等）。ここでは「状態 ctx の世代一致」だけを検査する: 行動次元
+            # = in_dim − feature_dim(世代) が (0, ACTION_DIM] を外れたら世代不一致。
+            ad = int(self.pnet.in_dim) - E.feature_dim(self.enc_version)
+            if not (0 < ad <= ACTION_DIM):
                 raise ValueError(
                     f"value/policy の符号化世代が不一致（value=v{self.enc_version}, "
-                    f"policy ctx_dim={pv}）: 同一世代の npz ペアを配置してください")
+                    f"policy in_dim={self.pnet.in_dim}）: 同一世代の npz ペアを配置してください")
 
     def _world_rng(self, manager, name: str, rng) -> np.random.Generator:
         """ターン内 sticky な PIMC 決定化 rng を返す（SERVE_STICKY_WORLD）。

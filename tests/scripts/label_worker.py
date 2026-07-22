@@ -29,6 +29,22 @@ def _git(wt, *a):
     return subprocess.run(["git", "-C", wt] + list(a), capture_output=True, text=True)
 
 
+def next_seed0(base, metas, batch_id, games):
+    """seed 空間の割当て（pure）: 過去バッチの**累計局数**の次から割り当てる。
+
+    旧式 `base + batch_id × games` は `--games` を途中で変えると過去帯と重複した
+    （w1 運用報告 2026-07-18: games 16→4 で batch7 が batch1 の帯を再割当て）。
+    メタの games 合計＝消費済み seed 数なので games 設定に依らず連続・無重複。
+    メタに games が無い場合（想定外の欠損）のみ旧式へフォールバック。"""
+    tot = 0
+    for m in metas:
+        g = m.get("games")
+        if g is None:
+            return base + batch_id * games
+        tot += int(g)
+    return base + tot
+
+
 def _ensure_wt(wt, br):
     """データ枝の worktree を用意する（枝が無ければ現 HEAD から新規作成）。"""
     if not os.path.exists(wt + "/.git"):
@@ -52,7 +68,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--worker", default="w1", help="ワーカー名（w1/w2/…・枝と seed 空間を分ける）")
     ap.add_argument("--games", type=int, default=16, help="1バッチの生成局数")
-    ap.add_argument("--batches", type=int, default=10 ** 6, help="回すバッチ数（実質∞・停止で中断）")
+    ap.add_argument("--batches", type=int, default=20,
+                    help="1起動で回すバッチ数。**有限**にして while ループの git pull へ定期的に"
+                         "戻る＝本体コード更新（新特徴等）を自動追従する（無限ループだと追従不能・"
+                         "2026-07-18 の25次元切替遅延の教訓）。0/負で実質∞")
     ap.add_argument("--sims-play", type=int, default=120)
     ap.add_argument("--sims", type=int, default=32)
     ap.add_argument("--worlds", type=int, default=4)
@@ -66,11 +85,18 @@ def main():
     widx = int("".join(c for c in args.worker if c.isdigit()) or 0)
     labeler = os.path.join(REPO, "tests", "scripts", "referee_labeler.py")
 
-    for _ in range(args.batches):
+    n_batches = args.batches if args.batches > 0 else 10 ** 9
+    for _ in range(n_batches):
         _ensure_wt(wt, br)
         os.makedirs(wt + "/p9label", exist_ok=True)
         batch_id = len(glob.glob(wt + "/p9label/batch_*.npz"))
-        seed0 = 10_000_000 * (widx + 1) + batch_id * args.games
+        metas = []
+        for mf in sorted(glob.glob(wt + "/p9label/meta_*.json")):
+            try:
+                metas.append(json.load(open(mf)))
+            except Exception:
+                metas.append({})   # 壊れたメタ＝games欠損扱い→旧式フォールバック
+        seed0 = next_seed0(10_000_000 * (widx + 1), metas, batch_id, args.games)
         out = tempfile.mkdtemp(prefix="reflabel_")
         t0 = time.time()
         env = dict(os.environ, PYTHONPATH=os.path.join(REPO, "tests"), OPCG_LOG_SILENT="1")
