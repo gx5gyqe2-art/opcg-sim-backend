@@ -350,14 +350,14 @@ def _gen2_vnet():
 def test_enc_version_autodetect_from_weights():
     """符号化世代はロードした npz の入力次元から自動判別（コード既定に依存しない）。
 
-    同梱 Gen2＝v1・既定 gen5(v5)＝符号化 v4（2026-07-15採用）。訓練済み npz を置いた時点で
+    同梱 Gen2＝v1・既定 gen6(v6)＝符号化 v5（2026-07-22採用）。訓練済み npz を置いた時点で
     新特徴が自動有効になる（デプロイはファイル差し替えのみ・フラグ不要）。
     """
     import os, tempfile
     from opcg_sim.src.learned.value_net import ValueNet
     assert cpu_learned._net_enc_version(_gen2_vnet()) == 1, "同梱 Gen2 は v1 のはず"
-    assert cpu_learned._net_enc_version(cpu_learned._default_engine().vnet) == 4,\
-        "既定 gen5(v5) は符号化 v4 のはず"
+    assert cpu_learned._net_enc_version(cpu_learned._default_engine().vnet) == 5,\
+        "既定 gen6(v6) は符号化 v5 のはず"
     v2 = ValueNet(vocab_size=10, d_emb=4, hidden=8, feat_dim=PROD_E.feature_dim(2), seed=0)
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, "v2_value.npz")
