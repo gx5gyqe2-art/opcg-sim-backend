@@ -230,6 +230,8 @@ def main():
     ap.add_argument("--beam", type=int, default=12)
     ap.add_argument("--max-plans", type=int, default=12)
     ap.add_argument("--out", default=None, help="batch.npz/meta.json の出力先ディレクトリ")
+    ap.add_argument("--max-batch-s", type=float, default=900.0,
+                    help="1バッチの wall-clock 予算（秒）。超過で残り採掘点/対局をスキップ（安全弁）")
     ARGS = ap.parse_args()
     CR.ARGS = ARGS   # enumerate/rollout が sims 等を参照
 
@@ -255,7 +257,14 @@ def main():
     sinks = {"S": [], "F": [], "I": [], "Y": [], "Q": [], "T": [], "K": []}
     pol = []
     n_labeled = 0
+    # バッチの wall-clock 予算（安全弁）。捲りモード採掘点(worlds×4)×長対局×多点で計算量が跳ねる
+    # 局面（seed0=30000468 batch78 で33分超を実測）でも、label_worker の想定ペースを守る。
+    deadline = time.time() + ARGS.max_batch_s
     for g in range(ARGS.games):
+        if time.time() > deadline:
+            print(f"  [予算] バッチ予算 {ARGS.max_batch_s:.0f}s 超過 → 残り {ARGS.games - g} 局をスキップ",
+                  flush=True)
+            break
         seed = ARGS.seed0 + g
         miner = _MineObserver(game_root, vf, ARGS.eps, ARGS.sat, pf=pf)
         t0 = time.time()
@@ -265,6 +274,9 @@ def main():
         print(f"game {g + 1}/{ARGS.games} seed={seed}: {len(desc['actions'])}手 "
               f"候補{len(miner.cands)}→採掘{len(picked)} ({time.time() - t0:.0f}s)", flush=True)
         for idx, kind, metric, actor, pend_kind in picked:
+            if time.time() > deadline:
+                print("  [予算] バッチ予算超過 → 局内の残り採掘点をスキップ", flush=True)
+                break
             vs, ps = label_decision(db, game_root, game_serve, vf, pf, vocab, ev_rec, desc, idx,
                                     expect=(actor, pend_kind))
             if vs is None:
