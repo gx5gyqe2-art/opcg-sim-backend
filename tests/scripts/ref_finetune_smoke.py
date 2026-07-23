@@ -160,8 +160,8 @@ def main():
     ap.add_argument("--out", default=None, help="候補ネットの保存先（lr ごとのサブ名で保存）")
     ap.add_argument("--base", default="gen6",
                     help="温スタート元の同梱世代（既定 gen6=現既定ネット。gen5 で旧ベース比較）")
-    ap.add_argument("--child-frac", type=float, default=1.0,
-                    help="子盤面教師の train 混合率（0=不使用〜1=全量。過剰混合の切り分け用）")
+    ap.add_argument("--child-frac", type=float, default=0.0,
+                    help="子盤面教師の train 混合率（既定0=不使用。全変種で有害の実測＝docs/reports/cpu_v11_child_label_20260723.md）")
     ap.add_argument("--child-pass-only", action="store_true",
                     help="子盤面教師を『手番が渡った初手』（TURN_END/PASS 系＝is_my_turn=0）のみに"
                          "絞る。攻撃/付与系の子盤面は族ベスト値＝楽観バイアスで有害（v11 実測）だが、"
