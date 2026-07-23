@@ -71,6 +71,7 @@ def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), log=print):
     （旧 v4=51 / 新 v5=55）しても最新版へゼロ埋め統一する（append-only 恒等・cpu_v10）。"""
     tsc = scalars_dim(max(known_versions()))
     S, F, I, Y, K = [], [], [], [], []
+    CS, CF, CI, CY = [], [], [], []   # v11 子盤面 value 教師（root 行と独立）
     pol = []
     n_batches = 0
     for w in workers:
@@ -88,6 +89,9 @@ def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), log=print):
             # kind（disagree/sat/blind）: kind 修正前の旧バッチは "" 埋め（重み付け対象外）
             K.append(z["kind"] if "kind" in z.files
                      else np.array([""] * len(z["value"]), dtype="<U8"))
+            if "child_value" in z.files:
+                CS.append(_pad_cols(z["child_scalars"], tsc)); CF.append(z["child_field"])
+                CI.append(z["child_card_idx"]); CY.append(z["child_value"])
             for ctx, am, t in unpack_policy({k: z[k] for k in z.files if k.startswith("pol_")}):
                 pol.append((_pad_ctx(ctx, tsc), _pad_cols(am, ACTION_DIM), t))
             n_batches += 1
@@ -97,7 +101,13 @@ def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), log=print):
              "card_idx": np.concatenate(I),
              "value": np.concatenate(Y).astype(np.float32),
              "kind": np.concatenate(K)}
-    log(f"収集: {n_batches}バッチ・教師 {len(vdata['value'])} 決定")
+    n_child = 0
+    if CY:
+        vdata["_child"] = {"scalars": np.concatenate(CS), "field": np.concatenate(CF),
+                           "card_idx": np.concatenate(CI),
+                           "value": np.concatenate(CY).astype(np.float32)}
+        n_child = len(vdata["_child"]["value"])
+    log(f"収集: {n_batches}バッチ・教師 {len(vdata['value'])} 決定・子盤面 {n_child}")
     return vdata, pol
 
 
@@ -167,7 +177,13 @@ def main():
           f"policy 支持一致={base['agree']*100:.0f}% KL={base['kl']:.3f}")
 
     tr_kind = vdata["kind"][tr]
-    tr_vdata = {k: vdata[k][tr] for k in vdata if k != "kind"}   # kind は train へ渡さない
+    tr_vdata = {k: vdata[k][tr] for k in vdata if k not in ("kind", "_child")}
+    ch = vdata.get("_child")
+    if ch is not None:
+        # v11 子盤面教師は全て train へ併合（val は root 決定のみ＝前後比較の指標互換を維持）。
+        # decide が比較する「初手後の子盤面」の序列を value に直接教える（@68/@93 の実測根拠）。
+        tr_vdata = {k: np.concatenate([tr_vdata[k], ch[k]]) for k in tr_vdata}
+        print(f"子盤面教師: +{len(ch['value'])} 行を train に併合")
     tr_pol = [pol[j] for j in tr]
     if args.disagree_weight > 1:
         # 反例（disagree）を複製して policy 学習で重く効かせる（policy_selfdistill と同じ手法）。
