@@ -148,6 +148,8 @@ def main():
     ap.add_argument("--disagree-weight", type=float, default=1.0,
                     help="kind=disagree（反例）サンプルの policy 学習での複製倍率。1=無効")
     ap.add_argument("--out", default=None, help="候補ネットの保存先（lr ごとのサブ名で保存）")
+    ap.add_argument("--base", default="gen6",
+                    help="温スタート元の同梱世代（既定 gen6=現既定ネット。gen5 で旧ベース比較）")
     args = ap.parse_args()
 
     vdata, pol = collect_ref_batches()
@@ -157,11 +159,11 @@ def main():
     tr, va = split_idx(n, args.val_frac)
     print(f"train {len(tr)} / val {len(va)}")
 
-    gen5_v = os.path.join(REPO, "opcg_sim", "data", "learned", "gen5_value.npz")
-    gen5_p = os.path.join(REPO, "opcg_sim", "data", "learned", "gen5_policy.npz")
-    base = eval_nets(*_warm_expand(RN.ValueNet.load(gen5_v), PolicyScorer.load(gen5_p)),
+    base_v_path = os.path.join(REPO, "opcg_sim", "data", "learned", f"{args.base}_value.npz")
+    base_p_path = os.path.join(REPO, "opcg_sim", "data", "learned", f"{args.base}_policy.npz")
+    base = eval_nets(*_warm_expand(RN.ValueNet.load(base_v_path), PolicyScorer.load(base_p_path)),
                      vdata, pol, va)
-    print(f"\n[gen5 基準] val: value MAE={base['mae']:.3f} corr={base['corr']:.3f}  "
+    print(f"\n[{args.base} 基準] val: value MAE={base['mae']:.3f} corr={base['corr']:.3f}  "
           f"policy 支持一致={base['agree']*100:.0f}% KL={base['kl']:.3f}")
 
     tr_kind = vdata["kind"][tr]
@@ -177,7 +179,7 @@ def main():
         tr_pol = tr_pol + extra
         print(f"disagree 重み付け: {n_dis} 反例 ×{args.disagree_weight:g} → +{len(extra)} 複製")
     ctx_dim = len(pol[0][0])
-    base_v, base_p = _warm_expand(RN.ValueNet.load(gen5_v), PolicyScorer.load(gen5_p))
+    base_v, base_p = _warm_expand(RN.ValueNet.load(base_v_path), PolicyScorer.load(base_p_path))
     if args.distill_weight > 0:
         # 忘却対策（value）: 凍結 gen5 の予測を distill アンカーに（v5 §4-4b の機構を流用）。
         tr_vdata = dict(tr_vdata)
@@ -196,7 +198,7 @@ def main():
             sd.append((ctx, am, base_p.priors(ctx, am)))
         tr_pol = tr_pol + sd
     for lr in [float(x) for x in args.lrs.split(",")]:
-        vnet, pnet = _warm_expand(RN.ValueNet.load(gen5_v), PolicyScorer.load(gen5_p))
+        vnet, pnet = _warm_expand(RN.ValueNet.load(base_v_path), PolicyScorer.load(base_p_path))
         if pnet.in_dim < ctx_dim + ACTION_DIM:
             # v9 行動特徴拡張の温スタート（零行追加＝出力恒等）。新特徴（カウンター値等）は
             # 新形式で記録されたバッチからのみ学習される（旧22次元記録はゼロ埋め）。
