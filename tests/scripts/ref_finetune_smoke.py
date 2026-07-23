@@ -160,6 +160,13 @@ def main():
     ap.add_argument("--out", default=None, help="候補ネットの保存先（lr ごとのサブ名で保存）")
     ap.add_argument("--base", default="gen6",
                     help="温スタート元の同梱世代（既定 gen6=現既定ネット。gen5 で旧ベース比較）")
+    ap.add_argument("--child-frac", type=float, default=1.0,
+                    help="子盤面教師の train 混合率（0=不使用〜1=全量。過剰混合の切り分け用）")
+    ap.add_argument("--child-pass-only", action="store_true",
+                    help="子盤面教師を『手番が渡った初手』（TURN_END/PASS 系＝is_my_turn=0）のみに"
+                         "絞る。攻撃/付与系の子盤面は族ベスト値＝楽観バイアスで有害（v11 実測）だが、"
+                         "TURN_END は族ベスト＝実測値なので無害＝value の TURN_END 過大評価"
+                         "（@64/@68 で +0.6〜0.7）を外科的に矯正する")
     args = ap.parse_args()
 
     vdata, pol = collect_ref_batches()
@@ -179,11 +186,19 @@ def main():
     tr_kind = vdata["kind"][tr]
     tr_vdata = {k: vdata[k][tr] for k in vdata if k not in ("kind", "_child")}
     ch = vdata.get("_child")
-    if ch is not None:
-        # v11 子盤面教師は全て train へ併合（val は root 決定のみ＝前後比較の指標互換を維持）。
+    if ch is not None and args.child_frac > 0:
+        # v11 子盤面教師は train へのみ併合（val は root 決定のみ＝前後比較の指標互換を維持）。
         # decide が比較する「初手後の子盤面」の序列を value に直接教える（@68/@93 の実測根拠）。
-        tr_vdata = {k: np.concatenate([tr_vdata[k], ch[k]]) for k in tr_vdata}
-        print(f"子盤面教師: +{len(ch['value'])} 行を train に併合")
+        # child_frac<1 は固定 seed の部分サンプル＝全量混合が @64/@137 を壊した実測の切り分け用。
+        if args.child_pass_only:
+            # is_my_turn（scalars index 11）=0 ＝手番が渡った子盤面（TURN_END/PASS 系）のみ。
+            mask = ch["scalars"][:, 11] == 0.0
+            ch = {k: v[mask] for k, v in ch.items()}
+        n_ch = len(ch["value"])
+        keep = np.random.default_rng(13).permutation(n_ch)[:int(round(n_ch * args.child_frac))]
+        tr_vdata = {k: np.concatenate([tr_vdata[k], ch[k][keep]]) for k in tr_vdata}
+        print(f"子盤面教師: {n_ch} 行中 {len(keep)} 行を train に併合"
+              f"（frac={args.child_frac:g}{'・pass-only' if args.child_pass_only else ''}）")
     tr_pol = [pol[j] for j in tr]
     if args.disagree_weight > 1:
         # 反例（disagree）を複製して policy 学習で重く効かせる（policy_selfdistill と同じ手法）。
