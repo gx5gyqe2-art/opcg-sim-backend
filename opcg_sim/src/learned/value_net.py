@@ -251,6 +251,10 @@ class ValueNet:
         net.W2t = self.W2t.copy(); net.b2t = self.b2t.copy()
         if self.W_eff is not None:
             net.W_eff = self.W_eff.copy()
+        # 焼き込み vocab を引き継ぐ（他の複製系メソッドと同じ）。落とすと serve 側が
+        # build_vocab(現行DB) へフォールバックし、DB 増加分の途中挿入で index がズレて
+        # 既存カードの Embedding が崩れる（v10 候補の coach gate 誤判定・2026-07-22 実害）。
+        net.vocab_ids = list(self.vocab_ids) if self.vocab_ids else None
         net._init_adam()
         return net
 

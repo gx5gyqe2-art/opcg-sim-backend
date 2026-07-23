@@ -135,10 +135,11 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 完結する。フロントは人間=p1 を操作し、CPU の手はポーリングで 1 手ずつ受け取る。
 
 ### 2.5.1 配線・逐次進行
-- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（`learned`＝既定・**v5学習型**
-  （`gen5_*.npz`・2026-07-15採用＝v4温スタート＋符号化v4（自デッキ残集約）＋マーク局面シード＋value蒸留の
-  run ピーク round15/cum2048。対v4直接対戦 0.610 [0.512,0.700] 100局＝有意勝ち。
-  `docs/reports/v5_adoption_20260715.md`。旧 v4=gen4／v3=gen3／v1=gen2 はリプレイ再現/A/B/ロールバック用に同梱維持）／
+- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（`learned`＝既定・**v6学習型**
+  （`gen6_*.npz`・2026-07-22採用＝gen5温スタート＋符号化v5（相手場の脅威集約・展開余力）＋行動特徴
+  （ATTACH_DON 付与後パワー）＋レフェリー教師 10159 決定（v9採掘・disagree×4重み・自己蒸留0.85）の微調整。
+  コーチゲート 3.8>3.0 PASS（@33 0→1.0・@64 0.8 維持の両立）・対gen5 直接対戦 204局 wr=0.564。
+  `docs/reports/v10_gen6_adoption_20260722.md`。旧 v5=gen5／v4=gen4／v3=gen3／v1=gen2 はリプレイ再現/A/B/ロールバック用に同梱維持）／
   `hard`＝α-β）/ `cpu_deck`。未指定・未知値は `learned` に正規化。モデル未同梱環境（`cpu_learned.available()`
   が False）では `learned`→`hard` に安全フォールバック。CPU メタは `CPU_GAMES` に保持（`{cpu_player_id, difficulty}`）。
   - **符号化の対応表はネットが持つ**（`ValueNet.vocab_ids`・2026-07-15 事故対応）: カードDBが増えても

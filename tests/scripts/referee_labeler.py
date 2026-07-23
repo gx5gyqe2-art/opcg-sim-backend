@@ -169,18 +169,18 @@ def label_decision(db, game_root, game_serve, vf, pf, vocab, ev, desc, idx, log=
     val_sample = (enc, z)・pol_sample = (ctx, am, visit)。"""
     m0, who = RR.state_at_action(db, desc, idx)
     if m0 is None:
-        return None, None
+        return None, None, []
     pend = m0.get_pending_request(with_request_id=False) or {}
     if pend.get("action") not in _WINDOWS:
-        return None, None
+        return None, None, []
     if expect is not None and (who, pend.get("action")) != tuple(expect):
         log(f"    @{idx} 照合不一致（採掘{expect} vs 再生{(who, pend.get('action'))}）＝棄却")
-        return None, None
+        return None, None, []
     name = who
     plans = CR.enumerate_turn_plans(game_root, vf, m0, name, max_len=ARGS.plan_len,
                                     beam=ARGS.beam, max_plans=ARGS.max_plans, log=log)
     if len(plans) <= 1:
-        return None, None
+        return None, None, []
     entries = [{"label": ">".join(CR._step_label(d) for d in descs), "keys": keys}
                for keys, descs in plans]
     CR._eval_entries(entries, game_root, game_serve, vf, pf, m0, name, ARGS.worlds)
@@ -202,7 +202,7 @@ def label_decision(db, game_root, game_serve, vf, pf, vocab, ev, desc, idx, log=
             legal_keys.append(None)
     visit = plan_teacher_visit(legal_keys, entries, ARGS.band)
     if visit is None:
-        return None, None
+        return None, None, []
     best = entries[0]
     z = 2.0 * (best["wins"] / max(best["ok"], 1)) - 1.0
     enc = E.encode(m0, name, vocab, version=ev)
@@ -210,7 +210,29 @@ def label_decision(db, game_root, game_serve, vf, pf, vocab, ev, desc, idx, log=
     am = legal_action_matrix(m0, legal, name)
     log(f"    @{idx} {'捲り' if n_w > ARGS.worlds else ''}教師: "
         f"z={z:+.2f} 初手候補{int((visit > 0).sum())}/{len(legal)}  最良: {best['label']}")
-    return (enc, z), (ctx, am, visit)
+    # v11: 子盤面ラベル（反実仮想の初手別 value 教師）。root の z だけでは decide が比較する
+    # 「初手後の子盤面」の序列を教えられない（実測: @68=TURN_END 子盤面の過大評価 +0.64・
+    # @93=全子盤面フラット）。プラン評価は初手族ごとの wins を既に持つので、追加ロールアウト
+    # なしで 子盤面 enc → z(初手族ベスト) を教師化する。
+    childs = []
+    fam = {}
+    for e in entries:
+        k0 = repr(e["keys"][0])
+        r = e["wins"] / max(e["ok"], 1)
+        if k0 not in fam or r > fam[k0]:
+            fam[k0] = r
+    for j, lk in enumerate(legal_keys):
+        if lk is None or repr(lk) not in fam:
+            continue
+        try:
+            ch = game_root.apply(m0, legal[j], name)
+        except Exception:
+            ch = None
+        if ch is None:
+            continue
+        childs.append((E.encode(ch, name, vocab, version=ev),
+                       2.0 * fam.pop(repr(lk)) - 1.0))   # pop=同一 equiv 初手は1回だけ
+    return (enc, z), (ctx, am, visit), childs
 
 
 def main():
@@ -254,7 +276,8 @@ def main():
         l2, c2 = HD.build(_db, ids[(seed + 1) % len(ids)], "p2")
         return l1, c1, l2, c2
 
-    sinks = {"S": [], "F": [], "I": [], "Y": [], "Q": [], "T": [], "K": []}
+    sinks = {"S": [], "F": [], "I": [], "Y": [], "Q": [], "T": [], "K": [],
+             "CS": [], "CF": [], "CI": [], "CY": []}   # C*=子盤面 value 教師（v11）
     pol = []
     n_labeled = 0
     # バッチの wall-clock 予算（安全弁）。捲りモード採掘点(worlds×4)×長対局×多点で計算量が跳ねる
@@ -277,8 +300,8 @@ def main():
             if time.time() > deadline:
                 print("  [予算] バッチ予算超過 → 局内の残り採掘点をスキップ", flush=True)
                 break
-            vs, ps = label_decision(db, game_root, game_serve, vf, pf, vocab, ev_rec, desc, idx,
-                                    expect=(actor, pend_kind))
+            vs, ps, childs = label_decision(db, game_root, game_serve, vf, pf, vocab, ev_rec,
+                                            desc, idx, expect=(actor, pend_kind))
             if vs is None:
                 continue
             enc, z = vs
@@ -287,6 +310,9 @@ def main():
             sinks["Y"].append(z); sinks["Q"].append(z); sinks["T"].append(np.nan)
             sinks["K"].append(kind)   # 採掘カテゴリ（disagree/sat/blind）。policy 学習で
                                       # disagree を重み付けるための追跡タグ（append-only）
+            for cenc, cz in childs:   # v11: 子盤面 value 教師（policy 側と行を揃えない別配列）
+                sinks["CS"].append(cenc["scalars"]); sinks["CF"].append(cenc["field"])
+                sinks["CI"].append(cenc["card_idx"]); sinks["CY"].append(cz)
             pol.append(ps)
             n_labeled += 1
     print(f"\nLABEL_RESULT: {ARGS.games}局 → 教師 {n_labeled} 決定", flush=True)
@@ -298,6 +324,12 @@ def main():
                   "q_root": np.array(sinks["Q"], dtype=np.float32),
                   "turns_left": np.array(sinks["T"], dtype=np.float32),
                   "kind": np.array(sinks["K"])}   # 読み手は "kind" in z.files で判定（append-only）
+        if sinks["CY"]:
+            # v11 子盤面教師（root 行と独立の別配列＝policy との index 整合を壊さない・append-only）
+            arrays.update({"child_scalars": np.stack(sinks["CS"]),
+                           "child_field": np.stack(sinks["CF"]),
+                           "child_card_idx": np.stack(sinks["CI"]),
+                           "child_value": np.array(sinks["CY"], dtype=np.float32)})
         arrays.update(pack_policy(pol))
         np.savez_compressed(os.path.join(ARGS.out, "batch.npz"), **arrays)
         # worker はワーカー運用時に label_worker が w1 等へ上書きする（枝と consumed の単位）。
