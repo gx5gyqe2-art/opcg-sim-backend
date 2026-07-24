@@ -42,6 +42,10 @@ import heldout_decks as HD
 from game_driver import make_seat, run_game
 from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
+from az_policy import state_context
+from opcg_action import legal_action_matrix
+from pd_batch_common import pack_policy
+from referee_labeler import plan_teacher_visit
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.core.cpu_learned import LearnedEngine
 
@@ -84,13 +88,13 @@ def record_vs(db, seed, deckb, cand_eng, best_eng, cand_pid, sims):
 
 
 def band_top_keys(game_root, game_serve, vf, pf, m0, name):
-    """決定点のプラン列挙＋CRN 評価 → 同価値バンド上位プランの初手 equiv キー集合（repr）。
-    referee_labeler.label_decision と同一機構（捲りエスカレーション含む）。プラン不足は None。"""
+    """決定点のプラン列挙＋CRN 評価 → (同価値バンド上位プランの初手 equiv キー集合(repr), entries)。
+    referee_labeler.label_decision と同一機構（捲りエスカレーション含む）。プラン不足は (None, None)。"""
     plans = CR.enumerate_turn_plans(game_root, vf, m0, name, max_len=ARGS.plan_len,
                                     beam=ARGS.beam, max_plans=ARGS.max_plans,
                                     log=lambda *a, **k: None)
     if len(plans) <= 1:
-        return None
+        return None, None
     entries = [{"label": "", "keys": keys} for keys, _descs in plans]
     CR._eval_entries(entries, game_root, game_serve, vf, pf, m0, name, ARGS.worlds)
     entries.sort(key=lambda e: (-e["wins"], -e["lifem"]))
@@ -101,13 +105,15 @@ def band_top_keys(game_root, game_serve, vf, pf, m0, name):
         sub.sort(key=lambda e: (-e["wins"], -e["lifem"]))
         entries = sub
     best = entries[0]
-    return {repr(e["keys"][0]) for e in entries
+    tops = {repr(e["keys"][0]) for e in entries
             if e is best or CR.same_value(best, e, ARGS.band)}
+    return tops, entries
 
 
 def probe_game(db, game_root, game_serve, vf, pf, cand_eng, best_eng, desc, cand_name,
-               deadline):
-    """候補敗北局1つを走査: 候補手番の乖離点を裁定し行リストを返す。"""
+               deadline, sink=None, vocab=None, ev_rec=None):
+    """候補敗北局1つを走査: 候補手番の乖離点を裁定し行リストを返す。
+    sink 指定時は裁定済み乖離点を教師化して sink へ追加（kind='diverge'・v12 教師化）。"""
     rows = []
     idxs = [i for i, a in enumerate(desc["actions"]) if a.get("player") == cand_name]
     if len(idxs) > ARGS.scan_cap:            # 走査は等間隔サンプル（O(n^2) 再生の抑制）
@@ -143,7 +149,7 @@ def probe_game(db, game_root, game_serve, vf, pf, cand_eng, best_eng, desc, cand
             continue
         if repr(kc) == repr(kb):
             continue                                   # 同選択＝乖離なし
-        tops = band_top_keys(game_root, game_serve, vf, pf, m0, cand_name)
+        tops, entries = band_top_keys(game_root, game_serve, vf, pf, m0, cand_name)
         if tops is None:
             continue
         judged += 1
@@ -158,6 +164,24 @@ def probe_game(db, game_root, game_serve, vf, pf, cand_eng, best_eng, desc, cand
                      "best": [mv_b.get("action_type"), kb[1]], "verdict": verdict})
         print(f"    @{i} T{tc} {pend.get('action')}: cand={mv_c.get('action_type')}:{kc[1]}"
               f" vs gen6={mv_b.get('action_type')}:{kb[1]} → {verdict}", flush=True)
+        if sink is not None:
+            # v12 教師化: 裁定済み乖離点＝候補の失敗分布そのものから採った反例。バンド判定を
+            # そのまま policy 教師（band-top 初手 multi-hot）と value 教師（best 勝率 z）にする。
+            legal = game_root.legal_actions(m0)
+            legal_keys = []
+            for mv in legal:
+                try:
+                    legal_keys.append(cpu_ai._move_equiv_key(m0, mv))
+                except Exception:
+                    legal_keys.append(None)
+            visit = plan_teacher_visit(legal_keys, entries, ARGS.band)
+            if visit is not None:
+                best = entries[0]
+                z = 2.0 * (best["wins"] / max(best["ok"], 1)) - 1.0
+                enc = E.encode(m0, cand_name, vocab, version=ev_rec)
+                ctx = state_context(m0, cand_name, vocab, version=ev_rec)
+                am = legal_action_matrix(m0, legal, cand_name)
+                sink.append((enc, z, (ctx, am, visit)))
     return rows
 
 
@@ -179,6 +203,8 @@ def main():
     ap.add_argument("--scan-cap", type=int, default=24, help="1局あたり走査する候補手番の上限")
     ap.add_argument("--max-per-game", type=int, default=6, help="1局あたり裁定する乖離点の上限")
     ap.add_argument("--max-probe-s", type=float, default=2400.0, help="全体 wall-clock 予算（安全弁）")
+    ap.add_argument("--out", default=None,
+                    help="裁定済み乖離点を教師バッチ（batch.npz/meta.json・kind='diverge'）として保存")
     ARGS = ap.parse_args()
     CR.ARGS = ARGS
 
@@ -205,6 +231,8 @@ def main():
         l2, c2 = HD.build(_db, ids[(seed + 1) % len(ids)], "p2")
         return l1, c1, l2, c2
 
+    ev_rec = max(E.known_versions())     # 教師の記録は最新符号化版（referee_labeler と同じ）
+    sink = [] if ARGS.out else None
     deadline = time.time() + ARGS.max_probe_s
     all_rows = []
     wins = losses = 0
@@ -224,7 +252,25 @@ def main():
                   f"({time.time() - t0:.0f}s){'  → 乖離採掘' if lost else ''}", flush=True)
             if lost:
                 all_rows += probe_game(db, game_root, game_serve, vf, pf, cand_eng,
-                                       best_eng, desc, cand_pid, deadline)
+                                       best_eng, desc, cand_pid, deadline,
+                                       sink=sink, vocab=vocab, ev_rec=ev_rec)
+
+    if ARGS.out and sink:
+        os.makedirs(ARGS.out, exist_ok=True)
+        arrays = {"scalars": np.stack([s[0]["scalars"] for s in sink]),
+                  "field": np.stack([s[0]["field"] for s in sink]),
+                  "card_idx": np.stack([s[0]["card_idx"] for s in sink]),
+                  "value": np.array([s[1] for s in sink], dtype=np.float32),
+                  "q_root": np.array([s[1] for s in sink], dtype=np.float32),
+                  "turns_left": np.full(len(sink), np.nan, dtype=np.float32),
+                  "kind": np.array(["diverge"] * len(sink))}
+        arrays.update(pack_policy([s[2] for s in sink]))
+        np.savez_compressed(os.path.join(ARGS.out, "batch.npz"), **arrays)
+        with open(os.path.join(ARGS.out, "meta.json"), "w") as f:
+            json.dump({"worker": "dvg", "source": "divergence_probe", "states": len(sink),
+                       "schema_version": 2, "games": ARGS.pairs * 2, "worlds": ARGS.worlds,
+                       "comeback": ARGS.comeback}, f, ensure_ascii=False)
+        print(f"saved: {ARGS.out}/batch.npz ({len(sink)} 乖離教師)", flush=True)
 
     cnt = Counter(r["verdict"] for r in all_rows)
     trans = Counter(f"{r['cand'][0]}→{r['best'][0]}" for r in all_rows

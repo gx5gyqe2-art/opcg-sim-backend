@@ -66,14 +66,28 @@ def _warm_expand(vnet, pnet):
     return vnet, pnet
 
 
-def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), log=print):
+def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), extra_dirs=(), log=print):
     """v9-label 枝から全教師バッチを収集して (vdata dict, pol list) に連結する。版が混在
-    （旧 v4=51 / 新 v5=55）しても最新版へゼロ埋め統一する（append-only 恒等・cpu_v10）。"""
+    （旧 v4=51 / 新 v5=55）しても最新版へゼロ埋め統一する（append-only 恒等・cpu_v10）。
+    extra_dirs はローカル npz バッチの追加読み込み（divergence_probe の乖離教師等・v12）。"""
     tsc = scalars_dim(max(known_versions()))
     S, F, I, Y, K = [], [], [], [], []
     CS, CF, CI, CY = [], [], [], []   # v11 子盤面 value 教師（root 行と独立）
     pol = []
     n_batches = 0
+
+    def _ingest(z):
+        S.append(_pad_cols(z["scalars"], tsc)); F.append(z["field"]); I.append(z["card_idx"])
+        Y.append(z["value"])
+        # kind（disagree/sat/blind/diverge）: kind 修正前の旧バッチは "" 埋め（重み付け対象外）
+        K.append(z["kind"] if "kind" in z.files
+                 else np.array([""] * len(z["value"]), dtype="<U8"))
+        if "child_value" in z.files:
+            CS.append(_pad_cols(z["child_scalars"], tsc)); CF.append(z["child_field"])
+            CI.append(z["child_card_idx"]); CY.append(z["child_value"])
+        for ctx, am, t in unpack_policy({k: z[k] for k in z.files if k.startswith("pol_")}):
+            pol.append((_pad_ctx(ctx, tsc), _pad_cols(am, ACTION_DIM), t))
+
     for w in workers:
         br = f"origin/claude/v9-label-{w}"
         ls = subprocess.run(["git", "-C", REPO, "ls-tree", br + ":p9label", "--name-only"],
@@ -83,17 +97,12 @@ def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), log=print):
                 continue
             raw = subprocess.run(["git", "-C", REPO, "show", f"{br}:p9label/{f}"],
                                  capture_output=True).stdout
-            z = np.load(io.BytesIO(raw))
-            S.append(_pad_cols(z["scalars"], tsc)); F.append(z["field"]); I.append(z["card_idx"])
-            Y.append(z["value"])
-            # kind（disagree/sat/blind）: kind 修正前の旧バッチは "" 埋め（重み付け対象外）
-            K.append(z["kind"] if "kind" in z.files
-                     else np.array([""] * len(z["value"]), dtype="<U8"))
-            if "child_value" in z.files:
-                CS.append(_pad_cols(z["child_scalars"], tsc)); CF.append(z["child_field"])
-                CI.append(z["child_card_idx"]); CY.append(z["child_value"])
-            for ctx, am, t in unpack_policy({k: z[k] for k in z.files if k.startswith("pol_")}):
-                pol.append((_pad_ctx(ctx, tsc), _pad_cols(am, ACTION_DIM), t))
+            _ingest(np.load(io.BytesIO(raw)))
+            n_batches += 1
+    import glob as _glob
+    for d in extra_dirs:
+        for f in sorted(_glob.glob(os.path.join(d, "*.npz"))):
+            _ingest(np.load(f))
             n_batches += 1
     if not S:
         return None, None
@@ -156,7 +165,9 @@ def main():
                          "素直に学べるため、policy を据え置くのが v9 の正しい形。")
     ap.add_argument("--val-frac", type=float, default=0.15)
     ap.add_argument("--disagree-weight", type=float, default=1.0,
-                    help="kind=disagree（反例）サンプルの policy 学習での複製倍率。1=無効")
+                    help="kind=disagree/diverge（反例）サンプルの policy 学習での複製倍率。1=無効")
+    ap.add_argument("--extra-dirs", default=None,
+                    help="ローカル教師バッチのディレクトリ（カンマ区切り・divergence_probe --out 等）")
     ap.add_argument("--out", default=None, help="候補ネットの保存先（lr ごとのサブ名で保存）")
     ap.add_argument("--base", default="gen6",
                     help="温スタート元の同梱世代（既定 gen6=現既定ネット。gen5 で旧ベース比較）")
@@ -169,7 +180,8 @@ def main():
                          "（@64/@68 で +0.6〜0.7）を外科的に矯正する")
     args = ap.parse_args()
 
-    vdata, pol = collect_ref_batches()
+    vdata, pol = collect_ref_batches(
+        extra_dirs=[d for d in (args.extra_dirs or "").split(",") if d])
     if vdata is None:
         print("教師バッチが見つからない（git fetch 済みか確認）"); return 1
     n = len(vdata["value"])
@@ -201,14 +213,15 @@ def main():
               f"（frac={args.child_frac:g}{'・pass-only' if args.child_pass_only else ''}）")
     tr_pol = [pol[j] for j in tr]
     if args.disagree_weight > 1:
-        # 反例（disagree）を複製して policy 学習で重く効かせる（policy_selfdistill と同じ手法）。
-        # kind 付きの新バッチのみ対象＝旧バッチ（"" 埋め）は等倍。
+        # 反例（disagree=採掘・diverge=乖離裁定 v12）を複製して policy 学習で重く効かせる
+        # （policy_selfdistill と同じ手法）。kind 付きの新バッチのみ対象＝旧バッチ（"" 埋め）は等倍。
         reps = int(round(args.disagree_weight)) - 1
+        _neg = ("disagree", "diverge")
         extra = [tr_pol[j] for j in range(len(tr_pol))
-                 if tr_kind[j] == "disagree" for _ in range(reps)]
-        n_dis = int((tr_kind == "disagree").sum())
+                 if tr_kind[j] in _neg for _ in range(reps)]
+        n_dis = int(np.isin(tr_kind, _neg).sum())
         tr_pol = tr_pol + extra
-        print(f"disagree 重み付け: {n_dis} 反例 ×{args.disagree_weight:g} → +{len(extra)} 複製")
+        print(f"反例重み付け（disagree+diverge）: {n_dis} 件 ×{args.disagree_weight:g} → +{len(extra)} 複製")
     ctx_dim = len(pol[0][0])
     base_v, base_p = _warm_expand(RN.ValueNet.load(base_v_path), PolicyScorer.load(base_p_path))
     if args.distill_weight > 0:
