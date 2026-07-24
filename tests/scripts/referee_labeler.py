@@ -36,11 +36,13 @@ import rl_net as RN
 import rl_encoder as E
 import heldout_decks as HD
 from az_policy import PolicyScorer, state_context
+from game_driver import make_seat, run_game
 from opcg_action import legal_action_matrix
 from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
 from pd_batch_common import pack_policy
 from opcg_sim.src.core import cpu_ai
+from opcg_sim.src.core.cpu_learned import LearnedEngine
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _WINDOWS = ("MAIN_ACTION", "SELECT_COUNTER", "SELECT_BLOCKER")
@@ -159,6 +161,71 @@ def plan_teacher_visit(legal_keys, entries, band):
     return visit / visit.sum()
 
 
+def _mix_parse(spec):
+    """'self:0.5,gen5:0.3,l1:0.2' → [(kind, 正規化重み)]（pure）。"""
+    out = []
+    for part in spec.split(","):
+        k, w = part.split(":")
+        out.append((k.strip(), float(w)))
+    tot = sum(w for _, w in out) or 1.0
+    return [(k, w / tot) for k, w in out]
+
+
+def _pick_opp(mix, seed):
+    """seed 決定論で対戦相手種と席を選ぶ（再現可能・seed 帯で偏らない）。"""
+    r = float(np.random.default_rng(seed).random())
+    acc = 0.0
+    kind = mix[-1][0]
+    for k, w in mix:
+        acc += w
+        if r < acc:
+            kind = k
+            break
+    return kind, ("p1" if seed % 2 == 0 else "p2")
+
+
+def record_mixed_descriptor(db, seed, deck_ids_builder, sims, opp_kind, opp_pid,
+                            observers, gen5_eng):
+    """対戦相手混合の記録つき対局（v12 エコー破り）。既定(gen6) vs {gen5|l1} の1局を録画する。
+
+    RR.record_selfplay_descriptor と同じ rng 隔離・記述子形式（scripted 再生は記録手を
+    再適用するので、相手種は再生可能性に影響しない＝記録が正）。教師の中身は
+    「既定ネットの均衡の外」の局面になる＝エコー教師（自己対戦だけが教材になり
+    微調整が必ず実戦悪化する・v12 実測 5候補 wr0.33-0.42）への対策。"""
+    built = deck_ids_builder(db, seed)
+    l1, c1, l2, c2 = built
+    rec = RR._RecordObserver()
+
+    def iso(seat):
+        import random as _r
+        def s(ctx):
+            st = _r.getstate()
+            try:
+                return seat(ctx)
+            finally:
+                _r.setstate(st)
+        return s
+
+    def seat_for(pid):
+        if pid == opp_pid and opp_kind == "gen5":
+            return make_seat(kind="learned", sims=sims, engine=gen5_eng)
+        if pid == opp_pid and opp_kind == "l1":
+            return make_seat("hard", kind="arena")
+        return make_seat(kind="learned", sims=sims)
+
+    seats = {pid: iso(seat_for(pid)) for pid in ("p1", "p2")}
+    res = run_game(seed, db, seats=seats, deck_builder=lambda *_: built,
+                   observers=[rec, *observers], legal_moves="skip", invariants="raise",
+                   first_player="random")
+    return {"seed": seed, "first_player": None, "first_player_mode": "random",
+            "cpu_player_id": None, "difficulty": "learned",
+            "leaders": {"p1": l1.master.card_id if l1 else None,
+                        "p2": l2.master.card_id if l2 else None},
+            "decks": {"p1": [ci.master.card_id for ci in c1],
+                      "p2": [ci.master.card_id for ci in c2]},
+            "actions": rec.actions, "_winner": res.winner}
+
+
 def label_decision(db, game_root, game_serve, vf, pf, vocab, ev, desc, idx, log=print,
                    expect=None):
     """決定点 idx を真盤面再生してレフェリー教師サンプルを作る。
@@ -254,6 +321,9 @@ def main():
     ap.add_argument("--out", default=None, help="batch.npz/meta.json の出力先ディレクトリ")
     ap.add_argument("--max-batch-s", type=float, default=900.0,
                     help="1バッチの wall-clock 予算（秒）。超過で残り採掘点/対局をスキップ（安全弁）")
+    ap.add_argument("--opp-mix", default="self:0.5,gen5:0.3,l1:0.2",
+                    help="生成対局の相手種の混合比（v12 エコー破り）。self=既定同士・gen5=旧世代・"
+                         "l1=α-β。既定で混合ON＝ワーカーは git pull で自動適用")
     ARGS = ap.parse_args()
     CR.ARGS = ARGS   # enumerate/rollout が sims 等を参照
 
@@ -276,6 +346,11 @@ def main():
         l2, c2 = HD.build(_db, ids[(seed + 1) % len(ids)], "p2")
         return l1, c1, l2, c2
 
+    _mix = _mix_parse(ARGS.opp_mix)
+    gen5_eng = (LearnedEngine(
+        value_path=os.path.join(REPO, "opcg_sim", "data", "learned", "gen5_value.npz"),
+        policy_path=os.path.join(REPO, "opcg_sim", "data", "learned", "gen5_policy.npz"))
+        if any(k == "gen5" and w > 0 for k, w in _mix) else None)
     sinks = {"S": [], "F": [], "I": [], "Y": [], "Q": [], "T": [], "K": [],
              "CS": [], "CF": [], "CI": [], "CY": []}   # C*=子盤面 value 教師（v11）
     pol = []
@@ -291,11 +366,17 @@ def main():
         seed = ARGS.seed0 + g
         miner = _MineObserver(game_root, vf, ARGS.eps, ARGS.sat, pf=pf)
         t0 = time.time()
-        desc = RR.record_selfplay_descriptor(db, seed, _deckb, sims=ARGS.sims_play,
-                                             first_player="random", observers=[miner])
+        opp_kind, opp_pid = _pick_opp(_mix, seed)
+        if opp_kind == "self":
+            desc = RR.record_selfplay_descriptor(db, seed, _deckb, sims=ARGS.sims_play,
+                                                 first_player="random", observers=[miner])
+        else:
+            desc = record_mixed_descriptor(db, seed, _deckb, ARGS.sims_play, opp_kind,
+                                           opp_pid, [miner], gen5_eng)
         picked = select_candidates(miner.cands, ARGS.max_per_game)
-        print(f"game {g + 1}/{ARGS.games} seed={seed}: {len(desc['actions'])}手 "
-              f"候補{len(miner.cands)}→採掘{len(picked)} ({time.time() - t0:.0f}s)", flush=True)
+        print(f"game {g + 1}/{ARGS.games} seed={seed} vs={opp_kind}: "
+              f"{len(desc['actions'])}手 候補{len(miner.cands)}→採掘{len(picked)} "
+              f"({time.time() - t0:.0f}s)", flush=True)
         for idx, kind, metric, actor, pend_kind in picked:
             if time.time() > deadline:
                 print("  [予算] バッチ予算超過 → 局内の残り採掘点をスキップ", flush=True)
@@ -337,6 +418,7 @@ def main():
         meta = {"worker": "ref", "batch_id": int(time.time()), "against_round": -1,
                 "games": ARGS.games, "states": n_labeled, "schema_version": 2,
                 "source": "referee_label", "worlds": ARGS.worlds, "comeback": ARGS.comeback,
+                "opp_mix": ARGS.opp_mix,   # v12 エコー破り: 相手混合比（バッチの出自の記録）
                 "miner": 3}   # 採掘条件の版: 3=sat/disagree/blind の3カテゴリround-robin
                               #（disagree=policy vs 1-ply value 最善の乖離＝反例採掘・v9.3）
         with open(os.path.join(ARGS.out, "meta.json"), "w") as f:

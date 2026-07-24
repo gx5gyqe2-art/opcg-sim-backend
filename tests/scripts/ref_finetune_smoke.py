@@ -168,6 +168,10 @@ def main():
                     help="kind=disagree/diverge（反例）サンプルの policy 学習での複製倍率。1=無効")
     ap.add_argument("--extra-dirs", default=None,
                     help="ローカル教師バッチのディレクトリ（カンマ区切り・divergence_probe --out 等）")
+    ap.add_argument("--diverge-weight", type=float, default=None,
+                    help="kind=diverge（乖離教師）専用の複製倍率。未指定は --disagree-weight に従う。"
+                         "乖離教師は少数精鋭（候補の失敗分布から採った文脈つき反例）のため"
+                         "高倍率で効かせる用途")
     ap.add_argument("--out", default=None, help="候補ネットの保存先（lr ごとのサブ名で保存）")
     ap.add_argument("--base", default="gen6",
                     help="温スタート元の同梱世代（既定 gen6=現既定ネット。gen5 で旧ベース比較）")
@@ -212,16 +216,20 @@ def main():
         print(f"子盤面教師: {n_ch} 行中 {len(keep)} 行を train に併合"
               f"（frac={args.child_frac:g}{'・pass-only' if args.child_pass_only else ''}）")
     tr_pol = [pol[j] for j in tr]
-    if args.disagree_weight > 1:
+    dw_dis = args.disagree_weight
+    dw_dvg = args.diverge_weight if args.diverge_weight is not None else dw_dis
+    if dw_dis > 1 or dw_dvg > 1:
         # 反例（disagree=採掘・diverge=乖離裁定 v12）を複製して policy 学習で重く効かせる
         # （policy_selfdistill と同じ手法）。kind 付きの新バッチのみ対象＝旧バッチ（"" 埋め）は等倍。
-        reps = int(round(args.disagree_weight)) - 1
-        _neg = ("disagree", "diverge")
+        # diverge は少数（数十点）のため専用倍率で効かせられる。
+        _reps = {"disagree": max(int(round(dw_dis)) - 1, 0),
+                 "diverge": max(int(round(dw_dvg)) - 1, 0)}
         extra = [tr_pol[j] for j in range(len(tr_pol))
-                 if tr_kind[j] in _neg for _ in range(reps)]
-        n_dis = int(np.isin(tr_kind, _neg).sum())
+                 for _ in range(_reps.get(tr_kind[j], 0))]
+        n_dis = int((tr_kind == "disagree").sum()); n_dvg = int((tr_kind == "diverge").sum())
         tr_pol = tr_pol + extra
-        print(f"反例重み付け（disagree+diverge）: {n_dis} 件 ×{args.disagree_weight:g} → +{len(extra)} 複製")
+        print(f"反例重み付け: disagree {n_dis}×{dw_dis:g}・diverge {n_dvg}×{dw_dvg:g} "
+              f"→ +{len(extra)} 複製")
     ctx_dim = len(pol[0][0])
     base_v, base_p = _warm_expand(RN.ValueNet.load(base_v_path), PolicyScorer.load(base_p_path))
     if args.distill_weight > 0:
