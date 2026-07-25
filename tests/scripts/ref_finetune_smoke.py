@@ -73,6 +73,8 @@ def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), extra_dirs=(), l
     tsc = scalars_dim(max(known_versions()))
     S, F, I, Y, K = [], [], [], [], []
     CS, CF, CI, CY = [], [], [], []   # v11 子盤面 value 教師（root 行と独立）
+    CG = []                           # v12.1 決定点グループ（バッチ跨ぎで一意化・旧バッチは -1）
+    _gbase = [0]
     pol = []
     n_batches = 0
 
@@ -85,6 +87,12 @@ def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), extra_dirs=(), l
         if "child_value" in z.files:
             CS.append(_pad_cols(z["child_scalars"], tsc)); CF.append(z["child_field"])
             CI.append(z["child_card_idx"]); CY.append(z["child_value"])
+            n_c = len(z["child_value"])
+            if "child_group" in z.files and n_c:
+                CG.append(z["child_group"].astype(np.int64) + _gbase[0])
+                _gbase[0] += int(z["child_group"].max()) + 1
+            else:
+                CG.append(np.full(n_c, -1, dtype=np.int64))   # 旧バッチ＝グループ不明でペア不能
         for ctx, am, t in unpack_policy({k: z[k] for k in z.files if k.startswith("pol_")}):
             pol.append((_pad_ctx(ctx, tsc), _pad_cols(am, ACTION_DIM), t))
 
@@ -111,13 +119,84 @@ def collect_ref_batches(workers=("w1", "w2", "w3", "w4", "w5"), extra_dirs=(), l
              "value": np.concatenate(Y).astype(np.float32),
              "kind": np.concatenate(K)}
     n_child = 0
+    n_grouped = 0
     if CY:
+        grp = np.concatenate(CG)
         vdata["_child"] = {"scalars": np.concatenate(CS), "field": np.concatenate(CF),
                            "card_idx": np.concatenate(CI),
-                           "value": np.concatenate(CY).astype(np.float32)}
+                           "value": np.concatenate(CY).astype(np.float32),
+                           "group": grp}
         n_child = len(vdata["_child"]["value"])
-    log(f"収集: {n_batches}バッチ・教師 {len(vdata['value'])} 決定・子盤面 {n_child}")
+        n_grouped = int((grp >= 0).sum())
+    log(f"収集: {n_batches}バッチ・教師 {len(vdata['value'])} 決定・子盤面 {n_child}"
+        f"（グループ付き {n_grouped}）")
     return vdata, pol
+
+
+def build_rank_pairs(child, delta=0.25, cap_per_group=12):
+    """同一決定点（group）の子盤面から z 差 > δ のペア (勝ちidx, 負けidx, group) を作る（pure）。
+    v12.1: レフェリーが実測した「初手後の子盤面の順位」だけを教える＝絶対値 z を強制した
+    v11 子盤面ラベルの楽観バイアス問題を構造的に回避する。"""
+    import collections
+    grp = child.get("group")
+    if grp is None:
+        return []
+    z = child["value"]
+    by = collections.defaultdict(list)
+    for i, g in enumerate(grp):
+        if g >= 0:
+            by[int(g)].append(i)
+    pairs = []
+    for g, idxs in by.items():
+        got = 0
+        for ai in range(len(idxs)):
+            for bi in range(ai + 1, len(idxs)):
+                if got >= cap_per_group:
+                    break
+                a, b = idxs[ai], idxs[bi]
+                if abs(z[a] - z[b]) > delta:
+                    pairs.append((a, b, g) if z[a] > z[b] else (b, a, g))
+                    got += 1
+    return pairs
+
+
+def pair_acc(vnet, child, pairs):
+    """ペア順位の正答率（v(勝ち子盤面) > v(負け子盤面) の割合）。"""
+    if not pairs:
+        return float("nan")
+    ia = np.array([p[0] for p in pairs]); ib = np.array([p[1] for p in pairs])
+    rows = np.concatenate([ia, ib])
+    pred = vnet.predict({k: child[k][rows] for k in ("scalars", "field", "card_idx")})
+    m = len(pairs)
+    return float((pred[:m] > pred[m:]).mean())
+
+
+def rank_finetune(vnet, child, pairs, epochs=4, lr=2e-5, weight=1.0, margin=0.2,
+                  batch_pairs=32):
+    """子盤面ペアの順位ヒンジ max(0, margin−(v_a−v_b)) で value を微調整（v12.1）。
+
+    実装は ValueNet の公開 API（forward/backward/step）のみ: backward の MSE 勾配
+    dpred=(2/B)(pred−y) に対し y=pred±(B/2)·w を与えるとヒンジの ∓w 勾配に恒等変換される
+    （コア無改修＝実験は scripts 層に留める）。活性ペア（margin 未達）のみ勾配を流す。"""
+    rng = np.random.default_rng(17)
+    for _ep in range(epochs):
+        order = rng.permutation(len(pairs))
+        for s in range(0, len(order), batch_pairs):
+            sel = [pairs[k] for k in order[s:s + batch_pairs]]
+            ia = np.array([p[0] for p in sel]); ib = np.array([p[1] for p in sel])
+            rows = np.concatenate([ia, ib])
+            batch = {k: child[k][rows] for k in ("scalars", "field", "card_idx")}
+            pred, cache = vnet.forward(batch)
+            m = len(sel)
+            act = (pred[:m] - pred[m:]) < margin
+            if not act.any():
+                continue
+            B = len(pred)
+            y = pred.copy()
+            y[:m][act] += (B / 2.0) * weight    # dpred_a = −weight（勝ち側を押し上げ）
+            y[m:][act] -= (B / 2.0) * weight    # dpred_b = ＋weight（負け側を押し下げ）
+            vnet.step(vnet.backward(cache, y), lr=lr)
+    return vnet
 
 
 def split_idx(n, val_frac=0.15, seed=7):
@@ -171,6 +250,13 @@ def main():
                     help="kind=disagree/diverge（反例）サンプルの policy 学習での複製倍率。1=無効")
     ap.add_argument("--extra-dirs", default=None,
                     help="ローカル教師バッチのディレクトリ（カンマ区切り・divergence_probe --out 等）")
+    ap.add_argument("--rank-epochs", type=int, default=0,
+                    help="子盤面ペア順位ヒンジの微調整エポック（v12.1・0=無効）。value 学習の後段で適用")
+    ap.add_argument("--rank-lr", type=float, default=2e-5)
+    ap.add_argument("--rank-weight", type=float, default=1.0)
+    ap.add_argument("--rank-margin", type=float, default=0.2)
+    ap.add_argument("--rank-delta", type=float, default=0.25,
+                    help="ペア成立に要求する子盤面 z 差（レフェリー実測が明確に割れた点のみ教える）")
     ap.add_argument("--diverge-weight", type=float, default=None,
                     help="kind=diverge（乖離教師）専用の複製倍率。未指定は --disagree-weight に従う。"
                          "乖離教師は少数精鋭（候補の失敗分布から採った文脈つき反例）のため"
@@ -259,7 +345,18 @@ def main():
             # 新形式で記録されたバッチからのみ学習される（旧22次元記録はゼロ埋め）。
             extend_action_dim(pnet, ctx_dim + ACTION_DIM - pnet.in_dim)
         tm, vm = RN.train(vnet, tr_vdata, epochs=args.epochs, lr=lr, batch=64, val_frac=0.1,
-                          distill_weight=args.distill_weight)
+                          distill_weight=args.distill_weight) if args.epochs > 0 else (0.0, 0.0)
+        if args.rank_epochs > 0 and vdata.get("_child") is not None:
+            child_all = vdata["_child"]
+            pairs = build_rank_pairs(child_all, delta=args.rank_delta)
+            p_tr = [p for p in pairs if p[2] % 7 != 0]   # group 単位で train/val（漏洩防止）
+            p_va = [p for p in pairs if p[2] % 7 == 0]
+            acc0 = pair_acc(vnet, child_all, p_va)
+            rank_finetune(vnet, child_all, p_tr, epochs=args.rank_epochs, lr=args.rank_lr,
+                          weight=args.rank_weight, margin=args.rank_margin)
+            acc1 = pair_acc(vnet, child_all, p_va)
+            print(f"rank微調整: pairs {len(p_tr)}tr/{len(p_va)}va・val順位正答 "
+                  f"{acc0:.3f}→{acc1:.3f}")
         if args.skip_policy or not args.train_policy:
             ce = float("nan")   # policy はベース据え置き（value のみ＝v12 確定の既定）
         else:

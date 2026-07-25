@@ -352,7 +352,8 @@ def main():
         policy_path=os.path.join(REPO, "opcg_sim", "data", "learned", "gen5_policy.npz"))
         if any(k == "gen5" and w > 0 for k, w in _mix) else None)
     sinks = {"S": [], "F": [], "I": [], "Y": [], "Q": [], "T": [], "K": [],
-             "CS": [], "CF": [], "CI": [], "CY": []}   # C*=子盤面 value 教師（v11）
+             "CS": [], "CF": [], "CI": [], "CY": [], "CG": []}   # C*=子盤面 value 教師（v11）
+             # CG=決定点ID（v12.1: 同一決定点の子盤面同士で v の順位ペアを組む系）
     pol = []
     n_labeled = 0
     # バッチの wall-clock 予算（安全弁）。捲りモード採掘点(worlds×4)×長対局×多点で計算量が跳ねる
@@ -394,6 +395,7 @@ def main():
             for cenc, cz in childs:   # v11: 子盤面 value 教師（policy 側と行を揃えない別配列）
                 sinks["CS"].append(cenc["scalars"]); sinks["CF"].append(cenc["field"])
                 sinks["CI"].append(cenc["card_idx"]); sinks["CY"].append(cz)
+                sinks["CG"].append(n_labeled)   # v12.1: 同一決定点の子盤面は同じグループID
             pol.append(ps)
             n_labeled += 1
     print(f"\nLABEL_RESULT: {ARGS.games}局 → 教師 {n_labeled} 決定", flush=True)
@@ -410,7 +412,8 @@ def main():
             arrays.update({"child_scalars": np.stack(sinks["CS"]),
                            "child_field": np.stack(sinks["CF"]),
                            "child_card_idx": np.stack(sinks["CI"]),
-                           "child_value": np.array(sinks["CY"], dtype=np.float32)})
+                           "child_value": np.array(sinks["CY"], dtype=np.float32),
+                           "child_group": np.array(sinks["CG"], dtype=np.int32)})
         arrays.update(pack_policy(pol))
         np.savez_compressed(os.path.join(ARGS.out, "batch.npz"), **arrays)
         # worker はワーカー運用時に label_worker が w1 等へ上書きする（枝と consumed の単位）。
