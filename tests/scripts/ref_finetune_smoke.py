@@ -158,11 +158,14 @@ def main():
     ap.add_argument("--policy-selfdistill", type=float, default=0.0,
                     help="policy の忘却対策: gen5 prior を教師とする自己蒸留サンプルを"
                          "ref 教師1件あたりこの比率で混合（mark ガード退行の抑制）")
+    ap.add_argument("--train-policy", action="store_true",
+                    help="policy も微調整する（**既定OFF＝value のみ学習**）。v12 で確定: policy "
+                         "微調整は1エポックでも対gen6 アリーナを 0.33 に落とし、value のみは "
+                         "80局 0.4875＝無傷（ヌル対照 0.500 で計器健全性も確認）。v9 でも同結論"
+                         "（2026-07-18）。新特徴で局面の区別を与えるまで policy 学習は封印")
     ap.add_argument("--skip-policy", action="store_true",
-                    help="policy を微調整せず gen5 のまま保存する（v9 既定推奨）。ablation で "
-                         "policy 微調整が @64 等の正しい点を壊す犯人と確定（value のみ学習で "
-                         "コーチPASS・arena 非退行・2026-07-18）。value は decide の主役で "
-                         "素直に学べるため、policy を据え置くのが v9 の正しい形。")
+                    help="（後方互換・現在は value のみが既定のため冗長。--train-policy と併用時は"
+                         "こちらが優先＝skip）")
     ap.add_argument("--val-frac", type=float, default=0.15)
     ap.add_argument("--disagree-weight", type=float, default=1.0,
                     help="kind=disagree/diverge（反例）サンプルの policy 学習での複製倍率。1=無効")
@@ -257,8 +260,8 @@ def main():
             extend_action_dim(pnet, ctx_dim + ACTION_DIM - pnet.in_dim)
         tm, vm = RN.train(vnet, tr_vdata, epochs=args.epochs, lr=lr, batch=64, val_frac=0.1,
                           distill_weight=args.distill_weight)
-        if args.skip_policy:
-            ce = float("nan")   # policy は gen5 のまま（据え置き＝v9 既定）
+        if args.skip_policy or not args.train_policy:
+            ce = float("nan")   # policy はベース据え置き（value のみ＝v12 確定の既定）
         else:
             ce = train_policy(pnet, tr_pol, epochs=args.epochs, lr=lr,
                               smooth=args.policy_smooth)
