@@ -156,7 +156,9 @@ class LearnedEngine:
     """
 
     def __init__(self, value_path: Optional[str] = None, policy_path: Optional[str] = None,
-                 vocab=None, game=None, aux_tiebreak: Optional[bool] = None):
+                 vocab=None, game=None, aux_tiebreak: Optional[bool] = None,
+                 sims: Optional[int] = None, c_puct: Optional[float] = None,
+                 root_frac: Optional[float] = None, root_gap: Optional[float] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
@@ -166,6 +168,13 @@ class LearnedEngine:
         # aux 粘り項のエンジン別上書き（None=config.SERVE_AUX_TIEBREAK に従う）。ON/OFF を
         # 同一プロセスで対戦させる A/B（net-vs-net arena）用＝本番既定は None。
         self.aux_tiebreak = aux_tiebreak
+        # 探索つまみのエンジン別上書き（None=既定に従う・aux_tiebreak と同じ A/B 用の seam）。
+        # **設定時は decide の呼び出し引数より優先**する＝席ごとに探索設定を変えた net-vs-net
+        # （`search_config_probe.py`）で、ハーネス側が渡す sims を上書きできるようにするため。
+        self.sims = sims
+        self.c_puct = c_puct
+        self.root_frac = root_frac      # root 読み出しの乗り換え条件（訪問比）
+        self.root_gap = root_gap        # 同（Q 差・inf で従来の argmax(N)）
         # ターン内 sticky 世界線の seed キャッシュ {(id(manager), turn, player): (weakref, seed)}（§_world_rng）。
         self._world_seeds: Dict[Any, Any] = {}
         self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
@@ -229,6 +238,10 @@ class LearnedEngine:
                rng=None, trace=None) -> Optional[Dict[str, Any]]:
         """このエンジンのネットで 1 手決定する（`decide_learned` と同一契約・同一探索）。"""
         name = player.name
+        if self.sims is not None:
+            sims = self.sims           # エンジン別上書き（未設定=None で従来どおり引数/既定）
+        if self.c_puct is not None:
+            c_puct = self.c_puct
         # numpy rng の種を **global random** から引く＝リプレイ種（routers が cpu_trace 時に random.seed）で
         # learned 対局も決定論再生できる。通常対局は global random 未 seed（プロセス由来）＝実質ランダム。
         if not isinstance(rng, np.random.Generator):
@@ -251,7 +264,12 @@ class LearnedEngine:
         if stats and stats.get("legal"):
             groups = _merge_root_stats(manager, stats["legal"], stats["N"], stats["Q"])
             if groups:
-                move = stats["legal"][_select_root_group(groups)["rep"]]
+                kw = {}
+                if self.root_frac is not None:
+                    kw["min_frac"] = self.root_frac
+                if self.root_gap is not None:
+                    kw["min_gap"] = self.root_gap
+                move = stats["legal"][_select_root_group(groups, **kw)["rep"]]
         if move is None:
             move = legal[0] if legal else None
         if trace is not None:
