@@ -35,6 +35,16 @@ def test_screen_rejects_below_floor():
     assert AG.screen_decision(48, 96, 0.48) == "continue"   # 境界は継続側
 
 
+def test_normalize_pairs_guards_the_ci_contract():
+    """`_play_pair` の勝ち数（0/1/2）→ ペア水準スコア（0/0.5/1）。
+
+    2026-07-27 のヌル対照（gen6 vs gen6）が検出した実バグの回帰: 正規化を忘れると
+    `_pair_level_ci` の平均が2倍になり、**五分の候補が wr=1.000・CI[1,1] で PASS** した。"""
+    assert AG.normalize_pairs([0.0, 1.0, 2.0]) == [0.0, 0.5, 1.0]
+    ok, ci = AG.final_decision(AG.normalize_pairs([1.0] * 40))   # 全ペア1勝1敗＝真の五分
+    assert not ok and ci["win_rate"] == pytest.approx(0.5)
+
+
 def test_final_requires_both_point_estimate_and_ci():
     """勝率 ≥ frac **かつ** CI下限 > 0.50。片方だけでは通さない。"""
     # 全ペア 1.0（＝候補が両席で勝つ）: 点推定 1.0・分散 0 で明確に通る

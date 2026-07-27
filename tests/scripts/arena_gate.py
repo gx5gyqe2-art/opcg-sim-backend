@@ -53,8 +53,19 @@ def screen_decision(wins, games, floor):
     return "reject" if (wins / max(games, 1)) < floor else "continue"
 
 
+def normalize_pairs(raw):
+    """`_play_pair` の返り値（ペアあたり candidate の勝ち数 0..2）→ ペア水準スコア（0/0.5/1）。
+
+    `arena_parallel._pair_level_ci` は**ペアあたり [0,1]** のスコアを前提とする。生の勝ち数のまま
+    渡すと平均が2倍になり、**五分の候補が wr=1.000・CI[1,1] で PASS する**。2026-07-27 の
+    ヌル対照（gen6 vs gen6）が実際にこれを検出した＝計器を先に較正する手順の実効性の実例。"""
+    return [s / 2.0 for s in raw]
+
+
 def final_decision(pair_scores, frac=0.55):
     """本判定（pure）: 勝率 ≥ frac かつ **ペア水準95%CI下限 > 0.50**。
+
+    `pair_scores` は **正規化済み**（0/0.5/1）を受ける＝`normalize_pairs` を通すこと。
 
     2条件にするのは、点推定だけだと標本誤差で通ってしまうため（v15 の反省）。CI は
     `arena_parallel._pair_level_ci`（対照ペア設計の正しい区間）を使う。"""
@@ -115,7 +126,7 @@ def main():
             w, g = sum(sc), 2 * len(sc)
             band_rows.append({"band": bi, "wins": w, "games": g, "wr": round(w / g, 4)})
             print(f"band{bi}: {w:.1f}/{g} wr={w / g:.3f} ({time.time() - t0:.0f}s)", flush=True)
-    ok, ci = final_decision(all_scores, args.frac)
+    ok, ci = final_decision(normalize_pairs(all_scores), args.frac)
     games = 2 * len(all_scores)
     res.update({"promoted": ok, "games": games, "wins": sum(all_scores),
                 "wr": round(ci["win_rate"], 4),
