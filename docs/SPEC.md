@@ -135,11 +135,11 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 完結する。フロントは人間=p1 を操作し、CPU の手はポーリングで 1 手ずつ受け取る。
 
 ### 2.5.1 配線・逐次進行
-- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（`learned`＝既定・**v6学習型**
-  （`gen6_*.npz`・2026-07-22採用＝gen5温スタート＋符号化v5（相手場の脅威集約・展開余力）＋行動特徴
-  （ATTACH_DON 付与後パワー）＋レフェリー教師 10159 決定（v9採掘・disagree×4重み・自己蒸留0.85）の微調整。
-  コーチゲート 3.8>3.0 PASS（@33 0→1.0・@64 0.8 維持の両立）・対gen5 直接対戦 204局 wr=0.564。
-  `docs/reports/v10_gen6_adoption_20260722.md`。旧 v5=gen5／v4=gen4／v3=gen3／v1=gen2 はリプレイ再現/A/B/ロールバック用に同梱維持）／
+- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（`learned`＝既定・**gen7学習型**
+  （`gen7_*.npz`・2026-07-27採用＝gen6 value の密ラベル追い学習（v16・自己対戦2048局の全決定点 236,387行・
+  混合ラベル＋残りターン補助・1エポック）。policy は gen6 と同一バイナリ（v12確定＝policy微調整は有害）。
+  較正済み800局アリーナで対gen6 wr=0.5713 CI[0.540,0.603]（4帯すべて0.555-0.600）・対gen5 アンカー 0.550 非退行。
+  `docs/reports/cpu_v16_dense_labels_20260727.md`。旧 gen6／gen5／gen4／gen3／gen2 はリプレイ再現/A/B/ロールバック用に同梱維持）／
   `hard`＝α-β）/ `cpu_deck`。未指定・未知値は `learned` に正規化。モデル未同梱環境（`cpu_learned.available()`
   が False）では `learned`→`hard` に安全フォールバック。CPU メタは `CPU_GAMES` に保持（`{cpu_player_id, difficulty}`）。
   - **符号化の対応表はネットが持つ**（`ValueNet.vocab_ids`・2026-07-15 事故対応）: カードDBが増えても
