@@ -96,7 +96,7 @@ def main():
 
     from promotion_gate import _init_pool
     t_all = time.time()
-    res = {"candidate": args.candidate, "baseline": args.baseline or "gen6(default)"}
+    res = {"candidate": args.candidate, "baseline": args.baseline or "default(出荷既定)"}
     with mp.Pool(args.workers, initializer=_init_pool,
                  initargs=(args.candidate, args.baseline)) as pool:
         # --- 一次スクリーン（無駄な本判定を避ける安全弁） ---
