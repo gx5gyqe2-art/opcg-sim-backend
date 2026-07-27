@@ -37,15 +37,17 @@ _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "data")
 
-# v6(gen6) = gen5 からの温スタート（符号化 v4→v5 拡張・恒等＝相手場の脅威集約＋展開余力・
-# 行動特徴に ATTACH_DON 付与後パワー）＋レフェリー教師 10159 決定（v9 採掘 sat/blind/disagree・
-# disagree×4 重み・policy 自己蒸留 0.85・value 蒸留 0.5・lr5e-5/8ep）の微調整を凍結
-# （docs/reports/v10_gen6_adoption_20260722.md・コーチゲート 3.8>3.0 PASS＝@33 0→1.0 と @64 0.8
-# 維持の両立・対gen5 直接対戦 204局 wr=0.564）。符号化は v5（55スカラー）で net の feat_dim から
-# 自動判別される。gen5 以前はリプレイ再現・A/B・ロールバック用に同梱を維持する
-# （レフェリー教師の錨は gen5 固定のまま＝referee_labeler は明示ロード）。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen6_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen6_policy.npz")
+# v7世代(gen7) = gen6 value の密ラベル追い学習（v16・自己対戦 2048局の**全決定点** 236,387 行・
+# 混合ラベル y=0.5·z+0.5·q_root＋残りターン補助・1エポック lr2e-4）。policy は gen6 と同一
+# バイナリ（v12 確定＝policy 微調整は有害のため凍結）。判定は較正済み 800局アリーナ
+# （docs/reports/cpu_v16_dense_labels_20260727.md・4帯すべて 0.555-0.600・通算 wr=0.5713
+# CI[0.540,0.603]・対gen5 アンカー 0.550 非退行）。コーチゲートは 2.4<3.8 だが v16 総括 §4 の
+# とおり診断計器へ降格（7点は gen4 期の単一対局由来・飽和負け3点は 1/6〜1/16 の捲り筋のみ）。
+# 符号化は v5（55スカラー）で net の feat_dim から自動判別される。gen6 以前はリプレイ再現・
+# A/B・ロールバック用に同梱を維持する（レフェリー教師の錨は gen5 固定のまま＝referee_labeler は
+# 明示ロード）。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen7_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen7_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}
