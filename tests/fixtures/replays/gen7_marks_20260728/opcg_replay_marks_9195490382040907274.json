@@ -1,0 +1,311 @@
+{
+ "kind": "opcg-replay-marks",
+ "game_id": "ddb73820-41d7-4f6e-b7a8-7738d03991fe",
+ "seed": "9195490382040907274",
+ "difficulty": "learned",
+ "leaders": {
+  "p1": "OP09-001",
+  "p2": "OP11-041"
+ },
+ "marks": [
+  {
+   "action_index": 7,
+   "turn": 3,
+   "note": "ナミに3ドンつけない理由がない",
+   "action": {
+    "src": "cpu",
+    "turn": 3,
+    "player": "p2",
+    "action_type": "ATTACK",
+    "card": "OP11-041",
+    "targets": [
+     "OP09-001"
+    ]
+   },
+   "decision": {
+    "turn": 3,
+    "player": "p2",
+    "action_index": 7,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP11-041",
+     "targets": [
+      "OP09-001"
+     ]
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "OP11-041",
+       "targets": [
+        "OP09-001"
+       ]
+      },
+      "visit_pct": 48.8,
+      "q": -0.222
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP11-041"
+      },
+      "visit_pct": 30.6,
+      "q": -0.316
+     },
+     {
+      "move": {
+       "action_type": "TURN_END"
+      },
+      "visit_pct": 15,
+      "q": -0.254
+     },
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "OP11-106"
+      },
+      "visit_pct": 5.6,
+      "q": -0.559
+     }
+    ],
+    "value": -0.222,
+    "l1_move": {
+     "action_type": "ATTACH_DON",
+     "card": "OP11-041"
+    },
+    "l1_disagrees": true
+   }
+  },
+  {
+   "action_index": 61,
+   "turn": 8,
+   "note": "ドンが余っているので次ターンのナミのリーダー効果条件を満たすためにドンは付与した方が良い",
+   "action": {
+    "src": "cpu",
+    "turn": 7,
+    "player": "p2",
+    "action_type": "TURN_END"
+   },
+   "decision": {
+    "turn": 7,
+    "player": "p2",
+    "action_index": 61,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "TURN_END"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "TURN_END"
+      },
+      "visit_pct": 100,
+      "q": -0.063
+     }
+    ],
+    "value": -0.063,
+    "l1_move": {
+     "action_type": "TURN_END"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 74,
+   "turn": 9,
+   "note": "シャンクス側のライフが多く、ブロッカーもいるためゲームが伸びることが予想される。盤面にキャラクターを展開してゲームが伸びた時にアドバンテージが取れるような盤面を作った方が良い（ティーチかモリア）",
+   "action": {
+    "src": "cpu",
+    "turn": 9,
+    "player": "p2",
+    "action_type": "ATTACK",
+    "card": "OP11-041",
+    "targets": [
+     "OP09-001"
+    ]
+   },
+   "decision": {
+    "turn": 9,
+    "player": "p2",
+    "action_index": 74,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP11-041",
+     "targets": [
+      "OP09-001"
+     ]
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP11-041"
+      },
+      "visit_pct": 41.9,
+      "q": 0.411
+     },
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "OP11-041",
+       "targets": [
+        "OP09-001"
+       ]
+      },
+      "visit_pct": 28.8,
+      "q": 0.468
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP14-110"
+      },
+      "visit_pct": 18.8,
+      "q": 0.454
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP14-108"
+      },
+      "visit_pct": 5.6,
+      "q": 0.263
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "EB03-053"
+      },
+      "visit_pct": 5,
+      "q": 0.269
+     }
+    ],
+    "value": 0.468,
+    "l1_move": {
+     "action_type": "ATTACH_DON",
+     "card": "EB03-053"
+    },
+    "l1_disagrees": true
+   }
+  },
+  {
+   "action_index": 96,
+   "turn": 10,
+   "note": "既にリーダーのパワーは足りているのに無駄にカウンターを切っている",
+   "action": {
+    "src": "cpu",
+    "turn": 10,
+    "player": "p2",
+    "action_type": "SELECT_COUNTER",
+    "card": "OP14-110"
+   },
+   "decision": {
+    "turn": 10,
+    "player": "p2",
+    "action_index": 96,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "SELECT_COUNTER",
+     "card": "OP14-110"
+    },
+    "dialog": "SELECT_COUNTER",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP14-110"
+      },
+      "visit_pct": 24.4,
+      "q": 0.098
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "EB04-058"
+      },
+      "visit_pct": 23.1,
+      "q": 0.122
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "EB03-053"
+      },
+      "visit_pct": 23.1,
+      "q": 0.103
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP08-050"
+      },
+      "visit_pct": 18.8,
+      "q": 0.141
+     },
+     {
+      "move": {
+       "action_type": "PASS"
+      },
+      "visit_pct": 10.6,
+      "q": 0.012
+     }
+    ],
+    "value": 0.098,
+    "l1_move": {
+     "action_type": "SELECT_COUNTER",
+     "card": "EB03-053"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 99,
+   "turn": 10,
+   "note": "無駄なカウンター切り",
+   "action": {
+    "src": "cpu",
+    "turn": 10,
+    "player": "p2",
+    "action_type": "PASS"
+   },
+   "decision": {
+    "turn": 10,
+    "player": "p2",
+    "action_index": 99,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "PASS"
+    },
+    "dialog": "SELECT_COUNTER",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "PASS"
+      },
+      "visit_pct": 53.1,
+      "q": -0.623
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP08-050"
+      },
+      "visit_pct": 46.9,
+      "q": -0.646
+     }
+    ],
+    "value": -0.623,
+    "l1_move": {
+     "action_type": "PASS"
+    },
+    "l1_disagrees": false
+   }
+  }
+ ]
+}

@@ -1,0 +1,165 @@
+{
+ "kind": "opcg-replay-marks",
+ "game_id": "4b06a6f2-0931-4565-92d4-75f014d5d2d1",
+ "seed": "5936431651544026420",
+ "difficulty": "learned",
+ "leaders": {
+  "p1": "OP16-022",
+  "p2": "OP11-041"
+ },
+ "marks": [
+  {
+   "action_index": 26,
+   "turn": 5,
+   "note": "キャラクターナミの効果でドンを付与しないメリットはない",
+   "action": {
+    "src": "cpu",
+    "turn": 5,
+    "player": "p2",
+    "action_type": "RESOLVE_EFFECT_SELECTION",
+    "index": 0,
+    "position": "BOTTOM"
+   },
+   "decision": {
+    "turn": 5,
+    "player": "p2",
+    "action_index": 26,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "index": 0,
+     "position": "BOTTOM"
+    },
+    "dialog": "SEARCH_AND_SELECT",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 50,
+      "q": 0.376
+     },
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "selected": [
+        "OP11-041"
+       ],
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 50,
+      "q": 0.377
+     }
+    ],
+    "value": 0.376,
+    "l1_move": {
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "selected": [
+      "OP11-041"
+     ],
+     "index": 0,
+     "position": "BOTTOM"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 28,
+   "turn": 6,
+   "note": "攻撃しなかった理由が不明",
+   "action": {
+    "src": "cpu",
+    "turn": 5,
+    "player": "p2",
+    "action_type": "TURN_END"
+   },
+   "decision": {
+    "turn": 5,
+    "player": "p2",
+    "action_index": 28,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "TURN_END"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "OP11-041",
+       "targets": [
+        "OP16-022"
+       ]
+      },
+      "visit_pct": 53.1,
+      "q": 0.34
+     },
+     {
+      "move": {
+       "action_type": "TURN_END"
+      },
+      "visit_pct": 46.9,
+      "q": 0.406
+     }
+    ],
+    "value": 0.406,
+    "l1_move": {
+     "action_type": "ATTACK",
+     "card": "OP11-041",
+     "targets": [
+      "OP16-022"
+     ]
+    },
+    "l1_disagrees": true
+   }
+  },
+  {
+   "action_index": 78,
+   "turn": 8,
+   "note": "無駄なカウンター切り",
+   "action": {
+    "src": "cpu",
+    "turn": 8,
+    "player": "p2",
+    "action_type": "SELECT_COUNTER",
+    "card": "OP14-108"
+   },
+   "decision": {
+    "turn": 8,
+    "player": "p2",
+    "action_index": 78,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "SELECT_COUNTER",
+     "card": "OP14-108"
+    },
+    "dialog": "SELECT_COUNTER",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP14-108"
+      },
+      "visit_pct": 58.8,
+      "q": 0.074
+     },
+     {
+      "move": {
+       "action_type": "PASS"
+      },
+      "visit_pct": 41.2,
+      "q": 0.06
+     }
+    ],
+    "value": 0.074,
+    "l1_move": {
+     "action_type": "PASS"
+    },
+    "l1_disagrees": true
+   }
+  }
+ ]
+}

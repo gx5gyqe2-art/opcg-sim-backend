@@ -80,14 +80,40 @@ def _cpu_seat(difficulty: str, sims: int = 160):
     return make_seat(difficulty, kind="arena")
 
 
-class _HumanReplaySeat:
-    """記録された人間アクション列を順に注入する席（`seat(ctx)->move`）。"""
+def _skip_pending_move(manager, actor, recorded):
+    """再実行側にだけ現れた skippable な効果対話を decline する手を作る（`state_at_action` 専用）。
 
-    def __init__(self, actions: List[Dict[str, Any]], resolver=None):
+    録画時ビルドと現ビルドの効果解決差分で、現ビルドだけが任意効果ダイアログ
+    （CONFIRM_OPTIONAL 等）を出すことがある（実測 2026-07-28: ST30-004 イワンコフの登場時
+    ダイアログが録画に無く、直後の記録 TURN_END が no_match で全再生が落ちた）。録画がこの
+    対話への応答を持たない＝録画世界ではダイアログ自体が無かったと解釈し、decline を注入して
+    記録アクションを再試行させる。録画側が応答を持つ（recorded が RESOLVE_EFFECT_SELECTION）
+    場合は None＝本物の分岐として従来どおり miss に回す（黙って誤再生しない）。"""
+    if (recorded or {}).get("action_type") == "RESOLVE_EFFECT_SELECTION":
+        return None
+    pending = manager.get_pending_request()
+    if not pending or pending.get("player_id") != actor.name or not pending.get("can_skip"):
+        return None
+    payload = dict(manager.default_interaction_payload(pending))
+    payload["selected_uuids"] = []
+    payload["accepted"] = False
+    return {"kind": "game", "action_type": "RESOLVE_EFFECT_SELECTION", "payload": payload}
+
+
+class _HumanReplaySeat:
+    """記録された人間アクション列を順に注入する席（`seat(ctx)->move`）。
+
+    `auto_skip=True`（`state_at_action` のみ）で、録画に応答が無い skippable ダイアログを
+    decline して先へ進む（`_skip_pending_move`）。round-trip 検証（同一ビルドの録画再生）は
+    既定 False のまま＝分岐は従来どおり厳格に miss 検出する。"""
+
+    def __init__(self, actions: List[Dict[str, Any]], resolver=None, auto_skip: bool = False):
         self._actions = list(actions)
         self._i = 0
         self._resolve = resolver or resolve_recorded_action   # 既定＝従来（roundtrip 挙動不変）
+        self._auto_skip = auto_skip
         self.misses: List[Dict[str, Any]] = []   # 逆写像不能・列消尽を記録（round-trip 診断）
+        self.auto_skips: List[Dict[str, Any]] = []
 
     def __call__(self, ctx):
         if self._i >= len(self._actions):
@@ -96,6 +122,13 @@ class _HumanReplaySeat:
         rec = self._actions[self._i]
         self._i += 1
         mv = self._resolve(ctx.manager, ctx.actor, rec)
+        if mv is None and self._auto_skip:
+            skip = _skip_pending_move(ctx.manager, ctx.actor, rec)
+            if skip is not None:
+                self._i -= 1     # 記録アクションを未消費に戻す＝ダイアログ解決後に再試行
+                self.auto_skips.append({"step": ctx.step,
+                                        "message": (ctx.manager.get_pending_request() or {}).get("message")})
+                return skip
         if mv is None:
             self.misses.append({"reason": "no_match", "step": ctx.step, "recorded": rec})
         return mv
@@ -277,7 +310,7 @@ def state_at_action(db, descriptor: Dict[str, Any], upto: int,
     def _resolver(m, a, r):
         return resolve_api_action(m, a, r, frames=fmap, actions=acts_idx)
     seats = {pid: _HumanReplaySeat([a for a in acts_idx if a.get("player") == pid],
-                                   resolver=_resolver)
+                                   resolver=_resolver, auto_skip=True)
              for pid in ("p1", "p2")}
     cap = _ManagerCapture()
     # API 実対局はコイントスが乱数を消費する＝"random" を渡して seed から再現（結果 "p1" を
