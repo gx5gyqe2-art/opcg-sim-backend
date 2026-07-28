@@ -14,7 +14,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 "tests", "scripts"))
-from coach_gate import VERIFIED, hit, judge  # noqa: E402
+from coach_gate import REPLAYS_V2, VERIFIED, VERIFIED_V2, hit, judge  # noqa: E402
 
 pytestmark = pytest.mark.cpu_infra
 
@@ -44,3 +44,16 @@ def test_verified_entries_wellformed():
     for tag, i, accept in VERIFIED:
         assert tag == "g3" and isinstance(i, int) and i >= 0
         assert accept and all(isinstance(a, tuple) and len(a) == 2 for a in accept)
+
+
+def test_verified_v2_entries_wellformed():
+    """VERIFIED v2（gen7 実対局13点）: tag が REPLAYS_V2 に実在し fixture ファイルもある。
+    複数対局・両対面方向（CPU=ナミ/シャンクス）を含む＝g3 の単一対局バイアスの回帰防止。"""
+    assert len(VERIFIED_V2) >= 10
+    tags = {t for t, _i, _a in VERIFIED_V2}
+    assert len(tags) >= 3, "複数対局から採録されているはず"
+    for tag, i, accept in VERIFIED_V2:
+        assert tag in REPLAYS_V2 and isinstance(i, int) and i >= 0
+        assert accept and all(isinstance(a, tuple) and len(a) == 2 for a in accept)
+    for path in REPLAYS_V2.values():
+        assert os.path.exists(path), path
