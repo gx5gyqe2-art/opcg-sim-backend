@@ -1,0 +1,469 @@
+{
+ "kind": "opcg-replay-marks",
+ "game_id": "9a654a8a-87e5-4923-bf91-de765d501400",
+ "seed": "3806796710697874793",
+ "difficulty": "learned",
+ "leaders": {
+  "p1": "OP09-001",
+  "p2": "OP11-041"
+ },
+ "marks": [
+  {
+   "action_index": 12,
+   "turn": 3,
+   "note": "前のターンにドンを付与していれば、リーダー効果と1000で守れた。手札を1枚損している",
+   "action": {
+    "src": "cpu",
+    "turn": 3,
+    "player": "p2",
+    "action_type": "SELECT_COUNTER",
+    "card": "OP08-050"
+   },
+   "decision": {
+    "turn": 3,
+    "player": "p2",
+    "action_index": 12,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "SELECT_COUNTER",
+     "card": "OP08-050"
+    },
+    "dialog": "SELECT_COUNTER",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP08-050"
+      },
+      "visit_pct": 38.8,
+      "q": -0.127
+     },
+     {
+      "move": {
+       "action_type": "PASS"
+      },
+      "visit_pct": 29.4,
+      "q": -0.249
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP16-056"
+      },
+      "visit_pct": 17.5,
+      "q": -0.2
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP14-108"
+      },
+      "visit_pct": 14.4,
+      "q": -0.204
+     }
+    ],
+    "value": -0.127,
+    "l1_move": {
+     "action_type": "SELECT_COUNTER",
+     "card": "OP08-050"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 44,
+   "turn": 8,
+   "note": "シャンクスのリーダー効果で相手にタダで守られることが予想できるため、リーダーにドンを付与して次ターンの守りを固めた方が良い",
+   "action": {
+    "src": "cpu",
+    "turn": 8,
+    "player": "p2",
+    "action_type": "ATTACH_DON",
+    "card": "EB03-053"
+   },
+   "decision": {
+    "turn": 8,
+    "player": "p2",
+    "action_index": 44,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "EB03-053"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "EB03-053"
+      },
+      "visit_pct": 64.4,
+      "q": 0.224
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP11-041"
+      },
+      "visit_pct": 18.1,
+      "q": 0.026
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP16-056"
+      },
+      "visit_pct": 13.8,
+      "q": 0.042
+     },
+     {
+      "move": {
+       "action_type": "ACTIVATE_MAIN",
+       "card": "OP16-056"
+      },
+      "visit_pct": 3.1,
+      "q": 0.025
+     },
+     {
+      "move": {
+       "action_type": "TURN_END"
+      },
+      "visit_pct": 0.6,
+      "q": -0.06
+     }
+    ],
+    "value": 0.224,
+    "l1_move": {
+     "action_type": "ATTACH_DON",
+     "card": "EB03-053"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 58,
+   "turn": 9,
+   "note": "このターンに盾を3枚受けるくらいなら、前のターンにギャルディーノの起動メインを使用してゾロを止めておくべき？（要検討）",
+   "action": {
+    "src": "cpu",
+    "turn": 9,
+    "player": "p2",
+    "action_type": "PASS"
+   },
+   "decision": {
+    "turn": 9,
+    "player": "p2",
+    "action_index": 58,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "PASS"
+    },
+    "dialog": "SELECT_COUNTER",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "PASS"
+      },
+      "visit_pct": 67.5,
+      "q": -0.092
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP14-108"
+      },
+      "visit_pct": 11.2,
+      "q": -0.343
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "EB03-053"
+      },
+      "visit_pct": 11.2,
+      "q": -0.345
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "EB04-058"
+      },
+      "visit_pct": 10,
+      "q": -0.351
+     }
+    ],
+    "value": -0.092,
+    "l1_move": {
+     "action_type": "PASS"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 64,
+   "turn": 10,
+   "note": "クマシーを出す意味はない",
+   "action": {
+    "src": "cpu",
+    "turn": 10,
+    "player": "p2",
+    "action_type": "PLAY",
+    "card": "OP14-102"
+   },
+   "decision": {
+    "turn": 10,
+    "player": "p2",
+    "action_index": 64,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP14-102"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP11-041"
+      },
+      "visit_pct": 31.2,
+      "q": -0.3
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "EB03-055"
+      },
+      "visit_pct": 16.2,
+      "q": -0.247
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP16-056"
+      },
+      "visit_pct": 15.6,
+      "q": -0.271
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "EB03-053"
+      },
+      "visit_pct": 13.8,
+      "q": -0.275
+     },
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "OP14-102"
+      },
+      "visit_pct": 12.5,
+      "q": -0.218
+     }
+    ],
+    "value": -0.218,
+    "l1_move": {
+     "action_type": "PLAY",
+     "card": "OP14-102"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 66,
+   "turn": 11,
+   "note": "ロビンで攻撃しない意味はない",
+   "action": {
+    "src": "cpu",
+    "turn": 10,
+    "player": "p2",
+    "action_type": "TURN_END"
+   },
+   "decision": {
+    "turn": 10,
+    "player": "p2",
+    "action_index": 66,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "TURN_END"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "OP11-041",
+       "targets": [
+        "OP09-001"
+       ]
+      },
+      "visit_pct": 31.2,
+      "q": -0.34
+     },
+     {
+      "move": {
+       "action_type": "TURN_END"
+      },
+      "visit_pct": 21.9,
+      "q": -0.283
+     },
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "OP11-041",
+       "targets": [
+        "OP09-013"
+       ]
+      },
+      "visit_pct": 18.1,
+      "q": -0.361
+     },
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "EB03-055",
+       "targets": [
+        "OP09-001"
+       ]
+      },
+      "visit_pct": 11.9,
+      "q": -0.395
+     },
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "EB03-055",
+       "targets": [
+        "OP09-013"
+       ]
+      },
+      "visit_pct": 8.1,
+      "q": -0.41
+     }
+    ],
+    "value": -0.283,
+    "l1_move": {
+     "action_type": "ATTACK",
+     "card": "OP11-041",
+     "targets": [
+      "OP09-013"
+     ]
+    },
+    "l1_disagrees": true
+   }
+  },
+  {
+   "action_index": 73,
+   "turn": 11,
+   "note": "どうせ後ろの7000攻撃を止めているので、リーダー効果込みで守っておくべき",
+   "action": {
+    "src": "cpu",
+    "turn": 11,
+    "player": "p2",
+    "action_type": "RESOLVE_EFFECT_SELECTION",
+    "index": 0,
+    "position": "BOTTOM",
+    "accepted": false
+   },
+   "decision": {
+    "turn": 11,
+    "player": "p2",
+    "action_index": 73,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "index": 0,
+     "position": "BOTTOM",
+     "accepted": false
+    },
+    "dialog": "CONFIRM_OPTIONAL",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "index": 0,
+       "position": "BOTTOM",
+       "accepted": false
+      },
+      "visit_pct": 61.2,
+      "q": 0.223
+     },
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 38.8,
+      "q": 0.173
+     }
+    ],
+    "value": 0.223,
+    "l1_move": {
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "index": 0,
+     "position": "BOTTOM",
+     "accepted": false
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 76,
+   "turn": 11,
+   "note": "守るならリーダー効果込みで守っておくべき",
+   "action": {
+    "src": "cpu",
+    "turn": 11,
+    "player": "p2",
+    "action_type": "RESOLVE_EFFECT_SELECTION",
+    "index": 0,
+    "position": "BOTTOM",
+    "accepted": false
+   },
+   "decision": {
+    "turn": 11,
+    "player": "p2",
+    "action_index": 76,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "index": 0,
+     "position": "BOTTOM",
+     "accepted": false
+    },
+    "dialog": "CONFIRM_OPTIONAL",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "index": 0,
+       "position": "BOTTOM",
+       "accepted": false
+      },
+      "visit_pct": 58.1,
+      "q": 0.386
+     },
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 41.9,
+      "q": 0.336
+     }
+    ],
+    "value": 0.386,
+    "l1_move": {
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "index": 0,
+     "position": "BOTTOM",
+     "accepted": false
+    },
+    "l1_disagrees": false
+   }
+  }
+ ]
+}

@@ -80,23 +80,81 @@ def _cpu_seat(difficulty: str, sims: int = 160):
     return make_seat(difficulty, kind="arena")
 
 
-class _HumanReplaySeat:
-    """記録された人間アクション列を順に注入する席（`seat(ctx)->move`）。"""
+def _skip_pending_move(manager, actor, recorded):
+    """再実行側にだけ現れた skippable な効果対話を decline する手を作る（`state_at_action` 専用）。
 
-    def __init__(self, actions: List[Dict[str, Any]], resolver=None):
+    録画時ビルドと現ビルドの効果解決差分で、現ビルドだけが任意効果ダイアログ
+    （CONFIRM_OPTIONAL 等）を出すことがある（実測 2026-07-28: ST30-004 イワンコフの登場時
+    ダイアログが録画に無く、直後の記録 TURN_END が no_match で全再生が落ちた）。録画がこの
+    対話への応答を持たない＝録画世界ではダイアログ自体が無かったと解釈し、decline を注入して
+    記録アクションを再試行させる。録画側が応答を持つ（recorded が RESOLVE_EFFECT_SELECTION）
+    場合は None＝本物の分岐として従来どおり miss に回す（黙って誤再生しない）。"""
+    if (recorded or {}).get("action_type") == "RESOLVE_EFFECT_SELECTION":
+        return None
+    pending = manager.get_pending_request()
+    if not pending or pending.get("player_id") != actor.name or not pending.get("can_skip"):
+        return None
+    payload = dict(manager.default_interaction_payload(pending))
+    payload["selected_uuids"] = []
+    payload["accepted"] = False
+    return {"kind": "game", "action_type": "RESOLVE_EFFECT_SELECTION", "payload": payload}
+
+
+class _HumanReplaySeat:
+    """記録された人間アクション列を順に注入する席（`seat(ctx)->move`）。
+
+    `auto_skip=True`（`state_at_action` のみ）で、録画に応答が無い skippable ダイアログを
+    decline して先へ進む（`_skip_pending_move`）。round-trip 検証（同一ビルドの録画再生）は
+    既定 False のまま＝分岐は従来どおり厳格に miss 検出する。"""
+
+    _MAX_CONSEC_SKIPS = 16   # decline が pending を解消しない異常のループ止め
+
+    def __init__(self, actions: List[Dict[str, Any]], resolver=None, auto_skip: bool = False,
+                 stop_at_idx: Optional[int] = None):
         self._actions = list(actions)
         self._i = 0
         self._resolve = resolver or resolve_recorded_action   # 既定＝従来（roundtrip 挙動不変）
+        self._auto_skip = auto_skip
+        self._stop_at = stop_at_idx
+        self._consec_skips = 0
+        self.stopped = False     # stop_at_idx 到達で True（state_at_action が成功として回収）
         self.misses: List[Dict[str, Any]] = []   # 逆写像不能・列消尽を記録（round-trip 診断）
+        self.auto_skips: List[Dict[str, Any]] = []
+
+    def _try_auto_skip(self, ctx, rec):
+        if not self._auto_skip or self._consec_skips >= self._MAX_CONSEC_SKIPS:
+            return None
+        skip = _skip_pending_move(ctx.manager, ctx.actor, rec)
+        if skip is not None:
+            self._consec_skips += 1
+            self.auto_skips.append({"step": ctx.step,
+                                    "message": (ctx.manager.get_pending_request() or {}).get("message")})
+        return skip
 
     def __call__(self, ctx):
         if self._i >= len(self._actions):
             self.misses.append({"reason": "actions_exhausted", "step": ctx.step})
             return None
         rec = self._actions[self._i]
-        self._i += 1
+        # 目標 index 到達（`state_at_action`）: 記録上 `_idx` 未満のアクションを全席が消費し終えた
+        # 状態で止める。**注入 auto_skip は決定数に数えない**（旧 stop_after_decisions は
+        # スキップぶん手前で止まり、以後の全リクエストが同一の途中盤面に落ちる実害・2026-07-28）。
+        # 再実行側だけのダイアログが挟まっていれば先に解決してから止める。
+        if self._stop_at is not None and rec.get("_idx") is not None and rec["_idx"] >= self._stop_at:
+            skip = self._try_auto_skip(ctx, rec)
+            if skip is not None:
+                return skip
+            self.stopped = True
+            return None          # invariants='raise' の InvariantError 経由で呼び出し側が回収
         mv = self._resolve(ctx.manager, ctx.actor, rec)
         if mv is None:
+            skip = self._try_auto_skip(ctx, rec)
+            if skip is not None:
+                return skip      # 記録アクションは未消費のまま＝ダイアログ解決後に再試行
+        if mv is not None:
+            self._i += 1
+            self._consec_skips = 0
+        else:
             self.misses.append({"reason": "no_match", "step": ctx.step, "recorded": rec})
         return mv
 
@@ -146,6 +204,21 @@ def resolve_api_action(manager, actor, recorded: Dict[str, Any],
                 return m2
         if cands:
             return cands[0][0]
+    if recorded.get("action_type") == "ATTACH_DON":
+        # 合法手列挙は付与先を「今アタック可能なユニット＋レスト中の自キャラ」に限定しており、
+        # 「アタックできないリーダー/アクティブ味方への守りの付与」を**手として列挙しない**
+        # （gamestate.get_legal_actions・2026-07-28 実測: 後攻1ターン目のリーダー付与が
+        # 照合不能で全再生が落ちた）。API 適用層（apply_game_action）は任意の自ユニットを
+        # 受けるため、記録の card_id から payload を直接構築して忠実に再生する。
+        me = actor
+        nd = len(getattr(me, "don_active", ()) or ())
+        if nd > 0:
+            want = recorded.get("card")
+            units = ([me.leader] if me.leader else []) + list(me.field)
+            for u in units:
+                if getattr(getattr(u, "master", None), "card_id", None) == want:
+                    return {"kind": "game", "action_type": "ATTACH_DON",
+                            "payload": {"uuid": u.uuid}}
     return None
 
 
@@ -277,23 +350,32 @@ def state_at_action(db, descriptor: Dict[str, Any], upto: int,
     def _resolver(m, a, r):
         return resolve_api_action(m, a, r, frames=fmap, actions=acts_idx)
     seats = {pid: _HumanReplaySeat([a for a in acts_idx if a.get("player") == pid],
-                                   resolver=_resolver)
+                                   resolver=_resolver, auto_skip=True, stop_at_idx=upto)
              for pid in ("p1", "p2")}
     cap = _ManagerCapture()
     # API 実対局はコイントスが乱数を消費する＝"random" を渡して seed から再現（結果 "p1" を
     # 直接渡すと以後のシャッフル/ドローの乱数列がズレる）。合成録画は first_player_mode 保存値。
     fp = first_player if first_player is not None else \
         descriptor.get("first_player_mode") or "random"
+    stopped = False
     try:
+        # 停止は seat 側の stop_at_idx（記録 index 到達）で行う＝注入 auto_skip を決定数に
+        # 数えない（stop_after_decisions=upto は skip ぶん手前の盤面を黙って返す実害・2026-07-28）。
+        # stop_after_decisions は暴走止めの安全弁としてだけ残す。
         run_game(seed, db, seats=seats, deck_builder=_deck_builder, observers=[cap],
-                 legal_moves="skip", invariants="raise", stop_after_decisions=upto,
-                 first_player=fp)
+                 legal_moves="skip", invariants="raise",
+                 stop_after_decisions=upto + 200, first_player=fp)
     except InvariantError as e:
-        misses = seats["p1"].misses + seats["p2"].misses
-        return None, {"reason": "invariant", "step": getattr(e, "step", None), "misses": misses}
+        stopped = seats["p1"].stopped or seats["p2"].stopped
+        if not stopped:
+            misses = seats["p1"].misses + seats["p2"].misses
+            return None, {"reason": "invariant", "step": getattr(e, "step", None), "misses": misses,
+                          "auto_skips": seats["p1"].auto_skips + seats["p2"].auto_skips}
     misses = seats["p1"].misses + seats["p2"].misses
     if misses:
         return None, {"reason": "miss", "misses": misses}
+    if not stopped:
+        return None, {"reason": "ended_before_upto"}
     if cap.manager is None:
         return None, {"reason": "no_decision"}
     return cap.manager, acts[upto].get("player") if upto < len(acts) else None

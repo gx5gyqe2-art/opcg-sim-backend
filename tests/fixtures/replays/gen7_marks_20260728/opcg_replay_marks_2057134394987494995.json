@@ -1,0 +1,432 @@
+{
+ "kind": "opcg-replay-marks",
+ "game_id": "c6917504-0052-4e69-b894-24bb4c5e1f7b",
+ "seed": "2057134394987494995",
+ "difficulty": "learned",
+ "leaders": {
+  "p1": "OP11-041",
+  "p2": "OP09-001"
+ },
+ "marks": [
+  {
+   "action_index": 3,
+   "turn": 2,
+   "note": "イワンコフは無駄出し",
+   "action": {
+    "src": "cpu",
+    "turn": 2,
+    "player": "p2",
+    "action_type": "PLAY",
+    "card": "ST30-004"
+   },
+   "decision": {
+    "turn": 2,
+    "player": "p2",
+    "action_index": 3,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "ST30-004"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "ST30-004"
+      },
+      "visit_pct": 51.9,
+      "q": 0.529
+     },
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "OP09-002"
+      },
+      "visit_pct": 43.8,
+      "q": 0.439,
+      "copies": 2
+     },
+     {
+      "move": {
+       "action_type": "TURN_END"
+      },
+      "visit_pct": 4.4,
+      "q": 0.244
+     }
+    ],
+    "value": 0.529,
+    "l1_move": {
+     "action_type": "PLAY",
+     "card": "OP09-002"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 14,
+   "turn": 3,
+   "note": "最終的にパスしているのに、なぜかカウンターを切っている",
+   "action": {
+    "src": "cpu",
+    "turn": 3,
+    "player": "p2",
+    "action_type": "SELECT_COUNTER",
+    "card": "OP09-002"
+   },
+   "decision": {
+    "turn": 3,
+    "player": "p2",
+    "action_index": 14,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "SELECT_COUNTER",
+     "card": "OP09-002"
+    },
+    "dialog": "SELECT_COUNTER",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP09-002"
+      },
+      "visit_pct": 32.5,
+      "q": 0.481
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP10-011"
+      },
+      "visit_pct": 28.1,
+      "q": 0.5
+     },
+     {
+      "move": {
+       "action_type": "PASS"
+      },
+      "visit_pct": 21.9,
+      "q": 0.428
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP16-012"
+      },
+      "visit_pct": 17.5,
+      "q": 0.476
+     }
+    ],
+    "value": 0.481,
+    "l1_move": {
+     "action_type": "SELECT_COUNTER",
+     "card": "OP10-011"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 15,
+   "turn": 3,
+   "note": "同上",
+   "action": {
+    "src": "cpu",
+    "turn": 3,
+    "player": "p2",
+    "action_type": "SELECT_COUNTER",
+    "card": "OP16-012"
+   },
+   "decision": {
+    "turn": 3,
+    "player": "p2",
+    "action_index": 15,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "SELECT_COUNTER",
+     "card": "OP16-012"
+    },
+    "dialog": "SELECT_COUNTER",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "PASS"
+      },
+      "visit_pct": 36.2,
+      "q": 0.404
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP10-011"
+      },
+      "visit_pct": 31.9,
+      "q": 0.452
+     },
+     {
+      "move": {
+       "action_type": "SELECT_COUNTER",
+       "card": "OP16-012"
+      },
+      "visit_pct": 31.9,
+      "q": 0.467
+     }
+    ],
+    "value": 0.467,
+    "l1_move": {
+     "action_type": "SELECT_COUNTER",
+     "card": "OP10-011"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 42,
+   "turn": 6,
+   "note": "ドンを振り分けるより、4シャンクスを出した方が良い",
+   "action": {
+    "src": "cpu",
+    "turn": 6,
+    "player": "p2",
+    "action_type": "ATTACH_DON",
+    "card": "OP12-008"
+   },
+   "decision": {
+    "turn": 6,
+    "player": "p2",
+    "action_index": 42,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP12-008"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP12-008"
+      },
+      "visit_pct": 40.6,
+      "q": -0.28
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "ST30-004"
+      },
+      "visit_pct": 21.2,
+      "q": -0.362
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP09-002"
+      },
+      "visit_pct": 16.2,
+      "q": -0.316
+     },
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "OP13-007"
+      },
+      "visit_pct": 12.5,
+      "q": -0.284
+     },
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "OP12-008"
+      },
+      "visit_pct": 5,
+      "q": -0.713
+     }
+    ],
+    "value": -0.28,
+    "l1_move": {
+     "action_type": "PLAY",
+     "card": "OP12-008"
+    },
+    "l1_disagrees": true
+   }
+  },
+  {
+   "action_index": 51,
+   "turn": 6,
+   "note": "イワンコフに5ドン振るくらいならリーダーにもドンを振った方が効率が良い。",
+   "action": {
+    "src": "cpu",
+    "turn": 6,
+    "player": "p2",
+    "action_type": "RESOLVE_EFFECT_SELECTION",
+    "selected": [
+     "ST30-004"
+    ],
+    "index": 0,
+    "position": "BOTTOM"
+   },
+   "decision": {
+    "turn": 6,
+    "player": "p2",
+    "action_index": 51,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "selected": [
+      "ST30-004"
+     ],
+     "index": 0,
+     "position": "BOTTOM"
+    },
+    "dialog": "SEARCH_AND_SELECT",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "selected": [
+        "ST30-004"
+       ],
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 33.1,
+      "q": -0.76
+     },
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "selected": [
+        "OP09-002"
+       ],
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 17.5,
+      "q": -0.826
+     },
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "selected": [
+        "OP12-008"
+       ],
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 17.5,
+      "q": -0.822
+     },
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "selected": [
+        "OP13-007"
+       ],
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 16.2,
+      "q": -0.836
+     },
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "selected": [
+        "OP09-001"
+       ],
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 15.6,
+      "q": -0.837
+     }
+    ],
+    "value": -0.76,
+    "l1_move": {
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "selected": [
+      "OP09-002"
+     ],
+     "index": 0,
+     "position": "BOTTOM"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 94,
+   "turn": 10,
+   "note": "7ゾロを出した方が良い。現に次ターン負けているので、リーダーのパワーを上げて耐久をすることが良い。また、ナミ側のライフが多く勝つためにはゲームを伸ばす必要があるので、大型のキャラクターを出して後ろのターンで強く出られるようにした方が良い",
+   "action": {
+    "src": "cpu",
+    "turn": 10,
+    "player": "p2",
+    "action_type": "ATTACH_DON",
+    "card": "OP09-002"
+   },
+   "decision": {
+    "turn": 10,
+    "player": "p2",
+    "action_index": 94,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP09-002"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP09-002"
+      },
+      "visit_pct": 33.8,
+      "q": -0.762,
+      "copies": 2
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP09-001"
+      },
+      "visit_pct": 15.6,
+      "q": -0.756
+     },
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "OP12-008"
+      },
+      "visit_pct": 11.2,
+      "q": -0.724
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "ST30-004"
+      },
+      "visit_pct": 11.2,
+      "q": -0.743
+     },
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "OP09-001",
+       "targets": [
+        "OP11-041"
+       ]
+      },
+      "visit_pct": 9.4,
+      "q": -0.816
+     }
+    ],
+    "value": -0.762,
+    "l1_move": {
+     "action_type": "PLAY",
+     "card": "EB04-007"
+    },
+    "l1_disagrees": true
+   }
+  }
+ ]
+}

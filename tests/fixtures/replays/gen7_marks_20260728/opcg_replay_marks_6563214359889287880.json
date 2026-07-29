@@ -1,0 +1,882 @@
+{
+ "kind": "opcg-replay-marks",
+ "game_id": "879229d0-b490-44ea-a7af-57d61841a133",
+ "seed": "6563214359889287880",
+ "difficulty": "learned",
+ "leaders": {
+  "p1": "OP11-041",
+  "p2": "OP09-001"
+ },
+ "marks": [
+  {
+   "action_index": 2,
+   "turn": 1,
+   "note": "このターンのイワンコフ出しはメリットがない。手札が減っているだけ",
+   "action": {
+    "src": "cpu",
+    "turn": 1,
+    "player": "p2",
+    "action_type": "PLAY",
+    "card": "ST30-004"
+   },
+   "decision": {
+    "turn": 1,
+    "player": "p2",
+    "action_index": 2,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "ST30-004"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "ST30-004"
+      },
+      "visit_pct": 86.2,
+      "q": 0.32,
+      "copies": 2
+     },
+     {
+      "move": {
+       "action_type": "TURN_END"
+      },
+      "visit_pct": 13.8,
+      "q": 0.222
+     }
+    ],
+    "value": 0.32,
+    "l1_move": {
+     "action_type": "PLAY",
+     "card": "ST30-004"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 8,
+   "turn": 3,
+   "note": "ナミのリーダー効果でパワーが上がることが予測されるので、イワンコフにドンを振るのは無駄（ナミ相手でなければ5000と5000を作る選択肢はある）",
+   "action": {
+    "src": "cpu",
+    "turn": 3,
+    "player": "p2",
+    "action_type": "ATTACK",
+    "card": "OP09-001",
+    "targets": [
+     "OP11-041"
+    ]
+   },
+   "decision": {
+    "turn": 3,
+    "player": "p2",
+    "action_index": 8,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP09-001",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "ST30-004"
+      },
+      "visit_pct": 43.1,
+      "q": -0.336
+     },
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "OP09-001",
+       "targets": [
+        "OP11-041"
+       ]
+      },
+      "visit_pct": 28.1,
+      "q": -0.221
+     },
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "ST30-004"
+      },
+      "visit_pct": 26.9,
+      "q": -0.221
+     },
+     {
+      "move": {
+       "action_type": "TURN_END"
+      },
+      "visit_pct": 1.9,
+      "q": -0.535
+     }
+    ],
+    "value": -0.221,
+    "l1_move": {
+     "action_type": "PLAY",
+     "card": "ST30-004"
+    },
+    "l1_disagrees": true
+   }
+  },
+  {
+   "action_index": 12,
+   "turn": 3,
+   "note": "ここのイワンコフ出しも無駄",
+   "action": {
+    "src": "cpu",
+    "turn": 3,
+    "player": "p2",
+    "action_type": "PLAY",
+    "card": "ST30-004"
+   },
+   "decision": {
+    "turn": 3,
+    "player": "p2",
+    "action_index": 12,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "ST30-004"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "ST30-004"
+      },
+      "visit_pct": 86.9,
+      "q": 0.476
+     },
+     {
+      "move": {
+       "action_type": "TURN_END"
+      },
+      "visit_pct": 13.1,
+      "q": 0.332
+     }
+    ],
+    "value": 0.476,
+    "l1_move": {
+     "action_type": "PLAY",
+     "card": "ST30-004"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 40,
+   "turn": 7,
+   "note": "最終的に2ドン余っているが、チョッパーに振るよりリーダーに振る方がナミ側に負荷がかかる",
+   "action": {
+    "src": "cpu",
+    "turn": 7,
+    "player": "p2",
+    "action_type": "ATTACK",
+    "card": "OP09-001",
+    "targets": [
+     "OP11-041"
+    ]
+   },
+   "decision": {
+    "turn": 7,
+    "player": "p2",
+    "action_index": 40,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP09-001",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "OP09-001",
+       "targets": [
+        "OP11-041"
+       ]
+      },
+      "visit_pct": 49.4,
+      "q": 0.352
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "ST30-004"
+      },
+      "visit_pct": 16.9,
+      "q": 0.271,
+      "copies": 2
+     },
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "OP16-012"
+      },
+      "visit_pct": 16.2,
+      "q": 0.254
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP10-011"
+      },
+      "visit_pct": 8.8,
+      "q": 0.248
+     },
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "OP10-011"
+      },
+      "visit_pct": 8.1,
+      "q": 0.207
+     }
+    ],
+    "value": 0.352,
+    "l1_move": {
+     "action_type": "PLAY",
+     "card": "OP10-011"
+    },
+    "l1_disagrees": true
+   }
+  },
+  {
+   "action_index": 51,
+   "turn": 8,
+   "note": "",
+   "action": {
+    "src": "cpu",
+    "turn": 8,
+    "player": "p2",
+    "action_type": "SELECT_BLOCKER",
+    "card": "OP10-011"
+   },
+   "decision": {
+    "turn": 8,
+    "player": "p2",
+    "action_index": 51,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "SELECT_BLOCKER",
+     "card": "OP10-011"
+    },
+    "dialog": "SELECT_BLOCKER",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "SELECT_BLOCKER",
+       "card": "OP10-011"
+      },
+      "visit_pct": 46.9,
+      "q": 0.292
+     },
+     {
+      "move": {
+       "action_type": "PASS"
+      },
+      "visit_pct": 36.9,
+      "q": 0.255
+     },
+     {
+      "move": {
+       "action_type": "SELECT_BLOCKER",
+       "card": "OP16-012"
+      },
+      "visit_pct": 16.2,
+      "q": 0.187
+     }
+    ],
+    "value": 0.292,
+    "l1_move": {
+     "action_type": "PASS"
+    },
+    "l1_disagrees": true
+   }
+  },
+  {
+   "action_index": 57,
+   "turn": 9,
+   "note": "9コストのシャンクスを出した方が、後ろのターンで相手にかける負荷が高いため望ましい",
+   "action": {
+    "src": "cpu",
+    "turn": 9,
+    "player": "p2",
+    "action_type": "PLAY",
+    "card": "OP09-013"
+   },
+   "decision": {
+    "turn": 9,
+    "player": "p2",
+    "action_index": 57,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP09-013"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "OP09-001",
+       "targets": [
+        "OP11-041"
+       ]
+      },
+      "visit_pct": 20,
+      "q": 0.166
+     },
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "ST23-002"
+      },
+      "visit_pct": 17.5,
+      "q": 0.237
+     },
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "OP10-011"
+      },
+      "visit_pct": 14.4,
+      "q": 0.247
+     },
+     {
+      "move": {
+       "action_type": "PLAY",
+       "card": "OP09-013"
+      },
+      "visit_pct": 14.4,
+      "q": 0.259
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "ST30-004"
+      },
+      "visit_pct": 12.5,
+      "q": 0.19,
+      "copies": 2
+     }
+    ],
+    "value": 0.259,
+    "l1_move": {
+     "action_type": "PLAY",
+     "card": "ST23-002"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 59,
+   "turn": 9,
+   "note": "ここはなんのドン付与？",
+   "action": {
+    "src": "cpu",
+    "turn": 9,
+    "player": "p2",
+    "action_type": "ATTACH_DON",
+    "card": "ST30-004"
+   },
+   "decision": {
+    "turn": 9,
+    "player": "p2",
+    "action_index": 59,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "ST30-004"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "ST30-004"
+      },
+      "visit_pct": 35,
+      "q": 0.222,
+      "copies": 2
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP10-011"
+      },
+      "visit_pct": 17.5,
+      "q": 0.186
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP16-012"
+      },
+      "visit_pct": 17.5,
+      "q": 0.161
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP09-001"
+      },
+      "visit_pct": 15.6,
+      "q": 0.197
+     },
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "OP09-001",
+       "targets": [
+        "OP11-041"
+       ]
+      },
+      "visit_pct": 8.8,
+      "q": 0.181
+     }
+    ],
+    "value": 0.222,
+    "l1_move": {
+     "action_type": "ATTACK",
+     "card": "OP09-001",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "l1_disagrees": true
+   }
+  },
+  {
+   "action_index": 68,
+   "turn": 9,
+   "note": "ここも無駄ドン付与",
+   "action": {
+    "src": "cpu",
+    "turn": 9,
+    "player": "p2",
+    "action_type": "ATTACH_DON",
+    "card": "ST30-004"
+   },
+   "decision": {
+    "turn": 9,
+    "player": "p2",
+    "action_index": 68,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "ST30-004"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "ST30-004"
+      },
+      "visit_pct": 61.2,
+      "q": -0.119
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP10-011"
+      },
+      "visit_pct": 32.5,
+      "q": -0.133
+     },
+     {
+      "move": {
+       "action_type": "TURN_END"
+      },
+      "visit_pct": 6.2,
+      "q": -0.108
+     }
+    ],
+    "value": -0.119,
+    "l1_move": {
+     "action_type": "ATTACH_DON",
+     "card": "ST30-004"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 69,
+   "turn": 9,
+   "note": "ここも無駄ドン付与",
+   "action": {
+    "src": "cpu",
+    "turn": 9,
+    "player": "p2",
+    "action_type": "ATTACH_DON",
+    "card": "OP10-011"
+   },
+   "decision": {
+    "turn": 9,
+    "player": "p2",
+    "action_index": 69,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP10-011"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "ST30-004"
+      },
+      "visit_pct": 50.6,
+      "q": -0.195
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP10-011"
+      },
+      "visit_pct": 41.9,
+      "q": -0.115
+     },
+     {
+      "move": {
+       "action_type": "TURN_END"
+      },
+      "visit_pct": 7.5,
+      "q": -0.105
+     }
+    ],
+    "value": -0.115,
+    "l1_move": {
+     "action_type": "TURN_END"
+    },
+    "l1_disagrees": true
+   }
+  },
+  {
+   "action_index": 75,
+   "turn": 10,
+   "note": "ギャルディーノを下げる意味はない。ギャルディーノを下げる場合、ギャルディーノの攻撃時で良い",
+   "action": {
+    "src": "cpu",
+    "turn": 10,
+    "player": "p2",
+    "action_type": "RESOLVE_EFFECT_SELECTION",
+    "selected": [
+     "OP16-056"
+    ],
+    "index": 0,
+    "position": "BOTTOM"
+   },
+   "decision": {
+    "turn": 10,
+    "player": "p2",
+    "action_index": 75,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "selected": [
+      "OP16-056"
+     ],
+     "index": 0,
+     "position": "BOTTOM"
+    },
+    "dialog": "SEARCH_AND_SELECT",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "selected": [
+        "OP16-056"
+       ],
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 28.1,
+      "q": -0.106
+     },
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "selected": [
+        "OP11-041"
+       ],
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 25.6,
+      "q": -0.119
+     },
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 23.8,
+      "q": -0.118
+     },
+     {
+      "move": {
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "selected": [
+        "EB03-055"
+       ],
+       "index": 0,
+       "position": "BOTTOM"
+      },
+      "visit_pct": 22.5,
+      "q": -0.127
+     }
+    ],
+    "value": -0.106,
+    "l1_move": {
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "selected": [
+      "OP16-056"
+     ],
+     "index": 0,
+     "position": "BOTTOM"
+    },
+    "l1_disagrees": false
+   }
+  },
+  {
+   "action_index": 86,
+   "turn": 11,
+   "note": "ここは無駄ドン付与。10コストのシャンクスや7ゾロ、9シャンクスを出さなければ後ろのターンでナミより盤面が弱くなる",
+   "action": {
+    "src": "cpu",
+    "turn": 11,
+    "player": "p2",
+    "action_type": "ATTACH_DON",
+    "card": "ST30-004"
+   },
+   "decision": {
+    "turn": 11,
+    "player": "p2",
+    "action_index": 86,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "ST30-004"
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "ST30-004"
+      },
+      "visit_pct": 50.6,
+      "q": -0.04,
+      "copies": 2
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP10-011"
+      },
+      "visit_pct": 12.5,
+      "q": -0.068
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP09-001"
+      },
+      "visit_pct": 7.5,
+      "q": -0.157
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP16-012"
+      },
+      "visit_pct": 7.5,
+      "q": -0.142
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP09-013"
+      },
+      "visit_pct": 4.4,
+      "q": -0.235
+     }
+    ],
+    "value": -0.04,
+    "l1_move": {
+     "action_type": "PLAY",
+     "card": "OP09-004"
+    },
+    "l1_disagrees": true
+   }
+  },
+  {
+   "action_index": 98,
+   "turn": 11,
+   "note": "このドン割り振り配分は意味がわかりません。5000以下のキャラクターにドンを振るよりは、5000以上のキャラクターに振り分けた方が効率が良い",
+   "action": {
+    "src": "cpu",
+    "turn": 11,
+    "player": "p2",
+    "action_type": "ATTACK",
+    "card": "OP09-013",
+    "targets": [
+     "OP11-041"
+    ]
+   },
+   "decision": {
+    "turn": 11,
+    "player": "p2",
+    "action_index": 98,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP09-013",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "OP09-013",
+       "targets": [
+        "OP11-041"
+       ]
+      },
+      "visit_pct": 38.1,
+      "q": -0.337
+     },
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "OP16-012",
+       "targets": [
+        "OP11-041"
+       ]
+      },
+      "visit_pct": 15,
+      "q": -0.347
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP10-011"
+      },
+      "visit_pct": 11.9,
+      "q": -0.612
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "ST30-004"
+      },
+      "visit_pct": 11.2,
+      "q": -0.565
+     },
+     {
+      "move": {
+       "action_type": "ATTACH_DON",
+       "card": "OP16-012"
+      },
+      "visit_pct": 8.8,
+      "q": -0.533
+     }
+    ],
+    "value": -0.337,
+    "l1_move": {
+     "action_type": "ATTACH_DON",
+     "card": "OP09-013"
+    },
+    "l1_disagrees": true
+   }
+  },
+  {
+   "action_index": 107,
+   "turn": 11,
+   "note": "イワンコフが8000、ヤソップが6000なのは明らかに効率が悪い。ヤソップの攻撃が無駄になっているので",
+   "action": {
+    "src": "cpu",
+    "turn": 11,
+    "player": "p2",
+    "action_type": "ATTACK",
+    "card": "ST30-004",
+    "targets": [
+     "OP11-041"
+    ]
+   },
+   "decision": {
+    "turn": 11,
+    "player": "p2",
+    "action_index": 107,
+    "difficulty": "learned",
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "ST30-004",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "dialog": "MAIN_ACTION",
+    "candidates": [
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "ST30-004",
+       "targets": [
+        "OP11-041"
+       ]
+      },
+      "visit_pct": 75.6,
+      "q": -0.552
+     },
+     {
+      "move": {
+       "action_type": "ATTACK",
+       "card": "ST30-004",
+       "targets": [
+        "EB03-055"
+       ]
+      },
+      "visit_pct": 15,
+      "q": -0.757
+     },
+     {
+      "move": {
+       "action_type": "TURN_END"
+      },
+      "visit_pct": 9.4,
+      "q": -0.545
+     }
+    ],
+    "value": -0.552,
+    "l1_move": {
+     "action_type": "ATTACK",
+     "card": "ST30-004",
+     "targets": [
+      "EB03-055"
+     ]
+    },
+    "l1_disagrees": false
+   }
+  }
+ ]
+}

@@ -39,6 +39,45 @@ from pd_batch_common import pack_policy
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODELS = os.path.join(REPO, "opcg_sim", "data", "learned")
+DECKS_JSON = os.path.join(REPO, "tests", "fixtures", "decks", "user_decks_20260728.json")
+
+
+def _make_fixed_matchup_game(decks_json, a, b):
+    """固定リスト対面用の OPCGGame を作る（v19・対面特化の密ラベル生成）。
+
+    `p3_run._init_worker` が置く `_W["game"]` を差し替える＝`p3_loop.selfplay_game` の
+    `game.new_game(db, seed, leaders)` だけがフックで、生成コアは無改修のまま。
+    seed 偶奇で席を入れ替える（両デッキを両席から学習分布に入れる）。乱数規約は
+    素の `new_game` と同一（`random.seed(seed)` → デッキ構築（固定＝乱数不使用）→
+    `start_game()` のシャッフルが global random を消費）。"""
+    import json as _json
+    from matchup_balance_probe import deck_ids
+    from opcg_game import OPCGGame as _G
+    specs = _json.load(open(decks_json))
+    pair = [(specs[a]["leader"], deck_ids(specs[a])),
+            (specs[b]["leader"], deck_ids(specs[b]))]
+
+    class _FixedMatchupGame(_G):
+        def new_game(self, db, seed, leaders=None):
+            import random as _r
+            from replay_runner import build_deck_from_ids
+            from opcg_sim.src.core.gamestate import GameManager, Player
+            _r.seed(seed)
+            (la, ca), (lb, cb) = (pair if seed % 2 == 0 else (pair[1], pair[0]))
+            l1, c1 = build_deck_from_ids(db, la, ca, "p1")
+            l2, c2 = build_deck_from_ids(db, lb, cb, "p2")
+            m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+            m.start_game()
+            return m
+
+    from opcg_sim.src.learned.config import GEN_PRUNE_FUTILE
+    return _FixedMatchupGame(prune_futile=GEN_PRUNE_FUTILE)
+
+
+def _init_worker_fixed(decks_json, a, b):
+    import p3_run as R
+    R._init_worker()
+    R._W["game"] = _make_fixed_matchup_game(decks_json, a, b)
 
 
 def main():
@@ -56,6 +95,10 @@ def main():
     ap.add_argument("--seed-base", type=int, default=810000)
     ap.add_argument("--rotate-leaders", action="store_true", default=True,
                     help="リーダーを全プールから抽選（学習データの偏り防止・既定ON）")
+    ap.add_argument("--matchup", default=None,
+                    help="固定リスト対面 'a:b'（user_decks の名前・v19。指定時は rotate 無効・"
+                         "seed 偶奇で席入替）")
+    ap.add_argument("--decks-json", default=DECKS_JSON)
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -64,7 +107,11 @@ def main():
     vpath = os.path.join(MODELS, f"{args.base}_value.npz")
     ppath = os.path.join(MODELS, f"{args.base}_policy.npz")
     leaders = None
-    if args.rotate_leaders:
+    init, initargs = R._init_worker, ()
+    if args.matchup:
+        a, b = args.matchup.split(":")
+        init, initargs = _init_worker_fixed, (args.decks_json, a, b)
+    elif args.rotate_leaders:
         # p3_run.main と同じ作り方（リーダー card_id のプール）。デッキIDではない点に注意。
         from cpu_selfplay import _load_db
         from deckgen import all_leader_ids
@@ -72,11 +119,11 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     done = len(glob.glob(os.path.join(args.out, "dense_*.npz")))   # 再開時は既存分をスキップ
     print(f"生成開始: base={args.base} ev={args.enc_version} sims={args.sims} "
-          f"eps={args.dirichlet_eps} l1_mix={args.l1_mix} 既存シャード={done}", flush=True)
+          f"eps={args.dirichlet_eps} l1_mix={args.l1_mix} matchup={args.matchup} 既存シャード={done}", flush=True)
 
     t_all = time.time()
     tot_rows = tot_games = 0
-    with mp.Pool(args.workers, initializer=R._init_worker) as pool:
+    with mp.Pool(args.workers, initializer=init, initargs=initargs) as pool:
         shard = done
         while tot_games < args.target_games:
             n = min(args.shard_games, args.target_games - tot_games)

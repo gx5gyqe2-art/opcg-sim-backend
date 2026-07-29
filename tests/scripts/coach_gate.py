@@ -62,6 +62,43 @@ VERIFIED = [
     ("g3", 137, {("ATTACH_DON", "OP11-106")}),
 ]
 
+# --- VERIFIED v2（gen7 実対局マーク 2026-07-28・`mark_referee_verify.py` worlds=8 実測） ---
+# 出典: tests/fixtures/replays/gen7_marks_20260728/（5局34マーク→真盤面復元＋ターン一致 17点→
+# 裁定14点。捲り1/32勝ちの極薄点 @94 は不採録＝旧@137型の反省）。バンド外=改善ターゲット・
+# バンド内=非退行ガードの両方を採録する（判定則 judge は共通＝base≥0.8 の点が退行しないこと）。
+# 旧 g3（単一対局・gen4期）は --profile g3 で存続（診断用）。
+_FIX2 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "fixtures", "replays", "gen7_marks_20260728")
+REPLAYS_V2 = {
+    "m1": os.path.join(_FIX2, "opcg_replay_2057134394987494995.json.gz"),   # ナミ(人) vs シャンクス(CPU)
+    "m2": os.path.join(_FIX2, "opcg_replay_3806796710697874793.json.gz"),   # シャンクス(人) vs ナミ(CPU)
+    "m4": os.path.join(_FIX2, "opcg_replay_6563214359889287880.json.gz"),   # ナミ(人) vs シャンクス(CPU)
+    "m5": os.path.join(_FIX2, "opcg_replay_9195490382040907274.json.gz"),   # シャンクス(人) vs ナミ(CPU)
+}
+VERIFIED_V2 = [
+    # m1: CPU=シャンクス（無駄カウンター2点・ガード2点）
+    ("m1", 3,  {("PLAY", "ST30-004")}),                                    # ガード（レフェリーは出す側を支持）
+    ("m1", 14, {("PASS", None)}),                                          # 無駄カウンター
+    ("m1", 15, {("PASS", None), ("SELECT_COUNTER", "OP10-011")}),          # 同上（2枚目）
+    ("m1", 42, {("ATTACH_DON", "OP12-008"), ("ATTACK", "OP09-002"),
+                ("PLAY", "OP12-008")}),                                    # ガード
+    # m2: CPU=ナミ（リーダー付与・攻撃の3点＋防御ガード2点）
+    ("m2", 12, {("SELECT_COUNTER", "OP14-108"), ("SELECT_COUNTER", "OP08-050")}),   # ガード
+    ("m2", 44, {("ATTACH_DON", "OP11-041")}),                              # リーダーへ付与（守り）
+    ("m2", 58, {("SELECT_COUNTER", "OP14-108"), ("PASS", None),
+                ("SELECT_COUNTER", "EB03-053"), ("SELECT_COUNTER", "EB04-058")}),   # ガード
+    ("m2", 64, {("ATTACK", "OP16-056")}),                                  # クマシー出しでなく攻撃
+    ("m2", 66, {("ATTACK", "EB03-053"), ("ATTACK", "OP16-056"),
+                ("ATTACK", "EB03-055")}),                                  # ロビンで攻撃
+    # m4: CPU=シャンクス（イワンコフ無駄出し2点＋ガード1点）
+    ("m4", 2,  {("TURN_END", None)}),                                      # turn1 イワンコフ出しは損
+    ("m4", 8,  {("ATTACH_DON", "OP09-001"), ("ATTACK", "OP09-001")}),      # ガード
+    ("m4", 12, {("TURN_END", None), ("ATTACH_DON", "ST30-004"),
+                ("PLAY", "OP13-007")}),                                    # 2枚目イワンコフも損
+    # m5: CPU=ナミ
+    ("m5", 7,  {("ATTACH_DON", "OP11-041"), ("PLAY", "OP11-106")}),        # ナミ3ドン付与
+]
+
 
 def hit(desc, accept):
     """decide の記述（action_type/card）が合格集合に入るか（pure）。"""
@@ -97,9 +134,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--challenger", required=True, help="value.npz[,policy.npz]")
     ap.add_argument("--baseline", default=None,
-                    help="value.npz[,policy.npz]（既定=出荷 gen5）")
+                    help="value.npz[,policy.npz]（既定=出荷既定＝現 gen7）")
     ap.add_argument("--seeds", type=int, default=5)
     ap.add_argument("--sims", type=int, default=160)
+    ap.add_argument("--profile", default="v2", choices=("v2", "g3", "all"),
+                    help="v2=gen7実対局13点（既定）／g3=旧7点（gen4期・診断用）／all=両方")
     ARGS = ap.parse_args()
     CR.ARGS = argparse.Namespace(true_board=True)
 
@@ -117,11 +156,14 @@ def main():
     base_eng = _eng(ARGS.baseline)
     chall_eng = _eng(ARGS.challenger)
 
+    points = {"v2": VERIFIED_V2, "g3": VERIFIED,
+              "all": VERIFIED + VERIFIED_V2}[ARGS.profile]
+    replays = {**MG.REPLAYS, **REPLAYS_V2}
     CR.GAMES = {}
     rows = []
-    for tag, i, accept in VERIFIED:
+    for tag, i, accept in points:
         if tag not in CR.GAMES:
-            raw = RE.load_replay_json(MG.REPLAYS[tag]); rec = raw.get("replay", raw)
+            raw = RE.load_replay_json(replays[tag]); rec = raw.get("replay", raw)
             CR.GAMES[tag] = (rec, {f.get("action_index"): f for f in raw.get("frames") or []},
                              rec["actions"])
         built = CR._restore_board(db, tag, i)
