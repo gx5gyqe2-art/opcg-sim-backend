@@ -14,7 +14,8 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 "tests", "scripts"))
-from coach_gate import REPLAYS_V2, VERIFIED, VERIFIED_V2, hit, judge  # noqa: E402
+from coach_gate import (REPLAYS_V2, VERIFIED, VERIFIED_V2, hit, judge,  # noqa: E402
+                        min_reliable_delta)
 
 pytestmark = pytest.mark.cpu_infra
 
@@ -57,3 +58,16 @@ def test_verified_v2_entries_wellformed():
         assert accept and all(isinstance(a, tuple) and len(a) == 2 for a in accept)
     for path in REPLAYS_V2.values():
         assert os.path.exists(path), path
+
+
+def test_min_reliable_delta_shrinks_with_seeds():
+    """点別差の信頼下限（2σ）は √n で縮む。**5seed は 0.63＝ほぼ何も言えない**という
+    v22 の実測事実を数値で固定する（5seed の 0.60→0.20 を『退行』と読んだ誤りの再発防止）。"""
+    assert min_reliable_delta(5) == pytest.approx(0.632, abs=0.01)
+    assert min_reliable_delta(16) == pytest.approx(0.354, abs=0.01)
+    assert min_reliable_delta(64) == pytest.approx(0.177, abs=0.01)
+    assert min_reliable_delta(16) < min_reliable_delta(5)
+
+
+def test_min_reliable_delta_guards_zero_seeds():
+    assert min_reliable_delta(0) == float("inf")

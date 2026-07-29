@@ -121,6 +121,16 @@ def decide_rate(eng, m0, actor, accept, seeds, sims):
     return n / max(seeds, 1)
 
 
+def min_reliable_delta(seeds):
+    """点別の命中率差が『測定ノイズでない』と言える最小幅（pure・2σ・最悪ケース p=0.5）。
+
+    命中率は seeds 回のベルヌーイ試行＝SE ≤ 0.5/√n。2条件の差の SE は √2 倍なので
+    2σ ≈ 1.414/√n。v22 実測（`docs/reports/coach_gate_variance_20260729.md`）で
+    5seed（bar 0.63）では m4@8 の 0.60→0.20 が『退行』に見えたが、16seed（bar 0.35）では
+    両者 0.38 で差が無かった。**この bar 未満の点別増減を『治った/壊れた』と書かない**。"""
+    return 1.4142135623730951 / (seeds ** 0.5) if seeds > 0 else float("inf")
+
+
 def judge(rows, regress_base=0.8, regress_drop=0.4):
     """点別 (base, chall) → (非退行OK, 改善OK, 退行リスト)（pure・mark_gate と同型の判定）。"""
     regressions = [(tag, i, b, c) for (tag, i, b, c) in rows
@@ -135,7 +145,9 @@ def main():
     ap.add_argument("--challenger", required=True, help="value.npz[,policy.npz]")
     ap.add_argument("--baseline", default=None,
                     help="value.npz[,policy.npz]（既定=出荷既定＝現 gen7）")
-    ap.add_argument("--seeds", type=int, default=5)
+    ap.add_argument("--seeds", type=int, default=16,
+                    help="点ごとの decide 回数。**5 は分散が大きすぎる**（v22 実測: 5seed で "
+                         "『退行』に見えた m4@8 が 16seed では差なし）。`min_reliable_delta` 参照")
     ap.add_argument("--sims", type=int, default=160)
     ap.add_argument("--profile", default="v2", choices=("v2", "g3", "all"),
                     help="v2=gen7実対局13点（既定）／g3=旧7点（gen4期・診断用）／all=両方")
@@ -177,6 +189,12 @@ def main():
         c = decide_rate(chall_eng, m0, actor, accept, ARGS.seeds, ARGS.sims)
         rows.append((tag, i, b, c))
         print(f"  {tag}@{i:<4} base={b:.2f} chall={c:.2f}  合格手={sorted(accept)}")
+    bar = min_reliable_delta(ARGS.seeds)
+    sig = [(t, i, b, c) for t, i, b, c in rows if abs(c - b) >= bar]
+    print(f"\n測定ノイズでないと言える差の下限（2σ・seeds={ARGS.seeds}）= {bar:.2f}")
+    print(f"  この bar を超えた点: "
+          + (", ".join(f"{t}@{i}({b:.2f}→{c:.2f})" for t, i, b, c in sig) if sig else "なし")
+          + "  ← これ未満の増減は『治った/壊れた』と読まない")
     ok_nr, ok_imp, regs = judge(rows)
     print(f"\n改善: {'OK' if ok_imp else 'NG'}"
           f"（chall計 {sum(c for *_ , c in rows):.1f} vs base計 {sum(b for _t, _i, b, _c in rows):.1f}）")
