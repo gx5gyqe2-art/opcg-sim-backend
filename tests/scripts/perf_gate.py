@@ -65,7 +65,8 @@ def model_hash() -> Dict[str, str]:
     for name in ("gen2_value.npz", "gen2_policy.npz", "gen3_value.npz", "gen3_policy.npz",
                  "gen4_value.npz", "gen4_policy.npz", "gen5_value.npz", "gen5_policy.npz",
                  "gen6_value.npz", "gen6_policy.npz",
-                 "gen7_value.npz", "gen7_policy.npz"):
+                 "gen7_value.npz", "gen7_policy.npz",
+                 "gen8_value.npz", "gen8_policy.npz"):
         p = os.path.join(_MODELS, name)
         if os.path.exists(p):
             with open(p, "rb") as f:

@@ -37,17 +37,17 @@ _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "data")
 
-# v7世代(gen7) = gen6 value の密ラベル追い学習（v16・自己対戦 2048局の**全決定点** 236,387 行・
-# 混合ラベル y=0.5·z+0.5·q_root＋残りターン補助・1エポック lr2e-4）。policy は gen6 と同一
-# バイナリ（v12 確定＝policy 微調整は有害のため凍結）。判定は較正済み 800局アリーナ
-# （docs/reports/cpu_v16_dense_labels_20260727.md・4帯すべて 0.555-0.600・通算 wr=0.5713
-# CI[0.540,0.603]・対gen5 アンカー 0.550 非退行）。コーチゲートは 2.4<3.8 だが v16 総括 §4 の
-# とおり診断計器へ降格（7点は gen4 期の単一対局由来・飽和負け3点は 1/6〜1/16 の捲り筋のみ）。
-# 符号化は v5（55スカラー）で net の feat_dim から自動判別される。gen6 以前はリプレイ再現・
-# A/B・ロールバック用に同梱を維持する（レフェリー教師の錨は gen5 固定のまま＝referee_labeler は
-# 明示ロード）。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen7_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen7_policy.npz")
+# gen8 = gen7 value の**対面特化**密ラベル追い学習（v19・ユーザ実デッキの固定対面ナミvsシャンクス・
+# 自己対戦 1,536局の全決定点 197,683 行・混合ラベル y=0.5·z+0.5·q_root＋残りターン補助・
+# 1エポック lr2e-4）。policy は gen6/gen7 と同一バイナリ（v12 確定＝policy 微調整は有害のため凍結）。
+# 判定は較正済み 800局アリーナ（docs/reports/cpu_v19_matchup_density_20260729.md・
+# 対gen7 wr=0.570 CI[0.537,0.603]・対gen5 アンカー 0.615 CI[0.556,0.674]・コーチゲートv2 5.4>5.0
+# ＝無駄カウンター2点完治）。1対面のコーパスが汎用側へ +49 Elo 波及＝「密度×分布の新しさ」が効く
+# （同分布2周目の v17 は +21 未確証で打ち切り）。符号化は v5（55スカラー）で net の feat_dim から
+# 自動判別される。gen7 以前はリプレイ再現・A/B・ロールバック用に同梱を維持する
+# （レフェリー教師の錨は gen5 固定のまま＝referee_labeler は明示ロード）。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen8_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen8_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}

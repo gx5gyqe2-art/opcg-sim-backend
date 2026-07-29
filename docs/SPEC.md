@@ -135,11 +135,12 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 完結する。フロントは人間=p1 を操作し、CPU の手はポーリングで 1 手ずつ受け取る。
 
 ### 2.5.1 配線・逐次進行
-- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（`learned`＝既定・**gen7学習型**
-  （`gen7_*.npz`・2026-07-27採用＝gen6 value の密ラベル追い学習（v16・自己対戦2048局の全決定点 236,387行・
-  混合ラベル＋残りターン補助・1エポック）。policy は gen6 と同一バイナリ（v12確定＝policy微調整は有害）。
-  較正済み800局アリーナで対gen6 wr=0.5713 CI[0.540,0.603]（4帯すべて0.555-0.600）・対gen5 アンカー 0.550 非退行。
-  `docs/reports/cpu_v16_dense_labels_20260727.md`。旧 gen6／gen5／gen4／gen3／gen2 はリプレイ再現/A/B/ロールバック用に同梱維持）／
+- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（`learned`＝既定・**gen8学習型**
+  （`gen8_*.npz`・2026-07-29採用＝gen7 value の**対面特化**密ラベル追い学習（v19・ユーザ実デッキの固定対面
+  ナミvsシャンクス・自己対戦1,536局の全決定点 197,683行・混合ラベル＋残りターン補助・1エポック）。
+  policy は gen6/gen7 と同一バイナリ（v12確定＝policy微調整は有害）。較正済み800局アリーナで
+  対gen7 wr=0.570 CI[0.537,0.603]・対gen5 アンカー 0.615 CI[0.556,0.674]・コーチゲートv2 5.4>5.0。
+  `docs/reports/cpu_v19_matchup_density_20260729.md`。旧 gen7 以前はリプレイ再現/A/B/ロールバック用に同梱維持）／
   `hard`＝α-β）/ `cpu_deck`。未指定・未知値は `learned` に正規化。モデル未同梱環境（`cpu_learned.available()`
   が False）では `learned`→`hard` に安全フォールバック。CPU メタは `CPU_GAMES` に保持（`{cpu_player_id, difficulty}`）。
   - **符号化の対応表はネットが持つ**（`ValueNet.vocab_ids`・2026-07-15 事故対応）: カードDBが増えても

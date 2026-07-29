@@ -144,7 +144,7 @@ make test-slow   # 重テストだけ
 | `tests/test_referee_band.py` | **基盤健全性**（`cpu_infra`）。**同価値バンド v2 の対判定則**（v8 柱B・`counterfactual_referee.same_value`・純関数＝高速）: CRN の世界線共有を活かした符号検定風＝同一世界で勝敗が割れたペアの正味差 ≥3 のみ断定・未満はライフ差 < band で同価値（±1勝の揺れで断定が往復した @64 実測が較正根拠）・割れの相殺・飽和局面のライフ序列・不成立世界の共通部分対判定 |
 | `tests/test_referee_plan_enum.py` | **基盤健全性**（`cpu_infra`）。**ターンプラン自動列挙＋実プラン復元**（v8 柱A/C・`counterfactual_referee.enumerate_turn_plans`／`coach_sweep.actual_plan_keys`）: g3@64 真盤面で比較の本命（素の攻撃・攻撃者自身への付与→攻撃・素の TURN_END）が縮約後も必ず残る（素朴な value 順が gen5 の付与バイアスで全滅させた回帰＝コミットメント別ラウンドロビン＋種内「短さ→自己強化→value」）・終端規約（手番が自分から離れる手で終わる）・縮約の必須ログ（無言の縮約禁止）・実際の手（素 ATTACK:PRB02-008）の記録からの復元一致。ロールアウトなし＝高速 |
 | `tests/test_replay_frames.py` | **リプレイ盤面フレーム**（`services/replay.py::_replay_record_frame`＋`GET /replay/frames`・リプレイビューアのデータ供給契約）: frames↔actions↔decisions の action_index 整合（フレーム0＝初期盤面のみ None）・フレームカードは動的状態のみ（マスター情報を持たない＝サイズ抑制）・`_FRAME_CAP` 超過で記録停止＋`frames_truncated`・非 traced 対局は記録なし＋整形エラー |
-| `tests/test_perf_gate.py` | **基盤健全性**（`cpu_infra`）。**CPU 性能ゲートの判定ロジック**（`tests/scripts/perf_gate.py`・§5.1）: `evaluate_gate` 純関数（強度不足/レイテンシ超過/失敗局/データ不足→FAIL・理由の蓄積）＋ gen2〜gen7_*.npz ハッシュの安定性（gen7＝本番既定・2026-07-27採用）。実対局は回さず高速固定 |
+| `tests/test_perf_gate.py` | **基盤健全性**（`cpu_infra`）。**CPU 性能ゲートの判定ロジック**（`tests/scripts/perf_gate.py`・§5.1）: `evaluate_gate` 純関数（強度不足/レイテンシ超過/失敗局/データ不足→FAIL・理由の蓄積）＋ gen2〜gen8_*.npz ハッシュの安定性（gen8＝本番既定・2026-07-29採用）。実対局は回さず高速固定 |
 | `tests/test_promotion_gate.py` | **基盤健全性**（`cpu_infra`）。**昇格ゲートの判定ロジック**（`tests/scripts/promotion_gate.py`・v6 柱①）: 段階式判定の純関数＝stage1（24局で勝ち越しのみ継続・五分以下は即棄却）／final（累計勝率 ≥ 0.55 で昇格・境界は昇格側・frac 可変・浮動小数境界の安定）／anchor（v7・固定アンカー非退行 ≥0.5・五分は許容・r99 実測ケース 8/24 を棄却）。実対局 arena は回さず高速固定 |
 | `tests/test_arena_gate.py` | **基盤健全性**（`cpu_infra`）。**固定N・帯層別アリーナ判定器**（`tests/scripts/arena_gate.py`・v16・`docs/reports/cpu_v15_ensemble_power_20260726.md` §2＝24〜120局の判定は検定力不足だった反省）: 帯分割の純関数（全ペアを過不足なく分配・帯間 seed 基点が stride ぶん離れ全 seed 一意）／一次スクリーン（floor 未満で早期棄却・境界は継続）／本判定（**勝率 ≥ frac かつペア水準95%CI下限 > 0.50 の2条件**＝点推定だけの偽陽性を塞ぐ・五分のヌル対照は PASS しない）。実対局 arena は回さず高速固定 |
 | `tests/test_dense_finetune.py` | **基盤健全性**（`cpu_infra`）。**密ラベル追い学習のラベル生成**（`tests/scripts/dense_finetune.py`・v16・純関数 `build_labels`）: 混合ラベル y=α·勝敗+(1−α)·q_root（α=1 で勝敗単独＝レフェリー教師と地続き）・**q_root が非有限な行（L1 席等）は勝敗単独へ退化**＝NaN がラベルへ伝播して学習を壊さない・aux は [0,1] 正規化＋飽和で NaN は欠損のまま通す（`ValueNet.backward` が補助損失から除外する契約） |
@@ -234,8 +234,8 @@ make test-slow   # 重テストだけ
 | `tests/harness/effect_oracle.py` | 期待 vs テキスト/AST の静的整合性コンパレータ（既存ゲートが拾わない高シグナル候補のみ抽出。`--category`/`--json`） |
 | `tests/harness/structural_invariants.py` | 構造不変条件4スキャン（H先頭ゲート漏れ／Duration write-off／chooser欠落／「すべて」count退化）の一括検出（`--show`）。カテゴリH 横展開の回帰ツール化 |
 | `tests/harness/false_path_coverage.py` | 条件を偽にして発動し、ゲートされた効果が走らない（盤面変化ゼロ）かを動的検証（`--show`/`--card`） |
-| `tests/scripts/arena_parallel.py` | **並列アリーナ**（対照ペア×コア並列・旧 depth/thinktime_arena を統合）: 挑戦者の探索深さ/予算/PIMC/L1係数/**難易度（--challenger-difficulty learned＝既定Gen＝現gen7）/sims** を席別に振って Elo A/B。SPSA の f(θ) 評価にも使う |
-| `tests/scripts/perf_gate.py` | **CPU 性能ゲート**（§5.1）: learned(既定Gen＝現gen7) vs 凍結 hard(L1) の Elo＋ペア単位 CI・1手レイテンシ・失敗局0・npz ハッシュを1コマンドで PASS/FAIL（`--quick`/`--full`） |
+| `tests/scripts/arena_parallel.py` | **並列アリーナ**（対照ペア×コア並列・旧 depth/thinktime_arena を統合）: 挑戦者の探索深さ/予算/PIMC/L1係数/**難易度（--challenger-difficulty learned＝既定Gen＝現gen8）/sims** を席別に振って Elo A/B。SPSA の f(θ) 評価にも使う |
+| `tests/scripts/perf_gate.py` | **CPU 性能ゲート**（§5.1）: learned(既定Gen＝現gen8) vs 凍結 hard(L1) の Elo＋ペア単位 CI・1手レイテンシ・失敗局0・npz ハッシュを1コマンドで PASS/FAIL（`--quick`/`--full`） |
 | `tests/scripts/replay_ambiguity_probe.py` | **実対局リプレイの曖昧性計測**（R0）: 記録アクション（card_id 基準）の一意復元可否を実デッキで実測（`--real-decks`・アクション種別ごとの曖昧率）。報告は `docs/reports/cpu_replay_ambiguity_r0_20260704.md` |
 | `tests/scripts/sample_audit.py` | 各弾から決定的ランダム抽出＋自動スクリーニング＋精査素材出力（§8.4 ✓信頼度の実測。`--per-set`/`--seed`/`--dump`）。報告は `docs/reports/sample_audit_*.md` |
 | `tests/scripts/leader_spec_probe.py` | リーダー1枚のテキスト/AST要約/実行観測の出力（`<ID>`/`--set`/`--all`/`--json`）。手動検証（§8）の補助に使う |
@@ -289,7 +289,7 @@ make test-slow   # 重テストだけ
   は手書き J値評価の撤去〔2026-06-27〕で消滅）。
 - **リプレイ種**: `--record seed.json` で `{seed, リーダー, 難易度}` の極小記述子を残し、
   `--descriptor seed.json` で完全再現する。
-- **learned（本番既定 CPU＝現gen7）のトレース**: `--difficulty learned`（席別 `--p1-/--p2-difficulty learned`）で
+- **learned（本番既定 CPU＝現gen8）のトレース**: `--difficulty learned`（席別 `--p1-/--p2-difficulty learned`）で
   Gen2 学習型（`game_driver.make_seat(kind="learned")`）を再生する。思考トレースは L1 の 4 項目に代わり
   **MCTS root 統計**を記録する（`candidates`＝訪問%＋行動価値Q／`value`＝採用手のQ／`l1_move`・`l1_disagrees`
   ＝独立評価器 L1 の第二意見）。learned の numpy rng は global random 由来（PR-D2）なので **seed から
@@ -366,7 +366,7 @@ make regen-baseline
 
 ### 5.1 CPU 性能ゲート（Gen2 非退行・手動/定期）
 
-本番既定 CPU＝**learned（現gen7）** の強度・非退行を測る運用ツール（実対局は重いので `make test` 外・手動/定期）:
+本番既定 CPU＝**learned（現gen8）** の強度・非退行を測る運用ツール（実対局は重いので `make test` 外・手動/定期）:
 
 ```bash
 OPCG_LOG_SILENT=1 python tests/scripts/perf_gate.py --quick     # 疎通/軽い確認（pairs6・sims40）
