@@ -715,8 +715,9 @@ def _selection_moves(manager, actor_name: str):
     # 単一対象選択: 候補ごとに分岐。
     if max_n == 1 and min_n <= 1:
         moves: List[Dict[str, Any]] = [_mk([uid]) for uid in uuids[:HARD_SELECT_CAP]]
-        # 任意選択（min==0・スキップ可）なら「選ばない」も一級の候補にする。
-        if min_n == 0 and bool(pending.get(KEY_SKIP, False)):
+        # 任意選択（min==0）なら「選ばない」も一級の候補にする。2026-07-30 以前は raw 既定解決
+        # （常に0枚）が見送り枝を担っていたが、既定がゾーン意味論の価値選択になったため明示する。
+        if min_n == 0:
             moves.append(_mk([]))
         return moves
 
