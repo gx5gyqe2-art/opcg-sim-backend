@@ -40,7 +40,9 @@ SCALARS_V2 = 16        # v2 = v1 + [自リーダー付与ドン, 相手リーダ
 SCALARS_V3 = 46        # v3 = v2 + [山札/トラッシュ/今ターンKO数 6] + [ターン1使用済み 12] + [召喚酔い 12]
 SCALARS_V4 = 51        # v4 = v3 + 自デッキ残の集約5（残カウンター総量/密度・ブロッカー残・イベント残・高コストキャラ残）
 SCALARS_V5 = 55        # v5 = v4 + 相手場の脅威集約3（総火力/高パワー数/ブロッカー数）＋展開余力1（ドンで出せる手札キャラ数）
-_SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4, 5: SCALARS_V5}
+SCALARS_V6 = 60        # v6 = v5 + **自手札の資源集約5**（カウンター総量/カウンター札数/最大カウンター/ブロッカー数/イベント数）
+_SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4,
+                       5: SCALARS_V5, 6: SCALARS_V6}
 
 
 def scalars_dim(version=1):
@@ -172,6 +174,49 @@ def _opp_field_aggregate(field):
     ]
 
 
+# v6: **自手札の資源集約**（2026-07-30・ユーザ指摘「手札の価値をどう正しく判断するか」）。
+# v5 までスカラーに載る手札情報は**枚数だけ**で、質（カウンター値・ブロッカー・イベント）は
+# card_idx の埋め込み経由でしか見えなかった。その結果 value は「手札が減った＝勝者の相貌」という
+# 逆向きの相関を学んでいた（v23 遮蔽帰属: 手札枚数 +0.084・手札ID +0.165 が誤着を押し上げ）。
+# 山札残（v4）と同じ集計を**手札**にも与え、「手札は防御資源である」という線形の取っ手を作る。
+# 相手手札は対象外（公平性契約＝中身を符号化しない）。カード個別知識は持たない汎用量。
+def _hand_aggregate(hand):
+    """自手札の資源集約 5 値。空・属性欠落に安全（探索クローン上で呼ばれるため例外を投げない）。
+
+    正規化は有界化のためだけ（恒等温スタートは新 W1 行ゼロで保証）。"""
+    counter_total = 0.0
+    counter_cards = 0
+    max_counter = 0.0
+    blockers = 0
+    events = 0
+    for c in hand:
+        m = getattr(c, "master", None)
+        if m is None:
+            continue
+        try:
+            cv = float(getattr(c, "current_counter", None) or 0) or float(getattr(m, "counter", 0) or 0)
+        except Exception:
+            cv = 0.0
+        counter_total += cv
+        if cv > 0:
+            counter_cards += 1
+        max_counter = max(max_counter, cv)
+        try:
+            if _BLOCKER_KW in (m.keywords or ()):
+                blockers += 1
+        except Exception:
+            pass
+        if getattr(getattr(m, "type", None), "name", None) == "EVENT":
+            events += 1
+    return [
+        counter_total / (10.0 * 2000.0),   # 手札のカウンター総量（守りの総火力）
+        counter_cards / float(MAX_HAND),   # カウンター札枚数（守れる回数）
+        max_counter / 2000.0,              # 最大カウンター値（1回で止められる上限）
+        blockers / float(MAX_HAND),        # 手札ブロッカー数（次ターンの防御設置）
+        events / float(MAX_HAND),          # イベント数（カウンターイベント/トリック資源）
+    ]
+
+
 def _playable_chars(me):
     """me.hand のうち今のアクティブドンで召喚できるキャラ数（@93「ドン余剰＝展開すべき」の素地）。
     ドン付与や効果コストの厳密計算はしない代理量（有界化のみ）。"""
@@ -250,6 +295,10 @@ def encode(manager, me_name, vocab, version=1):
         # v5（cpu_v10）: 相手場の脅威集約3＋自分の展開余力1。相手場は公開情報（公平性契約に適合）。
         vals += _opp_field_aggregate(getattr(opp, "field", ()) or ())
         vals += [_playable_chars(me) / float(MAX_HAND)]
+    if version >= 6:
+        # v6（2026-07-30・防御応答矯正③）: 自手札の資源集約5。手札の「質」をスカラーに載せる
+        # （v5 までは枚数のみ＝ネットが「手札減＝良い」を学ぶ素地になっていた）。自分のみ＝公平性契約。
+        vals += _hand_aggregate(getattr(me, "hand", ()) or ())
     scalars = np.array(vals, dtype=np.float32)
 
     field = np.zeros((2 * MAX_FIELD, PER_CHAR), dtype=np.float32)
