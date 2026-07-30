@@ -75,26 +75,31 @@ REPLAYS_V2 = {
     "m4": os.path.join(_FIX2, "opcg_replay_6563214359889287880.json.gz"),   # ナミ(人) vs シャンクス(CPU)
     "m5": os.path.join(_FIX2, "opcg_replay_9195490382040907274.json.gz"),   # シャンクス(人) vs ナミ(CPU)
 }
+# **VERIFIED v3**（2026-07-30 再裁定・/tmp/mark_verify3.jsonl・worlds16）。旧 v2（13点・worlds8）は
+# 効果対話の既定解決欠陥（`docs/reports/default_interaction_fix_20260730.md`＝捨て札が公開札を
+# 捨てる／up-to 獲得を常時見送る）で PLAY 系プランの測定が汚染されていたため、修正後エンジンで
+# 34マークを全点再裁定した（11/34 で裁定/accept が変化・旧表は同レポートと v18 レポートに保存）。
+# 変数名は既存プローブ（prior_bound_probe / value_blind_probe）互換のため VERIFIED_V2 のまま。
 VERIFIED_V2 = [
-    # m1: CPU=シャンクス（無駄カウンター2点・ガード2点）
-    ("m1", 3,  {("PLAY", "ST30-004")}),                                    # ガード（レフェリーは出す側を支持）
-    ("m1", 14, {("PASS", None)}),                                          # 無駄カウンター
-    ("m1", 15, {("PASS", None), ("SELECT_COUNTER", "OP10-011")}),          # 同上（2枚目）
-    ("m1", 42, {("ATTACH_DON", "OP12-008"), ("ATTACK", "OP09-002"),
-                ("PLAY", "OP12-008")}),                                    # ガード
-    # m2: CPU=ナミ（リーダー付与・攻撃の3点＋防御ガード2点）
-    ("m2", 12, {("SELECT_COUNTER", "OP14-108"), ("SELECT_COUNTER", "OP08-050")}),   # ガード
+    # m1: CPU=シャンクス
+    ("m1", 3,  {("PLAY", "OP09-002"), ("PLAY", "ST30-004")}),              # ガード（1コスト展開は正・ウタも band）
+    ("m1", 14, {("SELECT_COUNTER", "OP09-002"), ("SELECT_COUNTER", "OP10-011")}),  # 反転: カウンターは band 内（旧: PASS のみ）
+    ("m1", 15, {("SELECT_COUNTER", "OP10-011")}),                          # チョッパーで守る（PASS は band 外へ）
+    ("m1", 42, {("ATTACH_DON", "OP09-002"), ("ATTACH_DON", "OP12-008"),
+                ("ATTACK", "ST30-004")}),                                  # ガード
+    ("m1", 94, {("ATTACK", "OP09-001"), ("ATTACK", "OP09-002"),
+                ("ATTACK", "ST30-004")}),                                  # 新規: 攻撃すべき（耐久でなく）
+    # m2: CPU=ナミ
+    ("m2", 12, {("PASS", None)}),                                          # 反転: 素通しが正（旧: カウンター）
     ("m2", 44, {("ATTACH_DON", "OP11-041")}),                              # リーダーへ付与（守り）
-    ("m2", 58, {("SELECT_COUNTER", "OP14-108"), ("PASS", None),
-                ("SELECT_COUNTER", "EB03-053"), ("SELECT_COUNTER", "EB04-058")}),   # ガード
+    ("m2", 58, {("PASS", None)}),                                          # ガード（accept は素通しのみに縮小）
     ("m2", 64, {("ATTACK", "OP16-056")}),                                  # クマシー出しでなく攻撃
-    ("m2", 66, {("ATTACK", "EB03-053"), ("ATTACK", "OP16-056"),
-                ("ATTACK", "EB03-055")}),                                  # ロビンで攻撃
-    # m4: CPU=シャンクス（イワンコフ無駄出し2点＋ガード1点）
-    ("m4", 2,  {("TURN_END", None)}),                                      # turn1 イワンコフ出しは損
-    ("m4", 8,  {("ATTACH_DON", "OP09-001"), ("ATTACK", "OP09-001")}),      # ガード
-    ("m4", 12, {("TURN_END", None), ("ATTACH_DON", "ST30-004"),
-                ("PLAY", "OP13-007")}),                                    # 2枚目イワンコフも損
+    ("m2", 66, {("ATTACK", "EB03-055")}),                                  # ロビンで攻撃（accept 縮小）
+    # m4: CPU=シャンクス
+    ("m4", 2,  {("PLAY", "OP13-007")}),                                    # 正解変化: TURN_END でなくエース&サボ&ルフィを出す
+    ("m4", 8,  {("ATTACH_DON", "ST30-004"), ("ATTACK", "OP09-001"),
+                ("ATTACK", "ST30-004"), ("PLAY", "OP13-007")}),            # ガード（band 拡大）
+    ("m4", 12, {("ATTACK", "ST30-004"), ("PLAY", "OP09-002")}),            # 正解変化: イワンコフで攻撃 or ウタ展開
     # m5: CPU=ナミ
     ("m5", 7,  {("ATTACH_DON", "OP11-041"), ("PLAY", "OP11-106")}),        # ナミ3ドン付与
 ]
