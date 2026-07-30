@@ -603,23 +603,21 @@ def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any],
 def _rank_select_candidates(manager, uuids: List[str], actor_name: str) -> List[str]:
     """選択候補 uuid を「CPU にとって選ぶ価値の高い順」に並べる。
 
-    相手のカード（除去/弱体の対象）＝**脅威の大きい順**（パワー→コスト降順）に除去する。
-    自分のカード（コスト/犠牲としての対象）＝**価値の小さい順**（パワー→コスト昇順）に差し出す。
+    相手のカード（除去/弱体の対象）＝**残す価値の大きい順**に除去、自分のカード（コスト/犠牲）＝
+    **残す価値の小さい順**に差し出す。序列は `engine.interaction.card_keep_value`
+    （コスト・現在パワー・カウンター値・効果保有・カウンタートリガー・【トリガー】の合成・
+    2026-07-30 統一）＝ドレイン既定（`choose_selection`）と同じ1本を使う。旧序列（パワー→コスト
+    のみ）は低コストの要札（カウンター2000 のイベント・効果持ち1コスト等）を一律最下位に置き、
+    捨て札コストで要札から捨てる分岐しか探索に見せていなかった。
     候補に対応するカードが見つからないものは末尾へ（順序のみのヒューリスティック）。"""
-    def _pw(c):
-        try:
-            return c.get_power(False)
-        except Exception:
-            return getattr(getattr(c, "master", None), "power", 0) or 0
-    def _cost(c):
-        return getattr(getattr(c, "master", None), "cost", 0) or 0
+    from .engine.interaction import card_keep_value
     pairs = [(u, manager._find_card_by_uuid(u)) for u in uuids]
     found = [(u, c) for u, c in pairs if c is not None]
     missing = [u for u, c in pairs if c is None]
     if found and all(getattr(c, "owner_id", None) == actor_name for _u, c in found):
-        found.sort(key=lambda uc: (_pw(uc[1]), _cost(uc[1])))            # 自分＝弱い順に差し出す
+        found.sort(key=lambda uc: card_keep_value(uc[1]))                # 自分＝価値の低い順に差し出す
     else:
-        found.sort(key=lambda uc: (-_pw(uc[1]), -_cost(uc[1])))          # 相手＝強い脅威から除去
+        found.sort(key=lambda uc: -card_keep_value(uc[1]))               # 相手＝価値の高い脅威から
     return [u for u, _c in found] + missing
 
 

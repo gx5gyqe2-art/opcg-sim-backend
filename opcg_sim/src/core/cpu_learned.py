@@ -342,13 +342,17 @@ def _select_root_group(groups, min_frac: float = SERVE_ROOT_SWITCH_MIN_FRAC,
 def _merge_root_stats(manager, legal, N, Q):
     """ルート合法手を挙動等価キー（`cpu_ai._move_equiv_key`）でグループ化し訪問数を合算する。
 
-    返り値: [{"rep": 代表index(グループ内N最大), "idxs": [...], "n": N合算, "q": N加重平均Q}]
+    返り値: [{"rep": 代表index(グループ内の**列挙順先頭**), "idxs": [...], "n": N合算, "q": N加重平均Q}]
     を n 降順（同数は legal 列挙順＝安定）で。等価手が無い局面では全グループが単独＝
     先頭グループの rep が従来の argmax(N) と一致し**挙動不変**。
 
     等価判定は card_id 基準＝リプレイ逆写像（`replay_runner._key`）と同じ同一視。場の複製
     （同名キャラで付与ドン数が違う等）は厳密には非等価だが、その残差はリプレイ側と同じ
-    許容（R0 §5）に揃える。
+    許容（R0 §5）に揃える。**代表は列挙順先頭**（2026-07-30）: 旧実装のグループ内 N 最大は
+    探索ノイズで割れた訪問数の多い側＝card_id 記述子から再現不能で、録画時に2枚目の複製へ
+    ATTACH_DON した手を再生（`resolve_recorded_action`＝記述子一致の先頭）が1枚目に写像し、
+    以後の盤面が無音で分岐する実害が出た（seed9100 round-trip 実測）。等価前提の下で
+    代表の選び方は挙動中立＝再現可能な先頭に固定する。
     """
     from opcg_sim.src.core import cpu_ai
     order, groups = [], {}
@@ -363,7 +367,7 @@ def _merge_root_stats(manager, legal, N, Q):
         idxs = groups[k]
         n = float(sum(float(N[i]) for i in idxs))
         q = (sum(float(N[i]) * float(Q[i]) for i in idxs) / n) if n > 0 else 0.0
-        rep = max(idxs, key=lambda i: float(N[i]))
+        rep = idxs[0]   # 列挙順先頭＝リプレイ逆写像と同じ実体（旧: N最大＝再現不能）
         out.append({"rep": rep, "idxs": idxs, "n": n, "q": q})
     out.sort(key=lambda g: -g["n"])   # sort は安定＝同数なら列挙順を保つ
     return out

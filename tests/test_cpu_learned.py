@@ -209,7 +209,7 @@ def test_root_visit_merge_flips_split_duplicates():
     Q = np.array([-0.9, -0.9, -1.0])
     groups = cpu_learned._merge_root_stats(gm, legal, N, Q)
     assert groups[0]["n"] == 61.0 and len(groups[0]["idxs"]) == 2
-    assert legal[groups[0]["rep"]]["card_uuid"] == c1.uuid   # グループ内はN最大の実体
+    assert legal[groups[0]["rep"]]["card_uuid"] == c1.uuid   # グループ内は列挙順先頭の実体（再生と同写像）
     assert abs(groups[0]["q"] - (-0.9)) < 1e-9               # QはN加重平均
 
 

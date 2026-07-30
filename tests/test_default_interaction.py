@@ -63,6 +63,37 @@ def test_unresolvable_and_forced_temp_fall_back_to_legacy():
     assert choose_selection([_e("x", "own", "hand", 1, 0)], 0, 0) is None   # max<1
 
 
+def _stub(cost=0, power=0, counter=0, triggers=()):
+    class _T:
+        def __init__(self, name):
+            self.name = name
+    class _Ab:
+        def __init__(self, name):
+            self.trigger = _T(name)
+    class _M:
+        pass
+    m = _M(); m.cost = cost; m.power = power; m.counter = counter
+    m.abilities = [_Ab(t) for t in triggers]
+    class _C:
+        pass
+    c = _C(); c.master = m
+    return c
+
+
+def test_card_keep_value_ordinal_properties():
+    """統一「残す価値」の序数性質（重みの絶対値でなく順序を固定・ユーザ指摘 2026-07-30）:
+    コストだけで決めない＝カウンター/効果/防御トリガーが価値に数えられること。"""
+    from opcg_sim.src.core.engine.interaction import card_keep_value as v
+    # 同コストなら 効果+カウンター持ち > バニラ
+    assert v(_stub(1, 1000, 2000, ("ACTIVATE_MAIN",))) > v(_stub(1, 2000, 0))
+    # カウンターイベント（コスト1・パワー0）はバニラ1コストキャラより残す価値が高い
+    assert v(_stub(1, 0, 0, ("COUNTER",))) > v(_stub(1, 2000, 0))
+    # 実測ケースの序列: エース&サボ&ルフィ(1/1000/カウンター2000/起動) > ウタ(1/2000/1000/登場時)
+    assert v(_stub(1, 1000, 2000, ("ACTIVATE_MAIN",))) > v(_stub(1, 2000, 1000, ("ON_PLAY",)))
+    # 高コスト大型は依然として上位（合成が逆転を起こさない）
+    assert v(_stub(9, 10000, 0)) > v(_stub(1, 1000, 2000, ("ACTIVATE_MAIN", "TRIGGER")))
+
+
 @pytest.fixture(scope="module")
 def _marks():
     """実測欠陥点の真盤面（m4@2・m1@3）。tests/scripts の復元機構を再利用する。"""
@@ -96,11 +127,15 @@ def _apply_play(boards, tag, i, card):
 
 
 def test_m4_at_2_ivankov_discard_keeps_revealed_6000s(_marks):
-    """イワンコフの引き3捨て2: 公開したベン・ベックマン(6000)2枚を温存し低価値2枚を捨てる。"""
+    """イワンコフの引き3捨て2: 公開したベン・ベックマン(6000)2枚を温存し「残す価値」最低の
+    2枚を捨てる。統一価値（card_keep_value）ではエース&サボ&ルフィ OP13-007（コスト1だが
+    **カウンター2000＋起動効果**）はウタ OP09-002（カウンター1000）より上＝コストだけなら
+    最下位の要札が温存される（2026-07-30 ユーザ指摘の修正）。"""
     me = _apply_play(_marks, "m4", 2, "ST30-004")
     hand = [c.master.card_id for c in me.hand]
     assert hand.count("OP16-012") == 2                        # ベックマン温存
-    assert sorted(c.master.card_id for c in me.trash) == ["OP09-002", "OP13-007"]
+    assert "OP13-007" in hand                                 # カウンター2000+効果の要札を温存
+    assert sorted(c.master.card_id for c in me.trash) == ["OP09-002", "OP09-002"]
 
 
 def test_m1_at_3_uta_takes_best_revealed_card(_marks):

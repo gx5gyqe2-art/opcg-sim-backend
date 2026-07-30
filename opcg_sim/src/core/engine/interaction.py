@@ -387,18 +387,47 @@ def get_pending_request(gm, with_request_id: bool = True) -> Optional[Dict[str, 
         request["request_id"] = _rid(request)
     return request
 
-def _selection_card_value(card) -> int:
-    """既定選択の価値序列（コスト主・パワー従）。カード個別知識は持たない汎用量。"""
+def _int_of(v) -> int:
+    try:
+        return int(v or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def card_keep_value(card) -> int:
+    """「残す価値」の合成序列。カード個別知識は持たない汎用属性のみ（2026-07-30）。
+
+    旧序列（コスト×パワーのみ）は「低コストでも価値がある札」（カウンター2000のイベント、
+    効果持ちの1コスト等）を一律最下位に置き、捨て札コストで要札から捨てていた（ユーザ指摘）。
+    加点はすべて印刷/現在属性の集計＝特定カードのハードコード無し:
+      - コスト（資源投資の規模）           × 100
+      - 現在パワー（盤面圧）               / 100
+      - カウンター値（防御資源）           / 20   （2000 カウンター ＝ コスト1相当）
+      - 効果ブロック数（効果持ち＞バニラ）  × 120
+      - カウンタートリガー効果（防御イベント札）+150
+      - 【トリガー】アイコン               +60
+    ドレイン既定（`choose_selection`）と探索分岐順序（`cpu_ai._rank_select_candidates`）の
+    両方がこの1本を使う＝既定と分岐で序列が食い違わない。"""
     m = getattr(card, "master", None)
+    cost = _int_of(getattr(m, "cost", 0))
     try:
-        cost = int(getattr(m, "cost", 0) or 0)
-    except (TypeError, ValueError):
-        cost = 0
-    try:
-        power = int(getattr(m, "power", 0) or 0)
-    except (TypeError, ValueError):
-        power = 0
-    return cost * 100000 + power
+        power = _int_of(card.get_power(False))
+    except Exception:
+        power = _int_of(getattr(m, "power", 0))
+    counter = _int_of(getattr(card, "current_counter", None))
+    if counter == 0:
+        counter = _int_of(getattr(m, "counter", 0))
+    abilities = getattr(m, "abilities", None) or ()
+    n_abil = len(abilities)
+    trig_names = {getattr(getattr(ab, "trigger", None), "name", "") for ab in abilities}
+    has_counter_trig = "COUNTER" in trig_names
+    has_trigger_icon = "TRIGGER" in trig_names
+    return (cost * 100 + power // 100 + counter // 20 + 120 * n_abil
+            + (150 if has_counter_trig else 0) + (60 if has_trigger_icon else 0))
+
+
+# 後方互換の別名（`_selection_entries` と旧参照が使う）。
+_selection_card_value = card_keep_value
 
 
 def choose_selection(entries, min_n: int, max_n: int):
