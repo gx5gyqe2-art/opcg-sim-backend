@@ -158,8 +158,11 @@ def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, lo
             child = game_serve.apply(world, mv, name)
             if child is None:
                 continue
+            # rng_seed は**手 k に依存させない**（真のCRN・2026-07-30）。手別乱数はロールアウトの
+            # 対照性を壊し、m2@48 実測で「機械的に厳密優位な素通しが 4勝 vs カウンター 8勝」という
+            # 偽の差を作った（共有乱数では 10 vs 9 の同値に収束）。差は「最初の手」だけから生まれるべき。
             winner, ld, et = rollout(game_serve, vf, pf, child, name,
-                                     world_seed=90000 + w * 97, rng_seed=w * 7919 + k)
+                                     world_seed=90000 + w * 97, rng_seed=w * 7919)
             outcomes[k][w] = (winner == name)
             if winner == name:
                 wins[k] += 1

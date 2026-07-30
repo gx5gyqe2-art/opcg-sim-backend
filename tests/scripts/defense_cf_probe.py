@@ -147,8 +147,10 @@ def probe_window(task):
             child = gserve.apply(world, legal[i], name)
             if child is None:
                 continue
+            # rng_seed は**枝に依存させない**（真のCRN）。枝別乱数は対照性を壊し、m2@48 で
+            # 「素通し4勝 vs カウンター8勝」という偽の差を作った（共有乱数では 10 vs 9=同値）。
             winner, _ld, _et = CR.rollout(gserve, _G["vf"], _G["pf"], child, name,
-                                          world_seed=wseed, rng_seed=wseed * 31 + i,
+                                          world_seed=wseed, rng_seed=wseed * 131,
                                           def_temp=cfg["def_temp"])
             results[key] = results.get(key, 0) + (1 if winner == name else 0)
     ag = agreement(human_key, results, band=cfg["band"])
