@@ -37,6 +37,32 @@ def test_non_finite_q_root_falls_back_to_outcome():
     assert np.isfinite(y).all() and y == pytest.approx([1.0, -1.0])
 
 
+def test_policy_copy_follows_value_enc_version():
+    """候補の policy は value と**同じ符号化版**で保存される（恒等温スタート拡張）。
+
+    2026-07-31 実害: value だけ v6 へ拡張し policy を v5 のままコピーすると、serve の
+    ctx(v6・+5列) を v5 policy の `_fit_actions` が「行動特徴の末尾ズレ」と誤解釈して
+    行動特徴全列が5列ずれた重みで読まれ、priors が無意味になる（クラッシュせず黙って
+    壊れる＝arena 0/48 の全損）。ここでは拡張の恒等性＝v5 ctx での priors と、
+    scalars 末尾へ5列ゼロ挿入した v6 ctx での拡張後 priors の完全一致を固定する。"""
+    from opcg_sim.src.learned.policy import PolicyScorer
+    from opcg_sim.src.learned.action import ACTION_DIM
+    from opcg_sim.src.core.cpu_learned import warm_start_policy
+    import rl_encoder as E
+
+    rng = np.random.default_rng(0)
+    ctx5_dim = E.scalars_dim(5) + 24          # scalars ++ 適当な field 平坦長（実寸に依存しない）
+    p5 = PolicyScorer(ctx_dim=ctx5_dim, hidden=8, seed=3)
+    ctx5 = rng.normal(size=ctx5_dim)
+    am = rng.normal(size=(4, ACTION_DIM))
+    pr5 = p5.priors(ctx5, am)
+
+    p6 = warm_start_policy(p5, 5, 6)
+    ctx6 = np.insert(ctx5, E.scalars_dim(5), np.zeros(5))   # v6=scalars末尾に5値 append
+    assert p6.in_dim == p5.in_dim + 5
+    assert np.allclose(pr5, p6.priors(ctx6, am))
+
+
 def test_aux_is_clipped_and_normalized():
     """aux は [0,1] へ正規化され、スケール超過は 1.0 に飽和する。NaN は欠損のまま通す
     （`ValueNet.backward` 側が欠損として補助損失から除外する契約）。"""

@@ -41,7 +41,7 @@ import rl_net as RN
 import rl_encoder as E
 from pd_batch_common import mixed_value_label, normalize_batch_v2
 from opcg_sim.src.learned.config import V4_LABEL_ALPHA, V4_AUX_TURNS_WEIGHT, V4_TURNS_SCALE
-from opcg_sim.src.core.cpu_learned import warm_start_value, _net_enc_version
+from opcg_sim.src.core.cpu_learned import warm_start_value, warm_start_policy, _net_enc_version
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODELS = os.path.join(REPO, "opcg_sim", "data", "learned")
@@ -142,7 +142,16 @@ def main():
     assert RN.ValueNet.load(out_v).vocab_ids == RN.ValueNet.load(vpath).vocab_ids, \
         "保存した候補の vocab_ids が base と一致しない（index ズレで評価が無意味になる）"
     out_p = os.path.join(args.out, "policy.npz")
-    shutil.copyfile(ppath, out_p)            # policy は base のまま（v12: 微調整は有害）
+    # policy は base のまま学習しない（v12: 微調整は有害）が、**符号化版は value に揃える**。
+    # 2026-07-31 実害: value だけ v6 へ拡張し policy を v5 のままコピーすると、serve の
+    # ctx(v6) を v5 policy の `_fit_actions` が「行動特徴の末尾ズレ」と誤解釈し、行動特徴が
+    # 5列ずれた重みで読まれて priors が無意味になる（クラッシュせず黙って壊れる＝arena 0/48）。
+    if ev0 != args.enc_version:
+        from opcg_sim.src.learned.policy import PolicyScorer
+        pnet = warm_start_policy(PolicyScorer.load(ppath), ev0, args.enc_version)  # 恒等拡張
+        pnet.save(out_p)
+    else:
+        shutil.copyfile(ppath, out_p)
     res = {"rows": int(len(y)), "base": args.base, "epochs": args.epochs, "lr": args.lr,
            "label_alpha": args.label_alpha, "aux_weight": args.aux_weight,
            "distill_weight": args.distill_weight,
