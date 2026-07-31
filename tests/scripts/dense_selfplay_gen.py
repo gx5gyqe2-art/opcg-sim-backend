@@ -104,8 +104,13 @@ def main():
 
     import p3_run as R
 
-    vpath = os.path.join(MODELS, f"{args.base}_value.npz")
-    ppath = os.path.join(MODELS, f"{args.base}_policy.npz")
+    if os.path.sep in args.base:
+        # パス接頭辞（例 /tmp/gen8v6）: 温スタート拡張ネット等、同梱外の生成ネットを使う。
+        # 行の符号化版（--enc-version）はネット入力にも使われるため、ネット側の版と一致が必要。
+        vpath, ppath = args.base + "_value.npz", args.base + "_policy.npz"
+    else:
+        vpath = os.path.join(MODELS, f"{args.base}_value.npz")
+        ppath = os.path.join(MODELS, f"{args.base}_policy.npz")
     leaders = None
     init, initargs = R._init_worker, ()
     if args.matchup:
