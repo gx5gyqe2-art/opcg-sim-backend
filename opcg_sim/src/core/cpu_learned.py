@@ -37,17 +37,21 @@ _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "data")
 
-# gen8 = gen7 value の**対面特化**密ラベル追い学習（v19・ユーザ実デッキの固定対面ナミvsシャンクス・
-# 自己対戦 1,536局の全決定点 197,683 行・混合ラベル y=0.5·z+0.5·q_root＋残りターン補助・
-# 1エポック lr2e-4）。policy は gen6/gen7 と同一バイナリ（v12 確定＝policy 微調整は有害のため凍結）。
-# 判定は較正済み 800局アリーナ（docs/reports/cpu_v19_matchup_density_20260729.md・
-# 対gen7 wr=0.570 CI[0.537,0.603]・対gen5 アンカー 0.615 CI[0.556,0.674]・コーチゲートv2 5.4>5.0
-# ＝無駄カウンター2点完治）。1対面のコーパスが汎用側へ +49 Elo 波及＝「密度×分布の新しさ」が効く
-# （同分布2周目の v17 は +21 未確証で打ち切り）。符号化は v5（55スカラー）で net の feat_dim から
-# 自動判別される。gen7 以前はリプレイ再現・A/B・ロールバック用に同梱を維持する
-# （レフェリー教師の錨は gen5 固定のまま＝referee_labeler は明示ロード）。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen8_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen8_policy.npz")
+# gen9 = gen8 と「v25 防御混合候補」の value 重み**線形補間 α=0.5**（v28・
+# docs/reports/gen9_adoption_20260801.md）。候補側は修正済み効果解決エンジン上の密対面
+# コーパス（nami:shanks 2,048局 244,544行・v6符号化）＋防御CF 438行で gen8 を追い学習した
+# もの（ep2 lr2e-4・混合ラベル α=0.5）。純候補はコーチゲート v3 初 PASS（6.1 vs 4.7・
+# 退行ゼロ）だがアリーナ 0.454 で、補間 α=0.5 が「コーチ 5.6 PASS × アリーナ 0.475
+# CI[0.426,0.524]（parity 棄却されず）」の意思決定点（交換曲線は v28 レポート）。
+# **昇格基準（wr≥0.55）では FAIL のままユーザ判断で採用**＝人間検証14点の改善を取り、
+# 自己対戦で最大 ~2-3pp を許容する取引（2026-08-01 ユーザ決定）。
+# policy は gen8 と同一の重みを v6 へ恒等温スタート拡張したバイナリ（v12 確定＝policy
+# 微調整は有害のため凍結。value が v6=60スカラーのため ctx 幅を揃える必要がある——
+# 版不整合は行動特徴が5列ずれて黙って壊れる: dense_finetune の 2026-07-31 修正参照）。
+# 符号化は v6 で net の feat_dim から自動判別される。gen8 以前はリプレイ再現・A/B・
+# ロールバック用に同梱を維持する（レフェリー教師の錨は gen5 固定のまま）。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen9_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen9_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}

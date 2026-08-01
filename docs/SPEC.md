@@ -135,12 +135,14 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 完結する。フロントは人間=p1 を操作し、CPU の手はポーリングで 1 手ずつ受け取る。
 
 ### 2.5.1 配線・逐次進行
-- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（`learned`＝既定・**gen8学習型**
-  （`gen8_*.npz`・2026-07-29採用＝gen7 value の**対面特化**密ラベル追い学習（v19・ユーザ実デッキの固定対面
-  ナミvsシャンクス・自己対戦1,536局の全決定点 197,683行・混合ラベル＋残りターン補助・1エポック）。
-  policy は gen6/gen7 と同一バイナリ（v12確定＝policy微調整は有害）。較正済み800局アリーナで
-  対gen7 wr=0.570 CI[0.537,0.603]・対gen5 アンカー 0.615 CI[0.556,0.674]・コーチゲートv2 5.4>5.0。
-  `docs/reports/cpu_v19_matchup_density_20260729.md`。旧 gen7 以前はリプレイ再現/A/B/ロールバック用に同梱維持）／
+- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（`learned`＝既定・**gen9学習型**
+  （`gen9_*.npz`・2026-08-01採用＝gen8 と「修正済み効果解決エンジン上の密対面コーパス
+  （nami:shanks 2,048局 244,544行・v6符号化＝手札資源集約つき）＋防御CF で追い学習した候補」の
+  value 重み線形補間 α=0.5。policy は gen8 と同一重みの v6 恒等拡張バイナリ（v12確定＝policy
+  微調整は有害・value との符号化版一致が必須）。判定＝コーチゲート v3 PASS（5.6 vs 4.7・退行ゼロ）×
+  アリーナ 0.475 CI[0.426,0.524]（parity 棄却されず）。**昇格基準では FAIL のままユーザ判断採用**
+  ＝人間検証14点の改善を取り自己対戦 ~2-3pp を許容（`docs/reports/gen9_adoption_20260801.md`・
+  交換曲線は `cpu_v28_weight_interp_20260801.md`）。旧 gen8 以前はリプレイ再現/A/B/ロールバック用に同梱維持）／
   `hard`＝α-β）/ `cpu_deck`。未指定・未知値は `learned` に正規化。モデル未同梱環境（`cpu_learned.available()`
   が False）では `learned`→`hard` に安全フォールバック。CPU メタは `CPU_GAMES` に保持（`{cpu_player_id, difficulty}`）。
   - **符号化の対応表はネットが持つ**（`ValueNet.vocab_ids`・2026-07-15 事故対応）: カードDBが増えても
