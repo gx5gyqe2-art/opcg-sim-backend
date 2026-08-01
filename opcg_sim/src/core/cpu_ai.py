@@ -566,6 +566,65 @@ def _score_move_1ply(manager, actor_name: str, move: Dict[str, Any], eval_name: 
     return evaluate(clone, eval_name, see_opp_hand=see_opp_hand)
 
 
+def onplay_option_scan(manager, actor_name: str):
+    """手札の「登場時オプション」を実測でスキャンする（v29・符号化 v7 の土台）。
+
+    自分のメイン手番（pending=MAIN_ACTION が actor 宛て）で、合法な PLAY 手それぞれを
+    **make/unmake で適用→観測→巻き戻し**し、バニラ設置以外の何か（効果対話 or EFFECT
+    イベント）が起きるかを見る。判定子: 適用後 pending.action != MAIN_ACTION（対話が
+    立った）または action_events に EFFECT（無対話の自動効果）。
+
+    なぜ実測か: 「手札のパワー6000を2枚公開」等の登場時条件はカード間の関係で、
+    静的特徴では表現できない（v24 representation-bound の正体）。エンジン自身に
+    試させれば条件知識の重複実装ゼロで全カードに一般化する。stop_at_select=True で
+    選択解決の手前まで＝実測 0.08〜0.26ms/枚（clone 1.1ms の 1/4〜1/14）。
+
+    返り値 (n_live, n_dead, keep_live): 発火する PLAY 数・**ON_PLAY 能力を持つのに
+    発火しない** PLAY 数（＝出すとオプションを浪費する札。バニラや起動型のみの札は
+    数えない）・発火する札の card_keep_value 合計。非メイン手番・mu 不能・列挙不能は
+    (0,0,0)＝「今行使できるオプション」の意味論（フェイズ外では 0 で正しい）。
+    global random は消費しない（stop 手前に乱数系処理なし・テストで機械保証）。
+    """
+    if not _mu_safe(manager):
+        return (0, 0, 0.0)
+    pend0 = manager.get_pending_request(with_request_id=False) or {}
+    if pend0.get("action") != "MAIN_ACTION" or pend0.get("player_id") != actor_name:
+        return (0, 0, 0.0)
+    from .engine.interaction import card_keep_value
+    try:
+        legal = manager.get_legal_actions()
+    except Exception:
+        return (0, 0, 0.0)
+    n_live = n_dead = 0
+    keep_live = 0.0
+    saved_events = manager.action_events
+    for mv in legal:
+        if mv.get("action_type") != "PLAY":
+            continue
+        uuid = (mv.get("payload") or {}).get("uuid")
+        with journal.transaction():
+            manager.action_events = JournaledList()
+            try:
+                _apply_move_inplace(manager, actor_name, mv, stop_at_select=True)
+                pend = manager.get_pending_request(with_request_id=False) or {}
+                fired = (pend.get("action") != "MAIN_ACTION") or any(
+                    isinstance(e, dict) and e.get("type") == "EFFECT"
+                    for e in manager.action_events)
+            except Exception:
+                fired = False
+        ci = _find_card(manager, uuid) if uuid else None
+        if fired:
+            n_live += 1
+            if ci is not None:
+                keep_live += float(card_keep_value(ci))
+        else:
+            abil = (getattr(getattr(ci, "master", None), "abilities", None) or ()) if ci else ()
+            if any(getattr(getattr(ab, "trigger", None), "name", "") == "ON_PLAY" for ab in abil):
+                n_dead += 1                          # ON_PLAY 持ちの不発＝オプション浪費だけ数える
+    manager.action_events = saved_events
+    return (n_live, n_dead, keep_live)
+
+
 def _recurse_child(manager, actor_name: str, move: Dict[str, Any], search_fn) -> Optional[float]:
     """move を適用した子局面で `search_fn(child) -> float` を評価して返す。失敗は None。
 

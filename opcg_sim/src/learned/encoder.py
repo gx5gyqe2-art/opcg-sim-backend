@@ -41,8 +41,9 @@ SCALARS_V3 = 46        # v3 = v2 + [山札/トラッシュ/今ターンKO数 6] 
 SCALARS_V4 = 51        # v4 = v3 + 自デッキ残の集約5（残カウンター総量/密度・ブロッカー残・イベント残・高コストキャラ残）
 SCALARS_V5 = 55        # v5 = v4 + 相手場の脅威集約3（総火力/高パワー数/ブロッカー数）＋展開余力1（ドンで出せる手札キャラ数）
 SCALARS_V6 = 60        # v6 = v5 + **自手札の資源集約5**（カウンター総量/カウンター札数/最大カウンター/ブロッカー数/イベント数）
+SCALARS_V7 = 63        # v7 = v6 + **登場時オプション実測3**（発火するPLAY数/そのkeep値/ON_PLAY持ち不発数・v29）
 _SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4,
-                       5: SCALARS_V5, 6: SCALARS_V6}
+                       5: SCALARS_V5, 6: SCALARS_V6, 7: SCALARS_V7}
 
 
 def scalars_dim(version=1):
@@ -299,6 +300,17 @@ def encode(manager, me_name, vocab, version=1):
         # v6（2026-07-30・防御応答矯正③）: 自手札の資源集約5。手札の「質」をスカラーに載せる
         # （v5 までは枚数のみ＝ネットが「手札減＝良い」を学ぶ素地になっていた）。自分のみ＝公平性契約。
         vals += _hand_aggregate(getattr(me, "hand", ()) or ())
+    if version >= 7:
+        # v7（2026-08-01・v29）: 登場時オプションの**実測**3値。手札の各 PLAY を make/unmake で
+        # 試し「バニラ設置以外の何かが起きるか」をエンジン自身に確かめさせる（判定子は
+        # 適用後 pending!=MAIN_ACTION or EFFECT イベント）。「手札のパワー6000を2枚公開」の
+        # ような**カード間関係の条件**は埋め込みの線形和では表現できず（v24 representation-
+        # bound）、静的特徴でなく実測でしか一般化しない。実測 0.08〜0.26ms/枚（clone の
+        # 1/4〜1/14）＝探索の葉評価に載る。非メイン手番は (0,0,0)＝「今行使できる
+        # オプション」の意味論。自分の手札のみ＝公平性契約。
+        from opcg_sim.src.core.cpu_ai import onplay_option_scan
+        n_live, n_dead, keep_live = onplay_option_scan(manager, me_name)
+        vals += [n_live / 5.0, min(keep_live / 2000.0, 1.0), n_dead / 5.0]
     scalars = np.array(vals, dtype=np.float32)
 
     field = np.zeros((2 * MAX_FIELD, PER_CHAR), dtype=np.float32)
