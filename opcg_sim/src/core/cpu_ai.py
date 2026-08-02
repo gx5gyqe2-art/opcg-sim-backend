@@ -579,10 +579,19 @@ def onplay_option_scan(manager, actor_name: str):
     試させれば条件知識の重複実装ゼロで全カードに一般化する。stop_at_select=True で
     選択解決の手前まで＝実測 0.08〜0.26ms/枚（clone 1.1ms の 1/4〜1/14）。
 
-    返り値 (n_live, n_dead, keep_live): 発火する PLAY 数・**ON_PLAY 能力を持つのに
-    発火しない** PLAY 数（＝出すとオプションを浪費する札。バニラや起動型のみの札は
-    数えない）・発火する札の card_keep_value 合計。非メイン手番・mu 不能・列挙不能は
-    (0,0,0)＝「今行使できるオプション」の意味論（フェイズ外では 0 で正しい）。
+    **ドン非依存**（2026-08-02 修正）: 対象は「手札にある ON_PLAY 持ち」であり、今その
+    コストを払えるかは問わない。テスト時にそのカードのコストぶんのドンを**トランザクション
+    内で一時的に補う**（巻き戻される）。この意味論でないと、ドンを使い切った子盤面で全札が
+    非合法になり (0,0,0) へ潰れる＝**「オプションを温存した子」と「行使した子」が同じ値に
+    見える**（v30 中間で実測。判別が要る唯一の場所で盲目だった）。オプション価値は手札の
+    構成の性質であって、今ターンの支払い能力ではない。
+
+    近似の限界: 一時ドンは「場のドンN枚なら」型の条件を歪めうる（補うのはコスト分だけ＝
+    最小限に留める）。カード個別の知識は持たないので、この歪みは全カードに一様に乗る。
+
+    返り値 (n_live, n_dead, keep_live): 発火する札数・**ON_PLAY 持ちなのに発火しない**
+    札数（＝出してもオプションを浪費するだけの札）・発火する札の card_keep_value 合計。
+    非メイン手番・mu 不能は (0,0,0)＝「手番の意思決定点でのみ意味を持つ」意味論。
     global random は消費しない（stop 手前に乱数系処理なし・テストで機械保証）。
     """
     if not _mu_safe(manager):
@@ -591,36 +600,43 @@ def onplay_option_scan(manager, actor_name: str):
     if pend0.get("action") != "MAIN_ACTION" or pend0.get("player_id") != actor_name:
         return (0, 0, 0.0)
     from .engine.interaction import card_keep_value
-    try:
-        legal = manager.get_legal_actions()
-    except Exception:
+    from ..models.models import DonInstance
+    actor = _player_by_name(manager, actor_name)
+    if actor is None:
+        return (0, 0, 0.0)
+    targets = [c for c in list(actor.hand)
+               if any(getattr(getattr(ab, "trigger", None), "name", "") == "ON_PLAY"
+                      for ab in (getattr(c.master, "abilities", None) or ()))]
+    if not targets:
         return (0, 0, 0.0)
     n_live = n_dead = 0
     keep_live = 0.0
     saved_events = manager.action_events
-    for mv in legal:
-        if mv.get("action_type") != "PLAY":
-            continue
-        uuid = (mv.get("payload") or {}).get("uuid")
+    for ci in targets:
+        cost = int(getattr(ci.master, "cost", 0) or 0)
+        fired = False
         with journal.transaction():
             manager.action_events = JournaledList()
             try:
-                _apply_move_inplace(manager, actor_name, mv, stop_at_select=True)
-                pend = manager.get_pending_request(with_request_id=False) or {}
-                fired = (pend.get("action") != "MAIN_ACTION") or any(
-                    isinstance(e, dict) and e.get("type") == "EFFECT"
-                    for e in manager.action_events)
+                need = cost - len(actor.don_active)
+                for _ in range(max(0, need)):        # 一時ドン（txn 巻き戻しで消える）
+                    actor.don_active.append(DonInstance(owner_id=actor_name))
+                mv = next((m for m in manager.get_legal_actions()
+                           if m.get("action_type") == "PLAY"
+                           and (m.get("payload") or {}).get("uuid") == ci.uuid), None)
+                if mv is not None:
+                    _apply_move_inplace(manager, actor_name, mv, stop_at_select=True)
+                    pend = manager.get_pending_request(with_request_id=False) or {}
+                    fired = (pend.get("action") != "MAIN_ACTION") or any(
+                        isinstance(e, dict) and e.get("type") == "EFFECT"
+                        for e in manager.action_events)
             except Exception:
                 fired = False
-        ci = _find_card(manager, uuid) if uuid else None
         if fired:
             n_live += 1
-            if ci is not None:
-                keep_live += float(card_keep_value(ci))
+            keep_live += float(card_keep_value(ci))
         else:
-            abil = (getattr(getattr(ci, "master", None), "abilities", None) or ()) if ci else ()
-            if any(getattr(getattr(ab, "trigger", None), "name", "") == "ON_PLAY" for ab in abil):
-                n_dead += 1                          # ON_PLAY 持ちの不発＝オプション浪費だけ数える
+            n_dead += 1                              # ON_PLAY 持ちの不発＝オプションの浪費
     manager.action_events = saved_events
     return (n_live, n_dead, keep_live)
 

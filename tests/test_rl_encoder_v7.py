@@ -1,9 +1,10 @@
 """v7 符号化世代（**登場時オプションの実測3値**・append-only・2026-08-01・v29）の検証。
 
-v7 は v6（scalars 60）末尾に [発火するPLAY数/5, そのkeep値合計/2000(飽和), ON_PLAY持ち不発数/5]
-を足す（63）。値の出どころは `cpu_ai.onplay_option_scan`＝手札の各合法 PLAY を **make/unmake で
-適用→観測→巻き戻し**し、「バニラ設置以外の何か」（効果対話 or EFFECT イベント）が起きるかを
-エンジン自身に確かめさせる実測。
+v7 は v6（scalars 60）末尾に [発火する札数/5, そのkeep値合計/2000(飽和), ON_PLAY持ち不発数/5]
+を足す（63）。値の出どころは `cpu_ai.onplay_option_scan`＝手札の **ON_PLAY 持ち各札**を
+**make/unmake で適用→観測→巻き戻し**し、「バニラ設置以外の何か」（効果対話 or EFFECT
+イベント）が起きるかをエンジン自身に確かめさせる実測。**ドン非依存**（コスト分の一時ドンを
+txn 内で補う・2026-08-02 修正）＝支払い能力ではなく手札の構成で決まる。
 
 なぜ要るか（m4@2/m1@3・v24 representation-bound）: 「手札のパワー6000を2枚公開」のような
 登場時条件は**カード間の関係**で、カード埋め込みの線形和では原理的に表現できない。実測なら
@@ -11,12 +12,13 @@ v7 は v6（scalars 60）末尾に [発火するPLAY数/5, そのkeep値合計/2
 値段をつけるための取っ手（探索は効果の即時結果しか見せられない＝地平線の先はネットの仕事）。
 
 固定する性質:
-  - 実マーク局面での判別: m4@2（イワンコフのコンボ成立）= live1/dead0、
-    m1@3（不成立・ウタ2枚）= live2/dead1 ＝ この特徴の存在理由そのもの
+  - **子盤面での判別**（存在理由そのもの）: オプションを行使した子は live が減り、温存した子は
+    保たれる。旧実装はドン枯渇後に両方 (0,0,0) へ潰れて判別できなかった
+  - **ドン非依存**: ドンを剥がしても値が変わらない
   - **恒等温スタート**（v6→v7 拡張で出力不変）
-  - **副作用ゼロ**: encode(v7) が global random を消費せず、盤面（手札/場/ドン）を汚さない
-    ＝探索・リプレイ再現・CRN 対局の再現性を壊さない（ここが崩れると全計器が狂う）
-  - 非メイン手番（戦闘応答中）は (0,0,0)＝「今行使できるオプション」の意味論
+  - **副作用ゼロ**: encode(v7) が global random を消費せず、盤面（手札/場/ドン・一時ドン含む）を
+    汚さない＝探索・リプレイ再現・CRN 対局の再現性を壊さない（ここが崩れると全計器が狂う）
+  - 非メイン手番（戦闘応答中）は (0,0,0)＝手番の意思決定点でのみ意味を持つ
 """
 import os
 import random
@@ -61,16 +63,38 @@ def test_version_map_appends_three():
     assert 7 in E.known_versions() and E.known_versions() == sorted(E.known_versions())
 
 
-def test_discriminates_live_vs_dead_option_on_real_marks(db, vocab):
-    """m4@2（成立）と m1@3（不成立）を実リプレイ盤面で判別する＝存在理由の直接検証。"""
+def test_discriminates_option_spend_vs_keep_on_child_states(db, vocab):
+    """**子盤面で判別できること**が存在理由（2026-08-02 修正の核心）。
+
+    探索は子盤面同士を比べて手を選ぶ。旧実装は「今払えるコストの PLAY」だけを見ていたため、
+    ドンを使い切った子では全札が非合法になり両方 (0,0,0) へ潰れ、**オプションを温存した子と
+    行使した子が同じ値に見えていた**（v30 中間で実測）。ドン非依存にして初めて判別が立つ。
+    """
+    from opcg_game import OPCGGame
     m4, n4 = _mark_state(db, "opcg_replay_6563214359889287880.json.gz", 2)
-    assert cpu_ai.onplay_option_scan(m4, n4) == (1, 0, 290.0)   # イワンコフ発火・A&S&Lは対象外
-    m1, n1 = _mark_state(db, "opcg_replay_2057134394987494995.json.gz", 3)
-    assert cpu_ai.onplay_option_scan(m1, n1) == (2, 1, 580.0)   # ウタ×2発火・イワンコフ不発=dead
-    s4 = E.encode(m4, n4, vocab, version=7)["scalars"]
-    s1 = E.encode(m1, n1, vocab, version=7)["scalars"]
-    assert s4[OFF + 0] == pytest.approx(0.2) and s4[OFF + 2] == pytest.approx(0.0)
-    assert s1[OFF + 0] == pytest.approx(0.4) and s1[OFF + 2] == pytest.approx(0.2)
+    root = cpu_ai.onplay_option_scan(m4, n4)
+    assert root[0] > 0, "手番の意思決定点で live が立たない"
+    kids = {}
+    for mv in OPCGGame().legal_actions(m4):
+        if mv.get("action_type") != "PLAY":
+            continue
+        d = cpu_ai._describe_move(m4, mv) or {}
+        child = cpu_ai._apply_clone(m4, n4, mv)
+        if child is not None:
+            kids[d.get("card")] = cpu_ai.onplay_option_scan(child, n4)
+    # イワンコフを出す＝オプションを1つ使う / エース&サボ&ルフィ＝オプションは手札に残る
+    assert kids["ST30-004"][0] == root[0] - 1
+    assert kids["OP13-007"][0] == root[0]
+    assert kids["ST30-004"][2] < kids["OP13-007"][2]      # keep 値でも温存側が上
+
+
+def test_scan_is_don_independent(db, vocab):
+    """支払い能力ではなく手札の構成で決まる＝ドンが 0 でも ON_PLAY 持ちを数える。"""
+    m, name = _mark_state(db, "opcg_replay_2057134394987494995.json.gz", 3)
+    me = m.p1 if m.p1.name == name else m.p2
+    before = cpu_ai.onplay_option_scan(m, name)
+    del me.don_active[:]                                  # ドンを全部剥がす
+    assert cpu_ai.onplay_option_scan(m, name) == before
 
 
 def test_encode_v7_has_no_side_effects(db, vocab):
@@ -84,7 +108,8 @@ def test_encode_v7_has_no_side_effects(db, vocab):
     e6 = E.encode(m, name, vocab, version=6)
     e7 = E.encode(m, name, vocab, version=7)
     assert random.getstate() == st0, "encode(v7) が global random を消費した"
-    assert [c.uuid for c in me.hand] == hand0 and don0 == (len(me.don_active), len(me.don_rested))
+    assert [c.uuid for c in me.hand] == hand0
+    assert don0 == (len(me.don_active), len(me.don_rested)), "一時ドンが巻き戻っていない"
     assert [c.uuid for c in (m.p1.field + m.p2.field)] == field0
     assert np.allclose(e6["scalars"], e7["scalars"][:E.SCALARS_V6])
 
