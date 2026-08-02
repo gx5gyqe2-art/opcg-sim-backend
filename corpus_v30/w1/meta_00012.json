@@ -1,0 +1,1 @@
+{"source": "dense_selfplay", "base": "/tmp/gen9v7", "games": 8, "rows": 936, "sims": 160, "eps": 0.15, "def_force_eps": 0.0, "mark_frac": 0.25, "hand_counter_mean": 0.17815, "live_option": [0.5449, 0.51453], "l1_mix": 0.0, "l1_games": 0, "enc_version": 7, "schema_version": 2, "mean_turns": 19.5}
