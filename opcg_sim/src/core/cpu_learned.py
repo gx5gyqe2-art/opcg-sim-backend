@@ -48,10 +48,22 @@ _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 # policy は gen8 と同一の重みを v6 へ恒等温スタート拡張したバイナリ（v12 確定＝policy
 # 微調整は有害のため凍結。value が v6=60スカラーのため ctx 幅を揃える必要がある——
 # 版不整合は行動特徴が5列ずれて黙って壊れる: dense_finetune の 2026-07-31 修正参照）。
-# 符号化は v6 で net の feat_dim から自動判別される。gen8 以前はリプレイ再現・A/B・
-# ロールバック用に同梱を維持する（レフェリー教師の錨は gen5 固定のまま）。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen9_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen9_policy.npz")
+# gen10 = gen9 に「登場時オプションの実測特徴（符号化 v7・63スカラー）」を積んで追い学習
+# （v30・docs/reports/cpu_v30_option_feature_20260802.md）。密対面コーパス（nami:shanks
+# 512局 54,511行・v7・マーク局面シード0.25）を gen9 の v7 恒等拡張ネットで生成し、
+# ep2 lr2e-4・混合ラベル α=0.5・**distill0.5**（gen9 への value アンカー＝一般対局の忘却抑制）で
+# 追い学習。v7 特徴（`cpu_ai.onplay_option_scan`＝手札の各 ON_PLAY 持ちを make/unmake で
+# 試し発火を実測・ドン非依存）が m4@2 型（同じカードの価値が手札構成で反転する点）の value を
+# 初めて動かした（子盤面 value 差 -0.140→-0.106・representation-bound の緩和）。判定＝
+# コーチゲート v3 PASS（5.0 vs 4.6・m5@7 獲得）× アリーナ 0.509（gen9 と同等・800局
+# CI[0.476,0.542]・Elo+6.1）。**昇格基準（wr≥0.55）では FAIL のまま、アリーナ中立の純増＋
+# v7 特徴を土台として確定するユーザ判断で採用**（2026-08-02。標的 m4@2 の完全解決は
+# 次段のペア順位損失へ）。decide は v7 実測ぶん +77%（309→546ms・1秒予算内）。
+# policy は gen9 と同一重みの v7 恒等拡張バイナリ（v12 確定＝policy 微調整は有害・value との
+# 符号化版一致が必須）。符号化は v7 で net の feat_dim から自動判別。gen9 以前はリプレイ
+# 再現・A/B・ロールバック用に同梱維持（レフェリー教師の錨は gen5 固定のまま）。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen10_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen10_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}

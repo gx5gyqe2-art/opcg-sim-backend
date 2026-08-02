@@ -135,14 +135,17 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
 完結する。フロントは人間=p1 を操作し、CPU の手はポーリングで 1 手ずつ受け取る。
 
 ### 2.5.1 配線・逐次進行
-- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（`learned`＝既定・**gen9学習型**
-  （`gen9_*.npz`・2026-08-01採用＝gen8 と「修正済み効果解決エンジン上の密対面コーパス
-  （nami:shanks 2,048局 244,544行・v6符号化＝手札資源集約つき）＋防御CF で追い学習した候補」の
-  value 重み線形補間 α=0.5。policy は gen8 と同一重みの v6 恒等拡張バイナリ（v12確定＝policy
-  微調整は有害・value との符号化版一致が必須）。判定＝コーチゲート v3 PASS（5.6 vs 4.7・退行ゼロ）×
-  アリーナ 0.475 CI[0.426,0.524]（parity 棄却されず）。**昇格基準では FAIL のままユーザ判断採用**
-  ＝人間検証14点の改善を取り自己対戦 ~2-3pp を許容（`docs/reports/gen9_adoption_20260801.md`・
-  交換曲線は `cpu_v28_weight_interp_20260801.md`）。旧 gen8 以前はリプレイ再現/A/B/ロールバック用に同梱維持）／
+- **生成**: `POST /api/game/create` に `vs_cpu:true` / `cpu_difficulty`（`learned`＝既定・**gen10学習型**
+  （`gen10_*.npz`・2026-08-02採用＝gen9 に**登場時オプションの実測特徴（符号化 v7・63スカラー）**を
+  積んで追い学習。密対面コーパス（nami:shanks 512局 54,511行・v7・マーク局面シード0.25）を gen9 の
+  v7 恒等拡張ネットで生成し、ep2 lr2e-4・混合ラベル α=0.5・distill0.5（gen9 への value アンカー）。
+  v7 特徴＝`cpu_ai.onplay_option_scan`（手札の各 ON_PLAY 持ちを make/unmake で試し発火を実測・
+  ドン非依存）で「同じカードの価値が手札構成で反転する点（m4@2 型）」の value を初めて動かした
+  ＝representation-bound の緩和。policy は gen9 と同一重みの v7 恒等拡張。判定＝コーチゲート v3 PASS
+  （5.0 vs 4.6・m5@7 獲得）× アリーナ 0.509（gen9 と同等・800局 CI[0.476,0.542]・Elo+6.1）。
+  **昇格基準（wr≥0.55）では FAIL のまま、アリーナ中立の純増＋v7 特徴を土台として確定するユーザ判断で採用**
+  （`docs/reports/cpu_v30_option_feature_20260802.md`。標的 m4@2 の完全解決は次段のペア順位損失へ）。
+  decide は v7 実測ぶん +77%（309→546ms・1秒予算内）。旧 gen9 以前はリプレイ再現/A/B/ロールバック用に同梱維持）／
   `hard`＝α-β）/ `cpu_deck`。未指定・未知値は `learned` に正規化。モデル未同梱環境（`cpu_learned.available()`
   が False）では `learned`→`hard` に安全フォールバック。CPU メタは `CPU_GAMES` に保持（`{cpu_player_id, difficulty}`）。
   - **符号化の対応表はネットが持つ**（`ValueNet.vocab_ids`・2026-07-15 事故対応）: カードDBが増えても
