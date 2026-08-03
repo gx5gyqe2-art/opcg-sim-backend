@@ -92,10 +92,34 @@ def _sample(counts, rng, temp):
 _BATTLE_RESPONSES = ("SELECT_BLOCKER", "SELECT_COUNTER")
 
 
+def _forced_defense_index(legal, rng, eps):
+    """防御窓で確率 `eps` のとき「守る手」から一様に選ぶ index を返す（pure・非該当は None）。
+
+    v26（2026-07-31）。**なぜ温度サンプリングでは足りないか**: v4(c) の防御応答温度は
+    訪問分布からサンプルするが、その訪問分布を作るのは現行 value であり、守りに価値を
+    認めないネットでは訪問が PASS に集中する＝温度1.0でも守る対局はほとんど生成されない
+    （実測: v25 コーパスは温度延長込みで生成したが守り採択率 0.281＝gen8 0.289 と同値）。
+    「価値を知らないから守らない → 守った対局が無いから価値を学べない」の循環を、
+    訪問分布を**無視した**強制探索で断つ（フェーズ1の反実仮想測定と同じ発想を、
+    全決定点に教師が付く密生成へ移す）。両席に適用＝双方の温存カウンターが使われる世界を作る。
+
+    rng 規約: `eps<=0` および守る手が無い窓では**乱数を引かない**＝既定で従来と同一の
+    消費順（seed_frac/relabel_frac と同じ作法）。
+    """
+    if eps <= 0.0:
+        return None
+    idxs = [i for i, mv in enumerate(legal) if (mv or {}).get("action_type") != "PASS"]
+    if not idxs:
+        return None
+    if float(rng.random()) >= eps:
+        return None
+    return int(idxs[int(rng.integers(len(idxs)))])
+
+
 def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_moves=SELFPLAY_TEMP_MOVES,
                   max_steps=400, enc_version=1, leaders=None, dirichlet_eps=0.0, db=None,
                   l1_seat=None, seed_boards=None, seed_frac=0.0,
-                  relabel_frac=0.0, relabel_sims=0, q_teacher_beta=0.0):
+                  relabel_frac=0.0, relabel_sims=0, q_teacher_beta=0.0, def_force_eps=0.0):
     """1局の自己対戦データを採取する（直列/pd並列生成の共通コア・v4計画 §4-1）。
 
     v4 での拡張（docs/cpu_v4_plan.md）:
@@ -126,6 +150,14 @@ def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_move
       prior に誘導された深探索は盲点の枝（無駄ドン回避等の正着）に到達できないことが計測で確定
       しているため。教師探索は同じ sticky 世界（det_seed 共有）で行う。`relabel_frac=0`（既定）で
       挙動不変（rng 消費順も従来どおり＝frac=0 のとき判定の乱数を引かない）。
+
+    v26 での拡張（2026-07-31・`docs/reports/cpu_v25_dense_regen_20260731.md` §5）:
+    - **(f) ε強制防御**: 防御窓で確率 `def_force_eps` のとき訪問分布を無視し「守る手」から
+      一様に選ぶ（`_forced_defense_index`）。v4(c) の温度延長は訪問分布依存のため、
+      守りに価値を認めないネットでは守る対局が生成されない循環を切れない（v25 実測）。
+      **policy 教師（visit）は探索の訪問分布のまま**＝方策は歪めず、value ラベル z が付く
+      **状態分布だけ**を「守った世界」へ広げる（v12 の policy 微調整有害の知見と両立）。
+      `def_force_eps=0`（既定）で挙動不変・rng 消費順も従来どおり。
 
     返り値: (val_recs, pol_recs, winner)。val_recs は (enc, who, q_root, turns_left)。
     """
@@ -196,7 +228,9 @@ def selfplay_game(game, value_fn, priors_fn, vocab, sims, c_puct, rng, temp_move
         pol_recs.append((ctx, am, visit, name))
         pend = m.get_pending_request(with_request_id=False) or {}  # action だけ読む＝request_id 不要
         is_battle_resp = pend.get("action") in _BATTLE_RESPONSES
-        a = _sample(N, rng, temp=1.0 if (steps < temp_moves or is_battle_resp) else 0.0)
+        a = _forced_defense_index(legal, rng, def_force_eps) if is_battle_resp else None
+        if a is None:                                        # (f) 非該当は従来どおり訪問サンプル
+            a = _sample(N, rng, temp=1.0 if (steps < temp_moves or is_battle_resp) else 0.0)
         try:
             cpu_ai._apply_move_inplace(m, name, legal[a])
         except Exception:

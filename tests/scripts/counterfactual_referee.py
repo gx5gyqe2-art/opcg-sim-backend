@@ -66,13 +66,20 @@ def _sample_by_visits(legal, N, temp, rng):
     return legal[int(rng.choice(len(p), p=p))]
 
 
-def rollout(game_serve, vf, pf, state, mover, world_seed, rng_seed, opp_temp=0.0):
+def rollout(game_serve, vf, pf, state, mover, world_seed, rng_seed, opp_temp=0.0,
+            def_temp=0.0):
     """state から終局まで両者同一エンジンで打つ（sticky世界線・既定 temp0）。
 
     `opp_temp` > 0 は**捲りモード**: mover 以外の手番を訪問数比例（温度 τ）でサンプルする＝
     相手の不完全性をモデル化する。相手も完璧（temp0）の前提では「相手が最善なら負け」の
     飽和局面で捲り率が構造的に 0 になり、捲り筋（相手のミスと引きの偏りをどう最大化するか）が
     測れないため。mover 側は常に temp0（自分は最善を尽くす前提）。
+
+    `def_temp` > 0 は**防御探索**（2026-07-30・手札価値測定の循環切り）: 防御窓
+    （SELECT_BLOCKER/SELECT_COUNTER）の応答だけを両席とも訪問数比例（温度 τ）でサンプルする。
+    現行ネットは守らなさすぎ（defense_rate_probe 実測）で、argmax ロールアウトでは
+    「温存したカウンターが将来使われる世界」が生成されず、手札温存の価値が構造的に
+    測定から消える。防御窓のみの探索なので攻め手順の質は落とさない。既定 0＝挙動不変。
 
     返り値 (winner, life_diff, end_turn): life_diff は mover 視点の残ライフ差（勝ち方の質・
     タイブレーク用）。end_turn は決着ターン（速い勝ち／粘る負けの判別用）。"""
@@ -97,7 +104,10 @@ def rollout(game_serve, vf, pf, state, mover, world_seed, rng_seed, opp_temp=0.0
         mv, N, legal = mcts.run(m)
         if mv is None:
             break
-        if opp_temp > 0 and name != mover:
+        pa = m.pending_actor_action()
+        if def_temp > 0 and pa and pa[1] in ("SELECT_BLOCKER", "SELECT_COUNTER"):
+            mv = _sample_by_visits(legal, N, def_temp, rng) or mv
+        elif opp_temp > 0 and name != mover:
             mv = _sample_by_visits(legal, N, opp_temp, rng) or mv
         try:
             cpu_ai._apply_move_inplace(m, name, mv)
@@ -148,8 +158,11 @@ def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, lo
             child = game_serve.apply(world, mv, name)
             if child is None:
                 continue
+            # rng_seed は**手 k に依存させない**（真のCRN・2026-07-30）。手別乱数はロールアウトの
+            # 対照性を壊し、m2@48 実測で「機械的に厳密優位な素通しが 4勝 vs カウンター 8勝」という
+            # 偽の差を作った（共有乱数では 10 vs 9 の同値に収束）。差は「最初の手」だけから生まれるべき。
             winner, ld, et = rollout(game_serve, vf, pf, child, name,
-                                     world_seed=90000 + w * 97, rng_seed=w * 7919 + k)
+                                     world_seed=90000 + w * 97, rng_seed=w * 7919)
             outcomes[k][w] = (winner == name)
             if winner == name:
                 wins[k] += 1

@@ -90,6 +90,13 @@ def main():
     ap.add_argument("--l1-mix", type=float, default=0.0,
                     help="L1-hard 席の混合比（>0 で gen6 の均衡外の局面を混ぜる。"
                          "注意: L1 席の行は q_root=NaN で z へ退化するため別 --out に分けること）")
+    ap.add_argument("--mark-frac", type=float, default=0.0,
+                    help="マーク局面シード比（v5 §4-2・`mark_seeds.load_mark_boards`）。>0 で各局を"
+                         "この確率で人間マークの失敗盤面から開始する＝観測された失敗モードを"
+                         "in-distribution 化する（0=従来の turn1 開始のみ）")
+    ap.add_argument("--def-force-eps", type=float, default=0.0,
+                    help="v26 ε強制防御: 防御窓で確率εのとき訪問分布を無視し『守る手』から一様抽選"
+                         "（0=無効。分布の新規性を作る主レバー・`p3_loop._forced_defense_index`）")
     ap.add_argument("--enc-version", type=int, default=5, help="符号化版（gen6=5）")
     ap.add_argument("--base", default="gen6", help="生成に使う同梱世代")
     ap.add_argument("--seed-base", type=int, default=810000)
@@ -104,8 +111,13 @@ def main():
 
     import p3_run as R
 
-    vpath = os.path.join(MODELS, f"{args.base}_value.npz")
-    ppath = os.path.join(MODELS, f"{args.base}_policy.npz")
+    if os.path.sep in args.base:
+        # パス接頭辞（例 /tmp/gen8v6）: 温スタート拡張ネット等、同梱外の生成ネットを使う。
+        # 行の符号化版（--enc-version）はネット入力にも使われるため、ネット側の版と一致が必要。
+        vpath, ppath = args.base + "_value.npz", args.base + "_policy.npz"
+    else:
+        vpath = os.path.join(MODELS, f"{args.base}_value.npz")
+        ppath = os.path.join(MODELS, f"{args.base}_policy.npz")
     leaders = None
     init, initargs = R._init_worker, ()
     if args.matchup:
@@ -131,7 +143,8 @@ def main():
             vdata, pol, turns, l1g = R.selfplay_shard(
                 pool, args.workers, n, args.sims, args.dirichlet_eps, vpath, ppath,
                 args.seed_base + shard, ev=args.enc_version, leaders=leaders,
-                l1_mix=args.l1_mix)
+                l1_mix=args.l1_mix, mark_frac=args.mark_frac,
+                def_force_eps=args.def_force_eps)
             if vdata is None:
                 print(f"shard{shard}: 生成失敗（スキップ）", flush=True)
                 shard += 1
@@ -139,6 +152,18 @@ def main():
             rows = len(vdata["value"])
             arrays = {k: vdata[k] for k in ("scalars", "field", "card_idx", "value",
                                             "q_root", "turns_left")}
+            # v26 監視: 手札カウンター保有の平均（v6 特徴の先頭＝scalars[SCALARS_V5]）。
+            # ε強制防御が効いていれば「カウンターを切った状態」が増え、この値が下がる
+            # ＝分布の新規性が実際に生まれているかを走りながら見る唯一の安価な指標。
+            hcm = opt = None
+            if args.enc_version >= 6:
+                import rl_encoder as _E
+                hcm = round(float(vdata["scalars"][:, _E.SCALARS_V5].mean()), 5)
+            if args.enc_version >= 7:
+                # v29 監視: 登場時オプションが「生きている」行の割合（v7 特徴の先頭）。
+                # 0 に張り付くなら新特徴は分散を持たず学習の取っ手にならない＝走行中に検知する。
+                col = vdata["scalars"][:, _E.SCALARS_V6]
+                opt = [round(float((col > 0).mean()), 4), round(float(col.mean()), 5)]
             arrays["kind"] = np.array(["dense"] * rows)
             arrays.update(pack_policy(pol))
             path = os.path.join(args.out, f"dense_{shard:05d}.npz")
@@ -146,6 +171,8 @@ def main():
             with open(os.path.join(args.out, f"meta_{shard:05d}.json"), "w") as f:
                 json.dump({"source": "dense_selfplay", "base": args.base, "games": n,
                            "rows": rows, "sims": args.sims, "eps": args.dirichlet_eps,
+                           "def_force_eps": args.def_force_eps, "mark_frac": args.mark_frac,
+                           "hand_counter_mean": hcm, "live_option": opt,
                            "l1_mix": args.l1_mix, "l1_games": l1g,
                            "enc_version": args.enc_version, "schema_version": 2,
                            "mean_turns": float(np.mean(turns)) if turns else None}, f)

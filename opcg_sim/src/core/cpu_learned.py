@@ -37,17 +37,56 @@ _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "data")
 
-# gen8 = gen7 value の**対面特化**密ラベル追い学習（v19・ユーザ実デッキの固定対面ナミvsシャンクス・
-# 自己対戦 1,536局の全決定点 197,683 行・混合ラベル y=0.5·z+0.5·q_root＋残りターン補助・
-# 1エポック lr2e-4）。policy は gen6/gen7 と同一バイナリ（v12 確定＝policy 微調整は有害のため凍結）。
-# 判定は較正済み 800局アリーナ（docs/reports/cpu_v19_matchup_density_20260729.md・
-# 対gen7 wr=0.570 CI[0.537,0.603]・対gen5 アンカー 0.615 CI[0.556,0.674]・コーチゲートv2 5.4>5.0
-# ＝無駄カウンター2点完治）。1対面のコーパスが汎用側へ +49 Elo 波及＝「密度×分布の新しさ」が効く
-# （同分布2周目の v17 は +21 未確証で打ち切り）。符号化は v5（55スカラー）で net の feat_dim から
-# 自動判別される。gen7 以前はリプレイ再現・A/B・ロールバック用に同梱を維持する
-# （レフェリー教師の錨は gen5 固定のまま＝referee_labeler は明示ロード）。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen8_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen8_policy.npz")
+# gen9 = gen8 と「v25 防御混合候補」の value 重み**線形補間 α=0.5**（v28・
+# docs/reports/gen9_adoption_20260801.md）。候補側は修正済み効果解決エンジン上の密対面
+# コーパス（nami:shanks 2,048局 244,544行・v6符号化）＋防御CF 438行で gen8 を追い学習した
+# もの（ep2 lr2e-4・混合ラベル α=0.5）。純候補はコーチゲート v3 初 PASS（6.1 vs 4.7・
+# 退行ゼロ）だがアリーナ 0.454 で、補間 α=0.5 が「コーチ 5.6 PASS × アリーナ 0.475
+# CI[0.426,0.524]（parity 棄却されず）」の意思決定点（交換曲線は v28 レポート）。
+# **昇格基準（wr≥0.55）では FAIL のままユーザ判断で採用**＝人間検証14点の改善を取り、
+# 自己対戦で最大 ~2-3pp を許容する取引（2026-08-01 ユーザ決定）。
+# policy は gen8 と同一の重みを v6 へ恒等温スタート拡張したバイナリ（v12 確定＝policy
+# 微調整は有害のため凍結。value が v6=60スカラーのため ctx 幅を揃える必要がある——
+# 版不整合は行動特徴が5列ずれて黙って壊れる: dense_finetune の 2026-07-31 修正参照）。
+# gen10 = gen9 に「登場時オプションの実測特徴（符号化 v7・63スカラー）」を積んで追い学習
+# （v30・docs/reports/cpu_v30_option_feature_20260802.md）。密対面コーパス（nami:shanks
+# 512局 54,511行・v7・マーク局面シード0.25）を gen9 の v7 恒等拡張ネットで生成し、
+# ep2 lr2e-4・混合ラベル α=0.5・**distill0.5**（gen9 への value アンカー＝一般対局の忘却抑制）で
+# 追い学習。v7 特徴（`cpu_ai.onplay_option_scan`＝手札の各 ON_PLAY 持ちを make/unmake で
+# 試し発火を実測・ドン非依存）が m4@2 型（同じカードの価値が手札構成で反転する点）の value を
+# 初めて動かした（子盤面 value 差 -0.140→-0.106・representation-bound の緩和）。判定＝
+# コーチゲート v3 PASS（5.0 vs 4.6・m5@7 獲得）× アリーナ 0.509（gen9 と同等・800局
+# CI[0.476,0.542]・Elo+6.1）。**昇格基準（wr≥0.55）では FAIL のまま、アリーナ中立の純増＋
+# v7 特徴を土台として確定するユーザ判断で採用**（2026-08-02。標的 m4@2 の完全解決は
+# 次段のペア順位損失へ）。decide は v7 実測ぶん +77%（309→546ms・1秒予算内）。
+# policy は gen9 と同一重みの v7 恒等拡張バイナリ（v12 確定＝policy 微調整は有害・value との
+# 符号化版一致が必須）。符号化は v7 で net の feat_dim から自動判別。gen9 以前はリプレイ
+# 再現・A/B・ロールバック用に同梱維持（レフェリー教師の錨は gen5 固定のまま）。
+# gen11 = gen10 に「蒸留アンカー付き順位学習」を積み、さらに gen10 と **α=0.3 で線形補間**
+# （v33・docs/reports/gen11_adoption_20260803.md）。符号化は **v8**（=v7 + 自場集約3。相手場
+# （v5）と同じ関数の純対称化＝自場が生カウントのみだった非対称の解消。しきい値つき弱ボディ
+# 特徴は汎用性のため設けない・ユーザ方針 2026-08-03）。
+# 教師は `option_pair_gen` のカード単位ペア（160局・296群・1,328ペア）で、**v32 で確立した
+# 2つの評価方法の修正**を含む: (1) ロールアウトの **def_temp=0.7**（argmax 防御は「手札を回して
+# 即出しする枝」に偽の優位を与える＝温存カウンターが使われる世界が生成されない。m4@2 実測で
+# イワンコフ 18/32→11/32 と偽優位が消失）、(2) **margin_blend ラベル**（勝敗 z ＋
+# 0.25·clip(平均残ライフ差/4)＝拮抗群を勝ち方の質でタイブレーク）。
+# 学習は `rank_finetune_anchored`（v33）＝順位ヒンジのバッチごとに「dense 一般盤面 16,000点で
+# gen10 の予測へ引き戻す蒸留バッチ」を交互に流す。v32 は**アンカー無し順位ヒンジが順位を
+# 上げるほど防御較正（m2@12/58 の「素通しが正」）を先に壊す**負の結果を3回再現しており、
+# 錘で既存挙動を固定したまま順位だけ動かすのが本世代の核。残った m2@58 の劣化は gen10 との
+# α=0.3 補間で回収した（gen9 と同じ交換曲線の使い方）。
+# 判定＝コーチゲート v3 **PASS（6.9 vs 6.5・歴代最高）**・bar 超えは狙った m1@3 の改善
+# （0.50→1.00＝**非発動イワンコフ**〈手札 6000×1 で条件不成立・手札 6→5 でバニラ 2000 が
+# 湧くだけ〉を出さずウタを出す）のみで**退行ゼロ**、アリーナ 800局 0.4925 CI[0.463,0.522]
+# ＝中立（Elo−5.2）。**昇格基準（wr≥0.55）では FAIL のままユーザ判断で採用**（2026-08-03・
+# gen9/gen10 と同じ「人間検証点の改善 × 自己対戦中立」の取引）。
+# policy は gen10 と同一重みの v8 恒等温スタート拡張バイナリ（v12 確定＝policy 微調整は有害・
+# value との符号化版一致が必須＝版不整合は行動特徴列がずれて黙って壊れる）。符号化は net の
+# feat_dim から自動判別。gen10 以前はリプレイ再現・A/B・ロールバック用に同梱維持
+# （レフェリー教師の錨は gen5 固定のまま）。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen11_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen11_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}
@@ -342,13 +381,17 @@ def _select_root_group(groups, min_frac: float = SERVE_ROOT_SWITCH_MIN_FRAC,
 def _merge_root_stats(manager, legal, N, Q):
     """ルート合法手を挙動等価キー（`cpu_ai._move_equiv_key`）でグループ化し訪問数を合算する。
 
-    返り値: [{"rep": 代表index(グループ内N最大), "idxs": [...], "n": N合算, "q": N加重平均Q}]
+    返り値: [{"rep": 代表index(グループ内の**列挙順先頭**), "idxs": [...], "n": N合算, "q": N加重平均Q}]
     を n 降順（同数は legal 列挙順＝安定）で。等価手が無い局面では全グループが単独＝
     先頭グループの rep が従来の argmax(N) と一致し**挙動不変**。
 
     等価判定は card_id 基準＝リプレイ逆写像（`replay_runner._key`）と同じ同一視。場の複製
     （同名キャラで付与ドン数が違う等）は厳密には非等価だが、その残差はリプレイ側と同じ
-    許容（R0 §5）に揃える。
+    許容（R0 §5）に揃える。**代表は列挙順先頭**（2026-07-30）: 旧実装のグループ内 N 最大は
+    探索ノイズで割れた訪問数の多い側＝card_id 記述子から再現不能で、録画時に2枚目の複製へ
+    ATTACH_DON した手を再生（`resolve_recorded_action`＝記述子一致の先頭）が1枚目に写像し、
+    以後の盤面が無音で分岐する実害が出た（seed9100 round-trip 実測）。等価前提の下で
+    代表の選び方は挙動中立＝再現可能な先頭に固定する。
     """
     from opcg_sim.src.core import cpu_ai
     order, groups = [], {}
@@ -363,7 +406,7 @@ def _merge_root_stats(manager, legal, N, Q):
         idxs = groups[k]
         n = float(sum(float(N[i]) for i in idxs))
         q = (sum(float(N[i]) * float(Q[i]) for i in idxs) / n) if n > 0 else 0.0
-        rep = max(idxs, key=lambda i: float(N[i]))
+        rep = idxs[0]   # 列挙順先頭＝リプレイ逆写像と同じ実体（旧: N最大＝再現不能）
         out.append({"rep": rep, "idxs": idxs, "n": n, "q": q})
     out.sort(key=lambda g: -g["n"])   # sort は安定＝同数なら列挙順を保つ
     return out

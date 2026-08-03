@@ -387,20 +387,129 @@ def get_pending_request(gm, with_request_id: bool = True) -> Optional[Dict[str, 
         request["request_id"] = _rid(request)
     return request
 
+def _int_of(v) -> int:
+    try:
+        return int(v or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def card_keep_value(card) -> int:
+    """「残す価値」の合成序列。カード個別知識は持たない汎用属性のみ（2026-07-30）。
+
+    旧序列（コスト×パワーのみ）は「低コストでも価値がある札」（カウンター2000のイベント、
+    効果持ちの1コスト等）を一律最下位に置き、捨て札コストで要札から捨てていた（ユーザ指摘）。
+    加点はすべて印刷/現在属性の集計＝特定カードのハードコード無し:
+      - コスト（資源投資の規模）           × 100
+      - 現在パワー（盤面圧）               / 100
+      - カウンター値（防御資源）           / 20   （2000 カウンター ＝ コスト1相当）
+      - 効果ブロック数（効果持ち＞バニラ）  × 120
+      - カウンタートリガー効果（防御イベント札）+150
+      - 【トリガー】アイコン               +60
+    ドレイン既定（`choose_selection`）と探索分岐順序（`cpu_ai._rank_select_candidates`）の
+    両方がこの1本を使う＝既定と分岐で序列が食い違わない。"""
+    m = getattr(card, "master", None)
+    cost = _int_of(getattr(m, "cost", 0))
+    try:
+        power = _int_of(card.get_power(False))
+    except Exception:
+        power = _int_of(getattr(m, "power", 0))
+    counter = _int_of(getattr(card, "current_counter", None))
+    if counter == 0:
+        counter = _int_of(getattr(m, "counter", 0))
+    abilities = getattr(m, "abilities", None) or ()
+    n_abil = len(abilities)
+    trig_names = {getattr(getattr(ab, "trigger", None), "name", "") for ab in abilities}
+    has_counter_trig = "COUNTER" in trig_names
+    has_trigger_icon = "TRIGGER" in trig_names
+    return (cost * 100 + power // 100 + counter // 20 + 120 * n_abil
+            + (150 if has_counter_trig else 0) + (60 if has_trigger_icon else 0))
+
+
+# 後方互換の別名（`_selection_entries` と旧参照が使う）。
+_selection_card_value = card_keep_value
+
+
+def choose_selection(entries, min_n: int, max_n: int):
+    """ゾーン意味論に基づく既定選択（pure）。entries=[(uuid, side, zone, value)]。
+
+    2026-07-30 の実測欠陥（m4@2/m1@3・`docs/reports/cpu_v24_counterfactual_pairs_20260729.md` 後続調査）:
+    旧既定「候補先頭から min 件」は (a) 手札破棄コストで**最良札から**捨てる
+    （イワンコフ ST30-004 が公開した 6000 2枚を自分で捨てた）、(b) min=0 の「〜まで」獲得を
+    **常に0件見送る**（ウタ OP09-002 が公開山札から1枚も加えない）。候補のゾーンで意味を判別する:
+      - 全候補が自分の山札/トラッシュ＝**獲得系** → max 件・価値降順（良い札から取る）
+      - 全候補が自分の手札/場＝**コスト系** → min 件・価値昇順（安い札から払う）
+      - 全候補が相手側＝**対象系** → max 件・価値降順（強い札から狙う）
+    判別できない（混在/ゾーン不明/ドン/ライフ）ときは None ＝呼び出し側が旧既定（先頭 min 件）へ
+    退避する。ドンは RETURN_DON の候補順細工（レスト優先・SPEC §2.5 実装済み）を壊さないため、
+    ライフは「手札に加える」が実質コスト（ライフ減）でありゾーンだけで損得を判別できないため。
+    """
+    if not entries or max_n < 1:
+        return None
+    sides = {e[1] for e in entries}
+    zones = {e[2] for e in entries}
+    if None in sides or None in zones:
+        return None
+    n_max = min(max_n, len(entries))
+    n_min = max(min(min_n, len(entries)), 0)
+    if sides == {"own"} and zones <= {"deck", "trash"}:
+        ranked = sorted(entries, key=lambda e: -e[3])
+        return [e[0] for e in ranked[:n_max]]
+    if sides == {"own"} and zones <= {"temp"} and min_n == 0:
+        # 公開一時領域（デッキを見て選ぶ系）の「〜まで」＝獲得。強制（min>0）の TEMP 選択は
+        # 意味を断定できないため旧既定へ（ミル系コストで最良札を選ぶ誤爆を避ける）。
+        ranked = sorted(entries, key=lambda e: -e[3])
+        return [e[0] for e in ranked[:n_max]]
+    if sides == {"own"} and zones <= {"hand", "field"}:
+        ranked = sorted(entries, key=lambda e: e[3])
+        return [e[0] for e in ranked[:n_min]]
+    if sides == {"opp"}:
+        ranked = sorted(entries, key=lambda e: -e[3])
+        return [e[0] for e in ranked[:n_max]]
+    return None
+
+
+def _selection_entries(gm, pid: str, uuids):
+    """selectable uuid 列 → (uuid, side, zone, value) 列。ゾーンを1走査で索引して引く。"""
+    actor = gm.p1 if gm.p1.name == pid else gm.p2
+    opp = gm.p2 if actor is gm.p1 else gm.p1
+    index = {}
+    for owner, side in ((actor, "own"), (opp, "opp")):
+        for zname in ("hand", "deck", "trash", "field", "life"):
+            for c in getattr(owner, zname, None) or ():
+                u = getattr(c, "uuid", None)
+                if u is not None and u not in index:
+                    index[u] = (side, zname, _selection_card_value(c))
+        for zname in ("leader", "stage"):
+            c = getattr(owner, zname, None)
+            if c is not None and getattr(c, "uuid", None) is not None:
+                index.setdefault(c.uuid, (side, zname, _selection_card_value(c)))
+    ai = getattr(gm, "active_interaction", None) or {}
+    if ai.get("player_id") == pid:
+        # デッキを見て選ぶ系は候補が公開一時領域（active_interaction.candidates）に居て
+        # プレイヤーのゾーン走査では見つからない（m1@3 ウタで実測）。
+        for c in ai.get("candidates") or ():
+            u = getattr(c, "uuid", None)
+            if u is not None and u not in index:
+                index[u] = ("own", "temp", _selection_card_value(c))
+    return [(u,) + index.get(u, (None, None, 0)) for u in uuids]
+
+
 def default_interaction_payload(gm, pending: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """効果対話に対する「妥当な既定解決」のペイロードを構築する。
 
-    本番（自己対戦/CPU）でも使える機械的な既定選択:
-      - 必要最小数 (constraints.min) を満たすよう候補の先頭から選ぶ
-      - can_skip なら 0 件選択（スキップ）も可だが、min>0 のときは min 件選ぶ
+    機械的な既定選択（本番の自己対戦/CPU・探索ドレイン・`get_legal_actions` の既定解決1手が使う）:
+      - **ゾーン意味論**（`choose_selection`）: 獲得系（自山札/トラッシュ候補）は max 件を価値降順、
+        コスト系（自手札/場候補）は min 件を価値昇順、対象系（相手側候補）は max 件を価値降順
+      - 判別できない対話は従来どおり候補の先頭から min 件（後方互換・ARRANGE_DECK 等）
       - CHOICE/CONFIRM 系は index=0（最初の選択肢/発動する）
-    AI（PR2）は本メソッドを評価関数で上書きして最良選択を選ぶ。
     """
     if pending is None:
         pending = gm.get_pending_request() or {}
     pending_props = CONST.get('PENDING_REQUEST_PROPERTIES', {})
     KEY_UUIDS = pending_props.get('SELECTABLE_UUIDS', 'selectable_uuids')
     KEY_CONSTRAINTS = pending_props.get('CONSTRAINTS', 'constraints')
+    KEY_PID = pending_props.get('PLAYER_ID', 'player_id')
     uuids = list(pending.get(KEY_UUIDS, []) or [])
     constraints = pending.get(KEY_CONSTRAINTS) or {}
     try:
@@ -411,9 +520,14 @@ def default_interaction_payload(gm, pending: Optional[Dict[str, Any]] = None) ->
         max_n = int(constraints.get("max", len(uuids)))
     except (TypeError, ValueError):
         max_n = len(uuids)
-    take = max(min_n, 0)
-    take = min(take, max_n, len(uuids))
-    selected = uuids[:take]
+    selected = None
+    pid = pending.get(KEY_PID)
+    if uuids and max_n >= 1 and pid in (gm.p1.name, gm.p2.name):
+        selected = choose_selection(_selection_entries(gm, pid, uuids), min_n, max_n)
+    if selected is None:
+        take = max(min_n, 0)
+        take = min(take, max_n, len(uuids))
+        selected = uuids[:take]
     return {
         "selected_uuids": selected,
         "index": 0,

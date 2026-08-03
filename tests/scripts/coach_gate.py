@@ -75,26 +75,43 @@ REPLAYS_V2 = {
     "m4": os.path.join(_FIX2, "opcg_replay_6563214359889287880.json.gz"),   # ナミ(人) vs シャンクス(CPU)
     "m5": os.path.join(_FIX2, "opcg_replay_9195490382040907274.json.gz"),   # シャンクス(人) vs ナミ(CPU)
 }
+# **VERIFIED v3**（2026-07-30 再裁定・/tmp/mark_verify3.jsonl・worlds16）。旧 v2（13点・worlds8）は
+# 効果対話の既定解決欠陥（`docs/reports/default_interaction_fix_20260730.md`＝捨て札が公開札を
+# 捨てる／up-to 獲得を常時見送る）で PLAY 系プランの測定が汚染されていたため、修正後エンジンで
+# 34マークを全点再裁定した（11/34 で裁定/accept が変化・旧表は同レポートと v18 レポートに保存）。
+# 変数名は既存プローブ（prior_bound_probe / value_blind_probe）互換のため VERIFIED_V2 のまま。
 VERIFIED_V2 = [
-    # m1: CPU=シャンクス（無駄カウンター2点・ガード2点）
-    ("m1", 3,  {("PLAY", "ST30-004")}),                                    # ガード（レフェリーは出す側を支持）
-    ("m1", 14, {("PASS", None)}),                                          # 無駄カウンター
-    ("m1", 15, {("PASS", None), ("SELECT_COUNTER", "OP10-011")}),          # 同上（2枚目）
-    ("m1", 42, {("ATTACH_DON", "OP12-008"), ("ATTACK", "OP09-002"),
-                ("PLAY", "OP12-008")}),                                    # ガード
-    # m2: CPU=ナミ（リーダー付与・攻撃の3点＋防御ガード2点）
-    ("m2", 12, {("SELECT_COUNTER", "OP14-108"), ("SELECT_COUNTER", "OP08-050")}),   # ガード
+    # m1: CPU=シャンクス
+    # m1@3 は 2026-07-30 に「判別不能」で取り下げ→**2026-08-03 再採録**: (1) ユーザ最終裁定＝
+    # 非発動イワンコフ（6000×1 で条件不成立・手札 6→5 でバニラ2000 が湧くだけ）を出すのが問題、
+    # (2) 修正済み評価（32世界 def_temp0.7・マージン記録）でウタが勝敗（7/6/4）・ライフ差
+    # （−0.44/−0.69/−1.25）の両方で最上位＝旧「判別不能」は def_temp=0 測定器の盲点だった、
+    # (3) gen10 の行動欠陥を実測（8seed でイワンコフ 5/ウタ 3）＝改善ターゲットとして機能する。
+    # TURN_END は両指標最下位（序盤6枚手札はテンポ優先）のため band 外。
+    ("m1", 3,  {("PLAY", "OP09-002")}),                                    # ウタを出す（非発動イワンコフは band 外）
+    ("m1", 14, {("SELECT_COUNTER", "OP09-002"), ("SELECT_COUNTER", "OP10-011")}),  # 反転: カウンターは band 内（旧: PASS のみ）
+    ("m1", 15, {("SELECT_COUNTER", "OP10-011")}),                          # チョッパーで守る（PASS は band 外へ）
+    ("m1", 42, {("ATTACH_DON", "OP09-002"), ("ATTACH_DON", "OP12-008"),
+                ("ATTACK", "ST30-004")}),                                  # ガード
+    ("m1", 94, {("ATTACK", "OP09-001"), ("ATTACK", "OP09-002"),
+                ("ATTACK", "ST30-004")}),                                  # 新規: 攻撃すべき（耐久でなく）
+    # m2: CPU=ナミ
+    ("m2", 12, {("PASS", None)}),                                          # 反転: 素通しが正（旧: カウンター）
     ("m2", 44, {("ATTACH_DON", "OP11-041")}),                              # リーダーへ付与（守り）
-    ("m2", 58, {("SELECT_COUNTER", "OP14-108"), ("PASS", None),
-                ("SELECT_COUNTER", "EB03-053"), ("SELECT_COUNTER", "EB04-058")}),   # ガード
+    ("m2", 58, {("PASS", None)}),                                          # ガード（accept は素通しのみに縮小）
     ("m2", 64, {("ATTACK", "OP16-056")}),                                  # クマシー出しでなく攻撃
-    ("m2", 66, {("ATTACK", "EB03-053"), ("ATTACK", "OP16-056"),
-                ("ATTACK", "EB03-055")}),                                  # ロビンで攻撃
-    # m4: CPU=シャンクス（イワンコフ無駄出し2点＋ガード1点）
-    ("m4", 2,  {("TURN_END", None)}),                                      # turn1 イワンコフ出しは損
-    ("m4", 8,  {("ATTACH_DON", "OP09-001"), ("ATTACK", "OP09-001")}),      # ガード
-    ("m4", 12, {("TURN_END", None), ("ATTACH_DON", "ST30-004"),
-                ("PLAY", "OP13-007")}),                                    # 2枚目イワンコフも損
+    ("m2", 66, {("ATTACK", "EB03-055")}),                                  # ロビンで攻撃（accept 縮小）
+    # m4: CPU=シャンクス
+    # m4@2 の accept はユーザ最終裁定（2026-08-03）: **イワンコフ出しが正解**。手札に 6000×2
+    # （OP16-012×2）があり登場時効果が**発動する**（3枚引いて2枚捨て＝手札 5→5・エンジン実測）
+    # ＝実質ノーコストで体と手札の入替が得られる。2026-08-02 の TURN_END/A&S&L への拡大裁定は
+    # 「発動しない」誤認に基づくもので破棄。単手測定（32世界 def_temp0.7）でも3枝拮抗＝
+    # イワンコフを band 外に置く根拠は無い。gen8〜10 は本点を打てている＝非退行ガードとして機能。
+    # 「非発動イワンコフを咎める」課題は m1@3（6000×1・不成立・手札 6→5）が正しい標的。
+    ("m4", 2,  {("PLAY", "ST30-004")}),
+    ("m4", 8,  {("ATTACH_DON", "ST30-004"), ("ATTACK", "OP09-001"),
+                ("ATTACK", "ST30-004"), ("PLAY", "OP13-007")}),            # ガード（band 拡大）
+    ("m4", 12, {("ATTACK", "ST30-004"), ("PLAY", "OP09-002")}),            # 正解変化: イワンコフで攻撃 or ウタ展開
     # m5: CPU=ナミ
     ("m5", 7,  {("ATTACH_DON", "OP11-041"), ("PLAY", "OP11-106")}),        # ナミ3ドン付与
 ]
@@ -121,6 +138,16 @@ def decide_rate(eng, m0, actor, accept, seeds, sims):
     return n / max(seeds, 1)
 
 
+def min_reliable_delta(seeds):
+    """点別の命中率差が『測定ノイズでない』と言える最小幅（pure・2σ・最悪ケース p=0.5）。
+
+    命中率は seeds 回のベルヌーイ試行＝SE ≤ 0.5/√n。2条件の差の SE は √2 倍なので
+    2σ ≈ 1.414/√n。v22 実測（`docs/reports/coach_gate_variance_20260729.md`）で
+    5seed（bar 0.63）では m4@8 の 0.60→0.20 が『退行』に見えたが、16seed（bar 0.35）では
+    両者 0.38 で差が無かった。**この bar 未満の点別増減を『治った/壊れた』と書かない**。"""
+    return 1.4142135623730951 / (seeds ** 0.5) if seeds > 0 else float("inf")
+
+
 def judge(rows, regress_base=0.8, regress_drop=0.4):
     """点別 (base, chall) → (非退行OK, 改善OK, 退行リスト)（pure・mark_gate と同型の判定）。"""
     regressions = [(tag, i, b, c) for (tag, i, b, c) in rows
@@ -135,7 +162,9 @@ def main():
     ap.add_argument("--challenger", required=True, help="value.npz[,policy.npz]")
     ap.add_argument("--baseline", default=None,
                     help="value.npz[,policy.npz]（既定=出荷既定＝現 gen7）")
-    ap.add_argument("--seeds", type=int, default=5)
+    ap.add_argument("--seeds", type=int, default=16,
+                    help="点ごとの decide 回数。**5 は分散が大きすぎる**（v22 実測: 5seed で "
+                         "『退行』に見えた m4@8 が 16seed では差なし）。`min_reliable_delta` 参照")
     ap.add_argument("--sims", type=int, default=160)
     ap.add_argument("--profile", default="v2", choices=("v2", "g3", "all"),
                     help="v2=gen7実対局13点（既定）／g3=旧7点（gen4期・診断用）／all=両方")
@@ -177,6 +206,12 @@ def main():
         c = decide_rate(chall_eng, m0, actor, accept, ARGS.seeds, ARGS.sims)
         rows.append((tag, i, b, c))
         print(f"  {tag}@{i:<4} base={b:.2f} chall={c:.2f}  合格手={sorted(accept)}")
+    bar = min_reliable_delta(ARGS.seeds)
+    sig = [(t, i, b, c) for t, i, b, c in rows if abs(c - b) >= bar]
+    print(f"\n測定ノイズでないと言える差の下限（2σ・seeds={ARGS.seeds}）= {bar:.2f}")
+    print(f"  この bar を超えた点: "
+          + (", ".join(f"{t}@{i}({b:.2f}→{c:.2f})" for t, i, b, c in sig) if sig else "なし")
+          + "  ← これ未満の増減は『治った/壊れた』と読まない")
     ok_nr, ok_imp, regs = judge(rows)
     print(f"\n改善: {'OK' if ok_imp else 'NG'}"
           f"（chall計 {sum(c for *_ , c in rows):.1f} vs base計 {sum(b for _t, _i, b, _c in rows):.1f}）")

@@ -566,6 +566,81 @@ def _score_move_1ply(manager, actor_name: str, move: Dict[str, Any], eval_name: 
     return evaluate(clone, eval_name, see_opp_hand=see_opp_hand)
 
 
+def onplay_option_scan(manager, actor_name: str):
+    """手札の「登場時オプション」を実測でスキャンする（v29・符号化 v7 の土台）。
+
+    自分のメイン手番（pending=MAIN_ACTION が actor 宛て）で、合法な PLAY 手それぞれを
+    **make/unmake で適用→観測→巻き戻し**し、バニラ設置以外の何か（効果対話 or EFFECT
+    イベント）が起きるかを見る。判定子: 適用後 pending.action != MAIN_ACTION（対話が
+    立った）または action_events に EFFECT（無対話の自動効果）。
+
+    なぜ実測か: 「手札のパワー6000を2枚公開」等の登場時条件はカード間の関係で、
+    静的特徴では表現できない（v24 representation-bound の正体）。エンジン自身に
+    試させれば条件知識の重複実装ゼロで全カードに一般化する。stop_at_select=True で
+    選択解決の手前まで＝実測 0.08〜0.26ms/枚（clone 1.1ms の 1/4〜1/14）。
+
+    **ドン非依存**（2026-08-02 修正）: 対象は「手札にある ON_PLAY 持ち」であり、今その
+    コストを払えるかは問わない。テスト時にそのカードのコストぶんのドンを**トランザクション
+    内で一時的に補う**（巻き戻される）。この意味論でないと、ドンを使い切った子盤面で全札が
+    非合法になり (0,0,0) へ潰れる＝**「オプションを温存した子」と「行使した子」が同じ値に
+    見える**（v30 中間で実測。判別が要る唯一の場所で盲目だった）。オプション価値は手札の
+    構成の性質であって、今ターンの支払い能力ではない。
+
+    近似の限界: 一時ドンは「場のドンN枚なら」型の条件を歪めうる（補うのはコスト分だけ＝
+    最小限に留める）。カード個別の知識は持たないので、この歪みは全カードに一様に乗る。
+
+    返り値 (n_live, n_dead, keep_live): 発火する札数・**ON_PLAY 持ちなのに発火しない**
+    札数（＝出してもオプションを浪費するだけの札）・発火する札の card_keep_value 合計。
+    非メイン手番・mu 不能は (0,0,0)＝「手番の意思決定点でのみ意味を持つ」意味論。
+    global random は消費しない（stop 手前に乱数系処理なし・テストで機械保証）。
+    """
+    if not _mu_safe(manager):
+        return (0, 0, 0.0)
+    pend0 = manager.get_pending_request(with_request_id=False) or {}
+    if pend0.get("action") != "MAIN_ACTION" or pend0.get("player_id") != actor_name:
+        return (0, 0, 0.0)
+    from .engine.interaction import card_keep_value
+    from ..models.models import DonInstance
+    actor = _player_by_name(manager, actor_name)
+    if actor is None:
+        return (0, 0, 0.0)
+    targets = [c for c in list(actor.hand)
+               if any(getattr(getattr(ab, "trigger", None), "name", "") == "ON_PLAY"
+                      for ab in (getattr(c.master, "abilities", None) or ()))]
+    if not targets:
+        return (0, 0, 0.0)
+    n_live = n_dead = 0
+    keep_live = 0.0
+    saved_events = manager.action_events
+    for ci in targets:
+        cost = int(getattr(ci.master, "cost", 0) or 0)
+        fired = False
+        with journal.transaction():
+            manager.action_events = JournaledList()
+            try:
+                need = cost - len(actor.don_active)
+                for _ in range(max(0, need)):        # 一時ドン（txn 巻き戻しで消える）
+                    actor.don_active.append(DonInstance(owner_id=actor_name))
+                mv = next((m for m in manager.get_legal_actions()
+                           if m.get("action_type") == "PLAY"
+                           and (m.get("payload") or {}).get("uuid") == ci.uuid), None)
+                if mv is not None:
+                    _apply_move_inplace(manager, actor_name, mv, stop_at_select=True)
+                    pend = manager.get_pending_request(with_request_id=False) or {}
+                    fired = (pend.get("action") != "MAIN_ACTION") or any(
+                        isinstance(e, dict) and e.get("type") == "EFFECT"
+                        for e in manager.action_events)
+            except Exception:
+                fired = False
+        if fired:
+            n_live += 1
+            keep_live += float(card_keep_value(ci))
+        else:
+            n_dead += 1                              # ON_PLAY 持ちの不発＝オプションの浪費
+    manager.action_events = saved_events
+    return (n_live, n_dead, keep_live)
+
+
 def _recurse_child(manager, actor_name: str, move: Dict[str, Any], search_fn) -> Optional[float]:
     """move を適用した子局面で `search_fn(child) -> float` を評価して返す。失敗は None。
 
@@ -603,23 +678,21 @@ def _simulate_and_eval(manager, actor_name: str, move: Dict[str, Any],
 def _rank_select_candidates(manager, uuids: List[str], actor_name: str) -> List[str]:
     """選択候補 uuid を「CPU にとって選ぶ価値の高い順」に並べる。
 
-    相手のカード（除去/弱体の対象）＝**脅威の大きい順**（パワー→コスト降順）に除去する。
-    自分のカード（コスト/犠牲としての対象）＝**価値の小さい順**（パワー→コスト昇順）に差し出す。
+    相手のカード（除去/弱体の対象）＝**残す価値の大きい順**に除去、自分のカード（コスト/犠牲）＝
+    **残す価値の小さい順**に差し出す。序列は `engine.interaction.card_keep_value`
+    （コスト・現在パワー・カウンター値・効果保有・カウンタートリガー・【トリガー】の合成・
+    2026-07-30 統一）＝ドレイン既定（`choose_selection`）と同じ1本を使う。旧序列（パワー→コスト
+    のみ）は低コストの要札（カウンター2000 のイベント・効果持ち1コスト等）を一律最下位に置き、
+    捨て札コストで要札から捨てる分岐しか探索に見せていなかった。
     候補に対応するカードが見つからないものは末尾へ（順序のみのヒューリスティック）。"""
-    def _pw(c):
-        try:
-            return c.get_power(False)
-        except Exception:
-            return getattr(getattr(c, "master", None), "power", 0) or 0
-    def _cost(c):
-        return getattr(getattr(c, "master", None), "cost", 0) or 0
+    from .engine.interaction import card_keep_value
     pairs = [(u, manager._find_card_by_uuid(u)) for u in uuids]
     found = [(u, c) for u, c in pairs if c is not None]
     missing = [u for u, c in pairs if c is None]
     if found and all(getattr(c, "owner_id", None) == actor_name for _u, c in found):
-        found.sort(key=lambda uc: (_pw(uc[1]), _cost(uc[1])))            # 自分＝弱い順に差し出す
+        found.sort(key=lambda uc: card_keep_value(uc[1]))                # 自分＝価値の低い順に差し出す
     else:
-        found.sort(key=lambda uc: (-_pw(uc[1]), -_cost(uc[1])))          # 相手＝強い脅威から除去
+        found.sort(key=lambda uc: -card_keep_value(uc[1]))               # 相手＝価値の高い脅威から
     return [u for u, _c in found] + missing
 
 
@@ -715,8 +788,9 @@ def _selection_moves(manager, actor_name: str):
     # 単一対象選択: 候補ごとに分岐。
     if max_n == 1 and min_n <= 1:
         moves: List[Dict[str, Any]] = [_mk([uid]) for uid in uuids[:HARD_SELECT_CAP]]
-        # 任意選択（min==0・スキップ可）なら「選ばない」も一級の候補にする。
-        if min_n == 0 and bool(pending.get(KEY_SKIP, False)):
+        # 任意選択（min==0）なら「選ばない」も一級の候補にする。2026-07-30 以前は raw 既定解決
+        # （常に0枚）が見送り枝を担っていたが、既定がゾーン意味論の価値選択になったため明示する。
+        if min_n == 0:
             moves.append(_mk([]))
         return moves
 

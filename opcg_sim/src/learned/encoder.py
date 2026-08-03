@@ -40,7 +40,11 @@ SCALARS_V2 = 16        # v2 = v1 + [自リーダー付与ドン, 相手リーダ
 SCALARS_V3 = 46        # v3 = v2 + [山札/トラッシュ/今ターンKO数 6] + [ターン1使用済み 12] + [召喚酔い 12]
 SCALARS_V4 = 51        # v4 = v3 + 自デッキ残の集約5（残カウンター総量/密度・ブロッカー残・イベント残・高コストキャラ残）
 SCALARS_V5 = 55        # v5 = v4 + 相手場の脅威集約3（総火力/高パワー数/ブロッカー数）＋展開余力1（ドンで出せる手札キャラ数）
-_SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4, 5: SCALARS_V5}
+SCALARS_V6 = 60        # v6 = v5 + **自手札の資源集約5**（カウンター総量/カウンター札数/最大カウンター/ブロッカー数/イベント数）
+SCALARS_V7 = 63        # v7 = v6 + **登場時オプション実測3**（発火するPLAY数/そのkeep値/ON_PLAY持ち不発数・v29）
+SCALARS_V8 = 66        # v8 = v7 + **自場集約3**（総火力/高パワー数/ブロッカー数＝相手v5と純対称・v32）
+_SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4,
+                       5: SCALARS_V5, 6: SCALARS_V6, 7: SCALARS_V7, 8: SCALARS_V8}
 
 
 def scalars_dim(version=1):
@@ -172,6 +176,49 @@ def _opp_field_aggregate(field):
     ]
 
 
+# v6: **自手札の資源集約**（2026-07-30・ユーザ指摘「手札の価値をどう正しく判断するか」）。
+# v5 までスカラーに載る手札情報は**枚数だけ**で、質（カウンター値・ブロッカー・イベント）は
+# card_idx の埋め込み経由でしか見えなかった。その結果 value は「手札が減った＝勝者の相貌」という
+# 逆向きの相関を学んでいた（v23 遮蔽帰属: 手札枚数 +0.084・手札ID +0.165 が誤着を押し上げ）。
+# 山札残（v4）と同じ集計を**手札**にも与え、「手札は防御資源である」という線形の取っ手を作る。
+# 相手手札は対象外（公平性契約＝中身を符号化しない）。カード個別知識は持たない汎用量。
+def _hand_aggregate(hand):
+    """自手札の資源集約 5 値。空・属性欠落に安全（探索クローン上で呼ばれるため例外を投げない）。
+
+    正規化は有界化のためだけ（恒等温スタートは新 W1 行ゼロで保証）。"""
+    counter_total = 0.0
+    counter_cards = 0
+    max_counter = 0.0
+    blockers = 0
+    events = 0
+    for c in hand:
+        m = getattr(c, "master", None)
+        if m is None:
+            continue
+        try:
+            cv = float(getattr(c, "current_counter", None) or 0) or float(getattr(m, "counter", 0) or 0)
+        except Exception:
+            cv = 0.0
+        counter_total += cv
+        if cv > 0:
+            counter_cards += 1
+        max_counter = max(max_counter, cv)
+        try:
+            if _BLOCKER_KW in (m.keywords or ()):
+                blockers += 1
+        except Exception:
+            pass
+        if getattr(getattr(m, "type", None), "name", None) == "EVENT":
+            events += 1
+    return [
+        counter_total / (10.0 * 2000.0),   # 手札のカウンター総量（守りの総火力）
+        counter_cards / float(MAX_HAND),   # カウンター札枚数（守れる回数）
+        max_counter / 2000.0,              # 最大カウンター値（1回で止められる上限）
+        blockers / float(MAX_HAND),        # 手札ブロッカー数（次ターンの防御設置）
+        events / float(MAX_HAND),          # イベント数（カウンターイベント/トリック資源）
+    ]
+
+
 def _playable_chars(me):
     """me.hand のうち今のアクティブドンで召喚できるキャラ数（@93「ドン余剰＝展開すべき」の素地）。
     ドン付与や効果コストの厳密計算はしない代理量（有界化のみ）。"""
@@ -250,6 +297,29 @@ def encode(manager, me_name, vocab, version=1):
         # v5（cpu_v10）: 相手場の脅威集約3＋自分の展開余力1。相手場は公開情報（公平性契約に適合）。
         vals += _opp_field_aggregate(getattr(opp, "field", ()) or ())
         vals += [_playable_chars(me) / float(MAX_HAND)]
+    if version >= 6:
+        # v6（2026-07-30・防御応答矯正③）: 自手札の資源集約5。手札の「質」をスカラーに載せる
+        # （v5 までは枚数のみ＝ネットが「手札減＝良い」を学ぶ素地になっていた）。自分のみ＝公平性契約。
+        vals += _hand_aggregate(getattr(me, "hand", ()) or ())
+    if version >= 7:
+        # v7（2026-08-01・v29）: 登場時オプションの**実測**3値。手札の各 PLAY を make/unmake で
+        # 試し「バニラ設置以外の何かが起きるか」をエンジン自身に確かめさせる（判定子は
+        # 適用後 pending!=MAIN_ACTION or EFFECT イベント）。「手札のパワー6000を2枚公開」の
+        # ような**カード間関係の条件**は埋め込みの線形和では表現できず（v24 representation-
+        # bound）、静的特徴でなく実測でしか一般化しない。実測 0.08〜0.26ms/枚（clone の
+        # 1/4〜1/14）＝探索の葉評価に載る。非メイン手番は (0,0,0)＝「今行使できる
+        # オプション」の意味論。自分の手札のみ＝公平性契約。
+        from opcg_sim.src.core.cpu_ai import onplay_option_scan
+        n_live, n_dead, keep_live = onplay_option_scan(manager, me_name)
+        vals += [n_live / 5.0, min(keep_live / 2000.0, 1.0), n_dead / 5.0]
+    if version >= 8:
+        # v8（2026-08-02/03・v32）: 自場集約＝相手（v5）と同じ [総火力, 高パワー数, ブロッカー数]
+        # の**純対称化のみ**。v5 まで自場はキャラ数の生カウントだけ＝パワー2000も10000も同じ
+        # 「1体」で、gen10 反実仮想実測（power_value_probe 2026-08-02）ではバニラ2000追加でも
+        # 6000体の 2/3 の加点（「体があれば加点」が支配・自側のパワー傾きは相手側より緩い）。
+        # 「低パワー体の盤面価値は低い」は総火力とキャラ数から平均としてネットが導出する
+        # （汎用性のため新しいしきい値特徴は設けない＝ユーザ方針 2026-08-03）。
+        vals += _opp_field_aggregate(getattr(me, "field", ()) or ())
     scalars = np.array(vals, dtype=np.float32)
 
     field = np.zeros((2 * MAX_FIELD, PER_CHAR), dtype=np.float32)
