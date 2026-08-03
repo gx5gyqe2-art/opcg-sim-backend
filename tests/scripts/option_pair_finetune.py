@@ -29,7 +29,7 @@ import _bootstrap  # noqa: E402,F401
 import rl_net as RN
 import rl_encoder as E
 from ref_finetune_smoke import build_rank_pairs, pair_acc, rank_finetune
-from opcg_sim.src.core.cpu_learned import warm_start_value, _net_enc_version
+from opcg_sim.src.core.cpu_learned import warm_start_value, warm_start_policy, _net_enc_version
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODELS = os.path.join(REPO, "opcg_sim", "data", "learned")
@@ -102,7 +102,15 @@ def main():
     vnet.save(out_v)
     assert RN.ValueNet.load(out_v).vocab_ids == RN.ValueNet.load(vpath).vocab_ids, \
         "保存した候補の vocab_ids が base と一致しない"
-    shutil.copyfile(ppath, os.path.join(args.out, "policy.npz"))   # policy は base のまま（v12）
+    out_p = os.path.join(args.out, "policy.npz")
+    # policy は base のまま学習しない（v12）が、**符号化版は value に揃える**（dense_finetune と
+    # 同じ 2026-07-31 実害の再発防止: 版違いコピーは `_fit_actions` の行動特徴列ズレで
+    # クラッシュせず黙って壊れる＝v30 の arena 0/48 の根本原因）。
+    if ev0 != args.enc_version:
+        from opcg_sim.src.learned.policy import PolicyScorer
+        warm_start_policy(PolicyScorer.load(ppath), ev0, args.enc_version).save(out_p)
+    else:
+        shutil.copyfile(ppath, out_p)
     res = {"base": args.base, "files": n_files, "children": int(len(child["value"])),
            "groups": int(len(set(child["group"]))), "pairs": len(pairs),
            "rank_acc_base": round(ab, 4), "rank_acc_before": round(a0, 4),
