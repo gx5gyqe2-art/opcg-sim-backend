@@ -12,10 +12,15 @@
   1. 選択肢（素通し PASS / 各カウンター / 各ブロッカー・card_id で重複排除）を列挙
   2. **同一決定化世界 × 枝間共有のロールアウト乱数**（フェーズ1で発見した CRN 破れの修正後）で
      終局まで打ち、選択肢ごとの勝率 → 因果 z = 2·wr − 1
-  3. 各選択肢の**子盤面**に z を付けて出力（dense_finetune 互換・q_root=NaN＝勝敗単独ラベル）
+  3. 各選択肢の**子盤面**に **margin_blend ラベル**（v34・z ＋ 0.25·clip(平均残ライフ差/4)＝
+     gen11 採用で実証済みの「勝ち方の質」タイブレーク。防御窓は「守った/守らなかった」が
+     勝敗を覆さず残ライフに現れる窓が多く、二値 z だけでは拮抗して順位ペアが立たない）と
+     **group ID**（同一窓の子盤面束＝順位学習 `build_rank_pairs` が読む）を付けて出力
+     （dense_finetune 互換・q_root=NaN＝勝敗単独ラベル）。
 
 出力は `counterfactual_pair_gen.py`（v24・メイン決定の展開/攻撃）と同じスキーマだが、
 **採掘する窓が防御専用**で、あちらが持たない「守る/守らない」の因果対照を作る（1トピック=1ファイル）。
+v34 の学習側は `option_pair_finetune`（蒸留アンカー付き順位学習）＝ defcf_*.npz も読める。
 
 実行例:
   OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/defense_cf_gen.py \
@@ -37,6 +42,7 @@ import os as _os, sys as _sys  # noqa: E402  test bootstrap
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
 from defense_cf_probe import dedupe_branches   # 選択肢の同一視は probe と共有（1定義）
+from option_pair_gen import margin_blend       # v34: ラベル式は option_pair と共有（1定義）
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DECKS_JSON = os.path.join(REPO, "tests", "fixtures", "decks", "user_decks_20260728.json")
@@ -118,7 +124,7 @@ def _decide(game, m, name, sims, eps, rng, world_seed):
 
 def process_game(task):
     """1局: 自己対戦（copy-apply で盤面保持）→ 防御窓採掘 → 反実仮想測定 → 行データ。"""
-    seed, cfg = task
+    seed, cfg, gbase = task
     CR = _G["CR"]
     import rl_encoder as E
     from opcg_sim.src.core import cpu_ai
@@ -144,9 +150,10 @@ def process_game(task):
 
     picked = pick_windows([int(getattr(s, "turn_count", 0) or 0) for s, _ in snaps],
                           cfg["windows_per_game"], rng)
-    rows = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root", "turns_left")}
+    rows = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root", "turns_left",
+                            "group")}
     diag = []
-    for pi in picked:
+    for gi, pi in enumerate(picked):
         m0, name = snaps[pi]
         actor = m0.p1 if m0.p1.name == name else m0.p2
         legal = m0.get_legal_actions(actor) or []
@@ -161,6 +168,7 @@ def process_game(task):
             continue                               # 選択肢1つ＝対照が組めない
         wins = {k: 0 for k, _ in branches}
         ends = {k: [] for k, _ in branches}
+        lds = {k: [] for k, _ in branches}          # v34: mover 視点の残ライフ差（勝ち方の質）
         childs = {}
         ok_worlds = 0
         for w in range(cfg["worlds"]):
@@ -175,21 +183,24 @@ def process_game(task):
                 if cw is None:
                     continue
                 # rng_seed は枝に依存させない（フェーズ1で修正した CRN 規約）
-                winner, _ld, et = CR.rollout(gserve, _G["vf"], _G["pf"], cw, name,
-                                             world_seed=wseed, rng_seed=wseed * 131,
-                                             def_temp=cfg["def_temp"])
+                winner, ld, et = CR.rollout(gserve, _G["vf"], _G["pf"], cw, name,
+                                            world_seed=wseed, rng_seed=wseed * 131,
+                                            def_temp=cfg["def_temp"])
                 if winner == name:
                     wins[key] += 1
                 ends[key].append(et)
+                lds[key].append(ld)
         if ok_worlds == 0:
             continue
+        group_id = gbase + gi                       # グローバル一意（呼び出し側で gbase を割当）
         zs = []
         for key, i in branches:
             child = gserve.apply(m0, legal[i], name)   # ラベル対象は実盤面の子（世界は決定化前）
             if child is None:
                 continue
             childs[key] = child
-            z = causal_z(wins[key], ok_worlds)
+            z = margin_blend(causal_z(wins[key], ok_worlds),
+                             float(np.mean(lds[key])) if lds[key] else None)
             zs.append(z)
             enc = E.encode(child, name, eng.vocab, version=_G["enc_version"])
             rows["scalars"].append(enc["scalars"])
@@ -199,6 +210,7 @@ def process_game(task):
             rows["q_root"].append(np.nan)          # 勝敗単独ラベル（エコー遮断）
             tl = (np.mean(ends[key]) - float(getattr(child, "turn_count", 0) or 0)) if ends[key] else np.nan
             rows["turns_left"].append(max(0.0, float(tl)) if np.isfinite(tl) else np.nan)
+            rows["group"].append(group_id)
         if zs:
             diag.append({"turn": int(getattr(m0, "turn_count", 0) or 0),
                          "window": m0.pending_actor_action()[1],
@@ -222,8 +234,8 @@ def main():
     ap.add_argument("--windows-per-game", type=int, default=6)
     ap.add_argument("--matchup", default="nami:shanks")
     ap.add_argument("--decks-json", default=DECKS_JSON)
-    ap.add_argument("--enc-version", type=int, default=6,
-                    help="教師行の符号化版（既定 6＝手札資源集約を含む。ロールアウトは出荷ネット）")
+    ap.add_argument("--enc-version", type=int, default=8,
+                    help="教師行の符号化版（既定 8＝gen11 の現行版。ロールアウトは出荷ネット）")
     ap.add_argument("--seed-base", type=int, default=920000)
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
@@ -246,8 +258,10 @@ def main():
         while games_done < args.games:
             n = min(args.shard_games, args.games - games_done)
             t0 = time.time()
-            outs = pool.map(process_game, [(args.seed_base + games_done + g, cfg) for g in range(n)])
-            parts = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root", "turns_left")}
+            outs = pool.map(process_game, [(args.seed_base + games_done + g, cfg,
+                                            (games_done + g) * 100) for g in range(n)])
+            parts = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root",
+                                     "turns_left", "group")}
             diags, cand = [], 0
             for rows, diag, n_snaps in outs:
                 for k in parts:
@@ -262,6 +276,7 @@ def main():
                     "value": np.array(parts["value"], dtype=np.float32),
                     "q_root": np.array(parts["q_root"], dtype=np.float32),
                     "turns_left": np.array(parts["turns_left"], dtype=np.float32),
+                    "group": np.array(parts["group"], dtype=np.int64),
                     "kind": np.array(["defcf"] * nrows),
                 }
                 np.savez_compressed(os.path.join(args.out, f"defcf_{shard:05d}.npz"), **arrays)

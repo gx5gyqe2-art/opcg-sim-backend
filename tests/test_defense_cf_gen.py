@@ -47,3 +47,24 @@ def test_branch_dedupe_is_shared_with_probe():
     """選択肢の同一視は probe と同一定義を import して使う（定義の二重化を防ぐ）。"""
     import defense_cf_probe as DP
     assert DG.dedupe_branches is DP.dedupe_branches
+
+
+def test_v34_labels_feed_rank_pairs_with_margin():
+    """v34 契約: 生成物（group + margin_blend ラベル）が順位学習へそのまま繋がる。
+
+    (a) ラベル式は option_pair と共有（1定義＝margin_blend の import 同一性）、
+    (b) 勝敗 z が拮抗（同値）でも残ライフ差のタイブレークで順位ペアが立つ
+        ＝防御窓の主目的（「守った/守らなかった」が勝敗を覆さず残ライフに現れる）、
+    (c) group + value の形式を build_rank_pairs が読める。
+    """
+    import option_pair_gen as G
+    from ref_finetune_smoke import build_rank_pairs
+    assert DG.margin_blend is G.margin_blend                       # 定義の二重化を防ぐ
+    # 同一窓（group=7）: 勝敗 z は同値（4/8）・残ライフ差だけが違う2枝
+    za = DG.margin_blend(DG.causal_z(4, 8), +3.0)                  # 守って薄氷を凌いだ枝
+    zb = DG.margin_blend(DG.causal_z(4, 8), -3.0)                  # 素通しで削られた枝
+    child = {"value": np.array([za, zb, 1.0, -1.0], np.float32),
+             "group": np.array([7, 7, 8, 8], np.int64)}
+    pairs = build_rank_pairs(child, delta=0.25)
+    assert (0, 1, 7) in pairs                                      # 拮抗窓でも順位が立つ
+    assert (2, 3, 8) in pairs

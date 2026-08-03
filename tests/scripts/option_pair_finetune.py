@@ -45,7 +45,9 @@ def load_pairs_corpus(dirs):
     dead = []
     n_files = 0
     for d in dirs:
-        for f in sorted(glob.glob(os.path.join(d, "optpair_*.npz"))):
+        # v34: 防御窓CF（defcf_*）も同スキーマ（group つき margin_blend ラベル）＝同じ順位学習に流せる
+        for f in sorted(glob.glob(os.path.join(d, "optpair_*.npz"))
+                        + glob.glob(os.path.join(d, "defcf_*.npz"))):
             z = np.load(f)
             for k in keys:
                 parts[k].append(z[k])
