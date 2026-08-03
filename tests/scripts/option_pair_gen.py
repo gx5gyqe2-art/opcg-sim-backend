@@ -124,7 +124,7 @@ def _describe_onplay(m, mv, cpu_ai):
     return d
 
 
-def _init_worker(matchup, decks_json, rollout_sims, mark_frac):
+def _init_worker(matchup, decks_json, rollout_sims, mark_frac, enc_version=0):
     import counterfactual_referee as CR
     import p3_loop as P
     from cpu_selfplay import _load_db
@@ -140,7 +140,7 @@ def _init_worker(matchup, decks_json, rollout_sims, mark_frac):
         from mark_seeds import load_mark_boards
         seed_boards = load_mark_boards(db)
     _G.update(
-        db=db, eng=eng, enc_version=eng.enc_version,
+        db=db, eng=eng, enc_version=(enc_version or eng.enc_version),
         vf=P.value_fn_of(eng.vnet, eng.vocab, eng.enc_version),
         pf=P.priors_fn_of(eng.pnet, eng.vocab, eng.enc_version),
         game_gen=_make_fixed_matchup_game(decks_json, a, b),
@@ -277,6 +277,9 @@ def main():
     ap.add_argument("--max-mine-steps", type=int, default=24,
                     help="採掘自己対戦の打ち切りステップ（狙う点は序盤＝turn1-4 なので全局回さない）")
     ap.add_argument("--mark-frac", type=float, default=0.0, help="マーク局面から開始する比率")
+    ap.add_argument("--enc-version", type=int, default=0,
+                    help="子盤面ラベルの符号化世代の上書き（0=生成エンジンの版）。採掘・ロールアウトは"
+                         "エンジンの版のまま＝新版特徴つきコーパスを旧版エンジンで作れる（v32: v8）")
     ap.add_argument("--matchup", default="nami:shanks")
     ap.add_argument("--decks-json", default=DECKS_JSON)
     ap.add_argument("--seed-base", type=int, default=970000)
@@ -293,7 +296,8 @@ def main():
     t_all = time.time()
     tot_rows = tot_games = tot_pts = tot_info = 0
     with mp.Pool(args.workers, initializer=_init_worker,
-                 initargs=(args.matchup, args.decks_json, args.rollout_sims, args.mark_frac)) as pool:
+                 initargs=(args.matchup, args.decks_json, args.rollout_sims, args.mark_frac,
+                           args.enc_version)) as pool:
         shard = done
         games_done = done * args.shard_games
         while games_done < args.games:
@@ -327,7 +331,7 @@ def main():
                     json.dump({"source": "option_pair", "games": n, "rows": nrows,
                                "points": len(diags), "informative": info, "worlds": args.worlds,
                                "mark_frac": args.mark_frac, "matchup": args.matchup,
-                               "enc_version": _G.get("enc_version"), "schema_version": 2,
+                               "enc_version": args.enc_version or "engine", "schema_version": 2,
                                "diag": diags[:20]}, f, ensure_ascii=False)
                 tot_info += info
             tot_rows += nrows

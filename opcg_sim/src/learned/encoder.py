@@ -42,8 +42,9 @@ SCALARS_V4 = 51        # v4 = v3 + 自デッキ残の集約5（残カウンタ�
 SCALARS_V5 = 55        # v5 = v4 + 相手場の脅威集約3（総火力/高パワー数/ブロッカー数）＋展開余力1（ドンで出せる手札キャラ数）
 SCALARS_V6 = 60        # v6 = v5 + **自手札の資源集約5**（カウンター総量/カウンター札数/最大カウンター/ブロッカー数/イベント数）
 SCALARS_V7 = 63        # v7 = v6 + **登場時オプション実測3**（発火するPLAY数/そのkeep値/ON_PLAY持ち不発数・v29）
+SCALARS_V8 = 66        # v8 = v7 + **自場集約3**（総火力/高パワー数/ブロッカー数＝相手v5と純対称・v32）
 _SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4,
-                       5: SCALARS_V5, 6: SCALARS_V6, 7: SCALARS_V7}
+                       5: SCALARS_V5, 6: SCALARS_V6, 7: SCALARS_V7, 8: SCALARS_V8}
 
 
 def scalars_dim(version=1):
@@ -311,6 +312,14 @@ def encode(manager, me_name, vocab, version=1):
         from opcg_sim.src.core.cpu_ai import onplay_option_scan
         n_live, n_dead, keep_live = onplay_option_scan(manager, me_name)
         vals += [n_live / 5.0, min(keep_live / 2000.0, 1.0), n_dead / 5.0]
+    if version >= 8:
+        # v8（2026-08-02/03・v32）: 自場集約＝相手（v5）と同じ [総火力, 高パワー数, ブロッカー数]
+        # の**純対称化のみ**。v5 まで自場はキャラ数の生カウントだけ＝パワー2000も10000も同じ
+        # 「1体」で、gen10 反実仮想実測（power_value_probe 2026-08-02）ではバニラ2000追加でも
+        # 6000体の 2/3 の加点（「体があれば加点」が支配・自側のパワー傾きは相手側より緩い）。
+        # 「低パワー体の盤面価値は低い」は総火力とキャラ数から平均としてネットが導出する
+        # （汎用性のため新しいしきい値特徴は設けない＝ユーザ方針 2026-08-03）。
+        vals += _opp_field_aggregate(getattr(me, "field", ()) or ())
     scalars = np.array(vals, dtype=np.float32)
 
     field = np.zeros((2 * MAX_FIELD, PER_CHAR), dtype=np.float32)
