@@ -51,6 +51,21 @@ def test_causal_z_and_spread():
     assert G.spread([]) == 0.0
 
 
+def test_margin_blend_is_bounded_tiebreak():
+    """マージンはタイブレーク（v32・2026-08-03）: 寄与は ±w に飽和し、勝敗 z の符号を
+    単独では覆せない（z 差 0.5 未満の拮抗群にだけ順位を作る）。NaN/None は z 素通し。"""
+    assert G.margin_blend(0.0, 0.0) == pytest.approx(0.0)
+    assert G.margin_blend(0.0, 2.0) == pytest.approx(0.125)          # +ld/4 * w
+    assert G.margin_blend(0.0, 100.0) == pytest.approx(0.25)         # 飽和 = +w
+    assert G.margin_blend(0.0, -100.0) == pytest.approx(-0.25)
+    assert G.margin_blend(0.5, None) == pytest.approx(0.5)
+    assert G.margin_blend(0.5, float("nan")) == pytest.approx(0.5)
+    # m4@2 実測形: 勝敗同数（z 同値）でも勝ち方の質で順位が立つ
+    a = G.margin_blend(-0.312, -0.22)   # イワンコフ（勝ち時マージン薄）
+    b = G.margin_blend(-0.312, +0.30)   # 温存（勝ち時マージン厚・仮値）
+    assert b > a
+
+
 def test_sample_points_spreads_across_turns_and_deterministic():
     turns = [2] * 5 + [3] * 5 + [4]
     a = G.sample_points(turns, 3, np.random.default_rng(1))

@@ -56,6 +56,19 @@ def spread(zs):
     return (max(zs) - min(zs)) if zs else 0.0
 
 
+def margin_blend(z, ld_mean, w=0.25, scale=4.0):
+    """勝敗 z にライフ差マージンを混合したラベル（pure・v32 評価方法分析 2026-08-03）。
+
+    m4@2 実測（32世界・def_temp0.7）で勝敗二値は 11/32 vs 11/32 と拮抗のまま、勝ち方の質
+    （温存枝の勝ち時ライフ差 +2.29 vs 手札を回す枝 +1.60）にだけ差が出た。二値 z の分解能
+    （2/worlds）では拮抗群に順位ペアが立たないため、平均残ライフ差を [-1,1] へ正規化して
+    小さい重み w で足す＝**マージンはタイブレーク**（w=0.25 は δ=0.25 の順位しきい値と同尺度・
+    勝敗の符号を覆すには z 差 0.5 が要る）。ld_mean が NaN/None のときは z 単独。"""
+    if ld_mean is None or not np.isfinite(ld_mean):
+        return float(z)
+    return float(z + w * max(-1.0, min(1.0, ld_mean / scale)))
+
+
 def option_branches(descs):
     """決定点の合法手記述子列 → 対照する枝の index 列（pure・**カード単位**）。
 
@@ -222,6 +235,7 @@ def process_game(task):
             continue
         wins = {k: 0 for k in branch}
         ends = {k: [] for k in branch}
+        lds = {k: [] for k in branch}               # mover 視点の残ライフ差（勝ち方の質）
         ok_worlds = 0
         for w in range(cfg["worlds"]):
             wseed = seed * 1009 + pi * 101 + w * 97
@@ -234,11 +248,13 @@ def process_game(task):
                 cw = gserve.apply(world, legal[k], name)
                 if cw is None:
                     continue
-                winner, _ld, et = CR.rollout(gserve, _G["vf"], _G["pf"], cw, name,
-                                             world_seed=wseed, rng_seed=wseed * 31 + k)
+                winner, ld, et = CR.rollout(gserve, _G["vf"], _G["pf"], cw, name,
+                                            world_seed=wseed, rng_seed=wseed * 31 + k,
+                                            def_temp=cfg.get("def_temp", 0.0))
                 if winner == name:
                     wins[k] += 1
                 ends[k].append(et)
+                lds[k].append(ld)
         if ok_worlds == 0:
             continue
         group_id = gbase + gi                       # グローバル一意（呼び出し側で gbase を割当）
@@ -248,7 +264,8 @@ def process_game(task):
             if c is None:
                 continue
             enc = E.encode(c, name, _G["eng"].vocab, version=ev)
-            z = causal_z(wins[k], ok_worlds)
+            z = margin_blend(causal_z(wins[k], ok_worlds),
+                             float(np.mean(lds[k])) if lds[k] else None)
             zs.append(z)
             rows["scalars"].append(enc["scalars"])
             rows["field"].append(enc["field"])
@@ -276,6 +293,10 @@ def main():
     ap.add_argument("--points-per-game", type=int, default=4)
     ap.add_argument("--max-mine-steps", type=int, default=24,
                     help="採掘自己対戦の打ち切りステップ（狙う点は序盤＝turn1-4 なので全局回さない）")
+    ap.add_argument("--def-temp", type=float, default=0.7,
+                    help="ロールアウトの防御窓温度（0=argmax）。v32 実測: argmax は「手札を回して"
+                         "即出しする枝」に偽の優位（m4@2 で +3勝差）を与える＝温存カウンターが"
+                         "使われる世界が生成されないため。既定 0.7＝防御矯正フェーズの実績値")
     ap.add_argument("--mark-frac", type=float, default=0.0, help="マーク局面から開始する比率")
     ap.add_argument("--enc-version", type=int, default=0,
                     help="子盤面ラベルの符号化世代の上書き（0=生成エンジンの版）。採掘・ロールアウトは"
@@ -289,7 +310,7 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     done = len(glob.glob(os.path.join(args.out, "optpair_*.npz")))
     cfg = {k: getattr(args, k) for k in ("worlds", "rollout_sims", "gen_sims", "eps",
-                                         "points_per_game", "max_mine_steps")}
+                                         "points_per_game", "max_mine_steps", "def_temp")}
     print(f"=== オプションペア生成 matchup={args.matchup} worlds={args.worlds} "
           f"mark_frac={args.mark_frac} 既存シャード={done} ===", flush=True)
 
@@ -330,6 +351,7 @@ def main():
                 with open(os.path.join(args.out, f"meta_{shard:05d}.json"), "w") as f:
                     json.dump({"source": "option_pair", "games": n, "rows": nrows,
                                "points": len(diags), "informative": info, "worlds": args.worlds,
+                               "def_temp": args.def_temp,
                                "mark_frac": args.mark_frac, "matchup": args.matchup,
                                "enc_version": args.enc_version or "engine", "schema_version": 2,
                                "diag": diags[:20]}, f, ensure_ascii=False)
