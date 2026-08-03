@@ -199,6 +199,59 @@ def rank_finetune(vnet, child, pairs, epochs=4, lr=2e-5, weight=1.0, margin=0.2,
     return vnet
 
 
+def dead_weighted_pairs(pairs, dead_flags, k=3):
+    """負け側が「不発PLAY」の順位ペアを k 倍に複製する（v33・pure）。
+
+    m1@3 型（ON_PLAY 持ちを条件不成立で出す＝1枚損のバニラ設置）は一般ペアの海に薄まると
+    教師信号が届かない（v32: 296群/1328ペアでも m1@3 の value 差 +0.01 を動かせず）。
+    「不発を咎める」ペアだけ重み増しして信号を集中する。k=1 は恒等。"""
+    if k <= 1:
+        return list(pairs)
+    out = list(pairs)
+    for p in pairs:
+        if dead_flags[p[1]]:                       # p=(勝ちidx, 負けidx, group)
+            out.extend([p] * (int(k) - 1))
+    return out
+
+
+def rank_finetune_anchored(vnet, child, pairs, anchor, y_anchor, epochs=4, lr=2e-5,
+                           weight=1.0, margin=0.2, batch_pairs=32,
+                           anchor_scale=1.0, batch_anchor=192, rng_seed=17):
+    """順位ヒンジ＋**蒸留アンカー**で value を微調整する（v33・rank_finetune の後継腕）。
+
+    v32 の負の結果（3回再現）: アンカー無しの順位ヒンジは共有 value を歪め、一般オプション
+    順位が上がるほど**防御窓の「素通しが正」較正（m2@12/58）が先に壊れる**。本関数は順位
+    バッチごとに「アンカー盤面（dense コーパスの一般盤面）で base の予測値 y_anchor へ引き戻す
+    MSE バッチ」を交互に流し、既存挙動を錘で固定したまま順位だけを動かす。
+
+    実装は rank_finetune と同じく ValueNet の公開 API のみ（backward(cache, y) は MSE 勾配＝
+    y=y_anchor を与えればそのまま蒸留）。anchor_scale が錘の強さ（lr への係数）。"""
+    rng = np.random.default_rng(rng_seed)
+    n_anchor = len(y_anchor)
+    for _ep in range(epochs):
+        order = rng.permutation(len(pairs))
+        for s in range(0, len(order), batch_pairs):
+            sel = [pairs[k] for k in order[s:s + batch_pairs]]
+            ia = np.array([p[0] for p in sel]); ib = np.array([p[1] for p in sel])
+            rows = np.concatenate([ia, ib])
+            batch = {k: child[k][rows] for k in ("scalars", "field", "card_idx")}
+            pred, cache = vnet.forward(batch)
+            m = len(sel)
+            act = (pred[:m] - pred[m:]) < margin
+            if act.any():
+                B = len(pred)
+                y = pred.copy()
+                y[:m][act] += (B / 2.0) * weight
+                y[m:][act] -= (B / 2.0) * weight
+                vnet.step(vnet.backward(cache, y), lr=lr)
+            if n_anchor and anchor_scale > 0:
+                ai = rng.integers(0, n_anchor, size=min(batch_anchor, n_anchor))
+                ab = {k: anchor[k][ai] for k in ("scalars", "field", "card_idx")}
+                _pred_a, cache_a = vnet.forward(ab)
+                vnet.step(vnet.backward(cache_a, y_anchor[ai]), lr=lr * anchor_scale)
+    return vnet
+
+
 def split_idx(n, val_frac=0.15, seed=7):
     """決定単位の train/val 分割（固定 seed＝再現可能）。"""
     rng = np.random.default_rng(seed)

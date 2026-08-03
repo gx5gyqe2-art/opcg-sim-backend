@@ -137,6 +137,32 @@ def _describe_onplay(m, mv, cpu_ai):
     return d
 
 
+def _play_fires(manager, actor_name, mv, cpu_ai):
+    """合法な PLAY 手 mv が「バニラ設置以外の何か」を起こすか（v33・単手版）。
+
+    判定子は `cpu_ai.onplay_option_scan` と同一（適用後 pending != MAIN_ACTION or EFFECT
+    イベント）。mv は合法＝支払い可能なので一時ドンは不要。make/unmake で盤面を汚さない。
+    mu 不能など判定できない場合は True（保守側＝不発と断定しない→重み増しされない）。"""
+    from opcg_sim.src.core import journal
+    from opcg_sim.src.core.journal import JournaledList
+    if not cpu_ai._mu_safe(manager):
+        return True
+    saved = manager.action_events
+    fired = True
+    with journal.transaction():
+        manager.action_events = JournaledList()
+        try:
+            cpu_ai._apply_move_inplace(manager, actor_name, mv, stop_at_select=True)
+            pend = manager.get_pending_request(with_request_id=False) or {}
+            fired = (pend.get("action") != "MAIN_ACTION") or any(
+                isinstance(e, dict) and e.get("type") == "EFFECT"
+                for e in manager.action_events)
+        except Exception:
+            fired = True
+    manager.action_events = saved
+    return fired
+
+
 def _init_worker(matchup, decks_json, rollout_sims, mark_frac, enc_version=0):
     import counterfactual_referee as CR
     import p3_loop as P
@@ -221,7 +247,8 @@ def process_game(task):
 
     picked = sample_points([int(getattr(s, "turn_count", 0) or 0) for s, _ in snaps],
                            cfg["points_per_game"], rng)
-    rows = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root", "turns_left", "group")}
+    rows = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root", "turns_left",
+                            "group", "dead_play")}
     diag = []
     for gi, pi in enumerate(picked):
         m0, name = snaps[pi]
@@ -275,6 +302,10 @@ def process_game(task):
             tl = (np.mean(ends[k]) - float(getattr(c, "turn_count", 0) or 0)) if ends[k] else np.nan
             rows["turns_left"].append(max(0.0, float(tl)) if np.isfinite(tl) else np.nan)
             rows["group"].append(group_id)
+            # v33: 不発PLAY（ON_PLAY 持ちなのに発動しない＝m1@3 型の1枚損バニラ設置）フラグ。
+            rows["dead_play"].append(
+                1.0 if (descs[k].get("action_type") == "PLAY" and descs[k].get("onplay")
+                        and not _play_fires(m0, name, legal[k], cpu_ai)) else 0.0)
         diag.append({"turn": int(getattr(m0, "turn_count", 0) or 0),
                      "n_branch": len(branch), "spread": round(spread(zs), 3),
                      "cards": [descs[k].get("card") or "TURN_END" for k in branch]})
@@ -328,7 +359,7 @@ def main():
                      for g in range(n)]
             outs = pool.map(process_game, tasks)
             parts = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root",
-                                     "turns_left", "group")}
+                                     "turns_left", "group", "dead_play")}
             diags, snap_total = [], 0
             for rows, diag, n_snaps in outs:
                 for k in parts:
@@ -344,6 +375,7 @@ def main():
                     "q_root": np.array(parts["q_root"], dtype=np.float32),
                     "turns_left": np.array(parts["turns_left"], dtype=np.float32),
                     "group": np.array(parts["group"], dtype=np.int64),
+                    "dead_play": np.array(parts["dead_play"], dtype=np.float32),
                     "kind": np.array(["optpr"] * nrows),
                 }
                 np.savez_compressed(os.path.join(args.out, f"optpair_{shard:05d}.npz"), **arrays)

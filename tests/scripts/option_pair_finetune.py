@@ -28,7 +28,8 @@ _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)
 import _bootstrap  # noqa: E402,F401
 import rl_net as RN
 import rl_encoder as E
-from ref_finetune_smoke import build_rank_pairs, pair_acc, rank_finetune
+from ref_finetune_smoke import (build_rank_pairs, dead_weighted_pairs, pair_acc,
+                                rank_finetune, rank_finetune_anchored)
 from opcg_sim.src.core.cpu_learned import warm_start_value, warm_start_policy, _net_enc_version
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -36,21 +37,59 @@ MODELS = os.path.join(REPO, "opcg_sim", "data", "learned")
 
 
 def load_pairs_corpus(dirs):
-    """optpair シャード群を child dict（scalars/field/card_idx/value/group）へ連結。"""
+    """optpair シャード群を child dict（scalars/field/card_idx/value/group/dead_play）へ連結。
+
+    dead_play（v33・不発PLAYフラグ）は旧シャードに無い＝0 で埋める（後方互換）。"""
     keys = ("scalars", "field", "card_idx", "value", "group")
     parts = {k: [] for k in keys}
+    dead = []
     n_files = 0
     for d in dirs:
         for f in sorted(glob.glob(os.path.join(d, "optpair_*.npz"))):
             z = np.load(f)
             for k in keys:
                 parts[k].append(z[k])
+            dead.append(z["dead_play"] if "dead_play" in z.files
+                        else np.zeros(len(z["value"]), np.float32))
             n_files += 1
     if not n_files:
         return None, 0
     child = {k: np.concatenate(parts[k]) for k in keys}
     child["value"] = child["value"].astype(np.float32)
+    child["dead_play"] = np.concatenate(dead).astype(np.float32)
     return child, n_files
+
+
+def load_anchor(dirs, enc_version, base_net, rows, seed=11):
+    """蒸留アンカー（v33）: dense コーパスの一般盤面を読み、scalars を enc_version 幅へ
+    ゼロ拡張し、base ネットの予測 y を焼く。
+
+    ゼロ拡張の意味論: append-only 契約の下で、v8 温スタート直後の base は追加列の重みが
+    ゼロ＝ゼロ埋め入力での予測は旧版と厳密に一致する。アンカーは「v7 特徴で決まる既存挙動
+    （防御較正など）」を固定する錘であり、新特徴（v8 列）の学習は妨げない。"""
+    keys = ("scalars", "field", "card_idx")
+    parts = {k: [] for k in keys}
+    for d in dirs:
+        for f in sorted(glob.glob(os.path.join(d, "dense_*.npz"))):
+            z = np.load(f)
+            for k in keys:
+                parts[k].append(z[k])
+    if not parts["scalars"]:
+        return None, None
+    anchor = {k: np.concatenate(parts[k]) for k in keys}
+    want = E.scalars_dim(enc_version)
+    have = anchor["scalars"].shape[1]
+    assert have <= want, f"アンカーの符号化が新しすぎる: {have} > {want}"
+    if have < want:
+        pad = np.zeros((len(anchor["scalars"]), want - have), np.float32)
+        anchor["scalars"] = np.concatenate([anchor["scalars"], pad], axis=1)
+    rng = np.random.default_rng(seed)
+    sel = rng.permutation(len(anchor["scalars"]))[:rows]
+    anchor = {k: anchor[k][sel] for k in keys}
+    y = np.empty(len(sel), np.float64)
+    for s in range(0, len(sel), 4096):
+        y[s:s + 4096] = base_net.predict({k: anchor[k][s:s + 4096] for k in keys})
+    return anchor, y
 
 
 def main():
@@ -63,6 +102,12 @@ def main():
     ap.add_argument("--margin", type=float, default=0.2)
     ap.add_argument("--delta", type=float, default=0.25, help="順位ペアに採る z 差の下限")
     ap.add_argument("--val-frac", type=float, default=0.15)
+    ap.add_argument("--anchor-dirs", default="",
+                    help="蒸留アンカーの dense コーパス（カンマ区切り・空=アンカー無し=v32 挙動）")
+    ap.add_argument("--anchor-rows", type=int, default=16000)
+    ap.add_argument("--anchor-scale", type=float, default=1.0, help="錘の強さ（lr への係数）")
+    ap.add_argument("--dead-weight", type=float, default=1.0,
+                    help="負け側が不発PLAYのペアの重み（複製倍率・1=無効）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -90,10 +135,24 @@ def main():
     a0 = pair_acc(vnet, child, p_va)
     ab = pair_acc(base, child, p_va)
     print(f"収集: {n_files}シャード・{len(child['value'])}子盤面・{len(set(child['group']))}群・"
-          f"順位ペア {len(pairs)}（tr {len(p_tr)}/va {len(p_va)}）", flush=True)
+          f"順位ペア {len(pairs)}（tr {len(p_tr)}/va {len(p_va)}・不発行 "
+          f"{int(child['dead_play'].sum())}）", flush=True)
     print(f"順位正答(val) 学習前: base={ab:.3f} / cand(=base)={a0:.3f}", flush=True)
 
-    rank_finetune(vnet, child, p_tr, epochs=args.epochs, lr=args.lr, margin=args.margin)
+    if args.dead_weight > 1:
+        n0 = len(p_tr)
+        p_tr = dead_weighted_pairs(p_tr, child["dead_play"], k=args.dead_weight)
+        print(f"不発ペア重み増し: tr {n0} → {len(p_tr)}", flush=True)
+    if args.anchor_dirs:
+        anchor, y_anchor = load_anchor([d for d in args.anchor_dirs.split(",") if d],
+                                       args.enc_version, base, args.anchor_rows)
+        assert anchor is not None, "アンカーコーパスが空（--anchor-dirs を確認）"
+        print(f"蒸留アンカー: {len(y_anchor)}盤面・scale={args.anchor_scale}", flush=True)
+        rank_finetune_anchored(vnet, child, p_tr, anchor, y_anchor,
+                               epochs=args.epochs, lr=args.lr, margin=args.margin,
+                               anchor_scale=args.anchor_scale)
+    else:
+        rank_finetune(vnet, child, p_tr, epochs=args.epochs, lr=args.lr, margin=args.margin)
     a1 = pair_acc(vnet, child, p_va)
     print(f"順位正答(val) 学習後: cand={a1:.3f}（base {ab:.3f}）", flush=True)
 
@@ -113,6 +172,8 @@ def main():
         shutil.copyfile(ppath, out_p)
     res = {"base": args.base, "files": n_files, "children": int(len(child["value"])),
            "groups": int(len(set(child["group"]))), "pairs": len(pairs),
+           "anchor": bool(args.anchor_dirs), "anchor_scale": args.anchor_scale,
+           "dead_weight": args.dead_weight,
            "rank_acc_base": round(ab, 4), "rank_acc_before": round(a0, 4),
            "rank_acc_after": round(a1, 4),
            "candidate": f"{out_v},{os.path.join(args.out, 'policy.npz')}"}
