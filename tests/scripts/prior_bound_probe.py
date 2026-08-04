@@ -173,7 +173,10 @@ def main():
         label = parts[0].split("/")[-1]
     else:
         eng = LearnedEngine()
-        label = "既定(gen8)"
+        # 世代名をハードコードしない（出荷既定は世代交代で変わる＝古い名前を表示すると
+        # 「どのネットを測ったか」の記録が壊れる。2026-08-04 実害: gen11 の測定結果に
+        # gen8 と印字されていた）。ネット自身が持つ符号化版から機械的に名乗る。
+        label = f"既定(符号化v{eng.enc_version})"
 
     replays = {**__import__("mark_gate").REPLAYS, **CG.REPLAYS_V2}
     CR.GAMES = {}
