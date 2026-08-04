@@ -354,9 +354,12 @@ def main():
         games_done = done * args.shard_games
         while games_done < args.games:
             n = min(args.shard_games, args.games - games_done)
-            # group の gbase は (shard, game) から一意に割当＝再開しても衝突しない。
-            tasks = [(args.seed_base + games_done + g, cfg, (games_done + g) * 100)
-                     for g in range(n)]
+            # group の gbase は **seed_base 込み**で (shard, game) から一意に割当＝再開しても、
+            # **別ランのコーパスと --dirs で連結しても**衝突しない（2026-08-04 実害:
+            # seed_base を除いていたため別ランと 119/121 群が衝突し、無関係な窓の子盤面同士が
+            # 順位ペアにされていた＝教師が黙って壊れる）。
+            tasks = [(args.seed_base + games_done + g, cfg,
+                      (args.seed_base + games_done + g) * 100) for g in range(n)]
             outs = pool.map(process_game, tasks)
             parts = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root",
                                      "turns_left", "group", "dead_play")}

@@ -258,8 +258,12 @@ def main():
         while games_done < args.games:
             n = min(args.shard_games, args.games - games_done)
             t0 = time.time()
+            # group の gbase は **seed_base 込み**で割り当てる（2026-08-04 実害: 別ランの
+            # コーパスを --dirs で連結すると group ID が衝突し、**無関係な窓の子盤面同士が
+            # 順位ペアにされる**＝教師が黙って壊れる。実測 119/121 群が衝突していた）。
             outs = pool.map(process_game, [(args.seed_base + games_done + g, cfg,
-                                            (games_done + g) * 100) for g in range(n)])
+                                            (args.seed_base + games_done + g) * 100)
+                                           for g in range(n)])
             parts = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root",
                                      "turns_left", "group")}
             diags, cand = [], 0

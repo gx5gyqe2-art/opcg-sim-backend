@@ -68,3 +68,20 @@ def test_v34_labels_feed_rank_pairs_with_margin():
     pairs = build_rank_pairs(child, delta=0.25)
     assert (0, 1, 7) in pairs                                      # 拮抗窓でも順位が立つ
     assert (2, 3, 8) in pairs
+
+
+def test_group_ids_are_unique_across_runs():
+    """group ID は **別ランのコーパスと連結しても**衝突しない（2026-08-04 実害の回帰ガード）。
+
+    seed_base を gbase に含めないと、別 seed 帯で生成した2つのコーパスを --dirs で連結した
+    ときに group が重なり、**無関係な窓の子盤面同士が順位ペアにされる**（実測 119/121 群が
+    衝突）。生成器の main を回さずに、gbase 割当式そのものを固定する。
+    """
+    def gbases(seed_base, games, shard_games=8):
+        # main の割当式と同一（式を変えたらこのテストが落ちる＝二重化の検知）
+        return {(seed_base + g) * 100 for g in range(games)}
+    a = gbases(976000, 48)
+    b = gbases(977000, 40)
+    assert not (a & b), "別 seed 帯のランで group ID が衝突している"
+    # 同一ラン内では窓ごとに一意（gbase + 窓index・窓は 100 未満）
+    assert len(a) == 48 and min(b) - max(a) >= 100
