@@ -40,7 +40,8 @@ import numpy as np
 
 from opcg_sim.src.core import cpu_ai, journal
 from opcg_sim.src.core.journal import JournaledList
-from .config import C_PUCT, DIRICHLET_ALPHA, TERM_DECAY, TERM_FLOOR
+from .config import (C_PUCT, DIRICHLET_ALPHA, TERM_DECAY, TERM_FLOOR,
+                     SERVE_QUIESCE, QUIESCE_MAX_PLIES)
 
 
 class _Node:
@@ -61,7 +62,8 @@ class _Node:
 class TreeMCTS:
     def __init__(self, game, value_fn, priors_fn=None, c_puct=C_PUCT, n_sims=100,
                  determinize_fn=None, rng=None, dirichlet_alpha=DIRICHLET_ALPHA, dirichlet_eps=0.0,
-                 term_decay=TERM_DECAY, term_floor=TERM_FLOOR):
+                 term_decay=TERM_DECAY, term_floor=TERM_FLOOR,
+                 quiesce=None, quiesce_max_plies=QUIESCE_MAX_PLIES):
         self.game = game
         self.value_fn = value_fn
         self.priors_fn = priors_fn
@@ -75,6 +77,9 @@ class TreeMCTS:
         # 抵抗して長い方の負けを選ぶ（全候補 −1 飽和の無差別を解消・config.TERM_DECAY 参照）。
         self.term_decay = term_decay
         self.term_floor = term_floor
+        # 静止探索（config.SERVE_QUIESCE）: 戦闘中の葉は解決まで進めてから評価する。
+        self.quiesce = SERVE_QUIESCE if quiesce is None else quiesce
+        self.quiesce_max_plies = quiesce_max_plies
         # apply/unmake 経路を1回だけ判定（ホットループで分岐しない）。ゲームが make/unmake IF を
         # 提供する＝汎用経路（三目並べ等・OPCG journal に非依存）。OPCGGame は持たない＝journal経路。
         self._generic = hasattr(game, "apply_inplace") and hasattr(game, "unmake")
@@ -102,6 +107,72 @@ class TreeMCTS:
         self.last_stats = {"legal": root.legal, "N": root.N.copy(),
                            "Q": root.W / np.maximum(root.N, 1.0)}
         return root.legal[best], root.N, root.legal
+
+    @staticmethod
+    def _in_battle(mgr):
+        """戦闘が未解決か（＝葉評価してはいけない「騒がしい」局面か）。
+
+        カウンター/ブロッカー選択の最中は、どの札を切ったかで手札が1枚減る点は同じでも
+        **命が助かるかどうかは解決後にしか盤面へ現れない**。OPCG 以外のゲーム（active_battle を
+        持たない）では常に False＝静止探索は no-op。"""
+        try:
+            return bool(getattr(mgr, "active_battle", None))
+        except Exception:
+            return False
+
+    def _quiesce_choice(self, mgr, legal):
+        """静止探索の延長で採る手の index（**最小コミット＝PASS 優先**）。
+
+        PASS が無い局面（効果選択の解決など）は priors 最良手、priors 不在なら先頭手。"""
+        for i, mv in enumerate(legal):
+            if (mv or {}).get("action_type") == "PASS":
+                return i
+        if self.priors_fn is not None and len(legal) > 1:
+            p = self.priors_fn(mgr, legal)
+            if p is not None:
+                return int(np.argmax(p))
+        return 0
+
+    def _leaf_value(self, mgr, to_move):
+        """葉の評価。戦闘中なら**解決するまで進めてから**評価する（静止探索・v35）。
+
+        **延長方針＝最小コミット（PASS 優先）**: 「今払った分だけで打ち切ったらどうなるか」を
+        葉の意味論とする。追加でカウンターを重ねる手は木の**別経路**として独立に評価される
+        （その葉も同じ規約で解決される）ので、ここで重ねると「1000 を切った枝」でも延長が
+        2000 を足してしまい**両枝とも助かって区別が消える**（2026-08-04 実測。当初 priors
+        最良手で延長したが、この理由で判別不能だった）。PASS が無い解決（効果選択など）は
+        priors 最良手→先頭手の順にフォールバックする。
+
+        延長は `journal.transaction()` で巻き戻す。延長中の apply は確率効果で global random を
+        消費しうるため**乱数状態も復元**する（消費したままだとエッジ固定＝CRN 一貫性が壊れ、
+        ノード統計が訪問ごとにブレる）。
+        """
+        if not self.quiesce or self._generic or not self._in_battle(mgr):
+            return self.value_fn(mgr, to_move)
+        g = self.game
+        rng_state = random.getstate()
+        saved_events = mgr.action_events
+        vbox = [None]
+        try:
+            with journal.transaction():
+                mgr.action_events = JournaledList()
+                for _ in range(self.quiesce_max_plies):
+                    if g.is_terminal(mgr) or not self._in_battle(mgr):
+                        break
+                    name = g.current_player(mgr)
+                    legal = g.legal_actions(mgr) if name else None
+                    if not legal:
+                        break
+                    a = self._quiesce_choice(mgr, legal)
+                    try:
+                        cpu_ai._apply_move_inplace(mgr, name, legal[a])
+                    except Exception:
+                        break
+                vbox[0] = self.value_fn(mgr, to_move)
+        finally:
+            mgr.action_events = saved_events
+            random.setstate(rng_state)
+        return vbox[0] if vbox[0] is not None else self.value_fn(mgr, to_move)
 
     def _expand(self, node, mgr):
         """mgr は node の状態にある。葉価値（node.to_move 視点）を返す。"""
@@ -132,7 +203,7 @@ class TreeMCTS:
         else:
             node.P = np.full(n, 1.0 / max(n, 1))
         node.expanded = True
-        return self.value_fn(mgr, node.to_move)
+        return self._leaf_value(mgr, node.to_move)
 
     def _new_child_after_apply(self, node, mgr):
         """apply 直後の mgr（子状態）から子ノードの終局情報を確定（旧clone版 _make_child と同規約）。"""
@@ -215,7 +286,7 @@ class TreeMCTS:
         if not node.expanded:
             return self._expand(node, mgr)
         if not node.legal:
-            return self.value_fn(mgr, node.to_move)
+            return self._leaf_value(mgr, node.to_move)
         # PUCT 選択（旧clone版と同一式）
         Ns = node.N.sum()
         sqrtN = math.sqrt(Ns) if Ns > 0 else 1.0
