@@ -48,9 +48,14 @@ def test_verified_entries_wellformed():
 
 
 def test_verified_v2_entries_wellformed():
-    """VERIFIED v2（gen7 実対局13点）: tag が REPLAYS_V2 に実在し fixture ファイルもある。
-    複数対局・両対面方向（CPU=ナミ/シャンクス）を含む＝g3 の単一対局バイアスの回帰防止。"""
-    assert len(VERIFIED_V2) >= 10
+    """VERIFIED v2（gen7 実対局由来）: tag が REPLAYS_V2 に実在し fixture ファイルもある。
+    複数対局・両対面方向（CPU=ナミ/シャンクス）を含む＝g3 の単一対局バイアスの回帰防止。
+
+    下限は 2026-08-04 のユーザレビューで 10→8 へ引き下げ: 局面前提が不自然な点
+    （パワー2000 のキャラにドン2枚付与＝m1@42/m1@94/m4@12）、バンドが広すぎて識別力の無い点
+    （m4@8）、裁定が誤り/未確定の点（m2@12/m2@64）を取り下げた結果。**点数を保つために
+    疑わしい点を残さない**（水増しされたバンドは候補を実力以上に見せる）。"""
+    assert len(VERIFIED_V2) >= 8
     tags = {t for t, _i, _a in VERIFIED_V2}
     assert len(tags) >= 3, "複数対局から採録されているはず"
     for tag, i, accept in VERIFIED_V2:
