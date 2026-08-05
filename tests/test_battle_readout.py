@@ -14,7 +14,8 @@ full-tree の root Q は箱の外の深い未来まで平均するため判断�
 固定する性質:
   - **箱の出口で選ぶ**: value を差し替えると（出口盤面の評価順が変わると）選択が追従する
   - **副作用ゼロ**: 評価後も盤面（手札/ライフ/場）と global random が完全復元される
-  - 既定 OFF は従来（gen11 まで）と同一の手を返す＝ロールバック可能
+  - **明示 OFF は従来（gen11 まで）と同一の手**＝ロールバック可能（gen12 で既定 ON になった
+    あとも、3機構を False に戻せば旧挙動へ戻れることを固定する）
   - 戦闘中でないメインフェーズの決定は読み出しを通らない（full-tree のまま）
 """
 import os
@@ -128,15 +129,21 @@ def test_choice_follows_the_value_function(battle_board):
     assert hi != lo, f"value を反転しても選択が変わらない（読み出しが value に従っていない）: {hi}"
 
 
-def test_default_off_matches_legacy_decision(battle_board):
-    """既定 OFF は従来経路と同一の手（ロールバック可能＝挙動不変の契約）。"""
+def test_explicit_off_matches_legacy_engine(battle_board):
+    """3機構を明示 OFF にすれば gen11 までと同一の手（ロールバック経路が生きている）。
+
+    gen12 で既定は ON になったが、旧世代の重みへ戻すときは3つとも False に戻す必要がある
+    （片方だけ ON は train/serve skew）。その戻し方が実際に効くことを固定する。
+    """
     m, name = battle_board
     player = m.p1 if m.p1.name == name else m.p2
-    off = LearnedEngine(battle_readout=False)
-    legacy = LearnedEngine()          # 既定＝config.SERVE_BATTLE_READOUT（False）
-    a = off.decide(m, player, sims=8, rng=np.random.default_rng(3))
-    b = legacy.decide(m, player, sims=8, rng=np.random.default_rng(3))
+    kw = dict(battle_readout=False, quiesce=False, box_battle=False)
+    a = LearnedEngine(**kw).decide(m, player, sims=8, rng=np.random.default_rng(3))
+    b = LearnedEngine(**kw).decide(m, player, sims=8, rng=np.random.default_rng(3))
     assert cpu_ai._describe_move(m, a) == cpu_ai._describe_move(m, b)
+    # 既定（gen12＝3機構 ON）は戦闘窓で読み出しを通る＝旧経路と同じとは限らない。
+    d = LearnedEngine().decide(m, player, sims=8, rng=np.random.default_rng(3))
+    assert d is not None
 
 
 def test_main_phase_is_not_routed_to_battle_readout(db):
