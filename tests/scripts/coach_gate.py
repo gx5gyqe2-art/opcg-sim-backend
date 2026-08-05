@@ -117,17 +117,19 @@ VERIFIED_V2 = [
     # m2@64 は**取り下げ**（2026-08-04・ユーザ裁定）: accept の Mr.3（OP16-056・パワー5000）で
     # 攻撃しても**相手リーダーは 7000 で届かない**（相手キャラはこの時点でアタック可能な
     # レスト状態のものが無い）＝攻撃する意味が無い局面で「攻撃が唯一の正解」とする裁定は誤り。
-    # m2@66 の accept は**再裁定で拡大**（2026-08-05・ユーザ裁定）: 「TURN_END 以外なら全て正しい」。
-    # 盤面の機構（相手リーダー シャンクスの【ターン1回】相手アタック時 −1000）が「どの攻撃を
-    # 不発にするか」の択一を相手に迫るため、**攻撃の順序はほぼ等価**になる——ロビン8000先頭は
-    # −1000 を吸収して満額で刺さり、安い攻撃先頭は −1000 の囮になって後続ロビンが満額 8000 で
-    # 通る。レフェリー32世界（def_temp0.7）でも攻撃同士の z 差は全てノイズ幅（2σ≈0.35）の内側
-    # （ロビン→ヤソップ −0.125 〜 ナミ→ヤソップ −0.562）で、明確に悪いのは攻撃しないこと
-    # （記録対局の CPU は実際に TURN_END した＝マークの原点）。Mr.3 起動（2ドロー＋次ターンの
-    # アタック封じ）も z −0.250 で正当。旧 accept（ロビンのみ）は順序に本質があるとする過度に
-    # 狭い裁定だった。
-    ("m2", 66, {("ATTACK", "EB03-055"), ("ATTACK", "OP11-041"),
-                ("ATTACK", "EB03-053"), ("ACTIVATE_MAIN", "OP16-056")}),
+    # m2@66 の accept は**シーケンス基準へ再裁定**（2026-08-05・ユーザ裁定・同日2段階）:
+    # ①「TURN_END 以外なら全て正しい」＝初手はどれでも良い。盤面の機構（相手リーダー シャンクスの
+    # 【ターン1回】相手アタック時 −1000）が「どの攻撃を不発にするか」の択一を相手に迫るため
+    # **攻撃の順序はほぼ等価**——ロビン8000先頭は −1000 を吸収して満額で刺さり、安い攻撃先頭は
+    # −1000 の囮になって後続ロビンが満額で通る。レフェリー32世界（def_temp0.7）でも攻撃同士の
+    # z 差は全てノイズ幅（2σ≈0.35）内（ロビン→ヤソップ −0.125 〜 ナミ→ヤソップ −0.562）。
+    # ②ただし合格は初手でなく**ターン終了までに全アクションを消化したか**で測る＝ナミ・リーダー・
+    # ロビンの攻撃と Mr.3（ギャルディーノ）の効果起動を全て行ってから TURN_END すること
+    # （turn_all 形式・decide_rate が自ターン終端まで指させて判定）。記録対局の CPU は初手で
+    # TURN_END した（＝マークの原点）。ドン0のためこれ以外の合法アクションは存在しない。
+    ("m2", 66, {"turn_all": frozenset({
+        ("ATTACK", "EB03-055"), ("ATTACK", "OP11-041"),
+        ("ATTACK", "EB03-053"), ("ACTIVATE_MAIN", "OP16-056")})}),
     # m4: CPU=シャンクス
     # m4@2 の accept はユーザ最終裁定（2026-08-03）: **イワンコフ出しが正解**。手札に 6000×2
     # （OP16-012×2）があり登場時効果が**発動する**（3枚引いて2枚捨て＝手札 5→5・エンジン実測）
@@ -157,7 +159,68 @@ def hit(desc, accept):
     return (at, card) in accept or (at, None) in accept
 
 
+def turn_all_required(accept):
+    """accept が「ターン内全消化」形式（{"turn_all": {(type, card), ...}}）なら必須集合を
+    返し、従来の初手集合なら None を返す（pure・decide_rate のディスパッチ用）。"""
+    if isinstance(accept, dict):
+        req = accept.get("turn_all")
+        return frozenset(req) if req else None
+    return None
+
+
+def turn_all_rate(eng, m0, name, required, seeds, sims, max_plies=24):
+    """決定点から**自ターンの終わりまで**エンジンに指させ、TURN_END までに required の
+    (action_type, card) を全て実行した割合（m2@66 型・2026-08-05 ユーザ裁定）。
+
+    初手だけ見る decide_rate では「どれか1つ打てば合格」になり、「全ての攻撃と起動を
+    使い切ってからターンを終える」という裁定を表せない。相手側の戦闘応答（カウンター窓・
+    効果対象選択）も同じエンジンが指す（self-play と同じ規約＝gen12 では箱読み出しが処理）。
+    sticky 世界線は seed ごとにリセット＝ターン内は serve と同じ一貫した世界で計画する。
+    max_plies 到達時は「必須を消化済みか」で判定（終え方でなく消化を測る計器のため）。"""
+    game = eng.game
+    hit_n = 0
+    for s in range(seeds):
+        eng._world_seeds = {}
+        rng = np.random.default_rng(9100 + 97 * s)
+        mgr = m0
+        done = set()
+        ok = False
+        for _ply in range(max_plies):
+            if game.is_terminal(mgr):
+                ok = required <= done
+                break
+            actor_name = game.current_player(mgr)
+            if actor_name is None:
+                break
+            actor = mgr.p1 if mgr.p1.name == actor_name else mgr.p2
+            mv = eng.decide(mgr, actor, sims=sims, rng=rng)
+            if mv is None:
+                break
+            try:
+                d = cpu_ai._describe_move(mgr, mv) or {}
+            except Exception:
+                d = {"action_type": (mv or {}).get("action_type")}
+            if actor_name == name:
+                at = d.get("action_type")
+                if at == "TURN_END":
+                    ok = required <= done
+                    break
+                done.add((at, d.get("card")))
+            nxt = game.apply(mgr, mv, actor_name)
+            if nxt is None:
+                break
+            mgr = nxt
+        else:
+            ok = required <= done
+        hit_n += 1 if ok else 0
+    return hit_n / max(seeds, 1)
+
+
 def decide_rate(eng, m0, actor, accept, seeds, sims):
+    req = turn_all_required(accept)
+    if req is not None:
+        return turn_all_rate(eng, m0, actor if isinstance(actor, str) else actor.name,
+                             req, seeds, sims)
     n = 0
     for s in range(seeds):
         eng._world_seeds = {}

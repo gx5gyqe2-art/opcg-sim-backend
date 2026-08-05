@@ -15,7 +15,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 "tests", "scripts"))
 from coach_gate import (REPLAYS_V2, VERIFIED, VERIFIED_V2, hit, judge,  # noqa: E402
-                        min_reliable_delta)
+                        min_reliable_delta, turn_all_required)
 
 pytestmark = pytest.mark.cpu_infra
 
@@ -60,9 +60,22 @@ def test_verified_v2_entries_wellformed():
     assert len(tags) >= 3, "複数対局から採録されているはず"
     for tag, i, accept in VERIFIED_V2:
         assert tag in REPLAYS_V2 and isinstance(i, int) and i >= 0
-        assert accept and all(isinstance(a, tuple) and len(a) == 2 for a in accept)
+        req = turn_all_required(accept)
+        entries = req if req is not None else accept
+        assert entries and all(isinstance(a, tuple) and len(a) == 2 for a in entries)
     for path in REPLAYS_V2.values():
         assert os.path.exists(path), path
+
+
+def test_turn_all_dispatch_shape():
+    """turn_all 形式（m2@66・2026-08-05 裁定「ターン終了までに全アクションを消化」）の判別:
+    dict+turn_all は必須集合を返し、従来の初手集合・空 dict は None（＝初手判定のまま）。"""
+    req = {("ATTACK", "EB03-055"), ("ACTIVATE_MAIN", "OP16-056")}
+    assert turn_all_required({"turn_all": req}) == frozenset(req)
+    assert turn_all_required({("ATTACK", "EB03-055")}) is None
+    assert turn_all_required({"turn_all": frozenset()}) is None
+    m266 = next(a for t, i, a in VERIFIED_V2 if (t, i) == ("m2", 66))
+    assert turn_all_required(m266) is not None, "m2@66 はシーケンス基準（turn_all）のはず"
 
 
 def test_min_reliable_delta_shrinks_with_seeds():
