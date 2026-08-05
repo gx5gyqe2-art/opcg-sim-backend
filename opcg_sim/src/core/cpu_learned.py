@@ -29,7 +29,8 @@ from opcg_sim.src.learned.config import (
     C_PUCT, SERVE_SIMS, SERVE_DIRICHLET_EPS,
     SERVE_ROOT_SWITCH_MIN_FRAC, SERVE_ROOT_SWITCH_MIN_GAP, SERVE_STICKY_WORLD,
     AUX_TIE_DECAY, AUX_SAT_START, TERM_FLOOR, V4_TURNS_SCALE)
-from opcg_sim.src.learned.mcts import TreeMCTS   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
+from opcg_sim.src.learned.mcts import (   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
+    TreeMCTS, in_battle, resolved_branch_values)
 from opcg_sim.src.utils.loader import CardLoader
 
 _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -199,7 +200,8 @@ class LearnedEngine:
     def __init__(self, value_path: Optional[str] = None, policy_path: Optional[str] = None,
                  vocab=None, game=None, aux_tiebreak: Optional[bool] = None,
                  sims: Optional[int] = None, c_puct: Optional[float] = None,
-                 root_frac: Optional[float] = None, root_gap: Optional[float] = None):
+                 root_frac: Optional[float] = None, root_gap: Optional[float] = None,
+                 battle_readout: Optional[bool] = None, quiesce: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
@@ -216,6 +218,12 @@ class LearnedEngine:
         self.c_puct = c_puct
         self.root_frac = root_frac      # root 読み出しの乗り換え条件（訪問比）
         self.root_gap = root_gap        # 同（Q 差・inf で従来の argmax(N)）
+        # 戦闘窓の読み出し（None=config.SERVE_BATTLE_READOUT に従う・A/B 用の seam）。
+        self.battle_readout = battle_readout
+        # 静止探索（None=config.SERVE_QUIESCE に従う）。**同一プロセスで席ごとに機構を変える**
+        # ための seam＝「新機構の候補 vs 現行本番」を公平に1回で測る（グローバル定数を書き換える
+        # 測り方だと両席に同時に効いてしまい、機構とネットの寄与が分離できない）。
+        self.quiesce = quiesce
         # ターン内 sticky 世界線の seed キャッシュ {(id(manager), turn, player): (weakref, seed)}（§_world_rng）。
         self._world_seeds: Dict[Any, Any] = {}
         self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
@@ -275,6 +283,41 @@ class LearnedEngine:
         # determinize の shuffle が同じ乱数列から始まる（公開情報の更新は盤面側から反映される）。
         return np.random.default_rng(seed)
 
+    def _battle_window_choice(self, manager, name, det_rng):
+        """戦闘窓の読み出し（`SERVE_BATTLE_READOUT`）: 出口盤面の value で選ぶ。
+
+        **戦闘を1つの箱として畳む**（ユーザ整理 2026-08-05）: カウンター/ブロッカー選択は
+        「どの出口（解決後の盤面・手札・ライフ）になるか」で決まる局所判断で、箱の外の深い
+        未来まで平均した root Q は判断を薄める（v35 実測: 出口評価は防御3類型を全て正しく
+        順序づけるのに、探索後 Q は木の68%を占める『次の自ターン』の通常盤面＝旧レートに
+        引き戻されて逆転する）。判断するのは葉評価と同じ value ネット自身であり、別系統の
+        防御ロジックではない。
+
+        世界線は探索と同じ決定化（PIMC・sticky）を使い、返す手は決定化クローン上の合法手
+        （`TreeMCTS.run` と同一契約）。返り値は (move, root統計, 評価に使った盤面)＝
+        トレースは呼び出し側で埋める。選べないときは (None, None, None) で従来の探索へ委ねる。
+        """
+        mgr = self.game.determinize(manager, name, det_rng)
+        legal = self.game.legal_actions(mgr)
+        if not legal:
+            return None, None, None
+        if len(legal) == 1:
+            return legal[0], None, None
+        vals = resolved_branch_values(
+            self.game, mgr, name, legal,
+            _value_fn(self.vnet, self.vocab, self.enc_version, aux_tiebreak=self.aux_tiebreak),
+            _priors_fn(self.pnet, self.vocab, self.enc_version))
+        ok = [i for i, v in enumerate(vals) if v is not None]
+        if not ok:
+            return None, None, None      # 全枝で解決に失敗＝従来の full-tree に任せる（安全側）
+        best = max(ok, key=lambda i: vals[i])
+        # トレース用の root 統計は探索と同じ形（N/Q）で作る: 各枝を1回ずつ解決して評価した、
+        # という事実をそのまま N=1 に、判断の根拠である出口評価を Q に載せる。
+        stats = {"legal": legal,
+                 "N": np.array([1.0 if v is not None else 0.0 for v in vals]),
+                 "Q": np.array([v if v is not None else -1.0 for v in vals], dtype=float)}
+        return legal[best], stats, mgr
+
     def decide(self, manager, player, sims: int = SERVE_SIMS, c_puct: float = C_PUCT,
                rng=None, trace=None) -> Optional[Dict[str, Any]]:
         """このエンジンのネットで 1 手決定する（`decide_learned` と同一契約・同一探索）。"""
@@ -289,11 +332,27 @@ class LearnedEngine:
             import random as _random
             rng = np.random.default_rng(_random.getrandbits(64))
         det_rng = self._world_rng(manager, name, rng) if SERVE_STICKY_WORLD else rng
+        # 戦闘窓は箱として畳んで出口評価で選ぶ（config.SERVE_BATTLE_READOUT）。メインフェーズ
+        # （バトルをするか・どこを殴るか）は下の full-tree のまま＝変更しない。
+        use_battle = (CFG.SERVE_BATTLE_READOUT if self.battle_readout is None
+                      else self.battle_readout)
+        if use_battle and in_battle(manager):
+            move, stats, ev_mgr = self._battle_window_choice(manager, name, det_rng)
+            if move is not None:
+                if trace is not None:
+                    try:
+                        _fill_trace(trace, ev_mgr if ev_mgr is not None else manager,
+                                    player, move, stats)
+                        trace["readout"] = "battle_resolved"
+                    except Exception:
+                        pass   # 分析失敗で対局を止めない
+                return move
         mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab, self.enc_version,
                                                       aux_tiebreak=self.aux_tiebreak),
                         priors_fn=_priors_fn(self.pnet, self.vocab, self.enc_version),
                         c_puct=c_puct, n_sims=sims, dirichlet_eps=SERVE_DIRICHLET_EPS,
-                        determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=det_rng)
+                        determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=det_rng,
+                        quiesce=self.quiesce)
         move, _, legal = mcts.run(manager)
         # 同名カードの別実体（手札の複製等）は探索木で別 edge になり訪問数が分裂する。
         # 素の argmax(N) は分裂した等価手を系統的に不利にする（例: EB03-053×2 のカウンターが

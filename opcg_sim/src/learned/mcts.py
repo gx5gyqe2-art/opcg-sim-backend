@@ -98,6 +98,41 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
     return n
 
 
+def resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn=None,
+                           max_plies=QUIESCE_MAX_PLIES):
+    """各合法手を「戦闘を解決した出口盤面」まで進めて評価した value 列（`mgr` は不変）。
+
+    **戦闘を1つの箱として畳む**（ユーザ整理 2026-08-05）: 箱の中の手順そのものは評価対象に
+    せず、箱の**出口**（解決後の盤面・手札・ライフ）だけを value で比べる。どの出口になるかは
+    ネットの予測ではなく**エンジンの実計算**（7000 攻撃に 2000 を足せば 8000 で凌ぐ、は算術的に
+    確定する）。判断しているのは葉評価と同じ value ネット自身で、別系統の防御ロジックではない。
+
+    枝の残り手は `resolve_battle_inplace`（policy 最良手→PASS→先頭手）で進める＝探索の静止探索・
+    教師コーパスと**同一の解決規約**（train/serve skew 防止の単一の正）。
+
+    値は `name` 視点。適用に失敗した枝は None（呼び出し側で除外）。全枝を**同一の乱数列**から
+    評価し（CRN）、抜けるときに乱数状態を元へ戻す＝実ゲームへ探索の消費を漏らさない。"""
+    base_rng_state = random.getstate()
+    vals = []
+    for mv in legal:
+        random.setstate(base_rng_state)      # CRN: 枝間の差だけを見る（確率効果を共通化）
+        saved_events = mgr.action_events
+        v = None
+        try:
+            with journal.transaction():      # 退出で盤面を巻き戻す（呼び出し側の mgr は不変）
+                mgr.action_events = JournaledList()
+                cpu_ai._apply_move_inplace(mgr, name, mv)
+                resolve_battle_inplace(game, mgr, priors_fn, max_plies)
+                v = value_fn(mgr, name)
+        except Exception:
+            v = None
+        finally:
+            mgr.action_events = saved_events
+        vals.append(v)
+    random.setstate(base_rng_state)
+    return vals
+
+
 class _Node:
     __slots__ = ("to_move", "legal", "P", "N", "W", "children", "expanded", "terminal", "term_val")
 
