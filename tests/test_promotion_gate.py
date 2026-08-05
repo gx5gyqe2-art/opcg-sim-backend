@@ -58,3 +58,38 @@ def test_anchor_requires_non_regression():
     assert not PG.anchor_decision(8, 24)       # r99 実測ケース
     assert not PG.anchor_decision(14, 24, frac=0.6)   # 14/24=0.583 < 0.6
     assert PG.anchor_decision(14, 24, frac=0.55)      # 0.583 ≥ 0.55（frac 可変）
+
+
+def test_init_pool_applies_engine_options_to_candidate_only(monkeypatch):
+    """席別 seam（v35）: `cand_kw` は候補席のエンジンにだけ渡る（best は既定のまま）。
+
+    機構（戦闘窓の箱読み出し・静止探索）をグローバル定数で切り替えると**両席に同時に効き**、
+    「新機構つき候補 vs 現行本番」を測れない。arena がこの seam を通していることを固定する。
+    """
+    import sys
+    import types
+
+    seen = []
+
+    class _FakeEngine:
+        def __init__(self, value_path=None, policy_path=None, **kw):
+            seen.append({"value_path": value_path, **kw})
+
+    fake_arena = types.ModuleType("cpu_arena")
+    fake_arena._load_db = lambda: "db"
+    monkeypatch.setitem(sys.modules, "cpu_arena", fake_arena)
+    import opcg_sim.src.core.cpu_learned as CL
+    monkeypatch.setattr(CL, "LearnedEngine", _FakeEngine)
+
+    PG._init_pool("cand_value.npz", "", {"battle_readout": True, "quiesce": True})
+    assert seen[0]["value_path"] == "cand_value.npz"
+    assert seen[0]["battle_readout"] is True and seen[0]["quiesce"] is True
+    assert "battle_readout" not in seen[1] and "quiesce" not in seen[1], \
+        "基準席にも機構が渡っている（A/B が成立しない）"
+
+
+def test_init_pool_without_options_is_unchanged():
+    """`cand_kw` 未指定は従来と同一＝既存の呼び出し側を壊さない（後方互換）。"""
+    import inspect
+    sig = inspect.signature(PG._init_pool)
+    assert sig.parameters["cand_kw"].default is None
