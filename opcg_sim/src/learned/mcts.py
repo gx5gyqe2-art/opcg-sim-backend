@@ -41,7 +41,7 @@ import numpy as np
 from opcg_sim.src.core import cpu_ai, journal
 from opcg_sim.src.core.journal import JournaledList
 from .config import (C_PUCT, DIRICHLET_ALPHA, TERM_DECAY, TERM_FLOOR,
-                     SERVE_QUIESCE, QUIESCE_MAX_PLIES)
+                     SERVE_QUIESCE, QUIESCE_MAX_PLIES, TREE_BOX_BATTLE)
 
 
 def in_battle(mgr):
@@ -152,7 +152,7 @@ class TreeMCTS:
     def __init__(self, game, value_fn, priors_fn=None, c_puct=C_PUCT, n_sims=100,
                  determinize_fn=None, rng=None, dirichlet_alpha=DIRICHLET_ALPHA, dirichlet_eps=0.0,
                  term_decay=TERM_DECAY, term_floor=TERM_FLOOR,
-                 quiesce=None, quiesce_max_plies=QUIESCE_MAX_PLIES):
+                 quiesce=None, quiesce_max_plies=QUIESCE_MAX_PLIES, box_battle=None):
         self.game = game
         self.value_fn = value_fn
         self.priors_fn = priors_fn
@@ -169,6 +169,8 @@ class TreeMCTS:
         # 静止探索（config.SERVE_QUIESCE）: 戦闘中の葉は解決まで進めてから評価する。
         self.quiesce = SERVE_QUIESCE if quiesce is None else quiesce
         self.quiesce_max_plies = quiesce_max_plies
+        # 木の中の箱化（config.TREE_BOX_BATTLE）: 戦闘窓ノードを出口 value 最良の1手へ畳む。
+        self.box_battle = TREE_BOX_BATTLE if box_battle is None else box_battle
         # apply/unmake 経路を1回だけ判定（ホットループで分岐しない）。ゲームが make/unmake IF を
         # 提供する＝汎用経路（三目並べ等・OPCG journal に非依存）。OPCGGame は持たない＝journal経路。
         self._generic = hasattr(game, "apply_inplace") and hasattr(game, "unmake")
@@ -247,6 +249,21 @@ class TreeMCTS:
             return self.value_fn(mgr, tm) if tm else 0.0
         node.to_move = g.current_player(mgr)
         legal = g.legal_actions(mgr)
+        leaf_v = None
+        if self.box_battle and not self._generic and len(legal) > 1 and in_battle(mgr):
+            # **木の中の箱化**（v35・2026-08-05）: 戦闘窓は「どの出口（解決後の盤面・手札・
+            # ライフ）になるか」で決まる局所判断なので、子を並べて訪問を配らず**出口 value 最良の
+            # 1手へ畳む**＝戦闘全体が1本のマクロ手になる。二人零和では相手は最善応手を返すのが
+            # 正しく、PUCT の訪問混合は収束前の副産物（保険ではない）＝畳む方がミニマックスに近い。
+            # 幅は失われない（木には別の攻撃順・別盤面の戦闘が無数にあり、各々が別の箱を持つ）。
+            # 副次効果として、カウンターの組合せに費やしていた訪問がメイン判断へ回る。
+            vals = resolved_branch_values(g, mgr, node.to_move, legal, self.value_fn,
+                                          self.priors_fn, self.quiesce_max_plies)
+            ok = [i for i, v in enumerate(vals) if v is not None]
+            if ok:
+                b = max(ok, key=lambda i: vals[i])
+                legal = [legal[b]]
+                leaf_v = vals[b]       # 葉見積もりも同じ出口＝木と読み出しで規約が一致する
         node.legal = legal
         n = len(legal)
         node.N = np.zeros(n)
@@ -258,7 +275,7 @@ class TreeMCTS:
         else:
             node.P = np.full(n, 1.0 / max(n, 1))
         node.expanded = True
-        return self._leaf_value(mgr, node.to_move)
+        return leaf_v if leaf_v is not None else self._leaf_value(mgr, node.to_move)
 
     def _new_child_after_apply(self, node, mgr):
         """apply 直後の mgr（子状態）から子ノードの終局情報を確定（旧clone版 _make_child と同規約）。"""
