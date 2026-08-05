@@ -44,6 +44,60 @@ from .config import (C_PUCT, DIRICHLET_ALPHA, TERM_DECAY, TERM_FLOOR,
                      SERVE_QUIESCE, QUIESCE_MAX_PLIES)
 
 
+def in_battle(mgr):
+    """戦闘が未解決か（＝葉評価してはいけない「騒がしい」局面か）。
+
+    カウンター/ブロッカー選択の最中は、どの札を切ったかで手札が1枚減る点は同じでも
+    **命が助かるかどうかは解決後にしか盤面へ現れない**。OPCG 以外のゲーム（active_battle を
+    持たない）では常に False＝静止探索は no-op。"""
+    try:
+        return bool(getattr(mgr, "active_battle", None))
+    except Exception:
+        return False
+
+
+def quiesce_choice(mgr, legal, priors_fn=None):
+    """静止探索の延長で採る手の index（**policy 最良手 → PASS → 先頭手**・pure）。
+
+    葉の意味論は「**解決した時点の手札と盤面**」（ユーザ指摘 2026-08-04）。打ち切る位置を
+    人為的に決める（例: 常に PASS）と、実際には選ばれない継続を評価してしまう。
+
+    priors 不在時に **先頭手を機械的に採ってはいけない**（2026-08-04 実測の落とし穴）:
+    m1@15 では先頭が「もう1枚カウンターを足す」で、**どちらの枝も残りを足してしまい
+    両方助かって判別不能**になった。判別が要る唯一の場所で盲目になるため PASS へ落とす。"""
+    if priors_fn is not None and len(legal) > 1:
+        p = priors_fn(mgr, legal)
+        if p is not None:
+            return int(np.argmax(p))
+    for i, mv in enumerate(legal):
+        if (mv or {}).get("action_type") == "PASS":
+            return i
+    return 0
+
+
+def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIES):
+    """戦闘が解決するまで mgr をその場で進める（**巻き戻さない**・適用手数を返す）。
+
+    **探索（葉評価）と教師（コーパス符号化）が同一の解決規約を使うための単一の正**。
+    別々に実装すると必ずずれ、教師が「ネットが実際に見ることのない盤面」を教えることになる
+    （2026-08-04 の train/serve skew 対策）。巻き戻し・乱数復元は呼び出し側の責務
+    （探索は transaction 内で使い、教師はクローン上で使うため要件が異なる）。"""
+    n = 0
+    for _ in range(max_plies):
+        if game.is_terminal(mgr) or not in_battle(mgr):
+            break
+        name = game.current_player(mgr)
+        legal = game.legal_actions(mgr) if name else None
+        if not legal:
+            break
+        try:
+            cpu_ai._apply_move_inplace(mgr, name, legal[quiesce_choice(mgr, legal, priors_fn)])
+        except Exception:
+            break
+        n += 1
+    return n
+
+
 class _Node:
     __slots__ = ("to_move", "legal", "P", "N", "W", "children", "expanded", "terminal", "term_val")
 
@@ -108,39 +162,11 @@ class TreeMCTS:
                            "Q": root.W / np.maximum(root.N, 1.0)}
         return root.legal[best], root.N, root.legal
 
-    @staticmethod
-    def _in_battle(mgr):
-        """戦闘が未解決か（＝葉評価してはいけない「騒がしい」局面か）。
-
-        カウンター/ブロッカー選択の最中は、どの札を切ったかで手札が1枚減る点は同じでも
-        **命が助かるかどうかは解決後にしか盤面へ現れない**。OPCG 以外のゲーム（active_battle を
-        持たない）では常に False＝静止探索は no-op。"""
-        try:
-            return bool(getattr(mgr, "active_battle", None))
-        except Exception:
-            return False
+    _in_battle = staticmethod(in_battle)   # 後方互換の別名（定義はモジュール関数が正）
 
     def _quiesce_choice(self, mgr, legal):
-        """静止探索の延長で採る手の index（**policy 最良手 → PASS → 先頭手**）。
-
-        葉の意味論は「**解決した時点の手札と盤面**」（ユーザ指摘 2026-08-04）。打ち切る位置を
-        人為的に決める（例: 常に PASS）と、実際には選ばれない継続を評価してしまう。policy の
-        見立てで解決まで進め、その盤面を評価するのが筋。
-
-        priors 不在時に **先頭手を機械的に採ってはいけない**（2026-08-04 実測の落とし穴）:
-        m1@15 では先頭が「もう1枚カウンターを足す」で、**どちらの枝も残りを足してしまい
-        両方助かって判別不能**になった。判別が要る唯一の場所で盲目になるため、priors が
-        無い場合は PASS（＝これ以上払わない）へフォールバックする。
-        なお解決時の盤面はどちらの継続でも 2000 で止めた枝が優位に出る
-        （足せば手札-2・ライフ維持／足さなければ手札-1・ライフ減）。"""
-        if self.priors_fn is not None and len(legal) > 1:
-            p = self.priors_fn(mgr, legal)
-            if p is not None:
-                return int(np.argmax(p))
-        for i, mv in enumerate(legal):
-            if (mv or {}).get("action_type") == "PASS":
-                return i
-        return 0
+        """後方互換の薄いラッパ（定義はモジュール関数 `quiesce_choice` が正）。"""
+        return quiesce_choice(mgr, legal, self.priors_fn)
 
     def _leaf_value(self, mgr, to_move):
         """葉の評価。戦闘中なら**解決するまで進めてから**評価する（静止探索・v35）。
@@ -153,32 +179,20 @@ class TreeMCTS:
         消費しうるため**乱数状態も復元**する（消費したままだとエッジ固定＝CRN 一貫性が壊れ、
         ノード統計が訪問ごとにブレる）。
         """
-        if not self.quiesce or self._generic or not self._in_battle(mgr):
+        if not self.quiesce or self._generic or not in_battle(mgr):
             return self.value_fn(mgr, to_move)
-        g = self.game
         rng_state = random.getstate()
         saved_events = mgr.action_events
-        vbox = [None]
+        v = None
         try:
             with journal.transaction():
                 mgr.action_events = JournaledList()
-                for _ in range(self.quiesce_max_plies):
-                    if g.is_terminal(mgr) or not self._in_battle(mgr):
-                        break
-                    name = g.current_player(mgr)
-                    legal = g.legal_actions(mgr) if name else None
-                    if not legal:
-                        break
-                    a = self._quiesce_choice(mgr, legal)
-                    try:
-                        cpu_ai._apply_move_inplace(mgr, name, legal[a])
-                    except Exception:
-                        break
-                vbox[0] = self.value_fn(mgr, to_move)
+                resolve_battle_inplace(self.game, mgr, self.priors_fn, self.quiesce_max_plies)
+                v = self.value_fn(mgr, to_move)
         finally:
             mgr.action_events = saved_events
-            random.setstate(rng_state)
-        return vbox[0] if vbox[0] is not None else self.value_fn(mgr, to_move)
+            random.setstate(rng_state)   # 延長の乱数消費を漏らさない（CRN 一貫性）
+        return v if v is not None else self.value_fn(mgr, to_move)
 
     def _expand(self, node, mgr):
         """mgr は node の状態にある。葉価値（node.to_move 視点）を返す。"""

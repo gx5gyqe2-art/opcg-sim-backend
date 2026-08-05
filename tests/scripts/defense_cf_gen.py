@@ -42,6 +42,7 @@ import os as _os, sys as _sys  # noqa: E402  test bootstrap
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
 from defense_cf_probe import dedupe_branches   # 選択肢の同一視は probe と共有（1定義）
+from opcg_sim.src.learned.mcts import resolve_battle_inplace   # 解決規約は探索と共有（1定義）
 from option_pair_gen import margin_blend       # v34: ラベル式は option_pair と共有（1定義）
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -198,6 +199,13 @@ def process_game(task):
             child = gserve.apply(m0, legal[i], name)   # ラベル対象は実盤面の子（世界は決定化前）
             if child is None:
                 continue
+            # **戦闘を解決してから符号化する**（v35・train/serve skew の解消）。
+            # 戦闘途中の子は「1000 を切った子」と「2000 を切った子」が手札-1・ライフ不変で
+            # **ほぼ同一の入力**になり、そこへ異なるラベル（z=-0.875 と -0.562）を付けていた
+            # ＝学習不可能な教師だった（2026-08-04 実測。v34 で教えても動かず、強く押すと
+            # 他点が壊れた原因の疑い）。探索側（静止探索）と**同一の解決関数**を使い、
+            # ネットが実際に見る盤面＝解決時の手札と盤面にラベルを付ける。
+            resolve_battle_inplace(gserve, child, _G["pf"])
             childs[key] = child
             z = margin_blend(causal_z(wins[key], ok_worlds),
                              float(np.mean(lds[key])) if lds[key] else None)
