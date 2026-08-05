@@ -46,6 +46,10 @@ SCALARS_V8 = 66        # v8 = v7 + **自場集約3**（総火力/高パワー数
 _SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4,
                        5: SCALARS_V5, 6: SCALARS_V6, 7: SCALARS_V7, 8: SCALARS_V8}
 
+# 手番フラグ（is_my_turn）の scalars 列位置。append-only 契約により全版で不変＝
+# コーパスの盤面を「自ターン/相手ターン」で層別するときの唯一の正（v35 層別アンカー）。
+IDX_IS_MY_TURN = 11
+
 
 def scalars_dim(version=1):
     """符号化世代 version のグローバル数値特徴数（append-only ＝ version が上がるほど単調増加）。"""

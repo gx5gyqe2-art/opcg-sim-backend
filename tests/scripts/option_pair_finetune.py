@@ -62,13 +62,19 @@ def load_pairs_corpus(dirs):
     return child, n_files
 
 
-def load_anchor(dirs, enc_version, base_net, rows, seed=11):
+def load_anchor(dirs, enc_version, base_net, rows, seed=11, own_turn_only=False):
     """蒸留アンカー（v33）: dense コーパスの一般盤面を読み、scalars を enc_version 幅へ
     ゼロ拡張し、base ネットの予測 y を焼く。
 
     ゼロ拡張の意味論: append-only 契約の下で、v8 温スタート直後の base は追加列の重みが
     ゼロ＝ゼロ埋め入力での予測は旧版と厳密に一致する。アンカーは「v7 特徴で決まる既存挙動
-    （防御較正など）」を固定する錘であり、新特徴（v8 列）の学習は妨げない。"""
+    （防御較正など）」を固定する錘であり、新特徴（v8 列）の学習は妨げない。
+
+    own_turn_only（v35 層別アンカー）: 相手ターン（＝防御判断側）の盤面をアンカーから除外し、
+    自ターン盤面だけを base へ釘付けにする。防御較正はライフ↔手札の交換レートという
+    **評価尺度そのもの**を動かす学習であり、dense 盤面の約4割を占める相手ターン盤面を
+    MSE で固定すると順位教師の押しが木の深部で打ち消される（v35 実測: 1手先は正解が
+    +0.117 上なのに探索後 root Q は PASS が +0.029 上へ逆転）。"""
     keys = ("scalars", "field", "card_idx")
     parts = {k: [] for k in keys}
     for d in dirs:
@@ -79,6 +85,11 @@ def load_anchor(dirs, enc_version, base_net, rows, seed=11):
     if not parts["scalars"]:
         return None, None
     anchor = {k: np.concatenate(parts[k]) for k in keys}
+    if own_turn_only:
+        keep = anchor["scalars"][:, E.IDX_IS_MY_TURN] > 0.5
+        print(f"層別アンカー: 自ターン {int(keep.sum())}/{len(keep)} 盤面のみ使用"
+              f"（相手ターン＝防御系 {int((~keep).sum())} を除外）", flush=True)
+        anchor = {k: anchor[k][keep] for k in keys}
     want = E.scalars_dim(enc_version)
     have = anchor["scalars"].shape[1]
     assert have <= want, f"アンカーの符号化が新しすぎる: {have} > {want}"
@@ -108,6 +119,8 @@ def main():
                     help="蒸留アンカーの dense コーパス（カンマ区切り・空=アンカー無し=v32 挙動）")
     ap.add_argument("--anchor-rows", type=int, default=16000)
     ap.add_argument("--anchor-scale", type=float, default=1.0, help="錘の強さ（lr への係数）")
+    ap.add_argument("--anchor-own-turn-only", action="store_true",
+                    help="層別アンカー（v35）: 相手ターン＝防御系の盤面をアンカーから除外")
     ap.add_argument("--dead-weight", type=float, default=1.0,
                     help="負け側が不発PLAYのペアの重み（複製倍率・1=無効）")
     ap.add_argument("--out", required=True)
@@ -147,7 +160,8 @@ def main():
         print(f"不発ペア重み増し: tr {n0} → {len(p_tr)}", flush=True)
     if args.anchor_dirs:
         anchor, y_anchor = load_anchor([d for d in args.anchor_dirs.split(",") if d],
-                                       args.enc_version, base, args.anchor_rows)
+                                       args.enc_version, base, args.anchor_rows,
+                                       own_turn_only=args.anchor_own_turn_only)
         assert anchor is not None, "アンカーコーパスが空（--anchor-dirs を確認）"
         print(f"蒸留アンカー: {len(y_anchor)}盤面・scale={args.anchor_scale}", flush=True)
         rank_finetune_anchored(vnet, child, p_tr, anchor, y_anchor,
@@ -175,6 +189,7 @@ def main():
     res = {"base": args.base, "files": n_files, "children": int(len(child["value"])),
            "groups": int(len(set(child["group"]))), "pairs": len(pairs),
            "anchor": bool(args.anchor_dirs), "anchor_scale": args.anchor_scale,
+           "anchor_own_turn_only": args.anchor_own_turn_only,
            "dead_weight": args.dead_weight,
            "rank_acc_base": round(ab, 4), "rank_acc_before": round(a0, 4),
            "rank_acc_after": round(a1, 4),
