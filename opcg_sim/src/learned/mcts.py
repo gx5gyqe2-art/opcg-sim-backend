@@ -41,7 +41,8 @@ import numpy as np
 from opcg_sim.src.core import cpu_ai, journal
 from opcg_sim.src.core.journal import JournaledList
 from .config import (C_PUCT, DIRICHLET_ALPHA, TERM_DECAY, TERM_FLOOR,
-                     SERVE_QUIESCE, QUIESCE_MAX_PLIES, TREE_BOX_BATTLE)
+                     SERVE_QUIESCE, QUIESCE_MAX_PLIES, TREE_BOX_BATTLE,
+                     SERVE_TURN_QUIESCE, TURN_QUIESCE_MAX_PLIES)
 
 
 def in_battle(mgr):
@@ -133,6 +134,46 @@ def resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn=None,
     return vals
 
 
+def _turn_owner(mgr):
+    """現在のターンの持ち主の名前（無ければ None・純読み）。戦闘窓では手番（応答者）と
+    ターン所有者が食い違うため、ターン境界の判定はこちらを使う。"""
+    tp = getattr(mgr, "turn_player", None)
+    return getattr(tp, "name", None)
+
+
+def resolve_turn_inplace(game, mgr, value_fn, priors_fn=None,
+                         max_plies=TURN_QUIESCE_MAX_PLIES):
+    """現在のターンが**終わるまで** mgr をその場で進める（巻き戻さない・適用手数を返す）。
+
+    **ターンを1つの箱として畳むときの解決規約の単一の正**（v37・2026-08-06）:
+      - 戦闘窓は**出口 value の箱**（`resolved_branch_values` argmax＝木の箱化と同一規約）
+      - メイン手は **policy 最良手**（priors argmax。TURN_END も候補に含まれ、政策が
+        「もう打つ手が無い」と判断すれば自然にターンが閉じる）
+    停止条件はターン所有者の交代（TURN_END 適用で相手ターンへ）・終局・上限手数。
+    巻き戻し・乱数復元は呼び出し側の責務（`resolve_battle_inplace` と同じ契約）。"""
+    start_owner = _turn_owner(mgr)
+    n = 0
+    for _ in range(max_plies):
+        if game.is_terminal(mgr) or _turn_owner(mgr) != start_owner:
+            break
+        name = game.current_player(mgr)
+        legal = game.legal_actions(mgr) if name else None
+        if not legal:
+            break
+        if in_battle(mgr) and len(legal) > 1:
+            vals = resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn)
+            ok = [i for i, v in enumerate(vals) if v is not None]
+            pick = max(ok, key=lambda i: vals[i]) if ok else quiesce_choice(mgr, legal, priors_fn)
+        else:
+            pick = quiesce_choice(mgr, legal, priors_fn)
+        try:
+            cpu_ai._apply_move_inplace(mgr, name, legal[pick])
+        except Exception:
+            break
+        n += 1
+    return n
+
+
 class _Node:
     __slots__ = ("to_move", "legal", "P", "N", "W", "children", "expanded", "terminal", "term_val")
 
@@ -152,7 +193,8 @@ class TreeMCTS:
     def __init__(self, game, value_fn, priors_fn=None, c_puct=C_PUCT, n_sims=100,
                  determinize_fn=None, rng=None, dirichlet_alpha=DIRICHLET_ALPHA, dirichlet_eps=0.0,
                  term_decay=TERM_DECAY, term_floor=TERM_FLOOR,
-                 quiesce=None, quiesce_max_plies=QUIESCE_MAX_PLIES, box_battle=None):
+                 quiesce=None, quiesce_max_plies=QUIESCE_MAX_PLIES, box_battle=None,
+                 turn_quiesce=None):
         self.game = game
         self.value_fn = value_fn
         self.priors_fn = priors_fn
@@ -171,6 +213,10 @@ class TreeMCTS:
         self.quiesce_max_plies = quiesce_max_plies
         # 木の中の箱化（config.TREE_BOX_BATTLE）: 戦闘窓ノードを出口 value 最良の1手へ畳む。
         self.box_battle = TREE_BOX_BATTLE if box_battle is None else box_battle
+        # ターン静止（config.SERVE_TURN_QUIESCE）: root 手番側の自ターン途中の葉は
+        # ターンが終わるまで進めてから評価する（v37・ターンの箱の第1段）。
+        self.turn_quiesce = SERVE_TURN_QUIESCE if turn_quiesce is None else turn_quiesce
+        self._root_turn = None      # run() が (ターン番号, ターン所有者, root手番) を記録
         # apply/unmake 経路を1回だけ判定（ホットループで分岐しない）。ゲームが make/unmake IF を
         # 提供する＝汎用経路（三目並べ等・OPCG journal に非依存）。OPCGGame は持たない＝journal経路。
         self._generic = hasattr(game, "apply_inplace") and hasattr(game, "unmake")
@@ -178,6 +224,11 @@ class TreeMCTS:
     def run(self, real_state):
         # 作業状態＝determinize のクローン（無ければ 1回だけ clone して呼び出し側を汚さない）。
         mgr = self.determinize_fn(real_state, self.rng) if self.determinize_fn else real_state.clone()
+        # ターン静止の適用範囲を「root 手番側の、いま進行中の自ターン」に限定するための文脈。
+        # 防御窓（相手ターン中の decide）では root 手番 ≠ ターン所有者 ＝ ターン延長はしない
+        # （相手の動きは決め打ちせず、分布と毎手の再計画で扱う方針）。
+        self._root_turn = (int(getattr(mgr, "turn_count", 0) or 0), _turn_owner(mgr),
+                           self.game.current_player(mgr))
         root = _Node()
         self._expand(root, mgr)
         if not root.legal:
@@ -216,7 +267,16 @@ class TreeMCTS:
         消費しうるため**乱数状態も復元**する（消費したままだとエッジ固定＝CRN 一貫性が壊れ、
         ノード統計が訪問ごとにブレる）。
         """
-        if not self.quiesce or self._generic or not in_battle(mgr):
+        # ターン静止（v37）: root 手番側の自ターン途中の葉は**ターンが終わるまで**進めてから
+        # 評価する（戦闘中かどうかを問わない＝戦闘静止を包含する）。適用条件は run() が記録した
+        # root 文脈と一致する葉のみ＝相手ターンの葉・防御窓は従来どおり（戦闘静止のみ）。
+        turn_ext = False
+        if self.turn_quiesce and not self._generic and self._root_turn is not None:
+            t_no, t_owner, t_decider = self._root_turn
+            turn_ext = (t_owner is not None and t_owner == t_decider
+                        and int(getattr(mgr, "turn_count", 0) or 0) == t_no
+                        and _turn_owner(mgr) == t_owner)
+        if not turn_ext and (not self.quiesce or self._generic or not in_battle(mgr)):
             return self.value_fn(mgr, to_move)
         rng_state = random.getstate()
         saved_events = mgr.action_events
@@ -224,7 +284,10 @@ class TreeMCTS:
         try:
             with journal.transaction():
                 mgr.action_events = JournaledList()
-                resolve_battle_inplace(self.game, mgr, self.priors_fn, self.quiesce_max_plies)
+                if turn_ext:
+                    resolve_turn_inplace(self.game, mgr, self.value_fn, self.priors_fn)
+                else:
+                    resolve_battle_inplace(self.game, mgr, self.priors_fn, self.quiesce_max_plies)
                 v = self.value_fn(mgr, to_move)
         finally:
             mgr.action_events = saved_events

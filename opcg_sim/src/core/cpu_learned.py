@@ -223,7 +223,7 @@ class LearnedEngine:
                  sims: Optional[int] = None, c_puct: Optional[float] = None,
                  root_frac: Optional[float] = None, root_gap: Optional[float] = None,
                  battle_readout: Optional[bool] = None, quiesce: Optional[bool] = None,
-                 box_battle: Optional[bool] = None):
+                 box_battle: Optional[bool] = None, turn_quiesce: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
@@ -248,6 +248,8 @@ class LearnedEngine:
         self.quiesce = quiesce
         # 木の中の箱化（None=config.TREE_BOX_BATTLE に従う・同上の席別 seam）。
         self.box_battle = box_battle
+        # ターン静止（None=config.SERVE_TURN_QUIESCE に従う・v37 の席別 seam）。
+        self.turn_quiesce = turn_quiesce
         # ターン内 sticky 世界線の seed キャッシュ {(id(manager), turn, player): (weakref, seed)}（§_world_rng）。
         self._world_seeds: Dict[Any, Any] = {}
         self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
@@ -376,7 +378,8 @@ class LearnedEngine:
                         priors_fn=_priors_fn(self.pnet, self.vocab, self.enc_version),
                         c_puct=c_puct, n_sims=sims, dirichlet_eps=SERVE_DIRICHLET_EPS,
                         determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=det_rng,
-                        quiesce=self.quiesce, box_battle=self.box_battle)
+                        quiesce=self.quiesce, box_battle=self.box_battle,
+                        turn_quiesce=self.turn_quiesce)
         move, _, legal = mcts.run(manager)
         # 同名カードの別実体（手札の複製等）は探索木で別 edge になり訪問数が分裂する。
         # 素の argmax(N) は分裂した等価手を系統的に不利にする（例: EB03-053×2 のカウンターが
