@@ -194,7 +194,7 @@ class TreeMCTS:
                  determinize_fn=None, rng=None, dirichlet_alpha=DIRICHLET_ALPHA, dirichlet_eps=0.0,
                  term_decay=TERM_DECAY, term_floor=TERM_FLOOR,
                  quiesce=None, quiesce_max_plies=QUIESCE_MAX_PLIES, box_battle=None,
-                 turn_quiesce=None):
+                 turn_quiesce=None, turn_value_fn=None):
         self.game = game
         self.value_fn = value_fn
         self.priors_fn = priors_fn
@@ -216,6 +216,9 @@ class TreeMCTS:
         # ターン静止（config.SERVE_TURN_QUIESCE）: root 手番側の自ターン途中の葉は
         # ターンが終わるまで進めてから評価する（v37・ターンの箱の第1段）。
         self.turn_quiesce = SERVE_TURN_QUIESCE if turn_quiesce is None else turn_quiesce
+        # ターン末専用ヘッドの評価関数（v39・None=従来どおり value_fn で測る）。ターン静止で
+        # 延長した葉＝**ターンの箱の出口**だけがこれを見る（戦闘窓の解決は value_fn のまま）。
+        self.turn_value_fn = turn_value_fn
         self._root_turn = None      # run() が (ターン番号, ターン所有者, root手番) を記録
         # apply/unmake 経路を1回だけ判定（ホットループで分岐しない）。ゲームが make/unmake IF を
         # 提供する＝汎用経路（三目並べ等・OPCG journal に非依存）。OPCGGame は持たない＝journal経路。
@@ -286,9 +289,10 @@ class TreeMCTS:
                 mgr.action_events = JournaledList()
                 if turn_ext:
                     resolve_turn_inplace(self.game, mgr, self.value_fn, self.priors_fn)
+                    v = (self.turn_value_fn or self.value_fn)(mgr, to_move)
                 else:
                     resolve_battle_inplace(self.game, mgr, self.priors_fn, self.quiesce_max_plies)
-                v = self.value_fn(mgr, to_move)
+                    v = self.value_fn(mgr, to_move)
         finally:
             mgr.action_events = saved_events
             random.setstate(rng_state)   # 延長の乱数消費を漏らさない（CRN 一貫性）

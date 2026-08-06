@@ -36,10 +36,15 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 MODELS = os.path.join(REPO, "opcg_sim", "data", "learned")
 
 
-def load_pairs_corpus(dirs):
+PAIR_GLOBS = ("optpair_*.npz", "defcf_*.npz", "plancf_*.npz")
+
+
+def load_pairs_corpus(dirs, globs=PAIR_GLOBS):
     """optpair シャード群を child dict（scalars/field/card_idx/value/group/dead_play）へ連結。
 
-    dead_play（v33・不発PLAYフラグ）は旧シャードに無い＝0 で埋める（後方互換）。"""
+    dead_play（v33・不発PLAYフラグ）は旧シャードに無い＝0 で埋める（後方互換）。
+    `globs`（v39）は読むシャード種の指定＝**箱の階層ごとに教師を分けて読む**ための seam
+    （ターン末ヘッドの学習は plancf のみを読む・`turn_head_finetune.py`）。"""
     keys = ("scalars", "field", "card_idx", "value", "group")
     parts = {k: [] for k in keys}
     dead = []
@@ -47,9 +52,10 @@ def load_pairs_corpus(dirs):
     for d in dirs:
         # v34: 防御窓CF（defcf_*）も同スキーマ（group つき margin_blend ラベル）＝同じ順位学習に流せる。
         # v38: ターン出口CF（plancf_*）も同様（ラベル対象がターン末盤面である点だけが違う）。
-        for f in sorted(glob.glob(os.path.join(d, "optpair_*.npz"))
-                        + glob.glob(os.path.join(d, "defcf_*.npz"))
-                        + glob.glob(os.path.join(d, "plancf_*.npz"))):
+        files = []
+        for g in globs:
+            files += glob.glob(os.path.join(d, g))
+        for f in sorted(files):
             z = np.load(f)
             for k in keys:
                 parts[k].append(z[k])

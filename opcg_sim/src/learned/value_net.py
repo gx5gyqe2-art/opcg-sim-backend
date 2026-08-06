@@ -55,6 +55,23 @@ class ValueNet:
         # ゼロ初期化でもデッドロックしない（W_eff のケースと異なり片側が学習済み活性）。
         self.W2t = np.zeros((hidden, 1))
         self.b2t = np.zeros(1)
+        # ターン末専用の value ヘッド（v39・「箱の階層ごとに較正を分ける」）: 同じ胴体 A1 から
+        # **ターン出口盤面の勝率だけ**を読む第2の value 出力。既定は無効（turn_hidden=0）＝
+        # `predict_turn` は既存ヘッドへフォールバック＝旧 npz を含め完全恒等。
+        # 分ける理由（v38 実測）: 戦闘出口較正（m1@15）とターン末較正（m5@7/m2@66）を1つの
+        # ヘッドに同居させると、似た特徴を共有する重みへ逆向きの勾配が掛かり、守るべき点の
+        # マージン（gen12 の m1@15 は +0.062）が薄いため必ずどちらかが折れる（8点中 3.06 < 3.44）。
+        # 真の勝率は盤面ごとに1つに定まるので**両者は論理的には矛盾しない**＝競合は表現の
+        # 共有という工学的制約に由来する。出力を分ければ共存できる、が本ヘッドの仮説。
+        # 構造は**既存ロジットへの残差 MLP**: turn = tanh(Z2 + We2ᵀrelu(We1ᵀA1+be1) + be2)。
+        # 出力層ゼロ初期化＝有効化直後は既存ヘッドと bit 一致（恒等）で、そこから「ターン末での
+        # 差分」だけを学ぶ。単なる線形ヘッド（hidden→1 の 65 パラメタ）では凍結特徴の上で
+        # 表現力が足りず、実測で train 0.66→0.85 に対し val が 0.66 のまま動かなかった。
+        self.turn_hidden = 0
+        self.We1 = np.zeros((hidden, 0))
+        self.be1 = np.zeros(0)
+        self.We2 = np.zeros((0, 1))
+        self.be2 = np.zeros(1)
         # ネット付属 vocab（card_id の index 順リスト・idx=位置+1・0=PAD/UNK）。カードDBが増えると
         # `encoder.build_vocab`（card_id ソート）は**途中挿入**で既存カードの idx がズレ、学習済み
         # Emb/EffF 行との対応が壊れる（2026-07-15 実害: DB+32枚で既存371枚が+2ズレ＋範囲外クラッシュ）。
@@ -81,7 +98,7 @@ class ValueNet:
         return self.W1.shape[0] - self.d_emb * (1 + self.lead_slots) - self._eff_extra_dims()
 
     def _param_names(self):
-        names = ["Emb", "W1", "b1", "W2", "b2", "W2t", "b2t"]
+        names = ["Emb", "W1", "b1", "W2", "b2", "W2t", "b2t", "We1", "be1", "We2", "be2"]
         if self.W_eff is not None:
             names.append("W_eff")
         return names
@@ -158,6 +175,81 @@ class ValueNet:
         （serve の aux 粘り項＝config.SERVE_AUX_TIEBREAK 用。二重 forward を避ける）。"""
         pred, cache = self.forward(batch)
         return pred, self.aux_from_cache(cache)
+
+    def _copy_extra_heads(self, net, pad_rows=0):
+        """複製系メソッド（expanded/widened/to_*）共通: ターン末ヘッドを引き継ぐ。
+
+        `pad_rows`>0（hidden 拡張）では新ユニットの入力行をゼロで埋める＝W2 側と同じ規約で恒等。
+        落とすと「学習済みのターン末較正が拡張で静かに消える」＝W2t を引き継がなかった場合と
+        同型の事故になるため、複製の追加時はここを必ず通す。"""
+        We1 = self.We1
+        if pad_rows > 0:
+            We1 = np.concatenate([We1, np.zeros((pad_rows, self.turn_hidden))], axis=0)
+        net.turn_hidden = self.turn_hidden
+        net.We1 = We1.copy()
+        net.be1 = self.be1.copy()
+        net.We2 = self.We2.copy()
+        net.be2 = self.be2.copy()
+
+    @property
+    def turn_head(self):
+        """ターン末専用ヘッドを持つか（消費側の分岐・保存フラグの唯一の真実源）。"""
+        return self.turn_hidden > 0
+
+    def enable_turn_head(self, turn_hidden=32, seed=0):
+        """ターン末専用ヘッド（残差 MLP）を有効化する（**恒等**: 出力層ゼロ初期化）。
+
+        残差にする理由: 本ヘッドは serve の**評価値そのもの**として使われるため、ゼロから
+        学ぶ独立ヘッドでは「常に 0 を返す無意味な評価」から始まる。既存ロジットに 0 を足す形なら
+        学習前は現行 value と bit 一致し、そこから**ターン末での差分**だけを学べる。
+        中間層は乱数初期化・出力層はゼロ＝勾配デッドロックしない（W2t と同じ論法）。
+        二重適用は禁止（既に学習済みのヘッドを潰すため）。"""
+        if self.turn_head:
+            raise ValueError("既にターン末ヘッドが有効です（二重適用は不可）")
+        rng = np.random.default_rng(seed)
+        hidden = self.W1.shape[1]
+        self.turn_hidden = int(turn_hidden)
+        self.We1 = rng.standard_normal((hidden, self.turn_hidden)) * np.sqrt(2.0 / hidden)
+        self.be1 = np.zeros(self.turn_hidden)
+        self.We2 = np.zeros((self.turn_hidden, 1))
+        self.be2 = np.zeros(1)
+        self._init_adam()
+        return self
+
+    def _turn_hidden_act(self, A1):
+        u = A1 @ self.We1 + self.be1
+        return u, np.maximum(u, 0.0)
+
+    def turn_from_cache(self, cache):
+        """forward の cache から**ターン末 value**（tanh∈[-1,1]）を返す。
+
+        無効時は既存ヘッドの予測をそのまま返す（旧 npz・未学習ネットでも呼び出し側は分岐不要）。"""
+        if not self.turn_head:
+            return cache[10]
+        _, h = self._turn_hidden_act(cache[8])
+        return np.tanh(cache[9][:, 0] + (h @ self.We2 + self.be2)[:, 0])
+
+    def predict_turn(self, batch):
+        """ターン末 value の予測（プラン読み出し／ターン静止の出口評価が使う唯一の口）。"""
+        return self.turn_from_cache(self.forward(batch)[1])
+
+    def backward_turn(self, cache, y):
+        """ターン末ヘッド**のみ**の MSE 勾配（We1/be1/We2/be2）を返す。
+
+        胴体（Emb/W1/b1）にも既存ヘッド（W2/b2）にも勾配を流さない＝ターン末教師で学習しても
+        **既存の較正は物理的に 1bit も動かない**。これが v38（共有重みの綱引きで守るべき点が
+        折れた）に対する本設計の核心で、「学習後に既存挙動が保たれたか」を測る必要すらなくす
+        （テストは bit 一致を直接主張する）。順位ヒンジは `backward` と同じく y の細工で表す。"""
+        if not self.turn_head:
+            raise ValueError("ターン末ヘッドが無効です（enable_turn_head を先に呼ぶ）")
+        A1 = cache[8]
+        u, h = self._turn_hidden_act(A1)
+        pred = self.turn_from_cache(cache)
+        dpred = (2.0 / len(y)) * (pred - y)
+        dr = (dpred * (1 - pred ** 2))[:, None]        # tanh'（残差の加算は勾配を素通し）
+        du = (dr @ self.We2.T) * (u > 0)
+        return {"We2": h.T @ dr, "be2": dr.sum(0),
+                "We1": A1.T @ du, "be1": du.sum(0)}
 
     def backward(self, cache, y, y_aux=None, aux_weight=0.0, y_distill=None, distill_weight=0.0):
         """MSE 勾配。`y_aux`（正規化残りターン・NaN=ラベル無し）と `aux_weight`>0 を渡すと
@@ -249,6 +341,7 @@ class ValueNet:
         net.Emb = self.Emb.copy(); net.W1 = W1n
         net.b1 = self.b1.copy(); net.W2 = self.W2.copy(); net.b2 = self.b2.copy()
         net.W2t = self.W2t.copy(); net.b2t = self.b2t.copy()
+        self._copy_extra_heads(net)
         if self.W_eff is not None:
             net.W_eff = self.W_eff.copy()
         # 焼き込み vocab を引き継ぐ（他の複製系メソッドと同じ）。落とすと serve 側が
@@ -276,6 +369,7 @@ class ValueNet:
         net.Emb = self.Emb.copy(); net.W1 = W1n
         net.b1 = self.b1.copy(); net.W2 = self.W2.copy(); net.b2 = self.b2.copy()
         net.W2t = self.W2t.copy(); net.b2t = self.b2t.copy()
+        self._copy_extra_heads(net)
         net.vocab_ids = list(self.vocab_ids) if self.vocab_ids else None
         net._init_adam()
         return net
@@ -302,6 +396,7 @@ class ValueNet:
         net.Emb = self.Emb.copy(); net.W1 = W1n
         net.b1 = self.b1.copy(); net.W2 = self.W2.copy(); net.b2 = self.b2.copy()
         net.W2t = self.W2t.copy(); net.b2t = self.b2t.copy()
+        self._copy_extra_heads(net)
         net.vocab_ids = list(self.vocab_ids) if self.vocab_ids else None
         net._init_adam()
         return net
@@ -326,6 +421,7 @@ class ValueNet:
         net.b1 = b1n; net.W2 = W2n; net.b2 = self.b2.copy()
         net.W2t = np.concatenate([self.W2t, np.zeros((new_hidden - hidden, 1))], axis=0)
         net.b2t = self.b2t.copy()
+        self._copy_extra_heads(net, pad_rows=new_hidden - hidden)
         if self.W_eff is not None:
             net.W_eff = self.W_eff.copy()
         net.vocab_ids = list(self.vocab_ids) if self.vocab_ids else None
@@ -335,6 +431,8 @@ class ValueNet:
     def save(self, path):
         payload = dict(Emb=self.Emb, W1=self.W1, b1=self.b1, W2=self.W2, b2=self.b2,
                        W2t=self.W2t, b2t=self.b2t,
+                       We1=self.We1, be1=self.be1, We2=self.We2, be2=self.be2,
+                       turn_hidden=np.array(self.turn_hidden),
                        d_emb=np.array(self.d_emb), lead_slots=np.array(self.lead_slots))
         if self.EffF is not None:
             payload.update(EffF=self.EffF.astype(np.float32), W_eff=self.W_eff,
@@ -360,6 +458,12 @@ class ValueNet:
             setattr(net, k, z[k])
         for k in ("W2t", "b2t"):      # 補助ヘッド（v4）: 旧 npz は欠落＝ゼロのまま（恒等）
             if k in z.files:
+                setattr(net, k, z[k])
+        # ターン末ヘッド（v39）: 旧 npz は欠落＝turn_hidden=0 のまま＝predict_turn は
+        # 既存ヘッドへフォールバック（同梱ネットを含む全既存 npz が無改修で動く）。
+        if "turn_hidden" in z.files and int(z["turn_hidden"]) > 0:
+            net.turn_hidden = int(z["turn_hidden"])
+            for k in ("We1", "be1", "We2", "be2"):
                 setattr(net, k, z[k])
         if eff_table is not None:
             net.W_eff = z["W_eff"]

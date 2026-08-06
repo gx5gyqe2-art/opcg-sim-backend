@@ -135,13 +135,18 @@ def execute_plan(game, world, name, steps, value_fn, priors_fn,
 
 
 def evaluate_plan(game, world, name, steps, value_fn, priors_fn,
-                  max_plies=TURN_QUIESCE_MAX_PLIES):
-    """プランを箱実行した**自ターン末の value**（name 視点）。実行は `execute_plan` が正。"""
-    return value_fn(execute_plan(game, world, name, steps, value_fn, priors_fn, max_plies), name)
+                  max_plies=TURN_QUIESCE_MAX_PLIES, exit_value_fn=None):
+    """プランを箱実行した**自ターン末の value**（name 視点）。実行は `execute_plan` が正。
+
+    `exit_value_fn`（v39・ターン末専用ヘッド）を渡すと**出口盤面の評価だけ**をそちらで行う。
+    実行途中の戦闘窓は従来どおり `value_fn`（戦闘出口の較正＝gen12 が持つ規約）で畳む＝
+    「どの箱の出口か」と「どのヘッドで測るか」を1対1に保つ。None は従来と同値。"""
+    exit_mgr = execute_plan(game, world, name, steps, value_fn, priors_fn, max_plies)
+    return (exit_value_fn or value_fn)(exit_mgr, name)
 
 
 def select_plan(game, manager, name, value_fn, priors_fn, rng,
-                n_worlds=PLAN_WORLDS, n_proposals=PLAN_PROPOSALS):
+                n_worlds=PLAN_WORLDS, n_proposals=PLAN_PROPOSALS, exit_value_fn=None):
     """プランを提案→K世界期待値で選ぶ。返り値 (steps, 診断 dict)。候補が無ければ (None, {})。
 
     世界はプラン間で共有（CRN）＝差はプランだけから生じる。提案の1本目は必ず argmax
@@ -165,7 +170,8 @@ def select_plan(game, manager, name, value_fn, priors_fn, rng,
         return None, {}
     scores = []
     for steps in plans:
-        vs = [evaluate_plan(game, w, name, steps, value_fn, priors_fn) for w in worlds]
+        vs = [evaluate_plan(game, w, name, steps, value_fn, priors_fn,
+                            exit_value_fn=exit_value_fn) for w in worlds]
         vs = [v for v in vs if v is not None]
         scores.append(float(np.mean(vs)) if vs else float("-inf"))
     best = int(np.argmax(scores))

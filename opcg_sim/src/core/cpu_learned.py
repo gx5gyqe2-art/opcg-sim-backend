@@ -162,6 +162,22 @@ def _value_fn(vnet, vocab, enc_version=1, aux_tiebreak=None):
     return value
 
 
+def _turn_value_fn(vnet, vocab, enc_version=1):
+    """**ターン末の出口専用**の価値関数（v39・`ValueNet.predict_turn`）。
+
+    箱の階層ごとに較正を分ける（v38 の学び）: 通常の葉評価＝既存ヘッド、ターンを畳んだ出口＝
+    本関数。ネットにターン末ヘッドが無ければ `predict_turn` は既存ヘッドへ落ちる＝従来と同値。
+    aux 粘り項は掛けない（飽和域の減衰は「探索の葉の無差別」を解く発見的補正で、ターン末 z を
+    直接教えたヘッドの較正を上書きする理由がない）。"""
+    def value(state, to_move):
+        if state.winner is not None:
+            return 1.0 if state.winner == to_move else -1.0
+        enc = E.encode(state, to_move, vocab, version=enc_version)
+        batch = {k: enc[k][None, ...] for k in ("scalars", "field", "card_idx")}
+        return float(vnet.predict_turn(batch)[0])
+    return value
+
+
 def _priors_fn(pnet, vocab, enc_version=1):
     if pnet is None:
         return None
@@ -316,6 +332,15 @@ class LearnedEngine:
         # determinize の shuffle が同じ乱数列から始まる（公開情報の更新は盤面側から反映される）。
         return np.random.default_rng(seed)
 
+    def _exit_value_fn(self):
+        """ターン出口の評価関数（ターン末ヘッドを持つネットのみ・無ければ None＝従来どおり）。
+
+        None を返す経路では呼び出し側が通常の value_fn を使う＝**既存の同梱ネットでは
+        v39 導入前と完全に同一の計算**（新ヘッドを持つ候補ネットでだけ挙動が変わる）。"""
+        if not getattr(self.vnet, "turn_head", False):
+            return None
+        return _turn_value_fn(self.vnet, self.vocab, self.enc_version)
+
     def _battle_window_choice(self, manager, name, det_rng):
         """戦闘窓の読み出し（`SERVE_BATTLE_READOUT`）: 出口盤面の value で選ぶ。
 
@@ -368,7 +393,8 @@ class LearnedEngine:
             vf = _value_fn(self.vnet, self.vocab, self.enc_version,
                            aux_tiebreak=self.aux_tiebreak)
             pf = _priors_fn(self.pnet, self.vocab, self.enc_version)
-            steps, _diag = PL.select_plan(self.game, manager, name, vf, pf, det_rng)
+            steps, _diag = PL.select_plan(self.game, manager, name, vf, pf, det_rng,
+                                          exit_value_fn=self._exit_value_fn())
             self._turn_plans[key] = list(steps) if steps else None
         steps = self._turn_plans[key]
         if steps is None:
@@ -394,7 +420,8 @@ class LearnedEngine:
                 vf = _value_fn(self.vnet, self.vocab, self.enc_version,
                                aux_tiebreak=self.aux_tiebreak)
                 pf = _priors_fn(self.pnet, self.vocab, self.enc_version)
-                new_steps, _diag = PL.select_plan(self.game, manager, name, vf, pf, det_rng)
+                new_steps, _diag = PL.select_plan(self.game, manager, name, vf, pf, det_rng,
+                                                  exit_value_fn=self._exit_value_fn())
                 if not new_steps:
                     self._turn_plans[key] = None
                     return None
@@ -454,7 +481,8 @@ class LearnedEngine:
                         c_puct=c_puct, n_sims=sims, dirichlet_eps=SERVE_DIRICHLET_EPS,
                         determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=det_rng,
                         quiesce=self.quiesce, box_battle=self.box_battle,
-                        turn_quiesce=self.turn_quiesce)
+                        turn_quiesce=self.turn_quiesce,
+                        turn_value_fn=self._exit_value_fn())
         move, _, legal = mcts.run(manager)
         # 同名カードの別実体（手札の複製等）は探索木で別 edge になり訪問数が分裂する。
         # 素の argmax(N) は分裂した等価手を系統的に不利にする（例: EB03-053×2 のカウンターが
