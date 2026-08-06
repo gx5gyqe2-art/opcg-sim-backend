@@ -223,7 +223,8 @@ class LearnedEngine:
                  sims: Optional[int] = None, c_puct: Optional[float] = None,
                  root_frac: Optional[float] = None, root_gap: Optional[float] = None,
                  battle_readout: Optional[bool] = None, quiesce: Optional[bool] = None,
-                 box_battle: Optional[bool] = None, turn_quiesce: Optional[bool] = None):
+                 box_battle: Optional[bool] = None, turn_quiesce: Optional[bool] = None,
+                 plan_readout: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
@@ -250,6 +251,12 @@ class LearnedEngine:
         self.box_battle = box_battle
         # ターン静止（None=config.SERVE_TURN_QUIESCE に従う・v37 の席別 seam）。
         self.turn_quiesce = turn_quiesce
+        # プラン読み出し（None=config.SERVE_PLAN_READOUT に従う・v37② の席別 seam）。
+        self.plan_readout = plan_readout
+        # ターンプランのキャッシュ {(id(manager), turn, name, world_seed): steps or None}。
+        # world_seed 込みのキー＝sticky 世界線と同じ寿命（外部が _world_seeds をリセットして
+        # 新しい世界を引けばプランも立て直す。ゲート計測の seed 独立性がこれで保たれる）。
+        self._turn_plans: Dict[Any, Any] = {}
         # ターン内 sticky 世界線の seed キャッシュ {(id(manager), turn, player): (weakref, seed)}（§_world_rng）。
         self._world_seeds: Dict[Any, Any] = {}
         self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
@@ -344,6 +351,56 @@ class LearnedEngine:
                  "Q": np.array([v if v is not None else -1.0 for v in vals], dtype=float)}
         return legal[best], stats, mgr
 
+    def _plan_step(self, manager, name, det_rng, world_seed):
+        """プラン読み出し（`SERVE_PLAN_READOUT`・v37②）: ターンに1回プランを立てて
+        （K世界期待値・`plan.select_plan`）、以後はその手を1つずつ返す。
+
+        次の手が実盤面で非合法になったら（想定外の応手＝計画が割れた）**その場で1回だけ
+        再計画**する。プランが尽きたら TURN_END を返してターンを閉じる（プラン評価は
+        「この列を打って閉じたターン末」の値なので、閉じるまでがプランの一部）。
+        立案失敗（候補ゼロ等）は None を記憶し、このターンは従来の探索に委ねる。"""
+        from opcg_sim.src.learned import plan as PL
+        key = (id(manager), int(getattr(manager, "turn_count", 0) or 0), name, world_seed)
+        if key not in self._turn_plans:
+            if len(self._turn_plans) >= 64:
+                for k in list(self._turn_plans)[:32]:
+                    del self._turn_plans[k]
+            vf = _value_fn(self.vnet, self.vocab, self.enc_version,
+                           aux_tiebreak=self.aux_tiebreak)
+            pf = _priors_fn(self.pnet, self.vocab, self.enc_version)
+            steps, _diag = PL.select_plan(self.game, manager, name, vf, pf, det_rng)
+            self._turn_plans[key] = list(steps) if steps else None
+        steps = self._turn_plans[key]
+        if steps is None:
+            return None
+        for attempt in (0, 1):
+            legal = self.game.legal_actions(manager)
+            while steps:
+                mv = PL._find_move(legal, steps[0])
+                if mv is not None:
+                    steps.pop(0)
+                    return mv
+                steps.pop(0)       # 対象消滅などで非合法になった手は縮退（プラン評価と同じ規約）
+            if not steps and attempt == 0:
+                # プランが尽きた: ターンを閉じる（これもプランの一部）
+                for cand in legal:
+                    try:
+                        d = cpu_ai._describe_move(manager, cand) or {}
+                    except Exception:
+                        d = {}
+                    if d.get("action_type") == "TURN_END":
+                        return cand
+                # TURN_END が無い（対話中など）＝計画が割れた → 1回だけ再計画
+                vf = _value_fn(self.vnet, self.vocab, self.enc_version,
+                               aux_tiebreak=self.aux_tiebreak)
+                pf = _priors_fn(self.pnet, self.vocab, self.enc_version)
+                new_steps, _diag = PL.select_plan(self.game, manager, name, vf, pf, det_rng)
+                if not new_steps:
+                    self._turn_plans[key] = None
+                    return None
+                steps = self._turn_plans[key] = list(new_steps)
+        return None
+
     def decide(self, manager, player, sims: int = SERVE_SIMS, c_puct: float = C_PUCT,
                rng=None, trace=None) -> Optional[Dict[str, Any]]:
         """このエンジンのネットで 1 手決定する（`decide_learned` と同一契約・同一探索）。"""
@@ -372,6 +429,24 @@ class LearnedEngine:
                         trace["readout"] = "battle_resolved"
                     except Exception:
                         pass   # 分析失敗で対局を止めない
+                return move
+        # プラン読み出し（v37②）: 自ターンのメイン判断は「プラン×K世界の期待値」で決める。
+        # 対象は自ターン所有かつ非戦闘の判断のみ（防御窓は上の箱読み出し・相手ターンは対象外）。
+        use_plan = (CFG.SERVE_PLAN_READOUT if self.plan_readout is None
+                    else self.plan_readout)
+        if use_plan and not in_battle(manager) and \
+                getattr(getattr(manager, "turn_player", None), "name", None) == name:
+            wkey = (id(manager), int(getattr(manager, "turn_count", 0) or 0), name)
+            hit = self._world_seeds.get(wkey)
+            wseed = hit[1] if hit is not None else None
+            move = self._plan_step(manager, name, det_rng, wseed)
+            if move is not None:
+                if trace is not None:
+                    try:
+                        _fill_trace(trace, manager, player, move, None)
+                        trace["readout"] = "turn_plan"
+                    except Exception:
+                        pass
                 return move
         mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab, self.enc_version,
                                                       aux_tiebreak=self.aux_tiebreak),
