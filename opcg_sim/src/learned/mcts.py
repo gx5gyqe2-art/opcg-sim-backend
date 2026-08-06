@@ -40,7 +40,7 @@ import numpy as np
 
 from opcg_sim.src.core import cpu_ai, journal
 from opcg_sim.src.core.journal import JournaledList
-from .config import (BOX_RESOLVE_DEPTH, C_PUCT, DIRICHLET_ALPHA, TERM_DECAY, TERM_FLOOR,
+from .config import (BOX_RESOLVE_BLIND_ONLY, BOX_RESOLVE_DEPTH, C_PUCT, DIRICHLET_ALPHA, TERM_DECAY, TERM_FLOOR,
                      SERVE_QUIESCE, QUIESCE_MAX_PLIES, TREE_BOX_BATTLE,
                      SERVE_TURN_QUIESCE, TURN_QUIESCE_MAX_PLIES)
 
@@ -76,6 +76,24 @@ def quiesce_choice(mgr, legal, priors_fn=None):
     return 0
 
 
+def _priors_blind(mgr, legal, priors_fn, eps=1e-9):
+    """policy がこの窓の選択肢を**区別できない**か（priors が無い/一様・pure）。
+
+    効果選択（RESOLVE_EFFECT_SELECTION）は行動特徴に対象が入らないため全選択肢が同一ベクトルに
+    なり、priors は一様（実測 m2@44 の5択で 0.2 ずつ）＝policy 最良手は実質「先頭固定」。
+    こういう窓でだけ出口 value に判断させれば、policy が区別できる窓（カウンター値の特徴を持つ
+    カウンター窓など）の既存較正には触れずに済む。"""
+    if priors_fn is None:
+        return True
+    try:
+        p = priors_fn(mgr, legal)
+    except Exception:
+        return True
+    if p is None or len(p) == 0:
+        return True
+    return float(np.max(p) - np.min(p)) <= eps
+
+
 def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIES,
                            value_fn=None, box_depth=0):
     """戦闘が解決するまで mgr をその場で進める（**巻き戻さない**・適用手数を返す）。
@@ -100,7 +118,8 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
         if not legal:
             break
         pick = None
-        if box_depth > 0 and value_fn is not None and len(legal) > 1:
+        if (box_depth > 0 and value_fn is not None and len(legal) > 1
+                and (not BOX_RESOLVE_BLIND_ONLY or _priors_blind(mgr, legal, priors_fn))):
             vals = resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn,
                                           max_plies, box_depth=box_depth - 1)
             ok = [i for i, v in enumerate(vals) if v is not None]
