@@ -20,7 +20,8 @@
 import numpy as np
 
 from opcg_sim.src.core import cpu_ai
-from .config import PLAN_WORLDS, PLAN_PROPOSALS, PLAN_TEMP, TURN_QUIESCE_MAX_PLIES
+from .config import (PLAN_MIN_SPREAD, PLAN_PROPOSALS, PLAN_TEMP, PLAN_WORLDS,
+                     TURN_QUIESCE_MAX_PLIES)
 from .mcts import in_battle, resolved_branch_values, _turn_owner
 
 
@@ -146,11 +147,17 @@ def evaluate_plan(game, world, name, steps, value_fn, priors_fn,
 
 
 def select_plan(game, manager, name, value_fn, priors_fn, rng,
-                n_worlds=PLAN_WORLDS, n_proposals=PLAN_PROPOSALS, exit_value_fn=None):
+                n_worlds=PLAN_WORLDS, n_proposals=PLAN_PROPOSALS, exit_value_fn=None,
+                min_spread=PLAN_MIN_SPREAD):
     """プランを提案→K世界期待値で選ぶ。返り値 (steps, 診断 dict)。候補が無ければ (None, {})。
 
     世界はプラン間で共有（CRN）＝差はプランだけから生じる。提案の1本目は必ず argmax
-    （現行 policy の最良線を常に候補に含める）。"""
+    （現行 policy の最良線を常に候補に含める）。
+
+    `min_spread`（v39・`config.PLAN_MIN_SPREAD`）: 候補の出口 value の幅がこれ未満なら
+    **箱化を放棄して (None, 診断) を返す**＝呼び出し側は従来の探索に委ねる。平坦な窓の薄い差は
+    プランの優劣ではなくノイズで、そこで箱に決めさせると決定点近傍の較正（gen11 で教えた
+    m1@3 型の矯正など）を薄い差で上書きしてしまう。"""
     worlds = []
     for _ in range(n_worlds):
         try:
@@ -175,5 +182,11 @@ def select_plan(game, manager, name, value_fn, priors_fn, rng,
         vs = [v for v in vs if v is not None]
         scores.append(float(np.mean(vs)) if vs else float("-inf"))
     best = int(np.argmax(scores))
-    return plans[best], {"n_plans": len(plans), "n_worlds": len(worlds),
-                         "scores": [round(s, 4) for s in scores], "best": best}
+    finite = [s for s in scores if s > float("-inf")]
+    spread = float(max(finite) - min(finite)) if len(finite) > 1 else 0.0
+    diag = {"n_plans": len(plans), "n_worlds": len(worlds),
+            "scores": [round(s, 4) for s in scores], "best": best,
+            "spread": round(spread, 4)}
+    if len(finite) > 1 and spread < min_spread:
+        return None, {**diag, "skipped": "flat_exits"}
+    return plans[best], diag

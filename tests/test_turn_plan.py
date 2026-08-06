@@ -83,8 +83,10 @@ def test_select_plan_picks_argmax_of_scores(main_board, eng):
     m, name = main_board
     vf = _value_fn(eng.vnet, eng.vocab, eng.enc_version, aux_tiebreak=eng.aux_tiebreak)
     pf = _priors_fn(eng.pnet, eng.vocab, eng.enc_version)
+    # min_spread=0＝平坦窓ゲート（v39）を無効化して「argmax で選ぶ」ことだけを見る
+    # （ゲート自体は test_flat_exits_skip_the_box が別に固定する）。
     steps, diag = PL.select_plan(eng.game, m, name, vf, pf, np.random.default_rng(7),
-                                 n_worlds=3, n_proposals=4)
+                                 n_worlds=3, n_proposals=4, min_spread=0.0)
     assert steps, "プランが選ばれない"
     assert diag["scores"][diag["best"]] == max(diag["scores"])
 
@@ -121,3 +123,23 @@ def test_broken_plan_degrades_without_crash(main_board):
     if mv is not None:
         legal_sigs = {PL.move_sig(x) for x in e.game.legal_actions(m)}
         assert PL.move_sig(mv) in legal_sigs
+
+
+def test_flat_exits_skip_the_box(main_board):
+    """出口が割れない窓では箱化を放棄する（v39・`PLAN_MIN_SPREAD`）。
+
+    平坦な窓の薄い差はプランの優劣でなくノイズで、そこで箱に決めさせると決定点近傍の較正を
+    上書きしてしまう（m1@3 の退行）。閾値を跨いで挙動が切り替わることを固定する。"""
+    m, name = main_board
+    e = LearnedEngine(plan_readout=True)
+    vf = _value_fn(e.vnet, e.vocab, e.enc_version)
+    pf = _priors_fn(e.pnet, e.vocab, e.enc_version)
+    rng = np.random.default_rng(11)
+    steps, diag = PL.select_plan(e.game, m, name, vf, pf, rng, min_spread=0.0)
+    if steps is None:
+        pytest.skip("この盤面ではプラン候補が立たない")
+    assert "spread" in diag and diag["spread"] >= 0.0
+    # 閾値を実測幅より上に置けば必ず箱を放棄する（呼び出し側は従来の探索へ委ねる）
+    s2, d2 = PL.select_plan(e.game, m, name, vf, pf, np.random.default_rng(11),
+                            min_spread=diag["spread"] + 1.0)
+    assert s2 is None and d2.get("skipped") == "flat_exits"
