@@ -67,7 +67,11 @@ def _card_of(mgr, mv):
 def test_resolved_values_rank_by_exit_board(battle_board):
     """出口で評価する＝「止まる 2000」がライフを守り、「止まらない 1000」は失う。
 
-    評価器は自分のライフ枚数を返す純関数（ネット非依存＝この性質だけを固定）。
+    評価器は「自分のライフ＋手札（1/100 重み）」を返す純関数（ネット非依存＝この性質だけを固定）。
+    v39（`BOX_RESOLVE_DEPTH`≥1）で箱の内部解決が**出口 value 最良**になったため、ライフだけを
+    数える評価器では「1000 を切った枝も、続けてもう1枚足して助かる」と読まれ両枝が同値になる
+    （`quiesce_choice` の docstring にある m1@15 の落とし穴と同型）。**払った枚数**を評価に含めれば
+    「1枚で止める」が「2枚で止める」より上、という本来の性質がそのまま出る。
     """
     m, name = battle_board
     game = _game()
@@ -75,7 +79,7 @@ def test_resolved_values_rank_by_exit_board(battle_board):
 
     def life_fn(mgr, to_move):
         me = mgr.p1 if mgr.p1.name == to_move else mgr.p2
-        return float(len(me.life))
+        return float(len(me.life)) + len(me.hand) / 100.0
 
     vals = resolved_branch_values(game, m, name, legal, life_fn)
     by_card = {_card_of(m, mv): v for mv, v in zip(legal, vals)}

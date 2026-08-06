@@ -40,7 +40,7 @@ import numpy as np
 
 from opcg_sim.src.core import cpu_ai, journal
 from opcg_sim.src.core.journal import JournaledList
-from .config import (C_PUCT, DIRICHLET_ALPHA, TERM_DECAY, TERM_FLOOR,
+from .config import (BOX_RESOLVE_DEPTH, C_PUCT, DIRICHLET_ALPHA, TERM_DECAY, TERM_FLOOR,
                      SERVE_QUIESCE, QUIESCE_MAX_PLIES, TREE_BOX_BATTLE,
                      SERVE_TURN_QUIESCE, TURN_QUIESCE_MAX_PLIES)
 
@@ -76,13 +76,21 @@ def quiesce_choice(mgr, legal, priors_fn=None):
     return 0
 
 
-def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIES):
+def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIES,
+                           value_fn=None, box_depth=0):
     """戦闘が解決するまで mgr をその場で進める（**巻き戻さない**・適用手数を返す）。
 
     **探索（葉評価）と教師（コーパス符号化）が同一の解決規約を使うための単一の正**。
     別々に実装すると必ずずれ、教師が「ネットが実際に見ることのない盤面」を教えることになる
     （2026-08-04 の train/serve skew 対策）。巻き戻し・乱数復元は呼び出し側の責務
-    （探索は transaction 内で使い、教師はクローン上で使うため要件が異なる）。"""
+    （探索は transaction 内で使い、教師はクローン上で使うため要件が異なる）。
+
+    `box_depth`>0 かつ `value_fn` あり（v39・2026-08-06）: 残りの窓も**出口 value 最良**で
+    進める＝実対局の読み出し（`SERVE_BATTLE_READOUT`）と同一規約になる。既定（0）は
+    policy 最良手だが、**policy は効果選択の選択肢を区別できない**（行動特徴に対象が入らず
+    priors が一様＝実質「先頭固定」・m2@44 実測）ため、箱が予測する出口と実際に到達する出口が
+    ずれる（箱は「どうせカウンターされる」と読み、実際の CPU は出口 value で PASS を選ぶ）。
+    深さで再帰を止める（resolved_branch_values ↔ 本関数の相互再帰）。"""
     n = 0
     for _ in range(max_plies):
         if game.is_terminal(mgr) or not in_battle(mgr):
@@ -91,9 +99,17 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
         legal = game.legal_actions(mgr) if name else None
         if not legal:
             break
+        pick = None
+        if box_depth > 0 and value_fn is not None and len(legal) > 1:
+            vals = resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn,
+                                          max_plies, box_depth=box_depth - 1)
+            ok = [i for i, v in enumerate(vals) if v is not None]
+            if ok:
+                pick = max(ok, key=lambda i: vals[i])
+        if pick is None:
+            pick = quiesce_choice(mgr, legal, priors_fn)
         try:
-            cpu_ai._apply_move_inplace(mgr, name, legal[quiesce_choice(mgr, legal, priors_fn)],
-                                       stop_at_select=True)
+            cpu_ai._apply_move_inplace(mgr, name, legal[pick], stop_at_select=True)
         except Exception:
             break
         n += 1
@@ -101,7 +117,7 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
 
 
 def resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn=None,
-                           max_plies=QUIESCE_MAX_PLIES):
+                           max_plies=QUIESCE_MAX_PLIES, box_depth=None):
     """各合法手を「戦闘を解決した出口盤面」まで進めて評価した value 列（`mgr` は不変）。
 
     **戦闘を1つの箱として畳む**（ユーザ整理 2026-08-05）: 箱の中の手順そのものは評価対象に
@@ -109,11 +125,14 @@ def resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn=None,
     ネットの予測ではなく**エンジンの実計算**（7000 攻撃に 2000 を足せば 8000 で凌ぐ、は算術的に
     確定する）。判断しているのは葉評価と同じ value ネット自身で、別系統の防御ロジックではない。
 
-    枝の残り手は `resolve_battle_inplace`（policy 最良手→PASS→先頭手）で進める＝探索の静止探索・
-    教師コーパスと**同一の解決規約**（train/serve skew 防止の単一の正）。
+    枝の残り手は `resolve_battle_inplace` で進める。`box_depth`（既定 `config.BOX_RESOLVE_DEPTH`）
+    が >0 なら**残りの窓も出口 value 最良**で進める＝実対局の読み出しと同一規約（v39）。0 なら
+    従来どおり policy 最良手（policy は効果選択を区別できないため実質「先頭固定」になる）。
 
     値は `name` 視点。適用に失敗した枝は None（呼び出し側で除外）。全枝を**同一の乱数列**から
     評価し（CRN）、抜けるときに乱数状態を元へ戻す＝実ゲームへ探索の消費を漏らさない。"""
+    if box_depth is None:
+        box_depth = BOX_RESOLVE_DEPTH
     base_rng_state = random.getstate()
     vals = []
     for mv in legal:
@@ -124,7 +143,8 @@ def resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn=None,
             with journal.transaction():      # 退出で盤面を巻き戻す（呼び出し側の mgr は不変）
                 mgr.action_events = JournaledList()
                 cpu_ai._apply_move_inplace(mgr, name, mv, stop_at_select=True)
-                resolve_battle_inplace(game, mgr, priors_fn, max_plies)
+                resolve_battle_inplace(game, mgr, priors_fn, max_plies,
+                                       value_fn=value_fn, box_depth=box_depth)
                 v = value_fn(mgr, name)
         except Exception:
             v = None
