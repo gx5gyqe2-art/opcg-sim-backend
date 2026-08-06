@@ -45,9 +45,11 @@ def load_pairs_corpus(dirs):
     dead = []
     n_files = 0
     for d in dirs:
-        # v34: 防御窓CF（defcf_*）も同スキーマ（group つき margin_blend ラベル）＝同じ順位学習に流せる
+        # v34: 防御窓CF（defcf_*）も同スキーマ（group つき margin_blend ラベル）＝同じ順位学習に流せる。
+        # v38: ターン出口CF（plancf_*）も同様（ラベル対象がターン末盤面である点だけが違う）。
         for f in sorted(glob.glob(os.path.join(d, "optpair_*.npz"))
-                        + glob.glob(os.path.join(d, "defcf_*.npz"))):
+                        + glob.glob(os.path.join(d, "defcf_*.npz"))
+                        + glob.glob(os.path.join(d, "plancf_*.npz"))):
             z = np.load(f)
             for k in keys:
                 parts[k].append(z[k])
