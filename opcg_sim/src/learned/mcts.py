@@ -92,7 +92,8 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
         if not legal:
             break
         try:
-            cpu_ai._apply_move_inplace(mgr, name, legal[quiesce_choice(mgr, legal, priors_fn)])
+            cpu_ai._apply_move_inplace(mgr, name, legal[quiesce_choice(mgr, legal, priors_fn)],
+                                       stop_at_select=True)
         except Exception:
             break
         n += 1
@@ -122,7 +123,7 @@ def resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn=None,
         try:
             with journal.transaction():      # 退出で盤面を巻き戻す（呼び出し側の mgr は不変）
                 mgr.action_events = JournaledList()
-                cpu_ai._apply_move_inplace(mgr, name, mv)
+                cpu_ai._apply_move_inplace(mgr, name, mv, stop_at_select=True)
                 resolve_battle_inplace(game, mgr, priors_fn, max_plies)
                 v = value_fn(mgr, name)
         except Exception:
@@ -167,7 +168,7 @@ def resolve_turn_inplace(game, mgr, value_fn, priors_fn=None,
         else:
             pick = quiesce_choice(mgr, legal, priors_fn)
         try:
-            cpu_ai._apply_move_inplace(mgr, name, legal[pick])
+            cpu_ai._apply_move_inplace(mgr, name, legal[pick], stop_at_select=True)
         except Exception:
             break
         n += 1
@@ -385,7 +386,7 @@ class TreeMCTS:
             mgr.action_events = JournaledList()
             dead = False
             try:
-                cpu_ai._apply_move_inplace(mgr, node.to_move, move)
+                cpu_ai._apply_move_inplace(mgr, node.to_move, move, stop_at_select=True)
             except Exception:
                 dead = True
             if dead:

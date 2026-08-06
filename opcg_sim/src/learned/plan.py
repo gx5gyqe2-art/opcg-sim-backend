@@ -22,14 +22,19 @@ import numpy as np
 from opcg_sim.src.core import cpu_ai
 from .config import (PLAN_MIN_SPREAD, PLAN_PROPOSALS, PLAN_TEMP, PLAN_WORLDS,
                      TURN_QUIESCE_MAX_PLIES)
-from .mcts import in_battle, resolved_branch_values, _turn_owner
+from .mcts import in_battle, quiesce_choice, resolved_branch_values, _turn_owner
 
 
 def move_sig(mv):
-    """手の同一性キー（pure）: action_type ＋ payload の uuid/対象（世界に依存しない）。"""
+    """手の同一性キー（pure）: action_type ＋ payload の uuid/対象（世界に依存しない）。
+
+    効果選択（RESOLVE_EFFECT_SELECTION）は uuid/target_ids を持たず `selected_uuids` と
+    accepted で区別されるため、それも鍵に含める（含めないと「誰に -1000 を当てるか」等の
+    全選択肢が同一キーに潰れ、プラン実行が別の選択肢を適用してしまう・v39）。"""
     p = mv.get("payload") or {}
     return (mv.get("action_type") or p.get("action_type"), p.get("uuid"),
-            tuple(p.get("target_ids") or ()))
+            tuple(p.get("target_ids") or ()),
+            tuple(p.get("selected_uuids") or ()), p.get("accepted"))
 
 
 def _find_move(legal, sig):
@@ -126,6 +131,11 @@ def execute_plan(game, world, name, steps, value_fn, priors_fn,
                     if (cpu_ai._describe_move(mgr, cand) or {}).get("action_type") == "TURN_END":
                         mv = cand
                         break
+                if mv is None and legal:
+                    # TURN_END が出せない＝自分の効果選択が保留中（v39 でこれが探索の決定点に
+                    # なった）。プランに無い選択は policy 最良手で埋める＝ターンを閉じられずに
+                    # 途中の盤面を「ターン末」と誤って評価する事故を防ぐ。
+                    mv = legal[quiesce_choice(mgr, legal, priors_fn)]
         if mv is None:
             return mgr
         nxt = game.apply(mgr, mv, actor)

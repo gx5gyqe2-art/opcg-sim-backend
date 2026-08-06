@@ -67,7 +67,7 @@ class OPCGGame:
 
     def apply(self, state, move, actor_name):
         """move を新クローンへ適用（対話ドレイン込み）。例外手は None（呼び出し側で除外）。"""
-        return cpu_ai._apply_clone(state, actor_name, move)
+        return cpu_ai._apply_clone(state, actor_name, move, stop_at_select=True)
 
     def determinize(self, state, me_name, rng):
         """探索の世界線を固定＝相手の伏せ手札を再サンプリングしたクローンを返す（PIMC）。"""
