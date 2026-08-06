@@ -42,6 +42,7 @@ import os as _os, sys as _sys  # noqa: E402  test bootstrap
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
 from defense_cf_probe import dedupe_branches   # 選択肢の同一視は probe と共有（1定義）
+from opcg_sim.src.learned.config import BOX_RESOLVE_DEPTH
 from opcg_sim.src.learned.mcts import resolve_battle_inplace   # 解決規約は探索と共有（1定義）
 from option_pair_gen import margin_blend       # v34: ラベル式は option_pair と共有（1定義）
 
@@ -205,7 +206,11 @@ def process_game(task):
             # ＝学習不可能な教師だった（2026-08-04 実測。v34 で教えても動かず、強く押すと
             # 他点が壊れた原因の疑い）。探索側（静止探索）と**同一の解決関数**を使い、
             # ネットが実際に見る盤面＝解決時の手札と盤面にラベルを付ける。
-            resolve_battle_inplace(gserve, child, _G["pf"])
+            # v39: 解決規約も serve と揃える（value_fn＋BOX_RESOLVE_DEPTH）。深さ0のままだと
+            # 「policy 任せで途中終了した出口」＝**実対局では到達しない盤面**を教えることになる
+            # （深さ1の serve は最善 continuation まで読み切って別の出口へ至る）。
+            resolve_battle_inplace(gserve, child, _G["pf"],
+                                   value_fn=_G["vf"], box_depth=BOX_RESOLVE_DEPTH)
             childs[key] = child
             z = margin_blend(causal_z(wins[key], ok_worlds),
                              float(np.mean(lds[key])) if lds[key] else None)
