@@ -96,19 +96,21 @@ def rollout_plan(game, world, name, value_fn, priors_fn, rng, temp=PLAN_TEMP,
     return tuple(steps)
 
 
-def evaluate_plan(game, world, name, steps, value_fn, priors_fn,
-                  max_plies=TURN_QUIESCE_MAX_PLIES):
-    """プランを world 上で箱実行し**自ターン末の value**（name 視点）を返す（world は不変）。
+def execute_plan(game, world, name, steps, value_fn, priors_fn,
+                 max_plies=TURN_QUIESCE_MAX_PLIES):
+    """プランを world 上で箱実行し**ターン末の盤面**を返す（world は不変・clone-apply）。
+
+    **serve（プラン読み出し）と教師（プランCF生成）が共有する実行規約の単一の正**（v38）。
+    別々に実装すると必ずずれ、教師が「serve が実際に到達しない盤面」を教えることになる
+    （v35 の train/serve skew と同型の予防）。
 
     手が非合法な世界では skip（相手の応手次第で対象が消える等＝その世界でのプランの自然な
-    縮退）。TURN_END を適用してターン境界で評価する。"""
+    縮退）。プランが尽きたら TURN_END を適用してターンを閉じる（閉じるまでがプラン）。"""
     mgr = world
     idx = 0
     for _ in range(max_plies):
-        if game.is_terminal(mgr):
-            break
-        if _turn_owner(mgr) != name:
-            return value_fn(mgr, name)          # ターンが替わった＝そこが出口
+        if game.is_terminal(mgr) or _turn_owner(mgr) != name:
+            return mgr                          # 終局／ターンが替わった＝そこが出口
         actor = game.current_player(mgr)
         if actor != name or in_battle(mgr):
             mv = _battle_box_step(game, mgr, actor, value_fn, priors_fn)
@@ -123,15 +125,19 @@ def evaluate_plan(game, world, name, steps, value_fn, priors_fn,
                     if (cpu_ai._describe_move(mgr, cand) or {}).get("action_type") == "TURN_END":
                         mv = cand
                         break
-                if mv is None:
-                    return value_fn(mgr, name)
         if mv is None:
-            return value_fn(mgr, name)
+            return mgr
         nxt = game.apply(mgr, mv, actor)
         if nxt is None:
-            return value_fn(mgr, name)
+            return mgr
         mgr = nxt
-    return value_fn(mgr, name)
+    return mgr
+
+
+def evaluate_plan(game, world, name, steps, value_fn, priors_fn,
+                  max_plies=TURN_QUIESCE_MAX_PLIES):
+    """プランを箱実行した**自ターン末の value**（name 視点）。実行は `execute_plan` が正。"""
+    return value_fn(execute_plan(game, world, name, steps, value_fn, priors_fn, max_plies), name)
 
 
 def select_plan(game, manager, name, value_fn, priors_fn, rng,
