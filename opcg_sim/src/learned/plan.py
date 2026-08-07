@@ -57,13 +57,16 @@ def _battle_box_step(game, mgr, name, value_fn, priors_fn):
 
 
 def rollout_plan(game, world, name, value_fn, priors_fn, rng, temp=PLAN_TEMP,
-                 max_plies=TURN_QUIESCE_MAX_PLIES):
+                 max_plies=TURN_QUIESCE_MAX_PLIES, battle_value_fn=None):
     """1本のターンロールアウトから候補プラン（自分のメイン手の signature 列）を作る。
 
     メイン手＝priors の温度サンプリング（temp=0 で argmax）。戦闘窓＝箱。TURN_END で終了
-    （TURN_END 自体はプランに含めない＝実行側は「プランが尽きたら」木/既定に委ねる）。"""
+    （TURN_END 自体はプランに含めない＝実行側は「プランが尽きたら」木/既定に委ねる）。
+
+    `battle_value_fn`（v41）: 戦闘箱の物差し（None=`value_fn`）。箱の階層と物差しを1対1に保つ。"""
     steps = []
     mgr = world
+    bvf = battle_value_fn or value_fn
     for _ in range(max_plies):
         if game.is_terminal(mgr) or _turn_owner(mgr) != name:
             break
@@ -71,9 +74,9 @@ def rollout_plan(game, world, name, value_fn, priors_fn, rng, temp=PLAN_TEMP,
         if actor is None:
             break
         if in_battle(mgr):
-            mv = _battle_box_step(game, mgr, actor, value_fn, priors_fn)
+            mv = _battle_box_step(game, mgr, actor, bvf, priors_fn)
         elif actor != name:
-            mv = _battle_box_step(game, mgr, actor, value_fn, priors_fn)  # 相手の割込は箱
+            mv = _battle_box_step(game, mgr, actor, bvf, priors_fn)  # 相手の割込は箱
         else:
             legal = game.legal_actions(mgr)
             if not legal:
@@ -103,7 +106,7 @@ def rollout_plan(game, world, name, value_fn, priors_fn, rng, temp=PLAN_TEMP,
 
 
 def execute_plan(game, world, name, steps, value_fn, priors_fn,
-                 max_plies=TURN_QUIESCE_MAX_PLIES):
+                 max_plies=TURN_QUIESCE_MAX_PLIES, battle_value_fn=None):
     """プランを world 上で箱実行し**ターン末の盤面**を返す（world は不変・clone-apply）。
 
     **serve（プラン読み出し）と教師（プランCF生成）が共有する実行規約の単一の正**（v38）。
@@ -114,12 +117,13 @@ def execute_plan(game, world, name, steps, value_fn, priors_fn,
     縮退）。プランが尽きたら TURN_END を適用してターンを閉じる（閉じるまでがプラン）。"""
     mgr = world
     idx = 0
+    bvf = battle_value_fn or value_fn
     for _ in range(max_plies):
         if game.is_terminal(mgr) or _turn_owner(mgr) != name:
             return mgr                          # 終局／ターンが替わった＝そこが出口
         actor = game.current_player(mgr)
         if actor != name or in_battle(mgr):
-            mv = _battle_box_step(game, mgr, actor, value_fn, priors_fn)
+            mv = _battle_box_step(game, mgr, actor, bvf, priors_fn)
         else:
             legal = game.legal_actions(mgr)
             mv = None
@@ -146,19 +150,22 @@ def execute_plan(game, world, name, steps, value_fn, priors_fn,
 
 
 def evaluate_plan(game, world, name, steps, value_fn, priors_fn,
-                  max_plies=TURN_QUIESCE_MAX_PLIES, exit_value_fn=None):
+                  max_plies=TURN_QUIESCE_MAX_PLIES, exit_value_fn=None,
+                  battle_value_fn=None):
     """プランを箱実行した**自ターン末の value**（name 視点）。実行は `execute_plan` が正。
 
-    `exit_value_fn`（v39・ターン末専用ヘッド）を渡すと**出口盤面の評価だけ**をそちらで行う。
-    実行途中の戦闘窓は従来どおり `value_fn`（戦闘出口の較正＝gen12 が持つ規約）で畳む＝
-    「どの箱の出口か」と「どのヘッドで測るか」を1対1に保つ。None は従来と同値。"""
-    exit_mgr = execute_plan(game, world, name, steps, value_fn, priors_fn, max_plies)
+    「どの箱の出口か」と「どのヘッドで測るか」を1対1に保つ（v39/v41）:
+      - ターン箱の出口＝`exit_value_fn`（ターン末専用ヘッド）
+      - 実行途中の戦闘窓＝`battle_value_fn`（戦闘出口専用ヘッド）
+      - どちらも None なら `value_fn`＝v39 以前と完全に同値。"""
+    exit_mgr = execute_plan(game, world, name, steps, value_fn, priors_fn, max_plies,
+                            battle_value_fn=battle_value_fn)
     return (exit_value_fn or value_fn)(exit_mgr, name)
 
 
 def select_plan(game, manager, name, value_fn, priors_fn, rng,
                 n_worlds=PLAN_WORLDS, n_proposals=PLAN_PROPOSALS, exit_value_fn=None,
-                min_spread=PLAN_MIN_SPREAD):
+                min_spread=PLAN_MIN_SPREAD, battle_value_fn=None):
     """プランを提案→K世界期待値で選ぶ。返り値 (steps, 診断 dict)。候補が無ければ (None, {})。
 
     世界はプラン間で共有（CRN）＝差はプランだけから生じる。提案の1本目は必ず argmax
@@ -180,7 +187,7 @@ def select_plan(game, manager, name, value_fn, priors_fn, rng,
     for k in range(n_proposals):
         t = 0.0 if k == 0 else PLAN_TEMP
         steps = rollout_plan(game, worlds[k % len(worlds)], name, value_fn, priors_fn,
-                             rng, temp=t)
+                             rng, temp=t, battle_value_fn=battle_value_fn)
         if steps and steps not in plans:
             plans.append(steps)
     if not plans:
@@ -188,7 +195,8 @@ def select_plan(game, manager, name, value_fn, priors_fn, rng,
     scores = []
     for steps in plans:
         vs = [evaluate_plan(game, w, name, steps, value_fn, priors_fn,
-                            exit_value_fn=exit_value_fn) for w in worlds]
+                            exit_value_fn=exit_value_fn,
+                            battle_value_fn=battle_value_fn) for w in worlds]
         vs = [v for v in vs if v is not None]
         scores.append(float(np.mean(vs)) if vs else float("-inf"))
     best = int(np.argmax(scores))

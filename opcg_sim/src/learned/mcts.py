@@ -130,7 +130,13 @@ def resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn=None,
     従来どおり policy 最良手（policy は効果選択を区別できないため実質「先頭固定」になる）。
 
     値は `name` 視点。適用に失敗した枝は None（呼び出し側で除外）。全枝を**同一の乱数列**から
-    評価し（CRN）、抜けるときに乱数状態を元へ戻す＝実ゲームへ探索の消費を漏らさない。"""
+    評価し（CRN）、抜けるときに乱数状態を元へ戻す＝実ゲームへ探索の消費を漏らさない。
+
+    **ここで渡す `value_fn` が「戦闘箱の物差し」**（v41）: 出口の評価も、深さ1の内部窓の
+    解決も、同じ関数で行う（箱の中で物差しを変えない）。戦闘出口専用ヘッドを持つネットでは
+    呼び出し側が `_battle_exit_fn()` を渡す＝防御の較正が**箱の枝を並べるときだけ**効き、
+    木の葉評価は本体 value のまま動かない（v40 の失敗＝本体 value を動かすとゲートを満点に
+    してもアリーナが落ちる、への構造的な答え）。"""
     if box_depth is None:
         box_depth = BOX_RESOLVE_DEPTH
     base_rng_state = random.getstate()
@@ -163,7 +169,7 @@ def _turn_owner(mgr):
 
 
 def resolve_turn_inplace(game, mgr, value_fn, priors_fn=None,
-                         max_plies=TURN_QUIESCE_MAX_PLIES):
+                         max_plies=TURN_QUIESCE_MAX_PLIES, battle_value_fn=None):
     """現在のターンが**終わるまで** mgr をその場で進める（巻き戻さない・適用手数を返す）。
 
     **ターンを1つの箱として畳むときの解決規約の単一の正**（v37・2026-08-06）:
@@ -171,8 +177,13 @@ def resolve_turn_inplace(game, mgr, value_fn, priors_fn=None,
       - メイン手は **policy 最良手**（priors argmax。TURN_END も候補に含まれ、政策が
         「もう打つ手が無い」と判断すれば自然にターンが閉じる）
     停止条件はターン所有者の交代（TURN_END 適用で相手ターンへ）・終局・上限手数。
-    巻き戻し・乱数復元は呼び出し側の責務（`resolve_battle_inplace` と同じ契約）。"""
+    巻き戻し・乱数復元は呼び出し側の責務（`resolve_battle_inplace` と同じ契約）。
+
+    `battle_value_fn`（v41）: ターン箱の中の**戦闘窓だけ**を測る物差し（None=`value_fn`）。
+    箱の階層と物差しを1対1に保つ＝この関数の中では戦闘窓＝戦闘出口ヘッド、ターン出口の
+    評価は呼び出し側（`_leaf_value`）がターン末ヘッドで行う。"""
     start_owner = _turn_owner(mgr)
+    bvf = battle_value_fn or value_fn
     n = 0
     for _ in range(max_plies):
         if game.is_terminal(mgr) or _turn_owner(mgr) != start_owner:
@@ -182,7 +193,7 @@ def resolve_turn_inplace(game, mgr, value_fn, priors_fn=None,
         if not legal:
             break
         if in_battle(mgr) and len(legal) > 1:
-            vals = resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn)
+            vals = resolved_branch_values(game, mgr, name, legal, bvf, priors_fn)
             ok = [i for i, v in enumerate(vals) if v is not None]
             pick = max(ok, key=lambda i: vals[i]) if ok else quiesce_choice(mgr, legal, priors_fn)
         else:
@@ -215,7 +226,7 @@ class TreeMCTS:
                  determinize_fn=None, rng=None, dirichlet_alpha=DIRICHLET_ALPHA, dirichlet_eps=0.0,
                  term_decay=TERM_DECAY, term_floor=TERM_FLOOR,
                  quiesce=None, quiesce_max_plies=QUIESCE_MAX_PLIES, box_battle=None,
-                 turn_quiesce=None, turn_value_fn=None):
+                 turn_quiesce=None, turn_value_fn=None, battle_value_fn=None):
         self.game = game
         self.value_fn = value_fn
         self.priors_fn = priors_fn
@@ -238,8 +249,13 @@ class TreeMCTS:
         # ターンが終わるまで進めてから評価する（v37・ターンの箱の第1段）。
         self.turn_quiesce = SERVE_TURN_QUIESCE if turn_quiesce is None else turn_quiesce
         # ターン末専用ヘッドの評価関数（v39・None=従来どおり value_fn で測る）。ターン静止で
-        # 延長した葉＝**ターンの箱の出口**だけがこれを見る（戦闘窓の解決は value_fn のまま）。
+        # 延長した葉＝**ターンの箱の出口**だけがこれを見る。
         self.turn_value_fn = turn_value_fn
+        # 戦闘出口専用ヘッドの評価関数（v41・None=従来どおり value_fn で測る）。**戦闘箱の枝を
+        # 並べるとき**（木の箱化・ターン箱の中の戦闘窓）だけがこれを見る。木の葉評価
+        # （`_leaf_value` の通常経路）は本体 value のまま＝防御較正の影響がアリーナ全域に
+        # 漏れない（v40 の教訓）。
+        self.battle_value_fn = battle_value_fn
         self._root_turn = None      # run() が (ターン番号, ターン所有者, root手番) を記録
         # apply/unmake 経路を1回だけ判定（ホットループで分岐しない）。ゲームが make/unmake IF を
         # 提供する＝汎用経路（三目並べ等・OPCG journal に非依存）。OPCGGame は持たない＝journal経路。
@@ -309,10 +325,14 @@ class TreeMCTS:
             with journal.transaction():
                 mgr.action_events = JournaledList()
                 if turn_ext:
-                    resolve_turn_inplace(self.game, mgr, self.value_fn, self.priors_fn)
+                    resolve_turn_inplace(self.game, mgr, self.value_fn, self.priors_fn,
+                                         battle_value_fn=self.battle_value_fn)
                     v = (self.turn_value_fn or self.value_fn)(mgr, to_move)
                 else:
                     resolve_battle_inplace(self.game, mgr, self.priors_fn, self.quiesce_max_plies)
+                    # 静止で畳んだ戦闘出口の**葉の値**は本体 value で測る（v41 の範囲外）:
+                    # ここは「箱の枝を並べる」場面ではなく木の葉の絶対評価で、他の葉と同じ
+                    # 物差しで比べられなければ backup が壊れる（箱の相対順位づけとは別問題）。
                     v = self.value_fn(mgr, to_move)
         finally:
             mgr.action_events = saved_events
@@ -345,7 +365,13 @@ class TreeMCTS:
             # 正しく、PUCT の訪問混合は収束前の副産物（保険ではない）＝畳む方がミニマックスに近い。
             # 幅は失われない（木には別の攻撃順・別盤面の戦闘が無数にあり、各々が別の箱を持つ）。
             # 副次効果として、カウンターの組合せに費やしていた訪問がメイン判断へ回る。
-            vals = resolved_branch_values(g, mgr, node.to_move, legal, self.value_fn,
+            # 物差しは戦闘出口ヘッド（v41・`battle_value_fn`）。葉見積もり `leaf_v` も同じ関数で
+            # 測る＝**箱が選んだ枝と、木がその枝に付ける値が同じ物差し**になる（別々にすると
+            # 木が箱の選択と矛盾する順位を持つ）。影響範囲は「戦闘の出口盤面」に限られ、
+            # メインフェーズの葉・プラン評価・手札評価は本体 value のまま＝v40（本体 value を
+            # 全域で動かしてアリーナが落ちた）の再来にはならない。
+            vals = resolved_branch_values(g, mgr, node.to_move, legal,
+                                          self.battle_value_fn or self.value_fn,
                                           self.priors_fn, self.quiesce_max_plies)
             ok = [i for i, v in enumerate(vals) if v is not None]
             if ok:

@@ -44,7 +44,7 @@ def load_pairs_corpus(dirs, globs=PAIR_GLOBS):
 
     dead_play（v33・不発PLAYフラグ）は旧シャードに無い＝0 で埋める（後方互換）。
     `globs`（v39）は読むシャード種の指定＝**箱の階層ごとに教師を分けて読む**ための seam
-    （ターン末ヘッドの学習は plancf のみを読む・`turn_head_finetune.py`）。"""
+    （出口ヘッドの学習は自階層の教師だけを読む＝ターン末 plancf / 戦闘出口 defcf・`exit_head_finetune.py` の `HEAD_GLOBS`）。"""
     keys = ("scalars", "field", "card_idx", "value", "group")
     parts = {k: [] for k in keys}
     dead = []
