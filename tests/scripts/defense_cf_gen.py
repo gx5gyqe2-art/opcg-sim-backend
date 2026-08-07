@@ -62,16 +62,23 @@ def spread(zs):
 
 
 def pick_windows(turns, k, rng):
-    """採掘候補（各窓のターン番号列）から上限 k 窓をターン分散で抽出（pure・昇順）。
+    """採掘候補（各窓の**層キー**列）から上限 k 窓を層分散で抽出（pure・昇順）。
 
     防御窓は攻撃連打の1ターンに固まるため、一様抽出だと同一ターンばかりになる
-    （v24 で同型の偏りを踏んだ）。各ターンから1窓ずつのラウンドロビンで埋める。"""
+    （v24 で同型の偏りを踏んだ）。各層から1窓ずつのラウンドロビンで埋める。
+
+    **層キーは v39 で「ターン番号」から「守る側の残ライフ」へ変更**（2026-08-07）。
+    ターン分散だと序盤から順に埋まって k 窓で打ち切られ、**低ライフ帯（リーサル圏）の窓が
+    ほぼ採れていなかった**（実測 69群: ライフ5=12/4=33/3=21/**2=3**/1=0）。守るか通すかの
+    交換レートは残ライフで符号が変わる（序盤は素通しが得・終盤は守るのが必須）ので、
+    低ライフ帯が欠けた教師で学習すると「守るな」に倒れる危険がある。完走した対局には必ず
+    低ライフ局面が含まれる＝データは既に在り、**選び方だけで捨てていた**（生成コストは不変）。"""
     n = len(turns)
     if n <= k:
         return list(range(n))
     by_turn = {}
     for i, t in enumerate(turns):
-        by_turn.setdefault(t, []).append(i)
+        by_turn.setdefault(t, []).append(i)   # t＝層キー（v39: 守る側の残ライフ）
     for idxs in by_turn.values():
         rng.shuffle(idxs)
     out, r = [], 0
@@ -150,7 +157,8 @@ def process_game(task):
         m = child
         steps += 1
 
-    picked = pick_windows([int(getattr(s, "turn_count", 0) or 0) for s, _ in snaps],
+    # 層キー＝守る側の残ライフ（v39）。ターン番号だと序盤に偏り低ライフ帯が採れない。
+    picked = pick_windows([len((s.p1 if s.p1.name == who else s.p2).life) for s, who in snaps],
                           cfg["windows_per_game"], rng)
     rows = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root", "turns_left",
                             "group")}
@@ -244,6 +252,13 @@ def main():
     ap.add_argument("--eps", type=float, default=0.15)
     ap.add_argument("--def-temp", type=float, default=0.7,
                     help="ロールアウト内の防御応答サンプリング温度（0=argmax＝旧来の盲点）")
+    # 1局あたりの採掘窓数。コスト構造（v39 実測・worlds4/rollout-sims24）:
+    #   1局の生成（自己対戦）≈3分は局ごとに1回だけ／1窓のラベル付け ≈2分（枝×世界×ロールアウト）
+    #   → 群あたり = 生成3分/窓数 + 2分。6窓なら 2.5分、12窓なら 2.25分（**約1割の短縮**）。
+    # 窓数を増やすほど局生成が償却される一方、同一対局由来の窓は盤面が相関する（多様性は
+    # 件数ほど増えない）。既定 6 は v34 期のヒューリスティックで根拠の記録が無い。
+    # v39 の再生成では 12 を明示指定した（残ライフ層で採るため、帯あたり2窓以上を確保する
+    # 狙いも兼ねる。ユーザ判断 2026-08-07＝時間短縮を優先）。
     ap.add_argument("--windows-per-game", type=int, default=6)
     ap.add_argument("--matchup", default="nami:shanks")
     ap.add_argument("--decks-json", default=DECKS_JSON)

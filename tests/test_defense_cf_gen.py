@@ -4,7 +4,10 @@
   - causal_z の値域と worlds 正規化（v24 と同一規約）
   - spread（選択肢間の z 幅）＝0 なら「どの防御でも結果が同じ」＝教師として無情報の窓
     （生成時の有情報率モニタの土台）
-  - pick_windows のターン分散（防御窓は攻撃連打の1ターンに固まるため一様抽出は偏る）
+  - pick_windows の**層分散**（一様抽出は同一ターンに固まる）。層キーは v39 で
+    「ターン番号」から「守る側の残ライフ」へ変更＝低ライフ帯（リーサル圏）の窓を確保する
+    （実測 69群でライフ2 が3群・ライフ1 が0群だった。守る/通すの交換レートは残ライフで
+    符号が変わるため、この帯が欠けると『守るな』へ倒れる）
 """
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 import numpy as np
@@ -28,11 +31,22 @@ def test_spread_flags_uninformative_window():
     assert DG.spread([]) == 0.0
 
 
-def test_pick_windows_spreads_across_turns():
-    turns = [5] * 8 + [6] * 8 + [9]
-    picked = DG.pick_windows(turns, 3, np.random.default_rng(1))
-    assert sorted({turns[i] for i in picked}) == [5, 6, 9]        # 3窓で3ターンを被覆
+def test_pick_windows_spreads_across_strata():
+    keys = [5] * 8 + [6] * 8 + [9]
+    picked = DG.pick_windows(keys, 3, np.random.default_rng(1))
+    assert sorted({keys[i] for i in picked}) == [5, 6, 9]         # 3窓で3層を被覆
     assert picked == sorted(picked)
+
+
+def test_pick_windows_reaches_low_life_band():
+    """v39: 層キー＝残ライフ。低ライフ帯が少数でも必ず1窓は確保される（偏りの是正）。
+
+    実測の分布を模した入力（ライフ5/4/3 が厚く、2・1 が各1窓）で、6窓の抽出に
+    低ライフ帯が入ることを固定する。ターン分散のままだと序盤で枠が尽きて採れなかった。"""
+    life = [5] * 10 + [4] * 10 + [3] * 6 + [2] + [1]
+    picked = DG.pick_windows(life, 6, np.random.default_rng(3))
+    bands = {life[i] for i in picked}
+    assert 1 in bands and 2 in bands, f"低ライフ帯が採れていない: {sorted(bands)}"
 
 
 def test_pick_windows_takes_all_when_under_cap_and_is_deterministic():
