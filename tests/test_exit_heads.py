@@ -20,13 +20,14 @@
   - 順位ヒンジがその出口の順位を実際に改善する（学習が効いている）
   - save/load・複製（expanded/widened）でヘッドが失われない
   - 消費側の結線: 該当ヘッドを持たないネットでは v39/v41 以前と同一計算になる
+  - 中心化（v42）は**箱の中の順位を厳密に保存**し、一律バイアスだけを取り除く
 """
 import numpy as np
 import pytest
 
 import conftest  # noqa: F401
 import rl_net as RN
-from exit_head_finetune import (assert_trunk_frozen, exit_pair_acc,
+from exit_head_finetune import (assert_trunk_frozen, center_exit_head, exit_pair_acc,
                                 rank_finetune_exit_head, snapshot_trunk)
 
 pytestmark = pytest.mark.cpu_infra   # 基盤健全性（学習パイプライン／評価ヘッド）
@@ -146,6 +147,34 @@ def test_clones_keep_exit_heads():
         assert wide.has_exit_head(k) and getattr(wide, W1n).shape == (16, getattr(net, wf))
         assert np.allclose(wide.predict_exit(b, k), net.predict_exit(b, k))   # 拡張は恒等
         assert grown.has_exit_head(k) and np.array_equal(getattr(grown, W2n), getattr(net, W2n))
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_centering_preserves_order_and_removes_bias(kind):
+    """中心化は残差ロジットの平行移動＝**順位は1つも動かず**、平均オフセットだけが消える。
+
+    これが logit 空間で中心化する理由そのもの（tanh 前の定数加算は単調＝順位保存）。
+    なぜ要るか（v42 実測）: 注入教師のヘッドは順位を直すのと同時に一律バイアスを持ちうる
+    （管轄限定注入で平均 +0.457）。箱の argmax には無害だが、木では戦闘箱ノードの葉見積もりが
+    一律に底上げされ、非戦闘の葉（本体 value）と別スケールで比較される＝探索が歪む。"""
+    net, ref = _net(seed=11), _batch(n=24, seed=12)
+    net.enable_exit_head(kind, hidden=8)
+    rng = np.random.default_rng(3)
+    w2 = RN.EXIT_HEADS[kind][3]
+    setattr(net, w2, rng.standard_normal(getattr(net, w2).shape) * 0.5)  # 「学習済み」を模す
+    main_before = net.predict(ref)
+    before = net.predict_exit(ref, kind)
+    shift = center_exit_head(net, ref, kind)
+    assert abs(shift) > 1e-6, "バイアスが乗っていない前提が崩れた（テストの意味が無い）"
+    after = net.predict_exit(ref, kind)
+    # (1) 順位は厳密に保存（全ペアの大小関係が1つも変わらない）＝logit 空間で足す理由そのもの
+    assert np.array_equal(np.argsort(np.argsort(before)), np.argsort(np.argsort(after))), \
+        f"中心化で順位が動いた（shift={shift}）"
+    # (2) 冪等＝残差ロジットの平均がゼロになった（これが中心化の保証する量。tanh 通過後の
+    #     平均ではない——tanh は非線形なので、残差が大きい領域では tanh 空間の偏りは残る）
+    assert abs(center_exit_head(net, ref, kind)) < 1e-9, "2回目の中心化が動いた（冪等でない）"
+    # (3) 本体 value には一切触れない
+    assert np.array_equal(net.predict(ref), main_before)
 
 
 def test_engine_exit_value_fns_are_neutral_without_heads():

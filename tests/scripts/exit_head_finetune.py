@@ -107,6 +107,27 @@ def rank_finetune_exit_head(net, child, pairs, kind="turn", epochs=8, lr=2e-4, w
     return net
 
 
+def center_exit_head(net, ref, kind):
+    """出口ヘッドの残差ロジットを基準盤面集合 `ref` の上で**平均ゼロ**へ寄せる（v42）。
+
+    なぜ要るか（実測 2026-08-07）: 注入教師で学習したヘッドは、順位を直すのと同時に
+    **ほぼ一律のバイアス**を持ちうる（管轄限定注入の腕で平均 +0.457・標準偏差 0.176）。
+    箱の中の argmax は全枝に同じ定数を足しても不変なのでバイアスは無害だが、**木の中では
+    有害**——戦闘箱ノードの葉見積もり `leaf_v` はこのヘッドの値なので、一律に底上げされると
+    非戦闘の葉（本体 value）と**別スケールで比較**され、探索が無差別に戦闘へ入る方向へ歪む。
+
+    tanh 前のロジットへ定数を足す操作は単調なので、**同一の箱の中の順位は厳密に保存される**
+    （返り値の shift を検算に使える）。基準は「ヘッドが実際に評価する盤面」＝戦闘出口の
+    コーパスを渡すこと（注入コーパスだけで中心化すると3点の偏った分布に合わせてしまう）。"""
+    _, _, _, W2n, b2n = RN.EXIT_HEADS[kind]
+    _, cache = net.forward(ref)
+    _, h = net._exit_hidden_act(cache[8], kind)
+    resid = (h @ getattr(net, W2n) + getattr(net, b2n))[:, 0]
+    shift = float(resid.mean())
+    setattr(net, b2n, getattr(net, b2n) - shift)
+    return shift
+
+
 # 既存呼び出し（v39 のテスト・レポート）向けの薄い別名。
 def turn_pair_acc(net, child, pairs):
     return exit_pair_acc(net, child, pairs, "turn")
@@ -135,6 +156,11 @@ def main():
     ap.add_argument("--delta", type=float, default=0.25, help="順位ペアに採る z 差の下限")
     ap.add_argument("--globs", default=None,
                     help="読むシャード種（カンマ区切り）。既定＝--head に対応する教師のみ")
+    ap.add_argument("--center-dirs", default="",
+                    help="ヘッドの残差ロジットを平均ゼロへ寄せる基準コーパス（カンマ区切り）。"
+                         "ヘッドが実際に評価する盤面＝戦闘出口のコーパスを渡す。空＝中心化しない")
+    ap.add_argument("--center-glob", default=None,
+                    help="基準コーパスのシャード種（既定＝--head に対応する教師）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -168,6 +194,18 @@ def main():
     rank_finetune_exit_head(vnet, child, p_tr, kind=args.head, epochs=args.epochs, lr=args.lr,
                             margin=args.margin)
     assert_trunk_frozen(vnet, snap)
+    if args.center_dirs:
+        ref, n_ref = load_pairs_corpus([d for d in args.center_dirs.split(",") if d],
+                                       globs=tuple(g for g in (args.center_glob or
+                                                               HEAD_GLOBS[args.head]).split(",")))
+        if ref is None:
+            print("中心化の基準コーパスが空（--center-dirs を確認）"); return 1
+        acc_pre = exit_pair_acc(vnet, child, p_va, args.head)
+        shift = center_exit_head(vnet, ref, args.head)
+        acc_post = exit_pair_acc(vnet, child, p_va, args.head)
+        assert acc_pre == acc_post, "中心化で順位が動いた（単調変換のはずで、あり得ない）"
+        print(f"中心化: 残差ロジットを {shift:+.4f} 平行移動"
+              f"（基準 {n_ref}シャード {len(ref['value'])}盤面・順位は厳密に不変）", flush=True)
     a1 = exit_pair_acc(vnet, child, p_va, args.head)
     print(f"{args.head} 出口順位正答(val) 学習後: {a1:.3f}（学習前 {a0:.3f}）", flush=True)
     print("凍結検査: 胴体・既存ヘッド・補助ヘッド・他の出口ヘッドは bit 不変"
