@@ -252,6 +252,13 @@ def main():
     ap.add_argument("--eps", type=float, default=0.15)
     ap.add_argument("--def-temp", type=float, default=0.7,
                     help="ロールアウト内の防御応答サンプリング温度（0=argmax＝旧来の盲点）")
+    # 1局あたりの採掘窓数。コスト構造（v39 実測・worlds4/rollout-sims24）:
+    #   1局の生成（自己対戦）≈3分は局ごとに1回だけ／1窓のラベル付け ≈2分（枝×世界×ロールアウト）
+    #   → 群あたり = 生成3分/窓数 + 2分。6窓なら 2.5分、12窓なら 2.25分（**約1割の短縮**）。
+    # 窓数を増やすほど局生成が償却される一方、同一対局由来の窓は盤面が相関する（多様性は
+    # 件数ほど増えない）。既定 6 は v34 期のヒューリスティックで根拠の記録が無い。
+    # v39 の再生成では 12 を明示指定した（残ライフ層で採るため、帯あたり2窓以上を確保する
+    # 狙いも兼ねる。ユーザ判断 2026-08-07＝時間短縮を優先）。
     ap.add_argument("--windows-per-game", type=int, default=6)
     ap.add_argument("--matchup", default="nami:shanks")
     ap.add_argument("--decks-json", default=DECKS_JSON)
