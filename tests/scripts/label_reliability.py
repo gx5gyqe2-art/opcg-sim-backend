@@ -20,8 +20,11 @@ v41 は「学習しても直らない」で1周、v42 は「アリーナで有�
   - **推定ラベル1σ**: 2組の z 差の標準偏差 /√2。枝間マージンとの比が本質。
 分割は `--repeats` 回繰り返して平均する（分け方の当たり外れを均す）。
 
-**K は「半分ずつ」で測る点に注意**: K=16 の行は 8世界ラベル同士の比較なので、本番（16世界を
-全部使う）より**保守側**の数字になる。予算の当たりを見るには十分。
+**K の行は「K世界のラベル」の信頼度**（互いに素な K世界の組を2つ取って比較）。したがって
+**2K ≤ 生成時の worlds** が必要で、worlds=32 のコーパスからは K=16 までしか測れない。
+「K/2 ずつに割る」実装だと数字の意味が K/2 世界のラベルになり、本生成の worlds を決める
+根拠にならない（v44 初版の誤り。worlds=8 の実測 δ選抜後 0.231 と worlds=32 由来の
+「K=4」0.767 が食い違って発覚した）。
 
 実行例:
   OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/label_reliability.py \\
@@ -88,11 +91,16 @@ def measure(col, budget, delta, repeats, rng):
     """予算 `budget` での (半々一致率, δ選抜後一致率, 選抜数, 1σ) を repeats 回平均で返す。"""
     win, life, ps = col["win_w"], col["life_w"], pairs_of(col["group"])
     n_worlds = win.shape[1]
-    half = budget // 2
+    # **K の行は「K世界のラベル」の信頼度**: 互いに素な K世界の組を2つ取り、
+    # それぞれで独立にラベルを作って比べる。したがって 2K ≤ worlds が要る
+    # （worlds=32 なら K は 16 まで測れる）。K/2 ずつ割ると数字の意味が
+    # 「K/2 世界のラベル」になってしまい、本生成の worlds を決める根拠にならない。
+    if 2 * budget > n_worlds:
+        return float("nan"), float("nan"), 0, float("nan"), len(ps)
     ag, ag_sel, n_sel, sig = [], [], [], []
     for _ in range(repeats):
         perm = rng.permutation(n_worlds)
-        sa, sb = perm[:half], perm[half:2 * half]
+        sa, sb = perm[:budget], perm[budget:2 * budget]
         za = np.array([z_from(win[i], life[i], sa) for i in range(len(win))])
         zb = np.array([z_from(win[i], life[i], sb) for i in range(len(win))])
         da = np.array([za[a] - za[b] for a, b in ps])
@@ -131,8 +139,8 @@ def main():
     n_worlds = col["win_w"].shape[1]
     groups = len(set(col["group"].tolist()))
     budgets = ([int(b) for b in args.budgets.split(",") if b] if args.budgets
-               else [b for b in (4, 8, 16, 32, 64) if b <= n_worlds])
-    budgets = [b for b in budgets if 2 <= b <= n_worlds]
+               else [b for b in (2, 4, 8, 16, 32) if 2 * b <= n_worlds])
+    budgets = [b for b in budgets if 2 <= 2 * b <= n_worlds]   # 独立2組が取れる予算だけ
     print(f"{n_files}シャード {len(col['win_w'])}盤面 {groups}群 worlds={n_worlds}"
           f"（skip {n_skipped}）・δ={args.delta}・分け方{args.repeats}回平均", flush=True)
     print(f"{'予算K':>6} {'半々一致率':>10} {'δ選抜後':>10} {'選抜数':>7} "
