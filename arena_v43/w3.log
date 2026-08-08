@@ -1,0 +1,7 @@
+消化済み 0/100 ペア・残り 100
+今回 40 ペア（1144s）・累計 40/100
+消化済み 40/100 ペア・残り 60
+今回 40 ペア（1090s）・累計 80/100
+消化済み 80/100 ペア・残り 20
+今回 20 ペア（579s）・累計 100/100
+ARENA_RESUME_FINAL {"pairs": 100, "games": 200, "wins": 96.0, "wr": 0.48, "ci95": [0.4227, 0.5373], "elo": -13.9, "promoted": false, "candidate": "tests/fixtures/candidates/v43_lowmag_value.npz,opcg_sim/data/learned/gen12_policy.npz"}
