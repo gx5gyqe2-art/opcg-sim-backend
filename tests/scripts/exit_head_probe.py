@@ -16,10 +16,15 @@
 ノイズの当たり外れで、実際に m1@14 を直す腕は必ず m2@44 を壊した（5腕すべて 4/8）。
 腕を増やす前にこの2列を見れば、コーパスの信号がマージンを超えているかが分かる。
 
-**(1) の読み方の注意**: 検証点には戦闘窓でないもの（メインフェーズの判断＝m1@3/m4@2/m2@66
-など）も含まれる。それらの行は「root の合法手を戦闘箱と同じ規約で並べたら」という**近似**で、
+**(1) の読み方の注意**: 検証点には戦闘窓でないもの（メインフェーズの判断＝m1@3/m4@2 など）も
+含まれる。それらの行は「root の合法手を戦闘箱と同じ規約で並べたら」という**近似**で、
 実対局の decide（木／プラン読み出し）とは経路が違う＝順位が一致しなくても即 NG ではない。
 戦闘窓の点（m1@14/m1@15/m2@58）が一次情報。
+`turn_all` 形式の点（m2@66＝ターン内で全ての攻撃と起動を消化することが条件）は**初手1手の
+枝順位では原理的に判定できない**ので分母から外して `--` と表示する（コーチゲートの
+`turn_all_rate` が正しい計器）。v44 まで `CG.hit` に dict を渡して**黙って常時不一致**に
+数えており、gen13 の出口順位を 7/8 と過小に見せていた（腕どうしの比較は同じ偏りなので
+無傷だが、絶対値の読み違いを招いた）。
 
 実行例:
   OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/exit_head_probe.py \\
@@ -116,8 +121,15 @@ def main():
               flush=True)
         bf = eng._battle_value_fn()
         pf = _priors_fn(eng.pnet, eng.vocab, eng.enc_version)
-        hits = 0
+        hits = scored = 0
         for name, m0, actor, accept in boards:
+            # turn_all 形式（{"turn_all": {...}}＝ターン内で全て実行する必要がある点・m2@66）は
+            # **初手1手の枝順位では判定できない**ので分母から外す。`CG.hit` に dict を渡すと
+            # キー文字列との照合になり黙って常時不一致になる（v44 で計器側の欠陥として発見）。
+            if CG.turn_all_required(accept) is not None:
+                print(f"  {name:<8} --  判定不能（turn_all 形式＝ターン全消化・"
+                      f"分母から除外。コーチゲートの turn_all_rate で見る）", flush=True)
+                continue
             legal = eng.game.legal_actions(m0)
             vals = resolved_branch_values(eng.game, m0, actor, legal, bf, pf)
             ok = [i for i, v in enumerate(vals) if v is not None]
@@ -129,11 +141,13 @@ def main():
             d = cpu_ai._describe_move(m0, legal[best]) or {}
             good = CG.hit(d, accept)
             hits += bool(good)
+            scored += 1
             gap = vals[best] - (vals[order[1]] if len(order) > 1 else vals[best])
             print(f"  {name:<8} {'OK ' if good else '   '} "
                   f"best={(d.get('action_type'), d.get('card'))} "
                   f"v={vals[best]:+.4f} gap={gap:+.4f}", flush=True)
-        print(f"  → 出口順位一致 {hits}/{len(boards)}", flush=True)
+        print(f"  → 出口順位一致 {hits}/{scored}"
+              f"（判定可能な点のみ・全{len(boards)}点）", flush=True)
         if corpus is not None and has:
             off = eng.vnet.predict_exit(corpus, args.head) - eng.vnet.predict(corpus)
             m, s = float(off.mean()), float(off.std())
