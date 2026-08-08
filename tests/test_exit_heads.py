@@ -22,6 +22,8 @@
   - 消費側の結線: 該当ヘッドを持たないネットでは v39/v41 以前と同一計算になる
   - 中心化（v42）は**箱の中の順位を厳密に保存**し、一律バイアスだけを取り除く
 """
+import os
+
 import numpy as np
 import pytest
 
@@ -178,12 +180,15 @@ def test_centering_preserves_order_and_removes_bias(kind):
 
 
 def test_engine_exit_value_fns_are_neutral_without_heads():
-    """同梱ネット（ヘッド無し）では出口評価が v39/v41 導入前と同一計算になる。
+    """ヘッド無しネット（gen12）では出口評価が v39/v41 導入前と同一計算になる。
 
     ターン出口は None（呼び出し側が value_fn へ落ちる）、戦闘出口は「本体 value と
-    同じ値を返す関数」＝どちらも既存挙動と bit 一致する。"""
-    from opcg_sim.src.core.cpu_learned import LearnedEngine, _value_fn
-    eng = LearnedEngine()
+    同じ値を返す関数」＝どちらも既存挙動と bit 一致する。gen13 で既定ネットが戦闘
+    ヘッドを持つようになったため、本テストは gen12 を明示ロードして主張する
+    （「ヘッド無しなら中立」という性質自体は世代に依らない不変条件）。"""
+    from opcg_sim.src.core.cpu_learned import _MODELS, LearnedEngine, _value_fn
+    eng = LearnedEngine(value_path=os.path.join(_MODELS, "gen12_value.npz"),
+                        policy_path=os.path.join(_MODELS, "gen12_policy.npz"))
     assert eng.vnet.turn_head is False and eng.vnet.battle_head is False
     assert eng._exit_value_fn() is None
     bvf = eng._battle_value_fn()
@@ -193,6 +198,26 @@ def test_engine_exit_value_fns_are_neutral_without_heads():
     class _S:
         winner = "me"
     assert bvf(_S(), "me") == vf(_S(), "me")
+
+
+def test_default_engine_is_gen13_with_battle_head_only():
+    """既定エンジン（gen13）は戦闘出口ヘッドを持ち、本体 value は gen12 と bit 一致する。
+
+    gen13 の採用契約そのもの: 較正は戦闘箱の枝順位づけだけに宿り、通常の葉評価は
+    前世代と不変（ロールバックはヘッドを外すだけ）。"""
+    from opcg_sim.src.core.cpu_learned import _MODELS, LearnedEngine
+    eng = LearnedEngine()
+    assert eng.vnet.battle_head is True and eng.vnet.turn_head is False
+    assert eng._exit_value_fn("battle") is not None
+    # 胴体・本体ヘッドの**重みそのもの**が gen12 と bit 一致＝入力に依らず本体 value は不変
+    g12 = RN.ValueNet.load(os.path.join(_MODELS, "gen12_value.npz"))
+    for k in ("Emb", "W1", "b1", "W2", "b2", "W2t", "b2t", "W_eff"):
+        a, c = getattr(eng.vnet, k, None), getattr(g12, k, None)
+        if a is None or c is None:
+            assert a is None and c is None
+        else:
+            assert np.array_equal(a, c), f"{k} が gen12 と不一致（胴体凍結の契約違反）"
+    assert eng.vnet.vocab_ids == g12.vocab_ids
 
 
 def test_evaluate_plan_uses_each_head_for_its_own_box(monkeypatch):

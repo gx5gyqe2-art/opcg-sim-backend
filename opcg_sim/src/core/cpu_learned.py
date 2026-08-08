@@ -107,8 +107,26 @@ _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 # （帯別 0.565/0.550/0.490/0.480）。**昇格基準（wr≥0.55）では FAIL のままユーザ判断で採用**
 # （2026-08-05・gen9/gen10/gen11 と同じ「人間検証点の改善 × 自己対戦中立」の取引）。
 # policy は gen11 と同一バイナリ（v12 確定＝policy 微調整は有害・value と符号化版 v8 が一致）。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen12_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen12_policy.npz")
+# gen13 = gen12 に**戦闘出口専用 value ヘッド**（`ValueNet.EXIT_HEADS` の "battle"・残差 MLP
+# hidden4）を載せ、人間裁定済み7点の注入順位ペア（`verified_inject_gen.py`・84ペア）で
+# **ヘッドのみ**を学習したもの（v43・docs/reports/gen13_adoption_20260808.md）。
+# 胴体と本体 value ヘッドは物理的に凍結＝**通常の葉評価・プラン評価は gen12 と bit 一致**で、
+# 変わるのは戦闘箱の枝順位づけ（防御窓の読み出し・木の箱化・ターン箱の戦闘窓）だけ。
+# 学習は margin0.03/lr1e-3/ep200 に**摂動を点の修正に必要な最小限へ絞り**、学習後に
+# 残差ロジットを defcf 2198盤面上で中心化（順位を厳密に保存して一律バイアスだけ除去）＝
+# 一般の戦闘出口への摂動は標準偏差 0.038（枝間マージン 0.02〜0.03 と同規模）。
+# 前段の失敗2つがこの設計を決めた: v40=本体 value を全面順位学習→ゲート満点でもアリーナ
+# 0.447 の有意退行（置き場所の誤り）。v42=同じ注入教師で margin0.2/hidden32 のヘッド→
+# 摂動 std0.32 が7点の外でノイズとなりアリーナ 0.378 で中止（摂動過大）。
+# 判定＝コーチゲート PASS（7.4 vs 6.6・bar 超えは狙った m1@14 0.00→1.00〈素通しが正の
+# 交換レート裁定〉のみ・退行ゼロ。**ただし8点中7点は本候補の訓練データ＝ゲートは確認用**）
+# × アリーナ 400ペア800局 0.5212 CI[0.494,0.549] Elo+14.8＝中立（シャード別 0.575/0.535/
+# 0.495/0.480・追加の seed90000系63ペア込みでも 0.518）。**昇格基準（wr≥0.55）では FAIL の
+# ままユーザ判断で採用**（2026-08-08・gen9〜12 と同じ「人間検証点の改善 × 自己対戦中立」の
+# 取引）。ロールバックはヘッドを外すだけ（幅0にすれば gen12 と bit 一致＝過去世代より安全）。
+# policy は gen12 と同一バイナリ（v12 確定＝policy 微調整は有害・符号化版 v8 一致）。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen13_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen13_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}
