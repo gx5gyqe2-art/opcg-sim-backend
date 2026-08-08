@@ -164,7 +164,7 @@ def process_game(task):
 
     picked = pick_turn_starts(len(snaps), cfg["windows_per_game"], rng)
     rows = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root", "turns_left",
-                            "group", "value_a", "value_b")}
+                            "group", "win_w", "life_w")}
     diag = []
     for gi, pi in enumerate(picked):
         m0, name = snaps[pi]
@@ -175,14 +175,15 @@ def process_game(task):
         ends = {j: [] for j in range(len(plans))}
         lds = {j: [] for j in range(len(plans))}
         ok_worlds = 0
-        # 分割半ラベル（v44・`--split-halves`）: 世界を偶奇で2組に割り、**同じ決定点の
-        # ラベルを独立2回引いた**ものを別列（value_a/value_b）で出す。両者の順位が一致
-        # するかが「そのラベルは信号か引きの当たり外れか」の直接の測定になる（worlds を
-        # 増やす価値を、本生成に着手する前に安価に判定するため）。列は学習側の
-        # `load_pairs_corpus` が読まないので、既存の学習経路には一切影響しない。
-        wins_h = {j: [0, 0] for j in range(len(plans))}
-        lds_h = {j: [[], []] for j in range(len(plans))}
-        ok_h = [0, 0]
+        # **世界ごとの生の結果を保存する**（v44）: 集計した z だけを残すと、「worlds を
+        # いくつにすべきか」を問うたびにコーパスを作り直すことになる（1窓 ≈ worlds×プラン数の
+        # ロールアウトで、実測 245秒@worlds8＝ここが生成コストのほぼ全部）。世界単位で残せば
+        # **1回の生成から任意の予算 K≤worlds の z を再計算でき**、分割半の信頼度測定も
+        # 予算ごとの一致率曲線も再生成なしで得られる。列は学習側の `load_pairs_corpus` が
+        # 読まないので、既存の学習経路には一切影響しない。
+        # 欠測（決定化やプラン実行の失敗）は NaN で埋める＝「0勝」と区別する。
+        win_w = {j: [np.nan] * cfg["worlds"] for j in range(len(plans))}
+        life_w = {j: [np.nan] * cfg["worlds"] for j in range(len(plans))}
         for w in range(cfg["worlds"]):
             wseed = seed * 1009 + pi * 101 + w * 97
             try:
@@ -190,8 +191,6 @@ def process_game(task):
             except Exception:
                 continue
             ok_worlds += 1
-            h = w % 2                             # 分割半（偶奇で独立2組へ振り分け）
-            ok_h[h] += 1
             for j, plan_steps in enumerate(plans):
                 end = PL.execute_plan(gserve, world, name, list(plan_steps), _G["vf"], _G["pf"])
                 if end is None:
@@ -199,21 +198,21 @@ def process_game(task):
                 if gserve.is_terminal(end):       # ターン内で決着＝ロールアウト不要
                     won = (getattr(end, "winner", None) == name)
                     wins[j] += 1 if won else 0
-                    wins_h[j][h] += 1 if won else 0
+                    win_w[j][w] = 1.0 if won else 0.0
                     ends[j].append(float(getattr(end, "turn_count", 0) or 0))
                     lds[j].append(1.0 if won else -1.0)
-                    lds_h[j][h].append(1.0 if won else -1.0)
+                    life_w[j][w] = 1.0 if won else -1.0
                     continue
                 # rng_seed は枝に依存させない（CRN 規約・防御CFと同一）
                 winner, ld, et = CR.rollout(gserve, _G["vf"], _G["pf"], end, name,
                                             world_seed=wseed, rng_seed=wseed * 131,
                                             def_temp=cfg["def_temp"])
+                win_w[j][w] = 1.0 if winner == name else 0.0
                 if winner == name:
                     wins[j] += 1
-                    wins_h[j][h] += 1
                 ends[j].append(et)
                 lds[j].append(ld)
-                lds_h[j][h].append(ld)
+                life_w[j][w] = ld
         if ok_worlds == 0:
             continue
         group_id = gbase + gi
@@ -232,10 +231,8 @@ def process_game(task):
             rows["field"].append(enc["field"])
             rows["card_idx"].append(enc["card_idx"])
             rows["value"].append(z)
-            for h, col in ((0, "value_a"), (1, "value_b")):
-                rows[col].append(margin_blend(causal_z(wins_h[j][h], ok_h[h]),
-                                              float(np.mean(lds_h[j][h])) if lds_h[j][h] else None)
-                                 if ok_h[h] else np.nan)
+            rows["win_w"].append(list(win_w[j]))       # 世界ごとの勝敗（NaN=欠測）
+            rows["life_w"].append(list(life_w[j]))     # 世界ごとの残ライフ差（margin_blend の材料）
             rows["q_root"].append(np.nan)          # 勝敗単独ラベル（エコー遮断）
             tl = (np.mean(ends[j]) - float(getattr(end, "turn_count", 0) or 0)) if ends[j] else np.nan
             rows["turns_left"].append(max(0.0, float(tl)) if np.isfinite(tl) else np.nan)
@@ -291,7 +288,7 @@ def main():
                                             (args.seed_base + games_done + g) * 100)
                                            for g in range(n)])
             parts = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root",
-                                     "turns_left", "group", "value_a", "value_b")}
+                                     "turns_left", "group", "win_w", "life_w")}
             diags, cand = [], 0
             for rows, diag, n_snaps in outs:
                 for k in parts:
@@ -308,9 +305,9 @@ def main():
                     "turns_left": np.array(parts["turns_left"], dtype=np.float32),
                     "group": np.array(parts["group"], dtype=np.int64),
                     "kind": np.array(["plancf"] * nrows),
-                    # 分割半ラベル（v44・信頼度測定用。学習側の loader は読まない）
-                    "value_a": np.array(parts["value_a"], dtype=np.float32),
-                    "value_b": np.array(parts["value_b"], dtype=np.float32),
+                    # 世界ごとの生の結果（v44・信頼度測定と予算再計算用。loader は読まない）
+                    "win_w": np.array(parts["win_w"], dtype=np.float32),
+                    "life_w": np.array(parts["life_w"], dtype=np.float32),
                 }
                 np.savez_compressed(os.path.join(args.out, f"plancf_{shard:05d}.npz"), **arrays)
                 with open(os.path.join(args.out, f"meta_{shard:05d}.json"), "w") as f:
