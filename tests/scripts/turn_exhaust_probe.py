@@ -122,14 +122,30 @@ def run_point(eng, game, m0, name, required, seeds, sims, max_plies=24):
                         legal_keys.add(_key(cpu_ai._describe_move(mgr, mv2) or {}))
                     except Exception:
                         pass
+                # **枝刈り前**の候補集合。必須アクションがここには有って `legal_keys` に
+                # 無ければ、消したのは `_prune_futile_attacks`（＝CPU 側の判断以前の
+                # 候補生成）であり、エンジンの合法性ではない。両方に無ければルール上
+                # 打てない（＝裁定が実現不可能な順序を要求している）。
+                raw_keys = set()
+                try:
+                    raw = cpu_ai.merged_search_actions(
+                        mgr, actor_name, mgr.get_legal_actions(actor))
+                    for mv2 in raw:
+                        raw_keys.add(_key(cpu_ai._describe_move(mgr, mv2) or {}))
+                except Exception:
+                    pass
                 rows.append({"seed": s, "done": len(done & required),
                              "missing": [list(k) for k in missing],
                              "missing_legal": [list(k) for k in missing if k in legal_keys],
+                             "missing_pruned": [list(k) for k in missing
+                                                if k in raw_keys and k not in legal_keys],
+                             "missing_illegal": [list(k) for k in missing if k not in raw_keys],
                              "n_legal": len(legal or []),
                              "legal_keys": sorted(str(k) for k in legal_keys),
                              "turn_end": cands.get(("TURN_END", None)),
                              "missing_stats": [{"move": list(k), "stat": cands.get(k),
                                                 "legal": k in legal_keys,
+                                                "pruned": (k in raw_keys and k not in legal_keys),
                                                 "prior": round(pri.get(k, float("nan")), 4)}
                                                for k in missing],
                              "turn_end_prior": round(pri.get(("TURN_END", None),
@@ -202,7 +218,8 @@ def main():
         for m in r["missing_stats"]:
             st = m["stat"]
             st_s = (f"visit%={st['visit_pct']} Q={st['q']}" if st else "探索上位5に不在")
-            tag_s = "選べた" if m["legal"] else "**合法手に無い**"
+            tag_s = ("選べた" if m["legal"] else
+                     "**枝刈りで除外**" if m["pruned"] else "**ルール上打てない**")
             print(f"      残 {m['move']}: {tag_s} {st_s} prior={m['prior']}", flush=True)
 
     # 判定の材料: TURN_END と残存必須の Q / prior を平均で並べる
@@ -217,15 +234,17 @@ def main():
     unfinished = [r for r in rows if r["done"] < len(required)]
     choosable = [r for r in unfinished if r["missing_legal"]]
     print(f"\n平均: TURN_END Q={te_q} prior={te_p} ／ 残存必須 Q={ms_q} prior={ms_p}", flush=True)
-    print(f"未消化 {len(unfinished)}件のうち、残りを**選べたのに選ばなかった**のは "
-          f"{len(choosable)}件（残りが合法手に無かった＝判断以前は {len(unfinished) - len(choosable)}件）",
-          flush=True)
+    n_pruned = sum(1 for r in unfinished if r["missing_pruned"])
+    n_illegal = sum(1 for r in unfinished if r["missing_illegal"])
+    print(f"未消化 {len(unfinished)}件の内訳: 選べたのに選ばなかった {len(choosable)}件 ／ "
+          f"**枝刈りで除外** {n_pruned}件 ／ **ルール上打てない** {n_illegal}件", flush=True)
     print("TURN_EXHAUST_RESULT " + json.dumps(
         {"point": args.point, "required": len(required), "rate": round(full / n, 4),
          "hist": {str(k): v for k, v in sorted(hist.items())},
          "turn_end_q": te_q, "turn_end_prior": te_p,
          "missing_q": ms_q, "missing_prior": ms_p,
-         "unfinished": len(unfinished), "unfinished_choosable": len(choosable)},
+         "unfinished": len(unfinished), "unfinished_choosable": len(choosable),
+         "unfinished_pruned": n_pruned, "unfinished_illegal": n_illegal},
         ensure_ascii=False), flush=True)
     return 0
 
