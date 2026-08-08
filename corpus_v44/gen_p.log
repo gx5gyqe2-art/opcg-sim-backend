@@ -1,0 +1,3 @@
+=== ターン出口CFコーパス生成 matchup=nami:shanks worlds=32 proposals=4 def_temp=0.7 ev=8 既存シャード=0 ===
+  シャード0: 4局 81行 23窓 （候補62）19529s 有情報窓率=0.70
+PLANCF_GEN_DONE 局=4 行=81 19530s out=/tmp/plancf_w32_w2_p
