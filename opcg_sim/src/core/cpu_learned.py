@@ -29,7 +29,8 @@ from opcg_sim.src.learned.config import (
     C_PUCT, SERVE_SIMS, SERVE_DIRICHLET_EPS,
     SERVE_ROOT_SWITCH_MIN_FRAC, SERVE_ROOT_SWITCH_MIN_GAP, SERVE_STICKY_WORLD,
     AUX_TIE_DECAY, AUX_SAT_START, TERM_FLOOR, V4_TURNS_SCALE)
-from opcg_sim.src.learned.mcts import TreeMCTS   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
+from opcg_sim.src.learned.mcts import (   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
+    TreeMCTS, in_battle, resolved_branch_values)
 from opcg_sim.src.utils.loader import CardLoader
 
 _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -85,8 +86,47 @@ _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 # value との符号化版一致が必須＝版不整合は行動特徴列がずれて黙って壊れる）。符号化は net の
 # feat_dim から自動判別。gen10 以前はリプレイ再現・A/B・ロールバック用に同梱維持
 # （レフェリー教師の錨は gen5 固定のまま）。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen11_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen11_policy.npz")
+# gen12 = gen11 と「防御窓CF順位学習の腕」の value 重み**線形補間 α=0.5**（v35・
+# docs/reports/gen12_adoption_20260805.md）。腕側は `defense_cf_gen` の解決後盤面コーパス
+# （nami:shanks 4セッション並列生成・19シャード 2,198行 584群・def_temp0.7・margin_blend）で
+# gen11 を `rank_finetune_anchored`（全面アンカー scale1.5・δ0.3/lr8e-5/ep10）したもの。
+# 純腕は自ターン判断 m1@3 を 1.00→0.62-0.69 へ実際に劣化させたため（独立2 seed 系列で再現）、
+# gen9/gen11 と同じ交換曲線の使い方で α=0.5 に置いた（α=0.3/0.5 が両立点・0.7 以上で劣化）。
+#
+# **本世代の核は重みでなく探索の規約**（ユーザ整理 2026-08-05「バトルを一つの箱としてまとめて、
+# 探索と value はバトルをするかどうか／バトルの結果どんな盤面・手札・ライフになるかのみを
+# 判断する」）＝戦闘を1つの箱として畳み、**出口（解決後の盤面）だけを value で比べる**。
+# 3機構を既定 ON にして初めて意味を持つ: `SERVE_QUIESCE`（葉が戦闘中なら解決してから評価）・
+# `SERVE_BATTLE_READOUT`（実対局の防御窓は出口 value で選ぶ）・`TREE_BOX_BATTLE`（木の戦闘窓
+# ノードも出口最良の1手へ畳む）。これで木・実対局・教師コーパスの解決規約が初めて一致した。
+# 判定＝コーチゲート **6.19 vs 4.00（8点・退行ゼロ・ガード4点満点維持）**。bar 超えは
+# m1@15（0.00→1.00＝「一度払ったら2000で止め切る」）・m2@44（0.00→0.62）・m5@7（0.00→0.56）
+# の3点で、後2点は木の箱化が初めて動かした（攻撃の帰結が「相手手札−1」か「相手ライフ−1」の
+# 具体的な出口として立ち上がるため。攻撃は必ず相手に損失を強いるので『止められる＝無駄』では
+# ない——ユーザ指摘 2026-08-05）。アリーナ 800局 0.5212 CI[0.489,0.554] Elo+14.8＝中立
+# （帯別 0.565/0.550/0.490/0.480）。**昇格基準（wr≥0.55）では FAIL のままユーザ判断で採用**
+# （2026-08-05・gen9/gen10/gen11 と同じ「人間検証点の改善 × 自己対戦中立」の取引）。
+# policy は gen11 と同一バイナリ（v12 確定＝policy 微調整は有害・value と符号化版 v8 が一致）。
+# gen13 = gen12 に**戦闘出口専用 value ヘッド**（`ValueNet.EXIT_HEADS` の "battle"・残差 MLP
+# hidden4）を載せ、人間裁定済み7点の注入順位ペア（`verified_inject_gen.py`・84ペア）で
+# **ヘッドのみ**を学習したもの（v43・docs/reports/gen13_adoption_20260808.md）。
+# 胴体と本体 value ヘッドは物理的に凍結＝**通常の葉評価・プラン評価は gen12 と bit 一致**で、
+# 変わるのは戦闘箱の枝順位づけ（防御窓の読み出し・木の箱化・ターン箱の戦闘窓）だけ。
+# 学習は margin0.03/lr1e-3/ep200 に**摂動を点の修正に必要な最小限へ絞り**、学習後に
+# 残差ロジットを defcf 2198盤面上で中心化（順位を厳密に保存して一律バイアスだけ除去）＝
+# 一般の戦闘出口への摂動は標準偏差 0.038（枝間マージン 0.02〜0.03 と同規模）。
+# 前段の失敗2つがこの設計を決めた: v40=本体 value を全面順位学習→ゲート満点でもアリーナ
+# 0.447 の有意退行（置き場所の誤り）。v42=同じ注入教師で margin0.2/hidden32 のヘッド→
+# 摂動 std0.32 が7点の外でノイズとなりアリーナ 0.378 で中止（摂動過大）。
+# 判定＝コーチゲート PASS（7.4 vs 6.6・bar 超えは狙った m1@14 0.00→1.00〈素通しが正の
+# 交換レート裁定〉のみ・退行ゼロ。**ただし8点中7点は本候補の訓練データ＝ゲートは確認用**）
+# × アリーナ 400ペア800局 0.5212 CI[0.494,0.549] Elo+14.8＝中立（シャード別 0.575/0.535/
+# 0.495/0.480・追加の seed90000系63ペア込みでも 0.518）。**昇格基準（wr≥0.55）では FAIL の
+# ままユーザ判断で採用**（2026-08-08・gen9〜12 と同じ「人間検証点の改善 × 自己対戦中立」の
+# 取引）。ロールバックはヘッドを外すだけ（幅0にすれば gen12 と bit 一致＝過去世代より安全）。
+# policy は gen12 と同一バイナリ（v12 確定＝policy 微調整は有害・符号化版 v8 一致）。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen13_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen13_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}
@@ -137,6 +177,22 @@ def _value_fn(vnet, vocab, enc_version=1, aux_tiebreak=None):
         pred, aux = vnet.predict_with_aux(batch)   # forward 1回を共有（二重計算しない）
         t_hat = float(aux[0]) * V4_TURNS_SCALE     # 正規化残りターン → ターン数
         return _aux_tie_scale(float(pred[0]), t_hat)
+    return value
+
+
+def _exit_head_value_fn(vnet, vocab, enc_version=1, kind="turn"):
+    """**箱の出口専用**の価値関数（v39 ターン末 / v41 戦闘出口・`ValueNet.predict_exit`）。
+
+    箱の階層ごとに較正を分ける（v38/v40 の学び）: 通常の葉評価＝既存ヘッド、箱を畳んだ出口＝
+    その階層の専用ヘッド。ネットに該当ヘッドが無ければ `predict_exit` は既存ヘッドへ落ちる
+    ＝従来と同値。aux 粘り項は掛けない（飽和域の減衰は「探索の葉の無差別」を解く発見的補正で、
+    出口 z を直接教えたヘッドの較正を上書きする理由がない）。"""
+    def value(state, to_move):
+        if state.winner is not None:
+            return 1.0 if state.winner == to_move else -1.0
+        enc = E.encode(state, to_move, vocab, version=enc_version)
+        batch = {k: enc[k][None, ...] for k in ("scalars", "field", "card_idx")}
+        return float(vnet.predict_exit(batch, kind)[0])
     return value
 
 
@@ -199,7 +255,10 @@ class LearnedEngine:
     def __init__(self, value_path: Optional[str] = None, policy_path: Optional[str] = None,
                  vocab=None, game=None, aux_tiebreak: Optional[bool] = None,
                  sims: Optional[int] = None, c_puct: Optional[float] = None,
-                 root_frac: Optional[float] = None, root_gap: Optional[float] = None):
+                 root_frac: Optional[float] = None, root_gap: Optional[float] = None,
+                 battle_readout: Optional[bool] = None, quiesce: Optional[bool] = None,
+                 box_battle: Optional[bool] = None, turn_quiesce: Optional[bool] = None,
+                 plan_readout: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
@@ -216,6 +275,22 @@ class LearnedEngine:
         self.c_puct = c_puct
         self.root_frac = root_frac      # root 読み出しの乗り換え条件（訪問比）
         self.root_gap = root_gap        # 同（Q 差・inf で従来の argmax(N)）
+        # 戦闘窓の読み出し（None=config.SERVE_BATTLE_READOUT に従う・A/B 用の seam）。
+        self.battle_readout = battle_readout
+        # 静止探索（None=config.SERVE_QUIESCE に従う）。**同一プロセスで席ごとに機構を変える**
+        # ための seam＝「新機構の候補 vs 現行本番」を公平に1回で測る（グローバル定数を書き換える
+        # 測り方だと両席に同時に効いてしまい、機構とネットの寄与が分離できない）。
+        self.quiesce = quiesce
+        # 木の中の箱化（None=config.TREE_BOX_BATTLE に従う・同上の席別 seam）。
+        self.box_battle = box_battle
+        # ターン静止（None=config.SERVE_TURN_QUIESCE に従う・v37 の席別 seam）。
+        self.turn_quiesce = turn_quiesce
+        # プラン読み出し（None=config.SERVE_PLAN_READOUT に従う・v37② の席別 seam）。
+        self.plan_readout = plan_readout
+        # ターンプランのキャッシュ {(id(manager), turn, name, world_seed): steps or None}。
+        # world_seed 込みのキー＝sticky 世界線と同じ寿命（外部が _world_seeds をリセットして
+        # 新しい世界を引けばプランも立て直す。ゲート計測の seed 独立性がこれで保たれる）。
+        self._turn_plans: Dict[Any, Any] = {}
         # ターン内 sticky 世界線の seed キャッシュ {(id(manager), turn, player): (weakref, seed)}（§_world_rng）。
         self._world_seeds: Dict[Any, Any] = {}
         self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
@@ -275,6 +350,114 @@ class LearnedEngine:
         # determinize の shuffle が同じ乱数列から始まる（公開情報の更新は盤面側から反映される）。
         return np.random.default_rng(seed)
 
+    def _exit_value_fn(self, kind="turn"):
+        """箱の出口の評価関数（該当の専用ヘッドを持つネットのみ・無ければ None＝従来どおり）。
+
+        None を返す経路では呼び出し側が通常の value_fn を使う＝**既存の同梱ネットでは
+        v39/v41 導入前と完全に同一の計算**（新ヘッドを持つ候補ネットでだけ挙動が変わる）。"""
+        # vnet が None のエンジン（value_fn を差し替えて「決めているのは value か」を検査する
+        # 経路・`test_battle_readout`）でも成立させる＝ヘッド無しと同じ従来経路へ落とす。
+        if self.vnet is None or not self.vnet.has_exit_head(kind):
+            return None
+        return _exit_head_value_fn(self.vnet, self.vocab, self.enc_version, kind=kind)
+
+    def _battle_value_fn(self):
+        """戦闘箱の物差し（v41）。戦闘出口ヘッドが無ければ通常の葉評価と同一関数を返す。
+
+        `_exit_value_fn` と違って None を返さない: 戦闘箱の呼び出し側（`resolved_branch_values`）
+        は物差しを必ず1つ要求するため、ここで「ヘッドがあればそれ／無ければ本体 value」を
+        1か所に閉じ込める（分岐を呼び出し側にばら撒かない）。"""
+        return self._exit_value_fn("battle") or _value_fn(
+            self.vnet, self.vocab, self.enc_version, aux_tiebreak=self.aux_tiebreak)
+
+    def _battle_window_choice(self, manager, name, det_rng):
+        """戦闘窓の読み出し（`SERVE_BATTLE_READOUT`）: 出口盤面の value で選ぶ。
+
+        **戦闘を1つの箱として畳む**（ユーザ整理 2026-08-05）: カウンター/ブロッカー選択は
+        「どの出口（解決後の盤面・手札・ライフ）になるか」で決まる局所判断で、箱の外の深い
+        未来まで平均した root Q は判断を薄める（v35 実測: 出口評価は防御3類型を全て正しく
+        順序づけるのに、探索後 Q は木の68%を占める『次の自ターン』の通常盤面＝旧レートに
+        引き戻されて逆転する）。判断するのは葉評価と同じ value ネット自身であり、別系統の
+        防御ロジックではない。
+
+        世界線は探索と同じ決定化（PIMC・sticky）を使い、返す手は決定化クローン上の合法手
+        （`TreeMCTS.run` と同一契約）。返り値は (move, root統計, 評価に使った盤面)＝
+        トレースは呼び出し側で埋める。選べないときは (None, None, None) で従来の探索へ委ねる。
+        """
+        mgr = self.game.determinize(manager, name, det_rng)
+        legal = self.game.legal_actions(mgr)
+        if not legal:
+            return None, None, None
+        if len(legal) == 1:
+            return legal[0], None, None
+        vals = resolved_branch_values(
+            self.game, mgr, name, legal, self._battle_value_fn(),
+            _priors_fn(self.pnet, self.vocab, self.enc_version))
+        ok = [i for i, v in enumerate(vals) if v is not None]
+        if not ok:
+            return None, None, None      # 全枝で解決に失敗＝従来の full-tree に任せる（安全側）
+        best = max(ok, key=lambda i: vals[i])
+        # トレース用の root 統計は探索と同じ形（N/Q）で作る: 各枝を1回ずつ解決して評価した、
+        # という事実をそのまま N=1 に、判断の根拠である出口評価を Q に載せる。
+        stats = {"legal": legal,
+                 "N": np.array([1.0 if v is not None else 0.0 for v in vals]),
+                 "Q": np.array([v if v is not None else -1.0 for v in vals], dtype=float)}
+        return legal[best], stats, mgr
+
+    def _plan_step(self, manager, name, det_rng, world_seed):
+        """プラン読み出し（`SERVE_PLAN_READOUT`・v37②）: ターンに1回プランを立てて
+        （K世界期待値・`plan.select_plan`）、以後はその手を1つずつ返す。
+
+        次の手が実盤面で非合法になったら（想定外の応手＝計画が割れた）**その場で1回だけ
+        再計画**する。プランが尽きたら TURN_END を返してターンを閉じる（プラン評価は
+        「この列を打って閉じたターン末」の値なので、閉じるまでがプランの一部）。
+        立案失敗（候補ゼロ等）は None を記憶し、このターンは従来の探索に委ねる。"""
+        from opcg_sim.src.learned import plan as PL
+        key = (id(manager), int(getattr(manager, "turn_count", 0) or 0), name, world_seed)
+        if key not in self._turn_plans:
+            if len(self._turn_plans) >= 64:
+                for k in list(self._turn_plans)[:32]:
+                    del self._turn_plans[k]
+            vf = _value_fn(self.vnet, self.vocab, self.enc_version,
+                           aux_tiebreak=self.aux_tiebreak)
+            pf = _priors_fn(self.pnet, self.vocab, self.enc_version)
+            steps, _diag = PL.select_plan(self.game, manager, name, vf, pf, det_rng,
+                                          exit_value_fn=self._exit_value_fn(),
+                                          battle_value_fn=self._battle_value_fn())
+            self._turn_plans[key] = list(steps) if steps else None
+        steps = self._turn_plans[key]
+        if steps is None:
+            return None
+        for attempt in (0, 1):
+            legal = self.game.legal_actions(manager)
+            while steps:
+                mv = PL._find_move(legal, steps[0])
+                if mv is not None:
+                    steps.pop(0)
+                    return mv
+                steps.pop(0)       # 対象消滅などで非合法になった手は縮退（プラン評価と同じ規約）
+            if not steps and attempt == 0:
+                # プランが尽きた: ターンを閉じる（これもプランの一部）
+                for cand in legal:
+                    try:
+                        d = cpu_ai._describe_move(manager, cand) or {}
+                    except Exception:
+                        d = {}
+                    if d.get("action_type") == "TURN_END":
+                        return cand
+                # TURN_END が無い（対話中など）＝計画が割れた → 1回だけ再計画
+                vf = _value_fn(self.vnet, self.vocab, self.enc_version,
+                               aux_tiebreak=self.aux_tiebreak)
+                pf = _priors_fn(self.pnet, self.vocab, self.enc_version)
+                new_steps, _diag = PL.select_plan(self.game, manager, name, vf, pf, det_rng,
+                                                  exit_value_fn=self._exit_value_fn(),
+                                                  battle_value_fn=self._battle_value_fn())
+                if not new_steps:
+                    self._turn_plans[key] = None
+                    return None
+                steps = self._turn_plans[key] = list(new_steps)
+        return None
+
     def decide(self, manager, player, sims: int = SERVE_SIMS, c_puct: float = C_PUCT,
                rng=None, trace=None) -> Optional[Dict[str, Any]]:
         """このエンジンのネットで 1 手決定する（`decide_learned` と同一契約・同一探索）。"""
@@ -289,11 +472,48 @@ class LearnedEngine:
             import random as _random
             rng = np.random.default_rng(_random.getrandbits(64))
         det_rng = self._world_rng(manager, name, rng) if SERVE_STICKY_WORLD else rng
+        # 戦闘窓は箱として畳んで出口評価で選ぶ（config.SERVE_BATTLE_READOUT）。メインフェーズ
+        # （バトルをするか・どこを殴るか）は下の full-tree のまま＝変更しない。
+        use_battle = (CFG.SERVE_BATTLE_READOUT if self.battle_readout is None
+                      else self.battle_readout)
+        if use_battle and in_battle(manager):
+            move, stats, ev_mgr = self._battle_window_choice(manager, name, det_rng)
+            if move is not None:
+                if trace is not None:
+                    try:
+                        _fill_trace(trace, ev_mgr if ev_mgr is not None else manager,
+                                    player, move, stats)
+                        trace["readout"] = "battle_resolved"
+                    except Exception:
+                        pass   # 分析失敗で対局を止めない
+                return move
+        # プラン読み出し（v37②）: 自ターンのメイン判断は「プラン×K世界の期待値」で決める。
+        # 対象は自ターン所有かつ非戦闘の判断のみ（防御窓は上の箱読み出し・相手ターンは対象外）。
+        use_plan = (CFG.SERVE_PLAN_READOUT if self.plan_readout is None
+                    else self.plan_readout)
+        if use_plan and not in_battle(manager) and \
+                getattr(getattr(manager, "turn_player", None), "name", None) == name:
+            wkey = (id(manager), int(getattr(manager, "turn_count", 0) or 0), name)
+            hit = self._world_seeds.get(wkey)
+            wseed = hit[1] if hit is not None else None
+            move = self._plan_step(manager, name, det_rng, wseed)
+            if move is not None:
+                if trace is not None:
+                    try:
+                        _fill_trace(trace, manager, player, move, None)
+                        trace["readout"] = "turn_plan"
+                    except Exception:
+                        pass
+                return move
         mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab, self.enc_version,
                                                       aux_tiebreak=self.aux_tiebreak),
                         priors_fn=_priors_fn(self.pnet, self.vocab, self.enc_version),
                         c_puct=c_puct, n_sims=sims, dirichlet_eps=SERVE_DIRICHLET_EPS,
-                        determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=det_rng)
+                        determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=det_rng,
+                        quiesce=self.quiesce, box_battle=self.box_battle,
+                        turn_quiesce=self.turn_quiesce,
+                        turn_value_fn=self._exit_value_fn(),
+                        battle_value_fn=self._battle_value_fn())
         move, _, legal = mcts.run(manager)
         # 同名カードの別実体（手札の複製等）は探索木で別 edge になり訪問数が分裂する。
         # 素の argmax(N) は分裂した等価手を系統的に不利にする（例: EB03-053×2 のカウンターが

@@ -115,6 +115,11 @@ def _marks():
 
 
 def _apply_play(boards, tag, i, card):
+    """card を出し、**残った効果対話を既定解決でドレイン**した後の自分側を返す。
+
+    v39 以降、探索の apply（`OPCGGame.apply`）は分岐可能な対象選択で停止する（CPU が選べる
+    ようにするため・`test_effect_selection_wiring.py`）。本ファイルの主題は「既定解決の意味論」
+    なので、停止した対話をここで `_drain_own_interactions`（既定解決そのもの）へ明示的に流す。"""
     from opcg_game import OPCGGame
     from opcg_sim.src.core import cpu_ai
     m0, who = boards[(tag, i)]
@@ -123,6 +128,7 @@ def _apply_play(boards, tag, i, card):
     mv = next(x for x in g.legal_actions(m0)
               if (cpu_ai._describe_move(m0, x) or {}).get("card") == card)
     child = g.apply(m0, mv, name)
+    cpu_ai._drain_own_interactions(child, name)      # 既定解決（分岐は探索でなくヒューリスティクス）
     return child.p1 if child.p1.name == name else child.p2
 
 

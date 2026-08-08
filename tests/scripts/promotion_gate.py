@@ -56,18 +56,24 @@ def anchor_decision(wins: float, games: int, frac: float = 0.5) -> bool:
 _G = {}
 
 
-def _init_pool(cand_spec, best_spec):
-    """子プロセス初期化: DB とエンジン2体を1回だけロード（以後の全ペアで共有）。"""
+def _init_pool(cand_spec, best_spec, cand_kw=None):
+    """子プロセス初期化: DB とエンジン2体を1回だけロード（以後の全ペアで共有）。
+
+    `cand_kw`（v35）: **候補席にだけ**渡す LearnedEngine のオプション（例
+    `{"battle_readout": True, "quiesce": True}`）。機構をグローバル定数で切り替えると
+    両席に同時に効いてしまい「新機構つき候補 vs 現行本番」を測れないため、席別の seam を通す。
+    未指定＝両席とも既定＝従来と同一挙動。"""
     from cpu_arena import _load_db
     from opcg_sim.src.core.cpu_learned import LearnedEngine
 
-    def eng(spec):
+    def eng(spec, **kw):
         if not spec:
-            return LearnedEngine()   # 出荷既定（現 gen5）
+            return LearnedEngine(**kw)   # 出荷既定（現 gen11）
         parts = spec.split(",")
-        return LearnedEngine(value_path=parts[0], policy_path=parts[1] if len(parts) > 1 else None)
+        return LearnedEngine(value_path=parts[0],
+                             policy_path=parts[1] if len(parts) > 1 else None, **kw)
     _G["db"] = _load_db()
-    _G["cand"] = eng(cand_spec)
+    _G["cand"] = eng(cand_spec, **(cand_kw or {}))
     _G["best"] = eng(best_spec)
 
 

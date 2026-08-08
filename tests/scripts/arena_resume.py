@@ -71,7 +71,16 @@ def main():
     ap.add_argument("--frac", type=float, default=0.55)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--out", required=True, help="ペアスコア jsonl（追記台帳・再開の正）")
+    ap.add_argument("--cand-box", action="store_true",
+                    help="候補席だけ戦闘窓の箱読み出し＋静止探索を有効にする（v35・機構の A/B）")
+    ap.add_argument("--cand-tree-box", action="store_true",
+                    help="さらに木の中の箱化も候補席へ入れる（v35・--cand-box を含意）")
     args = ap.parse_args()
+    cand_kw = None
+    if args.cand_box or args.cand_tree_box:
+        cand_kw = {"battle_readout": True, "quiesce": True}
+        if args.cand_tree_box:
+            cand_kw["box_battle"] = True
 
     from arena_gate import plan_bands
     planned = [s for band in plan_bands(args.pairs, args.bands, args.seed_base) for s in band]
@@ -83,7 +92,7 @@ def main():
         from promotion_gate import _init_pool, _play_pair
         t0 = time.time()
         with mp.Pool(args.workers, initializer=_init_pool,
-                     initargs=(args.candidate, args.baseline)) as pool:
+                     initargs=(args.candidate, args.baseline, cand_kw)) as pool:
             with open(args.out, "a") as f:
                 for seed, score in zip(batch, pool.imap(_play_pair, batch)):  # imap=入力順を保存
                     f.write(json.dumps({"seed": seed, "score": score}) + "\n")

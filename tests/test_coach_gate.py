@@ -15,7 +15,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 "tests", "scripts"))
 from coach_gate import (REPLAYS_V2, VERIFIED, VERIFIED_V2, hit, judge,  # noqa: E402
-                        min_reliable_delta)
+                        min_reliable_delta, turn_all_required)
 
 pytestmark = pytest.mark.cpu_infra
 
@@ -48,16 +48,34 @@ def test_verified_entries_wellformed():
 
 
 def test_verified_v2_entries_wellformed():
-    """VERIFIED v2（gen7 実対局13点）: tag が REPLAYS_V2 に実在し fixture ファイルもある。
-    複数対局・両対面方向（CPU=ナミ/シャンクス）を含む＝g3 の単一対局バイアスの回帰防止。"""
-    assert len(VERIFIED_V2) >= 10
+    """VERIFIED v2（gen7 実対局由来）: tag が REPLAYS_V2 に実在し fixture ファイルもある。
+    複数対局・両対面方向（CPU=ナミ/シャンクス）を含む＝g3 の単一対局バイアスの回帰防止。
+
+    下限は 2026-08-04 のユーザレビューで 10→8 へ引き下げ: 局面前提が不自然な点
+    （パワー2000 のキャラにドン2枚付与＝m1@42/m1@94/m4@12）、バンドが広すぎて識別力の無い点
+    （m4@8）、裁定が誤り/未確定の点（m2@12/m2@64）を取り下げた結果。**点数を保つために
+    疑わしい点を残さない**（水増しされたバンドは候補を実力以上に見せる）。"""
+    assert len(VERIFIED_V2) >= 8
     tags = {t for t, _i, _a in VERIFIED_V2}
     assert len(tags) >= 3, "複数対局から採録されているはず"
     for tag, i, accept in VERIFIED_V2:
         assert tag in REPLAYS_V2 and isinstance(i, int) and i >= 0
-        assert accept and all(isinstance(a, tuple) and len(a) == 2 for a in accept)
+        req = turn_all_required(accept)
+        entries = req if req is not None else accept
+        assert entries and all(isinstance(a, tuple) and len(a) == 2 for a in entries)
     for path in REPLAYS_V2.values():
         assert os.path.exists(path), path
+
+
+def test_turn_all_dispatch_shape():
+    """turn_all 形式（m2@66・2026-08-05 裁定「ターン終了までに全アクションを消化」）の判別:
+    dict+turn_all は必須集合を返し、従来の初手集合・空 dict は None（＝初手判定のまま）。"""
+    req = {("ATTACK", "EB03-055"), ("ACTIVATE_MAIN", "OP16-056")}
+    assert turn_all_required({"turn_all": req}) == frozenset(req)
+    assert turn_all_required({("ATTACK", "EB03-055")}) is None
+    assert turn_all_required({"turn_all": frozenset()}) is None
+    m266 = next(a for t, i, a in VERIFIED_V2 if (t, i) == ("m2", 66))
+    assert turn_all_required(m266) is not None, "m2@66 はシーケンス基準（turn_all）のはず"
 
 
 def test_min_reliable_delta_shrinks_with_seeds():

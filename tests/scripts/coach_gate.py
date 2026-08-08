@@ -89,18 +89,47 @@ VERIFIED_V2 = [
     # (3) gen10 の行動欠陥を実測（8seed でイワンコフ 5/ウタ 3）＝改善ターゲットとして機能する。
     # TURN_END は両指標最下位（序盤6枚手札はテンポ優先）のため band 外。
     ("m1", 3,  {("PLAY", "OP09-002")}),                                    # ウタを出す（非発動イワンコフは band 外）
-    ("m1", 14, {("SELECT_COUNTER", "OP09-002"), ("SELECT_COUNTER", "OP10-011")}),  # 反転: カウンターは band 内（旧: PASS のみ）
-    ("m1", 15, {("SELECT_COUNTER", "OP10-011")}),                          # チョッパーで守る（PASS は band 外へ）
-    ("m1", 42, {("ATTACH_DON", "OP09-002"), ("ATTACH_DON", "OP12-008"),
-                ("ATTACK", "ST30-004")}),                                  # ガード
-    ("m1", 94, {("ATTACK", "OP09-001"), ("ATTACK", "OP09-002"),
-                ("ATTACK", "ST30-004")}),                                  # 新規: 攻撃すべき（耐久でなく）
+    # m1@14 は accept を**素通しへ再反転**（2026-08-04・ユーザ指摘＋修正済み評価方法で実測）:
+    # 攻撃7000 vs リーダー5000 で、止めるには **2枚必要**（2000単独では 7000 同値＝攻撃側勝ち・
+    # 1000+2000 で 8000）。ライフ5 の入口でカード2枚を1ライフに換えるのは割に合わない
+    # （素通しなら受けたライフが手札に入るので実収支は 3枚 vs 1ライフ）。
+    # 32世界 def_temp0.7 実測: 素通し z=-0.688（最上位タイ・応答直後 手札6/ライフ4）に対し
+    # 旧 accept の OP10-011 は -0.812、OP09-002 は -0.875 と**どちらも下位**。
+    # なお **m1@15（1枚払った後）は逆に守り切るのが正**（下記）＝「入口では守らない／
+    # 一度払ったら止め切る」の一貫した原理。
+    ("m1", 14, {("PASS", None)}),
+    # m1@15（m1@14 で 1000 を1枚払った後・現在 6000 で 7000 に届かない）: 32世界 def_temp0.7
+    # 実測で OP10-011（2000→8000 で止め切る）z=-0.562 が明確に最上位・素通しは -0.938 で最下位
+    # ＝裁定どおり。既に払った1枚を無駄にせず止め切る側が正しい。
+    ("m1", 15, {("SELECT_COUNTER", "OP10-011")}),
+    # m1@42 は**取り下げ**（2026-08-04・ユーザ裁定）: m4@12 と同じく**パワー2000 の
+    # イワンコフにドン2枚を付与した状態**という局面前提そのものが不自然で、ここでの
+    # 最善手を検証点にしても実プレイの参考にならない。
+    # m1@94 は**取り下げ**（2026-08-04・ユーザ裁定）: m1@42 / m4@12 と同種で、**パワー2000 の
+    # ウタにドン2枚を付与した状態**という局面前提が不自然。実プレイの参考にならない。
     # m2: CPU=ナミ
-    ("m2", 12, {("PASS", None)}),                                          # 反転: 素通しが正（旧: カウンター）
+    # m2@12 は**取り下げ**（2026-08-04・ユーザレビュー）: 攻撃7000 vs 防御7000（既に
+    # カウンター2000を投入済み）で、**あと1000を1枚足せば 8000 で守り切れる**局面＝
+    # 「守れないから捨てる」m2@58 型ではない。収支は 2枚 vs 1ライフ（素通しならライフが
+    # 手札に入るため）で人間でも判断が割れる領域。裁定を確定できるまで検証済み集合から外す。
     ("m2", 44, {("ATTACH_DON", "OP11-041")}),                              # リーダーへ付与（守り）
     ("m2", 58, {("PASS", None)}),                                          # ガード（accept は素通しのみに縮小）
-    ("m2", 64, {("ATTACK", "OP16-056")}),                                  # クマシー出しでなく攻撃
-    ("m2", 66, {("ATTACK", "EB03-055")}),                                  # ロビンで攻撃（accept 縮小）
+    # m2@64 は**取り下げ**（2026-08-04・ユーザ裁定）: accept の Mr.3（OP16-056・パワー5000）で
+    # 攻撃しても**相手リーダーは 7000 で届かない**（相手キャラはこの時点でアタック可能な
+    # レスト状態のものが無い）＝攻撃する意味が無い局面で「攻撃が唯一の正解」とする裁定は誤り。
+    # m2@66 の accept は**シーケンス基準へ再裁定**（2026-08-05・ユーザ裁定・同日2段階）:
+    # ①「TURN_END 以外なら全て正しい」＝初手はどれでも良い。盤面の機構（相手リーダー シャンクスの
+    # 【ターン1回】相手アタック時 −1000）が「どの攻撃を不発にするか」の択一を相手に迫るため
+    # **攻撃の順序はほぼ等価**——ロビン8000先頭は −1000 を吸収して満額で刺さり、安い攻撃先頭は
+    # −1000 の囮になって後続ロビンが満額で通る。レフェリー32世界（def_temp0.7）でも攻撃同士の
+    # z 差は全てノイズ幅（2σ≈0.35）内（ロビン→ヤソップ −0.125 〜 ナミ→ヤソップ −0.562）。
+    # ②ただし合格は初手でなく**ターン終了までに全アクションを消化したか**で測る＝ナミ・リーダー・
+    # ロビンの攻撃と Mr.3（ギャルディーノ）の効果起動を全て行ってから TURN_END すること
+    # （turn_all 形式・decide_rate が自ターン終端まで指させて判定）。記録対局の CPU は初手で
+    # TURN_END した（＝マークの原点）。ドン0のためこれ以外の合法アクションは存在しない。
+    ("m2", 66, {"turn_all": frozenset({
+        ("ATTACK", "EB03-055"), ("ATTACK", "OP11-041"),
+        ("ATTACK", "EB03-053"), ("ACTIVATE_MAIN", "OP16-056")})}),
     # m4: CPU=シャンクス
     # m4@2 の accept はユーザ最終裁定（2026-08-03）: **イワンコフ出しが正解**。手札に 6000×2
     # （OP16-012×2）があり登場時効果が**発動する**（3枚引いて2枚捨て＝手札 5→5・エンジン実測）
@@ -109,11 +138,17 @@ VERIFIED_V2 = [
     # イワンコフを band 外に置く根拠は無い。gen8〜10 は本点を打てている＝非退行ガードとして機能。
     # 「非発動イワンコフを咎める」課題は m1@3（6000×1・不成立・手札 6→5）が正しい標的。
     ("m4", 2,  {("PLAY", "ST30-004")}),
-    ("m4", 8,  {("ATTACH_DON", "ST30-004"), ("ATTACK", "OP09-001"),
-                ("ATTACK", "ST30-004"), ("PLAY", "OP13-007")}),            # ガード（band 拡大）
-    ("m4", 12, {("ATTACK", "ST30-004"), ("PLAY", "OP09-002")}),            # 正解変化: イワンコフで攻撃 or ウタ展開
+    # m4@8 は**取り下げ**（2026-08-04・ユーザレビュー）: 合法手7に対し accept 4＝
+    # 「ターン終了/ウタ/リーダー付与以外なら何でも合格」でテストとしての識別力が無い
+    # （gen8〜11 が一律 1.00 なのは実力でなく外すのが難しいだけ）。再裁定するならバンドを絞る。
+    # m4@12 は**取り下げ**（2026-08-04・ユーザ裁定）: パワー2000 のイワンコフにドン2枚を
+    # 付与した状態という**局面前提そのものが不自然**（人間側の指し手の産物）で、ここでの
+    # 最善手を検証点にしても実プレイの参考にならない。
     # m5: CPU=ナミ
-    ("m5", 7,  {("ATTACH_DON", "OP11-041"), ("PLAY", "OP11-106")}),        # ナミ3ドン付与
+    # m5@7 accept を**ユーザ裁定で縮小**（2026-08-04）: 正解は「リーダーにドン3枚を付与して
+    # リーダーで殴る」。ゼウス（OP11-106）の登場時は**自分のライフ1枚を手札に加えるのが条件**で、
+    # 除去できるのは場のイワンコフ（パワー2000・脅威にならない）＝ライフ1枚の方が価値が高い。
+    ("m5", 7,  {("ATTACH_DON", "OP11-041")}),                              # ナミへドン付与→リーダーで攻撃
 ]
 
 
@@ -124,7 +159,68 @@ def hit(desc, accept):
     return (at, card) in accept or (at, None) in accept
 
 
+def turn_all_required(accept):
+    """accept が「ターン内全消化」形式（{"turn_all": {(type, card), ...}}）なら必須集合を
+    返し、従来の初手集合なら None を返す（pure・decide_rate のディスパッチ用）。"""
+    if isinstance(accept, dict):
+        req = accept.get("turn_all")
+        return frozenset(req) if req else None
+    return None
+
+
+def turn_all_rate(eng, m0, name, required, seeds, sims, max_plies=24):
+    """決定点から**自ターンの終わりまで**エンジンに指させ、TURN_END までに required の
+    (action_type, card) を全て実行した割合（m2@66 型・2026-08-05 ユーザ裁定）。
+
+    初手だけ見る decide_rate では「どれか1つ打てば合格」になり、「全ての攻撃と起動を
+    使い切ってからターンを終える」という裁定を表せない。相手側の戦闘応答（カウンター窓・
+    効果対象選択）も同じエンジンが指す（self-play と同じ規約＝gen12 では箱読み出しが処理）。
+    sticky 世界線は seed ごとにリセット＝ターン内は serve と同じ一貫した世界で計画する。
+    max_plies 到達時は「必須を消化済みか」で判定（終え方でなく消化を測る計器のため）。"""
+    game = eng.game
+    hit_n = 0
+    for s in range(seeds):
+        eng._world_seeds = {}
+        rng = np.random.default_rng(9100 + 97 * s)
+        mgr = m0
+        done = set()
+        ok = False
+        for _ply in range(max_plies):
+            if game.is_terminal(mgr):
+                ok = required <= done
+                break
+            actor_name = game.current_player(mgr)
+            if actor_name is None:
+                break
+            actor = mgr.p1 if mgr.p1.name == actor_name else mgr.p2
+            mv = eng.decide(mgr, actor, sims=sims, rng=rng)
+            if mv is None:
+                break
+            try:
+                d = cpu_ai._describe_move(mgr, mv) or {}
+            except Exception:
+                d = {"action_type": (mv or {}).get("action_type")}
+            if actor_name == name:
+                at = d.get("action_type")
+                if at == "TURN_END":
+                    ok = required <= done
+                    break
+                done.add((at, d.get("card")))
+            nxt = game.apply(mgr, mv, actor_name)
+            if nxt is None:
+                break
+            mgr = nxt
+        else:
+            ok = required <= done
+        hit_n += 1 if ok else 0
+    return hit_n / max(seeds, 1)
+
+
 def decide_rate(eng, m0, actor, accept, seeds, sims):
+    req = turn_all_required(accept)
+    if req is not None:
+        return turn_all_rate(eng, m0, actor if isinstance(actor, str) else actor.name,
+                             req, seeds, sims)
     n = 0
     for s in range(seeds):
         eng._world_seeds = {}
