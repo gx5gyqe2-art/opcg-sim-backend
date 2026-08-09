@@ -154,6 +154,8 @@ def main():
     ap.add_argument("--enc-version", type=int, default=8)
     ap.add_argument("--rollout-sims", type=int, default=24)
     ap.add_argument("--out", default="", help="要約 JSON の保存先（空=保存しない）")
+    ap.add_argument("--viewer-json", default="",
+                    help="リプレイビューアが読む形式（opcg-replay/v1＋frames）の保存先")
     args = ap.parse_args()
 
     _init_worker(args.matchup, args.decks_json, args.rollout_sims, args.enc_version)
@@ -161,6 +163,19 @@ def main():
     max_steps = args.max_steps or CR.MAX_STEPS
     rng = np.random.default_rng(args.seed)
     m = game.new_game(_G["db"], args.seed)
+
+    # ビューア用メタ。**API と同じ記録関数**（`opcg_sim.api.services.replay`）を呼ぶので、
+    # フレームの形は本番の traced 対局と1バイトも変わらない＝ビューアがそのまま読める。
+    # 自己対戦なので両席とも src="cpu"、cpu_player_id は p2 を名乗らせない（None）。
+    vmeta = None
+    if args.viewer_json:
+        from opcg_sim.api.services import replay as RV
+        vmeta = {"cpu_trace": True, "seed": args.seed, "first_player": None,
+                 "difficulty": f"selfplay:{args.matchup}", "cpu_player_id": None,
+                 "leaders": {"p1": _leader_id(m.p1), "p2": _leader_id(m.p2)},
+                 "decks": {"p1": [c.master.card_id for c in m.p1.deck],
+                           "p2": [c.master.card_id for c in m.p2.deck]}}
+        RV._replay_record_frame(vmeta, m)          # 初期盤面（action_index=None）
 
     lead = {p.name: _leader_id(p) for p in (m.p1, m.p2)}
     print(f"=== {args.matchup} seed={args.seed} sims={args.sims} eps={args.eps}")
@@ -193,11 +208,15 @@ def main():
             print(f"  [{lid}] {_side_str(me, show_hand=not args.no_hand)}")
             print(f"        相手: {_side_str(opp)}")   # 相手手札は出さない（公平性契約と同じ扱い）
             print(f"     合法{len(legal):3d}手 → {txt}")
+        if vmeta is not None:
+            RV._replay_record_action(vmeta, m, "cpu", name, mv)   # 適用**前**に記録する規約
         child = gserve.apply(m, mv, name)
         if child is None:
             break
         m = child
         steps += 1
+        if vmeta is not None:
+            RV._replay_record_frame(vmeta, m)                     # 適用**後**に記録する規約
 
     win = getattr(m, "winner", None)
     wl = lead.get(win, "?") if win else "（未決着＝打ち切り）"
@@ -213,6 +232,23 @@ def main():
     if args.out:
         with open(args.out, "w") as f:
             json.dump(summary, f, ensure_ascii=False, indent=1)
+    if vmeta is not None:
+        from opcg_sim.api.config import REPLAY_SCHEMA
+        # 封筒は `routers.game_replay` / `game_replay_frames` と同じ形。seed は**文字列**
+        # （数値のままだとフロントの JSON.parse で末尾が丸まり、種からの再現が壊れる）。
+        env = {"success": True, "game_id": f"selfplay-{args.matchup}-{args.seed}",
+               "replay": {"schema": REPLAY_SCHEMA, "seed": str(args.seed),
+                          "first_player": vmeta["first_player"],
+                          "difficulty": vmeta["difficulty"],
+                          "cpu_player_id": vmeta["cpu_player_id"],
+                          "leaders": vmeta["leaders"], "decks": vmeta["decks"],
+                          "actions": vmeta.get("actions", [])},
+               "decisions": [], "frames": vmeta.get("frames", []),
+               "frames_truncated": bool(vmeta.get("frames_truncated"))}
+        with open(args.viewer_json, "w") as f:
+            json.dump(env, f, ensure_ascii=False)
+        print(f"ビューア用 JSON: {args.viewer_json}"
+              f"（actions {len(env['replay']['actions'])} / frames {len(env['frames'])}）")
     print("GAME_REPLAY_LOG_DONE " + json.dumps(summary, ensure_ascii=False))
     return 0
 
