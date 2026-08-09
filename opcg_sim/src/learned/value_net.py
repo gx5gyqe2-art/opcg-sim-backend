@@ -92,6 +92,19 @@ class ValueNet:
         # Emb/EffF 行との対応が壊れる（2026-07-15 実害: DB+32枚で既存371枚が+2ズレ＋範囲外クラッシュ）。
         # 訓練時の対応をネット自身が持ち、serve は常にこれで符号化する（無いカード=UNK 0 で安全）。
         self.vocab_ids = None
+        # **出力の単調再較正**（v47・既定 None＝完全恒等）: `predict` 系の出力に単調な
+        # 区分線形写像 g を掛ける。g は増加関数なので**あらゆる直接比較（箱の出口選択・
+        # 枝の順位づけ）は bit 単位で不変**で、変わるのは探索が値を**平均する**ときだけ。
+        # なぜ要るか（v47 手順0 実測）: 本体 value は中間域を圧縮して出力する
+        # （予測 +0.18 の盤面の実測勝率は +0.35）。順位は保てても、木が葉を平均する経路では
+        # 「勝っている葉」の寄与が過小になる。水準の是正は本体の再学習より前に、順位を
+        # 一切壊さない変換で試せる——これが v40（本体全面学習でアリーナ 0.447）を
+        # 繰り返さないための最小手。
+        # **訓練経路には掛けない**（`forward`/`exit_from_cache`/`aux_from_cache` は生のまま）＝
+        # 勾配は未較正の出力に対して計算される。掛けるのは serve が呼ぶ `predict`/
+        # `predict_with_aux`/`predict_exit` のみ。
+        self.calib_x = None      # 単調増加ノット（入力・[-1,1]）
+        self.calib_y = None      # 対応する出力（単調増加）
         self._init_adam()
 
     @property
@@ -191,7 +204,7 @@ class ValueNet:
         """value と残りターン補助の同時予測 (pred, aux_pred)。1回の forward を共有する
         （serve の aux 粘り項＝config.SERVE_AUX_TIEBREAK 用。二重 forward を避ける）。"""
         pred, cache = self.forward(batch)
-        return pred, self.aux_from_cache(cache)
+        return self.apply_calib(pred), self.aux_from_cache(cache)
 
     def _copy_extra_heads(self, net, pad_rows=0):
         """複製系メソッド（expanded/widened/to_*）共通: 出口専用ヘッド群を引き継ぐ。
@@ -208,6 +221,40 @@ class ValueNet:
             setattr(net, W1n, H1.copy())
             for k in (b1n, W2n, b2n):
                 setattr(net, k, getattr(self, k).copy())
+        # 較正も引き継ぐ（落とすと「複製したら水準較正が静かに消える」事故になる）
+        net.calib_x = None if self.calib_x is None else self.calib_x.copy()
+        net.calib_y = None if self.calib_y is None else self.calib_y.copy()
+
+    def has_calib(self):
+        """単調再較正が設定されているか（消費側の分岐の唯一の真実源）。"""
+        return self.calib_x is not None and self.calib_y is not None
+
+    def apply_calib(self, v):
+        """出力 v に単調再較正を掛ける（未設定なら恒等・pure）。
+
+        区分線形（`np.interp`）＝ノット外は端の値で一定に留まる。ノットが単調増加である
+        ことは `set_calib` が検査済みなので、**順序は厳密に保存される**（同値は同値のまま）。"""
+        if not self.has_calib():
+            return v
+        return np.interp(v, self.calib_x, self.calib_y)
+
+    def set_calib(self, xs, ys):
+        """単調再較正を設定する（xs/ys とも単調増加であることを検査）。
+
+        None を渡すと解除＝恒等に戻る（ロールバックはこれだけで完了する）。"""
+        if xs is None or ys is None:
+            self.calib_x = self.calib_y = None
+            return self
+        xs = np.asarray(xs, dtype=np.float64).ravel()
+        ys = np.asarray(ys, dtype=np.float64).ravel()
+        if xs.shape != ys.shape or xs.size < 2:
+            raise ValueError("calib ノットは同数（2点以上）で与える")
+        if np.any(np.diff(xs) <= 0):
+            raise ValueError("calib_x は狭義単調増加でなければならない")
+        if np.any(np.diff(ys) < 0):
+            raise ValueError("calib_y は単調増加でなければならない（順位を壊さないため）")
+        self.calib_x, self.calib_y = xs, ys
+        return self
 
     def has_exit_head(self, kind):
         """種別 `kind`（"turn"/"battle"）の出口ヘッドを持つか（消費側の分岐の唯一の真実源）。"""
@@ -250,8 +297,12 @@ class ValueNet:
         return np.tanh(cache[9][:, 0] + (h @ getattr(self, W2n) + getattr(self, b2n))[:, 0])
 
     def predict_exit(self, batch, kind):
-        """出口 value の予測（種別ごとの箱の出口評価が使う唯一の口）。"""
-        return self.exit_from_cache(self.forward(batch)[1], kind)
+        """その箱の出口 value（serve 用）。**単調再較正を掛ける**＝葉評価（`predict`）と
+        同じ物差しに揃える。掛けないと「木の葉は較正後・箱を畳んだノードは較正前」という
+        train/serve skew と同型のずれが探索の中に生まれる。単調なので箱の選択（argmax）と
+        枝の順位は bit 不変＝gen13 の戦闘出口較正は壊れない。
+        訓練が使う `exit_from_cache` は生のまま（勾配は未較正の出力に対して計算する）。"""
+        return self.apply_calib(self.exit_from_cache(self.forward(batch)[1], kind))
 
     def backward_exit(self, cache, y, kind):
         """その出口ヘッド**のみ**の MSE 勾配を返す。
@@ -378,7 +429,7 @@ class ValueNet:
         self.Emb[0] = 0.0
 
     def predict(self, batch):
-        return self.forward(batch)[0]
+        return self.apply_calib(self.forward(batch)[0])
 
     def expanded(self, insert_at, n_new):
         """W1 の入力に `n_new` 個のゼロ行を row-offset `insert_at` へ挿入した新 ValueNet を返す。
@@ -496,6 +547,9 @@ class ValueNet:
             payload[spec[0]] = np.array(getattr(self, spec[0]))
             for k in spec[1:]:
                 payload[k] = getattr(self, k)
+        if self.has_calib():                       # 未設定なら列ごと書かない＝旧 npz と同形
+            payload["calib_x"] = self.calib_x
+            payload["calib_y"] = self.calib_y
         if self.EffF is not None:
             payload.update(EffF=self.EffF.astype(np.float32), W_eff=self.W_eff,
                            eff_proj=np.array(self.eff_proj))
@@ -529,6 +583,9 @@ class ValueNet:
                 setattr(net, spec[0], int(z[spec[0]]))
                 for k in spec[1:]:
                     setattr(net, k, z[k])
+        # 単調再較正（v47）: 旧 npz は欠落＝恒等（`apply_calib` が素通し）。
+        if "calib_x" in z.files and "calib_y" in z.files:
+            net.set_calib(z["calib_x"], z["calib_y"])
         if eff_table is not None:
             net.W_eff = z["W_eff"]
         if "vocab_ids" in z.files:
