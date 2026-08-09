@@ -81,6 +81,13 @@ def audit(name, col, label, note=""):
         ("手札差(自-相)",   sc[:, 6] - sc[:, 7], [(-9, -1.5), (-1.5, -0.5), (-0.5, 0.5), (0.5, 1.5), (1.5, 9)]),
         ("自ライフ",        sc[:, 0],            [(-1, 1.5), (1.5, 2.5), (2.5, 3.5), (3.5, 9)]),
         ("ターン数",        sc[:, 10],           [(0, 6.5), (6.5, 10.5), (10.5, 40)]),
+        # ドン層（v47b）: OP15-058 紫エネルは「ドン!!デッキ6枚」のルール変更を持つため、相手ドン数
+        # そのものが対面の識別子になる。ネットが「相手のドンが少ない＝有利」と読んでいるなら
+        # バイアスはドン差とともに増える——という仮説を、出力の層別だけで検定できる。
+        # scalars 索引は encoder.encode の vals 定義に従う（2,3=自ドン active/rest・4,5=相手）。
+        ("相手ドン総数",    sc[:, 4] + sc[:, 5], [(0, 4.5), (4.5, 6.5), (6.5, 8.5), (8.5, 20)]),
+        ("ドン差(自-相)",   (sc[:, 2] + sc[:, 3]) - (sc[:, 4] + sc[:, 5]),
+         [(-20, -0.5), (-0.5, 0.5), (0.5, 2.5), (2.5, 20)]),
     ]
     for sname, vals, bins in strata:
         print(f"  層別バイアス — {sname}:")
@@ -91,6 +98,24 @@ def audit(name, col, label, note=""):
             st = cse(m)
             flag = " ←" if abs(st[0]) > 2 * st[1] and abs(st[0]) > 0.05 else ""
             print(f"    [{lo:+.1f},{hi:+.1f}) n={st[2]:4d} 群={st[3]:3d}: バイアス {st[0]:+.3f} ±{2*st[1]:.3f}{flag}")
+
+    # 手番リーダー別（v47b）。対面をプールした全体バイアスは**席の打ち消し合い**を隠す:
+    # 一方の席で +x・他方で −x なら、その誤りは「対面依存」ではなく片方のリーダーに紐づく。
+    # card_idx[:,0] は to-move 側リーダーの語彙 index（**0=パディングの 1-origin**）。
+    ci = col["card_idx"][ok]
+    ids = list(getattr(net, "vocab_ids", []) or [])
+    seats = sorted(set(int(v) for v in ci[:, 0]))
+    if ids and len(seats) > 1:
+        print("  手番リーダー別バイアス（席ごとの符号が逆なら、誤りは対面でなくリーダーに紐づく）:")
+        for s in seats:
+            m = ci[:, 0] == s
+            if m.sum() < 10:
+                continue
+            st = cse(m)
+            cid = ids[s - 1] if 1 <= s <= len(ids) else "UNK"
+            flag = " ←" if abs(st[0]) > 2 * st[1] and abs(st[0]) > 0.05 else ""
+            print(f"    {cid:<10} n={st[2]:4d} 群={st[3]:3d}: バイアス {st[0]:+.3f} ±{2*st[1]:.3f}"
+                  f"  実測 {50*(1+lab[m].mean()):5.1f}% / 予測 {50*(1+pred[m].mean()):5.1f}%{flag}")
 
 
 
