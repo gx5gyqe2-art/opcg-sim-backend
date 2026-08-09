@@ -111,6 +111,19 @@ def _board_from_frame(db, rec, fr, actor_pid):
         pl.don_attached_cards = _dons(pid, attached)
         players[pid] = pl
     m = GameManager(players["p1"], players["p2"])
+    # ドンデッキ**残**をフレームから復元する。`Player.__init__` は満タン（10枚）で作り、
+    # `GameManager.__init__` がリーダーのルール（エネル OP15-058＝6枚）で作り直すので、ここで
+    # 入れ直さないと「既に場へ出した分だけ多い」ドンを以後ずっと引き続ける（修正前の実測:
+    # m2@44 で真値3に対し10・m1@14 で真値7に対し10・エネル e1@7 で真値3に対し6）。
+    # ドンデッキ枚数は将来ターンの伸び代そのものなので、復元点以降のロールアウトで両者の
+    # 資源計算が系統的にずれる（終盤の点ほど影響が大きい）。エネルでは上限そのものが壊れ、
+    # 「ドン!!が6枚以下の場合」系のシナジー条件の成否まで変わる。
+    # **マネージャ構築後**に置くこと（構築時のリーダールール適用に上書きされるため）。
+    for pid in ("p1", "p2"):
+        n = (fr["players"][pid] or {}).get("don_deck")
+        if n is not None:
+            pl = players[pid]
+            pl.don_deck = type(pl.don_deck)(_dons(pid, int(n)))
     m.turn_count = fr.get("turn", 1)
     m.phase = Phase.MAIN
     m.turn_player = players[actor_pid]
