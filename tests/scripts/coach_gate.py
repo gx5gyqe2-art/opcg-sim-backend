@@ -75,6 +75,17 @@ REPLAYS_V2 = {
     "m4": os.path.join(_FIX2, "opcg_replay_6563214359889287880.json.gz"),   # ナミ(人) vs シャンクス(CPU)
     "m5": os.path.join(_FIX2, "opcg_replay_9195490382040907274.json.gz"),   # シャンクス(人) vs ナミ(CPU)
 }
+# --- v48 エネル調査用リプレイ（2026-08-09・自己対戦・裁定の裏取り対象） ---
+# 出典: `game_replay_log.py --matchup nami:p_enel --sims 128`（gen13・Dirichlet なし＝決定論的に
+# 再現できる）。**まだ検証済み点ではない**——ユーザ裁定（先行2ターン目に1コストの登場時ドローを
+# 出して OP15-118 エネル(cost6)を掘る）をレフェリーで裏取りするための盤面として登録する。
+# 裏が取れた点だけを VERIFIED へ昇格させる（v46 の教訓＝ゲートの点を動かす前に勝率で効くかを測る）。
+_FIX48 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                      "fixtures", "replays", "enel_v48_20260809")
+REPLAYS_V48 = {
+    "e1": os.path.join(_FIX48, "enel_selfplay_991001.json.gz"),   # p1=エネル / p2=ナミ（ナミ勝ち）
+    "e2": os.path.join(_FIX48, "enel_selfplay_991002.json.gz"),   # p1=ナミ / p2=エネル（ナミ勝ち）
+}
 # **VERIFIED v3**（2026-07-30 再裁定・/tmp/mark_verify3.jsonl・worlds16）。旧 v2（13点・worlds8）は
 # 効果対話の既定解決欠陥（`docs/reports/default_interaction_fix_20260730.md`＝捨て札が公開札を
 # 捨てる／up-to 獲得を常時見送る）で PLAY 系プランの測定が汚染されていたため、修正後エンジンで

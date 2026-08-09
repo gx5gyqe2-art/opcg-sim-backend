@@ -460,6 +460,11 @@ def main():
     game_serve = OPCGGame()                    # ロールアウトは serve 同等（config に従う）
 
     table = _mark_table()
+    # リプレイ表は mark_gate（v4 マーク）＋ coach_gate（v2 / v48）の合併。coach_gate 側が
+    # `import counterfactual_referee` するので、**遅延 import** で循環を避ける。
+    # 従来は MG.REPLAYS だけを見ており、コーチゲートの局面を --marks に渡せなかった。
+    import coach_gate as _CG
+    replays = {**MG.REPLAYS, **_CG.REPLAYS_V2, **_CG.REPLAYS_V48}
     GAMES = {}
     results = []
     marks = []
@@ -467,7 +472,7 @@ def main():
         tag, i = spec.split(":"); i = int(i)
         marks.append((tag, i))
         if tag not in GAMES:
-            raw = RE.load_replay_json(MG.REPLAYS[tag]); rec = raw.get("replay", raw)
+            raw = RE.load_replay_json(replays[tag]); rec = raw.get("replay", raw)
             GAMES[tag] = (rec, {f.get("action_index"): f for f in raw.get("frames") or []},
                           rec["actions"])
     if ARGS.plans:
