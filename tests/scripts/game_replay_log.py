@@ -91,12 +91,39 @@ def _char_str(c):
     return f"{cid}({','.join(bits)})"
 
 
-def _side_str(pl):
+def _hand_str(pl):
+    """自手札を「card_id(cコスト,Cカウンター)」で並べる。
+
+    **自分の手札のみ**に使う（相手手札は encoder も枚数しか見ない＝公平性契約。
+    ログでも出さないことで、読む側が「CPU に見えていない情報」で判断しないようにする）。
+    ドンをリーダーに注いだ手が妥当かは、そのとき出せた手札を見ないと判定できないので、
+    コストと**カウンター値**（＝出さずに守りへ残す価値）の両方を出す。
+    """
+    out = []
+    for c in pl.hand:
+        m = getattr(c, "master", None)
+        if m is None:
+            continue
+        cid = getattr(m, "card_id", None) or getattr(m, "name", "?")
+        cost = int(getattr(m, "cost", 0) or 0)
+        try:
+            cv = int(float(getattr(c, "current_counter", None) or 0)
+                     or float(getattr(m, "counter", 0) or 0))
+        except Exception:
+            cv = 0
+        out.append(f"{cid}(c{cost}{f',C{cv}' if cv else ''})")
+    return " ".join(out) or "（手札なし）"
+
+
+def _side_str(pl, show_hand=False):
     da, dr = len(pl.don_active), len(pl.don_rested)
     ld_don = int(getattr(getattr(pl, "leader", None), "attached_don", 0) or 0)
     field = " / ".join(_char_str(c) for c in pl.field) or "（場は空）"
-    return (f"ライフ{len(pl.life)} ドン{da + dr}(活{da}/レ{dr}) 手札{len(pl.hand)}"
-            f"{f' L+{ld_don}don' if ld_don else ''}\n        場: {field}")
+    s = (f"ライフ{len(pl.life)} ドン{da + dr}(活{da}/レ{dr}) 手札{len(pl.hand)}"
+         f"{f' L+{ld_don}don' if ld_don else ''}\n        場: {field}")
+    if show_hand:
+        s += f"\n        手: {_hand_str(pl)}"
+    return s
 
 
 def _fmt_move(m, mv):
@@ -120,6 +147,8 @@ def main():
     ap.add_argument("--sims", type=int, default=128, help="決定の探索数（生成器の gen_sims 相当）")
     ap.add_argument("--eps", type=float, default=0.0, help="Dirichlet ノイズ（生成再現は 0.15）")
     ap.add_argument("--focus", default="", help="詳細表示するリーダー card_id（空＝両席）")
+    ap.add_argument("--no-hand", action="store_true",
+                    help="手番側の手札内訳を出さない（既定は出す。相手手札は常に非表示）")
     ap.add_argument("--max-steps", type=int, default=0, help="0=CR.MAX_STEPS")
     ap.add_argument("--decks-json", default=DECKS_JSON)
     ap.add_argument("--enc-version", type=int, default=8)
@@ -161,8 +190,8 @@ def main():
         if at in ("PLAY", "PLAY_CARD", "ACTIVATE_MAIN") and d.get("card"):
             played[lid][d["card"]] += 1
         if show:
-            print(f"  [{lid}] {_side_str(me)}")
-            print(f"        相手: {_side_str(opp)}")
+            print(f"  [{lid}] {_side_str(me, show_hand=not args.no_hand)}")
+            print(f"        相手: {_side_str(opp)}")   # 相手手札は出さない（公平性契約と同じ扱い）
             print(f"     合法{len(legal):3d}手 → {txt}")
         child = gserve.apply(m, mv, name)
         if child is None:
