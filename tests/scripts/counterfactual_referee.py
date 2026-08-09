@@ -350,6 +350,23 @@ def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds,
                                     beam=ARGS.beam, max_plans=ARGS.max_plans, log=log)
         entries = [{"label": ">".join(_step_label(d) for d in descs), "keys": keys}
                    for keys, descs in auto]
+        # --plan-filter: 列挙結果から**比較したい線だけ**を残す（接頭辞ごとに最初の1本）。
+        # 裁定の裏取りでは「人間が指した線 vs CPU が実際に打った線」を必ず同じ表に載せたいが、
+        # 自動列挙の縮約は手順全体で数えたコミットメントのラウンドロビンなので、上限を下げると
+        # 特定の初手が丸ごと落ちる（実測: e1@7 で上限20なら残る PLAY:OP15-061 が上限10で消失）。
+        # 手順文字列の手書き（--plans "A|B"）は効果対話の途中で切れると偽の結果を出す（v46）ため、
+        # **列挙済みの keys をそのまま使い、選ぶだけ**にするのが安全。
+        if getattr(ARGS, "plan_filter", ""):
+            pref = [p.strip() for p in ARGS.plan_filter.split(",") if p.strip()]
+            picked, used = [], set()
+            for p in pref:
+                for e in entries:
+                    if e["label"].startswith(p) and id(e) not in used:
+                        picked.append(e); used.add(id(e)); break
+                else:
+                    log(f"  [filter] 接頭辞 '{p}' に一致するプランが列挙に無い")
+            log(f"  [filter] {len(entries)}→{len(picked)} 本（接頭辞ごとに先頭1本）")
+            entries = picked
     else:
         entries = [{"label": p, "steps": p.split(">")} for p in plans]
     if not entries:
@@ -431,6 +448,9 @@ def main():
                     help="捲りモードの相手温度 τ（>0 で有効）: プラン比較が飽和負け"
                          "（最善でも勝ち≤1）のとき、上位プランを世界数×4＋相手手番の"
                          "訪問数比例サンプル（τ）で再判定し捲り率を測る")
+    ap.add_argument("--plan-filter", default="",
+                    help="auto 列挙から比較する線を選ぶ（ラベル接頭辞のカンマ区切り・"
+                         "接頭辞ごとに先頭1本）。例: 'PLAY:OP15-061,ATTACH_DON:OP15-058'")
     ap.add_argument("--plan-len", type=int, default=4, help="自動列挙の手順長上限")
     ap.add_argument("--beam", type=int, default=12, help="自動列挙のビーム幅（value順）")
     ap.add_argument("--max-plans", type=int, default=16, help="自動列挙のプラン上限（value順）")
