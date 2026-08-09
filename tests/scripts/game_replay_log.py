@@ -158,7 +158,7 @@ def main():
         txt, d = _fmt_move(m, mv)
         at = str(d.get("action_type"))
         acts[lid][at] += 1
-        if at in ("PLAY_CARD", "ACTIVATE_MAIN") and d.get("card"):
+        if at in ("PLAY", "PLAY_CARD", "ACTIVATE_MAIN") and d.get("card"):
             played[lid][d["card"]] += 1
         if show:
             print(f"  [{lid}] {_side_str(me)}")
