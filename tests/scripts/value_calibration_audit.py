@@ -8,7 +8,10 @@
   無ければ `value` 列（margin_blend 済み＝ライフ差タイブレーク w=0.25 込み）。
   **blend はライフ差バイアスを減衰させる向きに働く**（劣勢盤面のラベルを下げ優勢盤面を上げる）
   ため、blend 込みで出た単調バイアスの真の値は表示より大きい（保守側の測定）。
-- 群内相関（同一決定点の兄弟盤面）があるため、バイアスの SE は group 単位のクラスタで計算。
+- 群内相関があるため SE は群クラスタで計算する。**クラスタ単位は分布で変わる**:
+  順位ペア教師（plancf/defcf）は 1群=同一決定点の兄弟盤面なので `--cluster group`、
+  `value_label_gen` のコーパスは 1群=1盤面なので `--cluster game`（同一対局の盤面は
+  同じデッキ引き・勝敗トレンドを共有して相関するため、group だと SE を過小評価する）。
 
 実行例:
   OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/value_calibration_audit.py \
@@ -98,6 +101,11 @@ def main():
     ap.add_argument("--glob", default="*.npz")
     ap.add_argument("--net", default="opcg_sim/data/learned/gen13_value.npz")
     ap.add_argument("--label", default="auto", choices=("auto", "winw", "value"))
+    ap.add_argument("--cluster", default="group", choices=("group", "game"),
+                    help="SE のクラスタ単位。**value_label_gen のコーパスは `game` を指定する**"
+                         "（1盤面=1群なので `group` だと盤面を独立とみなし SE を過小評価する。"
+                         "同一対局の盤面は同じデッキ引き・同じ勝敗トレンドを共有して相関する）。"
+                         "group=(seed_base+局番号)*100+盤面番号 なので game は group//100")
     args = ap.parse_args()
     global net
     net = RN.ValueNet.load(args.net)
@@ -112,6 +120,9 @@ def main():
     else:
         lab = col["value"]
         note = "（value=margin_blend 混合ラベル＝ライフ差バイアスは保守側に出る）"
+    if args.cluster == "game":
+        col = dict(col); col["group"] = col["group"] // 100
+        note += "・SEは対局クラスタ"
     audit(args.name, col, lab, note)
     print("VALUE_CALIB_AUDIT_DONE")
     return 0
