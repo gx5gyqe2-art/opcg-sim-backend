@@ -86,6 +86,15 @@ REPLAYS_V48 = {
     "e1": os.path.join(_FIX48, "enel_selfplay_991001.json.gz"),   # p1=エネル / p2=ナミ（ナミ勝ち）
     "e2": os.path.join(_FIX48, "enel_selfplay_991002.json.gz"),   # p1=ナミ / p2=エネル（ナミ勝ち）
 }
+# --- 人間の基準線（2026-08-10・ユーザがエネルを握って CPU ナミに勝った実対局） ---
+# 出典: アプリの traced 対局（cpu_trace=true・seed 5703575646787553228）。人間 96手 / CPU 44手、
+# **turn 10 でエネル（p1・人間）勝ち**。CPU 自己対戦のエネルは e1/e2 とも敗北しているので、
+# 「このデッキは勝てる」ことの存在証明であり、打点しきい値・決定点の食い違い抽出の基準になる。
+_FIXH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "fixtures", "replays", "enel_human_20260810")
+REPLAYS_HUMAN = {
+    "h1": os.path.join(_FIXH, "enel_human_5703575646787553228.json.gz"),  # p1=エネル(人) / p2=ナミ(CPU)
+}
 # **VERIFIED v3**（2026-07-30 再裁定・/tmp/mark_verify3.jsonl・worlds16）。旧 v2（13点・worlds8）は
 # 効果対話の既定解決欠陥（`docs/reports/default_interaction_fix_20260730.md`＝捨て札が公開札を
 # 捨てる／up-to 獲得を常時見送る）で PLAY 系プランの測定が汚染されていたため、修正後エンジンで

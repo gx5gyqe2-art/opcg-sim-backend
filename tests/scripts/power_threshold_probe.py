@@ -63,10 +63,18 @@ def scan(raw, focus_leader, threshold):
     def before(k):
         return byidx.get(k - 1, init)
 
+    # **自ターンだけ**を対象にする。`player == 自分` のアクションには相手ターン中の防御応答
+    # （SELECT_COUNTER / PASS）が含まれ、それを自ターンとして数えると「攻撃0＝未達」に化ける
+    # （2026-08-10 実測で発覚。e2@7/@9 を未達と誤報告した原因）。手番はフレームの `active` で判定する。
+    own = set()
+    for fr in frames:
+        if fr.get("active") == pid:
+            own.add(int(fr.get("turn", 0) or 0))
     turns = {}
     for i, a in enumerate(acts):
-        if a.get("player") == pid:
-            turns.setdefault(int(a.get("turn", 0) or 0), []).append(i)
+        t = int(a.get("turn", 0) or 0)
+        if a.get("player") == pid and t in own:
+            turns.setdefault(t, []).append(i)
 
     rows = []
     for t in sorted(turns):
@@ -90,7 +98,10 @@ def scan(raw, focus_leader, threshold):
 
         actual, actual_card = 0, None
         for i in idxs:
-            if acts[i].get("action_type") != "ATTACK":
+            # 攻撃の記録は経路で action_type が違う: CPU は "ATTACK"、アプリの人間操作は
+            # **"ATTACK_CONFIRM"**（宣言→確定の2段UI）。片方だけを数えると人間のリプレイで
+            # 攻撃が0件になり「全ターン未達」という偽の結果が出る（2026-08-10 実測で発覚）。
+            if acts[i].get("action_type") not in ("ATTACK", "ATTACK_CONFIRM"):
                 continue
             fr = before(i)
             if fr is None:
@@ -113,15 +124,17 @@ def scan(raw, focus_leader, threshold):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--replays", default="e1,e2", help="coach_gate のリプレイタグ（カンマ区切り）")
+    ap.add_argument("--replays", default="e1,e2",
+                    help="リプレイタグ（coach_gate の表）または JSON ファイルパス・カンマ区切りで混在可")
     ap.add_argument("--leader", default="OP15-058", help="走査対象のリーダー card_id")
     ap.add_argument("--threshold", type=int, default=7000)
     args = ap.parse_args()
 
-    table = {**MG.REPLAYS, **CG.REPLAYS_V2, **CG.REPLAYS_V48}
+    table = {**MG.REPLAYS, **CG.REPLAYS_V2, **CG.REPLAYS_V48, **CG.REPLAYS_HUMAN}
     tot_turns = tot_gap = 0
     for tag in [t.strip() for t in args.replays.split(",") if t.strip()]:
-        raw = RE.load_replay_json(table[tag])
+        # タグ表に無ければファイルパスとして開く（アプリから届いた生 JSON をそのまま測れる）
+        raw = RE.load_replay_json(table.get(tag, tag))
         r = scan(raw, args.leader, args.threshold)
         if r is None:
             print(f"{tag}: リーダー {args.leader} が居ない（skip）")
