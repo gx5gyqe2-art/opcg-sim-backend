@@ -1,0 +1,61 @@
+{
+ "source": "dig_inject",
+ "groups": 5,
+ "rows": 16,
+ "enc_version": 9,
+ "turn_max": 4,
+ "cost_max": 2,
+ "diag": [
+  {
+   "tag": "h1",
+   "i": 2,
+   "turn": 1,
+   "player": "p1",
+   "digs": [
+    "OP15-066"
+   ]
+  },
+  {
+   "tag": "e1",
+   "i": 2,
+   "turn": 1,
+   "player": "p1",
+   "digs": [
+    "OP15-061",
+    "OP15-063",
+    "OP15-066"
+   ]
+  },
+  {
+   "tag": "e1",
+   "i": 7,
+   "turn": 3,
+   "player": "p1",
+   "digs": [
+    "OP15-061",
+    "OP15-063",
+    "OP15-066"
+   ]
+  },
+  {
+   "tag": "e2",
+   "i": 4,
+   "turn": 2,
+   "player": "p2",
+   "digs": [
+    "OP15-066",
+    "OP15-067"
+   ]
+  },
+  {
+   "tag": "e2",
+   "i": 8,
+   "turn": 4,
+   "player": "p2",
+   "digs": [
+    "OP15-066",
+    "OP15-067"
+   ]
+  }
+ ]
+}
