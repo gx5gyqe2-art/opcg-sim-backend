@@ -118,10 +118,18 @@ def _board_from_frame(db, rec, fr, actor_pid, actions=None, upto=None):
         pl.stage = _ci(db, s["stage"]["card_id"], pid, s["stage"]) if s.get("stage") else None
         leader.attached_don = (s.get("leader") or {}).get("attached_don", 0) or 0
         # ドン: 非付与ぶんを don_active/don_rested に、付与ぶんは attached_to 付きで積む。
-        pl.don_active = _dons(pid, s.get("don_active", 0))
-        pl.don_rested = _dons(pid, s.get("don_rested", 0))
+        # **必ず JournaledList で持つ**（実機 Player.__init__ と同型）。素の list を代入すると、
+        # in-place 探索（TreeMCTS の journal.transaction 巻き戻し）でドン支払いが**巻き戻らず**、
+        # シミュレーションのたびに復元盤面からドンが蓄積的に消える。実測（h1@35・2026-08-10）:
+        # 160sims 中に「ドン!!が不足しています」例外が多発し、コストを払う全手（PLAY/ATTACH_DON）が
+        # 例外手＝終局値 -1 で封印され、探索が TURN_END へ吸い込まれていた（prior 0.600 の
+        # 最有力手 PLAY OP15-118 が 6 訪問 Q=-0.993）。カードゾーン（hand/field 等）は
+        # Player の __setattr__ 側で JournaledList 化されるがドン系リストはされないため明示する。
+        from opcg_sim.src.core.journal import JournaledList as _JL
+        pl.don_active = _JL(_dons(pid, s.get("don_active", 0)))
+        pl.don_rested = _JL(_dons(pid, s.get("don_rested", 0)))
         attached = leader.attached_don + sum(c.attached_don for c in pl.field)
-        pl.don_attached_cards = _dons(pid, attached)
+        pl.don_attached_cards = _JL(_dons(pid, attached))
         players[pid] = pl
     m = GameManager(players["p1"], players["p2"])
     # ドンデッキ**残**をフレームから復元する。`Player.__init__` は満タン（10枚）で作り、
