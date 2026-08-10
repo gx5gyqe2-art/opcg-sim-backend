@@ -36,7 +36,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 MODELS = os.path.join(REPO, "opcg_sim", "data", "learned")
 
 
-PAIR_GLOBS = ("optpair_*.npz", "defcf_*.npz", "plancf_*.npz")
+PAIR_GLOBS = ("optpair_*.npz", "defcf_*.npz", "plancf_*.npz", "diginj_*.npz")
 
 
 def load_pairs_corpus(dirs, globs=PAIR_GLOBS):
