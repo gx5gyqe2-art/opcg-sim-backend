@@ -77,8 +77,21 @@ def _dons(owner, n, rested=False):
     return out
 
 
-def _board_from_frame(db, rec, fr, actor_pid):
-    """フレーム fr（あるマーク直前の盤面）から MAIN 手番の GameManager を復元する。"""
+def _board_from_frame(db, rec, fr, actor_pid, actions=None, upto=None):
+    """フレーム fr（あるマーク直前の盤面）から MAIN 手番の GameManager を復元する。
+
+    `actions`/`upto` を渡すと、フレームが運ばない**ターン内の履歴フラグ**2種を行動記録から
+    導出して復元する（フレームの `_CARD_KEEP` は is_rest/attached_don/is_frozen 等の見た目の
+    状態だけで、この2つを含まない）:
+      - `is_newly_played`（召喚酔い）: このターンの PLAY を場のキャラへ対応づける。無いと
+        「このターンに出たキャラで攻撃」が合法に見える（実測 h1@139: CPU が出たばかりの
+        ブロッカーのフランキーで攻撃を選んだ＝実局面では違法）。
+      - `ability_used_this_turn`（ターン1回）: このターンの ACTIVATE_MAIN を対応づける。無いと
+        使用済みの起動能力を再発動できてしまう（実測 h1@28: 人間が使用済みのエネル・リーダー
+        能力を CPU が再選択）。カードに起動メインが複数ある場合はどれを使ったか記録から
+        判別できないため**ターン制限つきの全てに使用を記録**する（過剰制限側に倒す・
+        現行4デッキに該当カードは無い）。
+    """
     from collections import Counter
     players = {}
     for pid in ("p1", "p2"):
@@ -128,11 +141,51 @@ def _board_from_frame(db, rec, fr, actor_pid):
     m.phase = Phase.MAIN
     m.turn_player = players[actor_pid]
     m.opponent = players["p2" if actor_pid == "p1" else "p1"]
+    if actions is not None and upto is not None:
+        _restore_turn_flags(m, players, actions, upto)
     try:
         m.refresh_passive_state()
     except Exception:
         pass
     return m
+
+
+def _restore_turn_flags(m, players, actions, upto):
+    """行動記録から is_newly_played / ability_used_this_turn を復元する（docstring 参照）。
+
+    「このターン」= actions[upto] のターン。upto より前の同ターン行動だけを見る（復元対象の
+    フレームは actions[upto] の直前盤面なので、それ以降の行動はまだ起きていない）。"""
+    from opcg_sim.src.core.engine._helpers import _ability_index, _condition_turn_limit
+    if not (0 <= upto < len(actions)):
+        return
+    t = int(actions[upto].get("turn", 0) or 0)
+    for j in range(upto):
+        a = actions[j]
+        if int(a.get("turn", 0) or 0) != t or not a.get("card"):
+            continue
+        pl = players.get(a.get("player"))
+        if pl is None:
+            continue
+        at = a.get("action_type")
+        if at == "PLAY":
+            # 同名複数体は「まだ印の無い1体」へ順に対応づける（イベント/除去済みは場に無い＝no-op）
+            for c in pl.field:
+                if (getattr(c.master, "card_id", None) == a["card"]
+                        and not getattr(c, "is_newly_played", False)):
+                    c.is_newly_played = True
+                    break
+        elif at == "ACTIVATE_MAIN":
+            cands = [pl.leader] if (pl.leader is not None and
+                                    getattr(pl.leader.master, "card_id", None) == a["card"]) else \
+                [c for c in pl.field if getattr(c.master, "card_id", None) == a["card"]]
+            for c in cands:
+                for ab in (getattr(c.master, "abilities", ()) or ()):
+                    if getattr(getattr(ab, "trigger", None), "name", None) != "ACTIVATE_MAIN":
+                        continue
+                    if _condition_turn_limit(getattr(ab, "condition", None)) is None:
+                        continue
+                    k = _ability_index(c, ab)
+                    c.ability_used_this_turn[k] = c.ability_used_this_turn.get(k, 0) + 1
 
 
 def _describe(m, mv):
@@ -185,7 +238,7 @@ def _board_for_counter_mark(db, rec, frames_by_idx, actions, i):
     if pre is None or postatk is None:
         return "攻撃前/後フレームが欠落"
     atk_pid = atk_act["player"]
-    m = _board_from_frame(db, rec, pre, atk_pid)
+    m = _board_from_frame(db, rec, pre, atk_pid, actions=actions, upto=j)
     atk_pl = m.turn_player
     defender = m.opponent
     attacker = _find_unit(atk_pl, atk_act.get("card"), active_only=True)
