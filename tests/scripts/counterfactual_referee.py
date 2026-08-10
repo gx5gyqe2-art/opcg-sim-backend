@@ -202,15 +202,33 @@ def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, lo
 
 
 def _match_move(state, legal, step):
-    """プラン1歩（'ACTION_TYPE:card' または 'ACTION_TYPE'）に合致する合法手を返す（無ければ None）。"""
+    """プラン1歩に合致する合法手を返す（無ければ None）。
+
+    書式: `ACTION_TYPE` / `ACTION_TYPE:card` / `ACTION_TYPE[sel1,sel2]` / `ACTION_TYPE:card[sel]`
+    末尾の `[...]` は**効果対話の選択内容**（`_describe_move` の `selected`）への一致条件。
+    `[]` は「何も選ばない」を明示指定する。
+
+    選択内容の指定が要る理由: 対話の分岐は action_type も card も同一で、選択だけが違う
+    （実測 e1@7 のエネル能力＝「付与しない / OP15-066 に付与 / OP15-061 に付与」の3択が
+    すべて `RESOLVE_EFFECT_SELECTION`）。指定できないと**先頭一致＝付与しない**が常に選ばれ、
+    「リーダー能力でドンを付与する」線がプランとして表現できなかった。自動列挙も同じ理由で
+    付与ありの枝を1本も残さない（40本すべて付与0枚・2026-08-09 実測）。
+    """
+    sel = None
+    if step.endswith("]") and "[" in step:
+        step, _, tail = step.rpartition("[")
+        sel = [s for s in tail[:-1].split(",") if s.strip()]
     at, _, card = step.partition(":")
     for mv in legal:
         try:
             d = cpu_ai._describe_move(state, mv) or {}
         except Exception:
             continue
-        if d.get("action_type") == at and (not card or d.get("card") == card):
-            return mv
+        if d.get("action_type") != at or (card and d.get("card") != card):
+            continue
+        if sel is not None and list(d.get("selected") or []) != sel:
+            continue
+        return mv
     return None
 
 
