@@ -162,13 +162,23 @@ def process_game(task):
         m = child
         steps_n += 1
 
-    picked = pick_turn_starts(len(snaps), cfg["windows_per_game"], rng)
+    # v49（掘りCF・2026-08-10）: turn_max>0 なら早期ターンの開始局面だけを窓にする。
+    # 序盤の掘り（1コスト登場時ドローで山の勝ち筋を探す）の経済はターン1〜4に住んでおり、
+    # 全域一様抽出では対照がほとんど採れない（A1＝h1@2 型の決定点が対象）。
+    cand = [i for i, (sm, _) in enumerate(snaps)
+            if not cfg.get("turn_max") or int(getattr(sm, "turn_count", 0) or 0) <= cfg["turn_max"]]
+    picked = [cand[j] for j in pick_turn_starts(len(cand), cfg["windows_per_game"], rng)]
     rows = {k: [] for k in ("scalars", "field", "card_idx", "value", "q_root", "turns_left",
                             "group", "win_w", "life_w")}
     diag = []
     for gi, pi in enumerate(picked):
         m0, name = snaps[pi]
         plans = propose_plans(gserve, m0, name, rng, cfg["proposals"], cfg["worlds"])
+        if cfg.get("include_pass") and () not in [tuple(p) for p in plans]:
+            # v49: 「無行動でターン終了」を明示的な対照腕として加える。propose_plans は
+            # TURN_END 枝を出さない（policy argmax が TURN_END のときだけ空プランが立つ）ため、
+            # A1（掘る vs 何もしない）型の対照はこの腕が無いと**構造的に**組めない。
+            plans.append(())
         if len(plans) < 2:
             continue                              # 候補1つ＝対照が組めない
         wins = {j: 0 for j in range(len(plans))}
@@ -257,6 +267,11 @@ def main():
     ap.add_argument("--eps", type=float, default=0.15)
     ap.add_argument("--def-temp", type=float, default=0.7)
     ap.add_argument("--windows-per-game", type=int, default=4)
+    ap.add_argument("--turn-max", type=int, default=0,
+                    help="0=全域一様（既定）。N>0 で turn_count≤N のターン開始だけを窓にする"
+                         "（v49 掘りCF＝序盤の掘り経済の対照採取）")
+    ap.add_argument("--include-pass", action="store_true",
+                    help="「無行動でターン終了」を対照腕として常に加える（v49 掘りCF）")
     ap.add_argument("--matchup", default="nami:shanks")
     ap.add_argument("--decks-json", default=DECKS_JSON)
     ap.add_argument("--enc-version", type=int, default=8)
@@ -267,7 +282,8 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     done = len(glob.glob(os.path.join(args.out, "plancf_*.npz")))
     cfg = {k: getattr(args, k) for k in ("worlds", "proposals", "rollout_sims", "gen_sims",
-                                         "eps", "def_temp", "windows_per_game")}
+                                         "eps", "def_temp", "windows_per_game",
+                                         "turn_max", "include_pass")}
     print(f"=== ターン出口CFコーパス生成 matchup={args.matchup} worlds={args.worlds} "
           f"proposals={args.proposals} def_temp={args.def_temp} ev={args.enc_version} "
           f"既存シャード={done} ===", flush=True)
