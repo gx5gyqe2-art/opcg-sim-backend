@@ -337,8 +337,15 @@ def main():
                              rec["actions"])
         built = CR._restore_board(db, tag, i)
         if isinstance(built, str):
-            print(f"{tag}@{i}: 復元不可（スキップ）: {built}")
-            continue
+            # 真盤面（記録全手順の再実行）が再生不能な対局（例: h1＝人間対局は相手CPUの
+            # カウンター選択を replayer が再現できない・既知の制限）は**フレーム復元へ
+            # フォールバック**する。h系の裁定・v48/v49 の測定は全てフレーム復元が正本。
+            rec, fbi, actions = CR.GAMES[tag]
+            built = MG._restore(db, rec, fbi, actions, i)
+            if isinstance(built, str) or built is None:
+                print(f"{tag}@{i}: 復元不可（スキップ）: {built}")
+                continue
+            print(f"{tag}@{i}: 真盤面再生不能→フレーム復元で測定")
         m0, who = built
         name = who if isinstance(who, str) else who.name
         actor = m0.p1 if m0.p1.name == name else m0.p2
