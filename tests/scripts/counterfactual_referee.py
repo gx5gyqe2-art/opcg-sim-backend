@@ -202,15 +202,33 @@ def referee_position(db, game_root, game_serve, vf, pf, tag, i, pred, worlds, lo
 
 
 def _match_move(state, legal, step):
-    """プラン1歩（'ACTION_TYPE:card' または 'ACTION_TYPE'）に合致する合法手を返す（無ければ None）。"""
+    """プラン1歩に合致する合法手を返す（無ければ None）。
+
+    書式: `ACTION_TYPE` / `ACTION_TYPE:card` / `ACTION_TYPE[sel1,sel2]` / `ACTION_TYPE:card[sel]`
+    末尾の `[...]` は**効果対話の選択内容**（`_describe_move` の `selected`）への一致条件。
+    `[]` は「何も選ばない」を明示指定する。
+
+    選択内容の指定が要る理由: 対話の分岐は action_type も card も同一で、選択だけが違う
+    （実測 e1@7 のエネル能力＝「付与しない / OP15-066 に付与 / OP15-061 に付与」の3択が
+    すべて `RESOLVE_EFFECT_SELECTION`）。指定できないと**先頭一致＝付与しない**が常に選ばれ、
+    「リーダー能力でドンを付与する」線がプランとして表現できなかった。自動列挙も同じ理由で
+    付与ありの枝を1本も残さない（40本すべて付与0枚・2026-08-09 実測）。
+    """
+    sel = None
+    if step.endswith("]") and "[" in step:
+        step, _, tail = step.rpartition("[")
+        sel = [s for s in tail[:-1].split(",") if s.strip()]
     at, _, card = step.partition(":")
     for mv in legal:
         try:
             d = cpu_ai._describe_move(state, mv) or {}
         except Exception:
             continue
-        if d.get("action_type") == at and (not card or d.get("card") == card):
-            return mv
+        if d.get("action_type") != at or (card and d.get("card") != card):
+            continue
+        if sel is not None and list(d.get("selected") or []) != sel:
+            continue
+        return mv
     return None
 
 
@@ -350,6 +368,23 @@ def plan_referee(db, game_root, game_serve, vf, pf, tag, i, plans, worlds,
                                     beam=ARGS.beam, max_plans=ARGS.max_plans, log=log)
         entries = [{"label": ">".join(_step_label(d) for d in descs), "keys": keys}
                    for keys, descs in auto]
+        # --plan-filter: 列挙結果から**比較したい線だけ**を残す（接頭辞ごとに最初の1本）。
+        # 裁定の裏取りでは「人間が指した線 vs CPU が実際に打った線」を必ず同じ表に載せたいが、
+        # 自動列挙の縮約は手順全体で数えたコミットメントのラウンドロビンなので、上限を下げると
+        # 特定の初手が丸ごと落ちる（実測: e1@7 で上限20なら残る PLAY:OP15-061 が上限10で消失）。
+        # 手順文字列の手書き（--plans "A|B"）は効果対話の途中で切れると偽の結果を出す（v46）ため、
+        # **列挙済みの keys をそのまま使い、選ぶだけ**にするのが安全。
+        if getattr(ARGS, "plan_filter", ""):
+            pref = [p.strip() for p in ARGS.plan_filter.split(",") if p.strip()]
+            picked, used = [], set()
+            for p in pref:
+                for e in entries:
+                    if e["label"].startswith(p) and id(e) not in used:
+                        picked.append(e); used.add(id(e)); break
+                else:
+                    log(f"  [filter] 接頭辞 '{p}' に一致するプランが列挙に無い")
+            log(f"  [filter] {len(entries)}→{len(picked)} 本（接頭辞ごとに先頭1本）")
+            entries = picked
     else:
         entries = [{"label": p, "steps": p.split(">")} for p in plans]
     if not entries:
@@ -431,6 +466,9 @@ def main():
                     help="捲りモードの相手温度 τ（>0 で有効）: プラン比較が飽和負け"
                          "（最善でも勝ち≤1）のとき、上位プランを世界数×4＋相手手番の"
                          "訪問数比例サンプル（τ）で再判定し捲り率を測る")
+    ap.add_argument("--plan-filter", default="",
+                    help="auto 列挙から比較する線を選ぶ（ラベル接頭辞のカンマ区切り・"
+                         "接頭辞ごとに先頭1本）。例: 'PLAY:OP15-061,ATTACH_DON:OP15-058'")
     ap.add_argument("--plan-len", type=int, default=4, help="自動列挙の手順長上限")
     ap.add_argument("--beam", type=int, default=12, help="自動列挙のビーム幅（value順）")
     ap.add_argument("--max-plans", type=int, default=16, help="自動列挙のプラン上限（value順）")
@@ -460,6 +498,11 @@ def main():
     game_serve = OPCGGame()                    # ロールアウトは serve 同等（config に従う）
 
     table = _mark_table()
+    # リプレイ表は mark_gate（v4 マーク）＋ coach_gate（v2 / v48）の合併。coach_gate 側が
+    # `import counterfactual_referee` するので、**遅延 import** で循環を避ける。
+    # 従来は MG.REPLAYS だけを見ており、コーチゲートの局面を --marks に渡せなかった。
+    import coach_gate as _CG
+    replays = {**MG.REPLAYS, **_CG.REPLAYS_V2, **_CG.REPLAYS_V48}
     GAMES = {}
     results = []
     marks = []
@@ -467,7 +510,7 @@ def main():
         tag, i = spec.split(":"); i = int(i)
         marks.append((tag, i))
         if tag not in GAMES:
-            raw = RE.load_replay_json(MG.REPLAYS[tag]); rec = raw.get("replay", raw)
+            raw = RE.load_replay_json(replays[tag]); rec = raw.get("replay", raw)
             GAMES[tag] = (rec, {f.get("action_index"): f for f in raw.get("frames") or []},
                           rec["actions"])
     if ARGS.plans:

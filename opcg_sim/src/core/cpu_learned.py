@@ -125,8 +125,22 @@ _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 # ままユーザ判断で採用**（2026-08-08・gen9〜12 と同じ「人間検証点の改善 × 自己対戦中立」の
 # 取引）。ロールバックはヘッドを外すだけ（幅0にすれば gen12 と bit 一致＝過去世代より安全）。
 # policy は gen12 と同一バイナリ（v12 確定＝policy 微調整は有害・符号化版 v8 一致）。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen13_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen13_policy.npz")
+# gen14 = gen13 の value 本体を**符号化 v9**（ドンデッキ残2＋自デッキ残キャラ頂点2・恒等温
+# スタート）へ拡張し、掘り裁定の注入順位ペア（`dig_inject_gen.py`・エネル席5群11ペア・
+# 「登場時ドローで掘ってEND ＞ 無行動END」）で蒸留アンカー付き順位微調整（v33 機構・
+# アンカー=リプレイ復元633一般盤面）したもの（v49・docs/reports/gen14_adoption_20260811.md）。
+# **戦闘出口ヘッドと vocab は gen13 と bit 一致**（較正維持）・胴体の摂動は最大 0.006/重み・
+# 一般盤面の予測摂動 std 0.069。判定＝コーチゲート 9/9 PASS（h1@2 掘り 0.00→1.00 が
+# 2σ=0.35 超の実獲得・注入点はゲート7点と独立・退行ゼロ）× アリーナ 400ペア800局
+# 0.5038 CI[0.473,0.534] Elo+2.6＝中立。**昇格基準（wr≥0.55）FAIL のままユーザ判断で採用**
+# （2026-08-11・gen9〜13 と同じ「人間検証点の改善 × 自己対戦中立」の取引）。
+# 既知の限界（v49 レポート§トリレンマ）: 非エネル席の低コスト展開マージンが平均 +0.09 傾く
+# 漏れ（行動レベルの退行はゲート未検出）・サトリ移植プローブ ✗（掘りはドン経済でなく
+# カード/文脈特徴に紐づく）＝50ペア規模の注入で安全に買えるのはエネル獲得のみ。
+# ロールバックは既定を gen13 に戻すだけ。policy は gen13 と挙動同一（v9 温スタートの
+# ゼロ拡張のみ・v12 確定＝policy 微調整は有害）。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen14_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen14_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}

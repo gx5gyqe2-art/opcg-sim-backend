@@ -128,7 +128,7 @@ def _restore(db, rec, frames_by_idx, actions, i):
     pre = frames_by_idx.get(i - 1)
     if pre is None:
         return "直前フレーム欠落"
-    m = RE._board_from_frame(db, rec, pre, actions[i]["player"])
+    m = RE._board_from_frame(db, rec, pre, actions[i]["player"], actions=actions, upto=i)
     return m, m.turn_player
 
 

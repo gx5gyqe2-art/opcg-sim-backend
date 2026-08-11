@@ -17,7 +17,10 @@ v4=**自デッキ残の集約**（残カウンター総量/密度・ブロッカ
 ＝「自分の山札にどれだけ守り札/カウンターが残るか」を可視化し、薄いライフの価値（C5）と残ターン読み
 （D3）を底上げする（cpu_v5_plan.md §4-3）。v5=**相手場の脅威集約**（総火力/高パワー数/ブロッカー数）
 ＋**展開余力**（ドンで出せる手札キャラ数）で 55 ＝ policy が @33（相手無防備＝攻める）と @64（相手鉄壁
-＝慎重）を区別でき、@93（ドン余剰＝展開すべき）も見える（cpu_v10・真盤面診断）。version は**ロード済み
+＝慎重）を区別でき、@93（ドン余剰＝展開すべき）も見える（cpu_v10・真盤面診断）。v6=自手札の資源集約（60）。
+v7=登場時オプション実測（63）。v8=自場集約の純対称化（66）。v9=**ドンデッキ残（自/相手）＋自デッキ残
+キャラ頂点**（最大パワー/最大コスト）で 70 ＝リーダー固有のドン上限・don!!-X の再装填経済・「山に眠る
+勝ち筋」を可視化する（v49・h1@2 の掘り無差別 Δ=+0.011 の根因）。version は**ロード済み
 ネットの入力次元から自動判別**する（cpu_learned 側）＝現行ネットは挙動不変・新版ネットへ差し替えた
 時点で新特徴が有効になる。
 """
@@ -43,8 +46,10 @@ SCALARS_V5 = 55        # v5 = v4 + 相手場の脅威集約3（総火力/高パ�
 SCALARS_V6 = 60        # v6 = v5 + **自手札の資源集約5**（カウンター総量/カウンター札数/最大カウンター/ブロッカー数/イベント数）
 SCALARS_V7 = 63        # v7 = v6 + **登場時オプション実測3**（発火するPLAY数/そのkeep値/ON_PLAY持ち不発数・v29）
 SCALARS_V8 = 66        # v8 = v7 + **自場集約3**（総火力/高パワー数/ブロッカー数＝相手v5と純対称・v32）
+SCALARS_V9 = 70        # v9 = v8 + **ドンデッキ残2**（自/相手）＋**自デッキ残キャラ頂点2**（最大パワー/最大コスト・v49）
 _SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4,
-                       5: SCALARS_V5, 6: SCALARS_V6, 7: SCALARS_V7, 8: SCALARS_V8}
+                       5: SCALARS_V5, 6: SCALARS_V6, 7: SCALARS_V7, 8: SCALARS_V8,
+                       9: SCALARS_V9}
 
 # 手番フラグ（is_my_turn）の scalars 列位置。append-only 契約により全版で不変＝
 # コーパスの盤面を「自ターン/相手ターン」で層別するときの唯一の正（v35 層別アンカー）。
@@ -152,6 +157,27 @@ def _deck_aggregate(deck):
         events / 50.0,                      # イベント残（カウンターイベント/トリック資源）
         highcost_char / 50.0,               # 高コストキャラ残（キーカード残の汎用代理）
     ]
+
+
+# v9: 自デッキ残キャラの頂点量。「デッキに何が眠っているか」を**連続量**で載せる（しきい値特徴は
+# 設けない＝ユーザ方針 2026-08-03。v4 の cost≥7 カウントは OP15-118（cost6/8000＝紫エネルの勝ち筋）を
+# 落とすが、既存特徴の意味は append-only 契約のため変更しない）。掘り（don!!-1 ドロー）の価値は
+# 「山に眠る頂点の高さ」に比例する——これが無いと 1コスト掘りキャラの登場時効果が無差別になる
+# （h1@2 実測 2026-08-10: 掘る線と無行動の線で value Δ=+0.011）。
+def _deck_apex(deck):
+    """me.deck（残ライブラリ）のキャラ頂点 2 値（最大パワー/10000・最大コスト/10）。
+    空デッキ・属性欠落に安全（探索クローン上で呼ばれるため決して例外を投げない）。"""
+    max_power = 0.0
+    max_cost = 0.0
+    for c in deck:
+        m = getattr(c, "master", None)
+        if m is None:
+            continue
+        if getattr(getattr(m, "type", None), "name", None) != "CHARACTER":
+            continue
+        max_power = max(max_power, float(getattr(m, "power", 0) or 0))
+        max_cost = max(max_cost, float(getattr(m, "cost", 0) or 0))
+    return [max_power / 10000.0, max_cost / 10.0]
 
 
 # v5: 相手場（公開情報）の脅威集約＋自分の展開余力。個別キャラは field テンソルに入るが「集約」が
@@ -324,6 +350,15 @@ def encode(manager, me_name, vocab, version=1):
         # 「低パワー体の盤面価値は低い」は総火力とキャラ数から平均としてネットが導出する
         # （汎用性のため新しいしきい値特徴は設けない＝ユーザ方針 2026-08-03）。
         vals += _opp_field_aggregate(getattr(me, "field", ()) or ())
+    if version >= 9:
+        # v9（2026-08-10・v49）: ドン経済とデッキ残の頂点量。
+        # (a) ドンデッキ残（自/相手・公開情報＝公平性契約に適合）: リーダー固有のドン上限
+        #     （紫エネル OP15-058 はドンデッキ6）と「don!!-X で山へ戻したドンがリーダー効果で
+        #     再装填される」経済は、この量が無いと**原理的に**見えない。/10 正規化（通常上限）。
+        # (b) 自デッキ残キャラの頂点2値（_deck_apex）: 掘りに行く先の価値。
+        vals += [len(getattr(me, "don_deck", ()) or ()) / 10.0,
+                 len(getattr(opp, "don_deck", ()) or ()) / 10.0]
+        vals += _deck_apex(getattr(me, "deck", ()) or ())
     scalars = np.array(vals, dtype=np.float32)
 
     field = np.zeros((2 * MAX_FIELD, PER_CHAR), dtype=np.float32)

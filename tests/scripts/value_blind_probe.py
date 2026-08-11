@@ -48,7 +48,8 @@ from opcg_game import OPCGGame
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.core.cpu_learned import LearnedEngine
 
-DEFAULT_POINTS = "m2@64,m2@66,m4@2,m4@8"     # v20 の VALUE_BLIND 4点
+DEFAULT_POINTS = "m4@2"     # v20 の VALUE_BLIND 4点のうち VERIFIED_V2 に残るのは m4@2 のみ
+# （m2@64/m4@8 は 2026-08-04・m2@66 は 2026-08-08 に取り下げ。指定しても accept が引けず skip される）
 
 # --- 特徴グループ（SCALARS_V5=55 の並び・encoder.py encode() と1対1） --------------------
 # 遮蔽の単位。scalars はインデックス列、field は行（キャラ枠）、card_idx は枠位置。

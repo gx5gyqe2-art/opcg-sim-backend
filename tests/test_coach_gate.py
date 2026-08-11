@@ -14,8 +14,8 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 "tests", "scripts"))
-from coach_gate import (REPLAYS_V2, VERIFIED, VERIFIED_V2, hit, judge,  # noqa: E402
-                        min_reliable_delta, turn_all_required)
+from coach_gate import (REPLAYS_HUMAN, REPLAYS_V2, REPLAYS_V48, VERIFIED,  # noqa: E402
+                        VERIFIED_V2, hit, judge, min_reliable_delta, turn_all_required)
 
 pytestmark = pytest.mark.cpu_infra
 
@@ -54,28 +54,41 @@ def test_verified_v2_entries_wellformed():
     下限は 2026-08-04 のユーザレビューで 10→8 へ引き下げ: 局面前提が不自然な点
     （パワー2000 のキャラにドン2枚付与＝m1@42/m1@94/m4@12）、バンドが広すぎて識別力の無い点
     （m4@8）、裁定が誤り/未確定の点（m2@12/m2@64）を取り下げた結果。**点数を保つために
-    疑わしい点を残さない**（水増しされたバンドは候補を実力以上に見せる）。"""
-    assert len(VERIFIED_V2) >= 8
+    疑わしい点を残さない**（水増しされたバンドは候補を実力以上に見せる）。
+
+    2026-08-08 にさらに 8→7: m2@66 を取り下げた（v46 実測でゲートが「より勝つ手順」を
+    不合格にしていたと判明＝裁定が逆を向いていた。詳細は coach_gate.py の該当コメントと
+    docs/reports/cpu_v46_m2at66_winrate_20260808.md）。"""
+    assert len(VERIFIED_V2) >= 7
     tags = {t for t, _i, _a in VERIFIED_V2}
     assert len(tags) >= 3, "複数対局から採録されているはず"
+    # 2026-08-11: エネル人間基準線の h系2点（h1@2 掘り・h1@35 6c着地）を追加（ユーザ指示）。
+    # tag の解決はゲート本体と同じ結合表（REPLAYS_V2 + REPLAYS_V48 + REPLAYS_HUMAN）で行う。
+    resolvable = {**REPLAYS_V2, **REPLAYS_V48, **REPLAYS_HUMAN}
     for tag, i, accept in VERIFIED_V2:
-        assert tag in REPLAYS_V2 and isinstance(i, int) and i >= 0
+        assert tag in resolvable and isinstance(i, int) and i >= 0
         req = turn_all_required(accept)
         entries = req if req is not None else accept
         assert entries and all(isinstance(a, tuple) and len(a) == 2 for a in entries)
-    for path in REPLAYS_V2.values():
+    for path in resolvable.values():
         assert os.path.exists(path), path
 
 
 def test_turn_all_dispatch_shape():
-    """turn_all 形式（m2@66・2026-08-05 裁定「ターン終了までに全アクションを消化」）の判別:
-    dict+turn_all は必須集合を返し、従来の初手集合・空 dict は None（＝初手判定のまま）。"""
+    """turn_all 形式（ターン終了までに全アクションを消化したかで測る系列基準）の判別:
+    dict+turn_all は必須集合を返し、従来の初手集合・空 dict は None（＝初手判定のまま）。
+
+    **2026-08-08 現在この形式を使う検証点は無い**（唯一だった m2@66 は v46 で取り下げ＝
+    消化率が勝率と逆を向いていた）。機構は将来の再裁定に備えて残すので、純関数として
+    形だけ固定し、採録側は下の不変条件で担保する。"""
     req = {("ATTACK", "EB03-055"), ("ACTIVATE_MAIN", "OP16-056")}
     assert turn_all_required({"turn_all": req}) == frozenset(req)
     assert turn_all_required({("ATTACK", "EB03-055")}) is None
     assert turn_all_required({"turn_all": frozenset()}) is None
-    m266 = next(a for t, i, a in VERIFIED_V2 if (t, i) == ("m2", 66))
-    assert turn_all_required(m266) is not None, "m2@66 はシーケンス基準（turn_all）のはず"
+    # 採録側が turn_all を使うなら必須集合が空でないこと（空だと全点素通しになる）
+    for tag, i, accept in VERIFIED_V2:
+        r = turn_all_required(accept)
+        assert r is None or r, f"{tag}@{i}: turn_all の必須集合が空"
 
 
 def test_min_reliable_delta_shrinks_with_seeds():

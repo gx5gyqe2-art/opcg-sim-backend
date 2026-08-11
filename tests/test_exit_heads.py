@@ -200,24 +200,27 @@ def test_engine_exit_value_fns_are_neutral_without_heads():
     assert bvf(_S(), "me") == vf(_S(), "me")
 
 
-def test_default_engine_is_gen13_with_battle_head_only():
-    """既定エンジン（gen13）は戦闘出口ヘッドを持ち、本体 value は gen12 と bit 一致する。
+def test_default_engine_is_gen14_v9_with_battle_head_preserved():
+    """既定エンジン（gen14）の採用契約: 符号化 v9（feat_dim=150）へ拡張された本体 value を
+    持ち、**戦闘出口ヘッドと vocab は gen13 と bit 一致**（v43 で入れた戦闘較正を壊さない）。
 
-    gen13 の採用契約そのもの: 較正は戦闘箱の枝順位づけだけに宿り、通常の葉評価は
-    前世代と不変（ロールバックはヘッドを外すだけ）。"""
+    gen13 までの契約（胴体 bit 凍結）は v49 で意図的に破った——掘り裁定（h1@2）は本体の
+    葉評価で決まるため、蒸留アンカー付き順位微調整で**胴体に最小摂動**（最大 0.006/重み）を
+    入れた（docs/reports/gen14_adoption_20260811.md）。ロールバックは既定を gen13 へ戻すだけ。"""
+    import rl_encoder as E
     from opcg_sim.src.core.cpu_learned import _MODELS, LearnedEngine
+    from opcg_sim.src.learned.value_net import EXIT_HEADS
     eng = LearnedEngine()
     assert eng.vnet.battle_head is True and eng.vnet.turn_head is False
     assert eng._exit_value_fn("battle") is not None
-    # 胴体・本体ヘッドの**重みそのもの**が gen12 と bit 一致＝入力に依らず本体 value は不変
-    g12 = RN.ValueNet.load(os.path.join(_MODELS, "gen12_value.npz"))
-    for k in ("Emb", "W1", "b1", "W2", "b2", "W2t", "b2t", "W_eff"):
-        a, c = getattr(eng.vnet, k, None), getattr(g12, k, None)
-        if a is None or c is None:
-            assert a is None and c is None
-        else:
-            assert np.array_equal(a, c), f"{k} が gen12 と不一致（胴体凍結の契約違反）"
-    assert eng.vnet.vocab_ids == g12.vocab_ids
+    assert eng.enc_version == 9 and eng.vnet.feat_dim == E.feature_dim(9)
+    g13 = RN.ValueNet.load(os.path.join(_MODELS, "gen13_value.npz"))
+    wf, W1n, b1n, W2n, b2n = EXIT_HEADS["battle"]
+    assert getattr(eng.vnet, wf) == getattr(g13, wf)
+    for k in (W1n, b1n, W2n, b2n):
+        assert np.array_equal(getattr(eng.vnet, k), getattr(g13, k)), \
+            f"{k} が gen13 と不一致（戦闘出口較正の維持契約違反）"
+    assert eng.vnet.vocab_ids == g13.vocab_ids
 
 
 def test_evaluate_plan_uses_each_head_for_its_own_box(monkeypatch):
@@ -273,3 +276,69 @@ def test_battle_box_ruler_is_the_battle_head(monkeypatch):
     monkeypatch.setattr(eng, "game", _G)
     eng._battle_window_choice(object(), "me", np.random.default_rng(0))
     assert seen["vf"] is marker
+
+
+# --- 出力の単調再較正（v47・`ValueNet.set_calib`）---------------------------------
+def _calib_batch(n=24, seed=5):
+    """較正テスト用の小バッチ（出口ヘッドのテストと同じ作り方）。"""
+    rng = np.random.default_rng(seed)
+    net = RN.ValueNet(vocab_size=12, d_emb=4, hidden=8, feat_dim=6)
+    batch = {"scalars": rng.standard_normal((n, 6)).astype(np.float32),
+             "field": np.zeros((n, 0), dtype=np.float32),
+             "card_idx": rng.integers(0, 13, size=(n, RN.POOL_SLOTS)).astype(np.int32)}
+    return net, batch
+
+
+def test_calib_absent_is_bit_identity():
+    """未設定なら `predict`/`predict_exit` は較正機構の追加前と bit 一致（＝生の forward）。"""
+    net, batch = _calib_batch()
+    assert not net.has_calib()
+    raw = net.forward(batch)[0]
+    assert np.array_equal(net.predict(batch), raw)
+    for kind in KINDS:
+        cache = net.forward(batch)[1]
+        assert np.array_equal(net.predict_exit(batch, kind),
+                              net.exit_from_cache(cache, kind))
+
+
+def test_calib_preserves_order_exactly():
+    """単調写像なので**順位は厳密に保存**される（箱の選択・枝の順位が壊れない根拠）。"""
+    net, batch = _calib_batch()
+    before = net.predict(batch)
+    net.set_calib([-1.0, -0.5, 0.0, 0.5, 1.0], [-1.0, -0.2, 0.15, 0.7, 1.0])
+    after = net.predict(batch)
+    assert np.array_equal(np.argsort(before, kind="stable"),
+                          np.argsort(after, kind="stable"))
+    assert not np.allclose(before, after), "値そのものは変わるはず（恒等ではない）"
+
+
+def test_calib_does_not_touch_training_paths():
+    """訓練が使う `forward`/`exit_from_cache`/`aux_from_cache` は較正の影響を受けない。"""
+    net, batch = _calib_batch()
+    raw, cache = net.forward(batch)
+    raw_exit = {k: net.exit_from_cache(cache, k).copy() for k in KINDS}
+    raw_aux = net.aux_from_cache(cache).copy()
+    net.set_calib([-1.0, 0.0, 1.0], [-1.0, 0.4, 1.0])
+    raw2, cache2 = net.forward(batch)
+    assert np.array_equal(raw, raw2)
+    assert np.array_equal(raw_aux, net.aux_from_cache(cache2))
+    for k in KINDS:
+        assert np.array_equal(raw_exit[k], net.exit_from_cache(cache2, k))
+
+
+def test_calib_rejects_non_monotone_and_roundtrips(tmp_path):
+    """非単調なノットは拒否（順位を壊す設定を作れない）／save-load で往復する。"""
+    net, batch = _calib_batch()
+    with pytest.raises(ValueError):
+        net.set_calib([-1.0, 0.0, 1.0], [0.0, -0.5, 1.0])     # y が減少
+    with pytest.raises(ValueError):
+        net.set_calib([-1.0, -1.0, 1.0], [-1.0, 0.0, 1.0])    # x が非狭義増加
+    net.set_calib([-1.0, 0.0, 1.0], [-1.0, 0.3, 1.0])
+    p = str(tmp_path / "calib.npz")
+    net.save(p)
+    re = RN.ValueNet.load(p)
+    assert re.has_calib()
+    assert np.array_equal(net.predict(batch), re.predict(batch))
+    re.set_calib(None, None)                                   # 解除＝恒等へ戻る
+    assert not re.has_calib()
+    assert np.array_equal(re.predict(batch), re.forward(batch)[0])
