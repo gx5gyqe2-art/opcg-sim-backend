@@ -200,24 +200,27 @@ def test_engine_exit_value_fns_are_neutral_without_heads():
     assert bvf(_S(), "me") == vf(_S(), "me")
 
 
-def test_default_engine_is_gen13_with_battle_head_only():
-    """既定エンジン（gen13）は戦闘出口ヘッドを持ち、本体 value は gen12 と bit 一致する。
+def test_default_engine_is_gen14_v9_with_battle_head_preserved():
+    """既定エンジン（gen14）の採用契約: 符号化 v9（feat_dim=150）へ拡張された本体 value を
+    持ち、**戦闘出口ヘッドと vocab は gen13 と bit 一致**（v43 で入れた戦闘較正を壊さない）。
 
-    gen13 の採用契約そのもの: 較正は戦闘箱の枝順位づけだけに宿り、通常の葉評価は
-    前世代と不変（ロールバックはヘッドを外すだけ）。"""
+    gen13 までの契約（胴体 bit 凍結）は v49 で意図的に破った——掘り裁定（h1@2）は本体の
+    葉評価で決まるため、蒸留アンカー付き順位微調整で**胴体に最小摂動**（最大 0.006/重み）を
+    入れた（docs/reports/gen14_adoption_20260811.md）。ロールバックは既定を gen13 へ戻すだけ。"""
+    import rl_encoder as E
     from opcg_sim.src.core.cpu_learned import _MODELS, LearnedEngine
+    from opcg_sim.src.learned.value_net import EXIT_HEADS
     eng = LearnedEngine()
     assert eng.vnet.battle_head is True and eng.vnet.turn_head is False
     assert eng._exit_value_fn("battle") is not None
-    # 胴体・本体ヘッドの**重みそのもの**が gen12 と bit 一致＝入力に依らず本体 value は不変
-    g12 = RN.ValueNet.load(os.path.join(_MODELS, "gen12_value.npz"))
-    for k in ("Emb", "W1", "b1", "W2", "b2", "W2t", "b2t", "W_eff"):
-        a, c = getattr(eng.vnet, k, None), getattr(g12, k, None)
-        if a is None or c is None:
-            assert a is None and c is None
-        else:
-            assert np.array_equal(a, c), f"{k} が gen12 と不一致（胴体凍結の契約違反）"
-    assert eng.vnet.vocab_ids == g12.vocab_ids
+    assert eng.enc_version == 9 and eng.vnet.feat_dim == E.feature_dim(9)
+    g13 = RN.ValueNet.load(os.path.join(_MODELS, "gen13_value.npz"))
+    wf, W1n, b1n, W2n, b2n = EXIT_HEADS["battle"]
+    assert getattr(eng.vnet, wf) == getattr(g13, wf)
+    for k in (W1n, b1n, W2n, b2n):
+        assert np.array_equal(getattr(eng.vnet, k), getattr(g13, k)), \
+            f"{k} が gen13 と不一致（戦闘出口較正の維持契約違反）"
+    assert eng.vnet.vocab_ids == g13.vocab_ids
 
 
 def test_evaluate_plan_uses_each_head_for_its_own_box(monkeypatch):
