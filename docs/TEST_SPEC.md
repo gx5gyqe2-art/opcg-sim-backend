@@ -83,6 +83,8 @@ make test-slow   # 重テストだけ
 | ファイル | 役割 |
 |---|---|
 | `tests/test_rules_summoning_field_limit.py` | **召喚酔い/速攻**（登場ターン攻撃不可・速攻例外・リーダー非対象）と**場5体上限**（6体目で `FIELD_OVERFLOW_TRASH` 強制トラッシュ／効果登場でも発火／境界／**押し出し確定が【登場時】解決より先**）の検証 |
+| `tests/test_leader_move_guard.py` | **リーダーのゾーン移動ガード**（bb0 発見の欠陥A・2026-08-11）: `move_card` がリーダーへ届くと元リスト remove が素通りしたまま宛先へ append＝**カード複製**（合成世界の実測 seed880007・実カードでも INCLUDE_LEADER 選択→KO で到達可能）。中央 no-op ガードで全経路（KO/バウンス/トラッシュ/デッキ送り）の保存則を固定。通常キャラ移動の回帰対照込み |
+| `tests/test_attack_legal_cannot_rest.py` | **CANNOT_REST と攻撃列挙の整合**（bb0 発見の欠陥B・2026-08-11）: 「レストにできない」継続効果持ちの攻撃が合法手に載るのに `declare_attack` は ValueError で拒否する不整合（実測 seed880014・dead_child 汚染源）。列挙が検証側と同じ timed_flags を見ることをリーダー/キャラ両方で固定＋「列挙された全 ATTACK は declare_attack を通る」の整合直接検査 |
 | `tests/test_turn_start_trigger.py` | **ターン開始時トリガー**（TURN_START。「自分のターン開始時、発動できる」OP11-040＝確認→受諾/拒否、ドン8枚条件は**ドン!!展開前**判定の裁定込み） |
 | `tests/test_event_main_playability.py` | **イベントのメイン発動可否**（【メイン】効果を持つイベントのみ手札からメインで発動可。【カウンター】/【トリガー】専用イベントは合法手に出ず play_card_action も拒否。OP09-078/OP06-059/OP11-080） |
 | `tests/test_event_listener_triggers.py` | **イベントリスナー誘発**（他カードの「…が登場した時」/「…キャラがKOされた時」を登場/KO地点から走査して発火。側・特徴・元々のパワー・出所ゾーン・タイミングのフィルタとドン条件/ターン1回。OP14-041/OP01-061） |
