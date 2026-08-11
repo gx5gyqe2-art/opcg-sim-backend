@@ -57,6 +57,26 @@ def _desc(m, mv):
         return {}
 
 
+def _apply_dialogs_decline(gs, m, name, cap=12):
+    """効果対話を**見送る側**（accepted=False を優先）で解決する（C腕・v49b）。
+
+    掘り手を出した後に don!!-X ドローを見送った盤面＝e1@4/156 で実機が打った線。受ける側との
+    差は場が同一でドン経済（活性−1・ドン山+1・手札+1）に集中する＝経済特徴への紐づけを強制する。"""
+    for _ in range(cap):
+        legal = gs.legal_actions(m)
+        resolves = [mv for mv in legal
+                    if _desc(m, mv).get("action_type") == "RESOLVE_EFFECT_SELECTION"]
+        if not resolves:
+            return m
+        pick = next((mv for mv in resolves if _desc(m, mv).get("accepted") is False),
+                    resolves[0])
+        m2 = gs.apply(m, pick, name)
+        if m2 is None:
+            return None
+        m = m2
+    return None
+
+
 def _apply_dialogs(gs, m, name, cap=12):
     """立った効果対話を「受ける側」で解決する（accepted!=False 優先・選択は列挙順先頭）。
 
@@ -110,6 +130,10 @@ def main():
     ap.add_argument("--replays", default="h1,e1,e2", help="タグ（coach_gate 表）or JSON パス")
     ap.add_argument("--turn-max", type=int, default=4)
     ap.add_argument("--cost-max", type=int, default=2, help="掘り手と見なす PLAY のコスト上限")
+    ap.add_argument("--decline-arm", action="store_true",
+                    help="「効果を見送る」腕（−1）も群に加える（C腕・v49b）。受ける(+1) vs "
+                         "見送る(−1) は場が同一でドン経済だけが違うペア＝浅いパターン"
+                         "（体が出た＝良い）では満たせず、経済特徴への紐づけを強制する")
     ap.add_argument("--leader", default="OP15-058",
                     help="この card_id のリーダー席だけを採る（裁定の射程＝既定は紫エネル）。"
                          "空文字で全席（未裁定席へ注入する場合は射程外の教師と承知して使う）")
@@ -177,7 +201,21 @@ def main():
                 me_ = _end_turn(gs, md, name)
                 if me_ is None:
                     continue
-                digs.append((card, me_))
+                mdec_end = None
+                if args.decline_arm:
+                    mb2 = MG._restore(db, rec, fbi, acts, i)
+                    if not isinstance(mb2, str):
+                        mt2, _ = mb2
+                        mv2 = next((v for v in gr.legal_actions(mt2)
+                                    if _desc(mt2, v).get("action_type") == "PLAY"
+                                    and _desc(mt2, v).get("card") == card), None)
+                        if mv2 is not None:
+                            mp2 = gs.apply(mt2, mv2, name)
+                            if mp2 is not None:
+                                md2 = _apply_dialogs_decline(gs, mp2, name)
+                                if md2 is not None:
+                                    mdec_end = _end_turn(gs, md2, name)
+                digs.append((card, me_, mdec_end))
             if not digs:
                 continue
             mb = MG._restore(db, rec, fbi, acts, i)
@@ -186,19 +224,27 @@ def main():
             mpass = _end_turn(gs, mb[0], name)
             if mpass is None:
                 continue
-            for card, mend in digs:
+            n_dec = 0
+            for card, mend, mdec in digs:
                 enc = E.encode(mend, name, eng.vocab, version=args.enc_version)
                 for k in ("scalars", "field", "card_idx"):
                     rows[k].append(enc[k])
                 rows["value"].append(1.0)
                 rows["group"].append(gid)
+                if mdec is not None:
+                    encd = E.encode(mdec, name, eng.vocab, version=args.enc_version)
+                    for k in ("scalars", "field", "card_idx"):
+                        rows[k].append(encd[k])
+                    rows["value"].append(-1.0)   # 見送り＝負け側（受ける腕とのみペアになる）
+                    rows["group"].append(gid)
+                    n_dec += 1
             encp = E.encode(mpass, name, eng.vocab, version=args.enc_version)
             for k in ("scalars", "field", "card_idx"):
                 rows[k].append(encp[k])
             rows["value"].append(-1.0)
             rows["group"].append(gid)
             diag.append({"tag": tag, "i": i, "turn": int(acts[i].get("turn", 0) or 0),
-                         "player": name, "digs": [c for c, _ in digs]})
+                         "player": name, "digs": [c for c, _, _ in digs], "declines": n_dec})
             gid += 1
 
     os.makedirs(args.out, exist_ok=True)
