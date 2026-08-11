@@ -64,6 +64,11 @@ def main():
     ap.add_argument("--replays", default="h1,e1,e2",
                     help="リプレイタグ or JSON パス（カンマ区切り）。'all'＝全フィクスチャ表")
     ap.add_argument("--worlds", type=int, default=6)
+    ap.add_argument("--min-life", type=int, default=1,
+                    help="min(自ライフ,相手ライフ) がこの値以下の盤面だけ採る（既定1＝リーサル圏）。"
+                         "99 で全盤面＝一般ホールドアウトのラベル化（bb1 の実盤面評価用）")
+    ap.add_argument("--min-turn", type=int, default=0,
+                    help="このターン以降の盤面だけ採る（序盤盤面のロールアウトは長い＝コスト制御）")
     ap.add_argument("--max-per-replay", type=int, default=8, help="1リプレイあたりの採取上限")
     ap.add_argument("--net", default="", help="value.npz[,policy.npz]（空＝出荷既定・測定/ロールアウト共通）")
     ap.add_argument("--out", default="", help="ラベル行（npz）を書くディレクトリ（空＝測定のみ）")
@@ -98,7 +103,9 @@ def main():
                 continue
             ps = fr.get("players") or {}
             lifes = {p: len((ps.get(p) or {}).get("life") or []) for p in ("p1", "p2")}
-            if min(lifes.values()) > 1:
+            if min(lifes.values()) > args.min_life:
+                continue
+            if int(a.get("turn", 0) or 0) < args.min_turn:
                 continue
             key = (a.get("player"), int(a.get("turn", 0) or 0))
             if key in seen:
