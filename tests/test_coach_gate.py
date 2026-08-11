@@ -14,8 +14,8 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 "tests", "scripts"))
-from coach_gate import (REPLAYS_V2, VERIFIED, VERIFIED_V2, hit, judge,  # noqa: E402
-                        min_reliable_delta, turn_all_required)
+from coach_gate import (REPLAYS_HUMAN, REPLAYS_V2, REPLAYS_V48, VERIFIED,  # noqa: E402
+                        VERIFIED_V2, hit, judge, min_reliable_delta, turn_all_required)
 
 pytestmark = pytest.mark.cpu_infra
 
@@ -62,12 +62,15 @@ def test_verified_v2_entries_wellformed():
     assert len(VERIFIED_V2) >= 7
     tags = {t for t, _i, _a in VERIFIED_V2}
     assert len(tags) >= 3, "複数対局から採録されているはず"
+    # 2026-08-11: エネル人間基準線の h系2点（h1@2 掘り・h1@35 6c着地）を追加（ユーザ指示）。
+    # tag の解決はゲート本体と同じ結合表（REPLAYS_V2 + REPLAYS_V48 + REPLAYS_HUMAN）で行う。
+    resolvable = {**REPLAYS_V2, **REPLAYS_V48, **REPLAYS_HUMAN}
     for tag, i, accept in VERIFIED_V2:
-        assert tag in REPLAYS_V2 and isinstance(i, int) and i >= 0
+        assert tag in resolvable and isinstance(i, int) and i >= 0
         req = turn_all_required(accept)
         entries = req if req is not None else accept
         assert entries and all(isinstance(a, tuple) and len(a) == 2 for a in entries)
-    for path in REPLAYS_V2.values():
+    for path in resolvable.values():
         assert os.path.exists(path), path
 
 
