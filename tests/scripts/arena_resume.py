@@ -75,12 +75,17 @@ def main():
                     help="候補席だけ戦闘窓の箱読み出し＋静止探索を有効にする（v35・機構の A/B）")
     ap.add_argument("--cand-tree-box", action="store_true",
                     help="さらに木の中の箱化も候補席へ入れる（v35・--cand-box を含意）")
+    ap.add_argument("--cand-don-margin", action="store_true",
+                    help="候補席だけ (C) マージン付与を有効化（2026-08-12・don_attach_audit の A/B。"
+                         "プロセスは OPCG_DON_MARGIN=0 で走らせ、既定側を旧規則にすること）")
     args = ap.parse_args()
     cand_kw = None
     if args.cand_box or args.cand_tree_box:
         cand_kw = {"battle_readout": True, "quiesce": True}
         if args.cand_tree_box:
             cand_kw["box_battle"] = True
+    if args.cand_don_margin:
+        cand_kw = dict(cand_kw or {}, don_margin=True)
 
     from arena_gate import plan_bands
     planned = [s for band in plan_bands(args.pairs, args.bands, args.seed_base) for s in band]

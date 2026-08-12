@@ -18,9 +18,12 @@ from .config import VALUE_SCALE
 class OPCGGame:
     # L1 生スコアは card-currency で桁が大きい（実測 中央 ~-5800・範囲[-11920,7091]）。
     # scale=10000 で tanh 飽和率0%・std0.25＝探索が勾配を使える値域（GATE B 診断で較正）。
-    def __init__(self, value_scale=VALUE_SCALE, see_opp_hand=False, prune_futile=None):
+    def __init__(self, value_scale=VALUE_SCALE, see_opp_hand=False, prune_futile=None,
+                 don_margin=None):
         self.value_scale = value_scale
         self.see_opp_hand = see_opp_hand
+        # (C) マージン付与の席別上書き（None=cpu_ai.DON_MARGIN_ATTACH に従う・アリーナ A/B 用）
+        self.don_margin = don_margin
         # v6 柱⑤（生成/serve の探索設定分離・docs/reports/v5_adoption_20260715.md §4-5）:
         # None=config の SERVE_PRUNE_FUTILE に従う（serve 既定）。自己対戦生成は False を渡して
         # 枝刈りを外す＝「刈った枝は学習データに現れない→枝刈りの誤りが学習で固定化される」
@@ -61,7 +64,7 @@ class OPCGGame:
             from opcg_sim.src.learned.config import SERVE_PRUNE_FUTILE
             pf = SERVE_PRUNE_FUTILE
         if pf:
-            moves = cpu_ai._prune_don_moves(state, name, moves)
+            moves = cpu_ai._prune_don_moves(state, name, moves, margin=self.don_margin)
             moves = cpu_ai._prune_futile_attacks(state, name, moves)
         return moves
 

@@ -919,8 +919,12 @@ def test_b2_attach_don_meaningful_threshold(db):
     # 届かない（-500）が 1 枚で届く → 意味あり。
     c.passive_power_override = leader_pw - 500
     assert cpu_ai._attach_don_meaningful(gm, "p1", c) is True
-    # 既に超過（overcap）→ 無意味。
+    # (C) リーダー超過でも +2000 未満はカウンター強要のマージン作り → 意味あり
+    # （don_attach_audit 2026-08-12: 人間の付与の53%が旧規則の「過剰」で候補から消えていた）。
     c.passive_power_override = leader_pw + 1000
+    assert cpu_ai._attach_don_meaningful(gm, "p1", c) is True
+    # +2000 以上の上乗せ（カウンター2枚要求を超える過剰盛り）→ 無意味。
+    c.passive_power_override = leader_pw + 2000
     assert cpu_ai._attach_don_meaningful(gm, "p1", c) is False
     # 1 枚では届かない（-1500）→ 無意味。
     c.passive_power_override = leader_pw - 1500

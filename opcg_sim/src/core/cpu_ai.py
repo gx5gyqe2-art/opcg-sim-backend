@@ -270,15 +270,24 @@ def _has_don_conditional(c) -> bool:
     return bool(_DON_COND_RE.search(getattr(m, "effect_text", "") or ""))
 
 
-def _attach_don_meaningful(manager, actor_name: str, c) -> bool:
+# (C) マージン付与の既定（OPCG_DON_MARGIN=0 で旧規則へ・アリーナ A/B 用の seam）
+DON_MARGIN_ATTACH = os.environ.get("OPCG_DON_MARGIN", "1") != "0"
+
+
+def _attach_don_meaningful(manager, actor_name: str, c, margin: Optional[bool] = None) -> bool:
     """ドン!!付与の手が「意味ある配分」か（B-2・§2.5.3）。
 
     付与ドンのパワーは自分のターンのみ・付与先がこのターン実際に攻撃する体でなければ純損（アクティブドンを
     失うだけ）。意味があるのは:
       (A) 戦闘結果を変えられる: 付与先（このターン攻撃できる体）が現状では上回れない相手の防御パワー
-          （リーダー/場キャラ）を、手持ちアクティブドンの範囲で**新たに上回れる**。既に最硬防御を上回る
-          付与先（過剰=オーバーキャップ）や、全ドンを乗せても最低の未踏破防御に届かない付与先は無意味。
+          （リーダー/場キャラ）を、手持ちアクティブドンの範囲で**新たに上回れる**。全ドンを乗せても
+          最低の未踏破防御に届かない付与先は無意味。
       (B) 付与ドン条件【ドン!!×N】を開ける: 付与で常在/起動効果が立つカードは戦闘閾値に関わらず残す。
+      (C) **カウンター強要のマージン作り**（2026-08-12・`don_attach_audit` 実測: 人間の付与58手の
+          53%＝31手が旧規則では「過剰＝無意味」として候補から消えていた）: 相手**リーダー**を既に
+          上回れる攻撃者への上乗せも、リーダー防御+2000（＝カウンター2枚を要求する打点・ユーザの
+          7000理論）**未満**までは意味ある配分として残す。リーダー限定＋マージン上限でビーム影響を
+          有界化（追加候補は攻撃者あたり高々2手）。
     """
     actor = _player_by_name(manager, actor_name)
     budget = len(actor.don_active)
@@ -305,11 +314,23 @@ def _attach_don_meaningful(manager, actor_name: str, c) -> bool:
             tp = float(getattr(getattr(u, "master", None), "power", 0) or 0)
         if p < tp <= reach_max:   # 現状は上回れない（p<tp）が、付与で上回れる（tp<=reach_max）
             return True
+    # (C) リーダーを既に上回れる攻撃者への上乗せ（カウンター強要・上限=リーダー防御+2000 未満）
+    if margin is None:
+        margin = DON_MARGIN_ATTACH
+    if margin and opp.leader is not None:
+        try:
+            lp_ = float(opp.leader.get_power(False))
+        except Exception:
+            lp_ = float(getattr(getattr(opp.leader, "master", None), "power", 0) or 0)
+        if lp_ <= p < lp_ + 2 * _DON_POWER:
+            return True
     return False
 
 
-def _prune_don_moves(manager, actor_name: str, moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _prune_don_moves(manager, actor_name: str, moves: List[Dict[str, Any]],
+                     margin: Optional[bool] = None) -> List[Dict[str, Any]]:
     """ドン!!付与の手を「意味ある配分」だけに絞る（B-2・§2.5.3）。ATTACH_DON 以外は素通し。
+    `margin`＝(C) マージン付与の席別上書き（None=DON_MARGIN_ATTACH・アリーナ A/B 用）。
 
     付与の手生成は付与先候補ごとに 1 手出るため、5000 未満/過剰への無意味な付与でビーム（HARD_BEAM=3）と
     探索予算を浪費していた。戦闘結果を変えうる付与＋付与ドン条件を開ける付与だけを残し、ビームを意味ある
@@ -329,7 +350,7 @@ def _prune_don_moves(manager, actor_name: str, moves: List[Dict[str, Any]]) -> L
         if m.get("action_type") == "ATTACH_DON":
             uid = (m.get("payload") or {}).get("uuid")
             tgt = by_uuid.get(uid)
-            if tgt is None or not _attach_don_meaningful(manager, actor_name, tgt):
+            if tgt is None or not _attach_don_meaningful(manager, actor_name, tgt, margin=margin):
                 continue
         out.append(m)
     return out
