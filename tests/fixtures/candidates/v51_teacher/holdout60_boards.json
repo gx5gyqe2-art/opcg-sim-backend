@@ -1,0 +1,546 @@
+{
+ "origin": "lethal_calibration_probe --replays all --worlds 6 --min-life 99 --min-turn 6 --max-per-replay 6 --workers 4 --label-sims 48 (2026-08-12, bb1 holdout)",
+ "n": 60,
+ "rows": [
+  {
+   "tag": "g1",
+   "i": 33,
+   "turn": 6,
+   "who": "p1",
+   "ev": -1.0,
+   "me_life": 5,
+   "opp_life": 3
+  },
+  {
+   "tag": "g1",
+   "i": 39,
+   "turn": 6,
+   "who": "p2",
+   "ev": 0.667,
+   "me_life": 3,
+   "opp_life": 5
+  },
+  {
+   "tag": "g1",
+   "i": 41,
+   "turn": 7,
+   "who": "p1",
+   "ev": 0.333,
+   "me_life": 5,
+   "opp_life": 2
+  },
+  {
+   "tag": "g1",
+   "i": 42,
+   "turn": 7,
+   "who": "p2",
+   "ev": 0.333,
+   "me_life": 2,
+   "opp_life": 5
+  },
+  {
+   "tag": "g1",
+   "i": 62,
+   "turn": 8,
+   "who": "p2",
+   "ev": -1.0,
+   "me_life": 3,
+   "opp_life": 4
+  },
+  {
+   "tag": "g1",
+   "i": 50,
+   "turn": 8,
+   "who": "p1",
+   "ev": -1.0,
+   "me_life": 4,
+   "opp_life": 3
+  },
+  {
+   "tag": "g2",
+   "i": 34,
+   "turn": 6,
+   "who": "p2",
+   "ev": 1.0,
+   "me_life": 3,
+   "opp_life": 4
+  },
+  {
+   "tag": "g2",
+   "i": 36,
+   "turn": 6,
+   "who": "p1",
+   "ev": -1.0,
+   "me_life": 4,
+   "opp_life": 3
+  },
+  {
+   "tag": "g2",
+   "i": 40,
+   "turn": 7,
+   "who": "p1",
+   "ev": -1.0,
+   "me_life": 4,
+   "opp_life": 3
+  },
+  {
+   "tag": "g2",
+   "i": 56,
+   "turn": 8,
+   "who": "p1",
+   "ev": 1.0,
+   "me_life": 4,
+   "opp_life": 2
+  },
+  {
+   "tag": "g2",
+   "i": 53,
+   "turn": 7,
+   "who": "p2",
+   "ev": -1.0,
+   "me_life": 3,
+   "opp_life": 4
+  },
+  {
+   "tag": "g2",
+   "i": 57,
+   "turn": 8,
+   "who": "p2",
+   "ev": -0.667,
+   "me_life": 2,
+   "opp_life": 4
+  },
+  {
+   "tag": "g3",
+   "i": 59,
+   "turn": 7,
+   "who": "p2",
+   "ev": -1.0,
+   "me_life": 2,
+   "opp_life": 4
+  },
+  {
+   "tag": "g3",
+   "i": 62,
+   "turn": 8,
+   "who": "p1",
+   "ev": 1.0,
+   "me_life": 4,
+   "opp_life": 2
+  },
+  {
+   "tag": "g3",
+   "i": 32,
+   "turn": 6,
+   "who": "p2",
+   "ev": 1.0,
+   "me_life": 2,
+   "opp_life": 5
+  },
+  {
+   "tag": "g3",
+   "i": 44,
+   "turn": 7,
+   "who": "p1",
+   "ev": -1.0,
+   "me_life": 4,
+   "opp_life": 2
+  },
+  {
+   "tag": "g3",
+   "i": 34,
+   "turn": 6,
+   "who": "p1",
+   "ev": -1.0,
+   "me_life": 5,
+   "opp_life": 2
+  },
+  {
+   "tag": "m1",
+   "i": 36,
+   "turn": 6,
+   "who": "p2",
+   "ev": -0.667,
+   "me_life": 4,
+   "opp_life": 5
+  },
+  {
+   "tag": "m1",
+   "i": 37,
+   "turn": 6,
+   "who": "p1",
+   "ev": 0.0,
+   "me_life": 5,
+   "opp_life": 4
+  },
+  {
+   "tag": "g3",
+   "i": 63,
+   "turn": 8,
+   "who": "p2",
+   "ev": 0.667,
+   "me_life": 2,
+   "opp_life": 4
+  },
+  {
+   "tag": "m1",
+   "i": 60,
+   "turn": 7,
+   "who": "p2",
+   "ev": -1.0,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "m1",
+   "i": 56,
+   "turn": 7,
+   "who": "p1",
+   "ev": 0.667,
+   "me_life": 3,
+   "opp_life": 4
+  },
+  {
+   "tag": "m1",
+   "i": 72,
+   "turn": 8,
+   "who": "p2",
+   "ev": -0.667,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "m1",
+   "i": 75,
+   "turn": 8,
+   "who": "p1",
+   "ev": 1.0,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "m2",
+   "i": 26,
+   "turn": 6,
+   "who": "p2",
+   "ev": 0.0,
+   "me_life": 3,
+   "opp_life": 5
+  },
+  {
+   "tag": "m2",
+   "i": 31,
+   "turn": 6,
+   "who": "p1",
+   "ev": -0.333,
+   "me_life": 4,
+   "opp_life": 3
+  },
+  {
+   "tag": "m2",
+   "i": 34,
+   "turn": 7,
+   "who": "p1",
+   "ev": 0.333,
+   "me_life": 3,
+   "opp_life": 3
+  },
+  {
+   "tag": "m2",
+   "i": 36,
+   "turn": 7,
+   "who": "p2",
+   "ev": -0.333,
+   "me_life": 3,
+   "opp_life": 3
+  },
+  {
+   "tag": "m2",
+   "i": 41,
+   "turn": 8,
+   "who": "p2",
+   "ev": 0.0,
+   "me_life": 3,
+   "opp_life": 3
+  },
+  {
+   "tag": "m2",
+   "i": 46,
+   "turn": 8,
+   "who": "p1",
+   "ev": -0.333,
+   "me_life": 3,
+   "opp_life": 4
+  },
+  {
+   "tag": "m4",
+   "i": 30,
+   "turn": 6,
+   "who": "p1",
+   "ev": 1.0,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "m4",
+   "i": 33,
+   "turn": 6,
+   "who": "p2",
+   "ev": -1.0,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "m4",
+   "i": 47,
+   "turn": 8,
+   "who": "p1",
+   "ev": 1.0,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "m4",
+   "i": 40,
+   "turn": 7,
+   "who": "p2",
+   "ev": -1.0,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "m4",
+   "i": 41,
+   "turn": 7,
+   "who": "p1",
+   "ev": 0.333,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "m4",
+   "i": 49,
+   "turn": 8,
+   "who": "p2",
+   "ev": -1.0,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "m5",
+   "i": 48,
+   "turn": 7,
+   "who": "p1",
+   "ev": -0.333,
+   "me_life": 4,
+   "opp_life": 3
+  },
+  {
+   "tag": "m5",
+   "i": 47,
+   "turn": 7,
+   "who": "p2",
+   "ev": -0.333,
+   "me_life": 3,
+   "opp_life": 4
+  },
+  {
+   "tag": "m5",
+   "i": 27,
+   "turn": 6,
+   "who": "p1",
+   "ev": 0.333,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "m5",
+   "i": 35,
+   "turn": 6,
+   "who": "p2",
+   "ev": -0.333,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "e1",
+   "i": 38,
+   "turn": 6,
+   "who": "p2",
+   "ev": 1.0,
+   "me_life": 4,
+   "opp_life": 5
+  },
+  {
+   "tag": "e1",
+   "i": 43,
+   "turn": 6,
+   "who": "p1",
+   "ev": -1.0,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "m5",
+   "i": 62,
+   "turn": 8,
+   "who": "p1",
+   "ev": 1.0,
+   "me_life": 4,
+   "opp_life": 3
+  },
+  {
+   "tag": "m5",
+   "i": 65,
+   "turn": 8,
+   "who": "p2",
+   "ev": 0.333,
+   "me_life": 3,
+   "opp_life": 4
+  },
+  {
+   "tag": "e1",
+   "i": 54,
+   "turn": 7,
+   "who": "p1",
+   "ev": -1.0,
+   "me_life": 2,
+   "opp_life": 4
+  },
+  {
+   "tag": "e1",
+   "i": 81,
+   "turn": 8,
+   "who": "p2",
+   "ev": 1.0,
+   "me_life": 4,
+   "opp_life": 2
+  },
+  {
+   "tag": "e1",
+   "i": 55,
+   "turn": 7,
+   "who": "p2",
+   "ev": 1.0,
+   "me_life": 4,
+   "opp_life": 2
+  },
+  {
+   "tag": "e1",
+   "i": 82,
+   "turn": 8,
+   "who": "p1",
+   "ev": -1.0,
+   "me_life": 2,
+   "opp_life": 4
+  },
+  {
+   "tag": "e2",
+   "i": 57,
+   "turn": 7,
+   "who": "p1",
+   "ev": 1.0,
+   "me_life": 3,
+   "opp_life": 4
+  },
+  {
+   "tag": "e2",
+   "i": 58,
+   "turn": 7,
+   "who": "p2",
+   "ev": -1.0,
+   "me_life": 4,
+   "opp_life": 3
+  },
+  {
+   "tag": "e2",
+   "i": 33,
+   "turn": 6,
+   "who": "p2",
+   "ev": -0.333,
+   "me_life": 4,
+   "opp_life": 3
+  },
+  {
+   "tag": "e2",
+   "i": 68,
+   "turn": 8,
+   "who": "p2",
+   "ev": -1.0,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "e2",
+   "i": 43,
+   "turn": 6,
+   "who": "p1",
+   "ev": 0.667,
+   "me_life": 3,
+   "opp_life": 4
+  },
+  {
+   "tag": "e2",
+   "i": 73,
+   "turn": 8,
+   "who": "p1",
+   "ev": 1.0,
+   "me_life": 4,
+   "opp_life": 4
+  },
+  {
+   "tag": "h1",
+   "i": 56,
+   "turn": 6,
+   "who": "p1",
+   "ev": -0.333,
+   "me_life": 5,
+   "opp_life": 3
+  },
+  {
+   "tag": "h1",
+   "i": 53,
+   "turn": 6,
+   "who": "p2",
+   "ev": 0.0,
+   "me_life": 3,
+   "opp_life": 5
+  },
+  {
+   "tag": "h1",
+   "i": 62,
+   "turn": 7,
+   "who": "p1",
+   "ev": -1.0,
+   "me_life": 4,
+   "opp_life": 3
+  },
+  {
+   "tag": "h1",
+   "i": 92,
+   "turn": 8,
+   "who": "p2",
+   "ev": 0.0,
+   "me_life": 1,
+   "opp_life": 4
+  },
+  {
+   "tag": "h1",
+   "i": 64,
+   "turn": 7,
+   "who": "p2",
+   "ev": 0.333,
+   "me_life": 3,
+   "opp_life": 4
+  },
+  {
+   "tag": "h1",
+   "i": 93,
+   "turn": 8,
+   "who": "p1",
+   "ev": -0.667,
+   "me_life": 4,
+   "opp_life": 1
+  }
+ ]
+}
