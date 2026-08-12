@@ -47,9 +47,10 @@ SCALARS_V6 = 60        # v6 = v5 + **自手札の資源集約5**（カウンタ�
 SCALARS_V7 = 63        # v7 = v6 + **登場時オプション実測3**（発火するPLAY数/そのkeep値/ON_PLAY持ち不発数・v29）
 SCALARS_V8 = 66        # v8 = v7 + **自場集約3**（総火力/高パワー数/ブロッカー数＝相手v5と純対称・v32）
 SCALARS_V9 = 70        # v9 = v8 + **ドンデッキ残2**（自/相手）＋**自デッキ残キャラ頂点2**（最大パワー/最大コスト・v49）
+SCALARS_V10 = 73       # v10 = v9 + **リーサル距離Δ3**（d_me/d_opp/d_opp_def・台本レース実測・v52b）
 _SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4,
                        5: SCALARS_V5, 6: SCALARS_V6, 7: SCALARS_V7, 8: SCALARS_V8,
-                       9: SCALARS_V9}
+                       9: SCALARS_V9, 10: SCALARS_V10}
 
 # 手番フラグ（is_my_turn）の scalars 列位置。append-only 契約により全版で不変＝
 # コーパスの盤面を「自ターン/相手ターン」で層別するときの唯一の正（v35 層別アンカー）。
@@ -359,6 +360,17 @@ def encode(manager, me_name, vocab, version=1):
         vals += [len(getattr(me, "don_deck", ()) or ()) / 10.0,
                  len(getattr(opp, "don_deck", ()) or ()) / 10.0]
         vals += _deck_apex(getattr(me, "deck", ()) or ())
+    if version >= 10:
+        # v10（2026-08-12・v52b）: リーサル距離Δ3値＝台本レースのエンジン実測（lethal.py）。
+        # 乖離族（見かけと実質が乖離・ライフ差が逆向きに壊れる盤面）で唯一正の説明力を持つ
+        # 動力学の要約（v52: 乖離58点 r+0.35／一般60点 r+0.52）。v24/v41/v51 の
+        # representation-bound（現行特徴で表現不能）への処方＝静的特徴でなく実測。
+        # d_me_def（自攻撃 vs 相手の実防御）は相手手札を読む＝公平性契約違反のため入れない
+        # （クリーン3成分の検証は v52b 追補）。/(MAX_TURNS+1) 正規化・実測 ~25ms/盤面。
+        from opcg_sim.src.learned.lethal import lethal_scan, MAX_TURNS as _LMT
+        d_me_l, d_opp_l, d_opp_def_l = lethal_scan(manager, me_name)
+        _cap = float(_LMT + 1)
+        vals += [d_me_l / _cap, d_opp_l / _cap, d_opp_def_l / _cap]
     scalars = np.array(vals, dtype=np.float32)
 
     field = np.zeros((2 * MAX_FIELD, PER_CHAR), dtype=np.float32)
