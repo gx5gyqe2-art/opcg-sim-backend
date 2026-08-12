@@ -19,11 +19,13 @@ class OPCGGame:
     # L1 生スコアは card-currency で桁が大きい（実測 中央 ~-5800・範囲[-11920,7091]）。
     # scale=10000 で tanh 飽和率0%・std0.25＝探索が勾配を使える値域（GATE B 診断で較正）。
     def __init__(self, value_scale=VALUE_SCALE, see_opp_hand=False, prune_futile=None,
-                 don_margin=None):
+                 don_margin=None, don_box=None):
         self.value_scale = value_scale
         self.see_opp_hand = see_opp_hand
         # (C) マージン付与の席別上書き（None=cpu_ai.DON_MARGIN_ATTACH に従う・アリーナ A/B 用）
         self.don_margin = don_margin
+        # ドン箱（DON_BOX・cpu_don_box_plan Phase 1）: True で候補合成 ON（既定 None=OFF・seam）
+        self.don_box = don_box
         # v6 柱⑤（生成/serve の探索設定分離・docs/reports/v5_adoption_20260715.md §4-5）:
         # None=config の SERVE_PRUNE_FUTILE に従う（serve 既定）。自己対戦生成は False を渡して
         # 枝刈りを外す＝「刈った枝は学習データに現れない→枝刈りの誤りが学習で固定化される」
@@ -66,6 +68,10 @@ class OPCGGame:
         if pf:
             moves = cpu_ai._prune_don_moves(state, name, moves, margin=self.don_margin)
             moves = cpu_ai._prune_futile_attacks(state, name, moves)
+        if self.don_box:
+            # ドン箱の合成は枝刈り後に足す（箱は素の合法手 base から算術で導出＝
+            # 枝刈りの影響を受けない。DON_BOX 自体は既存 prune を素通りする型）。
+            moves = moves + cpu_ai.don_box_candidates(state, name, base)
         return moves
 
     def apply(self, state, move, actor_name):

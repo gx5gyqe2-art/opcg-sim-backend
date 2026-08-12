@@ -274,6 +274,66 @@ def _has_don_conditional(c) -> bool:
 DON_MARGIN_ATTACH = os.environ.get("OPCG_DON_MARGIN", "1") != "0"
 
 
+def don_box_candidates(manager, actor_name: str,
+                       raw_moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """ドン箱（DON_BOX）の合成（`docs/cpu_don_box_plan.md` §2.2・Phase 1＝攻撃箱のみ）。
+
+    「付与 k 枚 → 相手リーダーへ攻撃」を1個のマクロ候補にする。k は算術で高々2点:
+      k_min = 攻撃が通る最小（atk ≥ L になる枚数・現状不足の攻撃者を1手で候補化）
+      k_two = need=3000（カウンター2枚要求＝7000理論）を作る枚数
+    探索内部専用（適用は `_apply_move_inplace` が原始列へ展開・記録/再生/API は原始手のまま。
+    実対局への出力は decide が先頭原始手 ATTACH_DON に変換する）。"""
+    actor = _player_by_name(manager, actor_name)
+    opp = _other(manager, actor_name)
+    budget = len(actor.don_active)
+    if budget <= 0 or opp.leader is None:
+        return []
+    lid = opp.leader.uuid
+    try:
+        L = float(opp.leader.get_power(False))
+    except Exception:
+        L = float(getattr(getattr(opp.leader, "master", None), "power", 0) or 0)
+    by_uuid = {}
+    for u in ([actor.leader] if actor.leader is not None else []) + list(actor.field):
+        by_uuid[getattr(u, "uuid", None)] = u
+    out: List[Dict[str, Any]] = []
+    seen = set()
+    for mv in raw_moves:
+        if mv.get("action_type") != "ATTACK":
+            continue
+        pl = mv.get("payload") or {}
+        if (pl.get("target_ids") or [None])[0] != lid:
+            continue
+        c = by_uuid.get(pl.get("uuid"))
+        if c is None:
+            continue
+        try:
+            p = float(c.get_power(True))
+        except Exception:
+            p = float(getattr(getattr(c, "master", None), "power", 0) or 0)
+        k_min = max(0, int((L - p + 999) // 1000))
+        k_two = max(0, int((L + 2000.0 - p + 999) // 1000))
+        for k in {k_min, k_two}:
+            key = (pl.get("uuid"), k)
+            if 1 <= k <= budget and key not in seen:
+                seen.add(key)
+                out.append({"kind": "game", "action_type": "DON_BOX",
+                            "payload": {"uuid": pl.get("uuid"),
+                                        "target_ids": [lid], "don_k": int(k)}})
+    return out
+
+
+def don_box_first_primitive(move: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """DON_BOX を実対局へ出す形＝先頭原始手 ATTACH_DON へ変換（それ以外は素通し）。
+
+    実行はステートレス: 1枚付与後の次 decide で箱候補が再計算され（k が1減った箱）、
+    探索が計画の続行/変更を毎手選び直す＝キューを持たない（盤面が変われば計画も変わる）。"""
+    if move and move.get("action_type") == "DON_BOX":
+        pl = move.get("payload") or {}
+        return {"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": pl.get("uuid")}}
+    return move
+
+
 def _attach_don_meaningful(manager, actor_name: str, c, margin: Optional[bool] = None) -> bool:
     """ドン!!付与の手が「意味ある配分」か（B-2・§2.5.3）。
 
@@ -527,6 +587,17 @@ def _apply_move_inplace(board, actor_name: str, move: Dict[str, Any], stop_at_se
     """
     from . import action_api
     actor = _player_by_name(board, actor_name)
+    if move.get("action_type") == "DON_BOX":
+        # ドン箱（探索内部のマクロ手）は原始列へ展開して適用する（cpu_don_box_plan §2.1）。
+        payload = move.get("payload") or {}
+        for _ in range(int(payload.get("don_k", 0) or 0)):
+            action_api.apply_game_action(board, actor, "ATTACH_DON", {"uuid": payload.get("uuid")})
+            _drain_own_interactions(board, actor_name, stop_at_select=stop_at_select)
+        action_api.apply_game_action(board, actor, "ATTACK",
+                                     {"uuid": payload.get("uuid"),
+                                      "target_ids": list(payload.get("target_ids") or [])})
+        _drain_own_interactions(board, actor_name, stop_at_select=stop_at_select)
+        return
     if move["kind"] == "battle":
         action_api.apply_battle_action(board, actor, move["action_type"], move.get("card_uuid"))
     else:

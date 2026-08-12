@@ -78,6 +78,9 @@ def main():
     ap.add_argument("--cand-don-margin", action="store_true",
                     help="候補席だけ (C) マージン付与を有効化（2026-08-12・don_attach_audit の A/B。"
                          "プロセスは OPCG_DON_MARGIN=0 で走らせ、既定側を旧規則にすること）")
+    ap.add_argument("--cand-don-box", action="store_true",
+                    help="候補席だけドン箱（DON_BOX・cpu_don_box_plan Phase 1）を有効化。"
+                         "(C) 済み現行を基準に箱の上乗せを測る＝OPCG_DON_MARGIN は既定(1)のまま")
     args = ap.parse_args()
     cand_kw = None
     if args.cand_box or args.cand_tree_box:
@@ -86,6 +89,8 @@ def main():
             cand_kw["box_battle"] = True
     if args.cand_don_margin:
         cand_kw = dict(cand_kw or {}, don_margin=True)
+    if args.cand_don_box:
+        cand_kw = dict(cand_kw or {}, don_box=True)
 
     from arena_gate import plan_bands
     planned = [s for band in plan_bands(args.pairs, args.bands, args.seed_base) for s in band]

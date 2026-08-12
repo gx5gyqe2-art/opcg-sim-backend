@@ -43,7 +43,8 @@ def action_key(move):
     sel = payload.get("selected_uuids")
     sel = tuple(sel) if isinstance(sel, (list, tuple)) else sel
     return (move.get("kind"), at, uuid, tgt, sel, payload.get("index"),
-            payload.get("position"), payload.get("declared_value"), payload.get("accepted"))
+            payload.get("position"), payload.get("declared_value"), payload.get("accepted"),
+            payload.get("don_k"))   # DON_BOX の k 違いは別 edge（他の手は None＝キー不変）
 
 
 def _find_card(manager, uuid):
@@ -61,6 +62,13 @@ def action_features(manager, move, me_name):
     """手番 me_name 視点で 1 手を ACTION_DIM 次元へ符号化（関与カードは self/opp を区別）。"""
     f = np.zeros(ACTION_DIM, dtype=np.float32)
     at = move.get("action_type")
+    don_k = 0
+    if at == "DON_BOX":
+        # ドン箱（配分計画のマクロ手・cpu_don_box_plan §2）は「付与後マージンの ATTACK」として
+        # 特徴化する＝素攻撃の prior を継承しつつ、マージン列（v9.2）だけ付与後の値で差別化。
+        # 新 action_type を語彙に足さない＝旧 policy ネットがそのまま使える。
+        don_k = int((move.get("payload") or {}).get("don_k", 0) or 0)
+        at = "ATTACK"
     if at in _AT_IDX:
         f[_AT_IDX[at]] = 1.0
     payload = move.get("payload") or {}
@@ -91,7 +99,7 @@ def action_features(manager, move, me_name):
             tgt = _find_target(manager, tids[0])
             if tgt is not None:
                 f[base + _CARD_FEAT + 5] = float(np.clip(
-                    (E._power(card) - E._power(tgt)) / 10000.0, -1.0, 1.0))
+                    (E._power(card) + don_k * 1000.0 - E._power(tgt)) / 10000.0, -1.0, 1.0))
     # v10: ATTACH_DON の付与後到達パワー（残ドンを全部この対象に付与した場合の上限）。弱キャラへの
     # 付与＝リーサル準備（@68）を候補化する素地。攻撃行動でないため上のマージンとは別枠で持つ。
     if at == "ATTACH_DON" and card is not None:

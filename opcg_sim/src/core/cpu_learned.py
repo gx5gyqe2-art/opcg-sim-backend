@@ -19,6 +19,7 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 
+from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.learned import encoder as E
 from opcg_sim.src.learned.value_net import ValueNet
 from opcg_sim.src.learned.policy import PolicyScorer, state_context
@@ -272,16 +273,17 @@ class LearnedEngine:
                  root_frac: Optional[float] = None, root_gap: Optional[float] = None,
                  battle_readout: Optional[bool] = None, quiesce: Optional[bool] = None,
                  box_battle: Optional[bool] = None, turn_quiesce: Optional[bool] = None,
-                 plan_readout: Optional[bool] = None, don_margin: Optional[bool] = None):
+                 plan_readout: Optional[bool] = None, don_margin: Optional[bool] = None,
+                 don_box: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
             game = game if game is not None else sgame
-        # (C) マージン付与の席別 seam（quiesce 等と同じ A/B 用）: 指定時は共有 game でなく
-        # 席専用の adapter を持つ＝同一プロセスの net-vs-net で席ごとに候補生成を変えられる。
-        if don_margin is not None:
+        # (C) マージン付与／ドン箱の席別 seam（quiesce 等と同じ A/B 用）: 指定時は共有 game
+        # でなく席専用の adapter を持つ＝同一プロセスの net-vs-net で席ごとに候補生成を変えられる。
+        if don_margin is not None or don_box is not None:
             from opcg_sim.src.learned.adapter import OPCGGame as _OG
-            game = _OG(don_margin=don_margin)
+            game = _OG(don_margin=don_margin, don_box=don_box)
         self.vocab = vocab
         self.game = game
         # aux 粘り項のエンジン別上書き（None=config.SERVE_AUX_TIEBREAK に従う）。ON/OFF を
@@ -552,6 +554,10 @@ class LearnedEngine:
                 move = stats["legal"][_select_root_group(groups, **kw)["rep"]]
         if move is None:
             move = legal[0] if legal else None
+        # ドン箱（探索内部のマクロ手）は実対局へは先頭原始手 ATTACH_DON で出す＝
+        # 記録/再生/API の行動空間を変えない（cpu_don_box_plan §2.1。次 decide で
+        # 箱候補が再計算され計画の続行/変更を選び直す＝ステートレス実行）。
+        move = cpu_ai.don_box_first_primitive(move)
         if trace is not None:
             try:
                 _fill_trace(trace, manager, player, move, getattr(mcts, "last_stats", None))
