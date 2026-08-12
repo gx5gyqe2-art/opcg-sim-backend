@@ -49,6 +49,89 @@ from opcg_sim.src.core.cpu_learned import LearnedEngine, _value_fn  # noqa: E402
 from serve_referee import rollout_serve, _shuffle_decks  # noqa: E402
 
 
+_G = {}
+
+
+def _init_worker(net, label_sims):
+    """盤面並列ワーカー（--workers>1）。label_sims>0 なら教師正本（CR.rollout sims=N）で
+    ラベル化する——本番 serve（160sims・逐次）はターン6以降の盤面で1盤面15〜30分かかり
+    ホールドアウト量産に不適（2026-08-12 実測・7盤面/数時間）。CR canon は約3倍/手 安く、
+    盤面並列と合わせ10〜20倍速い。"""
+    import argparse as _ap
+    import counterfactual_referee as CR
+    import p3_loop as P
+    from cpu_selfplay import _load_db
+    from opcg_game import OPCGGame
+    from opcg_sim.src.core.cpu_learned import LearnedEngine, _value_fn
+    CR.ARGS = _ap.Namespace(sims=label_sims or 48, true_board=False)
+    db = _load_db()
+    if net:
+        parts = net.split(",")
+        eng = LearnedEngine(value_path=parts[0],
+                            policy_path=parts[1] if len(parts) > 1 else None)
+    else:
+        eng = LearnedEngine()
+    _G.update(CR=CR, db=db, eng=eng, gs=OPCGGame(), label_sims=label_sims,
+              vf=P.value_fn_of(eng.vnet, eng.vocab, eng.enc_version),
+              pf=P.priors_fn_of(eng.pnet, eng.vocab, eng.enc_version),
+              vpred=_value_fn(eng.vnet, eng.vocab, eng.enc_version, aux_tiebreak=False))
+
+
+def label_one(task):
+    """1盤面: 復元→予測→worlds ロールアウト→行。(row, enc) を返す（enc は --out 用）。"""
+    import mark_gate as MGw
+    import replay_reeval as REw
+    import rl_encoder as Ew
+    path, tag, i, worlds, want_enc = task
+    raw = REw.load_replay_json(path)
+    rec = raw.get("replay", raw)
+    acts = rec["actions"]
+    fbi = {f.get("action_index"): f for f in raw.get("frames") or []}
+    built = MGw._restore(_G["db"], rec, fbi, acts, i)
+    if isinstance(built, str) or built is None:
+        return None
+    m0, actor = built
+    if m0.winner is not None:
+        return None
+    name = actor.name if hasattr(actor, "name") else actor
+    me = m0.p1 if m0.p1.name == name else m0.p2
+    opp = m0.p2 if m0.p1.name == name else m0.p1
+    pred = _G["vpred"](m0, name)
+    wins = ok = 0
+    for w in range(worlds):
+        mb = MGw._restore(_G["db"], rec, fbi, acts, i)
+        if isinstance(mb, str) or mb is None:
+            continue
+        mw, _ = mb
+        _shuffle_decks(mw, w)
+        try:
+            if _G["label_sims"]:
+                wn, _ld, _et = _G["CR"].rollout(_G["gs"], _G["vf"], _G["pf"], mw, name,
+                                                world_seed=52000 + w,
+                                                rng_seed=(52000 + w) * 131, def_temp=0.7)
+            else:
+                _G["eng"]._world_seeds = {}
+                wn, _ld = rollout_serve(_G["eng"], _G["gs"], mw, name,
+                                        rng_seed=52000 + w * 7919)
+        except Exception:
+            continue
+        ok += 1
+        wins += 1 if wn == name else 0
+    if ok == 0:
+        return None
+    ev = 2.0 * wins / ok - 1.0
+    b = bucket(len(me.life or []), len(opp.life or []))
+    row = {"tag": tag, "i": i, "turn": int(acts[i].get("turn", 0) or 0), "who": name,
+           "bucket": b, "me_life": len(me.life or []), "opp_life": len(opp.life or []),
+           "pred": round(pred, 3), "wr": f"{wins}/{ok}", "ev": round(ev, 3),
+           "err": round(pred - ev, 3)}
+    enc = None
+    if want_enc:
+        e = Ew.encode(m0, name, _G["eng"].vocab, version=_G["eng"].enc_version)
+        enc = (e["scalars"], e["field"], e["card_idx"], ev)
+    return row, enc
+
+
 def bucket(me_life, opp_life):
     if opp_life <= 0:
         return "敵0"
@@ -56,7 +139,9 @@ def bucket(me_life, opp_life):
         return "自0"
     if opp_life == 1:
         return "敵1"
-    return "自1"
+    if me_life == 1:
+        return "自1"
+    return "一般"
 
 
 def main():
@@ -72,25 +157,21 @@ def main():
     ap.add_argument("--max-per-replay", type=int, default=8, help="1リプレイあたりの採取上限")
     ap.add_argument("--net", default="", help="value.npz[,policy.npz]（空＝出荷既定・測定/ロールアウト共通）")
     ap.add_argument("--out", default="", help="ラベル行（npz）を書くディレクトリ（空＝測定のみ）")
+    ap.add_argument("--workers", type=int, default=1, help=">1 で盤面並列（候補走査は逐次）")
+    ap.add_argument("--label-sims", type=int, default=0,
+                    help="0=本番 serve（160sims・高価）・N>0=教師正本 CR.rollout（例 48）")
     args = ap.parse_args()
 
     table = {**MG.REPLAYS, **CG.REPLAYS_V2, **CG.REPLAYS_V48, **CG.REPLAYS_HUMAN}
     tags = list(table) if args.replays == "all" else \
         [t.strip() for t in args.replays.split(",") if t.strip()]
-    db = _load_db()
-    if args.net:
-        parts = args.net.split(",")
-        eng = LearnedEngine(value_path=parts[0],
-                            policy_path=parts[1] if len(parts) > 1 else None)
-    else:
-        eng = LearnedEngine()
-    gs = OPCGGame()
-    vf = _value_fn(eng.vnet, eng.vocab, eng.enc_version, aux_tiebreak=False)
 
-    rows = []
-    out_rows = {k: [] for k in ("scalars", "field", "card_idx", "value", "group")}
+    # フェーズ1: 候補走査（軽い・逐次）。フェーズ2: ラベル化（重い・盤面並列可）。
+    db = _load_db()
+    tasks = []
     for tag in tags:
-        raw = RE.load_replay_json(table.get(tag, tag))
+        path = table.get(tag, tag)
+        raw = RE.load_replay_json(path)
         rec = raw.get("replay", raw)
         acts = rec["actions"]
         fbi = {f.get("action_index"): f for f in raw.get("frames") or []}
@@ -118,37 +199,40 @@ def main():
                 continue
             name = actor.name if hasattr(actor, "name") else actor
             seen.add(key)
-            me = m0.p1 if m0.p1.name == name else m0.p2
-            opp = m0.p2 if m0.p1.name == name else m0.p1
-            pred = vf(m0, name)
-            wins, ok = 0, 0
-            for w in range(args.worlds):
-                mb = MG._restore(db, rec, fbi, acts, i)
-                if isinstance(mb, str) or mb is None:
-                    continue
-                mw, _ = mb
-                _shuffle_decks(mw, w)
-                eng._world_seeds = {}
-                wn, _ld = rollout_serve(eng, gs, mw, name, rng_seed=52000 + w * 7919)
-                ok += 1
-                wins += 1 if wn == name else 0
-            if ok == 0:
-                continue
-            ev = 2.0 * wins / ok - 1.0
-            b = bucket(len(me.life or []), len(opp.life or []))
-            rows.append({"tag": tag, "i": i, "turn": key[1], "who": name, "bucket": b,
-                         "me_life": len(me.life or []), "opp_life": len(opp.life or []),
-                         "pred": round(pred, 3), "wr": f"{wins}/{ok}", "ev": round(ev, 3),
-                         "err": round(pred - ev, 3)})
+            tasks.append((path, tag, i, args.worlds, bool(args.out)))
             n_tag += 1
-            if args.out:
-                enc = E.encode(m0, name, eng.vocab, version=eng.enc_version)
-                for k in ("scalars", "field", "card_idx"):
-                    out_rows[k].append(enc[k])
-                out_rows["value"].append(ev)
-                out_rows["group"].append(len(rows) - 1)
-            print(f"  {tag}@{i} T{key[1]} {name} [{b}] 予測{pred:+.3f} 実測{wins}/{ok}"
-                  f"(EV{ev:+.2f}) 誤差{pred - ev:+.3f}", flush=True)
+    print(f"候補 {len(tasks)} 盤面（workers={args.workers}・"
+          f"ラベル器={'CR canon sims' + str(args.label_sims) if args.label_sims else '本番serve'}）",
+          flush=True)
+
+    rows = []
+    out_rows = {k: [] for k in ("scalars", "field", "card_idx", "value", "group")}
+
+    def _consume(res):
+        if res is None:
+            return
+        row, enc = res
+        rows.append(row)
+        if enc is not None:
+            out_rows["scalars"].append(enc[0])
+            out_rows["field"].append(enc[1])
+            out_rows["card_idx"].append(enc[2])
+            out_rows["value"].append(enc[3])
+            out_rows["group"].append(len(rows) - 1)
+        print(f"  {row['tag']}@{row['i']} T{row['turn']} {row['who']} [{row['bucket']}]"
+              f" 予測{row['pred']:+.3f} 実測{row['wr']}(EV{row['ev']:+.2f})"
+              f" 誤差{row['err']:+.3f}", flush=True)
+
+    if args.workers > 1:
+        import multiprocessing as mp
+        with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
+                                          initargs=(args.net, args.label_sims)) as pool:
+            for res in pool.imap_unordered(label_one, tasks):
+                _consume(res)
+    else:
+        _init_worker(args.net, args.label_sims)
+        for t in tasks:
+            _consume(label_one(t))
 
     print(f"\n=== ライフ帯別の較正誤差（予測−実測EV・負＝悲観）")
     for b in ("敵0", "敵1", "自0", "自1"):
