@@ -68,7 +68,11 @@ class OPCGGame:
         if pf:
             moves = cpu_ai._prune_don_moves(state, name, moves, margin=self.don_margin)
             moves = cpu_ai._prune_futile_attacks(state, name, moves)
-        if self.don_box:
+        db_on = self.don_box
+        if db_on is None:   # インスタンス未指定＝config（serve 既定）に従う
+            from opcg_sim.src.learned.config import SERVE_DON_BOX
+            db_on = SERVE_DON_BOX
+        if db_on:
             # ドン箱の合成は枝刈り後に足す（箱は素の合法手 base から算術で導出＝
             # 枝刈りの影響を受けない。DON_BOX 自体は既存 prune を素通りする型）。
             moves = moves + cpu_ai.don_box_candidates(state, name, base)

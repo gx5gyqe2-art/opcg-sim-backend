@@ -47,6 +47,14 @@ SERVE_STICKY_WORLD = True
 # serve に効く（OPCGGame.legal_actions 経由・インスタンス未指定時の既定）。
 SERVE_PRUNE_FUTILE = True
 
+# ドン箱（DON_BOX・`docs/cpu_don_box_plan.md` Phase 1）: 候補生成に「付与k→リーダー攻撃」の
+# 配分計画マクロを合成する（k∈{通る最小, 2枚要求}・実対局出力は先頭原始手 ATTACH_DON＝
+# 記録/再生/API 不変）。A/B は中立（v55: 200ペア wr 0.522 CI[0.480,0.565]・(C)済み基準）だが、
+# **ユーザ判断（2026-08-12）で既定 ON**——探索表現として素直（配分済み盤面を同深の兄弟で比較）で
+# 害の証拠が無く、生成/serve 一貫で将来のネットが箱化された行動分布から学べる。
+# インスタンス上書きは OPCGGame(don_box=)／LearnedEngine(don_box=)（席別 A/B seam）。
+SERVE_DON_BOX = True
+
 # v6 柱⑤（生成/serve の探索設定分離・docs/reports/v5_adoption_20260715.md §4-5）: 自己対戦**生成**の
 # 枝刈り既定。生成側は枝刈りを外す＝探索が訪れない枝は学習できないため、serve 用ヒューリスティクスを
 # 生成に入れると「刈った枝の反例をネットが二度と見ない」自己強化盲点になる（v5 は serve と生成の両方に

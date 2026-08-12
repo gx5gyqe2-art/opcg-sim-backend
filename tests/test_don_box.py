@@ -120,11 +120,16 @@ def test_first_primitive_conversion():
     assert cpu_ai.don_box_first_primitive(None) is None
 
 
-def test_adapter_seam_default_off(db):
+def test_adapter_seam_follows_config_and_override(db):
+    """既定＝config（SERVE_DON_BOX=True・ユーザ判断 2026-08-12）・インスタンス指定が優先。"""
+    from opcg_sim.src.learned.config import SERVE_DON_BOX
+    assert SERVE_DON_BOX is True
     gm = _new_gm(db)
     _setup(gm, power_delta=0, dons=4)
-    off = OPCGGame()                      # 既定＝箱なし
+    default = OPCGGame()                  # 既定＝config に従う（ON）
+    off = OPCGGame(don_box=False)         # 席別上書きで旧挙動
     on = OPCGGame(don_box=True)
+    assert any(m.get("action_type") == "DON_BOX" for m in default.legal_actions(gm))
     assert not any(m.get("action_type") == "DON_BOX" for m in off.legal_actions(gm))
     assert any(m.get("action_type") == "DON_BOX" for m in on.legal_actions(gm))
 
