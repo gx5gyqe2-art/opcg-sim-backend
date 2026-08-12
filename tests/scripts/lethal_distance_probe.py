@@ -48,14 +48,43 @@ def _desc(m, mv):
         return {}
 
 
-def _script_move(gs, m, name):
-    """台本方策の1手: 手番側=能力起動→顔面攻撃→END、非手番側=常に素通し。"""
+def _counter_value(owner, card_id):
+    for c in owner.hand:
+        if getattr(c.master, "card_id", None) == card_id:
+            v = int(getattr(c, "current_counter", 0) or 0)
+            if v > 0:
+                return v
+    return 0
+
+
+def _script_move(gs, m, name, defend=False):
+    """台本方策の1手: 手番側=能力起動→顔面攻撃→END。非手番側= defend=False なら素通し、
+    True なら**カウンター防御台本**（v2）: 攻撃が通る場合のみ、手持ちカウンター合計で
+    止め切れるなら最大値から切る（止め切れないなら温存＝PASS）。イベントカウンターは
+    値が静的に読めないため使わない（限界・v6 集約は別特徴として存在）。"""
     legal = gs.legal_actions(m)
     if not legal:
         return None
     cur = gs.current_player(m)
     descs = [(_desc(m, mv), mv) for mv in legal]
     if cur != name:
+        if defend:
+            ctr = [(d, mv) for d, mv in descs if d.get("action_type") == "SELECT_COUNTER"]
+            ab = getattr(m, "active_battle", None)
+            if ctr and ab:
+                try:
+                    atk = int(ab["attacker"].get_power(True))
+                    tgt = int(ab["target"].get_power(False)) + int(ab.get("counter_buff", 0) or 0)
+                except Exception:
+                    atk, tgt = 0, 0
+                need = atk - tgt + 1000 if atk >= tgt else 0   # 攻撃は atk>=def で通る
+                if need > 0:
+                    owner = ab["target_owner"]
+                    vals = sorted((( _counter_value(owner, d.get("card")), d, mv)
+                                   for d, mv in ctr), key=lambda x: -x[0])
+                    total = sum(v for v, _d, _m in vals if v > 0)
+                    if total >= need and vals and vals[0][0] > 0:
+                        return vals[0][2]          # 止め切れる時だけ最大値から切る
         # 相手の自ターン: **何もせず END**（無抵抗レース＝相手の時間だけが流れる）。
         # v0 は誤って legal[0]（任意のプレイ）を打っており距離が 0/13 に崩壊していた
         # （2026-08-12 実測 19/58・引分21）。応答窓: PASS/「しない」で素通し。
@@ -95,8 +124,9 @@ def _script_move(gs, m, name):
     return legal[0]
 
 
-def lethal_distance(gs, m0, name, max_turns=MAX_TURNS):
-    """name 視点: 台本レースで相手のライフ+リーダーを削り切るまでの自ターン数（詰まねば max+1）。"""
+def lethal_distance(gs, m0, name, max_turns=MAX_TURNS, defend=False):
+    """name 視点: 台本レースで相手を削り切るまでの自ターン数（詰まねば max+1）。
+    defend=True＝相手がカウンター防御台本で抵抗する（v2・防御込みリーサル距離）。"""
     m = m0.clone()
     my_turns = 0
     steps = 0
@@ -106,7 +136,7 @@ def lethal_distance(gs, m0, name, max_turns=MAX_TURNS):
         cur = gs.current_player(m)
         if cur is None:
             return max_turns + 1
-        mv = _script_move(gs, m, name)
+        mv = _script_move(gs, m, name, defend=defend)
         if mv is None:
             return max_turns + 1
         d = _desc(m, mv)
@@ -177,11 +207,14 @@ def main():
                     dme = lethal_distance(gs, m, name)
                     opp = m.p2.name if m.p1.name == name else m.p1.name
                     dop = lethal_distance(gs, m, opp)
+                    dme_d = lethal_distance(gs, m, name, defend=True)
+                    dop_d = lethal_distance(gs, m, opp, defend=True)
                     s = None  # ライフ差/火力差は再計算
                     me = m.p1 if m.p1.name == name else m.p2
                     op_ = m.p2 if m.p1.name == name else m.p1
                     rows.append({"src": meta_f[:-5], "seed": seed, "turn": t, "who": name,
                                  "ev": ev, "d_me": dme, "d_opp": dop,
+                                 "d_me_def": dme_d, "d_opp_def": dop_d,
                                  "life_diff": len(me.life or []) - len(op_.life or [])})
                 actor = m.p1 if m.p1.name == name else m.p2
                 eng._world_seeds = {}
@@ -216,25 +249,32 @@ def main():
         dme = lethal_distance(gs, m0, name)
         opp = m0.p2.name if m0.p1.name == name else m0.p1.name
         dop = lethal_distance(gs, m0, opp)
+        dme_d = lethal_distance(gs, m0, name, defend=True)
+        dop_d = lethal_distance(gs, m0, opp, defend=True)
         me = m0.p1 if m0.p1.name == name else m0.p2
         op_ = m0.p2 if m0.p1.name == name else m0.p1
         rows.append({"src": "v50", "seed": f"{tag}@{i}", "turn": int(acts[i].get("turn", 0) or 0),
                      "who": name, "ev": V50_EV[(tag, i)], "d_me": dme, "d_opp": dop,
+                     "d_me_def": dme_d, "d_opp_def": dop_d,
                      "life_diff": len(me.life or []) - len(op_.life or [])})
         print(f"  v50 {tag}@{i}: d_me={dme} d_opp={dop} ev={V50_EV[(tag, i)]:+.2f}", flush=True)
 
     # --- 説明力の集計
     ev = np.array([r["ev"] for r in rows], float)
     dd = np.array([r["d_opp"] - r["d_me"] for r in rows], float)   # 正＝自分が先に詰ませる
+    ddf = np.array([r.get("d_opp_def", 0) - r.get("d_me_def", 0) for r in rows], float)
     ld = np.array([r["life_diff"] for r in rows], float)
     ok = np.sign(dd) == np.sign(ev)
+    okf = np.sign(ddf) == np.sign(ev)
+    tiedf = ddf == 0
     tied = dd == 0
     print(f"\n=== リーサル距離の説明力（{len(rows)}点＝全て現行特徴で説明不能の乖離盤面）")
-    print(f"  符号一致（距離差 vs 実測EV）: {int(ok.sum())}/{len(rows)}"
-          f"（うち距離差0で判定不能 {int(tied.sum())}）")
+    print(f"  無抵抗:   符号一致 {int(ok.sum())}/{len(rows)}（引分 {int(tied.sum())}）")
+    print(f"  防御込み: 符号一致 {int(okf.sum())}/{len(rows)}（引分 {int(tiedf.sum())}）")
     print(f"  参照: ライフ差の符号一致 {int((np.sign(ld) == np.sign(ev)).sum())}/{len(rows)}")
     if len(rows) > 3:
-        print(f"  相関: 距離差 r={np.corrcoef(dd, ev)[0,1]:+.3f} / ライフ差 r={np.corrcoef(ld, ev)[0,1]:+.3f}")
+        print(f"  相関: 無抵抗 r={np.corrcoef(dd, ev)[0,1]:+.3f} / 防御込み r={np.corrcoef(ddf, ev)[0,1]:+.3f}"
+              f" / ライフ差 r={np.corrcoef(ld, ev)[0,1]:+.3f}")
     print("LETHAL_DISTANCE_SPIKE " + json.dumps(
         {"n": len(rows), "sign_ok": int(ok.sum()), "tied": int(tied.sum()),
          "rows": rows}, ensure_ascii=False))
