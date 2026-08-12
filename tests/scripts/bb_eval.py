@@ -64,8 +64,11 @@ def main():
     p_bb = bb.predict({"scalars": X["scalars"], "field": X["field"], "card_idx": pad_idx})
 
     from opcg_sim.src.core.cpu_learned import LearnedEngine
+    import rl_encoder as E
     g = LearnedEngine().vnet                       # 参考線＝出荷既定（G14）・実ID込み
-    p_g = g.predict({k: X[k] for k in ("scalars", "field", "card_idx")})
+    # ホールドアウトが v10 行（73列）でも G14 は v9 接頭辞（append-only 契約）で評価できる
+    Xg = dict(X, scalars=X["scalars"][:, :E.scalars_dim(9)])
+    p_g = g.predict({k: Xg[k] for k in ("scalars", "field", "card_idx")})
 
     base = np.zeros(n)                             # 無情報基準（常に0）
     print(f"\n  {'指標':<8} {'骨組み(ID無)':>14} {'G14参考線':>12} {'常に0':>8}")

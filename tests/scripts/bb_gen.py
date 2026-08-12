@@ -39,7 +39,7 @@ MAX_STEPS = 400
 _G = {}
 
 
-def _init_worker(sims):
+def _init_worker(sims, enc_version=9):
     import bb_card_factory as F
     import rl_encoder as E
     from cpu_selfplay import _load_db
@@ -49,7 +49,7 @@ def _init_worker(sims):
     pool, stats = F.harvest(db)
     eng = LearnedEngine()
     _G.update(F=F, E=E, pool=pool, stats=stats, gs=OPCGGame(), eng=eng,
-              vocab=eng.vocab, sims=sims)
+              vocab=eng.vocab, sims=sims, enc_version=enc_version)
 
 
 def play_one(seed):
@@ -82,7 +82,7 @@ def play_one(seed):
             key = (int(getattr(m, "turn_count", 0) or 0), name)
             if key not in seen_turns:
                 seen_turns.add(key)
-                enc = E.encode(m, name, _G["vocab"], version=9)
+                enc = E.encode(m, name, _G["vocab"], version=_G["enc_version"])
                 rows["scalars"].append(enc["scalars"])
                 rows["field"].append(enc["field"])
                 rows["who"].append(name)
@@ -122,6 +122,8 @@ def main():
     ap.add_argument("--sims", type=int, default=32)
     ap.add_argument("--seed-base", type=int, default=890000)
     ap.add_argument("--shard-games", type=int, default=100)
+    ap.add_argument("--enc-version", type=int, default=9,
+                    help="符号化世代（bb2=10: リーサル距離Δ3値つき・v52b）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -130,7 +132,7 @@ def main():
     t0 = time.time()
     buf, shard, n_rows, n_drop = {"scalars": [], "field": [], "value": []}, 0, 0, 0
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
-                                      initargs=(args.sims,)) as pool:
+                                      initargs=(args.sims, args.enc_version)) as pool:
         done = 0
         for r in pool.imap_unordered(play_one, seeds):
             done += 1
@@ -152,7 +154,8 @@ def main():
                 print(f"  {done}/{args.games}局 行{n_rows} 棄却{n_drop} "
                       f"{time.time()-t0:.0f}s", flush=True)
     meta = {"games": args.games, "dropped": n_drop, "rows": n_rows,
-            "sims": args.sims, "enc_version": 9, "card_idx": "PAD固定（骨組み規約）"}
+            "sims": args.sims, "enc_version": args.enc_version,
+            "card_idx": "PAD固定（骨組み規約）"}
     with open(os.path.join(args.out, "meta_bb1.json"), "w") as f:
         json.dump(meta, f, ensure_ascii=False, indent=1)
     print("BB1_GEN_DONE " + json.dumps(meta, ensure_ascii=False))

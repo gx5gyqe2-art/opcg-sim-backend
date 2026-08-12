@@ -41,6 +41,8 @@ def main():
     ap.add_argument("--hidden", type=int, default=96)
     ap.add_argument("--val-frac", type=float, default=0.1)
     ap.add_argument("--seed", type=int, default=11)
+    ap.add_argument("--enc-version", type=int, default=9,
+                    help="符号化世代（コーパスと一致させる。bb2=10）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -64,7 +66,7 @@ def main():
     from opcg_sim.src.core.cpu_learned import LearnedEngine
     vocab_size = len(LearnedEngine().vocab)                # G系と同じ語彙次元（埋め込みは死重）
     net = RN.ValueNet(vocab_size=vocab_size, d_emb=args.d_emb, hidden=args.hidden,
-                      feat_dim=E.feature_dim(9), seed=args.seed)
+                      feat_dim=E.feature_dim(args.enc_version), seed=args.seed)
 
     def mse(idx):
         s = 0.0
