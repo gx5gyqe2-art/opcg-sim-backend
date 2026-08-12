@@ -77,20 +77,30 @@ def main():
         d2b = lethal_distance(gs, m0, opp, defend=True)
         d3a = lethal_distance(gs_raw, m0, name, defend=True, v3=True)
         d3b = lethal_distance(gs_raw, m0, opp, defend=True, v3=True)
+        # 変種（②の方式の切り分け・probe docstring）: b=②なし / c=need3000固定しきい値
+        dba = lethal_distance(gs_raw, m0, name, defend=True, v3=True, don_mode="none")
+        dbb = lethal_distance(gs_raw, m0, opp, defend=True, v3=True, don_mode="none")
+        dca = lethal_distance(gs_raw, m0, name, defend=True, v3=True, don_mode="threshold")
+        dcb = lethal_distance(gs_raw, m0, opp, defend=True, v3=True, don_mode="threshold")
         me = m0.p1 if m0.p1.name == name else m0.p2
         op_ = m0.p2 if m0.p1.name == name else m0.p1
         rows.append({**r, "d_me": d1a, "d_opp": d1b, "d_me_def": d2a, "d_opp_def": d2b,
                      "d_me_v3": d3a, "d_opp_v3": d3b,
+                     "d_me_v3b": dba, "d_opp_v3b": dbb,
+                     "d_me_v3c": dca, "d_opp_v3c": dcb,
                      "life_diff": len(me.life or []) - len(op_.life or [])})
         print(f"  {tag}@{i} T{r['turn']} {name}: v1=({d1a},{d1b}) v2=({d2a},{d2b})"
-              f" v3=({d3a},{d3b}) ev={r['ev']:+.2f} {time.time()-t0:.0f}s", flush=True)
+              f" v3=({d3a},{d3b}) v3b=({dba},{dbb}) v3c=({dca},{dcb})"
+              f" ev={r['ev']:+.2f} {time.time()-t0:.0f}s", flush=True)
 
     ev = np.array([r["ev"] for r in rows], float)
     ld = np.array([r["life_diff"] for r in rows], float)
     nz = ev != 0                                    # EV=0（勝率5割）は符号判定から除外
     print(f"\n=== 一般{len(rows)}点ホールドアウト（レフェリー勝率ラベル・EV≠0 は {int(nz.sum())}点）")
-    for label, a, b in (("無抵抗v1 ", "d_opp", "d_me"), ("防御込みv2", "d_opp_def", "d_me_def"),
-                        ("防御込みv3", "d_opp_v3", "d_me_v3")):
+    for label, a, b in (("無抵抗v1  ", "d_opp", "d_me"), ("防御込みv2 ", "d_opp_def", "d_me_def"),
+                        ("防御込みv3a", "d_opp_v3", "d_me_v3"),
+                        ("防御込みv3b", "d_opp_v3b", "d_me_v3b"),
+                        ("防御込みv3c", "d_opp_v3c", "d_me_v3c")):
         dd = np.array([r[a] - r[b] for r in rows], float)
         oks = int((np.sign(dd)[nz] == np.sign(ev)[nz]).sum())
         tie = int((dd[nz] == 0).sum())

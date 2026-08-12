@@ -157,10 +157,17 @@ def _counter_total(gs, m, cur_name, owner, ctr_moves):
     return total
 
 
-def _v3_attacker_move(gs, m, name, descs):
+def _v3_attacker_move(gs, m, name, descs, don_mode="hand"):
     """v3 攻め側のドン付与算術（c）: ①不足アタッカーの底上げ（安い順・攻撃本数最大化）→
-    ②余りは最強へ集中（相手手札の印字カウンター総量を超える need を作れる時だけ）→
-    ③最強から顔面攻撃。付与・攻撃とも 1 手ずつ返す（次の手番で再計画）。"""
+    ②余りの集中投下（don_mode 参照）→ ③最強から顔面攻撃。付与・攻撃とも 1 手ずつ返す
+    （次の手番で再計画）。
+
+    don_mode（②の方式・一般60点での切り分け 2026-08-12）:
+      "hand"      = 相手手札の印字カウンター総量を読み、それを超える need を作れる時だけ積む
+                    （全知・盤面の非公開情報を使う）
+      "threshold" = need=3000（カウンター2枚を要求する打点）まで積む（手札は読まない・
+                    ユーザの7000理論の直訳）
+      "none"      = ②なし（底上げ①のみ）"""
     me = m.p1 if m.p1.name == name else m.p2
     opp = m.p2 if m.p1.name == name else m.p1
     if opp.leader is None:
@@ -198,19 +205,25 @@ def _v3_attacker_move(gs, m, name, descs):
         fixable = [(k, u) for k, u in deficits if k <= budget]
         if fixable and fixable[0][1] in attach:
             return attach[fixable[0][1]]
-        # ② 余りは最強へ集中（止め切れない need を作れる見込みがある時だけ）
+        # ② 余りの集中投下（方式は don_mode）
         p0, u0, _ = face[0]
         if p0 >= def_p and u0 in attach:
             need = p0 - def_p + 1000
-            if opp_ctr >= need and need + budget * 1000 > opp_ctr:
-                return attach[u0]
+            if don_mode == "hand":
+                if opp_ctr >= need and need + budget * 1000 > opp_ctr:
+                    return attach[u0]
+            elif don_mode == "threshold":
+                if need < 3000:
+                    return attach[u0]
     for p, _u, mv in face:                          # ③ 最強から顔面攻撃（素で通る体のみ）
         if p >= def_p:
             return mv
     return None
 
 
-def _script_move(gs, m, name, defend=False, v3=False):
+def _script_move(gs, m, name, defend=False, v3=False, don_mode="hand", parts="both"):
+    atk3 = v3 and parts in ("both", "atk")
+    def3 = v3 and parts in ("both", "def")
     """台本方策の1手: 手番側=能力起動→顔面攻撃→END。非手番側= defend=False なら素通し、
     True なら**カウンター防御台本**（v2）: 攻撃が通る場合のみ、手持ちカウンター合計で
     止め切れるなら最大値から切る（止め切れないなら温存＝PASS）。v2 ではイベントカウンターは
@@ -225,7 +238,7 @@ def _script_move(gs, m, name, defend=False, v3=False):
             ab = getattr(m, "active_battle", None)
             # (a) ブロック窓（v3）: リーダーが対象で、カウンターで止め切れない時だけブロック。
             blk = [mv for _d, mv in descs if mv.get("action_type") == "SELECT_BLOCKER"]
-            if v3 and blk and ab:
+            if def3 and blk and ab:
                 owner = ab["target_owner"]
                 if ab["target"] is owner.leader:
                     need = _battle_need(ab)
@@ -255,12 +268,12 @@ def _script_move(gs, m, name, defend=False, v3=False):
             ctr = [(d, mv) for d, mv in descs if d.get("action_type") == "SELECT_COUNTER"]
             if ctr and ab:
                 owner = ab["target_owner"]
-                if v3 and ab["target"] is not owner.leader:
+                if def3 and ab["target"] is not owner.leader:
                     pass                            # キャラ/ブロッカーは守らない（ライフ優先）
                 else:
                     need = _battle_need(ab)
                     if need > 0:
-                        if v3:
+                        if def3:
                             # (b) イベント込みの支払い計画（実測・止め切れる時だけ）
                             mv3 = _counter_plan(gs, m, cur, owner, need,
                                                 [mv for _d, mv in ctr])
@@ -299,8 +312,8 @@ def _script_move(gs, m, name, defend=False, v3=False):
             if me.leader is not None and d.get("card") == me.leader.master.card_id:
                 return mv
     # (c) v3: ドン付与算術＋最強から顔面攻撃
-    if v3:
-        mv3 = _v3_attacker_move(gs, m, name, descs)
+    if atk3:
+        mv3 = _v3_attacker_move(gs, m, name, descs, don_mode=don_mode)
         if mv3 is not None:
             return mv3
         for d, mv in descs:
@@ -320,7 +333,8 @@ def _script_move(gs, m, name, defend=False, v3=False):
     return legal[0]
 
 
-def lethal_distance(gs, m0, name, max_turns=MAX_TURNS, defend=False, v3=False):
+def lethal_distance(gs, m0, name, max_turns=MAX_TURNS, defend=False, v3=False, don_mode="hand",
+                    parts="both"):
     """name 視点: 台本レースで相手を削り切るまでの自ターン数（詰まねば max+1）。
     defend=True＝相手がカウンター防御台本で抵抗する（v2・防御込みリーサル距離）。
     v3=True＝忠実度改善 a〜c（ブロッカー/イベント実測/ドン付与算術）。v3 は枝刈り無し gs
@@ -335,7 +349,7 @@ def lethal_distance(gs, m0, name, max_turns=MAX_TURNS, defend=False, v3=False):
         cur = gs.current_player(m)
         if cur is None:
             return max_turns + 1
-        mv = _script_move(gs, m, name, defend=defend, v3=v3)
+        mv = _script_move(gs, m, name, defend=defend, v3=v3, don_mode=don_mode, parts=parts)
         if mv is None:
             return max_turns + 1
         d = _desc(m, mv)
@@ -411,6 +425,14 @@ def main():
                     dop_d = lethal_distance(gs, m, opp, defend=True)
                     dme_3 = lethal_distance(gs_raw, m, name, defend=True, v3=True)
                     dop_3 = lethal_distance(gs_raw, m, opp, defend=True, v3=True)
+                    dme_3b = lethal_distance(gs_raw, m, name, defend=True, v3=True, don_mode="none")
+                    dop_3b = lethal_distance(gs_raw, m, opp, defend=True, v3=True, don_mode="none")
+                    dme_3c = lethal_distance(gs_raw, m, name, defend=True, v3=True, don_mode="threshold")
+                    dop_3c = lethal_distance(gs_raw, m, opp, defend=True, v3=True, don_mode="threshold")
+                    dme_3atk = lethal_distance(gs_raw, m, name, defend=True, v3=True, parts="atk")
+                    dop_3atk = lethal_distance(gs_raw, m, opp, defend=True, v3=True, parts="atk")
+                    dme_3def = lethal_distance(gs, m, name, defend=True, v3=True, parts="def")
+                    dop_3def = lethal_distance(gs, m, opp, defend=True, v3=True, parts="def")
                     s = None  # ライフ差/火力差は再計算
                     me = m.p1 if m.p1.name == name else m.p2
                     op_ = m.p2 if m.p1.name == name else m.p1
@@ -418,6 +440,10 @@ def main():
                                  "ev": ev, "d_me": dme, "d_opp": dop,
                                  "d_me_def": dme_d, "d_opp_def": dop_d,
                                  "d_me_v3": dme_3, "d_opp_v3": dop_3,
+                                 "d_me_v3b": dme_3b, "d_opp_v3b": dop_3b,
+                                 "d_me_v3c": dme_3c, "d_opp_v3c": dop_3c,
+                                 "d_me_v3atk": dme_3atk, "d_opp_v3atk": dop_3atk,
+                                 "d_me_v3def": dme_3def, "d_opp_v3def": dop_3def,
                                  "life_diff": len(me.life or []) - len(op_.life or [])})
                 actor = m.p1 if m.p1.name == name else m.p2
                 eng._world_seeds = {}
@@ -456,12 +482,24 @@ def main():
         dop_d = lethal_distance(gs, m0, opp, defend=True)
         dme_3 = lethal_distance(gs_raw, m0, name, defend=True, v3=True)
         dop_3 = lethal_distance(gs_raw, m0, opp, defend=True, v3=True)
+        dme_3b = lethal_distance(gs_raw, m0, name, defend=True, v3=True, don_mode="none")
+        dop_3b = lethal_distance(gs_raw, m0, opp, defend=True, v3=True, don_mode="none")
+        dme_3c = lethal_distance(gs_raw, m0, name, defend=True, v3=True, don_mode="threshold")
+        dop_3c = lethal_distance(gs_raw, m0, opp, defend=True, v3=True, don_mode="threshold")
+        dme_3atk = lethal_distance(gs_raw, m0, name, defend=True, v3=True, parts="atk")
+        dop_3atk = lethal_distance(gs_raw, m0, opp, defend=True, v3=True, parts="atk")
+        dme_3def = lethal_distance(gs, m0, name, defend=True, v3=True, parts="def")
+        dop_3def = lethal_distance(gs, m0, opp, defend=True, v3=True, parts="def")
         me = m0.p1 if m0.p1.name == name else m0.p2
         op_ = m0.p2 if m0.p1.name == name else m0.p1
         rows.append({"src": "v50", "seed": f"{tag}@{i}", "turn": int(acts[i].get("turn", 0) or 0),
                      "who": name, "ev": V50_EV[(tag, i)], "d_me": dme, "d_opp": dop,
                      "d_me_def": dme_d, "d_opp_def": dop_d,
                      "d_me_v3": dme_3, "d_opp_v3": dop_3,
+                     "d_me_v3b": dme_3b, "d_opp_v3b": dop_3b,
+                     "d_me_v3c": dme_3c, "d_opp_v3c": dop_3c,
+                     "d_me_v3atk": dme_3atk, "d_opp_v3atk": dop_3atk,
+                     "d_me_v3def": dme_3def, "d_opp_v3def": dop_3def,
                      "life_diff": len(me.life or []) - len(op_.life or [])})
         print(f"  v50 {tag}@{i}: d_me={dme} d_opp={dop} ev={V50_EV[(tag, i)]:+.2f}", flush=True)
 
@@ -469,26 +507,27 @@ def main():
     ev = np.array([r["ev"] for r in rows], float)
     dd = np.array([r["d_opp"] - r["d_me"] for r in rows], float)   # 正＝自分が先に詰ませる
     ddf = np.array([r.get("d_opp_def", 0) - r.get("d_me_def", 0) for r in rows], float)
-    dd3 = np.array([r.get("d_opp_v3", 0) - r.get("d_me_v3", 0) for r in rows], float)
     ld = np.array([r["life_diff"] for r in rows], float)
     ok = np.sign(dd) == np.sign(ev)
     okf = np.sign(ddf) == np.sign(ev)
-    ok3 = np.sign(dd3) == np.sign(ev)
     tiedf = ddf == 0
     tied = dd == 0
-    tied3 = dd3 == 0
     print(f"\n=== リーサル距離の説明力（{len(rows)}点＝全て現行特徴で説明不能の乖離盤面）")
     print(f"  無抵抗:      符号一致 {int(ok.sum())}/{len(rows)}（引分 {int(tied.sum())}）")
     print(f"  防御込みv2:  符号一致 {int(okf.sum())}/{len(rows)}（引分 {int(tiedf.sum())}）")
-    print(f"  防御込みv3:  符号一致 {int(ok3.sum())}/{len(rows)}（引分 {int(tied3.sum())}）")
+    summary = {"n": len(rows), "sign_ok": int(ok.sum()), "tied": int(tied.sum())}
+    for lab, key in (("v3a", "v3"), ("v3b", "v3b"), ("v3c", "v3c"),
+                     ("v3atk", "v3atk"), ("v3def", "v3def")):
+        d3 = np.array([r.get(f"d_opp_{key}", 0) - r.get(f"d_me_{key}", 0) for r in rows], float)
+        ok3 = np.sign(d3) == np.sign(ev)
+        print(f"  防御込み{lab}: 符号一致 {int(ok3.sum())}/{len(rows)}（引分 {int((d3==0).sum())}）"
+              f"  r={np.corrcoef(d3, ev)[0,1]:+.3f}")
+        summary[f"sign_ok_{lab}"] = int(ok3.sum())
     print(f"  参照: ライフ差の符号一致 {int((np.sign(ld) == np.sign(ev)).sum())}/{len(rows)}")
     if len(rows) > 3:
         print(f"  相関: 無抵抗 r={np.corrcoef(dd, ev)[0,1]:+.3f} / 防御込みv2 r={np.corrcoef(ddf, ev)[0,1]:+.3f}"
-              f" / 防御込みv3 r={np.corrcoef(dd3, ev)[0,1]:+.3f} / ライフ差 r={np.corrcoef(ld, ev)[0,1]:+.3f}")
-    print("LETHAL_DISTANCE_SPIKE " + json.dumps(
-        {"n": len(rows), "sign_ok": int(ok.sum()), "tied": int(tied.sum()),
-         "sign_ok_v3": int(ok3.sum()), "tied_v3": int(tied3.sum()),
-         "rows": rows}, ensure_ascii=False))
+              f" / ライフ差 r={np.corrcoef(ld, ev)[0,1]:+.3f}")
+    print("LETHAL_DISTANCE_SPIKE " + json.dumps({**summary, "rows": rows}, ensure_ascii=False))
     return 0
 
 
