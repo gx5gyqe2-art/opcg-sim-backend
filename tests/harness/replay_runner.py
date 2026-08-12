@@ -71,6 +71,12 @@ def resolve_recorded_action(manager, actor, recorded: Dict[str, Any]):
                 return mv
     except Exception:
         pass
+    # slots つき新録画の RESOLVE は、既定/併合候補に位置一致が無くても pending 候補列から
+    # payload を直接構築できる（同名複製のうち録画どおりの実体を選ぶ）。旧録画（slots なし）は
+    # ここに来ない＝roundtrip の従来挙動は不変。
+    if recorded.get("action_type") == "RESOLVE_EFFECT_SELECTION" \
+            and recorded.get("selected_slots") is not None:
+        return _resolve_dialog_action(manager, actor, recorded)
     return None
 
 
