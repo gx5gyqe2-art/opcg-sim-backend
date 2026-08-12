@@ -49,15 +49,25 @@ def resolve_recorded_action(manager, actor, recorded: Dict[str, Any]):
     一致が無ければ None（＝再生不能。round-trip テストが検出）。
     """
     want = _key(recorded)
+
+    def _slots_ok(desc):
+        # 同名複製の曖昧性ガード（2026-08-12）: 録画が `selected_slots`（候補列内の位置）を
+        # 持つ場合はラベル一致に加えて位置も一致した手だけを採る（レスト/アクティブ複製の
+        # 誤対応で盤面が分岐した実測に基づく）。旧録画（slots なし）は従来どおり。
+        rs = recorded.get("selected_slots")
+        return rs is None or (desc or {}).get("selected_slots") == rs
+
     for mv in manager.get_legal_actions(actor):
-        if _key(cpu_ai._describe_move(manager, mv)) == want:
+        d = cpu_ai._describe_move(manager, mv)
+        if _key(d) == want and _slots_ok(d):
             return mv
     # 素の合法手に無い記述子＝決定層だけが持つ代替手（任意効果の decline: accepted=False や
     # up-to の見送り等）は merged_search_actions の展開候補から逆写像する（一致時のみ・挙動追加）。
     try:
         base = manager.get_legal_actions(actor)
         for mv in cpu_ai.merged_search_actions(manager, actor.name, base):
-            if _key(cpu_ai._describe_move(manager, mv)) == want:
+            d = cpu_ai._describe_move(manager, mv)
+            if _key(d) == want and _slots_ok(d):
                 return mv
     except Exception:
         pass
@@ -277,8 +287,25 @@ def _resolve_dialog_action(manager, actor, recorded: Dict[str, Any]):
     if want:
         by_uuid = {c.get("uuid"): c.get("card_id")
                    for c in (pending.get("candidates") or []) if c.get("uuid")}
-        pool = [(u, by_uuid.get(u) or cpu_ai._card_label(manager, u))
-                for u in (pending.get("selectable_uuids") or [])]
+        su = list(pending.get("selectable_uuids") or [])
+        # 位置優先マッチ（2026-08-12）: 録画に `selected_slots`（候補列内の位置）があれば
+        # それで一意に復元する＝同名複製（レスト/アクティブ等・挙動非等価）の誤対応を断つ。
+        # ラベル一致のサニティが崩れたら従来のラベルマッチへフォールバック（黙って信じない）。
+        slots = recorded.get("selected_slots")
+        if slots is not None and len(slots) == len(want) \
+                and all(isinstance(s, int) and 0 <= s < len(su) for s in slots):
+            uuids_s = [su[s] for s in slots]
+            labels_s = [by_uuid.get(u) or cpu_ai._card_label(manager, u) for u in uuids_s]
+            if labels_s == want:
+                payload["selected_uuids"] = uuids_s
+                for k in ("index", "position"):
+                    if recorded.get(k) is not None:
+                        payload[k] = recorded[k]
+                if recorded.get("accepted") is not None:
+                    payload["accepted"] = recorded["accepted"]
+                return {"kind": "game", "action_type": "RESOLVE_EFFECT_SELECTION",
+                        "payload": payload}
+        pool = [(u, by_uuid.get(u) or cpu_ai._card_label(manager, u)) for u in su]
         uuids: List[str] = []
         unmatched = 0
         for cid in want:

@@ -1350,6 +1350,20 @@ def _describe_move(manager, move: Optional[Dict[str, Any]]) -> Optional[Dict[str
     sel = payload.get("selected_uuids") or extra.get("selected_uuids") or []
     if sel:
         d["selected"] = [_card_label(manager, u) for u in sel]
+        # 同名複製の曖昧性解消（2026-08-12）: 選択の card_id ラベルだけでは「レスト中の複製 vs
+        # アクティブの複製」を再生側が区別できず、誤対応→盤面分岐する（don_margin の軌道変化で
+        # 露出した既存の再生忠実度バグ）。pending の selectable 候補列内の**位置**を併記する
+        # （候補列挙は決定論＝再生時も同順。旧録画には無いキー＝再生側はあれば優先・無ければ従来）。
+        if move.get("action_type") == "RESOLVE_EFFECT_SELECTION":
+            try:
+                pend = manager.get_pending_request(with_request_id=False) or {}
+                su = list(pend.get("selectable_uuids") or [])
+                pos = {u: i for i, u in enumerate(su)}
+                slots = [pos.get(u, -1) for u in sel]
+                if slots and all(s >= 0 for s in slots):
+                    d["selected_slots"] = slots
+            except Exception:
+                pass
     for k in ("index", "position"):
         v = payload.get(k)
         if v is None:
