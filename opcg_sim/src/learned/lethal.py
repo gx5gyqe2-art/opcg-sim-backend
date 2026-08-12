@@ -110,7 +110,24 @@ def lethal_distance(gs, m0, name, max_turns=MAX_TURNS, defend=False) -> int:
 
     probe 版との差は適用経路のみ: per-step clone → **1回 clone＋in-place**
     （`cpu_ai._apply_move_inplace`）。適用例外＝ probe の apply→None と同じく測定打ち切り。
+
+    **乱数状態ガード**: クローン上のレースでも効果解決（デッキサーチ後のシャッフル等）が
+    グローバル `random`/`np.random` を消費する。符号化は観測であり世界を進めてはならない
+    （消費すると同一シード対局の軌道が変わる＝CRN/決定論再生が壊れる。bb2 実測 2026-08-12:
+    行数 8652→8553 の乖離・教師再生 35/50 不一致の原因）。測定前後で状態を退避/復元する。
     """
+    import random as _random
+    import numpy as _np
+    _st_py = _random.getstate()
+    _st_np = _np.random.get_state()
+    try:
+        return _lethal_distance_inner(gs, m0, name, max_turns, defend)
+    finally:
+        _random.setstate(_st_py)
+        _np.random.set_state(_st_np)
+
+
+def _lethal_distance_inner(gs, m0, name, max_turns, defend) -> int:
     m = m0.clone()
     m.action_events = []
     my_turns = 0

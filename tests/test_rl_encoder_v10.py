@@ -82,6 +82,26 @@ def test_v10_scan_does_not_mutate_board(db, vocab):
     assert np.array_equal(before["card_idx"], after["card_idx"])
 
 
+def test_v10_scan_does_not_consume_global_rng(db, vocab):
+    """符号化は観測＝グローバル乱数状態を消費しない（CRN/決定論再生の契約）。
+
+    台本レースはクローン上でも効果解決（シャッフル等）が `random`/`np.random` を
+    消費し得る。ガード無しだと同一シード対局の軌道が符号化の有無で変わる
+    （bb2 実測: 同一シード 400 局で行数 8652→8553 に乖離・教師再生 35/50 不一致）。
+    """
+    import random
+    m, name = _mark_state(db, "opcg_replay_6563214359889287880.json.gz", 8)
+    random.seed(12345)
+    np.random.seed(6789)
+    st_py = random.getstate()
+    st_np = np.random.get_state()
+    E.encode(m, name, vocab, version=10)
+    assert random.getstate() == st_py, "encode(v10) がグローバル random を消費した"
+    after = np.random.get_state()
+    assert after[0] == st_np[0] and np.array_equal(after[1], st_np[1]) \
+        and after[2:] == st_np[2:], "encode(v10) がグローバル np.random を消費した"
+
+
 def test_prefix_invariant_v9(db, vocab):
     m, name = _mark_state(db, "opcg_replay_6563214359889287880.json.gz", 8)
     e9 = E.encode(m, name, vocab, version=9)
