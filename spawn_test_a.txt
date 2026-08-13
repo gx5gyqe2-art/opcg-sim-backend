@@ -1,0 +1,8 @@
+boot_id=65ffd870-ebec-4168-9802-eb0edccf7ea9
+hostname=vm
+nproc=4
+mem_total=15
+booted_at=2026-08-13 23:47:10
+pwd=/home/user/opcg-sim-backend
+head_commit=a0617da636e290d62e11e5ab57c865d36b91cdbb
+utc=Thu Aug 13 23:47:41 UTC 2026
