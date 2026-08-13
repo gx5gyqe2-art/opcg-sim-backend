@@ -1,0 +1,4 @@
+{"tag": "g3", "i": 151, "turn": 13, "who": "p1", "bucket": "敵1", "me_life": 2, "opp_life": 1, "pred": 0.981, "wr": "24/24", "ev": 1.0, "err": -0.019}
+{"tag": "m4", "i": 71, "turn": 10, "who": "p1", "bucket": "一般", "me_life": 5, "opp_life": 4, "pred": 0.686, "wr": "24/24", "ev": 1.0, "err": -0.314}
+{"tag": "g2", "i": 62, "turn": 8, "who": "p1", "bucket": "一般", "me_life": 3, "opp_life": 2, "pred": 0.86, "wr": "15/24", "ev": 0.25, "err": 0.61}
+{"tag": "m5", "i": 94, "turn": 10, "who": "p2", "bucket": "一般", "me_life": 2, "opp_life": 3, "pred": -0.311, "wr": "0/24", "ev": -1.0, "err": 0.689}
