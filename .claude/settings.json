@@ -7,6 +7,7 @@
       "Bash(make lint)",
       "Bash(make audit)",
       "Bash(git fetch *)",
+      "mcp__Claude_Code_Remote__create_session",
       "mcp__Claude_Code_Remote__list_environments",
       "mcp__Claude_Code_Remote__list_sessions",
       "mcp__Claude_Code_Remote__get_session",
