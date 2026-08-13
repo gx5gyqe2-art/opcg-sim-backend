@@ -11,9 +11,13 @@
 （リーダー合成の質へ投資）。読めない（r≈0 のまま）＝特徴不足＝能力意味論の
 静的要約特徴が本命。
 
+**出力は逐次シャード**（--out はディレクトリ・--shard-rows 行たまるごとに rows_%05d.npz を
+アトミック書き出し＋ meta.jsonl 追記）＝分散ワーカーが走行中に git push でき、
+中間結果の一次判定が可能（2026-08-13 ユーザ要望）。
+
 実行例:
   OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/bb_contested_isolation.py \\
-    --games 72 --workers 4 --out /tmp/bb4b_rows.npz \\
+    --games 72 --workers 4 --out /tmp/bb4b_rows \\
     --nets "bb3=/tmp/bb3_net12/value.npz@10,bb4_w2=/tmp/bb4_net_w2/value.npz@10"
 """
 import os
@@ -152,14 +156,38 @@ def main():
     ap.add_argument("--label-sims", type=int, default=48)
     ap.add_argument("--boards-per-game", type=int, default=5)
     ap.add_argument("--matchups", default="nami:shanks,p_enel:bg_luffy,nami:bg_luffy,p_enel:shanks")
-    ap.add_argument("--out", required=True, help="行列 npz の出力パス")
+    ap.add_argument("--out", required=True, help="シャード出力ディレクトリ（rows_%%05d.npz＋meta.jsonl）")
+    ap.add_argument("--shard-rows", type=int, default=25,
+                    help="この行数たまるごとに書き出す（〜5局分＝走行中の git push を可能にする）")
     ap.add_argument("--nets", default="",
                     help="判定するID無しネット 'label=path@encver,...'（空＝生成のみ）")
     args = ap.parse_args()
 
     matchups = [m.strip() for m in args.matchups.split(",") if m.strip()]
+    os.makedirs(args.out, exist_ok=True)
     t0 = time.time()
-    rows = []
+    buf, shard, n_rows = [], 0, 0
+
+    def _flush():
+        nonlocal buf, shard
+        if not buf:
+            return
+        L = max(len(r["card_idx"]) for r in buf)
+        ci = np.zeros((len(buf), L), np.int64)
+        for k, r in enumerate(buf):
+            ci[k, :len(r["card_idx"])] = r["card_idx"]
+        path = os.path.join(args.out, f"rows_{shard:05d}.npz")
+        tmp = os.path.join(args.out, f".rows_{shard:05d}.tmp.npz")   # savez は .npz を強制付与
+        np.savez_compressed(tmp, scalars=np.stack([r["scalars"] for r in buf]),
+                            field=np.stack([r["field"] for r in buf]), card_idx=ci,
+                            value=np.array([r["value"] for r in buf], np.float32))
+        os.replace(tmp, path)                     # アトミック（push 中の中途半端ファイル防止）
+        with open(os.path.join(args.out, "meta.jsonl"), "a") as f:
+            for r in buf:
+                f.write(json.dumps(r["meta"], ensure_ascii=False) + "\n")
+        shard += 1
+        buf = []
+
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
                                       initargs=(matchups, args.gen_sims, args.label_sims,
                                                 args.boards_per_game)) as pool:
@@ -167,22 +195,26 @@ def main():
         for out in pool.imap_unordered(play_one,
                                        [args.seed_base + i for i in range(args.games)]):
             done += 1
-            rows += out
-            if done % 10 == 0 or done == args.games:
-                print(f"  {done}/{args.games}局 盤面{len(rows)} {time.time()-t0:.0f}s",
+            buf += out
+            n_rows += len(out)
+            if len(buf) >= args.shard_rows:
+                _flush()
+            if done % 5 == 0 or done == args.games:
+                print(f"  {done}/{args.games}局 盤面{n_rows} {time.time()-t0:.0f}s",
                       flush=True)
-    assert rows, "盤面ゼロ"
-    L = max(len(r["card_idx"]) for r in rows)
-    ci = np.zeros((len(rows), L), np.int64)
-    for k, r in enumerate(rows):
-        ci[k, :len(r["card_idx"])] = r["card_idx"]
-    y = np.array([r["value"] for r in rows], np.float32)
-    S = np.stack([r["scalars"] for r in rows])
-    Fd = np.stack([r["field"] for r in rows])
-    np.savez_compressed(args.out, scalars=S, field=Fd, card_idx=ci, value=y)
-    with open(args.out + ".meta.json", "w") as f:
-        json.dump({"games": args.games, "rows": len(rows), "matchups": matchups,
-                   "metas": [r["meta"] for r in rows]}, f, ensure_ascii=False)
+    _flush()
+    assert n_rows, "盤面ゼロ"
+
+    import glob as _glob
+    parts = {"scalars": [], "field": [], "card_idx": [], "value": []}
+    for f in sorted(_glob.glob(os.path.join(args.out, "rows_*.npz"))):
+        z = np.load(f)
+        for k in parts:
+            parts[k].append(z[k])
+    L = max(a.shape[1] for a in parts["card_idx"])
+    parts["card_idx"] = [np.pad(a, ((0, 0), (0, L - a.shape[1]))) for a in parts["card_idx"]]
+    S, Fd = np.concatenate(parts["scalars"]), np.concatenate(parts["field"])
+    ci, y = np.concatenate(parts["card_idx"]), np.concatenate(parts["value"])
 
     import rl_encoder as E
     import rl_net as RN
