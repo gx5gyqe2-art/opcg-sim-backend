@@ -2,3 +2,7 @@
 {"tag": "g3", "i": 152, "turn": 13, "who": "p2", "bucket": "自1", "me_life": 1, "opp_life": 2, "pred": -0.933, "wr": "0/24", "ev": -1.0, "err": 0.067}
 {"tag": "m4", "i": 74, "turn": 10, "who": "p2", "bucket": "一般", "me_life": 4, "opp_life": 5, "pred": -0.689, "wr": "0/24", "ev": -1.0, "err": 0.311}
 {"tag": "g2", "i": 68, "turn": 9, "who": "p1", "bucket": "一般", "me_life": 3, "opp_life": 2, "pred": 0.95, "wr": "24/24", "ev": 1.0, "err": -0.05}
+{"tag": "e1", "i": 27, "turn": 5, "who": "p1", "bucket": "一般", "me_life": 5, "opp_life": 4, "pred": -0.458, "wr": "0/24", "ev": -1.0, "err": 0.542}
+{"tag": "m2", "i": 67, "turn": 11, "who": "p1", "bucket": "一般", "me_life": 3, "opp_life": 2, "pred": 0.743, "wr": "22/24", "ev": 0.833, "err": -0.091}
+{"tag": "e2", "i": 33, "turn": 6, "who": "p2", "bucket": "一般", "me_life": 4, "opp_life": 3, "pred": -0.549, "wr": "0/24", "ev": -1.0, "err": 0.451}
+{"tag": "h1", "i": 57, "turn": 6, "who": "p2", "bucket": "一般", "me_life": 3, "opp_life": 4, "pred": -0.927, "wr": "10/24", "ev": -0.167, "err": -0.76}
