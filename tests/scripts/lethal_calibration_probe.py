@@ -160,6 +160,18 @@ def main():
     ap.add_argument("--workers", type=int, default=1, help=">1 で盤面並列（候補走査は逐次）")
     ap.add_argument("--label-sims", type=int, default=0,
                     help="0=本番 serve（160sims・高価）・N>0=教師正本 CR.rollout（例 48）")
+    # --- 接戦帯 v2（2026-08-13 監査後）: 帯を**状態で事前定義**する（測定EVでの事後定義は
+    # 「真は決着済みだが世界数が少なくたまたま割れた盤面」を混入させ帯の信号を薄める）。
+    ap.add_argument("--max-life-diff", type=int, default=-1,
+                    help="|自ライフ−相手ライフ| がこの値以下の盤面だけ採る（-1=無効。接戦帯 v2=1）")
+    ap.add_argument("--min-both-life", type=int, default=0,
+                    help="min(両ライフ) がこの値以上の盤面だけ採る（リーサル圏の除外・接戦帯 v2=1）")
+    # --- 分散実行（ワーカー間で盤面をストライプ分割）と逐次シャード出力（走行中 push 可） ---
+    ap.add_argument("--board-offset", type=int, default=0, help="候補列の開始オフセット（分散用）")
+    ap.add_argument("--board-stride", type=int, default=1, help="候補列のストライド（分散用・ワーカー数）")
+    ap.add_argument("--shard-rows", type=int, default=0,
+                    help=">0: この行数ごとに --out へ逐次シャード（lethal_%%05d.npz＋meta.jsonl＋"
+                         "provenance.json）を書く。0=従来の一括 lethal_00000.npz")
     args = ap.parse_args()
 
     table = {**MG.REPLAYS, **CG.REPLAYS_V2, **CG.REPLAYS_V48, **CG.REPLAYS_HUMAN}
@@ -186,6 +198,10 @@ def main():
             lifes = {p: len((ps.get(p) or {}).get("life") or []) for p in ("p1", "p2")}
             if min(lifes.values()) > args.min_life:
                 continue
+            if args.max_life_diff >= 0 and abs(lifes["p1"] - lifes["p2"]) > args.max_life_diff:
+                continue
+            if min(lifes.values()) < args.min_both_life:
+                continue
             if int(a.get("turn", 0) or 0) < args.min_turn:
                 continue
             key = (a.get("player"), int(a.get("turn", 0) or 0))
@@ -201,12 +217,57 @@ def main():
             seen.add(key)
             tasks.append((path, tag, i, args.worlds, bool(args.out)))
             n_tag += 1
-    print(f"候補 {len(tasks)} 盤面（workers={args.workers}・"
+    if args.board_stride > 1 or args.board_offset:
+        tasks = tasks[args.board_offset::args.board_stride]
+    print(f"候補 {len(tasks)} 盤面（workers={args.workers}"
+          f"・offset/stride={args.board_offset}/{args.board_stride}・"
           f"ラベル器={'CR canon sims' + str(args.label_sims) if args.label_sims else '本番serve'}）",
           flush=True)
 
+    if args.out and args.shard_rows:
+        os.makedirs(args.out, exist_ok=True)
+        import subprocess
+        try:
+            rev = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                                 capture_output=True, text=True,
+                                 cwd=os.path.dirname(os.path.abspath(__file__))).stdout.strip()
+        except Exception:
+            rev = "?"
+        from opcg_sim.src.learned import config as _cfg
+        with open(os.path.join(args.out, "provenance.json"), "w") as f:
+            json.dump({"git_rev": rev, "worlds": args.worlds, "label_sims": args.label_sims,
+                       "band": {"min_life": args.min_life, "min_turn": args.min_turn,
+                                "max_life_diff": args.max_life_diff,
+                                "min_both_life": args.min_both_life,
+                                "max_per_replay": args.max_per_replay},
+                       "offset_stride": [args.board_offset, args.board_stride],
+                       "serve_don_box": bool(getattr(_cfg, "SERVE_DON_BOX", False)),
+                       "don_margin_env": os.environ.get("OPCG_DON_MARGIN", ""),
+                       "replays": args.replays}, f, ensure_ascii=False)
+
     rows = []
     out_rows = {k: [] for k in ("scalars", "field", "card_idx", "value", "group")}
+    shard_buf, shard_no = [], 0
+
+    def _flush_shard():
+        nonlocal shard_buf, shard_no
+        if not shard_buf:
+            return
+        L = max(len(e[0][2]) for e in shard_buf)
+        ci = np.zeros((len(shard_buf), L), np.int64)
+        for k, (e, _r) in enumerate(shard_buf):
+            ci[k, :len(e[2])] = e[2]
+        path = os.path.join(args.out, f"lethal_{shard_no:05d}.npz")
+        tmp = os.path.join(args.out, f".lethal_{shard_no:05d}.tmp.npz")
+        np.savez_compressed(tmp, scalars=np.stack([e[0] for e, _ in shard_buf]),
+                            field=np.stack([e[1] for e, _ in shard_buf]), card_idx=ci,
+                            value=np.array([e[3] for e, _ in shard_buf], np.float32))
+        os.replace(tmp, path)
+        with open(os.path.join(args.out, "meta.jsonl"), "a") as f:
+            for _e, r in shard_buf:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        shard_no += 1
+        shard_buf = []
 
     def _consume(res):
         if res is None:
@@ -214,11 +275,16 @@ def main():
         row, enc = res
         rows.append(row)
         if enc is not None:
-            out_rows["scalars"].append(enc[0])
-            out_rows["field"].append(enc[1])
-            out_rows["card_idx"].append(enc[2])
-            out_rows["value"].append(enc[3])
-            out_rows["group"].append(len(rows) - 1)
+            if args.shard_rows:
+                shard_buf.append((enc, row))
+                if len(shard_buf) >= args.shard_rows:
+                    _flush_shard()
+            else:
+                out_rows["scalars"].append(enc[0])
+                out_rows["field"].append(enc[1])
+                out_rows["card_idx"].append(enc[2])
+                out_rows["value"].append(enc[3])
+                out_rows["group"].append(len(rows) - 1)
         print(f"  {row['tag']}@{row['i']} T{row['turn']} {row['who']} [{row['bucket']}]"
               f" 予測{row['pred']:+.3f} 実測{row['wr']}(EV{row['ev']:+.2f})"
               f" 誤差{row['err']:+.3f}", flush=True)
@@ -239,6 +305,8 @@ def main():
         sub = [r["err"] for r in rows if r["bucket"] == b]
         if sub:
             print(f"  {b}: n={len(sub)}  平均 {np.mean(sub):+.3f}  最悪 {min(sub):+.3f}/{max(sub):+.3f}")
+    if args.shard_rows:
+        _flush_shard()
     if args.out and out_rows["value"]:
         os.makedirs(args.out, exist_ok=True)
         np.savez_compressed(os.path.join(args.out, "lethal_00000.npz"),
