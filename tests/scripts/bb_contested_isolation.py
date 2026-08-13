@@ -43,7 +43,20 @@ MAX_STEPS = 400
 _G = {}
 
 
-def _init_worker(matchups, gen_sims, label_sims, boards_per_game):
+def _strip_master(m, cache):
+    """能力を消した master の共有コピー（--strip-card-abilities・db は不変のまま）。
+
+    abilities/effect_text/trigger_text を空に＝キャラ・イベントの効果・トリガー・
+    ブロッカー等が全て消え、コスト/パワー/カウンター値だけの純ステータス世界になる。"""
+    import dataclasses as _dc
+    s = cache.get(m.card_id)
+    if s is None:                                  # CardMaster は frozen dataclass → replace で複製
+        s = _dc.replace(m, abilities=(), effect_text="", trigger_text="")
+        cache[m.card_id] = s
+    return s
+
+
+def _init_worker(matchups, gen_sims, label_sims, boards_per_game, strip):
     import bb_card_factory as F
     import counterfactual_referee as CR
     import p3_loop as P
@@ -63,6 +76,7 @@ def _init_worker(matchups, gen_sims, label_sims, boards_per_game):
     eng = LearnedEngine()
     _G.update(CR=CR, E=E, F=F, db=db, eng=eng, gs=OPCGGame(), gen_sims=gen_sims,
               pairs=pairs, build=build_deck_from_ids, boards_per_game=boards_per_game,
+              strip=strip, strip_cache={},
               vf=P.value_fn_of(eng.vnet, eng.vocab, eng.enc_version),
               pf=P.priors_fn_of(eng.pnet, eng.vocab, eng.enc_version))
 
@@ -76,6 +90,9 @@ def play_one(seed):
     random.seed(seed)
     _l1, c1 = _G["build"](_G["db"], None, ids_a, "p1")
     _l2, c2 = _G["build"](_G["db"], None, ids_b, "p2")
+    if _G["strip"]:                                # 純ステータス世界（効果・トリガー・ブロッカー無し）
+        c1 = [CardInstance(_strip_master(ci.master, _G["strip_cache"]), "p1") for ci in c1]
+        c2 = [CardInstance(_strip_master(ci.master, _G["strip_cache"]), "p2") for ci in c2]
     m = GameManager(Player("p1", c1, CardInstance(F.vanilla_leader("BB-L001"), "p1")),
                     Player("p2", c2, CardInstance(F.vanilla_leader("BB-L002"), "p2")))
     m.start_game()
@@ -159,6 +176,8 @@ def main():
     ap.add_argument("--out", required=True, help="シャード出力ディレクトリ（rows_%%05d.npz＋meta.jsonl）")
     ap.add_argument("--shard-rows", type=int, default=25,
                     help="この行数たまるごとに書き出す（〜5局分＝走行中の git push を可能にする）")
+    ap.add_argument("--strip-card-abilities", action="store_true",
+                    help="キャラ・イベントの能力も消す（純ステータス世界＝消去はしごの最下段）")
     ap.add_argument("--nets", default="",
                     help="判定するID無しネット 'label=path@encver,...'（空＝生成のみ）")
     args = ap.parse_args()
@@ -190,7 +209,8 @@ def main():
 
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
                                       initargs=(matchups, args.gen_sims, args.label_sims,
-                                                args.boards_per_game)) as pool:
+                                                args.boards_per_game,
+                                                args.strip_card_abilities)) as pool:
         done = 0
         for out in pool.imap_unordered(play_one,
                                        [args.seed_base + i for i in range(args.games)]):
