@@ -33,3 +33,8 @@
 {"seed": 920001, "turn": 5, "who": "p1", "mu": "p_enel:bg_luffy", "wr": "0/24"}
 {"seed": 920001, "turn": 5, "who": "p2", "mu": "p_enel:bg_luffy", "wr": "24/24"}
 {"seed": 920001, "turn": 8, "who": "p2", "mu": "p_enel:bg_luffy", "wr": "24/24"}
+{"seed": 920008, "turn": 13, "who": "p1", "mu": "nami:shanks", "wr": "22/24"}
+{"seed": 920008, "turn": 13, "who": "p2", "mu": "nami:shanks", "wr": "1/24"}
+{"seed": 920008, "turn": 11, "who": "p1", "mu": "nami:shanks", "wr": "23/24"}
+{"seed": 920008, "turn": 11, "who": "p2", "mu": "nami:shanks", "wr": "1/24"}
+{"seed": 920008, "turn": 9, "who": "p1", "mu": "nami:shanks", "wr": "21/24"}
