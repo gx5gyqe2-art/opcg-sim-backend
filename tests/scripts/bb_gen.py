@@ -39,17 +39,18 @@ MAX_STEPS = 400
 _G = {}
 
 
-def _init_worker(sims, enc_version=9, leader_synth=False):
+def _init_worker(sims, enc_version=9, leader_synth=False, engine="learned"):
     import bb_card_factory as F
     import rl_encoder as E
     from cpu_selfplay import _load_db
     from opcg_game import OPCGGame
+    from opcg_sim.src.core import cpu_ai
     from opcg_sim.src.core.cpu_learned import LearnedEngine
     db = _load_db()
     pool, stats = F.harvest(db)
-    eng = LearnedEngine()
-    _G.update(F=F, E=E, pool=pool, stats=stats, gs=OPCGGame(), eng=eng,
-              vocab=eng.vocab, sims=sims, enc_version=enc_version,
+    eng = LearnedEngine()                          # 符号化 vocab 供給のため engine=l1 でも保持
+    _G.update(F=F, E=E, pool=pool, stats=stats, gs=OPCGGame(), eng=eng, cpu_ai=cpu_ai,
+              vocab=eng.vocab, sims=sims, enc_version=enc_version, engine=engine,
               leader_pool=F.harvest_leaders(db) if leader_synth else None)
 
 
@@ -82,6 +83,10 @@ def play_one(seed):
     seen_turns = set()
     steps = 0
     drng = np.random.default_rng(seed * 31 + 7)
+    # engine=l1（2026-08-13 監査の処方）: 学習CPUの埋め込みは合成カードで全 UNK＝半盲目の先生に
+    # なるため、埋め込み非依存の古典CPU（αβ＋ガード・効果木を直接読む）で打つ。
+    l1_rng = random.Random(seed * 17 + 3)
+    l1_mem = {"p1": {}, "p2": {}}
     try:
         while m.winner is None and not gs.is_terminal(m) and steps < MAX_STEPS:
             name = gs.current_player(m)
@@ -95,8 +100,12 @@ def play_one(seed):
                 rows["field"].append(enc["field"])
                 rows["who"].append(name)
             actor = m.p1 if m.p1.name == name else m.p2
-            eng._world_seeds = {}
-            mv = eng.decide(m, actor, sims=_G["sims"], rng=drng)
+            if _G.get("engine") == "l1":
+                mv = _G["cpu_ai"].decide_guarded(m, actor, "hard", rng=l1_rng,
+                                                 mem=l1_mem[name], pimc_worlds=1)
+            else:
+                eng._world_seeds = {}
+                mv = eng.decide(m, actor, sims=_G["sims"], rng=drng)
             if mv is None:
                 break
             d = mv.get("action_type") if isinstance(mv, dict) else None
@@ -134,6 +143,9 @@ def main():
                     help="符号化世代（bb2=10: リーサル距離Δ3値つき・v52b）")
     ap.add_argument("--leader-synth", action="store_true",
                     help="bb3: リーダー能力もランダム合成（既定=バニラリーダー）")
+    ap.add_argument("--engine", choices=("learned", "l1"), default="learned",
+                    help="対局の駆動エンジン。l1=古典CPU（埋め込み非依存＝合成世界で盲目でない先生・"
+                         "bb5 以降の既定候補・2026-08-13 監査の処方）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -143,7 +155,7 @@ def main():
     buf, shard, n_rows, n_drop = {"scalars": [], "field": [], "value": []}, 0, 0, 0
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
                                       initargs=(args.sims, args.enc_version,
-                                                args.leader_synth)) as pool:
+                                                args.leader_synth, args.engine)) as pool:
         done = 0
         for r in pool.imap_unordered(play_one, seeds):
             done += 1
@@ -166,7 +178,7 @@ def main():
                       f"{time.time()-t0:.0f}s", flush=True)
     meta = {"games": args.games, "dropped": n_drop, "rows": n_rows,
             "sims": args.sims, "enc_version": args.enc_version,
-            "leader_synth": bool(args.leader_synth),
+            "leader_synth": bool(args.leader_synth), "engine": args.engine,
             "card_idx": "PAD固定（骨組み規約）"}
     with open(os.path.join(args.out, "meta_bb1.json"), "w") as f:
         json.dump(meta, f, ensure_ascii=False, indent=1)

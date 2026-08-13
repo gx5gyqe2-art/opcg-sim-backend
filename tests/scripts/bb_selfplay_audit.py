@@ -37,16 +37,17 @@ MAX_STEPS = 400
 _G = {}
 
 
-def _init_worker(sims, leader_synth=False):
+def _init_worker(sims, leader_synth=False, engine="learned"):
     import bb_card_factory as F
     from cpu_selfplay import _load_db
     from full_card_audit import _total_cards
     from opcg_game import OPCGGame
+    from opcg_sim.src.core import cpu_ai
     from opcg_sim.src.core.cpu_learned import LearnedEngine
     db = _load_db()
     pool, stats = F.harvest(db)
     _G.update(F=F, pool=pool, stats=stats, gs=OPCGGame(), eng=LearnedEngine(),
-              total_cards=_total_cards, sims=sims,
+              total_cards=_total_cards, sims=sims, cpu_ai=cpu_ai, engine=engine,
               leader_pool=F.harvest_leaders(db) if leader_synth else None)
 
 
@@ -81,14 +82,20 @@ def play_one(seed):
     acts = {"p1": 0, "p2": 0}
     steps = 0
     drng = np.random.default_rng(seed * 31 + 7)
+    l1_rng = random.Random(seed * 17 + 3)          # bb_gen --engine l1 と同一規約
+    l1_mem = {"p1": {}, "p2": {}}
     try:
         while m.winner is None and not gs.is_terminal(m) and steps < MAX_STEPS:
             name = gs.current_player(m)
             if name is None:
                 break
             actor = m.p1 if m.p1.name == name else m.p2
-            eng._world_seeds = {}
-            mv = eng.decide(m, actor, sims=_G["sims"], rng=drng)
+            if _G.get("engine") == "l1":
+                mv = _G["cpu_ai"].decide_guarded(m, actor, "hard", rng=l1_rng,
+                                                 mem=l1_mem[name], pimc_worlds=1)
+            else:
+                eng._world_seeds = {}
+                mv = eng.decide(m, actor, sims=_G["sims"], rng=drng)
             if mv is None:
                 break
             d = mv.get("action_type") if isinstance(mv, dict) else None
@@ -131,6 +138,8 @@ def main():
     ap.add_argument("--sims", type=int, default=32)
     ap.add_argument("--seed-base", type=int, default=880000)
     ap.add_argument("--out", default="", help="jsonl 台帳（追記・複数ランで数百局へ積む）")
+    ap.add_argument("--engine", choices=("learned", "l1"), default="learned",
+                    help="対局の駆動エンジン（l1=古典CPU・埋め込み非依存＝2026-08-13 監査の処方）")
     ap.add_argument("--leader-synth", action="store_true",
                     help="bb3: リーダー能力もランダム合成（既定=バニラリーダー）")
     args = ap.parse_args()
@@ -138,7 +147,7 @@ def main():
     seeds = [args.seed_base + i for i in range(args.games)]
     t0 = time.time()
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
-                                      initargs=(args.sims, args.leader_synth)) as pool:
+                                      initargs=(args.sims, args.leader_synth, args.engine)) as pool:
         results = []
         for r in pool.imap_unordered(play_one, seeds):
             results.append(r)
