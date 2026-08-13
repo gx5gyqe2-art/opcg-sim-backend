@@ -130,6 +130,54 @@ def vanilla_leader(card_id="BB-L000", name="バニラ", power=5000, life=5):
                        cost=0, power=power, counter=0, life=life, abilities=())
 
 
+def harvest_leaders(db):
+    """実リーダーから (life, power, ability) を能力単位で収穫する（bb3・Phase 3 第2段）。
+
+    動くことが保証された断片だけを使う原則はカード収穫と同じ。UNKNOWN トリガーは除外。
+    ホストの life/power を能力と一緒に記録する＝**予算結合**（4ライフの強能力/5ライフの
+    控えめな能力という実在のバランス設計を、合成時にホスト単位で保存するため）。"""
+    db.parse_all()
+    out = []
+    for m in db.cards.values():
+        if getattr(m, "type", None) != CardType.LEADER:
+            continue
+        life = int(getattr(m, "life", 0) or 0)
+        power = int(getattr(m, "power", 0) or 0)
+        for ab in getattr(m, "abilities", ()) or ():
+            if getattr(getattr(ab, "trigger", None), "name", "UNKNOWN") == "UNKNOWN":
+                continue
+            out.append((life, power, ab))
+    return out
+
+
+def synth_leader_random(leader_pool, rng, card_id, name="合成L"):
+    """リーダー能力のランダム合成（bb3）: 能力 0〜2 個・life/power は**第1能力のホスト**から。
+
+    - 能力数は実分布の粗い近似（1 が最頻・0=バニラも少数残す＝被覆）。
+    - 2個目は同 life 帯（±1 は低確率＝包絡拡張・カード合成の span 規約と同型）から選ぶ。
+    - ドンデッキ枚数ルール（エネル6枚等・effect_text 正規表現由来）は本段では合成しない
+      （次段のつまみとして保留・`cpu_backbone_plan.md` Phase 3 第2段）。"""
+    if not leader_pool:
+        return vanilla_leader(card_id, name=name)
+    n = int(rng.choice([0, 1, 1, 1, 1, 2]))
+    if n == 0:
+        return vanilla_leader(card_id, name=name)
+    life, power, ab0 = leader_pool[int(rng.integers(len(leader_pool)))]
+    abilities = [copy.deepcopy(ab0)]
+    if n >= 2:
+        span = 1 if rng.random() < 0.15 else 0
+        cands = [ab for lf, _pw, ab in leader_pool if abs(lf - life) <= span]
+        if cands:
+            abilities.append(copy.deepcopy(cands[int(rng.integers(len(cands)))]))
+    # effect_text は raw_text の連結: 「ルール上、ドン!!デッキはN枚」のような **effect_text
+    # 正規表現駆動の常在ルール**（card_moves._apply_leader_don_deck_rule）も、収穫した能力の
+    # 文面ごと引き継いで自然に発火させる（エネル型経済が合成世界に現れる）。
+    return make_master(card_id=card_id, name=name, type=CardType.LEADER,
+                       cost=0, power=power or 5000, counter=0, life=life or 5,
+                       effect_text="".join((ab.raw_text or "") for ab in abilities),
+                       abilities=tuple(abilities))
+
+
 def synth_deck(pool, stats, rng, seq_base, n_distinct=15, deck_size=50, mutate=False):
     """合成デッキ1つ: n_distinct 種を 2〜4 枚ずつ（計 deck_size 枚）。戻り値 (masters, counts)。"""
     masters = [synth_card(pool, stats, rng, seq_base + k, mutate) for k in range(n_distinct)]

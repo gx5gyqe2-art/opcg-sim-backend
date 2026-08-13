@@ -37,7 +37,7 @@ MAX_STEPS = 400
 _G = {}
 
 
-def _init_worker(sims):
+def _init_worker(sims, leader_synth=False):
     import bb_card_factory as F
     from cpu_selfplay import _load_db
     from full_card_audit import _total_cards
@@ -46,7 +46,8 @@ def _init_worker(sims):
     db = _load_db()
     pool, stats = F.harvest(db)
     _G.update(F=F, pool=pool, stats=stats, gs=OPCGGame(), eng=LearnedEngine(),
-              total_cards=_total_cards, sims=sims)
+              total_cards=_total_cards, sims=sims,
+              leader_pool=F.harvest_leaders(db) if leader_synth else None)
 
 
 def play_one(seed):
@@ -61,8 +62,14 @@ def play_one(seed):
         for pid, base in (("p1", seed * 1000), ("p2", seed * 1000 + 500)):
             masters, counts = F.synth_deck(_G["pool"], _G["stats"], rng, seq_base=base)
             cards[pid] = [CardInstance(m, pid) for m, n in zip(masters, counts) for _ in range(n)]
-        l1 = CardInstance(F.vanilla_leader("BB-L001"), "p1")
-        l2 = CardInstance(F.vanilla_leader("BB-L002"), "p2")
+        if _G.get("leader_pool"):
+            # bb3: リーダー能力もランダム合成（席別 rng＝デッキ合成の乱数列は不変に保つ）
+            rngL = np.random.default_rng(seed * 13 + 5)
+            l1 = CardInstance(F.synth_leader_random(_G["leader_pool"], rngL, "BB-L001"), "p1")
+            l2 = CardInstance(F.synth_leader_random(_G["leader_pool"], rngL, "BB-L002"), "p2")
+        else:
+            l1 = CardInstance(F.vanilla_leader("BB-L001"), "p1")
+            l2 = CardInstance(F.vanilla_leader("BB-L002"), "p2")
         random.seed(seed)
         m = GameManager(Player("p1", cards["p1"], l1), Player("p2", cards["p2"], l2))
         m.start_game()
@@ -124,12 +131,14 @@ def main():
     ap.add_argument("--sims", type=int, default=32)
     ap.add_argument("--seed-base", type=int, default=880000)
     ap.add_argument("--out", default="", help="jsonl 台帳（追記・複数ランで数百局へ積む）")
+    ap.add_argument("--leader-synth", action="store_true",
+                    help="bb3: リーダー能力もランダム合成（既定=バニラリーダー）")
     args = ap.parse_args()
 
     seeds = [args.seed_base + i for i in range(args.games)]
     t0 = time.time()
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
-                                      initargs=(args.sims,)) as pool:
+                                      initargs=(args.sims, args.leader_synth)) as pool:
         results = []
         for r in pool.imap_unordered(play_one, seeds):
             results.append(r)

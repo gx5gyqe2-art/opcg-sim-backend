@@ -39,7 +39,7 @@ MAX_STEPS = 400
 _G = {}
 
 
-def _init_worker(sims, enc_version=9):
+def _init_worker(sims, enc_version=9, leader_synth=False):
     import bb_card_factory as F
     import rl_encoder as E
     from cpu_selfplay import _load_db
@@ -49,7 +49,8 @@ def _init_worker(sims, enc_version=9):
     pool, stats = F.harvest(db)
     eng = LearnedEngine()
     _G.update(F=F, E=E, pool=pool, stats=stats, gs=OPCGGame(), eng=eng,
-              vocab=eng.vocab, sims=sims, enc_version=enc_version)
+              vocab=eng.vocab, sims=sims, enc_version=enc_version,
+              leader_pool=F.harvest_leaders(db) if leader_synth else None)
 
 
 def play_one(seed):
@@ -62,9 +63,16 @@ def play_one(seed):
         for pid, base in (("p1", seed * 1000), ("p2", seed * 1000 + 500)):
             masters, counts = F.synth_deck(_G["pool"], _G["stats"], rng, seq_base=base)
             cards[pid] = [CardInstance(m, pid) for m, n in zip(masters, counts) for _ in range(n)]
+        if _G.get("leader_pool"):
+            # bb3: リーダー能力もランダム合成（席別 rng＝デッキ合成の乱数列は不変に保つ）
+            rngL = np.random.default_rng(seed * 13 + 5)
+            l1m = F.synth_leader_random(_G["leader_pool"], rngL, "BB-L001")
+            l2m = F.synth_leader_random(_G["leader_pool"], rngL, "BB-L002")
+        else:
+            l1m, l2m = F.vanilla_leader("BB-L001"), F.vanilla_leader("BB-L002")
         random.seed(seed)
-        m = GameManager(Player("p1", cards["p1"], CardInstance(F.vanilla_leader("BB-L001"), "p1")),
-                        Player("p2", cards["p2"], CardInstance(F.vanilla_leader("BB-L002"), "p2")))
+        m = GameManager(Player("p1", cards["p1"], CardInstance(l1m, "p1")),
+                        Player("p2", cards["p2"], CardInstance(l2m, "p2")))
         m.start_game()
     except Exception:
         return None
@@ -124,6 +132,8 @@ def main():
     ap.add_argument("--shard-games", type=int, default=100)
     ap.add_argument("--enc-version", type=int, default=9,
                     help="符号化世代（bb2=10: リーサル距離Δ3値つき・v52b）")
+    ap.add_argument("--leader-synth", action="store_true",
+                    help="bb3: リーダー能力もランダム合成（既定=バニラリーダー）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -132,7 +142,8 @@ def main():
     t0 = time.time()
     buf, shard, n_rows, n_drop = {"scalars": [], "field": [], "value": []}, 0, 0, 0
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
-                                      initargs=(args.sims, args.enc_version)) as pool:
+                                      initargs=(args.sims, args.enc_version,
+                                                args.leader_synth)) as pool:
         done = 0
         for r in pool.imap_unordered(play_one, seeds):
             done += 1
@@ -155,6 +166,7 @@ def main():
                       f"{time.time()-t0:.0f}s", flush=True)
     meta = {"games": args.games, "dropped": n_drop, "rows": n_rows,
             "sims": args.sims, "enc_version": args.enc_version,
+            "leader_synth": bool(args.leader_synth),
             "card_idx": "PAD固定（骨組み規約）"}
     with open(os.path.join(args.out, "meta_bb1.json"), "w") as f:
         json.dump(meta, f, ensure_ascii=False, indent=1)
