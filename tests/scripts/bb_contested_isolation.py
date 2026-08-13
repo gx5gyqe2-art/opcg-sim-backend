@@ -56,7 +56,7 @@ def _strip_master(m, cache):
     return s
 
 
-def _init_worker(matchups, gen_sims, label_sims, boards_per_game, strip):
+def _init_worker(matchups, gen_sims, label_sims, boards_per_game, strip, worlds, band):
     import bb_card_factory as F
     import counterfactual_referee as CR
     import p3_loop as P
@@ -76,7 +76,7 @@ def _init_worker(matchups, gen_sims, label_sims, boards_per_game, strip):
     eng = LearnedEngine()
     _G.update(CR=CR, E=E, F=F, db=db, eng=eng, gs=OPCGGame(), gen_sims=gen_sims,
               pairs=pairs, build=build_deck_from_ids, boards_per_game=boards_per_game,
-              strip=strip, strip_cache={},
+              strip=strip, strip_cache={}, worlds=worlds, band=band,
               vf=P.value_fn_of(eng.vnet, eng.vocab, eng.enc_version),
               pf=P.priors_fn_of(eng.pnet, eng.vocab, eng.enc_version))
 
@@ -120,20 +120,29 @@ def play_one(seed):
     except Exception:
         return []
 
-    # 接戦フィルタ（bb_relabel と同一規約）: turn≥4・ライフ差昇順（同差は遅いターン優先）
+    # 接戦フィルタ: band=None → 旧規約（turn≥4・ライフ差昇順 top-N）。
+    # band=(min_turn, max_life_diff, min_both_life) → **状態による事前定義**（holdout_ns2 と同一・
+    # 2026-08-13 計測監査後の再測定用）。
     cands = []
+    band = _G["band"]
     for m0, name, t in snaps:
-        if t < 4:
-            continue
         me = m0.p1 if m0.p1.name == name else m0.p2
         op_ = m0.p2 if m0.p1.name == name else m0.p1
-        ld = abs(len(me.life or []) - len(op_.life or []))
+        ml, ol = len(me.life or []), len(op_.life or [])
+        ld = abs(ml - ol)
+        if band is None:
+            if t < 4:
+                continue
+        else:
+            mt, mld, mbl = band
+            if t < mt or ld > mld or min(ml, ol) < mbl:
+                continue
         cands.append((ld, -t, m0, name, t))
     cands.sort(key=lambda x: (x[0], x[1]))
     out = []
     for _ld, _nt, m0, name, t in cands[:_G["boards_per_game"]]:
         wins = ok = 0
-        for w in range(6):
+        for w in range(_G["worlds"]):
             mw = m0.clone()
             for pid_i, pl in enumerate((mw.p1, mw.p2)):
                 r = np.random.default_rng(70000 + w * 101 + pid_i)
@@ -178,6 +187,10 @@ def main():
                     help="この行数たまるごとに書き出す（〜5局分＝走行中の git push を可能にする）")
     ap.add_argument("--strip-card-abilities", action="store_true",
                     help="キャラ・イベントの能力も消す（純ステータス世界＝消去はしごの最下段）")
+    ap.add_argument("--worlds", type=int, default=6, help="ラベルの世界数（再測定 v2=24）")
+    ap.add_argument("--state-band", action="store_true",
+                    help="接戦帯を状態で事前定義（turn≥5・|ライフ差|≤1・両ライフ≥1＝holdout_ns2 と同一）。"
+                         "無指定＝旧規約（turn≥4・ライフ差昇順 top-N）")
     ap.add_argument("--nets", default="",
                     help="判定するID無しネット 'label=path@encver,...'（空＝生成のみ）")
     args = ap.parse_args()
@@ -207,10 +220,12 @@ def main():
         shard += 1
         buf = []
 
+    band = (5, 1, 1) if args.state_band else None
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
                                       initargs=(matchups, args.gen_sims, args.label_sims,
                                                 args.boards_per_game,
-                                                args.strip_card_abilities)) as pool:
+                                                args.strip_card_abilities,
+                                                args.worlds, band)) as pool:
         done = 0
         for out in pool.imap_unordered(play_one,
                                        [args.seed_base + i for i in range(args.games)]):
