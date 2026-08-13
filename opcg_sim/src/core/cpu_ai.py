@@ -1409,6 +1409,8 @@ def _describe_move(manager, move: Optional[Dict[str, Any]]) -> Optional[Dict[str
     payload = move.get("payload") or {}
     uuid = payload.get("uuid") or move.get("card_uuid")
     d: Dict[str, Any] = {"action_type": move.get("action_type")}
+    if move.get("action_type") == "DON_BOX" and payload.get("don_k") is not None:
+        d["don_k"] = int(payload["don_k"])   # k 違いの箱を describe/equiv キーで区別（探索内部専用の型）
     label = _card_label(manager, uuid)
     if label:
         d["card"] = label
@@ -1461,7 +1463,7 @@ def _move_equiv_key(manager, move: Optional[Dict[str, Any]]):
     d = _describe_move(manager, move) or {}
     return (d.get("action_type"), d.get("card"), tuple(d.get("targets") or ()),
             tuple(d.get("selected") or ()), d.get("index"), d.get("position"),
-            d.get("accepted"))
+            d.get("accepted"), d.get("don_k"))   # DON_BOX の k 違い＝別挙動（他は None＝キー不変）
 
 
 def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_only: bool,

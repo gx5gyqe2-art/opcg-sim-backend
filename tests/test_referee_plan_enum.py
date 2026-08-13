@@ -63,7 +63,10 @@ def test_enumeration_includes_核心プラン(plans):
     labels = {">".join(CR._step_label(d) for d in descs) for _k, descs in out}
     assert "TURN_END" in labels
     assert "ATTACK:PRB02-008→OP16-060" in labels
-    assert "ATTACH_DON:PRB02-008>ATTACK:PRB02-008→OP16-060" in labels
+    # 「攻撃者自身への付与→攻撃」は、ドン箱既定 ON（2026-08-13）後は 1 手のマクロ
+    # DON_BOX として列挙されるのが正（チェーン形はプラン枠を箱に譲って落ち得る）。
+    assert ("ATTACH_DON:PRB02-008>ATTACK:PRB02-008→OP16-060" in labels
+            or any(lb.split(">")[-1].startswith("DON_BOX:PRB02-008") for lb in labels))
 
 
 def test_enumeration_terminal_and_caps(plans):
@@ -72,7 +75,8 @@ def test_enumeration_terminal_and_caps(plans):
     assert 0 < len(out) <= 16
     for keys, descs in out:
         assert len(keys) == len(descs) <= 4
-        assert descs[-1].get("action_type") in ("ATTACK", "TURN_END")
+        # DON_BOX（ドン箱・既定 ON 2026-08-13）は「付与k→攻撃宣言」のマクロ＝攻撃コミット終端
+        assert descs[-1].get("action_type") in ("ATTACK", "TURN_END", "DON_BOX")
     assert any("[cap]" in s for s in logs), "縮約したのにログが無い（無言の縮約）"
 
 
