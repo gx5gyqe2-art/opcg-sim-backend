@@ -301,6 +301,23 @@ class ValueNet:
         self._init_adam()
         return self
 
+    def disable_exit_head(self, kind):
+        """出口ヘッドを破棄して従来経路（既存 value へのフォールバック）に戻す。
+
+        用途（2026-08-14 実害）: 胴体を微調整すると**胴体入力の出口ヘッドは黙って腐る**
+        （重みは据え置きのまま入力分布だけズレる＝gen15 温スタートで戦闘箱の物差しが壊れ
+        m1@15 が 1.00→0.00）。微調整後は本メソッドで捨ててから defcf で学習し直すのが正。"""
+        wf, W1n, b1n, W2n, b2n = EXIT_HEADS[kind]
+        hidden = self.W1.shape[1]
+        setattr(self, wf, 0)
+        setattr(self, W1n, np.zeros((hidden, 0)))
+        setattr(self, b1n, np.zeros(0))
+        setattr(self, W2n, np.zeros((0, 1)))
+        setattr(self, b2n, np.zeros(1))
+        setattr(self, f"{kind}_in_cols", np.zeros(0, dtype=np.int64))
+        self._init_adam()
+        return self
+
     def _exit_head_input(self, cache, kind):
         """出口ヘッドの中間層入力（既定=胴体 A1／in_cols 指定時=生 scalars の該当列）。"""
         cols = getattr(self, f"{kind}_in_cols", None)

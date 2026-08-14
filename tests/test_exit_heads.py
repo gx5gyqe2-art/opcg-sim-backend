@@ -396,3 +396,24 @@ def test_battle_resource_cols_within_bounds():
         if prev is not None:
             assert set(prev) <= set(cols), f"v{v} で列集合が縮んだ（append-only 違反）"
         prev = cols
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_disable_exit_head_restores_fallback(kind, tmp_path):
+    """破棄で従来経路へ戻る（胴体微調整後の stale ヘッド差し替え・2026-08-14 gen15 実害の処方）。"""
+    net, b = _net(), _batch()
+    net.enable_exit_head(kind, hidden=8)
+    for _ in range(20):
+        _, cache = net.forward(b)
+        net.step(net.backward_exit(cache, np.ones(len(b["scalars"])), kind), lr=1e-2)
+    assert not np.allclose(net.predict_exit(b, kind), net.predict(b))   # 学習で乖離している
+    net.disable_exit_head(kind)
+    assert not net.has_exit_head(kind)
+    assert np.array_equal(net.predict_exit(b, kind), net.predict(b))    # フォールバック復帰
+    p = str(tmp_path / "disabled.npz")
+    net.save(p)
+    re = RN.ValueNet.load(p)
+    assert not re.has_exit_head(kind)                                   # 破棄が保存でも保たれる
+    # 破棄後は同種ヘッドを再有効化できる（差し替えの成立・リソース入力でも可）
+    net.enable_exit_head(kind, hidden=8, in_cols=[0, 1, 6])
+    assert np.allclose(net.predict_exit(b, kind), net.predict(b))

@@ -155,6 +155,9 @@ def main():
     ap.add_argument("--lr", type=float, default=1e-3,
                     help="ヘッドのみ（共有重みを一切動かさない）＝共有重み学習 2e-5 より大きく取れる")
     ap.add_argument("--head-hidden", type=int, default=32, help="出口ヘッドの中間層幅")
+    ap.add_argument("--replace-head", action="store_true",
+                    help="base が既に同種ヘッドを持つ場合に破棄して学習し直す（胴体微調整後の "
+                         "stale ヘッド差し替え・2026-08-14 gen15 実害）。無指定なら従来どおりエラー")
     ap.add_argument("--head-input", default="trunk", choices=("trunk", "resource"),
                     help="ヘッドの入力（trunk=胴体A1〔従来〕／resource=生scalarsのリソース束"
                          "〔E.battle_resource_cols・交換レートを物理量から学ぶA/B・2026-08-14〕）")
@@ -190,6 +193,9 @@ def main():
         print(f"温スタート拡張: v{ev0} → v{args.enc_version}")
     assert vnet.feat_dim == E.feature_dim(args.enc_version), \
         f"入力次元不一致: {vnet.feat_dim} != {E.feature_dim(args.enc_version)}"
+    if args.replace_head and vnet.has_exit_head(args.head):
+        vnet.disable_exit_head(args.head)
+        print(f"既存 {args.head} ヘッドを破棄（胴体微調整後の stale ヘッド差し替え）", flush=True)
     in_cols = (E.battle_resource_cols(args.enc_version)
                if args.head_input == "resource" else None)
     vnet.enable_exit_head(args.head, hidden=args.head_hidden,
