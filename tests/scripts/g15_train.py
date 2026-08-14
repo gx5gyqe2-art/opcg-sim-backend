@@ -31,6 +31,14 @@ import rl_net as RN  # noqa: E402
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dirs", required=True, help="g15_gen シャードのディレクトリ（カンマ区切り）")
+    ap.add_argument("--bb-dirs", default="",
+                    help="混合する bb_gen シャード（bb1_*.npz・card_idx 無し→全0=UNK として結合。"
+                         "合成カードは vocab 外なので UNK が正しい表現＝『ID不明時はリーダー特徴で"
+                         "読む』経路の教材・gen15 混合訓練 2026-08-14）")
+    ap.add_argument("--init-net", default="",
+                    help="温スタート元 value.npz（例: 出荷 G14）。--init-version から本コーパスの"
+                         "世代へ warm_start_value で恒等拡張してから訓練する")
+    ap.add_argument("--init-version", type=int, default=9, help="--init-net の符号化世代")
     ap.add_argument("--scalar-cols", type=int, required=True,
                     help="scalars の接頭辞切り出し列数（97=v11腕・73=v10腕）")
     ap.add_argument("--epochs", type=int, default=12)
@@ -49,9 +57,22 @@ def main():
             z = np.load(f)
             for k in parts:
                 parts[k].append(z[k])
+    n_ci = parts["card_idx"][0].shape[1] if parts["card_idx"] else 24
+    n_bb = 0
+    for d in [x for x in args.bb_dirs.split(",") if x.strip()]:
+        for f in sorted(glob.glob(os.path.join(d.strip(), "bb1_*.npz"))):
+            z = np.load(f)
+            k = len(z["value"])
+            parts["scalars"].append(z["scalars"])
+            parts["field"].append(z["field"])
+            parts["card_idx"].append(np.zeros((k, n_ci), np.int64))
+            parts["value"].append(z["value"])
+            n_bb += k
     X = {k: np.concatenate(v) for k, v in parts.items()}
     n = len(X["value"])
     assert n > 0, "コーパスが空"
+    if n_bb:
+        print(f"混合: 実デッキ {n - n_bb} 行 + 合成リーダー世界 {n_bb} 行（card_idx=UNK）")
     X["scalars"] = X["scalars"][:, :args.scalar_cols]
     rng = np.random.default_rng(args.seed)
     order = rng.permutation(n)
@@ -60,11 +81,17 @@ def main():
     print(f"コーパス {n} 行（train {len(tr)} / val {len(va)}）"
           f"・scalars {args.scalar_cols}列・勝敗均衡 {X['value'].mean():+.3f}")
 
-    from opcg_sim.src.core.cpu_learned import LearnedEngine
+    from opcg_sim.src.core.cpu_learned import LearnedEngine, warm_start_value
     vocab_size = len(LearnedEngine().vocab)
     ver = {E.scalars_dim(v): v for v in E.known_versions()}[args.scalar_cols]
-    net = RN.ValueNet(vocab_size=vocab_size, d_emb=args.d_emb, hidden=args.hidden,
-                      feat_dim=E.feature_dim(ver), seed=args.seed)
+    if args.init_net:
+        net = RN.ValueNet.load(args.init_net)
+        if args.init_version != ver:
+            net = warm_start_value(net, args.init_version, ver)
+        print(f"温スタート: {args.init_net} v{args.init_version}→v{ver}（恒等拡張）")
+    else:
+        net = RN.ValueNet(vocab_size=vocab_size, d_emb=args.d_emb, hidden=args.hidden,
+                          feat_dim=E.feature_dim(ver), seed=args.seed)
 
     def mse(idx):
         s = 0.0
