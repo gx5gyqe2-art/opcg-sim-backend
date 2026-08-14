@@ -48,9 +48,10 @@ SCALARS_V7 = 63        # v7 = v6 + **登場時オプション実測3**（発火�
 SCALARS_V8 = 66        # v8 = v7 + **自場集約3**（総火力/高パワー数/ブロッカー数＝相手v5と純対称・v32）
 SCALARS_V9 = 70        # v9 = v8 + **ドンデッキ残2**（自/相手）＋**自デッキ残キャラ頂点2**（最大パワー/最大コスト・v49）
 SCALARS_V10 = 73       # v10 = v9 + **リーサル距離Δ3**（d_me/d_opp/d_opp_def・台本レース実測・v52b）
+SCALARS_V11 = 97       # v11 = v10 + **リーダー物理要約24**（自12+相手12・能力木→毎ターン率・leader_feat・v54系）
 _SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4,
                        5: SCALARS_V5, 6: SCALARS_V6, 7: SCALARS_V7, 8: SCALARS_V8,
-                       9: SCALARS_V9, 10: SCALARS_V10}
+                       9: SCALARS_V9, 10: SCALARS_V10, 11: SCALARS_V11}
 
 # 手番フラグ（is_my_turn）の scalars 列位置。append-only 契約により全版で不変＝
 # コーパスの盤面を「自ターン/相手ターン」で層別するときの唯一の正（v35 層別アンカー）。
@@ -371,6 +372,14 @@ def encode(manager, me_name, vocab, version=1):
         d_me_l, d_opp_l, d_opp_def_l = lethal_scan(manager, me_name)
         _cap = float(_LMT + 1)
         vals += [d_me_l / _cap, d_opp_l / _cap, d_opp_def_l / _cap]
+    if version >= 11:
+        # v11（2026-08-14）: リーダー物理要約（能力木→毎ターン率12次元×自/相手）。
+        # 接戦帯の帰趨を支配するリーダー再帰効果（ドンランプ・回復・ミル・常在修正）が
+        # 現行特徴に0ビットだった欠陥（消去はしご2.6σ）への処方。ID非依存＝新リーダーへ
+        # パース即汎化。純粋な木walk＝乱数無消費・エンジン実行なし（符号化は観測）。
+        from opcg_sim.src.learned.leader_feat import leader_pair_vectors
+        lv_me, lv_opp = leader_pair_vectors(manager, me_name)
+        vals += list(lv_me) + list(lv_opp)
     scalars = np.array(vals, dtype=np.float32)
 
     field = np.zeros((2 * MAX_FIELD, PER_CHAR), dtype=np.float32)
