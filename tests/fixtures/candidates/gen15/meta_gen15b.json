@@ -1,0 +1,22 @@
+{
+ "recipe": "armB(温スタートG14+混合25960行lr1e-4ep3) + 裁定注入battleヘッド(v43系)",
+ "head": {
+  "input": "trunk",
+  "hidden": 4,
+  "margin": 0.03,
+  "epochs": 64,
+  "lr": 0.001,
+  "teacher": "verified_inject 8点32群136盤面(armB出口解決・repeat4・攻守混合)",
+  "centering": "defcf 15パート1198盤面",
+  "offset_std": 0.161
+ },
+ "screen": {
+  "m1@3": 1.0,
+  "m1@14": 1.0,
+  "m1@15": 1.0,
+  "ns2_mid_r": 0.716,
+  "seeds": 8
+ },
+ "note": "注入点のゲートは非独立（v43と同じ取引）＝一次証拠はアリーナ",
+ "date": "2026-08-14"
+}
