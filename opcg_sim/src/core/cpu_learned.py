@@ -14,6 +14,7 @@ docs/reports/cpu_rl_pilot_p3_results_20260630.md。P3本走で得た Gen2 ネッ
 """
 import math
 import os
+import random
 import weakref
 from typing import Any, Dict, Optional
 
@@ -31,7 +32,7 @@ from opcg_sim.src.learned.config import (
     SERVE_ROOT_SWITCH_MIN_FRAC, SERVE_ROOT_SWITCH_MIN_GAP, SERVE_STICKY_WORLD,
     AUX_TIE_DECAY, AUX_SAT_START, TERM_FLOOR, V4_TURNS_SCALE)
 from opcg_sim.src.learned.mcts import (   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
-    TreeMCTS, in_battle, resolved_branch_values)
+    TreeMCTS, in_battle, resolve_battle_inplace, resolved_branch_values)
 from opcg_sim.src.utils.loader import CardLoader
 
 _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -274,7 +275,7 @@ class LearnedEngine:
                  battle_readout: Optional[bool] = None, quiesce: Optional[bool] = None,
                  box_battle: Optional[bool] = None, turn_quiesce: Optional[bool] = None,
                  plan_readout: Optional[bool] = None, don_margin: Optional[bool] = None,
-                 don_box: Optional[bool] = None):
+                 don_box: Optional[bool] = None, battle_commit: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
@@ -298,6 +299,10 @@ class LearnedEngine:
         self.root_gap = root_gap        # 同（Q 差・inf で従来の argmax(N)）
         # 戦闘窓の読み出し（None=config.SERVE_BATTLE_READOUT に従う・A/B 用の seam）。
         self.battle_readout = battle_readout
+        # 入口コミット（None=config.SERVE_BATTLE_COMMIT に従う・席別 seam・2026-08-14）。
+        # プランのキャッシュ {(id(manager), id(battle), name): (weakref(battle), [move_sig])}。
+        self.battle_commit = battle_commit
+        self._battle_plans: Dict[Any, Any] = {}
         # 静止探索（None=config.SERVE_QUIESCE に従う）。**同一プロセスで席ごとに機構を変える**
         # ための seam＝「新機構の候補 vs 現行本番」を公平に1回で測る（グローバル定数を書き換える
         # 測り方だと両席に同時に効いてしまい、機構とネットの寄与が分離できない）。
@@ -425,6 +430,89 @@ class LearnedEngine:
                  "Q": np.array([v if v is not None else -1.0 for v in vals], dtype=float)}
         return legal[best], stats, mgr
 
+    def _battle_window_plan(self, manager, name, det_rng):
+        """`_battle_window_choice` のプラン版（SERVE_BATTLE_COMMIT・2026-08-14 ユーザ決定）。
+
+        選び方は choice と完全に同一（同じ決定化・同じ resolved_branch_values・同じ argmax）。
+        違いは、最良枝をもう一度解決してその過程で**自分側が選んだ後続手**（move_sig 列）を
+        採取して返すことだけ＝「何を選ぶか」は不変で「いつ決めるか」を入口に寄せる部品。
+        返り値 (move, stats, ev_mgr, tail_sigs)。"""
+        from opcg_sim.src.core import journal
+        from opcg_sim.src.core.journal import JournaledList
+        from opcg_sim.src.learned import plan as PL
+        mgr = self.game.determinize(manager, name, det_rng)
+        legal = self.game.legal_actions(mgr)
+        if not legal:
+            return None, None, None, []
+        if len(legal) == 1:
+            return legal[0], None, None, []
+        pf = _priors_fn(self.pnet, self.vocab, self.enc_version)
+        bvf = self._battle_value_fn()
+        vals = resolved_branch_values(self.game, mgr, name, legal, bvf, pf)
+        ok = [i for i, v in enumerate(vals) if v is not None]
+        if not ok:
+            return None, None, None, []
+        best = max(ok, key=lambda i: vals[i])
+        stats = {"legal": legal,
+                 "N": np.array([1.0 if v is not None else 0.0 for v in vals]),
+                 "Q": np.array([v if v is not None else -1.0 for v in vals], dtype=float)}
+        tail = []
+        base_rng_state = random.getstate()
+        saved_events = mgr.action_events
+        try:
+            with journal.transaction():      # 採取後に巻き戻す（mgr は評価用の決定化クローン）
+                mgr.action_events = JournaledList()
+                cpu_ai._apply_move_inplace(mgr, name, legal[best], stop_at_select=True)
+                trace = []
+                resolve_battle_inplace(self.game, mgr, pf, value_fn=bvf, trace=trace)
+                tail = [PL.move_sig(mv) for nm, mv in trace if nm == name]
+        except Exception:
+            tail = []                        # 採取失敗＝プラン無し（ステップ動作に退化・安全側）
+        finally:
+            mgr.action_events = saved_events
+            random.setstate(base_rng_state)  # 実ゲームへ乱数消費を漏らさない（CRN と同じ規約）
+        return legal[best], stats, mgr, tail
+
+    def _battle_commit_step(self, manager, name, det_rng, _replanned=False):
+        """入口コミットの読み出し（SERVE_BATTLE_COMMIT）: 窓の最初の decide でプランを立てて
+        キャッシュし、以後の decide はその実行だけを返す。
+
+        人間の意思決定（カウンターを1枚切った後に考え直さない）に合わせる（ユーザ決定
+        2026-08-14）。効果は (1)「払い始めたら払い切る」の構造保証（途中で聞き直さないため
+        『1枚払って素通し』という支配された折衷ラインが原理的に出ない）(2) 窓のステップ数ぶん
+        あった全枝解決が1回になる高速化。プラン手が実盤面で非合法（トリガー等の想定外）なら
+        1回だけ立て直し、それも失敗なら従来のステップ動作へ退化する（安全側）。"""
+        from opcg_sim.src.learned import plan as PL
+        bat = getattr(manager, "active_battle", None)
+        if bat is None:
+            return None, None, None
+        key = (id(manager), id(bat), name)
+        hit = self._battle_plans.get(key)
+        steps = hit[1] if (hit is not None and hit[0]() is bat) else None
+        if steps is None:
+            move, stats, ev_mgr, tail = self._battle_window_plan(manager, name, det_rng)
+            if move is None:
+                return None, None, None
+            if len(self._battle_plans) >= 64:
+                for k in list(self._battle_plans)[:32]:
+                    del self._battle_plans[k]
+            try:
+                self._battle_plans[key] = (weakref.ref(bat), list(tail))
+            except TypeError:
+                pass                         # weakref 不可＝毎回プランを立て直す（従来挙動相当）
+            return move, stats, ev_mgr
+        legal = self.game.legal_actions(manager)
+        while steps:
+            mv = PL._find_move(legal, steps[0])
+            steps.pop(0)
+            if mv is not None:
+                return mv, None, None
+        # プランが尽きた/全手が非合法＝計画が割れた → 1回だけ立て直す
+        self._battle_plans.pop(key, None)
+        if _replanned:
+            return None, None, None          # 二度目も割れたら従来経路（full-tree）へ委ねる
+        return self._battle_commit_step(manager, name, det_rng, _replanned=True)
+
     def _plan_step(self, manager, name, det_rng, world_seed):
         """プラン読み出し（`SERVE_PLAN_READOUT`・v37②）: ターンに1回プランを立てて
         （K世界期待値・`plan.select_plan`）、以後はその手を1つずつ返す。
@@ -498,13 +586,19 @@ class LearnedEngine:
         use_battle = (CFG.SERVE_BATTLE_READOUT if self.battle_readout is None
                       else self.battle_readout)
         if use_battle and in_battle(manager):
-            move, stats, ev_mgr = self._battle_window_choice(manager, name, det_rng)
+            commit = (CFG.SERVE_BATTLE_COMMIT if self.battle_commit is None
+                      else self.battle_commit)
+            if commit:
+                move, stats, ev_mgr = self._battle_commit_step(manager, name, det_rng)
+            else:
+                move, stats, ev_mgr = self._battle_window_choice(manager, name, det_rng)
             if move is not None:
                 if trace is not None:
                     try:
                         _fill_trace(trace, ev_mgr if ev_mgr is not None else manager,
                                     player, move, stats)
-                        trace["readout"] = "battle_resolved"
+                        trace["readout"] = ("battle_commit" if commit
+                                            else "battle_resolved")
                     except Exception:
                         pass   # 分析失敗で対局を止めない
                 return move

@@ -77,7 +77,7 @@ def quiesce_choice(mgr, legal, priors_fn=None):
 
 
 def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIES,
-                           value_fn=None, box_depth=0):
+                           value_fn=None, box_depth=0, trace=None):
     """戦闘が解決するまで mgr をその場で進める（**巻き戻さない**・適用手数を返す）。
 
     **探索（葉評価）と教師（コーパス符号化）が同一の解決規約を使うための単一の正**。
@@ -108,6 +108,11 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
                 pick = max(ok, key=lambda i: vals[i])
         if pick is None:
             pick = quiesce_choice(mgr, legal, priors_fn)
+        if trace is not None:
+            # 入口コミット（SERVE_BATTLE_COMMIT）用: 解決中に「誰がどの手を選んだか」を
+            # 採取する。適用前に積む＝適用失敗時は最後の1件が余るが、呼び出し側は
+            # move_sig 照合で実盤面に無い手を捨てるため無害。
+            trace.append((name, legal[pick]))
         try:
             cpu_ai._apply_move_inplace(mgr, name, legal[pick], stop_at_select=True)
         except Exception:
