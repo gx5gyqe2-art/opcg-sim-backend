@@ -1,0 +1,6 @@
+shard=c1
+boot_id=0c966c49-2e3d-47d9-ad1b-d975b163e07a
+nproc=4
+start_epoch=1786672684.137614262
+end_epoch=1786672714.182990156
+iterations=60107000 elapsed=30.00
