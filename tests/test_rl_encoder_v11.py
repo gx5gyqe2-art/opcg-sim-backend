@@ -101,7 +101,9 @@ def test_semantic_anchors_known_leaders(db):
     # fixture リーダー3枚（2026-08-14 の配線見逃し＝BUFF/ACTIVE_DON/防御系トリガーの再発防止）
     v = leader_static_vector(db.get_card("OP11-041"))
     assert v[DIMS.index("pow_own")] > 0, "ナミ OP11-041: 防御+2000（BUFF）が映らない"
-    assert v[DIMS.index("draw_rate")] > 0, "ナミ OP11-041: 被弾ドローが映らない"
+    # draw_rate は純手札経済（被弾ドロー0.7 − パンプコストの捨て1.0 = −0.3）。
+    # 符号でなく「非ゼロ＝手札経済が写っている」ことを錨にする（DISCARD 配線 2026-08-14）。
+    assert abs(v[DIMS.index("draw_rate")]) > 0.1, "ナミ OP11-041: 手札経済が映らない"
     v = leader_static_vector(db.get_card("OP09-001"))
     assert v[DIMS.index("pow_opp")] < 0, "シャンクス: アタック時−1000（BUFF/OPP）が映らない"
     v = leader_static_vector(db.get_card("OP16-022"))

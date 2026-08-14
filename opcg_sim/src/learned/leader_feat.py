@@ -117,6 +117,13 @@ def _accumulate(vec: np.ndarray, node: GameAction, w: float, sign: float = 1.0):
         vec[k] += w * max(v, 1.0)
     elif at == ActionType.DRAW:
         vec[4] += sign * w * max(v, 1.0)
+    elif at == ActionType.DISCARD:
+        # 手札経済の負側（2026-08-14 被覆監査: 落ち26件の筆頭）。自分側＝コスト/自傷は
+        # draw_rate から減算（手札Δ/ターンに統一）。相手側＝ハンデス＝資源攻撃として除去へ。
+        if self_side is False:
+            vec[7] += w * 0.5
+        else:
+            vec[4] -= w * max(v, 1.0)
     elif at in (ActionType.BP_BUFF, ActionType.SET_BASE_POWER, ActionType.BUFF,
                 ActionType.SWAP_POWER):
         # BUFF は BP_BUFF と別列挙（2026-08-14 修正: fixture ナミ+2000/シャンクス−1000 は
@@ -132,6 +139,10 @@ def _accumulate(vec: np.ndarray, node: GameAction, w: float, sign: float = 1.0):
                    ActionType.TRASH, ActionType.MOVE) and self_side is False):
         # BOUNCE 等の移動系は相手側対象のみ除去（自分側はコスト/配置換え・ハンニャバル自己戻し等）
         vec[7] += w
+    elif at == ActionType.REST and self_side is False:
+        vec[7] += w * 0.5                          # 相手キャラのレスト＝擬似除去（半分重み）
+    elif at == ActionType.ACTIVE and self_side is not False:
+        vec[8] += w * 0.5                          # 自キャラ起こし＝テンポ（展開の半分重み）
     elif at in (ActionType.PLAY_CARD, ActionType.EXECUTE_EVENT):
         vec[8] += w
     elif at in (ActionType.COST_BUFF, ActionType.COST_CHANGE, ActionType.SET_COST):
