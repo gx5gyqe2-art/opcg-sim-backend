@@ -1,0 +1,16 @@
+shard=p2
+boot_id=a1a23d43-f673-420f-ae0c-d5b3ff888d2b
+nproc=4
+cpu_model=Intel(R) Xeon(R) Processor @ 2.10GHz
+start_epoch=1786677609.370371102
+bucket=0 iterations=75831000
+bucket=1 iterations=72884000
+bucket=2 iterations=84412000
+bucket=3 iterations=77316000
+bucket=4 iterations=74385000
+bucket=5 iterations=75689000
+bucket=6 iterations=89546000
+bucket=7 iterations=73673000
+bucket=8 iterations=77260000
+bucket=9 iterations=77833000
+end_epoch=1786677909.417306845
