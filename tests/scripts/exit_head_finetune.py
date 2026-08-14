@@ -121,7 +121,7 @@ def center_exit_head(net, ref, kind):
     コーパスを渡すこと（注入コーパスだけで中心化すると3点の偏った分布に合わせてしまう）。"""
     _, _, _, W2n, b2n = RN.EXIT_HEADS[kind]
     _, cache = net.forward(ref)
-    _, h = net._exit_hidden_act(cache[8], kind)
+    _, _, h = net._exit_hidden_act(cache, kind)
     resid = (h @ getattr(net, W2n) + getattr(net, b2n))[:, 0]
     shift = float(resid.mean())
     setattr(net, b2n, getattr(net, b2n) - shift)
@@ -155,6 +155,9 @@ def main():
     ap.add_argument("--lr", type=float, default=1e-3,
                     help="ヘッドのみ（共有重みを一切動かさない）＝共有重み学習 2e-5 より大きく取れる")
     ap.add_argument("--head-hidden", type=int, default=32, help="出口ヘッドの中間層幅")
+    ap.add_argument("--head-input", default="trunk", choices=("trunk", "resource"),
+                    help="ヘッドの入力（trunk=胴体A1〔従来〕／resource=生scalarsのリソース束"
+                         "〔E.battle_resource_cols・交換レートを物理量から学ぶA/B・2026-08-14〕）")
     ap.add_argument("--margin", type=float, default=0.2)
     ap.add_argument("--delta", type=float, default=0.25, help="順位ペアに採る z 差の下限")
     ap.add_argument("--globs", default=None,
@@ -187,7 +190,13 @@ def main():
         print(f"温スタート拡張: v{ev0} → v{args.enc_version}")
     assert vnet.feat_dim == E.feature_dim(args.enc_version), \
         f"入力次元不一致: {vnet.feat_dim} != {E.feature_dim(args.enc_version)}"
-    vnet.enable_exit_head(args.head, hidden=args.head_hidden)  # 残差ゼロ＝学習前は現行 value と同一
+    in_cols = (E.battle_resource_cols(args.enc_version)
+               if args.head_input == "resource" else None)
+    vnet.enable_exit_head(args.head, hidden=args.head_hidden,
+                          in_cols=in_cols)  # 残差ゼロ＝学習前は現行 value と同一
+    if in_cols:
+        print(f"リソースヘッド: 入力 {len(in_cols)} 列（battle_resource_cols v{args.enc_version}）",
+              flush=True)
 
     pairs = build_rank_pairs(child, delta=args.delta)
     # group 単位で train/val 分割（同一決定点が両側に跨がない＝リークしない）。
@@ -238,6 +247,7 @@ def main():
            "boards": int(len(child["value"])),
            "groups": int(len(set(child["group"]))), "pairs": len(pairs),
            "epochs": args.epochs, "lr": args.lr, "head_hidden": args.head_hidden,
+           "head_input": args.head_input,
            "rank_acc_before": round(a0, 4), "rank_acc_after": round(a1, 4),
            "candidate": f"{out_v},{out_p}"}
     print(f"EXIT_HEAD_FINETUNE_RESULT {json.dumps(res)}", flush=True)

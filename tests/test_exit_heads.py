@@ -342,3 +342,57 @@ def test_calib_rejects_non_monotone_and_roundtrips(tmp_path):
     re.set_calib(None, None)                                   # 解除＝恒等へ戻る
     assert not re.has_calib()
     assert np.array_equal(re.predict(batch), re.forward(batch)[0])
+
+
+# --- リソースヘッド（in_cols・2026-08-14 ユーザ提案「手札/盤面/ライフの束で交換レートを学ぶ」） ---
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_resource_head_identity_isolation_roundtrip(kind, tmp_path):
+    """in_cols 指定ヘッドでも既存性質が全て成立する: 有効化恒等・胴体凍結・本体 predict 不変・
+    save/load 往復・expanded（温スタート挿入）での列シフト追随＝恒等保存。"""
+    net, b = _net(), _batch()
+    cols = [0, 1, 6, 7, 11, 20]          # scalars 5列 + field 域 1列（シフト検査用）
+    net.enable_exit_head(kind, hidden=8, in_cols=cols)
+    assert np.array_equal(getattr(net, f"{kind}_in_cols"), np.array(sorted(cols)))
+    # 有効化は恒等（出力層ゼロ）
+    assert np.allclose(net.predict_exit(b, kind), net.predict(b))
+    # 勾配の入力側は「胴体 A1」でなく「指定列」の形
+    _, cache = net.forward(b)
+    grads = net.backward_exit(cache, np.zeros(len(b["scalars"])), kind)
+    assert grads[RN.EXIT_HEADS[kind][1]].shape[0] == len(cols)
+    # 学習で出口だけが動く（胴体・本体 predict・他階層は 1bit も動かない）
+    before = net.predict(b).copy()
+    snap = snapshot_trunk(net, kind)
+    for _ in range(50):
+        _, cache = net.forward(b)
+        net.step(net.backward_exit(cache, np.ones(len(b["scalars"])), kind), lr=1e-2)
+    assert_trunk_frozen(net, snap)
+    assert np.array_equal(net.predict(b), before)
+    assert not np.allclose(net.predict_exit(b, kind), before)
+    # save/load 往復（in_cols と挙動が保存される）
+    p = str(tmp_path / "res_head.npz")
+    net.save(p)
+    re = RN.ValueNet.load(p)
+    assert np.array_equal(getattr(re, f"{kind}_in_cols"), getattr(net, f"{kind}_in_cols"))
+    assert np.allclose(re.predict_exit(b, kind), net.predict_exit(b, kind))
+    # expanded＝scalars 14→17 の挿入。挿入位置以降を指す列（field 域の 20）が +3 に追随し、
+    # 同一盤面（新列ゼロ）で出口評価が恒等に保たれる
+    ex = net.expanded(14, 3)
+    assert np.array_equal(getattr(ex, f"{kind}_in_cols"), np.array([0, 1, 6, 7, 11, 23]))
+    b2 = {**b, "scalars": np.concatenate(
+        [b["scalars"], np.zeros((len(b["scalars"]), 3), np.float32)], axis=1)}
+    assert np.allclose(ex.predict_exit(b2, kind), net.predict_exit(b, kind))
+
+
+def test_battle_resource_cols_within_bounds():
+    """リソース束の列番号は各世代の scalars 次元内・重複なし・世代間で単調（append-only）。"""
+    import rl_encoder as E
+    prev = None
+    for v in E.known_versions():
+        cols = E.battle_resource_cols(v)
+        assert len(cols) == len(set(cols))
+        assert min(cols) >= 0 and max(cols) < E.scalars_dim(v), f"v{v} で列が範囲外"
+        if prev is not None:
+            assert set(prev) <= set(cols), f"v{v} で列集合が縮んだ（append-only 違反）"
+        prev = cols
