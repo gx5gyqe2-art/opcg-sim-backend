@@ -1,0 +1,16 @@
+shard=p5
+boot_id=0f437cff-e23d-4d03-a2a6-fcf8ae229e54
+nproc=4
+cpu_model=Intel(R) Xeon(R) Processor @ 2.80GHz
+start_epoch=1786677618.637060286
+bucket=0 iterations=38989000
+bucket=1 iterations=39258000
+bucket=2 iterations=38683000
+bucket=3 iterations=38802000
+bucket=4 iterations=39067000
+bucket=5 iterations=38779000
+bucket=6 iterations=38881000
+bucket=7 iterations=38876000
+bucket=8 iterations=38980000
+bucket=9 iterations=38683000
+end_epoch=1786677918.700796312
