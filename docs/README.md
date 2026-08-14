@@ -21,6 +21,8 @@
 | [`LOGGING.md`](LOGGING.md) | **ログ仕様**。汎用ログ（`log_event`/GCS/Slack）は撤去済み。唯一のログ＝ CPU 思考トレース（ローカル自己対戦／実アプリ `/replay`）の正本 |
 | [`parser_v2.md`](parser_v2.md) | カード効果パーサ（EffectParserV2）の設計・ルール一覧・既知のパース制約 |
 | [`leader_specs/`](leader_specs/README.md) | 全137リーダーのカード個別仕様（テキスト／期待挙動／テストケース）。作成ガイド [`_GUIDE.md`](leader_specs/_GUIDE.md)、テスト方針 [`_TEST_GUIDE.md`](leader_specs/_TEST_GUIDE.md)、既知差異 [`ISSUES.md`](leader_specs/ISSUES.md) |
+| [`test_worker_prompt.md`](test_worker_prompt.md) | **テスト実行ワーカー プロンプト**。品質ゲート（`make test`・約10分）を別セッション＝別コンテナに実行させ、レポートを枝経由で回収するための貼り付け用プロンプト。依存インストール手順を含む（コンテナにテスト依存は入っていない） |
+| [`session_orchestration.md`](session_orchestration.md) | **セッション並列運用**。親セッションから子セッション＝別コンテナを起動して CPU 律速の作業を分散する手順（起動／進捗確認／追加指示 poke／後片付け）と実測値。**成果の受け渡しは git push のみ**（`post_turn_summary` は要約が別生成されるためデータ経路に使えない）ほか既知の制約 |
 
 フロントエンドの仕様は `opcg-sim-frontend/docs/`。
 
