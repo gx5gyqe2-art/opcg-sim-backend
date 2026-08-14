@@ -1,0 +1,10 @@
+{
+ "games": 400,
+ "dropped": 4,
+ "rows": 8048,
+ "sims": 32,
+ "enc_version": 11,
+ "leader_synth": true,
+ "engine": "learned",
+ "card_idx": "PAD固定（骨組み規約）"
+}
