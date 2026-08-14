@@ -49,7 +49,12 @@ _RATE = {TriggerType.TURN_END: 1.0, TriggerType.TURN_START: 1.0,
          TriggerType.ACTIVATE_MAIN: 1.0, TriggerType.ON_ATTACK: 1.0,
          TriggerType.OPP_TURN_END: 1.0,
          TriggerType.PASSIVE: 1.0, TriggerType.YOUR_TURN: 1.0,
-         TriggerType.OPPONENT_TURN: 1.0, TriggerType.RULE: 1.0}
+         TriggerType.OPPONENT_TURN: 1.0, TriggerType.RULE: 1.0,
+         # 防御系（2026-08-14 修正: 相手は毎ターン攻撃し、接戦帯ではライフも毎ターン動く。
+         # 0.3 の既定重みでは fixture ナミ（被弾ドロー＋防御パンプ）とシャンクス（アタック時
+         # デバフ）の主力能力がほぼ消えていた——ナミ:シャンクス帯が bb6 で動かなかった主因）
+         TriggerType.ON_OPP_ATTACK: 1.0, TriggerType.OPPONENT_ATTACK: 1.0,
+         TriggerType.ON_LIFE_DECREASE: 0.7, TriggerType.ON_DAMAGE_DEALT_TO_LIFE: 0.7}
 _RATE_DEFAULT = 0.3
 
 _DON_DECK_RE = re.compile(r"ドン!!デッキは(\d+)枚")
@@ -99,11 +104,12 @@ def _accumulate(vec: np.ndarray, node: GameAction, w: float, sign: float = 1.0):
     at = getattr(node, "type", None)
     v = _val(getattr(node, "value", None))
     self_side = _tgt_is_self(node)
-    if at in (ActionType.RAMP_DON,):
+    if at in (ActionType.RAMP_DON, ActionType.ACTIVE_DON):
+        # ACTIVE_DON（レスト起こし）＝再利用可能ドン＝経済（2026-08-14 修正: bg_luffy OP16-022）
         vec[0] += sign * w * max(v, 1.0)
     elif at in (ActionType.RETURN_DON, ActionType.REST_DON, ActionType.FREEZE_DON):
         vec[0] -= w * max(v, 1.0) * (1.0 if sign > 0 else 0.5)
-    elif at in (ActionType.LIFE_RECOVER,) or (
+    elif at in (ActionType.LIFE_RECOVER, ActionType.HEAL) or (
             at == ActionType.MOVE_CARD and getattr(node, "destination", None) == Zone.LIFE):
         vec[1] += sign * w * max(v, 1.0)
     elif at in (ActionType.TRASH_FROM_DECK, ActionType.DECK_BOTTOM):
@@ -111,17 +117,22 @@ def _accumulate(vec: np.ndarray, node: GameAction, w: float, sign: float = 1.0):
         vec[k] += w * max(v, 1.0)
     elif at == ActionType.DRAW:
         vec[4] += sign * w * max(v, 1.0)
-    elif at in (ActionType.BP_BUFF, ActionType.SET_BASE_POWER):
+    elif at in (ActionType.BP_BUFF, ActionType.SET_BASE_POWER, ActionType.BUFF,
+                ActionType.SWAP_POWER):
+        # BUFF は BP_BUFF と別列挙（2026-08-14 修正: fixture ナミ+2000/シャンクス−1000 は
+        # BUFF で表現されており旧分岐では消えていた）。符号は base の符号×対象側で決める。
         amt = v / 1000.0
         if self_side is False:
             vec[6] += w * (-abs(amt))
         else:
             vec[5] += w * amt
     elif at in (ActionType.KO, ActionType.FREEZE, ActionType.LOCK,
-                ActionType.PREVENT_REST) or (
-            at == ActionType.MOVE_CARD and self_side is False):
+                ActionType.PREVENT_REST, ActionType.DEAL_DAMAGE) or (
+            at in (ActionType.BOUNCE, ActionType.MOVE_CARD, ActionType.MOVE_TO_HAND,
+                   ActionType.TRASH, ActionType.MOVE) and self_side is False):
+        # BOUNCE 等の移動系は相手側対象のみ除去（自分側はコスト/配置換え・ハンニャバル自己戻し等）
         vec[7] += w
-    elif at in (ActionType.PLAY_CARD,):
+    elif at in (ActionType.PLAY_CARD, ActionType.EXECUTE_EVENT):
         vec[8] += w
     elif at in (ActionType.COST_BUFF, ActionType.COST_CHANGE, ActionType.SET_COST):
         vec[8] += w * 0.5

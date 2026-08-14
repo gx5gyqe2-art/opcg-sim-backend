@@ -98,6 +98,14 @@ def test_semantic_anchors_known_leaders(db):
     if nami is not None:
         v = leader_static_vector(nami)
         assert v[DIMS.index("rule_flag")] == 1.0, "ナミ: デッキ0勝利ルールが映らない"
+    # fixture リーダー3枚（2026-08-14 の配線見逃し＝BUFF/ACTIVE_DON/防御系トリガーの再発防止）
+    v = leader_static_vector(db.get_card("OP11-041"))
+    assert v[DIMS.index("pow_own")] > 0, "ナミ OP11-041: 防御+2000（BUFF）が映らない"
+    assert v[DIMS.index("draw_rate")] > 0, "ナミ OP11-041: 被弾ドローが映らない"
+    v = leader_static_vector(db.get_card("OP09-001"))
+    assert v[DIMS.index("pow_opp")] < 0, "シャンクス: アタック時−1000（BUFF/OPP）が映らない"
+    v = leader_static_vector(db.get_card("OP16-022"))
+    assert v[DIMS.index("don_rate")] > 0, "bg_luffy: ドン2枚アクティブ化（ACTIVE_DON）が映らない"
 
 
 def test_warm_start_identity_v10_to_v11(db, vocab):
