@@ -28,7 +28,7 @@ from opcg_sim.src.models.models import CardInstance
 
 DECK_SIZE = 50
 MAX_COPIES = 4                    # 同名カードは4枚まで（構築ルール）
-TARGET_DISTINCT = (12, 18)        # 実デッキ実測は 14〜16 種
+TARGET_DISTINCT = (14, 16)        # 実デッキ実測は 14〜16 種
 MIN_COUNTER_CARDS = 26            # 実デッキ実測は 21〜34 枚がカウンター持ち
 
 # --- 硬い構築制約（効果文に「デッキに入れ」と書かれた実在4枚・違反＝不正デッキ）------
@@ -43,6 +43,19 @@ PURITY_PAT = re.compile(r"キャラが.{0,20}(のみ|だけ)の場合")
 
 _TRAIT_PAT = re.compile(r"[〈《『]([^〉》』]{2,14})[〉》』]")
 _NAME_PAT = re.compile(r"「([^」]{2,14})」")
+
+
+# --- 品質の基準（第3版・2026-08-15 の方針転換）-------------------------------
+# 第2版は「リーダー効果からアーキタイプを推定して目標コスト平均へ寄せる」設計だったが、
+# **エネルで判定が逆になって破綻した**（ドン加速リーダー＝重いと判定 → 実デッキはコスト平均
+# 1.3 の最軽量。ドン加速して軽いカードを大量に打つ構築だった）。実デッキ4つに合わせて
+# ヒューリスティックを足すのは**サンプル4個への過剰適合**なので、基準を「実デッキに似せる」
+# から「**ゲームとして機能する**」へ変える:
+#   - 死に札ゼロ（各カードの条件がデッキ内で満たせる）
+#   - 守り札が十分（カウンター比率）
+#   - コスト帯が極端でない（序盤に動けて終盤の決め手もある）＝下の CURVE_FLOOR
+#   - 自己対戦で正常に決着する（別途 `deck_synth_report` が測る）
+CURVE_FLOOR = {"low": 3, "high": 1}   # コスト≤2 を3種類以上・コスト≥6 を1種類以上
 
 
 def _text(c):
@@ -120,17 +133,15 @@ def score_card(c, leader, theme):
         s += 2.5                                   # 守り札（交換レートの原資）
     elif cv >= 1000:
         s += 0.8
-    cost = getattr(c, "cost", 0) or 0
-    if cost <= 2:
-        s += 1.2                                   # 序盤の動き
-    elif cost >= 8:
-        s -= 1.0
-    if c.type.name == "EVENT":
-        s += 0.5
     return s
 
 
-def synth_deck(db, leader_id, seed=0, size=DECK_SIZE):
+def _master(x):
+    """CardInstance でも CardMaster でもマスターを返す（呼び分けを1か所に閉じる）。"""
+    return x.master if hasattr(x, "master") else x
+
+
+def synth_deck(db, leader_id, seed=0, size=DECK_SIZE, owner="p1"):
     """リーダーに適したデッキ（leader, [CardInstance]×50）を決定論的に生成する。
 
     手順: テーマ決定 → 核の選抜（スコア順）→ **名指しの相方を閉包で引き込む** →
@@ -158,8 +169,25 @@ def synth_deck(db, leader_id, seed=0, size=DECK_SIZE):
         picked.append(c)
         return True
 
-    for c in scored[:TARGET_DISTINCT[1]]:
+    # **曲線を目標配分として満たす**（第2版・2026-08-15）: 単純加点だと低コストとイベントに
+    # 寄って重いフィニッシャーが入らず、実デッキ（ナミ/シャンクスはコスト平均4.8前後）を
+    # 再現できなかった。選ぶたびに「今の平均コストが目標へ近づくか」で採否を決める。
+    def avg_cost(sel):
+        return sum((getattr(x, "cost", 0) or 0) for x in sel) / max(len(sel), 1)
+
+    for c in scored:
+        if len(picked) >= TARGET_DISTINCT[1]:
+            break
         add(c)
+    # コスト帯の最低確保（序盤に動けて終盤の決め手もある＝極端な曲線の防止）
+    def n_cost(lo, hi):
+        return sum(1 for x in picked if lo <= (getattr(x, "cost", 0) or 0) <= hi)
+    for lo, hi, need in ((0, 2, CURVE_FLOOR["low"]), (6, 99, CURVE_FLOOR["high"])):
+        for c in scored:
+            if n_cost(lo, hi) >= need:
+                break
+            if lo <= (getattr(c, "cost", 0) or 0) <= hi:
+                add(c)
     # 名指しコンボの閉包（相方が無ければ死に札になる 369枚対策）
     for c in list(picked):
         for nm in names_in_text(c):
@@ -203,7 +231,8 @@ def synth_deck(db, leader_id, seed=0, size=DECK_SIZE):
             else:
                 break
     rng.shuffle(cards)
-    return leader, [CardInstance(c, "p1") for c in cards[:size]]
+    # リーダーも **CardInstance** で返す（`build_deck` と同一契約＝run_game にそのまま渡せる）
+    return CardInstance(leader, owner), [CardInstance(c, owner) for c in cards[:size]]
 
 
 def audit_deck(leader, cards):
@@ -212,8 +241,8 @@ def audit_deck(leader, cards):
     見るのは (a) 名指しの相方がデッキ（またはリーダー）に居るか (b) 参照する特徴を持つカードが
     デッキに一定数あるか (c) イベント/ステージを要求するなら実際に入っているか。
     """
-    masters = [c.master if hasattr(c, "master") else c for c in cards]
-    names = {m.name for m in masters} | {leader.name}
+    masters = [_master(c) for c in cards]
+    names = {m.name for m in masters} | {_master(leader).name}
     trait_count = collections.Counter()
     for m in masters:
         for t in traits_of(m):
@@ -243,10 +272,10 @@ def audit_deck(leader, cards):
 
 def deck_stats(leader, cards):
     """実デッキとの比較用の統計（pure）。"""
-    masters = [c.master if hasattr(c, "master") else c for c in cards]
+    masters = [_master(c) for c in cards]
     costs = [getattr(m, "cost", 0) or 0 for m in masters]
     cnt = [getattr(m, "counter", 0) or 0 for m in masters]
-    return {"leader": leader.card_id, "size": len(masters),
+    return {"leader": _master(leader).card_id, "size": len(masters),
             "distinct": len({m.card_id for m in masters}),
             "max_copies": max(collections.Counter(m.card_id for m in masters).values()),
             "cost_avg": round(sum(costs) / max(len(costs), 1), 2),
@@ -254,3 +283,16 @@ def deck_stats(leader, cards):
             "events": sum(1 for m in masters if m.type.name == "EVENT"),
             "stages": sum(1 for m in masters if m.type.name == "STAGE"),
             "vanilla": sum(1 for m in masters if not has_effect(m))}
+
+
+def synth_deck_builder(l1_id, l2_id=None, seed=0):
+    """`run_game(deck_builder=…)` 互換の builder を返す（アリーナ/自己対戦から使う）。
+
+    既定の `leader_deck_builder()` が「ID順で色が合う最初の50枚・全部1枚ずつ・イベント0」
+    という実在しない構築だったのに対し、本器はテーマ整合・依存閉包・守り札比率を満たした
+    デッキを組む。両席に別リーダーを渡せる（左右非対称の対面）。"""
+    def _build(db, game_seed):
+        l1, c1 = synth_deck(db, l1_id, seed=seed, owner="p1")
+        l2, c2 = synth_deck(db, l2_id or l1_id, seed=seed + 1, owner="p2")
+        return l1, c1, l2, c2
+    return _build
