@@ -350,15 +350,16 @@ def _gen2_vnet():
 def test_enc_version_autodetect_from_weights():
     """符号化世代はロードした npz の入力次元から自動判別（コード既定に依存しない）。
 
-    同梱 Gen2＝v1・既定 gen14＝符号化 v9（2026-08-11採用・gen13＋ドンデッキ残/デッキ頂点の
-    v9 拡張＋掘り裁定注入・docs/reports/gen14_adoption_20260811.md）。訓練済み npz を
-    置いた時点で新特徴が自動有効になる（デプロイはファイル差し替えのみ・フラグ不要）。
+    同梱 Gen2＝v1・既定 gen15＝符号化 **v12**（2026-08-15採用・v9＋リーダー物理要約24。
+    v10 のリーサルΔ3列は serve コスト〔~25ms/盤面→decide 13.5s〕で外した
+    ・docs/reports/gen15_adoption_20260815.md）。訓練済み npz を置いた時点で新特徴が
+    自動有効になる（デプロイはファイル差し替えのみ・フラグ不要）。
     """
     import os, tempfile
     from opcg_sim.src.learned.value_net import ValueNet
     assert cpu_learned._net_enc_version(_gen2_vnet()) == 1, "同梱 Gen2 は v1 のはず"
-    assert cpu_learned._net_enc_version(cpu_learned._default_engine().vnet) == 9,\
-        "既定 gen14 は符号化 v9 のはず"
+    assert cpu_learned._net_enc_version(cpu_learned._default_engine().vnet) == 12,\
+        "既定 gen15 は符号化 v12 のはず"
     v2 = ValueNet(vocab_size=10, d_emb=4, hidden=8, feat_dim=PROD_E.feature_dim(2), seed=0)
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, "v2_value.npz")

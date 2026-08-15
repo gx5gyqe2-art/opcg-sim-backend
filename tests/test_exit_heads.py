@@ -200,27 +200,29 @@ def test_engine_exit_value_fns_are_neutral_without_heads():
     assert bvf(_S(), "me") == vf(_S(), "me")
 
 
-def test_default_engine_is_gen14_v9_with_battle_head_preserved():
-    """既定エンジン（gen14）の採用契約: 符号化 v9（feat_dim=150）へ拡張された本体 value を
-    持ち、**戦闘出口ヘッドと vocab は gen13 と bit 一致**（v43 で入れた戦闘較正を壊さない）。
+def test_default_engine_is_gen15_v12_with_battle_head():
+    """既定エンジン（gen15）の採用契約: 符号化 **v12**（v9＋リーダー物理要約24）の本体に
+    **戦闘出口ヘッドを持つ**（docs/reports/gen15_adoption_20260815.md）。
 
-    gen13 までの契約（胴体 bit 凍結）は v49 で意図的に破った——掘り裁定（h1@2）は本体の
-    葉評価で決まるため、蒸留アンカー付き順位微調整で**胴体に最小摂動**（最大 0.006/重み）を
-    入れた（docs/reports/gen14_adoption_20260811.md）。ロールバックは既定を gen13 へ戻すだけ。"""
+    gen13/gen14 は「ヘッドを gen13 と bit 一致で維持」する契約だったが、gen15 は胴体を
+    v12 で作り直したため**ヘッドは載せ直し**た（胴体入力のヘッドは胴体が変われば腐る＝
+    2026-08-14 に gen15 前身で m1@15 が 1.00→0.00 と壊れた実害の教訓。載せ直しは裁定注入
+    ~2分＋学習数十秒）。よってここで固定するのは「ヘッドが有効で serve が戦闘箱の物差しに
+    使う」ことと符号化世代であり、bit 一致ではない。ロールバックは既定を gen14 へ戻すだけ。"""
     import rl_encoder as E
-    from opcg_sim.src.core.cpu_learned import _MODELS, LearnedEngine
-    from opcg_sim.src.learned.value_net import EXIT_HEADS
+    from opcg_sim.src.core.cpu_learned import LearnedEngine
     eng = LearnedEngine()
     assert eng.vnet.battle_head is True and eng.vnet.turn_head is False
     assert eng._exit_value_fn("battle") is not None
-    assert eng.enc_version == 9 and eng.vnet.feat_dim == E.feature_dim(9)
-    g13 = RN.ValueNet.load(os.path.join(_MODELS, "gen13_value.npz"))
-    wf, W1n, b1n, W2n, b2n = EXIT_HEADS["battle"]
-    assert getattr(eng.vnet, wf) == getattr(g13, wf)
-    for k in (W1n, b1n, W2n, b2n):
-        assert np.array_equal(getattr(eng.vnet, k), getattr(g13, k)), \
-            f"{k} が gen13 と不一致（戦闘出口較正の維持契約違反）"
-    assert eng.vnet.vocab_ids == g13.vocab_ids
+    assert eng.enc_version == 12 and eng.vnet.feat_dim == E.feature_dim(12)
+    # ヘッドは胴体 A1 を読む従来型（リソース入力版は 2026-08-14 の掃引18腕で m1@15 を
+    # 取れず不採用＝棚上げ）。serve の戦闘箱がこのヘッドを物差しに使うことは
+    # test_battle_value_fn_uses_battle_head が別途固定する。
+    assert len(getattr(eng.vnet, "battle_in_cols", [])) == 0
+    # vocab は世代を跨いで維持（焼き込み vocab が落ちると既存カードの Emb 対応が崩れる）
+    from opcg_sim.src.core.cpu_learned import _MODELS
+    g14 = RN.ValueNet.load(os.path.join(_MODELS, "gen14_value.npz"))
+    assert eng.vnet.vocab_ids == g14.vocab_ids
 
 
 def test_evaluate_plan_uses_each_head_for_its_own_box(monkeypatch):
