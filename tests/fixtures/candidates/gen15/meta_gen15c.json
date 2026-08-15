@@ -1,0 +1,26 @@
+{
+ "recipe": "v12本体（G14温スタート9→12・実17912行+bb7合成8048行〔UNK〕混合・lr1e-4/ep3）＋戦闘出口ヘッド載せ直し（裁定注入8点32群136盤面・trunk入力・hidden4・margin0.03・e64・defcf 1198盤面で中心化）",
+ "encoding": "v12（94列＝v9 70 + リーダー物理要約24・リーサルΔ抜き）",
+ "screen": {
+  "latency_s_per_decide": 0.49,
+  "budget_s": 1.0,
+  "ns2_all_r": 0.867,
+  "ns2_mid_r": 0.709,
+  "m1@3": 1.0,
+  "m1@14": 1.0,
+  "m1@15": 1.0,
+  "seeds": 8
+ },
+ "baseline_G14": {
+  "latency_s_per_decide": 0.47,
+  "ns2_all_r": 0.732,
+  "ns2_mid_r": 0.455
+ },
+ "head_rank_acc": {
+  "before": 0.917,
+  "after": 1.0
+ },
+ "engine": "SERVE_BATTLE_COMMIT=True（入口コミット既定ON・2026-08-15採用）",
+ "note": "注入8点はゲート非独立（v43と同じ取引）＝一次証拠はアリーナ",
+ "date": "2026-08-15"
+}
