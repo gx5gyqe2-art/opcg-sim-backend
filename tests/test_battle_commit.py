@@ -52,9 +52,10 @@ def _game():
     return OPCGGame(prune_futile=False)
 
 
-def test_config_default_off():
-    """既定 OFF＝出荷挙動は不変（切替はゲート＋アリーナ後の明示手順）。"""
-    assert CFG.SERVE_BATTLE_COMMIT is False
+def test_config_default_on():
+    """既定 ON（2026-08-15 採用）＝アリーナ同等（wr0.520 CI[0.451,0.589]）×31%高速×
+    「払い始めたら払い切る」の構造保証。False に戻せば gen14 出荷時と同一挙動（ロールバック経路）。"""
+    assert CFG.SERVE_BATTLE_COMMIT is True
 
 
 def test_entry_choice_identical_to_stepwise(battle_board):
