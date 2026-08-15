@@ -750,14 +750,14 @@ class EffectResolver:
         # 再計算がまた同じ対話を出す＝無限ループになる（OP05-097 聖地マリージョア:
         # 「コスト2以上の天竜人キャラの支払うコストは1少なくなる」の対象が手札に2枚以上
         #   あると毎回「どれを軽減するか」を訊いていた）。全候補へ適用して返す。
-        if getattr(self.game_manager, "_in_passive_recalc", False):
-            # 適用先は「継続的な修飾」（パワー/コスト・キーワード付与・耐性・置換等）に限る。
-            # 再計算は盤面が動くたびに何度も走るので、ドロー/KO/登場のような**1回性の
-            # アクション**を全候補へ広げるのは危険＝対象なしで畳む（従来もこの経路は対話で
-            # 詰まっており機能していない。反応型「…された時」は _is_reactive_passive が別途除外）。
-            at = getattr(action_node, "type", None)
-            selected = (self._with_leader(query, player, candidates)
-                        if at in _CONTINUOUS_MODIFIER_ACTIONS else [])
+        # ただし対象は「継続的な修飾」（パワー/コスト・キーワード付与・耐性・置換等）のときだけ全候補へ
+        # 広げる。ドロー/KO/登場のような**1回性のアクション**は再計算経路でも従来どおり
+        # （＝中断して選ばせる）に留める。畳んでしまうと、反応型なのに再計算で走ってしまう能力の
+        # 「その後〜」だけが消えて半端な挙動になる（OP08-056 モビー・ディック号がベースラインで
+        # 顕在化: ドローだけ通り「手札1枚をデッキに置く」が抜けた）。
+        if (getattr(self.game_manager, "_in_passive_recalc", False)
+                and getattr(action_node, "type", None) in _CONTINUOUS_MODIFIER_ACTIONS):
+            selected = self._with_leader(query, player, candidates)
             if query.save_id:
                 self.context["saved_targets"][query.save_id] = selected
             return selected
