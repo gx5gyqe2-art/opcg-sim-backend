@@ -22,6 +22,16 @@ _SEL_GROUP_ID = "_sel_group"
 # context にキーが「無い」ことと「値が None/空」であることを区別するための番兵。
 _UNSET = object()
 
+# 継続効果（PASSIVE/YOUR_TURN/OPPONENT_TURN の再計算）で「条件に合う全カードへ一律に掛かる」
+# 修飾アクション。再計算は盤面が動くたびに走るため、ここに無い 1回性のアクション
+# （DRAW/KO/PLAY_CARD 等）を再計算経路で全候補へ広げてはならない。
+_CONTINUOUS_MODIFIER_ACTIONS = frozenset({
+    ActionType.BUFF, ActionType.GRANT_KEYWORD, ActionType.REPLACE_EFFECT,
+    ActionType.PREVENT_LEAVE, ActionType.PREVENT_REST, ActionType.ATTACK_DISABLE,
+    ActionType.DISABLE_ABILITY, ActionType.FREEZE, ActionType.RESTRICTION,
+    ActionType.RULE_PROCESSING,
+})
+
 
 class EffectResolver:
     def __setattr__(self, name, value):
@@ -519,6 +529,30 @@ class EffectResolver:
             out = [ldr] + out
         return out
 
+    def _is_cost_node(self, source_card, node) -> bool:
+        """node が source_card のいずれかの能力の**コスト句**（「X：Y」の X）に属するか。
+
+        パース木（master 側）は カード共有の同一オブジェクトなので、同一性の探索で判定できる
+        ＝中断→再開でリゾルバが作り直されても判定が変わらない（状態を持たない）。
+        """
+        def _contains(n) -> bool:
+            if n is None:
+                return False
+            if n is node:
+                return True
+            for sub in (getattr(n, "actions", None) or getattr(n, "options", None) or ()):
+                if _contains(sub):
+                    return True
+            for attr in ("if_true", "if_false", "sub_effect"):
+                if _contains(getattr(n, attr, None)):
+                    return True
+            return False
+
+        for ab in (getattr(source_card.master, "abilities", ()) or ()):
+            if _contains(getattr(ab, "cost", None)):
+                return True
+        return False
+
     def _resolve_targets(self, player, query, source_card, action_node=None):
         if not query: return []
 
@@ -622,6 +656,17 @@ class EffectResolver:
 
         candidates = get_target_cards(self.game_manager, query, source_card)
 
+        # レストコストの候補はアクティブなカードに限る（既にレスト済みは「レストにできる」を
+        # 支払えない）。_can_satisfy_node の REST フィルタと同じ規則を解決側にも適用する
+        # ＝支払い可否判定と実際の支払いを一致させる。両者がずれていると「払える」と判定された
+        # 起動メインがレスト済みカードを選んで no-op になり、何も消費しないまま無限に再起動
+        # できた（OP10-083 光月モモの助: コスト候補にレスト済みリーダーが混ざる）。
+        # 効果（コスト句以外）の「レストにする」は候補を絞らない——レスト済みを対象に選ぶのは
+        # ルール上合法で、後続の「そのキャラ」参照を壊さないため。
+        if (action_node is not None and getattr(action_node, "type", None) == ActionType.REST
+                and self._is_cost_node(source_card, action_node)):
+            candidates = [c for c in candidates if not getattr(c, "is_rest", False)]
+
         # 「（戻した／選んだ）キャラと異なる色の…」: selected_card と色が重なる候補を除外する
         # （OP01-002）。selected_card は直前の FIELD 選択（BOUNCE 等）で保存済み。
         if "EXCLUDE_SELECTED_COLOR" in getattr(query, "flags", set()):
@@ -697,6 +742,24 @@ class EffectResolver:
             if (query.select_mode == "CHOOSE" and not query.ref_id
                     and query.zone == Zone.FIELD):
                 self.context["saved_targets"]["selected_card"] = selected
+            return selected
+
+        # 継続効果（PASSIVE/YOUR_TURN/OPPONENT_TURN の再計算）は**対象選択を伴わない**。
+        # 条件に合うカード全部へ一律に掛かる静的効果であり、プレイヤーが選ぶ余地は無い。
+        # ここで中断すると、盤面が動くたびに走る再計算のたびに対話が生まれ、解決しても次の
+        # 再計算がまた同じ対話を出す＝無限ループになる（OP05-097 聖地マリージョア:
+        # 「コスト2以上の天竜人キャラの支払うコストは1少なくなる」の対象が手札に2枚以上
+        #   あると毎回「どれを軽減するか」を訊いていた）。全候補へ適用して返す。
+        if getattr(self.game_manager, "_in_passive_recalc", False):
+            # 適用先は「継続的な修飾」（パワー/コスト・キーワード付与・耐性・置換等）に限る。
+            # 再計算は盤面が動くたびに何度も走るので、ドロー/KO/登場のような**1回性の
+            # アクション**を全候補へ広げるのは危険＝対象なしで畳む（従来もこの経路は対話で
+            # 詰まっており機能していない。反応型「…された時」は _is_reactive_passive が別途除外）。
+            at = getattr(action_node, "type", None)
+            selected = (self._with_leader(query, player, candidates)
+                        if at in _CONTINUOUS_MODIFIER_ACTIONS else [])
+            if query.save_id:
+                self.context["saved_targets"][query.save_id] = selected
             return selected
 
         self._suspend_for_target_selection(player, candidates, query, source_card, action_node)

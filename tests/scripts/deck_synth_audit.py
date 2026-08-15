@@ -9,6 +9,7 @@
 各リーダーについて「そのリーダーのデッキ同士のミラー」を1局回し、
   ok        … 正常決着（ターン数も記録）
   hang      … 上限手数に到達（**繰り返している対話の source_card_name を記録＝犯人**）
+  timeout   … `--timeout` の実時間上限に到達（手数上限では捕まらない「1手が終わらない」暴走）
   error     … 例外（種別とメッセージを記録）
 を集計する。犯人カードの一覧がそのまま修正対象／暫定除外リストになる。
 
@@ -33,11 +34,18 @@ import _bootstrap  # noqa: E402,F401
 _G = {}
 
 
-def _init(sims, max_steps):
+class _GameTimeout(BaseException):
+    """1局の実時間上限。**BaseException 派生**にするのが要点で、エンジン/探索側の
+    広い `except Exception` に食われて握り潰されないようにする（Exception 派生だと
+    アラームが消費されるだけで対局が続き、上限が効かない）。"""
+
+
+def _init(sims, max_steps, timeout=0):
     from cpu_arena import _load_db
     _G["db"] = _load_db()
     _G["sims"] = sims
     _G["max_steps"] = max_steps
+    _G["timeout"] = timeout
 
 
 def _audit_one(leader_id):
@@ -60,14 +68,30 @@ def _audit_one(leader_id):
             return fn(ctx)
         return g
 
+    # 手数ではなく**実時間**の上限。手数上限では捕まらない「1手の中で終わらない」暴走
+    # （探索がバトル箱の中で回り続ける等）を timeout として記録し、監査全体を止めない。
+    if _G.get("timeout"):
+        import signal
+
+        def _alarm(_sig, _frm):
+            raise _GameTimeout(f"game exceeded {_G['timeout']}s")
+        signal.signal(signal.SIGALRM, _alarm)
+        signal.alarm(int(_G["timeout"]))
     try:
         res = run_game(4242, db, seats={
             "p1": wrap(_arena_seat("learned", None, None, 1, None, None, None, sims)),
             "p2": wrap(_arena_seat("learned", None, None, 1, None, None, None, sims))},
             deck_builder=synth_deck_builder(leader_id, leader_id),
             max_steps=max_steps, legal_moves="skip", invariants="raise")
-        return {"leader": leader_id, "status": "ok",
-                "turns": getattr(res, "turns", None), "steps": getattr(res, "steps", None)}
+        row = {"leader": leader_id, "status": "ok",
+               "turns": getattr(res, "turns", None), "steps": getattr(res, "steps", None)}
+        if _G.get("timeout"):
+            import signal as _sg
+            _sg.alarm(0)
+        return row
+    except _GameTimeout as e:
+        hot = sorted(seen.items(), key=lambda kv: -kv[1])[:2]
+        return {"leader": leader_id, "status": "timeout", "error": str(e), "hot_dialogs": hot}
     except Exception as e:
         kind = type(e).__name__
         hot = sorted(seen.items(), key=lambda kv: -kv[1])[:2]
@@ -82,6 +106,8 @@ def main():
     ap.add_argument("--max-steps", type=int, default=700)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--limit", type=int, default=0, help="先頭N体だけ（0=全部）")
+    ap.add_argument("--timeout", type=int, default=0,
+                    help="1局あたりの実時間上限（秒。0=無制限）")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
@@ -95,7 +121,7 @@ def main():
           flush=True)
 
     rows = []
-    with mp.Pool(args.workers, initializer=_init, initargs=(args.sims, args.max_steps)) as pool:
+    with mp.Pool(args.workers, initializer=_init, initargs=(args.sims, args.max_steps, args.timeout)) as pool:
         for r in pool.imap_unordered(_audit_one, leaders):
             rows.append(r)
             if r["status"] != "ok":
@@ -110,7 +136,7 @@ def main():
         for name, n in (r.get("hot_dialogs") or []):
             culprit[name] += 1
     turns = [r["turns"] for r in rows if r["status"] == "ok" and r.get("turns")]
-    print(f"\n結果: ok={st['ok']} hang={st['hang']} error={st['error']}")
+    print(f"\n結果: ok={st['ok']} hang={st['hang']} timeout={st['timeout']} error={st['error']}")
     if turns:
         print(f"正常決着のターン数: 平均{sum(turns)/len(turns):.1f} 最小{min(turns)} 最大{max(turns)}")
     print("ハング時に繰り返していた対話の発生元（＝修正/除外の候補）:")
