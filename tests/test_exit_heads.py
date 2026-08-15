@@ -386,16 +386,25 @@ def test_resource_head_identity_isolation_roundtrip(kind, tmp_path):
 
 
 def test_battle_resource_cols_within_bounds():
-    """リソース束の列番号は各世代の scalars 次元内・重複なし・世代間で単調（append-only）。"""
+    """リソース束の列番号は各版の scalars 次元内・重複なし。
+
+    包含関係は**版の系譜に沿って**主張する（2026-08-15）: v1..v11 は append-only の一本道
+    なので単調な上位集合。v12 は v9 から分岐した安価版（v10 のリーサルΔ3列を持たず
+    リーダー24列の起点がずれる）ので、v11 でなく **v9 の上位集合**であることを見る。"""
     import rl_encoder as E
+    LINEAGE = [v for v in E.known_versions() if v <= 11]
     prev = None
-    for v in E.known_versions():
+    for v in LINEAGE:
         cols = E.battle_resource_cols(v)
         assert len(cols) == len(set(cols))
         assert min(cols) >= 0 and max(cols) < E.scalars_dim(v), f"v{v} で列が範囲外"
         if prev is not None:
             assert set(prev) <= set(cols), f"v{v} で列集合が縮んだ（append-only 違反）"
         prev = cols
+    c12 = E.battle_resource_cols(12)
+    assert len(c12) == len(set(c12))
+    assert min(c12) >= 0 and max(c12) < E.scalars_dim(12)
+    assert set(E.battle_resource_cols(9)) <= set(c12), "v12 は v9 の束を含むはず"
 
 
 @pytest.mark.parametrize("kind", KINDS)
