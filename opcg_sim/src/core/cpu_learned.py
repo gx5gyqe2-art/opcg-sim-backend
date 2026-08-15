@@ -14,11 +14,13 @@ docs/reports/cpu_rl_pilot_p3_results_20260630.md。P3本走で得た Gen2 ネッ
 """
 import math
 import os
+import random
 import weakref
 from typing import Any, Dict, Optional
 
 import numpy as np
 
+from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.learned import encoder as E
 from opcg_sim.src.learned.value_net import ValueNet
 from opcg_sim.src.learned.policy import PolicyScorer, state_context
@@ -30,7 +32,7 @@ from opcg_sim.src.learned.config import (
     SERVE_ROOT_SWITCH_MIN_FRAC, SERVE_ROOT_SWITCH_MIN_GAP, SERVE_STICKY_WORLD,
     AUX_TIE_DECAY, AUX_SAT_START, TERM_FLOOR, V4_TURNS_SCALE)
 from opcg_sim.src.learned.mcts import (   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
-    TreeMCTS, in_battle, resolved_branch_values)
+    TreeMCTS, in_battle, resolve_battle_inplace, resolved_branch_values)
 from opcg_sim.src.utils.loader import CardLoader
 
 _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -139,8 +141,37 @@ _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 # カード/文脈特徴に紐づく）＝50ペア規模の注入で安全に買えるのはエネル獲得のみ。
 # ロールバックは既定を gen13 に戻すだけ。policy は gen13 と挙動同一（v9 温スタートの
 # ゼロ拡張のみ・v12 確定＝policy 微調整は有害）。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen14_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen14_policy.npz")
+# gen15 = **符号化 v12**（=v9 + リーダー物理要約24・リーサルΔ抜き）の本体に、裁定注入で
+# 学習した**戦闘出口ヘッド**を載せ直したもの（gen15c・docs/reports/gen15_adoption_20260815.md）。
+# 本世代は**歴代で初めてアリーナの昇格基準（wr≥0.55 かつ CI下限>0.50）を満たした**
+# ＝225ペア450局 **0.5756 CI[0.533,0.619] Elo+52.9**・帯別 0.595/0.593/0.546/0.565 で
+# 4帯すべて 0.5 超え（デッキ相性の偏りでない）。gen9〜gen14 は全て「人間検証点の改善 ×
+# 自己対戦中立」の取引でユーザ判断採用だったため、自己対戦そのもので有意に強い世代は初。
+# 寄与は4つの合わせ技:
+#  (1) **リーダー物理要約24**（能力木→毎ターン率×自/相手・`leader_feat`・ユーザ提案 2026-08-14）
+#      ＝接戦帯を支配するリーダー再帰効果が現行特徴に0ビットだった欠陥への処方。ID非依存で
+#      新リーダーへ汎化する。符号化コストはカードID キャッシュで**実質ゼロ**。
+#  (2) **B/G混合コーパス**（実デッキ 17,912行 ＋ 合成リーダー世界 8,048行〔card_idx=UNK〕）
+#      ＝「IDが分からない時はリーダー物理要約で読む」経路を数百種の合成リーダーで教える。
+#      実データのみでは未見リーダー（ハンニャバル）で過適合した（+0.684→+0.365）ものが
+#      混合で +0.622 へ回復＝B系の存在意義が G系の数字で初めて実証された。
+#  (3) **入口コミット**（`SERVE_BATTLE_COMMIT`・ユーザ決定 2026-08-15）＝防御プランを窓の
+#      入口で1回立て以後は実行のみ。人間の意思決定（カウンターを切った後に考え直さない）に
+#      合わせる構造で、「払い始めたら払い切る」が保証され防御窓の再解決も消えて 31% 高速化。
+#  (4) **戦闘出口ヘッドの載せ直し**（v43 レシピ・margin0.03/hidden4/e64・defcf 1198盤面で中心化）。
+# **v10 のリーサル距離Δ3列は意図的に外した**（v12 の要点）: エンジンで台本を再生する実測特徴で
+# ~25ms/盤面あり、探索が1手で数百回符号化するため decide が **0.47s(v9) → 13.5s(v11)** と
+# 本番予算1秒を28倍超過していた（2026-08-15 実測・アリーナが10分/ペアになって発覚）。
+# Δ自体も v53 で両系とも転移せず効果未実証のままだったため、**出荷実績のある v9 系譜に
+# 無料の24列だけを継ぐ**構成にした。gen15 の decide は **0.49s**（gen14 0.47s と同等）。
+# 判定チェーン: レイテンシ 0.49s（新設の関門）→ ns2 中間帯 r **+0.709**（gen14 +0.455）→
+# コーチゲート 20点 **PASS**（11.9 vs 11.1・退行ゼロ・m2@44 0.00→1.00 の獲得）→ アリーナ上記。
+# **ゲートの限定**: 注入8点は本候補の訓練データ＝その点は確認用（v43 と同じ取引）。独立証拠は
+# 非注入点の非退行とアリーナ。
+# ロールバックは既定を gen14 に戻すだけ（符号化は net の入力次元から自動判別＝配線変更不要）。
+# policy は gen14 と挙動同一（v9→v12 の恒等ゼロ拡張のみ・v12 確定＝policy 微調整は有害）。
+_DEFAULT_VALUE = os.path.join(_MODELS, "gen15_value.npz")
+_DEFAULT_POLICY = os.path.join(_MODELS, "gen15_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}
@@ -272,11 +303,17 @@ class LearnedEngine:
                  root_frac: Optional[float] = None, root_gap: Optional[float] = None,
                  battle_readout: Optional[bool] = None, quiesce: Optional[bool] = None,
                  box_battle: Optional[bool] = None, turn_quiesce: Optional[bool] = None,
-                 plan_readout: Optional[bool] = None):
+                 plan_readout: Optional[bool] = None, don_margin: Optional[bool] = None,
+                 don_box: Optional[bool] = None, battle_commit: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
             game = game if game is not None else sgame
+        # (C) マージン付与／ドン箱の席別 seam（quiesce 等と同じ A/B 用）: 指定時は共有 game
+        # でなく席専用の adapter を持つ＝同一プロセスの net-vs-net で席ごとに候補生成を変えられる。
+        if don_margin is not None or don_box is not None:
+            from opcg_sim.src.learned.adapter import OPCGGame as _OG
+            game = _OG(don_margin=don_margin, don_box=don_box)
         self.vocab = vocab
         self.game = game
         # aux 粘り項のエンジン別上書き（None=config.SERVE_AUX_TIEBREAK に従う）。ON/OFF を
@@ -291,6 +328,10 @@ class LearnedEngine:
         self.root_gap = root_gap        # 同（Q 差・inf で従来の argmax(N)）
         # 戦闘窓の読み出し（None=config.SERVE_BATTLE_READOUT に従う・A/B 用の seam）。
         self.battle_readout = battle_readout
+        # 入口コミット（None=config.SERVE_BATTLE_COMMIT に従う・席別 seam・2026-08-14）。
+        # プランのキャッシュ {(id(manager), id(battle), name): (weakref(battle), [move_sig])}。
+        self.battle_commit = battle_commit
+        self._battle_plans: Dict[Any, Any] = {}
         # 静止探索（None=config.SERVE_QUIESCE に従う）。**同一プロセスで席ごとに機構を変える**
         # ための seam＝「新機構の候補 vs 現行本番」を公平に1回で測る（グローバル定数を書き換える
         # 測り方だと両席に同時に効いてしまい、機構とネットの寄与が分離できない）。
@@ -418,6 +459,96 @@ class LearnedEngine:
                  "Q": np.array([v if v is not None else -1.0 for v in vals], dtype=float)}
         return legal[best], stats, mgr
 
+    def _battle_window_plan(self, manager, name, det_rng):
+        """`_battle_window_choice` のプラン版（SERVE_BATTLE_COMMIT・2026-08-14 ユーザ決定）。
+
+        選び方は choice と完全に同一（同じ決定化・同じ resolved_branch_values・同じ argmax）。
+        違いは、最良枝をもう一度解決してその過程で**自分側が選んだ後続手**（move_sig 列）を
+        採取して返すことだけ＝「何を選ぶか」は不変で「いつ決めるか」を入口に寄せる部品。
+        返り値 (move, stats, ev_mgr, tail_sigs)。"""
+        from opcg_sim.src.core import journal
+        from opcg_sim.src.core.journal import JournaledList
+        from opcg_sim.src.learned import plan as PL
+        mgr = self.game.determinize(manager, name, det_rng)
+        legal = self.game.legal_actions(mgr)
+        if not legal:
+            return None, None, None, []
+        if len(legal) == 1:
+            return legal[0], None, None, []
+        pf = _priors_fn(self.pnet, self.vocab, self.enc_version)
+        bvf = self._battle_value_fn()
+        vals = resolved_branch_values(self.game, mgr, name, legal, bvf, pf)
+        ok = [i for i, v in enumerate(vals) if v is not None]
+        if not ok:
+            return None, None, None, []
+        best = max(ok, key=lambda i: vals[i])
+        stats = {"legal": legal,
+                 "N": np.array([1.0 if v is not None else 0.0 for v in vals]),
+                 "Q": np.array([v if v is not None else -1.0 for v in vals], dtype=float)}
+        tail = []
+        base_rng_state = random.getstate()
+        saved_events = mgr.action_events
+        try:
+            with journal.transaction():      # 採取後に巻き戻す（mgr は評価用の決定化クローン）
+                mgr.action_events = JournaledList()
+                cpu_ai._apply_move_inplace(mgr, name, legal[best], stop_at_select=True)
+                trace = []
+                # box_depth を明示（2026-08-15 の実害修正）: 既定 0 のまま呼ぶと後続手が
+                # 「policy最良→PASS」の弱い選択器で決まり、**評価が正当化した継続と
+                # 実行される継続が別物**になる（皮肉にも『払った後に素通し』を量産し
+                # commit ON がアリーナ 0.320 で大敗した根因）。resolved_branch_values の
+                # 内部解決と同じ規約（出口 value 最良）で採取する。
+                from opcg_sim.src.learned.config import BOX_RESOLVE_DEPTH
+                resolve_battle_inplace(self.game, mgr, pf, value_fn=bvf,
+                                       box_depth=BOX_RESOLVE_DEPTH, trace=trace)
+                tail = [PL.move_sig(mv) for nm, mv in trace if nm == name]
+        except Exception:
+            tail = []                        # 採取失敗＝プラン無し（ステップ動作に退化・安全側）
+        finally:
+            mgr.action_events = saved_events
+            random.setstate(base_rng_state)  # 実ゲームへ乱数消費を漏らさない（CRN と同じ規約）
+        return legal[best], stats, mgr, tail
+
+    def _battle_commit_step(self, manager, name, det_rng, _replanned=False):
+        """入口コミットの読み出し（SERVE_BATTLE_COMMIT）: 窓の最初の decide でプランを立てて
+        キャッシュし、以後の decide はその実行だけを返す。
+
+        人間の意思決定（カウンターを1枚切った後に考え直さない）に合わせる（ユーザ決定
+        2026-08-14）。効果は (1)「払い始めたら払い切る」の構造保証（途中で聞き直さないため
+        『1枚払って素通し』という支配された折衷ラインが原理的に出ない）(2) 窓のステップ数ぶん
+        あった全枝解決が1回になる高速化。プラン手が実盤面で非合法（トリガー等の想定外）なら
+        1回だけ立て直し、それも失敗なら従来のステップ動作へ退化する（安全側）。"""
+        from opcg_sim.src.learned import plan as PL
+        bat = getattr(manager, "active_battle", None)
+        if bat is None:
+            return None, None, None
+        key = (id(manager), id(bat), name)
+        hit = self._battle_plans.get(key)
+        steps = hit[1] if (hit is not None and hit[0]() is bat) else None
+        if steps is None:
+            move, stats, ev_mgr, tail = self._battle_window_plan(manager, name, det_rng)
+            if move is None:
+                return None, None, None
+            if len(self._battle_plans) >= 64:
+                for k in list(self._battle_plans)[:32]:
+                    del self._battle_plans[k]
+            try:
+                self._battle_plans[key] = (weakref.ref(bat), list(tail))
+            except TypeError:
+                pass                         # weakref 不可＝毎回プランを立て直す（従来挙動相当）
+            return move, stats, ev_mgr
+        legal = self.game.legal_actions(manager)
+        while steps:
+            mv = PL._find_move(legal, steps[0])
+            steps.pop(0)
+            if mv is not None:
+                return mv, None, None
+        # プランが尽きた/全手が非合法＝計画が割れた → 1回だけ立て直す
+        self._battle_plans.pop(key, None)
+        if _replanned:
+            return None, None, None          # 二度目も割れたら従来経路（full-tree）へ委ねる
+        return self._battle_commit_step(manager, name, det_rng, _replanned=True)
+
     def _plan_step(self, manager, name, det_rng, world_seed):
         """プラン読み出し（`SERVE_PLAN_READOUT`・v37②）: ターンに1回プランを立てて
         （K世界期待値・`plan.select_plan`）、以後はその手を1つずつ返す。
@@ -491,13 +622,19 @@ class LearnedEngine:
         use_battle = (CFG.SERVE_BATTLE_READOUT if self.battle_readout is None
                       else self.battle_readout)
         if use_battle and in_battle(manager):
-            move, stats, ev_mgr = self._battle_window_choice(manager, name, det_rng)
+            commit = (CFG.SERVE_BATTLE_COMMIT if self.battle_commit is None
+                      else self.battle_commit)
+            if commit:
+                move, stats, ev_mgr = self._battle_commit_step(manager, name, det_rng)
+            else:
+                move, stats, ev_mgr = self._battle_window_choice(manager, name, det_rng)
             if move is not None:
                 if trace is not None:
                     try:
                         _fill_trace(trace, ev_mgr if ev_mgr is not None else manager,
                                     player, move, stats)
-                        trace["readout"] = "battle_resolved"
+                        trace["readout"] = ("battle_commit" if commit
+                                            else "battle_resolved")
                     except Exception:
                         pass   # 分析失敗で対局を止めない
                 return move
@@ -547,6 +684,10 @@ class LearnedEngine:
                 move = stats["legal"][_select_root_group(groups, **kw)["rep"]]
         if move is None:
             move = legal[0] if legal else None
+        # ドン箱（探索内部のマクロ手）は実対局へは先頭原始手 ATTACH_DON で出す＝
+        # 記録/再生/API の行動空間を変えない（cpu_don_box_plan §2.1。次 decide で
+        # 箱候補が再計算され計画の続行/変更を選び直す＝ステートレス実行）。
+        move = cpu_ai.don_box_first_primitive(move)
         if trace is not None:
             try:
                 _fill_trace(trace, manager, player, move, getattr(mcts, "last_stats", None))

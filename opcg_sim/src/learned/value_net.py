@@ -81,10 +81,14 @@ class ValueNet:
         # 出力層ゼロ初期化＝有効化直後は既存ヘッドと bit 一致（恒等）で、そこから「その出口での
         # 差分」だけを学ぶ。単なる線形ヘッド（hidden→1 の 65 パラメタ）では凍結特徴の上で
         # 表現力が足りず、実測で train 0.66→0.85 に対し val が 0.66 のまま動かなかった。
-        for wf, W1n, b1n, W2n, b2n in EXIT_HEADS.values():
+        for kind, (wf, W1n, b1n, W2n, b2n) in EXIT_HEADS.items():
             setattr(self, wf, 0)
             setattr(self, W1n, np.zeros((hidden, 0)))
             setattr(self, b1n, np.zeros(0))
+            # 出口ヘッドの入力列（リソースヘッド・2026-08-14）: 空=従来どおり胴体 A1 を読む。
+            # 非空=生 scalars の指定列だけを読む＝「手札/盤面/ライフ等のリソース束と文脈で
+            # 交換レートを学ぶ」帰納バイアス（ユーザ提案）。訓練パラメタではないので Adam 対象外。
+            setattr(self, f"{kind}_in_cols", np.zeros(0, dtype=np.int64))
             setattr(self, W2n, np.zeros((0, 1)))
             setattr(self, b2n, np.zeros(1))
         # ネット付属 vocab（card_id の index 順リスト・idx=位置+1・0=PAD/UNK）。カードDBが増えると
@@ -212,13 +216,17 @@ class ValueNet:
         `pad_rows`>0（hidden 拡張）では新ユニットの入力行をゼロで埋める＝W2 側と同じ規約で恒等。
         落とすと「学習済みの出口較正が拡張で静かに消える」＝W2t を引き継がなかった場合と
         同型の事故になるため、複製の追加時はここを必ず通す。"""
-        for wf, W1n, b1n, W2n, b2n in EXIT_HEADS.values():
+        for kind, (wf, W1n, b1n, W2n, b2n) in EXIT_HEADS.items():
             wide = int(getattr(self, wf))
             H1 = getattr(self, W1n)
-            if pad_rows > 0:
+            cols = getattr(self, f"{kind}_in_cols", np.zeros(0, dtype=np.int64))
+            # pad_rows は「胴体 A1 を読むヘッド」の入力次元（=hidden）拡張時のみ意味を持つ。
+            # リソースヘッド（in_cols 非空）の入力は生 scalars で hidden と無関係＝pad しない。
+            if pad_rows > 0 and not len(cols):
                 H1 = np.concatenate([H1, np.zeros((pad_rows, wide))], axis=0)
             setattr(net, wf, wide)
             setattr(net, W1n, H1.copy())
+            setattr(net, f"{kind}_in_cols", np.array(cols, dtype=np.int64))
             for k in (b1n, W2n, b2n):
                 setattr(net, k, getattr(self, k).copy())
         # 較正も引き継ぐ（落とすと「複製したら水準較正が静かに消える」事故になる）
@@ -260,31 +268,68 @@ class ValueNet:
         """種別 `kind`（"turn"/"battle"）の出口ヘッドを持つか（消費側の分岐の唯一の真実源）。"""
         return int(getattr(self, EXIT_HEADS[kind][0])) > 0
 
-    def enable_exit_head(self, kind, hidden=32, seed=0):
+    def enable_exit_head(self, kind, hidden=32, seed=0, in_cols=None):
         """出口専用ヘッド（残差 MLP）を有効化する（**恒等**: 出力層ゼロ初期化）。
 
         残差にする理由: 本ヘッドは serve の**評価値そのもの**として使われるため、ゼロから
         学ぶ独立ヘッドでは「常に 0 を返す無意味な評価」から始まる。既存ロジットに 0 を足す形なら
         学習前は現行 value と bit 一致し、そこから**その出口での差分**だけを学べる。
         中間層は乱数初期化・出力層はゼロ＝勾配デッドロックしない（W2t と同じ論法）。
-        二重適用は禁止（既に学習済みのヘッドを潰すため）。"""
+        二重適用は禁止（既に学習済みのヘッドを潰すため）。
+
+        `in_cols`（リソースヘッド・2026-08-14 ユーザ提案）: 生 scalars の列番号列を渡すと、
+        胴体 A1 でなく**その列だけ**を中間層の入力にする。カウンター判断のような「手札/盤面/
+        ライフのリソース交換」を、勝敗相関で汚れた胴体表現でなく物理量から直接学ぶための
+        帰納バイアス。scalars は append-only 規約なので列番号は世代を跨いで安定。"""
         wf, W1n, b1n, W2n, b2n = EXIT_HEADS[kind]
         if self.has_exit_head(kind):
             raise ValueError(f"既に {kind} 出口ヘッドが有効です（二重適用は不可）")
         rng = np.random.default_rng(seed)
-        h = self.W1.shape[1]
+        if in_cols is not None and len(in_cols):
+            cols = np.asarray(sorted(int(c) for c in in_cols), dtype=np.int64)
+            if cols[0] < 0:
+                raise ValueError("in_cols は非負の scalars 列番号で与える")
+            setattr(self, f"{kind}_in_cols", cols)
+            d_in = len(cols)
+        else:
+            d_in = self.W1.shape[1]
         setattr(self, wf, int(hidden))
-        setattr(self, W1n, rng.standard_normal((h, int(hidden))) * np.sqrt(2.0 / h))
+        setattr(self, W1n, rng.standard_normal((d_in, int(hidden))) * np.sqrt(2.0 / d_in))
         setattr(self, b1n, np.zeros(int(hidden)))
         setattr(self, W2n, np.zeros((int(hidden), 1)))
         setattr(self, b2n, np.zeros(1))
         self._init_adam()
         return self
 
-    def _exit_hidden_act(self, A1, kind):
+    def disable_exit_head(self, kind):
+        """出口ヘッドを破棄して従来経路（既存 value へのフォールバック）に戻す。
+
+        用途（2026-08-14 実害）: 胴体を微調整すると**胴体入力の出口ヘッドは黙って腐る**
+        （重みは据え置きのまま入力分布だけズレる＝gen15 温スタートで戦闘箱の物差しが壊れ
+        m1@15 が 1.00→0.00）。微調整後は本メソッドで捨ててから defcf で学習し直すのが正。"""
+        wf, W1n, b1n, W2n, b2n = EXIT_HEADS[kind]
+        hidden = self.W1.shape[1]
+        setattr(self, wf, 0)
+        setattr(self, W1n, np.zeros((hidden, 0)))
+        setattr(self, b1n, np.zeros(0))
+        setattr(self, W2n, np.zeros((0, 1)))
+        setattr(self, b2n, np.zeros(1))
+        setattr(self, f"{kind}_in_cols", np.zeros(0, dtype=np.int64))
+        self._init_adam()
+        return self
+
+    def _exit_head_input(self, cache, kind):
+        """出口ヘッドの中間層入力（既定=胴体 A1／in_cols 指定時=生 scalars の該当列）。"""
+        cols = getattr(self, f"{kind}_in_cols", None)
+        if cols is not None and len(cols):
+            return cache[0][:, cols]        # cache[0]=X=concat(scalars, field)・scalars が先頭
+        return cache[8]
+
+    def _exit_hidden_act(self, cache, kind):
         _, W1n, b1n, _, _ = EXIT_HEADS[kind]
-        u = A1 @ getattr(self, W1n) + getattr(self, b1n)
-        return u, np.maximum(u, 0.0)
+        inp = self._exit_head_input(cache, kind)
+        u = inp @ getattr(self, W1n) + getattr(self, b1n)
+        return inp, u, np.maximum(u, 0.0)
 
     def exit_from_cache(self, cache, kind):
         """forward の cache から**その箱の出口 value**（tanh∈[-1,1]）を返す。
@@ -293,7 +338,7 @@ class ValueNet:
         if not self.has_exit_head(kind):
             return cache[10]
         _, _, _, W2n, b2n = EXIT_HEADS[kind]
-        _, h = self._exit_hidden_act(cache[8], kind)
+        _, _, h = self._exit_hidden_act(cache, kind)
         return np.tanh(cache[9][:, 0] + (h @ getattr(self, W2n) + getattr(self, b2n))[:, 0])
 
     def predict_exit(self, batch, kind):
@@ -315,14 +360,13 @@ class ValueNet:
         wf, W1n, b1n, W2n, b2n = EXIT_HEADS[kind]
         if not self.has_exit_head(kind):
             raise ValueError(f"{kind} 出口ヘッドが無効です（enable_exit_head を先に呼ぶ）")
-        A1 = cache[8]
-        u, h = self._exit_hidden_act(A1, kind)
+        inp, u, h = self._exit_hidden_act(cache, kind)
         pred = self.exit_from_cache(cache, kind)
         dpred = (2.0 / len(y)) * (pred - y)
         dr = (dpred * (1 - pred ** 2))[:, None]        # tanh'（残差の加算は勾配を素通し）
         du = (dr @ getattr(self, W2n).T) * (u > 0)
         return {W2n: h.T @ dr, b2n: dr.sum(0),
-                W1n: A1.T @ du, b1n: du.sum(0)}
+                W1n: inp.T @ du, b1n: du.sum(0)}
 
     # --- 種別ごとの薄い別名（呼び出し側の可読性・既存 API の後方互換） ---
 
@@ -453,6 +497,14 @@ class ValueNet:
         net.b1 = self.b1.copy(); net.W2 = self.W2.copy(); net.b2 = self.b2.copy()
         net.W2t = self.W2t.copy(); net.b2t = self.b2t.copy()
         self._copy_extra_heads(net)
+        # リソースヘッドの列番号は X（scalars→field 連結）基準。insert_at へ n_new 列挿入されると
+        # それ以降を指す列（field 域を含む）はずれるため追随させる（恒等保存）。
+        if n_new > 0:
+            for kind in EXIT_HEADS:
+                cols = getattr(net, f"{kind}_in_cols")
+                if len(cols):
+                    setattr(net, f"{kind}_in_cols",
+                            np.where(cols >= insert_at, cols + n_new, cols))
         if self.W_eff is not None:
             net.W_eff = self.W_eff.copy()
         # 焼き込み vocab を引き継ぐ（他の複製系メソッドと同じ）。落とすと serve 側が
@@ -543,10 +595,13 @@ class ValueNet:
         payload = dict(Emb=self.Emb, W1=self.W1, b1=self.b1, W2=self.W2, b2=self.b2,
                        W2t=self.W2t, b2t=self.b2t,
                        d_emb=np.array(self.d_emb), lead_slots=np.array(self.lead_slots))
-        for spec in EXIT_HEADS.values():
+        for kind, spec in EXIT_HEADS.items():
             payload[spec[0]] = np.array(getattr(self, spec[0]))
             for k in spec[1:]:
                 payload[k] = getattr(self, k)
+            cols = getattr(self, f"{kind}_in_cols", None)
+            if cols is not None and len(cols):     # 空なら書かない＝旧 npz と同形（胴体入力）
+                payload[f"{kind}_in_cols"] = cols
         if self.has_calib():                       # 未設定なら列ごと書かない＝旧 npz と同形
             payload["calib_x"] = self.calib_x
             payload["calib_y"] = self.calib_y
@@ -578,11 +633,14 @@ class ValueNet:
         # 出口専用ヘッド（v39 ターン末 / v41 戦闘出口）: 旧 npz は欠落＝幅0のまま＝
         # predict_turn/predict_battle は既存ヘッドへフォールバック（同梱ネットを含む
         # 全既存 npz が無改修で動く）。
-        for spec in EXIT_HEADS.values():
+        for kind, spec in EXIT_HEADS.items():
             if spec[0] in z.files and int(z[spec[0]]) > 0:
                 setattr(net, spec[0], int(z[spec[0]]))
                 for k in spec[1:]:
                     setattr(net, k, z[k])
+                if f"{kind}_in_cols" in z.files:   # リソースヘッド（欠落=胴体入力・後方互換）
+                    setattr(net, f"{kind}_in_cols",
+                            np.asarray(z[f"{kind}_in_cols"], dtype=np.int64))
         # 単調再較正（v47）: 旧 npz は欠落＝恒等（`apply_calib` が素通し）。
         if "calib_x" in z.files and "calib_y" in z.files:
             net.set_calib(z["calib_x"], z["calib_y"])

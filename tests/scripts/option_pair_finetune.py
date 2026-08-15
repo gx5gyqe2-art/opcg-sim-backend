@@ -117,6 +117,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dirs", required=True, help="optpair コーパスのディレクトリ（カンマ区切り）")
     ap.add_argument("--base", default="gen10", help="順位微調整の起点（v7 表現）")
+    ap.add_argument("--base-path", default="",
+                    help="起点 value.npz[,policy.npz] をパス直指定（MODELS 外の候補ネット＝"
+                         "fixture 保全品などを起点にする時。--base より優先・2026-08-14）")
     ap.add_argument("--enc-version", type=int, default=7)
     ap.add_argument("--epochs", type=int, default=6)
     ap.add_argument("--lr", type=float, default=2e-5)
@@ -138,8 +141,13 @@ def main():
     if child is None:
         print("optpair コーパスが空（--dirs を確認）"); return 1
 
-    vpath = os.path.join(MODELS, f"{args.base}_value.npz")
-    ppath = os.path.join(MODELS, f"{args.base}_policy.npz")
+    if args.base_path:
+        _bp = args.base_path.split(",")
+        vpath = _bp[0]
+        ppath = _bp[1] if len(_bp) > 1 else os.path.join(MODELS, f"{args.base}_policy.npz")
+    else:
+        vpath = os.path.join(MODELS, f"{args.base}_value.npz")
+        ppath = os.path.join(MODELS, f"{args.base}_policy.npz")
     vnet = RN.ValueNet.load(vpath)
     ev0 = _net_enc_version(vnet)
     if ev0 != args.enc_version:

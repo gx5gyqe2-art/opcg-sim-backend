@@ -47,9 +47,24 @@ SCALARS_V6 = 60        # v6 = v5 + **自手札の資源集約5**（カウンタ�
 SCALARS_V7 = 63        # v7 = v6 + **登場時オプション実測3**（発火するPLAY数/そのkeep値/ON_PLAY持ち不発数・v29）
 SCALARS_V8 = 66        # v8 = v7 + **自場集約3**（総火力/高パワー数/ブロッカー数＝相手v5と純対称・v32）
 SCALARS_V9 = 70        # v9 = v8 + **ドンデッキ残2**（自/相手）＋**自デッキ残キャラ頂点2**（最大パワー/最大コスト・v49）
+SCALARS_V10 = 73       # v10 = v9 + **リーサル距離Δ3**（d_me/d_opp/d_opp_def・台本レース実測・v52b）
+SCALARS_V11 = 97       # v11 = v10 + **リーダー物理要約24**（自12+相手12・能力木→毎ターン率・leader_feat・v54系）
+# v12 = **v9 + リーダー物理要約24**（＝v11 から v10 のリーサル距離Δ3列を外した安価版・2026-08-15）。
+# なぜ分岐させるか（実測）: v10 のΔはエンジンで台本を再生する実測特徴で **~25ms/盤面**。
+# 探索は1手で数百回符号化するため decide が **0.47s（v9）→13.5s（v11）** と本番予算1秒を
+# 28倍超過する。一方リーダー要約は能力木の走査結果をカードIDでキャッシュ＝**実質ゼロ**で、
+# gen15 系の改善はこちら側の寄与だった。v10 のΔは v53 で両系とも転移せず効果未実証のまま
+# なので、**出荷実績のある v9 系譜に無料の24列だけを継ぐ**のが v12。
+# 列の並び: [v9 の 70 列 | リーダー要約 24 列]＝**v9 からは append-only**（G14 からの温スタートは
+# 末尾ゼロ追加で恒等）。v11 行からは列 [0:70]+[73:97] の切り出しで教師を作れる（再生成不要）。
+# **単調増加の例外**（v12 < v11）: 本 dict は「版→列数」の対応表であって順序の意味は持たない。
+# 次元→版の逆引き（`{scalars_dim(v): v}`）は列数が一意なので成立する。温スタートは v9→v12 のみ
+# 有効で、v11→v12 は縮小方向として `warm_start_value` が拒否する（設計どおり）。
+SCALARS_V12 = 94
 _SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4,
                        5: SCALARS_V5, 6: SCALARS_V6, 7: SCALARS_V7, 8: SCALARS_V8,
-                       9: SCALARS_V9}
+                       9: SCALARS_V9, 10: SCALARS_V10, 11: SCALARS_V11,
+                       12: SCALARS_V12}
 
 # 手番フラグ（is_my_turn）の scalars 列位置。append-only 契約により全版で不変＝
 # コーパスの盤面を「自ターン/相手ターン」で層別するときの唯一の正（v35 層別アンカー）。
@@ -66,6 +81,47 @@ def scalars_dim(version=1):
 def known_versions():
     """登録済みの符号化世代（昇順）。次元→版の逆引き・拡張ループが版をハードコードしないため。"""
     return sorted(_SCALARS_BY_VERSION)
+
+
+def battle_resource_cols(version):
+    """戦闘リソースヘッドの入力列（scalars 列番号・ユーザ提案 2026-08-14）。
+
+    カウンターを切る行為＝「盤面/ライフ ↔ 手札」のリソース交換（ワンピースカードの基本
+    交換レート）を、勝敗相関で汚れた胴体表現でなく**物理量の束**から直接学ぶための列選択。
+    束の中身: 中核リソース（ライフ/ドン/手札/盤面の量と質）＋交換レートを条件づける文脈
+    （ターン・リーダー・デッキ残・脅威・リーサル距離・リーダー物理要約=デッキ進行の代理）。
+    除外: スロット別フラグ（v3）・登場時実測（v7）・展開余力（v5）など攻め側のメイン判断
+    専用の列。append-only 契約により列番号は世代を跨いで安定（挿入時は `expanded` が追随）。"""
+    cols = [
+        0, 1,                    # ライフ枚数（自/相手）
+        2, 3, 4, 5,              # ドン（自 active/rested・相手 active/rested）
+        6, 7,                    # 手札枚数（自/相手）
+        8, 9,                    # 盤面キャラ数（自/相手）
+        10, 11,                  # ターン数・手番フラグ
+        12, 13,                  # リーダーパワー（自/相手）
+    ]
+    if version >= 2:
+        cols += [14, 15]         # リーダー付与ドン
+    if version >= 3:
+        cols += [16, 17]         # デッキ残（自/相手・デッキアウト距離）
+    if version >= 4:
+        cols += [46, 47, 48, 49, 50]     # 自デッキ残の守り札集約（カウンター総量/密度…）
+    if version >= 5:
+        cols += [51, 52, 53]     # 相手場の脅威集約（総火力/高パワー/ブロッカー）
+    if version >= 6:
+        cols += [55, 56, 57, 58, 59]     # 自手札の資源集約（カウンター総量/札数/最大値…）
+    if version >= 8:
+        cols += [63, 64, 65]     # 自場の集約（総火力/高パワー/ブロッカー）
+    if version >= 9:
+        cols += [66, 67]         # ドンデッキ残（自/相手・ドン経済）
+    if version == 10 or version == 11:
+        cols += [70, 71, 72]     # リーサル距離Δ（v12 には無い＝コストで外した列）
+    if version >= 11:
+        # リーダー物理要約（自12+相手12＝デッキ依存の条件づけ）。v11 は 73 起点・
+        # v12 は v10 の3列が無いぶん 70 起点（末尾24列であることは共通）。
+        base = 73 if version == 11 else 70
+        cols += list(range(base, base + 24))
+    return cols
 
 
 def build_vocab(db):
@@ -359,6 +415,25 @@ def encode(manager, me_name, vocab, version=1):
         vals += [len(getattr(me, "don_deck", ()) or ()) / 10.0,
                  len(getattr(opp, "don_deck", ()) or ()) / 10.0]
         vals += _deck_apex(getattr(me, "deck", ()) or ())
+    if 10 <= version <= 11:
+        # v10（2026-08-12・v52b）: リーサル距離Δ3値＝台本レースのエンジン実測（lethal.py）。
+        # 乖離族（見かけと実質が乖離・ライフ差が逆向きに壊れる盤面）で唯一正の説明力を持つ
+        # 動力学の要約（v52: 乖離58点 r+0.35／一般60点 r+0.52）。v24/v41/v51 の
+        # representation-bound（現行特徴で表現不能）への処方＝静的特徴でなく実測。
+        # d_me_def（自攻撃 vs 相手の実防御）は相手手札を読む＝公平性契約違反のため入れない
+        # （クリーン3成分の検証は v52b 追補）。/(MAX_TURNS+1) 正規化・実測 ~25ms/盤面。
+        from opcg_sim.src.learned.lethal import lethal_scan, MAX_TURNS as _LMT
+        d_me_l, d_opp_l, d_opp_def_l = lethal_scan(manager, me_name)
+        _cap = float(_LMT + 1)
+        vals += [d_me_l / _cap, d_opp_l / _cap, d_opp_def_l / _cap]
+    if version >= 11:
+        # v11（2026-08-14）/ v12（2026-08-15・リーサルΔ抜き）: リーダー物理要約（能力木→毎ターン率12次元×自/相手）。
+        # 接戦帯の帰趨を支配するリーダー再帰効果（ドンランプ・回復・ミル・常在修正）が
+        # 現行特徴に0ビットだった欠陥（消去はしご2.6σ）への処方。ID非依存＝新リーダーへ
+        # パース即汎化。純粋な木walk＝乱数無消費・エンジン実行なし（符号化は観測）。
+        from opcg_sim.src.learned.leader_feat import leader_pair_vectors
+        lv_me, lv_opp = leader_pair_vectors(manager, me_name)
+        vals += list(lv_me) + list(lv_opp)
     scalars = np.array(vals, dtype=np.float32)
 
     field = np.zeros((2 * MAX_FIELD, PER_CHAR), dtype=np.float32)

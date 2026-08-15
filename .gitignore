@@ -16,3 +16,7 @@ tests/cand_*.json
 tests/eval_v2_spsa_best.json
 tests/value_*.jsonl
 tests/p2_sl_net.npz
+
+# アリーナ実行中の作業台帳/ログ（結果は docs/reports にまとめる。最終台帳が要るときだけ git add -f）
+arena_*.jsonl
+arena_*.log

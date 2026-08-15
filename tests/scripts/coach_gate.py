@@ -225,6 +225,7 @@ def turn_all_rate(eng, m0, name, required, seeds, sims, max_plies=24):
     hit_n = 0
     for s in range(seeds):
         eng._world_seeds = {}
+        getattr(eng, "_battle_plans", {}).clear()   # 入口コミットのプランも独立化（2026-08-15・同一盤面の反復 decide でシード1のプラン尾を返す測定汚染の修正）
         rng = np.random.default_rng(9100 + 97 * s)
         mgr = m0
         done = set()
@@ -268,6 +269,7 @@ def decide_rate(eng, m0, actor, accept, seeds, sims):
     n = 0
     for s in range(seeds):
         eng._world_seeds = {}
+        getattr(eng, "_battle_plans", {}).clear()   # 入口コミットのプランも独立化（2026-08-15・同一盤面の反復 decide でシード1のプラン尾を返す測定汚染の修正）
         mv = eng.decide(m0, actor, sims=sims, rng=np.random.default_rng(9100 + 97 * s))
         try:
             d = cpu_ai._describe_move(m0, mv) or {}
@@ -308,6 +310,12 @@ def main():
     ap.add_argument("--sims", type=int, default=160)
     ap.add_argument("--profile", default="v2", choices=("v2", "g3", "all"),
                     help="v2=gen7実対局13点（既定）／g3=旧7点（gen4期・診断用）／all=両方")
+    # --- 分散実行（2026-08-14・gen15 採用ゲートの高速化）: 点列をストライプ分割して
+    # 子セッションへ配る。部分実行の PASS/FAIL は**参考値**（正式判定は全点集約後に
+    # coach_gate.judge を再適用する）。--out jsonl が集約用の正本。
+    ap.add_argument("--point-offset", type=int, default=0)
+    ap.add_argument("--point-stride", type=int, default=1)
+    ap.add_argument("--out", default="", help="点ごとの結果を jsonl 追記（分散集約用）")
     ARGS = ap.parse_args()
     CR.ARGS = argparse.Namespace(true_board=True)
 
@@ -327,6 +335,10 @@ def main():
 
     points = {"v2": VERIFIED_V2, "g3": VERIFIED,
               "all": VERIFIED + VERIFIED_V2}[ARGS.profile]
+    if ARGS.point_stride > 1 or ARGS.point_offset:
+        points = points[ARGS.point_offset::ARGS.point_stride]
+        print(f"点ストライプ: offset={ARGS.point_offset}/stride={ARGS.point_stride}"
+              f" → {len(points)}点", flush=True)
     replays = {**MG.REPLAYS, **REPLAYS_V2, **REPLAYS_V48, **REPLAYS_HUMAN}
     CR.GAMES = {}
     rows = []
@@ -352,7 +364,12 @@ def main():
         b = decide_rate(base_eng, m0, actor, accept, ARGS.seeds, ARGS.sims)
         c = decide_rate(chall_eng, m0, actor, accept, ARGS.seeds, ARGS.sims)
         rows.append((tag, i, b, c))
-        print(f"  {tag}@{i:<4} base={b:.2f} chall={c:.2f}  合格手={sorted(accept)}")
+        print(f"  {tag}@{i:<4} base={b:.2f} chall={c:.2f}  合格手={sorted(accept)}", flush=True)
+        if ARGS.out:
+            with open(ARGS.out, "a") as f:
+                f.write(json.dumps({"tag": tag, "i": i, "base": b, "chall": c,
+                                    "seeds": ARGS.seeds, "sims": ARGS.sims},
+                                   ensure_ascii=False) + "\n")
     bar = min_reliable_delta(ARGS.seeds)
     sig = [(t, i, b, c) for t, i, b, c in rows if abs(c - b) >= bar]
     print(f"\n測定ノイズでないと言える差の下限（2σ・seeds={ARGS.seeds}）= {bar:.2f}")

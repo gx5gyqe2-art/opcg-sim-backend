@@ -83,6 +83,13 @@ def _find_card_location(gm, card: Card) -> Tuple[Optional[Player], Optional[List
     return None, None
 
 def move_card(gm, card: Card, dest_zone: Zone, dest_player: Player, dest_position: str = "BOTTOM"):
+    # リーダーはリーダー枠から離れない（ルール上ゾーン移動しない）。汎用移動が誤って
+    # リーダーへ届くと、リーダーはどのリストにも属さないため下の remove が素通りし、
+    # **枠に残ったまま宛先リストへ append＝カードが複製される**（bb0 実測 2026-08-11:
+    # INCLUDE_LEADER 選択→KO の経路・seed880007 ほか計3局でカード総数+1）。発生源
+    # （KO/バウンス/トラッシュ等の per_target ハンドラ）に依らず中央で no-op ガードする。
+    if card is gm.p1.leader or card is gm.p2.leader:
+        return
     current_owner, current_list = gm._find_card_location(card)
     
     # 領域移動時はステータスをリセット（特にトラッシュ/手札へ戻る場合）。

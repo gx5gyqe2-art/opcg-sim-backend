@@ -340,7 +340,18 @@ class GameManager:
             opponent = self.p2 if player == self.p1 else self.p1
             attackers = []
             if self.turn_count > 2:
-                if player.leader and not player.leader.is_rest:
+                # CANNOT_REST（「レストにできない」継続効果）はアタック不能＝declare_attack が
+                # ValueError で拒否する。列挙側が見ていないと「合法なのに適用できない手」になり、
+                # 探索の例外手封印（dead_child）を汚染する（bb0 実測 2026-08-11: seed880014 ほか
+                # 2局で APPLY_NONE）。検証側（engine/battle.py）と同じ timed_flags を見る。
+                # ATTACK_DISABLE（「このリーダーはアタックできない」ビビ OP04-001 等7枚）も
+                # 場キャラの列挙と同様に見る。見ていないと「合法なのに適用できない手」が
+                # API/探索へ出る（bb3 実測 2026-08-13: 合成リーダー監査 300局中25局で APPLY_NONE
+                # ＝実リーダーでも同じ経路・欠陥C）。検証側（declare_attack）と同じ判定。
+                if (player.leader and not player.leader.is_rest
+                        and "CANNOT_REST" not in player.leader.timed_flags
+                        and "ATTACK_DISABLE" not in player.leader.flags
+                        and "ATTACK_DISABLE" not in player.leader.timed_flags):
                     attackers.append(player.leader)
                 for c in player.field:
                     if c.is_rest:
@@ -349,6 +360,8 @@ class GameManager:
                             and not c.has_keyword("速攻")):
                         continue
                     if "ATTACK_DISABLE" in c.flags or "ATTACK_DISABLE" in c.timed_flags:
+                        continue
+                    if "CANNOT_REST" in c.timed_flags:
                         continue
                     attackers.append(c)
             targets = []

@@ -200,27 +200,29 @@ def test_engine_exit_value_fns_are_neutral_without_heads():
     assert bvf(_S(), "me") == vf(_S(), "me")
 
 
-def test_default_engine_is_gen14_v9_with_battle_head_preserved():
-    """既定エンジン（gen14）の採用契約: 符号化 v9（feat_dim=150）へ拡張された本体 value を
-    持ち、**戦闘出口ヘッドと vocab は gen13 と bit 一致**（v43 で入れた戦闘較正を壊さない）。
+def test_default_engine_is_gen15_v12_with_battle_head():
+    """既定エンジン（gen15）の採用契約: 符号化 **v12**（v9＋リーダー物理要約24）の本体に
+    **戦闘出口ヘッドを持つ**（docs/reports/gen15_adoption_20260815.md）。
 
-    gen13 までの契約（胴体 bit 凍結）は v49 で意図的に破った——掘り裁定（h1@2）は本体の
-    葉評価で決まるため、蒸留アンカー付き順位微調整で**胴体に最小摂動**（最大 0.006/重み）を
-    入れた（docs/reports/gen14_adoption_20260811.md）。ロールバックは既定を gen13 へ戻すだけ。"""
+    gen13/gen14 は「ヘッドを gen13 と bit 一致で維持」する契約だったが、gen15 は胴体を
+    v12 で作り直したため**ヘッドは載せ直し**た（胴体入力のヘッドは胴体が変われば腐る＝
+    2026-08-14 に gen15 前身で m1@15 が 1.00→0.00 と壊れた実害の教訓。載せ直しは裁定注入
+    ~2分＋学習数十秒）。よってここで固定するのは「ヘッドが有効で serve が戦闘箱の物差しに
+    使う」ことと符号化世代であり、bit 一致ではない。ロールバックは既定を gen14 へ戻すだけ。"""
     import rl_encoder as E
-    from opcg_sim.src.core.cpu_learned import _MODELS, LearnedEngine
-    from opcg_sim.src.learned.value_net import EXIT_HEADS
+    from opcg_sim.src.core.cpu_learned import LearnedEngine
     eng = LearnedEngine()
     assert eng.vnet.battle_head is True and eng.vnet.turn_head is False
     assert eng._exit_value_fn("battle") is not None
-    assert eng.enc_version == 9 and eng.vnet.feat_dim == E.feature_dim(9)
-    g13 = RN.ValueNet.load(os.path.join(_MODELS, "gen13_value.npz"))
-    wf, W1n, b1n, W2n, b2n = EXIT_HEADS["battle"]
-    assert getattr(eng.vnet, wf) == getattr(g13, wf)
-    for k in (W1n, b1n, W2n, b2n):
-        assert np.array_equal(getattr(eng.vnet, k), getattr(g13, k)), \
-            f"{k} が gen13 と不一致（戦闘出口較正の維持契約違反）"
-    assert eng.vnet.vocab_ids == g13.vocab_ids
+    assert eng.enc_version == 12 and eng.vnet.feat_dim == E.feature_dim(12)
+    # ヘッドは胴体 A1 を読む従来型（リソース入力版は 2026-08-14 の掃引18腕で m1@15 を
+    # 取れず不採用＝棚上げ）。serve の戦闘箱がこのヘッドを物差しに使うことは
+    # test_battle_value_fn_uses_battle_head が別途固定する。
+    assert len(getattr(eng.vnet, "battle_in_cols", [])) == 0
+    # vocab は世代を跨いで維持（焼き込み vocab が落ちると既存カードの Emb 対応が崩れる）
+    from opcg_sim.src.core.cpu_learned import _MODELS
+    g14 = RN.ValueNet.load(os.path.join(_MODELS, "gen14_value.npz"))
+    assert eng.vnet.vocab_ids == g14.vocab_ids
 
 
 def test_evaluate_plan_uses_each_head_for_its_own_box(monkeypatch):
@@ -342,3 +344,87 @@ def test_calib_rejects_non_monotone_and_roundtrips(tmp_path):
     re.set_calib(None, None)                                   # 解除＝恒等へ戻る
     assert not re.has_calib()
     assert np.array_equal(re.predict(batch), re.forward(batch)[0])
+
+
+# --- リソースヘッド（in_cols・2026-08-14 ユーザ提案「手札/盤面/ライフの束で交換レートを学ぶ」） ---
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_resource_head_identity_isolation_roundtrip(kind, tmp_path):
+    """in_cols 指定ヘッドでも既存性質が全て成立する: 有効化恒等・胴体凍結・本体 predict 不変・
+    save/load 往復・expanded（温スタート挿入）での列シフト追随＝恒等保存。"""
+    net, b = _net(), _batch()
+    cols = [0, 1, 6, 7, 11, 20]          # scalars 5列 + field 域 1列（シフト検査用）
+    net.enable_exit_head(kind, hidden=8, in_cols=cols)
+    assert np.array_equal(getattr(net, f"{kind}_in_cols"), np.array(sorted(cols)))
+    # 有効化は恒等（出力層ゼロ）
+    assert np.allclose(net.predict_exit(b, kind), net.predict(b))
+    # 勾配の入力側は「胴体 A1」でなく「指定列」の形
+    _, cache = net.forward(b)
+    grads = net.backward_exit(cache, np.zeros(len(b["scalars"])), kind)
+    assert grads[RN.EXIT_HEADS[kind][1]].shape[0] == len(cols)
+    # 学習で出口だけが動く（胴体・本体 predict・他階層は 1bit も動かない）
+    before = net.predict(b).copy()
+    snap = snapshot_trunk(net, kind)
+    for _ in range(50):
+        _, cache = net.forward(b)
+        net.step(net.backward_exit(cache, np.ones(len(b["scalars"])), kind), lr=1e-2)
+    assert_trunk_frozen(net, snap)
+    assert np.array_equal(net.predict(b), before)
+    assert not np.allclose(net.predict_exit(b, kind), before)
+    # save/load 往復（in_cols と挙動が保存される）
+    p = str(tmp_path / "res_head.npz")
+    net.save(p)
+    re = RN.ValueNet.load(p)
+    assert np.array_equal(getattr(re, f"{kind}_in_cols"), getattr(net, f"{kind}_in_cols"))
+    assert np.allclose(re.predict_exit(b, kind), net.predict_exit(b, kind))
+    # expanded＝scalars 14→17 の挿入。挿入位置以降を指す列（field 域の 20）が +3 に追随し、
+    # 同一盤面（新列ゼロ）で出口評価が恒等に保たれる
+    ex = net.expanded(14, 3)
+    assert np.array_equal(getattr(ex, f"{kind}_in_cols"), np.array([0, 1, 6, 7, 11, 23]))
+    b2 = {**b, "scalars": np.concatenate(
+        [b["scalars"], np.zeros((len(b["scalars"]), 3), np.float32)], axis=1)}
+    assert np.allclose(ex.predict_exit(b2, kind), net.predict_exit(b, kind))
+
+
+def test_battle_resource_cols_within_bounds():
+    """リソース束の列番号は各版の scalars 次元内・重複なし。
+
+    包含関係は**版の系譜に沿って**主張する（2026-08-15）: v1..v11 は append-only の一本道
+    なので単調な上位集合。v12 は v9 から分岐した安価版（v10 のリーサルΔ3列を持たず
+    リーダー24列の起点がずれる）ので、v11 でなく **v9 の上位集合**であることを見る。"""
+    import rl_encoder as E
+    LINEAGE = [v for v in E.known_versions() if v <= 11]
+    prev = None
+    for v in LINEAGE:
+        cols = E.battle_resource_cols(v)
+        assert len(cols) == len(set(cols))
+        assert min(cols) >= 0 and max(cols) < E.scalars_dim(v), f"v{v} で列が範囲外"
+        if prev is not None:
+            assert set(prev) <= set(cols), f"v{v} で列集合が縮んだ（append-only 違反）"
+        prev = cols
+    c12 = E.battle_resource_cols(12)
+    assert len(c12) == len(set(c12))
+    assert min(c12) >= 0 and max(c12) < E.scalars_dim(12)
+    assert set(E.battle_resource_cols(9)) <= set(c12), "v12 は v9 の束を含むはず"
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_disable_exit_head_restores_fallback(kind, tmp_path):
+    """破棄で従来経路へ戻る（胴体微調整後の stale ヘッド差し替え・2026-08-14 gen15 実害の処方）。"""
+    net, b = _net(), _batch()
+    net.enable_exit_head(kind, hidden=8)
+    for _ in range(20):
+        _, cache = net.forward(b)
+        net.step(net.backward_exit(cache, np.ones(len(b["scalars"])), kind), lr=1e-2)
+    assert not np.allclose(net.predict_exit(b, kind), net.predict(b))   # 学習で乖離している
+    net.disable_exit_head(kind)
+    assert not net.has_exit_head(kind)
+    assert np.array_equal(net.predict_exit(b, kind), net.predict(b))    # フォールバック復帰
+    p = str(tmp_path / "disabled.npz")
+    net.save(p)
+    re = RN.ValueNet.load(p)
+    assert not re.has_exit_head(kind)                                   # 破棄が保存でも保たれる
+    # 破棄後は同種ヘッドを再有効化できる（差し替えの成立・リソース入力でも可）
+    net.enable_exit_head(kind, hidden=8, in_cols=[0, 1, 6])
+    assert np.allclose(net.predict_exit(b, kind), net.predict(b))

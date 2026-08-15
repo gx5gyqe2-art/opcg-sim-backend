@@ -1,0 +1,6936 @@
+{
+ "games": 360,
+ "labeled": 692,
+ "teachers": 44,
+ "cfg": {
+  "worlds": 6,
+  "min_turn": 5,
+  "max_life": 1,
+  "pred_min": 0.5,
+  "pred_gap": 0.5,
+  "boards_per_game": 2
+ },
+ "matchup": "nami:shanks",
+ "diag": [
+  {
+   "seed": 901001,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.995,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901001,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.987,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901003,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.989,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901003,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.988,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901000,
+   "turn": 18,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901000,
+   "turn": 18,
+   "who": "p1",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901002,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.979,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901002,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.598,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901005,
+   "turn": 18,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901005,
+   "turn": 18,
+   "who": "p1",
+   "pred": -0.996,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901004,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.919,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901004,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.889,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901007,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.982,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901007,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.976,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901006,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.994,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901006,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.989,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901009,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901009,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.988,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901011,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.958,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901011,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.936,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901010,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.988,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901010,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.979,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901013,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.665,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901014,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.917,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901014,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.796,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901012,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.934,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901012,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.841,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901017,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.972,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901017,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.915,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901015,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.926,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901015,
+   "turn": 15,
+   "who": "p1",
+   "pred": -0.91,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901019,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901019,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.997,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901020,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.996,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901020,
+   "turn": 16,
+   "who": "p2",
+   "pred": -0.956,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901018,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.969,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901018,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.958,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901008,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.776,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901008,
+   "turn": 10,
+   "who": "p2",
+   "pred": -0.77,
+   "wr": "3/6",
+   "ev": 0.0,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901016,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.833,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901016,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.783,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901023,
+   "turn": 15,
+   "who": "p1",
+   "pred": -0.879,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901023,
+   "turn": 15,
+   "who": "p2",
+   "pred": 0.759,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901022,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.958,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901022,
+   "turn": 14,
+   "who": "p1",
+   "pred": 0.938,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901026,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901026,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.974,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901025,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.96,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901025,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.927,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901024,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.976,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901024,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.972,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901021,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.907,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901021,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.898,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901029,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.956,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901029,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.708,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901031,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.995,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901031,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.962,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901030,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.996,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901030,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.903,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901033,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901033,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.996,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901032,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.994,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901032,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.987,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901035,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.884,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901035,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.883,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901028,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.881,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901028,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.88,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901037,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.676,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901038,
+   "turn": 13,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901038,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.999,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901036,
+   "turn": 16,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901036,
+   "turn": 15,
+   "who": "p2",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901041,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.989,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901041,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.988,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901034,
+   "turn": 16,
+   "who": "p2",
+   "pred": -0.92,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901034,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.854,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901039,
+   "turn": 17,
+   "who": "p2",
+   "pred": 0.943,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901039,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.82,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901042,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901042,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.806,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901040,
+   "turn": 15,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901040,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.999,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901043,
+   "turn": 20,
+   "who": "p2",
+   "pred": 0.988,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901043,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.977,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901046,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.992,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901046,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.983,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901045,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901045,
+   "turn": 13,
+   "who": "p2",
+   "pred": 0.627,
+   "wr": "3/6",
+   "ev": 0.0,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901048,
+   "turn": 18,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901048,
+   "turn": 18,
+   "who": "p1",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901050,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.914,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901050,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.751,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901051,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.99,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901051,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.985,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901047,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.714,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901047,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.635,
+   "wr": "3/6",
+   "ev": 0.0,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901049,
+   "turn": 13,
+   "who": "p1",
+   "pred": -0.88,
+   "wr": "2/6",
+   "ev": -0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901049,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.88,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901053,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901053,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901055,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.921,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901055,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.73,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901056,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.974,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901056,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.929,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901052,
+   "turn": 19,
+   "who": "p1",
+   "pred": 0.997,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901052,
+   "turn": 18,
+   "who": "p2",
+   "pred": -0.986,
+   "wr": "3/6",
+   "ev": 0.0,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901054,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.821,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901054,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.761,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901058,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.69,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901057,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.906,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901057,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.903,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901061,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.991,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901061,
+   "turn": 13,
+   "who": "p2",
+   "pred": 0.987,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901044,
+   "turn": 9,
+   "who": "p1",
+   "pred": 0.953,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901044,
+   "turn": 8,
+   "who": "p1",
+   "pred": 0.908,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901062,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.987,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901062,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.983,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901063,
+   "turn": 14,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901063,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.993,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901060,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.721,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901060,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.612,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901064,
+   "turn": 18,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901064,
+   "turn": 18,
+   "who": "p1",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901066,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.999,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901066,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901065,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.994,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901065,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.983,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901067,
+   "turn": 18,
+   "who": "p2",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901067,
+   "turn": 18,
+   "who": "p1",
+   "pred": -0.996,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901069,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901069,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.86,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901068,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.994,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901068,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.952,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901059,
+   "turn": 10,
+   "who": "p2",
+   "pred": 0.933,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901059,
+   "turn": 11,
+   "who": "p1",
+   "pred": -0.932,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901072,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.996,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901072,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.986,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901071,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.994,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901071,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.992,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901070,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.836,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901070,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.666,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901073,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.648,
+   "wr": "2/6",
+   "ev": -0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901075,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.975,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901075,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.936,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901076,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.563,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901079,
+   "turn": 18,
+   "who": "p2",
+   "pred": 0.983,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901079,
+   "turn": 18,
+   "who": "p1",
+   "pred": -0.951,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901080,
+   "turn": 19,
+   "who": "p2",
+   "pred": -0.966,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901080,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.953,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901074,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.931,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901074,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.872,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901078,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.991,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901078,
+   "turn": 14,
+   "who": "p1",
+   "pred": 0.972,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901081,
+   "turn": 14,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901081,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.995,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901083,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901083,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.964,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901082,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.908,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901082,
+   "turn": 16,
+   "who": "p2",
+   "pred": -0.676,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901077,
+   "turn": 10,
+   "who": "p2",
+   "pred": 0.8,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901077,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.773,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901086,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.999,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901086,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.997,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901084,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.994,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901084,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.808,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901087,
+   "turn": 11,
+   "who": "p2",
+   "pred": 0.921,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901087,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.888,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901088,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.704,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901088,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.687,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901089,
+   "turn": 17,
+   "who": "p2",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901089,
+   "turn": 17,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901085,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.92,
+   "wr": "2/6",
+   "ev": -0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901085,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.9,
+   "wr": "2/6",
+   "ev": -0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901090,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.989,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901090,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.957,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901091,
+   "turn": 19,
+   "who": "p2",
+   "pred": -0.992,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901091,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.983,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901094,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.932,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901094,
+   "turn": 14,
+   "who": "p1",
+   "pred": 0.915,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901095,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.606,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901096,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.939,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901096,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.764,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901097,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.806,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901097,
+   "turn": 13,
+   "who": "p2",
+   "pred": 0.802,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901098,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.988,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901098,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.946,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901093,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.892,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901093,
+   "turn": 10,
+   "who": "p2",
+   "pred": 0.831,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901100,
+   "turn": 15,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901100,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.976,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901102,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.708,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901102,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.695,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901101,
+   "turn": 13,
+   "who": "p1",
+   "pred": -0.952,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901101,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.829,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901092,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.976,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901092,
+   "turn": 9,
+   "who": "p1",
+   "pred": 0.948,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901104,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.717,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901104,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.607,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901103,
+   "turn": 19,
+   "who": "p1",
+   "pred": 0.993,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901103,
+   "turn": 13,
+   "who": "p1",
+   "pred": -0.984,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901107,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.982,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901107,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.806,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901105,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.993,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901105,
+   "turn": 11,
+   "who": "p2",
+   "pred": 0.667,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901109,
+   "turn": 18,
+   "who": "p1",
+   "pred": -0.989,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901109,
+   "turn": 18,
+   "who": "p2",
+   "pred": 0.988,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901108,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901108,
+   "turn": 15,
+   "who": "p1",
+   "pred": -0.905,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901106,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.913,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901106,
+   "turn": 15,
+   "who": "p2",
+   "pred": 0.907,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901111,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.982,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901111,
+   "turn": 13,
+   "who": "p1",
+   "pred": -0.975,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901112,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.998,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901112,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.997,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901113,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901113,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.981,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901114,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.944,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901114,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.881,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901117,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.964,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901117,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.953,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901116,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.948,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901116,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.826,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901119,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.995,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901119,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.945,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901115,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.781,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901115,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.612,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901118,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.811,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901118,
+   "turn": 13,
+   "who": "p1",
+   "pred": -0.799,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901121,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.976,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901121,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.91,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901120,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.974,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901120,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.955,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901124,
+   "turn": 13,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901124,
+   "turn": 13,
+   "who": "p2",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901122,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.97,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901122,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.816,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901125,
+   "turn": 19,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901125,
+   "turn": 19,
+   "who": "p2",
+   "pred": -0.998,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901110,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.795,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901110,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.756,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901126,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.97,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901126,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.965,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901128,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.988,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901128,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.972,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901129,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.998,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901129,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901127,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.999,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901127,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901123,
+   "turn": 19,
+   "who": "p2",
+   "pred": -0.991,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901123,
+   "turn": 19,
+   "who": "p1",
+   "pred": 0.989,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901130,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.971,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901130,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.934,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901131,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.982,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901131,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.91,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901132,
+   "turn": 15,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901132,
+   "turn": 15,
+   "who": "p2",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901135,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.934,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901135,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.909,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901134,
+   "turn": 15,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901134,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.975,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901136,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901136,
+   "turn": 10,
+   "who": "p1",
+   "pred": 0.996,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901133,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901133,
+   "turn": 11,
+   "who": "p2",
+   "pred": 0.986,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901139,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.991,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901139,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.989,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901138,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.98,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901138,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.955,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901142,
+   "turn": 13,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901142,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.993,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901141,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.958,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901141,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.951,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901137,
+   "turn": 13,
+   "who": "p1",
+   "pred": -0.687,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901137,
+   "turn": 11,
+   "who": "p1",
+   "pred": -0.666,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901143,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.899,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901143,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.808,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901145,
+   "turn": 18,
+   "who": "p2",
+   "pred": 0.978,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901145,
+   "turn": 18,
+   "who": "p1",
+   "pred": -0.876,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901147,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.999,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901147,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901144,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.991,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901144,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.987,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901148,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.912,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901148,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.751,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901149,
+   "turn": 17,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901149,
+   "turn": 17,
+   "who": "p2",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901140,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.834,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901140,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.64,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901150,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.996,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901150,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.925,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901152,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.949,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901152,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.925,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901146,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.858,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901146,
+   "turn": 16,
+   "who": "p2",
+   "pred": -0.795,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901153,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.992,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901153,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.991,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901155,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.938,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901155,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.93,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901154,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.99,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901154,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.953,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901157,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.978,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901157,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.868,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901158,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.994,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901158,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.989,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901156,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.985,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901156,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.962,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901160,
+   "turn": 19,
+   "who": "p1",
+   "pred": 0.971,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901160,
+   "turn": 19,
+   "who": "p2",
+   "pred": -0.94,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901159,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.934,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901159,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.919,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901161,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.835,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901161,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.78,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901163,
+   "turn": 18,
+   "who": "p2",
+   "pred": 0.97,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901163,
+   "turn": 18,
+   "who": "p1",
+   "pred": -0.945,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901164,
+   "turn": 15,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901164,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.999,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901165,
+   "turn": 16,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901165,
+   "turn": 15,
+   "who": "p2",
+   "pred": 0.992,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901166,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.971,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901166,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.97,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901169,
+   "turn": 15,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901169,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.998,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901162,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.984,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901162,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.979,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901168,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.963,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901168,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.914,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901171,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.721,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901171,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.602,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901170,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.816,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901170,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.578,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901151,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.912,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901151,
+   "turn": 13,
+   "who": "p2",
+   "pred": 0.738,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901172,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901172,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.997,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901173,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.759,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901175,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.972,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901175,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.847,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901178,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.998,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901178,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.997,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901176,
+   "turn": 18,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901176,
+   "turn": 18,
+   "who": "p1",
+   "pred": -0.997,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901177,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.717,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901177,
+   "turn": 14,
+   "who": "p1",
+   "pred": 0.705,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901179,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.986,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901179,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.982,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901174,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.784,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901174,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.654,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901182,
+   "turn": 13,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901182,
+   "turn": 12,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901181,
+   "turn": 18,
+   "who": "p1",
+   "pred": -0.982,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901181,
+   "turn": 18,
+   "who": "p2",
+   "pred": 0.925,
+   "wr": "3/6",
+   "ev": 0.0,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901183,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901183,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.982,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901185,
+   "turn": 21,
+   "who": "p2",
+   "pred": -0.745,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901185,
+   "turn": 21,
+   "who": "p1",
+   "pred": 0.664,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901186,
+   "turn": 15,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901186,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.997,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901187,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.92,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901187,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.89,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901184,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.91,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901184,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.771,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901180,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.927,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901180,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.885,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901191,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.983,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901191,
+   "turn": 16,
+   "who": "p1",
+   "pred": 0.951,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901190,
+   "turn": 19,
+   "who": "p1",
+   "pred": 0.996,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901190,
+   "turn": 19,
+   "who": "p2",
+   "pred": -0.994,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901192,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.861,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901192,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.857,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901189,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.982,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901189,
+   "turn": 15,
+   "who": "p1",
+   "pred": -0.974,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901193,
+   "turn": 11,
+   "who": "p1",
+   "pred": -0.989,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901193,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.972,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901196,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.946,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901196,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.903,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901194,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901194,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.994,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901195,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.68,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901197,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.877,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901197,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.865,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901199,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.99,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901199,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.987,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901198,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.954,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901198,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.945,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901200,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.956,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901200,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.821,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901201,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.993,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901201,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.988,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901204,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.961,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901204,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.782,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901202,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.992,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901202,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.98,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901205,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.992,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901205,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.976,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901188,
+   "turn": 10,
+   "who": "p1",
+   "pred": 0.935,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901188,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.917,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901208,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.99,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901208,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.93,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901206,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901206,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.988,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901203,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.884,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901203,
+   "turn": 10,
+   "who": "p2",
+   "pred": 0.829,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901210,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.942,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901210,
+   "turn": 16,
+   "who": "p2",
+   "pred": -0.905,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901207,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901207,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.996,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901211,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.95,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901211,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.933,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901213,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901213,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.996,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901212,
+   "turn": 15,
+   "who": "p2",
+   "pred": 0.949,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901212,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.895,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901216,
+   "turn": 16,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901216,
+   "turn": 16,
+   "who": "p1",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901214,
+   "turn": 13,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901214,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.987,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901217,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.987,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901217,
+   "turn": 16,
+   "who": "p1",
+   "pred": 0.961,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901215,
+   "turn": 15,
+   "who": "p1",
+   "pred": -0.951,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901215,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.922,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901209,
+   "turn": 8,
+   "who": "p2",
+   "pred": 0.818,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901209,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.787,
+   "wr": "2/6",
+   "ev": -0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901219,
+   "turn": 17,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901219,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.999,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901220,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.932,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901220,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.912,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901222,
+   "turn": 18,
+   "who": "p2",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901222,
+   "turn": 18,
+   "who": "p1",
+   "pred": -0.982,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901218,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.784,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901218,
+   "turn": 14,
+   "who": "p1",
+   "pred": 0.748,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901221,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.959,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901221,
+   "turn": 13,
+   "who": "p1",
+   "pred": -0.953,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901225,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.991,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901225,
+   "turn": 16,
+   "who": "p1",
+   "pred": 0.682,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901224,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.984,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901224,
+   "turn": 7,
+   "who": "p1",
+   "pred": 0.947,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901223,
+   "turn": 13,
+   "who": "p1",
+   "pred": -0.844,
+   "wr": "2/6",
+   "ev": -0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901223,
+   "turn": 15,
+   "who": "p2",
+   "pred": 0.767,
+   "wr": "3/6",
+   "ev": 0.0,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901227,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.979,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901227,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.973,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901229,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.981,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901229,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.928,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901226,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.978,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901226,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.976,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901230,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.981,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901230,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.979,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901228,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.937,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901228,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.704,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901231,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.985,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901231,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.971,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901233,
+   "turn": 15,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901233,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.996,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901236,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.996,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901236,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.991,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901235,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.852,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901235,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.718,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901232,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.896,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901238,
+   "turn": 18,
+   "who": "p2",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901238,
+   "turn": 18,
+   "who": "p1",
+   "pred": -0.994,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901239,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.988,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901239,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.925,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901241,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.941,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901241,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.926,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901234,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.891,
+   "wr": "3/6",
+   "ev": 0.0,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901234,
+   "turn": 14,
+   "who": "p1",
+   "pred": 0.856,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901240,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.976,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901240,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.95,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901243,
+   "turn": 13,
+   "who": "p1",
+   "pred": -0.981,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901243,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.948,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901242,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.931,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901242,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.873,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901245,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.996,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901245,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.99,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901237,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.946,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901237,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.751,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901247,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.652,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901249,
+   "turn": 19,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901249,
+   "turn": 19,
+   "who": "p2",
+   "pred": -0.996,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901246,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901246,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.995,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901251,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901251,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.998,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901250,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.971,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901250,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.97,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901248,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.94,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901248,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.79,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901254,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.888,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901252,
+   "turn": 15,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901252,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.994,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901255,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.724,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901257,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.951,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901257,
+   "turn": 11,
+   "who": "p1",
+   "pred": -0.899,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901259,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.989,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901259,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.989,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901258,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.956,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901258,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.946,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901256,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.966,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901256,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.898,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901262,
+   "turn": 18,
+   "who": "p1",
+   "pred": -0.955,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901262,
+   "turn": 18,
+   "who": "p2",
+   "pred": 0.931,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901260,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.994,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901260,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.983,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901261,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.983,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901261,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.973,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901263,
+   "turn": 17,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901263,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.979,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901265,
+   "turn": 18,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901265,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.975,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901264,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.892,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901264,
+   "turn": 18,
+   "who": "p1",
+   "pred": -0.844,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901267,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.99,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901267,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.986,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901268,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.988,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901268,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.889,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901270,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.982,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901270,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.974,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901266,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.937,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901266,
+   "turn": 14,
+   "who": "p1",
+   "pred": 0.809,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901271,
+   "turn": 17,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901271,
+   "turn": 17,
+   "who": "p2",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901253,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.911,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901253,
+   "turn": 11,
+   "who": "p1",
+   "pred": -0.851,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901273,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.905,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901273,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.775,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901272,
+   "turn": 15,
+   "who": "p2",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901272,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901269,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.908,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901269,
+   "turn": 15,
+   "who": "p2",
+   "pred": 0.834,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901274,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.983,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901274,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.98,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901277,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.812,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901277,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.775,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901275,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.992,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901275,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.948,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901278,
+   "turn": 19,
+   "who": "p1",
+   "pred": 0.997,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901278,
+   "turn": 17,
+   "who": "p1",
+   "pred": 0.97,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901276,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.951,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901276,
+   "turn": 14,
+   "who": "p1",
+   "pred": 0.875,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901282,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.957,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901282,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.814,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901281,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.859,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901281,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.777,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901283,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.868,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901283,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.841,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901284,
+   "turn": 16,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901284,
+   "turn": 17,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901285,
+   "turn": 16,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901285,
+   "turn": 14,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901287,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.988,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901287,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.956,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901286,
+   "turn": 10,
+   "who": "p1",
+   "pred": 0.989,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901286,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.988,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901279,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.996,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901279,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.982,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901291,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.989,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901291,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.915,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901290,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.964,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901290,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.93,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901288,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.963,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901288,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.944,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901293,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.902,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901293,
+   "turn": 13,
+   "who": "p2",
+   "pred": 0.734,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901294,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.957,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901294,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.945,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901296,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.99,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901296,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.987,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901289,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.925,
+   "wr": "3/6",
+   "ev": 0.0,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901289,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.698,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901295,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.873,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901295,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.8,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901298,
+   "turn": 15,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901298,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.999,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901301,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.971,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901301,
+   "turn": 13,
+   "who": "p2",
+   "pred": 0.885,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901292,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.907,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901292,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.904,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901300,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.844,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901300,
+   "turn": 13,
+   "who": "p2",
+   "pred": 0.614,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901297,
+   "turn": 13,
+   "who": "p1",
+   "pred": -0.927,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901297,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.917,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901304,
+   "turn": 17,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901304,
+   "turn": 17,
+   "who": "p2",
+   "pred": -0.997,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901303,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.975,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901303,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.94,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901306,
+   "turn": 15,
+   "who": "p2",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901306,
+   "turn": 15,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901308,
+   "turn": 16,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901308,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.985,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901307,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.982,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901307,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.98,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901309,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.995,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901309,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.991,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901310,
+   "turn": 18,
+   "who": "p2",
+   "pred": 0.915,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901310,
+   "turn": 16,
+   "who": "p2",
+   "pred": -0.895,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901302,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.792,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901302,
+   "turn": 10,
+   "who": "p2",
+   "pred": -0.772,
+   "wr": "2/6",
+   "ev": -0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901311,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.999,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901311,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.999,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901305,
+   "turn": 10,
+   "who": "p1",
+   "pred": -0.668,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901305,
+   "turn": 10,
+   "who": "p2",
+   "pred": 0.661,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901313,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.761,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901313,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.667,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901312,
+   "turn": 17,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901312,
+   "turn": 16,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901314,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.964,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901314,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.959,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901315,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.807,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901315,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.757,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901316,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.947,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901316,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.913,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901318,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.905,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901318,
+   "turn": 13,
+   "who": "p2",
+   "pred": 0.671,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901321,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.849,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901320,
+   "turn": 15,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901320,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.999,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901317,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.993,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901317,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.99,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901323,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.99,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901323,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.912,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901322,
+   "turn": 15,
+   "who": "p1",
+   "pred": -0.754,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901322,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.697,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901319,
+   "turn": 14,
+   "who": "p1",
+   "pred": 0.992,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901319,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.927,
+   "wr": "4/6",
+   "ev": 0.333,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901327,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.981,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901327,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.979,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901326,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.987,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901326,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.969,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901329,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.998,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901329,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.995,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901324,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.913,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901324,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.911,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901328,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.949,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901328,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.881,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901330,
+   "turn": 15,
+   "who": "p1",
+   "pred": -0.97,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901330,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.96,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901331,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.955,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901331,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.924,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901335,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901335,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.995,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901334,
+   "turn": 15,
+   "who": "p1",
+   "pred": 0.995,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901334,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.941,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901325,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.881,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901325,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.74,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901338,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.899,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901338,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.641,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901337,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901337,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.966,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901336,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.987,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901336,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.979,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901339,
+   "turn": 12,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901339,
+   "turn": 11,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901340,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.97,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901340,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.868,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901342,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.917,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901342,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.912,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901343,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901343,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.999,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901341,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.588,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901341,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.572,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901346,
+   "turn": 13,
+   "who": "p1",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901346,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.998,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901347,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.928,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901347,
+   "turn": 12,
+   "who": "p2",
+   "pred": 0.91,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901344,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.732,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901344,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.635,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901345,
+   "turn": 13,
+   "who": "p1",
+   "pred": -0.739,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901345,
+   "turn": 12,
+   "who": "p1",
+   "pred": -0.723,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": true
+  },
+  {
+   "seed": 901332,
+   "turn": 12,
+   "who": "p1",
+   "pred": 0.958,
+   "wr": "5/6",
+   "ev": 0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901332,
+   "turn": 12,
+   "who": "p2",
+   "pred": -0.911,
+   "wr": "3/6",
+   "ev": 0.0,
+   "cert": false,
+   "teach": false
+  },
+  {
+   "seed": 901349,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.988,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901349,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.936,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901351,
+   "turn": 14,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901351,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.997,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901348,
+   "turn": 14,
+   "who": "p2",
+   "pred": -0.593,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901348,
+   "turn": 15,
+   "who": "p2",
+   "pred": -0.501,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901352,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.508,
+   "wr": "1/6",
+   "ev": -0.667,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901350,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.95,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901350,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.86,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901353,
+   "turn": 14,
+   "who": "p2",
+   "pred": 0.97,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901353,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.965,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901355,
+   "turn": 16,
+   "who": "p1",
+   "pred": -1.0,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901355,
+   "turn": 16,
+   "who": "p2",
+   "pred": 1.0,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901357,
+   "turn": 16,
+   "who": "p1",
+   "pred": -0.923,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901357,
+   "turn": 16,
+   "who": "p2",
+   "pred": 0.782,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901356,
+   "turn": 11,
+   "who": "p1",
+   "pred": 0.972,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901356,
+   "turn": 11,
+   "who": "p2",
+   "pred": -0.96,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901354,
+   "turn": 14,
+   "who": "p1",
+   "pred": 0.969,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901354,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.968,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901359,
+   "turn": 14,
+   "who": "p1",
+   "pred": -0.942,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901359,
+   "turn": 13,
+   "who": "p1",
+   "pred": -0.913,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901358,
+   "turn": 13,
+   "who": "p1",
+   "pred": 0.911,
+   "wr": "6/6",
+   "ev": 1.0,
+   "cert": true,
+   "teach": false
+  },
+  {
+   "seed": 901358,
+   "turn": 13,
+   "who": "p2",
+   "pred": -0.854,
+   "wr": "0/6",
+   "ev": -1.0,
+   "cert": true,
+   "teach": false
+  }
+ ]
+}

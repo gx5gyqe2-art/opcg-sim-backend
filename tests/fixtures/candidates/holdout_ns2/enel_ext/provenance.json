@@ -1,0 +1,1 @@
+{"git_rev": "5f50463", "worlds": 24, "label_sims": 48, "band": {"min_life": 99, "min_turn": 5, "max_life_diff": 1, "min_both_life": 1, "max_per_replay": 99}, "offset_stride": [0, 1], "serve_don_box": true, "don_margin_env": "", "replays": "e1,e2,h1"}

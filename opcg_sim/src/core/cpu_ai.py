@@ -270,15 +270,84 @@ def _has_don_conditional(c) -> bool:
     return bool(_DON_COND_RE.search(getattr(m, "effect_text", "") or ""))
 
 
-def _attach_don_meaningful(manager, actor_name: str, c) -> bool:
+# (C) マージン付与の既定（OPCG_DON_MARGIN=0 で旧規則へ・アリーナ A/B 用の seam）
+DON_MARGIN_ATTACH = os.environ.get("OPCG_DON_MARGIN", "1") != "0"
+
+
+def don_box_candidates(manager, actor_name: str,
+                       raw_moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """ドン箱（DON_BOX）の合成（`docs/cpu_don_box_plan.md` §2.2・Phase 1＝攻撃箱のみ）。
+
+    「付与 k 枚 → 相手リーダーへ攻撃」を1個のマクロ候補にする。k は算術で高々2点:
+      k_min = 攻撃が通る最小（atk ≥ L になる枚数・現状不足の攻撃者を1手で候補化）
+      k_two = need=3000（カウンター2枚要求＝7000理論）を作る枚数
+    探索内部専用（適用は `_apply_move_inplace` が原始列へ展開・記録/再生/API は原始手のまま。
+    実対局への出力は decide が先頭原始手 ATTACH_DON に変換する）。"""
+    actor = _player_by_name(manager, actor_name)
+    opp = _other(manager, actor_name)
+    budget = len(actor.don_active)
+    if budget <= 0 or opp.leader is None:
+        return []
+    lid = opp.leader.uuid
+    try:
+        L = float(opp.leader.get_power(False))
+    except Exception:
+        L = float(getattr(getattr(opp.leader, "master", None), "power", 0) or 0)
+    by_uuid = {}
+    for u in ([actor.leader] if actor.leader is not None else []) + list(actor.field):
+        by_uuid[getattr(u, "uuid", None)] = u
+    out: List[Dict[str, Any]] = []
+    seen = set()
+    for mv in raw_moves:
+        if mv.get("action_type") != "ATTACK":
+            continue
+        pl = mv.get("payload") or {}
+        if (pl.get("target_ids") or [None])[0] != lid:
+            continue
+        c = by_uuid.get(pl.get("uuid"))
+        if c is None:
+            continue
+        try:
+            p = float(c.get_power(True))
+        except Exception:
+            p = float(getattr(getattr(c, "master", None), "power", 0) or 0)
+        k_min = max(0, int((L - p + 999) // 1000))
+        k_two = max(0, int((L + 2000.0 - p + 999) // 1000))
+        for k in {k_min, k_two}:
+            key = (pl.get("uuid"), k)
+            if 1 <= k <= budget and key not in seen:
+                seen.add(key)
+                out.append({"kind": "game", "action_type": "DON_BOX",
+                            "payload": {"uuid": pl.get("uuid"),
+                                        "target_ids": [lid], "don_k": int(k)}})
+    return out
+
+
+def don_box_first_primitive(move: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """DON_BOX を実対局へ出す形＝先頭原始手 ATTACH_DON へ変換（それ以外は素通し）。
+
+    実行はステートレス: 1枚付与後の次 decide で箱候補が再計算され（k が1減った箱）、
+    探索が計画の続行/変更を毎手選び直す＝キューを持たない（盤面が変われば計画も変わる）。"""
+    if move and move.get("action_type") == "DON_BOX":
+        pl = move.get("payload") or {}
+        return {"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": pl.get("uuid")}}
+    return move
+
+
+def _attach_don_meaningful(manager, actor_name: str, c, margin: Optional[bool] = None) -> bool:
     """ドン!!付与の手が「意味ある配分」か（B-2・§2.5.3）。
 
     付与ドンのパワーは自分のターンのみ・付与先がこのターン実際に攻撃する体でなければ純損（アクティブドンを
     失うだけ）。意味があるのは:
       (A) 戦闘結果を変えられる: 付与先（このターン攻撃できる体）が現状では上回れない相手の防御パワー
-          （リーダー/場キャラ）を、手持ちアクティブドンの範囲で**新たに上回れる**。既に最硬防御を上回る
-          付与先（過剰=オーバーキャップ）や、全ドンを乗せても最低の未踏破防御に届かない付与先は無意味。
+          （リーダー/場キャラ）を、手持ちアクティブドンの範囲で**新たに上回れる**。全ドンを乗せても
+          最低の未踏破防御に届かない付与先は無意味。
       (B) 付与ドン条件【ドン!!×N】を開ける: 付与で常在/起動効果が立つカードは戦闘閾値に関わらず残す。
+      (C) **カウンター強要のマージン作り**（2026-08-12・`don_attach_audit` 実測: 人間の付与58手の
+          53%＝31手が旧規則では「過剰＝無意味」として候補から消えていた）: 相手**リーダー**を既に
+          上回れる攻撃者への上乗せも、リーダー防御+2000（＝カウンター2枚を要求する打点・ユーザの
+          7000理論）**未満**までは意味ある配分として残す。リーダー限定＋マージン上限でビーム影響を
+          有界化（追加候補は攻撃者あたり高々2手）。
     """
     actor = _player_by_name(manager, actor_name)
     budget = len(actor.don_active)
@@ -305,11 +374,23 @@ def _attach_don_meaningful(manager, actor_name: str, c) -> bool:
             tp = float(getattr(getattr(u, "master", None), "power", 0) or 0)
         if p < tp <= reach_max:   # 現状は上回れない（p<tp）が、付与で上回れる（tp<=reach_max）
             return True
+    # (C) リーダーを既に上回れる攻撃者への上乗せ（カウンター強要・上限=リーダー防御+2000 未満）
+    if margin is None:
+        margin = DON_MARGIN_ATTACH
+    if margin and opp.leader is not None:
+        try:
+            lp_ = float(opp.leader.get_power(False))
+        except Exception:
+            lp_ = float(getattr(getattr(opp.leader, "master", None), "power", 0) or 0)
+        if lp_ <= p < lp_ + 2 * _DON_POWER:
+            return True
     return False
 
 
-def _prune_don_moves(manager, actor_name: str, moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _prune_don_moves(manager, actor_name: str, moves: List[Dict[str, Any]],
+                     margin: Optional[bool] = None) -> List[Dict[str, Any]]:
     """ドン!!付与の手を「意味ある配分」だけに絞る（B-2・§2.5.3）。ATTACH_DON 以外は素通し。
+    `margin`＝(C) マージン付与の席別上書き（None=DON_MARGIN_ATTACH・アリーナ A/B 用）。
 
     付与の手生成は付与先候補ごとに 1 手出るため、5000 未満/過剰への無意味な付与でビーム（HARD_BEAM=3）と
     探索予算を浪費していた。戦闘結果を変えうる付与＋付与ドン条件を開ける付与だけを残し、ビームを意味ある
@@ -329,7 +410,7 @@ def _prune_don_moves(manager, actor_name: str, moves: List[Dict[str, Any]]) -> L
         if m.get("action_type") == "ATTACH_DON":
             uid = (m.get("payload") or {}).get("uuid")
             tgt = by_uuid.get(uid)
-            if tgt is None or not _attach_don_meaningful(manager, actor_name, tgt):
+            if tgt is None or not _attach_don_meaningful(manager, actor_name, tgt, margin=margin):
                 continue
         out.append(m)
     return out
@@ -506,6 +587,17 @@ def _apply_move_inplace(board, actor_name: str, move: Dict[str, Any], stop_at_se
     """
     from . import action_api
     actor = _player_by_name(board, actor_name)
+    if move.get("action_type") == "DON_BOX":
+        # ドン箱（探索内部のマクロ手）は原始列へ展開して適用する（cpu_don_box_plan §2.1）。
+        payload = move.get("payload") or {}
+        for _ in range(int(payload.get("don_k", 0) or 0)):
+            action_api.apply_game_action(board, actor, "ATTACH_DON", {"uuid": payload.get("uuid")})
+            _drain_own_interactions(board, actor_name, stop_at_select=stop_at_select)
+        action_api.apply_game_action(board, actor, "ATTACK",
+                                     {"uuid": payload.get("uuid"),
+                                      "target_ids": list(payload.get("target_ids") or [])})
+        _drain_own_interactions(board, actor_name, stop_at_select=stop_at_select)
+        return
     if move["kind"] == "battle":
         action_api.apply_battle_action(board, actor, move["action_type"], move.get("card_uuid"))
     else:
@@ -1317,6 +1409,8 @@ def _describe_move(manager, move: Optional[Dict[str, Any]]) -> Optional[Dict[str
     payload = move.get("payload") or {}
     uuid = payload.get("uuid") or move.get("card_uuid")
     d: Dict[str, Any] = {"action_type": move.get("action_type")}
+    if move.get("action_type") == "DON_BOX" and payload.get("don_k") is not None:
+        d["don_k"] = int(payload["don_k"])   # k 違いの箱を describe/equiv キーで区別（探索内部専用の型）
     label = _card_label(manager, uuid)
     if label:
         d["card"] = label
@@ -1329,6 +1423,20 @@ def _describe_move(manager, move: Optional[Dict[str, Any]]) -> Optional[Dict[str
     sel = payload.get("selected_uuids") or extra.get("selected_uuids") or []
     if sel:
         d["selected"] = [_card_label(manager, u) for u in sel]
+        # 同名複製の曖昧性解消（2026-08-12）: 選択の card_id ラベルだけでは「レスト中の複製 vs
+        # アクティブの複製」を再生側が区別できず、誤対応→盤面分岐する（don_margin の軌道変化で
+        # 露出した既存の再生忠実度バグ）。pending の selectable 候補列内の**位置**を併記する
+        # （候補列挙は決定論＝再生時も同順。旧録画には無いキー＝再生側はあれば優先・無ければ従来）。
+        if move.get("action_type") == "RESOLVE_EFFECT_SELECTION":
+            try:
+                pend = manager.get_pending_request(with_request_id=False) or {}
+                su = list(pend.get("selectable_uuids") or [])
+                pos = {u: i for i, u in enumerate(su)}
+                slots = [pos.get(u, -1) for u in sel]
+                if slots and all(s >= 0 for s in slots):
+                    d["selected_slots"] = slots
+            except Exception:
+                pass
     for k in ("index", "position"):
         v = payload.get(k)
         if v is None:
@@ -1355,7 +1463,7 @@ def _move_equiv_key(manager, move: Optional[Dict[str, Any]]):
     d = _describe_move(manager, move) or {}
     return (d.get("action_type"), d.get("card"), tuple(d.get("targets") or ()),
             tuple(d.get("selected") or ()), d.get("index"), d.get("position"),
-            d.get("accepted"))
+            d.get("accepted"), d.get("don_k"))   # DON_BOX の k 違い＝別挙動（他は None＝キー不変）
 
 
 def _read_ahead_line(manager, root_name: str, see_opp_hand: bool, opp_public_only: bool,

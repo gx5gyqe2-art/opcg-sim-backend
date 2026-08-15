@@ -61,7 +61,7 @@ def load_boards():
     """VERIFIED_V2 の各点を真盤面復元して (名前, manager, 手番, accept) の列にする。"""
     CR.ARGS = argparse.Namespace(true_board=True)
     db = _load_db()
-    replays = {**MG.REPLAYS, **CG.REPLAYS_V2}
+    replays = {**MG.REPLAYS, **CG.REPLAYS_V2, **CG.REPLAYS_V48, **CG.REPLAYS_HUMAN}
     CR.GAMES = {}
     out = []
     for tag, i, accept in CG.VERIFIED_V2:
