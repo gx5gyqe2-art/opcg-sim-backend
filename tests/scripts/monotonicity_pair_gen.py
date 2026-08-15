@@ -47,6 +47,10 @@ def main():
     ap.add_argument("--boards", type=int, default=400)
     ap.add_argument("--stride", type=int, default=3, help="リプレイの採取間隔（小さいほど多く）")
     ap.add_argument("--enc-version", type=int, default=0, help="0=出荷ネットの世代に合わせる")
+    ap.add_argument("--kinds", default="",
+                    help="生成する種類を絞る（カンマ区切り: life,hand,don,power・空=全部）。"
+                         "壊れている次元だけを直したい時に使う＝本体の移動を最小化する"
+                         "（2026-08-15: 全種で教えると m1@14〔入口では素通し〕が崩れたため）")
     ap.add_argument("--group-base", type=int, default=800000)
     ap.add_argument("--shard", default="monopair_00000.npz")
     ap.add_argument("--out", required=True)
@@ -61,6 +65,7 @@ def main():
     boards = sample_boards(db, args.boards, args.stride)
     print(f"盤面 {len(boards)} 点から単調性ペアを生成（enc_v={ver}）", flush=True)
 
+    want = {k.strip() for k in args.kinds.split(",") if k.strip()}
     rows = {k: [] for k in ("scalars", "field", "card_idx", "value", "group",
                             "q_root", "turns_left")}
     gi = args.group_base
@@ -79,6 +84,8 @@ def main():
     for tag, i, m, name in boards:
         _, opp = _players(m, name)
         for key, fn in MUTATIONS:
+            if want and key not in want:
+                continue
             for side, who in (("me", name), ("opp", opp.name)):
                 try:
                     m2 = m.clone()
