@@ -116,6 +116,9 @@ def load_anchor(dirs, enc_version, base_net, rows, seed=11, own_turn_only=False)
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dirs", required=True, help="optpair コーパスのディレクトリ（カンマ区切り）")
+    ap.add_argument("--globs", default="",
+                    help="読むシャード種（カンマ区切り・空=既定の PAIR_GLOBS）。"
+                         "単調性教師 monopair_*.npz など新種を読むときに指定（2026-08-15）")
     ap.add_argument("--base", default="gen10", help="順位微調整の起点（v7 表現）")
     ap.add_argument("--base-path", default="",
                     help="起点 value.npz[,policy.npz] をパス直指定（MODELS 外の候補ネット＝"
@@ -137,7 +140,8 @@ def main():
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
-    child, n_files = load_pairs_corpus([d for d in args.dirs.split(",") if d])
+    _globs = tuple(g for g in args.globs.split(",") if g) or PAIR_GLOBS
+    child, n_files = load_pairs_corpus([d for d in args.dirs.split(",") if d], globs=_globs)
     if child is None:
         print("optpair コーパスが空（--dirs を確認）"); return 1
 
