@@ -225,6 +225,7 @@ def turn_all_rate(eng, m0, name, required, seeds, sims, max_plies=24):
     hit_n = 0
     for s in range(seeds):
         eng._world_seeds = {}
+        getattr(eng, "_battle_plans", {}).clear()   # 入口コミットのプランも独立化（2026-08-15・同一盤面の反復 decide でシード1のプラン尾を返す測定汚染の修正）
         rng = np.random.default_rng(9100 + 97 * s)
         mgr = m0
         done = set()
@@ -268,6 +269,7 @@ def decide_rate(eng, m0, actor, accept, seeds, sims):
     n = 0
     for s in range(seeds):
         eng._world_seeds = {}
+        getattr(eng, "_battle_plans", {}).clear()   # 入口コミットのプランも独立化（2026-08-15・同一盤面の反復 decide でシード1のプラン尾を返す測定汚染の修正）
         mv = eng.decide(m0, actor, sims=sims, rng=np.random.default_rng(9100 + 97 * s))
         try:
             d = cpu_ai._describe_move(m0, mv) or {}
