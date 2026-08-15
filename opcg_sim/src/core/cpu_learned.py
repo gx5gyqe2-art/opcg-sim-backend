@@ -464,7 +464,14 @@ class LearnedEngine:
                 mgr.action_events = JournaledList()
                 cpu_ai._apply_move_inplace(mgr, name, legal[best], stop_at_select=True)
                 trace = []
-                resolve_battle_inplace(self.game, mgr, pf, value_fn=bvf, trace=trace)
+                # box_depth を明示（2026-08-15 の実害修正）: 既定 0 のまま呼ぶと後続手が
+                # 「policy最良→PASS」の弱い選択器で決まり、**評価が正当化した継続と
+                # 実行される継続が別物**になる（皮肉にも『払った後に素通し』を量産し
+                # commit ON がアリーナ 0.320 で大敗した根因）。resolved_branch_values の
+                # 内部解決と同じ規約（出口 value 最良）で採取する。
+                from opcg_sim.src.learned.config import BOX_RESOLVE_DEPTH
+                resolve_battle_inplace(self.game, mgr, pf, value_fn=bvf,
+                                       box_depth=BOX_RESOLVE_DEPTH, trace=trace)
                 tail = [PL.move_sig(mv) for nm, mv in trace if nm == name]
         except Exception:
             tail = []                        # 採取失敗＝プラン無し（ステップ動作に退化・安全側）
