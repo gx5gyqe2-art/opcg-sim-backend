@@ -70,6 +70,11 @@ def main():
     ap.add_argument("--max-pairs", type=int, default=40, help="この実行で回す上限（≈10分/40ペア）")
     ap.add_argument("--frac", type=float, default=0.55)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--leaders", default="fixed", choices=("fixed", "random", "real"),
+                    help="対面の選び方（2026-08-15 ユーザ提案）: fixed=従来の既定リーダーミラー"
+                         "（歴代判定と地続き）／random=全リーダーからペアごとに2枚引く（汎化）／"
+                         "real=実デッキ4リーダーの総当たり（出荷先）。ペア内では席とリーダーを"
+                         "入替＝リーダー相性は相殺され打ち回しの差だけが残る")
     ap.add_argument("--out", required=True, help="ペアスコア jsonl（追記台帳・再開の正）")
     ap.add_argument("--cand-box", action="store_true",
                     help="候補席だけ戦闘窓の箱読み出し＋静止探索を有効にする（v35・機構の A/B）")
@@ -102,7 +107,7 @@ def main():
         from promotion_gate import _init_pool, _play_pair
         t0 = time.time()
         with mp.Pool(args.workers, initializer=_init_pool,
-                     initargs=(args.candidate, args.baseline, cand_kw)) as pool:
+                     initargs=(args.candidate, args.baseline, cand_kw, args.leaders)) as pool:
             with open(args.out, "a") as f:
                 for seed, score in zip(batch, pool.imap(_play_pair, batch)):  # imap=入力順を保存
                     f.write(json.dumps({"seed": seed, "score": score}) + "\n")

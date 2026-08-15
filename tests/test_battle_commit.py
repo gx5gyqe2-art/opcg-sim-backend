@@ -130,3 +130,26 @@ def test_stale_plan_triggers_single_replan(battle_board):
     mv2, _, _ = eng._battle_commit_step(m, name, np.random.default_rng(9))
     assert calls["n"] == 2, "割れたプランの立て直しが起きていない"
     assert mv2 is not None
+
+
+# --- アリーナの対面選択（2026-08-15 ユーザ提案「アリーナは全リーダーランダムがいい」） ---
+
+def test_arena_leader_modes_are_deterministic_and_swapped():
+    """`promotion_gate` の対面選択: seed から決定論・ペア内で席とリーダーを入替できる。
+
+    背景（測定の穴）: 既定（fixed）は `leader_deck_builder()`＝**両者ハンニャバル固定のミラー**で、
+    歴代のアリーナ判定は全てこの1対面だけで測られていた（実デッキは一度も対局していない）。
+    random は全リーダーから2枚引き（左右非対称を許す）、real は実デッキ4リーダー。
+    **ペア内でリーダー対を固定して入れ替える**ことで相性の有利不利が相殺される。
+    """
+    import promotion_gate as PG
+    db = _load_db()
+    assert PG._leader_pair(db, 123, "fixed") == (None, None)      # 従来＝builder を渡さない
+    r1 = PG._leader_pair(db, 123, "random")
+    assert r1 == PG._leader_pair(db, 123, "random"), "同一 seed で対面が再現しない"
+    assert r1 != PG._leader_pair(db, 124, "random"), "seed を変えても同じ対面（乱数が効いていない）"
+    for cid in r1:
+        m = db.get_card(cid)
+        assert m is not None and m.type.name == "LEADER"
+    real = PG._leader_pair(db, 5, "real")
+    assert all(c in PG.REAL_LEADERS for c in real)

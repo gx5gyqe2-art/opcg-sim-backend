@@ -24,6 +24,7 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXP
 import argparse
 import json
 import multiprocessing as mp
+import random
 import time
 
 import os as _os, sys as _sys  # noqa: E402  test bootstrap
@@ -56,7 +57,7 @@ def anchor_decision(wins: float, games: int, frac: float = 0.5) -> bool:
 _G = {}
 
 
-def _init_pool(cand_spec, best_spec, cand_kw=None):
+def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed"):
     """子プロセス初期化: DB とエンジン2体を1回だけロード（以後の全ペアで共有）。
 
     `cand_kw`（v35）: **候補席にだけ**渡す LearnedEngine のオプション（例
@@ -65,6 +66,7 @@ def _init_pool(cand_spec, best_spec, cand_kw=None):
     未指定＝両席とも既定＝従来と同一挙動。"""
     from cpu_arena import _load_db
     from opcg_sim.src.core.cpu_learned import LearnedEngine
+    _G["leaders_mode"] = leaders_mode
 
     def eng(spec, **kw):
         if not spec:
@@ -77,12 +79,50 @@ def _init_pool(cand_spec, best_spec, cand_kw=None):
     _G["best"] = eng(best_spec)
 
 
+# --- 対面の選び方（2026-08-15）------------------------------------------------
+# 既定（`leader_deck_builder()`）は**両者ハンニャバル固定のミラー**で、歴代のアリーナ判定は
+# 全てこの1対面だけで測られていた（実デッキは一度も対局していない）。ユーザ提案により
+# **リーダーをランダム化**して汎化を測れるようにする。
+#   fixed  … 従来（既定リーダーのミラー・歴代との地続き比較用）
+#   random … 全リーダーからペアごとに2枚引く（**左右非対称**を許す）
+#   real   … 実デッキ4リーダーの総当たり（出荷先の対面）
+# **ペア内ではリーダー対を固定し、席とリーダーを入れ替える**（game a: cand=L1 / game b:
+# cand=L2）＝リーダー相性の有利不利が相殺され、残るのは打ち回しの差だけになる。
+REAL_LEADERS = ("OP11-041", "OP09-001", "OP15-058", "OP16-022")   # ナミ/シャンクス/エネル/黒黄ルフィ
+
+
+def _leader_pool(db):
+    if "leaders" not in _G:
+        _G["leaders"] = sorted(cid for cid, _ in db.raw_db.items()
+                               if (db.get_card(cid) is not None
+                                   and getattr(db.get_card(cid).type, "name", "") == "LEADER"))
+    return _G["leaders"]
+
+
+def _leader_pair(db, seed, mode):
+    """seed から決定論的にリーダー対を選ぶ（pure・pool は1回だけ構築）。"""
+    if mode == "fixed":
+        return None, None
+    pool = REAL_LEADERS if mode == "real" else _leader_pool(db)
+    if not pool:
+        return None, None
+    rng = random.Random(seed * 7919 + 13)
+    return rng.choice(pool), rng.choice(pool)
+
+
 def _play_pair(args):
-    """1ペア＝同seedで席入替の2局。candidate の勝ち数(0..2)を返す。"""
+    """1ペア＝同seedで**席とリーダーを入替**た2局。candidate の勝ち数(0..2)を返す。"""
     seed = args
     from cpu_arena import play_game
-    a = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["cand"], p2_engine=_G["best"])
-    b = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["best"], p2_engine=_G["cand"])
+    from game_driver import leader_deck_builder
+    mode = _G.get("leaders_mode", "fixed")
+    la, lb = _leader_pair(_G["db"], seed, mode)
+    ab = leader_deck_builder(la, lb) if la else None      # game a: cand=la / best=lb
+    ba = leader_deck_builder(lb, la) if la else None      # game b: best=lb→p1 なので入替
+    a = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["cand"],
+                  p2_engine=_G["best"], deck_builder=ab)
+    b = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["best"],
+                  p2_engine=_G["cand"], deck_builder=ba)
     return (1.0 if a["winner"] == "p1" else 0.0) + (1.0 if b["winner"] == "p2" else 0.0)
 
 

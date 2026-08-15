@@ -144,7 +144,7 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
               p1_search=None, p2_search=None,
               p1_coeffs=None, p2_coeffs=None,
               p1_sims: int = 160, p2_sims: int = 160,
-              p1_engine=None, p2_engine=None) -> Dict[str, Any]:
+              p1_engine=None, p2_engine=None, deck_builder=None) -> Dict[str, Any]:
     """p1/p2 に別難易度を割り当てて 1 ゲームを決定論的に完走させ、勝者を返す。
 
     対局ループは `game_driver.run_game`（全ハーネス共通）で回し、席（seat）だけ非対称にする。
@@ -168,7 +168,12 @@ def play_game(seed: int, db, p1_difficulty: str, p2_difficulty: str,
                           p2_sims, engine=p2_engine),
     }
     # arena は各手番で get_legal_actions を事前呼びしない（seat 内で解決＝乱数消費順の保存）。
+    # deck_builder（2026-08-15）: 既定は `leader_deck_builder()`＝**両者ハンニャバル固定の
+    # ミラー**（EB01-021・自動生成50枚）。歴代のアリーナ判定は全てこの1対面で測られていた
+    # ＝実デッキ（ナミ/シャンクス/エネル/黒黄ルフィ）は一度も対局していない、という測定の穴。
+    # 呼び出し側がリーダー対を渡せるようにして、ランダムリーダー帯・実デッキ帯を測れるようにする。
     result = run_game(seed, db, seats=seats, max_steps=max_steps,
+                      deck_builder=deck_builder,
                       legal_moves="skip", invariants="raise")
     return {"seed": seed, "winner": result.winner, "steps": result.steps, "turns": result.turns}
 
