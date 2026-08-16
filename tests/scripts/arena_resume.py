@@ -29,7 +29,11 @@ import _bootstrap  # noqa: E402,F401
 
 
 def load_ledger(path):
-    """台帳 jsonl → {seed: score}（pure I/O 読み）。壊れた行は無視せず落とす＝黙って欠測にしない。"""
+    """台帳 jsonl → {seed: score}（pure I/O 読み）。壊れた行は無視せず落とす＝黙って欠測にしない。
+
+    score=None は **void**（対局がエンジン欠陥で成立しなかったペア）。消化済みとしては数えるが
+    （決定論なので撃ち直しても同じ所で落ちる）、勝率の母数からは外す。
+    """
     done = {}
     if os.path.exists(path):
         for line in open(path):
@@ -37,7 +41,8 @@ def load_ledger(path):
             if not line:
                 continue
             r = json.loads(line)
-            done[int(r["seed"])] = float(r["score"])
+            sc = r.get("score")
+            done[int(r["seed"])] = None if sc is None else float(sc)
     return done
 
 
@@ -47,14 +52,22 @@ def remaining_seeds(planned, done):
 
 
 def final_result(planned, done, frac=0.55):
-    """全ペア消化後の最終判定（pure・arena_gate.final_decision と同規約）。未消化があれば None。"""
+    """全ペア消化後の最終判定（pure・arena_gate.final_decision と同規約）。未消化があれば None。
+
+    void（score=None）のペアは母数から外し、`void` 件数として結果に必ず載せる
+    ＝落としたぶんを黙って隠さない。全ペアが void なら判定は出さない。
+    """
     if any(s not in done for s in planned):
         return None
     from arena_parallel import _pair_level_ci
-    scores = [done[s] / 2.0 for s in planned]          # 勝ち数0..2 → ペア水準0/0.5/1
+    valid = [s for s in planned if done[s] is not None]
+    if not valid:
+        return None
+    scores = [done[s] / 2.0 for s in valid]            # 勝ち数0..2 → ペア水準0/0.5/1
     ci = _pair_level_ci(scores)
-    return {"pairs": len(planned), "games": 2 * len(planned),
-            "wins": sum(done[s] for s in planned),
+    return {"pairs": len(valid), "games": 2 * len(valid),
+            "void": len(planned) - len(valid),
+            "wins": sum(done[s] for s in valid),
             "wr": round(ci["win_rate"], 4), "ci95": [round(ci["lo"], 4), round(ci["hi"], 4)],
             "elo": round(ci["elo"], 1),
             "promoted": bool(ci["win_rate"] >= frac and ci["lo"] > 0.50)}
@@ -107,14 +120,15 @@ def main():
     print(f"消化済み {len(done)}/{args.pairs} ペア・残り {len(todo)}", flush=True)
     if todo:
         batch = todo[: args.max_pairs]
-        from promotion_gate import _init_pool, _play_pair
+        from promotion_gate import _init_pool, _play_pair_detail
         t0 = time.time()
         with mp.Pool(args.workers, initializer=_init_pool,
                      initargs=(args.candidate, args.baseline, cand_kw, args.leaders,
                                args.decks)) as pool:
             with open(args.out, "a") as f:
-                for seed, score in zip(batch, pool.imap(_play_pair, batch)):  # imap=入力順を保存
-                    f.write(json.dumps({"seed": seed, "score": score}) + "\n")
+                for seed, row in zip(batch, pool.imap(_play_pair_detail, batch)):  # imap=入力順
+                    row["seed"] = seed          # 念のため seed は呼び出し側の値で上書き
+                    f.write(json.dumps(row, ensure_ascii=False) + "\n")
                     f.flush()                                    # ターン打切りでも書けた分は残す
         done = load_ledger(args.out)
         print(f"今回 {len(batch)} ペア（{time.time() - t0:.0f}s）・累計 {len(done)}/{args.pairs}",

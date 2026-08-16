@@ -113,6 +113,15 @@ def _leader_pair(db, seed, mode):
 
 def _play_pair(args):
     """1ペア＝同seedで**席とリーダーを入替**た2局。candidate の勝ち数(0..2)を返す。"""
+    return _play_pair_detail(args)["score"]
+
+
+def _play_pair_detail(args):
+    """`_play_pair` の詳細版: 勝ち数に加えて**どの対面だったか**を返す。
+
+    ランダムリーダー帯では「総合の勝率」だけ見ても、どのリーダーで強い/弱いかが分からない
+    （ユーザ決定 2026-08-16: 対面を記録する）。台帳へ leaders を書けるよう、スコアと一緒に
+    返す。判定側（勝ち数の集計）は score だけを見るので規約は不変。"""
     seed = args
     from cpu_arena import play_game
     from game_driver import leader_deck_builder
@@ -129,11 +138,24 @@ def _play_pair(args):
     else:
         ab = leader_deck_builder(la, lb) if la else None      # game a: cand=la / best=lb
         ba = leader_deck_builder(lb, la) if la else None      # game b: best=lb→p1 なので入替
-    a = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["cand"],
-                  p2_engine=_G["best"], deck_builder=ab)
-    b = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["best"],
-                  p2_engine=_G["cand"], deck_builder=ba)
-    return (1.0 if a["winner"] == "p1" else 0.0) + (1.0 if b["winner"] == "p2" else 0.0)
+    try:
+        a = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["cand"],
+                      p2_engine=_G["best"], deck_builder=ab)
+        b = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["best"],
+                      p2_engine=_G["cand"], deck_builder=ba)
+    except Exception as e:
+        # 対局がエンジン欠陥で成立しなかった（上限手数 MAX_STEPS 等）。**1ペアの失敗で計測全体を
+        # 落とさない**（ランダム対面では未知のループを踏むことがあり、シャードが丸ごと止まる）。
+        # スコアは付けず void として台帳に残し、集計側で母数から外して**件数を明示**する
+        # （黙って落とすと「全部測れた」ように見えてしまう）。対面も残すので後から再現できる。
+        return {"seed": seed, "score": None, "leaders": [la, lb],
+                "void": f"{type(e).__name__}: {str(e)[:120]}"}
+    wa = 1.0 if a["winner"] == "p1" else 0.0    # game a: 候補が la を握る
+    wb = 1.0 if b["winner"] == "p2" else 0.0    # game b: 候補が lb を握る（席とリーダーを入替）
+    # leaders=[la, lb] と games=[wa, wb] を対にして残すと、**どのリーダーを握って勝ったか**を
+    # 後から集計できる（score だけだと2局の合計なのでリーダー別に割れない）。
+    return {"seed": seed, "score": wa + wb, "leaders": [la, lb], "games": [wa, wb],
+            "turns": [a.get("turns"), b.get("turns")]}
 
 
 def run_stage(pool, seeds):

@@ -36,3 +36,33 @@ def test_final_decision_matches_arena_gate_rule():
     assert win_all["promoted"] and win_all["wr"] == pytest.approx(1.0)
     even = AR.final_result(planned, {s: 1.0 for s in planned})
     assert not even["promoted"] and even["wr"] == pytest.approx(0.5)
+
+
+# --- void（対局が成立しなかったペア）の扱い（2026-08-16）------------------------------
+# ランダムリーダー＋合成デッキ帯で、未知のエンジン欠陥により上限手数（MAX_STEPS）に達する
+# 対局が出た。従来は例外がそのままシャードを落とし、計測が丸ごと止まっていた。1ペアの失敗で
+# 計測全体を止めず、かつ**落としたぶんを黙って隠さない**規約を固定する。
+
+def test_ledger_keeps_void_pairs_as_done_but_scoreless(tmp_path):
+    """void（score=null）は消化済みとして数える（決定論なので撃ち直しても同じ所で落ちる）。"""
+    p = tmp_path / "led.jsonl"
+    p.write_text(json.dumps({"seed": 1, "score": 2.0}) + "\n"
+                 + json.dumps({"seed": 2, "score": None, "void": "InvariantError: MAX_STEPS"}) + "\n")
+    done = AR.load_ledger(str(p))
+    assert done == {1: 2.0, 2: None}
+    assert AR.remaining_seeds([1, 2, 3], done) == [3]
+
+
+def test_final_excludes_void_from_denominator_and_reports_count():
+    planned = list(range(10))
+    done = {s: 2.0 for s in planned}
+    done[0] = done[1] = None                       # 2ペアが void
+    res = AR.final_result(planned, done)
+    assert res["void"] == 2
+    assert res["pairs"] == 8 and res["games"] == 16   # 母数から外れる
+    assert res["wr"] == pytest.approx(1.0)            # 残り8ペアは全勝
+
+
+def test_final_is_none_when_every_pair_is_void():
+    """全部 void なら判定を出さない（0件から勝率を作らない）。"""
+    assert AR.final_result([1, 2], {1: None, 2: None}) is None
