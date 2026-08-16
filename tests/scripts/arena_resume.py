@@ -99,6 +99,10 @@ def main():
     ap.add_argument("--cand-don-box", action="store_true",
                     help="候補席だけドン箱（DON_BOX・cpu_don_box_plan Phase 1）を有効化。"
                          "(C) 済み現行を基準に箱の上乗せを測る＝OPCG_DON_MARGIN は既定(1)のまま")
+    ap.add_argument("--pair-timeout", type=int, default=900,
+                    help="1ペアの実時間上限（秒・0=無制限）。超過したペアは void として台帳に"
+                         "残し次へ進む。手数上限では捕まらない「1回の decide() から戻らない」"
+                         "暴走（戦闘箱の組合せ爆発）を切るための保険")
     ap.add_argument("--decks", default="singleton", choices=("singleton", "synth"),
                     help="デッキの中身。singleton=従来（色が合う50枚・全部1枚ずつ・イベント0）／"
                          "synth=リーダーに合わせて合成（deck_synth）")
@@ -124,10 +128,12 @@ def main():
         t0 = time.time()
         with mp.Pool(args.workers, initializer=_init_pool,
                      initargs=(args.candidate, args.baseline, cand_kw, args.leaders,
-                               args.decks)) as pool:
+                               args.decks, args.pair_timeout)) as pool:
             with open(args.out, "a") as f:
-                for seed, row in zip(batch, pool.imap(_play_pair_detail, batch)):  # imap=入力順
-                    row["seed"] = seed          # 念のため seed は呼び出し側の値で上書き
+                # imap（入力順）だと先頭のペアが詰まっている間、後続が完了しても台帳へ
+                # flush されない＝1局面でシャード全体が止まる（2026-08-16 b_p04）。行は
+                # seed を自分で持つので順序は不要＝完了順に書き出す。
+                for row in pool.imap_unordered(_play_pair_detail, batch):
                     f.write(json.dumps(row, ensure_ascii=False) + "\n")
                     f.flush()                                    # ターン打切りでも書けた分は残す
         done = load_ledger(args.out)

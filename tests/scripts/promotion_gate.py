@@ -57,7 +57,17 @@ def anchor_decision(wins: float, games: int, frac: float = 0.5) -> bool:
 _G = {}
 
 
-def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed", decks="singleton"):
+class PairTimeout(BaseException):
+    """1ペアの実時間上限。**BaseException 派生**が要点で、エンジン/探索側の広い
+    `except Exception` に食われて握り潰されないようにする。
+
+    なぜ手数上限では足りないか（2026-08-16・b_p04 seed 904002）: 上限手数は「手」を数えるので、
+    **1回の decide() から戻ってこない**（戦闘箱の枝が組合せ的に膨らむ）局面では一生増えない。
+    実際に 1局面で 3時間48分 CPU を焼き続けた。実時間で切るしかない。"""
+
+
+def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed", decks="singleton",
+               pair_timeout=0):
     """子プロセス初期化: DB とエンジン2体を1回だけロード（以後の全ペアで共有）。
 
     `cand_kw`（v35）: **候補席にだけ**渡す LearnedEngine のオプション（例
@@ -68,6 +78,7 @@ def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed", decks="
     from opcg_sim.src.core.cpu_learned import LearnedEngine
     _G["leaders_mode"] = leaders_mode
     _G["decks"] = decks
+    _G["pair_timeout"] = pair_timeout
 
     def eng(spec, **kw):
         if not spec:
@@ -138,18 +149,29 @@ def _play_pair_detail(args):
     else:
         ab = leader_deck_builder(la, lb) if la else None      # game a: cand=la / best=lb
         ba = leader_deck_builder(lb, la) if la else None      # game b: best=lb→p1 なので入替
+    if _G.get("pair_timeout"):
+        import signal
+
+        def _alarm(_sig, _frm):
+            raise PairTimeout(f"pair exceeded {_G['pair_timeout']}s")
+        signal.signal(signal.SIGALRM, _alarm)
+        signal.alarm(int(_G["pair_timeout"]))
     try:
         a = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["cand"],
                       p2_engine=_G["best"], deck_builder=ab)
         b = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["best"],
                       p2_engine=_G["cand"], deck_builder=ba)
-    except Exception as e:
-        # 対局がエンジン欠陥で成立しなかった（上限手数 MAX_STEPS 等）。**1ペアの失敗で計測全体を
+    except (Exception, PairTimeout) as e:
+        # 対局がエンジン欠陥で成立しなかった（上限手数 MAX_STEPS / 実時間上限 等）。**1ペアの失敗で計測全体を
         # 落とさない**（ランダム対面では未知のループを踏むことがあり、シャードが丸ごと止まる）。
         # スコアは付けず void として台帳に残し、集計側で母数から外して**件数を明示**する
         # （黙って落とすと「全部測れた」ように見えてしまう）。対面も残すので後から再現できる。
         return {"seed": seed, "score": None, "leaders": [la, lb],
                 "void": f"{type(e).__name__}: {str(e)[:120]}"}
+    finally:
+        if _G.get("pair_timeout"):
+            import signal as _sg
+            _sg.alarm(0)
     wa = 1.0 if a["winner"] == "p1" else 0.0    # game a: 候補が la を握る
     wb = 1.0 if b["winner"] == "p2" else 0.0    # game b: 候補が lb を握る（席とリーダーを入替）
     # leaders=[la, lb] と games=[wa, wb] を対にして残すと、**どのリーダーを握って勝ったか**を
