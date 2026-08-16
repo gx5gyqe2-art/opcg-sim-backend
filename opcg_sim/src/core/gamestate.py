@@ -577,7 +577,11 @@ class GameManager:
     def main_phase(self): 
         return _turn_flow.main_phase(self)
 
-    _REACTIVE_RE = re.compile(r'(された|した|受けた|なった)時、')
+    # 「離れた」（場/ライフを離れた時）も反応型。**継続効果ではなくイベント誘発**なので
+    # 再計算ループで実行してはならない（OP09-080 サウザンド・サニー号ほか10節が該当。
+    # 継続効果として毎回評価されると、任意コストの確認対話が再計算のたびに復活して
+    # 対局が終わらなくなる）。該当10節はいずれも「…た時、」の反応型で、常時効果は無い。
+    _REACTIVE_RE = re.compile(r'(された|した|受けた|なった|離れた)時、')
 
     def _is_reactive_passive(self, ability) -> bool:
         return _passives._is_reactive_passive(self, ability)

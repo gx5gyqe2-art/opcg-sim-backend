@@ -21,6 +21,13 @@
      アクティブにできない」。2回目以降は自己制限で完全な no-op だが、コストもターン制限も
      無いため何も消費せず、合法手に出続けていた。
 
+  E. 継続効果の再計算がコスト確認の対話を出す（OP09-080 サウザンド・サニー号・2026-08-16）
+     「【相手のターン中】このステージをレストにできる：…場を離れた時、…」の「離れた時」が
+     反応型と判定されず、常時効果として再計算のたびに評価されていた。任意コストなので
+     「使用しますか？」を訊き、拒否しても使用回数も盤面も変わらないため次の再計算がまた
+     同じ問いを立てる＝無限ループ（交差対面の対局で 613 回連続）。B と同じ「再計算は
+     対話を出さない」原則で、こちらはコスト確認側。
+
   D. 複合コストから「自分自身の分」が落ちる（パーサ・9枚）
      「この（カード/キャラ）と〈X〉を レスト／トラッシュ／デッキの下 にできる：」の自身の分が
      脱落し、コストが実質「X だけ」に化けていた。発生源が場に残るので起動メインを撃ち続け
@@ -189,6 +196,44 @@ def test_active_don_main_stops_being_legal_after_one_empty_activation():
     assert gm._has_activatable_main(src, p1) is True
     gm.resolve_ability(p1, ab, source_card=src)
     assert gm._has_activatable_main(src, p1) is False
+
+
+SUNNY_TEXT = (
+    "【相手のターン中】このステージをレストにできる:自分の特徴《麦わらの一味》を持つキャラが"
+    "相手の効果で場を離れた時、"
+)
+
+
+def _sunny_board():
+    """相手（＝非ターンプレイヤー）の場に OP09-080 サウザンド・サニー号が立っている盤面。"""
+    gm, p1, p2 = make_game()
+    stage = _real("OP09-080", owner="P2")
+    assert SUNNY_TEXT[:20] in stage.master.effect_text          # 実物のテキストで検証している
+    p2.stage = stage
+    gm.turn_player = p1                                          # p2 から見て「相手のターン中」
+    return gm, p1, p2, stage
+
+
+def test_leave_field_trigger_is_not_a_continuous_effect():
+    """「…場を離れた時、」はイベント誘発＝再計算ループで実行してはいけない反応型。"""
+    _gm, _p1, _p2, stage = _sunny_board()
+    gm = _gm
+    ab = next(ab for ab in stage.master.abilities
+              if ab.trigger == TriggerType.OPPONENT_TURN)
+    assert gm._is_reactive_passive(ab) is True
+
+
+def test_passive_recalc_never_asks_to_pay_a_cost():
+    """継続効果の再計算は**コスト確認の対話を出さない**（出すと無限ループになる）。
+
+    拒否しても使用回数は減らず盤面も変わらないので、次の再計算がまた同じ問いを立てる。
+    OP09-080 は「離れた時」が反応型と判定されず継続効果として毎回評価されており、
+    生成デッキの交差対面で 613 回連続の同一確認＝上限手数まで終わらない対局になっていた。
+    """
+    gm, p1, p2, stage = _sunny_board()
+    gm._apply_passive_effects(p1)
+    assert gm.active_interaction is None        # 問い合わせが立たない
+    assert stage.is_rest is False               # 勝手にコストも払わない
 
 
 def test_active_don_main_is_illegal_after_self_restriction():

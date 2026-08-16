@@ -13,9 +13,16 @@
   error     … 例外（種別とメッセージを記録）
 を集計する。犯人カードの一覧がそのまま修正対象／暫定除外リストになる。
 
+`--cross N`（2026-08-16）は**ミラーではなく交差対面**を N 件回す。アリーナをランダム対面へ
+広げたときに出た void（終局しないペア・20件）は**交差対面でしか出ない**（ミラー監査は ok=137）。
+対面の引き方はアリーナ（`promotion_gate._leader_pair`）と同じで、hang 時は繰り返していた
+**対話の発生元**に加えて**繰り返していた手**も出す（対話を伴わないループは発生元が付かないため）。
+
 実行例:
   OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/deck_synth_audit.py \\
     --sims 8 --max-steps 700 --workers 4 --out /tmp/deck_audit.json
+  OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/deck_synth_audit.py \\
+    --cross 200 --sims 8 --max-steps 700 --workers 4 --out /tmp/cross_audit.json
 """
 import os
 for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
@@ -48,25 +55,49 @@ def _init(sims, max_steps, timeout=0):
     _G["timeout"] = timeout
 
 
-def _audit_one(leader_id):
-    """1リーダー分: 生成デッキのミラーを1局回して結果を返す（子プロセスで実行）。"""
+def _audit_one(job):
+    """1件分: 生成デッキで1局回して結果を返す（子プロセスで実行）。
+
+    job は `leader_id`（ミラー）または `(l1, l2, seed)`（交差対面）。アリーナの void
+    （終局しないペア）は**交差対面でだけ**出たので、ミラーと同じ器で対面を非対称にできるようにする。
+    """
     from cpu_arena import _arena_seat
     from game_driver import run_game
     from deck_synth import synth_deck_builder
     db, sims, max_steps = _G["db"], _G["sims"], _G["max_steps"]
+    if isinstance(job, tuple):
+        l1, l2, gseed = job
+        dseed = gseed           # 交差対面はデッキ中身も件ごとに振る
+        label = f"{l1}×{l2}"
+    else:
+        l1 = l2 = job
+        gseed, dseed = 4242, 0  # ミラーは従来どおり（既存の監査結果と地続き）
+        label = job
     seen = {}
+    moves = {}
 
-    def wrap(fn):
+    def wrap(fn, who):
         def g(ctx):
             m = getattr(ctx, "manager", None)
+            src = None
             if m is not None:
                 ai = getattr(m, "active_interaction", None)
                 if ai:
                     src = ai.get("source_card_name") if isinstance(ai, dict) else None
                     if src:
                         seen[src] = seen.get(src, 0) + 1
-            return fn(ctx)
+            mv = fn(ctx)
+            # **繰り返している「手」**も数える。対話を伴わないループ（同じ起動メインの連打等）は
+            # source_card_name が付かないため、対話の集計だけでは犯人が見えない。
+            key = (who, src, str(mv)[:110])
+            moves[key] = moves.get(key, 0) + 1
+            return mv
         return g
+
+    def _hot():
+        return {"dialogs": sorted(seen.items(), key=lambda kv: -kv[1])[:2],
+                "moves": [[f"{k[0]} {k[1] or '-'} {k[2]}", n]
+                          for k, n in sorted(moves.items(), key=lambda kv: -kv[1])[:3]]}
 
     # 手数ではなく**実時間**の上限。手数上限では捕まらない「1手の中で終わらない」暴走
     # （探索がバトル箱の中で回り続ける等）を timeout として記録し、監査全体を止めない。
@@ -78,26 +109,29 @@ def _audit_one(leader_id):
         signal.signal(signal.SIGALRM, _alarm)
         signal.alarm(int(_G["timeout"]))
     try:
-        res = run_game(4242, db, seats={
-            "p1": wrap(_arena_seat("learned", None, None, 1, None, None, None, sims)),
-            "p2": wrap(_arena_seat("learned", None, None, 1, None, None, None, sims))},
-            deck_builder=synth_deck_builder(leader_id, leader_id),
+        res = run_game(gseed, db, seats={
+            "p1": wrap(_arena_seat("learned", None, None, 1, None, None, None, sims), "p1"),
+            "p2": wrap(_arena_seat("learned", None, None, 1, None, None, None, sims), "p2")},
+            deck_builder=synth_deck_builder(l1, l2, seed=gseed),
             max_steps=max_steps, legal_moves="skip", invariants="raise")
-        row = {"leader": leader_id, "status": "ok",
+        row = {"leader": label, "status": "ok",
                "turns": getattr(res, "turns", None), "steps": getattr(res, "steps", None)}
         if _G.get("timeout"):
             import signal as _sg
             _sg.alarm(0)
         return row
     except _GameTimeout as e:
-        hot = sorted(seen.items(), key=lambda kv: -kv[1])[:2]
-        return {"leader": leader_id, "status": "timeout", "error": str(e), "hot_dialogs": hot}
+        h = _hot()
+        return {"leader": label, "status": "timeout", "error": str(e),
+                "hot_dialogs": h["dialogs"], "hot_moves": h["moves"]}
     except Exception as e:
         kind = type(e).__name__
-        hot = sorted(seen.items(), key=lambda kv: -kv[1])[:2]
-        status = "hang" if ("MAX_STEPS" in str(e) or kind == "InvariantError") else "error"
-        return {"leader": leader_id, "status": status, "error": f"{kind}: {str(e)[:80]}",
-                "hot_dialogs": hot}
+        h = _hot()
+        # InvariantError は「上限手数」と「手の適用中に例外」の両方を運ぶ。前者だけが hang
+        # （終わらないループ）で、後者は素の欠陥＝error。混ぜると原因の切り分けができない。
+        status = "hang" if "MAX_STEPS" in str(e) else "error"
+        return {"leader": label, "status": status, "error": f"{kind}: {str(e)[:80]}",
+                "hot_dialogs": h["dialogs"], "hot_moves": h["moves"]}
 
 
 def main():
@@ -108,6 +142,9 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="先頭N体だけ（0=全部）")
     ap.add_argument("--timeout", type=int, default=0,
                     help="1局あたりの実時間上限（秒。0=無制限）")
+    ap.add_argument("--cross", type=int, default=0,
+                    help="ミラーではなく**交差対面**をN件監査する（アリーナの void はここでしか出ない）")
+    ap.add_argument("--cross-seed", type=int, default=0, help="交差対面の引き直し基点")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
@@ -117,18 +154,31 @@ def main():
                      if db.get_card(cid) is not None and db.get_card(cid).type.name == "LEADER")
     if args.limit:
         leaders = leaders[:args.limit]
-    print(f"生成デッキ監査: {len(leaders)}リーダー・sims={args.sims}・上限{args.max_steps}手",
-          flush=True)
+    if args.cross:
+        # アリーナと同じ引き方（`promotion_gate._leader_pair`）で対面を決める＝void の再現条件と
+        # 揃える。件ごとに seed を変えるので、同じ対面でも別の展開を踏める。
+        import random as _rnd
+        jobs = []
+        for i in range(args.cross):
+            s = args.cross_seed + i
+            rng = _rnd.Random(s * 7919 + 13)
+            jobs.append((rng.choice(leaders), rng.choice(leaders), s))
+        print(f"生成デッキ監査（交差対面）: {len(jobs)}件・sims={args.sims}・上限{args.max_steps}手",
+              flush=True)
+    else:
+        jobs = leaders
+        print(f"生成デッキ監査: {len(leaders)}リーダー・sims={args.sims}・上限{args.max_steps}手",
+              flush=True)
 
     rows = []
     with mp.Pool(args.workers, initializer=_init, initargs=(args.sims, args.max_steps, args.timeout)) as pool:
-        for r in pool.imap_unordered(_audit_one, leaders):
+        for r in pool.imap_unordered(_audit_one, jobs):
             rows.append(r)
             if r["status"] != "ok":
                 print(f"  {r['leader']}: {r['status']} {r.get('error','')} "
-                      f"{r.get('hot_dialogs','')}", flush=True)
+                      f"{r.get('hot_dialogs','')} {r.get('hot_moves','')}", flush=True)
             if len(rows) % 20 == 0:
-                print(f"  ...{len(rows)}/{len(leaders)}", flush=True)
+                print(f"  ...{len(rows)}/{len(jobs)}", flush=True)
 
     st = collections.Counter(r["status"] for r in rows)
     culprit = collections.Counter()

@@ -2739,6 +2739,15 @@ def _freeze_target(ctx: ParseContext) -> Optional[EffectNode]:
         tq.player = Player.OPPONENT
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # 対象が**ドン!!だけ**（コストエリア）のフリーズは FREEZE_DON（枚数処理）で解く。
+    # FREEZE は `card.flags` に書き込む＝カードにしか効かないため、ドン!!を対象に選ぶと
+    # `DonInstance' object has no attribute 'flags'` で対局が落ちていた（OP10-033 ナミ
+    # 「相手のレストのドン!!1枚まで」。上の「キャラかドン」分岐は択一形しか拾わない）。
+    if getattr(tq, "zone", None) == Zone.COST_AREA:
+        return GameAction(type=ActionType.FREEZE_DON,
+                          value=ValueSource(base=tq.count if tq.count and tq.count > 0 else 1),
+                          status="OPPONENT" if tq.player == Player.OPPONENT else None,
+                          raw_text=t)
     return GameAction(type=ActionType.FREEZE, target=tq, raw_text=t)
 
 

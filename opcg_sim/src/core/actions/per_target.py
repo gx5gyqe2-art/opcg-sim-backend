@@ -135,6 +135,12 @@ def freeze(gm, player, action, target, owner, source_list, value, source_card):
     # 「次の相手のリフレッシュフェイズでアクティブにならない」
     # refresh_all が flags["FREEZE"] を確認してからリセットするため、
     # ターン境界を跨ぐ flags に直接書き込む（timed_flags でなく flags）。
+    if not hasattr(target, "flags"):
+        # ドン!!（DonInstance）は flags を持たず `is_frozen` でフリーズする。対象クエリが
+        # コストエリアを指す形は parser 側で FREEZE_DON へ回すが、ここでも取りこぼさない
+        # （落ちると対局ごと死ぬ＝アリーナ1ペア全損）。
+        target.is_frozen = True
+        return
     target.flags.add("FREEZE")
 
 

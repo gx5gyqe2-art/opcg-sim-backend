@@ -100,6 +100,17 @@ class EffectResolver:
         if (not cost_confirmed and ability.cost is not None
                 and ability.trigger not in _cost_confirm_exempt
                 and source_card.master.type != CardType.EVENT):
+            # 継続効果の再計算中は**問い合わせを出さない**（出すと無限ループになる）:
+            # 拒否しても使用回数が減らず盤面も変わらないので、次の再計算で同じ問いが復活し、
+            # プレイヤーは永久に同じ確認へ答え続ける（OP09-080 サウザンド・サニー号＝
+            # 「【相手のターン中】このステージをレストにできる：…場を離れた時、…」が
+            # 反応型と判定されず継続効果として毎回評価され、生成デッキの対局が上限手数で
+            # 終わらなかった）。**コストを持つ能力は継続的な修飾ではない**ので、
+            # 再計算では発動しない（=支払わない）で確定させる。
+            if getattr(self.game_manager, "_in_passive_recalc", False):
+                self._log_failure_snapshot(player, source_card, ability, "PASSIVE_RECALC_COST",
+                                           "cost-bearing ability is not resolved during recalc")
+                return
             self._suspend_for_ability_cost_confirm(player, ability, source_card)
             return
 
