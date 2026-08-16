@@ -59,6 +59,13 @@ def with_leaders(rows, db, mode):
     return out
 
 
+def split_void(rows):
+    """void（対局が成立しなかった）行を分離する。母数から外すが件数と対面は必ず出す。"""
+    ok = [r for r in rows if r.get("score") is not None]
+    void = [r for r in rows if r.get("score") is None]
+    return ok, void
+
+
 def per_leader(rows):
     """リーダー別の {games, wins}（候補席がそのリーダーを握った局だけを数える）。
 
@@ -117,9 +124,20 @@ def main():
     db = _load_db()
     rows = with_leaders(rows, db, args.leaders)
 
+    rows, void = split_void(rows)
     from arena_parallel import _pair_level_ci
     ci = _pair_level_ci([float(r["score"]) / 2.0 for r in rows])
-    print(f"台帳 {len(paths)}本・{len(rows)}ペア（{2 * len(rows)}局）")
+    print(f"台帳 {len(paths)}本・{len(rows)}ペア（{2 * len(rows)}局）"
+          + (f"／void {len(void)}ペア（対局が成立せず母数から除外）" if void else ""))
+    if void:
+        vc = collections.Counter()
+        for r in void:
+            for cid in (r.get("leaders") or []):
+                if cid:
+                    vc[cid] += 1
+        print("  void を踏んだリーダー: "
+              + ", ".join(f"{_name(db, c)}×{n}" for c, n in vc.most_common(8)))
+        print("  void の seed: " + ", ".join(str(r["seed"]) for r in void[:12]))
     print(f"総合: wr {ci['win_rate']:.4f} CI95[{ci['lo']:.4f},{ci['hi']:.4f}] Elo {ci['elo']:+.1f}")
 
     lead = per_leader(rows)

@@ -138,10 +138,18 @@ def _play_pair_detail(args):
     else:
         ab = leader_deck_builder(la, lb) if la else None      # game a: cand=la / best=lb
         ba = leader_deck_builder(lb, la) if la else None      # game b: best=lb→p1 なので入替
-    a = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["cand"],
-                  p2_engine=_G["best"], deck_builder=ab)
-    b = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["best"],
-                  p2_engine=_G["cand"], deck_builder=ba)
+    try:
+        a = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["cand"],
+                      p2_engine=_G["best"], deck_builder=ab)
+        b = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["best"],
+                      p2_engine=_G["cand"], deck_builder=ba)
+    except Exception as e:
+        # 対局がエンジン欠陥で成立しなかった（上限手数 MAX_STEPS 等）。**1ペアの失敗で計測全体を
+        # 落とさない**（ランダム対面では未知のループを踏むことがあり、シャードが丸ごと止まる）。
+        # スコアは付けず void として台帳に残し、集計側で母数から外して**件数を明示**する
+        # （黙って落とすと「全部測れた」ように見えてしまう）。対面も残すので後から再現できる。
+        return {"seed": seed, "score": None, "leaders": [la, lb],
+                "void": f"{type(e).__name__}: {str(e)[:120]}"}
     wa = 1.0 if a["winner"] == "p1" else 0.0    # game a: 候補が la を握る
     wb = 1.0 if b["winner"] == "p2" else 0.0    # game b: 候補が lb を握る（席とリーダーを入替）
     # leaders=[la, lb] と games=[wa, wb] を対にして残すと、**どのリーダーを握って勝ったか**を
