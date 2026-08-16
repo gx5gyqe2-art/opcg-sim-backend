@@ -63,6 +63,24 @@ def test_403_maps_to_tcgplus_error(monkeypatch):
         T.fetch_events(7839)
 
 
+def test_pref_falls_back_to_pref_code(monkeypatch):
+    """§16.17: 店舗予選は `place` が null で `pref_code` にしか都道府県が無い。"""
+    rows = [
+        {"id": 1, "organizer_name": "店A", "place": "京都府", "pref_code": "JP-13"},   # place 優先
+        {"id": 2, "organizer_name": "店B", "place": None, "pref_code": "JP-14"},
+        {"id": 3, "organizer_name": "店C", "place": None, "pref_code": "JP-01"},
+        {"id": 4, "organizer_name": "店D", "place": None, "pref_code": "JP-47"},
+        {"id": 5, "organizer_name": "店E", "place": None, "pref_code": "ID-JK"},       # 日本以外
+        {"id": 6, "organizer_name": "店F", "place": None, "pref_code": None},
+    ]
+    monkeypatch.setattr(
+        requests, "get",
+        lambda *a, **k: _Res(payload={"success": {"event_list": rows, "total": len(rows)}}),
+    )
+    got = [e.pref for e in T.fetch_events(7757)]
+    assert got == ["京都府", "神奈川県", "北海道", "沖縄県", "", ""]
+
+
 def test_paginates_until_total(monkeypatch):
     """limit=100 で offset を進め、total 到達で止まる（1シリーズ数百件を取り切る）。"""
     calls = []
@@ -97,3 +115,12 @@ def test_cache_avoids_refetch(monkeypatch):
     T.fetch_events(7839)
     T.fetch_events(7839)
     assert n["calls"] == 1
+
+
+def test_is_cached_reports_whether_next_fetch_hits_network(monkeypatch):
+    """`/events` の upsert 抑止（§16.17）が拠り所にするフラグ。"""
+    monkeypatch.setattr(requests, "get", lambda *a, **k: _Res())
+    assert T.is_cached(7839) is False       # 未取得
+    T.fetch_events(7839)
+    assert T.is_cached(7839) is True        # 以降 TTL 内はキャッシュ応答
+    assert T.is_cached(7840) is False       # シリーズ別

@@ -372,13 +372,18 @@ def _sync_event_master(series_id: int) -> list:
     """TCG+ 最新を開催マスターへ upsert し、マスター（過去含む）を dict で返す（設計 §16.8）。
 
     TCG+ が過去開催を消しても、once スナップショットした分は残る。TCG+ 不達でもマスターを返す。
+
+    upsert は **TCG+ を実際に取りに行ったときだけ**行う（§16.17）。`fetch_events` は 120 秒
+    キャッシュするので、キャッシュ応答に対して書き戻しても内容は変わらない。店舗予選は
+    1シリーズ 2550 件あり、一覧を開くたびの全件書き戻しはコスト・レイテンシとも無視できない。
     """
+    cached = tcgplus.is_cached(series_id)
     try:
         current = tcgplus.fetch_events(series_id)
     except tcgplus.TcgPlusError:
         current = []
     master = feventmaster.get_event_master()
-    if current:
+    if current and not cached:
         master.upsert([{
             "id": e.event_id, "series_id": series_id,
             "start_datetime": e.start_datetime or e.date, "store": e.store,
