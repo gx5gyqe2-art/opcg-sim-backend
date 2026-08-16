@@ -1,10 +1,11 @@
-"""「何も起きない手」を無限に打てる 3 経路の回帰テスト（2026-08-15）。
+"""「何も起きない手」を無限に打てる経路の回帰テスト（2026-08-15。A'/E は 2026-08-16 追加）。
 
 生成デッキ監査（`tests/scripts/deck_synth_audit.py`）が 137 リーダー中 3 リーダーで
 「上限手数まで終わらない」対局を検出した。原因はいずれも**盤面が 1 ミリも動かない手を
 エンジンが合法手として出し続ける**ことだった。固定ハンニャバルデッキ（ステージ0・
 イベント0・特徴の絡む効果ほぼ無し）では 1 度も通らない経路で、歴代のアリーナ／ゲート／
-自己対戦では検出できなかった実バグ。
+自己対戦では検出できなかった実バグ。**交差対面**（同監査の `--cross`）へ広げると、
+ミラーでは出ない A'（コストの空振り・別種）と E（再計算がコスト確認を訊く）も出た。
 
   A. レストコストの候補にレスト済みカードが混ざる（OP10-083 光月モモの助）
      支払い可否（`_can_satisfy_node`）はレスト済みを候補から外すのに、実際の支払い
@@ -27,6 +28,12 @@
      「使用しますか？」を訊き、拒否しても使用回数も盤面も変わらないため次の再計算がまた
      同じ問いを立てる＝無限ループ（交差対面の対局で 613 回連続）。B と同じ「再計算は
      対話を出さない」原則で、こちらはコスト確認側。
+
+  A'. 状態を変えるコストが「既にその状態」でも払える（OP15-099 ウルージ・2026-08-16）
+     「自分のライフの上から1枚を裏向きにできる」は表向きのライフが要る。ライフが全て裏向き
+     でも支払い可能と判定され、裏向きを裏向きにする空振りで何も消費せず起動メインを撃ち
+     続けられた（交差対面の対局で 297 回連続）。A と同じ「判定と支払いの不一致」で、
+     レスト以外にも同じ穴があったことを示す＝規則を `_cost_state_noop` に一本化した。
 
   D. 複合コストから「自分自身の分」が落ちる（パーサ・9枚）
      「この（カード/キャラ）と〈X〉を レスト／トラッシュ／デッキの下 にできる：」の自身の分が
@@ -122,6 +129,43 @@ def test_rest_cost_activation_consumes_the_source_and_cannot_repeat():
     gm.resolve_ability(p1, ab, source_card=src)
     assert src.is_rest is True                      # コストが実際に支払われた
     assert p1.leader.is_rest is True
+    assert gm._has_activatable_main(src, p1) is False
+
+
+UROUGE_TEXT = "【起動メイン】自分のライフの上から1枚を裏向きにできる"
+
+
+def _urouge_board(face_up_lives=0):
+    """ウルージ（OP15-099）と、指定枚数だけ表向きのライフを持つ盤面。"""
+    gm, p1, p2 = make_game()
+    src = _real("OP15-099")
+    assert UROUGE_TEXT[:18] in src.master.effect_text            # 実物のテキストで検証している
+    p1.field = [src]
+    p1.life = [make_instance(make_master(card_id=f"L-{i}", name=f"ライフ{i}"), owner="P1")
+               for i in range(3)]
+    for i in range(face_up_lives):
+        p1.life[i].is_face_up = True
+    p1.don_rested.append(DonInstance(owner_id="P1"))             # 効果自体は空振りではない
+    gm.turn_player = p1
+    return gm, p1, src, _main_ability(src)
+
+
+def test_face_down_life_cost_is_unpayable_when_all_lives_are_face_down():
+    """「ライフの上から1枚を裏向きにできる」は**表向きのライフ**が無いと払えない。
+
+    払えることになっていると、裏向きのライフを何度も「裏向きに」して何も消費せず、
+    起動メインを無限に撃てる（交差対面の対局で 297 回連続＝上限手数で終わらない）。
+    """
+    gm, p1, src, _ab = _urouge_board(face_up_lives=0)
+    assert gm._has_activatable_main(src, p1) is False
+
+
+def test_face_down_life_cost_is_paid_once_and_then_unpayable():
+    """表向きのライフがあるときだけ撃て、支払うと同じ手はもう撃てない。"""
+    gm, p1, src, ab = _urouge_board(face_up_lives=1)
+    assert gm._has_activatable_main(src, p1) is True
+    gm.resolve_ability(p1, ab, source_card=src)
+    assert p1.life[0].is_face_up is False        # コストが実際に支払われた（裏向きになった）
     assert gm._has_activatable_main(src, p1) is False
 
 

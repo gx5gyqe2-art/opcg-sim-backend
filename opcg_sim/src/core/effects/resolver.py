@@ -33,6 +33,23 @@ _CONTINUOUS_MODIFIER_ACTIONS = frozenset({
 })
 
 
+def _cost_state_noop(node, card) -> bool:
+    """「状態を変える」コストが、その対象では**空振り**になるか（＝支払いにならない）。
+
+    支払い可否（`_can_satisfy_node`）と実際の支払い（`_resolve_targets`）で同じ規則を使う。
+    食い違うと「払えることになっているのに払っても何も変わらない」＝何も消費しないまま
+    起動メインを無限に撃てる（OP10-083 光月モモの助＝レスト済みを再レスト、
+    OP15-099 ウルージ＝裏向きのライフを再び裏向きに）。
+    """
+    t = getattr(node, "type", None)
+    if t == ActionType.REST:
+        return bool(getattr(card, "is_rest", False))
+    if t == ActionType.FACE_UP_LIFE:
+        want_face_up = getattr(node, "status", None) != "DOWN"
+        return bool(getattr(card, "is_face_up", False)) == want_face_up
+    return False
+
+
 class EffectResolver:
     def __setattr__(self, name, value):
         # 差分巻き戻し（journal.transaction 中のみ記録）。中断再開の手（parked resolver を持ち越す手）も
@@ -227,8 +244,10 @@ class EffectResolver:
             # （未レスト）でなければ支払えない（レスト済みは再レストできない）。対象フィルタは
             # レスト状態を問わない（is_rest=None）ため候補にレスト済みも含まれ、自己レストを伴う
             # 起動メイン（ハチノス OP09-099 等）がレスト後も何度も撃てていた。
-            if node.type == ActionType.REST:
-                candidates = [c for c in candidates if not getattr(c, "is_rest", False)]
+            # 「裏向きにできる」等の**状態を変えるコスト**も同様＝既にその状態の対象では払えない
+            # （OP15-099 ウルージ「自分のライフの上から1枚を裏向きにできる」。ライフが全て裏向き
+            #   でも払えることになり、起動メインを無限に撃てていた）。
+            candidates = [c for c in candidates if not _cost_state_noop(node, c)]
             required = getattr(node.target, 'count', 1)
             if getattr(node.target, 'is_strict_count', False) and len(candidates) < required:
                 return False
@@ -667,16 +686,17 @@ class EffectResolver:
 
         candidates = get_target_cards(self.game_manager, query, source_card)
 
-        # レストコストの候補はアクティブなカードに限る（既にレスト済みは「レストにできる」を
-        # 支払えない）。_can_satisfy_node の REST フィルタと同じ規則を解決側にも適用する
+        # コストで「状態を変える」対象は、まだその状態でないカードに限る（レスト済みは
+        # 「レストにできる」を、裏向きのライフは「裏向きにできる」を支払えない）。
+        # `_can_satisfy_node` と**同じ規則**（`_cost_state_noop`）を解決側にも適用する
         # ＝支払い可否判定と実際の支払いを一致させる。両者がずれていると「払える」と判定された
-        # 起動メインがレスト済みカードを選んで no-op になり、何も消費しないまま無限に再起動
-        # できた（OP10-083 光月モモの助: コスト候補にレスト済みリーダーが混ざる）。
-        # 効果（コスト句以外）の「レストにする」は候補を絞らない——レスト済みを対象に選ぶのは
-        # ルール上合法で、後続の「そのキャラ」参照を壊さないため。
-        if (action_node is not None and getattr(action_node, "type", None) == ActionType.REST
-                and self._is_cost_node(source_card, action_node)):
-            candidates = [c for c in candidates if not getattr(c, "is_rest", False)]
+        # 起動メインが空振りの対象を選んで no-op になり、何も消費しないまま無限に再起動できた
+        # （OP10-083 光月モモの助＝レスト済みリーダーが候補に混ざる、
+        #   OP15-099 ウルージ＝ライフが全て裏向きでも「裏向きにできる」を払えてしまう）。
+        # 効果（コスト句以外）の同種アクションは候補を絞らない——既にその状態のカードを対象に
+        # 選ぶのはルール上合法で、後続の「そのキャラ」参照を壊さないため。
+        if (action_node is not None and self._is_cost_node(source_card, action_node)):
+            candidates = [c for c in candidates if not _cost_state_noop(action_node, c)]
 
         # 「（戻した／選んだ）キャラと異なる色の…」: selected_card と色が重なる候補を除外する
         # （OP01-002）。selected_card は直前の FIELD 選択（BOUNCE 等）で保存済み。

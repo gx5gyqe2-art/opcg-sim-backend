@@ -1371,7 +1371,7 @@
 "OP08-060|ON_PLAY": "p1_hand:6→5, p1_field:3→4, p1_don:10→9 | pw0,kw1,rs0,co0",
 "OP08-061|ON_ATTACK": "p1_don:10→9, p2_field:3→2, p2_trash:0→1 | pw0,kw0,rs0,co0",
 "OP08-062|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
-"OP08-063|ON_PLAY": "p1_hand:6→5, p1_field:3→4, p1_don:10→11 | pw0,kw0,rs0,co0",
+"OP08-063|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
 "OP08-064|ACTIVATE_MAIN": "p1_don:10→9 | pw0,kw0,rs0,co0",
 "OP08-066|ON_KO": "p1_don:10→11 | pw0,kw0,rs0,co0",
 "OP08-067|YOUR_TURN": "- | pw0,kw0,rs0,co0",
