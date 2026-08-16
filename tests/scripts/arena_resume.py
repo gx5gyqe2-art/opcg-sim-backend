@@ -86,6 +86,9 @@ def main():
     ap.add_argument("--cand-don-box", action="store_true",
                     help="候補席だけドン箱（DON_BOX・cpu_don_box_plan Phase 1）を有効化。"
                          "(C) 済み現行を基準に箱の上乗せを測る＝OPCG_DON_MARGIN は既定(1)のまま")
+    ap.add_argument("--decks", default="singleton", choices=("singleton", "synth"),
+                    help="デッキの中身。singleton=従来（色が合う50枚・全部1枚ずつ・イベント0）／"
+                         "synth=リーダーに合わせて合成（deck_synth）")
     args = ap.parse_args()
     cand_kw = None
     if args.cand_box or args.cand_tree_box:
@@ -107,7 +110,8 @@ def main():
         from promotion_gate import _init_pool, _play_pair
         t0 = time.time()
         with mp.Pool(args.workers, initializer=_init_pool,
-                     initargs=(args.candidate, args.baseline, cand_kw, args.leaders)) as pool:
+                     initargs=(args.candidate, args.baseline, cand_kw, args.leaders,
+                               args.decks)) as pool:
             with open(args.out, "a") as f:
                 for seed, score in zip(batch, pool.imap(_play_pair, batch)):  # imap=入力順を保存
                     f.write(json.dumps({"seed": seed, "score": score}) + "\n")

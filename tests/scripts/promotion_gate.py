@@ -57,7 +57,7 @@ def anchor_decision(wins: float, games: int, frac: float = 0.5) -> bool:
 _G = {}
 
 
-def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed"):
+def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed", decks="singleton"):
     """子プロセス初期化: DB とエンジン2体を1回だけロード（以後の全ペアで共有）。
 
     `cand_kw`（v35）: **候補席にだけ**渡す LearnedEngine のオプション（例
@@ -67,6 +67,7 @@ def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed"):
     from cpu_arena import _load_db
     from opcg_sim.src.core.cpu_learned import LearnedEngine
     _G["leaders_mode"] = leaders_mode
+    _G["decks"] = decks
 
     def eng(spec, **kw):
         if not spec:
@@ -117,8 +118,17 @@ def _play_pair(args):
     from game_driver import leader_deck_builder
     mode = _G.get("leaders_mode", "fixed")
     la, lb = _leader_pair(_G["db"], seed, mode)
-    ab = leader_deck_builder(la, lb) if la else None      # game a: cand=la / best=lb
-    ba = leader_deck_builder(lb, la) if la else None      # game b: best=lb→p1 なので入替
+    if _G.get("decks") == "synth":
+        # 中身もリーダーに合わせて合成する（deck_synth）。singleton builder は「ID順で色が
+        # 合う最初の50枚・全部1枚ずつ・イベント0」という実在しない構築で、テーマ参照や
+        # イベント/ステージを持つ効果が一度も盤面に乗らない＝歴代の判定の射程外だった。
+        # デッキ内容は seed（=ペア）で決め、ペアの2局では**同じ中身のまま席だけ入替**える。
+        from deck_synth import synth_deck_builder
+        ab = synth_deck_builder(la, lb, seed=seed) if la else None
+        ba = synth_deck_builder(lb, la, seed=seed) if la else None
+    else:
+        ab = leader_deck_builder(la, lb) if la else None      # game a: cand=la / best=lb
+        ba = leader_deck_builder(lb, la) if la else None      # game b: best=lb→p1 なので入替
     a = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["cand"],
                   p2_engine=_G["best"], deck_builder=ab)
     b = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["best"],
