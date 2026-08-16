@@ -40,9 +40,30 @@ import numpy as np
 
 from opcg_sim.src.core import cpu_ai, journal
 from opcg_sim.src.core.journal import JournaledList
-from .config import (BOX_RESOLVE_DEPTH, C_PUCT, DIRICHLET_ALPHA, TERM_DECAY, TERM_FLOOR,
-                     SERVE_QUIESCE, QUIESCE_MAX_PLIES, TREE_BOX_BATTLE,
+from .config import (BOX_BRANCH_BUDGET, BOX_RESOLVE_DEPTH, C_PUCT, DIRICHLET_ALPHA, TERM_DECAY,
+                     TERM_FLOOR, SERVE_QUIESCE, QUIESCE_MAX_PLIES, TREE_BOX_BATTLE,
                      SERVE_TURN_QUIESCE, TURN_QUIESCE_MAX_PLIES)
+
+
+# --- 戦闘箱の枝予算（config.BOX_BRANCH_BUDGET）--------------------------------------
+# 1回の decide() で `resolved_branch_values` が評価してよい枝の総数。使い切ったら箱の評価を
+# やめ、以後その decide では policy 最良手（quiesce_choice）へ退避する。**ノード数で切る**の
+# が要点＝時間で切ると実行環境の速さで手が変わり決定論が壊れる（詳細は config の注記）。
+# 探索はプロセス内で単一スレッド（席ごとに逐次）なのでモジュール変数で足りる。
+_BOX_BUDGET = {"left": None, "exhausted": 0, "used": 0}
+
+
+def reset_box_budget(budget=None):
+    """decide() の入口で予算を張り直す。budget=0/None は無制限（従来挙動）。"""
+    b = BOX_BRANCH_BUDGET if budget is None else budget
+    _BOX_BUDGET["left"] = b if b and b > 0 else None
+    _BOX_BUDGET["used"] = 0
+    return _BOX_BUDGET
+
+
+def box_budget_stats():
+    """直近の decide の消費（計器用・読み取り専用）。exhausted は通算の打ち切り回数。"""
+    return dict(_BOX_BUDGET)
 
 
 def in_battle(mgr):
@@ -144,6 +165,17 @@ def resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn=None,
     してもアリーナが落ちる、への構造的な答え）。"""
     if box_depth is None:
         box_depth = BOX_RESOLVE_DEPTH
+    # 予算切れ: 箱の評価をやめて全枝 None を返す。呼び出し側は「判別できなかった」として
+    # policy 最良手へ退避する（_expand は通常展開、resolve_battle_inplace は quiesce_choice、
+    # _battle_window_plan は従来経路）＝**手は必ず返る**。
+    left = _BOX_BUDGET["left"]
+    if left is not None:
+        if left <= 0:
+            return [None] * len(legal)
+        _BOX_BUDGET["left"] = left - len(legal)
+        _BOX_BUDGET["used"] += len(legal)
+        if _BOX_BUDGET["left"] <= 0:
+            _BOX_BUDGET["exhausted"] += 1
     base_rng_state = random.getstate()
     vals = []
     for mv in legal:
