@@ -32,7 +32,8 @@ from opcg_sim.src.learned.config import (
     SERVE_ROOT_SWITCH_MIN_FRAC, SERVE_ROOT_SWITCH_MIN_GAP, SERVE_STICKY_WORLD,
     AUX_TIE_DECAY, AUX_SAT_START, TERM_FLOOR, V4_TURNS_SCALE)
 from opcg_sim.src.learned.mcts import (   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
-    TreeMCTS, in_battle, reset_box_budget, resolve_battle_inplace, resolved_branch_values)
+    TreeMCTS, clear_box_budget, in_battle, reset_box_budget, resolve_battle_inplace,
+    resolved_branch_values)
 from opcg_sim.src.utils.loader import CardLoader
 
 _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -610,7 +611,14 @@ class LearnedEngine:
         # 戦闘箱の枝予算をこの decide のぶんだけ張り直す（config.BOX_BRANCH_BUDGET）。
         # 使い切ったら箱の評価をやめて policy 最良手へ退避する＝**decide が必ず戻る**。
         # 通常局面では発動しない余裕（実測最大の約4.4倍）を取ってある。
+        # 予算は decide の中だけの話なので、抜けるときに必ず外す（下の finally）。
         reset_box_budget()
+        try:
+            return self._decide_inner(manager, player, name, sims, c_puct, rng, trace)
+        finally:
+            clear_box_budget()
+
+    def _decide_inner(self, manager, player, name, sims, c_puct, rng, trace):
         if self.sims is not None:
             sims = self.sims           # エンジン別上書き（未設定=None で従来どおり引数/既定）
         if self.c_puct is not None:

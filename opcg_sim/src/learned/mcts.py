@@ -61,6 +61,16 @@ def reset_box_budget(budget=None):
     return _BOX_BUDGET
 
 
+def clear_box_budget():
+    """decide() の出口で予算を外す（＝無制限へ戻す）。
+
+    **入口で張るだけだと使い切った状態がモジュールに残り**、`decide` を経由しない直接呼び出し
+    （テスト・計器・教師生成）で箱の評価が永久に無効化される。予算は「1回の decide の中の
+    話」なので、抜けるときに必ず外す。"""
+    _BOX_BUDGET["left"] = None
+    return _BOX_BUDGET
+
+
 def box_budget_stats():
     """直近の decide の消費（計器用・読み取り専用）。exhausted は通算の打ち切り回数。"""
     return dict(_BOX_BUDGET)
