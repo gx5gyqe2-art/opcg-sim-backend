@@ -1,0 +1,30 @@
+{"seed": 801000, "score": 2.0}
+{"seed": 801001, "score": 0.0}
+{"seed": 801002, "score": 1.0}
+{"seed": 801003, "score": 0.0}
+{"seed": 801004, "score": 1.0}
+{"seed": 801005, "score": 1.0}
+{"seed": 801006, "score": 2.0}
+{"seed": 801007, "score": 0.0}
+{"seed": 801008, "score": 1.0}
+{"seed": 801009, "score": null, "leaders": ["OP16-001", "OP11-040"], "void": "InvariantError: invariant violation(s) at step 4000: [('MAX_STEPS', 'game did not finish within 4000 steps')]"}
+{"seed": 901000, "score": 2.0, "leaders": ["OP03-022", "OP09-081"], "games": [1.0, 1.0], "turns": [13, 12]}
+{"seed": 901001, "score": 0.0, "leaders": ["OP01-031", "EB01-021"], "games": [0.0, 0.0], "turns": [12, 13]}
+{"seed": 901002, "score": 1.0, "leaders": ["OP10-099", "OP11-021"], "games": [0.0, 1.0], "turns": [14, 14]}
+{"seed": 901003, "score": 1.0, "leaders": ["OP10-001", "OP07-079"], "games": [1.0, 0.0], "turns": [15, 11]}
+{"seed": 901004, "score": 2.0, "leaders": ["OP14-060", "OP06-020"], "games": [1.0, 1.0], "turns": [15, 12]}
+{"seed": 901005, "score": 0.0, "leaders": ["EB02-010", "ST14-001"], "games": [0.0, 0.0], "turns": [12, 13]}
+{"seed": 901006, "score": 0.0, "leaders": ["OP15-022", "OP02-026"], "games": [0.0, 0.0], "turns": [14, 13]}
+{"seed": 901007, "score": 2.0, "leaders": ["OP05-098", "EB02-010"], "games": [1.0, 1.0], "turns": [13, 14]}
+{"seed": 901008, "score": 0.0, "leaders": ["OP09-062", "OP16-079"], "games": [0.0, 0.0], "turns": [12, 9]}
+{"seed": 901009, "score": 2.0, "leaders": ["ST11-001", "OP08-001"], "games": [1.0, 1.0], "turns": [13, 10]}
+{"seed": 1001000, "score": 0.0, "leaders": ["OP14-001", "OP14-080"], "games": [0.0, 0.0], "turns": [12, 11]}
+{"seed": 1001001, "score": 0.0, "leaders": ["OP02-072", "OP02-093"], "games": [0.0, 0.0], "turns": [12, 11]}
+{"seed": 1001002, "score": 0.0, "leaders": ["P-117", "OP11-040"], "games": [0.0, 0.0], "turns": [14, 11]}
+{"seed": 1001003, "score": 0.0, "leaders": ["OP02-071", "OP11-062"], "games": [0.0, 0.0], "turns": [14, 15]}
+{"seed": 1001004, "score": 0.0, "leaders": ["OP07-079", "EB01-001"], "games": [0.0, 0.0], "turns": [12, 11]}
+{"seed": 1001005, "score": 1.0, "leaders": ["OP15-058", "OP07-038"], "games": [1.0, 0.0], "turns": [11, 11]}
+{"seed": 1001006, "score": 1.0, "leaders": ["P-076", "ST13-003"], "games": [1.0, 0.0], "turns": [11, 11]}
+{"seed": 1001007, "score": 0.0, "leaders": ["OP13-079", "OP15-098"], "games": [0.0, 0.0], "turns": [12, 11]}
+{"seed": 1001008, "score": 2.0, "leaders": ["ST02-001", "OP12-041"], "games": [1.0, 1.0], "turns": [9, 10]}
+{"seed": 1001009, "score": 2.0, "leaders": ["ST08-001", "OP05-001"], "games": [1.0, 1.0], "turns": [9, 10]}
