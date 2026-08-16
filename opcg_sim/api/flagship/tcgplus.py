@@ -11,7 +11,11 @@ from typing import Dict, List, Tuple
 from .match import StoreEvent
 
 _URL = "https://api.bandai-tcg-plus.com/api/user/event/list"
-_UA = "opcg-sim-flagship/1.0"
+# TCG+ は 2026-08 時点で **`Mozilla/` で始まらない User-Agent を 403 で拒否**する（実測 2026-08-16:
+# `opcg-sim-flagship/1.0` → 403 / `Mozilla/5.0 (compatible; opcg-sim-flagship/1.0)` → 200）。
+# 素性を名乗ったまま通る `Mozilla/5.0 (compatible; ...)` 形式に揃える（`xfetch.py` と同じ形）。
+# ブラウザ偽装が目的ではない。アクセス頻度の抑制（要件 §4.1）は従来どおり変えない。
+_UA = "Mozilla/5.0 (compatible; opcg-sim-flagship/1.0)"
 _TIMEOUT = 15
 _PAGE = 100
 _MAX_PAGES = 40   # 暴走防止（1シリーズ ~1100件 = 11ページ）。
