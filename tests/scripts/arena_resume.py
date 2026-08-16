@@ -107,14 +107,15 @@ def main():
     print(f"消化済み {len(done)}/{args.pairs} ペア・残り {len(todo)}", flush=True)
     if todo:
         batch = todo[: args.max_pairs]
-        from promotion_gate import _init_pool, _play_pair
+        from promotion_gate import _init_pool, _play_pair_detail
         t0 = time.time()
         with mp.Pool(args.workers, initializer=_init_pool,
                      initargs=(args.candidate, args.baseline, cand_kw, args.leaders,
                                args.decks)) as pool:
             with open(args.out, "a") as f:
-                for seed, score in zip(batch, pool.imap(_play_pair, batch)):  # imap=入力順を保存
-                    f.write(json.dumps({"seed": seed, "score": score}) + "\n")
+                for seed, row in zip(batch, pool.imap(_play_pair_detail, batch)):  # imap=入力順
+                    row["seed"] = seed          # 念のため seed は呼び出し側の値で上書き
+                    f.write(json.dumps(row, ensure_ascii=False) + "\n")
                     f.flush()                                    # ターン打切りでも書けた分は残す
         done = load_ledger(args.out)
         print(f"今回 {len(batch)} ペア（{time.time() - t0:.0f}s）・累計 {len(done)}/{args.pairs}",
