@@ -33,6 +33,10 @@ _CONTINUOUS_MODIFIER_ACTIONS = frozenset({
 })
 
 
+# 「登場させる」で場に置ける種別（イベントは発動するもので、登場はしない）。
+_PLAYABLE_TO_FIELD = frozenset({CardType.CHARACTER, CardType.STAGE})
+
+
 def _cost_state_noop(node, card) -> bool:
     """「状態を変える」コストが、その対象では**空振り**になるか（＝支払いにならない）。
 
@@ -700,6 +704,15 @@ class EffectResolver:
         # 選ぶのはルール上合法で、後続の「そのキャラ」参照を壊さないため。
         if (action_node is not None and self._is_cost_node(source_card, action_node)):
             candidates = [c for c in candidates if not _cost_state_noop(action_node, c)]
+
+        # 「登場させる」の候補はキャラ／ステージだけ（イベントは登場しない）。カードテキストが
+        # 「キャラカード」ではなく**「カード」**とだけ言う効果（ST31-002 ジンベエ「手札からコスト1の
+        # 特徴《麦わらの一味》を持つカード1枚までを、登場させる」）は対象種別が無制限に解析され、
+        # イベントを場に置けてしまう。場に残ったイベントは【メイン】がコストなしの起動メインとして
+        # 列挙され、空振りを無限に撃てる（seed 907006 のアリーナ void＝426回連続）。
+        if getattr(action_node, "type", None) == ActionType.PLAY_CARD:
+            candidates = [c for c in candidates
+                          if getattr(getattr(c, "master", None), "type", None) in _PLAYABLE_TO_FIELD]
 
         # 「（戻した／選んだ）キャラと異なる色の…」: selected_card と色が重なる候補を除外する
         # （OP01-002）。selected_card は直前の FIELD 選択（BOUNCE 等）で保存済み。

@@ -43,6 +43,11 @@
      無限ループ＝アリーナ seed 904002 の void）。OP02-035/P-074 は挙動ベースライン上でも
      「相手のキャラを手札に戻す」になっていた＝ルール違反の実害。件数 0 をラチェットで固定する。
 
+  F. イベントが場に登場して起動メインを撃ち続ける（ST31-002 ジンベエ→ST01-016 悪魔風脚・2026-08-16）
+     「キャラカード」ではなく**「カード」**とだけ言う効果は対象種別が無制限に解析され、
+     イベントを「登場させる」ことができた。場に残ったイベントは【メイン】がコストなしの
+     起動メインとして列挙され、空振りを426回連続で撃っていた（アリーナ seed 907006 の void）。
+
   D. 複合コストから「自分自身の分」が落ちる（パーサ・9枚）
      「この（カード/キャラ）と〈X〉を レスト／トラッシュ／デッキの下 にできる：」の自身の分が
      脱落し、コストが実質「X だけ」に化けていた。発生源が場に残るので起動メインを撃ち続け
@@ -369,3 +374,61 @@ def test_active_don_main_is_illegal_after_self_restriction():
     assert gm._active_restriction(p1, "CANNOT_ACTIVATE_DON") is not None
     assert len(p1.don_rested) == 1                  # まだレスト中のドン!!は残っている
     assert gm._has_activatable_main(src, p1) is False   # それでも撃つ意味は無い＝除外
+
+
+# --- F. イベントが場に登場して起動メインを撃ち続ける ----------------------------------
+JINBE_TEXT = "自分の手札からコスト1の特徴《麦わらの一味》を持つカード1枚までを、登場させる"
+
+
+def test_play_card_never_puts_an_event_on_the_field():
+    """「登場させる」の対象はキャラ／ステージだけ（イベントは発動するもので登場しない）。
+
+    ST31-002 ジンベエは「キャラカード」ではなく**「カード」**とだけ言うため対象種別が
+    無制限に解析され、イベント（ST01-016 悪魔風脚）が場に出ていた。場に残ったイベントは
+    【メイン】がコストなしの起動メインとして列挙され、空振りを無限に撃てる
+    （seed 907006 のアリーナ void＝426回連続）。候補側（resolver）と適用側（play_card）の
+    両方で塞ぐ＝片方を取りこぼしても盤面が壊れない。
+    """
+    from opcg_sim.src.core.effects.resolver import EffectResolver
+    from opcg_sim.src.models.enums import ActionType
+
+    gm, p1, p2 = make_game()
+    src = _real("ST31-002")
+    assert JINBE_TEXT[:20] in src.master.effect_text          # 実物のテキストで検証している
+    event = _real("ST01-016")                                  # コスト1・麦わらの一味のイベント
+    chara = make_instance(make_master(card_id="C-1", name="麦わらキャラ", type=CardType.CHARACTER,
+                                      cost=1, traits=["麦わらの一味"]), owner="P1")
+    p1.hand = [event, chara]
+    p1.field = [src]
+    gm.turn_player = p1
+
+    play = next(n for ab in src.master.abilities for n in _walk(ab.effect)
+                if getattr(n, "type", None) == ActionType.PLAY_CARD)
+    chosen = EffectResolver(gm)._resolve_targets(p1, play.target, src, action_node=play)
+    # 「1枚まで」なので選択の対話が立つ（選ばない自由がある）。候補にイベントが載らないことを見る。
+    if chosen is None:
+        cands = (gm.active_interaction or {}).get("candidates") or []
+        assert [c.uuid for c in cands] == [chara.uuid]
+        gm.active_interaction = None
+    else:
+        assert [c.uuid for c in chosen] == [chara.uuid]
+
+    # 適用側の保険: 直接 play_card にイベントを渡しても場には置かない。
+    from opcg_sim.src.core.actions.per_target import play_card
+    play_card(gm, p1, play, event, p1, p1.hand, 0, src)
+    assert event not in p1.field
+    assert all(c.master.type != CardType.EVENT for c in p1.field)
+
+
+def _walk(node):
+    """効果ツリーの GameAction を列挙する（Branch/Choice/Sequence を辿る）。"""
+    if node is None:
+        return
+    subs = getattr(node, "actions", None) or getattr(node, "options", None)
+    if subs:
+        for s in subs:
+            yield from _walk(s)
+        return
+    yield node
+    for attr in ("if_true", "if_false", "sub_effect"):
+        yield from _walk(getattr(node, attr, None))
