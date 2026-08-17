@@ -18,6 +18,21 @@ _H_CLEANUP_ACTIONS = frozenset({
 })
 
 
+# 「この〈カード/キャラ/リーダー/ステージ〉を〜できる：」＝発生源自身を消費するコストの動詞表。
+# 対象を ref_id="self" に固定するのが要点で、固定しないと汎用の対象解析に落ち
+# 「場のキャラ1枚」という**別のカードで払えるコスト**に化ける（DB 全体で96節が該当していた）。
+# 「このキャラ以外の…」は "この〈語〉を" に一致しないので巻き込まない。
+_SELF_COST_VERBS = (
+    (r'この(?:カード|キャラ|リーダー|ステージ)をレストに(?:し[、，]|できる|する)', ActionType.REST),
+    (r'この(?:カード|キャラ|リーダー|ステージ)を(?:持ち主の)?トラッシュに置(?:き[、，]|くことができる|く)',
+     ActionType.TRASH),
+    (r'この(?:カード|キャラ|リーダー|ステージ)を(?:持ち主の)?手札に戻(?:し[、，]|すことができる|す)',
+     ActionType.BOUNCE),
+    (r'この(?:カード|キャラ|リーダー|ステージ)を(?:持ち主の)?デッキの下に置(?:き[、，]|くことができる|く)',
+     ActionType.DECK_BOTTOM),
+)
+
+
 def _h_iter_actions(node):
     """ノード木中の GameAction を浅く列挙（Branch/Choice 内部は辿らない＝兄弟レベル判定用）。"""
     if isinstance(node, GameAction):
@@ -766,7 +781,10 @@ class EffectParser:
             num_paren_part = num_paren_m.group(1) + num_paren_m.group(2)
             add_cost_part = num_paren_m.group(3).strip()
             num_node = self._parse_to_node(num_paren_part, is_cost=True)
-            add_node = self._parse_to_node(add_cost_part, is_cost=True)
+            # 追加コスト側も**コストとして**解析する（自己参照コストの ref_id="self" 固定を通す）。
+            # 素の _parse_to_node に落とすと「このステージをレストにできる」等が汎用の対象解析へ流れ、
+            # 別のカードで払えるコストに化ける（OP02-035/OP03-020 等8節）。
+            add_node = self._parse_cost_node(add_cost_part)
             if num_node is not None and add_node is not None:
                 num_acts = num_node.actions if isinstance(num_node, Sequence) else [num_node]
                 add_acts = add_node.actions if isinstance(add_node, Sequence) else [add_node]
@@ -787,17 +805,25 @@ class EffectParser:
                 value=ValueSource(base=don_count),
                 raw_text=don_prefix_m.group(1),
             )
-            rest_node = self._parse_to_node(rest_part, is_cost=True)
+            rest_node = self._parse_cost_node(rest_part)   # 同上（ドン!!-N の後続コスト）
             if rest_node is not None:
                 if isinstance(rest_node, Sequence):
                     return Sequence(actions=[don_action] + rest_node.actions)
                 return Sequence(actions=[don_action, rest_node])
             return don_action
 
-        m = re.search(_nfc(r'この(?:キャラ|リーダー)をレストに(し[、，]|できる|する)'), norm)
-        if m:
-            rest_action = GameAction(
-                type=ActionType.REST,
+        # 「この〈カード/キャラ/リーダー/ステージ〉を〈レスト/トラッシュ/手札に戻す/デッキの下〉できる：」
+        # ＝**発生源自身を消費する**コスト。対象は必ず発生源（ref_id="self"）に固定する。
+        # 固定しないと汎用の対象解析に落ち、「場のキャラ1枚」（P-081 は player=ALL＝相手のキャラまで）
+        # という別物のコストに化ける。発生源が場に残るのでターン制限の無い起動メインを無限に撃てる
+        # （P-081 ジュラキュール・ミホーク＝自分以外を手札に戻して払い、効果で同じ盤面へ戻す3手周期の
+        #  無限ループ。1手5〜6秒かかるため上限手数より先にアリーナのペア時間上限に当たっていた）。
+        for _pat, _atype in _SELF_COST_VERBS:
+            m = re.search(_pat, norm)
+            if not m:
+                continue
+            self_action = GameAction(
+                type=_atype,
                 target=TargetQuery(
                     player=Player.SELF,
                     zone=Zone.FIELD,
@@ -807,7 +833,14 @@ class EffectParser:
                 ),
                 raw_text=norm
             )
-            before_part = norm[:m.start()].strip('、，。 ')
+            head = norm[:m.start()].rstrip(' 　')
+            # head が**区切り**（、 ， , ／ 並列の「と」）で終わっていれば別のコスト
+            # （「自分のドン!!1枚とこのキャラをレストにできる」＝ドンのレスト＋自身のレスト）。
+            # 終わっていなければ **同じ句の修飾語**であって別コストではない
+            # （OP16-084「コスト20以上のこのキャラをトラッシュに置く…」）。修飾語を別コストとして
+            # 解析すると、その断片だけが原子句として残りパーサのフォールバックラチェットを割る。
+            # 対象は発生源に固定済みなので、修飾語は raw_text に残すだけでよい。
+            before_part = head.strip('、，,。 ') if head.endswith(('、', '，', ',', 'と')) else ''
             remainder = norm[m.end():].strip('、，。 ')
 
             actions = []
@@ -817,14 +850,14 @@ class EffectParser:
                     actions.extend(before_node.actions)
                 elif before_node is not None:
                     actions.append(before_node)
-            actions.append(rest_action)
+            actions.append(self_action)
             if remainder and remainder not in ('ことができる', 'できる'):
                 rest_node = self._parse_to_node(remainder, is_cost=True)
                 if isinstance(rest_node, Sequence):
                     actions.extend(rest_node.actions)
                 elif rest_node is not None:
                     actions.append(rest_node)
-            return Sequence(actions=actions) if len(actions) > 1 else (actions[0] if actions else rest_action)
+            return Sequence(actions=actions) if len(actions) > 1 else (actions[0] if actions else self_action)
 
         return self._parse_to_node(norm, is_cost=True)
 

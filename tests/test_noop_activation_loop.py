@@ -35,6 +35,14 @@
      続けられた（交差対面の対局で 297 回連続）。A と同じ「判定と支払いの不一致」で、
      レスト以外にも同じ穴があったことを示す＝規則を `_cost_state_noop` に一本化した。
 
+  A''. 自己参照コストが「別のカードで払える」に化ける（パーサ・DB全体で96節・2026-08-16）
+     「この〈カード/キャラ/リーダー/ステージ〉を〈レスト/トラッシュ/手札に戻す/デッキの下〉できる：」
+     のうち**レスト以外**が ref_id='self' に固定されておらず、汎用の対象解析へ落ちていた。
+     P-081 ジュラキュール・ミホークは player=ALL＝**相手のキャラを手札に戻して**払え、発生源が
+     場に残るのでターン制限の無い起動メインを撃ち続けられる（効果で盤面が元へ戻る3手周期の
+     無限ループ＝アリーナ seed 904002 の void）。OP02-035/P-074 は挙動ベースライン上でも
+     「相手のキャラを手札に戻す」になっていた＝ルール違反の実害。件数 0 をラチェットで固定する。
+
   D. 複合コストから「自分自身の分」が落ちる（パーサ・9枚）
      「この（カード/キャラ）と〈X〉を レスト／トラッシュ／デッキの下 にできる：」の自身の分が
      脱落し、コストが実質「X だけ」に化けていた。発生源が場に残るので起動メインを撃ち続け
@@ -130,6 +138,78 @@ def test_rest_cost_activation_consumes_the_source_and_cannot_repeat():
     assert src.is_rest is True                      # コストが実際に支払われた
     assert p1.leader.is_rest is True
     assert gm._has_activatable_main(src, p1) is False
+
+
+# --- A''. 自己参照コストが「別のカードで払える」に化ける -------------------------------
+MIHAWK_TEXT = "【起動メイン】このキャラを持ち主の手札に戻すことができる"
+
+
+def test_self_cost_binds_to_the_source_card():
+    """「このキャラを〜できる：」のコストは**発生源自身**に固定される（ref_id='self'）。
+
+    固定しないと汎用の対象解析へ落ち、P-081 は player=ALL＝**相手のキャラを手札に戻して**
+    払える別物のコストになる。発生源が場に残るのでターン制限の無い起動メインを撃ち続けられ、
+    効果（手札からコスト5の《クロスギルド》キャラを登場）で盤面が元へ戻る3手周期の
+    無限ループになっていた（seed 904002 のアリーナ void）。
+    """
+    src = _real("P-081")
+    assert MIHAWK_TEXT[:20] in src.master.effect_text            # 実物のテキストで検証している
+    cost = _main_ability(src).cost
+    assert cost.target.ref_id == "self"
+    assert cost.target.player.name == "SELF"
+
+
+def test_self_cost_binds_after_a_don_cost_prefix():
+    """「ドン!!コスト，このXを〜できる：」の後段も自己参照として固定する（複合形の取りこぼし）。"""
+    for card_id, kind in (("OP02-035", "BOUNCE"), ("OP03-020", "REST"),
+                          ("OP06-060", "TRASH"), ("OP16-078", "REST")):
+        cost = next(ab for ab in _real(card_id).master.abilities if ab.cost is not None).cost
+        legs = cost.actions if hasattr(cost, "actions") else [cost]
+        self_legs = [a for a in legs if getattr(getattr(a, "target", None), "ref_id", None) == "self"]
+        assert len(self_legs) == 1, card_id
+        assert self_legs[0].type.name == kind, card_id
+
+
+def test_no_self_referential_cost_targets_another_card():
+    """**ラチェット**: 出荷カード DB 全体で「このXを〜」コストが自己参照でない節は 0 件。
+
+    レスト（旧実装が対応済み）以外にトラッシュ／手札に戻す／デッキの下が抜けており、
+    DB 全体で 96 節が「別のカードで払えるコスト」に化けていた。個別修正だと再発するので、
+    件数そのものを 0 に固定する。
+    """
+    import unicodedata
+    self_re = __import__("re").compile(r"この(カード|キャラ|リーダー|ステージ)を")
+
+    def walk(node):
+        if node is None:
+            return
+        subs = getattr(node, "actions", None) or getattr(node, "options", None)
+        if subs:
+            for s in subs:
+                yield from walk(s)
+            return
+        yield node
+        for attr in ("if_true", "if_false", "sub_effect"):
+            yield from walk(getattr(node, attr, None))
+
+    db = _db()
+    bad = []
+    for card_id in sorted(db.raw_db):
+        master = db.get_card(card_id)
+        if master is None:
+            continue
+        for ab in (master.abilities or ()):
+            if ab.cost is None:
+                continue
+            for node in walk(ab.cost):
+                raw = unicodedata.normalize("NFC", getattr(node, "raw_text", "") or "")
+                if not self_re.search(raw):
+                    continue
+                tq = getattr(node, "target", None)
+                if tq is None or getattr(tq, "ref_id", None) == "self":
+                    continue          # 対象なし＝発生源に作用／既に self 固定
+                bad.append(f"{card_id} {master.name}: {raw[:40]}")
+    assert not bad, f"自己参照コストが別カードを対象にしている {len(bad)} 件: {bad[:5]}"
 
 
 UROUGE_TEXT = "【起動メイン】自分のライフの上から1枚を裏向きにできる"
