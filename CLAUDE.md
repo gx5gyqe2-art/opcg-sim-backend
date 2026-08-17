@@ -45,6 +45,16 @@ make test-fast    # 開発中のイテレーション用（slow・cpu_infra除�
 > （module-level `pytestmark` 可）を明示する（迷ったら必須/標準側に倒す）。`docs/TEST_SPEC.md` §2 への
 > 追記時、基盤健全性はその旨を明記する。
 
+> **エンジン/パーサを変更したときは `make audit-cross`（交差対面の実プレイ監査・約10分）も
+> 通す**（合格＝hang/timeout/error=0）。ミラー監査（`make test` 内）では一度も通らない経路が
+> あり、そこにしか出ない欠陥が実在する（2026-08-16 に3件検出）。詳細は `docs/TEST_SPEC.md` §5.0。
+
+> **アリーナで新世代を昇格させるときは条件を2本以上測る**（主=ランダム対面×生成デッキ／
+> 副=固定ミラー）。1本の測定は昇格の証拠にならない——gen15 の「歴代初の昇格 0.5756」は
+> 同条件で再現しなかった。判定は測定時のコミットに紐づき、エンジンを触れば失効しうる。
+> void 率が2%を超えたら判定を出さず原因を潰す。**判定に使ったネットは不採用でも消さない**
+> （gen16 は失われ、当時の void を再現できなくなった）。詳細は `docs/TEST_SPEC.md` §5.05。
+
 - 全テスト pass（`test_full_card_baseline.py`＝挙動ベースライン一致、`test_effect_oracle_gate.py`＝
   HAS_OTHER/PER_TURN_LIMIT_GAP/UP_TO_GAP = 0 のラチェットを含む）
 - **挙動を意図的に変えた場合のみ** `make regen-baseline` でベースライン再生成し、
