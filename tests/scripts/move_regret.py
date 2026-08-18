@@ -311,6 +311,9 @@ def main():
     print(f"手の監査 段2: 容疑者{len(suspects)}点／{len(jobs)}局・世界{args.worlds}・"
           f"選択肢上限{args.max_options}・sims={args.sims}", flush=True)
 
+    # 結果は**seed 単位で即座に書き出す**（1判断点で十数ロールアウト＝打ち切りが現実的に起きる。
+    # 最後にまとめて書くと打ち切りで全損する＝アリーナ台帳と同じ教訓）。
+    out_f = open(args.out, "w") if args.out else None
     rows = []
     with mp.Pool(args.workers, initializer=_init,
                  initargs=(args.engine, args.leaders, args.decks, args.sims,
@@ -318,6 +321,9 @@ def main():
         for res in pool.imap_unordered(_run_seed, jobs):
             for r in res:
                 rows.append(r)
+                if out_f:
+                    out_f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                    out_f.flush()
                 if r.get("error"):
                     print(f"  seed {r['seed']}@{r.get('decision')}: {r['error']}", flush=True)
                 else:
@@ -337,11 +343,9 @@ def main():
         for r in worst:
             print(f"  {r['regret']:+.3f} seed {r['seed']}@{r['decision']} {r['category']} "
                   f"打={r['chosen']} 最良={r['best']}")
-    if args.out:
-        with open(args.out, "w") as f:
-            for r in rows:
-                f.write(json.dumps(r, ensure_ascii=False) + "\n")
-        print(f"\n結果 -> {args.out}")
+    if out_f:
+        out_f.close()
+        print(f"\n結果 -> {args.out}（seed ごとに逐次書き出し済み）")
     print("MOVE_REGRET_DONE " + json.dumps(
         {"measured": sum(1 for r in rows if r.get("regret") is not None),
          "saturated": sum(1 for r in rows if r.get("saturated"))}, ensure_ascii=False))
