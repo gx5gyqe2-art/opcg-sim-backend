@@ -19,6 +19,10 @@
 ならない**（実測）。迷いは 1位と2位の差＝`q_margin` で見る。L1 との不一致は単独では 4割に出て
 絞り込みにならないので、容疑者条件としては three_way（policy とも食い違う）でのみ使う。
 
+**L1 は効果の対話では第二意見にならない**（実測: 効果選択カテゴリの L1 不一致率 0%）。
+対話は選択肢の意味づけが評価関数の外にあるため、そのカテゴリで three_way は立たない
+＝効果選択の容疑者は toss_up / policy_low / off_top_q で拾う。
+
 **段2以降との接続**: 各行は `(seed, decision)` を持つ。対局は seed で決定論再生できるので、
 `run_game(..., stop_after_decisions=decision)` でその判断点の直前まで再生すれば局面を厳密に
 復元できる（トレースは乱数を消費しない＝`_fill_trace` の乱数状態ガード）。段2はそこから
@@ -67,6 +71,8 @@ def category_of(row):
     if dlg == "MULLIGAN":
         return "マリガン"
     at = (row.get("action_type") or "").upper()
+    if at == "RESOLVE_EFFECT_SELECTION":
+        return "効果選択"      # dialog が採れなかった対話（トレース欠測）も効果選択に寄せる
     if at in ("SELECT_COUNTER", "SELECT_BLOCKER") or (row.get("kind") == "battle"):
         return "防御"
     if at == "ATTACK":
@@ -119,8 +125,9 @@ def priority(row):
 class _Collector:
     """observer: 判断点ごとにトレースを1行へ畳む（manager は触らない＝決定論契約）。"""
 
-    def __init__(self, seed):
+    def __init__(self, seed, cond=None):
         self.seed = seed
+        self.cond = cond or {}     # 測定条件（段2 が**同じ条件で再生**するために必要）
         self.rows = []
 
     def on_decision(self, ctx, move):
@@ -143,6 +150,10 @@ class _Collector:
             "l1_disagrees": tr.get("l1_disagrees"),
             "n_candidates": len(tr.get("candidates") or []),
             "readout": tr.get("readout"),
+            # 測定条件。段2 は `(seed, decision)` で局面を復元するが、**再生は同じ条件**
+            # （同じ sims・同じ対面/デッキ・同じネット）でないと対局が分岐して別の判断点に
+            # 着地する（実測: sims を変えたら席までずれた）。行に埋めて持ち回る。
+            **self.cond,
         }
         row["category"] = category_of(row)
         row["suspect"] = sorted(classify_suspect(row))
@@ -158,6 +169,7 @@ def _init(sims, engine_spec, leaders_mode, decks, max_steps):
     _G["decks"] = decks
     _G["max_steps"] = max_steps
     from opcg_sim.src.core.cpu_learned import LearnedEngine
+    _G["engine_spec"] = engine_spec
     if engine_spec:
         v, _, p = engine_spec.partition(",")
         _G["engine"] = LearnedEngine(value_path=v, policy_path=p or None)
@@ -176,7 +188,8 @@ def _audit_one(seed):
         builder = synth_deck_builder(la, lb, seed=seed)
     else:
         builder = leader_deck_builder(la, lb) if la else None
-    col = _Collector(seed)
+    col = _Collector(seed, cond={"audit_sims": sims, "audit_leaders": _G["leaders"],
+                                "audit_decks": _G["decks"], "audit_engine": _G["engine_spec"]})
     seat = make_seat(kind="learned", want_trace=True, sims=sims, engine=_G["engine"])
     try:
         res = run_game(seed, db, seats={"p1": seat, "p2": seat}, deck_builder=builder,
