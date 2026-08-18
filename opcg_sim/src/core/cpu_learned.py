@@ -829,7 +829,33 @@ def _fill_trace(trace, manager, player, chosen, stats):
             if any(legal[i] is chosen for i in g["idxs"]):
                 trace["value"] = round(g["q"], 3)
                 break
+        # 手の監査（段1）が読む2つの信号。どちらも観測専用で選択には使わない。
+        #  q_gap: 最良グループの Q と選んだ手の Q の差＝「箱の出口評価で見た損」。ほぼ 0 なら
+        #         **迷っている**（＝反実仮想で測る価値がある容疑者）。
+        #  policy_rank: 事前分布 P で並べた順位（1=policy の第一候補）。順位が低い手を探索が
+        #         選んだ点は「policy が見落としている」か「探索が間違えた」かの分岐点。
+        qs = sorted((g["q"] for g in groups), reverse=True)
+        if qs and "value" in trace:
+            # q_gap: 打った手が最良 Q からどれだけ下か（読み出しが Q 最良を選ばなかった量）。
+            trace["q_gap"] = round(qs[0] - trace["value"], 3)
+        if len(qs) >= 2:
+            # q_margin: 1位と2位の差＝**迷いの深さ**。ほぼ 0 なら「どちらでもよい」と読んで
+            # いる＝反実仮想で実際に差があるかを測る価値がある（q_gap は CPU がほぼ常に
+            # 最良 Q を選ぶため中央値 0 で、迷いの指標にはならない）。
+            trace["q_margin"] = round(qs[0] - qs[1], 3)
+        P = stats.get("P")
+        if P is not None:
+            ranked = sorted(groups, key=lambda g: -sum(float(P[i]) for i in g["idxs"]))
+            for r, g in enumerate(ranked, 1):
+                if any(legal[i] is chosen for i in g["idxs"]):
+                    trace["policy_rank"] = r
+                    trace["policy_top"] = cpu_ai._describe_move(manager, legal[ranked[0]["rep"]])
+                    break
     # ② 独立評価器 L1 の第二意見（分布外での net 系統誤差を拾う・evalは信じ過ぎない）。
+    #    **観測はグローバル乱数を消費しない**（L1 は PIMC 等で global random を引きうる）。
+    #    消費すると「トレースを採ると対局が変わる」＝観測が対象を変えてしまい、同じ seed の
+    #    再生で決定点を復元できない（手の監査の段2は seed+決定番号で局面を復元する）。
+    _rand_state = _random.getstate()
     try:
         clone = manager.clone()
         cp = clone.p1 if clone.p1.name == player.name else clone.p2
@@ -839,3 +865,5 @@ def _fill_trace(trace, manager, player, chosen, stats):
                                      l1.get("action_type") != chosen.get("action_type"))
     except Exception:
         pass
+    finally:
+        _random.setstate(_rand_state)

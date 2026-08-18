@@ -333,8 +333,11 @@ class TreeMCTS:
         best = int(np.argmax(root.N))
         # トレース用の root 統計（訪問数・行動価値 Q=W/N）を残す（`cpu_learned.decide` が等価手マージと
         # トレース候補一覧に読む）。無いと等価手マージが効かず trace["candidates"] も欠落する。
+        # P（事前分布）も残す: 「policy が低く見ていた手を探索が選んだ」＝手の監査の一次
+        # フィルタが読む信号。統計は観測専用（探索・選択には使わない）＝挙動不変。
         self.last_stats = {"legal": root.legal, "N": root.N.copy(),
-                           "Q": root.W / np.maximum(root.N, 1.0)}
+                           "Q": root.W / np.maximum(root.N, 1.0),
+                           "P": (root.P.copy() if root.P is not None else None)}
         return root.legal[best], root.N, root.legal
 
     _in_battle = staticmethod(in_battle)   # 後方互換の別名（定義はモジュール関数が正）
