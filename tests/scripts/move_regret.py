@@ -45,10 +45,13 @@ ROLLOUT_MAX_STEPS = 600
 _G = {}
 
 
-def load_suspects(path, max_suspects=0, categories=None):
+def load_suspects(path, max_suspects=0, categories=None, per_category=0):
     """段1 の jsonl から容疑者を読む（優先度降順・純関数寄りの I/O）。
 
     `categories` 指定時はそのカテゴリだけ（「防御だけ深く測る」等の絞り込み）。
+    `per_category` 指定時は**カテゴリごとに上位N点**を取る（層化抽出）。優先度順に素で取ると
+    three_way の多いカテゴリ（ドン付与・攻撃）に偏り、**カテゴリ別の平均 regret が作れない**
+    ため。段2 は高価なので、限られた点数を「どこへ物量を投じるかの判断」に使える形で配る。
     """
     rows = []
     with open(path) as f:
@@ -63,6 +66,16 @@ def load_suspects(path, max_suspects=0, categories=None):
                 continue
             rows.append(r)
     rows.sort(key=lambda r: (-(r.get("priority") or 0), r["seed"], r["decision"]))
+    if per_category:
+        taken = collections.defaultdict(int)
+        picked = []
+        for r in rows:
+            c = r.get("category") or "その他"
+            if taken[c] >= per_category:
+                continue
+            taken[c] += 1
+            picked.append(r)
+        rows = picked
     return rows[:max_suspects] if max_suspects else rows
 
 
@@ -295,6 +308,8 @@ def main():
     ap.add_argument("--worlds", type=int, default=4, help="世界数（山札の並びだけを振る）")
     ap.add_argument("--max-options", type=int, default=5, help="1判断点で測る選択肢の上限")
     ap.add_argument("--max-suspects", type=int, default=24)
+    ap.add_argument("--per-category", type=int, default=0,
+                    help="カテゴリごとに上位N点だけ測る（層化抽出＝カテゴリ別平均を作れる）")
     ap.add_argument("--categories", default="", help="カンマ区切りで絞る（例: 防御,ドン付与）")
     ap.add_argument("--sims", type=int, default=160,
                     help="ロールアウトの探索数（既定=本番）。再生は監査時の sims を使う")
@@ -306,7 +321,7 @@ def main():
     args = ap.parse_args()
 
     cats = [c for c in args.categories.split(",") if c] or None
-    suspects = load_suspects(args.suspects, args.max_suspects, cats)
+    suspects = load_suspects(args.suspects, args.max_suspects, cats, args.per_category)
     jobs = list(plan_replays(suspects).items())
     print(f"手の監査 段2: 容疑者{len(suspects)}点／{len(jobs)}局・世界{args.worlds}・"
           f"選択肢上限{args.max_options}・sims={args.sims}", flush=True)

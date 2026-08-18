@@ -72,6 +72,21 @@ def test_load_suspects_takes_only_suspects_in_priority_order(tmp_path):
     assert [r["decision"] for r in MR.load_suspects(str(p), categories=["攻撃"])] == [7]
 
 
+def test_per_category_takes_top_n_of_each_category(tmp_path):
+    """層化抽出: 優先度順に素で取るとカテゴリが偏り、カテゴリ別の平均 regret が作れない。"""
+    rows = [
+        {"seed": 1, "decision": 1, "suspect": ["three_way"], "priority": 3.0, "category": "攻撃"},
+        {"seed": 1, "decision": 2, "suspect": ["three_way"], "priority": 3.0, "category": "攻撃"},
+        {"seed": 1, "decision": 3, "suspect": ["toss_up"], "priority": 1.0, "category": "防御"},
+        {"seed": 1, "decision": 4, "suspect": ["toss_up"], "priority": 1.0, "category": "防御"},
+    ]
+    p = tmp_path / "s.jsonl"
+    p.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows), encoding="utf-8")
+    got = MR.load_suspects(str(p), per_category=1)
+    assert sorted(r["category"] for r in got) == ["攻撃", "防御"]      # 各1点ずつ
+    assert [r["decision"] for r in got] == [1, 3]                      # 各カテゴリの優先度上位
+
+
 def test_plan_replays_groups_by_seed_in_decision_order():
     suspects = [{"seed": 9, "decision": 40}, {"seed": 9, "decision": 12}, {"seed": 8, "decision": 3}]
     plan = MR.plan_replays(suspects)
