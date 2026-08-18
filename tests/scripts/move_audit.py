@@ -53,6 +53,7 @@ import _bootstrap  # noqa: E402,F401
 TOSS_UP_MARGIN = 0.01     # 1位と2位の Q 差。枝間マージン実測（0.02〜0.03）の半分＝実質同着
 POLICY_LOW_RANK = 3       # policy の3番手以下を探索が選んだ
 OFF_TOP_Q = 0.001         # 打った手が最良 Q でない（読み出しが Q 以外の理由で選んだ）
+DECIDED_ABS = 0.9         # |Q| がこれ以上＝勝敗がほぼ決している（何を選んでも同じ）
 
 _G = {}
 
@@ -89,12 +90,18 @@ def category_of(row):
 
 
 def classify_suspect(row, toss_up_margin=TOSS_UP_MARGIN, policy_low_rank=POLICY_LOW_RANK,
-                     off_top_q=OFF_TOP_Q):
+                     off_top_q=OFF_TOP_Q, decided_abs=DECIDED_ABS):
     """容疑者フラグの集合を返す（純関数・ロールアウト無しの信号だけで決める）。
 
     `row` は監査行（chosen/l1_move/l1_disagrees/policy_rank/policy_top/q_gap）。
     情報が欠けている項目は「その条件では容疑者にしない」（欠測を疑いに数えない）。
     """
+    # **勝敗がほぼ決している点は測らない**（段2 の実測: 飽和した判断点は全選択肢 wr=1.000＝
+    # 何を選んでも勝つ局面だった）。高価なロールアウトを18本使っても「判別不能」しか返らない。
+    val = row.get("value")
+    if val is not None and abs(val) >= decided_abs:
+        return set()
+
     flags = set()
     gap, margin = row.get("q_gap"), row.get("q_margin")
     rank = row.get("policy_rank")

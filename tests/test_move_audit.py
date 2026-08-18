@@ -59,6 +59,18 @@ def test_three_way_needs_both_l1_and_policy_disagreement():
     assert "three_way" in MA.classify_suspect(both)
 
 
+def test_decided_positions_are_not_suspects():
+    """勝敗がほぼ決している点（|Q| が高い）は容疑者にしない。
+
+    段2 の実測で、飽和した判断点は**全選択肢が wr=1.000**＝何を選んでも勝つ局面だった。
+    そこに 18 本のロールアウトを使っても「判別不能」しか返らない＝ファネルの無駄。
+    """
+    decided = {"value": 0.95, "q_margin": 0.0, "policy_rank": 5, "q_gap": 0.1}
+    assert MA.classify_suspect(decided) == set()
+    close = {"value": 0.10, "q_margin": 0.0, "policy_rank": 5, "q_gap": 0.1}
+    assert MA.classify_suspect(close)          # 接戦なら従来どおり容疑者
+
+
 def test_missing_signals_are_not_suspects():
     """信号が無い判断点（統計を採れなかった等）は疑わない＝欠測を疑いに数えない。"""
     assert MA.classify_suspect({}) == set()
