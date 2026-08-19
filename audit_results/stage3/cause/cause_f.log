@@ -1,0 +1,40 @@
+seed 502006: frames [121, 127, 130]
+seed 500003: frames [86, 90]
+seed 503002: frames [8]
+========================================================================
+■ 500003@86 席=p1
+  plan OFF 1手分布: PLAY 菊之丞×3、ATTACH_DON 霜月牛マル×2
+  plan ON  1手分布: PLAY 菊之丞×5
+  plan OFF ターン線: ATTACH_DON 霜月牛マル → ATTACH_DON 霜月牛マル → PLAY 菊之丞 → ACTIVATE_MAIN 菊之丞 → ATTACK ヤマト→クザン → ACTIVATE_MAIN ヤマト → RESOLVE_EFFECT_SELECTION → ATTACH_DON 霜月牛マル → TURN_END
+  plan ON  ターン線: PLAY 菊之丞 → ACTIVATE_MAIN ヤマト → RESOLVE_EFFECT_SELECTION → ACTIVATE_MAIN 菊之丞 → ATTACH_DON ヤマト → ATTACH_DON ヤマト → ATTACK ヤマト→クザン → ATTACH_DON 霜月牛マル → TURN_END
+========================================================================
+■ 500003@90 席=p1
+  plan OFF 1手分布: ATTACH_DON ヤマト×5
+  plan ON  1手分布: ATTACH_DON ヤマト×4、DON_BOX ヤマト→クザン×1
+  plan OFF ターン線: ATTACH_DON ヤマト → ATTACK ヤマト→クザン → ACTIVATE_MAIN ヤマト → RESOLVE_EFFECT_SELECTION → TURN_END
+  plan ON  ターン線: ATTACH_DON ヤマト → ATTACK ヤマト→クザン → ACTIVATE_MAIN ヤマト → RESOLVE_EFFECT_SELECTION → TURN_END
+========================================================================
+■ 502006@121 席=p2
+  plan OFF 1手分布: ATTACK イッショウ→バギー×3、ATTACK X・ドレーク→バギー×2
+  plan ON  1手分布: ATTACH_DON イッショウ×2、PLAY ひばり×1、ATTACK X・ドレーク→カバジ×1、ATTACK X・ドレーク→バギー×1
+  plan OFF ターン線: ATTACK イッショウ→バギー → ATTACK イッショウ→バギー → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACK X・ドレーク→バギー → PLAY 錦えもん → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ACTIVATE_MAIN スモーカー → ATTACH_DON X・ドレーク
+  plan ON  ターン線: ATTACH_DON イッショウ → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → DON_BOX イッショウ→バギー → ATTACK イッショウ→カバジ → ACTIVATE_MAIN スモーカー → PLAY ひばり → RESOLVE_EFFECT_SELECTION → TURN_END
+========================================================================
+■ 502006@127 席=p2
+  plan OFF 1手分布: ATTACH_DON イッショウ×5
+  plan ON  1手分布: ATTACH_DON イッショウ×2、ATTACH_DON X・ドレーク×2、ATTACK イッショウ→アルビダ×1
+  plan OFF ターン線: ATTACH_DON イッショウ → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ACTIVATE_MAIN スモーカー → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACK イッショウ→カバジ → ATTACH_DON X・ドレーク → TURN_END
+  plan ON  ターン線: ATTACK イッショウ→アルビダ → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ACTIVATE_MAIN スモーカー → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → TURN_END
+========================================================================
+■ 502006@130 席=p2
+  plan OFF 1手分布: ATTACH_DON X・ドレーク×5
+  plan ON  1手分布: ATTACH_DON X・ドレーク×3、ATTACK イッショウ→カバジ×1、ATTACK イッショウ→アルビダ×1
+  plan OFF ターン線: ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → PLAY 錦えもん → ATTACH_DON X・ドレーク → ATTACK イッショウ→アルビダ → TURN_END
+  plan ON  ターン線: ATTACK イッショウ→カバジ → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → TURN_END
+========================================================================
+■ 503002@8 席=p1
+  plan OFF 1手分布: TURN_END×2、ATTACH_DON モンキー・D・ルフィ×2、PLAY サンジ×1
+  plan ON  1手分布: ATTACH_DON モンキー・D・ルフィ×2、DON_BOX モンキー・D・ルフィ→モンキー・D・ルフィ×2、PLAY サンジ×1
+  plan OFF ターン線: ATTACH_DON モンキー・D・ルフィ → ATTACH_DON モンキー・D・ルフィ → ATTACK モンキー・D・ルフィ→モンキー・D・ルフィ → ACTIVATE_MAIN モンキー・D・ルフィ → TURN_END
+  plan ON  ターン線: DON_BOX モンキー・D・ルフィ→モンキー・D・ルフィ → PLAY サンジ → ACTIVATE_MAIN モンキー・D・ルフィ → RESOLVE_EFFECT_SELECTION → TURN_END
+CAUSE_F_DONE

@@ -1,0 +1,131 @@
+seed 502006: frames [121, 127, 130]
+seed 500003: frames [86, 90]
+seed 506006: frames [101]
+seed 500000: frames [31]
+========================================================================
+■ 500000@31 席=p2
+-- A: 各選択肢の後状態 V(s')（席視点・探索なし）
+   V'=-0.328  PLAY 海軍本部(ST06-017)
+   V'=-0.359  ATTACK コビー(OP11-001)→ドンキホーテ・ロシナンテ
+   V'=-0.391  TURN_END
+   V'=-0.407  PLAY センゴク(ST19-002)
+   V'=-0.407  ATTACH_DON コビー(OP11-001)
+   V'=-0.453  PLAY アラマキ(OP11-082)
+   V'=-0.482  DON_BOX コビー(OP11-001)→ドンキホーテ・ロシナンテ
+   V'=-0.617  PLAY ドール(OP11-008)
+-- C: traced decide (sims=160)
+   chosen: ATTACH_DON コビー(OP11-001)  readout=None
+   q_margin=0.009 policy_rank=1 policy_top={'action_type': 'ATTACH_DON', 'card': 'OP11-001'}
+-- B: sims=40/160/640 ×5 の decide 分布
+   sims= 40: ATTACH_DON コビー(OP11-001)×5
+   sims=160: ATTACH_DON コビー(OP11-001)×5
+   sims=640: ATTACH_DON コビー(OP11-001)×2、PLAY センゴク(ST19-002)×2、ATTACK コビー(OP11-001)→ドンキホーテ・ロシナンテ×1
+========================================================================
+■ 500003@86 席=p1
+-- A: 各選択肢の後状態 V(s')（席視点・探索なし）
+   V'=+0.546  ACTIVATE_MAIN ヤマト(OP06-022)
+   V'=+0.417  PLAY 霜月牛マル(ST09-008)
+   V'=+0.415  ATTACH_DON 霜月牛マル(ST09-008)
+   V'=+0.325  TURN_END
+   V'=+0.323  PLAY 菊之丞(EB04-012)
+-- C: traced decide (sims=160)
+   chosen: ATTACH_DON 霜月牛マル(ST09-008)  readout=None
+   q_margin=0.017 policy_rank=4 policy_top={'action_type': 'PLAY', 'card': 'EB04-012'}
+-- B: sims=40/160/640 ×5 の decide 分布
+   sims= 40: ACTIVATE_MAIN ヤマト(OP06-022)×5
+   sims=160: PLAY 菊之丞(EB04-012)×3、ATTACH_DON 霜月牛マル(ST09-008)×2
+   sims=640: PLAY 菊之丞(EB04-012)×5
+========================================================================
+■ 500003@90 席=p1
+-- A: 各選択肢の後状態 V(s')（席視点・探索なし）
+   V'=+0.334  ACTIVATE_MAIN ヤマト(OP06-022)
+   V'=+0.273  ATTACK ヤマト(OP06-022)→クザン
+   V'=+0.273  DON_BOX ヤマト(OP06-022)→クザン
+   V'=+0.273  ATTACH_DON ヤマト(OP06-022)
+   V'=+0.261  ATTACH_DON 霜月牛マル(ST09-008)
+   V'=+0.202  TURN_END
+-- C: traced decide (sims=160)
+   chosen: ATTACH_DON ヤマト(OP06-022)  readout=None
+   q_margin=0.067 policy_rank=None policy_top=None
+-- B: sims=40/160/640 ×5 の decide 分布
+   sims= 40: ATTACH_DON ヤマト(OP06-022)×4、ATTACK ヤマト(OP06-022)→クザン×1
+   sims=160: ATTACH_DON ヤマト(OP06-022)×5
+   sims=640: ATTACH_DON ヤマト(OP06-022)×3、ATTACK ヤマト(OP06-022)→クザン×1、ACTIVATE_MAIN ヤマト(OP06-022)×1
+========================================================================
+■ 502006@121 席=p2
+-- A: 各選択肢の後状態 V(s')（席視点・探索なし）
+   V'=+0.806  ATTACH_DON イッショウ(OP10-023)
+   V'=+0.768  ATTACH_DON X・ドレーク(ST02-014)
+   V'=+0.626  ATTACK X・ドレーク(ST02-014)→バギー
+   V'=+0.626  ATTACK X・ドレーク(ST02-014)→カバジ
+   V'=+0.570  PLAY 錦えもん(OP10-027)
+   V'=+0.521  ATTACK イッショウ(OP10-023)→バギー
+   V'=+0.521  ATTACK イッショウ(OP10-023)→カバジ
+   V'=+0.438  DON_BOX イッショウ(OP10-023)→バギー
+   V'=+0.387  PLAY ひばり(OP11-010)
+   V'=+0.338  DON_BOX X・ドレーク(ST02-014)→バギー
+   V'=-0.214  TURN_END
+-- C: traced decide (sims=160)
+   chosen: ATTACK イッショウ(OP10-023)→バギー  readout=None
+   q_margin=0.006 policy_rank=3 policy_top={'action_type': 'ATTACH_DON', 'card': 'OP10-023'}
+-- B: sims=40/160/640 ×5 の decide 分布
+   sims= 40: ATTACH_DON イッショウ(OP10-023)×5
+   sims=160: ATTACK イッショウ(OP10-023)→バギー×3、ATTACK X・ドレーク(ST02-014)→バギー×2
+   sims=640: ATTACH_DON イッショウ(OP10-023)×3、ATTACK X・ドレーク(ST02-014)→バギー×2
+========================================================================
+■ 502006@127 席=p2
+-- A: 各選択肢の後状態 V(s')（席視点・探索なし）
+   V'=+0.157  ATTACH_DON イッショウ(OP10-023)
+   V'=+0.104  ATTACH_DON X・ドレーク(ST02-014)
+   V'=-0.058  PLAY 錦えもん(OP10-027)
+   V'=-0.293  ATTACK イッショウ(OP10-023)→バギー
+   V'=-0.293  ATTACK イッショウ(OP10-023)→カバジ
+   V'=-0.293  ATTACK イッショウ(OP10-023)→アルビダ
+   V'=-0.363  PLAY ひばり(OP11-010)
+   V'=-0.400  DON_BOX イッショウ(OP10-023)→バギー
+   V'=-0.575  TURN_END
+-- C: traced decide (sims=160)
+   chosen: ATTACH_DON イッショウ(OP10-023)  readout=None
+   q_margin=0.006 policy_rank=1 policy_top={'action_type': 'ATTACH_DON', 'card': 'OP10-023'}
+-- B: sims=40/160/640 ×5 の decide 分布
+   sims= 40: ATTACH_DON イッショウ(OP10-023)×5
+   sims=160: ATTACH_DON イッショウ(OP10-023)×5
+   sims=640: ATTACH_DON イッショウ(OP10-023)×5
+========================================================================
+■ 502006@130 席=p2
+-- A: 各選択肢の後状態 V(s')（席視点・探索なし）
+   V'=+0.201  ATTACH_DON イッショウ(OP10-023)
+   V'=+0.188  ATTACH_DON X・ドレーク(ST02-014)
+   V'=-0.034  PLAY 錦えもん(OP10-027)
+   V'=-0.181  ATTACK イッショウ(OP10-023)→バギー
+   V'=-0.181  ATTACK イッショウ(OP10-023)→カバジ
+   V'=-0.181  ATTACK イッショウ(OP10-023)→アルビダ
+   V'=-0.352  PLAY ひばり(OP11-010)
+   V'=-0.486  TURN_END
+-- C: traced decide (sims=160)
+   chosen: ATTACH_DON X・ドレーク(ST02-014)  readout=None
+   q_margin=0.019 policy_rank=5 policy_top={'action_type': 'ATTACK', 'card': 'OP10-023', 'targets': ['OP09-042']}
+-- B: sims=40/160/640 ×5 の decide 分布
+   sims= 40: ATTACH_DON X・ドレーク(ST02-014)×5
+   sims=160: ATTACH_DON X・ドレーク(ST02-014)×5
+   sims=640: ATTACH_DON X・ドレーク(ST02-014)×5
+========================================================================
+■ 506006@101 席=p1
+-- A: 各選択肢の後状態 V(s')（席視点・探索なし）
+   V'=-0.589  ACTIVATE_MAIN トラファルガー・ロー(OP14-001)
+   V'=-0.613  ATTACH_DON カポネ・ベッジ(OP14-003)
+   V'=-0.749  TURN_END
+   V'=-0.794  PLAY バルトロメオ(OP14-011)
+   V'=-0.810  PLAY バジル・ホーキンス(OP14-010)
+   V'=-0.839  ATTACK カポネ・ベッジ(OP14-003)→ドンキホーテ・ロシナンテ
+   V'=-0.839  ATTACK カポネ・ベッジ(OP14-003)→ドンキホーテ・ロシナンテ
+   V'=-0.881  DON_BOX カポネ・ベッジ(OP14-003)→ドンキホーテ・ロシナンテ
+   V'=-0.902  DON_BOX カポネ・ベッジ(OP14-003)→ドンキホーテ・ロシナンテ
+-- C: traced decide (sims=160)
+   chosen: ATTACH_DON カポネ・ベッジ(OP14-003)  readout=None
+   q_margin=0.035 policy_rank=1 policy_top={'action_type': 'ATTACH_DON', 'card': 'OP14-003'}
+-- B: sims=40/160/640 ×5 の decide 分布
+   sims= 40: ATTACH_DON カポネ・ベッジ(OP14-003)×5
+   sims=160: ACTIVATE_MAIN トラファルガー・ロー(OP14-001)×5
+   sims=640: ATTACH_DON カポネ・ベッジ(OP14-003)×5
+CAUSE_ABC_DONE
