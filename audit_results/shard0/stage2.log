@@ -1,0 +1,30 @@
+手の監査 段2: 容疑者12点／6局・世界6・選択肢上限3・sims=160
+  seed 500005@26 攻撃: 飽和 （選択肢3）
+  seed 500002@66 展開: regret +0.000 （選択肢3）
+  seed 500002@77 起動メイン: 飽和 （選択肢3）
+  seed 500007@122 起動メイン: regret +0.167 （選択肢3）
+  seed 500001@2 マリガン: 飽和 （選択肢2）
+  seed 500000@31 攻撃: regret +0.333 （選択肢3）
+  seed 500000@45 ターン終了: 飽和 （選択肢2）
+  seed 500000@102 展開: regret +0.167 （選択肢3）
+  seed 500003@2 マリガン: 飽和 （選択肢2）
+  seed 500003@68 ターン終了: regret +0.000 （選択肢3）
+  seed 500003@86 ドン付与: regret +0.167 （選択肢3）
+  seed 500003@106 ドン付与: 飽和 （選択肢3）
+
+カテゴリ別の平均 regret（n / 飽和 / 未測定）:
+  攻撃         regret=0.3334  n=1  飽和=1  未測定=0
+  起動メイン      regret=0.1667  n=1  飽和=1  未測定=0
+  ドン付与       regret=0.1667  n=1  飽和=1  未測定=0
+  展開         regret=0.0833  n=2  飽和=0  未測定=0
+  マリガン       regret=None  n=0  飽和=2  未測定=0
+  ターン終了      regret=0.0  n=1  飽和=1  未測定=0
+
+regret 上位（段3の裁定候補）:
+  +0.333 seed 500000@31 攻撃 打={'action_type': 'ATTACK', 'card': 'OP11-001', 'targets': ['OP12-061']} 最良={'action_type': 'PLAY', 'card': 'OP11-008'}
+  +0.167 seed 500007@122 起動メイン 打={'action_type': 'ACTIVATE_MAIN', 'card': 'OP04-001'} 最良={'action_type': 'PLAY', 'card': 'OP04-012'}
+  +0.167 seed 500003@86 ドン付与 打={'action_type': 'ATTACH_DON', 'card': 'ST09-008'} 最良={'action_type': 'PLAY', 'card': 'ST09-008'}
+  +0.167 seed 500000@102 展開 打={'action_type': 'PLAY', 'card': 'ST06-017'} 最良={'action_type': 'ATTACK', 'card': 'ST19-002', 'targets': ['OP12-061']}
+
+結果 -> /home/user/move_audit_shard0/regret.jsonl（seed ごとに逐次書き出し済み）
+MOVE_REGRET_DONE {"measured": 12, "saturated": 6}
