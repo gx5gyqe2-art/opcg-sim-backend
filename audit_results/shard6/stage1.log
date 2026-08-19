@@ -1,0 +1,25 @@
+手の監査 段1: 8局・sims=160・random/synth
+  seed 506003 ['OP16-080', 'OP04-040']: 判断145点 容疑者44
+  seed 506001 ['OP12-081', 'OP05-001']: 判断149点 容疑者49
+  seed 506000 ['OP01-062', 'OP11-062']: 判断185点 容疑者34
+  seed 506002 ['OP11-062', 'ST21-001']: 判断202点 容疑者56
+  seed 506004 ['OP01-060', 'PRB01-001']: 判断145点 容疑者61
+  seed 506005 ['OP14-020', 'PRB01-001']: 判断126点 容疑者45
+  seed 506006 ['OP14-001', 'OP05-022']: 判断145点 容疑者57
+  seed 506007 ['OP15-098', 'EB01-021']: 判断140点 容疑者44
+
+判断点 1237 / 容疑者 390（31.5%）
+容疑者の内訳: {'three_way': 126, 'toss_up': 163, 'off_top_q': 146, 'policy_low': 144}
+
+カテゴリ別（n / 平均マージン / 容疑者率 / L1不一致率）:
+  防御           326  margin=0.0921  suspect=0.061  l1diff=0.242
+  ドン付与         265  margin=0.053  suspect=0.494  l1diff=0.781
+  効果選択         206  margin=0.1156  suspect=0.184  l1diff=0.0
+  攻撃           198  margin=0.1121  suspect=0.581  l1diff=0.571
+  展開           102  margin=0.1242  suspect=0.539  l1diff=0.206
+  ターン終了        101  margin=0.1536  suspect=0.149  l1diff=0.149
+  起動メイン         23  margin=0.0903  suspect=0.652  l1diff=0.522
+  マリガン          16  margin=0.1452  suspect=0.062  l1diff=0.25
+
+監査行 1237件 -> /tmp/move_audit_shard6/suspects.jsonl
+MOVE_AUDIT_DONE {"rows": 1237, "suspects": 390}
