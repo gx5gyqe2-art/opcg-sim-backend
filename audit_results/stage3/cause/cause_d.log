@@ -1,0 +1,18 @@
+対象 2 点 × オフセット (0, 6, 12, 18) = 8 ジョブ
+  506006@101 off=0: 完了
+  506006@101 off=12: 完了
+  506006@101 off=18: 完了
+  506006@101 off=6: 完了
+  500000@31 off=6: 完了
+  500000@31 off=18: 完了
+  500000@31 off=0: 完了
+  500000@31 off=12: 完了
+■ 506006@101: worlds=24 regret=0.0833
+   wr=0.500 (n=24) {'action_type': 'PLAY', 'card': 'OP14-011'} 
+   wr=0.417 (n=24) {'action_type': 'ACTIVATE_MAIN', 'card': 'OP14-001'} ★打った手
+   wr=0.333 (n=24) {'action_type': 'PLAY', 'card': 'OP14-010'} 
+■ 500000@31: worlds=24 regret=0.1667
+   wr=0.667 (n=24) {'action_type': 'PLAY', 'card': 'OP11-008'} 
+   wr=0.500 (n=24) {'action_type': 'ATTACK', 'card': 'OP11-001', 'targets': ['OP12-061']} ★打った手
+   wr=0.333 (n=24) {'action_type': 'PLAY', 'card': 'OP11-082'} 
+CAUSE_D_DONE
