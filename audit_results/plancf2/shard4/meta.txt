@@ -1,0 +1,3 @@
+ed0ddfc001a8e5bf02e90b22cd2922d8f17b5a4c
+Python 3.11.15
+2.4.6
