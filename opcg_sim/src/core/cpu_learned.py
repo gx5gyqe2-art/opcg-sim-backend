@@ -12,6 +12,7 @@ docs/reports/cpu_rl_pilot_p3_results_20260630.md。P3本走で得た Gen2 ネッ
 `decide_learned` は既定ネットの**プロセス共有シングルトン**（`_default_engine()`）を使う薄いラッパ
 ＝**挙動不変**（vocab/game はネット非依存なので複数エンジンで共有ロード可能）。
 """
+import itertools
 import math
 import os
 import random
@@ -252,6 +253,30 @@ def _priors_fn(pnet, vocab, enc_version=1):
         p = pnet.priors(ctx, am)
         return p if p.shape[0] == len(legal) else None
     return priors
+
+
+_PLAN_STICKY_SEQ = itertools.count(1)
+
+
+def _plan_sticky_id(manager):
+    """プラン読み出しのターン内 sticky 鍵に使う、ゲームに安定な識別子。
+
+    従来は `id(manager)` だったが、対局の進め方には2通りある:
+      - 実対局（サーバ/ドライバ）＝ manager を in-place に進める → id は安定
+      - リプレイ/ロールアウト＝ apply が新クローンを返す → **毎手 id が変わり、
+        「ターンに1回立案」のはずが毎手立案になる**（挙動が呼び出し環境で変わる隠れ結合。
+        id() の再利用による別対局との衝突も理論上ある）
+    初見の manager にトークンを付与して鍵にする。`clone()` は deepcopy なのでトークンは
+    クローンへ継承され、どちらの進め方でも同一ターンのプランが継続する。トークンの値は
+    手の選択に影響しない（キャッシュの同一性のみ）＝決定論再生を壊さない。"""
+    sid = getattr(manager, "_plan_sticky_id", None)
+    if sid is None:
+        sid = next(_PLAN_STICKY_SEQ)
+        try:
+            manager._plan_sticky_id = sid
+        except Exception:
+            sid = id(manager)   # 属性を持てない特殊型は従来鍵へ退避
+    return sid
 
 
 def _net_enc_version(vnet) -> int:
@@ -559,7 +584,8 @@ class LearnedEngine:
         「この列を打って閉じたターン末」の値なので、閉じるまでがプランの一部）。
         立案失敗（候補ゼロ等）は None を記憶し、このターンは従来の探索に委ねる。"""
         from opcg_sim.src.learned import plan as PL
-        key = (id(manager), int(getattr(manager, "turn_count", 0) or 0), name, world_seed)
+        key = (_plan_sticky_id(manager),
+               int(getattr(manager, "turn_count", 0) or 0), name, world_seed)
         if key not in self._turn_plans:
             if len(self._turn_plans) >= 64:
                 for k in list(self._turn_plans)[:32]:
