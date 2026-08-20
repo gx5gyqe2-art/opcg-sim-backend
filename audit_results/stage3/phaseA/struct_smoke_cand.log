@@ -1,0 +1,34 @@
+候補: turn_head=True
+======================================================================
+■ 502006@121 席=p2
+  [base(ヘッド無)] 候補12本 上位: policy:t1(-0.461)、struct:c0+don10:spread(-0.463)、policy:t1(-0.489)
+    選択: policy:t1
+    列  : ATTACK イッショウ → DON_BOX イッショウ → ATTACK X・ドレーク → PLAY ひばり → RESOLVE_EFFECT_SELECTION
+  [cand(turnヘッド)] 候補12本 上位: policy:argmax(+0.853)、struct:c0+don10:spread(+0.827)、struct:c7+don3:spread(+0.778)
+    選択: policy:argmax
+    列  : ATTACH_DON イッショウ → ATTACH_DON イッショウ → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク…
+======================================================================
+■ 502006@127 席=p2
+  [base(ヘッド無)] 候補11本 上位: policy:t1(-0.489)、policy:t1(-0.639)、struct:c0+don5:hold(-0.688)
+    選択: policy:t1
+    列  : ATTACK イッショウ
+  [cand(turnヘッド)] 候補11本 上位: policy:argmax(+0.941)、policy:t1(+0.717)、policy:t1(+0.480)
+    選択: policy:argmax
+    列  : ATTACH_DON イッショウ → ATTACK イッショウ → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ACTIVATE_MAIN スモーカー → ATTACH_DON X・ドレーク…
+======================================================================
+■ 502006@130 席=p2
+  [base(ヘッド無)] 候補8本 上位: policy:t1(-0.602)、policy:t1(-0.641)、policy:t1(-0.712)
+    選択: policy:t1
+    列  : ATTACK イッショウ
+  [cand(turnヘッド)] 候補8本 上位: policy:argmax(+0.948)、policy:t1(+0.919)、struct:c5+don0:hold(+0.702)
+    選択: policy:argmax
+    列  : ATTACK イッショウ → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク → ATTACH_DON X・ドレーク
+======================================================================
+■ 503002@8 席=p1
+  [base(ヘッド無)] 候補8本 上位: policy:argmax(-0.220)、struct:c0+don3:spread(-0.220)、policy:t1(-0.365)
+    選択: policy:argmax
+    列  : ATTACH_DON モンキー・D・ルフィ → ATTACH_DON モンキー・D・ルフィ → ATTACH_DON モンキー・D・ルフィ → ATTACK モンキー・D・ルフィ → ACTIVATE_MAIN モンキー・D・ルフィ
+  [cand(turnヘッド)] 候補8本 上位: policy:argmax(+0.793)、struct:c0+don3:spread(+0.793)、policy:t1(+0.628)
+    選択: policy:argmax
+    列  : ATTACH_DON モンキー・D・ルフィ → ATTACH_DON モンキー・D・ルフィ → ATTACH_DON モンキー・D・ルフィ → ATTACK モンキー・D・ルフィ → ACTIVATE_MAIN モンキー・D・ルフィ
+STRUCT_SMOKE_DONE
