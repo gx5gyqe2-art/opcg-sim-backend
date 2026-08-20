@@ -201,8 +201,9 @@ def _run_game(job):
         return {"seed": seed, "error": f"{type(e).__name__}: {str(e)[:80]}",
                 "rows": [], "drift": []}
 
-    # 判断点をターン全域から等間隔に採る（序盤偏りを避ける）
-    frames = cap.frames
+    # 判断点は中盤帯（T3〜14）から等間隔に採る。序盤は自明・終盤は決着済みで
+    # 打ち切りロールアウトが全プラン ±1 に飽和し順位を教えられない（スモーク実測）。
+    frames = [f for f in cap.frames if 3 <= f[1] <= 14] or cap.frames
     take = args["points"]
     if len(frames) > take:
         idx = np.linspace(0, len(frames) - 1, take).astype(int)
@@ -233,7 +234,10 @@ def _run_game(job):
                 drifts.append(float(np.mean(ds)))
             args["drift_left"] -= 1
         ok = [(p, z) for p, z in zip(plans, zs) if z is not None]
-        if len(ok) < 2 or max(z for _, z in ok) == min(z for _, z in ok):
+        spread = (max(z for _, z in ok) - min(z for _, z in ok)) if len(ok) >= 2 else 0.0
+        if len(ok) < 2 or spread < 0.05:
+            print(f"  seed {seed}@{dec} T{turn}: skip（有効{len(ok)}本・幅{spread:.3f}） "
+                  f"{time.time() - t0:.0f}s", flush=True)
             continue          # 全滅/飽和の決定点は捨てる（順位を教えられない）
         for steps, z in ok:
             exit_mgr = PL.execute_plan(eng.game, frame.clone(), name, list(steps),
