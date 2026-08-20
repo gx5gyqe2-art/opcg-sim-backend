@@ -95,6 +95,16 @@ def _init(cand_spec, sims, rollout_sims, enc_version):
     _G["vf"] = CL._value_fn(eng.vnet, eng.vocab, eng.enc_version)
     _G["pf"] = CL._priors_fn(eng.pnet, eng.vocab, eng.enc_version)
     _G["enc_version"] = enc_version or eng.enc_version
+    # 審判の立案を軽量化: ロールアウト内の select_plan は世界3・policy提案3で足りる
+    # （ラベルは順位ペア化するので審判の精度は本番程でなくて良い＝コストが支配的）。
+    # n_worlds/n_proposals は def 時に束縛された既定引数のためラッパで上書きする。
+    _orig_select = PL.select_plan
+    def _cheap_select(game, manager, name, value_fn, priors_fn, rng, **kw):
+        kw.setdefault("n_worlds", 3)
+        kw.setdefault("n_proposals", 3)
+        return _orig_select(game, manager, name, value_fn, priors_fn, rng, **kw)
+    PL.select_plan = _cheap_select
+    PL.PLAN_STRUCT_MAX = 4
 
 
 def candidate_plans(frame, name, rng, n_policy=3, n_struct=4, cap=6):
@@ -118,11 +128,18 @@ def candidate_plans(frame, name, rng, n_policy=3, n_struct=4, cap=6):
     return plans, labels
 
 
-def _rollout_winner(gs, m, ref_eng, rng_seed):
-    """出口から終局まで両席 ref_eng（π_plan または旧π）で打つ。返り値 winner 名。"""
+def _rollout_winner(gs, m, ref_eng, rng_seed, max_turns=0):
+    """出口から両席 ref_eng（π_plan または旧π）で打つ。返り値 (winner, 最終盤面)。
+
+    `max_turns`>0 なら**そのターン数だけ進めて打ち切る**（TD式短縮）。終局に届かない場合は
+    呼び出し側が最終盤面を value でブートストラップしてラベル化する＝フル終局ロールアウトが
+    高すぎる場合のコストつまみ（順位ペア化するので粗いラベルで足りる）。"""
     rng = np.random.default_rng(rng_seed)
     steps = 0
+    turn0 = int(getattr(m, "turn_count", 0) or 0)
     while m.winner is None and not gs.is_terminal(m) and steps < ROLLOUT_MAX_STEPS:
+        if max_turns and int(getattr(m, "turn_count", 0) or 0) - turn0 >= max_turns:
+            break
         name = gs.current_player(m)
         if name is None:
             break
@@ -135,26 +152,31 @@ def _rollout_winner(gs, m, ref_eng, rng_seed):
             break
         m = m2
         steps += 1
-    return m.winner
+    return m.winner, m
 
 
-def label_plans(frame, name, plans, worlds, ref_key):
-    """各プランを K 決定化世界（プラン間共有＝CRN）で出口→終局し z=2·wr−1 を返す。"""
+def label_plans(frame, name, plans, worlds, ref_key, max_turns=0):
+    """各プランを K 決定化世界（プラン間共有＝CRN）で出口→終局（または M ターン打ち切り＋
+    value ブートストラップ）し、z の平均を返す。"""
     eng, vf, pf = _G["base"], _G["vf"], _G["pf"]
     gs = eng.game
     ref = _G[ref_key]
     zs = []
     for steps in plans:
-        wins = n = 0
+        acc, n = 0.0, 0
         for wi, world in enumerate(worlds):
             exit_mgr = PL.execute_plan(gs, world, name, list(steps), vf, pf)
             ref._world_seeds = {}
             ref._turn_plans = {}
-            w = _rollout_winner(gs, exit_mgr, ref, 91000 + wi * 13 + 1)
+            w, last = _rollout_winner(gs, exit_mgr, ref, 91000 + wi * 13 + 1,
+                                      max_turns=max_turns)
             if w is not None:
-                wins += 1 if w == name else 0
+                acc += 1.0 if w == name else -1.0
                 n += 1
-        zs.append(2.0 * wins / n - 1.0 if n else None)
+            elif max_turns and last is not None:
+                acc += float(_G["vf"](last, name))     # 打ち切り＝value ブートストラップ
+                n += 1
+        zs.append(acc / n if n else None)
     return zs
 
 
@@ -203,9 +225,9 @@ def _run_game(job):
                 break
         if len(worlds) < 2:
             continue
-        zs = label_plans(frame, name, plans, worlds, "ref_plan")
+        zs = label_plans(frame, name, plans, worlds, "ref_plan", args["rollout_turns"])
         if args["drift_left"] > 0:
-            zo = label_plans(frame, name, plans, worlds, "ref_old")
+            zo = label_plans(frame, name, plans, worlds, "ref_old", args["rollout_turns"])
             ds = [abs(a - b) for a, b in zip(zs, zo) if a is not None and b is not None]
             if ds:
                 drifts.append(float(np.mean(ds)))
@@ -232,6 +254,8 @@ def main():
     ap.add_argument("--points", type=int, default=2, help="1局あたりの判断点数（ターン全域から等間隔）")
     ap.add_argument("--worlds", type=int, default=4, help="決定化世界の数（プラン間共有＝CRN）")
     ap.add_argument("--sims", type=int, default=160, help="局面採取の自己対戦（分布=本番仕様）")
+    ap.add_argument("--rollout-turns", type=int, default=0,
+                    help="ロールアウトを M ターンで打ち切り value でブートストラップ（0=終局まで）")
     ap.add_argument("--rollout-sims", type=int, default=40,
                     help="審判ロールアウトの sims（教師は順位ペア化するので低くて良い）")
     ap.add_argument("--cand", default="", help="審判ネット value,policy（空=既定G14）")
@@ -246,7 +270,8 @@ def main():
 
     jobs = [(args.seed_base + i,
              {"sims": args.sims, "points": args.points, "worlds": args.worlds,
-              "drift_left": 1 if i < args.drift else 0}) for i in range(args.games)]
+              "drift_left": 1 if i < args.drift else 0,
+              "rollout_turns": args.rollout_turns}) for i in range(args.games)]
     buf, stats, drifts = [], {"rows": 0, "groups": 0, "errors": 0}, []
     shard = [0]
 
