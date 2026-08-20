@@ -1,0 +1,74 @@
+======================================================================
+■ 502006@121 席=p2
+  [struct OFF] 候補6本:
+      -0.461  policy:t1
+      -0.489  policy:t1
+      -0.668  policy:t1
+      -0.701  policy:argmax
+      -0.835  policy:t1
+      -0.896  policy:t1
+    選択: policy:t1
+    列  : ATTACK イッショウ → DON_BOX イッショウ → ATTACK X・ドレーク → PLAY ひばり → RESOLVE_EFFECT_SELECTION
+  [struct ON ] 候補12本:
+      -0.461  policy:t1
+      -0.463  struct:c0+don10:spread
+      -0.489  policy:t1
+      -0.504  struct:c0+don10:leader
+      -0.668  policy:t1
+      -0.701  policy:argmax
+      -0.803  struct:c7+don3:leader
+      -0.835  policy:t1
+      -0.840  struct:c7+don3:spread
+      -0.857  struct:c5+don5:spread
+      -0.896  policy:t1
+      -0.901  struct:c10+don0:hold
+    選択: policy:t1
+    列  : ATTACK イッショウ → DON_BOX イッショウ → ATTACK X・ドレーク → PLAY ひばり → RESOLVE_EFFECT_SELECTION
+======================================================================
+■ 502006@127 席=p2
+  [struct OFF] 候補6本:
+      -0.489  policy:t1
+      -0.639  policy:t1
+      -0.770  policy:t1
+      -0.783  policy:argmax
+      -0.818  policy:t1
+      -0.850  policy:t1
+    選択: policy:t1
+    列  : ATTACK イッショウ
+  [struct ON ] 候補11本:
+      -0.489  policy:t1
+      -0.639  policy:t1
+      -0.688  struct:c0+don5:hold
+      -0.741  struct:c0+don5:spread
+      -0.770  policy:t1
+      -0.783  policy:argmax
+      -0.818  policy:t1
+      -0.835  struct:c2+don3:hold
+      -0.850  policy:t1
+      -0.850  struct:c2+don3:spread
+      -0.881  struct:c5+don0:hold
+    選択: policy:t1
+    列  : ATTACK イッショウ
+======================================================================
+■ 502006@130 席=p2
+  [struct OFF] 候補6本:
+      -0.602  policy:t1
+      -0.641  policy:t1
+      -0.712  policy:t1
+      -0.720  policy:t1
+      -0.776  policy:argmax
+      -0.856  policy:t1
+    選択: policy:t1
+    列  : ATTACK イッショウ
+  [struct ON ] 候補8本:
+      -0.602  policy:t1
+      -0.641  policy:t1
+      -0.712  policy:t1
+      -0.720  policy:t1
+      -0.776  policy:argmax
+      -0.777  struct:c2+don3:spread
+      -0.856  policy:t1
+      -0.856  struct:c5+don0:hold
+    選択: policy:t1
+    列  : ATTACK イッショウ
+STRUCT_SMOKE_DONE
