@@ -31,6 +31,7 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXP
 
 import argparse
 import multiprocessing as mp
+import re
 
 import numpy as np
 
@@ -48,22 +49,51 @@ MAX_MAIN_PER_TURN = 6     # 1ターンに対を作る自席メイン判断の上
 K_ATTACH = 2              # 対で動かす付与ドンの枚数上限（1〜K）
 
 
-def _no_dyn_text(c):
-    t = getattr(getattr(c, "master", None), "effect_text", "") or ""
-    return "相手のターン" not in t and "レストの場合" not in t
+# 【ドン!!×N】の閾値 N を取り出す（cpu_ai._DON_COND_RE のキャプチャ版・表記揺れ耐性は同一）
+_DON_COND_N_RE = re.compile(r'【\s*ドン\s*(?:!!|！！|‼)\s*[××xX]\s*(\d+)\s*】')
+
+
+def _effect_text(c):
+    return getattr(getattr(c, "master", None), "effect_text", "") or ""
+
+
+def _don_cond_max_n(c):
+    """カードの【ドン!!×N】閾値の最大値（無ければ None・pure）。"""
+    ns = [int(m.group(1)) for m in _DON_COND_N_RE.finditer(_effect_text(c))]
+    return max(ns) if ns else None
+
+
+def _attached_count(c):
+    ad = getattr(c, "attached_don", None)
+    return ad if isinstance(ad, int) else len(ad or [])
 
 
 def dead_targets(player):
-    """「死に付与先」＝レスト済み・ドン条件なし・相手ターン/レスト常在の文言なし（保守的・pure）。"""
+    """「死に付与先」の列挙（pure）。返り値 [(card, tag)]・tag は V1 の亜種名。
+
+    - V1s（閾値達成済み・V1'・2026-08-20）: 【ドン!!×N】持ちでも **attached ≥ N なら追加付与は
+      死に**（条件は既に開いており、レストのキャラへの+1000は自ターンの攻撃に使えない）。
+      段3裁定 #1/#2 のドレーク（×1・レスト時常在）の2枚目以降がこの型＝原因分析§4で特定した
+      (B)フィルタの穴と同形。「レストの場合」常在の文言も閾値達成後は追加付与を正当化しない。
+    - V1（素の死に）: ドン条件なし・レスト/相手ターン常在の文言なしのレスト済みキャラ。
+    どちらも「相手のターン」常在（チョッパー型＝守備的な付与に意味）を持つカードは除外。"""
     out = []
     for c in (getattr(player, "field", None) or []):
         if not getattr(c, "is_rest", False):
             continue
-        if cpu_ai._has_don_conditional(c):
+        t = _effect_text(c)
+        if "相手のターン" in t:
             continue
-        if not _no_dyn_text(c):
+        n = _don_cond_max_n(c)
+        if n is not None:
+            if _attached_count(c) >= n:
+                out.append((c, "V1s"))
+            continue                          # 閾値未達＝1枚目は条件を開く正当な付与
+        if "レストの場合" in t:
             continue
-        out.append(c)
+        out.append((c, "V1"))
+    # 閾値達成済み（V1s）を優先＝逆転の実測が濃い型（#1/#2）から教える
+    out.sort(key=lambda ct: 0 if ct[1] == "V1s" else 1)
     return out
 
 
@@ -99,8 +129,8 @@ def dominance_pairs(manager, name):
     out = []
     k = min(spare, K_ATTACH)
     if deads:
-        d, a = deads[0], actives[0]
-        out.append((f"V1k{k}",
+        (d, dtag), a = deads[0], actives[0]
+        out.append((f"{dtag}k{k}",
                     [("ATTACH", a.uuid)] * k + attacks,
                     [("ATTACH", d.uuid)] * k + attacks))
     # V4: レスト後も付与が列挙される場キャラ攻撃者のみ（リーダーはレスト後に付与不可）
@@ -226,7 +256,7 @@ def main():
     os.makedirs(args.out, exist_ok=True)
 
     jobs = [(args.seed_base + i, args.sims) for i in range(args.games)]
-    buf, stats = [], {"pairs": 0, "V1": 0, "V4": 0, "errors": 0}
+    buf, stats = [], {"pairs": 0, "V1": 0, "V1s": 0, "V4": 0, "errors": 0}
     shard = [0]
 
     def _flush(chunk):
@@ -253,7 +283,8 @@ def main():
             gbase = res["seed"] * 1000
             for enc, z, g, tag in res["rows"]:
                 buf.append((enc, z, gbase + g, tag))
-                stats[tag[:2]] = stats.get(tag[:2], 0) + 0.5   # 対で1（行で0.5）
+                kind = tag.split("k")[0]
+                stats[kind] = stats.get(kind, 0) + 0.5   # 対で1（行で0.5）
             stats["pairs"] += len(res["rows"]) // 2
             print(f"  seed {res['seed']}: 判断点{res.get('frames', 0)}・対 {len(res['rows']) // 2}",
                   flush=True)
@@ -263,7 +294,8 @@ def main():
                 buf = buf[args.shard_size:]
     _flush(buf)
     print(f"PLAN_DOM_DONE pairs={stats['pairs']} V1={int(stats.get('V1', 0))} "
-          f"V4={int(stats.get('V4', 0))} errors={stats['errors']} shards={shard[0]} -> {args.out}",
+          f"V1s={int(stats.get('V1s', 0))} V4={int(stats.get('V4', 0))} "
+          f"errors={stats['errors']} shards={shard[0]} -> {args.out}",
           flush=True)
     return 0
 
