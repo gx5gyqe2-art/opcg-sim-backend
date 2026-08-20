@@ -17,10 +17,13 @@
 再サンプルする（自分の手札・場・相手の公開盤面の uuid は全世界で共通）ため、同じ手が
 全世界でそのまま適用できる。自ターンのメイン判断のみが対象＝防御窓・相手ターンは不変。
 """
+import itertools
+
 import numpy as np
 
 from opcg_sim.src.core import cpu_ai
-from .config import (PLAN_MIN_SPREAD, PLAN_PROPOSALS, PLAN_TEMP, PLAN_WORLDS,
+from .config import (PLAN_MIN_SPREAD, PLAN_PROPOSALS, PLAN_STRUCT_MAX,
+                     PLAN_STRUCT_PROPOSALS, PLAN_STRUCT_SETS, PLAN_TEMP, PLAN_WORLDS,
                      TURN_QUIESCE_MAX_PLIES)
 from .mcts import in_battle, quiesce_choice, resolved_branch_values, _turn_owner
 
@@ -96,6 +99,160 @@ def rollout_plan(game, world, name, value_fn, priors_fn, rng, temp=PLAN_TEMP,
             if (cpu_ai._describe_move(mgr, mv) or {}).get("action_type") == "TURN_END":
                 break
             steps.append(move_sig(mv))
+        if mv is None:
+            break
+        nxt = game.apply(mgr, mv, actor)
+        if nxt is None:
+            break
+        mgr = nxt
+    return tuple(steps)
+
+
+def _own_player(manager, name):
+    return manager.p1 if getattr(manager.p1, "name", None) == name else manager.p2
+
+
+def hand_play_sets(manager, name, max_sets=PLAN_STRUCT_SETS):
+    """「このターン出すカードの組」の候補（構造化提案の第1軸・ユーザ設計 2026-08-20）。
+
+    人間は「今の手札から、このターンはこれを出して余ったドンは振る」と考える。分岐の
+    第1軸は**プレイするカードの組**で、予算はアクティブドン。同名カード（card_id）の
+    組は1つに畳む。必ず含める: **空集合**（全ドンを圧力に使う線）と**コスト和最大の組**
+    （盤面アドに全振りする線）。残り枠はコスト和の大きい順。
+
+    返り値: [(uuids タプル（コスト降順＝出す順）, コスト和), ...]（先頭は空集合）。"""
+    p = _own_player(manager, name)
+    budget = len(getattr(p, "don_active", []) or [])
+    cards = []
+    for c in (getattr(p, "hand", None) or []):
+        cost = getattr(getattr(c, "master", None), "cost", None)
+        if cost is None or cost > budget:
+            continue
+        cards.append((c.uuid, int(cost), getattr(c.master, "card_id", c.uuid)))
+    # 部分集合の列挙（手札≤10 → 高々1024）。同名の組は初出だけ残す。
+    seen, feasible = set(), []
+    for r in range(1, len(cards) + 1):
+        for combo in itertools.combinations(cards, r):
+            cost_sum = sum(c[1] for c in combo)
+            if cost_sum > budget:
+                continue
+            key = tuple(sorted(c[2] for c in combo))
+            if key in seen:
+                continue
+            seen.add(key)
+            ordered = tuple(u for u, _, _ in sorted(combo, key=lambda x: -x[1]))
+            feasible.append((ordered, cost_sum))
+    feasible.sort(key=lambda fc: (-fc[1], len(fc[0])))
+    out = [((), 0)]
+    for fc in feasible:
+        if len(out) >= max_sets:
+            break
+        out.append(fc)
+    return out
+
+
+def struct_intents(manager, name, max_sets=PLAN_STRUCT_SETS):
+    """プレイ組×浮ドンの使い途を intent（抽象方針の列）に展開する（構造化提案の第2軸）。
+
+    正準順序は **登場 → ドン付与 → アタック**（P1: 付与はアタックの前・段3裁定の原則）。
+    付与/攻撃の対象は**今アクティブな既存ユニット**のみ＝このターン登場するカードと
+    レスト済みには振らない（P1/P2 を生成側で守る。カード固有の例外—レスト時常在や
+    相手ターン常在—は policy 提案側が拾う）。浮ドンの変種:
+      spread … アクティブなアタッカーへ順繰りに振ってから総攻撃
+      leader … リーダーへ全振りしてから総攻撃（圧力線）
+      hold   … 振らずに攻撃だけ（温存線）
+    返り値: [(label, intent), ...]。intent の要素は ("PLAY", uuid) / ("ATTACH", uuid) /
+    ("ATTACK", uuid)。"""
+    p = _own_player(manager, name)
+    budget = len(getattr(p, "don_active", []) or [])
+    attackers = []
+    lead = getattr(p, "leader", None)
+    if lead is not None and not getattr(lead, "is_rest", False):
+        attackers.append(lead.uuid)
+    for c in (getattr(p, "field", None) or []):
+        if getattr(c, "is_rest", False) or getattr(c, "is_newly_played", False):
+            continue
+        attackers.append(c.uuid)
+    out = []
+    for uuids, cost_sum in hand_play_sets(manager, name, max_sets=max_sets):
+        spare = budget - cost_sum
+        plays = [("PLAY", u) for u in uuids]
+        attacks = [("ATTACK", a) for a in attackers]
+        variants = []
+        if spare > 0 and attackers:
+            spread = [("ATTACH", attackers[i % len(attackers)]) for i in range(spare)]
+            variants.append(("spread", plays + spread + attacks))
+            if lead is not None and len(attackers) > 1:
+                to_lead = [("ATTACH", lead.uuid)] * spare
+                variants.append(("leader", plays + to_lead + attacks))
+        variants.append(("hold", plays + attacks))
+        for vname, intent in variants:
+            if not intent:
+                continue
+            out.append((f"struct:c{cost_sum}+don{spare}:{vname}", intent))
+    return out
+
+
+_MAIN_TYPES = {"PLAY", "ATTACK", "ATTACH_DON", "ACTIVATE_MAIN", "TURN_END"}
+
+
+def scripted_plan(game, world, name, intent, value_fn, priors_fn,
+                  max_plies=TURN_QUIESCE_MAX_PLIES, battle_value_fn=None):
+    """intent（抽象方針）を world 上で実現して手の signature 列にする（構造化提案の実現器）。
+
+    自分のメイン窓では intent を先頭から走査して**最初に合法化できる指示**を採る（正準順序を
+    保ちつつ、実現できない指示は縮退）。ATTACK の対象は priors の argmax（不在なら先頭＝
+    列挙規約により相手リーダー）。対話（効果選択等・メイン手が無い窓）は `quiesce_choice` で
+    埋めて**その sig も列に含める**（プラン実行が別の選択肢を適用しない・v39 の規約）。
+    メイン窓で何も実現できなくなったら終了（ターンを閉じるのは `execute_plan` 側の規約）。"""
+    steps = []
+    todo = list(intent)
+    mgr = world
+    bvf = battle_value_fn or value_fn
+    for _ in range(max_plies):
+        if game.is_terminal(mgr) or _turn_owner(mgr) != name:
+            break
+        actor = game.current_player(mgr)
+        if actor is None:
+            break
+        if in_battle(mgr) or actor != name:
+            mv = _battle_box_step(game, mgr, actor, bvf, priors_fn)
+        else:
+            legal = game.legal_actions(mgr)
+            if not legal:
+                break
+            is_main = any((cpu_ai._describe_move(mgr, m) or {}).get("action_type")
+                          in _MAIN_TYPES for m in legal)
+            mv = None
+            if is_main:
+                for i, (kind, uuid) in enumerate(todo):
+                    if kind == "ATTACK":
+                        cands = [m for m in legal
+                                 if m.get("action_type") == "ATTACK"
+                                 and (m.get("payload") or {}).get("uuid") == uuid]
+                        if cands:
+                            j = 0
+                            if priors_fn is not None and len(cands) > 1:
+                                pr = priors_fn(mgr, cands)
+                                if pr is not None:
+                                    j = int(np.argmax(pr))
+                            mv = cands[j]
+                    else:
+                        at = "PLAY" if kind == "PLAY" else "ATTACH_DON"
+                        for m in legal:
+                            if m.get("action_type") == at and \
+                                    (m.get("payload") or {}).get("uuid") == uuid:
+                                mv = m
+                                break
+                    if mv is not None:
+                        del todo[i]
+                        break
+                if mv is None:
+                    break                       # 方針を使い切った/実現不能＝提案はここまで
+                steps.append(move_sig(mv))
+            else:
+                mv = legal[quiesce_choice(mgr, legal, priors_fn)]
+                steps.append(move_sig(mv))      # 対話の選択もプランの一部（v39）
         if mv is None:
             break
         nxt = game.apply(mgr, mv, actor)
@@ -183,13 +340,26 @@ def select_plan(game, manager, name, value_fn, priors_fn, rng,
             break
     if not worlds:
         return None, {}
-    plans = []
+    plans, labels = [], []
+
+    def _add(steps, label):
+        if steps and steps not in plans:
+            plans.append(steps)
+            labels.append(label)
+
     for k in range(n_proposals):
         t = 0.0 if k == 0 else PLAN_TEMP
         steps = rollout_plan(game, worlds[k % len(worlds)], name, value_fn, priors_fn,
                              rng, temp=t, battle_value_fn=battle_value_fn)
-        if steps and steps not in plans:
-            plans.append(steps)
+        _add(steps, "policy:argmax" if k == 0 else f"policy:t{PLAN_TEMP:g}")
+    # 構造化提案（プレイ組×浮ドンの使い途・ユーザ設計 2026-08-20）: policy 提案は現行方策の
+    # 癖（例: ドン付与への偏り）を引き継ぐため、**正解の型が候補に入らない**ことがある
+    # （段3裁定 #1/#2 の実測）。人間の分岐構造で候補を別経路から供給する。
+    if PLAN_STRUCT_PROPOSALS:
+        for i, (label, intent) in enumerate(struct_intents(manager, name)[:PLAN_STRUCT_MAX]):
+            steps = scripted_plan(game, worlds[i % len(worlds)], name, intent,
+                                  value_fn, priors_fn, battle_value_fn=battle_value_fn)
+            _add(steps, label)
     if not plans:
         return None, {}
     scores = []
@@ -204,7 +374,7 @@ def select_plan(game, manager, name, value_fn, priors_fn, rng,
     spread = float(max(finite) - min(finite)) if len(finite) > 1 else 0.0
     diag = {"n_plans": len(plans), "n_worlds": len(worlds),
             "scores": [round(s, 4) for s in scores], "best": best,
-            "spread": round(spread, 4)}
+            "kinds": labels, "spread": round(spread, 4)}
     if len(finite) > 1 and spread < min_spread:
         return None, {**diag, "skipped": "flat_exits"}
     return plans[best], diag
