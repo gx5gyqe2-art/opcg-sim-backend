@@ -196,6 +196,31 @@ def struct_intents(manager, name, max_sets=PLAN_STRUCT_SETS):
 _MAIN_TYPES = {"PLAY", "ATTACK", "ATTACH_DON", "ACTIVATE_MAIN", "TURN_END"}
 
 
+_ATTACH_TYPES = ("ATTACH_DON", "DON_BOX")
+
+
+def canonicalize_steps(steps):
+    """P1 正準化（pure）: 付与系 sig を**最初の ATTACK の直前**へブロック移動する。
+
+    - 付与（ATTACH_DON/DON_BOX）はドン予算を消費しない手より後に置く理由がなく、
+      アタック後の付与はそのターンの攻撃に乗らない（段3裁定 P1）。
+    - 付与は効果対話を生まないため、PLAY→RESOLVE 等の隣接ペアを壊さずに移動できる。
+    - ATTACK が無ければ原順のまま（動かす根拠がない）。相対順序は保存（安定移動）。"""
+    steps = list(steps)
+    kinds = [(s[0] if isinstance(s, (list, tuple)) else None) for s in steps]
+    if "ATTACK" not in kinds:
+        return tuple(steps)
+    first_atk = kinds.index("ATTACK")
+    attaches = [s for s, k in zip(steps, kinds) if k in _ATTACH_TYPES]
+    late = [s for s, k in zip(steps[first_atk:], kinds[first_atk:]) if k in _ATTACH_TYPES]
+    if not late:
+        return tuple(steps)                  # 既に全付与が攻撃前＝正準
+    rest = [s for s, k in zip(steps, kinds) if k not in _ATTACH_TYPES]
+    head = [s for s, k in zip(steps[:first_atk], kinds[:first_atk]) if k not in _ATTACH_TYPES]
+    tail = rest[len(head):]
+    return tuple(head + attaches + tail)
+
+
 def _attack_candidates(legal, uuid, tgt=None):
     """攻撃者 uuid（と任意の対象 tgt uuid）に合致する ATTACK 手を返す（pure）。"""
     cands = [m for m in legal
@@ -364,7 +389,13 @@ def select_plan(game, manager, name, value_fn, priors_fn, rng,
         t = 0.0 if k == 0 else PLAN_TEMP
         steps = rollout_plan(game, worlds[k % len(worlds)], name, value_fn, priors_fn,
                              rng, temp=t, battle_value_fn=battle_value_fn)
+        # W5（2026-08-22）: policy 提案は現行方策の癖で「攻撃→付与」の誤順（P1違反・段3裁定
+        # #1/#2/502006@130）を含みうる。付与を最初の攻撃の前へ正準化した版**も**候補に足す
+        # （原順も残す＝正準化で壊れる世界があっても候補集合は狭まらない）。
         _add(steps, "policy:argmax" if k == 0 else f"policy:t{PLAN_TEMP:g}")
+        canon = canonicalize_steps(steps)
+        if canon != steps:
+            _add(canon, "policy:canon" if k == 0 else f"policy:canon:t{PLAN_TEMP:g}")
     # 構造化提案（プレイ組×浮ドンの使い途・ユーザ設計 2026-08-20）: policy 提案は現行方策の
     # 癖（例: ドン付与への偏り）を引き継ぐため、**正解の型が候補に入らない**ことがある
     # （段3裁定 #1/#2 の実測）。人間の分岐構造で候補を別経路から供給する。

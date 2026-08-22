@@ -205,3 +205,31 @@ def test_select_plan_includes_struct_kinds(monkeypatch):
     assert steps is not None
     assert diag["kinds"] and all(k.startswith("struct:") for k in diag["kinds"])
     assert any("hold" in k or "spread" in k or "leader" in k for k in diag["kinds"])
+
+
+def _sig(kind, uuid="u"):
+    return (kind, uuid, ())
+
+
+def test_canonicalize_moves_late_attaches_before_first_attack():
+    # 攻撃→付与の誤順（P1違反・502006@130型）→ 付与ブロックが最初の攻撃の直前へ
+    steps = (_sig("ATTACK", "a1"), _sig("ATTACH_DON", "c1"), _sig("ATTACK", "a2"),
+             _sig("DON_BOX", "c2"))
+    out = PL.canonicalize_steps(steps)
+    assert [s[0] for s in out] == ["ATTACH_DON", "DON_BOX", "ATTACK", "ATTACK"]
+    assert out[0][1] == "c1" and out[1][1] == "c2"      # 付与どうしの相対順は保存
+
+
+def test_canonicalize_keeps_play_resolve_adjacency():
+    steps = (_sig("PLAY", "p"), _sig("RESOLVE_EFFECT_SELECTION", None),
+             _sig("ATTACK", "a"), _sig("ATTACH_DON", "c"))
+    out = PL.canonicalize_steps(steps)
+    assert [s[0] for s in out] == ["PLAY", "RESOLVE_EFFECT_SELECTION",
+                                   "ATTACH_DON", "ATTACK"]
+
+
+def test_canonicalize_noop_when_already_canonical_or_no_attack():
+    canon = (_sig("PLAY", "p"), _sig("ATTACH_DON", "c"), _sig("ATTACK", "a"))
+    assert PL.canonicalize_steps(canon) == canon
+    no_atk = (_sig("ATTACH_DON", "c"), _sig("PLAY", "p"))
+    assert PL.canonicalize_steps(no_atk) == no_atk
