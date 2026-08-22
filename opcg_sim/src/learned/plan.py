@@ -196,6 +196,17 @@ def struct_intents(manager, name, max_sets=PLAN_STRUCT_SETS):
 _MAIN_TYPES = {"PLAY", "ATTACK", "ATTACH_DON", "ACTIVATE_MAIN", "TURN_END"}
 
 
+def _attack_candidates(legal, uuid, tgt=None):
+    """攻撃者 uuid（と任意の対象 tgt uuid）に合致する ATTACK 手を返す（pure）。"""
+    cands = [m for m in legal
+             if m.get("action_type") == "ATTACK"
+             and (m.get("payload") or {}).get("uuid") == uuid]
+    if tgt is not None:
+        cands = [m for m in cands
+                 if ((m.get("payload") or {}).get("target_ids") or [None])[0] == tgt]
+    return cands
+
+
 def scripted_plan(game, world, name, intent, value_fn, priors_fn,
                   max_plies=TURN_QUIESCE_MAX_PLIES, battle_value_fn=None):
     """intent（抽象方針）を world 上で実現して手の signature 列にする（構造化提案の実現器）。
@@ -225,11 +236,13 @@ def scripted_plan(game, world, name, intent, value_fn, priors_fn,
                           in _MAIN_TYPES for m in legal)
             mv = None
             if is_main:
-                for i, (kind, uuid) in enumerate(todo):
+                for i, item in enumerate(todo):
+                    kind, uuid = item[0], item[1]
                     if kind == "ATTACK":
-                        cands = [m for m in legal
-                                 if m.get("action_type") == "ATTACK"
-                                 and (m.get("payload") or {}).get("uuid") == uuid]
+                        # 任意の第3要素＝攻撃対象 uuid（V8 リーダー攻撃族・2026-08-22。
+                        # 2要素の従来形は無指定＝priors argmax のまま）
+                        tgt = item[2] if len(item) > 2 else None
+                        cands = _attack_candidates(legal, uuid, tgt)
                         if cands:
                             j = 0
                             if priors_fn is not None and len(cands) > 1:
