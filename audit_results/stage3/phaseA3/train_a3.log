@@ -1,0 +1,14 @@
+凍結検査: 胴体・既存ヘッド・補助ヘッド・他の出口ヘッドは bit 不変（既存挙動は定義上不変）
+EXIT_HEAD_FINETUNE_RESULT {"head": "turn", "base": "gen14", "files": 6, "boards": 1522, "groups": 739, "pairs": 783, "epochs": 8, "lr": 0.001, "head_hidden": 32, "head_input": "trunk", "rank_acc_before": 0.513, "rank_acc_after": 0.9826, "candidate": "/home/user/cand_A3/value.npz,/home/user/cand_A3/policy.npz"}
+  500000@31: NG  上位側 +0.1892 vs 下位側 +0.8692
+  501000@30: OK  上位側 -0.7758 vs 下位側 -0.9783
+  501003@84: OK  上位側 +0.8027 vs 下位側 +0.7061
+  502006@130: OK  上位側 +0.3954 vs 下位側 +0.2750
+  502006@98: OK  上位側 +0.5842 vs 下位側 +0.3106
+  503001@19: OK  上位側 +0.6245 vs 下位側 +0.6004
+  503002@8: OK  上位側 -0.0221 vs 下位側 -0.4333
+  504004@43: NG  上位側 +0.3706 vs 下位側 +0.7860
+  505000@44: NG  上位側 +0.0300 vs 下位側 +0.1184
+
+ANCHOR_GATE_RESULT {"value": "/home/user/cand_A3/value.npz", "ok": 6, "total": 9}
+TRAIN_A3_DONE
