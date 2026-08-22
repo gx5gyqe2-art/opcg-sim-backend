@@ -392,10 +392,12 @@ def select_plan(game, manager, name, value_fn, priors_fn, rng,
         # W5（2026-08-22）: policy 提案は現行方策の癖で「攻撃→付与」の誤順（P1違反・段3裁定
         # #1/#2/502006@130）を含みうる。付与を最初の攻撃の前へ正準化した版**も**候補に足す
         # （原順も残す＝正準化で壊れる世界があっても候補集合は狭まらない）。
-        _add(steps, "policy:argmax" if k == 0 else f"policy:t{PLAN_TEMP:g}")
         canon = canonicalize_steps(steps)
         if canon != steps:
+            # 正準版を**先に**追加する: 出口が同一（順序だけの違い＝P8）なら同点になり、
+            # argmax は先頭＝正準版を選ぶ（P1 のタイブレーク）。
             _add(canon, "policy:canon" if k == 0 else f"policy:canon:t{PLAN_TEMP:g}")
+        _add(steps, "policy:argmax" if k == 0 else f"policy:t{PLAN_TEMP:g}")
     # 構造化提案（プレイ組×浮ドンの使い途・ユーザ設計 2026-08-20）: policy 提案は現行方策の
     # 癖（例: ドン付与への偏り）を引き継ぐため、**正解の型が候補に入らない**ことがある
     # （段3裁定 #1/#2 の実測）。人間の分岐構造で候補を別経路から供給する。
