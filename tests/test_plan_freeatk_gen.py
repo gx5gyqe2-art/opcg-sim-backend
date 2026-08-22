@@ -47,15 +47,21 @@ def test_free_kill_none_when_leader_rested_or_no_prey():
     assert PF.free_kill_target(_mgr(None), "p1") is None
 
 
-def test_free_kill_none_when_active_blocker_present():
+def test_free_kill_none_only_when_blocker_beats_leader():
+    # リーダーより強いアクティブブロッカー＝空振りに変えられる → 除外
     m = _mgr(_card("L", 6000), opp_field=[
-        _card("prey", 3000, rest=True), _card("blk", 4000, rest=False, blocker=True)])
+        _card("prey", 3000, rest=True), _card("blk", 7000, rest=False, blocker=True)])
     assert PF.free_kill_target(m, "p1") is None
-    # ブロッカーがレスト済みなら阻止できない＝対象になる/対は立つ
-    m2 = _mgr(_card("L", 6000), opp_field=[
-        _card("prey", 3000, rest=True), _card("blk", 4000, rest=True, blocker=True)])
+    # リーダーで取れるアクティブブロッカーなら支配は維持（504004@43 の型）
+    m2 = _mgr(_card("L", 5000), opp_field=[
+        _card("prey", 4000, rest=True), _card("blk", 1000, rest=False, blocker=True)])
     lead, tgt = PF.free_kill_target(m2, "p1")
-    assert tgt.uuid == "blk"                        # レストブロッカー4000 > prey3000
+    assert tgt.uuid == "prey"
+    # ブロッカーがレスト済みなら強くても阻止できない＝対は立つ
+    m3 = _mgr(_card("L", 6000), opp_field=[
+        _card("prey", 3000, rest=True), _card("blk", 7000, rest=True, blocker=True)])
+    lead, tgt = PF.free_kill_target(m3, "p1")
+    assert tgt.uuid == "prey"                       # 7000 は格上なので獲物には ならない
 
 
 def _atk(uuid, tgt):

@@ -58,10 +58,13 @@ def free_kill_target(manager, name):
     lead = getattr(p, "leader", None)
     if lead is None or getattr(lead, "is_rest", False):
         return None
-    for c in (getattr(o, "field", None) or []):
-        if not getattr(c, "is_rest", False) and c.has_keyword("ブロッカー"):
-            return None                      # アクティブなブロッカーがいる＝空振りに変えられる
     lp = _power(lead, True)
+    for c in (getattr(o, "field", None) or []):
+        if not getattr(c, "is_rest", False) and c.has_keyword("ブロッカー") \
+                and _power(c, False) > lp:
+            return None      # リーダーで取れないアクティブブロッカー＝空振りに変えられる。
+                             # 取れるブロッカーなら、ブロックされても獲物が変わるだけ＝支配は維持
+                             # （504004@43 の実測 2026-08-22: ブロッカー1000 vs リーダー5000）
     best = None
     for c in (getattr(o, "field", None) or []):
         if not getattr(c, "is_rest", False):
