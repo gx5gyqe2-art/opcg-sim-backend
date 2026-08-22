@@ -1,0 +1,12 @@
+候補: turn_head=True
+502006@121 [base(素value)] 選択=? 手数=2 先頭=['ATTACK', 'ATTACK']
+502006@121 [cand(A5 turnヘッド)] 選択=? 手数=13 先頭=['ATTACH_DON', 'DON_BOX', 'ATTACH_DON', 'PLAY', 'ATTACH_DON', 'ATTACH_DON']
+502006@127 [base(素value)] 選択=? 手数=2 先頭=['DON_BOX', 'ACTIVATE_MAIN']
+502006@127 [cand(A5 turnヘッド)] 選択=? 手数=9 先頭=['ATTACH_DON', 'ATTACK', 'ATTACH_DON', 'ATTACH_DON', 'ATTACH_DON', 'ATTACH_DON']
+502006@130 [base(素value)] 選択=? 手数=1 先頭=['ATTACK']
+502006@130 [cand(A5 turnヘッド)] 選択=? 手数=6 先頭=['ATTACH_DON', 'ATTACH_DON', 'ATTACH_DON', 'ATTACH_DON', 'ATTACH_DON', 'ATTACK']
+504004@43 [base(素value)] 選択=? 手数=3 先頭=['ATTACK', 'ATTACK', 'ATTACK']
+504004@43 [cand(A5 turnヘッド)] 選択なし(min_spread未満) diag=['policy:argmax', 'policy:t1', 'policy:t1', 'policy:t1', 'policy:t1', 'struct:c0+don0:hold
+505000@44 [base(素value)] 選択=? 手数=1 先頭=['ATTACH_DON']
+505000@44 [cand(A5 turnヘッド)] 選択=? 手数=1 先頭=['ATTACH_DON']
+STRUCT_SMOKE_A5_DONE

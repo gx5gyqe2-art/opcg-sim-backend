@@ -1,0 +1,28 @@
+凍結検査: 胴体・既存ヘッド・補助ヘッド・他の出口ヘッドは bit 不変（既存挙動は定義上不変）
+EXIT_HEAD_FINETUNE_RESULT {"head": "turn", "base": "gen15", "files": 12, "boards": 1876, "groups": 916, "pairs": 960, "epochs": 8, "lr": 0.001, "head_hidden": 32, "head_input": "trunk", "rank_acc_before": 0.5643, "rank_acc_after": 0.9643, "candidate": "/home/user/cand_A6/value.npz,/home/user/cand_A6/policy.npz"}
+  500000@31: NG  上位側 +0.0970 vs 下位側 +0.7732
+  501000@30: OK  上位側 -0.8217 vs 下位側 -0.9569
+  501003@84: OK  上位側 +0.7328 vs 下位側 +0.5769
+  502006@130: NG  上位側 +0.2403 vs 下位側 +0.3538
+  502006@98: OK  上位側 +0.4836 vs 下位側 +0.4007
+  503001@19: OK  上位側 +0.8214 vs 下位側 +0.7655
+  503002@8: OK  上位側 +0.4708 vs 下位側 +0.3824
+  504004@43: NG  上位側 +0.8498 vs 下位側 +0.9069
+  505000@44: OK  上位側 +0.1973 vs 下位側 +0.1792
+
+ANCHOR_GATE_RESULT {"value": "/home/user/cand_A6/value.npz", "ok": 6, "total": 9}
+== coach identity(gen15) ==
+改善: OK（chall計 9.0 vs base計 9.0）
+非退行: OK []
+COACH_GATE_RESULT {"verdict": "PASS", "points": 9}
+== coach A6 plan OFF ==
+
+改善: OK（chall計 9.0 vs base計 9.0）
+非退行: OK []
+COACH_GATE_RESULT {"verdict": "PASS", "points": 9}
+== coach A6 plan ON ==
+
+改善: OK（chall計 9.0 vs base計 9.0）
+非退行: OK []
+COACH_GATE_RESULT {"verdict": "PASS", "points": 9}
+TRAIN_A6_DONE

@@ -1,0 +1,15 @@
+== plan OFF ==
+測定ノイズでないと言える差の下限（2σ・seeds=16）= 0.35
+  この bar を超えた点: m2@44(1.00→0.00)  ← これ未満の増減は『治った/壊れた』と読まない
+
+改善: NG（chall計 8.0 vs base計 9.0）
+非退行: NG [('m2', 44, 1.0, 0.0)]
+COACH_GATE_RESULT {"verdict": "FAIL", "points": 9}
+== plan ON ==
+測定ノイズでないと言える差の下限（2σ・seeds=16）= 0.35
+  この bar を超えた点: m2@44(1.00→0.00)  ← これ未満の増減は『治った/壊れた』と読まない
+
+改善: NG（chall計 8.0 vs base計 9.0）
+非退行: NG [('m2', 44, 1.0, 0.0)]
+COACH_GATE_RESULT {"verdict": "FAIL", "points": 9}
+GATE2_DONE
