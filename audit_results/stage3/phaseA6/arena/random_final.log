@@ -1,0 +1,3 @@
+消化済み 88/96 ペア・残り 8
+今回 8 ペア（332s）・累計 96/96
+ARENA_RESUME_FINAL {"pairs": 96, "games": 192, "void": 0, "wins": 31.0, "wr": 0.1615, "ci95": [0.1123, 0.2107], "elo": -286.2, "promoted": false, "candidate": "/home/user/cand_A6/value.npz,/home/user/cand_A6/policy.npz"}
