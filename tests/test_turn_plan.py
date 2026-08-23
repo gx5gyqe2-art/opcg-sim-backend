@@ -143,3 +143,27 @@ def test_flat_exits_skip_the_box(main_board):
     s2, d2 = PL.select_plan(e.game, m, name, vf, pf, np.random.default_rng(11),
                             min_spread=diag["spread"] + 1.0)
     assert s2 is None and d2.get("skipped") == "flat_exits"
+
+
+def test_plan_step_converts_don_box_to_primitive(main_board):
+    """プラン経路も DON_BOX（探索内部のマクロ手）を実対局へ素通ししない（2026-08-23）。
+
+    木経路は root で `don_box_first_primitive` を通すがプラン読み出しは素通しで、
+    実エンジンが ACTION_EXCEPTION「不明なアクションです: DON_BOX」で落ちた
+    （A6 アリーナ実測 void 88%）。キャッシュに DON_BOX 先頭のプランを注入し、
+    decide が先頭原始手（ATTACH_DON）へ変換して返すことを固定する。
+    盤面はドン付与判断点 m2@44（浮ドンあり＝DON_BOX 候補が立つ）。"""
+    main_board  # リプレイのロード副作用（CR.GAMES）を先に踏む
+    m, who = CR._restore_board(_load_db(), "m2", 44)
+    name = who if isinstance(who, str) else who.name
+    e = LearnedEngine(plan_readout=True)
+    actor = m.p1 if m.p1.name == name else m.p2
+    boxes = [x for x in e.game.legal_actions(m) if x.get("action_type") == "DON_BOX"]
+    if not boxes:
+        pytest.skip("この盤面に DON_BOX 候補が無い（浮ドン/対象なし）")
+    e.decide(m, actor, sims=8, rng=np.random.default_rng(11))    # キャッシュ枠を作らせる
+    for k in list(e._turn_plans):
+        e._turn_plans[k] = [PL.move_sig(boxes[0])]
+    mv = e.decide(m, actor, sims=8, rng=np.random.default_rng(11))
+    assert mv is not None
+    assert mv.get("action_type") != "DON_BOX", "プラン経路が DON_BOX を素通しした"

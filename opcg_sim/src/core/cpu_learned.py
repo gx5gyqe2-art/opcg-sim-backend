@@ -687,6 +687,12 @@ class LearnedEngine:
             wseed = hit[1] if hit is not None else None
             move = self._plan_step(manager, name, det_rng, wseed)
             if move is not None:
+                # ドン箱（探索内部のマクロ手）は実対局へは先頭原始手で出す（木経路の
+                # L728 と同一規約）。プラン経路だけ素通しだと実エンジンが
+                # 「不明なアクションです: DON_BOX」で落ちる（2026-08-23 アリーナ実測
+                # void 88%）。次 decide では箱候補が再計算され sig（don_k 非含有）が
+                # 残り k-1 の箱に再マッチする＝プランは1本ずつ原始手で消化される。
+                move = cpu_ai.don_box_first_primitive(move)
                 if trace is not None:
                     try:
                         _fill_trace(trace, manager, player, move, None)
