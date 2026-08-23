@@ -99,6 +99,9 @@ def main():
     ap.add_argument("--cand-don-box", action="store_true",
                     help="候補席だけドン箱（DON_BOX・cpu_don_box_plan Phase 1）を有効化。"
                          "(C) 済み現行を基準に箱の上乗せを測る＝OPCG_DON_MARGIN は既定(1)のまま")
+    ap.add_argument("--cand-plan-readout", action="store_true",
+                    help="候補席だけプラン読み出し（v37②・turn出口ヘッド候補の実戦測定）を有効化。"
+                         "env の SERVE_PLAN_READOUT は両席に効いて対照を汚すため使わない")
     ap.add_argument("--pair-timeout", type=int, default=900,
                     help="1ペアの実時間上限（秒・0=無制限）。超過したペアは void として台帳に"
                          "残し次へ進む。手数上限では捕まらない「1回の decide() から戻らない」"
@@ -116,6 +119,8 @@ def main():
         cand_kw = dict(cand_kw or {}, don_margin=True)
     if args.cand_don_box:
         cand_kw = dict(cand_kw or {}, don_box=True)
+    if args.cand_plan_readout:
+        cand_kw = dict(cand_kw or {}, plan_readout=True)
 
     from arena_gate import plan_bands
     planned = [s for band in plan_bands(args.pairs, args.bands, args.seed_base) for s in band]
