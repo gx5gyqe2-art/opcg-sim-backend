@@ -86,3 +86,11 @@
 {"seed": 376014, "score": 0.0, "leaders": ["OP06-042", "OP05-098"], "games": [0.0, 0.0], "turns": [16, 9]}
 {"seed": 376015, "score": 1.0, "leaders": ["EB02-010", "OP02-072"], "games": [1.0, 0.0], "turns": [13, 13]}
 {"seed": 376010, "score": null, "leaders": ["ST02-001", "OP07-019"], "void": "InvariantError: invariant violation(s) at step 4000: [('MAX_STEPS', 'game did not finish within 4000 steps')]"}
+{"seed": 376017, "score": 1.0, "leaders": ["P-047", "OP01-001"], "games": [1.0, 0.0], "turns": [15, 11]}
+{"seed": 376018, "score": 1.0, "leaders": ["OP03-077", "OP01-091"], "games": [0.0, 1.0], "turns": [12, 12]}
+{"seed": 376016, "score": 1.0, "leaders": ["OP08-098", "OP16-022"], "games": [1.0, 0.0], "turns": [9, 13]}
+{"seed": 376019, "score": 2.0, "leaders": ["ST02-001", "ST10-002"], "games": [1.0, 1.0], "turns": [13, 10]}
+{"seed": 376020, "score": 0.0, "leaders": ["OP13-001", "OP09-061"], "games": [0.0, 0.0], "turns": [12, 11]}
+{"seed": 376021, "score": 1.0, "leaders": ["OP03-021", "OP15-098"], "games": [1.0, 0.0], "turns": [9, 11]}
+{"seed": 376022, "score": 1.0, "leaders": ["P-076", "OP04-019"], "games": [1.0, 0.0], "turns": [11, 13]}
+{"seed": 376023, "score": 0.0, "leaders": ["OP06-042", "OP08-002"], "games": [0.0, 0.0], "turns": [12, 11]}
