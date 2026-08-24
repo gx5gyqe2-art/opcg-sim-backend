@@ -107,3 +107,63 @@ def test_macro_seam_replaces_primitive_attach(m2_44):
     # OFF（既定）は配分箱を混ぜない
     assert not any(x.get("action_type") == "DON_BOX" and not x["payload"].get("target_ids")
                    for x in off)
+
+
+def _pcard(uuid, power):
+    return types.SimpleNamespace(
+        uuid=uuid, attached_don=0, get_power=lambda attacking, _p=power: _p,
+        master=types.SimpleNamespace(card_id=uuid, effect_text="", power=power))
+
+
+def _mgr2(leader, don, opp_field):
+    p1 = types.SimpleNamespace(name="p1", leader=leader, field=[], don_active=[1] * don)
+    p2 = types.SimpleNamespace(name="p2", leader=None, field=list(opp_field))
+    return types.SimpleNamespace(p1=p1, p2=p2)
+
+
+def test_attack_box_candidates_salient_ks():
+    # P2: 攻撃者5000 vs 対象6000・浮ドン3 → k∈{0(素), 1(通る), 3(カウンター2枚要求)}
+    lead = _pcard("L", 5000)
+    tgt = _pcard("T", 6000)
+    m = _mgr2(leader=lead, don=3, opp_field=[tgt])
+    atks = [{"kind": "game", "action_type": "ATTACK",
+             "payload": {"uuid": "L", "target_ids": ["T"]}}]
+    boxes = cpu_ai.attack_box_candidates(m, "p1", atks)
+    ks = sorted((b["payload"]["don_k"]) for b in boxes)
+    assert ks == [0, 1, 3]
+    assert all(b["payload"]["target_ids"] == ["T"] for b in boxes)
+
+
+def test_attack_box_k_capped_by_budget():
+    lead = _pcard("L", 1000)
+    tgt = _pcard("T", 9000)
+    m = _mgr2(leader=lead, don=2, opp_field=[tgt])         # 通るには8枚必要＝予算2で不可
+    atks = [{"kind": "game", "action_type": "ATTACK",
+             "payload": {"uuid": "L", "target_ids": ["T"]}}]
+    boxes = cpu_ai.attack_box_candidates(m, "p1", atks)
+    assert sorted(b["payload"]["don_k"] for b in boxes) == [0]   # 素の攻撃だけ残る
+
+
+def test_first_primitive_k0_attack_box_returns_attack():
+    mv = {"kind": "game", "action_type": "DON_BOX",
+          "payload": {"uuid": "L", "target_ids": ["T"], "don_k": 0}}
+    out = cpu_ai.don_box_first_primitive(mv)
+    assert out["action_type"] == "ATTACK" and out["payload"]["target_ids"] == ["T"]
+    mv2 = {"kind": "game", "action_type": "DON_BOX",
+           "payload": {"uuid": "L", "target_ids": ["T"], "don_k": 2}}
+    assert cpu_ai.don_box_first_primitive(mv2)["action_type"] == "ATTACH_DON"
+
+
+def test_macro_seam_replaces_primitive_attack(m2_44):
+    m, name = m2_44
+    from opcg_sim.src.learned.adapter import OPCGGame
+    on = OPCGGame(macro_moves=True).legal_actions(m)
+    assert not any(x.get("action_type") == "ATTACK" for x in on), \
+        "マクロONで原始ATTACKが残っている"
+    atk_boxes = [x for x in on if x.get("action_type") == "DON_BOX"
+                 and (x.get("payload") or {}).get("target_ids")]
+    off = OPCGGame(macro_moves=False).legal_actions(m)
+    if any(x.get("action_type") == "ATTACK" for x in off):
+        assert atk_boxes, "元盤面に攻撃があるのにアタック箱が無い"
+        assert any((b["payload"] or {}).get("don_k") == 0 for b in atk_boxes), \
+            "素の攻撃（k=0箱）が候補に無い"

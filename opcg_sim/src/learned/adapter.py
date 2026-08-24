@@ -93,6 +93,18 @@ class OPCGGame:
                 if allocs:
                     moves = [m for m in moves
                              if m.get("action_type") != "ATTACH_DON"] + allocs
+            # マクロ手化 P2: 原始 ATTACK を「（付与k→）対象Yへ攻撃」のアタック箱に置換
+            # （素の攻撃は k=0 の箱として吸収）。ドン箱攻撃形（don_box_candidates・
+            # リーダー限定）はアタック箱に包含されるため、マクロモードでは重複を除く。
+            attacks = [m for m in moves if m.get("action_type") == "ATTACK"]
+            if attacks:
+                atk_boxes = cpu_ai.attack_box_candidates(state, name, attacks)
+                if atk_boxes:
+                    moves = [m for m in moves
+                             if m.get("action_type") != "ATTACK"
+                             and not (m.get("action_type") == "DON_BOX"
+                                      and (m.get("payload") or {}).get("target_ids"))]
+                    moves = moves + atk_boxes
         return moves
 
     def apply(self, state, move, actor_name):

@@ -327,11 +327,67 @@ def don_box_first_primitive(move: Optional[Dict[str, Any]]) -> Optional[Dict[str
     """DON_BOX を実対局へ出す形＝先頭原始手 ATTACH_DON へ変換（それ以外は素通し）。
 
     実行はステートレス: 1枚付与後の次 decide で箱候補が再計算され（k が1減った箱）、
-    探索が計画の続行/変更を毎手選び直す＝キューを持たない（盤面が変われば計画も変わる）。"""
+    探索が計画の続行/変更を毎手選び直す＝キューを持たない（盤面が変われば計画も変わる）。
+    k=0 のアタック箱（P2＝素の攻撃の箱形）は付与が無いので ATTACK をそのまま出す。"""
     if move and move.get("action_type") == "DON_BOX":
         pl = move.get("payload") or {}
+        if int(pl.get("don_k", 0) or 0) <= 0 and pl.get("target_ids"):
+            return {"kind": "game", "action_type": "ATTACK",
+                    "payload": {"uuid": pl.get("uuid"),
+                                "target_ids": list(pl.get("target_ids") or [])}}
         return {"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": pl.get("uuid")}}
     return move
+
+
+def attack_box_candidates(manager, actor_name: str,
+                          attack_moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """アタック箱の合成（マクロ手化 P2・2026-08-24）: 「（付与k枚→）Xで対象Yへ攻撃」を1候補に。
+
+    don_box_candidates（Phase 1＝相手リーダー限定）の一般化: **任意の攻撃対象**に対し、
+    k の要点だけで箱を作る。素の攻撃も k=0 の箱として吸収する（原始 ATTACK は
+    マクロモードでは候補から消える）。
+      k=0    … 素の攻撃（付与なし）
+      k=通る … 攻撃が通る最小枚数（atk ≥ def になる k）
+      k=2枚  … 相手にカウンター2枚を要求する枚数（def+2000 到達）
+    attack_moves は枝刈り済みの原始 ATTACK（無駄攻撃フィルタ通過済み）を渡すこと。"""
+    actor = _player_by_name(manager, actor_name)
+    opp = _other(manager, actor_name)
+    budget = len(actor.don_active)
+    by_uuid = {}
+    for u in ([actor.leader] if actor.leader is not None else []) + list(actor.field):
+        by_uuid[getattr(u, "uuid", None)] = u
+    tgt_by_uuid = {}
+    for u in ([opp.leader] if opp.leader is not None else []) + list(opp.field):
+        tgt_by_uuid[getattr(u, "uuid", None)] = u
+    out: List[Dict[str, Any]] = []
+    seen = set()
+    for mv in attack_moves:
+        if mv.get("action_type") != "ATTACK":
+            continue
+        pl = mv.get("payload") or {}
+        tid = (pl.get("target_ids") or [None])[0]
+        c = by_uuid.get(pl.get("uuid"))
+        t = tgt_by_uuid.get(tid)
+        if c is None or t is None:
+            continue
+        try:
+            p = float(c.get_power(True))
+        except Exception:
+            p = float(getattr(getattr(c, "master", None), "power", 0) or 0)
+        try:
+            L = float(t.get_power(False))
+        except Exception:
+            L = float(getattr(getattr(t, "master", None), "power", 0) or 0)
+        k_min = max(0, int((L - p + 999) // 1000))
+        k_two = max(0, int((L + 2000.0 - p + 999) // 1000))
+        for k in {0, k_min, k_two}:
+            key = (pl.get("uuid"), tid, k)
+            if 0 <= k <= budget and key not in seen:
+                seen.add(key)
+                out.append({"kind": "game", "action_type": "DON_BOX",
+                            "payload": {"uuid": pl.get("uuid"),
+                                        "target_ids": [tid], "don_k": int(k)}})
+    return out
 
 
 # 【ドン!!×N】の閾値 N を取り出す（_DON_COND_RE のキャプチャ版・表記揺れは同一）。
