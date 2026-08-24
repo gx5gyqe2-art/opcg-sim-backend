@@ -334,6 +334,63 @@ def don_box_first_primitive(move: Optional[Dict[str, Any]]) -> Optional[Dict[str
     return move
 
 
+# 【ドン!!×N】の閾値 N を取り出す（_DON_COND_RE のキャプチャ版・表記揺れは同一）。
+_DON_COND_N_RE = re.compile(r'【\s*ドン\s*(?:!!|！！|‼)\s*[××xX]\s*(\d+)\s*】')
+
+
+def _don_cond_max_n(c) -> Optional[int]:
+    m = getattr(c, "master", None)
+    ns = [int(x) for x in _DON_COND_N_RE.findall(getattr(m, "effect_text", "") or "")] if m else []
+    return max(ns) if ns else None
+
+
+def don_alloc_candidates(manager, actor_name: str,
+                         attach_moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """配分箱の合成（マクロ手化 P1・2026-08-24）: 「対象 X へ k 枚付与」を1候補にする。
+
+    ドン付与はメイン判断の46%を占め、順序重複（同一配分への原始経路）は中央値5.3x・
+    最大9756x（macro_p0_probe 実測）＝1枚単位の原始手は読みの浪費の主因。攻撃を含む箱
+    （don_box_candidates）と違い**付与だけ**を畳む＝`target_ids=[]` の DON_BOX として
+    表現し、展開・原始手変換・行動特徴の don_k 経路をそのまま再利用する。
+
+    k は要点のみ（配分空間を数点で代表する）:
+      k=1        … 最小粒度（旧原始手の表現力の下限を保つ）
+      k=閾値開放 … 対象が【ドン!!×N】持ちで attached<N のとき N-attached（条件を開く）
+      k=全振り   … budget（1点集中の上限）
+    attach_moves は枝刈り済みの原始 ATTACH_DON（意味フィルタ通過済み）だけを渡すこと＝
+    死に付与先はここへ来ない。"""
+    actor = _player_by_name(manager, actor_name)
+    budget = len(actor.don_active)
+    if budget <= 0:
+        return []
+    by_uuid = {}
+    for u in ([actor.leader] if actor.leader is not None else []) + list(actor.field):
+        by_uuid[getattr(u, "uuid", None)] = u
+    out: List[Dict[str, Any]] = []
+    seen = set()
+    for mv in attach_moves:
+        if mv.get("action_type") != "ATTACH_DON":
+            continue
+        uuid = (mv.get("payload") or {}).get("uuid")
+        c = by_uuid.get(uuid)
+        if c is None:
+            continue
+        ks = {1, budget}
+        n = _don_cond_max_n(c)
+        if n is not None:
+            ad = getattr(c, "attached_don", None)
+            attached = ad if isinstance(ad, int) else len(ad or [])
+            if attached < n:
+                ks.add(n - attached)
+        for k in ks:
+            key = (uuid, k)
+            if 1 <= k <= budget and key not in seen:
+                seen.add(key)
+                out.append({"kind": "game", "action_type": "DON_BOX",
+                            "payload": {"uuid": uuid, "target_ids": [], "don_k": int(k)}})
+    return out
+
+
 def _attach_don_meaningful(manager, actor_name: str, c, margin: Optional[bool] = None) -> bool:
     """ドン!!付与の手が「意味ある配分」か（B-2・§2.5.3）。
 
@@ -589,14 +646,16 @@ def _apply_move_inplace(board, actor_name: str, move: Dict[str, Any], stop_at_se
     actor = _player_by_name(board, actor_name)
     if move.get("action_type") == "DON_BOX":
         # ドン箱（探索内部のマクロ手）は原始列へ展開して適用する（cpu_don_box_plan §2.1）。
+        # target_ids=[] は配分箱（マクロ手化 P1）＝付与のみで攻撃しない。
         payload = move.get("payload") or {}
         for _ in range(int(payload.get("don_k", 0) or 0)):
             action_api.apply_game_action(board, actor, "ATTACH_DON", {"uuid": payload.get("uuid")})
             _drain_own_interactions(board, actor_name, stop_at_select=stop_at_select)
-        action_api.apply_game_action(board, actor, "ATTACK",
-                                     {"uuid": payload.get("uuid"),
-                                      "target_ids": list(payload.get("target_ids") or [])})
-        _drain_own_interactions(board, actor_name, stop_at_select=stop_at_select)
+        if payload.get("target_ids"):
+            action_api.apply_game_action(board, actor, "ATTACK",
+                                         {"uuid": payload.get("uuid"),
+                                          "target_ids": list(payload.get("target_ids") or [])})
+            _drain_own_interactions(board, actor_name, stop_at_select=stop_at_select)
         return
     if move["kind"] == "battle":
         action_api.apply_battle_action(board, actor, move["action_type"], move.get("card_uuid"))

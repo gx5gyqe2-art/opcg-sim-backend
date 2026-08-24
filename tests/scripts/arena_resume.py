@@ -99,6 +99,9 @@ def main():
     ap.add_argument("--cand-don-box", action="store_true",
                     help="候補席だけドン箱（DON_BOX・cpu_don_box_plan Phase 1）を有効化。"
                          "(C) 済み現行を基準に箱の上乗せを測る＝OPCG_DON_MARGIN は既定(1)のまま")
+    ap.add_argument("--cand-macro", action="store_true",
+                    help="候補席だけマクロ手化 P1（配分箱＋戦闘の木内箱化・quiesce）を有効化"
+                         "（2026-08-24・macro_p0_probe が示した読みの浪費の A/B）")
     ap.add_argument("--cand-plan-readout", action="store_true",
                     help="候補席だけプラン読み出し（v37②・turn出口ヘッド候補の実戦測定）を有効化。"
                          "env の SERVE_PLAN_READOUT は両席に効いて対照を汚すため使わない")
@@ -121,6 +124,9 @@ def main():
         cand_kw = dict(cand_kw or {}, don_box=True)
     if args.cand_plan_readout:
         cand_kw = dict(cand_kw or {}, plan_readout=True)
+    if args.cand_macro:
+        cand_kw = dict(cand_kw or {}, macro_moves=True,
+                       box_battle=True, battle_readout=True, quiesce=True)
 
     from arena_gate import plan_bands
     planned = [s for band in plan_bands(args.pairs, args.bands, args.seed_base) for s in band]

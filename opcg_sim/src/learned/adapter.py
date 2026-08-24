@@ -19,13 +19,16 @@ class OPCGGame:
     # L1 生スコアは card-currency で桁が大きい（実測 中央 ~-5800・範囲[-11920,7091]）。
     # scale=10000 で tanh 飽和率0%・std0.25＝探索が勾配を使える値域（GATE B 診断で較正）。
     def __init__(self, value_scale=VALUE_SCALE, see_opp_hand=False, prune_futile=None,
-                 don_margin=None, don_box=None):
+                 don_margin=None, don_box=None, macro_moves=None):
         self.value_scale = value_scale
         self.see_opp_hand = see_opp_hand
         # (C) マージン付与の席別上書き（None=cpu_ai.DON_MARGIN_ATTACH に従う・アリーナ A/B 用）
         self.don_margin = don_margin
         # ドン箱（DON_BOX・cpu_don_box_plan Phase 1）: True で候補合成 ON（既定 None=OFF・seam）
         self.don_box = don_box
+        # マクロ手化 P1（ユーザ設計 2026-08-24）: True で原始 ATTACH_DON を配分箱
+        # 「対象へk枚」に置換（None=config.SERVE_MACRO_MOVES に従う・席別 seam）
+        self.macro_moves = macro_moves
         # v6 柱⑤（生成/serve の探索設定分離・docs/reports/v5_adoption_20260715.md §4-5）:
         # None=config の SERVE_PRUNE_FUTILE に従う（serve 既定）。自己対戦生成は False を渡して
         # 枝刈りを外す＝「刈った枝は学習データに現れない→枝刈りの誤りが学習で固定化される」
@@ -76,6 +79,20 @@ class OPCGGame:
             # ドン箱の合成は枝刈り後に足す（箱は素の合法手 base から算術で導出＝
             # 枝刈りの影響を受けない。DON_BOX 自体は既存 prune を素通りする型）。
             moves = moves + cpu_ai.don_box_candidates(state, name, base)
+        mm = self.macro_moves
+        if mm is None:
+            from opcg_sim.src.learned.config import SERVE_MACRO_MOVES
+            mm = SERVE_MACRO_MOVES
+        if mm:
+            # マクロ手化 P1: 原始 ATTACH_DON（1枚単位）を配分箱「対象へk枚」に置換。
+            # 順序重複（同一配分への原始経路 中央値5.3x/最大9756x・macro_p0_probe）を潰す。
+            # 配分箱の対象は枝刈り済み原始手から導出＝意味フィルタを継承（死に先は来ない）。
+            attaches = [m for m in moves if m.get("action_type") == "ATTACH_DON"]
+            if attaches:
+                allocs = cpu_ai.don_alloc_candidates(state, name, attaches)
+                if allocs:
+                    moves = [m for m in moves
+                             if m.get("action_type") != "ATTACH_DON"] + allocs
         return moves
 
     def apply(self, state, move, actor_name):

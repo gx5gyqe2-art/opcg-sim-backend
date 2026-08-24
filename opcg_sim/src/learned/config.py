@@ -54,6 +54,12 @@ SERVE_PRUNE_FUTILE = True
 # 害の証拠が無く、生成/serve 一貫で将来のネットが箱化された行動分布から学べる。
 # インスタンス上書きは OPCGGame(don_box=)／LearnedEngine(don_box=)（席別 A/B seam）。
 SERVE_DON_BOX = True
+# マクロ手化 P1（ユーザ設計 2026-08-24・docs/reports/2026-08-23_planA6_arena_verdict.md の次段）:
+# 木の候補から原始 ATTACH_DON（1枚単位）を外し、配分箱「対象へk枚」（DON_BOX の
+# target_ids=[] 形）に置換する。P0 実測（macro_p0_probe）: メイン判断の46%がドン1枚付与・
+# 順序重複 中央値5.3x/最大9756x＝読みの浪費の主因。既定 OFF（挙動連続性）＝
+# アリーナ A/B（arena_resume --cand-macro）で効果を実測してから既定化を判断する。
+SERVE_MACRO_MOVES = False
 
 # v6 柱⑤（生成/serve の探索設定分離・docs/reports/v5_adoption_20260715.md §4-5）: 自己対戦**生成**の
 # 枝刈り既定。生成側は枝刈りを外す＝探索が訪れない枝は学習できないため、serve 用ヒューリスティクスを
