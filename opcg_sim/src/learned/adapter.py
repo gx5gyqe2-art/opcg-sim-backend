@@ -19,7 +19,7 @@ class OPCGGame:
     # L1 生スコアは card-currency で桁が大きい（実測 中央 ~-5800・範囲[-11920,7091]）。
     # scale=10000 で tanh 飽和率0%・std0.25＝探索が勾配を使える値域（GATE B 診断で較正）。
     def __init__(self, value_scale=VALUE_SCALE, see_opp_hand=False, prune_futile=None,
-                 don_margin=None, don_box=None, macro_moves=None):
+                 don_margin=None, don_box=None, macro_moves=None, defense_box=None):
         self.value_scale = value_scale
         self.see_opp_hand = see_opp_hand
         # (C) マージン付与の席別上書き（None=cpu_ai.DON_MARGIN_ATTACH に従う・アリーナ A/B 用）
@@ -29,6 +29,9 @@ class OPCGGame:
         # マクロ手化 P1（ユーザ設計 2026-08-24）: True で原始 ATTACH_DON を配分箱
         # 「対象へk枚」に置換（None=config.SERVE_MACRO_MOVES に従う・席別 seam）
         self.macro_moves = macro_moves
+        # マクロ手化 P4-c（防御箱 v1・2026-08-24）: True で防御窓の候補を D1'/D2' 支配則で
+        # 整形（None=config.SERVE_DEFENSE_BOX に従う・席別 seam）
+        self.defense_box = defense_box
         # v6 柱⑤（生成/serve の探索設定分離・docs/reports/v5_adoption_20260715.md §4-5）:
         # None=config の SERVE_PRUNE_FUTILE に従う（serve 既定）。自己対戦生成は False を渡して
         # 枝刈りを外す＝「刈った枝は学習データに現れない→枝刈りの誤りが学習で固定化される」
@@ -105,6 +108,16 @@ class OPCGGame:
                              and not (m.get("action_type") == "DON_BOX"
                                       and (m.get("payload") or {}).get("target_ids"))]
                     moves = moves + atk_boxes
+        dbx = self.defense_box
+        if dbx is None:   # インスタンス未指定＝config（serve 既定）に従う
+            from opcg_sim.src.learned.config import SERVE_DEFENSE_BOX
+            dbx = SERVE_DEFENSE_BOX
+        if dbx:
+            # マクロ手化 P4-c: 防御窓（SELECT_COUNTER+PASS のみの窓）の候補を D1'（総量不足
+            # →素通し以外を落とす）/ D2'（止まった戦闘に払わない）の支配則で整形。
+            # 同一インスタンス経由の全経路（serve 窓読み出し・resolved_branch_values の
+            # 内部窓・木の展開）に一様に効く。
+            moves = cpu_ai.defense_box_prune(state, name, moves)
         return moves
 
     def apply(self, state, move, actor_name):

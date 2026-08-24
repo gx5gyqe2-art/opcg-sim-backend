@@ -98,6 +98,9 @@ def main():
     ap.add_argument("--games", type=int, default=4)
     ap.add_argument("--seed-base", type=int, default=780000)
     ap.add_argument("--max-windows", type=int, default=40)
+    ap.add_argument("--defense-box", action="store_true",
+                    help="防御箱 v1（P4-c・D1'/D2' 候補整形）を有効化したエンジンで測る"
+                         "（乖離が減るかの効果確認用）")
     args = ap.parse_args()
 
     from cpu_arena import _load_db
@@ -110,7 +113,7 @@ def main():
     from opcg_sim.src.core.journal import JournaledList
 
     db = _load_db()
-    eng = CL.LearnedEngine()
+    eng = CL.LearnedEngine(defense_box=True) if args.defense_box else CL.LearnedEngine()
     vf = CL._value_fn(eng.vnet, eng.vocab, eng.enc_version)
     pf = CL._priors_fn(eng.pnet, eng.vocab, eng.enc_version)
 

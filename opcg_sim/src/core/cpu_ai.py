@@ -447,6 +447,63 @@ def don_alloc_candidates(manager, actor_name: str,
     return out
 
 
+def defense_battle_need(manager) -> Optional[int]:
+    """現在の戦闘を止めるのに必要な追加カウンター値（算術・pure）。戦闘外/読めない形は None。
+
+    攻撃側 `get_power(True)` vs 防御側 `get_power(False)`＋counter_buff（既払い分）。
+    atk≥def のとき need = atk−def+1000（同値は攻撃側勝ち）、下回っていれば 0＝止まっている。
+    D族教師（`tests/scripts/plandef_gen.py` battle_need）と同一規約。"""
+    bat = getattr(manager, "active_battle", None)
+    if bat is None:
+        return None
+    try:
+        atk = int(bat["attacker"].get_power(True))
+        tgt = int(bat["target"].get_power(False)) + int(bat.get("counter_buff", 0) or 0)
+    except Exception:
+        return None
+    return atk - tgt + 1000 if atk >= tgt else 0
+
+
+def defense_box_prune(manager, actor_name: str,
+                      moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """防御箱 v1（マクロ手化 P4-c・2026-08-24）: 防御窓の候補を支配則で整形する（pure）。
+
+    D族の支配則（`plandef_gen`・`docs/reports/2026-08-24_p4_defense_verdict.md`）を学習では
+    なく**候補整形**として適用する（どの出口になるかは印字値の算術で確定＝エンジンの実計算。
+    D族ヘッド再学習は紙上改善でも実枝判別を壊しゲート FAIL＝出口採点ルートは打ち止め）:
+
+      D1' 総量不足     … 払える印字カウンター総量 < need なら何を払っても止まらない
+                         ＝SELECT_COUNTER を全て落とす（素通しが任意の支払いを支配・m2@58型）
+      D2' 既に止まった … need==0 の窓で印字カウンターを払っても戦闘結果は不変
+                         ＝SELECT_COUNTER を全て落とす（払う札の分だけ純損＝過剰防御の矯正）
+
+    適用条件（保守側）: 候補が SELECT_COUNTER と PASS のみで構成され、SELECT_COUNTER の
+    対象カードが全て手札の印字カウンター（current_counter>0）であること。イベント/効果が
+    混在する窓・印字0の札が混ざる窓は算術で閉じないため触らない。PASS は常に残る＝
+    候補は空にならない。CPU の候補生成のみで作用しエンジンの合法手列挙は変えない。"""
+    kinds = {m.get("action_type") for m in moves}
+    if "SELECT_COUNTER" not in kinds or not (kinds <= {"SELECT_COUNTER", "PASS"}):
+        return moves
+    need = defense_battle_need(manager)
+    if need is None:
+        return moves
+    actor = _player_by_name(manager, actor_name)
+    by_uuid = {getattr(c, "uuid", None): c
+               for c in (getattr(actor, "hand", None) or [])}
+    total = 0
+    for m in moves:
+        if m.get("action_type") != "SELECT_COUNTER":
+            continue
+        c = by_uuid.get((m.get("payload") or {}).get("uuid") or m.get("card_uuid"))
+        v = int(getattr(c, "current_counter", 0) or 0) if c is not None else 0
+        if v <= 0:
+            return moves        # 印字カウンター以外が混ざる窓＝触らない（保守側）
+        total += v
+    if need == 0 or total < need:
+        return [m for m in moves if m.get("action_type") != "SELECT_COUNTER"]
+    return moves
+
+
 def _attach_don_meaningful(manager, actor_name: str, c, margin: Optional[bool] = None) -> bool:
     """ドン!!付与の手が「意味ある配分」か（B-2・§2.5.3）。
 

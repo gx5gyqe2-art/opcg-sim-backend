@@ -60,6 +60,14 @@ SERVE_DON_BOX = True
 # 順序重複 中央値5.3x/最大9756x＝読みの浪費の主因。既定 OFF（挙動連続性）＝
 # アリーナ A/B（arena_resume --cand-macro）で効果を実測してから既定化を判断する。
 SERVE_MACRO_MOVES = False
+# マクロ手化 P4-c（防御箱 v1・2026-08-24・docs/reports/2026-08-24_p4_defense_verdict.md）:
+# 防御窓（SELECT_COUNTER+PASS のみの窓）の候補を D1'/D2' 支配則で整形する
+# （D1'=印字総量不足なら素通し以外を落とす／D2'=止まった戦闘に払わない。算術的確定・
+# ネット不変）。P4-a 実測: 乖離21%・過剰防御が主。D族ヘッド再学習はゲート FAIL で
+# 打ち止め＝学習でなく候補整形として実装。既定 OFF（挙動連続性）＝アリーナ A/B
+# （arena_resume --cand-defense-box）で効果を実測してから既定化を判断する。
+# インスタンス上書きは OPCGGame(defense_box=)／LearnedEngine(defense_box=)（席別 seam）。
+SERVE_DEFENSE_BOX = False
 
 # v6 柱⑤（生成/serve の探索設定分離・docs/reports/v5_adoption_20260715.md §4-5）: 自己対戦**生成**の
 # 枝刈り既定。生成側は枝刈りを外す＝探索が訪れない枝は学習できないため、serve 用ヒューリスティクスを

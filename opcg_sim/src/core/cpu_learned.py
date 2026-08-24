@@ -331,16 +331,19 @@ class LearnedEngine:
                  box_battle: Optional[bool] = None, turn_quiesce: Optional[bool] = None,
                  plan_readout: Optional[bool] = None, don_margin: Optional[bool] = None,
                  don_box: Optional[bool] = None, battle_commit: Optional[bool] = None,
-                 macro_moves: Optional[bool] = None):
+                 macro_moves: Optional[bool] = None,
+                 defense_box: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
             game = game if game is not None else sgame
         # (C) マージン付与／ドン箱の席別 seam（quiesce 等と同じ A/B 用）: 指定時は共有 game
         # でなく席専用の adapter を持つ＝同一プロセスの net-vs-net で席ごとに候補生成を変えられる。
-        if don_margin is not None or don_box is not None or macro_moves is not None:
+        if (don_margin is not None or don_box is not None or macro_moves is not None
+                or defense_box is not None):
             from opcg_sim.src.learned.adapter import OPCGGame as _OG
-            game = _OG(don_margin=don_margin, don_box=don_box, macro_moves=macro_moves)
+            game = _OG(don_margin=don_margin, don_box=don_box, macro_moves=macro_moves,
+                       defense_box=defense_box)
         self.vocab = vocab
         self.game = game
         # aux 粘り項のエンジン別上書き（None=config.SERVE_AUX_TIEBREAK に従う）。ON/OFF を

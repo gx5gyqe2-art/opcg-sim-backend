@@ -102,6 +102,9 @@ def main():
     ap.add_argument("--cand-macro", action="store_true",
                     help="候補席だけマクロ手化 P1（配分箱＋戦闘の木内箱化・quiesce）を有効化"
                          "（2026-08-24・macro_p0_probe が示した読みの浪費の A/B）")
+    ap.add_argument("--cand-defense-box", action="store_true",
+                    help="候補席だけ防御箱 v1（P4-c・D1'/D2' 支配則の候補整形）を有効化"
+                         "（2026-08-24・ネット不変の防御矯正の A/B）")
     ap.add_argument("--cand-plan-readout", action="store_true",
                     help="候補席だけプラン読み出し（v37②・turn出口ヘッド候補の実戦測定）を有効化。"
                          "env の SERVE_PLAN_READOUT は両席に効いて対照を汚すため使わない")
@@ -127,6 +130,8 @@ def main():
     if args.cand_macro:
         cand_kw = dict(cand_kw or {}, macro_moves=True,
                        box_battle=True, battle_readout=True, quiesce=True)
+    if args.cand_defense_box:
+        cand_kw = dict(cand_kw or {}, defense_box=True)
 
     from arena_gate import plan_bands
     planned = [s for band in plan_bands(args.pairs, args.bands, args.seed_base) for s in band]
