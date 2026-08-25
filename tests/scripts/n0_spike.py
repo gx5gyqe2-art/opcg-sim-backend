@@ -332,6 +332,87 @@ def probe(args):
         print(f"  {v:+.4f}  {s}" if v is not None else f"  None  {s}")
 
 
+class N0ValueAdapter:
+    """N0Net を ValueNet のダックタイプ（predict/predict_exit/has_exit_head）に適合させ、
+    LearnedEngine の葉評価・戦闘出口・ターン出口の物差しを**単一胴体の文脈切替**で供給する
+    （N1＝エンジン統合・2026-08-25）。aux は持たない＝engine は aux_tiebreak=False で組むこと。"""
+
+    def __init__(self, net, tab):
+        self.net = net
+        self.tab = tab
+
+    def _fwd(self, batch, ctx_id):
+        sc = np.asarray(batch["scalars"], np.float32)
+        ci = np.asarray(batch["card_idx"])
+        if ci.shape[1] < MAX_CI:
+            ci = np.concatenate([ci, np.zeros((len(ci), MAX_CI - ci.shape[1]), ci.dtype)], 1)
+        ctx = np.zeros((len(sc), CTX), np.float32)
+        ctx[:, ctx_id] = 1.0
+        return self.net.forward(sc, card_channel(ci[:, :MAX_CI], self.tab), ctx)
+
+    def predict(self, batch):
+        return self._fwd(batch, 0)
+
+    def predict_with_aux(self, batch):
+        v = self._fwd(batch, 0)
+        return v, np.zeros(len(v), np.float32)
+
+    def has_exit_head(self, kind):
+        return kind in ("battle", "turn")
+
+    def predict_exit(self, batch, kind):
+        return self._fwd(batch, 1 if kind == "battle" else 2)
+
+
+def n0_engine(net_path):
+    """N0 を積んだ LearnedEngine（符号化 v12 は共通・policy は現行 gen15 のまま）。"""
+    from opcg_sim.src.core.cpu_learned import LearnedEngine
+    tab, _vocab = build_card_table()
+    eng = LearnedEngine(aux_tiebreak=False)
+    eng.vnet = N0ValueAdapter(N0Net.load(net_path), tab)
+    return eng
+
+
+def gate(args):
+    """coach 13点（既定 vs N0エンジン）＝N1 の行動ゲート。"""
+    import counterfactual_referee as CR
+    import coach_gate as CG
+    import mark_gate as MG
+    import replay_reeval as RE
+    from cpu_selfplay import _load_db
+    from opcg_sim.src.core.cpu_learned import LearnedEngine
+    CR.ARGS = argparse.Namespace(true_board=True)
+    db = _load_db()
+    base = LearnedEngine()
+    chall = n0_engine(args.net)
+    replays = {**MG.REPLAYS, **CG.REPLAYS_V2, **CG.REPLAYS_V48, **CG.REPLAYS_HUMAN}
+    CR.GAMES = {}
+    rows = []
+    for tag, i, accept in CG.VERIFIED_V2:
+        if tag not in CR.GAMES:
+            raw = RE.load_replay_json(replays[tag]); rec = raw.get("replay", raw)
+            CR.GAMES[tag] = (rec, {f.get("action_index"): f for f in raw.get("frames") or []},
+                             rec["actions"])
+        built = CR._restore_board(db, tag, i)
+        if isinstance(built, str):
+            rec, fbi, actions = CR.GAMES[tag]
+            built = MG._restore(db, rec, fbi, actions, i)
+            if isinstance(built, str) or built is None:
+                print(f"{tag}@{i}: 復元不可"); continue
+        m0, who = built
+        name = who if isinstance(who, str) else who.name
+        actor = m0.p1 if m0.p1.name == name else m0.p2
+        b = CG.decide_rate(base, m0, actor, accept, args.seeds, 160)
+        c = CG.decide_rate(chall, m0, actor, accept, args.seeds, 160)
+        rows.append((tag, i, b, c))
+        print(f"  {tag}@{i:<4} base={b:.2f} n0={c:.2f}", flush=True)
+    ok_nr, ok_imp, regs = CG.judge(rows)
+    print(f"改善: {'OK' if ok_imp else 'NG'}（n0計 {sum(c for *_, c in rows):.1f}"
+          f" vs base計 {sum(b for _t, _i, b, _c in rows):.1f}）")
+    print(f"非退行: {'OK' if ok_nr else 'NG'} {regs}")
+    print("N0_GATE_RESULT", json.dumps({"verdict": "PASS" if (ok_nr and ok_imp) else "FAIL"}))
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -345,9 +426,14 @@ def main():
     t.add_argument("--out", default="/home/user/n0_net.npz")
     p = sub.add_parser("probe")
     p.add_argument("--net", default="/home/user/n0_net.npz")
+    g = sub.add_parser("gate")
+    g.add_argument("--net", default="/home/user/n0_net.npz")
+    g.add_argument("--seeds", type=int, default=16)
     args = ap.parse_args()
     if args.cmd == "train":
         train(args)
+    elif args.cmd == "gate":
+        gate(args)
     else:
         probe(args)
 
