@@ -628,7 +628,8 @@ class LearnedEngine:
             vf = _value_fn(self.vnet, self.vocab, self.enc_version,
                            aux_tiebreak=self.aux_tiebreak)
             pf = _priors_fn(self.pnet, self.vocab, self.enc_version)
-            dbx = CFG.TREE_BOX_DIALOG if self.box_dialog is None else self.box_dialog
+            _bd = getattr(self, "box_dialog", None)   # 部分構築エンジン（sticky テスト）互換
+            dbx = CFG.TREE_BOX_DIALOG if _bd is None else _bd
             steps, _diag = PL.select_plan(self.game, manager, name, vf, pf, det_rng,
                                           exit_value_fn=self._exit_value_fn(),
                                           battle_value_fn=self._battle_value_fn(),
@@ -662,7 +663,7 @@ class LearnedEngine:
                                                   exit_value_fn=self._exit_value_fn(),
                                                   battle_value_fn=self._battle_value_fn(),
                                                   dialog_box=(CFG.TREE_BOX_DIALOG
-                                                              if self.box_dialog is None
+                                                              if getattr(self, "box_dialog", None) is None
                                                               else self.box_dialog))
                 if not new_steps:
                     self._turn_plans[key] = None

@@ -384,8 +384,14 @@ def evaluate_plan(game, world, name, steps, value_fn, priors_fn,
       - ターン箱の出口＝`exit_value_fn`（ターン末専用ヘッド）
       - 実行途中の戦闘窓＝`battle_value_fn`（戦闘出口専用ヘッド）
       - どちらも None なら `value_fn`＝v39 以前と完全に同値。"""
-    exit_mgr = execute_plan(game, world, name, steps, value_fn, priors_fn, max_plies,
-                            battle_value_fn=battle_value_fn, dialog_box=dialog_box)
+    if dialog_box:
+        exit_mgr = execute_plan(game, world, name, steps, value_fn, priors_fn, max_plies,
+                                battle_value_fn=battle_value_fn, dialog_box=True)
+    else:
+        # 旧署名で呼ぶ＝execute_plan を差し替える既存テスト/計器（test_exit_heads の
+        # モック等）と後方互換（dialog_box 既定 False では挙動も呼び出し形も従来どおり）
+        exit_mgr = execute_plan(game, world, name, steps, value_fn, priors_fn, max_plies,
+                                battle_value_fn=battle_value_fn)
     return (exit_value_fn or value_fn)(exit_mgr, name)
 
 
