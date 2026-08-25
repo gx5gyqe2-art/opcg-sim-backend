@@ -93,7 +93,7 @@
 | P3 | カード使用箱（キャラ/ステージ/イベント＋対話畳み込み） | **済＝対話箱**（`TREE_BOX_DIALOG`・効果対話窓を `resolved_branch_values(window_pred=in_dialog)` で畳む。木＋serve読み出し両方・対話窓decide ~100倍高速。既定OFF・アリーナ待ち） |
 | P4 | 防御箱（ブロック×カウンターの結合判断） | **P4-a/b 済**: 監査（乖離21%・過剰防御主体）→D族ヘッド不採用（ゲートFAIL・出口採点ルート打ち止め。`docs/reports/2026-08-24_p4_defense_verdict.md`）。**P4-c 測定済・PAR＝既定OFF維持**（主0.442/副0.526 とも有意差なし。seam/テストは残置。`docs/reports/2026-08-24_p4c_defense_box_arena.md`） |
 | P5 | 効果起動箱（自分ターン版・相手ターン版）・応答箱・トリガー | **済＝対話箱に統合**（P3と同一機構。CONFIRM_TRIGGER/CONFIRM_OPTIONAL/CHOICE/DECLARE_COST/SEARCH_AND_SELECT。外周=MULLIGAN/ARRANGE_DECK/SELECT_RESOURCEは畳まない） |
-| P6 | 上位箱の再挑戦: ターン箱（プラン）＝箱列の提案＋turn出口ヘッド接続／受け方針箱 | **P6-a 済**: プラン機構を箱語彙対応（`plan.py dialog_box=`・提案/実行/採点に対話箱を接続。箱エンジン上では提案が自然に箱列になることを実測＝m2@44 で配分箱プラン・spread 0.43・decide 採用 6/8）。seam=`arena_resume --cand-plan-box`（全箱+プラン読み出し）。**P6-c 受け方針箱も実装済**（`guard.py`・local/pass/minimal/hold の台本比較選択＋防御窓の候補整形・`--cand-guard-policy`・m1@14 で hold が正しく最下位）。turn出口ヘッドの学習接続とプラン/方針のアリーナ測定が残り |
+| P6 | 上位箱の再挑戦: ターン箱（プラン）＝箱列の提案＋turn出口ヘッド接続／受け方針箱 | **P6-a 済**: プラン機構を箱語彙対応（`plan.py dialog_box=`・提案/実行/採点に対話箱を接続。箱エンジン上では提案が自然に箱列になることを実測＝m2@44 で配分箱プラン・spread 0.43・decide 採用 6/8）。seam=`arena_resume --cand-plan-box`（全箱+プラン読み出し）。**P6-c 受け方針箱も実装済**（`guard.py`・local/pass/minimal/hold の台本比較選択＋防御窓の候補整形・`--cand-guard-policy`・m1@14 で hold が正しく最下位）。**ターン箱は既定 ON（ユーザ決定 2026-08-25・中身は今後改善）**: 測定は半消化バグ発見→修正（カウントダウン式の箱完走）後に打ち切り。残る課題=素valueのターン末バイアス（資源温存の出口を過大評価・残ドン0.45→0.91・詳細 `docs/reports/2026-08-25_planbox_finding.md`）＝turn出口ヘッド接続が改善の本命。受け方針箱は既定OFF・測定待ち |
 
 ### 検証規約（プランA6の教訓を明文化）
 

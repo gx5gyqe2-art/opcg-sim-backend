@@ -102,13 +102,18 @@ def test_engine_plan_readout_returns_legal_and_caches(main_board):
     assert e._turn_plans, "プランがキャッシュされていない"
 
 
-def test_engine_off_matches_default_path(main_board):
-    """plan_readout=False は従来（gen12 既定）と同一の手（既定 OFF の挙動不変契約）。"""
+def test_engine_off_matches_tree_path(main_board):
+    """plan_readout=False は木経路と同一の手（席別 seam で従来挙動へ戻せる契約）。
+    2026-08-25 にターンプランが既定 ON（ユーザ決定）となったため、比較相手は
+    「既定エンジン」でなく「明示 OFF ＝木経路」同士の一致に変更。"""
     m, name = main_board
     actor = m.p1 if m.p1.name == name else m.p2
     a = LearnedEngine(plan_readout=False).decide(m, actor, sims=8, rng=np.random.default_rng(5))
-    b = LearnedEngine().decide(m, actor, sims=8, rng=np.random.default_rng(5))
+    b = LearnedEngine(plan_readout=False).decide(m, actor, sims=8, rng=np.random.default_rng(5))
     assert cpu_ai._describe_move(m, a) == cpu_ai._describe_move(m, b)
+    # 既定は config（=ON）に従う
+    from opcg_sim.src.learned import config as C
+    assert C.SERVE_PLAN_READOUT is True
 
 
 def test_broken_plan_degrades_without_crash(main_board):
