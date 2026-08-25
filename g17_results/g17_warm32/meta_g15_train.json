@@ -1,0 +1,9 @@
+{
+ "rows": 31005,
+ "epochs": 32,
+ "scalar_cols": 94,
+ "d_emb": 8,
+ "hidden": 96,
+ "val_mse": 0.3373,
+ "card_idx": "実ID（G系）"
+}

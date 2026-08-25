@@ -1,0 +1,17 @@
+  m1@3    base=1.00 chall=0.44  合格手=[('PLAY', 'OP09-002')]
+  m1@14   base=1.00 chall=0.00  合格手=[('PASS', None)]
+  m1@15   base=1.00 chall=1.00  合格手=[('SELECT_COUNTER', 'OP10-011')]
+  m2@44   base=0.62 chall=0.88  合格手=[('ATTACH_DON', 'OP11-041')]
+  m2@58   base=1.00 chall=1.00  合格手=[('PASS', None)]
+  m4@2    base=1.00 chall=1.00  合格手=[('PLAY', 'ST30-004')]
+  m5@7    base=1.00 chall=1.00  合格手=[('ATTACH_DON', 'OP11-041')]
+  h1@2    base=1.00 chall=1.00  合格手=[('PLAY', 'OP15-066')]
+h1@35: 真盤面再生不能→フレーム復元で測定
+  h1@35   base=0.94 chall=0.94  合格手=[('PLAY', 'OP15-118')]
+
+測定ノイズでないと言える差の下限（2σ・seeds=16）= 0.35
+  この bar を超えた点: m1@3(1.00→0.44), m1@14(1.00→0.00)  ← これ未満の増減は『治った/壊れた』と読まない
+
+改善: NG（chall計 7.2 vs base計 8.6）
+非退行: NG [('m1', 3, 1.0, 0.4375), ('m1', 14, 1.0, 0.0)]
+COACH_GATE_RESULT {"verdict": "FAIL", "points": 9}

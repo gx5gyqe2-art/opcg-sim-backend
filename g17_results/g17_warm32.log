@@ -1,0 +1,37 @@
+混合: 実デッキ 22957 行 + 合成リーダー世界 8048 行（card_idx=UNK）
+コーパス 31005 行（train 27905 / val 3100）・scalars 94列・勝敗均衡 -0.002
+温スタート: opcg_sim/data/learned/gen15_value.npz v12→v12（恒等拡張）
+学習前: train 0.8217 / val 0.8534
+  ep1: train 0.7219 / val 0.7622
+  ep2: train 0.6648 / val 0.7103
+  ep3: train 0.6228 / val 0.6732
+  ep4: train 0.5900 / val 0.6474
+  ep5: train 0.5616 / val 0.6235
+  ep6: train 0.5357 / val 0.6034
+  ep7: train 0.5139 / val 0.5860
+  ep8: train 0.4916 / val 0.5693
+  ep9: train 0.4735 / val 0.5547
+  ep10: train 0.4551 / val 0.5412
+  ep11: train 0.4384 / val 0.5271
+  ep12: train 0.4224 / val 0.5153
+  ep13: train 0.4077 / val 0.5027
+  ep14: train 0.3939 / val 0.4912
+  ep15: train 0.3823 / val 0.4817
+  ep16: train 0.3678 / val 0.4685
+  ep17: train 0.3558 / val 0.4578
+  ep18: train 0.3451 / val 0.4481
+  ep19: train 0.3360 / val 0.4407
+  ep20: train 0.3253 / val 0.4295
+  ep21: train 0.3178 / val 0.4203
+  ep22: train 0.3070 / val 0.4108
+  ep23: train 0.2977 / val 0.4027
+  ep24: train 0.2890 / val 0.3934
+  ep25: train 0.2811 / val 0.3861
+  ep26: train 0.2745 / val 0.3795
+  ep27: train 0.2666 / val 0.3715
+  ep28: train 0.2600 / val 0.3642
+  ep29: train 0.2538 / val 0.3593
+  ep30: train 0.2479 / val 0.3527
+  ep31: train 0.2413 / val 0.3437
+  ep32: train 0.2351 / val 0.3373
+G15_TRAIN_DONE {"rows": 31005, "epochs": 32, "scalar_cols": 94, "d_emb": 8, "hidden": 96, "val_mse": 0.3373, "card_idx": "実ID（G系）"}

@@ -1,0 +1,20 @@
+混合: 実デッキ 22957 行 + 合成リーダー世界 8048 行（card_idx=UNK）
+コーパス 31005 行（train 27905 / val 3100）・scalars 94列・勝敗均衡 -0.002
+学習前: train 1.8527 / val 1.8396
+  ep1: train 0.9205 / val 0.9238
+  ep2: train 0.8240 / val 0.8273
+  ep3: train 0.7677 / val 0.7753
+  ep4: train 0.7373 / val 0.7500
+  ep5: train 0.7080 / val 0.7235
+  ep6: train 0.6919 / val 0.7121
+  ep7: train 0.6836 / val 0.7036
+  ep8: train 0.6544 / val 0.6784
+  ep9: train 0.6394 / val 0.6674
+  ep10: train 0.6269 / val 0.6601
+  ep11: train 0.6313 / val 0.6698
+  ep12: train 0.6056 / val 0.6446
+  ep13: train 0.6000 / val 0.6433
+  ep14: train 0.5903 / val 0.6347
+  ep15: train 0.5854 / val 0.6324
+  ep16: train 0.5727 / val 0.6227
+G15_TRAIN_DONE {"rows": 31005, "epochs": 16, "scalar_cols": 94, "d_emb": 8, "hidden": 96, "val_mse": 0.6227, "card_idx": "実ID（G系）"}
