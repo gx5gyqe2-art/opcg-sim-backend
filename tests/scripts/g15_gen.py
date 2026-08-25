@@ -40,16 +40,25 @@ _G = {}
 def _init_worker(matchup, sims, enc_version):
     import rl_encoder as E
     from cpu_selfplay import _load_db
-    from matchup_balance_probe import deck_ids
     from opcg_game import OPCGGame
     from opcg_sim.src.core.cpu_learned import LearnedEngine
-    from replay_runner import build_deck_from_ids
     db = _load_db()
-    spec = json.load(open(DECKS_JSON))
-    a, b = matchup.split(":")
     eng = LearnedEngine()
     _G.update(E=E, db=db, gs=OPCGGame(), eng=eng, vocab=eng.vocab,
-              sims=sims, enc_version=enc_version,
+              sims=sims, enc_version=enc_version)
+    if matchup == "random":
+        # ランダムリーダー×生成デッキ（G17・2026-08-25）: アリーナ主条件と同じ分布で
+        # コーパスを採る（`promotion_gate._leader_pair` / `deck_synth.synth_deck` と同規約）。
+        leaders = sorted(cid for cid, _ in db.raw_db.items()
+                         if (db.get_card(cid) is not None
+                             and getattr(db.get_card(cid).type, "name", "") == "LEADER"))
+        _G.update(random_mode=True, leaders=leaders)
+        return
+    from matchup_balance_probe import deck_ids
+    from replay_runner import build_deck_from_ids
+    spec = json.load(open(DECKS_JSON))
+    a, b = matchup.split(":")
+    _G.update(random_mode=False,
               ids_a=deck_ids(spec[a]), ids_b=deck_ids(spec[b]),
               leader_a=spec[a]["leader"], leader_b=spec[b]["leader"],
               build=build_deck_from_ids)
@@ -61,11 +70,19 @@ def play_one(seed):
     from opcg_sim.src.models.models import CardInstance
     random.seed(seed)
     try:
-        _l1, c1 = _G["build"](_G["db"], None, _G["ids_a"], "p1")
-        _l2, c2 = _G["build"](_G["db"], None, _G["ids_b"], "p2")
-        m = GameManager(
-            Player("p1", c1, CardInstance(_G["db"].get_card(_G["leader_a"]), "p1")),
-            Player("p2", c2, CardInstance(_G["db"].get_card(_G["leader_b"]), "p2")))
+        if _G.get("random_mode"):
+            from deck_synth import synth_deck
+            rl = random.Random(seed * 7919 + 13)          # promotion_gate._leader_pair と同規約
+            la, lb = rl.choice(_G["leaders"]), rl.choice(_G["leaders"])
+            l1, c1 = synth_deck(_G["db"], la, seed=seed, owner="p1")
+            l2, c2 = synth_deck(_G["db"], lb, seed=seed + 1, owner="p2")
+            m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+        else:
+            _l1, c1 = _G["build"](_G["db"], None, _G["ids_a"], "p1")
+            _l2, c2 = _G["build"](_G["db"], None, _G["ids_b"], "p2")
+            m = GameManager(
+                Player("p1", c1, CardInstance(_G["db"].get_card(_G["leader_a"]), "p1")),
+                Player("p2", c2, CardInstance(_G["db"].get_card(_G["leader_b"]), "p2")))
         m.start_game()
     except Exception:
         return None
