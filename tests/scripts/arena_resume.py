@@ -111,6 +111,8 @@ def main():
     ap.add_argument("--cand-boxes-all", action="store_true",
                     help="候補席で箱化インフラ全部入り（P1配分箱+P2アタック箱+P4c防御箱+"
                          "P3/P5対話箱＝macro_moves+defense_box+box_dialog+戦闘箱設定）を有効化")
+    ap.add_argument("--cand-guard-policy", action="store_true",
+                    help="候補席で箱化フルセット＋受け方針箱（P6-c）を有効化（2026-08-25）")
     ap.add_argument("--cand-plan-box", action="store_true",
                     help="候補席で箱化フルセット＋プラン読み出し（P6-a=ターン箱を箱語彙の上で）"
                          "を有効化（2026-08-25）")
@@ -146,6 +148,10 @@ def main():
     if args.cand_boxes_all:
         cand_kw = dict(cand_kw or {}, macro_moves=True, defense_box=True, box_dialog=True,
                        box_battle=True, battle_readout=True, quiesce=True)
+    if args.cand_guard_policy:
+        cand_kw = dict(cand_kw or {}, macro_moves=True, defense_box=True, box_dialog=True,
+                       box_battle=True, battle_readout=True, quiesce=True,
+                       guard_policy=True)
     if args.cand_plan_box:
         cand_kw = dict(cand_kw or {}, macro_moves=True, defense_box=True, box_dialog=True,
                        box_battle=True, battle_readout=True, quiesce=True,

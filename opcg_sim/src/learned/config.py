@@ -57,17 +57,19 @@ SERVE_DON_BOX = True
 # マクロ手化 P1（ユーザ設計 2026-08-24・docs/reports/2026-08-23_planA6_arena_verdict.md の次段）:
 # 木の候補から原始 ATTACH_DON（1枚単位）を外し、配分箱「対象へk枚」（DON_BOX の
 # target_ids=[] 形）に置換する。P0 実測（macro_p0_probe）: メイン判断の46%がドン1枚付与・
-# 順序重複 中央値5.3x/最大9756x＝読みの浪費の主因。既定 OFF（挙動連続性）＝
-# アリーナ A/B（arena_resume --cand-macro）で効果を実測してから既定化を判断する。
-SERVE_MACRO_MOVES = False
+# 順序重複 中央値5.3x/最大9756x＝読みの浪費の主因。単独 A/B は PAR（主0.505/副0.510）だが
+# **全箱同時 ON で初の有意プラス**（下記 TREE_BOX_DIALOG の採用記録）＝
+# **ユーザ決定（2026-08-25）で既定 ON**（P2 アタック箱もこのフラグに含まれる）。
+SERVE_MACRO_MOVES = True
 # マクロ手化 P4-c（防御箱 v1・2026-08-24・docs/reports/2026-08-24_p4_defense_verdict.md）:
 # 防御窓（SELECT_COUNTER+PASS のみの窓）の候補を D1'/D2' 支配則で整形する
 # （D1'=印字総量不足なら素通し以外を落とす／D2'=止まった戦闘に払わない。算術的確定・
 # ネット不変）。P4-a 実測: 乖離21%・過剰防御が主。D族ヘッド再学習はゲート FAIL で
-# 打ち止め＝学習でなく候補整形として実装。既定 OFF（挙動連続性）＝アリーナ A/B
-# （arena_resume --cand-defense-box）で効果を実測してから既定化を判断する。
+# 打ち止め＝学習でなく候補整形として実装。単独 A/B は PAR（主0.442/副0.526）だが
+# **全箱同時 ON で初の有意プラス**（下記 TREE_BOX_DIALOG の採用記録）＝
+# **ユーザ決定（2026-08-25）で既定 ON**。
 # インスタンス上書きは OPCGGame(defense_box=)／LearnedEngine(defense_box=)（席別 seam）。
-SERVE_DEFENSE_BOX = False
+SERVE_DEFENSE_BOX = True
 # マクロ手化 P3/P5（対話箱・2026-08-25・docs/cpu_macro_plan.md §2）: 効果対話窓
 # （SELECT_TARGET / RESOLVE_EFFECT_SELECTION / SEARCH_AND_SELECT / ORDER_CARDS /
 # CONFIRM_DECISION）を戦闘箱と同じ規約（`resolved_branch_values` の window_pred=in_dialog）で
@@ -75,10 +77,24 @@ SERVE_DEFENSE_BOX = False
 # （LearnedEngine の対話窓読み出し）の両方に効く。これにより PLAY 辺=カード使用箱・
 # ACTIVATE_MAIN 辺=効果起動箱・相手の応答窓=応答箱・トリガー可否=CONFIRM 窓として
 # **P3/P5 の語彙が1機構で実現**する（変種分裂は畳みが代替＝各窓で自視点 value 最善）。
-# 外周（MULLIGAN/ARRANGE_DECK/SELECT_RESOURCE）は畳まない。既定 OFF（挙動連続性）＝
-# アリーナ A/B（arena_resume --cand-dialog-box / --cand-boxes-all）で実測してから判断。
+# 外周（MULLIGAN/ARRANGE_DECK/SELECT_RESOURCE）は畳まない。
+# **既定 ON（ユーザ決定 2026-08-25・箱化フルセット一括採用）**: P1/P2/P4c 単独は全て PAR
+# だったが、対話箱を加えた全箱同時 ON のアリーナ合算（gen15 同ネット機構 A/B）で
+# 主=ランダム対面 n=224 wr0.522 CI[0.472,0.573]（中立プラス）・副=固定ミラー n=240
+# wr0.563 CI[0.522,0.603]（**+44 Elo・有意**）・void 0・coach_gate 裁定点 PASS（9.0=9.0）。
+# 対話窓の decide は ~100倍高速。生成側（p3_run 等）は既定追従＝生成/serve 一貫。
+# 記録: docs/reports/2026-08-25_boxes_default_on.md。OFF に戻せば 32a31c1 以前の挙動。
 # インスタンス上書きは LearnedEngine(box_dialog=)（席別 seam）。
-TREE_BOX_DIALOG = False
+TREE_BOX_DIALOG = True
+# 受け方針箱（P6-c・2026-08-25・docs/cpu_macro_plan.md §2 上位箱）: 相手ターンの入口で
+# 「このターンの受けの姿勢」（local=局所判断(現行)/pass=素通し/minimal=最小防御/hold=死守）を
+# 台本比較（各方針で相手ターンを解決→ターン末valueで比較・CRN・差が薄ければ local）で
+# 1回選び、ターン中 sticky に防御窓の候補整形として作用させる。方針は予算の層＝効果の
+# 個別判断は含まない（イベント/起動/ブロッカーの価値は戦闘箱・対話箱が窓ごとに解決、
+# トリガー・強制誘発はコスト無しで方針の対象外）。既定 OFF＝アリーナ A/B
+# （arena_resume --cand-guard-policy）で実測してから判断。
+# インスタンス上書きは LearnedEngine(guard_policy=)（席別 seam）。
+SERVE_GUARD_POLICY = False
 
 # v6 柱⑤（生成/serve の探索設定分離・docs/reports/v5_adoption_20260715.md §4-5）: 自己対戦**生成**の
 # 枝刈り既定。生成側は枝刈りを外す＝探索が訪れない枝は学習できないため、serve 用ヒューリスティクスを

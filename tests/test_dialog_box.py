@@ -93,8 +93,12 @@ def test_dialog_branch_resolution_reaches_exit(m2_game):
     assert not in_dialog(c)
 
 
-def test_seam_default_off():
+def test_seam_default_on_and_off_override():
     from opcg_sim.src.learned import config as C
-    assert C.TREE_BOX_DIALOG is False              # 既定 OFF（挙動連続性）
-    assert TreeMCTS(game=types.SimpleNamespace(apply_inplace=None, unmake=None),
-                    value_fn=lambda m, n: 0.0).box_dialog is False
+    assert C.TREE_BOX_DIALOG is True               # 既定 ON（2026-08-25 箱化一括採用）
+    t = TreeMCTS(game=types.SimpleNamespace(apply_inplace=None, unmake=None),
+                 value_fn=lambda m, n: 0.0)
+    assert t.box_dialog is True                    # 既定は config に従う
+    t_off = TreeMCTS(game=types.SimpleNamespace(apply_inplace=None, unmake=None),
+                     value_fn=lambda m, n: 0.0, box_dialog=False)
+    assert t_off.box_dialog is False               # 席別 seam で OFF に戻せる

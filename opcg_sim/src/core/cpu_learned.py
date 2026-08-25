@@ -333,7 +333,8 @@ class LearnedEngine:
                  don_box: Optional[bool] = None, battle_commit: Optional[bool] = None,
                  macro_moves: Optional[bool] = None,
                  defense_box: Optional[bool] = None,
-                 box_dialog: Optional[bool] = None):
+                 box_dialog: Optional[bool] = None,
+                 guard_policy: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
@@ -371,6 +372,9 @@ class LearnedEngine:
         self.box_battle = box_battle
         # 対話箱（P3/P5・config.TREE_BOX_DIALOG のエンジン別上書き・None=config に従う）
         self.box_dialog = box_dialog
+        # 受け方針箱（P6-c・config.SERVE_GUARD_POLICY のエンジン別上書き・None=config に従う）
+        self.guard_policy = guard_policy
+        self._guard_policies = {}    # (sticky_id, turn, name) -> 方針（相手ターン中 sticky）
         # ターン静止（None=config.SERVE_TURN_QUIESCE に従う・v37 の席別 seam）。
         self.turn_quiesce = turn_quiesce
         # プラン読み出し（None=config.SERVE_PLAN_READOUT に従う・v37② の席別 seam）。
@@ -458,7 +462,7 @@ class LearnedEngine:
         return self._exit_value_fn("battle") or _value_fn(
             self.vnet, self.vocab, self.enc_version, aux_tiebreak=self.aux_tiebreak)
 
-    def _battle_window_choice(self, manager, name, det_rng):
+    def _battle_window_choice(self, manager, name, det_rng, shape=None):
         """戦闘窓の読み出し（`SERVE_BATTLE_READOUT`）: 出口盤面の value で選ぶ。
 
         **戦闘を1つの箱として畳む**（ユーザ整理 2026-08-05）: カウンター/ブロッカー選択は
@@ -474,6 +478,8 @@ class LearnedEngine:
         """
         mgr = self.game.determinize(manager, name, det_rng)
         legal = self.game.legal_actions(mgr)
+        if shape is not None:
+            legal = shape(mgr, legal)      # 受け方針箱の候補整形（空にはならない契約）
         if not legal:
             return None, None, None
         if len(legal) == 1:
@@ -520,7 +526,7 @@ class LearnedEngine:
                  "Q": np.array([v if v is not None else -1.0 for v in vals], dtype=float)}
         return legal[best], stats, mgr
 
-    def _battle_window_plan(self, manager, name, det_rng):
+    def _battle_window_plan(self, manager, name, det_rng, shape=None):
         """`_battle_window_choice` のプラン版（SERVE_BATTLE_COMMIT・2026-08-14 ユーザ決定）。
 
         選び方は choice と完全に同一（同じ決定化・同じ resolved_branch_values・同じ argmax）。
@@ -532,6 +538,8 @@ class LearnedEngine:
         from opcg_sim.src.learned import plan as PL
         mgr = self.game.determinize(manager, name, det_rng)
         legal = self.game.legal_actions(mgr)
+        if shape is not None:
+            legal = shape(mgr, legal)      # 受け方針箱の候補整形（空にはならない契約）
         if not legal:
             return None, None, None, []
         if len(legal) == 1:
@@ -570,7 +578,7 @@ class LearnedEngine:
             random.setstate(base_rng_state)  # 実ゲームへ乱数消費を漏らさない（CRN と同じ規約）
         return legal[best], stats, mgr, tail
 
-    def _battle_commit_step(self, manager, name, det_rng, _replanned=False):
+    def _battle_commit_step(self, manager, name, det_rng, _replanned=False, shape=None):
         """入口コミットの読み出し（SERVE_BATTLE_COMMIT）: 窓の最初の decide でプランを立てて
         キャッシュし、以後の decide はその実行だけを返す。
 
@@ -587,7 +595,8 @@ class LearnedEngine:
         hit = self._battle_plans.get(key)
         steps = hit[1] if (hit is not None and hit[0]() is bat) else None
         if steps is None:
-            move, stats, ev_mgr, tail = self._battle_window_plan(manager, name, det_rng)
+            move, stats, ev_mgr, tail = self._battle_window_plan(manager, name, det_rng,
+                                                                 shape=shape)
             if move is None:
                 return None, None, None
             if len(self._battle_plans) >= 64:
@@ -608,7 +617,38 @@ class LearnedEngine:
         self._battle_plans.pop(key, None)
         if _replanned:
             return None, None, None          # 二度目も割れたら従来経路（full-tree）へ委ねる
-        return self._battle_commit_step(manager, name, det_rng, _replanned=True)
+        return self._battle_commit_step(manager, name, det_rng, _replanned=True,
+                                        shape=shape)
+
+    def _guard_policy_for(self, manager, name, det_rng):
+        """このターンの受け方針（P6-c・相手ターン中 sticky）。初回だけ台本比較で選ぶ。
+
+        対象は「相手ターン中の自分の防御判断」のみ（自ターンの戦闘窓＝攻撃側の窓では
+        方針を立てない）。選択は決定化1世界（戦闘窓読み出しと同じ規約）＋CRN。"""
+        from opcg_sim.src.learned import guard as GD
+        if getattr(getattr(manager, "turn_player", None), "name", None) == name:
+            return None                      # 自ターン＝受け方針の対象外
+        key = (_plan_sticky_id(manager),
+               int(getattr(manager, "turn_count", 0) or 0), name)
+        if key in self._guard_policies:
+            return self._guard_policies[key]
+        if len(self._guard_policies) >= 64:
+            for k in list(self._guard_policies)[:32]:
+                del self._guard_policies[k]
+        try:
+            world = self.game.determinize(manager, name, det_rng)
+            vf = _value_fn(self.vnet, self.vocab, self.enc_version,
+                           aux_tiebreak=self.aux_tiebreak)
+            pf = _priors_fn(self.pnet, self.vocab, self.enc_version)
+            dbx = CFG.TREE_BOX_DIALOG if getattr(self, "box_dialog", None) is None \
+                else self.box_dialog
+            pol, _diag = GD.select_guard_policy(
+                self.game, world, name, vf, pf,
+                battle_value_fn=self._battle_value_fn(), dialog_box=bool(dbx))
+        except Exception:
+            pol = "local"                    # 選択に失敗しても手は必ず返る（現行挙動へ）
+        self._guard_policies[key] = pol
+        return pol
 
     def _plan_step(self, manager, name, det_rng, world_seed):
         """プラン読み出し（`SERVE_PLAN_READOUT`・v37②）: ターンに1回プランを立てて
@@ -701,12 +741,24 @@ class LearnedEngine:
         use_battle = (CFG.SERVE_BATTLE_READOUT if self.battle_readout is None
                       else self.battle_readout)
         if use_battle and in_battle(manager):
+            # 受け方針箱（P6-c）: 相手ターンの入口で方針を1回選び、防御窓の候補整形として渡す
+            gp_on = (CFG.SERVE_GUARD_POLICY if self.guard_policy is None
+                     else self.guard_policy)
+            shape = None
+            if gp_on:
+                pol = self._guard_policy_for(manager, name, det_rng)
+                if pol and pol != "local":
+                    from opcg_sim.src.learned import guard as GD
+                    shape = (lambda mgr, legal, _p=pol:
+                             GD.shape_moves(_p, mgr, name, legal))
             commit = (CFG.SERVE_BATTLE_COMMIT if self.battle_commit is None
                       else self.battle_commit)
             if commit:
-                move, stats, ev_mgr = self._battle_commit_step(manager, name, det_rng)
+                move, stats, ev_mgr = self._battle_commit_step(manager, name, det_rng,
+                                                               shape=shape)
             else:
-                move, stats, ev_mgr = self._battle_window_choice(manager, name, det_rng)
+                move, stats, ev_mgr = self._battle_window_choice(manager, name, det_rng,
+                                                                 shape=shape)
             if move is not None:
                 if trace is not None:
                     try:
