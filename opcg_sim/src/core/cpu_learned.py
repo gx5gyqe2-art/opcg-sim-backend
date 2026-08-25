@@ -681,8 +681,38 @@ class LearnedEngine:
         for attempt in (0, 1):
             legal = self.game.legal_actions(manager)
             while steps:
-                mv = PL._find_move(legal, steps[0])
+                st = steps[0]
+                if isinstance(st, tuple) and len(st) == 3 and st[0] == "__box__":
+                    # 箱の完走カウントダウン（下の修正の続き）: 残 n 回ぶん同 sig の箱へ
+                    # 再マッチして原始手を出す。箱が候補から消えたら縮退（pop）。
+                    _tag, sig0, n = st
+                    mv = PL._find_move(legal, sig0)
+                    if mv is None:
+                        steps.pop(0)
+                        continue
+                    if n <= 1:
+                        steps.pop(0)
+                    else:
+                        steps[0] = ("__box__", sig0, n - 1)
+                    return mv
+                mv = PL._find_move(legal, st)
                 if mv is not None:
+                    p = (mv.get("payload") or {})
+                    k = int(p.get("don_k") or 0)
+                    if mv.get("action_type") == "DON_BOX" and k > 0:
+                        # **箱の半消化バグ修正（2026-08-25・plan-box アリーナ 0.06 の根因）**:
+                        # k>0 の箱は原始手 k 回（付与）＋攻撃形はさらに1回（ATTACK）で完走する。
+                        # 先頭1手で pop すると「付与だけして攻撃しない」に化け、評価
+                        # （execute_plan は箱を丸ごと適用）と実行が乖離する（battle commit
+                        # 0.320 事件と同型）。sig は don_k 非含有なので、残回数はステップ側に
+                        # カウントダウンとして持つ（配分箱が意図の k を超えて全ドン投入に
+                        # 化けないため）。
+                        total = k + (1 if p.get("target_ids") else 0)
+                        if total > 1:
+                            steps[0] = ("__box__", st, total - 1)
+                        else:
+                            steps.pop(0)
+                        return mv
                     steps.pop(0)
                     return mv
                 steps.pop(0)       # 対象消滅などで非合法になった手は縮退（プラン評価と同じ規約）

@@ -69,6 +69,36 @@ def test_plan_readout_outputs_primitive(m2_44):
     assert seen_plan, "6シードで一度もプラン読み出しが採用されない"
 
 
+def test_plan_step_completes_box_before_advancing(m2_44):
+    """箱の半消化バグの再発ガード（2026-08-25・plan-box アリーナ 0.06 の根因）:
+    k>0 の DON_BOX ステップは先頭原始手を返した後も**プランに残り**、箱を完走してから
+    次のステップへ進む（pop すると付与だけして攻撃しない/配分が途切れる）。"""
+    m, name = m2_44
+    eng = CL.LearnedEngine(plan_readout=True, **_BOX_KW)
+    actor = m.p1 if m.p1.name == name else m.p2
+    legal = eng.game.legal_actions(m)
+    # 原始手2回以上で完走する箱＝配分 k>=2 またはアタック形 k>=1（付与k＋攻撃1）
+    def emits(x):
+        p = x.get("payload") or {}
+        k = int(p.get("don_k") or 0)
+        return k + (1 if p.get("target_ids") else 0) if x.get("action_type") == "DON_BOX" else 0
+    boxes = [x for x in legal if emits(x) >= 2]
+    assert boxes, "複数原始手の箱が立たない盤面では検証できない"
+    sig = PL.move_sig(boxes[0])
+    n_total = emits(boxes[0])
+    rng = np.random.default_rng(1)
+    eng._world_seeds = {}
+    # decide を1回呼んでプランキーを確立してから、プランを注入して差し替える
+    eng.decide(m, actor, sims=8, rng=rng)
+    assert eng._turn_plans, "プランキャッシュが作られていない"
+    key = list(eng._turn_plans)[-1]
+    eng._turn_plans[key] = [sig]
+    mv = eng.decide(m, actor, sims=8, rng=rng)
+    assert (mv or {}).get("action_type") == "ATTACH_DON"      # 先頭原始手＝付与
+    st = eng._turn_plans[key][0]                              # カウントダウンで残る
+    assert st[0] == "__box__" and st[1] == sig and st[2] == n_total - 1
+
+
 def test_execute_plan_dialog_box_kw_accepted(m2_44):
     m, name = m2_44
     eng = CL.LearnedEngine(**_BOX_KW)
