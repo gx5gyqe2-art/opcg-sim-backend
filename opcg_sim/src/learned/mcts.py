@@ -41,7 +41,7 @@ import numpy as np
 from opcg_sim.src.core import cpu_ai, journal
 from opcg_sim.src.core.journal import JournaledList
 from .config import (BOX_BRANCH_BUDGET, BOX_RESOLVE_DEPTH, C_PUCT, DIRICHLET_ALPHA, TERM_DECAY,
-                     TERM_FLOOR, SERVE_QUIESCE, QUIESCE_MAX_PLIES, TREE_BOX_BATTLE,
+                     TERM_FLOOR, SERVE_QUIESCE, QUIESCE_MAX_PLIES, TREE_BOX_BATTLE, TREE_BOX_DIALOG,
                      SERVE_TURN_QUIESCE, TURN_QUIESCE_MAX_PLIES)
 
 
@@ -88,6 +88,32 @@ def in_battle(mgr):
         return False
 
 
+# 効果対話窓のアクション名（マクロ手化 P3/P5＝対話箱・2026-08-25）。
+# 語彙の正本は `engine/interaction.py pending_actor_action`＝`active_interaction` の
+# action_type（SELECT_TARGET/FIELD_OVERFLOW_TRASH は SEARCH_AND_SELECT に写像されるが
+# 頑健のため元名も含める）。CONFIRM_TRIGGER=トリガー発動可否・CONFIRM_OPTIONAL=任意確認・
+# CHOICE=モード選択・DECLARE_COST=コスト宣言。外周の単発判断（MULLIGAN=マリガン・
+# ARRANGE_DECK=デッキ並べ替え・SELECT_RESOURCE=リソース選択）と MAIN_ACTION は
+# **含めない**（`docs/cpu_macro_plan.md` §2 の「外周は箱化しない」）。
+DIALOG_ACTIONS = frozenset({
+    "SEARCH_AND_SELECT", "SELECT_TARGET", "FIELD_OVERFLOW_TRASH",
+    "CONFIRM_OPTIONAL", "CONFIRM_TRIGGER", "CHOICE", "DECLARE_COST",
+})
+
+
+def in_dialog(mgr):
+    """効果対話窓か（＝in_battle の効果版・pure）。
+
+    PLAY/ACTIVATE の後に開く対象選択・効果選択・サーチ・並べ替え・任意確認の窓。
+    戦闘中に開く対話（active_battle あり）は in_battle が先に立つため、対話箱の判定は
+    **非戦闘時のみ**呼び出し側で組み合わせる（戦闘中の窓は戦闘箱の解決規約が畳む）。"""
+    try:
+        pa = mgr.pending_actor_action()
+        return bool(pa) and pa[1] in DIALOG_ACTIONS
+    except Exception:
+        return False
+
+
 def quiesce_choice(mgr, legal, priors_fn=None):
     """静止探索の延長で採る手の index（**policy 最良手 → PASS → 先頭手**・pure）。
 
@@ -108,7 +134,7 @@ def quiesce_choice(mgr, legal, priors_fn=None):
 
 
 def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIES,
-                           value_fn=None, box_depth=0, trace=None):
+                           value_fn=None, box_depth=0, trace=None, window_pred=None):
     """戦闘が解決するまで mgr をその場で進める（**巻き戻さない**・適用手数を返す）。
 
     **探索（葉評価）と教師（コーパス符号化）が同一の解決規約を使うための単一の正**。
@@ -121,10 +147,15 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
     policy 最良手だが、**policy は効果選択の選択肢を区別できない**（行動特徴に対象が入らず
     priors が一様＝実質「先頭固定」・m2@44 実測）ため、箱が予測する出口と実際に到達する出口が
     ずれる（箱は「どうせカウンターされる」と読み、実際の CPU は出口 value で PASS を選ぶ）。
-    深さで再帰を止める（resolved_branch_values ↔ 本関数の相互再帰）。"""
+    深さで再帰を止める（resolved_branch_values ↔ 本関数の相互再帰）。
+
+    `window_pred`（対話箱・2026-08-25）: 「まだ窓の中か」の述語を差し替えて**効果対話窓の
+    解決にも同じ規約を使う**（None=従来どおり in_battle＝戦闘窓）。対話箱は
+    `window_pred=in_dialog` で呼ぶ＝解決の本体・巻き戻し契約・予算は完全に共通。"""
+    pred = window_pred or in_battle
     n = 0
     for _ in range(max_plies):
-        if game.is_terminal(mgr) or not in_battle(mgr):
+        if game.is_terminal(mgr) or not pred(mgr):
             break
         name = game.current_player(mgr)
         legal = game.legal_actions(mgr) if name else None
@@ -133,7 +164,8 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
         pick = None
         if box_depth > 0 and value_fn is not None and len(legal) > 1:
             vals = resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn,
-                                          max_plies, box_depth=box_depth - 1)
+                                          max_plies, box_depth=box_depth - 1,
+                                          window_pred=window_pred)
             ok = [i for i, v in enumerate(vals) if v is not None]
             if ok:
                 pick = max(ok, key=lambda i: vals[i])
@@ -153,7 +185,7 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
 
 
 def resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn=None,
-                           max_plies=QUIESCE_MAX_PLIES, box_depth=None):
+                           max_plies=QUIESCE_MAX_PLIES, box_depth=None, window_pred=None):
     """各合法手を「戦闘を解決した出口盤面」まで進めて評価した value 列（`mgr` は不変）。
 
     **戦闘を1つの箱として畳む**（ユーザ整理 2026-08-05）: 箱の中の手順そのものは評価対象に
@@ -197,7 +229,8 @@ def resolved_branch_values(game, mgr, name, legal, value_fn, priors_fn=None,
                 mgr.action_events = JournaledList()
                 cpu_ai._apply_move_inplace(mgr, name, mv, stop_at_select=True)
                 resolve_battle_inplace(game, mgr, priors_fn, max_plies,
-                                       value_fn=value_fn, box_depth=box_depth)
+                                       value_fn=value_fn, box_depth=box_depth,
+                                       window_pred=window_pred)
                 v = value_fn(mgr, name)
         except Exception:
             v = None
@@ -273,7 +306,8 @@ class TreeMCTS:
                  determinize_fn=None, rng=None, dirichlet_alpha=DIRICHLET_ALPHA, dirichlet_eps=0.0,
                  term_decay=TERM_DECAY, term_floor=TERM_FLOOR,
                  quiesce=None, quiesce_max_plies=QUIESCE_MAX_PLIES, box_battle=None,
-                 turn_quiesce=None, turn_value_fn=None, battle_value_fn=None):
+                 turn_quiesce=None, turn_value_fn=None, battle_value_fn=None,
+                 box_dialog=None):
         self.game = game
         self.value_fn = value_fn
         self.priors_fn = priors_fn
@@ -292,6 +326,8 @@ class TreeMCTS:
         self.quiesce_max_plies = quiesce_max_plies
         # 木の中の箱化（config.TREE_BOX_BATTLE）: 戦闘窓ノードを出口 value 最良の1手へ畳む。
         self.box_battle = TREE_BOX_BATTLE if box_battle is None else box_battle
+        # 対話箱（config.TREE_BOX_DIALOG・P3/P5）: 効果対話窓ノードも同じ規約で畳む。
+        self.box_dialog = TREE_BOX_DIALOG if box_dialog is None else box_dialog
         # ターン静止（config.SERVE_TURN_QUIESCE）: root 手番側の自ターン途中の葉は
         # ターンが終わるまで進めてから評価する（v37・ターンの箱の第1段）。
         self.turn_quiesce = SERVE_TURN_QUIESCE if turn_quiesce is None else turn_quiesce
@@ -366,7 +402,8 @@ class TreeMCTS:
             turn_ext = (t_owner is not None and t_owner == t_decider
                         and int(getattr(mgr, "turn_count", 0) or 0) == t_no
                         and _turn_owner(mgr) == t_owner)
-        if not turn_ext and (not self.quiesce or self._generic or not in_battle(mgr)):
+        noisy = in_battle(mgr) or (self.box_dialog and in_dialog(mgr))
+        if not turn_ext and (not self.quiesce or self._generic or not noisy):
             return self.value_fn(mgr, to_move)
         rng_state = random.getstate()
         saved_events = mgr.action_events
@@ -379,6 +416,10 @@ class TreeMCTS:
                                          battle_value_fn=self.battle_value_fn)
                     v = (self.turn_value_fn or self.value_fn)(mgr, to_move)
                 else:
+                    if self.box_dialog and in_dialog(mgr) and not in_battle(mgr):
+                        # 対話中の葉＝解決した時点の盤面を見る（戦闘静止と同じ意味論）。
+                        resolve_battle_inplace(self.game, mgr, self.priors_fn,
+                                               self.quiesce_max_plies, window_pred=in_dialog)
                     resolve_battle_inplace(self.game, mgr, self.priors_fn, self.quiesce_max_plies)
                     # 静止で畳んだ戦闘出口の**葉の値**は本体 value で測る（v41 の範囲外）:
                     # ここは「箱の枝を並べる」場面ではなく木の葉の絶対評価で、他の葉と同じ
@@ -428,6 +469,22 @@ class TreeMCTS:
                 b = max(ok, key=lambda i: vals[i])
                 legal = [legal[b]]
                 leaf_v = vals[b]       # 葉見積もりも同じ出口＝木と読み出しで規約が一致する
+        if (leaf_v is None and self.box_dialog and not self._generic and len(legal) > 1
+                and not in_battle(mgr) and in_dialog(mgr)):
+            # **対話箱**（P3/P5・2026-08-25）: 効果対話窓（対象選択・効果選択・サーチ・
+            # 並べ替え・任意確認）も戦闘窓と同じく「どの出口盤面になるか」の局所判断＝
+            # 出口 value 最良の1手へ畳む。これにより PLAY 辺がカード使用箱・ACTIVATE_MAIN 辺が
+            # 効果起動箱・相手の応答窓が応答箱として機能する（各窓の手番が自視点 value で
+            # 最善応手＝戦闘箱と同じミニマックス規約）。物差しは**本体 value**（出口は
+            # メイン窓の通常盤面＝葉評価と同じ物差しでなければ backup と矛盾する）。
+            vals = resolved_branch_values(g, mgr, node.to_move, legal,
+                                          self.value_fn, self.priors_fn,
+                                          self.quiesce_max_plies, window_pred=in_dialog)
+            ok = [i for i, v in enumerate(vals) if v is not None]
+            if ok:
+                b = max(ok, key=lambda i: vals[i])
+                legal = [legal[b]]
+                leaf_v = vals[b]
         node.legal = legal
         n = len(legal)
         node.N = np.zeros(n)

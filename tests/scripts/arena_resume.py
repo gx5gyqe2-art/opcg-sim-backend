@@ -105,6 +105,12 @@ def main():
     ap.add_argument("--cand-defense-box", action="store_true",
                     help="候補席だけ防御箱 v1（P4-c・D1'/D2' 支配則の候補整形）を有効化"
                          "（2026-08-24・ネット不変の防御矯正の A/B）")
+    ap.add_argument("--cand-dialog-box", action="store_true",
+                    help="候補席だけ対話箱（P3/P5・効果対話窓を出口value最良で畳む）を有効化"
+                         "（2026-08-25）")
+    ap.add_argument("--cand-boxes-all", action="store_true",
+                    help="候補席で箱化インフラ全部入り（P1配分箱+P2アタック箱+P4c防御箱+"
+                         "P3/P5対話箱＝macro_moves+defense_box+box_dialog+戦闘箱設定）を有効化")
     ap.add_argument("--cand-plan-readout", action="store_true",
                     help="候補席だけプラン読み出し（v37②・turn出口ヘッド候補の実戦測定）を有効化。"
                          "env の SERVE_PLAN_READOUT は両席に効いて対照を汚すため使わない")
@@ -132,6 +138,11 @@ def main():
                        box_battle=True, battle_readout=True, quiesce=True)
     if args.cand_defense_box:
         cand_kw = dict(cand_kw or {}, defense_box=True)
+    if args.cand_dialog_box:
+        cand_kw = dict(cand_kw or {}, box_dialog=True)
+    if args.cand_boxes_all:
+        cand_kw = dict(cand_kw or {}, macro_moves=True, defense_box=True, box_dialog=True,
+                       box_battle=True, battle_readout=True, quiesce=True)
 
     from arena_gate import plan_bands
     planned = [s for band in plan_bands(args.pairs, args.bands, args.seed_base) for s in band]

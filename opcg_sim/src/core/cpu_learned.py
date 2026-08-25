@@ -33,8 +33,8 @@ from opcg_sim.src.learned.config import (
     SERVE_ROOT_SWITCH_MIN_FRAC, SERVE_ROOT_SWITCH_MIN_GAP, SERVE_STICKY_WORLD,
     AUX_TIE_DECAY, AUX_SAT_START, TERM_FLOOR, V4_TURNS_SCALE)
 from opcg_sim.src.learned.mcts import (   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
-    TreeMCTS, clear_box_budget, in_battle, reset_box_budget, resolve_battle_inplace,
-    resolved_branch_values)
+    TreeMCTS, clear_box_budget, in_battle, in_dialog, reset_box_budget,
+    resolve_battle_inplace, resolved_branch_values)
 from opcg_sim.src.utils.loader import CardLoader
 
 _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -332,7 +332,8 @@ class LearnedEngine:
                  plan_readout: Optional[bool] = None, don_margin: Optional[bool] = None,
                  don_box: Optional[bool] = None, battle_commit: Optional[bool] = None,
                  macro_moves: Optional[bool] = None,
-                 defense_box: Optional[bool] = None):
+                 defense_box: Optional[bool] = None,
+                 box_dialog: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
@@ -368,6 +369,8 @@ class LearnedEngine:
         self.quiesce = quiesce
         # 木の中の箱化（None=config.TREE_BOX_BATTLE に従う・同上の席別 seam）。
         self.box_battle = box_battle
+        # 対話箱（P3/P5・config.TREE_BOX_DIALOG のエンジン別上書き・None=config に従う）
+        self.box_dialog = box_dialog
         # ターン静止（None=config.SERVE_TURN_QUIESCE に従う・v37 の席別 seam）。
         self.turn_quiesce = turn_quiesce
         # プラン読み出し（None=config.SERVE_PLAN_READOUT に従う・v37② の席別 seam）。
@@ -484,6 +487,34 @@ class LearnedEngine:
         best = max(ok, key=lambda i: vals[i])
         # トレース用の root 統計は探索と同じ形（N/Q）で作る: 各枝を1回ずつ解決して評価した、
         # という事実をそのまま N=1 に、判断の根拠である出口評価を Q に載せる。
+        stats = {"legal": legal,
+                 "N": np.array([1.0 if v is not None else 0.0 for v in vals]),
+                 "Q": np.array([v if v is not None else -1.0 for v in vals], dtype=float)}
+        return legal[best], stats, mgr
+
+    def _dialog_window_choice(self, manager, name, det_rng):
+        """効果対話窓の読み出し（対話箱・P3/P5・2026-08-25）: 出口盤面の value で選ぶ。
+
+        `_battle_window_choice` と同型（同じ決定化・同じ `resolved_branch_values`・同じ
+        argmax）。違いは窓の述語（window_pred=in_dialog）と物差し（**本体 value**＝出口は
+        メイン窓の通常盤面なので葉評価と同じ物差しで測る）だけ。これにより serve の対話窓
+        decide が full-tree（160 sims）から枝数回の出口評価に落ちる（P0 実測: 細部窓は
+        全 decide の42%＝うち効果系 ~11%）。選べないときは (None, None, None) で従来の探索へ。"""
+        mgr = self.game.determinize(manager, name, det_rng)
+        legal = self.game.legal_actions(mgr)
+        if not legal:
+            return None, None, None
+        if len(legal) == 1:
+            return legal[0], None, None
+        vf = _value_fn(self.vnet, self.vocab, self.enc_version,
+                       aux_tiebreak=self.aux_tiebreak)
+        vals = resolved_branch_values(
+            self.game, mgr, name, legal, vf,
+            _priors_fn(self.pnet, self.vocab, self.enc_version), window_pred=in_dialog)
+        ok = [i for i, v in enumerate(vals) if v is not None]
+        if not ok:
+            return None, None, None
+        best = max(ok, key=lambda i: vals[i])
         stats = {"legal": legal,
                  "N": np.array([1.0 if v is not None else 0.0 for v in vals]),
                  "Q": np.array([v if v is not None else -1.0 for v in vals], dtype=float)}
@@ -680,6 +711,20 @@ class LearnedEngine:
                     except Exception:
                         pass   # 分析失敗で対局を止めない
                 return move
+        # 対話箱（P3/P5・2026-08-25）: 効果対話窓は出口 value で直接選ぶ（戦闘窓読み出しと
+        # 同型・非戦闘時のみ。戦闘中の対話は上の戦闘箱経路が扱う）。
+        use_dialog = (CFG.TREE_BOX_DIALOG if self.box_dialog is None else self.box_dialog)
+        if use_dialog and not in_battle(manager) and in_dialog(manager):
+            move, stats, ev_mgr = self._dialog_window_choice(manager, name, det_rng)
+            if move is not None:
+                if trace is not None:
+                    try:
+                        _fill_trace(trace, ev_mgr if ev_mgr is not None else manager,
+                                    player, move, stats)
+                        trace["readout"] = "dialog_resolved"
+                    except Exception:
+                        pass   # 分析失敗で対局を止めない
+                return move
         # プラン読み出し（v37②）: 自ターンのメイン判断は「プラン×K世界の期待値」で決める。
         # 対象は自ターン所有かつ非戦闘の判断のみ（防御窓は上の箱読み出し・相手ターンは対象外）。
         use_plan = (CFG.SERVE_PLAN_READOUT if self.plan_readout is None
@@ -710,6 +755,7 @@ class LearnedEngine:
                         c_puct=c_puct, n_sims=sims, dirichlet_eps=SERVE_DIRICHLET_EPS,
                         determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=det_rng,
                         quiesce=self.quiesce, box_battle=self.box_battle,
+                        box_dialog=self.box_dialog,
                         turn_quiesce=self.turn_quiesce,
                         turn_value_fn=self._exit_value_fn(),
                         battle_value_fn=self._battle_value_fn())

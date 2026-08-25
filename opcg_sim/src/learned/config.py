@@ -68,6 +68,17 @@ SERVE_MACRO_MOVES = False
 # （arena_resume --cand-defense-box）で効果を実測してから既定化を判断する。
 # インスタンス上書きは OPCGGame(defense_box=)／LearnedEngine(defense_box=)（席別 seam）。
 SERVE_DEFENSE_BOX = False
+# マクロ手化 P3/P5（対話箱・2026-08-25・docs/cpu_macro_plan.md §2）: 効果対話窓
+# （SELECT_TARGET / RESOLVE_EFFECT_SELECTION / SEARCH_AND_SELECT / ORDER_CARDS /
+# CONFIRM_DECISION）を戦闘箱と同じ規約（`resolved_branch_values` の window_pred=in_dialog）で
+# **出口 value 最良の1手へ畳む**。木の中（TreeMCTS._expand）と serve の対話窓
+# （LearnedEngine の対話窓読み出し）の両方に効く。これにより PLAY 辺=カード使用箱・
+# ACTIVATE_MAIN 辺=効果起動箱・相手の応答窓=応答箱・トリガー可否=CONFIRM 窓として
+# **P3/P5 の語彙が1機構で実現**する（変種分裂は畳みが代替＝各窓で自視点 value 最善）。
+# 外周（MULLIGAN/ARRANGE_DECK/SELECT_RESOURCE）は畳まない。既定 OFF（挙動連続性）＝
+# アリーナ A/B（arena_resume --cand-dialog-box / --cand-boxes-all）で実測してから判断。
+# インスタンス上書きは LearnedEngine(box_dialog=)（席別 seam）。
+TREE_BOX_DIALOG = False
 
 # v6 柱⑤（生成/serve の探索設定分離・docs/reports/v5_adoption_20260715.md §4-5）: 自己対戦**生成**の
 # 枝刈り既定。生成側は枝刈りを外す＝探索が訪れない枝は学習できないため、serve 用ヒューリスティクスを
