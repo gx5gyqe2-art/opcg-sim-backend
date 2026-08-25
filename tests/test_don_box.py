@@ -126,9 +126,11 @@ def test_adapter_seam_follows_config_and_override(db):
     assert SERVE_DON_BOX is True
     gm = _new_gm(db)
     _setup(gm, power_delta=0, dons=4)
-    default = OPCGGame()                  # 既定＝config に従う（ON）
-    off = OPCGGame(don_box=False)         # 席別上書きで旧挙動
-    on = OPCGGame(don_box=True)
+    # macro_moves は明示 OFF（2026-08-25 既定 ON 化に伴う固定）: 本テストの対象は
+    # don_box の seam であり、配分箱（macro）が合成する DON_BOX と混同しないため。
+    default = OPCGGame(macro_moves=False)             # 既定＝config に従う（ON）
+    off = OPCGGame(don_box=False, macro_moves=False)  # 席別上書きで旧挙動
+    on = OPCGGame(don_box=True, macro_moves=False)
     assert any(m.get("action_type") == "DON_BOX" for m in default.legal_actions(gm))
     assert not any(m.get("action_type") == "DON_BOX" for m in off.legal_actions(gm))
     assert any(m.get("action_type") == "DON_BOX" for m in on.legal_actions(gm))

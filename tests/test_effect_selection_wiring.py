@@ -52,7 +52,9 @@ def m244():
         pytest.skip(f"盤面復元不可: {built}")
     m0, who = built
     name = who if isinstance(who, str) else who.name
-    eng = LearnedEngine()
+    # 原始手（ATTACH_DON/ATTACK）で盤面を組み立てる配線テスト＝箱化は明示 OFF
+    # （serve 既定の箱化 2026-08-25 と独立に効果選択の配線だけを見る）
+    eng = LearnedEngine(macro_moves=False, defense_box=False)
     g = eng.game
 
     def find(mgr, atype, card=None):

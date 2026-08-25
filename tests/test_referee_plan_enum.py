@@ -39,7 +39,8 @@ def setup():
     db = _load_db()
     vnet = RN.ValueNet.load(os.path.join(REPO, "opcg_sim", "data", "learned", "gen5_value.npz"))
     vf = P.value_fn_of(vnet, E.vocab_from_ids(vnet.vocab_ids), _net_enc_version(vnet))
-    game_root = OPCGGame(prune_futile=False)
+    game_root = OPCGGame(prune_futile=False, macro_moves=False, defense_box=False)
+    # ↑ レフェリー列挙は**原始手の全空間**が対象（serve 既定の箱化 2026-08-25 と独立）
     raw = RE.load_replay_json(MG.REPLAYS["g3"]); rec = raw.get("replay", raw)
     fbi = {f.get("action_index"): f for f in raw.get("frames") or []}
     CR.GAMES = {"g3": (rec, fbi, rec["actions"])}
