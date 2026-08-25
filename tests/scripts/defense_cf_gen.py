@@ -106,6 +106,40 @@ def _init_worker(matchup, decks_json, rollout_sims, enc_version):
     from opcg_sim.src.core.cpu_learned import LearnedEngine
     CR.ARGS = argparse.Namespace(sims=rollout_sims, true_board=False)
     eng = LearnedEngine()
+    if matchup == "random":
+        # ランダムリーダー×生成デッキ（N2・2026-08-25）: 教師も実デッキを使わない
+        # （CLAUDE.md「開発判断の前提」＝実デッキは完全ホールドアウトの検証帯）。
+        # g15_gen --matchup random / promotion_gate._leader_pair と同規約。
+        from opcg_game import OPCGGame as _OG
+        from opcg_sim.src.learned.config import GEN_PRUNE_FUTILE as _GPF
+
+        class _RandomGame(_OG):
+            def new_game(self, db, seed, leaders=None):
+                import random as _r
+                from deck_synth import synth_deck
+                from opcg_sim.src.core.gamestate import GameManager, Player
+                _r.seed(seed)
+                pool = getattr(self, "_pool", None)
+                if pool is None:
+                    pool = sorted(cid for cid, _ in db.raw_db.items()
+                                  if (db.get_card(cid) is not None
+                                      and getattr(db.get_card(cid).type, "name", "")
+                                      == "LEADER"))
+                    self._pool = pool
+                rl = _r.Random(seed * 7919 + 13)
+                la, lb = rl.choice(pool), rl.choice(pool)
+                l1, c1 = synth_deck(db, la, seed=seed, owner="p1")
+                l2, c2 = synth_deck(db, lb, seed=seed + 1, owner="p2")
+                m = GameManager(Player("p1", c1, l1), Player("p2", c2, l2))
+                m.start_game()
+                return m
+
+        _G.update(db=_load_db(), CR=CR, eng=eng, enc_version=enc_version,
+                  vf=P.value_fn_of(eng.vnet, eng.vocab, eng.enc_version),
+                  pf=P.priors_fn_of(eng.pnet, eng.vocab, eng.enc_version),
+                  game_gen=_RandomGame(prune_futile=_GPF),
+                  gserve=OPCGGame())
+        return
     a, b = matchup.split(":")
     # ラベル（勝敗）は出荷ネットのロールアウトで測る一方、**行の符号化は enc_version**
     # （既定 v6＝手札資源集約つき）。ネットが v5 でも盤面の記述として新特徴を教師行に載せる

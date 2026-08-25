@@ -99,7 +99,11 @@ def _init(sims, enc_version):
 
 
 def battle_exit(manager, name, pay_uuids):
-    """カウンター列を払い、残る自窓を素通しで閉じ、戦闘解決後の盤面を返す（失敗は None）。"""
+    """カウンター列を払い、残りの戦闘を**エンジンと同じ解決規約**で閉じた盤面を返す（失敗は None）。
+
+    2026-08-25 規約一致修正（N1 ゲートの発見）: 旧実装は「残る自窓を素通しで流す」簡略規約で、
+    serve（resolve_battle_inplace の出口価値最良継続・box_depth=config）と**教師の出口分布が
+    ずれていた**。defense_cf_gen と同じく解決規約を探索と共有する（1定義）。"""
     m = manager.clone()
     m.action_events = []
     random.seed(4242)
@@ -109,25 +113,14 @@ def battle_exit(manager, name, pay_uuids):
             cpu_ai._apply_move_inplace(
                 m, name, {"kind": "battle", "action_type": "SELECT_COUNTER",
                           "card_uuid": u}, stop_at_select=True)
-        for _ in range(24):
-            if getattr(m, "active_battle", None) is None:
-                return m
-            pa = m.pending_actor_action()
-            if pa is None:
-                return None
-            if pa[0] != name:
-                return None                     # 相手の応手が挟まる窓＝対を立てない（保守側）
-            legal = _G["eng"].game.legal_actions(m)
-            mv = None
-            for x in legal:
-                d = cpu_ai._describe_move(m, x) or {}
-                if d.get("action_type") in ("PASS",) or d.get("accepted") is False:
-                    mv = x
-                    break
-            if mv is None:
-                return None
-            cpu_ai._apply_move_inplace(m, name, mv, stop_at_select=True)
-        return None
+        from opcg_sim.src.learned.config import BOX_RESOLVE_DEPTH
+        from opcg_sim.src.learned.mcts import resolve_battle_inplace
+        from opcg_sim.src.core import cpu_learned as CL
+        eng = _G["eng"]
+        pf = CL._priors_fn(eng.pnet, eng.vocab, eng.enc_version)
+        resolve_battle_inplace(eng.game, m, pf, value_fn=eng._battle_value_fn(),
+                               box_depth=BOX_RESOLVE_DEPTH)
+        return m if getattr(m, "active_battle", None) is None else None
     except Exception:
         return None
 
