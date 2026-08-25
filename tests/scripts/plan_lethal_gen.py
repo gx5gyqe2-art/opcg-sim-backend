@@ -149,7 +149,12 @@ def _init(sims, enc_version):
     from cpu_arena import _load_db
     from opcg_sim.src.core import cpu_learned as CL
     _G["db"] = _load_db()
-    eng = CL.LearnedEngine(sims=sims)
+    eng = CL.LearnedEngine(sims=sims,
+                           # 教師生成は**原始手の全空間**が対象（レフェリー/計器と同じ原則・
+                           # 2026-08-25 既定 ON 化に伴う明示化）: 箱化された候補では
+                           # V1/V4/リーサル対の原始手探索が成立しない（実測 0 対）。
+                           macro_moves=False, defense_box=False, box_dialog=False,
+                           plan_readout=False)
     _G["eng"] = eng
     _G["vf"] = CL._value_fn(eng.vnet, eng.vocab, eng.enc_version)
     _G["pf"] = CL._priors_fn(eng.pnet, eng.vocab, eng.enc_version)
