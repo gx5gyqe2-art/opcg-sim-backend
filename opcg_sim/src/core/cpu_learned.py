@@ -817,8 +817,13 @@ class LearnedEngine:
         # 対象は自ターン所有かつ非戦闘の判断のみ（防御窓は上の箱読み出し・相手ターンは対象外）。
         use_plan = (CFG.SERVE_PLAN_READOUT if self.plan_readout is None
                     else self.plan_readout)
+        _pa = manager.pending_actor_action()
         if use_plan and not in_battle(manager) and \
+                _pa is not None and _pa[1] == "MAIN_ACTION" and \
                 getattr(getattr(manager, "turn_player", None), "name", None) == name:
+            # プラン読み出しの対象は自ターンの**メイン判断のみ**（v37 の設計どおり）。
+            # 外周（MULLIGAN 等）・対話窓は対象外＝trace 契約（candidates）も従来のまま
+            # （2026-08-25 既定 ON 化で顕在化した境界の明示）。
             wkey = (id(manager), int(getattr(manager, "turn_count", 0) or 0), name)
             hit = self._world_seeds.get(wkey)
             wseed = hit[1] if hit is not None else None
