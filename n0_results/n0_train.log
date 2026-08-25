@@ -1,0 +1,22 @@
+z行 31005（train 27904/val 3101）・battle対 400+58・turn対 388+60・カード表 (2653, 20)
+  ep1: train 0.9214 / val 0.8036 / battle対val 0.931 / turn対val 1.000
+  ep2: train 0.7921 / val 0.7974 / battle対val 0.931 / turn対val 1.000
+  ep3: train 0.7582 / val 0.7381 / battle対val 0.931 / turn対val 1.000
+  ep4: train 0.7315 / val 0.7315 / battle対val 0.931 / turn対val 1.000
+  ep5: train 0.7132 / val 0.7143 / battle対val 0.914 / turn対val 1.000
+  ep6: train 0.7061 / val 0.7177 / battle対val 0.931 / turn対val 1.000
+  ep7: train 0.6915 / val 0.6983 / battle対val 0.931 / turn対val 1.000
+  ep8: train 0.6776 / val 0.6857 / battle対val 0.931 / turn対val 1.000
+  ep9: train 0.6775 / val 0.6832 / battle対val 0.931 / turn対val 1.000
+  ep10: train 0.6671 / val 0.6730 / battle対val 0.931 / turn対val 1.000
+  ep11: train 0.6639 / val 0.6593 / battle対val 0.931 / turn対val 1.000
+  ep12: train 0.6606 / val 0.6761 / battle対val 0.931 / turn対val 1.000
+  ep13: train 0.6385 / val 0.6601 / battle対val 0.931 / turn対val 1.000
+  ep14: train 0.6381 / val 0.6619 / battle対val 0.931 / turn対val 1.000
+  ep15: train 0.6261 / val 0.6724 / battle対val 0.931 / turn対val 1.000
+  ep16: train 0.6238 / val 0.6573 / battle対val 0.914 / turn対val 1.000
+  ep17: train 0.6181 / val 0.6549 / battle対val 0.931 / turn対val 1.000
+  ep18: train 0.6135 / val 0.6397 / battle対val 0.931 / turn対val 1.000
+  ep19: train 0.6101 / val 0.6345 / battle対val 0.931 / turn対val 1.000
+  ep20: train 0.5938 / val 0.6359 / battle対val 0.914 / turn対val 1.000
+N0_TRAIN_DONE {"val_mse": 0.6359, "battle_pair_val": 0.9138, "turn_pair_val": 1.0, "out": "/home/user/n0_net.npz"}
