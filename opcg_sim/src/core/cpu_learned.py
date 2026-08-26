@@ -313,6 +313,11 @@ class LearnedEngine:
         self.box_dialog = box_dialog
         # 箱コミット実行（2026-08-26・config.SERVE_BOX_COMMIT のエンジン別上書き・None=config）
         self.box_commit = box_commit
+        # 方策 priors の注入口（純正Nループ④ 2026-08-26）: None=既定（self.pnet の G 系
+        # priors）。設定時はその callable(state, legal)->np.array|None を全経路（木・窓の
+        # 根畳み・コミット生成）で使う＝N 系ネットの方策チャネルを pnet の G 形式を経由せず
+        # serve に繋ぐ seam（value の vnet 差し替えと対）。
+        self.priors_override = None
         # ターン内 sticky 世界線の seed キャッシュ {(id(manager), turn, player): (weakref, seed)}（§_world_rng）。
         self._world_seeds: Dict[Any, Any] = {}
         # 箱コミット（選んだ箱の自分側の残り手順）{(id(manager), turn, player): (weakref, steps)}。
@@ -396,6 +401,12 @@ class LearnedEngine:
         return self._exit_value_fn("battle") or _value_fn(
             self.vnet, self.vocab, self.enc_version)
 
+    def _priors(self):
+        """priors 関数（seam）: priors_override があればそれ・無ければ pnet の G 系 priors。"""
+        if self.priors_override is not None:
+            return self.priors_override
+        return _priors_fn(self.pnet, self.vocab, self.enc_version)
+
     def _window_choice(self, manager, name, det_rng):
         """**窓の根畳み**（純正AZ化 2026-08-25 の統一読み出し）: 窓（戦闘窓＝in_battle／
         （box_dialog 有効時の）効果対話窓＝in_dialog）では、決定化1世界の合法手を
@@ -424,7 +435,7 @@ class LearnedEngine:
             vf, wp = _value_fn(self.vnet, self.vocab, self.enc_version), in_dialog
         vals = resolved_branch_values(
             self.game, mgr, name, legal, vf,
-            _priors_fn(self.pnet, self.vocab, self.enc_version), window_pred=wp)
+            self._priors(), window_pred=wp)
         ok = [i for i, v in enumerate(vals) if v is not None]
         if not ok:
             return None, None, None      # 全枝で解決に失敗＝従来の full-tree に任せる（安全側）
@@ -565,7 +576,7 @@ class LearnedEngine:
                 return
             tr = []
             resolve_battle_inplace(
-                self.game, nxt, _priors_fn(self.pnet, self.vocab, self.enc_version),
+                self.game, nxt, self._priors(),
                 value_fn=vf, box_depth=CFG.BOX_RESOLVE_DEPTH, window_pred=wp, trace=tr)
             self._store_commit(manager, name, self._trace_to_steps(tr, name))
         except Exception:
@@ -590,7 +601,7 @@ class LearnedEngine:
                 return                       # 対話が無ければコミット無し
             tr = []
             resolve_battle_inplace(
-                self.game, nxt, _priors_fn(self.pnet, self.vocab, self.enc_version),
+                self.game, nxt, self._priors(),
                 value_fn=_value_fn(self.vnet, self.vocab, self.enc_version),
                 box_depth=CFG.BOX_RESOLVE_DEPTH, window_pred=in_dialog, trace=tr)
             self._store_commit(manager, name, self._trace_to_steps(tr, name))
@@ -664,7 +675,7 @@ class LearnedEngine:
                         pass   # 分析失敗で対局を止めない
                 return move
         mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab, self.enc_version),
-                        priors_fn=_priors_fn(self.pnet, self.vocab, self.enc_version),
+                        priors_fn=self._priors(),
                         c_puct=c_puct, n_sims=sims, dirichlet_eps=SERVE_DIRICHLET_EPS,
                         determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=det_rng,
                         quiesce=self.quiesce, box_battle=self.box_battle,

@@ -291,6 +291,8 @@ def train(args):
     tr_v = np.where(~va_v)[0]
     tr_p = np.where(~va_p)[0]
     va_pi = np.where(va_p)[0]
+    best = None                        # (val v_mse, params snapshot)＝過学習前のベストを保存
+    best_ep = -1
     for ep in range(args.epochs):
         rng.shuffle(tr_v); rng.shuffle(tr_p)
         nv = len(tr_v) // args.bs_v
@@ -321,8 +323,18 @@ def train(args):
               f"val v_mse {vmse:.4f} v_sign {vsgn:.3f} "
               f"pi_top1 {p_pi:.3f} chosen_top1 {p_ch:.3f} ce {p_ce:.3f} "
               f"{time.time()-t0:.0f}s", flush=True)
+        # ベストチェックポイント（val v_mse 基準＝探索を駆動するのは value。方策は
+        # 平坦（top1 0.51〜0.55）なので value の過学習前を採る）
+        if best is None or vmse < best[0]:
+            best = (vmse, {p: getattr(net, p).copy() for p in net.params})
+            best_ep = ep
+    if best is not None:
+        for p, w in best[1].items():
+            setattr(net, p, w)
+        print(f"best ep{best_ep} val v_mse {best[0]:.4f} を保存", flush=True)
     net.save(args.out, meta={"rows_v": int(len(V["z"])), "points_p": int(len(P["len"])),
-                             "epochs": args.epochs, "holdout_mod": args.holdout_mod,
+                             "epochs": args.epochs, "best_ep": best_ep,
+                             "holdout_mod": args.holdout_mod,
                              "src": args.src})
     print("N1_TRAIN_DONE " + json.dumps({"out": args.out}))
     return 0
