@@ -167,3 +167,30 @@ def test_play_dialog_commit_matches_evaluation(m2_game, eng):
     assert not in_dialog(nxt)                                  # 解決は窓の外の出口へ到達
     expected = [move_sig(x) for a, x in tr if a == name]
     assert hit[1] == expected
+
+
+def test_commit_unapplicable_move_discards_whole_commit(m2_game, eng):
+    """適用検証（2026-08-26 void 修正）: 合成手が実盤面に適用できない場合は契約違反として
+    箱ごと全破棄し、通常判断へ退避する（実例: コスト付きアタックの手札不足が実対局へ出て
+    ACTION_EXCEPTION→void・arena_n3 seed292004）。"""
+    m, name = _board(m2_game, 50)
+    boxes = [x for x in eng.game.legal_actions(m)
+             if x.get("action_type") == "DON_BOX" and x["payload"].get("target_ids")
+             and int(x["payload"].get("don_k") or 0) >= 1]
+    assert boxes
+    box = boxes[0]
+    injected = [("__box__", move_sig(box), int(box["payload"]["don_k"]) + 1)]
+    _inject(eng, m, name, list(injected))
+    orig = eng._commit_apply_ok
+    eng._commit_apply_ok = lambda *_a: False        # 適用不能を強制（検証 seam）
+    try:
+        tr = {}
+        mv = eng.decide(m, _actor(m, name), sims=4, rng=np.random.default_rng(0), trace=tr)
+    finally:
+        eng._commit_apply_ok = orig
+    assert mv is not None and mv.get("action_type")          # 通常判断へ退避して手が返る
+    assert tr.get("readout") != "box_commit"                 # コミットからは出ていない
+    # 注入した手順は縮退せず全破棄される（通常判断が**新しい**箱を再コミットするのは正当＝
+    # 「箱単位で再入札」。残っているなら注入と別物であることだけを確認する）
+    hit = eng._commits.get(eng._commit_key(m, name))
+    assert hit is None or hit[1] != injected

@@ -492,6 +492,17 @@ class LearnedEngine:
                 steps.append(move_sig(mv))
         return steps
 
+    def _commit_apply_ok(self, manager, name, move):
+        """コミット手の適用検証（観測中立: クローンにのみ適用・global random は保存/復元）。"""
+        import random as _random
+        rst = _random.getstate()
+        try:
+            return cpu_ai._apply_clone(manager, name, move, stop_at_select=True) is not None
+        except Exception:
+            return False
+        finally:
+            _random.setstate(rst)
+
     def _commit_step(self, manager, player, name, trace):
         """コミット済み手順の機械実行（decide 入口・窓の根畳み/木より前）。
 
@@ -546,8 +557,15 @@ class LearnedEngine:
                         move = cpu_ai.don_box_first_primitive(mv)
         except Exception:
             move = None
+        # 適用検証（2026-08-26 void 修正）: コミットの返す手——特にカウントダウンの合成
+        # ATTACK/ATTACH_DON——は legal に実在しないため、通常経路が持つ「木で一度適用して
+        # 失敗手を弾く」検証を通っていない。実盤面クローンで適用可能かを確認し、不可なら
+        # 契約違反として箱ごと全破棄する（実例: 手札2枚捨てが必要なアタックのコスト不足が
+        # そのまま実対局へ出て ACTION_EXCEPTION→void・arena_n3 seed292004）。
+        if move is not None and not self._commit_apply_ok(manager, name, move):
+            move = None
         if move is None or not steps:
-            # 消化完了（空）または契約違反（照合失敗/例外）＝どちらも key を畳む
+            # 消化完了（空）または契約違反（照合失敗/例外/適用不能）＝どちらも key を畳む
             self._commits.pop(key, None)
         if move is not None and trace is not None:
             try:
