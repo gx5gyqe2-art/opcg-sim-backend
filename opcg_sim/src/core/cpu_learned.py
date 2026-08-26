@@ -600,8 +600,14 @@ class LearnedEngine:
             _random.setstate(rst)
 
     def decide(self, manager, player, sims: int = SERVE_SIMS, c_puct: float = C_PUCT,
-               rng=None, trace=None) -> Optional[Dict[str, Any]]:
-        """このエンジンのネットで 1 手決定する（`decide_learned` と同一契約・同一探索）。"""
+               rng=None, trace=None, record=None) -> Optional[Dict[str, Any]]:
+        """このエンジンのネットで 1 手決定する（`decide_learned` と同一契約・同一探索）。
+
+        `record`（dict）は棋譜ダンプ用の**観測専用**出力（純正Nループ 2026-08-26）:
+        kind（main=木探索／window=窓の根畳み／commit=箱コミット機械実行）・sig（選択手の
+        move_sig・DON_BOX は箱レベル＝原始手化前）・main では groups（等価マージ後の
+        全候補 {sig, n=訪問合算, q}・`_merge_root_stats` と同一集計）と sims。
+        trace と違い L1 第二意見を採らない＝生成コスト最小。挙動には一切影響しない。"""
         name = player.name
         # 戦闘箱の枝予算をこの decide のぶんだけ張り直す（config.BOX_BRANCH_BUDGET）。
         # 使い切ったら箱の評価をやめて policy 最良手へ退避する＝**decide が必ず戻る**。
@@ -609,11 +615,12 @@ class LearnedEngine:
         # 予算は decide の中だけの話なので、抜けるときに必ず外す（下の finally）。
         reset_box_budget()
         try:
-            return self._decide_inner(manager, player, name, sims, c_puct, rng, trace)
+            return self._decide_inner(manager, player, name, sims, c_puct, rng, trace,
+                                      record)
         finally:
             clear_box_budget()
 
-    def _decide_inner(self, manager, player, name, sims, c_puct, rng, trace):
+    def _decide_inner(self, manager, player, name, sims, c_puct, rng, trace, record=None):
         if self.sims is not None:
             sims = self.sims           # エンジン別上書き（未設定=None で従来どおり引数/既定）
         if self.c_puct is not None:
@@ -624,6 +631,9 @@ class LearnedEngine:
         if use_commit:
             move = self._commit_step(manager, player, name, trace)
             if move is not None:
+                if record is not None:
+                    record["kind"] = "commit"
+                    record["sig"] = move_sig(move)
                 return move
         # numpy rng の種を **global random** から引く＝リプレイ種（routers が cpu_trace 時に random.seed）で
         # learned 対局も決定論再生できる。通常対局は global random 未 seed（プロセス由来）＝実質ランダム。
@@ -642,6 +652,9 @@ class LearnedEngine:
                 # 箱コミット: 選んだ枝の自分側の戦闘内/対話内継続を確定（以後は機械実行）。
                 if use_commit and ev_mgr is not None:
                     self._commit_window_continuation(manager, name, ev_mgr, move)
+                if record is not None:
+                    record["kind"] = "window"
+                    record["sig"] = move_sig(move)
                 if trace is not None:
                     try:
                         _fill_trace(trace, ev_mgr if ev_mgr is not None else manager,
@@ -665,12 +678,29 @@ class LearnedEngine:
         # 訪問合算は**行動の同一性**の話であり補償層ではない＝必ず残す。旧 LCB 乗り換え
         # （二重ゲート `_select_root_group`）は純正AZ化（2026-08-25）で削除。
         stats = getattr(mcts, "last_stats", None)
+        groups = None
         if stats and stats.get("legal"):
             groups = _merge_root_stats(manager, stats["legal"], stats["N"], stats["Q"])
             if groups:
                 move = stats["legal"][groups[0]["rep"]]
         if move is None:
             move = legal[0] if legal else None
+        # 棋譜ダンプ（観測専用）: 決定の同一性は箱レベル（原始手化前）の sig で記録する。
+        # groups は選択と同じ集計（等価マージ後の訪問合算）＝方策ターゲットの生分布。
+        if record is not None:
+            record["kind"] = "main"
+            record["sims"] = sims
+            record["sig"] = move_sig(move) if move is not None else None
+            # move_sig は don_k 非含有（コミットの残回数管理と同じ理由）だが、配分箱は
+            # k 違い＝別候補（`_move_equiv_key` が don_k を含む）。ダンプ側で候補を
+            # 区別できるよう k を並記する（None=DON_BOX 以外）。
+            record["k"] = ((move.get("payload") or {}).get("don_k")
+                           if isinstance(move, dict) else None)
+            lg = stats["legal"] if stats else None
+            record["groups"] = ([{"sig": move_sig(lg[g["rep"]]),
+                                  "k": (lg[g["rep"]].get("payload") or {}).get("don_k"),
+                                  "n": g["n"], "q": g["q"]}
+                                 for g in groups] if groups else [])
         # 箱コミット（2026-08-26）: 木が選んだ箱の**自分側の残り手順**を確定する。
         #  - DON_BOX: 原始手順は payload から算術で確定＝カウントダウン形1要素（トレース不要。
         #    このdecideが先頭原始手を返すので残りは 総原始手数-1）
