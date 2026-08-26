@@ -74,7 +74,7 @@ def _init_worker(net, label_sims):
     _G.update(CR=CR, db=db, eng=eng, gs=OPCGGame(), label_sims=label_sims,
               vf=P.value_fn_of(eng.vnet, eng.vocab, eng.enc_version),
               pf=P.priors_fn_of(eng.pnet, eng.vocab, eng.enc_version),
-              vpred=_value_fn(eng.vnet, eng.vocab, eng.enc_version, aux_tiebreak=False))
+              vpred=_value_fn(eng.vnet, eng.vocab, eng.enc_version))
 
 
 def label_one(task):
@@ -241,7 +241,7 @@ def main():
                                 "min_both_life": args.min_both_life,
                                 "max_per_replay": args.max_per_replay},
                        "offset_stride": [args.board_offset, args.board_stride],
-                       "serve_don_box": bool(getattr(_cfg, "SERVE_DON_BOX", False)),
+                       "serve_don_box": False,   # 旧ドン箱は純正AZ化（2026-08-25）で削除
                        "don_margin_env": os.environ.get("OPCG_DON_MARGIN", ""),
                        "replays": args.replays}, f, ensure_ascii=False)
 

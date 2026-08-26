@@ -57,7 +57,7 @@ def _init_worker(matchup, gen_sims, label_sims):
               gs=OPCGGame(), gen_sims=gen_sims,
               vf=P.value_fn_of(eng.vnet, eng.vocab, eng.enc_version),
               pf=P.priors_fn_of(eng.pnet, eng.vocab, eng.enc_version),
-              vpred=_value_fn(eng.vnet, eng.vocab, eng.enc_version, aux_tiebreak=False))
+              vpred=_value_fn(eng.vnet, eng.vocab, eng.enc_version))
 
 
 def _shuffle_decks(m, w):

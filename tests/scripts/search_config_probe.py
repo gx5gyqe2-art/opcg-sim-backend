@@ -10,7 +10,7 @@
 
 実行例:
   OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/search_config_probe.py \
-    --variants "sims320:sims=320" "cpuct25:c_puct=2.5" "rootoff:root_gap=inf" --pairs 20
+    --variants "sims320:sims=320" "cpuct25:c_puct=2.5" --pairs 20
 """
 import os
 for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):

@@ -1,5 +1,9 @@
 """ターンプランの列挙・K世界期待値評価・逐次実行（v37②・2026-08-06）。
 
+**計器専用**（serve 配線は 2026-08-25 に削除・純正AZ化）: 本モジュールを import するのは
+教師/計器（`plan_dom_gen.py`/`plan_lethal_gen.py`/`plan_cf2_gen.py` 等）のみで、
+実対局の decide からは呼ばれない。
+
 **ターンを箱として畳む第2段**（ユーザ方針 2026-08-05「ターンも箱とみなす事でゲーム全体としての
 プランを立てられるように」）。手単位の木は「1つの決定化世界」で建つため、サンプルされた相手
 手札がたまたま誤った手を良く見せる seed で誤る（v37① 実測: m2@44/m5@7 の 0.6 前後は正着が
@@ -22,10 +26,20 @@ import itertools
 import numpy as np
 
 from opcg_sim.src.core import cpu_ai
-from .config import (PLAN_MIN_SPREAD, PLAN_PROPOSALS, PLAN_STRUCT_MAX,
-                     PLAN_STRUCT_PROPOSALS, PLAN_STRUCT_SETS, PLAN_TEMP, PLAN_WORLDS,
-                     TURN_QUIESCE_MAX_PLIES)
-from .mcts import in_battle, in_dialog, quiesce_choice, resolved_branch_values, _turn_owner
+from .mcts import (TURN_QUIESCE_MAX_PLIES, in_battle, in_dialog, quiesce_choice,
+                   resolved_branch_values, _turn_owner)
+
+# --- プラン計器のつまみ（旧 config.PLAN_*・純正AZ化 2026-08-25 でここへ移設）--------------
+PLAN_WORLDS = 6        # 期待値を取る決定化世界の数（プラン間で共有＝CRN）
+PLAN_PROPOSALS = 6     # 提案ロールアウト本数（1本目は argmax・残りは温度サンプル・重複除去）
+PLAN_TEMP = 1.0        # 提案サンプリングの温度（0=argmax）
+# **平坦な箱は箱にしない**（v39・2026-08-06）: 候補プランのターン末 value がほとんど割れない窓では、
+# 出口の差はプランの優劣でなくノイズに近い＝箱化を放棄して呼び出し側（探索）に委ねる閾値。
+PLAN_MIN_SPREAD = 0.15
+# 構造化提案（2026-08-20 ユーザ設計「プレイするカードの組 × 浮ドンの使い途」）。
+PLAN_STRUCT_PROPOSALS = True
+PLAN_STRUCT_SETS = 4     # 「出す組」の候補数（空集合を含む）
+PLAN_STRUCT_MAX = 8      # 構造化提案の上限本数（組×変種の展開後にこの数で打ち切り）
 
 
 def move_sig(mv):

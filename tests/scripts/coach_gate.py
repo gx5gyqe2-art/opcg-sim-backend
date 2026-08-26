@@ -329,7 +329,7 @@ def main():
 
     def _eng(spec, boxes=False):
         kw = dict(macro_moves=True, defense_box=True, box_dialog=True,
-                  box_battle=True, battle_readout=True, quiesce=True) if boxes else {}
+                  box_battle=True, quiesce=True) if boxes else {}
         if not spec:
             return LearnedEngine(**kw)
         parts = spec.split(",")

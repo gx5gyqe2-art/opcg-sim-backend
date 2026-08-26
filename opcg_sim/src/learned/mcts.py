@@ -27,9 +27,7 @@ journal は RNG を巻き戻さない。素の再適用だと「訪問ごとに�
 PIMC: 探索開始時に determinize_fn で世界線を1つ固定（簡略 ISMCTS＝water-oil 回避）。
 value_fn(state, to_move)->[-1,1] が固定評価器（learned は value net）。priors は既定一様（policy head 後付け可）。
 
-終局値の深さ減衰（2026-07-11・マークレビュー F2）: terminal は ±max(TERM_FLOOR, 1 − TERM_DECAY·depth) で
-backup する（L1 の ±(W_WIN − ply) と同原理）。減衰が無いと敗勢の探索が全候補 q=−1 に飽和し、
-「カウンターで1手粘る」と「素通しで即負け」が無差別になる（防御崩壊）。非終局の葉価値は素通し。
+終局値は素の ±1（純正AZ化 2026-08-25: 旧 TERM_DECAY/TERM_FLOOR の深さ減衰は補償層として削除）。
 
 API: run(real_state) -> (best_move, N[K], legal[K])。
 """
@@ -40,9 +38,13 @@ import numpy as np
 
 from opcg_sim.src.core import cpu_ai, journal
 from opcg_sim.src.core.journal import JournaledList
-from .config import (BOX_BRANCH_BUDGET, BOX_RESOLVE_DEPTH, C_PUCT, DIRICHLET_ALPHA, TERM_DECAY,
-                     TERM_FLOOR, SERVE_QUIESCE, QUIESCE_MAX_PLIES, TREE_BOX_BATTLE, TREE_BOX_DIALOG,
-                     SERVE_TURN_QUIESCE, TURN_QUIESCE_MAX_PLIES)
+from .config import (BOX_BRANCH_BUDGET, BOX_RESOLVE_DEPTH, C_PUCT, DIRICHLET_ALPHA,
+                     SERVE_QUIESCE, QUIESCE_MAX_PLIES, TREE_BOX_BATTLE, TREE_BOX_DIALOG)
+
+# ターン延長の上限手数（攻撃×戦闘窓を含む。無限ループ防止）。旧 config.TURN_QUIESCE_MAX_PLIES
+# （ターン静止の serve 配線は純正AZ化 2026-08-25 で削除）＝現在は計器（`resolve_turn_inplace` を
+# 使う plan.py の教師/計測）だけが読む。
+TURN_QUIESCE_MAX_PLIES = 40
 
 
 # --- 戦闘箱の枝予算（config.BOX_BRANCH_BUDGET）--------------------------------------
@@ -134,7 +136,7 @@ def quiesce_choice(mgr, legal, priors_fn=None):
 
 
 def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIES,
-                           value_fn=None, box_depth=0, trace=None, window_pred=None):
+                           value_fn=None, box_depth=0, window_pred=None):
     """戦闘が解決するまで mgr をその場で進める（**巻き戻さない**・適用手数を返す）。
 
     **探索（葉評価）と教師（コーパス符号化）が同一の解決規約を使うための単一の正**。
@@ -143,7 +145,7 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
     （探索は transaction 内で使い、教師はクローン上で使うため要件が異なる）。
 
     `box_depth`>0 かつ `value_fn` あり（v39・2026-08-06）: 残りの窓も**出口 value 最良**で
-    進める＝実対局の読み出し（`SERVE_BATTLE_READOUT`）と同一規約になる。既定（0）は
+    進める＝実対局の読み出し（decide の「窓の根畳み」）と同一規約になる。既定（0）は
     policy 最良手だが、**policy は効果選択の選択肢を区別できない**（行動特徴に対象が入らず
     priors が一様＝実質「先頭固定」・m2@44 実測）ため、箱が予測する出口と実際に到達する出口が
     ずれる（箱は「どうせカウンターされる」と読み、実際の CPU は出口 value で PASS を選ぶ）。
@@ -171,11 +173,6 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
                 pick = max(ok, key=lambda i: vals[i])
         if pick is None:
             pick = quiesce_choice(mgr, legal, priors_fn)
-        if trace is not None:
-            # 入口コミット（SERVE_BATTLE_COMMIT）用: 解決中に「誰がどの手を選んだか」を
-            # 採取する。適用前に積む＝適用失敗時は最後の1件が余るが、呼び出し側は
-            # move_sig 照合で実盤面に無い手を捨てるため無害。
-            trace.append((name, legal[pick]))
         try:
             cpu_ai._apply_move_inplace(mgr, name, legal[pick], stop_at_select=True)
         except Exception:
@@ -304,10 +301,8 @@ class _Node:
 class TreeMCTS:
     def __init__(self, game, value_fn, priors_fn=None, c_puct=C_PUCT, n_sims=100,
                  determinize_fn=None, rng=None, dirichlet_alpha=DIRICHLET_ALPHA, dirichlet_eps=0.0,
-                 term_decay=TERM_DECAY, term_floor=TERM_FLOOR,
                  quiesce=None, quiesce_max_plies=QUIESCE_MAX_PLIES, box_battle=None,
-                 turn_quiesce=None, turn_value_fn=None, battle_value_fn=None,
-                 box_dialog=None):
+                 battle_value_fn=None, box_dialog=None):
         self.game = game
         self.value_fn = value_fn
         self.priors_fn = priors_fn
@@ -317,10 +312,6 @@ class TreeMCTS:
         self.rng = rng or np.random.default_rng(0)
         self.da = dirichlet_alpha
         self.de = dirichlet_eps
-        # 終局値の深さ減衰（L1 の ±(W_WIN − ply) と同原理）: 速い勝ちを優先し、敗勢では
-        # 抵抗して長い方の負けを選ぶ（全候補 −1 飽和の無差別を解消・config.TERM_DECAY 参照）。
-        self.term_decay = term_decay
-        self.term_floor = term_floor
         # 静止探索（config.SERVE_QUIESCE）: 戦闘中の葉は解決まで進めてから評価する。
         self.quiesce = SERVE_QUIESCE if quiesce is None else quiesce
         self.quiesce_max_plies = quiesce_max_plies
@@ -328,18 +319,11 @@ class TreeMCTS:
         self.box_battle = TREE_BOX_BATTLE if box_battle is None else box_battle
         # 対話箱（config.TREE_BOX_DIALOG・P3/P5）: 効果対話窓ノードも同じ規約で畳む。
         self.box_dialog = TREE_BOX_DIALOG if box_dialog is None else box_dialog
-        # ターン静止（config.SERVE_TURN_QUIESCE）: root 手番側の自ターン途中の葉は
-        # ターンが終わるまで進めてから評価する（v37・ターンの箱の第1段）。
-        self.turn_quiesce = SERVE_TURN_QUIESCE if turn_quiesce is None else turn_quiesce
-        # ターン末専用ヘッドの評価関数（v39・None=従来どおり value_fn で測る）。ターン静止で
-        # 延長した葉＝**ターンの箱の出口**だけがこれを見る。
-        self.turn_value_fn = turn_value_fn
         # 戦闘出口専用ヘッドの評価関数（v41・None=従来どおり value_fn で測る）。**戦闘箱の枝を
         # 並べるとき**（木の箱化・ターン箱の中の戦闘窓）だけがこれを見る。木の葉評価
         # （`_leaf_value` の通常経路）は本体 value のまま＝防御較正の影響がアリーナ全域に
         # 漏れない（v40 の教訓）。
         self.battle_value_fn = battle_value_fn
-        self._root_turn = None      # run() が (ターン番号, ターン所有者, root手番) を記録
         # apply/unmake 経路を1回だけ判定（ホットループで分岐しない）。ゲームが make/unmake IF を
         # 提供する＝汎用経路（三目並べ等・OPCG journal に非依存）。OPCGGame は持たない＝journal経路。
         self._generic = hasattr(game, "apply_inplace") and hasattr(game, "unmake")
@@ -347,11 +331,6 @@ class TreeMCTS:
     def run(self, real_state):
         # 作業状態＝determinize のクローン（無ければ 1回だけ clone して呼び出し側を汚さない）。
         mgr = self.determinize_fn(real_state, self.rng) if self.determinize_fn else real_state.clone()
-        # ターン静止の適用範囲を「root 手番側の、いま進行中の自ターン」に限定するための文脈。
-        # 防御窓（相手ターン中の decide）では root 手番 ≠ ターン所有者 ＝ ターン延長はしない
-        # （相手の動きは決め打ちせず、分布と毎手の再計画で扱う方針）。
-        self._root_turn = (int(getattr(mgr, "turn_count", 0) or 0), _turn_owner(mgr),
-                           self.game.current_player(mgr))
         root = _Node()
         self._expand(root, mgr)
         if not root.legal:
@@ -393,17 +372,8 @@ class TreeMCTS:
         消費しうるため**乱数状態も復元**する（消費したままだとエッジ固定＝CRN 一貫性が壊れ、
         ノード統計が訪問ごとにブレる）。
         """
-        # ターン静止（v37）: root 手番側の自ターン途中の葉は**ターンが終わるまで**進めてから
-        # 評価する（戦闘中かどうかを問わない＝戦闘静止を包含する）。適用条件は run() が記録した
-        # root 文脈と一致する葉のみ＝相手ターンの葉・防御窓は従来どおり（戦闘静止のみ）。
-        turn_ext = False
-        if self.turn_quiesce and not self._generic and self._root_turn is not None:
-            t_no, t_owner, t_decider = self._root_turn
-            turn_ext = (t_owner is not None and t_owner == t_decider
-                        and int(getattr(mgr, "turn_count", 0) or 0) == t_no
-                        and _turn_owner(mgr) == t_owner)
         noisy = in_battle(mgr) or (self.box_dialog and in_dialog(mgr))
-        if not turn_ext and (not self.quiesce or self._generic or not noisy):
+        if not self.quiesce or self._generic or not noisy:
             return self.value_fn(mgr, to_move)
         rng_state = random.getstate()
         saved_events = mgr.action_events
@@ -411,20 +381,15 @@ class TreeMCTS:
         try:
             with journal.transaction():
                 mgr.action_events = JournaledList()
-                if turn_ext:
-                    resolve_turn_inplace(self.game, mgr, self.value_fn, self.priors_fn,
-                                         battle_value_fn=self.battle_value_fn)
-                    v = (self.turn_value_fn or self.value_fn)(mgr, to_move)
-                else:
-                    if self.box_dialog and in_dialog(mgr) and not in_battle(mgr):
-                        # 対話中の葉＝解決した時点の盤面を見る（戦闘静止と同じ意味論）。
-                        resolve_battle_inplace(self.game, mgr, self.priors_fn,
-                                               self.quiesce_max_plies, window_pred=in_dialog)
-                    resolve_battle_inplace(self.game, mgr, self.priors_fn, self.quiesce_max_plies)
-                    # 静止で畳んだ戦闘出口の**葉の値**は本体 value で測る（v41 の範囲外）:
-                    # ここは「箱の枝を並べる」場面ではなく木の葉の絶対評価で、他の葉と同じ
-                    # 物差しで比べられなければ backup が壊れる（箱の相対順位づけとは別問題）。
-                    v = self.value_fn(mgr, to_move)
+                if self.box_dialog and in_dialog(mgr) and not in_battle(mgr):
+                    # 対話中の葉＝解決した時点の盤面を見る（戦闘静止と同じ意味論）。
+                    resolve_battle_inplace(self.game, mgr, self.priors_fn,
+                                           self.quiesce_max_plies, window_pred=in_dialog)
+                resolve_battle_inplace(self.game, mgr, self.priors_fn, self.quiesce_max_plies)
+                # 静止で畳んだ戦闘出口の**葉の値**は本体 value で測る（v41 の範囲外）:
+                # ここは「箱の枝を並べる」場面ではなく木の葉の絶対評価で、他の葉と同じ
+                # 物差しで比べられなければ backup が壊れる（箱の相対順位づけとは別問題）。
+                v = self.value_fn(mgr, to_move)
         finally:
             mgr.action_events = saved_events
             random.setstate(rng_state)   # 延長の乱数消費を漏らさない（CRN 一貫性）
@@ -527,11 +492,7 @@ class TreeMCTS:
             node.children[a] = child
         return child.term_val
 
-    def _term_scale(self, depth):
-        """終局値の深さ減衰係数 ∈ [term_floor, 1]。depth=root からの手数（terminal ノードの深さ）。"""
-        return max(self.term_floor, 1.0 - self.term_decay * depth)
-
-    def _descend_journal(self, node, a, move, mgr, depth):
+    def _descend_journal(self, node, a, move, mgr):
         """OPCG: journal.transaction() 退出で自動巻き戻し。子の value（子手番視点）を返す。"""
         vbox = [0.0]
         saved_events = mgr.action_events
@@ -549,11 +510,11 @@ class TreeMCTS:
                 if child is None:
                     child = self._new_child_after_apply(node, mgr)
                     node.children[a] = child
-                vbox[0] = self._simulate(child, mgr, depth)
+                vbox[0] = self._simulate(child, mgr)
         mgr.action_events = saved_events            # transient（値に無関係・念のため復元）
         return vbox[0]
 
-    def _descend_generic(self, node, a, move, mgr, depth):
+    def _descend_generic(self, node, a, move, mgr):
         """汎用: ゲーム提供の apply_inplace/unmake で make/unmake。子の value（子手番視点）を返す。"""
         try:
             token = self.game.apply_inplace(mgr, node.to_move, move)
@@ -564,18 +525,17 @@ class TreeMCTS:
             if child is None:
                 child = self._new_child_after_apply(node, mgr)
                 node.children[a] = child
-            return self._simulate(child, mgr, depth)
+            return self._simulate(child, mgr)
         finally:
             self.game.unmake(mgr, token)
 
-    def _simulate(self, node, mgr, depth=0):
+    def _simulate(self, node, mgr):
         """node 手番視点の value を返す。mgr は node の状態にある（呼び出し前提）。
 
-        depth＝root からの手数。終局値のみ `_term_scale(depth)` で減衰する（非終局の
-        葉価値は素通し＝ネット/評価器の見積もりに深さバイアスを足さない）。
+        終局値は素の ±1（純正AZ化 2026-08-25: 旧 TERM_DECAY の深さ減衰は削除）。
         """
         if node.terminal:
-            return node.term_val * self._term_scale(depth)
+            return node.term_val
         if not node.expanded:
             return self._expand(node, mgr)
         if not node.legal:
@@ -589,9 +549,9 @@ class TreeMCTS:
         move = node.legal[a]
 
         if self._generic:
-            v_child = self._descend_generic(node, a, move, mgr, depth + 1)
+            v_child = self._descend_generic(node, a, move, mgr)
         else:
-            v_child = self._descend_journal(node, a, move, mgr, depth + 1)
+            v_child = self._descend_journal(node, a, move, mgr)
 
         child = node.children[a]
         v = v_child if child.to_move == node.to_move else -v_child

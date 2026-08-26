@@ -55,16 +55,13 @@ def main():
     CR.ARGS = argparse.Namespace(true_board=True)
 
     from opcg_sim.src.core.cpu_learned import LearnedEngine
-    from opcg_sim.src.learned import config as CFG
     parts = [p for p in args.candidate.split(",") if p]
     eng = LearnedEngine(value_path=parts[0] if parts else None,
                         policy_path=parts[1] if len(parts) > 1 else None)
     db = _load_db()
     res = {"enc_version": eng.enc_version,
-           "battle_head": bool(eng.vnet.has_exit_head("battle")),
-           "battle_commit": bool(CFG.SERVE_BATTLE_COMMIT)}
-    print(f"enc_v={res['enc_version']} battle_head={res['battle_head']} "
-          f"commit={res['battle_commit']}", flush=True)
+           "battle_head": bool(eng.vnet.has_exit_head("battle"))}
+    print(f"enc_v={res['enc_version']} battle_head={res['battle_head']}", flush=True)
 
     replays = {**MG.REPLAYS, **CG.REPLAYS_V2, **CG.REPLAYS_V48, **CG.REPLAYS_HUMAN}
     CR.GAMES = {}

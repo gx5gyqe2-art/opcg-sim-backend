@@ -116,7 +116,7 @@ def test_exit_value_box_prefers_blanking_the_attack(m244):
     eng, g, mgr, name = m244
     nxt = g.apply(mgr, g.legal_actions(mgr)[0], "p1")
     assert in_battle(nxt), "戦闘中のはず（active_battle）"
-    vf = _value_fn(eng.vnet, eng.vocab, eng.enc_version, aux_tiebreak=eng.aux_tiebreak)
+    vf = _value_fn(eng.vnet, eng.vocab, eng.enc_version)
     legal = g.legal_actions(nxt)
     vals = resolved_branch_values(g, nxt, "p1", legal, vf, None)
     best = max(range(len(legal)), key=lambda i: (vals[i] if vals[i] is not None else -9))

@@ -1,8 +1,8 @@
 """マクロ手化 P3/P5＝対話箱の契約（2026-08-25）。
 
 `mcts.in_dialog`（効果対話窓の判定・外周は含めない）と、対話窓の箱読み出し
-（`LearnedEngine._dialog_window_choice`・`resolved_branch_values(window_pred=in_dialog)`）、
-seam（`TREE_BOX_DIALOG` 既定 OFF は挙動不変）を固定する。設計の正本は
+（`LearnedEngine._window_choice`＝窓の根畳み・`resolved_branch_values(window_pred=in_dialog)`）、
+seam（`TREE_BOX_DIALOG`）を固定する。設計の正本は
 `docs/cpu_macro_plan.md` §2（PLAY 辺=カード使用箱・ACTIVATE 辺=効果起動箱・応答窓=応答箱・
 トリガー可否=CONFIRM_TRIGGER 窓を対話箱1機構で実現）。
 """
@@ -71,7 +71,7 @@ def test_dialog_readout_returns_legal_and_fast(m2_game):
     off = LearnedEngine()
     tr = {}
     mv = on.decide(m, actor, sims=8, rng=np.random.default_rng(1), trace=tr)
-    assert tr.get("readout") == "dialog_resolved"
+    assert tr.get("readout") == "window_resolved"
     # 出力合法: ON の手は OFF（従来）の合法手集合に含まれる（対話箱は新手型を作らない）
     legal = off.game.legal_actions(m)
     assert any(mv == x for x in legal)

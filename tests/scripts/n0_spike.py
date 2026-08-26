@@ -335,7 +335,7 @@ def probe(args):
 class N0ValueAdapter:
     """N0Net を ValueNet のダックタイプ（predict/predict_exit/has_exit_head）に適合させ、
     LearnedEngine の葉評価・戦闘出口・ターン出口の物差しを**単一胴体の文脈切替**で供給する
-    （N1＝エンジン統合・2026-08-25）。aux は持たない＝engine は aux_tiebreak=False で組むこと。"""
+    （N1＝エンジン統合・2026-08-25）。aux は持たない（本体の aux 粘り項も純正AZ化で削除済み）。"""
 
     def __init__(self, net, tab):
         self.net = net
@@ -368,7 +368,7 @@ def n0_engine(net_path):
     """N0 を積んだ LearnedEngine（符号化 v12 は共通・policy は現行 gen15 のまま）。"""
     from opcg_sim.src.core.cpu_learned import LearnedEngine
     tab, _vocab = build_card_table()
-    eng = LearnedEngine(aux_tiebreak=False)
+    eng = LearnedEngine()
     eng.vnet = N0ValueAdapter(N0Net.load(net_path), tab)
     return eng
 

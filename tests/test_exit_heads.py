@@ -193,7 +193,7 @@ def test_engine_exit_value_fns_are_neutral_without_heads():
     assert eng._exit_value_fn() is None
     bvf = eng._battle_value_fn()
     assert bvf is not None
-    vf = _value_fn(eng.vnet, eng.vocab, eng.enc_version, aux_tiebreak=eng.aux_tiebreak)
+    vf = _value_fn(eng.vnet, eng.vocab, eng.enc_version)
 
     class _S:
         winner = "me"
@@ -276,7 +276,9 @@ def test_battle_box_ruler_is_the_battle_head(monkeypatch):
             return ["a", "b"]
 
     monkeypatch.setattr(eng, "game", _G)
-    eng._battle_window_choice(object(), "me", np.random.default_rng(0))
+    import types as _types
+    battle_mgr = _types.SimpleNamespace(active_battle=object())   # in_battle=True の窓
+    eng._window_choice(battle_mgr, "me", np.random.default_rng(0))
     assert seen["vf"] is marker
 
 

@@ -85,12 +85,15 @@ def _init(cand_spec, sims, rollout_sims, enc_version):
     from opcg_sim.src.core import cpu_learned as CL
     _G["db"] = _load_db()
     v, _, p = cand_spec.partition(",")
-    # 局面採取は本番既定（G14・plan OFF）＝出荷分布。審判は π_plan（候補ヘッド＋plan ON）。
+    # 局面採取は本番既定＝出荷分布。**注**: プラン読み出しの serve 配線は純正AZ化
+    # （2026-08-25）で削除されたため、旧 π_plan 審判（plan_readout=True）は組めない＝
+    # ref_plan/ref_old は同一構成（候補ネット＋標準 decide）になる。--drift の乖離測定は
+    # 実質無効（計器としての立案系 API＝plan.py はそのまま使う）。
     _G["base"] = CL.LearnedEngine(sims=sims)
     _G["ref_plan"] = CL.LearnedEngine(value_path=v or None, policy_path=p or None,
-                                      plan_readout=True, sims=rollout_sims)
+                                      sims=rollout_sims)
     _G["ref_old"] = CL.LearnedEngine(value_path=v or None, policy_path=p or None,
-                                     plan_readout=False, sims=rollout_sims)
+                                     sims=rollout_sims)
     eng = _G["base"]
     _G["vf"] = CL._value_fn(eng.vnet, eng.vocab, eng.enc_version)
     _G["pf"] = CL._priors_fn(eng.pnet, eng.vocab, eng.enc_version)

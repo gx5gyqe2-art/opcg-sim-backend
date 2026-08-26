@@ -71,7 +71,7 @@ def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed", decks="
     """子プロセス初期化: DB とエンジン2体を1回だけロード（以後の全ペアで共有）。
 
     `cand_kw`（v35）: **候補席にだけ**渡す LearnedEngine のオプション（例
-    `{"battle_readout": True, "quiesce": True}`）。機構をグローバル定数で切り替えると
+    `{"box_battle": True, "quiesce": True}`）。機構をグローバル定数で切り替えると
     両席に同時に効いてしまい「新機構つき候補 vs 現行本番」を測れないため、席別の seam を通す。
     未指定＝両席とも既定＝従来と同一挙動。"""
     from cpu_arena import _load_db

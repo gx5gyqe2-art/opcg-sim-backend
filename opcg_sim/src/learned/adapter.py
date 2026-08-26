@@ -19,13 +19,11 @@ class OPCGGame:
     # L1 生スコアは card-currency で桁が大きい（実測 中央 ~-5800・範囲[-11920,7091]）。
     # scale=10000 で tanh 飽和率0%・std0.25＝探索が勾配を使える値域（GATE B 診断で較正）。
     def __init__(self, value_scale=VALUE_SCALE, see_opp_hand=False, prune_futile=None,
-                 don_margin=None, don_box=None, macro_moves=None, defense_box=None):
+                 don_margin=None, macro_moves=None, defense_box=None):
         self.value_scale = value_scale
         self.see_opp_hand = see_opp_hand
         # (C) マージン付与の席別上書き（None=cpu_ai.DON_MARGIN_ATTACH に従う・アリーナ A/B 用）
         self.don_margin = don_margin
-        # ドン箱（DON_BOX・cpu_don_box_plan Phase 1）: True で候補合成 ON（既定 None=OFF・seam）
-        self.don_box = don_box
         # マクロ手化 P1（ユーザ設計 2026-08-24）: True で原始 ATTACH_DON を配分箱
         # 「対象へk枚」に置換（None=config.SERVE_MACRO_MOVES に従う・席別 seam）
         self.macro_moves = macro_moves
@@ -74,14 +72,8 @@ class OPCGGame:
         if pf:
             moves = cpu_ai._prune_don_moves(state, name, moves, margin=self.don_margin)
             moves = cpu_ai._prune_futile_attacks(state, name, moves)
-        db_on = self.don_box
-        if db_on is None:   # インスタンス未指定＝config（serve 既定）に従う
-            from opcg_sim.src.learned.config import SERVE_DON_BOX
-            db_on = SERVE_DON_BOX
-        if db_on:
-            # ドン箱の合成は枝刈り後に足す（箱は素の合法手 base から算術で導出＝
-            # 枝刈りの影響を受けない。DON_BOX 自体は既存 prune を素通りする型）。
-            moves = moves + cpu_ai.don_box_candidates(state, name, base)
+        # 旧ドン箱（SERVE_DON_BOX・don_box_candidates のリーダー限定攻撃形の合成）は
+        # 純正AZ化（2026-08-25）で削除＝P2 アタック箱（下の macro_moves）が上位互換。
         mm = self.macro_moves
         if mm is None:
             from opcg_sim.src.learned.config import SERVE_MACRO_MOVES
@@ -97,8 +89,8 @@ class OPCGGame:
                     moves = [m for m in moves
                              if m.get("action_type") != "ATTACH_DON"] + allocs
             # マクロ手化 P2: 原始 ATTACK を「（付与k→）対象Yへ攻撃」のアタック箱に置換
-            # （素の攻撃は k=0 の箱として吸収）。ドン箱攻撃形（don_box_candidates・
-            # リーダー限定）はアタック箱に包含されるため、マクロモードでは重複を除く。
+            # （素の攻撃は k=0 の箱として吸収）。DON_BOX の target_ids 付き＝攻撃形の
+            # 重複はここで除く。
             attacks = [m for m in moves if m.get("action_type") == "ATTACK"]
             if attacks:
                 atk_boxes = cpu_ai.attack_box_candidates(state, name, attacks)

@@ -81,10 +81,10 @@ def test_init_pool_applies_engine_options_to_candidate_only(monkeypatch):
     import opcg_sim.src.core.cpu_learned as CL
     monkeypatch.setattr(CL, "LearnedEngine", _FakeEngine)
 
-    PG._init_pool("cand_value.npz", "", {"battle_readout": True, "quiesce": True})
+    PG._init_pool("cand_value.npz", "", {"box_battle": True, "quiesce": True})
     assert seen[0]["value_path"] == "cand_value.npz"
-    assert seen[0]["battle_readout"] is True and seen[0]["quiesce"] is True
-    assert "battle_readout" not in seen[1] and "quiesce" not in seen[1], \
+    assert seen[0]["box_battle"] is True and seen[0]["quiesce"] is True
+    assert "box_battle" not in seen[1] and "quiesce" not in seen[1], \
         "基準席にも機構が渡っている（A/B が成立しない）"
 
 

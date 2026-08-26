@@ -89,16 +89,8 @@ def main():
                          "real=実デッキ4リーダーの総当たり（出荷先）。ペア内では席とリーダーを"
                          "入替＝リーダー相性は相殺され打ち回しの差だけが残る")
     ap.add_argument("--out", required=True, help="ペアスコア jsonl（追記台帳・再開の正）")
-    ap.add_argument("--cand-box", action="store_true",
-                    help="候補席だけ戦闘窓の箱読み出し＋静止探索を有効にする（v35・機構の A/B）")
-    ap.add_argument("--cand-tree-box", action="store_true",
-                    help="さらに木の中の箱化も候補席へ入れる（v35・--cand-box を含意）")
-    ap.add_argument("--cand-don-margin", action="store_true",
-                    help="候補席だけ (C) マージン付与を有効化（2026-08-12・don_attach_audit の A/B。"
-                         "プロセスは OPCG_DON_MARGIN=0 で走らせ、既定側を旧規則にすること）")
-    ap.add_argument("--cand-don-box", action="store_true",
-                    help="候補席だけドン箱（DON_BOX・cpu_don_box_plan Phase 1）を有効化。"
-                         "(C) 済み現行を基準に箱の上乗せを測る＝OPCG_DON_MARGIN は既定(1)のまま")
+    # 補償層系の cand フラグ（--cand-box/--cand-tree-box/--cand-don-margin/--cand-don-box/
+    # --cand-plan-readout/--cand-plan-box/--cand-guard-policy）は純正AZ化（2026-08-25）で削除。
     ap.add_argument("--cand-macro", action="store_true",
                     help="候補席だけマクロ手化 P1（配分箱＋戦闘の木内箱化・quiesce）を有効化"
                          "（2026-08-24・macro_p0_probe が示した読みの浪費の A/B）")
@@ -111,14 +103,6 @@ def main():
     ap.add_argument("--cand-boxes-all", action="store_true",
                     help="候補席で箱化インフラ全部入り（P1配分箱+P2アタック箱+P4c防御箱+"
                          "P3/P5対話箱＝macro_moves+defense_box+box_dialog+戦闘箱設定）を有効化")
-    ap.add_argument("--cand-guard-policy", action="store_true",
-                    help="候補席で箱化フルセット＋受け方針箱（P6-c）を有効化（2026-08-25）")
-    ap.add_argument("--cand-plan-box", action="store_true",
-                    help="候補席で箱化フルセット＋プラン読み出し（P6-a=ターン箱を箱語彙の上で）"
-                         "を有効化（2026-08-25）")
-    ap.add_argument("--cand-plan-readout", action="store_true",
-                    help="候補席だけプラン読み出し（v37②・turn出口ヘッド候補の実戦測定）を有効化。"
-                         "env の SERVE_PLAN_READOUT は両席に効いて対照を汚すため使わない")
     ap.add_argument("--pair-timeout", type=int, default=900,
                     help="1ペアの実時間上限（秒・0=無制限）。超過したペアは void として台帳に"
                          "残し次へ進む。手数上限では捕まらない「1回の decide() から戻らない」"
@@ -128,34 +112,16 @@ def main():
                          "synth=リーダーに合わせて合成（deck_synth）")
     args = ap.parse_args()
     cand_kw = None
-    if args.cand_box or args.cand_tree_box:
-        cand_kw = {"battle_readout": True, "quiesce": True}
-        if args.cand_tree_box:
-            cand_kw["box_battle"] = True
-    if args.cand_don_margin:
-        cand_kw = dict(cand_kw or {}, don_margin=True)
-    if args.cand_don_box:
-        cand_kw = dict(cand_kw or {}, don_box=True)
-    if args.cand_plan_readout:
-        cand_kw = dict(cand_kw or {}, plan_readout=True)
     if args.cand_macro:
         cand_kw = dict(cand_kw or {}, macro_moves=True,
-                       box_battle=True, battle_readout=True, quiesce=True)
+                       box_battle=True, quiesce=True)
     if args.cand_defense_box:
         cand_kw = dict(cand_kw or {}, defense_box=True)
     if args.cand_dialog_box:
         cand_kw = dict(cand_kw or {}, box_dialog=True)
     if args.cand_boxes_all:
         cand_kw = dict(cand_kw or {}, macro_moves=True, defense_box=True, box_dialog=True,
-                       box_battle=True, battle_readout=True, quiesce=True)
-    if args.cand_guard_policy:
-        cand_kw = dict(cand_kw or {}, macro_moves=True, defense_box=True, box_dialog=True,
-                       box_battle=True, battle_readout=True, quiesce=True,
-                       guard_policy=True)
-    if args.cand_plan_box:
-        cand_kw = dict(cand_kw or {}, macro_moves=True, defense_box=True, box_dialog=True,
-                       box_battle=True, battle_readout=True, quiesce=True,
-                       plan_readout=True)
+                       box_battle=True, quiesce=True)
 
     from arena_gate import plan_bands
     planned = [s for band in plan_bands(args.pairs, args.bands, args.seed_base) for s in band]
