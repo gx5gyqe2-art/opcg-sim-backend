@@ -83,6 +83,15 @@ def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed", decks="
     def eng(spec, **kw):
         if not spec:
             return LearnedEngine(**kw)   # 出荷既定（現 gen11）
+        if spec.startswith("n1:"):
+            # N系ネット（純正Nループ④ 2026-08-26）: value+方策チャネルを n1_gate 経由で
+            # 注入したエンジン。席別 seam（cand_kw）は注入後に属性で適用する
+            # （LearnedEngine のコンストラクタ引数と同名の属性）。
+            import n1_gate
+            e = n1_gate.n1_engine(spec[3:])
+            for k2, v2 in (kw or {}).items():
+                setattr(e, k2, v2)
+            return e
         parts = spec.split(",")
         return LearnedEngine(value_path=parts[0],
                              policy_path=parts[1] if len(parts) > 1 else None, **kw)
