@@ -70,6 +70,18 @@ SERVE_DEFENSE_BOX = True
 # 記録: docs/reports/2026-08-25_boxes_default_on.md。OFF に戻せば 32a31c1 以前の挙動。
 # インスタンス上書きは LearnedEngine(box_dialog=)（席別 seam）。
 TREE_BOX_DIALOG = True
+# 箱コミット実行（ユーザ決定 2026-08-26「これで行きましょう」＝既定 ON）:
+# **「箱は選ぶ時だけ判断し、中身は機械実行」＝箱の原子性の完成**。従来の decide は箱
+# （DON_BOX 等）を選んでも先頭原始手1枚を返すだけで、次の decide で木を回し直す＝箱の
+# 中身で再判断していた。これを「選んだ箱の**自分側の残り手順**を確定し、以後は機械実行」に
+# 変える（battle commit 0.320 事件・プラン半消化バグ〔docs/reports/2026-08-25_planbox_finding.md〕
+# と同型の「評価と実行のずれ」事故クラスの根治＝**評価が正当化した継続と実行される継続を
+# 同一にする**）。対象は配分箱/アタック箱（DON_BOX）・カード使用箱/効果起動箱
+# （PLAY/ACTIVATE_MAIN 後の自分側効果対話列）・窓の根畳みで選んだ枝の自分側戦闘内継続。
+# 相手の窓・外周（TURN_END/マリガン等）は対象外。手順が実盤面で非合法化したら契約違反＝
+# その箱のコミットを**丸ごと破棄**して通常の判断へ（縮退して続きだけ拾わない＝箱単位で再入札）。
+# インスタンス上書きは LearnedEngine(box_commit=)（席別 seam・arena_resume --cand-no-box-commit）。
+SERVE_BOX_COMMIT = True
 
 # v6 柱⑤（生成/serve の探索設定分離・docs/reports/v5_adoption_20260715.md §4-5）: 自己対戦**生成**の
 # 枝刈り既定。生成側は枝刈りを外す＝探索が訪れない枝は学習できないため、serve 用ヒューリスティクスを

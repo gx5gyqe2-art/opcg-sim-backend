@@ -29,7 +29,9 @@ from opcg_sim.src.learned.config import (
     C_PUCT, SERVE_SIMS, SERVE_DIRICHLET_EPS, SERVE_STICKY_WORLD)
 from opcg_sim.src.learned.mcts import (   # make/unmake版（唯一の探索実装。旧clone版は削除済み）
     TreeMCTS, clear_box_budget, in_battle, in_dialog, reset_box_budget,
-    resolved_branch_values)
+    resolve_battle_inplace, resolved_branch_values)
+# move_sig（手の同一性キー）は plan.py の定義が正（重複定義しない・箱コミット実行 2026-08-26）
+from opcg_sim.src.learned.plan import _find_move, move_sig
 from opcg_sim.src.utils.loader import CardLoader
 
 _MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -281,7 +283,8 @@ class LearnedEngine:
                  don_margin: Optional[bool] = None,
                  macro_moves: Optional[bool] = None,
                  defense_box: Optional[bool] = None,
-                 box_dialog: Optional[bool] = None):
+                 box_dialog: Optional[bool] = None,
+                 box_commit: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
@@ -308,8 +311,14 @@ class LearnedEngine:
         self.box_battle = box_battle
         # 対話箱（P3/P5・config.TREE_BOX_DIALOG のエンジン別上書き・None=config に従う）
         self.box_dialog = box_dialog
+        # 箱コミット実行（2026-08-26・config.SERVE_BOX_COMMIT のエンジン別上書き・None=config）
+        self.box_commit = box_commit
         # ターン内 sticky 世界線の seed キャッシュ {(id(manager), turn, player): (weakref, seed)}（§_world_rng）。
         self._world_seeds: Dict[Any, Any] = {}
+        # 箱コミット（選んだ箱の自分側の残り手順）{(id(manager), turn, player): (weakref, steps)}。
+        # steps の要素は (a) move_sig タプル (b) ("__box__", sig, 残り回数)＝DON_BOX の
+        # カウントダウン形。ターンが変われば key が変わる＝自然に失効する。
+        self._commits: Dict[Any, Any] = {}
         self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
         # 符号化は**ネット付属 vocab を最優先**（訓練時の card_id→idx を固定）。カードDBが増えても
         # 既存カードの idx がズレず（build_vocab は途中挿入でズレる・2026-07-15 実害）、ネットが
@@ -427,6 +436,169 @@ class LearnedEngine:
                  "Q": np.array([v if v is not None else -1.0 for v in vals], dtype=float)}
         return legal[best], stats, mgr
 
+    # --- 箱コミット実行（ユーザ決定 2026-08-26「箱は選ぶ時だけ判断し、中身は機械実行」）------
+    #
+    # 従来は箱（DON_BOX 等）を選んでも先頭原始手1枚を返すだけで、次の decide で木を回し直す
+    # ＝箱の中身で再判断していた。評価が正当化した継続と実行される継続がずれる事故クラス
+    # （battle commit 0.320 事件・プラン半消化バグ〔docs/reports/2026-08-25_planbox_finding.md〕）
+    # の根治として、**選んだ箱の自分側の残り手順を確定し、以後は機械実行**する。
+    # 手順が実盤面で非合法化したら契約違反＝その箱のコミットを丸ごと破棄して通常の判断へ
+    # （縮退して続きだけ拾わない＝箱単位で再入札）。相手の窓・外周は対象外。
+
+    def _commit_key(self, manager, name):
+        return (id(manager), int(getattr(manager, "turn_count", 0) or 0), name)
+
+    def _store_commit(self, manager, name, steps):
+        """残り手順をコミットする（空なら何もしない・上限64で古い半分を掃除）。"""
+        if not steps:
+            return
+        if len(self._commits) >= 64:
+            for k in list(self._commits)[:32]:
+                del self._commits[k]
+        try:
+            self._commits[self._commit_key(manager, name)] = (weakref.ref(manager),
+                                                              list(steps))
+        except TypeError:
+            pass   # weakref 不可の manager はコミットを持たない（毎 decide 判断＝従来挙動）
+
+    def _trace_to_steps(self, tr, name):
+        """解決トレース（(actor, move) 列）→ 自分側の手順（sig 列）。
+
+        DON_BOX（配分箱/アタック箱）はカウントダウン形 ("__box__", sig, 総原始手数) に変換する
+        （sig は don_k 非含有のため残回数はステップ側に持つ＝半消化バグ 2026-08-25 の再発防止。
+        付与 k 枚＋攻撃形はさらに1回＝ATTACK で完走）。相手の手は含めない（相手の窓は対象外。
+        実行中に相手の実選択が予測と割れれば sig 照合が失敗し、契約違反として箱ごと破棄される）。"""
+        steps = []
+        for actor, mv in tr:
+            if actor != name:
+                continue
+            if mv.get("action_type") == "DON_BOX":
+                p = mv.get("payload") or {}
+                total = int(p.get("don_k") or 0) + (1 if p.get("target_ids") else 0)
+                if total >= 1:
+                    steps.append(("__box__", move_sig(mv), total))
+            else:
+                steps.append(move_sig(mv))
+        return steps
+
+    def _commit_step(self, manager, player, name, trace):
+        """コミット済み手順の機械実行（decide 入口・窓の根畳み/木より前）。
+
+        現在の legal（エンジンの候補生成そのまま）から先頭 sig を照合し、見つかれば原始手化
+        して返す。照合失敗＝契約違反 → その key のコミットを**全破棄**して None（通常の判断へ）。"""
+        key = self._commit_key(manager, name)
+        hit = self._commits.get(key)
+        if hit is None:
+            return None
+        # id() は解放後に再利用されうる（_world_rng と同じ理由）＝weakref で同一性を検証。
+        if hit[0]() is not manager:
+            del self._commits[key]
+            return None
+        steps = hit[1]
+        move = None
+        try:
+            legal = self.game.legal_actions(manager) if steps else None
+            if legal:
+                st = steps[0]
+                if isinstance(st, tuple) and len(st) == 3 and st[0] == "__box__":
+                    # カウントダウン形: sig（don_k 非含有）が今の箱候補に残っていることを
+                    # 契約として確認し、原始手は算術で導出する（付与が残っていれば
+                    # ATTACH_DON・攻撃形の最終回は ATTACK）。legal の先頭一致に don_k を
+                    # 委ねない＝k=0 箱が先に並ぶと攻撃が早出しされる。
+                    _tag, sig, n = st
+                    if _find_move(legal, sig) is not None:
+                        if n <= 1:
+                            steps.pop(0)
+                        else:
+                            steps[0] = ("__box__", sig, n - 1)
+                        tgts = list(sig[2] or ())
+                        if tgts and n <= 1:
+                            move = {"kind": "game", "action_type": "ATTACK",
+                                    "payload": {"uuid": sig[1], "target_ids": tgts}}
+                        else:
+                            move = {"kind": "game", "action_type": "ATTACH_DON",
+                                    "payload": {"uuid": sig[1]}}
+                else:
+                    mv = _find_move(legal, st)
+                    if mv is not None:
+                        p = mv.get("payload") or {}
+                        k = int(p.get("don_k") or 0)
+                        if mv.get("action_type") == "DON_BOX" and k > 0:
+                            # 防御的経路（生成側はカウントダウン形へ変換済み＝通常来ない）
+                            total = k + (1 if p.get("target_ids") else 0)
+                            if total > 1:
+                                steps[0] = ("__box__", st, total - 1)
+                            else:
+                                steps.pop(0)
+                        else:
+                            steps.pop(0)
+                        move = cpu_ai.don_box_first_primitive(mv)
+        except Exception:
+            move = None
+        if move is None or not steps:
+            # 消化完了（空）または契約違反（照合失敗/例外）＝どちらも key を畳む
+            self._commits.pop(key, None)
+        if move is not None and trace is not None:
+            try:
+                _fill_trace(trace, manager, player, move, None)
+                trace["readout"] = "box_commit"
+            except Exception:
+                pass   # 分析失敗で対局を止めない
+        return move
+
+    def _commit_window_continuation(self, manager, name, world, move):
+        """窓の根畳み（`_window_choice`）で選んだ枝の自分側継続をコミットする。
+
+        選んだ枝を決定化クローンに適用し、評価（`resolved_branch_values`）と**同じ解決規約**
+        （同じ value_fn・box_depth・CRN＝global random 保存/復元）で解決した trace の自分側
+        手順を確定する＝評価が正当化した継続と実行される継続が同一になる（旧・入口コミットの
+        一般形）。失敗はコミット無し（毎 decide 判断＝従来挙動へ退化・安全側）。"""
+        import random as _random
+        rst = _random.getstate()
+        try:
+            if in_battle(manager):
+                vf, wp = self._battle_value_fn(), None
+            else:
+                vf, wp = _value_fn(self.vnet, self.vocab, self.enc_version), in_dialog
+            nxt = self.game.apply(world, move, name)
+            if nxt is None:
+                return
+            tr = []
+            resolve_battle_inplace(
+                self.game, nxt, _priors_fn(self.pnet, self.vocab, self.enc_version),
+                value_fn=vf, box_depth=CFG.BOX_RESOLVE_DEPTH, window_pred=wp, trace=tr)
+            self._store_commit(manager, name, self._trace_to_steps(tr, name))
+        except Exception:
+            pass   # コミット生成の失敗で手を止めない
+        finally:
+            _random.setstate(rst)
+
+    def _commit_play_dialog(self, manager, name, det_rng, move, world=None):
+        """木が PLAY / ACTIVATE_MAIN を選んだ時: 後続の**自分側**効果対話列をコミットする。
+
+        決定化クローン（`world` 指定時はそれ＝テスト/計器用）に適用し、対話が開けば評価
+        （木の対話箱畳み）と同じ解決規約（window_pred=in_dialog・本体 value・box_depth）で
+        解決＝同じ結論になる。対話が無ければコミット無し。乱数は CRN 規約（保存→復元）で
+        汚染しない。"""
+        import random as _random
+        rst = _random.getstate()
+        try:
+            if world is None:
+                world = self.game.determinize(manager, name, det_rng)
+            nxt = self.game.apply(world, move, name)
+            if nxt is None or not in_dialog(nxt) or in_battle(nxt):
+                return                       # 対話が無ければコミット無し
+            tr = []
+            resolve_battle_inplace(
+                self.game, nxt, _priors_fn(self.pnet, self.vocab, self.enc_version),
+                value_fn=_value_fn(self.vnet, self.vocab, self.enc_version),
+                box_depth=CFG.BOX_RESOLVE_DEPTH, window_pred=in_dialog, trace=tr)
+            self._store_commit(manager, name, self._trace_to_steps(tr, name))
+        except Exception:
+            pass   # コミット生成の失敗で手を止めない
+        finally:
+            _random.setstate(rst)
+
     def decide(self, manager, player, sims: int = SERVE_SIMS, c_puct: float = C_PUCT,
                rng=None, trace=None) -> Optional[Dict[str, Any]]:
         """このエンジンのネットで 1 手決定する（`decide_learned` と同一契約・同一探索）。"""
@@ -446,6 +618,13 @@ class LearnedEngine:
             sims = self.sims           # エンジン別上書き（未設定=None で従来どおり引数/既定）
         if self.c_puct is not None:
             c_puct = self.c_puct
+        # 箱コミット実行（2026-08-26）: コミット済みの残り手順があれば機械実行（窓の根畳み・
+        # 木より前）。照合失敗＝契約違反はコミット全破棄で下の通常判断へ落ちる。
+        use_commit = (CFG.SERVE_BOX_COMMIT if self.box_commit is None else self.box_commit)
+        if use_commit:
+            move = self._commit_step(manager, player, name, trace)
+            if move is not None:
+                return move
         # numpy rng の種を **global random** から引く＝リプレイ種（routers が cpu_trace 時に random.seed）で
         # learned 対局も決定論再生できる。通常対局は global random 未 seed（プロセス由来）＝実質ランダム。
         if not isinstance(rng, np.random.Generator):
@@ -460,6 +639,9 @@ class LearnedEngine:
         if in_battle(manager) or (use_dialog and in_dialog(manager)):
             move, stats, ev_mgr = self._window_choice(manager, name, det_rng)
             if move is not None:
+                # 箱コミット: 選んだ枝の自分側の戦闘内/対話内継続を確定（以後は機械実行）。
+                if use_commit and ev_mgr is not None:
+                    self._commit_window_continuation(manager, name, ev_mgr, move)
                 if trace is not None:
                     try:
                         _fill_trace(trace, ev_mgr if ev_mgr is not None else manager,
@@ -489,9 +671,23 @@ class LearnedEngine:
                 move = stats["legal"][groups[0]["rep"]]
         if move is None:
             move = legal[0] if legal else None
+        # 箱コミット（2026-08-26）: 木が選んだ箱の**自分側の残り手順**を確定する。
+        #  - DON_BOX: 原始手順は payload から算術で確定＝カウントダウン形1要素（トレース不要。
+        #    このdecideが先頭原始手を返すので残りは 総原始手数-1）
+        #  - PLAY/ACTIVATE_MAIN: 後続の自分側効果対話列を評価と同じ解決規約で確定
+        if use_commit and move is not None:
+            at = move.get("action_type")
+            if at == "DON_BOX":
+                p = move.get("payload") or {}
+                total = int(p.get("don_k") or 0) + (1 if p.get("target_ids") else 0)
+                if total > 1:
+                    self._store_commit(manager, name,
+                                       [("__box__", move_sig(move), total - 1)])
+            elif at in ("PLAY", "ACTIVATE_MAIN"):
+                self._commit_play_dialog(manager, name, det_rng, move)
         # ドン箱（探索内部のマクロ手）は実対局へは先頭原始手 ATTACH_DON で出す＝
-        # 記録/再生/API の行動空間を変えない（cpu_don_box_plan §2.1。次 decide で
-        # 箱候補が再計算され計画の続行/変更を選び直す＝ステートレス実行）。
+        # 記録/再生/API の行動空間を変えない（cpu_don_box_plan §2.1。コミット無しの
+        # 箱は次 decide で箱候補が再計算され計画の続行/変更を選び直す）。
         move = cpu_ai.don_box_first_primitive(move)
         if trace is not None:
             try:

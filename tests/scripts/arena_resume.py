@@ -103,6 +103,12 @@ def main():
     ap.add_argument("--cand-boxes-all", action="store_true",
                     help="候補席で箱化インフラ全部入り（P1配分箱+P2アタック箱+P4c防御箱+"
                          "P3/P5対話箱＝macro_moves+defense_box+box_dialog+戦闘箱設定）を有効化")
+    ap.add_argument("--cand-box-commit", action="store_true",
+                    help="候補席だけ箱コミット実行（2026-08-26・選んだ箱の中身を機械実行）を"
+                         "有効化（config 既定 ON の明示上書き）")
+    ap.add_argument("--cand-no-box-commit", action="store_true",
+                    help="候補席だけ箱コミット実行を**無効化**（box_commit=False）＝"
+                         "「既定(コミットON) vs OFF」の欠陥検出 A/B の OFF 側測定用")
     ap.add_argument("--pair-timeout", type=int, default=900,
                     help="1ペアの実時間上限（秒・0=無制限）。超過したペアは void として台帳に"
                          "残し次へ進む。手数上限では捕まらない「1回の decide() から戻らない」"
@@ -122,6 +128,10 @@ def main():
     if args.cand_boxes_all:
         cand_kw = dict(cand_kw or {}, macro_moves=True, defense_box=True, box_dialog=True,
                        box_battle=True, quiesce=True)
+    if args.cand_box_commit:
+        cand_kw = dict(cand_kw or {}, box_commit=True)
+    if args.cand_no_box_commit:
+        cand_kw = dict(cand_kw or {}, box_commit=False)
 
     from arena_gate import plan_bands
     planned = [s for band in plan_bands(args.pairs, args.bands, args.seed_base) for s in band]

@@ -95,6 +95,10 @@
 | P5 | 効果起動箱（自分ターン版・相手ターン版）・応答箱・トリガー | **済＝対話箱に統合**（P3と同一機構。CONFIRM_TRIGGER/CONFIRM_OPTIONAL/CHOICE/DECLARE_COST/SEARCH_AND_SELECT。外周=MULLIGAN/ARRANGE_DECK/SELECT_RESOURCEは畳まない） |
 | P6 | 上位箱の再挑戦: ターン箱（プラン）＝箱列の提案＋turn出口ヘッド接続／受け方針箱 | **P6-a 済**: プラン機構を箱語彙対応（`plan.py dialog_box=`・提案/実行/採点に対話箱を接続。箱エンジン上では提案が自然に箱列になることを実測＝m2@44 で配分箱プラン・spread 0.43・decide 採用 6/8）。seam=`arena_resume --cand-plan-box`（全箱+プラン読み出し）。**P6-c 受け方針箱も実装済**（`guard.py`・local/pass/minimal/hold の台本比較選択＋防御窓の候補整形・`--cand-guard-policy`・m1@14 で hold が正しく最下位）。**ターン箱は既定 ON（ユーザ決定 2026-08-25・中身は今後改善）**: 測定は半消化バグ発見→修正（カウントダウン式の箱完走）後に打ち切り。残る課題=素valueのターン末バイアス（資源温存の出口を過大評価・残ドン0.45→0.91・詳細 `docs/reports/2026-08-25_planbox_finding.md`）＝turn出口ヘッド接続が改善の本命。受け方針箱は既定OFF・測定待ち。**追記（2026-08-25 純正AZ化）: プラン読み出し/受け方針箱は純正AZ化で削除（木がプランを兼ねる）**＝serve 配線・config フラグ・guard.py を撤去し、plan.py は教師/計器専用ライブラリとして存続（docs/reports/2026-08-25_pure_az_cleanup.md） |
 
+- **箱コミット実行（2026-08-26 ユーザ決定）＝箱の原子性の完成**: 箱は選ぶ時だけ判断し、中身は機械実行
+  （`SERVE_BOX_COMMIT` 既定 ON・`LearnedEngine._commits`＝選んだ箱の自分側の残り手順を確定）。
+  破綻（手順の非合法化＝契約違反）時のみ箱単位で再入札（縮退して続きだけ拾わない）。
+
 ### 検証規約（プランA6の教訓を明文化）
 
 - 新しい箱は**必ず seam**（config 既定 OFF＋`LearnedEngine`/adapter のエンジン別 kw＋

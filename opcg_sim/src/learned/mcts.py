@@ -136,7 +136,7 @@ def quiesce_choice(mgr, legal, priors_fn=None):
 
 
 def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIES,
-                           value_fn=None, box_depth=0, window_pred=None):
+                           value_fn=None, box_depth=0, window_pred=None, trace=None):
     """戦闘が解決するまで mgr をその場で進める（**巻き戻さない**・適用手数を返す）。
 
     **探索（葉評価）と教師（コーパス符号化）が同一の解決規約を使うための単一の正**。
@@ -153,7 +153,11 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
 
     `window_pred`（対話箱・2026-08-25）: 「まだ窓の中か」の述語を差し替えて**効果対話窓の
     解決にも同じ規約を使う**（None=従来どおり in_battle＝戦闘窓）。対話箱は
-    `window_pred=in_dialog` で呼ぶ＝解決の本体・巻き戻し契約・予算は完全に共通。"""
+    `window_pred=in_dialog` で呼ぶ＝解決の本体・巻き戻し契約・予算は完全に共通。
+
+    `trace`（箱コミット実行・2026-08-26）: list を渡すと**この関数が実際に適用した手**を
+    (actor_name, move) で追記する（内部窓の枝評価＝`resolved_branch_values` の試行は含めない）。
+    コミット生成（評価が正当化した継続をそのまま実行手順として確定する）が読む。"""
     pred = window_pred or in_battle
     n = 0
     for _ in range(max_plies):
@@ -177,6 +181,8 @@ def resolve_battle_inplace(game, mgr, priors_fn=None, max_plies=QUIESCE_MAX_PLIE
             cpu_ai._apply_move_inplace(mgr, name, legal[pick], stop_at_select=True)
         except Exception:
             break
+        if trace is not None:
+            trace.append((name, legal[pick]))
         n += 1
     return n
 
