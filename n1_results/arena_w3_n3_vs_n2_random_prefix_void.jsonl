@@ -1,0 +1,24 @@
+{"seed": 92001, "score": 1.0, "leaders": ["OP14-020", "OP03-040"], "games": [0.0, 1.0], "turns": [20, 12]}
+{"seed": 92000, "score": 1.0, "leaders": ["OP04-039", "OP13-001"], "games": [1.0, 0.0], "turns": [13, 11]}
+{"seed": 92002, "score": 0.0, "leaders": ["OP05-002", "ST21-001"], "games": [0.0, 0.0], "turns": [10, 13]}
+{"seed": 92003, "score": 2.0, "leaders": ["OP12-020", "OP03-040"], "games": [1.0, 1.0], "turns": [11, 12]}
+{"seed": 92004, "score": 1.0, "leaders": ["OP11-001", "ST29-001"], "games": [1.0, 0.0], "turns": [9, 9]}
+{"seed": 92005, "score": 0.0, "leaders": ["OP02-025", "OP14-040"], "games": [0.0, 0.0], "turns": [10, 11]}
+{"seed": 192000, "score": 1.0, "leaders": ["OP09-022", "OP11-062"], "games": [1.0, 0.0], "turns": [11, 13]}
+{"seed": 192001, "score": 1.0, "leaders": ["OP08-002", "OP04-020"], "games": [1.0, 0.0], "turns": [11, 9]}
+{"seed": 192003, "score": 1.0, "leaders": ["OP10-042", "EB04-001"], "games": [1.0, 0.0], "turns": [9, 11]}
+{"seed": 192002, "score": 1.0, "leaders": ["OP05-002", "OP03-077"], "games": [0.0, 1.0], "turns": [12, 10]}
+{"seed": 192004, "score": 0.0, "leaders": ["OP16-080", "ST07-001"], "games": [0.0, 0.0], "turns": [12, 13]}
+{"seed": 192005, "score": 2.0, "leaders": ["OP05-041", "OP08-002"], "games": [1.0, 1.0], "turns": [11, 10]}
+{"seed": 292000, "score": 2.0, "leaders": ["OP07-001", "OP02-025"], "games": [1.0, 1.0], "turns": [11, 10]}
+{"seed": 292002, "score": 1.0, "leaders": ["OP15-022", "OP13-001"], "games": [1.0, 0.0], "turns": [13, 11]}
+{"seed": 292003, "score": 2.0, "leaders": ["OP10-022", "OP06-042"], "games": [1.0, 1.0], "turns": [9, 10]}
+{"seed": 292001, "score": 1.0, "leaders": ["OP14-040", "OP16-060"], "games": [1.0, 0.0], "turns": [11, 13]}
+{"seed": 292004, "score": null, "leaders": ["OP14-020", "ST22-001"], "void": "InvariantError: invariant violation(s) at step 136: [('ACTION_EXCEPTION', 'ValueError: アタックするには手札2枚を捨てる必要があり、手札が足りません。\\nTraceback (most "}
+{"seed": 292005, "score": 2.0, "leaders": ["ST06-001", "OP14-080"], "games": [1.0, 1.0], "turns": [13, 12]}
+{"seed": 392000, "score": 2.0, "leaders": ["OP06-020", "OP04-039"], "games": [1.0, 1.0], "turns": [13, 12]}
+{"seed": 392001, "score": 1.0, "leaders": ["ST29-001", "OP08-058"], "games": [0.0, 1.0], "turns": [12, 12]}
+{"seed": 392002, "score": 1.0, "leaders": ["OP05-060", "OP09-062"], "games": [1.0, 0.0], "turns": [11, 13]}
+{"seed": 392003, "score": 0.0, "leaders": ["OP09-081", "ST22-001"], "games": [0.0, 0.0], "turns": [10, 11]}
+{"seed": 392004, "score": 1.0, "leaders": ["OP15-022", "OP04-039"], "games": [1.0, 0.0], "turns": [11, 13]}
+{"seed": 392005, "score": 2.0, "leaders": ["OP13-100", "OP05-041"], "games": [1.0, 1.0], "turns": [11, 10]}
