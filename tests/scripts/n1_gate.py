@@ -145,7 +145,8 @@ def gate(args):
     from opcg_sim.src.core.cpu_learned import LearnedEngine
     CR.ARGS = argparse.Namespace(true_board=True)
     db = _load_db()
-    base = LearnedEngine()
+    # --base-net: 前世代比（N系同士・純正Nループの主ゲート）。未指定=gen15 既定（外部参照）。
+    base = n1_engine(args.base_net) if args.base_net else LearnedEngine()
     chall = n1_engine(args.net)
     replays = {**MG.REPLAYS, **CG.REPLAYS_V2, **CG.REPLAYS_V48, **CG.REPLAYS_HUMAN}
     CR.GAMES = {}
@@ -226,6 +227,8 @@ def main():
     g = sub.add_parser("gate")
     g.add_argument("--net", required=True)
     g.add_argument("--seeds", type=int, default=5)
+    g.add_argument("--base-net", default=None,
+                   help="基準側も N 系ネットにする（前世代比）。未指定=出荷 gen15")
     s = sub.add_parser("smoke")
     s.add_argument("--net", required=True)
     s.add_argument("--seed", type=int, default=424242)
