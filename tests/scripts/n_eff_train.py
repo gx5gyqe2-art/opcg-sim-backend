@@ -304,7 +304,13 @@ def train(args):
     va_p = P["seed"] % args.holdout_mod == 0
     print(f"value {len(V['z'])}行（val {int(va_v.sum())}）"
           f" policy {len(P['len'])}点（val {int(va_p.sum())}） {time.time()-t0:.0f}s", flush=True)
-    net = NEffNet((stats, ab, abm, pwr, isl), hidden=args.hidden, seed=args.seed)
+    if args.warm_start:
+        # 連続訓練（純正AZの本来形・2026-08-27 ユーザ決定「1でいきましょう」）:
+        # 前世代の重みから低学習率で追学習＝世代を跨いで知識を蓄積する。
+        net = NEffNet.load(args.warm_start, tables=(stats, ab, abm, pwr, isl))
+        print(f"warm-start: {args.warm_start}（hidden={net.W1.shape[1]}）", flush=True)
+    else:
+        net = NEffNet((stats, ab, abm, pwr, isl), hidden=args.hidden, seed=args.seed)
     rng = np.random.default_rng(args.seed)
     tr_v = np.where(~va_v)[0]
     tr_p = np.where(~va_p)[0]
@@ -364,6 +370,8 @@ def main():
     tr.add_argument("--seed", type=int, default=13)
     tr.add_argument("--hidden", type=int, default=96)
     tr.add_argument("--holdout-mod", type=int, default=7)
+    tr.add_argument("--warm-start", default=None,
+                    help="前世代 net から連続訓練（低 lr 推奨・未指定=ゼロから）")
     tr.add_argument("--out", required=True)
     args = ap.parse_args()
     if args.cmd == "train":
