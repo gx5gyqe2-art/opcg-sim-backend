@@ -183,9 +183,11 @@ class N1Net:
     @classmethod
     def load(cls, path):
         d = np.load(path, allow_pickle=True)
-        net = cls()
+        net = cls(hidden=d["W1"].shape[1])      # 保存形状が真実源（容量A/Bに追従）
         for p in net.params:
             setattr(net, p, d[p])
+        net._adam = {p: [np.zeros_like(getattr(net, p)), np.zeros_like(getattr(net, p))]
+                     for p in net.params}
         return net
 
 
@@ -286,7 +288,7 @@ def train(args):
     va_p = P["seed"] % args.holdout_mod == 0
     print(f"value {len(V['z'])}行（val {int(va_v.sum())}）"
           f" policy {len(P['len'])}点（val {int(va_p.sum())}） {time.time()-t0:.0f}s", flush=True)
-    net = N1Net(seed=args.seed)
+    net = N1Net(hidden=args.hidden, seed=args.seed)
     rng = np.random.default_rng(args.seed)
     tr_v = np.where(~va_v)[0]
     tr_p = np.where(~va_p)[0]
@@ -351,6 +353,8 @@ def main():
     tr.add_argument("--bs-p", type=int, default=128)
     tr.add_argument("--lr", type=float, default=1e-3)
     tr.add_argument("--seed", type=int, default=11)
+    tr.add_argument("--hidden", type=int, default=96,
+                    help="胴体の隠れ幅（容量A/B用・既定96=第1〜3周と同一）")
     tr.add_argument("--holdout-mod", type=int, default=7)
     tr.add_argument("--out", required=True)
     args = ap.parse_args()
