@@ -51,7 +51,8 @@ _G = {}
 _KIND = {"main": 0, "window": 1, "commit": 2}
 
 
-def _init_worker(sims, value_path, policy_path, n1_net=None):
+def _init_worker(sims, value_path, policy_path, n1_net=None,
+                 dirichlet_eps=0.0, temp_turns=0):
     import rl_encoder as E
     from cpu_selfplay import _load_db
     from opcg_game import OPCGGame
@@ -61,14 +62,15 @@ def _init_worker(sims, value_path, policy_path, n1_net=None):
     db = _load_db()
     # 生成は枝刈りを外す（GEN_PRUNE_FUTILE=False・v6 柱⑤: 刈った枝は学習データに現れない）。
     # それ以外（箱化・箱コミット・quiesce 等）は serve 既定のまま＝実対局と同じ行動列。
+    ex = dict(dirichlet_eps=(dirichlet_eps or None), temp_turns=(temp_turns or None))
     if n1_net:
         # 第2波以降（純正AZ: 最新のNネットで生成する）。value+方策とも N1 を注入。
         from n1_gate import n1_engine
-        eng = n1_engine(n1_net)
+        eng = n1_engine(n1_net, **ex)
         eng.game = _AG(prune_futile=GEN_PRUNE_FUTILE)
     else:
         eng = LearnedEngine(value_path=value_path, policy_path=policy_path,
-                            game=_AG(prune_futile=GEN_PRUNE_FUTILE))
+                            game=_AG(prune_futile=GEN_PRUNE_FUTILE), **ex)
     leaders = sorted(cid for cid, _ in db.raw_db.items()
                      if (db.get_card(cid) is not None
                          and getattr(db.get_card(cid).type, "name", "") == "LEADER"))
@@ -211,6 +213,10 @@ def main():
     ap.add_argument("--policy", default=None, help="方策ネット npz（既定=出荷 G15）")
     ap.add_argument("--n1-net", default=None,
                     help="N系ネット npz（指定時は value/policy を無視して N1 エンジンで生成）")
+    ap.add_argument("--dirichlet-eps", type=float, default=0.25,
+                    help="root priors への Dirichlet ノイズ（純正AZ の自己対戦既定 0.25・0=無効）")
+    ap.add_argument("--temp-turns", type=int, default=4,
+                    help="この turn まではメイン窓を訪問分布 τ=1 でサンプリング（0=無効）")
     ap.add_argument("--shard-games", type=int, default=10)
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
@@ -221,7 +227,8 @@ def main():
     shard = n_rows = n_drop = n_main = 0
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
                                       initargs=(args.sims, args.value,
-                                                args.policy, args.n1_net)) as pool:
+                                                args.policy, args.n1_net,
+                                                args.dirichlet_eps, args.temp_turns)) as pool:
         done = 0
         for r in pool.imap_unordered(play_one,
                                      [args.seed_base + i for i in range(args.games)]):
@@ -248,7 +255,8 @@ def main():
                    "dropped": n_drop, "sims": args.sims,
                    "enc_version": ENC_VERSION, "seed_base": args.seed_base,
                    "value": args.value, "policy": args.policy,
-                   "n1_net": args.n1_net}, f, ensure_ascii=False)
+                   "n1_net": args.n1_net, "dirichlet_eps": args.dirichlet_eps,
+                   "temp_turns": args.temp_turns}, f, ensure_ascii=False)
     print("N_RECORD_DONE " + json.dumps({"rows": n_rows, "main_rows": n_main,
                                          "dropped": n_drop}))
     return 0

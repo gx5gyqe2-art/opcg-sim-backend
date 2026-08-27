@@ -284,7 +284,9 @@ class LearnedEngine:
                  macro_moves: Optional[bool] = None,
                  defense_box: Optional[bool] = None,
                  box_dialog: Optional[bool] = None,
-                 box_commit: Optional[bool] = None):
+                 box_commit: Optional[bool] = None,
+                 dirichlet_eps: Optional[float] = None,
+                 temp_turns: Optional[int] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
@@ -313,6 +315,13 @@ class LearnedEngine:
         self.box_dialog = box_dialog
         # 箱コミット実行（2026-08-26・config.SERVE_BOX_COMMIT のエンジン別上書き・None=config）
         self.box_commit = box_commit
+        # 生成の探索多様性（純正AZ 2026-08-27・serve 既定は両方無効＝挙動不変）:
+        #  dirichlet_eps: root priors への Dirichlet ノイズ（None=config.SERVE_DIRICHLET_EPS=0）
+        #  temp_turns: turn <= この値のメイン窓で argmax でなく訪問分布 π∝n（τ=1）から
+        #              サンプリングする（0/None=無効）。AZ の自己対戦の探索はこの2つが担う
+        #              ——無いと同じ線ばかり打ち、π 教師が argmax クローンに退化して飽和する。
+        self.dirichlet_eps = dirichlet_eps
+        self.temp_turns = temp_turns
         # 方策 priors の注入口（純正Nループ④ 2026-08-26）: None=既定（self.pnet の G 系
         # priors）。設定時はその callable(state, legal)->np.array|None を全経路（木・窓の
         # 根畳み・コミット生成）で使う＝N 系ネットの方策チャネルを pnet の G 形式を経由せず
@@ -694,7 +703,9 @@ class LearnedEngine:
                 return move
         mcts = TreeMCTS(self.game, value_fn=_value_fn(self.vnet, self.vocab, self.enc_version),
                         priors_fn=self._priors(),
-                        c_puct=c_puct, n_sims=sims, dirichlet_eps=SERVE_DIRICHLET_EPS,
+                        c_puct=c_puct, n_sims=sims,
+                        dirichlet_eps=(SERVE_DIRICHLET_EPS if self.dirichlet_eps is None
+                                       else self.dirichlet_eps),
                         determinize_fn=lambda s, r: self.game.determinize(s, name, r), rng=det_rng,
                         quiesce=self.quiesce, box_battle=self.box_battle,
                         box_dialog=self.box_dialog,
@@ -711,7 +722,15 @@ class LearnedEngine:
         if stats and stats.get("legal"):
             groups = _merge_root_stats(manager, stats["legal"], stats["N"], stats["Q"])
             if groups:
-                move = stats["legal"][groups[0]["rep"]]
+                gi = 0
+                # 生成の温度サンプリング: 序盤（turn <= temp_turns）は訪問分布から引く。
+                # 選択の後段（箱コミット・record・原始手化）はサンプル結果に自然追従する。
+                tt = self.temp_turns or 0
+                if tt and int(getattr(manager, "turn_count", 0) or 0) <= tt:
+                    ns = np.array([g["n"] for g in groups], dtype=np.float64)
+                    if ns.sum() > 0:
+                        gi = int(det_rng.choice(len(groups), p=ns / ns.sum()))
+                move = stats["legal"][groups[gi]["rep"]]
         if move is None:
             move = legal[0] if legal else None
         # 棋譜ダンプ（観測専用）: 決定の同一性は箱レベル（原始手化前）の sig で記録する。

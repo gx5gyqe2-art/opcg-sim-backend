@@ -124,12 +124,13 @@ def n1_priors(net, tab, vocab, enc_version=12):
     return priors
 
 
-def n1_engine(net_path):
-    """N1 を value+policy 両輪で積んだ LearnedEngine。"""
+def n1_engine(net_path, **engine_kw):
+    """N1 を value+policy 両輪で積んだ LearnedEngine（engine_kw はそのまま渡す＝生成の
+    探索多様性 dirichlet_eps/temp_turns 等）。"""
     from opcg_sim.src.core.cpu_learned import LearnedEngine
     tab, vocab = N0.build_card_table()
     net = N1Net.load(net_path)
-    eng = LearnedEngine()
+    eng = LearnedEngine(**engine_kw)
     eng.vnet = N1ValueAdapter(net, tab)
     eng.priors_override = n1_priors(net, tab, vocab, eng.enc_version)
     return eng
