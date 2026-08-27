@@ -1,0 +1,1 @@
+{"games": 240, "rows": 33165, "main_rows": 20397, "dropped": 0, "sims": 128, "enc_version": 12, "seed_base": 2091000, "value": null, "policy": null, "n1_net": "/tmp/gen_net.npz", "dirichlet_eps": 0.25, "temp_turns": 4}
