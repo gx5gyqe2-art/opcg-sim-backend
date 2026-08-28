@@ -299,6 +299,16 @@ def train(args):
     for pat in args.src:
         dirs += sorted(glob.glob(pat)) if any(ch in pat for ch in "*?[") else [pat]
     V, P, C = N1.load_dump(dirs, vocab)
+    if args.zsrc:
+        # z専用ディレクトリ（2026-08-28 ユーザ実験）: 旧世代の波は π（訪問分布）が古い探索の
+        # 結論で方策を引き戻すが、z（勝敗）は価値教師として古びにくい——πを読まず z 行だけ
+        # 合流させる。対面カバレッジ（167リーダー×1.4万対面）を局数で埋める狙い。
+        zdirs = []
+        for pat in args.zsrc:
+            zdirs += sorted(glob.glob(pat)) if any(ch in pat for ch in "*?[") else [pat]
+        Vz, _Pz, _Cz = N1.load_dump(zdirs, vocab)
+        V = {k: np.concatenate([V[k], Vz[k]]) for k in V}
+        print(f"z専用 {len(Vz['z'])}行を合流（π除外・{len(zdirs)}ディレクトリ）", flush=True)
     ptr = np.concatenate([[0], np.cumsum(P["len"])]).astype(np.int64)
     va_v = V["seed"] % args.holdout_mod == 0
     va_p = P["seed"] % args.holdout_mod == 0
@@ -372,6 +382,8 @@ def main():
     tr.add_argument("--holdout-mod", type=int, default=7)
     tr.add_argument("--warm-start", default=None,
                     help="前世代 net から連続訓練（低 lr 推奨・未指定=ゼロから）")
+    tr.add_argument("--z-in", dest="zsrc", nargs="*", default=[],
+                    help="z 専用ディレクトリ（π を読まない・旧世代波の勝敗だけ使う）")
     tr.add_argument("--out", required=True)
     args = ap.parse_args()
     if args.cmd == "train":
