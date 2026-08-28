@@ -83,6 +83,13 @@ def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed", decks="
     def eng(spec, **kw):
         if not spec:
             return LearnedEngine(**kw)   # 出荷既定（現 gen11）
+        if spec.startswith("neff:"):
+            # 効果構造符号化ネット（2026-08-27）: n_eff_gate 経由で注入。
+            import n_eff_gate
+            e = n_eff_gate.neff_engine(spec[5:])
+            for k2, v2 in (kw or {}).items():
+                setattr(e, k2, v2)
+            return e
         if spec.startswith("n1:"):
             # N系ネット（純正Nループ④ 2026-08-26）: value+方策チャネルを n1_gate 経由で
             # 注入したエンジン。席別 seam（cand_kw）は注入後に属性で適用する
