@@ -1,0 +1,24 @@
+{"seed": 106000, "score": 0.0, "leaders": ["OP12-041", "OP07-038"], "games": [0.0, 0.0], "turns": [12, 9]}
+{"seed": 106002, "score": 0.0, "leaders": ["OP10-042", "EB04-001"], "games": [0.0, 0.0], "turns": [10, 11]}
+{"seed": 106001, "score": 1.0, "leaders": ["OP06-020", "OP03-058"], "games": [0.0, 1.0], "turns": [12, 14]}
+{"seed": 106003, "score": 1.0, "leaders": ["OP01-031", "P-086"], "games": [1.0, 0.0], "turns": [13, 11]}
+{"seed": 106004, "score": 2.0, "leaders": ["OP16-022", "OP01-060"], "games": [1.0, 1.0], "turns": [11, 12]}
+{"seed": 106005, "score": 2.0, "leaders": ["OP01-003", "OP05-001"], "games": [1.0, 1.0], "turns": [9, 10]}
+{"seed": 206000, "score": 1.0, "leaders": ["OP03-021", "OP11-040"], "games": [0.0, 1.0], "turns": [12, 10]}
+{"seed": 206001, "score": 0.0, "leaders": ["OP02-025", "ST05-001"], "games": [0.0, 0.0], "turns": [12, 11]}
+{"seed": 206002, "score": 0.0, "leaders": ["P-086", "OP10-042"], "games": [0.0, 0.0], "turns": [10, 11]}
+{"seed": 206003, "score": 2.0, "leaders": ["OP13-003", "OP04-001"], "games": [1.0, 1.0], "turns": [13, 12]}
+{"seed": 206004, "score": 2.0, "leaders": ["OP10-022", "OP03-076"], "games": [1.0, 1.0], "turns": [15, 12]}
+{"seed": 306000, "score": 1.0, "leaders": ["OP01-091", "OP01-091"], "games": [1.0, 0.0], "turns": [15, 13]}
+{"seed": 206005, "score": 1.0, "leaders": ["OP16-080", "OP13-100"], "games": [0.0, 1.0], "turns": [12, 14]}
+{"seed": 306001, "score": 0.0, "leaders": ["ST10-003", "OP10-003"], "games": [0.0, 0.0], "turns": [12, 11]}
+{"seed": 306002, "score": 0.0, "leaders": ["OP07-097", "OP16-022"], "games": [0.0, 0.0], "turns": [12, 9]}
+{"seed": 306003, "score": 2.0, "leaders": ["OP11-021", "OP03-021"], "games": [1.0, 1.0], "turns": [11, 10]}
+{"seed": 306005, "score": 2.0, "leaders": ["ST07-001", "PRB01-001"], "games": [1.0, 1.0], "turns": [11, 12]}
+{"seed": 306004, "score": 1.0, "leaders": ["OP08-002", "OP09-042"], "games": [0.0, 1.0], "turns": [10, 10]}
+{"seed": 406001, "score": 2.0, "leaders": ["OP06-001", "OP12-001"], "games": [1.0, 1.0], "turns": [11, 12]}
+{"seed": 406002, "score": null, "leaders": ["ST13-002", "EB01-040"], "void": "InvariantError: invariant violation(s) at step 98: [('ACTION_EXCEPTION', 'ValueError: アタックするには手札2枚を捨てる必要があり、手札が足りません。\\nTraceback (most r"}
+{"seed": 406000, "score": 1.0, "leaders": ["OP15-001", "OP06-080"], "games": [1.0, 0.0], "turns": [17, 11]}
+{"seed": 406003, "score": 2.0, "leaders": ["OP15-001", "OP13-004"], "games": [1.0, 1.0], "turns": [11, 10]}
+{"seed": 406004, "score": 0.0, "leaders": ["EB01-040", "OP07-079"], "games": [0.0, 0.0], "turns": [14, 13]}
+{"seed": 406005, "score": 2.0, "leaders": ["ST11-001", "ST01-001"], "games": [1.0, 1.0], "turns": [11, 12]}
