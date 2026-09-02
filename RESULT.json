@@ -1,0 +1,40 @@
+{
+  "job": "n20-22-w02",
+  "role": "generate",
+  "status": "partial",
+  "inputs": {
+    "net": "claude/n1-results:n1_results/neff_net_c10.npz",
+    "net_bytes": 221963,
+    "games_per_chunk": 960,
+    "sims": 128,
+    "workers": 4,
+    "shard_games": 10
+  },
+  "chunks": [
+    {
+      "wave": 20,
+      "seed_base": 2202000,
+      "out": "n20_records",
+      "log": "n20_gen.log",
+      "status": "done",
+      "rows": 132960,
+      "main_rows": 80933,
+      "dropped": 0
+    },
+    {
+      "wave": 21,
+      "seed_base": 2212000,
+      "out": "n21_records",
+      "log": "n21_gen.log",
+      "status": "in_progress"
+    },
+    {
+      "wave": 22,
+      "seed_base": 2222000,
+      "out": "n22_records",
+      "log": "n22_gen.log",
+      "status": "not_started"
+    }
+  ],
+  "notes": "コンテナ再起動によりチャンク2が複数回中断・同一引数(seed-base/games/out不変)で再起動を継続中。完了時にstatus=doneへ更新し3チャンク分のN_RECORD_DONEを転記予定。"
+}
