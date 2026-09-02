@@ -83,7 +83,7 @@ def main():
     ap.add_argument("--max-pairs", type=int, default=40, help="この実行で回す上限（≈10分/40ペア）")
     ap.add_argument("--frac", type=float, default=0.55)
     ap.add_argument("--workers", type=int, default=4)
-    ap.add_argument("--leaders", default="fixed", choices=("fixed", "random", "real"),
+    ap.add_argument("--leaders", default="fixed", choices=("fixed", "random", "real", "purple"),
                     help="対面の選び方（2026-08-15 ユーザ提案）: fixed=従来の既定リーダーミラー"
                          "（歴代判定と地続き）／random=全リーダーからペアごとに2枚引く（汎化）／"
                          "real=実デッキ4リーダーの総当たり（出荷先）。ペア内では席とリーダーを"
@@ -109,13 +109,18 @@ def main():
     ap.add_argument("--cand-no-box-commit", action="store_true",
                     help="候補席だけ箱コミット実行を**無効化**（box_commit=False）＝"
                          "「既定(コミットON) vs OFF」の欠陥検出 A/B の OFF 側測定用")
+    ap.add_argument("--cand-residual-dig", action="store_true",
+                    help="候補席だけ残ドン掘り（2026-09-02・対照生成の腕A）: 木が TURN_END を"
+                         "選んだ時にアクティブドンが残り、手札に「登場時ドン-Xでドロー」の"
+                         "コスト1キャラがあれば代わりに出す。発火は台帳行 dig に記録")
     ap.add_argument("--pair-timeout", type=int, default=900,
                     help="1ペアの実時間上限（秒・0=無制限）。超過したペアは void として台帳に"
                          "残し次へ進む。手数上限では捕まらない「1回の decide() から戻らない」"
                          "暴走（戦闘箱の組合せ爆発）を切るための保険")
-    ap.add_argument("--decks", default="singleton", choices=("singleton", "synth"),
+    ap.add_argument("--decks", default="singleton", choices=("singleton", "synth", "synth_dig"),
                     help="デッキの中身。singleton=従来（色が合う50枚・全部1枚ずつ・イベント0）／"
-                         "synth=リーダーに合わせて合成（deck_synth）")
+                         "synth=リーダーに合わせて合成（deck_synth）／synth_dig=合成に掘りカード"
+                         "（登場時ドン-Xドローのコスト1）を差し込む（deck_dig・--leaders purple と対）")
     args = ap.parse_args()
     cand_kw = None
     if args.cand_macro:
@@ -132,6 +137,8 @@ def main():
         cand_kw = dict(cand_kw or {}, box_commit=True)
     if args.cand_no_box_commit:
         cand_kw = dict(cand_kw or {}, box_commit=False)
+    if args.cand_residual_dig:
+        cand_kw = dict(cand_kw or {}, residual_dig=True)
 
     from arena_gate import plan_bands
     planned = [s for band in plan_bands(args.pairs, args.bands, args.seed_base) for s in band]

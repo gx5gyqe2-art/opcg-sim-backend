@@ -119,19 +119,34 @@ def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed", decks="
 REAL_LEADERS = ("OP11-041", "OP09-001", "OP15-058", "OP16-022")   # ナミ/シャンクス/エネル/黒黄ルフィ
 
 
-def _leader_pool(db):
-    if "leaders" not in _G:
-        _G["leaders"] = sorted(cid for cid, _ in db.raw_db.items()
-                               if (db.get_card(cid) is not None
-                                   and getattr(db.get_card(cid).type, "name", "") == "LEADER"))
-    return _G["leaders"]
+def _leader_pool(db, color=None):
+    """全リーダー（color 指定時は**その色を含む**リーダーだけ・例 "PURPLE"）。1回だけ構築。"""
+    key = "leaders" if color is None else f"leaders:{color}"
+    if key not in _G:
+        out = []
+        for cid, _ in db.raw_db.items():
+            c = db.get_card(cid)
+            if c is None or getattr(c.type, "name", "") != "LEADER":
+                continue
+            if color is not None:
+                cols = {getattr(x, "name", str(x)) for x in (getattr(c, "colors", ()) or ())}
+                if color not in cols:
+                    continue
+            out.append(cid)
+        _G[key] = sorted(out)
+    return _G[key]
 
 
 def _leader_pair(db, seed, mode):
-    """seed から決定論的にリーダー対を選ぶ（pure・pool は1回だけ構築）。"""
+    """seed から決定論的にリーダー対を選ぶ（pure・pool は1回だけ構築）。
+
+    purple（2026-09-02・残ドン掘りの対照実験用）: 紫を含むリーダーだけから引く＝掘りカード
+    （全5種・全て紫）を `deck_dig` で差し込める母集団に限る。"""
     if mode == "fixed":
         return None, None
-    pool = REAL_LEADERS if mode == "real" else _leader_pool(db)
+    pool = (REAL_LEADERS if mode == "real"
+            else _leader_pool(db, "PURPLE") if mode == "purple"
+            else _leader_pool(db))
     if not pool:
         return None, None
     rng = random.Random(seed * 7919 + 13)
@@ -154,7 +169,13 @@ def _play_pair_detail(args):
     from game_driver import leader_deck_builder
     mode = _G.get("leaders_mode", "fixed")
     la, lb = _leader_pair(_G["db"], seed, mode)
-    if _G.get("decks") == "synth":
+    if _G.get("decks") == "synth_dig":
+        # 残ドン掘りの対照実験（2026-09-02）: 合成デッキに掘りカードを差し込む（両席同じ規則＝
+        # 腕A/腕B のデッキは同一・差は「終了前に掘ったか」だけ）。`--leaders purple` と対で使う。
+        from deck_dig import synth_dig_deck_builder
+        ab = synth_dig_deck_builder(la, lb, seed=seed) if la else None
+        ba = synth_dig_deck_builder(lb, la, seed=seed) if la else None
+    elif _G.get("decks") == "synth":
         # 中身もリーダーに合わせて合成する（deck_synth）。singleton builder は「ID順で色が
         # 合う最初の50枚・全部1枚ずつ・イベント0」という実在しない構築で、テーマ参照や
         # イベント/ステージを持つ効果が一度も盤面に乗らない＝歴代の判定の射程外だった。
@@ -172,11 +193,23 @@ def _play_pair_detail(args):
             raise PairTimeout(f"pair exceeded {_G['pair_timeout']}s")
         signal.signal(signal.SIGALRM, _alarm)
         signal.alarm(int(_G["pair_timeout"]))
+    # 残ドン掘り（腕A・2026-09-02）の発火記録: 候補席エンジンの events を局ごとに回収して
+    # 台帳行へ載せる（区分別の事後集計用・`dig_cf_breakdown.py`）。無効時は空のまま。
+    ev_a = ev_b = None
     try:
+        _cand = _G["cand"]
+        if getattr(_cand, "residual_dig_events", None) is not None:
+            _cand.residual_dig_events.clear()
         a = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["cand"],
                       p2_engine=_G["best"], deck_builder=ab)
+        if getattr(_cand, "residual_dig_events", None) is not None:
+            ev_a = list(_cand.residual_dig_events)
+            _cand.residual_dig_events.clear()
         b = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["best"],
                       p2_engine=_G["cand"], deck_builder=ba)
+        if getattr(_cand, "residual_dig_events", None) is not None:
+            ev_b = list(_cand.residual_dig_events)
+            _cand.residual_dig_events.clear()
     except (Exception, PairTimeout) as e:
         # 対局がエンジン欠陥で成立しなかった（上限手数 MAX_STEPS / 実時間上限 等）。**1ペアの失敗で計測全体を
         # 落とさない**（ランダム対面では未知のループを踏むことがあり、シャードが丸ごと止まる）。
@@ -192,8 +225,11 @@ def _play_pair_detail(args):
     wb = 1.0 if b["winner"] == "p2" else 0.0    # game b: 候補が lb を握る（席とリーダーを入替）
     # leaders=[la, lb] と games=[wa, wb] を対にして残すと、**どのリーダーを握って勝ったか**を
     # 後から集計できる（score だけだと2局の合計なのでリーダー別に割れない）。
-    return {"seed": seed, "score": wa + wb, "leaders": [la, lb], "games": [wa, wb],
-            "turns": [a.get("turns"), b.get("turns")]}
+    row = {"seed": seed, "score": wa + wb, "leaders": [la, lb], "games": [wa, wb],
+           "turns": [a.get("turns"), b.get("turns")]}
+    if ev_a is not None or ev_b is not None:
+        row["dig"] = [ev_a or [], ev_b or []]     # 候補席の掘り発火（game a / game b）
+    return row
 
 
 def run_stage(pool, seeds):

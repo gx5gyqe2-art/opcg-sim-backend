@@ -286,7 +286,8 @@ class LearnedEngine:
                  box_dialog: Optional[bool] = None,
                  box_commit: Optional[bool] = None,
                  dirichlet_eps: Optional[float] = None,
-                 temp_turns: Optional[int] = None):
+                 temp_turns: Optional[int] = None,
+                 residual_dig: Optional[bool] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
@@ -322,6 +323,15 @@ class LearnedEngine:
         #              ——無いと同じ線ばかり打ち、π 教師が argmax クローンに退化して飽和する。
         self.dirichlet_eps = dirichlet_eps
         self.temp_turns = temp_turns
+        # 残ドン掘り（2026-09-02・対照生成の腕A・serve 既定 None=無効＝挙動不変）:
+        # 木が**メイン窓で TURN_END を選んだ時だけ**、手札に「登場時にドンを戻してドローする
+        # コスト1キャラ」があり場に空きがあれば、代わりにそれを出す。通常の手（大型・攻撃・
+        # 付与）は全て木の判断のまま＝腕の違いは「捨てるはずだったドンで掘ったか」だけ。
+        # 掘りの良否は勝敗（z）が決める＝人間裁定を教えない。条件は力学だけ（カードID・
+        # リーダー名を含めない）。発火は `residual_dig_events` に1件ずつ記録し、事後に
+        # 区分別（ターン・場のドン・ドンデッキ残）で勝敗を割り直せるようにする。
+        self.residual_dig = residual_dig
+        self.residual_dig_events: list = []
         # 方策 priors の注入口（純正Nループ④ 2026-08-26）: None=既定（self.pnet の G 系
         # priors）。設定時はその callable(state, legal)->np.array|None を全経路（木・窓の
         # 根畳み・コミット生成）で使う＝N 系ネットの方策チャネルを pnet の G 形式を経由せず
@@ -753,7 +763,17 @@ class LearnedEngine:
         #  - DON_BOX: 原始手順は payload から算術で確定＝カウントダウン形1要素（トレース不要。
         #    このdecideが先頭原始手を返すので残りは 総原始手数-1）
         #  - PLAY/ACTIVATE_MAIN: 後続の自分側効果対話列を評価と同じ解決規約で確定
-        if use_commit and move is not None:
+        # 残ドン掘り（腕A・§__init__ residual_dig）: 木が TURN_END を選んだ時だけ差し替える。
+        # 差し替えた PLAY はコミットしない（後続の対話は合法手が既定解決1手＝「払う」なので
+        # 次 decide が機械的に払う）。
+        dig_override = False
+        if (self.residual_dig and move is not None and move.get("action_type") == "TURN_END"
+                and not in_battle(manager) and not in_dialog(manager)):
+            alt = self._residual_dig_move(manager, player)
+            if alt is not None:
+                move = alt
+                dig_override = True
+        if use_commit and move is not None and not dig_override:
             at = move.get("action_type")
             if at == "DON_BOX":
                 p = move.get("payload") or {}
@@ -773,6 +793,85 @@ class LearnedEngine:
             except Exception:
                 pass   # 分析失敗で対局を止めない
         return move
+
+    def _residual_dig_move(self, manager, player):
+        """残ドン掘りの差し替え手（腕A）: 合法な PLAY のうち `_is_dig_card` を満たす手札を
+        先頭から1枚返す（無ければ None）。場の空き・アクティブドンの有無は合法手列挙が
+        担保する（コスト充足は列挙側、場の上限はここで見る）。発火を events に記録する。"""
+        try:
+            if len(getattr(player, "don_active", ()) or ()) < 1:
+                return None
+            if len(getattr(player, "field", ()) or ()) >= 5:
+                return None
+            by_uuid = {getattr(c, "uuid", None): c for c in (getattr(player, "hand", ()) or ())}
+            for mv in self.game.legal_actions(manager) or ():
+                if mv.get("action_type") != "PLAY":
+                    continue
+                c = by_uuid.get((mv.get("payload") or {}).get("uuid"))
+                master = getattr(c, "master", None)
+                if c is None or not _is_dig_card(master):
+                    continue
+                leader = getattr(getattr(player, "leader", None), "master", None)
+                self.residual_dig_events.append({
+                    "turn": int(getattr(manager, "turn_count", 0) or 0),
+                    "player": getattr(player, "name", None),
+                    "card": getattr(master, "card_id", None),
+                    "leader": getattr(leader, "card_id", None),
+                    "don_active": len(getattr(player, "don_active", ()) or ()),
+                    "don_rested": len(getattr(player, "don_rested", ()) or ()),
+                    "don_deck": len(getattr(player, "don_deck", ()) or ()),
+                    "hand": len(getattr(player, "hand", ()) or ()),
+                    "field": len(getattr(player, "field", ()) or ()),
+                })
+                return mv
+        except Exception:
+            return None
+        return None
+
+
+def _is_dig_card(master) -> bool:
+    """「登場時にドンを戻してカードを引く」コスト1キャラか（構造判定・カードID非依存・pure）。
+
+    条件: CHARACTER・cost==1・ON_PLAY 能力の効果に DRAW があり、その能力のコストに
+    RETURN_DON（ドン‼-X）がある。サトリ OP15-066・シュラ OP15-067 が該当。速攻や他能力の
+    有無は見ない（腕Aの規則は「捨てるはずのドンで掘る」だけ＝順序の妙は探索の仕事）。"""
+    try:
+        from opcg_sim.src.models.effect_types import ActionType, TriggerType
+        if master is None or getattr(getattr(master, "type", None), "name", None) != "CHARACTER":
+            return False
+        if getattr(master, "cost", None) != 1:
+            return False
+        for ab in (getattr(master, "abilities", ()) or ()):
+            if getattr(ab, "trigger", None) is not TriggerType.ON_PLAY:
+                continue
+            if not _tree_has(getattr(ab, "effect", None), ActionType.DRAW):
+                continue
+            if _tree_has(getattr(ab, "cost", None), ActionType.RETURN_DON):
+                return True
+        return False
+    except Exception:
+        return False
+
+
+def _tree_has(node, atype) -> bool:
+    """効果木（GameAction / Sequence / Branch / Choice / list）に atype の action があるか（pure）。"""
+    if node is None:
+        return False
+    if getattr(node, "type", None) is atype:
+        return True
+    # 効果木の子属性は n_eff_feat._walk と同じ集合（GameAction.sub_effect／Sequence.children・
+    # effects／Choice.options／Branch.branches・then・else_effect・on_true・on_false）。
+    for attr in ("sub_effect", "children", "effects", "options", "branches",
+                 "then", "else_effect", "on_true", "on_false"):
+        sub = getattr(node, attr, None)
+        if isinstance(sub, (list, tuple)):
+            if any(_tree_has(s, atype) for s in sub):
+                return True
+        elif sub is not None and _tree_has(sub, atype):
+            return True
+    if isinstance(node, (list, tuple)):
+        return any(_tree_has(s, atype) for s in node)
+    return False
 
 
 _DEFAULT_ENGINE: Optional[LearnedEngine] = None
