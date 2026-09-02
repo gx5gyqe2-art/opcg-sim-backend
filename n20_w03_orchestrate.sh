@@ -7,7 +7,12 @@ NET=/tmp/gen_net.npz
 
 push_progress() {
   local msg="$1"
-  git add -f n20_records n21_records n22_records n20_gen.log n21_gen.log n22_gen.log 2>/dev/null
+  for d in n20_records n21_records n22_records; do
+    [ -d "$d" ] && git add -f "$d"
+  done
+  for f in n20_gen.log n21_gen.log n22_gen.log n20_w03_orchestrate.log; do
+    [ -f "$f" ] && git add -f "$f"
+  done
   if ! git diff --cached --quiet; then
     git commit -m "$msg"
     for i in 1 2 3 4; do
