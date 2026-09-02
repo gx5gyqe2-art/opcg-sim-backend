@@ -1,1 +1,1 @@
-{"job":"actcf-w03","role":"arena","status":"done","candidate":"c10+residual_activate:low","baseline":"c10","pairs":24}
+{"job":"actcf-w03","role":"arena","status":"in_progress","candidate":"c10+residual_activate:low","baseline":"c10","pairs_target":24,"pairs_done":0,"note":"previous commit falsely claimed done/24 due to a $HOME path bug in the runner script; no real pairs were collected in that commit; re-running now"}
