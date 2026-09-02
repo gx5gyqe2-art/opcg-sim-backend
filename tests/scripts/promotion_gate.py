@@ -196,20 +196,27 @@ def _play_pair_detail(args):
     # 残ドン掘り（腕A・2026-09-02）の発火記録: 候補席エンジンの events を局ごとに回収して
     # 台帳行へ載せる（区分別の事後集計用・`dig_cf_breakdown.py`）。無効時は空のまま。
     ev_a = ev_b = None
+    act_a = act_b = None
     try:
         _cand = _G["cand"]
-        if getattr(_cand, "residual_dig_events", None) is not None:
-            _cand.residual_dig_events.clear()
+
+        def _take(attr):
+            lst = getattr(_cand, attr, None)
+            if lst is None:
+                return None
+            out = list(lst)
+            lst.clear()
+            return out
+        _take("residual_dig_events")
+        _take("residual_activate_events")
         a = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["cand"],
                       p2_engine=_G["best"], deck_builder=ab)
-        if getattr(_cand, "residual_dig_events", None) is not None:
-            ev_a = list(_cand.residual_dig_events)
-            _cand.residual_dig_events.clear()
+        ev_a = _take("residual_dig_events")
+        act_a = _take("residual_activate_events")
         b = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["best"],
                       p2_engine=_G["cand"], deck_builder=ba)
-        if getattr(_cand, "residual_dig_events", None) is not None:
-            ev_b = list(_cand.residual_dig_events)
-            _cand.residual_dig_events.clear()
+        ev_b = _take("residual_dig_events")
+        act_b = _take("residual_activate_events")
     except (Exception, PairTimeout) as e:
         # 対局がエンジン欠陥で成立しなかった（上限手数 MAX_STEPS / 実時間上限 等）。**1ペアの失敗で計測全体を
         # 落とさない**（ランダム対面では未知のループを踏むことがあり、シャードが丸ごと止まる）。
@@ -229,6 +236,8 @@ def _play_pair_detail(args):
            "turns": [a.get("turns"), b.get("turns")]}
     if ev_a is not None or ev_b is not None:
         row["dig"] = [ev_a or [], ev_b or []]     # 候補席の掘り発火（game a / game b）
+    if act_a is not None or act_b is not None:
+        row["act"] = [act_a or [], act_b or []]   # 候補席の残り起動/付与（game a / game b）
     return row
 
 

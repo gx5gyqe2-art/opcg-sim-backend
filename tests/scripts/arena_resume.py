@@ -113,6 +113,12 @@ def main():
                     help="候補席だけ残ドン掘り（2026-09-02・対照生成の腕A）: 木が TURN_END を"
                          "選んだ時にアクティブドンが残り、手札に「登場時ドン-Xでドロー」の"
                          "コスト1キャラがあれば代わりに出す。発火は台帳行 dig に記録")
+    ap.add_argument("--cand-residual-activate", default=None, choices=("low", "high"),
+                    help="候補席だけ残り起動（2026-09-02・対照生成の腕A2）: 木が TURN_END を選んだ"
+                         "時に、リーダーのドン追加起動効果が未使用なら起動し（ドンデッキが空でも"
+                         "レストのドンの付与が効く）、付与対話を方針で解く（low=攻撃できる最低"
+                         "パワー／high=最高パワー）。"
+                         "発火は台帳行 act に記録")
     ap.add_argument("--pair-timeout", type=int, default=900,
                     help="1ペアの実時間上限（秒・0=無制限）。超過したペアは void として台帳に"
                          "残し次へ進む。手数上限では捕まらない「1回の decide() から戻らない」"
@@ -139,6 +145,8 @@ def main():
         cand_kw = dict(cand_kw or {}, box_commit=False)
     if args.cand_residual_dig:
         cand_kw = dict(cand_kw or {}, residual_dig=True)
+    if args.cand_residual_activate:
+        cand_kw = dict(cand_kw or {}, residual_activate=args.cand_residual_activate)
 
     from arena_gate import plan_bands
     planned = [s for band in plan_bands(args.pairs, args.bands, args.seed_base) for s in band]

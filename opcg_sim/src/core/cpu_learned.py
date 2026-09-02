@@ -287,7 +287,8 @@ class LearnedEngine:
                  box_commit: Optional[bool] = None,
                  dirichlet_eps: Optional[float] = None,
                  temp_turns: Optional[int] = None,
-                 residual_dig: Optional[bool] = None):
+                 residual_dig: Optional[bool] = None,
+                 residual_activate: Optional[str] = None):
         if vocab is None or game is None:
             svocab, sgame = _shared_vocab_game()
             vocab = vocab if vocab is not None else svocab
@@ -332,6 +333,18 @@ class LearnedEngine:
         # 区分別（ターン・場のドン・ドンデッキ残）で勝敗を割り直せるようにする。
         self.residual_dig = residual_dig
         self.residual_dig_events: list = []
+        # 残り起動（2026-09-02・対照生成の腕A2・serve 既定 None=無効＝挙動不変）:
+        # 木が**メイン窓で TURN_END を選んだ時だけ**、リーダーの起動効果が未使用（合法手に
+        # ACTIVATE_MAIN がある）で、その効果が「ドン‼デッキからドンを追加する」構造語を持てば、
+        # 代わりに起動する（ドンデッキが空でも「レストのドンをキャラに付与」が効くので条件に
+        # しない）。起動で開く**自分のキャラへの付与対話**は
+        # 方針で付与先を決める（"low"＝このターン攻撃できるキャラのうち最低パワー＝攻撃本数を
+        # 増やす・実プレイの筋／"high"＝最高パワー）。その後は木に制御を返す（増えたドンで
+        # 追加の手・付与したキャラで攻撃するかは木の判断）。監査（`don_refund_audit`）で
+        # c10 が起動を負に評価して一度も使わない盲点が出たため、勝敗で良否を測る腕。
+        self.residual_activate = residual_activate
+        self.residual_activate_events: list = []
+        self._resact_pending = False      # 直前の decide で起動を返した（付与対話を方針で解く）
         # 方策 priors の注入口（純正Nループ④ 2026-08-26）: None=既定（self.pnet の G 系
         # priors）。設定時はその callable(state, legal)->np.array|None を全経路（木・窓の
         # 根畳み・コミット生成）で使う＝N 系ネットの方策チャネルを pnet の G 形式を経由せず
@@ -693,6 +706,15 @@ class LearnedEngine:
         # （TREE_BOX_BATTLE/TREE_BOX_DIALOG が `_expand` で行う計算）と同一の意味論で
         # 出口 value 最良の1手を直接返す（`_window_choice` 参照）。メインフェーズ
         # （バトルをするか・どこを殴るか）は下の full-tree のまま＝変更しない。
+        # 残り起動（腕A2）: 直前の decide で起動を返したなら、続く付与対話を方針で解く。
+        # メイン窓に戻ったら（対話でない）フラグは落とす＝起動1回ぶんの対話列にだけ効く。
+        if self._resact_pending:
+            if in_dialog(manager) and not in_battle(manager):
+                alt = self._residual_attach_move(manager, player)
+                if alt is not None:
+                    return alt
+            else:
+                self._resact_pending = False
         use_dialog = (CFG.TREE_BOX_DIALOG if self.box_dialog is None else self.box_dialog)
         if in_battle(manager) or (use_dialog and in_dialog(manager)):
             move, stats, ev_mgr = self._window_choice(manager, name, det_rng)
@@ -773,6 +795,16 @@ class LearnedEngine:
             if alt is not None:
                 move = alt
                 dig_override = True
+        # 残り起動（腕A2）: 掘りと同じ発火点（木が TURN_END を選んだ時）。起動を返したら
+        # 続く付与対話は `_residual_attach_move` が方針で解く（フラグ）。コミットはしない。
+        if (not dig_override and self.residual_activate and move is not None
+                and move.get("action_type") == "TURN_END"
+                and not in_battle(manager) and not in_dialog(manager)):
+            alt = self._residual_activate_move(manager, player)
+            if alt is not None:
+                move = alt
+                dig_override = True            # コミットを止める（同じ経路）
+                self._resact_pending = True
         if use_commit and move is not None and not dig_override:
             at = move.get("action_type")
             if at == "DON_BOX":
@@ -793,6 +825,97 @@ class LearnedEngine:
             except Exception:
                 pass   # 分析失敗で対局を止めない
         return move
+
+    def _residual_activate_move(self, manager, player):
+        """残り起動の差し替え手（腕A2）: 合法な ACTIVATE_MAIN のうちリーダー自身の起動で、
+        その効果がドン追加の構造語を持ち、ドンデッキに残があれば返す（無ければ None）。
+        合法手にあること＝未使用・条件成立・コスト充足（gamestate `_has_activatable_main`）。"""
+        try:
+            leader = getattr(player, "leader", None)
+            if leader is None:
+                return None
+            if not _leader_has_don_ramp(getattr(leader, "master", None)):
+                return None
+            # ドンデッキ残の条件は**付けない**（2026-09-02 実測）: エネルのドンデッキは6枚で
+            # turn3〜4 で尽きる。以後の起動は「追加」が空振りでも「レストのドン4枚までを
+            # キャラに付与」が効く（払ったドンを +4000 に変える）＝実プレイの主用途。
+            # 合法手にあること＝inert でない（gamestate `_has_activatable_main`）。
+            # don_deck は events に残し、集計で「追加あり／付与のみ」を分ける。
+            for mv in self.game.legal_actions(manager) or ():
+                if mv.get("action_type") != "ACTIVATE_MAIN":
+                    continue
+                if (mv.get("payload") or {}).get("uuid") != getattr(leader, "uuid", None):
+                    continue
+                self.residual_activate_events.append({
+                    "kind": "activate",
+                    "turn": int(getattr(manager, "turn_count", 0) or 0),
+                    "player": getattr(player, "name", None),
+                    "leader": getattr(getattr(leader, "master", None), "card_id", None),
+                    "don_active": len(getattr(player, "don_active", ()) or ()),
+                    "don_rested": len(getattr(player, "don_rested", ()) or ()),
+                    "don_deck": len(getattr(player, "don_deck", ()) or ()),
+                    "field": len(getattr(player, "field", ()) or ()),
+                    "policy": self.residual_activate,
+                })
+                return mv
+        except Exception:
+            return None
+        return None
+
+    def _residual_attach_move(self, manager, player):
+        """起動で開いた**自分のキャラへの付与対話**を方針で解く。候補が自分の場のキャラで
+        なければ None（通常の窓処理へ）。選んだ対象の RESOLVE 手を adapter の列挙から探し、
+        無ければ既定 payload に selected_uuids を差し替えて作る。"""
+        try:
+            req = manager.get_pending_request() or {}
+            sel = list(req.get("selectable_uuids") or [])
+            if not sel:
+                return None
+            by_uuid = {getattr(c, "uuid", None): c for c in (getattr(player, "field", ()) or ())}
+            if not all(u in by_uuid for u in sel):
+                return None                          # 自分のキャラ以外が混ざる対話は触らない
+            turn = int(getattr(manager, "turn_count", 0) or 0)
+            cands = []
+            for u in sel:
+                c = by_uuid[u]
+                try:
+                    pw = int(c.get_power(True))
+                except Exception:
+                    pw = int(getattr(getattr(c, "master", None), "power", 0) or 0)
+                can_atk = (turn > 2 and not getattr(c, "is_rest", False)
+                           and not (getattr(c, "is_newly_played", False)
+                                    and not c.has_keyword("速攻")))
+                cands.append((u, pw, bool(can_atk)))
+            target = _pick_attach_target(cands, self.residual_activate)
+            if target is None:
+                return None
+            chosen = None
+            for mv in self.game.legal_actions(manager) or ():
+                p = mv.get("payload") or {}
+                if (mv.get("action_type") == "RESOLVE_EFFECT_SELECTION"
+                        and list(p.get("selected_uuids") or []) == [target]):
+                    chosen = mv
+                    break
+            if chosen is None:
+                payload = dict(manager.default_interaction_payload() or {})
+                payload["selected_uuids"] = [target]
+                payload["accepted"] = True
+                chosen = {"kind": "game", "action_type": "RESOLVE_EFFECT_SELECTION",
+                          "payload": payload}
+            tc = by_uuid[target]
+            self.residual_activate_events.append({
+                "kind": "attach",
+                "turn": turn,
+                "player": getattr(player, "name", None),
+                "card": getattr(getattr(tc, "master", None), "card_id", None),
+                "power": next(pw for u, pw, _ in cands if u == target),
+                "can_attack": next(ca for u, _, ca in cands if u == target),
+                "n_cands": len(cands),
+                "policy": self.residual_activate,
+            })
+            return chosen
+        except Exception:
+            return None
 
     def _residual_dig_move(self, manager, player):
         """残ドン掘りの差し替え手（腕A）: 合法な PLAY のうち `_is_dig_card` を満たす手札を
@@ -827,6 +950,40 @@ class LearnedEngine:
         except Exception:
             return None
         return None
+
+
+DON_RAMP_MARK = "ドン!!デッキから"     # リーダー効果の「ドンデッキからドンを追加」構造語（‼は!!へ正規化）
+
+
+def _leader_has_don_ramp(master) -> bool:
+    """リーダーの起動効果がドンデッキからドンを追加するか（テキスト構造語・pure）。
+
+    パーサは紫エネル OP15-058 の起動効果を空（effect ops []）で返すため op 構造では判定できず、
+    能力の raw_text の構造語で見る（`dig_cf_breakdown.leader_has_don_ramp` と同じ規約）。"""
+    try:
+        if master is None:
+            return False
+        blob = " ".join((getattr(ab, "raw_text", "") or "")
+                        for ab in (getattr(master, "abilities", ()) or ()))
+        if not blob:
+            blob = getattr(master, "effect_text", "") or ""
+        return DON_RAMP_MARK in blob.replace("‼", "!!")
+    except Exception:
+        return False
+
+
+def _pick_attach_target(cands, policy):
+    """付与先の方針（pure）。cands=[(uuid, power, can_attack_this_turn)]。
+
+    "low": このターン攻撃できるキャラのうち最低パワー（4枚付与で攻撃本数を増やす＝実プレイの
+           筋・ユーザ 2026-09-02）。攻撃できるキャラが無ければ全体の最低パワー。
+    "high": 最高パワー。同点は uuid 順で決定論。候補が無ければ None。"""
+    if not cands:
+        return None
+    if policy == "high":
+        return sorted(cands, key=lambda t: (-t[1], t[0]))[0][0]
+    pool = [t for t in cands if t[2]] or list(cands)
+    return sorted(pool, key=lambda t: (t[1], t[0]))[0][0]
 
 
 def _is_dig_card(master) -> bool:
