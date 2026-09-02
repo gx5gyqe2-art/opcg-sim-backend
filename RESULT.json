@@ -1,0 +1,6 @@
+{"job":"train-c10","role":"train","status":"done",
+ "inputs":{"warm_start":"claude/n1-results:n1_results/neff_net_c9.npz",
+           "pi_waves":[16,17,18,19],"z_waves":[14,15,16,17,18,19],"epochs":2,"lr":2e-4},
+ "outputs":{"net":"n1_results/neff_net_c10.npz"},
+ "metrics":{"val_v_mse":0.5176,"val_v_sign":0.816,"pi_top1":0.637,"best_ep":0},
+ "notes":"n19 w05 は打ち切りシャード（96中75シャードのみ・meta_n_record.json も欠落）。corrupt removed: 0（残った75シャードは全て正常に読めたため除外なし。meta_n_record.json は load_dump が n_record_*.npz のみを glob するため欠落しても影響なし）。value 6372087行（val 909339）／policy 2405224点（val 343458）。OOM は発生せず、--z-in から n14 を外す必要はなかった（ピーク RSS 約11.3GB／15GB）。ep1（val v_mse 0.5216）は ep0（0.5176）より悪化したため best は ep0。"}
