@@ -1,0 +1,24 @@
+{"seed": 301003, "score": 0.0, "leaders": ["OP08-057", "OP16-060"], "games": [0.0, 0.0], "turns": [12, 11], "dig": [[], []]}
+{"seed": 301001, "score": 1.0, "leaders": ["ST10-002", "OP10-003"], "games": [1.0, 0.0], "turns": [13, 11], "dig": [[{"turn": 3, "player": "p1", "card": "OP15-063", "leader": "ST10-002", "don_active": 3, "don_rested": 0, "don_deck": 7, "hand": 6, "field": 0}], [{"turn": 2, "player": "p2", "card": "OP07-061", "leader": "ST10-002", "don_active": 2, "don_rested": 0, "don_deck": 8, "hand": 6, "field": 0}]]}
+{"seed": 301000, "score": 1.0, "leaders": ["OP10-003", "OP04-019"], "games": [1.0, 0.0], "turns": [11, 11], "dig": [[], []]}
+{"seed": 301002, "score": 1.0, "leaders": ["OP03-058", "OP10-003"], "games": [1.0, 0.0], "turns": [11, 13], "dig": [[{"turn": 9, "player": "p1", "card": "OP15-067", "leader": "OP03-058", "don_active": 2, "don_rested": 0, "don_deck": 5, "hand": 7, "field": 4}], []]}
+{"seed": 301004, "score": 2.0, "leaders": ["OP09-062", "P-086"], "games": [1.0, 1.0], "turns": [11, 10], "dig": [[], []]}
+{"seed": 301005, "score": 1.0, "leaders": ["OP02-071", "OP06-042"], "games": [0.0, 1.0], "turns": [10, 12], "dig": [[], []]}
+{"seed": 401000, "score": 2.0, "leaders": ["OP10-003", "OP09-061"], "games": [1.0, 1.0], "turns": [9, 12], "dig": [[], []]}
+{"seed": 401001, "score": 0.0, "leaders": ["OP09-022", "OP16-060"], "games": [0.0, 0.0], "turns": [12, 11], "dig": [[], [{"turn": 10, "player": "p2", "card": "OP07-061", "leader": "OP09-022", "don_active": 1, "don_rested": 6, "don_deck": 1, "hand": 4, "field": 3}]]}
+{"seed": 401003, "score": 2.0, "leaders": ["OP06-001", "OP02-072"], "games": [1.0, 1.0], "turns": [9, 10], "dig": [[], []]}
+{"seed": 401005, "score": 1.0, "leaders": ["EB01-021", "OP12-041"], "games": [1.0, 0.0], "turns": [9, 11], "dig": [[], []]}
+{"seed": 401002, "score": 0.0, "leaders": ["OP01-091", "OP13-003"], "games": [0.0, 0.0], "turns": [12, 13], "dig": [[], []]}
+{"seed": 401004, "score": 2.0, "leaders": ["OP13-003", "OP16-060"], "games": [1.0, 1.0], "turns": [11, 12], "dig": [[], []]}
+{"seed": 501003, "score": 0.0, "leaders": ["P-086", "ST10-001"], "games": [0.0, 0.0], "turns": [12, 9], "dig": [[], [{"turn": 2, "player": "p2", "card": "OP07-061", "leader": "P-086", "don_active": 1, "don_rested": 1, "don_deck": 8, "hand": 5, "field": 1}]]}
+{"seed": 501001, "score": 0.0, "leaders": ["OP01-062", "EB01-021"], "games": [0.0, 0.0], "turns": [10, 9], "dig": [[], [{"turn": 6, "player": "p2", "card": "OP15-066", "leader": "OP01-062", "don_active": 1, "don_rested": 5, "don_deck": 4, "hand": 5, "field": 3}]]}
+{"seed": 501000, "score": 2.0, "leaders": ["ST04-001", "OP12-061"], "games": [1.0, 1.0], "turns": [11, 12], "dig": [[], []]}
+{"seed": 501002, "score": 0.0, "leaders": ["ST10-003", "ST05-001"], "games": [0.0, 0.0], "turns": [14, 13], "dig": [[], [{"turn": 12, "player": "p2", "card": "OP15-066", "leader": "ST10-003", "don_active": 1, "don_rested": 4, "don_deck": 0, "hand": 2, "field": 2}]]}
+{"seed": 601000, "score": 0.0, "leaders": ["OP06-042", "OP06-001"], "games": [0.0, 0.0], "turns": [10, 9], "dig": [[], []]}
+{"seed": 501005, "score": 1.0, "leaders": ["OP04-019", "OP08-058"], "games": [1.0, 0.0], "turns": [13, 11], "dig": [[], []]}
+{"seed": 501004, "score": 1.0, "leaders": ["OP07-059", "ST10-002"], "games": [1.0, 0.0], "turns": [9, 13], "dig": [[], []]}
+{"seed": 601001, "score": 0.0, "leaders": ["ST10-001", "OP01-062"], "games": [0.0, 0.0], "turns": [12, 11], "dig": [[], [{"turn": 2, "player": "p2", "card": "OP07-061", "leader": "ST10-001", "don_active": 1, "don_rested": 1, "don_deck": 8, "hand": 6, "field": 0}]]}
+{"seed": 601002, "score": 1.0, "leaders": ["OP02-071", "OP01-062"], "games": [1.0, 0.0], "turns": [9, 11], "dig": [[], []]}
+{"seed": 601004, "score": 1.0, "leaders": ["OP02-071", "OP09-061"], "games": [1.0, 0.0], "turns": [7, 11], "dig": [[], []]}
+{"seed": 601005, "score": 1.0, "leaders": ["EB01-021", "EB01-021"], "games": [1.0, 0.0], "turns": [11, 11], "dig": [[], []]}
+{"seed": 601003, "score": 2.0, "leaders": ["OP13-003", "ST10-002"], "games": [1.0, 1.0], "turns": [11, 10], "dig": [[], []]}
