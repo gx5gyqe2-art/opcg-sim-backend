@@ -153,3 +153,12 @@ branch 'claude/n20-w03' set up to track 'origin/claude/n20-w03'.
   210/960局 行28919（main 17575） 棄却0 2717s
   220/960局 行30380（main 18457） 棄却0 2835s
   230/960局 行31833（main 19351） 棄却0 2968s
+[claude/n20-w03 55fa253] n20-22 w03 progress
+ 7 files changed, 14 insertions(+)
+To https://github.com/gx5gyqe2-art/opcg-sim-backend
+   bd605df..55fa253  claude/n20-w03 -> claude/n20-w03
+branch 'claude/n20-w03' set up to track 'origin/claude/n20-w03'.
+[2026-09-02T23:14:40Z] --- n20_gen.log tail ---
+  260/960局 行35794（main 21767） 棄却0 3331s
+  270/960局 行37134（main 22578） 棄却0 3455s
+  280/960局 行38565（main 23460） 棄却0 3580s
