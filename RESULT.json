@@ -1,7 +1,7 @@
 {
   "job": "n20-22-w02",
   "role": "generate",
-  "status": "partial",
+  "status": "partial_terminated_by_coordinator",
   "inputs": {
     "net": "claude/n1-results:n1_results/neff_net_c10.npz",
     "net_bytes": 221963,
@@ -26,16 +26,17 @@
       "seed_base": 2212000,
       "out": "n21_records",
       "log": "n21_gen.log",
-      "status": "blocked_container_lifetime",
-      "notes": "2026-09-02 20:23頃から約4時間、コンテナが約25-30分ごとに再起動し続けており、n_record_gen.pyが途中再開非対応のため毎回game 0からやり直しになる。観測上80/960局（約8%）を毎回超えられていない。同一引数（seed-base 2212000・games 960）での再起動を規則Aに従い継続中だが、コンテナ寿命が伸びない限り完走の見込みが立たない。"
+      "status": "truncated_by_coordinator",
+      "notes": "2026-09-02 20:23〜2026-09-03 12:18の約16時間、コンテナが約25-30分ごとに再起動し続け、n_record_gen.pyが途中再開非対応のため毎回game 0からやり直しになり120/960局（約12.5%）を安定して超えられなかった。依頼者の判断（trigger_id trig_01PawAhTEHXxfjGapPtaRVRi・2026-09-03T12:18:12Z）によりこの時点で作業を打ち切り。プロセスをkillし、再実行しない。n21_recordsは途中状態のシャードのまま保全（削除・作り直しはしていない）。"
     },
     {
       "wave": 22,
       "seed_base": 2222000,
       "out": "n22_records",
       "log": "n22_gen.log",
-      "status": "not_started"
+      "status": "not_started",
+      "notes": "依頼者の打ち切り指示により起動せず。"
     }
   ],
-  "notes": "コンテナ再起動が21:00頃から異常に高頻度（5〜15分間隔）で発生し、チャンク2がgame 40〜90付近で毎回中断・同一引数で再起動を繰り返しているが正味の進捗がほぼ増えていない状態。n_record_gen.pyは途中再開非対応（seed-base固定での頭からのやり直しのみ安全）なため、この頻度が続く限りチャンク2完走の見込みが立たない。コーディネータが本ブランチを回収する際はこの状況を踏まえて判断されたい。完了時にstatus=doneへ更新し3チャンク分のN_RECORD_DONEを転記予定。"
+  "notes": "チャンク1(seed2202000)のみ完全完了。チャンク2(seed2212000)はコンテナの短い実効寿命（概ね25-30分、末期は毎回game 120付近で頭打ち）により約16時間かけても完走できず、依頼者の判断で2026-09-03T12:18:12Zに打ち切り。チャンク3(seed2222000)は未着手。プロセスは全て停止済み、これ以上の再実行は行わない。"
 }
