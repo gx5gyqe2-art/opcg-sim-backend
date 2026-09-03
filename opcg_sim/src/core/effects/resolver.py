@@ -22,6 +22,37 @@ _SEL_GROUP_ID = "_sel_group"
 # context にキーが「無い」ことと「値が None/空」であることを区別するための番兵。
 _UNSET = object()
 
+# 継続効果（PASSIVE/YOUR_TURN/OPPONENT_TURN の再計算）で「条件に合う全カードへ一律に掛かる」
+# 修飾アクション。再計算は盤面が動くたびに走るため、ここに無い 1回性のアクション
+# （DRAW/KO/PLAY_CARD 等）を再計算経路で全候補へ広げてはならない。
+_CONTINUOUS_MODIFIER_ACTIONS = frozenset({
+    ActionType.BUFF, ActionType.GRANT_KEYWORD, ActionType.REPLACE_EFFECT,
+    ActionType.PREVENT_LEAVE, ActionType.PREVENT_REST, ActionType.ATTACK_DISABLE,
+    ActionType.DISABLE_ABILITY, ActionType.FREEZE, ActionType.RESTRICTION,
+    ActionType.RULE_PROCESSING,
+})
+
+
+# 「登場させる」で場に置ける種別（イベントは発動するもので、登場はしない）。
+_PLAYABLE_TO_FIELD = frozenset({CardType.CHARACTER, CardType.STAGE})
+
+
+def _cost_state_noop(node, card) -> bool:
+    """「状態を変える」コストが、その対象では**空振り**になるか（＝支払いにならない）。
+
+    支払い可否（`_can_satisfy_node`）と実際の支払い（`_resolve_targets`）で同じ規則を使う。
+    食い違うと「払えることになっているのに払っても何も変わらない」＝何も消費しないまま
+    起動メインを無限に撃てる（OP10-083 光月モモの助＝レスト済みを再レスト、
+    OP15-099 ウルージ＝裏向きのライフを再び裏向きに）。
+    """
+    t = getattr(node, "type", None)
+    if t == ActionType.REST:
+        return bool(getattr(card, "is_rest", False))
+    if t == ActionType.FACE_UP_LIFE:
+        want_face_up = getattr(node, "status", None) != "DOWN"
+        return bool(getattr(card, "is_face_up", False)) == want_face_up
+    return False
+
 
 class EffectResolver:
     def __setattr__(self, name, value):
@@ -90,6 +121,17 @@ class EffectResolver:
         if (not cost_confirmed and ability.cost is not None
                 and ability.trigger not in _cost_confirm_exempt
                 and source_card.master.type != CardType.EVENT):
+            # 継続効果の再計算中は**問い合わせを出さない**（出すと無限ループになる）:
+            # 拒否しても使用回数が減らず盤面も変わらないので、次の再計算で同じ問いが復活し、
+            # プレイヤーは永久に同じ確認へ答え続ける（OP09-080 サウザンド・サニー号＝
+            # 「【相手のターン中】このステージをレストにできる：…場を離れた時、…」が
+            # 反応型と判定されず継続効果として毎回評価され、生成デッキの対局が上限手数で
+            # 終わらなかった）。**コストを持つ能力は継続的な修飾ではない**ので、
+            # 再計算では発動しない（=支払わない）で確定させる。
+            if getattr(self.game_manager, "_in_passive_recalc", False):
+                self._log_failure_snapshot(player, source_card, ability, "PASSIVE_RECALC_COST",
+                                           "cost-bearing ability is not resolved during recalc")
+                return
             self._suspend_for_ability_cost_confirm(player, ability, source_card)
             return
 
@@ -194,20 +236,25 @@ class EffectResolver:
                 return total >= cost
             if not node.target: return True
             from .matcher import get_target_cards
-            candidates = get_target_cards(self.game_manager, node.target, source_card)
-            # ref_id='self'（「このキャラ」等）は解決時に source へ限定される（resolver._resolve_targets）。
-            # 充足判定も同じく source 限定にする。これをしないと、レスト済み source でも他のアクティブ
-            # キャラを候補に数えて「払える」と化け、自己レストコストの起動メインが無限再起動していた
-            # （OP01-063/EB04-024）。matcher.get_target_cards は ref_id='self' を解決せず zone/player で
-            # 全候補を返すため＝satisfiability と解決の食い違いが根因。
+            # ref_id='self'（「このキャラ」等）は解決時に **source そのもの**へ解決される
+            # （`_resolve_targets` は zone を見ずに [source_card] を返す）。充足判定も同じ規則にする
+            # ＝ここで zone/player の候補列挙を経由しない。経由すると、ステージ（player.stage は
+            # FIELD の列挙に載らない）の自己コストが「候補ゼロ＝払えない」に化けて、
+            # 「このステージをレストにできる：」の起動メインが一切撃てなくなる。
+            # 従来の穴（レスト済み source でも他のアクティブキャラを数えて「払える」と化ける
+            # ＝OP01-063/EB04-024 の無限再起動）も同じ一本化で塞がる。
             if getattr(node.target, "ref_id", None) == "self":
-                candidates = [c for c in candidates if c is source_card]
+                candidates = [source_card] if source_card is not None else []
+            else:
+                candidates = get_target_cards(self.game_manager, node.target, source_card)
             # 「このカード/ステージをレストにする」等のレストコストは、対象が現在アクティブ
             # （未レスト）でなければ支払えない（レスト済みは再レストできない）。対象フィルタは
             # レスト状態を問わない（is_rest=None）ため候補にレスト済みも含まれ、自己レストを伴う
             # 起動メイン（ハチノス OP09-099 等）がレスト後も何度も撃てていた。
-            if node.type == ActionType.REST:
-                candidates = [c for c in candidates if not getattr(c, "is_rest", False)]
+            # 「裏向きにできる」等の**状態を変えるコスト**も同様＝既にその状態の対象では払えない
+            # （OP15-099 ウルージ「自分のライフの上から1枚を裏向きにできる」。ライフが全て裏向き
+            #   でも払えることになり、起動メインを無限に撃てていた）。
+            candidates = [c for c in candidates if not _cost_state_noop(node, c)]
             required = getattr(node.target, 'count', 1)
             if getattr(node.target, 'is_strict_count', False) and len(candidates) < required:
                 return False
@@ -519,6 +566,30 @@ class EffectResolver:
             out = [ldr] + out
         return out
 
+    def _is_cost_node(self, source_card, node) -> bool:
+        """node が source_card のいずれかの能力の**コスト句**（「X：Y」の X）に属するか。
+
+        パース木（master 側）は カード共有の同一オブジェクトなので、同一性の探索で判定できる
+        ＝中断→再開でリゾルバが作り直されても判定が変わらない（状態を持たない）。
+        """
+        def _contains(n) -> bool:
+            if n is None:
+                return False
+            if n is node:
+                return True
+            for sub in (getattr(n, "actions", None) or getattr(n, "options", None) or ()):
+                if _contains(sub):
+                    return True
+            for attr in ("if_true", "if_false", "sub_effect"):
+                if _contains(getattr(n, attr, None)):
+                    return True
+            return False
+
+        for ab in (getattr(source_card.master, "abilities", ()) or ()):
+            if _contains(getattr(ab, "cost", None)):
+                return True
+        return False
+
     def _resolve_targets(self, player, query, source_card, action_node=None):
         if not query: return []
 
@@ -622,6 +693,27 @@ class EffectResolver:
 
         candidates = get_target_cards(self.game_manager, query, source_card)
 
+        # コストで「状態を変える」対象は、まだその状態でないカードに限る（レスト済みは
+        # 「レストにできる」を、裏向きのライフは「裏向きにできる」を支払えない）。
+        # `_can_satisfy_node` と**同じ規則**（`_cost_state_noop`）を解決側にも適用する
+        # ＝支払い可否判定と実際の支払いを一致させる。両者がずれていると「払える」と判定された
+        # 起動メインが空振りの対象を選んで no-op になり、何も消費しないまま無限に再起動できた
+        # （OP10-083 光月モモの助＝レスト済みリーダーが候補に混ざる、
+        #   OP15-099 ウルージ＝ライフが全て裏向きでも「裏向きにできる」を払えてしまう）。
+        # 効果（コスト句以外）の同種アクションは候補を絞らない——既にその状態のカードを対象に
+        # 選ぶのはルール上合法で、後続の「そのキャラ」参照を壊さないため。
+        if (action_node is not None and self._is_cost_node(source_card, action_node)):
+            candidates = [c for c in candidates if not _cost_state_noop(action_node, c)]
+
+        # 「登場させる」の候補はキャラ／ステージだけ（イベントは登場しない）。カードテキストが
+        # 「キャラカード」ではなく**「カード」**とだけ言う効果（ST31-002 ジンベエ「手札からコスト1の
+        # 特徴《麦わらの一味》を持つカード1枚までを、登場させる」）は対象種別が無制限に解析され、
+        # イベントを場に置けてしまう。場に残ったイベントは【メイン】がコストなしの起動メインとして
+        # 列挙され、空振りを無限に撃てる（seed 907006 のアリーナ void＝426回連続）。
+        if getattr(action_node, "type", None) == ActionType.PLAY_CARD:
+            candidates = [c for c in candidates
+                          if getattr(getattr(c, "master", None), "type", None) in _PLAYABLE_TO_FIELD]
+
         # 「（戻した／選んだ）キャラと異なる色の…」: selected_card と色が重なる候補を除外する
         # （OP01-002）。selected_card は直前の FIELD 選択（BOUNCE 等）で保存済み。
         if "EXCLUDE_SELECTED_COLOR" in getattr(query, "flags", set()):
@@ -697,6 +789,24 @@ class EffectResolver:
             if (query.select_mode == "CHOOSE" and not query.ref_id
                     and query.zone == Zone.FIELD):
                 self.context["saved_targets"]["selected_card"] = selected
+            return selected
+
+        # 継続効果（PASSIVE/YOUR_TURN/OPPONENT_TURN の再計算）は**対象選択を伴わない**。
+        # 条件に合うカード全部へ一律に掛かる静的効果であり、プレイヤーが選ぶ余地は無い。
+        # ここで中断すると、盤面が動くたびに走る再計算のたびに対話が生まれ、解決しても次の
+        # 再計算がまた同じ対話を出す＝無限ループになる（OP05-097 聖地マリージョア:
+        # 「コスト2以上の天竜人キャラの支払うコストは1少なくなる」の対象が手札に2枚以上
+        #   あると毎回「どれを軽減するか」を訊いていた）。全候補へ適用して返す。
+        # ただし対象は「継続的な修飾」（パワー/コスト・キーワード付与・耐性・置換等）のときだけ全候補へ
+        # 広げる。ドロー/KO/登場のような**1回性のアクション**は再計算経路でも従来どおり
+        # （＝中断して選ばせる）に留める。畳んでしまうと、反応型なのに再計算で走ってしまう能力の
+        # 「その後〜」だけが消えて半端な挙動になる（OP08-056 モビー・ディック号がベースラインで
+        # 顕在化: ドローだけ通り「手札1枚をデッキに置く」が抜けた）。
+        if (getattr(self.game_manager, "_in_passive_recalc", False)
+                and getattr(action_node, "type", None) in _CONTINUOUS_MODIFIER_ACTIONS):
+            selected = self._with_leader(query, player, candidates)
+            if query.save_id:
+                self.context["saved_targets"][query.save_id] = selected
             return selected
 
         self._suspend_for_target_selection(player, candidates, query, source_card, action_node)

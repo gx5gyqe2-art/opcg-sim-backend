@@ -316,6 +316,10 @@ def main():
     ap.add_argument("--point-offset", type=int, default=0)
     ap.add_argument("--point-stride", type=int, default=1)
     ap.add_argument("--out", default="", help="点ごとの結果を jsonl 追記（分散集約用）")
+    ap.add_argument("--chall-boxes", action="store_true",
+                    help="挑戦者エンジンに箱化フルセット（macro_moves+defense_box+box_dialog+"
+                         "戦闘箱設定）を適用する＝既定ON前の裁定13点非退行確認（2026-08-25）。"
+                         "ネット自体は既定と同一でもよい（機構だけのA/B）")
     ARGS = ap.parse_args()
     CR.ARGS = argparse.Namespace(true_board=True)
 
@@ -323,15 +327,17 @@ def main():
     from opcg_sim.src.core.cpu_learned import LearnedEngine
     db = _load_db()
 
-    def _eng(spec):
+    def _eng(spec, boxes=False):
+        kw = dict(macro_moves=True, defense_box=True, box_dialog=True,
+                  box_battle=True, quiesce=True) if boxes else {}
         if not spec:
-            return LearnedEngine()
+            return LearnedEngine(**kw)
         parts = spec.split(",")
         return LearnedEngine(value_path=parts[0],
-                             policy_path=parts[1] if len(parts) > 1 else None)
+                             policy_path=parts[1] if len(parts) > 1 else None, **kw)
 
     base_eng = _eng(ARGS.baseline)
-    chall_eng = _eng(ARGS.challenger)
+    chall_eng = _eng(ARGS.challenger, boxes=ARGS.chall_boxes)
 
     points = {"v2": VERIFIED_V2, "g3": VERIFIED,
               "all": VERIFIED + VERIFIED_V2}[ARGS.profile]

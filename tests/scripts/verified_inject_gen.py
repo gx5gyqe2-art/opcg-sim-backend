@@ -75,7 +75,7 @@ def build_rows(eng, enc_version=8, repeat=1, box_depth=None, battle_only=True):
     db = _load_db()
     replays = {**MG.REPLAYS, **CG.REPLAYS_V2, **CG.REPLAYS_V48, **CG.REPLAYS_HUMAN}
     CR.GAMES = {}
-    vf = _value_fn(eng.vnet, eng.vocab, eng.enc_version, aux_tiebreak=eng.aux_tiebreak)
+    vf = _value_fn(eng.vnet, eng.vocab, eng.enc_version)
     pf = _priors_fn(eng.pnet, eng.vocab, eng.enc_version)
     rows = {k: [] for k in ("scalars", "field", "card_idx", "value", "group",
                             "q_root", "turns_left")}

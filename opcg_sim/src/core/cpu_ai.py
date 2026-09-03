@@ -327,11 +327,181 @@ def don_box_first_primitive(move: Optional[Dict[str, Any]]) -> Optional[Dict[str
     """DON_BOX を実対局へ出す形＝先頭原始手 ATTACH_DON へ変換（それ以外は素通し）。
 
     実行はステートレス: 1枚付与後の次 decide で箱候補が再計算され（k が1減った箱）、
-    探索が計画の続行/変更を毎手選び直す＝キューを持たない（盤面が変われば計画も変わる）。"""
+    探索が計画の続行/変更を毎手選び直す＝キューを持たない（盤面が変われば計画も変わる）。
+    k=0 のアタック箱（P2＝素の攻撃の箱形）は付与が無いので ATTACK をそのまま出す。"""
     if move and move.get("action_type") == "DON_BOX":
         pl = move.get("payload") or {}
+        if int(pl.get("don_k", 0) or 0) <= 0 and pl.get("target_ids"):
+            return {"kind": "game", "action_type": "ATTACK",
+                    "payload": {"uuid": pl.get("uuid"),
+                                "target_ids": list(pl.get("target_ids") or [])}}
         return {"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": pl.get("uuid")}}
     return move
+
+
+def attack_box_candidates(manager, actor_name: str,
+                          attack_moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """アタック箱の合成（マクロ手化 P2・2026-08-24）: 「（付与k枚→）Xで対象Yへ攻撃」を1候補に。
+
+    don_box_candidates（Phase 1＝相手リーダー限定）の一般化: **任意の攻撃対象**に対し、
+    k の要点だけで箱を作る。素の攻撃も k=0 の箱として吸収する（原始 ATTACK は
+    マクロモードでは候補から消える）。
+      k=0    … 素の攻撃（付与なし）
+      k=通る … 攻撃が通る最小枚数（atk ≥ def になる k）
+      k=2枚  … 相手にカウンター2枚を要求する枚数（def+2000 到達）
+    attack_moves は枝刈り済みの原始 ATTACK（無駄攻撃フィルタ通過済み）を渡すこと。"""
+    actor = _player_by_name(manager, actor_name)
+    opp = _other(manager, actor_name)
+    budget = len(actor.don_active)
+    by_uuid = {}
+    for u in ([actor.leader] if actor.leader is not None else []) + list(actor.field):
+        by_uuid[getattr(u, "uuid", None)] = u
+    tgt_by_uuid = {}
+    for u in ([opp.leader] if opp.leader is not None else []) + list(opp.field):
+        tgt_by_uuid[getattr(u, "uuid", None)] = u
+    out: List[Dict[str, Any]] = []
+    seen = set()
+    for mv in attack_moves:
+        if mv.get("action_type") != "ATTACK":
+            continue
+        pl = mv.get("payload") or {}
+        tid = (pl.get("target_ids") or [None])[0]
+        c = by_uuid.get(pl.get("uuid"))
+        t = tgt_by_uuid.get(tid)
+        if c is None or t is None:
+            continue
+        try:
+            p = float(c.get_power(True))
+        except Exception:
+            p = float(getattr(getattr(c, "master", None), "power", 0) or 0)
+        try:
+            L = float(t.get_power(False))
+        except Exception:
+            L = float(getattr(getattr(t, "master", None), "power", 0) or 0)
+        k_min = max(0, int((L - p + 999) // 1000))
+        k_two = max(0, int((L + 2000.0 - p + 999) // 1000))
+        for k in {0, k_min, k_two}:
+            key = (pl.get("uuid"), tid, k)
+            if 0 <= k <= budget and key not in seen:
+                seen.add(key)
+                out.append({"kind": "game", "action_type": "DON_BOX",
+                            "payload": {"uuid": pl.get("uuid"),
+                                        "target_ids": [tid], "don_k": int(k)}})
+    return out
+
+
+# 【ドン!!×N】の閾値 N を取り出す（_DON_COND_RE のキャプチャ版・表記揺れは同一）。
+_DON_COND_N_RE = re.compile(r'【\s*ドン\s*(?:!!|！！|‼)\s*[××xX]\s*(\d+)\s*】')
+
+
+def _don_cond_max_n(c) -> Optional[int]:
+    m = getattr(c, "master", None)
+    ns = [int(x) for x in _DON_COND_N_RE.findall(getattr(m, "effect_text", "") or "")] if m else []
+    return max(ns) if ns else None
+
+
+def don_alloc_candidates(manager, actor_name: str,
+                         attach_moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """配分箱の合成（マクロ手化 P1・2026-08-24）: 「対象 X へ k 枚付与」を1候補にする。
+
+    ドン付与はメイン判断の46%を占め、順序重複（同一配分への原始経路）は中央値5.3x・
+    最大9756x（macro_p0_probe 実測）＝1枚単位の原始手は読みの浪費の主因。攻撃を含む箱
+    （don_box_candidates）と違い**付与だけ**を畳む＝`target_ids=[]` の DON_BOX として
+    表現し、展開・原始手変換・行動特徴の don_k 経路をそのまま再利用する。
+
+    k は要点のみ（配分空間を数点で代表する）:
+      k=1        … 最小粒度（旧原始手の表現力の下限を保つ）
+      k=閾値開放 … 対象が【ドン!!×N】持ちで attached<N のとき N-attached（条件を開く）
+      k=全振り   … budget（1点集中の上限）
+    attach_moves は枝刈り済みの原始 ATTACH_DON（意味フィルタ通過済み）だけを渡すこと＝
+    死に付与先はここへ来ない。"""
+    actor = _player_by_name(manager, actor_name)
+    budget = len(actor.don_active)
+    if budget <= 0:
+        return []
+    by_uuid = {}
+    for u in ([actor.leader] if actor.leader is not None else []) + list(actor.field):
+        by_uuid[getattr(u, "uuid", None)] = u
+    out: List[Dict[str, Any]] = []
+    seen = set()
+    for mv in attach_moves:
+        if mv.get("action_type") != "ATTACH_DON":
+            continue
+        uuid = (mv.get("payload") or {}).get("uuid")
+        c = by_uuid.get(uuid)
+        if c is None:
+            continue
+        ks = {1, budget}
+        n = _don_cond_max_n(c)
+        if n is not None:
+            ad = getattr(c, "attached_don", None)
+            attached = ad if isinstance(ad, int) else len(ad or [])
+            if attached < n:
+                ks.add(n - attached)
+        for k in ks:
+            key = (uuid, k)
+            if 1 <= k <= budget and key not in seen:
+                seen.add(key)
+                out.append({"kind": "game", "action_type": "DON_BOX",
+                            "payload": {"uuid": uuid, "target_ids": [], "don_k": int(k)}})
+    return out
+
+
+def defense_battle_need(manager) -> Optional[int]:
+    """現在の戦闘を止めるのに必要な追加カウンター値（算術・pure）。戦闘外/読めない形は None。
+
+    攻撃側 `get_power(True)` vs 防御側 `get_power(False)`＋counter_buff（既払い分）。
+    atk≥def のとき need = atk−def+1000（同値は攻撃側勝ち）、下回っていれば 0＝止まっている。
+    D族教師（`tests/scripts/plandef_gen.py` battle_need）と同一規約。"""
+    bat = getattr(manager, "active_battle", None)
+    if bat is None:
+        return None
+    try:
+        atk = int(bat["attacker"].get_power(True))
+        tgt = int(bat["target"].get_power(False)) + int(bat.get("counter_buff", 0) or 0)
+    except Exception:
+        return None
+    return atk - tgt + 1000 if atk >= tgt else 0
+
+
+def defense_box_prune(manager, actor_name: str,
+                      moves: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """防御箱 v1（マクロ手化 P4-c・2026-08-24）: 防御窓の候補を支配則で整形する（pure）。
+
+    D族の支配則（`plandef_gen`・`docs/reports/2026-08-24_p4_defense_verdict.md`）を学習では
+    なく**候補整形**として適用する（どの出口になるかは印字値の算術で確定＝エンジンの実計算。
+    D族ヘッド再学習は紙上改善でも実枝判別を壊しゲート FAIL＝出口採点ルートは打ち止め）:
+
+      D1' 総量不足     … 払える印字カウンター総量 < need なら何を払っても止まらない
+                         ＝SELECT_COUNTER を全て落とす（素通しが任意の支払いを支配・m2@58型）
+      D2' 既に止まった … need==0 の窓で印字カウンターを払っても戦闘結果は不変
+                         ＝SELECT_COUNTER を全て落とす（払う札の分だけ純損＝過剰防御の矯正）
+
+    適用条件（保守側）: 候補が SELECT_COUNTER と PASS のみで構成され、SELECT_COUNTER の
+    対象カードが全て手札の印字カウンター（current_counter>0）であること。イベント/効果が
+    混在する窓・印字0の札が混ざる窓は算術で閉じないため触らない。PASS は常に残る＝
+    候補は空にならない。CPU の候補生成のみで作用しエンジンの合法手列挙は変えない。"""
+    kinds = {m.get("action_type") for m in moves}
+    if "SELECT_COUNTER" not in kinds or not (kinds <= {"SELECT_COUNTER", "PASS"}):
+        return moves
+    need = defense_battle_need(manager)
+    if need is None:
+        return moves
+    actor = _player_by_name(manager, actor_name)
+    by_uuid = {getattr(c, "uuid", None): c
+               for c in (getattr(actor, "hand", None) or [])}
+    total = 0
+    for m in moves:
+        if m.get("action_type") != "SELECT_COUNTER":
+            continue
+        c = by_uuid.get((m.get("payload") or {}).get("uuid") or m.get("card_uuid"))
+        v = int(getattr(c, "current_counter", 0) or 0) if c is not None else 0
+        if v <= 0:
+            return moves        # 印字カウンター以外が混ざる窓＝触らない（保守側）
+        total += v
+    if need == 0 or total < need:
+        return [m for m in moves if m.get("action_type") != "SELECT_COUNTER"]
+    return moves
 
 
 def _attach_don_meaningful(manager, actor_name: str, c, margin: Optional[bool] = None) -> bool:
@@ -589,14 +759,16 @@ def _apply_move_inplace(board, actor_name: str, move: Dict[str, Any], stop_at_se
     actor = _player_by_name(board, actor_name)
     if move.get("action_type") == "DON_BOX":
         # ドン箱（探索内部のマクロ手）は原始列へ展開して適用する（cpu_don_box_plan §2.1）。
+        # target_ids=[] は配分箱（マクロ手化 P1）＝付与のみで攻撃しない。
         payload = move.get("payload") or {}
         for _ in range(int(payload.get("don_k", 0) or 0)):
             action_api.apply_game_action(board, actor, "ATTACH_DON", {"uuid": payload.get("uuid")})
             _drain_own_interactions(board, actor_name, stop_at_select=stop_at_select)
-        action_api.apply_game_action(board, actor, "ATTACK",
-                                     {"uuid": payload.get("uuid"),
-                                      "target_ids": list(payload.get("target_ids") or [])})
-        _drain_own_interactions(board, actor_name, stop_at_select=stop_at_select)
+        if payload.get("target_ids"):
+            action_api.apply_game_action(board, actor, "ATTACK",
+                                         {"uuid": payload.get("uuid"),
+                                          "target_ids": list(payload.get("target_ids") or [])})
+            _drain_own_interactions(board, actor_name, stop_at_select=stop_at_select)
         return
     if move["kind"] == "battle":
         action_api.apply_battle_action(board, actor, move["action_type"], move.get("card_uuid"))

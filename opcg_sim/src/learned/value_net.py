@@ -206,7 +206,7 @@ class ValueNet:
 
     def predict_with_aux(self, batch):
         """value と残りターン補助の同時予測 (pred, aux_pred)。1回の forward を共有する
-        （serve の aux 粘り項＝config.SERVE_AUX_TIEBREAK 用。二重 forward を避ける）。"""
+        （旧 serve aux 粘り項用＝現在は学習/計器のみが使う。二重 forward を避ける）。"""
         pred, cache = self.forward(batch)
         return self.apply_calib(pred), self.aux_from_cache(cache)
 

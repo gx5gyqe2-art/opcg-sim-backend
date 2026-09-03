@@ -92,7 +92,14 @@ def main():
           f"  seeds={args.seeds} sims={args.sims}")
 
     db = _load_db()
-    if args.net:
+    if args.net.startswith("neff:"):
+        # N系（効果構造符号化）ネット（2026-09-03）: promotion_gate の eng() と同じ注入経路。
+        import n_eff_gate
+        eng = n_eff_gate.neff_engine(args.net[5:])
+    elif args.net.startswith("n1:"):
+        import n1_gate
+        eng = n1_gate.n1_engine(args.net[3:])
+    elif args.net:
         parts = args.net.split(",")
         eng = LearnedEngine(value_path=parts[0],
                             policy_path=parts[1] if len(parts) > 1 else None)

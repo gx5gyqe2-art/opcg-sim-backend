@@ -67,8 +67,10 @@ def action_features(manager, move, me_name):
         # ドン箱（配分計画のマクロ手・cpu_don_box_plan §2）は「付与後マージンの ATTACK」として
         # 特徴化する＝素攻撃の prior を継承しつつ、マージン列（v9.2）だけ付与後の値で差別化。
         # 新 action_type を語彙に足さない＝旧 policy ネットがそのまま使える。
+        # target_ids=[] は配分箱（マクロ手化 P1・付与のみ）＝ATTACH_DON として特徴化し
+        # 素付与の prior を継承する（同じく新 action_type を足さない）。
         don_k = int((move.get("payload") or {}).get("don_k", 0) or 0)
-        at = "ATTACK"
+        at = "ATTACK" if (move.get("payload") or {}).get("target_ids") else "ATTACH_DON"
     if at in _AT_IDX:
         f[_AT_IDX[at]] = 1.0
     payload = move.get("payload") or {}

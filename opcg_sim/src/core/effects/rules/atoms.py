@@ -165,6 +165,55 @@ def _ko(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
+# 複合の自己消費: 「この（カード/キャラ/リーダー/ステージ）と〈X〉を〈消費動詞〉（ことが）できる」
+#   → Sequence[動詞(自身), 動詞(X)]。**自身の分が脱落すると、そのコストは実質「X だけ」になり、
+#   発生源が場に残り続けるため起動メインが無限に撃てる**（実測 2026-08-15 の生成デッキ監査）:
+#     EB01-030 ローグタウン「このカードと自分の手札1枚を…デッキの下に置くことができる:2枚引く」
+#       → ステージが場に残り、手札1枚を下に置いて2枚引く＝毎回+1枚の永久機関になっていた。
+#     OP13-099 虚の玉座「このカードとドン!!3枚をレストにできる:…登場させる」→ ステージが
+#       レストにならず、ドン!!さえ有れば何度でも登場させられた。
+#     OP10-083/087/088/091（ドレスローザ4種）は「1枚を、レストにできる」の読点で従来ルールの
+#       正規表現に噛み合わず自身のレストが脱落していた。
+#   対象の動詞は「消費」に限る（レスト／トラッシュ／デッキの下）。パワー±等の修飾は対象外。
+# ---------------------------------------------------------------------------
+_COMPOUND_SELF_VERBS = (
+    (r"レストに(?:する|できる|し)", ActionType.REST),
+    (r"トラッシュに置", ActionType.TRASH),
+    (r"デッキの下に(?:好きな順番で)?置|好きな順番で.*デッキの下に置", ActionType.DECK_BOTTOM),
+)
+
+
+@rule("compound_self_and_other", priority=93)
+def _compound_self_and_other(ctx: ParseContext) -> Optional[EffectNode]:
+    t = ctx.text
+    m = re.search(_nfc(r"この(?:カード|キャラ|リーダー|ステージ)と(.+)$"), t)
+    if not m:
+        return None
+    other_text = m.group(1)
+    act_type = next((a for pat, a in _COMPOUND_SELF_VERBS
+                     if re.search(_nfc(pat), other_text)), None)
+    if act_type is None:
+        return None
+    self_act = GameAction(
+        type=act_type,
+        target=TargetQuery(player=Player.SELF, zone=Zone.FIELD, count=1,
+                           is_strict_count=True, ref_id="self"),
+        raw_text=t)
+    # 相方がドン!!の場合は枚数ベースの REST_DON（ドン!!は TargetQuery で選ばない）。
+    m_don = re.search(_nfc(r"ドン[‼!]*\s*([\d０-９]+)枚"), other_text)
+    if m_don and act_type == ActionType.REST:
+        other_act = GameAction(type=ActionType.REST_DON,
+                               value=ValueSource(base=_to_int(m_don.group(1))),
+                               raw_text=other_text)
+    else:
+        other_tq = parse_target(other_text)
+        if _nfc("まで") in other_text:
+            other_tq.is_up_to = True
+        other_act = GameAction(type=act_type, target=other_tq, raw_text=other_text)
+    return Sequence(actions=[self_act, other_act])
+
+
+# ---------------------------------------------------------------------------
 # 自己レスト（コスト): 「このキャラ／このリーダーをレストにできる」
 # ---------------------------------------------------------------------------
 @rule("rest_self_cost", priority=90)
@@ -2690,6 +2739,15 @@ def _freeze_target(ctx: ParseContext) -> Optional[EffectNode]:
         tq.player = Player.OPPONENT
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # 対象が**ドン!!だけ**（コストエリア）のフリーズは FREEZE_DON（枚数処理）で解く。
+    # FREEZE は `card.flags` に書き込む＝カードにしか効かないため、ドン!!を対象に選ぶと
+    # `DonInstance' object has no attribute 'flags'` で対局が落ちていた（OP10-033 ナミ
+    # 「相手のレストのドン!!1枚まで」。上の「キャラかドン」分岐は択一形しか拾わない）。
+    if getattr(tq, "zone", None) == Zone.COST_AREA:
+        return GameAction(type=ActionType.FREEZE_DON,
+                          value=ValueSource(base=tq.count if tq.count and tq.count > 0 else 1),
+                          status="OPPONENT" if tq.player == Player.OPPONENT else None,
+                          raw_text=t)
     return GameAction(type=ActionType.FREEZE, target=tq, raw_text=t)
 
 

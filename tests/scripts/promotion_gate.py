@@ -24,6 +24,7 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXP
 import argparse
 import json
 import multiprocessing as mp
+import random
 import time
 
 import os as _os, sys as _sys  # noqa: E402  test bootstrap
@@ -56,19 +57,48 @@ def anchor_decision(wins: float, games: int, frac: float = 0.5) -> bool:
 _G = {}
 
 
-def _init_pool(cand_spec, best_spec, cand_kw=None):
+class PairTimeout(BaseException):
+    """1ペアの実時間上限。**BaseException 派生**が要点で、エンジン/探索側の広い
+    `except Exception` に食われて握り潰されないようにする。
+
+    なぜ手数上限では足りないか（2026-08-16・b_p04 seed 904002）: 上限手数は「手」を数えるので、
+    **1回の decide() から戻ってこない**（戦闘箱の枝が組合せ的に膨らむ）局面では一生増えない。
+    実際に 1局面で 3時間48分 CPU を焼き続けた。実時間で切るしかない。"""
+
+
+def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed", decks="singleton",
+               pair_timeout=0):
     """子プロセス初期化: DB とエンジン2体を1回だけロード（以後の全ペアで共有）。
 
     `cand_kw`（v35）: **候補席にだけ**渡す LearnedEngine のオプション（例
-    `{"battle_readout": True, "quiesce": True}`）。機構をグローバル定数で切り替えると
+    `{"box_battle": True, "quiesce": True}`）。機構をグローバル定数で切り替えると
     両席に同時に効いてしまい「新機構つき候補 vs 現行本番」を測れないため、席別の seam を通す。
     未指定＝両席とも既定＝従来と同一挙動。"""
     from cpu_arena import _load_db
     from opcg_sim.src.core.cpu_learned import LearnedEngine
+    _G["leaders_mode"] = leaders_mode
+    _G["decks"] = decks
+    _G["pair_timeout"] = pair_timeout
 
     def eng(spec, **kw):
         if not spec:
             return LearnedEngine(**kw)   # 出荷既定（現 gen11）
+        if spec.startswith("neff:"):
+            # 効果構造符号化ネット（2026-08-27）: n_eff_gate 経由で注入。
+            import n_eff_gate
+            e = n_eff_gate.neff_engine(spec[5:])
+            for k2, v2 in (kw or {}).items():
+                setattr(e, k2, v2)
+            return e
+        if spec.startswith("n1:"):
+            # N系ネット（純正Nループ④ 2026-08-26）: value+方策チャネルを n1_gate 経由で
+            # 注入したエンジン。席別 seam（cand_kw）は注入後に属性で適用する
+            # （LearnedEngine のコンストラクタ引数と同名の属性）。
+            import n1_gate
+            e = n1_gate.n1_engine(spec[3:])
+            for k2, v2 in (kw or {}).items():
+                setattr(e, k2, v2)
+            return e
         parts = spec.split(",")
         return LearnedEngine(value_path=parts[0],
                              policy_path=parts[1] if len(parts) > 1 else None, **kw)
@@ -77,13 +107,147 @@ def _init_pool(cand_spec, best_spec, cand_kw=None):
     _G["best"] = eng(best_spec)
 
 
+# --- 対面の選び方（2026-08-15）------------------------------------------------
+# 既定（`leader_deck_builder()`）は**両者ハンニャバル固定のミラー**で、歴代のアリーナ判定は
+# 全てこの1対面だけで測られていた（実デッキは一度も対局していない）。ユーザ提案により
+# **リーダーをランダム化**して汎化を測れるようにする。
+#   fixed  … 従来（既定リーダーのミラー・歴代との地続き比較用）
+#   random … 全リーダーからペアごとに2枚引く（**左右非対称**を許す）
+#   real   … 実デッキ4リーダーの総当たり（出荷先の対面）
+# **ペア内ではリーダー対を固定し、席（先後）を入れ替える**。**候補は2局とも la を握る**
+# （game a: cand=p1=la / game b: cand=p2=la・相手は2局とも lb）。設計当初のコメントは
+# 「game b は cand=lb（リーダーも入替）」だったが、実装は ba=builder(lb, la)（p1=lb/p2=la）で
+# 候補が p2 のため入替わっていない（2026-09-03 に台帳の発火イベントから判明）。総合勝率は
+# la/lb がランダムなので不偏だが、**ペア内でリーダー相性は相殺されない**（分散が増えるだけ）。
+# リーダー別の内訳は台帳の `cand_leaders` で割る（古い台帳は [la, la] と解釈）。リーダーも
+# 入替える設計へ改めるかは測定規約の変更＝ユーザ判断（過去台帳との地続き性に関わる）。
+REAL_LEADERS = ("OP11-041", "OP09-001", "OP15-058", "OP16-022")   # ナミ/シャンクス/エネル/黒黄ルフィ
+
+
+def _leader_pool(db, color=None):
+    """全リーダー（color 指定時は**その色を含む**リーダーだけ・例 "PURPLE"）。1回だけ構築。"""
+    key = "leaders" if color is None else f"leaders:{color}"
+    if key not in _G:
+        out = []
+        for cid, _ in db.raw_db.items():
+            c = db.get_card(cid)
+            if c is None or getattr(c.type, "name", "") != "LEADER":
+                continue
+            if color is not None:
+                cols = {getattr(x, "name", str(x)) for x in (getattr(c, "colors", ()) or ())}
+                if color not in cols:
+                    continue
+            out.append(cid)
+        _G[key] = sorted(out)
+    return _G[key]
+
+
+def _leader_pair(db, seed, mode):
+    """seed から決定論的にリーダー対を選ぶ（pure・pool は1回だけ構築）。
+
+    purple（2026-09-02・残ドン掘りの対照実験用）: 紫を含むリーダーだけから引く＝掘りカード
+    （全5種・全て紫）を `deck_dig` で差し込める母集団に限る。"""
+    if mode == "fixed":
+        return None, None
+    pool = (REAL_LEADERS if mode == "real"
+            else _leader_pool(db, "PURPLE") if mode == "purple"
+            else _leader_pool(db))
+    if not pool:
+        return None, None
+    rng = random.Random(seed * 7919 + 13)
+    return rng.choice(pool), rng.choice(pool)
+
+
 def _play_pair(args):
-    """1ペア＝同seedで席入替の2局。candidate の勝ち数(0..2)を返す。"""
+    """1ペア＝同seedで**席とリーダーを入替**た2局。candidate の勝ち数(0..2)を返す。"""
+    return _play_pair_detail(args)["score"]
+
+
+def _play_pair_detail(args):
+    """`_play_pair` の詳細版: 勝ち数に加えて**どの対面だったか**を返す。
+
+    ランダムリーダー帯では「総合の勝率」だけ見ても、どのリーダーで強い/弱いかが分からない
+    （ユーザ決定 2026-08-16: 対面を記録する）。台帳へ leaders を書けるよう、スコアと一緒に
+    返す。判定側（勝ち数の集計）は score だけを見るので規約は不変。"""
     seed = args
     from cpu_arena import play_game
-    a = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["cand"], p2_engine=_G["best"])
-    b = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["best"], p2_engine=_G["cand"])
-    return (1.0 if a["winner"] == "p1" else 0.0) + (1.0 if b["winner"] == "p2" else 0.0)
+    from game_driver import leader_deck_builder
+    mode = _G.get("leaders_mode", "fixed")
+    la, lb = _leader_pair(_G["db"], seed, mode)
+    if _G.get("decks") == "synth_dig":
+        # 残ドン掘りの対照実験（2026-09-02）: 合成デッキに掘りカードを差し込む（両席同じ規則＝
+        # 腕A/腕B のデッキは同一・差は「終了前に掘ったか」だけ）。`--leaders purple` と対で使う。
+        from deck_dig import synth_dig_deck_builder
+        ab = synth_dig_deck_builder(la, lb, seed=seed) if la else None
+        ba = synth_dig_deck_builder(lb, la, seed=seed) if la else None
+    elif _G.get("decks") == "synth":
+        # 中身もリーダーに合わせて合成する（deck_synth）。singleton builder は「ID順で色が
+        # 合う最初の50枚・全部1枚ずつ・イベント0」という実在しない構築で、テーマ参照や
+        # イベント/ステージを持つ効果が一度も盤面に乗らない＝歴代の判定の射程外だった。
+        # デッキ内容は seed（=ペア）で決め、ペアの2局では**同じ中身のまま席だけ入替**える。
+        from deck_synth import synth_deck_builder
+        ab = synth_deck_builder(la, lb, seed=seed) if la else None
+        ba = synth_deck_builder(lb, la, seed=seed) if la else None
+    else:
+        ab = leader_deck_builder(la, lb) if la else None      # game a: p1=cand=la / p2=best=lb
+        ba = leader_deck_builder(lb, la) if la else None      # game b: p1=best=lb / p2=cand=la（候補は la のまま）
+    if _G.get("pair_timeout"):
+        import signal
+
+        def _alarm(_sig, _frm):
+            raise PairTimeout(f"pair exceeded {_G['pair_timeout']}s")
+        signal.signal(signal.SIGALRM, _alarm)
+        signal.alarm(int(_G["pair_timeout"]))
+    # 残ドン掘り（腕A・2026-09-02）の発火記録: 候補席エンジンの events を局ごとに回収して
+    # 台帳行へ載せる（区分別の事後集計用・`dig_cf_breakdown.py`）。無効時は空のまま。
+    ev_a = ev_b = None
+    act_a = act_b = None
+    try:
+        _cand = _G["cand"]
+
+        def _take(attr):
+            lst = getattr(_cand, attr, None)
+            if lst is None:
+                return None
+            out = list(lst)
+            lst.clear()
+            return out
+        _take("residual_dig_events")
+        _take("residual_activate_events")
+        a = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["cand"],
+                      p2_engine=_G["best"], deck_builder=ab)
+        ev_a = _take("residual_dig_events")
+        act_a = _take("residual_activate_events")
+        b = play_game(seed, _G["db"], "learned", "learned", p1_engine=_G["best"],
+                      p2_engine=_G["cand"], deck_builder=ba)
+        ev_b = _take("residual_dig_events")
+        act_b = _take("residual_activate_events")
+    except (Exception, PairTimeout) as e:
+        # 対局がエンジン欠陥で成立しなかった（上限手数 MAX_STEPS / 実時間上限 等）。**1ペアの失敗で計測全体を
+        # 落とさない**（ランダム対面では未知のループを踏むことがあり、シャードが丸ごと止まる）。
+        # スコアは付けず void として台帳に残し、集計側で母数から外して**件数を明示**する
+        # （黙って落とすと「全部測れた」ように見えてしまう）。対面も残すので後から再現できる。
+        return {"seed": seed, "score": None, "leaders": [la, lb],
+                "void": f"{type(e).__name__}: {str(e)[:120]}"}
+    finally:
+        if _G.get("pair_timeout"):
+            import signal as _sg
+            _sg.alarm(0)
+    wa = 1.0 if a["winner"] == "p1" else 0.0    # game a: 候補が p1 で la を握る
+    wb = 1.0 if b["winner"] == "p2" else 0.0    # game b: 候補が p2（席入替）。ba=builder(lb, la) は
+    #   p1=lb / p2=la なので**候補は game b でも la を握る**（相手が lb）。入替わるのは席（先後）
+    #   だけで、リーダーは入替わらない（2026-09-03 実測で判明・従来コメントの「候補が lb を握る」
+    #   は誤り）。集計側は `cand_leaders` を見ること（古い台帳は [la, la] と解釈する）。
+    # leaders=[la, lb] と games=[wa, wb] を対にして残すと、**どのリーダーを握って勝ったか**を
+    # 後から集計できる（score だけだと2局の合計なのでリーダー別に割れない）。
+    row = {"seed": seed, "score": wa + wb, "leaders": [la, lb], "games": [wa, wb],
+           "cand_leaders": [la, la],
+           "turns": [a.get("turns"), b.get("turns")]}
+    if ev_a is not None or ev_b is not None:
+        row["dig"] = [ev_a or [], ev_b or []]     # 候補席の掘り発火（game a / game b）
+    if act_a is not None or act_b is not None:
+        row["act"] = [act_a or [], act_b or []]   # 候補席の残り起動/付与（game a / game b）
+    return row
 
 
 def run_stage(pool, seeds):

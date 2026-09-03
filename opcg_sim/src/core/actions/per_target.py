@@ -7,7 +7,7 @@
 除去保護・置換ゲート・success 規約は `target_loop.run_target_loop` が一元管理する。
 """
 import re
-from ...models.enums import ActionType, Zone, TriggerType
+from ...models.enums import ActionType, CardType, Zone, TriggerType
 from ...models.models import DonInstance
 from .registry import target_handler
 
@@ -135,6 +135,12 @@ def freeze(gm, player, action, target, owner, source_list, value, source_card):
     # 「次の相手のリフレッシュフェイズでアクティブにならない」
     # refresh_all が flags["FREEZE"] を確認してからリセットするため、
     # ターン境界を跨ぐ flags に直接書き込む（timed_flags でなく flags）。
+    if not hasattr(target, "flags"):
+        # ドン!!（DonInstance）は flags を持たず `is_frozen` でフリーズする。対象クエリが
+        # コストエリアを指す形は parser 側で FREEZE_DON へ回すが、ここでも取りこぼさない
+        # （落ちると対局ごと死ぬ＝アリーナ1ペア全損）。
+        target.is_frozen = True
+        return
     target.flags.add("FREEZE")
 
 
@@ -179,6 +185,13 @@ def play_card(gm, player, action, target, owner, source_list, value, source_card
     # 「手札のこのカードは効果で登場できない」: 手札源かつ当該 PASSIVE を持つ対象は
     # 効果による登場をスキップする（NO_EFFECT_PLAY）。
     if source_list is getattr(owner, "hand", None) and gm._blocks_effect_play(target):
+        return
+    # イベントは「発動」するもので「登場」はしない。対象種別を絞らないテキスト
+    # （ST31-002 ジンベエ「…特徴《麦わらの一味》を持つ**カード**1枚までを、登場させる」）で
+    # イベントが選ばれても場には置かない＝候補側の絞り込み（resolver）を取りこぼしても
+    # 盤面が壊れないようにする。場に残ったイベントは【メイン】がコストなしの起動メインとして
+    # 列挙され、空振りを無限に撃てる（seed 907006 のアリーナ void）。
+    if getattr(target.master, "type", None) == CardType.EVENT:
         return
     gm.move_card(target, Zone.FIELD, owner)
     target.is_newly_played = True

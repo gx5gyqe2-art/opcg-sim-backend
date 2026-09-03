@@ -426,8 +426,44 @@ class GameManager:
                 continue
             if ab.cost is not None and not resolver._can_satisfy_node(player, ab.cost, card):
                 continue
+            if self._ability_effect_is_inert(player, ab):
+                continue
             return True
         return False
+
+    def _ability_effect_is_inert(self, player: Player, ability) -> bool:
+        """効果が「今どう解決しても盤面が変わらない」と**証明できる**起動メインか。
+
+        条件・回数・コストを満たしていても効果側が完全な空振りなら撃つ意味が無い。ターン制限も
+        コストも持たない起動メインの場合、空振りでも何も消費しないため CPU が同じ手を無限に
+        撃ち続けてゲームが終わらない（EB04-016 トリ / OP10-030 スモーカー:
+        「ドン!!1枚までをアクティブにする。その後、このターン中キャラの効果でドン!!を
+          アクティブにできない」＝1回目で自己制限が付き、2回目以降は完全な no-op）。
+
+        **証明できる場合だけ True**（判らない効果は False＝従来どおり合法手に残す）。
+        """
+        def _inert(node) -> bool:
+            if node is None:
+                return True
+            subs = getattr(node, "actions", None) or getattr(node, "options", None)
+            if subs:
+                return all(_inert(s) for s in subs)
+            if not isinstance(node, GameAction):
+                return False
+            if node.type == ActionType.RULE_PROCESSING:
+                # 自己制限の付与は、既に同じ制限が有効なら盤面を変えない。
+                st = getattr(node, "status", None)
+                if st is None:
+                    return True   # ルール上の注記＝エンジン no-op
+                return st in SELF_RESTRICTION_KEYS and self._active_restriction(player, st) is not None
+            if node.type == ActionType.ACTIVE_DON and not getattr(node, "target", None):
+                # レスト中のドン!!が無い／効果によるアクティブ化が禁止中なら空振り。
+                if self._active_restriction(player, "CANNOT_ACTIVATE_DON") is not None:
+                    return True
+                return not player.don_rested
+            return False
+
+        return _inert(getattr(ability, "effect", None))
 
     def default_interaction_payload(self, pending: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         return _interaction.default_interaction_payload(self, pending)
@@ -541,7 +577,11 @@ class GameManager:
     def main_phase(self): 
         return _turn_flow.main_phase(self)
 
-    _REACTIVE_RE = re.compile(r'(された|した|受けた|なった)時、')
+    # 「離れた」（場/ライフを離れた時）も反応型。**継続効果ではなくイベント誘発**なので
+    # 再計算ループで実行してはならない（OP09-080 サウザンド・サニー号ほか10節が該当。
+    # 継続効果として毎回評価されると、任意コストの確認対話が再計算のたびに復活して
+    # 対局が終わらなくなる）。該当10節はいずれも「…た時、」の反応型で、常時効果は無い。
+    _REACTIVE_RE = re.compile(r'(された|した|受けた|なった|離れた)時、')
 
     def _is_reactive_passive(self, ability) -> bool:
         return _passives._is_reactive_passive(self, ability)
