@@ -1027,3 +1027,12 @@ branch 'claude/n20-w03' set up to track 'origin/claude/n20-w03'.
 To https://github.com/gx5gyqe2-art/opcg-sim-backend
    31ba4e4..c079193  claude/n20-w03 -> claude/n20-w03
 branch 'claude/n20-w03' set up to track 'origin/claude/n20-w03'.
+[claude/n20-w03 0223d4c] n20-22 w03: final
+ 1 file changed, 5 insertions(+)
+To https://github.com/gx5gyqe2-art/opcg-sim-backend
+   c079193..0223d4c  claude/n20-w03 -> claude/n20-w03
+branch 'claude/n20-w03' set up to track 'origin/claude/n20-w03'.
+ALL_CHUNKS_DONE
+n20_gen.log:N_RECORD_DONE {"rows": 132646, "main_rows": 80746, "dropped": 0}
+n21_gen.log:N_RECORD_DONE {"rows": 130420, "main_rows": 79129, "dropped": 2}
+n22_gen.log:N_RECORD_DONE {"rows": 131221, "main_rows": 79789, "dropped": 1}
