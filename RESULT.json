@@ -26,7 +26,8 @@
       "seed_base": 2212000,
       "out": "n21_records",
       "log": "n21_gen.log",
-      "status": "in_progress"
+      "status": "blocked_container_lifetime",
+      "notes": "2026-09-02 20:23頃から約4時間、コンテナが約25-30分ごとに再起動し続けており、n_record_gen.pyが途中再開非対応のため毎回game 0からやり直しになる。観測上80/960局（約8%）を毎回超えられていない。同一引数（seed-base 2212000・games 960）での再起動を規則Aに従い継続中だが、コンテナ寿命が伸びない限り完走の見込みが立たない。"
     },
     {
       "wave": 22,
