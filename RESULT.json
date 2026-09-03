@@ -1,0 +1,23 @@
+{"job": "n20-22-w08", "role": "generation", "status": "done",
+ "inputs": {
+   "gen_net": "claude/n1-results:n1_results/neff_net_c10.npz (era5・221963B, per docs/n_loop_ops.md seed ledger for waves 20-21)",
+   "waves": [
+     {"wave": 20, "seed_base": 2208000, "games": 960, "out": "n20_records"},
+     {"wave": 21, "seed_base": 2218000, "games": 960, "out": "n21_records"},
+     {"wave": 22, "seed_base": 2228000, "games": 960, "out": "n22_records"}
+   ],
+   "sims": 128, "workers": 4, "shard_games": 10
+ },
+ "outputs": {
+   "n20_records": "n20_records/ (96 npz + meta_n_record.json)",
+   "n21_records": "n21_records/ (96 npz + meta_n_record.json)",
+   "n22_records": "n22_records/ (96 npz + meta_n_record.json)"
+ },
+ "metrics": {
+   "n20": {"rows": 132057, "main_rows": 80180, "dropped": 0, "games": 960, "seed_base": 2208000},
+   "n21": {"rows": 131339, "main_rows": 79477, "dropped": 1, "games": 960, "seed_base": 2218000},
+   "n22": {"rows": 131548, "main_rows": 79744, "dropped": 0, "games": 960, "seed_base": 2228000}
+ },
+ "command": "OPCG_LOG_SILENT=1 nohup python3 tests/scripts/n_record_gen.py --games 960 --seed-base {seed_base} --workers 4 --sims 128 --shard-games 10 --neff-net /tmp/gen_net.npz --out n{W}_records > n{W}_gen.log 2>&1 &",
+ "notes": "全3チャンクとも複数回のコンテナ再起動で生成プロセスが落ちたが、そのたびに同一 seed-base・同一出力先で最初からやり直し（別ディレクトリは作成していない）。最終的に3チャンクとも960/960局で完走。全ログ（n20_gen.log/n21_gen.log/n22_gen.log）は再起動時のBrokenPipeトレースバックを含めてそのままコミット済み。"
+}
