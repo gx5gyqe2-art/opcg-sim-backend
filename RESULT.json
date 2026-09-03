@@ -1,0 +1,20 @@
+{"job": "n20-22-w05", "role": "gen", "status": "done",
+ "inputs": {"neff_net": "claude/n1-results:n1_results/neff_net_c10.npz",
+            "waves": [
+              {"wave": 20, "seed_base": 2205000, "games": 960},
+              {"wave": 21, "seed_base": 2215000, "games": 960},
+              {"wave": 22, "seed_base": 2225000, "games": 960}
+            ],
+            "sims": 128, "shard_games": 10, "workers": 4},
+ "outputs": {
+   "n20_records": {"meta": "n20_records/meta_n_record.json", "log": "n20_gen.log"},
+   "n21_records": {"meta": "n21_records/meta_n_record.json", "log": "n21_gen.log"},
+   "n22_records": {"meta": "n22_records/meta_n_record.json", "log": "n22_gen.log"}
+ },
+ "metrics": {
+   "n20": {"games": 960, "rows": 131704, "main_rows": 79889, "dropped": 0},
+   "n21": {"games": 960, "rows": 131426, "main_rows": 79801, "dropped": 0},
+   "n22": {"games": 960, "rows": 131641, "main_rows": 79694, "dropped": 1}
+ },
+ "command": "OPCG_LOG_SILENT=1 nohup python3 tests/scripts/n_record_gen.py --games 960 --seed-base {2205000,2215000,2225000} --workers 4 --sims 128 --shard-games 10 --neff-net /tmp/gen_net.npz --out n2{0,1,2}_records",
+ "notes": "3チャンク逐次生成（w05, 1セッション内）。コンテナ再起動により生成プロセスが複数回停止したため、都度同一引数で再起動（シード固定のため既存シャードは同一内容で上書き、データ欠落なし）。n19は依頼者指示により打ち切り済み（別途claude/n19-w05に記録）。"}
