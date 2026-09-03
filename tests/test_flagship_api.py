@@ -52,7 +52,7 @@ def test_leaders_dictionary(client):
     res = client.get("/api/flagship/leaders")
     assert res.status_code == 200
     leaders = res.json()
-    assert len(leaders) == 137  # docs/leader_specs/ の全リーダー数と一致
+    assert len(leaders) == 143  # カードDB `種類=リーダー` の件数（OP17 で 137→143・2026-09-03。docs/leader_specs は 137 枚時点の仕様）
     by_number = {l["card_number"]: l for l in leaders}
     zoro = by_number["OP01-001"]
     assert zoro["name"] == "ロロノア・ゾロ" and zoro["color"] == "赤" and zoro["life"] == "5"

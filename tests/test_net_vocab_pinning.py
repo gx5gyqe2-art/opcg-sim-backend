@@ -38,11 +38,17 @@ def test_engine_pins_trained_indices():
 
     PRB01-001 は訓練時 idx=2282（現行DBソートだと 2284 にズレる）。ネットが知らない新カード
     （ST31-001）は vocab に**含めない**＝encode の `_vidx` が UNK=0 に落とす＝範囲外参照なし。"""
-    from opcg_sim.src.core.cpu_learned import LearnedEngine
+    from opcg_sim.src.core.cpu_learned import LearnedEngine, _G15_VALUE, _G15_POLICY
+    # 既定（N系 c10・2026-09-03）: ネット付属 vocab_ids（gen15 系譜と同一）で固定
     eng = LearnedEngine()
     assert eng.vocab.get("PRB01-001") == 2282, "訓練時 idx が復元されていない（ズレ再発）"
     assert "ST31-001" not in eng.vocab, "訓練後に追加されたカードは UNK 扱いのはず"
-    assert max(eng.vocab.values()) == eng.vnet.Emb.shape[0] - 1, "idx が Emb 範囲を超えうる"
+    assert max(eng.vocab.values()) == len(eng.vnet.vocab_ids), "idx がカード表の範囲を超えうる"
+    assert max(eng.vocab.values()) == eng.vnet.tab.shape[0] - 1, "idx が効果カード表の範囲を超えうる"
+    # G15 ペアを明示ロードしても同じ vocab（Emb 行数と一致）
+    g = LearnedEngine(value_path=_G15_VALUE, policy_path=_G15_POLICY)
+    assert g.vocab == eng.vocab
+    assert max(g.vocab.values()) == g.vnet.Emb.shape[0] - 1, "idx が Emb 範囲を超えうる"
 
 
 def test_extend_appends_and_preserves_output(db):

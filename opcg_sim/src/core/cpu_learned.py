@@ -169,22 +169,52 @@ _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 # 非注入点の非退行とアリーナ。
 # ロールバックは既定を gen14 に戻すだけ（符号化は net の入力次元から自動判別＝配線変更不要）。
 # policy は gen14 と挙動同一（v9→v12 の恒等ゼロ拡張のみ・v12 確定＝policy 微調整は有害）。
-_DEFAULT_VALUE = os.path.join(_MODELS, "gen15_value.npz")
-_DEFAULT_POLICY = os.path.join(_MODELS, "gen15_policy.npz")
+#
+# ---- 出荷既定 = N系 c10（2026-09-03 採用・ユーザ決定「一旦c10を正式昇格」）----
+# c10 は効果構造符号化ネット（`opcg_sim/src/learned/n_eff.py`・カードIDの埋め込みを持たず
+# 能力列を構造で読む）。value/policy は**1本の npz**（`neff_c10.npz`・方策は同ネットの候補
+# ヘッドを `priors_override` に差す）＝G系の value/policy ペアではない。判定は
+# `docs/reports/c10_adoption_20260903.md`（分散アリーナ c10 vs c8 主0.589/副0.568・
+# c10 vs G15 24ペア×2条件 0.604/0.583）。ロールバックは既定を gen15 のペアへ戻すだけ
+# （`_is_neff` が npz の鍵で G/N を判別＝配線変更不要）。G15 は G系の最終世代として同梱を続ける。
+_DEFAULT_VALUE = os.path.join(_MODELS, "neff_c10.npz")
+_DEFAULT_POLICY = None        # N系は方策を value と同じ npz から出す（G系ペア運用時はパスを置く）
+_G15_VALUE = os.path.join(_MODELS, "gen15_value.npz")
+_G15_POLICY = os.path.join(_MODELS, "gen15_policy.npz")
 
 # vocab（カード語彙）と game（アダプタ）はネット非依存＝プロセス内で1回だけ作り全エンジンで共有する。
 _SHARED: Dict[str, Any] = {}
 
 
 def _shared_vocab_game():
-    if not _SHARED:
+    if "vocab" not in _SHARED:
         db = CardLoader(os.path.join(_DATA, "opcg_cards.json"))
         db.load()
         for cid in list(db.raw_db.keys()):
             db.get_card(cid)
+        _SHARED["db"] = db
         _SHARED["vocab"] = E.build_vocab(db)
         _SHARED["game"] = OPCGGame()
     return _SHARED["vocab"], _SHARED["game"]
+
+
+def _is_neff(path) -> bool:
+    """npz が N系（効果構造符号化）ネットか。G系 `ValueNet` npz は False。"""
+    from opcg_sim.src.learned import n_eff as NE
+    return NE.is_neff_npz(path)
+
+
+def _shared_neff(path):
+    """N系 npz → (value アダプタ, priors 関数)。表（語彙×効果ベクトル）の前計算はプロセス内で
+    パス単位に1回だけ＝同一ネットのエンジン同士（net-vs-net・並列アリーナ）で重複しない。"""
+    _shared_vocab_game()
+    key = (os.path.abspath(path), os.path.getmtime(path))
+    hit = _SHARED.setdefault("neff", {}).get(key)
+    if hit is None:
+        from opcg_sim.src.learned import n_eff as NE
+        adapter, priors, _vocab = NE.load_serve_parts(path, _SHARED["db"])
+        hit = _SHARED["neff"][key] = (adapter, priors)
+    return hit
 
 
 def available() -> bool:
@@ -356,7 +386,15 @@ class LearnedEngine:
         # steps の要素は (a) move_sig タプル (b) ("__box__", sig, 残り回数)＝DON_BOX の
         # カウントダウン形。ターンが変われば key が変わる＝自然に失効する。
         self._commits: Dict[Any, Any] = {}
-        self.vnet = ValueNet.load(value_path or _DEFAULT_VALUE)
+        vp = value_path or _DEFAULT_VALUE
+        neff_priors = None
+        if _is_neff(vp):
+            # N系（出荷既定 c10・2026-09-03）: value は `NEffValueAdapter`（vnet ダックタイプ・
+            # 出口ヘッド無し）、方策は同じネットの候補ヘッド → `priors_override`。
+            shared, neff_priors = _shared_neff(vp)
+            self.vnet = shared.clone()        # 席ごとに別インスタンス（表・重みは共有）
+        else:
+            self.vnet = ValueNet.load(vp)
         # 符号化は**ネット付属 vocab を最優先**（訓練時の card_id→idx を固定）。カードDBが増えても
         # 既存カードの idx がズレず（build_vocab は途中挿入でズレる・2026-07-15 実害）、ネットが
         # 知らない新カードは encode 側で UNK=0 に落ちる＝範囲外クラッシュも起きない。
@@ -372,7 +410,10 @@ class LearnedEngine:
         # 符号化世代は重みの入力次元から自動判別（v1=出荷Gen2・v2=リーダー付与ドン特徴）。
         self.enc_version = _net_enc_version(self.vnet)
         pp = policy_path or _DEFAULT_POLICY
-        self.pnet = PolicyScorer.load(pp) if os.path.exists(pp) else None
+        self.pnet = PolicyScorer.load(pp) if (pp and os.path.exists(pp)) else None
+        if neff_priors is not None and policy_path is None:
+            # N系の方策チャネル（G 形式の pnet を経由しない seam・`_priors` が最優先で使う）
+            self.priors_override = neff_priors
         if self.pnet is not None:
             from opcg_sim.src.learned.action import ACTION_DIM
             # 行動特徴は append-only で拡張される（v9: +カウンター値/対象=リーダー）。旧 net の

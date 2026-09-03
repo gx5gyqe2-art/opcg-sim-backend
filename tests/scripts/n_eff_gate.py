@@ -1,12 +1,12 @@
-"""n_eff_gate: 効果構造符号化ネットの serve 接続とゲート（`n_eff_train` の対・2026-08-27）。
+"""n_eff_gate: 効果構造符号化ネットのゲート（`n_eff_train` の対・2026-08-27）。
 
-`n1_gate` と同じ構図（value=vnet ダックタイプ・policy=priors_override seam）で、
-カード表現だけ効果埋め込み64次元に置換。serve では重みが凍結なので**カード表は
-アダプタ初期化時に1回だけ前計算**する（毎 decide の再計算をしない）。
-候補素性は訓練と同一の139次元（printed パワーマージン含む＝train/serve 一致）。
+**serve 接続（value アダプタ・方策 priors・候補素性）の正本は `opcg_sim/src/learned/n_eff.py`**
+（2026-09-03 c10 採用で昇格）。`neff_engine(path)` は `LearnedEngine(value_path=path)` の
+別名＝LearnedEngine が N系 npz を鍵で判別して自分で配線する。ここに残るのは計器としての
+gate/smoke と、他の計器が参照する名前の互換再輸出だけ。
 
 サブコマンド:
-  gate  … coach 13点（--base-net 指定で N 系前世代比・未指定=gen15）
+  gate  … coach 13点（--base-net 指定で N 系前世代比・未指定=出荷既定）
   smoke … NEff 同士の実対局1局完走（配線の煙試験）
 """
 import os
@@ -23,105 +23,14 @@ _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 import _bootstrap  # noqa: E402,F401
 
-from n1_gate import _uuid_card
-from n1_train import ATYPES
-from n_eff_feat import build_eff_tables
-from n_eff_train import NEffNet, D_CARD_FEAT, F_CAND, MAX_CI, NA
-
-
-class NEffValueAdapter:
-    """NEffNet → vnet ダックタイプ（表は前計算・出口ヘッド無し＝単一価値関数）。"""
-
-    def __init__(self, net):
-        self.net = net
-        self.tab = net.card_table()          # serve は重み凍結＝1回だけ計算
-
-    def _fwd(self, batch):
-        sc = np.asarray(batch["scalars"], np.float32)
-        ci = np.asarray(batch["card_idx"])
-        if ci.shape[1] < MAX_CI:
-            ci = np.concatenate([ci, np.zeros((len(ci), MAX_CI - ci.shape[1]), ci.dtype)], 1)
-        r2 = self.net.body(sc, self.net.cards_in(ci[:, :MAX_CI], self.tab))
-        return np.tanh((r2 @ self.net.Wv + self.net.bv)[:, 0])
-
-    def predict(self, batch):
-        return self._fwd(batch)
-
-    def predict_with_aux(self, batch):
-        v = self._fwd(batch)
-        return v, np.zeros(len(v), np.float32)
-
-    def has_exit_head(self, kind):
-        return False
-
-    def predict_exit(self, batch, kind):
-        return self._fwd(batch)
-
-
-def _cand_row(net, tab, manager, mv, vocab):
-    """1候補 → 訓練と同一の素性139次元（serve 版）。"""
-    x = np.zeros(F_CAND, np.float32)
-    at = mv.get("action_type") or ""
-    try:
-        x[ATYPES.index(at)] = 1.0
-    except ValueError:
-        x[NA - 1] = 1.0
-    p = mv.get("payload") or {}
-    ci = ti = 0
-    c = _uuid_card(manager, mv.get("card_uuid") or p.get("uuid"))
-    if c is not None:
-        ci = vocab.get(getattr(getattr(c, "master", None), "card_id", None), 0)
-    x[NA:NA + D_CARD_FEAT] = tab[ci]
-    tids = p.get("target_ids") or []
-    if tids:
-        t = _uuid_card(manager, tids[0])
-        if t is not None:
-            ti = vocab.get(getattr(getattr(t, "master", None), "card_id", None), 0)
-        x[NA + D_CARD_FEAT:NA + 2 * D_CARD_FEAT] = tab[ti]
-    k = p.get("don_k")
-    kk = float(k) if (at == "DON_BOX" and k is not None) else 0.0
-    has_t = 1.0 if tids else 0.0
-    x[-4] = kk / 5.0
-    x[-3] = has_t
-    x[-2] = float(np.clip((net.PWR[ci] + kk * 1000.0 - net.PWR[ti]) / 10000.0, -1, 1)) * has_t
-    x[-1] = float(net.ISL[ti]) * has_t
-    return x
-
-
-def neff_priors(net, tab, vocab, enc_version=12):
-    from opcg_sim.src.learned import encoder as E
-
-    def priors(state, legal):
-        try:
-            pa = state.pending_actor_action()
-            if not pa or not legal:
-                return None
-            enc = E.encode(state, pa[0], vocab, version=enc_version)
-            sc = np.asarray(enc["scalars"], np.float32)[None, :]
-            ci = np.zeros((1, MAX_CI), np.int64)
-            src = np.asarray(enc["card_idx"])[:MAX_CI]
-            ci[0, :len(src)] = src
-            feats = np.stack([_cand_row(net, tab, state, mv, vocab) for mv in legal])
-            r2 = net.body(sc, net.cards_in(ci, tab))
-            seg = np.zeros(len(legal), np.int64)
-            u = np.concatenate([r2[seg], feats], 1)
-            rp = np.maximum(u @ net.Wp1 + net.bp1, 0.0)
-            lo = (rp @ net.Wp2 + net.bp2)[:, 0]
-            return NEffNet._seg_softmax(lo, seg, 1)
-        except Exception:
-            return None
-    return priors
+from opcg_sim.src.learned.n_eff import (  # noqa: F401  （互換再輸出）
+    NEffValueAdapter, _cand_row, _uuid_card, neff_priors)
 
 
 def neff_engine(net_path, **engine_kw):
+    """N系 npz → `LearnedEngine`（value=アダプタ・policy=priors_override・vocab=ネット付属）。"""
     from opcg_sim.src.core.cpu_learned import LearnedEngine
-    stats, ab, abm, pwr, isl, vocab = build_eff_tables()
-    net = NEffNet.load(net_path, tables=(stats, ab, abm, pwr, isl))
-    eng = LearnedEngine(**engine_kw)
-    adapter = NEffValueAdapter(net)
-    eng.vnet = adapter
-    eng.priors_override = neff_priors(net, adapter.tab, vocab, eng.enc_version)
-    return eng
+    return LearnedEngine(value_path=net_path, **engine_kw)
 
 
 def gate(args):
@@ -218,7 +127,7 @@ def main():
     g.add_argument("--net", required=True)
     g.add_argument("--seeds", type=int, default=5)
     g.add_argument("--base-net", default=None,
-                   help="基準側を N 系ネットに（前世代比）。未指定=出荷 gen15")
+                   help="基準側を N 系ネットに（前世代比）。未指定=出荷既定")
     s = sub.add_parser("smoke")
     s.add_argument("--net", required=True)
     s.add_argument("--seed", type=int, default=434343)

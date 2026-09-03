@@ -1,4 +1,9 @@
-"""n_eff_train: 効果構造符号化ネットの訓練器（N系v2・2026-08-27・`n_eff_feat` の対）。
+"""n_eff_train: 効果構造符号化ネットの訓練器（N系v2・2026-08-27）。
+
+**forward の正本は `opcg_sim/src/learned/n_eff.py`**（2026-09-03 c10 採用で昇格）。本器の
+`NEffNet` はそれを継承して backward（手書き）と Adam を足すだけ＝train/serve で forward が
+分かれない。npz の鍵（`params`）も共有＝ここで保存したネットを serve がそのまま読む
+（保存時に**ネット付属 vocab_ids** を焼き込む＝serve は DB が増えても訓練時 idx を維持）。
 
 N1（`n1_train`）との差分は**カード表現だけ**（A/Bの単一変数）:
   カード = stats16 ＋ 効果埋め込み48（能力集合[≤4,167] → 共有MLP Wa(167→24) → mean/max プール）
@@ -31,59 +36,24 @@ _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 import _bootstrap  # noqa: E402,F401
 
-import n1_train as N1                       # load_dump / ATYPES（データ読みと候補語彙を共有）
-from n_eff_feat import ABILITY_DIM, STATS_DIM, build_eff_tables
+import n1_train as N1                       # load_dump（データ読みを共有）
+from n_eff_feat import build_eff_tables     # 引数なし版（既定エンジンの vocab ＋ テスト DB）
+from opcg_sim.src.learned import n_eff as NE
+from opcg_sim.src.learned.n_eff import (  # noqa: F401  （互換再輸出: 他の計器が参照する名前）
+    MAX_CI, D_SC, D_AB, D_CARD_FEAT, ZONE, D_IN, D_CH, D_EMB, NA, F_CAND, _SLOT_ZONE,
+    ABILITY_DIM, STATS_DIM)
 
-MAX_CI = 24
-D_SC = 94
-D_AB = 24                                    # 能力埋め込み幅（プール後 48）
-D_CARD_FEAT = STATS_DIM + 2 * D_AB           # 64 = カード表現
-ZONE = 5
-D_IN = D_CARD_FEAT + ZONE + 1                # 70
-D_CH = 24                                    # 盤面カードチャネル幅（プール後 48）
-D_EMB = 64
-NA = len(N1.ATYPES) + 1                      # 7
-F_CAND = NA + 2 * D_CARD_FEAT + 4            # 139
-_SLOT_ZONE = [0, 1] + [2] * 5 + [3] * 5 + [4] * 10 + [2] * 2
+assert N1.ATYPES == NE.ATYPES, "候補 action 語彙が n1_train と n_eff で食い違っている"
 
 
-class NEffNet:
-    """効果構造版（numpy・手書きbackward・Adam）。語彙カード表を Wa から毎回計算。"""
+class NEffNet(NE.NEffNet):
+    """訓練用（backward・Adam）。forward・save/load・語彙表は `n_eff.NEffNet` を継承。"""
 
     def __init__(self, tables, hidden=96, seed=13):
-        self.STATS, self.AB, self.ABM, self.PWR, self.ISL = tables
-        r = np.random.default_rng(seed)
-
-        def W(a, b):
-            return (r.standard_normal((a, b)) * np.sqrt(2.0 / a)).astype(np.float32)
-        self.Wa = W(ABILITY_DIM, D_AB); self.ba = np.zeros(D_AB, np.float32)
-        self.Wc = W(D_IN, D_CH); self.bc = np.zeros(D_CH, np.float32)
-        d_tr = D_SC + 2 * D_CH
-        self.W1 = W(d_tr, hidden); self.b1 = np.zeros(hidden, np.float32)
-        self.W2 = W(hidden, D_EMB); self.b2 = np.zeros(D_EMB, np.float32)
-        self.Wv = W(D_EMB, 1); self.bv = np.zeros(1, np.float32)
-        self.Wp1 = W(D_EMB + F_CAND, 64); self.bp1 = np.zeros(64, np.float32)
-        self.Wp2 = W(64, 1); self.bp2 = np.zeros(1, np.float32)
-        self.params = ["Wa", "ba", "Wc", "bc", "W1", "b1", "W2", "b2",
-                       "Wv", "bv", "Wp1", "bp1", "Wp2", "bp2"]
+        super().__init__(tables, hidden=hidden, seed=seed)
         self._adam = {p: [np.zeros_like(getattr(self, p)), np.zeros_like(getattr(self, p))]
                       for p in self.params}
         self._t = 0
-
-    # --- 語彙カード表（効果埋め込み・学習対象） ---
-    def card_table(self, keep=None):
-        H = self.AB @ self.Wa + self.ba                  # [n,4,24]
-        R = np.maximum(H, 0.0)
-        m = self.ABM[:, :, None]
-        nn = np.maximum(m.sum(1), 1.0)                   # [n,1]
-        mean = (R * m).sum(1) / nn
-        masked = np.where(m > 0, R, -1e9)
-        mx = masked.max(1)
-        mx = np.where(mx < -1e8, 0.0, mx)
-        tab = np.concatenate([self.STATS, mean, mx], 1)  # [n,64]
-        if keep is not None:
-            keep.update(t_R=R, t_m=m, t_nn=nn, t_masked=masked)
-        return tab
 
     def card_table_backward(self, k, dtab, g):
         dmean = dtab[:, STATS_DIM:STATS_DIM + D_AB]
@@ -99,34 +69,6 @@ class NEffNet:
         dH = (dR + dmax) * (k["t_R"] > 0)
         g["Wa"] = g.get("Wa", 0) + np.einsum("nsi,nsj->ij", self.AB, dH).astype(np.float32)
         g["ba"] = g.get("ba", 0) + dH.sum((0, 1))
-
-    # --- 盤面チャネル ---
-    def cards_in(self, ci, tab):
-        B = ci.shape[0]
-        x = np.zeros((B, MAX_CI, D_IN), np.float32)
-        x[:, :, :D_CARD_FEAT] = tab[np.clip(ci, 0, len(tab) - 1)]
-        for s in range(MAX_CI):
-            x[:, s, D_CARD_FEAT + _SLOT_ZONE[s]] = 1.0
-        x[:, :, -1] = (ci > 0).astype(np.float32)
-        x[ci <= 0] = 0.0
-        return x
-
-    def body(self, sc, cards, keep=None):
-        h_c = cards @ self.Wc + self.bc
-        r_c = np.maximum(h_c, 0.0)
-        present = cards[:, :, -1:]
-        nn = np.maximum(present.sum(1), 1.0)
-        mean = (r_c * present).sum(1) / nn
-        masked = np.where(present > 0, r_c, -1e9)
-        mx = masked.max(1)
-        mx = np.where(mx < -1e8, 0.0, mx)
-        z = np.concatenate([sc, mean, mx], 1)
-        h1 = z @ self.W1 + self.b1; r1 = np.maximum(h1, 0.0)
-        h2 = r1 @ self.W2 + self.b2; r2 = np.maximum(h2, 0.0)
-        if keep is not None:
-            keep.update(cards=cards, r_c=r_c, present=present, nn=nn, masked=masked,
-                        z=z, r1=r1, r2=r2)
-        return r2
 
     def body_backward(self, k, dr2, g, ci, dtab):
         """dr2→胴体勾配＋盤面カード特徴の勾配を dtab（語彙表勾配）へ合算。"""
@@ -188,11 +130,6 @@ class NEffNet:
         self.step(g, lr)
         return float(np.mean((v - zt) ** 2))
 
-    def value(self, sc, ci):
-        tab = self.card_table()
-        r2 = self.body(sc, self.cards_in(ci, tab))
-        return np.tanh((r2 @ self.Wv + self.bv)[:, 0])
-
     def policy_logits(self, sc, ci, seg, C, idx, keep=None, tab=None):
         k = keep if keep is not None else {}
         if tab is None:
@@ -206,15 +143,6 @@ class NEffNet:
         if keep is not None:
             keep.update(u=u, rp=rp, seg=seg, tab=tab, feats=feats)
         return lo
-
-    @staticmethod
-    def _seg_softmax(lo, seg, P):
-        mx = np.full(P, -1e30, np.float64)
-        np.maximum.at(mx, seg, lo)
-        e = np.exp(lo - mx[seg])
-        s = np.zeros(P, np.float64)
-        np.add.at(s, seg, e)
-        return (e / s[seg]).astype(np.float32)
 
     def policy_step(self, sc, ci, seg, C, idx, pi, lr):
         P = sc.shape[0]
@@ -253,22 +181,11 @@ class NEffNet:
             vh = v / (1 - b2 ** self._t)
             setattr(self, pnm, getattr(self, pnm) - lr * mh / (np.sqrt(vh) + eps))
 
-    def save(self, path, meta=None):
-        np.savez_compressed(path, **{p: getattr(self, p) for p in self.params},
-                            meta=json.dumps(meta or {}))
-
     @classmethod
     def load(cls, path, tables=None):
         if tables is None:
-            t = build_eff_tables()
-            tables = t[:5]
-        d = np.load(path, allow_pickle=True)
-        net = cls(tables, hidden=d["W1"].shape[1])
-        for p in net.params:
-            setattr(net, p, d[p])
-        net._adam = {p: [np.zeros_like(getattr(net, p)), np.zeros_like(getattr(net, p))]
-                     for p in net.params}
-        return net
+            tables = build_eff_tables()[:5]
+        return super().load(path, tables)
 
 
 def eval_policy(net, P, C, pt_idx, ptr, bs=256):
@@ -361,6 +278,8 @@ def train(args):
         for p, w in best[1].items():
             setattr(net, p, w)
         print(f"best ep{best_ep} val v_mse {best[0]:.4f} を保存", flush=True)
+    # ネット付属 vocab（訓練時 card_id→idx）を焼き込む＝serve は DB が増えても訓練時 idx を維持
+    net.vocab_ids = [cid for cid, _i in sorted(vocab.items(), key=lambda kv: kv[1])]
     net.save(args.out, meta={"rows_v": int(len(V["z"])), "points_p": int(len(P["len"])),
                              "epochs": args.epochs, "best_ep": best_ep,
                              "hidden": args.hidden, "src": args.src})

@@ -200,21 +200,23 @@ def test_engine_exit_value_fns_are_neutral_without_heads():
     assert bvf(_S(), "me") == vf(_S(), "me")
 
 
-def test_default_engine_is_gen15_v12_with_battle_head():
-    """既定エンジン（gen15）の採用契約: 符号化 **v12**（v9＋リーダー物理要約24）の本体に
-    **戦闘出口ヘッドを持つ**（docs/reports/gen15_adoption_20260815.md）。
+def test_gen15_pair_is_v12_with_battle_head():
+    """G15（G系最終世代・2026-09-03 に既定を N系 c10 へ譲った）を**明示ロード**したときの契約:
+    符号化 **v12**（v9＋リーダー物理要約24）の本体に**戦闘出口ヘッドを持つ**
+    （docs/reports/gen15_adoption_20260815.md）。
 
     gen13/gen14 は「ヘッドを gen13 と bit 一致で維持」する契約だったが、gen15 は胴体を
     v12 で作り直したため**ヘッドは載せ直し**た（胴体入力のヘッドは胴体が変われば腐る＝
-    2026-08-14 に gen15 前身で m1@15 が 1.00→0.00 と壊れた実害の教訓。載せ直しは裁定注入
-    ~2分＋学習数十秒）。よってここで固定するのは「ヘッドが有効で serve が戦闘箱の物差しに
-    使う」ことと符号化世代であり、bit 一致ではない。ロールバックは既定を gen14 へ戻すだけ。"""
+    2026-08-14 に gen15 前身で m1@15 が 1.00→0.00 と壊れた実害の教訓）。よってここで固定
+    するのは「ヘッドが有効で serve が戦闘箱の物差しに使う」ことと符号化世代であり、bit 一致
+    ではない。c10 からのロールバック先はこのペア（`_G15_VALUE`/`_G15_POLICY`）。"""
     import rl_encoder as E
-    from opcg_sim.src.core.cpu_learned import LearnedEngine
-    eng = LearnedEngine()
+    from opcg_sim.src.core.cpu_learned import LearnedEngine, _G15_VALUE, _G15_POLICY
+    eng = LearnedEngine(value_path=_G15_VALUE, policy_path=_G15_POLICY)
     assert eng.vnet.battle_head is True and eng.vnet.turn_head is False
     assert eng._exit_value_fn("battle") is not None
     assert eng.enc_version == 12 and eng.vnet.feat_dim == E.feature_dim(12)
+    assert eng.pnet is not None and eng.priors_override is None
     # ヘッドは胴体 A1 を読む従来型（リソース入力版は 2026-08-14 の掃引18腕で m1@15 を
     # 取れず不採用＝棚上げ）。serve の戦闘箱がこのヘッドを物差しに使うことは
     # test_battle_value_fn_uses_battle_head が別途固定する。
@@ -223,6 +225,17 @@ def test_default_engine_is_gen15_v12_with_battle_head():
     from opcg_sim.src.core.cpu_learned import _MODELS
     g14 = RN.ValueNet.load(os.path.join(_MODELS, "gen14_value.npz"))
     assert eng.vnet.vocab_ids == g14.vocab_ids
+
+
+def test_default_engine_is_neff_c10_without_exit_head():
+    """既定エンジン（N系 c10・2026-09-03 採用）の契約: 出口ヘッドを持たない＝箱の出口も本体
+    value で測る（`_exit_value_fn` は None・`predict_exit` は `predict` と一致）。詳細契約は
+    `tests/test_neff_default.py`。"""
+    from opcg_sim.src.core.cpu_learned import LearnedEngine
+    eng = LearnedEngine()
+    assert eng.vnet.battle_head is False and eng.vnet.turn_head is False
+    assert not eng.vnet.has_exit_head("battle") and eng._exit_value_fn("battle") is None
+    assert eng.enc_version == 12 and eng.priors_override is not None
 
 
 def test_evaluate_plan_uses_each_head_for_its_own_box(monkeypatch):
