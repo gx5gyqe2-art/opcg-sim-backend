@@ -1,0 +1,8 @@
+z専用 3184640行を合流（π除外・24ディレクトリ）
+value 6085206行（val 871711） policy 1615933点（val 231150） 242s
+warm-start: /root/start.npz（hidden=192）
+ep0 train mse 0.5320 ce 1.5895 | val v_mse 0.6052 v_sign 0.768 pi_top1 0.681 ce 1.588 1050s
+ep1 train mse 0.5233 ce 1.5882 | val v_mse 0.6144 v_sign 0.766 pi_top1 0.682 ce 1.588 1838s
+best ep0 val v_mse 0.6052 を保存
+N_EFF_TRAIN_DONE {"out": "/root/neff_net_c11.npz"}
+EXIT_CODE=0
