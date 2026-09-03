@@ -1,0 +1,24 @@
+{"seed": 311001, "score": 2.0, "leaders": ["ST10-002", "OP12-061"], "games": [1.0, 1.0], "turns": [11, 10], "dig": [[], []], "act": [[{"kind": "activate", "turn": 9, "player": "p1", "leader": "ST10-002", "don_active": 6, "don_rested": 0, "don_deck": 2, "field": 2, "policy": "low"}], [{"kind": "activate", "turn": 8, "player": "p2", "leader": "ST10-002", "don_active": 2, "don_rested": 0, "don_deck": 2, "field": 3, "policy": "low"}]]}
+{"seed": 311003, "score": 1.0, "leaders": ["OP08-057", "OP02-072"], "games": [1.0, 0.0], "turns": [13, 15], "dig": [[], []], "act": [[], []]}
+{"seed": 311002, "score": 1.0, "leaders": ["ST10-002", "OP07-059"], "games": [1.0, 0.0], "turns": [13, 13], "dig": [[], []], "act": [[], []]}
+{"seed": 311000, "score": 1.0, "leaders": ["OP10-003", "OP01-062"], "games": [0.0, 1.0], "turns": [12, 12], "dig": [[], []], "act": [[], []]}
+{"seed": 311004, "score": 1.0, "leaders": ["OP12-041", "OP09-022"], "games": [1.0, 0.0], "turns": [11, 11], "dig": [[], []], "act": [[{"kind": "activate", "turn": 3, "player": "p1", "leader": "OP12-041", "don_active": 0, "don_rested": 1, "don_deck": 7, "field": 1, "policy": "low"}, {"kind": "activate", "turn": 5, "player": "p1", "leader": "OP12-041", "don_active": 1, "don_rested": 5, "don_deck": 4, "field": 2, "policy": "low"}, {"kind": "activate", "turn": 9, "player": "p1", "leader": "OP12-041", "don_active": 0, "don_rested": 7, "don_deck": 0, "field": 4, "policy": "low"}], [{"kind": "activate", "turn": 2, "player": "p2", "leader": "OP12-041", "don_active": 0, "don_rested": 2, "don_deck": 8, "field": 1, "policy": "low"}, {"kind": "activate", "turn": 4, "player": "p2", "leader": "OP12-041", "don_active": 0, "don_rested": 1, "don_deck": 7, "field": 1, "policy": "low"}]]}
+{"seed": 411001, "score": 2.0, "leaders": ["ST10-001", "OP06-042"], "games": [1.0, 1.0], "turns": [11, 14], "dig": [[], []], "act": [[], []]}
+{"seed": 411000, "score": 2.0, "leaders": ["EB02-010", "OP06-042"], "games": [1.0, 1.0], "turns": [9, 10], "dig": [[], []], "act": [[], []]}
+{"seed": 311005, "score": 1.0, "leaders": ["OP10-003", "OP09-062"], "games": [0.0, 1.0], "turns": [12, 12], "dig": [[], []], "act": [[], []]}
+{"seed": 411005, "score": 1.0, "leaders": ["EB01-021", "OP08-058"], "games": [0.0, 1.0], "turns": [12, 10], "dig": [[], []], "act": [[], []]}
+{"seed": 411004, "score": 0.0, "leaders": ["EB02-010", "OP05-060"], "games": [0.0, 0.0], "turns": [10, 13], "dig": [[], []], "act": [[], []]}
+{"seed": 411003, "score": 0.0, "leaders": ["OP04-058", "OP04-019"], "games": [0.0, 0.0], "turns": [12, 11], "dig": [[], []], "act": [[], []]}
+{"seed": 411002, "score": 1.0, "leaders": ["OP01-061", "OP13-003"], "games": [0.0, 1.0], "turns": [18, 12], "dig": [[], []], "act": [[], []]}
+{"seed": 511000, "score": 1.0, "leaders": ["OP11-040", "OP06-042"], "games": [1.0, 0.0], "turns": [11, 11], "dig": [[], []], "act": [[], []]}
+{"seed": 511001, "score": 0.0, "leaders": ["OP12-061", "OP02-071"], "games": [0.0, 0.0], "turns": [10, 11], "dig": [[], []], "act": [[], []]}
+{"seed": 511005, "score": 2.0, "leaders": ["OP11-040", "P-086"], "games": [1.0, 1.0], "turns": [11, 10], "dig": [[], []], "act": [[], []]}
+{"seed": 511003, "score": 1.0, "leaders": ["OP01-062", "OP11-040"], "games": [0.0, 1.0], "turns": [12, 12], "dig": [[], []], "act": [[], []]}
+{"seed": 511002, "score": 2.0, "leaders": ["OP14-060", "OP08-057"], "games": [1.0, 1.0], "turns": [11, 14], "dig": [[], []], "act": [[], []]}
+{"seed": 511004, "score": 1.0, "leaders": ["OP04-019", "OP04-019"], "games": [1.0, 0.0], "turns": [13, 13], "dig": [[], []], "act": [[], []]}
+{"seed": 611001, "score": 2.0, "leaders": ["OP13-003", "OP02-071"], "games": [1.0, 1.0], "turns": [11, 12], "dig": [[], []], "act": [[], []]}
+{"seed": 611000, "score": 2.0, "leaders": ["OP08-058", "OP14-060"], "games": [1.0, 1.0], "turns": [13, 12], "dig": [[], []], "act": [[], []]}
+{"seed": 611003, "score": 0.0, "leaders": ["ST10-001", "OP08-058"], "games": [0.0, 0.0], "turns": [12, 11], "dig": [[], []], "act": [[], []]}
+{"seed": 611004, "score": 0.0, "leaders": ["OP01-061", "EB01-021"], "games": [0.0, 0.0], "turns": [10, 11], "dig": [[], []], "act": [[], []]}
+{"seed": 611005, "score": 1.0, "leaders": ["OP02-071", "OP04-058"], "games": [1.0, 0.0], "turns": [13, 9], "dig": [[], []], "act": [[], []]}
+{"seed": 611002, "score": 2.0, "leaders": ["OP01-091", "OP04-019"], "games": [1.0, 1.0], "turns": [15, 10], "dig": [[], []], "act": [[], []]}
