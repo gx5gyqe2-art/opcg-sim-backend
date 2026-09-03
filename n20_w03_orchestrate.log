@@ -431,3 +431,5 @@ branch 'claude/n20-w03' set up to track 'origin/claude/n20-w03'.
 To https://github.com/gx5gyqe2-art/opcg-sim-backend
    803908a..b6ff322  claude/n20-w03 -> claude/n20-w03
 branch 'claude/n20-w03' set up to track 'origin/claude/n20-w03'.
+[2026-09-03T03:00:42Z] chunk n20_records already done, skip
+[2026-09-03T03:00:42Z] launching seed=2213000 out=n21_records
