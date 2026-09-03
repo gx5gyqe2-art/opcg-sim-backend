@@ -433,3 +433,7 @@ To https://github.com/gx5gyqe2-art/opcg-sim-backend
 branch 'claude/n20-w03' set up to track 'origin/claude/n20-w03'.
 [2026-09-03T03:00:42Z] chunk n20_records already done, skip
 [2026-09-03T03:00:42Z] launching seed=2213000 out=n21_records
+[2026-09-03T03:10:42Z] --- n21_gen.log tail ---
+  20/960局 行2958（main 1794） 棄却0 300s
+  30/960局 行4681（main 2807） 棄却0 427s
+  40/960局 行6125（main 3680） 棄却0 586s
