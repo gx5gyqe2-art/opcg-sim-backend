@@ -704,3 +704,9 @@ To https://github.com/gx5gyqe2-art/opcg-sim-backend
    3ac6bd1..f248884  claude/n20-w03 -> claude/n20-w03
 branch 'claude/n20-w03' set up to track 'origin/claude/n20-w03'.
 [2026-09-03T07:01:36Z] chunk n21_records DONE
+[claude/n20-w03 fd6c013] n20-22 w03: chunk n21_records complete
+ 1 file changed, 11 insertions(+)
+To https://github.com/gx5gyqe2-art/opcg-sim-backend
+   f248884..fd6c013  claude/n20-w03 -> claude/n20-w03
+branch 'claude/n20-w03' set up to track 'origin/claude/n20-w03'.
+[2026-09-03T07:01:38Z] launching seed=2223000 out=n22_records
