@@ -1,0 +1,16 @@
+{"job": "n20-22-w07", "role": "generate", "status": "done",
+ "inputs": {"neff_net": "claude/n1-results:n1_results/neff_net_c10.npz",
+            "chunks": [
+              {"out": "n20_records", "seed_base": 2207000, "games": 960},
+              {"out": "n21_records", "seed_base": 2217000, "games": 960},
+              {"out": "n22_records", "seed_base": 2227000, "games": 960}
+            ],
+            "workers": 4, "sims": 128, "shard_games": 10},
+ "outputs": {
+   "n20_records": {"rows": 131759, "main_rows": 79910, "dropped": 1, "seed_range": "2207000-2207959"},
+   "n21_records": {"rows": 131545, "main_rows": 80110, "dropped": 0, "seed_range": "2217000-2217959"},
+   "n22_records": {"rows": 130352, "main_rows": 79493, "dropped": 0, "seed_range": "2227000-2227959"}
+ },
+ "metrics": {"total_games": 2880, "total_rows": 393656, "total_main_rows": 239513, "total_dropped": 1},
+ "command": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/n_record_gen.py --games 960 --seed-base {seed_base} --workers 4 --sims 128 --shard-games 10 --neff-net /tmp/gen_net.npz --out n{20,21,22}_records",
+ "notes": "3チャンクとも本ブランチ(claude/n20-w07)にpush。コンテナ再起動によりn21は2回・n22は2回、seed-base/games据え置きで最初から再実行した（採番の巻き戻り事故は無し）。"}
