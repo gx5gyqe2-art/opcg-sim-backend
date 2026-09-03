@@ -487,3 +487,7 @@ branch 'claude/n20-w03' set up to track 'origin/claude/n20-w03'.
 To https://github.com/gx5gyqe2-art/opcg-sim-backend
    0ab3712..2e3b276  claude/n20-w03 -> claude/n20-w03
 branch 'claude/n20-w03' set up to track 'origin/claude/n20-w03'.
+[2026-09-03T04:10:56Z] --- n21_gen.log tail ---
+  250/960局 行34879（main 21133） 棄却0 3772s
+  260/960局 行36122（main 21923） 棄却0 3928s
+  270/960局 行37598（main 22832） 棄却0 4095s
