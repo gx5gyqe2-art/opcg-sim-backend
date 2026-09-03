@@ -16,25 +16,39 @@ pytestmark = pytest.mark.cpu_infra
 from arena_breakdown import per_leader, per_matchup, read_rows   # noqa: E402
 
 
-def test_per_leader_uses_game_level_results_when_present():
-    """games=[wa, wb] があれば、候補が実際に握ったリーダーへ局単位で割り当てる。"""
+def test_per_leader_uses_cand_leaders_when_present():
+    """`cand_leaders`（2026-09-03〜）があれば、候補が各局で実際に握ったリーダーへ割り当てる。"""
+    rows = [{"seed": 1, "score": 1.0, "leaders": ["L-A", "L-B"], "games": [1.0, 0.0],
+             "cand_leaders": ["L-A", "L-B"]}]
+    stat = per_leader(rows)
+    assert stat["L-A"] == {"games": 1.0, "wins": 1.0}
+    assert stat["L-B"] == {"games": 1.0, "wins": 0.0}
+
+
+def test_per_leader_old_ledger_means_candidate_held_la_in_both_games():
+    """`cand_leaders` の無い古い台帳: promotion_gate は game b でも候補に la を渡していた
+    （ba=builder(lb, la) は p1=lb/p2=la・候補は p2）ので、2局とも la に割り当てる。
+    従来の「game b は lb」解釈は誤帰属（2026-09-03 実測で判明）。"""
     rows = [{"seed": 1, "score": 1.0, "leaders": ["L-A", "L-B"], "games": [1.0, 0.0]}]
     stat = per_leader(rows)
-    assert stat["L-A"] == {"games": 1.0, "wins": 1.0}    # 候補が L-A を握った局は勝ち
-    assert stat["L-B"] == {"games": 1.0, "wins": 0.0}    # L-B を握った局は負け
+    assert stat["L-A"] == {"games": 2.0, "wins": 1.0}
+    assert "L-B" not in stat
 
 
 def test_per_leader_falls_back_to_half_split_for_old_ledgers():
-    """games が無い古い台帳は2局の内訳を復元できないので、score を半分ずつ割る（不偏）。"""
+    """games が無い古い台帳は2局の内訳を復元できないので、score を半分ずつ割る（不偏）。
+    握ったリーダーは2局とも la。"""
     rows = [{"seed": 1, "score": 1.0, "leaders": ["L-A", "L-B"]}]
     stat = per_leader(rows)
-    assert stat["L-A"] == {"games": 1.0, "wins": 0.5}
-    assert stat["L-B"] == {"games": 1.0, "wins": 0.5}
+    assert stat["L-A"] == {"games": 2.0, "wins": 1.0}
+    assert "L-B" not in stat
 
 
 def test_per_leader_accumulates_across_pairs():
-    rows = [{"seed": 1, "score": 2.0, "leaders": ["L-A", "L-B"], "games": [1.0, 1.0]},
-            {"seed": 2, "score": 0.0, "leaders": ["L-A", "L-C"], "games": [0.0, 0.0]}]
+    rows = [{"seed": 1, "score": 2.0, "leaders": ["L-A", "L-B"], "games": [1.0, 1.0],
+             "cand_leaders": ["L-A", "L-B"]},
+            {"seed": 2, "score": 0.0, "leaders": ["L-A", "L-C"], "games": [0.0, 0.0],
+             "cand_leaders": ["L-A", "L-C"]}]
     stat = per_leader(rows)
     assert stat["L-A"] == {"games": 2.0, "wins": 1.0}
     assert stat["L-C"] == {"games": 1.0, "wins": 0.0}

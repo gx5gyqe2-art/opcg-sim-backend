@@ -76,18 +76,22 @@ def per_leader(rows):
         la, lb = r["leaders"]
         if la is None:
             continue
+        # 候補が各局で握ったリーダー。`cand_leaders`（2026-09-03〜）が正。無い古い台帳は
+        # **[la, la]**＝promotion_gate の実装は game b でも候補に la を渡していた
+        # （ba=builder(lb, la) は p1=lb/p2=la・候補は p2）。従来の [la, lb] 解釈は誤帰属。
+        cl = r.get("cand_leaders") or [la, la]
         g = r.get("games")
         if g and len(g) == 2:
-            stat[la]["games"] += 1.0
-            stat[la]["wins"] += float(g[0])
-            stat[lb]["games"] += 1.0
-            stat[lb]["wins"] += float(g[1])
+            stat[cl[0]]["games"] += 1.0
+            stat[cl[0]]["wins"] += float(g[0])
+            stat[cl[1]]["games"] += 1.0
+            stat[cl[1]]["wins"] += float(g[1])
         else:
             half = float(r["score"]) / 2.0
-            stat[la]["games"] += 1.0
-            stat[la]["wins"] += half
-            stat[lb]["games"] += 1.0
-            stat[lb]["wins"] += half
+            stat[cl[0]]["games"] += 1.0
+            stat[cl[0]]["wins"] += half
+            stat[cl[1]]["games"] += 1.0
+            stat[cl[1]]["wins"] += half
     return stat
 
 

@@ -74,8 +74,11 @@ def game_records(rows):
         la, lb = (r.get("leaders") or [None, None])[:2]
         wa, wb = r["games"]
         dig = r.get("dig") or [[], []]
-        out.append((la, float(wa), dig[0] or []))   # game a: 候補が la
-        out.append((lb, float(wb), dig[1] or []))   # game b: 候補が lb
+        # 候補が各局で握ったリーダーは `cand_leaders`（2026-09-03〜）。無い古い台帳は [la, la]
+        # （promotion_gate は game b でも候補に la を渡していた・従来の「game b は lb」は誤帰属）。
+        cl = r.get("cand_leaders") or [la, la]
+        out.append((cl[0], float(wa), dig[0] or []))
+        out.append((cl[1], float(wb), dig[1] or []))
     return out
 
 

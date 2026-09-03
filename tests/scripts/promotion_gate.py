@@ -114,8 +114,13 @@ def _init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed", decks="
 #   fixed  … 従来（既定リーダーのミラー・歴代との地続き比較用）
 #   random … 全リーダーからペアごとに2枚引く（**左右非対称**を許す）
 #   real   … 実デッキ4リーダーの総当たり（出荷先の対面）
-# **ペア内ではリーダー対を固定し、席とリーダーを入れ替える**（game a: cand=L1 / game b:
-# cand=L2）＝リーダー相性の有利不利が相殺され、残るのは打ち回しの差だけになる。
+# **ペア内ではリーダー対を固定し、席（先後）を入れ替える**。**候補は2局とも la を握る**
+# （game a: cand=p1=la / game b: cand=p2=la・相手は2局とも lb）。設計当初のコメントは
+# 「game b は cand=lb（リーダーも入替）」だったが、実装は ba=builder(lb, la)（p1=lb/p2=la）で
+# 候補が p2 のため入替わっていない（2026-09-03 に台帳の発火イベントから判明）。総合勝率は
+# la/lb がランダムなので不偏だが、**ペア内でリーダー相性は相殺されない**（分散が増えるだけ）。
+# リーダー別の内訳は台帳の `cand_leaders` で割る（古い台帳は [la, la] と解釈）。リーダーも
+# 入替える設計へ改めるかは測定規約の変更＝ユーザ判断（過去台帳との地続き性に関わる）。
 REAL_LEADERS = ("OP11-041", "OP09-001", "OP15-058", "OP16-022")   # ナミ/シャンクス/エネル/黒黄ルフィ
 
 
@@ -184,8 +189,8 @@ def _play_pair_detail(args):
         ab = synth_deck_builder(la, lb, seed=seed) if la else None
         ba = synth_deck_builder(lb, la, seed=seed) if la else None
     else:
-        ab = leader_deck_builder(la, lb) if la else None      # game a: cand=la / best=lb
-        ba = leader_deck_builder(lb, la) if la else None      # game b: best=lb→p1 なので入替
+        ab = leader_deck_builder(la, lb) if la else None      # game a: p1=cand=la / p2=best=lb
+        ba = leader_deck_builder(lb, la) if la else None      # game b: p1=best=lb / p2=cand=la（候補は la のまま）
     if _G.get("pair_timeout"):
         import signal
 
@@ -228,11 +233,15 @@ def _play_pair_detail(args):
         if _G.get("pair_timeout"):
             import signal as _sg
             _sg.alarm(0)
-    wa = 1.0 if a["winner"] == "p1" else 0.0    # game a: 候補が la を握る
-    wb = 1.0 if b["winner"] == "p2" else 0.0    # game b: 候補が lb を握る（席とリーダーを入替）
+    wa = 1.0 if a["winner"] == "p1" else 0.0    # game a: 候補が p1 で la を握る
+    wb = 1.0 if b["winner"] == "p2" else 0.0    # game b: 候補が p2（席入替）。ba=builder(lb, la) は
+    #   p1=lb / p2=la なので**候補は game b でも la を握る**（相手が lb）。入替わるのは席（先後）
+    #   だけで、リーダーは入替わらない（2026-09-03 実測で判明・従来コメントの「候補が lb を握る」
+    #   は誤り）。集計側は `cand_leaders` を見ること（古い台帳は [la, la] と解釈する）。
     # leaders=[la, lb] と games=[wa, wb] を対にして残すと、**どのリーダーを握って勝ったか**を
     # 後から集計できる（score だけだと2局の合計なのでリーダー別に割れない）。
     row = {"seed": seed, "score": wa + wb, "leaders": [la, lb], "games": [wa, wb],
+           "cand_leaders": [la, la],
            "turns": [a.get("turns"), b.get("turns")]}
     if ev_a is not None or ev_b is not None:
         row["dig"] = [ev_a or [], ev_b or []]     # 候補席の掘り発火（game a / game b）
