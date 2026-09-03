@@ -1,0 +1,8 @@
+{"job": "train-c11", "role": "train", "status": "done",
+ "inputs": {"warm_start": "claude/n1-results:n1_results/neff_net_c10.npz",
+            "pi_waves": [20, 21, 22], "z_waves": [17, 18, 19],
+            "epochs": 2, "lr": 2e-4},
+ "outputs": {"net": "n1_results/neff_net_c11.npz"},
+ "metrics": {"val_v_mse": 0.6052, "val_v_sign": 0.768, "pi_top1": 0.681, "best_ep": 0},
+ "command": "PYTHONPATH=tests python tests/scripts/n_eff_train.py train --in ~/n20_wave/w*/n20_records ~/n21_wave/w*/n21_records ~/n22_wave/w*/n22_records --z-in ~/n17_wave/w*/n17_records ~/n18_wave/w*/n18_records ~/n19_wave/w*/n19_records --epochs 2 --lr 2e-4 --warm-start ~/start.npz --out ~/neff_net_c11.npz",
+ "notes": "z=17〜19 に縮小（指示どおり）。指示書どおり z=16〜19（π含め計7波）でまず実行したが、データ読み込み中（value/policy 行数の表示より前）に OOM で exit 137・出力なし。--z-in から最古の n16 を外して z=17〜19（計6波）で再実行したところ成功。n21-w02・n22-w02 ブランチは存在しない（台帳どおり・意図的な打ち切り）ため各7シャードで実施。ep1（val v_mse 0.6144）は ep0（0.6052）より悪化したため best は ep0。value 6085206行（val 871711）／policy 1615933点（val 231150）。"}
