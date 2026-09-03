@@ -3,3 +3,8 @@
   30/960局 行3727（main 2260） 棄却0 524s
   40/960局 行5065（main 3045） 棄却0 727s
   50/960局 行6518（main 3924） 棄却0 936s
+  60/960局 行7931（main 4753） 棄却0 1141s
+  70/960局 行9138（main 5492） 棄却0 1350s
+  80/960局 行10709（main 6446） 棄却0 1570s
+/usr/lib/python3.11/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 6 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
