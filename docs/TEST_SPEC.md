@@ -119,6 +119,7 @@ make test-slow   # 重テストだけ
 | `tests/test_flagship_winnerstore.py` | 収集優勝ポストの一時保管（`opcg_sim/api/flagship/winnerstore.py`、設計 docs/design.md §16.7）。tweet_id 重複除去／再収集で event_id 保持／未紐付け抽出／開催割り当て／**削除（承認時の掃除）**を SQLite（tmp）と Fake Firestore の両実装で検証・`get_winner_store()` 選択 |
 | `tests/test_flagship_link.py` | 収集の蓄積と開催紐付け（`/collect`・`/link/review`・`/link/approve`、設計 docs/design.md §16.7）。収集→DB蓄積／未紐付けポストの開催マスターへの照合レビュー（handle自動候補・個人ポストは候補ゼロ）／**承認で収集ポストを削除**（ポスト内容は恒久保持しない・結果は別途保存）・`event_id=null` は解除で行を残す／TCG+不達でもマスターにフォールバック・未設定503。検索と TCG+（`tcgplus.py`）は monkeypatch 遮断・SQLite(tmp) 永続 |
 | `tests/test_flagship_eventmaster.py` | 開催マスターの永続化（`opcg_sim/api/flagship/eventmaster.py`・`GET /events`、設計 docs/design.md §16.8）。`get_event_master()` 選択／シリーズ別 upsert・list を SQLite(tmp)・Fake Firestore の両実装で検証／**TCG+ が過去開催を消しても `/events` が過去+現行を返す**（スナップショット保持）／TCG+不達でもマスターを返す |
+| `tests/test_flagship_tcgplus.py` | TCG+ 開催マスター取得クライアント（`opcg_sim/api/flagship/tcgplus.py`、設計 docs/design.md §5.1）。**User-Agent のラチェット**（TCG+ は `Mozilla/` 始まりでない UA を 403 で拒否する＝実測 2026-08-16。退行すると全シリーズの開催同期が黙って止まり新開催期が「0件」に見える）／UA が実リクエストに載ること／403→`TcgPlusError` 写像／**`pref_code` からの都道府県フォールバック**（店舗予選は `place` が null・§16.17）／`limit=100` の offset ページング（total 到達で停止）／シリーズ単位キャッシュで再取得しないこと・`is_cached`（`/events` の upsert 抑止が拠り所にする）。ネットワークは monkeypatch 遮断 |
 
 ### カード効果（パーサ/ゴールデン/全カード・回帰/安定性）
 | ファイル | 役割 |

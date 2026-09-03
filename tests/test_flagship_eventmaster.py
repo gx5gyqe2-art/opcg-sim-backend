@@ -43,7 +43,22 @@ class _Col:
     def document(self, i): return _Ref(self, str(i))
     def where(self, f, op, v): return _Q(self, [(f, v)])
 
+class _Batch:
+    """Firestore の WriteBatch 相当（§16.17 のバッチ upsert 用）。"""
+    def __init__(self, db): self._db = db; self._ops = []
+    def set(self, ref, data, merge=False): self._ops.append((ref, data, merge))
+    def commit(self):
+        for ref, data, merge in self._ops: ref.set(data, merge=merge)
+        self._ops = []
+        self._db.commits += 1
+
 class FakeFS:
+    def __init__(self): self._c = {}; self.commits = 0
+    def collection(self, n): return self._c.setdefault(n, _Col())
+    def batch(self): return _Batch(self)
+
+class FakeFSNoBatch:
+    """`batch()` を持たないクライアント（1件ずつ set へフォールバックする経路の検証用）。"""
     def __init__(self): self._c = {}
     def collection(self, n): return self._c.setdefault(n, _Col())
 
@@ -82,6 +97,25 @@ def test_upsert_and_list_by_series(store):
     assert got["store"] and got["capacity"] == 32 and got["sns_url"] == "https://x.com/a"
 
 
+def test_firestore_upsert_uses_batches(monkeypatch):
+    """§16.17: 1件ずつの往復ではなく `_BATCH` 件ずつのバッチで書く（店舗予選=2550件対策）。"""
+    fs = FakeFS()
+    monkeypatch.setattr(resources, "db", fs)
+    master = EM.get_event_master()
+    events = [_ev(id=i) for i in range(1000)]
+    assert master.upsert(events) == 1000
+    assert len(master.list(7395)) == 1000
+    assert fs.commits == 3          # 450 + 450 + 100
+
+
+def test_firestore_upsert_without_batch_support(monkeypatch):
+    """`batch()` を持たないクライアントでは1件ずつの経路へフォールバックする。"""
+    monkeypatch.setattr(resources, "db", FakeFSNoBatch())
+    master = EM.get_event_master()
+    assert master.upsert([_ev(id=1), _ev(id=2, store="店B")]) == 2
+    assert {e["id"] for e in master.list(7395)} == {1, 2}
+
+
 # --- /events：過去開催が TCG+ から消えても残る ------------------------------
 
 @pytest.fixture
@@ -109,6 +143,18 @@ def test_events_persists_past_after_tcgplus_drops(client, monkeypatch):
     assert {e["id"] for e in r2["events"]} == {1, 2}          # A(1) は消えない
     a = next(e for e in r2["events"] if e["id"] == 1)
     assert a["store"] == "店A" and a["start_datetime"].startswith("2026-07-05")
+
+
+def test_events_skips_upsert_while_tcgplus_cache_is_warm(client, monkeypatch):
+    """§16.17: TCG+ をキャッシュで返す間は書き戻さない（内容が変わらないため）。"""
+    monkeypatch.setattr(R.tcgplus, "fetch_events", lambda sid: [_se(1, "店A", "2026-09-01")])
+    monkeypatch.setattr(R.tcgplus, "is_cached", lambda sid: True)
+    r = client.get("/api/flagship/events", params={"series_id": 7757}).json()
+    assert r["events"] == []                                   # マスターへ書かれない
+
+    monkeypatch.setattr(R.tcgplus, "is_cached", lambda sid: False)
+    r = client.get("/api/flagship/events", params={"series_id": 7757}).json()
+    assert {e["id"] for e in r["events"]} == {1}               # 実取得のときだけ書く
 
 
 def test_events_tcgplus_error_returns_master(client, monkeypatch):

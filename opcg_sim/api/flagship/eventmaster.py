@@ -18,6 +18,8 @@ from .. import resources
 from . import db as fdb
 
 COLLECTION = "flagship_event_master"
+# Firestore の書き込みバッチ上限は 500。余裕を見て 450 ずつ束ねる（§16.17）。
+_BATCH = 450
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS event_master (
@@ -117,12 +119,29 @@ class FirestoreEventMaster:
         return self._client.collection(COLLECTION)
 
     def upsert(self, events: List[Dict[str, Any]]) -> int:
+        """バッチ書き込みで upsert する（設計 §16.17）。
+
+        1件ずつ `set()` すると開催数ぶんの往復が起きる。店舗予選は1シリーズ 2550 件あり
+        （実測 2026-08-16）`/events` のたびに直列 2550 往復では実用にならないため、
+        `batch()` に `_BATCH` 件ずつ束ねる。`batch()` を持たないクライアント（テストの
+        Fake 等）では 1件ずつの経路へフォールバックする。
+        """
         now = _now()
-        for e in events:
-            # merge=True で既存の count_applicants（フロント sync 分・§16.14）を消さない。
-            self._col().document(str(e["id"])).set(
-                {**{k: e.get(k) for k in _FIELDS}, "updated_at": now}, merge=True
-            )
+        col = self._col()
+        batch_factory = getattr(self._client, "batch", None)
+        for i in range(0, len(events), _BATCH):
+            chunk = events[i:i + _BATCH]
+            batch = batch_factory() if batch_factory is not None else None
+            for e in chunk:
+                # merge=True で既存の count_applicants（フロント sync 分・§16.14）を消さない。
+                data = {**{k: e.get(k) for k in _FIELDS}, "updated_at": now}
+                ref = col.document(str(e["id"]))
+                if batch is None:
+                    ref.set(data, merge=True)
+                else:
+                    batch.set(ref, data, merge=True)
+            if batch is not None:
+                batch.commit()
         return len(events)
 
     def update_applicants(self, counts: Dict[int, Any]) -> int:
