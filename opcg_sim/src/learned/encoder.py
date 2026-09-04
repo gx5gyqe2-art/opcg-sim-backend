@@ -61,10 +61,16 @@ SCALARS_V11 = 97       # v11 = v10 + **リーダー物理要約24**（自12+相�
 # 次元→版の逆引き（`{scalars_dim(v): v}`）は列数が一意なので成立する。温スタートは v9→v12 のみ
 # 有効で、v11→v12 は縮小方向として `warm_start_value` が拒否する（設計どおり）。
 SCALARS_V12 = 94
+# v13（2026-09-04・NRel P0・`docs/n_attention_plan.md` §2.3）: v12 + グローバル追加列 29
+#（起動の未使用・加速可能枚数・残りの攻撃可能数・速攻・ライフ圧・自デッキ残の役割別 7・
+# 相手の未見プールの役割別 7＋脅威 4・リーダーパワー現在/見込み・次ターンのドン・次ターンに
+# 出せる最大の札・守りの単価）。列の定義は `n_rel_feat.EXTRA_COLS` が正本。append-only。
+from opcg_sim.src.learned.n_rel_feat import EXTRA_DIM as _NREL_EXTRA_DIM  # noqa: E402
+SCALARS_V13 = SCALARS_V12 + _NREL_EXTRA_DIM
 _SCALARS_BY_VERSION = {1: SCALARS_V1, 2: SCALARS_V2, 3: SCALARS_V3, 4: SCALARS_V4,
                        5: SCALARS_V5, 6: SCALARS_V6, 7: SCALARS_V7, 8: SCALARS_V8,
                        9: SCALARS_V9, 10: SCALARS_V10, 11: SCALARS_V11,
-                       12: SCALARS_V12}
+                       12: SCALARS_V12, 13: SCALARS_V13}
 
 # 手番フラグ（is_my_turn）の scalars 列位置。append-only 契約により全版で不変＝
 # コーパスの盤面を「自ターン/相手ターン」で層別するときの唯一の正（v35 層別アンカー）。
@@ -434,6 +440,11 @@ def encode(manager, me_name, vocab, version=1):
         from opcg_sim.src.learned.leader_feat import leader_pair_vectors
         lv_me, lv_opp = leader_pair_vectors(manager, me_name)
         vals += list(lv_me) + list(lv_opp)
+    if version >= 13:
+        # v13（2026-09-04・NRel P0）: グローバル追加列（n_rel_feat.EXTRA_COLS）。トークン状態 S と
+        # 関係 R は scalars に畳まず `n_rel_feat.encode_rel` が別キーで返す（NRel 本体専用）。
+        from opcg_sim.src.learned.n_rel_feat import extra_scalars
+        vals += list(extra_scalars(manager, me_name))
     scalars = np.array(vals, dtype=np.float32)
 
     field = np.zeros((2 * MAX_FIELD, PER_CHAR), dtype=np.float32)

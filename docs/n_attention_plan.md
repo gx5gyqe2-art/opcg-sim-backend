@@ -154,7 +154,7 @@ h_i を 2 層の多頭注意（d=64・4 頭・関係 R_ij を加法バイアス�
 
 | 段 | 成果物 | テスト |
 |---|---|---|
-| P0 符号化 | `opcg_sim/src/learned/n_rel_feat.py`: 状態 S・関係 R・グローバル追加列（v13・append-only） | `test_n_rel_feat.py`: 見本盤面で cond_ok（エネル「ドン 6 枚以下」）・ko_gap（ガンマナイフ→神の裁き で 囚人 6000 が届く）・don_return_cost・leader_act_avail の真偽を固定 |
+| P0 符号化（**実装済み 2026-09-04**） | `opcg_sim/src/learned/n_rel_feat.py`: 状態 S（20 列）・関係 R（5 列・自 16×相手 6／自 16×自 16）・グローバル追加列 29（`encoder` v13・append-only）。1 盤面 ~1ms | `test_n_rel_feat.py`: 見本盤面で cond_ok（エネル「ドン 6 枚以下」）・ko_gap（ガンマナイフ→神の裁き で 囚人 6000 が届く）・don_return_cost・leader_act_avail の真偽を固定 |
 | P1 dump v2 | `tests/scripts/n_record_gen.py` に v2 出力（`--dump-v2`） | `test_n_record_v2.py`: 形状・float16・枠 index の整合 |
 | P2 ネット A | `opcg_sim/src/learned/n_rel.py`（forward）＋ `tests/scripts/n_rel_train.py`（backward・Adam） | `test_n_rel_grad.py`: 数値勾配一致（cpu_infra） |
 | P3 serve | `cpu_learned` の判別に NRel を追加（`Wr` 鍵） | `test_n_rel_default.py`（採用時） |
