@@ -94,6 +94,15 @@ _FIXH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                      "fixtures", "replays", "enel_human_20260810")
 REPLAYS_HUMAN = {
     "h1": os.path.join(_FIXH, "enel_human_5703575646787553228.json.gz"),  # p1=エネル(人) / p2=ナミ(CPU)
+    # 見本棋譜（2026-09-04・ユーザ採取・設計フェーズの定性分析用 `docs/reports/2026-09-04_human_samples_qualitative.md`）。
+    # 全て p1=人間・勝ち。相手 CPU は learned（当時の出荷既定）。ローは効果エンジンの不具合が
+    # 残る対局＝手順の型は参考にするが、個々の効果解決を正解扱いしない（ユーザ注記）。
+    "h2": os.path.join(os.path.dirname(_FIXH), "human_enel_vs_luffy_20260904",
+                       "enel_vs_luffy_3840809972709220407.json.gz"),      # エネル vs ルフィ OP16-022（後攻・turn12勝ち）
+    "h3": os.path.join(os.path.dirname(_FIXH), "human_law_vs_luffy_20260904",
+                       "law_vs_luffy_7808696651703795638.json.gz"),       # ロー ST10-001 vs ルフィ OP16-022（先攻・turn11勝ち）
+    "h4": os.path.join(os.path.dirname(_FIXH), "human_enel_vs_roger_20260904",
+                       "enel_vs_roger_5764875644126075159.json.gz"),      # エネル vs ロジャー OP13-003（先攻・turn15勝ち）
 }
 # **VERIFIED v3**（2026-07-30 再裁定・/tmp/mark_verify3.jsonl・worlds16）。旧 v2（13点・worlds8）は
 # 効果対話の既定解決欠陥（`docs/reports/default_interaction_fix_20260730.md`＝捨て札が公開札を
