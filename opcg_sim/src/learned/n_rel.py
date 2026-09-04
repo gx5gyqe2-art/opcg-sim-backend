@@ -26,8 +26,11 @@ import json
 
 import numpy as np
 
+from opcg_sim.src.learned import encoder as E
 from opcg_sim.src.learned import n_eff as NE
 from opcg_sim.src.learned import n_rel_feat as NR
+
+NR_ENC_VERSION = 13                   # NRel の符号化世代（v12 + n_rel_feat の追加 29）
 
 D_SC = 94 + NR.EXTRA_DIM              # 123
 D_STRUCT = NE.D_CARD_FEAT             # 64
@@ -231,3 +234,132 @@ def is_nrel_npz(path):
             return "Wr" in d.files and "Wt" in d.files
     except Exception:
         return False
+
+
+# ---------------------------------------------------------------------------
+# serve 接続（P3・2026-09-04）: LearnedEngine の vnet ダックタイプ＋priors_override
+# ---------------------------------------------------------------------------
+class NRelValueAdapter:
+    """NRelNet → `LearnedEngine.vnet`。盤面から直接評価する（`predict_state`）。
+
+    NRel は scalars/card_idx だけでは評価できない（トークン状態 S と関係 R が要る）ので、
+    `cpu_learned._value_fn` は `predict_state` を持つ vnet にはそれを使う。`predict(batch)` は
+    形式互換のために残すが、tokens/rel が batch に無いときは例外を投げる（黙って劣化しない）。"""
+
+    battle_head = False
+    turn_head = False
+
+    def __init__(self, net, vocab_ids, rel_table, ptab_ret):
+        self.net = net
+        self.tab = net.card_table()
+        self.vocab_ids = list(vocab_ids)
+        self.vocab = E.vocab_from_ids(self.vocab_ids)
+        self.rt = rel_table
+        self.ptab_ret = ptab_ret
+        self.feat_dim = E.feature_dim(NR_ENC_VERSION)
+
+    def clone(self):
+        c = object.__new__(NRelValueAdapter)
+        c.__dict__.update(self.__dict__)
+        return c
+
+    def encode_state(self, state, to_move):
+        """盤面 → (sc [1,123], ci [1,22], tok [1,22,S], rel_om, rel_oo, R)。encode_rel は 1 回だけ。"""
+        R = NR.encode_rel(state, to_move)
+        base = E.encode(state, to_move, self.vocab, version=12)
+        sc = np.concatenate([base["scalars"], R["extra"]]).astype(np.float32)[None, :]
+        ci = np.asarray(base["card_idx"])[:N_TOK][None, :]
+        tok = R["tokens"][None]
+        rel_om, rel_oo = NR.relations_batch(ci, tok, self.rt)
+        return sc, ci, tok, rel_om, rel_oo, R
+
+    def predict_state(self, state, to_move):
+        sc, ci, tok, rel_om, rel_oo, _R = self.encode_state(state, to_move)
+        h, present = self.net.tokens_forward(ci, tok, rel_om, rel_oo, self.tab)
+        e = self.net.body(sc, h, present)
+        return float(np.tanh((e @ self.net.Wv + self.net.bv)[0, 0]))
+
+    def predict(self, batch):
+        if "tokens" not in batch:
+            raise ValueError("NRelValueAdapter.predict には tokens/rel が要る（predict_state を使う）")
+        sc = np.asarray(batch["scalars"], np.float32)
+        ci = np.asarray(batch["card_idx"])[:, :N_TOK]
+        tok = np.asarray(batch["tokens"], np.float32)
+        rel_om, rel_oo = NR.relations_batch(ci, tok, self.rt)
+        return self.net.value(sc, ci, tok, rel_om, rel_oo)
+
+    def predict_with_aux(self, batch):
+        v = self.predict(batch)
+        return v, np.zeros(len(v), np.float32)
+
+    def has_exit_head(self, kind):
+        return False
+
+    def predict_exit(self, batch, kind):
+        return self.predict(batch)
+
+
+def _cand_rows(net, tab, vocab, state, legal, smap):
+    """候補 → (feats [n,139], si [n], ti [n])。素性は NEff と同じ定義（`n_eff._cand_row`）。"""
+    uidx = NE._uuid_index(state)
+    feats = np.stack([NE._cand_row(net, tab, state, mv, vocab, uidx) for mv in legal])
+    si = np.array([smap.get(mv.get("card_uuid") or (mv.get("payload") or {}).get("uuid"), -1)
+                   for mv in legal], np.int64)
+    ti = np.array([smap.get(((mv.get("payload") or {}).get("target_ids") or [None])[0], -1)
+                   for mv in legal], np.int64)
+    return feats, si, ti
+
+
+def nrel_priors(adapter):
+    """`LearnedEngine.priors_override` に差す方策関数（state, legal）→ 合法手上の確率 or None。"""
+    net, vocab, rt, ptab_ret = adapter.net, adapter.vocab, adapter.rt, adapter.ptab_ret
+
+    def priors(state, legal):
+        try:
+            pa = state.pending_actor_action()
+            if not pa or not legal:
+                return None
+            me_name = pa[0]
+            sc, ci, tok, rel_om, rel_oo, R = adapter.encode_state(state, me_name)
+            me = state.p1 if state.p1.name == me_name else state.p2
+            opp = state.p2 if me is state.p1 else state.p1
+            smap = {getattr(c, "uuid", None): i for i, c in enumerate(NR._slots(me, opp)) if c is not None}
+            feats, si, ti = _cand_rows(net, adapter.tab, vocab, state, legal, smap)
+            n = len(legal)
+            seg = np.zeros(n, np.int64)
+            # 予算 3（訓練の budget_feats と同じ定義）
+            ex = R["extra"]
+            don_next = ex[NR.EXTRA_COLS.index("don_next_turn")] * 10.0
+            max_play = ex[NR.EXTRA_COLS.index("max_play_next_turn")] * 10.0
+            budget = np.zeros((n, D_BUDGET), np.float32)
+            for q, mv in enumerate(legal):
+                at = mv.get("action_type") or ""
+                cidq = int(ci[0, si[q]]) if si[q] >= 0 else 0
+                ret = float(ptab_ret[cidq]) if 0 <= cidq < len(ptab_ret) else 0.0
+                budget[q, 0] = ret / 3.0
+                budget[q, 1] = 1.0 if (don_next - ret) >= max_play else 0.0
+                cost = tok[0, si[q], 1] * 10.0 if (at == "PLAY" and si[q] >= 0) else 0.0
+                k = (mv.get("payload") or {}).get("don_k")
+                kk = float(k) if (at == "DON_BOX" and k is not None) else 0.0
+                budget[q, 2] = min((cost + kk) / 10.0, 1.5)
+            lo = net.policy_logits(sc, ci, tok, rel_om, rel_oo, seg, si, ti, feats, budget, tab=adapter.tab)
+            return NRelNet.seg_softmax(lo, seg, 1)
+        except Exception:
+            return None
+    return priors
+
+
+def load_serve_parts(path, db):
+    """NRel npz → (adapter, priors_fn, vocab)。vocab_ids は npz（無ければ同梱既定 N系の vocab_ids）。"""
+    with np.load(path, allow_pickle=True) as d:
+        ids = [str(x) for x in d["vocab_ids"]] if "vocab_ids" in d.files else None
+    if ids is None:
+        ids = NE.default_vocab_ids()
+    vocab = E.vocab_from_ids(ids)
+    tables = NE.build_eff_tables(db, vocab)
+    net = NRelNet.load(path, tables)
+    ptab = NR.profile_table(db, vocab)
+    rt = NR.RelTable(ptab)
+    ptab_ret = np.array([(p["ret_don"] if p else 0.0) for p in ptab], np.float32)
+    adapter = NRelValueAdapter(net, ids, rt, ptab_ret)
+    return adapter, nrel_priors(adapter), vocab

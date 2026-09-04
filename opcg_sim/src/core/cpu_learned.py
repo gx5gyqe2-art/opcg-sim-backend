@@ -204,6 +204,24 @@ def _is_neff(path) -> bool:
     return NE.is_neff_npz(path)
 
 
+def _is_nrel(path) -> bool:
+    """npz が NRel（N系 v3・対と手順の本体・`n_rel.py`）か。"""
+    from opcg_sim.src.learned import n_rel as NL
+    return NL.is_nrel_npz(path)
+
+
+def _shared_nrel(path):
+    """NRel npz → (value アダプタ, priors 関数)。表・関係表の前計算はプロセス内でパス単位に 1 回。"""
+    _shared_vocab_game()
+    key = (os.path.abspath(path), os.path.getmtime(path))
+    hit = _SHARED.setdefault("nrel", {}).get(key)
+    if hit is None:
+        from opcg_sim.src.learned import n_rel as NL
+        adapter, priors, _vocab = NL.load_serve_parts(path, _SHARED["db"])
+        hit = _SHARED["nrel"][key] = (adapter, priors)
+    return hit
+
+
 def _shared_neff(path):
     """N系 npz → (value アダプタ, priors 関数)。表（語彙×効果ベクトル）の前計算はプロセス内で
     パス単位に1回だけ＝同一ネットのエンジン同士（net-vs-net・並列アリーナ）で重複しない。"""
@@ -224,6 +242,14 @@ def available() -> bool:
 
 def _value_fn(vnet, vocab, enc_version=1):
     """葉価値関数＝素の predict（純正AZ化 2026-08-25: 旧 aux 粘り項は補償層として削除）。"""
+    if hasattr(vnet, "predict_state"):
+        # NRel（2026-09-04）: トークン状態と関係が要るので盤面から直接評価する
+        def value_state(state, to_move):
+            if state.winner is not None:
+                return 1.0 if state.winner == to_move else -1.0
+            return float(vnet.predict_state(state, to_move))
+        return value_state
+
     def value(state, to_move):
         if state.winner is not None:
             return 1.0 if state.winner == to_move else -1.0
@@ -388,7 +414,12 @@ class LearnedEngine:
         self._commits: Dict[Any, Any] = {}
         vp = value_path or _DEFAULT_VALUE
         neff_priors = None
-        if _is_neff(vp):
+        if _is_nrel(vp):
+            # NRel（N系 v3・2026-09-04・`docs/n_attention_plan.md`）: 盤面から直接評価する
+            # アダプタ（predict_state）と、対・予算を見る方策 → `priors_override`。
+            shared, neff_priors = _shared_nrel(vp)
+            self.vnet = shared.clone()
+        elif _is_neff(vp):
             # N系（出荷既定 c10・2026-09-03）: value は `NEffValueAdapter`（vnet ダックタイプ・
             # 出口ヘッド無し）、方策は同じネットの候補ヘッド → `priors_override`。
             shared, neff_priors = _shared_neff(vp)
