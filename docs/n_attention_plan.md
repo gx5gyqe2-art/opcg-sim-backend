@@ -157,7 +157,7 @@ h_i を 2 層の多頭注意（d=64・4 頭・関係 R_ij を加法バイアス�
 | P0 符号化（**実装済み 2026-09-04**） | `opcg_sim/src/learned/n_rel_feat.py`: 状態 S（20 列）・関係 R（5 列・自 16×相手 6／自 16×自 16）・グローバル追加列 29（`encoder` v13・append-only）。1 盤面 ~1ms | `test_n_rel_feat.py`: 見本盤面で cond_ok（エネル「ドン 6 枚以下」）・ko_gap（ガンマナイフ→神の裁き で 囚人 6000 が届く）・don_return_cost・leader_act_avail の真偽を固定 |
 | P1 dump v2（**実装済み 2026-09-04**） | `n_record_gen --dump-v2`: 符号化 v13＋tokens **float32**（float16 は境界で反転・実測）＋候補の枠 index。R は `relations_from_dump` で再計算 | `test_n_record_v2.py`: 形状・dtype・枠 index の整合・再計算 |
 | P2 ネット A（**実装済み 2026-09-04**） | `opcg_sim/src/learned/n_rel.py`（forward・パラメータ 18・hidden 192）＋ `tests/scripts/n_rel_train.py`（backward・Adam・dump v2 読み・R の一括再計算 `relations_batch`） | `test_n_rel_grad.py`: 数値勾配一致（value/policy とも <5%）・PAD 不変・save/load・一括関係の参照一致 |
-| P3 serve | `cpu_learned` の判別に NRel を追加（`Wr` 鍵） | `test_n_rel_default.py`（採用時） |
+| P3 serve（**実装済み 2026-09-04**） | `n_rel.NRelValueAdapter`（`predict_state`＝盤面から直接評価・B=1 は参照実装の関係計算）＋`nrel_priors`（対・予算つき方策）＋`cpu_learned` の判別（`Wr`/`Wt` 鍵）と共有表 | `test_n_rel_serve.py`。**レイテンシ実測: sims 32 で c10 比 2.7 倍**（乱数初期化ネット・m2 3 盤面）。内訳/ノード ≒ encode v12 0.7ms（c10 と共通）＋トークン状態 0.6ms（条件評価 0.3ms 含む）＋関係 0.3ms＋forward 0.35ms＋priors 0.15ms。§5 の関門 ≤1.3 倍には届いていない＝r1 の判定時にユーザ判断（受容するか、条件評価の軽量化・ノード間の符号化共有に投資するか） |
 | P4 教材と訓練 | c10 生成の v2 波 ×3（分散運用）→ r1 | 評価帯（新帯）・一致率・アリーナ |
 
 ## 7. ユーザ決定（2026-09-04）

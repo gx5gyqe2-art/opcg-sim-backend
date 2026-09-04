@@ -166,11 +166,35 @@ def _walk_list(node):
     return out
 
 
+_ROLES: dict = {}
+
+
+_THR_ROWS: dict = {}
+
+
+def thr_rows(master):
+    """マスター → しきい値効果の行列 [n_thr, 6]（P, C, needs_rest, allow_leader, no_threshold, red）。無ければ None。"""
+    key = getattr(master, "card_id", None) or id(master)
+    if key in _THR_ROWS:
+        return _THR_ROWS[key]
+    p = profile(master)
+    rows = [[pm if pm is not None else np.inf, cm if cm is not None else np.inf,
+             1.0 if nr else 0.0, 1.0 if al else 0.0, 1.0 if (pm is None and cm is None) else 0.0, p["red"]]
+            for (pm, cm, nr, _k, al) in p["thr"]]
+    out = np.array(rows, np.float64) if rows else None
+    _THR_ROWS[key] = out
+    return out
+
+
 def roles_of(master):
-    """役割ベクトル（ROLES の順・0/1）。デッキ残・未見プールの集計に使う。"""
+    """役割ベクトル（ROLES の順・0/1）。デッキ残・未見プールの集計に使う（マスター単位でキャッシュ）。"""
+    key = getattr(master, "card_id", None) or id(master)
+    hit = _ROLES.get(key)
+    if hit is not None:
+        return hit
     p = profile(master)
     t = getattr(getattr(master, "type", None), "name", "")
-    return np.array([
+    out = np.array([
         1.0 if any(th[3] == "removal" for th in p["thr"]) else 0.0,
         1.0 if p["red"] > 0 else 0.0,
         1.0 if any(th[3] == "lock" for th in p["thr"]) else 0.0,
@@ -180,6 +204,8 @@ def roles_of(master):
         1.0 if (t == "CHARACTER" and ((getattr(master, "power", 0) or 0) >= _BIG_POWER
                                       or (getattr(master, "cost", 0) or 0) >= _BIG_COST)) else 0.0,
     ], np.float32)
+    _ROLES[key] = out
+    return out
 
 
 def _reach(thr, power, cost, is_rest, is_leader=False):
@@ -269,17 +295,18 @@ def _has_kw(c, kw):
         return kw in (getattr(getattr(c, "master", None), "keywords", ()) or ())
 
 
-def _cond_flags(manager, player, card):
+def _cond_flags(manager, player, card, res=None):
     """能力 k（≤4）の条件が今真か（条件無し＝1）。評価はエンジンの `_check_condition`。"""
     out = np.ones(MAX_AB, np.float32)
     abs_ = list(getattr(getattr(card, "master", None), "abilities", ()) or ())[:MAX_AB]
     if not any(getattr(ab, "condition", None) is not None for ab in abs_):
         return out
-    try:
-        from opcg_sim.src.core.effects.resolver import EffectResolver
-        res = EffectResolver(manager)
-    except Exception:
-        return out
+    if res is None:
+        try:
+            from opcg_sim.src.core.effects.resolver import EffectResolver
+            res = EffectResolver(manager)
+        except Exception:
+            return out
     for k, ab in enumerate(abs_):
         cond = getattr(ab, "condition", None)
         if cond is None:
@@ -414,8 +441,15 @@ def relations_from_dump(card_idx, tok, ptab):
     return relations_from_tokens(profs, tok)
 
 
-def encode_rel(manager, me_name):
-    """盤面 → {"tokens": [22,S_DIM], "rel_om": [16,6,R_DIM], "rel_oo": [16,16,R_DIM], "extra": [EXTRA_DIM]}。"""
+def encode_rel(manager, me_name, with_relations=True):
+    """盤面 → {"tokens": [22,S_DIM], "rel_om": [16,6,R_DIM], "rel_oo": [16,16,R_DIM], "extra": [EXTRA_DIM]}。
+
+    `with_relations=False` なら rel_om/rel_oo を計算しない（serve は `relations_batch` で一括計算する）。"""
+    try:
+        from opcg_sim.src.core.effects.resolver import EffectResolver
+        _res = EffectResolver(manager)
+    except Exception:
+        _res = None
     me, opp = _pl(manager, me_name), (manager.p2 if manager.p1.name == me_name else manager.p1)
     my_turn = getattr(manager, "turn_player", me) is me
     slots = _slots(me, opp)
@@ -425,16 +459,12 @@ def encode_rel(manager, me_name):
                      + len(getattr(opp, "don_attached_cards", ()) or ()))
     don_next_opp = min(10, don_total_opp + min(1, len(getattr(opp, "don_deck", ()) or ())))
     pool = _unseen_pool(opp)
-    pool_thr = []          # (thr, card_cost) — 相手プールの除去/減算が次ターン届くかの判定に使う
-    for c in pool:
-        m = getattr(c, "master", None)
-        if m is None:
-            continue
-        p = profile(m)
-        cc = int(getattr(m, "cost", 0) or 0)
-        for th in p["thr"]:
-            pool_thr.append((th, cc, p["red"]))
     n_pool = max(1, len(pool))
+    # 相手プールのしきい値効果（次ターンのドンで撃てるもの）を配列に畳む（threat_next の一括判定用）
+    _rows = [thr_rows(c.master) for c in pool
+             if getattr(c, "master", None) is not None and thr_rows(c.master) is not None
+             and int(getattr(c.master, "cost", 0) or 0) <= don_next_opp]
+    pool_arr = np.concatenate(_rows, 0) if _rows else None                    # [M, 6] = P, C, rest, lead, nothr, red
 
     pw = [0] * N_TOK
     cs = [0] * N_TOK
@@ -478,23 +508,22 @@ def encode_rel(manager, me_name):
             tok[i, 15] = 1.0 if "ON_ATTACK" in p["trig"] else 0.0
             tok[i, 16] = 1.0 if ("ON_OPP_ATTACK" in p["trig"] or "OPPONENT_ATTACK" in p["trig"]) else 0.0
         owner = me if z in ("own_leader", "own_field", "hand") else opp
-        tok[i, 10:14] = _cond_flags(manager, owner, c)
-        if z in ("own_leader", "own_field") and pool_thr:
-            hit = 0
-            for th, cc, red in pool_thr:
-                if cc > don_next_opp:
-                    continue
-                ok, _g = _reach(th, pw[i] - red, cs[i], rest, is_leader=(_zone(i) == 'own_leader'))
-                if ok:
-                    hit += 1
-            tok[i, 17] = min(hit / n_pool, 1.0)
+        tok[i, 10:14] = _cond_flags(manager, owner, c, _res)
+        if z in ("own_leader", "own_field") and pool_arr is not None:
+            P_, C_, RS_, LD_, NT_, RD_ = (pool_arr[:, k] for k in range(6))
+            pw_eff = pw[i] - RD_
+            gp = np.where(np.isfinite(P_), (pw_eff - P_) / 10000.0, -np.inf)
+            gc = np.where(np.isfinite(C_), (cs[i] - C_) * 0.1, -np.inf)
+            g = np.where(NT_ > 0, -1.0, np.maximum(gp, gc))
+            blocked = ((RS_ > 0) & (not rest)) | ((z == "own_leader") & (LD_ <= 0.5))
+            tok[i, 17] = min(float(((g <= 0.0) & ~blocked).sum()) / n_pool, 1.0)
         tok[i, 18] = 1.0 if t == "CHARACTER" else 0.0
         tok[i, 19] = 1.0 if t == "EVENT" else 0.0
 
     # ---- 関係 R（トークン状態 S とプロファイルだけから計算＝訓練時の再計算と同じ関数） ----
     profs = [profile(c.master) if (c is not None and getattr(c, "master", None) is not None) else None
              for c in slots]
-    rel_om, rel_oo = relations_from_tokens(profs, tok)
+    rel_om, rel_oo = relations_from_tokens(profs, tok) if with_relations else (None, None)
     own_ids = [i for i in range(N_TOK) if _zone(i) in ("own_leader", "own_field", "hand")]
     opp_ids = [i for i in range(N_TOK) if _zone(i) in ("opp_leader", "opp_field")]
 

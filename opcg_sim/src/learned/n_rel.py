@@ -249,12 +249,13 @@ class NRelValueAdapter:
     battle_head = False
     turn_head = False
 
-    def __init__(self, net, vocab_ids, rel_table, ptab_ret):
+    def __init__(self, net, vocab_ids, rel_table, ptab_ret, ptab=None):
         self.net = net
         self.tab = net.card_table()
         self.vocab_ids = list(vocab_ids)
         self.vocab = E.vocab_from_ids(self.vocab_ids)
         self.rt = rel_table
+        self.ptab = ptab
         self.ptab_ret = ptab_ret
         self.feat_dim = E.feature_dim(NR_ENC_VERSION)
 
@@ -263,15 +264,45 @@ class NRelValueAdapter:
         c.__dict__.update(self.__dict__)
         return c
 
+    @staticmethod
+    def _fingerprint(state, to_move):
+        """同じ盤面か（value と priors が同じノードで続けて呼ばれる＝符号化を 1 回にする）。
+        make/unmake は同一オブジェクトを書き換えるので id() では判別できない＝内容の指紋で見る。"""
+        def cz(c):
+            return (getattr(c, "uuid", None), bool(getattr(c, "is_rest", False)),
+                    int(getattr(c, "attached_don", 0) or 0), int(getattr(c, "power_buff", 0) or 0),
+                    int(getattr(c, "cost_buff", 0) or 0), bool(getattr(c, "is_newly_played", False)))
+        parts = [to_move, int(getattr(state, "turn_count", 0) or 0), str(getattr(state, "phase", None))]
+        ai = getattr(state, "active_interaction", None)
+        parts.append((ai or {}).get("action_type") if isinstance(ai, dict) else None)
+        for pl in (state.p1, state.p2):
+            parts.append((cz(pl.leader) if pl.leader is not None else None,
+                          tuple(cz(c) for c in pl.field), tuple(getattr(c, "uuid", None) for c in pl.hand),
+                          len(pl.don_active), len(pl.don_rested), len(getattr(pl, "don_deck", ()) or ()),
+                          len(pl.life), len(pl.deck), len(pl.trash),
+                          tuple(getattr(c, "ability_used_this_turn", {}).items()) if pl.leader is None
+                          else tuple(dict(getattr(pl.leader, "ability_used_this_turn", {}) or {}).items())))
+        return tuple(parts)
+
     def encode_state(self, state, to_move):
-        """盤面 → (sc [1,123], ci [1,22], tok [1,22,S], rel_om, rel_oo, R)。encode_rel は 1 回だけ。"""
-        R = NR.encode_rel(state, to_move)
+        """盤面 → (sc [1,123], ci [1,22], tok [1,22,S], rel_om, rel_oo, R)。
+
+        同じ盤面（指紋一致）なら直前の結果を返す＝1 ノードで value と priors が同じ符号化を共有する。"""
+        fp = self._fingerprint(state, to_move)
+        last = getattr(self, "_last", None)
+        if last is not None and last[0] == fp:
+            return last[1]
+        R = NR.encode_rel(state, to_move, with_relations=False)
         base = E.encode(state, to_move, self.vocab, version=12)
         sc = np.concatenate([base["scalars"], R["extra"]]).astype(np.float32)[None, :]
         ci = np.asarray(base["card_idx"])[:N_TOK][None, :]
         tok = R["tokens"][None]
-        rel_om, rel_oo = NR.relations_batch(ci, tok, self.rt)
-        return sc, ci, tok, rel_om, rel_oo, R
+        # B=1 は参照実装（python ループ）の方が一括版より速い（0.3ms vs 1.0ms・2026-09-04 実測）
+        om, oo = NR.relations_from_dump(ci[0], tok[0], self.ptab)
+        rel_om, rel_oo = om[None], oo[None]
+        out = (sc, ci, tok, rel_om, rel_oo, R)
+        self._last = (fp, out)
+        return out
 
     def predict_state(self, state, to_move):
         sc, ci, tok, rel_om, rel_oo, _R = self.encode_state(state, to_move)
@@ -361,5 +392,5 @@ def load_serve_parts(path, db):
     ptab = NR.profile_table(db, vocab)
     rt = NR.RelTable(ptab)
     ptab_ret = np.array([(p["ret_don"] if p else 0.0) for p in ptab], np.float32)
-    adapter = NRelValueAdapter(net, ids, rt, ptab_ret)
+    adapter = NRelValueAdapter(net, ids, rt, ptab_ret, ptab=ptab)
     return adapter, nrel_priors(adapter), vocab
