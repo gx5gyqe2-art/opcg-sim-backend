@@ -133,9 +133,9 @@ h_i を 2 層の多頭注意（d=64・4 頭・関係 R_ij を加法バイアス�
 
 ## 4. 教材（dump v2）
 
-- `n_record_gen` の dump に **状態 S（22×|S|）・関係 R（自×相手 11×11×R、自×自 11×11×R）・
-  候補の枠 index** を追加。関係は float16。行あたり 94＋22×|S|＋2×121×R ≒ 2,000 値（float16
-  で 4KB）→ 波 1 本 100 万行＝4GB。**z 窓は 3 波まで**（cgroup 14GB）。
+- `n_record_gen --dump-v2` の行 = scalars 123（v13）＋ tokens 22×20（float32）＋候補の枠 index。
+  行あたり ≒ 563 値（2.3KB）→ 波 1 本 100 万行 ≒ 2.3GB。R（自 16×相手 6、自 16×自 16、各 5 列）は
+  保存せず `relations_from_dump` で再計算（ユーザ決定）。
 - 関係は**トークン状態＋語彙表から決定的に再計算できる**ので、容量が問題なら dump には S だけ
   持ち、訓練時に再計算する（関数を `n_eff.py` 側に置き train/serve で共有）。
 - 旧波（v1 dump）は NRel の教材にならない＝**c10 を生成役に新形式で 3 波**を作る（π・z とも）。
@@ -155,7 +155,7 @@ h_i を 2 層の多頭注意（d=64・4 頭・関係 R_ij を加法バイアス�
 | 段 | 成果物 | テスト |
 |---|---|---|
 | P0 符号化（**実装済み 2026-09-04**） | `opcg_sim/src/learned/n_rel_feat.py`: 状態 S（20 列）・関係 R（5 列・自 16×相手 6／自 16×自 16）・グローバル追加列 29（`encoder` v13・append-only）。1 盤面 ~1ms | `test_n_rel_feat.py`: 見本盤面で cond_ok（エネル「ドン 6 枚以下」）・ko_gap（ガンマナイフ→神の裁き で 囚人 6000 が届く）・don_return_cost・leader_act_avail の真偽を固定 |
-| P1 dump v2 | `tests/scripts/n_record_gen.py` に v2 出力（`--dump-v2`） | `test_n_record_v2.py`: 形状・float16・枠 index の整合 |
+| P1 dump v2（**実装済み 2026-09-04**） | `n_record_gen --dump-v2`: 符号化 v13＋tokens **float32**（float16 は境界で反転・実測）＋候補の枠 index。R は `relations_from_dump` で再計算 | `test_n_record_v2.py`: 形状・dtype・枠 index の整合・再計算 |
 | P2 ネット A | `opcg_sim/src/learned/n_rel.py`（forward）＋ `tests/scripts/n_rel_train.py`（backward・Adam） | `test_n_rel_grad.py`: 数値勾配一致（cpu_infra） |
 | P3 serve | `cpu_learned` の判別に NRel を追加（`Wr` 鍵） | `test_n_rel_default.py`（採用時） |
 | P4 教材と訓練 | c10 生成の v2 波 ×3（分散運用）→ r1 | 評価帯（新帯）・一致率・アリーナ |

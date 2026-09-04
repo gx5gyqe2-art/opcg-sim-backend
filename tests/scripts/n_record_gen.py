@@ -52,7 +52,7 @@ _KIND = {"main": 0, "window": 1, "commit": 2}
 
 
 def _init_worker(sims, value_path, policy_path, n1_net=None,
-                 dirichlet_eps=0.0, temp_turns=0, neff_net=None):
+                 dirichlet_eps=0.0, temp_turns=0, neff_net=None, dump_v2=False):
     import rl_encoder as E
     from cpu_selfplay import _load_db
     from opcg_game import OPCGGame
@@ -80,7 +80,14 @@ def _init_worker(sims, value_path, policy_path, n1_net=None,
                      if (db.get_card(cid) is not None
                          and getattr(db.get_card(cid).type, "name", "") == "LEADER"))
     _G.update(E=E, db=db, gs=OPCGGame(), eng=eng, vocab=eng.vocab,
-              sims=sims, leaders=leaders)
+              sims=sims, leaders=leaders, v2=bool(dump_v2))
+    if dump_v2:
+        # dump v2（NRel P1・2026-09-04）: 符号化は本番 encoder の v13（v12＋グローバル追加 29）、
+        # トークン状態 S（float32・`n_rel_feat.encode_rel`）と候補の主体/対象の 22 枠 index を足す。
+        # 関係 R は保存しない（訓練時に `relations_from_dump` で再計算＝ユーザ決定）。
+        from opcg_sim.src.learned import encoder as PE
+        from opcg_sim.src.learned import n_rel_feat as NR
+        _G.update(PE=PE, NR=NR)
 
 
 def _uuid_cids(m):
@@ -118,8 +125,8 @@ def play_one(seed):
     except Exception:
         return None
     rows = {k: [] for k in ("scalars", "field", "card_idx", "who", "kind", "turn",
-                            "step", "sig", "pol_len", "pol_chosen")}
-    pol = {"n": [], "q": [], "k": [], "sig": [], "cid": [], "tcid": []}
+                            "step", "sig", "pol_len", "pol_chosen", "tokens")}
+    pol = {"n": [], "q": [], "k": [], "sig": [], "cid": [], "tcid": [], "si": [], "ti": []}
     acts = {"p1": 0, "p2": 0}
     steps = 0
     drng = np.random.default_rng(seed * 31 + 7)
@@ -129,7 +136,10 @@ def play_one(seed):
             if name is None:
                 break
             actor = m.p1 if m.p1.name == name else m.p2
-            enc = E.encode(m, name, _G["vocab"], version=ENC_VERSION)
+            if _G.get("v2"):
+                enc = _G["PE"].encode(m, name, _G["vocab"], version=ENC_VERSION_V2)
+            else:
+                enc = E.encode(m, name, _G["vocab"], version=ENC_VERSION)
             rec = {}
             eng._world_seeds = {}
             mv = eng.decide(m, actor, sims=_G["sims"], rng=drng, record=rec)
@@ -157,6 +167,14 @@ def play_one(seed):
                     break
             rows["pol_chosen"].append(chosen)
             cids = _uuid_cids(m) if groups else {}
+            smap = {}
+            if _G.get("v2"):
+                NR = _G["NR"]
+                rows["tokens"].append(NR.encode_rel(m, name)["tokens"])
+                _me = m.p1 if m.p1.name == name else m.p2
+                _opp = m.p2 if _me is m.p1 else m.p1
+                smap = {getattr(c, "uuid", None): i
+                        for i, c in enumerate(NR._slots(_me, _opp)) if c is not None}
             for g in groups:
                 pol["n"].append(float(g["n"]))
                 pol["q"].append(float(g["q"]))
@@ -166,6 +184,9 @@ def play_one(seed):
                 pol["cid"].append(cids.get(sg[1]) or "")
                 tg = list(sg[2] or ())
                 pol["tcid"].append((cids.get(tg[0]) or "") if tg else "")
+                if _G.get("v2"):
+                    pol["si"].append(smap.get(sg[1], -1))
+                    pol["ti"].append(smap.get(tg[0], -1) if tg else -1)
             m2 = gs.apply(m, mv, name)
             if m2 is None:
                 return None
@@ -182,7 +203,11 @@ def play_one(seed):
         return None                                  # 純正 z＝勝敗が付いた対局のみ採用
     z = {"p1": 1.0 if m.winner == "p1" else -1.0}
     z["p2"] = -z["p1"]
-    return {"scalars": np.array(rows["scalars"], np.float32),
+    out_v2 = {}
+    if _G.get("v2"):
+        out_v2 = {"tokens": np.array(rows["tokens"], np.float32),
+                  "pol_si": np.array(pol["si"], np.int16), "pol_ti": np.array(pol["ti"], np.int16)}
+    return {**out_v2, "scalars": np.array(rows["scalars"], np.float32),
             "field": np.array(rows["field"], np.float32),
             "card_idx": np.array(rows["card_idx"], np.int64),
             "z": np.array([z[w] for w in rows["who"]], np.float32),
@@ -205,6 +230,8 @@ def play_one(seed):
 _ROW_KEYS = ("scalars", "field", "card_idx", "z", "who", "kind", "turn", "step",
              "seed", "sig", "pol_len", "pol_chosen")
 _POL_KEYS = ("pol_n", "pol_q", "pol_k", "pol_sig", "pol_cid", "pol_tcid")
+_V2_KEYS = ("tokens", "pol_si", "pol_ti")
+ENC_VERSION_V2 = 13    # dump v2 の符号化世代（v12 + n_rel_feat のグローバル追加 29・append-only）
 
 
 def main():
@@ -225,18 +252,21 @@ def main():
     ap.add_argument("--temp-turns", type=int, default=4,
                     help="この turn まではメイン窓を訪問分布 τ=1 でサンプリング（0=無効）")
     ap.add_argument("--shard-games", type=int, default=10)
+    ap.add_argument("--dump-v2", action="store_true",
+                    help="NRel 用 dump v2（符号化 v13＋トークン状態 S float32＋候補の枠 index・2026-09-04）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
     t0 = time.time()
-    buf = {k: [] for k in _ROW_KEYS + _POL_KEYS}
+    keys = _ROW_KEYS + _POL_KEYS + (_V2_KEYS if args.dump_v2 else ())
+    buf = {k: [] for k in keys}
     shard = n_rows = n_drop = n_main = 0
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
                                       initargs=(args.sims, args.value,
                                                 args.policy, args.n1_net,
                                                 args.dirichlet_eps, args.temp_turns,
-                                                args.neff_net)) as pool:
+                                                args.neff_net, args.dump_v2)) as pool:
         done = 0
         for r in pool.imap_unordered(play_one,
                                      [args.seed_base + i for i in range(args.games)]):
@@ -255,13 +285,14 @@ def main():
                     np.savez_compressed(tmp, **{k: np.concatenate(buf[k]) for k in buf})
                     os.replace(tmp, path)
                     shard += 1
-                    buf = {k: [] for k in _ROW_KEYS + _POL_KEYS}
+                    buf = {k: [] for k in keys}
                 print(f"  {done}/{args.games}局 行{n_rows}（main {n_main}） 棄却{n_drop}"
                       f" {time.time()-t0:.0f}s", flush=True)
     with open(os.path.join(args.out, "meta_n_record.json"), "w") as f:
         json.dump({"games": args.games, "rows": n_rows, "main_rows": n_main,
                    "dropped": n_drop, "sims": args.sims,
-                   "enc_version": ENC_VERSION, "seed_base": args.seed_base,
+                   "enc_version": ENC_VERSION_V2 if args.dump_v2 else ENC_VERSION,
+                   "dump_version": 2 if args.dump_v2 else 1, "seed_base": args.seed_base,
                    "value": args.value, "policy": args.policy,
                    "n1_net": args.n1_net, "neff_net": args.neff_net,
                    "dirichlet_eps": args.dirichlet_eps,

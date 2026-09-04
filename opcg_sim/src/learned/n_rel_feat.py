@@ -316,6 +316,104 @@ def _unseen_pool(opp):
     return pool
 
 
+def relations_from_tokens(profs, tok):
+    """(22 枠のプロファイル, トークン状態 S) → (rel_om [16,6,R], rel_oo [16,16,R])。
+
+    盤面オブジェクトを見ない**純関数**＝dump に S だけ保存し訓練時に同じ関数で R を再計算できる
+    （ユーザ決定 2026-09-04・train/serve の一致）。使う S の列: power_now(0)・cost_now(1)・
+    is_rest(3)・can_attack_now(5)・playable_now(8)・cond_ok(10..13)。ゾーンは枠 index から決まる。
+    `profs[i]` は `profile(master)` か None（空枠）。"""
+    own_ids = [i for i in range(N_TOK) if _zone(i) in ("own_leader", "own_field", "hand")]
+    opp_ids = [i for i in range(N_TOK) if _zone(i) in ("opp_leader", "opp_field")]
+    rel_om = np.zeros((N_OWN, N_OPP, R_DIM), np.float32)
+    rel_om[:, :, 1] = GAP_SAT
+    rel_om[:, :, 2] = GAP_SAT
+    rel_oo = np.zeros((N_OWN, N_OWN, R_DIM), np.float32)
+    rel_oo[:, :, 1] = GAP_SAT
+    rel_oo[:, :, 2] = GAP_SAT
+    pw = tok[:, 0] * 10000.0
+    cs = tok[:, 1] * 10.0
+    rest = tok[:, 3] > 0.5
+    present = [profs[i] is not None or (tok[i] != 0).any() for i in range(N_TOK)]
+
+    def usable(i):
+        return (tok[i, 8] > 0.5) if _zone(i) == "hand" else True
+
+    for i in own_ids:
+        if not present[i]:
+            continue
+        pi = profs[i]
+        oi = _own_index(i)
+        cond_all = float(tok[i, 10:14].min())
+        for j in opp_ids:
+            if not present[j]:
+                continue
+            oj = _opp_index(j)
+            if _zone(i) != "hand" and tok[i, 5] > 0.5:
+                rel_om[oi, oj, 0] = (pw[i] - pw[j]) / 10000.0
+            if pi is None:
+                continue
+            j_leader = _zone(j) == "opp_leader"
+            best_gap, best_cgap, feas = GAP_SAT, GAP_SAT, 0.0
+            for th in pi["thr"]:
+                pm, cm, _nr, _k, _al = th
+                ok, g = _reach(th, pw[j], cs[j], bool(rest[j]), is_leader=j_leader)
+                if pm is not None or cm is None:
+                    best_gap = min(best_gap, g)
+                if cm is not None:
+                    best_cgap = min(best_cgap, (cs[j] - cm) * 0.1)
+                if ok and usable(i) and cond_all > 0:
+                    feas = 1.0
+            rel_om[oi, oj, 1] = best_gap
+            rel_om[oi, oj, 2] = best_cgap
+            rel_om[oi, oj, 3] = min(pi["red"], 15000.0) / 10000.0 if pi["red"] > 0 else 0.0
+            rel_om[oi, oj, 4] = feas
+    # 自×自: i の減算で k のしきい値が相手の誰かに届くか（組）
+    for i in own_ids:
+        pi = profs[i]
+        if pi is None or pi["red"] <= 0:
+            continue
+        oi = _own_index(i)
+        for k in own_ids:
+            if k == i:
+                continue
+            pk = profs[k]
+            if pk is None or not pk["thr"]:
+                continue
+            ok_ = _own_index(k)
+            best, feas = GAP_SAT, 0.0
+            for j in opp_ids:
+                if not present[j]:
+                    continue
+                for th in pk["thr"]:
+                    ok, g = _reach(th, pw[j] - pi["red"], cs[j], bool(rest[j]),
+                                   is_leader=(_zone(j) == "opp_leader"))
+                    best = min(best, g)
+                    if ok and usable(i) and usable(k):
+                        feas = 1.0
+            rel_oo[oi, ok_, 1] = best
+            rel_oo[oi, ok_, 3] = min(pi["red"], 15000.0) / 10000.0
+            rel_oo[oi, ok_, 4] = feas
+    return rel_om, rel_oo
+
+
+def profile_table(db, vocab):
+    """vocab idx → profile（訓練時に card_idx から関係を再計算するための表）。0=PAD は None。"""
+    n = max(vocab.values()) + 1
+    tab = [None] * n
+    for cid, idx in vocab.items():
+        c = db.get_card(cid)
+        if c is not None:
+            tab[idx] = profile(c)
+    return tab
+
+
+def relations_from_dump(card_idx, tok, ptab):
+    """dump の 1 行（card_idx [≥22], tokens [22,S]）→ (rel_om, rel_oo)。`profile_table` と対。"""
+    profs = [ptab[int(ci)] if 0 < int(ci) < len(ptab) else None for ci in list(card_idx)[:N_TOK]]
+    return relations_from_tokens(profs, tok)
+
+
 def encode_rel(manager, me_name):
     """盤面 → {"tokens": [22,S_DIM], "rel_om": [16,6,R_DIM], "rel_oo": [16,16,R_DIM], "extra": [EXTRA_DIM]}。"""
     me, opp = _pl(manager, me_name), (manager.p2 if manager.p1.name == me_name else manager.p1)
@@ -393,80 +491,12 @@ def encode_rel(manager, me_name):
         tok[i, 18] = 1.0 if t == "CHARACTER" else 0.0
         tok[i, 19] = 1.0 if t == "EVENT" else 0.0
 
-    # ---- 関係 R ----
+    # ---- 関係 R（トークン状態 S とプロファイルだけから計算＝訓練時の再計算と同じ関数） ----
+    profs = [profile(c.master) if (c is not None and getattr(c, "master", None) is not None) else None
+             for c in slots]
+    rel_om, rel_oo = relations_from_tokens(profs, tok)
     own_ids = [i for i in range(N_TOK) if _zone(i) in ("own_leader", "own_field", "hand")]
     opp_ids = [i for i in range(N_TOK) if _zone(i) in ("opp_leader", "opp_field")]
-    rel_om = np.zeros((N_OWN, N_OPP, R_DIM), np.float32)
-    rel_om[:, :, 1] = GAP_SAT
-    rel_om[:, :, 2] = GAP_SAT
-    rel_oo = np.zeros((N_OWN, N_OWN, R_DIM), np.float32)
-    rel_oo[:, :, 1] = GAP_SAT
-    rel_oo[:, :, 2] = GAP_SAT
-    profs = {}
-    for i in own_ids:
-        c = slots[i]
-        if c is None or getattr(c, "master", None) is None:
-            continue
-        profs[i] = profile(c.master)
-    for i in own_ids:
-        c = slots[i]
-        if c is None:
-            continue
-        pi = profs.get(i)
-        oi = _own_index(i)
-        usable = tok[i, 8] > 0 or _zone(i) != "hand"      # 手札は今出せる/使えるとき、場は常に
-        cond_all = float(tok[i, 10:14].min())
-        for j in opp_ids:
-            d = slots[j]
-            if d is None:
-                continue
-            oj = _opp_index(j)
-            if _zone(i) != "hand" and tok[i, 5] > 0:
-                rel_om[oi, oj, 0] = (pw[i] - pw[j]) / 10000.0
-            if pi is None:
-                continue
-            best_gap, best_cgap, feas = GAP_SAT, GAP_SAT, 0.0
-            j_leader = _zone(j) == "opp_leader"
-            for th in pi["thr"]:
-                pm, cm, needs_rest, _k, _al = th
-                ok, g = _reach(th, pw[j], cs[j], bool(getattr(d, "is_rest", False)), is_leader=j_leader)
-                if pm is not None or cm is None:
-                    best_gap = min(best_gap, g)
-                if cm is not None:
-                    best_cgap = min(best_cgap, (cs[j] - cm) * 0.1)
-                if ok and usable and cond_all > 0:
-                    feas = 1.0
-            rel_om[oi, oj, 1] = best_gap
-            rel_om[oi, oj, 2] = best_cgap
-            rel_om[oi, oj, 3] = min(pi["red"], 15000.0) / 10000.0 if pi["red"] > 0 else 0.0
-            rel_om[oi, oj, 4] = feas
-    # 自×自: i の減算で k のしきい値が相手の誰かに届くか（組）
-    for i in own_ids:
-        pi = profs.get(i)
-        if pi is None or pi["red"] <= 0:
-            continue
-        oi = _own_index(i)
-        for k in own_ids:
-            if k == i:
-                continue
-            pk = profs.get(k)
-            if pk is None or not pk["thr"]:
-                continue
-            ok_ = _own_index(k)
-            best, feas = GAP_SAT, 0.0
-            for j in opp_ids:
-                d = slots[j]
-                if d is None:
-                    continue
-                for th in pk["thr"]:
-                    ok, g = _reach(th, pw[j] - pi["red"], cs[j], bool(getattr(d, "is_rest", False)),
-                                   is_leader=(_zone(j) == "opp_leader"))
-                    best = min(best, g)
-                    if ok and (tok[i, 8] > 0 or _zone(i) != "hand") and (tok[k, 8] > 0 or _zone(k) != "hand"):
-                        feas = 1.0
-            rel_oo[oi, ok_, 1] = best
-            rel_oo[oi, ok_, 3] = min(pi["red"], 15000.0) / 10000.0
-            rel_oo[oi, ok_, 4] = feas
 
     # ---- グローバル追加列 ----
     ex = np.zeros(EXTRA_DIM, np.float32)

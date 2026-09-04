@@ -152,3 +152,24 @@ def test_encode_rel_is_cheap(db):
     for _ in range(20):
         NR.encode_rel(m, name)
     assert (time.time() - t) / 20 < 0.010
+
+
+def test_relations_recomputed_from_tokens_match_live_board(db):
+    """train/serve の一致: dump に S だけ保存し `relations_from_dump`（card_idx＋S＋プロファイル表）で
+    再計算した R が、盤面から直接計算した R と bit 一致する（ユーザ決定: R は保存せず再計算）。
+    S は float32 で保存する（float16 は境界で反転＝本テストで実測を固定）。"""
+    from opcg_sim.src.core.cpu_learned import LearnedEngine
+    vocab = LearnedEngine().vocab
+    ptab = NR.profile_table(db, vocab)
+    for tag, idx in (("h2", 48), ("h2", 96), ("h5", 113), ("h6", 99)):
+        m, name = _restore(db, tag, idx)
+        R = NR.encode_rel(m, name)
+        ci = E.encode(m, name, vocab, version=12)["card_idx"]
+        om, oo = NR.relations_from_dump(ci, R["tokens"], ptab)
+        assert np.array_equal(om, R["rel_om"]) and np.array_equal(oo, R["rel_oo"]), (tag, idx)
+        # float16 で保存すると 6000/10000 等が丸まり、しきい値の境界（差 0）で feasible が反転する
+        # （h2@48/96 で実測）＝**dump の S は float32 で保存する**（`n_record_gen --dump-v2`）。
+        om16, _ = NR.relations_from_dump(ci, R["tokens"].astype(np.float16).astype(np.float32), ptab)
+        if tag == "h2":
+            assert not np.array_equal(om16, R["rel_om"])
+        assert (R["rel_om"][:, :, 4] > 0).any() or (R["rel_oo"][:, :, 4] > 0).any(), "組/届く対が 1 つも無い盤面"
