@@ -1,0 +1,140 @@
+# N系 v3「対と手順」本体の設計計画（NRel・2026-09-04 起案）
+
+見本棋譜 6 局（`docs/reports/2026-09-04_human_samples_qualitative.md`・`_human_sample_roger.md`・
+`_human_sample_doflamingo.md`）から逆算した、次の学習 CPU 本体の設計。**本書は計画（生き文書）**で、
+確定した仕様は実装時に `docs/SPEC.md`／`TEST_SPEC.md` へ落とす。呼称は **NRel**（N系 v3・
+relation）。cN の系譜（c1〜c11）の次＝ **r1, r2, …** と番号を付ける。
+
+## 0. 何を直すのか（診断の要約）
+
+| 事実 | 出典 |
+|---|---|
+| c10 と人間の一致率は **組を要する局面ほど低い**: エネル／ロー 0.21〜0.28 < ロジャー 0.37 < ドフラミンゴ 0.55 | 乖離レポート 3 本 |
+| 人間の除去はほぼ全て **減算＋しきい値除去の 2〜3 枚の組**（型A）。守りでも **リーダー効果 × KO 時効果**の対 | qualitative §1・doflamingo §1 |
+| 人間はドンを **払う→補充→付与→殴る** の順で回し、殴る順は **中型→最大打点**（相手のカウンターを吐かせる）（型B/C） | qualitative §1・roger §1 |
+| 人間は序中盤の攻撃を **ライフで受け**、守りは最後に集中。c10 は早くカウンターを切る（型D） | divergence §3 |
+| 現ネット（c10）はカードを mean/max で**プール**し、カード間の関係・条件の充足・手順の資源を持たない | `opcg_sim/src/learned/n_eff.py` |
+| N系ループ（c8→c10→c11）は評価帯が単調改善しても対局の強さが頭打ち＝表現力の天井 | `2026-09-03_c11_judgment.md` |
+
+## 1. 設計原則
+
+1. **関係は符号化側で計算し、ネットに引き算を学ばせない**。「この効果はあの相手に今届くか・
+   あと何点足りないか」はエンジンが正確に出せる量。ネットはそれを**組み合わせる**役。
+2. **条件の充足はエンジンで評価した真偽**として与える（名前・特性の埋め込みより汎化する。
+   `resolver._check_condition` が正本）。
+3. **ID 非依存を維持**（c10 の設計を継ぐ）。カードは効果構造 64 次元＋状態＋関係で表す。
+4. **段階を踏む**: まず「対の MLP＋プール」（Stage A・backward が手書きで書ける）、効けば
+   「注意機構」（Stage B）。木（MCTS）・エンジンは変えない。
+5. **判定は従来どおり**: 分散アリーナ 2 条件（`docs/n_loop_ops.md`）が主、見本 6 局との一致率
+   （`human_replay_divergence.py`）とレイテンシ（c10 比 ≤1.3 倍）が補助。
+
+## 2. 入力の設計
+
+### 2.1 トークン（22 枠＝現行 card_idx と同じ並び）
+
+`[自L, 相手L, 自場×5, 相手場×5, 自手札×10]`。各トークン = **構造 64**（c10 の `card_table`：
+stats16＋効果埋め込み 48・語彙表で前計算）＋ **状態 S**（新設・盤面依存）＋ **ゾーン 5**。
+
+状態 S（案・各 /正規化）:
+
+| 列 | 内容 | 型の根拠 |
+|---|---|---|
+| power_now | 現在パワー（修正込み）/10000 | A（しきい値判定の実値） |
+| cost_now | 現在コスト（修正込み）/10 | A・E（放電のコスト+2） |
+| attached_don | 付与ドン /5 | B |
+| is_rest / is_sick / can_attack_now | 攻撃可否（速攻含む） | C |
+| is_blocker_active | ブロッカーとして今使えるか | D |
+| counter_value | 手札ならカウンター値 /2000・両用イベントは +2000 換算 | D |
+| playable_now | 手札なら今のドンで出せるか・イベントなら今使えるか | B |
+| don_return_cost | 使うとドンデッキへ戻す枚数 /3（1c 登場ドロー・0c イベント） | B |
+| cond_ok[k] | 能力 k（≤4）の**条件が今真か**（条件が無い能力は 1） | A・型E の名前/特性参照 |
+| trig_ko / trig_attack / trig_opp_attack | KO 時／アタック時／相手アタック時の能力を持つか（構造 64 に含まれるが状態側でも明示） | A（守りの組） |
+
+### 2.2 関係（対の特徴・R 次元・自トークン i × 相手トークン j）
+
+エンジンで計算する **「i の効果が j に今届くか・あと何点か」**:
+
+| 列 | 内容 |
+|---|---|
+| atk_margin | (power_i − power_j)/10000（i が攻撃側の場合） |
+| ko_gap | i が「パワー≤P を KO/レスト/デッキ下」の能力を持つ場合 (power_j − P)/10000（≤0 なら届く）・無ければ +∞ を飽和 |
+| cost_gap | i が「コスト≤C を…」の能力を持つ場合 (cost_j − C)/10 |
+| red_amount | i が j に与えられる減算量（−1000/−3000/−5000/−8000）/10000 |
+| feasible | 上の組合せで**今**届く（0/1）＝条件充足×コスト支払可×対象条件 |
+
+自 × 自（手札 i × 手札/場 k）にも同じ R を持たせ、「i の減算で k のしきい値が届く」＝**組**を
+表す（例: ガンマナイフ × 神の裁き）。相手 × 自（相手の攻撃 × 自分の KO 時効果）は守りの窓で使う。
+
+### 2.3 グローバル（現行 v12 の 94 列に追加・append-only）
+
+| 列 | 内容 | 型 |
+|---|---|---|
+| leader_act_avail | リーダー起動が未使用かつ合法 | B/C |
+| don_returned_turn | このターンにドンデッキへ戻した枚数 | B |
+| don_addable | 今の手札で今ターン追加できるドン枚数（加速札の合計） | B |
+| attacks_done / attackers_left | このターンの攻撃回数／残りの攻撃可能数 | C |
+| rush_in_hand | 出せば今ターン殴れる札の数 | C |
+| opp_counters_used_turn / opp_counters_used_total | 相手が切ったカウンター数（今ターン／通算） | C（相手手札の見積もり） |
+| my_counter_total / my_blockers | 既存 v6 と同じ（再掲・守りの可視化） | D |
+| life_pressure | 相手の残り攻撃力合計 − 自分の守り総量 | D |
+
+## 3. ネット（Stage A: 対 MLP＋プール／Stage B: 注意）
+
+### Stage A（NRel-A）
+
+```
+t_i   = MLP_t([構造64, 状態S, ゾーン5])                          # トークン埋め込み 48
+m_i   = max_j MLP_r([t_i, t_j, R_ij]) （j∈相手）+ mean_j (...)     # 相手との関係を畳む 32
+c_i   = max_k MLP_c([t_i, t_k, R_ik]) （k∈自分・k≠i）              # 味方との組を畳む 32
+h_i   = [t_i, m_i, c_i]                                           # 112
+z     = [scalars(94+追加), mean_i h_i, max_i h_i]                 # 胴体入力
+value = tanh(MLP_v(z))
+policy: 候補 = (action, 主体 i, 対象 j, k) → logit = MLP_p([MLP_v の中間, h_i, h_j, R_ij, 候補素性139])
+```
+
+- backward は全て手書き可能（MLP・max/mean プール・concat）＝現行 `n_eff_train.py` の作法を継ぐ。
+- 候補の主体/対象は **枠 index**（現行の語彙 id ではなく）で dump に持つ＝h_i/h_j を引ける。
+- 計算量: 22×11 対 ×MLP_r（入力 ~110→32）＝小。c10 比で forward 2〜3 倍を見込む→レイテンシ
+  関門（c10 比 ≤1.3 倍）に触れるなら候補側だけ軽量化する。
+
+### Stage B（NRel-B・A で効果が出た後）
+
+h_i を 2 層の多頭注意（d=64・4 頭・関係 R_ij を加法バイアスに）で更新。backward は numpy で
+書く（softmax・線形の合成）か、訓練だけ torch を使う（訓練セッションは `pip install` 可能）。
+**A で「組」の一致率が動かなければ B へ進まない**。
+
+## 4. 教材（dump v2）
+
+- `n_record_gen` の dump に **状態 S（22×|S|）・関係 R（自×相手 11×11×R、自×自 11×11×R）・
+  候補の枠 index** を追加。関係は float16。行あたり 94＋22×|S|＋2×121×R ≒ 2,000 値（float16
+  で 4KB）→ 波 1 本 100 万行＝4GB。**z 窓は 3 波まで**（cgroup 14GB）。
+- 関係は**トークン状態＋語彙表から決定的に再計算できる**ので、容量が問題なら dump には S だけ
+  持ち、訓練時に再計算する（関数を `n_eff.py` 側に置き train/serve で共有）。
+- 旧波（v1 dump）は NRel の教材にならない＝**c10 を生成役に新形式で 3 波**を作る（π・z とも）。
+  era は継続（c10 生成＝era5 の続き）。
+
+## 5. 判定
+
+| 関門 | 基準 |
+|---|---|
+| レイテンシ | decide sims160・同一 5 盤面で c10 比 ≤1.3 倍 |
+| 一致率（補助） | h1〜h6 の PLAY・ACTIVATE・順序（ATTACK）の一致が c10 より上がる。特に h2〜h4 の PLAY（0.00〜0.38） |
+| アリーナ（主） | r1 vs c10・8 シャード×24 ペア×2 条件・wr≥0.55 かつ CI 下限>0.50（`docs/n_loop_ops.md`） |
+| 出荷 | 上を満たせば既定を r1 へ（`_DEFAULT_VALUE`・npz の鍵で判別＝配線は `n_eff.py` に NRel の forward を足す） |
+
+## 6. 実装の段取り（1 トピック＝1 ファイル）
+
+| 段 | 成果物 | テスト |
+|---|---|---|
+| P0 符号化 | `opcg_sim/src/learned/n_rel_feat.py`: 状態 S・関係 R・グローバル追加列（v13・append-only） | `test_n_rel_feat.py`: 見本盤面で cond_ok（エネル「ドン 6 枚以下」）・ko_gap（ガンマナイフ→神の裁き で 囚人 6000 が届く）・don_return_cost・leader_act_avail の真偽を固定 |
+| P1 dump v2 | `tests/scripts/n_record_gen.py` に v2 出力（`--dump-v2`） | `test_n_record_v2.py`: 形状・float16・枠 index の整合 |
+| P2 ネット A | `opcg_sim/src/learned/n_rel.py`（forward）＋ `tests/scripts/n_rel_train.py`（backward・Adam） | `test_n_rel_grad.py`: 数値勾配一致（cpu_infra） |
+| P3 serve | `cpu_learned` の判別に NRel を追加（`Wr` 鍵） | `test_n_rel_default.py`（採用時） |
+| P4 教材と訓練 | c10 生成の v2 波 ×3（分散運用）→ r1 | 評価帯（新帯）・一致率・アリーナ |
+
+## 7. 決めていないこと（ユーザ判断待ち）
+
+- Stage B（注意）の backward を numpy で書くか torch を訓練だけに入れるか。
+- dump v2 の関係 R を保存するか訓練時に再計算するか（容量 vs 訓練時間）。
+- 守りの窓（対象変更の受諾/辞退・カウンター）を人間の見本と比べる計器（復元器が対話を再現
+  できない問題）を先に直すか、NRel の後に回すか。
