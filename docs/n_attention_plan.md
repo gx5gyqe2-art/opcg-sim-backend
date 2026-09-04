@@ -156,7 +156,7 @@ h_i を 2 層の多頭注意（d=64・4 頭・関係 R_ij を加法バイアス�
 |---|---|---|
 | P0 符号化（**実装済み 2026-09-04**） | `opcg_sim/src/learned/n_rel_feat.py`: 状態 S（20 列）・関係 R（5 列・自 16×相手 6／自 16×自 16）・グローバル追加列 29（`encoder` v13・append-only）。1 盤面 ~1ms | `test_n_rel_feat.py`: 見本盤面で cond_ok（エネル「ドン 6 枚以下」）・ko_gap（ガンマナイフ→神の裁き で 囚人 6000 が届く）・don_return_cost・leader_act_avail の真偽を固定 |
 | P1 dump v2（**実装済み 2026-09-04**） | `n_record_gen --dump-v2`: 符号化 v13＋tokens **float32**（float16 は境界で反転・実測）＋候補の枠 index。R は `relations_from_dump` で再計算 | `test_n_record_v2.py`: 形状・dtype・枠 index の整合・再計算 |
-| P2 ネット A | `opcg_sim/src/learned/n_rel.py`（forward）＋ `tests/scripts/n_rel_train.py`（backward・Adam） | `test_n_rel_grad.py`: 数値勾配一致（cpu_infra） |
+| P2 ネット A（**実装済み 2026-09-04**） | `opcg_sim/src/learned/n_rel.py`（forward・パラメータ 18・hidden 192）＋ `tests/scripts/n_rel_train.py`（backward・Adam・dump v2 読み・R の一括再計算 `relations_batch`） | `test_n_rel_grad.py`: 数値勾配一致（value/policy とも <5%）・PAD 不変・save/load・一括関係の参照一致 |
 | P3 serve | `cpu_learned` の判別に NRel を追加（`Wr` 鍵） | `test_n_rel_default.py`（採用時） |
 | P4 教材と訓練 | c10 生成の v2 波 ×3（分散運用）→ r1 | 評価帯（新帯）・一致率・アリーナ |
 

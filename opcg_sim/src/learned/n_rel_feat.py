@@ -573,3 +573,119 @@ def encode_rel(manager, me_name):
 def extra_scalars(manager, me_name):
     """`encoder.encode(version=13)` が v12 の末尾へ付けるグローバル追加列（EXTRA_DIM）。"""
     return encode_rel(manager, me_name)["extra"]
+
+
+# ---------------------------------------------------------------------------
+# 一括版（訓練・探索の葉で使う・`relations_from_tokens` と同値＝テストで固定）
+# ---------------------------------------------------------------------------
+K_THR = 4          # 1 カードのしきい値効果の最大数（超過は先頭 4）
+
+
+class RelTable:
+    """vocab idx → しきい値/減算を固定長の配列にした表（`relations_batch` 用）。
+
+    THR_P/THR_C: しきい値（無い側は +inf・効果自体が無い枠は valid=0）・THR_REST: レスト要求・
+    THR_LEAD: リーダー可・RED: 減算量・HAS_THR: しきい値効果を持つか。"""
+
+    def __init__(self, ptab):
+        n = len(ptab)
+        self.THR_P = np.full((n, K_THR), np.inf, np.float32)
+        self.THR_C = np.full((n, K_THR), np.inf, np.float32)
+        self.THR_REST = np.zeros((n, K_THR), np.float32)
+        self.THR_LEAD = np.ones((n, K_THR), np.float32)
+        self.VALID = np.zeros((n, K_THR), np.float32)
+        self.NOTHR = np.zeros((n, K_THR), np.float32)     # しきい値の無い効果（全てに届く）
+        self.RED = np.zeros(n, np.float32)
+        for idx, p in enumerate(ptab):
+            if p is None:
+                continue
+            self.RED[idx] = min(p["red"], 15000.0)
+            for k, th in enumerate(p["thr"][:K_THR]):
+                pm, cm, needs_rest, _kind, allow_leader = th
+                self.VALID[idx, k] = 1.0
+                self.THR_P[idx, k] = pm if pm is not None else np.inf
+                self.THR_C[idx, k] = cm if cm is not None else np.inf
+                self.THR_REST[idx, k] = 1.0 if needs_rest else 0.0
+                self.THR_LEAD[idx, k] = 1.0 if allow_leader else 0.0
+                self.NOTHR[idx, k] = 1.0 if (pm is None and cm is None) else 0.0
+
+
+def _gap_batch(tab, ci_src, pw_t, cs_t, rest_t, lead_t):
+    """しきい値効果（ci_src [...]）が対象（pw_t, cs_t, rest_t, lead_t [...]）に届くかを一括で。
+
+    返り値: reach [..., K]（0/1）・gap [..., K]（届かない/該当なしは GAP_SAT）・pgap [..., K]（パワー/無しきい値
+    の差・cost のみの効果は GAP_SAT）・cgap [..., K]（コスト差・無ければ GAP_SAT）。"""
+    P = tab.THR_P[ci_src]; C = tab.THR_C[ci_src]; V = tab.VALID[ci_src]
+    NR_ = tab.NOTHR[ci_src]; RS = tab.THR_REST[ci_src]; LD = tab.THR_LEAD[ci_src]
+    pw = pw_t[..., None]; cs = cs_t[..., None]; rest = rest_t[..., None]; lead = lead_t[..., None]
+    gp = np.where(np.isfinite(P), (pw - P) / 10000.0, -np.inf)
+    gc = np.where(np.isfinite(C), (cs - C) * 0.1, -np.inf)
+    g = np.maximum(gp, gc)
+    g = np.where(NR_ > 0, -1.0, g)                       # しきい値無し＝全てに届く
+    blocked = ((RS > 0) & (rest <= 0.5)) | ((lead > 0.5) & (LD <= 0.5)) | (V <= 0)
+    reach = ((g <= 0.0) & ~blocked).astype(np.float32)
+    g = np.where(blocked, GAP_SAT, g)
+    pgap = np.where((np.isfinite(P) | (NR_ > 0)) & ~blocked, np.where(NR_ > 0, -1.0, gp), GAP_SAT)
+    cgap = np.where(np.isfinite(C) & (V > 0), (cs - C) * 0.1, GAP_SAT)
+    return reach, g, pgap, cgap
+
+
+def relations_batch(ci, tok, tab):
+    """`relations_from_tokens` の一括版。ci [B,22] tok [B,22,S] → (rel_om [B,16,6,R], rel_oo [B,16,16,R])。"""
+    ci = np.asarray(ci)[:, :N_TOK]
+    tok = np.asarray(tok, np.float32)
+    B = ci.shape[0]
+    own = np.array([i for i in range(N_TOK) if _zone(i) in ("own_leader", "own_field", "hand")])
+    opp = np.array([i for i in range(N_TOK) if _zone(i) in ("opp_leader", "opp_field")])
+    hand = np.array([_zone(i) == "hand" for i in own])
+    ci_o = np.clip(ci[:, own], 0, len(tab.RED) - 1); ci_p = ci[:, opp]
+    pres_o = (ci[:, own] > 0) | (tok[:, own] != 0).any(2)
+    pres_p = (ci[:, opp] > 0) | (tok[:, opp] != 0).any(2)
+    pw = tok[:, :, 0] * 10000.0; cs = tok[:, :, 1] * 10.0; rest = tok[:, :, 3]
+    usable = np.where(hand[None, :], tok[:, own, 8] > 0.5, True)               # [B,16]
+    cond_all = tok[:, own, 10:14].min(2) > 0                                     # [B,16]
+    can_atk = (~hand[None, :]) & (tok[:, own, 5] > 0.5)
+    lead_p = np.array([_zone(j) == "opp_leader" for j in opp], np.float32)
+    rel_om = np.zeros((B, N_OWN, N_OPP, R_DIM), np.float32)
+    rel_om[:, :, :, 1] = GAP_SAT; rel_om[:, :, :, 2] = GAP_SAT
+    rel_oo = np.zeros((B, N_OWN, N_OWN, R_DIM), np.float32)
+    rel_oo[:, :, :, 1] = GAP_SAT; rel_oo[:, :, :, 2] = GAP_SAT
+    pair = pres_o[:, :, None] & pres_p[:, None, :]                               # [B,16,6]
+    # 自×相手
+    src = np.broadcast_to(ci_o[:, :, None], (B, N_OWN, N_OPP))
+    pw_t = np.broadcast_to(pw[:, opp][:, None, :], (B, N_OWN, N_OPP))
+    cs_t = np.broadcast_to(cs[:, opp][:, None, :], (B, N_OWN, N_OPP))
+    rs_t = np.broadcast_to(rest[:, opp][:, None, :], (B, N_OWN, N_OPP))
+    ld_t = np.broadcast_to(lead_p[None, None, :], (B, N_OWN, N_OPP))
+    reach, g, pgap, cgap = _gap_batch(tab, src, pw_t, cs_t, rs_t, ld_t)
+    has_thr = tab.VALID[ci_o].max(2) > 0                                         # [B,16]
+    best_gap = np.where(has_thr[:, :, None], pgap.min(3), GAP_SAT)
+    best_cgap = np.where(has_thr[:, :, None], cgap.min(3), GAP_SAT)
+    feas = (reach.max(3) > 0) & usable[:, :, None] & cond_all[:, :, None]
+    red = tab.RED[ci_o] / 10000.0                                                # [B,16]
+    atk = np.where(can_atk[:, :, None], (pw[:, own][:, :, None] - pw[:, opp][:, None, :]) / 10000.0, 0.0)
+    rel_om[:, :, :, 0] = np.where(pair, atk, 0.0)
+    rel_om[:, :, :, 1] = np.where(pair, best_gap, GAP_SAT)
+    rel_om[:, :, :, 2] = np.where(pair, best_cgap, GAP_SAT)
+    rel_om[:, :, :, 3] = np.where(pair, red[:, :, None], 0.0)
+    rel_om[:, :, :, 4] = np.where(pair & has_thr[:, :, None], feas.astype(np.float32), 0.0)
+    # 自×自（i の減算で k のしきい値が相手の誰かに届く）
+    src_k = np.broadcast_to(ci_o[:, None, :, None], (B, N_OWN, N_OWN, N_OPP))   # k の効果
+    red_i = np.broadcast_to((tab.RED[ci_o])[:, :, None, None], (B, N_OWN, N_OWN, N_OPP))
+    pw_j = np.broadcast_to(pw[:, opp][:, None, None, :], (B, N_OWN, N_OWN, N_OPP)) - red_i
+    cs_j = np.broadcast_to(cs[:, opp][:, None, None, :], (B, N_OWN, N_OWN, N_OPP))
+    rs_j = np.broadcast_to(rest[:, opp][:, None, None, :], (B, N_OWN, N_OWN, N_OPP))
+    ld_j = np.broadcast_to(lead_p[None, None, None, :], (B, N_OWN, N_OWN, N_OPP))
+    reach2, g2, _pg2, _cg2 = _gap_batch(tab, src_k, pw_j, cs_j, rs_j, ld_j)     # [B,16,16,6,K]
+    pres_j = pres_p[:, None, None, :, None]
+    g2 = np.where(pres_j > 0, g2, GAP_SAT); reach2 = np.where(pres_j > 0, reach2, 0.0)
+    has_red_i = (tab.RED[ci_o] > 0)                                             # [B,16]
+    has_thr_k = has_thr                                                          # [B,16]
+    valid_pair = pres_o[:, :, None] & pres_o[:, None, :] & has_red_i[:, :, None] & has_thr_k[:, None, :]
+    valid_pair &= ~np.eye(N_OWN, dtype=bool)[None]
+    best2 = g2.min(4).min(3)                                                     # [B,16,16]
+    feas2 = (reach2.max(4).max(3) > 0) & usable[:, :, None] & usable[:, None, :]
+    rel_oo[:, :, :, 1] = np.where(valid_pair, best2, GAP_SAT)
+    rel_oo[:, :, :, 3] = np.where(valid_pair, red[:, :, None], 0.0)
+    rel_oo[:, :, :, 4] = np.where(valid_pair, feas2.astype(np.float32), 0.0)
+    return rel_om, rel_oo

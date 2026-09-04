@@ -225,10 +225,13 @@ def build_eff_tables(db, vocab):
 
 
 def is_neff_npz(path):
-    """npz が N系（効果構造符号化）ネットか（G系 `ValueNet` npz との判別＝`Wa` 鍵の有無）。"""
+    """npz が N系 c 系譜（効果構造符号化・プール本体）のネットか。
+
+    判別: `Wa` あり（効果埋め込み）・`Emb` なし（G系 `ValueNet` でない）・`Wr` なし（NRel＝`n_rel.py`
+    は `Wa` を共有するが対の MLP `Wr`/`Wt` を持つ＝別の本体・2026-09-04）。"""
     try:
         with np.load(path, allow_pickle=True) as d:
-            return "Wa" in d.files and "Emb" not in d.files
+            return "Wa" in d.files and "Emb" not in d.files and "Wr" not in d.files
     except Exception:
         return False
 
