@@ -1,0 +1,5 @@
+{"job": "gen-n24-w02", "role": "gen", "status": "done",
+ "inputs": {"neff_net": "claude/n1-results:n1_results/neff_net_c10.npz",
+            "wave": 24, "shard": "02", "seed_base": 2242000, "games": 960,
+            "sims": 128, "workers": 4, "shard_games": 10, "dump_v2": true},
+ "outputs": {"records": "n24_records/", "log": "n24_gen.log", "meta": {"games": 960, "rows": 133203, "main_rows": 80750, "dropped": 1, "sims": 128, "enc_version": 13, "dump_version": 2, "seed_base": 2242000, "value": null, "policy": null, "n1_net": null, "neff_net": "/root/gen_net.npz", "dirichlet_eps": 0.25, "temp_turns": 4}}}
