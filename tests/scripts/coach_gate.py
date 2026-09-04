@@ -103,6 +103,9 @@ REPLAYS_HUMAN = {
                        "law_vs_luffy_7808696651703795638.json.gz"),       # ロー ST10-001 vs ルフィ OP16-022（先攻・turn11勝ち）
     "h4": os.path.join(os.path.dirname(_FIXH), "human_enel_vs_roger_20260904",
                        "enel_vs_roger_5764875644126075159.json.gz"),      # エネル vs ロジャー OP13-003（先攻・turn15勝ち）
+    # 対照（殴り合い系リーダーを人間が握る・2026-09-04 採取）
+    "h5": os.path.join(os.path.dirname(_FIXH), "human_roger_vs_luffy_20260904",
+                       "roger_vs_luffy_8473732354491595481.json.gz"),     # ロジャー OP13-003 vs ルフィ OP16-022（後攻・turn14勝ち）
 }
 # **VERIFIED v3**（2026-07-30 再裁定・/tmp/mark_verify3.jsonl・worlds16）。旧 v2（13点・worlds8）は
 # 効果対話の既定解決欠陥（`docs/reports/default_interaction_fix_20260730.md`＝捨て札が公開札を
