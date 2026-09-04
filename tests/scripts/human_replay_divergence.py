@@ -45,12 +45,21 @@ from opcg_sim.src.core import cpu_ai  # noqa: E402
 from opcg_sim.src.core.cpu_learned import LearnedEngine  # noqa: E402
 
 
-def _norm(d):
-    """比較キー。ATTACK_CONFIRM（人間UI）と ATTACK（CPU）を同一視する。"""
+def _norm(d, ref=None):
+    """比較キー。ATTACK_CONFIRM（人間UI）と ATTACK（CPU）を同一視する。
+
+    **対象の欠落（2026-09-04 実測）**: アプリの人間操作の記録は ATTACK_CONFIRM に `card` だけを
+    持ち `targets` を持たない（宣言→確定の 2 段 UI で対象は別イベント）。CPU 側の記述は対象を
+    含むので、そのまま比べると**全攻撃が不一致**に化ける（h2〜h4 で ATTACK 61 点が全て 0.00 に
+    なった）。`ref`（人間の記録）に対象が無いときは対象を比較から外し、「同じカードで攻撃したか」
+    だけを見る。"""
     at = d.get("action_type")
     if at == "ATTACK_CONFIRM":
         at = "ATTACK"
-    return (at, d.get("card"), tuple(d.get("targets") or ()))
+    tg = tuple(d.get("targets") or ())
+    if ref is not None and not ref.get("targets"):
+        tg = ()
+    return (at, d.get("card"), tg)
 
 
 def _label(d):
@@ -72,8 +81,10 @@ def main():
     ap.add_argument("--net", default="", help="value.npz[,policy.npz]（空＝同梱の既定ネット）")
     ap.add_argument("--seeds", type=int, default=4)
     ap.add_argument("--sims", type=int, default=160)
-    ap.add_argument("--skip", default="MULLIGAN,KEEP_HAND",
-                    help="比較しない action_type（選択肢が無い/自明な手）")
+    ap.add_argument("--skip", default="MULLIGAN,KEEP_HAND,RESOLVE_EFFECT_SELECTION",
+                    help="比較しない action_type（選択肢が無い/自明な手・RESOLVE_EFFECT_SELECTION は "
+                         "`mark_gate._restore` が効果対話の途中状態を再現できず〔復元盤面は常にメイン窓・"
+                         "h1/h2 で実測〕比較にならないため既定で除外）")
     args = ap.parse_args()
 
     table = {**MG.REPLAYS, **CG.REPLAYS_V2, **CG.REPLAYS_V48, **CG.REPLAYS_HUMAN}
@@ -130,7 +141,7 @@ def main():
             except Exception as e:
                 d = {"action_type": f"例外:{type(e).__name__}"}
             got[_label(d)] += 1
-            hit += 1 if _norm(d) == want else 0
+            hit += 1 if _norm(d, ref=a) == want else 0
         n_cmp += 1
         rate = hit / max(args.seeds, 1)
         if rate < 1.0:
