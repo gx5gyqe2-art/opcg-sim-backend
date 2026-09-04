@@ -106,6 +106,8 @@ REPLAYS_HUMAN = {
     # 対照（殴り合い系リーダーを人間が握る・2026-09-04 採取）
     "h5": os.path.join(os.path.dirname(_FIXH), "human_roger_vs_luffy_20260904",
                        "roger_vs_luffy_8473732354491595481.json.gz"),     # ロジャー OP13-003 vs ルフィ OP16-022（後攻・turn14勝ち）
+    "h6": os.path.join(os.path.dirname(_FIXH), "human_doflamingo_vs_luffy_20260904",
+                       "doflamingo_vs_luffy_8288992169314594167.json.gz"),  # ドフラミンゴ OP14-060 vs ルフィ OP16-022（後攻・turn12勝ち）
 }
 # **VERIFIED v3**（2026-07-30 再裁定・/tmp/mark_verify3.jsonl・worlds16）。旧 v2（13点・worlds8）は
 # 効果対話の既定解決欠陥（`docs/reports/default_interaction_fix_20260730.md`＝捨て札が公開札を
