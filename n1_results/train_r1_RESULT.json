@@ -1,0 +1,7 @@
+{"job": "train-r1", "role": "train", "status": "done",
+ "inputs": {"pi_waves": [23, 24], "z_waves": [23, 24], "warm_start": null,
+            "epochs": 2, "lr": 5e-4, "hidden": 192},
+ "outputs": {"net": "n1_results/nrel_r1.npz"},
+ "metrics": {"val_v_mse": 0.5218, "val_v_sign": 0.821, "pi_top1": 0.622, "best_ep": 0},
+ "command": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/n_rel_train.py train --in ~/n23_wave/w*/n23_records ~/n24_wave/w*/n24_records --epochs 2 --lr 5e-4 --hidden 192 --out ~/nrel_r1.npz",
+ "notes": "土台 work=4f959550。教材は波23/24 の各 w01-08（計16シャード）。読み込み value 2164053行（val 312880）／policy 1200648点（val 172662）。ep0 val v_mse 0.5218 v_sign 0.821 pi_top1 0.622（5128s）、ep1 val v_mse 0.5292 v_sign 0.816 pi_top1 0.627（10271s）＝ep1 は v_mse が悪化したため best は ep0。保存されたネットは ep0 の重み。所要 約2時間51分・RSS ピーク約6.1GB（コンテナ 15GB）。"}
