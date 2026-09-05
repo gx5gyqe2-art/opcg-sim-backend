@@ -7,3 +7,4 @@ ablate: ['rel']
 ep0 train mse 0.5464 ce 1.6687 | val v_mse 0.5352 v_sign 0.812 pi_top1 0.632 ce 1.644 3788s
   ep0 を /root/nrel_a1.npz に保存（暫定最良）
   ep1 step 5000/23293 mse 0.5053 ce 1.6319 4588s
+  ep1 step 10000/23293 mse 0.5018 ce 1.6320 5354s
