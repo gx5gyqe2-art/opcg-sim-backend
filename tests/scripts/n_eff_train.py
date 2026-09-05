@@ -263,7 +263,10 @@ def train(args):
         sched = [0] * nv + [1] * npi
         rng.shuffle(sched)
         iv = ip = 0
-        for what in sched:
+        for st, what in enumerate(sched):
+            if st and st % 5000 == 0:                    # 途中経過（分散運用でログを push して見る）
+                print(f"  ep{ep} step {st}/{len(sched)} mse {mse/max(iv,1):.4f} ce {ce/max(ip,1):.4f}"
+                      f" {time.time()-t0:.0f}s", flush=True)
             if what == 0:
                 bi = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]; iv += 1
                 mse += net.value_step(V["sc"][bi], V["ci"][bi], V["z"][bi], args.lr)
