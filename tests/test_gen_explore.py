@@ -60,8 +60,13 @@ def test_serve_default_is_deterministic_argmax(m2_game):
 
 
 def test_temp_sampling_varies_and_stays_legal(m2_game):
-    """temp_turns 有効: 選択は候補（record.groups）の一員のまま、seed により分散する。"""
-    eng = LearnedEngine(temp_turns=99)          # 全ターン温度 ON（試験用）
+    """temp_turns 有効: 選択は候補（record.groups）の一員のまま、seed により分散する。
+
+    ネットは c10 を明示（`_C10_VALUE`）: 検査対象はサンプリングの機構であってネットの尖り方ではない。
+    既定が a1 になった 2026-09-05 に m2@50 で 10 seed が全て同じ手に収束し（a1 の訪問分布が尖っている）
+    偽の失敗を出したため、機構の検査は分布が割れる既知のネットで固定する。"""
+    from opcg_sim.src.core.cpu_learned import _C10_VALUE
+    eng = LearnedEngine(value_path=_C10_VALUE, temp_turns=99)   # 全ターン温度 ON（試験用）
     m, name = _board(m2_game, 50)
     sigs = set()
     for sd in range(10):
