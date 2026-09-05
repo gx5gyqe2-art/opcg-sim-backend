@@ -1,0 +1,7 @@
+{"job": "train-a2", "role": "train", "status": "done",
+ "inputs": {"pi_waves": [23, 24], "z_waves": [23, 24],
+            "extra": "--epochs 2 --lr 5e-4 --hidden 192 --ablate opp_pool"},
+ "outputs": {"net": "n1_results/nrel_a2.npz"},
+ "metrics": {"val_v_mse": 0.5280, "val_v_sign": 0.815, "pi_top1": 0.620, "best_ep": 0},
+ "command": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/n_rel_train.py train --in ~/n23_wave/w*/n23_records ~/n24_wave/w*/n24_records --epochs 2 --lr 5e-4 --hidden 192 --ablate opp_pool --out ~/nrel_a2.npz",
+ "notes": "opp_pool アブレーション。データは波23・24 各 w01〜w08（計16シャード）、value 2164053 行（val 312880）／policy 1200648 点（val 172662）。ep1 は val v_mse 0.5311 と ep0 の 0.5280 からやや悪化したため best は ep0（v_sign 0.816・pi_top1 0.621・ce 1.633 は ep1 がわずかに良いが、選択基準の v_mse で ep0 を採用）。train mse は 0.5464→0.4929 と改善が続いており、v_mse の悪化は過学習の入りと見られる。所要 8072s。出力ブランチ claude/train-a2 は res 起点で訓練コードを含まないため、コードは変更せず work（9b20124d）を指す git worktree から起動した。"}
