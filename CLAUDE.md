@@ -115,9 +115,14 @@ make test-fast    # 開発中のイテレーション用（slow・cpu_infra除�
 ## CPU 系統の呼称（ユーザ決定 2026-08-11・指示・会話・文書でこの略称を使う）
 
 - **L1** = 古典CPU（手作り評価 L1・α-β＋ビーム＋PIMC・`cpu_ai.py` 本体）
-- **N系** = 効果構造符号化の学習CPU（cN・カードID埋め込みなし・`opcg_sim/src/learned/n_eff.py`）。
-  **現在の出荷既定は N系 c10**〔2026-09-03 採用・`neff_c10.npz`・`cpu_learned._DEFAULT_VALUE` が正本・
-  `docs/reports/c10_adoption_20260903.md`〕。ロールバック先は G15 ペア（`_G15_VALUE`/`_G15_POLICY`）。
+- **N系** = 効果構造符号化の学習CPU（カードID埋め込みなし）。2 世代ある:
+  - **NRel（N系 v3・rN/aN）** = 22 枠の「効果構造＋今の状態＋ゾーン」トークン＋対の小ネット
+    （`opcg_sim/src/learned/n_rel.py`・`n_rel_feat.py`・符号化 v13・`docs/n_attention_plan.md`）。
+    **現在の出荷既定は NRel a1**〔2026-09-05 採用・`nrel_a1.npz`・`cpu_learned._DEFAULT_VALUE` が正本・
+    `docs/reports/a1_adoption_20260905.md`〕。構成は**関係 R なし・相手デッキ知識あり**（ユーザ決定
+    2026-09-05・訓練は `n_rel_train.py --ablate rel` が既定・系譜は r2, r3, … を続ける）。
+  - **c 系（cN）** = 旧 N系（`n_eff.py`・符号化 v12・最終 c10=2026-09-03 採用）。ロールバック先
+    （`_C10_VALUE`）。その先は G15 ペア（`_G15_VALUE`/`_G15_POLICY`）。
 - **G系** = 旧本流の学習CPU（genN・埋め込みあり・最終世代 **G15=gen15**
   〔2026-08-15 採用・符号化v12＋戦闘出口ヘッド。2026-09-03 に既定を c10 へ譲った〕。
   cpu_vNN の分析/学習作業はこの系統。**候補ヘッドの土台や比較基準は必ず現既定に合わせる**

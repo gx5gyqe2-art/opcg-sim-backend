@@ -69,7 +69,7 @@ def test_engine_detects_nrel_and_wires_adapter(npz):
     assert eng.pnet is None and eng.priors_override is not None
     assert eng.enc_version == NL.NR_ENC_VERSION == 13
     assert not eng.vnet.has_exit_head("battle") and eng._exit_value_fn("battle") is None
-    ref = LearnedEngine()                                      # 既定は c10 のまま
+    ref = LearnedEngine(value_path=CL._C10_VALUE)              # c10（ロールバック先）は N系 c の配線のまま
     assert not isinstance(ref.vnet, NL.NRelValueAdapter) and ref.enc_version == 12
     b = LearnedEngine(value_path=npz)
     assert b.vnet is not eng.vnet and b.vnet.net is eng.vnet.net and b.vnet.tab is eng.vnet.tab

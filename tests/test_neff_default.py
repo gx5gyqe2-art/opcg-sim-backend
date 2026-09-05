@@ -1,11 +1,12 @@
-"""出荷既定 CPU＝N系 c10（効果構造符号化ネット・2026-09-03 採用）の serve 配線契約。
+"""N系 c10（効果構造符号化ネット・2026-09-03 採用・2026-09-05 に既定を a1 へ譲りロールバック先）の
+serve 配線契約。既定（a1・NRel）の契約は `tests/test_nrel_default.py`。
 
-**必須テスト**（`cpu_infra` ではない）: ここが壊れると実プレイの CPU がクラッシュする／
+**必須テスト**（`cpu_infra` ではない）: ここが壊れるとロールバック先の CPU がクラッシュする／
 黙って別のネットで打つ（誤評価）ため、ゲームプレイ退行そのものを見逃す。
 
 守る性質:
-  1. `LearnedEngine()` は同梱 `neff_c10.npz` を N系として読む（`vnet` はアダプタ・`pnet` 無し・
-     `priors_override` あり・符号化 v12・出口ヘッド無し）。
+  1. `LearnedEngine(value_path=_C10_VALUE)` は同梱 `neff_c10.npz` を N系として読む（`vnet` はアダプタ・
+     `pnet` 無し・`priors_override` あり・符号化 v12・出口ヘッド無し）。
   2. 同梱 npz は**ネット付属 vocab_ids** を持ち、gen15 系譜（N系の訓練 vocab）と同一。
      vocab_ids を持たない旧 N系 npz は同梱既定の vocab_ids へフォールバックする
      （`build_vocab` の現行 DB ソートには落とさない＝2026-07-15 の索引ズレ事故を再発させない）。
@@ -64,10 +65,15 @@ def _batch(m, name, vocab):
     return {k: enc[k][None, ...] for k in ("scalars", "field", "card_idx")}
 
 
-def test_default_is_neff_c10():
-    assert os.path.basename(CL._DEFAULT_VALUE) == "neff_c10.npz" and CL._DEFAULT_POLICY is None
-    assert NE.is_neff_npz(CL._DEFAULT_VALUE) and not NE.is_neff_npz(CL._G15_VALUE)
-    eng = LearnedEngine()
+def _c10():
+    return LearnedEngine(value_path=CL._C10_VALUE)
+
+
+def test_c10_is_neff_and_rollback_target():
+    assert os.path.basename(CL._C10_VALUE) == "neff_c10.npz" and CL._DEFAULT_POLICY is None
+    assert NE.is_neff_npz(CL._C10_VALUE) and not NE.is_neff_npz(CL._G15_VALUE)
+    assert not NE.is_neff_npz(CL._DEFAULT_VALUE), "既定は a1（NRel）＝N系 c の判別に掛からない"
+    eng = _c10()
     assert isinstance(eng.vnet, NE.NEffValueAdapter)
     assert eng.pnet is None and eng.priors_override is not None
     assert eng.enc_version == 12 and eng.vnet.feat_dim == E.feature_dim(12)
@@ -81,19 +87,19 @@ def test_bundled_npz_carries_gen15_vocab_ids():
     ids = NE.default_vocab_ids()
     g15 = ValueNet.load(CL._G15_VALUE)
     assert ids == list(g15.vocab_ids), "c10 の vocab_ids は訓練時（gen15 系譜）と同一のはず"
-    eng = LearnedEngine()
+    eng = _c10()
     assert eng.vnet.vocab_ids == ids
     assert max(eng.vocab.values()) == len(ids) == eng.vnet.tab.shape[0] - 1
 
 
 def test_npz_without_vocab_ids_falls_back_to_default_ids(tmp_path):
     """旧 N系 npz（vocab_ids 無し）は同梱既定の vocab_ids で読む＝現行 DB ソートへは落ちない。"""
-    d = np.load(CL._DEFAULT_VALUE, allow_pickle=True)
+    d = np.load(CL._C10_VALUE, allow_pickle=True)
     p = str(tmp_path / "old_style.npz")
     np.savez_compressed(p, **{k: d[k] for k in d.files if k not in ("vocab_ids", "meta")})
     assert NE.is_neff_npz(p)
     eng = LearnedEngine(value_path=p)
-    ref = LearnedEngine()
+    ref = _c10()
     assert eng.vocab == ref.vocab
     assert np.array_equal(eng.vnet.tab, ref.vnet.tab)
     # 現行 DB ソートとは違う（DB は訓練後に増えている）
@@ -101,7 +107,7 @@ def test_npz_without_vocab_ids_falls_back_to_default_ids(tmp_path):
 
 
 def test_adapter_matches_net_value_and_has_no_exit_head(m2):
-    eng = LearnedEngine()
+    eng = _c10()
     for i in (10, 30, 50):
         m, name, _ = _board(m2, i)
         b = _batch(m, name, eng.vocab)
@@ -117,7 +123,7 @@ def test_adapter_matches_net_value_and_has_no_exit_head(m2):
 
 
 def test_priors_are_probabilities_over_legal(m2):
-    eng = LearnedEngine()
+    eng = _c10()
     seen = 0
     for i in (10, 30, 50, 70):
         m, name, _ = _board(m2, i)
@@ -135,11 +141,11 @@ def test_priors_are_probabilities_over_legal(m2):
 
 
 def test_decide_is_legal_and_deterministic_across_load_paths(m2, tmp_path):
-    """既定ロードと明示パスロード（同じ重み）は同一 seed で同一手。"""
-    d = np.load(CL._DEFAULT_VALUE, allow_pickle=True)
+    """同梱パスのロードとコピーのロード（同じ重み）は同一 seed で同一手。"""
+    d = np.load(CL._C10_VALUE, allow_pickle=True)
     p = str(tmp_path / "copy.npz")
     np.savez_compressed(p, **{k: d[k] for k in d.files})
-    a, b = LearnedEngine(), LearnedEngine(value_path=p)
+    a, b = _c10(), LearnedEngine(value_path=p)
     for i in (10, 50):
         m, name, actor = _board(m2, i)
         mvs = []
@@ -155,7 +161,7 @@ def test_decide_is_legal_and_deterministic_across_load_paths(m2, tmp_path):
 def test_tables_shared_per_path_but_vnet_per_engine():
     """表・重みはプロセス内共有（重複計算なし）、`vnet` はエンジンごとの別インスタンス
     （net-vs-net で席ごとに差し替えられる LearnedEngine の契約）。"""
-    a, b = LearnedEngine(), LearnedEngine()
+    a, b = _c10(), _c10()
     assert a.vnet is not b.vnet
     assert a.vnet.net is b.vnet.net and a.vnet.tab is b.vnet.tab
     assert a.priors_override is b.priors_override

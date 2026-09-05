@@ -170,15 +170,25 @@ _DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 # ロールバックは既定を gen14 に戻すだけ（符号化は net の入力次元から自動判別＝配線変更不要）。
 # policy は gen14 と挙動同一（v9→v12 の恒等ゼロ拡張のみ・v12 確定＝policy 微調整は有害）。
 #
-# ---- 出荷既定 = N系 c10（2026-09-03 採用・ユーザ決定「一旦c10を正式昇格」）----
+# ---- 旧既定 = N系 c10（2026-09-03 採用・2026-09-05 に a1 へ譲った）----
 # c10 は効果構造符号化ネット（`opcg_sim/src/learned/n_eff.py`・カードIDの埋め込みを持たず
 # 能力列を構造で読む）。value/policy は**1本の npz**（`neff_c10.npz`・方策は同ネットの候補
 # ヘッドを `priors_override` に差す）＝G系の value/policy ペアではない。判定は
 # `docs/reports/c10_adoption_20260903.md`（分散アリーナ c10 vs c8 主0.589/副0.568・
 # c10 vs G15 24ペア×2条件 0.604/0.583）。ロールバックは既定を gen15 のペアへ戻すだけ
 # （`_is_neff` が npz の鍵で G/N を判別＝配線変更不要）。G15 は G系の最終世代として同梱を続ける。
-_DEFAULT_VALUE = os.path.join(_MODELS, "neff_c10.npz")
+#
+# ---- 出荷既定 = NRel a1（2026-09-05 採用・ユーザ決定「R なし・相手デッキ知識は入れて進める」）----
+# a1 は N系 v3（NRel Stage A・`opcg_sim/src/learned/n_rel.py`）: 盤面を 22 枠の「効果構造＋今の状態
+# ＋ゾーン」トークンで読み、対の小ネットで畳む。関係 R（エンジン計算の届く/あと何点）は遮断
+# （`ablate={"rel"}`・npz の meta・serve では計算自体を省く）、相手デッキ知識（未見プールの要約列）は
+# 入れる。判定は `docs/reports/2026-09-05_r1_judgment.md`（r1 vs c10 主 0.557/副 0.591）と
+# `2026-09-05_r1_ablation.md`（a1 vs r1 0.544＝同等・R は寄与せず）・採用は `a1_adoption_20260905.md`。
+# レイテンシは c10 比 1.67 倍（sims 160）＝関門 1.3 倍は未達のままユーザ受容。
+# ロールバック先は c10（`_C10_VALUE`・`_is_neff` が鍵で判別＝配線変更不要）、その先は G15 ペア。
+_DEFAULT_VALUE = os.path.join(_MODELS, "nrel_a1.npz")
 _DEFAULT_POLICY = None        # N系は方策を value と同じ npz から出す（G系ペア運用時はパスを置く）
+_C10_VALUE = os.path.join(_MODELS, "neff_c10.npz")
 _G15_VALUE = os.path.join(_MODELS, "gen15_value.npz")
 _G15_POLICY = os.path.join(_MODELS, "gen15_policy.npz")
 

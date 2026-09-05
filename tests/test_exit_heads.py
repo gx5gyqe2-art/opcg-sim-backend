@@ -227,15 +227,17 @@ def test_gen15_pair_is_v12_with_battle_head():
     assert eng.vnet.vocab_ids == g14.vocab_ids
 
 
-def test_default_engine_is_neff_c10_without_exit_head():
-    """既定エンジン（N系 c10・2026-09-03 採用）の契約: 出口ヘッドを持たない＝箱の出口も本体
-    value で測る（`_exit_value_fn` は None・`predict_exit` は `predict` と一致）。詳細契約は
-    `tests/test_neff_default.py`。"""
-    from opcg_sim.src.core.cpu_learned import LearnedEngine
+def test_default_engine_is_nrel_a1_without_exit_head():
+    """既定エンジン（NRel a1・2026-09-05 採用）の契約: 出口ヘッドを持たない＝箱の出口も本体
+    value で測る（`_exit_value_fn` は None）。符号化は v13。ロールバック先 c10（v12）も同じく
+    出口ヘッド無し。詳細契約は `tests/test_nrel_default.py`／`tests/test_neff_default.py`。"""
+    from opcg_sim.src.core.cpu_learned import LearnedEngine, _C10_VALUE
     eng = LearnedEngine()
     assert eng.vnet.battle_head is False and eng.vnet.turn_head is False
     assert not eng.vnet.has_exit_head("battle") and eng._exit_value_fn("battle") is None
-    assert eng.enc_version == 12 and eng.priors_override is not None
+    assert eng.enc_version == 13 and eng.priors_override is not None
+    c10 = LearnedEngine(value_path=_C10_VALUE)
+    assert not c10.vnet.has_exit_head("battle") and c10.enc_version == 12
 
 
 def test_evaluate_plan_uses_each_head_for_its_own_box(monkeypatch):

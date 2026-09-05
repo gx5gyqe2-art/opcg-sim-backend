@@ -350,7 +350,7 @@ def _gen2_vnet():
 def test_enc_version_autodetect_from_weights():
     """符号化世代はロードした npz の入力次元から自動判別（コード既定に依存しない）。
 
-    同梱 Gen2＝v1・既定 N系 c10＝符号化 **v12**（2026-09-03採用。N系アダプタは `feat_dim` を
+    同梱 Gen2＝v1・既定 NRel a1＝符号化 **v13**（2026-09-05採用）・c10＝符号化 **v12**（2026-09-03採用。N系アダプタは `feat_dim` を
     v12 の次元で名乗る＝G系と同じ判別経路を通る）・G15＝v12（2026-08-15採用・v9＋リーダー
     物理要約24。v10 のリーサルΔ3列は serve コスト〔~25ms/盤面→decide 13.5s〕で外した
     ・docs/reports/gen15_adoption_20260815.md）。訓練済み npz を置いた時点で新特徴が
@@ -359,8 +359,11 @@ def test_enc_version_autodetect_from_weights():
     import os, tempfile
     from opcg_sim.src.learned.value_net import ValueNet
     assert cpu_learned._net_enc_version(_gen2_vnet()) == 1, "同梱 Gen2 は v1 のはず"
-    assert cpu_learned._net_enc_version(cpu_learned._default_engine().vnet) == 12,\
-        "既定 c10（N系）は符号化 v12 のはず"
+    assert cpu_learned._net_enc_version(cpu_learned._default_engine().vnet) == 13,\
+        "既定 a1（NRel）は符号化 v13 のはず"
+    assert cpu_learned._net_enc_version(
+        cpu_learned.LearnedEngine(value_path=cpu_learned._C10_VALUE).vnet) == 12,\
+        "c10（N系・ロールバック先）は符号化 v12 のはず"
     assert cpu_learned._net_enc_version(ValueNet.load(cpu_learned._G15_VALUE)) == 12,\
         "G15 は符号化 v12 のはず"
     v2 = ValueNet(vocab_size=10, d_emb=4, hidden=8, feat_dim=PROD_E.feature_dim(2), seed=0)

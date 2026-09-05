@@ -151,7 +151,7 @@ def test_forward_shapes_determinism_and_pad_invariance(env):
 
 
 def test_save_load_roundtrip_and_npz_kind(env, tmp_path):
-    from opcg_sim.src.core.cpu_learned import _DEFAULT_VALUE
+    from opcg_sim.src.core.cpu_learned import _C10_VALUE
     from opcg_sim.src.learned import n_eff as NE
     rng = np.random.default_rng(4)
     net = NT.NRelNet(env["tables"], hidden=32, seed=5)
@@ -169,7 +169,7 @@ def test_save_load_roundtrip_and_npz_kind(env, tmp_path):
     la = net.policy_logits(env["sc"], env["ci"], env["tok"], env["rel_om"], env["rel_oo"], seg, si, ti, feats, budget, tab=tab)
     lb = re_.policy_logits(env["sc"], env["ci"], env["tok"], env["rel_om"], env["rel_oo"], seg, si, ti, feats, budget, tab=re_.card_table())
     assert np.array_equal(la, lb)
-    assert NL.is_nrel_npz(p) and not NL.is_nrel_npz(_DEFAULT_VALUE)
+    assert NL.is_nrel_npz(p) and not NL.is_nrel_npz(_C10_VALUE)
     assert not NE.is_neff_npz(p)                        # N系 c10 の判別と衝突しない
 
 
