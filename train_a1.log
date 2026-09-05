@@ -10,3 +10,6 @@ ep0 train mse 0.5464 ce 1.6687 | val v_mse 0.5352 v_sign 0.812 pi_top1 0.632 ce 
   ep1 step 10000/23293 mse 0.5018 ce 1.6320 5354s
   ep1 step 15000/23293 mse 0.4990 ce 1.6320 6118s
   ep1 step 20000/23293 mse 0.4949 ce 1.6311 6906s
+ep1 train mse 0.4930 ce 1.6300 | val v_mse 0.5393 v_sign 0.811 pi_top1 0.635 ce 1.635 7417s
+best ep0 val v_mse 0.5352 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_a1.npz"}

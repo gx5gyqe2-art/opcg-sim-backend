@@ -1,0 +1,7 @@
+{"job": "train-a1", "role": "train", "status": "done",
+ "inputs": {"pi_waves": [23, 24], "z_waves": [23, 24],
+            "extra": "--epochs 2 --lr 5e-4 --hidden 192 --ablate rel"},
+ "outputs": {"net": "n1_results/nrel_a1.npz"},
+ "metrics": {"val_v_mse": 0.5352, "val_v_sign": 0.812, "pi_top1": 0.632, "best_ep": 0},
+ "command": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/n_rel_train.py train --in ~/n23_wave/w*/n23_records ~/n24_wave/w*/n24_records --epochs 2 --lr 5e-4 --hidden 192 --ablate rel --out ~/nrel_a1.npz",
+ "notes": "入力は n23/n24 各 w01-w08（計 16 シャード、各 97 ファイル）。value 2164053 行（val 312880）/ policy 1200648 点（val 172662）。ep1 は train 側が改善（mse 0.4930 ce 1.6300）する一方 val v_mse が 0.5352→0.5393 と悪化したため best は ep0。ep1 の val は v_sign 0.811 / pi_top1 0.635 / ce 1.635 で pi_top1 と ce は微増だが、選択基準の v_mse で ep0 を採用。所要 7417s。なお出力ブランチ（claude/n1-results 由来）には tests/scripts/n_rel_train.py が無いため、work(9b20124d) の worktree を別途 ~/opcg-src に作成してそこから実行した（コード変更なし）。"}
