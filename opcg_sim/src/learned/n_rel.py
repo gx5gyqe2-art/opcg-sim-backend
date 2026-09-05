@@ -320,7 +320,11 @@ class NRelValueAdapter:
         ci = np.asarray(base["card_idx"])[:N_TOK][None, :]
         tok = R["tokens"][None]
         # B=1 は参照実装（python ループ）の方が一括版より速い（0.3ms vs 1.0ms・2026-09-04 実測）
-        om, oo = NR.relations_from_dump(ci[0], tok[0], self.ptab)
+        if "rel" in self.net.ablate:
+            # 切り分け a1（R 遮断・2026-09-05）: どうせ 0 にされるので関係の計算そのものを省く
+            om = np.zeros((N_OWN, N_OPP, NR.R_DIM), np.float32); oo = np.zeros((N_OWN, N_OWN, NR.R_DIM), np.float32)
+        else:
+            om, oo = NR.relations_from_dump(ci[0], tok[0], self.ptab)
         rel_om, rel_oo = om[None], oo[None]
         out = (sc, ci, tok, rel_om, rel_oo, R)
         self._last = (fp, out)

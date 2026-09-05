@@ -131,3 +131,27 @@ def test_latency_report(npz, m2):
         out[label] = float(np.mean(ts))
     print(f"\nNREL_LATENCY sims32 c10 {out['c10']:.2f}s nrel {out['nrel']:.2f}s ratio {out['nrel']/max(out['c10'],1e-6):.2f}")
     assert out["nrel"] > 0
+
+
+def test_rel_ablated_net_skips_relations_and_matches_value(m2, tmp_path):
+    """切り分け a1 の serve（2026-09-05）: `ablate={"rel"}` の npz は `LearnedEngine` で読むと関係 R の計算を
+    省き（`encode_state` が零の R を返す）、葉価値は「R を計算して渡した value」と一致する（遮断は forward
+    の入口なので同値）。"""
+    tabs = build_eff_tables()
+    net = NL.NRelNet(tabs[:5], hidden=32, seed=11)
+    net.ablate = {"rel"}
+    vocab = tabs[5]
+    net.vocab_ids = [cid for cid, _i in sorted(vocab.items(), key=lambda kv: kv[1])]
+    p = str(tmp_path / "nrel_a1_test.npz")
+    net.save(p, meta={"kind": "nrel-a"})
+    eng = LearnedEngine(value_path=p)
+    assert eng.vnet.net.ablate == {"rel"}
+    m, name, _actor = _board(m2, 30)
+    sc, ci, tok, rel_om, rel_oo, _R = eng.vnet.encode_state(m, name)
+    assert not rel_om.any() and not rel_oo.any(), "R 遮断なら関係は計算せず零"
+    v = eng.vnet.predict_state(m, name)
+    from opcg_sim.src.learned import n_rel_feat as NR
+    om, oo = NR.relations_from_dump(ci[0], tok[0], eng.vnet.ptab)
+    assert om.any() or oo.any(), "検査盤面に関係が無い（盤面を変える）"
+    ref = float(net.value(sc, ci, tok, om[None], oo[None])[0])
+    assert abs(v - ref) < 1e-6
