@@ -1,0 +1,15 @@
+value 2164053行（val 312880） policy 1200648点（val 172662） 84s
+ablate: ['rel']
+  ep0 step 5000/23293 mse 0.6155 ce 1.7371 863s
+  ep0 step 10000/23293 mse 0.5806 ce 1.7023 1630s
+  ep0 step 15000/23293 mse 0.5640 ce 1.6848 2433s
+  ep0 step 20000/23293 mse 0.5520 ce 1.6738 3230s
+ep0 train mse 0.5464 ce 1.6687 | val v_mse 0.5352 v_sign 0.812 pi_top1 0.632 ce 1.644 3788s
+  ep0 を /root/nrel_a1.npz に保存（暫定最良）
+  ep1 step 5000/23293 mse 0.5053 ce 1.6319 4588s
+  ep1 step 10000/23293 mse 0.5018 ce 1.6320 5354s
+  ep1 step 15000/23293 mse 0.4990 ce 1.6320 6118s
+  ep1 step 20000/23293 mse 0.4949 ce 1.6311 6906s
+ep1 train mse 0.4930 ce 1.6300 | val v_mse 0.5393 v_sign 0.811 pi_top1 0.635 ce 1.635 7417s
+best ep0 val v_mse 0.5352 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_a1.npz"}
