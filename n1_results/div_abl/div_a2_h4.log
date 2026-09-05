@@ -1,0 +1,95 @@
+=== h4  人間=p1（OP15-058） / CPU=OP13-003  seeds=4 sims=160
+
+   idx turn    一致  人間の手 / CPU の手
+     2    1  0.00  PLAY OP15-061  /  CPU: PLAY OP15-063  ← 乖離
+     5    1  1.00  TURN_END
+    10    3  0.00  PLAY OP15-063  /  CPU: ACTIVATE_MAIN OP15-058  ← 乖離
+    13    3  0.00  PLAY OP15-061  /  CPU: ACTIVATE_MAIN OP15-058  ← 乖離
+    16    3  1.00  ACTIVATE_MAIN OP15-058
+    22    3  0.00  PLAY OP15-066  /  CPU: ATTACH_DON OP15-058  ← 乖離
+    25    3  0.75  ATTACK_CONFIRM OP15-058  /  CPU: ATTACK OP15-058 → OP13-003  ← 一部
+    28    3  0.00  ATTACK_CONFIRM OP15-061  /  CPU: TURN_END  ← 乖離
+    32    3  0.75  TURN_END  /  CPU: TURN_END  ← 一部
+    34    4  0.00  PASS  /  CPU: SELECT_COUNTER OP15-078  ← 乖離
+    37    4  0.00  SELECT_COUNTER OP15-067  /  CPU: SELECT_COUNTER OP15-078  ← 乖離
+    38    4   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+    40    5  1.00  PLAY OP15-118
+    46    5  0.00  ATTACK_CONFIRM OP15-066  /  CPU: ATTACK OP15-061 → OP13-065  ← 乖離
+    49    5  0.00  ACTIVATE_MAIN OP15-058  /  CPU: ATTACK OP15-061 → OP13-003  ← 乖離
+    51    5  0.50  ATTACK_CONFIRM OP15-061  /  CPU: ATTACK OP15-061 → OP13-003  ← 一部
+    54    5  0.00  PLAY OP15-075  /  CPU: ATTACK OP15-058 → OP13-003  ← 乖離
+    58    5  0.25  ATTACH_DON OP15-058  /  CPU: ATTACK OP15-058 → OP13-003  ← 一部
+    59    5  1.00  ATTACK_CONFIRM OP15-058
+    61    5  1.00  TURN_END
+    64    6  0.00  PASS  /  CPU: SELECT_COUNTER OP15-078  ← 乖離
+    67    7  0.00  ATTACK_CONFIRM OP15-066  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+    70    7  0.00  PLAY OP09-072  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+    75    7  0.00  PLAY OP05-077  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+    78    7  0.00  PLAY OP15-078  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+    81    7  0.00  ATTACK_CONFIRM OP15-061  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+    84    7  0.00  ACTIVATE_MAIN OP15-058  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+    86    7  0.50  ATTACH_DON OP15-061  /  CPU: ATTACH_DON OP15-061  ← 一部
+    87    7  0.75  ATTACK_CONFIRM OP15-061  /  CPU: ATTACK OP15-061 → OP13-003  ← 一部
+    91    7  0.00  ATTACK_CONFIRM OP15-058  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+    93    7  1.00  ATTACK_CONFIRM OP15-118
+    95    7  1.00  TURN_END
+    98    8  1.00  PASS
+    99    8  1.00  PASS
+   102    8  0.00  PASS  /  CPU: SELECT_COUNTER OP13-076  ← 乖離
+   103    8  0.00  PASS  /  CPU: SELECT_COUNTER OP13-076  ← 乖離
+   105    9  0.00  PLAY OP09-072  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   110    9  0.00  PLAY OP15-074  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   113    9  0.00  PLAY OP15-074  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   116    9  0.00  ATTACK_CONFIRM OP15-061  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   119    9  0.00  ATTACK_CONFIRM OP15-061  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   122    9  0.00  ATTACH_DON OP15-058  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   123    9  0.00  ATTACH_DON OP15-058  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   124    9  0.50  ATTACK_CONFIRM OP15-058  /  CPU: ATTACK OP15-058 → OP13-003  ← 一部
+   128    9  0.00  ACTIVATE_MAIN OP15-058  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   130    9  1.00  ATTACK_CONFIRM OP15-118
+   132    9  0.00  ATTACH_DON OP09-072  /  CPU: ATTACK OP09-072 → OP13-003  ← 乖離
+   133    9  1.00  ATTACK_CONFIRM OP09-072
+   136    9  0.50  TURN_END  /  CPU: TURN_END  ← 一部
+   139   10  0.00  SELECT_BLOCKER OP09-072  /  CPU: PASS  ← 乖離
+   140   10  1.00  PASS
+   142   10  0.00  SELECT_COUNTER OP15-061  /  CPU: SELECT_COUNTER OP13-076  ← 乖離
+   143   10   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+   144   10   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+   145   10   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+   147   11  0.00  ATTACH_DON OP15-058  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   148   11  0.00  PLAY OP13-076  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   150   11  0.00  PLAY OP15-077  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   153   11  0.00  ATTACK_CONFIRM OP15-061  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   156   11  0.00  ATTACK_CONFIRM OP15-061  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   159   11  0.00  ACTIVATE_MAIN OP15-058  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   161   11  0.00  ATTACK_CONFIRM OP15-058  /  CPU: ATTACH_DON OP15-058  ← 乖離
+   163   11  1.00  ATTACK_CONFIRM OP15-118
+   165   11  1.00  PLAY OP15-061
+   168   11  0.50  TURN_END  /  CPU: TURN_END  ← 一部
+   173   12  0.00  SELECT_BLOCKER OP09-072  /  CPU: PASS  ← 乖離
+   174   12  1.00  PASS
+   178   13  0.00  ATTACK_CONFIRM OP15-061  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   182   13  0.00  PLAY OP12-063  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   183   13  0.00  PLAY OP09-077  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   186   13  0.00  ACTIVATE_MAIN OP15-058  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   188   13  0.00  ATTACH_DON OP15-061  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   189   13  0.00  ATTACK_CONFIRM OP15-061  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   192   13  1.00  ATTACK_CONFIRM OP15-118
+   194   13  1.00  TURN_END
+   199   14  1.00  PASS
+   200   14  1.00  PASS
+   204   15  0.75  ATTACH_DON OP15-058  /  CPU: ATTACH_DON OP15-058  ← 一部
+   205   15  0.00  ATTACH_DON OP15-058  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   206   15  0.75  ATTACH_DON OP15-058  /  CPU: ATTACH_DON OP15-058  ← 一部
+   207   15  1.00  ATTACH_DON OP15-058
+   208   15  1.00  ATTACK_CONFIRM OP15-058
+   212   15  0.00  PLAY OP15-075  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   215   15  0.00  PLAY OP15-075  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   218   15  0.00  PLAY OP15-076  /  CPU: ATTACH_DON OP12-063  ← 乖離
+   221   15  0.00  PLAY OP15-076  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   224   15  0.00  ACTIVATE_MAIN OP15-058  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   226   15  0.00  ATTACH_DON OP15-118  /  CPU: ATTACK OP15-118 → OP13-003  ← 乖離
+   227   15  1.00  ATTACK_CONFIRM OP15-118
+
+=== 比較 85 点中 **63 点で乖離**（CPU が人間と違う手を選ぶ）
+HUMAN_DIVERGENCE {"replay": "h4", "compared": 85, "diverged": 63, "points": [{"i": 2, "turn": 1, "rate": 0.0}, {"i": 10, "turn": 3, "rate": 0.0}, {"i": 13, "turn": 3, "rate": 0.0}, {"i": 22, "turn": 3, "rate": 0.0}, {"i": 25, "turn": 3, "rate": 0.75}, {"i": 28, "turn": 3, "rate": 0.0}, {"i": 32, "turn": 3, "rate": 0.75}, {"i": 34, "turn": 4, "rate": 0.0}, {"i": 37, "turn": 4, "rate": 0.0}, {"i": 46, "turn": 5, "rate": 0.0}, {"i": 49, "turn": 5, "rate": 0.0}, {"i": 51, "turn": 5, "rate": 0.5}, {"i": 54, "turn": 5, "rate": 0.0}, {"i": 58, "turn": 5, "rate": 0.25}, {"i": 64, "turn": 6, "rate": 0.0}, {"i": 67, "turn": 7, "rate": 0.0}, {"i": 70, "turn": 7, "rate": 0.0}, {"i": 75, "turn": 7, "rate": 0.0}, {"i": 78, "turn": 7, "rate": 0.0}, {"i": 81, "turn": 7, "rate": 0.0}, {"i": 84, "turn": 7, "rate": 0.0}, {"i": 86, "turn": 7, "rate": 0.5}, {"i": 87, "turn": 7, "rate": 0.75}, {"i": 91, "turn": 7, "rate": 0.0}, {"i": 102, "turn": 8, "rate": 0.0}, {"i": 103, "turn": 8, "rate": 0.0}, {"i": 105, "turn": 9, "rate": 0.0}, {"i": 110, "turn": 9, "rate": 0.0}, {"i": 113, "turn": 9, "rate": 0.0}, {"i": 116, "turn": 9, "rate": 0.0}, {"i": 119, "turn": 9, "rate": 0.0}, {"i": 122, "turn": 9, "rate": 0.0}, {"i": 123, "turn": 9, "rate": 0.0}, {"i": 124, "turn": 9, "rate": 0.5}, {"i": 128, "turn": 9, "rate": 0.0}, {"i": 132, "turn": 9, "rate": 0.0}, {"i": 136, "turn": 9, "rate": 0.5}, {"i": 139, "turn": 10, "rate": 0.0}, {"i": 142, "turn": 10, "rate": 0.0}, {"i": 147, "turn": 11, "rate": 0.0}, {"i": 148, "turn": 11, "rate": 0.0}, {"i": 150, "turn": 11, "rate": 0.0}, {"i": 153, "turn": 11, "rate": 0.0}, {"i": 156, "turn": 11, "rate": 0.0}, {"i": 159, "turn": 11, "rate": 0.0}, {"i": 161, "turn": 11, "rate": 0.0}, {"i": 168, "turn": 11, "rate": 0.5}, {"i": 173, "turn": 12, "rate": 0.0}, {"i": 178, "turn": 13, "rate": 0.0}, {"i": 182, "turn": 13, "rate": 0.0}, {"i": 183, "turn": 13, "rate": 0.0}, {"i": 186, "turn": 13, "rate": 0.0}, {"i": 188, "turn": 13, "rate": 0.0}, {"i": 189, "turn": 13, "rate": 0.0}, {"i": 204, "turn": 15, "rate": 0.75}, {"i": 205, "turn": 15, "rate": 0.0}, {"i": 206, "turn": 15, "rate": 0.75}, {"i": 212, "turn": 15, "rate": 0.0}, {"i": 215, "turn": 15, "rate": 0.0}, {"i": 218, "turn": 15, "rate": 0.0}, {"i": 221, "turn": 15, "rate": 0.0}, {"i": 224, "turn": 15, "rate": 0.0}, {"i": 226, "turn": 15, "rate": 0.0}]}
