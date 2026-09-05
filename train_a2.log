@@ -8,3 +8,4 @@ ep0 train mse 0.5464 ce 1.6653 | val v_mse 0.5280 v_sign 0.815 pi_top1 0.620 ce 
   ep0 を /root/nrel_a2.npz に保存（暫定最良）
   ep1 step 5000/23293 mse 0.5055 ce 1.6283 4915s
   ep1 step 10000/23293 mse 0.5012 ce 1.6285 5775s
+  ep1 step 15000/23293 mse 0.4985 ce 1.6284 6629s
