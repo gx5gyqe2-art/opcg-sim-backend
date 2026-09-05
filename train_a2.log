@@ -2,3 +2,4 @@ value 2164053行（val 312880） policy 1200648点（val 172662） 89s
 ablate: ['opp_pool']
   ep0 step 5000/23293 mse 0.6148 ce 1.7345 937s
   ep0 step 10000/23293 mse 0.5799 ce 1.6991 1786s
+  ep0 step 15000/23293 mse 0.5637 ce 1.6814 2636s

@@ -1,1 +1,1 @@
-{"job":"train-a2","status":"running","last":"  ep0 step 10000/23293 mse 0.5799 ce 1.6991 1786s"}
+{"job":"train-a2","status":"running","last":"  ep0 step 15000/23293 mse 0.5637 ce 1.6814 2636s"}
