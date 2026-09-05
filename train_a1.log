@@ -1,3 +1,4 @@
 value 2164053行（val 312880） policy 1200648点（val 172662） 84s
 ablate: ['rel']
   ep0 step 5000/23293 mse 0.6155 ce 1.7371 863s
+  ep0 step 10000/23293 mse 0.5806 ce 1.7023 1630s
