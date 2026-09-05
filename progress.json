@@ -1,1 +1,1 @@
-{"job":"train-a2","status":"running","last":"  ep0 を /root/nrel_a2.npz に保存（暫定最良）"}
+{"job":"train-a2","status":"running","last":"  ep1 step 5000/23293 mse 0.5055 ce 1.6283 4915s"}

@@ -6,3 +6,4 @@ ablate: ['opp_pool']
   ep0 step 20000/23293 mse 0.5518 ce 1.6703 3480s
 ep0 train mse 0.5464 ce 1.6653 | val v_mse 0.5280 v_sign 0.815 pi_top1 0.620 ce 1.649 4048s
   ep0 を /root/nrel_a2.npz に保存（暫定最良）
+  ep1 step 5000/23293 mse 0.5055 ce 1.6283 4915s
