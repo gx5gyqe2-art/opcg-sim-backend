@@ -209,6 +209,15 @@ def eval_policy(net, P, C, pt_idx, ptr, bs=256):
     return hit / tot, ce_sum / tot
 
 
+def _to_v12(D):
+    """dump v2（符号化 v13＝v12 の末尾に 29 列を足した append-only）を c ネットの入力（v12・94 列）へ
+    切り詰める（2026-09-05・c12＝c10 を波23〜24 で再訓練する対照実験のため）。v1 dump は無変更。"""
+    from opcg_sim.src.learned.encoder import SCALARS_V12
+    if D["sc"].ndim == 2 and D["sc"].shape[1] > SCALARS_V12:
+        D = dict(D); D["sc"] = np.ascontiguousarray(D["sc"][:, :SCALARS_V12])
+    return D
+
+
 def train(args):
     t0 = time.time()
     stats, ab, abm, pwr, isl, vocab = build_eff_tables()
@@ -216,6 +225,7 @@ def train(args):
     for pat in args.src:
         dirs += sorted(glob.glob(pat)) if any(ch in pat for ch in "*?[") else [pat]
     V, P, C = N1.load_dump(dirs, vocab)
+    V, P = _to_v12(V), _to_v12(P)
     if args.zsrc:
         # z専用ディレクトリ（2026-08-28 ユーザ実験）: 旧世代の波は π（訪問分布）が古い探索の
         # 結論で方策を引き戻すが、z（勝敗）は価値教師として古びにくい——πを読まず z 行だけ
@@ -224,6 +234,7 @@ def train(args):
         for pat in args.zsrc:
             zdirs += sorted(glob.glob(pat)) if any(ch in pat for ch in "*?[") else [pat]
         Vz, _Pz, _Cz = N1.load_dump(zdirs, vocab)
+        Vz = _to_v12(Vz)
         V = {k: np.concatenate([V[k], Vz[k]]) for k in V}
         print(f"z専用 {len(Vz['z'])}行を合流（π除外・{len(zdirs)}ディレクトリ）", flush=True)
     ptr = np.concatenate([[0], np.cumsum(P["len"])]).astype(np.int64)

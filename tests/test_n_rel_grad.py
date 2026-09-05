@@ -196,3 +196,47 @@ def test_relations_batch_matches_reference_on_many_boards(env):
     assert len(refs) >= 18
     for i, (a, b) in enumerate(refs):
         assert np.array_equal(om[i], a) and np.array_equal(oo[i], b), i
+
+
+def test_ablation_masks_inputs_in_train_and_serve(env, tmp_path):
+    """切り分け（2026-09-05）: `ablate={"rel"}` は関係 R を、`{"opp_pool"}` は相手デッキ知識の列を
+    forward の入口で 0 にする＝(1) 遮断した入力を変えても value/policy が変わらない、(2) 遮断していない
+    入力は効く、(3) save→load で ablate が復元され同じ出力、(4) 遮断ありでも数値勾配が一致。"""
+    rng = np.random.default_rng(6)
+    sc, ci, tok, om, oo = env["sc"], env["ci"], env["tok"], env["rel_om"], env["rel_oo"]
+    om2 = om + rng.uniform(0.1, 0.5, om.shape).astype(np.float32)
+    oo2 = oo + rng.uniform(0.1, 0.5, oo.shape).astype(np.float32)
+    sc2 = sc.copy(); sc2[:, list(NL.OPP_POOL_COLS)] += 0.7
+    base = NT.NRelNet(env["tables"], hidden=32, seed=7)
+    assert base.value(sc, ci, tok, om, oo).shape == (len(sc),)
+    assert not np.allclose(base.value(sc, ci, tok, om, oo), base.value(sc, ci, tok, om2, oo2))
+    assert not np.allclose(base.value(sc, ci, tok, om, oo), base.value(sc2, ci, tok, om, oo))
+    # rel 遮断: R を変えても不変・opp_pool は効く
+    net = NT.NRelNet(env["tables"], hidden=32, seed=7); net.ablate = {"rel"}
+    assert np.array_equal(net.value(sc, ci, tok, om, oo), net.value(sc, ci, tok, om2, oo2))
+    assert not np.allclose(net.value(sc, ci, tok, om, oo), net.value(sc2, ci, tok, om, oo))
+    seg, si, ti, C, idx, budget, pi = _policy_batch(env, rng)
+    tab = net.card_table(); feats = net.cand_feats(C, idx, tab)
+    la = net.policy_logits(sc, ci, tok, om, oo, seg, si, ti, feats, budget, tab=tab)
+    lb = net.policy_logits(sc, ci, tok, om2, oo2, seg, si, ti, feats, budget, tab=tab)
+    assert np.array_equal(la, lb)
+    # opp_pool 遮断: 列を変えても不変・R は効く
+    net2 = NT.NRelNet(env["tables"], hidden=32, seed=7); net2.ablate = {"opp_pool"}
+    assert np.array_equal(net2.value(sc, ci, tok, om, oo), net2.value(sc2, ci, tok, om, oo))
+    assert not np.allclose(net2.value(sc, ci, tok, om, oo), net2.value(sc, ci, tok, om2, oo2))
+    # save→load で復元
+    p = str(tmp_path / "abl.npz")
+    net.save(p, meta={"kind": "nrel-a"})
+    re_ = NL.NRelNet.load(p, env["tables"])
+    assert re_.ablate == {"rel"} and re_.meta.get("ablate") == ["rel"]
+    assert np.array_equal(re_.value(sc, ci, tok, om2, oo2), net.value(sc, ci, tok, om, oo))
+    # 遮断ありでも勾配は一致（backward は遮断後の中間値で組む）
+    zt = rng.uniform(-1, 1, len(sc)).astype(np.float32)
+    captured = {}
+    net.step = lambda grads, lr=1e-3, **kw: captured.update({k: np.array(v, np.float64) for k, v in grads.items()})
+    net.value_step(sc, ci, tok, om, oo, zt, 1e-3)
+
+    def loss():
+        v = net.value(sc, ci, tok, om, oo)
+        return 0.5 * float(np.mean((v - zt) ** 2))
+    _check(net, captured, loss, rng, ("Wa", "Wt", "Wr", "Wc", "W1", "W2", "Wv", "bt", "br", "bc", "b1"))

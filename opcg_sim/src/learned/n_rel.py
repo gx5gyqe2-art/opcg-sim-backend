@@ -33,6 +33,9 @@ from opcg_sim.src.learned import n_rel_feat as NR
 NR_ENC_VERSION = 13                   # NRel の符号化世代（v12 + n_rel_feat の追加 29）
 
 D_SC = 94 + NR.EXTRA_DIM              # 123
+# 切り分け（ablation・2026-09-05）: 相手デッキ知識＝EXTRA の opp_pool_* 列（scalars 上の列番号）
+OPP_POOL_COLS = tuple(94 + j for j, _n in enumerate(NR.EXTRA_COLS) if _n.startswith("opp_pool_"))
+ABLATE_KINDS = ("rel", "opp_pool")
 D_STRUCT = NE.D_CARD_FEAT             # 64
 D_ZONE = 5
 D_X = D_STRUCT + NR.S_DIM + D_ZONE    # 89
@@ -78,6 +81,19 @@ class NRelNet:
         self.params = list(self.PARAMS)
         self.vocab_ids = None
         self.meta = {}
+        # 切り分け（ablation）: {"rel"}＝関係 R を 0 に・{"opp_pool"}＝相手デッキ知識の列を 0 に。
+        # 訓練・serve の両方でここ（forward の入口）で遮断する＝npz の meta に焼き込まれ load で復元。
+        self.ablate = set()
+
+    # --- 切り分け（入力の遮断）---
+    def mask_sc(self, sc):
+        if "opp_pool" in self.ablate:
+            sc = np.array(sc, np.float32, copy=True)
+            sc[:, list(OPP_POOL_COLS)] = 0.0
+        return sc
+
+    def mask_rel(self, rel):
+        return np.zeros_like(rel) if "rel" in self.ablate else rel
 
     # --- 語彙カード表（NEff と同じ効果埋め込み・学習対象） ---
     def card_table(self, keep=None):
@@ -98,6 +114,7 @@ class NRelNet:
     def tokens_forward(self, ci, tok, rel_om, rel_oo, tab, keep=None):
         """ci [B,22] tok [B,22,S] rel_om [B,16,6,R] rel_oo [B,16,16,R] → h [B,22,D_H], present [B,22]."""
         B = ci.shape[0]
+        rel_om = self.mask_rel(rel_om); rel_oo = self.mask_rel(rel_oo)
         present = (ci > 0).astype(np.float32)                                  # [B,22]
         x = np.concatenate([tab[np.clip(ci, 0, len(tab) - 1)], tok,
                             np.broadcast_to(ZONE_ONEHOT, (B, N_TOK, D_ZONE))], 2)   # [B,22,89]
@@ -144,6 +161,7 @@ class NRelNet:
         return h, present
 
     def body(self, sc, h, present, keep=None):
+        sc = self.mask_sc(sc)
         n = np.maximum(present.sum(1, keepdims=True), 1.0)                      # [B,1]
         mean = h.sum(1) / n
         h_masked = np.where(present[:, :, None] > 0, h, -1e9)
@@ -165,6 +183,7 @@ class NRelNet:
     def cand_input(self, e, h, rel_om, seg, si, ti, feats, budget):
         """候補ごとの入力 [P_cand, D_PIN]。si/ti は 22 枠 index（−1=無し）。"""
         P = len(seg)
+        rel_om = self.mask_rel(rel_om)
         hs = np.zeros((P, D_H), np.float32)
         ht = np.zeros((P, D_H), np.float32)
         rr = np.zeros((P, NR.R_DIM), np.float32)
@@ -210,9 +229,11 @@ class NRelNet:
         ids = vocab_ids if vocab_ids is not None else self.vocab_ids
         if ids:
             extra["vocab_ids"] = np.array([str(x) for x in ids])
+        m = dict(meta if meta is not None else (self.meta or {}))
+        if self.ablate:
+            m["ablate"] = sorted(self.ablate)
         np.savez_compressed(path, **{p: getattr(self, p) for p in self.params},
-                            meta=json.dumps(meta if meta is not None else (self.meta or {})),
-                            nrel=np.array(1), **extra)
+                            meta=json.dumps(m), nrel=np.array(1), **extra)
 
     @classmethod
     def load(cls, path, tables):
@@ -225,6 +246,7 @@ class NRelNet:
             net.meta = json.loads(str(d["meta"])) if "meta" in d.files else {}
         except Exception:
             net.meta = {}
+        net.ablate = set(net.meta.get("ablate") or ())
         return net
 
 

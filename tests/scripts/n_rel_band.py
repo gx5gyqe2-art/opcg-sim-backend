@@ -64,6 +64,10 @@ def main():
     ap.add_argument("--holdout-mod", type=int, default=7)
     ap.add_argument("--limit", type=int, default=0, help="先頭 N 行だけ（0＝全 holdout 行）")
     ap.add_argument("--bs", type=int, default=512)
+    ap.add_argument("--zero-rel", action="store_true",
+                    help="serve 時の遮断: 関係 R（rel_om/rel_oo）を 0 にして評価（r ネットのみ）")
+    ap.add_argument("--zero-opp-pool", action="store_true",
+                    help="serve 時の遮断: 相手デッキ知識（EXTRA の opp_pool_* 列）を 0 にして評価")
     args = ap.parse_args()
 
     t0 = time.time()
@@ -83,14 +87,23 @@ def main():
     if args.nrel:
         ptab = NR.profile_table(db, vocab)
         rt = NR.RelTable(ptab)
+    sc_r = D["sc"]
+    if args.zero_opp_pool:
+        sc_r = sc_r.copy()
+        for j, name in enumerate(NR.EXTRA_COLS):
+            if name.startswith("opp_pool_"):
+                sc_r[:, SCALARS_V12 + j] = 0.0
     for p in args.nrel:
         net = NL.NRelNet.load(p, tables=tables)
         vs = []
         for s in range(0, len(z), args.bs):
             ci = D["ci"][s:s + args.bs][:, :NL.N_TOK]; tok = D["tok"][s:s + args.bs]
             rel_om, rel_oo = NR.relations_batch(ci, tok, rt)
-            vs.append(net.value(D["sc"][s:s + args.bs], ci, tok, rel_om, rel_oo))
-        preds[os.path.basename(p)] = np.concatenate(vs)
+            if args.zero_rel:
+                rel_om = np.zeros_like(rel_om); rel_oo = np.zeros_like(rel_oo)
+            vs.append(net.value(sc_r[s:s + args.bs], ci, tok, rel_om, rel_oo))
+        tag = os.path.basename(p) + ("" if not args.zero_rel else "+zero_rel") + ("" if not args.zero_opp_pool else "+zero_opp_pool")
+        preds[tag] = np.concatenate(vs)
     res = {}
     buckets = [("all", np.ones(len(z), bool))]
     if D["turn"].any():                                   # ターン帯別（dump に turn がある場合）

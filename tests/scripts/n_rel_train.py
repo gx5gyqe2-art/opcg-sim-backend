@@ -373,6 +373,12 @@ def train(args):
         print(f"warm-start: {args.warm_start}（hidden={net.W1.shape[1]}）", flush=True)
     else:
         net = NRelNet(tables, hidden=args.hidden, seed=args.seed)
+    if getattr(args, "ablate", ""):
+        net.ablate = {a.strip() for a in args.ablate.split(",") if a.strip()}
+        bad = net.ablate - set(NL.ABLATE_KINDS)
+        if bad:
+            raise ValueError(f"--ablate に未知の種類: {sorted(bad)}（{NL.ABLATE_KINDS}）")
+        print(f"ablate: {sorted(net.ablate)}", flush=True)
     rng = np.random.default_rng(args.seed)
     tr_v = np.where(~va_v)[0]; tr_p = np.where(~va_p)[0]; va_pi = np.where(va_p)[0]
     best = None; best_ep = -1
@@ -431,7 +437,8 @@ def _save(net, args, vocab, V, P, best_ep):
     net.vocab_ids = [cid for cid, _i in sorted(vocab.items(), key=lambda kv: kv[1])]
     net.save(args.out, meta={"rows_v": int(len(V["z"])), "points_p": int(len(P["len"])),
                              "epochs": args.epochs, "best_ep": best_ep, "hidden": args.hidden,
-                             "src": args.src, "kind": "nrel-a"})
+                             "src": args.src, "kind": "nrel-a",
+                             "ablate": sorted(net.ablate)})
 
 
 def main():
@@ -448,6 +455,9 @@ def main():
     tr.add_argument("--hidden", type=int, default=192)
     tr.add_argument("--holdout-mod", type=int, default=7)
     tr.add_argument("--warm-start", default=None)
+    tr.add_argument("--ablate", default="",
+                    help="切り分け: rel（関係 R を 0）/ opp_pool（相手デッキ知識の列を 0）をカンマ区切り。"
+                         "訓練・serve の両方で遮断され npz の meta に焼き込まれる")
     tr.add_argument("--out", required=True)
     args = ap.parse_args()
     if args.cmd == "train":
