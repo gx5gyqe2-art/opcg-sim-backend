@@ -224,45 +224,75 @@ class NRelNet(NL.NRelNet):
 # ---------------------------------------------------------------------------
 # dump v2 の読み込み
 # ---------------------------------------------------------------------------
-def load_dump_v2(dirs, vocab, with_policy=True):
-    """dump v2 → V（value 行）, P（方策点）, C（候補）。R は含めない（バッチごとに再計算）。"""
-    V = {"sc": [], "ci": [], "tok": [], "z": [], "seed": []}
-    P = {"sc": [], "ci": [], "tok": [], "seed": [], "len": [], "chosen": []}
-    C = {"pi": [], "at": [], "cid": [], "tcid": [], "k": [], "si": [], "ti": []}
-    for d_ in dirs:
-        for f in sorted(glob.glob(os.path.join(d_, "n_record_*.npz"))):
-            d = np.load(f, allow_pickle=True)
+def _files(dirs):
+    return [f for d_ in dirs for f in sorted(glob.glob(os.path.join(d_, "n_record_*.npz")))]
+
+
+def load_dump_v2(dirs, vocab, with_policy=True, z_dirs=()):
+    """dump v2 → V（value 行）, P（方策点）, C（候補）。R は含めない（バッチごとに再計算）。
+
+    **メモリ（2026-09-05・16 シャード≈216 万行を cgroup 14GB に収めるため）**: tokens は 1 行
+    1,760B＝216 万行で 3.8GB。ファイルごとのリストを最後に concatenate すると一時的に二重持ちに
+    なるので、**先に行数を数えて V を一度だけ確保**し、ファイルごとに書き込む。方策点 P は盤面
+    （sc/ci/tok）を複製せず **V の行 index（`P["row"]`）で参照**する（`prow` で取り出す）。
+    `z_dirs` は z 専用（π を読まない）＝V にだけ入る。"""
+    pi_files = [(f, with_policy) for f in _files(dirs)]
+    z_files = [(f, False) for f in _files(z_dirs)]
+    files = pi_files + z_files
+    if not files:
+        raise ValueError(f"dump v2 が見つからない: {dirs} {z_dirs}")
+    n_tot = 0
+    for f, _ in files:
+        with np.load(f, allow_pickle=True) as d:
             if "tokens" not in d.files:
                 raise ValueError(f"{f}: dump v2 ではない（tokens 無し）")
-            V["sc"].append(d["scalars"]); V["ci"].append(d["card_idx"][:, :N_TOK]); V["tok"].append(d["tokens"])
-            V["z"].append(d["z"]); V["seed"].append(d["seed"])
-            if not with_policy:
-                continue
+            n_tot += int(d["z"].shape[0])
+    with np.load(files[0][0], allow_pickle=True) as d0:
+        V = {"sc": np.empty((n_tot, d0["scalars"].shape[1]), d0["scalars"].dtype),
+             "ci": np.empty((n_tot, N_TOK), d0["card_idx"].dtype),
+             "tok": np.empty((n_tot,) + tuple(d0["tokens"].shape[1:]), d0["tokens"].dtype),
+             "z": np.empty(n_tot, d0["z"].dtype), "seed": np.empty(n_tot, d0["seed"].dtype)}
+    P = {"row": [], "seed": [], "len": [], "chosen": []}
+    C = {"pi": [], "at": [], "cid": [], "tcid": [], "k": [], "si": [], "ti": []}
+    off_v = 0
+    for f, pol in files:
+        d = np.load(f, allow_pickle=True)
+        n = int(d["z"].shape[0])
+        sl = slice(off_v, off_v + n)
+        V["sc"][sl] = d["scalars"]; V["ci"][sl] = d["card_idx"][:, :N_TOK]; V["tok"][sl] = d["tokens"]
+        V["z"][sl] = d["z"]; V["seed"][sl] = d["seed"]
+        if pol:
             pl, pc, kind = d["pol_len"], d["pol_chosen"], d["kind"]
             off = np.concatenate([[0], np.cumsum(pl)])
             take = np.where((kind == 0) & (pl >= 2) & (pc >= 0))[0]
-            if len(take) == 0:
-                continue
-            P["sc"].append(d["scalars"][take]); P["ci"].append(d["card_idx"][take][:, :N_TOK])
-            P["tok"].append(d["tokens"][take]); P["seed"].append(d["seed"][take])
-            P["len"].append(pl[take]); P["chosen"].append(pc[take])
-            idx = np.concatenate([np.arange(off[i], off[i + 1]) for i in take])
-            n = d["pol_n"][idx].astype(np.float64)
-            segl = np.repeat(np.arange(len(take)), pl[take])
-            tot = np.zeros(len(take)); np.add.at(tot, segl, n); tot = np.maximum(tot, 1e-9)
-            C["pi"].append((n / tot[segl]).astype(np.float32))
-            C["at"].append(np.array([_atype_idx(json.loads(s)[0]) for s in d["pol_sig"][idx]], np.int16))
-            C["cid"].append(np.array([vocab.get(c, 0) for c in d["pol_cid"][idx]], np.int32))
-            C["tcid"].append(np.array([vocab.get(c, 0) for c in d["pol_tcid"][idx]], np.int32))
-            C["k"].append(d["pol_k"][idx].astype(np.int16))
-            C["si"].append(d["pol_si"][idx].astype(np.int16)); C["ti"].append(d["pol_ti"][idx].astype(np.int16))
-    V = {k: np.concatenate(v) for k, v in V.items()}
-    if with_policy and P["sc"]:
+            if len(take):
+                P["row"].append((take + off_v).astype(np.int64)); P["seed"].append(d["seed"][take])
+                P["len"].append(pl[take]); P["chosen"].append(pc[take])
+                idx = np.concatenate([np.arange(off[i], off[i + 1]) for i in take])
+                nn = d["pol_n"][idx].astype(np.float64)
+                segl = np.repeat(np.arange(len(take)), pl[take])
+                tot = np.zeros(len(take)); np.add.at(tot, segl, nn); tot = np.maximum(tot, 1e-9)
+                C["pi"].append((nn / tot[segl]).astype(np.float32))
+                C["at"].append(np.array([_atype_idx(json.loads(s)[0]) for s in d["pol_sig"][idx]], np.int16))
+                C["cid"].append(np.array([vocab.get(c, 0) for c in d["pol_cid"][idx]], np.int32))
+                C["tcid"].append(np.array([vocab.get(c, 0) for c in d["pol_tcid"][idx]], np.int32))
+                C["k"].append(d["pol_k"][idx].astype(np.int16))
+                C["si"].append(d["pol_si"][idx].astype(np.int16)); C["ti"].append(d["pol_ti"][idx].astype(np.int16))
+        d.close()
+        off_v += n
+    assert off_v == n_tot
+    if P["row"]:
         P = {k: np.concatenate(v) for k, v in P.items()}
         C = {k: np.concatenate(v) for k, v in C.items()}
     else:
-        P = {k: np.zeros(0) for k in P}; C = {k: np.zeros(0) for k in C}
+        P = {k: np.zeros(0, np.int64) for k in P}; C = {k: np.zeros(0) for k in C}
     return V, P, C
+
+
+def prow(V, P, bi):
+    """方策点 bi の盤面（sc, ci, tok）を V から取り出す（複製を持たない・`load_dump_v2` 参照）。"""
+    r = P["row"][bi]
+    return V["sc"][r], V["ci"][r], V["tok"][r]
 
 
 def budget_feats(sc, ci, tok, seg, si, C, idx, ptab_ret):
@@ -287,7 +317,7 @@ def budget_feats(sc, ci, tok, seg, si, C, idx, ptab_ret):
 # ---------------------------------------------------------------------------
 # 訓練ループ
 # ---------------------------------------------------------------------------
-def eval_policy(net, rt, ptab_ret, P, C, pt_idx, ptr, bs=256):
+def eval_policy(net, rt, ptab_ret, V, P, C, pt_idx, ptr, bs=256):
     hit = tot = 0
     ce_sum = 0.0
     for s in range(0, len(pt_idx), bs):
@@ -295,7 +325,7 @@ def eval_policy(net, rt, ptab_ret, P, C, pt_idx, ptr, bs=256):
         lens = P["len"][bi]
         idx = np.concatenate([np.arange(ptr[i], ptr[i] + P["len"][i]) for i in bi])
         seg = np.repeat(np.arange(len(bi)), lens)
-        sc, ci, tok = P["sc"][bi], P["ci"][bi], P["tok"][bi]
+        sc, ci, tok = prow(V, P, bi)
         rel_om, rel_oo = NR.relations_batch(ci, tok, rt)
         si = C["si"][idx].astype(np.int64); ti = C["ti"][idx].astype(np.int64)
         tab = net.card_table()
@@ -330,11 +360,9 @@ def train(args):
     ptab = NR.profile_table(db, vocab)
     rt = NR.RelTable(ptab)
     ptab_ret = np.array([(p["ret_don"] if p else 0.0) for p in ptab], np.float32)
-    V, P, C = load_dump_v2(_expand(args.src), vocab)
+    V, P, C = load_dump_v2(_expand(args.src), vocab, z_dirs=_expand(args.zsrc))
     if args.zsrc:
-        Vz, _p, _c = load_dump_v2(_expand(args.zsrc), vocab, with_policy=False)
-        V = {k: np.concatenate([V[k], Vz[k]]) for k in V}
-        print(f"z専用 {len(Vz['z'])}行を合流", flush=True)
+        print(f"z専用 dir {len(_expand(args.zsrc))} 本を合流（π は読まない）", flush=True)
     ptr = np.concatenate([[0], np.cumsum(P["len"])]).astype(np.int64)
     va_v = V["seed"] % args.holdout_mod == 0
     va_p = P["seed"] % args.holdout_mod == 0
@@ -355,7 +383,10 @@ def train(args):
         sched = [0] * nv + [1] * npi
         rng.shuffle(sched)
         iv = ip = 0
-        for what in sched:
+        for st, what in enumerate(sched):
+            if st and st % 5000 == 0:
+                print(f"  ep{ep} step {st}/{len(sched)} mse {mse/max(iv,1):.4f} ce {ce/max(ip,1):.4f}"
+                      f" {time.time()-t0:.0f}s", flush=True)
             if what == 0:
                 bi = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]; iv += 1
                 sc, ci, tok = V["sc"][bi], V["ci"][bi], V["tok"][bi]
@@ -366,7 +397,7 @@ def train(args):
                 lens = P["len"][bi]
                 idx = np.concatenate([np.arange(ptr[i], ptr[i] + P["len"][i]) for i in bi])
                 seg = np.repeat(np.arange(len(bi)), lens)
-                sc, ci, tok = P["sc"][bi], P["ci"][bi], P["tok"][bi]
+                sc, ci, tok = prow(V, P, bi)
                 rel_om, rel_oo = NR.relations_batch(ci, tok, rt)
                 si = C["si"][idx].astype(np.int64); ti = C["ti"][idx].astype(np.int64)
                 budget = budget_feats(sc, ci, tok, seg, si, C, idx, ptab_ret)
@@ -378,22 +409,29 @@ def train(args):
                              for s in range(0, len(vi), 512)]) if len(vi) else np.zeros(0)
         vmse = float(np.mean((vv - V["z"][vi]) ** 2)) if len(vi) else float("nan")
         vsgn = float(np.mean((vv > 0) == (V["z"][vi] > 0))) if len(vi) else float("nan")
-        p_pi, p_ce = eval_policy(net, rt, ptab_ret, P, C, va_pi[:4000], ptr) if len(va_pi) else (float("nan"), float("nan"))
+        p_pi, p_ce = eval_policy(net, rt, ptab_ret, V, P, C, va_pi[:4000], ptr) if len(va_pi) else (float("nan"), float("nan"))
         print(f"ep{ep} train mse {mse/max(nv,1):.4f} ce {ce/max(npi,1):.4f} | "
               f"val v_mse {vmse:.4f} v_sign {vsgn:.3f} pi_top1 {p_pi:.3f} ce {p_ce:.3f} "
               f"{time.time()-t0:.0f}s", flush=True)
         if best is None or vmse < best[0]:
             best = (vmse, {p: getattr(net, p).copy() for p in net.params}); best_ep = ep
+            # epoch ごとに最良を書き出す（16 シャード×2 epoch ≒ 3.5 時間・途中で落ちても ep0 が残る）
+            _save(net, args, vocab, V, P, best_ep)
+            print(f"  ep{ep} を {args.out} に保存（暫定最良）", flush=True)
     if best is not None:
         for p, w in best[1].items():
             setattr(net, p, w)
         print(f"best ep{best_ep} val v_mse {best[0]:.4f} を保存", flush=True)
+    _save(net, args, vocab, V, P, best_ep)
+    print("N_REL_TRAIN_DONE " + json.dumps({"out": args.out}))
+    return 0
+
+
+def _save(net, args, vocab, V, P, best_ep):
     net.vocab_ids = [cid for cid, _i in sorted(vocab.items(), key=lambda kv: kv[1])]
     net.save(args.out, meta={"rows_v": int(len(V["z"])), "points_p": int(len(P["len"])),
                              "epochs": args.epochs, "best_ep": best_ep, "hidden": args.hidden,
                              "src": args.src, "kind": "nrel-a"})
-    print("N_REL_TRAIN_DONE " + json.dumps({"out": args.out}))
-    return 0
 
 
 def main():
