@@ -1,0 +1,7 @@
+{"job": "train-c12", "role": "train", "status": "done",
+ "inputs": {"pi_waves": [23, 24], "z_waves": [23, 24],
+            "extra": "--epochs 2 --lr 2e-4 --warm-start opcg_sim/data/learned/neff_c10.npz"},
+ "outputs": {"net": "n1_results/neff_net_c12.npz"},
+ "metrics": {"val_v_mse": 0.5474, "val_v_sign": 0.801, "pi_top1": 0.655, "best_ep": 0},
+ "command": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/n_eff_train.py train --in ~/n23_wave/w*/n23_records ~/n24_wave/w*/n24_records --epochs 2 --lr 2e-4 --warm-start opcg_sim/data/learned/neff_c10.npz --out ~/neff_net_c12.npz",
+ "notes": "value 2164053行（val 312880）/ policy 1200648点（val 172662）、warm-start hidden=192。ep1 は val v_mse 0.5626・v_sign 0.795・pi_top1 0.646 と悪化したため best は ep0。所要 1207s。res ブランチには tests/scripts/n_eff_train.py と opcg_sim/data/learned/neff_c10.npz が無いため、work（9b20124d）の git worktree から訓練を実行し、push のみ本ブランチで行った。コードの変更は無し。"}
