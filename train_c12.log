@@ -1,0 +1,6 @@
+value 2164053行（val 312880） policy 1200648点（val 172662） 125s
+warm-start: opcg_sim/data/learned/neff_c10.npz（hidden=192）
+  ep0 step 5000/11646 mse 0.5464 ce 1.6213 359s
+  ep0 step 10000/11646 mse 0.5405 ce 1.6187 590s
+ep0 train mse 0.5388 ce 1.6187 | val v_mse 0.5474 v_sign 0.801 pi_top1 0.655 ce 1.626 668s
+  ep1 step 5000/11646 mse 0.5236 ce 1.6163 900s
