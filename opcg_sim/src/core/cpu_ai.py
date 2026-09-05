@@ -876,6 +876,20 @@ def onplay_option_scan(manager, actor_name: str):
     n_live = n_dead = 0
     keep_live = 0.0
     saved_events = manager.action_events
+    # 合法 PLAY の列挙は 1 回だけ（2026-09-05・serve の律速）: PLAY の合法性はコスト≤ドン以外は
+    # ドン枚数に依らない（`get_legal_actions` の MAIN_ACTION 節）ので、最大コストぶんの一時ドンを
+    # 補った 1 回の列挙で「どの札が PLAY 可能か」が決まる。旧実装は札ごとに全合法手を列挙して
+    # いた（葉評価の約 15%）。札ごとの適用は従来どおり各自の txn で行う＝観測結果は同一。
+    playable = set()
+    with journal.transaction():
+        try:
+            need_max = max(int(getattr(c.master, "cost", 0) or 0) for c in targets) - len(actor.don_active)
+            for _ in range(max(0, need_max)):
+                actor.don_active.append(DonInstance(owner_id=actor_name))
+            playable = {(m.get("payload") or {}).get("uuid") for m in manager.get_legal_actions()
+                        if m.get("action_type") == "PLAY"}
+        except Exception:
+            playable = set()
     for ci in targets:
         cost = int(getattr(ci.master, "cost", 0) or 0)
         fired = False
@@ -885,9 +899,8 @@ def onplay_option_scan(manager, actor_name: str):
                 need = cost - len(actor.don_active)
                 for _ in range(max(0, need)):        # 一時ドン（txn 巻き戻しで消える）
                     actor.don_active.append(DonInstance(owner_id=actor_name))
-                mv = next((m for m in manager.get_legal_actions()
-                           if m.get("action_type") == "PLAY"
-                           and (m.get("payload") or {}).get("uuid") == ci.uuid), None)
+                mv = ({"kind": "game", "action_type": "PLAY", "payload": {"uuid": ci.uuid}}
+                      if ci.uuid in playable else None)
                 if mv is not None:
                     _apply_move_inplace(manager, actor_name, mv, stop_at_select=True)
                     pend = manager.get_pending_request(with_request_id=False) or {}

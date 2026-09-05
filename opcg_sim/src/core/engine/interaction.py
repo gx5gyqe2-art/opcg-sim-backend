@@ -470,29 +470,40 @@ def choose_selection(entries, min_n: int, max_n: int):
 
 
 def _selection_entries(gm, pid: str, uuids):
-    """selectable uuid 列 → (uuid, side, zone, value) 列。ゾーンを1走査で索引して引く。"""
+    """selectable uuid 列 → (uuid, side, zone, value) 列。ゾーンを1走査で索引して引く。
+
+    **価値は候補（uuids）だけ計算する**（2026-09-05・serve の律速）: 旧実装は両者の全ゾーン
+    （山札 40〜50 枚を含む）の全カードに `card_keep_value` を掛けていた＝1 回の既定解決で 270 回超、
+    符号化 v7 の `onplay_option_scan`（葉ごとに手札の登場時札を試す）経由で葉評価の約 1/3 を占めた。
+    索引はゾーンの走査だけ（値は持たない）にし、値は候補 uuid にだけ引く＝出力は同一。"""
     actor = gm.p1 if gm.p1.name == pid else gm.p2
     opp = gm.p2 if actor is gm.p1 else gm.p1
+    want = set(uuids)
     index = {}
     for owner, side in ((actor, "own"), (opp, "opp")):
         for zname in ("hand", "deck", "trash", "field", "life"):
             for c in getattr(owner, zname, None) or ():
                 u = getattr(c, "uuid", None)
-                if u is not None and u not in index:
-                    index[u] = (side, zname, _selection_card_value(c))
+                if u in want and u not in index:
+                    index[u] = (side, zname, c)
         for zname in ("leader", "stage"):
             c = getattr(owner, zname, None)
-            if c is not None and getattr(c, "uuid", None) is not None:
-                index.setdefault(c.uuid, (side, zname, _selection_card_value(c)))
+            if c is not None and getattr(c, "uuid", None) in want:
+                index.setdefault(c.uuid, (side, zname, c))
     ai = getattr(gm, "active_interaction", None) or {}
     if ai.get("player_id") == pid:
         # デッキを見て選ぶ系は候補が公開一時領域（active_interaction.candidates）に居て
         # プレイヤーのゾーン走査では見つからない（m1@3 ウタで実測）。
         for c in ai.get("candidates") or ():
             u = getattr(c, "uuid", None)
-            if u is not None and u not in index:
-                index[u] = ("own", "temp", _selection_card_value(c))
-    return [(u,) + index.get(u, (None, None, 0)) for u in uuids]
+            if u in want and u not in index:
+                index[u] = ("own", "temp", c)
+    out = []
+    for u in uuids:
+        hit = index.get(u)
+        out.append((u, hit[0], hit[1], _selection_card_value(hit[2])) if hit is not None
+                   else (u, None, None, 0))
+    return out
 
 
 def default_interaction_payload(gm, pending: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
