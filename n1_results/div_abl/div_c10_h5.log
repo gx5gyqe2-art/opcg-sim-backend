@@ -1,0 +1,55 @@
+=== h5  人間=p1（OP13-003） / CPU=OP16-022  seeds=4 sims=160
+
+   idx turn    一致  人間の手 / CPU の手
+     7    2  1.00  PLAY OP13-065
+    10    2  1.00  TURN_END
+    12    3  1.00  PASS
+    16    4  0.00  ATTACH_DON OP13-003  /  CPU: PLAY OP13-068  ← 乖離
+    17    4  0.25  PLAY OP13-068  /  CPU: ATTACK OP13-003 → OP16-022  ← 一部
+    18    4  1.00  ATTACK_CONFIRM OP13-003
+    21    4  1.00  TURN_END
+    25    5  0.00  SELECT_COUNTER OP13-065  /  CPU: SELECT_COUNTER ST23-001  ← 乖離
+    26    5   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+    31    5  0.00  SELECT_COUNTER OP13-072  /  CPU: SELECT_COUNTER ST23-001  ← 乖離
+    32    5   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+    34    5  0.00  PASS  /  CPU: SELECT_COUNTER OP13-076  ← 乖離
+    36    6  0.00  ATTACK_CONFIRM OP13-065  /  CPU: ATTACK OP13-003 → OP16-022  ← 乖離
+    39    6  0.75  PLAY OP13-067  /  CPU: PLAY OP13-067  ← 一部
+    41    6  0.00  PLAY OP13-065  /  CPU: ATTACH_DON OP13-003  ← 乖離
+    44    6  0.50  ATTACK_CONFIRM OP13-003  /  CPU: ATTACK OP13-003 → OP16-022  ← 一部
+    46    6  1.00  ATTACK_CONFIRM OP13-068
+    49    6  1.00  TURN_END
+    53    7  0.50  SELECT_COUNTER OP13-072  /  CPU: SELECT_COUNTER OP13-072  ← 一部
+    54    7   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+    56    7  0.50  SELECT_COUNTER EB01-061  /  CPU: SELECT_COUNTER EB01-061  ← 一部
+    57    7   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+    58    7   ---  復元不可(直近の攻撃宣言が見つからない（直前手=PASS）)
+    62    7  0.25  PASS  /  CPU: SELECT_COUNTER EB01-061  ← 一部
+    64    8  0.00  PLAY P-107  /  CPU: PLAY OP09-004  ← 乖離
+    65    8  0.50  ATTACK_CONFIRM OP13-003  /  CPU: ATTACK OP13-003 → OP16-022  ← 一部
+    69    8  0.00  ATTACK_CONFIRM OP13-068  /  CPU: ATTACK OP13-067 → OP16-048  ← 乖離
+    72    8  0.00  TURN_END  /  CPU: ATTACK OP13-067 → OP16-022  ← 乖離
+    74    9  0.50  SELECT_COUNTER EB01-061  /  CPU: SELECT_COUNTER EB01-061  ← 一部
+    75    9   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+    81    9  0.25  PASS  /  CPU: SELECT_COUNTER OP13-072  ← 一部
+    87    9  1.00  PASS
+    90   10  0.50  PLAY OP09-004  /  CPU: ATTACK P-107 → OP16-022  ← 一部
+    91   10  0.00  ATTACK_CONFIRM P-107  /  CPU: ATTACK OP09-004 → OP16-032  ← 乖離
+    96   10  1.00  ATTACK_CONFIRM OP09-004
+    98   10  0.25  ATTACK_CONFIRM OP13-067  /  CPU: ATTACK OP13-003 → OP16-048  ← 一部
+   100   10  1.00  ATTACK_CONFIRM OP13-003
+   102   10  1.00  TURN_END
+   111   11  0.25  PASS  /  CPU: SELECT_COUNTER ST23-001  ← 一部
+   113   12  0.00  PLAY P-107  /  CPU: ATTACK OP13-003 → OP16-022  ← 乖離
+   115   12  0.00  ATTACK_CONFIRM OP13-067  /  CPU: ATTACK OP09-004 → OP16-022  ← 乖離
+   119   12  0.00  ATTACK_CONFIRM OP13-003  /  CPU: ATTACK OP09-004 → OP16-022  ← 乖離
+   121   12  0.00  ATTACK_CONFIRM P-107  /  CPU: ATTACK OP09-004 → OP16-022  ← 乖離
+   124   12  0.25  ATTACK_CONFIRM OP09-004  /  CPU: ATTACK P-107 → OP16-022  ← 一部
+   126   12  0.00  PLAY ST23-001  /  CPU: ATTACH_DON OP13-065  ← 乖離
+   128   12  0.00  TURN_END  /  CPU: ATTACK P-107 → OP16-022  ← 乖離
+   136   13  0.00  SELECT_BLOCKER ST23-001  /  CPU: SELECT_COUNTER ST23-001  ← 乖離
+   137   13  1.00  PASS
+   144   14  0.00  ATTACK_CONFIRM OP09-004  /  CPU: ATTACK OP13-003 → OP16-022  ← 乖離
+
+=== 比較 43 点中 **31 点で乖離**（CPU が人間と違う手を選ぶ）
+HUMAN_DIVERGENCE {"replay": "h5", "compared": 43, "diverged": 31, "points": [{"i": 16, "turn": 4, "rate": 0.0}, {"i": 17, "turn": 4, "rate": 0.25}, {"i": 25, "turn": 5, "rate": 0.0}, {"i": 31, "turn": 5, "rate": 0.0}, {"i": 34, "turn": 5, "rate": 0.0}, {"i": 36, "turn": 6, "rate": 0.0}, {"i": 39, "turn": 6, "rate": 0.75}, {"i": 41, "turn": 6, "rate": 0.0}, {"i": 44, "turn": 6, "rate": 0.5}, {"i": 53, "turn": 7, "rate": 0.5}, {"i": 56, "turn": 7, "rate": 0.5}, {"i": 62, "turn": 7, "rate": 0.25}, {"i": 64, "turn": 8, "rate": 0.0}, {"i": 65, "turn": 8, "rate": 0.5}, {"i": 69, "turn": 8, "rate": 0.0}, {"i": 72, "turn": 8, "rate": 0.0}, {"i": 74, "turn": 9, "rate": 0.5}, {"i": 81, "turn": 9, "rate": 0.25}, {"i": 90, "turn": 10, "rate": 0.5}, {"i": 91, "turn": 10, "rate": 0.0}, {"i": 98, "turn": 10, "rate": 0.25}, {"i": 111, "turn": 11, "rate": 0.25}, {"i": 113, "turn": 12, "rate": 0.0}, {"i": 115, "turn": 12, "rate": 0.0}, {"i": 119, "turn": 12, "rate": 0.0}, {"i": 121, "turn": 12, "rate": 0.0}, {"i": 124, "turn": 12, "rate": 0.25}, {"i": 126, "turn": 12, "rate": 0.0}, {"i": 128, "turn": 12, "rate": 0.0}, {"i": 136, "turn": 13, "rate": 0.0}, {"i": 144, "turn": 14, "rate": 0.0}]}

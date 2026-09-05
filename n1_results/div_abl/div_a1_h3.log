@@ -1,0 +1,57 @@
+=== h3  人間=p1（ST10-001） / CPU=OP16-022  seeds=4 sims=160
+
+   idx turn    一致  人間の手 / CPU の手
+     2    1  1.00  PLAY OP09-008
+     3    1  1.00  TURN_END
+     7    3  1.00  PLAY OP08-067
+     8    3  1.00  ATTACK_CONFIRM ST10-001
+    11    3  0.00  TURN_END  /  CPU: ACTIVATE_MAIN ST10-001  ← 乖離
+    17    4  0.00  PASS  /  CPU: SELECT_COUNTER OP15-078  ← 乖離
+    19    5  0.00  PLAY OP06-016  /  CPU: PLAY EB01-003  ← 乖離
+    20    5  0.00  ACTIVATE_MAIN OP06-016  /  CPU: PLAY EB01-003  ← 乖離
+    22    5  1.00  PLAY EB01-003
+    23    5  0.00  ACTIVATE_MAIN ST10-001  /  CPU: ACTIVATE_MAIN OP09-008  ← 乖離
+    27    5  0.75  ATTACK_CONFIRM ST10-001  /  CPU: ATTACK ST10-001 → OP16-022  ← 一部
+    30    5  0.00  TURN_END  /  CPU: ATTACK EB01-003 → OP16-022  ← 乖離
+    34    6  0.00  SELECT_COUNTER OP13-007  /  CPU: SELECT_COUNTER OP15-078  ← 乖離
+    35    6   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+    40    6  1.00  PASS
+    42    7  0.00  ATTACK_CONFIRM OP09-008  /  CPU: ATTACK ST10-001 → OP16-022  ← 乖離
+    45    7  0.00  ACTIVATE_MAIN OP09-008  /  CPU: ATTACK ST10-001 → OP16-022  ← 乖離
+    47    7  0.00  PLAY OP06-069  /  CPU: ATTACK ST10-001 → OP16-022  ← 乖離
+    48    7  0.00  ACTIVATE_MAIN ST10-001  /  CPU: ATTACK OP06-069 → OP16-022  ← 乖離
+    52    7  0.00  ATTACK_CONFIRM ST10-001  /  CPU: ATTACK OP06-069 → OP16-022  ← 乖離
+    55    7  1.00  ATTACK_CONFIRM OP06-069
+    58    7  0.25  ATTACK_CONFIRM EB01-003  /  CPU: ATTACK OP06-069 → OP16-022  ← 一部
+    61    7  0.00  TURN_END  /  CPU: ATTACK OP06-069 → OP16-022  ← 乖離
+    68    8  0.00  SELECT_COUNTER OP15-078  /  CPU: PASS  ← 乖離
+    70    8   ---  復元不可(直近の攻撃宣言が見つからない（直前手=RESOLVE_EFFECT_SELECTION）)
+    72    8   ---  復元不可(直近の攻撃宣言が見つからない（直前手=RESOLVE_EFFECT_SELECTION）)
+    74    8   ---  復元不可(直近の攻撃宣言が見つからない（直前手=RESOLVE_EFFECT_SELECTION）)
+    76    9  0.00  ATTACK_CONFIRM ST10-008  /  CPU: ATTACK ST10-001 → OP16-022  ← 乖離
+    77    9   ---  復元不可(直前フレーム欠落)
+    80    9  0.00  ATTACK_CONFIRM OP06-069  /  CPU: ATTACK ST10-001 → OP16-022  ← 乖離
+    82    9  0.50  ATTACK_CONFIRM ST10-001  /  CPU: ATTACK ST10-001 → OP16-022  ← 一部
+    85    9  0.00  PLAY OP09-008  /  CPU: ATTACK EB01-003 → OP16-022  ← 乖離
+    87    9  0.00  ACTIVATE_MAIN OP09-008  /  CPU: ATTACK EB01-003 → OP16-022  ← 乖離
+    89    9  0.00  PLAY OP06-016  /  CPU: ATTACK EB01-003 → OP16-022  ← 乖離
+    90    9  0.00  ACTIVATE_MAIN OP06-016  /  CPU: ATTACK EB01-003 → OP16-022  ← 乖離
+    92    9  0.00  ACTIVATE_MAIN ST10-001  /  CPU: ATTACH_DON ST10-008  ← 乖離
+    96    9  0.00  ATTACH_DON EB01-003  /  CPU: ATTACH_DON ST10-008  ← 乖離
+    97    9  0.00  ATTACH_DON EB01-003  /  CPU: ATTACK ST10-008 → OP16-022  ← 乖離
+    98    9  0.00  ATTACK_CONFIRM EB01-003  /  CPU: ATTACK ST10-008 → OP16-022  ← 乖離
+   100    9  0.00  TURN_END  /  CPU: ATTACK ST10-008 → OP16-022  ← 乖離
+   102   10  0.50  PASS  /  CPU: SELECT_COUNTER EB03-035  ← 一部
+   110   11  0.00  ATTACK_CONFIRM ST10-008  /  CPU: ATTACH_DON ST10-001  ← 乖離
+   115   11  0.00  PLAY EB02-035  /  CPU: ATTACH_DON ST10-001  ← 乖離
+   117   11  0.00  ATTACK_CONFIRM ST10-008  /  CPU: ATTACK EB01-003 → OP16-022  ← 乖離
+   120   11  0.00  ATTACK_CONFIRM OP06-069  /  CPU: ATTACK EB01-003 → OP16-022  ← 乖離
+   123   11  0.00  ATTACK_CONFIRM OP06-069  /  CPU: ATTACH_DON ST10-001  ← 乖離
+   125   11  0.00  ATTACK_CONFIRM EB01-003  /  CPU: ATTACK ST10-001 → OP16-022  ← 乖離
+   127   11  0.25  ATTACK_CONFIRM ST10-001  /  CPU: ATTACH_DON ST10-001  ← 一部
+   130   11  1.00  ACTIVATE_MAIN ST10-001
+   135   11  0.00  ATTACH_DON EB01-003  /  CPU: ATTACK EB01-003 → OP16-022  ← 乖離
+   136   11  1.00  ATTACK_CONFIRM EB01-003
+
+=== 比較 46 点中 **37 点で乖離**（CPU が人間と違う手を選ぶ）
+HUMAN_DIVERGENCE {"replay": "h3", "compared": 46, "diverged": 37, "points": [{"i": 11, "turn": 3, "rate": 0.0}, {"i": 17, "turn": 4, "rate": 0.0}, {"i": 19, "turn": 5, "rate": 0.0}, {"i": 20, "turn": 5, "rate": 0.0}, {"i": 23, "turn": 5, "rate": 0.0}, {"i": 27, "turn": 5, "rate": 0.75}, {"i": 30, "turn": 5, "rate": 0.0}, {"i": 34, "turn": 6, "rate": 0.0}, {"i": 42, "turn": 7, "rate": 0.0}, {"i": 45, "turn": 7, "rate": 0.0}, {"i": 47, "turn": 7, "rate": 0.0}, {"i": 48, "turn": 7, "rate": 0.0}, {"i": 52, "turn": 7, "rate": 0.0}, {"i": 58, "turn": 7, "rate": 0.25}, {"i": 61, "turn": 7, "rate": 0.0}, {"i": 68, "turn": 8, "rate": 0.0}, {"i": 76, "turn": 9, "rate": 0.0}, {"i": 80, "turn": 9, "rate": 0.0}, {"i": 82, "turn": 9, "rate": 0.5}, {"i": 85, "turn": 9, "rate": 0.0}, {"i": 87, "turn": 9, "rate": 0.0}, {"i": 89, "turn": 9, "rate": 0.0}, {"i": 90, "turn": 9, "rate": 0.0}, {"i": 92, "turn": 9, "rate": 0.0}, {"i": 96, "turn": 9, "rate": 0.0}, {"i": 97, "turn": 9, "rate": 0.0}, {"i": 98, "turn": 9, "rate": 0.0}, {"i": 100, "turn": 9, "rate": 0.0}, {"i": 102, "turn": 10, "rate": 0.5}, {"i": 110, "turn": 11, "rate": 0.0}, {"i": 115, "turn": 11, "rate": 0.0}, {"i": 117, "turn": 11, "rate": 0.0}, {"i": 120, "turn": 11, "rate": 0.0}, {"i": 123, "turn": 11, "rate": 0.0}, {"i": 125, "turn": 11, "rate": 0.0}, {"i": 127, "turn": 11, "rate": 0.25}, {"i": 135, "turn": 11, "rate": 0.0}]}

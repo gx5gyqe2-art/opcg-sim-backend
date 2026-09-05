@@ -1,0 +1,51 @@
+=== h6  人間=p1（OP14-060） / CPU=OP16-022  seeds=4 sims=160
+
+   idx turn    一致  人間の手 / CPU の手
+     3    2  1.00  PLAY OP14-067
+     4    2  1.00  TURN_END
+    11    3   ---  復元不可(戦闘中の記録応答 RESOLVE_EFFECT_SELECTION@8 を逆写像できない)
+    15    4  1.00  PLAY OP14-063
+    16    4  1.00  ATTACH_DON OP14-060
+    17    4  1.00  ATTACK_CONFIRM OP14-060
+    20    4  1.00  TURN_END
+    28    5   ---  復元不可(戦闘中の記録応答 RESOLVE_EFFECT_SELECTION@27 を逆写像できない)
+    29    5   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+    31    6  1.00  PLAY OP14-061
+    32    6  1.00  ATTACH_DON OP14-060
+    33    6  0.50  ATTACH_DON OP14-060  /  CPU: ATTACH_DON OP14-060  ← 一部
+    34    6  1.00  ATTACK_CONFIRM OP14-060
+    36    6  1.00  TURN_END
+    41    7   ---  復元不可(戦闘中の記録応答 RESOLVE_EFFECT_SELECTION@40 を逆写像できない)
+    42    7   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+    51    7   ---  復元不可(戦闘中の記録応答 RESOLVE_EFFECT_SELECTION@50 を逆写像できない)
+    53    8  1.00  PLAY OP10-071
+    57    8  0.00  ATTACK_CONFIRM OP14-060  /  CPU: ATTACH_DON OP14-060  ← 乖離
+    62    8  0.00  ATTACH_DON OP14-061  /  CPU: ATTACK OP14-061 → OP16-022  ← 乖離
+    63    8  1.00  ATTACK_CONFIRM OP14-061
+    68    8  0.00  TURN_END  /  CPU: ATTACK OP14-071 → OP16-022  ← 乖離
+    74    9   ---  復元不可(戦闘中の記録応答 RESOLVE_EFFECT_SELECTION@70 を逆写像できない)
+    79    9   ---  復元不可(カウンター待ちに到達しない（pending=CONFIRM_OPTIONAL/p1）)
+    80    9   ---  復元不可(戦闘中の記録応答 PASS@79 を逆写像できない)
+    82    9   ---  復元不可(カウンター待ちに到達しない（pending=CONFIRM_OPTIONAL/p1）)
+    88    9   ---  復元不可(カウンター待ちに到達しない（pending=CONFIRM_OPTIONAL/p1）)
+    91    9   ---  復元不可(カウンター待ちに到達しない（pending=CONFIRM_OPTIONAL/p1）)
+    92    9   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+    96    9   ---  復元不可(カウンター待ちに到達しない（pending=CONFIRM_OPTIONAL/p1）)
+    97    9   ---  復元不可(直近の攻撃宣言が見つからない（直前手=SELECT_COUNTER）)
+    99   10  0.25  ATTACK_CONFIRM OP14-060  /  CPU: ATTACH_DON OP14-060  ← 一部
+   103   10  0.00  ATTACK_CONFIRM OP14-061  /  CPU: ATTACK OP10-071 → OP16-022  ← 乖離
+   106   10  0.00  ATTACK_CONFIRM OP14-071  /  CPU: ATTACK OP10-071 → OP16-022  ← 乖離
+   108   10  1.00  ATTACK_CONFIRM OP10-071
+   110   10  0.00  ATTACK_CONFIRM OP14-061  /  CPU: PLAY OP14-069  ← 乖離
+   115   10  1.00  PLAY OP14-069
+   120   10  1.00  TURN_END
+   126   11   ---  復元不可(戦闘中の記録応答 RESOLVE_EFFECT_SELECTION@124 を逆写像できない)
+   129   11   ---  復元不可(直近の攻撃宣言が見つからない（直前手=RESOLVE_EFFECT_SELECTION）)
+   138   12  0.00  ATTACK_CONFIRM OP14-061  /  CPU: ATTACK OP14-060 → OP16-022  ← 乖離
+   141   12  0.00  ATTACK_CONFIRM OP14-061  /  CPU: ATTACK OP14-060 → OP16-022  ← 乖離
+   146   12  0.00  ATTACK_CONFIRM OP14-071  /  CPU: ATTACK OP14-060 → OP16-022  ← 乖離
+   148   12  0.00  ATTACK_CONFIRM OP10-071  /  CPU: ATTACH_DON OP14-060  ← 乖離
+   150   12  0.00  ATTACK_CONFIRM OP14-069  /  CPU: ATTACK OP14-060 → OP16-022  ← 乖離
+
+=== 比較 28 点中 **13 点で乖離**（CPU が人間と違う手を選ぶ）
+HUMAN_DIVERGENCE {"replay": "h6", "compared": 28, "diverged": 13, "points": [{"i": 33, "turn": 6, "rate": 0.5}, {"i": 57, "turn": 8, "rate": 0.0}, {"i": 62, "turn": 8, "rate": 0.0}, {"i": 68, "turn": 8, "rate": 0.0}, {"i": 99, "turn": 10, "rate": 0.25}, {"i": 103, "turn": 10, "rate": 0.0}, {"i": 106, "turn": 10, "rate": 0.0}, {"i": 110, "turn": 10, "rate": 0.0}, {"i": 138, "turn": 12, "rate": 0.0}, {"i": 141, "turn": 12, "rate": 0.0}, {"i": 146, "turn": 12, "rate": 0.0}, {"i": 148, "turn": 12, "rate": 0.0}, {"i": 150, "turn": 12, "rate": 0.0}]}
