@@ -9,3 +9,4 @@ ep0 train mse 0.5464 ce 1.6687 | val v_mse 0.5352 v_sign 0.812 pi_top1 0.632 ce 
   ep1 step 5000/23293 mse 0.5053 ce 1.6319 4588s
   ep1 step 10000/23293 mse 0.5018 ce 1.6320 5354s
   ep1 step 15000/23293 mse 0.4990 ce 1.6320 6118s
+  ep1 step 20000/23293 mse 0.4949 ce 1.6311 6906s
