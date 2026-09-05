@@ -1,0 +1,3 @@
+消化済み 0/24 ペア・残り 24
+今回 24 ペア（867s）・累計 24/24
+ARENA_RESUME_FINAL {"pairs": 24, "games": 48, "void": 0, "wins": 31.0, "wr": 0.6458, "ci95": [0.5358, 0.7559], "elo": 104.4, "promoted": true, "candidate": "neff:n1_results/nrel_r1.npz"}
