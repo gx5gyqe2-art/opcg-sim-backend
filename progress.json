@@ -1,1 +1,1 @@
-{"job":"train-c12","status":"running","last":"  ep1 step 5000/11646 mse 0.5236 ce 1.6163 900s"}
+{"job":"train-c12","status":"running","last":"ep1 train mse 0.5205 ce 1.6166 | val v_mse 0.5626 v_sign 0.795 pi_top1 0.646 ce 1.627 1207s"}
