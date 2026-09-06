@@ -21,3 +21,4 @@
 {"seed": 668000, "score": 1.0, "leaders": ["OP01-031", "OP17-039"], "games": [0.0, 1.0], "cand_leaders": ["OP01-031", "OP01-031"], "turns": [12, 14], "dig": [[], []], "act": [[], []]}
 {"seed": 668003, "score": 2.0, "leaders": ["OP02-002", "OP03-076"], "games": [1.0, 1.0], "cand_leaders": ["OP02-002", "OP02-002"], "turns": [13, 12], "dig": [[], []], "act": [[], []]}
 {"seed": 668002, "score": 0.0, "leaders": ["OP01-062", "EB01-021"], "games": [0.0, 0.0], "cand_leaders": ["OP01-062", "OP01-062"], "turns": [12, 11], "dig": [[], []], "act": [[], []]}
+{"seed": 668005, "score": 1.0, "leaders": ["OP03-001", "OP17-001"], "games": [0.0, 1.0], "cand_leaders": ["OP03-001", "OP03-001"], "turns": [16, 14], "dig": [[], []], "act": [[], []]}
