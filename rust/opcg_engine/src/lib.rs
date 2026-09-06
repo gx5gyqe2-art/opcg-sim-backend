@@ -43,10 +43,19 @@ fn echo_state(json_str: &str) -> PyResult<String> {
     Ok(state::echo_state(json_str)?)
 }
 
+/// カード定義（`opcg_sim/data/opcg_effects.json`）を読み込む。**プロセスで 1 度**でよい。
+///
+/// 戻り値は表に載ったカード枚数。2 回目以降の呼び出しは何もせず現在の枚数を返す。
+/// ファイルが無い／JSON が壊れている／未知の enum 名がある場合は `ValueError`。
+#[pyfunction]
+fn load_masters(path: &str) -> PyResult<usize> {
+    Ok(state::load_masters(path)?)
+}
+
 /// 記録 v2 の `hidden`（完全な内部状態）から盤面を組み立て、盤面 dict（`to_dict` 相当）を JSON で返す。
 ///
-/// `tests/scripts/rs_diff_replay.py --mode state` が呼ぶ P1-model の受け入れ口。骨組みでは
-/// `NotImplementedError`（WP `rs-p1-model` が `model::GameState::from_record`＋`board_json` で置き換える）。
+/// `tests/scripts/rs_diff_replay.py --mode state` が呼ぶ P1-model の受け入れ口。
+/// `load_masters()` を先に呼んでいない場合は `ValueError`。
 #[pyfunction]
 fn state_roundtrip(hidden_json: &str) -> PyResult<String> {
     Ok(state::state_roundtrip(hidden_json)?)
@@ -66,6 +75,7 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
     m.add_function(wrap_pyfunction!(record_version, m)?)?;
     m.add_function(wrap_pyfunction!(echo_state, m)?)?;
+    m.add_function(wrap_pyfunction!(load_masters, m)?)?;
     m.add_function(wrap_pyfunction!(state_roundtrip, m)?)?;
     m.add_function(wrap_pyfunction!(replay, m)?)?;
     Ok(())

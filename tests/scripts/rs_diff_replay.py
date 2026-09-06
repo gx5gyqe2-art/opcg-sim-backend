@@ -16,7 +16,13 @@ unimplemented が減り、mismatch が 0 のまま maintained されることが
 実行例:
     OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_diff_replay.py --games 5 --policy random
     OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_diff_replay.py \\
+      --mode state --games 500 --policy random          # P1-model の受け入れ
+    OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_diff_replay.py \\
       --games 20 --policy l1 --seed-base 500000 --dump /tmp/rec.json
+
+`--effects`（既定 `opcg_sim/data/opcg_effects.json`）は Rust 側が読むカード定義（効果構造 JSON）。
+生成物・git 管理外なので、無ければ `export_effects_json` を呼んで作り、`opcg_engine.load_masters`
+へ渡す（拡張に `load_masters` が無い旧版では何もしない）。
 
 照合の規約（計画 §4）:
   - 盤面の比較は **キー順に依存しない正規化 JSON**（`json.dumps(..., sort_keys=True)`）で行う。
@@ -39,6 +45,7 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXP
 
 import argparse
 import json
+import subprocess
 import traceback
 
 import os as _os, sys as _sys  # noqa: E402  test bootstrap (sys.path + google スタブ)
@@ -56,6 +63,29 @@ except ImportError:         # pragma: no cover - 実行環境依存
 # 記録ペイロードの形式バージョン。Rust 側 `state::RECORD_VERSION` と一致させること
 # （形を非互換に変えたら両方 +1 する）。
 RECORD_VERSION = 2
+
+# 効果構造 JSON（`opcg_sim/tools/export_effects_json.py` の生成物・git 管理外・約 8MB）。
+# Rust 側は起動時にこれを 1 度だけ読んで `CardMaster` 表を作る（`opcg_engine.load_masters`）。
+_REPO_ROOT = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+DEFAULT_EFFECTS_PATH = _os.path.join(_REPO_ROOT, "opcg_sim", "data", "opcg_effects.json")
+
+
+def ensure_effects_json(path: str) -> str:
+    """効果構造 JSON を用意する（無ければ exporter を呼んで生成する）。"""
+    if os.path.exists(path):
+        return path
+    print(f"[effects] {path} が無いので生成する: python -m opcg_sim.tools.export_effects_json")
+    subprocess.run([_sys.executable, "-m", "opcg_sim.tools.export_effects_json", "--out", path],
+                   cwd=_REPO_ROOT, check=True, stdout=subprocess.DEVNULL)
+    return path
+
+
+def load_masters(path: str) -> None:
+    """Rust 側へカード定義を読み込ませる（`load_masters` が無い版の拡張では何もしない）。"""
+    if opcg_engine is None or not hasattr(opcg_engine, "load_masters"):
+        return
+    n = opcg_engine.load_masters(ensure_effects_json(path))
+    print(f"[effects] load_masters({path}) -> {n} cards")
 
 
 # --- 盤面スナップショット -----------------------------------------------------
@@ -356,10 +386,14 @@ def main(argv=None) -> int:
                     help="各行動後の完全な内部状態（形式 v2 の hidden）も記録する（--mode state は必須）")
     ap.add_argument("--mode", choices=["replay", "state"], default="replay",
                     help="replay=行動列の再生を照合（既定）／state=hidden→GameState→盤面 dict の往復を照合（P1-model）")
+    ap.add_argument("--effects", default=DEFAULT_EFFECTS_PATH,
+                    help="効果構造 JSON（Rust の CardMaster 表・既定 opcg_sim/data/opcg_effects.json）。"
+                         "無ければ export_effects_json で生成する")
     ap.add_argument("--dump", default=None, help="1局目の記録をこのパスへ書き出す（Rust 側の開発用）")
     ap.add_argument("--verbose", action="store_true", help="局ごとの判定を出す")
     args = ap.parse_args(argv)
 
+    load_masters(args.effects)
     db = load_db()
     totals = {"games": 0, "actions": 0, "match": 0, "mismatch": 0, "unimplemented": 0,
               "python_error": 0, "bad_payload": 0, "bad_output": 0}

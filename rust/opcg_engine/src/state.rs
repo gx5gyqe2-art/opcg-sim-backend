@@ -4,7 +4,9 @@
 //! P1 以降 `model`/`journal` が入ったら、`replay` の中身を本物の再生に差し替える
 //! （呼び出し規約＝入出力 JSON は変えない）。設計は `docs/rust_engine_plan.md` §4。
 
+use crate::model::{GameState, MasterTable};
 use serde_json::Value;
+use std::sync::OnceLock;
 
 /// 再生ペイロード（`tests/scripts/rs_diff_replay.py` が書く JSON）の想定バージョン。
 /// 形を非互換に変えたら +1 し、Python 側（`RECORD_VERSION`）も同時に上げる。
@@ -31,10 +33,37 @@ pub fn echo_state(json_str: &str) -> Result<String, EngineError> {
         .map_err(|e| EngineError::BadPayload(format!("cannot re-serialize board JSON: {e}")))
 }
 
+/// カード定義表（`opcg_sim/data/opcg_effects.json`）。**プロセスで 1 度だけ**読み込む。
+///
+/// 7.9MB の JSON をパースして 2,803 枚の `CardMaster` を作るので、局ごとに読み直すと
+/// ハーネスが遅くなる。Python 側は起動時に `opcg_engine.load_masters(path)` を 1 度呼ぶ。
+static MASTERS: OnceLock<MasterTable> = OnceLock::new();
+
+/// 効果 JSON を読み込んでカード定義表を作る（既に読み込み済みなら何もしない）。
+///
+/// 戻り値は表に載っているカード枚数（Python 側の疎通確認・取り違え検出用）。
+pub fn load_masters(path: &str) -> Result<usize, EngineError> {
+    if let Some(table) = MASTERS.get() {
+        return Ok(table.masters.len()); // プロセスで 1 度＝2 回目以降は現在の表をそのまま使う
+    }
+    let text = std::fs::read_to_string(path)
+        .map_err(|e| EngineError::BadPayload(format!("load_masters: cannot read '{path}': {e}")))?;
+    let doc: Value = serde_json::from_str(&text)
+        .map_err(|e| EngineError::BadPayload(format!("load_masters: invalid JSON in '{path}': {e}")))?;
+    let table = MasterTable::from_effects_json(&doc)?;
+    // 競合で先に入った表があればそちらを採る（同じファイルを読むので内容は同じ）。
+    Ok(MASTERS.get_or_init(|| table).masters.len())
+}
+
+/// 読み込み済みのカード定義表（未ロードなら `None`）。
+pub fn masters() -> Option<&'static MasterTable> {
+    MASTERS.get()
+}
+
 /// 記録 v2 の `hidden` → `GameState` → 盤面 JSON（P1-model の受け入れ口・`lib.rs` から呼ばれる）。
 ///
-/// 骨組みでは JSON の妥当性だけ検査して `Unimplemented` を返す。WP `rs-p1-model` が
-/// `model::GameState::from_record(&Value)` と `board_json(&GameState)` を実装してここを置き換える。
+/// 出力は `tests/scripts/rs_diff_replay.py::board_dict` と同じ形・同じ値（`pending_request` は
+/// 対話スタックを持つ P2 の責務なので出さない＝ハーネス側も比較から外す）。
 pub fn state_roundtrip(hidden_json: &str) -> Result<String, EngineError> {
     let value: Value = serde_json::from_str(hidden_json)
         .map_err(|e| EngineError::BadPayload(format!("invalid hidden JSON: {e}")))?;
@@ -46,9 +75,17 @@ pub fn state_roundtrip(hidden_json: &str) -> Result<String, EngineError> {
             return Err(EngineError::BadPayload(format!("hidden: missing '{key}'")));
         }
     }
-    Err(EngineError::Unimplemented(
-        "state_roundtrip: model not implemented yet (P1 skeleton); see docs/rust_engine_plan.md §9".into(),
-    ))
+    let masters = masters().ok_or_else(|| {
+        EngineError::BadPayload(
+            "state_roundtrip: card masters are not loaded; call opcg_engine.load_masters(path) \
+             with opcg_sim/data/opcg_effects.json first"
+                .into(),
+        )
+    })?;
+    let state = GameState::from_record(&value, masters)?;
+    let board = state.board_json(masters)?;
+    serde_json::to_string(&board)
+        .map_err(|e| EngineError::BadPayload(format!("cannot serialize board JSON: {e}")))
 }
 
 /// 記録した局（seed・初期盤面・行動列）を Rust エンジンで再生する。
@@ -125,13 +162,23 @@ mod tests {
     }
 
     #[test]
-    fn state_roundtrip_checks_contract_then_reports_unimplemented() {
-        match state_roundtrip(r#"{"players":{},"manager":{}}"#) {
-            Err(EngineError::Unimplemented(msg)) => assert!(msg.contains("state_roundtrip")),
-            other => panic!("expected Unimplemented, got {other:?}"),
-        }
+    fn state_roundtrip_checks_the_contract() {
         match state_roundtrip(r#"{"players":{}}"#) {
             Err(EngineError::BadPayload(msg)) => assert!(msg.contains("'manager'")),
+            other => panic!("expected BadPayload, got {other:?}"),
+        }
+        // 契約は満たすが中身は空＝マスター未ロードなら「未ロード」、ロード済みなら盤面の不整合。
+        // どちらでも BadPayload（Unimplemented を返さない＝P1-model は実装済み）。
+        match state_roundtrip(r#"{"players":{},"manager":{}}"#) {
+            Err(EngineError::BadPayload(_)) => {}
+            other => panic!("expected BadPayload, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn load_masters_reports_a_missing_file() {
+        match load_masters("/nonexistent/opcg_effects.json") {
+            Err(EngineError::BadPayload(msg)) => assert!(msg.contains("cannot read")),
             other => panic!("expected BadPayload, got {other:?}"),
         }
     }

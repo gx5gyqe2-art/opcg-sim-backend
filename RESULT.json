@@ -1,0 +1,34 @@
+{
+  "job": "rs-p1-model",
+  "status": "done",
+  "branch": "claude/rs-p1-model",
+  "base": "claude/cpu-spec-improvements-yw91jd (485c3cb)",
+  "harness": {
+    "random500": {"games": 500, "actions": 49738, "match": 500, "mismatch": 0, "unimplemented": 0,
+                  "python_error": 0, "bad_payload": 0, "bad_output": 0, "policy": "random",
+                  "mode": "state", "seed_base": 500000, "engine": "0.0.1", "record_version": 2,
+                  "first": null},
+    "l1_50": {"games": 50, "actions": 5770, "match": 50, "mismatch": 0, "unimplemented": 0,
+              "python_error": 0, "bad_payload": 0, "bad_output": 0, "policy": "l1",
+              "mode": "state", "seed_base": 600000, "engine": "0.0.1", "record_version": 2,
+              "first": null}
+  },
+  "gates": {
+    "make_test": {"passed": 1761, "failed": 0, "seconds": 586.82},
+    "cargo_test": {"tests": 16, "failed": 0, "cmd": "cargo test --no-default-features"},
+    "cargo_clippy": {"warnings": 0, "cmd": "cargo clippy --no-default-features --all-targets -- -D warnings"},
+    "load_masters": {"cards": 2803, "seconds": 0.14}
+  },
+  "owned_files": [
+    "rust/opcg_engine/src/model.rs",
+    "rust/opcg_engine/src/state.rs",
+    "rust/opcg_engine/src/lib.rs",
+    "rust/opcg_engine/README.md",
+    "rust/opcg_engine/tests/fixtures/{hidden_v2,board_v2,masters_v2}.json + README.md",
+    "tests/scripts/rs_diff_replay.py",
+    "docs/rust_engine_plan.md (§8 の結果行と §8.2)",
+    "docs/TEST_SPEC.md (rs_diff_replay.py の行)"
+  ],
+  "untouched": ["journal.rs", "ops.rs", "opcg_sim/ 配下の実装（Python エンジンは無変更）"],
+  "notes": "受け入れは 2 本とも達成（random 500 局=全 500 一致・L1 50 局=全 50 一致、いずれも mismatch=0・unimplemented=0）。Python 側の欠陥は 1 件も見つからず、Python の修正はしていない（ハーネスへの --effects 追加と load_masters 呼び出しのみ）。■ 実装で踏んだ罠 1（要周知）: opcg_sim/src/models/enums.py の CardType の値は濁点が結合文字（NFD）で書かれている（リーダー = U+30EA U+30FC U+30BF U+3099 U+30FC。イベント・ステージも同様。キャラクター/Attribute/Color/DonInstance の『ドン!!』は NFC）。Rust 側に素直な文字列リテラルを書くと NFC になり、全行の players.*.leader.type が不一致になる（実測）。CardType::value はエスケープで符号位置を固定し、テスト card_type_values_keep_the_python_normalization で守った。P2 以降で Python の enum 値を Rust へ写すときは同じ検査を入れること。■ 罠 2: Python の CardInstance._refresh_keywords は hasattr(ability,'actions') で KEYWORD アクションを拾うが、Ability dataclass に actions フィールドが無いため現行カード DB では全 2803 枚で current_keywords == master.keywords（実測確認）。指示どおり『master keywords ∪ 各 ability の KEYWORD アクションの details』を実装しているが、Python と同じ場所（ability のトップレベル actions のみ・空文字は足さない）を走査する形にしてあるので、将来 Ability に actions が生えても Python と一致し続ける。■ 契約の扱い: model.rs の型（§9.2）は 1 つも変更・追加していない。hidden.manager の interaction_depth / pending_triggers / pending_end_of_turn は形の検査（非負整数）だけして読み捨てる（盤面 dict に出ないため GameState には持たせていない）。P2 で中身の契約が決まったら追加が要る。pending_request は出していない（P2 の責務・ハーネスも比較から外している）。■ from_record は記録 v2 の欄を全て明示的に読み、未知のキー・型違い・未知の enum 名・重複 uuid・解決できない付与先 uuid・ドン!!の所在と attached_to の食い違いを BadPayload にする（500+50 局の全行でこの厳格化に引っかかった行は 0）。■ 環境メモ: このコンテナには pytest/numpy/fastapi/httpx/maturin が入っていなかったので pip で導入して make test を通した（リポジトリの変更ではない）。docker build は P0 と同じくベースイメージ取得が egress ポリシーで 403 のため本セッションでも未検証。"
+}
