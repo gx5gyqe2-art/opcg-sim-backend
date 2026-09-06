@@ -256,6 +256,13 @@ def _zone(i):
     return "hand"
 
 
+_ZONE = tuple(_zone(i) for i in range(N_TOK))
+_OWN_IDS = tuple(i for i in range(N_TOK) if _ZONE[i] in ("own_leader", "own_field", "hand"))
+_OPP_IDS = tuple(i for i in range(N_TOK) if _ZONE[i] in ("opp_leader", "opp_field"))
+_ON_BOARD = tuple(_ZONE[i] in ("own_leader", "own_field", "opp_leader", "opp_field") for i in range(N_TOK))
+_OWN_SIDE = tuple(_ZONE[i] in ("own_leader", "own_field", "hand") for i in range(N_TOK))
+
+
 def _own_index(i):
     """22 枠 index → 自トークン index（0..15）。自L=0・自場=1..5・手札=6..15。"""
     if i == 0:
@@ -295,11 +302,33 @@ def _has_kw(c, kw):
         return kw in (getattr(getattr(c, "master", None), "keywords", ()) or ())
 
 
+_STATIC: dict = {}
+
+
+def _static(master):
+    """マスター単位の静的情報（2026-09-06・serve の律速対策）: 種別名・プロファイル・トリガー旗・
+    条件つき能力の (k, condition) 列。枠ループの getattr／名前引きを 1 回の dict 引きに置き換える。"""
+    key = getattr(master, "card_id", None) or id(master)
+    hit = _STATIC.get(key)
+    if hit is not None:
+        return hit
+    p = profile(master)
+    t = getattr(getattr(master, "type", None), "name", "")
+    abs_ = list(getattr(master, "abilities", ()) or ())[:MAX_AB]
+    conds = tuple((k, ab.condition) for k, ab in enumerate(abs_) if getattr(ab, "condition", None) is not None)
+    hit = (t, p, 1.0 if "ON_KO" in p["trig"] else 0.0, 1.0 if "ON_ATTACK" in p["trig"] else 0.0,
+           1.0 if ("ON_OPP_ATTACK" in p["trig"] or "OPPONENT_ATTACK" in p["trig"]) else 0.0,
+           min(p["ret_don"], 3.0) / 3.0, conds)
+    _STATIC[key] = hit
+    return hit
+
+
 def _cond_flags(manager, player, card, res=None):
     """能力 k（≤4）の条件が今真か（条件無し＝1）。評価はエンジンの `_check_condition`。"""
     out = np.ones(MAX_AB, np.float32)
-    abs_ = list(getattr(getattr(card, "master", None), "abilities", ()) or ())[:MAX_AB]
-    if not any(getattr(ab, "condition", None) is not None for ab in abs_):
+    m = getattr(card, "master", None)
+    conds = _static(m)[6] if m is not None else ()
+    if not conds:
         return out
     if res is None:
         try:
@@ -307,10 +336,7 @@ def _cond_flags(manager, player, card, res=None):
             res = EffectResolver(manager)
         except Exception:
             return out
-    for k, ab in enumerate(abs_):
-        cond = getattr(ab, "condition", None)
-        if cond is None:
-            continue
+    for k, cond in conds:
         try:
             out[k] = 1.0 if res._check_condition(player, cond, card, card) else 0.0
         except Exception:
@@ -318,8 +344,9 @@ def _cond_flags(manager, player, card, res=None):
     return out
 
 
-def _leader_act_avail(manager, me):
-    """リーダー起動（ACTIVATE_MAIN）が今の合法手にあるか＝未使用かつ条件/コストを満たす。"""
+def _leader_act_avail(manager, me, legal=None):
+    """リーダー起動（ACTIVATE_MAIN）が今の合法手にあるか＝未使用かつ条件/コストを満たす。
+    `legal`（呼び出し側が既に列挙した合法手）があれば再列挙しない。"""
     if me.leader is None or getattr(manager, "turn_player", None) is not me:
         return 0.0
     try:
@@ -327,7 +354,7 @@ def _leader_act_avail(manager, me):
         if not pa or pa[0] != me.name or pa[1] != "MAIN_ACTION":
             return 0.0
         lu = getattr(me.leader, "uuid", None)
-        for a in manager.get_legal_actions(me):
+        for a in (legal if legal is not None else manager.get_legal_actions(me)):
             if a.get("action_type") == "ACTIVATE_MAIN":
                 p = a.get("payload") or {}
                 if (a.get("card_uuid") or p.get("uuid") or p.get("card_uuid")) == lu:
@@ -441,7 +468,77 @@ def relations_from_dump(card_idx, tok, ptab):
     return relations_from_tokens(profs, tok)
 
 
-def encode_rel(manager, me_name, with_relations=True):
+# ---------------------------------------------------------------------------
+# 集計キャッシュ（2026-09-06・serve の律速対策）: 山札／未見プール／トラッシュの集計は「中身の
+# card_id 列」で決まる純関数なので、列をキーに直近の結果を持つ。探索木の中で山札の中身が変わるのは
+# ドロー/サーチのときだけで、大半のノードで同じ列＝同じ結果を引く。出力は非キャッシュ版と同一。
+# ---------------------------------------------------------------------------
+_AGG_MAX = 256
+
+
+def _agg_get(cache, key, fn):
+    hit = cache.get(key)
+    if hit is None:
+        hit = fn()
+        if len(cache) >= _AGG_MAX:
+            cache.clear()
+        cache[key] = hit
+    return hit
+
+
+_DECK_ROLES_CACHE: dict = {}
+_POOL_CACHE: dict = {}
+_TRASH_CTR_CACHE: dict = {}
+
+
+def _card_ids(cards):
+    return tuple(getattr(getattr(c, "master", None), "card_id", None) for c in cards)
+
+
+def _deck_roles(deck):
+    def fn():
+        dr = np.zeros(len(ROLES), np.float32)
+        for c in deck:
+            m = getattr(c, "master", None)
+            if m is not None:
+                dr += roles_of(m)
+        return dr
+    return _agg_get(_DECK_ROLES_CACHE, _card_ids(deck), fn)
+
+
+def _pool_summary(pool, don_next_opp):
+    """(pool_arr, pr, pmax, pbig, pctr, pblk)。pool_arr は次ターンのドンで撃てるしきい値効果の行列。"""
+    def fn():
+        rows = [thr_rows(c.master) for c in pool
+                if getattr(c, "master", None) is not None and thr_rows(c.master) is not None
+                and int(getattr(c.master, "cost", 0) or 0) <= don_next_opp]
+        pool_arr = np.concatenate(rows, 0) if rows else None
+        pr = np.zeros(len(ROLES), np.float32)
+        pmax, pbig, pctr, pblk = 0.0, 0, 0.0, 0
+        for c in pool:
+            m = getattr(c, "master", None)
+            if m is None:
+                continue
+            pr += roles_of(m)
+            pp = float(getattr(m, "power", 0) or 0)
+            if _tname(c) == "CHARACTER":
+                pmax = max(pmax, pp)
+                if pp >= _BIG_POWER:
+                    pbig += 1
+            pctr += float(getattr(m, "counter", 0) or 0)
+            if profile(m)["blocker"]:
+                pblk += 1
+        return (pool_arr, pr, pmax, pbig, pctr, pblk)
+    return _agg_get(_POOL_CACHE, (_card_ids(pool), int(don_next_opp)), fn)
+
+
+def _trash_counter_count(trash):
+    def fn():
+        return sum(1 for c in trash if (getattr(getattr(c, "master", None), "counter", 0) or 0) > 0)
+    return _agg_get(_TRASH_CTR_CACHE, _card_ids(trash), fn)
+
+
+def encode_rel(manager, me_name, with_relations=True, legal=None):
     """盤面 → {"tokens": [22,S_DIM], "rel_om": [16,6,R_DIM], "rel_oo": [16,16,R_DIM], "extra": [EXTRA_DIM]}。
 
     `with_relations=False` なら rel_om/rel_oo を計算しない（serve は `relations_batch` で一括計算する）。"""
@@ -460,25 +557,29 @@ def encode_rel(manager, me_name, with_relations=True):
     don_next_opp = min(10, don_total_opp + min(1, len(getattr(opp, "don_deck", ()) or ())))
     pool = _unseen_pool(opp)
     n_pool = max(1, len(pool))
-    # 相手プールのしきい値効果（次ターンのドンで撃てるもの）を配列に畳む（threat_next の一括判定用）
-    _rows = [thr_rows(c.master) for c in pool
-             if getattr(c, "master", None) is not None and thr_rows(c.master) is not None
-             and int(getattr(c.master, "cost", 0) or 0) <= don_next_opp]
-    pool_arr = np.concatenate(_rows, 0) if _rows else None                    # [M, 6] = P, C, rest, lead, nothr, red
+    # 相手プールのしきい値効果（次ターンのドンで撃てるもの）と役割/脅威の要約（中身が同じなら再利用）
+    pool_arr, pr, pmax, pbig, pctr, pblk = _pool_summary(pool, don_next_opp)   # pool_arr [M, 6] = P, C, rest, lead, nothr, red
 
     pw = [0] * N_TOK
     cs = [0] * N_TOK
+    thr_slots = []
+    tok[:, 10:14] = 1.0                                   # cond_ok の既定（条件無し＝1・空枠は後で 0 に戻す）
     for i, c in enumerate(slots):
         if c is None:
+            tok[i, 10:14] = 0.0
             continue
-        z = _zone(i)
-        owner_turn = my_turn if z in ("own_leader", "own_field", "hand") else (not my_turn)
+        z = _ZONE[i]
+        own_side = _OWN_SIDE[i]
+        owner_turn = my_turn if own_side else (not my_turn)
         m = getattr(c, "master", None)
-        p = profile(m) if m is not None else None
-        t = _tname(c)
-        pw[i] = _power(c, owner_turn) if t in ("LEADER", "CHARACTER") else 0
+        if m is not None:
+            t, p, trig_ko, trig_atk, trig_oatk, ret_norm, conds = _static(m)
+        else:
+            t, p, trig_ko, trig_atk, trig_oatk, ret_norm, conds = "", None, 0.0, 0.0, 0.0, 0.0, ()
+        is_unit = t == "LEADER" or t == "CHARACTER"
+        pw[i] = _power(c, owner_turn) if is_unit else 0
         cs[i] = _cost(c)
-        on_board = z in ("own_leader", "own_field", "opp_leader", "opp_field")
+        on_board = _ON_BOARD[i]
         sick = bool(getattr(c, "is_newly_played", False)) and not _has_kw(c, _RUSH_KW)
         rest = bool(getattr(c, "is_rest", False))
         tok[i, 0] = pw[i] / 10000.0
@@ -486,8 +587,7 @@ def encode_rel(manager, me_name, with_relations=True):
         tok[i, 2] = float(getattr(c, "attached_don", 0) or 0) / 5.0
         tok[i, 3] = 1.0 if rest else 0.0
         tok[i, 4] = 1.0 if (on_board and sick) else 0.0
-        tok[i, 5] = 1.0 if (on_board and owner_turn and not rest and not sick
-                            and t in ("LEADER", "CHARACTER")) else 0.0
+        tok[i, 5] = 1.0 if (on_board and owner_turn and not rest and not sick and is_unit) else 0.0
         tok[i, 6] = 1.0 if (on_board and t == "CHARACTER" and not rest and _has_kw(c, _BLOCKER_KW)) else 0.0
         if z == "hand":
             cv = 0.0
@@ -498,38 +598,48 @@ def encode_rel(manager, me_name, with_relations=True):
             if p is not None and t == "EVENT":
                 cv = max(cv, p["counter_event"])
             tok[i, 7] = min(cv / 2000.0, 2.5)
-            if t == "CHARACTER":
-                tok[i, 8] = 1.0 if cs[i] <= n_active else 0.0
-            elif t in ("EVENT", "STAGE"):
+            if t == "CHARACTER" or t == "EVENT" or t == "STAGE":
                 tok[i, 8] = 1.0 if cs[i] <= n_active else 0.0
         if p is not None:
-            tok[i, 9] = min(p["ret_don"], 3.0) / 3.0
-            tok[i, 14] = 1.0 if "ON_KO" in p["trig"] else 0.0
-            tok[i, 15] = 1.0 if "ON_ATTACK" in p["trig"] else 0.0
-            tok[i, 16] = 1.0 if ("ON_OPP_ATTACK" in p["trig"] or "OPPONENT_ATTACK" in p["trig"]) else 0.0
-        owner = me if z in ("own_leader", "own_field", "hand") else opp
-        tok[i, 10:14] = _cond_flags(manager, owner, c, _res)
-        if z in ("own_leader", "own_field") and pool_arr is not None:
-            P_, C_, RS_, LD_, NT_, RD_ = (pool_arr[:, k] for k in range(6))
-            pw_eff = pw[i] - RD_
-            gp = np.where(np.isfinite(P_), (pw_eff - P_) / 10000.0, -np.inf)
-            gc = np.where(np.isfinite(C_), (cs[i] - C_) * 0.1, -np.inf)
-            g = np.where(NT_ > 0, -1.0, np.maximum(gp, gc))
-            blocked = ((RS_ > 0) & (not rest)) | ((z == "own_leader") & (LD_ <= 0.5))
-            tok[i, 17] = min(float(((g <= 0.0) & ~blocked).sum()) / n_pool, 1.0)
+            tok[i, 9] = ret_norm
+            tok[i, 14] = trig_ko
+            tok[i, 15] = trig_atk
+            tok[i, 16] = trig_oatk
+        if conds:
+            owner = me if own_side else opp
+            tok[i, 10:14] = _cond_flags(manager, owner, c, _res)
+        if own_side and z != "hand" and pool_arr is not None:
+            thr_slots.append((i, rest, z == "own_leader"))          # threat_next はループ後に一括計算
         tok[i, 18] = 1.0 if t == "CHARACTER" else 0.0
         tok[i, 19] = 1.0 if t == "EVENT" else 0.0
+
+    if thr_slots:
+        # threat_next（自分の場の枠 × 相手プールのしきい値効果）を枠ごとの numpy 呼び出しでなく一括で
+        # 計算する（2026-09-06・要素ごとの式は従来と同一＝出力同一）。
+        P_, C_, RS_, LD_, NT_, RD_ = (pool_arr[:, k] for k in range(6))
+        idx = np.array([i for i, _r, _l in thr_slots])
+        pw_a = np.array([pw[i] for i in idx], np.float64)[:, None]
+        cs_a = np.array([cs[i] for i in idx], np.float64)[:, None]
+        rest_a = np.array([r for _i, r, _l in thr_slots], bool)[:, None]
+        lead_a = np.array([l for _i, _r, l in thr_slots], bool)[:, None]
+        pw_eff = pw_a - RD_[None, :]
+        gp = np.where(np.isfinite(P_)[None, :], (pw_eff - P_[None, :]) / 10000.0, -np.inf)
+        gc = np.where(np.isfinite(C_)[None, :], (cs_a - C_[None, :]) * 0.1, -np.inf)
+        g = np.where(NT_[None, :] > 0, -1.0, np.maximum(gp, gc))
+        blocked = ((RS_[None, :] > 0) & ~rest_a) | (lead_a & (LD_[None, :] <= 0.5))
+        cnt = ((g <= 0.0) & ~blocked).sum(1).astype(np.float64)
+        tok[idx, 17] = np.minimum(cnt / n_pool, 1.0)
 
     # ---- 関係 R（トークン状態 S とプロファイルだけから計算＝訓練時の再計算と同じ関数） ----
     profs = [profile(c.master) if (c is not None and getattr(c, "master", None) is not None) else None
              for c in slots]
     rel_om, rel_oo = relations_from_tokens(profs, tok) if with_relations else (None, None)
-    own_ids = [i for i in range(N_TOK) if _zone(i) in ("own_leader", "own_field", "hand")]
-    opp_ids = [i for i in range(N_TOK) if _zone(i) in ("opp_leader", "opp_field")]
+    own_ids = _OWN_IDS
+    opp_ids = _OPP_IDS
 
     # ---- グローバル追加列 ----
     ex = np.zeros(EXTRA_DIM, np.float32)
-    ex[0] = _leader_act_avail(manager, me) if my_turn else 0.0
+    ex[0] = _leader_act_avail(manager, me, legal=legal) if my_turn else 0.0
     add = 0.0
     rush = 0
     for c in (getattr(me, "hand", ()) or ()):
@@ -544,33 +654,13 @@ def encode_rel(manager, me_name, with_relations=True):
     ex[1] = min(add, 5.0) / 5.0
     ex[2] = sum(1 for i in own_ids if tok[i, 5] > 0) / 6.0
     ex[3] = min(rush, 5) / 5.0
-    ex[4] = min(sum(1 for c in (getattr(opp, "trash", ()) or ())
-                    if (getattr(getattr(c, "master", None), "counter", 0) or 0) > 0), 10) / 10.0
+    ex[4] = min(_trash_counter_count(getattr(opp, "trash", ()) or ()), 10) / 10.0
     opp_attack = sum(pw[j] for j in opp_ids if slots[j] is not None and not getattr(slots[j], "is_rest", False))
-    my_guard = sum(tok[i, 7] * 2000.0 for i in own_ids if _zone(i) == "hand") + 1000.0 * sum(
+    my_guard = sum(tok[i, 7] * 2000.0 for i in own_ids if _ZONE[i] == "hand") + 1000.0 * sum(
         1 for i in own_ids if tok[i, 6] > 0)
     ex[5] = float(np.clip((opp_attack - my_guard) / 20000.0, -1.5, 1.5))
-    dr = np.zeros(len(ROLES), np.float32)
-    for c in (getattr(me, "deck", ()) or ()):
-        m = getattr(c, "master", None)
-        if m is not None:
-            dr += roles_of(m)
+    dr = _deck_roles(getattr(me, "deck", ()) or ())
     ex[6:6 + len(ROLES)] = np.minimum(dr, 10.0) / 10.0
-    pr = np.zeros(len(ROLES), np.float32)
-    pmax, pbig, pctr, pblk = 0.0, 0, 0.0, 0
-    for c in pool:
-        m = getattr(c, "master", None)
-        if m is None:
-            continue
-        pr += roles_of(m)
-        pp = float(getattr(m, "power", 0) or 0)
-        if _tname(c) == "CHARACTER":
-            pmax = max(pmax, pp)
-            if pp >= _BIG_POWER:
-                pbig += 1
-        pctr += float(getattr(m, "counter", 0) or 0)
-        if profile(m)["blocker"]:
-            pblk += 1
     b = 6 + len(ROLES)
     ex[b:b + len(ROLES)] = np.minimum(pr, 10.0) / 10.0
     b += len(ROLES)

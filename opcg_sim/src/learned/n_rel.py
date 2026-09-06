@@ -307,8 +307,7 @@ class NRelValueAdapter:
         c._cache = collections.OrderedDict()          # 符号化キャッシュは席（エンジン）ごと
         return c
 
-    @staticmethod
-    def _fingerprint(state, to_move):
+    def _fingerprint(self, state, to_move):
         """同じ盤面か（value と priors が同じノードで続けて呼ばれる＝符号化を 1 回にする）。
         make/unmake は同一オブジェクトを書き換えるので id() では判別できない＝内容の指紋で見る。"""
         def cz(c):
@@ -341,10 +340,13 @@ class NRelValueAdapter:
         except Exception:
             parts.append(None)
         try:
+            legal = state.get_legal_actions()
             parts.append(tuple((m.get("action_type"), tuple(sorted((k, str(v)) for k, v in (m.get("payload") or {}).items())))
-                               for m in state.get_legal_actions()))
+                               for m in legal))
         except Exception:
+            legal = None
             parts.append(None)
+        self._fp_legal = legal
         for pl in (state.p1, state.p2):
             # 山札・ライフ・トラッシュは**中身**まで見る（2026-09-06・複数エントリ化に伴い）: PIMC の
             # 別世界は見える盤面が同じでも山札の中身（デッキ残の役割・未見プール）が違うので、枚数だけの
@@ -369,6 +371,7 @@ class NRelValueAdapter:
         cache = getattr(self, "_cache", None)
         if cache is None:
             cache = self._cache = collections.OrderedDict()
+        self._fp_legal = None
         if _NOCACHE:
             fp = None
         else:
@@ -390,7 +393,10 @@ class NRelValueAdapter:
                             _VERIFY_STATS["tok"] += 1
                     _VERIFY_STATS["hits"] += 1
                 return hit
-        R = NR.encode_rel(state, to_move, with_relations=False)
+        # 指紋で列挙した合法手（同じ盤面・手番）を `_leader_act_avail` に再利用＝再列挙しない
+        me_pl = state.p1 if state.p1.name == to_move else state.p2
+        legal = self._fp_legal if (self._fp_legal is not None and getattr(state, "turn_player", None) is me_pl) else None
+        R = NR.encode_rel(state, to_move, with_relations=False, legal=legal)
         base = E.encode(state, to_move, self.vocab, version=12)
         sc = np.concatenate([base["scalars"], R["extra"]]).astype(np.float32)[None, :]
         ci = np.asarray(base["card_idx"])[:N_TOK][None, :]
