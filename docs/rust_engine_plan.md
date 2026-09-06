@@ -122,6 +122,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-06 | P0 | 指示書作成 |
 | 2026-09-06 | P0 | **完了**（`claude/rs-p0-skeleton`）: crate 雛形＋PyO3/maturin・Docker ビルド段・効果 JSON 書き出し・差分照合ハーネス・`make rust`。結果は下記 §8.1 |
 | 2026-09-06 | P0 | 統合（本線へ cherry-pick・d252eb20）。ローカル再検証: exporter 2803 枚／`--games 2` unimplemented=2／`cargo test` 5 件 green |
+| 2026-09-06 | P1 | **`rs-p1-journal` 完了**（`claude/rs-p1-journal`）: `journal.rs`（undo ログ・入れ子/rollback/commit）・`ops.rs`（原始操作 10 種＋`apply_ops`）・`rs_record.py`／`rs_ops_oracle.py`。結果は下記 §8.2 |
 | 2026-09-06 | P1 | **設計＋契約を本線へ**（§9）: 記録形式 v2（`hidden`＝完全な内部状態）・`--mode state`・`model.rs` 型契約と stub（`MasterTable::from_effects_json`／`GameState::from_record`／`board_json`）・`state_roundtrip` 入口。WP `rs-p1-model`／`rs-p1-journal` の指示書は §9.4 |
 
 ### 8.1 P0 の結果（2026-09-06）
@@ -178,6 +179,44 @@ TriggerType は ON_PLAY 940／ACTIVATE_MAIN 670／TRIGGER 507／PASSIVE 346／ON
 - 盤面 dict は API と同じ形（`turn_info`／`players`／`active_battle`＋`pending_request`）をハーネス側で
   組み立てている（`GameManager.to_dict` は存在しないため。Python 側は変更しない P0 の制約）。P1 で
   Rust 側の出力をこの形に合わせる。
+
+### 8.2 P1 `rs-p1-journal` の結果（2026-09-06）
+
+成果物（Python 側は**追加のみ**＝`opcg_sim/` は 1 行も変えていない）:
+
+| 成果物 | 中身 |
+|---|---|
+| `rust/opcg_engine/src/journal.rs` | undo ログ。`Session` が `GameState` を**所有**し、外へ出すのは読み取り専用の `&GameState` と記録つきの `StateMut` だけ（`&mut GameState` はモジュール外へ出ない＝`ops.rs` 以外は盤面を書き換えられない）。方式は**全て逆操作**（フィールド旧値／ゾーンの挿入・削除）で、Python の「コンテナ初回スナップショット＋世代カウンタ」に当たる仕組みは不要（逆順再生だけで開始点へ戻る）。`begin`/`rollback`（直近の開始点まで）/`commit`（記録を親へ畳む・親が無ければ捨てる）/`transaction`（Python の `with transaction():` と同じ＝必ず巻き戻す） |
+| `rust/opcg_engine/src/ops.rs` | 原始操作 10 種＋`apply_ops`。`move_card`（リーダー no-op・TRASH/HAND で `reset_turn_status(clear_usage)`・TRASH/HAND/DECK で `is_rest=False`・場を離れる時の付与ドン!!返却・ステージ置換・TOP/BOTTOM）／`draw`／`pay_cost`（`don_list` 有無）／`return_one_don`／`attach_don`／`reset_turn_status`／`life_to_hand`／`deck_to_life`／`set_rest`／`record_turn_event`。誘発（ON_LEAVE／ON_LIFE_DECREASE）と継続効果の破棄は**積まず**に `LeaveEvent` で返すだけ（P2/P3 の責務） |
+| `rust/opcg_engine/src/testkit.rs` | テスト専用（`#[cfg(test)]`）の盤面フィクスチャと決定的乱数。`from_record` が未実装の間、単体テストは手組みの盤面で回す |
+| `tests/harness/rs_record.py` | 記録 v2 の `hidden` → 本物の `GameManager` 復元（`manager_from_hidden`）＋操作台本 1 件を Python の原始操作へ流す `apply_python_op` |
+| `tests/scripts/rs_ops_oracle.py` | 原始操作のオラクル（§3 P1 受け入れ (b)）。`RS_OPS {...}` 1 行 |
+
+計測（本セッションのコンテナ・x86_64）:
+
+- **Python 側の自己検査**（復元 → 盤面 dict が記録の `state` と一致）: `--games 100 --ops-per-state 20`
+  → `RS_OPS {"games":100,"rows":9931,"ops":195717,"mismatch":0,"restore_mismatch":0,"python_error":0}`（75s）。
+  9,931 行すべてで復元が一致し、195,717 件の原始操作が Python 側で例外なく通った。
+- **`cargo test`**: 34 件 green（うち `apply_ops` の統合テスト 1 件は `#[ignore]`＝`from_record` 待ち）。
+  性質テスト（ランダム書き換え × 入れ子 3 段 × rollback で `PartialEq` 一致）**1000 試行** green。
+  `cargo clippy --all-targets -D warnings` 警告 0。
+- **undo vs clone**（探索用途の要件）: 21 枚の小盤面で **9.8 倍**（debug・undo 1.92ms / clone 18.88ms）／
+  **11.4 倍**（release・undo 0.48ms / clone 5.49ms）速い（各 2000 回・1 回あたり 4 変更）。clone の
+  コストはカード枚数に比例し undo は変更点数に比例するので、実盤面（100 枚超）では差はさらに開く。
+- **Rust とのオラクル照合は deferred**: `MasterTable::from_effects_json`／`GameState::from_record`
+  （WP `rs-p1-model` の担当）が未実装のため、`apply_ops` は `NotImplementedError` を返す
+  → ハーネスは全行 `unimplemented`（黙って緑にしない）。統合後にコーディネータが
+  `--games 100 --ops-per-state 20` を実行する。
+
+**引き継ぎ（統合時の注意）**:
+
+- `apply_ops` はマスター表をプロセスに 1 度だけ持つ（`ops.rs` の `MASTERS`／`set_masters`）。WP
+  `rs-p1-model` が `lib.rs` に足す `load_masters(path)` と役割が重なるので、統合時はどちらか
+  一方へ寄せる（`load_masters` から `ops::set_masters` を呼ぶのが最小変更）。
+- 記録 v2 の `active_battle` は `{attacker, target, counter_buff}` しか持たないが、
+  `engine/interaction.py` は BLOCK_STEP/COUNTER_STEP で `active_battle["target_owner"]` を読む。
+  よって復元した盤面では `get_pending_request()` を呼べない（`rs_record.py` が None を返して塞ぐ）。
+  **P2 で対話を扱うときに記録形式へ欄を足す**こと。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
@@ -328,3 +367,37 @@ docs/rust_engine_plan.md §6・§9（契約は本線 claude/cpu-spec-improvement
 RESULT.json: {"job":"rs-p1-journal","status":"done","self_check":{...},"oracle":"deferred"|{...},
  "notes":"..."} を push。
 ```
+
+### 9.5 原始操作の台本（ops_json）— WP `rs-p1-journal` が決めた形
+
+`apply_ops(hidden_json, ops_json, effects_path=None) -> {"states":[<各操作後の盤面 dict>...]}`
+（`rust/opcg_engine/src/lib.rs`。`effects_path` は初回のみ必要＝マスター表をプロセスで 1 度読む）。
+
+`ops_json` は**操作 dict の list**。カード／ドン!!は **uuid** で指す（index は Python 側から見えない）。
+各操作は Python の原始操作と 1:1 で、`tests/harness/rs_record.py::apply_python_op` が同じ 1 件を
+Python 側で適用する（＝オラクルの対）。
+
+```jsonc
+[
+  // ゾーン移動（card_moves.move_card）。to: FIELD|HAND|DECK|TRASH|LIFE|TEMP
+  //   pos: TOP|BOTTOM（既定 BOTTOM）。ステージは to=FIELD で枠へ入る（旧ステージはトラッシュ）
+  {"op": "move_card", "card": "<uuid>", "to": "TRASH", "player": "p2", "pos": "BOTTOM"},
+  {"op": "draw", "player": "p1", "n": 2},                       // デッキ上→手札（既定 n=1）
+  {"op": "pay_cost", "player": "p1", "cost": 2},                // アクティブ ドン!!の先頭から
+  {"op": "pay_cost", "player": "p1", "cost": 2, "dons": ["<uuid>", "..."]},  // 指定支払い
+  {"op": "return_don", "player": "p1", "don": "<uuid>"},        // 場のドン!!1 枚→ドン!!デッキ
+  {"op": "attach_don", "player": "p1", "card": "<uuid>", "from_rested": false},
+  {"op": "reset_turn_status", "card": "<uuid>", "keep_don": false, "clear_usage": true},
+  {"op": "life_to_hand", "player": "p1", "from": "TOP"},        // from: TOP|BOTTOM（既定 TOP）
+  {"op": "deck_to_life", "player": "p1"},                       // デッキ上→ライフの一番下（HEAL）
+  {"op": "set_rest", "card": "<uuid>", "value": true},
+  {"op": "record_turn_event", "name": "DON_RETURNED", "n": 1}
+]
+```
+
+- 未知の `op`・未知の uuid・未知のゾーン名は **`ValueError`**（黙って無視しない）。
+- `states[i]` は「i 番目の操作を**適用した後**」の盤面 dict（`GameState::board_json`＝
+  `rs_diff_replay.py::board_dict` と同じ形）。`pending_request` は P2 の責務なので照合から外す。
+- **journal の生きた検査**: 各操作の前に「transaction の中で同じ操作を適用 → rollback」を 1 回挟み、
+  盤面が bit 一致（`PartialEq`）で戻らなければ `ValueError`（`journal leak at op i`）を返す。
+  実データ（記録 v2 の全行）で undo の記録漏れを機械的に検出するための仕掛け。

@@ -1,0 +1,61 @@
+{
+  "job": "rs-p1-journal",
+  "status": "done",
+  "date": "2026-09-06",
+  "base": "claude/cpu-spec-improvements-yw91jd @ 485c3cb (P1 設計＋契約)",
+  "owned": [
+    "rust/opcg_engine/src/journal.rs",
+    "rust/opcg_engine/src/ops.rs",
+    "rust/opcg_engine/src/testkit.rs",
+    "rust/opcg_engine/src/lib.rs (apply_ops の追加のみ)",
+    "tests/harness/rs_record.py",
+    "tests/scripts/rs_ops_oracle.py",
+    "docs/rust_engine_plan.md (§8 進捗行・§8.2・§9.5)",
+    "docs/TEST_SPEC.md (§3 に 2 行)"
+  ],
+  "untouched": ["rust/opcg_engine/src/model.rs", "rust/opcg_engine/src/state.rs", "opcg_sim/**"],
+  "self_check": {
+    "cmd": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_ops_oracle.py --games 100 --ops-per-state 20",
+    "RS_OPS": {
+      "games": 100,
+      "rows": 9931,
+      "ops": 195717,
+      "mismatch": 0,
+      "restore_mismatch": 0,
+      "python_error": 0,
+      "bad_payload": 0,
+      "bad_output": 0,
+      "unimplemented": 9931
+    },
+    "elapsed_sec": 75,
+    "meaning": "記録 v2 の hidden から復元した GameManager の board_dict が、9931 行すべてで記録の state と一致（pending_request を除く）。195,717 件のランダム原始操作を Python 側で例外なく適用。unimplemented は Rust 側（from_record 待ち）の内訳で、自己検査はこれと独立に成立している"
+  },
+  "cargo": {
+    "test": "33 passed, 0 failed, 1 ignored（apply_ops のオラクル統合テスト＝from_record 待ち）",
+    "property_test": "ランダム書き換え × transaction 入れ子 3 段 × rollback で PartialEq 一致・1000 試行 green",
+    "clippy": "cargo clippy --no-default-features --all-targets -- -D warnings → 警告 0",
+    "undo_vs_clone": {
+      "debug": "9.8x (undo 1.92ms / clone 18.88ms・2000 回)",
+      "release": "11.4x (undo 0.48ms / clone 5.49ms・2000 回)",
+      "note": "21 枚の小盤面での比。clone はカード枚数に比例し undo は変更点数に比例するので実盤面では差が開く"
+    }
+  },
+  "oracle": "deferred",
+  "oracle_detail": {
+    "reason": "MasterTable::from_effects_json / GameState::from_record が未実装（WP rs-p1-model の担当）",
+    "observed": "maturin で拡張を入れて実行 → apply_ops は NotImplementedError('MasterTable::from_effects_json: WP rs-p1-model') を返し、ハーネスは全 9931 行を unimplemented に計上（黙って緑にしない）",
+    "after_integration": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_ops_oracle.py --games 100 --ops-per-state 20 を実行し、mismatch=0 / unimplemented=0 を確認する。cargo の #[ignore] テスト（apply_ops_runs_against_a_recorded_hidden_state）も --ignored で外す"
+  },
+  "make_test": "1761 passed, 0 failed (469.98s) — Python 側は追加のみ・既存挙動不変",
+  "notes": [
+    "model.rs の型は過不足なく足りた（追加要求なし）。GameState/CardInstance/DonInstance/PlayerState の欄だけで原始操作 10 種を書けた。",
+    "【要統合判断】apply_ops はマスター表をプロセスに 1 度持つ（ops.rs の MASTERS / set_masters）。WP rs-p1-model が lib.rs へ足す load_masters(path) と役割が重なるので、統合時は load_masters から ops::set_masters を呼ぶ形へ寄せてほしい（apply_ops の第 3 引数 effects_path は、その後は省略可になる）。",
+    "【記録形式 v2 の穴・P2 で塞ぐ】hidden の active_battle は {attacker,target,counter_buff} しか持たないが、engine/interaction.py は BLOCK_STEP/COUNTER_STEP で active_battle['target_owner'] を読む。よって復元した GameManager では get_pending_request() が KeyError になる。P1 の照合対象外（pending_request は P2 の責務）なので rs_record.py 側で None を返して塞いだ。P2 で対話を扱うときに記録形式へ target_owner 等を足すこと。",
+    "Python の挙動をそのまま移した箇所（意図的・直していない）: pay_cost に付与中のドン!!を指定して支払うと、付与先キャラの attached_don が減らない（card_moves.pay_cost は減算していない。_return_one_don だけが減らす）。",
+    "Python の move_card は dest_zone が DON_DECK/COST_AREA/ANY のとき target_list=None のままカードを元ゾーンから外すだけ＝カードが消える。Rust の Zone enum にこれらは無いので、ops_json ではこれらの移動先を表現できない（不正な移動先は ValueError）。P2 でこの経路を移すときに Python 側の妥当性を確認したい。",
+    "journal の方式はフィールド単位の逆操作（Undo enum）。Python の『コンテナ初回スナップショット＋世代カウンタ(_jgen)』に当たる仕組みは要らない（逆順再生だけで開始点へ戻るため）。commit は Python に無い操作で、『印だけ外して記録を親へ畳む』意味論にした。",
+    "直接フィールド代入の禁止は Session が GameState を所有し &mut GameState を外へ出さないことで担保した。model.rs のフィールドが pub なので型レベルでは閉じきれない（pub(crate) 化は model.rs の変更＝所有範囲外）。閉じたい場合はコーディネータ側で判断してほしい。",
+    "実行環境メモ: 本コンテナには pytest / numpy / fastapi / httpx / maturin が入っていなかったため、ゲートを回すために pip で導入した（リポジトリの依存定義は変更していない）。opcg_sim/data/opcg_effects.json は python -m opcg_sim.tools.export_effects_json で生成（git 管理外）。",
+    "push 先: 指示書の claude/rs-p1-journal と、本セッションの指定ブランチ claude/rs-p1-journal-ops-rvinb8 の両方に同じコミットを置いた。"
+  ]
+}
