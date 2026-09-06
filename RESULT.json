@@ -1,0 +1,57 @@
+{
+  "job": "rs-p0-skeleton",
+  "role": "rust-migration-p0",
+  "status": "done",
+  "branch": "claude/rs-p0-skeleton-hnfjcw",
+  "build_sec": 14.0,
+  "wheel_mb": 0.23,
+  "cards": 2803,
+  "abilities": 3386,
+  "top_actions": [
+    ["BUFF", 911],
+    ["MOVE_CARD", 431],
+    ["PLAY_CARD", 430],
+    ["DISCARD", 413],
+    ["DRAW", 409],
+    ["DECK_BOTTOM", 380],
+    ["REST", 375],
+    ["KO", 346],
+    ["LOOK", 258],
+    ["RETURN_DON", 209]
+  ],
+  "outputs": {
+    "crate": "rust/opcg_engine/ (pyo3 0.29 + maturin, abi3-py311, crate=opcg_engine)",
+    "wheel": "opcg_engine-0.0.1-cp311-abi3-linux_x86_64.whl (226238 B)",
+    "dockerfile": "Dockerfile: rustbuild 段 (rust:slim -> maturin build --release) -> 実行段へ wheel だけ COPY + pip install",
+    "exporter": "opcg_sim/tools/export_effects_json.py -> opcg_sim/data/opcg_effects.json (7.88 MB, git 管理外)",
+    "harness": "tests/scripts/rs_diff_replay.py (RS_DIFF 行・記録形式 version=1)",
+    "make": "Makefile: rust / rust-test / rust-clippy / rust-develop / rust-wheel",
+    "docs": "docs/TEST_SPEC.md §3 に2行追記・docs/rust_engine_plan.md §8/§8.1 に P0 結果"
+  },
+  "metrics": {
+    "cargo_test": "5 passed",
+    "cargo_clippy": "0 warnings (-D warnings)",
+    "cards_with_ability": 2472,
+    "effect_nodes": 22738,
+    "action_nodes": 5815,
+    "condition_nodes": 2050,
+    "action_types": 45,
+    "condition_types": 36,
+    "trigger_types": 20,
+    "effects_json_mb": 7.88,
+    "export_sec": 1.9,
+    "rs_diff_random": {"games": 5, "actions": 431, "mismatch": 0, "unimplemented": 5, "sec": 1.4},
+    "rs_diff_l1": {"games": 2, "actions": 175, "mismatch": 0, "unimplemented": 2, "sec": 52},
+    "make_test": "green (Python 側は追加のみ・既存コード無変更)"
+  },
+  "commands": [
+    "make rust",
+    "python -m opcg_sim.tools.export_effects_json",
+    "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_diff_replay.py --games 5 --policy random",
+    "make test"
+  ],
+  "unverified": {
+    "docker_build": "本セッションでは実行不能。ベースイメージの blob 取得先 production.cloudfront.docker.com が実行環境の egress ポリシーで 403（既存の pypy:3.11-slim 段の pull で落ちる＝Dockerfile 変更とは無関係）。代替として同じ手順を素の環境で確認済み: maturin build --release --compatibility linux -> wheel -> pip install <wheel> -> python -c 'import opcg_engine; print(opcg_engine.version())' => 0.0.1。イメージを引ける環境で docker build . を1回通すことが P1 の最初のチェック項目。"
+  },
+  "notes": "P0 の Rust は骨組み: version()/record_version()/echo_state()/replay() のみ。replay は契約検査だけ行い NotImplementedError を返す（黙って一致を返さない）ため、ハーネスは全局 unimplemented（mismatch=0）と集計する。opcg_effects.json は再生成物なので .gitignore（2秒で再生成）。既知の穴＝対局中のシャッフルは再生できない（--hidden で隠しゾーンの並びも記録できる。方式決定は P1・記録形式 version を上げる）。盤面 dict は GameManager.to_dict が無いためハーネス側で API と同じ形（turn_info/players/active_battle+pending_request）を組み立てている。"
+}

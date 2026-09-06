@@ -3,6 +3,24 @@
 # 配信スタック（pydantic-core/grpcio）は PyPy 非互換のため CPython 側のみに置く（Phase0 で確認）。
 FROM pypy:3.11-slim AS pypy
 
+# Rust エンジン（`rust/opcg_engine`・docs/rust_engine_plan.md）の wheel をビルドする段。
+# 実行イメージには **wheel だけ** を COPY する＝コンパイラ/ソース/target は載せない。
+# P0 の中身は version()/echo_state()/replay() のみで、配信・探索の経路はまだ一切通らない
+# （import しないので、この段が壊れても既存挙動には影響しない）。
+# suite（trixie）は**実行段の python:3.11-slim と揃える**こと（2026-09-06 時点で
+# python:3.11-slim = 3.11-slim-trixie）。ずれると拡張が要求する glibc が実行段に無く、
+# import 時に "GLIBC_x.yz not found" で落ちる。
+FROM rust:slim-trixie AS rustbuild
+# maturin は Python 拡張のビルドに Python を要る（abi3 の tag 決定・wheel 生成）。
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip3 install --no-cache-dir --break-system-packages maturin==1.15.0
+WORKDIR /build
+COPY rust/opcg_engine /build/opcg_engine
+# abi3-py311 なので出力は cp311-abi3（実行段の Python 3.11 で読める）。
+# --compatibility linux: manylinux の glibc タグ付けを省く（ビルド段と実行段は同じ Debian 系）。
+RUN cd /build/opcg_engine && maturin build --release --compatibility linux --out /wheels
+
 FROM python:3.11-slim
 
 # PyPy ランタイムを CPython イメージへ同梱（探索ワーカー専用。配信スタックは載せない）。
@@ -12,6 +30,10 @@ RUN ln -sf /opt/pypy/bin/pypy3 /usr/local/bin/pypy3
 WORKDIR /app
 COPY opcg_sim/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Rust エンジンの wheel（ビルド段の成果物のみ）。コンパイラ・cargo registry は持ち込まない。
+COPY --from=rustbuild /wheels/*.whl /tmp/wheels/
+RUN pip install --no-cache-dir /tmp/wheels/*.whl && rm -rf /tmp/wheels
 
 COPY . /app
 

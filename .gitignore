@@ -20,3 +20,8 @@ tests/p2_sl_net.npz
 # アリーナ実行中の作業台帳/ログ（結果は docs/reports にまとめる。最終台帳が要るときだけ git add -f）
 arena_*.jsonl
 arena_*.log
+
+# Rust エンジンのビルド成果物（rust/opcg_engine・再生成可能。wheel は Docker のビルド段で作る）
+rust/opcg_engine/target/
+# 効果構造の書き出し（opcg_sim/tools/export_effects_json.py で 2 秒で再生成・約8MB）
+opcg_sim/data/opcg_effects.json

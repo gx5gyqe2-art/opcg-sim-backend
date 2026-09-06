@@ -43,3 +43,33 @@ regen-baseline:
 
 lint:
 	ruff check opcg_sim/
+
+# --- Rust エンジン（rust/opcg_engine・docs/rust_engine_plan.md） ---------------
+# Rust 側の品質ゲート。`make test`（Python）とは独立で、**Rust を触ったときに通す**。
+# cargo は extension-module を外して回す（有効なままだとテストバイナリが libpython の
+# シンボルを解決できずリンクに失敗する。既定 feature の説明は crate の Cargo.toml）。
+# rust-develop は現在の Python 環境へ拡張を入れる（maturin develop は venv/conda を要求するため、
+# 無い環境では build → pip install へ自動で退避する。どちらでも `import opcg_engine` が通る）。
+RUST_DIR = rust/opcg_engine
+.PHONY: rust rust-test rust-clippy rust-develop rust-wheel
+
+rust: rust-test rust-clippy rust-develop
+
+rust-test:
+	cd $(RUST_DIR) && cargo test --no-default-features
+
+rust-clippy:
+	cd $(RUST_DIR) && cargo clippy --no-default-features --all-targets -- -D warnings
+
+rust-develop:
+	@if [ -n "$$VIRTUAL_ENV" ] || [ -n "$$CONDA_PREFIX" ]; then \
+	  cd $(RUST_DIR) && maturin develop --release; \
+	else \
+	  echo "[rust-develop] venv 無し: maturin build + pip install で代替する"; \
+	  cd $(RUST_DIR) && maturin build --release --compatibility linux --out target/wheels \
+	    && pip install --force-reinstall --no-deps target/wheels/*.whl; \
+	fi
+
+# 配布用 wheel（Dockerfile のビルド段と同じコマンド）。
+rust-wheel:
+	cd $(RUST_DIR) && maturin build --release --compatibility linux --out target/wheels
