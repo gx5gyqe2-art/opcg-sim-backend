@@ -1,0 +1,24 @@
+{"seed": 362002, "score": 2.0, "leaders": ["ST04-001", "OP03-040"], "games": [1.0, 1.0], "cand_leaders": ["ST04-001", "ST04-001"], "turns": [13, 12], "dig": [[], []], "act": [[], []]}
+{"seed": 362001, "score": 1.0, "leaders": ["OP08-058", "OP16-022"], "games": [1.0, 0.0], "cand_leaders": ["OP08-058", "OP08-058"], "turns": [11, 11], "dig": [[], []], "act": [[], []]}
+{"seed": 362004, "score": 0.0, "leaders": ["OP13-004", "OP01-060"], "games": [0.0, 0.0], "cand_leaders": ["OP13-004", "OP13-004"], "turns": [12, 11], "dig": [[], []], "act": [[], []]}
+{"seed": 362005, "score": 2.0, "leaders": ["OP16-079", "EB03-001"], "games": [1.0, 1.0], "cand_leaders": ["OP16-079", "OP16-079"], "turns": [11, 10], "dig": [[], []], "act": [[], []]}
+{"seed": 362003, "score": 2.0, "leaders": ["OP11-022", "ST21-001"], "games": [1.0, 1.0], "cand_leaders": ["OP11-022", "OP11-022"], "turns": [13, 16], "dig": [[], []], "act": [[], []]}
+{"seed": 362000, "score": null, "leaders": ["OP14-060", "OP01-091"], "void": "PairTimeout: pair exceeded 900s"}
+{"seed": 462000, "score": 1.0, "leaders": ["P-076", "OP14-079"], "games": [0.0, 1.0], "cand_leaders": ["P-076", "P-076"], "turns": [10, 10], "dig": [[], []], "act": [[], []]}
+{"seed": 462002, "score": 0.0, "leaders": ["OP01-031", "OP07-059"], "games": [0.0, 0.0], "cand_leaders": ["OP01-031", "OP01-031"], "turns": [12, 11], "dig": [[], []], "act": [[], []]}
+{"seed": 462001, "score": 1.0, "leaders": ["OP09-022", "OP08-058"], "games": [1.0, 0.0], "cand_leaders": ["OP09-022", "OP09-022"], "turns": [11, 13], "dig": [[], []], "act": [[], []]}
+{"seed": 462004, "score": 1.0, "leaders": ["OP01-062", "OP10-042"], "games": [0.0, 1.0], "cand_leaders": ["OP01-062", "OP01-062"], "turns": [10, 12], "dig": [[], []], "act": [[], []]}
+{"seed": 462005, "score": 0.0, "leaders": ["ST13-001", "ST02-001"], "games": [0.0, 0.0], "cand_leaders": ["ST13-001", "ST13-001"], "turns": [12, 11], "dig": [[], []], "act": [[], []]}
+{"seed": 462003, "score": 1.0, "leaders": ["OP07-059", "OP16-041"], "games": [0.0, 1.0], "cand_leaders": ["OP07-059", "OP07-059"], "turns": [12, 12], "dig": [[], []], "act": [[], []]}
+{"seed": 562002, "score": 0.0, "leaders": ["OP03-076", "OP06-022"], "games": [0.0, 0.0], "cand_leaders": ["OP03-076", "OP03-076"], "turns": [12, 11], "dig": [[], []], "act": [[], []]}
+{"seed": 562003, "score": 0.0, "leaders": ["P-086", "OP08-021"], "games": [0.0, 0.0], "cand_leaders": ["P-086", "P-086"], "turns": [10, 9], "dig": [[], []], "act": [[], []]}
+{"seed": 562001, "score": 1.0, "leaders": ["OP04-019", "OP09-001"], "games": [0.0, 1.0], "cand_leaders": ["OP04-019", "OP04-019"], "turns": [14, 14], "dig": [[], []], "act": [[], []]}
+{"seed": 562000, "score": 1.0, "leaders": ["OP04-019", "OP06-080"], "games": [1.0, 0.0], "cand_leaders": ["OP04-019", "OP04-019"], "turns": [13, 13], "dig": [[], []], "act": [[], []]}
+{"seed": 562004, "score": 0.0, "leaders": ["OP15-039", "OP15-001"], "games": [0.0, 0.0], "cand_leaders": ["OP15-039", "OP15-039"], "turns": [12, 13], "dig": [[], []], "act": [[], []]}
+{"seed": 662000, "score": 2.0, "leaders": ["OP09-022", "OP05-022"], "games": [1.0, 1.0], "cand_leaders": ["OP09-022", "OP09-022"], "turns": [11, 10], "dig": [[], []], "act": [[], []]}
+{"seed": 562005, "score": 2.0, "leaders": ["OP04-020", "OP13-002"], "games": [1.0, 1.0], "cand_leaders": ["OP04-020", "OP04-020"], "turns": [13, 12], "dig": [[], []], "act": [[], []]}
+{"seed": 662001, "score": 0.0, "leaders": ["OP08-021", "ST01-001"], "games": [0.0, 0.0], "cand_leaders": ["OP08-021", "OP08-021"], "turns": [12, 13], "dig": [[], []], "act": [[], []]}
+{"seed": 662004, "score": 1.0, "leaders": ["OP04-058", "OP02-071"], "games": [1.0, 0.0], "cand_leaders": ["OP04-058", "OP04-058"], "turns": [11, 11], "dig": [[], []], "act": [[], []]}
+{"seed": 662003, "score": 2.0, "leaders": ["OP04-040", "OP06-020"], "games": [1.0, 1.0], "cand_leaders": ["OP04-040", "OP04-040"], "turns": [15, 14], "dig": [[], []], "act": [[], []]}
+{"seed": 662002, "score": 2.0, "leaders": ["OP16-022", "OP03-040"], "games": [1.0, 1.0], "cand_leaders": ["OP16-022", "OP16-022"], "turns": [13, 12], "dig": [[], []], "act": [[], []]}
+{"seed": 662005, "score": 0.0, "leaders": ["OP07-038", "P-047"], "games": [0.0, 0.0], "cand_leaders": ["OP07-038", "OP07-038"], "turns": [18, 15], "dig": [[], []], "act": [[], []]}
