@@ -1,0 +1,1 @@
+{"job":"gen-n26-w02","role":"gen","status":"done","inputs":{"neff_net":"claude/n1-results:n1_results/nrel_a1.npz","wave":26,"shard":"02","seed_base":2262000,"games":960,"sims":128,"workers":4,"dump_v2":true},"outputs":{"records":"n26_records/","log":"n26_gen.log"}}
