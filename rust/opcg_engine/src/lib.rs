@@ -7,8 +7,12 @@
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
 use pyo3::prelude::*;
 
+mod journal;
 mod model;
+mod ops;
 mod state;
+#[cfg(test)]
+mod testkit;
 
 use state::EngineError;
 
@@ -61,6 +65,17 @@ fn state_roundtrip(hidden_json: &str) -> PyResult<String> {
     Ok(state::state_roundtrip(hidden_json)?)
 }
 
+/// 記録 v2 の `hidden` から盤面を組み、原始操作の台本（`ops_json`）を順に適用する。
+///
+/// 戻り値は `{"states":[<各操作後の盤面 dict>...]}`。台本の形は `docs/rust_engine_plan.md` §9.5。
+/// `effects_path` は初回のみ必要（マスター表をプロセスで 1 度読む）。
+/// `tests/scripts/rs_ops_oracle.py` が Python 側の原始操作と突き合わせる受け入れ口（P1-journal）。
+#[pyfunction]
+#[pyo3(signature = (hidden_json, ops_json, effects_path=None))]
+fn apply_ops(hidden_json: &str, ops_json: &str, effects_path: Option<&str>) -> PyResult<String> {
+    Ok(ops::apply_ops(hidden_json, ops_json, effects_path)?)
+}
+
 /// 記録した局を Rust エンジンで再生する（`tests/scripts/rs_diff_replay.py` が呼ぶ）。
 ///
 /// P0 では契約検査のみ行い `NotImplementedError` を送出する（黙って一致を返さない）。
@@ -77,6 +92,7 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(echo_state, m)?)?;
     m.add_function(wrap_pyfunction!(load_masters, m)?)?;
     m.add_function(wrap_pyfunction!(state_roundtrip, m)?)?;
+    m.add_function(wrap_pyfunction!(apply_ops, m)?)?;
     m.add_function(wrap_pyfunction!(replay, m)?)?;
     Ok(())
 }
