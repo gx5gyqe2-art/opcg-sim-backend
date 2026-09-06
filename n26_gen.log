@@ -1,0 +1,111 @@
+  10/960局 行1184（main 721） 棄却0 457s
+  20/960局 行2624（main 1616） 棄却0 916s
+  30/960局 行3979（main 2459） 棄却0 1317s
+  40/960局 行5250（main 3269） 棄却0 1755s
+  50/960局 行6754（main 4194） 棄却0 2275s
+  60/960局 行8113（main 5055） 棄却0 2777s
+  70/960局 行9448（main 5841） 棄却0 3700s
+  80/960局 行11133（main 6900） 棄却0 4544s
+  90/960局 行12844（main 7939） 棄却0 5362s
+  100/960局 行14045（main 8647） 棄却1 5843s
+  110/960局 行15447（main 9511） 棄却1 6519s
+  120/960局 行16883（main 10420） 棄却1 6978s
+  130/960局 行18427（main 11399） 棄却1 7512s
+  140/960局 行19994（main 12388） 棄却1 7950s
+  150/960局 行21465（main 13299） 棄却1 8699s
+  160/960局 行22797（main 14114） 棄却1 9134s
+  170/960局 行24289（main 15014） 棄却1 9776s
+  180/960局 行25927（main 15945） 棄却1 10373s
+  190/960局 行27310（main 16773） 棄却1 10878s
+  200/960局 行28571（main 17552） 棄却1 11364s
+  210/960局 行29831（main 18348） 棄却1 11852s
+  220/960局 行31392（main 19282） 棄却1 12395s
+  230/960局 行32991（main 20277） 棄却1 13042s
+  240/960局 行34570（main 21175） 棄却1 13653s
+  250/960局 行36183（main 22168） 棄却1 14221s
+  260/960局 行37627（main 23072） 棄却1 14855s
+  270/960局 行39222（main 24022） 棄却1 15385s
+  280/960局 行40730（main 24943） 棄却1 15980s
+  290/960局 行42286（main 25914） 棄却1 16558s
+  300/960局 行43695（main 26766） 棄却1 16949s
+  310/960局 行44957（main 27568） 棄却1 17377s
+  320/960局 行46350（main 28440） 棄却1 17788s
+  330/960局 行47765（main 29314） 棄却1 18297s
+  340/960局 行49203（main 30221） 棄却1 19036s
+  350/960局 行50520（main 31069） 棄却1 19466s
+  360/960局 行52073（main 32013） 棄却1 20139s
+  370/960局 行53541（main 32919） 棄却1 20717s
+  380/960局 行55049（main 33903） 棄却1 21289s
+  390/960局 行56659（main 34873） 棄却1 22019s
+  400/960局 行58144（main 35808） 棄却1 22641s
+  410/960局 行59918（main 36855） 棄却1 23409s
+  420/960局 行61339（main 37707） 棄却1 23934s
+  430/960局 行62846（main 38692） 棄却1 24508s
+  440/960局 行64314（main 39550） 棄却1 24895s
+  450/960局 行65880（main 40577） 棄却1 25462s
+  460/960局 行67460（main 41507） 棄却1 26179s
+  470/960局 行69061（main 42469） 棄却1 26675s
+  480/960局 行70439（main 43301） 棄却1 27167s
+  490/960局 行71838（main 44183） 棄却1 27598s
+  500/960局 行73201（main 45009） 棄却1 28129s
+  510/960局 行74692（main 45938） 棄却1 28690s
+  520/960局 行76200（main 46862） 棄却1 29256s
+  530/960局 行77720（main 47792） 棄却1 29716s
+  540/960局 行79243（main 48760） 棄却1 30280s
+  550/960局 行80519（main 49591） 棄却1 30792s
+  560/960局 行82072（main 50535） 棄却1 31438s
+  570/960局 行83649（main 51549） 棄却1 31965s
+  580/960局 行84867（main 52296） 棄却1 32401s
+  590/960局 行86364（main 53190） 棄却1 32979s
+  600/960局 行87777（main 54063） 棄却1 33442s
+  610/960局 行89220（main 54904） 棄却1 33845s
+  620/960局 行90847（main 55926） 棄却1 34568s
+  630/960局 行92352（main 56863） 棄却1 35362s
+  640/960局 行93730（main 57718） 棄却1 36022s
+  650/960局 行95362（main 58715） 棄却1 36982s
+  660/960局 行96522（main 59451） 棄却2 37410s
+  670/960局 行97812（main 60285） 棄却2 37949s
+  680/960局 行99456（main 61293） 棄却2 38628s
+  690/960局 行100979（main 62265） 棄却2 39147s
+  700/960局 行102513（main 63200） 棄却2 39798s
+  710/960局 行103985（main 64117） 棄却2 40382s
+  720/960局 行105533（main 65074） 棄却2 41312s
+  730/960局 行107036（main 66017） 棄却2 41792s
+  740/960局 行108516（main 66933） 棄却2 42502s
+  750/960局 行109993（main 67860） 棄却2 43125s
+  760/960局 行111444（main 68783） 棄却2 43545s
+  770/960局 行113149（main 69816） 棄却2 44156s
+Process SpawnPoolWorker-3:
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/multiprocessing/pool.py", line 131, in worker
+    put((job, i, result))
+  File "/usr/lib/python3.11/multiprocessing/queues.py", line 377, in put
+    self._writer.send_bytes(obj)
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 200, in send_bytes
+    self._send_bytes(m[offset:offset + size])
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 420, in _send_bytes
+    self._send(header)
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 384, in _send
+    n = write(self._handle, buf)
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.11/multiprocessing/pool.py", line 136, in worker
+    put((job, i, (False, wrapped)))
+  File "/usr/lib/python3.11/multiprocessing/queues.py", line 377, in put
+    self._writer.send_bytes(obj)
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 200, in send_bytes
+    self._send_bytes(m[offset:offset + size])
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 420, in _send_bytes
+    self._send(header)
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 384, in _send
+    n = write(self._handle, buf)
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
