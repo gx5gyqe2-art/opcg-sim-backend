@@ -1,0 +1,1 @@
+{"job":"gen-n25-w07","role":"gen","status":"done","inputs":{"neff_net":"claude/n1-results:n1_results/nrel_a1.npz","wave":25,"shard":"07","seed_base":2257000,"games":960,"sims":128,"workers":4,"dump_v2":true},"outputs":{"records":"n25_records/","log":"n25_gen.log"}}
