@@ -1,0 +1,17 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "opcg_engine"
+description = "OPCG simulator engine (Rust, PyO3). P0 skeleton: version()/echo_state()/replay()."
+requires-python = ">=3.11"
+dynamic = ["version"]
+classifiers = [
+  "Programming Language :: Rust",
+  "Programming Language :: Python :: Implementation :: CPython",
+]
+
+[tool.maturin]
+# ビルドは crate の default features（extension-module 込み）で行う。
+strip = true

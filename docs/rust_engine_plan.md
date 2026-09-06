@@ -78,7 +78,9 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 
 ## 5. 作業パッケージ（WP）の運用
 
-- ブランチ: `claude/rs-<段>-<WP>`（例 `claude/rs-p1-model`）。統合ブランチ `claude/rust-engine`。
+- ブランチ: `claude/rs-<段>-<WP>`（例 `claude/rs-p1-model`）。統合ブランチは開発本線
+  `claude/cpu-spec-improvements-yw91jd`（P0 統合時に決定 2026-09-06。WP セッションは**必ずこの
+  ブランチから分岐**する——P0 は main から分岐したため取り込みは cherry-pick になった）。
   コーディネータが WP ブランチを統合ブランチへ取り込む（コンフリクトは WP の所有範囲で回避:
   1 WP＝1 モジュール）。
 - 各 WP の指示書に**受け入れ基準の数値**（ハーネスの一致率・対象カード集合）を書く。
@@ -118,3 +120,59 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 日付 | 段 | 状態 |
 |---|---|---|
 | 2026-09-06 | P0 | 指示書作成 |
+| 2026-09-06 | P0 | **完了**（`claude/rs-p0-skeleton`）: crate 雛形＋PyO3/maturin・Docker ビルド段・効果 JSON 書き出し・差分照合ハーネス・`make rust`。結果は下記 §8.1 |
+
+### 8.1 P0 の結果（2026-09-06）
+
+成果物（Python 側は一切変更していない＝追加のみ）:
+
+| 成果物 | 中身 |
+|---|---|
+| `rust/opcg_engine/` | PyO3 0.29＋maturin の crate（crate 名 `opcg_engine`・abi3-py311）。公開 API は `version()` / `record_version()` / `echo_state(json)` / `replay(json)` の 4 つ。`echo_state` は盤面 JSON をキー順ごと恒等に返す（P1 で「JSON→`GameState`→盤面 dict」に差し替える土台）。`replay` は**契約検査だけ行い `NotImplementedError`**（黙って一致を返さない） |
+| `Dockerfile` | `rust:slim` のビルド段（apt で python3/pip → maturin → `maturin build --release --compatibility linux`）→ 実行段（`python:3.11-slim`）へ **wheel だけ COPY して pip install**。コンパイラ・ソース・`target/` は実行イメージに載せない |
+| `opcg_sim/tools/export_effects_json.py` | 全カードの効果構造を `opcg_sim/data/opcg_effects.json` へ（生成物・git 管理外。再生成 1.9s） |
+| `tests/scripts/rs_diff_replay.py` | 差分照合ハーネス（§4）。記録形式 `version=1` は Rust の `state::RECORD_VERSION` と対 |
+| `Makefile` | `make rust` = `cargo test --no-default-features` ＋ `cargo clippy … -D warnings` ＋ maturin（venv があれば `develop`、無ければ `build`＋`pip install` へ退避） |
+
+計測（本セッションのコンテナ・x86_64）:
+
+- **ビルド時間**: `cargo test --no-default-features` 初回 12.2s（依存 6 crate 込み）／`maturin build --release`
+  初回 **14.0s**（クリーン・依存込み）・再ビルド 0.2s（キャッシュ）。
+- **wheel サイズ**: **0.23 MB**（`opcg_engine-0.0.1-cp311-abi3-linux_x86_64.whl` = 226,238 B。
+  manylinux タグ版も同サイズ）。`pip install` 後 `python -c "import opcg_engine; print(opcg_engine.version())"` → `0.0.1`。
+- **Rust 側テスト**: `cargo test` 5 件 green・`cargo clippy -D warnings` 警告 0。
+- **効果 JSON**: cards=**2803**（能力持ち 2472）・abilities=**3386**・ノード総数 22738
+  （GameAction 5815／Condition 2050）・ActionType 45 種／ConditionType 36 種／TriggerType 20 種・
+  出力 7.88 MB。
+- **差分ハーネス**: `--games 5 --policy random` → `RS_DIFF {"games":5,"actions":431,"match":0,
+  "mismatch":0,"unimplemented":5,...}`（1.4s）。`--games 2 --policy l1` → actions=175・
+  unimplemented=2（52s）。
+
+**ActionType 出現頻度 上位 10**（全 5815 ノード。P3 の WP 分割はこの順に配る＝上位 10 種で **71.6%**）:
+
+| # | ActionType | 件数 | 割合 | # | ActionType | 件数 | 割合 |
+|---|---|---|---|---|---|---|---|
+| 1 | BUFF | 911 | 15.7% | 6 | DECK_BOTTOM | 380 | 6.5% |
+| 2 | MOVE_CARD | 431 | 7.4% | 7 | REST | 375 | 6.4% |
+| 3 | PLAY_CARD | 430 | 7.4% | 8 | KO | 346 | 6.0% |
+| 4 | DISCARD | 413 | 7.1% | 9 | LOOK | 258 | 4.4% |
+| 5 | DRAW | 409 | 7.0% | 10 | RETURN_DON | 209 | 3.6% |
+
+（参考・ConditionType 上位 10＝全 2050 ノードの 83.4%: TURN_LIMIT 321／LEADER_TRAIT 316／AND 261／
+HAS_DON 221／FIELD_COUNT 161／LIFE_COUNT 123／LEADER_NAME 93／DON_COUNT 87／HAND_COUNT 75／CONTEXT 51。
+TriggerType は ON_PLAY 940／ACTIVATE_MAIN 670／TRIGGER 507／PASSIVE 346／ON_ATTACK 256 が上位。）
+
+**未検証（P1 で塞ぐ／引き継ぎ事項）**:
+
+- **`docker build` は本セッションでは通せていない**。ベースイメージの blob 取得先
+  （`production.cloudfront.docker.com`）が実行環境の egress ポリシーで 403 になり、既存の
+  `pypy:3.11-slim` 段の時点で pull が落ちる（Dockerfile の変更とは無関係）。代わりに**同じ手順を
+  素の環境で実行して確認**した（maturin build --release --compatibility linux → wheel →
+  `pip install <wheel>` → `import opcg_engine` 成功）。イメージを引ける環境で `docker build .` を
+  1 回通すことが P1 の最初のチェック項目。
+- 記録の再生は**対局中のシャッフル**（マリガン・シャッフル効果）を再現できない。ハーネスの
+  `--hidden`（各行動後の隠しゾーンの並びも記録）で塞ぐ方式を用意してある。P1 で「記録した並びを
+  与える」か「乱数列を記録して Rust の生成器へ流す」かを決め、記録形式 `version` を上げる。
+- 盤面 dict は API と同じ形（`turn_info`／`players`／`active_battle`＋`pending_request`）をハーネス側で
+  組み立てている（`GameManager.to_dict` は存在しないため。Python 側は変更しない P0 の制約）。P1 で
+  Rust 側の出力をこの形に合わせる。
