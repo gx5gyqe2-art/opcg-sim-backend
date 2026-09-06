@@ -41,7 +41,9 @@ NR_ENC_VERSION = 13                   # NRel の符号化世代（v12 + n_rel_fe
 D_SC = 94 + NR.EXTRA_DIM              # 123
 # 切り分け（ablation・2026-09-05）: 相手デッキ知識＝EXTRA の opp_pool_* 列（scalars 上の列番号）
 OPP_POOL_COLS = tuple(94 + j for j, _n in enumerate(NR.EXTRA_COLS) if _n.startswith("opp_pool_"))
-ABLATE_KINDS = ("rel", "opp_pool")
+# 登場時スキャン（v7・`cpu_ai.onplay_option_scan` の実測 3 列）: 発火する PLAY 数・その keep 値・不発数
+ONPLAY_COLS = (E.SCALARS_V6, E.SCALARS_V6 + 1, E.SCALARS_V6 + 2)
+ABLATE_KINDS = ("rel", "opp_pool", "onplay")
 D_STRUCT = NE.D_CARD_FEAT             # 64
 D_ZONE = 5
 D_X = D_STRUCT + NR.S_DIM + D_ZONE    # 89
@@ -93,9 +95,12 @@ class NRelNet:
 
     # --- 切り分け（入力の遮断）---
     def mask_sc(self, sc):
-        if "opp_pool" in self.ablate:
+        if "opp_pool" in self.ablate or "onplay" in self.ablate:
             sc = np.array(sc, np.float32, copy=True)
-            sc[:, list(OPP_POOL_COLS)] = 0.0
+            if "opp_pool" in self.ablate:
+                sc[:, list(OPP_POOL_COLS)] = 0.0
+            if "onplay" in self.ablate:
+                sc[:, list(ONPLAY_COLS)] = 0.0
         return sc
 
     def mask_rel(self, rel):
@@ -397,7 +402,7 @@ class NRelValueAdapter:
         me_pl = state.p1 if state.p1.name == to_move else state.p2
         legal = self._fp_legal if (self._fp_legal is not None and getattr(state, "turn_player", None) is me_pl) else None
         R = NR.encode_rel(state, to_move, with_relations=False, legal=legal)
-        base = E.encode(state, to_move, self.vocab, version=12)
+        base = E.encode(state, to_move, self.vocab, version=12, skip_onplay=("onplay" in self.net.ablate))
         sc = np.concatenate([base["scalars"], R["extra"]]).astype(np.float32)[None, :]
         ci = np.asarray(base["card_idx"])[:N_TOK][None, :]
         tok = R["tokens"][None]

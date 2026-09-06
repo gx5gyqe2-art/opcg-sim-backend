@@ -326,7 +326,7 @@ def _playable_chars(me):
     return n
 
 
-def encode(manager, me_name, vocab, version=1):
+def encode(manager, me_name, vocab, version=1, skip_onplay=False):
     """to-move 視点 `me_name` で局面を符号化して dict（numpy 配列）を返す。
 
     returns:
@@ -401,9 +401,14 @@ def encode(manager, me_name, vocab, version=1):
         # bound）、静的特徴でなく実測でしか一般化しない。実測 0.08〜0.26ms/枚（clone の
         # 1/4〜1/14）＝探索の葉評価に載る。非メイン手番は (0,0,0)＝「今行使できる
         # オプション」の意味論。自分の手札のみ＝公平性契約。
-        from opcg_sim.src.core.cpu_ai import onplay_option_scan
-        n_live, n_dead, keep_live = onplay_option_scan(manager, me_name)
-        vals += [n_live / 5.0, min(keep_live / 2000.0, 1.0), n_dead / 5.0]
+        if skip_onplay:
+            # 切り分け a3（2026-09-06）: 登場時スキャンを遮断するネットでは実測そのものを省く
+            # （ネット側で同じ列を 0 にするので出力は同値・葉ごとの make/unmake 実測 0.66ms を省略）。
+            vals += [0.0, 0.0, 0.0]
+        else:
+            from opcg_sim.src.core.cpu_ai import onplay_option_scan
+            n_live, n_dead, keep_live = onplay_option_scan(manager, me_name)
+            vals += [n_live / 5.0, min(keep_live / 2000.0, 1.0), n_dead / 5.0]
     if version >= 8:
         # v8（2026-08-02/03・v32）: 自場集約＝相手（v5）と同じ [総火力, 高パワー数, ブロッカー数]
         # の**純対称化のみ**。v5 まで自場はキャラ数の生カウントだけ＝パワー2000も10000も同じ

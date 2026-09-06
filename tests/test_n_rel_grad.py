@@ -257,3 +257,18 @@ def test_rel_ablated_fast_path_matches_batch_path(env):
     e = net.body(env["sc"], h, present)
     v_ref = np.tanh((e @ net.Wv + net.bv)[:, 0])
     assert np.abs(v_fast - v_ref).max() < 1e-5
+
+
+def test_onplay_ablation_masks_v7_columns(env, tmp_path):
+    """切り分け a3（2026-09-06）: `ablate={"onplay"}` は v7 の登場時スキャン 3 列（`ONPLAY_COLS`）を 0 に
+    する＝その列を変えても value/policy が不変・save→load で復元。"""
+    rng = np.random.default_rng(3)
+    sc, ci, tok, om, oo = env["sc"], env["ci"], env["tok"], env["rel_om"], env["rel_oo"]
+    sc2 = sc.copy(); sc2[:, list(NL.ONPLAY_COLS)] += 0.9
+    net = NT.NRelNet(env["tables"], hidden=32, seed=8); net.ablate = {"rel", "onplay"}
+    assert np.array_equal(net.value(sc, ci, tok, om, oo), net.value(sc2, ci, tok, om, oo))
+    base = NT.NRelNet(env["tables"], hidden=32, seed=8)
+    assert not np.allclose(base.value(sc, ci, tok, om, oo), base.value(sc2, ci, tok, om, oo))
+    p = str(tmp_path / "a3.npz"); net.save(p, meta={"kind": "nrel-a"})
+    re_ = NL.NRelNet.load(p, env["tables"])
+    assert re_.ablate == {"onplay", "rel"} and re_.meta.get("ablate") == ["onplay", "rel"]

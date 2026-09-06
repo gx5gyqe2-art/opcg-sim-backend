@@ -155,3 +155,26 @@ def test_rel_ablated_net_skips_relations_and_matches_value(m2, tmp_path):
     assert om.any() or oo.any(), "検査盤面に関係が無い（盤面を変える）"
     ref = float(net.value(sc, ci, tok, om[None], oo[None])[0])
     assert abs(v - ref) < 1e-5     # R 遮断の serve 経路は対の積和を分解する（加算順の差＝1e-6 級）
+
+
+def test_onplay_ablated_net_skips_scan_and_matches_value(m2, tmp_path):
+    """切り分け a3 の serve（2026-09-06）: `ablate={"rel","onplay"}` の npz は `encode_state` が登場時スキャンを
+    省き（v7 の 3 列が 0）、葉価値は「スキャンありで符号化して渡した value」と一致（ネット側で同じ列を 0 に
+    するため同値）。"""
+    from opcg_sim.src.learned import encoder as E
+    tabs = build_eff_tables()
+    net = NL.NRelNet(tabs[:5], hidden=32, seed=12); net.ablate = {"rel", "onplay"}
+    vocab = tabs[5]
+    net.vocab_ids = [cid for cid, _i in sorted(vocab.items(), key=lambda kv: kv[1])]
+    p = str(tmp_path / "nrel_a3_test.npz"); net.save(p, meta={"kind": "nrel-a"})
+    eng = LearnedEngine(value_path=p)
+    assert eng.vnet.net.ablate == {"rel", "onplay"}
+    m, name, _actor = _board(m2, 30)
+    sc, ci, tok, rel_om, rel_oo, _R = eng.vnet.encode_state(m, name)
+    assert not sc[0, list(NL.ONPLAY_COLS)].any(), "onplay 遮断なら v7 の 3 列は計算せず 0"
+    full = E.encode(m, name, eng.vocab, version=12)
+    assert full["scalars"][list(NL.ONPLAY_COLS)].any(), "検査盤面にはスキャンが発火する札がある（盤面を変える）"
+    v = eng.vnet.predict_state(m, name)
+    sc_full = sc.copy(); sc_full[0, :E.SCALARS_V12] = full["scalars"]
+    ref = float(net.value(sc_full, ci, tok, rel_om, rel_oo)[0])
+    assert abs(v - ref) < 1e-5
