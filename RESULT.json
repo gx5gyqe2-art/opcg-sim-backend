@@ -1,0 +1,1 @@
+{"job":"gen-n26-w04","role":"gen","status":"partial","inputs":{"neff_net":"claude/n1-results:n1_results/nrel_a1.npz","wave":26,"shard":"04","seed_base":2264000,"games":960,"sims":128,"workers":4,"dump_v2":true},"outputs":{"records":"n26_records/","log":"n26_gen.log"},"note":"stopped early by coordinator (user decision); 810/960 games kept"}
