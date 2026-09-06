@@ -7,6 +7,7 @@
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
 use pyo3::prelude::*;
 
+mod model;
 mod state;
 
 use state::EngineError;
@@ -42,6 +43,15 @@ fn echo_state(json_str: &str) -> PyResult<String> {
     Ok(state::echo_state(json_str)?)
 }
 
+/// 記録 v2 の `hidden`（完全な内部状態）から盤面を組み立て、盤面 dict（`to_dict` 相当）を JSON で返す。
+///
+/// `tests/scripts/rs_diff_replay.py --mode state` が呼ぶ P1-model の受け入れ口。骨組みでは
+/// `NotImplementedError`（WP `rs-p1-model` が `model::GameState::from_record`＋`board_json` で置き換える）。
+#[pyfunction]
+fn state_roundtrip(hidden_json: &str) -> PyResult<String> {
+    Ok(state::state_roundtrip(hidden_json)?)
+}
+
 /// 記録した局を Rust エンジンで再生する（`tests/scripts/rs_diff_replay.py` が呼ぶ）。
 ///
 /// P0 では契約検査のみ行い `NotImplementedError` を送出する（黙って一致を返さない）。
@@ -56,6 +66,7 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
     m.add_function(wrap_pyfunction!(record_version, m)?)?;
     m.add_function(wrap_pyfunction!(echo_state, m)?)?;
+    m.add_function(wrap_pyfunction!(state_roundtrip, m)?)?;
     m.add_function(wrap_pyfunction!(replay, m)?)?;
     Ok(())
 }

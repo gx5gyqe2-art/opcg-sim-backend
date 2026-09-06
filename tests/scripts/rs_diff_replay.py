@@ -25,10 +25,13 @@ unimplemented が減り、mismatch が 0 のまま maintained されることが
     `turn_info` / `players`（`Player.to_dict`）/ `active_battle`）＋ `pending_request`。
     Python 側のコードは一切変更せず、この読み取りだけで組み立てる（P0 は追加のみ）。
 
-既知の穴（P1 で決める・記録形式 version を上げる）:
-  - **対局中のシャッフル**（マリガン・デッキシャッフル効果）は再生側で再現できない。
-    `--hidden` を付けると各行動後の隠しゾーン（デッキ/ライフの並び）も記録するので、
-    「記録した並びを与える」方式でこれを塞げる。既定 off（記録が数百 KB/局 増えるため）。
+記録形式 v2（P1・`docs/rust_engine_plan.md` §9.1）:
+  - `--hidden` で各行動後の**完全な内部状態**（全ゾーンの並び・カード実体の実行時フィールド・
+    ドン!!の所在・進行状態）も記録する。対局中のシャッフル（マリガン・シャッフル効果）は
+    「記録した並びを与える」方式で塞ぐ（乱数列は Rust へ流さない）。
+  - `--mode state`（P1-model の受け入れ）: 各行の `hidden` から Rust が `GameState` を組み立て、
+    `state_roundtrip(hidden_json)` の盤面 dict が同じ行の `state` と一致するか（`pending_request` は
+    P2 の責務なので除外）。`--mode replay`（既定）: 行動列の再生（P2 以降）。
 """
 import os
 for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
@@ -52,7 +55,7 @@ except ImportError:         # pragma: no cover - 実行環境依存
 
 # 記録ペイロードの形式バージョン。Rust 側 `state::RECORD_VERSION` と一致させること
 # （形を非互換に変えたら両方 +1 する）。
-RECORD_VERSION = 1
+RECORD_VERSION = 2
 
 
 # --- 盤面スナップショット -----------------------------------------------------
@@ -86,26 +89,78 @@ def board_dict(manager) -> dict:
     }
 
 
+# 記録形式 v2（P1 の契約・`docs/rust_engine_plan.md` §9.1）: `hidden` は「盤面を完全に再構成できる」
+# 内部状態＝カード実体の実行時フィールド全部・ドン!!の所在と付与先・マネージャの進行状態を持つ。
+# Rust 側はこれだけから `GameState` を組み立て、`to_dict` 相当が同じ行の `state` と一致することで
+# P1-model を受け入れる（`--mode state`）。順序（並び）は全ゾーンで記録順＝Python の list 順。
+
+_CARD_RUNTIME_FIELDS = (
+    "is_rest", "is_newly_played", "attached_don", "is_face_up", "power_buff", "cost_buff",
+    "passive_power", "passive_power_override", "passive_counter", "base_power_override",
+    "base_cost_override", "negated", "ability_disabled", "timed_power", "timed_cost",
+)
+_CARD_SET_FIELDS = ("current_keywords", "flags", "timed_flags", "timed_keywords")
+
+
+def card_record(c) -> dict:
+    """カード実体 1 枚の完全な記録（マスター参照＝card_id＋実行時フィールド全部）。"""
+    d = {"card_id": c.master.card_id, "uuid": c.uuid, "owner_id": c.owner_id}
+    for f in _CARD_RUNTIME_FIELDS:
+        d[f] = getattr(c, f)
+    for f in _CARD_SET_FIELDS:
+        d[f] = sorted(getattr(c, f))
+    d["ability_used_this_turn"] = {str(k): v for k, v in sorted(c.ability_used_this_turn.items())}
+    return d
+
+
 def _zone_order(cards) -> list:
-    """隠しゾーン（デッキ/ライフ等）の並びを card_id + uuid で記録する。"""
-    return [{"card_id": c.master.card_id, "uuid": c.uuid, "is_face_up": c.is_face_up} for c in cards]
+    return [card_record(c) for c in cards]
+
+
+def don_record(d) -> dict:
+    return {"uuid": d.uuid, "owner_id": d.owner_id, "is_rest": d.is_rest,
+            "attached_to": d.attached_to, "is_frozen": d.is_frozen}
 
 
 def hidden_dict(manager) -> dict:
-    """再生に必要な非公開情報（各ゾーンの並び）。to_dict では見えない部分。"""
-    out = {}
+    """再生に必要な非公開情報＝盤面の完全な内部状態（形式 v2）。to_dict では見えない部分を含む。"""
+    out = {"players": {}}
     for p in (manager.p1, manager.p2):
-        out[p.name] = {
-            "leader": ({"card_id": p.leader.master.card_id, "uuid": p.leader.uuid}
-                       if p.leader else None),
+        out["players"][p.name] = {
+            "name": p.name,
+            "leader": card_record(p.leader) if p.leader else None,
+            "stage": card_record(p.stage) if p.stage else None,
             "deck": _zone_order(p.deck),
             "hand": _zone_order(p.hand),
             "life": _zone_order(p.life),
             "field": _zone_order(p.field),
             "trash": _zone_order(p.trash),
-            "don": {"deck": len(p.don_deck), "active": len(p.don_active),
-                    "rested": len(p.don_rested), "attached": len(p.don_attached_cards)},
+            "temp_zone": _zone_order(p.temp_zone),
+            "don": {"deck": [don_record(d) for d in p.don_deck],
+                    "active": [don_record(d) for d in p.don_active],
+                    "rested": [don_record(d) for d in p.don_rested],
+                    "attached": [don_record(d) for d in p.don_attached_cards]},
+            "negate_onplay_until": p.negate_onplay_until,
+            "restrictions": {k: dict(v) for k, v in p.restrictions.items()},
         }
+    ab = manager.active_battle
+    out["manager"] = {
+        "turn_count": manager.turn_count,
+        "phase": manager.phase.name,
+        "turn_player": manager.turn_player.name,
+        "winner": manager.winner,
+        "active_battle": ({"attacker": ab["attacker"].uuid, "target": ab["target"].uuid,
+                           "counter_buff": ab.get("counter_buff", 0)} if ab else None),
+        "turn_events": dict(manager._turn_events),
+        "mulligan_done": sorted(manager.mulligan_done),
+        "setup_phase_pending": manager.setup_phase_pending,
+        "turn_start_pending": manager.turn_start_pending,
+        # 対話スタック・遅延継続・誘発待ち行列は P2/P3 の契約で足す（P1 では件数だけ持ち、
+        # 0 でない行は state モードの照合対象から外す＝`interaction_depth`）。
+        "interaction_depth": len(manager._interaction_stack),
+        "pending_triggers": len(manager._pending_triggers),
+        "pending_end_of_turn": len(manager.pending_end_of_turn),
+    }
     return out
 
 
@@ -171,9 +226,26 @@ class Recorder:
 
 # --- 照合 ---------------------------------------------------------------------
 
+# 順序を持たない list 欄（Python 側が set から作る＝プロセス毎の hash 乱択で並びが変わる）。
+# 照合前にソートして正規化する。Rust 側はソート済みで出せばよい。
+_UNORDERED_LIST_KEYS = frozenset({"keywords"})
+
+
+def canon(value, key=None):
+    """順序を持たない list 欄をソートした複製を返す（比較の前処理）。"""
+    if isinstance(value, dict):
+        return {k: canon(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        items = [canon(v) for v in value]
+        if key in _UNORDERED_LIST_KEYS:
+            items = sorted(items, key=lambda x: json.dumps(x, sort_keys=True, ensure_ascii=False, default=str))
+        return items
+    return value
+
+
 def _norm(value) -> str:
-    """キー順に依存しない正規化 JSON（比較の正本）。"""
-    return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
+    """キー順に依存しない正規化 JSON（比較の正本）。順序を持たない list 欄はソートする。"""
+    return json.dumps(canon(value), sort_keys=True, ensure_ascii=False, default=str)
 
 
 def first_diff(expected, actual, path="") -> str:
@@ -212,13 +284,38 @@ def compare(record: dict, replayed: dict) -> dict:
                 "path": f"states[len {len(expected)}!={len(states)}]"}
     for i, (exp, got) in enumerate(zip(expected, states)):
         if _norm(exp) != _norm(got):
-            return {"status": "mismatch", "action": i, "path": first_diff(exp, got)}
+            return {"status": "mismatch", "action": i, "path": first_diff(canon(exp), canon(got))}
+    return {"status": "match"}
+
+
+def compare_states(record: dict) -> dict:
+    """`--mode state`: 各行の hidden → Rust の `state_roundtrip` → 盤面 dict が記録の `state` と一致するか。"""
+    rows = [record["setup"]] + record["steps"]
+    for i, row in enumerate(rows):
+        hidden = row.get("hidden")
+        if hidden is None:
+            return {"status": "bad_payload", "detail": "--mode state requires --hidden"}
+        try:
+            out = opcg_engine.state_roundtrip(json.dumps(hidden, ensure_ascii=False, default=str))
+        except NotImplementedError as e:
+            return {"status": "unimplemented", "detail": str(e)}
+        except ValueError as e:
+            return {"status": "bad_payload", "detail": f"row {i}: {e}"}
+        try:
+            got = json.loads(out)
+        except (TypeError, ValueError) as e:
+            return {"status": "bad_output", "detail": f"state_roundtrip returned non-JSON: {e}"}
+        exp = dict(row["state"])
+        exp.pop("pending_request", None)
+        got.pop("pending_request", None)
+        if _norm(exp) != _norm(got):
+            return {"status": "mismatch", "action": i - 1, "path": first_diff(canon(exp), canon(got))}
     return {"status": "match"}
 
 
 # --- 1 局 ---------------------------------------------------------------------
 
-def run_one(seed: int, db, policy: str, max_steps: int, record_hidden: bool):
+def run_one(seed: int, db, policy: str, max_steps: int, record_hidden: bool, mode: str = "replay"):
     """1 局を Python で打って記録し、Rust で再生して照合する。戻り値: (record, verdict)。"""
     kind = "random" if policy == "random" else "ai"
     seats = {"p1": make_seat(kind=kind), "p2": make_seat(kind=kind)}
@@ -233,6 +330,8 @@ def run_one(seed: int, db, policy: str, max_steps: int, record_hidden: bool):
     record = rec.payload()
     if opcg_engine is None:
         return rec, {"status": "unimplemented", "detail": "opcg_engine is not installed"}
+    if mode == "state":
+        return rec, compare_states(record)
     try:
         out = opcg_engine.replay(json.dumps(record, ensure_ascii=False, default=str))
     except NotImplementedError as e:
@@ -254,7 +353,9 @@ def main(argv=None) -> int:
                     help="両席の方策: random=ランダム合法手 / l1=古典CPU（既定 random）")
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS, help="1局の上限ステップ")
     ap.add_argument("--hidden", action="store_true",
-                    help="各行動後の隠しゾーン（デッキ/ライフの並び）も記録する")
+                    help="各行動後の完全な内部状態（形式 v2 の hidden）も記録する（--mode state は必須）")
+    ap.add_argument("--mode", choices=["replay", "state"], default="replay",
+                    help="replay=行動列の再生を照合（既定）／state=hidden→GameState→盤面 dict の往復を照合（P1-model）")
     ap.add_argument("--dump", default=None, help="1局目の記録をこのパスへ書き出す（Rust 側の開発用）")
     ap.add_argument("--verbose", action="store_true", help="局ごとの判定を出す")
     args = ap.parse_args(argv)
@@ -267,7 +368,9 @@ def main(argv=None) -> int:
     for i in range(args.games):
         seed = args.seed_base + i
         try:
-            rec, verdict = run_one(seed, db, args.policy, args.max_steps, args.hidden)
+            if args.mode == "state" and not args.hidden:
+                args.hidden = True
+            rec, verdict = run_one(seed, db, args.policy, args.max_steps, args.hidden, args.mode)
         except Exception as e:  # noqa: BLE001 - ハーネス自身の事故も集計に載せる
             rec, verdict = None, {"status": "python_error",
                                   "detail": f"{type(e).__name__}: {e}\n{traceback.format_exc()}"}
@@ -296,6 +399,7 @@ def main(argv=None) -> int:
         "bad_payload": totals["bad_payload"],
         "bad_output": totals["bad_output"],
         "policy": args.policy,
+        "mode": args.mode,
         "seed_base": args.seed_base,
         "engine": (opcg_engine.version() if opcg_engine is not None else None),
         "record_version": RECORD_VERSION,

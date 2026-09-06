@@ -8,7 +8,7 @@ use serde_json::Value;
 
 /// 再生ペイロード（`tests/scripts/rs_diff_replay.py` が書く JSON）の想定バージョン。
 /// 形を非互換に変えたら +1 し、Python 側（`RECORD_VERSION`）も同時に上げる。
-pub const RECORD_VERSION: u64 = 1;
+pub const RECORD_VERSION: u64 = 2;
 
 /// 骨組みの実装状況を表すエラー。PyO3 側で Python 例外へ写像する。
 #[derive(Debug, PartialEq, Eq)]
@@ -29,6 +29,26 @@ pub fn echo_state(json_str: &str) -> Result<String, EngineError> {
         .map_err(|e| EngineError::BadPayload(format!("invalid board JSON: {e}")))?;
     serde_json::to_string(&value)
         .map_err(|e| EngineError::BadPayload(format!("cannot re-serialize board JSON: {e}")))
+}
+
+/// 記録 v2 の `hidden` → `GameState` → 盤面 JSON（P1-model の受け入れ口・`lib.rs` から呼ばれる）。
+///
+/// 骨組みでは JSON の妥当性だけ検査して `Unimplemented` を返す。WP `rs-p1-model` が
+/// `model::GameState::from_record(&Value)` と `board_json(&GameState)` を実装してここを置き換える。
+pub fn state_roundtrip(hidden_json: &str) -> Result<String, EngineError> {
+    let value: Value = serde_json::from_str(hidden_json)
+        .map_err(|e| EngineError::BadPayload(format!("invalid hidden JSON: {e}")))?;
+    let obj = value
+        .as_object()
+        .ok_or_else(|| EngineError::BadPayload("hidden must be a JSON object".into()))?;
+    for key in ["players", "manager"] {
+        if !obj.contains_key(key) {
+            return Err(EngineError::BadPayload(format!("hidden: missing '{key}'")));
+        }
+    }
+    Err(EngineError::Unimplemented(
+        "state_roundtrip: model not implemented yet (P1 skeleton); see docs/rust_engine_plan.md §9".into(),
+    ))
 }
 
 /// 記録した局（seed・初期盤面・行動列）を Rust エンジンで再生する。
@@ -101,6 +121,18 @@ mod tests {
                 assert!(msg.contains("1 step"), "message should count steps: {msg}");
             }
             other => panic!("expected Unimplemented, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn state_roundtrip_checks_contract_then_reports_unimplemented() {
+        match state_roundtrip(r#"{"players":{},"manager":{}}"#) {
+            Err(EngineError::Unimplemented(msg)) => assert!(msg.contains("state_roundtrip")),
+            other => panic!("expected Unimplemented, got {other:?}"),
+        }
+        match state_roundtrip(r#"{"players":{}}"#) {
+            Err(EngineError::BadPayload(msg)) => assert!(msg.contains("'manager'")),
+            other => panic!("expected BadPayload, got {other:?}"),
         }
     }
 
