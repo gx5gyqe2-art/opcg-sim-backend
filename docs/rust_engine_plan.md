@@ -123,6 +123,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-06 | P0 | **完了**（`claude/rs-p0-skeleton`）: crate 雛形＋PyO3/maturin・Docker ビルド段・効果 JSON 書き出し・差分照合ハーネス・`make rust`。結果は下記 §8.1 |
 | 2026-09-06 | P0 | 統合（本線へ cherry-pick・d252eb20）。ローカル再検証: exporter 2803 枚／`--games 2` unimplemented=2／`cargo test` 5 件 green |
 | 2026-09-06 | P1 | **設計＋契約を本線へ**（§9）: 記録形式 v2（`hidden`＝完全な内部状態）・`--mode state`・`model.rs` 型契約と stub（`MasterTable::from_effects_json`／`GameState::from_record`／`board_json`）・`state_roundtrip` 入口。WP `rs-p1-model`／`rs-p1-journal` の指示書は §9.4 |
+| 2026-09-06 | P1 | **WP `rs-p1-model` 完了**（`claude/rs-p1-model`）: `MasterTable::from_effects_json`／`GameState::from_record`／`GameState::board_json`・`load_masters(path)`・ハーネスの `--effects`。`--mode state` は random 500 局・L1 50 局とも**全行一致**（mismatch=0・unimplemented=0）。結果は下記 §8.2 |
 
 ### 8.1 P0 の結果（2026-09-06）
 
@@ -178,6 +179,48 @@ TriggerType は ON_PLAY 940／ACTIVATE_MAIN 670／TRIGGER 507／PASSIVE 346／ON
 - 盤面 dict は API と同じ形（`turn_info`／`players`／`active_battle`＋`pending_request`）をハーネス側で
   組み立てている（`GameManager.to_dict` は存在しないため。Python 側は変更しない P0 の制約）。P1 で
   Rust 側の出力をこの形に合わせる。
+
+### 8.2 P1-model（WP `rs-p1-model`）の結果（2026-09-06）
+
+成果物（所有範囲は §9.3。`journal.rs`／`ops.rs` は触っていない）:
+
+| 成果物 | 中身 |
+|---|---|
+| `model.rs`（stub → 本体） | `MasterTable::from_effects_json`（`opcg_effects.json` の `cards` から 2,803 枚の `CardMaster`。`keywords` は Python `_refresh_keywords` と同じ集合）／`GameState::from_record`（記録 v2 の `hidden` → 両席の全ゾーン・ドン!! 4 ゾーン・manager 欄。uuid→`CardIdx` を解決）／`GameState::board_json`（Python の `Player.to_dict`／`CardInstance.to_dict`／`DonInstance.to_dict` と同じ形・同じ値） |
+| `state.rs` | `load_masters`（`OnceLock` でプロセス 1 回）＋本物の `state_roundtrip`（未ロードは `ValueError`） |
+| `lib.rs` | `load_masters(path) -> int` を公開 API へ追加 |
+| `rs_diff_replay.py` | `--effects`（既定 `opcg_sim/data/opcg_effects.json`・**無ければ exporter を自動実行**）と起動時の `load_masters` 呼び出し |
+| `rust/opcg_engine/tests/fixtures/` | `hidden_v2.json`（1 行・51KB）／`board_v2.json`（期待値・26KB）／`masters_v2.json`（その盤面の 51 枚・122KB）＋作り方の README |
+
+受け入れ（実測）:
+
+- `--mode state --games 500 --policy random` → `match=500 / mismatch=0 / unimplemented=0`（49,738 行動）
+- `--mode state --games 50 --policy l1 --seed-base 600000` → `match=50 / mismatch=0 / unimplemented=0`（5,770 行動）
+- `make test`（Python 側）**1,761 passed**（9m46s・Python 側の変更はハーネスの追加のみ）
+- `cargo test --no-default-features` **16 件 green**／`cargo clippy --all-targets -D warnings` 警告 0
+- `load_masters` は 7.88MB の JSON を **0.14s** で読む（局ごとではなくプロセスで 1 回）
+
+**罠 1（実害あり）: 日本語 enum 値の正規化形**。`opcg_sim/src/models/enums.py` の `CardType` の値は
+**濁点が結合文字（NFD）**で書かれている（`リーダー` = リ ー タ U+3099 ー／`イベント`／`ステージ` も同様。
+`キャラクター`・`Attribute`・`Color`・`DonInstance` の「ドン!!」は NFC）。Rust 側に素直に
+`"リーダー"` と書くと NFC になり、**全行の `players.*.leader.type` が不一致**になる。`CardType::value`
+はエスケープで書き、`card_type_values_keep_the_python_normalization` で符号位置を固定した。
+Python 側の to_dict を通る文字列は他に `name`／`traits`／`text` があるが、これらは効果 JSON 由来
+（バイト列がそのまま流れる）なので同じ問題は起きない。
+
+**罠 2: `_refresh_keywords` の第 2 項は現状 no-op**。Python の `_refresh_keywords` は
+`hasattr(ability, 'actions')` で `KEYWORD` アクションを拾うが、`Ability` dataclass に `actions`
+フィールドは無いため**全 2,803 枚で `current_keywords == master.keywords`**（実測で確認）。Rust 側は
+「同じ場所・同じ条件で走査する」形（ability の**トップレベル** `actions` のみ・空文字は足さない）で
+実装してあるので、将来 `Ability` に `actions` が生えても Python と同じ結果になる。
+
+未実装・引き継ぎ（P2 以降）:
+
+- `pending_request` は出さない（対話スタックは P2 の責務。ハーネスも比較から外している）。
+- `hidden.manager` の `interaction_depth`／`pending_triggers`／`pending_end_of_turn` は**形の検査だけ**
+  して読み捨てる（盤面 dict に出ないため）。P2 で中身の契約が決まったら `GameState` へ足す。
+- `docker build` は本セッションでも通せていない（P0 と同じくベースイメージの blob 取得が
+  egress ポリシーで 403。Dockerfile は未変更）。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
