@@ -1,0 +1,1 @@
+{"job":"gen-n25-w04b","role":"gen","status":"partial","inputs":{"neff_net":"claude/n1-results:n1_results/nrel_a1.npz","wave":25,"shard":"04b","seed_base":2259000,"games":380,"sims":128,"workers":4,"dump_v2":true},"outputs":{"records":"n25b_records/","log":"n25b_gen.log"},"note":"fill for claude/n25-w04; stopped early by coordinator (user decision); 150/380 games kept"}
