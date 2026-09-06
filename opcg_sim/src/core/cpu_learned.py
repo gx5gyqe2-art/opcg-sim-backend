@@ -427,8 +427,14 @@ class LearnedEngine:
         if _is_nrel(vp):
             # NRel（N系 v3・2026-09-04・`docs/n_attention_plan.md`）: 盤面から直接評価する
             # アダプタ（predict_state）と、対・予算を見る方策 → `priors_override`。
-            shared, neff_priors = _shared_nrel(vp)
+            shared, _shared_priors = _shared_nrel(vp)
             self.vnet = shared.clone()
+            # priors は**このエンジンの vnet（クローン）に束縛**する（2026-09-06）: 共有アダプタに
+            # 束縛した priors を使うと value（クローン側）と priors（共有側）の符号化キャッシュ
+            # （`encode_state` の指紋）が別物になり、同じ葉で 2 回符号化していた（生成 1 局の
+            # プロファイルで encode_state 79,685 回＝value 49,039＋priors 30,646・キャッシュ命中 0）。
+            from opcg_sim.src.learned import n_rel as _NL
+            neff_priors = _NL.nrel_priors(self.vnet)
         elif _is_neff(vp):
             # N系（出荷既定 c10・2026-09-03）: value は `NEffValueAdapter`（vnet ダックタイプ・
             # 出口ヘッド無し）、方策は同じネットの候補ヘッド → `priors_override`。

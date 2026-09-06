@@ -126,7 +126,9 @@ def test_tables_shared_per_path_but_vnet_per_engine():
     a, b = LearnedEngine(), LearnedEngine()
     assert a.vnet is not b.vnet
     assert a.vnet.net is b.vnet.net and a.vnet.tab is b.vnet.tab and a.vnet.rt is b.vnet.rt
-    assert a.priors_override is b.priors_override
+    # priors は**エンジンごと**（自分の vnet＝符号化キャッシュに束縛・2026-09-06）。共有だと value と
+    # priors の符号化キャッシュが別物になり同じ葉を 2 回符号化していた。
+    assert a.priors_override is not b.priors_override
 
 
 def test_c10_rollback_path_keeps_neff_wiring():

@@ -22,6 +22,8 @@ serve と訓練で **forward はここが唯一の正本**（訓練器 `tests/sc
           logit = relu([e, h_si, h_ti, R(si,ti), f139, 予算3] Wp1 + bp1) Wp2 + bp2 → seg-softmax
   枠が無い（−1）主体/対象は 0 ベクトル。R(si,ti) は si∈自・ti∈相手のときだけ rel_om、それ以外 0。
 """
+import collections
+import os
 import json
 
 import numpy as np
@@ -30,6 +32,10 @@ from opcg_sim.src.learned import encoder as E
 from opcg_sim.src.learned import n_eff as NE
 from opcg_sim.src.learned import n_rel_feat as NR
 
+_CACHE_MAX = 4096                     # 席ごとの符号化キャッシュ上限（1 エントリ ≒ 4KB）
+_NOCACHE = bool(os.environ.get("OPCG_NREL_NOCACHE"))
+_VERIFY = bool(os.environ.get("OPCG_NREL_VERIFY"))
+_VERIFY_STATS = collections.Counter()   # 同値性の検査用（キャッシュ無し＝毎回符号化）
 NR_ENC_VERSION = 13                   # NRel の符号化世代（v12 + n_rel_feat の追加 29）
 
 D_SC = 94 + NR.EXTRA_DIM              # 123
@@ -124,11 +130,20 @@ class NRelNet:
         to = t[:, OWN_SLOTS]                                                    # [B,16,48]
         tp = t[:, OPP_SLOTS]                                                    # [B,6,48]
         po = present[:, OWN_SLOTS]; pp = present[:, OPP_SLOTS]
+        fast = keep is None and "rel" in self.ablate
         # 自×相手
-        u = np.concatenate([np.broadcast_to(to[:, :, None, :], (B, N_OWN, N_OPP, D_T)),
-                            np.broadcast_to(tp[:, None, :, :], (B, N_OWN, N_OPP, D_T)),
-                            rel_om], 3)                                          # [B,16,6,101]
-        hr = u @ self.Wr + self.br
+        if fast:
+            # R 遮断の serve 経路（2026-09-06）: R は常に 0 なので [t_i, t_j, 0]·Wr = t_i·Wr_a + t_j·Wr_b。
+            # 対ごとの [B,16,6,101] を組まず、[B,16,32]+[B,6,32] の和で同じ値を得る（生成 1 局で
+            # tokens_forward が 57s→ 大半が broadcast/concat だった）。加算順が変わるぶん 1e-6 級の差。
+            u = None
+            hr = ((to @ self.Wr[:D_T])[:, :, None, :] + (tp @ self.Wr[D_T:2 * D_T])[:, None, :, :]
+                  + self.br)
+        else:
+            u = np.concatenate([np.broadcast_to(to[:, :, None, :], (B, N_OWN, N_OPP, D_T)),
+                                np.broadcast_to(tp[:, None, :, :], (B, N_OWN, N_OPP, D_T)),
+                                rel_om], 3)                                          # [B,16,6,101]
+            hr = u @ self.Wr + self.br
         r = np.maximum(hr, 0.0)                                                 # [B,16,6,32]
         mask_om = (po[:, :, None] * pp[:, None, :])[:, :, :, None]              # [B,16,6,1]
         r = r * mask_om
@@ -140,10 +155,15 @@ class NRelNet:
         mx_i = r_masked.max(1); mx_i = np.where(mx_i < -1e8, 0.0, mx_i)         # [B,6,32]
         mean_i = r.sum(1) / n_i
         # 自×自（k≠i）
-        v = np.concatenate([np.broadcast_to(to[:, :, None, :], (B, N_OWN, N_OWN, D_T)),
-                            np.broadcast_to(to[:, None, :, :], (B, N_OWN, N_OWN, D_T)),
-                            rel_oo], 3)                                          # [B,16,16,101]
-        hc = v @ self.Wc + self.bc
+        if fast:
+            v = None
+            hc = ((to @ self.Wc[:D_T])[:, :, None, :] + (to @ self.Wc[D_T:2 * D_T])[:, None, :, :]
+                  + self.bc)
+        else:
+            v = np.concatenate([np.broadcast_to(to[:, :, None, :], (B, N_OWN, N_OWN, D_T)),
+                                np.broadcast_to(to[:, None, :, :], (B, N_OWN, N_OWN, D_T)),
+                                rel_oo], 3)                                          # [B,16,16,101]
+            hc = v @ self.Wc + self.bc
         c = np.maximum(hc, 0.0)
         eye = np.eye(N_OWN, dtype=np.float32)[None, :, :, None]
         mask_oo = (po[:, :, None] * po[:, None, :])[:, :, :, None] * (1.0 - eye)
@@ -284,6 +304,7 @@ class NRelValueAdapter:
     def clone(self):
         c = object.__new__(NRelValueAdapter)
         c.__dict__.update(self.__dict__)
+        c._cache = collections.OrderedDict()          # 符号化キャッシュは席（エンジン）ごと
         return c
 
     @staticmethod
@@ -291,17 +312,52 @@ class NRelValueAdapter:
         """同じ盤面か（value と priors が同じノードで続けて呼ばれる＝符号化を 1 回にする）。
         make/unmake は同一オブジェクトを書き換えるので id() では判別できない＝内容の指紋で見る。"""
         def cz(c):
+            # パワー/コスト/キーワード/カウンターを決める全フィールド（`models.get_power`/`current_cost`/
+            # `has_keyword`/`current_counter` の入力）。2026-09-06 の検証で timed_power 等を欠いた指紋は
+            # 生成 1 局で命中 53,501 回中 14,434 回が別盤面の符号化を返していた。
             return (getattr(c, "uuid", None), bool(getattr(c, "is_rest", False)),
                     int(getattr(c, "attached_don", 0) or 0), int(getattr(c, "power_buff", 0) or 0),
-                    int(getattr(c, "cost_buff", 0) or 0), bool(getattr(c, "is_newly_played", False)))
-        parts = [to_move, int(getattr(state, "turn_count", 0) or 0), str(getattr(state, "phase", None))]
+                    int(getattr(c, "timed_power", 0) or 0), int(getattr(c, "passive_power", 0) or 0),
+                    getattr(c, "passive_power_override", None), getattr(c, "base_power_override", None),
+                    int(getattr(c, "cost_buff", 0) or 0), int(getattr(c, "timed_cost", 0) or 0),
+                    getattr(c, "base_cost_override", None), int(getattr(c, "passive_counter", 0) or 0),
+                    bool(getattr(c, "is_effect_negated", False)),
+                    tuple(sorted(getattr(c, "timed_keywords", ()) or ())),
+                    tuple(sorted(getattr(c, "current_keywords", ()) or ())),
+                    bool(getattr(c, "is_newly_played", False)),
+                    tuple(sorted(dict(getattr(c, "ability_used_this_turn", {}) or {}).items())))
+        parts = [to_move, int(getattr(state, "turn_count", 0) or 0), str(getattr(state, "phase", None)),
+                 getattr(state, "turn_player", None) is state.p1]
         ai = getattr(state, "active_interaction", None)
         parts.append((ai or {}).get("action_type") if isinstance(ai, dict) else None)
+        # 符号化が読む「盤面以外」の状態（2026-09-06・複数エントリ化で衝突が実害になったため）:
+        # ターン内イベント（KO 数など v3 列）・手番要求（誰の何の窓か）・合法手（`_leader_act_avail` と
+        # v7 の登場時スキャンは合法手を通して戦闘/対話の状態に依存する）。
+        ev = getattr(state, "_turn_events", None) or {}
+        parts.append(tuple(sorted((str(k), v) for k, v in dict(ev).items())))
+        try:
+            pa = state.pending_actor_action()
+            parts.append(tuple(pa) if pa else None)
+        except Exception:
+            parts.append(None)
+        try:
+            parts.append(tuple((m.get("action_type"), tuple(sorted((k, str(v)) for k, v in (m.get("payload") or {}).items())))
+                               for m in state.get_legal_actions()))
+        except Exception:
+            parts.append(None)
         for pl in (state.p1, state.p2):
+            # 山札・ライフ・トラッシュは**中身**まで見る（2026-09-06・複数エントリ化に伴い）: PIMC の
+            # 別世界は見える盤面が同じでも山札の中身（デッキ残の役割・未見プール）が違うので、枚数だけの
+            # 指紋だと世界をまたいで衝突し、別世界の符号化を返してしまう。
             parts.append((cz(pl.leader) if pl.leader is not None else None,
-                          tuple(cz(c) for c in pl.field), tuple(getattr(c, "uuid", None) for c in pl.hand),
+                          tuple(cz(c) for c in pl.field),
+                          tuple(cz(c) for c in pl.hand),
                           len(pl.don_active), len(pl.don_rested), len(getattr(pl, "don_deck", ()) or ()),
-                          len(pl.life), len(pl.deck), len(pl.trash),
+                          len(getattr(pl, "don_attached_cards", ()) or ()),
+                          tuple((getattr(c, "uuid", None), bool(getattr(c, "is_face_up", False))) for c in pl.life),
+                          tuple(getattr(c, "uuid", None) for c in pl.deck),
+                          tuple(getattr(c, "uuid", None) for c in pl.trash),
+                          getattr(getattr(pl, "stage", None), "uuid", None),
                           tuple(getattr(c, "ability_used_this_turn", {}).items()) if pl.leader is None
                           else tuple(dict(getattr(pl.leader, "ability_used_this_turn", {}) or {}).items())))
         return tuple(parts)
@@ -310,10 +366,30 @@ class NRelValueAdapter:
         """盤面 → (sc [1,123], ci [1,22], tok [1,22,S], rel_om, rel_oo, R)。
 
         同じ盤面（指紋一致）なら直前の結果を返す＝1 ノードで value と priors が同じ符号化を共有する。"""
-        fp = self._fingerprint(state, to_move)
-        last = getattr(self, "_last", None)
-        if last is not None and last[0] == fp:
-            return last[1]
+        cache = getattr(self, "_cache", None)
+        if cache is None:
+            cache = self._cache = collections.OrderedDict()
+        if _NOCACHE:
+            fp = None
+        else:
+            fp = self._fingerprint(state, to_move)
+            hit = cache.get(fp)
+            if hit is not None:
+                cache.move_to_end(fp)
+                if _VERIFY:                                   # 検査: 命中が正しいか（再符号化と比較）
+                    R2 = NR.encode_rel(state, to_move, with_relations=False)
+                    b2 = E.encode(state, to_move, self.vocab, version=12)
+                    sc2 = np.concatenate([b2["scalars"], R2["extra"]]).astype(np.float32)[None, :]
+                    same = (np.array_equal(sc2, hit[0]) and np.array_equal(np.asarray(b2["card_idx"])[:N_TOK][None, :], hit[1])
+                            and np.array_equal(R2["tokens"][None], hit[2]))
+                    if not same:
+                        _VERIFY_STATS["stale"] += 1
+                        d = np.abs(sc2 - hit[0])[0]
+                        _VERIFY_STATS.setdefault("cols", collections.Counter()).update(np.where(d > 0)[0].tolist())
+                        if not np.array_equal(R2["tokens"][None], hit[2]):
+                            _VERIFY_STATS["tok"] += 1
+                    _VERIFY_STATS["hits"] += 1
+                return hit
         R = NR.encode_rel(state, to_move, with_relations=False)
         base = E.encode(state, to_move, self.vocab, version=12)
         sc = np.concatenate([base["scalars"], R["extra"]]).astype(np.float32)[None, :]
@@ -327,7 +403,12 @@ class NRelValueAdapter:
             om, oo = NR.relations_from_dump(ci[0], tok[0], self.ptab)
         rel_om, rel_oo = om[None], oo[None]
         out = (sc, ci, tok, rel_om, rel_oo, R)
-        self._last = (fp, out)
+        # 複数エントリの LRU（2026-09-06）: 1 エントリだと「葉で value → 次の訪問で priors」の間に
+        # 他ノードの符号化が挟まり命中しなかった（生成 1 局で命中 0＝priors 側 30,646 回が全て再符号化）。
+        if fp is not None:
+            cache[fp] = out
+            if len(cache) > _CACHE_MAX:
+                cache.popitem(last=False)
         return out
 
     def predict_state(self, state, to_move):

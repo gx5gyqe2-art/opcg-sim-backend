@@ -154,4 +154,4 @@ def test_rel_ablated_net_skips_relations_and_matches_value(m2, tmp_path):
     om, oo = NR.relations_from_dump(ci[0], tok[0], eng.vnet.ptab)
     assert om.any() or oo.any(), "検査盤面に関係が無い（盤面を変える）"
     ref = float(net.value(sc, ci, tok, om[None], oo[None])[0])
-    assert abs(v - ref) < 1e-6
+    assert abs(v - ref) < 1e-5     # R 遮断の serve 経路は対の積和を分解する（加算順の差＝1e-6 級）

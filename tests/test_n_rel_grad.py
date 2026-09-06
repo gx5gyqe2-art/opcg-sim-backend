@@ -240,3 +240,20 @@ def test_ablation_masks_inputs_in_train_and_serve(env, tmp_path):
         v = net.value(sc, ci, tok, om, oo)
         return 0.5 * float(np.mean((v - zt) ** 2))
     _check(net, captured, loss, rng, ("Wa", "Wt", "Wr", "Wc", "W1", "W2", "Wv", "bt", "br", "bc", "b1"))
+
+
+def test_rel_ablated_fast_path_matches_batch_path(env):
+    """R 遮断の serve 経路（keep=None・対テンソルを組まない）と訓練の一括経路（keep あり）は同じ値
+    （加算順の差のみ・|Δ|<1e-5）。"""
+    net = NT.NRelNet(env["tables"], hidden=32, seed=9); net.ablate = {"rel"}
+    tab = net.card_table()
+    h_fast, p_fast = net.tokens_forward(env["ci"], env["tok"], env["rel_om"], env["rel_oo"], tab)
+    h_ref, p_ref = net.tokens_forward(env["ci"], env["tok"], env["rel_om"], env["rel_oo"], tab, keep={})
+    assert np.array_equal(p_fast, p_ref)
+    assert np.abs(h_fast - h_ref).max() < 1e-5
+    v_fast = net.value(env["sc"], env["ci"], env["tok"], env["rel_om"], env["rel_oo"])
+    k = {}
+    h, present = net.tokens_forward(env["ci"], env["tok"], env["rel_om"], env["rel_oo"], tab, k)
+    e = net.body(env["sc"], h, present)
+    v_ref = np.tanh((e @ net.Wv + net.bv)[:, 0])
+    assert np.abs(v_fast - v_ref).max() < 1e-5
