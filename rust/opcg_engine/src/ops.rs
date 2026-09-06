@@ -649,43 +649,20 @@ pub fn apply_op(s: &mut Session, masters: &MasterTable, op: &Value) -> Result<()
 
 // --- 公開口 `apply_ops`（`lib.rs` から呼ばれる）-------------------------------
 
-/// マスター表の保持。プロセスで 1 度だけ読む。
-///
-/// WP `rs-p1-model` が `lib.rs` に入れる `load_masters(path)` と同じ役割なので、統合時は
-/// どちらか一方（[`set_masters`]）へ寄せる（RESULT.json の notes 参照）。
-static MASTERS: std::sync::OnceLock<std::sync::Mutex<Option<MasterTable>>> =
-    std::sync::OnceLock::new();
-
-fn masters_cell() -> &'static std::sync::Mutex<Option<MasterTable>> {
-    MASTERS.get_or_init(|| std::sync::Mutex::new(None))
-}
-
-/// 既に読み込んだ表を差し替える（統合後は `load_masters` からこれを呼べばよい）。
-pub fn set_masters(table: MasterTable) {
-    let mut cell = masters_cell().lock().unwrap_or_else(|e| e.into_inner());
-    *cell = Some(table);
-}
-
-/// 未ロードなら `path` の効果 JSON から読み込む。読み込み済みなら何もしない。
-fn ensure_masters(path: Option<&str>) -> Result<(), EngineError> {
-    {
-        let cell = masters_cell().lock().unwrap_or_else(|e| e.into_inner());
-        if cell.is_some() {
-            return Ok(());
-        }
+/// マスター表は `state::load_masters`／`state::masters`（プロセスで 1 度・`OnceLock`）に一本化した
+/// （統合時 2026-09-06。WP 時点の `ops.rs` 独自の保持は撤去）。`effects_path` は未ロードのときの
+/// 便宜（`load_masters` を先に呼んでいれば省略可）。
+fn ensure_masters(path: Option<&str>) -> Result<&'static MasterTable, EngineError> {
+    if let Some(m) = crate::state::masters() {
+        return Ok(m);
     }
     let Some(path) = path else {
         return Err(EngineError::BadPayload(
-            "apply_ops: マスター未ロード（effects_path に opcg_effects.json を渡すこと）".into(),
+            "apply_ops: マスター未ロード（先に load_masters(path) を呼ぶか effects_path を渡すこと）".into(),
         ));
     };
-    let text = std::fs::read_to_string(path)
-        .map_err(|e| EngineError::BadPayload(format!("apply_ops: cannot read {path}: {e}")))?;
-    let doc: Value = serde_json::from_str(&text)
-        .map_err(|e| EngineError::BadPayload(format!("apply_ops: invalid effects JSON: {e}")))?;
-    let table = MasterTable::from_effects_json(&doc)?;
-    set_masters(table);
-    Ok(())
+    crate::state::load_masters(path)?;
+    crate::state::masters().ok_or_else(|| EngineError::BadPayload("apply_ops: マスター未ロード".into()))
 }
 
 /// 記録 v2 の `hidden` から盤面を組み、ops_json（§9.5）を順に適用して各適用後の盤面を返す。
@@ -697,11 +674,7 @@ pub fn apply_ops(
     ops_json: &str,
     effects_path: Option<&str>,
 ) -> Result<String, EngineError> {
-    ensure_masters(effects_path)?;
-    let guard = masters_cell().lock().unwrap_or_else(|e| e.into_inner());
-    let masters = guard
-        .as_ref()
-        .ok_or_else(|| EngineError::BadPayload("apply_ops: マスター未ロード".into()))?;
+    let masters = ensure_masters(effects_path)?;
 
     let hidden: Value = serde_json::from_str(hidden_json)
         .map_err(|e| EngineError::BadPayload(format!("apply_ops: invalid hidden JSON: {e}")))?;

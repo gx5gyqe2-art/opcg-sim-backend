@@ -302,6 +302,8 @@ pub fn fixture() -> Fixture {
         active_battle: Some(ActiveBattle {
             attacker: p1_field_char,
             target: p2_leader,
+            attacker_owner: Seat::P1,
+            target_owner: Seat::P2,
             counter_buff: 1000,
         }),
         turn_events: vec![("DON_RETURNED".to_string(), 1)],

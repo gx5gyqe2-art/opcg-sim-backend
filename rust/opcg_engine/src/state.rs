@@ -10,7 +10,7 @@ use std::sync::OnceLock;
 
 /// 再生ペイロード（`tests/scripts/rs_diff_replay.py` が書く JSON）の想定バージョン。
 /// 形を非互換に変えたら +1 し、Python 側（`RECORD_VERSION`）も同時に上げる。
-pub const RECORD_VERSION: u64 = 2;
+pub const RECORD_VERSION: u64 = 3;
 
 /// 骨組みの実装状況を表すエラー。PyO3 側で Python 例外へ写像する。
 #[derive(Debug, PartialEq, Eq)]

@@ -936,6 +936,8 @@ mod tests {
                         Some(ActiveBattle {
                             attacker: rng.below(ncards),
                             target: rng.below(ncards),
+                            attacker_owner: seat,
+                            target_owner: seat.other(),
                             counter_buff: rng.below(3000) as i32,
                         })
                     }),

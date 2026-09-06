@@ -122,9 +122,11 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-06 | P0 | 指示書作成 |
 | 2026-09-06 | P0 | **完了**（`claude/rs-p0-skeleton`）: crate 雛形＋PyO3/maturin・Docker ビルド段・効果 JSON 書き出し・差分照合ハーネス・`make rust`。結果は下記 §8.1 |
 | 2026-09-06 | P0 | 統合（本線へ cherry-pick・d252eb20）。ローカル再検証: exporter 2803 枚／`--games 2` unimplemented=2／`cargo test` 5 件 green |
-| 2026-09-06 | P1 | **`rs-p1-journal` 完了**（`claude/rs-p1-journal`）: `journal.rs`（undo ログ・入れ子/rollback/commit）・`ops.rs`（原始操作 10 種＋`apply_ops`）・`rs_record.py`／`rs_ops_oracle.py`。結果は下記 §8.2 |
+| 2026-09-06 | P1 | **`rs-p1-journal` 完了**（`claude/rs-p1-journal`）: `journal.rs`（undo ログ・入れ子/rollback/commit）・`ops.rs`（原始操作 10 種＋`apply_ops`）・`rs_record.py`／`rs_ops_oracle.py`。結果は下記 §8.3 |
 | 2026-09-06 | P1 | **設計＋契約を本線へ**（§9）: 記録形式 v2（`hidden`＝完全な内部状態）・`--mode state`・`model.rs` 型契約と stub（`MasterTable::from_effects_json`／`GameState::from_record`／`board_json`）・`state_roundtrip` 入口。WP `rs-p1-model`／`rs-p1-journal` の指示書は §9.4 |
 | 2026-09-06 | P1 | **WP `rs-p1-model` 完了**（`claude/rs-p1-model`）: `MasterTable::from_effects_json`／`GameState::from_record`／`GameState::board_json`・`load_masters(path)`・ハーネスの `--effects`。`--mode state` は random 500 局・L1 50 局とも**全行一致**（mismatch=0・unimplemented=0）。結果は下記 §8.2 |
+| 2026-09-06 | P1 | **統合・受け入れ**（本線）: 両 WP を cherry-pick。マスター表の保持を `state::load_masters` に一本化（`ops.rs` の独自保持を撤去）。`cargo test` 41＋ignored 1（`apply_ops` 統合テスト）green・clippy 0。原始操作オラクル `rs_ops_oracle.py --games 100 --ops-per-state 20` と `--mode state` 追加 seed（random 30・L1 5）の結果は §8.4 |
+| 2026-09-06 | P2 | **設計＋契約を本線へ**（§10）: 記録形式 v3（`active_battle` の所在の持ち主・各決定点の `legal`・`--vanilla`）・`ActiveBattle` に `attacker_owner`/`target_owner`・replay の照合規約（`pending_request` 込み・`request_id` のみ除外）。WP `rs-p2-rules` の指示書は §10.4 |
 
 ### 8.1 P0 の結果（2026-09-06）
 
@@ -260,6 +262,30 @@ Python 側の to_dict を通る文字列は他に `name`／`traits`／`text` が
   `engine/interaction.py` は BLOCK_STEP/COUNTER_STEP で `active_battle["target_owner"]` を読む。
   よって復元した盤面では `get_pending_request()` を呼べない（`rs_record.py` が None を返して塞ぐ）。
   **P2 で対話を扱うときに記録形式へ欄を足す**こと。
+
+### 8.4 P1 統合の受け入れ結果（2026-09-06・コーディネータ）
+
+両 WP を本線へ取り込み（cherry-pick・`RESULT.json` は本線に置かない）、マスター表の保持を
+`state::load_masters`／`state::masters` に一本化した（`ops.rs` の `MASTERS`/`set_masters` を撤去。
+`apply_ops` の `effects_path` は未ロード時の便宜として残す）。受け入れの実測（本セッションのコンテナ・
+wheel は `maturin build --release`）:
+
+- **原始操作オラクル**（P1 受け入れ (b)）: `rs_ops_oracle.py --games 100 --ops-per-state 20` →
+  `RS_OPS {"games":100,"rows":9931,"ops":195717,"match":9931,"mismatch":0,"restore_mismatch":0,
+  "unimplemented":0}`。9,931 行 × 20 操作＝**195,717 件の原始操作がすべて Python と一致**し、各操作の
+  transaction＋rollback で盤面が bit 一致（`apply_ops` 内の生きた検査）。
+- **盤面モデル**（P1 受け入れ (a)）: WP の random 500／L1 50 に加え、未見 seed で
+  `--mode state --games 30 --policy random --seed-base 700000` → match=30、`--games 5 --policy l1
+  --seed-base 710000` → match=5。記録 v3 化後も `--vanilla` 3 局・実デッキ 3 局で全一致。
+- `cargo test --no-default-features` **41 passed**＋`--ignored` の `apply_ops` 統合テスト 1 件 green・
+  `cargo clippy --all-targets -D warnings` 警告 0。`make test`（Python 側）green。
+
+**P1 受け入れ＝完了**。引き継ぎ事項（両 WP の notes から採録）: `pay_cost` で付与中のドン!!を指定して
+支払うと付与先の `attached_don` が減らない（Python の挙動をそのまま移した。P2 で Python 側の妥当性を
+確認する）／`move_card` の宛先 DON_DECK・COST_AREA・ANY はカードが消える経路（Rust では表現不可＝
+ValueError。P3 で Python 側を確認）／`CardType` の値は NFD（濁点が結合文字）＝Rust 側の文字列定数は
+符号位置で固定しテストで守る（P2 以降も同じ検査を入れる）／`model.rs` のフィールドは `pub` のままで
+「書き換えは journal 経由」は `Session` の所有で担保（型で閉じるのは P3 以降の判断）。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
@@ -444,3 +470,85 @@ Python 側で適用する（＝オラクルの対）。
 - **journal の生きた検査**: 各操作の前に「transaction の中で同じ操作を適用 → rollback」を 1 回挟み、
   盤面が bit 一致（`PartialEq`）で戻らなければ `ValueError`（`journal leak at op i`）を返す。
   実データ（記録 v2 の全行）で undo の記録漏れを機械的に検出するための仕掛け。
+
+## 10. P2 の設計（2026-09-06・コーディネータが本線に入れた契約）
+
+P2＝**ルール**（ターン進行・戦闘・勝敗・合法手列挙・要求 pending request・行動の適用）。効果解決（P3）は
+混ぜない。オラクルは **バニラデッキ**（実カードから abilities を外したもの＝数値・キーワード・
+トリガーテキストは実カード。`rs_diff_replay.py --vanilla`）で打った局の**行動列の再生**。
+1 WP（`rs-p2-rules`）で出す（ターン進行・戦闘・要求は 1 つの状態機械で分割すると境界が増えるだけ）。
+
+### 10.1 記録形式 v3（`RECORD_VERSION = 3`・v2 からの差分）
+
+- `hidden.manager.active_battle` に `attacker_owner`／`target_owner`（**所在**の持ち主＝Python
+  `_find_card_location`。`owner_id` ではない）を追加。`model.rs::ActiveBattle` にも同名欄。
+- 各 `steps[i]` に `legal`＝その決定点の `get_legal_actions()`（行動**前**）を記録。
+- ペイロードに `vanilla: bool`。`--mode replay` でも `hidden` を全行に持つ（再生側の並び再同期用）。
+- 照合規約（replay）: 各行動後の盤面 dict を **`pending_request` 込み**で照合する。除外は
+  `pending_request.request_id` だけ（フロント専用の sha1）。`keywords` はソート。合法手は各行の
+  `legal[i]` を**順序不問の集合**として照合（Rust の `replay` は `{"states":[...],"legal":[...]}` を返す）。
+
+### 10.2 再生の意味論（Rust `replay`）
+
+1. `setup.hidden` から `GameState::from_record`（`start_game` 直後＝MULLIGAN フェイズ・手札 5 枚・ライフ配置済み）。
+2. 各 `steps[i]`: まず `legal[i]` 相当を Rust の合法手列挙で作る → `move` を適用（`kind: game|battle`・
+   `action_type`・`payload`/`card_uuid` の形は `tests/harness/game_driver.py::run_game` と
+   `opcg_sim/src/core/action_api.py` のとおり）→ 盤面 dict（`pending_request` 込み）を出す。
+3. **乱数を消費する行動の後は記録の並びを採る**: P2 時点では `MULLIGAN` のみ（手札をデッキ底へ→
+   シャッフル→5 枚）。Rust は意味論どおり処理したうえで、その行の `hidden` から当該プレイヤーの
+   `deck`／`hand` の並びを取り直す。乱数列は Rust へ流さない（§6）。
+4. 未実装の経路（効果を要する分岐）に入ったら `Unimplemented`（黙って進めない）。バニラでは
+   `ACTIVATE_MAIN`／イベントの登場／`RESOLVE_EFFECT_SELECTION`（場の上限超過 `FIELD_OVERFLOW_TRASH` を
+   除く）は出ない。
+
+### 10.3 P2 の範囲（Python 側の対応関数＝必ず読む）
+
+| 範囲 | Python | 要点 |
+|---|---|---|
+| ターン進行 | `engine/turn_flow.py` | `start_game`（GAME_START 誘発は無し）・`do_mulligan`/`keep_hand`/`_check_mulligan_complete`・`end_turn`→`switch_turn`→`_begin_turn`→`refresh_phase`（`_reset_player_status(opponent)`＝`reset_turn_status(keep_don, clear_usage)`・`refresh_all`＝FREEZE/凍結ドン!!の扱い・付与ドン!!の全戻し）→`draw_phase`（turn 1 は引かない）→`don_phase`（turn 1 は 1 枚・以降 2 枚）→`main_phase`。`pending_extra_turn`／TURN_START・TURN_END 誘発は効果＝P3 |
+| 行動 | `core/action_api.py`・`gamestate.play_card_action` | PLAY（`pay_cost`→キャラは場へ `is_newly_played`・ステージは置換・イベントは【メイン】無し＝不可）・ATTACK・ATTACH_DON・TURN_END・MULLIGAN／KEEP_HAND・戦闘 SELECT_BLOCKER／SELECT_COUNTER／PASS・`_validate_action`。各行動末尾の `_advance_pending_triggers`／`refresh_passive_state` はバニラでは「キーワード再計算＋passive 欄のゼロ化」だけ |
+| 戦闘 | `engine/battle.py` | `declare_attack` の全検証（turn≤2 不可・レスト・召喚酔いと速攻・レスト対象のみ・ATTACK_DISABLE/CANNOT_REST フラグ）→ブロッカー有無で BLOCK_STEP／BATTLE_COUNTER・`handle_block`・`apply_counter`（カウンター値カードのみ。イベントカウンターは P3）・`resolve_attack`（リーダー: ダブルアタック／バニッシュ・ライフ→手札 or トラッシュ／キャラ: KO→トラッシュ）・`_finish_attack`（`reset_turn_status(keep_don=True)`・MAIN へ・`check_victory`）・`has_blocker`・デッキアウト |
+| 場の上限 | `engine/card_moves.py::_enforce_field_limit` | 6 枚目の登場で `FIELD_OVERFLOW_TRASH` の中断（要求は `SEARCH_AND_SELECT` として出る）。解決は `RESOLVE_EFFECT_SELECTION` の既定ペイロード（`default_interaction_payload`→`choose_selection`＝コスト系は min 件を価値昇順。`card_keep_value` を移す）。**対話スタックの表現**は P2 で `GameState` に足す（`interaction_stack: Vec<Interaction>`・P3 が拡張） |
+| 要求 | `engine/interaction.py::get_pending_request` | MULLIGAN（先手から・`candidates`＝手札 to_dict・`constraints`）／SELECT_BLOCKER／SELECT_COUNTER（`current_counter>0` のみ）／MAIN_ACTION（`selectable_uuids`＝手札＋アクティブの場＋リーダー）／中断（`FIELD_OVERFLOW_TRASH`→`SEARCH_AND_SELECT`）。`message` は `enums.PendingMessage` の文字列をそのまま |
+| 合法手 | `gamestate.get_legal_actions` | MULLIGAN／ブロッカー／カウンター／MAIN_ACTION（PLAY・ATTACK（攻撃者×対象）・ATTACH_DON・TURN_END）／中断の既定解決 1 手。バニラでは ACTIVATE_MAIN は出ない |
+
+### 10.4 指示書
+
+**WP `rs-p2-rules`**（1〜2 セッション）
+
+```
+Rust エンジン移行 P2「ルール」を実装してください。計画 docs/rust_engine_plan.md §10（契約は本線
+claude/cpu-spec-improvements-yw91jd。必ずここから分岐）。成果は claude/rs-p2-rules に push、PR は
+作りません。Python 側（opcg_sim/）は変更しない。Python 版が正＝不一致は Rust を直す。Python 側の
+欠陥と判断した場合は直さず RESULT.json の notes に盤面と path を書く。
+
+やること:
+1. rust/opcg_engine/src/rules/（turn.rs・battle.rs・actions.rs・legal.rs・pending.rs）に §10.3 の表の
+   Python 関数を同じ意味論で移す。GameState の書き換えは journal（Session/StateMut）経由・原始操作は
+   ops.rs を使う（足りない原始操作は ops.rs に追加してよい＝所有範囲に含む）。
+2. GameState に対話スタック（FIELD_OVERFLOW_TRASH の中断を表せる最小の Interaction）と
+   `_battle_triggers` 相当の空の待ち行列を足す（model.rs の型追加は本 WP の所有。append-only）。
+   記録 v3 の hidden.manager.interaction_depth は件数だけなので、再生中に立った中断は Rust 内部で
+   保持し、盤面 dict の pending_request に出す。
+3. state.rs::replay を本物にする（§10.2）。戻り値 {"states":[盤面 dict...], "legal":[合法手 list...]}。
+   MULLIGAN 後は当該プレイヤーの deck/hand をその行の hidden から取り直す。未実装経路は
+   Unimplemented（NotImplementedError）。
+4. pending_request は Python と同じキー・同じ値（message は enums.PendingMessage の文字列・
+   candidates は to_dict の list・constraints・can_skip・options=null・source_card_uuid）。request_id は
+   出さなくてよい（ハーネスが除外する）。
+5. cargo test: ターン進行（turn 1 ドロー無し・ドン!! 1/2 枚・付与ドン!!の全戻し・FREEZE）・戦闘
+   （召喚酔い/速攻・ブロッカー分岐・カウンター加算・ダブルアタック/バニッシュ・KO・デッキアウト）・
+   場の上限の中断と既定解決・合法手（攻撃者×対象の列挙規則）を Python の挙動から 1 件ずつ転記。
+   cargo clippy -D warnings 警告 0。
+6. docs/rust_engine_plan.md §8 に結果行と §8.5、docs/TEST_SPEC.md の rs_diff_replay.py 行を replay の
+   受け入れ込みに更新。
+
+受け入れ（数値・すべて --hidden は自動）:
+- OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_diff_replay.py --mode replay --vanilla
+  --games 500 --policy random --seed-base 800000 → match=500・mismatch=0・unimplemented=0
+- 同 --games 100 --policy l1 --seed-base 810000 → match=100・mismatch=0・unimplemented=0
+- 同 --mode state --games 50（バニラ/実デッキ各 25）が引き続き全一致（P1 の退行なし）
+- make test green（Python 無変更）・cargo test/clippy green
+RESULT.json: {"job":"rs-p2-rules","status":"done","harness":{"vanilla_random500":{...},
+ "vanilla_l1_100":{...},"state_regress":{...}},"notes":"..."} を push。
+```

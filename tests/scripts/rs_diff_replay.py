@@ -38,6 +38,11 @@ unimplemented が減り、mismatch が 0 のまま maintained されることが
   - `--mode state`（P1-model の受け入れ）: 各行の `hidden` から Rust が `GameState` を組み立て、
     `state_roundtrip(hidden_json)` の盤面 dict が同じ行の `state` と一致するか（`pending_request` は
     P2 の責務なので除外）。`--mode replay`（既定）: 行動列の再生（P2 以降）。
+記録形式 v3（P2・`docs/rust_engine_plan.md` §10）:
+  - `hidden.manager.active_battle` に `attacker_owner`／`target_owner`（所在の持ち主）を追加。
+  - `--vanilla`: 全カードの abilities を外したデッキ（数値・キーワード・トリガーテキストは実カード）。
+  - replay の照合は `pending_request` も含む（`request_id` だけ除外＝フロント専用ハッシュ）。
+    MULLIGAN のような乱数を消費する行動の後は、再生側が同じ行の `hidden` から並びを取り直す。
 """
 import os
 for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
@@ -53,7 +58,8 @@ _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 import _bootstrap  # noqa: E402,F401
 
-from harness.game_driver import DEFAULT_MAX_STEPS, InvariantError, load_db, make_seat, run_game  # noqa: E402
+from harness.game_driver import (DEFAULT_MAX_STEPS, InvariantError, build_deck, load_db,  # noqa: E402
+                                 make_seat, run_game)
 
 try:                        # Rust 拡張は未導入でも動く（その場合は全局 unimplemented）。
     import opcg_engine
@@ -62,7 +68,7 @@ except ImportError:         # pragma: no cover - 実行環境依存
 
 # 記録ペイロードの形式バージョン。Rust 側 `state::RECORD_VERSION` と一致させること
 # （形を非互換に変えたら両方 +1 する）。
-RECORD_VERSION = 2
+RECORD_VERSION = 3
 
 # 効果構造 JSON（`opcg_sim/tools/export_effects_json.py` の生成物・git 管理外・約 8MB）。
 # Rust 側は起動時にこれを 1 度だけ読んで `CardMaster` 表を作る（`opcg_engine.load_masters`）。
@@ -179,7 +185,11 @@ def hidden_dict(manager) -> dict:
         "phase": manager.phase.name,
         "turn_player": manager.turn_player.name,
         "winner": manager.winner,
+        # v3: 所在の持ち主（Python `_find_card_location`＝`owner_id` ではない）。P2 のブロック/
+        # カウンター要求先と戦闘解決に要る。
         "active_battle": ({"attacker": ab["attacker"].uuid, "target": ab["target"].uuid,
+                           "attacker_owner": ab["attacker_owner"].name,
+                           "target_owner": ab["target_owner"].name,
                            "counter_buff": ab.get("counter_buff", 0)} if ab else None),
         "turn_events": dict(manager._turn_events),
         "mulligan_done": sorted(manager.mulligan_done),
@@ -192,6 +202,30 @@ def hidden_dict(manager) -> dict:
         "pending_end_of_turn": len(manager.pending_end_of_turn),
     }
     return out
+
+
+# --- バニラデッキ（P2 の受け入れ用・記録形式 v3）------------------------------------
+
+def _strip_abilities(card):
+    """効果を持たないカードにする（`CardMaster` は frozen なので replace で複製・keywords は残す）。
+
+    P2（ルール）の照合では効果解決（P3）を混ぜない。実カードの数値・キーワード（ブロッカー／速攻／
+    ダブルアタック／バニッシュ）・トリガーテキストはそのまま＝ルール側の分岐は全部通る。
+    `trigger_text` が残るので Python は登場時に `TRIGGER_CHAR_PLAYED` を記録する（Rust も同じ）。"""
+    import dataclasses
+    card.master = dataclasses.replace(card.master, abilities=())
+    card._refresh_keywords()
+    return card
+
+
+def vanilla_deck_builder(p1_leader=None, p2_leader=None):
+    """`run_game(deck_builder=…)` 用: 既定リーダーで組んだ実デッキの**全カードから abilities を外す**。"""
+    def _build(db, seed):
+        l1, c1 = build_deck(db, "p1", p1_leader)
+        l2, c2 = build_deck(db, "p2", p2_leader)
+        return (_strip_abilities(l1), [_strip_abilities(c) for c in c1],
+                _strip_abilities(l2), [_strip_abilities(c) for c in c2])
+    return _build
 
 
 # --- 記録 observer ------------------------------------------------------------
@@ -228,6 +262,9 @@ class Recorder:
             "phase": ctx.phase,
             "turn": ctx.turn,
             "move": move,
+            # v3: この決定点の合法手（`get_legal_actions`）。Rust の再生は各行動**前**の合法手を
+            # `legal[i]` として返し、順序を問わない集合として照合する（P2 の合法手列挙の受け入れ）。
+            "legal": list(ctx.moves or []),
         }
 
     def on_step(self, ctx, move, events):
@@ -248,6 +285,7 @@ class Recorder:
             "version": RECORD_VERSION,
             "seed": self.seed,
             "policy": self.policy,
+            "vanilla": bool(getattr(self, "vanilla", False)),
             "setup": self.setup,
             "steps": self.steps,
             "result": self.result,
@@ -302,12 +340,26 @@ def first_diff(expected, actual, path="") -> str:
     return "" if expected == actual else (path or "<root>")
 
 
+def _strip_request_id(board: dict) -> dict:
+    """`pending_request.request_id` はフロント専用の sha1（候補 to_dict を含む Python 固有の
+    正規化 JSON のハッシュ）なので照合から外す。それ以外（player_id/action/message/
+    selectable_uuids/can_skip/candidates/constraints/options…）は全部照合する。"""
+    b = dict(board)
+    pr = b.get("pending_request")
+    if isinstance(pr, dict):
+        pr = dict(pr)
+        pr.pop("request_id", None)
+        b["pending_request"] = pr
+    return b
+
+
 def compare(record: dict, replayed: dict) -> dict:
     """Rust の replay 出力（`{"version":..,"states":[...]}`）を記録と突き合わせる。"""
     states = replayed.get("states")
     if not isinstance(states, list):
         return {"status": "bad_output", "detail": "replay result has no 'states' list"}
-    expected = [s["state"] for s in record["steps"]]
+    expected = [_strip_request_id(s["state"]) for s in record["steps"]]
+    states = [_strip_request_id(g) if isinstance(g, dict) else g for g in states]
     if len(states) != len(expected):
         return {"status": "mismatch",
                 "action": min(len(states), len(expected)),
@@ -315,6 +367,17 @@ def compare(record: dict, replayed: dict) -> dict:
     for i, (exp, got) in enumerate(zip(expected, states)):
         if _norm(exp) != _norm(got):
             return {"status": "mismatch", "action": i, "path": first_diff(canon(exp), canon(got))}
+    legal = replayed.get("legal")
+    if isinstance(legal, list):   # v3: 合法手（各行動前）を順序不問で照合
+        exp_legal = [s.get("legal") for s in record["steps"]]
+        if len(legal) != len(exp_legal):
+            return {"status": "mismatch", "action": min(len(legal), len(exp_legal)),
+                    "path": f"legal[len {len(exp_legal)}!={len(legal)}]"}
+        for i, (e, g) in enumerate(zip(exp_legal, legal)):
+            if e is None:
+                continue
+            if sorted(map(_norm, e)) != sorted(map(_norm, g)):
+                return {"status": "mismatch", "action": i, "path": f"legal[{i}]"}
     return {"status": "match"}
 
 
@@ -345,13 +408,16 @@ def compare_states(record: dict) -> dict:
 
 # --- 1 局 ---------------------------------------------------------------------
 
-def run_one(seed: int, db, policy: str, max_steps: int, record_hidden: bool, mode: str = "replay"):
+def run_one(seed: int, db, policy: str, max_steps: int, record_hidden: bool, mode: str = "replay",
+            vanilla: bool = False):
     """1 局を Python で打って記録し、Rust で再生して照合する。戻り値: (record, verdict)。"""
     kind = "random" if policy == "random" else "ai"
     seats = {"p1": make_seat(kind=kind), "p2": make_seat(kind=kind)}
     rec = Recorder(seed, policy, record_hidden)
+    rec.vanilla = vanilla
     try:
-        run_game(seed, db, seats=seats, observers=(rec,), max_steps=max_steps)
+        run_game(seed, db, seats=seats, observers=(rec,), max_steps=max_steps,
+                 deck_builder=(vanilla_deck_builder() if vanilla else None))
     except InvariantError as e:
         return rec, {"status": "python_error", "detail": f"InvariantError: {e.violations[:1]}"}
     except Exception as e:  # noqa: BLE001 - ハーネスは落とさず集計に載せる
@@ -384,6 +450,8 @@ def main(argv=None) -> int:
     ap.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS, help="1局の上限ステップ")
     ap.add_argument("--hidden", action="store_true",
                     help="各行動後の完全な内部状態（形式 v2 の hidden）も記録する（--mode state は必須）")
+    ap.add_argument("--vanilla", action="store_true",
+                    help="全カードの abilities を外したデッキで打つ（P2 の受け入れ・効果解決を混ぜない）")
     ap.add_argument("--mode", choices=["replay", "state"], default="replay",
                     help="replay=行動列の再生を照合（既定）／state=hidden→GameState→盤面 dict の往復を照合（P1-model）")
     ap.add_argument("--effects", default=DEFAULT_EFFECTS_PATH,
@@ -402,9 +470,10 @@ def main(argv=None) -> int:
     for i in range(args.games):
         seed = args.seed_base + i
         try:
-            if args.mode == "state" and not args.hidden:
-                args.hidden = True
-            rec, verdict = run_one(seed, db, args.policy, args.max_steps, args.hidden, args.mode)
+            if not args.hidden:
+                args.hidden = True   # v3: state/replay とも各行の hidden を要する（再生側の並び再同期）
+            rec, verdict = run_one(seed, db, args.policy, args.max_steps, args.hidden, args.mode,
+                                   args.vanilla)
         except Exception as e:  # noqa: BLE001 - ハーネス自身の事故も集計に載せる
             rec, verdict = None, {"status": "python_error",
                                   "detail": f"{type(e).__name__}: {e}\n{traceback.format_exc()}"}
@@ -434,6 +503,7 @@ def main(argv=None) -> int:
         "bad_output": totals["bad_output"],
         "policy": args.policy,
         "mode": args.mode,
+        "vanilla": args.vanilla,
         "seed_base": args.seed_base,
         "engine": (opcg_engine.version() if opcg_engine is not None else None),
         "record_version": RECORD_VERSION,

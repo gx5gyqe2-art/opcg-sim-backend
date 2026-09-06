@@ -6,7 +6,7 @@
 
 | ファイル | 中身 |
 |---|---|
-| `hidden_v2.json` | 記録形式 v2 の `hidden` 1 行（§9.1）＝盤面を完全に再構成できる内部状態。約 51KB |
+| `hidden_v2.json` | 記録形式 v2 の `hidden` 1 行（§9.1。v3 で `active_battle` に `attacker_owner`/`target_owner` を追記済み）＝盤面を完全に再構成できる内部状態。約 51KB |
 | `board_v2.json` | 同じ行の `state`（Python の `rs_diff_replay.py::board_dict`）から `pending_request` を除いたもの＝**期待値**。約 26KB |
 | `masters_v2.json` | `opcg_effects.json` を「この盤面に出るカード（51 枚）」だけに絞った効果 JSON＝`MasterTable::from_effects_json` の入力。約 122KB |
 

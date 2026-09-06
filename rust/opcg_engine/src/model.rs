@@ -838,11 +838,14 @@ pub struct PlayerState {
     pub restrictions: Vec<Restriction>,
 }
 
-/// 進行中の戦闘（Python `GameManager.active_battle` の再生に要る部分。P2 で欄を足す）。
+/// 進行中の戦闘（Python `GameManager.active_battle`）。`attacker_owner`／`target_owner` は
+/// Python の `_find_card_location` の持ち主（`owner_id` ではなく**所在**）。記録 v3 で追加（P2）。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActiveBattle {
     pub attacker: CardIdx,
     pub target: CardIdx,
+    pub attacker_owner: Seat,
+    pub target_owner: Seat,
     pub counter_buff: i32,
 }
 
@@ -897,7 +900,7 @@ const MANAGER_KEYS: &[&str] = &[
     "pending_triggers",
     "pending_end_of_turn",
 ];
-const ACTIVE_BATTLE_KEYS: &[&str] = &["attacker", "target", "counter_buff"];
+const ACTIVE_BATTLE_KEYS: &[&str] = &["attacker", "target", "attacker_owner", "target_owner", "counter_buff"];
 
 /// カード実体を集めながら uuid → index を作る読み込みの作業台。
 struct Loader<'a> {
@@ -1090,9 +1093,16 @@ impl GameState {
                         .copied()
                         .ok_or_else(|| bad(format!("{bctx}.{key}: unknown card uuid '{uuid}'")))
                 };
+                let seat = |key: &str| -> Result<Seat, EngineError> {
+                    let name = f_str(b, key, &bctx)?;
+                    Seat::from_name(name)
+                        .ok_or_else(|| bad(format!("{bctx}.{key}: unknown seat '{name}'")))
+                };
                 Some(ActiveBattle {
                     attacker: resolve("attacker")?,
                     target: resolve("target")?,
+                    attacker_owner: seat("attacker_owner")?,
+                    target_owner: seat("target_owner")?,
                     counter_buff: f_i32(b, "counter_buff", &bctx)?,
                 })
             }
