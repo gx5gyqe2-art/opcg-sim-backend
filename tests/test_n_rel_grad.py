@@ -272,3 +272,16 @@ def test_onplay_ablation_masks_v7_columns(env, tmp_path):
     p = str(tmp_path / "a3.npz"); net.save(p, meta={"kind": "nrel-a"})
     re_ = NL.NRelNet.load(p, env["tables"])
     assert re_.ablate == {"onplay", "rel"} and re_.meta.get("ablate") == ["onplay", "rel"]
+
+
+def test_rel_ablated_b1_path_matches_batch_path(env):
+    """serve の B=1 経路（`_tokens_forward_1`・空枠を外して対を組む）は一括経路と同じ値（|Δ|<1e-5）。
+    盤面ごとに 1 件ずつ通す（present の並びが枠によって違う 22 盤面）。"""
+    net = NT.NRelNet(env["tables"], hidden=32, seed=9); net.ablate = {"rel"}
+    tab = net.card_table()
+    h_ref, p_ref = net.tokens_forward(env["ci"], env["tok"], env["rel_om"], env["rel_oo"], tab, keep={})
+    for b in range(len(env["ci"])):
+        h1, p1 = net.tokens_forward(env["ci"][b:b + 1], env["tok"][b:b + 1], env["rel_om"][b:b + 1],
+                                    env["rel_oo"][b:b + 1], tab)
+        assert np.array_equal(p1[0], p_ref[b])
+        assert np.abs(h1[0] - h_ref[b]).max() < 1e-5, f"盤面 {b} で B=1 経路が一括経路と不一致"

@@ -23,6 +23,7 @@ serve と訓練で **forward はここが唯一の正本**（訓練器 `tests/sc
   枠が無い（−1）主体/対象は 0 ベクトル。R(si,ti) は si∈自・ti∈相手のときだけ rel_om、それ以外 0。
 """
 import collections
+import operator
 import os
 import json
 
@@ -32,6 +33,10 @@ from opcg_sim.src.learned import encoder as E
 from opcg_sim.src.learned import n_eff as NE
 from opcg_sim.src.learned import n_rel_feat as NR
 
+_CZ_FIELDS = ("uuid", "is_rest", "attached_don", "power_buff", "timed_power", "passive_power",
+              "passive_power_override", "base_power_override", "cost_buff", "timed_cost",
+              "base_cost_override", "passive_counter", "is_effect_negated", "is_newly_played")
+_CZ_GET = operator.attrgetter(*_CZ_FIELDS)
 _CACHE_MAX = 4096                     # 席ごとの符号化キャッシュ上限（1 エントリ ≒ 4KB）
 _NOCACHE = bool(os.environ.get("OPCG_NREL_NOCACHE"))
 _VERIFY = bool(os.environ.get("OPCG_NREL_VERIFY"))
@@ -125,6 +130,8 @@ class NRelNet:
     def tokens_forward(self, ci, tok, rel_om, rel_oo, tab, keep=None):
         """ci [B,22] tok [B,22,S] rel_om [B,16,6,R] rel_oo [B,16,16,R] → h [B,22,D_H], present [B,22]."""
         B = ci.shape[0]
+        if keep is None and B == 1 and "rel" in self.ablate:
+            return self._tokens_forward_1(ci, tok, tab)
         rel_om = self.mask_rel(rel_om); rel_oo = self.mask_rel(rel_oo)
         present = (ci > 0).astype(np.float32)                                  # [B,22]
         x = np.concatenate([tab[np.clip(ci, 0, len(tab) - 1)], tok,
@@ -183,6 +190,44 @@ class NRelNet:
             keep.update(x=x, ht=ht, t=t, present=present, u=u, hr=hr, r=r, mask_om=mask_om,
                         n_j=n_j, n_i=n_i, r_masked=r_masked, v=v, hc=hc, c=c, mask_oo=mask_oo,
                         c_masked=c_masked, h=h)
+        return h, present
+
+    def _tokens_forward_1(self, ci, tok, tab):
+        """serve 専用（B=1・R 遮断・2026-09-06）: 空枠を最初から外し、居るトークンだけで対を組む。
+        一括経路（mask で 0 にして −1e9 の max を取る）と同じ値（|Δ|≤1e-6・`test_n_rel_grad`）を
+        1/4 程度の numpy 呼び出しで得る。生成 1 決定のプロファイルで `tokens_forward` が最大の自己時間だった。"""
+        c0 = ci[0]
+        idx = np.nonzero(c0 > 0)[0]                                             # 居る枠
+        present = np.zeros((1, N_TOK), np.float32); present[0, idx] = 1.0
+        h = np.zeros((1, N_TOK, D_H), np.float32)
+        if len(idx) == 0:
+            return h, present
+        x = np.concatenate([tab[c0[idx]], tok[0, idx], ZONE_ONEHOT[idx]], 1)     # [n,89]
+        t = np.maximum(x @ self.Wt + self.bt, 0.0)                              # [n,48]
+        own_m = np.isin(idx, OWN_SLOTS); opp_m = ~own_m
+        to = t[own_m]; tp = t[opp_m]
+        no, npp = len(to), len(tp)
+        D = D_T
+        if no:
+            a_r = to @ self.Wr[:D]
+            a_c = to @ self.Wc[:D]; b_c = to @ self.Wc[D:2 * D]
+            if npp:
+                r = np.maximum(a_r[:, None, :] + (tp @ self.Wr[D:2 * D])[None, :, :] + self.br, 0.0)   # [no,np,32]
+                mx_j = r.max(1); mean_j = r.sum(1) / npp
+                mx_i = r.max(0); mean_i = r.sum(0) / no
+            else:
+                mx_j = mean_j = np.zeros((no, D_R), np.float32)
+            if no > 1:
+                c = np.maximum(a_c[:, None, :] + b_c[None, :, :] + self.bc, 0.0)                     # [no,no,32]
+                c[np.arange(no), np.arange(no)] = -1e9
+                mx_k = c.max(1)
+            else:
+                mx_k = np.zeros((no, D_C), np.float32)
+            h[0, idx[own_m]] = np.concatenate([to, mx_j, mean_j, mx_k], 1)
+        if npp:
+            if not no:
+                mx_i = mean_i = np.zeros((npp, D_R), np.float32)
+            h[0, idx[opp_m]] = np.concatenate([tp, mx_i, mean_i, np.zeros((npp, D_C), np.float32)], 1)
         return h, present
 
     def body(self, sc, h, present, keep=None):
@@ -319,16 +364,13 @@ class NRelValueAdapter:
             # パワー/コスト/キーワード/カウンターを決める全フィールド（`models.get_power`/`current_cost`/
             # `has_keyword`/`current_counter` の入力）。2026-09-06 の検証で timed_power 等を欠いた指紋は
             # 生成 1 局で命中 53,501 回中 14,434 回が別盤面の符号化を返していた。
-            return (getattr(c, "uuid", None), bool(getattr(c, "is_rest", False)),
-                    int(getattr(c, "attached_don", 0) or 0), int(getattr(c, "power_buff", 0) or 0),
-                    int(getattr(c, "timed_power", 0) or 0), int(getattr(c, "passive_power", 0) or 0),
-                    getattr(c, "passive_power_override", None), getattr(c, "base_power_override", None),
-                    int(getattr(c, "cost_buff", 0) or 0), int(getattr(c, "timed_cost", 0) or 0),
-                    getattr(c, "base_cost_override", None), int(getattr(c, "passive_counter", 0) or 0),
-                    bool(getattr(c, "is_effect_negated", False)),
-                    tuple(sorted(getattr(c, "timed_keywords", ()) or ())),
+            # 取り出しは attrgetter（C 実装・1 呼び出し）: 17 回の getattr より約 3 倍速い。
+            try:
+                sc_ = _CZ_GET(c)
+            except AttributeError:
+                sc_ = tuple(getattr(c, n, None) for n in _CZ_FIELDS)
+            return (sc_, tuple(sorted(getattr(c, "timed_keywords", ()) or ())),
                     tuple(sorted(getattr(c, "current_keywords", ()) or ())),
-                    bool(getattr(c, "is_newly_played", False)),
                     tuple(sorted(dict(getattr(c, "ability_used_this_turn", {}) or {}).items())))
         parts = [to_move, int(getattr(state, "turn_count", 0) or 0), str(getattr(state, "phase", None)),
                  getattr(state, "turn_player", None) is state.p1]
