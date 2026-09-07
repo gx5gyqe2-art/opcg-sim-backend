@@ -2482,9 +2482,11 @@ make test-legacy が従来どおり green（1,786）。RESULT.json: {"job":"rs-a
 `opcg_sim/learned/` に残す・journal を `models/` へ・符号化のエンジン実測 3 か所を `hooks.py` に・
 計画キャッシュ／ポンダリング／投機の削除）も承認。以下を追補する。
 
-1. **アリーナ A/B の基準を差し替える**。fair モードでも Python 席は `hidden` 経由の橋渡しで対話の途中の
-   継続を持てず構造的に不利＝勝率 0.5±0.05 は「2 実装が同じか」を測れていない。A/B は **void ≤2%・
-   hang/timeout/error=0** だけを見る（勝率は参考値として記録）。等価性の主証拠は決定オラクル。
+1. **アリーナ A/B（対 Python 席）はやめる**（ユーザ決定 2026-09-07「対 Python をやらなければ時短に
+   なる？」→ なる。Python 席の 1 局は Rust の 10 倍以上遅く、800 局で数時間）。fair モードでも Python 席は
+   `hidden` 経由の橋渡しで対話の途中の継続を持てず構造的に不利＝勝率 0.5±0.05 は「2 実装が同じか」を
+   測れていないので、続ける価値もない。**実行中なら止めてよい**（途中までの数字があれば参考値として
+   RESULT.json に残す）。void／hang は 2 の Rust 席同士のアリーナで見る。等価性の主証拠は決定オラクル。
 2. **強さの保存は「a1 vs r1」で測る**（両席とも Rust の decide・主条件＝ランダム対面×生成デッキ・
    192 ペア以上・`opcg_sim/loop/arena.py`）。Python 時代の実測 **0.544 [0.487,0.601]**
    （`docs/reports/2026-09-05_r1_ablation.md`）と 95% CI が重なれば合格。r1 の npz は
@@ -2695,15 +2697,20 @@ RESULT.json: {"job":"train-norel","status":"done","loss_max_abs_diff":0.0,"npz_b
 "value_sec_per_row_before":..,"after":..,"speedup":..}
 ```
 
-### 18.4 WP `train-torch` の指示書（切替 §16.3 の取り込み後に出す・中）
+### 18.4 WP `train-torch` の指示書（2026-09-07・切替と並行して着手・中）
 
-前提: §16.3 の取り込み後（学習は `opcg_sim/learned/train/` に移っている）と §18.3 の取り込み後。
+前提の変更（ユーザ決定 2026-09-07「18 を早くやりたい」）: 切替の取り込みを待たず、**切替ブランチ
+`claude/rs-archive-cutover-8y6odi` から分岐**する（学習は既に `opcg_sim/learned/train/` に移っている）。
+§18.3（R 省略・本線 66897856）は切替ブランチに入っていないので、**分岐直後に cherry-pick する**
+（`git cherry-pick 66897856`。パスの移動は rename 検出で追従する。衝突したら 23 行なので手で当てる）。
+取り込み順はコーディネータが「切替 → train-torch」の順で行う。
 
 ```
 NRel の訓練器（opcg_sim/learned/train/n_rel_train.py・移動後のパス）に torch（CPU）の学習経路を足して
 ください。docs/reports/2026-09-07_train_profile.md §4 の実測（forward が numpy と 8.8e-7 で一致・
 1 スレッド 2.28 倍・4 スレッド 5.33 倍）を本番の訓練器に入れる作業です。プロトタイプは
-tests/scripts/train_profile_torch.py（value 経路のみ）。本線から分岐し claude/train-torch に push、PR は
+tests/scripts/train_profile_torch.py（value 経路のみ）。**claude/rs-archive-cutover-8y6odi から分岐**し、
+直後に git cherry-pick 66897856（R 省略・§18.3）を当ててから始める。claude/train-torch に push、PR は
 作りません。
 
 やること:
