@@ -7,6 +7,7 @@
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
 use pyo3::prelude::*;
 
+mod effects;
 mod journal;
 mod model;
 mod ops;

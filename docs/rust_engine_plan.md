@@ -127,6 +127,9 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-06 | P1 | **WP `rs-p1-model` 完了**（`claude/rs-p1-model`）: `MasterTable::from_effects_json`／`GameState::from_record`／`GameState::board_json`・`load_masters(path)`・ハーネスの `--effects`。`--mode state` は random 500 局・L1 50 局とも**全行一致**（mismatch=0・unimplemented=0）。結果は下記 §8.2 |
 | 2026-09-06 | P1 | **統合・受け入れ**（本線）: 両 WP を cherry-pick。マスター表の保持を `state::load_masters` に一本化（`ops.rs` の独自保持を撤去）。`cargo test` 41＋ignored 1（`apply_ops` 統合テスト）green・clippy 0。原始操作オラクル `rs_ops_oracle.py --games 100 --ops-per-state 20` と `--mode state` 追加 seed（random 30・L1 5）の結果は §8.4 |
 | 2026-09-06 | P2 | **設計＋契約を本線へ**（§10）: 記録形式 v3（`active_battle` の所在の持ち主・各決定点の `legal`・`--vanilla`）・`ActiveBattle` に `attacker_owner`/`target_owner`・replay の照合規約（`pending_request` 込み・`request_id` のみ除外）。WP `rs-p2-rules` の指示書は §10.4 |
+| 2026-09-07 | P2 | **`rs-p2-rules` 完了**（`claude/rs-p2-rules`）: `rules/`（turn／battle／actions／legal／pending／passive）と `replay`。バニラ random 500 局＝全一致（48,160 行動）／L1 100 局＝全一致／`--mode state` 退行なし。結果は §8.5 |
+| 2026-09-07 | P2 | **統合・受け入れ**（本線）: cherry-pick。未見 seed でバニラ random 50 局＝全一致（4,630 行動）ほか §8.6。`cargo test` 70＋ignored 1 green・clippy 0・`make test` green |
+| 2026-09-07 | P3 | **設計＋契約を本線へ**（§11）: `effects/ast.rs`（ActionType 62／TriggerType 24／ConditionType 42／TargetQuery／ValueSource／Condition／EffectNode／Ability の型契約・効果 JSON の enum 名検査テスト）。WP `rs-p3-core`／`rs-p3-resolver` の指示書は §11.5 |
 | 2026-09-07 | P2 | **WP `rs-p2-rules` 完了**（`claude/rs-p2-rules`）: `rules/`（turn・battle・actions・legal・pending・passive）・`GameState` に対話スタックと誘発待ち行列・`state.rs::replay` を本物に。`--mode replay --vanilla` は random 500 局／L1 100 局とも**全行一致**（mismatch=0・unimplemented=0）。結果は下記 §8.5 |
 
 ### 8.1 P0 の結果（2026-09-06）
@@ -365,6 +368,27 @@ P2 の経路（`pay_cost` は `don_list=None` でしか呼ばれない）では�
 - 記録 v3 の `hidden.manager.interaction_depth`／`pending_triggers`／`pending_end_of_turn` は
   件数だけなので `from_record` では復元しない（再生中に立った中断は Rust 内部で保持する）。
   実デッキの `--mode replay` を通すには、P3 で中身を記録形式へ足す（v4）必要がある。
+
+### 8.6 P2 統合の受け入れ結果（2026-09-07・コーディネータ）
+
+`claude/rs-p2-rules` を本線へ cherry-pick（`RESULT.json` は本線に置かない）。未見 seed での再検証
+（本セッションのコンテナ・wheel は `maturin build --release`）:
+
+| 照合 | 局数 | 行動 | 結果 |
+|---|---|---|---|
+| `--mode replay --vanilla --policy random --seed-base 900000` | 50 | 4,630 | match=50・mismatch=0・unimplemented=0 |
+| `--mode replay --vanilla --policy l1 --seed-base 910000` | 10 | 1,187 | match=10・mismatch=0 |
+| `--mode state`（実デッキ）`--seed-base 920000` | 10 | 922 | match=10（P1 の退行なし） |
+| `--mode replay`（実デッキ・効果あり）`--seed-base 930000` | 3 | 318 | unimplemented=3（想定どおり＝P3 まで `NotImplementedError`。黙って進めていない） |
+
+`cargo test --no-default-features` **70 passed**＋`--ignored` 1 件 green・clippy 警告 0・`make test` green。
+**P2 受け入れ＝完了**。WP の notes から採録した引き継ぎ: (1) `get_pending_request` は「`active_battle` が
+無いのに BLOCK_STEP/BATTLE_COUNTER のまま」を MAIN へ直す副作用を持ち、盤面 dict を作ってから要求を作る
+順序まで合わせる必要がある（ハーネスの `board_dict` の評価順）／(2) 要求の `candidates` は
+`CardInstance.to_dict()` を `is_my_turn=True` 既定で呼ぶ（`_format_card` を通らない）／(3) `action_api` の
+ATTACH_DON はドン!!のレスト状態を変えない（`ops::attach_don` と意味が違う）／(4) `_resolve_on_ko` は
+バニラでも `CHAR_KOED_<owner>` を記録する／(5) P3 で対話スタック・誘発待ち行列の中身を記録形式へ足す
+（v4・§11.2）。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
@@ -630,4 +654,180 @@ claude/cpu-spec-improvements-yw91jd。必ずここから分岐）。成果は cl
 - make test green（Python 無変更）・cargo test/clippy green
 RESULT.json: {"job":"rs-p2-rules","status":"done","harness":{"vanilla_random500":{...},
  "vanilla_l1_100":{...},"state_regress":{...}},"notes":"..."} を push。
+```
+
+## 11. P3 の設計（2026-09-07・コーディネータが本線に入れた契約）
+
+P3＝**効果解決**。最大の山なので、(1) 土台 2 WP を並列 → (2) ActionType を 5 群に分けた WP を並列 →
+(3) 統合と全カード受け入れ、の 3 段で進める。Python 版（`effects/resolver.py` 1,495 行・`matcher.py`
+625 行・`actions/` 700 行・`engine/triggers.py`・`passives.py`・`effects/continuous.py`）が正本。
+
+### 11.1 オラクル（3 本）
+
+| 名前 | 何を照合するか | 使う段 |
+|---|---|---|
+| **問合せオラクル** `tests/scripts/rs_query_oracle.py`（新規・WP `rs-p3-core`） | 記録した実局面（記録 v3 の `hidden`）ごとに、カード DB の全 `TargetQuery`／`Condition`／`ValueSource` を **発生源カードを場・手札の各カードに置き換えて** Python（`matcher.get_target_cards`／`EffectResolver._check_condition`／`_calculate_value`）と Rust（`opcg_engine.eval_queries`）で評価し、対象 uuid 集合・真偽・値を照合 | 土台（純関数） |
+| **監査オラクル** `tests/scripts/rs_audit_replay.py`（新規・WP `rs-p3-resolver`） | `tests/harness/full_card_audit.py` と同じ手順（`effect_coverage._build_test_state` の汎用盤面→能力を 1 つ発動→`_smart_drain` で既定解決）を**記録**し、Rust `replay_audit` で再生して各段の盤面 dict（`pending_request` 込み）を照合。カード×トリガー単位の判定＝WP 群の受け入れ単位 | 土台・群・統合 |
+| **実局再生** `rs_diff_replay.py --mode replay`（実デッキ・`--vanilla` 無し） | P2 と同じ行動列再生を実デッキで。乱数を消費した段（マリガン・SHUFFLE）は記録の並びで再同期 | 統合 |
+
+### 11.2 記録形式 v4（v3 からの差分・土台 WP が入れる）
+
+- `extra_masters`: 効果 JSON に無いカード定義（監査の汎用盤面の `FILLER` や `make_master` のテスト定義）を
+  `export_effects_json.py` と同じ形で同梱する。`MasterTable` は読込時にこれを追加する。
+- 各 `steps[i]` に `shuffled: ["p1", ...]`＝その段で Python が `random.shuffle` を呼んだデッキの持ち主。
+  ハーネスが `turn_flow`／`actions.player_level`／`gamestate` の `random.shuffle` を対局中だけラップして記録する
+  （エンジンは変えない）。Rust は `shuffled` の持ち主のデッキだけ、その段の `hidden` の並びを採る
+  （多重集合が一致しなければ `BadPayload`）。P2 の「MULLIGAN なら再同期」はこれに置き換える。
+- 監査記録（`kind: "audit"`）: `{"version":4,"kind":"audit","card_id","trigger","ability_index",
+  "extra_masters":[...],"setup":{"hidden":...,"state":...},"fire":{"kind":"play"|"ability"},
+  "steps":[{"payload":{...RESOLVE_EFFECT_SELECTION...},"state":...,"hidden":...}, ...],"final":{"interactive":bool}}`。
+  `fire` の後と各 `payload` の後の盤面（`pending_request` 込み・`request_id` 除外）を照合する。
+
+### 11.3 構造（`rust/opcg_engine/src/effects/`）
+
+| モジュール | 中身 | Python の対応 | WP |
+|---|---|---|---|
+| `ast.rs` | 型契約（本線に入れた） | `effect_types.py`・`enums.py` | — |
+| `loader.rs` | 効果 JSON→`AbilityTable`＋`CardMaster.ability_ids`。未知の enum 名・キーは `BadPayload` | `Ability.from_dict` 系 | core |
+| `matcher.rs` | `TargetQuery`→候補カード（全フィルタ・`ANY`/複数ゾーン・`exclude_*`・`is_vanilla`・`lacks_trigger`…） | `matcher.get_target_cards` | core |
+| `cond.rs` | 36 種の条件（`AND/OR/NOT`・`TURN_LIMIT`・`CONTEXT`・`PREV_ACTION`…）と `_compare` | `resolver._check_condition`／`_offset_threshold`／`_compare` | core |
+| `value.rs` | `ValueSource`（`dynamic_source` 5 種） | `resolver._calculate_value` | core |
+| `resolver.rs` | `resolve_ability`（コスト・条件・ターン制限・`ability_used_this_turn`）・`_process_stack`（実行スタック）・`Sequence`／`Branch`／`Choice`・`_execute_game_action` の共通部（対象解決→`game_handler`／`target_handler` へ）・`_reclaim_temp_to_deck_top` | `resolver.py` | resolver |
+| `interact.rs` | 中断/再開: SELECT_TARGET／CHOICE／CONFIRM_OPTIONAL／CONFIRM_TRIGGER／ARRANGE_DECK／DECLARE_COST／SELECT_RESOURCE／DON_BOX・`resolve_interaction`・`default_interaction_payload`（`choose_selection` 全規則）・`_deferred_continuations` | `engine/interaction.py`・`resolver._suspend_*`／`resume_*` | resolver |
+| `triggers.rs` | 誘発の待ち行列（ON_PLAY／ON_KO／ON_ATTACK／ON_BLOCK／TRIGGER／ON_LEAVE／ON_REST／登場リスナー／KO リスナー／ライフ減少／ターン開始・終了）と確認 | `engine/triggers.py`・`turn_flow` の誘発部 | resolver |
+| `continuous.rs`／`passives.rs` | 期間付き効果（`timed_*`・失効イベント）と PASSIVE／YOUR_TURN／OPPONENT_TURN の再計算 | `effects/continuous.py`・`engine/passives.py` | resolver |
+| `actions/status.rs` | BUFF・GRANT_KEYWORD・ATTACK_DISABLE・PREVENT_REST・FREEZE・NEGATE_EFFECT・DISABLE_ABILITY・SWAP_POWER・SET_BASE_POWER／COST_BUFF／SET_COST／COST_CHANGE（未使用型は `Unimplemented`） | `per_target.buff` ほか | 群 A |
+| `actions/zone.rs` | MOVE_CARD・DECK_BOTTOM・DECK_TOP・BOUNCE・TRASH・DISCARD・KO・TRASH_FROM_DECK・HEAL・DEAL_DAMAGE・SHUFFLE・ORDER_LIFE・FACE_UP_LIFE・LOOK_LIFE・MOVE_TO_HAND | `per_target.ko/discard/bounce/move/deck_bottom/…`・`player_level.deal_damage/shuffle/heal/trash_from_deck/order_life/look_life` | 群 B |
+| `actions/flow.rs` | PLAY_CARD・DRAW・LOOK・REVEAL・SELECT・EXECUTE_MAIN_EFFECT・EXECUTE_EVENT・DECLARE_COST（`_expand_main_effect`／`_execute_selected_main` を含む） | `per_target.play_card`・`player_level.draw/look/select/execute_event`・`resolver._expand_main_effect` | 群 C |
+| `actions/don.rs` | RETURN_DON・RAMP_DON・REST_DON・ATTACH_DON・ACTIVE_DON・ACTIVE・REST・FREEZE_DON・MOVE_ATTACHED_DON | `player_level.return_don/ramp_don/rest_don/freeze_don/active_don_by_count/move_attached_don`・`per_target.attach_don/rest/active` | 群 D |
+| `actions/rules.rs` | REPLACE_EFFECT・PREVENT_LEAVE（置換・保護＝`_active_protection`／`_find_replacement`／`_active_replacement`／`_register_granted_replacements`・戦闘 KO 置換の中断）・RULE_PROCESSING・RESTRICTION・REDIRECT_ATTACK・VICTORY・EXTRA_TURN・アタック税・【カウンター】イベント・イベントの登場 | `gamestate._active_protection` 系・`player_level.rule_processing_self_restriction/redirect_attack/extra_turn/victory`・`battle.py` の置換分岐 | 群 E |
+
+群の受け入れは **監査オラクルで「その群＋土台が扱う ActionType だけを使うカード」が全一致**。頻度表
+（§8.1・ノード数／カード数）から、群 A〜E をすべて入れると 2,472 枚を覆う（上位 45 種で 100%）。
+複数群に跨るカードは統合時にコーディネータが全カード監査で受け入れる。
+
+### 11.4 WP 分割
+
+| WP | ブランチ | 所有 | 受け入れ |
+|---|---|---|---|
+| `rs-p3-core` | `claude/rs-p3-core` | `effects/{loader,matcher,cond,value}.rs`・`lib.rs` に `eval_queries`・`model.rs` の `ability_ids` 充填（`MasterTable::from_effects_json` 内）・記録 v4 の `extra_masters`・`tests/scripts/rs_query_oracle.py` | 問合せオラクル: 実局面 200（random 100＋L1 100 の全行から等間隔に抽出）× 全クエリ・条件・値で mismatch=0 |
+| `rs-p3-resolver` | `claude/rs-p3-resolver` | `effects/{resolver,interact,triggers,continuous,passives}.rs`・`effects/actions/mod.rs`（ディスパッチ表と土台ハンドラ: DRAW／DISCARD／KO／REST／ACTIVE／BUFF の基本形）・`lib.rs` に `replay_audit`・`rules/` の誘発フック（P2 で空だった待ち行列を本物に）・記録 v4 の `shuffled`・`tests/scripts/rs_audit_replay.py` | cargo（実行スタック・中断/再開・既定解決）＋監査オラクルで土台ハンドラだけのカードが全一致（統合後にコーディネータが実行。WP 内では `matcher`/`cond` が無いので `#[ignore]`） |
+| `rs-p3-a`〜`rs-p3-e` | `claude/rs-p3-<群>` | `effects/actions/<群>.rs` のみ（＋必要なら `ops.rs` の原始操作追加） | 監査オラクル: 群＋土台の ActionType だけを使うカードが全一致 |
+| 統合 | 本線 | コーディネータ | 全カード監査（2,472 枚×トリガー）一致・実デッキ再生 random 500／L1 100・`leader_specs` 相当・`make audit-cross` |
+
+`rs-p3-core` と `rs-p3-resolver` は並列（P1 と同じく、resolver は core の関数シグネチャ（§11.5 の契約）に
+対して書き、統合後にオラクルを回す）。群 A〜E は両者の統合後に並列で出す（最大 5 セッション）。
+
+### 11.5 土台 2 WP の指示書
+
+両 WP が共有する関数契約（`effects/mod.rs` に置く。所有は core。resolver はシグネチャだけに依存する）:
+
+```rust
+// matcher.rs（core）
+pub fn get_target_cards(state: &GameState, masters: &MasterTable, abilities: &AbilityTable,
+                        query: &TargetQuery, actor: Seat, source: Option<CardIdx>,
+                        ctx: &EffectContext) -> Result<Vec<CardIdx>, EngineError>;
+// cond.rs（core）
+pub fn check_condition(state: &GameState, masters: &MasterTable, abilities: &AbilityTable,
+                       cond: &Condition, actor: Seat, source: Option<CardIdx>, host: Option<CardIdx>,
+                       ctx: &EffectContext) -> Result<bool, EngineError>;
+// value.rs（core）
+pub fn calculate_value(state: &GameState, masters: &MasterTable, abilities: &AbilityTable,
+                       value: &ValueSource, actor: Seat, targets: &[CardIdx],
+                       ctx: &EffectContext) -> Result<i32, EngineError>;
+// EffectContext（core が定義・resolver が値を入れる）: Python の effect_context（saved targets の
+// save_id→uuid 列・prev_action_count・revealed cards・declared_cost・トリガー種 など）。
+```
+
+**WP `rs-p3-core`**（1〜2 セッション）
+
+```
+Rust エンジン移行 P3 の土台（効果構造の読込・対象・条件・値）を実装してください。計画
+docs/rust_engine_plan.md §11（契約 effects/ast.rs は本線 claude/cpu-spec-improvements-yw91jd。必ず
+ここから分岐）。成果は claude/rs-p3-core に push、PR は作りません。所有範囲は §11.4（resolver.rs／
+interact.rs／triggers.rs／actions/ は触らない）。Python 側（opcg_sim/）は変更しない。
+
+やること:
+1. effects/loader.rs: opcg_effects.json の cards[].abilities → AbilityTable（ast.rs の型）。
+   MasterTable::from_effects_json で CardMaster.ability_ids を充填（カード内順序＝Python の
+   master.abilities の順）。未知の enum 名・未知のキー・型違いは BadPayload。記録 v4 の
+   extra_masters（効果 JSON に無い定義。同じ形）を from_record 前に表へ足す口を用意する。
+2. effects/mod.rs に §11.5 の関数契約と EffectContext を置く（resolver WP はこれに依存する）。
+3. effects/matcher.rs: opcg_sim/src/core/effects/matcher.py::get_target_cards を全フィルタ込みで移す
+   （zone 単一/複数/ANY・player SELF/OPPONENT/OWNER/ALL・card_type・traits・attributes・colors・names
+   （別名 all_names・部分一致）・cost/power の min/max・cost_max_dynamic・power_sum_max・
+   min_attached_don・is_face_up・lacks_trigger・is_rest・is_vanilla・is_unique_name・exclude_ids/
+   exclude_names・flags・ref_id（保存対象の参照）・select_mode）。返す順序も Python と同じ
+   （ゾーンの並び順）。
+4. effects/cond.rs: resolver._check_condition の 36 種（DB で使われる全種）＋_offset_threshold＋
+   _compare。CONTEXT／PREV_ACTION／REVEALED_CARD_TRAIT／DECLARED_COST_MATCH／EVENT_THIS_TURN／
+   CHAR_KOED_THIS_TURN／OPPONENT_REMOVAL は EffectContext と turn_events から読む。
+5. effects/value.rs: _calculate_value（base・multiplier/divisor・dynamic_source 5 種・count_query）。
+6. lib.rs に eval_queries(hidden_json, queries_json, effects_path=None) を追加。queries は
+   [{"kind":"target"|"condition"|"value", "card_id":..., "ability_index":..., "path":"effect.actions[1].target",
+   "actor":"p1", "source": uuid|null, "host": uuid|null, "ctx": {...}}...] で、それぞれ対象 uuid 列／真偽／
+   整数を返す。
+7. tests/scripts/rs_query_oracle.py（新規）: rs_diff_replay の Recorder で局を打って各行の hidden を集め、
+   等間隔に 200 局面を抽出 → カード DB から全 TargetQuery／Condition／ValueSource を path 付きで列挙し、
+   発生源を「p1 の場・手札の各カード」に置き換えて Python 側（get_target_cards／
+   EffectResolver._check_condition／_calculate_value。effect_context は空）で評価 → Rust eval_queries と
+   照合 → RS_QUERY {"boards":200,"queries":N,"mismatch":0,...} 1 行。例外を出す組合せは両側で
+   「error」として一致を見る（黙って除外しない）。
+8. cargo test（loader が全 2,803 枚を読めること・各フィルタの単体）・clippy -D warnings 0。
+   docs/rust_engine_plan.md §8 に結果行・docs/TEST_SPEC.md §3 に rs_query_oracle.py の行。
+
+受け入れ（数値）:
+- rs_query_oracle.py --boards 200 → mismatch=0（対象・条件・値の全組合せ。error の一致も含む）
+- 効果 JSON の全カードが loader を通る（BadPayload 0）
+- make test green（Python 無変更）・cargo test/clippy green
+RESULT.json: {"job":"rs-p3-core","status":"done","oracle":{...RS_QUERY...},"notes":"..."} を push。
+```
+
+**WP `rs-p3-resolver`**（2 セッション・`rs-p3-core` と並行）
+
+```
+Rust エンジン移行 P3 の土台（効果の実行エンジン・中断/再開・誘発・継続効果）を実装してください。計画
+docs/rust_engine_plan.md §11（契約 effects/ast.rs と §11.5 の関数シグネチャは本線
+claude/cpu-spec-improvements-yw91jd。必ずここから分岐）。成果は claude/rs-p3-resolver に push、PR は
+作りません。所有範囲は §11.4（loader.rs／matcher.rs／cond.rs／value.rs は触らない。無い間は
+§11.5 のシグネチャどおりの stub（Unimplemented）を effects/mod.rs に置いて進める＝統合時に core の
+本体へ置き換わる）。Python 側（opcg_sim/）は変更しない。
+
+やること:
+1. effects/resolver.rs: EffectResolver（resolve_ability のコスト/条件/ターン制限/ability_used_this_turn・
+   _can_satisfy_node・_process_stack の実行スタック・Sequence/Branch/Choice・_execute_game_action の共通部
+   （対象解決→ハンドラ・§7-5「1枚につき」スケーリング・save_id）・_reclaim_temp_to_deck_top・
+   _log_* は不要）。Python の resolver.py を関数単位で対応させ、対応表をモジュール docstring に書く。
+2. effects/interact.rs: 中断/再開の全種（SELECT_TARGET／CHOICE／CONFIRM_OPTIONAL／CONFIRM_TRIGGER／
+   ARRANGE_DECK／DECLARE_COST／SELECT_RESOURCE／DON_BOX）と resolve_interaction（engine/interaction.py）・
+   default_interaction_payload／choose_selection／_selection_entries／card_keep_value の全規則・
+   _deferred_continuations（_defer_resolver_stack／_defer_removal_targets／_resume_deferred_continuations）。
+   P2 の Interaction 型を拡張する（model.rs は append-only で本 WP が所有）。
+3. effects/triggers.rs: engine/triggers.py 全部（_enqueue_trigger／_advance_pending_triggers／
+   _suspend_for_trigger_confirm／_relocate_activated_trigger_card／ON_KO・ON_REST・ON_LEAVE・登場リスナー・
+   KO リスナー・ライフ減少）＋ turn_flow のターン開始/終了誘発・battle の ON_ATTACK/ON_OPP_ATTACK/
+   ON_BLOCK/【トリガー】・play_card_action の ON_PLAY 分岐を rules/ の該当箇所へ接続する。
+4. effects/continuous.rs・passives.rs: ContinuousEffectManager（apply/expire/drop_for・timed_*）と
+   _apply_passive_effects／refresh_passive_state／_apply_hand_self_cost／_is_reactive_passive。
+5. effects/actions/mod.rs: ActionType→ハンドラのディスパッチ表（registry.py と同じ 2 種: game_handler/
+   target_handler と guard）。土台ハンドラとして DRAW／DISCARD／KO／REST／ACTIVE／BUFF（基本形）を入れる。
+   それ以外の ActionType は Unimplemented（黙って no-op にしない。Python の「未登録は no-op」とは
+   意図的に違える＝P3 完了時に全種が入るため）。
+6. lib.rs に replay_audit(record_json, effects_path=None) を追加（§11.2 の監査記録を再生）。
+   tests/scripts/rs_audit_replay.py（新規）: full_card_audit.py と同じ手順を記録し（extra_masters に
+   FILLER 等を同梱・_smart_drain の各 payload を記録）、Rust と照合 → RS_AUDIT {"cards":..,"abilities":..,
+   "match":..,"mismatch":..,"unimplemented":..,"first":...} 1 行。--card-ids／--action-types（このセットに
+   含まれる ActionType だけを使うカードに絞る）を持たせる。
+7. 記録 v4 の shuffled（rs_diff_replay.py: 対局中だけ turn_flow／player_level／gamestate の random.shuffle
+   をラップして持ち主を記録）と、Rust 側の再同期（P2 の MULLIGAN 特例を置き換え）。RECORD_VERSION=4。
+8. cargo test: 実行スタック（Sequence 入れ子・Branch・Choice の中断と再開）・各中断種の pending_request
+   の形・default_interaction_payload の規則・誘発待ち行列の順序・継続効果の失効。監査オラクルの統合
+   テストは matcher/cond 待ちのため #[ignore]。clippy -D warnings 0。
+   docs/rust_engine_plan.md §8 に結果行・docs/TEST_SPEC.md §3 に rs_audit_replay.py の行。
+
+受け入れ（数値）:
+- cargo test green（上記）・make test green（Python 無変更・ハーネス追加のみ）
+- rs_audit_replay.py の Python 側自己検査（記録→再生無し）が全 2,472 枚で例外 0
+- Rust との監査照合は統合後にコーディネータが --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF で実行
+RESULT.json: {"job":"rs-p3-resolver","status":"done","self_check":{...},"oracle":"deferred","notes":"..."} を push。
 ```
