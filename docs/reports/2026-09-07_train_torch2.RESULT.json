@@ -1,0 +1,103 @@
+{
+ "job": "train-torch2",
+ "status": "done",
+ "branch": "claude/train-torch2",
+ "base": "claude/cpu-spec-improvements-yw91jd 0633d0d2",
+ "input": {
+  "shard": "origin/claude/n28-w01 n28_records",
+  "rows": 81871,
+  "policy_points": 46325,
+  "cand_rows": 643652,
+  "steps_per_epoch": 895,
+  "value_batches": 274,
+  "policy_batches": 621,
+  "ablate": ["rel"],
+  "seed": 13,
+  "bs_v": 256,
+  "bs_p": 64,
+  "lr": 0.0005
+ },
+ "machine_note": "§8.21 を測った日より速い。同じ分岐元コードの 1 エポックが 34.7s(§8.21) -> 24.12s(今日)。倍率は読めるが絶対秒は §8.21 の表と直接比較できない。before/after は同一セッションで交互に 3 回ずつ測った中央値",
+ "breakdown_before": {
+  "threads": 4,
+  "train_sec": 24.12,
+  "step_v_fwd": 5.748,
+  "step_v_bwd": 7.766,
+  "step_p_fwd": 3.937,
+  "step_p_bwd": 6.234,
+  "slice_v": 0.059,
+  "slice_p": 0.182,
+  "budget_p": 0.124,
+  "rel_v": 0.034,
+  "rel_p": 0.026,
+  "step_v_prep": 0.007,
+  "step_p_prep": 0.258,
+  "step_v": 0.003,
+  "step_p": 0.008,
+  "numpy_side_total": 0.701,
+  "numpy_side_share": 0.029,
+  "holdout": 2.653
+ },
+ "breakdown_after": {
+  "threads": 4,
+  "train_sec": 20.281,
+  "step_v_fwd": 3.945,
+  "step_v_bwd": 6.132,
+  "step_p_fwd": 3.616,
+  "step_p_bwd": 6.064,
+  "slice_v": 0.055,
+  "slice_p": 0.088,
+  "budget_p": 0.072,
+  "rel_v": 0.007,
+  "rel_p": 0.001,
+  "step_v_prep": 0.001,
+  "step_p_prep": 0.0,
+  "step_v": 0.001,
+  "step_p": 0.002,
+  "numpy_side_total": 0.227,
+  "numpy_side_share": 0.011,
+  "holdout": 0.953
+ },
+ "epoch_sec": {
+  "before": 34.7,
+  "after": 20.281,
+  "before_same_machine": 24.12,
+  "speedup_same_machine": 1.19,
+  "threads1": {"before": 51.032, "after": 43.926},
+  "full_epoch_wall": {"before": 35, "after": 29},
+  "target_20s_met": false,
+  "target_note": "§8.21 の土俵に換算すると 34.7 * (20.281/24.12) = 29.2s 相当で未達。numpy 側は 0.23s(1.1%) しか残っておらず、残る 19.8s は torch の forward/backward 自体（op 別: mm 28.7%・where 11.3%・index_put 8.7%・cat 7.7%・max 6.6%・sum 6.5%）。削るには式か加算順を変える必要があり受け入れ a と両立しない"
+ },
+ "loss_traj_max_abs": 0.0,
+ "loss_traj": {
+  "threads1_new_vs_ref_8_21": {"max_abs": 0.0, "mean_abs": 0.0, "bit_identical": true, "steps": 895},
+  "threads4_new_vs_ref_8_21": {"max_abs": 0.4345668554, "mean_abs": 0.0145459390, "bit_identical": false},
+  "threads4_ref_vs_ref_noise_floor": {"max_abs": 1.1226393580, "mean_abs": 0.0329174994, "bit_identical": false},
+  "note": "4 スレッドでは torch CPU の index_add_（index_select の backward）がスレッド並列で加算順が変わり、§8.21 のコード同士を 2 回走らせても軌跡が再現しない（下限 1.123）。新旧の差 0.435 はその下限より小さい。1 スレッドでは 895 ステップ全部ビット一致"
+ },
+ "budget_bit_identical": true,
+ "budget_check": {
+  "points_checked": 46325,
+  "cand_rows": 643652,
+  "batches_mismatched": 0,
+  "max_abs_diff": 0.0,
+  "precompute_sec": 0.22
+ },
+ "numpy_backend_ok": true,
+ "numpy_backend": {
+  "train_sec_before": 115.951,
+  "train_sec_after": 119.66,
+  "val_vmse": 0.7411069869995117,
+  "val_p_loss": 1.8416580276489258,
+  "val_pi_top1": 0.4925,
+  "note": "holdout 指標は変更前後で 16 桁まで一致＝参照実装の経路は値が動いていない。時間差は振れ幅（±10%）の内側"
+ },
+ "holdout_torch_side_effect": {
+  "val_vmse_threads1": {"before": 0.7512661218643188, "after": 0.7512661218643188},
+  "val_pi_top1_threads1": {"before": 0.4875, "after": 0.48775},
+  "note": "4000 点のうち 1 点で argmax が入れ替わっただけ（logits の丸めが numpy と torch で違う）。v_mse は 16 桁一致・p_loss の相対差 4e-9"
+ },
+ "memory_note": "C[\"budget\"] と候補素性の末尾 4 列で候補行あたり 28 バイト増（1 シャード 18MB・16 シャード約 290MB）",
+ "tests": "tests/test_n_rel_train_torch.py 12 passed（新規 5 本）。実データ照合は tests/scripts/n_rel_torch2_check.py（budget / traj）",
+ "report": "docs/reports/2026-09-07_train_torch2.md"
+}
