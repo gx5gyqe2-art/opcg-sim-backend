@@ -2547,34 +2547,42 @@ RESULT.json: {"job":"rs-archive-cutover","status":"done","arena":{...},"gen_seco
 
 第 2 段（切替）と**並行**して、まず原因分析だけを 1 セッションで行う（学習コードは変えない）。
 
-### 18.1 計測 WP `train-profile`（並行可）
+### 18.1 計測 WP `train-profile`（並行可・最小計測）
+
+**方針（ユーザ決定 2026-09-07）: 全学習は回さない**。「何が効くか」を判断するのに必要な最小の
+データ量・ステップ数だけ回し、全体は行数比例で外挿する。目安は 1 回の計測が数分、WP 全体で
+1〜2 時間以内。
 
 ```
-NRel の学習（tests/scripts/n_rel_train.py・--ablate rel が既定）の時間とメモリの内訳を計測し、
-高速化の設計判断に必要な数字を出してください。学習コード・エンジンは変更しない（計測用の複製と
-プロトタイプは tests/scripts/ に別ファイルで）。本線 claude/cpu-spec-improvements-yw91jd から分岐し、
-claude/train-profile に push、PR は作りません。
+NRel の学習（tests/scripts/n_rel_train.py・--ablate rel が既定）の時間とメモリの内訳を、最小の
+計測で出してください。全学習は回さない（1 波・1 エポック・固定バッチ数の部分計測で、全体は行数比例で
+外挿する）。学習コード・エンジンは変更しない（計測用の複製とプロトタイプは tests/scripts/ に別ファイルで）。
+本線 claude/cpu-spec-improvements-yw91jd から分岐し、claude/train-profile に push、PR は作りません。
 
-入力: 直近の波の dump v2（origin/claude/n27-w0N・n28-w0N の n27_records／n28_records ほか。
-docs/n_loop_ops.md §6 の台帳を見て、a1 の訓練に使った構成＝π は現 era・z は新しい順に載る最大数）。
+入力: 直近の波の dump v2 を 1 波（origin/claude/n28-w01 の n28_records 等。1 波で足りる）。
+比例則の確認用にもう 1 波だけ追加する（2 波で線形なら全体は行数比例で外挿してよい）。
 
-やること:
-1. 全体: 実際の訓練コマンド（r2b と同じ引数）を 1 回回し、壁時計を「読み込み（load_dump_v2）／
-   エポックごとの学習／評価（eval_policy）／保存」に分けて計測。RSS のピークと、行数・1 行のバイト数
-   （scalars／tokens／card_idx／π の各配列の dtype と形）を表にする。
-2. 学習ループの内訳: 1 エポックの中で forward／backward／パラメータ更新／Python のバッチ切り出しに
-   かかる時間を分け、CPU 使用率（コア数に対する平均）を測る。bs-v 256／bs-p 64 を 4 倍・16 倍にしたときの
-   1 行あたり時間の変化も測る（精度の話は不要・速度だけ）。
-3. データ形式の試算: 同じ行を float16／int16 の memmap（.npy）に書き出したときのサイズと、そこから
-   バッチを切り出す速度（RAM に載せない読み方）を実測する。
-4. PyTorch（CPU）のプロトタイプ: NRelNet の forward/backward を torch で同じ式に書き（npz の重みを読んで
-   forward が numpy 版と 1e-5 で一致することを確認）、同じデータ・同じバッチで 1 エポックの時間を比べる。
-   スレッド数 1／4／全コアで測る。
-5. 報告: docs/reports/2026-09-07_train_profile.md に表（時間の内訳・RSS・形式別サイズ・numpy 対 torch）と
-   「どこが律速か」「1〜3 のどれで何倍になる見込みか」の結論。RESULT.json に同じ数字。
+やること（各計測は数分で終わる規模に絞る）:
+1. 読み込みと常駐: load_dump_v2 を 1 波・2 波で回し、壁時計と RSS を測って「1 行あたり秒」「1 行あたり
+   バイト」を出す（scalars／tokens／card_idx／π の各配列の dtype と形も表に）。これで a1 相当の全波
+   （台帳の行数）の読み込み時間と RSS を外挿する。
+2. 学習ループの内訳: 1 波・--epochs 1 で回し、固定 200 バッチ分の forward／backward／更新／
+   Python のバッチ切り出しの時間比率と CPU 使用率（コア数に対する平均）を測る。bs-v 256／bs-p 64 を
+   4 倍・16 倍にしたときの 1 行あたり時間（同じ 200 バッチ相当の行数で比較・精度は見ない）。
+3. データ形式の試算: 1 波を float16／int16 の memmap（.npy）に書き出したサイズと、そこから 200 バッチを
+   切り出す速度（RAM に載せない読み方）。float16 化による forward 出力の最大差も 1 バッチで見る。
+4. PyTorch（CPU）のプロトタイプ: NRelNet の forward/backward を torch で同じ式に書き、npz の重みを読んで
+   forward が numpy 版と 1e-5 で一致することを 1 バッチで確認。同じ 200 バッチで numpy 対 torch の時間を
+   スレッド 1／4／全コアで測る（torch が入らない環境なら CPU 版を pip で入れ、入らなければ理由を報告して
+   4 は飛ばす）。
+5. 報告: docs/reports/2026-09-07_train_profile.md に表（1 行あたりの時間とバイト・内訳の比率・形式別
+   サイズ・numpy 対 torch）と「全波に外挿した見込み」「律速はどこか」「1〜4 のどれで何倍になる見込みか」
+   の結論。RESULT.json に同じ数字。
 
-受け入れ: 上の 5 点の数字が揃っていること（推定ではなく実測）。学習コードは無変更。
-RESULT.json: {"job":"train-profile","status":"done","breakdown":{...},"rss_peak_gb":..,"row_bytes":{...},
+受け入れ: 1〜5 の数字が実測で揃っていること（外挿は「1 行あたり × 台帳の行数」と根拠を書く）。
+学習コードは無変更（diff は tests/scripts/ の新規ファイルと docs のみ）。
+RESULT.json: {"job":"train-profile","status":"done","per_row":{"load_sec":..,"bytes":..,"train_sec":..},
+"breakdown":{...},"extrapolated":{"rows":..,"load_sec":..,"epoch_sec":..,"rss_gb":..},
 "torch_vs_numpy":{...},"recommendation":"..."}。
 ```
 
