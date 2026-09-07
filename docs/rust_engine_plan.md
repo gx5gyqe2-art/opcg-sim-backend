@@ -2316,6 +2316,30 @@ make test-legacy が従来どおり green（1,786）。RESULT.json: {"job":"rs-a
 3. L1（`cpu_ai.py`）は廃止（ユーザ決定 2026-09-07）。`--policy l1` の記録は Rust の N系に置き換える。
 4. Dockerfile から PyPy 段を除去。CLAUDE.md の CPU 系統・ゲート・運用の記述を更新。
 5. 裁定待ち 4 件（§11.8 #10 と §14）はこの時点で判断し、直すなら Rust を正として直し golden を再生成する。
+6. **不要物の整理**（ユーザ指示 2026-09-07「次のフェーズで、不要なものは削除または退避」）。第 2 段の WP が
+   一覧を作り、下の規則で仕分けてから実施する（削除は git 履歴と tag `py-engine-final` に残る）:
+   - 削除: リポジトリ直下の作業残骸（`arena_v43/local_87000.jsonl`）・PyPy 方式 B（Dockerfile の `pypy` 段・
+     `opcg_sim/tools/decide_worker.py`・`api/decide_client.py` のワーカー分岐）・`tests/__pycache__` 等の
+     追跡漏れ・参照されない fixture（`tests/fixtures/candidates` 31MB ほかは参照を確認して判断）。
+   - 退避 `legacy/`: Python エンジン一式（§16.2-2）・L1（`cpu_ai.py`・`cpu_eval_v2.py`）・G系／B系／c系／
+     RL 試作の学習コード（`learned/value_net.py`・`plan.py`・`policy.py`・`action.py`・`lethal.py`・
+     `effect_features.py`・`n_eff.py` は NRel のカード表が依存するため Rust 移植後に）・`tests/harness/` の
+     旧ライン（`az_*`・`rl_*`・`gate_a_tictactoe`・`tictactoe`・`p2_gen0`・`p3_loop`・`phase1_sweep`・
+     `quality_map`・`mistarget_diagnostics` ほか legacy テストだけが使うもの）・`tests/scripts/` の一過性の
+     実験 CLI（`bb_*`・`value_*`・`plan_*`・`pd_*`・`lethal_*`・`p3_*`・`defense_*`・`rl_*`・`v51_*`・`g15_*`・
+     `exit_*` など。報告書 `docs/reports/` から参照されるものは `legacy/experiments/` に置き、報告書の
+     パスは書き換えない＝報告は不変）。
+   - 学習済みネット `opcg_sim/data/learned/*.npz`（43MB）: **出荷既定 `nrel_a1`・ロールバック先 `neff_c10`・
+     `gen15` ペアだけを残し**、gen2〜gen14（28 ファイル・約 40MB）は tree から外す。CLAUDE.md の
+     「判定に使ったネットは不採用でも消さない」は履歴と tag で担保する（gen16 の教訓＝取り出せなくなる
+     ことが問題であり、tree に置き続けることではない）。CLAUDE.md にその旨を追記する。
+   - 文書 `docs/`: 役目を終えた作業指示書（`*_worker_prompt.md`・`cpu_v5_run_prompts.md`・
+     `orchestrator_handoff.md`・`session_orchestration.md`・`cluster_training_prompt.md`）と完了した計画
+     （`cpu_v5/v7/v8/v9_plan.md`・`cpu_don_box_plan.md`・`cpu_macro_plan.md`・`cpu_perf_testing_plan.md`・
+     `cpu_backbone_plan.md`・`refactoring_*.md`・`replay_verification_plan.md`）は `docs/archive/` へ。
+     `docs/README.md` の索引を書き換える。正本（SPEC／TEST_SPEC／parser_v2／leader_specs）と
+     `docs/reports/` は触らない。
+   - 残す: `api/flagship/`（大会情報の別機能）・`sandbox.py`・パーサ・ツール・契約。
 
 ## 17. 到達形のモジュール構成（ユーザ確認 2026-09-07）
 
