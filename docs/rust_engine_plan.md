@@ -2542,3 +2542,40 @@ B. 移動と退避
 RESULT.json: {"job":"rs-archive-cutover","status":"done","arena":{...},"gen_seconds_per_game":{...},
 "api_tests":{...},"moved":[...],"legacy_imports_from_opcg_sim":0,"tag":"py-engine-final","notes":"..."}。
 ```
+
+## 18. 学習の高速化（ユーザ要望 2026-09-07「学習も高速化できないか。容量が大きくなって時間がかかる」）
+
+第 2 段（切替）と**並行**して、まず原因分析だけを 1 セッションで行う（学習コードは変えない）。
+
+### 18.1 計測 WP `train-profile`（並行可）
+
+```
+NRel の学習（tests/scripts/n_rel_train.py・--ablate rel が既定）の時間とメモリの内訳を計測し、
+高速化の設計判断に必要な数字を出してください。学習コード・エンジンは変更しない（計測用の複製と
+プロトタイプは tests/scripts/ に別ファイルで）。本線 claude/cpu-spec-improvements-yw91jd から分岐し、
+claude/train-profile に push、PR は作りません。
+
+入力: 直近の波の dump v2（origin/claude/n27-w0N・n28-w0N の n27_records／n28_records ほか。
+docs/n_loop_ops.md §6 の台帳を見て、a1 の訓練に使った構成＝π は現 era・z は新しい順に載る最大数）。
+
+やること:
+1. 全体: 実際の訓練コマンド（r2b と同じ引数）を 1 回回し、壁時計を「読み込み（load_dump_v2）／
+   エポックごとの学習／評価（eval_policy）／保存」に分けて計測。RSS のピークと、行数・1 行のバイト数
+   （scalars／tokens／card_idx／π の各配列の dtype と形）を表にする。
+2. 学習ループの内訳: 1 エポックの中で forward／backward／パラメータ更新／Python のバッチ切り出しに
+   かかる時間を分け、CPU 使用率（コア数に対する平均）を測る。bs-v 256／bs-p 64 を 4 倍・16 倍にしたときの
+   1 行あたり時間の変化も測る（精度の話は不要・速度だけ）。
+3. データ形式の試算: 同じ行を float16／int16 の memmap（.npy）に書き出したときのサイズと、そこから
+   バッチを切り出す速度（RAM に載せない読み方）を実測する。
+4. PyTorch（CPU）のプロトタイプ: NRelNet の forward/backward を torch で同じ式に書き（npz の重みを読んで
+   forward が numpy 版と 1e-5 で一致することを確認）、同じデータ・同じバッチで 1 エポックの時間を比べる。
+   スレッド数 1／4／全コアで測る。
+5. 報告: docs/reports/2026-09-07_train_profile.md に表（時間の内訳・RSS・形式別サイズ・numpy 対 torch）と
+   「どこが律速か」「1〜3 のどれで何倍になる見込みか」の結論。RESULT.json に同じ数字。
+
+受け入れ: 上の 5 点の数字が揃っていること（推定ではなく実測）。学習コードは無変更。
+RESULT.json: {"job":"train-profile","status":"done","breakdown":{...},"rss_peak_gb":..,"row_bytes":{...},
+"torch_vs_numpy":{...},"recommendation":"..."}。
+```
+
+結果を見て §18.2（設計: Rust 生成が memmap ダンプを直接書く／torch 学習／行の窓）を書く。
