@@ -1236,8 +1236,8 @@ Python 側の復元器（`opcg_sim/src/core/rs_bridge.py`）は触らず、ハ�
 - Python の `LearnedEngine`（a1・serve 既定）で `--games` 局を打ち、**各決定点**で
   (a) 決定前の `hidden`、(b) その decide が引いた乱数の出目、(c) 箱コミットの残り手順を採って
   Rust の `decide` を同じ出目で走らせ、**手**と**根の訪問数 N**（＋合法手の並び）を照合する。
-- 出目の記録はハーネス内の 3 部品だけ（`opcg_sim/` は無変更）: `RecordingRng`
-  （`np.random.Generator` を包む）・`RecordingEngine`（`_world_rng` の返り値を包む席別 seam）・
+- 出目の記録はハーネス内の 3 部品だけ（`opcg_sim/` は無変更）: `RecordingGenerator`
+  （`np.random.Generator` を包む。`--what determinize` の `RecordingRng`＝`random.Random` を包む方とは別物）・`RecordingEngine`（`_world_rng` の返り値を包む席別 seam）・
   `_TracingMCTS`（`cpu_learned.TreeMCTS` を包んで `last_stats` を取り出す。`decide` は木の
   インスタンスを返さないので根の素の N はここからしか採れない＝`record["groups"]` は
   **マージ後**の集計）。`choice(n, p=...)` だけは自前で組む（numpy と同じ
