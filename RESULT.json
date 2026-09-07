@@ -1,0 +1,53 @@
+{
+  "job": "rs-p3-don",
+  "status": "done",
+  "branch": "claude/rs-p3-don-mdlsba",
+  "base": "claude/cpu-spec-improvements-yw91jd (e619991)",
+  "audit": {
+    "cards": 979,
+    "abilities": 1273,
+    "match": 1272,
+    "mismatch": 0,
+    "unimplemented": 1,
+    "record_error": 0,
+    "bad_payload": 0,
+    "bad_output": 0,
+    "mode": "replay",
+    "action_types": ["ACTIVE", "ACTIVE_DON", "ATTACH_DON", "BUFF", "DISCARD", "DRAW", "FREEZE_DON", "KO", "MOVE_ATTACHED_DON", "RAMP_DON", "REST", "REST_DON", "RETURN_DON"],
+    "engine": "0.0.1",
+    "record_version": 4,
+    "first": {
+      "status": "unimplemented",
+      "detail": "effects: 対象にドン!!が含まれる（ドン!!を取るハンドラは群 D）",
+      "card_id": "OP12-037",
+      "trigger": "ACTIVATE_MAIN",
+      "ability_index": 0
+    }
+  },
+  "regress": {
+    "audit_f": {
+      "cards": 634, "abilities": 817, "match": 817, "mismatch": 0, "unimplemented": 0,
+      "action_types": ["ACTIVE", "BUFF", "DISCARD", "DRAW", "KO", "REST"]
+    },
+    "replay_vanilla": {
+      "games": 20, "actions": 1803, "match": 20, "mismatch": 0, "unimplemented": 0,
+      "seed_base": 1400000
+    },
+    "state": {
+      "games": 5, "actions": 431, "match": 5, "mismatch": 0, "seed_base": 500000
+    },
+    "query_oracle": {
+      "boards": 40, "queries": 1467480, "match": 1285229, "error_match": 182251,
+      "mismatch": 0, "unimplemented": 0, "restore_mismatch": 0, "seed_base": 1410000
+    },
+    "cargo_test": {"passed": 187, "failed": 0, "ignored": 0, "added_by_this_wp": 21},
+    "clippy": {"warnings": 0},
+    "make_test": "green"
+  },
+  "changed_files": [
+    "rust/opcg_engine/src/effects/actions/don.rs",
+    "docs/rust_engine_plan.md",
+    "RESULT.json"
+  ],
+  "notes": "【実装】actions/don.rs の 3 入口を本物にした。game_handler: RAMP_DON / RETURN_DON / REST_DON / FREEZE_DON / ACTIVE_DON(target 無し＝Python の when ガード。target ありは None を返して対象ループへ) / MOVE_ATTACHED_DON。owns_target+apply_target: ATTACH_DON。Python の player_level.* / per_target.attach_don を 1 つずつ読んで逐語移設した（pop(0) と pop() の違い、value<=0 のときの既定 1 枚、_last_resource_count の更新有無、RETURN_DON の空 list は falsy＝自動選択へ落ちる、MOVE_ATTACHED_DON だけが moved>=n を success として返す、など）。ops.rs への追加は不要だった＝P1 の return_one_don / attach_don / record_turn_event と journal の don ゾーン操作で足りたので、ops.rs は 1 行も触っていない。actions/mod.rs も未変更（pub(super) 化も不要）。resolver.rs / interact.rs / triggers.rs / model.rs も未変更。変更は don.rs の 1 ファイルのみ。cargo test は担当 ActionType ごとに Python の挙動を転記した単体 21 件を追加した。\n\n【申告 1・only_cards_strict の広げ（本 WP の所有経路だが未変更）】指示の「resolver.rs の only_cards_strict 3 か所をドン!!込みに広げる」は、その 3 か所だけでは成立しなかった。resolve_targets の戻り値・model.rs の Interaction.candidates・actions/mod.rs の run_target_loop の targets が**すべて Vec<CardIdx>** で、TargetRef::Don を受け取れる型が 1 つも無いため。necessary な変更は所有外の 3 ファイル（model.rs の Interaction は candidates/candidate_dons の「どちらか一方だけが非空」不変条件を崩して並び順つき混在にする／interact.rs は suspend_for_target_selection の混在候補と SELECT_TARGET 再開のドン!!解決＋EffectContext::temp_resolved_targets／actions/mod.rs は run_target_loop の targets を TargetRef へ広げ rest・active に Python の isinstance(target, DonInstance) 分岐を入れる）に跨るので、指示 2 のとおり変更せず申告する。**黙って落とす（ドン!!を捨ててカードだけ処理する）ことはしていない**＝only_cards_strict の Unimplemented をそのまま残したので統合時に必ず見える。詳細な必要変更の一覧は docs/rust_engine_plan.md §8.10 の表。\n\n影響は DB 全体で 3 能力（すべて REST。他の ActionType でドン!!を対象に取るカードは無い）。(1) OP12-037#0『【メイン】自分のドン!!3枚をレストにできる:相手の、キャラかドン!!合計2枚までを、レストにする』TargetQuery.flags=[CHAR_OR_DON]・player=OPPONENT・count=2・is_up_to=true・zone=FIELD。監査の汎用盤面では Python の SELECT_TARGET が candidates=キャラ 3 枚＋ドン!! 5 枚の混在 8 件（selectable_uuids も同順）になる。path: fire.state.pending_request.candidates / .selectable_uuids。既定応答は先頭 1 件（キャラ）を選ぶので**実際にレストになるのはキャラ 1 枚だけ**＝盤面自体は Rust でも作れるが、混在候補を出す pending_request が作れない。(2) OP10-074#0『このキャラが相手の効果でKOされる場合、代わりに自分のアクティブのドン!!2枚をレストにできる』zone=COST_AREA・player=SELF・count=2。REPLACE_EFFECT の sub_effect なので**群 E の未実装で先に止まる**（現状の first は REPLACE_EFFECT）。(3) PRB02-005#0 zone=COST_AREA・player=OPPONENT・count=1。次の相手メインフェイズ開始時の遅延効果で、監査の汎用盤面からは到達しない＝現状も match（--card-ids PRB02-005 で unimplemented=0 を確認済み）。\n\n【申告 2・interact.rs の don_pool_player（未変更）】Python card_moves._don_pool_player は status==\"OPPONENT\" **または** action.target.player==OPPONENT で相手プールを指すが、Rust の同名関数（interact.rs:392・所有外）は前者しか見ない。効果 JSON 上、RETURN_DON / REST_DON / FREEZE_DON / ACTIVE_DON / RAMP_DON に target を持つ能力は 1 件も無い（全 2,803 枚を走査して確認。ATTACH_DON は target を持つが target_handler なので _don_pool_player を通らない）ので現状は到達しない。don.rs は中断（suspend_for_don_selection）と同じこの 1 つの定義を使う＝どちらのプールを選択させるかと、どちらのプールを実際に戻すかが常に一致する。将来パーサが該当 target を作るようになったら interact.rs 側を Python に合わせて直すべき。\n\n【P1 引き継ぎの再確認・pay_cost】『付与中のドン!!を指定して払うと付与先の attached_don が減らない』は Python の実挙動そのもの。opcg_sim/src/core/engine/card_moves.py::pay_cost の `elif don in player.don_attached_cards:` 枝は don_attached_cards から外して don_rested へ移し attached_to=None にするだけで、host.attached_don -= 1 をしない（同ファイルの _return_one_don は減らす＝意図的な差ではなく取りこぼしに見える）。盤面としては「付与先キャラは自分のターン中 +1000 を保ったままドン!!だけ剥がれる」（CardInstance.get_power の don_power = attached_don * 1000 が残る）。path: opcg_sim/src/core/engine/card_moves.py:151-159（pay_cost）vs :161-177（_return_one_don）。Rust ops::pay_cost は P1 でこの挙動をそのまま移してあり（doc コメントにも明記済み）、本 WP で読み直して一致を再確認した＝**変更していない**。Python 側の欠陥の可能性はあるが Python が正の原則どおり直していない。唯一の呼び出し口は battle.py::apply_counter の【カウンター】イベント支払い（＝群 E の範囲）。\n\n【マージ時の注意】本 WP のブランチ名はハーネス指定の claude/rs-p3-don-mdlsba（指示書の claude/rs-p3-don に対応）。"
+}

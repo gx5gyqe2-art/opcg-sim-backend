@@ -136,6 +136,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P3 | **土台 2 WP の統合・受け入れ**（`claude/rs-p3-integrate`）: core → resolver の順に cherry-pick し §11.6 のとおり単一化（`Vec<TargetRef>`／`EffectContext` の全欄／能力表は `MasterTable.abilities`／stub は core へ委譲／文脈の JSON 読込は `eval::context_from_json`）。オラクル 5 本すべて一致（問合せ 7,337,400 件 mismatch=0／土台監査 634 枚・817 能力 mismatch=0・unimplemented=0／バニラ再生 50 局・状態 10 局・原始操作 10 局とも一致）・`cargo test` 166 green（`#[ignore]` 0）・clippy 0・`make test` green。結果は下記 §8.9 |
 | 2026-09-07 | P3 | **統合をコーディネータが受け入れ・本線へ**（`claude/rs-p3-integrate` 776d492a を fast-forward）。未見 seed の再検証: F 監査 634 枚/817 能力 mismatch=0・問合せ 40 局面 1,467,480 件 mismatch=0・バニラ再生 20 局 match=20・状態 5 局 match=5・原始操作 3 局 5,190 件 mismatch=0。`cargo test` 166 green・clippy 0・`make test` green |
 | 2026-09-07 | P3 | **群 A〜E の差し口と指示書を本線へ**（§11.7）: `actions/{status,zone,flow,don,rules}.rs` の 3 入口（`game_handler`／`owns_target`／`apply_target`）と `mod.rs` の呼び出し。受け入れ集合は F∪群だけのカード（A 782／B 987／C 865／D 979／E 710 枚） |
+| 2026-09-07 | P3 | **群 D（ドン!!）完了**（`claude/rs-p3-don-mdlsba`）: `actions/don.rs` の 7 種（RETURN_DON／RAMP_DON／REST_DON／ATTACH_DON／ACTIVE_DON〔target 無し〕／FREEZE_DON／MOVE_ATTACHED_DON）。F∪D 監査 979 枚・1,273 能力で **mismatch=0**・unimplemented=1（残り 1 件＝OP12-037 の「キャラかドン!!」選択。`resolve_targets`→`Interaction`→`run_target_loop` の `Vec<CardIdx>` を `TargetRef` へ広げる必要があり本 WP の所有外＝コーディネータへ申告）。退行 4 本一致・`cargo test` 187 green・clippy 0・`make test` green。結果は下記 §8.10 |
 
 ### 8.1 P0 の結果（2026-09-06）
 
@@ -581,6 +582,55 @@ bad_payload=21 に退行した。`rs_diff_replay.py` のバニラデッキは Py
 `request_id` を除いて段ごとに突き合わせる。負のコントロール: fixture の期待値を 1 か所
 （`life_count`）ずらすと「段 0 の盤面が Python と違う」で落ちる＝素通りしていない。
 全カード（634 枚／817 能力）の照合はハーネス側（上表）で回す。
+
+### 8.10 P3 群 D（ドン!!）の結果（2026-09-07）
+
+WP `rs-p3-don`（ブランチ `claude/rs-p3-don-mdlsba`）。本線 `claude/cpu-spec-improvements-yw91jd`
+（e619991）から分岐。**Python 側（`opcg_sim/`）は 1 行も変えていない**。変更は
+`rust/opcg_engine/src/effects/actions/don.rs` の 1 ファイルのみ（`ops.rs` への追加も不要だった＝
+P1 の `return_one_don`／`attach_don`／`record_turn_event` と journal の don ゾーン操作で足りた）。
+
+| 受け入れ | 結果 |
+|---|---|
+| `rs_audit_replay.py --action-types <F∪D 13 種>`（群 D 監査） | cards=**979**／abilities=**1,273**／match=1,272／**mismatch=0**／unimplemented=**1**（下記） |
+| `rs_audit_replay.py --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF`（F 退行） | cards=634／abilities=**817**／match=817／mismatch=0・unimplemented=0 |
+| `rs_diff_replay.py --mode replay --vanilla --games 20 --seed-base 1400000` | **match=20**／mismatch=0（1,803 行動） |
+| `rs_diff_replay.py --mode state --games 5` | **match=5**／mismatch=0（431 行） |
+| `rs_query_oracle.py --boards 40 --seed-base 1410000` | queries=1,467,480／**mismatch=0**（error_match=182,251） |
+| `cargo test --no-default-features` | **187 passed**・0 failed・0 ignored（群 D の単体 21 件を追加） |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `make test` | green |
+
+**残る 1 件（OP12-037・コーディネータへ申告）**: 「相手の、キャラかドン!!合計2枚までを、レストにする」
+（`TargetQuery.flags=["CHAR_OR_DON"]`）。Python は `get_target_cards` が**カードとドン!!の混在 list** を
+返し、`SELECT_TARGET` の `candidates`／`selectable_uuids` に両方が並ぶ（監査の汎用盤面では
+キャラ 3 ＋ドン!! 5 の 8 件）。Rust は `resolve_targets` の戻り値・`Interaction.candidates`・
+`run_target_loop` の `targets` がすべて `Vec<CardIdx>` なので、**`only_cards_strict` の 3 か所を
+広げるだけでは通らない**（型が受け取れない）。必要な変更は §11.7 で本 WP の所有外の 3 ファイルに跨る:
+
+| 箇所 | 要る変更 |
+|---|---|
+| `effects/resolver.rs::resolve_targets`（所有内） | 戻り値を `Vec<TargetRef>` へ。本体の絞り込み（`cost_state_noop`／`PlayCard` 種別／`EXCLUDE_SELECTED_COLOR`／`power_sum_max`）はカードにだけ効かせる |
+| `model.rs::Interaction`（**所有外**） | `candidates`／`candidate_dons` の「どちらか一方だけが非空」の不変条件を崩し、**並び順つきの混在**を持てる形にする（Python は 1 つの list） |
+| `effects/interact.rs`（**所有外**） | `suspend_for_target_selection` が混在候補を積む／`SELECT_TARGET` の再開で選ばれた uuid をドン!!へも解決する（`EffectContext::temp_resolved_targets` も `TargetRef` へ） |
+| `effects/actions/mod.rs`（**所有外**） | `run_target_loop` の `targets` を `TargetRef` へ。`rest`／`active` に Python の `isinstance(target, DonInstance)` 分岐（`source_list` からの付け替え・`ON_REST` を撃たない）を入れる。受け口の `activate_don` は既に `mod.rs` にある |
+| `rules/pending.rs` | 混在候補の `candidates`／`selectable_uuids` を Python と同じ並びで書き出す |
+
+影響範囲は DB 全体で 3 能力（`REST` のみ・他の ActionType でドン!!を対象に取るカードは無い）:
+OP12-037（`CHAR_OR_DON`・上記）／OP10-074（`COST_AREA`・ただし `REPLACE_EFFECT` の中＝**群 E**の
+未実装で先に止まる）／PRB02-005（`COST_AREA`・遅延効果で監査の汎用盤面からは到達せず、
+現状も match）。**黙って落とす（ドン!!を捨ててカードだけ処理する）ことはしていない**＝
+`only_cards_strict` の `Unimplemented` をそのまま残したので、統合時に必ず見える。
+
+**P1 の引き継ぎ「`pay_cost` で付与中のドン!!を指定して払うと付与先の `attached_don` が減らない」の
+再確認**: Python `card_moves.pay_cost` の `elif don in player.don_attached_cards:` 枝は
+`don_attached_cards` から外して `don_rested` へ移し `attached_to=None` にするだけで、
+付与先の `host.attached_don -= 1` を**しない**（同じファイルの `_return_one_don` は減らす＝
+意図的な差ではなく取りこぼしに見える）。結果、付与先キャラは自分のターン中 +1000 を保ったまま
+ドン!!だけ剥がれる。Rust `ops::pay_cost` は**この挙動をそのまま移してある**（P1 で移設済み・
+本 WP で再確認。コメントも既にその旨を書いている）ので、群 D では触っていない。
+Python 側の欠陥の可能性があるが、Python が正の原則どおり直していない
+（呼び出し口は `battle.py::apply_counter` の【カウンター】イベント支払いのみ＝群 E の範囲）。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
@@ -1125,6 +1175,7 @@ pub fn apply_target(s, masters, actor, action, target, owner, source_list, value
 | B ゾーン移動 | `zone.rs` | MOVE_CARD・DECK_BOTTOM・DECK_TOP・BOUNCE・TRASH_FROM_DECK・HEAL・DEAL_DAMAGE・SHUFFLE・ORDER_LIFE・FACE_UP_LIFE・LOOK_LIFE・MOVE_TO_HAND（DB 未使用の LIFE_RECOVER／LIFE_MANIPULATE は `Unimplemented` 可） | 987／1,271 | `per_target.move/bounce/deck_bottom/deck_top/move_card/face_up_life`・`player_level.deal_damage/shuffle/heal/trash_from_deck/order_life/look_life` |
 | C カードの流れ | `flow.rs` | PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_MAIN_EFFECT・EXECUTE_EVENT・DECLARE_COST（DB 未使用の SELECT_OPTION は不要） | 865／1,144 | `per_target.play_card/reveal`・`player_level.look/select/execute_event`・`resolver._expand_main_effect/_execute_selected_main/_suspend_for_cost_declaration` |
 | D ドン!! | `don.rs` | RETURN_DON・RAMP_DON・REST_DON・ATTACH_DON・ACTIVE_DON（target 無し）・FREEZE_DON・MOVE_ATTACHED_DON（DB 未使用の MODIFY_DON_PHASE は不要）＋**ドン!!を対象に取るクエリ**（`TargetRef::Don`＝COST_AREA 3 件・CHAR_OR_DON 2 件。resolver の `only_cards_strict` 3 か所をドン!!込みに広げる＝この群だけ `resolver.rs` の当該経路を所有） | 979／1,273 | `player_level.return_don/ramp_don/rest_don/freeze_don/active_don_by_count/move_attached_don`・`per_target.attach_don`・`resolver._suspend_for_don_selection` |
+| ↳ **完了**（2026-09-07・`claude/rs-p3-don-mdlsba`） | `don.rs`（1 ファイルのみ・`ops.rs` への追加は不要） | 7 種すべて実装 | 979 枚／1,273 能力で **mismatch=0**・match=1,272・**unimplemented=1**（OP12-037 の `CHAR_OR_DON` 選択のみ。`resolve_targets`／`Interaction`／`run_target_loop` の `Vec<CardIdx>` を `TargetRef` へ広げる必要があり、`model.rs`／`interact.rs`／`actions/mod.rs` に跨る＝**所有外につき未変更・申告**。詳細と必要変更の一覧は §8.10） | 退行 4 本一致（F 監査 817 能力／バニラ 20 局／状態 5 局／問合せ 1,467,480 件）・`cargo test` 187・clippy 0・`make test` green |
 | E 置換とルール | `rules.rs` | REPLACE_EFFECT・PREVENT_LEAVE（`active_protection`／`find_replacement`／`active_replacement`／`_register_granted_replacements` の本体＝`mod.rs` の高速路を置き換える・戦闘 KO 置換の中断）・RULE_PROCESSING・RESTRICTION・REDIRECT_ATTACK・VICTORY・EXTRA_TURN＋P2 の積み残し（【カウンター】イベント・イベントの登場・アタック税）。DB 未使用の KEYWORD／PASSIVE_EFFECT／GRANT_EFFECT／LOCK／OTHER は `Unimplemented` 可 | 710／917 | `engine/guards.py`・`player_level.rule_processing_self_restriction/redirect_attack/extra_turn/victory`・`battle.py` の置換分岐 |
 
 複数群に跨るカードは 685 枚（統合時にコーディネータが全カード監査で受け入れる）。5 群＋F で 2,472 枚を覆う。
