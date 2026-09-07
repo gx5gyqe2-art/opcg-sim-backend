@@ -2316,3 +2316,50 @@ make test-legacy が従来どおり green（1,786）。RESULT.json: {"job":"rs-a
 3. L1（`cpu_ai.py`）は廃止（ユーザ決定 2026-09-07）。`--policy l1` の記録は Rust の N系に置き換える。
 4. Dockerfile から PyPy 段を除去。CLAUDE.md の CPU 系統・ゲート・運用の記述を更新。
 5. 裁定待ち 4 件（§11.8 #10 と §14）はこの時点で判断し、直すなら Rust を正として直し golden を再生成する。
+
+## 17. 到達形のモジュール構成（ユーザ確認 2026-09-07）
+
+方針: **ルール・効果・探索は Rust、カード本文の解釈と学習と API は Python**。裁定を書く場所はパーサ（Python）と
+Rust の 2 つだけ。生成・アリーナのオーケストレーションと学習スクリプトは、今の `tests/scripts/` 配下
+（「単体実行の実験/計測/監査 CLI」の置き場）から**役割どおりの場所へ移す**（ユーザ決定 2026-09-07:
+「置き場の意味とスクリプトの意味が違う」）。移動は第 2 段 `rs-archive-cutover`（§16.2）で行う。
+
+```
+rust/opcg_engine/src/                 エンジン本体（PyO3 wheel・Cloud Run にはこれだけ載る）
+  model.rs / journal.rs / ops.rs      盤面・undo ログ・原始操作（P1）
+  rules/   turn battle actions legal pending passive      ターン進行・戦闘・合法手・要求（P2）
+  effects/ ast loader matcher cond value resolver interact triggers continuous passives
+           actions/{status,zone,flow,don,rules}           効果解決（P3）
+  encode/  cardtab scalars tokens leader                  符号化 v13（P4）
+  net/     npz nrel                                       NRel forward（P4）
+  search/  adapter macro prune determinize apply rng mcts decide   探索と decide（P4）
+  audit.rs / state.rs                 golden 用の汎用盤面・記録の再生
+  py_game.rs / lib.rs                 Python に見せる面（Game クラス・decide・load_*）
+
+opcg_sim/                             Python に残すもの
+  api/                                FastAPI（engine_rs.py が Game を包む。契約・フロントは不変）
+  src/effects/parser.py, parser_v2.py カード本文 → 効果構造（裁定を書く場所その 1）
+  src/models/  enums effect_types models(CardMaster)      パーサと exporter が使う型
+  src/utils/loader.py                 CardLoader
+  src/core/sandbox.py                 自由配置の編集（ルールエンジンではない）
+  tools/  export_effects_json.py export_contract.py       効果 JSON・API 契約の生成
+  learned/train/                      学習（n_rel_train・データ処理・評価帯・アリーナ判定の集計。numpy）
+                                      ← 今の tests/scripts/n_rel_train.py・n_eff_train.py・評価帯スクリプトを移す
+  loop/                               生成・アリーナのオーケストレーション（Game＋decide を Rust で回す）
+                                      ← 今の tests/scripts/ の生成／アリーナ／シャード結合スクリプトを移す
+  data/   opcg_cards.json  opcg_effects.json(生成物)  learned/*.npz
+
+tests/
+  test_rs_golden_audit.py / test_rs_golden_replay.py      ゲームプレイ退行の一次防衛線（Rust だけで回る）
+  test_api_*.py / test_contract_export.py / パーサ・ツール・loop・train のテスト
+  fixtures/rs_goldens/                監査 3,386 件・再生 200 局
+  scripts/                            単体実行の実験・計測・監査 CLI（golden の作り直しなど）だけを残す
+
+legacy/python_engine/                 tag py-engine-final で凍結・テスト対象外
+  core/ (gamestate engine effects actions journal cpu_ai cpu_learned)
+  learned/ (encoder n_rel n_rel_feat n_eff mcts adapter lethal leader_feat effect_features)
+  tests/ (legacy 115 本＋harness の Python エンジン依存部)・rs_*_oracle.py（移行期の照合ハーネス）
+```
+
+`tests/scripts/` の配置規約（CLAUDE.md「単体実行の実験/計測/監査 CLI」）はそのまま。移した後は
+`docs/n_loop_ops.md` の手順・`Makefile`・`docs/TEST_SPEC.md` §3 の索引を新しい場所に書き換える。
