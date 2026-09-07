@@ -25,7 +25,7 @@ import rl_net as RN
 from az_policy import PolicyScorer
 from legacy.python_engine.core.cpu_learned import warm_start_policy, _net_enc_version
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 SEED_REF = "origin/claude/p3-v3-blue-checkpoints:p3ckpt/gen0_value.npz"   # git上のv3種（恒久）
 SHIP_P = os.path.join(REPO, "opcg_sim", "data", "learned", "gen2_policy.npz")
 

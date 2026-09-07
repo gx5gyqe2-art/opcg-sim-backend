@@ -15,7 +15,7 @@ import conftest  # noqa: F401
 import structural_invariants as si
 from opcg_sim.src.utils.loader import CardLoader
 
-DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
                     "opcg_sim", "data", "opcg_cards.json")
 
 # 各カテゴリのラチェット上限（現状すべて 0。引き上げは退行）。

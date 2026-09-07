@@ -32,7 +32,7 @@ from ref_finetune_smoke import (build_rank_pairs, dead_weighted_pairs, pair_acc,
                                 rank_finetune, rank_finetune_anchored)
 from legacy.python_engine.core.cpu_learned import warm_start_value, warm_start_policy, _net_enc_version
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 MODELS = os.path.join(REPO, "opcg_sim", "data", "learned")
 
 

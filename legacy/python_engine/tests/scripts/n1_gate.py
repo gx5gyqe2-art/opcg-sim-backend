@@ -28,8 +28,8 @@ _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 import _bootstrap  # noqa: E402,F401
 
-import n0_spike as N0
-from n1_train import N1Net, ATYPES, NA, D_PHYS, F_CAND
+from opcg_sim.learned.train import n0_spike as N0
+from opcg_sim.learned.train.n1_train import N1Net, ATYPES, NA, D_PHYS, F_CAND
 
 MAX_CI = N0.MAX_CI
 

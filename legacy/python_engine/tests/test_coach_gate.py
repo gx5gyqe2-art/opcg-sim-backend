@@ -12,7 +12,7 @@ import sys
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
                                 "tests", "scripts"))
 from coach_gate import (REPLAYS_HUMAN, REPLAYS_V2, REPLAYS_V48, VERIFIED,  # noqa: E402
                         VERIFIED_V2, hit, judge, min_reliable_delta, turn_all_required)

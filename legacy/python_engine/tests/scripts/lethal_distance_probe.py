@@ -376,7 +376,7 @@ def main():
     from cpu_selfplay import _load_db
     from opcg_game import OPCGGame
 
-    REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
     fixt = args.teachers or os.path.join(REPO, "tests", "fixtures", "candidates", "v51_teacher")
 
     # 58点の盤面は npz（符号化済み）にしか無い→盤面そのものが要る。教師50点は meta の

@@ -28,7 +28,7 @@ import p3_loop as P
 import p2_gen0 as P2
 
 WT, CK, BR = "/tmp/p3ckpt-wt", "/tmp/p3ckpt-wt/p3ckpt", "claude/p3-checkpoints"
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 
 def ensure_wt():

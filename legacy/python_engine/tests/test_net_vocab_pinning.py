@@ -16,7 +16,7 @@ import rl_net as RN
 import rl_encoder as E
 from cpu_selfplay import _load_db
 
-_MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+_MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
                        "opcg_sim", "data", "learned")
 
 

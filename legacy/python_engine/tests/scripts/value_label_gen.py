@@ -45,7 +45,7 @@ import defense_cf_gen as DG                       # ワーカー状態と自己�
 from defense_cf_gen import _decide                # noqa: E402
 from plan_cf_gen import DECKS_JSON, _init_worker  # 初期化も共有（同一の _G を埋める）
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 _G = DG._G
 
 # ターン帯のクォータ（監査の層別セルに最低数を確保する）。合計が boards_per_game を超える

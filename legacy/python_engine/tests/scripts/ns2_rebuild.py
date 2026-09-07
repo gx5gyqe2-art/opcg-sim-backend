@@ -30,7 +30,7 @@ import rl_encoder as E  # noqa: E402
 from cpu_selfplay import _load_db  # noqa: E402
 from legacy.python_engine.core.cpu_learned import LearnedEngine  # noqa: E402
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 FIXDIR = os.path.join(REPO, "tests", "fixtures", "candidates", "holdout_ns2")
 
 

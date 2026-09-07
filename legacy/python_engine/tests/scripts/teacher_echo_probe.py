@@ -28,7 +28,7 @@ import pd_batch_common as C
 from az_policy import PolicyScorer
 from opcg_action import ACTION_TYPES
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 
 def _fetch(ref, out):

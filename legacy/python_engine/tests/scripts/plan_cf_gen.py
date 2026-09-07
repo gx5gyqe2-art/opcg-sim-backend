@@ -43,7 +43,7 @@ from defense_cf_gen import causal_z, spread, _decide
 from option_pair_gen import margin_blend                            # ラベル式も共有（1定義）
 from legacy.python_engine.learned import plan as PL                         # 実行規約は serve と共有
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 DECKS_JSON = os.path.join(REPO, "tests", "fixtures", "decks", "user_decks_20260728.json")
 
 # ワーカー状態は防御CFと**同一の dict オブジェクト**を共有する。`_decide`（自己対戦の1手）を

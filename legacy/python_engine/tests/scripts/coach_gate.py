@@ -35,7 +35,7 @@ import mark_gate as MG
 import replay_reeval as RE
 from legacy.python_engine.core import cpu_ai
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 # レフェリー検証済み決定点（真盤面・出典は各行コメント: 世界数/sims/実測日）。
 # accept = 同価値バンド（band-top）プランの**初手**の (action_type, card) 集合。

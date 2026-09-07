@@ -23,7 +23,11 @@ for _p in (ROOT, _HERE, HARNESS_DIR, SCRIPTS_DIR,
         sys.path.insert(0, _p)
 
 # google スタブは `tests/_bootstrap` の実装をそのまま使う（二重に書かない）。
-sys.path.insert(0, TESTS_DIR)
-from _bootstrap import _install_google_stub  # noqa: E402
+# **モジュール名が同じ**（どちらも `_bootstrap`）ので `import` では自分自身を掴む
+# ＝ファイルパスから直接読み込む。
+import importlib.util as _ilu  # noqa: E402
 
-_install_google_stub()
+_spec = _ilu.spec_from_file_location("_tests_bootstrap", os.path.join(TESTS_DIR, "_bootstrap.py"))
+_mod = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+_mod._install_google_stub()

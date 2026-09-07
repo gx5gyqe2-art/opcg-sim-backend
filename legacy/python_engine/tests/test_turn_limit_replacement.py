@@ -20,7 +20,7 @@ from opcg_sim.src.models.enums import ActionType, TriggerType
 
 pytestmark = pytest.mark.legacy
 
-DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "opcg_sim", "data")
+DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "opcg_sim", "data")
 
 
 @pytest.fixture(scope="module")

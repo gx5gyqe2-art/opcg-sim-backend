@@ -15,7 +15,7 @@ import pytest
 
 import quality_map
 
-DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
                     "opcg_sim", "data")
 
 # ラチェット上限（現状値で固定。修正が進んだら引き下げる）

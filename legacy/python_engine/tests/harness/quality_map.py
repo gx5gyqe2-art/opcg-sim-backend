@@ -36,7 +36,7 @@ from opcg_sim.src.utils.loader import CardLoader
 
 import effect_coverage as cov  # 既存の分類機構を再利用
 
-DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
                     "opcg_sim", "data")
 
 # 設計上 resolve_ability で盤面が動かない（=NO_CHANGE が正常な）アクション型

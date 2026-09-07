@@ -46,7 +46,7 @@ from opcg_sim.learned.config import BOX_RESOLVE_DEPTH
 from legacy.python_engine.learned.mcts import resolve_battle_inplace   # 解決規約は探索と共有（1定義）
 from option_pair_gen import margin_blend       # v34: ラベル式は option_pair と共有（1定義）
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 DECKS_JSON = os.path.join(REPO, "tests", "fixtures", "decks", "user_decks_20260728.json")
 DEF_WINDOWS = ("SELECT_COUNTER", "SELECT_BLOCKER")
 

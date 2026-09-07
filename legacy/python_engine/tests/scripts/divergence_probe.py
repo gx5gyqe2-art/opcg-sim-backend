@@ -49,7 +49,7 @@ from referee_labeler import plan_teacher_visit
 from legacy.python_engine.core import cpu_ai
 from legacy.python_engine.core.cpu_learned import LearnedEngine
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 _WINDOWS = ("MAIN_ACTION", "SELECT_COUNTER", "SELECT_BLOCKER")
 ARGS = None
 

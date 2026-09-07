@@ -36,7 +36,7 @@ P2 = "P2"
 @pytest.fixture(scope="module")
 def db():
     import os
-    data = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    data = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
                         "opcg_sim", "data", "opcg_cards.json")
     loader = CardLoader(data)
     loader.load()

@@ -36,7 +36,7 @@ import _bootstrap  # noqa: E402,F401
 import rl_encoder as E  # noqa: E402
 import rl_net as RN  # noqa: E402
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 MODELS = os.path.join(REPO, "opcg_sim", "data", "learned")
 FIXT = os.path.join(REPO, "tests", "fixtures", "candidates", "v51_teacher")
 

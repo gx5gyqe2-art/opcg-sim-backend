@@ -30,7 +30,7 @@ import _bootstrap  # noqa: E402,F401
 from game_driver import load_db, build_deck, DEFAULT_MAX_STEPS
 from legacy.python_engine.core import action_api
 
-_MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+_MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
                        "opcg_sim", "data", "learned")
 
 

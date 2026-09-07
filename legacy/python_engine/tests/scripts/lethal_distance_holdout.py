@@ -43,7 +43,7 @@ def main():
     import coach_gate as CG
     from lethal_distance_probe import lethal_distance
 
-    REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
     path = args.boards or os.path.join(REPO, "tests", "fixtures", "candidates",
                                        "v51_teacher", "holdout60_boards.json")
     spec = json.load(open(path))

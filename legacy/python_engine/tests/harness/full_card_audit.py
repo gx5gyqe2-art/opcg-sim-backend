@@ -31,7 +31,7 @@ import _bootstrap  # noqa: E402,F401
 import effect_coverage as cov
 from opcg_sim.src.utils.loader import CardLoader
 
-DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
                     "opcg_sim", "data")
 BASELINE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         "fixtures", "full_card_baseline.json")

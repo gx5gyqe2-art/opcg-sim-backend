@@ -31,7 +31,7 @@ from cpu_selfplay import _load_db
 from deckgen import all_leader_ids
 import p3_loop as P
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 SHIP_V = os.path.join(REPO, "opcg_sim", "data", "learned", "gen2_value.npz")
 SHIP_P = os.path.join(REPO, "opcg_sim", "data", "learned", "gen2_policy.npz")
 SIMS, EPS = 40, 0.25

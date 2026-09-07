@@ -35,7 +35,7 @@ from legacy.python_engine.core.cpu_learned import _net_enc_version
 import p3_loop as P
 
 WT, CK, BR = "/tmp/p3ckpt-wt", "/tmp/p3ckpt-wt/p3ckpt", "claude/p3-checkpoints"
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 
 def _git(*a):

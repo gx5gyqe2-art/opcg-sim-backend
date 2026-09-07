@@ -15,7 +15,7 @@ import pytest
 
 pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 
 @pytest.fixture(scope="module")

@@ -45,7 +45,7 @@ import p3_loop as P
 WT = os.environ.get("OPCG_P3_WT", "/tmp/p3ckpt-wt")
 CK = WT + "/p3ckpt"
 BR = os.environ.get("OPCG_P3_BRANCH", "claude/p3-checkpoints")
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 TARGET_DEFAULT = 10000
 
 

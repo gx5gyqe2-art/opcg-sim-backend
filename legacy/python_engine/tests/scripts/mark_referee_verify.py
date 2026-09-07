@@ -41,7 +41,7 @@ from cpu_selfplay import _load_db
 from az_policy import PolicyScorer
 from legacy.python_engine.core.cpu_learned import _net_enc_version
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 FIXDIR = os.path.join(REPO, "tests", "fixtures", "replays", "gen7_marks_20260728")
 _WINDOWS = ("MAIN_ACTION", "SELECT_COUNTER", "SELECT_BLOCKER")
 ARGS = None

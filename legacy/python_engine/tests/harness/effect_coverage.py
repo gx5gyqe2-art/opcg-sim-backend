@@ -43,7 +43,7 @@ from engine_helpers import make_master, make_player
 from interactive_target_audit import audit_target
 
 DATA = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
     "opcg_sim", "data",
 )
 

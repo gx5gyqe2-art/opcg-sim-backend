@@ -36,7 +36,7 @@ from cpu_selfplay import _load_db
 import p3_run as R
 import pd_batch_common as C
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 NET_BR = os.environ.get("OPCG_PD_NET_BRANCH", "claude/p3-pd-net")
 DATA_BR = os.environ.get("OPCG_PD_DATA_BRANCH", "claude/p3-pd-data-w1")
 NET_WT = os.environ.get("OPCG_PD_WT", "/tmp/pd-gen") + "/net"

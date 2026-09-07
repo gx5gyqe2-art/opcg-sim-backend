@@ -34,7 +34,7 @@ from opcg_sim.src.models.effect_types import GameAction, Sequence, Branch, Choic
 from opcg_sim.src.utils.loader import CardLoader
 from effect_coverage import _build_test_state
 
-DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "opcg_sim", "data")
+DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))), "opcg_sim", "data")
 
 
 def _nfc(s: str) -> str:

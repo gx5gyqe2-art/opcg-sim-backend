@@ -29,7 +29,7 @@ from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.enums import CardType
 
 DATA = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
     "opcg_sim", "data", "opcg_cards.json",
 )
 

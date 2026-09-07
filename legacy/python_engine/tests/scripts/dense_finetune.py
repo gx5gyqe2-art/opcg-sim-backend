@@ -43,7 +43,7 @@ from pd_batch_common import mixed_value_label, normalize_batch_v2
 from opcg_sim.learned.config import V4_LABEL_ALPHA, V4_AUX_TURNS_WEIGHT, V4_TURNS_SCALE
 from legacy.python_engine.core.cpu_learned import warm_start_value, warm_start_policy, _net_enc_version
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 MODELS = os.path.join(REPO, "opcg_sim", "data", "learned")
 
 VKEYS = ("scalars", "field", "card_idx", "value", "q_root", "turns_left")

@@ -32,7 +32,7 @@ import rl_encoder as E
 from ref_finetune_smoke import (collect_ref_batches, split_idx, build_rank_pairs, pair_acc,
                                 rank_finetune)
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 MODELS = os.path.join(REPO, "opcg_sim", "data", "learned")
 
 

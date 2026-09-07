@@ -43,7 +43,7 @@ from legacy.python_engine.core import cpu_ai  # noqa: E402
 from legacy.python_engine.core.cpu_learned import LearnedEngine  # noqa: E402
 from dig_inject_gen import _desc, _apply_dialogs, _end_turn  # noqa: E402
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 DECKS_JSON = os.path.join(REPO, "tests", "fixtures", "decks", "user_decks_20260728.json")
 SWAP_OUT = "OP16-119"          # 4枚をサトリ×4へ置換（枚数維持・プローブ規約）
 SATORI = "OP15-066"

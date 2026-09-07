@@ -43,7 +43,7 @@ from cpu_selfplay import _load_db
 from legacy.python_engine.core import cpu_ai
 from legacy.python_engine.core.cpu_learned import _net_enc_version
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 MAX_STEPS = 400
 
 

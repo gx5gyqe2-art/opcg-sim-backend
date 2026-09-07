@@ -31,7 +31,7 @@ def db():
 @pytest.fixture(scope="module")
 def g3():
     import os
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), FIXTURE)
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), FIXTURE)
     with gzip.open(path, "rt") as f:
         return json.load(f)
 

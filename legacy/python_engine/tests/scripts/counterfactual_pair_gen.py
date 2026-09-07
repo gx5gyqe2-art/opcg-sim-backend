@@ -44,7 +44,7 @@ import os as _os, sys as _sys  # noqa: E402  test bootstrap
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 DECKS_JSON = os.path.join(REPO, "tests", "fixtures", "decks", "user_decks_20260728.json")
 
 COSMETIC = ("PLAY", "ATTACH_DON", "ACTIVATE_MAIN")   # 相貌が即時に良く見える側（v23）

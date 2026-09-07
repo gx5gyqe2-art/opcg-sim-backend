@@ -15,7 +15,7 @@ import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 import numpy as np
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
                                 "tests", "scripts"))
 from counterfactual_referee import _sample_by_visits  # noqa: E402
 

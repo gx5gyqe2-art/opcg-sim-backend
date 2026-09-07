@@ -24,7 +24,7 @@ from az_policy import PolicyScorer
 from cpu_selfplay import _load_db
 from legacy.python_engine.core.cpu_learned import warm_start_value, warm_start_policy, _net_enc_version
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 
 def build_seed(enc_version, gen_value=None, gen_policy=None):

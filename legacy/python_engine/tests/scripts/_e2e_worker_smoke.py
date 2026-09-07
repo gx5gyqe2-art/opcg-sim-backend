@@ -1,7 +1,7 @@
 """実 PyPy ワーカー e2e スモーク（手動・CI 非対象）。CPython→PyPy の実 IPC で同一手を確認。"""
 import os, sys, time, random
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
 import _bootstrap  # noqa: E402,F401  (tests/harness を path に載せる＝cpu_selfplay 等を解決)
 from legacy.python_engine.core.gamestate import GameManager, Player
 from legacy.python_engine.core import action_api, cpu_ai

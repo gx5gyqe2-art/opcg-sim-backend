@@ -19,9 +19,9 @@ import _bootstrap  # noqa: F401
 import coach_gate as CG
 import mark_gate as MG
 import replay_reeval as RE
-import n_rel_train as NT
+from opcg_sim.learned.train import n_rel_train as NT
 from cpu_selfplay import _load_db
-from n_eff_feat import build_eff_tables
+from opcg_sim.learned.train.n_eff_feat import build_eff_tables
 from opcg_sim.learned import encoder as E
 from opcg_sim.learned import n_rel as NL
 from opcg_sim.learned import n_rel_feat as NR

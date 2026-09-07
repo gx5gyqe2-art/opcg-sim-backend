@@ -33,7 +33,7 @@ from opcg_sim.learned.config import V4_LABEL_ALPHA, V4_AUX_TURNS_WEIGHT, V4_TURN
 import p3_run as R
 import pd_batch_common as C
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 NET_BR = os.environ.get("OPCG_PD_NET_BRANCH", "claude/p3-pd-net")
 DATA_BRS = [b for b in os.environ.get("OPCG_PD_DATA_BRANCHES", "").split(",") if b]
 NET_WT = os.environ.get("OPCG_PD_WT", "/tmp/pd-learn") + "/net"

@@ -35,7 +35,7 @@ from cpu_selfplay import _load_db
 from legacy.python_engine.core import cpu_ai
 from legacy.python_engine.core.cpu_learned import _net_enc_version
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 
 def actual_plan_keys(game_root, m0, name, actions, start, fmap):

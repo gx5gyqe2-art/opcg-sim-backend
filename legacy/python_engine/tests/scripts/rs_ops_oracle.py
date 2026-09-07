@@ -47,7 +47,7 @@ except ImportError:         # pragma: no cover - 実行環境依存
     opcg_engine = None
 
 DEFAULT_EFFECTS = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
     "opcg_sim", "data", "opcg_effects.json",
 )
 

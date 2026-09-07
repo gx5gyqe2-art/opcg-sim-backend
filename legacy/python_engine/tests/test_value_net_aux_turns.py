@@ -15,7 +15,7 @@ from legacy.python_engine.learned.value_net import ValueNet, train
 
 pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（学習部品の機構）
 
-_V3 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+_V3 = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
                    "opcg_sim", "data", "learned", "gen3_value.npz")
 
 

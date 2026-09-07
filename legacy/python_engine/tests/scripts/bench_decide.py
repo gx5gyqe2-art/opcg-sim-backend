@@ -6,7 +6,7 @@ JIT ウォームアップ用に最初の1ゲームは計測から除外する。
 """
 import os, sys, time, statistics, random
 os.environ.setdefault("OPCG_LOG_SILENT", "1")
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401  (tests/harness を path に載せる＝cpu_selfplay 等を解決)
 

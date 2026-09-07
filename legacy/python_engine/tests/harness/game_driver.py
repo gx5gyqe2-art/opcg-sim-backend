@@ -32,7 +32,7 @@ from legacy.python_engine.core.invariants import check_invariants, check_turn_bo
 from opcg_sim.src.models.models import CardInstance
 from opcg_sim.src.utils.loader import CardLoader
 
-DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
                     "opcg_sim", "data")
 
 # 1 ゲーム当たりの安全上限（無限ループ検出）。

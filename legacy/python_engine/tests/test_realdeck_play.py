@@ -19,7 +19,7 @@ from engine_helpers import make_player, make_master
 import pytest
 pytestmark = pytest.mark.legacy
 
-DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "opcg_sim", "data")
+DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "opcg_sim", "data")
 
 _DB = None
 

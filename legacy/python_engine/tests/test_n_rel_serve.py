@@ -24,7 +24,7 @@ import coach_gate as CG
 import counterfactual_referee as CR
 import replay_reeval as RE
 from cpu_selfplay import _load_db
-from n_eff_feat import build_eff_tables
+from opcg_sim.learned.train.n_eff_feat import build_eff_tables
 from legacy.python_engine.core import cpu_learned as CL
 from legacy.python_engine.core.cpu_learned import LearnedEngine
 from opcg_sim.learned import n_rel as NL

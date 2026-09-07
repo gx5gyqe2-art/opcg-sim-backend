@@ -33,7 +33,7 @@ from pd_batch_common import unpack_policy
 from opcg_sim.learned.encoder import scalars_dim, field_dim, known_versions
 from legacy.python_engine.core.cpu_learned import _net_enc_version
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 
 def _pad_cols(a, cols):
