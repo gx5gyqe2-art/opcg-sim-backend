@@ -2195,3 +2195,64 @@ Python 側（opcg_sim/）は変更しない（ハーネスの追加のみ）。P
 40 局面・net 40 局面・encode 40 局面）一致・cargo test/clippy green。
 RESULT.json: {"job":"rs-p4-mcts","status":"done","decide":{...},"ties":..,"notes":"..."}。
 ```
+
+## 16. Python 版の退避（P5 の先頭・ユーザ決定 2026-09-07「P5 は Python の退避から進める」）
+
+退避は 2 段に分ける。第 1 段は `rs-p4-mcts` と並行して今出せる（Python 版はまだ使う＝mcts のオラクル・
+暫定 CPU 経路・生成／アリーナ）。第 2 段は mcts の受け入れ後（Python の decide が要らなくなってから）。
+
+### 16.1 第 1 段 `rs-archive-goldens`（保証の移し先とゲートの 2 段化・今）
+
+現状の `tests/test_*.py` 180 本のうち 83 本が Python エンジンを直接叩く（`cpu_infra` 83 本と概ね重なる）。
+Rust 化後に残す保証は次の 3 本の golden に集約し、Rust だけで検査できる形にする（**Python はもう回さない**）。
+
+| golden | 中身 | 作り方（今・Python で 1 度） | Rust 側の検査 |
+|---|---|---|---|
+| **監査 golden** `tests/fixtures/rs_goldens/audit.json` | カード×トリガー 3,386 件の「汎用盤面で発動→既定解決で最後まで」の各段の盤面 dict の sha1 列＋最終盤面の要約（`_snap_diff`／stat）。1 件 1 行 | `rs_audit_replay.py --golden-out`（Rust 側も同じ手順で汎用盤面を組めるよう、`effect_coverage._build_test_state`／`_smart_drain` を Rust の `audit::build_test_state`／`drain_default` に移し、Python と一致することを記録時に確認） | `cargo test`／pytest `test_rs_golden_audit.py`: Rust が汎用盤面を組んで発動し、sha1 列が一致 |
+| **再生 golden** `tests/fixtures/rs_goldens/replay/*.json` | 実デッキ 200 局（random 150・L1 50）の初期並び・行動列・`shuffled` の並び・各段の盤面 dict の sha1・events の sha1（盤面本体は持たない＝1 局 100KB 程度） | `rs_diff_replay.py --golden-out` | pytest `test_rs_golden_replay.py`: Rust が再生して sha1 列一致 |
+| **検証済みデッキ／leader_specs** | `tests/test_verified_decks.py`・`test_leader_*.py`（17 本）は Python エンジンの内部 API を直接叩くため機械的には移せない。**能力の発動は監査 golden が全カード分を覆う**ので、これらは凍結（`make test-legacy` でのみ実行・第 2 段で `legacy/` へ） | — | — |
+
+ゲート（§13 の実施）:
+
+- `make test`（push 前の必須・目標 3 分以内）: `cargo test` ＋ pytest の **Rust 裏付け**集合＝API／契約／パーサ／
+  ツール／golden 3 種／`test_effect_oracle_gate`（パーサのラチェット）。`cpu_infra` と Python エンジン直叩きは含めない。
+- `make test-legacy`: 従来の全 1,786 本（Python エンジン）。第 2 段まで「パーサ・効果 JSON を変えたとき」だけ回す。
+- CLAUDE.md／TEST_SPEC.md の「品質ゲート」を新定義に書き換える（`make test` の中身が変わったことを明記）。
+
+```
+Rust 化後の保証を golden に移し、テストゲートを 2 段化してください。計画 docs/rust_engine_plan.md §16.1。
+本線 claude/cpu-spec-improvements-yw91jd から分岐し、claude/rs-archive-goldens に push、PR は作りません。
+Python エンジン（opcg_sim/src/core・effects・learned）は変更しない（ハーネス・テスト・Makefile・文書のみ）。
+
+やること:
+1. Rust: audit::build_test_state（effect_coverage._build_test_state の汎用盤面＝FILLER 定義・各ゾーン枚数・
+   ON_PLAY は手札）と drain_default（_smart_drain＝既定解決で最後まで）を rust/opcg_engine/src/audit.rs に移し、
+   lib.rs に golden_audit(card_id, trigger, ability_index) -> {"hashes":[...],"summary":{...}} を追加。
+   Python と同じ盤面になることを rs_audit_replay.py の記録との照合で確認（3,386 件一致）。
+2. tests/scripts/rs_audit_replay.py --golden-out と rs_diff_replay.py --golden-out（sha1 列＋要約だけを書く）。
+   tests/fixtures/rs_goldens/audit.json と replay/（random 150・L1 50・seed 帯 5000000〜）を生成してコミット
+   （合計 30MB 以内に収める。超えるなら局数を減らして notes に書く）。
+3. pytest: tests/test_rs_golden_audit.py・tests/test_rs_golden_replay.py（Rust の wheel が無ければ skip ではなく
+   fail＝ゲートが黙って通らない）。tests/harness/rs_golden.py に共通の sha1 正規化（canon＋sort_keys）。
+4. Makefile: test（新定義＝cargo test＋Rust 裏付けの pytest 集合・-m "not legacy"）／test-legacy（従来の全数）。
+   Python エンジン直叩きのテスト 83 本に @pytest.mark.legacy を付ける（cpu_infra はそのまま残す）。
+   `make test` を計測して 3 分以内であることを RESULT.json に書く。
+5. docs: CLAUDE.md「マージ前に緑であるべき品質ゲート」と docs/TEST_SPEC.md §5 を新定義に書き換え。
+   TEST_SPEC §2 に golden テスト 2 本の行、§3 に --golden-out。docs/rust_engine_plan.md §8 に結果行。
+
+受け入れ: 監査 golden 3,386 件一致・再生 golden 200 局一致・新 make test が green かつ 3 分以内・
+make test-legacy が従来どおり green（1,786）。RESULT.json: {"job":"rs-archive-goldens","status":"done",
+"golden":{...},"make_test_seconds":..,"notes":"..."}。
+```
+
+### 16.2 第 2 段 `rs-archive-cutover`（mcts 受け入れ後）
+
+1. 生成・アリーナ・serve・API の CPU 経路を Rust の `decide` に切り替える（`rs_bridge` の暫定経路を撤去）。
+   受け入れ: アリーナ a1（Rust）対 a1（Python）互角の確認（§3 P5）・生成 1 局の実測。
+2. `legacy/python_engine/` へ移す: `opcg_sim/src/core/`（engine／effects／actions／cpu_ai／cpu_learned／
+   sandbox 以外）・`opcg_sim/src/learned/`（encoder／n_rel／n_rel_feat／n_eff／mcts／adapter／lethal／
+   leader_feat／effect_features）・`tests/` の legacy 83 本・`tests/harness/` の Python エンジン依存部。
+   最終コミットに tag `py-engine-final`。`make test-legacy` は tag の checkout で回す手順として文書に残す。
+3. L1（`cpu_ai.py`）は廃止（ユーザ決定 2026-09-07）。`--policy l1` の記録は Rust の N系に置き換える。
+4. Dockerfile から PyPy 段を除去。CLAUDE.md の CPU 系統・ゲート・運用の記述を更新。
+5. 裁定待ち 4 件（§11.8 #10 と §14）はこの時点で判断し、直すなら Rust を正として直し golden を再生成する。
