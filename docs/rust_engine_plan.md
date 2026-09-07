@@ -1178,6 +1178,9 @@ Python の `NRelValueAdapter.encode_state` を JSON で渡す。
 | `--what apply`（各局面の全合法手・上限 20） | boards=200・moves=1,167・**match=1,167・mismatch=0**（DON_BOX の手 671・`pending_request` を持つ盤面 1,167） |
 | `cargo test --no-default-features` | **316 passed**・0 failed・0 ignored |
 | `make test`（Python 側・無変更） | 実行中（結果は追記する） |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `make test`（Python 側・無変更） | **green**（1,761 passed・0 failed・606s） |
+
 **残る観測の穴（申告）**: `determinize` の照合は盤面 dict（`Player.to_dict`）で行うため、
 **引き直した後の山札の並びは観測できない**（盤面 dict に `deck` は出ない＝手札の中身だけが
 見える）。山札側の並び（`pool[n_hand:]`）は `cargo test` の
