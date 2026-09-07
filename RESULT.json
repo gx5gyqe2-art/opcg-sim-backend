@@ -1,6 +1,6 @@
 {
   "job": "rs-api",
-  "status": "in_progress",
+  "status": "done",
   "branch": "claude/rs-api",
   "base": "claude/cpu-spec-improvements-yw91jd (cd7d3fb)",
   "events_oracle": {
@@ -36,10 +36,10 @@
     "tests/test_api.py": "23 passed",
     "tests/test_api_contract.py": "4 passed（うち 1 本は新規＝プレイヤー識別子の形のラチェット）",
     "tests/test_contract_export.py": "passed（contract/ の再生成差分ゼロ）",
-    "tests/test_api_rs_errors.py": "24 passed（新規・不正な行動 23 種＋HTTP 層 1 件）",
+    "tests/test_api_rs_errors.py": "25 passed（新規・不正な行動 23 種＋HTTP 層 1 件＋hidden の往復 1 件）",
     "tests/test_replay_frames.py + tests/test_plan_cache.py": "13 passed",
     "prod_flags": "OPCG_PLAN_CACHE=1 OPCG_PONDER=1 OPCG_PONDER_SPEC=1（Dockerfile の本番設定）でも tests/test_api.py は 23 passed",
-    "make test": "pending（このコミット時点で実行中。結果は後続コミットで記入する）",
+    "make test": "1,786 passed・0 failed（670s）。収集時点で tests/test_api_rs_errors.py は 24 本（hidden 往復の 1 本を後から追加）＝最終ツリーちょうどではない。追加分は単体で 25 passed を確認済みで、差分はテスト関数 1 本の追加のみ（他ファイルは同一）。最終ツリーでの通し直しはユーザ判断で省略した（2026-09-07）",
     "cargo test --no-default-features": "295 passed / 0 failed",
     "cargo clippy --no-default-features --all-targets -- -D warnings": "警告 0",
     "vs_cpu_end_to_end": "hard・learned（出荷既定）とも /api/game/cpu/step で決着まで進行（勝者が確定）"
