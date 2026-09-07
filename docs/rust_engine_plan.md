@@ -813,6 +813,104 @@ Python に合わせた（単体テスト `find_action_does_not_descend_into_a_su
 デッキアウト敗北→勝利の置換（`check_victory` に `masters` を通す）。どちらも黙って落とさず
 `Unimplemented`／未接続として明示してある。詳細は `RESULT.json` の notes。
 
+### 8.15 P3 仕上げ（WP `rs-p3-final`）の結果（2026-09-07）
+
+`claude/cpu-spec-improvements-yw91jd`（群 A〜E 統合直後・a90595a）から分岐。**Python 側
+（`opcg_sim/）は 1 行も変えていない**（変更は `rust/opcg_engine/` と `tests/scripts/
+rs_diff_replay.py`／`rs_audit_replay.py` のみ）。§11.8 の決定表 #1〜#9・#11 を実装した
+（#10 は「直さない」決定なので対応不要）。
+
+**#1（記録形式 v5）**: `RECORD_VERSION=5`。監査記録の `fire` 直後・各 `steps[i]` 直後に
+`shuffled`（その段でシャッフルしたデッキの持ち主）を持たせ、`state::replay_audit_with` が
+`replay`（v4）と同じ `resync_shuffled` を呼ぶ。Python 側は `ShuffleWatcher` を `fire`／
+`_drain_and_record` の各応答に巻くだけ（対局中のシャッフルは実物のまま・観測だけ）。
+OP04-048／OP06-047／P-002 のシャッフル再同期ずれ（4 mismatch）が解消した。
+
+**#2（ドン!!対象経路）**: `TargetRef`（`Card`／`Don`）を `model.rs` に定義し
+（`effects::TargetRef` は再輸出）、`Interaction.candidates: Vec<TargetRef>` へ一本化して
+`candidate_dons` を削除（Python の「1 つの混在 list」と同じ形）。`EffectContext::
+temp_resolved_targets`・`Resolver::resolve_targets`・`Resolver::with_leader`・
+`suspend_for_target_selection` を `TargetRef` ベースに広げ、カードにしか効かない絞り込み
+（`cost_state_noop`／`PlayCard` 種別／`EXCLUDE_SELECTED_COLOR`／`power_sum_max`）はカード
+だけに適用してドン!!はそのまま候補に残す。`actions/mod.rs::run_target_loop` の `targets` も
+`Vec<TargetRef>` にし、ドン!!の対象は新設の `ops::find_don_location`／`rest_don`／
+`active_don` で捌く（Python `per_target.rest`／`active` の `isinstance(target, DonInstance)`
+分岐に対応）。プレイヤーレベル・ハンドラ（群 A〜E の `game_handler`）は現行 DB でドン!!を
+受け取らないため、`apply_action` は群への差し口だけ `cards_of` でカードへ絞る。
+OP06-035／OP12-037 の unimplemented が解消した（残り 2 能力〔OP10-074／PRB02-005〕は
+COST_AREA だが既に一致していた＝§8.13 のとおり）。
+
+**#3・#4（差し口の意味論）**: `apply_action` の `GameHandler::Unregistered` 分岐を
+「群 A〜E が全て `None` を返したら `Err(unimplemented)` ではなく `run_target_loop` へ
+フォールスルーする」に直した。これにより `status.rs`（群 A）が DISABLE_ABILITY の
+ガード偽（`status != "OPP_ONPLAY"`）のときに自前で `run_target_loop` を呼んでいた回避策
+（Python の `when=` 偽フォールスルーを群 A 自身が模していた）を撤去し、`None` を返すだけの
+自然な形にした。群 E の `RuleProcessing`（自己制限）は既にどちらの枝でも `Some(Ok(true))`
+を返す形になっていたため変更不要（申告どおり #3 に吸収）。
+
+**#5（`granted_replacements`）**: `model.rs` に `GrantedReplacement { status, sub: NodeRef,
+is_optional, expire_turn }` と `PlayerState.granted_replacements: Vec<GrantedReplacement>`
+を追加（記録 v5 の `hidden` には含めない＝同一 Rust セッション内でのみ生成・参照する
+「このターン中」限定の一時領域なので、`from_record` は常に空から始めてよい）。
+`journal.rs` に `set_granted_replacements` を追加。`actions/rules.rs::
+register_granted_replacements` を実装し（`battle::apply_counter` の【カウンター】イベント
+支払いから `player`＝カウンターした側で呼ぶ）、`find_replacement` の末尾に継続付与型の
+置換の走査（Python `guards._find_replacement` の `owner.granted_replacements` ループ）を
+足した。EB02-030 が対象。
+
+**#6（デッキアウト敗北→勝利の置換）**: `battle::check_victory` に `masters: &MasterTable`
+を通し、`rules::has_deckout_win_replace`（群 E が既に実装済みだった §8.14）を接続した。
+呼び口 `turn::draw_card`（`masters` を追加し `Result` を返すよう変更）・
+`actions/mod.rs::draw`（DRAW ハンドラ）・`battle::finish_attack`・`tests_rules.rs` を
+合わせて直した。OP03-040 等が対象。
+
+**#7（BATTLE_KO_REPLACE decline 枝の離脱イベント）**: `interact.rs` の 3 か所
+（`ConfirmOptional` の `battle_ko` decline 枝・`ArrangeDest::Deck` の確定・
+`resolve_field_overflow`）で生の `ops::move_card`（離脱イベントを返すだけで積まない）を
+使っていたのを `actions::move_card`（Python `gm.move_card` 相当＝ON_LEAVE・
+継続効果破棄・ライフ減少を積む）に統一した。監査の汎用盤面（PREVENT_LEAVE を持たない
+単純なキャラ）ではどちらでも一致するため監査の数値には出ないが、ON_LEAVE 誘発や継続効果
+を持つキャラがバトル KO・ARRANGE_DECK でのデッキ送り・場の上限超過トラッシュに遭うと
+Python と食い違う経路だった。
+
+**#8（`active_restriction` の期限切れ pop 副作用）**: `rules::active_restriction_mut`
+（`&mut Session` 版・期限切れなら `set_restrictions` で取り除く）を追加し、`&mut Session`
+を持つ呼び口（`play_card_action` の 2 箇所・`declare_attack`・DRAW ハンドラ・群 B の
+`CANNOT_LIFE_TO_HAND`・群 D の `CANNOT_ACTIVATE_DON`）を差し替えた。`restrictions` は
+`board_json` に出ない内部欄で観測不能なため、探索用の合法手列挙（`legal.rs::main_actions`
+等・`&GameState` のみの純関数）は読み取り専用の `active_restriction` のまま据え置いた
+（判定結果は掃除版と常に同じ）。
+
+**#9（`replay` の vanilla ガード撤廃）**: `state::replay` の「`vanilla` でない記録は
+`Unimplemented`」ガードを外した。効果解決が P3 で入ったので実デッキの行動列再生を受け入れる。
+
+**#11（ARRANGE_DECK 既定解決）**: `interact.rs::default_interaction_payload` の既定選択
+（`choose_selection` が `None` を返したときの候補先頭 `take` 件）が Python の
+`take = min(max(min_n,0), max_n, len(uuids)); uuids[:take]` を `take.max(0)` で丸めていた
+ため、`max_n=-1`（ARRANGE_DECK の並び替えモード）のとき Python の `uuids[:-1]`
+（末尾 1 枚を除いた全部＝Python の list slice 意味論）ではなく空 list を返していた。
+Python と同じ slice 意味論（`take` が負なら `len + take` を 0 未満にしない）に直した。
+実デッキ再生 20 局のうち `legal[i]` が食い違っていた 12 局（例: カヤ・そげキング等の
+「順番を決める」）が解消し、20 局とも完全一致になった。
+
+**受け入れ実測（2026-09-07）**:
+
+| 項目 | 結果 |
+|---|---|
+| 全カード監査（絞り込み無し） | cards=2,472／abilities=3,386／**match=3,386・mismatch=0・unimplemented=0** |
+| 実デッキ再生 random 500 局（`--seed-base 2000000`） | **match=500・mismatch=0・unimplemented=0**（49,144 行動） |
+| 実デッキ再生 L1 100 局（`--seed-base 2100000`） | 実測中（RESULT.json に記載） |
+| 問合せ 200 局面（`--seed-base 2200000`） | queries=7,337,400・**mismatch=0** |
+| 原始操作 10 局（`--seed-base 2400000`） | rows=1,009・ops=19,921・**mismatch=0** |
+| バニラ再生 50 局（`--seed-base 2300000`） | **match=50・mismatch=0** |
+| 状態 20 局・退行（`--mode state --seed-base 2200000`） | **match=20・mismatch=0** |
+| `cargo test --no-default-features` | **288 passed**・0 failed・0 ignored |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `make test`（Python 側・無変更） | **green**（1,761 passed・0 failed） |
+
+`make audit-cross` 相当（(d)）はハーネスに `--policy l1 --cross` が無いため、計画どおり
+L1 100 局再生（上表）で代える。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
@@ -1444,6 +1542,14 @@ RESULT.json: {"job":"rs-p3-<file>","status":"done","audit":{...RS_AUDIT...},"reg
 - 実デッキ再生（#9 のガードを一時的に外して計測・random 20 局・1,914 行動）: **盤面 dict は 20 局すべて
   最後まで一致**。`legal[i]` だけが 12 局で食い違い（#11）。バニラ再生 20 局は一致。
 - `cargo test` 288 green・clippy 0。
+
+**`rs-p3-final` 完了時の実測（2026-09-07・本 WP・詳細は §8.15）**: (a)〜(d) すべて達成。
+全カード監査 2,472 枚／3,386 能力で **match=3,386・mismatch=0・unimplemented=0**（#1〜#2 で
+シャッフル再同期・ドン!!対象の残り 6 mismatch/unimplemented を解消）。実デッキ再生
+random 500 局 **match=500**（#11 で legal[] の ARRANGE_DECK 既定解決を直したことで達成）。
+問合せ 200 局面・原始操作 10 局・バニラ再生 50 局・状態 20 局は mismatch=0。L1 100 局は
+数値・詳細を §8.15 の表と RESULT.json に記載。`cargo test` 288 green・clippy 0・
+`make test` green（Python 側は無変更）。
 
 **指示書（1〜2 セッション）**
 
