@@ -143,6 +143,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P3 | **群 A（状態系）`rs-p3-status` 完了**（`claude/rs-p3-status-rkkh9m`）: `actions/status.rs` の 3 入口を本体化（GRANT_KEYWORD／ATTACK_DISABLE／PREVENT_REST／FREEZE／NEGATE_EFFECT／DISABLE_ABILITY／SWAP_POWER。BUFF の全形は土台 `mod.rs::buff` が既に持っていた＝委譲不要で `mod.rs` は無変更）。監査 **cards=782／abilities=1014／match=1014・mismatch=0・unimplemented=0**（受け入れ規模ちょうど）・退行 4 本一致・`cargo test` 194 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 B `rs-p3-zone` 完了**（`claude/rs-p3-zone`）: `actions/zone.rs` の 3 入口を本体化（12 種＋DB 未使用の LIFE_RECOVER／MOVE／MOVE_TO_HAND／DECK_TOP）。監査 987 枚／1,271 能力＝**match 1,268・mismatch 2・unimplemented 1**（残る 3 件はいずれも**群 B の所有範囲の外**＝監査記録に `shuffled` 再同期が無い 2 件と `TargetRef::Don`（群 D）1 件。§8.10）。退行 4 本すべて一致・`cargo test` 196 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 C（カードの流れ）完了**（`claude/rs-p3-flow`）: `actions/flow.rs` に PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_EVENT（EXECUTE_MAIN_EFFECT／DECLARE_COST は resolver が既に捌く）。監査 **cards=865／abilities=1144／match=1144・mismatch=0・unimplemented=0**（着手前は unimplemented=128）。退行 4 本一致・`cargo test` 182 green・clippy 0・`make test` green。結果は下記 §8.10 |
+| 2026-09-07 | P4 | **`rs-p4-legal` 完了**（`claude/rs-p4-legal-bl36ka`）: `search/{adapter,macro,prune,determinize,apply}.rs`（探索用合法手の配管・対話の代替手併合・枝刈り・配分箱／アタック箱／防御箱・世界サンプル・DON_BOX の展開とドレイン）＋`lib.rs` の `search_legal`／`search_determinize`／`search_apply`＋新規オラクル `tests/scripts/rs_search_oracle.py`。**3 本とも 200 局面 mismatch=0**（legal 631 窓〔順序込み〕／determinize 400／apply 1,167 手）・否定対照 3 本で不一致が出ることも確認。`cargo test` 316 green・clippy 0・`make test` green。結果は下記 §8.16 |
 | 2026-09-07 | P3 | **群 D（ドン!!）完了**（`claude/rs-p3-don-mdlsba`）: `actions/don.rs` の 7 種（RETURN_DON／RAMP_DON／REST_DON／ATTACH_DON／ACTIVE_DON〔target 無し〕／FREEZE_DON／MOVE_ATTACHED_DON）。F∪D 監査 979 枚・1,273 能力で **mismatch=0**・unimplemented=1（残り 1 件＝OP12-037 の「キャラかドン!!」選択。`resolve_targets`→`Interaction`→`run_target_loop` の `Vec<CardIdx>` を `TargetRef` へ広げる必要があり本 WP の所有外＝コーディネータへ申告）。退行 4 本一致・`cargo test` 187 green・clippy 0・`make test` green。結果は下記 §8.10 |
 
 ### 8.1 P0 の結果（2026-09-06）
@@ -912,6 +913,79 @@ Python と同じ slice 意味論（`take` が負なら `len + take` を 0 未満
 
 `make audit-cross` 相当（(d)）はハーネスに `--policy l1 --cross` が無いため、計画どおり
 L1 100 局再生（上表）で代える。
+
+### 8.16 P4 `rs-p4-legal`（探索用の候補・世界・適用）の結果（2026-09-07）
+
+`claude/cpu-spec-improvements-yw91jd`（P4 契約を入れた 9d71c7a）から分岐。**Python 側
+（`opcg_sim/`）は 1 行も変えていない**（変更は `rust/opcg_engine/src/search/` と新規の
+`tests/scripts/rs_search_oracle.py` のみ）。
+
+**実装**（`search/mod.rs` の契約 3 関数はシグネチャそのまま・本体を各モジュールへ委譲）:
+
+| Rust | Python（正本） |
+|---|---|
+| `search/adapter.rs` | `learned/adapter.py::OPCGGame.legal_actions` の配管（`get_legal_actions` → `merged_search_actions` → `_prune_don_moves`／`_prune_futile_attacks` → 配分箱／アタック箱 → `defense_box_prune`）＋`cpu_ai.merged_search_actions`／`_selection_moves`／`_selection_merge_key`／`_rank_select_candidates` |
+| `search/prune.rs` | `_prune_don_moves`／`_attach_don_meaningful`（A 戦闘結果・B【ドン!!×N】・C マージン）／`_prune_futile_attacks`／`_attacker_has_on_attack`／`DON_MARGIN_ATTACH` |
+| `search/macro.rs` | `don_alloc_candidates`（配分箱）／`attack_box_candidates`（アタック箱）／`defense_battle_need`／`defense_box_prune` |
+| `search/determinize.rs` | `_determinize_opponent`（並びは引数・pool＝相手の`hand + deck`） |
+| `search/apply.rs` | `_apply_move_inplace`（DON_BOX の原始列展開）／`_drain_own_interactions`（`_DRAIN_LIMIT=12`・`stop_at_select`） |
+| `lib.rs` | `search_legal`／`search_determinize`／`search_apply`（自分の 3 関数のみ追加） |
+
+**移すときに気付いた 3 点**（Python の挙動に合わせるために要った工夫）:
+
+1. **候補の並びは CPython の `set` の反復順に依存する**。`don_alloc_candidates` は
+   `ks = {1, budget}`（＋閾値開放 `N - attached`）、`attack_box_candidates` は
+   `{0, k_min, k_two}` を **set のまま `for k in ks`** で回すので、箱の並びは
+   「小さい順」ではない（例: `{1, 8}` は `[8, 1]`＝`8 & 7 == 0` が slot 0 に入るため）。
+   `macro.rs::py_set_order` で CPython の実装（表サイズ 8・`hash(int)==int`・
+   `perturb >>= 5; i = (i*5+1+perturb) & mask`。要素 4 個までは表が拡張されない）を写した。
+   0〜24 の全 2 要素・3 要素の組で `list({a,b})`／`list({a,b,c})` と一致することを Python 側で
+   確認済み。**順序も照合する**（§12.5 の指示）ので、ここを「昇順」にすると即座に落ちる。
+2. **正規表現を依存 crate 無しで写した**。【ドン!!×N】の判定
+   （`_DON_COND_RE`／`_DON_COND_N_RE`）は `prune.rs` の手書き走査。カード DB 実測で
+   一致する形は 7 種（`【ドン !!×1】`／`【ドン!!×1】`／`【ドン‼×3】` 等・N は 1〜3・
+   全角数字や `！！` は現行 DB に無いが受理する）。
+3. **`SearchOptions.don_margin` の型は `Option<i32>`**（契約）だが Python の `don_margin` は
+   真偽値（`if margin and ...` の真偽評価）。`0`／`false` を偽・非 0 を真として読む＝
+   Python の duck typing と同じ意味にした（契約の型は変えていない）。
+
+**オラクル `tests/scripts/rs_search_oracle.py`**（新規・`--what legal,determinize,apply`）:
+
+- 局面は `rs_query_oracle` と同じ取り方（`Recorder` で random／l1 各 10 局 → 全行の `hidden`
+  から等間隔に 200 局面）。
+- **`legal` は 2 パスで照合する**。記録 v5 の `hidden` は中断スタックを持たない
+  （`GameState::from_record` も同じ＝両側とも「中断が無い盤面」から始まる）ので、復元した
+  局面（pass A）だけでは `merged_search_actions` の代替手併合・防御箱を 1 度も踏まない。
+  そこで**先頭の合法手を 1 手打った先**（pass B・両側とも同じ手）でも照合する。Rust 側は
+  `search_legal` の `opts_json` に `"prefix"`（先に `stop_at_select=true` で適用する手の列）を
+  受ける（契約の型・関数シグネチャは変えていない＝Python 受け口の JSON 欄の追加）。
+- 山札を混ぜる手（マリガン・サーチ効果）は Rust が自前の並びで混ぜる（計画 §6）ので
+  **照合から外して件数を報告**する（`shuffle_skipped`）。
+- 例外も答えとして扱う（両側 error なら一致・片側だけなら不一致）。
+
+**否定対照**（オラクルが本当に不一致を見つけられるかの確認・40 局面 random）:
+
+| わざと壊した箇所 | 結果 |
+|---|---|
+| `attack_box_candidates` の `k_two` を +1 | `legal` mismatch=37／124 |
+| `apply_move_inplace` の DON_BOX 展開を k−1 回に | `apply` mismatch=84／240 |
+| `determinize` の並びを反転 | `determinize` mismatch=78／80 |
+
+**受け入れ実測（2026-09-07・`--boards 200 --games 10 --policy both --seed-base 940000`）**:
+
+| 項目 | 結果 |
+|---|---|
+| `--what legal`（順序込み） | boards=200・checks=631・**match=631・mismatch=0**（候補 4,387 手。箱を含む窓 319／対話の代替手を含む窓 74／防御窓 152） |
+| `--what determinize`（両席） | boards=200・checks=400・**match=400・mismatch=0**（pool 非空 400） |
+| `--what apply`（各局面の全合法手・上限 20） | boards=200・moves=1,167・**match=1,167・mismatch=0**（DON_BOX の手 671・`pending_request` を持つ盤面 1,167） |
+| `cargo test --no-default-features` | **316 passed**・0 failed・0 ignored |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `make test`（Python 側・無変更） | 実行中（結果は追記する） |
+
+**残る観測の穴（申告）**: `determinize` の照合は盤面 dict（`Player.to_dict`）で行うため、
+**引き直した後の山札の並びは観測できない**（盤面 dict に `deck` は出ない＝手札の中身だけが
+見える）。山札側の並び（`pool[n_hand:]`）は `cargo test` の
+`determinize_resamples_only_the_opponent_hand` が直接アサートする。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 

@@ -133,6 +133,42 @@ fn replay_audit(record_json: &str, effects_path: Option<&str>) -> PyResult<Strin
     Ok(state::replay_audit(record_json, effects_path)?)
 }
 
+/// 探索用の合法手（`learned/adapter.py::OPCGGame.legal_actions`）を返す（P4・WP `rs-p4-legal`）。
+///
+/// `hidden_json` は記録 v5 の `hidden`、`opts_json` は
+/// `{"prune_futile":bool,"macro_moves":bool,"defense_box":bool,"don_margin":bool|null,
+///   "prefix":[<先に適用する手>...]}`（欄はどれも省略可・既定は serve の config）。
+/// 戻り値は手（Python の dict と同じ形）の JSON list で、**並びも Python と同じ**。
+/// `tests/scripts/rs_search_oracle.py --what legal` が順序込みで照合する。
+#[pyfunction]
+fn search_legal(hidden_json: &str, opts_json: &str) -> PyResult<String> {
+    Ok(search::search_legal(hidden_json, opts_json)?)
+}
+
+/// 世界サンプル（`cpu_ai._determinize_opponent`）の盤面 dict を返す（P4・WP `rs-p4-legal`）。
+///
+/// `seat` は「自分」（`me_name`）の席。`order_json` は相手の `hand + deck` を
+/// `rng.shuffle` した結果の uuid 列（**出目は Python 側が記録して渡す**）。
+#[pyfunction]
+fn search_determinize(hidden_json: &str, seat: &str, order_json: &str) -> PyResult<String> {
+    Ok(search::search_determinize(hidden_json, seat, order_json)?)
+}
+
+/// 1 手を適用した盤面 dict（`pending_request` 込み）を返す（P4・WP `rs-p4-legal`）。
+///
+/// `cpu_ai._apply_move_inplace` と同じ＝`DON_BOX` は原始列へ展開し、各原始手の後に
+/// `actor` 側の対話を既定解決でドレインする（`stop_at_select` で分岐対象の選択は残す）。
+/// Python が例外を出す手は `ValueError`（ハーネスは「両側 error」を一致として数える）。
+#[pyfunction]
+fn search_apply(
+    hidden_json: &str,
+    seat: &str,
+    move_json: &str,
+    stop_at_select: bool,
+) -> PyResult<String> {
+    Ok(search::search_apply(hidden_json, seat, move_json, stop_at_select)?)
+}
+
 #[pymodule]
 fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
@@ -145,5 +181,8 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(replay, m)?)?;
     m.add_function(wrap_pyfunction!(eval_queries, m)?)?;
     m.add_function(wrap_pyfunction!(replay_audit, m)?)?;
+    m.add_function(wrap_pyfunction!(search_legal, m)?)?;
+    m.add_function(wrap_pyfunction!(search_determinize, m)?)?;
+    m.add_function(wrap_pyfunction!(search_apply, m)?)?;
     Ok(())
 }

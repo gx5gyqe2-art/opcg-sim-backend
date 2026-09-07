@@ -1,0 +1,94 @@
+{
+  "job": "rs-p4-legal",
+  "status": "in_progress",
+  "branch": "claude/rs-p4-legal-bl36ka",
+  "base": "claude/cpu-spec-improvements-yw91jd@9d71c7a",
+  "oracle": {
+    "script": "tests/scripts/rs_search_oracle.py",
+    "args": "--what legal,determinize,apply --boards 200 --games 10 --policy both --seed-base 940000",
+    "legal": {
+      "boards": 200,
+      "checks": 631,
+      "moves": 4387,
+      "match": 631,
+      "mismatch": 0,
+      "unimplemented": 0,
+      "bad_payload": 0,
+      "harness_error": 0,
+      "shuffle_skipped": 4,
+      "boards_with_box": 319,
+      "boards_with_selection": 74,
+      "boards_with_defense": 152,
+      "boards_with_choice": 484
+    },
+    "determinize": {
+      "boards": 200,
+      "checks": 400,
+      "match": 400,
+      "mismatch": 0,
+      "unimplemented": 0,
+      "bad_payload": 0,
+      "harness_error": 0,
+      "nonempty_pools": 400
+    },
+    "apply": {
+      "boards": 200,
+      "checks": 1167,
+      "moves": 1167,
+      "match": 1167,
+      "mismatch": 0,
+      "error_match": 0,
+      "unimplemented": 0,
+      "bad_payload": 0,
+      "harness_error": 0,
+      "shuffle_skipped": 4,
+      "box_moves": 671,
+      "with_pending": 1167
+    },
+    "negative_control": {
+      "attack_box_k_two_plus_one": {
+        "what": "legal",
+        "boards": 40,
+        "mismatch": 37,
+        "checks": 124
+      },
+      "don_box_expand_k_minus_one": {
+        "what": "apply",
+        "boards": 40,
+        "mismatch": 84,
+        "checks": 240
+      },
+      "determinize_order_reversed": {
+        "what": "determinize",
+        "boards": 40,
+        "mismatch": 78,
+        "checks": 80
+      }
+    }
+  },
+  "gates": {
+    "cargo_test": "316 passed, 0 failed, 0 ignored (cargo test --no-default-features)",
+    "cargo_clippy": "0 warnings (cargo clippy --no-default-features --all-targets -- -D warnings)",
+    "make_test": "running (結果は追記する)"
+  },
+  "files": {
+    "rust": [
+      "rust/opcg_engine/src/search/adapter.rs",
+      "rust/opcg_engine/src/search/macro.rs",
+      "rust/opcg_engine/src/search/prune.rs",
+      "rust/opcg_engine/src/search/determinize.rs",
+      "rust/opcg_engine/src/search/apply.rs",
+      "rust/opcg_engine/src/search/tests_search.rs",
+      "rust/opcg_engine/src/search/mod.rs",
+      "rust/opcg_engine/src/lib.rs"
+    ],
+    "python": [
+      "tests/scripts/rs_search_oracle.py"
+    ],
+    "docs": [
+      "docs/rust_engine_plan.md",
+      "docs/TEST_SPEC.md"
+    ]
+  },
+  "notes": "opcg_sim/ は 1 行も変更していない（追加はハーネス tests/scripts/rs_search_oracle.py のみ）。契約（search/mod.rs の型と 3 関数のシグネチャ）は変更なし。実装で要った工夫が 3 点: (1) 箱の並びが CPython の set の反復順に依存する（don_alloc は {1,budget}(+閾値開放)、attack_box は {0,k_min,k_two} を set のまま回す。例 {1,8} は [8,1]）ので macro.rs::py_set_order で表サイズ 8 の開番地法を写した。0〜24 の全 2/3 要素の組で CPython と一致を確認済み。(2)【ドン!!×N】の 2 本の正規表現は依存 crate を増やさず prune.rs の手書き走査で写した（カード DB 実測の 7 異形＋全角/‼ 表記を受理）。(3) 契約の SearchOptions.don_margin は Option<i32> だが Python の don_margin は真偽値なので、0/false を偽・非 0 を真として読む（Python の真偽評価と同義・契約の型は変えていない）。オラクルの設計で 2 点申告: (a) 記録 v5 の hidden は中断スタックを持たない（Rust の from_record も同じ）ため、復元した局面だけでは対話の代替手併合・防御箱を 1 度も踏まない。そこで legal は「先頭の合法手を 1 手打った先」でも照合する 2 パス構成にし、Rust 側は search_legal の opts_json に prefix 欄（先に stop_at_select=true で適用する手の列）を受ける＝Python 受け口の JSON 欄の追加であり、契約の Rust 型・関数シグネチャは変えていない。この pass B で対話窓 74・防御窓 152 を実際に踏んでいる。(b) determinize の照合は盤面 dict（Player.to_dict）で行うため、引き直した後の山札の並びは観測できない（盤面 dict に deck が出ない＝手札の中身だけが見える）。山札側の並びは cargo test の determinize_resamples_only_the_opponent_hand が直接アサートする。山札を混ぜる手（マリガン・サーチ効果）は Rust が自前の並びで混ぜる（計画 §6）ので照合から外し shuffle_skipped として報告する（legal/apply とも 4 件）。オラクルが不一致を検出できることは否定対照 3 本（k_two を +1／DON_BOX 展開を k-1／世界の並びを反転）で確認した。"
+}
