@@ -72,18 +72,25 @@ Python エンジンは `legacy/python_engine/` へ退避し、テスト対象外
 無い。ゲームプレイ退行は golden 2 本（`tests/test_rs_golden_audit.py`・
 `tests/test_rs_golden_replay.py`・§2／§3）が Rust エンジンだけで見る。
 
-### legacy（tag `py-engine-final`）を回す
+### legacy（tag `py-engine-final` ／ ブランチ `claude/py-engine-final`）を回す
 
-凍結した Python エンジンのテスト 1,786 本は、**tag を checkout して**回す:
+凍結した Python エンジンのテスト 1,786 本は、**その時点を checkout して**回す:
 
 ```bash
-git checkout py-engine-final
+git checkout py-engine-final              # tag（ローカル）
+git checkout claude/py-engine-final       # 同じコミット c22f0a62 のブランチ（origin にある）
 OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -m "not slow" -p no:cacheprovider
 ```
 
-その tag は「Python 版がそのまま動く最後の点」（退避コミットの 1 つ前）。現在のツリーでも
-`legacy/python_engine/tests/` に一式（テスト 288 本＋harness 25＋実験 CLI 116）が残っているが、
-**ゲートでは回さない**（`legacy/python_engine/tests/conftest.py` を使えば手動で回せる）。
+**ブランチも用意した理由**: この環境のプロキシは tag ref の push を 403 で弾く（実測・ユーザ環境
+でも同じ）。リモートに置けるのはブランチだけなので、同じコミットを `claude/py-engine-final` と
+しても push してある（中身は完全に同一）。
+
+その点は「Python 版がそのまま動く最後の点」（退避コミットの 1 つ前）。現在のツリーでも
+`legacy/python_engine/tests/` に一式（テスト 288 本＋harness 25＋実験 CLI 116）が残っており、
+`legacy/python_engine/tests/conftest.py` 経由で 1,359 本が collect できる。ただし**移動後の
+写しは全数 green を保証しない**（旧計器が前提にしていたパスや周辺モジュールの所在が変わって
+いるものがある）＝**回すなら tag／ブランチが正**。ゲート（`make test`）には入らない。
 Python エンジンを直に叩くテストを新しく足す理由は、もう無いはず——足すなら Rust 側の
 `cargo test` か golden に足す。
 

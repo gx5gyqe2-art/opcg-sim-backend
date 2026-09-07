@@ -157,6 +157,8 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 
 | 2026-09-07 | P4 | **`rs-p4-net` 完了**（`claude/rs-p4-net`＝`claude/rs-p4-net-yiwio4`・同じコミット）: `net/npz.rs`（zip64 の local header・deflate・npy v1/v2・`<U` 文字列。依存は `miniz_oxide` のみ）・`net/nrel.rs`（`card_table`／`tokens_forward`＝`_tokens_forward_1` 同値／`body`／`value`／`cand_input`＋`policy_logits`＋`seg_softmax`／`mask_sc`／`mask_rel`／`_cand_row` 139／予算 3）・`lib.rs::load_net`／`net_eval`・`rs_net_oracle.py`。200 局面×両視点で **value 最大誤差 1.05e-06・priors 最大誤差 5.51e-07・mismatch=0**（許容 1e-5）。`cargo test` 301 green・clippy 0・`make test` green。契約からの逸脱 4 点は §8.16 に申告。結果は下記 §8.16 |
 
+| 2026-09-07 | P5-2 | **`rs-archive-cutover` 完了**（`claude/rs-archive-cutover-8y6odi`）: 生成・アリーナ・serve を Rust の `decide` へ／Python 版を `legacy/python_engine/` へ退避／§17 の 2 つの移動／裁定 PREVENT_REST の 3 枚／L1 廃止。等価性は決定オラクル **3,855/3,856（99.97%）**・生成 **57.06→4.96 s（11.5 倍）**・`make test` **418 passed・122 s**・`cargo test` 381・clippy 0・golden 監査ハッシュ不変／再生の L1 帯を a1 帯へ・API 契約不変・全長照合を復帰。対 Python 席の A/B は §16.4-1 で中止（参考値のみ）。凍結点は tag `py-engine-final`＝ブランチ `claude/py-engine-final`（c22f0a62）。結果は下記 §8.20 |
+
 ### 8.1 P0 の結果（2026-09-06）
 
 成果物（Python 側は一切変更していない＝追加のみ）:
@@ -1367,6 +1369,144 @@ Rust をここに合わせるには BLAS のブロッキングまで写す必要
 `merge_root_stats_folds_equivalent_copies`／`..._keeps_different_cards_apart`／
 `..._splits_boxes_by_don_k`（同名 2 枚の合算・card_id 違いの分離・`don_k` 違いの分離・
 代表は列挙順先頭・n 降順の安定ソート）が直接アサートする。
+
+### 8.20 P5 第 2 段 `rs-archive-cutover`（切替と Python 版の退避）の結果（2026-09-07）
+
+> §8.18＝`train-profile`・§8.19＝`train-norel` が先に本線へ入ったので、本 WP の結果節は §8.20
+> （§16.4-5）。基準は §16.3 の指示書＋§16.4 の追補（A/B の差し替え・a1 vs r1・hooks の raise・
+> tag の代替ブランチ）。
+
+**この WP でやったこと**: Python エンジンを呼ぶ経路をゼロにし（生成・アリーナ・serve）、
+Python 版を `legacy/python_engine/` へ退避し、§17 の 2 つの移動（`loop/`・`learned/train/`）を
+入れた。裁定 1 件（PREVENT_REST）を Rust を正として直した。
+
+#### Rust 側の追加（裁定 1 件のほかは**すべて additive**＝既存の裁定は動かしていない）
+
+| 追加 | なぜ要ったか |
+|---|---|
+| `Game.decide(player_id, opts_json)` | `decide(hidden_json, …)` は記録 v5 の `hidden` を経由するので**中断（対話）スタックを持てず** `prefix` で入り直す必要があった。生盤面のまま決める口を足した＝生成・アリーナ・serve はこちらを使う |
+| `opts["search_seed"]` → `Pcg32SearchRng` | 探索の乱数を seed から作る。**同じ (対局, ターン, 席) には同じ seed** を渡す＝Python `LearnedEngine._world_rng`（同一 seed から `default_rng` を作り直す）と同じ「ターン内 sticky 世界線」（§8.17 の申告 (2)） |
+| `decide` の戻り値に `sig`／`k` | 棋譜ダンプの鍵は**箱レベル**（先頭原始手化と残り掘りの**前**）。`mv` は実対局へ出す手なので候補（`groups`）と突き合わせられない。Python が `record` を採るのと同じ位置で採る |
+| ネットをパス鍵で複数持つ（`net_named`） | アリーナは 1 プロセスで候補と基準を同時に使う。最初に読んだものが既定＝従来の 1 本運用は無変更 |
+| `Game.encode`／`dump_index_json`／`describe_move_json`／`deck_counts_json`／`shuffled_json` | 順に、棋譜ダンプの符号化／候補の card_id と 22 枠 index／思考トレースの記述（旧 `cpu_ai._describe_move`）／リプレイフレームの山札残／golden 記録の `shuffled` |
+| `Session.shuffled` | 「その要求で山札を混ぜた席」。golden の記録に要る（再生は混ぜないので、混ぜた段のイベントは `targets` を枚数へ潰して照合する） |
+
+#### 裁定（§16.3-10・ユーザ決定 2026-09-07）
+
+`PREVENT_REST` の**自身を守る形**（「このキャラは相手の効果でレストにされない」＝対象が
+`SOURCE`＝発生源そのもの）に `CANNOT_BE_RESTED_BY_OPP` を新設し、`REST` ハンドラが
+**`actor != owner`（相手の効果）のときだけ**弾くようにした。自分のアタック宣言・ブロックは
+従来どおり可能（それらは `rules::battle` の経路でこのハンドラを通らない）。相手を縛る形
+（「相手の…キャラはレストにできない」＝`CHOOSE`）は従来の `CANNOT_REST` のまま。KO 耐性は
+既存の `PREVENT_LEAVE` 経路。該当は 3 枚（**OP11-046** ヴィンスモーク・ヨンジ／**OP12-021**
+いっぽんマツ／**OP15-024** ウソップ）。
+
+**監査 golden は 3,386 件すべてハッシュ不変だった**。監査は「汎用盤面で発動 → 既定解決で
+最後まで」なので、相手の効果による REST も自分のアタックも通らず、フラグ名の違いが盤面 dict に
+現れない（`timed_flags` は `board_json` に出さない欄）。該当 3 枚のエントリもレビューのうえ
+不変を確認した（Rust の出力で作り直した結果として同一）。挙動の差は `cargo test` 3 本で固定:
+
+- `prevent_rest_on_source_sets_the_opponent_only_flag`（自己保護は別フラグ）
+- `cannot_be_rested_by_opp_blocks_only_the_opponent`（相手の効果は弾き・持ち主自身の効果は通す）
+- `only_three_cards_protect_themselves_from_being_rested`（効果 JSON 全体で `SOURCE` 対象の
+  `PREVENT_REST` がちょうど 3 枚＝**裁定の射程をラチェットする**。カードが増えて数が変われば落ちる）
+
+他の 3 件は裁定不要で確定＝変えていない（付与中ドン!!での支払い＝到達しない経路／
+`attack_disable` の潰し＝対象なしで実害ゼロ／カードが消える宛先＝エラー確定）。
+
+#### 受け入れ実測
+
+| 項目 | 結果 |
+|---|---|
+| **決定オラクル**（等価性の主証拠・未見 seed 40 局・sims 160・`--seed-base 6500000`） | 決定 3,955／照合 3,856・**一致 3,855（99.97%）**・不一致 1。`legal` の並び 0・`kind` 0・`N` 0。読み出し内訳 main 1,909／window 807／commit 1,239・中断へ prefix で入り直した 238。除外は山札を混ぜた決定点 99 のみ（`harness_error`／`game_aborted` とも 0）。所要 1,322.8 s |
+| 　残る 1 件 | `RESOLVE_EFFECT_SELECTION`。候補の素性行が**全候補で完全に同一**（手が `card_uuid` を持たない）ため priors は本来完全な同点で、Python 側は numpy の float32 行列積が**行位置で別の丸め**を返して `argmax` がぶれる＝§8.17 で `rs_blas_tie_probe.py` により実証済みの既知クラス。Rust は候補ごとに独立に計算するので完全な同点＝numpy の規約どおり添字 0 を選ぶ |
+| **生成 1 局**（同 seed 帯 6 局・sims 64・dirichlet 0.25・temp_turns 4・単プロセス） | Python **57.06 s** → Rust **4.96 s**（**11.5 倍**・min 3.16／max 6.80）。§0 の見込み「30 秒 → 1〜3 秒（10〜30 倍）」の倍率は範囲内。基準の 30 秒は当時の条件での概算で、**同条件の Python 実測は 57 秒**だった |
+| **強さの保存 a1 vs r1**（両席とも Rust・主条件・192 ペア 384 局・§16.4-2） | 下記「a1 vs r1」の節 |
+| `make test`（新定義） | **418 passed・0 failed・122〜127 秒**（Rust 化前は 1,786 本・約 10 分） |
+| `cargo test --no-default-features` | **381 passed**・0 failed |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 **0** |
+| golden 監査 | Rust の出力で 3,386 件を作り直し＝**ハッシュ差分 0** |
+| golden 再生 | random 150 局＋**a1 50 局**（旧 L1 帯 `l1_5000150〜` を `a1_5000150〜` で打ち直し・§16.3-8）。記録時に `opcg_engine.replay` で再生して一致した局だけを書く＝**mismatched 0** |
+| API | `tests/test_api.py`＋`test_api_contract.py`＋`test_contract_export.py` **29 passed**・`contract/` 再生成差分 0。`test_api_rs_errors.py` **25 passed**（Python エンジンをオラクルに使う 3 者照合なので `legacy/` 側） |
+| 全長照合の復帰 | `test_replay_api_descriptor_end_to_end` の照合区間を**全長**へ戻した（§8.16 の縮小を解消）。録画側（API）も再生側も Rust の decide にしたので、狭める理由が無くなった。再生器は `tests/harness/rs_replay.py`（旧 `replay_runner.replay_from_descriptor` の Rust 版・記述子の逆写像は `describe_move_json`） |
+
+#### 対 Python 席のアリーナ A/B は**中止**（§16.4-1・ユーザ決定 2026-09-07）
+
+当初の受け入れ（§3 P5）は「a1（Rust decide）対 a1（Python decide＝legacy 経路）を各 400 局・
+勝率 0.5±0.05」だったが、**この設計では「2 実装が同じか」を測れない**ことが実行中に判明した:
+
+- Python 席は記録 v5 の `hidden` から `GameManager` を組んで読む。`hidden` は**中断（対話）の
+  継続を持てない**（記録 v5 の契約）ので、対話の途中では浅い要求しか見えない。実測した局では
+  決定点の約 4 割が `RESOLVE_EFFECT_SELECTION` で、そこの読みが丸ごと落ちる。
+- 加えて素の `LearnedEngine` は箱コミット（`_commits`）とターン内 sticky 世界線（`_world_seeds`）を
+  `id(manager)` で鍵付けするので、**決定のたびに manager を組み直す経路では一度も当たらない**
+  （＝切替前の serve が実際に抱えていた欠点でもある）。
+
+構造的な不利を外した `fair` モード（期間付き効果の一覧を戻す／両鍵を `(turn, seat)` に張り替える）
+も作って測ったが、対話の継続だけは外せず、それでも Rust 席が大きく勝った。**中止時点の参考値**:
+
+| モード | 条件 | ペア | void | Rust 席の勝率 |
+|---|---|---|---|---|
+| `legacy`（切替前の serve 経路そのまま） | random×synth・sims 160 | 13 | 0 | **1.000** |
+| `fair`（構造的な不利を 3 つ外す） | random×synth・sims 32 | 6 | 0 | **0.833** [0.627, 1.000] |
+
+数字は「Rust の decide が強い」ではなく「**切替前の serve 経路が橋渡しで損をしていた**」と読む。
+切替はその損を消す変更でもある。等価性の主証拠は上の決定オラクル（99.97%）、void／hang は
+下の a1 vs r1（Rust 席同士）で見る。計器（`tests/scripts/rs_arena_ab.py`）は
+`legacy/python_engine/tests/scripts/` に残す（Python エンジンが要るため）。
+
+#### 移動と退避（§17 の到達形へ）
+
+| 移した先 | 中身 |
+|---|---|
+| `opcg_sim/loop/` | `record_gen`（生成）・`arena`／`arena_shard`／`arena_merge`／`gate`（アリーナと判定）・`driver`（対局ループ）・`decks`／`deck_synth`／`deck_dig`・`engine`（Rust の起動と席のつまみ） |
+| `opcg_sim/learned/` | ネット定義と符号化の**仕様**（`encoder`／`n_rel`／`n_rel_feat`／`n_eff`／`effect_features`／`leader_feat`／`config`／`vocab`／`hooks`）＝**エンジンを import しない** |
+| `opcg_sim/learned/train/` | 訓練・評価帯・採掘（`n_rel_train`／`n_eff_train`／`n_rel_band`／`n1_train`／`n0_spike`／`n_eff_feat`／`n_mine_pi`／`n_mine_z`）。`python -m opcg_sim.learned.train.xxx` |
+| `opcg_sim/src/effects/` | パーサ（`parser`／`parser_v2`／`matcher`／`rules`）＝**裁定を書く場所その 1** |
+| `opcg_sim/src/models/journal.py` | 差分巻き戻しの器（`models.py` が import する＝型の層の道具） |
+| `legacy/python_engine/core`／`learned` | Python エンジン（gamestate・engine・effects の resolver/continuous・actions・action_api・invariants・cpu_ai〔L1〕・cpu_eval_v2・cpu_learned・rs_bridge／mcts・adapter・lethal・plan・policy・action・value_net） |
+| `legacy/python_engine/tests/` | エンジン依存のテスト 288 本＋harness 25＋実験 CLI 116（`rs_*_oracle.py`・`rs_record.py`・旧ループの Python 版スクリプトを含む） |
+
+**削除**: `opcg_sim/api/decide_client.py`（方式 B の CPython 側）・`opcg_sim/tools/decide_worker.py`
+（PyPy ワーカー）・`opcg_sim/api/services/cpu_driver.py`（計画キャッシュ／ポンダリング／投機）と、
+それらのテスト 2 本（`test_pypy_worker_parity.py`／`test_plan_cache.py`）。Dockerfile から pypy 段・
+`OPCG_PYPY_WORKER`・`OPCG_PLAN_CACHE`／`OPCG_PONDER`／`OPCG_PONDER_SPEC`・L1 の探索ノブ
+（`OPCG_PIMC_WORLDS`／`OPCG_HARD_PER_MOVE_BUDGET`）を除去。いずれも「Python の decide が秒
+オーダーだったこと」への手当てで、Rust の decide（数十 ms）では意味が無い。
+
+**`opcg_sim/` から `legacy/` を import する箇所は 0**
+（`grep -rn '^\s*\(from\|import\) legacy' --include=*.py opcg_sim/` → 0 件）。符号化のうち
+**エンジン実測**が要る 3 か所（登場時スキャン v7・リーサル距離 v10・条件列）は
+`opcg_sim/learned/hooks.py` の差し込み口にし、`legacy.python_engine.install_hooks()` が差す。
+**差さっていなければ `MissingHook` を送出する**（§16.4-3。0 で埋めると「符号化はできたが列だけ
+違う」ネットが黙って出るため）。
+
+#### 指示書からの逸脱（4 点・§16.4 で承認済み）
+
+1. §16.2-2 の一覧のうち `encoder`／`n_rel`／`n_rel_feat`／`n_eff` は **legacy へ送らず**
+   `opcg_sim/learned/` に残した。訓練が使うネット定義と符号化の仕様で、エンジンを import しない
+   ＝§17 の到達形（`learned/train/` が学習の置き場）と整合する。legacy へ送ったのはエンジンに
+   結合した `mcts`／`adapter`／`lethal`／`plan`／`policy`／`action`／`value_net`。
+2. `journal` も legacy 一覧だが、`models.py`（型・`opcg_sim` に残す）が import するので
+   `opcg_sim/src/models/journal.py` へ移した。
+3. 符号化のエンジン実測 3 か所を `hooks.py` の差し込み口にした（上記）。
+4. 計画キャッシュ／ポンダリング／投機は指示書に無いが削除した（上記）。
+
+#### 凍結点（tag とブランチ）
+
+移動の直前のコミット **`c22f0a62`** に tag `py-engine-final` を打った。**tag の push は
+この環境のプロキシが ref を 403 で弾く**（コーディネータ環境でも同じ）ので、同じコミットを
+ブランチ **`claude/py-engine-final`** としても push した（中身は完全に同一）。回し方:
+
+```bash
+git checkout py-engine-final          # tag（ローカル）
+git checkout claude/py-engine-final   # 同じコミットのブランチ（origin にある）
+OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -m "not slow" -p no:cacheprovider
+```
+
+現在のツリーの `legacy/python_engine/tests/` は 1,359 本 collect できるところまで直した
+（`_bootstrap` の名前衝突・移動でずれたパス計算・移した訓練モジュールの参照）が、**全数 green は
+保証しない**（旧計器が前提にしていた周辺の所在が変わっているものがある）＝回すなら tag／ブランチが正。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 

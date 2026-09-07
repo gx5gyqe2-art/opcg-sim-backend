@@ -332,10 +332,10 @@ def _cond_flags(manager, player, card, res=None):
         return out
     if res is None:
         from opcg_sim.learned import hooks as _H
-        if _H.RESOLVER_FACTORY is None:
-            return out          # 解決器が無い＝条件列は既定（Rust 側は自前で判定する）
+        # 解決器が無ければ**例外**（既定で埋めると条件列だけ違うトークンが黙って出る・§16.4-3）。
+        factory = _H.require_resolver_factory()
         try:
-            res = _H.RESOLVER_FACTORY(manager)
+            res = factory(manager)
         except Exception:
             return out
     for k, cond in conds:
@@ -545,8 +545,9 @@ def encode_rel(manager, me_name, with_relations=True, legal=None):
 
     `with_relations=False` なら rel_om/rel_oo を計算しない（serve は `relations_batch` で一括計算する）。"""
     from opcg_sim.learned import hooks as _H
+    factory = _H.require_resolver_factory()
     try:
-        _res = None if _H.RESOLVER_FACTORY is None else _H.RESOLVER_FACTORY(manager)
+        _res = factory(manager)
     except Exception:
         _res = None
     me, opp = _pl(manager, me_name), (manager.p2 if manager.p1.name == me_name else manager.p1)

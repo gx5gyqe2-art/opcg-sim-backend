@@ -34,12 +34,17 @@ make test-fast   # 開発中のイテレーション用（slow・cpu_infra除外
 >
 > **ゲートは `make test` 1 本**（2026-09-07・第 2 段 `rs-archive-cutover`）。Python エンジンは
 > `legacy/python_engine/` へ退避してテスト対象外になった＝旧 `make test-legacy` は無い。
-> 凍結した 1,786 本を回したいときは **tag を checkout して回す**:
+> 凍結した 1,786 本を回したいときは **tag（またはブランチ）を checkout して回す**:
 >
 > ```bash
-> git checkout py-engine-final
+> git checkout py-engine-final              # tag（ローカル）
+> git checkout claude/py-engine-final       # 同じコミット c22f0a62 のブランチ（origin にある）
 > OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -m "not slow" -p no:cacheprovider
 > ```
+>
+> **ブランチを併記する理由**: この環境のプロキシは tag ref の push を 403 で弾く（実測・
+> ユーザ環境でも同じ）。**リモートに置けるのはブランチだけ**なので、同じコミットを
+> `claude/py-engine-final` としても push してある。中身は完全に同一。
 
 > **ゲームプレイ退行の一次防衛線は golden 2 本**（いずれも Rust だけで回り
 > `tests/fixtures/rs_goldens/` の記録と照合する）:

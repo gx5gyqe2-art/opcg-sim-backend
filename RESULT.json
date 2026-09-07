@@ -1,40 +1,38 @@
 {
   "job": "rs-archive-cutover",
   "status": "partial",
-  "notes_status": "A（切替）と B（移動と退避）の実装・文書は完了。受け入れのうち**アリーナ A/B だけが実行中**（バックグラウンド・fair 200 ペア×2 条件＋参考 legacy 60 ペア）。等価性の主証拠は決定オラクル（下記 decide_oracle）で、これは完了済み。A/B の数値が出たら arena 欄と status を更新する。",
-  "arena": {
-    "state": "running",
-    "design": "Rust 席=Game.decide（切替後の serve 経路）／Python 席=rs_bridge.manager_from_hidden→LearnedEngine.decide。盤面は両席とも Rust。ペア=同 seed で席入替の 2 局・勝率はペア水準（0/0.5/1）・95% CI は arena.pair_level_ci。tests/scripts/rs_arena_ab.py",
-    "modes": {
-      "fair": "橋渡しに由来する構造的な不利を 3 つ外す（期間付き効果の一覧を戻す／箱コミットと sticky 世界線を (turn,seat) 鍵で持ち越す）。**受け入れの本番**",
-      "legacy": "切替前の serve 経路そのまま（参考値＝切替が serve に与えた変化）"
-    },
-    "planned": {
-      "main": {
+  "notes_status": "PLACEHOLDER",
+  "arena_ab_vs_python": {
+    "state": "cancelled",
+    "why_cancelled": "§16.4-1（ユーザ決定 2026-09-07）。**この設計では「2 実装が同じか」を測れない**ことが実行中に判明したため中止した。Python 席は記録 v5 の `hidden` から GameManager を組んで読むが、`hidden` は**中断（対話）の継続を持てない**（記録 v5 の契約）ので対話の途中では浅い要求しか見えない。実測した局では決定点の約 4 割が RESOLVE_EFFECT_SELECTION で、そこの読みが丸ごと落ちる。加えて素の LearnedEngine は箱コミット（_commits）とターン内 sticky 世界線（_world_seeds）を id(manager) で鍵付けするので、決定のたびに manager を組み直す経路では一度も当たらない（＝切替前の serve が実際に抱えていた欠点でもある）。構造的な不利を外した fair モードも作ったが、対話の継続だけは外せない",
+    "design": "Rust 席=Game.decide（切替後の serve 経路）／Python 席=rs_bridge.manager_from_hidden→LearnedEngine.decide。盤面は両席とも Rust。ペア=同 seed で席入替の 2 局。tests/scripts/rs_arena_ab.py（Python エンジンが要るので legacy/python_engine/tests/scripts/ に残した）",
+    "reference_numbers": [
+      {
+        "mode": "legacy",
+        "what": "切替前の serve 経路そのまま",
         "leaders": "random",
         "decks": "synth",
-        "pairs": 200,
-        "games": 400,
-        "seed_base": 6000000
+        "sims": 160,
+        "pairs": 13,
+        "void": 0,
+        "rust_seat_win_rate": 1.0
       },
-      "mirror": {
-        "leaders": "fixed",
-        "decks": "singleton",
-        "pairs": 200,
-        "games": 400,
-        "seed_base": 6200000
-      },
-      "legacy_ref": {
+      {
+        "mode": "fair",
+        "what": "橋渡しに由来する構造的な不利を 3 つ外す（期間付き効果の一覧を戻す／箱コミットと sticky 世界線を (turn,seat) 鍵で持ち越す）",
         "leaders": "random",
         "decks": "synth",
-        "pairs": 60,
-        "games": 120,
-        "seed_base": 6000000
-      },
-      "sims": 64
-    },
-    "criterion": "void ≤2% かつ 勝率 0.5±0.05（§3 P5）",
-    "preliminary": "小規模の先行測定では Rust 席が大きく勝った（sims 32・6 ペアで 0.83／sims 160・9 ペアで 1.00）。原因は Rust が強いからではなく、Python 席が `hidden` 経由の橋渡しで不利になるため（対話の途中は継続を持てず読みが浅い＝この制約だけは fair モードでも外せない）。**基準未達で終わる可能性が高い**——その場合は未達として報告し、等価性は decide_oracle を主証拠にする"
+        "sims": 32,
+        "pairs": 6,
+        "void": 0,
+        "rust_seat_win_rate": 0.8333,
+        "ci95": [0.6267, 1.0]
+      }
+    ],
+    "how_to_read": "「Rust の decide が強い」ではなく「**切替前の serve 経路が橋渡しで損をしていた**」と読む。切替はその損を消す変更でもある。等価性の主証拠は decide_oracle（99.97%）、void／hang は arena_a1_vs_r1（Rust 席同士）で見る"
+  },
+  "arena_a1_vs_r1": {
+    "state": "running"
   },
   "decide_oracle": {
     "what": "同じ盤面・同じ出目で Python と Rust の decide を突き合わせる（Python 盤面が正・rs_search_oracle.py --what decide）。**これが「同じアルゴリズムの 2 実装が同じ判断をするか」の公平な照合**",
@@ -138,9 +136,18 @@
   "legacy_imports_from_opcg_sim": 0,
   "legacy_imports_check": "grep -rn '^\\s*\\(from\\|import\\) legacy' --include=*.py opcg_sim/ → **0 件**。文字列としての出現は 1 件だけで、`opcg_sim/learned/hooks.py` の docstring に書いた使用例（`importlib.import_module(\"legacy.python_engine\")`＝import 文の形を避けてある）",
   "tag": "py-engine-final",
-  "tag_commit": "c22f0a6",
+  "tag_commit": "c22f0a62",
   "tag_pushed_to_remote": false,
-  "tag_push_error": "git push origin py-engine-final が HTTP 403（RPC failed）。4 回リトライ（2/4/8/16 秒）とも同じ。ブランチの push は成功しているので、**tag の push だけが権限またはタグ保護で弾かれている**と見られる。tag はローカルにある（`git tag -n5 py-engine-final`）。リモートに要るなら手で `git push origin py-engine-final` するか、リポジトリ設定のタグ保護を確認すること",
+  "tag_push_error": "git push origin py-engine-final が HTTP 403（RPC failed）。4 回リトライ（2/4/8/16 秒）とも同じ。ブランチの push は成功しているので、**tag ref だけがプロキシに弾かれている**（§16.4-4 でコーディネータ環境でも同じと確認済み）。tag はローカルにある（`git tag -n5 py-engine-final`）",
+  "tag_fallback_branch": "claude/py-engine-final",
+  "tag_fallback_pushed": true,
+  "tag_fallback_note": "§16.4-4 のとおり、同じコミット c22f0a62 をブランチ `claude/py-engine-final` としても push した（中身は完全に同一）。CLAUDE.md／docs/TEST_SPEC.md の「tag を checkout して回す」手順に「ブランチでも可」を併記した",
+  "hooks_raise": {
+    "done": true,
+    "what": "opcg_sim/learned/hooks.py はフックが差さっていないとき 0 を返さず `MissingHook`(RuntimeError) を送出する（§16.4-3）。encoder.encode／n_rel_feat.encode_rel は require_onplay_scan()／require_lethal_scan()／require_resolver_factory() 経由で取る",
+    "why": "参照実装なので黙る方が危険。0 で埋めると「符号化はできたが列だけ違う」ネットや評価値が黙って出て、legacy 側の install_hooks() 呼び忘れに気づけない",
+    "verified": "install_hooks() の前は 3 つとも MissingHook を送出し、後は onplay_option_scan／(lethal_scan, 12)／EffectResolver に解決することを実測"
+  },
   "ruling_prevent_rest": {
     "cards": [
       "OP11-046",
@@ -164,6 +171,6 @@
     "docs/SPEC.md §0: アーキテクチャ図と「裁定を書く場所はパーサと Rust の 2 つだけ」・本文の core/… は tag の中の所在と読む旨",
     "docs/README.md: 索引の冒頭に「エンジンは Rust」・cpu_thinking_logic.md は歴史文書と注記",
     "docs/n_loop_ops.md §2.5: コマンドの所在（旧→新の対応表）と生成の実測（11.5 倍）・記録形式は不変だが乱数系統が変わった旨",
-    "docs/rust_engine_plan.md §8 の結果行と §8.18（A/B の完了後に確定値で書く）"
+    "docs/rust_engine_plan.md §8 の結果行（P5-2）と **§8.20**（§16.4-5。§8.18＝train-profile・§8.19＝train-norel が先に本線へ入っているため）"
   ]
 }

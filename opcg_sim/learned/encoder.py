@@ -406,14 +406,12 @@ def encode(manager, me_name, vocab, version=1, skip_onplay=False):
             # （ネット側で同じ列を 0 にするので出力は同値・葉ごとの make/unmake 実測 0.66ms を省略）。
             vals += [0.0, 0.0, 0.0]
         else:
-            # 実測はエンジンの仕事＝フック（`hooks.ONPLAY_SCAN`）。差さっていなければ 0
-            # （serve はこの経路を通らない＝Rust の `encode` が同じ列を自前で作る）。
+            # 実測はエンジンの仕事＝フック（`hooks.ONPLAY_SCAN`）。差さっていなければ
+            # **例外**（0 で埋めると列だけ違う符号化が黙って出る・計画 §16.4-3）。
+            # serve はこの経路を通らない＝Rust の `encode` が同じ列を自前で作る。
             from opcg_sim.learned import hooks as _H
-            if _H.ONPLAY_SCAN is None:
-                vals += [0.0, 0.0, 0.0]
-            else:
-                n_live, n_dead, keep_live = _H.ONPLAY_SCAN(manager, me_name)
-                vals += [n_live / 5.0, min(keep_live / 2000.0, 1.0), n_dead / 5.0]
+            n_live, n_dead, keep_live = _H.require_onplay_scan()(manager, me_name)
+            vals += [n_live / 5.0, min(keep_live / 2000.0, 1.0), n_dead / 5.0]
     if version >= 8:
         # v8（2026-08-02/03・v32）: 自場集約＝相手（v5）と同じ [総火力, 高パワー数, ブロッカー数]
         # の**純対称化のみ**。v5 まで自場はキャラ数の生カウントだけ＝パワー2000も10000も同じ
@@ -439,13 +437,10 @@ def encode(manager, me_name, vocab, version=1, skip_onplay=False):
         # d_me_def（自攻撃 vs 相手の実防御）は相手手札を読む＝公平性契約違反のため入れない
         # （クリーン3成分の検証は v52b 追補）。/(MAX_TURNS+1) 正規化・実測 ~25ms/盤面。
         from opcg_sim.learned import hooks as _H
-        if _H.LETHAL_SCAN is None:
-            vals += [0.0, 0.0, 0.0]
-        else:
-            _scan, _LMT = _H.LETHAL_SCAN
-            d_me_l, d_opp_l, d_opp_def_l = _scan(manager, me_name)
-            _cap = float(_LMT + 1)
-            vals += [d_me_l / _cap, d_opp_l / _cap, d_opp_def_l / _cap]
+        _scan, _LMT = _H.require_lethal_scan()
+        d_me_l, d_opp_l, d_opp_def_l = _scan(manager, me_name)
+        _cap = float(_LMT + 1)
+        vals += [d_me_l / _cap, d_opp_l / _cap, d_opp_def_l / _cap]
     if version >= 11:
         # v11（2026-08-14）/ v12（2026-08-15・リーサルΔ抜き）: リーダー物理要約（能力木→毎ターン率12次元×自/相手）。
         # 接戦帯の帰趨を支配するリーダー再帰効果（ドンランプ・回復・ミル・常在修正）が
