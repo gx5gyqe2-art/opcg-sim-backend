@@ -1,0 +1,77 @@
+{
+  "job": "rs-p3-final",
+  "status": "done",
+  "audit_all": {
+    "cards": 2472,
+    "abilities": 3386,
+    "match": 3386,
+    "mismatch": 0,
+    "unimplemented": 0,
+    "record_error": 0,
+    "bad_payload": 0,
+    "bad_output": 0,
+    "record_version": 5,
+    "cmd": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_audit_replay.py"
+  },
+  "replay_random500": {
+    "games": 500,
+    "actions": 49144,
+    "match": 500,
+    "mismatch": 0,
+    "unimplemented": 0,
+    "policy": "random",
+    "seed_base": 2000000,
+    "cmd": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_diff_replay.py --mode replay --games 500 --policy random --seed-base 2000000"
+  },
+  "replay_l1_100": {
+    "games": 100,
+    "actions": 11262,
+    "match": 100,
+    "mismatch": 0,
+    "unimplemented": 0,
+    "policy": "l1",
+    "seed_base": 2100000,
+    "cmd": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_diff_replay.py --mode replay --games 100 --policy l1 --seed-base 2100000"
+  },
+  "regress": {
+    "query_oracle_200_boards": {
+      "boards": 200,
+      "queries": 7337400,
+      "match": 6426139,
+      "mismatch": 0,
+      "error_match": 911261,
+      "seed_base": 2200000,
+      "cmd": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_query_oracle.py --boards 200 --seed-base 2200000"
+    },
+    "ops_oracle_10_games": {
+      "games": 10,
+      "rows": 1009,
+      "ops": 19921,
+      "match": 1009,
+      "mismatch": 0,
+      "restore_mismatch": 0,
+      "seed_base": 2400000,
+      "cmd": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_ops_oracle.py --games 10 --seed-base 2400000"
+    },
+    "vanilla_replay_50_games": {
+      "games": 50,
+      "actions": 4614,
+      "match": 50,
+      "mismatch": 0,
+      "seed_base": 2300000,
+      "cmd": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_diff_replay.py --mode replay --vanilla --games 50 --seed-base 2300000"
+    },
+    "state_mode_20_games": {
+      "games": 20,
+      "actions": 1900,
+      "match": 20,
+      "mismatch": 0,
+      "seed_base": 2200000,
+      "cmd": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_diff_replay.py --mode state --games 20 --policy random --seed-base 2200000"
+    },
+    "cargo_test": "288 passed, 0 failed, 0 ignored (cargo test --no-default-features)",
+    "cargo_clippy": "0 warnings (cargo clippy --no-default-features --all-targets -- -D warnings)",
+    "make_test": "1761 passed, 0 failed (Python side unchanged)"
+  },
+  "notes": "決定表 #1〜#9・#11 を実装。Python 側（opcg_sim/）は無変更（rust/opcg_engine/ と tests/scripts/rs_diff_replay.py・rs_audit_replay.py のみ変更）。#10（DB未使用ActionType／カードが消える宛先）は決定どおり直していない。#1: 記録形式v5（監査記録にshuffled/hiddenを追加・RECORD_VERSION=5）。#2: model::TargetRef(Card|Don)をInteraction.candidates/EffectContext.temp_resolved_targets/resolve_targets/run_target_loopのtargetsに一本化し、only_cards_strictによるゲートを撤去。OP06-035/OP12-037のunimplementedを解消。#3・#4: apply_actionを「群A〜Eが全てNoneならrun_target_loopへ落ちる」に直し、status.rsのDISABLE_ABILITY自前呼び出しを撤去。#5: PlayerState.granted_replacementsを追加しEB02-030の継続付与型置換を実装。#6: battle::check_victoryにmastersを通しhas_deckout_win_replaceを接続（呼び口turn::draw_card等を更新）。#7: BATTLE_KO_REPLACE decline枝・ARRANGE_DECKのDeck配置・FIELD_OVERFLOW_TRASHでops::move_cardではなくactions::move_card（離脱イベント込み）を使うよう統一。#8: active_restriction_mutを追加し&mut Sessionを持つ呼び口で期限切れ制限のpop副作用をPythonに合わせた（legal.rsの純関数側は読み取り専用のまま＝restrictionsはboard_jsonに出ない内部欄で観測不能なため据え置いた・判定結果は常に同じ）。#9: state::replayのvanillaガードを撤廃。#11: default_interaction_payloadのARRANGE_DECK既定選択（max=-1）をPythonのlist slice意味論（uuids[:-1]相当・take.max(0)で丸めていたのが原因）に合わせ、実デッキ再生でlegal[]が食い違っていた12/20局を解消。(d) make audit-cross相当はハーネスに--policy l1 --crossが無いため計画どおりL1 100局再生で代えた。全カード監査2,472枚/3,386能力でmismatch=0・unimplemented=0（跨り685枚も含め全一致）。実デッキ再生random 500局・L1 100局とも完全一致。cargo test 288 green・clippy 0・make test green（Python無変更）。"
+}

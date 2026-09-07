@@ -899,7 +899,7 @@ Python と同じ slice 意味論（`take` が負なら `len + take` を 0 未満
 |---|---|
 | 全カード監査（絞り込み無し） | cards=2,472／abilities=3,386／**match=3,386・mismatch=0・unimplemented=0** |
 | 実デッキ再生 random 500 局（`--seed-base 2000000`） | **match=500・mismatch=0・unimplemented=0**（49,144 行動） |
-| 実デッキ再生 L1 100 局（`--seed-base 2100000`） | 実測中（RESULT.json に記載） |
+| 実デッキ再生 L1 100 局（`--seed-base 2100000`） | **match=100・mismatch=0・unimplemented=0**（11,262 行動） |
 | 問合せ 200 局面（`--seed-base 2200000`） | queries=7,337,400・**mismatch=0** |
 | 原始操作 10 局（`--seed-base 2400000`） | rows=1,009・ops=19,921・**mismatch=0** |
 | バニラ再生 50 局（`--seed-base 2300000`） | **match=50・mismatch=0** |
@@ -1547,8 +1547,8 @@ RESULT.json: {"job":"rs-p3-<file>","status":"done","audit":{...RS_AUDIT...},"reg
 全カード監査 2,472 枚／3,386 能力で **match=3,386・mismatch=0・unimplemented=0**（#1〜#2 で
 シャッフル再同期・ドン!!対象の残り 6 mismatch/unimplemented を解消）。実デッキ再生
 random 500 局 **match=500**（#11 で legal[] の ARRANGE_DECK 既定解決を直したことで達成）。
-問合せ 200 局面・原始操作 10 局・バニラ再生 50 局・状態 20 局は mismatch=0。L1 100 局は
-数値・詳細を §8.15 の表と RESULT.json に記載。`cargo test` 288 green・clippy 0・
+問合せ 200 局面・原始操作 10 局・バニラ再生 50 局・状態 20 局は mismatch=0。実デッキ再生
+L1 100 局も **match=100**（11,262 行動）。`cargo test` 288 green・clippy 0・
 `make test` green（Python 側は無変更）。
 
 **指示書（1〜2 セッション）**
