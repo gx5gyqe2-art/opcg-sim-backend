@@ -147,6 +147,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P4 | **統合**（コーディネータ・4 ブランチを cherry-pick。衝突は `lib.rs`（追加関数の併記）・`resolver.rs`（API の `action_history` 本体＋encode の計数を両方残す）・`rs_record.py`（復元器は `rs_bridge` に一本化し `with_pending` の互換ラッパ）・`search/mod.rs`）。統合後の再検証は §8.17。契約の申告 4 点（`cand_rows` の `stat` 引数・`load_net` の `tables_path`・`search_legal` の `prefix`・`rel_oo` の寸法）は承認＝契約に反映 |
 | 2026-09-07 | P4 | **統合後の再検証**（未見 seed）: 符号化 40 局面 × 2 視点 207,441 値 mismatch 0／forward 40 局面 value 6.6e-7・priors 3.0e-7／候補 legal 134 検査・determinize 80・apply 223 すべて一致／実デッキ再生（events 込み）random 20 局 一致／F 監査 817 一致／API テスト 54 passed／`cargo test` 351 green・clippy 0。`rs-p4-mcts` の指示書は §12.6 |
 | 2026-09-07 | P5-1 | **`rs-archive-goldens` 完了・本線へ**（§16.1）: 監査 golden 3,386 件（1.06MB）・再生 golden 200 局（17MB）・`audit.rs`（汎用盤面と既定解決を Rust に移植）・`legacy` マーカー 115 ファイル・`make test` 新定義＝`cargo test` 358＋pytest 608（**約 2 分**・旧 10〜15 分）・`make test-legacy` 1,793 passed。コーディネータの再検証: 新 `make test` green（golden 6 本は最新 wheel で通る＝古い wheel だと `golden_audit` 不在で fail する設計どおり） |
+| 2026-09-07 | P4 | **`rs-p4-mcts` 完了・コーディネータが受け入れ＝P4 完了**（`claude/rs-p4-mcts`）: 木・静止探索・箱・decide。決定オラクル 100 局 10,096 決定＝9,849/9,855 一致（手 99.96%）。残差 6 件は numpy の BLAS が**同点候補を行位置で別の丸めにする** Python 側の非決定性（`rs_blas_tie_probe.py` で実証・§8.17）＝Rust の「添字が小さい方」が定義として正しいので受け入れる。副産物: 記録 v5 に期間付き効果の一覧を additive で追加（復元の穴 1 件）。本線での再検証: 未見 seed 6 局 643 決定 全一致・`cargo test` 378・新 `make test` green（608 passed・65s）。第 2 段の指示書は §16.3 |
 | 2026-09-07 | P3 | **群 A（状態系）`rs-p3-status` 完了**（`claude/rs-p3-status-rkkh9m`）: `actions/status.rs` の 3 入口を本体化（GRANT_KEYWORD／ATTACK_DISABLE／PREVENT_REST／FREEZE／NEGATE_EFFECT／DISABLE_ABILITY／SWAP_POWER。BUFF の全形は土台 `mod.rs::buff` が既に持っていた＝委譲不要で `mod.rs` は無変更）。監査 **cards=782／abilities=1014／match=1014・mismatch=0・unimplemented=0**（受け入れ規模ちょうど）・退行 4 本一致・`cargo test` 194 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 B `rs-p3-zone` 完了**（`claude/rs-p3-zone`）: `actions/zone.rs` の 3 入口を本体化（12 種＋DB 未使用の LIFE_RECOVER／MOVE／MOVE_TO_HAND／DECK_TOP）。監査 987 枚／1,271 能力＝**match 1,268・mismatch 2・unimplemented 1**（残る 3 件はいずれも**群 B の所有範囲の外**＝監査記録に `shuffled` 再同期が無い 2 件と `TargetRef::Don`（群 D）1 件。§8.10）。退行 4 本すべて一致・`cargo test` 196 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 C（カードの流れ）完了**（`claude/rs-p3-flow`）: `actions/flow.rs` に PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_EVENT（EXECUTE_MAIN_EFFECT／DECLARE_COST は resolver が既に捌く）。監査 **cards=865／abilities=1144／match=1144・mismatch=0・unimplemented=0**（着手前は unimplemented=128）。退行 4 本一致・`cargo test` 182 green・clippy 0・`make test` green。結果は下記 §8.10 |
@@ -2482,3 +2483,56 @@ legacy/python_engine/                 tag py-engine-final で凍結・テスト�
 
 `tests/scripts/` の配置規約（CLAUDE.md「単体実行の実験/計測/監査 CLI」）はそのまま。移した後は
 `docs/n_loop_ops.md` の手順・`Makefile`・`docs/TEST_SPEC.md` §3 の索引を新しい場所に書き換える。
+
+### 16.3 第 2 段 `rs-archive-cutover` の指示書（2026-09-07・P4 受け入れ後）
+
+前提: 本線に Rust の `decide`（`rs-p4-mcts`・決定オラクル 9,849/9,855 一致・残差 6 件は numpy の BLAS が
+同点候補を行位置で別の丸めにする Python 側の非決定性＝§8.17）と golden ゲート（§16.1）が入っている。
+この WP で **Python エンジンを使う経路をゼロにし**、Python 版を `legacy/` へ退避する。2 セッションを想定
+（A: 切替と受け入れ／B: 移動と退避と文書）。A が通ってから B。
+
+```
+Rust エンジン移行の最終段（第 2 段・切替と Python 版の退避）を実施してください。計画
+docs/rust_engine_plan.md §16.2・§16.3・§17。本線 claude/cpu-spec-improvements-yw91jd から分岐し、
+claude/rs-archive-cutover に push、PR は作りません。Rust 側の裁定は変えない（golden 一致を保つ）。
+
+A. 切替（Python エンジンを呼ぶ経路をゼロにする）
+1. 生成: tests/scripts/n_record_gen.py（記録の生成）を Rust の Game＋decide で回す版に書き換える。
+   乱数は search/rng.rs の Pcg32SearchRng（seed→決定的・(game, turn, seat) ごとの sticky 世界線は
+   ドライバが同じ seed の生成器を渡す＝§8.17 の申告 (2)）。記録形式（n_rel_train.py が読む
+   records）は変えない＝学習コードは無変更で動くこと。
+2. アリーナ: tests/scripts/arena_parallel.py／arena_merge.py／n1_gate.py の対局ループを Rust に載せる
+   （席入替 CRN・void 判定・RESULT の集計は同じ規約）。
+3. serve: opcg_sim/api/engine_rs.py の暫定 CPU 経路（rs_bridge.manager_from_hidden→Python decide）を
+   opcg_engine.decide に置き換える。decide_client.py の PyPy 分岐（方式 B）と opcg_sim/tools/
+   decide_worker.py を削除。Dockerfile から pypy 段と OPCG_PYPY_WORKER を除去。
+4. 受け入れ（§3 P5）:
+   - アリーナ a1（Rust decide）対 a1（Python decide＝legacy 経路）を主副 2 条件（ランダム対面×生成デッキ／
+     固定ミラー）で各 400 局・void ≤2%・勝率 0.5±0.05（互角）。
+   - 生成 1 局の実測（Rust）と Python 版の比（§0 の見込み 30 秒→1〜3 秒に対して実測を書く）。
+   - API: tests/test_api*.py・test_api_rs_errors.py・test_contract_export.py が通る（契約不変）。
+     test_replay_api_descriptor_end_to_end の照合区間を全長に戻す（§8.16 の縮小を解消）。
+   - golden 2 本・cargo test・clippy green。
+
+B. 移動と退避
+5. §17 の 2 つの移動: 生成・アリーナ・シャード結合・ゲート判定のスクリプトを opcg_sim/loop/ へ、
+   学習（n_rel_train.py・n_eff_train.py・n_rel_band.py・評価帯・holdout）を opcg_sim/learned/train/ へ。
+   `python -m opcg_sim.loop.xxx` で動く形にし、docs/n_loop_ops.md の手順・Makefile・docs/TEST_SPEC.md §3 の
+   索引を新しい場所に書き換える。tests/scripts/ に残すのは単体実行の実験・計測・監査 CLI だけ。
+6. Python エンジン一式を legacy/python_engine/ へ移す（§16.2-2 の一覧。import パスを legacy.python_engine.*
+   に付け替え、legacy テスト 115 本と rs_*_oracle.py・rs_record.py もそこへ）。opcg_sim/src/models（型）・
+   src/effects/parser*.py・src/utils・src/core/sandbox.py・tools は残す。パーサが models に依存する以外で
+   opcg_sim/ から legacy/ を import する箇所を 0 にする（grep で確認し RESULT.json に書く）。
+7. 最終コミットに tag py-engine-final を打つ（移動の直前のコミット＝Python 版がそのまま動く最後の点）。
+   make test-legacy は「tag を checkout して回す」手順に置き換え、Makefile から外す（文書に手順を残す）。
+8. L1 は廃止（cpu_ai.py・cpu_eval_v2.py は legacy へ）。--policy l1 の記録・golden の L1 50 局は
+   Rust の N系（a1）で打ち直して置き換える（golden-replay の L1 帯を a1 帯に改名）。
+9. 文書: CLAUDE.md（ゲート＝make test のみ・CPU 系統の記述から L1 を外し「エンジンは Rust」を明記・
+   「判定に使ったネットは消さない」は履歴と tag で担保する旨）・docs/README.md 索引・docs/SPEC.md の
+   エンジン所在・docs/rust_engine_plan.md §8 に結果行と §8.18。
+10. 裁定待ち 4 件（§11.8 #10・§14）: ユーザの決定を待つ（この WP では変えない。決定が出ていれば Rust を正に
+    直して golden を作り直す）。
+
+RESULT.json: {"job":"rs-archive-cutover","status":"done","arena":{...},"gen_seconds_per_game":{...},
+"api_tests":{...},"moved":[...],"legacy_imports_from_opcg_sim":0,"tag":"py-engine-final","notes":"..."}。
+```
