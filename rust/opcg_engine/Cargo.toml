@@ -13,6 +13,9 @@ name = "opcg_engine"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+# npz（zip）の deflate 展開だけに使う（P4 `net::npz`・`docs/rust_engine_plan.md` §12.4 で
+# 許可された唯一の追加依存）。adler2 は miniz_oxide が checksum に使う必須の推移依存。
+miniz_oxide = "0.8"
 # abi3-py311: Python 3.11 の安定 ABI に対して 1 度だけビルドする（3.11 以降で同じ wheel が使える）。
 pyo3 = { version = "0.29", features = ["abi3-py311"] }
 # preserve_order: JSON オブジェクトのキー順を保つ（echo_state を真に恒等にするため）。
