@@ -41,6 +41,37 @@ def _atype_idx(at):
         return NA - 1
 
 
+class Split:
+    """区間ごとの累積秒（1 エポックの内訳・2026-09-07・§18.6）。
+
+    `sp("slice_v")` で「今からこの区間」と宣言し、次の宣言までの時間を足し込む。時計は
+    1 ステップあたり 6 回＝約 2 マイクロ秒で、895 ステップでも 2 ミリ秒（1 エポックの 0.01%
+    未満）＝**常時入れたままでよい**。エポック行 `N_REL_TRAIN_EPOCH` の `breakdown` に出る。"""
+    __slots__ = ("t", "_k", "_t0")
+
+    def __init__(self):
+        self.t = {}
+        self._k = None
+        self._t0 = 0.0
+
+    def __call__(self, k):
+        now = time.perf_counter()
+        if self._k is not None:
+            self.t[self._k] = self.t.get(self._k, 0.0) + (now - self._t0)
+        self._k = k
+        self._t0 = now
+
+    def stop(self):
+        self(None)
+        self._k = None
+
+    def add(self, k, dt):
+        self.t[k] = self.t.get(k, 0.0) + dt
+
+    def dump(self, nd=3):
+        return {k: round(v, nd) for k, v in sorted(self.t.items())}
+
+
 def make_backend(name, net, lr, threads=None):
     """訓練ループが叩く backend を返す（`--backend`・2026-09-07・§18.4）。
 
@@ -350,10 +381,52 @@ def budget_feats(sc, ci, tok, seg, si, C, idx, ptab_ret):
     return out
 
 
+def budget_feats_all(V, P, C, ptr, ptab_ret, chunk=8192):
+    """**全方策点ぶん**の予算 3 を一度に作る（`C["budget"]` の中身・2026-09-07・§18.6-2）。
+
+    予算はデータ（盤面と候補）と `ptab_ret` だけで決まる＝方策点ごとに固定なので、ステップの
+    たびに作り直す理由が無い。ここは点のかたまりごとに**上の `budget_feats` をそのまま呼ぶ**＝
+    式の正本は 1 つで、全行でビット一致する（要素ごとの演算しか無いので分割しても値は同じ）。"""
+    n_pts = len(P["len"])
+    ptr = np.asarray(ptr)
+    out = np.empty((int(ptr[n_pts]), D_BUDGET), np.float32)
+    for p0 in range(0, n_pts, chunk):
+        p1 = min(p0 + chunk, n_pts)
+        rows = P["row"][p0:p1]
+        seg = np.repeat(np.arange(p1 - p0), P["len"][p0:p1])
+        idx = np.arange(ptr[p0], ptr[p1])
+        out[ptr[p0]:ptr[p1]] = budget_feats(
+            V["sc"][rows], V["ci"][rows], V["tok"][rows], seg,
+            C["si"][idx].astype(np.int64), C, idx, ptab_ret)
+    return out
+
+
+def cand_tail_all(net, C, chunk=65536):
+    """候補素性 139 の**末尾 4 列**を全候補行ぶん一度に作る（§18.6-3）。
+
+    139 のうち「action の onehot 7」と「末尾 4」は候補行だけで決まり（学習中のカード表に
+    依らない）、ステップごとに作り直す必要が無い。onehot は `C["at"]` から torch 側で作れる
+    ので、ここでは末尾 4 だけを持つ。**`NRelNet.cand_feats` に 0 の表を渡して取り出す**＝
+    式の正本は 1 か所（`cand_feats`）のまま。"""
+    n = len(C["cid"])
+    d_tail = F_CAND - NA - 2 * D_STRUCT
+    out = np.empty((n, d_tail), np.float32)
+    zero_tab = np.zeros_like(net.card_table())
+    for s in range(0, n, chunk):
+        idx = np.arange(s, min(s + chunk, n))
+        out[s:s + len(idx)] = net.cand_feats(C, idx, zero_tab)[:, NA + 2 * D_STRUCT:]
+    return out
+
+
 # ---------------------------------------------------------------------------
 # 訓練ループ
 # ---------------------------------------------------------------------------
-def eval_policy(net, rt, ptab_ret, V, P, C, pt_idx, ptr, bs=256):
+def eval_policy(net, rt, ptab_ret, V, P, C, pt_idx, ptr, bs=256, budget_all=None, src=None,
+                tn=None):
+    """holdout の方策指標（top1・CE）。
+
+    `src`（`n_rel_torch.EpochBatches`）と `tn` があれば **logits だけ torch で回す**
+    （§18.6-5）。指標（seg-softmax・top1・CE）の式は torch でも numpy でも**ここ 1 か所**。"""
     hit = tot = 0
     ce_sum = 0.0
     for s in range(0, len(pt_idx), bs):
@@ -361,13 +434,18 @@ def eval_policy(net, rt, ptab_ret, V, P, C, pt_idx, ptr, bs=256):
         lens = P["len"][bi]
         idx = np.concatenate([np.arange(ptr[i], ptr[i] + P["len"][i]) for i in bi])
         seg = np.repeat(np.arange(len(bi)), lens)
-        sc, ci, tok = prow(V, P, bi)
-        rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
-        si = C["si"][idx].astype(np.int64); ti = C["ti"][idx].astype(np.int64)
-        tab = net.card_table()
-        feats = net.cand_feats(C, idx, tab)
-        budget = budget_feats(sc, ci, tok, seg, si, C, idx, ptab_ret)
-        lo = net.policy_logits(sc, ci, tok, rel_om, rel_oo, seg, si, ti, feats, budget, tab=tab)
+        if src is not None:
+            lo = src.eval_logits(tn, bi)
+        else:
+            sc, ci, tok = prow(V, P, bi)
+            rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
+            si = C["si"][idx].astype(np.int64); ti = C["ti"][idx].astype(np.int64)
+            tab = net.card_table()
+            feats = net.cand_feats(C, idx, tab)
+            budget = (budget_all[idx] if budget_all is not None
+                      else budget_feats(sc, ci, tok, seg, si, C, idx, ptab_ret))
+            lo = net.policy_logits(sc, ci, tok, rel_om, rel_oo, seg, si, ti, feats, budget,
+                                   tab=tab)
         p = net.seg_softmax(lo, seg, len(bi))
         pi = C["pi"][idx]
         ce_sum += float(-(pi * np.log(np.maximum(p, 1e-9))).sum())
@@ -422,6 +500,15 @@ def train(args):
     # 学習中は torch 側に置き、epoch の終わりに `sync_to_numpy()` で書き戻す。
     backend, backend_name, note = make_backend(args.backend, net, args.lr, args.threads)
     print(f"backend: {backend_name}{(' ' + note) if note else ''}", flush=True)
+    # 方策点ごとに決まる値は**ここで 1 回だけ**作る（§18.6-2/3）。ループでは切り出すだけ。
+    t_pre = time.time()
+    C["budget"] = budget_feats_all(V, P, C, ptr, ptab_ret) if len(P["len"]) else np.zeros((0, D_BUDGET), np.float32)
+    c_tail = cand_tail_all(net, C) if len(P["len"]) else np.zeros((0, F_CAND - NA - 2 * D_STRUCT), np.float32)
+    print(f"予算・候補定数を先に作った（候補 {len(C['budget'])}行 {time.time()-t_pre:.1f}s）", flush=True)
+    src = None
+    if backend_name == "torch":
+        from opcg_sim.learned.train import n_rel_torch as TT
+        src = TT.EpochBatches(V, P, C, ptr, C["budget"], c_tail, rt, net.ablate)
     rng = np.random.default_rng(args.seed)
     tr_v = np.where(~va_v)[0]; tr_p = np.where(~va_p)[0]; va_pi = np.where(va_p)[0]
     best = None; best_ep = -1
@@ -429,40 +516,77 @@ def train(args):
         t_ep = time.time()
         rng.shuffle(tr_v); rng.shuffle(tr_p)
         nv = len(tr_v) // args.bs_v; npi = len(tr_p) // args.bs_p
+        if src is not None:
+            src.begin(tr_v[:nv * args.bs_v], args.bs_v, tr_p[:npi * args.bs_p], args.bs_p)
         mse = ce = 0.0
         sched = [0] * nv + [1] * npi
         rng.shuffle(sched)
         iv = ip = 0
+        sp = Split()
+        if hasattr(backend, "set_split"):
+            backend.set_split(sp)        # ステップの中（prep/fwd/bwd）も同じ表に出す
         for st, what in enumerate(sched):
             if st and st % 5000 == 0:
                 print(f"  ep{ep} step {st}/{len(sched)} mse {mse/max(iv,1):.4f} ce {ce/max(ip,1):.4f}"
                       f" {time.time()-t0:.0f}s", flush=True)
             if what == 0:
-                bi = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]; iv += 1
-                sc, ci, tok = V["sc"][bi], V["ci"][bi], V["tok"][bi]
-                rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
-                mse += backend.value_step(sc, ci, tok, rel_om, rel_oo, V["z"][bi], args.lr)
+                if src is not None:
+                    b = src.value(iv, sp)                   # 切り出しは torch 側（§18.6-3）
+                    sp("step_v")
+                    mse += backend.value_step(*b, args.lr)
+                else:
+                    sp("slice_v")
+                    bi = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]
+                    sc, ci, tok = V["sc"][bi], V["ci"][bi], V["tok"][bi]
+                    sp("rel_v")
+                    rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
+                    sp("step_v")
+                    mse += backend.value_step(sc, ci, tok, rel_om, rel_oo, V["z"][bi], args.lr)
+                iv += 1
             else:
-                bi = tr_p[ip * args.bs_p:(ip + 1) * args.bs_p]; ip += 1
-                lens = P["len"][bi]
-                idx = np.concatenate([np.arange(ptr[i], ptr[i] + P["len"][i]) for i in bi])
-                seg = np.repeat(np.arange(len(bi)), lens)
-                sc, ci, tok = prow(V, P, bi)
-                rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
-                si = C["si"][idx].astype(np.int64); ti = C["ti"][idx].astype(np.int64)
-                budget = budget_feats(sc, ci, tok, seg, si, C, idx, ptab_ret)
-                ce += backend.policy_step(sc, ci, tok, rel_om, rel_oo, seg, si, ti, C, idx, budget,
-                                          C["pi"][idx], args.lr)
+                if src is not None:
+                    b = src.policy(ip, sp)
+                    sp("step_p")
+                    ce += backend.policy_step_b(*b, args.lr)
+                else:
+                    sp("slice_p")
+                    bi = tr_p[ip * args.bs_p:(ip + 1) * args.bs_p]
+                    lens = P["len"][bi]
+                    idx = np.concatenate([np.arange(ptr[i], ptr[i] + P["len"][i]) for i in bi])
+                    seg = np.repeat(np.arange(len(bi)), lens)
+                    sc, ci, tok = prow(V, P, bi)
+                    si = C["si"][idx].astype(np.int64); ti = C["ti"][idx].astype(np.int64)
+                    sp("rel_p")
+                    rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
+                    sp("budget_p")
+                    budget = C["budget"][idx]               # 先に作ってある（§18.6-2）
+                    sp("step_p")
+                    ce += backend.policy_step(sc, ci, tok, rel_om, rel_oo, seg, si, ti, C, idx,
+                                              budget, C["pi"][idx], args.lr)
+                ip += 1
+        sp.stop()
         # 学習ループだけの壁時計（読み込み・holdout 評価を含まない＝backend 比較の土俵）
         ep_train_sec = time.time() - t_ep
-        backend.sync_to_numpy()          # torch → numpy（以降の評価・保存は numpy 版が担当）
+        t_ev = time.time()
+        backend.sync_to_numpy()          # torch → numpy（保存は numpy 版が担当）
         vi = np.where(va_v)[0][:20000]
-        vv = np.concatenate([net.value(V["sc"][vi[s:s + 512]], V["ci"][vi[s:s + 512]], V["tok"][vi[s:s + 512]],
-                                       *relations_or_zeros(net, V["ci"][vi[s:s + 512]], V["tok"][vi[s:s + 512]], rt))
-                             for s in range(0, len(vi), 512)]) if len(vi) else np.zeros(0)
+        # holdout の forward も torch 経路で回す（§18.6-5）。重みは同じ（torch の Parameter が
+        # 正本で、`sync_to_numpy` で numpy 側にも同じ値が入っている）＝指標の意味は変わらない。
+        if len(vi) == 0:
+            vv = np.zeros(0)
+        elif src is not None:
+            vv = src.eval_value(backend.tn, vi)
+        else:
+            vv = np.concatenate([net.value(V["sc"][vi[s:s + 512]], V["ci"][vi[s:s + 512]], V["tok"][vi[s:s + 512]],
+                                           *relations_or_zeros(net, V["ci"][vi[s:s + 512]], V["tok"][vi[s:s + 512]], rt))
+                                 for s in range(0, len(vi), 512)])
         vmse = float(np.mean((vv - V["z"][vi]) ** 2)) if len(vi) else float("nan")
         vsgn = float(np.mean((vv > 0) == (V["z"][vi] > 0))) if len(vi) else float("nan")
-        p_pi, p_ce = eval_policy(net, rt, ptab_ret, V, P, C, va_pi[:4000], ptr) if len(va_pi) else (float("nan"), float("nan"))
+        p_pi, p_ce = (eval_policy(net, rt, ptab_ret, V, P, C, va_pi[:4000], ptr,
+                                  budget_all=C["budget"], src=src,
+                                  tn=getattr(backend, "tn", None))
+                      if len(va_pi) else (float("nan"), float("nan")))
+        sp.add("holdout", time.time() - t_ev)
         print(f"ep{ep} train mse {mse/max(nv,1):.4f} ce {ce/max(npi,1):.4f} | "
               f"val v_mse {vmse:.4f} v_sign {vsgn:.3f} pi_top1 {p_pi:.3f} ce {p_ce:.3f} "
               f"{time.time()-t0:.0f}s", flush=True)
@@ -470,6 +594,7 @@ def train(args):
         print("N_REL_TRAIN_EPOCH " + json.dumps(
             {"ep": ep, "backend": backend_name, "threads": getattr(backend, "threads", 1),
              "train_sec": round(ep_train_sec, 3), "steps": len(sched),
+             "breakdown": sp.dump(),
              "train_mse": mse / max(nv, 1), "train_ce": ce / max(npi, 1),
              "val_vmse": vmse, "val_vsign": vsgn, "val_pi_top1": p_pi, "val_p_loss": p_ce}),
             flush=True)
