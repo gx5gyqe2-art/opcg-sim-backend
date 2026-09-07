@@ -10,11 +10,12 @@
 | 条件列（`n_rel_feat`） | 静的条件が今の盤面で満たせるか | `core.effects.resolver.EffectResolver` |
 
 serve はこの経路を通らない（符号化は Rust の `encode`／`Game.encode` が持つ）ので、
-`opcg_sim/` は **Python エンジンを import しない**（計画 §16.3-6）。エンジンを持つ環境
-（`legacy/python_engine`）が [`install`] で差し込み、差さっていなければ列は 0／既定値になる。
+`opcg_sim/` は **Python エンジンを import しない**（計画 §16.3-6。この docstring も import 文の形を
+避けてある＝`grep '^\s*\(from\|import\) legacy' opcg_sim/` が 0 件になるように）。エンジンを持つ
+環境（`legacy/python_engine`）が [`install`] で差し込み、差さっていなければ列は 0／既定値になる。
 
-    import legacy.python_engine as LE
-    LE.install_resolver_hook()      # まとめて差す
+    LE = importlib.import_module("legacy.python_engine")   # エンジンを持つ側から
+    LE.install_hooks()                                     # 3 か所まとめて差す
 """
 from typing import Any, Callable, Optional, Tuple
 

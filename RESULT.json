@@ -1,0 +1,169 @@
+{
+  "job": "rs-archive-cutover",
+  "status": "partial",
+  "notes_status": "A（切替）と B（移動と退避）の実装・文書は完了。受け入れのうち**アリーナ A/B だけが実行中**（バックグラウンド・fair 200 ペア×2 条件＋参考 legacy 60 ペア）。等価性の主証拠は決定オラクル（下記 decide_oracle）で、これは完了済み。A/B の数値が出たら arena 欄と status を更新する。",
+  "arena": {
+    "state": "running",
+    "design": "Rust 席=Game.decide（切替後の serve 経路）／Python 席=rs_bridge.manager_from_hidden→LearnedEngine.decide。盤面は両席とも Rust。ペア=同 seed で席入替の 2 局・勝率はペア水準（0/0.5/1）・95% CI は arena.pair_level_ci。tests/scripts/rs_arena_ab.py",
+    "modes": {
+      "fair": "橋渡しに由来する構造的な不利を 3 つ外す（期間付き効果の一覧を戻す／箱コミットと sticky 世界線を (turn,seat) 鍵で持ち越す）。**受け入れの本番**",
+      "legacy": "切替前の serve 経路そのまま（参考値＝切替が serve に与えた変化）"
+    },
+    "planned": {
+      "main": {
+        "leaders": "random",
+        "decks": "synth",
+        "pairs": 200,
+        "games": 400,
+        "seed_base": 6000000
+      },
+      "mirror": {
+        "leaders": "fixed",
+        "decks": "singleton",
+        "pairs": 200,
+        "games": 400,
+        "seed_base": 6200000
+      },
+      "legacy_ref": {
+        "leaders": "random",
+        "decks": "synth",
+        "pairs": 60,
+        "games": 120,
+        "seed_base": 6000000
+      },
+      "sims": 64
+    },
+    "criterion": "void ≤2% かつ 勝率 0.5±0.05（§3 P5）",
+    "preliminary": "小規模の先行測定では Rust 席が大きく勝った（sims 32・6 ペアで 0.83／sims 160・9 ペアで 1.00）。原因は Rust が強いからではなく、Python 席が `hidden` 経由の橋渡しで不利になるため（対話の途中は継続を持てず読みが浅い＝この制約だけは fair モードでも外せない）。**基準未達で終わる可能性が高い**——その場合は未達として報告し、等価性は decide_oracle を主証拠にする"
+  },
+  "decide_oracle": {
+    "what": "同じ盤面・同じ出目で Python と Rust の decide を突き合わせる（Python 盤面が正・rs_search_oracle.py --what decide）。**これが「同じアルゴリズムの 2 実装が同じ判断をするか」の公平な照合**",
+    "command": "python tests/scripts/rs_search_oracle.py --what decide --games 40 --policy random --seed-base 6500000 --sims 160 --jobs 4",
+    "decisions": 3955,
+    "checks": 3856,
+    "match": 3855,
+    "mismatch": 1,
+    "match_rate": 0.9997,
+    "move_mismatch": 1,
+    "n_mismatch": 0,
+    "legal_mismatch": 0,
+    "kind_mismatch": 0,
+    "kind_main": 1909,
+    "kind_window": 807,
+    "kind_commit": 1239,
+    "with_prefix": 238,
+    "shuffle_skipped": 99,
+    "unimplemented": 0,
+    "bad_payload": 0,
+    "harness_error": 0,
+    "game_aborted": 0,
+    "seconds": 1322.8,
+    "mismatch_cause": "RESOLVE_EFFECT_SELECTION の 1 件。候補の素性行が全候補で完全に同一（手が card_uuid を持たない）ため priors は本来完全な同点で、Python 側は numpy の float32 行列積が**行位置で別の丸め**を返して argmax がぶれる（§8.17 で `rs_blas_tie_probe.py` により実証済みの既知クラス）。Rust は候補ごとに独立に計算するので完全な同点＝numpy の規約どおり添字 0 を選ぶ"
+  },
+  "gen_seconds_per_game": {
+    "python": 57.06,
+    "rust": 4.96,
+    "speedup": 11.5,
+    "conditions": "同 seed 帯 6 局（950000〜950005）・sims 64・dirichlet 0.25・temp_turns 4・単プロセス・4 コア機。リーダー対とデッキは両者同規約（seed*7919+13）だが乱数系統が違うので局そのものは一致しない",
+    "plan_expectation": "§0 の見込みは 30 秒 → 1〜3 秒（10〜30 倍）。実測は 57.06 → 4.96 秒（11.5 倍）で見込みの範囲内。基準の 30 秒は当時の sims/条件での概算で、同条件の Python 実測は 57 秒だった"
+  },
+  "api_tests": {
+    "make_test": {
+      "passed": 418,
+      "failed": 0,
+      "seconds": 127,
+      "note": "cargo test 381 と併走・`-m \"not slow and not legacy\"`"
+    },
+    "test_api_py_and_contract": {
+      "passed": 29,
+      "files": [
+        "tests/test_api.py",
+        "tests/test_api_contract.py",
+        "tests/test_contract_export.py"
+      ]
+    },
+    "test_api_rs_errors": {
+      "passed": 25,
+      "where": "legacy/python_engine/tests/（Python エンジンをオラクルに使う 3 者照合なので退避先）"
+    },
+    "contract_unchanged": true,
+    "replay_descriptor_full_length": {
+      "done": true,
+      "how": "録画側（API）も再生側も Rust の decide にしたので、`test_replay_api_descriptor_end_to_end` の照合を**全長**へ戻した（§8.16 で「効果対話の決定点まで」に狭めていた縮小を解消）。再生器は `tests/harness/rs_replay.py`（旧 `replay_runner.replay_from_descriptor` の Rust 版）。録画は cap 付きで打ち切るので、再生が録画の全決定を覆っていることを見る（内容による切り詰めは無い）"
+    }
+  },
+  "goldens": {
+    "source_of_truth": "rust",
+    "maker": "tests/scripts/rs_golden_make.py（Python エンジン不要）",
+    "audit": {
+      "entries": 3386,
+      "regenerated": true,
+      "hash_diff_vs_previous": 0,
+      "note": "Rust の出力で作り直した結果、3,386 件すべてハッシュ不変。裁定（PREVENT_REST）の差は `timed_flags` に出るが盤面 dict には出ないため"
+    },
+    "replay": {
+      "random": 150,
+      "a1": 50,
+      "total_files": 200,
+      "note": "L1 帯 50 局（l1_5000150〜）を **Rust の N 系 a1 で打ち直して置き換えた**（§16.3-8）。生成時に `opcg_engine.replay` で再生し一致した局だけを書く＝mismatched 0"
+    }
+  },
+  "rust_gate": {
+    "cargo_test": 381,
+    "cargo_clippy_warnings": 0
+  },
+  "moved": [
+    "tests/scripts/n_record_gen.py -> opcg_sim/loop/record_gen.py（Rust で書き直し・記録形式は不変）",
+    "tests/scripts/arena_resume.py -> opcg_sim/loop/arena_shard.py（Rust で書き直し・判定規約は不変）",
+    "tests/scripts/arena_parallel.py + arena_gate.py + promotion_gate.py -> opcg_sim/loop/arena.py + gate.py",
+    "tests/scripts/arena_merge.py -> opcg_sim/loop/arena_merge.py（純関数は同一）",
+    "tests/harness/deck_synth.py, deck_dig.py -> opcg_sim/loop/",
+    "tests/scripts/{n_rel_train,n_eff_train,n_rel_band,n1_train,n0_spike,n_eff_feat,n_mine_pi,n_mine_z}.py -> opcg_sim/learned/train/",
+    "opcg_sim/src/learned/{encoder,n_eff,n_rel,n_rel_feat,effect_features,leader_feat,config}.py -> opcg_sim/learned/",
+    "opcg_sim/src/learned/{mcts,adapter,lethal,plan,policy,action,value_net}.py -> legacy/python_engine/learned/",
+    "opcg_sim/src/core/effects/{parser,parser_v2,matcher,rules} -> opcg_sim/src/effects/",
+    "opcg_sim/src/core/journal.py -> opcg_sim/src/models/journal.py",
+    "opcg_sim/src/core/（sandbox.py 以外）-> legacy/python_engine/core/",
+    "tests/ の Python エンジン依存 288 本 + harness 25 + 実験 CLI 116（rs_*_oracle・rs_record 含む）-> legacy/python_engine/tests/",
+    "削除: opcg_sim/api/decide_client.py・opcg_sim/tools/decide_worker.py・opcg_sim/api/services/cpu_driver.py（方式 B と体感最適化）",
+    "削除: tests/test_pypy_worker_parity.py・tests/test_plan_cache.py（対象の機能ごと消えた）",
+    "opcg_sim/learned/train/n0_spike.py の probe／gate（Python エンジンと旧 coach 計器を要る） -> legacy/python_engine/tests/scripts/n0_gate.py（残るのはカード表・N0Net・訓練＝n1_train が使う部分）"
+  ],
+  "moved_deviations": [
+    "§16.2-2 は encoder／n_rel／n_rel_feat／n_eff も legacy へ送る一覧だが、**送らずに `opcg_sim/learned/` へ残した**。これらは訓練（n_rel_train）が使うネット定義と符号化の仕様で、エンジンを import しない＝Python 側に残すのが §17 の到達形（`learned/train/` が学習の置き場）と整合する。legacy へ送ったのはエンジンに結合した mcts／adapter／lethal／plan／policy／action／value_net",
+    "§16.2-2 は journal も legacy 一覧だが、`models.py`（型・opcg_sim に残す）が import するので `opcg_sim/src/models/journal.py` へ移した（差分巻き戻しの器＝型の層の道具）",
+    "符号化のうちエンジン実測が要る 3 か所（登場時スキャン v7・リーサル距離 v10・条件列）は `opcg_sim/learned/hooks.py` の差し込み口にした。legacy 側が `install_hooks()` で差す＝opcg_sim から legacy を import しない",
+    "計画キャッシュ／ポンダリング／投機（services/cpu_driver）は指示書に無いが**削除した**。Python の decide が秒オーダーだったことへの手当てで、Rust の decide（数十 ms）では意味が無く、実装が Python エンジンに依存していたため"
+  ],
+  "legacy_imports_from_opcg_sim": 0,
+  "legacy_imports_check": "grep -rn '^\\s*\\(from\\|import\\) legacy' --include=*.py opcg_sim/ → **0 件**。文字列としての出現は 1 件だけで、`opcg_sim/learned/hooks.py` の docstring に書いた使用例（`importlib.import_module(\"legacy.python_engine\")`＝import 文の形を避けてある）",
+  "tag": "py-engine-final",
+  "tag_commit": "c22f0a6",
+  "tag_pushed_to_remote": false,
+  "tag_push_error": "git push origin py-engine-final が HTTP 403（RPC failed）。4 回リトライ（2/4/8/16 秒）とも同じ。ブランチの push は成功しているので、**tag の push だけが権限またはタグ保護で弾かれている**と見られる。tag はローカルにある（`git tag -n5 py-engine-final`）。リモートに要るなら手で `git push origin py-engine-final` するか、リポジトリ設定のタグ保護を確認すること",
+  "ruling_prevent_rest": {
+    "cards": [
+      "OP11-046",
+      "OP12-021",
+      "OP15-024"
+    ],
+    "golden_regenerated": true,
+    "golden_hash_diff": 0,
+    "change": "自身を守る形（対象＝発生源＝select_mode SOURCE）は `CANNOT_BE_RESTED_BY_OPP` を載せ、REST ハンドラが `actor != owner`（相手の効果）のときだけ弾く。自分のアタック宣言・ブロックは従来どおり可能（それらは rules::battle の経路でこのハンドラを通らない）。相手を縛る形（CHOOSE）は従来の `CANNOT_REST` のまま。KO 耐性は既存の PREVENT_LEAVE 経路",
+    "verification": [
+      "cargo test `prevent_rest_on_source_sets_the_opponent_only_flag`（自己保護は別フラグ）",
+      "cargo test `cannot_be_rested_by_opp_blocks_only_the_opponent`（相手の効果は弾き・持ち主自身の効果は通す）",
+      "cargo test `only_three_cards_protect_themselves_from_being_rested`（効果 JSON 全体で SOURCE 対象の PREVENT_REST がちょうど 3 枚＝裁定の射程を固定）"
+    ],
+    "audit_golden_note": "監査 golden は 3,386 件すべてハッシュ不変だった。監査は「汎用盤面で発動→既定解決」までで、相手の効果による REST も自分のアタックも通らないため、フラグ名の違いが盤面 dict に現れない。該当 3 枚のエントリもレビューのうえ不変を確認した（Rust の出力で作り直した結果として同一）",
+    "other_three_rulings": "裁定不要で確定（変えない）: 付与中ドン!!での支払い＝到達しない経路／attack_disable の潰し＝対象なしで実害ゼロ／カードが消える宛先＝エラー確定"
+  },
+  "docs": [
+    "CLAUDE.md: 品質ゲートは make test 1 本（旧 test-legacy は tag checkout の手順へ）・CPU 系統から L1 を外し「エンジンは Rust」を明記・「判定に使ったネットは消さない」は履歴と tag で担保・配置規約",
+    "docs/TEST_SPEC.md: 実行方法（make test 1 本・legacy は tag）・§3 に現在のコマンドの所在表・§5 品質ゲートの表を golden 2 本＋cargo test へ・audit-cross を Rust のアリーナ（void 0）へ",
+    "docs/SPEC.md §0: アーキテクチャ図と「裁定を書く場所はパーサと Rust の 2 つだけ」・本文の core/… は tag の中の所在と読む旨",
+    "docs/README.md: 索引の冒頭に「エンジンは Rust」・cpu_thinking_logic.md は歴史文書と注記",
+    "docs/n_loop_ops.md §2.5: コマンドの所在（旧→新の対応表）と生成の実測（11.5 倍）・記録形式は不変だが乱数系統が変わった旨",
+    "docs/rust_engine_plan.md §8 の結果行と §8.18（A/B の完了後に確定値で書く）"
+  ]
+}
