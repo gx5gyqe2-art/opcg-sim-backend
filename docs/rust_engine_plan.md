@@ -136,6 +136,8 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P3 | **土台 2 WP の統合・受け入れ**（`claude/rs-p3-integrate`）: core → resolver の順に cherry-pick し §11.6 のとおり単一化（`Vec<TargetRef>`／`EffectContext` の全欄／能力表は `MasterTable.abilities`／stub は core へ委譲／文脈の JSON 読込は `eval::context_from_json`）。オラクル 5 本すべて一致（問合せ 7,337,400 件 mismatch=0／土台監査 634 枚・817 能力 mismatch=0・unimplemented=0／バニラ再生 50 局・状態 10 局・原始操作 10 局とも一致）・`cargo test` 166 green（`#[ignore]` 0）・clippy 0・`make test` green。結果は下記 §8.9 |
 | 2026-09-07 | P3 | **統合をコーディネータが受け入れ・本線へ**（`claude/rs-p3-integrate` 776d492a を fast-forward）。未見 seed の再検証: F 監査 634 枚/817 能力 mismatch=0・問合せ 40 局面 1,467,480 件 mismatch=0・バニラ再生 20 局 match=20・状態 5 局 match=5・原始操作 3 局 5,190 件 mismatch=0。`cargo test` 166 green・clippy 0・`make test` green |
 | 2026-09-07 | P3 | **群 A〜E の差し口と指示書を本線へ**（§11.7）: `actions/{status,zone,flow,don,rules}.rs` の 3 入口（`game_handler`／`owns_target`／`apply_target`）と `mod.rs` の呼び出し。受け入れ集合は F∪群だけのカード（A 782／B 987／C 865／D 979／E 710 枚） |
+| 2026-09-07 | P3 | **群 A〜E をコーディネータが本線へ**（5 ブランチを cherry-pick・§8.10〜8.14）。受け入れ集合: A 1,014／C 1,144／E 917 能力＝全一致、B 1,268/1,271（残 3 は横断事項）、D 1,272/1,273（残 1 は横断事項）。本線で全カード監査 3,380/3,386（跨り 685 枚は全一致）・実デッキ再生は盤面 20 局一致・`legal` 12 局差（§11.8）。`cargo test` 288 green・clippy 0・`make test` green |
+| 2026-09-07 | P3 | **仕上げ WP `rs-p3-final` を発行**（§11.8）: 横断事項 #1〜#11（監査記録 v5 のシャッフル再同期・ドン!!対象・差し口の意味論・群 E の申告 4 件・vanilla ガード撤去・ARRANGE_DECK 既定解決）と P3 全体の受け入れ（全カード監査・実デッキ再生 random 500／L1 100） |
 | 2026-09-07 | P3 | **群 A（状態系）`rs-p3-status` 完了**（`claude/rs-p3-status-rkkh9m`）: `actions/status.rs` の 3 入口を本体化（GRANT_KEYWORD／ATTACK_DISABLE／PREVENT_REST／FREEZE／NEGATE_EFFECT／DISABLE_ABILITY／SWAP_POWER。BUFF の全形は土台 `mod.rs::buff` が既に持っていた＝委譲不要で `mod.rs` は無変更）。監査 **cards=782／abilities=1014／match=1014・mismatch=0・unimplemented=0**（受け入れ規模ちょうど）・退行 4 本一致・`cargo test` 194 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 B `rs-p3-zone` 完了**（`claude/rs-p3-zone`）: `actions/zone.rs` の 3 入口を本体化（12 種＋DB 未使用の LIFE_RECOVER／MOVE／MOVE_TO_HAND／DECK_TOP）。監査 987 枚／1,271 能力＝**match 1,268・mismatch 2・unimplemented 1**（残る 3 件はいずれも**群 B の所有範囲の外**＝監査記録に `shuffled` 再同期が無い 2 件と `TargetRef::Don`（群 D）1 件。§8.10）。退行 4 本すべて一致・`cargo test` 196 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 C（カードの流れ）完了**（`claude/rs-p3-flow`）: `actions/flow.rs` に PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_EVENT（EXECUTE_MAIN_EFFECT／DECLARE_COST は resolver が既に捌く）。監査 **cards=865／abilities=1144／match=1144・mismatch=0・unimplemented=0**（着手前は unimplemented=128）。退行 4 本一致・`cargo test` 182 green・clippy 0・`make test` green。結果は下記 §8.10 |
@@ -641,7 +643,7 @@ bad_payload=21 に退行した。`rs_diff_replay.py` のバニラデッキは Py
 
 **Python 側の欠陥と判断して直さなかったもの**: 無し（監査 1,014 能力・退行 4 本とも全一致で、
 Python と挙動が割れた盤面は 1 つも出なかった）。
-### 8.10 P3 群 B `rs-p3-zone`（ゾーン移動）の結果（2026-09-07）
+### 8.11 P3 群 B `rs-p3-zone`（ゾーン移動）の結果（2026-09-07）
 成果物（Python 側は**1 行も変えていない**＝`opcg_sim/` は無変更。`actions/mod.rs`・`resolver.rs`・
 `interact.rs`・`triggers.rs`・`model.rs`・`ops.rs` も無変更＝**追加した原始操作は無し**）:
 | 成果物 | 中身 |
@@ -699,7 +701,7 @@ Python と挙動が割れた盤面は 1 つも出なかった）。
 記録し直すと `mismatch=0`（`cards=2, abilities=2, match=2`）＝Rust の意味論は Python と同一で、
 違うのは RNG が作った並びだけ。`SHUFFLE` を使うカードは DB 全体で 11 枚、うち F∪B の受け入れ
 集合に入るのは 3 枚（`OP01-098`／`OP04-048`／`OP06-047`。`OP01-098` は並びを観測しないので一致する）。
-### 8.10 P3 群 C（カードの流れ）の結果（2026-09-07・WP `rs-p3-flow`）
+### 8.12 P3 群 C（カードの流れ）の結果（2026-09-07・WP `rs-p3-flow`）
 本線 `claude/cpu-spec-improvements-yw91jd`（e6199915）から分岐。**変更は
 `rust/opcg_engine/src/effects/actions/flow.rs` と本書だけ**——`actions/mod.rs`・`resolver.rs`／
 `interact.rs`／`triggers.rs`／`model.rs`・`ops.rs`・Python 側（`opcg_sim/`）はいずれも 1 行も
@@ -728,7 +730,7 @@ Python と挙動が割れた盤面は 1 つも出なかった）。
 | 退行 `rs_query_oracle.py --boards 40 --seed-base 1310000` | queries=1,467,480／match=1,285,228／error_match=182,252／**mismatch=0** |
 | `cargo test --no-default-features` | **182 passed**・0 failed・0 ignored（群 C の単体 16 件を追加。166→182） |
 **Python 側の欠陥は見つからなかった**（865 枚 × 1,144 能力の全段で盤面が一致した）。
-### 8.10 P3 群 D（ドン!!）の結果（2026-09-07）
+### 8.13 P3 群 D（ドン!!）の結果（2026-09-07）
 WP `rs-p3-don`（ブランチ `claude/rs-p3-don-mdlsba`）。本線 `claude/cpu-spec-improvements-yw91jd`
 （e619991）から分岐。**Python 側（`opcg_sim/`）は 1 行も変えていない**。変更は
 `rust/opcg_engine/src/effects/actions/don.rs` の 1 ファイルのみ（`ops.rs` への追加も不要だった＝
@@ -766,7 +768,7 @@ OP12-037（`CHAR_OR_DON`・上記）／OP10-074（`COST_AREA`・ただし `REPLA
 本 WP で再確認。コメントも既にその旨を書いている）ので、群 D では触っていない。
 Python 側の欠陥の可能性があるが、Python が正の原則どおり直していない
 （呼び出し口は `battle.py::apply_counter` の【カウンター】イベント支払いのみ＝群 E の範囲）。
-### 8.10 P3 群 E（置換とルール）の結果（2026-09-07）
+### 8.14 P3 群 E（置換とルール）の結果（2026-09-07）
 WP `rs-p3-rules`。本線 `claude/cpu-spec-improvements-yw91jd`（e6199915）から分岐。
 **Python 側（`opcg_sim/`）は 1 行も変えていない**。
 | `rs_audit_replay.py --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF,REPLACE_EFFECT,PREVENT_LEAVE,RULE_PROCESSING,RESTRICTION,REDIRECT_ATTACK,VICTORY,EXTRA_TURN` | **cards=710／abilities=917／match=917／mismatch=0・unimplemented=0**（§11.7 の想定枚数どおり） |
@@ -1402,4 +1404,70 @@ Python 側の欠陥と判断した場合は直さず RESULT.json の notes に�
 6. docs/rust_engine_plan.md §8 に結果行、§11.7 の表の <X> 行に「完了」と実測値。make test green。
 RESULT.json: {"job":"rs-p3-<file>","status":"done","audit":{...RS_AUDIT...},"regress":{...},
  "notes":"..."} を push。
+```
+
+### 11.8 P3 仕上げ WP（`rs-p3-final`・2026-09-07・コーディネータ）
+
+群 A〜E を本線へ取り込んだ（§8.10〜8.14）。5 群が**所有範囲外として申告した横断事項**と、P3 全体の
+受け入れ（全カード監査・実デッキ再生）を 1 本の WP にまとめる。決定（申告に対するコーディネータの判断）:
+
+| # | 申告元 | 事項 | 決定 |
+|---|---|---|---|
+| 1 | B | 監査記録に `shuffled` 再同期が無い（`fire` の中で起きるシャッフルを再生側が再現できない・OP04-048／OP06-047） | **記録形式 v5**: 監査記録の `fire` 直後と各 `payload` 直後に `{shuffled, hidden}` を持たせ、`replay_audit` が同じ位置で `resync_shuffled` を呼ぶ（`--mode replay` と同じ規約）。`rs_audit_replay.py`＋`state.rs` を変更 |
+| 2 | D／B | ドン!!を対象に取るクエリ（`TargetRef::Don`・COST_AREA 3 件／CHAR_OR_DON 2 件・DB で REST の 3 能力: OP12-037／OP06-035 ほか）が `only_cards_strict` で止まる | `model.rs` の `Interaction` 候補を並び順つきの混在（`Vec<TargetRef>`）にし、`interact.rs` の SELECT_TARGET 提示/再開と `EffectContext::temp_resolved_targets`、`actions/mod.rs::run_target_loop` の `targets` を `TargetRef` に広げ、`rest`／`active` に Python の `isinstance(target, DonInstance)` 分岐を入れる。詳細は §8.13 の表 |
+| 3 | A | 差し口の意味論: 群が `None` を返したとき `mod.rs::apply_action` が対象ループへ落ちない（Python の `when=` 偽＝フォールスルーと違う） | `apply_action` を「全群が `None` なら `run_target_loop` へ落ちる」に直し、群 A が自前で `run_target_loop` を呼んでいる回避策を外す（群 D の `ACTIVE_DON`・群 E の `RULE_PROCESSING` も同じ経路に載せる） |
+| 4 | E | `mod.rs::game_handler_for` に `RuleProcessing` を 1 行追加した（所有範囲外） | 承認（#3 の直しに吸収） |
+| 5 | E | `PlayerState.granted_replacements` が無い（EB02-030・1 枚） | `model.rs` に `GrantedReplacement { status, sub: NodeRef, is_optional, expire_turn }` と journal の setter を足し、`rules.rs::register_granted_replacements`／`find_replacement` の走査を繋ぐ |
+| 6 | E | デッキアウト敗北→勝利の置換（`VICTORY`・REPLACE_DECKOUT_LOSS）が `check_victory` に未接続 | `battle::check_victory` に `masters` を通し `rules::has_deckout_win_replace` を接続（呼び口 `turn::draw_card`／DRAW ハンドラ／テストを直す） |
+| 7 | E | `interact.rs` の BATTLE_KO_REPLACE（decline 枝）が `ops::move_card` を使い離脱イベントを捨てる | `effects::actions::move_card` に置き換える（Python の `gm.move_card` と同じ） |
+| 8 | E | `active_restriction` が期限切れ行を `restrictions` から pop する副作用を持たない | Python と同じ副作用にする（`&mut Session` を通す）。盤面 dict に出ないが、長い対局で差が残る経路なので直す |
+| 9 | P2 | `state.rs::replay` の「`vanilla` でない記録は `Unimplemented`」ガード | 外す（P3 の受け入れで実デッキ再生を通す） |
+| 11 | コーディネータ（実デッキ再生の実測） | `default_interaction_payload` の ARRANGE_DECK（`constraints {min:0, max:-1}`）で Python は候補全部を並び順のまま `selected_uuids` に返す（カヤ／そげキング等の「順番を決める」）が、Rust は `[]` を返す＝合法手（既定解決 1 手）が食い違う。盤面は一致し `legal[i]` だけが違う | `interact.rs` の既定解決を Python `default_interaction_payload` の ARRANGE_DECK 分岐（`max=-1` の扱い）に合わせる。実デッキ再生 20 局のうち 12 局がこれで落ちた（少なくとも 4 局は確認済み・残りも同型の可能性が高い） |
+| 10 | 全群 | DB 未使用の ActionType（SET_BASE_POWER／COST_BUFF／SET_COST／COST_CHANGE／BP_BUFF／LIFE_RECOVER／LIFE_MANIPULATE／MODIFY_DON_PHASE／KEYWORD／PASSIVE_EFFECT／GRANT_EFFECT／LOCK／OTHER／SELECT_OPTION）と Python で「カードが消える」宛先（DON_DECK／COST_AREA／ANY） | `Unimplemented` のまま（黙って no-op にしない）。Python 側の「カードが消える」経路は Python の欠陥として §12 に記録し、P5 で Python を直すか判断する |
+
+**受け入れ（P3 全体・§3 の (a)〜(d)）**:
+
+- (a) 全カード監査: `rs_audit_replay.py`（絞り込み無し）→ 2,472 枚／3,386 能力で mismatch=0・unimplemented=0
+  （#10 の DB 未使用型は監査に現れない）。
+- (b) 実デッキ再生: `rs_diff_replay.py --mode replay --games 500 --policy random --seed-base 2000000` → match=500／
+  `--games 100 --policy l1 --seed-base 2100000` → match=100（`pending_request`・`legal` 込み）。
+- (c) 問合せ 200 局面（実デッキ・`--seed-base 2200000`）mismatch=0／原始操作 10 局 mismatch=0／バニラ再生 50 局／
+  状態 20 局（退行）。
+- (d) `make audit-cross` 相当: `tests/scripts/deck_synth_audit.py --cross` の局を記録して再生（ハーネスに
+  `--policy l1 --cross` があれば使う。無ければ (b) の L1 100 局で代える＝notes に明記）。
+
+**本線での実測（2026-09-07・5 群を取り込んだ直後・コーディネータ）**:
+
+- 全カード監査（絞り込み無し）: **2,472 枚／3,386 能力中 3,380 一致**・mismatch 4（OP04-048／OP06-047／
+  P-002 ×2＝すべて #1 のシャッフル再同期）・unimplemented 2（OP06-035／OP12-037＝#2 のドン!!対象）。
+  **複数群に跨る 685 枚は全部一致**した。
+- 実デッキ再生（#9 のガードを一時的に外して計測・random 20 局・1,914 行動）: **盤面 dict は 20 局すべて
+  最後まで一致**。`legal[i]` だけが 12 局で食い違い（#11）。バニラ再生 20 局は一致。
+- `cargo test` 288 green・clippy 0。
+
+**指示書（1〜2 セッション）**
+
+```
+Rust エンジン移行 P3 の仕上げ（横断事項の解消と全体受け入れ）を実装してください。計画
+docs/rust_engine_plan.md §11.8（決定表 #1〜#10 と受け入れ）。本線 claude/cpu-spec-improvements-yw91jd から
+分岐し、claude/rs-p3-final に push、PR は作りません。Python 側（opcg_sim/）は変更しない。Python 版が正＝
+不一致は Rust を直す。Python 側の欠陥と判断した場合は直さず RESULT.json の notes に盤面と path を書く
+（§11.8 #10 のように計画へ記録する）。
+
+やること（決定表の順）:
+1. #1 記録形式 v5（監査記録の fire 直後・各 payload 直後に {shuffled, hidden}・replay_audit の再同期）。
+   RECORD_VERSION=5（rs_diff_replay.py／rs_audit_replay.py／state.rs）。
+2. #2 ドン!!対象の経路（model.rs の Interaction 候補を Vec<TargetRef>・interact.rs の提示/再開・
+   EffectContext::temp_resolved_targets・actions/mod.rs::run_target_loop の targets・rest/active の分岐）。
+   群 D の §8.13 の表を仕様として使う。
+3. #3・#4 差し口の意味論（全群 None → run_target_loop）と群 A の回避策の撤去。
+4. #5〜#8 群 E の申告 4 件。
+5. #9 replay の vanilla ガードを外す。
+6. 全カード監査を回し、跨り 685 枚を含む残りの不一致・未実装を潰す（群ファイルの修正は可＝所有範囲は
+   本 WP が全体）。実デッキ再生 random 500／L1 100 を通す。
+7. cargo test/clippy green・make test green。docs/rust_engine_plan.md §8 に結果行と §8.15、§11.8 の
+   受け入れ表を実測で埋める。docs/TEST_SPEC.md の記録形式の記述を v5 に更新。
+
+受け入れ（数値）: §11.8 の (a)〜(d) すべて。RESULT.json: {"job":"rs-p3-final","status":"done",
+"audit_all":{...},"replay_random500":{...},"replay_l1_100":{...},"regress":{...},"notes":"..."} を push。
 ```
