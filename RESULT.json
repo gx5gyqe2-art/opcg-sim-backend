@@ -1,0 +1,63 @@
+{
+  "job": "rs-p4-mcts",
+  "status": "done",
+  "branch": "claude/rs-p4-mcts",
+  "base": "claude/cpu-spec-improvements-yw91jd (6123c20)",
+  "python_changed": false,
+  "decide": {
+    "oracle": "tests/scripts/rs_search_oracle.py --what decide --games 100 --jobs 4",
+    "sims": 160,
+    "net": "nrel_a1.npz",
+    "decisions": 10096,
+    "checks": 9855,
+    "match": 9849,
+    "mismatch": 6,
+    "move_match": 9851,
+    "move_match_rate": 0.9996,
+    "move_mismatch": 4,
+    "n_mismatch_same_move": 2,
+    "legal_mismatch": 0,
+    "kind_mismatch": 0,
+    "l1_max": 76.0,
+    "mismatch_permutation": 4,
+    "mismatch_values": 2,
+    "shuffle_skipped": 241,
+    "long_prefix_skipped": 0,
+    "unrestorable_skipped": 0,
+    "harness_error": 0,
+    "game_aborted": 0,
+    "kind_main": 4843,
+    "kind_window": 2046,
+    "kind_commit": 3207,
+    "with_commit_in": 3291,
+    "with_prefix": 627,
+    "multi_choice": 3697,
+    "groups_merged": 0,
+    "seconds": 1715.6
+  },
+  "ties": 5,
+  "regression": {
+    "legal": {"boards": 40, "checks": 124, "mismatch": 0},
+    "determinize": {"boards": 40, "checks": 80, "mismatch": 0},
+    "apply": {"boards": 40, "moves": 227, "mismatch": 0},
+    "net": {"boards": 40, "value_max_abs_err": 8.941e-07, "priors_max_abs_err": 3.576e-07, "mismatch": 0},
+    "encode": {"boards": 40, "views": 80, "values": 2074410, "cardtab_rows": 2653, "mismatch": 0}
+  },
+  "cargo_test": {"passed": 371, "failed": 0},
+  "clippy": {"warnings": 0},
+  "make_test": "pending",
+  "negative_controls": [
+    {"break": "argmax の同点を添字が大きい方にする", "result": "mismatch=5 / checks=757"},
+    {"break": "静止探索（_leaf_value の解決）を止める", "result": "mismatch=48 / checks=757"},
+    {"break": "箱コミットの機械実行を止める", "result": "bad_payload=244・match 757→513"},
+    {"break": "等価手マージを外す／代表を末尾にする", "result": "発火せず（被覆の穴・notes 参照）"}
+  ],
+  "notes": [
+    "残る不一致 6 件は 1 つの原因に帰着する。numpy の float32 行列積は**ビット同一の行**でも行位置で別の丸めを返す（tests/scripts/rs_blas_tie_probe.py の実測: Wp1/Wp2 で 1,000 組中 196 組・割れるのはバッチ 3 行と 5 行のときだけ・最大差 1.9e-06・numpy 2.4.6）。効果選択の対話は候補の素性が全候補で同一になるので、Python の quiesce_choice の np.argmax(priors) は「BLAS がどの行を別の丸めにしたか」で決まる（実測 [0.3333333730697632, 0.3333333730697632, 0.333333283662796] → argmax 0／別の呼び出しでは argmax 2）。Rust は候補ごとに独立に計算するため完全な同点になり添字 0 を選ぶ。よって『手 100% 一致・N 完全一致』はこの設計（forward 1e-5 許容・計画 §12.4-5）では原理的に到達できない。追跡の経路と証拠は計画 §8.17。",
+    "移植中に**記録の穴を 1 件**見つけて直した。記録 v5 の hidden が期間付き効果の一覧（effects/continuous.py の ContinuousEffectManager.effects）を持たず、復元した盤面で TURN_END を打っても「このターン中 パワー−5000」（EB04-023 チャカ&ペルの登場コスト）が失効しなかった。hidden_dict に manager.continuous を v5 additive で足し、GameState::from_record が読む（欄が無い記録は空＝従来どおり）。opcg_sim/ は触らず、Python 側の復元はハーネス（rs_record._restore_continuous）で一覧だけ戻す。",
+    "契約からの逸脱を 2 点申告する。(1) search/mod.rs の RecordedRng は search/rng.rs へ移し、SearchRng trait（shuffle_order／dirichlet／choice）を切って PCG32 版（Pcg32SearchRng・P5 の生成用）を同じ口で差せるようにした。uniforms は『温度サンプルが引いた一様乱数』で、numpy の Generator.choice(n, p=...) と同じ式（累積分布を cdf[-1] で割り searchsorted(u, side=right)）で index に直す（2,000 回の照合で numpy と完全一致）。(2) decide をまたぐ状態（_commits の残り手順・_resact_pending）は opts_json/戻り値で入出力する。Rust の decide は盤面 JSON から毎回組み直すため。ターン内 sticky 世界線（_world_seeds）は出目そのものが渡ってくるので Rust 側に状態を持たない＝P5 の生成側ドライバが (game, turn, seat) ごとに同じ seed の生成器を渡す責務を負う。",
+    "net/mod.rs の load_net(tables_path 省略時) が ret_don を 0 埋めしていたのを Rust の profile から組むよう直した（0 のままだと方策の予算 3 列が壊れる＝decide はこの経路を通る）。",
+    "被覆の穴: 等価手マージ（_merge_root_stats の訪問合算）はこの corpus で一度も効かない（groups_merged=0）。ハーネスのデッキ構築 game_driver.build_deck が card_id ごとに 1 枚しか入れないため、根に『同じ card_id の別実体』が出ない。マージの規約は cargo test の merge_root_stats_* 3 本が直接アサートする。",
+    "決定オラクルは中断（対話）へ prefix で入り直す。記録 v5 の hidden が中断スタックを持たないため、復元できる直近の決定点（interaction_depth／pending_triggers／pending_end_of_turn が 0）を基準に、そこから打った手を run_game と同じ素の apply_game_action／apply_battle_action で再適用する（--what legal の prefix は _apply_move_inplace＋ドレインで別物）。基準点から今まで、または探索の中で山札を混ぜた決定点は照合から外して件数を報告する（shuffle_skipped 241）。"
+  ]
+}

@@ -724,6 +724,11 @@ class DecideRunner:
             return
         l1 = (sum(abs(a - b) for a, b in zip(py_n, rs_n))
               if len(py_n) == len(rs_n) else None)
+        # 空振り検査: 等価手マージが実際に効いた決定点（同名カードの別実体が同じ組に入った）
+        for g in (got.get("groups") or []):
+            if len(g.get("idxs") or []) > 1:
+                totals.bump("groups_merged")
+                break
         if same_move and l1 == 0.0:
             totals.bump("match")
             if len(py_legal) > 1:
@@ -868,6 +873,7 @@ def run_decide(db, args, effects_path: str) -> int:
         "kind_commit": totals.get("kind_commit", 0),
         "with_commit_in": totals.get("with_commit_in", 0),
         "multi_choice": totals.get("multi_choice", 0),
+        "groups_merged": totals.get("groups_merged", 0),
         "sims": args.sims,
         "net": _os.path.basename(args.net),
         "seed_base": args.seed_base,

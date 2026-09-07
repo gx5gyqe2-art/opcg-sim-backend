@@ -1253,6 +1253,62 @@ Python 側の復元器（`opcg_sim/src/core/rs_bridge.py`）は触らず、ハ�
 - 同点の扱い（§12.4-5）: `main` は「手が同じで訪問分布の L1 ≤ 2/sims」なら通す（`ties`）。
   `window` は訪問を配らないので、Rust 側の出口 value で「その 2 枝の差が forward の許容
   （`--tie-tol` 既定 1e-5）以下＝同点」と確かめられたときだけ通す（`tie_window`）。
+- 不一致は**性質で分けて数える**: 根の `Q` を昇順に並べた「集合」が許容内で一致するなら
+  `mismatch_permutation`（同じ枝の値が別の添字に付いただけ＝同点で順位が割れた形）、
+  集合まで違うなら `mismatch_values`。`--dump-dir` に**再現一式**（`hidden`／`prefix`／出目／
+  Python の答え）を書き出せる＝100 局を回し直さずに 1 決定点だけを両側で打ち直せる。
+
+**受け入れ実測（2026-09-07・`--games 100 --jobs 4`・sims=160・a1）**:
+| 決定オラクル `--what decide` | 決定点 10,096・照合 9,855（読み出し経路: main 4,843／window 2,046／commit 3,207。箱コミットが実際に走った決定点 3,291・候補 2 つ以上 3,697・中断へ prefix で入り直した 627） |
+| 　一致 | **9,849**（99.94%）。手の一致は **9,851／9,855（99.96%）** |
+| 　不一致 | **6**（0.06%・内訳は下）。`legal` の並びの不一致 0・`kind`（main/window/commit）の不一致 0 |
+| 　照合から外した | 山札を混ぜた決定点 241（`shuffle_skipped`）。`long_prefix_skipped` 0・`unrestorable_skipped` 0・`harness_error` 0・`game_aborted` 0 |
+| 退行 `legal`／`determinize`／`apply`（40 局面） | checks 124／80・moves 227 とも **mismatch=0** |
+| 退行 `net`（40 局面） | value 最大誤差 8.94e-07・priors 3.58e-07・**mismatch=0** |
+| 退行 `encode`（40 局面） | views 80・values 2,074,410・**mismatch=0**・カード表 2,653 行一致 |
+| `cargo test --no-default-features` | **371 passed**・0 failed |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+
+**残る 6 件は 1 つの原因に帰着する（追跡の結果・実装の差ではない）**:
+分類は `mismatch_permutation` 4 件（根の `Q` の集合が 6.9e-09〜2.9e-07 で一致＝**同じ枝の値が
+別の添字に付いただけ**）・`mismatch_values` 2 件。値の 2 件を `--dump-dir` の一式から
+1 決定点だけ打ち直して降りたところ、**`quiesce_choice` の `np.argmax(priors)`** に行き着いた:
+
+- 効果選択の対話（`RESOLVE_EFFECT_SELECTION`）の候補は、手が `card_uuid` を持たないので
+  `n_eff._cand_row` の 139 列が**全候補で完全に同一**になる（`si`／`ti` も −1）。よって
+  priors は本来**完全な同点**で、`np.argmax` は添字 0 を返すはず。
+- ところが Python の実測は `[0.3333333730697632, 0.3333333730697632, 0.333333283662796]`
+  ——最後の 1 本だけ **float32 の 1 ULP** 小さい。別の呼び出しでは
+  `[0.3333333134651184, 0.3333333134651184, 0.3333333730697632]` で **argmax が 2 になる**。
+- 原因は候補の中身ではなく**行の位置**。numpy の float32 行列積は、**ビット同一の行**を
+  バッチにしても行位置で別の丸めを返す（`tests/scripts/rs_blas_tie_probe.py` の実測:
+  `Wp1`／`Wp2` で 1,000 組中 **196 組**が割れ、割れるのは**バッチ 3 行・5 行のときだけ**
+  ＝2／4／8 行では割れない〔SIMD の端数処理の形〕・最大差 1.9e-06・numpy 2.4.6）。
+- Rust は候補ごとに独立に計算するので**完全な同点**になり、numpy の規約どおり添字 0 を選ぶ
+  （`net/nrel.rs` の `seg_softmax_gives_exact_ties_for_equal_logits`）。この 1 手の差が
+  箱の解決を別の出口へ導き、根の `Q`／`N` に伝わる。
+
+つまり **Python 側のこの決定は BLAS の丸めが決めており、候補の中身では決まっていない**。
+Rust をここに合わせるには BLAS のブロッキングまで写す必要があり、それは機械の性質であって
+アルゴリズムの性質ではない（写す価値がない）。**「手 100% 一致・N 完全一致」はこの
+設計（forward 1e-5 許容・§12.4-5）では原理的に到達できない**ことの記録として残す。
+
+**否定対照**（オラクルが本当に不一致を見つけられるか）:
+| わざと壊した箇所 | 結果（8 局 sims=24・checks=757） |
+| `argmax` の同点を「添字が大きい方」にする | **mismatch=5**（手 5） |
+| 静止探索（`_leaf_value` の解決）を止める | **mismatch=48**（手 7・N 41） |
+| 箱コミットの機械実行を止める | **bad_payload=244**（Rust が木へ落ちて世界サンプルの出目を余分に要求する＝「記録した並びの出目が尽きた」で捕まる。match は 757→513 へ落ちる） |
+| 等価手マージを外す／代表を末尾にする | **発火しない**（下の「被覆の穴」） |
+
+**被覆の穴（申告）**: 等価手マージ（`_merge_root_stats` の訪問合算）は**この corpus では
+一度も効かない**。100 局の実測で `groups_merged=0`（20 局 sims=64 の別実行でも main 940 決定点で 0）＝
+根の候補に「同じ card_id の別実体」が出ない。原因はハーネスのデッキ構築
+（`game_driver.build_deck` が `raw_db` を走査して **card_id ごとに 1 枚**しか入れない）で、
+実デッキのような 4 枚積みが無いため。よって否定対照（マージを外す／代表を末尾にする）も
+差を作れない。マージの規約そのものは `cargo test` の
+`merge_root_stats_folds_equivalent_copies`／`..._keeps_different_cards_apart`／
+`..._splits_boxes_by_don_k`（同名 2 枚の合算・card_id 違いの分離・`don_k` 違いの分離・
+代表は列挙順先頭・n 降順の安定ソート）が直接アサートする。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 

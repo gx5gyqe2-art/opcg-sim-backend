@@ -435,6 +435,14 @@ pub fn priors(
 }
 
 /// `NRelNet.seg_softmax`（1 セグメント）。Python は float64 で exp/和を取り最後に float32 へ落とす。
+///
+/// **同じ logit には同じ確率を返す**（＝完全な同点）。Python 側は同点にならないことがある:
+/// numpy の float32 行列積は**ビット同一の行でも行位置によって丸めが変わる**（`Wp1`／`Wp2` の
+/// 実測で 1,000 組中 196 組・多くは最終行だけ 1 ULP ずれる）。効果選択の対話は候補の素性が
+/// 全て同一（手が card_uuid を持たない）になるので、Python の `quiesce_choice` の
+/// `np.argmax(priors)` は「BLAS がどの行を別の丸めにしたか」で決まる。Rust は候補ごとに
+/// 独立に計算するため同点になり、numpy の規約どおり**添字が小さい方**を選ぶ。
+/// この差は決定オラクル（`--what decide`）の残る不一致の唯一の原因（計画 §8.17）。
 pub fn seg_softmax(logits: &[f32]) -> Vec<f32> {
     let mut mx = -1e30f64;
     for l in logits {
@@ -554,6 +562,25 @@ fn extra_of(enc: &Encoding) -> Result<Vec<f32>, EngineError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 同じ logit には同じ確率＝**完全な同点**（Python の BLAS 由来の 1 ULP 差は写さない）。
+    /// 同点になれば `quiesce_choice` の argmax は添字が小さい方＝再現可能な選択になる。
+    #[test]
+    fn seg_softmax_gives_exact_ties_for_equal_logits() {
+        for n in [2usize, 3, 5, 8] {
+            let p = seg_softmax(&vec![1.25f32; n]);
+            assert_eq!(p.len(), n);
+            assert!(p.windows(2).all(|w| w[0].to_bits() == w[1].to_bits()),
+                    "n={n} で同点にならない: {p:?}");
+            let best = p.iter().enumerate()
+                .fold(0usize, |b, (i, v)| if *v > p[b] { i } else { b });
+            assert_eq!(best, 0, "同点は添字が小さい方");
+        }
+        // 和は 1（float32 の丸めの範囲で）
+        let p = seg_softmax(&[0.5, 1.5, -2.0]);
+        assert!((p.iter().sum::<f32>() - 1.0).abs() < 1e-6);
+        assert!(p[1] > p[0] && p[0] > p[2]);
+    }
 
     fn mat(rows: usize, cols: usize, f: impl Fn(usize, usize) -> f32) -> Mat {
         let mut d = vec![0.0; rows * cols];
