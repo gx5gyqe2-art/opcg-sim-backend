@@ -8,7 +8,7 @@
 //! | [`target_handler_for`] | `registry._TARGET_HANDLERS` |
 //! | [`run_target_loop`] | `target_loop.run_target_loop`（除去保護・置換ゲート・B2 退避） |
 //! | [`move_card`] | `card_moves.move_card`＋離脱イベント（`drop_for`／ON_LEAVE／ライフ減少） |
-//! | [`active_protection`]／[`find_replacement`]／[`active_replacement`] | `engine/guards.py` の同名（**群 E**。ここは「保護者が居ない」高速路だけ） |
+//! | [`active_protection`]／[`find_replacement`]／[`active_replacement`] | `engine/guards.py` の同名（本体は**群 E**＝[`rules`]。ここは呼び口だけ） |
 //!
 //! ## 未実装は `Unimplemented`（Python の「未登録は no-op」とは意図的に違える）
 //!
@@ -35,9 +35,9 @@ use crate::model::{
 use crate::ops;
 use crate::state::EngineError;
 
-use super::ast::{ActionType, GameAction, PlayerRef, TriggerType};
+use super::ast::{ActionType, GameAction, PlayerRef};
 use super::resolver::{expire_turn_for, is_timed};
-use super::{ability, continuous, triggers, NodeRef};
+use super::{continuous, triggers, NodeRef};
 
 /// 「相手の効果で場を離れない」対象になり得る除去アクション（Python `_LEAVE_ACTIONS`）。
 const LEAVE_ACTIONS: &[ActionType] = &[
@@ -81,9 +81,12 @@ fn game_handler_for(action: &GameAction) -> Option<GameHandler> {
         | ActionType::RampDon
         | ActionType::ReturnDon
         | ActionType::RestDon
-        | ActionType::FreezeDon => Some(GameHandler::Unregistered),
-        // RULE_PROCESSING は Python では guard 付き（自己制限のときだけ）。ここでは
-        // 対象ループ側にも登録があるので、どちらへ落ちても群 E の未実装で止まる。
+        | ActionType::FreezeDon
+        // RULE_PROCESSING は Python では guard 付き（自己制限のときだけプレイヤーレベル）。
+        // 自己制限は対象を持たない＝対象ループでは 1 度も呼ばれないので、ここで群 E へ渡す
+        // （ガードが偽のときの Python のフォールスルー先＝`rule_processing` は no-op で
+        //  success=true なので、群 E 側はどちらの枝でも `Some(Ok(true))` を返す）。
+        | ActionType::RuleProcessing => Some(GameHandler::Unregistered),
         _ => None,
     }
 }
@@ -461,99 +464,54 @@ pub fn move_card(
 // 除去保護・置換（群 E の担当。ここは「保護者が居ない」高速路だけ）
 // ---------------------------------------------------------------------------
 
-/// Python `guards._active_protection` のうち、**核心以外**を Python どおりに答える。
+/// Python `guards._active_protection`（本体は群 E＝[`rules::active_protection`]）。
 ///
-/// - `PREVENT_{status}` が `flags | timed_flags` にある → `true`（完全一致・matcher 不要）
-/// - 走査対象の中に「PASSIVE ＋ `PREVENT_LEAVE` ＋ 該当 status」の能力が**1 つも無い**
-///   → `false`（Python も同じ結論になる。matcher も条件評価も要らない）
-/// - 1 つでもある → [`EngineError::Unimplemented`]（保護クエリの照合・条件・ターン制限は
-///   群 E＋core の担当。黙って `false` にしない）
+/// `mod.rs::run_target_loop` の呼び口（Python `target_loop` と同じく `attacker` を渡さない）。
+/// バトル KO 経路は属性限定の耐性判定にバトル相手が要るので [`active_protection_vs`] を使う。
 pub fn active_protection(
-    s: &Session,
+    s: &mut Session,
     masters: &MasterTable,
     card: CardIdx,
     status_values: &[&str],
     actor: Option<Seat>,
 ) -> Result<bool, EngineError> {
-    if s.state().card(card).negated {
-        return Ok(false);
-    }
-    let owner = s.state().card(card).owner;
-    for st in status_values {
-        let want = format!("PREVENT_{st}");
-        if crate::rules::has_flag(s.state(), card, &want) {
-            return Ok(true);
-        }
-    }
-    let mut protectors: Vec<CardIdx> = vec![card];
-    push_scope(s, owner, card, &mut protectors);
-    if let Some(actor) = actor {
-        if actor != owner {
-            push_scope(s, actor, card, &mut protectors);
-        }
-    }
-    for p in protectors {
-        if crate::rules::is_effect_negated(s.state(), p) || s.state().card(p).negated {
-            continue;
-        }
-        if has_passive_action(s, masters, p, ActionType::PreventLeave, status_values)? {
-            return Err(EngineError::Unimplemented(format!(
-                "guards::_active_protection（PREVENT_LEAVE の照合）は P3 群 E: card={}",
-                s.state().card(p).uuid
-            )));
-        }
-    }
-    Ok(false)
+    rules::active_protection(s, masters, card, status_values, actor, None)
 }
 
-/// Python `guards._find_replacement` の「置換候補が 1 つも無い」高速路。
-///
-/// `granted_replacements`（`_register_granted_replacements` が積む「このターン中」付与）は
-/// **【カウンター】イベントの発動でしか積まれない**（群 E の `apply_counter`）。この WP は
-/// その経路を持たないので常に空＝Python と同じ結論になる。
+/// [`active_protection`] にバトル相手（Python の `attacker=`）を渡す版。
+pub fn active_protection_vs(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+    attacker: Option<CardIdx>,
+) -> Result<bool, EngineError> {
+    rules::active_protection(s, masters, card, status_values, actor, attacker)
+}
+
+/// Python `guards._find_replacement`（本体は群 E＝[`rules::find_replacement`]）。
 pub fn find_replacement(
     s: &Session,
     masters: &MasterTable,
     card: CardIdx,
     status_values: &[&str],
-) -> Result<bool, EngineError> {
-    if s.state().card(card).negated {
-        return Ok(false);
-    }
-    let owner = s.state().card(card).owner;
-    let mut candidates: Vec<CardIdx> = vec![card];
-    if let Some(l) = s.state().player(owner).leader {
-        if l != card {
-            candidates.push(l);
-        }
-    }
-    candidates.extend(s.state().player(owner).field.iter().copied().filter(|c| *c != card));
-    for p in candidates {
-        if crate::rules::is_effect_negated(s.state(), p) {
-            continue;
-        }
-        if has_passive_action(s, masters, p, ActionType::ReplaceEffect, status_values)? {
-            return Err(EngineError::Unimplemented(format!(
-                "guards::_find_replacement（REPLACE_EFFECT の照合）は P3 群 E: card={}",
-                s.state().card(p).uuid
-            )));
-        }
-    }
-    Ok(false)
+) -> Result<Option<rules::Replacement>, EngineError> {
+    rules::find_replacement(s, masters, card, status_values)
 }
 
-/// Python `guards._active_replacement`（置換が成立して実行されたか）。
+/// Python `guards._active_replacement`（本体は群 E＝[`rules::active_replacement`]）。
 pub fn active_replacement(
     s: &mut Session,
     masters: &MasterTable,
     card: CardIdx,
     status_values: &[&str],
 ) -> Result<bool, EngineError> {
-    find_replacement(s, masters, card, status_values)
+    rules::active_replacement(s, masters, card, status_values)
 }
 
 /// `owner` の リーダー／場／ステージ（`card` 自身は除く）を積む。
-fn push_scope(s: &Session, owner: Seat, card: CardIdx, out: &mut Vec<CardIdx>) {
+pub(super) fn push_scope(s: &Session, owner: Seat, card: CardIdx, out: &mut Vec<CardIdx>) {
     let p = s.state().player(owner);
     if let Some(l) = p.leader {
         if l != card {
@@ -566,36 +524,6 @@ fn push_scope(s: &Session, owner: Seat, card: CardIdx, out: &mut Vec<CardIdx>) {
             out.push(st);
         }
     }
-}
-
-/// PASSIVE 能力の効果木に、指定 `ActionType` かつ `status` が `status_values` に含まれる
-/// アクションがあるか（Python `gm._find_action(ab.effect, ...)` ＋ `eff.status in status_values`）。
-fn has_passive_action(
-    s: &Session,
-    masters: &MasterTable,
-    card: CardIdx,
-    ty: ActionType,
-    status_values: &[&str],
-) -> Result<bool, EngineError> {
-    for id in &masters.get(s.state().card(card).master).ability_ids {
-        let ab = ability(masters, *id)?;
-        if ab.trigger != TriggerType::Passive {
-            continue;
-        }
-        if let Some(effect) = ab.effect.as_ref() {
-            if let Some(a) = find_action(effect, ty) {
-                if a
-                    .status
-                    .as_deref()
-                    .map(|st| status_values.contains(&st))
-                    .unwrap_or(false)
-                {
-                    return Ok(true);
-                }
-            }
-        }
-    }
-    Ok(false)
 }
 
 /// Python `gm._find_action(node, action_type)`（効果木を前順で辿り最初の該当アクション）。
