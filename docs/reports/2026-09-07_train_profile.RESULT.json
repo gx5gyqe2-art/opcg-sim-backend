@@ -3,6 +3,7 @@
   "status": "done",
   "date": "2026-09-07",
   "report": "docs/reports/2026-09-07_train_profile.md",
+  "moved_to": "docs/reports/2026-09-07_train_profile.RESULT.json",
   "scripts": ["tests/scripts/train_profile.py", "tests/scripts/train_profile_torch.py"],
   "training_code_unchanged": true,
   "env": {

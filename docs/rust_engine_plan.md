@@ -1368,6 +1368,27 @@ Rust をここに合わせるには BLAS のブロッキングまで写す必要
 `..._splits_boxes_by_don_k`（同名 2 枚の合算・card_id 違いの分離・`don_k` 違いの分離・
 代表は列挙順先頭・n 降順の安定ソート）が直接アサートする。
 
+### 8.18 学習の計測 `train-profile`（§18.1）の結果（2026-09-07）
+
+ブランチ `claude/train-profile-g26cyx`（3 コミット）を本線に取り込んだ（学習コード無変更・新規は
+`tests/scripts/train_profile.py`／`train_profile_torch.py`・報告 `docs/reports/2026-09-07_train_profile.md`・
+数字の一次情報は `docs/reports/2026-09-07_train_profile.RESULT.json`）。1 シャード（n28-w01・81,871 行）＋
+200 バッチの部分計測で、2 シャードとの比が行数比と一致（2.669 対 2.692）＝行数比例で外挿できる。
+
+**律速**: backward（46〜54%）と、`--ablate rel` では `mask_rel` が全部 0 にする＝**捨てられている関係 R の
+再計算**（29〜37%）。どちらも 1 コアのみ（4 コア中 25%）。Python の切り出し 0.1〜0.5%・Adam 1% は無関係。
+
+| 手 | 実測 | 1 エポックの見込み |
+|---|---|---|
+| ① `--ablate rel` のとき `relations_batch` を呼ばない | value 1.46 倍・損失 200 バッチでビット一致 | **1.44 倍** |
+| ④ torch（CPU）化 | 1 スレッドでも 2.28 倍・4 スレッド 5.33 倍・forward は numpy と 8.8e-7 一致 | ①込みで value のみ 2.83 倍／**policy も 7.67 倍（推定）** |
+| ③ float16/int16 memmap | 常駐 2.08 倍圧縮・切り出しはステップの 0.17% | 時間には効かない（メモリの手） |
+| ② バッチサイズ拡大 | 4 倍 0.74・16 倍 0.64 と**逆効果**・BLAS 4 スレッドも 0.93 | やらない |
+
+1 行あたり: 読み込み 6.99e-5 s・保持 2,610 B（`V.tok` float32 [22,20] が 67%）・学習 2.86 ms。a1 相当
+（216 万行）で読み込み 151 s・RSS 6.2 GB・1 エポック 6,186 s（当機。実機は 0.59〜0.68 倍）。
+波 4 本＝12.7 GB で cgroup 14 GB にぎりぎり＝「古い波から落とす」運用の実測裏付け。設計は §18.2。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
@@ -2586,4 +2607,88 @@ RESULT.json: {"job":"train-profile","status":"done","per_row":{"load_sec":..,"by
 "torch_vs_numpy":{...},"recommendation":"..."}。
 ```
 
-結果を見て §18.2（設計: Rust 生成が memmap ダンプを直接書く／torch 学習／行の窓）を書く。
+結果は §8.18。設計は次節。
+
+### 18.2 設計（2026-09-07・§8.18 の実測から）
+
+計測が示した順に 3 段。②（バッチサイズ）と BLAS スレッド増はやらない。
+
+1. **①R 省略（WP `train-norel`・今すぐ・§18.3）**: `--ablate rel` のとき `relations_batch` を呼ばず
+   ゼロ配列（`mask_rel` が出すのと同じ形・dtype）を渡す。損失がビット一致することは実測済みなので
+   受け入れは機械的（`train_profile.py norel` の再実行で `loss_max_abs_diff == 0`）。`relations_batch`
+   自体は残す（R を戻す設計の余地）。1.44 倍。r2b の次の訓練から効く。
+2. **④torch 化（WP `train-torch`・切替 §16.3 の取り込み後・§18.4）**: value と policy の**両方**を
+   torch（CPU）で書く。numpy の手書き backward は**参照実装として残し**、`--backend numpy|torch`
+   （既定 torch・import できなければ numpy に落ちる）で切り替える。**npz の形式は変えない**
+   （`meta.kind=nrel-a`・vocab_ids・重みの名前と形。Rust の `load_net` と `n_rel.load` が同じ npz を
+   読む＝serve 側は無変更）。①込みで 7〜8 倍（推定・受け入れで実測する）。
+3. **③float16/int16（切替後の後続・Rust 生成が dump を書く形に合わせて別途）**: 時間ではなくメモリ
+   （同じ 14 GB に 2 倍の波）。`V.tok` float16・`V.ci` int16・`V.sc` float16 の memmap を Rust の生成側が
+   最初から書き、学習側は `mmap_mode="r"` で読む（読み込み 300 s も消える）。fp16 の forward 差は
+   最大 1.07e-4 で無視できる。全波規模ではページキャッシュに乗らない点だけ注意。**④の後**に着手
+   （④で学習側の読み口が固まってから形式を決める）。
+
+### 18.3 WP `train-norel` の指示書（2026-09-07・今すぐ・小）
+
+```
+NRel の訓練器（tests/scripts/n_rel_train.py）で、--ablate に rel が含まれるとき関係 R（relations_batch）の
+再計算を省いてください。docs/reports/2026-09-07_train_profile.md §2b の実測で、この計算結果は mask_rel に
+よって全部 0 に置き換えられており（捨てられている）、省いても損失はビット一致します。
+本線 claude/cpu-spec-improvements-yw91jd から分岐し、claude/train-norel に push、PR は作りません。
+
+やること:
+1. n_rel_train.py の value_step／policy_step（またはその呼び出し側）で、"rel" in ablate のときは
+   relations_batch を呼ばず、mask_rel が出すのと同じ形・dtype のゼロ配列を渡す。relations_batch 自体は
+   残す（--ablate rel でないときは今までどおり呼ぶ）。関数のシグネチャ・npz の形式・meta は変えない。
+2. 確認: tests/scripts/train_profile.py norel を同じ入力で回し、loss_max_abs_diff == 0（ビット一致）
+   であること。さらに 1 シャード・--epochs 1 を「変更前」「変更後」で回し、保存された npz の重みが
+   全配列でビット一致すること（np.array_equal）。
+3. tests/test_n_rel_grad.py に「--ablate rel のとき relations_batch が呼ばれない（monkeypatch で
+   呼ばれたら fail）・呼ばない経路と呼ぶ経路で loss がビット一致」の 1 テストを足す（cpu_infra）。
+4. docs/TEST_SPEC.md の n_rel_train.py の行に一言追記。RESULT.json を添える。
+   確認は make test（Rust とゲート）＋ pytest tests/test_n_rel_grad.py。
+
+受け入れ: 2 のビット一致が両方成立・3 のテスト green・変更は n_rel_train.py と test_n_rel_grad.py と
+docs のみ。
+RESULT.json: {"job":"train-norel","status":"done","loss_max_abs_diff":0.0,"npz_bit_identical":true,
+"value_sec_per_row_before":..,"after":..,"speedup":..}
+```
+
+### 18.4 WP `train-torch` の指示書（切替 §16.3 の取り込み後に出す・中）
+
+前提: §16.3 の取り込み後（学習は `opcg_sim/learned/train/` に移っている）と §18.3 の取り込み後。
+
+```
+NRel の訓練器（opcg_sim/learned/train/n_rel_train.py・移動後のパス）に torch（CPU）の学習経路を足して
+ください。docs/reports/2026-09-07_train_profile.md §4 の実測（forward が numpy と 8.8e-7 で一致・
+1 スレッド 2.28 倍・4 スレッド 5.33 倍）を本番の訓練器に入れる作業です。プロトタイプは
+tests/scripts/train_profile_torch.py（value 経路のみ）。本線から分岐し claude/train-torch に push、PR は
+作りません。
+
+やること:
+1. value と policy の両方の forward／loss を torch で書く（式は numpy 版と同じ。backward は autograd・
+   更新は torch.optim.Adam を numpy 版と同じハイパーパラメータで）。numpy の手書き backward は参照実装
+   として残し、--backend numpy|torch（既定 torch。torch を import できなければ警告して numpy）で切り替える。
+   --threads N（既定は全コア）で torch.set_num_threads。
+2. npz の形式は変えない: 重みの名前・形・dtype（float32）・meta.kind=nrel-a・vocab_ids・ablate の焼き込み。
+   torch で訓練した npz を opcg_sim/src/learned/n_rel.py の load と Rust の load_net の両方が読めて、
+   同じ入力に対する value/policy が numpy 版の forward と 1e-5 で一致すること。
+3. 受け入れの照合（1 シャード・n28-w01 で可）:
+   a. forward: 同じ重み・同じバッチで numpy 版と torch 版の value／policy logits が 1e-5 で一致。
+   b. 勾配: 同じバッチで numpy の手書き backward と torch autograd の全パラメータの勾配が相対 1e-4
+      （|g|>1e-6 の要素）で一致。
+   c. 学習: 同じ教材・同じ seed・--epochs 1 で numpy と torch を回し、holdout の v_mse と p_loss の差が
+      相対 1e-2 以内（Adam の演算順が違うのでビット一致は求めない）。
+   d. 時間: 同じ 1 シャード・1 エポックの壁時計を numpy／torch 1 スレッド／torch 全コアで表にする。
+4. テスト: tests/test_n_rel_train_torch.py（cpu_infra・torch が無ければ skip）に a・b と「npz を
+   n_rel.load で読めて forward 一致」を入れる。TEST_SPEC に行を足す。torch は任意依存
+   （requirements に固定せず、README の学習手順に pip install torch --index-url …/cpu を書く）。
+5. 報告: docs/reports/<日付>_train_torch.md（a〜d の数字）＋ RESULT.json。
+   確認は make test ＋ 4 のテスト。
+
+受け入れ: 3 の a〜d が揃う・npz 形式無変更（Rust load_net で読めることを rs_net_oracle.py で 1 回照合）・
+numpy 経路が残っている。
+RESULT.json: {"job":"train-torch","status":"done","forward_max_abs":..,"grad_max_rel":..,
+"val_vmse":{"numpy":..,"torch":..},"epoch_sec":{"numpy":..,"torch1":..,"torchN":..},"speedup":..}
+```
+
