@@ -4,9 +4,9 @@
 `self` を第1引数 `gm`（GameManager）へ読み替えただけで、挙動・戻り値は不変。
 """
 import random
-from ...models.enums import ActionType, Zone, TriggerType
-from ..rules_constants import SELF_RESTRICTION_KEYS
-from .registry import game_handler
+from opcg_sim.src.models.enums import ActionType, Zone, TriggerType
+from legacy.python_engine.core.rules_constants import SELF_RESTRICTION_KEYS
+from legacy.python_engine.core.actions.registry import game_handler
 
 
 @game_handler(ActionType.RULE_PROCESSING,

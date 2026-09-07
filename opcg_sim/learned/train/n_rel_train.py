@@ -17,15 +17,13 @@ import glob
 import json
 import time
 
+import sys as _sys
+
 import numpy as np
 
-import os as _os, sys as _sys  # noqa: E402
-_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-import _bootstrap  # noqa: E402,F401
 
-import n1_train as N1                       # ATYPES（候補 action 語彙）
-from n_eff_feat import build_eff_tables     # 語彙表（既定エンジンの vocab）
+from opcg_sim.learned.train import n1_train as N1                       # ATYPES（候補 action 語彙）
+from opcg_sim.learned.train.n_eff_feat import build_eff_tables     # 語彙表（既定エンジンの vocab）
 from opcg_sim.learned import n_eff as NE
 from opcg_sim.learned import n_rel as NL
 from opcg_sim.learned import n_rel_feat as NR

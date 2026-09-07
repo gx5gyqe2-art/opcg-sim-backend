@@ -19,14 +19,12 @@ import glob
 import json
 import time
 
+import sys as _sys
+
 import numpy as np
 
-import os as _os, sys as _sys  # noqa: E402
-_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-import _bootstrap  # noqa: E402,F401
 
-from n_eff_feat import build_eff_tables  # noqa: E402
+from opcg_sim.learned.train.n_eff_feat import build_eff_tables  # noqa: E402
 from opcg_sim.learned import n_eff as NE  # noqa: E402
 from opcg_sim.learned import n_rel as NL  # noqa: E402
 from opcg_sim.learned import n_rel_feat as NR  # noqa: E402

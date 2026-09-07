@@ -129,7 +129,7 @@ def _py_move(game, name):
     if _G.get("mode") == "fair":
         # 期間付き効果の**一覧**を戻す（`rs_bridge` はカード側の値しか戻さない＝失効させる側が
         # 効果を知らず「このターン中 −5000」が残る・§8.17 で実測した記録の穴）。
-        import rs_record
+        from legacy.python_engine.tests.harness import rs_record
         rs_record._restore_continuous(manager, hidden)
     player = manager.p1 if manager.p1.name == name else manager.p2
     return _G["py"].decide(manager, player, sims=_G["sims"])

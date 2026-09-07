@@ -11,7 +11,7 @@ import re
 import unicodedata
 from typing import Any, Dict, List, Tuple
 
-from .gamestate import FIELD_LIMIT
+from legacy.python_engine.core.gamestate import FIELD_LIMIT
 
 Violation = Tuple[str, str]
 

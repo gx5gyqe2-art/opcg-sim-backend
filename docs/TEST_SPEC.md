@@ -58,21 +58,34 @@ resolver は `success = True` を返す。エラー・フォールバック・OT
 logger が `sys.stdout` を直接掴むため、pytest はキャプチャ無効で実行する。
 
 ```bash
-make test         # 新定義（2026-09-07・push前ゲート）。cargo test（Rust）＋ pytest -m "not slow and not legacy"
-make test-legacy   # 従来の全数（-m "not slow"）。Python エンジンを変更したときはこちらも通す
+make rust-develop  # 先に wheel を入れる（無いと golden ゲートは skip ではなく fail する）
+make test          # push前ゲート（**これ 1 本**）。cargo test（Rust 381 本）＋ pytest -m "not slow and not legacy"
 make test-fast     # 開発中のイテレーション用（cpu_infra 除外。push前ゲートの代替ではない）
 ```
 
 コマンドの正本は `Makefile`。`-s/-p no:capture` を付けないと I/O error になる。CI は無く、
 `make test` がマージ前の唯一の確認手段（2026-07-11 廃止・詳細は `CLAUDE.md`）。
+実測 **418 passed・122 秒**（2026-09-07。Rust 化前は 1,786 本・約 10 分）。
 
-**Rust 化後のゲート 2 段化（2026-09-07・`docs/rust_engine_plan.md` §16.1）**: `legacy` マーカーは
-「Python エンジン（`opcg_sim/src/core`・`effects`・`learned`）を直に叩くテスト」に付く。`make test`
-（新定義）はこれを除外し、代わりに golden 2 本（`tests/test_rs_golden_audit.py`・
-`tests/test_rs_golden_replay.py`・§2／§3）が Rust エンジンだけでゲームプレイ退行を見る一次防衛線に
-なる。**Python エンジン自体を変更したときは、`make test` に加えて `make test-legacy`（従来の全数・
-1,786 件）も通す**——golden は「ある時点で Rust と Python が一致した」記録であって、Python 側の
-挙動変更そのものは検出しない。
+**ゲートは 1 本（2026-09-07・第 2 段 `rs-archive-cutover`・`docs/rust_engine_plan.md` §16.3）**:
+Python エンジンは `legacy/python_engine/` へ退避し、テスト対象外になった＝旧 tag `py-engine-final` は
+無い。ゲームプレイ退行は golden 2 本（`tests/test_rs_golden_audit.py`・
+`tests/test_rs_golden_replay.py`・§2／§3）が Rust エンジンだけで見る。
+
+### legacy（tag `py-engine-final`）を回す
+
+凍結した Python エンジンのテスト 1,786 本は、**tag を checkout して**回す:
+
+```bash
+git checkout py-engine-final
+OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -m "not slow" -p no:cacheprovider
+```
+
+その tag は「Python 版がそのまま動く最後の点」（退避コミットの 1 つ前）。現在のツリーでも
+`legacy/python_engine/tests/` に一式（テスト 288 本＋harness 25＋実験 CLI 116）が残っているが、
+**ゲートでは回さない**（`legacy/python_engine/tests/conftest.py` を使えば手動で回せる）。
+Python エンジンを直に叩くテストを新しく足す理由は、もう無いはず——足すなら Rust 側の
+`cargo test` か golden に足す。
 
 `slow` マーカー（`pytest_configure` で登録）は **`make test` から除外**する重テスト（手動実行前提）。現状の対象は
 `test_journal.py::test_parked_resume_make_unmake_roundtrip`（8 seed × 全手の make/unmake 照合 ~245s＝
@@ -138,8 +151,8 @@ make test-slow   # 重テストだけ
 | `tests/test_golden.py` / `tests/golden/*` | ゴールデンコーパス（AST 指紋の部分一致） |
 | `tests/test_rs_golden_audit.py` | **全カード監査 golden**（Rust エンジンだけで回る・`docs/rust_engine_plan.md` §16.1）。`opcg_engine.golden_audit(card_id, trigger, ability_index)` が汎用盤面の生成から `_smart_drain` 既定応答での解決まで自前で辿り、`tests/fixtures/rs_goldens/audit.json`（3,386 能力・Python の記録から `--golden-out` で作った sha1 の列）と一致するかを見る。`test_full_card_audit.py`／`test_full_card_baseline.py`（旧・Python エンジンで全カードを回すゲート・legacy）の Rust 側置き換え |
 | `tests/test_rs_golden_replay.py` | **実対局の再生 golden**（Rust エンジンだけで回る・§16.1）。`opcg_engine.replay()` の盤面・合法手・イベントログの sha1 が `tests/fixtures/rs_goldens/replay/`（random 150 局＋L1 50 局・`--golden-out` で作成）と一致するかを見る |
-| `tests/test_full_card_audit.py` | **legacy**（Python エンジン直叩き）。全カード構造不変条件ゲート（EXCEPTION/CARD_LOSS/TEMP_LEAK=0）。golden 化後は `make test-legacy` でのみ実行 |
-| `tests/test_full_card_baseline.py` | **legacy**。全カード挙動ベースライン回帰（`full_card_baseline.json` と一致）。golden 化後は `make test-legacy` でのみ実行 |
+| `tests/test_full_card_audit.py` | **legacy**（Python エンジン直叩き）。全カード構造不変条件ゲート（EXCEPTION/CARD_LOSS/TEMP_LEAK=0）。退避後は tag `py-engine-final` でのみ実行 |
+| `tests/test_full_card_baseline.py` | **legacy**。全カード挙動ベースライン回帰（`full_card_baseline.json` と一致）。退避後は tag `py-engine-final` でのみ実行 |
 | `tests/test_verified_decks.py` | **手動検証済みデッキの効果回帰**（§8）。ベースラインが捕捉できない常在ルール（RULE_PROCESSING）・ON_LEAVE 誘発・勝利条件・ドンデッキ枚数・カード名別名・持続時間等を意味的に固定 |
 | `tests/test_cpu_selfplay.py` | CPU 対 CPU 自己対戦の完走・決定論・clone 非破壊・合法手適用・インバリアント検出 |
 
@@ -361,8 +374,31 @@ make test-slow   # 重テストだけ
 
 ## 3. 診断・監査ツール（pytest 外）
 
+> **所在の変更（2026-09-07・第 2 段 `rs-archive-cutover`・計画 §17）**: 下表の多くは Python
+> エンジンを直に叩くので `legacy/python_engine/tests/{harness,scripts}/` へ退避した（**tag
+> `py-engine-final` を checkout すれば動く**）。現在のツリーで動くものは次のとおり:
+>
+> | 役割 | 現在の場所 |
+> |---|---|
+> | 生成（棋譜ダンプ） | `python -m opcg_sim.loop.record_gen` |
+> | アリーナ（シャード・再開可） | `python -m opcg_sim.loop.arena_shard` |
+> | 台帳の合算と判定 | `python -m opcg_sim.loop.arena_merge` |
+> | 昇格ゲート・帯層別判定・煙試験 | `python -m opcg_sim.loop.gate {promote,band,smoke}` |
+> | 訓練（NRel／NEff）・評価帯 | `python -m opcg_sim.learned.train.{n_rel_train,n_eff_train,n_rel_band}` |
+> | golden の作り直し（Rust だけ） | `tests/scripts/rs_golden_make.py {audit,replay}` |
+> | 切替の受け入れ A/B（Rust decide 対 Python decide） | `legacy/.../scripts/rs_arena_ab.py`（Python エンジンが要る） |
+> | パーサ差分・効果診断・カバレッジ | `tests/scripts/compare_parsers.py` ほか（Python エンジン不要のものだけ残した） |
+>
+> 下表の `tests/scripts/`／`tests/harness/` の行は、`legacy/python_engine/tests/` 配下に
+> 同じ相対位置で残っているものが多い（履歴の索引として行は消さない）。
+
 | ツール | 役割 |
 |---|---|
+| `tests/scripts/rs_golden_make.py` | **golden の作り直し**（2026-09-07・計画 §16.3-10 で golden の正本が Rust になった）: `audit`＝効果構造 JSON の全能力を `opcg_engine.golden_audit` で回して `tests/fixtures/rs_goldens/audit.json` を書く（3,386 件）。`replay`＝Rust の `Game` で局を打ち、記録（`replay` が食える最小の入力）と sha1 を書く。**焼き付ける前にその場で `opcg_engine.replay` を回して一致を確かめ、一致した局だけを書く**。`--policy a1|random`・`--games`・`--seed-base`・`--sims`。`make golden-audit`／`make golden-replay` の実体 |
+| `opcg_sim/loop/record_gen.py` | **自己対戦の棋譜ダンプ**（旧 `tests/scripts/n_record_gen.py`）: 盤面も思考も Rust。**記録形式（npz の列）は不変**＝`n_rel_train` は無変更で読める。乱数は Rust の決定的な生成器（対局＝`Game(seed)`／探索＝`(対局,ターン,席)` から作る `Pcg32SearchRng`＝ターン内 sticky 世界線）。実測 **4.96 秒/局**（sims 64・Python 版 57.06 秒の 11.5 倍速） |
+| `opcg_sim/loop/arena_shard.py` | **再開可能アリーナ**（旧 `arena_resume.py`）: 帯設計・席入替 CRN・void・ペア水準 95% CI の規約は不変。`--candidate`／`--baseline`／`--leaders`／`--decks`／`--cand-*`（席別の探索つまみ） |
+| `opcg_sim/loop/arena_merge.py` | **台帳の合算と判定**（旧 `tests/scripts/arena_merge.py`・純関数は同一）: seed 衝突を黙って畳まない |
+| `opcg_sim/loop/gate.py` | **昇格ゲート**（旧 `promotion_gate.py`＋`arena_gate.py`＋`n1_gate.py smoke`）: `promote`（stage1/stage2＋アンカー）／`band`（一次スクリーン＋帯層別の本判定）／`smoke`（1 局完走） |
 | `tests/scripts/compare_parsers.py` | レガシー vs V2 の全カード差分（退行検知） |
 | `tests/harness/full_card_audit.py` | 全カード構造不変条件検証＋挙動ベースライン生成（`--regen` で更新） |
 | `tests/harness/game_driver.py` | **共通対局ドライバ**（設計⑥ `docs/refactoring_harness_driver.md`）: 統一対局ループ `run_game`（決定論契約＝global random の消費順保存・`first_player` 再現）＋席生成 `make_seat`（random/ai/arena/**learned**・engine 注入で net-vs-net）＋観測専用 observer。全 CPU 検証ハーネスの土台（新計器の追加＝observer 1 個） |
@@ -504,43 +540,38 @@ make regen-baseline
 
 ## 5. 品質ゲート
 
-**Rust 化後のゲート 2 段化（2026-09-07・`docs/rust_engine_plan.md` §16.1）**: push 前の必須ゲート
-（`make test` の新定義）は golden 2 本（`tests/test_rs_golden_audit.py`／`tests/test_rs_golden_replay.py`・
-Rust エンジンだけで回る）がゲームプレイ退行の一次防衛線になる。下表のうち `tests/harness/full_card_audit.py`
-と `tests/test_full_card_baseline.py` は Python エンジンを直に叩くため `legacy` マーカーが付き、
-`make test-legacy` でのみ実行する（**Python エンジンを変更したら引き続きこちらも通す**）。
-`compare_parsers.py`／`test_effect_oracle_gate.py`／`test_verified_decks.py`／`test_structural_gate.py`／
-`test_verified_buckets.py` はいずれもゲームプレイの静的解析またはエンジン直叩きではない検証で、
-`make test`（新定義）に残る。
+push 前の必須ゲートは **`make test` 1 本**（2026-09-07・第 2 段 `rs-archive-cutover`）。
+ゲームプレイ退行の一次防衛線は golden 2 本（Rust エンジンだけで回る）。Python エンジンを叩く
+旧ゲート（`full_card_audit.py`／`test_full_card_baseline.py`／`test_verified_decks.py`）は
+`legacy/python_engine/` へ退避した＝**tag `py-engine-final` を checkout したときだけ回る**。
 
 | ツール | 合格条件 |
 |---|---|
-| `tests/test_rs_golden_audit.py` | **golden**（Rust だけで回る・§16.1）: `opcg_engine.golden_audit` の sha1 列が `tests/fixtures/rs_goldens/audit.json`（3,386 能力）と一致 |
-| `tests/test_rs_golden_replay.py` | **golden**（Rust だけで回る・§16.1）: `opcg_engine.replay` の sha1 列が `tests/fixtures/rs_goldens/replay/`（random 150 局＋L1 50 局）と一致 |
-| `tests/harness/full_card_audit.py` | **legacy**（`make test-legacy` のみ）: EXCEPTION / CARD_LOSS / TEMP_LEAK = 0 |
-| `tests/test_full_card_baseline.py` | **legacy**（`make test-legacy` のみ）: `full_card_baseline.json` と一致 |
-| `tests/scripts/compare_parsers.py` | 新規 OTHER（退行）= 0 |
+| `tests/test_rs_golden_audit.py` | **golden**: `opcg_engine.golden_audit` の sha1 列が `tests/fixtures/rs_goldens/audit.json`（3,386 能力）と一致 |
+| `tests/test_rs_golden_replay.py` | **golden**: `opcg_engine.replay` の sha1 列が `tests/fixtures/rs_goldens/replay/`（random 150 局＋**a1 50 局**）と一致 |
+| `cargo test --no-default-features` | Rust の単体テスト 381 本（`make test` が先に回す） |
 | `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER / PER_TURN_LIMIT_GAP / UP_TO_GAP = 0（**ラチェット**） |
-| `tests/test_verified_decks.py` | **legacy**（`make test-legacy` のみ）: 検証済みデッキの効果回帰 = 全合格（**ラチェット**: 検証済みの挙動は減らさない） |
-| `tests/test_structural_gate.py` | 構造不変条件4スキャン（H先頭ゲート漏れ／Duration write-off／chooser欠落／「すべて」count退化）= 0 ＋ 条件偽パスで盤面変化ゼロ（**ラチェット**。カテゴリH 再発防止） |
 | `tests/test_verified_buckets.py` | §8.2 台帳「✓」弾×色がベースライン全数登録・H違反0（ドキュメント主張の機械保証） |
+| `tests/test_contract_export.py` | `contract/` の再生成差分ゼロ（API 契約のラチェット） |
+| （legacy・tag で回す） | `full_card_audit.py`（EXCEPTION/CARD_LOSS/TEMP_LEAK=0）・`test_full_card_baseline.py`・`test_verified_decks.py`・`compare_parsers.py`・`test_structural_gate.py` |
 
-挙動を変更したら差分をレビューのうえ `full_card_audit.py --regen` でベースライン更新し、上記ゲートを通す
-（`make test-legacy` を通す）。**検証済みデッキ（§8.2 台帳）の挙動を直したら `tests/test_verified_decks.py`
-にアサートを追記**し、以後それを割らないことをマージ条件とする（カバレッジは単調増加）。
-**golden（`tests/fixtures/rs_goldens/`）は Python エンジンの挙動を意図的に変えたときだけ作り直す**
-（`make golden-audit`／`make golden-replay`）——ベースライン更新と同様、黙って追従させない。
+**golden（`tests/fixtures/rs_goldens/`）は挙動を意図的に変えたときだけ作り直す**
+（`make golden-audit`／`make golden-replay`＝`tests/scripts/rs_golden_make.py`・**Rust だけで回る**）
+——**差分は必ずレビューする**。golden は「その時点の Rust の出力」であって、正しさの独立した
+証拠ではない（2026-09-07 から golden の正本は Rust・計画 §16.3-10）。
 
 ### 5.0 交差対面の実プレイ監査（エンジン/パーサを変更したときの追加ゲート・2026-08-16）
 
 ```bash
-make audit-cross                      # 既定 120 件・約10分（CROSS/CROSS_SEED で件数と対面集合を変更）
+make audit-cross                      # 既定 120 ペア（CROSS/CROSS_SEED で件数と対面集合を変更）
 make audit-cross CROSS=240            # 変更が広いときは件数を増やす
 ```
 
-**合格条件: hang / timeout / error = 0**（`ok` 以外が1件でも出たら push しない）。
+**合格条件: void（決着せず）= 0**（1 件でも出たら push しない）。中身は Rust のアリーナ
+（`opcg_sim.loop.arena_shard` の自己対戦・ランダム対面×生成デッキ）で、決着しなかったペアが
+void として台帳に残る（2026-09-07 に `deck_synth_audit.py`＝Python エンジン版から置き換え）。
 
-なぜ `make test` に入れないか: 1件あたり実プレイ1局で 120件≈10分かかり、`make test`（約7分）を倍にする。
+なぜ `make test` に入れないか: 実プレイを 120 ペア打つので `make test`（約 2 分）より重い。
 一方で**掛ける価値があるのはエンジン/パーサを触ったときだけ**なので、その作業単位でのみ追加する。
 
 なぜミラー監査では足りないか: 137リーダーの**ミラー**（同一リーダー同士）監査は ok=137 / hang=0 なのに、

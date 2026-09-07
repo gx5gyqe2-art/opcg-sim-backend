@@ -33,9 +33,9 @@ import random
 from typing import Any, Dict, List, Optional, Tuple
 import re
 
-from ..models.enums import TriggerType
-from . import journal
-from .journal import JournaledList
+from opcg_sim.src.models.enums import TriggerType
+from opcg_sim.src.models import journal
+from opcg_sim.src.models.journal import JournaledList
 
 
 def _env_int(name: str, default: int) -> int:
@@ -698,12 +698,12 @@ def evaluate_base(manager, me_name: str, see_opp_hand: bool = True,
     `evaluate_v2` 側が扱う（重複ロジックを置かない）。`see_opp_hand=False` のとき相手手札は枚数のみ評価する
     （中身＝カウンター値を読まない）。自分の手札は常に full。情報方針は呼び出し側（`decide`）が渡す。
     """
-    from . import cpu_eval_v2
+    from legacy.python_engine.core import cpu_eval_v2
     return cpu_eval_v2.evaluate_v2(manager, me_name, see_opp_hand=see_opp_hand, out=out)
 
 
 def _pending_keys():
-    from . import action_api
+    from legacy.python_engine.core import action_api
     pending_props = action_api.CONST.get('PENDING_REQUEST_PROPERTIES', {})
     return pending_props.get('PLAYER_ID', 'player_id'), pending_props.get('ACTION', 'action')
 
@@ -723,7 +723,7 @@ def _drain_own_interactions(manager, actor_name: str, stop_at_select: bool = Fal
     `stop_at_select=True` のとき、分岐対象の単一対象選択（_SELECT_ACTION）はドレインせず残す
     （探索側が候補ごとに分岐して最善対象を選ぶため・§2.5.2）。
     """
-    from . import action_api
+    from legacy.python_engine.core import action_api
     for _ in range(_DRAIN_LIMIT):
         # 判定は軽量版（pid, action だけ）で行い、重い payload は実際にドレインするときだけ作る
         # （get_pending_request は毎回 selectable 構築＋uuid4 で重い・§2.5.2）。pending_actor_action は
@@ -755,7 +755,7 @@ def _apply_move_inplace(board, actor_name: str, move: Dict[str, Any], stop_at_se
 
     clone 経路（`_apply_clone`）と make/unmake 経路（`_score_move_1ply`）の共通コア。
     """
-    from . import action_api
+    from legacy.python_engine.core import action_api
     actor = _player_by_name(board, actor_name)
     if move.get("action_type") == "DON_BOX":
         # ドン箱（探索内部のマクロ手）は原始列へ展開して適用する（cpu_don_box_plan §2.1）。
@@ -863,8 +863,8 @@ def onplay_option_scan(manager, actor_name: str):
     pend0 = manager.get_pending_request(with_request_id=False) or {}
     if pend0.get("action") != "MAIN_ACTION" or pend0.get("player_id") != actor_name:
         return (0, 0, 0.0)
-    from .engine.interaction import card_keep_value
-    from ..models.models import DonInstance
+    from legacy.python_engine.core.engine.interaction import card_keep_value
+    from opcg_sim.src.models.models import DonInstance
     actor = _player_by_name(manager, actor_name)
     if actor is None:
         return (0, 0, 0.0)
@@ -962,7 +962,7 @@ def _rank_select_candidates(manager, uuids: List[str], actor_name: str) -> List[
     のみ）は低コストの要札（カウンター2000 のイベント・効果持ち1コスト等）を一律最下位に置き、
     捨て札コストで要札から捨てる分岐しか探索に見せていなかった。
     候補に対応するカードが見つからないものは末尾へ（順序のみのヒューリスティック）。"""
-    from .engine.interaction import card_keep_value
+    from legacy.python_engine.core.engine.interaction import card_keep_value
     pairs = [(u, manager._find_card_by_uuid(u)) for u in uuids]
     found = [(u, c) for u, c in pairs if c is not None]
     missing = [u for u, c in pairs if c is None]
@@ -988,7 +988,7 @@ def _selection_moves(manager, actor_name: str):
         （例: ティーチ OP16-080 が相手のアタック時にトリガー1枚を捨ててアタック対象を変更＝リーダーが
         既に対象なら no-op なのに毎回カードを浪費）。両手を採点して、得なときだけ払う。
     """
-    from . import action_api
+    from legacy.python_engine.core import action_api
     # request_id はここでは読まない（player_id/action/selectable_uuids/constraints のみ）。
     # _selection_moves は探索の分岐生成で make/unmake 探索（_score_move_1ply→_search）と
     # ドレインの両方から高頻度に呼ばれるため、request_id ハッシュ／候補 to_dict を省く高速パス。
@@ -1145,7 +1145,7 @@ def _settle_eval(manager, root_name: str, see_opp_hand: bool, ply: int = 0) -> f
       - その他の選択（どちら側でも）→ `default_interaction_payload` で既定解決。
     相手の MAIN_ACTION に到達したら停止（＝相手ターン開始の静止点）。`manager` はクローンなので破壊的に進めてよい。
     """
-    from . import action_api
+    from legacy.python_engine.core import action_api
     KEY_PID, KEY_ACTION = _pending_keys()
     battle_actions = action_api.CONST.get('c_to_s_interface', {}).get('BATTLE_ACTIONS', {}).get('TYPES', {})
     ACT_PASS = battle_actions.get('PASS', 'PASS')
@@ -1351,7 +1351,7 @@ def _is_important_root_move(manager, name: str, move: Dict[str, Any], child) -> 
     """
     if child is None:
         return False
-    from . import action_api
+    from legacy.python_engine.core import action_api
     if move.get("action_type") == action_api.ACT_RESOLVE_SELECTION:
         return True
     # クロック/逆算リーサル手: 相手リーダーへのアタック（child は戦闘応答待ちで未だライフ未減なので
@@ -1378,7 +1378,7 @@ def _is_important_root_move_post(manager, name: str, move: Dict[str, Any],
     `_is_important_root_move` と**完全同値**（適用後の自ブロッカー数を pre_block と、適用後の相手
     ライフ枚数を pre_opp_life と比較する）。相手リーダー uuid は適用で不変なので post の opp を使える。
     """
-    from . import action_api
+    from legacy.python_engine.core import action_api
     if move.get("action_type") == action_api.ACT_RESOLVE_SELECTION:
         return True
     opp = _other(manager, name)
@@ -2050,7 +2050,7 @@ def plan_turn(manager, name: str, difficulty: str = "hard", rng=None,
     戻り値: 行動 move dict のリスト（末尾は TURN_END か、相手介入の直前まで）。`mem`/`rng` は per-action と
     同じものを渡すと、計画適用後の状態が本物の逐次実行と一致する（呼び出し側で replay 時は decide を呼ばない）。
     """
-    from . import action_api
+    from legacy.python_engine.core import action_api
     rng = rng or random
     clone = manager.clone()
     actions: List[Dict[str, Any]] = []

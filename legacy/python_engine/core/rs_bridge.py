@@ -22,10 +22,10 @@
 """
 from typing import Any, Dict, Optional
 
-from .gamestate import GameManager, Player
-from .journal import JournaledDict, JournaledList, JournaledSet
-from ..models.enums import Phase
-from ..models.models import CardInstance, DonInstance
+from legacy.python_engine.core.gamestate import GameManager, Player
+from opcg_sim.src.models.journal import JournaledDict, JournaledList, JournaledSet
+from opcg_sim.src.models.enums import Phase
+from opcg_sim.src.models.models import CardInstance, DonInstance
 
 # `tests/scripts/rs_diff_replay.py::card_record` ／ Rust `GameState::card_record` が書く
 # 実行時フィールド（記録 v5）。追加したら 3 か所（記録・Rust・ここ）を同時に直す。

@@ -7,7 +7,7 @@ import re
 import unicodedata
 from typing import Optional, Any
 
-from ...models.enums import ConditionType
+from opcg_sim.src.models.enums import ConditionType
 
 
 def _nfc(text: str) -> str:

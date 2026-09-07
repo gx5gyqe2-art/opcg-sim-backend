@@ -26,14 +26,12 @@ import glob
 import json
 import time
 
+import sys as _sys
+
 import numpy as np
 
-import os as _os, sys as _sys  # noqa: E402
-_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-import _bootstrap  # noqa: E402,F401
 
-import n0_spike as N0  # build_card_table / card_channel / 定数（芯の共有）
+from opcg_sim.learned.train import n0_spike as N0  # build_card_table / card_channel / 定数（芯の共有）
 
 D_SC = 94
 D_EMB = 64                       # 胴体出力（状態埋め込み）

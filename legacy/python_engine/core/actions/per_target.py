@@ -7,9 +7,9 @@
 除去保護・置換ゲート・success 規約は `target_loop.run_target_loop` が一元管理する。
 """
 import re
-from ...models.enums import ActionType, CardType, Zone, TriggerType
-from ...models.models import DonInstance
-from .registry import target_handler
+from opcg_sim.src.models.enums import ActionType, CardType, Zone, TriggerType
+from opcg_sim.src.models.models import DonInstance
+from legacy.python_engine.core.actions.registry import target_handler
 
 
 @target_handler(ActionType.PREVENT_LEAVE)

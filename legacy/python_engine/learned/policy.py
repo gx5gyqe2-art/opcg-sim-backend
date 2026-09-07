@@ -7,8 +7,8 @@ numpy 実装が単純で正しさを担保しやすい・AZ的には等価）。
 """
 import numpy as np
 
-from . import encoder as E
-from .action import ACTION_DIM, legal_action_matrix
+from opcg_sim.learned import encoder as E
+from legacy.python_engine.learned.action import ACTION_DIM, legal_action_matrix
 
 
 def state_context(manager, me_name, vocab, version=1):

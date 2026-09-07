@@ -10,8 +10,8 @@
 """
 from typing import Any, Dict, List, Optional
 
-from ..models.models import CONST
-from ..models.enums import TriggerType, Phase
+from opcg_sim.src.models.models import CONST
+from opcg_sim.src.models.enums import TriggerType, Phase
 
 _C_TO_S = CONST.get('c_to_s_interface', {})
 _GAME_ACTIONS = _C_TO_S.get('GAME_ACTIONS', {}).get('TYPES', {})

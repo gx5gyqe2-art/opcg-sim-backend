@@ -3,8 +3,8 @@
 旧 `apply_action_to_engine` 後半の `for target in targets:` 前処理を逐語移設。各対象への実適用は
 `per_target` の `@target_handler` へ委譲する。act_name 文字列比較を ActionType へ置換したのみ。
 """
-from ...models.enums import ActionType
-from .registry import _TARGET_HANDLERS
+from opcg_sim.src.models.enums import ActionType
+from legacy.python_engine.core.actions.registry import _TARGET_HANDLERS
 
 # 「相手の効果で場を離れない」対象になり得る除去アクション（旧 _LEAVE_ACTIONS の enum 版）。
 _LEAVE_ACTIONS = frozenset({

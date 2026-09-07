@@ -4,10 +4,10 @@ from __future__ import annotations
 import re
 import logging
 
-from ...models.enums import TriggerType, ActionType, CardType
-from ..effects.resolver import EffectResolver
-from ..effects.matcher import get_target_cards
-from ._helpers import _nfc, _ability_turn_limit, _ability_index
+from opcg_sim.src.models.enums import TriggerType, ActionType, CardType
+from legacy.python_engine.core.effects.resolver import EffectResolver
+from opcg_sim.src.effects.matcher import get_target_cards
+from legacy.python_engine.core.engine._helpers import _nfc, _ability_turn_limit, _ability_index
 
 _logger = logging.getLogger("opcg.engine")
 

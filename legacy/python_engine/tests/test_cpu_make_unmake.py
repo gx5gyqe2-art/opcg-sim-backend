@@ -15,7 +15,8 @@ import random
 import conftest  # noqa: F401
 import pytest
 
-from legacy.python_engine.core import cpu_ai, journal, action_api
+from opcg_sim.src.models import journal
+from legacy.python_engine.core import cpu_ai, action_api
 import cpu_arena
 import test_cpu_puzzles as P
 

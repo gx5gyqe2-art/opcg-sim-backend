@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import re
 
-from ..journal import JournaledDict
-from ...models.enums import TriggerType, Zone, CardType
-from ._helpers import _nfc
+from opcg_sim.src.models.journal import JournaledDict
+from opcg_sim.src.models.enums import TriggerType, Zone, CardType
+from legacy.python_engine.core.engine._helpers import _nfc
 
 
 def _enqueue_trigger(gm, player: Player, ability: Ability, card: CardInstance,

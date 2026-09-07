@@ -29,15 +29,13 @@ import glob
 import json
 import time
 
+import sys as _sys
+
 import numpy as np
 
-import os as _os, sys as _sys  # noqa: E402
-_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-import _bootstrap  # noqa: E402,F401
 
-import n1_train as N1                       # load_dump（データ読みを共有）
-from n_eff_feat import build_eff_tables     # 引数なし版（既定エンジンの vocab ＋ テスト DB）
+from opcg_sim.learned.train import n1_train as N1                       # load_dump（データ読みを共有）
+from opcg_sim.learned.train.n_eff_feat import build_eff_tables     # 引数なし版（既定エンジンの vocab ＋ テスト DB）
 from opcg_sim.learned import n_eff as NE
 from opcg_sim.learned.n_eff import (  # noqa: F401  （互換再輸出: 他の計器が参照する名前）
     MAX_CI, D_SC, D_AB, D_CARD_FEAT, ZONE, D_IN, D_CH, D_EMB, NA, F_CAND, _SLOT_ZONE,

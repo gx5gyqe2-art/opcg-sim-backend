@@ -24,10 +24,6 @@ import json
 
 import numpy as np
 
-import os as _os, sys as _sys  # noqa: E402
-_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-import _bootstrap  # noqa: E402,F401
 
 MAX_CI = 24
 CARD_STAT = 8       # cost, power, counter, is_leader, is_char, is_event, is_stage, blocker
@@ -41,12 +37,10 @@ _SLOT_ZONE = [0, 1] + [2] * 5 + [3] * 5 + [4] * 10 + [2] * 2   # pad2はダミ�
 
 def build_card_table():
     """vocab index → 物理特徴ベクトル（D_IN-ZONE-1 次元・PAD/UNK=0行）。"""
-    from legacy.python_engine.core.cpu_learned import LearnedEngine
     from opcg_sim.learned.leader_feat import leader_static_vector
-    eng = LearnedEngine()
-    vocab = eng.vocab                     # card_id -> idx（生成時と同一＝gen15 vocab）
-    from cpu_selfplay import _load_db
-    db = _load_db()
+    from opcg_sim.learned.vocab import load_db, shared_vocab
+    vocab = shared_vocab()                # card_id -> idx（生成時と同一＝gen15 vocab）
+    db = load_db()
     n = max(vocab.values()) + 1
     tab = np.zeros((n, CARD_STAT + PHYS), np.float32)
     for cid, idx in vocab.items():

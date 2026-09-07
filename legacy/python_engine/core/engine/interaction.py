@@ -5,11 +5,11 @@ import json
 import hashlib
 import logging
 
-from ..journal import JournaledList, JournaledSet
-from ..rules_constants import FIELD_LIMIT
-from ...models.models import CONST
-from ...models.enums import Phase, Zone, CardType, TriggerType, PendingMessage
-from ..effects.resolver import EffectResolver
+from opcg_sim.src.models.journal import JournaledList, JournaledSet
+from legacy.python_engine.core.rules_constants import FIELD_LIMIT
+from opcg_sim.src.models.models import CONST
+from opcg_sim.src.models.enums import Phase, Zone, CardType, TriggerType, PendingMessage
+from legacy.python_engine.core.effects.resolver import EffectResolver
 
 _logger = logging.getLogger("opcg.engine")
 

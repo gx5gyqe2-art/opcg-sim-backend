@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import unicodedata
 
-from .. import journal
-from ...models.enums import TriggerType
-from ...models.effect_types import GameAction, Sequence, Branch, Choice
-from ..effects.resolver import EffectResolver
+from opcg_sim.src.models import journal
+from opcg_sim.src.models.enums import TriggerType
+from opcg_sim.src.models.effect_types import GameAction, Sequence, Branch, Choice
+from legacy.python_engine.core.effects.resolver import EffectResolver
 
 
 def refresh_passive_state(gm) -> None:

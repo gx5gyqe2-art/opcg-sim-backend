@@ -34,10 +34,12 @@ from legacy.python_engine.learned.mcts import (   # make/unmake版（唯一の�
 from legacy.python_engine.learned.plan import _find_move, move_sig
 from opcg_sim.src.utils.loader import CardLoader
 
-_MODELS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__)))), "data", "learned")
-_DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__)))), "data")
+# データは `opcg_sim/data/` のまま（退避したのはコードだけ）。リポジトリルートから引く
+# （このファイルは legacy/python_engine/core/ にあるので 3 つ上がルート）。
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__)))))
+_DATA = os.path.join(_REPO_ROOT, "opcg_sim", "data")
+_MODELS = os.path.join(_DATA, "learned")
 
 # gen9 = gen8 と「v25 防御混合候補」の value 重み**線形補間 α=0.5**（v28・
 # docs/reports/gen9_adoption_20260801.md）。候補側は修正済み効果解決エンジン上の密対面

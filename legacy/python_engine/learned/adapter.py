@@ -12,7 +12,7 @@ import math
 
 from legacy.python_engine.core import cpu_ai
 from legacy.python_engine.core.gamestate import GameManager, Player
-from .config import VALUE_SCALE
+from opcg_sim.learned.config import VALUE_SCALE
 
 
 class OPCGGame:

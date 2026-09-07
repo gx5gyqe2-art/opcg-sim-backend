@@ -39,7 +39,7 @@ import numpy as np
 from legacy.python_engine.core import cpu_ai
 from opcg_sim.src.models import journal
 from opcg_sim.src.models.journal import JournaledList
-from .config import (BOX_BRANCH_BUDGET, BOX_RESOLVE_DEPTH, C_PUCT, DIRICHLET_ALPHA,
+from opcg_sim.learned.config import (BOX_BRANCH_BUDGET, BOX_RESOLVE_DEPTH, C_PUCT, DIRICHLET_ALPHA,
                      SERVE_QUIESCE, QUIESCE_MAX_PLIES, TREE_BOX_BATTLE, TREE_BOX_DIALOG)
 
 # ターン延長の上限手数（攻撃×戦闘窓を含む。無限ループ防止）。旧 config.TURN_QUIESCE_MAX_PLIES

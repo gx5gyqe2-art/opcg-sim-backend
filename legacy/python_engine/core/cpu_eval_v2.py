@@ -62,7 +62,7 @@ def _life_value(p) -> float:
     L = len(p.life)
     near = min(L, V2_LIFE_KNEE)               # 薄域＝precious
     far = max(0, L - V2_LIFE_KNEE)            # 厚域＝安い
-    from .cpu_ai import DECK_DANGER           # 既存のしきい値を流用（遅延 import で循環回避）
+    from legacy.python_engine.core.cpu_ai import DECK_DANGER           # 既存のしきい値を流用（遅延 import で循環回避）
     deck_danger = max(0, DECK_DANGER - len(p.deck))
     return near * V2_W_LIFE_PRECIOUS + far * V2_W_LIFE_HIGH - V2_W_DECK * deck_danger
 
@@ -73,7 +73,7 @@ def _clock_of(p, opp, is_turn: bool) -> float:
     防御控除（相手ブロッカー吸収・相手の期待カウンター緩衝）は Tele 側でのみ行う（§4.2）。ここでは
     生の攻め圧（攻撃できる体の有効パワーの和 / 1000）を返す。
     """
-    from .cpu_ai import _power_cap, _effective_power
+    from legacy.python_engine.core.cpu_ai import _power_cap, _effective_power
     cap = _power_cap(opp)
     reach = 0.0
     for c in p.field:
@@ -178,7 +178,7 @@ def evaluate_v2(manager, me_name: str, see_opp_hand: bool = True,
 
     first cut＝構造は v0.4 に忠実・係数は未チューニング。CPU 評価はこの L1 単一系統。
     """
-    from .cpu_ai import _player_by_name, _other, W_WIN
+    from legacy.python_engine.core.cpu_ai import _player_by_name, _other, W_WIN
     if manager.winner == me_name:
         return W_WIN
     if manager.winner is not None:

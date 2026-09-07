@@ -12,10 +12,10 @@
     ハンドラは**必ず明示的に `return True`**（コスト不払い等の失敗時のみ `False`）。暗黙の
     `return None` は resolver の success ゲートを無言でスキップさせるバグになる。
 """
-from .registry import _GAME_HANDLERS, normalize
-from . import player_level  # noqa: F401  (import 時にデコレータでハンドラを登録する)
-from . import per_target    # noqa: F401  (import 時に対象ハンドラを登録する)
-from .target_loop import run_target_loop
+from legacy.python_engine.core.actions.registry import _GAME_HANDLERS, normalize
+from legacy.python_engine.core.actions import player_level  # noqa: F401  (import 時にデコレータでハンドラを登録する)
+from legacy.python_engine.core.actions import per_target    # noqa: F401  (import 時に対象ハンドラを登録する)
+from legacy.python_engine.core.actions.target_loop import run_target_loop
 
 
 def apply_action(gm, player, action, targets, value, source_card=None) -> bool:

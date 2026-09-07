@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import re
 
-from ..journal import JournaledList
-from ...models.models import DonInstance
-from ...models.enums import Zone, CardType
-from ..rules_constants import FIELD_LIMIT
-from ._helpers import _nfc
+from opcg_sim.src.models.journal import JournaledList
+from opcg_sim.src.models.models import DonInstance
+from opcg_sim.src.models.enums import Zone, CardType
+from legacy.python_engine.core.rules_constants import FIELD_LIMIT
+from legacy.python_engine.core.engine._helpers import _nfc
 
 
 def _apply_leader_don_deck_rule(gm, player: Player) -> None:

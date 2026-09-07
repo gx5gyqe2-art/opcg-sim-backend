@@ -11,13 +11,20 @@
 > 計画書（plan）は実装完了後に正本（SPEC / TEST_SPEC）へ吸収し、文書としては残さない。
 > 設計の経緯は git 履歴を参照する。
 
+> **エンジンは Rust**（2026-09-07・第 2 段 `rs-archive-cutover` 完了）。ルール・効果・探索は
+> `rust/opcg_engine`、Python が持つのは**パーサ・学習・API** だけ。旧 Python エンジンは
+> `legacy/python_engine/`（tag `py-engine-final` で凍結・テストゲート対象外）。
+> 経緯と受け入れは [`rust_engine_plan.md`](rust_engine_plan.md) §8。
+> **文書中の `opcg_sim/src/core`・`opcg_sim/src/learned` の記述は、断りが無ければ
+> 退避前（＝tag の中）の所在**として読む。
+
 ## 仕様（正本）— `docs/` 直下
 
 | 文書 | 内容 |
 |---|---|
 | [`SPEC.md`](SPEC.md) | **システム仕様書**。全体アーキテクチャ／コアゲームルール（ターン・戦闘・召喚酔い/速攻・場5体上限）／オンライン対戦（ルーム・WS）／**CPU 対戦・AI**（§2.5）／カード効果システム／ファイルマップ／**ログ・可観測性**（§5.1）／既知のモデル化制約（§6.1） |
 | [`TEST_SPEC.md`](TEST_SPEC.md) | **テスト仕様書**。テスト戦略／スイート一覧／診断・監査ツール／**効果検証ハーネス**（CPU 対 CPU 自己対戦・インバリアント検出, §3.1）／**CPU 思考トレース＋決定論リプレイ**（§3.2）／品質ゲート／デッキ単位の手動検証 |
-| [`cpu_thinking_logic.md`](cpu_thinking_logic.md) | **CPU 思考ロジック詳細図**。決定パイプライン（呼び出し経路→`decide_guarded`→`decide`→α-β+ビーム+PIMC→L1 評価 `evaluate_v2`）と暴走防止の責務分担（`TURN_ACTION_CAP`＝終了保証／エンジンのコストゲート＝起動効果の自己制限）を1枚で俯瞰。SPEC §2.5 の図版 |
+| [`cpu_thinking_logic.md`](cpu_thinking_logic.md) | **CPU 思考ロジック詳細図**（**L1 の図＝2026-09-07 に廃止**。現在の CPU は N 系＋Rust の MCTS で、本書は tag `py-engine-final` の姿を残した歴史文書として読む）。決定パイプラインと暴走防止の責務分担を1枚で俯瞰 |
 | [`LOGGING.md`](LOGGING.md) | **ログ仕様**。汎用ログ（`log_event`/GCS/Slack）は撤去済み。唯一のログ＝ CPU 思考トレース（ローカル自己対戦／実アプリ `/replay`）の正本 |
 | [`parser_v2.md`](parser_v2.md) | カード効果パーサ（EffectParserV2）の設計・ルール一覧・既知のパース制約 |
 | [`leader_specs/`](leader_specs/README.md) | 全137リーダーのカード個別仕様（テキスト／期待挙動／テストケース）。作成ガイド [`_GUIDE.md`](leader_specs/_GUIDE.md)、テスト方針 [`_TEST_GUIDE.md`](leader_specs/_TEST_GUIDE.md)、既知差異 [`ISSUES.md`](leader_specs/ISSUES.md) |

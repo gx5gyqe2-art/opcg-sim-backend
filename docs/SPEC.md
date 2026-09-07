@@ -16,26 +16,41 @@
                          [FastAPI: opcg_sim/api/app.py]
         ┌───────────────────────────────┬───────────────────────────────┐
         ▼                               ▼                               ▼
-  ルールモード(GameManager)      フリーモード(SandboxManager)      デッキ/カードDB
-  公式ルール自動進行              手動操作(ルール強制なし)          (Firestore / JSON)
-  GAMES[game_id]                  SANDBOX_GAMES[game_id]
-  + RULE_ROOMS(オンライン対戦)    + ルーム/WS(/ws/sandbox)
+  ルールモード(engine_rs.RsGame)   フリーモード(SandboxManager)     デッキ/カードDB
+   └→ rust/opcg_engine（Rust）     手動操作(ルール強制なし)          (Firestore / JSON)
+  公式ルール自動進行＋CPU の思考    SANDBOX_GAMES[game_id]
+  GAMES[game_id]                   + ルーム/WS(/ws/sandbox)
+  + RULE_ROOMS(オンライン対戦)
 ```
+
+**エンジンの所在（2026-09-07・`docs/rust_engine_plan.md` §17）**: ルール・効果・探索は
+**Rust**（`rust/opcg_engine`・PyO3 wheel）にある。Python が持つのは 3 つだけ:
+
+| 役割 | 所在 |
+|---|---|
+| カード本文 → 効果構造（**裁定を書く場所その 1**） | `opcg_sim/src/effects/parser*.py`・`rules/`。生成物 `opcg_sim/data/opcg_effects.json`（`tools/export_effects_json.py`）を Rust が起動時に読む |
+| 学習（ネット定義・符号化の仕様・訓練） | `opcg_sim/learned/`・`learned/train/`（numpy） |
+| API（FastAPI）と学習ループの段取り | `opcg_sim/api/`・`opcg_sim/loop/` |
+
+**裁定を書く場所は 2 つだけ**——パーサ（Python）と Rust エンジン。旧 Python エンジンは
+`legacy/python_engine/`（tag `py-engine-final` で凍結・テストゲート対象外・`opcg_sim/` から
+import しない）。**本書で `core/…`・`opcg_sim/src/core/…` と書いてある実装箇所は、
+断りが無ければ tag の中の所在**（Rust 側の対応は `rust/opcg_engine/src/` の同名モジュール）。
 
 本システムは2つの対局モードを持つ。
 
 | モード | エンジン | エンドポイント | 特徴 |
 |---|---|---|---|
-| **ルールモード** | `GameManager`（`core/gamestate.py`） | `/api/game/*`（REST）＋ `/api/rule/*` ＋ `/api/game/cpu/step` ＋ `/ws/game/{id}` | 公式ルールを自動進行。ソロ（ホットシート）／オンライン対戦／**CPU 対戦**に対応 |
-| **フリーモード** | `SandboxManager`（`core/sandbox.py`） | `/api/sandbox/*` ＋ `/ws/sandbox/{id}` | ルール強制なしの自由操作。ソロ／オンライン対戦に対応 |
+| **ルールモード** | `engine_rs.RsGame`（`rust/opcg_engine` のラッパ） | `/api/game/*`（REST）＋ `/api/rule/*` ＋ `/api/game/cpu/step` ＋ `/ws/game/{id}` | 公式ルールを自動進行。ソロ（ホットシート）／オンライン対戦／**CPU 対戦**に対応 |
+| **フリーモード** | `SandboxManager`（`opcg_sim/src/core/sandbox.py`） | `/api/sandbox/*` ＋ `/ws/sandbox/{id}` | ルール強制なしの自由操作。ソロ／オンライン対戦に対応 |
 
-カード効果は `GameManager`（ルールモード）でのみ解決される。フリーモードは盤面操作のみ。
+カード効果はルールモードでのみ解決される。フリーモードは盤面操作のみ。
 
-ルールモードのアクション適用ロジックは `core/action_api.py`（`apply_game_action`/`apply_battle_action`）に
-集約され、HTTP エンドポイント・CPU 対戦ドライバ・自己対戦ランナーが**同一コアパス**を通る。これが
-ないと AI シミュレーション・自己対戦とルール本番の挙動が乖離するため、適用ロジックは必ずこの関数を
-経由する。CPU（AI）対戦の設計は §2.5、効果検証ハーネス（CPU 対 CPU 自己対戦）は
-[`docs/TEST_SPEC.md`](TEST_SPEC.md) §3.1 を参照。
+ルールモードのアクション適用は `RsGame.apply_game_action`／`apply_battle_action`（Rust の
+`rules::actions`）に集約され、HTTP エンドポイント・CPU 対戦ドライバ・生成/アリーナの
+ドライバ（`opcg_sim/loop/driver.py`）が**同一コアパス**を通る。CPU の思考も同じ盤面の上で
+Rust の `Game.decide` が行う＝**物差しは 1 本**。CPU（AI）対戦の設計は §2.5、テストの
+ゲート（golden 2 本）は [`docs/TEST_SPEC.md`](TEST_SPEC.md) §5 を参照。
 
 ---
 

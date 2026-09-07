@@ -19,7 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-from ..journal import JournaledList
+from opcg_sim.src.models.journal import JournaledList
 
 # Duration 定数
 THIS_TURN = "THIS_TURN"               # 現在のターン終了時に失効
@@ -46,7 +46,7 @@ class ContinuousEffect:
 class ContinuousEffectManager:
     def __setattr__(self, name, value):
         # 差分巻き戻し（journal.transaction 中のみ記録）。effects の付け替えを巻き戻すため。
-        from .. import journal
+        from opcg_sim.src.models import journal
         if journal._TL.active is not None:
             journal.record_attr(self, name, self.__dict__)
         object.__setattr__(self, name, value)

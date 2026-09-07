@@ -27,7 +27,7 @@ import itertools
 import numpy as np
 
 from legacy.python_engine.core import cpu_ai
-from .mcts import (TURN_QUIESCE_MAX_PLIES, in_battle, in_dialog, quiesce_choice,
+from legacy.python_engine.learned.mcts import (TURN_QUIESCE_MAX_PLIES, in_battle, in_dialog, quiesce_choice,
                    resolved_branch_values, _turn_owner)
 
 # --- プラン計器のつまみ（旧 config.PLAN_*・純正AZ化 2026-08-25 でここへ移設）--------------

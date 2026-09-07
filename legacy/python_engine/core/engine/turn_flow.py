@@ -4,10 +4,10 @@ from __future__ import annotations
 import random
 import logging
 
-from ..journal import JournaledDict, JournaledList, JournaledSet
-from ...models.enums import Phase, TriggerType
-from ..effects.resolver import EffectResolver
-from ._helpers import _nfc
+from opcg_sim.src.models.journal import JournaledDict, JournaledList, JournaledSet
+from opcg_sim.src.models.enums import Phase, TriggerType
+from legacy.python_engine.core.effects.resolver import EffectResolver
+from legacy.python_engine.core.engine._helpers import _nfc
 
 _logger = logging.getLogger("opcg.engine")
 

@@ -17,7 +17,7 @@ ActionType をキーにしたハンドラ表へ置き換える。ハンドラは
     （対象ループ側で失敗シグナルは持たない）。未登録 ActionType は no-op（ランナーがフォールスルー）。
 """
 from typing import Callable, Dict, Optional, Tuple
-from ...models.enums import ActionType
+from opcg_sim.src.models.enums import ActionType
 
 # ActionType -> (handler, guard)。guard は action を受け bool を返す述語（None なら常に適用）。
 # guard が False のアクションは対象ループへフォールスルーする（現行の条件付き分岐を保存）。

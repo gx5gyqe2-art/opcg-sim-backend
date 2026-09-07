@@ -1,7 +1,7 @@
 """動的値の解決（GameManager からの移管・ステートレス。第1引数 gm）。"""
 from __future__ import annotations
 
-from ..effects.matcher import get_target_cards
+from opcg_sim.src.effects.matcher import get_target_cards
 
 
 def get_dynamic_value(gm, player: Player, val_source: ValueSource, targets: List[CardInstance], context: Dict) -> int:

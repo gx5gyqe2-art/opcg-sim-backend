@@ -2,14 +2,14 @@ from typing import List, Any, Dict, Optional, Union
 import json
 import os
 from dataclasses import asdict, replace
-from ...models.effect_types import (
+from opcg_sim.src.models.effect_types import (
     EffectNode, GameAction, Sequence, Branch, Choice, ValueSource, Condition, TargetQuery, _nfc
 )
-from ...models.enums import ActionType, Zone, TriggerType, ConditionType, CompareOperator, Player, CardType
+from opcg_sim.src.models.enums import ActionType, Zone, TriggerType, ConditionType, CompareOperator, Player, CardType
 import re
 import logging
-from .. import journal
-from ..journal import JournaledList, JournaledDict, JournaledSet, record_attr
+from opcg_sim.src.models import journal
+from opcg_sim.src.models.journal import JournaledList, JournaledDict, JournaledSet, record_attr
 
 # 効果解決のデバッグスナップショット（EXECUTION_REPORT/DEBUG_SNAPSHOT）用ロガー。
 # OPCG_LOG_SILENT=1 のとき logging_setup が opcg.* を抑止する（従来の print ゲートと同一挙動）。
@@ -235,7 +235,7 @@ class EffectResolver:
                          + len(player.don_attached_cards))
                 return total >= cost
             if not node.target: return True
-            from .matcher import get_target_cards
+            from opcg_sim.src.effects.matcher import get_target_cards
             # ref_id='self'（「このキャラ」等）は解決時に **source そのもの**へ解決される
             # （`_resolve_targets` は zone を見ずに [source_card] を返す）。充足判定も同じ規則にする
             # ＝ここで zone/player の候補列挙を経由しない。経由すると、ステージ（player.stage は
@@ -640,7 +640,7 @@ class EffectResolver:
                 consumed = self.context.setdefault("_grp_consumed", JournaledDict()).setdefault(_SEL_GROUP_ID, JournaledList())
                 return [c for c in group if c.uuid not in consumed]
 
-        from .matcher import get_target_cards
+        from opcg_sim.src.effects.matcher import get_target_cards
 
         # 「お互いの〜」(BOTH_SIDES): 両プレイヤーへ独立・同時に適用する。各サイドで候補・枚数を
         # 個別に解決し結合する。選択を伴うサイド（候補>必要枚数の手札捨て等。OP05-058）は、その
@@ -886,7 +886,7 @@ class EffectResolver:
             # 盤面のキャラ枚数条件。target にフィルタ（レスト/特徴/コスト/プレイヤー）が
             # あれば matcher で実体化して数える。無ければ場全体の枚数。
             if condition.target is not None:
-                from .matcher import get_target_cards
+                from opcg_sim.src.effects.matcher import get_target_cards
                 current_val = len(get_target_cards(self.game_manager, condition.target, source_card))
             else:
                 current_val = len(target_player.field) + (1 if target_player.stage else 0)
@@ -988,7 +988,7 @@ class EffectResolver:
             return False
             
         elif condition.type in [ConditionType.HAS_TRAIT, ConditionType.HAS_ATTRIBUTE, ConditionType.HAS_UNIT]:
-            from .matcher import get_target_cards
+            from opcg_sim.src.effects.matcher import get_target_cards
             query = condition.target
             if not query:
                 query = TargetQuery(zone=Zone.FIELD, player=condition.player)
@@ -1203,7 +1203,7 @@ class EffectResolver:
                 return False
             # カードタイプチェック
             if "card_type" in val:
-                from ...models.enums import CardType
+                from opcg_sim.src.models.enums import CardType
                 type_map = {
                     "キャラ": CardType.CHARACTER,
                     "イベント": CardType.EVENT,

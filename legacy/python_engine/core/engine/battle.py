@@ -1,8 +1,8 @@
 """アタック宣言・バトル解決・勝敗判定（GameManager からの移管・第1引数 gm）。"""
 from __future__ import annotations
 
-from ..journal import JournaledDict, JournaledList
-from ...models.enums import CardType, TriggerType, Zone, ActionType, Phase
+from opcg_sim.src.models.journal import JournaledDict, JournaledList
+from opcg_sim.src.models.enums import CardType, TriggerType, Zone, ActionType, Phase
 
 
 def declare_attack(gm, attacker: Card, target: Card):

@@ -10,7 +10,7 @@ ATTACH_DON/SELECT_COUNTER/SELECT_BLOCKER/ACTIVATE_MAIN/RESOLVE_EFFECT_SELECTIONã
 """
 import numpy as np
 
-from . import encoder as E
+from opcg_sim.learned import encoder as E
 
 ACTION_TYPES = [
     "MULLIGAN", "KEEP_HAND", "TURN_END", "PASS", "PLAY", "ATTACK",

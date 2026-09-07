@@ -1,18 +1,18 @@
 from typing import List, Optional, Any, Tuple, Dict, Set
 import random
 import re
-from ..models.models import CardInstance, DonInstance, CONST
-from . import journal
-from .journal import JournaledList, JournaledDict, JournaledSet, record_attr
-from ..models.enums import CardType, Phase, Zone, TriggerType, ActionType
-from ..models.effect_types import Ability, GameAction, ValueSource, Sequence, Branch, Choice
-from .effects.resolver import EffectResolver
-from .actions import apply_action as _apply_action
-from .engine import values as _values, guards as _guards
-from .engine import interaction as _interaction
-from .engine import battle as _battle, turn_flow as _turn_flow
-from .engine import triggers as _triggers
-from .engine import card_moves as _card_moves, passives as _passives
+from opcg_sim.src.models.models import CardInstance, DonInstance, CONST
+from opcg_sim.src.models import journal
+from opcg_sim.src.models.journal import JournaledList, JournaledDict, JournaledSet, record_attr
+from opcg_sim.src.models.enums import CardType, Phase, Zone, TriggerType, ActionType
+from opcg_sim.src.models.effect_types import Ability, GameAction, ValueSource, Sequence, Branch, Choice
+from legacy.python_engine.core.effects.resolver import EffectResolver
+from legacy.python_engine.core.actions import apply_action as _apply_action
+from legacy.python_engine.core.engine import values as _values, guards as _guards
+from legacy.python_engine.core.engine import interaction as _interaction
+from legacy.python_engine.core.engine import battle as _battle, turn_flow as _turn_flow
+from legacy.python_engine.core.engine import triggers as _triggers
+from legacy.python_engine.core.engine import card_moves as _card_moves, passives as _passives
 
 
 Card = CardInstance
@@ -24,10 +24,10 @@ Card = CardInstance
 # ここは後方互換の再エクスポート（恒久・公開エイリアス）。新規参照は rules_constants から import する
 # こと（gamestate は resolver/matcher/atoms より下流なので、それら上流から本エイリアスを import すると
 # 循環する）。
-from .rules_constants import SELF_RESTRICTION_KEYS, FIELD_LIMIT  # noqa: E402,F401
+from legacy.python_engine.core.rules_constants import SELF_RESTRICTION_KEYS, FIELD_LIMIT  # noqa: E402,F401
 
 
-from .engine._helpers import _nfc, _TURN1_RE, _condition_turn_limit, _ability_turn_limit, _ability_index  # noqa: F401
+from legacy.python_engine.core.engine._helpers import _nfc, _TURN1_RE, _condition_turn_limit, _ability_turn_limit, _ability_index  # noqa: F401
 # ↑ 後方互換の再エクスポート（正本は engine/_helpers.py。gamestate/engine の双方が使う葉ヘルパ）。
 
 class Player:
@@ -173,7 +173,7 @@ class GameManager:
         # 保留するフラグ。解決完了時に resolve_interaction が refresh_phase を再開する。
         self.turn_start_pending = False
         self.mulligan_done: Set[str] = JournaledSet()
-        from .effects.continuous import ContinuousEffectManager
+        from legacy.python_engine.core.effects.continuous import ContinuousEffectManager
         self.continuous = ContinuousEffectManager(self)
         self.action_events: List[Dict] = JournaledList()  # per-request event buffer; reset in API handler
         # 「このターン終了時、〜」の遅延アクション待ち行列: (player, GameAction, source_card)。
