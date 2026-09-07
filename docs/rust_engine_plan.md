@@ -2947,3 +2947,80 @@ RESULT.json: {"job":"train-torch","status":"done","forward_max_abs":..,"grad_max
 "val_vmse":{"numpy":..,"torch":..},"epoch_sec":{"numpy":..,"torch1":..,"torchN":..},"speedup":..}
 ```
 
+
+### 18.5 WP `dump-f16`（③ float16/int16 の dump と memmap 読み・ユーザ決定 2026-09-07「両方やる」）
+
+前提: 本線 fdd5105d 以降（切替・R 省略・torch 化が入っている）。§18.6 と**並行**（触る場所が違う。
+境界は「訓練ループは `V["tok"][bi]` の形で配列を切り出す」＝memmap でもそのまま動く）。
+
+```
+dump v2 の保存形式を半分にし、学習側は RAM に載せず memmap で読むようにしてください。
+docs/reports/2026-09-07_train_profile.md §3 の実測（float16/int16 で常駐 2.08 倍圧縮・切り出しはステップの
+0.2%・fp16 の forward 差 1.07e-4）を本番に入れる作業です。本線 claude/cpu-spec-improvements-yw91jd から
+分岐し claude/dump-f16 に push、PR は作りません。詳細は docs/rust_engine_plan.md §18.5。
+
+やること:
+1. 生成側（opcg_sim/loop/record_gen.py）: dump v3 を既定にする。シャード npz の tokens を float16・
+   scalars を float16・card_idx を int16 で書く（値は float32 を cast しただけ。meta の dump_version=3・
+   enc_version は不変）。v2 を書く経路は残さなくてよい。
+2. 読み側（新規 opcg_sim/learned/train/dump_io.py）: load_dump(dirs, vocab, with_policy, z_dirs, cache_dir)
+   が今の load_dump_v2 と同じ V/P/C の dict を返す。ただし V の tok/sc/ci/z は cache_dir 下に 1 波ずつ
+   作った .npy（float16/float16/int16/float16）を np.load(mmap_mode="r") で開いた memmap。pack は最初の
+   1 回だけ（既にあれば再利用・shard の一覧と mtime で鍵付け）。v2 の npz（float32/int64）も同じ関数で
+   読めること（cast して pack する）。load_dump_v2 は load_dump を呼ぶ薄い互換にする。
+3. 訓練器（n_rel_train.py）と評価帯（n_rel_band.py）は load_dump に差し替えるだけ。切り出した後で
+   float32 に上げる（numpy 経路・torch 経路とも。torch 経路は torch.from_numpy(batch.astype(np.float32))
+   でよい）。
+4. 受け入れの照合（1 シャード・origin/claude/n28-w01 で可。2 シャードで比例の確認）:
+   a. 生成: 同 seed 6 局を v3 で生成し、tokens.astype(float32) が従来の float32 と等しい（fp16 で表せる
+      値は等しく、それ以外は最近接。最大差と、ci が完全一致すること）。
+   b. RSS: 2 シャードの load 後の RSS 増分が v2 の 55% 以下（memmap なので実際は大幅に下がるはず。
+      数字を表に）。
+   c. 学習: a1 から warm-start・1 エポックを「v2 float32・RAM」と「v3 memmap」で回し、val v_mse の相対差
+      ≤1%（torch 既定 backend）。1 エポックの時間が memmap で 10% 以上遅くならないこと。
+   d. 全波規模の注意（ページキャッシュに乗らない）を報告に書く。
+5. テスト: tests/test_n_record_v2.py を v3 に更新（dtype と cast の等価）・tests/test_dump_io.py（新規・
+   cpu_infra・v2 と v3 の両方を読めて同じ値・pack の再利用）。TEST_SPEC に行を足す。
+6. 報告 docs/reports/<日付>_dump_f16.md ＋ RESULT.json。確認は make test。
+
+受け入れ: 4 の a〜c が揃う・v2 も読める・訓練ループの切り出しの形（V["tok"][bi]）は変えない。
+RESULT.json: {"job":"dump-f16","status":"done","bytes_per_row":{"v2":..,"v3":..},"rss_2shards_gb":{"v2":..,"v3":..},
+"val_vmse":{"v2":..,"v3":..},"epoch_sec":{"v2":..,"v3":..},"tokens_max_abs_cast_diff":..}
+```
+
+### 18.6 WP `train-torch2`（⑤ 切り出しと budget を torch 側へ・ユーザ決定 2026-09-07「両方やる」）
+
+前提: 本線 fdd5105d 以降。§18.5 と並行。触るのは訓練ループ（`n_rel_train.py` の `train`）と
+`n_rel_torch.py` だけ＝`load_dump*` の中身と V/P/C の形には触らない。
+
+```
+NRel の torch 訓練経路（opcg_sim/learned/train/n_rel_torch.py・§8.21）で numpy のまま残っている部分を
+torch 側へ寄せて、1 エポックをさらに縮めてください。docs/reports/2026-09-07_train_torch.md の実測では
+895 ステップが numpy 146.7 s → torch 4 スレッド 34.7 s（4.22 倍）で、ステップだけの見込み（7〜8 倍）に
+届かない差は Python のバッチ切り出し・budget_feats・R のゼロ配列の確保です。本線
+claude/cpu-spec-improvements-yw91jd から分岐し claude/train-torch2 に push、PR は作りません。
+詳細は docs/rust_engine_plan.md §18.6。
+
+やること:
+1. まず内訳を測る: torch 4 スレッドの 1 エポックを「切り出し（prow・index の連結）／budget_feats／
+   R ゼロ確保／forward+backward+Adam／holdout 評価」に分けて表にする（tests/scripts/train_profile.py の
+   やり方で。数字が無いまま直さない）。
+2. budget_feats: 方策点ごとに決まる値（データと ptab だけの関数）なので、読み込み直後に全方策点ぶんを
+   1 回だけ計算して C["budget"]（float32 [候補行, 3]）に持ち、ループでは切り出すだけにする。
+   従来の budget_feats と全行でビット一致すること。
+3. 切り出し: 1 エポック分の index（tr_v・tr_p の順列）を先に作り、torch 側で index_select する。
+   方策点の候補行 idx／seg の連結は numpy で 1 回にまとめる（ステップごとの np.concatenate を消す）。
+   V の配列が memmap でも動くこと（§18.5 と並行するため。V["tok"][bi] の形で切り出すのは変えない）。
+4. R: --ablate rel のときはゼロ配列を作らず None を渡し、TorchNRel が rel 入力を飛ばす（numpy 経路は
+   今のまま）。
+5. holdout 評価も torch 経路で回す（numpy の net.value をバッチで回している所）。
+6. 受け入れの照合（1 シャード・n28-w01）: a. 損失の軌跡が §8.21 の torch 経路と一致（同 seed・
+   同じバッチ順で各ステップの loss が 1e-5）・b. budget のビット一致・c. 1 エポックの時間を
+   §8.21（34.7 s）と比べて表に。目標は 20 s 以下（届かなければどこが残るかを 1 の内訳で示す）。
+7. テスト: tests/test_n_rel_train_torch.py に a・b を足す。TEST_SPEC に追記。報告
+   docs/reports/<日付>_train_torch2.md ＋ RESULT.json。確認は make test。
+
+受け入れ: 6 の a〜c・numpy 経路が壊れていない（--backend numpy で 1 エポック回る）。
+RESULT.json: {"job":"train-torch2","status":"done","breakdown_before":{...},"breakdown_after":{...},
+"epoch_sec":{"before":34.7,"after":..},"loss_traj_max_abs":..,"budget_bit_identical":true}
+```
