@@ -776,6 +776,29 @@ fn the_self_negating_pattern_matches_the_python_regex() {
     assert_eq!(self_negating_name("「ナミ」を手札に加える"), None);
 }
 
+/// Python `gm._find_action` は **`sub_effect` へ降りない**（一致しない `GameAction` で打ち切り）。
+/// 置換の「代わりの行動」に含まれるアクションを保護／置換の走査が拾ってしまわないこと。
+#[test]
+fn find_action_does_not_descend_into_a_sub_effect() {
+    // REPLACE_EFFECT の sub_effect が PREVENT_LEAVE。Python は PREVENT_LEAVE を見つけない。
+    let mut outer = action_json("REPLACE_EFFECT", Value::Null, value_json(0));
+    outer["sub_effect"] = action_json("PREVENT_LEAVE", Value::Null, value_json(0));
+    let node = crate::effects::loader::node_from_json(&outer, "n").expect("node");
+    let at = NodeRef::root(0, NodeRoot::Effect);
+
+    assert!(
+        find_action_ref(&node, &at, ActionType::ReplaceEffect).is_some(),
+        "根の一致は拾う"
+    );
+    assert!(
+        find_action_ref(&node, &at, ActionType::PreventLeave).is_none(),
+        "sub_effect の中までは見ない（Python `_find_action` と同じ）"
+    );
+    // `Sequence`／`Branch`／`Choice` は辿る。
+    let seq = EffectNode::Sequence(vec![action("DRAW", ""), action("PREVENT_LEAVE", "")].into_iter().map(EffectNode::Action).collect());
+    assert!(find_action_ref(&seq, &at, ActionType::PreventLeave).is_some());
+}
+
 /// Python `_helpers._ability_turn_limit`: 条件の `TURN_LIMIT` が無くても raw_text の
 /// 【ターン1回】表記から 1 を拾う（置換/保護は parser が TURN_LIMIT を落とすため）。
 #[test]

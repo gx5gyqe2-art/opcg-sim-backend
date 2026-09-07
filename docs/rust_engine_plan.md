@@ -594,9 +594,9 @@ WP `rs-p3-rules`。本線 `claude/cpu-spec-improvements-yw91jd`（e6199915）か
 | 退行: `rs_diff_replay.py --mode replay --vanilla --games 20 --seed-base 1500000` | **match=20**／mismatch=0／unimplemented=0（1,845 行動） |
 | 退行: `rs_diff_replay.py --mode state --games 5` | **match=5**／mismatch=0（431 行） |
 | 退行: `rs_query_oracle.py --boards 40 --seed-base 1510000` | queries=1,467,480／match=1,285,226／error_match=182,254／**mismatch=0** |
-| `cargo test --no-default-features` | **192 passed**・0 failed・0 ignored（群 E の新規 26 件） |
+| `cargo test --no-default-features` | **193 passed**・0 failed・0 ignored（群 E の新規 27 件） |
 | `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
-| `make test`（Python 無変更） | green |
+| `make test`（Python 無変更） | **green**（1,761 passed・0 failed・0 error） |
 
 **入れたもの**: `actions/rules.rs` の 3 入口（`game_handler`＝RULE_PROCESSING〔自己制限〕／
 REDIRECT_ATTACK／EXTRA_TURN／VICTORY・`owns_target`／`apply_target`＝PREVENT_LEAVE／
@@ -619,6 +619,14 @@ required_battle_attribute`／`self_negating_name`。単体テストで Python �
 `game_handler_for` の `Unregistered` 一覧へ `ActionType::RuleProcessing` を足して群 E へ渡す
 （Python の `when=` ガードが偽のときのフォールスルー先＝`per_target.rule_processing` は no-op で
 success=true なので、群 E 側はどちらの枝でも `Some(Ok(true))` を返して同値にする）。
+
+**直した欠陥をもう 1 件（`actions/mod.rs::find_action`）**: Python `gm._find_action` は
+**一致しない `GameAction` でそこを打ち切る**（`sub_effect` へは降りず、`Sequence`／`Branch`／
+`Choice` だけを辿る）が、Rust は `sub_effect` へ降りていた。「置換の代わりの行動に含まれる
+`PREVENT_LEAVE`」等を Python が見つけないものまで拾ってしまう。現行 DB の PASSIVE 能力では
+差が出ない（全カード×4 種で照合して差 0）ので受け入れ数値は変わらないが、`guards.py` の
+`_has_rested_play`／`_blocks_effect_play`／`_active_protection`／`_find_replacement` が全部これを使うので
+Python に合わせた（単体テスト `find_action_does_not_descend_into_a_sub_effect` で固定）。
 
 **残した穴（`model.rs`／`turn.rs` が要る＝群 E の所有外・統合時にコーディネータが入れる）**:
 `_register_granted_replacements`（`PlayerState.granted_replacements` の欄）と
