@@ -130,6 +130,9 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P2 | **`rs-p2-rules` 完了**（`claude/rs-p2-rules`）: `rules/`（turn／battle／actions／legal／pending／passive）と `replay`。バニラ random 500 局＝全一致（48,160 行動）／L1 100 局＝全一致／`--mode state` 退行なし。結果は §8.5 |
 | 2026-09-07 | P2 | **統合・受け入れ**（本線）: cherry-pick。未見 seed でバニラ random 50 局＝全一致（4,630 行動）ほか §8.6。`cargo test` 70＋ignored 1 green・clippy 0・`make test` green |
 | 2026-09-07 | P3 | **設計＋契約を本線へ**（§11）: `effects/ast.rs`（ActionType 62／TriggerType 24／ConditionType 42／TargetQuery／ValueSource／Condition／EffectNode／Ability の型契約・効果 JSON の enum 名検査テスト）。WP `rs-p3-core`／`rs-p3-resolver` の指示書は §11.5 |
+| 2026-09-07 | P3 | **`rs-p3-core` 完了**（`claude/rs-p3-core-h0bryg`・20c76061）: loader／matcher／cond／value／eval＋問合せオラクル。実局面 200 × 7,337,400 問合せ＝mismatch 0（error 一致 911,271 を含む）・全 2,803 枚読込・cargo 130 green・否定対照（わざと壊すと mismatch 385）あり |
+| 2026-09-07 | P3 | **`rs-p3-resolver` 完了**（`claude/rs-p3-resolver-yyjnt3`・4b621598）: resolver／interact／triggers／continuous／passives／actions/mod＋監査ハーネス（記録 v4・`shuffled`）。自己検査 2,472 枚例外 0・cargo 106 green・Rust 照合は deferred（能力表が空） |
+| 2026-09-07 | P3 | **統合 WP を発行**（§11.6）: 両 WP は契約 3 点（`EffectContext` の形・`get_target_cards` の戻り値・能力表の持ち方）で食い違うため、本線への取り込みと単一化を 1 セッションの WP `rs-p3-integrate` に出す（決定はコーディネータが §11.6 に固定） |
 | 2026-09-07 | P2 | **WP `rs-p2-rules` 完了**（`claude/rs-p2-rules`）: `rules/`（turn・battle・actions・legal・pending・passive）・`GameState` に対話スタックと誘発待ち行列・`state.rs::replay` を本物に。`--mode replay --vanilla` は random 500 局／L1 100 局とも**全行一致**（mismatch=0・unimplemented=0）。結果は下記 §8.5 |
 
 ### 8.1 P0 の結果（2026-09-06）
@@ -831,3 +834,55 @@ claude/cpu-spec-improvements-yw91jd。必ずここから分岐）。成果は cl
 - Rust との監査照合は統合後にコーディネータが --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF で実行
 RESULT.json: {"job":"rs-p3-resolver","status":"done","self_check":{...},"oracle":"deferred","notes":"..."} を push。
 ```
+
+### 11.6 土台 2 WP の統合（2026-09-07・コーディネータの決定）
+
+両 WP は §11.5 の契約に対し、実装で判明した事実に基づきそれぞれ追補した。食い違いは 3 点で、
+**どちらも実データ／Python の挙動に根拠がある**ので、次のとおり単一化する（統合 WP が実施）:
+
+| 論点 | core（`rs-p3-core`） | resolver（`rs-p3-resolver`） | 決定 |
+|---|---|---|---|
+| 対象の戻り値 | `Vec<TargetRef>`（カード or ドン!!。Python の `get_target_cards` はドン!!も返す＝COST_AREA 3 件・CHAR_OR_DON 2 件） | `Vec<CardIdx>` | **`Vec<TargetRef>`**。resolver は `TargetRef::card()` で絞り、ドン!!が来て扱えない経路は `Unimplemented`（群 D で扱う） |
+| `EffectContext` | 対象/条件/値が読む 8 欄・`HashMap<String, Vec<TargetRef>>`・`last_action_count: i32` | Python の context 全欄・`Eq`（`GameState` に入る）・`Vec<(String, Vec<CardIdx>)>`・`prev_action_count: Option<i32>` | **resolver の形（全欄・`Eq`）**に core の要件を合わせる: `saved_targets: Vec<(String, Vec<TargetRef>)>`、`prev_action_count: Option<i32>`（core の `PREV_ACTION_COUNT` は `unwrap_or(0)`）。JSON からの読込は core の `eval.rs::context_from_json`（キー検査つき）に一本化し、resolver の `EffectContext::from_json` は削る |
+| 能力表 | `MasterTable.abilities`（`with_extra_masters` で記録 v4 の追加定義を含む表を返す） | プロセス大域 `ABILITIES`（`init_abilities`） | **`MasterTable.abilities`**。大域と `init_abilities` は削り、`ability()`／`ability_of()` は `&MasterTable` から引く |
+
+他: `effects/mod.rs` は resolver の構造（`NodeRef`・`ability_of`・`EffectContext`）を残し、core の
+`pub mod loader/matcher/cond/value/eval` と `TargetRef` を足し、§11.5 の 3 関数は stub を捨てて
+`pub use` で core へ委譲する。`lib.rs` は `eval_queries`（core）と `replay_audit`（resolver）の両方を公開。
+`model.rs`／`journal.rs`／`testkit.rs` は両 WP とも append-only なので機械的に併合できるはず（衝突したら
+両方残す）。`docs/rust_engine_plan.md` は両 WP の §8 行・§8.7/§8.8 を両方残す。
+
+**WP `rs-p3-integrate`**（1 セッション）
+
+```
+Rust エンジン移行 P3 の土台 2 WP を統合してください。計画 docs/rust_engine_plan.md §11.6（統合の決定
+事項）。本線 claude/cpu-spec-improvements-yw91jd（1eaaade2）から分岐し、claude/rs-p3-integrate に push、
+PR は作りません。Python 側（opcg_sim/）は変更しない。
+
+やること:
+1. 本線に origin/claude/rs-p3-core-h0bryg（20c76061）→ origin/claude/rs-p3-resolver-yyjnt3（4b621598）の順に
+   cherry-pick -x する。RESULT.json は取り込まない。衝突は §11.6 の表のとおりに解消する。
+2. 契約の単一化（§11.6）: get_target_cards の戻り値 Vec<TargetRef>／EffectContext は resolver の全欄の形に
+   core の要件（saved_targets の値型・prev_action_count）を合わせる／能力表は MasterTable.abilities に一本化
+   （大域 ABILITIES と init_abilities を削除）／effects/mod.rs の stub を core への委譲に置き換える／
+   EffectContext::from_json は eval.rs の context_from_json に統合。
+3. 両 WP の cargo テストを全部通す（core 130＋resolver 106 の合計から stub 依存分を除いた数を RESULT.json に
+   書く）。resolver の #[ignore]（audit_oracle_matches_python）を外して通す。clippy -D warnings 0。
+4. maturin で wheel を作り、オラクルを回して不一致を潰す（Python が正。Python の欠陥と判断したら直さず
+   RESULT.json の notes に盤面と path を書く）:
+   - OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_query_oracle.py --boards 200 → mismatch=0
+   - OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_audit_replay.py
+       --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF → 634 枚／817 能力で mismatch=0・unimplemented=0
+     （土台ハンドラだけで書けるカード。不一致は resolver/core/actions の欠陥＝直す）
+   - 退行: rs_diff_replay.py --mode replay --vanilla --games 50 --seed-base 950000 → match=50／
+     --mode state --games 10 --seed-base 960000 → match=10／rs_ops_oracle.py --games 10 → mismatch=0
+5. docs/rust_engine_plan.md §8 に統合の結果行（テスト数・オラクルの数値）、§11.6 に「統合で決めた細部」を
+   追記。docs/TEST_SPEC.md は両 WP の行が残っていることを確認。
+6. make test green（Python 無変更）。
+
+受け入れ（数値）: 上記 4 の 5 本すべて mismatch=0（監査は unimplemented=0 も）・cargo test/clippy green・
+make test green。RESULT.json: {"job":"rs-p3-integrate","status":"done","cargo":{...},"oracle":{"query":{...},
+"audit_foundation":{...},"regress":{...}},"notes":"..."} を push。
+```
+
+統合が受け入れられたら群 A〜E（§11.3・§11.4）を並列に出す。
