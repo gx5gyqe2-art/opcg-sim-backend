@@ -10,6 +10,13 @@
 
 #![allow(dead_code)]
 
+pub mod cardtab;
+pub mod leader;
+pub mod scalars;
+pub mod tokens;
+
+use crate::effects::ast::{EffectNode, GameAction};
+use crate::journal::Session;
 use crate::model::{GameState, MasterTable, Seat};
 use crate::state::EngineError;
 use std::collections::HashMap;
@@ -35,6 +42,38 @@ pub const MAX_AB: usize = 4;
 pub const ABILITY_DIM: usize = 167;
 /// 登場時スキャン（v7）の列位置＝`encoder.SCALARS_V6`（`n_rel.ONPLAY_COLS`）。
 pub const ONPLAY_COLS: [usize; 3] = [67, 68, 69];
+/// `n_rel_feat.GAP_SAT`（「届かない／該当なし」の飽和値）。
+pub const GAP_SAT: f64 = 1.5;
+
+/// `n_rel_feat._walk`／`leader_feat._walk` の木の歩き（**全ての子を辿る**）。
+///
+/// `n_eff._walk` は属性名が違うため Sequence／Branch の中へ入らない（`cardtab.rs` を参照）。
+/// こちらは Sequence の `actions`・Choice の `options`・Branch の `if_true`/`if_false` を辿る。
+pub fn walk_all<'a>(node: Option<&'a EffectNode>, out: &mut Vec<&'a GameAction>) {
+    let Some(node) = node else { return };
+    match node {
+        EffectNode::Action(a) => {
+            out.push(a);
+            walk_all(a.sub_effect.as_deref(), out);
+        }
+        EffectNode::Sequence(items) => {
+            for a in items {
+                walk_all(Some(a), out);
+            }
+        }
+        EffectNode::Branch {
+            if_true, if_false, ..
+        } => {
+            walk_all(if_true.as_deref(), out);
+            walk_all(if_false.as_deref(), out);
+        }
+        EffectNode::Choice { options, .. } => {
+            for a in options {
+                walk_all(Some(a), out);
+            }
+        }
+    }
+}
 
 /// 語彙: card_id → index（0=PAD/UNK）。npz の `vocab_ids`（index 1..）から作る。
 #[derive(Debug, Clone, Default)]
@@ -81,9 +120,13 @@ pub struct Encoding {
     pub card_idx: Vec<u32>,
     /// トークン状態 S [N_TOK × S_DIM]（`encode_rel` の `tok`）
     pub tok: Vec<f32>,
-    /// 関係 R own→opp [N_OWN × N_OPP × R_DIM]（`rel_om`・ablate rel のときは全 0）
+    /// 関係 R own→opp [N_OWN × N_OPP × R_DIM]（`rel_om`・`skip_relations` のときは空）
     pub rel_om: Vec<f32>,
-    /// 関係 R opp→own [N_OPP × N_OWN × R_DIM]（`rel_oo`）
+    /// 関係 R own→own [N_OWN × N_OWN × R_DIM]（`rel_oo`＝「i の減算で k のしきい値が届く」組）。
+    ///
+    /// **契約の注記（WP `rs-p4-encode`）**: 当初のコメントは `[N_OPP × N_OWN × R_DIM]` だったが、
+    /// Python `n_rel_feat.relations_from_tokens` は `np.zeros((N_OWN, N_OWN, R_DIM))` を返す。
+    /// 型（`Vec<f32>`）は変えず、寸法の記述だけ Python に合わせた。
     pub rel_oo: Vec<f32>,
     /// 追加列 [EXTRA_DIM]（scalars の末尾 29 と同じ値。方策の予算特徴が読む）
     pub extra: Vec<f32>,
@@ -98,21 +141,86 @@ pub struct EncodeOptions {
     pub skip_onplay: bool,
 }
 
-/// `n_eff.build_eff_tables(db, vocab)`。**WP `rs-p4-encode` が実装する**。
-pub fn build_eff_tables(_masters: &MasterTable, _vocab: &Vocab) -> Result<EffTables, EngineError> {
-    Err(EngineError::Unimplemented("encode::build_eff_tables: WP rs-p4-encode".into()))
+/// `n_eff.build_eff_tables(db, vocab)`。実体は [`cardtab::build_eff_tables`]。
+pub fn build_eff_tables(masters: &MasterTable, vocab: &Vocab) -> Result<EffTables, EngineError> {
+    Ok(cardtab::build_eff_tables(masters, vocab))
 }
 
 /// Python `encoder.encode(manager, me_name, vocab, version=13)`＋`n_rel_feat.encode_rel(...)`。
-/// `legal` は `_leader_act_avail` が読む探索用合法手（無ければ Rust の `rules::legal` を使う）。
-/// **WP `rs-p4-encode` が実装する**。登場時スキャン（v7）は `rules`/`effects` で PLAY を
-/// make/unmake して Python `cpu_ai.onplay_option_scan` と同じ判定で数える。
+///
+/// `_leader_act_avail` が読む合法手は Python と同じ `get_legal_actions`（探索用の枝刈り前）。
+/// 登場時スキャン（v7）は `rules`/`effects` で PLAY を実際に適用して
+/// Python `cpu_ai.onplay_option_scan` と同じ判定で数える。
+///
+/// 引数が `&GameState`（契約）なので、合法手列挙と登場時スキャンが要る **一時的な
+/// 書き換え**は複製した [`Session`] の上で行い、呼び出し側の盤面は 1 bit も変えない
+/// （Python は make/unmake で同じことをする＝巻き戻し後は完全一致）。
 pub fn encode(
-    _state: &GameState,
-    _masters: &MasterTable,
-    _vocab: &Vocab,
-    _me: Seat,
-    _opts: &EncodeOptions,
+    state: &GameState,
+    masters: &MasterTable,
+    vocab: &Vocab,
+    me: Seat,
+    opts: &EncodeOptions,
 ) -> Result<Encoding, EngineError> {
-    Err(EngineError::Unimplemented("encode::encode: WP rs-p4-encode".into()))
+    let mut session = Session::new(state.clone());
+    scalars::encode(&mut session, masters, vocab, me, opts)
+}
+
+// --- プロセス内の語彙とカード表（`lib.rs` の `set_vocab`／`encode_state` が使う）-----------
+//
+// 語彙（`vocab_ids`）はネット側の資産（npz）なので、符号化側は npz を読まない
+// （§12.5 の決定: `set_vocab(ids_json)` で JSON として受け取る＝`rs-p4-net` と独立）。
+
+use std::sync::{Arc, Mutex, OnceLock};
+
+static VOCAB: OnceLock<Mutex<Option<Arc<Vocab>>>> = OnceLock::new();
+static EFF_TABLES: OnceLock<Mutex<Option<Arc<EffTables>>>> = OnceLock::new();
+
+fn vocab_slot() -> &'static Mutex<Option<Arc<Vocab>>> {
+    VOCAB.get_or_init(|| Mutex::new(None))
+}
+
+fn eff_slot() -> &'static Mutex<Option<Arc<EffTables>>> {
+    EFF_TABLES.get_or_init(|| Mutex::new(None))
+}
+
+fn lock_poisoned(what: &str) -> EngineError {
+    EngineError::BadPayload(format!("encode: {what} のロックが壊れている"))
+}
+
+/// 語彙を差し替える（カード表のキャッシュも捨てる）。戻り値は語彙の件数。
+pub fn set_vocab(ids: Vec<String>) -> Result<usize, EngineError> {
+    let n = ids.len();
+    let vocab = Vocab::from_ids(&ids);
+    *vocab_slot().lock().map_err(|_| lock_poisoned("vocab"))? = Some(Arc::new(vocab));
+    *eff_slot().lock().map_err(|_| lock_poisoned("eff_tables"))? = None;
+    Ok(n)
+}
+
+/// 設定済みの語彙（未設定なら `None`）。
+pub fn current_vocab() -> Result<Option<Arc<Vocab>>, EngineError> {
+    Ok(vocab_slot()
+        .lock()
+        .map_err(|_| lock_poisoned("vocab"))?
+        .clone())
+}
+
+/// 設定済み語彙のカード表（初回だけ計算してプロセス内に持つ）。
+pub fn current_eff_tables(masters: &MasterTable) -> Result<Arc<EffTables>, EngineError> {
+    if let Some(t) = eff_slot()
+        .lock()
+        .map_err(|_| lock_poisoned("eff_tables"))?
+        .clone()
+    {
+        return Ok(t);
+    }
+    let vocab = current_vocab()?.ok_or_else(|| {
+        EngineError::BadPayload(
+            "encode: 語彙が未設定。opcg_engine.set_vocab(json.dumps(vocab_ids)) を先に呼ぶこと"
+                .into(),
+        )
+    })?;
+    let table = Arc::new(cardtab::build_eff_tables(masters, &vocab));
+    *eff_slot().lock().map_err(|_| lock_poisoned("eff_tables"))? = Some(table.clone());
+    Ok(table)
 }

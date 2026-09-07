@@ -148,6 +148,42 @@ fn set_used_count(s: &mut Session, card: CardIdx, key: u32, n: u32) {
     s.edit().set_card_usage(card, usage);
 }
 
+// --- 効果イベント計数（Python `GameManager.action_events` の "EFFECT" だけ）----------
+//
+// Python は `resolver.action_history`（`_execute_game_action` が 1 件ずつ積む）を
+// `resolve_ability`／`resolve_interaction`／ターン終了フラッシュの末尾で `action_events` へ
+// `{"type": "EFFECT", ...}` として移す（`_in_passive_recalc` 中は移さない）。
+// Rust は履歴の中身を持たない（`action_events` は盤面に出ない）ので、
+// **「EFFECT イベントが 1 件でも出たか」だけ**を数える。
+//
+// 用途は符号化 v7 の登場時スキャン（`encode::scalars::onplay_option_scan`）＝
+// Python `cpu_ai.onplay_option_scan` の判定子「適用後 pending != MAIN_ACTION **または**
+// action_events に EFFECT」。Python の `_drain_own_interactions` が各ドレインの直前に
+// `action_events = []` と置き直すのと同じ位置で [`reset_effect_events`] を呼ぶこと。
+//
+// 近似（notes 申告済み）: Python が `action_history` を回収しない一部の内部リゾルバ
+// （除去保護の置換・退避継続の再開）も、ここでは 1 件として数える。
+thread_local! {
+    static EFFECT_EVENTS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// 効果イベントの計数を 0 に戻す（Python の `manager.action_events = []` と同じ位置で呼ぶ）。
+pub fn reset_effect_events() {
+    EFFECT_EVENTS.with(|c| c.set(0));
+}
+
+/// 直近の [`reset_effect_events`] 以降に出た効果イベント数。
+pub fn effect_events() -> u32 {
+    EFFECT_EVENTS.with(|c| c.get())
+}
+
+fn record_effect_event(s: &Session) {
+    if s.state().in_passive_recalc {
+        return; // Python: PASSIVE 再計算中はイベントを積まない
+    }
+    EFFECT_EVENTS.with(|c| c.set(c.get().saturating_add(1)));
+}
+
 /// Python `gamestate.GameManager.resolve_ability`（`negated`／`is_effect_negated` のガード）。
 pub fn game_resolve_ability(
     s: &mut Session,
@@ -744,6 +780,7 @@ impl Resolver {
                     "success": false,
                     "reason": "No targets found",
                 }));
+                record_effect_event(s);
                 return Ok(false);
             }
         }
@@ -889,6 +926,7 @@ impl Resolver {
         }
         self.action_history.push(Value::Object(entry));
 
+        record_effect_event(s);
         Ok(success)
     }
 

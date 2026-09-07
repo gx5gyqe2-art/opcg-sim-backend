@@ -20,8 +20,19 @@ import _bootstrap  # noqa: E402,F401
 
 from opcg_sim.src.core.gamestate import Player  # noqa: E402
 from opcg_sim.src.core.rs_bridge import (  # noqa: E402,F401
-    RestoreError, find_card, find_don, manager_from_hidden,
+    RestoreError, find_card, find_don,
 )
+from opcg_sim.src.core import rs_bridge as _rs_bridge  # noqa: E402
+
+
+def manager_from_hidden(db, hidden: dict, with_pending: bool = False, **kw):
+    """`rs_bridge.manager_from_hidden` の薄いラッパ（P4 のオラクル互換）。
+
+    `with_pending=True` は `get_pending_request()` を塞がない（`rs_bridge` の
+    `suppress_pending=False` と同義。記録 v3 以降は `active_battle` の所在の持ち主が入るので要求を
+    組み立てられる＝`rs_encode_oracle.py` の登場時スキャン v7・`_leader_act_avail` が使う）。"""
+    kw.setdefault("suppress_pending", not with_pending)
+    return _rs_bridge.manager_from_hidden(db, hidden, **kw)
 from opcg_sim.src.models.enums import Zone  # noqa: E402
 
 
