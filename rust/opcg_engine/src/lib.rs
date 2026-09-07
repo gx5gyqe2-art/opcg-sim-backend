@@ -1,7 +1,9 @@
 //! `opcg_engine` — OPCG シミュレータのエンジン（Rust）。Python からは PyO3 拡張として使う。
 //!
-//! 段階移行の計画は `docs/rust_engine_plan.md`。**現在 P2（ルール）まで**＝盤面モデル（P1）・
-//! journal と原始操作（P1）・ターン進行／戦闘／合法手／要求（P2）がある。効果解決（P3）は無い。
+//! 段階移行の計画は `docs/rust_engine_plan.md`。**現在 P3（効果解決）の土台まで**＝盤面モデル（P1）・
+//! journal と原始操作（P1）・ターン進行／戦闘／合法手／要求（P2）・効果構造の読込／対象／条件／値
+//! （P3 土台＝`effects::{loader,matcher,cond,value}`）がある。効果の**実行**（resolver／誘発／
+//! アクション）はまだ無い。
 //! Python 版が常に正本（オラクル）で、Rust 版は同じ入力に同じ出力を返すことで受け入れる。
 
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
@@ -88,6 +90,32 @@ fn replay(json_str: &str) -> PyResult<String> {
     Ok(state::replay(json_str)?)
 }
 
+/// 記録した局面（記録 v3 の `hidden`）に対して、カード DB の効果構造の一点
+/// （`TargetQuery`／`Condition`／`ValueSource`）を評価する（P3 土台・§11.4）。
+///
+/// `queries_json` は
+/// `[{"kind":"target"|"condition"|"value","card_id":..,"ability_index":..,"path":..,
+///    "actor":"p1","source":uuid|null,"host":uuid|null,"ctx":{...}}, ...]`。
+/// 戻り値は `{"results":[{"status":"ok","value":<uuid 列|真偽|整数>}|
+/// {"status":"error","error":".."}, ...]}`（**1 件ずつ**成否を返す＝Python 側で例外になる
+/// 組合せも "error" として照合できる）。`path` の文法と辿れる名前は `effects::eval` を参照。
+///
+/// `tests/scripts/rs_query_oracle.py` が Python 側（`matcher.get_target_cards`／
+/// `EffectResolver._check_condition`／`_calculate_value`）と突き合わせる受け入れ口。
+#[pyfunction]
+#[pyo3(signature = (hidden_json, queries_json, effects_path=None))]
+fn eval_queries(
+    hidden_json: &str,
+    queries_json: &str,
+    effects_path: Option<&str>,
+) -> PyResult<String> {
+    Ok(effects::eval::eval_queries(
+        hidden_json,
+        queries_json,
+        effects_path,
+    )?)
+}
+
 #[pymodule]
 fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
@@ -98,5 +126,6 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(state_roundtrip, m)?)?;
     m.add_function(wrap_pyfunction!(apply_ops, m)?)?;
     m.add_function(wrap_pyfunction!(replay, m)?)?;
+    m.add_function(wrap_pyfunction!(eval_queries, m)?)?;
     Ok(())
 }

@@ -131,7 +131,7 @@ pub fn sample_masters() -> MasterTable {
         .enumerate()
         .map(|(i, m)| (m.card_id.clone(), i as MasterIdx))
         .collect();
-    MasterTable { masters, by_id }
+    MasterTable { masters, by_id, abilities: Default::default() }
 }
 
 fn card(m: MasterIdx, owner: Seat, uuid: &str) -> CardInstance {
@@ -535,4 +535,177 @@ impl BoardBuilder {
         };
         (self.masters, state)
     }
+}
+
+// --- 効果（P3）の単体テスト用フィクスチャ ---------------------------------------
+//
+// `matcher`／`cond`／`value` の単体テストは「効果 JSON と同じ形の小さなカード定義」＋
+// 「記録 v3 と同じ形の hidden」から組む（`MasterTable::from_effects_json` と
+// `GameState::from_record` をそのまま通す＝loader と読込の契約も一緒に踏む）。
+
+use serde_json::{json, Value};
+
+/// 効果 JSON の 1 枚分（マスター欄を全て持つ）。
+#[allow(clippy::too_many_arguments)]
+fn master_json(
+    card_id: &str,
+    name: &str,
+    ty: &str,
+    cost: i32,
+    power: i32,
+    counter: i32,
+    attribute: &str,
+    colors: &[&str],
+    traits: &[&str],
+    effect_text: &str,
+    trigger_text: &str,
+    abilities: Value,
+) -> Value {
+    json!({
+        "card_id": card_id, "name": name, "type": ty, "colors": colors, "cost": cost,
+        "power": power, "counter": counter, "attribute": attribute, "traits": traits,
+        "life": if ty == "LEADER" { 5 } else { 0 }, "block_icon": "", "keywords": [],
+        "name_aliases": [], "effect_text": effect_text, "trigger_text": trigger_text,
+        "abilities": abilities,
+    })
+}
+
+/// 空の `GameAction`（欄を全て持つ・`type` と `target` だけ差し替える）。
+pub fn action_json(action_type: &str, target: Value, value: Value) -> Value {
+    json!({
+        "node": "GameAction", "type": action_type, "target": target, "value": value,
+        "duration": "INSTANT", "status": null, "destination": null, "is_rest": null,
+        "dest_position": null, "raw_text": "", "sub_effect": null, "is_optional": false,
+        "delay": null, "face_up": null,
+    })
+}
+
+/// 空の `ValueSource`（Python の dataclass 既定値）。
+pub fn value_json(base: i32) -> Value {
+    json!({"node": "ValueSource", "base": base, "dynamic_source": null, "multiplier": 1,
+           "divisor": 1, "ref_id": null, "count_query": null})
+}
+
+/// 効果（P3）テスト用のカード定義表。
+///
+/// | card_id | 種類 | cost/power/counter | 属性・色・特徴 | テキスト | 能力 |
+/// |---|---|---|---|---|---|
+/// | `CA` キャラA | CHARACTER | 3 / 5000 / 1000 | 斬・赤・麦わらの一味 | 効果あり・【トリガー】あり | ON_PLAY 1 件 |
+/// | `CB` キャラB | CHARACTER | 5 / 7000 / 0 | 打・緑・海軍 | 無し（バニラ） | 無し |
+/// | `LD` リーダー | LEADER | 0 / 5000 / 0 | 斬・赤・麦わらの一味 | 無し | 無し |
+/// | `SG` ステージ | STAGE | 1 / 0 / 0 | -・赤 | 無し | 無し |
+/// | `HA`／`HB` 手札X | CHARACTER | 2 / 2000 / 1000 | 打・青・海軍（**同名**） | 無し | 無し |
+/// | `HC` 手札Y | CHARACTER | 2 / 2000 / 1000 | 打・青・海軍 | 無し | 無し |
+/// | `TA` トラッシュA | EVENT | 1 / 0 / 2000 | -・赤 | 無し | 無し |
+/// | `LU` ライフ札 | CHARACTER | 1 / 1000 / 1000 | 知・黄・空島 | 無し | 無し |
+pub fn effect_masters() -> MasterTable {
+    let on_play = json!([{
+        "node": "Ability", "trigger": "ON_PLAY", "condition": null, "cost": null,
+        "effect": action_json("DRAW", Value::Null, value_json(1)),
+        "raw_text": "登場時: カード1枚を引く", "cost_optional": false,
+    }]);
+    let cards = json!({
+        "CA": master_json("CA", "キャラA", "CHARACTER", 3, 5000, 1000, "SLASH", &["RED"],
+                          &["麦わらの一味"], "登場時: カード1枚を引く", "自分のライフ1枚を手札に加える", on_play),
+        "CB": master_json("CB", "キャラB", "CHARACTER", 5, 7000, 0, "STRIKE", &["GREEN"],
+                          &["海軍"], "", "", json!([])),
+        "LD": master_json("LD", "リーダー", "LEADER", 0, 5000, 0, "SLASH", &["RED"],
+                          &["麦わらの一味"], "", "", json!([])),
+        "SG": master_json("SG", "ステージ", "STAGE", 1, 0, 0, "NONE", &["RED"], &[], "", "", json!([])),
+        "HA": master_json("HA", "手札X", "CHARACTER", 2, 2000, 1000, "STRIKE", &["BLUE"],
+                          &["海軍"], "", "", json!([])),
+        "HB": master_json("HB", "手札X", "CHARACTER", 2, 2000, 1000, "STRIKE", &["BLUE"],
+                          &["海軍"], "", "", json!([])),
+        "HC": master_json("HC", "手札Y", "CHARACTER", 2, 2000, 1000, "STRIKE", &["BLUE"],
+                          &["海軍"], "", "", json!([])),
+        "TA": master_json("TA", "トラッシュA", "EVENT", 1, 0, 2000, "NONE", &["RED"], &[], "", "", json!([])),
+        "LU": master_json("LU", "ライフ札", "CHARACTER", 1, 1000, 1000, "WISDOM", &["YELLOW"],
+                          &["空島"], "", "", json!([])),
+    });
+    MasterTable::from_effects_json(&json!({"cards": cards})).expect("fixture masters must load")
+}
+
+/// 記録 v3 の `card_record`（既定値＋上書き）。
+fn card_json(card_id: &str, uuid: &str, owner: &str, patch: Value) -> Value {
+    let mut o = json!({
+        "card_id": card_id, "uuid": uuid, "owner_id": owner, "is_rest": false,
+        "is_newly_played": false, "attached_don": 0, "is_face_up": false, "power_buff": 0,
+        "cost_buff": 0, "passive_power": 0, "passive_power_override": null, "passive_counter": 0,
+        "base_power_override": null, "base_cost_override": null, "negated": false,
+        "ability_disabled": false, "timed_power": 0, "timed_cost": 0, "current_keywords": [],
+        "flags": [], "timed_flags": [], "timed_keywords": [], "ability_used_this_turn": {},
+    });
+    if let (Some(dst), Some(src)) = (o.as_object_mut(), patch.as_object()) {
+        for (k, v) in src {
+            dst.insert(k.clone(), v.clone());
+        }
+    }
+    o
+}
+
+fn don_json(uuid: &str, owner: &str, attached_to: Option<&str>) -> Value {
+    json!({"uuid": uuid, "owner_id": owner, "is_rest": false,
+           "attached_to": attached_to, "is_frozen": false})
+}
+
+/// 効果（P3）テスト用の盤面。手番は **p2**（付与ドン!!のパワー加算を混ぜないため）。
+///
+/// - p1: リーダー `p1-leader`／ステージ `p1-stage`／場 `p1-char-a`(CA・付与ドン!!2)・
+///   `p1-char-b`(CB・レスト)／手札 `p1-hand-a`(HA)・`p1-hand-b`(HB・同名)・`p1-hand-c`(HC)／
+///   ライフ `p1-life-up`(表向き)・`p1-life-down`／トラッシュ `p1-trash-a`／
+///   ドン!! active 2・attached 2（`p1-char-a` へ）
+/// - p2: リーダー `p2-leader`／場 `p2-char-a`(CA)／ライフ `p2-life-1`／ドン!! active 1
+pub fn effect_hidden() -> Value {
+    json!({
+        "players": {
+            "p1": {
+                "name": "p1",
+                "leader": card_json("LD", "p1-leader", "p1", json!({})),
+                "stage": card_json("SG", "p1-stage", "p1", json!({})),
+                "deck": [card_json("HC", "p1-deck-1", "p1", json!({}))],
+                "hand": [card_json("HA", "p1-hand-a", "p1", json!({})),
+                         card_json("HB", "p1-hand-b", "p1", json!({})),
+                         card_json("HC", "p1-hand-c", "p1", json!({}))],
+                "life": [card_json("LU", "p1-life-up", "p1", json!({"is_face_up": true})),
+                         card_json("LU", "p1-life-down", "p1", json!({}))],
+                "field": [card_json("CA", "p1-char-a", "p1", json!({"attached_don": 2})),
+                          card_json("CB", "p1-char-b", "p1", json!({"is_rest": true}))],
+                "trash": [card_json("TA", "p1-trash-a", "p1", json!({}))],
+                "temp_zone": [],
+                "don": {"deck": [], "active": [don_json("p1-don-1", "p1", None),
+                                               don_json("p1-don-2", "p1", None)],
+                        "rested": [],
+                        "attached": [don_json("p1-don-3", "p1", Some("p1-char-a")),
+                                     don_json("p1-don-4", "p1", Some("p1-char-a"))]},
+                "negate_onplay_until": 0, "restrictions": {},
+            },
+            "p2": {
+                "name": "p2",
+                "leader": card_json("LD", "p2-leader", "p2", json!({})),
+                "stage": null,
+                "deck": [card_json("CB", "p2-deck-1", "p2", json!({}))],
+                "hand": [],
+                "life": [card_json("LU", "p2-life-1", "p2", json!({}))],
+                "field": [card_json("CA", "p2-char-a", "p2", json!({}))],
+                "trash": [],
+                "temp_zone": [],
+                "don": {"deck": [], "active": [don_json("p2-don-1", "p2", None)],
+                        "rested": [], "attached": []},
+                "negate_onplay_until": 0, "restrictions": {},
+            },
+        },
+        "manager": {
+            "turn_count": 4, "phase": "MAIN", "turn_player": "p2", "winner": null,
+            "active_battle": null, "turn_events": {}, "mulligan_done": ["p1", "p2"],
+            "setup_phase_pending": false, "turn_start_pending": false,
+            "interaction_depth": 0, "pending_triggers": 0, "pending_end_of_turn": 0,
+        },
+    })
+}
+
+/// [`effect_masters`] のマスターと [`effect_hidden`] の盤面。
+pub fn effect_board() -> (MasterTable, GameState) {
+    let masters = effect_masters();
+    let state = GameState::from_record(&effect_hidden(), &masters).expect("fixture board must load");
+    (masters, state)
 }

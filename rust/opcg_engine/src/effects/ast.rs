@@ -508,6 +508,54 @@ pub struct TargetQuery {
     pub raw_text: String,
 }
 
+/// Python `TargetQuery` の dataclass 既定値（`zone=FIELD`／`player=SELF`／`count=1`／
+/// `select_mode="CHOOSE"`／他は空・None・False）。`cond.rs` の `HAS_TRAIT` 等が
+/// 「`condition.target` が無いときに合成するクエリ」で使う。
+impl Default for TargetQuery {
+    fn default() -> TargetQuery {
+        TargetQuery {
+            zone: vec![ZoneRef::Field],
+            player: PlayerRef::SelfP,
+            card_type: Vec::new(),
+            traits: Vec::new(),
+            attributes: Vec::new(),
+            colors: Vec::new(),
+            names: Vec::new(),
+            cost_min: None,
+            cost_max: None,
+            cost_max_dynamic: None,
+            power_min: None,
+            power_max: None,
+            power_sum_max: None,
+            min_attached_don: None,
+            is_face_up: None,
+            lacks_trigger: None,
+            is_rest: None,
+            count: 1,
+            is_up_to: false,
+            count_dynamic: None,
+            select_mode: "CHOOSE".to_owned(),
+            save_id: None,
+            ref_id: None,
+            chooser: None,
+            flags: Vec::new(),
+            is_vanilla: false,
+            is_strict_count: false,
+            is_unique_name: false,
+            exclude_ids: Vec::new(),
+            exclude_names: Vec::new(),
+            raw_text: String::new(),
+        }
+    }
+}
+
+impl TargetQuery {
+    /// Python `"X" in query.flags`。
+    pub fn has_flag(&self, flag: &str) -> bool {
+        self.flags.iter().any(|f| f == flag)
+    }
+}
+
 /// Python `ValueSource`。
 #[derive(Debug, Clone, PartialEq)]
 pub struct ValueSource {
@@ -520,12 +568,85 @@ pub struct ValueSource {
     pub count_query: Option<Box<TargetQuery>>,
 }
 
-/// `Condition.value`（Python は `int | str | ValueSource`）。
+/// Python `ValueSource` の dataclass 既定値（`base=0`／`multiplier=1`／`divisor=1`）。
+/// **`derive(Default)` は使えない**（`multiplier`／`divisor` が 0 になり評価が変わる）。
+impl Default for ValueSource {
+    fn default() -> ValueSource {
+        ValueSource {
+            base: 0,
+            dynamic_source: None,
+            multiplier: 1,
+            divisor: 1,
+            ref_id: None,
+            count_query: None,
+        }
+    }
+}
+
+/// `Condition.value`（Python は「何でも入る」欄）。
+///
+/// **契約の追補（WP `rs-p3-core`・append-only）**: 当初の契約は `int | str | ValueSource` だったが、
+/// 実データ（`opcg_effects.json`）の `Condition.value` は **tuple / list / dict / bool** も取る
+/// （`EVENT_THIS_TURN`=("名前",N)・`FIELD_ALL_TRAIT`=("特徴",contains)・`LEADER_TRAIT`=["A","B"]・
+/// `OPPONENT_REMOVAL`／`REVEALED_CARD_TRAIT`=dict）。既存の 3 種は意味を変えず、表現できない値を
+/// 黙って落とさないために変種を足す。
+///
+/// exporter（`export_effects_json.py::_encode`）は **tuple も list も JSON 配列**にするので、
+/// Rust 側では両者を区別できない。現行 DB では区別が要る型（`EVENT_THIS_TURN`／`SOURCE_STATE`／
+/// `LEADER_STATE`／`FIELD_ALL_TRAIT`／`HAS_CHARACTER`＝Python が `isinstance(v, tuple)` で分岐する型）
+/// の値は**全て tuple**であり、list を取る型（`LEADER_NAME`／`LEADER_TRAIT`）は Python 側が
+/// `(list, tuple)` の両方を受けるため、`List` を「Python の tuple」として扱って一致する
+/// （`cond.rs` の各分岐に注記あり）。
 #[derive(Debug, Clone, PartialEq)]
 pub enum CondValue {
+    Null,
+    Bool(bool),
     Int(i32),
     Str(String),
+    /// Python の tuple／list（exporter はどちらも JSON 配列にする）。
+    List(Vec<CondValue>),
+    /// Python の dict（キー順は JSON の出現順＝exporter が `sort_keys` で書いた昇順）。
+    Dict(Vec<(String, CondValue)>),
     Source(ValueSource),
+}
+
+impl CondValue {
+    /// Python `isinstance(value, int)`（`bool` は除く＝現行 DB に bool 単体の値は無い）。
+    pub fn as_int(&self) -> Option<i32> {
+        match self {
+            CondValue::Int(n) => Some(*n),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            CondValue::Str(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn as_list(&self) -> Option<&[CondValue]> {
+        match self {
+            CondValue::List(items) => Some(items.as_slice()),
+            _ => None,
+        }
+    }
+
+    pub fn as_dict(&self) -> Option<&[(String, CondValue)]> {
+        match self {
+            CondValue::Dict(items) => Some(items.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// dict の 1 キー（Python `val.get(key)`）。
+    pub fn dict_get(&self, key: &str) -> Option<&CondValue> {
+        self.as_dict()?
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v)
+    }
 }
 
 /// Python `Condition`。
@@ -591,9 +712,23 @@ pub struct Ability {
 
 /// 全能力の表。`model::CardMaster.ability_ids` はここへの index（カード内の順序＝Python の
 /// `master.abilities` の順序を保つ。`ability_used_this_turn` のキー＝カード内 index）。
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct AbilityTable {
     pub abilities: Vec<Ability>,
+}
+
+impl AbilityTable {
+    pub fn get(&self, id: u32) -> Option<&Ability> {
+        self.abilities.get(id as usize)
+    }
+
+    pub fn len(&self) -> usize {
+        self.abilities.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.abilities.is_empty()
+    }
 }
 
 #[cfg(test)]
