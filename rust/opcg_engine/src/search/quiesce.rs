@@ -1,0 +1,586 @@
+//! 静止探索と箱（Python `learned/mcts.py` の窓述語・`quiesce_choice`・`resolve_battle_inplace`・
+//! `resolved_branch_values`・戦闘箱の枝予算）。
+//!
+//! | Rust | Python（正本） |
+//! |---|---|
+//! | [`Ctx`] | `learned/adapter.py::OPCGGame` ＋ `cpu_learned._value_fn`／`_priors` |
+//! | [`in_battle`]／[`in_dialog`] | `mcts.in_battle`／`mcts.in_dialog` |
+//! | [`quiesce_choice`] | `mcts.quiesce_choice` |
+//! | [`resolve_battle_inplace`] | `mcts.resolve_battle_inplace` |
+//! | [`resolved_branch_values`] | `mcts.resolved_branch_values` |
+//! | [`BoxBudget`] | `mcts._BOX_BUDGET`／`reset_box_budget`／`clear_box_budget` |
+//!
+//! **物差しは 1 本**（`docs/rust_engine_plan.md` §12.6）: a1（出荷既定の NRel）は戦闘出口
+//! ヘッドを持たないので、Python の `battle_value_fn` は本体 value と同一関数になる。
+//! よって Rust は value を 1 つだけ持つ（`Ctx::value`）。出口ヘッドを持つネットを載せる
+//! ときはここに枝を足す（P5）。
+//!
+//! **例外の扱い**: Python の `except Exception` は Rust の [`EngineError::BadPayload`] に対応する。
+//! [`EngineError::Unimplemented`]（Rust 側の穴）は**握りつぶさず伝播させる**＝黙って
+//! 「一致」にしない（計画 §3）。
+
+use crate::encode::{EncodeOptions, Vocab, N_OPP, N_OWN, N_TOK, R_DIM};
+use crate::journal::Session;
+use crate::model::{CardIdx, GameState, MasterTable, Seat};
+use crate::net::{nrel, Candidate, LoadedNet};
+use crate::state::EngineError;
+use serde_json::Value;
+use std::collections::HashMap;
+
+use super::{adapter, apply, Move, SearchOptions};
+
+/// Python `config.QUIESCE_MAX_PLIES`。
+pub const QUIESCE_MAX_PLIES: usize = 12;
+/// Python `config.BOX_RESOLVE_DEPTH`。
+pub const BOX_RESOLVE_DEPTH: i32 = 1;
+/// Python `config.BOX_BRANCH_BUDGET`。
+pub const BOX_BRANCH_BUDGET: i64 = 8000;
+/// Python `mcts.DIALOG_ACTIONS`（効果対話窓のアクション名）。
+pub const DIALOG_ACTIONS: [&str; 7] = [
+    "SEARCH_AND_SELECT",
+    "SELECT_TARGET",
+    "FIELD_OVERFLOW_TRASH",
+    "CONFIRM_OPTIONAL",
+    "CONFIRM_TRIGGER",
+    "CHOICE",
+    "DECLARE_COST",
+];
+
+/// 窓の種類（Python の `window_pred`＝`None`（戦闘窓）／`in_dialog`（対話窓））。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Window {
+    Battle,
+    Dialog,
+}
+
+impl Window {
+    fn holds(self, s: &mut Session) -> bool {
+        match self {
+            Window::Battle => in_battle(s),
+            Window::Dialog => in_dialog(s),
+        }
+    }
+}
+
+/// Python `mcts.in_battle`（戦闘が未解決か）。
+pub fn in_battle(s: &Session) -> bool {
+    s.state().active_battle.is_some()
+}
+
+/// Python `mcts.in_dialog`（効果対話窓か）。
+pub fn in_dialog(s: &mut Session) -> bool {
+    match crate::rules::pending::pending_actor_action(s) {
+        Some((_, action)) => DIALOG_ACTIONS.contains(&action),
+        None => false,
+    }
+}
+
+/// 戦闘箱の枝予算（Python `mcts._BOX_BUDGET`）。**decide 1 回のあいだだけ**張る。
+#[derive(Debug, Clone)]
+pub struct BoxBudget {
+    /// 残り枝数（`None`＝無制限）
+    pub left: Option<i64>,
+    /// 通算の打ち切り回数
+    pub exhausted: u64,
+    /// この decide で使った枝数
+    pub used: i64,
+}
+
+impl Default for BoxBudget {
+    fn default() -> Self {
+        BoxBudget::new(Some(BOX_BRANCH_BUDGET))
+    }
+}
+
+impl BoxBudget {
+    /// Python `reset_box_budget(budget)`（0／None は無制限）。
+    pub fn new(budget: Option<i64>) -> BoxBudget {
+        BoxBudget {
+            left: budget.filter(|b| *b > 0),
+            exhausted: 0,
+            used: 0,
+        }
+    }
+
+    /// Python `clear_box_budget()`（無制限へ戻す）。
+    pub fn clear(&mut self) {
+        self.left = None;
+    }
+
+    /// `len(legal)` 本ぶん引く。`false`＝予算切れ（呼び出し側は全枝 None を返す）。
+    fn take(&mut self, n: usize) -> bool {
+        let Some(left) = self.left else { return true };
+        if left <= 0 {
+            return false;
+        }
+        self.left = Some(left - n as i64);
+        self.used += n as i64;
+        if self.left.unwrap_or(0) <= 0 {
+            self.exhausted += 1;
+        }
+        true
+    }
+}
+
+/// 探索の可変状態（Python のモジュール変数＋グローバル `random`）。
+#[derive(Debug, Default)]
+pub struct SearchState {
+    pub budget: BoxBudget,
+}
+
+// --- 評価器（value／priors）の文脈 ----------------------------------------------
+
+/// 探索が触る「盤面以外」＝カード表・ネット・候補生成の設定。
+pub struct Ctx<'a> {
+    pub masters: &'a MasterTable,
+    pub net: &'a LoadedNet,
+    /// `OPCGGame` の候補生成設定（serve 既定）
+    pub opts: SearchOptions,
+    /// 木の中の箱化（`config.TREE_BOX_BATTLE`）
+    pub box_battle: bool,
+    /// 対話箱（`config.TREE_BOX_DIALOG`）
+    pub box_dialog: bool,
+    /// 静止探索（`config.SERVE_QUIESCE`）
+    pub quiesce: bool,
+    pub quiesce_max_plies: usize,
+}
+
+impl<'a> Ctx<'a> {
+    fn enc_opts(&self) -> EncodeOptions {
+        EncodeOptions {
+            // NRel の serve は関係を `encode_rel` で作らない（`NRelValueAdapter.encode_state` は
+            // 常に `with_relations=False`）。R を使うネットでは `relations_from_dump` 相当を
+            // 別途組むが、a1 は `ablate={"rel"}` なので 0 のままでよい。
+            skip_relations: true,
+            skip_onplay: self.net.weights.ablated("onplay"),
+        }
+    }
+
+    fn vocab(&self) -> &Vocab {
+        &self.net.vocab
+    }
+
+    /// Python `OPCGGame.is_terminal`（`winner is not None or pending_actor_action() is None`）。
+    pub fn is_terminal(&self, s: &mut Session) -> bool {
+        s.state().winner.is_some() || crate::rules::pending::pending_actor_action(s).is_none()
+    }
+
+    /// Python `OPCGGame.current_player`。
+    pub fn current_player(&self, s: &mut Session) -> Option<Seat> {
+        crate::rules::pending::pending_actor_action(s).map(|(seat, _)| seat)
+    }
+
+    /// Python `OPCGGame.legal_actions`（探索用の候補・順序込み）。
+    pub fn legal_actions(&self, s: &mut Session) -> Result<Vec<Move>, EngineError> {
+        adapter::legal_actions(s, self.masters, &self.opts)
+    }
+
+    /// Python `cpu_learned._value_fn`（NRel＝`predict_state`・終局は ±1）。
+    pub fn value(&self, s: &mut Session, to_move: Seat) -> Result<f64, EngineError> {
+        if let Some(w) = s.state().winner {
+            return Ok(if w == to_move { 1.0 } else { -1.0 });
+        }
+        let enc = self.encode_for(s, to_move)?;
+        Ok(crate::net::value(&self.net.weights, &self.net.tab, &enc)? as f64)
+    }
+
+    /// `NRelValueAdapter.encode_state`（R は ablate に従って 0 埋め）。
+    fn encode_for(
+        &self,
+        s: &mut Session,
+        to_move: Seat,
+    ) -> Result<crate::encode::Encoding, EngineError> {
+        let mut enc = crate::encode::encode(
+            s.state(),
+            self.masters,
+            self.vocab(),
+            to_move,
+            &self.enc_opts(),
+        )?;
+        if enc.rel_om.is_empty() {
+            enc.rel_om = vec![0.0; N_OWN * N_OPP * R_DIM];
+        }
+        if enc.rel_oo.is_empty() {
+            enc.rel_oo = vec![0.0; N_OWN * N_OWN * R_DIM];
+        }
+        // ネットが読むのは先頭 22 枠（Python `ci = base["card_idx"][:N_TOK]`）。
+        enc.card_idx.truncate(N_TOK);
+        Ok(enc)
+    }
+
+    /// Python `n_rel.nrel_priors` の中身（`state, legal` → 合法手上の確率 or `None`）。
+    ///
+    /// Python は全体を `try/except` で包んで例外時に `None` を返す＝同じ扱いにする。
+    /// ただし `Unimplemented` は伝播させる（黙って「priors 無し」に落とさない）。
+    pub fn priors(
+        &self,
+        s: &mut Session,
+        legal: &[Move],
+    ) -> Result<Option<Vec<f32>>, EngineError> {
+        if legal.is_empty() {
+            return Ok(None);
+        }
+        let Some((me, _)) = crate::rules::pending::pending_actor_action(s) else {
+            return Ok(None);
+        };
+        let enc = match self.encode_for(s, me) {
+            Ok(e) => e,
+            Err(e @ EngineError::Unimplemented(_)) => return Err(e),
+            Err(_) => return Ok(None),
+        };
+        let refs: Vec<CandOwned> = {
+            let state = s.state();
+            let slots = slot_index(state, me);
+            let uidx = uuid_index(state);
+            legal
+                .iter()
+                .map(|mv| cand_owned(state, self.masters, &uidx, &slots, mv))
+                .collect()
+        };
+        let cands = match self.cand_rows(&enc, &refs) {
+            Ok(c) => c,
+            Err(e @ EngineError::Unimplemented(_)) => return Err(e),
+            Err(_) => return Ok(None),
+        };
+        match crate::net::priors(&self.net.weights, &self.net.tab, &enc, &cands) {
+            Ok(p) if p.len() == legal.len() => Ok(Some(p)),
+            Ok(_) => Ok(None),
+            Err(e @ EngineError::Unimplemented(_)) => Err(e),
+            Err(_) => Ok(None),
+        }
+    }
+
+    fn cand_rows(
+        &self,
+        enc: &crate::encode::Encoding,
+        refs: &[CandOwned],
+    ) -> Result<Vec<Candidate>, EngineError> {
+        let borrowed: Vec<nrel::CandRef<'_>> = refs
+            .iter()
+            .map(|r| nrel::CandRef {
+                action_type: r.action_type.as_str(),
+                don_k: r.don_k,
+                has_target: r.has_target,
+                card_id: r.card_id.as_deref(),
+                target_card_id: r.target_card_id.as_deref(),
+                si: r.si,
+                ti: r.ti,
+            })
+            .collect();
+        nrel::cand_rows(
+            &self.net.tab,
+            &self.net.statics,
+            self.vocab(),
+            enc,
+            &borrowed,
+        )
+    }
+}
+
+/// 手 1 件から解けた識別（`nrel::CandRef` の所有版）。
+pub struct CandOwned {
+    pub action_type: String,
+    pub don_k: Option<f64>,
+    pub has_target: bool,
+    pub card_id: Option<String>,
+    pub target_card_id: Option<String>,
+    pub si: i32,
+    pub ti: i32,
+}
+
+/// Python `n_eff._uuid_index`（uuid → カード。**ゾーンの範囲と優先順を Python に揃える**:
+/// リーダー → 場 → 手札 → トラッシュ → ライフ → ステージ、p1 が先・先勝ち）。
+///
+/// 全カードを走査する [`crate::ops::find_card_by_uuid`] とは範囲が違う（山札・一時ゾーンを
+/// 含めない）＝方策の `card_id` 解決はこちらを使う。
+pub fn uuid_index(state: &GameState) -> HashMap<&str, CardIdx> {
+    let mut idx: HashMap<&str, CardIdx> = HashMap::new();
+    for seat in [Seat::P1, Seat::P2] {
+        let p = state.player(seat);
+        let zones = p
+            .leader
+            .iter()
+            .copied()
+            .chain(p.field.iter().copied())
+            .chain(p.hand.iter().copied())
+            .chain(p.trash.iter().copied())
+            .chain(p.life.iter().copied())
+            .chain(p.stage.iter().copied());
+        for c in zones {
+            idx.entry(state.card(c).uuid.as_str()).or_insert(c);
+        }
+    }
+    idx
+}
+
+/// Python `n_rel_feat._slots` の逆写像（uuid → 22 枠 index）。
+pub fn slot_index(state: &GameState, me: Seat) -> HashMap<&str, i32> {
+    let opp = me.other();
+    let mut slots: Vec<Option<CardIdx>> = Vec::with_capacity(N_TOK);
+    slots.push(state.player(me).leader);
+    slots.push(state.player(opp).leader);
+    for k in 0..crate::encode::MAX_FIELD {
+        slots.push(state.player(me).field.get(k).copied());
+    }
+    for k in 0..crate::encode::MAX_FIELD {
+        slots.push(state.player(opp).field.get(k).copied());
+    }
+    for k in 0..crate::encode::MAX_HAND {
+        slots.push(state.player(me).hand.get(k).copied());
+    }
+    let mut out: HashMap<&str, i32> = HashMap::new();
+    for (i, c) in slots.iter().enumerate() {
+        if let Some(c) = c {
+            // Python は dict 内包＝**後勝ち**（同じ uuid が 2 枠に出ることは無いので実質同じ）
+            out.insert(state.card(*c).uuid.as_str(), i as i32);
+        }
+    }
+    out
+}
+
+/// 手 → `CandOwned`（Python `_cand_row`／`_cand_rows` の uuid 解決と同じ規則）。
+///
+/// 主体は `card_uuid` → `payload.uuid` の順（Python の `mv.get("card_uuid") or p.get("uuid")`）、
+/// 対象は `payload.target_ids[0]`。引けない uuid は `card_id=None`（＝vocab の PAD 0）。
+pub fn cand_owned(
+    state: &GameState,
+    masters: &MasterTable,
+    uidx: &HashMap<&str, CardIdx>,
+    slots: &HashMap<&str, i32>,
+    mv: &Move,
+) -> CandOwned {
+    let null = Value::Null;
+    let p = mv.get("payload").unwrap_or(&null);
+    let su = mv
+        .get("card_uuid")
+        .and_then(Value::as_str)
+        .or_else(|| p.get("uuid").and_then(Value::as_str));
+    let tids = p.get("target_ids").and_then(Value::as_array);
+    let has_target = tids.map(|a| !a.is_empty()).unwrap_or(false);
+    let tu = tids.and_then(|a| a.first()).and_then(Value::as_str);
+    let card_id = |u: Option<&str>| -> Option<String> {
+        let c = *uidx.get(u?)?;
+        Some(masters.get(state.card(c).master).card_id.clone())
+    };
+    CandOwned {
+        action_type: mv
+            .get("action_type")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned(),
+        don_k: p.get("don_k").and_then(Value::as_f64),
+        has_target,
+        card_id: card_id(su),
+        // Python は `if tids:` のときだけ対象の card_id を引く
+        target_card_id: if has_target { card_id(tu) } else { None },
+        si: su.and_then(|u| slots.get(u).copied()).unwrap_or(-1),
+        ti: tu.and_then(|u| slots.get(u).copied()).unwrap_or(-1),
+    }
+}
+
+// --- 静止探索の本体 ---------------------------------------------------------------
+
+/// Python `mcts.quiesce_choice`（policy 最良手 → PASS → 先頭手）。
+pub fn quiesce_choice(
+    ctx: &Ctx,
+    s: &mut Session,
+    legal: &[Move],
+    use_priors: bool,
+) -> Result<usize, EngineError> {
+    if use_priors && legal.len() > 1 {
+        if let Some(p) = ctx.priors(s, legal)? {
+            return Ok(argmax_f32(&p));
+        }
+    }
+    for (i, mv) in legal.iter().enumerate() {
+        if mv.get("action_type").and_then(Value::as_str) == Some("PASS") {
+            return Ok(i);
+        }
+    }
+    Ok(0)
+}
+
+/// `np.argmax`（同点は**添字が小さい方**＝numpy と同じ規約）。
+pub fn argmax_f32(v: &[f32]) -> usize {
+    let mut best = 0usize;
+    for i in 1..v.len() {
+        if v[i] > v[best] {
+            best = i;
+        }
+    }
+    best
+}
+
+/// `np.argmax`（f64 版）。
+pub fn argmax_f64(v: &[f64]) -> usize {
+    let mut best = 0usize;
+    for i in 1..v.len() {
+        if v[i] > v[best] {
+            best = i;
+        }
+    }
+    best
+}
+
+/// `max(ok, key=lambda i: vals[i])`（Python の `max` は**最初の**最大値を返す）。
+pub fn best_branch(vals: &[Option<f64>]) -> Option<usize> {
+    let mut best: Option<usize> = None;
+    for (i, v) in vals.iter().enumerate() {
+        let Some(v) = v else { continue };
+        match best {
+            None => best = Some(i),
+            Some(b) => {
+                if *v > vals[b].expect("best は Some") {
+                    best = Some(i);
+                }
+            }
+        }
+    }
+    best
+}
+
+/// Python `mcts.resolve_battle_inplace`（窓が解決するまで**その場で**進める・巻き戻さない）。
+///
+/// `box_value=true` が Python の「`box_depth>0` かつ `value_fn` あり」＝残りの窓も出口 value
+/// 最良で進める（`BOX_RESOLVE_DEPTH`）。`trace` は箱コミット生成が読む適用手の列。
+#[allow(clippy::too_many_arguments)]
+pub fn resolve_battle_inplace(
+    ctx: &Ctx,
+    s: &mut Session,
+    st: &mut SearchState,
+    window: Window,
+    max_plies: usize,
+    box_value: bool,
+    box_depth: i32,
+    mut trace: Option<&mut Vec<(Seat, Move)>>,
+) -> Result<usize, EngineError> {
+    let mut n = 0usize;
+    for _ in 0..max_plies {
+        if ctx.is_terminal(s) || !window.holds(s) {
+            break;
+        }
+        let Some(name) = ctx.current_player(s) else {
+            break;
+        };
+        let legal = ctx.legal_actions(s)?;
+        if legal.is_empty() {
+            break;
+        }
+        let mut pick: Option<usize> = None;
+        if box_value && box_depth > 0 && legal.len() > 1 {
+            let vals = resolved_branch_values(
+                ctx,
+                s,
+                st,
+                name,
+                &legal,
+                max_plies,
+                box_depth - 1,
+                window,
+            )?;
+            pick = best_branch(&vals);
+        }
+        let pick = match pick {
+            Some(i) => i,
+            None => quiesce_choice(ctx, s, &legal, true)?,
+        };
+        match apply::apply_move_inplace(s, ctx.masters, name, &legal[pick], true) {
+            Ok(()) => {}
+            Err(e @ EngineError::Unimplemented(_)) => return Err(e),
+            Err(_) => break, // Python の `except Exception: break`
+        }
+        if let Some(tr) = trace.as_deref_mut() {
+            tr.push((name, legal[pick].clone()));
+        }
+        n += 1;
+    }
+    Ok(n)
+}
+
+/// Python `mcts.resolved_branch_values`（各枝を「窓を解決した出口盤面」まで進めて評価）。
+///
+/// `s` は**不変**（各枝は journal の transaction で巻き戻す）。適用に失敗した枝は `None`。
+#[allow(clippy::too_many_arguments)]
+pub fn resolved_branch_values(
+    ctx: &Ctx,
+    s: &mut Session,
+    st: &mut SearchState,
+    name: Seat,
+    legal: &[Move],
+    max_plies: usize,
+    box_depth: i32,
+    window: Window,
+) -> Result<Vec<Option<f64>>, EngineError> {
+    if !st.budget.take(legal.len()) {
+        return Ok(vec![None; legal.len()]);
+    }
+    // CRN: 全枝を同一の乱数列から評価し、抜けるときに戻す（Python の `random.getstate/setstate`）。
+    let base_rng = s.rng.snapshot();
+    let mut vals = Vec::with_capacity(legal.len());
+    for mv in legal {
+        s.rng.restore(&base_rng);
+        let saved = s.swap_events(Vec::new());
+        let mut unimplemented: Option<EngineError> = None;
+        let v = s.transaction(|s| {
+            let out = (|| -> Result<f64, EngineError> {
+                apply::apply_move_inplace(s, ctx.masters, name, mv, true)?;
+                resolve_battle_inplace(
+                    ctx, s, st, window, max_plies, true, box_depth, None,
+                )?;
+                ctx.value(s, name)
+            })();
+            match out {
+                Ok(v) => Some(v),
+                Err(e @ EngineError::Unimplemented(_)) => {
+                    unimplemented = Some(e);
+                    None
+                }
+                Err(_) => None,
+            }
+        });
+        s.swap_events(saved);
+        if let Some(e) = unimplemented {
+            return Err(e);
+        }
+        vals.push(v);
+    }
+    s.rng.restore(&base_rng);
+    Ok(vals)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn budget_stops_after_the_allowance() {
+        let mut b = BoxBudget::new(Some(5));
+        assert!(b.take(3)); // 残り 2
+        assert!(b.take(3)); // 残り -1（この呼び出しは通す＝Python と同じ）
+        assert_eq!(b.exhausted, 1);
+        assert!(!b.take(1)); // 以後は打ち切り
+        assert_eq!(b.used, 6);
+    }
+
+    #[test]
+    fn unlimited_budget_never_stops() {
+        let mut b = BoxBudget::new(None);
+        for _ in 0..1000 {
+            assert!(b.take(100));
+        }
+        assert_eq!(b.exhausted, 0);
+    }
+
+    #[test]
+    fn argmax_prefers_the_smaller_index_on_ties() {
+        assert_eq!(argmax_f32(&[0.5, 0.5, 0.4]), 0);
+        assert_eq!(argmax_f64(&[0.1, 0.9, 0.9]), 1);
+    }
+
+    #[test]
+    fn best_branch_skips_none_and_keeps_the_first_max() {
+        assert_eq!(best_branch(&[None, Some(1.0), Some(1.0)]), Some(1));
+        assert_eq!(best_branch(&[None, None]), None);
+        assert_eq!(best_branch(&[Some(-1.0), Some(0.5)]), Some(1));
+    }
+}

@@ -8,6 +8,30 @@ use crate::journal::{CardZone, Session};
 use crate::model::{CardIdx, GameState, Seat};
 use crate::state::EngineError;
 
+/// 乱数から並びを採る版（`TreeMCTS.run` の `determinize_fn` と `decide` が使う）。
+///
+/// Python は `pool`（相手の手札＋山札）が空なら `rng.shuffle` を**呼ばない**＝Rust も
+/// 乱数を消費しない（記録の出目と本数を合わせるのに要る）。
+pub fn determinize_with(
+    state: &GameState,
+    me: Seat,
+    rng: &mut dyn crate::search::rng::SearchRng,
+) -> Result<GameState, EngineError> {
+    let pool: Vec<String> = {
+        let p = state.player(me.other());
+        p.hand
+            .iter()
+            .chain(p.deck.iter())
+            .map(|c| state.card(*c).uuid.clone())
+            .collect()
+    };
+    if pool.is_empty() {
+        return Ok(state.clone());
+    }
+    let order = rng.shuffle_order(&pool)?;
+    determinize(state, me, &order)
+}
+
 /// Python `cpu_ai._determinize_opponent(manager, me_name, rng)`。
 ///
 /// `order` は `pool`（相手の**手札 → 山札**の順）を `rng.shuffle` した結果の uuid 列。

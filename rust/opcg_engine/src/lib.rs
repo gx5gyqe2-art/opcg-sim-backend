@@ -361,6 +361,26 @@ fn search_apply(
     Ok(search::search_apply(hidden_json, seat, move_json, stop_at_select)?)
 }
 
+/// 1 手を決める（`core/cpu_learned.py::LearnedEngine.decide`）。P4・WP `rs-p4-mcts`。
+///
+/// `hidden_json` は記録 v5 の `hidden`、`seat` は決める側（`player.name`）。
+/// `opts_json` は探索のつまみ（省略した欄は serve 既定＝`learned/config.py`）:
+/// `sims`／`c_puct`／`dirichlet_eps`／`temp_turns`／`box_commit`／`box_battle`／`box_dialog`／
+/// `quiesce`／`residual_dig`／`residual_activate`／候補生成（`prune_futile`／`macro_moves`／
+/// `defense_box`／`don_margin`）／`budget`（戦闘箱の枝予算）。decide をまたぐ状態は
+/// `commit`（残り手順）と `resact_pending` で受け渡す。
+/// `rng_json` は記録した出目 `{"shuffles":[[uuid...]...],"dirichlets":[[..]...],"uniforms":[..]}`
+/// （世界サンプルの並び・Dirichlet・温度サンプルの一様乱数）。出目が尽きたら `ValueError`。
+///
+/// 戻り値は
+/// `{"move":..,"stats":{"legal":[..],"N":[..],"Q":[..],"P":[..]|null},"kind":"main|window|commit",
+///   "groups":[..],"commit":[..],"resact_pending":bool,"budget":{..},"rng_used":[..]}`。
+/// `load_masters()` と `load_net()` が先に要る。
+#[pyfunction]
+fn decide(hidden_json: &str, seat: &str, opts_json: &str, rng_json: &str) -> PyResult<String> {
+    Ok(search::decide_json(hidden_json, seat, opts_json, rng_json)?)
+}
+
 #[pymodule]
 fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
@@ -383,5 +403,6 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(search_legal, m)?)?;
     m.add_function(wrap_pyfunction!(search_determinize, m)?)?;
     m.add_function(wrap_pyfunction!(search_apply, m)?)?;
+    m.add_function(wrap_pyfunction!(decide, m)?)?;
     Ok(())
 }

@@ -205,8 +205,27 @@ def hidden_dict(manager) -> dict:
         "interaction_depth": len(manager._interaction_stack),
         "pending_triggers": len(manager._pending_triggers),
         "pending_end_of_turn": len(manager.pending_end_of_turn),
+        # v5 additive（P4・WP `rs-p4-mcts`）: **期間付き効果の一覧**
+        # （`effects/continuous.py::ContinuousEffectManager.effects`）。カード側の
+        # `timed_power` 等だけを記録しても、失効させる側が効果を知らないため
+        # 「このターン中 パワー−5000」がターンを跨いで残る（決定オラクルで実測: EB04-023 の
+        # 登場コスト。復元した盤面で TURN_END を打つと Python 5000 / Rust 0 に割れた）。
+        "continuous": [_continuous_record(e) for e in manager.continuous.effects],
     }
     return out
+
+
+def _continuous_record(eff) -> dict:
+    """`ContinuousEffect` の dataclass をそのまま dict にする（欄名は Python と同じ）。"""
+    return {
+        "target_uuid": eff.target_uuid,
+        "kind": eff.kind,
+        "amount": int(eff.amount),
+        "flag": eff.flag or "",
+        "keyword": eff.keyword or "",
+        "duration": eff.duration,
+        "expire_turn": int(eff.expire_turn or 0),
+    }
 
 
 # --- バニラデッキ（P2 の受け入れ用・記録形式 v3）------------------------------------
