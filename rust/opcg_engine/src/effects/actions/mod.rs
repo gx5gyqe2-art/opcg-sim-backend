@@ -527,13 +527,19 @@ pub(super) fn push_scope(s: &Session, owner: Seat, card: CardIdx, out: &mut Vec<
 }
 
 /// Python `gm._find_action(node, action_type)`（効果木を前順で辿り最初の該当アクション）。
+///
+/// **`sub_effect` へは降りない**: Python は `if isinstance(node, GameAction): return node if
+/// node.type == action_type else None` で、一致しない `GameAction` はそこで打ち切る
+/// （`Sequence`／`Branch`／`Choice` だけを辿る）。降りると「置換の代わりの行動に含まれる
+/// `PREVENT_LEAVE`」等を Python が見つけないものまで拾ってしまう（群 E で発見・現行 DB の
+/// PASSIVE 能力では差は出ないが、意味論を Python に合わせる）。
 pub fn find_action(node: &super::ast::EffectNode, ty: ActionType) -> Option<&GameAction> {
     match node {
         super::ast::EffectNode::Action(a) => {
             if a.ty == ty {
                 Some(a)
             } else {
-                a.sub_effect.as_deref().and_then(|n| find_action(n, ty))
+                None
             }
         }
         super::ast::EffectNode::Sequence(items) => items.iter().find_map(|n| find_action(n, ty)),

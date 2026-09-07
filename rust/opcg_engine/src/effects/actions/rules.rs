@@ -717,6 +717,9 @@ pub fn has_deckout_win_replace(
 // ---------------------------------------------------------------------------
 
 /// Python `gm._find_action(node, ty)` の [`NodeRef`] 付き版（前順・最初の該当アクション）。
+///
+/// Python と同じく **`sub_effect` へは降りない**（一致しない `GameAction` でそこは打ち切り）。
+/// 辿るのは `Sequence`／`Branch`／`Choice` だけ。
 pub fn find_action_ref<'a>(
     node: &'a EffectNode,
     at: &NodeRef,
@@ -727,9 +730,7 @@ pub fn find_action_ref<'a>(
             if a.ty == ty {
                 Some((at.clone(), a))
             } else {
-                a.sub_effect
-                    .as_deref()
-                    .and_then(|n| find_action_ref(n, &at.child(0), ty))
+                None
             }
         }
         EffectNode::Sequence(items) => items
