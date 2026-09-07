@@ -164,20 +164,12 @@ pub fn get_pending_request(s: &mut Session, masters: &MasterTable, full: bool) -
     if s.state().active_interaction().is_some() {
         let st = s.state();
         let it = st.active_interaction().expect("checked above");
-        // 候補はカード列かドン!!列のどちらか（`SELECT_RESOURCE` だけがドン!!）。
-        let candidate_uuids: Vec<String> = if it.candidate_dons.is_empty() {
-            it.candidates
-                .iter()
-                .map(|c| st.card(*c).uuid.clone())
-                .collect()
-        } else {
-            it.candidate_dons
-                .iter()
-                .map(|d| st.don(*d).uuid.clone())
-                .collect()
-        };
+        // 候補はカード／ドン!!の並び順つきの混在（§11.8 #2。`SELECT_RESOURCE` はドン!!だけ、
+        // `SELECT_TARGET` の `CHAR_OR_DON`／`COST_AREA` クエリは両方混ざりうる）。
+        let candidate_uuids: Vec<String> =
+            it.candidates.iter().map(|t| st.target_uuid(*t).to_owned()).collect();
         let selectable: Vec<String> = match it.selectable.as_ref() {
-            Some(list) => list.iter().map(|c| st.card(*c).uuid.clone()).collect(),
+            Some(list) => list.iter().map(|t| st.target_uuid(*t).to_owned()).collect(),
             None => candidate_uuids.clone(),
         };
         let mut req = Map::new();
@@ -191,20 +183,18 @@ pub fn get_pending_request(s: &mut Session, masters: &MasterTable, full: bool) -
             "candidates".into(),
             Value::Array(if !full {
                 Vec::new()
-            } else if it.candidate_dons.is_empty() {
+            } else {
                 it.candidates
                     .iter()
-                    .map(|c| {
-                        let card = st.card(*c);
-                        card.to_dict(masters.get(card.master), true)
-                    })
-                    .collect()
-            } else {
-                it.candidate_dons
-                    .iter()
-                    .map(|d| {
-                        let don = st.don(*d);
-                        don.to_dict(don.attached_to.map(|c| st.card(c).uuid.as_str()))
+                    .map(|t| match *t {
+                        crate::model::TargetRef::Card(c) => {
+                            let card = st.card(c);
+                            card.to_dict(masters.get(card.master), true)
+                        }
+                        crate::model::TargetRef::Don(d) => {
+                            let don = st.don(d);
+                            don.to_dict(don.attached_to.map(|c| st.card(c).uuid.as_str()))
+                        }
                     })
                     .collect()
             }),

@@ -54,7 +54,7 @@ pub use cond::check_condition;
 pub use matcher::get_target_cards;
 pub use value::calculate_value;
 
-use crate::model::{CardIdx, DonIdx, GameState, MasterTable, Seat};
+use crate::model::{CardIdx, GameState, MasterTable, Seat};
 use crate::state::EngineError;
 use ast::{Ability, AbilityTable, Condition, EffectNode, TriggerType};
 
@@ -186,30 +186,11 @@ pub fn child_of(node: &EffectNode, step: u16) -> Option<&EffectNode> {
 }
 
 // ---------------------------------------------------------------------------
-// 対象（TargetRef）
+// 対象（TargetRef＝`model::TargetRef` を再輸出。効果解決の各モジュールは
+// `super::TargetRef`／`effects::TargetRef` の名前で呼び続ける）
 // ---------------------------------------------------------------------------
 
-/// 効果の対象になりうる実体（カード or ドン!!）。
-///
-/// Python の `get_target_cards` は `CardInstance` と `DonInstance` の混ざった list を返す
-/// （`matcher.py` の `if not hasattr(card, "master")` 分岐。`Zone.COST_AREA` を指すクエリ 3 件と
-/// `CHAR_OR_DON` フラグ 2 件＝「キャラかドン!!合計N枚を〜」OP06-035／OP12-037）。カード index
-/// だけでは表せないので、カード／ドン!!のどちらかを指すこの型を返す。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum TargetRef {
-    Card(CardIdx),
-    Don(DonIdx),
-}
-
-impl TargetRef {
-    /// カードなら index、ドン!!なら `None`。
-    pub fn card(self) -> Option<CardIdx> {
-        match self {
-            TargetRef::Card(i) => Some(i),
-            TargetRef::Don(_) => None,
-        }
-    }
-}
+pub use crate::model::TargetRef;
 
 /// `TargetRef` の列からカードだけを取り出す（ドン!!は落とす）。
 ///
@@ -265,8 +246,8 @@ pub struct EffectContext {
     pub main_expanded: bool,
     /// `_flushing_delayed`（ターン終了時フラッシュ中は `delay` を無視する）。
     pub flushing_delayed: bool,
-    /// `temp_resolved_targets`（中断→再開で持ち込まれた選択結果）。
-    pub temp_resolved_targets: Option<Vec<CardIdx>>,
+    /// `temp_resolved_targets`（中断→再開で持ち込まれた選択結果。§11.8 #2 でドン!!も持てる）。
+    pub temp_resolved_targets: Option<Vec<TargetRef>>,
     /// `_both_sides`（「お互いの〜」の side 名→解決済み対象）。
     pub both_sides: Vec<(String, Vec<CardIdx>)>,
     /// `_both_sides_pending`（いま選ばせている side 名）。

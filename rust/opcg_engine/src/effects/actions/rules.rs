@@ -26,7 +26,7 @@
 //! ので、ここでは**どちらの枝でも `Some(Ok(true))`**を返して同値にする（no-op も success=true）。
 
 use crate::journal::{CardZone, Session};
-use crate::model::{CardIdx, ContinuousKind, MasterTable, Restriction, Seat};
+use crate::model::{CardIdx, CardType, ContinuousKind, MasterTable, Restriction, Seat};
 use crate::state::EngineError;
 
 use super::super::ast::{Ability, ActionType, Duration, EffectNode, GameAction, TriggerType};
@@ -519,11 +519,34 @@ pub fn find_replacement(
         }
     }
 
-    // Python はこの後に継続付与型の置換（`owner.granted_replacements`・被除去カードが自分の
-    // キャラのとき）を走査する。この置き場は `PlayerState`（`model.rs`＝群 E の所有外）に無く、
-    // 積む経路（`register_granted_replacements`）は 1 件でも積むなら `Unimplemented` で止まる
-    // ＝ここへ来る時点で常に空。よって走査を省いても Python と同じ結論になる
-    // （RESULT.json の notes で申告）。
+    // 継続付与型の置換（EB02-030「自分のキャラすべては、このターン中、…代わりに〜できる」・
+    // §11.8 #5）。場に残らないイベント由来のため `owner.granted_replacements` を参照する。
+    // 付与対象は自分のキャラ（除去されるカード自身が自分のキャラであること）。
+    // `ab`／`eff` は持たないのでターン制限・条件は付与時に消化済みとして扱う。
+    if masters.get(s.state().card(card).master).ty == CardType::Character {
+        let granted = s.state().player(owner).granted_replacements.clone();
+        for g in &granted {
+            if !status_values.contains(&g.status.as_str()) {
+                continue;
+            }
+            if s.state().turn_count > g.expire_turn {
+                continue;
+            }
+            let Some(sub) = g.sub.resolve(&masters.abilities) else {
+                continue;
+            };
+            if !Resolver::new().can_satisfy_node(s, masters, owner, sub, &g.sub, Some(card))? {
+                continue;
+            }
+            return Ok(Some(Replacement {
+                protector: card,
+                ability_index: None,
+                turn_limit: None,
+                sub: g.sub.clone(),
+                sub_is_optional: g.is_optional,
+            }));
+        }
+    }
     Ok(None)
 }
 
@@ -613,7 +636,7 @@ fn auto_resolve_replacement(s: &mut Session, masters: &MasterTable) -> Result<()
                     .as_ref()
                     .unwrap_or(&it.candidates)
                     .iter()
-                    .map(|c| s.state().card(*c).uuid.clone())
+                    .map(|t| s.state().target_uuid(*t).to_owned())
                     .collect();
                 // Python: `(constraints or {}).get("max", 1) or 1`（None も 0 も 1 に倒す）。
                 let mx = match it.constraints {
@@ -646,36 +669,46 @@ fn auto_resolve_replacement(s: &mut Session, masters: &MasterTable) -> Result<()
     Ok(())
 }
 
-/// Python `guards._register_granted_replacements`（【カウンター】イベントの「このターン中」付与）。
+/// Python `guards._register_granted_replacements`（【カウンター】イベントの「このターン中」付与・
+/// §11.8 #5＝`PlayerState.granted_replacements` を model.rs に足したので実装した）。
 ///
-/// `player.granted_replacements` の置き場が `model.rs`（本 WP の所有外）に無いので、**積むものが
-/// 1 件でもあるなら** `Unimplemented` を返す（黙って落とさない）。1 件も無いカードでは Python も
-/// 何もしないので `Ok(())`＝同値。
+/// カード（`source_card`）の全能力を走査し、`REPLACE_EFFECT` を持てば `player` へ登録する。
+/// `is_optional` は `sub_effect.is_optional` か raw_text の「できる」／「てもよい」のどちらか
+/// （Python: `bool(sub.is_optional) or ("できる" in raw) or ("てもよい" in raw)`）。
 pub fn register_granted_replacements(
-    s: &Session,
+    s: &mut Session,
     masters: &MasterTable,
+    player: Seat,
     source_card: CardIdx,
 ) -> Result<(), EngineError> {
-    let ids = &masters.get(s.state().card(source_card).master).ability_ids;
-    for id in ids {
+    let ids = masters.get(s.state().card(source_card).master).ability_ids.clone();
+    let turn_count = s.state().turn_count;
+    let mut granted = s.state().player(player).granted_replacements.clone();
+    for id in &ids {
         let ab = ability(masters, *id)?;
         let Some(effect) = ab.effect.as_ref() else {
             continue;
         };
-        let Some((_, eff)) =
+        let Some((eff_ref, eff)) =
             find_action_ref(effect, &NodeRef::root(*id, NodeRoot::Effect), ActionType::ReplaceEffect)
         else {
             continue;
         };
-        if eff.sub_effect.is_none() {
+        let Some(sub) = eff.sub_effect.as_deref() else {
             continue;
-        }
-        return Err(EngineError::Unimplemented(format!(
-            "guards::_register_granted_replacements: 継続付与型の置換（{}）は \
-             `PlayerState.granted_replacements` の欄が要る（model.rs は群 E の所有外）",
-            masters.get(s.state().card(source_card).master).card_id
-        )));
+        };
+        let raw = &eff.raw_text;
+        let raw = if raw.is_empty() { &ab.raw_text } else { raw };
+        let is_optional =
+            node_is_optional(sub) || raw.contains("できる") || raw.contains("てもよい");
+        granted.push(crate::model::GrantedReplacement {
+            status: eff.status.clone().unwrap_or_default(),
+            sub: eff_ref.child(0),
+            is_optional,
+            expire_turn: turn_count,
+        });
     }
+    s.edit().set_granted_replacements(player, granted);
     Ok(())
 }
 

@@ -54,28 +54,16 @@ pub fn game_handler(
     value: i32,
     source_card: Option<CardIdx>,
 ) -> Option<Result<bool, EngineError>> {
+    let _ = (node_ref, value, source_card);
     match action.ty {
         // Python: `@game_handler(ActionType.DISABLE_ABILITY, when=lambda a: a.status == "OPP_ONPLAY")`
         ActionType::DisableAbility if action.status.as_deref() == Some("OPP_ONPLAY") => {
             Some(Ok(disable_opp_onplay(s, actor, action)))
         }
-        // ガードが偽（status が別の値／未指定）＝Python は `run_target_loop` へフォールスルーする。
-        //
-        // 差し口の規約は「担当外は `None`」だが、`mod.rs::apply_action` は
-        // `game_handler_for` が種別を返した時点で対象ループへは落ちない（どの群も `None` を
-        // 返すと `Unimplemented`）。`DISABLE_ABILITY` は `game_handler_for` の一覧に載って
-        // いるので、**guard 落ちの行き先をこの群が自分で呼ぶ**（`run_target_loop` は `pub`）。
-        // 呼び出し引数は Python の `apply_action` のフォールスルーと 1:1。
-        ActionType::DisableAbility => Some(super::run_target_loop(
-            s,
-            masters,
-            actor,
-            action,
-            node_ref,
-            targets,
-            value,
-            source_card,
-        )),
+        // ガードが偽（status が別の値／未指定）＝`None` を返す。§11.8 #3 で
+        // `mod.rs::apply_action` が「全群 `None` なら対象ループへ落ちる」に直ったので、
+        // ここで自前に `run_target_loop` を呼ぶ回避策は不要になった（Python の `when=` 偽と
+        // 同じフォールスルーが `apply_action` 側で成立する）。
         ActionType::SwapPower => Some(Ok(swap_power(s, masters, targets))),
         _ => None,
     }
@@ -336,7 +324,7 @@ mod tests {
         targets: &[CardIdx],
         value: i32,
     ) -> bool {
-        apply_action(s, masters, Seat::P1, action, &node_ref(), targets, value, None)
+        apply_action(s, masters, Seat::P1, action, &node_ref(), &crate::effects::refs_of(targets), value, None)
             .expect("apply_action")
     }
 
@@ -808,8 +796,12 @@ mod tests {
                 let mut a = testkit::action(ty, 0);
                 a.status = status.map(str::to_string);
                 a.duration = Duration::ThisTurn;
-                apply_action(s, &masters, Seat::P1, &a, &node_ref(), &[c1, c2], 1000, None)
-                    .expect("apply");
+                apply_action(
+                    s, &masters, Seat::P1, &a, &node_ref(),
+                    &[crate::model::TargetRef::Card(c1), crate::model::TargetRef::Card(c2)],
+                    1000, None,
+                )
+                .expect("apply");
             }
         });
         assert_eq!(*s.state(), before);

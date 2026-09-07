@@ -162,7 +162,6 @@ pub fn suspend_for_trigger_confirm(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
-        candidate_dons: Vec::new(),
     });
     Ok(())
 }

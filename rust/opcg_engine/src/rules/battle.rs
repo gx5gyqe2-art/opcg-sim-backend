@@ -81,7 +81,7 @@ pub fn declare_attack(
         ));
     }
     if card_type(s.state(), masters, target) == CardType::Leader
-        && super::active_restriction(s.state(), attacker_owner, "CANNOT_ATTACK_LEADER").is_some()
+        && super::active_restriction_mut(s, attacker_owner, "CANNOT_ATTACK_LEADER").is_some()
     {
         return Err(bad(
             "効果により、このターンはリーダーにアタックできません。",
@@ -233,7 +233,9 @@ pub fn apply_counter(
                 )?;
             }
         }
-        crate::effects::actions::rules::register_granted_replacements(s, masters, counter_card)?;
+        crate::effects::actions::rules::register_granted_replacements(
+            s, masters, seat, counter_card,
+        )?;
         crate::effects::actions::move_card(
             s,
             masters,
@@ -402,7 +404,7 @@ pub fn finish_attack(
     ops::reset_turn_status(s, masters, target, true, false);
     s.edit().set_active_battle(None);
     s.edit().set_phase(Phase::Main);
-    check_victory(s);
+    check_victory(s, masters)?;
     let turn_count = s.state().turn_count;
     continuous::expire(s, ExpireEvent::BattleEnd, turn_count);
     if s.state().winner.is_none() {
@@ -416,16 +418,32 @@ pub fn finish_attack(
     triggers::advance_pending_triggers(s, masters)
 }
 
-/// Python `check_victory`（デッキアウト）。
-///
-/// **未接続**: デッキアウト敗北→勝利の置換（`VICTORY`／`REPLACE_DECKOUT_LOSS`・OP03-040 等）の
-/// 走査は [`crate::effects::actions::rules::has_deckout_win_replace`] にあるが、ここへ挿すには
-/// `masters` が要る＝`turn::draw_card`／`actions/mod.rs` の DRAW ハンドラ／`tests_rules` の
-/// 呼び口を通す必要があり、群 E の所有範囲外（RESULT.json の notes で申告）。
-pub fn check_victory(s: &mut Session) {
+/// Python `check_victory`（デッキアウト。§11.8 #6 で `masters` を通し、デッキアウト敗北→勝利
+/// の置換〔`VICTORY`／`REPLACE_DECKOUT_LOSS`・OP03-040 等〕を
+/// [`crate::effects::actions::rules::has_deckout_win_replace`] に接続した）。
+pub fn check_victory(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
     if s.state().player(Seat::P1).deck.is_empty() {
-        s.edit().set_winner(Some(Seat::P2));
+        let winner = if crate::effects::actions::rules::has_deckout_win_replace(
+            s,
+            masters,
+            Seat::P1,
+        )? {
+            Seat::P1
+        } else {
+            Seat::P2
+        };
+        s.edit().set_winner(Some(winner));
     } else if s.state().player(Seat::P2).deck.is_empty() {
-        s.edit().set_winner(Some(Seat::P1));
+        let winner = if crate::effects::actions::rules::has_deckout_win_replace(
+            s,
+            masters,
+            Seat::P2,
+        )? {
+            Seat::P2
+        } else {
+            Seat::P1
+        };
+        s.edit().set_winner(Some(winner));
     }
+    Ok(())
 }

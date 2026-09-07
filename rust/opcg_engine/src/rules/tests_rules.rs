@@ -354,9 +354,9 @@ fn drawing_the_last_card_loses_the_game() {
     let mut b = BoardBuilder::new().turn(3, Seat::P1);
     b.put_deck(Seat::P1, M_CHAR);
     b.dons(Seat::P1, "deck", 4);
-    let (_masters, mut s) = session(b.build());
+    let (masters, mut s) = session(b.build());
 
-    turn::draw_card(&mut s, Seat::P1, 1);
+    turn::draw_card(&mut s, &masters, Seat::P1, 1).expect("draw_card");
     assert!(s.state().player(Seat::P1).deck.is_empty());
     assert_eq!(s.state().winner, Some(Seat::P2));
 }

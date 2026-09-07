@@ -11,8 +11,10 @@
 そのうえで **各段の盤面 dict（`pending_request` 込み・`request_id` 除外）を記録**し、
 `opcg_engine.replay_audit(record)` の返す盤面と 1 段ずつ突き合わせる。
 
-記録形式は v4 の `kind: "audit"`（§11.2）。汎用盤面は効果 JSON に無いカード（`FILLER`）を
-使うので、その定義を `extra_masters` に同梱する（Rust 側は表へ足してから読む）。
+記録形式は v5 の `kind: "audit"`（§11.2／§11.8 #1）。汎用盤面は効果 JSON に無いカード
+（`FILLER`）を使うので、その定義を `extra_masters` に同梱する（Rust 側は表へ足してから読む）。
+`fire` 直後・各 `steps[i]` 直後に `shuffled`（その段で混ぜたデッキの持ち主）を持たせ、
+Rust `replay_audit` が同じ位置で再同期する。
 
 実行例:
     # Python 側の自己検査（記録だけ・Rust 不要）。全カードで例外 0 が受け入れ条件。
@@ -52,8 +54,8 @@ from opcg_sim.src.utils.loader import CardLoader  # noqa: E402
 from opcg_sim.tools.export_effects_json import Stats, _encode  # noqa: E402
 
 from rs_diff_replay import (  # noqa: E402
-    DEFAULT_EFFECTS_PATH, RECORD_VERSION, board_dict, canon, first_diff, hidden_dict,
-    load_masters, _norm, _strip_request_id,
+    DEFAULT_EFFECTS_PATH, RECORD_VERSION, ShuffleWatcher, board_dict, canon, first_diff,
+    hidden_dict, load_masters, _norm, _strip_request_id,
 )
 
 try:                        # Rust 拡張は未導入でも動く（その場合は全件 unimplemented）。
@@ -152,11 +154,11 @@ def card_action_types(master) -> set:
 
 # --- 記録 ---------------------------------------------------------------------
 
-def _drain_and_record(gm, steps: list) -> None:
+def _drain_and_record(gm, steps: list, watcher: "ShuffleWatcher | None" = None) -> None:
     """`effect_coverage._smart_drain` と**同じ既定応答**で対話を消化し、各段を記録する。
 
     分岐・払い出す payload は `_smart_drain` の逐語写し（挙動を変えるとオラクルの意味が
-    変わるため）。違いは「各応答とその後の盤面を `steps` へ積む」ことだけ。
+    変わるため）。違いは「各応答とその後の盤面を `steps` へ積む」ことだけ（v5: `shuffled` も）。
     """
     count = 0
     while gm.active_interaction and count < DRAIN_LIMIT:
@@ -187,9 +189,11 @@ def _drain_and_record(gm, steps: list) -> None:
         except Exception:
             # `_smart_drain` は例外で打ち切る（記録もそこで止める＝Rust と同じ段数になる）。
             break
+        owners = watcher.take() if watcher is not None else []
         steps.append({
             "payload": payload,
             "state": board_dict(gm),
+            "shuffled": list(dict.fromkeys(owners)),
             "hidden": hidden_dict(gm),
         })
         count += 1
@@ -251,31 +255,43 @@ def _normalize_dons(*players) -> None:
 
 
 def record_one(master, ability, ability_index: int, extra: list) -> dict:
-    """1 能力ぶんの監査記録（記録 v4 の `kind: "audit"`）を作る。"""
-    trig = ability.trigger.name if hasattr(ability.trigger, "name") else str(ability.trigger)
-    if trig == "ON_PLAY":
-        gm, p1, p2, src = cov._build_test_state(master, source_in_hand=True)
-        _normalize_leaders(p1, p2)
-        _normalize_names(p1, p2)
-        _normalize_dons(p1, p2)
-        setup = {"hidden": hidden_dict(gm), "state": board_dict(gm)}
-        fire = {"kind": "play", "player": "p1", "source_uuid": src.uuid,
-                "ability_index": ability_index}
-        gm.play_card_action(p1, src)
-    else:
-        gm, p1, p2, src = cov._build_test_state(master)
-        _normalize_leaders(p1, p2)
-        _normalize_names(p1, p2)
-        _normalize_dons(p1, p2)
-        setup = {"hidden": hidden_dict(gm), "state": board_dict(gm)}
-        fire = {"kind": "ability", "player": "p1", "source_uuid": src.uuid,
-                "ability_index": ability_index}
-        gm.resolve_ability(p1, ability, src)
-    fire["state"] = board_dict(gm)
-    fire["hidden"] = hidden_dict(gm)
+    """1 能力ぶんの監査記録（記録 v5 の `kind: "audit"`）を作る。
 
-    steps: list = []
-    _drain_and_record(gm, steps)
+    v5: `fire` 直後と各 `steps[i]` の応答直後に `shuffled`（その段で `random.shuffle` を
+    呼んだデッキの持ち主）を持たせる（§11.8 #1）。`_build_test_state` 内のシャッフルは
+    `setup.hidden` に既に畳まれているので、`watcher.manager` を立てた直後に捨てる
+    （`rs_diff_replay.Recorder.on_start` と同じ規約）。
+    """
+    with ShuffleWatcher() as watcher:
+        trig = ability.trigger.name if hasattr(ability.trigger, "name") else str(ability.trigger)
+        if trig == "ON_PLAY":
+            gm, p1, p2, src = cov._build_test_state(master, source_in_hand=True)
+            _normalize_leaders(p1, p2)
+            _normalize_names(p1, p2)
+            _normalize_dons(p1, p2)
+            watcher.manager = gm
+            watcher.take()  # setup 中のシャッフルは setup.hidden に畳まれている
+            setup = {"hidden": hidden_dict(gm), "state": board_dict(gm)}
+            fire = {"kind": "play", "player": "p1", "source_uuid": src.uuid,
+                    "ability_index": ability_index}
+            gm.play_card_action(p1, src)
+        else:
+            gm, p1, p2, src = cov._build_test_state(master)
+            _normalize_leaders(p1, p2)
+            _normalize_names(p1, p2)
+            _normalize_dons(p1, p2)
+            watcher.manager = gm
+            watcher.take()
+            setup = {"hidden": hidden_dict(gm), "state": board_dict(gm)}
+            fire = {"kind": "ability", "player": "p1", "source_uuid": src.uuid,
+                    "ability_index": ability_index}
+            gm.resolve_ability(p1, ability, src)
+        fire["state"] = board_dict(gm)
+        fire["shuffled"] = list(dict.fromkeys(watcher.take()))
+        fire["hidden"] = hidden_dict(gm)
+
+        steps: list = []
+        _drain_and_record(gm, steps, watcher)
     return {
         "version": RECORD_VERSION,
         "kind": "audit",

@@ -74,6 +74,26 @@ pub fn find_card_location(state: &GameState, card: CardIdx) -> Option<(Seat, Opt
     None
 }
 
+/// ドン!!の現在地（Python `_find_card_location` の同じ関数がドン!!実体にも使われる分。
+/// §11.8 #2＝REST/ACTIVE がドン!!を対象に取れるようになったので、`find_card_location` の
+/// ドン!!版として新設する。付与中ドン!!も走査する（Python は `don_attached_cards` も見る）。
+pub fn find_don_location(state: &GameState, don: DonIdx) -> Option<(Seat, DonZone)> {
+    for seat in [Seat::P1, Seat::P2] {
+        let p = state.player(seat);
+        for (zone, list) in [
+            (DonZone::Deck, &p.don_deck),
+            (DonZone::Active, &p.don_active),
+            (DonZone::Rested, &p.don_rested),
+            (DonZone::Attached, &p.don_attached),
+        ] {
+            if list.contains(&don) {
+                return Some((seat, zone));
+            }
+        }
+    }
+    None
+}
+
 fn zone_slice(state: &GameState, seat: Seat, zone: CardZone) -> &[CardIdx] {
     let p = state.player(seat);
     match zone {

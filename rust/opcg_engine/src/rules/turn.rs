@@ -22,12 +22,19 @@ use super::passive::apply_passive_effects;
 /// Python `card_moves.draw_card`（デッキ上→手札＋デッキ切れの敗北判定）。
 ///
 /// `ops::draw` は「引く」だけなので、Python と同じく**引き終わってから**デッキが空なら
-/// `check_victory()` を呼ぶ（P1 の原始操作は敗北判定を持たない＝P2 の責務）。
-pub fn draw_card(s: &mut Session, seat: Seat, count: u32) {
+/// `check_victory()` を呼ぶ（P1 の原始操作は敗北判定を持たない＝P2 の責務）。§11.8 #6 で
+/// `masters` を通す（デッキアウト敗北→勝利の置換の判定に要る）。
+pub fn draw_card(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    count: u32,
+) -> Result<(), EngineError> {
     ops::draw(s, seat, count);
     if s.state().player(seat).deck.is_empty() && s.state().winner.is_none() {
-        check_victory(s);
+        check_victory(s, masters)?;
     }
+    Ok(())
 }
 
 /// Python `do_mulligan`: 手札を全てデッキ底へ戻してシャッフル→5 枚引き直す。
@@ -222,7 +229,7 @@ pub fn refresh_all(s: &mut Session, masters: &MasterTable, seat: Seat) {
 pub fn draw_phase(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
     if s.state().turn_count > 1 {
         let tp = s.state().turn_player;
-        draw_card(s, tp, 1);
+        draw_card(s, masters, tp, 1)?;
     }
     don_phase(s, masters)
 }

@@ -49,6 +49,15 @@ unimplemented が減り、mismatch が 0 のまま maintained されることが
   - `--vanilla`: 全カードの abilities を外したデッキ（数値・キーワード・トリガーテキストは実カード）。
   - replay の照合は `pending_request` も含む（`request_id` だけ除外＝フロント専用ハッシュ）。
     MULLIGAN のような乱数を消費する行動の後は、再生側が同じ行の `hidden` から並びを取り直す。
+
+記録形式 v5（P3 仕上げ・`docs/rust_engine_plan.md` §11.8 #1）:
+  - 監査記録（`kind: "audit"`）にも `shuffled` を持たせる: `fire` 直後と各 `steps[i].payload`
+    直後の `shuffled`（その段で `random.shuffle` を呼んだデッキの持ち主・`hidden` は既存どおり
+    同じ位置にある）。`replay_audit`（Rust）は `replay`（v4 の P2 経路）と同じ規約で、その位置の
+    `hidden` から `shuffled` の持ち主のゾーンだけを取り直す（`resync_shuffled`）。監査の汎用盤面は
+    「ドン!!を1枚場に出す（`RAMP_DON`）」等で `random.shuffle` は呼ばないことが多いが、
+    サーチ・シャッフル効果・引き直しを含む能力ではフィラーデッキの並びが記録と揃っていないと
+    Rust 側だけ違う並びで進む（OP04-048／OP06-047／P-002 で実際に起きた）。
 """
 import os
 for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
@@ -74,7 +83,7 @@ except ImportError:         # pragma: no cover - 実行環境依存
 
 # 記録ペイロードの形式バージョン。Rust 側 `state::RECORD_VERSION` と一致させること
 # （形を非互換に変えたら両方 +1 する）。
-RECORD_VERSION = 4
+RECORD_VERSION = 5
 
 # 効果構造 JSON（`opcg_sim/tools/export_effects_json.py` の生成物・git 管理外・約 8MB）。
 # Rust 側は起動時にこれを 1 度だけ読んで `CardMaster` 表を作る（`opcg_engine.load_masters`）。

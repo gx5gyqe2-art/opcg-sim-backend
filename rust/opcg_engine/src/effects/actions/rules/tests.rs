@@ -118,7 +118,7 @@ fn apply(
         actor,
         a,
         &NodeRef::root(0, NodeRoot::Effect),
-        targets,
+        &crate::effects::refs_of(targets),
         a.value.base,
         None,
     )
