@@ -138,6 +138,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P3 | **群 A〜E の差し口と指示書を本線へ**（§11.7）: `actions/{status,zone,flow,don,rules}.rs` の 3 入口（`game_handler`／`owns_target`／`apply_target`）と `mod.rs` の呼び出し。受け入れ集合は F∪群だけのカード（A 782／B 987／C 865／D 979／E 710 枚） |
 | 2026-09-07 | P3 | **群 A〜E をコーディネータが本線へ**（5 ブランチを cherry-pick・§8.10〜8.14）。受け入れ集合: A 1,014／C 1,144／E 917 能力＝全一致、B 1,268/1,271（残 3 は横断事項）、D 1,272/1,273（残 1 は横断事項）。本線で全カード監査 3,380/3,386（跨り 685 枚は全一致）・実デッキ再生は盤面 20 局一致・`legal` 12 局差（§11.8）。`cargo test` 288 green・clippy 0・`make test` green |
 | 2026-09-07 | P3 | **仕上げ WP `rs-p3-final` を発行**（§11.8）: 横断事項 #1〜#11（監査記録 v5 のシャッフル再同期・ドン!!対象・差し口の意味論・群 E の申告 4 件・vanilla ガード撤去・ARRANGE_DECK 既定解決）と P3 全体の受け入れ（全カード監査・実デッキ再生 random 500／L1 100） |
+| 2026-09-07 | P3 | **`rs-p3-final` 完了・コーディネータが受け入れ＝P3 完了**（`claude/rs-p3-final-8rh43r` を本線へ）。WP 実測: 全カード監査 2,472 枚/3,386 能力 mismatch=0・unimplemented=0／実デッキ再生 random 500 局・L1 100 局とも全一致／退行 4 本一致。本線での再検証（未見 seed）: 全カード監査 3,386 能力一致・実デッキ再生 random 30 局（3,048 行動）・L1 10 局（1,192 行動）一致・問合せ 20 局面 733,740 件 mismatch=0。`cargo test` 288 green・clippy 0・`make test` green。P4 の設計は §12 |
 | 2026-09-07 | P3 | **群 A（状態系）`rs-p3-status` 完了**（`claude/rs-p3-status-rkkh9m`）: `actions/status.rs` の 3 入口を本体化（GRANT_KEYWORD／ATTACK_DISABLE／PREVENT_REST／FREEZE／NEGATE_EFFECT／DISABLE_ABILITY／SWAP_POWER。BUFF の全形は土台 `mod.rs::buff` が既に持っていた＝委譲不要で `mod.rs` は無変更）。監査 **cards=782／abilities=1014／match=1014・mismatch=0・unimplemented=0**（受け入れ規模ちょうど）・退行 4 本一致・`cargo test` 194 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 B `rs-p3-zone` 完了**（`claude/rs-p3-zone`）: `actions/zone.rs` の 3 入口を本体化（12 種＋DB 未使用の LIFE_RECOVER／MOVE／MOVE_TO_HAND／DECK_TOP）。監査 987 枚／1,271 能力＝**match 1,268・mismatch 2・unimplemented 1**（残る 3 件はいずれも**群 B の所有範囲の外**＝監査記録に `shuffled` 再同期が無い 2 件と `TargetRef::Don`（群 D）1 件。§8.10）。退行 4 本すべて一致・`cargo test` 196 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 C（カードの流れ）完了**（`claude/rs-p3-flow`）: `actions/flow.rs` に PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_EVENT（EXECUTE_MAIN_EFFECT／DECLARE_COST は resolver が既に捌く）。監査 **cards=865／abilities=1144／match=1144・mismatch=0・unimplemented=0**（着手前は unimplemented=128）。退行 4 本一致・`cargo test` 182 green・clippy 0・`make test` green。結果は下記 §8.10 |
@@ -1577,3 +1578,57 @@ docs/rust_engine_plan.md §11.8（決定表 #1〜#10 と受け入れ）。本線
 受け入れ（数値）: §11.8 の (a)〜(d) すべて。RESULT.json: {"job":"rs-p3-final","status":"done",
 "audit_all":{...},"replay_random500":{...},"replay_l1_100":{...},"regress":{...},"notes":"..."} を push。
 ```
+
+## 12. P4 の設計（2026-09-07・コーディネータ）
+
+P4＝**符号化 v13・NRel forward・探索（adapter＋MCTS＋decide）**。P3 までと同じく Python が正本だが、
+探索には乱数（PIMC の世界サンプリング・Dirichlet・温度）が入るので、**乱数の出目を記録して Rust へ
+流す**（§6 の「乱数列は流さない」は再生のときの決定で、P4 の照合ではこれを例外にする）。
+到達点は「同じ盤面・同じ出目で Python と同じ手・同じ訪問数」。
+
+### 12.1 Python 側の構造（移すもの・行数は 2026-09-07 時点）
+
+| 層 | Python | 中身 |
+|---|---|---|
+| 符号化 | `learned/encoder.py`（491）・`learned/n_rel_feat.py`（810）・`learned/n_eff.py` の `ability_vector`／`build_eff_tables`・`learned/leader_feat.py`（205） | `encode(v13)`＝scalars 123（v1〜v9 の集約・v7 の**登場時スキャン＝エンジン実測**（`cpu_ai.onplay_option_scan`）・v11 のリーダー物理 12×2・v13 の追加 29）＋field 10×8＋card_idx 24／`encode_rel`＝22 枠トークン（構造 64＋状態 S20＋ゾーン 5）と関係 R（a1 は遮断＝計算しない）／カード表 struct64（能力ベクトル 24×2 プール＋stats） |
+| ネット | `learned/n_rel.py`（556） | `NRelNet`（npz 18 配列・138,466 パラメータ: Wa/Wt/Wr/Wc/W1/W2/Wv・方策 Wp1/Wp2）の `value`／`policy_logits`（候補特徴 F_CAND 139＝`n_eff._cand_rows`）・ablate マスク（rel／opp_pool／onplay）・`NRelValueAdapter`（指紋キャッシュ・`encode_state`）・`nrel_priors` |
+| 探索の候補 | `learned/adapter.py::OPCGGame.legal_actions`（`cpu_ai.merged_search_actions`／`_prune_don_moves`／`_prune_futile_attacks`／`don_alloc_candidates`／`attack_box_candidates`／`defense_box_prune`）・`determinize`（`_determinize_opponent`＝相手の手札を山札＋手札から再サンプル）・`_apply_move_inplace`（DON_BOX 展開・自分側対話のドレイン `stop_at_select`） | 合法手の**探索用の形**（対話の代替手併合・枝刈り・配分箱／アタック箱＝DON_BOX・防御箱） |
+| 木 | `learned/mcts.py`（566） | `TreeMCTS`（PUCT・journal で make/unmake・静止探索 `resolve_battle_inplace`・戦闘箱／対話箱 `resolved_branch_values`・Dirichlet・各 simulate 冒頭で global random を戻す CRN） |
+| 決定 | `core/cpu_learned.py::LearnedEngine.decide`（1252 のうち ~600） | 箱コミット機械実行・残り起動の付与対話・窓の根畳み `_window_choice`・木・等価手マージ `_merge_root_stats`・温度サンプル・残ドン掘り／残り起動の差し替え・`don_box_first_primitive` |
+
+### 12.2 オラクル（4 本・すべて記録 v5 の `hidden` 上）
+
+| 名前 | 照合 | 許容 |
+|---|---|---|
+| **符号化** `rs_encode_oracle.py`（新規） | 200 局面 × 両視点で `encode(v13)`（scalars/field/card_idx）・`encode_rel`（tok・S・relations 有/無）・カード表 struct64 を Python と Rust（`opcg_engine.encode_state`）で照合 | float は 1e-6（登場時スキャンはエンジン実測＝整数一致） |
+| **forward** `rs_net_oracle.py`（新規） | 同じ局面の符号化を入力に `value`・`policy_logits`（候補＝Python の探索用合法手）を照合。ablate（a1＝rel）を npz meta から復元 | 1e-5（累積丸め） |
+| **候補・世界** `rs_search_oracle.py --what legal,determinize`（新規） | `OPCGGame.legal_actions`（マクロ箱・枝刈り込み）の集合一致／`determinize` は Python の `rng.shuffle` の**出目（並び）**を記録して渡し、盤面一致 | 完全一致 |
+| **決定** `rs_search_oracle.py --what decide` | 100 局を Python の `decide` で打ち（記録 v5＋各決定の乱数出目: 世界サンプルの並び・Dirichlet ベクトル・温度サンプルの一様乱数）、各決定点で Rust の `decide` を同じ出目で走らせ**手と根の訪問数 N** を照合 | 手は完全一致・N は一致（float の同点で argmax が割れた場合だけ「訪問分布の L1 ≤ 2/sims」で通す＝件数を RESULT に書く） |
+
+乱数の記録は Python 側だけの変更（`np.random.Generator` をラップして出目を記録する `RecordingRng`＝
+ハーネス内。`opcg_sim/` は変えない）。Rust 側は出目を**受け取って**使う（自前の生成器は P5 で入れる）。
+
+### 12.3 WP 分割
+
+| WP | ブランチ | 所有 | 受け入れ |
+|---|---|---|---|
+| `rs-p4-encode` | `claude/rs-p4-encode` | `encode/{scalars,tokens,cardtab,leader}.rs`（v13 全欄・`onplay_option_scan` は rules/effects で make/unmake 実測）・`lib.rs::encode_state`・`rs_encode_oracle.py` | 符号化オラクル 200 局面 × 2 視点 mismatch=0 |
+| `rs-p4-net` | `claude/rs-p4-net` | `net/{npz,nrel}.rs`（npz 読込＝zip+npy の最小実装・forward・ablate・候補特徴 F_CAND）・`lib.rs::load_net/net_value/net_policy`・`rs_net_oracle.py`（入力は Python の符号化を JSON で渡す＝encode WP と独立に検証できる） | forward オラクル 200 局面 1e-5 |
+| `rs-p4-legal` | `claude/rs-p4-legal` | `search/{adapter,macro,prune,determinize}.rs`（`merged_search_actions`・枝刈り・配分箱／アタック箱・防御箱・世界サンプル・`apply_move_inplace`）・`rs_search_oracle.py --what legal,determinize` | 候補の集合一致 200 局面・世界一致 |
+| `rs-p4-mcts` | `claude/rs-p4-mcts`（上 3 本の統合後） | `search/{mcts,quiesce,box,decide}.rs`（PUCT・静止・戦闘箱／対話箱・窓の根畳み・箱コミット・等価手マージ・温度・残り腕）・`lib.rs::decide`・`rs_search_oracle.py --what decide`・`RecordingRng` | 決定オラクル 100 局: 手 100% 一致・N 一致（同点例外は件数報告）|
+
+前 3 本は並列（3 セッション）、`rs-p4-mcts` はその統合後に 1〜2 セッション。指示書は前 3 本の契約
+（`encode/`・`net/`・`search/` の型と関数シグネチャ）をコーディネータが本線に入れてから出す（P1〜P3 と同じ）。
+
+### 12.4 設計の決定（先に固定するもの）
+
+1. **npz は自前で読む**（依存 crate を増やさない: zip の stored/deflate＋npy ヘッダ。deflate は `miniz_oxide` 1 つだけ許可）。
+   `meta`（JSON 文字列）の `ablate`／`enc_version`／`hidden` を読み、Python と同じ既定で復元する。
+2. **登場時スキャン（v7）はエンジン実測のまま**（Rust の rules/effects で PLAY を make/unmake して判定。Python と同じ判定子＝
+   適用後 pending≠MAIN_ACTION or EFFECT イベント）。a1 は `onplay` を遮断していないので必要。
+3. **指紋キャッシュは持ち込まない**（Rust では符号化そのものが速い。P5 で実測して要れば足す）。
+4. **journal の transaction で make/unmake**（P1 の `Session`）。Python の「global random を各 simulate 冒頭で戻す」は、
+   Rust では乱数を使う効果（シャッフル）が探索内で決定的な擬似乱数（seed 固定・§6）になるので、同じ意味＝
+   「各 simulate で同じ出目」を **simulate ごとに生成器を base 状態へ戻す**ことで再現する。
+5. **数値の同一性**: 行列積の加算順は Python（numpy・BLAS）と一致しないので 1e-5 を許容。ただし `argmax` の同点は
+   Python 側の**添字が小さい方**を採る規約（numpy と同じ）にし、探索の同点処理も同じにする。
