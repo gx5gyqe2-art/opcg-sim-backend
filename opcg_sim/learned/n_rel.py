@@ -70,6 +70,28 @@ for _i in range(N_TOK):
     ZONE_ONEHOT[_i, _ZONE_ID[NR._zone(_i)]] = 1.0
 
 
+def cand_rel_rows(rel_om, seg, si, ti):
+    """候補ごとの R(si, ti) [P_cand, R_DIM]（`cand_input` の rr 列）。
+
+    si∈自・ti∈相手の対だけ `rel_om` を引き、それ以外（枠が無い／同陣営）は 0。`rel_om` は
+    **遮断済み**（`mask_rel` を通したもの）を渡すこと。torch 経路（`train/n_rel_torch.py`）も
+    ここを呼ぶ＝この対応付けの正本は 1 か所（`rel_om` は入力データで学習対象ではないので、
+    torch 側でもこの numpy の結果をそのまま定数として使える）。"""
+    P = len(seg)
+    rr = np.zeros((P, NR.R_DIM), np.float32)
+    ok_s = si >= 0
+    ok_t = ti >= 0
+    own_pos = np.full(N_TOK, -1, np.int64); own_pos[OWN_SLOTS] = np.arange(N_OWN)
+    opp_pos = np.full(N_TOK, -1, np.int64); opp_pos[OPP_SLOTS] = np.arange(N_OPP)
+    both = ok_s & ok_t
+    if both.any():
+        oi = own_pos[si[both]]; oj = opp_pos[ti[both]]
+        good = (oi >= 0) & (oj >= 0)
+        idx = np.where(both)[0][good]
+        rr[idx] = rel_om[seg[idx], oi[good], oj[good]]
+    return rr
+
+
 class NRelNet:
     """Stage A 本体（numpy・forward）。パラメータ名は npz 鍵と共有。"""
 
@@ -256,19 +278,11 @@ class NRelNet:
         rel_om = self.mask_rel(rel_om)
         hs = np.zeros((P, D_H), np.float32)
         ht = np.zeros((P, D_H), np.float32)
-        rr = np.zeros((P, NR.R_DIM), np.float32)
         ok_s = si >= 0
         hs[ok_s] = h[seg[ok_s], si[ok_s]]
         ok_t = ti >= 0
         ht[ok_t] = h[seg[ok_t], ti[ok_t]]
-        own_pos = np.full(N_TOK, -1, np.int64); own_pos[OWN_SLOTS] = np.arange(N_OWN)
-        opp_pos = np.full(N_TOK, -1, np.int64); opp_pos[OPP_SLOTS] = np.arange(N_OPP)
-        both = ok_s & ok_t
-        if both.any():
-            oi = own_pos[si[both]]; oj = opp_pos[ti[both]]
-            good = (oi >= 0) & (oj >= 0)
-            idx = np.where(both)[0][good]
-            rr[idx] = rel_om[seg[idx], oi[good], oj[good]]
+        rr = cand_rel_rows(rel_om, seg, si, ti)
         return np.concatenate([e[seg], hs, ht, rr, feats, budget], 1)
 
     def policy_logits(self, sc, ci, tok, rel_om, rel_oo, seg, si, ti, feats, budget, keep=None, tab=None):
