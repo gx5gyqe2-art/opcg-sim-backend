@@ -6,4 +6,4 @@ python-multipart
 requests
 google-cloud-firestore
 google-cloud-storage
-numpy   # 学習型CPU(difficulty="learned")の推論に必須（本番CPython。無いと learned が動かない）
+numpy   # 符号化の補助と npz の読み書き（ネットの forward・探索は Rust。学習は opcg_sim/learned）

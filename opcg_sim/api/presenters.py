@@ -5,31 +5,40 @@
 """
 from typing import Any, Dict
 
-from opcg_sim.src.core.gamestate import GameManager
 from .config import CONST
+from .engine_rs import RsGame
 from .schemas import GameStateSchema, PendingRequestSchema
 from .state import GAMES, RULE_ROOMS
 
 
-def build_game_result_hybrid(manager: GameManager, game_id: str, success: bool = True, error_code: str = None, error_msg: str = None) -> Dict[str, Any]:
-    player_keys = CONST.get('PLAYER_KEYS', {}); api_root_keys = CONST.get('API_ROOT_KEYS', {}); error_props = CONST.get('ERROR_PROPERTIES', {})
+def build_game_result_hybrid(manager: RsGame, game_id: str, success: bool = True, error_code: str = None, error_msg: str = None) -> Dict[str, Any]:
+    """対局状態を API レスポンス（契約）へ整形する。
+
+    盤面（`turn_info`／`players`／`active_battle`）は Rust エンジンが同じ形で出す
+    （`RsGame.board`＝`opcg_engine.Game.board_json`。計画 §15.2）ので、ここは `game_id` を足して
+    schema 検証にかけるだけ。`action_events` はその要求で積まれたイベントログ（フロントの
+    `EffectToast`／eventLog）。
+    """
+    api_root_keys = CONST.get('API_ROOT_KEYS', {}); error_props = CONST.get('ERROR_PROPERTIES', {})
+    player_keys = CONST.get('PLAYER_KEYS', {})
     p1_key = player_keys.get('P1', 'p1'); p2_key = player_keys.get('P2', 'p2')
-    active_pid = "N/A"
-    if manager: active_pid = p1_key if manager.turn_player == manager.p1 else p2_key
-    battle_props = CONST.get('BATTLE_PROPERTIES', {})
-    raw_game_state = {
-        "game_id": game_id,
-        "turn_info": {"turn_count": manager.turn_count if manager else 0, "current_phase": manager.phase.name if manager else "N/A", "active_player_id": active_pid, "winner": manager.winner if manager else None},
-        "players": {p1_key: manager.p1.to_dict(is_my_turn=(manager.turn_player == manager.p1)) if manager else {}, p2_key: manager.p2.to_dict(is_my_turn=(manager.turn_player == manager.p2)) if manager else {}},
-        battle_props.get('ACTIVE_BATTLE', 'active_battle'): {battle_props.get('ATTACKER_UUID', 'attacker_uuid'): manager.active_battle["attacker"].uuid, battle_props.get('TARGET_UUID', 'target_uuid'): manager.active_battle["target"].uuid, battle_props.get('COUNTER_BUFF', 'counter_buff'): manager.active_battle.get("counter_buff", 0)} if manager and manager.active_battle else None
-    }
+    if manager:
+        raw_game_state = manager.board()
+        raw_game_state["game_id"] = game_id
+    else:
+        raw_game_state = {
+            "game_id": game_id,
+            "turn_info": {"turn_count": 0, "current_phase": "N/A", "active_player_id": "N/A", "winner": None},
+            "players": {p1_key: {}, p2_key: {}},
+            "active_battle": None,
+        }
     validated_state = None
     if success:
         try: validated_state = GameStateSchema(**raw_game_state).model_dump(by_alias=True)
         except Exception: validated_state = raw_game_state
     pending_req_data = None
     if manager and success:
-        pending_obj = manager.get_pending_request()
+        pending_obj = manager.get_pending_request()  # request_id は engine_rs の `_rid` が付ける
         if pending_obj:
             try: pending_req_data = PendingRequestSchema(**pending_obj).model_dump(by_alias=True)
             except Exception: pending_req_data = pending_obj

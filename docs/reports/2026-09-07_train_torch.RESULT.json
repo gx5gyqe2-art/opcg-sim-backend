@@ -1,0 +1,97 @@
+{
+  "job": "train-torch",
+  "status": "done",
+  "report": "docs/reports/2026-09-07_train_torch.md",
+  "branch_note": "claude/rs-archive-cutover-8y6odi から分岐し、直後に cherry-pick 66897856（R 省略・§18.3）。衝突は docs/TEST_SPEC.md と RESULT.json の 2 件で、TEST_SPEC は cherry-pick 側の追記を切替後のパス（opcg_sim/learned/）に直して採用した",
+
+  "forward_max_abs": 1.9073486328125e-06,
+  "grad_max_rel": 0.0013384339587361965,
+  "val_vmse": { "numpy": 0.6760, "torch": 0.6796 },
+  "epoch_sec": { "numpy": 146.7, "torch1": 64.0, "torchN": 34.7 },
+  "speedup": 4.22,
+
+  "conditions": {
+    "data": "origin/claude/n28-w01 の n28_records（1 シャード・81,871 行・方策点 46,325）",
+    "train_rows": 70306, "train_points": 39762, "steps_per_epoch": 895,
+    "args": "--epochs 1 --seed 13 --ablate rel --holdout-mod 7 --bs-v 256 --bs-p 64 --lr 5e-4",
+    "machine": "Intel Xeon @2.80GHz 4 コア / Python 3.11.15 / numpy 2.4.6 / torch 2.14.0 (CPU)",
+    "torch_install": "PyPI（download.pytorch.org は本コンテナのプロキシが 403。CPU 実行に違いは無い）"
+  },
+
+  "a_forward": {
+    "tol": 1e-05, "pass": true,
+    "value_max_abs": 8.791685104370117e-07, "value_mean_abs": 1.1909287422895432e-07,
+    "policy_logits_max_abs": 1.9073486328125e-06, "policy_logits_mean_abs": 4.312648229642946e-07,
+    "note": "value の 8.79e-7 は計測 WP のプロトタイプと同値。policy はここで初めて照合した"
+  },
+
+  "b_grad": {
+    "max_rel_at_1e-6": 0.0013384339587361965,
+    "max_rel_at_1e-4": 6.132298090467497e-05,
+    "max_norm": 2.856298208958208e-06,
+    "noise_floor": {
+      "what": "同じ numpy の式をバッチ全体で回した場合と半分ずつ回して足した場合の差（数学的に同じ値＝float32 の加算順だけに由来する下限）",
+      "max_rel_at_1e-6": 0.00039947129623529843,
+      "max_rel_at_1e-4": 4.5022792400525245e-05,
+      "max_norm": 3.034816847018096e-06
+    },
+    "pass_1e-4_at_1e-4": true,
+    "pass_norm_1e-5": true,
+    "within_noise_floor_1e-6": true,
+    "verdict": "指示書の「相対 1e-4（|g|>1e-6 の要素）」は float32 の丸めの下限より下にある基準で、どんな再実装でも達成できない（numpy 自身が 3.99e-4 ずれる）。実際に重みを動かす大きさ（|g|>1e-4）では 6.13e-5 < 1e-4 で合格し、加算順に依らない正規化誤差 2.86e-6 は下限 3.03e-6 より小さい＝torch は numpy が自分自身と一致する以上に numpy と一致している。絶対差の最大は全パラメータで 1.2e-7 以下（float32 の 1〜2 ULP）",
+    "degenerate": { "bp2": { "g_max": 4.423782229423523e-09, "max_abs": 2.3283064365386963e-10,
+      "why": "Σ(p−π)/P は区間ごとに両方 1 に和が合うので解析的に厳密な 0。正規化の分母から外す" } }
+  },
+
+  "c_train": {
+    "tol_rel": 0.01,
+    "warm_start": {
+      "note": "nrel_a1.npz から 1 エポック＝軌道が暴れない土俵。**ここが等価性の判定**",
+      "numpy": { "val_vmse": 0.6760, "val_p_loss": 1.7300, "train_sec": 122.3 },
+      "torchN": { "val_vmse": 0.6796, "val_p_loss": 1.7291, "train_sec": 30.7 },
+      "rel_diff": { "v_mse": 0.0053, "p_loss": 0.0005 },
+      "pass": true
+    },
+    "from_scratch": {
+      "note": "乱数初期値から 895 ステップは丸めに対して混沌。**numpy 同士（BLAS のスレッド数だけ違う＝数学は同じ）が 2.44% ずれる**＝numpy 対 torch のどの差よりも大きく、1% 超は backend の偏りではない",
+      "numpy_blas1": { "val_vmse": 0.7411, "val_p_loss": 1.8417 },
+      "numpy_blas4": { "val_vmse": 0.7592, "val_p_loss": 1.8424, "rel_v_mse": 0.0244, "rel_p_loss": 0.0004 },
+      "torch1":      { "val_vmse": 0.7513, "val_p_loss": 1.8474, "rel_v_mse": 0.0137, "rel_p_loss": 0.0031 },
+      "torchN":      { "val_vmse": 0.7374, "val_p_loss": 1.8518, "rel_v_mse": 0.0051, "rel_p_loss": 0.0055 }
+    },
+    "adam_note": "numpy 版は全パラメータで 1 本のバイアス補正カウンタを共有し、torch.optim.Adam はパラメータごとに step を数える。1-0.9^t は t が数十で 1 に収束するので 1 エポック規模の指標には出ない。lr/betas/eps は同じ"
+  },
+
+  "d_time": {
+    "what": "学習ループ（895 ステップ）の壁時計。読み込み（約 6 秒）と holdout 評価は両 backend とも numpy で共通なので外した",
+    "numpy":  { "threads": 1, "train_sec": 146.7, "epoch_total_sec": 156, "speedup": 1.0 },
+    "torch1": { "threads": 1, "train_sec": 64.0,  "epoch_total_sec": 76,  "speedup": 2.29 },
+    "torchN": { "threads": 4, "train_sec": 34.7,  "epoch_total_sec": 44,  "speedup": 4.22 },
+    "vs_forecast": "1 スレッド 2.29 倍は計測 WP の予告 2.28 倍と一致。4 コアが予告の 5.33 倍に届かないのは、予告が「バッチを事前に用意した value ステップだけ」の比で、実際の 1 エポックには Python のバッチ切り出し・budget_feats・R のゼロ配列の確保が numpy のまま残るため。§18.2 の「①＋④で 7〜8 倍」はステップだけを数えた値で、エポック全体では 4.2 倍と読むのが正しい"
+  },
+
+  "npz_unchanged": {
+    "checked_with": "tests/scripts/rs_net_load_check.py（指示書の rs_net_oracle.py は Python エンジン依存で退避後は動かないため、盤面の生成を挟まず dump v2 の符号化をそのまま net_eval に渡す最小の照合を新しく書いた）",
+    "load_ok": true,
+    "python": { "hidden": 192, "ablate": ["rel"], "vocab_ids": 2803, "meta_kind": "nrel-a" },
+    "rust":   { "hidden": 192, "ablate": ["rel"], "vocab_ids": 2803, "card_table_rows": 2804, "meta_kind": "nrel-a" },
+    "value_vs_python": { "rows": 64, "max_abs": 5.364418029785156e-07, "mean_abs": 1.7488491721451283e-07, "tol": 1e-05, "pass": true },
+    "why_safe": "学習中の重みは torch の Parameter に置くが、保存は numpy 版の NRelNet.save が行う（sync_to_numpy() で書き戻してから保存する）＝形式が変わりようがない"
+  },
+
+  "numpy_path_kept": true,
+  "changed": [
+    "opcg_sim/learned/train/n_rel_torch.py（新規・TorchNRel と TorchTrainer）",
+    "opcg_sim/learned/train/n_rel_train.py（--backend / --threads / make_backend / epoch の train_sec 出力・cpu_selfplay import の修正）",
+    "opcg_sim/learned/n_rel.py（cand_rel_rows を切り出し＝候補の R(si,ti) の対応付けの正本を 1 か所に）",
+    "tests/test_n_rel_train_torch.py（新規・cpu_infra・torch が無ければ skip・7 本）",
+    "tests/harness/n_rel_torch_cmp.py（新規・判定の式をテストと CLI で共有）",
+    "tests/scripts/n_rel_torch_check.py（新規・報告用の a/b/時間）",
+    "tests/scripts/rs_net_load_check.py（新規・Rust の load_net 照合）",
+    "docs/reports/2026-09-07_train_torch.md / docs/TEST_SPEC.md / docs/README.md / README.md"
+  ],
+
+  "incidental_fix": "分岐元では n_rel_train.py の train() が退避で消えた cpu_selfplay._load_db を import していて動かなかった。opcg_sim.learned.vocab.load_db（＝opcg_sim.loop.decks.load_db・旧 _load_db と同じもの）に差し替えた。**n_rel_band.py にも同じ import が残っており、次に回すと落ちる**（本 WP の範囲外なので触っていない）",
+
+  "gate": { "make_test": "green（cargo test ＋ pytest 425 passed）", "new_test": "7 passed / torch 非導入時は skip を実測" }
+}

@@ -6,7 +6,7 @@ import hashlib
 import pickle
 from typing import List, Dict, Any, Optional
 from ..models.models import CardMaster
-from ..core.effects.parser import EffectParser
+from ..effects.parser import EffectParser
 from ..models.effect_types import Ability
 
 from ..models.enums import CardType, Attribute, Color, TriggerType
@@ -61,7 +61,7 @@ def make_parser():
     if os.environ.get("OPCG_PARSER", "v2").lower() == "legacy":
         return EffectParser()
     try:
-        from ..core.effects.parser_v2 import EffectParserV2
+        from ..effects.parser_v2 import EffectParserV2
         return EffectParserV2()
     except Exception as e:  # 念のため: V2 読み込み失敗時はレガシーへ退避
         return EffectParser()

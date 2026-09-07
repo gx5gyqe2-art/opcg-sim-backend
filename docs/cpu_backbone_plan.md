@@ -28,7 +28,7 @@
 - **バージョン体系の分離**: 骨組み線は `bb` 系列（bb0=Phase0, bb1=Phase1, …）。現行線の
   `cpu_vNN` / `genN` とは番号空間を共有しない。レポートは `docs/reports/backbone_bbN_*.md`。
 - **コードの分離**: 骨組み線のスクリプトは `tests/scripts/bb_*.py`（接頭辞で名前空間分離）、
-  ハーネスに置くものは `tests/harness/bb_*.py`。本番昇格時は `opcg_sim/src/learned/backbone/`
+  ハーネスに置くものは `tests/harness/bb_*.py`。本番昇格時は `legacy/python_engine/learned/backbone/`
   パッケージへ——現行線のモジュール（encoder.py / value_net.py / cpu_learned.py）には
   **骨組み線の都合による変更を入れない**。
 - **成果物の分離**: 骨組みネット・合成カードプール等は `opcg_sim/data/backbone/`

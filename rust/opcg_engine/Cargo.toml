@@ -1,0 +1,34 @@
+[package]
+name = "opcg_engine"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.75"
+description = "OPCG シミュレータのエンジン（Rust 移行 P0 骨組み・docs/rust_engine_plan.md）"
+license = "MIT"
+publish = false
+
+[lib]
+name = "opcg_engine"
+# cdylib = Python 拡張（maturin が wheel に詰める）／rlib = `cargo test` とワークスペース内参照用。
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# npz（zip）の deflate 展開だけに使う（P4 `net::npz`・`docs/rust_engine_plan.md` §12.4 で
+# 許可された唯一の追加依存）。adler2 は miniz_oxide が checksum に使う必須の推移依存。
+miniz_oxide = "0.8"
+# abi3-py311: Python 3.11 の安定 ABI に対して 1 度だけビルドする（3.11 以降で同じ wheel が使える）。
+pyo3 = { version = "0.29", features = ["abi3-py311"] }
+# preserve_order: JSON オブジェクトのキー順を保つ（echo_state を真に恒等にするため）。
+serde_json = { version = "1", features = ["preserve_order"] }
+
+[features]
+# extension-module は「Python 本体へリンクしない」指定。wheel ビルド（maturin）では必須だが、
+# 有効なままだと `cargo test` のテストバイナリが libpython のシンボルを解決できずリンクに失敗する。
+# 既定を extension-module にしておき、テストは `cargo test --no-default-features` で回す。
+default = ["extension-module"]
+extension-module = ["pyo3/extension-module"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

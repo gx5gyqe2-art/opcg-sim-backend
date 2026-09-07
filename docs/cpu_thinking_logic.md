@@ -4,7 +4,7 @@
 > 評価式 L1 の設計は [`reports/cpu_eval_redesign_card_currency_20260625.md`](reports/cpu_eval_redesign_card_currency_20260625.md)（点・履歴）を参照。
 > 本書はその**全体フローを1枚で俯瞰する図**＝コードの構造（呼び出し経路・分岐・責務分担）を示す。
 
-対象ソース: `opcg_sim/src/core/cpu_ai.py` / `cpu_eval_v2.py` / `effects/resolver.py` / `api/{app,decide_client}.py` / `tools/decide_worker.py`
+対象ソース: `legacy/python_engine/core/cpu_ai.py` / `cpu_eval_v2.py` / `effects/resolver.py` / `api/{app,decide_client}.py` / `tools/decide_worker.py`
 
 ---
 

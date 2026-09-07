@@ -27,7 +27,7 @@ from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.effect_types import Sequence, Branch, GameAction, Choice
 from opcg_sim.src.models.enums import ActionType, Player
 # H 検出は parser.py のH是正と同一定義を共有する（ゲートと修正の一貫性）。
-from opcg_sim.src.core.effects.parser import _H_SETUP_ACTIONS, _h_is_genuine
+from opcg_sim.src.effects.parser import _H_SETUP_ACTIONS, _h_is_genuine
 
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
                     "opcg_sim", "data", "opcg_cards.json")

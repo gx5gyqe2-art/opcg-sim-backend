@@ -1,0 +1,130 @@
+"""OPCG アクションの正準符号化（P3 policy head 用・docs/.../cpu_rl_pilot_plan_20260629.md P3）。
+
+heterogeneous な合法手（攻撃/プレイ/ドン付与/カウンター/効果起動…）を**ポインタ/marginal方式**で扱う:
+巨大疎な直積空間を作らず、各合法手を**固定長の特徴ベクトル**へ符号化し、policy は
+[状態埋め込み, 各手の特徴] からスコアを出して合法手上で softmax する（可変個の手に自然対応）。
+
+action_features = [action_type one-hot] ++ [関与カードの特徴(rl_encoder._char_feats と同型)] ++ [所有者flag, 対象有flag]。
+列挙した action_type（self-play 実測）: MULLIGAN/KEEP_HAND/TURN_END/PASS/PLAY/ATTACK/
+ATTACH_DON/SELECT_COUNTER/SELECT_BLOCKER/ACTIVATE_MAIN/RESOLVE_EFFECT_SELECTION。
+"""
+import numpy as np
+
+from opcg_sim.learned import encoder as E
+
+ACTION_TYPES = [
+    "MULLIGAN", "KEEP_HAND", "TURN_END", "PASS", "PLAY", "ATTACK",
+    "ATTACH_DON", "SELECT_COUNTER", "SELECT_BLOCKER", "ACTIVATE_MAIN",
+    "RESOLVE_EFFECT_SELECTION",
+]
+_AT_IDX = {t: i for i, t in enumerate(ACTION_TYPES)}
+_CARD_FEAT = E.PER_CHAR        # _char_feats の次元
+# [type one-hot] + [card feats] + [owner_mine, has_card, has_target]
+#   + v9 追加（append-only・PR#188 レビュー#7）: [counter値/2000, 対象=リーダー]
+#   カウンター値なしでは @82 型（「切るなら105・EB03温存」）の区別を policy が原理的に
+#   吸収できない（1.9k 教師の微調整で支持一致 60→62% 頭打ちの実測）。旧ネット/旧記録との
+#   互換は PolicyScorer 側の幅適合（新列は旧netで無視・旧記録は新netでゼロ埋め）で吸収する。
+#   + v9.2 追加（append-only）: [攻撃マージン (攻撃側パワー−対象パワー)/1e4]
+#   これが無いと「5000 で 7000 に届かない攻撃」と「7000 で 7000 に届く攻撃」を区別できず、
+#   候補ネットが @64 でリーダー攻撃（レフェリー判定 2/12 の悪手）を選び続けた（実測）。
+#   + v10 追加（append-only）: [ATTACH_DON 付与後到達パワー (対象パワー+残ドン×1000)/1e4]
+#   これが無いと弱キャラ（ゼウス P2000）への付与＝リーサル準備（@68）を policy が候補にできず、
+#   「今のパワーが低い」だけで付与を捨てていた（真盤面診断 cpu_v10）。
+ACTION_DIM = len(ACTION_TYPES) + _CARD_FEAT + 3 + 2 + 1 + 1
+
+
+def action_key(move):
+    """探索木のための hashable な手の同一性キー（dict は非hashable）。"""
+    at = move.get("action_type")
+    payload = move.get("payload") or {}
+    uuid = move.get("card_uuid") or payload.get("uuid")
+    tgt = payload.get("target_ids")
+    tgt = tuple(tgt) if isinstance(tgt, (list, tuple)) else tgt
+    sel = payload.get("selected_uuids")
+    sel = tuple(sel) if isinstance(sel, (list, tuple)) else sel
+    return (move.get("kind"), at, uuid, tgt, sel, payload.get("index"),
+            payload.get("position"), payload.get("declared_value"), payload.get("accepted"),
+            payload.get("don_k"))   # DON_BOX の k 違いは別 edge（他の手は None＝キー不変）
+
+
+def _find_card(manager, uuid):
+    if not uuid:
+        return None, None
+    for owner, pl in (("me", manager.p1), ("opp", manager.p2)):
+        for zone in (pl.field, pl.hand, [pl.leader] if pl.leader else []):
+            for c in zone:
+                if c is not None and getattr(c, "uuid", None) == uuid:
+                    return c, pl
+    return None, None
+
+
+def action_features(manager, move, me_name):
+    """手番 me_name 視点で 1 手を ACTION_DIM 次元へ符号化（関与カードは self/opp を区別）。"""
+    f = np.zeros(ACTION_DIM, dtype=np.float32)
+    at = move.get("action_type")
+    don_k = 0
+    if at == "DON_BOX":
+        # ドン箱（配分計画のマクロ手・cpu_don_box_plan §2）は「付与後マージンの ATTACK」として
+        # 特徴化する＝素攻撃の prior を継承しつつ、マージン列（v9.2）だけ付与後の値で差別化。
+        # 新 action_type を語彙に足さない＝旧 policy ネットがそのまま使える。
+        # target_ids=[] は配分箱（マクロ手化 P1・付与のみ）＝ATTACH_DON として特徴化し
+        # 素付与の prior を継承する（同じく新 action_type を足さない）。
+        don_k = int((move.get("payload") or {}).get("don_k", 0) or 0)
+        at = "ATTACK" if (move.get("payload") or {}).get("target_ids") else "ATTACH_DON"
+    if at in _AT_IDX:
+        f[_AT_IDX[at]] = 1.0
+    payload = move.get("payload") or {}
+    uuid = move.get("card_uuid") or payload.get("uuid")
+    card, owner_pl = _find_card(manager, uuid)
+    base = len(ACTION_TYPES)
+    if card is not None:
+        try:
+            f[base:base + _CARD_FEAT] = E._char_feats(card)
+        except Exception:
+            pass
+        f[base + _CARD_FEAT] = 1.0 if (owner_pl is not None and owner_pl.name == me_name) else 0.0
+        f[base + _CARD_FEAT + 1] = 1.0   # has_card
+        # v9: 関与カードのカウンター値（0/1000/2000 → 0/0.5/1.0）。カウンター温存の学習素地。
+        cv = float(getattr(card.master, "counter", 0) or 0)
+        f[base + _CARD_FEAT + 3] = min(cv / 2000.0, 1.0)
+    tids = payload.get("target_ids") or []
+    if tids:
+        f[base + _CARD_FEAT + 2] = 1.0   # has_target
+        # v9: 対象=リーダー（ライフ攻撃かキャラ除去かの区別）。
+        leaders = {getattr(pl.leader, "uuid", None)
+                   for pl in (manager.p1, manager.p2) if pl.leader is not None}
+        if any(t in leaders for t in tids):
+            f[base + _CARD_FEAT + 4] = 1.0
+        # v9.2: 攻撃マージン＝(攻撃側実効パワー − 対象実効パワー)/1e4（±1にクリップ）。
+        # 「届く攻撃」と「届かない攻撃」の区別はこの相対量でしか表せない。
+        if card is not None:
+            tgt = _find_target(manager, tids[0])
+            if tgt is not None:
+                f[base + _CARD_FEAT + 5] = float(np.clip(
+                    (E._power(card) + don_k * 1000.0 - E._power(tgt)) / 10000.0, -1.0, 1.0))
+    # v10: ATTACH_DON の付与後到達パワー（残ドンを全部この対象に付与した場合の上限）。弱キャラへの
+    # 付与＝リーサル準備（@68）を候補化する素地。攻撃行動でないため上のマージンとは別枠で持つ。
+    if at == "ATTACH_DON" and card is not None:
+        me = manager.p1 if manager.p1.name == me_name else manager.p2
+        nd = len(getattr(me, "don_active", ()) or ())
+        f[base + _CARD_FEAT + 6] = float(np.clip(
+            (E._power(card) + nd * 1000.0) / 10000.0, 0.0, 2.0))
+    return f
+
+
+def _find_target(manager, uuid):
+    """対象 uuid をリーダー含む全ゾーンから引く（攻撃マージン用）。"""
+    if not uuid:
+        return None
+    for pl in (manager.p1, manager.p2):
+        for c in ([pl.leader] if pl.leader is not None else []) + list(pl.field):
+            if c is not None and getattr(c, "uuid", None) == uuid:
+                return c
+    return None
+
+
+def legal_action_matrix(manager, moves, me_name):
+    """合法手リスト → [K, ACTION_DIM] 行列（policy 入力）。"""
+    if not moves:
+        return np.zeros((0, ACTION_DIM), dtype=np.float32)
+    return np.stack([action_features(manager, mv, me_name) for mv in moves])

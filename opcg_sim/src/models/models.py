@@ -6,8 +6,8 @@ import json
 import copy as _copy
 from .enums import CardType, Color, Attribute, ActionType, Phase, Player
 from .effect_types import Ability
-from ..core import journal
-from ..core.journal import JournaledSet, JournaledDict, record_attr
+from . import journal
+from .journal import JournaledSet, JournaledDict, record_attr
 from ..utils.shared_constants import load_shared_constants, FALLBACK_CONSTANTS
 
 # 共有定数はローダ一本化（utils/shared_constants.py）。読めなければ従来どおり最小フォールバック。

@@ -6,14 +6,15 @@
 """
 from typing import Any, Dict
 
-from opcg_sim.src.core.gamestate import GameManager
+from opcg_sim.api.engine_rs import RsGame
 
-# ルールモード対局本体（ソロ／オンライン／CPU 共通で GameManager を格納）。
-GAMES: Dict[str, GameManager] = {}
+# ルールモード対局本体（ソロ／オンライン／CPU 共通）。
+# 中身は Rust エンジンのラッパ（`engine_rs.RsGame`。2026-09-07・計画 §15 で `GameManager` から交替）。
+GAMES: Dict[str, RsGame] = {}
 # フリーモード（サンドボックス）の SandboxManager。
 SANDBOX_GAMES: Dict[str, Any] = {}
 # CPU 対戦のメタ情報: {game_id: {"cpu_player_id": "p2", "difficulty": "learned", ...}}。
-# GAMES[game_id] に GameManager 本体を、ここに CPU 側の識別子と難易度（既定=learned・Gen2）を保持する。
+# GAMES[game_id] に対局本体（`engine_rs.RsGame`）を、ここに CPU 側の識別子と難易度（既定=learned）を保持する。
 CPU_GAMES: Dict[str, Dict[str, Any]] = {}
 # ルールモード・オンライン対戦のルーム（ロビー）レジストリ。
 # 各値: {game_id, room_name, created_at, status(WAITING/PLAYING/FINISHED),

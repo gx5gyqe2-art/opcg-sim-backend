@@ -1,0 +1,106 @@
+{
+  "job": "dump-f16",
+  "status": "done",
+  "report": "docs/reports/2026-09-07_dump_f16.md",
+  "branch_note": "本線 claude/cpu-spec-improvements-yw91jd（0633d0d）から分岐。PR は作らない",
+
+  "bytes_per_row": { "v2": 2432.0, "v3": 1176.0 },
+  "rss_2shards_gb": { "v2": 0.524, "v3": 0.035 },
+  "val_vmse": { "v2": 0.684203565120697, "v3": 0.6848331689834595 },
+  "epoch_sec": { "v2": 28.049, "v3": 29.328 },
+  "tokens_max_abs_cast_diff": 0.00039064884185791016,
+
+  "conditions": {
+    "data": "origin/claude/n28-w01（57 シャード・81,871 行・方策点 46,325）＋ n28-w02（96 シャード・136,631 行）＝2 波 218,502 行。どちらも dump v2 の npz（v3 の読みは v2 も同じ関数で読めることの確認を兼ねる）",
+    "machine": "Intel Xeon @2.10GHz 4 コア・15GB / Python 3.11.15 / numpy 2.4.6 / torch 2.14.0 (CPU・PyPI 版)",
+    "train_args": "--epochs 1 --seed 13 --ablate rel --holdout-mod 7 --bs-v 256 --bs-p 64 --lr 5e-4 --backend torch（4 スレッド）・warm-start nrel_a1.npz・895 ステップ",
+    "measured_by": "tests/scripts/dump_f16_check.py（gen / rss / train）"
+  },
+
+  "a_gen": {
+    "what": "同 seed 6 局（910001〜910006・sims 16・6 局とも決着・646 行）を v3 と v2（DT_V3 を外した float32/int64）で生成して突き合わせ",
+    "tokens_bit_identical_to_cast": true,
+    "tokens_max_abs_cast_diff": 0.00039064884185791016,
+    "scalars_max_abs_cast_diff": 0.00039064884185791016,
+    "card_idx_identical": true,
+    "other_columns_bit_identical": true,
+    "bytes_per_row_all_columns": { "v2": 2847.0, "v3": 1577.0, "ratio": 0.554 },
+    "bytes_per_row_V_only": { "v2": 2432.0, "v3": 1176.0, "ratio": 0.484 },
+    "npz_on_disk_bytes_per_row": { "v2": 199.6, "v3": 183.0, "ratio": 0.917,
+      "note": "savez_compressed は tokens のゼロを既に潰しているので、ディスクは 8% しか縮まない。利得は常駐（RAM）にある" },
+    "note": "field（float32・320B/行）は指示の対象外なので v3 でも float32 のまま。NRel も N系 c も読んでいない列で、落とす余地がある"
+  },
+
+  "b_rss": {
+    "tol": "v3 の RSS 増分が v2 の 55% 以下",
+    "pass": true,
+    "waves": [
+      { "n_waves": 1, "rows": 81871,
+        "v2": { "rss_delta_gb": 0.228, "load_sec": 3.25, "v_bytes_per_row": 2432.0 },
+        "v3": { "rss_delta_gb": -0.0,  "load_sec": 2.03, "v_bytes_per_row": 1176.0 },
+        "ratio": -0.00055 },
+      { "n_waves": 2, "rows": 218502,
+        "v2": { "rss_delta_gb": 0.524, "load_sec": 8.64, "v_bytes_per_row": 2432.0 },
+        "v3": { "rss_delta_gb": 0.035, "load_sec": 5.89, "v_bytes_per_row": 1176.0 },
+        "ratio": 0.066 } ],
+    "why_not_half_but_zero": "V は memmap なので RSS にほぼ乗らない。v3 に残る 35MB は P/C（方策点と候補・39MB・従来どおり RAM）と読みの一時領域",
+    "pack_bytes": { "w01": 97101657, "w02": 162048110, "per_row": 1176.0 }
+  },
+
+  "c_train": {
+    "tol": { "val_vmse_rel": 0.01, "epoch_sec_slowdown": 0.10 },
+    "pass": true,
+    "val_vmse_rel_diff": 0.00092,
+    "epoch_sec_ratio_v3_over_v2": 1.0456,
+    "v2": { "val_vmse": 0.684203565120697, "val_vsign": 0.7554690877648076, "val_pi_top1": 0.60375,
+            "train_mse": 0.46001632924932634, "train_ce": 1.7148883619170259,
+            "train_sec": 28.049, "total_sec": 37.8 },
+    "v3": { "val_vmse": 0.6848331689834595, "val_vsign": 0.7541720709035884, "val_pi_top1": 0.5995,
+            "train_mse": 0.45943084533197165, "train_ce": 1.7146953444166075,
+            "train_sec": 29.328, "total_sec": 34.5 },
+    "note": "学習ループは +4.6% 遅い（memmap の切り出し）が、読み込みが速くなるので通し（読み込み＋学習＋holdout 評価）では 8.7% 速い"
+  },
+
+  "d_full_scale_caveat": {
+    "what": "全波規模ではページキャッシュに乗らない",
+    "pack_gb_per_wave": 1.18,
+    "detail": "1 波 ≒ 100 万行＝pack 1.18GB。z 窓 10 波で 11.8GB は cgroup 14GB に収まらず、ランダム index の memmap は実ディスク I/O になる。v3+memmap は時間ではなくメモリのための手段（OOM で止まらなくなるのが利得）。pack の置き場所（--cache-dir / $OPCG_DUMP_CACHE・既定 ~/.cache/opcg/dump_pack）のディスク残量に注意"
+  },
+
+  "side_finding_fp16_relations": {
+    "what": "fp16 の tokens から relations_batch で R を再計算すると境界が反転する（docs/n_attention_plan.md の P1 の警告は今も成立する）。w01 シャード 0 の先頭 2,000 行で実測",
+    "rel_om": { "atk_margin": { "frac": 0.0274, "max_abs": 0.000586 },
+                "ko_gap": { "frac": 0.0012, "max_abs": 0.000391 },
+                "cost_gap": { "frac": 0.0140, "max_abs": 0.000195 },
+                "red_amount": { "frac": 0.0, "max_abs": 0.0 },
+                "feasible": { "frac": 0.00050, "max_abs": 1.0, "flips": 69, "of": 137568 } },
+    "impact": "serve は無関係（実対局は生の float32 の符号化から R を計算する）。現行の学習線も無関係（a1/r2 は --ablate rel）。R を使う訓練を再開するときは、教師の 0.05% が別の真偽になることを承知して使う"
+  },
+
+  "compat": {
+    "v2_readable": true,
+    "v2_and_v3_bit_identical_after_pack": "tests/test_dump_io.py が同じ中身を v2/v3 の 2 通りで書いて照合",
+    "load_dump_v2_is_thin_wrapper": true,
+    "batch_slice_form_unchanged": "V[\"tok\"][bi]（訓練ループは無改造）"
+  },
+
+  "changed": [
+    "opcg_sim/loop/record_gen.py（dump v3 を既定に・DT_V3 で cast・dump_version=3・--dump-v2 は廃止旗として受けるだけ・v1/v2 を書く経路は削除）",
+    "opcg_sim/learned/train/dump_io.py（新規・load_dump / build_pack / _Waves / rows_f32）",
+    "opcg_sim/learned/train/n_rel_train.py（load_dump へ差し替え・切り出し後に float32・--cache-dir・load_dump_v2 は薄い互換）",
+    "opcg_sim/learned/train/n_rel_band.py（load_dump へ差し替え・holdout 行だけ float32 で RAM・--cache-dir）",
+    "opcg_sim/learned/train/n1_train.py / n_mine_pi.py / n_mine_z.py（v3 の npz を float32・int64 へ上げる。指示の範囲外だが、入れないと次の波から N系 c の学習が黙って float16 で回る）",
+    "tests/test_n_record_v3.py（新規・cpu_infra）",
+    "tests/test_dump_io.py（新規・cpu_infra）",
+    "tests/scripts/dump_f16_check.py（新規・受け入れ照合 CLI）",
+    "docs/reports/2026-09-07_dump_f16.md / docs/TEST_SPEC.md / docs/n_loop_ops.md / docs/n_attention_plan.md / docs/README.md"
+  ],
+
+  "deviations": [
+    "指示の「tests/test_n_record_v2.py を v3 に更新」: そのファイルは現行ツリーに無い（Python エンジンの生成器版で、2026-09-07 の退避で legacy/python_engine/tests/ へ移った＝ゲート対象外）。Rust の生成器を回す tests/test_n_record_v3.py を新規に書き、TEST_SPEC の索引行（まだ tests/ を指していた）を差し替えた",
+    "v1（tokens 無し）を書く経路も消した（v3 が既定になると v1 は別の旗を足さないと出せず、使う側もいないため）。--dump-v2 は分散生成の古い指示書のために受けるだけの no-op として残した"
+  ],
+
+  "gate": { "make_test": "green（cargo test 381 passed ＋ pytest 437 passed・43.8s）",
+            "new_tests": "test_dump_io.py 8 passed / test_n_record_v3.py 4 passed" }
+}
