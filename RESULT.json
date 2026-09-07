@@ -37,20 +37,64 @@
   },
   "ties": 5,
   "regression": {
-    "legal": {"boards": 40, "checks": 124, "mismatch": 0},
-    "determinize": {"boards": 40, "checks": 80, "mismatch": 0},
-    "apply": {"boards": 40, "moves": 227, "mismatch": 0},
-    "net": {"boards": 40, "value_max_abs_err": 8.941e-07, "priors_max_abs_err": 3.576e-07, "mismatch": 0},
-    "encode": {"boards": 40, "views": 80, "values": 2074410, "cardtab_rows": 2653, "mismatch": 0}
+    "legal": {
+      "boards": 40,
+      "checks": 124,
+      "mismatch": 0
+    },
+    "determinize": {
+      "boards": 40,
+      "checks": 80,
+      "mismatch": 0
+    },
+    "apply": {
+      "boards": 40,
+      "moves": 227,
+      "mismatch": 0
+    },
+    "net": {
+      "boards": 40,
+      "value_max_abs_err": 8.941e-07,
+      "priors_max_abs_err": 3.576e-07,
+      "mismatch": 0
+    },
+    "encode": {
+      "boards": 40,
+      "views": 80,
+      "values": 2074410,
+      "cardtab_rows": 2653,
+      "mismatch": 0
+    }
   },
-  "cargo_test": {"passed": 371, "failed": 0},
-  "clippy": {"warnings": 0},
-  "make_test": "pending",
+  "cargo_test": {
+    "passed": 371,
+    "failed": 0
+  },
+  "clippy": {
+    "warnings": 0
+  },
+  "make_test": {
+    "passed": 1787,
+    "failed": 0,
+    "seconds": 415.7
+  },
   "negative_controls": [
-    {"break": "argmax の同点を添字が大きい方にする", "result": "mismatch=5 / checks=757"},
-    {"break": "静止探索（_leaf_value の解決）を止める", "result": "mismatch=48 / checks=757"},
-    {"break": "箱コミットの機械実行を止める", "result": "bad_payload=244・match 757→513"},
-    {"break": "等価手マージを外す／代表を末尾にする", "result": "発火せず（被覆の穴・notes 参照）"}
+    {
+      "break": "argmax の同点を添字が大きい方にする",
+      "result": "mismatch=5 / checks=757"
+    },
+    {
+      "break": "静止探索（_leaf_value の解決）を止める",
+      "result": "mismatch=48 / checks=757"
+    },
+    {
+      "break": "箱コミットの機械実行を止める",
+      "result": "bad_payload=244・match 757→513"
+    },
+    {
+      "break": "等価手マージを外す／代表を末尾にする",
+      "result": "発火せず（被覆の穴・notes 参照）"
+    }
   ],
   "notes": [
     "残る不一致 6 件は 1 つの原因に帰着する。numpy の float32 行列積は**ビット同一の行**でも行位置で別の丸めを返す（tests/scripts/rs_blas_tie_probe.py の実測: Wp1/Wp2 で 1,000 組中 196 組・割れるのはバッチ 3 行と 5 行のときだけ・最大差 1.9e-06・numpy 2.4.6）。効果選択の対話は候補の素性が全候補で同一になるので、Python の quiesce_choice の np.argmax(priors) は「BLAS がどの行を別の丸めにしたか」で決まる（実測 [0.3333333730697632, 0.3333333730697632, 0.333333283662796] → argmax 0／別の呼び出しでは argmax 2）。Rust は候補ごとに独立に計算するため完全な同点になり添字 0 を選ぶ。よって『手 100% 一致・N 完全一致』はこの設計（forward 1e-5 許容・計画 §12.4-5）では原理的に到達できない。追跡の経路と証拠は計画 §8.17。",

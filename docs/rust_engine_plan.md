@@ -512,6 +512,7 @@ Python 側の自己検査（`hidden` から復元した盤面が記録の `state
 |---|---|
 | `cargo test --no-default-features` | **106 passed**・0 failed・2 ignored（監査オラクル統合テスト＋P2 の 1 件） |
 | `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `make test`（Python 側・無変更） | **green**（1,787 passed・0 failed・416s） |
 | `make test`（Python 無変更） | **1,761 passed**・0 failed（8:05） |
 | `rs_audit_replay.py --self-check`（記録→再生無し） | **cards=2,472／abilities=3,386／例外 0**（受け入れ条件） |
 | `rs_audit_replay.py --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF` | cards=634／abilities=817／mismatch=0・bad_payload=0・**unimplemented=817**（＝`ability_ids` が空＝`loader.rs` 待ち。統合後にコーディネータが再実行する） |
