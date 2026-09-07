@@ -1722,3 +1722,23 @@ RESULT.json: {"job":"rs-p4-legal","status":"done","oracle":{...},"notes":"..."}�
 ```
 
 3 本が揃ったらコーディネータが統合し、`rs-p4-mcts`（木・静止・箱・decide・`RecordedRng`・決定オラクル）を出す。
+
+## 13. テストの整理（Rust 化の後・ユーザ決定 2026-09-07「make test に時間がかかりすぎている。Rust 化が終わったら整理する」）
+
+現状: `make test` は 1,761 件で 7〜15 分（同時に監査やオラクルを回すと 15 分超）。時間の大半は
+`test_full_card_audit`／`test_full_card_baseline`（全カードの発動＝Python エンジン）と `cpu_infra`
+（探索・自己対戦・学習パイプラインの内部機構）にある。
+
+P5 が終わったら（Rust が生成・serve の既定になったら）次の順で整理する:
+
+1. **計測**: `pytest --durations=50` で上位を出し、「Python エンジンで全カードを回している」テストを列挙する。
+2. **オラクルの再配置**: 全カード監査・ベースライン・交差監査は Rust の `rs_audit_replay`／`rs_diff_replay` の
+   経路（数十秒）を正とし、Python 側は「Python と Rust の一致」を**サンプル**で見る 1 本に縮める
+   （Python 版は正本として残すが、毎回全数は回さない）。
+3. **ゲートの 2 段化**: push 前の必須は「ゲームプレイの退行を見るもの」だけ（数分）にし、`cpu_infra` と
+   重い監査は `make test-slow` 側へ移す（変更が探索/学習に触れたときだけ回す）。CLAUDE.md の
+   「push 前は必ず `make test`」の定義を、この新しい必須集合に書き換える。
+4. **Rust 側のゲート**: `cargo test`（数秒）＋ `make rust`（wheel）を必須に足す。
+
+判断は P5 の完了時に §8 の実測を見て行う（それまでは現状の運用のまま。ユーザ指示により make test は
+最低限＝Python エンジンに触れない変更では待たない）。
