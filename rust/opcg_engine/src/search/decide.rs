@@ -404,7 +404,12 @@ pub fn commit_step(
     if steps.is_empty() {
         return Ok(None);
     }
-    let legal = ctx.legal_actions(s)?;
+    // Python は本体を `try/except` で包み、候補生成が落ちたら「手を返さない」＝コミットを畳む。
+    let legal = match ctx.legal_actions(s) {
+        Ok(l) => l,
+        Err(e @ EngineError::Unimplemented(_)) => return Err(e),
+        Err(_) => return Ok(None),
+    };
     let mut mv: Option<Move> = None;
     if !legal.is_empty() {
         match steps[0].clone() {
@@ -872,10 +877,11 @@ fn decide_inner(
     // ② 残り起動の付与対話（腕 A2）
     if carry.resact_pending {
         if in_dialog(&mut real) && !in_battle(&real) {
-            if let Some(policy) = opts.residual_activate.as_deref() {
-                if let Some(mv) = residual_attach_move(ctx, &mut real, name, policy)? {
-                    return Ok(empty_out("main", Some(mv), carry, st));
-                }
+            // Python は `residual_activate` が None でも呼ぶ（`_pick_attach_target` は
+            // "high" 以外を「攻撃できるキャラの最低パワー」として扱う）＝同じにする。
+            let policy = opts.residual_activate.as_deref().unwrap_or("");
+            if let Some(mv) = residual_attach_move(ctx, &mut real, name, policy)? {
+                return Ok(empty_out("main", Some(mv), carry, st));
             }
         } else {
             carry.resact_pending = false;
