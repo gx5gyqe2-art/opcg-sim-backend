@@ -350,6 +350,16 @@ def test_replay_api_descriptor_end_to_end(client):
     # 再生した CPU の手が録画の CPU 思考トレースと（再生できた範囲で）一致する。
     n = min(len(cap.chosen), len(rec_chosen))
     assert n >= 3, f"再生の CPU 決定が少なすぎ（reproduced={rep['reproduced']} misses={rep['misses'][:1]}）"
+    # **効果対話の決定点までを照合する**（計画 §15 の暫定 CPU 経路の限界）。
+    # API 側の裁定は Rust だが CPU の decide はまだ Python で、盤面は記録 v5 の `hidden` から
+    # 組み直して渡す。`hidden` は中断（対話）の継続を持たないため、CPU が
+    # RESOLVE_EFFECT_SELECTION を「探索して」選ぶ決定点（CONFIRM_OPTIONAL の accept/decline 等）
+    # だけは読みが浅くなり、フル Python 再生と分岐しうる。そこまで（＝コイントスの再現・
+    # デッキ復元・人間手の注入・非対話の CPU 決定の決定性）は完全一致を要求する。
+    # P4 の `rs-p4-mcts` で decide が Rust に載ったら全長の照合へ戻す。
+    n = next((i for i, d in enumerate(rec_chosen[:n])
+              if (d or {}).get("action_type") == "RESOLVE_EFFECT_SELECTION"), n)
+    assert n >= 3, "効果対話より前の CPU 決定が少なすぎ（照合できる区間が無い）"
     assert cap.chosen[:n] == rec_chosen[:n], "API 実対局の CPU 意思決定が再生で一致しない"
 
 

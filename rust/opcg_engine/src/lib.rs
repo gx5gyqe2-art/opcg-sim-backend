@@ -17,6 +17,7 @@ mod journal;
 mod model;
 mod net;
 mod ops;
+mod py_game;
 mod rules;
 mod search;
 mod state;
@@ -145,5 +146,6 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(replay, m)?)?;
     m.add_function(wrap_pyfunction!(eval_queries, m)?)?;
     m.add_function(wrap_pyfunction!(replay_audit, m)?)?;
+    m.add_class::<py_game::Game>()?;
     Ok(())
 }

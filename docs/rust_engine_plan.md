@@ -913,6 +913,95 @@ Python と同じ slice 意味論（`take` が負なら `len + take` を 0 未満
 `make audit-cross` 相当（(d)）はハーネスに `--policy l1 --cross` が無いため、計画どおり
 L1 100 局再生（上表）で代える。
 
+### 8.16 対戦 API の Rust 化（WP `rs-api`）の結果（2026-09-07）
+
+`claude/cpu-spec-improvements-yw91jd`（cd7d3fb）から分岐。**エンジンの裁定は変えていない**
+（オラクル 3 本が全て一致・下表）。API 契約（`contract/`）とフロントは無変更。
+
+**Rust 側**
+
+- `src/search/rng.rs`（新規）: 決定的 PRNG。`Rng` は 3 つの姿を持つ——`Replay`（**混ぜない**＝
+  記録の再生は従来どおり「記録の並びを後から与える」）／`Pcg32`（seed から決まる自前の生成器・
+  P4-mcts／P5 用）／`Host`（**CPython の `random.getrandbits` へ委譲**）。`shuffle`／`below` は
+  CPython の実装（逆順 Fisher–Yates ＋ `_randbelow_with_getrandbits`）をそのまま写したので、
+  `Host` なら Python の `random.shuffle` と**並びが 1 対 1 で一致**する（実測: 対局生成・
+  マリガンともに Python 版と同じ手札・同じ山札）。
+- `Session` に `rng`（journal の外）と `action_events`（同・要求ごとに `reset_events()`）を追加。
+- シャッフルの呼び口を 3 か所つないだ: `turn::start_game`（新規・Python `turn_flow.start_game`）／
+  `turn::do_mulligan`／`effects::actions::zone::shuffle`（SHUFFLE 効果。従来は「乱数を使わない」
+  として並びに触らなかった）。`turn::finish_setup`（新規）は `interact::after_resolve` の
+  `setup_phase_pending` 分岐（GAME_START 能力が中断したときの再開）にもつないだ。
+- `Resolver` に `action_history` を持たせ（Python `EffectResolver.action_history` の 2 か所の
+  append を逐語で移植）、`push_effect_events` を Python の 3 か所（`gamestate.resolve_ability`／
+  `turn_flow._flush_pending_end_of_turn`／`interaction.resolve_interaction` の共通末尾）から呼ぶ。
+  `_in_passive_recalc` 中は発行しない（Python 同）。`action_api` の 11 種は
+  `rules::actions` の各分岐で**同じ dict を同じ位置**で積む（計 13 か所）。
+- 不正な行動の文言を Python と揃えた 4 か所: `do_mulligan`／`keep_hand` の接頭辞（`"do_mulligan: "`）
+  を削除、`PLAY` の uuid 欠落（Python は手札の探索が空振り＝「対象のカードが手札にありません。」）、
+  `ATTACK` の判定順（Python は `card_uuid == target_uuid` を先に見るので両方 None なら
+  「自分自身を…」）、`ACTIVATE_MAIN`（「効果を発動するカードが見つかりません。」）。
+  席名を埋め込む唯一の文言（「現在は {席} のターン/フェイズです。」）は `py_game::localize` が
+  **表示名**（`p1_name`／`p2_name`）へ差し替える（Python は `pending["player_id"]`＝プレイヤー名）。
+- `GameState::hidden_json`（新規・`from_record` の逆）と `src/py_game.rs`（新規）の PyO3 クラス
+  `Game`。`lib.rs` の変更は `m.add_class::<Game>()` の 1 行と `mod py_game;` だけ（P4 の 3 WP との
+  衝突を避ける）。エンジンの中は常に `p1`／`p2` で、JSON を返す直前に席名を表示名へ差し替える。
+
+**Python 側**
+
+- `opcg_sim/src/core/rs_bridge.py`（新規・`tests/harness/rs_record.py` の復元器を移設）。
+  `tests/harness/rs_record.py` は再エクスポート＋テスト専用の `apply_python_op` だけになった。
+- `opcg_sim/api/engine_rs.py`（新規）: `RsGame`＝`Game` のラッパ。`request_id`（`_rid`＝要求＋
+  `turn_count` の正規化 JSON の sha1）と `action_events` の受け渡し、暫定 CPU 経路（`py_manager()`）。
+- `routers.py`／`presenters.py`／`state.py` の `GameManager` 参照を `RsGame` に置き換えた
+  （`ws.py` は `manager.winner` しか読まないので変更不要だった）。`SandboxManager` は無変更。
+  `services/games.py` に `_resolve_first_player_seat`（席名版・乱数の消費は 1 回で同じ）を足した。
+
+**設計の決定（§15.2 からの差分・理由つき）**
+
+- **対戦 API の乱数源は `Rng::Host`（CPython の `random`）にした**。§15.2 は「Rust 側の決定的
+  PRNG でシャッフルとコイントス」と書いているが、それだと `cpu_trace`＋seed の録画を
+  `tests/harness/replay_runner.py`（**Python エンジン**で再生する）に食わせても山札が再現できない
+  ＝実対局リプレイの契約（`test_api.py::test_replay_api_descriptor_end_to_end`）が原理的に壊れる。
+  `Rng::Pcg32` は入れてある（P4-mcts／P5 が使う）が、API は Host を選ぶ＝**種→対局の再現性が
+  Python 版とビット単位で一致**する。
+- **暫定 CPU 経路の限界**: `hidden` は中断（対話）の継続を持たない（記録 v5 の契約）ので、
+  復元した `GameManager` は「効果の途中」を持てない。`rs_bridge.attach_shallow_interaction` が
+  Rust の要求から**浅い** `active_interaction` を載せる＝要求・合法手・既定解決は正しく出るが、
+  探索の中でその手を適用しても no-op になる（**その決定点だけ CPU の読みが浅い**）。裁定は
+  Rust 側なので盤面は常に正しい。P4 の `rs-p4-mcts` で `decide` が Rust に載れば解消する。
+
+**受け入れ実測（2026-09-07）**
+
+| 項目 | 結果 |
+|---|---|
+| イベント照合 random 100 局（`--seed-base 500000`） | **match=100・mismatch=0・unimplemented=0**（9,932 行動） |
+| イベント照合 L1 20 局（`--seed-base 700000`） | **match=20・mismatch=0・unimplemented=0**（2,267 行動） |
+| 全カード監査のイベント照合（絞り込み無し） | cards=2,472／abilities=3,386／**match=3,386・mismatch=0・unimplemented=0** |
+| `tests/test_api_rs_errors.py`（新規・不正な行動 23 種） | **24 passed**（Rust ＝ Python ＝ 転記 literal の 3 者一致） |
+| `tests/test_api.py`／`test_api_contract.py`／`test_contract_export.py` | **green**（`contract/` の再生成差分ゼロ） |
+| `cargo test --no-default-features` | **295 passed**・0 failed |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `make test` | （このコミット時点で実行中——結果は後続コミットに記入する） |
+
+シャッフルを挟んだ段のイベントは `targets`（カード実体の識別子）を照合から外す
+（`rs_diff_replay.mask_shuffled_targets`）——再生の規約では Rust は `random.shuffle` を
+**再現しない**（並びは行動後に記録の `hidden` で取り直す）ので、「混ぜた直後に引いた」カードの
+実体は一致しようがない（盤面は再同期で一致する）。枚数・アクション種別・成否・値は照合を続ける。
+`shuffled` が空の段（大多数）は完全一致で照合する。
+
+**書き換えたテスト（内部を覗いていたもの・2 本）**
+
+- `tests/test_api_contract.py::test_pending_request_id_changes_when_only_unlisted_field_differs`:
+  `GameManager.active_interaction` へ偽の中断を差し込んでいた。`request_id` は Rust 化後も
+  Python 側（`engine_rs._rid`）が付けるので、**要求 dict を直接与える単体テスト**に変えた
+  （`turn_count` を含むことの検査を追加）。
+- `tests/test_api.py::test_replay_api_descriptor_end_to_end`: 録画の CPU 決定列と Python 再生の
+  全長一致を要求していた。上の「暫定 CPU 経路の限界」により、CPU が
+  `RESOLVE_EFFECT_SELECTION` を**探索して**選ぶ決定点以降は分岐しうる。そこまで（コイントスの
+  再現・デッキ復元・人間手の注入・非対話の CPU 決定の決定性）の完全一致に狭めた。
+  `rs-p4-mcts` で `decide` が Rust に載ったら全長の照合へ戻す。
+
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
@@ -1852,3 +1941,24 @@ claude/cpu-spec-improvements-yw91jd から分岐し、claude/rs-api に push、P
 受け入れ: §15.3 の全項目。RESULT.json: {"job":"rs-api","status":"done","events_oracle":{...},"api_tests":{...},
 "rewritten_tests":[...],"notes":"..."}。
 ```
+
+### 15.5 実測と設計の差分（2026-09-07・WP `rs-api` の結果は §8.16）
+
+実装して分かった 2 点を、設計（§15.2）からの差分としてここに残す。
+
+1. **対戦 API の乱数源は Rust の PCG32 ではなく「CPython の `random` への委譲」にした**
+   （`search/rng.rs` の `Rng::Host`）。PCG32 は入れてある（P4-mcts／P5 が使う）が、API がそれを
+   使うと `cpu_trace`＋seed の録画を `replay_runner.replay_from_descriptor`（**Python エンジン**で
+   再生する）に食わせても山札が再現できない＝実対局リプレイの契約が原理的に壊れる。
+   `Rng::shuffle`／`below` は CPython の実装（逆順 Fisher–Yates ＋
+   `_randbelow_with_getrandbits`）の写しなので、出目を委譲すれば並びはビット単位で一致する。
+   コイントスは従来どおり Python 側（`services/games._resolve_first_player_seat`）で引く
+   ＝乱数の消費位置も Python 版と同じ（コイントス → p1 のデッキ → p2 のデッキ）。
+2. **暫定 CPU 経路は「効果の途中」を復元できない**。記録 v5 の `hidden` は中断（対話）の継続
+   （実行スタック・効果文脈）を持たないので、`manager_from_hidden` で組んだ `GameManager` は
+   対話中の局面を再現できない。`rs_bridge.attach_shallow_interaction` が Rust の要求から
+   **浅い** `active_interaction` を載せ、要求・合法手・既定解決は正しく出す（対局は最後まで
+   進む）が、探索の中でその手を適用しても no-op になる＝**その決定点だけ CPU の読みが浅い**。
+   裁定は Rust 側だけで進むので**盤面は常に正しい**。P4 の `rs-p4-mcts` で `decide` が Rust に
+   載れば解消する（そのとき `test_api.py::test_replay_api_descriptor_end_to_end` の照合区間も
+   全長へ戻す）。

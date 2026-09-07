@@ -20,6 +20,7 @@ from opcg_sim.src.core.gamestate import Player, GameManager
 from opcg_sim.src.core import action_api
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.api import decide_client
+from opcg_sim.api import engine_rs
 # 設定・定数／常駐リソース／対局レジストリ／サービスは分離済みモジュールから取り込む（後方互換の名前で再公開）。
 from .schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
 from .config import CONST, constants_hash, IMAGE_VERSION, REPLAY_SCHEMA, SCHEMA_HASH
@@ -44,6 +45,13 @@ _logger = logging.getLogger("opcg.api")
 
 @asynccontextmanager
 async def _lifespan(_app):
+    # Rust エンジン（`opcg_engine`）のカード定義表を**プロセスで 1 度**読む（約 8MB の
+    # 効果構造 JSON）。起動時に済ませておけば最初の対局生成が待たされない。失敗しても
+    # ここでは落とさず（診断だけ残す）、対局生成時に同じ例外で明示的に失敗させる。
+    try:
+        engine_rs.load_engine()
+    except Exception:
+        _logger.warning("Rust エンジンのカード定義読込に失敗（対局生成時に再試行）", exc_info=True)
     # 方式B: PyPy 探索ワーカーを常駐起動（OPCG_PYPY_WORKER=1 のときのみ）。JIT を常にウォームに保つ。
     # 未起動・失敗でも decide_client がインプロセス実行へフォールバックするので可用性は不変。
     try:

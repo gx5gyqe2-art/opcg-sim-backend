@@ -37,20 +37,78 @@ pub fn draw_card(
     Ok(())
 }
 
+/// Python `turn_flow.start_game`（対戦 API の対局生成・§15.2）。
+///
+/// 手順は Python のまま: 両者のデッキをシャッフル → リーダーの GAME_START 能力を解決
+/// （中断したら `setup_phase_pending` を立てて先行だけ決めて戻る）→ `finish_setup`
+/// （ライフ配置＋初手 5 枚）→ MULLIGAN フェイズ。
+///
+/// `first_player` を省略すると Python と同じく p1 が先行になる。
+pub fn start_game(
+    s: &mut Session,
+    masters: &MasterTable,
+    first_player: Option<Seat>,
+) -> Result<(), EngineError> {
+    crate::effects::actions::zone::shuffle_deck(s, Seat::P1);
+    crate::effects::actions::zone::shuffle_deck(s, Seat::P2);
+
+    for seat in [Seat::P1, Seat::P2] {
+        let Some(leader) = s.state().player(seat).leader else {
+            continue;
+        };
+        let ids = masters.get(s.state().card(leader).master).ability_ids.clone();
+        for (index, id) in ids.iter().enumerate() {
+            if crate::effects::ability(masters, *id)?.trigger
+                != crate::effects::ast::TriggerType::GameStart
+            {
+                continue;
+            }
+            crate::effects::resolver::game_resolve_ability(s, masters, seat, leader, index, false)?;
+            if s.state().active_interaction().is_some() {
+                // 中断＝セットアップは対話の解決後（`finish_setup`）へ持ち越す。
+                s.edit().set_mgr_bool(MgrBoolField::SetupPhasePending, true);
+                s.edit().set_turn_player(first_player.unwrap_or(Seat::P1));
+                return Ok(());
+            }
+        }
+    }
+
+    finish_setup(s, masters)?;
+    s.edit().set_turn_player(first_player.unwrap_or(Seat::P1));
+    s.edit().set_phase(Phase::Mulligan);
+    Ok(())
+}
+
+/// Python `turn_flow.finish_setup`（`place_life` → `draw_initial_hand` を p1・p2 の順に）。
+pub fn finish_setup(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
+    for seat in [Seat::P1, Seat::P2] {
+        let life = match s.state().player(seat).leader {
+            Some(l) => masters.get(s.state().card(l).master).life.max(0),
+            None => 0,
+        };
+        for _ in 0..life {
+            ops::deck_to_life(s, seat);
+        }
+        ops::draw(s, seat, 5);
+    }
+    Ok(())
+}
+
 /// Python `do_mulligan`: 手札を全てデッキ底へ戻してシャッフル→5 枚引き直す。
 ///
-/// **シャッフルは Rust では行わない**（乱数は Python と互換にしない＝計画 §6）。
-/// 再生側（`state::replay`）が「意味論どおりの処理」のあとで、その行の `hidden` から
-/// 当該プレイヤーの `deck`／`hand` の並びを取り直す（§10.2 の 3）。
+/// シャッフルは乱数源（[`crate::search::rng::Rng`]）に委ねる。記録の再生では `Replay`
+/// ＝**並びに触らない**（乱数列は Rust へ流さない＝計画 §6）ので、再生側（`state::replay`）が
+/// 「意味論どおりの処理」のあとで、その行の `hidden` から当該プレイヤーの `deck`／`hand` の
+/// 並びを取り直す（§10.2 の 3）。対戦 API では本物の乱数源が実際に混ぜる。
 pub fn do_mulligan(s: &mut Session, masters: &MasterTable, seat: Seat) -> Result<(), EngineError> {
     if s.state().phase != Phase::Mulligan {
         return Err(EngineError::BadPayload(
-            "do_mulligan: マリガンフェーズではありません。".into(),
+            "マリガンフェーズではありません。".into(),
         ));
     }
     if s.state().mulligan_done.contains(&seat) {
         return Err(EngineError::BadPayload(
-            "do_mulligan: 既にマリガンを実施済みです。".into(),
+            "既にマリガンを実施済みです。".into(),
         ));
     }
     // 手札を全てデッキ底へ（`deck.extend(hand)` → `hand.clear()`）。
@@ -64,7 +122,9 @@ pub fn do_mulligan(s: &mut Session, masters: &MasterTable, seat: Seat) -> Result
             e.card_zone_push(seat, CardZone::Deck, *card);
         }
     }
-    // ここで Python は `random.shuffle(player.deck)` する（再生側が並びを取り直す）。
+    // Python `random.shuffle(player.deck)`（記録の再生では乱数源が `Replay`＝並びに触らず、
+    // 再生側が記録の並びを取り直す＝従来どおり。対戦 API では本物の乱数源が混ぜる）。
+    crate::effects::actions::zone::shuffle_deck(s, seat);
     ops::draw(s, seat, 5);
     s.edit().add_mulligan_done(seat);
     check_mulligan_complete(s, masters)
@@ -74,12 +134,12 @@ pub fn do_mulligan(s: &mut Session, masters: &MasterTable, seat: Seat) -> Result
 pub fn keep_hand(s: &mut Session, masters: &MasterTable, seat: Seat) -> Result<(), EngineError> {
     if s.state().phase != Phase::Mulligan {
         return Err(EngineError::BadPayload(
-            "keep_hand: マリガンフェーズではありません。".into(),
+            "マリガンフェーズではありません。".into(),
         ));
     }
     if s.state().mulligan_done.contains(&seat) {
         return Err(EngineError::BadPayload(
-            "keep_hand: 既にマリガンを実施済みです。".into(),
+            "既にマリガンを実施済みです。".into(),
         ));
     }
     s.edit().add_mulligan_done(seat);

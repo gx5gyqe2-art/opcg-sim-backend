@@ -55,7 +55,7 @@ from opcg_sim.tools.export_effects_json import Stats, _encode  # noqa: E402
 
 from rs_diff_replay import (  # noqa: E402
     DEFAULT_EFFECTS_PATH, RECORD_VERSION, ShuffleWatcher, board_dict, canon, first_diff,
-    hidden_dict, load_masters, _norm, _strip_request_id,
+    hidden_dict, load_masters, mask_shuffled_targets, _norm, _strip_request_id,
 )
 
 try:                        # Rust 拡張は未導入でも動く（その場合は全件 unimplemented）。
@@ -184,6 +184,7 @@ def _drain_and_record(gm, steps: list, watcher: "ShuffleWatcher | None" = None) 
         else:  # CONFIRM_OPTIONAL / CONFIRM_TRIGGER / ARRANGE_DECK / DECLARE_COST 等
             payload = {"selected_uuids": [], "index": 0}
 
+        gm.action_events = []   # 1 応答ぶんのイベントログ（計画 §15.3 のオラクル）
         try:
             gm.resolve_interaction(player, payload)
         except Exception:
@@ -193,6 +194,7 @@ def _drain_and_record(gm, steps: list, watcher: "ShuffleWatcher | None" = None) 
         steps.append({
             "payload": payload,
             "state": board_dict(gm),
+            "events": [dict(e) for e in gm.action_events],
             "shuffled": list(dict.fromkeys(owners)),
             "hidden": hidden_dict(gm),
         })
@@ -274,6 +276,7 @@ def record_one(master, ability, ability_index: int, extra: list) -> dict:
             setup = {"hidden": hidden_dict(gm), "state": board_dict(gm)}
             fire = {"kind": "play", "player": "p1", "source_uuid": src.uuid,
                     "ability_index": ability_index}
+            gm.action_events = []   # 発動ぶんのイベントログ（計画 §15.3 のオラクル）
             gm.play_card_action(p1, src)
         else:
             gm, p1, p2, src = cov._build_test_state(master)
@@ -285,8 +288,10 @@ def record_one(master, ability, ability_index: int, extra: list) -> dict:
             setup = {"hidden": hidden_dict(gm), "state": board_dict(gm)}
             fire = {"kind": "ability", "player": "p1", "source_uuid": src.uuid,
                     "ability_index": ability_index}
+            gm.action_events = []
             gm.resolve_ability(p1, ability, src)
         fire["state"] = board_dict(gm)
+        fire["events"] = [dict(e) for e in gm.action_events]
         fire["shuffled"] = list(dict.fromkeys(watcher.take()))
         fire["hidden"] = hidden_dict(gm)
 
@@ -322,6 +327,24 @@ def compare(record: dict, replayed: dict) -> dict:
     for i, (exp, act) in enumerate(zip(expected, got)):
         if _norm(exp) != _norm(act):
             return {"status": "mismatch", "step": i, "path": first_diff(canon(exp), canon(act))}
+    # v5 additive（計画 §15.3）: イベントログ（`action_events` の `EFFECT` 行）も**順序込み**で照合。
+    events = replayed.get("events")
+    if isinstance(events, list):
+        exp_events = [record["fire"].get("events")]
+        exp_events += [s.get("events") for s in record["steps"]]
+        if len(events) != len(exp_events):
+            return {"status": "mismatch", "step": min(len(events), len(exp_events)),
+                    "path": f"events[len {len(exp_events)}!={len(events)}]"}
+        shuffled_at = [record["fire"].get("shuffled")]
+        shuffled_at += [s.get("shuffled") for s in record["steps"]]
+        for i, (exp, act) in enumerate(zip(exp_events, events)):
+            if exp is None:
+                continue
+            exp = mask_shuffled_targets(exp, shuffled_at[i])
+            act = mask_shuffled_targets(act, shuffled_at[i])
+            if _norm(exp) != _norm(act):
+                return {"status": "mismatch", "step": i,
+                        "path": f"events[{i}]" + (first_diff(canon(exp), canon(act)) or "")}
     return {"status": "match"}
 
 

@@ -22,3 +22,16 @@ def _resolve_first_player(value: Any, player1: Player, player2: Player) -> Optio
     if value == "p2":
         return player2
     return None
+
+
+def _resolve_first_player_seat(value: Any) -> Optional[str]:
+    """`_resolve_first_player` の席名版（Rust エンジン用・計画 §15.2）。
+
+    戻り値は "p1"／"p2"／None（既定）。"random" は `random.choice` を **1 回** 消費する＝
+    `_resolve_first_player` と乱数の消費が同じなので、種からの再現（`replay_runner`）が保たれる。
+    """
+    if value == "random":
+        return random.choice(["p1", "p2"])
+    if value in ("p1", "p2"):
+        return value
+    return None

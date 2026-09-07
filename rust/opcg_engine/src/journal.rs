@@ -161,6 +161,8 @@ pub enum Undo {
     TurnEventsSet(Vec<(String, i32)>),
     /// `mulligan_done` へ 1 件足した → 末尾を捨てる。
     MulliganPush,
+    /// `mulligan_done` を丸ごと入れ替えた（`finish_setup` のリセット）→ 旧内容へ戻す。
+    MulliganSet(Vec<Seat>),
     MgrBool(MgrBoolField, bool),
     /// 中断を積んだ → 末尾を捨てる（P2）。
     InteractionPush,
@@ -233,10 +235,19 @@ impl Journal {
 // --- セッション（GameState の唯一の持ち主）-----------------------------------
 
 /// `GameState` と `Journal` を束ねた入れ物。**`&mut GameState` を外へ出さない**のが役目。
+///
+/// `rng`／`action_events` は **journal の外**（巻き戻しの対象にしない）:
+/// - `rng` は乱数源で、盤面ではない（`docs/rust_engine_plan.md` §15.2）。
+/// - `action_events` は「1 要求ぶんのイベントログ」＝フロントへ返したら捨てる一時バッファ
+///   （Python も `action_events` を API ハンドラで毎回リセットする）。
 #[derive(Debug)]
 pub struct Session {
     state: GameState,
     journal: Journal,
+    /// シャッフル／コイントスの乱数源（既定は `Replay`＝混ぜない）。
+    pub rng: crate::search::rng::Rng,
+    /// 1 要求ぶんのイベントログ（Python `GameManager.action_events`）。
+    action_events: Vec<serde_json::Value>,
 }
 
 impl Session {
@@ -244,7 +255,24 @@ impl Session {
         Session {
             state,
             journal: Journal::new(),
+            rng: crate::search::rng::Rng::Replay,
+            action_events: Vec::new(),
         }
+    }
+
+    /// 1 要求ぶんのイベントログ（Python `manager.action_events`）。
+    pub fn action_events(&self) -> &[serde_json::Value] {
+        &self.action_events
+    }
+
+    /// イベントを 1 件積む（Python の `manager.action_events.append({...})` と 1:1）。
+    pub fn push_event(&mut self, event: serde_json::Value) {
+        self.action_events.push(event);
+    }
+
+    /// 要求の先頭で空にする（Python の API ハンドラの `manager.action_events = []`）。
+    pub fn reset_events(&mut self) {
+        self.action_events.clear();
     }
 
     /// 読み取り専用の盤面。
@@ -600,6 +628,15 @@ impl StateMut<'_> {
         self.rec(Undo::MulliganPush);
     }
 
+    /// `mulligan_done` を空に戻す（Python `gm.mulligan_done = JournaledSet()`）。
+    pub fn clear_mulligan_done(&mut self) {
+        if self.state.mulligan_done.is_empty() {
+            return;
+        }
+        let old = std::mem::take(&mut self.state.mulligan_done);
+        self.rec(Undo::MulliganSet(old));
+    }
+
     // -- 中断（対話）スタック・誘発待ち行列（P2）-----------------------------
     /// Python `push_interaction`（＝空なら `active_interaction = {...}` と同じ）。
     pub fn push_interaction(&mut self, interaction: Interaction) {
@@ -768,6 +805,7 @@ fn apply_undo(state: &mut GameState, entry: Undo) {
         Undo::MulliganPush => {
             state.mulligan_done.pop();
         }
+        Undo::MulliganSet(old) => state.mulligan_done = old,
         Undo::MgrBool(field, old) => match field {
             MgrBoolField::SetupPhasePending => state.setup_phase_pending = old,
             MgrBoolField::TurnStartPending => state.turn_start_pending = old,

@@ -42,6 +42,10 @@ COPY . /app
 # エンジンは stdlib-only なので CPython/PyPy 双方が同一キャッシュを読む。
 RUN python -m opcg_sim.tools.build_card_cache
 
+# Rust エンジンが読む効果構造 JSON（約 8MB・生成物なので git 管理外）を焼き込む。
+# 無い場合は API の起動時に生成されるが、コンテナ起動のたびに ~10 秒かかるのでここで作る。
+RUN python -m opcg_sim.tools.export_effects_json --out opcg_sim/data/opcg_effects.json
+
 ENV PORT=8080
 # Cloud Logging 費用対策: 効果処理ごとの盤面ダンプ JSON（resolver._log_execution_report /
 # _log_failure_snapshot）を本番では全停止する。CPU 探索（PIMC×予算按分）が resolve_ability を

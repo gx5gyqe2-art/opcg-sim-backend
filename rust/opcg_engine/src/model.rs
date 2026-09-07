@@ -1635,6 +1635,179 @@ impl GameState {
         Ok(Value::Object(out))
     }
 
+    /// 盤面を記録 v5 の `hidden` へ書き出す（[`GameState::from_record`] の逆・§15.2）。
+    ///
+    /// 形は `tests/scripts/rs_diff_replay.py::hidden_dict` と**同じ**（キー集合は
+    /// `HIDDEN_KEYS`／`PLAYER_RECORD_KEYS`／`MANAGER_KEYS`／`CARD_RECORD_KEYS` が正本）。
+    /// 対戦 API の暫定 CPU 経路（`opcg_sim/src/core/rs_bridge.py::manager_from_hidden` で
+    /// Python の `GameManager` を組み直す）とリプレイフレーム・テストが読む。
+    ///
+    /// **中断（対話）スタック・誘発待ち行列・遅延アクションは件数しか出さない**（記録 v5 の
+    /// 契約どおり）。Rust の内部にしかない状態なので、`from_hidden` の往復では失われる。
+    pub fn hidden_json(&self, masters: &MasterTable) -> Value {
+        let mut players = Obj::new();
+        for seat in [Seat::P1, Seat::P2] {
+            players.insert(seat.name().into(), self.player_record(seat, masters));
+        }
+
+        let mut m = Obj::new();
+        m.insert("turn_count".into(), Value::from(self.turn_count));
+        m.insert("phase".into(), Value::from(self.phase.name()));
+        m.insert("turn_player".into(), Value::from(self.turn_player.name()));
+        m.insert(
+            "winner".into(),
+            match self.winner {
+                Some(seat) => Value::from(seat.name()),
+                None => Value::Null,
+            },
+        );
+        m.insert(
+            "active_battle".into(),
+            match &self.active_battle {
+                None => Value::Null,
+                Some(b) => serde_json::json!({
+                    "attacker": self.card(b.attacker).uuid,
+                    "target": self.card(b.target).uuid,
+                    "attacker_owner": b.attacker_owner.name(),
+                    "target_owner": b.target_owner.name(),
+                    "counter_buff": b.counter_buff,
+                }),
+            },
+        );
+        let mut events = Obj::new();
+        for (k, v) in &self.turn_events {
+            events.insert(k.clone(), Value::from(*v));
+        }
+        m.insert("turn_events".into(), Value::Object(events));
+        let mut done: Vec<&'static str> = self.mulligan_done.iter().map(|s| s.name()).collect();
+        done.sort_unstable(); // Python は `sorted(manager.mulligan_done)`
+        m.insert("mulligan_done".into(), Value::from(done));
+        m.insert(
+            "setup_phase_pending".into(),
+            Value::Bool(self.setup_phase_pending),
+        );
+        m.insert(
+            "turn_start_pending".into(),
+            Value::Bool(self.turn_start_pending),
+        );
+        m.insert(
+            "interaction_depth".into(),
+            Value::from(self.interaction_stack.len()),
+        );
+        m.insert(
+            "pending_triggers".into(),
+            Value::from(self.pending_triggers.len()),
+        );
+        m.insert(
+            "pending_end_of_turn".into(),
+            Value::from(self.pending_end_of_turn.len()),
+        );
+
+        let mut out = Obj::new();
+        out.insert("players".into(), Value::Object(players));
+        out.insert("manager".into(), Value::Object(m));
+        Value::Object(out)
+    }
+
+    /// `hidden.players.<seat>`（`rs_diff_replay.py::hidden_dict` の 1 人ぶん）。
+    fn player_record(&self, seat: Seat, masters: &MasterTable) -> Value {
+        let p = self.player(seat);
+        let card = |idx: &CardIdx| -> Value { self.card_record(*idx, masters) };
+        let zone = |idxs: &Vec<CardIdx>| -> Value { Value::Array(idxs.iter().map(card).collect()) };
+        let dons = |idxs: &Vec<DonIdx>| -> Value {
+            Value::Array(
+                idxs.iter()
+                    .map(|i| {
+                        let d = self.don(*i);
+                        serde_json::json!({
+                            "uuid": d.uuid,
+                            "owner_id": d.owner.name(),
+                            "is_rest": d.is_rest,
+                            "attached_to": match d.attached_to {
+                                Some(c) => Value::from(self.card(c).uuid.clone()),
+                                None => Value::Null,
+                            },
+                            "is_frozen": d.is_frozen,
+                        })
+                    })
+                    .collect(),
+            )
+        };
+        let mut restrictions = Obj::new();
+        for r in &p.restrictions {
+            restrictions.insert(
+                r.key.clone(),
+                serde_json::json!({
+                    "expire": r.expire,
+                    "min_cost": match r.min_cost { Some(n) => Value::from(n), None => Value::Null },
+                }),
+            );
+        }
+
+        let mut o = Obj::new();
+        o.insert("name".into(), Value::from(seat.name()));
+        o.insert(
+            "leader".into(),
+            p.leader.as_ref().map(card).unwrap_or(Value::Null),
+        );
+        o.insert("stage".into(), p.stage.as_ref().map(card).unwrap_or(Value::Null));
+        o.insert("deck".into(), zone(&p.deck));
+        o.insert("hand".into(), zone(&p.hand));
+        o.insert("life".into(), zone(&p.life));
+        o.insert("field".into(), zone(&p.field));
+        o.insert("trash".into(), zone(&p.trash));
+        o.insert("temp_zone".into(), zone(&p.temp_zone));
+        o.insert(
+            "don".into(),
+            serde_json::json!({
+                "deck": dons(&p.don_deck),
+                "active": dons(&p.don_active),
+                "rested": dons(&p.don_rested),
+                "attached": dons(&p.don_attached),
+            }),
+        );
+        o.insert(
+            "negate_onplay_until".into(),
+            Value::from(p.negate_onplay_until),
+        );
+        o.insert("restrictions".into(), Value::Object(restrictions));
+        Value::Object(o)
+    }
+
+    /// カード 1 枚の記録（`rs_diff_replay.py::card_record`＝[`CARD_RECORD_KEYS`]）。
+    fn card_record(&self, idx: CardIdx, masters: &MasterTable) -> Value {
+        let c = self.card(idx);
+        let mut used = Obj::new();
+        for (k, n) in &c.ability_used_this_turn {
+            used.insert(k.to_string(), Value::from(*n));
+        }
+        serde_json::json!({
+            "card_id": masters.get(c.master).card_id,
+            "uuid": c.uuid,
+            "owner_id": c.owner.name(),
+            "is_rest": c.is_rest,
+            "is_newly_played": c.is_newly_played,
+            "attached_don": c.attached_don,
+            "is_face_up": c.is_face_up,
+            "power_buff": c.power_buff,
+            "cost_buff": c.cost_buff,
+            "passive_power": c.passive_power,
+            "passive_power_override": c.passive_power_override,
+            "passive_counter": c.passive_counter,
+            "base_power_override": c.base_power_override,
+            "base_cost_override": c.base_cost_override,
+            "negated": c.negated,
+            "ability_disabled": c.ability_disabled,
+            "timed_power": c.timed_power,
+            "timed_cost": c.timed_cost,
+            "current_keywords": c.current_keywords,
+            "flags": c.flags,
+            "timed_flags": c.timed_flags,
+            "timed_keywords": c.timed_keywords,
+            "ability_used_this_turn": Value::Object(used),
+        })
+    }
+
     /// Python `Player.to_dict(is_owner=True, is_my_turn=...)`。
     ///
     /// `is_face_up` の上書き規則（`Player.to_dict`／`_format_card`）:

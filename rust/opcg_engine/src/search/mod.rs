@@ -14,6 +14,8 @@
 
 #![allow(dead_code)]
 
+pub mod rng;
+
 use crate::journal::Session;
 use crate::model::{GameState, MasterTable, Seat};
 use crate::state::EngineError;

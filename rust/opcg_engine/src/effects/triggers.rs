@@ -833,12 +833,13 @@ pub fn flush_pending_end_of_turn(
             );
             continue;
         }
-        Resolver::resumed(vec![item.node.clone()], ctx).process_stack(
-            s,
-            masters,
-            item.player,
-            item.source_card,
-        )?;
+        let mut resolver = Resolver::resumed(vec![item.node.clone()], ctx);
+        resolver.process_stack(s, masters, item.player, item.source_card)?;
+        // Python `turn_flow._flush_pending_end_of_turn` の末尾＝`action_events` へ EFFECT を写す
+        // （13 か所のうちの 1 つ・§15.1）。
+        if let Some(source) = item.source_card {
+            resolver.flush_events(s, masters, item.player, source);
+        }
     }
     Ok(())
 }

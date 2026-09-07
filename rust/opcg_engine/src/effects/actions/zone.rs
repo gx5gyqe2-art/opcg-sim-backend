@@ -184,9 +184,11 @@ fn first_trigger_index(
     Ok(None)
 }
 
-/// Python `player_level.shuffle`。**並びには触らない**（モジュール docstring の「SHUFFLE は
-/// 乱数を使わない」）。対象プレイヤーの決定だけ Python と同じにする（副作用の無い分岐だが、
-/// 将来ここへ処理が増えたときに食い違わないため残す）。
+/// Python `player_level.shuffle`（`random.shuffle(target.deck)`）。
+///
+/// 記録の再生（`state::replay`／`replay_audit`）では乱数源が [`crate::search::rng::Rng::Replay`]
+/// ＝**並びに触らない**（記録した並びを後から与える＝計画 §6・従来どおり）。対戦 API
+/// （`py_game::Game`）は本物の乱数源を積むので、ここで実際に混ざる。
 fn shuffle(s: &mut Session, actor: Seat, action: &GameAction) -> Result<bool, EngineError> {
     let mut target_player = actor;
     if let Some(q) = action.target.as_ref() {
@@ -194,8 +196,25 @@ fn shuffle(s: &mut Session, actor: Seat, action: &GameAction) -> Result<bool, En
             target_player = actor.other();
         }
     }
-    let _ = (s, target_player);
+    shuffle_deck(s, target_player);
     Ok(true)
+}
+
+/// `random.shuffle(player.deck)`（乱数源が `Replay` なら何もしない）。
+pub fn shuffle_deck(s: &mut Session, seat: Seat) {
+    if !s.rng.shuffles() {
+        return;
+    }
+    let mut deck = s.state().player(seat).deck.clone();
+    s.rng.shuffle(&mut deck);
+    let len = deck.len();
+    let mut e = s.edit();
+    for _ in 0..len {
+        e.card_zone_remove_at(seat, crate::journal::CardZone::Deck, 0);
+    }
+    for card in deck {
+        e.card_zone_push(seat, crate::journal::CardZone::Deck, card);
+    }
 }
 
 /// Python `player_level.heal`（`HEAL`／`LIFE_RECOVER`）。デッキ上 1 枚をライフの**一番下**へ。
