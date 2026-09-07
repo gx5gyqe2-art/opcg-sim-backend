@@ -134,6 +134,8 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P3 | **`rs-p3-resolver` 完了**（`claude/rs-p3-resolver-yyjnt3`・4b621598）: resolver／interact／triggers／continuous／passives／actions/mod＋監査ハーネス（記録 v4・`shuffled`）。自己検査 2,472 枚例外 0・cargo 106 green・Rust 照合は deferred（能力表が空） |
 | 2026-09-07 | P3 | **統合 WP を発行**（§11.6）: 両 WP は契約 3 点（`EffectContext` の形・`get_target_cards` の戻り値・能力表の持ち方）で食い違うため、本線への取り込みと単一化を 1 セッションの WP `rs-p3-integrate` に出す（決定はコーディネータが §11.6 に固定） |
 | 2026-09-07 | P3 | **土台 2 WP の統合・受け入れ**（`claude/rs-p3-integrate`）: core → resolver の順に cherry-pick し §11.6 のとおり単一化（`Vec<TargetRef>`／`EffectContext` の全欄／能力表は `MasterTable.abilities`／stub は core へ委譲／文脈の JSON 読込は `eval::context_from_json`）。オラクル 5 本すべて一致（問合せ 7,337,400 件 mismatch=0／土台監査 634 枚・817 能力 mismatch=0・unimplemented=0／バニラ再生 50 局・状態 10 局・原始操作 10 局とも一致）・`cargo test` 166 green（`#[ignore]` 0）・clippy 0・`make test` green。結果は下記 §8.9 |
+| 2026-09-07 | P3 | **統合をコーディネータが受け入れ・本線へ**（`claude/rs-p3-integrate` 776d492a を fast-forward）。未見 seed の再検証: F 監査 634 枚/817 能力 mismatch=0・問合せ 40 局面 1,467,480 件 mismatch=0・バニラ再生 20 局 match=20・状態 5 局 match=5・原始操作 3 局 5,190 件 mismatch=0。`cargo test` 166 green・clippy 0・`make test` green |
+| 2026-09-07 | P3 | **群 A〜E の差し口と指示書を本線へ**（§11.7）: `actions/{status,zone,flow,don,rules}.rs` の 3 入口（`game_handler`／`owns_target`／`apply_target`）と `mod.rs` の呼び出し。受け入れ集合は F∪群だけのカード（A 782／B 987／C 865／D 979／E 710 枚） |
 
 ### 8.1 P0 の結果（2026-09-06）
 
@@ -1099,3 +1101,71 @@ make test green。RESULT.json: {"job":"rs-p3-integrate","status":"done","cargo":
    `docs/TEST_SPEC.md` は両 WP の行（`rs_query_oracle.py`／`rs_audit_replay.py`）をそのまま残す。
 
 統合が受け入れられたら群 A〜E（§11.3・§11.4）を並列に出す。
+
+### 11.7 群 A〜E（ActionType ハンドラ）の WP（2026-09-07・コーディネータ）
+
+**差し口（本線に入れた・`effects/actions/{status,zone,flow,don,rules}.rs`）**: 5 群が同時に開発しても
+`actions/mod.rs` を触らないよう、各群ファイルに 3 つの入口を置いた。`mod.rs::apply_action` は土台の
+`game_handler_for` が `Unregistered` を返す種別で各群の `game_handler` を順に試し（`Some` を返した群が
+担当）、`run_target_loop` は土台に無い種別で `owns_target` が真の群の `apply_target` を 1 対象ずつ呼ぶ
+（除去保護・置換・B2 退避は `mod.rs` が済ませる）。骨組みは全部「担当なし」＝`Unimplemented` のまま。
+
+```rust
+pub fn game_handler(s, masters, actor, action, node_ref, targets, value, source_card) -> Option<Result<bool, EngineError>>;
+pub fn owns_target(ty: ActionType) -> bool;
+pub fn apply_target(s, masters, actor, action, target, owner, source_list, value, source_card) -> Result<(), EngineError>;
+```
+
+**群の範囲と受け入れ規模**（土台 F＝DRAW／DISCARD／KO／REST／ACTIVE／BUFF 基本形。「F∪群」だけを使う
+カード＝その群の受け入れ集合。効果 JSON から算出・2026-09-07）:
+
+| 群 | ファイル | ActionType | F∪群だけのカード／能力 | Python の対応 |
+|---|---|---|---|---|
+| A 状態系 | `status.rs` | GRANT_KEYWORD・ATTACK_DISABLE・PREVENT_REST・FREEZE・NEGATE_EFFECT・DISABLE_ABILITY・SWAP_POWER＋**BUFF の全形**（status: COST_REDUCTION／POWER_OVERRIDE／BLOCKER_DISABLE／COUNTER／COST_OVERRIDE・duration: THIS_TURN／THIS_BATTLE／UNTIL_NEXT_TURN_END／PERMANENT＝継続効果登録）。DB 未使用の SET_BASE_POWER／COST_BUFF／SET_COST／COST_CHANGE／BP_BUFF は `Unimplemented` のまま可 | 782／1,014 | `per_target.buff/grant_keyword/attack_disable/prevent_rest/freeze/negate_effect`・`player_level.disable_ability/swap_power`・`continuous.py` |
+| B ゾーン移動 | `zone.rs` | MOVE_CARD・DECK_BOTTOM・DECK_TOP・BOUNCE・TRASH_FROM_DECK・HEAL・DEAL_DAMAGE・SHUFFLE・ORDER_LIFE・FACE_UP_LIFE・LOOK_LIFE・MOVE_TO_HAND（DB 未使用の LIFE_RECOVER／LIFE_MANIPULATE は `Unimplemented` 可） | 987／1,271 | `per_target.move/bounce/deck_bottom/deck_top/move_card/face_up_life`・`player_level.deal_damage/shuffle/heal/trash_from_deck/order_life/look_life` |
+| C カードの流れ | `flow.rs` | PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_MAIN_EFFECT・EXECUTE_EVENT・DECLARE_COST（DB 未使用の SELECT_OPTION は不要） | 865／1,144 | `per_target.play_card/reveal`・`player_level.look/select/execute_event`・`resolver._expand_main_effect/_execute_selected_main/_suspend_for_cost_declaration` |
+| D ドン!! | `don.rs` | RETURN_DON・RAMP_DON・REST_DON・ATTACH_DON・ACTIVE_DON（target 無し）・FREEZE_DON・MOVE_ATTACHED_DON（DB 未使用の MODIFY_DON_PHASE は不要）＋**ドン!!を対象に取るクエリ**（`TargetRef::Don`＝COST_AREA 3 件・CHAR_OR_DON 2 件。resolver の `only_cards_strict` 3 か所をドン!!込みに広げる＝この群だけ `resolver.rs` の当該経路を所有） | 979／1,273 | `player_level.return_don/ramp_don/rest_don/freeze_don/active_don_by_count/move_attached_don`・`per_target.attach_don`・`resolver._suspend_for_don_selection` |
+| E 置換とルール | `rules.rs` | REPLACE_EFFECT・PREVENT_LEAVE（`active_protection`／`find_replacement`／`active_replacement`／`_register_granted_replacements` の本体＝`mod.rs` の高速路を置き換える・戦闘 KO 置換の中断）・RULE_PROCESSING・RESTRICTION・REDIRECT_ATTACK・VICTORY・EXTRA_TURN＋P2 の積み残し（【カウンター】イベント・イベントの登場・アタック税）。DB 未使用の KEYWORD／PASSIVE_EFFECT／GRANT_EFFECT／LOCK／OTHER は `Unimplemented` 可 | 710／917 | `engine/guards.py`・`player_level.rule_processing_self_restriction/redirect_attack/extra_turn/victory`・`battle.py` の置換分岐 |
+
+複数群に跨るカードは 685 枚（統合時にコーディネータが全カード監査で受け入れる）。5 群＋F で 2,472 枚を覆う。
+
+**所有範囲**: 各群は自分の `actions/<群>.rs` と、必要なら `ops.rs` への原始操作の**追加**（既存の変更は不可）。
+`actions/mod.rs` は触らない（ヘルパの可視化 `pub(super)` 化だけ許可＝1 行単位）。群 D のみ `resolver.rs` の
+ドン!!対象経路（`only_cards_strict` 3 か所）を所有。群 E のみ `actions/mod.rs` の `active_protection`／
+`find_replacement`／`active_replacement`（高速路）を本体に置き換えてよい。それ以外の `resolver.rs`／
+`interact.rs`／`triggers.rs`／`model.rs` の変更が要るときは RESULT.json の notes で申告し、統合時に
+コーディネータが入れる（複数群で同じ箇所を変えると衝突するため）。
+
+**受け入れ（共通）**: `rs_audit_replay.py --action-types <F と群の ActionType>` で群の集合が全一致
+（mismatch=0・unimplemented=0・上表の枚数）／退行 4 本（F の監査 634 枚・バニラ再生 20 局・状態 5 局・
+問合せ 40 局面）が一致／cargo test・clippy・make test green。不一致は Python が正（Python の欠陥は直さず
+notes に書く）。
+
+**指示書（群 X＝A〜E。`<...>` を上表で埋める）**
+
+```
+Rust エンジン移行 P3 の群 <X>（<群名>）を実装してください。計画 docs/rust_engine_plan.md §11.7
+（差し口と所有範囲）。本線 claude/cpu-spec-improvements-yw91jd から分岐し、claude/rs-p3-<file 名> に
+push、PR は作りません。Python 側（opcg_sim/）は変更しない。Python 版が正＝不一致は Rust を直す。
+Python 側の欠陥と判断した場合は直さず RESULT.json の notes に盤面と path を書く。
+
+やること:
+1. rust/opcg_engine/src/effects/actions/<file>.rs の 3 入口（game_handler／owns_target／apply_target）を
+   本物にする。担当 ActionType は §11.7 の表の <X> 行。Python の対応関数を 1 つずつ読み、同じ意味論で
+   移す（guard=`when` の偽は None で対象ループへ）。原始操作が足りなければ ops.rs に追加（既存は変更不可）。
+2. actions/mod.rs は触らない（ヘルパの pub(super) 化のみ可）。<群 D: resolver.rs の only_cards_strict 3 か所を
+   TargetRef::Don 込みに広げる／群 E: mod.rs の active_protection・find_replacement・active_replacement を
+   本体に置き換える> 以外に resolver/interact/triggers/model を変えたいときは notes に申告し、変更しない。
+3. cargo test: 担当 ActionType ごとに Python の挙動を 1 件ずつ転記した単体（testkit の BoardBuilder）。
+   clippy -D warnings 0。
+4. maturin で wheel を作り、監査オラクルを回して不一致を潰す:
+   OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_audit_replay.py \
+     --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF,<群の ActionType をカンマ区切り>
+   → cards=<枚数>・abilities=<能力数>・mismatch=0・unimplemented=0
+5. 退行: 同 --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF → 817 能力一致／rs_diff_replay.py --mode replay
+   --vanilla --games 20 --seed-base 1<X>00000 → match=20／--mode state --games 5 → match=5／
+   rs_query_oracle.py --boards 40 --seed-base 1<X>10000 → mismatch=0。
+6. docs/rust_engine_plan.md §8 に結果行、§11.7 の表の <X> 行に「完了」と実測値。make test green。
+RESULT.json: {"job":"rs-p3-<file>","status":"done","audit":{...RS_AUDIT...},"regress":{...},
+ "notes":"..."} を push。
+```

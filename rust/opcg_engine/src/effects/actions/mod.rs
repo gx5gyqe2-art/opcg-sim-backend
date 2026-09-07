@@ -21,6 +21,13 @@
 //! Python が同じ関数に登録している別名（`DISCARD` と `TRASH`／`ACTIVE` と `ACTIVE_DON`）は
 //! 同じハンドラへ載せる——分けると Python と挙動が変わるため。
 
+// 群 A〜E の差し口（§11.7）。各群は自分のファイルだけを編集し、`mod.rs` は触らない。
+pub mod don;
+pub mod flow;
+pub mod rules;
+pub mod status;
+pub mod zone;
+
 use crate::journal::{CardBoolField, CardI32Field, CardStrsField, CardZone, DonZone, Session};
 use crate::model::{
     CardIdx, CardType, ContinuousKind, MasterTable, Position, Seat, Zone,
@@ -132,7 +139,20 @@ pub fn apply_action(
     if let Some(handler) = game_handler_for(action) {
         return match handler {
             GameHandler::Draw => draw(s, masters, actor, action, value),
-            GameHandler::Unregistered => Err(unimplemented(action.ty)),
+            GameHandler::Unregistered => {
+                // 群 A〜E の差し口（担当する群が `Some` を返す。誰も返さなければ未実装のまま）。
+                type GroupGame = fn(&mut Session, &MasterTable, Seat, &GameAction, &NodeRef, &[CardIdx], i32, Option<CardIdx>) -> Option<Result<bool, EngineError>>;
+                const GROUPS: &[GroupGame] = &[
+                    status::game_handler, zone::game_handler, flow::game_handler,
+                    don::game_handler, rules::game_handler,
+                ];
+                for g in GROUPS {
+                    if let Some(r) = g(s, masters, actor, action, node_ref, targets, value, source_card) {
+                        return r;
+                    }
+                }
+                Err(unimplemented(action.ty))
+            }
         };
     }
     run_target_loop(s, masters, actor, action, node_ref, targets, value, source_card)
@@ -151,7 +171,24 @@ pub fn run_target_loop(
     source_card: Option<CardIdx>,
 ) -> Result<bool, EngineError> {
     let handler = target_handler_for(action.ty);
-    if handler.is_none() {
+    // 群 A〜E の差し口: 土台に無い種別は、担当する群があればその `apply_target` へ 1 対象ずつ渡す。
+    type GroupTarget = fn(&mut Session, &MasterTable, Seat, &GameAction, CardIdx, Seat, Option<CardZone>, i32, Option<CardIdx>) -> Result<(), EngineError>;
+    let group: Option<GroupTarget> = if handler.is_some() {
+        None
+    } else if status::owns_target(action.ty) {
+        Some(status::apply_target)
+    } else if zone::owns_target(action.ty) {
+        Some(zone::apply_target)
+    } else if flow::owns_target(action.ty) {
+        Some(flow::apply_target)
+    } else if don::owns_target(action.ty) {
+        Some(don::apply_target)
+    } else if rules::owns_target(action.ty) {
+        Some(rules::apply_target)
+    } else {
+        None
+    };
+    if handler.is_none() && group.is_none() {
         // Python は「未登録は no-op」だが、Rust は明示エラー（モジュール docstring 参照）。
         // 対象が 0 枚でも同じ（黙って成功にしない）。
         return Err(unimplemented(action.ty));
@@ -188,12 +225,15 @@ pub fn run_target_loop(
                 continue;
             }
         }
-        match handler.as_ref().expect("checked above") {
-            TargetHandler::Ko => ko(s, masters, actor, *target, owner, source_card)?,
-            TargetHandler::Discard => discard(s, masters, *target, owner)?,
-            TargetHandler::Rest => rest(s, masters, actor, *target, source_card)?,
-            TargetHandler::Active => active(s, *target, owner),
-            TargetHandler::Buff => buff(s, masters, action, *target, value)?,
+        match handler.as_ref() {
+            Some(TargetHandler::Ko) => ko(s, masters, actor, *target, owner, source_card)?,
+            Some(TargetHandler::Discard) => discard(s, masters, *target, owner)?,
+            Some(TargetHandler::Rest) => rest(s, masters, actor, *target, source_card)?,
+            Some(TargetHandler::Active) => active(s, *target, owner),
+            Some(TargetHandler::Buff) => buff(s, masters, action, *target, value)?,
+            None => group.expect("checked above")(
+                s, masters, actor, action, *target, owner, source_list, value, source_card,
+            )?,
         }
     }
     Ok(success)
