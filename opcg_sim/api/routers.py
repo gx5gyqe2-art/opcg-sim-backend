@@ -20,8 +20,6 @@ except Exception:
     firestore = None
 
 from .schemas import BattleActionRequest
-from opcg_sim.src.core.gamestate import Player, GameManager
-from opcg_sim.src.core import action_api
 from opcg_sim.src.core.sandbox import SandboxManager
 from opcg_sim.api import decide_client
 from .config import CONST, IMAGE_VERSION, REPLAY_SCHEMA, constants_hash, SCHEMA_HASH
@@ -32,7 +30,8 @@ from .ws import ws_manager, game_ws_manager, broadcast_rule_state
 from .services import decks as deck_svc
 from .services.replay import (_replay_enabled, _replay_record_action, _capture_final_winner,
                               _replay_record_frame)
-from .services.games import _resolve_first_player
+from .services.games import _resolve_first_player_seat
+from .engine_rs import RsGame
 from .services.cpu_driver import _kick_ponder, _kick_speculate, _cached_cpu_move
 
 _logger = logging.getLogger("opcg.api")
@@ -69,8 +68,8 @@ async def game_create(req: Any = Body(...)):
         # CPU 対戦時は p2 を CPU とし、デッキは cpu_deck（無指定なら p2_deck）を使う。
         if vs_cpu and req.get("cpu_deck"):
             p2_source = req.get("cpu_deck")
-        p1_leader, p1_cards = deck_svc.load_deck_mixed(p1_source, req.get("p1_name", "P1")); p2_leader, p2_cards = deck_svc.load_deck_mixed(p2_source, req.get("p2_name", "P2"))
-        player1 = Player(req.get("p1_name", "P1"), p1_cards, p1_leader); player2 = Player(req.get("p2_name", "P2"), p2_cards, p2_leader)
+        p1_name = req.get("p1_name", "P1"); p2_name = req.get("p2_name", "P2")
+        p1_leader, p1_cards = deck_svc.load_deck_mixed(p1_source, p1_name); p2_leader, p2_cards = deck_svc.load_deck_mixed(p2_source, p2_name)
         # リプレイ種（opt-in）: cpu_trace 指定時のみ seed を固定し、コイントス＋シャッフルを再現可能にする。
         # 未指定の本番対局は seed を触らない＝従来の乱数挙動を完全に維持する。
         cpu_trace = bool(req.get("cpu_trace", False)) and vs_cpu
@@ -79,8 +78,11 @@ async def game_create(req: Any = Body(...)):
             replay_seed = int(req.get("seed")) if req.get("seed") is not None else random.randrange(2**63)
             random.seed(replay_seed)
         # 先行プレイヤー: ソロは "p1"/"p2"、CPU は "random"（コイントス）。未指定は既定。
-        first_player = _resolve_first_player(req.get("first_player"), player1, player2)
-        manager = GameManager(player1, player2); manager.start_game(first_player); GAMES[game_id] = manager
+        # 乱数の消費位置は Python 版と同じ（コイントス → デッキシャッフル）＝種から再現できる。
+        first_player = _resolve_first_player_seat(req.get("first_player"))
+        manager = RsGame.create(p1_name, p2_name, p1_leader, p1_cards, p2_leader, p2_cards,
+                                first_player, card_db=card_db)
+        GAMES[game_id] = manager
         if vs_cpu:
             # CPU は **learned（Gen2 学習型・NN誘導MCTS）** が既定。**hard**（α-β＋ビーム＋PIMC）も選択可。
             # モデル未同梱環境（`cpu_learned.available()` が False）では learned を hard へ安全フォールバック。
@@ -89,19 +91,20 @@ async def game_create(req: Any = Body(...)):
                 difficulty = "learned"
             if difficulty == "learned" and not _learned_available():
                 difficulty = "hard"
-            CPU_GAMES[game_id] = {"cpu_player_id": player2.name, "difficulty": difficulty}
+            CPU_GAMES[game_id] = {"cpu_player_id": p2_name, "difficulty": difficulty}
             if cpu_trace:
                 # リプレイ種＋思考ログの器を用意する（opt-in 時のみ）。
                 CPU_GAMES[game_id].update({
                     "cpu_trace": True, "seed": replay_seed,
-                    "first_player": first_player.name if first_player else None,
+                    "first_player": manager.turn_player_name,
                     "leaders": {"p1": p1_leader.master.card_id if p1_leader else None,
                                 "p2": p2_leader.master.card_id if p2_leader else None},
                     "decks": {"p1": [ci.master.card_id for ci in p1_cards],
                               "p2": [ci.master.card_id for ci in p2_cards]},
                     "actions": [], "decisions": [],
                 })
-                _replay_record_frame(CPU_GAMES[game_id], manager)  # フレーム0＝セットアップ直後の初期盤面
+                # フレーム0＝セットアップ直後の初期盤面
+                _replay_record_frame(CPU_GAMES[game_id], manager.py_manager())
         return build_game_result_hybrid(manager, game_id)
     except Exception as e:
         return {"success": False, "game_id": "", "error": {"message": str(e)}}
@@ -116,15 +119,17 @@ async def game_action(req: Dict[str, Any] = Body(...)):
     if not manager: return build_game_result_hybrid(None, game_id, success=False, error_code=error_codes.get('GAME_NOT_FOUND', 'GAME_NOT_FOUND'), error_msg="指定されたゲームが見つかりません。")
     payload = req.get("payload") or req.get("full_payload") or {}
     try:
-        manager.action_events = []
-        # ディスパッチは action_api（CPU ドライバ・自己対戦ランナーと同一コアパス）へ委譲する。
-        current_player = manager.p1 if player_id == manager.p1.name else manager.p2
+        manager.action_events = []   # 1 要求ぶんのイベントログ（例外で抜けたときの応答にも効く）
         _meta = CPU_GAMES.get(game_id)
         _src = "cpu" if (_meta and player_id == _meta.get("cpu_player_id")) else "human"
-        _replay_record_action(_meta, manager, _src, player_id, {"action_type": action_type, "payload": payload})
-        action_api.apply_game_action(manager, current_player, action_type, payload)
+        if _replay_enabled(_meta):   # 記述は Python のオブジェクトを要る＝暫定経路で組む（opt-in のみ）
+            _replay_record_action(_meta, manager.py_manager(), _src, player_id,
+                                  {"action_type": action_type, "payload": payload})
+        # 裁定は Rust エンジン（`engine_rs.RsGame`＝旧 `action_api.apply_game_action`）。
+        manager.apply_game_action(player_id, action_type, payload)
         _capture_final_winner(_meta, manager)
-        _replay_record_frame(_meta, manager)
+        if _replay_enabled(_meta):
+            _replay_record_frame(_meta, manager.py_manager())
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
         _kick_ponder(game_id)     # ⑥-a: 制御が CPU へ移ったら次手番の計画を前倒し（既定 OFF）
@@ -155,15 +160,17 @@ async def game_battle(req: BattleActionRequest):
     game_id = req.game_id; player_id = req.player_id; action_type = req.action_type; card_uuid = req.card_uuid
     manager = GAMES.get(game_id); error_codes = CONST.get('ERROR_CODES', {})
     if not manager: return build_game_result_hybrid(None, game_id, success=False, error_code=error_codes.get('GAME_NOT_FOUND', 'GAME_NOT_FOUND'), error_msg="Game not found")
-    player = manager.p1 if player_id == manager.p1.name else manager.p2
     try:
         manager.action_events = []
         _meta = CPU_GAMES.get(game_id)
         _src = "cpu" if (_meta and player_id == _meta.get("cpu_player_id")) else "human"
-        _replay_record_action(_meta, manager, _src, player_id, {"action_type": action_type, "card_uuid": card_uuid})
-        action_api.apply_battle_action(manager, player, action_type, card_uuid)
+        if _replay_enabled(_meta):
+            _replay_record_action(_meta, manager.py_manager(), _src, player_id,
+                                  {"action_type": action_type, "card_uuid": card_uuid})
+        manager.apply_battle_action(player_id, action_type, card_uuid)
         _capture_final_winner(_meta, manager)
-        _replay_record_frame(_meta, manager)
+        if _replay_enabled(_meta):
+            _replay_record_frame(_meta, manager.py_manager())
         result = build_game_result_hybrid(manager, game_id, success=True)
         await broadcast_rule_state(game_id)
         _kick_ponder(game_id)
@@ -189,7 +196,6 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg="このゲームは CPU 対戦ではありません。")
 
     cpu_pid = meta["cpu_player_id"]; difficulty = meta.get("difficulty", "hard")
-    cpu_player = manager.p1 if manager.p1.name == cpu_pid else manager.p2
 
     def _waiting_for() -> str:
         if manager.winner:
@@ -217,12 +223,17 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                         pass
                 trace_on = _replay_enabled(meta)
                 tr = {} if trace_on else None
+                # 暫定 CPU 経路（計画 §15.1）: 裁定は Rust だが `decide` はまだ Python なので、
+                # Rust の盤面を `hidden` で取り出して `GameManager` を組み、それに読ませる。
+                # P4 の `rs-p4-mcts` が入ったら Rust の `decide` に差し替える。
+                py_mgr = manager.py_manager()
+                cpu_player = py_mgr.p1 if py_mgr.p1.name == cpu_pid else py_mgr.p2
                 move = None
                 # Phase 3 ① 計画キャッシュ（OPCG_PLAN_CACHE=1・本番体感最適化・既定 OFF）。
                 if os.environ.get("OPCG_PLAN_CACHE", "0") == "1" and not trace_on:
-                    move = _cached_cpu_move(manager, cpu_player, difficulty, meta, turn_mem)
+                    move = _cached_cpu_move(py_mgr, cpu_player, difficulty, meta, turn_mem)
                 if move is None:
-                    move = decide_client.decide(manager, cpu_player, difficulty, mem=turn_mem,
+                    move = decide_client.decide(py_mgr, cpu_player, difficulty, mem=turn_mem,
                                                 trace=tr, trace_read_ahead=False)
                 if move is not None:
                     if trace_on:
@@ -230,15 +241,13 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                         meta.setdefault("decisions", []).append(
                             {"turn": manager.turn_count, "player": cpu_pid,
                              "action_index": len(meta.get("actions", [])), **tr})
-                        _replay_record_action(meta, manager, "cpu", cpu_pid, {
+                        _replay_record_action(meta, py_mgr, "cpu", cpu_pid, {
                             "action_type": move["action_type"], "card_uuid": move.get("card_uuid"),
                             "payload": move.get("payload")})
-                    if move["kind"] == "battle":
-                        action_api.apply_battle_action(manager, cpu_player, move["action_type"], move.get("card_uuid"))
-                    else:
-                        action_api.apply_game_action(manager, cpu_player, move["action_type"], move.get("payload", {}))
+                    manager.apply_move(cpu_pid, move)
                     _capture_final_winner(meta, manager)
-                    _replay_record_frame(meta, manager)
+                    if trace_on:
+                        _replay_record_frame(meta, manager.py_manager())
                     cpu_acted = True
                     cpu_event = manager.action_events[0] if manager.action_events else {"action": move["action_type"]}
         result = build_game_result_hybrid(manager, game_id, success=True)
@@ -510,11 +519,10 @@ async def rule_action(req: Dict[str, Any] = Body(...)):
             materialize_all_cards()
             p1_leader, p1_cards = deck_svc.load_deck_mixed(room["decks"]["p1"], "p1")
             p2_leader, p2_cards = deck_svc.load_deck_mixed(room["decks"]["p2"], "p2")
-            player1 = Player("p1", p1_cards, p1_leader); player2 = Player("p2", p2_cards, p2_leader)
             # 対戦モードの先行はランダム（コイントス）。結果は turn_info で両クライアントへ broadcast。
-            first_player = random.choice([player1, player2])
-            manager = GameManager(player1, player2); manager.start_game(first_player)
-            GAMES[game_id] = manager
+            first_player = random.choice(["p1", "p2"])
+            GAMES[game_id] = RsGame.create("p1", "p2", p1_leader, p1_cards, p2_leader, p2_cards,
+                                           first_player, card_db=card_db)
             room["status"] = "PLAYING"
         else:
             return {"success": False, "error": f"Unknown rule action: {act}"}

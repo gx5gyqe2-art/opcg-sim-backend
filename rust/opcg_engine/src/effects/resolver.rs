@@ -23,8 +23,11 @@
 //! | [`Resolver::maybe_suspend_arrange`] | `_maybe_suspend_arrange` |
 //! | [`super::interact`] | `_suspend_*`／`resume_*`（中断と再開） |
 //!
-//! **移していないもの**: `_log_execution_report`／`_log_failure_snapshot`／`action_history`
-//! （デバッグ出力・`action_events` 用で盤面には出ない＝指示書で「不要」とされている）。
+//! **移していないもの**: `_log_execution_report`／`_log_failure_snapshot`
+//! （デバッグ出力で盤面にも API にも出ない）。`action_history` は §15（対戦 API の Rust 化）で
+//! 移した——フロントの `EffectToast`／eventLog が読む `action_events` の `EFFECT` 行の素材で、
+//! Python の 3 か所（`gamestate.resolve_ability`／`turn_flow` の遅延フラッシュ／
+//! `interaction.resolve_interaction` の末尾）が同じ形へ写す。
 //!
 //! ## 実行スタックの持ち方
 //!
@@ -32,6 +35,8 @@
 //! 木を所有せず [`NodeRef`]（能力 index＋根＋子添字列）で指す。中断の continuation にも
 //! `NodeRef` の列を入れる＝再開時に木を再構築せずに済み、`id(node)` の同一性（任意効果の
 //! 確認済み集合・コスト句判定）も `NodeRef` の等値で表せる。
+
+use serde_json::Value;
 
 use crate::journal::Session;
 use crate::model::{
@@ -157,7 +162,58 @@ pub fn game_resolve_ability(
         return Ok(());
     }
     let mut resolver = Resolver::new();
-    resolver.resolve_ability(s, masters, actor, source_card, ability_index, cost_confirmed)
+    resolver.resolve_ability(s, masters, actor, source_card, ability_index, cost_confirmed)?;
+    // Python `gamestate.resolve_ability` の末尾: 継続効果の再計算（`_apply_passive_effects`）中は
+    // イベントを発行しない（同じバフを載せ直す内部処理で eventLog が膨張するため・§15.1）。
+    if !s.state().in_passive_recalc {
+        resolver.flush_events(s, masters, actor, source_card);
+    }
+    Ok(())
+}
+
+/// `resolver.action_history` を `action_events` の `EFFECT` 行へ写す（Python の 3 か所が
+/// 同じ 8 行を書き写しているので、Rust では 1 か所にまとめて 3 か所から呼ぶ）。
+///
+/// 形は Python のまま: `{type, player, card_name, action, targets, value, success[, dest]}`。
+pub fn push_effect_events(
+    s: &mut Session,
+    masters: &MasterTable,
+    actor: Seat,
+    source: CardIdx,
+    history: &[Value],
+) {
+    if history.is_empty() {
+        return;
+    }
+    let card_name = masters.get(s.state().card(source).master).name.clone();
+    for ev in history {
+        let mut o = serde_json::Map::new();
+        o.insert("type".into(), Value::from("EFFECT"));
+        o.insert("player".into(), Value::from(actor.name()));
+        o.insert("card_name".into(), Value::from(card_name.clone()));
+        o.insert(
+            "action".into(),
+            ev.get("action").cloned().unwrap_or_else(|| Value::from("")),
+        );
+        o.insert(
+            "targets".into(),
+            ev.get("targets")
+                .cloned()
+                .unwrap_or_else(|| Value::Array(Vec::new())),
+        );
+        o.insert("value".into(), ev.get("value").cloned().unwrap_or(Value::Null));
+        o.insert(
+            "success".into(),
+            ev.get("success").cloned().unwrap_or(Value::Bool(true)),
+        );
+        // 移動系の行き先（無い action は省略＝Python の `**({"dest": ..} if ev.get("dest") else {})`）。
+        if let Some(dest) = ev.get("dest") {
+            if !dest.is_null() {
+                o.insert("dest".into(), dest.clone());
+            }
+        }
+        s.push_event(Value::Object(o));
+    }
 }
 
 /// Python `EffectResolver`（実行スタック＋文脈）。
@@ -165,6 +221,9 @@ pub fn game_resolve_ability(
 pub struct Resolver {
     pub execution_stack: Vec<NodeRef>,
     pub context: EffectContext,
+    /// Python `EffectResolver.action_history`（実行したアクションの履歴）。
+    /// フロントへ返す `action_events` の `EFFECT` 行の素材（§15.1）。
+    pub action_history: Vec<Value>,
 }
 
 impl Resolver {
@@ -172,6 +231,7 @@ impl Resolver {
         Resolver {
             execution_stack: Vec::new(),
             context: EffectContext::new(),
+            action_history: Vec::new(),
         }
     }
 
@@ -180,7 +240,16 @@ impl Resolver {
         Resolver {
             execution_stack,
             context,
+            action_history: Vec::new(),
         }
+    }
+
+    /// Python `gamestate.resolve_ability`／`turn_flow`／`interaction` の共通の写し取り＝
+    /// `resolver.action_history` を `action_events` の `EFFECT` 行へ積む。
+    ///
+    /// 形は Python のまま: `{type, player, card_name, action, targets, value, success[, dest]}`。
+    pub fn flush_events(&self, s: &mut Session, masters: &MasterTable, actor: Seat, source: CardIdx) {
+        push_effect_events(s, masters, actor, source, &self.action_history);
     }
 
     // -- 発動（Python `resolve_ability`）-------------------------------------
@@ -669,6 +738,12 @@ impl Resolver {
 
         if let Some(query) = action.target.as_ref() {
             if targets.is_empty() && !query.is_up_to {
+                // Python の失敗履歴（`{"action":..,"success":False,"reason":"No targets found"}`）。
+                self.action_history.push(serde_json::json!({
+                    "action": action.ty.name(),
+                    "success": false,
+                    "reason": "No targets found",
+                }));
                 return Ok(false);
             }
         }
@@ -788,6 +863,31 @@ impl Resolver {
             }
             self.context.prev_action_count = Some(cnt);
         }
+
+        // Python の実行履歴（`action_history`）。ドン!!（master 無し）は "DON!!" 表記。
+        let target_names: Vec<Value> = targets
+            .iter()
+            .map(|t| match *t {
+                TargetRef::Card(c) => {
+                    let card = s.state().card(c);
+                    let uuid: String = card.uuid.chars().take(4).collect();
+                    Value::from(format!("{}({uuid})", masters.get(card.master).name))
+                }
+                TargetRef::Don(d) => {
+                    let uuid: String = s.state().don(d).uuid.chars().take(4).collect();
+                    Value::from(format!("DON!!({uuid})"))
+                }
+            })
+            .collect();
+        let mut entry = serde_json::Map::new();
+        entry.insert("action".into(), Value::from(action.ty.name()));
+        entry.insert("success".into(), Value::Bool(success));
+        entry.insert("targets".into(), Value::Array(target_names));
+        entry.insert("value".into(), Value::from(value));
+        if let Some(dest) = action.destination {
+            entry.insert("dest".into(), Value::from(dest.name()));
+        }
+        self.action_history.push(Value::Object(entry));
 
         Ok(success)
     }

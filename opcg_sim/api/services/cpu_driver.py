@@ -18,6 +18,20 @@ from opcg_sim.api import decide_client
 from ..state import GAMES, CPU_GAMES
 
 
+def _py_snapshot(manager):
+    """live 盤面から **Python の `GameManager` スナップショット**を得る（先読み計画の作業用）。
+
+    対局本体は Rust エンジン（`engine_rs.RsGame`・計画 §15）になったが、CPU の `decide`／
+    `plan_turn` はまだ Python のオブジェクトを要る。`RsGame.py_manager()` は記録 v5 の
+    `hidden` から**独立した**マネージャを組むので、従来の `manager.clone()`（deepcopy）と
+    同じく「live 盤面に触れない隔離スナップショット」として使える。
+    テストが `GAMES` へ生の `GameManager` を差し込む経路（`tests/test_plan_cache.py`）も
+    そのまま動くよう、`py_manager` を持たない相手には `clone()` を使う。
+    """
+    to_py = getattr(manager, "py_manager", None)
+    return to_py() if to_py is not None else manager.clone()
+
+
 def _ponder_enabled() -> bool:
     """Phase 3 ⑥-a 先行計画（pondering）の作動条件。①計画キャッシュ配下のオプトイン（既定 OFF・
     本番体感最適化のみ）。OPCG_PLAN_CACHE=1（①の replay 経路）かつ OPCG_PONDER=1 のとき作動。"""
@@ -52,7 +66,7 @@ async def _ponder_plan(game_id: str) -> None:
         # live 盤面をそのまま OS スレッドへ渡すと、スレッド側の deepcopy（plan_turn 内 clone / ワーカーへの
         # pickle）がメインスレッドの盤面変更と競合する（読み取り中の書き換え）。**メインスレッドで原子的に
         # clone**してから渡し、スレッドは隔離されたスナップショットだけに触れる（_kick_speculate と同方針）。
-        snap = manager.clone()
+        snap = _py_snapshot(manager)
         cpu_player = snap.p1 if snap.p1.name == cpu_pid else snap.p2
         actions = await asyncio.to_thread(
             _plan_segment, snap, cpu_player, difficulty, mem=turn_mem)
@@ -82,8 +96,9 @@ def _kick_ponder(game_id: str) -> None:
     # （CPU 初手の待ちすら消える）。外れ/未完なら下の ⑥-a（実盤面の先行計画）へ。合法性ゲートが採否を担保。
     spec = cache.pop("spec_queue", None)
     if spec:
-        cpu_player = manager.p1 if manager.p1.name == cpu_pid else manager.p2
-        legal_sigs = {cpu_ai._move_sig(m) for m in manager.get_legal_actions(cpu_player)}
+        snap = _py_snapshot(manager)
+        cpu_player = snap.p1 if snap.p1.name == cpu_pid else snap.p2
+        legal_sigs = {cpu_ai._move_sig(m) for m in snap.get_legal_actions(cpu_player)}
         if cpu_ai._move_sig(spec[0]) in legal_sigs:
             cache["queue"] = spec
             cache["spec_hits"] = cache.get("spec_hits", 0) + 1
@@ -159,12 +174,12 @@ def _kick_speculate(game_id: str) -> None:
         return
     cache = meta.setdefault("plan_cache", {})
     try:
-        clone = manager.clone()  # メインスレッドで原子的に隔離＝以降 task が触れても競合しない
+        clone = _py_snapshot(manager)  # メインスレッドで原子的に隔離＝以降 task が触れても競合しない
     except Exception:
         return
     gen = cache.get("spec_gen", 0) + 1
     cache["spec_gen"] = gen
-    human_pid = manager.p1.name if manager.p1.name != cpu_pid else manager.p2.name
+    human_pid = clone.p1.name if clone.p1.name != cpu_pid else clone.p2.name
     try:
         cache["spec_task"] = asyncio.create_task(_speculate_plan(game_id, clone, human_pid, gen))
     except RuntimeError:

@@ -340,6 +340,11 @@ class Recorder:
     def on_step(self, ctx, move, events):
         step = self._pending_move or {"index": len(self.steps), "actor": ctx.actor.name, "move": move}
         step["state"] = board_dict(ctx.manager)
+        # v5 additive（計画 §15.3）: この行動で積まれたイベントログ（`manager.action_events`）。
+        # フロント（`EffectToast`／eventLog）が読む契約なので、Rust も**同じ dict を同じ順序**で
+        # 積む必要がある。`run_game` が action ごとに `manager.action_events = []` してから
+        # 適用し、その結果を `events` として渡してくる。
+        step["events"] = [dict(e) for e in (events or [])]
         # v4: この段で混ぜられたデッキの持ち主（重複は落とし、出現順を保つ）。
         owners = self.watcher.take() if self.watcher is not None else []
         step["shuffled"] = list(dict.fromkeys(owners))
@@ -413,6 +418,27 @@ def first_diff(expected, actual, path="") -> str:
     return "" if expected == actual else (path or "<root>")
 
 
+def mask_shuffled_targets(events, shuffled) -> list:
+    """シャッフルを挟んだ段のイベントの `targets` を**枚数だけ**に潰す（照合の前処理）。
+
+    再生の規約（計画 §6／§10.2 の 3）では Rust は `random.shuffle` を**再現しない**——
+    その段の並びは、行動が終わってから記録の `hidden` で取り直す。よって「混ぜた直後に
+    引いた／見た」カードの**実体**は Python と一致しようがない（盤面は再同期で一致する）。
+    枚数・アクション・成否・値は照合を続け、実体の識別子だけを外す。
+
+    `shuffled` が空の段（大多数）は何も変えない＝そのまま完全一致で照合する。
+    """
+    if not shuffled:
+        return events
+    out = []
+    for e in (events or []):
+        e = dict(e)
+        if "targets" in e:
+            e["targets"] = f"<{len(e['targets'] or [])} targets after shuffle>"
+        out.append(e)
+    return out
+
+
 def _strip_request_id(board: dict) -> dict:
     """`pending_request.request_id` はフロント専用の sha1（候補 to_dict を含む Python 固有の
     正規化 JSON のハッシュ）なので照合から外す。それ以外（player_id/action/message/
@@ -451,6 +477,21 @@ def compare(record: dict, replayed: dict) -> dict:
                 continue
             if sorted(map(_norm, e)) != sorted(map(_norm, g)):
                 return {"status": "mismatch", "action": i, "path": f"legal[{i}]"}
+    events = replayed.get("events")
+    if isinstance(events, list):  # v5 additive: イベントログ（**順序込み**で照合・計画 §15.3）
+        exp_events = [s.get("events") for s in record["steps"]]
+        if len(events) != len(exp_events):
+            return {"status": "mismatch", "action": min(len(events), len(exp_events)),
+                    "path": f"events[len {len(exp_events)}!={len(events)}]"}
+        for i, (e, g) in enumerate(zip(exp_events, events)):
+            if e is None:
+                continue
+            shuffled = record["steps"][i].get("shuffled")
+            e = mask_shuffled_targets(e, shuffled)
+            g = mask_shuffled_targets(g, shuffled)
+            if _norm(e) != _norm(g):
+                return {"status": "mismatch", "action": i,
+                        "path": f"events[{i}]" + (first_diff(canon(e), canon(g)) or "")}
     return {"status": "match"}
 
 

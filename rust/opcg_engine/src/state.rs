@@ -164,6 +164,7 @@ pub fn replay(json_str: &str) -> Result<String, EngineError> {
 
     let mut states: Vec<Value> = Vec::with_capacity(steps.len());
     let mut legals: Vec<Value> = Vec::with_capacity(steps.len());
+    let mut events: Vec<Value> = Vec::with_capacity(steps.len());
     for (i, step) in steps.iter().enumerate() {
         let at = |e: EngineError| -> EngineError {
             match e {
@@ -183,7 +184,11 @@ pub fn replay(json_str: &str) -> Result<String, EngineError> {
         let mv = step
             .get("move")
             .ok_or_else(|| EngineError::BadPayload(format!("step {i}: 'move' が無い")))?;
+        // イベントログ（`action_events`）は 1 行動ぶんずつ＝Python の API ハンドラ／
+        // `game_driver.run_game` と同じく**適用の直前にリセット**する（§15.3 のオラクル）。
+        session.reset_events();
         rules::actions::apply_move(&mut session, masters, actor, mv).map_err(at)?;
+        events.push(Value::Array(session.action_events().to_vec()));
 
         // 乱数（`random.shuffle`）を消費した段は、記録の並びを採り直す（記録 v4・§11.2）。
         for seat in shuffled_owners(step).map_err(at)? {
@@ -211,6 +216,7 @@ pub fn replay(json_str: &str) -> Result<String, EngineError> {
         "version": RECORD_VERSION,
         "states": states,
         "legal": legals,
+        "events": events,
     }))
     .map_err(|e| EngineError::BadPayload(format!("replay: cannot serialize states: {e}")))
 }
@@ -295,6 +301,7 @@ pub fn replay_audit_with(payload: &Value, base: &MasterTable) -> Result<String, 
             masters.get(session.state().card(source).master).card_id
         )));
     }
+    session.reset_events();
     match fire.get("kind").and_then(Value::as_str) {
         Some("play") => rules::actions::play_card_action(&mut session, masters, seat, source)?,
         Some("ability") => {
@@ -337,6 +344,7 @@ pub fn replay_audit_with(payload: &Value, base: &MasterTable) -> Result<String, 
     }
 
     let mut states: Vec<Value> = vec![audit_board(&mut session, masters)?];
+    let mut events: Vec<Value> = vec![Value::Array(session.action_events().to_vec())];
 
     // --- _smart_drain の各応答 ------------------------------------------------
     let steps = obj
@@ -369,8 +377,10 @@ pub fn replay_audit_with(payload: &Value, base: &MasterTable) -> Result<String, 
                     EngineError::BadPayload(format!("step {i}: 中断が無いのに応答が記録されている"))
                 }
             })?;
+        session.reset_events();
         rules::actions::resolve_interaction(&mut session, masters, responder, payload)
             .map_err(at)?;
+        events.push(Value::Array(session.action_events().to_vec()));
         // この応答の中でシャッフルが起きた段は、記録の並びへ取り直す（記録 v5・§11.8 #1）。
         for seat in shuffled_owners(step).map_err(at)? {
             let hidden = step.get("hidden").ok_or_else(|| {
@@ -386,6 +396,7 @@ pub fn replay_audit_with(payload: &Value, base: &MasterTable) -> Result<String, 
     serde_json::to_string(&serde_json::json!({
         "version": RECORD_VERSION,
         "states": states,
+        "events": events,
         "interactive": session.state().active_interaction().is_some(),
     }))
     .map_err(|e| EngineError::BadPayload(format!("replay_audit: cannot serialize states: {e}")))

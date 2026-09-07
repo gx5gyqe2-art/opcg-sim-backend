@@ -517,6 +517,8 @@ pub fn resolve_interaction(
         return Ok(());
     };
 
+    // 分岐ごとに作る resolver の `action_history`（共通末尾で `action_events` へ写す）。
+    let mut history: Vec<Value> = Vec::new();
     match it.kind {
         InteractionKind::SelectTarget => {
             let uuids = selected_uuids(payload);
@@ -537,12 +539,9 @@ pub fn resolve_interaction(
                 }
             }
             s.edit().pop_interaction();
-            Resolver::resumed(cont.execution_stack.clone(), ctx).process_stack(
-                s,
-                masters,
-                actor,
-                Some(source_card),
-            )?;
+            let mut resolver = Resolver::resumed(cont.execution_stack.clone(), ctx);
+            resolver.process_stack(s, masters, actor, Some(source_card))?;
+            history = resolver.action_history;
         }
         InteractionKind::SelectResource => {
             let uuids = selected_uuids(payload);
@@ -551,12 +550,9 @@ pub fn resolve_interaction(
             s.edit().pop_interaction();
             // RETURN_DON は効果の責任者（source_card の持ち主）視点で再実行する。
             let controller = s.state().card(source_card).owner;
-            Resolver::resumed(cont.execution_stack.clone(), ctx).process_stack(
-                s,
-                masters,
-                controller,
-                Some(source_card),
-            )?;
+            let mut resolver = Resolver::resumed(cont.execution_stack.clone(), ctx);
+            resolver.process_stack(s, masters, controller, Some(source_card))?;
+            history = resolver.action_history;
         }
         InteractionKind::Choice => {
             let idx = index_of(payload);
@@ -573,6 +569,7 @@ pub fn resolve_interaction(
             }
             s.edit().pop_interaction();
             resolver.process_stack(s, masters, actor, Some(source_card))?;
+            history = resolver.action_history;
         }
         InteractionKind::ConfirmOptional => {
             let accepted = accepted_of(payload);
@@ -624,6 +621,7 @@ pub fn resolve_interaction(
                     }
                 }
                 resolver.process_stack(s, masters, actor, Some(source_card))?;
+                history = resolver.action_history;
             }
         }
         InteractionKind::ArrangeDeck => {
@@ -699,12 +697,9 @@ pub fn resolve_interaction(
                     }
                 }
             }
-            Resolver::resumed(cont.execution_stack.clone(), cont.context.clone()).process_stack(
-                s,
-                masters,
-                actor,
-                Some(source_card),
-            )?;
+            let mut resolver = Resolver::resumed(cont.execution_stack.clone(), cont.context.clone());
+            resolver.process_stack(s, masters, actor, Some(source_card))?;
+            history = resolver.action_history;
         }
         InteractionKind::DeclareCost => {
             let declared = payload
@@ -719,25 +714,30 @@ pub fn resolve_interaction(
                 ctx.last_revealed_card = Some(top);
             }
             s.edit().pop_interaction();
-            Resolver::resumed(cont.execution_stack.clone(), ctx).process_stack(
-                s,
-                masters,
-                actor,
-                Some(source_card),
-            )?;
+            let mut resolver = Resolver::resumed(cont.execution_stack.clone(), ctx);
+            resolver.process_stack(s, masters, actor, Some(source_card))?;
+            history = resolver.action_history;
         }
         InteractionKind::FieldOverflowTrash | InteractionKind::ConfirmTrigger => unreachable!(),
     }
+
+    // Python `resolve_interaction` の共通末尾: 再開経路で実行したアクションも `action_events` へ
+    // 写す（記録しないと中断を挟んだ効果が「何も実行していない」ように見える・§15.1 の 3 か所目）。
+    super::resolver::push_effect_events(s, masters, actor, source_card, &history);
 
     after_resolve(s, masters)
 }
 
 /// Python `resolve_interaction` の**共通末尾**（分岐の後に必ず通る後処理）。
 pub fn after_resolve(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
+    // GAME_START 能力が中断していた場合のセットアップ再開（Python `resolve_interaction` の
+    // 共通末尾。記録の再生には現れない経路だが、対戦 API では対局生成の続きとして通る）。
     if s.state().active_interaction().is_none() && s.state().setup_phase_pending {
-        return Err(EngineError::Unimplemented(
-            "resolve_interaction: setup_phase_pending の再開（finish_setup）は記録に現れない経路".into(),
-        ));
+        crate::rules::turn::finish_setup(s, masters)?;
+        s.edit()
+            .set_mgr_bool(crate::journal::MgrBoolField::SetupPhasePending, false);
+        s.edit().set_phase(crate::model::Phase::Mulligan);
+        s.edit().clear_mulligan_done();
     }
     // ライフ公開【トリガー】/ON_LIFE_DECREASE 等のペンディング誘発を消化する。
     if s.state().active_interaction().is_none() && !s.state().pending_triggers.is_empty() {

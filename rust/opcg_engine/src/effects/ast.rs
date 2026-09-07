@@ -430,6 +430,21 @@ pub enum ZoneRef {
 }
 
 impl ZoneRef {
+    /// Python の `Zone.name`（`action_history` の `dest` に出す名前）。
+    pub fn name(self) -> &'static str {
+        match self {
+            ZoneRef::Field => "FIELD",
+            ZoneRef::Hand => "HAND",
+            ZoneRef::Deck => "DECK",
+            ZoneRef::Trash => "TRASH",
+            ZoneRef::Life => "LIFE",
+            ZoneRef::DonDeck => "DON_DECK",
+            ZoneRef::CostArea => "COST_AREA",
+            ZoneRef::Temp => "TEMP",
+            ZoneRef::Any => "ANY",
+        }
+    }
+
     pub fn from_name(s: &str) -> Option<ZoneRef> {
         Some(match s {
             "FIELD" => ZoneRef::Field,
