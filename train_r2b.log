@@ -1,0 +1,15 @@
+z専用 dir 8 本を合流（π は読まない）
+value 5139292行（val 735285） policy 2301488点（val 328787） 191s
+warm-start: /root/start.npz（hidden=192）
+ablate: ['rel']
+  ep0 step 5000/48026 mse 0.5431 ce 1.6806 1137s
+  ep0 step 10000/48026 mse 0.5399 ce 1.6807 2033s
+  ep0 step 15000/48026 mse 0.5365 ce 1.6798 2943s
+  ep0 step 20000/48026 mse 0.5337 ce 1.6795 3863s
+  ep0 step 25000/48026 mse 0.5318 ce 1.6789 4741s
+  ep0 step 30000/48026 mse 0.5297 ce 1.6783 5650s
+  ep0 step 35000/48026 mse 0.5279 ce 1.6778 6538s
+  ep0 step 40000/48026 mse 0.5265 ce 1.6775 7438s
+  ep0 step 45000/48026 mse 0.5250 ce 1.6773 8329s
+ep0 train mse 0.5241 ce 1.6770 | val v_mse 0.5277 v_sign 0.806 pi_top1 0.609 ce 1.700 8887s
+  ep0 を /root/nrel_r2b.npz に保存（暫定最良）

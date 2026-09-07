@@ -1,0 +1,21 @@
+[19:39:24] running | no progress line yet
+[19:39:27] pushed wip (running)
+[19:54:27] running | no progress line yet
+[19:54:30] pushed wip (running)
+[20:09:30] running |   ep0 step 5000/48026 mse 0.5431 ce 1.6806 1137s
+[20:09:32] pushed wip (  ep0 step 5000/48026 mse 0.5431 ce 1.6806 1137s)
+[20:24:32] running |   ep0 step 10000/48026 mse 0.5399 ce 1.6807 2033s
+[20:24:34] pushed wip (  ep0 step 10000/48026 mse 0.5399 ce 1.6807 2033s)
+[20:39:34] running |   ep0 step 15000/48026 mse 0.5365 ce 1.6798 2943s
+[20:39:36] pushed wip (  ep0 step 15000/48026 mse 0.5365 ce 1.6798 2943s)
+[20:54:36] running |   ep0 step 20000/48026 mse 0.5337 ce 1.6795 3863s
+[20:54:39] pushed wip (  ep0 step 20000/48026 mse 0.5337 ce 1.6795 3863s)
+[21:09:39] running |   ep0 step 25000/48026 mse 0.5318 ce 1.6789 4741s
+[21:09:41] pushed wip (  ep0 step 25000/48026 mse 0.5318 ce 1.6789 4741s)
+[21:24:41] running |   ep0 step 30000/48026 mse 0.5297 ce 1.6783 5650s
+[21:24:43] pushed wip (  ep0 step 30000/48026 mse 0.5297 ce 1.6783 5650s)
+[21:39:43] running |   ep0 step 35000/48026 mse 0.5279 ce 1.6778 6538s
+[21:39:45] pushed wip (  ep0 step 35000/48026 mse 0.5279 ce 1.6778 6538s)
+[21:54:45] running |   ep0 step 40000/48026 mse 0.5265 ce 1.6775 7438s
+[21:54:47] pushed wip (  ep0 step 40000/48026 mse 0.5265 ce 1.6775 7438s)
+[22:09:47] running |   ep0 step 45000/48026 mse 0.5250 ce 1.6773 8329s
