@@ -1611,6 +1611,45 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -m "not slow" -p no:cach
 （既定）で回す**。torch は任意依存＝`pip install torch --index-url https://download.pytorch.org/whl/cpu`
 （README の学習手順）。
 
+### 8.22 WP `dump-f16`（§18.5・float16/int16 の dump と memmap 読み）の結果（2026-09-07）
+
+ブランチ `claude/dump-f16-ac4oql` を本線に取り込んだ。生成（`opcg_sim/loop/record_gen.py`）は **dump v3** が
+既定（tokens／scalars float16・card_idx int16・`dump_version=3`）。読みは新規 `opcg_sim/learned/train/dump_io.py`
+の `load_dump`（波ごとに pack した .npy を `mmap_mode="r"` で開く・v2 の npz も同じ関数で読める・
+`load_dump_v2` は薄い互換）。訓練ループは `V["tok"][bi]` の形のまま `rows_f32` で float32 に上げる。
+
+| 照合 | 結果 |
+|---|---|
+| a. 生成（同 seed 6 局） | tokens は float32 の cast とビット一致（最大差 3.9e-4＝fp16 の丸め）・card_idx 完全一致 |
+| b. RSS（2 波 218,502 行） | v2 0.524 GB → v3 **0.035 GB**（V は memmap で常駐しない。残りは P/C） |
+| c. 学習（a1 から 1 エポック・torch） | val v_mse 相対差 0.09%・学習ループ +4.6%（<10%）・通しでは読み込みが速く 8.7% 短い |
+| 副産物 | npz のディスクは 8% しか縮まない（zlib が既に潰している）＝利得は RAM。fp16 の tokens から R を再計算すると `feasible` の 0.05% が反転（現行は `--ablate rel` なので無関係。R を戻すときは承知の上で） |
+
+1 波（≒100 万行）の pack は 1.18 GB。**z 窓 10 波＝11.8 GB は cgroup 14 GB でもページキャッシュに
+乗り切らず実ディスク I/O になる**＝v3 は「OOM で止まらない」ための手で、時間の手ではない。
+pack の置き場所は `--cache-dir`／`$OPCG_DUMP_CACHE`（既定 `~/.cache/opcg/dump_pack`）。
+`n1_train`／`n_mine_*` も v3 を float32 に上げて読む（指示外だが入れないと N系 c の学習が黙って fp16 で回る）。
+ゲート `make test` 437 passed（新テスト `test_dump_io.py` 8・`test_n_record_v3.py` 4）。報告
+`docs/reports/2026-09-07_dump_f16.md`・RESULT `docs/reports/2026-09-07_dump_f16.RESULT.json`。
+
+### 8.23 WP `train-torch2`（§18.6・切り出し・予算・R 確保を torch 側へ）の結果（2026-09-07）
+
+ブランチ `claude/train-torch2` を本線に取り込んだ（`dump-f16` の後。併合で numpy 経路・予算の事前計算・
+`EpochBatches` の R 計算を `rows_f32` で float32 に上げる形に揃えた）。
+
+| 項目 | 結果 |
+|---|---|
+| 内訳（4 スレッド・同機で交互に 3 回の中央値） | numpy 側 0.701 s（2.9%）→ **0.227 s（1.1%）**・holdout 2.65→0.95 s・学習ループ 24.12→**20.28 s（1.19 倍）** |
+| 損失の軌跡 | 1 スレッドでは §8.21 の経路と 895 ステップ全部**ビット一致**。4 スレッドは torch の `index_add_` の加算順が非決定で、同じコード同士でも 1.12 ずれる（新旧の差 0.43 はその下限内） |
+| 予算 `C["budget"]` | 全 643,652 行で従来の `budget_feats` とビット一致（事前計算 0.22 s） |
+| numpy 経路 | holdout 指標が 16 桁一致・時間差は振れ幅内 |
+| 目標 20 s | **未達**（§8.21 の土俵に換算して 29.2 s 相当）。残る 19.8 s は torch の forward/backward そのもの（mm 28.7%・where 11.3%・index_put 8.7%・cat 7.7%）＝式か加算順を変えないと縮まず、受け入れ a（軌跡一致）と両立しない |
+
+ここで学習の高速化は打ち止めにする（切替前比: 1 エポック 217 s → R 省略 145 s → torch 34.7 s → 約 29 s 相当。
+読み込みは memmap で消え、RSS は波数に依らずほぼ P/C だけ）。さらに縮めるなら式の変更（受け入れ基準の
+作り直し）が要る＝別の判断。ゲート `make test` 442 passed（`test_n_rel_train_torch.py` 12 本）。
+報告 `docs/reports/2026-09-07_train_torch2.md`・RESULT `docs/reports/2026-09-07_train_torch2.RESULT.json`。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
@@ -2891,7 +2930,7 @@ RESULT.json: {"job":"train-profile","status":"done","per_row":{"load_sec":..,"by
    （既定 torch・import できなければ numpy に落ちる）で切り替える。**npz の形式は変えない**
    （`meta.kind=nrel-a`・vocab_ids・重みの名前と形。Rust の `load_net` と `n_rel.load` が同じ npz を
    読む＝serve 側は無変更）。①込みで 7〜8 倍（推定・受け入れで実測する）。
-3. **③float16/int16（切替後の後続・Rust 生成が dump を書く形に合わせて別途）**: 時間ではなくメモリ
+3. **③float16/int16（WP `dump-f16`・§18.5・取り込み済み §8.22）**: 時間ではなくメモリ
    （同じ 14 GB に 2 倍の波）。`V.tok` float16・`V.ci` int16・`V.sc` float16 の memmap を Rust の生成側が
    最初から書き、学習側は `mmap_mode="r"` で読む（読み込み 300 s も消える）。fp16 の forward 差は
    最大 1.07e-4 で無視できる。全波規模ではページキャッシュに乗らない点だけ注意。**④の後**に着手
