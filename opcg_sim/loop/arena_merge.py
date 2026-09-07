@@ -1,4 +1,4 @@
-"""分散アリーナの台帳マージ（v1・`arena_resume.py` のシャード実行を1判定にまとめる）。
+"""分散アリーナの台帳マージ（旧 `tests/scripts/arena_merge.py`・シャード実行を1判定にまとめる）。
 
 なぜ要るか（2026-09-01 ユーザ決定「アリーナの分散化」）: 1セッションで回せるのは
 24ペア×2条件＝192局程度で、この母数では**世代交代の実力差（実測 +0.04＝約+29 Elo）が
@@ -6,24 +6,22 @@ CI に埋もれて判定できない**——c9 vs c8 は4本とも 0.521〜0.563
 「0.55 以上かつ CI下限>0.50」を満たせなかった。生成波と同じくオーケストレータで
 セッションを分散し、**シャードごとに別 seed 帯**で回した台帳をここで合算する。
 
-判定規約は `arena_resume.final_result` と同一（ペア水準95%CI・promoted は wr≥frac かつ
+判定規約は `opcg_sim.loop.arena.final_result` と同一（ペア水準95%CI・promoted は wr≥frac かつ
 CI下限>0.50・void は母数から外して件数を必ず載せる）＝集計規約を二重化しない。
 
 **seed 衝突は黙って畳まない**: 同じ seed が複数シャードに現れたら帯設計のミス（同じ対局を
 二重計上すると CI が不当に狭まる）なので、重複を数えて明示し、既定では判定を出さずに落とす。
 
 実行例:
-  PYTHONPATH=tests python tests/scripts/arena_merge.py --in "/home/user/arena_c9/*/random_*.jsonl"
+  python -m opcg_sim.loop.arena_merge --in "/home/user/arena_c9/*/random_*.jsonl"
 """
 import argparse
 import glob
 import json
 import os
-import sys as _sys
+import sys
 
-import os as _os  # noqa: E402  test bootstrap
-_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-import _bootstrap  # noqa: E402,F401
+from opcg_sim.loop.arena import pair_level_ci
 
 
 def read_ledger(path):
@@ -59,12 +57,11 @@ def merge_ledgers(paths):
 
 
 def summarize(done, frac=0.55):
-    """合流台帳 → 判定（`arena_resume.final_result` と同規約・pure）。有効ペアが無ければ None。"""
-    from arena_parallel import _pair_level_ci
+    """合流台帳 → 判定（`arena.final_result` と同規約・pure）。有効ペアが無ければ None。"""
     valid = [s for s in done if done[s] is not None]
     if not valid:
         return None
-    ci = _pair_level_ci([done[s] / 2.0 for s in valid])
+    ci = pair_level_ci([done[s] / 2.0 for s in valid])
     return {"pairs": len(valid), "games": 2 * len(valid),
             "void": len(done) - len(valid),
             "wins": sum(done[s] for s in valid),
@@ -115,4 +112,4 @@ def main():
 
 
 if __name__ == "__main__":
-    _sys.exit(main())
+    sys.exit(main())

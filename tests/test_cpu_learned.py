@@ -72,25 +72,6 @@ def test_learned_engine_instances_and_net_vs_net():
     assert a == d, "同一ネットで engine 経路と decide_learned 経路が食い違う（本番挙動不変の破れ）"
 
 
-def test_decide_client_routes_learned():
-    from opcg_sim.api import decide_client
-    m = _game(3); name, actor = _actor(m)
-    legal = m.get_legal_actions(actor)
-    mv = decide_client.decide(m, actor, "learned", mem={})
-    assert mv in legal, "decide_client 経由の learned が合法手を返さない"
-
-
-def test_learned_only_no_l1_fallback():
-    """learned-only: decide/plan_segment とも常に学習型が手を返す（L1へ落ちない）。"""
-    from opcg_sim.api import decide_client
-    m = _game(4); name, actor = _actor(m)
-    legal = m.get_legal_actions(actor)
-    mv = decide_client.decide(m, actor, "learned", mem={})
-    assert mv in legal, "learned が合法手を返さない"
-    seg = decide_client.plan_segment(m, actor, "learned", mem={})
-    assert isinstance(seg, list) and (not seg or seg[0] in legal), "plan_segment(learned) が不正"
-
-
 def test_decision_trace_populated():
     """cpu_trace 相当: trace dict を渡すと手の分析(chosen/candidates/L1第二意見)が入る。"""
     m = _game(7); name, actor = _actor(m)

@@ -223,6 +223,103 @@ fn card_label(state: &GameState, masters: &MasterTable, uuid: Option<&str>) -> V
     }
 }
 
+/// Python `cpu_ai._describe_move`（手を card_id 基準の人間可読 dict へ・uuid 非依存＝再現性あり）。
+///
+/// 対戦 API の思考トレース（`services/replay._replay_record_action`）が録画に書く形。
+/// 空の欄は**入れない**（Python も `if label:`／`if tids:` で出し分ける）＝旧録画と同じキー集合。
+/// `selected_slots`（同名複製の曖昧性解消）は `pending` の `selectable_uuids` 内の位置で、
+/// `RESOLVE_EFFECT_SELECTION` のときだけ載る。
+pub fn describe_move(
+    state: &GameState,
+    masters: &MasterTable,
+    mv: &Move,
+    pending: Option<&Value>,
+) -> Value {
+    let null = Value::Null;
+    let p = mv.get("payload").unwrap_or(&null);
+    let extra = p.get("extra").unwrap_or(&null);
+    let at = mv.get("action_type").cloned().unwrap_or(Value::Null);
+    let mut d = Map::new();
+    d.insert("action_type".into(), at.clone());
+    if at.as_str() == Some("DON_BOX") {
+        if let Some(k) = p.get("don_k").and_then(Value::as_f64) {
+            d.insert("don_k".into(), Value::from(k as i64));
+        }
+    }
+    let uuid = p
+        .get("uuid")
+        .and_then(Value::as_str)
+        .or_else(|| mv.get("card_uuid").and_then(Value::as_str));
+    let label = card_label(state, masters, uuid);
+    if !label.is_null() {
+        d.insert("card".into(), label);
+    }
+    let labels = |a: &Vec<Value>| -> Value {
+        Value::Array(
+            a.iter()
+                .map(|v| card_label(state, masters, v.as_str()))
+                .collect(),
+        )
+    };
+    if let Some(tids) = p
+        .get("target_ids")
+        .and_then(Value::as_array)
+        .filter(|a| !a.is_empty())
+    {
+        d.insert("targets".into(), labels(tids));
+    }
+    let sel = p
+        .get("selected_uuids")
+        .and_then(Value::as_array)
+        .filter(|a| !a.is_empty())
+        .or_else(|| {
+            extra
+                .get("selected_uuids")
+                .and_then(Value::as_array)
+                .filter(|a| !a.is_empty())
+        });
+    if let Some(sel) = sel {
+        d.insert("selected".into(), labels(sel));
+        if at.as_str() == Some("RESOLVE_EFFECT_SELECTION") {
+            if let Some(su) = pending
+                .and_then(|pr| pr.get("selectable_uuids"))
+                .and_then(Value::as_array)
+            {
+                let slots: Vec<i64> = sel
+                    .iter()
+                    .map(|u| {
+                        su.iter()
+                            .position(|x| x == u)
+                            .map(|i| i as i64)
+                            .unwrap_or(-1)
+                    })
+                    .collect();
+                if !slots.is_empty() && slots.iter().all(|s| *s >= 0) {
+                    d.insert("selected_slots".into(), Value::from(slots));
+                }
+            }
+        }
+    }
+    for key in ["index", "position"] {
+        let v = match p.get(key) {
+            Some(v) if !v.is_null() => Some(v.clone()),
+            _ => extra.get(key).filter(|v| !v.is_null()).cloned(),
+        };
+        if let Some(v) = v {
+            d.insert(key.into(), v);
+        }
+    }
+    // 任意効果の「見送り」だけを明示する（accept 側は既定＝旧録画と同キーで照合できる）。
+    let acc = match p.get("accepted") {
+        Some(v) if !v.is_null() => Some(v.clone()),
+        _ => extra.get("accepted").filter(|v| !v.is_null()).cloned(),
+    };
+    if acc == Some(Value::Bool(false)) {
+        d.insert("accepted".into(), Value::Bool(false));
+    }
+    Value::Object(d)
+}
+
 /// Python `cpu_ai._move_equiv_key`（`_describe_move` と同じ card_id 基準の同一視）。
 ///
 /// 返り値は `[action_type, card, targets, selected, index, position, accepted, don_k]`。

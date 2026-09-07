@@ -218,7 +218,7 @@ def _drive_until_cpu_decides(client, gid, cpu_name, human_name, max_iter=80):
 
 def test_replay_capture_and_fetch(client):
     """cpu_trace=true の対局で CPU 思考トレース＋種が記録され、エンドポイントで取得できる。"""
-    body = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="hard",
+    body = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="learned",
                         cpu_trace=True, seed=12345).json()
     gid = body["game_id"]
     meta = A.CPU_GAMES[gid]
@@ -228,13 +228,13 @@ def test_replay_capture_and_fetch(client):
     _drive_until_cpu_decides(client, gid, cpu_name="P2", human_name="P1")
     assert meta["decisions"], "CPU 思考トレースが記録されていない"
 
-    # 思考トレースの中身（ライブは軽量＝read_ahead は省く）。
+    # 思考トレースの中身。L1 廃止（2026-09-07・計画 §16.3-8）で `regret`／`j_components`／
+    # `l1_move`（手作り評価と第二意見の欄）は無くなり、N 系の読み出し（訪問分布と行動価値）だけが残る。
     d0 = meta["decisions"][0]
     assert d0.get("chosen") and "action_type" in d0["chosen"]
-    assert "candidates" in d0 and "regret" in d0
-    assert "j_components" in d0 and "total" in d0["j_components"]
-    # ライブ採取は read_ahead（重い読み筋）を含まない＝CPU 思考のレイテンシを抑えるため。
-    assert "read_ahead" not in d0
+    assert d0.get("difficulty") == "learned"
+    assert d0.get("readout") in ("main", "window", "commit")
+    assert "regret" not in d0 and "j_components" not in d0
     # 人間の操作も card_id 基準で記録される（KEEP_HAND/TURN_END 等）。
     assert any(a.get("src") == "human" for a in meta["actions"])
 
@@ -251,8 +251,8 @@ def test_replay_capture_and_fetch(client):
 def test_replay_capture_learned(client):
     """本番既定 CPU＝learned(Gen2) の cpu_trace 対局でも思考トレース＋種が記録される（R3）。
 
-    learned のトレースは L1 の regret/j_components でなく **MCTS root 統計**（chosen/candidates=訪問%・Q・
-    L1第二意見）。既定=learned の実対局リプレイ記録の担保（従来テストは hard 固定だった穴を閉じる）。
+    トレースは **MCTS root 統計**（chosen／candidates＝訪問%・Q）。L1 は廃止したので
+    第二意見（`l1_move`）は無い（2026-09-07・計画 §16.3-8）。
     """
     body = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="learned",
                         cpu_trace=True, seed=777).json()
@@ -266,7 +266,7 @@ def test_replay_capture_learned(client):
     assert d0.get("difficulty") == "learned"
     assert d0.get("chosen") and "candidates" in d0 and len(d0["candidates"]) >= 1
     assert "visit_pct" in d0["candidates"][0] and "q" in d0["candidates"][0]  # MCTS root 統計
-    assert "l1_move" in d0                                                    # L1 第二意見
+    assert "l1_move" not in d0                                                # L1 は廃止
     r = client.get(f"/api/game/{gid}/replay")
     assert r.json()["success"] is True and r.json()["replay"]["seed"] == "777"
 
@@ -312,19 +312,22 @@ def _drive_full_or_cap(client, gid, cap=160):
                         "action": "RESOLVE_EFFECT_SELECTION", "payload": payload})
 
 
-@pytest.mark.legacy  # `replay_from_descriptor` は Python エンジンで再生する（計画 §15.5・§16.1）。
-                     # このファイルの他のテストは API 契約（HTTP 層）のみを見るので legacy ではない。
 def test_replay_api_descriptor_end_to_end(client):
-    """R3 実結線: API の実録画（`REPLAY_SCHEMA`＝/replay）を `replay_from_descriptor` へ食わせ、
-    CPU の意思決定列が録画と一致する（coin toss=first_player='random' を seed から再現）。
+    """R3 実結線: API の実録画（`REPLAY_SCHEMA`＝/replay）を `rs_replay.replay_from_descriptor`
+    へ食わせ、CPU の意思決定列が録画と**全長**一致する（coin toss=first_player='random' を
+    seed から再現）。
 
-    録画の CPU 思考トレース（decisions[].chosen・card_id 基準）と、再生の CPU 再 decide が一致＝
-    本番の実対局を丸ごと再現できることの end-to-end 証明（人間手は注入・§R3 残の実結線）。
+    録画の CPU 思考トレース（`decisions[].chosen`・card_id 基準）と、再生の CPU 再 decide が
+    一致＝本番の実対局を丸ごと再現できることの end-to-end 証明（人間手は注入）。
+
+    照合区間は**全長**に戻した（2026-09-07・計画 §16.3-A4）。§8.16 で「効果対話の決定点まで」に
+    狭めていたのは、当時の CPU が `hidden` から組み直した浅い盤面を読んでいたため
+    （暫定経路の限界）。CPU の思考が Rust の生盤面へ移り、再生側も同じ経路になったので、
+    狭める理由が無くなった。
     """
-    import replay_runner as RR
-    from opcg_sim.src.core import cpu_ai
+    import rs_replay as RSR
 
-    body = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="hard",
+    body = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="learned",
                         cpu_trace=True, seed=4242, first_player="random").json()
     gid = body["game_id"]
     _drive_full_or_cap(client, gid, cap=160)
@@ -335,34 +338,15 @@ def test_replay_api_descriptor_end_to_end(client):
     rec_chosen = [d.get("chosen") for d in rb["decisions"]]
     assert len(rec_chosen) >= 3, "CPU の意思決定が記録されていない"
 
-    cpu_name = desc["cpu_player_id"]
-
-    class _CpuCap:
-        def __init__(self):
-            self.chosen = []
-
-        def on_decision(self, ctx, move):
-            # 再生の CPU 席は run_game 名 "p2"（cpu）。録画は cpu_name。位置で判定。
-            if ctx.actor.name == "p2":
-                self.chosen.append(cpu_ai._describe_move(ctx.manager, move))
-
-    cap = _CpuCap()
-    rep = RR.replay_from_descriptor(A.card_db, desc, cpu_difficulty="hard",
-                                    first_player="random", observers=[cap])
-    # 再生した CPU の手が録画の CPU 思考トレースと（再生できた範囲で）一致する。
-    n = min(len(cap.chosen), len(rec_chosen))
-    assert n >= 3, f"再生の CPU 決定が少なすぎ（reproduced={rep['reproduced']} misses={rep['misses'][:1]}）"
-    # **効果対話の決定点までを照合する**（計画 §15 の暫定 CPU 経路の限界）。
-    # API 側の裁定は Rust だが CPU の decide はまだ Python で、盤面は記録 v5 の `hidden` から
-    # 組み直して渡す。`hidden` は中断（対話）の継続を持たないため、CPU が
-    # RESOLVE_EFFECT_SELECTION を「探索して」選ぶ決定点（CONFIRM_OPTIONAL の accept/decline 等）
-    # だけは読みが浅くなり、フル Python 再生と分岐しうる。そこまで（＝コイントスの再現・
-    # デッキ復元・人間手の注入・非対話の CPU 決定の決定性）は完全一致を要求する。
-    # P4 の `rs-p4-mcts` で decide が Rust に載ったら全長の照合へ戻す。
-    n = next((i for i, d in enumerate(rec_chosen[:n])
-              if (d or {}).get("action_type") == "RESOLVE_EFFECT_SELECTION"), n)
-    assert n >= 3, "効果対話より前の CPU 決定が少なすぎ（照合できる区間が無い）"
-    assert cap.chosen[:n] == rec_chosen[:n], "API 実対局の CPU 意思決定が再生で一致しない"
+    got = []
+    rep = RSR.replay_from_descriptor(desc, first_player="random",
+                                     on_cpu_decision=lambda mv, d: got.append(d))
+    assert rep["reproduced"], f"再生できなかった: {rep['misses'][:1]}"
+    # 録画は cap 付きで打ち切っているので、再生は録画の**全決定**を覆っていればよい
+    # （再生が 1 手先へ進んでいる分は切る）。狭めているのは録画の長さだけで、
+    # 「効果対話より前」のような**内容による**切り詰めはもう無い。
+    assert len(got) >= len(rec_chosen), f"再生の CPU 決定が足りない（{len(got)} < {len(rec_chosen)}）"
+    assert got[:len(rec_chosen)] == rec_chosen, "API 実対局の CPU 意思決定が再生で一致しない（全長照合）"
 
 
 # --- サンドボックス（フリーモード） -----------------------------------------

@@ -440,6 +440,35 @@ impl Game {
         to_py_json(&body)
     }
 
+    /// 山札の残り枚数（`{"p1": n, "p2": n}`）。盤面 dict は伏せ情報なので出さない欄で、
+    /// 思考トレースのリプレイフレーム（`services/replay._frame_side`）だけが使う。
+    fn deck_counts_json(&self) -> PyResult<String> {
+        let st = self.session.state();
+        to_py_json(&serde_json::json!({
+            "p1": st.player(Seat::P1).deck.len(),
+            "p2": st.player(Seat::P2).deck.len(),
+        }))
+    }
+
+    /// 手を card_id 基準の記述 dict にする（Python `cpu_ai._describe_move`）。
+    ///
+    /// 対戦 API の思考トレース（`services/replay._replay_record_action`）が録画に書く形で、
+    /// uuid を持たない＝**再現できる**記述。`selected_slots`（同名複製の曖昧性解消）のために
+    /// 現在の要求（`selectable_uuids`）を見るので、**手を適用する前**に呼ぶこと。
+    fn describe_move_json(&mut self, move_json: &str) -> PyResult<String> {
+        let masters = self.masters()?;
+        let mv = parse_json(move_json, "move")?;
+        let pending =
+            crate::rules::pending::get_pending_request(&mut self.session, masters, false);
+        let d = crate::search::decide::describe_move(
+            self.session.state(),
+            masters,
+            &mv,
+            pending.as_ref(),
+        );
+        to_py_json(&d)
+    }
+
     /// 棋譜ダンプ用の索引（`{"cids": {uuid: card_id}, "slots": {uuid: 22 枠 index}}`）。
     ///
     /// - `cids` … Python `n_record_gen._uuid_cids` と同じ範囲（両者の leader／hand／field／

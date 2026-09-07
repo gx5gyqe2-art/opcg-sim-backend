@@ -95,9 +95,24 @@ def _msg_rust(game, kind, player_id, action_type, arg):
     return str(exc.value)
 
 
+def _py_manager(game, db):
+    """Rust の盤面を記録 v5 の `hidden` から Python の `GameManager` へ復元する（オラクル側）。
+
+    本番の `RsGame` はもうこの経路を持たない（2026-09-07・第 2 段 `rs-archive-cutover` で
+    CPU の思考が Rust に移り、暫定経路 `py_manager()` を撤去した）。**この 3 者照合のためだけ**に
+    ここで組む＝`legacy` マーカー付きのこのファイルだけが Python エンジンを触る。
+    """
+    from opcg_sim.src.core import rs_bridge
+    manager = rs_bridge.manager_from_hidden(
+        db, game.hidden(), suppress_pending=False,
+        names={"p1": game.p1_name, "p2": game.p2_name})
+    rs_bridge.attach_shallow_interaction(manager, game.get_pending_request(False))
+    return manager
+
+
 def _msg_python(game, db, kind, player_id, action_type, arg):
     """同じ盤面を Python の `GameManager` へ復元し、同じ行動の `ValueError` 文言を返す。"""
-    manager = game.py_manager()
+    manager = _py_manager(game, db)
     manager.action_events = []
     player = manager.p1 if manager.p1.name == player_id else manager.p2
     with pytest.raises(ValueError) as exc:
