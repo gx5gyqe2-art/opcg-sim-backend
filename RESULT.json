@@ -1,0 +1,105 @@
+{
+  "job": "rs-p3-zone",
+  "status": "done",
+  "branch": "claude/rs-p3-zone",
+  "base": "claude/cpu-spec-improvements-yw91jd",
+  "owned": [
+    "rust/opcg_engine/src/effects/actions/zone.rs",
+    "rust/opcg_engine/src/effects/actions/zone/tests.rs"
+  ],
+  "unchanged": [
+    "opcg_sim/ (Python 側は 1 行も変更していない)",
+    "rust/opcg_engine/src/effects/actions/mod.rs",
+    "rust/opcg_engine/src/ops.rs (原始操作の追加は不要だった)",
+    "rust/opcg_engine/src/effects/{resolver,interact,triggers,continuous,passives,matcher,cond,value,loader,eval,mod}.rs",
+    "rust/opcg_engine/src/{model,journal,state,testkit}.rs",
+    "tests/ (ハーネスは無変更)"
+  ],
+  "implemented": {
+    "game_handler": ["DEAL_DAMAGE", "SHUFFLE", "HEAL", "LIFE_RECOVER", "TRASH_FROM_DECK", "ORDER_LIFE", "LOOK_LIFE"],
+    "target_handler": ["MOVE_CARD", "DECK_BOTTOM", "DECK_TOP", "BOUNCE", "MOVE_TO_HAND", "MOVE", "FACE_UP_LIFE"],
+    "still_unimplemented": ["LIFE_MANIPULATE"]
+  },
+  "audit": {
+    "command": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_audit_replay.py --action-types DRAW,DISCARD,TRASH,KO,REST,ACTIVE,BUFF,MOVE_CARD,DECK_BOTTOM,DECK_TOP,BOUNCE,TRASH_FROM_DECK,HEAL,DEAL_DAMAGE,SHUFFLE,ORDER_LIFE,FACE_UP_LIFE,LOOK_LIFE,MOVE_TO_HAND",
+    "cards": 987,
+    "abilities": 1271,
+    "match": 1268,
+    "mismatch": 2,
+    "unimplemented": 1,
+    "record_error": 0,
+    "bad_payload": 0,
+    "bad_output": 0,
+    "mode": "replay",
+    "engine": "0.0.1",
+    "record_version": 4,
+    "first": {
+      "status": "mismatch",
+      "step": 0,
+      "path": "pending_request.selectable_uuids[0]",
+      "card_id": "OP04-048",
+      "trigger": "ON_PLAY",
+      "ability_index": 0
+    },
+    "residuals": [
+      {
+        "status": "mismatch",
+        "card_id": "OP04-048",
+        "name": "ササキ",
+        "trigger": "ON_PLAY",
+        "ability_index": 0,
+        "step": 0,
+        "path": "pending_request.selectable_uuids[0]",
+        "cause": "harness_contract_gap:shuffled_resync",
+        "owner": "coordinator"
+      },
+      {
+        "status": "mismatch",
+        "card_id": "OP06-047",
+        "name": "シャーロット・プリン",
+        "trigger": "ON_PLAY",
+        "ability_index": 0,
+        "step": 0,
+        "path": "players.p2.zones.hand[0].uuid",
+        "cause": "harness_contract_gap:shuffled_resync",
+        "owner": "coordinator"
+      },
+      {
+        "status": "unimplemented",
+        "card_id": "OP06-035",
+        "name": "ホーディ・ジョーンズ",
+        "trigger": "ON_PLAY",
+        "ability_index": 0,
+        "step": 0,
+        "path": "rust/opcg_engine/src/effects/mod.rs::only_cards_strict",
+        "detail": "effects: 対象にドン!!が含まれる（ドン!!を取るハンドラは群 D）",
+        "cause": "target_ref_don:CHAR_OR_DON",
+        "owner": "group_D"
+      }
+    ],
+    "note_on_action_types": "指示書のコマンド列には TRASH が無く、そのままだと受け入れ集合が cards=934 / abilities=1201 になる（実測）。§11.7 の 987／1,271 は TRASH 込みの集合。TRASH は Python が DISCARD と同じハンドラに登録しており土台 F が実装済みなので、コード変更ではなく絞り込み条件の追加だけで一致する。"
+  },
+  "regress": {
+    "audit_f_only": {
+      "command": "rs_audit_replay.py --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF",
+      "cards": 634, "abilities": 817, "match": 817, "mismatch": 0, "unimplemented": 0
+    },
+    "replay_vanilla": {
+      "command": "rs_diff_replay.py --mode replay --vanilla --games 20 --seed-base 1200000",
+      "games": 20, "actions": 2087, "match": 20, "mismatch": 0, "unimplemented": 0
+    },
+    "state": {
+      "command": "rs_diff_replay.py --mode state --games 5 --seed-base 1200000",
+      "games": 5, "actions": 584, "match": 5, "mismatch": 0, "unimplemented": 0
+    },
+    "query_oracle": {
+      "command": "rs_query_oracle.py --boards 40 --seed-base 1210000",
+      "boards": 40, "queries": 1467480, "match": 1285223, "error_match": 182257,
+      "mismatch": 0, "unimplemented": 0, "restore_mismatch": 0, "seconds": 27.8
+    },
+    "cargo_test": {"passed": 196, "failed": 0, "ignored": 0, "before": 166},
+    "cargo_clippy": {"command": "cargo clippy --no-default-features --all-targets -- -D warnings", "warnings": 0},
+    "make_test": {"passed": 1761, "failed": 0, "warnings": 8, "seconds": 496.15}
+  },
+  "notes": "群 B の担当 12 種＋Python に登録がある DB 未使用の LIFE_RECOVER／MOVE を実装し、opcg_sim/ は 1 行も変更していない。actions/mod.rs・resolver/interact/triggers/model・ops.rs も無変更（原始操作の追加は不要だった。pub(super) 化も不要）。\n\n【Python から移すときに踏んだ地雷（実装の要点）】(1) move_card を通す経路と通さない経路がある: TRASH_FROM_DECK は trash.append(deck.pop(0))、LOOK_LIFE は temp_zone.append(life.pop(0)) の直接移動で、reset_turn_status も ON_LIFE_DECREASE も走らない（move_card に寄せると挙動が変わる）。(2) DEAL_DAMAGE の順序: ライフを 1 枚ずつ pop(0) → 【トリガー】は移す前に引く → move_card(HAND) → 任意（確認つき）で待ち行列へ。ライフ切れは効果の実行者の勝利で break し、その段では _enqueue_life_decrease を積まない（if life_lost and not gm.winner）。最後に _advance_pending_triggers を無条件で呼ぶ。(3) 0 の扱いが 3 通り: DEAL_DAMAGE は value<=0 → 1、LOOK_LIFE は value==0 → 1（0 は falsy・負は range() が空）、HEAL／TRASH_FROM_DECK は range(value) そのまま。(4) dest_position は \"TOP\" との一致だけを見る（DB の \"CHOOSE\" 37 件は BOTTOM 扱い）。(5) MOVE_CARD の CANNOT_LIFE_TO_HAND は「自分のライフ→自分の手札」だけを抑止する（Python の owner is player）。(6) SHUFFLE は乱数を使わず並びに触らない（計画 §6 の決定論・記録 v4 の shuffled 再同期に任せる）。\n\n【申告 1・コーディネータへ: 監査記録に shuffled 再同期が無い（mismatch 2 件の唯一の原因）】OP04-048／OP06-047 はどちらも「手札すべてをデッキに戻す → シャッフル → 引く」型で、Python は random.shuffle が作った並びから引き、Rust は元の並びから引く＝引いた札の uuid だけが違う（多重集合は一致）。根本原因は実験で確定した: Python 側の random.shuffle を恒等関数に差し替えて同じ 2 枚を記録し直すと mismatch=0（cards=2, abilities=2, match=2）＝Rust の意味論は Python と同一で、違うのは RNG が作った並びだけ。--mode replay は記録 v4 の shuffled＋その段の hidden で並びを取り直す（§11.2）が、監査記録（kind:\"audit\"）にはこの欄が無く state.rs::replay_audit も再同期をしない。しかも 2 件とも中断が 1 度も立たない（steps が空）＝シャッフルは fire の中で起きるので steps[i].hidden を足すだけでは届かない。必要な契約変更は「fire の後にも {shuffled, hidden} を記録し、replay_audit が fire 後と各 payload 後に resync_shuffled を呼ぶ」こと＝tests/scripts/rs_audit_replay.py と rust/opcg_engine/src/state.rs の両方で、どちらも群 B の所有範囲外・他の 4 群も同じ記録を使うため単独で変えると衝突する。よって変更していない。SHUFFLE を使うカードは DB 全体で 11 枚（OP01-069, OP01-098, OP02-030, OP04-048, OP05-080, OP06-047, OP08-071, OP08-073, OP13-079, P-002, ST03-007）、うち F∪B の受け入れ集合に入るのは 3 枚（OP01-098 は並びを観測しないので一致する）。群 A/C/D/E も SHUFFLE を含むカードで同じ穴に当たる。\n\n【申告 2・群 D へ: unimplemented 1 件】OP06-035（ホーディ・ジョーンズ・ON_PLAY）「相手の、キャラかドン!!合計2枚までを、レストにする」は対象が CHAR_OR_DON＝TargetRef::Don を返し、effects/mod.rs::only_cards_strict が Unimplemented を返す。§11.7 で only_cards_strict 3 か所は群 D の所有と明記されているため触っていない。REST 自体は土台 F のハンドラで動く＝群 D が対象経路を広げれば自動的に通るはず。\n\n【Python 側の欠陥（直していない・DB 未使用なので実害なし）】per_target.move_card / move の宛先が Zone.DON_DECK／COST_AREA／ANY のとき、Python の card_moves.move_card は target_list が None のまま元のゾーンから外すだけ＝カードが消える（P1 の引き継ぎ §8.4 と同じ経路）。Rust では表現できないので EngineError::Unimplemented にした（黙ってカードを消さない）。カード DB の MOVE_CARD の destination は HAND 328／LIFE 100／DECK 3 の 3 種だけで該当は 0 件（2026-09-07 実測）。\n\n【所有範囲について】actions/mod.rs は 1 行も触っていない（pub(super) 化も不要だった）。単体テストは #[cfg(test)] mod tests; で zone/tests.rs に置いた＝mod.rs へのモジュール宣言の追加が要らない配置。"
+}
