@@ -139,6 +139,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P3 | **群 A〜E をコーディネータが本線へ**（5 ブランチを cherry-pick・§8.10〜8.14）。受け入れ集合: A 1,014／C 1,144／E 917 能力＝全一致、B 1,268/1,271（残 3 は横断事項）、D 1,272/1,273（残 1 は横断事項）。本線で全カード監査 3,380/3,386（跨り 685 枚は全一致）・実デッキ再生は盤面 20 局一致・`legal` 12 局差（§11.8）。`cargo test` 288 green・clippy 0・`make test` green |
 | 2026-09-07 | P3 | **仕上げ WP `rs-p3-final` を発行**（§11.8）: 横断事項 #1〜#11（監査記録 v5 のシャッフル再同期・ドン!!対象・差し口の意味論・群 E の申告 4 件・vanilla ガード撤去・ARRANGE_DECK 既定解決）と P3 全体の受け入れ（全カード監査・実デッキ再生 random 500／L1 100） |
 | 2026-09-07 | P3 | **`rs-p3-final` 完了・コーディネータが受け入れ＝P3 完了**（`claude/rs-p3-final-8rh43r` を本線へ）。WP 実測: 全カード監査 2,472 枚/3,386 能力 mismatch=0・unimplemented=0／実デッキ再生 random 500 局・L1 100 局とも全一致／退行 4 本一致。本線での再検証（未見 seed）: 全カード監査 3,386 能力一致・実デッキ再生 random 30 局（3,048 行動）・L1 10 局（1,192 行動）一致・問合せ 20 局面 733,740 件 mismatch=0。`cargo test` 288 green・clippy 0・`make test` green。P4 の設計は §12 |
+| 2026-09-07 | P4 | **設計＋契約を本線へ**（§12）: `encode/mod.rs`（次元定数・`Vocab`／`EffTables`／`Encoding`／`EncodeOptions`・`build_eff_tables`／`encode` の stub）・`net/mod.rs`（`NRelWeights` 18 配列・`Candidate`・`load_npz`／`card_table`／`value`／`priors`／`cand_rows` の stub）・`search/mod.rs`（`Move`＝JSON・`SearchOptions`・`RecordedRng`・`legal_actions`／`determinize`／`apply_move_inplace` の stub）。WP `rs-p4-encode`／`rs-p4-net`／`rs-p4-legal` の指示書は §12.5 |
 | 2026-09-07 | P3 | **群 A（状態系）`rs-p3-status` 完了**（`claude/rs-p3-status-rkkh9m`）: `actions/status.rs` の 3 入口を本体化（GRANT_KEYWORD／ATTACK_DISABLE／PREVENT_REST／FREEZE／NEGATE_EFFECT／DISABLE_ABILITY／SWAP_POWER。BUFF の全形は土台 `mod.rs::buff` が既に持っていた＝委譲不要で `mod.rs` は無変更）。監査 **cards=782／abilities=1014／match=1014・mismatch=0・unimplemented=0**（受け入れ規模ちょうど）・退行 4 本一致・`cargo test` 194 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 B `rs-p3-zone` 完了**（`claude/rs-p3-zone`）: `actions/zone.rs` の 3 入口を本体化（12 種＋DB 未使用の LIFE_RECOVER／MOVE／MOVE_TO_HAND／DECK_TOP）。監査 987 枚／1,271 能力＝**match 1,268・mismatch 2・unimplemented 1**（残る 3 件はいずれも**群 B の所有範囲の外**＝監査記録に `shuffled` 再同期が無い 2 件と `TargetRef::Don`（群 D）1 件。§8.10）。退行 4 本すべて一致・`cargo test` 196 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 C（カードの流れ）完了**（`claude/rs-p3-flow`）: `actions/flow.rs` に PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_EVENT（EXECUTE_MAIN_EFFECT／DECLARE_COST は resolver が既に捌く）。監査 **cards=865／abilities=1144／match=1144・mismatch=0・unimplemented=0**（着手前は unimplemented=128）。退行 4 本一致・`cargo test` 182 green・clippy 0・`make test` green。結果は下記 §8.10 |
@@ -1632,3 +1633,92 @@ P4＝**符号化 v13・NRel forward・探索（adapter＋MCTS＋decide）**。P3
    「各 simulate で同じ出目」を **simulate ごとに生成器を base 状態へ戻す**ことで再現する。
 5. **数値の同一性**: 行列積の加算順は Python（numpy・BLAS）と一致しないので 1e-5 を許容。ただし `argmax` の同点は
    Python 側の**添字が小さい方**を採る規約（numpy と同じ）にし、探索の同点処理も同じにする。
+
+### 12.5 P4 前半 3 WP の指示書（2026-09-07・並列）
+
+共通の前提: 本線 `claude/cpu-spec-improvements-yw91jd` から分岐・`RESULT.json` を添えて push・PR は作らない・
+`opcg_sim/` は変えない（ハーネスの追加のみ可）・Python が正。契約（`encode/`／`net/`／`search/` の
+型と関数）は変えない（足りなければ notes で申告）。`lib.rs` への公開関数の追加は各 WP が自分の分だけ
+（`encode_state`／`load_net`・`net_eval`／`search_legal`・`search_determinize`・`search_apply`）。
+オラクルの局面は `rs_diff_replay.py --mode replay --games 10 --policy random`＋`--policy l1` の記録 v5 の
+`hidden` から等間隔に 200 局面（P3 の問合せオラクルと同じ取り方）。
+
+**WP `rs-p4-encode`**
+
+```
+Rust エンジン移行 P4「符号化 v13」を実装してください。計画 docs/rust_engine_plan.md §12（契約 encode/mod.rs は
+本線）。成果は claude/rs-p4-encode に push。
+
+やること:
+1. encode/{cardtab,scalars,tokens,leader}.rs: n_eff.build_eff_tables／ability_vector（STATS 16・能力 4×167）、
+   encoder.encode(version=13)（scalars 123＝v1〜v9 の集約・v7 登場時スキャンは rules/effects で PLAY を
+   make/unmake し cpu_ai.onplay_option_scan と同じ判定・v11 leader_feat.leader_pair_vectors 12×2・v13 の
+   n_rel_feat.extra_scalars 29／field 10×8／card_idx 24）、n_rel_feat.encode_rel（tok 22×20・relations
+   with_relations の有無両方・_leader_act_avail の legal は rules::legal の探索用でなく Python と同じ
+   get_legal_actions 由来＝rs-p4-legal に依存しない）。Python の式を 1 列ずつ転記し、列名を docstring に対応表で書く。
+2. lib.rs に encode_state(hidden_json, seat, opts_json) -> Encoding の JSON を追加（load_masters と load_net の
+   vocab に依存するので、vocab は effects JSON の card_id 順ではなく npz の vocab_ids を使う＝
+   opcg_engine.load_vocab(path_npz) を足すか、rs-p4-net の load_net と同じ npz 読みの最小版を encode 側に
+   持たないよう、vocab_ids だけを JSON で渡す口 set_vocab(ids_json) にする。後者を採る）。
+3. tests/scripts/rs_encode_oracle.py（新規）: 200 局面 × 両視点で Python の encode(v13)／encode_rel（両モード）／
+   build_eff_tables（vocab 全行）と Rust を照合 → RS_ENCODE {"boards":200,"cols_scalars":123,...,"mismatch":0} 1 行。
+   不一致は列名で報告する。
+4. cargo test（各集約関数の単体・登場時スキャンの判定）・clippy 0。docs/rust_engine_plan.md §8 に結果行・
+   docs/TEST_SPEC.md §3 に rs_encode_oracle.py の行。
+
+受け入れ: rs_encode_oracle.py --boards 200 → mismatch=0（float 1e-6・整数一致）・カード表 2,652 行一致・
+make test green・cargo test/clippy green。RESULT.json: {"job":"rs-p4-encode","status":"done","oracle":{...},"notes":"..."}。
+```
+
+**WP `rs-p4-net`**
+
+```
+Rust エンジン移行 P4「NRel forward」を実装してください。計画 docs/rust_engine_plan.md §12（契約 net/mod.rs は
+本線）。成果は claude/rs-p4-net に push。encode WP とは独立に検証する（入力は Python の符号化を JSON で渡す）。
+
+やること:
+1. net/npz.rs: npz（zip stored/deflate＋npy v1/v2 ヘッダ・float32/int64/<U 文字列/object は meta の JSON 文字列
+   のみ）を読む。依存は miniz_oxide だけ許可。nrel_a1.npz（18 配列＋meta＋nrel＋vocab_ids）を読めること。
+2. net/nrel.rs: NRelNet の card_table／tokens_forward（B=1・present 枠のみの経路 _tokens_forward_1 と同値）／
+   body／value／cand_input／policy_logits／seg_softmax と ablate マスク（mask_sc: OPP_POOL_COLS・ONPLAY_COLS／
+   mask_rel）。float32 で Python と同じ式。n_eff._cand_row（F_CAND 139）と nrel_priors の予算 3 列も移す。
+3. lib.rs に load_net(path)（プロセスで 1 度・vocab_ids を返す）と net_eval(encoding_json, legal_json) ->
+   {"value":..,"priors":[...]} を追加。encoding_json は encode/mod.rs の Encoding と同じキー（Python 側で
+   同じ形に詰める関数をハーネスに置く）。
+4. tests/scripts/rs_net_oracle.py（新規）: 200 局面 × 両視点で Python の NRelValueAdapter.encode_state と
+   探索用合法手（adapter.OPCGGame.legal_actions）を取り、value と priors を Rust と照合 →
+   RS_NET {"boards":200,"value_max_abs_err":..,"priors_max_abs_err":..,"mismatch":0} 1 行（許容 1e-5）。
+5. cargo test（npz の往復・小さな手組み入力での各層）・clippy 0。docs/rust_engine_plan.md §8 に結果行・
+   docs/TEST_SPEC.md §3 に rs_net_oracle.py の行。
+
+受け入れ: rs_net_oracle.py --boards 200 → value/priors とも最大誤差 ≤1e-5・make test green・cargo test/clippy green。
+RESULT.json: {"job":"rs-p4-net","status":"done","oracle":{...},"notes":"..."}。
+```
+
+**WP `rs-p4-legal`**
+
+```
+Rust エンジン移行 P4「探索用の候補・世界・適用」を実装してください。計画 docs/rust_engine_plan.md §12
+（契約 search/mod.rs は本線）。成果は claude/rs-p4-legal に push。
+
+やること:
+1. search/{adapter,macro,prune,determinize,apply}.rs: adapter.OPCGGame.legal_actions（rules::legal の
+   get_legal_actions → cpu_ai.merged_search_actions（対話の代替手併合）→ _prune_don_moves／
+   _prune_futile_attacks → don_alloc_candidates（配分箱）／attack_box_candidates（アタック箱）→
+   defense_box_prune）、_determinize_opponent（並びは引数）、_apply_move_inplace（DON_BOX の展開・
+   _drain_own_interactions の stop_at_select）。Python を関数ごとに読み、同じ順序で同じ list を作る
+   （順序も照合する＝探索の同点処理に効く）。
+2. lib.rs に search_legal(hidden_json, opts_json) -> [Move...]、search_determinize(hidden_json, seat, order_json)
+   -> hidden 相当の盤面 dict、search_apply(hidden_json, seat, move_json, stop_at_select) -> 盤面 dict を追加。
+3. tests/scripts/rs_search_oracle.py（新規・--what legal,determinize,apply）: 200 局面で Python の
+   OPCGGame.legal_actions と Rust を**順序込み**で照合／determinize は Python の rng.shuffle の並びを記録して
+   渡し盤面 dict 一致／apply は各局面の全合法手（上限 20）を両側で適用し盤面 dict（pending_request 込み）を
+   照合 → RS_SEARCH {"what":..,"boards":200,"moves":N,"mismatch":0} 1 行。
+4. cargo test（枝刈り・箱の生成規則を Python の挙動から転記）・clippy 0。docs/rust_engine_plan.md §8 に
+   結果行・docs/TEST_SPEC.md §3 に rs_search_oracle.py の行。
+
+受け入れ: --what legal,determinize,apply の 3 本とも mismatch=0（200 局面）・make test green・cargo test/clippy green。
+RESULT.json: {"job":"rs-p4-legal","status":"done","oracle":{...},"notes":"..."}。
+```
+
+3 本が揃ったらコーディネータが統合し、`rs-p4-mcts`（木・静止・箱・decide・`RecordedRng`・決定オラクル）を出す。
