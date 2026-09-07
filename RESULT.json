@@ -32,7 +32,7 @@
   },
   "make_test_seconds": 77.9,
   "make_test_result": "cargo test 358 passed, 0 failed; pytest 608 passed, 0 failed (-m \"not slow and not legacy\")",
-  "make_test_legacy_result": "PENDING_FILL",
+  "make_test_legacy_result": "1793 passed, 0 failed in 615.91s (0:10:15) -- 1786 original tests + 7 new golden tests (3 in test_rs_golden_audit.py + 4 in test_rs_golden_replay.py)",
   "cargo_test": "358 passed, 0 failed (cargo test --no-default-features)",
   "cargo_clippy": "0 warnings (cargo clippy --no-default-features --all-targets -- -D warnings)",
   "golden_pytest": "6 passed (tests/test_rs_golden_audit.py + tests/test_rs_golden_replay.py)",
