@@ -1,0 +1,1 @@
+{"job":"gen-n27-w04","role":"gen","status":"wip","inputs":{"neff_net":"claude/n1-results:n1_results/nrel_a1.npz","wave":27,"shard":"04","seed_base":2274000,"games":960,"sims":128,"workers":4,"dump_v2":true,"resumed":true,"resume_seed_bases":[2274037]},"outputs":{"records":"n27_records/","log":"n27_gen.log"}}
