@@ -93,17 +93,31 @@ pub fn declare_attack(
     {
         return Err(bad("レスト状態のキャラクターのみ攻撃可能です。"));
     }
-    // アタック税（ATTACK_TAX_DISCARD_N）は効果由来のフラグ＝バニラでは立たない（P3）。
-    if s.state()
+    // アタック税（OP08-043「アタックする際、自身の手札N枚を捨てなければアタックできない」）。
+    // 付与された `ATTACK_TAX_DISCARD_N` フラグがあれば、手札 N 枚を支払えるときのみアタック可。
+    let need = s
+        .state()
         .card(attacker)
         .flags
         .iter()
         .chain(s.state().card(attacker).timed_flags.iter())
-        .any(|f| f.starts_with("ATTACK_TAX_DISCARD_"))
-    {
-        return Err(EngineError::Unimplemented(
-            "declare_attack: アタック税（ATTACK_TAX_DISCARD_N）は効果由来＝P3".into(),
-        ));
+        .filter_map(|f| f.strip_prefix("ATTACK_TAX_DISCARD_"))
+        .filter_map(|n| n.parse::<usize>().ok())
+        .max();
+    if let Some(need) = need {
+        if s.state().player(attacker_owner).hand.len() < need {
+            return Err(bad(format!(
+                "アタックするには手札{need}枚を捨てる必要があり、手札が足りません。"
+            )));
+        }
+        // Python は `trash.append(hand.pop(0))` の生の付け替え（`move_card` を通さない＝
+        // 離脱イベントも継続効果の解除も起きない）。同じ粒度で写す。
+        for _ in 0..need {
+            let card = s
+                .edit()
+                .card_zone_remove_at(attacker_owner, CardZone::Hand, 0);
+            s.edit().card_zone_push(attacker_owner, CardZone::Trash, card);
+        }
     }
 
     ops::set_rest(s, attacker, true);
@@ -203,11 +217,32 @@ pub fn apply_counter(
     super::actions::validate_action(s, seat, "SELECT_COUNTER")?;
     if card_type(s.state(), masters, counter_card) == CardType::Event {
         // 【カウンター】イベント: `pay_cost` → COUNTER 能力の解決 →
-        // `_register_granted_replacements` → トラッシュ。継続付与型置換の登録が
-        // **群 E**（`actions/rules.rs`）の担当なので、ここは黙って進めずに止める。
-        return Err(EngineError::Unimplemented(
-            "apply_counter: 【カウンター】イベント（COUNTER 能力＋付与置換の登録）は P3 群 E".into(),
-        ));
+        // `_register_granted_replacements` → トラッシュ。
+        let cost = masters.get(s.state().card(counter_card).master).cost;
+        ops::pay_cost(s, seat, cost, None)?;
+        let ids = masters
+            .get(s.state().card(counter_card).master)
+            .ability_ids
+            .clone();
+        for (index, id) in ids.iter().enumerate() {
+            if crate::effects::ability(masters, *id)?.trigger
+                == crate::effects::ast::TriggerType::Counter
+            {
+                crate::effects::resolver::game_resolve_ability(
+                    s, masters, seat, counter_card, index, false,
+                )?;
+            }
+        }
+        crate::effects::actions::rules::register_granted_replacements(s, masters, counter_card)?;
+        crate::effects::actions::move_card(
+            s,
+            masters,
+            counter_card,
+            Zone::Trash,
+            seat,
+            Position::Bottom,
+        )?;
+        return Ok(());
     }
     let value = super::current_counter(s.state(), masters, counter_card);
     let mut battle = s.state().active_battle.clone().expect("checked above");
@@ -284,26 +319,54 @@ pub fn resolve_attack(s: &mut Session, masters: &MasterTable) -> Result<(), Engi
             }
         }
     } else if attacker_pwr >= target_pwr {
-        if crate::effects::actions::active_protection(
+        // Python: 保護 →（無ければ）置換 →（無ければ）本来の KO。保護判定は **1 回だけ**
+        // 呼ぶ（【ターン1回】保護は判定時に使用回数を消費するため）。
+        if crate::effects::actions::active_protection_vs(
             s,
             masters,
             target,
             &["BATTLE_KO"],
             None,
+            Some(attacker),
         )? {
             // 保護されている＝KO しない。
-        } else if crate::effects::actions::find_replacement(s, masters, target, &["BATTLE_KO"])? {
-            // 置換（任意なら確認で中断）は群 E＝`find_replacement` が Unimplemented を返す。
         } else {
-            crate::effects::actions::move_card(
-                s,
-                masters,
-                target,
-                Zone::Trash,
-                target_owner,
-                Position::Bottom,
-            )?;
-            triggers::resolve_on_ko(s, masters, target, target_owner, "BATTLE", None)?;
+            match crate::effects::actions::find_replacement(s, masters, target, &["BATTLE_KO"])? {
+                // 任意のバトル KO 置換（「代わりに〜してもよい/できる」OP10-034 等）は、被 KO 側へ
+                // 「代わりの効果を使うか」を確認するため戦闘を中断する（accept→置換実行で本来の
+                // KO をスキップ／decline→本来の KO。どちらも resume 時に `finish_attack`）。
+                Some(repl) if repl.sub_is_optional => {
+                    crate::effects::interact::suspend_for_battle_ko_replacement(
+                        s,
+                        masters,
+                        target,
+                        target_owner,
+                        life_lost,
+                    );
+                    return Ok(());
+                }
+                // 任意でない置換は即時実行（内側の選択はヘッドレス自動解決）。
+                Some(_) => {
+                    crate::effects::actions::rules::active_replacement_with(
+                        s,
+                        masters,
+                        target,
+                        &["BATTLE_KO"],
+                        false,
+                    )?;
+                }
+                None => {
+                    crate::effects::actions::move_card(
+                        s,
+                        masters,
+                        target,
+                        Zone::Trash,
+                        target_owner,
+                        Position::Bottom,
+                    )?;
+                    triggers::resolve_on_ko(s, masters, target, target_owner, "BATTLE", None)?;
+                }
+            }
         }
     }
 
@@ -353,7 +416,12 @@ pub fn finish_attack(
     triggers::advance_pending_triggers(s, masters)
 }
 
-/// Python `check_victory`（デッキアウト。勝敗の置換 REPLACE_DECKOUT_LOSS は効果＝P3）。
+/// Python `check_victory`（デッキアウト）。
+///
+/// **未接続**: デッキアウト敗北→勝利の置換（`VICTORY`／`REPLACE_DECKOUT_LOSS`・OP03-040 等）の
+/// 走査は [`crate::effects::actions::rules::has_deckout_win_replace`] にあるが、ここへ挿すには
+/// `masters` が要る＝`turn::draw_card`／`actions/mod.rs` の DRAW ハンドラ／`tests_rules` の
+/// 呼び口を通す必要があり、群 E の所有範囲外（RESULT.json の notes で申告）。
 pub fn check_victory(s: &mut Session) {
     if s.state().player(Seat::P1).deck.is_empty() {
         s.edit().set_winner(Some(Seat::P2));

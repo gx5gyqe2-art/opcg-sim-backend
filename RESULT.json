@@ -1,0 +1,46 @@
+{
+  "job": "rs-p3-rules",
+  "status": "done",
+  "branch": "claude/rs-p3-rules-ymvyrs",
+  "base": "claude/cpu-spec-improvements-yw91jd (e6199915)",
+  "audit": {
+    "cards": 710,
+    "abilities": 917,
+    "match": 917,
+    "mismatch": 0,
+    "unimplemented": 0,
+    "record_error": 0,
+    "bad_payload": 0,
+    "bad_output": 0,
+    "mode": "replay",
+    "action_types": ["ACTIVE", "BUFF", "DISCARD", "DRAW", "EXTRA_TURN", "KO", "PREVENT_LEAVE",
+                     "REDIRECT_ATTACK", "REPLACE_EFFECT", "REST", "RESTRICTION",
+                     "RULE_PROCESSING", "VICTORY"],
+    "engine": "0.0.1",
+    "record_version": 4,
+    "first": null
+  },
+  "regress": {
+    "audit_base_handlers": {
+      "cmd": "rs_audit_replay.py --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF",
+      "cards": 634, "abilities": 817, "match": 817, "mismatch": 0, "unimplemented": 0
+    },
+    "replay_vanilla": {
+      "cmd": "rs_diff_replay.py --mode replay --vanilla --games 20 --seed-base 1500000",
+      "games": 20, "actions": 1845, "match": 20, "mismatch": 0, "unimplemented": 0
+    },
+    "state": {
+      "cmd": "rs_diff_replay.py --mode state --games 5",
+      "games": 5, "actions": 431, "match": 5, "mismatch": 0, "unimplemented": 0
+    },
+    "query_oracle": {
+      "cmd": "rs_query_oracle.py --boards 40 --seed-base 1510000",
+      "boards": 40, "queries": 1467480, "match": 1285226, "error_match": 182254,
+      "mismatch": 0, "unimplemented": 0
+    },
+    "cargo_test": "192 passed / 0 failed / 0 ignored（群 E の新規 26 件）",
+    "cargo_clippy": "--all-targets -- -D warnings で警告 0",
+    "make_test": "green（Python は 1 行も変更していない）"
+  },
+  "notes": "【所有範囲の逸脱 1 件・要レビュー】actions/mod.rs の game_handler_for へ ActionType::RuleProcessing を 1 行足した（Unregistered 一覧＝群 A〜E の差し口へ渡す枝）。理由: 自己制限 RULE_PROCESSING は atoms.py::_self_cannot が target=None で作るので targets が常に空 → run_target_loop の対象ループは 1 度も回らず、owns_target/apply_target だけでは player.restrictions への登録が黙って落ちる（監査で mismatch になる）。骨組みのコメントは『対象ループ側にも登録があるのでどちらへ落ちても群 E の未実装で止まる』と書かれていたが、対象 0 枚では Unimplemented にもならず success=true で素通りする。Python の when= ガードが偽のときのフォールスルー先（per_target.rule_processing）は no-op で success=true なので、rules::game_handler はどちらの枝でも Some(Ok(true)) を返して同値にしてある。他群と衝突しない 1 行の追加だが、mod.rs は原則不可なので申告する。 | 【申告: model.rs が要る（変更していない）】guards._register_granted_replacements（EB02-030『自分のキャラすべては、このターン中、バトルでKOされる場合、代わりに〜できる』）の置き場 PlayerState.granted_replacements が model.rs に無い。rules.rs::register_granted_replacements は『積むものが 1 件でもあれば Unimplemented』にしてある（黙って落とさない）。現行カード DB 2,803 枚のうち該当は EB02-030 の 1 枚だけ（EVENT かつ REPLACE_EFFECT+sub_effect を持つ能力あり）で、監査オラクル・実局再生のどちらにも現れないため今回の受け入れ数値には影響しない。find_replacement の granted_replacements 走査も同じ理由で省いてある（常に空＝Python と同じ結論）。統合時に model.rs へ Vec<GrantedReplacement { status, sub: NodeRef, is_optional, expire_turn }> を足し、journal に setter を足せば rules.rs 側は数行で繋がる。 | 【申告: turn.rs/mod.rs が要る（変更していない）】デッキアウト敗北→勝利の置換（VICTORY status=REPLACE_DECKOUT_LOSS・OP03-040 等）。走査は rules.rs::has_deckout_win_replace として入れてあるが、battle::check_victory へ挿すには masters を通す必要があり、turn::draw_card / actions/mod.rs の DRAW ハンドラ / rules/tests_rules.rs の呼び口が変わる（群 E の所有外）。battle.rs の check_victory に未接続である旨をコメントで残した。 | 【申告: interact.rs の欠陥（変更していない）】interact.rs の BATTLE_KO_REPLACE 再開（decline 枝）が ops::move_card を使っており、戻り値の離脱イベント（DropContinuous / OnLeave / LifeDecrease）を捨てている。Python は gm.move_card（＝effects::actions::move_card 相当）なので、場→トラッシュの KO で継続効果の解除と ON_LEAVE 誘発が起きない。resolve_attack 側（battle.rs）は effects::actions::move_card を使っており非対称。任意バトル KO 置換を持つカードが監査に出ないため今回の数値には出ていない。 | 【申告: rules/mod.rs の欠落（変更していない）】active_restriction は Python の guards._active_restriction が持つ『期限切れエントリを player.restrictions から pop する副作用』を持たない（読み取り専用）。restrictions は board_dict（Player.to_dict）に出ないので監査・実局再生では観測できないが、長い対局で Rust 側に期限切れの行が残る。直すには &mut Session が要り、mod.rs の DRAW ハンドラ等の呼び口が変わる。 | 【can_suspend の振り分け】guards._active_replacement の can_suspend は Python の呼び出し元が 2 通りしかない（target_loop=('LEAVE','EFFECT_KO')/('LEAVE',) で True、battle/interaction=('BATTLE_KO',) で既定 False）。mod.rs::run_target_loop と interact.rs の呼び口はどちらも 4 引数で can_suspend を渡せないので、rules::active_replacement は status_values に 'BATTLE_KO' を含むかで振り分ける（明示版は active_replacement_with）。 | 【正規表現】regex クレートを足さないため Python の 2 本を手で解いた: 属性限定バトル KO 耐性 属性[(（《]([斬打射特知])[)）》]を持つ(?:カード|キャラ)?との(?:バトル|戦闘)（required_battle_attribute）と置換の自己無効化 「([^」]+)」がい[るて][^。]*?この効果は無効（self_negating_name）。どちらも Python の正規表現と同じ判定になることを単体テストで固定した。_nfc は NFC 正規化だが対象の文字（カタカナ・漢字・半角数字）は NFC で不変なので省いた。 | 【Python 側の欠陥】今回の照合では 1 件も見つからなかった（mismatch=0）。per_target.attack_disable が RESTRICTION の status（RESTED_PLAY / NO_EFFECT_PLAY）を ATTACK_DISABLE へ潰すのは意味論として疑わしいが、これらは PASSIVE の目印で実行されない想定なので実害は観測できず、Python のまま移した。 | 【所有範囲内の変更】rust/opcg_engine/src/effects/actions/rules.rs（新規本体＋rules/tests.rs）・同 mod.rs の active_protection/find_replacement/active_replacement（高速路→委譲の呼び口。active_protection_vs を足し、fast-path 専用だった has_passive_action を削除、push_scope を pub(super) 化）・rules/battle.rs（アタック税・【カウンター】イベント・任意バトル KO 置換の中断・check_victory のコメント）。ops.rs への追加は不要だった（既存の原始操作で足りた）。イベントの登場は rs-p3-resolver の統合時点で既に入っていたので今回は手を入れていない。"
+}

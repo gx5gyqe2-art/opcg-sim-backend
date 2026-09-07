@@ -582,6 +582,49 @@ bad_payload=21 に退行した。`rs_diff_replay.py` のバニラデッキは Py
 （`life_count`）ずらすと「段 0 の盤面が Python と違う」で落ちる＝素通りしていない。
 全カード（634 枚／817 能力）の照合はハーネス側（上表）で回す。
 
+### 8.10 P3 群 E（置換とルール）の結果（2026-09-07）
+
+WP `rs-p3-rules`。本線 `claude/cpu-spec-improvements-yw91jd`（e6199915）から分岐。
+**Python 側（`opcg_sim/`）は 1 行も変えていない**。
+
+| 受け入れ | 結果 |
+|---|---|
+| `rs_audit_replay.py --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF,REPLACE_EFFECT,PREVENT_LEAVE,RULE_PROCESSING,RESTRICTION,REDIRECT_ATTACK,VICTORY,EXTRA_TURN` | **cards=710／abilities=917／match=917／mismatch=0・unimplemented=0**（§11.7 の想定枚数どおり） |
+| 退行: 同 `--action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF`（土台 F） | cards=634／abilities=817／**match=817**／mismatch=0・unimplemented=0 |
+| 退行: `rs_diff_replay.py --mode replay --vanilla --games 20 --seed-base 1500000` | **match=20**／mismatch=0／unimplemented=0（1,845 行動） |
+| 退行: `rs_diff_replay.py --mode state --games 5` | **match=5**／mismatch=0（431 行） |
+| 退行: `rs_query_oracle.py --boards 40 --seed-base 1510000` | queries=1,467,480／match=1,285,226／error_match=182,254／**mismatch=0** |
+| `cargo test --no-default-features` | **192 passed**・0 failed・0 ignored（群 E の新規 26 件） |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `make test`（Python 無変更） | green |
+
+**入れたもの**: `actions/rules.rs` の 3 入口（`game_handler`＝RULE_PROCESSING〔自己制限〕／
+REDIRECT_ATTACK／EXTRA_TURN／VICTORY・`owns_target`／`apply_target`＝PREVENT_LEAVE／
+RULE_PROCESSING／RESTRICTION／REPLACE_EFFECT）と、`guards.py` の本体
+（`_active_protection`／`_find_replacement`／`_active_replacement`＋`_auto_resolve_replacement`／
+`_register_granted_replacements`／`battle._has_deckout_win_replace`）。`actions/mod.rs` の高速路 3 関数は
+`rules.rs` へ委譲する呼び口だけになった。P2 の積み残しのうち**アタック税**（`declare_attack` の
+`ATTACK_TAX_DISCARD_N`）と**【カウンター】イベント**（`apply_counter` の `pay_cost`→COUNTER 能力→
+付与置換の登録→トラッシュ）、**任意バトル KO 置換の中断**（`resolve_attack` → `CONFIRM_OPTIONAL`）を
+`rules/battle.rs` へ入れた（イベントの登場は `rs-p3-resolver` の統合時点で既に入っていた）。
+
+**Python の正規表現 2 本は手で解いた**（regex クレートを足さないため。`rules.rs::
+required_battle_attribute`／`self_negating_name`。単体テストで Python の正規表現と同じ判定になることを
+固定した）: 属性限定のバトル KO 耐性 `属性[(（《]([斬打射特知])[)）》]を持つ(?:カード|キャラ)?との(?:バトル|戦闘)`
+と、置換の自己無効化 `「([^」]+)」がい[るて][^。]*?この効果は無効`。
+
+**差し口の欠陥を 1 つ直した（`actions/mod.rs` の 1 か所）**: 自己制限 RULE_PROCESSING は
+`target=None`（`atoms.py::_self_cannot`）なので **対象ループでは 1 度も呼ばれない**＝
+`game_handler_for` が `None` を返す骨組みのままでは登録が黙って落ちていた。
+`game_handler_for` の `Unregistered` 一覧へ `ActionType::RuleProcessing` を足して群 E へ渡す
+（Python の `when=` ガードが偽のときのフォールスルー先＝`per_target.rule_processing` は no-op で
+success=true なので、群 E 側はどちらの枝でも `Some(Ok(true))` を返して同値にする）。
+
+**残した穴（`model.rs`／`turn.rs` が要る＝群 E の所有外・統合時にコーディネータが入れる）**:
+`_register_granted_replacements`（`PlayerState.granted_replacements` の欄）と
+デッキアウト敗北→勝利の置換（`check_victory` に `masters` を通す）。どちらも黙って落とさず
+`Unimplemented`／未接続として明示してある。詳細は `RESULT.json` の notes。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
@@ -1125,7 +1168,7 @@ pub fn apply_target(s, masters, actor, action, target, owner, source_list, value
 | B ゾーン移動 | `zone.rs` | MOVE_CARD・DECK_BOTTOM・DECK_TOP・BOUNCE・TRASH_FROM_DECK・HEAL・DEAL_DAMAGE・SHUFFLE・ORDER_LIFE・FACE_UP_LIFE・LOOK_LIFE・MOVE_TO_HAND（DB 未使用の LIFE_RECOVER／LIFE_MANIPULATE は `Unimplemented` 可） | 987／1,271 | `per_target.move/bounce/deck_bottom/deck_top/move_card/face_up_life`・`player_level.deal_damage/shuffle/heal/trash_from_deck/order_life/look_life` |
 | C カードの流れ | `flow.rs` | PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_MAIN_EFFECT・EXECUTE_EVENT・DECLARE_COST（DB 未使用の SELECT_OPTION は不要） | 865／1,144 | `per_target.play_card/reveal`・`player_level.look/select/execute_event`・`resolver._expand_main_effect/_execute_selected_main/_suspend_for_cost_declaration` |
 | D ドン!! | `don.rs` | RETURN_DON・RAMP_DON・REST_DON・ATTACH_DON・ACTIVE_DON（target 無し）・FREEZE_DON・MOVE_ATTACHED_DON（DB 未使用の MODIFY_DON_PHASE は不要）＋**ドン!!を対象に取るクエリ**（`TargetRef::Don`＝COST_AREA 3 件・CHAR_OR_DON 2 件。resolver の `only_cards_strict` 3 か所をドン!!込みに広げる＝この群だけ `resolver.rs` の当該経路を所有） | 979／1,273 | `player_level.return_don/ramp_don/rest_don/freeze_don/active_don_by_count/move_attached_don`・`per_target.attach_don`・`resolver._suspend_for_don_selection` |
-| E 置換とルール | `rules.rs` | REPLACE_EFFECT・PREVENT_LEAVE（`active_protection`／`find_replacement`／`active_replacement`／`_register_granted_replacements` の本体＝`mod.rs` の高速路を置き換える・戦闘 KO 置換の中断）・RULE_PROCESSING・RESTRICTION・REDIRECT_ATTACK・VICTORY・EXTRA_TURN＋P2 の積み残し（【カウンター】イベント・イベントの登場・アタック税）。DB 未使用の KEYWORD／PASSIVE_EFFECT／GRANT_EFFECT／LOCK／OTHER は `Unimplemented` 可 | 710／917 | `engine/guards.py`・`player_level.rule_processing_self_restriction/redirect_attack/extra_turn/victory`・`battle.py` の置換分岐 |
+| E 置換とルール **【完了 2026-09-07】** | `rules.rs` | REPLACE_EFFECT・PREVENT_LEAVE（`active_protection`／`find_replacement`／`active_replacement`／`_register_granted_replacements` の本体＝`mod.rs` の高速路を置き換える・戦闘 KO 置換の中断）・RULE_PROCESSING・RESTRICTION・REDIRECT_ATTACK・VICTORY・EXTRA_TURN＋P2 の積み残し（【カウンター】イベント・イベントの登場・アタック税）。DB 未使用の KEYWORD／PASSIVE_EFFECT／GRANT_EFFECT／LOCK／OTHER は `Unimplemented` 可 | 710／917 →**実測 cards=710・abilities=917・match=917・mismatch=0・unimplemented=0**（§8.10） | `engine/guards.py`・`player_level.rule_processing_self_restriction/redirect_attack/extra_turn/victory`・`battle.py` の置換分岐 |
 
 複数群に跨るカードは 685 枚（統合時にコーディネータが全カード監査で受け入れる）。5 群＋F で 2,472 枚を覆う。
 
