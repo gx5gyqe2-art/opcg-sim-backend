@@ -195,7 +195,7 @@ pub fn build_test_state(
 
     let source_uuid = ids.next();
     let source = card_record(masters, card_id, source_uuid.clone(), "p1");
-    let mut p1_leader_slot = Value::from(p1_leader);
+    let mut p1_leader_slot = p1_leader;
     let mut p1_stage_slot = Value::Null;
     if source_in_hand {
         p1_hand.push(source);

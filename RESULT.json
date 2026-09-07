@@ -1,0 +1,47 @@
+{
+  "job": "rs-archive-goldens",
+  "status": "done",
+  "branch": "claude/rs-archive-goldens-ta95q0",
+  "base": "claude/cpu-spec-improvements-yw91jd (1494f05c)",
+  "golden": {
+    "audit": {
+      "path": "tests/fixtures/rs_goldens/audit.json",
+      "entries": 3386,
+      "cards": 2472,
+      "size_mb": 1.06,
+      "generated_by": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_audit_replay.py --golden-out tests/fixtures/rs_goldens/audit.json",
+      "match_at_generation": "3386/3386 (mismatch=0)",
+      "reverified_independently": "opcg_engine.golden_audit called for all 3386 entries: mismatch=0"
+    },
+    "replay": {
+      "path": "tests/fixtures/rs_goldens/replay/",
+      "games": 200,
+      "random_games": 150,
+      "random_seed_base": 5000000,
+      "l1_games": 50,
+      "l1_seed_base": 5000150,
+      "size_mb": 17,
+      "generated_by": [
+        "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_diff_replay.py --games 150 --policy random --seed-base 5000000 --golden-out tests/fixtures/rs_goldens/replay",
+        "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_diff_replay.py --games 50 --policy l1 --seed-base 5000150 --golden-out tests/fixtures/rs_goldens/replay"
+      ],
+      "match_at_generation": "200/200 (mismatch=0); one L1 game (seed 5000179) lost to a local workspace race during development and regenerated individually, verified match=1"
+    },
+    "total_size_mb": 18,
+    "budget_mb": 30
+  },
+  "make_test_seconds": 77.9,
+  "make_test_result": "cargo test 358 passed, 0 failed; pytest 608 passed, 0 failed (-m \"not slow and not legacy\")",
+  "make_test_legacy_result": "PENDING_FILL",
+  "cargo_test": "358 passed, 0 failed (cargo test --no-default-features)",
+  "cargo_clippy": "0 warnings (cargo clippy --no-default-features --all-targets -- -D warnings)",
+  "golden_pytest": "6 passed (tests/test_rs_golden_audit.py + tests/test_rs_golden_replay.py)",
+  "legacy_marker": {
+    "files_marked": 115,
+    "note": "114 files got a module-level `pytestmark = pytest.mark.legacy` (55 of them already carried `pytest.mark.cpu_infra` and now carry both). tests/test_api.py kept its file-level cpu_infra-free status; only its single Python-engine-dependent test (test_replay_api_descriptor_end_to_end, which restores a GameManager via replay_runner) got a function-level @pytest.mark.legacy decorator instead of marking the whole file, since the rest of that file only exercises the API/HTTP layer and is engine-agnostic.",
+    "deviation_from_plan_estimate": "The plan's §16.1 draft estimated 83 files (~ the cpu_infra count). Actually enumerating tests that directly exercise the Python engine via GameManager (not just cpu_infra-marked pipeline/labeling tests) required 115 files to hit the <3min target for `make test`, because many cpu_infra tests (cpu_arena.play_game, p2_gen0.match, journal make/unmake roundtrips, self-play data generation) run full games through the engine and are individually multi-second to multi-minute. 24 cpu_infra files that do NOT touch the engine directly (pure labeling/arena-aggregation/referee pipelines on precomputed data) were left unmarked and remain in `make test`.",
+    "criteria": "A test file was marked legacy if it (a) directly imports and calls GameManager(...) / play_card_action / resolve_ability / resolve_interaction / apply_game_action / apply_battle_action / effect_coverage._build_test_state, or (b) drives full games through a wrapper that does so (game_driver.run_game, cpu_arena.play_game, leader_test_helpers.build, p2_gen0.match, full_card_audit.audit/signatures, replay_runner). Pure parser tests (test_parser.py, test_golden.py), pure network/npz-loading sanity tests explicitly marked \"required, not cpu_infra\" in their own docstrings (test_net_vocab_pinning.py), API/HTTP-contract-only tests, and unrelated feature tests (flagship store/event/search) were excluded even when cpu_infra-marked or transitively importing opcg_sim.src.core."
+  },
+  "python_engine_changed": false,
+  "notes": "Base branch was refreshed mid-session: the task's own reference to plan §16.1 only existed on a newer HEAD of claude/cpu-spec-improvements-yw91jd (1494f05c) than the one first fetched; work was rebuilt on the correct base. All golden generation and Rust changes (rust/opcg_engine/src/audit.rs, lib.rs::golden_audit) were verified against this base: cargo test 358 passed, clippy 0 warnings, and the full audit golden (3386 entries) was independently re-verified against opcg_engine.golden_audit after the final wheel build. Python engine (opcg_sim/src/core, effects, learned) was not touched — only tests/, rust/opcg_engine/, Makefile, CLAUDE.md, docs/TEST_SPEC.md, docs/rust_engine_plan.md were changed."
+}

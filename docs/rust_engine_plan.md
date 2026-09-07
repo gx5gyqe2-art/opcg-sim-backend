@@ -1192,6 +1192,65 @@ Python の `NRelValueAdapter.encode_state` を JSON で渡す。
 見える）。山札側の並び（`pool[n_hand:]`）は `cargo test` の
 `determinize_resamples_only_the_opponent_hand` が直接アサートする。
 
+### 8.17 Python 版の退避・第 1 段 `rs-archive-goldens`（golden 化とゲートの 2 段化）の結果（2026-09-07）
+
+`claude/cpu-spec-improvements-yw91jd`（1494f05c）から分岐。**Python エンジン（`opcg_sim/src/core`・
+`effects`・`learned`）は 1 行も変えていない**（変更は `rust/opcg_engine/`・`tests/`（ハーネス／
+golden 2 本／`legacy` マーカー）・`Makefile`／`CLAUDE.md`／`docs/TEST_SPEC.md` のみ）。
+
+**Rust 側**
+
+- `src/audit.rs`（新規）: `build_test_state`（`effect_coverage._build_test_state` の汎用盤面の
+  逐語移植＝両者のゾーン枚数・`FILLER`／合成リーダー `L-001`・`ON_PLAY` は手札）と `drain_default`
+  （`_smart_drain` の既定応答の逐語移植）。`golden_audit(card_id, trigger, ability_index)` が
+  盤面の生成から解決まで自前で辿り、各段の `{"events":…,"state":…}` を uuid 別名化＋キー順
+  正規化してから sha1 を取る（`UuidCanon`）。マスター表への `extra_masters` 追加は毎回複製すると
+  重いので `OnceLock`（`AUDIT_MASTERS`）でプロセス 1 回に留めた。
+- `lib.rs` に `golden_audit`（PyO3 関数・`debug=True` で段ごとの盤面も返す開発用の経路）を追加。
+  他 WP との衝突を避けるため `mod audit;` と関数登録の 2 行だけ足した。
+
+**Python 側**
+
+- `tests/harness/rs_golden.py`（新規）: golden の正規化を 1 か所に集約する共通モジュール
+  （`Canon`＝uuid 別名化・順序なし list のソート・sha1、`audit_hashes`／`replay_hashes`）。
+  効果構造 JSON のパス／生成（`ensure_effects_json`）と Rust 拡張の読み込み（`load_engine`＝
+  **wheel が無ければ skip ではなく `AssertionError`**）もここへ集約し、`rs_diff_replay.py` の
+  重複定義を差し替えた。
+- `tests/scripts/rs_audit_replay.py --golden-out PATH`：Python の記録から golden 1 件（sha1 の列＋
+  要約）を作り、その場で `opcg_engine.golden_audit` と突き合わせてから書く。
+- `tests/scripts/rs_diff_replay.py --golden-out DIR`：1 局ぶんの golden（`opcg_engine.replay()` に
+  渡す最小の再生入力＋sha1 の列）を局ごとの JSON へ書く。一致した局だけを書く。
+- `tests/test_rs_golden_audit.py`／`tests/test_rs_golden_replay.py`（新規）：Rust だけで golden と
+  照合する pytest 2 本。`tests/harness/rs_golden.load_engine` 経由なので **wheel が無ければ fail**
+  （skip で黙って緑にならない）。
+
+**golden の実測**
+
+| golden | 件数 | サイズ | 結果 |
+|---|---|---|---|
+| `tests/fixtures/rs_goldens/audit.json` | 3,386 能力（2,472 カード） | 1.1MB | Rust 再構成と**全件一致**（`opcg_engine.golden_audit` を全件呼んで独立検証） |
+| `tests/fixtures/rs_goldens/replay/` | 200 局（random 150・seed 5000000〜／L1 50・seed 5000150〜） | 17MB | Rust 再生と**全件一致**（`--golden-out` 生成時に mismatch=0 を確認済み） |
+| 合計 | — | **18MB**（予算 30MB 以内） | — |
+
+**ゲートの実測**
+
+| 項目 | 結果 |
+|---|---|
+| `cargo test --no-default-features` | **358 passed**・0 failed |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `tests/test_rs_golden_audit.py`／`tests/test_rs_golden_replay.py` | **6 passed** |
+| `make test`（新定義＝cargo test＋`-m "not slow and not legacy"`） | **green**（cargo 358 passed＋pytest 608 passed）・**77.9 秒**（目標 3 分以内を達成） |
+| `make test-legacy`（従来の全数・`-m "not slow"`） | 実測は RESULT.json に記入（進行中） |
+
+**`legacy` マーカーの適用**: 計画のたたき台（本節冒頭）は「180 本中 83 本」という粗い見積もりだったが、
+実際に「Python エンジンを GameManager 経由で直に叩くテスト」を洗い出すと、`cpu_infra`（探索/自己対戦/
+学習パイプライン内部機構）のうち実際にゲームを打つもの（`cpu_arena.play_game`・`p2_gen0.match`・
+`journal` の make/unmake・自己対戦データ生成 等）も同じ基準に当たり、**115 ファイル**（`test_api.py`
+はファイル全体ではなく `test_replay_api_descriptor_end_to_end` の 1 関数のみ）に `@pytest.mark.legacy`
+を付けた。この方が `make test` の 3 分以内という受け入れ条件に対して忠実（`cpu_infra` だが
+Python エンジンを直叩きしない 24 ファイル＝ラベリング／アリーナ集計等の純データパイプラインは
+`legacy` を付けず `make test` に残した）。内訳・判定根拠は本 WP の RESULT.json に記す。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
