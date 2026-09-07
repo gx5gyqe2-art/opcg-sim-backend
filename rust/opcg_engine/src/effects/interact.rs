@@ -30,7 +30,7 @@ use crate::journal::{CardZone, Session};
 use crate::model::{
     ArrangeContinuation, ArrangeDest, BattleKoContinuation, CardIdx, CardType, Continuation,
     DeferredFrame, DonIdx, GameState, Interaction, InteractionKind, MasterTable, Position, Seat,
-    Zone,
+    TargetRef, Zone,
 };
 use crate::ops;
 use crate::state::EngineError;
@@ -45,6 +45,7 @@ fn card_name(s: &Session, masters: &MasterTable, card: Option<CardIdx>) -> Strin
     card.map(|c| masters.get(s.state().card(c).master).name.clone())
         .unwrap_or_default()
 }
+
 
 fn continuation(
     execution_stack: &[NodeRef],
@@ -69,7 +70,7 @@ pub fn suspend_for_target_selection(
     s: &mut Session,
     masters: &MasterTable,
     actor: Seat,
-    candidates: &[CardIdx],
+    candidates: &[TargetRef],
     query: &TargetQuery,
     source_card: Option<CardIdx>,
     action_node: Option<&NodeRef>,
@@ -98,16 +99,17 @@ pub fn suspend_for_target_selection(
         saved_stack.push(node.clone());
     }
 
-    // temp_zone からの選択（デッキサーチ）は全公開カードを見せ、選べるものだけ絞る。
+    // temp_zone からの選択（デッキサーチ）は全公開カードを見せ、選べるものだけ絞る
+    // （常にカードだけ＝ドン!!はデッキサーチの対象にならない）。
     let mut view_candidates = candidates.to_vec();
-    let mut selectable: Option<Vec<CardIdx>> = None;
+    let mut selectable: Option<Vec<TargetRef>> = None;
     if query.zone == vec![super::ast::ZoneRef::Temp] {
         let owner = source_card
             .map(|c| s.state().card(c).owner)
             .unwrap_or(actor);
         let all_temp = s.state().player(owner).temp_zone.clone();
         if all_temp.len() > candidates.len() {
-            view_candidates = all_temp;
+            view_candidates = all_temp.into_iter().map(TargetRef::Card).collect();
             selectable = Some(candidates.to_vec());
         }
     }
@@ -143,7 +145,6 @@ pub fn suspend_for_target_selection(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
-        candidate_dons: Vec::new(),
     });
     Ok(())
 }
@@ -194,7 +195,6 @@ pub fn suspend_for_choice(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
-        candidate_dons: Vec::new(),
     });
     Ok(())
 }
@@ -230,7 +230,6 @@ pub fn suspend_for_ability_cost_confirm(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
-        candidate_dons: Vec::new(),
     });
 }
 
@@ -262,7 +261,6 @@ pub fn suspend_for_optional_confirmation(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
-        candidate_dons: Vec::new(),
     });
     Ok(())
 }
@@ -298,7 +296,6 @@ pub fn suspend_for_battle_ko_replacement(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
-        candidate_dons: Vec::new(),
     });
 }
 
@@ -342,7 +339,7 @@ pub fn suspend_for_arrange(
         kind: InteractionKind::ArrangeDeck,
         player: actor,
         message: format!("「{name}」の効果: {what}を決めてください"),
-        candidates: cards,
+        candidates: cards.into_iter().map(TargetRef::Card).collect(),
         selectable: None,
         // max=-1 はフロントの並び替えモード（全カード配置）を意味する。
         constraints: Some((0, if needs_reorder { -1 } else { 0 })),
@@ -353,7 +350,6 @@ pub fn suspend_for_arrange(
         allow_position: needs_pos,
         allow_reorder: needs_reorder,
         continuation: Some(cont),
-        candidate_dons: Vec::new(),
     });
     Ok(())
 }
@@ -383,7 +379,6 @@ pub fn suspend_for_cost_declaration(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
-        candidate_dons: Vec::new(),
     });
     Ok(())
 }
@@ -430,7 +425,7 @@ pub fn suspend_for_don_selection(
         kind: InteractionKind::SelectResource,
         player: tp,
         message: format!("ドン!!デッキに戻すドン!!を{to_return}枚選択してください"),
-        candidates: Vec::new(),
+        candidates: field_don.into_iter().map(TargetRef::Don).collect(),
         selectable: None,
         constraints: Some((to_return, to_return)),
         can_skip: false,
@@ -440,7 +435,6 @@ pub fn suspend_for_don_selection(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
-        candidate_dons: field_don,
     });
     let _ = name;
     Ok(true)
@@ -526,20 +520,20 @@ pub fn resolve_interaction(
     match it.kind {
         InteractionKind::SelectTarget => {
             let uuids = selected_uuids(payload);
-            let selected: Vec<CardIdx> = uuids
+            let selected: Vec<TargetRef> = uuids
                 .iter()
                 .filter_map(|u| {
                     it.candidates
                         .iter()
                         .copied()
-                        .find(|c| s.state().card(*c).uuid == *u)
+                        .find(|t| s.state().target_uuid(*t) == *u)
                 })
                 .collect();
             let mut ctx = cont.context.clone();
             ctx.temp_resolved_targets = Some(selected.clone());
             if let Some(query) = cont.query.as_ref() {
                 if let Some(save_id) = query.save_id.as_ref() {
-                    ctx.set_saved_cards(save_id, selected.clone());
+                    ctx.set_saved(save_id, selected.clone());
                 }
             }
             s.edit().pop_interaction();
@@ -589,7 +583,12 @@ pub fn resolve_interaction(
                 if accepted && super::actions::active_replacement(s, masters, target, &["BATTLE_KO"])? {
                     // 置換が成立＝本来の KO をスキップ
                 } else {
-                    ops::move_card(s, masters, target, Zone::Trash, bk.target_owner, Position::Bottom)?;
+                    // §11.8 #7: Python `gm.move_card`（＝`actions::move_card`）を使う——
+                    // 生の `ops::move_card` は離脱イベント（ON_LEAVE／DropContinuous／
+                    // LifeDecrease）を返すだけで積まない。decline 枝でここを生のまま
+                    // 呼ぶと、バトルで KO された対象の ON_LEAVE 誘発・継続効果破棄が
+                    // 消える（PREVENT_LEAVE を持たないカードのバトル KO で必ず通る経路）。
+                    super::actions::move_card(s, masters, target, Zone::Trash, bk.target_owner, Position::Bottom)?;
                     super::triggers::resolve_on_ko(
                         s,
                         masters,
@@ -685,6 +684,9 @@ pub fn resolve_interaction(
                 }
                 ArrangeDest::Deck => {
                     // BOTTOM は順に append（先頭が上）、TOP は逆順 insert(0)。
+                    // §11.8 #7 と同じ理由（Python `gm.move_card`＝離脱イベント込み）で
+                    // `actions::move_card` を使う: ARRANGE_DECK の対象は場のキャラのことも
+                    // ある（「キャラをデッキに戻す（並べ替え）」型の効果）。
                     let seq: Vec<CardIdx> = if position == Position::Bottom {
                         ordered.clone()
                     } else {
@@ -692,7 +694,7 @@ pub fn resolve_interaction(
                     };
                     for c in seq {
                         if let Some((owner, _)) = ops::find_card_location(s.state(), c) {
-                            ops::move_card(s, masters, c, Zone::Deck, owner, position)?;
+                            super::actions::move_card(s, masters, c, Zone::Deck, owner, position)?;
                         }
                     }
                 }
@@ -777,6 +779,8 @@ pub fn after_resolve(s: &mut Session, masters: &MasterTable) -> Result<(), Engin
 }
 
 /// Python `resolve_interaction` の `FIELD_OVERFLOW_TRASH` 分岐（P2 から移した本体）。
+/// §11.8 #7 と同じ理由で `actions::move_card`（Python `gm.move_card`）を使う——強制トラッシュ
+/// された場のキャラの ON_LEAVE 誘発・継続効果破棄を落とさない。
 fn resolve_field_overflow(
     s: &mut Session,
     masters: &MasterTable,
@@ -795,7 +799,7 @@ fn resolve_field_overflow(
             .copied()
             .find(|c| s.state().card(*c).uuid == uid);
         if let Some(card) = card {
-            ops::move_card(s, masters, card, Zone::Trash, owner, Position::Bottom)?;
+            super::actions::move_card(s, masters, card, Zone::Trash, owner, Position::Bottom)?;
         }
     }
     super::passives::refresh_passive_state(s, masters)?;
@@ -931,20 +935,17 @@ pub fn selection_entries(
         }
     }
     // デッキを見て選ぶ系は候補が公開一時領域（`active_interaction.candidates`）に居る。
+    // カード／ドン!!の**並び順つきの混在**（§11.8 #2）: ドン!!は Python では `master` を持たない
+    // 実体なので `card_keep_value` は全項目 0 になる＝値 0・zone "temp"。
     if let Some(it) = state.active_interaction() {
         if it.player == pid {
-            for c in &it.candidates {
-                let u = state.card(*c).uuid.clone();
+            for t in &it.candidates {
+                let (u, card) = match *t {
+                    TargetRef::Card(c) => (state.card(c).uuid.clone(), Some(c)),
+                    TargetRef::Don(d) => (state.don(d).uuid.clone(), None),
+                };
                 if uuids.contains(&u) && !seen(&index, &u) {
-                    index.push((u, "own", "temp", Some(*c)));
-                }
-            }
-            // ドン!!の候補（SELECT_RESOURCE）。Python では `master` を持たない実体なので
-            // `card_keep_value` は全項目 0 になる＝値 0・zone "temp"。
-            for d in &it.candidate_dons {
-                let u = state.don(*d).uuid.clone();
-                if uuids.contains(&u) && !seen(&index, &u) {
-                    index.push((u, "own", "temp", None));
+                    index.push((u, "own", "temp", card));
                 }
             }
         }
@@ -1058,8 +1059,17 @@ pub fn default_interaction_payload(
         }
     }
     let selected = selected.unwrap_or_else(|| {
-        let take = min_n.max(0).min(max_n).min(uuids.len() as i32).max(0) as usize;
-        uuids.into_iter().take(take).collect()
+        // Python: `take = min(max(min_n, 0), max_n, len(uuids)); selected = uuids[:take]`。
+        // `max_n` は ARRANGE_DECK の「並び替えモード」で **-1**（`constraints: {min:0, max:-1}`＝
+        // フロントの全カード配置 UI）になる（§11.8 #11）。Python の list slice は負の `take` を
+        // 「末尾から `|take|` 枚を除く」と読む（`uuids[:-1]` は最後の 1 枚を除いた全部）ので、
+        // Rust もその意味論を再現する（単純に 0 へ丸めると「並び替えを1枚も選ばない」になり、
+        // カヤ／そげキング等の「順番を決める」の既定解決が Python と食い違う＝
+        // 実デッキ再生 20 局のうち 12 局がこれで落ちていた）。
+        let n = uuids.len() as i32;
+        let take = min_n.max(0).min(max_n).min(n);
+        let end = if take < 0 { (n + take).max(0) } else { take };
+        uuids.into_iter().take(end as usize).collect()
     });
     serde_json::json!({
         "selected_uuids": selected,
@@ -1157,7 +1167,8 @@ pub fn resume_deferred_continuations(
                     })?;
                     if let super::ast::EffectNode::Action(a) = node {
                         super::actions::apply_action(
-                            s, masters, player, &a, &action, &remaining, value, None,
+                            s, masters, player, &a, &action, &super::refs_of(&remaining), value,
+                            None,
                         )?;
                     }
                 }

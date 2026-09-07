@@ -28,16 +28,18 @@ pub mod rules;
 pub mod status;
 pub mod zone;
 
-use crate::journal::{CardBoolField, CardI32Field, CardStrsField, CardZone, DonZone, Session};
+use crate::journal::{
+    CardBoolField, CardI32Field, CardStrsField, CardZone, DonBoolField, DonZone, Session,
+};
 use crate::model::{
-    CardIdx, CardType, ContinuousKind, MasterTable, Position, Seat, Zone,
+    CardIdx, CardType, ContinuousKind, DonIdx, MasterTable, Position, Seat, TargetRef, Zone,
 };
 use crate::ops;
 use crate::state::EngineError;
 
 use super::ast::{ActionType, GameAction, PlayerRef};
 use super::resolver::{expire_turn_for, is_timed};
-use super::{continuous, triggers, NodeRef};
+use super::{cards_of, continuous, triggers, NodeRef};
 
 /// 「相手の効果で場を離れない」対象になり得る除去アクション（Python `_LEAVE_ACTIONS`）。
 const LEAVE_ACTIONS: &[ActionType] = &[
@@ -128,6 +130,11 @@ fn unimplemented(ty: ActionType) -> EngineError {
 }
 
 /// Python `apply_action`（＝`gamestate.apply_action_to_engine`）。
+///
+/// `targets` は§11.8 #2 でカード／ドン!!の並び順つきの混在（`Vec<TargetRef>`）。プレイヤー
+/// レベル・ハンドラ（群 A〜E の `game_handler`）は現行 DB でドン!!を対象に取ることが無い
+/// （ドン!!対象は REST／ACTIVE の対象ループだけ＝§8.13）ので、その差し口へはカードだけの
+/// 列（[`cards_of`]）を渡す。対象ループ（[`run_target_loop`]）へは混在のまま渡す。
 #[allow(clippy::too_many_arguments)]
 pub fn apply_action(
     s: &mut Session,
@@ -135,33 +142,45 @@ pub fn apply_action(
     actor: Seat,
     action: &GameAction,
     node_ref: &NodeRef,
-    targets: &[CardIdx],
+    targets: &[TargetRef],
     value: i32,
     source_card: Option<CardIdx>,
 ) -> Result<bool, EngineError> {
     if let Some(handler) = game_handler_for(action) {
-        return match handler {
-            GameHandler::Draw => draw(s, masters, actor, action, value),
+        match handler {
+            GameHandler::Draw => return draw(s, masters, actor, action, value),
             GameHandler::Unregistered => {
-                // 群 A〜E の差し口（担当する群が `Some` を返す。誰も返さなければ未実装のまま）。
+                // 群 A〜E の差し口（担当する群が `Some` を返す）。§11.8 #3・#4: 全群が `None`
+                // を返したら Python の `when=` ガード偽と同じフォールスルー＝対象ループへ落ちる
+                // （旧実装はここで `Unimplemented` にしていたため、群 A が自前で
+                // `run_target_loop` を呼ぶ回避策〔status.rs の DISABLE_ABILITY〕を必要として
+                // いた。ここを直したので回避策は撤去した）。
+                let card_targets = cards_of(targets);
                 type GroupGame = fn(&mut Session, &MasterTable, Seat, &GameAction, &NodeRef, &[CardIdx], i32, Option<CardIdx>) -> Option<Result<bool, EngineError>>;
                 const GROUPS: &[GroupGame] = &[
                     status::game_handler, zone::game_handler, flow::game_handler,
                     don::game_handler, rules::game_handler,
                 ];
                 for g in GROUPS {
-                    if let Some(r) = g(s, masters, actor, action, node_ref, targets, value, source_card) {
+                    if let Some(r) = g(s, masters, actor, action, node_ref, &card_targets, value, source_card) {
                         return r;
                     }
                 }
-                Err(unimplemented(action.ty))
+                // 全群が `None`＝フォールスルー。ここで打ち切らず対象ループへ渡す。
             }
-        };
+        }
     }
     run_target_loop(s, masters, actor, action, node_ref, targets, value, source_card)
 }
 
 /// Python `target_loop.run_target_loop`（除去保護・置換ゲート・B2 退避・success 規約）。
+///
+/// `targets` は§11.8 #2 でカード／ドン!!の並び順つきの混在（`Vec<TargetRef>`）。現行 DB で
+/// ドン!!を対象に取るのは REST／ACTIVE の対象ループだけ（`CHAR_OR_DON`／`COST_AREA` クエリ・
+/// §8.13 の表）なので、Card 枝はこれまでどおり（除去保護・置換ゲート込み）、Don 枝は
+/// Python `per_target.rest`／`per_target.active` の `isinstance(target, DonInstance)` 分岐
+/// （[`rest_don`]／[`active_don`]）だけを持つ——ドン!!は場から「除去」されない実体なので
+/// 除去保護／置換ゲートの対象にならない（Python も `_LEAVE_ACTIONS` はカード限定）。
 #[allow(clippy::too_many_arguments)]
 pub fn run_target_loop(
     s: &mut Session,
@@ -169,7 +188,7 @@ pub fn run_target_loop(
     actor: Seat,
     action: &GameAction,
     node_ref: &NodeRef,
-    targets: &[CardIdx],
+    targets: &[TargetRef],
     value: i32,
     source_card: Option<CardIdx>,
 ) -> Result<bool, EngineError> {
@@ -198,8 +217,30 @@ pub fn run_target_loop(
     }
     // 初期値 true: 対象 0 枚でも「何もしないことに成功した」とみなす（旧 success 規約）。
     let success = true;
-    for (i, target) in targets.iter().enumerate() {
-        let Some((owner, source_list)) = ops::find_card_location(s.state(), *target) else {
+    for (i, target) in targets.iter().copied().enumerate() {
+        let card_target = match target {
+            TargetRef::Don(don) => {
+                // ドン!!が対象に取れるのは REST／ACTIVE だけ（他の種別が来たら明示エラー＝
+                // 黙ってカードだけ処理して落とさない）。
+                let Some((owner, source)) = ops::find_don_location(s.state(), don) else {
+                    continue;
+                };
+                match handler.as_ref() {
+                    Some(TargetHandler::Rest) => rest_don(s, owner, don, source),
+                    Some(TargetHandler::Active) => active_don(s, owner, don, source),
+                    _ => {
+                        return Err(EngineError::Unimplemented(format!(
+                            "actions: ActionType::{} はドン!!を対象に取れない",
+                            action.ty.name()
+                        )))
+                    }
+                }
+                continue;
+            }
+            TargetRef::Card(c) => c,
+        };
+        let target = card_target;
+        let Some((owner, source_list)) = ops::find_card_location(s.state(), target) else {
             continue;
         };
         // 相手の効果で場のカードを除去する場合、保護／置換を確認する。
@@ -212,15 +253,15 @@ pub fn run_target_loop(
             } else {
                 &["LEAVE"]
             };
-            if active_protection(s, masters, *target, guard_statuses, Some(actor))? {
+            if active_protection(s, masters, target, guard_statuses, Some(actor))? {
                 continue;
             }
-            if active_replacement(s, masters, *target, guard_statuses)? {
+            if active_replacement(s, masters, target, guard_statuses)? {
                 if s.state().active_interaction().is_some() {
                     let remaining = &targets[i + 1..];
                     if !remaining.is_empty() {
                         super::interact::defer_removal_targets(
-                            s, actor, node_ref, remaining, value,
+                            s, actor, node_ref, &cards_of(remaining), value,
                         );
                     }
                     return Ok(success);
@@ -229,13 +270,13 @@ pub fn run_target_loop(
             }
         }
         match handler.as_ref() {
-            Some(TargetHandler::Ko) => ko(s, masters, actor, *target, owner, source_card)?,
-            Some(TargetHandler::Discard) => discard(s, masters, *target, owner)?,
-            Some(TargetHandler::Rest) => rest(s, masters, actor, *target, source_card)?,
-            Some(TargetHandler::Active) => active(s, *target, owner),
-            Some(TargetHandler::Buff) => buff(s, masters, action, *target, value)?,
+            Some(TargetHandler::Ko) => ko(s, masters, actor, target, owner, source_card)?,
+            Some(TargetHandler::Discard) => discard(s, masters, target, owner)?,
+            Some(TargetHandler::Rest) => rest(s, masters, actor, target, source_card)?,
+            Some(TargetHandler::Active) => active(s, target, owner),
+            Some(TargetHandler::Buff) => buff(s, masters, action, target, value)?,
             None => group.expect("checked above")(
-                s, masters, actor, action, *target, owner, source_list, value, source_card,
+                s, masters, actor, action, target, owner, source_list, value, source_card,
             )?,
         }
     }
@@ -249,7 +290,7 @@ pub fn run_target_loop(
 /// Python `player_level.draw`。
 fn draw(
     s: &mut Session,
-    _masters: &MasterTable,
+    masters: &MasterTable,
     actor: Seat,
     action: &GameAction,
     value: i32,
@@ -261,11 +302,10 @@ fn draw(
         }
     }
     // 「自分の効果でカードを引くことができない」
-    if crate::rules::active_restriction(s.state(), target_player, "CANNOT_DRAW_BY_EFFECT").is_some()
-    {
+    if crate::rules::active_restriction_mut(s, target_player, "CANNOT_DRAW_BY_EFFECT").is_some() {
         return Ok(true);
     }
-    crate::rules::turn::draw_card(s, target_player, value.max(0) as u32);
+    crate::rules::turn::draw_card(s, masters, target_player, value.max(0) as u32)?;
     Ok(true)
 }
 
@@ -295,10 +335,7 @@ fn discard(
     Ok(())
 }
 
-/// Python `per_target.rest`。
-///
-/// ドン!!実体への `REST` は Python では `source_list` の付け替えを伴うが、§11.5 の
-/// `get_target_cards` はカードしか返せない（`Vec<CardIdx>`）ので、ここへドン!!は来ない。
+/// Python `per_target.rest`（カード枝。ドン!!枝は [`rest_don`]＝§11.8 #2 で分離した）。
 fn rest(
     s: &mut Session,
     masters: &MasterTable,
@@ -315,10 +352,41 @@ fn rest(
     Ok(())
 }
 
-/// Python `per_target.active`（`ACTIVE` と `ACTIVE_DON` の共通ハンドラ）。
+/// Python `per_target.active`（`ACTIVE` と `ACTIVE_DON` の共通ハンドラ・カード枝。
+/// ドン!!枝は [`active_don`]＝§11.8 #2 で分離した）。
 fn active(s: &mut Session, target: CardIdx, _owner: Seat) {
     s.edit().set_card_bool(target, CardBoolField::IsRest, false);
-    // ドン!!実体の分岐（`don_rested` → `don_active`）は対象がカードのため到達しない。
+}
+
+/// Python `per_target.rest` の `isinstance(target, DonInstance)` 分岐（§11.8 #2）。
+///
+/// `source`（ドン!!の現在ゾーン）が `Rested` でなければ `don_rested` へ付け替える（Python:
+/// `source_list.remove(target); owner.don_rested.append(target)`）。マッチャーは REST の対象
+/// クエリ（`CHAR_OR_DON`／`COST_AREA`）に付与中ドン!!を含めないため、`source` は常に
+/// `Active`／`Rested`（`attached_to` は既に `None` のはずだが、Python と同じく念のため外す）。
+/// ドン!!は ON_REST を誘発しない（Python: `not isinstance(target, DonInstance)`）。**Python は
+/// 付与先カードの `attached_don` カウントを減らさない**ので、Rust もそのまま合わせる
+/// （§8.13 の `pay_cost` と同種の Python 側の取りこぼしに見える挙動・意図的に直さない）。
+fn rest_don(s: &mut Session, owner: Seat, don: DonIdx, source: DonZone) {
+    s.edit().set_don_bool(don, DonBoolField::IsRest, true);
+    if source != DonZone::Rested {
+        let mut e = s.edit();
+        e.don_zone_remove_value(owner, source, don);
+        e.don_zone_push(owner, DonZone::Rested, don);
+        e.set_don_attached_to(don, None);
+    }
+}
+
+/// Python `per_target.active` の `isinstance(target, DonInstance)` 分岐（§11.8 #2）。
+/// 現行 DB に ACTIVE でドン!!を対象に取るカードは無い（§8.13）が、Python の分岐に合わせて
+/// 実装だけ足す。
+fn active_don(s: &mut Session, owner: Seat, don: DonIdx, source: DonZone) {
+    s.edit().set_don_bool(don, DonBoolField::IsRest, false);
+    if source == DonZone::Rested {
+        let mut e = s.edit();
+        e.don_zone_remove_value(owner, DonZone::Rested, don);
+        e.don_zone_push(owner, DonZone::Active, don);
+    }
 }
 
 /// Python `per_target.buff`（status による 6 分岐）。
@@ -558,7 +626,7 @@ pub fn find_action(node: &super::ast::EffectNode, ty: ActionType) -> Option<&Gam
 /// ドン!!ゾーンの並べ替え（`ACTIVE` がドン!!に当たったときの Python の分岐）。
 /// §11.5 の `get_target_cards` はカードしか返せないので現状は未到達だが、
 /// 群 D が原始操作を足すときの受け口としてシグネチャだけ置く。
-pub fn activate_don(s: &mut Session, seat: Seat, don: crate::model::DonIdx) {
+pub fn activate_don(s: &mut Session, seat: Seat, don: DonIdx) {
     if s.state().player(seat).don_rested.contains(&don) {
         let mut e = s.edit();
         e.don_zone_remove_value(seat, DonZone::Rested, don);

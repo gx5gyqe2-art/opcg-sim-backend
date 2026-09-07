@@ -126,6 +126,40 @@ pub type DonIdx = u32;
 /// `MasterTable.masters` への index。
 pub type MasterIdx = u32;
 
+/// 効果の対象になりうる実体（カード or ドン!!・§11.8 #2）。
+///
+/// Python の `get_target_cards` は `CardInstance` と `DonInstance` の混ざった list を返す
+/// （`matcher.py` の `if not hasattr(card, "master")` 分岐。`Zone.COST_AREA` を指すクエリと
+/// `CHAR_OR_DON` フラグ＝「キャラかドン!!合計N枚を〜」OP06-035／OP12-037／OP10-074・
+/// PRB02-005）。カード index だけでは表せないので、カード／ドン!!のどちらかを指すこの型で
+/// 候補・対象・選択結果を持ち回す（`Interaction.candidates`・`EffectContext.saved_targets`・
+/// `EffectContext.temp_resolved_targets`・`actions::run_target_loop` の `targets` など）。
+/// `CardIdx`／`DonIdx` はどちらも `u32` の別名（newtype ではない）なので、値だけでは
+/// カードかドン!!か判別できない＝必ずこの enum を経由すること。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TargetRef {
+    Card(CardIdx),
+    Don(DonIdx),
+}
+
+impl TargetRef {
+    /// カードなら index、ドン!!なら `None`。
+    pub fn card(self) -> Option<CardIdx> {
+        match self {
+            TargetRef::Card(i) => Some(i),
+            TargetRef::Don(_) => None,
+        }
+    }
+
+    /// ドン!!なら index、カードなら `None`。
+    pub fn don(self) -> Option<DonIdx> {
+        match self {
+            TargetRef::Card(_) => None,
+            TargetRef::Don(i) => Some(i),
+        }
+    }
+}
+
 /// 席。Python の `Player.name`（"p1"/"p2"）に対応する。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Seat {
@@ -925,6 +959,26 @@ pub struct PlayerState {
     pub don_attached: Vec<DonIdx>,
     pub negate_onplay_until: i32,
     pub restrictions: Vec<Restriction>,
+    /// `Player.granted_replacements`（Python `guards._register_granted_replacements`・
+    /// §11.8 #5）。「このターン中」限定で継続付与される置換（EB02-030 の【カウンター】
+    /// イベント等）。場に残らないイベント由来の `REPLACE_EFFECT` を、除去されるカード側から
+    /// 参照できるようプレイヤーへ退避しておく（`guards._find_replacement` の末尾の走査）。
+    pub granted_replacements: Vec<GrantedReplacement>,
+}
+
+/// `Player.granted_replacements` の 1 件（Python の dict と 1:1・§11.8 #5）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GrantedReplacement {
+    /// `REPLACE_EFFECT` の `status`（`_find_replacement` の `status_values` と突き合わせる）。
+    pub status: String,
+    /// 置換で実行する `sub_effect`（Python の `sub_effect` コピー。木は所有せず `NodeRef` で
+    /// 指す＝共有ノードをそのまま指す。`is_optional` の上書きは [`GrantedReplacement::is_optional`]
+    /// 欄で別に持つ＝Python の `copy.copy(sub); sub_copy.is_optional = ...` に相当）。
+    pub sub: crate::effects::NodeRef,
+    pub is_optional: bool,
+    /// `gm.turn_count`（付与したターン）。`_find_replacement` は `gm.turn_count > expire_turn`
+    /// で失効を判定する（このターン中のみ有効）。
+    pub expire_turn: i32,
 }
 
 /// 進行中の戦闘（Python `GameManager.active_battle`）。`attacker_owner`／`target_owner` は
@@ -1057,9 +1111,13 @@ pub struct Interaction {
     /// 要求先（`player_id`）。
     pub player: Seat,
     pub message: String,
-    pub candidates: Vec<CardIdx>,
-    /// Python の `selectable_uuids`。`None` なら `candidates` の uuid をそのまま出す。
-    pub selectable: Option<Vec<CardIdx>>,
+    /// カード／ドン!!の**並び順つきの混在**（§11.8 #2）。Python は 1 つの list に両方を混ぜて
+    /// 返す（`SELECT_TARGET` の `CHAR_OR_DON`／`COST_AREA` クエリ・`SELECT_RESOURCE` は
+    /// ドン!!だけ）。`get_pending_request` は各要素の型で `c.uuid`／`c.to_dict()` を出し分ける。
+    pub candidates: Vec<TargetRef>,
+    /// Python の `selectable_uuids`。`None` なら `candidates` の uuid をそのまま出す
+    /// （temp_zone からの選択＝デッキサーチはカードのみ）。
+    pub selectable: Option<Vec<TargetRef>>,
     /// `{"min": .., "max": ..}`。`None` なら `constraints: null`。
     pub constraints: Option<(i32, i32)>,
     pub can_skip: bool,
@@ -1074,14 +1132,11 @@ pub struct Interaction {
     pub allow_reorder: bool,
     /// 効果解決の continuation（P2 の `FIELD_OVERFLOW_TRASH` は持たない）。
     pub continuation: Option<Box<Continuation>>,
-    /// `SELECT_RESOURCE`（RETURN_DON）の候補は**ドン!!実体**（Python は `DonInstance` を
-    /// `candidates` に入れ、`get_pending_request` は `c.uuid`／`c.to_dict()` を読む）。
-    /// カード候補（`candidates`）とは排他で、どちらか一方だけが非空。
-    pub candidate_dons: Vec<DonIdx>,
 }
 
 impl Interaction {
-    /// P2 が立てる中断（continuation を持たない）の素の形。
+    /// P2 が立てる中断（continuation を持たない）の素の形。カードだけの候補（P2 の範囲では
+    /// ドン!!を候補に取る中断は無い）。
     // 欄は Python の `active_interaction` dict と 1:1。
     #[allow(clippy::too_many_arguments)]
     pub fn rules(
@@ -1098,8 +1153,9 @@ impl Interaction {
             kind,
             player,
             message,
-            candidates,
-            selectable,
+            candidates: candidates.into_iter().map(TargetRef::Card).collect(),
+            selectable: selectable
+                .map(|v| v.into_iter().map(TargetRef::Card).collect()),
             constraints,
             can_skip,
             source_card: None,
@@ -1108,7 +1164,6 @@ impl Interaction {
             allow_position: false,
             allow_reorder: false,
             continuation: None,
-            candidate_dons: Vec::new(),
         }
     }
 }
@@ -1419,6 +1474,10 @@ impl GameState {
                     field(p, "restrictions", &ctx)?,
                     &format!("{ctx}.restrictions"),
                 )?,
+                // 記録（`hidden`）に無い＝Rust セッション内でのみ管理する欄（§11.8 #5）。
+                // `restrictions` と違い記録の往復をまたがない（同一セッション内で登録・参照が
+                // 完結する「このターン中」限定の付与）ので、常に空から始めて問題ない。
+                granted_replacements: Vec::new(),
             });
         }
 
@@ -1648,6 +1707,13 @@ impl GameState {
     }
     pub fn don(&self, idx: DonIdx) -> &DonInstance {
         &self.dons[idx as usize]
+    }
+    /// `TargetRef` の uuid（カードなら `CardInstance.uuid`、ドン!!なら `DonInstance.uuid`）。
+    pub fn target_uuid(&self, target: TargetRef) -> &str {
+        match target {
+            TargetRef::Card(c) => &self.card(c).uuid,
+            TargetRef::Don(d) => &self.don(d).uuid,
+        }
     }
 }
 

@@ -190,6 +190,7 @@ fn empty_player(seat: Seat) -> PlayerState {
         don_attached: Vec::new(),
         negate_onplay_until: 0,
         restrictions: Vec::new(),
+        granted_replacements: Vec::new(),
     }
 }
 

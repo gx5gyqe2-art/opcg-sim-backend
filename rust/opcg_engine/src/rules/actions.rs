@@ -110,14 +110,14 @@ pub fn play_card_action(
         return Ok(());
     }
     validate_action(s, seat, "MAIN_ACTION")?;
-    if super::active_restriction(s.state(), seat, "CANNOT_PLAY_FROM_HAND").is_some() {
+    if super::active_restriction_mut(s, seat, "CANNOT_PLAY_FROM_HAND").is_some() {
         return Err(bad(
             "効果により、このターンは手札からカードをプレイできません。",
         ));
     }
     let ty = card_type(s.state(), masters, card);
     if ty == CardType::Character {
-        if let Some(rec) = super::active_restriction(s.state(), seat, "CANNOT_PLAY_CHARACTER") {
+        if let Some(rec) = super::active_restriction_mut(s, seat, "CANNOT_PLAY_CHARACTER") {
             // 「元々のコスト」＝ `master.cost`（修正前の値）で判定する。
             let min_cost = rec.min_cost;
             let base_cost = masters.get(s.state().card(card).master).cost;

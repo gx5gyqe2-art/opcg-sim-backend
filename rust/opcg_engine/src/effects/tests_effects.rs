@@ -165,7 +165,9 @@ fn every_suspension_kind_has_the_python_request_shape() {
     q.select_mode = "CHOOSE".to_string();
     q.count = 2;
     super::interact::suspend_for_target_selection(
-        &mut s, &masters, Seat::P1, &[t1, t2], &q, Some(src), None, &stack, &ctx,
+        &mut s, &masters, Seat::P1,
+        &[crate::model::TargetRef::Card(t1), crate::model::TargetRef::Card(t2)],
+        &q, Some(src), None, &stack, &ctx,
     )
     .expect("suspend");
     let req = request(&mut s, &masters);
@@ -493,16 +495,17 @@ fn effect_resolution_rolls_back_bit_for_bit() {
 /// 監査オラクル（`tests/scripts/rs_audit_replay.py`・§11.1）の 1 件を **Python が書いた記録**で
 /// 回す。統合（§11.6）で `matcher`／`cond`／`loader` が入ったので `#[ignore]` を外した。
 ///
-/// fixture は Python 側が生成した本物の監査記録（`tests/fixtures/audit_eb01_049_v4.json`＝
-/// EB01-049「相手のコスト2以下のキャラ1枚までを、KOする」・中断 1 回）で、その `fire.state` と
+/// fixture は Python 側が生成した本物の監査記録（`tests/fixtures/audit_eb01_049_v5.json`＝
+/// EB01-049「相手のコスト2以下のキャラ1枚までを、KOする」・中断 1 回・記録 v5＝`fire`／`steps[]`
+/// に `shuffled: []` を持つ〔このカードはシャッフルを起こさないので空〕）で、その `fire.state` と
 /// `steps[].state` が**期待値＝Python の盤面 dict**。Rust の [`crate::state::replay_audit_with`]
 /// を通し、`request_id` を除いて 1 段ずつ突き合わせる（＝ハーネスの `compare` と同じ規約）。
-/// 全カード（634 枚／817 能力）の照合はハーネス側で回す（数値は §8.9）。
+/// 全カード（2,472 枚／3,386 能力）の照合はハーネス側で回す（数値は §11.8）。
 #[test]
 fn audit_oracle_matches_python() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let record: Value =
-        serde_json::from_str(&std::fs::read_to_string(dir.join("audit_eb01_049_v4.json")).unwrap())
+        serde_json::from_str(&std::fs::read_to_string(dir.join("audit_eb01_049_v5.json")).unwrap())
             .unwrap();
     let effects: Value =
         serde_json::from_str(&std::fs::read_to_string(dir.join("audit_masters_v4.json")).unwrap())

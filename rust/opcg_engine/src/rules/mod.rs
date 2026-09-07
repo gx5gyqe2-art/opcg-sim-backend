@@ -79,8 +79,11 @@ pub fn has_timed_flag(state: &GameState, card: CardIdx, flag: &str) -> bool {
 
 /// Python `guards._active_restriction`（`turn_count <= expire` の間だけ有効）。
 ///
-/// Python は期限切れのエントリを掃除する副作用を持つが、バニラでは `restrictions` が常に空
-/// なので観測できない（P3 で自己制限を実装するときに掃除も入れる）。
+/// Python は期限切れのエントリを `player.restrictions` から掃除する副作用を持つ（読み取りに
+/// `&mut Session` を要る形で使う経路は [`active_restriction_mut`]）。盤面 dict には出ない
+/// （§11.8 #8・`restrictions` は `board_json` に出さない内部欄）ので、この読み取り専用版は
+/// 掃除しない＝合否の判定結果は掃除版と常に同じ（探索用の合法手列挙は `&GameState` しか
+/// 持たない純関数のまま保つ）。
 pub fn active_restriction<'a>(
     state: &'a GameState,
     seat: Seat,
@@ -96,6 +99,24 @@ pub fn active_restriction<'a>(
     } else {
         None
     }
+}
+
+/// [`active_restriction`] の `&mut Session` 版（§11.8 #8）。期限切れのエントリは Python と同じく
+/// `restrictions` から取り除く（`player.restrictions.pop(key, None)`）。判定結果（`Some`/`None`）
+/// は [`active_restriction`] と常に同じ＝掃除は副作用のみで戻り値の意味を変えない。
+pub fn active_restriction_mut(
+    s: &mut crate::journal::Session,
+    seat: Seat,
+    key: &str,
+) -> Option<Restriction> {
+    let rec = s.state().player(seat).restrictions.iter().find(|r| r.key == key)?.clone();
+    if s.state().turn_count <= rec.expire {
+        return Some(rec);
+    }
+    let mut recs = s.state().player(seat).restrictions.clone();
+    recs.retain(|r| r.key != key);
+    s.edit().set_restrictions(seat, recs);
+    None
 }
 
 /// Python `_operating_card`（`action_api.py`）: レスト操作の対象になりうる場のカード

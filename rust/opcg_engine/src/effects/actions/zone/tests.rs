@@ -22,8 +22,10 @@ fn apply(
     value: i32,
 ) -> bool {
     let node_ref = NodeRef::root(0, NodeRoot::Effect);
-    super::super::apply_action(s, masters, actor, action, &node_ref, targets, value, None)
-        .expect("apply_action")
+    super::super::apply_action(
+        s, masters, actor, action, &node_ref, &crate::effects::refs_of(targets), value, None,
+    )
+    .expect("apply_action")
 }
 
 fn act(ty: ActionType) -> GameAction {

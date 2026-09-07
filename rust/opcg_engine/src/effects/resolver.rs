@@ -35,7 +35,7 @@
 
 use crate::journal::Session;
 use crate::model::{
-    CardIdx, CardType, DelayedAction, MasterTable, Position, Seat,
+    CardIdx, CardType, DelayedAction, MasterTable, Position, Seat, TargetRef,
 };
 use crate::ops;
 use crate::state::EngineError;
@@ -314,12 +314,13 @@ impl Resolver {
                     return Ok(true);
                 };
                 // ref_id='self' は zone を見ずに source そのものへ解決する（充足判定も同じ規則）。
-                let mut candidates: Vec<CardIdx> = if query.ref_id.as_deref() == Some("self") {
-                    source_card.into_iter().collect()
+                let mut candidates: Vec<super::TargetRef> = if query.ref_id.as_deref() == Some("self") {
+                    source_card.into_iter().map(super::TargetRef::Card).collect()
                 } else {
-                    // §11.6: matcher はドン!!も返す。ドン!!を対象に取る経路は群 D の担当なので、
-                    // 混ざっていたら黙って落とさずに `Unimplemented`。
-                    super::only_cards_strict(&super::get_target_cards(
+                    // §11.6/§11.8 #2: matcher はドン!!も返す。ここは充足判定（枚数だけが要る）
+                    // なので、カードだけに効く絞り込み（cost_state_noop_on）はカードにだけ効かせ、
+                    // ドン!!はそのまま数へ残す。
+                    super::get_target_cards(
                         state,
                         masters,
                         &masters.abilities,
@@ -327,9 +328,12 @@ impl Resolver {
                         actor,
                         source_card,
                         &self.context,
-                    )?)?
+                    )?
                 };
-                candidates.retain(|c| !cost_state_noop_on(state, a, *c));
+                candidates.retain(|t| match t.card() {
+                    Some(c) => !cost_state_noop_on(state, a, c),
+                    None => true,
+                });
                 let required = query.count;
                 if query.is_strict_count && (candidates.len() as i32) < required {
                     return Ok(false);
@@ -475,11 +479,12 @@ impl Resolver {
                 }
                 if let Some(chosen) = chosen {
                     if !chosen.is_empty() {
+                        // EXECUTE_MAIN_EFFECT の対象は常にカード（他カードの【メイン】起動）。
                         self.execute_selected_main(
                             s,
                             masters,
                             actor,
-                            &chosen,
+                            &super::cards_of(&chosen),
                             action.status.as_deref(),
                         )?;
                         if s.state().active_interaction().is_some() {
@@ -668,8 +673,11 @@ impl Resolver {
             }
         }
 
-        // (2a)(2b) デッキ配置／ライフ並び替えの対話化
-        if self.maybe_suspend_arrange(s, masters, actor, action, &targets, source_card)? {
+        // (2a)(2b) デッキ配置／ライフ並び替えの対話化（常にカードだけ＝デッキ/ライフの
+        // 並び替えにドン!!は来ない）。
+        if self.maybe_suspend_arrange(
+            s, masters, actor, action, &super::cards_of(&targets), source_card,
+        )? {
             return Ok(false);
         }
 
@@ -680,7 +688,7 @@ impl Resolver {
             &masters.abilities,
             &action.value,
             actor,
-            &super::refs_of(&targets),
+            &targets,
             &self.context,
         )?;
 
@@ -746,8 +754,8 @@ impl Resolver {
             action.ty,
             ActionType::Reveal | ActionType::Look | ActionType::FaceUpLife | ActionType::LookLife
         ) {
-            if let Some(first) = targets.first() {
-                self.context.last_revealed_card = Some(*first);
+            if let Some(first) = targets.first().and_then(|t| t.card()) {
+                self.context.last_revealed_card = Some(first);
             } else if action.ty == ActionType::Look {
                 if let Some(c) = s.state().player(actor).temp_zone.first() {
                     self.context.last_revealed_card = Some(*c);
@@ -790,8 +798,8 @@ impl Resolver {
         s: &Session,
         query: &TargetQuery,
         actor: Seat,
-        selected: Vec<CardIdx>,
-    ) -> Vec<CardIdx> {
+        selected: Vec<TargetRef>,
+    ) -> Vec<TargetRef> {
         if !query.flags.iter().any(|f| f == "INCLUDE_LEADER") {
             return selected;
         }
@@ -804,8 +812,9 @@ impl Resolver {
             return selected;
         };
         let mut out = selected;
-        if !out.contains(&leader) {
-            out.insert(0, leader);
+        let leader_ref = TargetRef::Card(leader);
+        if !out.contains(&leader_ref) {
+            out.insert(0, leader_ref);
         }
         out
     }
@@ -822,44 +831,46 @@ impl Resolver {
         query: &TargetQuery,
         source_card: Option<CardIdx>,
         action: Option<(&GameAction, &NodeRef)>,
-    ) -> Result<Option<Vec<CardIdx>>, EngineError> {
+    ) -> Result<Option<Vec<TargetRef>>, EngineError> {
         // 中断→再開で持ち込まれた選択結果
         if self.context.temp_resolved_targets.is_some() && self.context.both_sides_pending.is_none()
         {
             let resumed = self.context.temp_resolved_targets.take().unwrap_or_default();
             let resumed = self.with_leader(s, query, actor, resumed);
             if let Some(save_id) = query.save_id.as_ref() {
-                self.context.set_saved_cards(save_id, resumed.clone());
+                self.context.set_saved(save_id, resumed.clone());
             }
             // 「そのキャラ/そのカード」の coreference 用の既定キー。
             if query.select_mode == "CHOOSE"
                 && query.ref_id.is_none()
                 && query.zone == vec![ZoneRef::Field]
             {
-                self.context.set_saved_cards("selected_card", resumed.clone());
+                self.context.set_saved("selected_card", resumed.clone());
             }
             return Ok(Some(resumed));
         }
 
         if let Some(save_id) = query.save_id.as_ref() {
-            if let Some(saved) = self.context.saved_cards(save_id) {
-                return Ok(Some(saved));
+            if let Some(saved) = self.context.saved(save_id) {
+                return Ok(Some(saved.clone()));
             }
         }
 
         // 選択グループ分配（§7-1）: 先頭 M 枚を取り、消費済みとして記録する。
         if query.select_mode == "GROUP_FIRST" {
             if let Some(ref_id) = query.ref_id.as_ref() {
-                let group = self.context.saved_cards(ref_id).unwrap_or_default();
+                let group = self.context.saved(ref_id).cloned().unwrap_or_default();
                 let consumed: Vec<String> = self.context.consumed(ref_id).to_vec();
-                let avail: Vec<CardIdx> = group
+                let avail: Vec<TargetRef> = group
                     .into_iter()
-                    .filter(|c| !consumed.contains(&s.state().card(*c).uuid))
+                    .filter(|t| !consumed.contains(&s.state().target_uuid(*t).to_owned()))
                     .collect();
                 let n = if query.count > 0 { query.count as usize } else { 1 };
-                let picked: Vec<CardIdx> = avail.into_iter().take(n).collect();
-                let uuids: Vec<String> =
-                    picked.iter().map(|c| s.state().card(*c).uuid.clone()).collect();
+                let picked: Vec<TargetRef> = avail.into_iter().take(n).collect();
+                let uuids: Vec<String> = picked
+                    .iter()
+                    .map(|t| s.state().target_uuid(*t).to_owned())
+                    .collect();
                 self.context.consume(ref_id, uuids);
                 return Ok(Some(picked));
             }
@@ -867,10 +878,10 @@ impl Resolver {
 
         if let Some(ref_id) = query.ref_id.as_ref() {
             if ref_id == "self" {
-                return Ok(Some(source_card.into_iter().collect()));
+                return Ok(Some(source_card.into_iter().map(TargetRef::Card).collect()));
             }
-            if let Some(saved) = self.context.saved_cards(ref_id) {
-                return Ok(Some(saved));
+            if let Some(saved) = self.context.saved(ref_id) {
+                return Ok(Some(saved.clone()));
             }
             // ref_id 指定なのに保存対象が無い＝対象なし（場全体クエリへ落とさない）。
             return Ok(Some(Vec::new()));
@@ -878,13 +889,14 @@ impl Resolver {
 
         // 「残り」: 直前の選択グループがあれば、その消費済みを除いた残余。
         if query.select_mode == "REMAINING" {
-            if let Some(group) = self.context.saved_cards(SEL_GROUP_ID) {
+            if let Some(group) = self.context.saved(SEL_GROUP_ID) {
                 if !group.is_empty() {
+                    let group = group.clone();
                     let consumed: Vec<String> = self.context.consumed(SEL_GROUP_ID).to_vec();
                     return Ok(Some(
                         group
                             .into_iter()
-                            .filter(|c| !consumed.contains(&s.state().card(*c).uuid))
+                            .filter(|t| !consumed.contains(&s.state().target_uuid(*t).to_owned()))
                             .collect(),
                     ));
                 }
@@ -896,7 +908,11 @@ impl Resolver {
             return self.resolve_both_sides(s, masters, actor, query, source_card, action);
         }
 
-        let mut candidates = super::only_cards_strict(&super::get_target_cards(
+        // §11.8 #2: matcher はカード／ドン!!の並び順つきの混在を返す（`CHAR_OR_DON`／
+        // `COST_AREA`）。以下の絞り込みはカードにだけ効かせ、ドン!!はそのまま候補に残す
+        // （Python の `get_target_cards` も混在 list をそのまま返し、絞り込みはカード側の
+        // 属性しか見ない）。
+        let mut candidates: Vec<TargetRef> = super::get_target_cards(
             s.state(),
             masters,
             &masters.abilities,
@@ -904,17 +920,21 @@ impl Resolver {
             actor,
             source_card,
             &self.context,
-        )?)?;
+        )?;
 
         // コストで「状態を変える」対象は、まだその状態でないカードに限る。
         if let Some((node, node_ref)) = action {
             if node_ref.is_cost_node() {
-                candidates.retain(|c| !cost_state_noop(s, node, *c));
+                candidates.retain(|t| match t.card() {
+                    Some(c) => !cost_state_noop(s, node, c),
+                    None => true,
+                });
             }
             // 「登場させる」の候補はキャラ／ステージだけ（イベントは登場しない）。
             if node.ty == ActionType::PlayCard {
-                candidates.retain(|c| {
-                    playable_to_field(masters.get(s.state().card(*c).master).ty)
+                candidates.retain(|t| match t.card() {
+                    Some(c) => playable_to_field(masters.get(s.state().card(c).master).ty),
+                    None => false,
                 });
             }
         }
@@ -932,40 +952,47 @@ impl Resolver {
                 }
             }
             if !ref_colors.is_empty() {
-                candidates.retain(|c| {
-                    !masters
-                        .get(s.state().card(*c).master)
+                candidates.retain(|t| match t.card() {
+                    Some(c) => !masters
+                        .get(s.state().card(c).master)
                         .colors
                         .iter()
-                        .any(|col| ref_colors.iter().any(|r| r == col.value()))
+                        .any(|col| ref_colors.iter().any(|r| r == col.value())),
+                    None => true,
                 });
             }
         }
 
-        // 「パワーの合計がN以下になるように」: 低パワー順に上限まで貪欲に取る。
+        // 「パワーの合計がN以下になるように」: 低パワー順に上限まで貪欲に取る
+        // （ドン!!はパワーを持たない＝0 として扱う。現行 DB でこのフラグとドン!!混在クエリの
+        // 組み合わせは無い）。
         if let Some(psum_max) = query.power_sum_max {
             if !candidates.is_empty() {
+                let power_of = |t: TargetRef| match t.card() {
+                    Some(c) => masters.get(s.state().card(c).master).power,
+                    None => 0,
+                };
                 let cap_n = if query.count > 0 {
                     query.count as usize
                 } else {
                     candidates.len()
                 };
                 let mut ordered = candidates.clone();
-                ordered.sort_by_key(|c| masters.get(s.state().card(*c).master).power);
-                let mut chosen: Vec<CardIdx> = Vec::new();
+                ordered.sort_by_key(|t| power_of(*t));
+                let mut chosen: Vec<TargetRef> = Vec::new();
                 let mut total = 0;
-                for c in ordered {
-                    let p = masters.get(s.state().card(c).master).power;
+                for t in ordered {
+                    let p = power_of(t);
                     if chosen.len() >= cap_n {
                         break;
                     }
                     if total + p <= psum_max {
-                        chosen.push(c);
+                        chosen.push(t);
                         total += p;
                     }
                 }
                 if let Some(save_id) = query.save_id.as_ref() {
-                    self.context.set_saved_cards(save_id, chosen.clone());
+                    self.context.set_saved(save_id, chosen.clone());
                 }
                 return Ok(Some(chosen));
             }
@@ -1002,9 +1029,9 @@ impl Resolver {
             } else {
                 candidates.len()
             };
-            let selected: Vec<CardIdx> = candidates.into_iter().take(n).collect();
+            let selected: Vec<TargetRef> = candidates.into_iter().take(n).collect();
             if let Some(save_id) = query.save_id.as_ref() {
-                self.context.set_saved_cards(save_id, selected.clone());
+                self.context.set_saved(save_id, selected.clone());
             }
             return Ok(Some(selected));
         }
@@ -1014,20 +1041,20 @@ impl Resolver {
             || ((candidates.len() as i32) <= required_count && !is_up_to)
             || (is_resource && !is_up_to)
         {
-            let selected: Vec<CardIdx> = if required_count > 0 {
+            let selected: Vec<TargetRef> = if required_count > 0 {
                 candidates.into_iter().take(required_count as usize).collect()
             } else {
                 candidates
             };
             let selected = self.with_leader(s, query, actor, selected);
             if let Some(save_id) = query.save_id.as_ref() {
-                self.context.set_saved_cards(save_id, selected.clone());
+                self.context.set_saved(save_id, selected.clone());
             }
             if query.select_mode == "CHOOSE"
                 && query.ref_id.is_none()
                 && query.zone == vec![ZoneRef::Field]
             {
-                self.context.set_saved_cards("selected_card", selected.clone());
+                self.context.set_saved("selected_card", selected.clone());
             }
             return Ok(Some(selected));
         }
@@ -1040,7 +1067,7 @@ impl Resolver {
             if is_modifier {
                 let selected = self.with_leader(s, query, actor, candidates);
                 if let Some(save_id) = query.save_id.as_ref() {
-                    self.context.set_saved_cards(save_id, selected.clone());
+                    self.context.set_saved(save_id, selected.clone());
                 }
                 return Ok(Some(selected));
             }
@@ -1070,20 +1097,21 @@ impl Resolver {
         query: &TargetQuery,
         source_card: Option<CardIdx>,
         action: Option<(&GameAction, &NodeRef)>,
-    ) -> Result<Option<Vec<CardIdx>>, EngineError> {
+    ) -> Result<Option<Vec<TargetRef>>, EngineError> {
         let owner = source_card
             .map(|c| s.state().card(c).owner)
             .unwrap_or(actor);
         let opp = owner.other();
 
-        // 再開で来た選択を、保留していたサイドへ割り当てる。
+        // 再開で来た選択を、保留していたサイドへ割り当てる（BOTH_SIDES はカードだけ＝
+        // 現行 DB に BOTH_SIDES と CHAR_OR_DON/COST_AREA の組み合わせは無い）。
         if let (Some(side), Some(selected)) = (
             self.context.both_sides_pending.clone(),
             self.context.temp_resolved_targets.clone(),
         ) {
             self.context.both_sides_pending = None;
             self.context.temp_resolved_targets = None;
-            self.context.set_both_side(&side, selected);
+            self.context.set_both_side(&side, super::cards_of(&selected));
         }
 
         for (side, side_name, side_player) in [
@@ -1142,7 +1170,7 @@ impl Resolver {
                 s,
                 masters,
                 side_player,
-                &cand,
+                &super::refs_of(&cand),
                 &suspend_q,
                 source_card,
                 action.map(|(_, r)| r),
@@ -1157,7 +1185,7 @@ impl Resolver {
         if let Some(save_id) = query.save_id.as_ref() {
             self.context.set_saved_cards(save_id, result.clone());
         }
-        Ok(Some(result))
+        Ok(Some(super::refs_of(&result)))
     }
 
     /// Python `_maybe_suspend_arrange`（並び替え／上下選択が要るなら中断する）。

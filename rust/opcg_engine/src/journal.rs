@@ -147,6 +147,7 @@ pub enum Undo {
     Slot(Seat, CardSlot, Option<CardIdx>),
     NegateOnplayUntil(Seat, i32),
     Restrictions(Seat, Vec<Restriction>),
+    GrantedReplacements(Seat, Vec<crate::model::GrantedReplacement>),
     TurnPlayer(Seat),
     TurnCount(i32),
     PhaseSet(Phase),
@@ -502,6 +503,20 @@ impl StateMut<'_> {
         self.rec(Undo::Restrictions(seat, old));
     }
 
+    /// Python `player.granted_replacements`（`guards._register_granted_replacements`・§11.8 #5）。
+    pub fn set_granted_replacements(
+        &mut self,
+        seat: Seat,
+        value: Vec<crate::model::GrantedReplacement>,
+    ) {
+        let slot = &mut self.state.players[seat as usize].granted_replacements;
+        if *slot == value {
+            return;
+        }
+        let old = std::mem::replace(slot, value);
+        self.rec(Undo::GrantedReplacements(seat, old));
+    }
+
     // -- マネージャ欄 -------------------------------------------------------
     pub fn set_turn_player(&mut self, seat: Seat) {
         if self.state.turn_player == seat {
@@ -733,6 +748,9 @@ fn apply_undo(state: &mut GameState, entry: Undo) {
         }
         Undo::NegateOnplayUntil(seat, old) => {
             state.players[seat as usize].negate_onplay_until = old;
+        }
+        Undo::GrantedReplacements(seat, old) => {
+            state.players[seat as usize].granted_replacements = old;
         }
         Undo::Restrictions(seat, old) => {
             state.players[seat as usize].restrictions = old;

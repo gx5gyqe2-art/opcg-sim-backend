@@ -216,7 +216,7 @@ fn freeze_don(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> 
 fn active_don_by_count(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> bool {
     let tp = don_pool_player(actor, action);
     // 「キャラの効果でドン‼をアクティブにできない」
-    if crate::rules::active_restriction(s.state(), tp, "CANNOT_ACTIVATE_DON").is_some() {
+    if crate::rules::active_restriction_mut(s, tp, "CANNOT_ACTIVATE_DON").is_some() {
         return true;
     }
     let mut activated = 0;

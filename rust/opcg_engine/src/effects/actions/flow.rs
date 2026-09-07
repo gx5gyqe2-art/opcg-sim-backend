@@ -376,7 +376,7 @@ mod tests {
         targets: &[CardIdx],
         value: i32,
     ) -> bool {
-        apply_action(s, masters, Seat::P1, action, &node_ref(), targets, value, None)
+        apply_action(s, masters, Seat::P1, action, &node_ref(), &crate::effects::refs_of(targets), value, None)
             .expect("群 C のハンドラは実装済み")
     }
 

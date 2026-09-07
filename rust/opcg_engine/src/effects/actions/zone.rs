@@ -308,7 +308,7 @@ fn move_card_action(
     if dest == Zone::Hand
         && source_list == Some(CardZone::Life)
         && owner == actor
-        && crate::rules::active_restriction(s.state(), actor, "CANNOT_LIFE_TO_HAND").is_some()
+        && crate::rules::active_restriction_mut(s, actor, "CANNOT_LIFE_TO_HAND").is_some()
     {
         return Ok(());
     }

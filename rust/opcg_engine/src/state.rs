@@ -16,7 +16,12 @@ use std::sync::OnceLock;
 /// v4（P3・§11.2）: 各 `steps[i]` に `shuffled`（その段で `random.shuffle` を呼んだデッキの
 /// 持ち主）を足し、P2 の「MULLIGAN なら再同期」を置き換えた。監査記録（`kind: "audit"`）と
 /// `extra_masters` も v4 で入る。
-pub const RECORD_VERSION: u64 = 4;
+///
+/// v5（P3 仕上げ・§11.8 #1）: 監査記録（`kind: "audit"`）にも `shuffled` を `fire` 直後と
+/// 各 `steps[i]` 直後に持たせ、`replay_audit` が `replay` と同じ規約で `resync_shuffled` を
+/// 呼ぶ（能力の中でシャッフル効果・サーチが走ると、記録と同じ位置で並びを取り直さないと
+/// Rust 側だけ違う並びのまま進んでしまう）。
+pub const RECORD_VERSION: u64 = 5;
 
 /// 骨組みの実装状況を表すエラー。PyO3 側で Python 例外へ写像する。
 #[derive(Debug, PartialEq, Eq)]
@@ -103,8 +108,9 @@ pub fn state_roundtrip(hidden_json: &str) -> Result<String, EngineError> {
 /// 3. 乱数を消費する行動（P2 では MULLIGAN のみ）の後は、その行の `hidden` から当該
 ///    プレイヤーの `deck`／`hand` の並びを取り直す（乱数列は Rust へ流さない＝計画 §6）。
 ///
-/// 戻り値は `{"version":3,"states":[盤面 dict...],"legal":[合法手 list...]}`。効果解決を要する
-/// 経路（`vanilla` でない記録・イベントの登場・`ACTIVATE_MAIN`）は `Unimplemented`（P3）。
+/// 戻り値は `{"version":5,"states":[盤面 dict...],"legal":[合法手 list...]}`。P3 仕上げ
+/// （§11.8 #9）で `vanilla` でない記録（効果を持つ実デッキ）も受け入れる。DB 未使用の
+/// ActionType（§11.8 #10）は引き続き `Unimplemented`。
 pub fn replay(json_str: &str) -> Result<String, EngineError> {
     let payload: Value = serde_json::from_str(json_str)
         .map_err(|e| EngineError::BadPayload(format!("invalid replay JSON: {e}")))?;
@@ -132,13 +138,8 @@ pub fn replay(json_str: &str) -> Result<String, EngineError> {
         .as_array()
         .ok_or_else(|| EngineError::BadPayload("replay payload: 'steps' must be a list".into()))?;
 
-    // 効果を持つデッキは P3（`rules` はルールだけ＝バニラで受け入れる。§10）。
     let vanilla = obj.get("vanilla").and_then(Value::as_bool).unwrap_or(false);
-    if !vanilla {
-        return Err(EngineError::Unimplemented(
-            "replay: 効果を持つデッキ（--vanilla 以外）の再生は P3（効果解決）の担当".into(),
-        ));
-    }
+    // v5（§11.8 #9）: 効果を持つデッキ（--vanilla 以外）も P3 の効果解決が入ったので受け入れる。
 
     let base = masters().ok_or_else(|| {
         EngineError::BadPayload(
@@ -214,12 +215,15 @@ pub fn replay(json_str: &str) -> Result<String, EngineError> {
     .map_err(|e| EngineError::BadPayload(format!("replay: cannot serialize states: {e}")))
 }
 
-/// 監査記録（`kind: "audit"`・§11.2）を再生する（`tests/scripts/rs_audit_replay.py` の受け口）。
+/// 監査記録（`kind: "audit"`・§11.2／§11.8 #1）を再生する（`tests/scripts/rs_audit_replay.py` の受け口）。
 ///
 /// 手順は `tests/harness/full_card_audit.py` と同じ:
 /// 1. `setup.hidden` から盤面を組む（`extra_masters` を足した表で読む＝`FILLER` 等が居る）
-/// 2. `fire` を実行する（`kind: "play"`＝`play_card_action` ／ `kind: "ability"`＝`resolve_ability`）
-/// 3. `steps[i].payload` を順に `resolve_interaction` へ渡す（`_smart_drain` の各応答）
+/// 2. `fire` を実行する（`kind: "play"`＝`play_card_action` ／ `kind: "ability"`＝`resolve_ability`）。
+///    直後に `fire.shuffled`（記録 v5）があれば、その持ち主のゾーンを `fire.hidden` の並びへ
+///    取り直す（能力の中でシャッフル効果・サーチが走った段）
+/// 3. `steps[i].payload` を順に `resolve_interaction` へ渡す（`_smart_drain` の各応答）。
+///    直後に `steps[i].shuffled` があれば同様に再同期する
 ///
 /// 戻り値は `{"version":4,"states":[<fire 後>, <payload 0 の後>, ...]}`。各盤面は
 /// `board_json` ＋ `pending_request`（`request_id` は出さない＝ハーネスが照合から外す）。
@@ -316,6 +320,22 @@ pub fn replay_audit_with(payload: &Value, base: &MasterTable) -> Result<String, 
         }
     }
 
+    // fire の中でシャッフルが起きた段は、記録の並びへ取り直す（記録 v5・§11.8 #1）。
+    let fire_err = |e: EngineError| -> EngineError {
+        match e {
+            EngineError::BadPayload(m) => EngineError::BadPayload(format!("fire: {m}")),
+            EngineError::Unimplemented(m) => EngineError::Unimplemented(format!("fire: {m}")),
+        }
+    };
+    for seat in shuffled_owners(&Value::Object(fire.clone())).map_err(fire_err)? {
+        let hidden = fire.get("hidden").ok_or_else(|| {
+            EngineError::BadPayload(
+                "fire: シャッフルの再同期に 'hidden' が要る（記録 v5）".into(),
+            )
+        })?;
+        resync_shuffled(&mut session, seat, hidden).map_err(fire_err)?;
+    }
+
     let mut states: Vec<Value> = vec![audit_board(&mut session, masters)?];
 
     // --- _smart_drain の各応答 ------------------------------------------------
@@ -351,6 +371,15 @@ pub fn replay_audit_with(payload: &Value, base: &MasterTable) -> Result<String, 
             })?;
         rules::actions::resolve_interaction(&mut session, masters, responder, payload)
             .map_err(at)?;
+        // この応答の中でシャッフルが起きた段は、記録の並びへ取り直す（記録 v5・§11.8 #1）。
+        for seat in shuffled_owners(step).map_err(at)? {
+            let hidden = step.get("hidden").ok_or_else(|| {
+                EngineError::BadPayload(format!(
+                    "step {i}: シャッフルの再同期に 'hidden' が要る（記録 v5）"
+                ))
+            })?;
+            resync_shuffled(&mut session, seat, hidden).map_err(at)?;
+        }
         states.push(audit_board(&mut session, masters)?);
     }
 
@@ -373,14 +402,15 @@ fn audit_board(session: &mut Session, masters: &MasterTable) -> Result<Value, En
     Ok(board)
 }
 
-/// 記録 v4 の `shuffled`（その段で `random.shuffle` を呼んだデッキの持ち主）。
+/// `shuffled`（その段で `random.shuffle` を呼んだデッキの持ち主・記録 v4 で `replay` の
+/// `steps[i]` に、v5 で監査記録の `fire`／`steps[i]` にも付く）。
 ///
-/// 欄が無い記録は「シャッフル無し」として扱わず**契約違反**にする（v4 では必ず付く）。
+/// 欄が無い記録は「シャッフル無し」として扱わず**契約違反**にする（両形式とも必ず付く）。
 fn shuffled_owners(step: &Value) -> Result<Vec<Seat>, EngineError> {
     let arr = step
         .get("shuffled")
         .and_then(Value::as_array)
-        .ok_or_else(|| EngineError::BadPayload("'shuffled' が無い（記録 v4）".into()))?;
+        .ok_or_else(|| EngineError::BadPayload("'shuffled' が無い（記録 v4/v5）".into()))?;
     let mut out = Vec::with_capacity(arr.len());
     for v in arr {
         let name = v
@@ -466,14 +496,15 @@ mod tests {
         )
     }
 
-    /// 効果を持つデッキ（`--vanilla` でない記録）は P3 の担当＝黙って進めず `Unimplemented`。
+    /// v5（§11.8 #9）: `vanilla` でない記録も `vanilla` ガードでは止まらない（`setup.hidden` の
+    /// 欠落やマスター未ロードといった、通常の契約違反だけが `BadPayload` になる）。
     #[test]
-    fn replay_reports_unimplemented_for_records_with_effects() {
+    fn replay_no_longer_gates_on_vanilla() {
         match replay(&record("[{\"index\":0}]")) {
-            Err(EngineError::Unimplemented(msg)) => {
-                assert!(msg.contains("vanilla"), "message should name the reason: {msg}");
+            Err(EngineError::BadPayload(msg)) => {
+                assert!(!msg.contains("vanilla"), "should not gate on vanilla anymore: {msg}");
             }
-            other => panic!("expected Unimplemented, got {other:?}"),
+            other => panic!("expected BadPayload (not Unimplemented), got {other:?}"),
         }
     }
 
