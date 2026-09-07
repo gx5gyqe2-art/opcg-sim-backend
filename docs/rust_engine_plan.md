@@ -1240,7 +1240,7 @@ golden 2 本／`legacy` マーカー）・`Makefile`／`CLAUDE.md`／`docs/TEST_
 | `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
 | `tests/test_rs_golden_audit.py`／`tests/test_rs_golden_replay.py` | **6 passed** |
 | `make test`（新定義＝cargo test＋`-m "not slow and not legacy"`） | **green**（cargo 358 passed＋pytest 608 passed）・**77.9 秒**（目標 3 分以内を達成） |
-| `make test-legacy`（従来の全数・`-m "not slow"`） | 実測は RESULT.json に記入（進行中） |
+| `make test-legacy`（従来の全数・`-m "not slow"`） | **green**（**1,793 passed**＝従来の 1,786 ＋ golden 2 本の新規 7 件・0 failed）・615.9 秒（10分16秒） |
 
 **`legacy` マーカーの適用**: 計画のたたき台（本節冒頭）は「180 本中 83 本」という粗い見積もりだったが、
 実際に「Python エンジンを GameManager 経由で直に叩くテスト」を洗い出すと、`cpu_infra`（探索/自己対戦/
