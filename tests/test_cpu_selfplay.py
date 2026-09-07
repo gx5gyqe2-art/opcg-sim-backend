@@ -17,6 +17,8 @@ from opcg_sim.src.core import action_api
 from opcg_sim.src.core.invariants import check_invariants
 from cpu_selfplay import build_deck, run_one_game, _load_db, InvariantError
 
+pytestmark = pytest.mark.legacy
+
 
 @pytest.fixture(scope="module")
 def db():

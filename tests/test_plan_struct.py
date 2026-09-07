@@ -19,7 +19,7 @@ import numpy as np
 
 from opcg_sim.src.learned import plan as PL
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 def _card(uuid, cost=None, card_id=None, rest=False, new=False):

@@ -15,7 +15,7 @@ from cpu_selfplay import _load_db
 from mark_seeds import load_mark_boards
 import rl_encoder as E
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（学習データ生成機構）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（学習データ生成機構）
 
 _DB = None
 

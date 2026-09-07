@@ -13,7 +13,7 @@ import replay_runner as RR
 from game_driver import load_db
 import heldout_decks as HD
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 @pytest.fixture(scope="module")

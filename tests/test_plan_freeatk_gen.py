@@ -15,7 +15,7 @@ import _bootstrap  # noqa: F401
 import plan_freeatk_gen as PF
 from opcg_sim.src.learned import plan as PL
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 def _card(uuid, power=5000, rest=False, blocker=False):

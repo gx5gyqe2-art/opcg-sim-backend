@@ -20,6 +20,8 @@ from leader_test_helpers import (  # noqa: F401
 )
 from opcg_sim.src.models.models import DonInstance
 
+pytestmark = pytest.mark.legacy
+
 
 # ---------------------------------------------------------------------------
 # OP06-001 ウタ（✅）

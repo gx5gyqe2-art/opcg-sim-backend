@@ -21,7 +21,7 @@ from cpu_selfplay import _load_db
 from opcg_sim.src.core.cpu_learned import LearnedEngine
 from opcg_sim.src.learned.plan import move_sig
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 @pytest.fixture(scope="module")

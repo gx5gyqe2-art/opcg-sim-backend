@@ -19,6 +19,8 @@ os.environ.setdefault("OPCG_LOG_SILENT", "1")
 from opcg_sim.src.core.gamestate import GameManager, Player
 from opcg_sim.src.core import action_api, cpu_ai
 
+pytestmark = pytest.mark.legacy
+
 try:
     from cpu_selfplay import _load_db, build_deck
 except ImportError:  # tests/ を sys.path に載せて再試行

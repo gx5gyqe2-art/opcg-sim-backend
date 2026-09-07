@@ -14,6 +14,9 @@ import conftest  # noqa: F401
 
 from full_card_audit import audit
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def test_all_cards_no_structural_anomaly():
     anomalies = audit()

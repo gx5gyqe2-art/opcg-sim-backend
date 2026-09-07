@@ -15,6 +15,8 @@ from leader_test_helpers import (
     leader_power, don_total, zone_counts, set_don,
 )
 
+pytestmark = pytest.mark.legacy
+
 
 # ===========================================================================
 # OP08-001 トニートニー・チョッパー

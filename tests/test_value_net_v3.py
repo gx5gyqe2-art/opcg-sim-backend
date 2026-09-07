@@ -12,6 +12,9 @@ import numpy as np
 import conftest  # noqa: F401
 from opcg_sim.src.learned.value_net import ValueNet, train
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 FIELD = 80
 
 

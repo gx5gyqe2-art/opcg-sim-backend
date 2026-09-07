@@ -16,6 +16,9 @@ from leader_test_helpers import build, add_char
 from engine_helpers import action
 from opcg_sim.src.models.enums import ActionType
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def _play_from_hand_via_effect(gm, player, card):
     """効果登場（PLAY_CARD）でキャラを手札から場に出す。"""

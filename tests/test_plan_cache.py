@@ -16,7 +16,7 @@ from opcg_sim.src.core import cpu_ai, action_api
 from opcg_sim.src.core.gamestate import GameManager, Player
 from cpu_selfplay import build_deck, _load_db
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 @pytest.fixture(scope="module")

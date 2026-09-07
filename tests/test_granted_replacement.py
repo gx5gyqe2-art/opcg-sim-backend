@@ -16,6 +16,9 @@ from opcg_sim.src.models.models import CardInstance
 from opcg_sim.src.models.enums import Phase
 from opcg_sim.src.utils.loader import CardLoader
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                     "opcg_sim", "data", "opcg_cards.json")
 _DB = None

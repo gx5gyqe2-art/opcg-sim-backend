@@ -17,6 +17,8 @@ from opcg_sim.src.core.gamestate import GameManager, Player
 from opcg_sim.src.core.invariants import check_invariants
 from cpu_selfplay import build_deck, _load_db
 
+pytestmark = pytest.mark.legacy
+
 
 def _build_deck(owner_id):
     leader, cards = None, []

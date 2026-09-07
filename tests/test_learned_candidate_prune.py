@@ -14,7 +14,7 @@ from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.learned.adapter import OPCGGame
 from opcg_sim.src.learned import config as CFG
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（探索候補生成の機構）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（探索候補生成の機構）
 
 
 def _game(seed=1):

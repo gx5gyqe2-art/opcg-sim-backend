@@ -13,6 +13,9 @@ from engine_helpers import make_game, make_instance, make_master
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.utils.loader import CardLoader
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def _teach_life_add_game():
     """OP16-119 の登場時効果を発動し、ライフ追加の選択対話まで進めた盤面を返す。"""

@@ -32,7 +32,7 @@ from cpu_selfplay import _load_db
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.learned.mcts import TreeMCTS, _Node, in_battle
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（探索機構）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（探索機構）
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures", "replays", "gen7_marks_20260728")
 M1 = "opcg_replay_2057134394987494995.json.gz"

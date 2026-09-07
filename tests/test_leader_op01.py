@@ -16,6 +16,8 @@ from leader_test_helpers import (
 )
 from opcg_sim.src.models.enums import CardType, Color
 
+pytestmark = pytest.mark.legacy
+
 
 # ---------------------------------------------------------------------------
 # OP01-001 ロロノア・ゾロ

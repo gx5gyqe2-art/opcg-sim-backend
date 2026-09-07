@@ -10,7 +10,7 @@ from cpu_selfplay import _load_db
 import opcg_action as A
 from az_policy import PolicyScorer, state_context, train_policy
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 def test_action_features_shape_and_onehot():

@@ -8,6 +8,8 @@ from opcg_sim.src.core.gamestate import GameManager, Player
 from engine_helpers import make_master, make_instance
 import rl_encoder as E
 
+pytestmark = pytest.mark.legacy
+
 
 @pytest.fixture(scope="module")
 def db():

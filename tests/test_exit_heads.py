@@ -32,7 +32,7 @@ import rl_net as RN
 from exit_head_finetune import (assert_trunk_frozen, center_exit_head, exit_pair_acc,
                                 rank_finetune_exit_head, snapshot_trunk)
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（学習パイプライン／評価ヘッド）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（学習パイプライン／評価ヘッド）
 
 FEAT = 94        # scalars14 + field10x8（既定レイアウト）
 KSLOT = 22

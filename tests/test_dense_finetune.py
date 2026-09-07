@@ -11,7 +11,7 @@ import pytest
 
 import dense_finetune as DF
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 def _vdata(value, q_root, turns_left):

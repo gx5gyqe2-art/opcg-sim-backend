@@ -11,6 +11,9 @@ import heldout_decks as HD
 from cpu_selfplay import _load_db
 from opcg_sim.src.core.gamestate import GameManager, Player
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 # 凍結ハッシュ（2026-07-01 freeze・変更する場合は新しい日付で freeze し直すこと）
 FROZEN_SHA256 = "b3c026d7d58511a0cbf94b12bd0af98cd615a26e8ec91824618fa051f802d5dd"
 

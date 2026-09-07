@@ -20,7 +20,7 @@ from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.learned import action as A
 from opcg_sim.src.learned.adapter import OPCGGame
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 def _card(uuid, text="", attached=0):

@@ -24,6 +24,8 @@ from opcg_sim.src.models.enums import CardType, ActionType
 from opcg_sim.src.models.models import CardInstance, DonInstance
 from engine_helpers import make_master, action
 
+pytestmark = pytest.mark.legacy
+
 
 # ---------------------------------------------------------------------------
 # 小ヘルパ

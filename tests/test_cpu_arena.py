@@ -17,7 +17,7 @@ from opcg_sim.src.core import cpu_ai
 import cpu_arena
 import test_cpu_puzzles as P  # フィクスチャ/ヘルパ再利用（_new_gm・_fast_forward_to_p1_main 等）
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 @pytest.fixture(scope="module")

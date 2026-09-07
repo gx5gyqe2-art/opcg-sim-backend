@@ -27,6 +27,8 @@ import cpu_arena
 import test_cpu_puzzles as P
 from opcg_sim.src.core import action_api
 
+pytestmark = pytest.mark.legacy
+
 
 @pytest.fixture(scope="module")
 def db():

@@ -22,28 +22,44 @@ CI は無い（2026-07-11 廃止・下記参照）。**品質ゲート（次節�
 API テストは `fastapi`/`httpx` 導入後に collection 可。
 
 ```bash
-make test        # 全テスト（並列／slow除外。構造監査 EXCEPTION/CARD_LOSS/TEMP_LEAK=0 も含む）
+make test        # 新定義（2026-09-07・push前ゲート）。cargo test（Rust）＋ pytest -m "not slow and not legacy"
+make test-legacy  # 従来の全数（-m "not slow"）。Python エンジンを変更したときはこちらも通す
 make test-slow    # 重テスト（make/unmake=journal変更時のみ手動）
 make test-fast    # 開発中のイテレーション用（slow・cpu_infra除外）
 ```
 
+> **Rust 化後のゲート 2 段化（2026-09-07・`docs/rust_engine_plan.md` §16.1）**: `make test` は
+> golden 2 本（`tests/test_rs_golden_audit.py`＝全カード監査・`tests/test_rs_golden_replay.py`＝
+> 実対局の再生。いずれも Rust エンジンだけで回り `tests/fixtures/rs_goldens/` の記録と照合する）が
+> ゲームプレイ退行を見る一次防衛線になった（旧 `test_full_card_audit.py`／`test_full_card_baseline.py`
+> は Python エンジン直叩き＝`legacy` マーカーが付き `make test-legacy` に移った）。**Python エンジン
+> （`opcg_sim/src/core`・`effects`・`learned`）を変更したときは、`make test` に加えて
+> `make test-legacy`（従来の全数）も必ず通す**——golden は Rust↔Python が一致した時点の記録で、
+> Python 側の挙動変更そのものは検出しない。golden の作り直しは **挙動を意図的に変えた場合のみ**
+> `make golden-audit`／`make golden-replay`。
+
 > `slow` マーカーの重テスト（現状 `test_journal.py::test_parked_resume_make_unmake_roundtrip` ~245s）は
-> `make test` から除外（`-m "not slow"`）。**make/unmake（journal）周辺を変更したときは `make test-slow` を手動実行**する。
+> `make test`/`make test-legacy` から除外（`-m "not slow"`）。**make/unmake（journal）周辺を変更したときは
+> `make test-slow` を手動実行**する。
 > 構造監査（`tests/harness/full_card_audit.py` の EXCEPTION/CARD_LOSS/TEMP_LEAK）は
-> `tests/test_full_card_audit.py` が `make test` の中で実行するため、**単体スクリプトを別途走らせる必要はない**
-> （`make audit` は異常カード一覧を見たいときの診断専用、ゲートの必須手順ではない）。
+> `tests/test_full_card_audit.py` が golden 化前は `make test` の中で実行していたが、Python エンジン
+> 直叩きのため `legacy` になった（`make test-legacy` の中で実行・**単体スクリプトを別途走らせる
+> 必要はない**）。`make audit` は異常カード一覧を見たいときの診断専用、ゲートの必須手順ではない。
 
 > テストは**重要度**で3階層に分ける（時間ではない。詳細は `docs/TEST_SPEC.md` §重要度分類）。**基盤健全性**
 > （探索/自己対戦/学習パイプラインの内部機構の健全性のみを見る。ゲームプレイの正しさ自体は
 > 必須/標準テストが別途担保）は `cpu_infra` マーカーを付け、`make test-fast` で除外する。
-> **push前は必ず `make test`（cpu_infra を含むフルスコープ）をgreenにする**——
-> `make test-fast` はイテレーション用の速い一次チェックであり、push前ゲートを代替しない。
+> **push前は必ず `make test`（新定義。cpu_infra のうち Python エンジンを直叩きしないものは含む）を
+> greenにし、Python エンジンを変更したときは `make test-legacy`（cpu_infra 込みの旧フルスコープ）も
+> greenにする**——`make test-fast` はイテレーション用の速い一次チェックであり、push前ゲートを代替しない。
 >
 > **新しいテストを追加するとき**: 「無ければ実プレイのゲームプレイ退行（誤った効果解決／クラッシュ／
 > カード消失／API契約破壊）を見逃すか」で判定する。Yes＝必須/標準（マーカー不要・常時実行）。No＝
 > 探索/自己対戦/学習パイプラインの内部機構の健全性のみを見る基盤健全性＝`@pytest.mark.cpu_infra`
-> （module-level `pytestmark` 可）を明示する（迷ったら必須/標準側に倒す）。`docs/TEST_SPEC.md` §2 への
-> 追記時、基盤健全性はその旨を明記する。
+> （module-level `pytestmark` 可）を明示する（迷ったら必須/標準側に倒す）。**Python エンジン
+> （`opcg_sim/src/core`・`effects`・`learned`）を GameManager 経由で直に叩くテスト**は、上記に加えて
+> `@pytest.mark.legacy` も付ける（`cpu_infra` と両立可・`docs/rust_engine_plan.md` §16.1）。
+> `docs/TEST_SPEC.md` §2 への追記時、基盤健全性・legacy はその旨を明記する。
 
 > **エンジン/パーサを変更したときは `make audit-cross`（交差対面の実プレイ監査・約10分）も
 > 通す**（合格＝hang/timeout/error=0）。ミラー監査（`make test` 内）では一度も通らない経路が

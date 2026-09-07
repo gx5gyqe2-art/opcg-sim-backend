@@ -12,7 +12,7 @@ from opcg_game import OPCGGame
 from cpu_selfplay import _load_db
 from p2_gen0 import sl_value, mcts_sl_agent, match, l1_agent_factory
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 def test_sl_value_in_range():

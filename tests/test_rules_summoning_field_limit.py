@@ -9,6 +9,8 @@ import pytest
 from engine_helpers import make_game, make_instance, make_master, action
 from opcg_sim.src.models.enums import CardType, Phase, ActionType, Zone
 
+pytestmark = pytest.mark.legacy
+
 
 def _char(name="キャラ", owner="P1", **kw):
     return make_instance(make_master(card_id=f"C-{name}", name=name, type=CardType.CHARACTER, power=5000), owner=owner, **kw)

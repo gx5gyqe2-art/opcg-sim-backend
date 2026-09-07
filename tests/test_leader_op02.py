@@ -21,6 +21,8 @@ from leader_test_helpers import (
 )
 from opcg_sim.src.models.models import DonInstance
 
+pytestmark = pytest.mark.legacy
+
 
 def _attach_don_to_leader(player, leader, n=1):
     """【ドン!!×N】条件用に、リーダーへドン!!を n 枚付与する。"""

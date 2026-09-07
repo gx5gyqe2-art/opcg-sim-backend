@@ -18,6 +18,9 @@ from opcg_sim.src.models.effect_types import TargetQuery
 from opcg_sim.src.models.models import CardInstance
 from opcg_sim.src.models.enums import Zone, Player
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def _power_max_query(power_max):
     return TargetQuery(zone=Zone.FIELD, player=Player.OPPONENT,

@@ -15,7 +15,11 @@ def pytest_configure(config):
     """マーカー登録。`slow` = 極端に重くルーチンから除外する重テスト（手動実行前提）。
     `cpu_infra` = 探索/自己対戦/学習パイプラインの内部機構の健全性のみを見るテスト
     （ゲームプレイの正しさ自体は必須/標準テストが別途担保。分類基準は docs/TEST_SPEC.md
-    §重要度分類）。`make test` は `-m "not slow"`、`make test-fast` は
+    §重要度分類）。`legacy` = Python エンジン（`opcg_sim/src/core`・`effects`・`learned`）を
+    直に叩くテスト（Rust 化後は監査／再生の golden 2 本がゲームプレイ退行の一次防衛線に
+    なったため、push 前の必須ゲートからは外す・`docs/rust_engine_plan.md` §16.1）。
+    `make test`（新定義）は `-m "not slow and not legacy"`（cargo test を併走）、
+    `make test-legacy` は従来どおり全数（`-m "not slow"`）、`make test-fast` は
     `-m "not slow and not cpu_infra"` で実行する。
     """
     config.addinivalue_line(
@@ -25,4 +29,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "cpu_infra: 探索/自己対戦/学習パイプラインの内部機構の健全性のみを見る基盤健全性テスト（make test-fast で除外）",
+    )
+    config.addinivalue_line(
+        "markers",
+        "legacy: Python エンジン直叩きのテスト（Rust 化後は golden 2 本が一次防衛線・"
+        "make test-legacy でのみ実行・docs/rust_engine_plan.md §16.1）",
     )

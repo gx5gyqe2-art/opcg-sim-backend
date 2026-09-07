@@ -312,6 +312,8 @@ def _drive_full_or_cap(client, gid, cap=160):
                         "action": "RESOLVE_EFFECT_SELECTION", "payload": payload})
 
 
+@pytest.mark.legacy  # `replay_from_descriptor` は Python エンジンで再生する（計画 §15.5・§16.1）。
+                     # このファイルの他のテストは API 契約（HTTP 層）のみを見るので legacy ではない。
 def test_replay_api_descriptor_end_to_end(client):
     """R3 実結線: API の実録画（`REPLAY_SCHEMA`＝/replay）を `replay_from_descriptor` へ食わせ、
     CPU の意思決定列が録画と一致する（coin toss=first_player='random' を seed から再現）。

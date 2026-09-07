@@ -23,7 +23,7 @@ import rl_encoder as E
 from opcg_sim.src.learned.value_net import ValueNet
 from opcg_sim.src.core.cpu_learned import warm_start_value
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（符号化拡張の機構）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（符号化拡張の機構）
 
 HAND_OFF = E.SCALARS_V5   # v6 追加ブロックの先頭 offset（55）
 

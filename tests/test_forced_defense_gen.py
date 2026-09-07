@@ -20,7 +20,7 @@ import pytest
 
 import p3_loop as PL
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 def _win(n_def=3, with_pass=True):

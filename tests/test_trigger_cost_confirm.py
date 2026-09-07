@@ -18,6 +18,9 @@ _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 
 from leader_test_helpers import build, db, get_ability
 from opcg_sim.src.models.models import CardInstance
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def _make_borsalino(gm, p1, rested=True):
     bor = CardInstance(db().get_card("OP16-073"), p1.name)

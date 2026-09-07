@@ -14,6 +14,9 @@ from opcg_sim.src.core import cpu_learned
 from opcg_sim.src.learned import encoder as PROD_E
 from opcg_sim.src.learned.action import legal_action_matrix as prod_lam
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def _game(seed=1):
     import random

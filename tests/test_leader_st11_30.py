@@ -22,6 +22,8 @@ from opcg_sim.src.core.effects.matcher import get_target_cards
 from opcg_sim.src.models.effect_types import TargetQuery
 from opcg_sim.src.models.enums import Player, Zone
 
+pytestmark = pytest.mark.legacy
+
 
 # ---------------------------------------------------------------------------
 # 共通補助

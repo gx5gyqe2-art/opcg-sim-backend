@@ -8,6 +8,9 @@ import conftest  # noqa: F401
 
 from opcg_sim.src.core.gamestate import GameManager, Player
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def _gm():
     p1 = Player(name="P1", deck=[], leader=None)
