@@ -1,7 +1,10 @@
 //! `opcg_engine` — OPCG シミュレータのエンジン（Rust）。Python からは PyO3 拡張として使う。
 //!
-//! 段階移行の計画は `docs/rust_engine_plan.md`。**現在 P2（ルール）まで**＝盤面モデル（P1）・
-//! journal と原始操作（P1）・ターン進行／戦闘／合法手／要求（P2）がある。効果解決（P3）は無い。
+//! 段階移行の計画は `docs/rust_engine_plan.md`。**現在 P3（効果解決）の土台まで**＝盤面モデル（P1）・
+//! journal と原始操作（P1）・ターン進行／戦闘／合法手／要求（P2）・効果の実行エンジン／中断／
+//! 誘発／継続効果（P3 の WP `rs-p3-resolver`）がある。対象・条件・値の評価（`matcher`／`cond`／
+//! `value`）と効果 JSON の読込（`loader`）は WP `rs-p3-core` の担当で、入るまでは
+//! `effects/mod.rs` の stub が `Unimplemented` を返す。
 //! Python 版が常に正本（オラクル）で、Rust 版は同じ入力に同じ出力を返すことで受け入れる。
 
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
@@ -88,6 +91,18 @@ fn replay(json_str: &str) -> PyResult<String> {
     Ok(state::replay(json_str)?)
 }
 
+/// 監査記録（記録 v4 の `kind: "audit"`・`docs/rust_engine_plan.md` §11.2）を再生する。
+///
+/// `tests/harness/full_card_audit.py` と同じ手順（汎用盤面 → 能力を 1 つ発動 →
+/// `_smart_drain` の各応答）を Rust で辿り、`{"version":4,"states":[...],"interactive":bool}`
+/// を返す。`tests/scripts/rs_audit_replay.py` が Python 側の盤面と照合する。
+/// `effects_path` は初回のみ必要（マスター表をプロセスで 1 度読む）。
+#[pyfunction]
+#[pyo3(signature = (record_json, effects_path=None))]
+fn replay_audit(record_json: &str, effects_path: Option<&str>) -> PyResult<String> {
+    Ok(state::replay_audit(record_json, effects_path)?)
+}
+
 #[pymodule]
 fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
@@ -98,5 +113,6 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(state_roundtrip, m)?)?;
     m.add_function(wrap_pyfunction!(apply_ops, m)?)?;
     m.add_function(wrap_pyfunction!(replay, m)?)?;
+    m.add_function(wrap_pyfunction!(replay_audit, m)?)?;
     Ok(())
 }

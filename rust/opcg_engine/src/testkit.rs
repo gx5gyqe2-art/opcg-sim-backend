@@ -159,6 +159,7 @@ fn card(m: MasterIdx, owner: Seat, uuid: &str) -> CardInstance {
         timed_flags: Vec::new(),
         timed_cost: 0,
         timed_keywords: Vec::new(),
+        temp_origin_life: false,
     }
 }
 
@@ -349,6 +350,14 @@ pub fn fixture() -> Fixture {
         interaction_stack: Vec::new(),
         battle_triggers: Vec::new(),
         pending_triggers: Vec::new(),
+        continuous: Vec::new(),
+        deferred_continuations: Vec::new(),
+        pending_end_of_turn: Vec::new(),
+        pending_extra_turn: None,
+        in_passive_recalc: false,
+        replacement_suspended: false,
+        return_don_selection: None,
+        last_resource_count: None,
     };
 
     Fixture {
@@ -532,7 +541,195 @@ impl BoardBuilder {
             interaction_stack: Vec::new(),
             battle_triggers: Vec::new(),
             pending_triggers: Vec::new(),
+            continuous: Vec::new(),
+            deferred_continuations: Vec::new(),
+            pending_end_of_turn: Vec::new(),
+            pending_extra_turn: None,
+            in_passive_recalc: false,
+            replacement_suspended: false,
+            return_don_selection: None,
+            last_resource_count: None,
         };
         (self.masters, state)
     }
+}
+
+// --- 効果（P3）テスト用の能力表 -------------------------------------------------
+//
+// `crate::effects::abilities()` はプロセスで 1 度だけ差し込む `OnceLock`（本番では core の
+// `loader.rs` が効果 JSON から作る）。テストは**全員がこの 1 つの表を使う**ことで、
+// 走る順序に依らず同じ index が同じ能力を指すようにする。
+
+use crate::effects::ast::{
+    Ability, AbilityTable, ActionType, Duration, EffectNode, GameAction, PlayerRef, TargetQuery,
+    TriggerType, ValueSource, ZoneRef,
+};
+
+/// 入れ子 Sequence ＋ 途中で中断する Choice（実行スタックの順序検査）。
+pub const AB_SEQ_CHOICE: u32 = 0;
+/// 条件なしの Branch（`if_true` を採る）。
+pub const AB_BRANCH: u32 = 1;
+/// 任意効果（「〜してもよい」）1 件だけの能力。
+pub const AB_OPTIONAL: u32 = 2;
+/// コスト句つきの能力（使用確認 CONFIRM_OPTIONAL）。
+pub const AB_WITH_COST: u32 = 3;
+/// 【トリガー】（ライフ公開時）。効果はドロー 1。
+pub const AB_LIFE_TRIGGER: u32 = 4;
+/// ターン終了時の誘発（ドロー 1）。
+pub const AB_TURN_END: u32 = 5;
+/// 「〜できる」ターン終了時の誘発（任意＝確認を挟む）。
+pub const AB_TURN_END_OPTIONAL: u32 = 6;
+/// 何もしない ACTIVATE_MAIN（`ability_used_this_turn` の検査などに使う）。
+pub const AB_DRAW1: u32 = 7;
+
+/// 素の `ValueSource`（`base` だけ・動的値なし）。
+pub fn value(base: i32) -> ValueSource {
+    ValueSource {
+        base,
+        dynamic_source: None,
+        multiplier: 1,
+        divisor: 1,
+        ref_id: None,
+        count_query: None,
+    }
+}
+
+/// `ref_id="self"` の対象クエリ（matcher を通さずに発生源へ解決される）。
+pub fn self_query() -> TargetQuery {
+    TargetQuery {
+        zone: vec![ZoneRef::Field],
+        player: PlayerRef::SelfP,
+        card_type: Vec::new(),
+        traits: Vec::new(),
+        attributes: Vec::new(),
+        colors: Vec::new(),
+        names: Vec::new(),
+        cost_min: None,
+        cost_max: None,
+        cost_max_dynamic: None,
+        power_min: None,
+        power_max: None,
+        power_sum_max: None,
+        min_attached_don: None,
+        is_face_up: None,
+        lacks_trigger: None,
+        is_rest: None,
+        count: 1,
+        is_up_to: false,
+        count_dynamic: None,
+        select_mode: "SOURCE".to_string(),
+        save_id: None,
+        ref_id: Some("self".to_string()),
+        chooser: None,
+        flags: Vec::new(),
+        is_vanilla: false,
+        is_strict_count: false,
+        is_unique_name: false,
+        exclude_ids: Vec::new(),
+        exclude_names: Vec::new(),
+        raw_text: String::new(),
+    }
+}
+
+/// 素の `GameAction`（対象なし）。
+pub fn action(ty: ActionType, base: i32) -> GameAction {
+    GameAction {
+        ty,
+        target: None,
+        value: value(base),
+        duration: Duration::Instant,
+        status: None,
+        destination: None,
+        is_rest: None,
+        dest_position: None,
+        raw_text: String::new(),
+        sub_effect: None,
+        is_optional: false,
+        delay: None,
+        face_up: None,
+    }
+}
+
+fn draw(n: i32) -> EffectNode {
+    EffectNode::Action(action(ActionType::Draw, n))
+}
+
+fn ability(trigger: TriggerType, effect: EffectNode, raw_text: &str) -> Ability {
+    Ability {
+        trigger,
+        condition: None,
+        cost: None,
+        effect: Some(effect),
+        raw_text: raw_text.to_string(),
+        cost_optional: false,
+    }
+}
+
+/// テスト用の能力表（プロセスで 1 度だけ差し込む）。
+pub fn effect_table() -> &'static AbilityTable {
+    let mut optional_draw = action(ActionType::Draw, 1);
+    optional_draw.is_optional = true;
+
+    let mut rest_self = action(ActionType::Rest, 1);
+    rest_self.target = Some(self_query());
+
+    let with_cost = Ability {
+        trigger: TriggerType::OnPlay, // ACTIVATE_MAIN/TRIGGER/COUNTER は確認を挟まないので別トリガー
+        condition: None,
+        cost: Some(EffectNode::Action(rest_self)),
+        effect: Some(draw(1)),
+        raw_text: "このキャラをレストにできる：カード1枚を引く。".to_string(),
+        cost_optional: false,
+    };
+
+    crate::effects::init_abilities(AbilityTable {
+        abilities: vec![
+            // AB_SEQ_CHOICE: [Draw1, [Draw1, Choice{Draw1|Draw4}]]
+            ability(
+                TriggerType::ActivateMain,
+                EffectNode::Sequence(vec![
+                    draw(1),
+                    EffectNode::Sequence(vec![
+                        draw(1),
+                        EffectNode::Choice {
+                            message: "どちらかを選ぶ".to_string(),
+                            options: vec![draw(1), draw(4)],
+                            option_labels: vec!["1枚引く".to_string(), "4枚引く".to_string()],
+                            player: PlayerRef::SelfP,
+                        },
+                    ]),
+                ]),
+                "",
+            ),
+            // AB_BRANCH: 条件なしの Branch（Python の `_check_condition(None)` は True）
+            ability(
+                TriggerType::ActivateMain,
+                EffectNode::Branch {
+                    condition: None,
+                    if_true: Some(Box::new(draw(2))),
+                    if_false: Some(Box::new(draw(7))),
+                },
+                "",
+            ),
+            // AB_OPTIONAL
+            ability(
+                TriggerType::ActivateMain,
+                EffectNode::Action(optional_draw),
+                "カード1枚を引いてもよい。",
+            ),
+            with_cost,
+            // AB_LIFE_TRIGGER
+            ability(TriggerType::Trigger, draw(1), "【トリガー】カード1枚を引く。"),
+            // AB_TURN_END
+            ability(TriggerType::TurnEnd, draw(1), "【自分のターン終了時】カード1枚を引く。"),
+            // AB_TURN_END_OPTIONAL
+            ability(
+                TriggerType::TurnEnd,
+                draw(1),
+                "【自分のターン終了時】カード1枚を引く効果を発動できる。",
+            ),
+            // AB_DRAW1
+            ability(TriggerType::ActivateMain, draw(1), ""),
+        ],
+    })
 }

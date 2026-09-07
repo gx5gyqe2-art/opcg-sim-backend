@@ -1,0 +1,68 @@
+{
+  "job": "rs-p3-resolver",
+  "status": "done",
+  "branch": "claude/rs-p3-resolver-yyjnt3",
+  "base": "claude/cpu-spec-improvements-yw91jd (1eaaade)",
+  "self_check": {
+    "command": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_audit_replay.py --self-check",
+    "cards": 2472,
+    "abilities": 3386,
+    "record_error": 0,
+    "mismatch": 0,
+    "bad_payload": 0,
+    "bad_output": 0,
+    "note": "記録→再生無しの Python 側自己検査。全 2,472 枚で例外 0（受け入れ条件）"
+  },
+  "oracle": "deferred",
+  "oracle_detail": {
+    "command": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_audit_replay.py --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF",
+    "cards": 634,
+    "abilities": 817,
+    "match": 0,
+    "mismatch": 0,
+    "unimplemented": 817,
+    "bad_payload": 0,
+    "bad_output": 0,
+    "record_error": 0,
+    "note": "全件 unimplemented＝`CardMaster.ability_ids` が空（効果 JSON の読込 loader.rs は WP rs-p3-core）。統合後にコーディネータが同じコマンドで再実行する"
+  },
+  "cargo": {
+    "test": "106 passed / 0 failed / 2 ignored（cargo test --no-default-features）",
+    "clippy": "0 warnings（cargo clippy --no-default-features --all-targets -- -D warnings）",
+    "ignored": [
+      "effects::tests_effects::audit_oracle_matches_python（監査オラクルは matcher/cond/loader 統合後）",
+      "P2 から引き継いだ 1 件"
+    ]
+  },
+  "make_test": "green（1,761 passed / 0 failed・8:05。Python 無変更・ハーネスとスクリプトの追加のみ）",
+  "record_version": 4,
+  "regression": {
+    "rs_diff_replay --mode replay --vanilla --games 8": "match=8 / mismatch=0 / unimplemented=0（745 行動・記録 v4 の shuffled 再同期）",
+    "rs_diff_replay --mode state --games 5": "match=5 / mismatch=0（431 行・P1 の退行なし）",
+    "rs_ops_oracle --games 3": "match=337 / mismatch=0 / restore_mismatch=0（6,623 操作・journal の bit 一致）"
+  },
+  "owned": [
+    "rust/opcg_engine/src/effects/resolver.rs",
+    "rust/opcg_engine/src/effects/interact.rs",
+    "rust/opcg_engine/src/effects/triggers.rs",
+    "rust/opcg_engine/src/effects/continuous.rs",
+    "rust/opcg_engine/src/effects/passives.rs",
+    "rust/opcg_engine/src/effects/actions/mod.rs",
+    "rust/opcg_engine/src/effects/mod.rs（§11.5 の stub・EffectContext・NodeRef・効果表の差し口）",
+    "rust/opcg_engine/src/effects/tests_effects.rs",
+    "rust/opcg_engine/src/model.rs（append-only: 中断 7 種・Continuation・継続効果・遅延/退避・temp_origin_life）",
+    "rust/opcg_engine/src/journal.rs（append-only: 上記の逆操作）",
+    "rust/opcg_engine/src/rules/{turn,battle,actions,passive,pending,legal}.rs（誘発フックの接続）",
+    "rust/opcg_engine/src/state.rs（RECORD_VERSION=4・shuffled 再同期・replay_audit）",
+    "rust/opcg_engine/src/lib.rs（replay_audit の公開）",
+    "tests/scripts/rs_audit_replay.py（新規）",
+    "tests/scripts/rs_diff_replay.py（記録 v4 の shuffled）",
+    "rust/opcg_engine/src/rules/legal.rs（ACTIVATE_MAIN の列挙＝Python `_has_activatable_main`）"
+  ],
+  "not_touched": [
+    "opcg_sim/（Python エンジンは 1 行も変えていない）",
+    "rust/opcg_engine/src/effects/{loader,matcher,cond,value}.rs（WP rs-p3-core）",
+    "rust/opcg_engine/src/effects/actions/{status,zone,flow,don,rules}.rs（群 A〜E）"
+  ],
+  "notes": "統合時に読む点は docs/rust_engine_plan.md §8.7 に 9 項目でまとめた。要点: (1) 実行スタックは効果木を持たず NodeRef（能力 index＋根＋子添字列）で指す＝Python の id(node) と同じ判別能力を持ちつつ continuation にそのまま入る。(2) §11.5 の 3 関数は effects/mod.rs の stub で、統合時は中身を matcher/cond/value へ委譲するだけ（シグネチャ不変）。効果表は init_abilities で差し込む口を用意した。(3) 既定解決（card_keep_value/選択規則/default_interaction_payload）は effects/interact.rs へ一本化し rules/legal.rs は委譲に変えた（2 か所に置くと必ずずれる）。(4) DON_BOX は中断ではない（cpu_ai のマクロ手）ので InteractionKind に持たせていない＝実装は Python に実在する 7 種＋FIELD_OVERFLOW_TRASH。(5) 記録 v4 の shuffled はマリガンのため deck だけでは足りず deck∪hand へ落とす段を持つ。(6) 除去保護/置換は群 E の担当なので『保護者が 1 人も居ない』高速路だけ入れた。(7) 監査の汎用盤面はプレイヤー名・ドン!!実体・合成リーダーの 3 点を記録前に正規化する必要がある（effect_coverage は変更していない）。(8) 未登録 ActionType は Python の『no-op』と違い Unimplemented にした（P3 完了時に全種が入る前提・取りこぼしが監査で見える）。 (9) rules/legal.rs に ACTIVATE_MAIN の列挙を足した（P2 は 1 手も出しておらず、出さないままだと統合後の実デッキ再生で legal が Python より小さくなるだけでエラーにならない＝黙って不一致になる）。"
+}

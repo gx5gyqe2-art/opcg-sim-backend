@@ -4,10 +4,13 @@
 //! リフレッシュ）→ `draw_phase`（turn 1 は引かない）→ `don_phase`（turn 1 は 1 枚・以降 2 枚）→
 //! `main_phase` の連鎖と、マリガンを移す。
 //!
-//! **P2 に無いもの**（Python では効果がここに絡む）: `start_game` の GAME_START 誘発・
-//! TURN_START／TURN_END 誘発・`pending_extra_turn`（追加ターン）・`continuous.expire`。
-//! いずれも効果（P3）が要るので、バニラでは「誘発待ち行列が常に空」＝分岐が走らない。
+//! P3（効果解決）で **TURN_START／TURN_END 誘発・遅延アクションのフラッシュ・
+//! `pending_extra_turn`（追加ターン）・`continuous.expire("TURN_END")`** をつないだ
+//! （`effects::triggers`／`effects::continuous`）。`start_game` の GAME_START 誘発だけは
+//! 記録が `start_game` 済みの盤面から始まるため経路に無い。
 
+use crate::effects::continuous::{self, ExpireEvent};
+use crate::effects::triggers;
 use crate::journal::{CardZone, DonBoolField, DonZone, MgrBoolField, Session};
 use crate::model::{CardIdx, DonIdx, MasterTable, Phase, Seat};
 use crate::ops;
@@ -57,8 +60,7 @@ pub fn do_mulligan(s: &mut Session, masters: &MasterTable, seat: Seat) -> Result
     // ここで Python は `random.shuffle(player.deck)` する（再生側が並びを取り直す）。
     ops::draw(s, seat, 5);
     s.edit().add_mulligan_done(seat);
-    check_mulligan_complete(s, masters);
-    Ok(())
+    check_mulligan_complete(s, masters)
 }
 
 /// Python `keep_hand`。
@@ -74,18 +76,17 @@ pub fn keep_hand(s: &mut Session, masters: &MasterTable, seat: Seat) -> Result<(
         ));
     }
     s.edit().add_mulligan_done(seat);
-    check_mulligan_complete(s, masters);
-    Ok(())
+    check_mulligan_complete(s, masters)
 }
 
 /// Python `_check_mulligan_complete`: 両者確定でターン 1 を開始する。
-fn check_mulligan_complete(s: &mut Session, masters: &MasterTable) {
+fn check_mulligan_complete(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
     let done = s.state().mulligan_done.contains(&Seat::P1) && s.state().mulligan_done.contains(&Seat::P2);
     if !done {
-        return;
+        return Ok(());
     }
     s.edit().set_turn_count(1);
-    refresh_phase(s, masters);
+    refresh_phase(s, masters)
 }
 
 /// Python `end_turn`。検証は**ターンプレイヤー基準**（行動主体ではない）で行う。
@@ -96,16 +97,25 @@ pub fn end_turn(s: &mut Session, masters: &MasterTable) -> Result<(), EngineErro
     let tp = s.state().turn_player;
     super::actions::validate_action(s, tp, "MAIN_ACTION")?;
     s.edit().set_phase(Phase::End);
-    // Python: _fire_turn_end_triggers() / _flush_pending_end_of_turn() / continuous.expire(...)
-    //   → バニラは能力が無いので何も起きない（P3 でここへ入る）。
-    switch_turn(s, masters);
-    Ok(())
+    triggers::fire_turn_end_triggers(s, masters)?;
+    // 「このターン終了時、〜」で予約された遅延アクションを解決する。
+    triggers::flush_pending_end_of_turn(s, masters)?;
+    let turn_count = s.state().turn_count;
+    continuous::expire(s, ExpireEvent::TurnEnd, turn_count);
+    switch_turn(s, masters)
 }
 
-/// Python `switch_turn`（追加ターン `pending_extra_turn` は効果＝P3）。
-pub fn switch_turn(s: &mut Session, masters: &MasterTable) {
+/// Python `switch_turn`（追加ターン `pending_extra_turn` は予約したプレイヤーが継続する）。
+pub fn switch_turn(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
     // 新しいターン＝ターン内イベント記録をクリアする。
     s.edit().clear_turn_events();
+    // 追加ターン（EXTRA_TURN）: 予約したプレイヤーがターンプレイヤーのまま継続する。
+    if s.state().pending_extra_turn == Some(s.state().turn_player) {
+        s.edit().set_pending_extra_turn(None);
+        let n = s.state().turn_count + 1;
+        s.edit().set_turn_count(n);
+        return begin_turn(s, masters);
+    }
     let next = s.state().turn_player.other();
     {
         let mut e = s.edit();
@@ -113,26 +123,34 @@ pub fn switch_turn(s: &mut Session, masters: &MasterTable) {
     }
     let n = s.state().turn_count + 1;
     s.edit().set_turn_count(n);
-    begin_turn(s, masters);
+    begin_turn(s, masters)
 }
 
-/// Python `_begin_turn`。TURN_START 誘発はバニラでは積まれないので必ず `refresh_phase` へ進む。
-fn begin_turn(s: &mut Session, masters: &MasterTable) {
-    // Python: gm._fire_turn_start_triggers()（バニラは no-op）
+/// Python `_begin_turn`。
+///
+/// ターン開始時誘発（TURN_START）はリフレッシュフェイズ**前**に解決する（OP11-040 の
+/// 山札 5 枚は通常ドロー前の 5 枚）。誘発の確認／効果解決が対話で中断する間は
+/// リフレッシュ以降を保留し、全対話の完了時に `resolve_interaction` が再開する。
+fn begin_turn(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
+    triggers::fire_turn_start_triggers(s, masters)?;
     if s.state().active_interaction().is_none() && s.state().pending_triggers.is_empty() {
-        refresh_phase(s, masters);
-        return;
+        return refresh_phase(s, masters);
     }
-    // 誘発が残る経路は効果解決（P3）でしか起きない。
-    s.edit().set_mgr_bool(MgrBoolField::TurnStartPending, true);
+    triggers::advance_pending_triggers(s, masters)?;
+    if s.state().active_interaction().is_some() || !s.state().pending_triggers.is_empty() {
+        s.edit().set_mgr_bool(MgrBoolField::TurnStartPending, true);
+        Ok(())
+    } else {
+        refresh_phase(s, masters)
+    }
 }
 
 /// Python `refresh_phase`＝相手の状態リセット → 自分のリフレッシュ → ドローフェイズ。
-pub fn refresh_phase(s: &mut Session, masters: &MasterTable) {
+pub fn refresh_phase(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
     let tp = s.state().turn_player;
     reset_player_status(s, masters, tp.other());
     refresh_all(s, masters, tp);
-    draw_phase(s, masters);
+    draw_phase(s, masters)
 }
 
 /// Python `_reset_player_status`: 直前のターンプレイヤーの一時効果を解除する
@@ -201,16 +219,16 @@ pub fn refresh_all(s: &mut Session, masters: &MasterTable, seat: Seat) {
 }
 
 /// Python `draw_phase`: ターン 1 は引かない。
-pub fn draw_phase(s: &mut Session, masters: &MasterTable) {
+pub fn draw_phase(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
     if s.state().turn_count > 1 {
         let tp = s.state().turn_player;
         draw_card(s, tp, 1);
     }
-    don_phase(s, masters);
+    don_phase(s, masters)
 }
 
 /// Python `don_phase`: ターン 1 は 1 枚・以降 2 枚をドン!!デッキからアクティブへ。
-pub fn don_phase(s: &mut Session, masters: &MasterTable) {
+pub fn don_phase(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
     let n = if s.state().turn_count == 1 { 1 } else { 2 };
     let seat = s.state().turn_player;
     for _ in 0..n {
@@ -221,12 +239,12 @@ pub fn don_phase(s: &mut Session, masters: &MasterTable) {
         let don = e.don_zone_remove_at(seat, DonZone::Deck, 0);
         e.don_zone_push(seat, DonZone::Active, don);
     }
-    main_phase(s, masters);
+    main_phase(s, masters)
 }
 
 /// Python `main_phase`。
-pub fn main_phase(s: &mut Session, masters: &MasterTable) {
+pub fn main_phase(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
     s.edit().set_phase(Phase::Main);
     let tp = s.state().turn_player;
-    apply_passive_effects(s, masters, tp);
+    apply_passive_effects(s, masters, tp)
 }

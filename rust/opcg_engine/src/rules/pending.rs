@@ -164,17 +164,34 @@ pub fn get_pending_request(s: &mut Session, masters: &MasterTable, full: bool) -
     if s.state().active_interaction().is_some() {
         let st = s.state();
         let it = st.active_interaction().expect("checked above");
-        let selectable = it.selectable.as_ref().unwrap_or(&it.candidates);
+        // 候補はカード列かドン!!列のどちらか（`SELECT_RESOURCE` だけがドン!!）。
+        let candidate_uuids: Vec<String> = if it.candidate_dons.is_empty() {
+            it.candidates
+                .iter()
+                .map(|c| st.card(*c).uuid.clone())
+                .collect()
+        } else {
+            it.candidate_dons
+                .iter()
+                .map(|d| st.don(*d).uuid.clone())
+                .collect()
+        };
+        let selectable: Vec<String> = match it.selectable.as_ref() {
+            Some(list) => list.iter().map(|c| st.card(*c).uuid.clone()).collect(),
+            None => candidate_uuids.clone(),
+        };
         let mut req = Map::new();
         req.insert("player_id".into(), Value::from(it.player.name()));
         req.insert("action".into(), Value::from(it.kind.front_action()));
         req.insert("message".into(), Value::from(it.message.clone()));
-        req.insert("selectable_uuids".into(), uuid_list(st, selectable));
+        req.insert("selectable_uuids".into(), Value::from(selectable));
         req.insert("can_skip".into(), Value::Bool(it.can_skip));
         // `candidates`（各候補の to_dict）はフロント表示専用＝高速パスでは空 list。
         req.insert(
             "candidates".into(),
-            Value::Array(if full {
+            Value::Array(if !full {
+                Vec::new()
+            } else if it.candidate_dons.is_empty() {
                 it.candidates
                     .iter()
                     .map(|c| {
@@ -183,7 +200,13 @@ pub fn get_pending_request(s: &mut Session, masters: &MasterTable, full: bool) -
                     })
                     .collect()
             } else {
-                Vec::new()
+                it.candidate_dons
+                    .iter()
+                    .map(|d| {
+                        let don = st.don(*d);
+                        don.to_dict(don.attached_to.map(|c| st.card(c).uuid.as_str()))
+                    })
+                    .collect()
             }),
         );
         req.insert(
@@ -193,12 +216,25 @@ pub fn get_pending_request(s: &mut Session, masters: &MasterTable, full: bool) -
                 None => Value::Null,
             },
         );
-        req.insert("options".into(), Value::Null);
+        // `options` は CHOICE だけが持つ（他は Python も `None`）。
+        req.insert(
+            "options".into(),
+            if it.options.is_empty() {
+                Value::Null
+            } else {
+                Value::from(it.options.clone())
+            },
+        );
         if let Some(src) = it.source_card {
             req.insert(
                 "source_card_uuid".into(),
                 Value::from(st.card(src).uuid.clone()),
             );
+        }
+        // ARRANGE_DECK はフロントの UI 切替フラグを併せて渡す。
+        if it.kind == crate::model::InteractionKind::ArrangeDeck {
+            req.insert("allow_position".into(), Value::Bool(it.allow_position));
+            req.insert("allow_reorder".into(), Value::Bool(it.allow_reorder));
         }
         return Some(Value::Object(req));
     }

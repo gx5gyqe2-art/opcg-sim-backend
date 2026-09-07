@@ -8,6 +8,7 @@ use crate::journal::{CardBoolField, CardI32Field, CardZone, DonZone, Session};
 use crate::model::{
     CardIdx, CardType, Interaction, InteractionKind, MasterTable, Position, Seat, Zone,
 };
+use crate::effects::ast::TriggerType;
 use crate::ops;
 use crate::state::EngineError;
 use serde_json::Value;
@@ -18,10 +19,6 @@ use super::{card_type, operating_card, FIELD_LIMIT};
 
 fn bad(msg: impl Into<String>) -> EngineError {
     EngineError::BadPayload(msg.into())
-}
-
-fn unimplemented(msg: impl Into<String>) -> EngineError {
-    EngineError::Unimplemented(msg.into())
 }
 
 // --- 検証（Python `GameManager._validate_action`）------------------------------
@@ -76,74 +73,29 @@ pub fn suspend_for_field_overflow(s: &mut Session, owner: Seat) {
     let message = format!(
         "場のキャラクターが上限({FIELD_LIMIT})を超えました。トラッシュするキャラを{excess}枚選んでください。"
     );
-    s.edit().push_interaction(Interaction {
-        kind: InteractionKind::FieldOverflowTrash,
-        player: owner,
-        message,
-        candidates: field.clone(),
-        selectable: Some(field),
-        constraints: Some((excess, excess)),
-        can_skip: false,
-        source_card: None,
+    s.edit().push_interaction(Interaction::rules(
+        InteractionKind::FieldOverflowTrash,
         owner,
-    });
+        message,
+        field.clone(),
+        Some(field),
+        Some((excess, excess)),
+        false,
+        owner,
+    ));
 }
 
 // --- 中断の解決（Python `resolve_interaction`）----------------------------------
 
-/// Python `resolve_interaction`。P2 が扱う中断は `FIELD_OVERFLOW_TRASH` だけ。
+/// Python `resolve_interaction`。P3 で 8 種すべてを [`crate::effects::interact`] へ移した
+/// （P2 の `FIELD_OVERFLOW_TRASH` もそちらの分岐に含まれる）。名前は呼び出し側のために残す。
 pub fn resolve_interaction(
     s: &mut Session,
     masters: &MasterTable,
+    seat: Seat,
     payload: &Value,
 ) -> Result<(), EngineError> {
-    let Some(it) = s.state().active_interaction() else {
-        return Ok(());
-    };
-    match it.kind {
-        InteractionKind::FieldOverflowTrash => {
-            let owner = it.owner;
-            let selected = selected_uuids(payload);
-            s.edit().pop_interaction();
-            for uid in selected {
-                let card = s
-                    .state()
-                    .player(owner)
-                    .field
-                    .iter()
-                    .copied()
-                    .find(|c| s.state().card(*c).uuid == uid);
-                if let Some(card) = card {
-                    ops::move_card(s, masters, card, Zone::Trash, owner, Position::Bottom)?;
-                }
-            }
-            refresh_passive_state(s, masters);
-            // 複数体同時超過などでまだ超過していれば再度要求する（保険）。
-            if s.state().player(owner).field.len() > FIELD_LIMIT {
-                suspend_for_field_overflow(s, owner);
-            }
-            // Python: 背後に積まれた誘発の消化（P3。バニラでは空）。
-            Ok(())
-        }
-    }
-}
-
-/// Python: `payload.get("selected_uuids") or payload.get("extra", {}).get("selected_uuids", [])`。
-fn selected_uuids(payload: &Value) -> Vec<String> {
-    let pick = |v: Option<&Value>| -> Option<Vec<String>> {
-        let arr = v?.as_array()?;
-        if arr.is_empty() {
-            return None; // Python の `or` は空 list を falsy として扱う
-        }
-        Some(
-            arr.iter()
-                .filter_map(|x| x.as_str().map(str::to_owned))
-                .collect(),
-        )
-    };
-    pick(payload.get("selected_uuids"))
-        .or_else(|| pick(payload.get("extra").and_then(|e| e.get("selected_uuids"))))
-        .unwrap_or_default()
+    crate::effects::interact::resolve_interaction(s, masters, seat, payload)
 }
 
 // --- カードのプレイ（Python `gamestate.play_card_action`）-----------------------
@@ -164,39 +116,143 @@ pub fn play_card_action(
         ));
     }
     let ty = card_type(s.state(), masters, card);
-    if ty == CardType::Character
-        && super::active_restriction(s.state(), seat, "CANNOT_PLAY_CHARACTER").is_some()
-    {
-        return Err(bad("効果により、このターンはキャラを登場できません。"));
+    if ty == CardType::Character {
+        if let Some(rec) = super::active_restriction(s.state(), seat, "CANNOT_PLAY_CHARACTER") {
+            // 「元々のコスト」＝ `master.cost`（修正前の値）で判定する。
+            let min_cost = rec.min_cost;
+            let base_cost = masters.get(s.state().card(card).master).cost;
+            if min_cost.is_none() || base_cost >= min_cost.unwrap_or(0) {
+                let suffix = match min_cost {
+                    Some(n) => format!("コスト{n}以上の"),
+                    None => String::new(),
+                };
+                return Err(bad(format!(
+                    "効果により、このターンは{suffix}キャラを登場できません。"
+                )));
+            }
+        }
     }
     if ty == CardType::Event {
-        // 【メイン】効果の解決が要る＝P3。バニラは abilities が無いので
-        // `_event_has_main_play` が False → 合法手にも出ない（Python は ValueError）。
-        return Err(unimplemented(
-            "play_card_action: イベントの発動（効果解決）は P3",
-        ));
+        // 【メイン】効果を持たないイベントはメインフェイズに発動できない。
+        if !event_has_main_play(s, masters, card)? {
+            return Err(bad(
+                "このイベントはメインフェイズに発動できません（【メイン】効果を持ちません）。",
+            ));
+        }
+        record_event_played(s, masters, card);
+        let ids = masters.get(s.state().card(card).master).ability_ids.clone();
+        for (index, id) in ids.iter().enumerate() {
+            let trigger = crate::effects::ability(*id)?.trigger;
+            if matches!(trigger, TriggerType::OnPlay | TriggerType::ActivateMain) {
+                crate::effects::resolver::game_resolve_ability(s, masters, seat, card, index, false)?;
+            }
+        }
+        crate::effects::actions::move_card(s, masters, card, Zone::Trash, seat, Position::Bottom)?;
+        return Ok(());
     }
 
-    ops::move_card(s, masters, card, Zone::Field, seat, Position::Bottom)?;
+    crate::effects::actions::move_card(s, masters, card, Zone::Field, seat, Position::Bottom)?;
     {
         let mut e = s.edit();
         e.set_card_i32(card, CardI32Field::AttachedDon, 0);
         e.set_card_bool(card, CardBoolField::IsNewlyPlayed, true);
     }
-    // 【トリガー】を持つキャラの登場をターン内イベントとして記録する。
-    // Python は `trigger_text` 非空 **または** TriggerType.TRIGGER 能力を持つ、で判定するが、
-    // バニラ（P2 の受け入れ範囲）は abilities を外してあるので `trigger_text` だけで一致する。
-    if !masters.get(s.state().card(card).master).trigger_text.is_empty() {
+    // 【トリガー】を持つキャラの登場をターン内イベントとして記録する
+    // （`trigger_text` 非空 **または** TriggerType::Trigger 能力を持つ）。
+    if has_trigger_icon(s, masters, card)? {
         ops::record_turn_event(s, "TRIGGER_CHAR_PLAYED", 1);
     }
+    // 登場した時点で継続効果（PASSIVE/YOUR_TURN）を適用してから ON_PLAY を解決する。
     let tp = s.state().turn_player;
-    apply_passive_effects(s, masters, tp);
-    // Python: `_has_rested_play`（「自分のキャラはレストで登場する」PASSIVE）＝P3。
+    apply_passive_effects(s, masters, tp)?;
+    if has_rested_play(s, masters, seat)? {
+        s.edit().set_card_bool(card, CardBoolField::IsRest, true);
+    }
+    // 場のキャラ上限超過の押し出しは ON_PLAY 解決より前に確定する。
     enforce_field_limit(s, seat);
-    // Python: ON_PLAY の解決・「…が登場した時」リスナー＝P3（バニラでは能力が無い）。
-    apply_passive_effects(s, masters, seat);
+    crate::effects::triggers::resolve_on_play(s, masters, seat, card)?;
+    // 他カードの「…が登場した時」リスナー（登場時無効に関わらず積む）。
+    crate::effects::triggers::enqueue_char_played_listeners(s, masters, card, seat, Some("HAND"))?;
+    apply_passive_effects(s, masters, seat)?;
+    // ON_PLAY がさらにキャラを登場させた場合の超過はここで拾う。
     enforce_field_limit(s, seat);
     Ok(())
+}
+
+/// Python `_event_has_main_play`（【メイン】効果＝ON_PLAY／ACTIVATE_MAIN を 1 つ以上持つか）。
+pub fn event_has_main_play(
+    s: &Session,
+    masters: &MasterTable,
+    card: CardIdx,
+) -> Result<bool, EngineError> {
+    for id in &masters.get(s.state().card(card).master).ability_ids {
+        if matches!(
+            crate::effects::ability(*id)?.trigger,
+            TriggerType::OnPlay | TriggerType::ActivateMain
+        ) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Python `_record_event_played`（コスト k 以上のしきい値も記録する）。
+fn record_event_played(s: &mut Session, masters: &MasterTable, card: CardIdx) {
+    let cost = masters.get(s.state().card(card).master).cost.max(0);
+    ops::record_turn_event(s, "EVENT_PLAYED", 1);
+    for k in 1..=cost {
+        ops::record_turn_event(s, &format!("EVENT_PLAYED_COST_GE_{k}"), 1);
+    }
+}
+
+/// Python `play_card_action` の【トリガー】判定（`trigger_text` 非空 or TRIGGER 能力）。
+fn has_trigger_icon(
+    s: &Session,
+    masters: &MasterTable,
+    card: CardIdx,
+) -> Result<bool, EngineError> {
+    let m = masters.get(s.state().card(card).master);
+    if !m.trigger_text.is_empty() {
+        return Ok(true);
+    }
+    for id in &m.ability_ids {
+        if crate::effects::ability(*id)?.trigger == TriggerType::Trigger {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Python `guards._has_rested_play`（「自分のキャラはレストで登場する」PASSIVE）。
+fn has_rested_play(
+    s: &Session,
+    masters: &MasterTable,
+    seat: Seat,
+) -> Result<bool, EngineError> {
+    let mut cards: Vec<CardIdx> = s.state().player(seat).leader.into_iter().collect();
+    cards.extend(s.state().player(seat).field.iter().copied());
+    for c in cards {
+        if super::is_effect_negated(s.state(), c) {
+            continue;
+        }
+        for id in &masters.get(s.state().card(c).master).ability_ids {
+            let ab = crate::effects::ability(*id)?;
+            if ab.trigger != TriggerType::Passive {
+                continue;
+            }
+            let Some(effect) = ab.effect.as_ref() else {
+                continue;
+            };
+            if let Some(act) =
+                crate::effects::actions::find_action(effect, crate::effects::ast::ActionType::Restriction)
+            {
+                if act.status.as_deref() == Some("RESTED_PLAY") {
+                    return Ok(true);
+                }
+            }
+        }
+    }
+    Ok(false)
 }
 
 // --- ゲームアクション（Python `action_api.apply_game_action`）-------------------
@@ -280,22 +336,52 @@ pub fn apply_game_action(
             e.set_card_i32(card, CardI32Field::AttachedDon, attached + 1);
         }
         "ACTIVATE_MAIN" => {
-            return Err(unimplemented(
-                "apply_game_action: ACTIVATE_MAIN（起動メイン効果の解決）は P3",
-            ));
+            let card = operating
+                .ok_or_else(|| bad("起動メインの発生源カードが見つかりません。"))?;
+            let index = payload
+                .get("ability_index")
+                .and_then(Value::as_u64)
+                .map(|n| n as usize);
+            activate_main(s, masters, seat, card, index)?;
         }
         "RESOLVE_EFFECT_SELECTION" => {
-            resolve_interaction(s, masters, payload)?;
+            resolve_interaction(s, masters, seat, payload)?;
         }
         "MULLIGAN" => super::turn::do_mulligan(s, masters, seat)?,
         "KEEP_HAND" => super::turn::keep_hand(s, masters, seat)?,
         other => return Err(bad(format!("不明なアクションです: {other}"))),
     }
 
-    // Python: アクション境界の `_advance_pending_triggers()`（P3。バニラでは空）→
-    // `refresh_passive_state()`。
-    refresh_passive_state(s, masters);
+    // Python: アクション境界の `_advance_pending_triggers()` → `refresh_passive_state()`。
+    crate::effects::triggers::advance_pending_triggers(s, masters)?;
+    refresh_passive_state(s, masters)?;
     Ok(())
+}
+
+/// 起動メイン（`ACTIVATE_MAIN`）の解決。`index` 未指定なら ACTIVATE_MAIN 能力を順に解決する
+/// （Python `action_api` は `ability_index` を渡す経路と渡さない経路の両方を持つ）。
+fn activate_main(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    card: CardIdx,
+    index: Option<usize>,
+) -> Result<(), EngineError> {
+    let ids = masters.get(s.state().card(card).master).ability_ids.clone();
+    match index {
+        Some(i) => crate::effects::resolver::game_resolve_ability(s, masters, seat, card, i, false),
+        None => {
+            // Python（`action_api.py`）は**途中で止めずに**全ての ACTIVATE_MAIN を回す。
+            // 中断中の 2 本目は `_process_stack` が 1 ステップも実行せずに返るだけ
+            // （＝実質 no-op だが使用回数やコスト確認の中断は起きうる）。同じにする。
+            for (i, id) in ids.iter().enumerate() {
+                if crate::effects::ability(*id)?.trigger == TriggerType::ActivateMain {
+                    crate::effects::resolver::game_resolve_ability(s, masters, seat, card, i, false)?;
+                }
+            }
+            Ok(())
+        }
+    }
 }
 
 // --- 戦闘アクション（Python `action_api.apply_battle_action`）--------------------
@@ -323,7 +409,7 @@ pub fn apply_battle_action(
                     .copied()
                     .find(|c| s.state().card(*c).uuid == u)
             });
-            super::battle::handle_block(s, blocker)?;
+            super::battle::handle_block(s, masters, blocker)?;
         }
         ACT_SELECT_COUNTER => {
             let counter = card_uuid.and_then(|u| {
@@ -339,7 +425,7 @@ pub fn apply_battle_action(
         ACT_PASS => {
             // ブロックステップのパスは「ブロックしない」＝カウンターステップへ進む。
             if s.state().phase == crate::model::Phase::BlockStep {
-                super::battle::handle_block(s, None)?;
+                super::battle::handle_block(s, masters, None)?;
             } else {
                 super::battle::apply_counter(s, masters, seat, None)?;
             }

@@ -1,10 +1,15 @@
 //! 戦闘＝Python `opcg_sim/src/core/engine/battle.py`（P2）。
 //!
 //! アタック宣言 → （ブロッカーが居れば）ブロックステップ → カウンターステップ → 解決 → 後処理。
-//! 効果を伴う分岐（ON_ATTACK／ON_OPP_ATTACK／ON_BLOCK／【トリガー】／KO 置換・除去保護・
-//! 【カウンター】イベント）は P3 の担当なので、バニラでは走らない経路として
-//! `Unimplemented` か「空の待ち行列」で表す。
+//!
+//! P3（効果解決）で効果を伴う分岐をつないだ: ON_ATTACK／ON_REST／ON_OPP_ATTACK の待ち行列
+//! （[`crate::effects::triggers::enqueue_battle_triggers`]）・ON_BLOCK・ライフ公開【トリガー】・
+//! 除去保護／KO 置換（`effects::actions`）・KO 時誘発・`continuous.expire("BATTLE_END")`・
+//! ライフ減少誘発。**【カウンター】イベント**の発動だけは効果の実行が群 E の担当なので
+//! `Unimplemented`（黙って進めない）。
 
+use crate::effects::continuous::{self, ExpireEvent};
+use crate::effects::triggers;
 use crate::journal::{CardBoolField, CardZone, Session, TriggerQueue};
 use crate::model::{ActiveBattle, CardIdx, CardType, MasterTable, Phase, Position, Seat, Zone};
 use crate::ops;
@@ -109,32 +114,56 @@ pub fn declare_attack(
         target_owner,
         counter_buff: 0,
     }));
-    // Python はここで ON_ATTACK / ON_REST / ON_OPP_ATTACK を `_battle_triggers` へ積む。
-    // バニラは abilities が無いので**空**（待ち行列だけ同じ形で持つ）。
-    s.edit().set_trigger_queue(TriggerQueue::Battle, Vec::new());
-    advance_battle_triggers(s, masters);
-    Ok(())
+    // ON_ATTACK / ON_REST（アタック宣言によるレスト）/ ON_OPP_ATTACK を待ち行列へ積む。
+    let queue =
+        triggers::enqueue_battle_triggers(s, masters, attacker, attacker_owner, target_owner)?;
+    s.edit().set_trigger_queue(TriggerQueue::Battle, queue);
+    advance_battle_triggers(s, masters)
 }
 
-/// Python `_advance_battle_triggers`: 積んだトリガーを解決し、終わったら防御フェイズへ。
-pub fn advance_battle_triggers(s: &mut Session, _masters: &MasterTable) {
-    let Some(battle) = s.state().active_battle.clone() else {
+/// Python `_advance_battle_triggers`: 積んだトリガーを 1 つずつ解決し、
+/// 全て片付いてから防御フェイズへ遷移する（途中で中断が立ったら return）。
+pub fn advance_battle_triggers(
+    s: &mut Session,
+    masters: &MasterTable,
+) -> Result<(), EngineError> {
+    if s.state().active_battle.is_none() {
         s.edit().set_trigger_queue(TriggerQueue::Battle, Vec::new());
-        return;
+        return Ok(());
+    }
+    while !s.state().battle_triggers.is_empty() {
+        let mut queue = s.state().battle_triggers.clone();
+        let item = queue.remove(0);
+        s.edit().set_trigger_queue(TriggerQueue::Battle, queue);
+        crate::effects::resolver::game_resolve_ability(
+            s,
+            masters,
+            item.player,
+            item.card,
+            item.ability as usize,
+            false,
+        )?;
+        if s.state().active_interaction().is_some() {
+            return Ok(()); // 中断: 解決後に resolve_interaction から再開される
+        }
+    }
+    // 全トリガー解決 → ブロッカー/カウンター段階へ
+    let Some(battle) = s.state().active_battle.clone() else {
+        return Ok(());
     };
-    // バニラでは `battle_triggers` は常に空（効果解決は P3）。
-    debug_assert!(s.state().battle_triggers.is_empty());
     let phase = if has_blocker(s, battle.target_owner) {
         Phase::BlockStep
     } else {
         Phase::BattleCounter
     };
     s.edit().set_phase(phase);
+    Ok(())
 }
 
 /// Python `handle_block`。`blocker=None`（ブロックしない）はカウンターステップへ進むだけ。
 pub fn handle_block(
     s: &mut Session,
+    masters: &MasterTable,
     blocker: Option<CardIdx>,
 ) -> Result<(), EngineError> {
     let Some(battle) = s.state().active_battle.clone() else {
@@ -147,7 +176,12 @@ pub fn handle_block(
         let mut updated = battle.clone();
         updated.target = blocker;
         s.edit().set_active_battle(Some(updated));
-        // Python: ON_BLOCK（【ブロック時】）の解決＝P3。バニラでは能力が無い。
+        // 【ブロック時】効果を発動する。
+        triggers::resolve_on_block(s, masters, blocker, battle.target_owner)?;
+        if s.state().active_interaction().is_some() {
+            // ブロック時効果が対象選択等で中断した場合はここで返す（resume が継続）。
+            return Ok(());
+        }
     }
     s.edit().set_phase(Phase::BattleCounter);
     Ok(())
@@ -168,10 +202,11 @@ pub fn apply_counter(
     };
     super::actions::validate_action(s, seat, "SELECT_COUNTER")?;
     if card_type(s.state(), masters, counter_card) == CardType::Event {
-        // 【カウンター】イベントは効果解決（P3）が要る。バニラでは候補に出ない
-        // （`counter_candidates` はカウンター値を持つ手札だけを出す）。
+        // 【カウンター】イベント: `pay_cost` → COUNTER 能力の解決 →
+        // `_register_granted_replacements` → トラッシュ。継続付与型置換の登録が
+        // **群 E**（`actions/rules.rs`）の担当なので、ここは黙って進めずに止める。
         return Err(EngineError::Unimplemented(
-            "apply_counter: 【カウンター】イベントの効果解決は P3".into(),
+            "apply_counter: 【カウンター】イベント（COUNTER 能力＋付与置換の登録）は P3 群 E".into(),
         ));
     }
     let value = super::current_counter(s.state(), masters, counter_card);
@@ -226,42 +261,96 @@ pub fn resolve_attack(s: &mut Session, masters: &MasterTable) -> Result<(), Engi
                 let life_card = s
                     .edit()
                     .card_zone_remove_at(target_owner, CardZone::Life, 0);
+                // 【トリガー】能力は **move_card の前**に見る（Python と同順。バニッシュなら見ない）。
+                let trigger_ability = if banish {
+                    None
+                } else {
+                    trigger_ability_index(s, masters, life_card)?
+                };
                 let dest = if banish { Zone::Trash } else { Zone::Hand };
-                ops::move_card(s, masters, life_card, dest, target_owner, Position::Bottom)?;
+                crate::effects::actions::move_card(
+                    s,
+                    masters,
+                    life_card,
+                    dest,
+                    target_owner,
+                    Position::Bottom,
+                )?;
                 life_lost += 1;
-                // Python: 公開した【トリガー】は確認付きで待ち行列へ（P3）。バニラでは無い。
+                // 【トリガー】は任意＝確認付きで待ち行列へ（複数枚でも消失しない）。
+                if let Some(index) = trigger_ability {
+                    triggers::enqueue_trigger(s, target_owner, life_card, index, true);
+                }
             }
         }
     } else if attacker_pwr >= target_pwr {
-        // 除去保護（PREVENT_LEAVE/BATTLE_KO）・KO 置換は効果＝P3。バニラでは素の KO。
-        ops::move_card(s, masters, target, Zone::Trash, target_owner, Position::Bottom)?;
-        resolve_on_ko(s, target_owner);
+        if crate::effects::actions::active_protection(
+            s,
+            masters,
+            target,
+            &["BATTLE_KO"],
+            None,
+        )? {
+            // 保護されている＝KO しない。
+        } else if crate::effects::actions::find_replacement(s, masters, target, &["BATTLE_KO"])? {
+            // 置換（任意なら確認で中断）は群 E＝`find_replacement` が Unimplemented を返す。
+        } else {
+            crate::effects::actions::move_card(
+                s,
+                masters,
+                target,
+                Zone::Trash,
+                target_owner,
+                Position::Bottom,
+            )?;
+            triggers::resolve_on_ko(s, masters, target, target_owner, "BATTLE", None)?;
+        }
     }
 
-    finish_attack(s, masters, target, life_lost);
-    Ok(())
+    finish_attack(s, masters, target, life_lost)
 }
 
-/// Python `_resolve_on_ko` のうち P2 が担う部分＝ターン内イベントの記録。
-/// 【KO時】誘発と第三者 KO リスナーは効果（P3）。
-fn resolve_on_ko(s: &mut Session, owner: Seat) {
-    let name = format!("CHAR_KOED_{}", owner.name());
-    ops::record_turn_event(s, &name, 1);
+/// ライフから公開されたカードの【トリガー】能力のカード内 index（無ければ `None`）。
+fn trigger_ability_index(
+    s: &Session,
+    masters: &MasterTable,
+    card: CardIdx,
+) -> Result<Option<usize>, EngineError> {
+    for (index, id) in masters
+        .get(s.state().card(card).master)
+        .ability_ids
+        .iter()
+        .enumerate()
+    {
+        if crate::effects::ability(*id)?.trigger == crate::effects::ast::TriggerType::Trigger {
+            return Ok(Some(index));
+        }
+    }
+    Ok(None)
 }
 
 /// Python `_finish_attack`（戦闘解決後の共通後処理）。
-fn finish_attack(s: &mut Session, masters: &MasterTable, target: CardIdx, life_lost: i32) {
+pub fn finish_attack(
+    s: &mut Session,
+    masters: &MasterTable,
+    target: CardIdx,
+    life_lost: i32,
+) -> Result<(), EngineError> {
     ops::reset_turn_status(s, masters, target, true, false);
     s.edit().set_active_battle(None);
     s.edit().set_phase(Phase::Main);
     check_victory(s);
-    // Python: continuous.expire("BATTLE_END", turn_count)＝継続効果の失効（P3）。
+    let turn_count = s.state().turn_count;
+    continuous::expire(s, ExpireEvent::BattleEnd, turn_count);
     if s.state().winner.is_none() {
         let tp = s.state().turn_player;
-        apply_passive_effects(s, masters, tp);
+        apply_passive_effects(s, masters, tp)?;
     }
-    // Python: ライフが離れた回数ぶん ON_LIFE_DECREASE を積む（P3。バニラでは空）。
-    let _ = life_lost;
+    // ライフが離れた回数ぶん ON_LIFE_DECREASE を積み、【トリガー】と共に消化する。
+    if life_lost > 0 && s.state().winner.is_none() {
+        triggers::enqueue_life_decrease(s, masters, life_lost)?;
+    }
+    triggers::advance_pending_triggers(s, masters)
 }
 
 /// Python `check_victory`（デッキアウト。勝敗の置換 REPLACE_DECKOUT_LOSS は効果＝P3）。
