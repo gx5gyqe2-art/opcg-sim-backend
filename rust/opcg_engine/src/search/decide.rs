@@ -122,6 +122,15 @@ pub struct DecideCarry {
 #[derive(Debug, Clone)]
 pub struct DecideOut {
     pub mv: Option<Move>,
+    /// 棋譜ダンプ用の**箱レベル**の `move_sig`（Python `record["sig"]`）。
+    ///
+    /// [`DecideOut::mv`] は「実対局へ出す手」＝配分箱は先頭原始手へ畳んだ後・残ドン掘り／
+    /// 残り起動で差し替えた後なので、**決定の同一性**（訪問分布の候補と突き合わせる鍵）とは
+    /// 別物になる。Python は `record` をその 2 つの前で採る＝ここも同じ位置で採る。
+    pub sig: Option<Value>,
+    /// 同じ位置の `don_k`（Python `record["k"]`。`move_sig` は don_k を含まないので並記が要る）。
+    /// 窓・コミットでは `None`（Python も `record["k"]` を書かない）。
+    pub k: Option<f64>,
     /// "main"／"window"／"commit"
     pub kind: &'static str,
     pub legal: Vec<Move>,
@@ -835,6 +844,8 @@ pub fn decide(
 
 fn empty_out(kind: &'static str, mv: Option<Move>, carry: DecideCarry, st: &SearchState) -> DecideOut {
     DecideOut {
+        sig: mv.as_ref().map(move_sig),
+        k: None,
         mv,
         kind,
         legal: Vec::new(),
@@ -901,6 +912,8 @@ fn decide_inner(
                 }
             }
             return Ok(DecideOut {
+                sig: Some(move_sig(&pick.mv)),
+                k: None,
                 mv: Some(pick.mv),
                 kind: "window",
                 legal: pick.legal,
@@ -939,6 +952,14 @@ fn decide_inner(
     if mv.is_none() {
         mv = run.legal.first().cloned();
     }
+    // 棋譜ダンプの鍵はここで採る（Python `_decide_inner` の `record` と同じ位置＝残ドン掘り／
+    // 残り起動の差し替えと先頭原始手化の**前**＝訪問分布の候補と突き合わせられる箱レベル）。
+    let rec_sig = mv.as_ref().map(move_sig);
+    let rec_k = mv
+        .as_ref()
+        .and_then(|m| m.get("payload"))
+        .and_then(|p| p.get("don_k"))
+        .and_then(Value::as_f64);
 
     // ⑤ 残ドン掘り／残り起動（腕 A・A2）
     let mut dig_override = false;
@@ -991,6 +1012,8 @@ fn decide_inner(
     let mv = mv.map(|m| don_box_first_primitive(&m));
     Ok(DecideOut {
         mv,
+        sig: rec_sig,
+        k: rec_k,
         kind: "main",
         legal: run.legal,
         n: run.n,

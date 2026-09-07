@@ -336,6 +336,11 @@ fn discard(
 }
 
 /// Python `per_target.rest`（カード枝。ドン!!枝は [`rest_don`]＝§11.8 #2 で分離した）。
+///
+/// 裁定（§16.3-10）: 「このキャラは相手の効果でレストにされない」を持つカードは
+/// [`status::FLAG_CANNOT_BE_RESTED_BY_OPP`] を載せている。**相手の効果**（`actor` が持ち主で
+/// ない）による REST だけをここで弾く＝本人のアタック宣言・ブロックには一切効かない
+/// （それらは `rules::battle` の経路で、このハンドラを通らない）。
 fn rest(
     s: &mut Session,
     masters: &MasterTable,
@@ -343,6 +348,16 @@ fn rest(
     target: CardIdx,
     source_card: Option<CardIdx>,
 ) -> Result<(), EngineError> {
+    let owner = s.state().card(target).owner;
+    if actor != owner
+        && crate::rules::has_timed_flag(
+            s.state(),
+            target,
+            status::FLAG_CANNOT_BE_RESTED_BY_OPP,
+        )
+    {
+        return Ok(());
+    }
     let was_rested = s.state().card(target).is_rest;
     s.edit().set_card_bool(target, CardBoolField::IsRest, true);
     // アクティブ→レスト遷移で ON_REST（キャラがレストになった時）を誘発する。

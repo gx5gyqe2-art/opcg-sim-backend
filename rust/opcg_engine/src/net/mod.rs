@@ -192,7 +192,12 @@ fn cand_ref(mv: &Value) -> nrel::CandRef<'_> {
     }
 }
 
-// --- プロセスに 1 つ持つネット（`lib.rs::load_net`／`net_eval` の受け皿）-------------
+// --- プロセスが持つネット（`lib.rs::load_net`／`net_eval` の受け皿）-------------------
+//
+// P5（`docs/rust_engine_plan.md` §16.3-A2）で**複数持てる**ようにした: アリーナは 1 プロセスの
+// 中で候補ネットと基準ネットを同時に使う（席入替 CRN のペアを 1 局ずつ順に打つため、席ごとに
+// 別のネットが要る）。鍵は npz のパスで、`Game.decide` の `opts.net` が選ぶ。**最初に読んだ
+// ものが既定**（`net()`＝`decide`／`net_eval` の従来の口）＝これまでの 1 本運用は無変更。
 
 /// 読み込み済みのネット（重み＋カード表＋語彙＋カードごとの静的値）。
 pub struct LoadedNet {
@@ -203,11 +208,25 @@ pub struct LoadedNet {
     pub statics: nrel::CardStatics,
 }
 
-static NET: OnceLock<LoadedNet> = OnceLock::new();
+/// 既定のネット（最初に `load_net` したもの）。
+static NET: OnceLock<&'static LoadedNet> = OnceLock::new();
+/// パス → ネット。値は `Box::leak` した `&'static`（プロセス寿命で数本しか読まないので、
+/// 参照を `&'static` に保てる leak が一番簡単＝呼び出し側の型を一切変えずに済む）。
+static NETS: OnceLock<std::sync::Mutex<std::collections::HashMap<String, &'static LoadedNet>>> =
+    OnceLock::new();
 
-/// 読み込み済みのネット（未ロードなら `None`）。
+fn nets() -> &'static std::sync::Mutex<std::collections::HashMap<String, &'static LoadedNet>> {
+    NETS.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// 名前（＝`load_net` に渡した npz のパス）で引く。未ロードなら `None`。
+pub fn net_named(key: &str) -> Option<&'static LoadedNet> {
+    nets().lock().ok()?.get(key).copied()
+}
+
+/// 既定のネット（未ロードなら `None`）。
 pub fn net() -> Option<&'static LoadedNet> {
-    NET.get()
+    NET.get().copied()
 }
 
 /// npz（＋カード表の元になる表）を読み、プロセスに 1 つ持つ。戻り値は要約 JSON。
@@ -216,7 +235,7 @@ pub fn net() -> Option<&'static LoadedNet> {
 /// 収めた npz（鍵 `STATS`/`AB`/`ABM`/`PWR`/`ISL`/`RET`）。省略時は Rust 側で組む
 /// （`encode::build_eff_tables`＝WP `rs-p4-encode` の担当・入るまでは `Unimplemented`）。
 pub fn load_net(path: &str, tables_path: Option<&str>) -> Result<String, EngineError> {
-    if let Some(loaded) = NET.get() {
+    if let Some(loaded) = net_named(path) {
         return Ok(summary(loaded));
     }
     let weights = load_npz(path)?;
@@ -239,8 +258,13 @@ pub fn load_net(path: &str, tables_path: Option<&str>) -> Result<String, EngineE
     };
     let tab = card_table(&weights, &tables)?;
     let statics = nrel::CardStatics { pwr: tables.pwr.clone(), isl: tables.isl.clone(), ret_don };
-    let loaded = LoadedNet { weights, tab, vocab, statics };
-    Ok(summary(NET.get_or_init(|| loaded)))
+    let loaded: &'static LoadedNet =
+        Box::leak(Box::new(LoadedNet { weights, tab, vocab, statics }));
+    if let Ok(mut map) = nets().lock() {
+        map.insert(path.to_owned(), loaded);
+    }
+    let _ = NET.set(loaded); // 2 本目以降は既定を書き換えない（最初のものが既定）
+    Ok(summary(loaded))
 }
 
 /// Python `n_rel_feat.profile_table(db, vocab)` の `ret_don` 列（行＝vocab index・0=PAD は 0.0）。
