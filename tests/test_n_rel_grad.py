@@ -9,6 +9,8 @@
      変わらない（present マスク）。
   3. save→load で value/policy が bit 一致し、`is_nrel_npz` が N系 c10 の npz と判別できる。
   4. `relations_batch`（一括）が `relations_from_tokens`（参照）と 22 盤面で bit 一致する。
+  5. `--ablate rel` のとき訓練器は `relations_batch` を呼ばない（結果は `mask_rel` に捨てられる）＝
+     呼ぶ経路と呼ばない経路で損失も更新後の重みもビット一致する（2026-09-07・§18.3）。
 """
 import numpy as np
 import pytest
@@ -272,6 +274,47 @@ def test_onplay_ablation_masks_v7_columns(env, tmp_path):
     p = str(tmp_path / "a3.npz"); net.save(p, meta={"kind": "nrel-a"})
     re_ = NL.NRelNet.load(p, env["tables"])
     assert re_.ablate == {"onplay", "rel"} and re_.meta.get("ablate") == ["onplay", "rel"]
+
+
+def test_ablate_rel_skips_relations_batch_bit_identically(env):
+    """R 省略（2026-09-07・`rust_engine_plan.md` §18.3）: 訓練器は `--ablate rel` のとき
+    `relations_batch` を**呼ばない**（`mask_rel` が全部 0 に置き換える＝計算結果は捨てられている）。
+    (1) 遮断時は呼ばれず `mask_rel` と同じ形・dtype のゼロが返る、(2) 遮断していなければ今までどおり
+    呼んで参照実装と bit 一致、(3) 呼ぶ経路と呼ばない経路で value/policy の損失と更新後の重みが
+    ビット一致する。"""
+    rng = np.random.default_rng(11)
+    sc, ci, tok, om, oo = env["sc"], env["ci"], env["tok"], env["rel_om"], env["rel_oo"]
+    calls = []
+    real_batch = NR.relations_batch
+
+    def _spy(ci_, tok_, tab):
+        calls.append(1)
+        return real_batch(ci_, tok_, tab)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(NR, "relations_batch", _spy)
+        net = NT.NRelNet(env["tables"], hidden=32, seed=12); net.ablate = {"rel"}
+        zom, zoo = NT.relations_or_zeros(net, ci, tok, env["rt"])
+        assert not calls, "--ablate rel なのに relations_batch が呼ばれた"
+        for z, r in ((zom, om), (zoo, oo)):
+            assert z.shape == r.shape and z.dtype == r.dtype
+            assert np.array_equal(z, net.mask_rel(r))   # mask_rel が出すのと同じゼロ
+        base = NT.NRelNet(env["tables"], hidden=32, seed=12)   # 遮断なしは今までどおり呼ぶ
+        bom, boo = NT.relations_or_zeros(base, ci, tok, env["rt"])
+        assert len(calls) == 1
+        assert np.array_equal(bom, om) and np.array_equal(boo, oo)
+    # 呼ぶ経路（R を渡す）と呼ばない経路（ゼロを渡す）で損失も重みもビット一致
+    zt = rng.uniform(-1, 1, len(sc)).astype(np.float32)
+    seg, si, ti, C, idx, budget, pi = _policy_batch(env, rng)
+    runs = []
+    for r_om, r_oo in ((om, oo), (zom, zoo)):
+        n = NT.NRelNet(env["tables"], hidden=32, seed=12); n.ablate = {"rel"}
+        mse = n.value_step(sc, ci, tok, r_om, r_oo, zt, 1e-3)
+        ce = n.policy_step(sc, ci, tok, r_om, r_oo, seg, si, ti, C, idx, budget, pi, 1e-3)
+        runs.append((mse, ce, {p: getattr(n, p).copy() for p in n.params}))
+    assert runs[0][0] == runs[1][0] and runs[0][1] == runs[1][1]
+    for p, w in runs[0][2].items():
+        assert np.array_equal(w, runs[1][2][p]), p
 
 
 def test_rel_ablated_b1_path_matches_batch_path(env):

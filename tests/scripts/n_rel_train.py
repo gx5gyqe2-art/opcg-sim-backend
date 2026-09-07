@@ -43,6 +43,21 @@ def _atype_idx(at):
         return NA - 1
 
 
+def relations_or_zeros(net, ci, tok, rt):
+    """関係 R を返す。**`--ablate rel` のときは `relations_batch` を呼ばない**（2026-09-07・§18.3）。
+
+    `NRelNet.mask_rel` が R 遮断時に `np.zeros_like(rel)` へ置き換えるので、再計算した R は
+    1 バイトも使われずに捨てられている（`docs/reports/2026-09-07_train_profile.md` §2b で実測・
+    value 1 行あたり 2.379→1.624 ms＝1.46 倍）。ここで `mask_rel` が返すのと同じ形・dtype の
+    ゼロ配列を直接渡す＝損失も重みもビット一致する。`relations_batch` 自体は残す（R を戻す設計の
+    余地・遮断していないときは今までどおり呼ぶ）。"""
+    if "rel" in getattr(net, "ablate", ()):
+        B = np.asarray(ci).shape[0]
+        return (np.zeros((B, N_OWN, N_OPP, NR.R_DIM), np.float32),
+                np.zeros((B, N_OWN, N_OWN, NR.R_DIM), np.float32))
+    return NR.relations_batch(ci, tok, rt)
+
+
 def _onehot_argmax(masked, d_out, axis):
     """masked [...] の axis 方向 argmax に d_out を散らす（max プールの backward）。
     行に有効要素が無い（max が −1e8 未満）場合は 0。"""
@@ -326,7 +341,7 @@ def eval_policy(net, rt, ptab_ret, V, P, C, pt_idx, ptr, bs=256):
         idx = np.concatenate([np.arange(ptr[i], ptr[i] + P["len"][i]) for i in bi])
         seg = np.repeat(np.arange(len(bi)), lens)
         sc, ci, tok = prow(V, P, bi)
-        rel_om, rel_oo = NR.relations_batch(ci, tok, rt)
+        rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
         si = C["si"][idx].astype(np.int64); ti = C["ti"][idx].astype(np.int64)
         tab = net.card_table()
         feats = net.cand_feats(C, idx, tab)
@@ -396,7 +411,7 @@ def train(args):
             if what == 0:
                 bi = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]; iv += 1
                 sc, ci, tok = V["sc"][bi], V["ci"][bi], V["tok"][bi]
-                rel_om, rel_oo = NR.relations_batch(ci, tok, rt)
+                rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
                 mse += net.value_step(sc, ci, tok, rel_om, rel_oo, V["z"][bi], args.lr)
             else:
                 bi = tr_p[ip * args.bs_p:(ip + 1) * args.bs_p]; ip += 1
@@ -404,14 +419,14 @@ def train(args):
                 idx = np.concatenate([np.arange(ptr[i], ptr[i] + P["len"][i]) for i in bi])
                 seg = np.repeat(np.arange(len(bi)), lens)
                 sc, ci, tok = prow(V, P, bi)
-                rel_om, rel_oo = NR.relations_batch(ci, tok, rt)
+                rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
                 si = C["si"][idx].astype(np.int64); ti = C["ti"][idx].astype(np.int64)
                 budget = budget_feats(sc, ci, tok, seg, si, C, idx, ptab_ret)
                 ce += net.policy_step(sc, ci, tok, rel_om, rel_oo, seg, si, ti, C, idx, budget,
                                       C["pi"][idx], args.lr)
         vi = np.where(va_v)[0][:20000]
         vv = np.concatenate([net.value(V["sc"][vi[s:s + 512]], V["ci"][vi[s:s + 512]], V["tok"][vi[s:s + 512]],
-                                       *NR.relations_batch(V["ci"][vi[s:s + 512]], V["tok"][vi[s:s + 512]], rt))
+                                       *relations_or_zeros(net, V["ci"][vi[s:s + 512]], V["tok"][vi[s:s + 512]], rt))
                              for s in range(0, len(vi), 512)]) if len(vi) else np.zeros(0)
         vmse = float(np.mean((vv - V["z"][vi]) ** 2)) if len(vi) else float("nan")
         vsgn = float(np.mean((vv > 0) == (V["z"][vi] > 0))) if len(vi) else float("nan")

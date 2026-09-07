@@ -1,0 +1,63 @@
+{
+  "job": "train-norel",
+  "status": "done",
+  "date": "2026-09-07",
+  "plan": "docs/rust_engine_plan.md §18.3",
+  "basis": "docs/reports/2026-09-07_train_profile.md §2b",
+  "branch": "claude/train-norel",
+  "base": "claude/cpu-spec-improvements-yw91jd",
+  "change": {
+    "files": ["tests/scripts/n_rel_train.py", "tests/test_n_rel_grad.py", "docs/TEST_SPEC.md"],
+    "summary": "n_rel_train.relations_or_zeros(net, ci, tok, rt) を追加し、\"rel\" in net.ablate のときは relations_batch を呼ばず mask_rel が出すのと同じ形・dtype のゼロ配列を渡す。value ループ／policy ループ／eval_policy／value 検証の 4 か所を差し替え。relations_batch 自体は残し、遮断していないときは今までどおり呼ぶ。関数のシグネチャ・npz の形式・meta は不変",
+    "signatures_unchanged": true,
+    "npz_format_unchanged": true,
+    "meta_unchanged": true
+  },
+  "loss_max_abs_diff": 0.0,
+  "npz_bit_identical": true,
+  "value_sec_per_row_before": 0.0016999437938085937,
+  "value_sec_per_row_after": 0.0010179301194140611,
+  "after": 0.0010179301194140611,
+  "speedup": 1.6700004856788322,
+  "verify": {
+    "train_profile_norel": {
+      "cmd": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/train_profile.py norel --in /home/user/n28_w01/n28_records --batches 200 --ablate rel",
+      "input": {"branch": "origin/claude/n28-w01", "dir": "n28_records", "games": 569, "rows": 81871},
+      "batches": 200, "bs": 256,
+      "recompute_sec": 87.037, "zeros_sec": 52.118,
+      "loss_identical": {"max_abs_diff": 0.0, "n": 200},
+      "speedup": 1.6700004856788322
+    },
+    "one_shard_one_epoch": {
+      "cmd": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/n_rel_train.py train --in /home/user/n28_w01/n28_records --epochs 1 --ablate rel --out <npz>",
+      "before_epoch_sec": 217,
+      "after_epoch_sec": 145,
+      "epoch_speedup": 1.497,
+      "metrics_identical": {
+        "train_mse": 0.7940, "train_ce": 1.9233,
+        "val_v_mse": 0.7141, "val_v_sign": 0.728, "val_pi_top1": 0.506, "val_pi_ce": 1.838
+      },
+      "npz_arrays_compared": 21,
+      "npz_bit_identical": true,
+      "npz_compare": "np.array_equal で全 21 配列（重み 18・meta・nrel・vocab_ids）が一致。meta も同一（kind=nrel-a・ablate=[\"rel\"]・rows_v=81871・points_p=46325）"
+    },
+    "tests": {
+      "pytest tests/test_n_rel_grad.py": "10 passed",
+      "new_test": "test_ablate_rel_skips_relations_batch_bit_identically（cpu_infra・monkeypatch の spy で relations_batch が呼ばれないことを検出＋呼ぶ/呼ばない経路で value/policy の損失と更新後の重みがビット一致）",
+      "make test": "green"
+    }
+  },
+  "env": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "cores": 4,
+    "python": "3.11",
+    "numpy": "2.4.6",
+    "blas_threads": 1,
+    "note": "計測機は過去の訓練機より遅い（報告 §計測環境と同じ注記）。倍率はそのまま読める"
+  },
+  "notes": [
+    "報告 §2b の 1.46 倍に対し今回は 1.67 倍。同じ計測を別日に引くと ±8% ばらつく旨が報告に明記されており、いずれも「R の再計算が value 1 行の 3〜4 割」という同じ構造を指す",
+    "1 エポック全体（value＋policy＋検証）では 217s→145s＝1.50 倍",
+    "policy 側・検証側の relations_batch も同じ判定で省いた（どちらも mask_rel／R 遮断の高速経路で捨てられるため出力はビット一致）"
+  ]
+}
