@@ -2708,6 +2708,25 @@ make test-legacy が従来どおり green（1,786）。RESULT.json: {"job":"rs-a
 6. RESULT.json は status=done にして push。取り込みはコーディネータが行う（RESULT.json は
    `docs/reports/` へ移す）。
 
+
+### 16.5 切替後の整理（ユーザ決定 2026-09-07「1〜4 はやる・3 は退避」）
+
+1. **ロールバック先の修正**: Rust のネット読み込みは NRel だけなので c10・G15 は serve のロールバック先に
+   ならない。CLAUDE.md を「ロールバック先は r1（`claude/n1-results:n1_results/nrel_r1.npz`）」に改めた。
+   `neff_c10.npz` は評価帯の比較用に同梱を続ける（`n_eff.py` の docstring も更新）。
+2. **G 系の npz 28 本（gen2〜gen15 の value/policy）をツリーから外した**。tag／ブランチ `py-engine-final`
+   の `opcg_sim/data/learned/` で辿れる（CLAUDE.md の「消す前に辿れることを確かめる」を満たす）。
+   コードからの参照は 0 件（grep で確認）。Docker イメージが約 40MB 減る。
+3. **どこからも参照されない旧ラインの CLI と harness を `legacy/python_engine/tests/` へ退避**:
+   harness `deckgen`／`heldout_decks`／`interactive_target_audit`／`rl_encoder`／`deck_synth`・`deck_dig`
+   （`opcg_sim/loop` への別名の殻）、scripts `corpus_v11_to_v12.py`／`coverage_report.py`／`pd_setup.py`／
+   `_w1_launch.sh`／`move_audit_shard.sh`／`pd_gen_w2_healthcheck.sh`／`pd_gen_w2_supervise.sh`。
+   `rs_arena_ab.py`（legacy を import する）も同じく退避。
+4. **文書の古いパス**: TEST_SPEC の行キーのうち `opcg_sim/` へ移ったもの 15 行を新パス（旧パス併記）に
+   直した（legacy へ退避したものは §3 冒頭の注記で読む）。`n_attention_plan.md` の訓練器のパス、
+   `requirements.txt` の numpy の注記も更新。`.dockerignore` は P0 で `dockerignore` に化けていた
+   （無効だった）ので名前を戻した。
+
 ## 17. 到達形のモジュール構成（ユーザ確認 2026-09-07）
 
 方針: **ルール・効果・探索は Rust、カード本文の解釈と学習と API は Python**。裁定を書く場所はパーサ（Python）と

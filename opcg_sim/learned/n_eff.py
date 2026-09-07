@@ -1,8 +1,10 @@
 """n_eff: 効果構造符号化ネット（N系 v2）の **serve 側実装**（2026-09-03・c10 採用で
 `tests/scripts/n_eff_feat.py` / `n_eff_train.py` / `n_eff_gate.py` から昇格）。
 
-出荷既定 CPU（`cpu_learned._DEFAULT_VALUE`＝`neff_c10.npz`）はこのモジュールで動く。訓練器
-（`tests/scripts/n_eff_train.py`）は `NEffNet` を継承して backward/Adam を足すだけ＝
+c10（`neff_c10.npz`）の forward はこのモジュールが持つ。出荷既定は 2026-09-05 に NRel a1
+（`n_rel.py`・`opcg_sim/loop/engine.py::DEFAULT_NET`）へ移り、Rust の serve は c 系を載せないので、
+現在は評価帯（`train/n_rel_band.py`）の比較用。訓練器（`train/n_eff_train.py`）は `NEffNet` を
+継承して backward/Adam を足すだけ＝
 **forward はここが唯一の正本**（train/serve の不一致を作らない）。
 
 ## カード表現（効果構造符号化・2026-08-27 ユーザ設計確認済み）

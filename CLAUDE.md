@@ -160,12 +160,15 @@ make test-fast   # 開発中のイテレーション用（slow・cpu_infra除外
     **現在の出荷既定は NRel a1**〔2026-09-05 採用・`nrel_a1.npz`・`cpu_learned._DEFAULT_VALUE` が正本・
     `docs/reports/a1_adoption_20260905.md`〕。構成は**関係 R なし・相手デッキ知識あり**（ユーザ決定
     2026-09-05・訓練は `n_rel_train.py --ablate rel` が既定・系譜は r2, r3, … を続ける）。
-  - **c 系（cN）** = 旧 N系（`n_eff.py`・符号化 v12・最終 c10=2026-09-03 採用）。ロールバック先
-    （`_C10_VALUE`）。その先は G15 ペア（`_G15_VALUE`/`_G15_POLICY`）。
+  - **c 系（cN）** = 旧 N系（`n_eff.py`・符号化 v12・最終 c10=2026-09-03 採用）。**Rust のネット
+    読み込みは NRel だけ**なので c10 は serve のロールバック先にはならない（2026-09-07・切替後）。
+    **ロールバック先は r1**（`claude/n1-results:n1_results/nrel_r1.npz`・a1 と同じ NRel）。
+    `neff_c10.npz` は評価帯（`n_rel_band.py`・Python の forward）の比較用に同梱を続ける。
 - **G系** = 旧本流の学習CPU（genN・埋め込みあり・最終世代 **G15=gen15**
   〔2026-08-15 採用・符号化v12＋戦闘出口ヘッド。2026-09-03 に既定を c10 へ譲った〕。
   **Rust エンジンは G系の value/policy ペアを載せない**（物差しを 1 本に保つ・§8.17 の設計 1）＝
-  同梱は続けるが、生成・アリーナ・serve では使えない。動かすなら tag `py-engine-final`。
+  生成・アリーナ・serve では使えない。**npz はツリーから外した**（2026-09-07・gen2〜gen15 の
+  28 本。tag／ブランチ `py-engine-final` の `opcg_sim/data/learned/` で辿れる）。動かすならそこを checkout。
   **候補ヘッドの土台や比較基準は必ず現既定に合わせる**
   ——2026-08-22 に gen14 土台で作った候補が coach_gate で「偽の退行」を出した実害あり）
 - **B系** = 骨組み線（リーダー非依存・合成カードのドメインランダム化・`bb_*`/bbN・
