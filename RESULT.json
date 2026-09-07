@@ -1,0 +1,155 @@
+{
+  "job": "train-profile",
+  "status": "done",
+  "date": "2026-09-07",
+  "report": "docs/reports/2026-09-07_train_profile.md",
+  "scripts": ["tests/scripts/train_profile.py", "tests/scripts/train_profile_torch.py"],
+  "training_code_unchanged": true,
+  "env": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "cores": 4,
+    "mem_gb": 16,
+    "python": "3.11.15",
+    "numpy": "2.4.6 (scipy-openblas 0.3.31 DYNAMIC_ARCH Haswell)",
+    "torch": "2.14.0 (CPU)",
+    "blas_threads_default": 1,
+    "note": "n_rel_train.py が import 時に OMP_NUM_THREADS=1 を立てる。注記のない計測は BLAS 1 スレッド"
+  },
+  "input": {
+    "shard1": {"branch": "origin/claude/n28-w01", "dir": "n28_records", "games": 569,
+               "rows": 81871, "policy_points": 46325, "cand_rows": 643652},
+    "shard2": {"branch": "origin/claude/n28-w02", "dir": "n28_records", "games": 960,
+               "rows": 136631},
+    "both": {"rows": 218502, "policy_points": 124121, "cand_rows": 1723343},
+    "ablate": "rel", "bs_v": 256, "bs_p": 64, "batches_per_measurement": 200
+  },
+
+  "per_row": {
+    "load_sec": 6.98974e-05,
+    "bytes": 2609.68,
+    "rss_bytes": 2844.50,
+    "train_sec": 0.0028583,
+    "train_sec_note": "1 エポック 234.01s ÷ 総行数 81871。value 2.050ms/行 と policy 2.271ms/点 の合成",
+    "value_step_sec_per_row": 0.0020500,
+    "policy_step_sec_per_point": 0.0022710,
+    "policy_points_per_row": 0.5658,
+    "cand_rows_per_row": 7.862
+  },
+
+  "linearity_1_vs_2_waves": {
+    "rows_ratio": 2.6689, "load_sec_ratio": 2.6923, "held_bytes_ratio": 2.6694,
+    "rss_ratio": 2.4654,
+    "verdict": "行数比例が成立（読み込み時間・保持バイトとも行数比と一致）"
+  },
+
+  "arrays_bytes_per_row": {
+    "V.tok": {"dtype": "float32", "shape": "[N,22,20]", "bytes_per_row": 1760.0, "share": 0.674},
+    "V.sc": {"dtype": "float32", "shape": "[N,123]", "bytes_per_row": 492.0},
+    "V.ci": {"dtype": "int64", "shape": "[N,22]", "bytes_per_row": 176.0},
+    "V.z": {"dtype": "float32", "shape": "[N]", "bytes_per_row": 4.0},
+    "V.seed": {"dtype": "int64", "shape": "[N]", "bytes_per_row": 8.0},
+    "C.pi": {"dtype": "float32", "bytes_per_row": 31.4},
+    "C.cid": {"dtype": "int32", "bytes_per_row": 31.4},
+    "C.tcid": {"dtype": "int32", "bytes_per_row": 31.4},
+    "C.at": {"dtype": "int16", "bytes_per_row": 15.7},
+    "C.k": {"dtype": "int16", "bytes_per_row": 15.7},
+    "C.si": {"dtype": "int16", "bytes_per_row": 15.7},
+    "C.ti": {"dtype": "int16", "bytes_per_row": 15.7},
+    "P.row": {"dtype": "int64", "bytes_per_row": 4.5},
+    "P.seed": {"dtype": "int64", "bytes_per_row": 4.5},
+    "P.len": {"dtype": "int32", "bytes_per_row": 2.3},
+    "P.chosen": {"dtype": "int16", "bytes_per_row": 1.1}
+  },
+
+  "breakdown": {
+    "value": {"sec_per_row": 0.0020500, "cpu_util_cores": 1.00, "cpu_util_frac_of_machine": 0.25,
+              "backward": 0.463, "relations_batch": 0.369, "forward": 0.159,
+              "adam_update": 0.008, "python_batch_slice": 0.001},
+    "policy": {"sec_per_point": 0.0022710, "cpu_util_cores": 1.00, "cpu_util_frac_of_machine": 0.25,
+               "backward": 0.541, "relations_batch": 0.286, "forward": 0.158,
+               "adam_update": 0.010, "python_batch_slice": 0.005},
+    "epoch_composition_1shard": {"epoch_sec": 234.01, "value_share": 0.614, "policy_share": 0.386,
+                                 "n_value_batches": 274, "n_policy_batches": 621}
+  },
+
+  "batch_size_sweep": {
+    "note": "同じ行数（200x256 相当）で比較。精度は見ていない",
+    "1x": {"bs_v": 256, "bs_p": 64, "value_sec_per_row": 0.002278, "value_speedup": 1.00,
+           "policy_sec_per_point": 0.002326, "policy_speedup": 1.00},
+    "4x": {"bs_v": 1024, "bs_p": 256, "value_sec_per_row": 0.003076, "value_speedup": 0.74,
+           "policy_sec_per_point": 0.002347, "policy_speedup": 0.99},
+    "16x": {"bs_v": 4096, "bs_p": 1024, "value_sec_per_row": 0.003545, "value_speedup": 0.64,
+            "policy_sec_per_point": 0.002596, "policy_speedup": 0.90, "rss_peak_gb": 2.9},
+    "verdict": "バッチサイズ拡大は逆効果（メモリ帯域で頭打ち）"
+  },
+
+  "memmap": {
+    "orig_bytes_per_row": 2432.0, "memmap_bytes_per_row": 1172.0, "shrink": 2.08,
+    "dtypes": {"sc": "float32->float16", "ci": "int64->int16", "tok": "float32->float16",
+               "z": "float32->float16"},
+    "slice_sec_per_row": {"ram": 1.2504e-06, "memmap_random": 3.4848e-06,
+                          "memmap_sorted": 3.9783e-06},
+    "slice_share_of_step": 0.0017,
+    "fp16_forward_diff": {"bs": 256, "max_abs": 1.0696e-04, "mean_abs": 1.5252e-05,
+                          "value_range": [-0.9502, -0.3082]},
+    "caveat": "切り出し計測はページキャッシュが温かい状態（1巡目と2巡目が同値）。全波 11GB 規模では実ディスク I/O になる",
+    "verdict": "時間には効かない（ステップの 0.17%）。メモリを 2.08 倍圧縮する手"
+  },
+
+  "torch_vs_numpy": {
+    "note": "value 経路のみ（forward+backward+Adam）。両者ともバッチは事前用意で relations_batch と切り出しは計測外＝①適用後の土俵",
+    "forward_agreement": {"max_abs_diff": 8.7917e-07, "mean_abs_diff": 1.1912e-07,
+                          "pass_1e-5": true, "net": "n1_results/nrel_a1.npz"},
+    "numpy_1thread": {"sec_per_row": 0.0014058, "cpu_util_cores": 1.00, "speedup": 1.00},
+    "numpy_4thread_blas": {"sec_per_row": 0.0015170, "cpu_util_cores": 1.74, "speedup": 0.93,
+                           "note": "1 スレッドより遅い＝行列積が小さくスレッド分割が損"},
+    "torch_1thread": {"sec_per_row": 0.00061626, "cpu_util_cores": 1.00, "speedup": 2.28},
+    "torch_2thread": {"sec_per_row": 0.00039199, "cpu_util_cores": 1.99, "speedup": 3.59},
+    "torch_4thread": {"sec_per_row": 0.00026376, "cpu_util_cores": 3.95, "speedup": 5.33}
+  },
+
+  "norel": {
+    "note": "--ablate rel では mask_rel が relations_batch の出力を全部 0 にする＝計算は捨てられている",
+    "recompute_sec_per_row": 0.0023786,
+    "zeros_sec_per_row": 0.0016241,
+    "speedup": 1.465,
+    "loss_max_abs_diff": 0.0,
+    "n_batches": 200,
+    "verdict": "損失はビット一致。挙動を変えずに value 1.46 倍"
+  },
+
+  "extrapolated": {
+    "basis": "1 行あたり × 台帳の行数。epoch_sec = (6/7) × (value行数 × 2.050ms + 方策点数 × 2.271ms)、load_sec = 行数 × 6.99e-5、RSS = 行数 × 2845B",
+    "machine_calibration": {
+      "note": "本計測機は過去の訓練機より遅い。比率はそのまま読めるが絶対秒は 0.59〜0.68 倍して読む",
+      "vs_a1_actual": 1.70, "vs_r2_actual": 1.47
+    },
+    "a1_scale_waves_23_24": {
+      "rows": 2164053, "policy_points": 1224484,
+      "load_sec": 151, "epoch_sec": 6186, "rss_gb": 6.2,
+      "actual_recorded_sec_per_epoch": 3630
+    },
+    "r2_scale": {
+      "rows": 4248000, "policy_points": 1183000,
+      "load_sec": 297, "epoch_sec": 9767, "rss_gb": 12.1,
+      "actual_recorded_sec_per_epoch": 6540
+    },
+    "r2b_scale_waves_25_28": {
+      "rows": 4480000, "policy_points": 2534000,
+      "load_sec": 313, "epoch_sec": 12805, "rss_gb": 12.7,
+      "note": "cgroup 14GB に対し 4 波でぎりぎり＝「古い波から落とす」運用の裏付け"
+    }
+  },
+
+  "projected_speedup_a1_scale": {
+    "baseline_epoch_sec": 6186,
+    "R_skip_value_only_measured": {"epoch_sec": 4980, "x": 1.24},
+    "R_skip_both_heads": {"epoch_sec": 4298, "x": 1.44, "policy_side": "算術（内訳 28.6% から）"},
+    "R_skip_plus_torch_value_only": {"epoch_sec": 2189, "x": 2.83},
+    "R_skip_plus_torch_both_heads": {"epoch_sec": 806, "x": 7.67, "estimated": true}
+  },
+
+  "bottleneck": "backward（時間の 46〜54%）と、--ablate rel では捨てられる relations_batch の再計算（29〜37%）。どちらも 1 コアのみ（4 コア中 25%）。Python のバッチ切り出し（0.1〜0.5%）と Adam 更新（1%）は律速ではない",
+
+  "recommendation": "①--ablate rel のとき relations_batch を呼ばない分岐を足す（value 1.46 倍・損失ビット一致・今日入れられる）→ 1 エポック 1.44 倍。④次に value と policy の両方を torch(CPU) へ移植する（1 スレッドでも 2.28 倍、4 スレッドで 5.33 倍、forward は numpy と 8.8e-7 一致）→ ①と併せて 7〜8 倍の見込み（value だけの移植では policy が残り 2.8 倍で頭打ち）。③float16/int16 の memmap は時間ではなくメモリの手（常駐 2.08 倍圧縮＝同じ 14GB に 2 倍の波）で、Rust 生成が最初からこの形で書けば読み込みも消える。②バッチサイズ拡大はやらない（4 倍で 0.74 倍・16 倍で 0.64 倍と逆効果）。環境変数で BLAS スレッドを増やすのも効かない（4 スレッドで 0.93 倍）"
+}
