@@ -1586,6 +1586,31 @@ OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -m "not slow" -p no:cach
 （`_bootstrap` の名前衝突・移動でずれたパス計算・移した訓練モジュールの参照）が、**全数 green は
 保証しない**（旧計器が前提にしていた周辺の所在が変わっているものがある）＝回すなら tag／ブランチが正。
 
+### 8.21 WP `train-torch`（§18.4・torch 化）の結果（2026-09-07）
+
+ブランチ `claude/train-torch-wdw0gu`（切替ブランチから分岐・R 省略を cherry-pick）を本線に取り込んだ。
+`opcg_sim/learned/train/n_rel_torch.py`（`TorchNRel`／`TorchTrainer`・value と policy の両方）を足し、
+訓練器は `--backend numpy|torch`（既定 torch・import できなければ警告して numpy）と `--threads` を持つ。
+保存は numpy 版の `NRelNet.save` が行う（`sync_to_numpy()` で書き戻す）＝**npz 形式は不変**。
+
+| 照合 | 結果 |
+|---|---|
+| a. forward（同じ重み・同じバッチ） | value 8.79e-7・policy logits 1.91e-6（1e-5 で一致） |
+| b. 勾配（numpy 手書き backward 対 autograd） | \|g\|>1e-4 で相対 6.13e-5（<1e-4）・正規化誤差 2.86e-6。指示書の「\|g\|>1e-6 で 1e-4」は float32 の加算順の下限（numpy 自身が 3.99e-4 ずれる）より下で達成不能＝基準を \|g\|>1e-4 に読み替えて合格 |
+| c. 学習（a1 から warm-start・1 エポック） | val v_mse 0.6760 対 0.6796（相対 0.53%）・p_loss 相対 0.05%（<1%）。乱数初期値からは numpy 同士でも 2.44% ずれるので判定に使わない |
+| d. 時間（1 シャード・895 ステップ） | numpy 146.7 s／torch 1 スレッド 64.0 s（2.29 倍）／torch 4 スレッド **34.7 s（4.22 倍）** |
+| npz | Rust の `load_net` で読めて value が Python と 5.36e-7 で一致（`tests/scripts/rs_net_load_check.py`） |
+| ゲート | `make test` green（425 passed）・新テスト `tests/test_n_rel_train_torch.py` 7 本（cpu_infra・torch 無しは skip） |
+
+§18.2 の「①＋④で 7〜8 倍」はステップだけの比で、エポック全体では **4.2 倍**が正しい（Python の
+バッチ切り出し・`budget_feats`・R のゼロ配列確保が numpy のまま残る）。①と合わせると切替前の
+1 エポック比で約 **6 倍**（217 s → 145 s → 34.7 s＋読み込み）。RESULT.json は
+`docs/reports/2026-09-07_train_torch.RESULT.json`・報告は `docs/reports/2026-09-07_train_torch.md`。
+取り込み時に `n_rel_band.py` の `cpu_selfplay._load_db` import（退避で消えていた）を
+`opcg_sim.learned.vocab.load_db` に直した（WP の申し送り）。**次の訓練（r2b 以降）は `--backend torch`
+（既定）で回す**。torch は任意依存＝`pip install torch --index-url https://download.pytorch.org/whl/cpu`
+（README の学習手順）。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
@@ -2842,7 +2867,7 @@ RESULT.json: {"job":"train-profile","status":"done","per_row":{"load_sec":..,"by
    ゼロ配列（`mask_rel` が出すのと同じ形・dtype）を渡す。損失がビット一致することは実測済みなので
    受け入れは機械的（`train_profile.py norel` の再実行で `loss_max_abs_diff == 0`）。`relations_batch`
    自体は残す（R を戻す設計の余地）。1.44 倍。r2b の次の訓練から効く。
-2. **④torch 化（WP `train-torch`・切替 §16.3 の取り込み後・§18.4）**: value と policy の**両方**を
+2. **④torch 化（WP `train-torch`・§18.4・取り込み済み §8.21＝エポック全体 4.2 倍）**: value と policy の**両方**を
    torch（CPU）で書く。numpy の手書き backward は**参照実装として残し**、`--backend numpy|torch`
    （既定 torch・import できなければ numpy に落ちる）で切り替える。**npz の形式は変えない**
    （`meta.kind=nrel-a`・vocab_ids・重みの名前と形。Rust の `load_net` と `n_rel.load` が同じ npz を

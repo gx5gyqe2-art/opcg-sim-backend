@@ -69,8 +69,8 @@ def main():
     args = ap.parse_args()
 
     t0 = time.time()
-    from cpu_selfplay import _load_db
-    db = _load_db()
+    from opcg_sim.learned.vocab import load_db   # 退避で cpu_selfplay が消えたため（2026-09-07）
+    db = load_db()
     stats, ab, abm, pwr, isl, vocab = build_eff_tables()
     tables = (stats, ab, abm, pwr, isl)
     D = _load(args.src, args.holdout_mod, args.limit)

@@ -41,6 +41,26 @@ def _atype_idx(at):
         return NA - 1
 
 
+def make_backend(name, net, lr, threads=None):
+    """訓練ループが叩く backend を返す（`--backend`・2026-09-07・§18.4）。
+
+    `numpy`＝この module の手書き backward（参照実装）。`torch`＝`n_rel_torch.TorchTrainer`
+    （autograd＋`torch.optim.Adam`・式は同じ）。**torch が import できなければ警告して numpy に
+    落ちる**（torch は任意依存＝requirements に固定しない）。戻り値は
+    `(backend, 実際に使った名前, 注記)`。"""
+    if name != "torch":
+        return net, "numpy", ""
+    try:
+        from opcg_sim.learned.train.n_rel_torch import TorchTrainer
+    except ImportError as e:
+        print(f"[warn] --backend torch だが torch を import できない（{e}）→ numpy で続行。"
+              f"入れるなら: pip install torch --index-url https://download.pytorch.org/whl/cpu",
+              flush=True)
+        return net, "numpy", "torch-import-failed"
+    tr = TorchTrainer(net, lr=lr, threads=threads)
+    return tr, "torch", f"threads={tr.threads}"
+
+
 def relations_or_zeros(net, ci, tok, rt):
     """関係 R を返す。**`--ablate rel` のときは `relations_batch` を呼ばない**（2026-09-07・§18.3）。
 
@@ -227,6 +247,9 @@ class NRelNet(NL.NRelNet):
             vh = v / (1 - b2 ** self._t)
             setattr(self, pnm, getattr(self, pnm) - lr * mh / (np.sqrt(vh) + eps))
 
+    def sync_to_numpy(self):
+        """backend の共通口（numpy 版は重みが常に自分の上にあるので何もしない・§18.4）。"""
+
     @classmethod
     def load(cls, path, tables=None):
         if tables is None:
@@ -366,8 +389,11 @@ def _expand(pats):
 
 def train(args):
     t0 = time.time()
-    from cpu_selfplay import _load_db
-    db = _load_db()
+    # 退避（2026-09-07・第 2 段 `rs-archive-cutover`）で `cpu_selfplay` が消えたため、カード DB は
+    # `opcg_sim.learned.vocab.load_db`（＝`opcg_sim.loop.decks.load_db`・旧 `_load_db` と同じもの）
+    # から取る。語彙は `build_eff_tables()` が同じ db から作るので値は変わらない。
+    from opcg_sim.learned.vocab import load_db
+    db = load_db()
     stats, ab, abm, pwr, isl, vocab = build_eff_tables()
     tables = (stats, ab, abm, pwr, isl)
     ptab = NR.profile_table(db, vocab)
@@ -392,10 +418,15 @@ def train(args):
         if bad:
             raise ValueError(f"--ablate に未知の種類: {sorted(bad)}（{NL.ABLATE_KINDS}）")
         print(f"ablate: {sorted(net.ablate)}", flush=True)
+    # backend（§18.4）: torch のときも重みの正本は numpy の `net`（holdout 評価・保存はそちら）。
+    # 学習中は torch 側に置き、epoch の終わりに `sync_to_numpy()` で書き戻す。
+    backend, backend_name, note = make_backend(args.backend, net, args.lr, args.threads)
+    print(f"backend: {backend_name}{(' ' + note) if note else ''}", flush=True)
     rng = np.random.default_rng(args.seed)
     tr_v = np.where(~va_v)[0]; tr_p = np.where(~va_p)[0]; va_pi = np.where(va_p)[0]
     best = None; best_ep = -1
     for ep in range(args.epochs):
+        t_ep = time.time()
         rng.shuffle(tr_v); rng.shuffle(tr_p)
         nv = len(tr_v) // args.bs_v; npi = len(tr_p) // args.bs_p
         mse = ce = 0.0
@@ -410,7 +441,7 @@ def train(args):
                 bi = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]; iv += 1
                 sc, ci, tok = V["sc"][bi], V["ci"][bi], V["tok"][bi]
                 rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
-                mse += net.value_step(sc, ci, tok, rel_om, rel_oo, V["z"][bi], args.lr)
+                mse += backend.value_step(sc, ci, tok, rel_om, rel_oo, V["z"][bi], args.lr)
             else:
                 bi = tr_p[ip * args.bs_p:(ip + 1) * args.bs_p]; ip += 1
                 lens = P["len"][bi]
@@ -420,8 +451,11 @@ def train(args):
                 rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
                 si = C["si"][idx].astype(np.int64); ti = C["ti"][idx].astype(np.int64)
                 budget = budget_feats(sc, ci, tok, seg, si, C, idx, ptab_ret)
-                ce += net.policy_step(sc, ci, tok, rel_om, rel_oo, seg, si, ti, C, idx, budget,
-                                      C["pi"][idx], args.lr)
+                ce += backend.policy_step(sc, ci, tok, rel_om, rel_oo, seg, si, ti, C, idx, budget,
+                                          C["pi"][idx], args.lr)
+        # 学習ループだけの壁時計（読み込み・holdout 評価を含まない＝backend 比較の土俵）
+        ep_train_sec = time.time() - t_ep
+        backend.sync_to_numpy()          # torch → numpy（以降の評価・保存は numpy 版が担当）
         vi = np.where(va_v)[0][:20000]
         vv = np.concatenate([net.value(V["sc"][vi[s:s + 512]], V["ci"][vi[s:s + 512]], V["tok"][vi[s:s + 512]],
                                        *relations_or_zeros(net, V["ci"][vi[s:s + 512]], V["tok"][vi[s:s + 512]], rt))
@@ -432,6 +466,13 @@ def train(args):
         print(f"ep{ep} train mse {mse/max(nv,1):.4f} ce {ce/max(npi,1):.4f} | "
               f"val v_mse {vmse:.4f} v_sign {vsgn:.3f} pi_top1 {p_pi:.3f} ce {p_ce:.3f} "
               f"{time.time()-t0:.0f}s", flush=True)
+        # backend 比較用の 1 行（`docs/reports/2026-09-07_train_torch.md` の d）
+        print("N_REL_TRAIN_EPOCH " + json.dumps(
+            {"ep": ep, "backend": backend_name, "threads": getattr(backend, "threads", 1),
+             "train_sec": round(ep_train_sec, 3), "steps": len(sched),
+             "train_mse": mse / max(nv, 1), "train_ce": ce / max(npi, 1),
+             "val_vmse": vmse, "val_vsign": vsgn, "val_pi_top1": p_pi, "val_p_loss": p_ce}),
+            flush=True)
         if best is None or vmse < best[0]:
             best = (vmse, {p: getattr(net, p).copy() for p in net.params}); best_ep = ep
             # epoch ごとに最良を書き出す（16 シャード×2 epoch ≒ 3.5 時間・途中で落ちても ep0 が残る）
@@ -471,6 +512,12 @@ def main():
     tr.add_argument("--ablate", default="",
                     help="切り分け: rel（関係 R を 0）/ opp_pool（相手デッキ知識の列を 0）をカンマ区切り。"
                          "訓練・serve の両方で遮断され npz の meta に焼き込まれる")
+    tr.add_argument("--backend", choices=("torch", "numpy"), default="torch",
+                    help="学習経路（2026-09-07・§18.4）: torch＝autograd＋torch.optim.Adam（既定・"
+                         "CPU で 1 スレッド 2.3 倍／全コア 5 倍）。numpy＝手書き backward（参照実装）。"
+                         "torch を import できなければ警告して numpy に落ちる")
+    tr.add_argument("--threads", type=int, default=0,
+                    help="torch のスレッド数（0＝全コア）。numpy backend では効かない")
     tr.add_argument("--out", required=True)
     args = ap.parse_args()
     if args.cmd == "train":
