@@ -1,0 +1,37 @@
+{
+ "job": "gen-n28-w04",
+ "role": "gen",
+ "status": "partial",
+ "inputs": {
+  "neff_net": "claude/n1-results:n1_results/nrel_a1.npz",
+  "wave": 28,
+  "shard": "04",
+  "seed_base": 2284000,
+  "games": 509,
+  "games_requested": 960,
+  "games_attempted": 510,
+  "dropped": 1,
+  "sims": 128,
+  "workers": 4,
+  "dump_v2": true,
+  "resumed": true,
+  "seed_bands": [
+   {
+    "seed_min": 2284000,
+    "seed_max": 2284359,
+    "games": 359
+   },
+   {
+    "seed_min": 2284367,
+    "seed_max": 2284516,
+    "games": 150
+   }
+  ]
+ },
+ "outputs": {
+  "records": "n28_records/",
+  "log": "n28_gen.log",
+  "resume_log": "n28_gen_r2.log"
+ },
+ "note": "Stopped early by user request at 510/960 games. Two runs: 360 games from seed_base 2284000 and 150 games from seed_base 2284367; the gap keeps the two seed bands disjoint. Interrupted twice by container reclamation while the session was idle."
+}
