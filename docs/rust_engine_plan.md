@@ -140,6 +140,12 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P3 | **仕上げ WP `rs-p3-final` を発行**（§11.8）: 横断事項 #1〜#11（監査記録 v5 のシャッフル再同期・ドン!!対象・差し口の意味論・群 E の申告 4 件・vanilla ガード撤去・ARRANGE_DECK 既定解決）と P3 全体の受け入れ（全カード監査・実デッキ再生 random 500／L1 100） |
 | 2026-09-07 | P3 | **`rs-p3-final` 完了・コーディネータが受け入れ＝P3 完了**（`claude/rs-p3-final-8rh43r` を本線へ）。WP 実測: 全カード監査 2,472 枚/3,386 能力 mismatch=0・unimplemented=0／実デッキ再生 random 500 局・L1 100 局とも全一致／退行 4 本一致。本線での再検証（未見 seed）: 全カード監査 3,386 能力一致・実デッキ再生 random 30 局（3,048 行動）・L1 10 局（1,192 行動）一致・問合せ 20 局面 733,740 件 mismatch=0。`cargo test` 288 green・clippy 0・`make test` green。P4 の設計は §12 |
 | 2026-09-07 | P4 | **設計＋契約を本線へ**（§12）: `encode/mod.rs`（次元定数・`Vocab`／`EffTables`／`Encoding`／`EncodeOptions`・`build_eff_tables`／`encode` の stub）・`net/mod.rs`（`NRelWeights` 18 配列・`Candidate`・`load_npz`／`card_table`／`value`／`priors`／`cand_rows` の stub）・`search/mod.rs`（`Move`＝JSON・`SearchOptions`・`RecordedRng`・`legal_actions`／`determinize`／`apply_move_inplace` の stub）。WP `rs-p4-encode`／`rs-p4-net`／`rs-p4-legal` の指示書は §12.5 |
+| 2026-09-07 | API | **`rs-api` 完了・本線へ**（`claude/rs-api`）: PyO3 `Game`・`action_events` を Rust で積む（13 か所）・`request_id` は Python 側・乱数は CPython `random` へ委譲（`Rng::Host`＝cpu_trace の再生契約を守る）・暫定 CPU 経路。events オラクル random 100／L1 20／全カード監査 3,386 一致・API テスト 23＋4＋25 passed・`make test` 1,786 passed。結果は §8.16 |
+| 2026-09-07 | P4 | **`rs-p4-encode` 完了・本線へ**: 200 局面 × 2 視点 3,049,770 値 mismatch 0（1e-6）・カード表 2,653 行一致・cargo 300 |
+| 2026-09-07 | P4 | **`rs-p4-net` 完了・本線へ**: 200 局面 value 最大誤差 1.05e-6・priors 5.5e-7（1,210 候補）・npz は `miniz_oxide` のみ・cargo 301 |
+| 2026-09-07 | P4 | **`rs-p4-legal` 完了・本線へ**: 200 局面 legal 631 検査（順序込み）・determinize 400・apply 1,167 すべて一致・CPython の set 反復順まで写した（`py_set_order`）・cargo 316 |
+| 2026-09-07 | P4 | **統合**（コーディネータ・4 ブランチを cherry-pick。衝突は `lib.rs`（追加関数の併記）・`resolver.rs`（API の `action_history` 本体＋encode の計数を両方残す）・`rs_record.py`（復元器は `rs_bridge` に一本化し `with_pending` の互換ラッパ）・`search/mod.rs`）。統合後の再検証は §8.17。契約の申告 4 点（`cand_rows` の `stat` 引数・`load_net` の `tables_path`・`search_legal` の `prefix`・`rel_oo` の寸法）は承認＝契約に反映 |
+| 2026-09-07 | P4 | **統合後の再検証**（未見 seed）: 符号化 40 局面 × 2 視点 207,441 値 mismatch 0／forward 40 局面 value 6.6e-7・priors 3.0e-7／候補 legal 134 検査・determinize 80・apply 223 すべて一致／実デッキ再生（events 込み）random 20 局 一致／F 監査 817 一致／API テスト 54 passed／`cargo test` 351 green・clippy 0。`rs-p4-mcts` の指示書は §12.6 |
 | 2026-09-07 | P3 | **群 A（状態系）`rs-p3-status` 完了**（`claude/rs-p3-status-rkkh9m`）: `actions/status.rs` の 3 入口を本体化（GRANT_KEYWORD／ATTACK_DISABLE／PREVENT_REST／FREEZE／NEGATE_EFFECT／DISABLE_ABILITY／SWAP_POWER。BUFF の全形は土台 `mod.rs::buff` が既に持っていた＝委譲不要で `mod.rs` は無変更）。監査 **cards=782／abilities=1014／match=1014・mismatch=0・unimplemented=0**（受け入れ規模ちょうど）・退行 4 本一致・`cargo test` 194 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 B `rs-p3-zone` 完了**（`claude/rs-p3-zone`）: `actions/zone.rs` の 3 入口を本体化（12 種＋DB 未使用の LIFE_RECOVER／MOVE／MOVE_TO_HAND／DECK_TOP）。監査 987 枚／1,271 能力＝**match 1,268・mismatch 2・unimplemented 1**（残る 3 件はいずれも**群 B の所有範囲の外**＝監査記録に `shuffled` 再同期が無い 2 件と `TargetRef::Don`（群 D）1 件。§8.10）。退行 4 本すべて一致・`cargo test` 196 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 C（カードの流れ）完了**（`claude/rs-p3-flow`）: `actions/flow.rs` に PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_EVENT（EXECUTE_MAIN_EFFECT／DECLARE_COST は resolver が既に捌く）。監査 **cards=865／abilities=1144／match=1144・mismatch=0・unimplemented=0**（着手前は unimplemented=128）。退行 4 本一致・`cargo test` 182 green・clippy 0・`make test` green。結果は下記 §8.10 |
@@ -2146,3 +2152,46 @@ claude/cpu-spec-improvements-yw91jd から分岐し、claude/rs-api に push、P
    裁定は Rust 側だけで進むので**盤面は常に正しい**。P4 の `rs-p4-mcts` で `decide` が Rust に
    載れば解消する（そのとき `test_api.py::test_replay_api_descriptor_end_to_end` の照合区間も
    全長へ戻す）。
+
+### 12.6 `rs-p4-mcts` の指示書（2026-09-07・前半 3 WP＋API の統合後）
+
+前提: 本線に符号化（`encode::encode`）・forward（`net::value`／`net::priors`／`net::cand_rows`）・候補
+（`search::legal_actions`／`determinize`／`apply_move_inplace`）・PRNG（`search/rng.rs`: PCG32 と
+`Rng::Host`）が揃っている。残りは木・静止探索・箱・`decide` と、その照合。
+
+```
+Rust エンジン移行 P4「探索と decide」を実装してください。計画 docs/rust_engine_plan.md §12（設計・オラクル）。
+本線 claude/cpu-spec-improvements-yw91jd から分岐し、claude/rs-p4-mcts に push、PR は作りません。
+Python 側（opcg_sim/）は変更しない（ハーネスの追加のみ）。Python が正。
+
+やること:
+1. search/mcts.rs: learned/mcts.py の TreeMCTS（_Node・PUCT（同点は添字が小さい方）・run（determinize→
+   root 展開→Dirichlet 混合→n_sims）・_expand（終局・戦闘箱 resolved_branch_values（battle_value_fn は
+   本体 value で代用＝a1 は出口ヘッドを持たない）・対話箱・priors）・_leaf_value（静止探索
+   resolve_battle_inplace／quiesce_choice）・_descend（journal の transaction で make/unmake・例外手は
+   dead_child）・_simulate・last_stats（legal/N/Q/P））。「各 simulate 冒頭で global random を戻す」は
+   Rust では PRNG を simulate ごとに base 状態へ戻すことで再現（§12.4-4）。
+2. search/decide.rs: core/cpu_learned.py の LearnedEngine.decide／_decide_inner（箱コミット _commit_step／
+   _store_commit／_commit_window_continuation／_commit_play_dialog・残り起動 _residual_attach_move・
+   窓の根畳み _window_choice・木・_merge_root_stats（等価手マージ）・温度サンプル・残ドン掘り
+   _residual_dig_move／残り起動 _residual_activate_move・don_box_first_primitive）と、config.py の既定
+   （SERVE_SIMS 160・C_PUCT 1.5・SERVE_DIRICHLET_EPS 0・SELFPLAY 系・SERVE_STICKY_WORLD・BOX_BRANCH_BUDGET）。
+   _world_rng（sticky world）も同じ規約で。
+3. 乱数: search::RecordedRng（出目を受け取る）を木・decide の全消費点（世界サンプルの並び・Dirichlet・
+   温度の choice）に配線。出目が尽きたら BadPayload。生成／serve 用に PCG32 版も同じ trait で差せるようにする
+   （P5 で使う）。
+4. lib.rs に decide(hidden_json, seat, opts_json, rng_json) -> {"move":..,"stats":{"legal":[..],"N":[..],"Q":[..],
+   "P":[..]},"kind":"main|window|commit"} を追加。opts は sims／c_puct／dirichlet_eps／temp_turns／
+   box_commit／box_battle／box_dialog／quiesce／residual_dig／residual_activate。
+5. tests/scripts/rs_search_oracle.py に --what decide を追加: Python 側で LearnedEngine（a1・serve 既定）を
+   RecordingRng（np.random.Generator をラップし shuffle／dirichlet／choice の出目を記録）で 100 局打ち、
+   各決定点の hidden・出目・Python の手・last_stats を記録 → Rust decide を同じ出目で走らせ、手と N を照合。
+   同点で argmax が割れた決定点は「訪問分布の L1 ≤ 2/sims」で通し件数を報告。窓（window）・コミット
+   （commit）の決定点は手の一致のみ。
+6. cargo test（PUCT の選択順・Dirichlet 混合・等価手マージ・温度・箱コミットの残回数）・clippy 0。
+   docs/rust_engine_plan.md §8 に結果行・docs/TEST_SPEC.md §3 に --what decide の追記。
+
+受け入れ: --what decide --games 100 → 手 100% 一致・N 一致（同点例外は件数）・退行（legal/determinize/apply
+40 局面・net 40 局面・encode 40 局面）一致・cargo test/clippy green。
+RESULT.json: {"job":"rs-p4-mcts","status":"done","decide":{...},"ties":..,"notes":"..."}。
+```
