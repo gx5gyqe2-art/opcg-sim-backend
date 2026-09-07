@@ -89,15 +89,10 @@ def value_grads_torch(tn, sc, ci, tok, rel_om, rel_oo, zt):
 
 def policy_grads_torch(tn, net, C, sc, ci, tok, rel_om, rel_oo, seg, si, ti, idx, budget, pi):
     from opcg_sim.learned.train import n_rel_torch as TT
-    rel_m = np.zeros_like(rel_om) if "rel" in tn.ablate else rel_om
-    rr = NL.cand_rel_rows(rel_m, seg, si, ti)
-    const = net.cand_feats(C, idx, np.zeros_like(net.card_table()))
-    lo = tn.policy_logits(
-        TT._f32(sc), TT._i64(ci), TT._f32(tok), TT._f32(rel_om), TT._f32(rel_oo),
-        TT._i64(seg), TT._i64(si), TT._i64(ti),
-        TT._i64(np.where(si >= 0)[0]), TT._i64(np.where(ti >= 0)[0]),
-        TT._f32(rr), TT._f32(const), TT._i64(C["cid"][idx]), TT._i64(C["tcid"][idx]),
-        TT._f32(budget))
+    b = TT.policy_batch_from_numpy(net, tn.ablate, sc.shape[0], rel_om, seg, si, ti, C, idx,
+                                   budget, pi)
+    lo = tn.policy_logits(TT._f32(sc), TT._i64(ci), TT._f32(tok), TT._f32(rel_om),
+                          TT._f32(rel_oo), b)
     logp = TT.seg_log_softmax(lo, TT._i64(seg), sc.shape[0])
     return torch_grads(tn, -(TT._f32(pi) * logp).sum() / sc.shape[0])
 
