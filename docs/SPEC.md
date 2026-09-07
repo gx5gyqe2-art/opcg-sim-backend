@@ -16,32 +16,47 @@
                          [FastAPI: opcg_sim/api/app.py]
         ┌───────────────────────────────┬───────────────────────────────┐
         ▼                               ▼                               ▼
-  ルールモード(GameManager)      フリーモード(SandboxManager)      デッキ/カードDB
-  公式ルール自動進行              手動操作(ルール強制なし)          (Firestore / JSON)
-  GAMES[game_id]                  SANDBOX_GAMES[game_id]
-  + RULE_ROOMS(オンライン対戦)    + ルーム/WS(/ws/sandbox)
+  ルールモード(engine_rs.RsGame)   フリーモード(SandboxManager)     デッキ/カードDB
+   └→ rust/opcg_engine（Rust）     手動操作(ルール強制なし)          (Firestore / JSON)
+  公式ルール自動進行＋CPU の思考    SANDBOX_GAMES[game_id]
+  GAMES[game_id]                   + ルーム/WS(/ws/sandbox)
+  + RULE_ROOMS(オンライン対戦)
 ```
+
+**エンジンの所在（2026-09-07・`docs/rust_engine_plan.md` §17）**: ルール・効果・探索は
+**Rust**（`rust/opcg_engine`・PyO3 wheel）にある。Python が持つのは 3 つだけ:
+
+| 役割 | 所在 |
+|---|---|
+| カード本文 → 効果構造（**裁定を書く場所その 1**） | `opcg_sim/src/effects/parser*.py`・`rules/`。生成物 `opcg_sim/data/opcg_effects.json`（`tools/export_effects_json.py`）を Rust が起動時に読む |
+| 学習（ネット定義・符号化の仕様・訓練） | `opcg_sim/learned/`・`learned/train/`（numpy） |
+| API（FastAPI）と学習ループの段取り | `opcg_sim/api/`・`opcg_sim/loop/` |
+
+**裁定を書く場所は 2 つだけ**——パーサ（Python）と Rust エンジン。旧 Python エンジンは
+`legacy/python_engine/`（tag `py-engine-final` で凍結・テストゲート対象外・`opcg_sim/` から
+import しない）。**本書で `core/…`・`opcg_sim/src/core/…` と書いてある実装箇所は、
+断りが無ければ tag の中の所在**（Rust 側の対応は `rust/opcg_engine/src/` の同名モジュール）。
 
 本システムは2つの対局モードを持つ。
 
 | モード | エンジン | エンドポイント | 特徴 |
 |---|---|---|---|
-| **ルールモード** | `GameManager`（`core/gamestate.py`） | `/api/game/*`（REST）＋ `/api/rule/*` ＋ `/api/game/cpu/step` ＋ `/ws/game/{id}` | 公式ルールを自動進行。ソロ（ホットシート）／オンライン対戦／**CPU 対戦**に対応 |
-| **フリーモード** | `SandboxManager`（`core/sandbox.py`） | `/api/sandbox/*` ＋ `/ws/sandbox/{id}` | ルール強制なしの自由操作。ソロ／オンライン対戦に対応 |
+| **ルールモード** | `engine_rs.RsGame`（`rust/opcg_engine` のラッパ） | `/api/game/*`（REST）＋ `/api/rule/*` ＋ `/api/game/cpu/step` ＋ `/ws/game/{id}` | 公式ルールを自動進行。ソロ（ホットシート）／オンライン対戦／**CPU 対戦**に対応 |
+| **フリーモード** | `SandboxManager`（`opcg_sim/src/core/sandbox.py`） | `/api/sandbox/*` ＋ `/ws/sandbox/{id}` | ルール強制なしの自由操作。ソロ／オンライン対戦に対応 |
 
-カード効果は `GameManager`（ルールモード）でのみ解決される。フリーモードは盤面操作のみ。
+カード効果はルールモードでのみ解決される。フリーモードは盤面操作のみ。
 
-ルールモードのアクション適用ロジックは `core/action_api.py`（`apply_game_action`/`apply_battle_action`）に
-集約され、HTTP エンドポイント・CPU 対戦ドライバ・自己対戦ランナーが**同一コアパス**を通る。これが
-ないと AI シミュレーション・自己対戦とルール本番の挙動が乖離するため、適用ロジックは必ずこの関数を
-経由する。CPU（AI）対戦の設計は §2.5、効果検証ハーネス（CPU 対 CPU 自己対戦）は
-[`docs/TEST_SPEC.md`](TEST_SPEC.md) §3.1 を参照。
+ルールモードのアクション適用は `RsGame.apply_game_action`／`apply_battle_action`（Rust の
+`rules::actions`）に集約され、HTTP エンドポイント・CPU 対戦ドライバ・生成/アリーナの
+ドライバ（`opcg_sim/loop/driver.py`）が**同一コアパス**を通る。CPU の思考も同じ盤面の上で
+Rust の `Game.decide` が行う＝**物差しは 1 本**。CPU（AI）対戦の設計は §2.5、テストの
+ゲート（golden 2 本）は [`docs/TEST_SPEC.md`](TEST_SPEC.md) §5 を参照。
 
 ---
 
 ## 1. コアゲームルール仕様（ルールモード）
 
-`GameManager`（`opcg_sim/src/core/gamestate.py`）が公式ワンピースカードゲームのルールに沿って
+`GameManager`（`legacy/python_engine/core/gamestate.py`）が公式ワンピースカードゲームのルールに沿って
 進行する。公式ルールに準拠する主要項目を以下に定める（実装箇所は file:line で示す）。
 
 ### 1.1 ターン構造
@@ -294,7 +309,7 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
       「undo 漏れで静かに盤面破壊」は、**適用前の盤面スナップショットを保持し undo 後に完全等価を assert**
       （make/unmake 不変条件）して**テスト失敗に変換**し、実プレイ全手で undo の取りこぼしを炙り出す（フル等価
       比較 `deep_diff`＝デバッグ時のみ・本番 OFF）。実装は効果ごとの逆操作手書きでなく**ミューテーション・
-      ジャーナリング**（`opcg_sim/src/core/journal.py`：`transaction()`／`JournaledList・Set・Dict`／
+      ジャーナリング**（`opcg_sim/src/models/journal.py`：`transaction()`／`JournaledList・Set・Dict`／
       `__setattr__` 旧値記録→逆順再生）で構造的に取りこぼしを防ぐ。**不活性時（transaction 外）は組み込み型・
       素の __setattr__ と完全同一**（グローバル 1 読みで素通り）＝通常プレイ無影響。
       **PoC 結果（2026-06）**: 基盤を `CardInstance/DonInstance/Player/GameManager/ContinuousEffectManager/
@@ -1202,21 +1217,21 @@ LLM を使わず、**カードデータ（キーワード・効果耐性）か�
 | `opcg_sim/api/schemas.py` | レスポンス/リクエストの Pydantic スキーマ（CONST は `config` へ委譲） |
 | `opcg_sim/api/{config,resources,state,presenters,ws}.py` ／ `services/` | app.py から分離した設定/常駐リソース/対局レジストリ（`GAMES`/`SANDBOX_GAMES`/`RULE_ROOMS`/`CPU_GAMES`）/整形（`build_game_result_hybrid`/`build_rule_message`）/WS（`broadcast_rule_state`/`GameConnectionManager`）／デッキ・リプレイ・対局・CPU思考駆動のサービス層（②C） |
 | `contract/api_schema.json`・`manifest.json` | `tools/export_contract.py` が pydantic スキーマから生成する API 契約の正本（フロント型生成の入力）。`/health` が `constants_hash`/`schema_hash` を返し乖離を検出。`test_contract_export.py` が再生成差分ゼロをラチェット |
-| `opcg_sim/src/core/gamestate.py` | ルールエンジンの**状態定義＋オーケストレーション**（`GameManager`/`Player`・`__init__`/`clone`/対話スタック・`get_legal_actions`/`play_card_action`/`resolve_ability`/`_find_action`）。責務別ロジックは `core/engine/` へ分割し、本体は同名の**1行デリゲート**で公開APIを維持（①B）。`apply_action_to_engine` は `core/actions` への1行デリゲート（①A） |
-| `opcg_sim/src/core/engine/` | `gamestate` から分割したステートレス・エンジン関数群（各関数の第1引数は `gm`）。`values`＝動的値／`guards`＝除去保護・置換・自己制限／`card_moves`＝移動・ドン・場札上限／`passives`＝常在再計算／`triggers`＝誘発キュー・KO/レスト/離脱/ライフ／`battle`＝アタック/バトル/勝敗／`turn_flow`＝開始・マリガン・ターン進行／`interaction`＝対話解決・pending 生成・deferred。`_helpers`＝葉ヘルパ（NFC/ターン制限/能力index）。engine 同士の直接 import は無し（相互呼び出しは `gm` デリゲート経由＝循環を構造的に排除。①B） |
-| `opcg_sim/src/core/actions/` | アクション適用のレジストリ・ディスパッチ（`apply_action`）。`player_level`＝プレイヤーレベル・ハンドラ／`per_target`＋`target_loop`＝対象ループ（除去保護/置換ゲート/success 規約）／`registry`＝`ActionType` キーの登録・正規化。旧 `apply_action_to_engine`（文字列比較45分岐）の分割先 |
-| `opcg_sim/src/core/rules_constants.py` | ルール定数（`SELF_RESTRICTION_KEYS`／`FIELD_LIMIT` 等）。`actions`/`gamestate`/`engine` が共有（循環回避のための葉モジュール） |
-| `opcg_sim/src/core/action_api.py` | アクション適用の共通コアパス（`apply_game_action`/`apply_battle_action`）。HTTP/CPU/自己対戦が共用 |
-| `opcg_sim/src/core/cpu_ai.py` | CPU(AI) 意思決定（`evaluate`/`evaluate_base`/`decide`/`_search`/`decide_guarded`）。**葉評価は L1 単一系統＝`cpu_eval_v2.evaluate_v2` に集約**（`evaluate_base` が素返し・`evaluate` はその別名。手書き J値評価／評価v2フラグ／effect-value 実験／相手モデル profile 補正は **2026-06-27 撤去**／学習価値葉ブレンド `_value_blend` は **2026-06-28 撤去**）・**情報方針 fair 既定＋PIMC 決定化（§2.5.8）**（`cheat` は診断用に明示指定のみ）・**ターン境界評価探索**（`_settle_eval`＝horizon/手番パリティ是正）・α-β＋ビーム・最短リーサル認識・**効果の単一対象選択の探索分岐**（`_selection_moves`）・L1 で存続する評価補助（`_power_cap`/`_effective_power`/`W_POWER_OVERCAP`/`DECK_DANGER`＝`cpu_eval_v2` が import）・暴走防止（自デッキ勝ち筋プラン補正§2.5.5／脅威評価§2.5.6 は **2026-06-27 に全廃**＝plan 非供給のフラット評価） |
-| `opcg_sim/src/core/cpu_eval_v2.py` | **CPU の現用葉評価（L1＝カード通貨）`evaluate_v2`**。トレース時は内訳を `out["v2"]` に出力。`cpu_ai` から `_power_cap`/`_effective_power`/`W_POWER_OVERCAP`/`DECK_DANGER` を import して使う（係数は固定＝SPSA で Elo 余地≈0 と実証され調整器は撤去・2026-06-28） |
-| ~~`opcg_sim/src/core/cpu_self_plan.py`~~ | **【削除 2026-06-27】** 自デッキ勝ち筋プラン（`build_plan`/`PlanProfile`・旧§2.5.5）。A/B 実験（control 倍率が vs-midrange −5.7pp）を受けてアーキタイプ・プリセット系を全廃しファイルごと削除 |
-| `opcg_sim/src/core/invariants.py` | 対局中インバリアント検出（自己対戦/テストの各ステップ後に呼ぶ） |
+| `legacy/python_engine/core/gamestate.py` | ルールエンジンの**状態定義＋オーケストレーション**（`GameManager`/`Player`・`__init__`/`clone`/対話スタック・`get_legal_actions`/`play_card_action`/`resolve_ability`/`_find_action`）。責務別ロジックは `core/engine/` へ分割し、本体は同名の**1行デリゲート**で公開APIを維持（①B）。`apply_action_to_engine` は `core/actions` への1行デリゲート（①A） |
+| `legacy/python_engine/core/engine/` | `gamestate` から分割したステートレス・エンジン関数群（各関数の第1引数は `gm`）。`values`＝動的値／`guards`＝除去保護・置換・自己制限／`card_moves`＝移動・ドン・場札上限／`passives`＝常在再計算／`triggers`＝誘発キュー・KO/レスト/離脱/ライフ／`battle`＝アタック/バトル/勝敗／`turn_flow`＝開始・マリガン・ターン進行／`interaction`＝対話解決・pending 生成・deferred。`_helpers`＝葉ヘルパ（NFC/ターン制限/能力index）。engine 同士の直接 import は無し（相互呼び出しは `gm` デリゲート経由＝循環を構造的に排除。①B） |
+| `legacy/python_engine/core/actions/` | アクション適用のレジストリ・ディスパッチ（`apply_action`）。`player_level`＝プレイヤーレベル・ハンドラ／`per_target`＋`target_loop`＝対象ループ（除去保護/置換ゲート/success 規約）／`registry`＝`ActionType` キーの登録・正規化。旧 `apply_action_to_engine`（文字列比較45分岐）の分割先 |
+| `legacy/python_engine/core/rules_constants.py` | ルール定数（`SELF_RESTRICTION_KEYS`／`FIELD_LIMIT` 等）。`actions`/`gamestate`/`engine` が共有（循環回避のための葉モジュール） |
+| `legacy/python_engine/core/action_api.py` | アクション適用の共通コアパス（`apply_game_action`/`apply_battle_action`）。HTTP/CPU/自己対戦が共用 |
+| `legacy/python_engine/core/cpu_ai.py` | CPU(AI) 意思決定（`evaluate`/`evaluate_base`/`decide`/`_search`/`decide_guarded`）。**葉評価は L1 単一系統＝`cpu_eval_v2.evaluate_v2` に集約**（`evaluate_base` が素返し・`evaluate` はその別名。手書き J値評価／評価v2フラグ／effect-value 実験／相手モデル profile 補正は **2026-06-27 撤去**／学習価値葉ブレンド `_value_blend` は **2026-06-28 撤去**）・**情報方針 fair 既定＋PIMC 決定化（§2.5.8）**（`cheat` は診断用に明示指定のみ）・**ターン境界評価探索**（`_settle_eval`＝horizon/手番パリティ是正）・α-β＋ビーム・最短リーサル認識・**効果の単一対象選択の探索分岐**（`_selection_moves`）・L1 で存続する評価補助（`_power_cap`/`_effective_power`/`W_POWER_OVERCAP`/`DECK_DANGER`＝`cpu_eval_v2` が import）・暴走防止（自デッキ勝ち筋プラン補正§2.5.5／脅威評価§2.5.6 は **2026-06-27 に全廃**＝plan 非供給のフラット評価） |
+| `legacy/python_engine/core/cpu_eval_v2.py` | **CPU の現用葉評価（L1＝カード通貨）`evaluate_v2`**。トレース時は内訳を `out["v2"]` に出力。`cpu_ai` から `_power_cap`/`_effective_power`/`W_POWER_OVERCAP`/`DECK_DANGER` を import して使う（係数は固定＝SPSA で Elo 余地≈0 と実証され調整器は撤去・2026-06-28） |
+| ~~`legacy/python_engine/core/cpu_self_plan.py`~~ | **【削除 2026-06-27】** 自デッキ勝ち筋プラン（`build_plan`/`PlanProfile`・旧§2.5.5）。A/B 実験（control 倍率が vs-midrange −5.7pp）を受けてアーキタイプ・プリセット系を全廃しファイルごと削除 |
+| `legacy/python_engine/core/invariants.py` | 対局中インバリアント検出（自己対戦/テストの各ステップ後に呼ぶ） |
 | `opcg_sim/src/core/sandbox.py` | フリーモードの盤面マネージャ |
-| `opcg_sim/src/core/effects/parser.py` / `parser_v2.py` | レガシー/V2 パーサ |
-| `opcg_sim/src/core/effects/rules/base.py` / `atoms.py` | ルール基盤／原子アクションルール群 |
-| `opcg_sim/src/core/effects/continuous.py` | 継続効果マネージャ |
-| `opcg_sim/src/core/effects/matcher.py` | 対象指定の解析(`parse_target`)・実体化(`get_target_cards`) |
-| `opcg_sim/src/core/effects/resolver.py` | IR の実行 |
+| `opcg_sim/src/effects/parser.py` / `parser_v2.py` | レガシー/V2 パーサ |
+| `opcg_sim/src/effects/rules/base.py` / `atoms.py` | ルール基盤／原子アクションルール群 |
+| `legacy/python_engine/core/effects/continuous.py` | 継続効果マネージャ |
+| `opcg_sim/src/effects/matcher.py` | 対象指定の解析(`parse_target`)・実体化(`get_target_cards`) |
+| `legacy/python_engine/core/effects/resolver.py` | IR の実行 |
 | `opcg_sim/src/models/effect_types.py` | IR 定義（Ability/GameAction/TargetQuery/Condition…） |
 | `opcg_sim/src/models/models.py` | CardMaster/CardInstance（`is_newly_played`、`timed_*`、`has_keyword()`、`is_effect_negated`、`get_power`） |
 | `opcg_sim/src/models/enums.py` | ActionType/TriggerType/Zone/Phase/CardType/ConditionType… |

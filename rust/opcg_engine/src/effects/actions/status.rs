@@ -35,8 +35,17 @@ use super::super::NodeRef;
 const FLAG_ATTACK_DISABLE: &str = "ATTACK_DISABLE";
 /// アタック税（「アタックする場合、手札 N 枚を捨てる」）の接頭辞。
 const ATTACK_TAX_PREFIX: &str = "ATTACK_TAX_";
-/// Python `per_target.prevent_rest` が載せる継続フラグ。
+/// `PREVENT_REST` が**相手のキャラを縛る**ときの継続フラグ（「相手の…キャラはレストにできない」）。
+/// 本人が自分をレストにする経路（アタック宣言・ブロック）ごと塞ぐ。
 const FLAG_CANNOT_REST: &str = "CANNOT_REST";
+/// `PREVENT_REST` が**自身を守る**ときの継続フラグ（「このキャラは相手の効果でレストにされない」）。
+///
+/// 裁定（ユーザ決定 2026-09-07・`docs/rust_engine_plan.md` §16.3-10）: 旧 Python は自己保護にも
+/// [`FLAG_CANNOT_REST`] を載せていたため、守られる側が**自分のアタック宣言・ブロックもできなく
+/// なる**という逆さまの読みになっていた。テキストどおり「相手の効果によるレストだけを弾く」
+/// ＝このフラグは [`super::rest`]（`actor != owner`）だけが見る。KO 耐性は従来どおり
+/// `PREVENT_LEAVE` 経路。
+pub(crate) const FLAG_CANNOT_BE_RESTED_BY_OPP: &str = "CANNOT_BE_RESTED_BY_OPP";
 /// Python `per_target.freeze` が `flags`（`timed_flags` ではない）へ直接書くフラグ。
 const FLAG_FREEZE: &str = "FREEZE";
 /// Python `per_target.negate_effect` が載せる継続フラグ（`CardInstance.is_effect_negated`）。
@@ -101,7 +110,7 @@ pub fn apply_target(
     match action.ty {
         ActionType::GrantKeyword => grant_keyword(s, action, target),
         ActionType::AttackDisable => attack_disable(s, action, target),
-        ActionType::PreventRest => prevent_rest(s, action, target),
+        ActionType::PreventRest => prevent_rest(s, action, target, _source_card),
         ActionType::Freeze => freeze(s, target),
         ActionType::NegateEffect => negate_effect(s, masters, action, target),
         // Python の対象ループは未登録の `ActionType` を no-op にする（`DISABLE_ABILITY` の
@@ -195,12 +204,31 @@ fn attack_disable(s: &mut Session, action: &GameAction, target: CardIdx) {
     timed_flag(s, target, action.duration, &flag);
 }
 
-/// Python `per_target.prevent_rest`。
+/// Python `per_target.prevent_rest`（**裁定で 2 通りに分ける**・§16.3-10）。
 ///
-/// 「（相手の）キャラは…までレストにできない」＝そのキャラは自身をレストにできない
-/// ＝アタックもブロックもできない（どちらも本体をレストにする）。
-fn prevent_rest(s: &mut Session, action: &GameAction, target: CardIdx) {
-    timed_flag(s, target, action.duration, FLAG_CANNOT_REST);
+/// - **相手を縛る形**（「相手の…キャラは…までレストにできない」・対象は `CHOOSE`）＝
+///   そのキャラは自身をレストにできない＝アタックもブロックもできない（どちらも本体を
+///   レストにする）。従来どおり [`FLAG_CANNOT_REST`]。
+/// - **自身を守る形**（「このキャラは相手の効果でレストにされない」・対象は `SOURCE`＝
+///   効果の発生源そのもの）＝弾くのは**相手の効果による**レストだけ。自分のアタック宣言・
+///   ブロックは従来どおりできる。[`FLAG_CANNOT_BE_RESTED_BY_OPP`] を載せ、
+///   [`super::rest`] が `actor != owner` のときだけ見る。
+///
+/// 該当カードは 3 枚（OP11-046 ヴィンスモーク・ヨンジ／OP12-021 いっぽんマツ／
+/// OP15-024 ウソップ）。旧 Python は両方に `CANNOT_REST` を載せていた（＝守られる側が
+/// 自分から動けなくなる逆さまの読み）ので、**Rust を正として直した**。
+fn prevent_rest(
+    s: &mut Session,
+    action: &GameAction,
+    target: CardIdx,
+    source_card: Option<CardIdx>,
+) {
+    let flag = if source_card == Some(target) {
+        FLAG_CANNOT_BE_RESTED_BY_OPP
+    } else {
+        FLAG_CANNOT_REST
+    };
+    timed_flag(s, target, action.duration, flag);
 }
 
 /// Python `per_target.freeze`。
@@ -466,6 +494,63 @@ mod tests {
         a.duration = Duration::UntilNextTurnEnd;
         run(&mut s, &masters, &a, &[c], 0);
         assert_eq!(effects(&s)[0].expire_turn, 4);
+    }
+
+    /// 裁定 §16.3-10: 自身を守る形（対象＝発生源そのもの）は**別のフラグ**を載せる。
+    /// `CANNOT_REST` は載せない＝本人のアタック宣言・ブロックは塞がれない。
+    #[test]
+    fn prevent_rest_on_source_sets_the_opponent_only_flag() {
+        let (masters, mut s, c) = board();
+        let a = testkit::action(ActionType::PreventRest, 0);
+        apply_action(
+            &mut s,
+            &masters,
+            Seat::P1,
+            &a,
+            &node_ref(),
+            &crate::effects::refs_of(&[c]),
+            0,
+            Some(c), // 発生源＝対象（select_mode="SOURCE" の解決結果）
+        )
+        .expect("apply_action");
+
+        assert_eq!(
+            s.state().card(c).timed_flags,
+            vec!["CANNOT_BE_RESTED_BY_OPP".to_string()]
+        );
+    }
+
+    /// 裁定 §16.3-10 の効き方: **相手の効果**の REST だけを弾き、持ち主自身の REST は通す。
+    #[test]
+    fn cannot_be_rested_by_opp_blocks_only_the_opponent() {
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        let c = b.put_field(Seat::P2, M_CHAR);
+        let (masters, state) = b.build();
+        let mut s = Session::new(state);
+        // 自己保護を載せる（発生源＝自分自身）。
+        let prevent = testkit::action(ActionType::PreventRest, 0);
+        apply_action(
+            &mut s, &masters, Seat::P2, &prevent, &node_ref(),
+            &crate::effects::refs_of(&[c]), 0, Some(c),
+        )
+        .expect("prevent_rest");
+
+        let rest = testkit::action(ActionType::Rest, 0);
+        // 相手（p1）の効果 → 弾かれる。
+        apply_action(
+            &mut s, &masters, Seat::P1, &rest, &node_ref(),
+            &crate::effects::refs_of(&[c]), 0, None,
+        )
+        .expect("rest by opponent");
+        assert!(!s.state().card(c).is_rest, "相手の効果ではレストにならない");
+
+        // 持ち主（p2）自身の効果 → 通る。
+        apply_action(
+            &mut s, &masters, Seat::P2, &rest, &node_ref(),
+            &crate::effects::refs_of(&[c]), 0, None,
+        )
+        .expect("rest by owner");
+        assert!(s.state().card(c).is_rest, "自分の効果はこれまでどおり通る");
     }
 
     // --- FREEZE ----------------------------------------------------------------

@@ -223,20 +223,7 @@ pub fn decide_json(
     let name = seat_or_err(seat, "decide")?;
     let ov = parse(opts_json, "decide: opts")?;
     let rv = parse(rng_json, "decide: rng")?;
-    let opts = decide_options_from_json(&ov);
-    let carry = decide::DecideCarry {
-        commit: match ov.get("commit").and_then(Value::as_array) {
-            Some(a) => a
-                .iter()
-                .map(decide::Step::from_json)
-                .collect::<Result<Vec<_>, _>>()?,
-            None => Vec::new(),
-        },
-        resact_pending: ov
-            .get("resact_pending")
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
-    };
+    let (opts, carry) = decide_opts_and_carry(&ov)?;
     let mut rng = recorded_rng_from_json(&rv)?;
     let mut s = Session::new(GameState::from_record(&hidden, masters)?);
     // `prefix`＝記録 v5 の `hidden` が持たない中断スタックへ入り直すための手順
@@ -244,10 +231,34 @@ pub fn decide_json(
     // （素の `apply_game_action`／`apply_battle_action`・ドレインしない）で辿る。
     apply_decide_prefix(&mut s, masters, ov.get("prefix"))?;
     let state = s.into_state();
-    let out = decide::decide(masters, net, &state, name, &opts, &mut rng, &carry)?;
+    let mut body = decide_on_state(masters, net, &state, name, &opts, &mut rng, &carry)?;
     let (ns, nd, nu) = rng.consumed();
-    let body = serde_json::json!({
+    if let Some(o) = body.as_object_mut() {
+        o.insert("rng_used".into(), serde_json::json!([ns, nd, nu]));
+    }
+    dump(&body, "decide")
+}
+
+/// decide の本体＋戻り値 JSON の組み立て（[`decide_json`] と PyO3 の `Game.decide` が共有する）。
+///
+/// `hidden` を経由しないので**中断（対話）スタックを持ったままの生の盤面**で決められる＝
+/// P5 の生成／アリーナ／serve はこちらを使う（記録 v5 の `hidden` は中断を持てないため、
+/// [`decide_json`] は `prefix` で入り直す必要があった）。
+pub fn decide_on_state(
+    masters: &MasterTable,
+    net: &crate::net::LoadedNet,
+    state: &GameState,
+    name: Seat,
+    opts: &decide::DecideOptions,
+    rng: &mut dyn SearchRng,
+    carry: &decide::DecideCarry,
+) -> Result<Value, EngineError> {
+    let out = decide::decide(masters, net, state, name, opts, rng, carry)?;
+    Ok(serde_json::json!({
         "move": out.mv,
+        // 棋譜ダンプの鍵（箱レベル・原始手化と残り掘りの前＝Python `record["sig"]`／`["k"]`）
+        "sig": out.sig,
+        "k": out.k,
         "kind": out.kind,
         "stats": {
             "legal": out.legal,
@@ -261,9 +272,28 @@ pub fn decide_json(
         "commit": out.carry.commit.iter().map(decide::Step::to_json).collect::<Vec<_>>(),
         "resact_pending": out.carry.resact_pending,
         "budget": {"used": out.budget_used, "exhausted": out.budget_exhausted},
-        "rng_used": [ns, nd, nu],
-    });
-    dump(&body, "decide")
+    }))
+}
+
+/// `opts_json` の欄から [`decide::DecideOptions`] と [`decide::DecideCarry`] を取り出す
+/// （[`decide_json`] と PyO3 の `Game.decide` が共有する）。
+pub fn decide_opts_and_carry(
+    ov: &Value,
+) -> Result<(decide::DecideOptions, decide::DecideCarry), EngineError> {
+    let carry = decide::DecideCarry {
+        commit: match ov.get("commit").and_then(Value::as_array) {
+            Some(a) => a
+                .iter()
+                .map(decide::Step::from_json)
+                .collect::<Result<Vec<_>, _>>()?,
+            None => Vec::new(),
+        },
+        resact_pending: ov
+            .get("resact_pending")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+    };
+    Ok((decide_options_from_json(ov), carry))
 }
 
 /// `decide` の `prefix`（`[{"actor":"p1","move":{...}}, ...]`）を `run_game` と同じ手順で適用する。

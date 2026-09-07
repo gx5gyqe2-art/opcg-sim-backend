@@ -16,10 +16,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from opcg_sim.src.core.sandbox import SandboxManager
-from opcg_sim.src.core.gamestate import Player, GameManager
-from opcg_sim.src.core import action_api
-from opcg_sim.src.core import cpu_ai
-from opcg_sim.api import decide_client
 from opcg_sim.api import engine_rs
 # 設定・定数／常駐リソース／対局レジストリ／サービスは分離済みモジュールから取り込む（後方互換の名前で再公開）。
 from .schemas import GameStateSchema, PendingRequestSchema, BattleActionRequest
@@ -33,10 +29,6 @@ from .ws import ws_manager, game_ws_manager, broadcast_rule_state
 # app モジュール属性を差し替えても効かない。テスト・スタブは `opcg_sim.api.services.decks` を patch する。
 from .services.replay import _replay_enabled, _replay_record_action, _capture_final_winner
 from .services.games import _resolve_first_player
-from .services.cpu_driver import (
-    _ponder_enabled, _plan_segment, _ponder_plan, _kick_ponder,
-    _speculate_enabled, _speculate_compute, _speculate_plan, _kick_speculate, _cached_cpu_move,
-)
 from .routers import router as _api_router
 from .flagship.router import router as _flagship_router
 
@@ -52,12 +44,6 @@ async def _lifespan(_app):
         engine_rs.load_engine()
     except Exception:
         _logger.warning("Rust エンジンのカード定義読込に失敗（対局生成時に再試行）", exc_info=True)
-    # 方式B: PyPy 探索ワーカーを常駐起動（OPCG_PYPY_WORKER=1 のときのみ）。JIT を常にウォームに保つ。
-    # 未起動・失敗でも decide_client がインプロセス実行へフォールバックするので可用性は不変。
-    try:
-        decide_client.spawn_worker()
-    except Exception:
-        _logger.warning("PyPy ワーカー起動に失敗（インプロセス実行へフォールバック）", exc_info=True)
     yield
 
 

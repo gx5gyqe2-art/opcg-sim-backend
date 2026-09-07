@@ -15,12 +15,13 @@ def pytest_configure(config):
     """マーカー登録。`slow` = 極端に重くルーチンから除外する重テスト（手動実行前提）。
     `cpu_infra` = 探索/自己対戦/学習パイプラインの内部機構の健全性のみを見るテスト
     （ゲームプレイの正しさ自体は必須/標準テストが別途担保。分類基準は docs/TEST_SPEC.md
-    §重要度分類）。`legacy` = Python エンジン（`opcg_sim/src/core`・`effects`・`learned`）を
-    直に叩くテスト（Rust 化後は監査／再生の golden 2 本がゲームプレイ退行の一次防衛線に
-    なったため、push 前の必須ゲートからは外す・`docs/rust_engine_plan.md` §16.1）。
-    `make test`（新定義）は `-m "not slow and not legacy"`（cargo test を併走）、
-    `make test-legacy` は従来どおり全数（`-m "not slow"`）、`make test-fast` は
-    `-m "not slow and not cpu_infra"` で実行する。
+    §重要度分類）。`legacy` = Python エンジンを直に叩くテスト。**本体は
+    `legacy/python_engine/tests/` へ退避した**（2026-09-07・計画 §16.3-6）ので、この下に
+    残るのは 1 本だけ（`test_api_rs_errors.py` は legacy 側）。マーカーは
+    「まだ Python エンジンを触るものがあれば `make test` から外す」という保険として残す。
+    `make test` は `-m "not slow and not legacy"`（cargo test を併走）、`make test-fast` は
+    `-m "not slow and not cpu_infra"`。legacy 側は tag `py-engine-final` を checkout して
+    回す（`docs/TEST_SPEC.md`）。
     """
     config.addinivalue_line(
         "markers",

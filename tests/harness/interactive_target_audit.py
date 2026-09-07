@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import os as _os, sys as _sys  # noqa: E402  test bootstrap (sys.path + google stub)
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import _bootstrap  # noqa: E402,F401
-from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+from opcg_sim.src.effects.parser_v2 import EffectParserV2
 from opcg_sim.src.models.effect_types import GameAction, Sequence, Branch, Choice
 from opcg_sim.src.models.enums import Player, Zone
 

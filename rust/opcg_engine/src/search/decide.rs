@@ -122,6 +122,15 @@ pub struct DecideCarry {
 #[derive(Debug, Clone)]
 pub struct DecideOut {
     pub mv: Option<Move>,
+    /// 棋譜ダンプ用の**箱レベル**の `move_sig`（Python `record["sig"]`）。
+    ///
+    /// [`DecideOut::mv`] は「実対局へ出す手」＝配分箱は先頭原始手へ畳んだ後・残ドン掘り／
+    /// 残り起動で差し替えた後なので、**決定の同一性**（訪問分布の候補と突き合わせる鍵）とは
+    /// 別物になる。Python は `record` をその 2 つの前で採る＝ここも同じ位置で採る。
+    pub sig: Option<Value>,
+    /// 同じ位置の `don_k`（Python `record["k"]`。`move_sig` は don_k を含まないので並記が要る）。
+    /// 窓・コミットでは `None`（Python も `record["k"]` を書かない）。
+    pub k: Option<f64>,
     /// "main"／"window"／"commit"
     pub kind: &'static str,
     pub legal: Vec<Move>,
@@ -212,6 +221,103 @@ fn card_label(state: &GameState, masters: &MasterTable, uuid: Option<&str>) -> V
             }
         }
     }
+}
+
+/// Python `cpu_ai._describe_move`（手を card_id 基準の人間可読 dict へ・uuid 非依存＝再現性あり）。
+///
+/// 対戦 API の思考トレース（`services/replay._replay_record_action`）が録画に書く形。
+/// 空の欄は**入れない**（Python も `if label:`／`if tids:` で出し分ける）＝旧録画と同じキー集合。
+/// `selected_slots`（同名複製の曖昧性解消）は `pending` の `selectable_uuids` 内の位置で、
+/// `RESOLVE_EFFECT_SELECTION` のときだけ載る。
+pub fn describe_move(
+    state: &GameState,
+    masters: &MasterTable,
+    mv: &Move,
+    pending: Option<&Value>,
+) -> Value {
+    let null = Value::Null;
+    let p = mv.get("payload").unwrap_or(&null);
+    let extra = p.get("extra").unwrap_or(&null);
+    let at = mv.get("action_type").cloned().unwrap_or(Value::Null);
+    let mut d = Map::new();
+    d.insert("action_type".into(), at.clone());
+    if at.as_str() == Some("DON_BOX") {
+        if let Some(k) = p.get("don_k").and_then(Value::as_f64) {
+            d.insert("don_k".into(), Value::from(k as i64));
+        }
+    }
+    let uuid = p
+        .get("uuid")
+        .and_then(Value::as_str)
+        .or_else(|| mv.get("card_uuid").and_then(Value::as_str));
+    let label = card_label(state, masters, uuid);
+    if !label.is_null() {
+        d.insert("card".into(), label);
+    }
+    let labels = |a: &Vec<Value>| -> Value {
+        Value::Array(
+            a.iter()
+                .map(|v| card_label(state, masters, v.as_str()))
+                .collect(),
+        )
+    };
+    if let Some(tids) = p
+        .get("target_ids")
+        .and_then(Value::as_array)
+        .filter(|a| !a.is_empty())
+    {
+        d.insert("targets".into(), labels(tids));
+    }
+    let sel = p
+        .get("selected_uuids")
+        .and_then(Value::as_array)
+        .filter(|a| !a.is_empty())
+        .or_else(|| {
+            extra
+                .get("selected_uuids")
+                .and_then(Value::as_array)
+                .filter(|a| !a.is_empty())
+        });
+    if let Some(sel) = sel {
+        d.insert("selected".into(), labels(sel));
+        if at.as_str() == Some("RESOLVE_EFFECT_SELECTION") {
+            if let Some(su) = pending
+                .and_then(|pr| pr.get("selectable_uuids"))
+                .and_then(Value::as_array)
+            {
+                let slots: Vec<i64> = sel
+                    .iter()
+                    .map(|u| {
+                        su.iter()
+                            .position(|x| x == u)
+                            .map(|i| i as i64)
+                            .unwrap_or(-1)
+                    })
+                    .collect();
+                if !slots.is_empty() && slots.iter().all(|s| *s >= 0) {
+                    d.insert("selected_slots".into(), Value::from(slots));
+                }
+            }
+        }
+    }
+    for key in ["index", "position"] {
+        let v = match p.get(key) {
+            Some(v) if !v.is_null() => Some(v.clone()),
+            _ => extra.get(key).filter(|v| !v.is_null()).cloned(),
+        };
+        if let Some(v) = v {
+            d.insert(key.into(), v);
+        }
+    }
+    // 任意効果の「見送り」だけを明示する（accept 側は既定＝旧録画と同キーで照合できる）。
+    let acc = match p.get("accepted") {
+        Some(v) if !v.is_null() => Some(v.clone()),
+        _ => extra.get("accepted").filter(|v| !v.is_null()).cloned(),
+    };
+    if acc == Some(Value::Bool(false)) {
+        d.insert("accepted".into(), Value::Bool(false));
+    }
+    Value::Object(d)
 }
 
 /// Python `cpu_ai._move_equiv_key`（`_describe_move` と同じ card_id 基準の同一視）。
@@ -835,6 +941,8 @@ pub fn decide(
 
 fn empty_out(kind: &'static str, mv: Option<Move>, carry: DecideCarry, st: &SearchState) -> DecideOut {
     DecideOut {
+        sig: mv.as_ref().map(move_sig),
+        k: None,
         mv,
         kind,
         legal: Vec::new(),
@@ -901,6 +1009,8 @@ fn decide_inner(
                 }
             }
             return Ok(DecideOut {
+                sig: Some(move_sig(&pick.mv)),
+                k: None,
                 mv: Some(pick.mv),
                 kind: "window",
                 legal: pick.legal,
@@ -939,6 +1049,14 @@ fn decide_inner(
     if mv.is_none() {
         mv = run.legal.first().cloned();
     }
+    // 棋譜ダンプの鍵はここで採る（Python `_decide_inner` の `record` と同じ位置＝残ドン掘り／
+    // 残り起動の差し替えと先頭原始手化の**前**＝訪問分布の候補と突き合わせられる箱レベル）。
+    let rec_sig = mv.as_ref().map(move_sig);
+    let rec_k = mv
+        .as_ref()
+        .and_then(|m| m.get("payload"))
+        .and_then(|p| p.get("don_k"))
+        .and_then(Value::as_f64);
 
     // ⑤ 残ドン掘り／残り起動（腕 A・A2）
     let mut dig_override = false;
@@ -991,6 +1109,8 @@ fn decide_inner(
     let mv = mv.map(|m| don_box_first_primitive(&m));
     Ok(DecideOut {
         mv,
+        sig: rec_sig,
+        k: rec_k,
         kind: "main",
         legal: run.legal,
         n: run.n,

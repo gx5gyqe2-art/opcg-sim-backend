@@ -248,6 +248,13 @@ pub struct Session {
     pub rng: crate::search::rng::Rng,
     /// 1 要求ぶんのイベントログ（Python `GameManager.action_events`）。
     action_events: Vec<serde_json::Value>,
+    /// この要求のあいだに**山札を混ぜた席**（記録の `shuffled`）。
+    ///
+    /// 再生（`Rng::Replay`）は混ぜないので、記録側だけが立てる。「混ぜた直後に引いた／見た」
+    /// カードの実体は再生では一致しないので、照合はその段のイベントの `targets` を枚数へ潰す
+    /// （`tests/harness/rs_golden.py::mask_shuffled_targets`）。journal の外＝巻き戻さない
+    /// （記録は「実際に混ぜたか」を残す）。
+    shuffled: Vec<Seat>,
 }
 
 impl Session {
@@ -257,6 +264,19 @@ impl Session {
             journal: Journal::new(),
             rng: crate::search::rng::Rng::Replay,
             action_events: Vec::new(),
+            shuffled: Vec::new(),
+        }
+    }
+
+    /// この要求のあいだに山札を混ぜた席（重複なし・席順）。
+    pub fn shuffled(&self) -> &[Seat] {
+        &self.shuffled
+    }
+
+    /// 山札を混ぜたことを記録する（`zone::shuffle_deck` だけが呼ぶ）。
+    pub fn note_shuffled(&mut self, seat: Seat) {
+        if !self.shuffled.contains(&seat) {
+            self.shuffled.push(seat);
         }
     }
 
@@ -273,6 +293,7 @@ impl Session {
     /// 要求の先頭で空にする（Python の API ハンドラの `manager.action_events = []`）。
     pub fn reset_events(&mut self) {
         self.action_events.clear();
+        self.shuffled.clear();
     }
 
     /// イベントログを差し替えて古い方を返す（Python の

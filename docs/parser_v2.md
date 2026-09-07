@@ -16,7 +16,7 @@
 ## 構成
 
 ```
-opcg_sim/src/core/effects/
+legacy/python_engine/core/effects/
 ├── parser.py            # レガシー（構造分解＝トリガー/コスト/条件/逐次/選択肢 を担当）
 ├── parser_v2.py         # EffectParserV2: レガシーを継承し原子句解釈だけ差し替え
 └── rules/
@@ -59,7 +59,7 @@ tests/
    ```bash
    OPCG_LOG_SILENT=1 python tests/test_golden.py
    ```
-3. **ルールを追加** — `opcg_sim/src/core/effects/rules/atoms.py` に `@rule(...)`
+3. **ルールを追加** — `opcg_sim/src/effects/rules/atoms.py` に `@rule(...)`
 4. **回帰確認＋カバレッジ確認**
    ```bash
    make test   # コマンドの正本は Makefile

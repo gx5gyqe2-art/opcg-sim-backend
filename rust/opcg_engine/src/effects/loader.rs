@@ -562,6 +562,55 @@ mod tests {
         }
     }
 
+    /// 裁定 §16.3-10 の適用範囲を固定する: **自身を守る `PREVENT_REST` は 3 枚だけ**。
+    ///
+    /// 「このキャラは相手の効果でレストにされない」は対象が `SOURCE`（＝発生源そのもの）＝
+    /// `actions::status::prevent_rest` が `CANNOT_BE_RESTED_BY_OPP` を載せる枝。相手を縛る形
+    /// （「相手の…キャラはレストにできない」・`CHOOSE`）は従来の `CANNOT_REST` のまま。
+    /// カードが増えてこの数が変われば、裁定の射程を見直す合図になる。
+    #[test]
+    fn only_three_cards_protect_themselves_from_being_rested() {
+        let Some(doc) = effects_doc() else { return };
+        let mut source_targeted: Vec<String> = Vec::new();
+        let cards = doc["cards"].as_object().expect("cards");
+        for (card_id, card) in cards {
+            let abilities = match card["abilities"].as_array() {
+                Some(a) => a,
+                None => continue,
+            };
+            for ab in abilities {
+                if has_source_prevent_rest(ab) {
+                    source_targeted.push(card_id.clone());
+                }
+            }
+        }
+        source_targeted.sort();
+        source_targeted.dedup();
+        assert_eq!(
+            source_targeted,
+            vec!["OP11-046".to_string(), "OP12-021".to_string(), "OP15-024".to_string()],
+            "自身を守る PREVENT_REST の枚数が変わった（裁定 §16.3-10 の射程を見直すこと）"
+        );
+    }
+
+    /// 効果木のどこかに「対象が SOURCE の PREVENT_REST」があるか（再帰・テスト専用）。
+    fn has_source_prevent_rest(node: &Value) -> bool {
+        if node.get("type").and_then(Value::as_str) == Some("PREVENT_REST")
+            && node
+                .get("target")
+                .and_then(|t| t.get("select_mode"))
+                .and_then(Value::as_str)
+                == Some("SOURCE")
+        {
+            return true;
+        }
+        match node {
+            Value::Object(o) => o.values().any(has_source_prevent_rest),
+            Value::Array(a) => a.iter().any(has_source_prevent_rest),
+            _ => false,
+        }
+    }
+
     #[test]
     fn unknown_enum_names_are_rejected() {
         let src = r#"{"node":"Ability","trigger":"NO_SUCH_TRIGGER","condition":null,"cost":null,

@@ -384,6 +384,177 @@ impl Game {
     fn player_names<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
         PyList::new(py, [PyString::new(py, &self.names[0]), PyString::new(py, &self.names[1])])
     }
+
+    /// **この盤面のまま** 1 手を決める（`opcg_engine.decide` の生盤面版・P5 §16.3-A）。
+    ///
+    /// `opcg_engine.decide(hidden_json, ...)` は記録 v5 の `hidden` を経由するので中断（対話）
+    /// スタックを持てず、`prefix` で入り直す必要があった。こちらは `Session` の生の盤面を
+    /// そのまま渡す＝**中断の途中でも正しく決められる**。生成・アリーナ・serve はこれを使う。
+    ///
+    /// `opts_json` は [`crate::search::decide_json`] と同じ欄（`sims`／`c_puct`／
+    /// `dirichlet_eps`／`temp_turns`／箱まわり／候補生成／`budget`／`commit`／
+    /// `resact_pending`）に加えて:
+    ///
+    /// - `search_seed`（必須）… 探索の乱数（世界サンプル・Dirichlet・温度）を作る seed。
+    ///   [`crate::search::Pcg32SearchRng`] を**毎回この seed から作り直す**ので、
+    ///   同じ (対局, ターン, 席) に同じ seed を渡せば Python の
+    ///   `LearnedEngine._world_rng`（同一 seed から `default_rng` を作り直す）と同じ
+    ///   「ターン内 sticky 世界線」になる（計画 §8.17 の申告 (2)）。
+    ///
+    /// 戻り値は `decide` と同形（`rng_used` だけは出ない＝出目は自前で作るので数える意味がない）。
+    /// `load_masters()` と `load_net()` が先に要る。
+    fn decide(&mut self, player_id: &str, opts_json: &str) -> PyResult<String> {
+        let masters = self.masters()?;
+        let seat = self.seat_of(player_id)?;
+        let ov = parse_json(opts_json, "decide opts")?;
+        // `net`（省略可）＝`load_net()` に渡した npz のパス。アリーナは席ごとに別のネットを
+        // 指す（省略時は最初に読んだ既定のネット）。
+        let net = match ov.get("net").and_then(Value::as_str) {
+            Some(key) => crate::net::net_named(key).ok_or_else(|| {
+                PyValueError::new_err(format!(
+                    "decide: ネット '{key}' が未ロード。opcg_engine.load_net('{key}') が先に要る"
+                ))
+            })?,
+            None => crate::net::net().ok_or_else(|| {
+                PyValueError::new_err("decide: opcg_engine.load_net(path) が先に要る")
+            })?,
+        };
+        let seed = ov
+            .get("search_seed")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| PyValueError::new_err("decide: opts に search_seed が要る"))?;
+        let (opts, carry) = crate::search::decide_opts_and_carry(&ov).map_err(err)?;
+        let mut rng = crate::search::Pcg32SearchRng::new(seed);
+        // 返す手は `legal_json` と同じ**席名のまま**（表示名へ差し替えない）。呼び出し側は
+        // これをそのまま `apply_game_action`／`apply_battle_action` へ渡す。
+        let body = crate::search::decide_on_state(
+            masters,
+            net,
+            self.session.state(),
+            seat,
+            &opts,
+            &mut rng,
+            &carry,
+        )
+        .map_err(|e| self.map_err(e))?;
+        to_py_json(&body)
+    }
+
+    /// 直前の `apply_*` のあいだに**山札を混ぜた席**（`["p1","p2"]`）。
+    ///
+    /// 記録（golden の `steps[].shuffled`）が要る欄。再生（`opcg_engine.replay`）は混ぜないので、
+    /// 「混ぜた直後に引いた／見た」カードの実体は一致しない＝その段のイベントの `targets` を
+    /// 枚数へ潰して照合する（`tests/harness/rs_golden.py::mask_shuffled_targets`）。
+    fn shuffled_json(&self) -> PyResult<String> {
+        to_py_json(&Value::Array(
+            self.session.shuffled().iter().map(|s| Value::from(s.name())).collect(),
+        ))
+    }
+
+    /// 山札の残り枚数（`{"p1": n, "p2": n}`）。盤面 dict は伏せ情報なので出さない欄で、
+    /// 思考トレースのリプレイフレーム（`services/replay._frame_side`）だけが使う。
+    fn deck_counts_json(&self) -> PyResult<String> {
+        let st = self.session.state();
+        to_py_json(&serde_json::json!({
+            "p1": st.player(Seat::P1).deck.len(),
+            "p2": st.player(Seat::P2).deck.len(),
+        }))
+    }
+
+    /// 手を card_id 基準の記述 dict にする（Python `cpu_ai._describe_move`）。
+    ///
+    /// 対戦 API の思考トレース（`services/replay._replay_record_action`）が録画に書く形で、
+    /// uuid を持たない＝**再現できる**記述。`selected_slots`（同名複製の曖昧性解消）のために
+    /// 現在の要求（`selectable_uuids`）を見るので、**手を適用する前**に呼ぶこと。
+    fn describe_move_json(&mut self, move_json: &str) -> PyResult<String> {
+        let masters = self.masters()?;
+        let mv = parse_json(move_json, "move")?;
+        let pending =
+            crate::rules::pending::get_pending_request(&mut self.session, masters, false);
+        let d = crate::search::decide::describe_move(
+            self.session.state(),
+            masters,
+            &mv,
+            pending.as_ref(),
+        );
+        to_py_json(&d)
+    }
+
+    /// 棋譜ダンプ用の索引（`{"cids": {uuid: card_id}, "slots": {uuid: 22 枠 index}}`）。
+    ///
+    /// - `cids` … Python `n_record_gen._uuid_cids` と同じ範囲（両者の leader／hand／field／
+    ///   stage／trash／life）。候補の主体・対象はこの範囲に収まる（デッキ内サーチ等の選択は
+    ///   対話窓＝main の候補に uuid が出ない）。
+    /// - `slots` … `n_rel_feat._slots` の逆写像（dump v2 の `pol_si`／`pol_ti`）。**視点席**が
+    ///   要るので `player_id` を取る。
+    ///
+    /// 観測専用（盤面は動かさない）。
+    fn dump_index_json(&self, player_id: &str) -> PyResult<String> {
+        let masters = self.masters()?;
+        let seat = self.seat_of(player_id)?;
+        let st = self.session.state();
+        let mut cids = Map::new();
+        for s in [Seat::P1, Seat::P2] {
+            let p = st.player(s);
+            let zones = [&p.hand, &p.field, &p.trash, &p.life];
+            let singles = [p.leader, p.stage];
+            for c in zones.iter().flat_map(|z| z.iter().copied()).chain(singles.into_iter().flatten())
+            {
+                let card = st.card(c);
+                cids.insert(
+                    card.uuid.clone(),
+                    Value::from(masters.get(card.master).card_id.clone()),
+                );
+            }
+        }
+        let mut slots = Map::new();
+        for (uuid, idx) in crate::search::quiesce::slot_index(st, seat) {
+            slots.insert(uuid.to_owned(), Value::from(idx));
+        }
+        to_py_json(&serde_json::json!({"cids": cids, "slots": slots}))
+    }
+
+    /// 学習用の符号化（`opcg_engine.encode_state` の生盤面版）。
+    ///
+    /// `encode_state(hidden_json, ...)` と同じ中身を、`hidden` を経由せずこの盤面から返す
+    /// （生成は 1 判断点ごとに符号化するので、往復の JSON 化がそのまま壁時計に乗る）。
+    /// `opcg_engine.set_vocab()` が先に要る。
+    #[pyo3(signature = (player_id, opts_json=None))]
+    fn encode(&self, player_id: &str, opts_json: Option<&str>) -> PyResult<String> {
+        let masters = self.masters()?;
+        let seat = self.seat_of(player_id)?;
+        let vocab = crate::encode::current_vocab()
+            .map_err(err)?
+            .ok_or_else(|| {
+                PyValueError::new_err(
+                    "encode: 語彙が未設定。opcg_engine.set_vocab(json.dumps(vocab_ids)) を先に呼ぶこと",
+                )
+            })?;
+        let opts = match opts_json {
+            None => crate::encode::EncodeOptions::default(),
+            Some(text) => {
+                let v = parse_json(text, "encode opts")?;
+                crate::encode::EncodeOptions {
+                    skip_relations: v
+                        .get("skip_relations")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false),
+                    skip_onplay: v.get("skip_onplay").and_then(Value::as_bool).unwrap_or(false),
+                }
+            }
+        };
+        let enc = crate::encode::encode(self.session.state(), masters, &vocab, seat, &opts)
+            .map_err(err)?;
+        to_py_json(&serde_json::json!({
+            "scalars": enc.scalars,
+            "field": enc.field,
+            "card_idx": enc.card_idx,
+            "tokens": enc.tok,
+            "rel_om": enc.rel_om,
+            "rel_oo": enc.rel_oo,
+            "extra": enc.extra,
+        }))
+    }
 }
 
 /// OS 乱数から seed を作る（`seed=None` のとき）。

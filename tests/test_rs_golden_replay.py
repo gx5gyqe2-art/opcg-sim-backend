@@ -7,12 +7,13 @@
 置き換え。golden 1 件は「再生に要る最小の入力（`setup.hidden`＋行動列＋シャッフル再同期材料）」
 と「期待する sha1」だけを持つ＝Python エンジンは要らない（`opcg_engine.replay()` だけで回る）。
 
-対象は `tests/fixtures/rs_goldens/replay/`（random 150 局・L1 50 局・シード帯は
-`docs/rust_engine_plan.md` §16.1 の払い出し）。
+対象は `tests/fixtures/rs_goldens/replay/`（random 150 局・**a1 50 局**・シード帯は
+`docs/rust_engine_plan.md` §16.1 の払い出し）。L1 帯は L1 廃止（2026-09-07・§16.3-8）で
+**Rust の N 系（a1）で打ち直した**もの＝`a1_5000150`〜。
 
 golden の作り直し（**挙動を意図的に変えたときだけ**）:
 
-    make golden-replay   # = rs_diff_replay.py --golden-out（random と l1 の両方を打ち直す）
+    make golden-replay   # = rs_golden_make.py replay（a1 帯を Rust だけで打ち直す）
 
 Rust の wheel が無い環境では **skip せず fail** する（ゲートが黙って通らないように）。
 """
@@ -55,16 +56,16 @@ def test_golden_version_and_record_version_are_current(golden_games):
         )
 
 
-def test_golden_covers_random_and_l1_policies(golden_games):
-    """random 150 局・L1 50 局（計画 §16.1 の受け入れ）を下回っていないか。"""
+def test_golden_covers_random_and_a1_policies(golden_games):
+    """random 150 局・a1 50 局（計画 §16.1 の受け入れ・帯は §16.3-8 で L1→a1）を下回っていないか。"""
     by_policy: dict = {}
     for _, g in golden_games:
         by_policy.setdefault(g["policy"], []).append(g["seed"])
     assert len(by_policy.get("random", [])) >= 150, (
         f"random の局数が減っている: {len(by_policy.get('random', []))}"
     )
-    assert len(by_policy.get("l1", [])) >= 50, (
-        f"l1 の局数が減っている: {len(by_policy.get('l1', []))}"
+    assert len(by_policy.get("a1", [])) >= 50, (
+        f"a1 の局数が減っている: {len(by_policy.get('a1', []))}"
     )
     for policy, seeds in by_policy.items():
         assert len(set(seeds)) == len(seeds), f"{policy}: seed が重複している"

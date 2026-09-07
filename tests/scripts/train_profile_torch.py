@@ -30,10 +30,10 @@ _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 import _bootstrap  # noqa: E402,F401
 
-import n_rel_train as T                                        # noqa: E402
-from opcg_sim.src.learned import n_rel as NL                   # noqa: E402
-from opcg_sim.src.learned import n_eff as NE                   # noqa: E402
-from opcg_sim.src.learned import n_rel_feat as NR              # noqa: E402
+from opcg_sim.learned.train import n_rel_train as T                                        # noqa: E402
+from opcg_sim.learned import n_rel as NL                   # noqa: E402
+from opcg_sim.learned import n_eff as NE                   # noqa: E402
+from opcg_sim.learned import n_rel_feat as NR              # noqa: E402
 import train_profile as PF                                     # noqa: E402
 
 

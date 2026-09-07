@@ -58,21 +58,41 @@ resolver は `success = True` を返す。エラー・フォールバック・OT
 logger が `sys.stdout` を直接掴むため、pytest はキャプチャ無効で実行する。
 
 ```bash
-make test         # 新定義（2026-09-07・push前ゲート）。cargo test（Rust）＋ pytest -m "not slow and not legacy"
-make test-legacy   # 従来の全数（-m "not slow"）。Python エンジンを変更したときはこちらも通す
+make rust-develop  # 先に wheel を入れる（無いと golden ゲートは skip ではなく fail する）
+make test          # push前ゲート（**これ 1 本**）。cargo test（Rust 381 本）＋ pytest -m "not slow and not legacy"
 make test-fast     # 開発中のイテレーション用（cpu_infra 除外。push前ゲートの代替ではない）
 ```
 
 コマンドの正本は `Makefile`。`-s/-p no:capture` を付けないと I/O error になる。CI は無く、
 `make test` がマージ前の唯一の確認手段（2026-07-11 廃止・詳細は `CLAUDE.md`）。
+実測 **418 passed・122 秒**（2026-09-07。Rust 化前は 1,786 本・約 10 分）。
 
-**Rust 化後のゲート 2 段化（2026-09-07・`docs/rust_engine_plan.md` §16.1）**: `legacy` マーカーは
-「Python エンジン（`opcg_sim/src/core`・`effects`・`learned`）を直に叩くテスト」に付く。`make test`
-（新定義）はこれを除外し、代わりに golden 2 本（`tests/test_rs_golden_audit.py`・
-`tests/test_rs_golden_replay.py`・§2／§3）が Rust エンジンだけでゲームプレイ退行を見る一次防衛線に
-なる。**Python エンジン自体を変更したときは、`make test` に加えて `make test-legacy`（従来の全数・
-1,786 件）も通す**——golden は「ある時点で Rust と Python が一致した」記録であって、Python 側の
-挙動変更そのものは検出しない。
+**ゲートは 1 本（2026-09-07・第 2 段 `rs-archive-cutover`・`docs/rust_engine_plan.md` §16.3）**:
+Python エンジンは `legacy/python_engine/` へ退避し、テスト対象外になった＝旧 tag `py-engine-final` は
+無い。ゲームプレイ退行は golden 2 本（`tests/test_rs_golden_audit.py`・
+`tests/test_rs_golden_replay.py`・§2／§3）が Rust エンジンだけで見る。
+
+### legacy（tag `py-engine-final` ／ ブランチ `claude/py-engine-final`）を回す
+
+凍結した Python エンジンのテスト 1,786 本は、**その時点を checkout して**回す:
+
+```bash
+git checkout py-engine-final              # tag（ローカル）
+git checkout claude/py-engine-final       # 同じコミット c22f0a62 のブランチ（origin にある）
+OPCG_LOG_SILENT=1 python -m pytest tests/ -q -s -n auto -m "not slow" -p no:cacheprovider
+```
+
+**ブランチも用意した理由**: この環境のプロキシは tag ref の push を 403 で弾く（実測・ユーザ環境
+でも同じ）。リモートに置けるのはブランチだけなので、同じコミットを `claude/py-engine-final` と
+しても push してある（中身は完全に同一）。
+
+その点は「Python 版がそのまま動く最後の点」（退避コミットの 1 つ前）。現在のツリーでも
+`legacy/python_engine/tests/` に一式（テスト 288 本＋harness 25＋実験 CLI 116）が残っており、
+`legacy/python_engine/tests/conftest.py` 経由で 1,359 本が collect できる。ただし**移動後の
+写しは全数 green を保証しない**（旧計器が前提にしていたパスや周辺モジュールの所在が変わって
+いるものがある）＝**回すなら tag／ブランチが正**。ゲート（`make test`）には入らない。
+Python エンジンを直に叩くテストを新しく足す理由は、もう無いはず——足すなら Rust 側の
+`cargo test` か golden に足す。
 
 `slow` マーカー（`pytest_configure` で登録）は **`make test` から除外**する重テスト（手動実行前提）。現状の対象は
 `test_journal.py::test_parked_resume_make_unmake_roundtrip`（8 seed × 全手の make/unmake 照合 ~245s＝
@@ -117,7 +137,7 @@ make test-slow   # 重テストだけ
 | ファイル | 役割 |
 |---|---|
 | `tests/test_api.py` | `opcg_sim/api/app.py` の **API 契約**を `fastapi.testclient.TestClient` で検証（エンジン挙動は他スイートが担保するためスモーク粒度）。対象: health／cards／log／対局生成→state→マリガン→TURN_END／CPU step の契約（`cpu_acted`・`waiting_for`）／sandbox 生成・list・WS ブロードキャスト（STATE_UPDATE）／rule ルーム生成→SET_DECK→START／未知 ID・DB 未初期化（デッキ CRUD）の整形済みエラー応答・`X-Session-ID` 往復。`load_deck_mixed` をローカルカード DB の stub に差し替え Firestore 非依存 |
-| `tests/test_api_rs_errors.py` | **不正な行動のエラー文言が Python エンジンと一致する**（対戦 API の Rust 化・`docs/rust_engine_plan.md` §15.3）。フロントは `/api/game/action` の `error.message` をそのまま表示するので、1 文字でも変われば UI が変わる。**不正な行動 23 種**（マリガン中の手番違い／未知のアクション／二重マリガン／マリガン後のマリガン・キープ／手札に無い uuid の PLAY／uuid 無しの PLAY／コスト不足／戦闘中の未知アクション／自分自身へのアタック／payload 無しのアタック／未知の攻撃者・攻撃対象／最初のターンのアタック／レスト中の攻撃者／アクティブな相手キャラへのアタック／登場ターンのキャラのアタック／付与対象が無い ATTACH_DON／アクティブなドン!!不足／未知の ACTIVATE_MAIN／戦闘外の SELECT_BLOCKER・SELECT_COUNTER）について、**3 者一致**を要求する: (1) Rust（`engine_rs.RsGame`）の `ValueError`、(2) 同じ盤面を記録 v5 の `hidden` から `GameManager` へ復元（`opcg_sim/src/core/rs_bridge.py`）して `action_api` に同じ行動を投げた文言＝**オラクル**、(3) Python 実装から本ファイルへ**転記した literal**。(2) だけでは「両方同時に壊れた」を、(3) だけでは「Python 側が変わった」を見逃すため両方を持つ。最後の 1 件は HTTP 層（`/api/game/action` の `error.message` がエンジンの文言をそのまま載せる）を `TestClient` で見る |
+| `tests/test_api_rs_errors.py` | **不正な行動のエラー文言が Python エンジンと一致する**（対戦 API の Rust 化・`docs/rust_engine_plan.md` §15.3）。フロントは `/api/game/action` の `error.message` をそのまま表示するので、1 文字でも変われば UI が変わる。**不正な行動 23 種**（マリガン中の手番違い／未知のアクション／二重マリガン／マリガン後のマリガン・キープ／手札に無い uuid の PLAY／uuid 無しの PLAY／コスト不足／戦闘中の未知アクション／自分自身へのアタック／payload 無しのアタック／未知の攻撃者・攻撃対象／最初のターンのアタック／レスト中の攻撃者／アクティブな相手キャラへのアタック／登場ターンのキャラのアタック／付与対象が無い ATTACH_DON／アクティブなドン!!不足／未知の ACTIVATE_MAIN／戦闘外の SELECT_BLOCKER・SELECT_COUNTER）について、**3 者一致**を要求する: (1) Rust（`engine_rs.RsGame`）の `ValueError`、(2) 同じ盤面を記録 v5 の `hidden` から `GameManager` へ復元（`legacy/python_engine/core/rs_bridge.py`）して `action_api` に同じ行動を投げた文言＝**オラクル**、(3) Python 実装から本ファイルへ**転記した literal**。(2) だけでは「両方同時に壊れた」を、(3) だけでは「Python 側が変わった」を見逃すため両方を持つ。最後の 1 件は HTTP 層（`/api/game/action` の `error.message` がエンジンの文言をそのまま載せる）を `TestClient` で見る |
 | `tests/test_flagship_api.py` | フラッグシップ結果集計 API（`opcg_sim/api/flagship/`、設計は flagship リポジトリ docs/design.md §12）。リーダー辞書（カードDB `種類=リーダー` 137件）配信／結果の登録（開催単位の全置換・冪等 PUT）→サマリ→詳細→削除の一連／ポストURL重複 409／placement・リーダーのバリデーション／SQLite 遅延作成（`OPCG_FLAGSHIP_DB` を tmp に向ける） |
 | `tests/test_flagship_extract.py` | フラッグシップ結果抽出（`opcg_sim/api/flagship/extract.py`、LLM不使用の辞書マッチング、設計 docs/design.md §13）。137リーダーのエイリアス生成（正規名・短縮名・色略称）／順位パターン写像（優勝/準優勝/N位/ベストN）／色略称の card_number 一意化／同名（クロコダイル等）の曖昧化／confidence／NFKC正規化／`/extract`・`/oembed` の API 契約 |
 | `tests/test_flagship_xfetch.py` | X ポスト本文取得（`opcg_sim/api/flagship/xfetch.py`、syndication API 主軸・oEmbed フォールバック、設計 docs/design.md §15）。URL→tweet id 抽出／決定的トークン算出／syndication JSON の本文組み立て（note_tweet 優先＝長文対応）／oEmbed フォールバック／取得不可時 None／`/ingest`（取得+抽出の一気通貫）・`/oembed` の API 契約。ネットワークは monkeypatch で遮断（ヘルメティック） |
@@ -138,8 +158,8 @@ make test-slow   # 重テストだけ
 | `tests/test_golden.py` / `tests/golden/*` | ゴールデンコーパス（AST 指紋の部分一致） |
 | `tests/test_rs_golden_audit.py` | **全カード監査 golden**（Rust エンジンだけで回る・`docs/rust_engine_plan.md` §16.1）。`opcg_engine.golden_audit(card_id, trigger, ability_index)` が汎用盤面の生成から `_smart_drain` 既定応答での解決まで自前で辿り、`tests/fixtures/rs_goldens/audit.json`（3,386 能力・Python の記録から `--golden-out` で作った sha1 の列）と一致するかを見る。`test_full_card_audit.py`／`test_full_card_baseline.py`（旧・Python エンジンで全カードを回すゲート・legacy）の Rust 側置き換え |
 | `tests/test_rs_golden_replay.py` | **実対局の再生 golden**（Rust エンジンだけで回る・§16.1）。`opcg_engine.replay()` の盤面・合法手・イベントログの sha1 が `tests/fixtures/rs_goldens/replay/`（random 150 局＋L1 50 局・`--golden-out` で作成）と一致するかを見る |
-| `tests/test_full_card_audit.py` | **legacy**（Python エンジン直叩き）。全カード構造不変条件ゲート（EXCEPTION/CARD_LOSS/TEMP_LEAK=0）。golden 化後は `make test-legacy` でのみ実行 |
-| `tests/test_full_card_baseline.py` | **legacy**。全カード挙動ベースライン回帰（`full_card_baseline.json` と一致）。golden 化後は `make test-legacy` でのみ実行 |
+| `tests/test_full_card_audit.py` | **legacy**（Python エンジン直叩き）。全カード構造不変条件ゲート（EXCEPTION/CARD_LOSS/TEMP_LEAK=0）。退避後は tag `py-engine-final` でのみ実行 |
+| `tests/test_full_card_baseline.py` | **legacy**。全カード挙動ベースライン回帰（`full_card_baseline.json` と一致）。退避後は tag `py-engine-final` でのみ実行 |
 | `tests/test_verified_decks.py` | **手動検証済みデッキの効果回帰**（§8）。ベースラインが捕捉できない常在ルール（RULE_PROCESSING）・ON_LEAVE 誘発・勝利条件・ドンデッキ枚数・カード名別名・持続時間等を意味的に固定 |
 | `tests/test_cpu_selfplay.py` | CPU 対 CPU 自己対戦の完走・決定論・clone 非破壊・合法手適用・インバリアント検出 |
 
@@ -170,7 +190,7 @@ make test-slow   # 重テストだけ
 | `tests/test_value_blind_probe.py` | **基盤健全性**（`cpu_infra`）。**VALUE_BLIND 原因分析プローブの純関数**（`tests/scripts/value_blind_probe.py`・v23）: 遮蔽帰属のグループ定義が符号化3キー（scalars55/field10行/card_idx24枠）の**完全分割**（漏れ・重複は帰属の見逃し/二重計上）・swap_group の非破壊/対象限定・**線形ネットでは帰属総和が gap に厳密一致**（fwd=rev＝分解の健全性）・scan_target の展開（自場ID新出）/付与（attached_don 増加）判別・contrast_stats の echo=dq−dz（NaN q 除外・対照空なら差を主張しない）。実ネット・実盤面は使わず高速固定 |
 | `tests/test_rl_encoder_v7.py` | **基盤健全性**（`cpu_infra`）。**v7 符号化世代＝登場時オプションの実測3値**（`cpu_ai.onplay_option_scan`・v29・2026-08-01）: 手札の **ON_PLAY 持ち各札**を **make/unmake で適用→観測→巻き戻し**し（**ドン非依存**＝コスト分の一時ドンを txn 内で補う。2026-08-02 修正: 旧実装は「今払える PLAY」だけを見ており、ドン枯渇後の子で全札が非合法になり両方 (0,0,0) へ潰れて**オプションを温存した子と行使した子が判別できなかった**＝判別が要る唯一の場所で盲目だった）「バニラ設置以外の何か」（効果対話 or EFFECT イベント）が起きるかをエンジン自身に確かめさせる（判定子＝適用後 pending!=MAIN_ACTION or EFFECT。実測 0.6〜1.1ms/局面・decide 309→546ms）。「手札のパワー6000を2枚公開」等の**カード間関係の登場時条件**は埋め込みの線形和で表現できず（v24 representation-bound）、実測でしか全カードに一般化しない。固定する性質＝**子盤面での判別**（オプションを行使した子は live が減り温存した子は保たれる）・ドン非依存・**恒等温スタート**（v6→v7 で予測完全一致）・**副作用ゼロ**（global random 不消費・盤面不変＝探索/リプレイ/CRN の再現性を壊さない）・非メイン手番は (0,0,0)（今行使できるオプションの意味論） |
 | `tests/test_rl_encoder_v8.py` | **基盤健全性**（`cpu_infra`）。**v8 符号化世代＝自場集約の純対称化**（v32・2026-08-02/03・ユーザ指摘「パワー2000以下のキャラの盤面価値は低い」）: v5 は相手場のみ集約を持ち自場はキャラ数の生カウントだけ＝gen10 実測（power_value_probe）でバニラ2000追加が 6000 体の 2/3 の加点（「体があれば加点」が支配・自側のパワー傾き 0.026/1000 < 相手側 0.036/1000）。v7 末尾に [自場総火力/高パワー数/ブロッカー数]＝相手 v5 と**同じ関数**（`_opp_field_aggregate`）の 3 を append。**しきい値つき弱ボディ特徴は設けない**（汎用性のユーザ方針 2026-08-03＝平均パワーは総火力÷キャラ数からネットが導出）。固定する性質＝版マップ（63+3=66）・**末尾3値の配線**（実盤面で直接計算と一致＝offset ズレ検出）・**純対称性**（自分視点の自場集約==相手視点の相手場集約）・接頭辞不変（v7 と完全一致）・**恒等温スタート**（v7→v8 で予測完全一致） |
-| `tests/test_rl_encoder_v11.py` | **基盤健全性**（`cpu_infra`）。**v11 符号化世代＝リーダー物理要約24**（`opcg_sim/src/learned/leader_feat.py`・2026-08-14）: 接戦帯の帰趨を支配するリーダー再帰効果（ドンランプ・回復・ミル・常在修正）が v10 まで**0ビット**（消去はしご2.6σ・重み直し天井0.16 で確定）。能力木を ActionType で歩き毎ターン率12次元×自/相手を append（73+24=97）。ID非依存＝パースできる新リーダーへ即汎化。固定する性質＝版マップ・末尾24値の配線・接頭辞不変（v10）・恒等温スタート・**乱数無消費**（純粋な木walk＝符号化は観測）・**意味の錨**（ハンニャバル don_rate>0／ビビ atk_disable=1／ナミ rule_flag=1）。初回実測（bb6）: 同一対局A/Bで域内MSE−9%・実L中間帯 +0.117→+0.147（弱い正）→**配線修正（BUFF/ACTIVE_DON/防御系トリガー・ユーザ指摘起点）で +0.249・ナミ帯 +0.311**→被覆86%化（DISCARD=純手札経済・REST/ACTIVE）で同水準を確認し**v11 定義確定**（`backbone_bb7_v11final_20260814.md`） |
+| `tests/test_rl_encoder_v11.py` | **基盤健全性**（`cpu_infra`）。**v11 符号化世代＝リーダー物理要約24**（`opcg_sim/learned/leader_feat.py`・2026-08-14）: 接戦帯の帰趨を支配するリーダー再帰効果（ドンランプ・回復・ミル・常在修正）が v10 まで**0ビット**（消去はしご2.6σ・重み直し天井0.16 で確定）。能力木を ActionType で歩き毎ターン率12次元×自/相手を append（73+24=97）。ID非依存＝パースできる新リーダーへ即汎化。固定する性質＝版マップ・末尾24値の配線・接頭辞不変（v10）・恒等温スタート・**乱数無消費**（純粋な木walk＝符号化は観測）・**意味の錨**（ハンニャバル don_rate>0／ビビ atk_disable=1／ナミ rule_flag=1）。初回実測（bb6）: 同一対局A/Bで域内MSE−9%・実L中間帯 +0.117→+0.147（弱い正）→**配線修正（BUFF/ACTIVE_DON/防御系トリガー・ユーザ指摘起点）で +0.249・ナミ帯 +0.311**→被覆86%化（DISCARD=純手札経済・REST/ACTIVE）で同水準を確認し**v11 定義確定**（`backbone_bb7_v11final_20260814.md`） |
 | `tests/test_rl_encoder_v12.py` | **基盤健全性**（`cpu_infra`）。**v12 符号化世代＝v9 + リーダー物理要約24（94列・リーサルΔ抜き）**: v11 から v10 のΔ3列だけを外した**安価版の分岐**（一本道の append-only 系譜ではない唯一の版）。固定＝版マップ登録と次元（94）・`encode(version=12)` が **v11 の列 [0:70]+[73:97] と bit 一致**（＝`corpus_v11_to_v12` の切り出しが正しい／コーパス再生成が不要であることの根拠）・前半70列が **v9 と一致**（G14 からの温スタートが末尾ゼロ追加の恒等拡張になる）・**符号化コストが v9 並み**（Δのエンジン台本再生を通らない＝`lethal_scan` を呼ばない）・`battle_resource_cols(12)` の列が範囲内で末尾24列がリーダー要約を指す。動機と実測は `docs/reports/gen15_adoption_20260815.md` §3 |
 | `tests/test_rl_encoder_v12.py` | **基盤健全性**（`cpu_infra`）。**符号化 v12**（= v9 + リーダー物理要約24・**リーサル距離Δ抜き**・2026-08-15）: v10 のΔはエンジンで台本を再生する実測特徴で ~25ms/盤面あり、探索が1手で数百回符号化するため候補ネットの decide が**0.47s（v9）→13.5s（v11）**＝本番予算1秒を28倍超過した（アリーナ 10分/ペアで発覚・2026-08-15 実測）。リーダー要約はカードIDキャッシュで実質ゼロコストかつ gen15 系の改善の実体、Δは v53 で両系とも転移せず効果未実証——よって**安い側だけを v9 系譜に継ぐ**分岐版。固定＝次元94・レイアウト[v9 70｜リーダー 24]・**v11 行の列切り出し（[0:70]+[73:97]）と bit 一致**（既存コーパスを再生成せず教師にできる根拠＝`corpus_v11_to_v12.py`）・前半70列が v9 と bit 一致・**リーサルスキャンを呼ばない**（呼べば失敗する細工で証明）・warm_start_value(9→12) が恒等 |
 | `tests/test_rl_encoder_v9.py` | **基盤健全性**（`cpu_infra`）。**v9 符号化世代＝ドンデッキ残＋自デッキ残キャラ頂点**（v49・2026-08-10）: リーダー固有のドン上限（紫エネル=6）と「don!!-X で山へ戻したドンがリーダー効果で再装填される」経済が v8 まで**原理的に不可視**＝h1@2（turn1 サトリで掘る/無行動）のターン末比較が value Δ=+0.011 の無差別になる根因（v48/v49 実測）。v8 末尾に [自ドンデッキ残/10, 相手ドンデッキ残/10, 自デッキ残キャラ最大パワー/10000, 同最大コスト/10] の 4 を append（66+4=70）。頂点＝連続量で「山に眠る勝ち筋」（OP15-118 cost6/8000＝v4 の cost≥7 カウントが落とす帯）を見せる——**しきい値特徴は新設しない**（ユーザ方針 2026-08-03）・既存 v4 特徴も append-only 契約で不変。固定する性質＝版マップ・末尾4値の配線・**ドンデッキ残の感度**（1枚差で該当特徴だけが動く）・頂点が cost6/8000 を見る・接頭辞不変・恒等温スタート（v8→v9 で予測完全一致） |
@@ -210,13 +230,13 @@ make test-slow   # 重テストだけ
 | `tests/test_net_vocab_pinning.py` | **ネット付属 vocab**（`value_net.vocab_ids`・2026-07-15 索引ズレ事故の恒久対策・`docs/reports/net_vocab_pinning_20260715.md`）: カードDB増加で `build_vocab`（card_id ソート）が途中挿入され学習済み Emb/EffF 行との対応が破壊された事故（既存371枚+2ズレ＋新カード範囲外クラッシュ）の回帰を直接見張る**必須テスト**＝同梱 gen2〜5 の vocab_ids 保持／既定エンジンの訓練時 idx 復元（PRB01-001=2282）・新カード UNK／学習側拡張（`extend_to_vocab`）の append-only・既存盤面の出力恒等・EffF 行補充／vocab_ids 無し＋行数不一致の明示エラー／save-load 往復 |
 | `tests/test_neff_default.py` | （2026-09-05 に既定を a1 へ譲り**ロールバック先 c10 の契約**へ変更・`LearnedEngine(value_path=_C10_VALUE)` で検査）**出荷既定 CPU＝N系 c10 の serve 配線契約**（2026-09-03 採用・`docs/reports/c10_adoption_20260903.md`）。**必須**（壊れると実プレイの CPU がクラッシュ／黙って別ネットで打つ）。固定＝`LearnedEngine()` が同梱 `neff_c10.npz` を N系として読む（`vnet`=`NEffValueAdapter`・`pnet` 無し・`priors_override` あり・符号化 v12・出口ヘッド無し）／同梱 npz の **vocab_ids が gen15 系譜と同一**（N系の訓練 vocab）／vocab_ids 無しの旧 N系 npz は同梱既定の vocab_ids へフォールバック（現行 DB ソートには落とさない）／アダプタの `predict`・`predict_exit` が `NEffNet.value` と一致／priors が合法手上の確率／`decide` が合法手で同一 seed 決定論（既定と明示パスで同一手）／表・重みはプロセス内共有だが `vnet` はエンジンごと別インスタンス／G15 ペアの明示ロードは G系配線のまま（ロールバック先）／`is_neff_npz` の G/N 判別 |
 | `tests/test_nrel_default.py` | **必須**。**出荷既定 NRel a1（2026-09-05 採用）の serve 配線契約**: `LearnedEngine()` が同梱 `nrel_a1.npz` を NRel として読む（アダプタ・`pnet` 無し・priors あり・v13・出口ヘッド無し）／同梱 npz は `ablate=["rel"]`＝serve は R を計算せず・相手デッキ知識の列は生きている／vocab_ids は c10（gen15 系譜）と同一・訓練時 idx 固定／priors は合法手上の確率／`decide` は合法手で同一 seed 決定論／表は共有・`vnet` はエンジン別／ロールバック先 c10 は N系 c の配線のまま |
-| `tests/test_n_rel_feat.py` | **基盤健全性**（`cpu_infra`）。**NRel P0 符号化**（`opcg_sim/src/learned/n_rel_feat.py`・`docs/n_attention_plan.md` §2）: 形状（tokens 22×S・rel_om 16×6×R・rel_oo 16×16×R・extra）／**組**＝h2 turn 6 で 神の裁き（KO≤3000）単独は囚人 6000 に届かず（gap +0.30）、ガンマナイフ（−5000）との自×自は届く（gap −0.20・feasible・リーダーは対象外）／しきい値＝ゴムゴムの雷（KO≤6000）はバギー 6000 に届き、キャラ限定の除去はリーダーに届かない／**条件の充足はエンジンの真偽**（バレット「ドン 8 枚以上」が turn 4 で偽・ウタ「10000 以上がいる」が turn 12 で真）／1c 登場ドローの戻すドン=1・エネルの起動が合法なら leader_act_avail=1／**v13 = v12 + EXTRA_DIM の append-only**（先頭 94 列が bit 一致）／encode_rel < 10ms |
+| `tests/test_n_rel_feat.py` | **基盤健全性**（`cpu_infra`）。**NRel P0 符号化**（`opcg_sim/learned/n_rel_feat.py`・`docs/n_attention_plan.md` §2）: 形状（tokens 22×S・rel_om 16×6×R・rel_oo 16×16×R・extra）／**組**＝h2 turn 6 で 神の裁き（KO≤3000）単独は囚人 6000 に届かず（gap +0.30）、ガンマナイフ（−5000）との自×自は届く（gap −0.20・feasible・リーダーは対象外）／しきい値＝ゴムゴムの雷（KO≤6000）はバギー 6000 に届き、キャラ限定の除去はリーダーに届かない／**条件の充足はエンジンの真偽**（バレット「ドン 8 枚以上」が turn 4 で偽・ウタ「10000 以上がいる」が turn 12 で真）／1c 登場ドローの戻すドン=1・エネルの起動が合法なら leader_act_avail=1／**v13 = v12 + EXTRA_DIM の append-only**（先頭 94 列が bit 一致）／encode_rel < 10ms |
 | `tests/test_n_record_v2.py` | **基盤健全性**（`cpu_infra`）。**dump v2**（`n_record_gen --dump-v2`・NRel P1）: 行が符号化 v13（94+29）・tokens float32 [n,22,S]（float16 は境界で反転するため不可）・候補ごとの主体/対象の 22 枠 index（pol_si/pol_ti・無ければ −1）を持つ／main 窓の候補に主体が枠にあるものが存在／dump 1 行から `relations_from_dump` で R を再計算できる／v1（既定）は tokens 無し・scalars 94 のまま。生成器を in-process で 1 局（sims 4） |
-| `tests/test_n_rel_grad.py` | **基盤健全性**（`cpu_infra`）。**NRel 本体（Stage A・`opcg_sim/src/learned/n_rel.py`）と訓練器（`tests/scripts/n_rel_train.py`）**: 手書き backward（value・policy）が中心差分と一致（|grad|>2e-3 のエントリで相対誤差 <5%・見本 h2/h5/h6 の実盤面 6 点）／forward の形状・決定論・空枠（PAD）不変性／save→load で value/policy が bit 一致・`is_nrel_npz` が N系 c10 の npz と衝突しない／`relations_batch`（一括）が参照実装と 22 盤面で bit 一致／**切り分け（ablation・2026-09-05）**: `ablate={"rel"}`（関係 R を 0）・`{"opp_pool"}`（相手デッキ知識の列を 0）が forward の入口で遮断＝遮断した入力の変化に不変・他は効く・save→load で復元・遮断ありでも数値勾配一致／R 遮断の serve 高速経路（keep=None・対テンソルを組まない）と一括経路が |Δ|<1e-5 で一致／`ablate={"onplay"}`（切り分け a3・2026-09-06）は v7 の登場時スキャン 3 列（`ONPLAY_COLS`）を 0 に＝列を変えても不変・save→load で復元／**R 省略（2026-09-07）**: `--ablate rel` のとき訓練器が `relations_batch` を呼ばない（monkeypatch の spy で検出）・呼ぶ経路と呼ばない経路で value/policy の損失と更新後の重みがビット一致 |
+| `tests/test_n_rel_grad.py` | **基盤健全性**（`cpu_infra`）。**NRel 本体（Stage A・`opcg_sim/learned/n_rel.py`）と訓練器（`tests/scripts/n_rel_train.py`）**: 手書き backward（value・policy）が中心差分と一致（|grad|>2e-3 のエントリで相対誤差 <5%・見本 h2/h5/h6 の実盤面 6 点）／forward の形状・決定論・空枠（PAD）不変性／save→load で value/policy が bit 一致・`is_nrel_npz` が N系 c10 の npz と衝突しない／`relations_batch`（一括）が参照実装と 22 盤面で bit 一致／**切り分け（ablation・2026-09-05）**: `ablate={"rel"}`（関係 R を 0）・`{"opp_pool"}`（相手デッキ知識の列を 0）が forward の入口で遮断＝遮断した入力の変化に不変・他は効く・save→load で復元・遮断ありでも数値勾配一致／R 遮断の serve 高速経路（keep=None・対テンソルを組まない）と一括経路が |Δ|<1e-5 で一致／`ablate={"onplay"}`（切り分け a3・2026-09-06）は v7 の登場時スキャン 3 列（`ONPLAY_COLS`）を 0 に＝列を変えても不変・save→load で復元／**R 省略（2026-09-07）**: `--ablate rel` のとき訓練器が `relations_batch` を呼ばない（monkeypatch の spy で検出）・呼ぶ経路と呼ばない経路で value/policy の損失と更新後の重みがビット一致 |
 | `tests/test_n_rel_serve.py` | **基盤健全性**（`cpu_infra`）。**NRel の serve 配線**（P3・`cpu_learned` × `n_rel.NRelValueAdapter`）: `LearnedEngine(value_path=<NRel npz>)` が NRel を判別（`vnet`=アダプタ・`pnet` 無し・`priors_override` あり・v13・出口ヘッド無し）し既定 c10 は不変／葉価値は `predict_state`（盤面から直接）／priors は合法手上の確率／`decide` は合法手で同一 seed 決定論・表と重みは席間で共有／レイテンシは情報出力（sims 32・c10 比 約 2.7 倍・2026-09-04 実測）／**R 遮断ネット（切り分け a1・2026-09-05）**は `encode_state` が関係の計算を省いて零の R を返し、葉価値は「R を計算して渡した value」と一致（|Δ|<1e-5・2026-09-06 の高速経路は対の積和を分解するため加算順の差がある）。**符号化キャッシュ（2026-09-06）**: 席ごとの LRU 4096 エントリ・指紋は盤面＋カードの全修正値（timed/passive power・cost・keyword・counter・ability_used）＋山札/ライフ/トラッシュの中身＋ターン内イベント＋手番要求＋合法手（`OPCG_NREL_VERIFY=1` で命中時に再符号化と照合＝生成 1 局 41,285 命中で不一致 0・`OPCG_NREL_NOCACHE=1` で無効化）。priors はエンジン自身の vnet に束縛（共有だと value/priors で二重符号化）／**onplay 遮断ネット（切り分け a3）**は `encode_state` が登場時スキャン（`E.encode(skip_onplay=True)`）を省いて v7 の 3 列を 0 にし、葉価値は「スキャンありで符号化して渡した value」と一致 |
-| `tests/test_cpu_learned.py` | **学習型CPU本番配線**（既定＝gen11(符号化v8・2026-08-03採用＝gen10＋自場集約の純対称化・蒸留アンカー付き順位学習×α0.3補間)・温スタート検証は v1(gen2) を明示ロード。`opcg_sim/src/core/cpu_learned.py`／`opcg_sim/src/learned/`）: 合法手・decide_client ルーティング・seed 決定論・席別エンジン（net-vs-net 等価）・**符号化/行動特徴の訓練時ドリフト検知（v1/v2）**（`tests/harness/{rl_encoder,opcg_action,rl_net,az_policy,az_mcts_tree}.py` は本番 `opcg_sim/src/learned/{encoder,action,value_net,policy,mcts}.py` への委譲shim＝TEST_E/TEST_A は本番と同一オブジェクトでドリフトは構造的に不可能・退行検知として存続。`tests/harness/opcg_game.py` は本番 `adapter.OPCGGame` の薄い継承＋研究専用 `new_game` のみ追加）・選択対話の併合（CONFIRM_OPTIONAL accept/decline・up-to ライフ追加・**ARRANGE_DECK の並び替え/上下選択**・position キー）・**ルート等価手マージ**（同名複製の訪問数分裂で PASS に負ける実害の反転ケース＋複製なし恒等）・トレース記述（decline の accepted 明示・dialog 種別）・**符号化世代 v2**（リーダー付与ドン特徴＝v1 では不可視・v1 出力不変・npz 入力次元からの自動判別）・**温スタート拡張**（v1→v2 の重み拡張が恒等＝拡張ネット×v2符号化 == 出荷×v1符号化・policy も恒等・縮小拒否・版差は scalars_dim のみが seam＝将来版に同一コード対応） |
+| `tests/test_cpu_learned.py` | **学習型CPU本番配線**（既定＝gen11(符号化v8・2026-08-03採用＝gen10＋自場集約の純対称化・蒸留アンカー付き順位学習×α0.3補間)・温スタート検証は v1(gen2) を明示ロード。`legacy/python_engine/core/cpu_learned.py`／`legacy/python_engine/learned/`）: 合法手・decide_client ルーティング・seed 決定論・席別エンジン（net-vs-net 等価）・**符号化/行動特徴の訓練時ドリフト検知（v1/v2）**（`tests/harness/{rl_encoder,opcg_action,rl_net,az_policy,az_mcts_tree}.py` は本番 `legacy/python_engine/learned/{encoder,action,value_net,policy,mcts}.py` への委譲shim＝TEST_E/TEST_A は本番と同一オブジェクトでドリフトは構造的に不可能・退行検知として存続。`tests/harness/opcg_game.py` は本番 `adapter.OPCGGame` の薄い継承＋研究専用 `new_game` のみ追加）・選択対話の併合（CONFIRM_OPTIONAL accept/decline・up-to ライフ追加・**ARRANGE_DECK の並び替え/上下選択**・position キー）・**ルート等価手マージ**（同名複製の訪問数分裂で PASS に負ける実害の反転ケース＋複製なし恒等）・トレース記述（decline の accepted 明示・dialog 種別）・**符号化世代 v2**（リーダー付与ドン特徴＝v1 では不可視・v1 出力不変・npz 入力次元からの自動判別）・**温スタート拡張**（v1→v2 の重み拡張が恒等＝拡張ネット×v2符号化 == 出荷×v1符号化・policy も恒等・縮小拒否・版差は scalars_dim のみが seam＝将来版に同一コード対応） |
 | `tests/test_value_net_leader_slots.py` | **ValueNet のリーダー条件付け専用枠**（`lead_slots`・`docs/reports/lc_value_net_plan_20260708.md`）: `to_leader_conditioned()` の恒等性（追加ゼロ行＝拡張直後は旧net予測と一致）・二重適用拒否・save/load 往復（旧形式npz=lead_slots無しの後方互換込み）・`expanded()`（enc版温スタート）との直交併用・解析勾配=数値微分一致・**リーダーIDのみで決まる合成ターゲットを lead_slots=2 だけが fit できる**回帰 |
-| `tests/test_effect_features.py` | **EffFeat＝効果セマンティクス特徴テーブル**（`opcg_sim/src/learned/effect_features.py`・`docs/reports/effect_semantics_v3_plan_20260708.md` §1）: 決定性（2回構築一致）・PAD行ゼロ・次元・効果持ち全カードの能力ブロック非ゼロ・実カードのスポットチェック（OP03ナミ=VICTORY独立枠＋資源条件／OP11ナミ=ON_OPP_ATTACK+2kバフ+HAS_DON+手札コスト／コスト操作とパワーバフの status×値スケール分離／ATTACH_DON全体センチネル／印刷キーワード・カウンター値・種別の静的ブロック） |
+| `tests/test_effect_features.py` | **EffFeat＝効果セマンティクス特徴テーブル**（`opcg_sim/learned/effect_features.py`・`docs/reports/effect_semantics_v3_plan_20260708.md` §1）: 決定性（2回構築一致）・PAD行ゼロ・次元・効果持ち全カードの能力ブロック非ゼロ・実カードのスポットチェック（OP03ナミ=VICTORY独立枠＋資源条件／OP11ナミ=ON_OPP_ATTACK+2kバフ+HAS_DON+手札コスト／コスト操作とパワーバフの status×値スケール分離／ATTACH_DON全体センチネル／印刷キーワード・カウンター値・種別の静的ブロック） |
 | `tests/scripts/replay_reeval.py` | **マーク付きリプレイ再評価CLI**（`opcg-replay/v1`のframes+marksから各マーク直前フレームの盤面を復元し候補ネットにdecideさせ「人間の指摘どおり手が変わるか」を検証＝ネット改善の人間フィードバック回帰。全編再生は山札覗き効果＋ドン経済で漂流するため局所復元方式を採用。カウンター系マークは直前の PASS（ブロッカー段の見送り等）・RESOLVE_EFFECT_SELECTION（【アタック時】効果の選択）を遡って攻撃宣言に着地し、宣言〜マーク間の記録応答を再生して復元する。`.json.gz` 直読み可） |
 | `tests/scripts/defense_rate_probe.py` | **防御応答の守り採択率 計器**（v5 R1 調査・`docs/cpu_v5_plan.md` §3-R1）: 既定 net で自己対戦し、防御応答（SELECT_COUNTER/BLOCKER）局面の「守る(非PASS)採択率」を net argmax／温度1期待（データ挙動）／L1-hard（良質目安）の3系統で集計。温度延長が守りを過剰注入したか（R1）を切り分ける読み取り専用計器。**実測結論: R1 否定**（net argmax はむしろ L1 より守らず・温度延長は L1 水準への補正＝過剰注入でない） |
 | `tests/scripts/defense_rate_probe.py` | **防御応答の守り採択率 計測CLI**（v5計画 §3-R1 の調査計器・読み取り専用）: 既定 net（gen4）で自己対戦し、SELECT_COUNTER/BLOCKER 局面の守り率を net argmax／温度1期待（データ挙動）／L1-hard（良質目安）の3系統で比較。「守りすぎ」の原因が防御温度延長の過剰注入か net 体質かを切り分ける（24局630局面で否定＝netはむしろ守らなさすぎ・温度延長は補正的） |
@@ -291,10 +311,10 @@ make test-slow   # 重テストだけ
 | `tests/scripts/n_mine_z.py` | **純正Nループ②-a: 素の z 教師採掘器**（`n_record_gen` の対）: 棋譜ダンプの全判断点（既定=main+window+commit・`--kinds` で絞り込み可）を訓練互換形式（scalars/field/card_idx/value）へ落とす。value は素の z=±1 のみ（TD・blend・margin 合成はしない＝純正 AZ） |
 | `tests/scripts/n1_train.py` | **純正Nループ③④: N1ネット訓練器**（value+方策チャネル・胴体共有）: 棋譜ダンプを直接読み（seed で**対局単位**の train/val 分割＝行リーク防止）、単一 value（素の z・ctx 出口ヘッド無し）と方策チャネル（状態埋め込み＋候補素性49次元→点内 softmax）を、訪問分布 π への交差エントロピーと z の MSE の多課題で同時学習。胴体は N0 の芯（`n0_spike.build_card_table`/`card_channel`）を再利用。val は v_mse/v_sign・π top1・実選択 top1・CE を印字 |
 | `tests/scripts/n1_gate.py` | **純正Nループ④: N1 の serve 接続とゲート**: N1 を LearnedEngine へ両輪注入——value は `N1ValueAdapter`（出口ヘッド無し has_exit_head=False＝戦闘/対話箱の物差しは本体 value へ自動フォールバック＝単一価値関数）、policy は `priors_override` seam（訓練と同一の候補素性49次元→点内 softmax。失敗時 None=一様）。`gate`=coach 13点（既定 vs N1・n0_spike.gate と同じ判定）／`smoke`=N1 同士の実対局1局完走（配線の煙試験） |
-| `tests/scripts/n_eff_feat.py` | **効果構造符号化（N系カード表現v2・2026-08-27）**: パーサ正本の能力列→能力ベクトル167次元（トリガーonehot23＋op62×自/相手量＋対象フィルタ要約〔コスト/パワー閾値・特徴参照・相手対象〕＋付与キーワード8＋構造フラグ7〔条件/任意/Choice/up-to/持続/回数制限〕＋コスト量）×最大4本＋基礎統計16（stats8+印字キーワード8）。トリガー×op×量×閾値の結合を保存（12次元合算の`leader_feat`と違い「ON_PLAYで2枚掘る」が固有の型になる）・重み付けはネットに学ばせる。**2026-09-03 c10 採用で forward・表・アダプタ・priors の正本は `opcg_sim/src/learned/n_eff.py` へ昇格**（本器は継承／再輸出の互換窓口） |
-| `tests/scripts/n_eff_train.py` | **効果構造版の訓練器**（`n1_train`とのA/B＝カード表現だけが変数）: 効果埋め込み48は学習対象（全語彙の能力集合→共有MLP(167→24)+mean/maxプール→カード表を毎stepWaから計算・backwardは語彙indexで勾配合算＝端から端）。候補素性139次元（主体/対象のカード表現64×2＋printedパワーマージン＋対象=リーダー）。value+policy多課題・対局単位分割・ベストチェックポイント。**2026-09-03 c10 採用で forward・表・アダプタ・priors の正本は `opcg_sim/src/learned/n_eff.py` へ昇格**（本器は継承／再輸出の互換窓口）。dump v2（v13・123 列）を読んだときは先頭 94 列（v12）へ切り詰める（`_to_v12`・2026-09-05・c12 対照実験） |
-| `tests/scripts/n_eff_gate.py` | **効果構造版の serve 接続とゲート**: カード表はアダプタ初期化時に1回前計算（serve凍結）・候補素性は訓練と同一139次元（train/serve一致）。`gate`=coach 13点（--base-net で前世代比）／`smoke`=実対局1局完走。**2026-09-03 c10 採用で forward・表・アダプタ・priors の正本は `opcg_sim/src/learned/n_eff.py` へ昇格**（本器は継承／再輸出の互換窓口） |
-| `tests/scripts/n_rel_train.py` | **NRel（Stage A）の訓練器**（2026-09-04・`n_rel` の対）: forward は `opcg_sim/src/learned/n_rel.py` を継承し backward（対の MLP・max/mean プール・候補の枠 index への散布）と Adam を足す。dump v2 を読み、関係 R は `n_rel_feat.relations_batch` でバッチごとに再計算。候補の予算 3（戻すドン・次ターンの最大の札が出せるか・ドンコスト）を `budget_feats` で作る。`--in`（π）/`--z-in`（z 専用）/`--warm-start`/`--holdout-mod 7`・保存時に vocab_ids と meta.kind=nrel-a を焼き込む。**メモリ（2026-09-05）**: 行数を先に数えて V を一度だけ確保し、方策点は盤面を複製せず V の行 index（`P["row"]`・`prow`）で参照＝1 シャード（≈13.6 万行）あたり 363MB・16 シャードで約 5.8GB（cgroup 14GB 内）。epoch ごとに暫定最良を `--out` へ書き出す（16 シャード×2 epoch ≒ 2 時間 51 分・r1 実測）。`--ablate rel,opp_pool`＝切り分け訓練（遮断は `n_rel.NRelNet.ablate`・npz の meta に焼き込まれ serve でも遮断される）。**R 省略（2026-09-07・`rust_engine_plan.md` §18.3）**: `--ablate rel` のときは `relations_batch` を呼ばず `mask_rel` と同じ形・dtype のゼロを渡す（`relations_or_zeros`）＝計算していた R は `mask_rel` に全部 0 で置き換えられ捨てられていた。損失・保存 npz はビット一致で value 1 行あたり 1.4 倍（`relations_batch` 自体は残す） |
+| `tests/scripts/n_eff_feat.py` | **効果構造符号化（N系カード表現v2・2026-08-27）**: パーサ正本の能力列→能力ベクトル167次元（トリガーonehot23＋op62×自/相手量＋対象フィルタ要約〔コスト/パワー閾値・特徴参照・相手対象〕＋付与キーワード8＋構造フラグ7〔条件/任意/Choice/up-to/持続/回数制限〕＋コスト量）×最大4本＋基礎統計16（stats8+印字キーワード8）。トリガー×op×量×閾値の結合を保存（12次元合算の`leader_feat`と違い「ON_PLAYで2枚掘る」が固有の型になる）・重み付けはネットに学ばせる。**2026-09-03 c10 採用で forward・表・アダプタ・priors の正本は `opcg_sim/learned/n_eff.py` へ昇格**（本器は継承／再輸出の互換窓口） |
+| `tests/scripts/n_eff_train.py` | **効果構造版の訓練器**（`n1_train`とのA/B＝カード表現だけが変数）: 効果埋め込み48は学習対象（全語彙の能力集合→共有MLP(167→24)+mean/maxプール→カード表を毎stepWaから計算・backwardは語彙indexで勾配合算＝端から端）。候補素性139次元（主体/対象のカード表現64×2＋printedパワーマージン＋対象=リーダー）。value+policy多課題・対局単位分割・ベストチェックポイント。**2026-09-03 c10 採用で forward・表・アダプタ・priors の正本は `opcg_sim/learned/n_eff.py` へ昇格**（本器は継承／再輸出の互換窓口）。dump v2（v13・123 列）を読んだときは先頭 94 列（v12）へ切り詰める（`_to_v12`・2026-09-05・c12 対照実験） |
+| `tests/scripts/n_eff_gate.py` | **効果構造版の serve 接続とゲート**: カード表はアダプタ初期化時に1回前計算（serve凍結）・候補素性は訓練と同一139次元（train/serve一致）。`gate`=coach 13点（--base-net で前世代比）／`smoke`=実対局1局完走。**2026-09-03 c10 採用で forward・表・アダプタ・priors の正本は `opcg_sim/learned/n_eff.py` へ昇格**（本器は継承／再輸出の互換窓口） |
+| `tests/scripts/n_rel_train.py` | **NRel（Stage A）の訓練器**（2026-09-04・`n_rel` の対）: forward は `opcg_sim/learned/n_rel.py` を継承し backward（対の MLP・max/mean プール・候補の枠 index への散布）と Adam を足す。dump v2 を読み、関係 R は `n_rel_feat.relations_batch` でバッチごとに再計算。候補の予算 3（戻すドン・次ターンの最大の札が出せるか・ドンコスト）を `budget_feats` で作る。`--in`（π）/`--z-in`（z 専用）/`--warm-start`/`--holdout-mod 7`・保存時に vocab_ids と meta.kind=nrel-a を焼き込む。**メモリ（2026-09-05）**: 行数を先に数えて V を一度だけ確保し、方策点は盤面を複製せず V の行 index（`P["row"]`・`prow`）で参照＝1 シャード（≈13.6 万行）あたり 363MB・16 シャードで約 5.8GB（cgroup 14GB 内）。epoch ごとに暫定最良を `--out` へ書き出す（16 シャード×2 epoch ≒ 2 時間 51 分・r1 実測）。`--ablate rel,opp_pool`＝切り分け訓練（遮断は `n_rel.NRelNet.ablate`・npz の meta に焼き込まれ serve でも遮断される）。**R 省略（2026-09-07・`rust_engine_plan.md` §18.3）**: `--ablate rel` のときは `relations_batch` を呼ばず `mask_rel` と同じ形・dtype のゼロを渡す（`relations_or_zeros`）＝計算していた R は `mask_rel` に全部 0 で置き換えられ捨てられていた。損失・保存 npz はビット一致で value 1 行あたり 1.4 倍（`relations_batch` 自体は残す） |
 | `tests/scripts/n_rel_band.py` | **評価帯（dump v2 の holdout 行・seed%7==0）で N系 c ネットと NRel r ネットの value を同じ行で比べる**（2026-09-05・r1 の判定用）。dump v2 の scalars は v13＝v12 の末尾に 29 列を足した append-only なので c ネットには先頭 94 列と card_idx を渡す。`--neff`/`--nrel` に複数 npz 可・`N_REL_BAND` 行に v_mse/v_sign（全体・ターン帯別）を出す。`--zero-rel`/`--zero-opp-pool`＝serve 時の遮断（訓練なしで r ネットの依存を見る・r1 実測: R 遮断 0.531→0.574／opp_pool 遮断 →0.637／両方 →0.751） |
 | `tests/scripts/n_mine_pi.py` | **純正Nループ②-b: 方策ターゲット採掘器**（`n_record_gen` の対）: main 窓の実質選択（候補2つ以上・chosen 解決済み）だけを採り、訪問分布 π=n/Σn（**選んだ手のクローンではない**）と候補素性（action_type・主体/第1対象カードID・don_k）を ragged（cand_ptr）で保存。カードIDは文字列のまま＝索引化は訓練側の語彙（採掘器は語彙非依存） |
 | `tests/scripts/g15_train.py` | **G系 g15: 実ID訓練（A/B両腕）**（2026-08-14・`g15_gen` の対）: card_idx を実IDのまま MSE 訓練。`--scalar-cols` の接頭辞切り出しで**同一コーパスから v10腕/v11腕**（対局・行・分割が完全同一の A/B）。実測（720局・ns2判定）: v11 は域内−6%・ナミ帯+0.10・エネル帯+0.13 だが**未見リーダーで−0.32（4リーダー過適合）**＝処方は B/G 混合訓練（`g15_v11_spike_20260814.md`） |
@@ -361,8 +381,31 @@ make test-slow   # 重テストだけ
 
 ## 3. 診断・監査ツール（pytest 外）
 
+> **所在の変更（2026-09-07・第 2 段 `rs-archive-cutover`・計画 §17）**: 下表の多くは Python
+> エンジンを直に叩くので `legacy/python_engine/tests/{harness,scripts}/` へ退避した（**tag
+> `py-engine-final` を checkout すれば動く**）。現在のツリーで動くものは次のとおり:
+>
+> | 役割 | 現在の場所 |
+> |---|---|
+> | 生成（棋譜ダンプ） | `python -m opcg_sim.loop.record_gen` |
+> | アリーナ（シャード・再開可） | `python -m opcg_sim.loop.arena_shard` |
+> | 台帳の合算と判定 | `python -m opcg_sim.loop.arena_merge` |
+> | 昇格ゲート・帯層別判定・煙試験 | `python -m opcg_sim.loop.gate {promote,band,smoke}` |
+> | 訓練（NRel／NEff）・評価帯 | `python -m opcg_sim.learned.train.{n_rel_train,n_eff_train,n_rel_band}` |
+> | golden の作り直し（Rust だけ） | `tests/scripts/rs_golden_make.py {audit,replay}` |
+> | 切替の受け入れ A/B（Rust decide 対 Python decide） | `legacy/.../scripts/rs_arena_ab.py`（Python エンジンが要る） |
+> | パーサ差分・効果診断・カバレッジ | `tests/scripts/compare_parsers.py` ほか（Python エンジン不要のものだけ残した） |
+>
+> 下表の `tests/scripts/`／`tests/harness/` の行は、`legacy/python_engine/tests/` 配下に
+> 同じ相対位置で残っているものが多い（履歴の索引として行は消さない）。
+
 | ツール | 役割 |
 |---|---|
+| `tests/scripts/rs_golden_make.py` | **golden の作り直し**（2026-09-07・計画 §16.3-10 で golden の正本が Rust になった）: `audit`＝効果構造 JSON の全能力を `opcg_engine.golden_audit` で回して `tests/fixtures/rs_goldens/audit.json` を書く（3,386 件）。`replay`＝Rust の `Game` で局を打ち、記録（`replay` が食える最小の入力）と sha1 を書く。**焼き付ける前にその場で `opcg_engine.replay` を回して一致を確かめ、一致した局だけを書く**。`--policy a1|random`・`--games`・`--seed-base`・`--sims`。`make golden-audit`／`make golden-replay` の実体 |
+| `opcg_sim/loop/record_gen.py` | **自己対戦の棋譜ダンプ**（旧 `tests/scripts/n_record_gen.py`）: 盤面も思考も Rust。**記録形式（npz の列）は不変**＝`n_rel_train` は無変更で読める。乱数は Rust の決定的な生成器（対局＝`Game(seed)`／探索＝`(対局,ターン,席)` から作る `Pcg32SearchRng`＝ターン内 sticky 世界線）。実測 **4.96 秒/局**（sims 64・Python 版 57.06 秒の 11.5 倍速） |
+| `opcg_sim/loop/arena_shard.py` | **再開可能アリーナ**（旧 `arena_resume.py`）: 帯設計・席入替 CRN・void・ペア水準 95% CI の規約は不変。`--candidate`／`--baseline`／`--leaders`／`--decks`／`--cand-*`（席別の探索つまみ） |
+| `opcg_sim/loop/arena_merge.py` | **台帳の合算と判定**（旧 `tests/scripts/arena_merge.py`・純関数は同一）: seed 衝突を黙って畳まない |
+| `opcg_sim/loop/gate.py` | **昇格ゲート**（旧 `promotion_gate.py`＋`arena_gate.py`＋`n1_gate.py smoke`）: `promote`（stage1/stage2＋アンカー）／`band`（一次スクリーン＋帯層別の本判定）／`smoke`（1 局完走） |
 | `tests/scripts/compare_parsers.py` | レガシー vs V2 の全カード差分（退行検知） |
 | `tests/harness/full_card_audit.py` | 全カード構造不変条件検証＋挙動ベースライン生成（`--regen` で更新） |
 | `tests/harness/game_driver.py` | **共通対局ドライバ**（設計⑥ `docs/refactoring_harness_driver.md`）: 統一対局ループ `run_game`（決定論契約＝global random の消費順保存・`first_player` 再現）＋席生成 `make_seat`（random/ai/arena/**learned**・engine 注入で net-vs-net）＋観測専用 observer。全 CPU 検証ハーネスの土台（新計器の追加＝observer 1 個） |
@@ -488,7 +531,7 @@ make test-slow   # 重テストだけ
 ## 4. 変更・回帰検証フロー
 
 ```bash
-# 1) ルール追加（opcg_sim/src/core/effects/rules/atoms.py に @rule）
+# 1) ルール追加（opcg_sim/src/effects/rules/atoms.py に @rule）
 #    エンジン実行が要るなら gamestate/resolver も実装し test_effects_engine に検証追加
 #    コアルール（ターン/戦闘等）の変更は gamestate.py を直接修正し test_rules_* に検証追加
 
@@ -506,43 +549,38 @@ make regen-baseline
 
 ## 5. 品質ゲート
 
-**Rust 化後のゲート 2 段化（2026-09-07・`docs/rust_engine_plan.md` §16.1）**: push 前の必須ゲート
-（`make test` の新定義）は golden 2 本（`tests/test_rs_golden_audit.py`／`tests/test_rs_golden_replay.py`・
-Rust エンジンだけで回る）がゲームプレイ退行の一次防衛線になる。下表のうち `tests/harness/full_card_audit.py`
-と `tests/test_full_card_baseline.py` は Python エンジンを直に叩くため `legacy` マーカーが付き、
-`make test-legacy` でのみ実行する（**Python エンジンを変更したら引き続きこちらも通す**）。
-`compare_parsers.py`／`test_effect_oracle_gate.py`／`test_verified_decks.py`／`test_structural_gate.py`／
-`test_verified_buckets.py` はいずれもゲームプレイの静的解析またはエンジン直叩きではない検証で、
-`make test`（新定義）に残る。
+push 前の必須ゲートは **`make test` 1 本**（2026-09-07・第 2 段 `rs-archive-cutover`）。
+ゲームプレイ退行の一次防衛線は golden 2 本（Rust エンジンだけで回る）。Python エンジンを叩く
+旧ゲート（`full_card_audit.py`／`test_full_card_baseline.py`／`test_verified_decks.py`）は
+`legacy/python_engine/` へ退避した＝**tag `py-engine-final` を checkout したときだけ回る**。
 
 | ツール | 合格条件 |
 |---|---|
-| `tests/test_rs_golden_audit.py` | **golden**（Rust だけで回る・§16.1）: `opcg_engine.golden_audit` の sha1 列が `tests/fixtures/rs_goldens/audit.json`（3,386 能力）と一致 |
-| `tests/test_rs_golden_replay.py` | **golden**（Rust だけで回る・§16.1）: `opcg_engine.replay` の sha1 列が `tests/fixtures/rs_goldens/replay/`（random 150 局＋L1 50 局）と一致 |
-| `tests/harness/full_card_audit.py` | **legacy**（`make test-legacy` のみ）: EXCEPTION / CARD_LOSS / TEMP_LEAK = 0 |
-| `tests/test_full_card_baseline.py` | **legacy**（`make test-legacy` のみ）: `full_card_baseline.json` と一致 |
-| `tests/scripts/compare_parsers.py` | 新規 OTHER（退行）= 0 |
+| `tests/test_rs_golden_audit.py` | **golden**: `opcg_engine.golden_audit` の sha1 列が `tests/fixtures/rs_goldens/audit.json`（3,386 能力）と一致 |
+| `tests/test_rs_golden_replay.py` | **golden**: `opcg_engine.replay` の sha1 列が `tests/fixtures/rs_goldens/replay/`（random 150 局＋**a1 50 局**）と一致 |
+| `cargo test --no-default-features` | Rust の単体テスト 381 本（`make test` が先に回す） |
 | `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER / PER_TURN_LIMIT_GAP / UP_TO_GAP = 0（**ラチェット**） |
-| `tests/test_verified_decks.py` | **legacy**（`make test-legacy` のみ）: 検証済みデッキの効果回帰 = 全合格（**ラチェット**: 検証済みの挙動は減らさない） |
-| `tests/test_structural_gate.py` | 構造不変条件4スキャン（H先頭ゲート漏れ／Duration write-off／chooser欠落／「すべて」count退化）= 0 ＋ 条件偽パスで盤面変化ゼロ（**ラチェット**。カテゴリH 再発防止） |
 | `tests/test_verified_buckets.py` | §8.2 台帳「✓」弾×色がベースライン全数登録・H違反0（ドキュメント主張の機械保証） |
+| `tests/test_contract_export.py` | `contract/` の再生成差分ゼロ（API 契約のラチェット） |
+| （legacy・tag で回す） | `full_card_audit.py`（EXCEPTION/CARD_LOSS/TEMP_LEAK=0）・`test_full_card_baseline.py`・`test_verified_decks.py`・`compare_parsers.py`・`test_structural_gate.py` |
 
-挙動を変更したら差分をレビューのうえ `full_card_audit.py --regen` でベースライン更新し、上記ゲートを通す
-（`make test-legacy` を通す）。**検証済みデッキ（§8.2 台帳）の挙動を直したら `tests/test_verified_decks.py`
-にアサートを追記**し、以後それを割らないことをマージ条件とする（カバレッジは単調増加）。
-**golden（`tests/fixtures/rs_goldens/`）は Python エンジンの挙動を意図的に変えたときだけ作り直す**
-（`make golden-audit`／`make golden-replay`）——ベースライン更新と同様、黙って追従させない。
+**golden（`tests/fixtures/rs_goldens/`）は挙動を意図的に変えたときだけ作り直す**
+（`make golden-audit`／`make golden-replay`＝`tests/scripts/rs_golden_make.py`・**Rust だけで回る**）
+——**差分は必ずレビューする**。golden は「その時点の Rust の出力」であって、正しさの独立した
+証拠ではない（2026-09-07 から golden の正本は Rust・計画 §16.3-10）。
 
 ### 5.0 交差対面の実プレイ監査（エンジン/パーサを変更したときの追加ゲート・2026-08-16）
 
 ```bash
-make audit-cross                      # 既定 120 件・約10分（CROSS/CROSS_SEED で件数と対面集合を変更）
+make audit-cross                      # 既定 120 ペア（CROSS/CROSS_SEED で件数と対面集合を変更）
 make audit-cross CROSS=240            # 変更が広いときは件数を増やす
 ```
 
-**合格条件: hang / timeout / error = 0**（`ok` 以外が1件でも出たら push しない）。
+**合格条件: void（決着せず）= 0**（1 件でも出たら push しない）。中身は Rust のアリーナ
+（`opcg_sim.loop.arena_shard` の自己対戦・ランダム対面×生成デッキ）で、決着しなかったペアが
+void として台帳に残る（2026-09-07 に `deck_synth_audit.py`＝Python エンジン版から置き換え）。
 
-なぜ `make test` に入れないか: 1件あたり実プレイ1局で 120件≈10分かかり、`make test`（約7分）を倍にする。
+なぜ `make test` に入れないか: 実プレイを 120 ペア打つので `make test`（約 2 分）より重い。
 一方で**掛ける価値があるのはエンジン/パーサを触ったときだけ**なので、その作業単位でのみ追加する。
 
 なぜミラー監査では足りないか: 137リーダーの**ミラー**（同一リーダー同士）監査は ok=137 / hang=0 なのに、

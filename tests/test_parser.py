@@ -6,7 +6,7 @@ parser.py の単体テスト（ロードマップ フェーズ1〜4の検証）�
 """
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 
-from opcg_sim.src.core.effects.parser import EffectParser
+from opcg_sim.src.effects.parser import EffectParser
 
 parser = EffectParser()
 
