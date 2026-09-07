@@ -87,8 +87,8 @@ class Split:
 def setup(with_db=True):
     """語彙表・関係表（`n_rel_train.train` の冒頭と同じ）。"""
     t0 = time.perf_counter()
-    from cpu_selfplay import _load_db
-    db = _load_db()
+    from opcg_sim.learned.vocab import load_db   # 退避で cpu_selfplay が消えたため（2026-09-07）
+    db = load_db()
     stats, ab, abm, pwr, isl, vocab = build_eff_tables()
     tables = (stats, ab, abm, pwr, isl)
     ptab = NR.profile_table(db, vocab)
