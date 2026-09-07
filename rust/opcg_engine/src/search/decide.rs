@@ -1,0 +1,1194 @@
+//! 1 手の決定（Python `core/cpu_learned.py::LearnedEngine.decide`／`_decide_inner` の移植）。
+//!
+//! | Rust | Python（正本） |
+//! |---|---|
+//! | [`decide`] | `LearnedEngine.decide`（枝予算を張って `_decide_inner`・抜けるとき外す） |
+//! | [`commit_step`] | `_commit_step`（箱コミットの機械実行） |
+//! | [`window_choice`] | `_window_choice`（窓の根畳み） |
+//! | [`commit_window_continuation`] | `_commit_window_continuation` |
+//! | [`commit_play_dialog`] | `_commit_play_dialog` |
+//! | [`merge_root_stats`] | `_merge_root_stats`（等価手マージ） |
+//! | [`move_sig`]／[`find_move`] | `learned/plan.py` の同名 |
+//! | [`don_box_first_primitive`] | `cpu_ai.don_box_first_primitive` |
+//! | [`residual_dig_move`]／[`residual_activate_move`]／[`residual_attach_move`] | 同名（腕 A／A2） |
+//!
+//! **エンジンをまたぐ状態**（Python は `LearnedEngine` のインスタンス辞書に持つ）は
+//! [`DecideCarry`] で入出力する: 箱コミットの残り手順（`_commits`）と残り起動の
+//! 付与待ちフラグ（`_resact_pending`）。ターン内 sticky 世界線（`_world_seeds`）は
+//! **出目そのもの**が渡ってくる（[`crate::search::rng::SearchRng`]）ので Rust 側に状態は要らない。
+
+use crate::journal::Session;
+use crate::model::{CardIdx, GameState, MasterTable, Seat};
+use crate::state::EngineError;
+use serde_json::{json, Map, Value};
+
+use super::mcts::{TreeMcts, C_PUCT, SERVE_SIMS};
+use super::quiesce::{
+    best_branch, in_battle, in_dialog, resolve_battle_inplace, resolved_branch_values, BoxBudget,
+    Ctx, SearchState, Window, BOX_RESOLVE_DEPTH, QUIESCE_MAX_PLIES,
+};
+use super::rng::SearchRng;
+use super::{apply, Move, SearchOptions};
+
+/// 決定のつまみ（Python `config.py` の serve 既定 ＋ `LearnedEngine.__init__` の席別上書き）。
+#[derive(Debug, Clone)]
+pub struct DecideOptions {
+    /// `SERVE_SIMS`
+    pub sims: usize,
+    /// `C_PUCT`
+    pub c_puct: f64,
+    /// `SERVE_DIRICHLET_EPS`
+    pub dirichlet_eps: f64,
+    /// `temp_turns`（0＝無効。turn <= これ のメイン窓で訪問分布からサンプルする）
+    pub temp_turns: i32,
+    /// `SERVE_BOX_COMMIT`
+    pub box_commit: bool,
+    /// `TREE_BOX_BATTLE`
+    pub box_battle: bool,
+    /// `TREE_BOX_DIALOG`
+    pub box_dialog: bool,
+    /// `SERVE_QUIESCE`
+    pub quiesce: bool,
+    /// `residual_dig`（腕 A）
+    pub residual_dig: bool,
+    /// `residual_activate`（腕 A2・"low"／"high"）
+    pub residual_activate: Option<String>,
+    /// 候補生成（`OPCGGame`）
+    pub search: SearchOptions,
+    /// `BOX_BRANCH_BUDGET`（`None`＝無制限）
+    pub budget: Option<i64>,
+}
+
+impl Default for DecideOptions {
+    fn default() -> Self {
+        DecideOptions {
+            sims: SERVE_SIMS,
+            c_puct: C_PUCT,
+            dirichlet_eps: 0.0,
+            temp_turns: 0,
+            box_commit: true,
+            box_battle: true,
+            box_dialog: true,
+            quiesce: true,
+            residual_dig: false,
+            residual_activate: None,
+            search: SearchOptions::default(),
+            budget: Some(super::quiesce::BOX_BRANCH_BUDGET),
+        }
+    }
+}
+
+/// 箱コミットの 1 手順（Python の `move_sig` タプル／`("__box__", sig, 残り回数)`）。
+#[derive(Debug, Clone, PartialEq)]
+pub enum Step {
+    /// 素の手（`move_sig`）
+    Sig(Value),
+    /// DON_BOX のカウントダウン形（sig は don_k 非含有＝残回数はこちらが持つ）
+    Box { sig: Value, left: i64 },
+}
+
+impl Step {
+    pub fn to_json(&self) -> Value {
+        match self {
+            Step::Sig(sig) => json!({"kind": "sig", "sig": sig}),
+            Step::Box { sig, left } => json!({"kind": "box", "sig": sig, "left": left}),
+        }
+    }
+
+    pub fn from_json(v: &Value) -> Result<Step, EngineError> {
+        let bad = || EngineError::BadPayload(format!("decide: 手順の形が違う（{v}）"));
+        let sig = v.get("sig").cloned().ok_or_else(bad)?;
+        match v.get("kind").and_then(Value::as_str) {
+            Some("sig") => Ok(Step::Sig(sig)),
+            Some("box") => Ok(Step::Box {
+                sig,
+                left: v.get("left").and_then(Value::as_i64).ok_or_else(bad)?,
+            }),
+            _ => Err(bad()),
+        }
+    }
+}
+
+/// decide をまたいで持ち越す状態（Python の `_commits`／`_resact_pending`）。
+#[derive(Debug, Clone, Default)]
+pub struct DecideCarry {
+    /// 現在の (turn, seat) の残り手順。空＝コミット無し。
+    pub commit: Vec<Step>,
+    /// 直前の decide が残り起動を返した（続く付与対話を方針で解く）
+    pub resact_pending: bool,
+}
+
+/// 決定の結果。
+#[derive(Debug, Clone)]
+pub struct DecideOut {
+    pub mv: Option<Move>,
+    /// "main"／"window"／"commit"
+    pub kind: &'static str,
+    pub legal: Vec<Move>,
+    pub n: Vec<f64>,
+    pub q: Vec<f64>,
+    /// 木のときだけ（窓・コミットは `None`）
+    pub p: Option<Vec<f64>>,
+    /// 等価手マージ後の候補（`record["groups"]` と同じ集計）
+    pub groups: Vec<Group>,
+    pub carry: DecideCarry,
+    pub budget_used: i64,
+    pub budget_exhausted: u64,
+}
+
+/// `_merge_root_stats` の 1 グループ。
+#[derive(Debug, Clone)]
+pub struct Group {
+    pub rep: usize,
+    pub idxs: Vec<usize>,
+    pub n: f64,
+    pub q: f64,
+}
+
+// --- 手のキー（plan.move_sig／cpu_ai._move_equiv_key）-----------------------------
+
+/// Python `plan.move_sig`（action_type・uuid・target_ids・selected_uuids・accepted）。
+pub fn move_sig(mv: &Move) -> Value {
+    let null = Value::Null;
+    let p = mv.get("payload").unwrap_or(&null);
+    let at = match mv.get("action_type") {
+        Some(v) if !v.is_null() => v.clone(),
+        _ => p.get("action_type").cloned().unwrap_or(Value::Null),
+    };
+    Value::Array(vec![
+        at,
+        p.get("uuid").cloned().unwrap_or(Value::Null),
+        p.get("target_ids").cloned().unwrap_or(Value::Array(vec![])),
+        p.get("selected_uuids")
+            .cloned()
+            .unwrap_or(Value::Array(vec![])),
+        p.get("accepted").cloned().unwrap_or(Value::Null),
+    ])
+}
+
+/// Python `plan._find_move`。
+pub fn find_move<'a>(legal: &'a [Move], sig: &Value) -> Option<&'a Move> {
+    legal.iter().find(|mv| move_sig(mv) == *sig)
+}
+
+/// Python `cpu_ai._find_card`（トレース記述用の全ゾーン横断・p1 → p2 の順）。
+fn find_card(state: &GameState, uuid: &str) -> Option<CardIdx> {
+    for seat in [Seat::P1, Seat::P2] {
+        let p = state.player(seat);
+        let zones = p
+            .field
+            .iter()
+            .chain(p.hand.iter())
+            .chain(p.life.iter())
+            .chain(p.deck.iter())
+            .chain(p.trash.iter())
+            .chain(p.temp_zone.iter())
+            .chain(p.leader.iter())
+            .chain(p.stage.iter());
+        for c in zones {
+            if state.card(*c).uuid == uuid {
+                return Some(*c);
+            }
+        }
+    }
+    None
+}
+
+/// Python `cpu_ai._card_label`（card_id → name → uuid）。
+fn card_label(state: &GameState, masters: &MasterTable, uuid: Option<&str>) -> Value {
+    let Some(uuid) = uuid.filter(|u| !u.is_empty()) else {
+        return Value::Null;
+    };
+    match find_card(state, uuid) {
+        None => Value::from(uuid),
+        Some(c) => {
+            let m = masters.get(state.card(c).master);
+            if !m.card_id.is_empty() {
+                Value::from(m.card_id.clone())
+            } else if !m.name.is_empty() {
+                Value::from(m.name.clone())
+            } else {
+                Value::from(uuid)
+            }
+        }
+    }
+}
+
+/// Python `cpu_ai._move_equiv_key`（`_describe_move` と同じ card_id 基準の同一視）。
+///
+/// 返り値は `[action_type, card, targets, selected, index, position, accepted, don_k]`。
+/// `_describe_move` の `selected_slots`（同名複製の曖昧性解消）は等価キーが読まないので作らない。
+pub fn move_equiv_key(state: &GameState, masters: &MasterTable, mv: &Move) -> Value {
+    let null = Value::Null;
+    let p = mv.get("payload").unwrap_or(&null);
+    let extra = p.get("extra").unwrap_or(&null);
+    let at = mv.get("action_type").cloned().unwrap_or(Value::Null);
+    let uuid = p
+        .get("uuid")
+        .and_then(Value::as_str)
+        .or_else(|| mv.get("card_uuid").and_then(Value::as_str));
+    let card = card_label(state, masters, uuid);
+    let labels = |arr: Option<&Vec<Value>>| -> Value {
+        match arr {
+            None => Value::Array(vec![]),
+            Some(a) => Value::Array(
+                a.iter()
+                    .map(|v| card_label(state, masters, v.as_str()))
+                    .collect(),
+            ),
+        }
+    };
+    let tids = p.get("target_ids").and_then(Value::as_array);
+    let targets = labels(tids.filter(|a| !a.is_empty()));
+    let sel = p
+        .get("selected_uuids")
+        .and_then(Value::as_array)
+        .filter(|a| !a.is_empty())
+        .or_else(|| {
+            extra
+                .get("selected_uuids")
+                .and_then(Value::as_array)
+                .filter(|a| !a.is_empty())
+        });
+    let selected = labels(sel);
+    let pick = |key: &str| -> Value {
+        match p.get(key) {
+            Some(v) if !v.is_null() => v.clone(),
+            _ => match extra.get(key) {
+                Some(v) if !v.is_null() => v.clone(),
+                _ => Value::Null,
+            },
+        }
+    };
+    let accepted = match pick("accepted") {
+        Value::Bool(false) => Value::Bool(false),
+        _ => Value::Null, // Python は accepted=False のときだけ記述に載せる
+    };
+    let don_k = if at.as_str() == Some("DON_BOX") {
+        match p.get("don_k") {
+            Some(v) if !v.is_null() => Value::from(v.as_f64().unwrap_or(0.0) as i64),
+            _ => Value::Null,
+        }
+    } else {
+        Value::Null
+    };
+    Value::Array(vec![
+        at,
+        card,
+        targets,
+        selected,
+        pick("index"),
+        pick("position"),
+        accepted,
+        don_k,
+    ])
+}
+
+/// Python `cpu_learned._merge_root_stats`（等価キーで訪問数を合算し n 降順・安定ソート）。
+pub fn merge_root_stats(
+    state: &GameState,
+    masters: &MasterTable,
+    legal: &[Move],
+    n: &[f64],
+    q: &[f64],
+) -> Vec<Group> {
+    let mut order: Vec<Value> = Vec::new();
+    let mut groups: Vec<Vec<usize>> = Vec::new();
+    for (i, mv) in legal.iter().enumerate() {
+        let k = move_equiv_key(state, masters, mv);
+        match order.iter().position(|o| *o == k) {
+            Some(g) => groups[g].push(i),
+            None => {
+                order.push(k);
+                groups.push(vec![i]);
+            }
+        }
+    }
+    let mut out: Vec<Group> = groups
+        .into_iter()
+        .map(|idxs| {
+            let total: f64 = idxs.iter().map(|i| n[*i]).sum();
+            let qq = if total > 0.0 {
+                idxs.iter().map(|i| n[*i] * q[*i]).sum::<f64>() / total
+            } else {
+                0.0
+            };
+            Group {
+                rep: idxs[0],
+                idxs,
+                n: total,
+                q: qq,
+            }
+        })
+        .collect();
+    // Python の `sort(key=lambda g: -g["n"])` は安定＝同数は列挙順のまま
+    out.sort_by(|a, b| {
+        b.n.partial_cmp(&a.n)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    out
+}
+
+/// Python `cpu_ai.don_box_first_primitive`（DON_BOX → 先頭原始手）。
+pub fn don_box_first_primitive(mv: &Move) -> Move {
+    if mv.get("action_type").and_then(Value::as_str) != Some("DON_BOX") {
+        return mv.clone();
+    }
+    let null = Value::Null;
+    let p = mv.get("payload").unwrap_or(&null);
+    let k = p.get("don_k").and_then(Value::as_f64).unwrap_or(0.0) as i64;
+    let tids = p.get("target_ids").and_then(Value::as_array);
+    let uuid = p.get("uuid").cloned().unwrap_or(Value::Null);
+    if k <= 0 {
+        if let Some(t) = tids.filter(|a| !a.is_empty()) {
+            return json!({"kind": "game", "action_type": "ATTACK",
+                          "payload": {"uuid": uuid, "target_ids": Value::Array(t.clone())}});
+        }
+    }
+    json!({"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": uuid}})
+}
+
+// --- 箱コミット -------------------------------------------------------------------
+
+/// Python `_trace_to_steps`（解決トレース → 自分側の手順）。
+fn trace_to_steps(trace: &[(Seat, Move)], name: Seat) -> Vec<Step> {
+    let mut steps = Vec::new();
+    for (actor, mv) in trace {
+        if *actor != name {
+            continue;
+        }
+        if mv.get("action_type").and_then(Value::as_str) == Some("DON_BOX") {
+            let total = box_total(mv);
+            if total >= 1 {
+                steps.push(Step::Box {
+                    sig: move_sig(mv),
+                    left: total,
+                });
+            }
+        } else {
+            steps.push(Step::Sig(move_sig(mv)));
+        }
+    }
+    steps
+}
+
+/// DON_BOX の総原始手数（付与 k 枚＋攻撃形なら 1）。
+fn box_total(mv: &Move) -> i64 {
+    let null = Value::Null;
+    let p = mv.get("payload").unwrap_or(&null);
+    let k = p.get("don_k").and_then(Value::as_f64).unwrap_or(0.0) as i64;
+    let has_t = p
+        .get("target_ids")
+        .and_then(Value::as_array)
+        .map(|a| !a.is_empty())
+        .unwrap_or(false);
+    k + i64::from(has_t)
+}
+
+/// Python `_commit_apply_ok`（クローンにのみ適用して合法性を確かめる）。
+fn commit_apply_ok(state: &GameState, masters: &MasterTable, name: Seat, mv: &Move) -> bool {
+    let mut s = Session::new(state.clone());
+    matches!(apply::apply_move_inplace(&mut s, masters, name, mv, true), Ok(()))
+}
+
+/// Python `_commit_step`（コミット済み手順の機械実行）。
+///
+/// `steps` は**その場で書き換える**（Python も list を破壊的に更新する）。返り値が `None`
+/// または `steps` が空になったら、呼び出し側はコミットを破棄する（契約違反／消化完了）。
+pub fn commit_step(
+    ctx: &Ctx,
+    s: &mut Session,
+    name: Seat,
+    steps: &mut Vec<Step>,
+) -> Result<Option<Move>, EngineError> {
+    if steps.is_empty() {
+        return Ok(None);
+    }
+    let legal = ctx.legal_actions(s)?;
+    let mut mv: Option<Move> = None;
+    if !legal.is_empty() {
+        match steps[0].clone() {
+            Step::Box { sig, left } => {
+                if find_move(&legal, &sig).is_some() {
+                    if left <= 1 {
+                        steps.remove(0);
+                    } else {
+                        steps[0] = Step::Box {
+                            sig: sig.clone(),
+                            left: left - 1,
+                        };
+                    }
+                    let uuid = sig.get(1).cloned().unwrap_or(Value::Null);
+                    let tgts = sig
+                        .get(2)
+                        .and_then(Value::as_array)
+                        .cloned()
+                        .unwrap_or_default();
+                    mv = Some(if !tgts.is_empty() && left <= 1 {
+                        json!({"kind": "game", "action_type": "ATTACK",
+                               "payload": {"uuid": uuid, "target_ids": tgts}})
+                    } else {
+                        json!({"kind": "game", "action_type": "ATTACH_DON",
+                               "payload": {"uuid": uuid}})
+                    });
+                }
+            }
+            Step::Sig(sig) => {
+                if let Some(found) = find_move(&legal, &sig).cloned() {
+                    let null = Value::Null;
+                    let p = found.get("payload").unwrap_or(&null);
+                    let k = p.get("don_k").and_then(Value::as_f64).unwrap_or(0.0) as i64;
+                    if found.get("action_type").and_then(Value::as_str) == Some("DON_BOX") && k > 0
+                    {
+                        // 防御的経路（生成側はカウントダウン形へ変換済み＝通常来ない）
+                        let total = box_total(&found);
+                        if total > 1 {
+                            steps[0] = Step::Box {
+                                sig,
+                                left: total - 1,
+                            };
+                        } else {
+                            steps.remove(0);
+                        }
+                    } else {
+                        steps.remove(0);
+                    }
+                    mv = Some(don_box_first_primitive(&found));
+                }
+            }
+        }
+    }
+    // 適用検証（2026-08-26 void 修正）: 合成した ATTACK/ATTACH_DON は legal に実在しないので
+    // 実盤面クローンで適用可能かを確かめる。不可なら契約違反＝箱ごと破棄。
+    if let Some(m) = &mv {
+        if !commit_apply_ok(s.state(), ctx.masters, name, m) {
+            mv = None;
+        }
+    }
+    Ok(mv)
+}
+
+// --- 窓の根畳み -------------------------------------------------------------------
+
+struct WindowPick {
+    mv: Move,
+    legal: Vec<Move>,
+    n: Vec<f64>,
+    q: Vec<f64>,
+    /// 評価に使った世界（コミット継続の生成に使う）。単一候補で即決したときは `None`。
+    world: Option<GameState>,
+}
+
+/// Python `_window_choice`（窓では木を回さず、出口 value 最良の 1 手を直接返す）。
+fn window_choice(
+    ctx: &Ctx,
+    real: &GameState,
+    name: Seat,
+    rng: &mut dyn SearchRng,
+    st: &mut SearchState,
+) -> Result<Option<WindowPick>, EngineError> {
+    let battle = real.active_battle.is_some();
+    let world = super::determinize::determinize_with(real, name, rng)?;
+    let mut s = Session::new(world.clone());
+    let legal = ctx.legal_actions(&mut s)?;
+    if legal.is_empty() {
+        return Ok(None);
+    }
+    if legal.len() == 1 {
+        return Ok(Some(WindowPick {
+            mv: legal[0].clone(),
+            legal,
+            n: Vec::new(),
+            q: Vec::new(),
+            world: None,
+        }));
+    }
+    let window = if battle { Window::Battle } else { Window::Dialog };
+    let vals = resolved_branch_values(
+        ctx,
+        &mut s,
+        st,
+        name,
+        &legal,
+        QUIESCE_MAX_PLIES,
+        BOX_RESOLVE_DEPTH,
+        window,
+    )?;
+    let Some(best) = best_branch(&vals) else {
+        return Ok(None); // 全枝で解決に失敗＝full-tree へ委ねる（安全側）
+    };
+    Ok(Some(WindowPick {
+        mv: legal[best].clone(),
+        legal,
+        n: vals.iter().map(|v| f64::from(v.is_some())).collect(),
+        q: vals.iter().map(|v| v.unwrap_or(-1.0)).collect(),
+        world: Some(world),
+    }))
+}
+
+/// Python `_commit_window_continuation`（選んだ枝の自分側継続をコミットする）。
+fn commit_window_continuation(
+    ctx: &Ctx,
+    real: &GameState,
+    world: &GameState,
+    name: Seat,
+    mv: &Move,
+    st: &mut SearchState,
+) -> Vec<Step> {
+    let window = if real.active_battle.is_some() {
+        Window::Battle
+    } else {
+        Window::Dialog
+    };
+    let mut s = Session::new(world.clone());
+    if apply::apply_move_inplace(&mut s, ctx.masters, name, mv, true).is_err() {
+        return Vec::new(); // Python: `nxt is None` → コミット無し
+    }
+    let mut trace: Vec<(Seat, Move)> = Vec::new();
+    let ok = resolve_battle_inplace(
+        ctx,
+        &mut s,
+        st,
+        window,
+        QUIESCE_MAX_PLIES,
+        true,
+        BOX_RESOLVE_DEPTH,
+        Some(&mut trace),
+    );
+    if ok.is_err() {
+        return Vec::new(); // Python の `except Exception: pass`（コミット生成の失敗は手を止めない）
+    }
+    trace_to_steps(&trace, name)
+}
+
+/// Python `_commit_play_dialog`（PLAY / ACTIVATE_MAIN の後続対話をコミットする）。
+fn commit_play_dialog(
+    ctx: &Ctx,
+    real: &GameState,
+    name: Seat,
+    mv: &Move,
+    rng: &mut dyn SearchRng,
+    st: &mut SearchState,
+) -> Result<Vec<Step>, EngineError> {
+    let world = super::determinize::determinize_with(real, name, rng)?;
+    let mut s = Session::new(world);
+    if apply::apply_move_inplace(&mut s, ctx.masters, name, mv, true).is_err() {
+        return Ok(Vec::new());
+    }
+    if !in_dialog(&mut s) || in_battle(&s) {
+        return Ok(Vec::new()); // 対話が無ければコミット無し
+    }
+    let mut trace: Vec<(Seat, Move)> = Vec::new();
+    let ok = resolve_battle_inplace(
+        ctx,
+        &mut s,
+        st,
+        Window::Dialog,
+        QUIESCE_MAX_PLIES,
+        true,
+        BOX_RESOLVE_DEPTH,
+        Some(&mut trace),
+    );
+    if ok.is_err() {
+        return Ok(Vec::new());
+    }
+    Ok(trace_to_steps(&trace, name))
+}
+
+// --- 残ドン掘り／残り起動（腕 A・A2）------------------------------------------------
+
+/// Python `cpu_learned.DON_RAMP_MARK`。
+pub const DON_RAMP_MARK: &str = "ドン!!デッキから";
+
+/// Python `_leader_has_don_ramp`（能力の raw_text の構造語）。
+fn leader_has_don_ramp(masters: &MasterTable, master: crate::model::MasterIdx) -> bool {
+    let m = masters.get(master);
+    let mut blob: Vec<&str> = Vec::new();
+    for id in &m.ability_ids {
+        if let Some(ab) = masters.abilities.get(*id) {
+            blob.push(ab.raw_text.as_str());
+        }
+    }
+    let text = if blob.iter().all(|s| s.is_empty()) {
+        m.effect_text.clone()
+    } else {
+        blob.join(" ")
+    };
+    text.replace('\u{203C}', "!!").contains(DON_RAMP_MARK)
+}
+
+/// Python `_tree_has`（効果木に `atype` の action があるか）。
+fn tree_has(node: Option<&crate::effects::ast::EffectNode>, atype: crate::effects::ast::ActionType) -> bool {
+    let mut acts = Vec::new();
+    crate::encode::walk_all(node, &mut acts);
+    acts.iter().any(|a| a.ty == atype)
+}
+
+/// Python `_is_dig_card`（登場時にドンを戻してドローするコスト 1 キャラ）。
+fn is_dig_card(masters: &MasterTable, master: crate::model::MasterIdx) -> bool {
+    use crate::effects::ast::{ActionType, TriggerType};
+    let m = masters.get(master);
+    if m.ty != crate::model::CardType::Character || m.cost != 1 {
+        return false;
+    }
+    for id in &m.ability_ids {
+        let Some(ab) = masters.abilities.get(*id) else {
+            continue;
+        };
+        if ab.trigger != TriggerType::OnPlay {
+            continue;
+        }
+        if !tree_has(ab.effect.as_ref(), ActionType::Draw) {
+            continue;
+        }
+        if tree_has(ab.cost.as_ref(), ActionType::ReturnDon) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Python `_residual_dig_move`（腕 A）。
+fn residual_dig_move(
+    ctx: &Ctx,
+    s: &mut Session,
+    seat: Seat,
+    legal: &[Move],
+) -> Option<Move> {
+    let state = s.state();
+    let p = state.player(seat);
+    if p.don_active.is_empty() || p.field.len() >= 5 {
+        return None;
+    }
+    for mv in legal {
+        if mv.get("action_type").and_then(Value::as_str) != Some("PLAY") {
+            continue;
+        }
+        let u = mv.get("payload")?.get("uuid").and_then(Value::as_str);
+        let Some(u) = u else { continue };
+        let card = p.hand.iter().find(|c| state.card(**c).uuid == u);
+        let Some(card) = card else { continue };
+        if is_dig_card(ctx.masters, state.card(*card).master) {
+            return Some(mv.clone());
+        }
+    }
+    None
+}
+
+/// Python `_residual_activate_move`（腕 A2）。
+fn residual_activate_move(
+    ctx: &Ctx,
+    s: &mut Session,
+    seat: Seat,
+    legal: &[Move],
+) -> Option<Move> {
+    let state = s.state();
+    let leader = state.player(seat).leader?;
+    if !leader_has_don_ramp(ctx.masters, state.card(leader).master) {
+        return None;
+    }
+    let leader_uuid = state.card(leader).uuid.clone();
+    for mv in legal {
+        if mv.get("action_type").and_then(Value::as_str) != Some("ACTIVATE_MAIN") {
+            continue;
+        }
+        if mv
+            .get("payload")
+            .and_then(|p| p.get("uuid"))
+            .and_then(Value::as_str)
+            != Some(leader_uuid.as_str())
+        {
+            continue;
+        }
+        return Some(mv.clone());
+    }
+    None
+}
+
+/// Python `_pick_attach_target`（"low"＝攻撃できるキャラの最低パワー／"high"＝最高パワー）。
+fn pick_attach_target(cands: &[(String, i32, bool)], policy: &str) -> Option<String> {
+    if cands.is_empty() {
+        return None;
+    }
+    if policy == "high" {
+        let mut v: Vec<&(String, i32, bool)> = cands.iter().collect();
+        v.sort_by(|a, b| (-a.1, &a.0).cmp(&(-b.1, &b.0)));
+        return Some(v[0].0.clone());
+    }
+    let pool: Vec<&(String, i32, bool)> = {
+        let atk: Vec<&(String, i32, bool)> = cands.iter().filter(|t| t.2).collect();
+        if atk.is_empty() {
+            cands.iter().collect()
+        } else {
+            atk
+        }
+    };
+    let mut v = pool;
+    v.sort_by(|a, b| (a.1, &a.0).cmp(&(b.1, &b.0)));
+    Some(v[0].0.clone())
+}
+
+/// Python `_residual_attach_move`（起動で開いた自分のキャラへの付与対話を方針で解く）。
+fn residual_attach_move(
+    ctx: &Ctx,
+    s: &mut Session,
+    seat: Seat,
+    policy: &str,
+) -> Result<Option<Move>, EngineError> {
+    let Some(req) = crate::rules::pending::get_pending_request(s, ctx.masters, false) else {
+        return Ok(None);
+    };
+    let sel: Vec<String> = req
+        .get("selectable_uuids")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect())
+        .unwrap_or_default();
+    if sel.is_empty() {
+        return Ok(None);
+    }
+    let turn = s.state().turn_count;
+    let mut cands: Vec<(String, i32, bool)> = Vec::new();
+    {
+        let state = s.state();
+        let field: Vec<CardIdx> = state.player(seat).field.clone();
+        for u in &sel {
+            let Some(c) = field.iter().find(|c| state.card(**c).uuid == *u) else {
+                return Ok(None); // 自分のキャラ以外が混ざる対話は触らない
+            };
+            let card = state.card(*c);
+            let pw = card.get_power(ctx.masters.get(card.master), true);
+            // Python: `turn > 2 and not is_rest and not (is_newly_played and not 速攻)`
+            let summoning_sick =
+                card.is_newly_played && !crate::rules::has_keyword(state, *c, "速攻");
+            let can_atk = turn > 2 && !card.is_rest && !summoning_sick;
+            cands.push((u.clone(), pw, can_atk));
+        }
+    }
+    let Some(target) = pick_attach_target(&cands, policy) else {
+        return Ok(None);
+    };
+    let legal = ctx.legal_actions(s)?;
+    for mv in &legal {
+        if mv.get("action_type").and_then(Value::as_str) != Some("RESOLVE_EFFECT_SELECTION") {
+            continue;
+        }
+        let su: Vec<&str> = mv
+            .get("payload")
+            .and_then(|p| p.get("selected_uuids"))
+            .and_then(Value::as_array)
+            .map(|a| a.iter().filter_map(Value::as_str).collect())
+            .unwrap_or_default();
+        if su == [target.as_str()] {
+            return Ok(Some(mv.clone()));
+        }
+    }
+    let pending = crate::rules::pending::get_pending_request(s, ctx.masters, false);
+    let mut payload = crate::effects::interact::default_interaction_payload(
+        s.state(),
+        ctx.masters,
+        pending.as_ref(),
+    );
+    let obj = payload.as_object_mut().map(std::mem::take).unwrap_or_default();
+    let mut obj: Map<String, Value> = obj;
+    obj.insert("selected_uuids".into(), json!([target]));
+    obj.insert("accepted".into(), Value::Bool(true));
+    Ok(Some(json!({"kind": "game", "action_type": "RESOLVE_EFFECT_SELECTION",
+                   "payload": Value::Object(obj)})))
+}
+
+// --- decide 本体 ------------------------------------------------------------------
+
+/// Python `LearnedEngine.decide`／`_decide_inner`。
+///
+/// `state` は**実盤面**（世界サンプル前）。`rng` は世界サンプル・Dirichlet・温度の出目を出す。
+pub fn decide(
+    masters: &MasterTable,
+    net: &crate::net::LoadedNet,
+    state: &GameState,
+    name: Seat,
+    opts: &DecideOptions,
+    rng: &mut dyn SearchRng,
+    carry: &DecideCarry,
+) -> Result<DecideOut, EngineError> {
+    let ctx = Ctx {
+        masters,
+        net,
+        opts: opts.search.clone(),
+        box_battle: opts.box_battle,
+        box_dialog: opts.box_dialog,
+        quiesce: opts.quiesce,
+        quiesce_max_plies: QUIESCE_MAX_PLIES,
+    };
+    // 戦闘箱の枝予算をこの decide のぶんだけ張る（Python `reset_box_budget()`／`clear_box_budget()`）。
+    let mut st = SearchState {
+        budget: BoxBudget::new(opts.budget),
+    };
+    let out = decide_inner(&ctx, state, name, opts, rng, carry, &mut st);
+    st.budget.clear();
+    out
+}
+
+fn empty_out(kind: &'static str, mv: Option<Move>, carry: DecideCarry, st: &SearchState) -> DecideOut {
+    DecideOut {
+        mv,
+        kind,
+        legal: Vec::new(),
+        n: Vec::new(),
+        q: Vec::new(),
+        p: None,
+        groups: Vec::new(),
+        carry,
+        budget_used: st.budget.used,
+        budget_exhausted: st.budget.exhausted,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn decide_inner(
+    ctx: &Ctx,
+    state: &GameState,
+    name: Seat,
+    opts: &DecideOptions,
+    rng: &mut dyn SearchRng,
+    carry: &DecideCarry,
+    st: &mut SearchState,
+) -> Result<DecideOut, EngineError> {
+    let mut carry = carry.clone();
+    let mut real = Session::new(state.clone());
+
+    // ① 箱コミットの機械実行（窓の根畳み・木より前）
+    if opts.box_commit && !carry.commit.is_empty() {
+        let mut steps = carry.commit.clone();
+        let mv = commit_step(ctx, &mut real, name, &mut steps)?;
+        match mv {
+            Some(mv) => {
+                carry.commit = if steps.is_empty() { Vec::new() } else { steps };
+                return Ok(empty_out("commit", Some(mv), carry, st));
+            }
+            None => carry.commit = Vec::new(), // 契約違反／消化完了＝key を畳む
+        }
+    }
+
+    // ② 残り起動の付与対話（腕 A2）
+    if carry.resact_pending {
+        if in_dialog(&mut real) && !in_battle(&real) {
+            if let Some(policy) = opts.residual_activate.as_deref() {
+                if let Some(mv) = residual_attach_move(ctx, &mut real, name, policy)? {
+                    return Ok(empty_out("main", Some(mv), carry, st));
+                }
+            }
+        } else {
+            carry.resact_pending = false;
+        }
+    }
+
+    // ③ 窓の根畳み（戦闘窓／対話箱が有効なら効果対話窓）
+    if in_battle(&real) || (opts.box_dialog && in_dialog(&mut real)) {
+        if let Some(pick) = window_choice(ctx, state, name, rng, st)? {
+            if opts.box_commit {
+                if let Some(world) = &pick.world {
+                    let steps =
+                        commit_window_continuation(ctx, state, world, name, &pick.mv, st);
+                    if !steps.is_empty() {
+                        carry.commit = steps;
+                    }
+                }
+            }
+            return Ok(DecideOut {
+                mv: Some(pick.mv),
+                kind: "window",
+                legal: pick.legal,
+                n: pick.n,
+                q: pick.q,
+                p: None,
+                groups: Vec::new(),
+                carry,
+                budget_used: st.budget.used,
+                budget_exhausted: st.budget.exhausted,
+            });
+        }
+    }
+
+    // ④ 木
+    let mut tree = TreeMcts::new(ctx, opts.c_puct, opts.sims, opts.dirichlet_eps);
+    let run = tree.run(state, name, rng, st)?;
+    let mut mv = run.best.clone();
+    let mut groups = Vec::new();
+    if !run.legal.is_empty() {
+        groups = merge_root_stats(state, ctx.masters, &run.legal, &run.n, &run.q);
+        if !groups.is_empty() {
+            let mut gi = 0usize;
+            // 生成の温度サンプリング（序盤は訪問分布から引く）
+            if opts.temp_turns > 0 && state.turn_count <= opts.temp_turns {
+                let ns: Vec<f64> = groups.iter().map(|g| g.n).collect();
+                let total: f64 = ns.iter().sum();
+                if total > 0.0 {
+                    let probs: Vec<f64> = ns.iter().map(|n| n / total).collect();
+                    gi = rng.choice(&probs)?;
+                }
+            }
+            mv = Some(run.legal[groups[gi].rep].clone());
+        }
+    }
+    if mv.is_none() {
+        mv = run.legal.first().cloned();
+    }
+
+    // ⑤ 残ドン掘り／残り起動（腕 A・A2）
+    let mut dig_override = false;
+    let is_turn_end = mv
+        .as_ref()
+        .and_then(|m| m.get("action_type").and_then(Value::as_str))
+        == Some("TURN_END");
+    if is_turn_end && !in_battle(&real) && !in_dialog(&mut real) {
+        let legal = ctx.legal_actions(&mut real)?;
+        if opts.residual_dig {
+            if let Some(alt) = residual_dig_move(ctx, &mut real, name, &legal) {
+                mv = Some(alt);
+                dig_override = true;
+            }
+        }
+        if !dig_override && opts.residual_activate.is_some() {
+            if let Some(alt) = residual_activate_move(ctx, &mut real, name, &legal) {
+                mv = Some(alt);
+                dig_override = true;
+                carry.resact_pending = true;
+            }
+        }
+    }
+
+    // ⑥ 箱コミット（木が選んだ箱の自分側の残り手順を確定）
+    if opts.box_commit && !dig_override {
+        if let Some(m) = mv.clone() {
+            match m.get("action_type").and_then(Value::as_str) {
+                Some("DON_BOX") => {
+                    let total = box_total(&m);
+                    if total > 1 {
+                        carry.commit = vec![Step::Box {
+                            sig: move_sig(&m),
+                            left: total - 1,
+                        }];
+                    }
+                }
+                Some("PLAY") | Some("ACTIVATE_MAIN") => {
+                    let steps = commit_play_dialog(ctx, state, name, &m, rng, st)?;
+                    if !steps.is_empty() {
+                        carry.commit = steps;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // ⑦ 箱は実対局へは先頭原始手で出す
+    let mv = mv.map(|m| don_box_first_primitive(&m));
+    Ok(DecideOut {
+        mv,
+        kind: "main",
+        legal: run.legal,
+        n: run.n,
+        q: run.q,
+        p: Some(run.p),
+        groups,
+        carry,
+        budget_used: st.budget.used,
+        budget_exhausted: st.budget.exhausted,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn move_sig_keys_on_action_uuid_targets_selection() {
+        let a = json!({"kind":"game","action_type":"ATTACK",
+                       "payload":{"uuid":"u1","target_ids":["t1"]}});
+        let b = json!({"kind":"game","action_type":"ATTACK",
+                       "payload":{"uuid":"u1","target_ids":["t2"]}});
+        assert_ne!(move_sig(&a), move_sig(&b));
+        // don_k は sig に入らない（残回数はステップ側が持つ）
+        let c = json!({"action_type":"DON_BOX","payload":{"uuid":"u1","don_k":2}});
+        let d = json!({"action_type":"DON_BOX","payload":{"uuid":"u1","don_k":3}});
+        assert_eq!(move_sig(&c), move_sig(&d));
+        // 効果選択は selected_uuids と accepted で割れる
+        let e = json!({"action_type":"RESOLVE_EFFECT_SELECTION","payload":{"selected_uuids":["x"]}});
+        let f = json!({"action_type":"RESOLVE_EFFECT_SELECTION","payload":{"selected_uuids":[]}});
+        assert_ne!(move_sig(&e), move_sig(&f));
+    }
+
+    #[test]
+    fn don_box_first_primitive_expands_the_head() {
+        let attach = json!({"action_type":"DON_BOX","payload":{"uuid":"u","don_k":2}});
+        assert_eq!(
+            don_box_first_primitive(&attach)["action_type"],
+            Value::from("ATTACH_DON")
+        );
+        // k=0 のアタック箱は ATTACK をそのまま出す
+        let atk = json!({"action_type":"DON_BOX","payload":{"uuid":"u","don_k":0,"target_ids":["t"]}});
+        let out = don_box_first_primitive(&atk);
+        assert_eq!(out["action_type"], Value::from("ATTACK"));
+        assert_eq!(out["payload"]["target_ids"], json!(["t"]));
+        // 付与つきの攻撃形はまず付与
+        let both = json!({"action_type":"DON_BOX","payload":{"uuid":"u","don_k":1,"target_ids":["t"]}});
+        assert_eq!(
+            don_box_first_primitive(&both)["action_type"],
+            Value::from("ATTACH_DON")
+        );
+        // DON_BOX 以外は素通し
+        let end = json!({"action_type":"TURN_END","payload":{}});
+        assert_eq!(don_box_first_primitive(&end), end);
+    }
+
+    #[test]
+    fn trace_to_steps_keeps_only_my_moves_and_counts_boxes() {
+        let mine = json!({"action_type":"DON_BOX","payload":{"uuid":"u","don_k":2,"target_ids":["t"]}});
+        let plain = json!({"action_type":"PASS","payload":{}});
+        let trace = vec![
+            (Seat::P1, mine.clone()),
+            (Seat::P2, plain.clone()),
+            (Seat::P1, plain.clone()),
+        ];
+        let steps = trace_to_steps(&trace, Seat::P1);
+        assert_eq!(steps.len(), 2);
+        match &steps[0] {
+            Step::Box { left, .. } => assert_eq!(*left, 3), // 付与 2 ＋ 攻撃 1
+            other => panic!("箱の形でない: {other:?}"),
+        }
+        assert_eq!(steps[1], Step::Sig(move_sig(&plain)));
+    }
+
+    /// 箱コミットの残回数: 付与 k 枚＋攻撃形は「付与 → … → 攻撃」で消化し、
+    /// 実盤面の候補から sig が消えたら（契約違反）1 手も返さない。
+    #[test]
+    fn box_countdown_shrinks_and_ends_with_the_attack() {
+        let (masters, state) = crate::testkit::BoardBuilder::new().build();
+        let net = crate::net::LoadedNet {
+            weights: Default::default(),
+            tab: Vec::new(),
+            vocab: Default::default(),
+            statics: Default::default(),
+        };
+        let ctx = Ctx {
+            masters: &masters,
+            net: &net,
+            opts: Default::default(),
+            box_battle: true,
+            box_dialog: true,
+            quiesce: true,
+            quiesce_max_plies: QUIESCE_MAX_PLIES,
+        };
+        let mut s = Session::new(state);
+        // `commit_step` は現在の合法手を引くが、この盤面では候補が出ない（＝契約違反）。
+        // 残り手順が消化されないこと（`None`）だけを見る＝箱ごと破棄する側の分岐。
+        let sig = move_sig(&json!({"action_type": "DON_BOX",
+                                   "payload": {"uuid": "u", "target_ids": ["t"]}}));
+        let mut steps = vec![Step::Box { sig: sig.clone(), left: 2 }];
+        assert!(commit_step(&ctx, &mut s, Seat::P1, &mut steps).unwrap().is_none());
+
+        // カウントダウンの算術そのもの（Python `_commit_step` の箱の分岐と同じ規則）:
+        // 残り n>1 は付与・n<=1 かつ対象ありは攻撃。
+        let head = |left: i64| -> Move {
+            let uuid = sig.get(1).cloned().unwrap();
+            let tgts = sig.get(2).and_then(Value::as_array).cloned().unwrap();
+            if !tgts.is_empty() && left <= 1 {
+                json!({"kind":"game","action_type":"ATTACK",
+                       "payload":{"uuid":uuid,"target_ids":tgts}})
+            } else {
+                json!({"kind":"game","action_type":"ATTACH_DON","payload":{"uuid":uuid}})
+            }
+        };
+        assert_eq!(head(2)["action_type"], Value::from("ATTACH_DON"));
+        assert_eq!(head(1)["action_type"], Value::from("ATTACK"));
+        // 生成側（木が箱を選んだ直後）の残回数＝総原始手数 − 1。
+        let box_move = json!({"action_type":"DON_BOX",
+                              "payload":{"uuid":"u","don_k":2,"target_ids":["t"]}});
+        assert_eq!(box_total(&box_move), 3);
+    }
+
+    /// 等価手マージ: 同名カードの別実体（card_id が同じ）は 1 グループへ畳み、
+    /// 訪問数を合算して n 降順（同数は列挙順）に並べる。代表は**グループ内の先頭**。
+    #[test]
+    fn merge_root_stats_folds_equivalent_copies() {
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        let a = b.put_hand(Seat::P1, M_CHAR);
+        let c = b.put_hand(Seat::P1, M_CHAR); // 同じカードの 2 枚目
+        let (masters, state) = b.build();
+        let ua = state.card(a).uuid.clone();
+        let uc = state.card(c).uuid.clone();
+        let play = |u: &str| json!({"kind":"game","action_type":"PLAY","payload":{"uuid":u}});
+        let end = json!({"kind":"game","action_type":"TURN_END","payload":{}});
+        let legal = vec![play(&ua), end.clone(), play(&uc)];
+        let n = [30.0, 38.0, 30.0];
+        let q = [0.5, -0.5, 0.1];
+        let groups = merge_root_stats(&state, &masters, &legal, &n, &q);
+        assert_eq!(groups.len(), 2, "同名の 2 枚は 1 グループ");
+        // 合算 60 の PLAY が 38 の TURN_END を上回る（素の argmax(N) なら負けていた）
+        assert_eq!(groups[0].n, 60.0);
+        assert_eq!(groups[0].rep, 0, "代表は列挙順の先頭");
+        assert_eq!(groups[0].idxs, vec![0, 2]);
+        // Q は訪問加重平均
+        assert!((groups[0].q - 0.3).abs() < 1e-12);
+        assert_eq!(groups[1].n, 38.0);
+    }
+
+    /// 別実体でも card_id が違えば別グループ（等価キーは card_id 基準）。
+    #[test]
+    fn merge_root_stats_keeps_different_cards_apart() {
+        use crate::testkit::{BoardBuilder, M_BLOCKER, M_CHAR};
+        let mut b = BoardBuilder::new();
+        let a = b.put_hand(Seat::P1, M_CHAR);
+        let c = b.put_hand(Seat::P1, M_BLOCKER);
+        let (masters, state) = b.build();
+        let play = |u: &str| json!({"kind":"game","action_type":"PLAY","payload":{"uuid":u}});
+        let legal = vec![
+            play(&state.card(a).uuid.clone()),
+            play(&state.card(c).uuid.clone()),
+        ];
+        let groups = merge_root_stats(&state, &masters, &legal, &[1.0, 2.0], &[0.0, 0.0]);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].rep, 1, "n 降順");
+    }
+
+    /// DON_BOX は `don_k` が違えば別挙動＝別グループ（`_move_equiv_key` の最後の欄）。
+    #[test]
+    fn merge_root_stats_splits_boxes_by_don_k() {
+        let (masters, state) = crate::testkit::BoardBuilder::new().build();
+        let bx = |k: i64| json!({"kind":"game","action_type":"DON_BOX",
+                                 "payload":{"uuid":"u","target_ids":[],"don_k":k}});
+        let legal = vec![bx(1), bx(2), bx(1)];
+        let groups = merge_root_stats(&state, &masters, &legal, &[1.0, 5.0, 2.0], &[0.0; 3]);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].n, 5.0); // k=2
+        assert_eq!(groups[1].idxs, vec![0, 2]); // k=1 は 2 本合算
+    }
+
+    /// 温度サンプル: 訪問数の分布から index を引く（累積分布 → searchsorted）。
+    #[test]
+    fn temperature_samples_from_the_visit_distribution() {
+        use super::super::rng::choice_from_uniform;
+        let probs = [0.25, 0.5, 0.25];
+        assert_eq!(choice_from_uniform(&probs, 0.0), 0);
+        assert_eq!(choice_from_uniform(&probs, 0.3), 1);
+        assert_eq!(choice_from_uniform(&probs, 0.8), 2);
+        assert_eq!(choice_from_uniform(&probs, 0.999), 2);
+    }
+
+    /// 付与先の方針: "low"＝このターン攻撃できるキャラの最低パワー・"high"＝最高パワー。
+    #[test]
+    fn attach_policy_picks_low_or_high() {
+        let cands = vec![
+            ("a".to_string(), 5000, false),
+            ("b".to_string(), 3000, true),
+            ("c".to_string(), 7000, true),
+        ];
+        assert_eq!(pick_attach_target(&cands, "low").as_deref(), Some("b"));
+        assert_eq!(pick_attach_target(&cands, "high").as_deref(), Some("c"));
+        // 攻撃できるキャラが無ければ全体の最低パワー
+        let rest = vec![("a".to_string(), 5000, false), ("b".to_string(), 3000, false)];
+        assert_eq!(pick_attach_target(&rest, "low").as_deref(), Some("b"));
+        assert_eq!(pick_attach_target(&[], "low"), None);
+    }
+}

@@ -17,12 +17,18 @@
 pub mod rng;
 pub mod adapter;
 pub mod apply;
+pub mod decide;
 pub mod determinize;
 #[path = "macro.rs"]
 pub mod r#macro;
+pub mod mcts;
 pub mod prune;
+pub mod quiesce;
 #[cfg(test)]
 mod tests_search;
+
+#[allow(unused_imports)]
+pub use rng::{Pcg32SearchRng, RecordedRng, SearchRng};
 
 use crate::journal::Session;
 use crate::model::{GameState, MasterTable, Seat};
@@ -49,17 +55,6 @@ impl Default for SearchOptions {
     fn default() -> Self {
         SearchOptions { prune_futile: true, macro_moves: true, defense_box: true, don_margin: None }
     }
-}
-
-/// 記録した乱数の出目（Python 側 `RecordingRng` が書く）。順に消費し、足りなければ `BadPayload`。
-#[derive(Debug, Clone, Default)]
-pub struct RecordedRng {
-    /// `rng.shuffle(pool)` の結果＝pool（相手の手札＋山札）の並び（uuid 列）。世界サンプルごとに 1 本。
-    pub shuffles: Vec<Vec<String>>,
-    /// `rng.dirichlet([alpha]*n)` の結果ベクトル。root ごとに 1 本。
-    pub dirichlets: Vec<Vec<f64>>,
-    /// `rng.choice(n, p=...)` の一様乱数（温度サンプル）。
-    pub uniforms: Vec<f64>,
 }
 
 /// `OPCGGame.legal_actions(state)`（手番＝`pending_actor_action`）。**WP `rs-p4-legal`**。
@@ -207,6 +202,190 @@ pub fn search_determinize(
     let mut s = Session::new(world);
     let board = board_with_pending(&mut s, masters)?;
     dump(&board, "search_determinize")
+}
+
+/// `opcg_engine.decide(hidden_json, seat, opts_json, rng_json)`（P4・WP `rs-p4-mcts`）。
+///
+/// `opts_json` は [`decide::DecideOptions`] の欄（省略＝serve 既定）に加えて、decide をまたぐ
+/// 状態（`commit`＝残り手順・`resact_pending`）を受ける。`rng_json` は
+/// `{"shuffles":[[uuid...]...],"dirichlets":[[..]...],"uniforms":[..]}`（記録した出目）。
+pub fn decide_json(
+    hidden_json: &str,
+    seat: &str,
+    opts_json: &str,
+    rng_json: &str,
+) -> Result<String, EngineError> {
+    let masters = masters_or_err("decide")?;
+    let net = crate::net::net().ok_or_else(|| {
+        EngineError::BadPayload("decide: opcg_engine.load_net(path) が先に要る".into())
+    })?;
+    let hidden = parse(hidden_json, "decide: hidden")?;
+    let name = seat_or_err(seat, "decide")?;
+    let ov = parse(opts_json, "decide: opts")?;
+    let rv = parse(rng_json, "decide: rng")?;
+    let opts = decide_options_from_json(&ov);
+    let carry = decide::DecideCarry {
+        commit: match ov.get("commit").and_then(Value::as_array) {
+            Some(a) => a
+                .iter()
+                .map(decide::Step::from_json)
+                .collect::<Result<Vec<_>, _>>()?,
+            None => Vec::new(),
+        },
+        resact_pending: ov
+            .get("resact_pending")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+    };
+    let mut rng = recorded_rng_from_json(&rv)?;
+    let mut s = Session::new(GameState::from_record(&hidden, masters)?);
+    // `prefix`＝記録 v5 の `hidden` が持たない中断スタックへ入り直すための手順
+    // （`hidden` は `interaction_depth` しか持たない）。`run_game` と**同じ適用**
+    // （素の `apply_game_action`／`apply_battle_action`・ドレインしない）で辿る。
+    apply_decide_prefix(&mut s, masters, ov.get("prefix"))?;
+    let state = s.into_state();
+    let out = decide::decide(masters, net, &state, name, &opts, &mut rng, &carry)?;
+    let (ns, nd, nu) = rng.consumed();
+    let body = serde_json::json!({
+        "move": out.mv,
+        "kind": out.kind,
+        "stats": {
+            "legal": out.legal,
+            "N": out.n,
+            "Q": out.q,
+            "P": out.p,
+        },
+        "groups": out.groups.iter().map(|g| serde_json::json!({
+            "rep": g.rep, "idxs": g.idxs, "n": g.n, "q": g.q,
+        })).collect::<Vec<_>>(),
+        "commit": out.carry.commit.iter().map(decide::Step::to_json).collect::<Vec<_>>(),
+        "resact_pending": out.carry.resact_pending,
+        "budget": {"used": out.budget_used, "exhausted": out.budget_exhausted},
+        "rng_used": [ns, nd, nu],
+    });
+    dump(&body, "decide")
+}
+
+/// `decide` の `prefix`（`[{"actor":"p1","move":{...}}, ...]`）を `run_game` と同じ手順で適用する。
+///
+/// **ドレインしない**のが要点（`cpu_ai._apply_move_inplace` とは違う）: `game_driver.run_game` は
+/// `action_api.apply_game_action`／`apply_battle_action` を素で呼び、開いた対話は次の決定点へ
+/// 残す。ここで対話を畳むと中断の深さが Python と食い違う。
+fn apply_decide_prefix(
+    s: &mut Session,
+    masters: &MasterTable,
+    prefix: Option<&Value>,
+) -> Result<(), EngineError> {
+    let Some(steps) = prefix.and_then(Value::as_array) else {
+        return Ok(());
+    };
+    for (i, step) in steps.iter().enumerate() {
+        let ctx = |m: String| EngineError::BadPayload(format!("decide: prefix[{i}]: {m}"));
+        let actor = step
+            .get("actor")
+            .and_then(Value::as_str)
+            .and_then(Seat::from_name)
+            .ok_or_else(|| ctx("actor が無い".into()))?;
+        let mv = step.get("move").ok_or_else(|| ctx("move が無い".into()))?;
+        let action_type = mv
+            .get("action_type")
+            .and_then(Value::as_str)
+            .ok_or_else(|| ctx("action_type が無い".into()))?;
+        let out = if mv.get("kind").and_then(Value::as_str) == Some("battle") {
+            crate::rules::actions::apply_battle_action(
+                s,
+                masters,
+                actor,
+                action_type,
+                mv.get("card_uuid").and_then(Value::as_str),
+            )
+        } else {
+            let empty = Value::Object(serde_json::Map::new());
+            let payload = mv.get("payload").unwrap_or(&empty);
+            crate::rules::actions::apply_game_action(s, masters, actor, action_type, payload)
+        };
+        out.map_err(|e| match e {
+            EngineError::BadPayload(m) => ctx(m),
+            EngineError::Unimplemented(m) => {
+                EngineError::Unimplemented(format!("decide: prefix[{i}]: {m}"))
+            }
+        })?;
+    }
+    Ok(())
+}
+
+fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
+    let d = decide::DecideOptions::default();
+    let flag = |key: &str, default: bool| v.get(key).and_then(Value::as_bool).unwrap_or(default);
+    decide::DecideOptions {
+        sims: v
+            .get("sims")
+            .and_then(Value::as_u64)
+            .map(|n| n as usize)
+            .unwrap_or(d.sims),
+        c_puct: v.get("c_puct").and_then(Value::as_f64).unwrap_or(d.c_puct),
+        dirichlet_eps: v
+            .get("dirichlet_eps")
+            .and_then(Value::as_f64)
+            .unwrap_or(d.dirichlet_eps),
+        temp_turns: v
+            .get("temp_turns")
+            .and_then(Value::as_i64)
+            .map(|n| n as i32)
+            .unwrap_or(d.temp_turns),
+        box_commit: flag("box_commit", d.box_commit),
+        box_battle: flag("box_battle", d.box_battle),
+        box_dialog: flag("box_dialog", d.box_dialog),
+        quiesce: flag("quiesce", d.quiesce),
+        residual_dig: flag("residual_dig", d.residual_dig),
+        residual_activate: v
+            .get("residual_activate")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        search: options_from_json(v),
+        budget: match v.get("budget") {
+            None | Some(Value::Null) => d.budget,
+            Some(other) => other.as_i64().filter(|b| *b > 0),
+        },
+    }
+}
+
+fn recorded_rng_from_json(v: &Value) -> Result<RecordedRng, EngineError> {
+    let bad = |m: &str| EngineError::BadPayload(format!("decide: rng の {m} の形が違う"));
+    let shuffles = match v.get("shuffles").and_then(Value::as_array) {
+        None => Vec::new(),
+        Some(a) => a
+            .iter()
+            .map(|row| {
+                row.as_array()
+                    .ok_or_else(|| bad("shuffles"))?
+                    .iter()
+                    .map(|u| u.as_str().map(str::to_owned).ok_or_else(|| bad("shuffles")))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    };
+    let dirichlets = match v.get("dirichlets").and_then(Value::as_array) {
+        None => Vec::new(),
+        Some(a) => a
+            .iter()
+            .map(|row| {
+                row.as_array()
+                    .ok_or_else(|| bad("dirichlets"))?
+                    .iter()
+                    .map(|x| x.as_f64().ok_or_else(|| bad("dirichlets")))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    };
+    let uniforms = match v.get("uniforms").and_then(Value::as_array) {
+        None => Vec::new(),
+        Some(a) => a
+            .iter()
+            .map(|x| x.as_f64().ok_or_else(|| bad("uniforms")))
+            .collect::<Result<Vec<_>, _>>()?,
+    };
+    Ok(RecordedRng::new(shuffles, dirichlets, uniforms))
 }
 
 /// `opcg_engine.search_apply(hidden_json, seat, move_json, stop_at_select)` → 盤面 dict。

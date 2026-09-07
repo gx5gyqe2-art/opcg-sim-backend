@@ -231,14 +231,28 @@ pub fn load_net(path: &str, tables_path: Option<&str>) -> Result<String, EngineE
                 EngineError::BadPayload("net: load_masters() が先に要る".into())
             })?;
             let t = crate::encode::build_eff_tables(masters, &vocab)?;
-            let n = t.n;
-            (t, vec![0.0f32; n])
+            // `n_rel_feat.profile_table` の `ret_don`（vocab 行・0=PAD は 0.0）。WP `rs-p4-net` は
+            // ハーネスが書いた npz から読んでいたが、`tables_path` 省略時に 0 のままだと方策の
+            // 予算 3 列が壊れる（`decide` はこちらを通る）＝Rust の profile から組む。
+            (t, ret_don_table(masters, &vocab))
         }
     };
     let tab = card_table(&weights, &tables)?;
     let statics = nrel::CardStatics { pwr: tables.pwr.clone(), isl: tables.isl.clone(), ret_don };
     let loaded = LoadedNet { weights, tab, vocab, statics };
     Ok(summary(NET.get_or_init(|| loaded)))
+}
+
+/// Python `n_rel_feat.profile_table(db, vocab)` の `ret_don` 列（行＝vocab index・0=PAD は 0.0）。
+fn ret_don_table(masters: &crate::model::MasterTable, vocab: &Vocab) -> Vec<f32> {
+    let mut cache = crate::encode::tokens::ProfileCache::default();
+    let mut out = vec![0.0f32; vocab.ids.len() + 1];
+    for (i, id) in vocab.ids.iter().enumerate() {
+        if let Some(mi) = masters.by_id.get(id) {
+            out[i + 1] = cache.get(masters, *mi).ret_don as f32;
+        }
+    }
+    out
 }
 
 fn summary(n: &LoadedNet) -> String {

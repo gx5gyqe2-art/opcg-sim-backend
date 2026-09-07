@@ -275,6 +275,15 @@ impl Session {
         self.action_events.clear();
     }
 
+    /// イベントログを差し替えて古い方を返す（Python の
+    /// `saved = mgr.action_events; mgr.action_events = JournaledList()` … `mgr.action_events = saved`）。
+    ///
+    /// 探索は枝ごとにログを空へ振り替える（枝間でイベントを混ぜない）。journal の外なので
+    /// 巻き戻しでは戻らない＝呼び出し側が明示的に戻す。
+    pub fn swap_events(&mut self, events: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
+        std::mem::replace(&mut self.action_events, events)
+    }
+
     /// 読み取り専用の盤面。
     pub fn state(&self) -> &GameState {
         &self.state

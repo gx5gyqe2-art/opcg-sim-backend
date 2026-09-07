@@ -1,10 +1,11 @@
-"""探索オラクル（`docs/rust_engine_plan.md` §12.2・WP `rs-p4-legal` の受け入れ道具）。
+"""探索オラクル（`docs/rust_engine_plan.md` §12.2・WP `rs-p4-legal`／`rs-p4-mcts` の受け入れ道具）。
 
-**問い**: Rust の「探索用の候補・世界サンプル・手の適用」（`search/{adapter,macro,prune,
-determinize,apply}.rs`）は Python 版（`learned/adapter.py::OPCGGame.legal_actions`／
-`cpu_ai._determinize_opponent`／`cpu_ai._apply_move_inplace`）と**同じ答え**を返すか。
+**問い**: Rust の探索（`search/{adapter,macro,prune,determinize,apply,quiesce,mcts,decide}.rs`）は
+Python 版（`learned/adapter.py::OPCGGame`／`cpu_ai._determinize_opponent`／
+`cpu_ai._apply_move_inplace`／`learned/mcts.py::TreeMCTS`／`core/cpu_learned.py::LearnedEngine.decide`）と
+**同じ答え**を返すか。
 
-3 本を `--what` で選ぶ（既定は 3 本とも）:
+4 本を `--what` で選ぶ（既定は 3 本＝legal,determinize,apply。decide は明示指定）:
 
   legal        `OPCGGame.legal_actions` を**順序込み**で照合する。局面そのもの（pass A）に加え、
                先頭の合法手を数手打った先（pass B＝`--prefix`）でも照合する。記録 v5 の
@@ -16,15 +17,30 @@ determinize,apply}.rs`）は Python 版（`learned/adapter.py::OPCGGame.legal_ac
   apply        各局面の全合法手（上限 `--max-moves`）を両側で適用し、盤面 dict
                （`pending_request` 込み）を照合する。**例外も答え**として扱い、
                両側 error なら一致・片側だけ error なら不一致と数える。
+  decide       **1 手の決定そのもの**を照合する（WP `rs-p4-mcts`）。Python の `LearnedEngine`
+               （a1・serve 既定）で `--games` 局を打ち、各決定点で
+                 (a) 決定前の `hidden`、(b) その decide が引いた乱数の出目（世界サンプルの並び・
+                 Dirichlet・温度サンプルの一様乱数）、(c) 箱コミットの残り手順、
+               を採って Rust の `decide` を**同じ出目**で走らせ、**手**と**根の訪問数 N** を
+               照合する。窓（window）・コミット（commit）の決定点は手の一致のみ
+               （どちらも訪問を配らないため N が無い）。
+
+               同点で argmax が割れた決定点（float の丸めで PUCT の順位が入れ替わりうる）は
+               「訪問分布の L1 ≤ 2/sims」で通し、`ties` として件数を報告する。
+               探索の途中で山札を混ぜた（`random.shuffle` を消費した）決定点は、Rust 側が
+               自前の擬似乱数で混ぜる（計画 §12.4-4）ため盤面が食い違って当然＝
+               `shuffle_skipped` として照合から外す（黙って一致にしない）。
 
 出力は `RS_SEARCH {...}` の 1 行（`--what` ごとに 1 行）。
 
-`opcg_engine` が無い／`search_legal` を持たない古い拡張では全件 unimplemented として集計する
+`opcg_engine` が無い／必要な関数を持たない古い拡張では全件 unimplemented として集計する
 （黙って緑にしない）。
 
 実行例:
     OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_search_oracle.py \\
       --what legal,determinize,apply --boards 200
+    OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_search_oracle.py \\
+      --what decide --games 100 --jobs 8
     OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_search_oracle.py \\
       --what legal --boards 20 --games 2 --policy random --verbose   # 開発中の一次チェック
 """
@@ -40,6 +56,8 @@ import sys  # noqa: E402
 import time  # noqa: E402
 import traceback  # noqa: E402
 
+import numpy as np  # noqa: E402
+
 import os as _os, sys as _sys  # noqa: E402  test bootstrap (sys.path + google スタブ)
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
@@ -47,7 +65,7 @@ import _bootstrap  # noqa: E402,F401
 
 from harness.game_driver import DEFAULT_MAX_STEPS, load_db  # noqa: E402
 from harness.rs_record import manager_from_hidden  # noqa: E402
-from rs_diff_replay import board_dict, canon, first_diff  # noqa: E402
+from rs_diff_replay import board_dict, canon, first_diff, hidden_dict  # noqa: E402
 from rs_query_oracle import collect_boards, ensure_effects_json, evenly  # noqa: E402
 
 from opcg_sim.src.core import cpu_ai  # noqa: E402
@@ -60,8 +78,9 @@ except ImportError:         # pragma: no cover - 実行環境依存
 
 _REPO_ROOT = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 DEFAULT_EFFECTS = _os.path.join(_REPO_ROOT, "opcg_sim", "data", "opcg_effects.json")
+DEFAULT_NET = _os.path.join(_REPO_ROOT, "opcg_sim", "data", "learned", "nrel_a1.npz")
 
-WHATS = ("legal", "determinize", "apply")
+WHATS = ("legal", "determinize", "apply", "decide")
 
 
 # --- Python 側の盤面（記録 v5 の hidden から「動く」manager を組む）------------------
@@ -156,6 +175,15 @@ class Totals(dict):
 def note_first(firsts: list, row: dict) -> None:
     if not firsts:
         firsts.append(row)
+
+
+_LOUD = {"on": False}
+
+
+def note_loud(row: dict) -> None:
+    """`--verbose` のとき不一致を**その場で**出す（1 件目だけでは原因が追えないため）。"""
+    if _LOUD["on"]:
+        print("  ! " + json.dumps(row, ensure_ascii=False, default=str)[:1400], flush=True)
 
 
 # --- 1. 候補（legal）-------------------------------------------------------------
@@ -363,6 +391,444 @@ CHECKERS = {
 }
 
 
+# --- 4. 決定（decide）--------------------------------------------------------------
+#
+# `opcg_sim/` は変えない。ここで足すのは 3 つのハーネス部品だけ:
+#   `RecordingRng`   … `np.random.Generator` を包んで shuffle／dirichlet／choice の出目を記録する
+#   `RecordingEngine`… `LearnedEngine._world_rng` の返り値を上のラッパへ差し替える（席別 seam）
+#   `_TracingMCTS`   … `cpu_learned` が参照する `TreeMCTS` を包んで `last_stats` を取り出す
+# どれも観測専用で、Python 側の決定そのものは 1 bit も変えない。
+
+class RecordingRng:
+    """`np.random.Generator` の薄い記録ラッパ（出目を `sink` へ書く）。
+
+    `choice(n, p=...)` だけは**自前で組む**（numpy の実装と同じ「累積分布を cdf[-1] で割り
+    `searchsorted(u, side="right")`」＝2,000 回の照合で完全一致）。こうすると Rust へ渡せる
+    「引いた一様乱数」がそのまま採れる（numpy の内部からは取り出せない）。
+    """
+
+    def __init__(self, rng, sink):
+        self._rng = rng
+        self._sink = sink
+
+    def shuffle(self, seq):
+        self._rng.shuffle(seq)
+        self._sink["shuffles"].append([getattr(c, "uuid", None) for c in seq])
+
+    def dirichlet(self, alpha, size=None):
+        v = self._rng.dirichlet(alpha, size)
+        self._sink["dirichlets"].append([float(x) for x in np.asarray(v).reshape(-1)])
+        return v
+
+    def choice(self, a, size=None, replace=True, p=None):
+        if p is None or size is not None:
+            return self._rng.choice(a, size=size, replace=replace, p=p)
+        u = float(self._rng.random())
+        self._sink["uniforms"].append(u)
+        cdf = np.asarray(p, np.float64).cumsum()
+        cdf /= cdf[-1]
+        return int(min(int(cdf.searchsorted(u, side="right")), len(cdf) - 1))
+
+    def __getattr__(self, name):     # integers / random / …（記録しない口は素通し）
+        return getattr(self._rng, name)
+
+
+def _engine_class():
+    """`LearnedEngine` に `_world_rng` の記録だけを足した席別 seam（ハーネス内）。"""
+    from opcg_sim.src.core import cpu_learned
+
+    class RecordingEngine(cpu_learned.LearnedEngine):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, **kw)
+            self.rec = None      # 現在の決定点の出目シンク（None＝記録しない）
+
+        def _world_rng(self, manager, name, rng):
+            g = super()._world_rng(manager, name, rng)
+            return RecordingRng(g, self.rec) if self.rec is not None else g
+
+    return RecordingEngine
+
+
+_MCTS_STATS = {}
+
+
+def _install_mcts_probe():
+    """`cpu_learned` が使う `TreeMCTS` を包み、`run` 後の `last_stats` を横取りする。
+
+    `decide` は木のインスタンスを返さないので、根の訪問数 N を採るにはここしかない
+    （`record["groups"]` は**マージ後**の集計＝素の N ではない）。観測専用。
+    """
+    from opcg_sim.src.core import cpu_learned
+
+    base = cpu_learned.TreeMCTS
+    if getattr(base, "_rs_probe", False):
+        return
+
+    class _TracingMCTS(base):
+        _rs_probe = True
+
+        def run(self, real_state):
+            out = super().run(real_state)
+            _MCTS_STATS["last"] = getattr(self, "last_stats", None)
+            return out
+
+    cpu_learned.TreeMCTS = _TracingMCTS
+
+
+def _step_to_json(step):
+    """Python の箱コミット手順 → Rust の `Step` JSON。"""
+    if isinstance(step, tuple) and len(step) == 3 and step[0] == "__box__":
+        return {"kind": "box", "sig": [_jsonable(x) for x in step[1]], "left": int(step[2])}
+    return {"kind": "sig", "sig": [_jsonable(x) for x in step]}
+
+
+def _jsonable(x):
+    return list(x) if isinstance(x, tuple) else x
+
+
+def _commit_steps(engine, manager, name):
+    """その決定点で有効なコミット（Python の `_commits` から読む・無ければ空）。"""
+    hit = engine._commits.get(engine._commit_key(manager, name))
+    if hit is None or hit[0]() is not manager:
+        return []
+    return [_step_to_json(s) for s in hit[1]]
+
+
+def _decide_opts(args, engine, manager, name):
+    opts = {"sims": args.sims, "commit": _commit_steps(engine, manager, name),
+            "resact_pending": bool(engine._resact_pending)}
+    for key, value in (("prune_futile", args.prune_futile), ("macro_moves", args.macro_moves),
+                       ("defense_box", args.defense_box), ("don_margin", args.don_margin)):
+        if value is not None:
+            opts[key] = value
+    return opts
+
+
+def _restorable(hidden: dict) -> bool:
+    """記録 v5 の `hidden` だけで盤面を完全に復元できるか。
+
+    `hidden` は中断スタック・誘発待ち行列・ターン終了待ちを**件数でしか**持たない
+    （`hidden_dict` の注記）ので、0 でない決定点は `prefix`（そこへ至る手順の再適用）が要る。
+    """
+    m = hidden.get("manager") or {}
+    return not (m.get("interaction_depth") or m.get("pending_triggers")
+                or m.get("pending_end_of_turn"))
+
+
+class GlobalShuffleCounter:
+    """`random.shuffle` の呼び出し回数を局のあいだ数え続ける（観測だけ）。
+
+    `prefix` を再適用する経路（Rust）は自前の並びで混ぜるので、**基準点から今までの間に
+    山札を混ぜていたら照合できない**。`ShuffleCounter` と違い局全体で開きっぱなしにする。
+    """
+
+    def __enter__(self):
+        self._real = random.shuffle
+        self.n = 0
+
+        def wrapped(seq, *a, **kw):
+            self._real(seq, *a, **kw)
+            self.n += 1
+
+        random.shuffle = wrapped
+        return self
+
+    def __exit__(self, *exc):
+        random.shuffle = self._real
+        return False
+
+
+class DecideRunner:
+    """1 局を打ちながら、各決定点で Python と Rust の decide を照合する。"""
+
+    def __init__(self, db, args, totals: "Totals", firsts: list):
+        self.db, self.args, self.totals, self.firsts = db, args, totals, firsts
+        _install_mcts_probe()
+        self.engine = _engine_class()(value_path=args.net)
+        self.shuffles = None          # 局のあいだ開きっぱなしの `GlobalShuffleCounter`
+        self.reset_game()
+
+    def reset_game(self):
+        """局の頭で基準点（復元できる決定点）と手順を空にする。"""
+        self.base_hidden = None       # 完全に復元できる直近の `hidden`
+        self.prefix = []              # そこから今までに打った手（`run_game` と同じ適用）
+        self.base_shuffles = 0
+
+    def seat(self, ctx):
+        manager, player = ctx.manager, ctx.actor
+        name = player.name
+        totals = self.totals
+        args = self.args
+        hidden = hidden_dict(manager)
+        shuffled_now = self.shuffles.n if self.shuffles is not None else 0
+        if _restorable(hidden):
+            # ここから復元できる＝基準点を更新して手順を空にする。
+            self.base_hidden, self.prefix, self.base_shuffles = hidden, [], shuffled_now
+        commit_in = _commit_steps(self.engine, manager, name)
+        opts = _decide_opts(args, self.engine, manager, name)
+        prefix = list(self.prefix)
+        if prefix:
+            opts["prefix"] = prefix
+        sink = {"shuffles": [], "dirichlets": [], "uniforms": []}
+        self.engine.rec = sink
+        record = {}
+        _MCTS_STATS.pop("last", None)
+        try:
+            with ShuffleCounter() as shuffles:
+                move = self.engine.decide(manager, player, sims=args.sims, record=record)
+        finally:
+            self.engine.rec = None
+        stats = _MCTS_STATS.pop("last", None)
+        kind = record.get("kind")
+        totals.bump("decisions")
+        totals.bump(f"kind_{kind}")
+        if commit_in:
+            totals.bump("with_commit_in")
+        if prefix:
+            totals.bump("with_prefix")
+
+        skip = None
+        if self.base_hidden is None:
+            skip = "unrestorable_skipped"     # 局頭から一度も復元できる点が無い（起こらない想定）
+        elif shuffled_now != self.base_shuffles:
+            # 基準点から今までのあいだに山札を混ぜた＝prefix の再適用で並びが食い違う。
+            skip = "shuffle_skipped"
+        elif shuffles.n:
+            # 探索の中で山札を混ぜた＝Rust は自前の擬似乱数で混ぜる（§12.4-4）ので
+            # 盤面が食い違って当然。どちらも「黙って一致」にしない。
+            skip = "shuffle_skipped"
+        elif len(prefix) > args.max_prefix:
+            skip = "long_prefix_skipped"
+        if skip is not None:
+            totals.bump(skip)
+        else:
+            self._compare(self.base_hidden, name, opts, sink, move, kind, stats, record)
+        self.prefix.append({"actor": name, "move": move})
+        return move
+
+    def _compare(self, hidden, name, opts, sink, move, kind, stats, record):
+        totals, firsts = self.totals, self.firsts
+        if opcg_engine is None or not hasattr(opcg_engine, "decide"):
+            totals.bump("unimplemented")
+            return
+        totals.bump("checks")
+        try:
+            got = json.loads(opcg_engine.decide(
+                json.dumps(hidden, ensure_ascii=False, default=str), name,
+                json.dumps(opts, ensure_ascii=False, default=str),
+                json.dumps(sink, ensure_ascii=False)))
+        except NotImplementedError as e:
+            totals.bump("unimplemented")
+            note_first(firsts, {"kind": "unimplemented", "detail": str(e)})
+            return
+        except ValueError as e:
+            totals.bump("bad_payload")
+            row = {"kind": "bad_payload", "decide_kind": kind, "detail": str(e),
+                   "commit_in": opts.get("commit"), "rng": sink}
+            note_first(firsts, row)
+            note_loud(row)
+            return
+
+        if got.get("kind") != kind:
+            totals.bump("mismatch")
+            totals.bump("kind_mismatch")
+            row = {"kind": "kind", "python": kind, "rust": got.get("kind"),
+                   "commit_in": opts.get("commit"), "python_move": move,
+                   "rust_move": got.get("move")}
+            note_first(firsts, row)
+            note_loud(row)
+            return
+        same_move = norm(move) == norm(got.get("move"))
+        rs_pre_legal = (got.get("stats") or {}).get("legal")
+
+        # 窓・コミットの決定点は手の一致だけを見る（訪問を配らないので N が無い）。
+        if kind != "main":
+            if same_move:
+                totals.bump("match")
+                return
+            # 窓の根畳みは枝の**出口 value** の argmax。float32 の行列積は加算順が numpy と
+            # 違う（`rs_net_oracle` の許容 1e-5）ので、同値の枝（同名カードの別実体など）で
+            # 順位が割れうる。Rust 側の Q で「その差が許容以下＝同点」と確かめられたときだけ
+            # 通し、`ties` として件数を報告する（§12.4-5 の同点規約）。
+            tie = False
+            rs_q = [float(x) for x in ((got.get("stats") or {}).get("Q") or [])]
+            if kind == "window" and rs_q and rs_pre_legal:
+                want = norm(move)
+                idx = next((i for i, m in enumerate(rs_pre_legal) if norm(m) == want), None)
+                best = max(range(len(rs_q)), key=lambda i: rs_q[i])
+                tie = (idx is not None and idx < len(rs_q)
+                       and abs(rs_q[idx] - rs_q[best]) <= self.args.tie_tol)
+            if tie:
+                totals.bump("match")
+                totals.bump("ties")
+                totals.bump("tie_window")
+                return
+            totals.bump("mismatch")
+            totals.bump("move_mismatch")
+            row = {"kind": "move", "decide_kind": kind, "python": move,
+                   "rust": got.get("move"), "commit_in": opts.get("commit"),
+                   "rust_Q": rs_q[:12],
+                   "rust_legal": [m.get("action_type") for m in (rs_pre_legal or [])][:12]}
+            note_first(firsts, row)
+            note_loud(row)
+            return
+
+        rs = got.get("stats") or {}
+        py_legal = list(stats["legal"]) if stats and stats.get("legal") is not None else []
+        py_n = [float(x) for x in np.asarray(stats["N"]).reshape(-1)] if stats else []
+        rs_legal = list(rs.get("legal") or [])
+        rs_n = [float(x) for x in (rs.get("N") or [])]
+        if norm(py_legal) != norm(rs_legal):
+            totals.bump("mismatch")
+            totals.bump("legal_mismatch")
+            row = {"kind": "legal", "python_n": len(py_legal), "rust_n": len(rs_legal),
+                   "path": first_diff(canon(py_legal), canon(rs_legal))}
+            note_first(firsts, row)
+            note_loud(row)
+            return
+        l1 = (sum(abs(a - b) for a, b in zip(py_n, rs_n))
+              if len(py_n) == len(rs_n) else None)
+        if same_move and l1 == 0.0:
+            totals.bump("match")
+            if len(py_legal) > 1:
+                totals.bump("multi_choice")
+            return
+        # 同点で argmax／PUCT の順位が割れた: 訪問分布の L1 ≤ 2/sims なら通す（件数を報告）。
+        if l1 is not None and l1 <= 2.0:
+            totals.bump("match")
+            totals.bump("ties")
+            if not same_move:
+                totals.bump("tie_moves")
+            return
+        totals.bump("mismatch")
+        totals.bump("n_mismatch" if same_move else "move_mismatch")
+        py_q = [float(x) for x in np.asarray(stats["Q"]).reshape(-1)] if stats else []
+        rs_q = [float(x) for x in (rs.get("Q") or [])]
+        dq = (max((abs(a - b) for a, b in zip(py_q, rs_q)), default=0.0)
+              if len(py_q) == len(rs_q) else None)
+        totals.bump("n_mismatch_same_move", int(bool(same_move)))
+        if l1 is not None:
+            totals["l1_max"] = max(totals.get("l1_max", 0.0), l1)
+        row = {
+            "kind": "decide", "same_move": same_move, "l1": l1, "sims": self.args.sims,
+            "max_abs_dq": dq,
+            "python_move": move, "rust_move": got.get("move"),
+            "python_N": py_n[:12], "rust_N": rs_n[:12],
+            "python_Q": [round(x, 9) for x in py_q[:12]],
+            "rust_Q": [round(x, 9) for x in rs_q[:12]],
+            "legal": [m.get("action_type") for m in py_legal][:12],
+            "sig": record.get("sig"),
+        }
+        note_first(firsts, row)
+        note_loud(row)
+
+
+def _play_decide_games(db, args, seeds, totals: "Totals", firsts: list) -> None:
+    from harness.game_driver import run_game
+    _LOUD["on"] = bool(args.verbose)
+    runner = DecideRunner(db, args, totals, firsts)
+    seat = {"p1": runner.seat, "p2": runner.seat}
+    for seed in seeds:
+        t0 = time.time()
+        runner.reset_game()
+        try:
+            with GlobalShuffleCounter() as counter:
+                runner.shuffles = counter
+                run_game(seed, db, seats=seat, max_steps=args.max_steps,
+                         stop_after_decisions=(args.max_decisions or None))
+        except Exception as e:  # noqa: BLE001 - 局が落ちてもそこまでの決定点は使える
+            totals.bump("game_aborted")
+            note_first(firsts, {"kind": "game_aborted", "seed": seed,
+                                "detail": f"{type(e).__name__}: {e}"})
+        finally:
+            runner.shuffles = None
+        totals.bump("games_played")
+        if args.verbose:
+            print(f"[decide] seed={seed} decisions={totals.get('decisions', 0)} "
+                  f"match={totals.get('match', 0)} mismatch={totals.get('mismatch', 0)} "
+                  f"({time.time() - t0:.1f}s)", flush=True)
+
+
+def _decide_worker(payload):
+    """並列実行の 1 ワーカー（seed の部分集合を打って集計を返す）。"""
+    args = argparse.Namespace(**payload["args"])
+    db = load_db()
+    if opcg_engine is not None and hasattr(opcg_engine, "load_masters"):
+        opcg_engine.load_masters(payload["effects"])
+        opcg_engine.load_net(args.net)
+    totals, firsts = Totals(), []
+    _play_decide_games(db, args, payload["seeds"], totals, firsts)
+    return {"totals": dict(totals), "firsts": firsts[:1]}
+
+
+def run_decide(db, args, effects_path: str) -> int:
+    """`--what decide` の本体（`run_one` と同じ形の 1 行を出す）。"""
+    t0 = time.time()
+    seeds = [args.seed_base + i for i in range(args.games)]
+    totals, firsts = Totals(), []
+    if args.jobs > 1 and len(seeds) > 1:
+        import concurrent.futures as cf
+        shards = [seeds[i::args.jobs] for i in range(args.jobs)]
+        payloads = [{"args": vars(args), "seeds": s, "effects": effects_path}
+                    for s in shards if s]
+        with cf.ProcessPoolExecutor(max_workers=len(payloads)) as pool:
+            for out in pool.map(_decide_worker, payloads):
+                for k, v in out["totals"].items():
+                    totals.bump(k, v)
+                for row in out["firsts"]:
+                    note_first(firsts, row)
+    else:
+        if opcg_engine is not None and hasattr(opcg_engine, "load_net"):
+            opcg_engine.load_net(args.net)
+        _play_decide_games(db, args, seeds, totals, firsts)
+
+    summary = {
+        "what": "decide",
+        "games": args.games,
+        "games_played": totals.get("games_played", 0),
+        "decisions": totals.get("decisions", 0),
+        "checks": totals.get("checks", 0),
+        "match": totals.get("match", 0),
+        "mismatch": totals.get("mismatch", 0),
+        "ties": totals.get("ties", 0),
+        "tie_moves": totals.get("tie_moves", 0),
+        "tie_window": totals.get("tie_window", 0),
+        "move_mismatch": totals.get("move_mismatch", 0),
+        "n_mismatch": totals.get("n_mismatch", 0),
+        "n_mismatch_same_move": totals.get("n_mismatch_same_move", 0),
+        "l1_max": totals.get("l1_max", 0.0),
+        "legal_mismatch": totals.get("legal_mismatch", 0),
+        "kind_mismatch": totals.get("kind_mismatch", 0),
+        "shuffle_skipped": totals.get("shuffle_skipped", 0),
+        "long_prefix_skipped": totals.get("long_prefix_skipped", 0),
+        "unrestorable_skipped": totals.get("unrestorable_skipped", 0),
+        "with_prefix": totals.get("with_prefix", 0),
+        "unimplemented": totals.get("unimplemented", 0),
+        "bad_payload": totals.get("bad_payload", 0),
+        "harness_error": totals.get("harness_error", 0),
+        "game_aborted": totals.get("game_aborted", 0),
+        # 空振り検査: どの読み出し経路をどれだけ踏んだか（main=木／window=窓の根畳み／
+        # commit=箱コミットの機械実行）と、候補が 2 つ以上あった決定点の数。
+        "kind_main": totals.get("kind_main", 0),
+        "kind_window": totals.get("kind_window", 0),
+        "kind_commit": totals.get("kind_commit", 0),
+        "with_commit_in": totals.get("with_commit_in", 0),
+        "multi_choice": totals.get("multi_choice", 0),
+        "sims": args.sims,
+        "net": _os.path.basename(args.net),
+        "seed_base": args.seed_base,
+        "jobs": args.jobs,
+        "engine": (opcg_engine.version() if opcg_engine is not None else None),
+        "seconds": round(time.time() - t0, 1),
+        "first": firsts[0] if firsts else None,
+    }
+    print("RS_SEARCH " + json.dumps(summary, ensure_ascii=False, default=str))
+    bad = (totals.get("mismatch", 0) or totals.get("bad_payload", 0)
+           or totals.get("unimplemented", 0) or totals.get("harness_error", 0)
+           or not totals.get("checks", 0))
+    return 1 if bad else 0
+
+
 def run_one(what: str, db, boards: list, args, effects_path: str) -> int:
     totals = Totals()
     firsts: list = []
@@ -442,11 +908,26 @@ def main(argv=None) -> int:
                     help="マージン付与（既定＝cpu_ai.DON_MARGIN_ATTACH）")
     ap.add_argument("--effects", default=DEFAULT_EFFECTS,
                     help="効果構造 JSON（Rust のカード定義表・カード DB と食い違えば再生成する）")
+    ap.add_argument("--net", default=DEFAULT_NET,
+                    help="decide が使う NRel の npz（既定 nrel_a1.npz＝出荷既定）")
+    ap.add_argument("--sims", type=int, default=None,
+                    help="decide の探索回数（既定＝config.SERVE_SIMS）")
+    ap.add_argument("--max-decisions", type=int, default=0,
+                    help="decide で 1 局あたりの決定点の上限（0=無制限）")
+    ap.add_argument("--jobs", type=int, default=1,
+                    help="decide を何プロセスに分けて打つか（既定 1）")
+    ap.add_argument("--tie-tol", type=float, default=1e-5,
+                    help="decide の窓で「同点」とみなす出口 value の差（既定 1e-5＝forward の許容）")
+    ap.add_argument("--max-prefix", type=int, default=24,
+                    help="decide で中断へ入り直す手順の上限（超えたら照合から外す・既定 24）")
     ap.add_argument("--verbose", action="store_true", help="局面ごとの進捗を出す")
     args = ap.parse_args(argv)
+    if args.sims is None:
+        from opcg_sim.src.learned.config import SERVE_SIMS
+        args.sims = SERVE_SIMS
 
     whats = [w.strip() for w in args.what.split(",") if w.strip()]
-    unknown = [w for w in whats if w not in CHECKERS]
+    unknown = [w for w in whats if w not in CHECKERS and w != "decide"]
     if unknown:
         ap.error(f"unknown --what: {unknown} (choose from {list(WHATS)})")
 
@@ -455,6 +936,9 @@ def main(argv=None) -> int:
     if opcg_engine is not None and hasattr(opcg_engine, "load_masters"):
         n = opcg_engine.load_masters(effects_path)
         print(f"[effects] load_masters({effects_path}) -> {n} cards")
+
+    if whats == ["decide"]:
+        return run_decide(db, args, effects_path)
 
     policies = ["random", "l1"] if args.policy == "both" else [args.policy]
     rows = []
@@ -472,7 +956,10 @@ def main(argv=None) -> int:
 
     rc = 0
     for what in whats:
-        rc |= run_one(what, db, boards, args, effects_path)
+        if what == "decide":
+            rc |= run_decide(db, args, effects_path)
+        else:
+            rc |= run_one(what, db, boards, args, effects_path)
     return rc
 
 

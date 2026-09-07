@@ -1324,8 +1324,67 @@ const MANAGER_KEYS: &[&str] = &[
     "interaction_depth",
     "pending_triggers",
     "pending_end_of_turn",
+    // 記録 v5 の追加（P4・WP `rs-p4-mcts`）: 期間付き効果の**一覧**。
+    // カード側の `timed_power` 等だけを記録しても、失効させる側（`continuous::expire`）が
+    // 効果を知らないため「このターン中 −5000」がターンを跨いで残る（決定オラクルで実測）。
+    // 欄が無い記録（v5 以前）は空＝従来どおり。
+    "continuous",
+];
+const CONTINUOUS_KEYS: &[&str] = &[
+    "target_uuid",
+    "kind",
+    "amount",
+    "flag",
+    "keyword",
+    "duration",
+    "expire_turn",
 ];
 const ACTIVE_BATTLE_KEYS: &[&str] = &["attacker", "target", "attacker_owner", "target_owner", "counter_buff"];
+
+/// 記録 v5 の `manager.continuous` → [`ContinuousEffect`] 列（欄が無ければ空）。
+///
+/// Python `effects/continuous.py::ContinuousEffect` の dataclass と 1:1
+/// （`target_uuid`／`kind`／`amount`／`flag`／`keyword`／`duration`／`expire_turn`）。
+fn continuous_from_record(m: &Obj, mctx: &str) -> Result<Vec<ContinuousEffect>, EngineError> {
+    let Some(v) = m.get("continuous") else {
+        return Ok(Vec::new());
+    };
+    if v.is_null() {
+        return Ok(Vec::new());
+    }
+    let arr = v
+        .as_array()
+        .ok_or_else(|| bad(format!("{mctx}.continuous: expected a list")))?;
+    let mut out = Vec::with_capacity(arr.len());
+    for (i, row) in arr.iter().enumerate() {
+        let ctx = format!("{mctx}.continuous[{i}]");
+        let o = row
+            .as_object()
+            .ok_or_else(|| bad(format!("{ctx}: expected an object")))?;
+        ensure_keys(o, CONTINUOUS_KEYS, &ctx)?;
+        let kind_name = f_str(o, "kind", &ctx)?;
+        let kind = match kind_name {
+            "POWER" => ContinuousKind::Power,
+            "COST" => ContinuousKind::Cost,
+            "FLAG" => ContinuousKind::Flag,
+            "KEYWORD" => ContinuousKind::Keyword,
+            other => return Err(bad(format!("{ctx}.kind: unknown kind '{other}'"))),
+        };
+        let duration_name = f_str(o, "duration", &ctx)?;
+        let duration = crate::effects::ast::Duration::from_name(duration_name)
+            .ok_or_else(|| bad(format!("{ctx}.duration: unknown duration '{duration_name}'")))?;
+        out.push(ContinuousEffect {
+            target_uuid: f_str(o, "target_uuid", &ctx)?.to_owned(),
+            kind,
+            amount: f_i32(o, "amount", &ctx)?,
+            flag: f_str(o, "flag", &ctx)?.to_owned(),
+            keyword: f_str(o, "keyword", &ctx)?.to_owned(),
+            duration,
+            expire_turn: f_i32(o, "expire_turn", &ctx)?,
+        });
+    }
+    Ok(out)
+}
 
 /// カード実体を集めながら uuid → index を作る読み込みの作業台。
 struct Loader<'a> {
@@ -1584,8 +1643,8 @@ impl GameState {
             interaction_stack: Vec::new(),
             battle_triggers: Vec::new(),
             pending_triggers: Vec::new(),
-            // P3 の欄も記録には無い（件数だけ）＝空・既定で始める。
-            continuous: Vec::new(),
+            // 記録 v5 の `manager.continuous`（無ければ空＝v5 以前と同じ）。
+            continuous: continuous_from_record(m, mctx)?,
             deferred_continuations: Vec::new(),
             pending_end_of_turn: Vec::new(),
             pending_extra_turn: None,
@@ -2080,6 +2139,38 @@ mod tests {
         hidden["manager"]["phase"] = Value::from("NOPE");
         match GameState::from_record(&hidden, &masters) {
             Err(EngineError::BadPayload(msg)) => assert!(msg.contains("unknown Phase 'NOPE'"), "{msg}"),
+            other => panic!("expected BadPayload, got {other:?}"),
+        }
+    }
+
+    /// 記録 v5 の `manager.continuous`（期間付き効果の一覧）を読む。
+    ///
+    /// 欄が無い記録（v5 以前）は空＝従来どおり。**一覧が無いと**「このターン中 −5000」を
+    /// TURN_END で失効させられず、カード側の `timed_power` だけが残る
+    /// （WP `rs-p4-mcts` の決定オラクルで実測した割れ）。
+    #[test]
+    fn from_record_restores_the_continuous_effects() {
+        let masters = MasterTable::from_effects_json(&fixture("masters_v2.json")).expect("masters");
+        let mut hidden = fixture("hidden_v2.json");
+        assert!(
+            GameState::from_record(&hidden, &masters).expect("v5 以前").continuous.is_empty(),
+            "欄が無い記録は空"
+        );
+        let uuid = hidden["players"]["p1"]["leader"]["uuid"].clone();
+        hidden["manager"]["continuous"] = serde_json::json!([{
+            "target_uuid": uuid, "kind": "POWER", "amount": -5000,
+            "flag": "", "keyword": "", "duration": "THIS_TURN", "expire_turn": 0,
+        }]);
+        let state = GameState::from_record(&hidden, &masters).expect("from_record");
+        assert_eq!(state.continuous.len(), 1);
+        let eff = &state.continuous[0];
+        assert_eq!(eff.kind, ContinuousKind::Power);
+        assert_eq!(eff.amount, -5000);
+        assert_eq!(eff.duration, crate::effects::ast::Duration::ThisTurn);
+        // 未知の種別・期間は黙って読み飛ばさない
+        hidden["manager"]["continuous"][0]["kind"] = Value::from("NOPE");
+        match GameState::from_record(&hidden, &masters) {
+            Err(EngineError::BadPayload(msg)) => assert!(msg.contains("unknown kind 'NOPE'"), "{msg}"),
             other => panic!("expected BadPayload, got {other:?}"),
         }
     }

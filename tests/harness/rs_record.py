@@ -32,7 +32,30 @@ def manager_from_hidden(db, hidden: dict, with_pending: bool = False, **kw):
     `suppress_pending=False` と同義。記録 v3 以降は `active_battle` の所在の持ち主が入るので要求を
     組み立てられる＝`rs_encode_oracle.py` の登場時スキャン v7・`_leader_act_avail` が使う）。"""
     kw.setdefault("suppress_pending", not with_pending)
-    return _rs_bridge.manager_from_hidden(db, hidden, **kw)
+    manager = _rs_bridge.manager_from_hidden(db, hidden, **kw)
+    _restore_continuous(manager, hidden)
+    return manager
+
+
+def _restore_continuous(manager, hidden: dict) -> None:
+    """記録 v5 の `manager.continuous`（期間付き効果の一覧）を復元する。
+
+    `rs_bridge.manager_from_hidden`（`opcg_sim/` 側・触らない）はカードの `timed_power` 等を
+    復元するが、**失効させる側の一覧**（`ContinuousEffectManager.effects`）は持たない。
+    一覧が空のまま TURN_END を打つと「このターン中 −5000」が消えずに残る（Rust は記録から
+    一覧を読むので、復元した Python 側だけが取り残されて割れる）。カード側の値は復元済みなので
+    ここでは**一覧だけ**を戻す（`_apply_to_card` は呼ばない＝二重適用しない）。
+    """
+    rows = (hidden.get("manager") or {}).get("continuous")
+    if not rows:
+        return
+    from opcg_sim.src.core.effects.continuous import ContinuousEffect
+    manager.continuous.effects = [
+        ContinuousEffect(target_uuid=r["target_uuid"], kind=r["kind"], amount=int(r["amount"]),
+                         flag=r.get("flag") or "", keyword=r.get("keyword") or "",
+                         duration=r["duration"], expire_turn=int(r.get("expire_turn") or 0))
+        for r in rows
+    ]
 from opcg_sim.src.models.enums import Zone  # noqa: E402
 
 

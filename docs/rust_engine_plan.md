@@ -1192,6 +1192,68 @@ Python の `NRelValueAdapter.encode_state` を JSON で渡す。
 見える）。山札側の並び（`pool[n_hand:]`）は `cargo test` の
 `determinize_resamples_only_the_opponent_hand` が直接アサートする。
 
+### 8.17 P4 `rs-p4-mcts`（探索と decide）の結果（2026-09-07）
+`claude/cpu-spec-improvements-yw91jd`（前半 3 WP＋API を統合した 6123c20）から分岐。**Python 側
+（`opcg_sim/`）は 1 行も変えていない**（変更は `rust/opcg_engine/src/` と `tests/` のみ）。
+**実装**:
+| Rust | Python（正本） |
+| `search/quiesce.rs` | `mcts.in_battle`／`in_dialog`／`quiesce_choice`／`resolve_battle_inplace`／`resolved_branch_values`／`_BOX_BUDGET`（`reset_box_budget`／`clear_box_budget`）＋評価器の文脈 `Ctx`（`OPCGGame` ＋ `cpu_learned._value_fn`／`_priors`＝`n_rel.nrel_priors`） |
+| `search/mcts.rs` | `TreeMCTS`（`_Node`・`run`・`_expand`・`_leaf_value`・`_descend_journal`・`_simulate`・`last_stats`） |
+| `search/decide.rs` | `LearnedEngine.decide`／`_decide_inner`（箱コミット `_commit_step`／`_store_commit`／`_commit_window_continuation`／`_commit_play_dialog`・窓の根畳み `_window_choice`・等価手マージ `_merge_root_stats`・温度サンプル・残ドン掘り `_residual_dig_move`／残り起動 `_residual_activate_move`／`_residual_attach_move`・`don_box_first_primitive`・`plan.move_sig`／`_find_move`） |
+| `search/rng.rs` | `SearchRng` trait ＋ `RecordedRng`（記録の出目を順に返す・尽きたら `BadPayload`）／`Pcg32SearchRng`（P5 の生成用・同じ trait で差せる）／`Rng::snapshot`・`restore`（CRN） |
+| `lib.rs` | `decide(hidden_json, seat, opts_json, rng_json)` |
+
+**設計の決定（§12.4 の補足として実装で固めたもの）**:
+1. **物差しは 1 本**。出荷既定 a1（NRel）は戦闘出口ヘッドを持たない（`NRelValueAdapter.has_exit_head`
+   は常に False）ので、Python の `battle_value_fn` は本体 value と同一関数になる。Rust は
+   `Ctx::value` 1 つだけを持ち、出口ヘッド付きネットを載せるときにここへ枝を足す（P5）。
+2. **decide をまたぐ状態は入出力で渡す**。Python は `LearnedEngine` のインスタンス辞書に
+   箱コミットの残り手順（`_commits`）と残り起動の待ちフラグ（`_resact_pending`）を持つ。
+   Rust の `decide` は盤面 JSON から毎回組み直すので、これを `opts_json` の `commit`／
+   `resact_pending` で受け、結果に更新後の値を返す。ターン内 sticky 世界線（`_world_seeds`）は
+   **出目そのもの**が渡ってくる（`RecordedRng.shuffles`）ので Rust 側に状態を持たない。
+3. **numpy の dtype を写した**（NEP 50）。`N`／`W`／`Q` は float64、`P` は priors がある時
+   float32・無い時（一様 `np.full`）float64。PUCT の `c_puct*P*sqrt(ΣN)` は **P の dtype で**
+   計算され `/(1+N)` で float64 に上がる（`Node::p_f32` がこの分岐を持つ）。Dirichlet 混合の
+   `(1-eps)*P` も同じ規則で float32 のまま計算してから float64 の noise を足す。
+4. **`argmax` の同点は添字が小さい方**（numpy と同じ）。`max(ok, key=...)`（Python の `max` は
+   最初の最大値）も同じにした（`best_branch`）。
+
+**移すときに見つかった実バグ 1 件（記録の穴・本 WP で直した）**:
+記録 v5 の `hidden` は**期間付き効果の一覧**（`effects/continuous.py::ContinuousEffectManager.effects`）を
+持たず、カード側の `timed_power` 等だけを持っていた。復元した盤面で TURN_END を打つと、
+失効させる側（`continuous::expire`）が効果を知らないので「このターン中 パワー−5000」が
+**ターンを跨いで残る**。決定オラクルが実測で捕まえた（EB04-023 チャカ&ペルの登場コスト
+「自分のアクティブのリーダーを、このターン中、パワー−5000」。木の深さ 6 の葉で
+Python 5000 / Rust 0 に割れ、そこから `attack_box_candidates` の `k_min`／`k_two` が食い違って
+根の訪問数が L1=10 ずれた）。**修正**: `hidden_dict` に `manager.continuous`（一覧）を
+v5 additive で足し、Rust の `GameState::from_record` が読む（欄が無い記録は空＝従来どおり）。
+Python 側の復元器（`opcg_sim/src/core/rs_bridge.py`）は触らず、ハーネス
+（`tests/harness/rs_record.py::_restore_continuous`）で一覧だけを戻す（カード側の値は
+復元済みなので `_apply_to_card` は呼ばない＝二重適用しない）。
+
+**オラクル `tests/scripts/rs_search_oracle.py --what decide`**（追加）:
+- Python の `LearnedEngine`（a1・serve 既定）で `--games` 局を打ち、**各決定点**で
+  (a) 決定前の `hidden`、(b) その decide が引いた乱数の出目、(c) 箱コミットの残り手順を採って
+  Rust の `decide` を同じ出目で走らせ、**手**と**根の訪問数 N**（＋合法手の並び）を照合する。
+- 出目の記録はハーネス内の 3 部品だけ（`opcg_sim/` は無変更）: `RecordingRng`
+  （`np.random.Generator` を包む）・`RecordingEngine`（`_world_rng` の返り値を包む席別 seam）・
+  `_TracingMCTS`（`cpu_learned.TreeMCTS` を包んで `last_stats` を取り出す。`decide` は木の
+  インスタンスを返さないので根の素の N はここからしか採れない＝`record["groups"]` は
+  **マージ後**の集計）。`choice(n, p=...)` だけは自前で組む（numpy と同じ
+  「累積分布を `cdf[-1]` で割り `searchsorted(u, side="right")`」＝2,000 回の照合で完全一致）＝
+  こうすると Rust へ渡せる「引いた一様乱数」がそのまま採れる。
+- **中断へ入り直す `prefix`**: 記録 v5 の `hidden` は中断スタックを持たないので、
+  復元できる直近の決定点（`interaction_depth`／`pending_triggers`／`pending_end_of_turn` が
+  すべて 0）を基準にし、そこから今までに打った手を `opts_json` の `prefix` で渡す。
+  適用は `run_game` と**同じ**（素の `apply_game_action`／`apply_battle_action`・
+  ドレインしない）＝`legal` の prefix（`_apply_move_inplace`＋ドレイン）とは別物。
+- 照合から外すもの（黙って緑にしない・件数で報告）: 基準点から今までのあいだ、または
+  探索の中で**山札を混ぜた**決定点（Rust は自前の擬似乱数で混ぜる＝§12.4-4）＝`shuffle_skipped`。
+- 同点の扱い（§12.4-5）: `main` は「手が同じで訪問分布の L1 ≤ 2/sims」なら通す（`ties`）。
+  `window` は訪問を配らないので、Rust 側の出口 value で「その 2 枝の差が forward の許容
+  （`--tie-tol` 既定 1e-5）以下＝同点」と確かめられたときだけ通す（`tie_window`）。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
