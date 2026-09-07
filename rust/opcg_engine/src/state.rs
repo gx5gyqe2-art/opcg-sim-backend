@@ -12,7 +12,11 @@ use std::sync::OnceLock;
 
 /// 再生ペイロード（`tests/scripts/rs_diff_replay.py` が書く JSON）の想定バージョン。
 /// 形を非互換に変えたら +1 し、Python 側（`RECORD_VERSION`）も同時に上げる。
-pub const RECORD_VERSION: u64 = 3;
+///
+/// v4（P3・§11.2）: 各 `steps[i]` に `shuffled`（その段で `random.shuffle` を呼んだデッキの
+/// 持ち主）を足し、P2 の「MULLIGAN なら再同期」を置き換えた。監査記録（`kind: "audit"`）と
+/// `extra_masters` も v4 で入る。
+pub const RECORD_VERSION: u64 = 4;
 
 /// 骨組みの実装状況を表すエラー。PyO3 側で Python 例外へ写像する。
 #[derive(Debug, PartialEq, Eq)]
@@ -170,14 +174,14 @@ pub fn replay(json_str: &str) -> Result<String, EngineError> {
             .ok_or_else(|| EngineError::BadPayload(format!("step {i}: 'move' が無い")))?;
         rules::actions::apply_move(&mut session, masters, actor, mv).map_err(at)?;
 
-        // 乱数を消費した行動（MULLIGAN）の後は記録の並びを採る。
-        if mv.get("action_type").and_then(Value::as_str) == Some("MULLIGAN") {
+        // 乱数（`random.shuffle`）を消費した段は、記録の並びを採り直す（記録 v4・§11.2）。
+        for seat in shuffled_owners(step).map_err(at)? {
             let hidden = step.get("hidden").ok_or_else(|| {
                 EngineError::BadPayload(format!(
-                    "step {i}: MULLIGAN の再同期に 'hidden' が要る（--hidden で記録する）"
+                    "step {i}: シャッフルの再同期に 'hidden' が要る（--hidden で記録する）"
                 ))
             })?;
-            resync_after_mulligan(&mut session, actor, hidden).map_err(at)?;
+            resync_shuffled(&mut session, seat, hidden).map_err(at)?;
         }
 
         // 盤面 dict → そのあと pending_request（Python `board_dict` と同じ評価順。
@@ -200,15 +204,194 @@ pub fn replay(json_str: &str) -> Result<String, EngineError> {
     .map_err(|e| EngineError::BadPayload(format!("replay: cannot serialize states: {e}")))
 }
 
-/// マリガン後に当該プレイヤーの `deck`／`hand` の並びを記録の `hidden` から取り直す（§10.2 の 3）。
-fn resync_after_mulligan(
-    session: &mut Session,
-    seat: Seat,
-    hidden: &Value,
-) -> Result<(), EngineError> {
-    let mut zones: Vec<(CardZone, Vec<CardIdx>)> = Vec::with_capacity(2);
-    for (key, zone) in [("deck", CardZone::Deck), ("hand", CardZone::Hand)] {
-        let recorded = hidden
+/// 監査記録（`kind: "audit"`・§11.2）を再生する（`tests/scripts/rs_audit_replay.py` の受け口）。
+///
+/// 手順は `tests/harness/full_card_audit.py` と同じ:
+/// 1. `setup.hidden` から盤面を組む（`extra_masters` を足した表で読む＝`FILLER` 等が居る）
+/// 2. `fire` を実行する（`kind: "play"`＝`play_card_action` ／ `kind: "ability"`＝`resolve_ability`）
+/// 3. `steps[i].payload` を順に `resolve_interaction` へ渡す（`_smart_drain` の各応答）
+///
+/// 戻り値は `{"version":4,"states":[<fire 後>, <payload 0 の後>, ...]}`。各盤面は
+/// `board_json` ＋ `pending_request`（`request_id` は出さない＝ハーネスが照合から外す）。
+pub fn replay_audit(json_str: &str, effects_path: Option<&str>) -> Result<String, EngineError> {
+    let payload: Value = serde_json::from_str(json_str)
+        .map_err(|e| EngineError::BadPayload(format!("invalid audit JSON: {e}")))?;
+    let obj = payload
+        .as_object()
+        .ok_or_else(|| EngineError::BadPayload("audit payload must be a JSON object".into()))?;
+    let version = obj
+        .get("version")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| EngineError::BadPayload("audit payload: missing 'version'".into()))?;
+    if version != RECORD_VERSION {
+        return Err(EngineError::BadPayload(format!(
+            "audit payload: version {version} != {RECORD_VERSION} (regenerate the record)"
+        )));
+    }
+    if obj.get("kind").and_then(Value::as_str) != Some("audit") {
+        return Err(EngineError::BadPayload(
+            "audit payload: 'kind' が 'audit' ではない".into(),
+        ));
+    }
+    if let Some(path) = effects_path {
+        load_masters(path)?;
+    }
+    let base = masters().ok_or_else(|| {
+        EngineError::BadPayload(
+            "replay_audit: card masters are not loaded; call opcg_engine.load_masters(path) first"
+                .into(),
+        )
+    })?;
+    let extra = obj.get("extra_masters").unwrap_or(&Value::Null);
+    let table = base.with_extra_masters(extra)?;
+    let masters = &table;
+
+    let setup_hidden = obj
+        .get("setup")
+        .and_then(|s| s.get("hidden"))
+        .ok_or_else(|| EngineError::BadPayload("audit payload: setup に 'hidden' が無い".into()))?;
+    let mut session = Session::new(GameState::from_record(setup_hidden, masters)?);
+
+    // --- fire ---------------------------------------------------------------
+    let fire = obj
+        .get("fire")
+        .and_then(Value::as_object)
+        .ok_or_else(|| EngineError::BadPayload("audit payload: 'fire' が無い".into()))?;
+    let seat = Seat::from_name(fire.get("player").and_then(Value::as_str).unwrap_or("p1"))
+        .ok_or_else(|| EngineError::BadPayload("fire.player: 未知の席".into()))?;
+    let source_uuid = fire
+        .get("source_uuid")
+        .and_then(Value::as_str)
+        .ok_or_else(|| EngineError::BadPayload("fire: 'source_uuid' が無い".into()))?;
+    let source = crate::ops::find_card_by_uuid(session.state(), source_uuid).ok_or_else(|| {
+        EngineError::BadPayload(format!("fire.source_uuid: 未知のカード '{source_uuid}'"))
+    })?;
+    // 監査記録は**必ず能力を 1 つ持つカード**について作られる。効果表（core の `loader.rs`）が
+    // 未統合だと `ability_ids` が空になり、`kind: "play"` の経路は「能力の無いカード」として
+    // 素通りしてしまう（＝黙って一致/不一致を返す）。ここで先に止める（計画 §3）。
+    if masters.get(session.state().card(source).master).ability_ids.is_empty() {
+        return Err(EngineError::Unimplemented(format!(
+            "replay_audit: '{}' の ability_ids が空（効果 JSON の読込は core の loader.rs＝WP rs-p3-core）",
+            masters.get(session.state().card(source).master).card_id
+        )));
+    }
+    match fire.get("kind").and_then(Value::as_str) {
+        Some("play") => rules::actions::play_card_action(&mut session, masters, seat, source)?,
+        Some("ability") => {
+            let index = fire
+                .get("ability_index")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| {
+                    EngineError::BadPayload("fire: 'ability_index' が無い（kind=ability）".into())
+                })? as usize;
+            crate::effects::resolver::game_resolve_ability(
+                &mut session,
+                masters,
+                seat,
+                source,
+                index,
+                false,
+            )?
+        }
+        other => {
+            return Err(EngineError::BadPayload(format!(
+                "fire.kind: 'play'|'ability' を期待（{other:?}）"
+            )))
+        }
+    }
+
+    let mut states: Vec<Value> = vec![audit_board(&mut session, masters)?];
+
+    // --- _smart_drain の各応答 ------------------------------------------------
+    let steps = obj
+        .get("steps")
+        .and_then(Value::as_array)
+        .ok_or_else(|| EngineError::BadPayload("audit payload: 'steps' が無い".into()))?;
+    for (i, step) in steps.iter().enumerate() {
+        let at = |e: EngineError| -> EngineError {
+            match e {
+                EngineError::BadPayload(m) => EngineError::BadPayload(format!("step {i}: {m}")),
+                EngineError::Unimplemented(m) => EngineError::Unimplemented(format!("step {i}: {m}")),
+            }
+        };
+        let payload = step
+            .get("payload")
+            .ok_or_else(|| EngineError::BadPayload(format!("step {i}: 'payload' が無い")))?;
+        // 応答先は要求の `player_id`（`_smart_drain` も同じように引く）。
+        let responder = session
+            .state()
+            .active_interaction()
+            .map(|it| it.player)
+            .ok_or_else(|| {
+                // 効果表が空（core の `loader.rs` 未統合）なら能力が 1 つも解決されない＝
+                // 中断も立たない。これは記録の不備ではないので `Unimplemented` で報告する
+                // （記録が壊れているときとは区別する）。
+                if masters.abilities.abilities.is_empty() {
+                    EngineError::Unimplemented(format!(
+                        "step {i}: 中断が立っていない（効果表が空＝効果 JSON を読んでいない）"
+                    ))
+                } else {
+                    EngineError::BadPayload(format!("step {i}: 中断が無いのに応答が記録されている"))
+                }
+            })?;
+        rules::actions::resolve_interaction(&mut session, masters, responder, payload)
+            .map_err(at)?;
+        states.push(audit_board(&mut session, masters)?);
+    }
+
+    serde_json::to_string(&serde_json::json!({
+        "version": RECORD_VERSION,
+        "states": states,
+        "interactive": session.state().active_interaction().is_some(),
+    }))
+    .map_err(|e| EngineError::BadPayload(format!("replay_audit: cannot serialize states: {e}")))
+}
+
+/// 盤面 dict ＋ `pending_request`（`replay` と同じ組み立て順）。
+fn audit_board(session: &mut Session, masters: &MasterTable) -> Result<Value, EngineError> {
+    let mut board = session.state().board_json(masters)?;
+    let pending = rules::pending::get_pending_request(session, masters, true);
+    board
+        .as_object_mut()
+        .expect("board_json returns an object")
+        .insert("pending_request".into(), pending.unwrap_or(Value::Null));
+    Ok(board)
+}
+
+/// 記録 v4 の `shuffled`（その段で `random.shuffle` を呼んだデッキの持ち主）。
+///
+/// 欄が無い記録は「シャッフル無し」として扱わず**契約違反**にする（v4 では必ず付く）。
+fn shuffled_owners(step: &Value) -> Result<Vec<Seat>, EngineError> {
+    let arr = step
+        .get("shuffled")
+        .and_then(Value::as_array)
+        .ok_or_else(|| EngineError::BadPayload("'shuffled' が無い（記録 v4）".into()))?;
+    let mut out = Vec::with_capacity(arr.len());
+    for v in arr {
+        let name = v
+            .as_str()
+            .ok_or_else(|| EngineError::BadPayload("shuffled: 席名は文字列".into()))?;
+        let seat = Seat::from_name(name)
+            .ok_or_else(|| EngineError::BadPayload(format!("shuffled: 未知の席 '{name}'")))?;
+        if !out.contains(&seat) {
+            out.push(seat);
+        }
+    }
+    Ok(out)
+}
+
+/// シャッフルを挟んだ段で、当該プレイヤーのゾーンの並びを記録の `hidden` から取り直す（§11.2）。
+///
+/// 原則は「`shuffled` の持ち主の**デッキだけ**」だが、**マリガンはシャッフルの直後に同じ
+/// 原始操作の中で 5 枚引く**（`turn_flow.do_mulligan`）ため、デッキだけでは山と手札の
+/// 切り分けが Python と揃わない。そこで
+///
+/// 1. デッキ単独で多重集合が一致すれば**デッキだけ**取り直す（シャッフル効果・サーチ）
+/// 2. 一致しないが `deck ∪ hand` で一致すれば**両方**取り直す（マリガン）
+/// 3. どちらも一致しなければ `BadPayload`（再生がずれている＝黙って進めない）
+fn resync_shuffled(session: &mut Session, seat: Seat, hidden: &Value) -> Result<(), EngineError> {
+    let recorded = |state: &GameState, key: &str| -> Result<Vec<CardIdx>, EngineError> {
+        let items = hidden
             .get("players")
             .and_then(|p| p.get(seat.name()))
             .and_then(|p| p.get(key))
@@ -216,18 +399,32 @@ fn resync_after_mulligan(
             .ok_or_else(|| {
                 EngineError::BadPayload(format!("hidden.players.{}.{key} が読めない", seat.name()))
             })?;
-        let mut order: Vec<CardIdx> = Vec::with_capacity(recorded.len());
-        for rec in recorded {
-            let uuid = rec.get("uuid").and_then(Value::as_str).ok_or_else(|| {
-                EngineError::BadPayload(format!("hidden.players.{}.{key}: uuid が無い", seat.name()))
-            })?;
-            order.push(crate::ops::find_card_by_uuid(session.state(), uuid).ok_or_else(|| {
-                EngineError::BadPayload(format!("再同期: 未知のカード uuid '{uuid}'"))
-            })?);
-        }
-        zones.push((zone, order));
+        items
+            .iter()
+            .map(|rec| {
+                let uuid = rec.get("uuid").and_then(Value::as_str).ok_or_else(|| {
+                    EngineError::BadPayload(format!(
+                        "hidden.players.{}.{key}: uuid が無い",
+                        seat.name()
+                    ))
+                })?;
+                crate::ops::find_card_by_uuid(state, uuid).ok_or_else(|| {
+                    EngineError::BadPayload(format!("再同期: 未知のカード uuid '{uuid}'"))
+                })
+            })
+            .collect()
+    };
+    let deck = recorded(session.state(), "deck")?;
+    let deck_only: Vec<(CardZone, Vec<CardIdx>)> = vec![(CardZone::Deck, deck.clone())];
+    if rules::actions::resync_zones(session, seat, &deck_only).is_ok() {
+        return Ok(());
     }
-    rules::actions::resync_zones(session, seat, &zones)
+    let hand = recorded(session.state(), "hand")?;
+    rules::actions::resync_zones(
+        session,
+        seat,
+        &[(CardZone::Deck, deck), (CardZone::Hand, hand)],
+    )
 }
 
 #[cfg(test)]

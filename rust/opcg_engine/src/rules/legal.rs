@@ -60,7 +60,7 @@ pub fn get_legal_actions(
         return Ok(moves);
     }
     if action == ACT_MAIN_ACTION {
-        return Ok(main_actions(s.state(), masters, seat));
+        return main_actions(s.state(), masters, seat);
     }
     // 効果対話は「妥当な既定解決」を 1 手として返す。
     let payload = default_interaction_payload(s.state(), masters, &pending);
@@ -81,9 +81,13 @@ fn selectable_uuids(pending: &Value) -> Vec<String> {
 
 /// MAIN_ACTION の合法手（PLAY・ATTACK・ATTACH_DON・TURN_END）。
 ///
-/// Python の `ACTIVATE_MAIN`（起動メイン）は効果の発動成立判定が要る＝P3。バニラでは
-/// `abilities` が空なので 1 手も出ない。
-fn main_actions(state: &GameState, masters: &MasterTable, seat: Seat) -> Vec<Value> {
+/// `ACTIVATE_MAIN`（起動メイン）は**発動が成立しうる**カードだけを出す
+/// （Python `_has_activatable_main`）。バニラでは `abilities` が空なので 1 手も出ない。
+fn main_actions(
+    state: &GameState,
+    masters: &MasterTable,
+    seat: Seat,
+) -> Result<Vec<Value>, EngineError> {
     let mut moves = Vec::new();
     let p = state.player(seat);
     let opponent = seat.other();
@@ -168,166 +172,144 @@ fn main_actions(state: &GameState, masters: &MasterTable, seat: Seat) -> Vec<Val
         }
     }
 
-    moves.push(game_move("TURN_END", json!({})));
-    moves
-}
-
-// --- 効果対話の既定解決 --------------------------------------------------------
-
-/// Python `interaction.card_keep_value`（「残す価値」の合成序列）。
-///
-/// バニラ（P2 の受け入れ範囲）は `abilities` が空なので、効果ブロック数・【カウンター】・
-/// 【トリガー】の加点は 0（P3 で `CardMaster.ability_ids` から数える）。
-pub fn card_keep_value(state: &GameState, masters: &MasterTable, card: CardIdx) -> i32 {
-    let c = state.card(card);
-    let m = masters.get(c.master);
-    let cost = m.cost;
-    let power = c.get_power(m, false);
-    let mut counter = super::current_counter(state, masters, card);
-    if counter == 0 {
-        counter = m.counter;
+    // --- 起動メイン（発動が成立しうるものだけ）-----------------------------------
+    let mut units: Vec<CardIdx> = p.leader.into_iter().collect();
+    units.extend(p.field.iter().copied());
+    units.extend(p.stage);
+    for c in units {
+        if super::is_effect_negated(state, c) || state.card(c).negated {
+            continue;
+        }
+        if has_activatable_main(state, masters, seat, c)? {
+            moves.push(game_move("ACTIVATE_MAIN", json!({"uuid": uuid(c)})));
+        }
     }
-    cost * 100 + power.div_euclid(100) + counter.div_euclid(20)
+
+    moves.push(game_move("TURN_END", json!({})));
+    Ok(moves)
 }
 
-/// 候補 1 件の分類（Python `_selection_entries` の `(uuid, side, zone, value)`）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Side {
-    Own,
-    Opp,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum EntryZone {
-    Hand,
-    Deck,
-    Trash,
-    Field,
-    Life,
-    Leader,
-    Stage,
-    Temp,
-}
-
-struct Entry {
-    uuid: String,
-    side: Option<Side>,
-    zone: Option<EntryZone>,
-    value: i32,
-}
-
-/// Python `_selection_entries`: selectable uuid 列 → `(uuid, side, zone, value)` 列。
-/// 走査順（`hand`→`deck`→`trash`→`field`→`life`、そのあと `leader`/`stage`）まで同じにする。
-fn selection_entries(
+/// Python `_has_activatable_main`: 条件・使用回数・コスト充足・**効果が空振りでない**の
+/// 4 つを満たす `ACTIVATE_MAIN` 能力を 1 つでも持つか。
+fn has_activatable_main(
     state: &GameState,
     masters: &MasterTable,
-    pid: Seat,
-    uuids: &[String],
-) -> Vec<Entry> {
-    use std::collections::HashMap;
-    let mut index: HashMap<&str, (Side, EntryZone, CardIdx)> = HashMap::new();
-    let want: std::collections::HashSet<&str> = uuids.iter().map(String::as_str).collect();
-    for (seat, side) in [(pid, Side::Own), (pid.other(), Side::Opp)] {
-        let p = state.player(seat);
-        for (zone, cards) in [
-            (EntryZone::Hand, &p.hand),
-            (EntryZone::Deck, &p.deck),
-            (EntryZone::Trash, &p.trash),
-            (EntryZone::Field, &p.field),
-            (EntryZone::Life, &p.life),
-        ] {
-            for c in cards {
-                let u = state.card(*c).uuid.as_str();
-                if want.contains(u) {
-                    index.entry(u).or_insert((side, zone, *c));
-                }
-            }
-        }
-        for (zone, slot) in [(EntryZone::Leader, p.leader), (EntryZone::Stage, p.stage)] {
-            if let Some(c) = slot {
-                let u = state.card(c).uuid.as_str();
-                if want.contains(u) {
-                    index.entry(u).or_insert((side, zone, c));
-                }
-            }
-        }
-    }
-    // デッキを見て選ぶ系の候補は公開一時領域（active_interaction.candidates）に居る。
-    if let Some(it) = state.active_interaction() {
-        if it.player == pid {
-            for c in &it.candidates {
-                let u = state.card(*c).uuid.as_str();
-                if want.contains(u) {
-                    index.entry(u).or_insert((Side::Own, EntryZone::Temp, *c));
-                }
-            }
-        }
-    }
-    uuids
+    seat: Seat,
+    card: CardIdx,
+) -> Result<bool, EngineError> {
+    use crate::effects::{ability, EffectContext, NodeRef, NodeRoot};
+    let ctx = EffectContext::new();
+    let resolver = crate::effects::resolver::Resolver::new();
+    for (index, id) in masters
+        .get(state.card(card).master)
+        .ability_ids
         .iter()
-        .map(|u| match index.get(u.as_str()) {
-            Some((side, zone, card)) => Entry {
-                uuid: u.clone(),
-                side: Some(*side),
-                zone: Some(*zone),
-                value: card_keep_value(state, masters, *card),
-            },
-            None => Entry {
-                uuid: u.clone(),
-                side: None,
-                zone: None,
-                value: 0,
-            },
-        })
-        .collect()
+        .enumerate()
+    {
+        let ab = ability(masters, *id)?;
+        if ab.trigger != crate::effects::ast::TriggerType::ActivateMain {
+            continue;
+        }
+        if let Some(cond) = ab.condition.as_ref() {
+            if !crate::effects::check_condition(
+                state,
+                masters,
+                &masters.abilities,
+                cond,
+                seat,
+                Some(card),
+                Some(card),
+                &ctx,
+            )? {
+                continue;
+            }
+        }
+        if let Some(limit) = crate::effects::resolver::turn_limit_of(ab.condition.as_ref()) {
+            let used = state
+                .card(card)
+                .ability_used_this_turn
+                .iter()
+                .find(|(k, _)| *k == index as u32)
+                .map(|(_, n)| *n)
+                .unwrap_or(0);
+            if used as i32 >= limit {
+                continue;
+            }
+        }
+        if let Some(cost) = ab.cost.as_ref() {
+            let cost_ref = NodeRef::root(*id, NodeRoot::Cost);
+            // `can_satisfy_node` は `&Session` ではなく盤面だけ見れば足りるが、
+            // 契約（`Resolver` のメソッド）を保つため一時セッションでは包まない。
+            if !resolver.can_satisfy_node_on(state, masters, seat, cost, &cost_ref, Some(card))? {
+                continue;
+            }
+        }
+        if ability_effect_is_inert(state, seat, ab.effect.as_ref()) {
+            continue;
+        }
+        return Ok(true);
+    }
+    Ok(false)
 }
 
-/// Python `choose_selection`（ゾーン意味論に基づく既定選択）。判別できなければ `None`。
-fn choose_selection(entries: &[Entry], min_n: i32, max_n: i32) -> Option<Vec<String>> {
-    if entries.is_empty() || max_n < 1 {
-        return None;
-    }
-    if entries.iter().any(|e| e.side.is_none() || e.zone.is_none()) {
-        return None;
-    }
-    let n_max = (max_n as usize).min(entries.len());
-    let n_min = (min_n.max(0) as usize).min(entries.len());
-    let all_own = entries.iter().all(|e| e.side == Some(Side::Own));
-    let all_opp = entries.iter().all(|e| e.side == Some(Side::Opp));
-    let zones_within = |allowed: &[EntryZone]| {
-        entries
+/// Python `_ability_effect_is_inert`: 「今どう解決しても盤面が変わらない」と**証明できる**か
+/// （判らない効果は `false`＝合法手に残す）。
+fn ability_effect_is_inert(
+    state: &GameState,
+    seat: Seat,
+    node: Option<&crate::effects::ast::EffectNode>,
+) -> bool {
+    use crate::effects::ast::{ActionType, EffectNode};
+    let Some(node) = node else {
+        return true; // Python: `_inert(None) -> True`
+    };
+    match node {
+        EffectNode::Sequence(items) => items
             .iter()
-            .all(|e| allowed.contains(&e.zone.expect("checked above")))
-    };
-    // Python の sorted は安定＝同値は候補の並びを保つ。
-    let ranked_desc = || {
-        let mut idx: Vec<usize> = (0..entries.len()).collect();
-        idx.sort_by_key(|i| -entries[*i].value);
-        idx
-    };
-    let ranked_asc = || {
-        let mut idx: Vec<usize> = (0..entries.len()).collect();
-        idx.sort_by_key(|i| entries[*i].value);
-        idx
-    };
-    let take = |idx: Vec<usize>, n: usize| -> Option<Vec<String>> {
-        Some(idx.into_iter().take(n).map(|i| entries[i].uuid.clone()).collect())
-    };
-
-    if all_own && zones_within(&[EntryZone::Deck, EntryZone::Trash]) {
-        return take(ranked_desc(), n_max); // 獲得系＝良い札から取る
+            .all(|n| ability_effect_is_inert(state, seat, Some(n))),
+        EffectNode::Choice { options, .. } => options
+            .iter()
+            .all(|n| ability_effect_is_inert(state, seat, Some(n))),
+        // Python は `actions`／`options` を持たない非 GameAction（Branch）を False にする。
+        EffectNode::Branch { .. } => false,
+        EffectNode::Action(a) => match a.ty {
+            ActionType::RuleProcessing => match a.status.as_deref() {
+                None => true, // ルール上の注記＝エンジン no-op
+                Some(st) => {
+                    SELF_RESTRICTION_KEYS.contains(&st)
+                        && super::active_restriction(state, seat, st).is_some()
+                }
+            },
+            ActionType::ActiveDon if a.target.is_none() => {
+                if super::active_restriction(state, seat, "CANNOT_ACTIVATE_DON").is_some() {
+                    return true;
+                }
+                state.player(seat).don_rested.is_empty()
+            }
+            _ => false,
+        },
     }
-    if all_own && zones_within(&[EntryZone::Temp]) && min_n == 0 {
-        return take(ranked_desc(), n_max);
-    }
-    if all_own && zones_within(&[EntryZone::Hand, EntryZone::Field]) {
-        return take(ranked_asc(), n_min); // コスト系＝安い札から払う
-    }
-    if all_opp {
-        return take(ranked_desc(), n_max); // 対象系＝強い札から狙う
-    }
-    None
 }
+
+/// Python `rules_constants.SELF_RESTRICTION_KEYS`。
+const SELF_RESTRICTION_KEYS: &[&str] = &[
+    "CANNOT_PLAY_FROM_HAND",
+    "CANNOT_PLAY_CHARACTER",
+    "CANNOT_DRAW_BY_EFFECT",
+    "CANNOT_LIFE_TO_HAND",
+    "CANNOT_ATTACK_LEADER",
+    "CANNOT_ACTIVATE_DON",
+];
+
+// --- 効果対話の既定解決 --------------------------------------------------------
+//
+// P2 はここに `card_keep_value`／`_selection_entries`／`choose_selection`／
+// `default_interaction_payload` を写していたが、P3 で中断の種類が増え（ドン!!候補・
+// 公開一時領域・効果ブロック数の加点）**同じ規則を 2 か所に置くと必ずずれる**ので、
+// 本体は [`crate::effects::interact`] に一本化した。ここは呼び名を保つ薄い委譲。
+
+#[allow(unused_imports)]
+pub use crate::effects::interact::{card_keep_value, choose_selection, selection_entries};
 
 /// Python `default_interaction_payload`。
 pub fn default_interaction_payload(
@@ -335,33 +317,5 @@ pub fn default_interaction_payload(
     masters: &MasterTable,
     pending: &Value,
 ) -> Value {
-    let uuids = selectable_uuids(pending);
-    let constraints = pending.get("constraints");
-    let min_n = constraints
-        .and_then(|c| c.get("min"))
-        .and_then(Value::as_i64)
-        .unwrap_or(0) as i32;
-    let max_n = constraints
-        .and_then(|c| c.get("max"))
-        .and_then(Value::as_i64)
-        .map(|v| v as i32)
-        .unwrap_or(uuids.len() as i32);
-    let pid = request_actor(pending);
-    let mut selected: Option<Vec<String>> = None;
-    if !uuids.is_empty() && max_n >= 1 {
-        if let Some(pid) = pid {
-            selected = choose_selection(&selection_entries(state, masters, pid, &uuids), min_n, max_n);
-        }
-    }
-    let selected = selected.unwrap_or_else(|| {
-        let take = min_n.max(0).min(max_n).max(0) as usize;
-        uuids.iter().take(take.min(uuids.len())).cloned().collect()
-    });
-    json!({
-        "selected_uuids": selected,
-        "index": 0,
-        "accepted": true,
-        "position": "BOTTOM",
-        "declared_value": 0,
-    })
+    crate::effects::interact::default_interaction_payload(state, masters, Some(pending))
 }

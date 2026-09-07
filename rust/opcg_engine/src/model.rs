@@ -582,15 +582,32 @@ impl MasterTable {
     ///
     /// 元の表（プロセス共有の `state::MASTERS`）は変えない＝`GameState::from_record` の**前**に
     /// この表を作り、その記録の間だけ使う。既に同じ `card_id` があれば `BadPayload`
-    /// （黙って上書きしない）。
+    /// （黙って上書きしない）。能力は [`add_master`](Self::add_master) が
+    /// `MasterTable.abilities` へ積む＝追加定義の能力もそのまま引ける。
+    ///
+    /// `extra` は list（`cards[]` と同じ形の並び）・`card_id -> カード` の object・
+    /// `null`（＝追加なし。記録に `extra_masters` が無いとき）を受ける。
     pub fn with_extra_masters(&self, extra: &Value) -> Result<MasterTable, EngineError> {
-        let items = as_arr(extra, "extra_masters")?;
-        if items.is_empty() {
+        let entries: Vec<(String, &Value)> = match extra {
+            Value::Object(map) => map.iter().map(|(k, v)| (k.clone(), v)).collect(),
+            Value::Array(items) => items
+                .iter()
+                .enumerate()
+                .map(|(i, v)| (format!("[{i}]"), v))
+                .collect(),
+            Value::Null => Vec::new(),
+            _ => {
+                return Err(bad(
+                    "extra_masters: object（card_id -> カード）か list を期待".into(),
+                ))
+            }
+        };
+        if entries.is_empty() {
             return Ok(self.clone());
         }
         let mut table = self.clone();
-        for (i, card) in items.iter().enumerate() {
-            table.add_master(card, &format!("extra_masters[{i}]"))?;
+        for (key, card) in entries {
+            table.add_master(card, &format!("extra_masters.{key}"))?;
         }
         Ok(table)
     }
@@ -635,6 +652,12 @@ pub struct CardInstance {
     pub timed_flags: Vec<String>,
     pub timed_cost: i32,
     pub timed_keywords: Vec<String>,
+    /// P3: Python の実行時属性 `CardInstance._temp_origin == "LIFE"`
+    /// （`LOOK_LIFE` が temp へ載せたカードは `_reclaim_temp_to_deck_top` でライフへ戻る）。
+    ///
+    /// 記録 v3/v4 の `card_record` には**無い**（Python 側も動的属性で、`temp_zone` が空の
+    /// 記録境界でしか観測されない）＝`from_record` では常に `false` で始まる。
+    pub temp_origin_life: bool,
 }
 
 /// 記録 v2 の `card_record`（`rs_diff_replay.py::card_record`）が持つ欄。
@@ -772,6 +795,7 @@ impl CardInstance {
             timed_flags: f_str_set(o, "timed_flags", ctx)?,
             timed_cost: f_i32(o, "timed_cost", ctx)?,
             timed_keywords: f_str_set(o, "timed_keywords", ctx)?,
+            temp_origin_life: false, // 記録に無い（上のフィールド docstring 参照）
         })
     }
 }
@@ -898,14 +922,35 @@ pub struct ActiveBattle {
     pub counter_buff: i32,
 }
 
-/// 中断（対話）の種別（P2 で追加）。Python `active_interaction["action_type"]` に対応する。
+/// 中断（対話）の種別（P2 で追加・P3 で効果解決の 7 種を足した）。
+/// Python `active_interaction["action_type"]` に対応する。
 ///
 /// P2（ルール）が立てる中断は**場のキャラ上限超過の強制トラッシュだけ**
-/// （`engine/card_moves.py::_suspend_for_field_overflow`）。効果解決が立てる
-/// `SELECT_TARGET`／`CHOICE`／`CONFIRM_OPTIONAL`… は P3 でここへ足す（append-only）。
+/// （`engine/card_moves.py::_suspend_for_field_overflow`）。P3 で `resolver.py`／
+/// `triggers.py`／`battle.py` が立てる 7 種を足した（append-only）。
+///
+/// **`DON_BOX` は中断ではない**（`engine/interaction.py::resolve_interaction` に分岐が無い）:
+/// `cpu_ai.py` が合法手を畳む**マクロ手**（`action_type: "DON_BOX"` → 実対局では先頭の
+/// `ATTACH_DON` へ展開される）であり、`active_interaction` には決して入らない。よって
+/// ここに変種は持たない（持つと Python に無い要求が盤面 dict に出て照合が落ちる）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InteractionKind {
     FieldOverflowTrash,
+    /// `resolver._suspend_for_target_selection`。
+    SelectTarget,
+    /// `resolver._suspend_for_choice`（`Choice` ノード）。
+    Choice,
+    /// `resolver._suspend_for_optional_confirmation`／`_suspend_for_ability_cost_confirm`／
+    /// `battle._suspend_for_battle_ko_replacement`（3 経路とも Python は同じ `CONFIRM_OPTIONAL`）。
+    ConfirmOptional,
+    /// `triggers._suspend_for_trigger_confirm`（【トリガー】等の発動可否）。
+    ConfirmTrigger,
+    /// `resolver._suspend_for_arrange`（並び替え／上下選択）。
+    ArrangeDeck,
+    /// `resolver._suspend_for_cost_declaration`（C8 のコスト宣言）。
+    DeclareCost,
+    /// `resolver._suspend_for_don_selection`（RETURN_DON の対象ドン!!選択）。
+    SelectResource,
 }
 
 impl InteractionKind {
@@ -913,22 +958,84 @@ impl InteractionKind {
     pub fn action_type(self) -> &'static str {
         match self {
             InteractionKind::FieldOverflowTrash => "FIELD_OVERFLOW_TRASH",
+            InteractionKind::SelectTarget => "SELECT_TARGET",
+            InteractionKind::Choice => "CHOICE",
+            InteractionKind::ConfirmOptional => "CONFIRM_OPTIONAL",
+            InteractionKind::ConfirmTrigger => "CONFIRM_TRIGGER",
+            InteractionKind::ArrangeDeck => "ARRANGE_DECK",
+            InteractionKind::DeclareCost => "DECLARE_COST",
+            InteractionKind::SelectResource => "SELECT_RESOURCE",
         }
     }
     /// `get_pending_request` がフロントへ出す `action`
-    /// （`SELECT_TARGET`／`FIELD_OVERFLOW_TRASH` → `SEARCH_AND_SELECT`）。
+    /// （`SELECT_TARGET`／`FIELD_OVERFLOW_TRASH` → `SEARCH_AND_SELECT`・他は種別名そのまま）。
     pub fn front_action(self) -> &'static str {
         match self {
-            InteractionKind::FieldOverflowTrash => "SEARCH_AND_SELECT",
+            InteractionKind::FieldOverflowTrash | InteractionKind::SelectTarget => {
+                "SEARCH_AND_SELECT"
+            }
+            other => other.action_type(),
         }
     }
 }
 
+/// 中断の continuation（Python `active_interaction["continuation"]` の dict）。
+///
+/// 種別ごとに使う欄が違うので、Python の dict と同じく「使う欄だけ入っている」形にする
+/// （欄名は Python のキー名と同じ）。効果木は所有せず [`crate::effects::NodeRef`] で指す。
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Continuation {
+    /// `execution_stack`（再開時に resolver へ戻す実行スタック）。
+    pub execution_stack: Vec<crate::effects::NodeRef>,
+    /// `effect_context`。
+    pub context: crate::effects::EffectContext,
+    /// `source_card_uuid`（Rust は index で持つ）。
+    pub source_card: Option<CardIdx>,
+    /// `query`（SELECT_TARGET の対象クエリ。`save_id` の保存に要る）。
+    pub query: Option<Box<crate::effects::ast::TargetQuery>>,
+    /// `node`（CHOICE）／`optional_node`（CONFIRM_OPTIONAL の任意効果）。
+    pub node: Option<crate::effects::NodeRef>,
+    /// `confirm_ability`（任意コスト能力の使用確認。能力表の index）。
+    pub confirm_ability: Option<u32>,
+    /// `trigger_item`（CONFIRM_TRIGGER。待ち行列の当該要素の複製）。
+    pub trigger_item: Option<PendingTrigger>,
+    /// ARRANGE_DECK の欄（`arrange_targets`／`dest_kind`／`dest_owner`／`fixed_position`）。
+    pub arrange: Option<ArrangeContinuation>,
+    /// `kind == "BATTLE_KO_REPLACE"` の欄（`target_owner_name`／`life_lost`）。
+    pub battle_ko: Option<BattleKoContinuation>,
+}
+
+/// ARRANGE_DECK の continuation（Python の同名キー）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArrangeContinuation {
+    pub targets: Vec<CardIdx>,
+    /// "DECK" | "LIFE"
+    pub dest_kind: ArrangeDest,
+    /// `dest_owner`（LIFE のときだけ入る）。
+    pub dest_owner: Option<Seat>,
+    /// `fixed_position`。
+    pub fixed_position: Position,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArrangeDest {
+    Deck,
+    Life,
+}
+
+/// 任意のバトル KO 置換（`battle._suspend_for_battle_ko_replacement`）の continuation。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BattleKoContinuation {
+    pub target_owner: Seat,
+    pub life_lost: i32,
+}
+
 /// 進行中の中断（Python `GameManager._interaction_stack` の 1 要素）。
 ///
-/// Python の dict は種別ごとに欄が違うが、P2 が扱う `FIELD_OVERFLOW_TRASH` を表すのに要る
-/// 欄だけを型で持つ。`continuation` に当たるのは `owner`（どちらの場が溢れたか）。
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Python の dict は種別ごとに欄が違うが、`get_pending_request` が読む欄と continuation を
+/// 型で持つ。`owner` は `FIELD_OVERFLOW_TRASH` の `owner_name`（効果由来の中断では
+/// `player` と同じ値を入れる＝読まれない）。
+#[derive(Debug, Clone, PartialEq)]
 pub struct Interaction {
     pub kind: InteractionKind,
     /// 要求先（`player_id`）。
@@ -944,6 +1051,104 @@ pub struct Interaction {
     pub source_card: Option<CardIdx>,
     /// continuation: 溢れた場の持ち主（`FIELD_OVERFLOW_TRASH` の `owner_name`）。
     pub owner: Seat,
+    /// `options`（CHOICE の選択肢ラベル。他の種別では空＝`options: null` を出す）。
+    pub options: Vec<String>,
+    /// ARRANGE_DECK がフロントへ出す UI 切替フラグ。
+    pub allow_position: bool,
+    pub allow_reorder: bool,
+    /// 効果解決の continuation（P2 の `FIELD_OVERFLOW_TRASH` は持たない）。
+    pub continuation: Option<Box<Continuation>>,
+    /// `SELECT_RESOURCE`（RETURN_DON）の候補は**ドン!!実体**（Python は `DonInstance` を
+    /// `candidates` に入れ、`get_pending_request` は `c.uuid`／`c.to_dict()` を読む）。
+    /// カード候補（`candidates`）とは排他で、どちらか一方だけが非空。
+    pub candidate_dons: Vec<DonIdx>,
+}
+
+impl Interaction {
+    /// P2 が立てる中断（continuation を持たない）の素の形。
+    // 欄は Python の `active_interaction` dict と 1:1。
+    #[allow(clippy::too_many_arguments)]
+    pub fn rules(
+        kind: InteractionKind,
+        player: Seat,
+        message: String,
+        candidates: Vec<CardIdx>,
+        selectable: Option<Vec<CardIdx>>,
+        constraints: Option<(i32, i32)>,
+        can_skip: bool,
+        owner: Seat,
+    ) -> Interaction {
+        Interaction {
+            kind,
+            player,
+            message,
+            candidates,
+            selectable,
+            constraints,
+            can_skip,
+            source_card: None,
+            owner,
+            options: Vec::new(),
+            allow_position: false,
+            allow_reorder: false,
+            continuation: None,
+            candidate_dons: Vec::new(),
+        }
+    }
+}
+
+/// 期間付き効果 1 件（Python `effects/continuous.py::ContinuousEffect`）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContinuousEffect {
+    pub target_uuid: String,
+    pub kind: ContinuousKind,
+    pub amount: i32,
+    pub flag: String,
+    pub keyword: String,
+    pub duration: crate::effects::ast::Duration,
+    /// `UNTIL_NEXT_TURN_END` 用: この `turn_count` の TURN_END で失効。
+    pub expire_turn: i32,
+}
+
+/// Python `ContinuousEffect.kind`（"POWER" | "COST" | "FLAG" | "KEYWORD"）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContinuousKind {
+    Power,
+    Cost,
+    Flag,
+    Keyword,
+}
+
+/// 退避した外側継続（Python `GameManager._deferred_continuations` の 1 要素）。
+#[derive(Debug, Clone, PartialEq)]
+pub enum DeferredFrame {
+    /// `kind == "RESOLVER_STACK"`（`_defer_resolver_stack`）。
+    ResolverStack(Box<ResolverStackFrame>),
+    /// `kind == "REMOVAL_TARGETS"`（`_defer_removal_targets`）。
+    RemovalTargets {
+        player: Seat,
+        action: crate::effects::NodeRef,
+        /// `remaining_target_uuids`（再開時に uuid で引き直す＝Python 同）。
+        remaining_target_uuids: Vec<String>,
+        value: i32,
+    },
+}
+
+/// [`DeferredFrame::ResolverStack`] の中身。
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolverStackFrame {
+    pub player: Seat,
+    pub source_card: Option<CardIdx>,
+    pub execution_stack: Vec<crate::effects::NodeRef>,
+    pub context: crate::effects::EffectContext,
+}
+
+/// 「このターン終了時、〜」で予約した遅延アクション（Python `pending_end_of_turn` の要素）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DelayedAction {
+    pub player: Seat,
+    pub node: crate::effects::NodeRef,
+    pub source_card: Option<CardIdx>,
 }
 
 /// 誘発待ち行列の 1 件（Python `_pending_triggers`／`_battle_triggers`）。
@@ -962,7 +1167,7 @@ pub struct PendingTrigger {
 }
 
 /// 盤面全体（Python `GameManager`＋両 `Player`）。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GameState {
     pub cards: Vec<CardInstance>,
     pub dons: Vec<DonInstance>,
@@ -990,6 +1195,24 @@ pub struct GameState {
     /// Python `_pending_triggers`（ライフ公開【トリガー】/ON_LIFE_DECREASE 等）。
     /// P2（バニラ）では常に空。
     pub pending_triggers: Vec<PendingTrigger>,
+
+    // --- P3（効果解決）で足した欄（append-only）--------------------------------
+    /// Python `effects/continuous.py::ContinuousEffectManager.effects`。
+    pub continuous: Vec<ContinuousEffect>,
+    /// Python `_deferred_continuations`（除去置換の中断で退避した外側継続）。
+    pub deferred_continuations: Vec<DeferredFrame>,
+    /// Python `pending_end_of_turn`（「このターン終了時、〜」の予約）。
+    pub pending_end_of_turn: Vec<DelayedAction>,
+    /// Python `pending_extra_turn`（EXTRA_TURN を予約したプレイヤー）。
+    pub pending_extra_turn: Option<Seat>,
+    /// Python `_in_passive_recalc`（継続効果の再計算中は問い合わせを出さない）。
+    pub in_passive_recalc: bool,
+    /// Python `_replacement_suspended`（除去置換が内側中断を提示した）。
+    pub replacement_suspended: bool,
+    /// Python `_return_don_selection`（SELECT_RESOURCE で選ばれたドン!!の uuid）。
+    pub return_don_selection: Option<Vec<String>>,
+    /// Python `_last_resource_count`（ドン!!の増減で実際に処理した枚数＝§7-5 の分母）。
+    pub last_resource_count: Option<i32>,
 }
 
 impl GameState {
@@ -1286,6 +1509,15 @@ impl GameState {
             interaction_stack: Vec::new(),
             battle_triggers: Vec::new(),
             pending_triggers: Vec::new(),
+            // P3 の欄も記録には無い（件数だけ）＝空・既定で始める。
+            continuous: Vec::new(),
+            deferred_continuations: Vec::new(),
+            pending_end_of_turn: Vec::new(),
+            pending_extra_turn: None,
+            in_passive_recalc: false,
+            replacement_suspended: false,
+            return_don_selection: None,
+            last_resource_count: None,
         })
     }
 

@@ -482,6 +482,69 @@ ATTACH_DON はドン!!のレスト状態を変えない（`ops::attach_don` と�
 バニラでも `CHAR_KOED_<owner>` を記録する／(5) P3 で対話スタック・誘発待ち行列の中身を記録形式へ足す
 （v4・§11.2）。
 
+### 8.7 P3 `rs-p3-resolver`（効果の実行エンジン・中断/再開・誘発・継続効果）の結果（2026-09-07）
+
+`claude/rs-p3-resolver` で実施（本線 `claude/cpu-spec-improvements-yw91jd` から分岐）。所有範囲は
+§11.4 の `effects/{resolver,interact,triggers,continuous,passives}.rs`・`effects/actions/mod.rs`・
+`lib.rs` の `replay_audit`・`rules/` の誘発フック・記録 v4 の `shuffled`・`tests/scripts/rs_audit_replay.py`。
+**Python 側（`opcg_sim/`）は 1 行も変えていない**（追加はハーネスとスクリプトのみ）。
+
+| 受け入れ | 結果 |
+|---|---|
+| `cargo test --no-default-features` | **106 passed**・0 failed・2 ignored（監査オラクル統合テスト＋P2 の 1 件） |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `make test`（Python 無変更） | **1,761 passed**・0 failed（8:05） |
+| `rs_audit_replay.py --self-check`（記録→再生無し） | **cards=2,472／abilities=3,386／例外 0**（受け入れ条件） |
+| `rs_audit_replay.py --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF` | cards=634／abilities=817／mismatch=0・bad_payload=0・**unimplemented=817**（＝`ability_ids` が空＝`loader.rs` 待ち。統合後にコーディネータが再実行する） |
+| `rs_diff_replay.py --mode replay --vanilla --games 8`（記録 v4 の退行確認） | match=8／mismatch=0／unimplemented=0（745 行動） |
+| `rs_diff_replay.py --mode state --games 5`（P1 の退行確認） | match=5／mismatch=0（431 行） |
+| `rs_ops_oracle.py --games 3`（P1 の退行確認・journal の bit 一致） | match=337／mismatch=0／restore_mismatch=0（6,623 操作） |
+
+**設計上の決定（統合時に読む）**
+
+1. **実行スタックはノードを持たず [`NodeRef`] で指す**（能力 index＋根 cost/effect＋子の添字列）。
+   Python は効果木を「カード共有の同一オブジェクト」として持ち `id(node)`（`_confirmed_optionals`）や
+   同一性探索（`_is_cost_node`）に使うが、Rust は木を所有・複製しない。`NodeRef` は同じノードなら
+   同じ値・違うノードなら違う値になるので、`id()` と同じ判別能力を持ちつつ continuation に
+   そのまま入れられる（中断→再開で木を作り直さない）。`_is_cost_node` は `root == Cost` の一致で済む。
+2. **`effects/mod.rs` に §11.5 の stub と `EffectContext`・効果表の差し口（`init_abilities`）を置いた**。
+   core の `loader.rs` が入るまで `ability_ids` は空なので、`replay_audit` は**先頭で明示的に
+   `Unimplemented` を返す**（`kind: "play"` は `ability_ids` を読まずに素通りしてしまい「黙って一致」に
+   化けるため、fire の前で止める）。統合時は stub の中身を `matcher`/`cond`/`value` へ委譲するだけ——
+   **シグネチャは変えない**。
+3. **既定解決（`card_keep_value`／`_selection_entries`／`choose_selection`／
+   `default_interaction_payload`）は `effects/interact.rs` に一本化**した。P2 は `rules/legal.rs` に
+   写しを持っていたが、P3 で中断の種類が増える（ドン!!候補・公開一時領域・効果ブロック数の加点）と
+   **2 か所は必ずずれる**。`legal.rs` は薄い委譲に変えた。
+4. **`DON_BOX` は中断ではない**。指示書の「中断/再開の全種」に挙がっているが、
+   `engine/interaction.py::resolve_interaction` に分岐は無く、`cpu_ai.py` が合法手を畳む**マクロ手**
+   （実対局では先頭の `ATTACH_DON` へ展開される）。`active_interaction` には入らないので
+   `InteractionKind` に変種を持たせていない（持つと Python に無い要求が盤面 dict に出て照合が落ちる）。
+   実装したのは Python に実在する 7 種＋P2 の `FIELD_OVERFLOW_TRASH`。
+5. **記録 v4 の `shuffled` は「デッキだけ」では足りない**。§11.2 は「持ち主のデッキだけ取り直す」と
+   書いてあるが、マリガンは**シャッフルの直後に同じ原始操作の中で 5 枚引く**ので、デッキだけでは
+   山と手札の切り分けが Python と揃わない。実装は「デッキ単独で多重集合が一致すればデッキだけ →
+   一致しないが `deck ∪ hand` で一致すれば両方 → どちらも違えば `BadPayload`」の順に判定する。
+6. **除去保護／置換（`_active_protection`／`_find_replacement`）は群 E の担当**なので、ここには
+   「保護者・置換者が 1 つも居ない」高速路だけを入れた（＝`PREVENT_LEAVE`／`REPLACE_EFFECT` を持つ
+   PASSIVE 能力が走査範囲に無ければ Python と同じ結論。1 つでもあれば `Unimplemented`）。
+   `granted_replacements` は【カウンター】イベントの発動でしか積まれない（群 E）ので常に空＝同値。
+7. **監査の汎用盤面には 3 か所の正規化が要る**（`rs_audit_replay.py`。`effect_coverage` は触っていない）:
+   プレイヤー名 `P1/P2` → `p1/p2`（記録 v4 のキー）・ドン!!ゾーンに詰まった `CardInstance` を
+   本物の `DonInstance` へ・両者の合成リーダー（`card_id="L-001"` なのに `name` が違う）を 1 つの定義へ。
+   いずれも**識別子の付け替えだけ**で盤面の意味は変わらない（詳細は各関数の docstring）。
+8. `CardInstance` に `temp_origin_life` を足した（Python の動的属性 `_temp_origin == "LIFE"`）。
+   記録には無い欄なので `from_record` では常に `false`（`temp_zone` が空の記録境界でしか観測されない）。
+9. **`rules/legal.rs` に `ACTIVATE_MAIN` の列挙を足した**（Python `_has_activatable_main` ＋
+   `_ability_effect_is_inert`）。P2 は「効果が要る＝P3」として 1 手も出していなかったが、
+   出さないままだと統合後の実デッキ再生で **`legal[i]` が Python より小さくなるだけ**で
+   エラーにならない（＝黙って不一致になる）。条件は core の `cond.rs` を呼ぶので、`ability_ids` が
+   空の現状は 1 手も出ず P2 の受け入れ（vanilla）はそのまま green。
+
+**未実装として残したもの**（黙って通していない＝全て `Unimplemented`）: `matcher`/`cond`/`value`/`loader`
+（core）・DRAW/DISCARD/KO/REST/ACTIVE/BUFF 以外の `ActionType`（群 A〜E）・【カウンター】イベントの
+発動（群 E）・`setup_phase_pending` の再開（記録に現れない経路）。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は

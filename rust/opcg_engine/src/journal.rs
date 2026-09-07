@@ -33,8 +33,8 @@
 #![allow(dead_code)] // アクセサは ops.rs / P2 以降が使う契約。現時点で未参照のものがある。
 
 use crate::model::{
-    ActiveBattle, CardIdx, CardInstance, DonIdx, DonInstance, GameState, Interaction, PendingTrigger,
-    Phase, PlayerState, Restriction, Seat,
+    ActiveBattle, CardIdx, CardInstance, ContinuousEffect, DeferredFrame, DelayedAction, DonIdx,
+    DonInstance, GameState, Interaction, PendingTrigger, Phase, PlayerState, Restriction, Seat,
 };
 
 // --- フィールド識別子 --------------------------------------------------------
@@ -47,6 +47,8 @@ pub enum CardBoolField {
     IsFaceUp,
     Negated,
     AbilityDisabled,
+    /// P3: `LOOK_LIFE` 由来の temp 滞在（`_reclaim_temp_to_deck_top` がライフへ戻す）。
+    TempOriginLife,
 }
 
 /// `CardInstance` の i32 フィールド。
@@ -124,7 +126,10 @@ pub enum MgrBoolField {
 // --- undo エントリ -----------------------------------------------------------
 
 /// 1 つの変更を元へ戻すための記録（＝逆操作）。`rollback` は逆順に再生する。
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// `Eq` は持たない: P3 で中断（[`Interaction`]）が効果木の型（`effects::ast`）を含むように
+/// なり、それらは `PartialEq` だけを導出しているため（比較の意味は変わらない）。
+#[derive(Debug, Clone, PartialEq)]
 pub enum Undo {
     CardBool(CardIdx, CardBoolField, bool),
     CardI32(CardIdx, CardI32Field, i32),
@@ -162,6 +167,30 @@ pub enum Undo {
     InteractionPop(Box<Interaction>),
     /// 誘発待ち行列の旧内容（P2。`battle_triggers`／`pending_triggers`）。
     TriggerQueue(TriggerQueue, Vec<PendingTrigger>),
+    // --- P3（効果解決）で足した逆操作（append-only）---------------------------
+    /// 継続効果の一覧を入れ替えた → 旧内容へ戻す。
+    Continuous(Vec<ContinuousEffect>),
+    /// 退避した外側継続の一覧を入れ替えた → 旧内容へ戻す。
+    Deferred(Vec<DeferredFrame>),
+    /// 遅延アクションの一覧を入れ替えた → 旧内容へ戻す。
+    PendingEndOfTurn(Vec<DelayedAction>),
+    /// マネージャの `Option<Seat>` 欄（`pending_extra_turn`）の旧値。
+    ExtraTurn(Option<Seat>),
+    /// マネージャの bool 欄（`in_passive_recalc`／`replacement_suspended`）の旧値。
+    MgrFlag(MgrFlagField, bool),
+    /// `return_don_selection` の旧値。
+    ReturnDonSelection(Option<Vec<String>>),
+    /// `last_resource_count` の旧値。
+    LastResourceCount(Option<i32>),
+    /// 中断（対話）を丸ごと差し替えた（Python の `active_interaction = {...}`＝先頭置換）。
+    InteractionReplace(Box<Interaction>),
+}
+
+/// P3 で足した `GameManager` の bool 欄。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MgrFlagField {
+    InPassiveRecalc,
+    ReplacementSuspended,
 }
 
 /// 誘発待ち行列の種別（Python `_battle_triggers`／`_pending_triggers`）。
@@ -579,6 +608,80 @@ impl StateMut<'_> {
         let old = std::mem::replace(slot, value);
         self.rec(Undo::TriggerQueue(which, old));
     }
+
+    // -- P3（効果解決）の欄 -----------------------------------------------------
+
+    /// Python `active_interaction = {...}`（スタックが空でなければ**先頭を置換**・空なら push）。
+    pub fn set_interaction(&mut self, interaction: Interaction) {
+        match self.state.interaction_stack.last_mut() {
+            Some(slot) => {
+                let old = std::mem::replace(slot, interaction);
+                self.rec(Undo::InteractionReplace(Box::new(old)));
+            }
+            None => self.push_interaction(interaction),
+        }
+    }
+
+    /// 継続効果の一覧を丸ごと置き換える（Python `self.effects = JournaledList(...)`）。
+    pub fn set_continuous(&mut self, value: Vec<ContinuousEffect>) {
+        if self.state.continuous == value {
+            return;
+        }
+        let old = std::mem::replace(&mut self.state.continuous, value);
+        self.rec(Undo::Continuous(old));
+    }
+
+    pub fn set_deferred(&mut self, value: Vec<DeferredFrame>) {
+        if self.state.deferred_continuations == value {
+            return;
+        }
+        let old = std::mem::replace(&mut self.state.deferred_continuations, value);
+        self.rec(Undo::Deferred(old));
+    }
+
+    pub fn set_pending_end_of_turn(&mut self, value: Vec<DelayedAction>) {
+        if self.state.pending_end_of_turn == value {
+            return;
+        }
+        let old = std::mem::replace(&mut self.state.pending_end_of_turn, value);
+        self.rec(Undo::PendingEndOfTurn(old));
+    }
+
+    pub fn set_pending_extra_turn(&mut self, value: Option<Seat>) {
+        if self.state.pending_extra_turn == value {
+            return;
+        }
+        let old = std::mem::replace(&mut self.state.pending_extra_turn, value);
+        self.rec(Undo::ExtraTurn(old));
+    }
+
+    pub fn set_mgr_flag(&mut self, field: MgrFlagField, value: bool) {
+        let slot = match field {
+            MgrFlagField::InPassiveRecalc => &mut self.state.in_passive_recalc,
+            MgrFlagField::ReplacementSuspended => &mut self.state.replacement_suspended,
+        };
+        if *slot == value {
+            return;
+        }
+        let old = std::mem::replace(slot, value);
+        self.rec(Undo::MgrFlag(field, old));
+    }
+
+    pub fn set_return_don_selection(&mut self, value: Option<Vec<String>>) {
+        if self.state.return_don_selection == value {
+            return;
+        }
+        let old = std::mem::replace(&mut self.state.return_don_selection, value);
+        self.rec(Undo::ReturnDonSelection(old));
+    }
+
+    pub fn set_last_resource_count(&mut self, value: Option<i32>) {
+        if self.state.last_resource_count == value {
+            return;
+        }
+        let old = std::mem::replace(&mut self.state.last_resource_count, value);
+        self.rec(Undo::LastResourceCount(old));
+    }
 }
 
 fn trigger_queue_mut(state: &mut GameState, which: TriggerQueue) -> &mut Vec<PendingTrigger> {
@@ -656,6 +759,21 @@ fn apply_undo(state: &mut GameState, entry: Undo) {
         }
         Undo::InteractionPop(old) => state.interaction_stack.push(*old),
         Undo::TriggerQueue(which, old) => *trigger_queue_mut(state, which) = old,
+        Undo::InteractionReplace(old) => {
+            if let Some(slot) = state.interaction_stack.last_mut() {
+                *slot = *old;
+            }
+        }
+        Undo::Continuous(old) => state.continuous = old,
+        Undo::Deferred(old) => state.deferred_continuations = old,
+        Undo::PendingEndOfTurn(old) => state.pending_end_of_turn = old,
+        Undo::ExtraTurn(old) => state.pending_extra_turn = old,
+        Undo::MgrFlag(field, old) => match field {
+            MgrFlagField::InPassiveRecalc => state.in_passive_recalc = old,
+            MgrFlagField::ReplacementSuspended => state.replacement_suspended = old,
+        },
+        Undo::ReturnDonSelection(old) => state.return_don_selection = old,
+        Undo::LastResourceCount(old) => state.last_resource_count = old,
     }
 }
 
@@ -668,6 +786,7 @@ fn card_bool_mut(c: &mut CardInstance, field: CardBoolField) -> &mut bool {
         CardBoolField::IsFaceUp => &mut c.is_face_up,
         CardBoolField::Negated => &mut c.negated,
         CardBoolField::AbilityDisabled => &mut c.ability_disabled,
+        CardBoolField::TempOriginLife => &mut c.temp_origin_life,
     }
 }
 

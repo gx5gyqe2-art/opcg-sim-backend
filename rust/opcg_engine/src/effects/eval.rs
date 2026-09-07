@@ -176,6 +176,7 @@ const CTX_KEYS: &[&str] = &[
     "last_action_success",
     "last_had_targets",
     "last_action_count",
+    "prev_action_count",
     "last_revealed_card",
     "declared_cost",
     "source_card_uuid",
@@ -229,7 +230,7 @@ fn context_from_json(state: &GameState, v: &Value, ctx: &str) -> Result<EffectCo
                     .ok_or_else(|| bad(format!("{sctx}.{key}: expected a list of uuids")))?;
                 refs.push(uuid_ref(state, uuid)?);
             }
-            out.saved_targets.insert(key.clone(), refs);
+            out.set_saved(key, refs);
         }
     }
     if let Some(v) = o.get("last_action_success") {
@@ -246,12 +247,21 @@ fn context_from_json(state: &GameState, v: &Value, ctx: &str) -> Result<EffectCo
             ),
         };
     }
-    if let Some(v) = o.get("last_action_count") {
-        out.last_action_count = i32::try_from(
-            v.as_i64()
-                .ok_or_else(|| bad(format!("{ctx}.last_action_count: expected an integer")))?,
-        )
-        .map_err(|_| bad(format!("{ctx}.last_action_count: does not fit in i32")))?;
+    // §11.6: 文脈の欄は `prev_action_count: Option<i32>`（resolver の形）。JSON のキーは
+    // Python の context キー（`_last_action_count`）に合わせた `last_action_count` と、
+    // 欄名そのままの `prev_action_count` の**どちらでも**受ける（同じ欄を指す）。
+    for key in ["last_action_count", "prev_action_count"] {
+        let Some(v) = o.get(key) else { continue };
+        out.prev_action_count = match v {
+            Value::Null => None,
+            _ => Some(
+                i32::try_from(
+                    v.as_i64()
+                        .ok_or_else(|| bad(format!("{ctx}.{key}: expected an integer")))?,
+                )
+                .map_err(|_| bad(format!("{ctx}.{key}: does not fit in i32")))?,
+            ),
+        };
     }
     out.last_revealed_card = opt_uuid_card(state, o, "last_revealed_card", ctx)?;
     if let Some(v) = o.get("declared_cost") {

@@ -44,7 +44,7 @@ fn turn_one_draws_nothing_and_adds_one_don() {
     b.dons(Seat::P1, "deck", 10);
     let (masters, mut s) = session(b.build());
 
-    turn::refresh_phase(&mut s, &masters);
+    turn::refresh_phase(&mut s, &masters).expect("refresh_phase");
     let p1 = s.state().player(Seat::P1);
     assert!(p1.hand.is_empty(), "ターン 1 はドローしない");
     assert_eq!(p1.deck.len(), 3);
@@ -61,7 +61,7 @@ fn later_turns_draw_one_card_and_add_two_dons() {
     b.dons(Seat::P1, "deck", 10);
     let (masters, mut s) = session(b.build());
 
-    turn::refresh_phase(&mut s, &masters);
+    turn::refresh_phase(&mut s, &masters).expect("refresh_phase");
     let p1 = s.state().player(Seat::P1);
     assert_eq!(p1.hand, vec![top], "デッキの上から 1 枚");
     assert_eq!(p1.deck.len(), 1);
@@ -656,25 +656,49 @@ fn the_battle_requests_use_the_python_messages_and_candidates() {
     );
 }
 
-/// 効果を要する経路は黙って進めず `Unimplemented`（計画 §3）。
+/// 効果を要する経路（P3 で実装）。**能力を 1 つも持たないカード**では Python と同じ結論になる:
+/// - 【メイン】効果を持たないイベントは手札から発動できない（`ValueError` 相当＝`BadPayload`）
+/// - `ACTIVATE_MAIN` は発動する能力が無い＝何も起きずに成功する
+///
+/// 能力を**持つ**カードは効果表（core の `loader.rs`）が要るので `Unimplemented`（黙って
+/// 「能力なし」として通さない＝計画 §3）。
 #[test]
-fn effect_paths_report_unimplemented_instead_of_guessing() {
+fn effect_paths_follow_python_for_ability_less_cards_and_report_missing_tables() {
     let mut b = BoardBuilder::new().turn(3, Seat::P1);
     let event = b.put_hand(Seat::P1, crate::testkit::M_EVENT);
     let ch = b.put_field(Seat::P1, M_CHAR);
     b.dons(Seat::P1, "active", 4);
     b.put_deck(Seat::P1, M_CHAR);
     b.put_deck(Seat::P2, M_CHAR);
-    let (masters, mut s) = session(b.build());
+    let (mut masters, mut s) = session(b.build());
 
     assert_eq!(
         crate::rules::card_type(s.state(), &masters, event),
         CardType::Event
     );
-    let err = actions::play_card_action(&mut s, &masters, Seat::P1, event).unwrap_err();
-    assert!(matches!(err, crate::state::EngineError::Unimplemented(_)));
+    // 【メイン】効果を持たないイベント（`abilities` が空）＝メインでは発動できない。
+    match actions::play_card_action(&mut s, &masters, Seat::P1, event) {
+        Err(crate::state::EngineError::BadPayload(msg)) => {
+            assert!(msg.contains("【メイン】効果を持ちません"), "{msg}")
+        }
+        other => panic!("expected BadPayload, got {other:?}"),
+    }
 
+    // 起動メイン: ACTIVATE_MAIN 能力が無い＝何もせず成功（Python も同じ）。
     let uuid = s.state().card(ch).uuid.clone();
+    actions::apply_game_action(
+        &mut s,
+        &masters,
+        Seat::P1,
+        "ACTIVATE_MAIN",
+        &json!({"uuid": uuid}),
+    )
+    .expect("能力の無いカードの ACTIVATE_MAIN は no-op");
+
+    // 能力表に載っていない能力を指すカードは黙って通さない（効果表は core の `loader.rs`）。
+    let table = crate::testkit::effect_table();
+    masters.masters[crate::testkit::M_CHAR as usize].ability_ids =
+        vec![table.abilities.len() as u32];
     let err = actions::apply_game_action(
         &mut s,
         &masters,
@@ -683,7 +707,12 @@ fn effect_paths_report_unimplemented_instead_of_guessing() {
         &json!({"uuid": uuid}),
     )
     .unwrap_err();
-    assert!(matches!(err, crate::state::EngineError::Unimplemented(_)));
+    match err {
+        crate::state::EngineError::BadPayload(msg) => {
+            assert!(msg.contains("表にない"), "理由を名指しすること: {msg}")
+        }
+        other => panic!("expected BadPayload, got {other:?}"),
+    }
 }
 
 /// `ATTACH_DON`（Python `action_api` の ACT_ATTACH_DON）: active の先頭を取り、

@@ -38,6 +38,12 @@ unimplemented が減り、mismatch が 0 のまま maintained されることが
   - `--mode state`（P1-model の受け入れ）: 各行の `hidden` から Rust が `GameState` を組み立て、
     `state_roundtrip(hidden_json)` の盤面 dict が同じ行の `state` と一致するか（`pending_request` は
     P2 の責務なので除外）。`--mode replay`（既定）: 行動列の再生（P2 以降）。
+記録形式 v4（P3・`docs/rust_engine_plan.md` §11.2）:
+  - 各 `steps[i]` に `shuffled: ["p1", ...]`＝**その段で Python が `random.shuffle` を呼んだ
+    デッキの持ち主**。再生側（Rust）はその持ち主のゾーンの並びだけを記録から採り直す
+    （P2 の「MULLIGAN なら再同期」の置き換え）。記録側はエンジンを変えず、対局中だけ
+    `random.shuffle` をラップして持ち主を観測する（[`ShuffleWatcher`]）。
+
 記録形式 v3（P2・`docs/rust_engine_plan.md` §10）:
   - `hidden.manager.active_battle` に `attacker_owner`／`target_owner`（所在の持ち主）を追加。
   - `--vanilla`: 全カードの abilities を外したデッキ（数値・キーワード・トリガーテキストは実カード）。
@@ -68,7 +74,7 @@ except ImportError:         # pragma: no cover - 実行環境依存
 
 # 記録ペイロードの形式バージョン。Rust 側 `state::RECORD_VERSION` と一致させること
 # （形を非互換に変えたら両方 +1 する）。
-RECORD_VERSION = 3
+RECORD_VERSION = 4
 
 # 効果構造 JSON（`opcg_sim/tools/export_effects_json.py` の生成物・git 管理外・約 8MB）。
 # Rust 側は起動時にこれを 1 度だけ読んで `CardMaster` 表を作る（`opcg_engine.load_masters`）。
@@ -228,6 +234,56 @@ def vanilla_deck_builder(p1_leader=None, p2_leader=None):
     return _build
 
 
+# --- シャッフルの観測（記録 v4 の `shuffled`）-----------------------------------
+
+
+class ShuffleWatcher:
+    """対局中だけ `random.shuffle` をラップし、**どちらのデッキが混ぜられたか**を記録する。
+
+    シャッフルを呼ぶのはエンジンの 3 か所（`engine/turn_flow.do_mulligan`／
+    `actions/player_level.shuffle`／`gamestate.Player.setup_game`・`shuffle_deck`）で、
+    いずれも `random.shuffle(<player>.deck)` の形。3 モジュールは同じ `random` モジュール
+    オブジェクトを共有するので、`random.shuffle` を 1 か所差し替えれば全部を捕まえられる
+    （観測だけ・並びは本物の shuffle に任せる＝**エンジンの挙動は変わらない**）。
+
+    どのデッキかは**リスト同一性**（`seq is player.deck`）で判別する。デッキ以外の
+    shuffle（`cpu_ai` は `random.Random` インスタンスのメソッドを使うのでそもそも通らない）は
+    素通しで記録しない。
+    """
+
+    def __init__(self):
+        self.manager = None
+        self.owners = []
+        self._real = None
+
+    def __enter__(self):
+        import random as _random
+        self._real = _random.shuffle
+
+        def _wrapped(seq, *args, **kwargs):
+            self._real(seq, *args, **kwargs)
+            m = self.manager
+            if m is not None:
+                for p in (m.p1, m.p2):
+                    if seq is p.deck:
+                        self.owners.append(p.name)
+                        break
+
+        _random.shuffle = _wrapped
+        return self
+
+    def __exit__(self, *exc):
+        import random as _random
+        if self._real is not None:
+            _random.shuffle = self._real
+        return False
+
+    def take(self) -> list:
+        """前回の `take()` 以降に観測した持ち主（重複を保った出現順）を返して空にする。"""
+        owners, self.owners = self.owners, []
+        return owners
+
+
 # --- 記録 observer ------------------------------------------------------------
 
 class Recorder:
@@ -238,10 +294,12 @@ class Recorder:
     観測専用で manager は一切変更しない（決定論契約）。
     """
 
-    def __init__(self, seed: int, policy: str, record_hidden: bool = False):
+    def __init__(self, seed: int, policy: str, record_hidden: bool = False,
+                 watcher: "ShuffleWatcher | None" = None):
         self.seed = seed
         self.policy = policy
         self.record_hidden = record_hidden
+        self.watcher = watcher
         self.setup = None
         self.steps = []
         self._pending_move = None
@@ -249,6 +307,9 @@ class Recorder:
 
     def on_start(self, ctx):
         m = ctx.manager
+        if self.watcher is not None:
+            self.watcher.manager = m
+            self.watcher.take()   # start_game 中のシャッフルは setup.hidden に畳まれている
         self.setup = {
             "first_player": "p1" if m.turn_player is m.p1 else "p2",
             "hidden": hidden_dict(m),
@@ -270,6 +331,9 @@ class Recorder:
     def on_step(self, ctx, move, events):
         step = self._pending_move or {"index": len(self.steps), "actor": ctx.actor.name, "move": move}
         step["state"] = board_dict(ctx.manager)
+        # v4: この段で混ぜられたデッキの持ち主（重複は落とし、出現順を保つ）。
+        owners = self.watcher.take() if self.watcher is not None else []
+        step["shuffled"] = list(dict.fromkeys(owners))
         if self.record_hidden:
             step["hidden"] = hidden_dict(ctx.manager)
         self.steps.append(step)
@@ -413,11 +477,13 @@ def run_one(seed: int, db, policy: str, max_steps: int, record_hidden: bool, mod
     """1 局を Python で打って記録し、Rust で再生して照合する。戻り値: (record, verdict)。"""
     kind = "random" if policy == "random" else "ai"
     seats = {"p1": make_seat(kind=kind), "p2": make_seat(kind=kind)}
-    rec = Recorder(seed, policy, record_hidden)
+    watcher = ShuffleWatcher()
+    rec = Recorder(seed, policy, record_hidden, watcher=watcher)
     rec.vanilla = vanilla
     try:
-        run_game(seed, db, seats=seats, observers=(rec,), max_steps=max_steps,
-                 deck_builder=(vanilla_deck_builder() if vanilla else None))
+        with watcher:
+            run_game(seed, db, seats=seats, observers=(rec,), max_steps=max_steps,
+                     deck_builder=(vanilla_deck_builder() if vanilla else None))
     except InvariantError as e:
         return rec, {"status": "python_error", "detail": f"InvariantError: {e.violations[:1]}"}
     except Exception as e:  # noqa: BLE001 - ハーネスは落とさず集計に載せる

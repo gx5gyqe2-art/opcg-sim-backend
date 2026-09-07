@@ -2,8 +2,10 @@
 //!
 //! 段階移行の計画は `docs/rust_engine_plan.md`。**現在 P3（効果解決）の土台まで**＝盤面モデル（P1）・
 //! journal と原始操作（P1）・ターン進行／戦闘／合法手／要求（P2）・効果構造の読込／対象／条件／値
-//! （P3 土台＝`effects::{loader,matcher,cond,value}`）がある。効果の**実行**（resolver／誘発／
-//! アクション）はまだ無い。
+//! （P3 土台の core＝`effects::{loader,matcher,cond,value}`）・効果の実行エンジン／中断／誘発／
+//! 継続効果（P3 土台の resolver＝`effects::{resolver,interact,triggers,continuous,passives}`）がある。
+//! 個々の `ActionType` のハンドラは土台の 6 種（DRAW／DISCARD／KO／REST／ACTIVE／BUFF）だけで、
+//! 残りは群 WP（§11.3）が入るまで `Unimplemented`。
 //! Python 版が常に正本（オラクル）で、Rust 版は同じ入力に同じ出力を返すことで受け入れる。
 
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
@@ -116,6 +118,18 @@ fn eval_queries(
     )?)
 }
 
+/// 監査記録（記録 v4 の `kind: "audit"`・`docs/rust_engine_plan.md` §11.2）を再生する。
+///
+/// `tests/harness/full_card_audit.py` と同じ手順（汎用盤面 → 能力を 1 つ発動 →
+/// `_smart_drain` の各応答）を Rust で辿り、`{"version":4,"states":[...],"interactive":bool}`
+/// を返す。`tests/scripts/rs_audit_replay.py` が Python 側の盤面と照合する。
+/// `effects_path` は初回のみ必要（マスター表をプロセスで 1 度読む）。
+#[pyfunction]
+#[pyo3(signature = (record_json, effects_path=None))]
+fn replay_audit(record_json: &str, effects_path: Option<&str>) -> PyResult<String> {
+    Ok(state::replay_audit(record_json, effects_path)?)
+}
+
 #[pymodule]
 fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
@@ -127,5 +141,6 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(apply_ops, m)?)?;
     m.add_function(wrap_pyfunction!(replay, m)?)?;
     m.add_function(wrap_pyfunction!(eval_queries, m)?)?;
+    m.add_function(wrap_pyfunction!(replay_audit, m)?)?;
     Ok(())
 }

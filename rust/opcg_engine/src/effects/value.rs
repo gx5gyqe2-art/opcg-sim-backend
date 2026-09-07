@@ -62,7 +62,8 @@ fn dynamic_value(
     match value.dynamic_source.as_deref() {
         Some("COUNT_REFERENCE") => Ok(state.player(actor).trash.len() as i32),
         // 文脈依存「直前アクションで捨てた/戻した/KO した…カードN枚につき」（§7-5）。
-        Some("PREV_ACTION_COUNT") => Ok(ctx.last_action_count),
+        // §11.6: 未設定（`None`）は Python の `context.get("_last_action_count", 0)` と同じ 0。
+        Some("PREV_ACTION_COUNT") => Ok(ctx.prev_action_count.unwrap_or(0)),
         Some("COUNT_QUERY") if value.count_query.is_some() => {
             let query = value.count_query.as_ref().expect("checked above");
             // 発生源が context で分かればそれを、無ければ自分のリーダーを発生源にする。
@@ -167,7 +168,7 @@ mod tests {
 
     #[test]
     fn prev_action_count_reads_the_context_and_applies_the_scaling() {
-        let ctx = EffectContext { last_action_count: 5, ..Default::default() };
+        let ctx = EffectContext { prev_action_count: Some(5), ..Default::default() };
         let vs = source(json!({"dynamic_source": "PREV_ACTION_COUNT", "multiplier": 1000}));
         assert_eq!(run(&vs, &ctx), 5000);
         // 除算は Python の床除算（先に割ってから掛ける）。
@@ -200,8 +201,7 @@ mod tests {
         // saved_targets の selected_card を見る。
         let (masters, state) = testkit::effect_board();
         let idx = crate::ops::find_card_by_uuid(&state, "p1-char-a").unwrap();
-        ctx.saved_targets
-            .insert("selected_card".into(), vec![TargetRef::Card(idx)]);
+        ctx.set_saved("selected_card", vec![TargetRef::Card(idx)]);
         let vs = source(json!({"dynamic_source": "REFERENCE_POWER", "ref_id": "selected"}));
         assert_eq!(
             calculate_value(&state, &masters, &masters.abilities, &vs, Seat::P1, &[], &ctx).unwrap(),
