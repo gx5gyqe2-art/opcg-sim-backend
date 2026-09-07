@@ -1,6 +1,6 @@
 # リファクタリング詳細設計: apply_action_to_engine のディスパッチ化と GameManager の責務分割
 
-- 対象: `opcg_sim/src/core/gamestate.py`（2,893行 / GameManager 2,715行・約90メソッド）
+- 対象: `legacy/python_engine/core/gamestate.py`（2,893行 / GameManager 2,715行・約90メソッド）
 - 目的: 挙動を **一切変えずに** 構造だけを改善する（pure refactoring）。
 - ステータス: **Phase A（ディスパッチ化）実装済み**（A-1/A-2/A-3・PR #157）。Phase B（GameManager 分割）は未着手。
 - 関連: `docs/SPEC.md` §2.5（クローン/シミュレーション）、`docs/TEST_SPEC.md` §4–5（品質ゲート）
@@ -100,7 +100,7 @@
 ### 2-2. 新パッケージ構成
 
 ```
-opcg_sim/src/core/actions/
+legacy/python_engine/core/actions/
 ├── __init__.py        # apply_action(gm, player, action, targets, value, source_card) を公開
 ├── registry.py        # レジストリ本体・登録デコレータ・ActionType 正規化
 ├── player_level.py    # (a) プレイヤーレベル・ハンドラ 22種（~300行）
@@ -119,7 +119,7 @@ def apply_action_to_engine(self, player, action, targets, value, source_card=Non
 - 依存の向き: `actions` → `models`（enums/models/effect_types）のみ。
   **actions から gamestate を import しない**（gm はダックタイピングで受ける）。
   `gamestate` → `actions` の一方向。`SELF_RESTRICTION_KEYS` / `FIELD_LIMIT` 等の定数は
-  循環回避のため `opcg_sim/src/core/rules_constants.py`（新設・定数のみ）へ移し、
+  循環回避のため `legacy/python_engine/core/rules_constants.py`（新設・定数のみ）へ移し、
   gamestate からは再エクスポートで互換維持する。
 
 ### 2-3. レジストリ設計
@@ -331,7 +331,7 @@ PR #157 の high-effort セルフレビューで挙がった、挙動に影響�
 
 ### 3-1. 方式: ステートレス・モジュール関数 + 1行デリゲート
 
-- 新設 `opcg_sim/src/core/engine/` パッケージに **状態を持たない関数群** を移す。
+- 新設 `legacy/python_engine/core/engine/` パッケージに **状態を持たない関数群** を移す。
   各関数は第1引数に gm を取る。
 - GameManager には**同名の1行デリゲートを残す**（公開API・テスト74ファイル・resolver/api の
   呼び出し互換を完全維持）。gamestate.py は「状態定義＋デリゲート＋少数の中核メソッド」

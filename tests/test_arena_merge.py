@@ -14,9 +14,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _bootstrap  # noqa: F401
-sys.path.insert(0, str(Path(__file__).resolve().parent / "scripts"))
 
-import arena_merge  # noqa: E402
+from opcg_sim.loop import arena_merge  # noqa: E402
 
 pytestmark = pytest.mark.cpu_infra
 

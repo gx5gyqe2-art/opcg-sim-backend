@@ -961,7 +961,7 @@ L1 100 局再生（上表）で代える。
 
 **Python 側**
 
-- `opcg_sim/src/core/rs_bridge.py`（新規・`tests/harness/rs_record.py` の復元器を移設）。
+- `legacy/python_engine/core/rs_bridge.py`（新規・`tests/harness/rs_record.py` の復元器を移設）。
   `tests/harness/rs_record.py` は再エクスポート＋テスト専用の `apply_python_op` だけになった。
 - `opcg_sim/api/engine_rs.py`（新規）: `RsGame`＝`Game` のラッパ。`request_id`（`_rid`＝要求＋
   `turn_count` の正規化 JSON の sha1）と `action_events` の受け渡し、暫定 CPU 経路（`py_manager()`）。
@@ -1287,7 +1287,7 @@ Python エンジンを直叩きしない 24 ファイル＝ラベリング／ア
 Python 5000 / Rust 0 に割れ、そこから `attack_box_candidates` の `k_min`／`k_two` が食い違って
 根の訪問数が L1=10 ずれた）。**修正**: `hidden_dict` に `manager.continuous`（一覧）を
 v5 additive で足し、Rust の `GameState::from_record` が読む（欄が無い記録は空＝従来どおり）。
-Python 側の復元器（`opcg_sim/src/core/rs_bridge.py`）は触らず、ハーネス
+Python 側の復元器（`legacy/python_engine/core/rs_bridge.py`）は触らず、ハーネス
 （`tests/harness/rs_record.py::_restore_continuous`）で一覧だけを戻す（カード側の値は
 復元済みなので `_apply_to_card` は呼ばない＝二重適用しない）。
 **オラクル `tests/scripts/rs_search_oracle.py --what decide`**（追加）:
@@ -1473,7 +1473,7 @@ docs/rust_engine_plan.md §6・§9（契約は本線 claude/cpu-spec-improvement
 型が足りなければ RESULT.json の notes で申告）。
 
 やること:
-1. rust/opcg_engine/src/journal.rs: undo ログ。Python opcg_sim/src/core/journal.py の意味論
+1. rust/opcg_engine/src/journal.rs: undo ログ。Python opcg_sim/src/models/journal.py の意味論
    （transaction の入れ子・rollback は直近の transaction 開始点まで・commit は親へ畳む）を持つ。
    GameState の書き換えは全て journal 経由のアクセサで行う（直接フィールド代入を禁じる設計に
    する＝ops.rs 以外から可変参照を出さない）。方式は自由（フィールド単位の Undo enum でも、
@@ -1574,7 +1574,7 @@ P2＝**ルール**（ターン進行・戦闘・勝敗・合法手列挙・要�
 1. `setup.hidden` から `GameState::from_record`（`start_game` 直後＝MULLIGAN フェイズ・手札 5 枚・ライフ配置済み）。
 2. 各 `steps[i]`: まず `legal[i]` 相当を Rust の合法手列挙で作る → `move` を適用（`kind: game|battle`・
    `action_type`・`payload`/`card_uuid` の形は `tests/harness/game_driver.py::run_game` と
-   `opcg_sim/src/core/action_api.py` のとおり）→ 盤面 dict（`pending_request` 込み）を出す。
+   `legacy/python_engine/core/action_api.py` のとおり）→ 盤面 dict（`pending_request` 込み）を出す。
 3. **乱数を消費する行動の後は記録の並びを採る**: P2 時点では `MULLIGAN` のみ（手札をデッキ底へ→
    シャッフル→5 枚）。Rust は意味論どおり処理したうえで、その行の `hidden` から当該プレイヤーの
    `deck`／`hand` の並びを取り直す。乱数列は Rust へ流さない（§6）。
@@ -1731,7 +1731,7 @@ interact.rs／triggers.rs／actions/ は触らない）。Python 側（opcg_sim/
    master.abilities の順）。未知の enum 名・未知のキー・型違いは BadPayload。記録 v4 の
    extra_masters（効果 JSON に無い定義。同じ形）を from_record 前に表へ足す口を用意する。
 2. effects/mod.rs に §11.5 の関数契約と EffectContext を置く（resolver WP はこれに依存する）。
-3. effects/matcher.rs: opcg_sim/src/core/effects/matcher.py::get_target_cards を全フィルタ込みで移す
+3. effects/matcher.rs: opcg_sim/src/effects/matcher.py::get_target_cards を全フィルタ込みで移す
    （zone 単一/複数/ANY・player SELF/OPPONENT/OWNER/ALL・card_type・traits・attributes・colors・names
    （別名 all_names・部分一致）・cost/power の min/max・cost_max_dynamic・power_sum_max・
    min_attached_don・is_face_up・lacks_trigger・is_rest・is_vanilla・is_unique_name・exclude_ids/
@@ -2207,8 +2207,8 @@ Rust 側に揃っており、PyO3 の対局オブジェクト 1 つと FastAPI �
 
 退避の形（案・P5 の完了時に実施）:
 
-- 最終コミットに tag `py-engine-final`。`opcg_sim/src/core/`（engine／effects／actions／cpu_ai／cpu_learned）と
-  `opcg_sim/src/learned/`（encoder／n_rel／n_rel_feat／mcts／adapter の serve 部分）を `legacy/python_engine/`
+- 最終コミットに tag `py-engine-final`。`legacy/python_engine/core/`（engine／effects／actions／cpu_ai／cpu_learned）と
+  `legacy/python_engine/learned/`（encoder／n_rel／n_rel_feat／mcts／adapter の serve 部分）を `legacy/python_engine/`
   へ移し、テスト対象から外す。履歴と tag で再現できる。
 - Python に残す: パーサ（`effects/parser.py`・`parser_v2.py`）と `export_effects_json.py`、学習
   （`n_rel_train.py`・データ処理・評価帯）、API 層（FastAPI・`contract/`）、生成／アリーナのオーケストレーション、
@@ -2295,7 +2295,7 @@ claude/cpu-spec-improvements-yw91jd から分岐し、claude/rs-api に push、P
    EFFECT 3 か所）と同じ dict を同じ順序で積む。不正な行動は Python と同じ文言の ValueError。
    lib.rs は m.add_class::<Game>() の 1 行だけ（P4 の 3 WP が lib.rs に関数を足すので衝突を避ける）。
 2. Python: opcg_sim/api/engine_rs.py（Game のラッパ・_rid の計算・manager_from_hidden による暫定 CPU 経路＝
-   tests/harness/rs_record.py の復元器を opcg_sim/src/core/rs_bridge.py へ移して import）。routers.py／
+   tests/harness/rs_record.py の復元器を legacy/python_engine/core/rs_bridge.py へ移して import）。routers.py／
    presenters.py／state.py／ws.py の GameManager 参照を置き換える。SandboxManager は触らない。
 3. オラクル: rs_diff_replay.py の Recorder に events を記録し compare で照合（additive・version 据え置き）。
    rs_audit_replay.py も同様。random 100 局＋L1 20 局・全カード監査で events 一致。
@@ -2425,8 +2425,8 @@ make test-legacy が従来どおり green（1,786）。RESULT.json: {"job":"rs-a
 
 1. 生成・アリーナ・serve・API の CPU 経路を Rust の `decide` に切り替える（`rs_bridge` の暫定経路を撤去）。
    受け入れ: アリーナ a1（Rust）対 a1（Python）互角の確認（§3 P5）・生成 1 局の実測。
-2. `legacy/python_engine/` へ移す: `opcg_sim/src/core/`（engine／effects／actions／cpu_ai／cpu_learned／
-   sandbox 以外）・`opcg_sim/src/learned/`（encoder／n_rel／n_rel_feat／n_eff／mcts／adapter／lethal／
+2. `legacy/python_engine/` へ移す: `legacy/python_engine/core/`（engine／effects／actions／cpu_ai／cpu_learned／
+   sandbox 以外）・`legacy/python_engine/learned/`（encoder／n_rel／n_rel_feat／n_eff／mcts／adapter／lethal／
    leader_feat／effect_features）・`tests/` の legacy 83 本・`tests/harness/` の Python エンジン依存部。
    最終コミットに tag `py-engine-final`。`make test-legacy` は tag の checkout で回す手順として文書に残す。
 3. L1（`cpu_ai.py`）は廃止（ユーザ決定 2026-09-07）。`--policy l1` の記録は Rust の N系に置き換える。

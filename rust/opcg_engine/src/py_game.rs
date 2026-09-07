@@ -440,6 +440,17 @@ impl Game {
         to_py_json(&body)
     }
 
+    /// 直前の `apply_*` のあいだに**山札を混ぜた席**（`["p1","p2"]`）。
+    ///
+    /// 記録（golden の `steps[].shuffled`）が要る欄。再生（`opcg_engine.replay`）は混ぜないので、
+    /// 「混ぜた直後に引いた／見た」カードの実体は一致しない＝その段のイベントの `targets` を
+    /// 枚数へ潰して照合する（`tests/harness/rs_golden.py::mask_shuffled_targets`）。
+    fn shuffled_json(&self) -> PyResult<String> {
+        to_py_json(&Value::Array(
+            self.session.shuffled().iter().map(|s| Value::from(s.name())).collect(),
+        ))
+    }
+
     /// 山札の残り枚数（`{"p1": n, "p2": n}`）。盤面 dict は伏せ情報なので出さない欄で、
     /// 思考トレースのリプレイフレーム（`services/replay._frame_side`）だけが使う。
     fn deck_counts_json(&self) -> PyResult<String> {

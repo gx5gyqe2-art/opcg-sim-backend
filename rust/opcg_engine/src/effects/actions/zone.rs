@@ -205,6 +205,7 @@ pub fn shuffle_deck(s: &mut Session, seat: Seat) {
     if !s.rng.shuffles() {
         return;
     }
+    s.note_shuffled(seat);   // 記録の `shuffled`（再生側は混ぜないので記録側だけが立つ）
     let mut deck = s.state().player(seat).deck.clone();
     s.rng.shuffle(&mut deck);
     let len = deck.len();

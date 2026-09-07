@@ -64,7 +64,7 @@ def _fair_engine():
     鍵を差し替えて両席に同じ機構を持たせる（判定規約・探索の中身は一切変えない）。
     """
     import weakref
-    from opcg_sim.src.core.cpu_learned import LearnedEngine
+    from legacy.python_engine.core.cpu_learned import LearnedEngine
 
     class _Keyed(LearnedEngine):
         def _commit_key(self, manager, name):
@@ -114,13 +114,13 @@ def _init(sims, mode="fair"):
     if mode == "fair":
         _G["py"] = _fair_engine()
     else:
-        from opcg_sim.src.core.cpu_learned import LearnedEngine
+        from legacy.python_engine.core.cpu_learned import LearnedEngine
         _G["py"] = LearnedEngine()
 
 
 def _py_move(game, name):
     """Python 席の 1 手（`hidden` から `GameManager` を組んで読ませる）。"""
-    from opcg_sim.src.core import rs_bridge
+    from legacy.python_engine.core import rs_bridge
     hidden = json.loads(game.hidden_json())
     pending = json.loads(game.pending_json())
     manager = rs_bridge.manager_from_hidden(_G["db"], hidden, suppress_pending=False,

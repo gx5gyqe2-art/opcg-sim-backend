@@ -29,7 +29,7 @@ CARDS_PATH = os.path.join(DATA, "opcg_cards.json")
 #: 出荷既定のネット（`cpu_learned._DEFAULT_VALUE` と同じもの＝物差しを 1 本に保つ）。
 DEFAULT_NET = os.path.join(MODELS, "nrel_a1.npz")
 
-#: serve 既定（`opcg_sim/src/learned/config.py` の共有既定と同じ値。Rust 側 `DecideOptions`
+#: serve 既定（`opcg_sim/learned/config.py` の共有既定と同じ値。Rust 側 `DecideOptions`
 #: の既定と一致するので、通常はここを触らない）。
 SERVE_SIMS = 160
 GEN_PRUNE_FUTILE = False   # 生成は枝刈りを外す（v6 柱⑤: 刈った枝は学習データに現れない）

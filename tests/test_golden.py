@@ -8,7 +8,7 @@
 """
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 
-from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
+from opcg_sim.src.effects.parser_v2 import EffectParserV2
 from tests.golden.golden_cases import CASES
 from tests.golden.summarize import matches_expected, summarize_ability
 

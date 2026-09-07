@@ -133,7 +133,7 @@ make test-fast    # 開発中のイテレーション用（slow・cpu_infra除�
 - **L1** = 古典CPU（手作り評価 L1・α-β＋ビーム＋PIMC・`cpu_ai.py` 本体）
 - **N系** = 効果構造符号化の学習CPU（カードID埋め込みなし）。2 世代ある:
   - **NRel（N系 v3・rN/aN）** = 22 枠の「効果構造＋今の状態＋ゾーン」トークン＋対の小ネット
-    （`opcg_sim/src/learned/n_rel.py`・`n_rel_feat.py`・符号化 v13・`docs/n_attention_plan.md`）。
+    （`opcg_sim/learned/n_rel.py`・`n_rel_feat.py`・符号化 v13・`docs/n_attention_plan.md`）。
     **現在の出荷既定は NRel a1**〔2026-09-05 採用・`nrel_a1.npz`・`cpu_learned._DEFAULT_VALUE` が正本・
     `docs/reports/a1_adoption_20260905.md`〕。構成は**関係 R なし・相手デッキ知識あり**（ユーザ決定
     2026-09-05・訓練は `n_rel_train.py --ablate rel` が既定・系譜は r2, r3, … を続ける）。
