@@ -133,19 +133,29 @@ pub fn replay(json_str: &str) -> Result<String, EngineError> {
         .ok_or_else(|| EngineError::BadPayload("replay payload: 'steps' must be a list".into()))?;
 
     // 効果を持つデッキは P3（`rules` はルールだけ＝バニラで受け入れる。§10）。
-    if !obj.get("vanilla").and_then(Value::as_bool).unwrap_or(false) {
+    let vanilla = obj.get("vanilla").and_then(Value::as_bool).unwrap_or(false);
+    if !vanilla {
         return Err(EngineError::Unimplemented(
             "replay: 効果を持つデッキ（--vanilla 以外）の再生は P3（効果解決）の担当".into(),
         ));
     }
 
-    let masters = masters().ok_or_else(|| {
+    let base = masters().ok_or_else(|| {
         EngineError::BadPayload(
             "replay: card masters are not loaded; call opcg_engine.load_masters(path) \
              with opcg_sim/data/opcg_effects.json first"
                 .into(),
         )
     })?;
+    // バニラ記録は Python 側が全カードの `abilities` を外して打っている（`rs_diff_replay.py`
+    // の `_strip_abilities`）。Rust も同じ表で再生する＝Python が持たない能力を発動しない。
+    let stripped;
+    let masters = if vanilla {
+        stripped = base.without_abilities();
+        &stripped
+    } else {
+        base
+    };
     let setup_hidden = obj["setup"]
         .get("hidden")
         .ok_or_else(|| EngineError::BadPayload("replay payload: setup に 'hidden' が無い".into()))?;
@@ -216,6 +226,21 @@ pub fn replay(json_str: &str) -> Result<String, EngineError> {
 pub fn replay_audit(json_str: &str, effects_path: Option<&str>) -> Result<String, EngineError> {
     let payload: Value = serde_json::from_str(json_str)
         .map_err(|e| EngineError::BadPayload(format!("invalid audit JSON: {e}")))?;
+    if let Some(path) = effects_path {
+        load_masters(path)?;
+    }
+    let base = masters().ok_or_else(|| {
+        EngineError::BadPayload(
+            "replay_audit: card masters are not loaded; call opcg_engine.load_masters(path) first"
+                .into(),
+        )
+    })?;
+    replay_audit_with(&payload, base)
+}
+
+/// [`replay_audit`] の本体（マスター表を明示で渡す）。`cargo test` は
+/// プロセス共有の表（`load_masters`）を使わずにここを直接呼ぶ。
+pub fn replay_audit_with(payload: &Value, base: &MasterTable) -> Result<String, EngineError> {
     let obj = payload
         .as_object()
         .ok_or_else(|| EngineError::BadPayload("audit payload must be a JSON object".into()))?;
@@ -233,15 +258,6 @@ pub fn replay_audit(json_str: &str, effects_path: Option<&str>) -> Result<String
             "audit payload: 'kind' が 'audit' ではない".into(),
         ));
     }
-    if let Some(path) = effects_path {
-        load_masters(path)?;
-    }
-    let base = masters().ok_or_else(|| {
-        EngineError::BadPayload(
-            "replay_audit: card masters are not loaded; call opcg_engine.load_masters(path) first"
-                .into(),
-        )
-    })?;
     let extra = obj.get("extra_masters").unwrap_or(&Value::Null);
     let table = base.with_extra_masters(extra)?;
     let masters = &table;
@@ -266,12 +282,12 @@ pub fn replay_audit(json_str: &str, effects_path: Option<&str>) -> Result<String
     let source = crate::ops::find_card_by_uuid(session.state(), source_uuid).ok_or_else(|| {
         EngineError::BadPayload(format!("fire.source_uuid: 未知のカード '{source_uuid}'"))
     })?;
-    // 監査記録は**必ず能力を 1 つ持つカード**について作られる。効果表（core の `loader.rs`）が
-    // 未統合だと `ability_ids` が空になり、`kind: "play"` の経路は「能力の無いカード」として
-    // 素通りしてしまう（＝黙って一致/不一致を返す）。ここで先に止める（計画 §3）。
+    // 監査記録は**必ず能力を 1 つ持つカード**について作られる。表に能力が無ければ
+    // `kind: "play"` の経路が「能力の無いカード」として素通りしてしまう（＝黙って
+    // 一致/不一致を返す）ので、ここで先に止める（計画 §3）。
     if masters.get(session.state().card(source).master).ability_ids.is_empty() {
         return Err(EngineError::Unimplemented(format!(
-            "replay_audit: '{}' の ability_ids が空（効果 JSON の読込は core の loader.rs＝WP rs-p3-core）",
+            "replay_audit: '{}' の ability_ids が空（効果 JSON を読み込んでいない表）",
             masters.get(session.state().card(source).master).card_id
         )));
     }
@@ -323,9 +339,8 @@ pub fn replay_audit(json_str: &str, effects_path: Option<&str>) -> Result<String
             .active_interaction()
             .map(|it| it.player)
             .ok_or_else(|| {
-                // 効果表が空（core の `loader.rs` 未統合）なら能力が 1 つも解決されない＝
-                // 中断も立たない。これは記録の不備ではないので `Unimplemented` で報告する
-                // （記録が壊れているときとは区別する）。
+                // 効果表が空なら能力が 1 つも解決されない＝中断も立たない。これは記録の
+                // 不備ではないので `Unimplemented` で報告する（記録が壊れているときとは区別する）。
                 if masters.abilities.abilities.is_empty() {
                     EngineError::Unimplemented(format!(
                         "step {i}: 中断が立っていない（効果表が空＝効果 JSON を読んでいない）"

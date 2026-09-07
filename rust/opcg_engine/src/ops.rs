@@ -1070,16 +1070,19 @@ mod tests {
         });
     }
 
-    /// オラクル統合テスト。`GameState::from_record`／`MasterTable::from_effects_json`（WP
-    /// `rs-p1-model`）と、その fixture（`tests/fixtures/hidden_v2.json`）が入るまで動かせないので
-    /// `#[ignore]`。統合後は `cargo test --no-default-features -- --ignored` で回す。
+    /// オラクル統合テスト（`GameState::from_record`／`MasterTable::from_effects_json` と
+    /// fixture `tests/fixtures/hidden_v2.json`）。P1-model の統合で動くようになったので
+    /// `#[ignore]` を外した。効果 JSON は**生成物**（git 管理外）なので、手元に無い環境では
+    /// 何もせずに通す（`loader.rs` のテストと同じ規約）。
     #[test]
-    #[ignore = "from_record / from_effects_json は WP rs-p1-model 待ち（統合後に外す）"]
     fn apply_ops_runs_against_a_recorded_hidden_state() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let hidden = std::fs::read_to_string(root.join("tests/fixtures/hidden_v2.json"))
             .expect("tests/fixtures/hidden_v2.json（rs-p1-model が同梱する）");
         let effects = root.join("../../opcg_sim/data/opcg_effects.json");
+        if !effects.exists() {
+            return; // 効果 JSON（生成物）が無い環境
+        }
         let ops = r#"[{"op":"draw","player":"p1","n":1},
                       {"op":"record_turn_event","name":"DON_RETURNED","n":1}]"#;
         let out = apply_ops(&hidden, ops, effects.to_str()).expect("apply_ops");

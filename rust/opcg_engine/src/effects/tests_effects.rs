@@ -488,18 +488,53 @@ fn effect_resolution_rolls_back_bit_for_bit() {
     assert_eq!(*s.state(), before);
 }
 
-// --- 監査オラクル（統合後に回す）--------------------------------------------------
+// --- 監査オラクル -----------------------------------------------------------------
 
-/// 全カード監査の照合（`tests/scripts/rs_audit_replay.py`）は `matcher`／`cond`／`loader`
-/// （WP `rs-p3-core`）が入るまで動かない。統合後にコーディネータが回す。
+/// 監査オラクル（`tests/scripts/rs_audit_replay.py`・§11.1）の 1 件を **Python が書いた記録**で
+/// 回す。統合（§11.6）で `matcher`／`cond`／`loader` が入ったので `#[ignore]` を外した。
+///
+/// fixture は Python 側が生成した本物の監査記録（`tests/fixtures/audit_eb01_049_v4.json`＝
+/// EB01-049「相手のコスト2以下のキャラ1枚までを、KOする」・中断 1 回）で、その `fire.state` と
+/// `steps[].state` が**期待値＝Python の盤面 dict**。Rust の [`crate::state::replay_audit_with`]
+/// を通し、`request_id` を除いて 1 段ずつ突き合わせる（＝ハーネスの `compare` と同じ規約）。
+/// 全カード（634 枚／817 能力）の照合はハーネス側で回す（数値は §8.9）。
 #[test]
-#[ignore = "監査オラクルは matcher/cond/loader（WP rs-p3-core）の統合後に回す"]
 fn audit_oracle_matches_python() {
-    // 統合後の手順（`docs/rust_engine_plan.md` §11.1）:
-    //   OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_audit_replay.py \
-    //     --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF
-    // → RS_AUDIT の mismatch=0／unimplemented=0 を確認する。
-    unimplemented!("統合後に rs_audit_replay.py で照合する");
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let record: Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.join("audit_eb01_049_v4.json")).unwrap())
+            .unwrap();
+    let effects: Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.join("audit_masters_v4.json")).unwrap())
+            .unwrap();
+    let masters = MasterTable::from_effects_json(&effects).expect("fixture masters must load");
+
+    let out = crate::state::replay_audit_with(&record, &masters).expect("replay_audit");
+    let got: Value = serde_json::from_str(&out).unwrap();
+
+    let mut expected: Vec<&Value> = vec![&record["fire"]["state"]];
+    expected.extend(record["steps"].as_array().unwrap().iter().map(|s| &s["state"]));
+    let states = got["states"].as_array().expect("states");
+    assert_eq!(states.len(), expected.len(), "段数が Python と違う");
+    for (i, (exp, act)) in expected.iter().zip(states.iter()).enumerate() {
+        assert_eq!(
+            strip_request_id(exp),
+            strip_request_id(act),
+            "段 {i} の盤面が Python と違う"
+        );
+    }
+    // 記録は中断を 1 回挟む（既定応答で消化する）＝素通りで一致していない足場の検査。
+    assert_eq!(record["steps"].as_array().unwrap().len(), 1);
+    assert_eq!(got["interactive"], json!(record["final"]["interactive"]));
+}
+
+/// 照合から外す欄（要求 id は毎回変わる。ハーネス `_strip_request_id` と同じ）。
+fn strip_request_id(state: &Value) -> Value {
+    let mut v = state.clone();
+    if let Some(req) = v.get_mut("pending_request").and_then(|r| r.as_object_mut()) {
+        req.remove("request_id");
+    }
+    v
 }
 
 // --- 継続効果の失効はターン終了フックからも走る -----------------------------------

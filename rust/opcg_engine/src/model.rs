@@ -577,6 +577,22 @@ impl MasterTable {
         Ok(idx)
     }
 
+    /// **能力を全て外した**表（`rs_diff_replay.py --vanilla` の `_strip_abilities` と同値）。
+    ///
+    /// バニラ記録は Python 側で `master.abilities = ()` にしたデッキで打っている（数値・
+    /// キーワード・`trigger_text` は実カードのまま）。Rust は同じ効果 JSON からカードを引くので、
+    /// この処理を入れないと**Python が持っていない能力**を Rust だけが持ち、`ACTIVATE_MAIN` の
+    /// 列挙や登場時誘発が食い違う（統合前は `loader.rs` が無く `ability_ids` が常に空だったので
+    /// 表面化しなかった）。
+    pub fn without_abilities(&self) -> MasterTable {
+        let mut table = self.clone();
+        for m in &mut table.masters {
+            m.ability_ids.clear();
+        }
+        table.abilities = crate::effects::ast::AbilityTable::default();
+        table
+    }
+
     /// 記録 v4 の `extra_masters`（効果 JSON に**無い**カード定義。監査の汎用盤面が使う
     /// `FILLER` や `make_master` のテスト定義。形は `cards[]` の 1 件と同じ）を足した表を返す。
     ///
