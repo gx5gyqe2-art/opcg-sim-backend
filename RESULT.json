@@ -1,6 +1,6 @@
 {
   "job": "rs-p4-legal",
-  "status": "in_progress",
+  "status": "done",
   "branch": "claude/rs-p4-legal-bl36ka",
   "base": "claude/cpu-spec-improvements-yw91jd@9d71c7a",
   "oracle": {
@@ -64,12 +64,13 @@
         "mismatch": 78,
         "checks": 80
       }
-    }
+    },
+    "reproduced_on_final_wheel": true
   },
   "gates": {
     "cargo_test": "316 passed, 0 failed, 0 ignored (cargo test --no-default-features)",
     "cargo_clippy": "0 warnings (cargo clippy --no-default-features --all-targets -- -D warnings)",
-    "make_test": "running (結果は追記する)"
+    "make_test": "green (1,761 passed, 0 failed, 606s)"
   },
   "files": {
     "rust": [
