@@ -1,13 +1,13 @@
 //! 効果解決（P3・WP `rs-p3-resolver`）の単体テスト。**Python の挙動を 1 件ずつ転記**する。
 //!
-//! 盤面は `testkit::BoardBuilder`、能力は `testkit::effect_table()`（プロセス共有の 1 表）。
-//! 対象・条件・値の評価（`matcher`／`cond`／`value`）は WP `rs-p3-core` の担当なので、
-//! ここで検査するのは **core を要さない経路**に絞る:
-//! 実行スタックの順序・中断と再開・要求（`pending_request`）の形・既定解決の規則・
-//! 誘発待ち行列の順序・継続効果の失効。
+//! 盤面は `testkit::BoardBuilder`、能力は `testkit::effect_table()`（`sample_masters()` が
+//! `MasterTable.abilities` に積む表＝`AB_*` の index はどのテストでも同じ能力を指す）。
+//! ここで検査するのは実行側の規則: 実行スタックの順序・中断と再開・要求（`pending_request`）の
+//! 形・既定解決の規則・誘発待ち行列の順序・継続効果の失効（対象・条件・値そのものの検査は
+//! `matcher`／`cond`／`value` の各モジュールにある）。
 //!
-//! 監査オラクル（全カード照合）は `matcher`／`cond`／`loader` が揃ってからでないと動かないので
-//! `#[ignore]` を付けてある（統合後にコーディネータが `tests/scripts/rs_audit_replay.py` で回す）。
+//! 監査オラクル（`audit_oracle_matches_python`）は統合（§11.6）で `#[ignore]` を外した。
+//! 全カード照合（634 枚／817 能力）は `tests/scripts/rs_audit_replay.py` で回す（§8.9）。
 
 use crate::journal::Session;
 use crate::model::{
