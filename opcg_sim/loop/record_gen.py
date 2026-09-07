@@ -28,7 +28,13 @@
   pol_len(D) pol_chosen(D)                 … main の候補数／選択候補の slice 内 index（無ければ 0/-1）
   pol_n(K) pol_q(K) pol_k(K) pol_sig(K str)… 訪問合算 n・行動価値 q・don_k（-1=無し）・候補 move_sig
   pol_cid(K str) pol_tcid(K str)           … 候補の主体/第1対象の**カードID**
-  dump v2 のみ: tokens(D,22,·) pol_si(K) pol_ti(K)
+  tokens(D,22,·) pol_si(K) pol_ti(K)      … NRel 用（dump v2 で追加・v3 で dtype だけ変えた）
+
+**dump v3**（既定・2026-09-07・計画 §18.5）: 常駐の 9 割を占める 3 本の保存 dtype を半分にする——
+`tokens`／`scalars` を **float16**・`card_idx` を **int16**（`pol_si`/`pol_ti` は v2 から int16）。
+値は float32／int64 を **cast しただけ**で、**符号化（`enc_version`=13）も列の形も変えていない**。
+学習側は `learned/train/dump_io.py` が波ごとに memmap の pack を作って読む（v2 の npz＝
+float32／int64 も同じ関数で読める＝過去の波はそのまま使える）。v1／v2 を書く経路は無い。
 """
 import os
 for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
@@ -48,8 +54,14 @@ from opcg_sim.loop import engine as E                                  # noqa: E
 
 MAX_STEPS = 400
 MAX_CI = 24            # card_idx の PAD 長（G 系符号化の既定枠・列の形は据え置き）
-ENC_VERSION = 12       # dump v1 の符号化世代
-ENC_VERSION_V2 = 13    # dump v2（v12 ＋ n_rel_feat のグローバル追加 29・append-only）
+ENC_VERSION = 12       # dump v1 の符号化世代（過去の波の meta にだけ残る）
+ENC_VERSION_V2 = 13    # dump v2／v3（v12 ＋ n_rel_feat のグローバル追加 29・append-only）
+DUMP_VERSION = 3       # 保存 dtype を半分にした版（符号化は v2 と同じ・§18.5）
+
+# v3 で dtype を落とす列（**float32／int64 を cast するだけ**＝符号化も列の形も変えない）。
+# 常駐の 9 割はこの 3 本（tokens 1,760B／scalars 492B／card_idx 176B per 行）。float16 の丸めが
+# forward に与える差は 1 バッチ最大 1.07e-4（`docs/reports/2026-09-07_train_profile.md` §3）。
+DT_V3 = {"tokens": np.float16, "scalars": np.float16, "card_idx": np.int16}
 
 # Rust の `encode` は平らな列で返す。**旧版と同じ形**へ戻してから積む（`n_rel_train` は
 # `tokens.shape[1:]` をそのまま使う＝形が変われば読めない）。
@@ -76,19 +88,17 @@ def _don_k(mv):
     return (mv.get("payload") or {}).get("don_k")
 
 
-def _init_worker(sims, net, dirichlet_eps, temp_turns, dump_v2):
+def _init_worker(sims, net, dirichlet_eps, temp_turns):
     E.engine()
     _G["spec"] = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps,
                             temp_turns=temp_turns, prune_futile=E.GEN_PRUNE_FUTILE)
     _G["db"] = D.load_db()
-    _G["v2"] = bool(dump_v2)
 
 
 class _Recorder:
     """1 局ぶんの観測（`driver.run_game(observer=…)`）。盤面は動かさない。"""
 
-    def __init__(self, v2):
-        self.v2 = v2
+    def __init__(self):
         self.rows = {k: [] for k in ("scalars", "field", "card_idx", "who", "kind", "turn",
                                      "step", "sig", "pol_len", "pol_chosen", "tokens")}
         self.pol = {k: [] for k in ("n", "q", "k", "sig", "cid", "tcid", "si", "ti")}
@@ -118,9 +128,8 @@ class _Recorder:
         if out.get("kind") != "main":
             groups = []
         self.rows["pol_len"].append(len(groups))
-        if self.v2:
-            self.rows["tokens"].append(
-                np.asarray(enc["tokens"], np.float32).reshape(TOKENS_SHAPE))
+        self.rows["tokens"].append(
+            np.asarray(enc["tokens"], np.float32).reshape(TOKENS_SHAPE))
         if not groups:
             self.rows["pol_chosen"].append(-1)
             return
@@ -142,16 +151,15 @@ class _Recorder:
             tu = gsig[2][0] if gsig[2] else None
             self.pol["cid"].append(cids.get(su) or "")
             self.pol["tcid"].append((cids.get(tu) or "") if tu else "")
-            if self.v2:
-                self.pol["si"].append(slots.get(su, -1) if su else -1)
-                self.pol["ti"].append(slots.get(tu, -1) if tu else -1)
+            self.pol["si"].append(slots.get(su, -1) if su else -1)
+            self.pol["ti"].append(slots.get(tu, -1) if tu else -1)
         self.rows["pol_chosen"].append(chosen)
 
 
 def play_one(seed):
     """1 局を打って行を返す（勝敗が付いた局だけ・純正 z）。失敗は None。"""
-    spec, db, v2 = _G["spec"], _G["db"], _G["v2"]
-    rec = _Recorder(v2)
+    spec, db = _G["spec"], _G["db"]
+    rec = _Recorder()
     try:
         la, lb = D.leader_pair(db, seed, "random")
         p1, p2 = D.build_pair(db, la, lb, seed, "synth")
@@ -167,15 +175,13 @@ def play_one(seed):
     z = {"p1": 1.0 if winner == "p1" else -1.0}
     z["p2"] = -z["p1"]
     rows, pol = rec.rows, rec.pol
-    out_v2 = {}
-    if v2:
-        out_v2 = {"tokens": np.array(rows["tokens"], np.float32),
-                  "pol_si": np.array(pol["si"], np.int16),
-                  "pol_ti": np.array(pol["ti"], np.int16)}
-    return {**out_v2,
-            "scalars": np.array(rows["scalars"], np.float32),
+    # dump v3: tokens／scalars は float16・card_idx は int16 で持つ（cast するだけ・§18.5）
+    return {"tokens": np.array(rows["tokens"], np.float32).astype(DT_V3["tokens"]),
+            "pol_si": np.array(pol["si"], np.int16),
+            "pol_ti": np.array(pol["ti"], np.int16),
+            "scalars": np.array(rows["scalars"], np.float32).astype(DT_V3["scalars"]),
             "field": np.array(rows["field"], np.float32),
-            "card_idx": np.array(rows["card_idx"], np.int64),
+            "card_idx": np.array(rows["card_idx"], np.int64).astype(DT_V3["card_idx"]),
             "z": np.array([z[w] for w in rows["who"]], np.float32),
             "who": np.array([0 if w == "p1" else 1 for w in rows["who"]], np.int8),
             "kind": np.array(rows["kind"], np.int8),
@@ -196,7 +202,7 @@ def play_one(seed):
 _ROW_KEYS = ("scalars", "field", "card_idx", "z", "who", "kind", "turn", "step",
              "seed", "sig", "pol_len", "pol_chosen")
 _POL_KEYS = ("pol_n", "pol_q", "pol_k", "pol_sig", "pol_cid", "pol_tcid")
-_V2_KEYS = ("tokens", "pol_si", "pol_ti")
+_TOK_KEYS = ("tokens", "pol_si", "pol_ti")            # NRel 用（v2 で追加・v3 も同じ列）
 
 
 def main(argv=None):
@@ -215,16 +221,19 @@ def main(argv=None):
                     help="この turn まではメイン窓を訪問分布 τ=1 でサンプリング（0=無効）")
     ap.add_argument("--shard-games", type=int, default=10)
     ap.add_argument("--dump-v2", action="store_true",
-                    help="NRel 用 dump v2（符号化 v13＋トークン状態 S float32＋候補の枠 index）")
+                    help="【廃止・受けるだけ】dump v3 が既定になった（2026-09-07・§18.5）。"
+                         "分散生成の古い指示書がこの旗を付けたまま回っても壊れないように残す")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
 
     os.makedirs(args.out, exist_ok=True)
     t0 = time.time()
-    keys = _ROW_KEYS + _POL_KEYS + (_V2_KEYS if args.dump_v2 else ())
+    if args.dump_v2:
+        print("[note] --dump-v2 は廃止（既定が dump v3・列は同じで dtype だけ半分）", flush=True)
+    keys = _ROW_KEYS + _POL_KEYS + _TOK_KEYS
     buf = {k: [] for k in keys}
     shard = n_rows = n_drop = n_main = 0
-    initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns, args.dump_v2)
+    initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns)
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
                                       initargs=initargs) as pool:
         done = 0
@@ -251,8 +260,8 @@ def main(argv=None):
     with open(os.path.join(args.out, "meta_n_record.json"), "w") as f:
         json.dump({"games": args.games, "rows": n_rows, "main_rows": n_main,
                    "dropped": n_drop, "sims": args.sims,
-                   "enc_version": ENC_VERSION_V2 if args.dump_v2 else ENC_VERSION,
-                   "dump_version": 2 if args.dump_v2 else 1, "seed_base": args.seed_base,
+                   "enc_version": ENC_VERSION_V2,
+                   "dump_version": DUMP_VERSION, "seed_base": args.seed_base,
                    "net": E.resolve_net(args.net), "engine": "rust",
                    "dirichlet_eps": args.dirichlet_eps,
                    "temp_turns": args.temp_turns}, f, ensure_ascii=False)

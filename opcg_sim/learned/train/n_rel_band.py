@@ -1,4 +1,4 @@
-"""n_rel_band: 評価帯（dump v2 の holdout 行）で N系 c ネットと NRel r ネットの value を同じ行で比べる
+"""n_rel_band: 評価帯（dump v2／v3 の holdout 行）で N系 c ネットと NRel r ネットの value を同じ行で比べる
 （2026-09-05・r1 の判定用）。
 
 **問い**: 訓練 val（`n_rel_train.py` の ep 行）は r1 自身の数字しか出ない。**同じ holdout 行**で
@@ -15,7 +15,6 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXP
     os.environ.setdefault(_v, "1")
 
 import argparse
-import glob
 import json
 import time
 
@@ -24,6 +23,7 @@ import sys as _sys
 import numpy as np
 
 
+from opcg_sim.learned.train import dump_io as DIO  # noqa: E402
 from opcg_sim.learned.train.n_eff_feat import build_eff_tables  # noqa: E402
 from opcg_sim.learned import n_eff as NE  # noqa: E402
 from opcg_sim.learned import n_rel as NL  # noqa: E402
@@ -31,22 +31,21 @@ from opcg_sim.learned import n_rel_feat as NR  # noqa: E402
 from opcg_sim.learned.encoder import SCALARS_V12  # noqa: E402
 
 
-def _load(dirs, mod, limit):
-    sc, ci, tok, z, turn = [], [], [], [], []
-    for d_ in dirs:
-        for f in sorted(glob.glob(os.path.join(d_, "n_record_*.npz"))):
-            d = np.load(f, allow_pickle=True)
-            keep = d["seed"] % mod == 0
-            sc.append(d["scalars"][keep]); ci.append(d["card_idx"][keep]); tok.append(d["tokens"][keep])
-            z.append(d["z"][keep])
-            turn.append(d["turn"][keep] if "turn" in d.files else np.zeros(int(keep.sum()), np.int16))
-            if limit and sum(len(x) for x in z) >= limit:
-                break
-    out = {k: np.concatenate(v) for k, v in
-           (("sc", sc), ("ci", ci), ("tok", tok), ("z", z), ("turn", turn))}
+def _load(dirs, mod, limit, cache_dir=None):
+    """holdout 行（`seed%mod==0`）だけを float32 で持つ（読みは `dump_io.load_dump`＝memmap）。
+
+    帯は holdout（既定 1/7）しか使わないので、**そこだけ切り出して RAM に置く**。dump v2／v3 の
+    どちらでも同じ値になる（pack が float16／int16 の正本）。"""
+    V, _P, _C = DIO.load_dump(dirs, {}, with_policy=False, cache_dir=cache_dir,
+                              n_tok=NE.MAX_CI)     # c ネットは 24 枠・r ネットは先頭 22 枠を使う
+    keep = np.where(V["seed"] % mod == 0)[0]
     if limit:
-        out = {k: v[:limit] for k, v in out.items()}
-    return out
+        keep = keep[:limit]
+    return {"sc": np.asarray(V["sc"][keep], np.float32),
+            "ci": np.asarray(V["ci"][keep], np.int64),
+            "tok": np.asarray(V["tok"][keep], np.float32),
+            "z": np.asarray(V["z"][keep], np.float32),
+            "turn": np.asarray(V["turn"][keep], np.int16)}
 
 
 def _metrics(v, z):
@@ -56,12 +55,15 @@ def _metrics(v, z):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--in", dest="src", nargs="+", required=True, help="dump v2 のディレクトリ")
+    ap.add_argument("--in", dest="src", nargs="+", required=True, help="dump v2／v3 のディレクトリ")
     ap.add_argument("--neff", nargs="*", default=[], help="N系 c ネット npz（複数可）")
     ap.add_argument("--nrel", nargs="*", default=[], help="NRel r ネット npz（複数可）")
     ap.add_argument("--holdout-mod", type=int, default=7)
     ap.add_argument("--limit", type=int, default=0, help="先頭 N 行だけ（0＝全 holdout 行）")
     ap.add_argument("--bs", type=int, default=512)
+    ap.add_argument("--cache-dir", default=None,
+                    help="dump の pack（float16/int16 の .npy・§18.5）の置き場所"
+                         f"（既定は ${DIO.CACHE_ENV} か ~/.cache/opcg/dump_pack）")
     ap.add_argument("--zero-rel", action="store_true",
                     help="serve 時の遮断: 関係 R（rel_om/rel_oo）を 0 にして評価（r ネットのみ）")
     ap.add_argument("--zero-opp-pool", action="store_true",
@@ -73,7 +75,7 @@ def main():
     db = load_db()
     stats, ab, abm, pwr, isl, vocab = build_eff_tables()
     tables = (stats, ab, abm, pwr, isl)
-    D = _load(args.src, args.holdout_mod, args.limit)
+    D = _load(args.src, args.holdout_mod, args.limit, args.cache_dir)
     z = D["z"].astype(np.float64)
     print(f"holdout 行 {len(z)}（seed%{args.holdout_mod}==0・{time.time()-t0:.0f}s）", flush=True)
     preds = {}

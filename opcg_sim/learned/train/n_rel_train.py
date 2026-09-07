@@ -1,8 +1,9 @@
 """n_rel_train: NRel（Stage A）の訓練器（P2・2026-09-04・`n_rel` の対）。
 
 forward は `opcg_sim/learned/n_rel.py` を継承し、ここは backward（手書き）と Adam・データ読み・
-訓練ループだけ。dump v2（`n_record_gen --dump-v2`）を読み、関係 R は `n_rel_feat.relations_batch`
-で**訓練時に再計算**する（ユーザ決定・dump には S だけ）。
+訓練ループだけ。dump（v3 が既定・v2 も読める）を `learned/train/dump_io.load_dump` で読み——
+**V は波ごとの float16／int16 の memmap**（RAM に載せない・§18.5）＝切り出してから float32 へ
+上げる——関係 R は `n_rel_feat.relations_batch` で**訓練時に再計算**する（ユーザ決定・dump には S だけ）。
 
 実行例:
   OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/n_rel_train.py train \\
@@ -23,6 +24,7 @@ import numpy as np
 
 
 from opcg_sim.learned.train import n1_train as N1                       # ATYPES（候補 action 語彙）
+from opcg_sim.learned.train import dump_io as DIO                       # dump の読み（memmap・§18.5）
 from opcg_sim.learned.train.n_eff_feat import build_eff_tables     # 語彙表（既定エンジンの vocab）
 from opcg_sim.learned import n_eff as NE
 from opcg_sim.learned import n_rel as NL
@@ -32,13 +34,6 @@ from opcg_sim.learned.n_rel import (  # noqa: F401
     N_TOK, N_OWN, N_OPP, OWN_SLOTS, OPP_SLOTS)
 
 NA = NE.NA
-
-
-def _atype_idx(at):
-    try:
-        return N1.ATYPES.index(at)
-    except ValueError:
-        return NA - 1
 
 
 def make_backend(name, net, lr, threads=None):
@@ -258,77 +253,20 @@ class NRelNet(NL.NRelNet):
 
 
 # ---------------------------------------------------------------------------
-# dump v2 の読み込み
+# dump（v2／v3）の読み込み — 正本は `dump_io.load_dump`（memmap・§18.5）
 # ---------------------------------------------------------------------------
-def _files(dirs):
-    return [f for d_ in dirs for f in sorted(glob.glob(os.path.join(d_, "n_record_*.npz")))]
+def load_dump_v2(dirs, vocab, with_policy=True, z_dirs=(), cache_dir=None):
+    """`dump_io.load_dump` の薄い互換（旧名・2026-09-07 以降は中身が memmap 版）。
 
-
-def load_dump_v2(dirs, vocab, with_policy=True, z_dirs=()):
-    """dump v2 → V（value 行）, P（方策点）, C（候補）。R は含めない（バッチごとに再計算）。
-
-    **メモリ（2026-09-05・16 シャード≈216 万行を cgroup 14GB に収めるため）**: tokens は 1 行
-    1,760B＝216 万行で 3.8GB。ファイルごとのリストを最後に concatenate すると一時的に二重持ちに
-    なるので、**先に行数を数えて V を一度だけ確保**し、ファイルごとに書き込む。方策点 P は盤面
-    （sc/ci/tok）を複製せず **V の行 index（`P["row"]`）で参照**する（`prow` で取り出す）。
-    `z_dirs` は z 専用（π を読まない）＝V にだけ入る。"""
-    pi_files = [(f, with_policy) for f in _files(dirs)]
-    z_files = [(f, False) for f in _files(z_dirs)]
-    files = pi_files + z_files
-    if not files:
-        raise ValueError(f"dump v2 が見つからない: {dirs} {z_dirs}")
-    n_tot = 0
-    for f, _ in files:
-        with np.load(f, allow_pickle=True) as d:
-            if "tokens" not in d.files:
-                raise ValueError(f"{f}: dump v2 ではない（tokens 無し）")
-            n_tot += int(d["z"].shape[0])
-    with np.load(files[0][0], allow_pickle=True) as d0:
-        V = {"sc": np.empty((n_tot, d0["scalars"].shape[1]), d0["scalars"].dtype),
-             "ci": np.empty((n_tot, N_TOK), d0["card_idx"].dtype),
-             "tok": np.empty((n_tot,) + tuple(d0["tokens"].shape[1:]), d0["tokens"].dtype),
-             "z": np.empty(n_tot, d0["z"].dtype), "seed": np.empty(n_tot, d0["seed"].dtype)}
-    P = {"row": [], "seed": [], "len": [], "chosen": []}
-    C = {"pi": [], "at": [], "cid": [], "tcid": [], "k": [], "si": [], "ti": []}
-    off_v = 0
-    for f, pol in files:
-        d = np.load(f, allow_pickle=True)
-        n = int(d["z"].shape[0])
-        sl = slice(off_v, off_v + n)
-        V["sc"][sl] = d["scalars"]; V["ci"][sl] = d["card_idx"][:, :N_TOK]; V["tok"][sl] = d["tokens"]
-        V["z"][sl] = d["z"]; V["seed"][sl] = d["seed"]
-        if pol:
-            pl, pc, kind = d["pol_len"], d["pol_chosen"], d["kind"]
-            off = np.concatenate([[0], np.cumsum(pl)])
-            take = np.where((kind == 0) & (pl >= 2) & (pc >= 0))[0]
-            if len(take):
-                P["row"].append((take + off_v).astype(np.int64)); P["seed"].append(d["seed"][take])
-                P["len"].append(pl[take]); P["chosen"].append(pc[take])
-                idx = np.concatenate([np.arange(off[i], off[i + 1]) for i in take])
-                nn = d["pol_n"][idx].astype(np.float64)
-                segl = np.repeat(np.arange(len(take)), pl[take])
-                tot = np.zeros(len(take)); np.add.at(tot, segl, nn); tot = np.maximum(tot, 1e-9)
-                C["pi"].append((nn / tot[segl]).astype(np.float32))
-                C["at"].append(np.array([_atype_idx(json.loads(s)[0]) for s in d["pol_sig"][idx]], np.int16))
-                C["cid"].append(np.array([vocab.get(c, 0) for c in d["pol_cid"][idx]], np.int32))
-                C["tcid"].append(np.array([vocab.get(c, 0) for c in d["pol_tcid"][idx]], np.int32))
-                C["k"].append(d["pol_k"][idx].astype(np.int16))
-                C["si"].append(d["pol_si"][idx].astype(np.int16)); C["ti"].append(d["pol_ti"][idx].astype(np.int16))
-        d.close()
-        off_v += n
-    assert off_v == n_tot
-    if P["row"]:
-        P = {k: np.concatenate(v) for k, v in P.items()}
-        C = {k: np.concatenate(v) for k, v in C.items()}
-    else:
-        P = {k: np.zeros(0, np.int64) for k in P}; C = {k: np.zeros(0) for k in C}
-    return V, P, C
+    V の `sc`/`ci`/`tok`/`z` は float16／int16 の memmap＝**切り出した後で float32 へ上げる**
+    （`prow`／`dump_io.rows_f32`）。dump v2（float32／int64）も v3（float16／int16）も読める。"""
+    return DIO.load_dump(dirs, vocab, with_policy=with_policy, z_dirs=z_dirs,
+                         cache_dir=cache_dir, n_tok=N_TOK)
 
 
 def prow(V, P, bi):
-    """方策点 bi の盤面（sc, ci, tok）を V から取り出す（複製を持たない・`load_dump_v2` 参照）。"""
-    r = P["row"][bi]
-    return V["sc"][r], V["ci"][r], V["tok"][r]
+    """方策点 bi の盤面（sc, ci, tok）を V から取り出す（float32／int64 へ上げて返す）。"""
+    return DIO.rows_f32(V, P["row"][bi])
 
 
 def budget_feats(sc, ci, tok, seg, si, C, idx, ptab_ret):
@@ -353,6 +291,12 @@ def budget_feats(sc, ci, tok, seg, si, C, idx, ptab_ret):
 # ---------------------------------------------------------------------------
 # 訓練ループ
 # ---------------------------------------------------------------------------
+def _val_batch(net, rt, V, vi):
+    """holdout の value 予測（memmap から切り出して float32 へ上げる）。"""
+    sc, ci, tok = DIO.rows_f32(V, vi)
+    return net.value(sc, ci, tok, *relations_or_zeros(net, ci, tok, rt))
+
+
 def eval_policy(net, rt, ptab_ret, V, P, C, pt_idx, ptr, bs=256):
     hit = tot = 0
     ce_sum = 0.0
@@ -399,7 +343,8 @@ def train(args):
     ptab = NR.profile_table(db, vocab)
     rt = NR.RelTable(ptab)
     ptab_ret = np.array([(p["ret_don"] if p else 0.0) for p in ptab], np.float32)
-    V, P, C = load_dump_v2(_expand(args.src), vocab, z_dirs=_expand(args.zsrc))
+    V, P, C = DIO.load_dump(_expand(args.src), vocab, z_dirs=_expand(args.zsrc),
+                            cache_dir=args.cache_dir, n_tok=N_TOK)
     if args.zsrc:
         print(f"z専用 dir {len(_expand(args.zsrc))} 本を合流（π は読まない）", flush=True)
     ptr = np.concatenate([[0], np.cumsum(P["len"])]).astype(np.int64)
@@ -439,9 +384,10 @@ def train(args):
                       f" {time.time()-t0:.0f}s", flush=True)
             if what == 0:
                 bi = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]; iv += 1
-                sc, ci, tok = V["sc"][bi], V["ci"][bi], V["tok"][bi]
+                sc, ci, tok = DIO.rows_f32(V, bi)     # memmap から切り出して float32 へ上げる
                 rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
-                mse += backend.value_step(sc, ci, tok, rel_om, rel_oo, V["z"][bi], args.lr)
+                mse += backend.value_step(sc, ci, tok, rel_om, rel_oo,
+                                          np.asarray(V["z"][bi], np.float32), args.lr)
             else:
                 bi = tr_p[ip * args.bs_p:(ip + 1) * args.bs_p]; ip += 1
                 lens = P["len"][bi]
@@ -457,11 +403,11 @@ def train(args):
         ep_train_sec = time.time() - t_ep
         backend.sync_to_numpy()          # torch → numpy（以降の評価・保存は numpy 版が担当）
         vi = np.where(va_v)[0][:20000]
-        vv = np.concatenate([net.value(V["sc"][vi[s:s + 512]], V["ci"][vi[s:s + 512]], V["tok"][vi[s:s + 512]],
-                                       *relations_or_zeros(net, V["ci"][vi[s:s + 512]], V["tok"][vi[s:s + 512]], rt))
+        vv = np.concatenate([_val_batch(net, rt, V, vi[s:s + 512])
                              for s in range(0, len(vi), 512)]) if len(vi) else np.zeros(0)
-        vmse = float(np.mean((vv - V["z"][vi]) ** 2)) if len(vi) else float("nan")
-        vsgn = float(np.mean((vv > 0) == (V["z"][vi] > 0))) if len(vi) else float("nan")
+        vz = np.asarray(V["z"][vi], np.float32)
+        vmse = float(np.mean((vv - vz) ** 2)) if len(vi) else float("nan")
+        vsgn = float(np.mean((vv > 0) == (vz > 0))) if len(vi) else float("nan")
         p_pi, p_ce = eval_policy(net, rt, ptab_ret, V, P, C, va_pi[:4000], ptr) if len(va_pi) else (float("nan"), float("nan"))
         print(f"ep{ep} train mse {mse/max(nv,1):.4f} ce {ce/max(npi,1):.4f} | "
               f"val v_mse {vmse:.4f} v_sign {vsgn:.3f} pi_top1 {p_pi:.3f} ce {p_ce:.3f} "
@@ -516,6 +462,10 @@ def main():
                     help="学習経路（2026-09-07・§18.4）: torch＝autograd＋torch.optim.Adam（既定・"
                          "CPU で 1 スレッド 2.3 倍／全コア 5 倍）。numpy＝手書き backward（参照実装）。"
                          "torch を import できなければ警告して numpy に落ちる")
+    tr.add_argument("--cache-dir", default=None,
+                    help="dump の pack（float16/int16 の .npy・§18.5）の置き場所。"
+                         f"既定は ${DIO.CACHE_ENV} か ~/.cache/opcg/dump_pack。"
+                         "波ごとに 1 度だけ作り、以後は memmap で読む（RAM に載せない）")
     tr.add_argument("--threads", type=int, default=0,
                     help="torch のスレッド数（0＝全コア）。numpy backend では効かない")
     tr.add_argument("--out", required=True)

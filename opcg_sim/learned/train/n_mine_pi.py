@@ -67,8 +67,10 @@ def main():
         take = np.where((kind == 0) & (pl >= args.min_cands) & (pc >= 0))[0]
         if not len(take):
             continue
+        # dump v3（float16／int16）も v2 と同じ float32／int64 の教材として出す
+        up = {"scalars": np.float32, "field": np.float32, "card_idx": np.int64}
         for k in ("scalars", "field", "card_idx", "who", "turn", "seed"):
-            buf[k].append(d[k][take])
+            buf[k].append(np.asarray(d[k][take], up[k]) if k in up else d[k][take])
         buf["chosen"].append(d["pol_chosen"][take].astype(np.int32))
         buf["cand_len"].append(pl[take].astype(np.int64))
         idx = np.concatenate([np.arange(off[i], off[i + 1]) for i in take])

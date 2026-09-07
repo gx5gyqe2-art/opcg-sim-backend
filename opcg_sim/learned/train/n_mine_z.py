@@ -58,9 +58,10 @@ def main():
         n_in += len(d["kind"])
         if not m.any():
             continue
-        buf["scalars"].append(d["scalars"][m])
-        buf["field"].append(d["field"][m])
-        buf["card_idx"].append(d["card_idx"][m])
+        # dump v3（float16／int16）も v2 と同じ float32／int64 の教材として出す
+        buf["scalars"].append(np.asarray(d["scalars"][m], np.float32))
+        buf["field"].append(np.asarray(d["field"][m], np.float32))
+        buf["card_idx"].append(np.asarray(d["card_idx"][m], np.int64))
         buf["value"].append(d["z"][m])
         n_rows += int(m.sum())
         pend += int(m.sum())
