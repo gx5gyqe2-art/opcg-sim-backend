@@ -981,7 +981,7 @@ L1 100 局再生（上表）で代える。
 | `tests/test_api.py`／`test_api_contract.py`／`test_contract_export.py` | **green**（`contract/` の再生成差分ゼロ） |
 | `cargo test --no-default-features` | **295 passed**・0 failed |
 | `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
-| `make test` | （このコミット時点で実行中——結果は後続コミットに記入する） |
+| `make test` | **1,786 passed・0 failed**（11分10秒）。ただしこの実行の収集時点では `tests/test_api_rs_errors.py` が 24 本（`hidden` 往復の 1 本を後から追加した）＝最終ツリーちょうどではない。追加分は単体で 25 passed を確認。差分は**テスト関数 1 本の追加のみ**（他ファイルは同一） |
 
 シャッフルを挟んだ段のイベントは `targets`（カード実体の識別子）を照合から外す
 （`rs_diff_replay.mask_shuffled_targets`）——再生の規約では Rust は `random.shuffle` を
