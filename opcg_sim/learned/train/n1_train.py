@@ -204,14 +204,17 @@ def load_dump(dirs, vocab):
     for dd in dirs:
         for f in sorted(glob.glob(os.path.join(dd, "n_record_*.npz"))):
             d = np.load(f, allow_pickle=False)
-            V["sc"].append(d["scalars"]); V["ci"].append(d["card_idx"])
+            # dump v3 は scalars float16／card_idx int16（v2 は float32／int64）＝ここで上げる
+            sc32 = np.asarray(d["scalars"], np.float32)
+            ci64 = np.asarray(d["card_idx"], np.int64)
+            V["sc"].append(sc32); V["ci"].append(ci64)
             V["z"].append(d["z"]); V["seed"].append(d["seed"])
             pl, pc, kind = d["pol_len"], d["pol_chosen"], d["kind"]
             off = np.concatenate([[0], np.cumsum(pl)])
             take = np.where((kind == 0) & (pl >= 2) & (pc >= 0))[0]
             if not len(take):
                 continue
-            P["sc"].append(d["scalars"][take]); P["ci"].append(d["card_idx"][take])
+            P["sc"].append(sc32[take]); P["ci"].append(ci64[take])
             P["seed"].append(d["seed"][take]); P["len"].append(pl[take])
             P["chosen"].append(pc[take])
             idx = np.concatenate([np.arange(off[i], off[i + 1]) for i in take])

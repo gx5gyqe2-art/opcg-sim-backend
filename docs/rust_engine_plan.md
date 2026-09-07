@@ -2950,6 +2950,9 @@ RESULT.json: {"job":"train-torch","status":"done","forward_max_abs":..,"grad_max
 
 ### 18.5 WP `dump-f16`（③ float16/int16 の dump と memmap 読み・ユーザ決定 2026-09-07「両方やる」）
 
+> **実装済み（2026-09-07・`docs/reports/2026-09-07_dump_f16.md`＋ RESULT.json）**: 生成は dump v3 が既定・読みは `opcg_sim/learned/train/dump_io.py`（波ごとの pack を memmap）。受け入れ a〜c は全て達成——cast の等価（tokens 最大差 3.9e-4・card_idx 完全一致）／**2 波の常駐 0.524GB → 0.035GB（6.6%・関門 55%）**／1 エポックの val v_mse 差 0.09%（関門 1%）・学習ループ +4.6%（関門 10%）。v2 の npz も同じ関数で読める。
+> 申告 2 点: (a) npz のディスク上は 8% しか縮まない（zlib が既に潰している）＝利得は RAM だけ。(b) fp16 の tokens から R を再計算すると `feasible` が (自枠×相手枠) の 0.05% で反転する（`--ablate rel` の現行線は無影響・serve は生の float32 から計算するので無関係）。
+
 前提: 本線 fdd5105d 以降（切替・R 省略・torch 化が入っている）。§18.6 と**並行**（触る場所が違う。
 境界は「訓練ループは `V["tok"][bi]` の形で配列を切り出す」＝memmap でもそのまま動く）。
 
