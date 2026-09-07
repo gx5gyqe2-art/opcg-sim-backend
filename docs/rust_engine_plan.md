@@ -2473,6 +2473,32 @@ make test-legacy が従来どおり green（1,786）。RESULT.json: {"job":"rs-a
    参照されない fixture は**そのまま残す**（履歴整理のための移動や削除はしない）。第 2 段で動かすのは
    §16.2-2 の Python エンジン一式の `legacy/` 退避と、§17 の 2 つの移動（`loop/`・`learned/train/`）だけ。
 
+
+### 16.4 第 2 段の途中結果への追補（2026-09-07・`claude/rs-archive-cutover-8y6odi` 7360bf21 の RESULT.json=partial を見て）
+
+完了分（決定オラクル 3,855/3,856＝残差は §8.17 の BLAS 同点クラス 1 件・生成 57.06→4.96 s＝11.5 倍・
+`make test` 418・cargo 381/clippy 0・golden 監査 3,386 件ハッシュ不変・再生 a1 帯 50 局・API 契約不変・
+全長照合の復帰・裁定 PREVENT_REST の 3 枚）は受け入れ。逸脱 4 点（encoder/n_rel/n_rel_feat/n_eff を
+`opcg_sim/learned/` に残す・journal を `models/` へ・符号化のエンジン実測 3 か所を `hooks.py` に・
+計画キャッシュ／ポンダリング／投機の削除）も承認。以下を追補する。
+
+1. **アリーナ A/B の基準を差し替える**。fair モードでも Python 席は `hidden` 経由の橋渡しで対話の途中の
+   継続を持てず構造的に不利＝勝率 0.5±0.05 は「2 実装が同じか」を測れていない。A/B は **void ≤2%・
+   hang/timeout/error=0** だけを見る（勝率は参考値として記録）。等価性の主証拠は決定オラクル。
+2. **強さの保存は「a1 vs r1」で測る**（両席とも Rust の decide・主条件＝ランダム対面×生成デッキ・
+   192 ペア以上・`opcg_sim/loop/arena.py`）。Python 時代の実測 **0.544 [0.487,0.601]**
+   （`docs/reports/2026-09-05_r1_ablation.md`）と 95% CI が重なれば合格。r1 の npz は
+   `claude/n1-results:n1_results/nrel_r1.npz`（1cd37ce）。Rust の NRel は R を実装している
+   （`net/nrel.rs`・`skip_relations` は ablate 時のみ）ので r1 はそのまま載る。
+3. `hooks.py`: 差さっていないときに 0／既定値を黙って返すのではなく **raise** する（参照実装なので黙る
+   方が危険。legacy 側のオラクルが `install_hooks()` を忘れたときに気づけるように）。
+4. tag `py-engine-final` の push はコーディネータ環境でも 403（プロキシがタグ ref を弾く）。
+   **同じコミット c22f0a62 をブランチ `claude/py-engine-final` としても push**し、CLAUDE.md／TEST_SPEC の
+   「tag を checkout」の手順に「ブランチでも可」と併記する。tag はユーザが手元から push する。
+5. 計画の結果節は **§8.20**（§8.18＝train-profile・§8.19＝train-norel が先に入った）。
+6. RESULT.json は status=done にして push。取り込みはコーディネータが行う（RESULT.json は
+   `docs/reports/` へ移す）。
+
 ## 17. 到達形のモジュール構成（ユーザ確認 2026-09-07）
 
 方針: **ルール・効果・探索は Rust、カード本文の解釈と学習と API は Python**。裁定を書く場所はパーサ（Python）と
