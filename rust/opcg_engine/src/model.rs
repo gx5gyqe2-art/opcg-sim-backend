@@ -11,8 +11,9 @@
 //! index の `Vec`。uuid は `to_dict` 互換のため保持する。Python の `CardMaster`（不変）は
 //! `MasterTable` に 1 度だけ読み込み、`CardInstance.master` はその index。
 //!
-//! 型の追加は append-only（既存フィールドの意味を変えない）。P2/P3 で対話スタック・誘発待ち行列・
-//! 継続効果を足す。
+//! 型の追加は append-only（既存フィールドの意味を変えない）。P2 で対話スタック
+//! （[`Interaction`]）と誘発待ち行列（[`PendingTrigger`]）を足した。P3 で対話の種別を増やし、
+//! 継続効果（`continuous`）と遅延継続を足す。
 
 #![allow(dead_code)] // P1 の WP が使う契約。骨組みの時点では未参照のものがある。
 
@@ -849,6 +850,69 @@ pub struct ActiveBattle {
     pub counter_buff: i32,
 }
 
+/// 中断（対話）の種別（P2 で追加）。Python `active_interaction["action_type"]` に対応する。
+///
+/// P2（ルール）が立てる中断は**場のキャラ上限超過の強制トラッシュだけ**
+/// （`engine/card_moves.py::_suspend_for_field_overflow`）。効果解決が立てる
+/// `SELECT_TARGET`／`CHOICE`／`CONFIRM_OPTIONAL`… は P3 でここへ足す（append-only）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InteractionKind {
+    FieldOverflowTrash,
+}
+
+impl InteractionKind {
+    /// Python `active_interaction["action_type"]`（内部の種別名）。
+    pub fn action_type(self) -> &'static str {
+        match self {
+            InteractionKind::FieldOverflowTrash => "FIELD_OVERFLOW_TRASH",
+        }
+    }
+    /// `get_pending_request` がフロントへ出す `action`
+    /// （`SELECT_TARGET`／`FIELD_OVERFLOW_TRASH` → `SEARCH_AND_SELECT`）。
+    pub fn front_action(self) -> &'static str {
+        match self {
+            InteractionKind::FieldOverflowTrash => "SEARCH_AND_SELECT",
+        }
+    }
+}
+
+/// 進行中の中断（Python `GameManager._interaction_stack` の 1 要素）。
+///
+/// Python の dict は種別ごとに欄が違うが、P2 が扱う `FIELD_OVERFLOW_TRASH` を表すのに要る
+/// 欄だけを型で持つ。`continuation` に当たるのは `owner`（どちらの場が溢れたか）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Interaction {
+    pub kind: InteractionKind,
+    /// 要求先（`player_id`）。
+    pub player: Seat,
+    pub message: String,
+    pub candidates: Vec<CardIdx>,
+    /// Python の `selectable_uuids`。`None` なら `candidates` の uuid をそのまま出す。
+    pub selectable: Option<Vec<CardIdx>>,
+    /// `{"min": .., "max": ..}`。`None` なら `constraints: null`。
+    pub constraints: Option<(i32, i32)>,
+    pub can_skip: bool,
+    /// `source_card_uuid`（無い中断＝キーごと出さない）。
+    pub source_card: Option<CardIdx>,
+    /// continuation: 溢れた場の持ち主（`FIELD_OVERFLOW_TRASH` の `owner_name`）。
+    pub owner: Seat,
+}
+
+/// 誘発待ち行列の 1 件（Python `_pending_triggers`／`_battle_triggers`）。
+///
+/// P2 では**常に空**（効果が無いバニラでしか誘発は積まれない）。中身の欄は P3 が使う
+/// （`ability` は `CardMaster.ability_ids` への index）。型と待ち行列だけ先に置くのは、
+/// ターン進行・戦闘の分岐（「中断中／誘発が残っている間は進めない」）を Python と同じ
+/// 形で書くため。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingTrigger {
+    pub player: Seat,
+    pub card: CardIdx,
+    pub ability: u32,
+    pub optional: bool,
+    pub confirmed: bool,
+}
+
 /// 盤面全体（Python `GameManager`＋両 `Player`）。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GameState {
@@ -866,6 +930,25 @@ pub struct GameState {
     pub mulligan_done: Vec<Seat>,
     pub setup_phase_pending: bool,
     pub turn_start_pending: bool,
+    /// Python `_interaction_stack`（`active_interaction` は末尾）。P2 で追加。
+    ///
+    /// 記録 v3 の `hidden.manager.interaction_depth` は**件数しか持たない**ので
+    /// `from_record` では復元しない（＝常に空で始まる）。再生中に立った中断は Rust 内部で
+    /// 保持し、盤面 dict の `pending_request` に出す。
+    pub interaction_stack: Vec<Interaction>,
+    /// Python `_battle_triggers`（`declare_attack` が積み `_advance_battle_triggers` が消化）。
+    /// P2（バニラ）では常に空。
+    pub battle_triggers: Vec<PendingTrigger>,
+    /// Python `_pending_triggers`（ライフ公開【トリガー】/ON_LIFE_DECREASE 等）。
+    /// P2（バニラ）では常に空。
+    pub pending_triggers: Vec<PendingTrigger>,
+}
+
+impl GameState {
+    /// いま UI へ提示すべき中断（Python `active_interaction`＝スタック先頭）。
+    pub fn active_interaction(&self) -> Option<&Interaction> {
+        self.interaction_stack.last()
+    }
 }
 
 const HIDDEN_KEYS: &[&str] = &["players", "manager"];
@@ -1150,6 +1233,11 @@ impl GameState {
             mulligan_done,
             setup_phase_pending: f_bool(m, "setup_phase_pending", mctx)?,
             turn_start_pending: f_bool(m, "turn_start_pending", mctx)?,
+            // 記録 v3 は件数しか持たない（上の形の検査だけ済ませてある）＝空で始める。
+            // 再生中に立った中断／誘発は Rust 内部で保持する（P2 の契約・§10.4）。
+            interaction_stack: Vec::new(),
+            battle_triggers: Vec::new(),
+            pending_triggers: Vec::new(),
         })
     }
 

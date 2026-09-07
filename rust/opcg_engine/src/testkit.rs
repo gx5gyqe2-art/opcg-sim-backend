@@ -74,9 +74,22 @@ pub const M_CHAR: MasterIdx = 1;
 pub const M_BLOCKER: MasterIdx = 2;
 pub const M_STAGE: MasterIdx = 3;
 pub const M_EVENT: MasterIdx = 4;
+// --- ルール（P2）テスト用の追加定義（append-only。上の index は変えない）-----------
+/// 速攻持ちのキャラ（召喚酔いを無視できる）。
+pub const M_RUSH: MasterIdx = 5;
+/// ダブルアタック持ちのキャラ。
+pub const M_DOUBLE: MasterIdx = 6;
+/// バニッシュ持ちのキャラ。
+pub const M_BANISH: MasterIdx = 7;
+/// 大きいキャラ（パワー 9000・カウンター 2000）。
+pub const M_BIG: MasterIdx = 8;
+/// 【トリガー】テキストを持つキャラ（`TRIGGER_CHAR_PLAYED` の記録用）。
+pub const M_TRIGGER_TEXT: MasterIdx = 9;
+/// ライフ 1 のリーダー（デッキアウト／ライフ切れの検査用）。
+pub const M_LEADER_L1: MasterIdx = 10;
 
 pub fn sample_masters() -> MasterTable {
-    let masters = vec![
+    let mut masters = vec![
         master("LDR-001", "モンキー・D・ルフィ", CardType::Leader, 0, 5000, &[]),
         master("CHR-001", "ナミ", CardType::Character, 2, 3000, &[]),
         master(
@@ -89,7 +102,30 @@ pub fn sample_masters() -> MasterTable {
         ),
         master("STG-001", "ゴーイングメリー号", CardType::Stage, 1, 0, &[]),
         master("EVT-001", "ゴムゴムの銃", CardType::Event, 1, 0, &[]),
+        master("CHR-003", "サンジ", CardType::Character, 2, 4000, &["速攻"]),
+        master(
+            "CHR-004",
+            "ウソップ",
+            CardType::Character,
+            4,
+            6000,
+            &["ダブルアタック"],
+        ),
+        master(
+            "CHR-005",
+            "チョッパー",
+            CardType::Character,
+            4,
+            6000,
+            &["バニッシュ"],
+        ),
+        master("CHR-006", "ジンベエ", CardType::Character, 5, 9000, &[]),
+        master("CHR-007", "ブルック", CardType::Character, 2, 3000, &[]),
+        master("LDR-002", "ゴール・D・ロジャー", CardType::Leader, 0, 5000, &[]),
     ];
+    masters[M_BIG as usize].counter = 2000;
+    masters[M_TRIGGER_TEXT as usize].trigger_text = "自分のライフ1枚を手札に加える。".to_string();
+    masters[M_LEADER_L1 as usize].life = 1;
     let by_id = masters
         .iter()
         .enumerate()
@@ -310,6 +346,9 @@ pub fn fixture() -> Fixture {
         mulligan_done: vec![Seat::P1],
         setup_phase_pending: false,
         turn_start_pending: false,
+        interaction_stack: Vec::new(),
+        battle_triggers: Vec::new(),
+        pending_triggers: Vec::new(),
     };
 
     Fixture {
@@ -339,4 +378,161 @@ pub fn fixture() -> Fixture {
 /// `journal.rs` の性質テスト用（index を要らない側）。
 pub fn sample_state() -> GameState {
     fixture().state
+}
+
+// --- ルール（P2）テスト用の盤面ビルダ ------------------------------------------
+//
+// `fixture()` は「全ゾーンに非既定値が詰まった」journal/ops 用の盤面なので、ルールの
+// 1 件ずつの検査には向かない（何が効いたのか読めない）。こちらは**素直な盤面**を組んで、
+// 検査したい要素だけを足す。
+
+pub struct BoardBuilder {
+    pub masters: MasterTable,
+    cards: Vec<CardInstance>,
+    dons: Vec<DonInstance>,
+    players: [PlayerState; 2],
+    turn_player: Seat,
+    turn_count: i32,
+    phase: Phase,
+}
+
+impl BoardBuilder {
+    /// 両者にリーダーだけを置いた盤面（ターン 3・MAIN・先手 p1）。
+    pub fn new() -> BoardBuilder {
+        BoardBuilder::with_leaders(M_LEADER, M_LEADER)
+    }
+
+    pub fn with_leaders(p1_leader: MasterIdx, p2_leader: MasterIdx) -> BoardBuilder {
+        let mut b = BoardBuilder {
+            masters: sample_masters(),
+            cards: Vec::new(),
+            dons: Vec::new(),
+            players: [empty_player(Seat::P1), empty_player(Seat::P2)],
+            turn_player: Seat::P1,
+            turn_count: 3,
+            phase: Phase::Main,
+        };
+        let l1 = b.card(p1_leader, Seat::P1);
+        let l2 = b.card(p2_leader, Seat::P2);
+        b.players[0].leader = Some(l1);
+        b.players[1].leader = Some(l2);
+        b
+    }
+
+    pub fn leader(&self, seat: Seat) -> CardIdx {
+        self.players[seat as usize].leader.expect("leader")
+    }
+
+    /// カード実体を 1 枚作る（どのゾーンにも入れない）。uuid は連番。
+    pub fn card(&mut self, m: MasterIdx, owner: Seat) -> CardIdx {
+        let uuid = format!("u-{}-{}", owner.name(), self.cards.len());
+        self.cards.push(card(m, owner, &uuid));
+        (self.cards.len() - 1) as CardIdx
+    }
+
+    pub fn put_field(&mut self, seat: Seat, m: MasterIdx) -> CardIdx {
+        let c = self.card(m, seat);
+        self.players[seat as usize].field.push(c);
+        c
+    }
+
+    pub fn put_hand(&mut self, seat: Seat, m: MasterIdx) -> CardIdx {
+        let c = self.card(m, seat);
+        self.players[seat as usize].hand.push(c);
+        c
+    }
+
+    pub fn put_deck(&mut self, seat: Seat, m: MasterIdx) -> CardIdx {
+        let c = self.card(m, seat);
+        self.players[seat as usize].deck.push(c);
+        c
+    }
+
+    pub fn put_life(&mut self, seat: Seat, m: MasterIdx) -> CardIdx {
+        let c = self.card(m, seat);
+        self.players[seat as usize].life.push(c);
+        c
+    }
+
+    pub fn put_stage(&mut self, seat: Seat, m: MasterIdx) -> CardIdx {
+        let c = self.card(m, seat);
+        self.players[seat as usize].stage = Some(c);
+        c
+    }
+
+    /// ドン!!を n 枚、指定ゾーンへ（`deck`/`active`/`rested`）。
+    pub fn dons(&mut self, seat: Seat, zone: &str, n: usize) -> Vec<DonIdx> {
+        let mut out = Vec::with_capacity(n);
+        for _ in 0..n {
+            let uuid = format!("d-{}-{}", seat.name(), self.dons.len());
+            let mut d = don(seat, &uuid);
+            d.is_rest = zone == "rested";
+            self.dons.push(d);
+            let idx = (self.dons.len() - 1) as DonIdx;
+            let p = &mut self.players[seat as usize];
+            match zone {
+                "deck" => p.don_deck.push(idx),
+                "active" => p.don_active.push(idx),
+                "rested" => p.don_rested.push(idx),
+                other => panic!("unknown don zone {other}"),
+            }
+            out.push(idx);
+        }
+        out
+    }
+
+    /// アクティブなドン!!を 1 枚、カードへ付与する（`ATTACH_DON` 適用後の形）。
+    pub fn attach_don(&mut self, seat: Seat, card: CardIdx) -> DonIdx {
+        let uuid = format!("d-{}-{}", seat.name(), self.dons.len());
+        self.dons.push(don(seat, &uuid));
+        let idx = (self.dons.len() - 1) as DonIdx;
+        self.dons[idx as usize].attached_to = Some(card);
+        self.players[seat as usize].don_attached.push(idx);
+        self.cards[card as usize].attached_don += 1;
+        idx
+    }
+
+    pub fn turn(mut self, turn_count: i32, turn_player: Seat) -> BoardBuilder {
+        self.turn_count = turn_count;
+        self.turn_player = turn_player;
+        self
+    }
+
+    pub fn phase(mut self, phase: Phase) -> BoardBuilder {
+        self.phase = phase;
+        self
+    }
+
+    /// カード実体を直接いじる（レスト・登場ターン・フラグ等の非既定値を作る）。
+    pub fn card_mut(&mut self, idx: CardIdx) -> &mut CardInstance {
+        &mut self.cards[idx as usize]
+    }
+
+    pub fn build(mut self) -> (MasterTable, GameState) {
+        // Python の `CardInstance.__post_init__` は `_refresh_keywords()` を呼ぶ＝
+        // `current_keywords` はマスターのキーワード集合で始まる。
+        for c in &mut self.cards {
+            if c.current_keywords.is_empty() {
+                c.current_keywords = self.masters.get(c.master).keywords.clone();
+            }
+        }
+        let state = GameState {
+            cards: self.cards,
+            dons: self.dons,
+            players: self.players,
+            turn_player: self.turn_player,
+            turn_count: self.turn_count,
+            phase: self.phase,
+            winner: None,
+            active_battle: None,
+            turn_events: Vec::new(),
+            mulligan_done: vec![Seat::P1, Seat::P2],
+            setup_phase_pending: false,
+            turn_start_pending: false,
+            interaction_stack: Vec::new(),
+            battle_triggers: Vec::new(),
+            pending_triggers: Vec::new(),
+        };
+        (self.masters, state)
+    }
 }

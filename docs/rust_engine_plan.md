@@ -127,6 +127,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-06 | P1 | **WP `rs-p1-model` 完了**（`claude/rs-p1-model`）: `MasterTable::from_effects_json`／`GameState::from_record`／`GameState::board_json`・`load_masters(path)`・ハーネスの `--effects`。`--mode state` は random 500 局・L1 50 局とも**全行一致**（mismatch=0・unimplemented=0）。結果は下記 §8.2 |
 | 2026-09-06 | P1 | **統合・受け入れ**（本線）: 両 WP を cherry-pick。マスター表の保持を `state::load_masters` に一本化（`ops.rs` の独自保持を撤去）。`cargo test` 41＋ignored 1（`apply_ops` 統合テスト）green・clippy 0。原始操作オラクル `rs_ops_oracle.py --games 100 --ops-per-state 20` と `--mode state` 追加 seed（random 30・L1 5）の結果は §8.4 |
 | 2026-09-06 | P2 | **設計＋契約を本線へ**（§10）: 記録形式 v3（`active_battle` の所在の持ち主・各決定点の `legal`・`--vanilla`）・`ActiveBattle` に `attacker_owner`/`target_owner`・replay の照合規約（`pending_request` 込み・`request_id` のみ除外）。WP `rs-p2-rules` の指示書は §10.4 |
+| 2026-09-07 | P2 | **WP `rs-p2-rules` 完了**（`claude/rs-p2-rules`）: `rules/`（turn・battle・actions・legal・pending・passive）・`GameState` に対話スタックと誘発待ち行列・`state.rs::replay` を本物に。`--mode replay --vanilla` は random 500 局／L1 100 局とも**全行一致**（mismatch=0・unimplemented=0）。結果は下記 §8.5 |
 
 ### 8.1 P0 の結果（2026-09-06）
 
@@ -286,6 +287,84 @@ wheel は `maturin build --release`）:
 ValueError。P3 で Python 側を確認）／`CardType` の値は NFD（濁点が結合文字）＝Rust 側の文字列定数は
 符号位置で固定しテストで守る（P2 以降も同じ検査を入れる）／`model.rs` のフィールドは `pub` のままで
 「書き換えは journal 経由」は `Session` の所有で担保（型で閉じるのは P3 以降の判断）。
+
+### 8.5 P2 `rs-p2-rules` の結果（2026-09-07）
+
+成果物（Python 側は**1 行も変えていない**＝`opcg_sim/` は無変更。追加も無し）:
+
+| 成果物 | 中身 |
+|---|---|
+| `rust/opcg_engine/src/rules/mod.rs` | 共有の小道具（`has_keyword`／`is_effect_negated`／`current_counter`／`active_restriction`／`operating_card`）とキーワード・`FIELD_LIMIT` の定数。キーワード文字列は符号位置をテストで固定（P1 の「罠 1」と同種の事故を防ぐ） |
+| `…/rules/turn.rs` | `turn_flow.py`: `do_mulligan`／`keep_hand`／`_check_mulligan_complete`／`end_turn`→`switch_turn`→`_begin_turn`→`refresh_phase`（`_reset_player_status`＝keep_don／`refresh_all`＝FREEZE・凍結ドン!!・付与ドン!!の全戻し）→`draw_phase`（turn 1 は引かない）→`don_phase`（turn 1 は 1 枚・以降 2 枚）→`main_phase`。`draw_card` はデッキ切れの敗北判定込み |
+| `…/rules/battle.rs` | `battle.py`: `declare_attack` の全検証（turn≤2・ATTACK_DISABLE／CANNOT_REST・レスト・召喚酔いと速攻・レスト対象のみ）→`_advance_battle_triggers`（ブロッカー有無で BLOCK_STEP／BATTLE_COUNTER）・`handle_block`・`apply_counter`（カウンター値の加算＋トラッシュ）・`resolve_attack`（リーダー: ダブルアタック／バニッシュ／ライフ切れ勝利／キャラ: KO＋`CHAR_KOED_<owner>` の記録）・`_finish_attack`・`check_victory`・`has_blocker` |
+| `…/rules/actions.rs` | `action_api.py`＋`play_card_action`＋`resolve_interaction`＋`_enforce_field_limit`。`_validate_action`／`FIELD_OVERFLOW_TRASH` の中断と解決／`apply_move`（記録の 1 手を適用する入口）／マリガン後のゾーン再同期 |
+| `…/rules/legal.rs` | `get_legal_actions`（MULLIGAN／ブロッカー／カウンター／MAIN_ACTION＝PLAY・ATTACK（攻撃者×対象）・ATTACH_DON・TURN_END／中断の既定解決 1 手）＋`default_interaction_payload`／`choose_selection`／`card_keep_value` |
+| `…/rules/pending.rs` | `get_pending_request`（MULLIGAN／中断／SELECT_BLOCKER／SELECT_COUNTER／MAIN_ACTION）と `pending_actor_action`。**要求の文言は `enums.PendingMessage` の文字列そのまま**で、符号位置をテストで固定 |
+| `…/rules/passive.rs` | `passives.py` の Step 1（両者のバフ・一時キーワードのリセット）だけ。Step 2〜4 は効果解決＝P3 |
+| `model.rs`（append-only） | `InteractionKind`／`Interaction`（`FIELD_OVERFLOW_TRASH` を表せる最小形）／`PendingTrigger`、`GameState` に `interaction_stack`／`battle_triggers`／`pending_triggers` |
+| `journal.rs`（append-only） | 上記 3 欄の記録つきアクセサ（`push_interaction`／`pop_interaction`／`set_trigger_queue`）と `clear_turn_events`（ターン切替の全消去） |
+| `state.rs::replay` | 本物の再生（§10.2）。戻り値 `{"version":3,"states":[盤面 dict…],"legal":[合法手 list…]}` |
+
+受け入れ（実測・本セッションのコンテナ・wheel は `maturin build --release`）:
+
+- `--mode replay --vanilla --games 500 --policy random --seed-base 800000` →
+  `match=500 / mismatch=0 / unimplemented=0`（**48,160 行動**）
+- `--mode replay --vanilla --games 100 --policy l1 --seed-base 810000` →
+  `match=100 / mismatch=0 / unimplemented=0`（9,996 行動）
+- `--mode state`（P1 の退行確認）: `--vanilla --games 25 --seed-base 820000` → match=25（2,095 行）／
+  実デッキ `--games 25 --seed-base 830000` → match=25（2,500 行）。いずれも mismatch=0・unimplemented=0
+- `cargo test --no-default-features` **70 passed**（＋`--ignored` の `apply_ops` 統合テスト 1 件 green）・
+  `cargo clippy --no-default-features --all-targets -- -D warnings` 警告 0
+- `make test`（Python 側）green（Python は無変更）
+
+**実装で効いた Python の細部**（読まないと落ちる箇所。いずれも実測で当てた）:
+
+1. **`get_pending_request` は盤面を書き換える**——「`active_battle` が無いのに BLOCK_STEP／
+   BATTLE_COUNTER のまま」を MAIN へ正規化する副作用がある。しかもハーネスの `board_dict` は
+   dict リテラルの評価順で `turn_info`（＝`phase` を読む）→ … → `pending_request` の順に作るので、
+   **盤面 dict を作ってから要求を作る**順序まで合わせないと `current_phase` がずれうる。
+2. **要求のキー集合は分岐ごとに違う**。MULLIGAN は `candidates`/`constraints` を持ち `options` を
+   持たない／中断は `options`（null）を持ち `source_card_uuid` は**有るときだけ**キーを足す／
+   BLOCK・COUNTER・MAIN は `player_id`/`action`/`message`/`selectable_uuids`/`can_skip` だけ。
+   `FIELD_OVERFLOW_TRASH` はルール処理なので発生源カードが無く、`source_card_uuid` キーは出ない。
+3. **要求の候補 `to_dict()` は `is_my_turn` 既定 True**（`Player.to_dict` の `_format_card` を通らない）＝
+   付与ドン!!のパワーが**相手ターンでも乗る**。`is_face_up` もカードの実値のまま（盤面 dict の
+   `zones.field` は True で上書きするので、同じカードが 2 か所で違う値になる）。
+4. **場の上限超過の既定解決は「価値昇順で min 件」**（`choose_selection` の「自分の場＝コスト系」）。
+   `card_keep_value` は `cost*100 + get_power(False)//100 + counter//20 + …` で、同値は候補の並び
+   （＝`owner.field` の順）を保つ（Python の `sorted` は安定）。
+5. **`_resolve_on_ko` はバニラでも空振りしない**——`CHAR_KOED_<owner>` をターン内イベントへ
+   記録する。ここを落とすと KO を含む局の `turn_events` がずれる（盤面 dict には出ないが、
+   `hidden` 照合（`--mode state`）と P3 の条件判定に効く）。
+6. **`ATTACH_DON`（`action_api`）はドン!!のレスト状態を変えない**——`don_active.pop(0)` して
+   `attached_to` を立てるだけ。`ops::attach_don`（P1）は `is_rest` を書くので、同じ経路に見えて
+   意味が違う（アクティブから取る限り結果は同じだが、依存しないよう `action_api` の手順で書いた）。
+7. **`_check_mulligan_complete` は 2 人目のマリガンの中で `refresh_phase` まで走る**。turn 1 は
+   ドローしないのでデッキは動かず、その後の「記録の並びへ再同期」と衝突しない。
+8. **マリガンの再同期は deck と hand を**まとめて**検査する**——Python は「手札をデッキ底へ →
+   シャッフル → 5 枚」で、Rust は乱数を互換にしない（§6）。片方のゾーンだけ多重集合を比べると
+   シャッフルの違いで必ず食い違う（実装当初これで 3 局中 2 局が `bad_payload` になった）。
+
+**Python 側の欠陥と判断したもの: 無し**（500＋100 局・約 57,600 行動で不一致 0）。P1 から
+引き継いだ「`pay_cost` で付与中のドン!!を指定して払うと付与先の `attached_don` が減らない」は
+P2 の経路（`pay_cost` は `don_list=None` でしか呼ばれない）では踏まないため未確認のまま。
+
+**引き継ぎ（P3 で塞ぐ）**:
+
+- `replay` は **`--vanilla` の記録だけ**を受け付ける（効果を持つ記録は `Unimplemented`）。
+  イベントの登場・`ACTIVATE_MAIN`・【カウンター】イベント・アタック税も同様に明示エラー。
+- `Interaction` は `FIELD_OVERFLOW_TRASH` だけを表せる最小形。`SELECT_TARGET`／`CHOICE`／
+  `CONFIRM_OPTIONAL`／`CONFIRM_TRIGGER`／`ARRANGE_DECK`／`DECLARE_COST`／`SELECT_RESOURCE` は
+  P3 が `InteractionKind` へ足す（append-only）。`_deferred_continuations` はまだ無い。
+- `battle_triggers`／`pending_triggers` は**型と待ち行列だけ**（常に空）。`PendingTrigger.ability` は
+  P3 が `CardMaster.ability_ids` の index を入れる。
+- `card_keep_value` の「効果ブロック数・【カウンター】・【トリガー】アイコン」の加点は 0 固定
+  （バニラは abilities が空）。P3 で `ability_ids` から数える。
+- `play_card_action` の `TRIGGER_CHAR_PLAYED` は `trigger_text` 非空だけで判定している
+  （Python は「または TriggerType.TRIGGER 能力を持つ」も見る）。P3 で abilities 側も見る。
+- 記録 v3 の `hidden.manager.interaction_depth`／`pending_triggers`／`pending_end_of_turn` は
+  件数だけなので `from_record` では復元しない（再生中に立った中断は Rust 内部で保持する）。
+  実デッキの `--mode replay` を通すには、P3 で中身を記録形式へ足す（v4）必要がある。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 

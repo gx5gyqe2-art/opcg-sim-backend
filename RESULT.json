@@ -1,0 +1,47 @@
+{
+  "job": "rs-p2-rules",
+  "status": "done",
+  "branch": "claude/rs-p2-rules",
+  "base": "claude/cpu-spec-improvements-yw91jd (4c19a93)",
+  "harness": {
+    "vanilla_random500": {"games": 500, "actions": 48160, "match": 500, "mismatch": 0,
+                          "unimplemented": 0, "python_error": 0, "bad_payload": 0, "bad_output": 0,
+                          "policy": "random", "mode": "replay", "vanilla": true,
+                          "seed_base": 800000, "engine": "0.0.1", "record_version": 3,
+                          "first": null},
+    "vanilla_l1_100": {"games": 100, "actions": 9996, "match": 100, "mismatch": 0,
+                       "unimplemented": 0, "python_error": 0, "bad_payload": 0, "bad_output": 0,
+                       "policy": "l1", "mode": "replay", "vanilla": true,
+                       "seed_base": 810000, "engine": "0.0.1", "record_version": 3,
+                       "first": null},
+    "state_regress": {
+      "vanilla25": {"games": 25, "actions": 2095, "match": 25, "mismatch": 0, "unimplemented": 0,
+                    "policy": "random", "mode": "state", "vanilla": true, "seed_base": 820000},
+      "real25": {"games": 25, "actions": 2500, "match": 25, "mismatch": 0, "unimplemented": 0,
+                 "policy": "random", "mode": "state", "vanilla": false, "seed_base": 830000}
+    },
+    "extra_unseen_seeds": {"games": 30, "actions": 3056, "match": 30, "mismatch": 0,
+                           "unimplemented": 0, "policy": "random", "mode": "replay",
+                           "vanilla": true, "seed_base": 840000}
+  },
+  "gates": {
+    "make_test": {"passed": 1761, "failed": 0, "seconds": 559.01},
+    "cargo_test": {"tests": 70, "failed": 0, "ignored": 1,
+                   "cmd": "cargo test --no-default-features",
+                   "ignored_run": {"tests": 1, "failed": 0, "cmd": "cargo test --no-default-features -- --ignored"}},
+    "cargo_clippy": {"warnings": 0,
+                     "cmd": "cargo clippy --no-default-features --all-targets -- -D warnings"}
+  },
+  "owned_files": [
+    "rust/opcg_engine/src/rules/{mod,turn,battle,actions,legal,pending,passive,tests_rules}.rs (新規)",
+    "rust/opcg_engine/src/model.rs (append-only: Interaction/InteractionKind/PendingTrigger と GameState の 3 欄)",
+    "rust/opcg_engine/src/journal.rs (append-only: 上記 3 欄の記録つきアクセサ・clear_turn_events)",
+    "rust/opcg_engine/src/state.rs (replay を本物に)",
+    "rust/opcg_engine/src/lib.rs (rules モジュール登録・docstring)",
+    "rust/opcg_engine/src/testkit.rs (ルール用の BoardBuilder と追加マスター・append-only)",
+    "docs/rust_engine_plan.md (§8 の結果行と §8.5)",
+    "docs/TEST_SPEC.md (rs_diff_replay.py の行を replay の受け入れ込みに更新)"
+  ],
+  "untouched": ["opcg_sim/ 配下（Python エンジンは 1 行も変えていない）", "tests/ 配下（ハーネスも無変更）"],
+  "notes": "受け入れは 3 本とも達成（バニラ random 500 局＝全 500 一致 48,160 行動／バニラ L1 100 局＝全 100 一致／--mode state はバニラ 25・実デッキ 25 とも全一致＝P1 の退行なし。いずれも mismatch=0・unimplemented=0）。照合は盤面 dict＋pending_request（request_id 除く）＋各決定点の合法手（順序不問の集合）を含む。■ Python 側の欠陥と判断したものは 0 件（約 57,600 行動で不一致なし）。よって Python の修正は 1 行も無い。■ 実装で効いた Python の細部（読まないと落ちる）: (1) get_pending_request は『active_battle が無いのに BLOCK_STEP/BATTLE_COUNTER のまま』を MAIN へ直す副作用を持ち、ハーネスの board_dict は dict リテラルの評価順で turn_info（phase を読む）→…→pending_request の順に作る＝盤面 dict を作ってから要求を作る順序まで合わせる必要がある。(2) 要求のキー集合は分岐ごとに違う（MULLIGAN は candidates/constraints を持ち options を持たない／中断は options=null を持ち source_card_uuid は有るときだけキーを足す／BLOCK・COUNTER・MAIN は player_id/action/message/selectable_uuids/can_skip だけ）。FIELD_OVERFLOW_TRASH はルール処理なので source_card_uuid キーが出ない。(3) 要求の candidates は CardInstance.to_dict() を is_my_turn 既定 True で呼ぶ（_format_card を通らない）＝付与ドン!!のパワーが相手ターンでも乗り、is_face_up もカードの実値のまま（同じカードが zones.field と candidates で違う値になる）。(4) 場の上限超過の既定解決は choose_selection の『自分の場＝コスト系』＝価値昇順で min 件。card_keep_value は cost*100 + get_power(False)//100 + counter//20 で、同値は候補の並び（owner.field 順）を保つ（Python の sorted は安定）。(5) _resolve_on_ko はバニラでも空振りせず CHAR_KOED_<owner> をターン内イベントへ記録する。(6) action_api の ATTACH_DON はドン!!のレスト状態を変えない（don_active.pop(0) して attached_to を立てるだけ）＝ops::attach_don（P1）とは意味が違うので action_api の手順で書いた。(7) マリガンの再同期は deck と hand を『まとめて』多重集合検査する必要がある——Python は手札をデッキ底へ→シャッフル→5 枚で、Rust は乱数を互換にしない（計画 §6）ため、片方のゾーンだけ比べるとシャッフルの違いで必ず食い違う（実装当初これで 3 局中 2 局が bad_payload になった）。■ 契約の扱い: model.rs への追加は append-only（Interaction / InteractionKind / PendingTrigger と GameState の interaction_stack / battle_triggers / pending_triggers）。既存フィールドの意味は変えていない。記録 v3 の hidden.manager.interaction_depth / pending_triggers / pending_end_of_turn は件数だけなので from_record では復元せず、再生中に立った中断は Rust 内部で保持して盤面 dict の pending_request に出す（指示どおり）。■ 未実装（P3 へ引き継ぐ・黙って進めず NotImplementedError にしてある）: --vanilla でない記録の再生／イベントの登場／ACTIVATE_MAIN／【カウンター】イベント／アタック税（ATTACK_TAX_DISCARD_N）。Interaction は FIELD_OVERFLOW_TRASH だけを表せる最小形で、SELECT_TARGET / CHOICE / CONFIRM_OPTIONAL / CONFIRM_TRIGGER / ARRANGE_DECK / DECLARE_COST / SELECT_RESOURCE と _deferred_continuations は P3。battle_triggers / pending_triggers は型と待ち行列だけ（常に空）。card_keep_value の効果ブロック数・【カウンター】・【トリガー】アイコンの加点は 0 固定（バニラは abilities が空）で、P3 で CardMaster.ability_ids から数える。play_card_action の TRIGGER_CHAR_PLAYED は trigger_text 非空だけで判定している（Python は『または TriggerType.TRIGGER 能力を持つ』も見る）ので P3 で abilities 側も見る。実デッキの --mode replay を通すには P3 で対話スタック・誘発待ち行列の中身を記録形式へ足す（v4）必要がある。■ P1 からの引き継ぎ『pay_cost で付与中のドン!!を指定して払うと付与先の attached_don が減らない』は、P2 の経路では pay_cost が don_list=None でしか呼ばれないため踏まず、未確認のまま（P3 で【カウンター】イベントを実装するときに再確認する）。■ 環境メモ: このコンテナには pytest / numpy / fastapi / httpx / maturin が入っていなかったので pip で導入して make test を通した（リポジトリの変更ではない）。docker build は P0/P1 と同じくベースイメージ取得が egress ポリシーで 403 のため本セッションでも未検証。"
+}

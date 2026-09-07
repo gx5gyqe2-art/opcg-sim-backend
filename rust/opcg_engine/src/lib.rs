@@ -1,7 +1,7 @@
 //! `opcg_engine` — OPCG シミュレータのエンジン（Rust）。Python からは PyO3 拡張として使う。
 //!
-//! 段階移行の計画は `docs/rust_engine_plan.md`。**P0（本段階）は骨組み**で、公開 API は
-//! `version()` / `echo_state()` / `replay()` の 3 つだけ。盤面・ルール・効果はまだ無い。
+//! 段階移行の計画は `docs/rust_engine_plan.md`。**現在 P2（ルール）まで**＝盤面モデル（P1）・
+//! journal と原始操作（P1）・ターン進行／戦闘／合法手／要求（P2）がある。効果解決（P3）は無い。
 //! Python 版が常に正本（オラクル）で、Rust 版は同じ入力に同じ出力を返すことで受け入れる。
 
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
@@ -10,6 +10,7 @@ use pyo3::prelude::*;
 mod journal;
 mod model;
 mod ops;
+mod rules;
 mod state;
 #[cfg(test)]
 mod testkit;
@@ -76,9 +77,11 @@ fn apply_ops(hidden_json: &str, ops_json: &str, effects_path: Option<&str>) -> P
     Ok(ops::apply_ops(hidden_json, ops_json, effects_path)?)
 }
 
-/// 記録した局を Rust エンジンで再生する（`tests/scripts/rs_diff_replay.py` が呼ぶ）。
+/// 記録した局を Rust エンジンで再生する（`tests/scripts/rs_diff_replay.py --mode replay` が呼ぶ）。
 ///
-/// P0 では契約検査のみ行い `NotImplementedError` を送出する（黙って一致を返さない）。
+/// 戻り値は `{"version":3,"states":[各行動後の盤面 dict...],"legal":[各決定点の合法手...]}`。
+/// 効果解決を要する経路（`--vanilla` でない記録・イベントの登場・`ACTIVATE_MAIN`）は
+/// `NotImplementedError`（P3 の担当・黙って一致を返さない）。`load_masters()` が先に要る。
 #[pyfunction]
 fn replay(json_str: &str) -> PyResult<String> {
     Ok(state::replay(json_str)?)
