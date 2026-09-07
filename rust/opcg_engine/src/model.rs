@@ -26,9 +26,9 @@ use std::collections::HashMap;
 // 方針（計画 §6「未知の種類は読み込み時にエラー」）: 記録 v2 の欄は**全て明示的に読み**、
 // 未知のキー・型違い・未知の enum 名・解決できない uuid は `BadPayload` にする（黙って捨てない）。
 
-type Obj = Map<String, Value>;
+pub(crate) type Obj = Map<String, Value>;
 
-fn bad(msg: String) -> EngineError {
+pub(crate) fn bad(msg: String) -> EngineError {
     EngineError::BadPayload(msg)
 }
 
@@ -42,13 +42,13 @@ fn as_arr<'a>(v: &'a Value, ctx: &str) -> Result<&'a Vec<Value>, EngineError> {
         .ok_or_else(|| bad(format!("{ctx}: expected a JSON list")))
 }
 
-fn field<'a>(o: &'a Obj, key: &str, ctx: &str) -> Result<&'a Value, EngineError> {
+pub(crate) fn field<'a>(o: &'a Obj, key: &str, ctx: &str) -> Result<&'a Value, EngineError> {
     o.get(key)
         .ok_or_else(|| bad(format!("{ctx}: missing '{key}'")))
 }
 
 /// 想定外のキーが混ざっていないか（記録形式が黙って変わったのを検出する）。
-fn ensure_keys(o: &Obj, allowed: &[&str], ctx: &str) -> Result<(), EngineError> {
+pub(crate) fn ensure_keys(o: &Obj, allowed: &[&str], ctx: &str) -> Result<(), EngineError> {
     for key in o.keys() {
         if !allowed.contains(&key.as_str()) {
             return Err(bad(format!("{ctx}: unknown key '{key}'")));
@@ -395,17 +395,25 @@ pub struct CardMaster {
     /// Python `CardMaster.keywords`＋`KEYWORD` アクション由来（`_refresh_keywords` の結果と同じ集合）。
     pub keywords: Vec<String>,
     pub name_aliases: Vec<String>,
-    /// P3: `effects::AbilityTable` への index。P1 では空。
+    /// P3: `MasterTable.abilities` への index（カード内の順序＝Python の `master.abilities` の順。
+    /// `ability_used_this_turn` のキーはこの Vec への添字＝カード内 index）。
     pub ability_ids: Vec<u32>,
 }
 
 /// 全カード定義の表（`opcg_sim/data/opcg_effects.json` の `cards[]` から 1 度だけ作る。
 /// P0 の書き出しはマスター欄＝card_id/name/type/colors/cost/power/counter/attribute/traits/
 /// effect_text/trigger_text/life/block_icon/keywords/name_aliases＋`abilities` を全部持つ）。
-#[derive(Debug, Default)]
+///
+/// P3 で効果構造（`abilities`）を同居させた。マスターと能力表は必ず対で使う（`ability_ids` は
+/// この表への index なので、別々に持つと取り違えが起きうる）。§11.5 の関数はシグネチャどおり
+/// `masters: &MasterTable, abilities: &AbilityTable` を取り、呼び出し側が `&masters.abilities`
+/// を渡す。
+#[derive(Debug, Default, Clone)]
 pub struct MasterTable {
     pub masters: Vec<CardMaster>,
     pub by_id: std::collections::HashMap<String, MasterIdx>,
+    /// 全カードの能力（`CardMaster.ability_ids` が指す先）。
+    pub abilities: crate::effects::ast::AbilityTable,
 }
 
 /// `CardMaster` を作る際に読む欄（`export_effects_json.py` の出力と 1:1）。
@@ -528,21 +536,61 @@ impl MasterTable {
         let mut table = MasterTable {
             masters: Vec::with_capacity(entries.len()),
             by_id: HashMap::with_capacity(entries.len()),
+            abilities: crate::effects::ast::AbilityTable::default(),
         };
         for (key, card) in entries {
-            let ctx = format!("effects json: cards.{key}");
-            let master = master_from_json(card, &ctx)?;
-            let idx = table.masters.len() as MasterIdx;
-            if let Some(prev) = table.by_id.insert(master.card_id.clone(), idx) {
-                return Err(bad(format!(
-                    "{ctx}: duplicate card_id '{}' (already at index {prev})",
-                    master.card_id
-                )));
-            }
-            table.masters.push(master);
+            table.add_master(card, &format!("effects json: cards.{key}"))?;
         }
         if table.masters.is_empty() {
             return Err(bad("effects json: 'cards' is empty".into()));
+        }
+        Ok(table)
+    }
+
+    /// カード定義 1 枚（`export_effects_json.py` と同じ形）を表へ足す。
+    ///
+    /// `abilities` は [`crate::effects::loader`] で読み、`CardMaster.ability_ids` に
+    /// **カード内の順序のまま** index を入れる（Python の `master.abilities` の順＝
+    /// `ability_used_this_turn` のキーと一致させるため）。
+    pub fn add_master(&mut self, card: &Value, ctx: &str) -> Result<MasterIdx, EngineError> {
+        let mut master = master_from_json(card, ctx)?;
+        // 重複の検査は**能力を積む前**に済ませる（弾いたあとに表へ迷子の能力が残らないように）。
+        if let Some(prev) = self.by_id.get(&master.card_id) {
+            return Err(bad(format!(
+                "{ctx}: duplicate card_id '{}' (already at index {prev})",
+                master.card_id
+            )));
+        }
+        let abilities = crate::effects::loader::abilities_from_json(
+            field(as_obj(card, ctx)?, "abilities", ctx)?,
+            &format!("{ctx}.abilities"),
+        )?;
+        master.ability_ids = Vec::with_capacity(abilities.len());
+        for ability in abilities {
+            let id = self.abilities.abilities.len() as u32;
+            self.abilities.abilities.push(ability);
+            master.ability_ids.push(id);
+        }
+        let idx = self.masters.len() as MasterIdx;
+        self.by_id.insert(master.card_id.clone(), idx);
+        self.masters.push(master);
+        Ok(idx)
+    }
+
+    /// 記録 v4 の `extra_masters`（効果 JSON に**無い**カード定義。監査の汎用盤面が使う
+    /// `FILLER` や `make_master` のテスト定義。形は `cards[]` の 1 件と同じ）を足した表を返す。
+    ///
+    /// 元の表（プロセス共有の `state::MASTERS`）は変えない＝`GameState::from_record` の**前**に
+    /// この表を作り、その記録の間だけ使う。既に同じ `card_id` があれば `BadPayload`
+    /// （黙って上書きしない）。
+    pub fn with_extra_masters(&self, extra: &Value) -> Result<MasterTable, EngineError> {
+        let items = as_arr(extra, "extra_masters")?;
+        if items.is_empty() {
+            return Ok(self.clone());
+        }
+        let mut table = self.clone();
+        for (i, card) in items.iter().enumerate() {
+            table.add_master(card, &format!("extra_masters[{i}]"))?;
         }
         Ok(table)
     }
@@ -1569,11 +1617,16 @@ mod tests {
                 "cost": 3, "power": 5000, "counter": 1000, "attribute": "SLASH", "traits": [],
                 "life": 0, "block_icon": "", "keywords": ["RUSH"], "name_aliases": [],
                 "effect_text": "", "trigger_text": "",
+                // P3 の loader が `abilities` を実際に読むようになったので、Ability の欄は
+                // 全て持たせる（`actions` は Python の dataclass には無い欄＝`_refresh_keywords`
+                // だけが見る。`effects::loader` は読み飛ばす）。
                 "abilities": [
-                    {"node": "Ability", "trigger": "PASSIVE",
+                    {"node": "Ability", "trigger": "PASSIVE", "condition": null, "cost": null,
+                     "effect": null, "raw_text": "", "cost_optional": false,
                      "actions": [{"node": "GameAction", "type": "KEYWORD", "details": "BLOCKER"},
                                  {"node": "GameAction", "type": "KO", "details": ""}]},
-                    {"node": "Ability", "trigger": "ON_PLAY"}
+                    {"node": "Ability", "trigger": "ON_PLAY", "condition": null, "cost": null,
+                     "effect": null, "raw_text": "", "cost_optional": false}
                 ]}}
         });
         let table = MasterTable::from_effects_json(&doc).expect("masters");

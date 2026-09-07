@@ -1,0 +1,39 @@
+{
+  "job": "rs-p3-core",
+  "status": "done",
+  "branch": "claude/rs-p3-core-h0bryg",
+  "base": "claude/cpu-spec-improvements-yw91jd",
+  "oracle": {
+    "boards": 200,
+    "queries": 7337400,
+    "match": 6426129,
+    "mismatch": 0,
+    "mismatch_by_kind": {},
+    "error_match": 911271,
+    "unimplemented": 0,
+    "bad_payload": 0,
+    "bad_output": 0,
+    "restore_mismatch": 0,
+    "nonempty_targets": 1054986,
+    "true_conditions": 418037,
+    "nonzero_values": 1435565,
+    "catalog": 12229,
+    "catalog_kinds": {"target": 4378, "value": 5801, "condition": 2050},
+    "games": 10,
+    "policy": "both",
+    "ctx": "both",
+    "null_source_pass": true,
+    "seed_base": 900000,
+    "engine": "0.0.1",
+    "seconds": 175.1,
+    "first": null
+  },
+  "gates": {
+    "loader_all_cards": "2803/2803 (BadPayload 0) — cargo test effects::loader::tests::every_card_in_the_effects_json_loads",
+    "cargo_test": "130 passed + 1 ignored (cargo test --no-default-features)",
+    "cargo_clippy": "0 warnings (cargo clippy --no-default-features --all-targets -- -D warnings)",
+    "make_test": "green (1761 passed, 622s) — Python 側は無変更",
+    "negative_control": "Rust を 3 か所わざと壊すと 4 局面で mismatch=385 (target 269 / condition 100 / value 16)。復旧後 mismatch=0 を再確認"
+  },
+  "notes": "所有範囲のみ変更（resolver.rs／interact.rs／triggers.rs／actions/ は作っていない）。Python 側（opcg_sim/）は無変更で、追加は tests/scripts/rs_query_oracle.py のみ。■契約への追補（effects/ast.rs・append-only。実装時に「実データを表せない」と判明した 3 点）: (1) CondValue に Null/Bool/List/Dict を追加（実データの Condition.value は tuple/list/dict も取る。exporter は tuple も list も JSON 配列にするが、区別が要る型＝Python が isinstance(v,tuple) で分岐する型の実データは全て tuple なので配列を tuple として扱えば一致する）。(2) TargetQuery/ValueSource に Default を実装（ValueSource は multiplier=1・divisor=1 なので derive(Default) は使えない。cond.rs の HAS_TRAIT 等が合成クエリで使う）。(3) get_target_cards の戻り値が Vec<CardIdx> ではなく Vec<TargetRef>（カード or ドン!!）＝Python の get_target_cards はドン!!も返す（Zone.COST_AREA を指すクエリ 3 件と CHAR_OR_DON フラグ 2 件）。§11.5 の他の引数・関数名は変えていない。■resolver WP／群 WP への引き継ぎ: (a) matcher の NAME_OR_COLORTYPE は名前照合に NAME_PARTIAL を効かせない（Python はこの枝だけ matches_name(n) を partial 無しで呼ぶ）。現行 DB に両フラグを併せ持つカードが無くオラクルでは検出できないため cargo テストで固定した。(b) lacks_trigger は Python では ab.trigger.name との文字列比較＝未知の名前でも例外にせず「一致しない」だけ。(c) exclude_ids は TargetQuery に欄はあるが Python のどこからも参照されていない（＝Rust も無視する）。(d) GameAction.value の null（RULE_PROCESSING 14 件）は既定の ValueSource として読む（Python の _calculate_value(None) と等価）。(e) matcher は行動主体（actor）を見ない＝SELF/OPPONENT は発生源カードの持ち主が基準。(f) MasterTable が AbilityTable を同居させ、§11.5 の呼び出しは &masters.abilities を渡す（取り違え防止）。記録 v4 の extra_masters は MasterTable::with_extra_masters（共有表を変えずに拡張した表を返す）。(g) model.rs の JSON 補助（bad/field/ensure_keys/Obj）を pub(crate) にして loader から使い回した。(h) model.rs の既存テスト master_keywords_take_keyword_actions_from_abilities は Ability の欄が欠けた JSON を作っていたため、loader が厳格に読むようになった分だけ欄を補った（意図は不変）。ABILITY_KEYS に actions を通してあるのは model::collect_ability_keywords が同じ場所を見るため（loader 自身は使わない）。■オラクルの設計: 1 局面につき 3 条件（空 context／盤面から作った合成 context／発生源を落とした条件）で回す。合成 context は PREV_ACTION・REVEALED_CARD_TRAIT・DECLARED_COST_MATCH・COUNT_QUERY・REFERENCE_POWER の既定値以外の枝を踏ませるため、発生源を落とす条件は「両側が同じように例外になる」ことを空振りさせないため（error_match 911,271 件）。効果 JSON がカード DB と食い違えば db_hash 比較で黙って再生成する＝古い生成物で緑にしない。■未実施: 効果の実行（resolver/誘発/アクション）は WP rs-p3-resolver と群 A〜E の担当で、rs_diff_replay --mode replay の実デッキは引き続き unimplemented（P3 統合まで）。"
+}
