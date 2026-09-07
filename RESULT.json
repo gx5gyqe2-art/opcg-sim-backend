@@ -1,0 +1,79 @@
+{
+  "job": "rs-p3-status",
+  "status": "done",
+  "branch": "claude/rs-p3-status-rkkh9m",
+  "base": "claude/cpu-spec-improvements-yw91jd (e619991)",
+  "audit": {
+    "cards": 782,
+    "abilities": 1014,
+    "match": 1014,
+    "mismatch": 0,
+    "unimplemented": 0,
+    "record_error": 0,
+    "bad_payload": 0,
+    "bad_output": 0,
+    "mode": "replay",
+    "action_types": [
+      "ACTIVE",
+      "ATTACK_DISABLE",
+      "BUFF",
+      "DISABLE_ABILITY",
+      "DISCARD",
+      "DRAW",
+      "FREEZE",
+      "GRANT_KEYWORD",
+      "KO",
+      "NEGATE_EFFECT",
+      "PREVENT_REST",
+      "REST",
+      "SWAP_POWER"
+    ],
+    "engine": "0.0.1",
+    "record_version": 4,
+    "first": null
+  },
+  "regress": {
+    "audit_foundation": {
+      "cards": 634,
+      "abilities": 817,
+      "match": 817,
+      "mismatch": 0,
+      "unimplemented": 0,
+      "action_types": ["ACTIVE", "BUFF", "DISCARD", "DRAW", "KO", "REST"]
+    },
+    "replay_vanilla": {
+      "games": 20,
+      "actions": 1832,
+      "match": 20,
+      "mismatch": 0,
+      "unimplemented": 0,
+      "seed_base": 1100000
+    },
+    "state": {
+      "games": 5,
+      "actions": 453,
+      "match": 5,
+      "mismatch": 0,
+      "seed_base": 1100000
+    },
+    "query_oracle": {
+      "boards": 40,
+      "queries": 1467480,
+      "match": 1285223,
+      "error_match": 182257,
+      "mismatch": 0,
+      "unimplemented": 0,
+      "restore_mismatch": 0,
+      "seed_base": 1110000
+    },
+    "cargo_test": {"passed": 194, "failed": 0, "ignored": 0, "baseline": 166, "added": 28},
+    "cargo_clippy": {"warnings": 0},
+    "make_test": "green"
+  },
+  "files_changed": [
+    "rust/opcg_engine/src/effects/actions/status.rs",
+    "docs/rust_engine_plan.md",
+    "RESULT.json"
+  ],
+  "notes": "Python 側（opcg_sim/）は 1 行も変更していない。actions/mod.rs も無変更（指示書が許した「buff から本物への委譲 1 か所」も使っていない）。resolver/interact/triggers/model/ops も無変更。詳細は docs/rust_engine_plan.md §8.10。 (1) BUFF は土台の mod.rs::buff が既に Python per_target.buff の全 6 分岐＋期間付き continuous::apply を持っていたため、群 A からの委譲は不要だった。Python との 1 対 1 は status.rs の転記テスト 8 件で固定した。 (2) 【差し口の申告】mod.rs::apply_action は game_handler_for が種別を返した時点で対象ループへ落ちない（全群が None を返すと Unimplemented）ため、差し口 docstring の『Python の when= ガードが偽のときも None＝対象ループへフォールスルー』はそのままでは Python と挙動が異なる。DISABLE_ABILITY（Python は when=status==\"OPP_ONPLAY\"）が該当。mod.rs を触らない制約のもと、status::game_handler が super::run_target_loop（pub）を Python の apply_action と同じ引数で自分で呼んでフォールスルーを再現した。実データでは DISABLE_ABILITY 4 件中 3 件がこの経路（Python でも盤面は動かない no-op）で、監査は一致している。同じ問題は guard 付きの他種別（ACTIVE_DON／RULE_PROCESSING＝群 D／E）でも起きるので、統合時に mod.rs 側で『群が None を返したら run_target_loop へ落ちる』へ直すのが筋。この WP は所有範囲外なので変更していない。 (3) ATTACK_DISABLE は Python では RESTRICTION と同じ per_target 関数に登録されているが、RESTRICTION は §11.7 で群 E の担当なので owns_target には入れていない。 (4) GRANT_KEYWORD の raw_text フォールバック（status が空なら 【…】 を拾う）は現行 DB の 202 件すべてで status が埋まっているため実データでは通らない。Rust 側は Python と同じ順序で拾うが NFC 正規化は入れていない（通るようになったら正規化が必要＝コード内にコメント）。 (5) PREVENT_REST の DB 3 件（PASSIVE『このキャラは相手の効果で、KOされずレストにされない』・duration=INSTANT）は Python が自分自身に THIS_TURN の CANNOT_REST を載せる＝自分がアタック／ブロックできなくなる読み方になっているが、Python が正なので同じ意味論のまま移した（監査も一致）。Python 側の欠陥として直したものは無い。"
+}
