@@ -1,7 +1,7 @@
 {
   "job": "rs-archive-cutover",
-  "status": "partial",
-  "notes_status": "PLACEHOLDER",
+  "status": "done",
+  "notes_status": "A（切替）・B（移動と退避）・受け入れ・文書とも完了。§16.4 の追補 6 点すべて反映済み: (1) 対 Python 席のアリーナ A/B は**中止**し参考値のみ記録（arena_ab_vs_python）／(2) 強さの保存は **a1 vs r1（Rust 席同士）192 ペアで 0.5365 [0.4802, 0.5927]・void 0**＝Python 時代 0.544 [0.487, 0.601] と CI が重なり**合格**（arena_a1_vs_r1）／(3) hooks は MissingHook を送出（hooks_raise）／(4) tag が push できないぶんブランチ claude/py-engine-final を併記（tag_fallback_*）／(5) 計画の結果節は **§8.20**／(6) status=done。等価性の主証拠は決定オラクル 3,855/3,856（99.97%・decide_oracle）。取り込みはコーディネータが行う",
   "arena_ab_vs_python": {
     "state": "cancelled",
     "why_cancelled": "§16.4-1（ユーザ決定 2026-09-07）。**この設計では「2 実装が同じか」を測れない**ことが実行中に判明したため中止した。Python 席は記録 v5 の `hidden` から GameManager を組んで読むが、`hidden` は**中断（対話）の継続を持てない**（記録 v5 の契約）ので対話の途中では浅い要求しか見えない。実測した局では決定点の約 4 割が RESOLVE_EFFECT_SELECTION で、そこの読みが丸ごと落ちる。加えて素の LearnedEngine は箱コミット（_commits）とターン内 sticky 世界線（_world_seeds）を id(manager) で鍵付けするので、決定のたびに manager を組み直す経路では一度も当たらない（＝切替前の serve が実際に抱えていた欠点でもある）。構造的な不利を外した fair モードも作ったが、対話の継続だけは外せない",
@@ -32,7 +32,51 @@
     "how_to_read": "「Rust の decide が強い」ではなく「**切替前の serve 経路が橋渡しで損をしていた**」と読む。切替はその損を消す変更でもある。等価性の主証拠は decide_oracle（99.97%）、void／hang は arena_a1_vs_r1（Rust 席同士）で見る"
   },
   "arena_a1_vs_r1": {
-    "state": "running"
+    "state": "done",
+    "verdict": "pass",
+    "what": "強さの保存を **Rust 席どうし**で測る（§16.4-2）。候補＝出荷既定 a1（nrel_a1.npz・関係 R なし）／基準＝r1（nrel_r1.npz・R あり・claude/n1-results:n1_results/ から取得）。Rust の NRel は R を実装済みなので r1 はそのまま載る（読み込み実測 r1=hidden 192/ablate []/vocab 2652・a1=hidden 192/ablate ['rel']）",
+    "command": "python -m opcg_sim.loop.arena_shard --candidate '' --baseline .../nrel_r1.npz --pairs 192 --bands 8 --seed-base 331000 --max-pairs 192 --workers 4 --sims 160 --leaders random --decks synth --out .../a1_vs_r1.jsonl",
+    "conditions": {
+      "leaders": "random",
+      "decks": "synth",
+      "sims": 160,
+      "workers": 4
+    },
+    "pairs": 192,
+    "games": 384,
+    "wins": 206.0,
+    "wr": 0.5365,
+    "ci95": [0.4802, 0.5927],
+    "elo": 25.4,
+    "elo95": [-13.8, 65.2],
+    "void": 0,
+    "hang": 0,
+    "timeout": 0,
+    "error": 0,
+    "void_note": "台帳は決着しなかったペアに例外クラス名を残す規約（arena.play_pair_detail が GameAborted〔上限手数 400〕／PairTimeout／その他の例外を void 欄へ書く）ので、void 0 は hang／timeout／error の 3 種すべて 0 を意味する。384 局の手数は平均 11.5・最大 21 で上限手数には遠い",
+    "seconds": 1492,
+    "seconds_note": "189 ペアぶん（3 ペアは先行実行ぶんが台帳にあり再開でスキップ）・4 並列・約 7.9 秒/ペア",
+    "baseline_python_era": {
+      "wr": 0.544,
+      "ci95": [0.487, 0.601],
+      "elo": 31,
+      "void": 0,
+      "pairs": 192,
+      "source": "docs/reports/2026-09-05_r1_ablation.md §2.2"
+    },
+    "criterion": "Python 時代の実測 0.544 [0.487, 0.601] と 95% CI が重なれば合格（§16.4-2）",
+    "result": "[0.4802, 0.5927] と [0.487, 0.601] で**大きく重なる＝合格**。点推定の差 0.008 は 192 ペアの標準誤差 0.029 の 1/4。どちらも「R は強さに寄与していない（むしろ僅かに上）」という同じ読みになる",
+    "bands": {
+      "331000": 0.625,
+      "431000": 0.625,
+      "531000": 0.604,
+      "631000": 0.417,
+      "731000": 0.542,
+      "831000": 0.458,
+      "931000": 0.521,
+      "1031000": 0.5
+    },
+    "seed_band_caveat": "**seed 帯は Python 時代と同一ではない**。arena.plan_bands の帯間隔は 100000 なので `--seed-base 331000 --bands 8` が引くのは 331000／431000／…／1031000 の各 24 ペアで、Python 時代の 331000〜338000（間隔 1000）と**共通なのは先頭の 24 ペアだけ**。よって上の比較は**独立な標本どうし**であり、対応のあるペアの比較ではない（同じ 24 対面を引いた先頭帯でも 0.438〔Python 時代〕対 0.625〔今回〕とばらつく＝24 ペアの分散。判定は 192 ペアの CI で見る）。なお乱数系統が違うので seed を揃えても局そのものは一致しない（対面とデッキは同規約 seed*7919+13 で一致するが、山札の混ぜと探索の出目が別系統）"
   },
   "decide_oracle": {
     "what": "同じ盤面・同じ出目で Python と Rust の decide を突き合わせる（Python 盤面が正・rs_search_oracle.py --what decide）。**これが「同じアルゴリズムの 2 実装が同じ判断をするか」の公平な照合**",

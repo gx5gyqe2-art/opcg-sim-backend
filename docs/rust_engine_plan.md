@@ -157,7 +157,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 
 | 2026-09-07 | P4 | **`rs-p4-net` 完了**（`claude/rs-p4-net`＝`claude/rs-p4-net-yiwio4`・同じコミット）: `net/npz.rs`（zip64 の local header・deflate・npy v1/v2・`<U` 文字列。依存は `miniz_oxide` のみ）・`net/nrel.rs`（`card_table`／`tokens_forward`＝`_tokens_forward_1` 同値／`body`／`value`／`cand_input`＋`policy_logits`＋`seg_softmax`／`mask_sc`／`mask_rel`／`_cand_row` 139／予算 3）・`lib.rs::load_net`／`net_eval`・`rs_net_oracle.py`。200 局面×両視点で **value 最大誤差 1.05e-06・priors 最大誤差 5.51e-07・mismatch=0**（許容 1e-5）。`cargo test` 301 green・clippy 0・`make test` green。契約からの逸脱 4 点は §8.16 に申告。結果は下記 §8.16 |
 
-| 2026-09-07 | P5-2 | **`rs-archive-cutover` 完了**（`claude/rs-archive-cutover-8y6odi`）: 生成・アリーナ・serve を Rust の `decide` へ／Python 版を `legacy/python_engine/` へ退避／§17 の 2 つの移動／裁定 PREVENT_REST の 3 枚／L1 廃止。等価性は決定オラクル **3,855/3,856（99.97%）**・生成 **57.06→4.96 s（11.5 倍）**・`make test` **418 passed・122 s**・`cargo test` 381・clippy 0・golden 監査ハッシュ不変／再生の L1 帯を a1 帯へ・API 契約不変・全長照合を復帰。対 Python 席の A/B は §16.4-1 で中止（参考値のみ）。凍結点は tag `py-engine-final`＝ブランチ `claude/py-engine-final`（c22f0a62）。結果は下記 §8.20 |
+| 2026-09-07 | P5-2 | **`rs-archive-cutover` 完了**（`claude/rs-archive-cutover-8y6odi`）: 生成・アリーナ・serve を Rust の `decide` へ／Python 版を `legacy/python_engine/` へ退避／§17 の 2 つの移動／裁定 PREVENT_REST の 3 枚／L1 廃止。等価性は決定オラクル **3,855/3,856（99.97%）**・強さの保存は a1 vs r1（Rust 席同士）**0.5365 [0.4802, 0.5927]・void 0**（Python 時代 0.544 [0.487, 0.601] と CI 重なり）・生成 **57.06→4.96 s（11.5 倍）**・`make test` **418 passed・122 s**・`cargo test` 381・clippy 0・golden 監査ハッシュ不変／再生の L1 帯を a1 帯へ・API 契約不変・全長照合を復帰。対 Python 席の A/B は §16.4-1 で中止（参考値のみ）。凍結点は tag `py-engine-final`＝ブランチ `claude/py-engine-final`（c22f0a62）。結果は下記 §8.20 |
 
 ### 8.1 P0 の結果（2026-09-06）
 
@@ -1421,7 +1421,7 @@ Python 版を `legacy/python_engine/` へ退避し、§17 の 2 つの移動（`
 | **決定オラクル**（等価性の主証拠・未見 seed 40 局・sims 160・`--seed-base 6500000`） | 決定 3,955／照合 3,856・**一致 3,855（99.97%）**・不一致 1。`legal` の並び 0・`kind` 0・`N` 0。読み出し内訳 main 1,909／window 807／commit 1,239・中断へ prefix で入り直した 238。除外は山札を混ぜた決定点 99 のみ（`harness_error`／`game_aborted` とも 0）。所要 1,322.8 s |
 | 　残る 1 件 | `RESOLVE_EFFECT_SELECTION`。候補の素性行が**全候補で完全に同一**（手が `card_uuid` を持たない）ため priors は本来完全な同点で、Python 側は numpy の float32 行列積が**行位置で別の丸め**を返して `argmax` がぶれる＝§8.17 で `rs_blas_tie_probe.py` により実証済みの既知クラス。Rust は候補ごとに独立に計算するので完全な同点＝numpy の規約どおり添字 0 を選ぶ |
 | **生成 1 局**（同 seed 帯 6 局・sims 64・dirichlet 0.25・temp_turns 4・単プロセス） | Python **57.06 s** → Rust **4.96 s**（**11.5 倍**・min 3.16／max 6.80）。§0 の見込み「30 秒 → 1〜3 秒（10〜30 倍）」の倍率は範囲内。基準の 30 秒は当時の条件での概算で、**同条件の Python 実測は 57 秒**だった |
-| **強さの保存 a1 vs r1**（両席とも Rust・主条件・192 ペア 384 局・§16.4-2） | 下記「a1 vs r1」の節 |
+| **強さの保存 a1 vs r1**（両席とも Rust・主条件・192 ペア 384 局・§16.4-2） | 勝率 **0.5365** [0.4802, 0.5927]・void **0**・Elo +25.4 [−13.8, +65.2]。Python 時代の **0.544** [0.487, 0.601] と CI が大きく重なる＝**合格**（下記「a1 vs r1」の節） |
 | `make test`（新定義） | **418 passed・0 failed・122〜127 秒**（Rust 化前は 1,786 本・約 10 分） |
 | `cargo test --no-default-features` | **381 passed**・0 failed |
 | `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 **0** |
@@ -1454,6 +1454,49 @@ Python 版を `legacy/python_engine/` へ退避し、§17 の 2 つの移動（`
 切替はその損を消す変更でもある。等価性の主証拠は上の決定オラクル（99.97%）、void／hang は
 下の a1 vs r1（Rust 席同士）で見る。計器（`tests/scripts/rs_arena_ab.py`）は
 `legacy/python_engine/tests/scripts/` に残す（Python エンジンが要るため）。
+
+#### 強さの保存: a1 vs r1（両席とも Rust・§16.4-2）
+
+「移植でネットの強さが落ちていないか」は **Rust 席どうし**で測る。候補＝出荷既定の
+**a1**（`nrel_a1.npz`・関係 R なし）／基準＝**r1**（`nrel_r1.npz`・R あり・
+`claude/n1-results:n1_results/` から取得）。**Rust の NRel は R を実装済みなので r1 はそのまま載る**
+（読み込み実測: r1＝`hidden 192, ablate [], vocab 2652`／a1＝`hidden 192, ablate ["rel"]`）。
+Python 時代に同じ対（a1 vs r1・主条件・192 ペア）で **0.544 [0.487, 0.601]** を実測している
+（`docs/reports/2026-09-05_r1_ablation.md` §2.2）ので、**CI が重なれば強さは保たれている**。
+
+```bash
+python -m opcg_sim.loop.arena_shard --candidate '' --baseline .../nrel_r1.npz \
+  --pairs 192 --bands 8 --seed-base 331000 --max-pairs 192 --workers 4 --sims 160 \
+  --leaders random --decks synth --out .../a1_vs_r1.jsonl
+```
+
+| | ペア | 局 | 勝率 | 95%CI | Elo | void | hang／timeout／error |
+|---|---|---|---|---|---|---|---|
+| **Rust（本 WP・2026-09-07）** | 192 | 384 | **0.5365** | **[0.4802, 0.5927]** | +25.4 [−13.8, +65.2] | **0** | **0／0／0** |
+| Python 時代（2026-09-05・基準） | 192 | 384 | 0.544 | [0.487, 0.601] | +31 [−9, +71] | 0 | — |
+
+**CI は [0.4802, 0.5927] と [0.487, 0.601] で大きく重なる＝合格**（点推定の差 0.008 は
+192 ペアの標準誤差 0.029 の 1/4）。どちらも「R は強さに寄与していない（むしろ僅かに上）」
+という同じ読みになる。
+
+**void 0＝hang／timeout／error も 0**。台帳は決着しなかったペアに例外クラス名を残す規約
+（`arena.play_pair_detail` が `GameAborted`〔上限手数 400〕／`PairTimeout`／その他の例外を
+`void` 欄へ書く）ので、void 0 は 3 種すべて 0 を意味する。384 局の手数は平均 11.5・最大 21
+＝上限手数には遠い。所要は 189 ペアで 1,492 秒（4 並列・sims 160・約 7.9 秒/ペア）。
+
+帯別（候補の得点/48）:
+
+| 帯先頭 seed | 331000 | 431000 | 531000 | 631000 | 731000 | 831000 | 931000 | 1031000 |
+|---|---|---|---|---|---|---|---|---|
+| a1 | 0.625 | 0.625 | 0.604 | 0.417 | 0.542 | 0.458 | 0.521 | 0.500 |
+
+> **seed 帯は Python 時代と同一ではない**（記録として明示する）。`arena.plan_bands` の帯間隔は
+> 100000 なので `--seed-base 331000 --bands 8` が引くのは 331000／431000／…／1031000 の各 24 ペアで、
+> Python 時代の 331000〜338000（間隔 1000）と**共通なのは先頭の 24 ペアだけ**。よって上の 2 行は
+> **独立な標本どうしの比較**であり、対応のあるペアの比較ではない（同じ 24 対面を引いた先頭帯でも
+> 0.438〔Python 時代〕対 0.625〔今回〕とばらつく＝24 ペアの分散。判定は 192 ペアの CI で見る）。
+> なお乱数系統が違うので、**seed を揃えても局そのものは一致しない**（対面とデッキは同規約
+> `seed*7919+13` で一致するが、山札の混ぜと探索の出目が別系統）。
 
 #### 移動と退避（§17 の到達形へ）
 
