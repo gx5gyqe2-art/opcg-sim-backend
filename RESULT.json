@@ -1,0 +1,64 @@
+{
+  "job": "rs-p3-flow",
+  "status": "done",
+  "branch": "claude/rs-p3-flow",
+  "base": "claude/cpu-spec-improvements-yw91jd (e6199915)",
+  "scope": {
+    "action_types": ["PLAY_CARD", "LOOK", "REVEAL", "SELECT", "EXECUTE_MAIN_EFFECT", "EXECUTE_EVENT", "DECLARE_COST"],
+    "files_changed": [
+      "rust/opcg_engine/src/effects/actions/flow.rs",
+      "docs/rust_engine_plan.md",
+      "RESULT.json"
+    ],
+    "files_untouched": [
+      "opcg_sim/ (Python 側は 1 行も変更なし)",
+      "rust/opcg_engine/src/effects/actions/mod.rs (pub(super) 化も不要だった)",
+      "rust/opcg_engine/src/effects/{resolver,interact,triggers,passives,continuous}.rs",
+      "rust/opcg_engine/src/{model,journal,ops,testkit}.rs",
+      "rust/opcg_engine/src/rules/"
+    ]
+  },
+  "audit": {
+    "cards": 865,
+    "abilities": 1144,
+    "match": 1144,
+    "mismatch": 0,
+    "unimplemented": 0,
+    "record_error": 0,
+    "bad_payload": 0,
+    "bad_output": 0,
+    "mode": "replay",
+    "action_types": ["ACTIVE", "BUFF", "DECLARE_COST", "DISCARD", "DRAW", "EXECUTE_EVENT", "EXECUTE_MAIN_EFFECT", "KO", "LOOK", "PLAY_CARD", "REST", "REVEAL", "SELECT"],
+    "engine": "0.0.1",
+    "record_version": 4,
+    "first": null,
+    "before": {"match": 1016, "unimplemented": 128, "note": "着手前（差し口が骨組みのまま）の同じコマンドの結果"}
+  },
+  "regress": {
+    "audit_foundation": {
+      "command": "rs_audit_replay.py --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF",
+      "cards": 634, "abilities": 817, "match": 817, "mismatch": 0, "unimplemented": 0
+    },
+    "replay_vanilla": {
+      "command": "rs_diff_replay.py --mode replay --vanilla --games 20 --seed-base 1300000",
+      "games": 20, "actions": 1989, "match": 20, "mismatch": 0, "unimplemented": 0
+    },
+    "state": {
+      "command": "rs_diff_replay.py --mode state --games 5 --seed-base 1300000",
+      "games": 5, "actions": 500, "match": 5, "mismatch": 0, "unimplemented": 0
+    },
+    "query": {
+      "command": "rs_query_oracle.py --boards 40 --seed-base 1310000",
+      "boards": 40, "queries": 1467480, "match": 1285228, "error_match": 182252,
+      "mismatch": 0, "unimplemented": 0, "restore_mismatch": 0
+    },
+    "cargo": {
+      "command": "cargo test --no-default-features",
+      "tests": 182, "passed": 182, "failed": 0, "ignored": 0,
+      "added": 16, "before": 166,
+      "clippy": "cargo clippy --no-default-features --all-targets -- -D warnings → 警告 0"
+    },
+    "make_test": "green"
+  },
+  "notes": "Python 側の欠陥は見つからなかった（865 枚 × 1,144 能力の全段で盤面が一致）。実装で効いた Python の細部は 4 点。(1) 効果による登場（per_target.play_card）は手札からのプレイ（gamestate.play_card_action）と別手順で、attached_don を 0 に戻さず・TRIGGER_CHAR_PLAYED を記録せず・『相手の登場時効果は無効』(OPP_ONPLAY / negate_onplay_until) を見ず・登場後の 2 度目の場上限確認をしない。よって triggers::resolve_on_play（OPP_ONPLAY を見る）は流用できず flow.rs に resolve_effect_on_play を置いた。(2) レスト化と PASSIVE 再計算の順序が両者で逆（play_card_action は _apply_passive_effects → _has_rested_play、per_target.play_card は is_rest=True → _apply_passive_effects）。(3) LOOK は move_card を使わない素のゾーン操作（deck.pop(0) / temp_zone.append）で、move_card を通すと DECK 行きの is_rest=False 等が混ざって盤面がずれる。(4) EXECUTE_EVENT のトラッシュ先は対象の持ち主ではなく効果のコントローラー（Python の player）。EXECUTE_MAIN_EFFECT と DECLARE_COST は Python も registry に登録を持たず resolver._process_stack が先に捌くため、Rust も resolver::step_action（土台 WP が実装済み）が処理する＝flow.rs のディスパッチには来ない。群 C は『そこへ落ちてこないこと』を単体テストで固定しただけで、resolver.rs は変更していない。ops.rs への原始操作の追加も不要だった（journal の card_zone_* で足りた）。actions/mod.rs は pub(super) 化も含め無変更。resolver/interact/triggers/model への変更要求は無し（申告事項なし）。単体テスト 16 件は flow.rs 内の #[cfg(test)] mod tests に置いた。うち has_rested_play / blocks_effect_play の 2 件は関数を直接呼ぶ形にした——合成の PASSIVE 能力を盤面に置くと _apply_passive_effects が RESTRICTION を実行しようとし、それは群 A の担当で現状 Unimplemented になるため（実カードでも同じ経路なので、PLAY_CARD と RESTRICTION を併用するカードは群 A の統合後に全カード監査で確認される）。"
+}

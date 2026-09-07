@@ -136,6 +136,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P3 | **土台 2 WP の統合・受け入れ**（`claude/rs-p3-integrate`）: core → resolver の順に cherry-pick し §11.6 のとおり単一化（`Vec<TargetRef>`／`EffectContext` の全欄／能力表は `MasterTable.abilities`／stub は core へ委譲／文脈の JSON 読込は `eval::context_from_json`）。オラクル 5 本すべて一致（問合せ 7,337,400 件 mismatch=0／土台監査 634 枚・817 能力 mismatch=0・unimplemented=0／バニラ再生 50 局・状態 10 局・原始操作 10 局とも一致）・`cargo test` 166 green（`#[ignore]` 0）・clippy 0・`make test` green。結果は下記 §8.9 |
 | 2026-09-07 | P3 | **統合をコーディネータが受け入れ・本線へ**（`claude/rs-p3-integrate` 776d492a を fast-forward）。未見 seed の再検証: F 監査 634 枚/817 能力 mismatch=0・問合せ 40 局面 1,467,480 件 mismatch=0・バニラ再生 20 局 match=20・状態 5 局 match=5・原始操作 3 局 5,190 件 mismatch=0。`cargo test` 166 green・clippy 0・`make test` green |
 | 2026-09-07 | P3 | **群 A〜E の差し口と指示書を本線へ**（§11.7）: `actions/{status,zone,flow,don,rules}.rs` の 3 入口（`game_handler`／`owns_target`／`apply_target`）と `mod.rs` の呼び出し。受け入れ集合は F∪群だけのカード（A 782／B 987／C 865／D 979／E 710 枚） |
+| 2026-09-07 | P3 | **群 C（カードの流れ）完了**（`claude/rs-p3-flow`）: `actions/flow.rs` に PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_EVENT（EXECUTE_MAIN_EFFECT／DECLARE_COST は resolver が既に捌く）。監査 **cards=865／abilities=1144／match=1144・mismatch=0・unimplemented=0**（着手前は unimplemented=128）。退行 4 本一致・`cargo test` 182 green・clippy 0・`make test` green。結果は下記 §8.10 |
 
 ### 8.1 P0 の結果（2026-09-06）
 
@@ -581,6 +582,47 @@ bad_payload=21 に退行した。`rs_diff_replay.py` のバニラデッキは Py
 `request_id` を除いて段ごとに突き合わせる。負のコントロール: fixture の期待値を 1 か所
 （`life_count`）ずらすと「段 0 の盤面が Python と違う」で落ちる＝素通りしていない。
 全カード（634 枚／817 能力）の照合はハーネス側（上表）で回す。
+
+### 8.10 P3 群 C（カードの流れ）の結果（2026-09-07・WP `rs-p3-flow`）
+
+本線 `claude/cpu-spec-improvements-yw91jd`（e6199915）から分岐。**変更は
+`rust/opcg_engine/src/effects/actions/flow.rs` と本書だけ**——`actions/mod.rs`・`resolver.rs`／
+`interact.rs`／`triggers.rs`／`model.rs`・`ops.rs`・Python 側（`opcg_sim/`）はいずれも 1 行も
+変えていない（`ops.rs` への原始操作の追加も不要だった）。
+
+| 担当 ActionType | 入口 | Python の対応 | 実装 |
+|---|---|---|---|
+| `LOOK` | `game_handler` | `player_level.look` | 自分のデッキ上 `value` 枚を `temp_zone` 末尾へ（`move_card` を通さない素のゾーン操作）。`status == "OPPONENT"` は**盤面不変** |
+| `SELECT` | `game_handler` | `player_level.select` | no-op（`return True`） |
+| `EXECUTE_EVENT` | `game_handler` | `player_level.execute_event` | 対象ごとに `_record_event_played` →【メイン】相当（ACTIVATE_MAIN／COUNTER／ON_PLAY の最初の 1 つ・無ければ効果を持つ最初）を `resolve_ability` → **効果のコントローラーの**トラッシュへ。中断しても打ち切らない |
+| `PLAY_CARD` | `apply_target` | `per_target.play_card` | NO_EFFECT_PLAY で手札源なら return → イベントは場に置かない → `move_card(FIELD)`・`is_newly_played` → `status=="RESTED"` or `RESTED_PLAY` でレスト → `_apply_passive_effects` → `_enforce_field_limit` → ON_PLAY（中断中は待ち行列へ）→ 登場リスナー（`from_zone`）→ `_apply_passive_effects` |
+| `REVEAL` | `apply_target` | `per_target.reveal` | no-op（公開のみ）。`last_revealed_card` の記録は resolver 側 |
+| `EXECUTE_MAIN_EFFECT`／`DECLARE_COST` | — | `resolver._expand_main_effect`／`_execute_selected_main`／`_suspend_for_cost_declaration` | **ディスパッチへ来ない**。Python も `registry` に登録が無く `_process_stack` で先に捌く。Rust も `resolver::step_action` が同じ位置で捌く（土台 WP で実装済み）＝群 C は「そこへ落ちてこないこと」を単体で固定しただけ |
+
+**Python の細部で効いた 4 点**（読まないと落ちる箇所。いずれも Python を正として写した）:
+
+1. **効果による登場は `play_card_action`（手札からのプレイ）と別手順**。`per_target.play_card` は
+   `attached_don` を 0 に戻さず・`TRIGGER_CHAR_PLAYED` を記録せず・**「相手の登場時効果は無効」
+   (OPP_ONPLAY) を見ず**・登場後の 2 度目の場上限確認をしない。よって `triggers::resolve_on_play`
+   （OPP_ONPLAY を見る）は流用できず、`flow.rs` に `resolve_effect_on_play` を置いた。
+2. **レスト化と PASSIVE 再計算の順序が逆**。`play_card_action` は `_apply_passive_effects` →
+   `_has_rested_play` の順、`per_target.play_card` は `is_rest = True` → `_apply_passive_effects`。
+3. **`LOOK` は `move_card` を使わない**（`deck.pop(0)` / `temp_zone.append`）。`move_card` を通すと
+   DECK/TRASH/HAND 行きの `is_rest=False` やターン状態のリセットが混ざって盤面がずれる。
+4. **`EXECUTE_EVENT` のトラッシュ先は `player`（効果のコントローラー）** で、対象の持ち主ではない。
+
+| 受け入れ | 結果 |
+|---|---|
+| `rs_audit_replay.py --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF,PLAY_CARD,LOOK,REVEAL,SELECT,EXECUTE_MAIN_EFFECT,EXECUTE_EVENT,DECLARE_COST` | cards=**865**／abilities=**1144**／match=**1144**／**mismatch=0・unimplemented=0**（着手前は match=1016・unimplemented=128） |
+| 退行 `--action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF`（土台 F） | cards=634／abilities=**817**／match=817／mismatch=0・unimplemented=0 |
+| 退行 `rs_diff_replay.py --mode replay --vanilla --games 20 --seed-base 1300000` | **match=20**／mismatch=0／unimplemented=0（1,989 行動） |
+| 退行 `rs_diff_replay.py --mode state --games 5 --seed-base 1300000` | **match=5**／mismatch=0（500 行） |
+| 退行 `rs_query_oracle.py --boards 40 --seed-base 1310000` | queries=1,467,480／match=1,285,228／error_match=182,252／**mismatch=0** |
+| `cargo test --no-default-features` | **182 passed**・0 failed・0 ignored（群 C の単体 16 件を追加。166→182） |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `make test`（Python 無変更） | green |
+
+**Python 側の欠陥は見つからなかった**（865 枚 × 1,144 能力の全段で盤面が一致した）。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
@@ -1123,7 +1165,7 @@ pub fn apply_target(s, masters, actor, action, target, owner, source_list, value
 |---|---|---|---|---|
 | A 状態系 | `status.rs` | GRANT_KEYWORD・ATTACK_DISABLE・PREVENT_REST・FREEZE・NEGATE_EFFECT・DISABLE_ABILITY・SWAP_POWER＋**BUFF の全形**（status: COST_REDUCTION／POWER_OVERRIDE／BLOCKER_DISABLE／COUNTER／COST_OVERRIDE・duration: THIS_TURN／THIS_BATTLE／UNTIL_NEXT_TURN_END／PERMANENT＝継続効果登録）。DB 未使用の SET_BASE_POWER／COST_BUFF／SET_COST／COST_CHANGE／BP_BUFF は `Unimplemented` のまま可 | 782／1,014 | `per_target.buff/grant_keyword/attack_disable/prevent_rest/freeze/negate_effect`・`player_level.disable_ability/swap_power`・`continuous.py` |
 | B ゾーン移動 | `zone.rs` | MOVE_CARD・DECK_BOTTOM・DECK_TOP・BOUNCE・TRASH_FROM_DECK・HEAL・DEAL_DAMAGE・SHUFFLE・ORDER_LIFE・FACE_UP_LIFE・LOOK_LIFE・MOVE_TO_HAND（DB 未使用の LIFE_RECOVER／LIFE_MANIPULATE は `Unimplemented` 可） | 987／1,271 | `per_target.move/bounce/deck_bottom/deck_top/move_card/face_up_life`・`player_level.deal_damage/shuffle/heal/trash_from_deck/order_life/look_life` |
-| C カードの流れ | `flow.rs` | PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_MAIN_EFFECT・EXECUTE_EVENT・DECLARE_COST（DB 未使用の SELECT_OPTION は不要） | 865／1,144 | `per_target.play_card/reveal`・`player_level.look/select/execute_event`・`resolver._expand_main_effect/_execute_selected_main/_suspend_for_cost_declaration` |
+| C カードの流れ ＝ **完了**（2026-09-07・`claude/rs-p3-flow`・実測 cards=865／abilities=1,144／match=1,144・mismatch=0・unimplemented=0。結果は §8.10） | `flow.rs` | PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_MAIN_EFFECT・EXECUTE_EVENT・DECLARE_COST（DB 未使用の SELECT_OPTION は不要）。**EXECUTE_MAIN_EFFECT／DECLARE_COST は土台の `resolver::step_action` が既に捌く**＝`flow.rs` は残り 5 種 | 865／1,144 | `per_target.play_card/reveal`・`player_level.look/select/execute_event`・`resolver._expand_main_effect/_execute_selected_main/_suspend_for_cost_declaration` |
 | D ドン!! | `don.rs` | RETURN_DON・RAMP_DON・REST_DON・ATTACH_DON・ACTIVE_DON（target 無し）・FREEZE_DON・MOVE_ATTACHED_DON（DB 未使用の MODIFY_DON_PHASE は不要）＋**ドン!!を対象に取るクエリ**（`TargetRef::Don`＝COST_AREA 3 件・CHAR_OR_DON 2 件。resolver の `only_cards_strict` 3 か所をドン!!込みに広げる＝この群だけ `resolver.rs` の当該経路を所有） | 979／1,273 | `player_level.return_don/ramp_don/rest_don/freeze_don/active_don_by_count/move_attached_don`・`per_target.attach_don`・`resolver._suspend_for_don_selection` |
 | E 置換とルール | `rules.rs` | REPLACE_EFFECT・PREVENT_LEAVE（`active_protection`／`find_replacement`／`active_replacement`／`_register_granted_replacements` の本体＝`mod.rs` の高速路を置き換える・戦闘 KO 置換の中断）・RULE_PROCESSING・RESTRICTION・REDIRECT_ATTACK・VICTORY・EXTRA_TURN＋P2 の積み残し（【カウンター】イベント・イベントの登場・アタック税）。DB 未使用の KEYWORD／PASSIVE_EFFECT／GRANT_EFFECT／LOCK／OTHER は `Unimplemented` 可 | 710／917 | `engine/guards.py`・`player_level.rule_processing_self_restriction/redirect_attack/extra_turn/victory`・`battle.py` の置換分岐 |
 
