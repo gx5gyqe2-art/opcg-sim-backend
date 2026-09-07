@@ -1,10 +1,12 @@
-//! 盤面 JSON の入出力（P0 骨組み）。
+//! 盤面 JSON の入出力と再生（`docs/rust_engine_plan.md` §4／§9.1／§10.2）。
 //!
-//! P0 の責務は「Python 側と受け渡す JSON の形を固定すること」だけで、盤面そのものは持たない。
-//! P1 以降 `model`/`journal` が入ったら、`replay` の中身を本物の再生に差し替える
-//! （呼び出し規約＝入出力 JSON は変えない）。設計は `docs/rust_engine_plan.md` §4。
+//! Python 側と受け渡す JSON の形をここで固定する: `state_roundtrip`（記録 v3 の `hidden` →
+//! `GameState` → 盤面 dict・P1）と `replay`（記録した行動列の再生・P2）。カード定義表は
+//! `load_masters` でプロセスに 1 度だけ読む。
 
-use crate::model::{GameState, MasterTable};
+use crate::journal::{CardZone, Session};
+use crate::model::{CardIdx, GameState, MasterTable, Seat};
+use crate::rules;
 use serde_json::Value;
 use std::sync::OnceLock;
 
@@ -88,11 +90,17 @@ pub fn state_roundtrip(hidden_json: &str) -> Result<String, EngineError> {
         .map_err(|e| EngineError::BadPayload(format!("cannot serialize board JSON: {e}")))
 }
 
-/// 記録した局（seed・初期盤面・行動列）を Rust エンジンで再生する。
+/// 記録した局（seed・初期盤面・行動列）を Rust エンジンで再生する（P2・§10.2）。
 ///
-/// P0 では**ペイロードの契約検査までを行い、再生自体は未実装エラーを返す**（黙って
-/// 「一致」を返さない＝`docs/rust_engine_plan.md` §3 の「未実装は明示エラー」）。
-/// 実装後の戻り値は `{"version":1,"states":[<各行動後の盤面 JSON>...]}`。
+/// 手順:
+/// 1. `setup.hidden` から `GameState`（`start_game` 直後＝MULLIGAN フェイズ）を組む。
+/// 2. 各 `steps[i]` で「その決定点の合法手」を作り（`legal[i]`）、記録された `move` を適用し、
+///    盤面 dict（`pending_request` 込み）を出す。
+/// 3. 乱数を消費する行動（P2 では MULLIGAN のみ）の後は、その行の `hidden` から当該
+///    プレイヤーの `deck`／`hand` の並びを取り直す（乱数列は Rust へ流さない＝計画 §6）。
+///
+/// 戻り値は `{"version":3,"states":[盤面 dict...],"legal":[合法手 list...]}`。効果解決を要する
+/// 経路（`vanilla` でない記録・イベントの登場・`ACTIVATE_MAIN`）は `Unimplemented`（P3）。
 pub fn replay(json_str: &str) -> Result<String, EngineError> {
     let payload: Value = serde_json::from_str(json_str)
         .map_err(|e| EngineError::BadPayload(format!("invalid replay JSON: {e}")))?;
@@ -120,11 +128,106 @@ pub fn replay(json_str: &str) -> Result<String, EngineError> {
         .as_array()
         .ok_or_else(|| EngineError::BadPayload("replay payload: 'steps' must be a list".into()))?;
 
-    Err(EngineError::Unimplemented(format!(
-        "replay: Rust engine not implemented yet (P0 skeleton); \
-         payload accepted with {} step(s). See docs/rust_engine_plan.md §3 (P1/P2/P3).",
-        steps.len()
-    )))
+    // 効果を持つデッキは P3（`rules` はルールだけ＝バニラで受け入れる。§10）。
+    if !obj.get("vanilla").and_then(Value::as_bool).unwrap_or(false) {
+        return Err(EngineError::Unimplemented(
+            "replay: 効果を持つデッキ（--vanilla 以外）の再生は P3（効果解決）の担当".into(),
+        ));
+    }
+
+    let masters = masters().ok_or_else(|| {
+        EngineError::BadPayload(
+            "replay: card masters are not loaded; call opcg_engine.load_masters(path) \
+             with opcg_sim/data/opcg_effects.json first"
+                .into(),
+        )
+    })?;
+    let setup_hidden = obj["setup"]
+        .get("hidden")
+        .ok_or_else(|| EngineError::BadPayload("replay payload: setup に 'hidden' が無い".into()))?;
+    let mut session = Session::new(GameState::from_record(setup_hidden, masters)?);
+
+    let mut states: Vec<Value> = Vec::with_capacity(steps.len());
+    let mut legals: Vec<Value> = Vec::with_capacity(steps.len());
+    for (i, step) in steps.iter().enumerate() {
+        let at = |e: EngineError| -> EngineError {
+            match e {
+                EngineError::BadPayload(m) => EngineError::BadPayload(format!("step {i}: {m}")),
+                EngineError::Unimplemented(m) => {
+                    EngineError::Unimplemented(format!("step {i}: {m}"))
+                }
+            }
+        };
+        // 行動主体は要求（pending）が決める＝`game_driver.run_game` と同じ。
+        let (actor, _) = rules::pending::pending_actor_action(&mut session).ok_or_else(|| {
+            EngineError::BadPayload(format!("step {i}: 要求が無いのに行動が記録されている"))
+        })?;
+        let legal = rules::legal::get_legal_actions(&mut session, masters, actor).map_err(at)?;
+        legals.push(Value::Array(legal));
+
+        let mv = step
+            .get("move")
+            .ok_or_else(|| EngineError::BadPayload(format!("step {i}: 'move' が無い")))?;
+        rules::actions::apply_move(&mut session, masters, actor, mv).map_err(at)?;
+
+        // 乱数を消費した行動（MULLIGAN）の後は記録の並びを採る。
+        if mv.get("action_type").and_then(Value::as_str) == Some("MULLIGAN") {
+            let hidden = step.get("hidden").ok_or_else(|| {
+                EngineError::BadPayload(format!(
+                    "step {i}: MULLIGAN の再同期に 'hidden' が要る（--hidden で記録する）"
+                ))
+            })?;
+            resync_after_mulligan(&mut session, actor, hidden).map_err(at)?;
+        }
+
+        // 盤面 dict → そのあと pending_request（Python `board_dict` と同じ評価順。
+        // `get_pending_request` は「戦闘が終わったのに BLOCK_STEP のまま」を MAIN へ直す
+        // 副作用を持つので、`turn_info.current_phase` を読んだ**後**に呼ぶ必要がある）。
+        let mut board = session.state().board_json(masters)?;
+        let pending = rules::pending::get_pending_request(&mut session, masters, true);
+        board
+            .as_object_mut()
+            .expect("board_json returns an object")
+            .insert("pending_request".into(), pending.unwrap_or(Value::Null));
+        states.push(board);
+    }
+
+    serde_json::to_string(&serde_json::json!({
+        "version": RECORD_VERSION,
+        "states": states,
+        "legal": legals,
+    }))
+    .map_err(|e| EngineError::BadPayload(format!("replay: cannot serialize states: {e}")))
+}
+
+/// マリガン後に当該プレイヤーの `deck`／`hand` の並びを記録の `hidden` から取り直す（§10.2 の 3）。
+fn resync_after_mulligan(
+    session: &mut Session,
+    seat: Seat,
+    hidden: &Value,
+) -> Result<(), EngineError> {
+    let mut zones: Vec<(CardZone, Vec<CardIdx>)> = Vec::with_capacity(2);
+    for (key, zone) in [("deck", CardZone::Deck), ("hand", CardZone::Hand)] {
+        let recorded = hidden
+            .get("players")
+            .and_then(|p| p.get(seat.name()))
+            .and_then(|p| p.get(key))
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                EngineError::BadPayload(format!("hidden.players.{}.{key} が読めない", seat.name()))
+            })?;
+        let mut order: Vec<CardIdx> = Vec::with_capacity(recorded.len());
+        for rec in recorded {
+            let uuid = rec.get("uuid").and_then(Value::as_str).ok_or_else(|| {
+                EngineError::BadPayload(format!("hidden.players.{}.{key}: uuid が無い", seat.name()))
+            })?;
+            order.push(crate::ops::find_card_by_uuid(session.state(), uuid).ok_or_else(|| {
+                EngineError::BadPayload(format!("再同期: 未知のカード uuid '{uuid}'"))
+            })?);
+        }
+        zones.push((zone, order));
+    }
+    rules::actions::resync_zones(session, seat, &zones)
 }
 
 #[cfg(test)]
@@ -151,13 +254,27 @@ mod tests {
         )
     }
 
+    /// 効果を持つデッキ（`--vanilla` でない記録）は P3 の担当＝黙って進めず `Unimplemented`。
     #[test]
-    fn replay_accepts_the_contract_and_reports_unimplemented() {
+    fn replay_reports_unimplemented_for_records_with_effects() {
         match replay(&record("[{\"index\":0}]")) {
             Err(EngineError::Unimplemented(msg)) => {
-                assert!(msg.contains("1 step"), "message should count steps: {msg}");
+                assert!(msg.contains("vanilla"), "message should name the reason: {msg}");
             }
             other => panic!("expected Unimplemented, got {other:?}"),
+        }
+    }
+
+    /// バニラの記録は契約検査を通り、`setup.hidden` が無ければ契約違反として報告する
+    /// （マスター未ロードの環境では「未ロード」で止まるので、どちらでも `BadPayload`）。
+    #[test]
+    fn replay_checks_the_vanilla_payload_contract() {
+        let payload = format!(
+            r#"{{"version":{RECORD_VERSION},"seed":1,"vanilla":true,"setup":{{}},"steps":[]}}"#
+        );
+        match replay(&payload) {
+            Err(EngineError::BadPayload(_)) => {}
+            other => panic!("expected BadPayload, got {other:?}"),
         }
     }
 

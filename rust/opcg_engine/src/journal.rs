@@ -33,8 +33,8 @@
 #![allow(dead_code)] // アクセサは ops.rs / P2 以降が使う契約。現時点で未参照のものがある。
 
 use crate::model::{
-    ActiveBattle, CardIdx, CardInstance, DonIdx, DonInstance, GameState, Phase, PlayerState,
-    Restriction, Seat,
+    ActiveBattle, CardIdx, CardInstance, DonIdx, DonInstance, GameState, Interaction, PendingTrigger,
+    Phase, PlayerState, Restriction, Seat,
 };
 
 // --- フィールド識別子 --------------------------------------------------------
@@ -151,9 +151,24 @@ pub enum Undo {
     TurnEventSet(usize, i32),
     /// `turn_events` へ 1 件足した → 末尾を捨てる。
     TurnEventPush,
+    /// `turn_events` を丸ごと入れ替えた（ターン切替のクリア）→ 旧内容へ戻す。
+    TurnEventsSet(Vec<(String, i32)>),
     /// `mulligan_done` へ 1 件足した → 末尾を捨てる。
     MulliganPush,
     MgrBool(MgrBoolField, bool),
+    /// 中断を積んだ → 末尾を捨てる（P2）。
+    InteractionPush,
+    /// 中断を外した → 元の中断を積み直す（P2）。
+    InteractionPop(Box<Interaction>),
+    /// 誘発待ち行列の旧内容（P2。`battle_triggers`／`pending_triggers`）。
+    TriggerQueue(TriggerQueue, Vec<PendingTrigger>),
+}
+
+/// 誘発待ち行列の種別（Python `_battle_triggers`／`_pending_triggers`）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TriggerQueue {
+    Battle,
+    Pending,
 }
 
 /// undo ログ本体（記録の並び＋トランザクションの開始点）。
@@ -523,6 +538,15 @@ impl StateMut<'_> {
         }
     }
 
+    /// Python `switch_turn` の `gm._turn_events = JournaledDict()`（ターン内イベントの全消去）。
+    pub fn clear_turn_events(&mut self) {
+        if self.state.turn_events.is_empty() {
+            return;
+        }
+        let old = std::mem::take(&mut self.state.turn_events);
+        self.rec(Undo::TurnEventsSet(old));
+    }
+
     /// `mulligan_done` へ席を足す（既にあれば何もしない）。
     pub fn add_mulligan_done(&mut self, seat: Seat) {
         if self.state.mulligan_done.contains(&seat) {
@@ -530,6 +554,37 @@ impl StateMut<'_> {
         }
         self.state.mulligan_done.push(seat);
         self.rec(Undo::MulliganPush);
+    }
+
+    // -- 中断（対話）スタック・誘発待ち行列（P2）-----------------------------
+    /// Python `push_interaction`（＝空なら `active_interaction = {...}` と同じ）。
+    pub fn push_interaction(&mut self, interaction: Interaction) {
+        self.state.interaction_stack.push(interaction);
+        self.rec(Undo::InteractionPush);
+    }
+
+    /// Python `active_interaction = None`（先頭を pop。空なら何もしない）。
+    pub fn pop_interaction(&mut self) -> Option<Interaction> {
+        let popped = self.state.interaction_stack.pop()?;
+        self.rec(Undo::InteractionPop(Box::new(popped.clone())));
+        Some(popped)
+    }
+
+    /// 誘発待ち行列の全置換（Python の `gm._battle_triggers = JournaledList(...)` と同じ粒度）。
+    pub fn set_trigger_queue(&mut self, which: TriggerQueue, value: Vec<PendingTrigger>) {
+        let slot = trigger_queue_mut(self.state, which);
+        if *slot == value {
+            return;
+        }
+        let old = std::mem::replace(slot, value);
+        self.rec(Undo::TriggerQueue(which, old));
+    }
+}
+
+fn trigger_queue_mut(state: &mut GameState, which: TriggerQueue) -> &mut Vec<PendingTrigger> {
+    match which {
+        TriggerQueue::Battle => &mut state.battle_triggers,
+        TriggerQueue::Pending => &mut state.pending_triggers,
     }
 }
 
@@ -588,6 +643,7 @@ fn apply_undo(state: &mut GameState, entry: Undo) {
         Undo::TurnEventPush => {
             state.turn_events.pop();
         }
+        Undo::TurnEventsSet(old) => state.turn_events = old,
         Undo::MulliganPush => {
             state.mulligan_done.pop();
         }
@@ -595,6 +651,11 @@ fn apply_undo(state: &mut GameState, entry: Undo) {
             MgrBoolField::SetupPhasePending => state.setup_phase_pending = old,
             MgrBoolField::TurnStartPending => state.turn_start_pending = old,
         },
+        Undo::InteractionPush => {
+            state.interaction_stack.pop();
+        }
+        Undo::InteractionPop(old) => state.interaction_stack.push(*old),
+        Undo::TriggerQueue(which, old) => *trigger_queue_mut(state, which) = old,
     }
 }
 
