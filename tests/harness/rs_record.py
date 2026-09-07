@@ -66,13 +66,21 @@ def _don_from_record(rec: dict) -> DonInstance:
     )
 
 
-def manager_from_hidden(db, hidden: dict) -> GameManager:
+def manager_from_hidden(db, hidden: dict, with_pending: bool = False) -> GameManager:
     """記録 v2 の `hidden` から `GameManager` を復元する。
 
     注意点:
       - `GameManager.__init__` はリーダーの「ドン!!デッキは N 枚」ルールで `don_deck` を作り直す。
         よってマネージャを作った**後**に全ゾーンを流し込む（記録の並びが正）。
       - ゾーンは `JournaledList` で入れる（make/unmake が効く形＝本番と同じ）。
+
+    `with_pending=True` は `get_pending_request()` を**塞がない**（既定は塞ぐ＝P1 からの
+    互換。`_suppress_pending_request` の説明を参照）。記録 v3 以降は `active_battle` に
+    所在の持ち主（`attacker_owner`／`target_owner`）が入っているので、要求を組み立てられる。
+    要求を読む符号化（`rs_encode_oracle.py` の登場時スキャン v7・`_leader_act_avail`）で使う。
+    **中断（`_interaction_stack`）は記録が件数しか持たない**ので復元後は常に空＝
+    対話の最中だった局面は「対話が無い局面」として復元される（Rust 側の `from_record` も
+    同じ扱いなので、Python と Rust の照合は同じ入力の上で成立する）。
     """
     players = {}
     for name in ("p1", "p2"):
@@ -124,6 +132,10 @@ def manager_from_hidden(db, hidden: dict) -> GameManager:
                 "target": by_uuid[battle["target"]],
                 "counter_buff": battle.get("counter_buff", 0),
             }
+            # 記録 v3 以降の所在の持ち主（`engine/interaction.py` のブロック/カウンター要求が読む）。
+            for key in ("attacker_owner", "target_owner"):
+                if key in battle:
+                    manager.active_battle[key] = players[battle[key]]
         except KeyError as e:  # 戦闘参加者が盤面に居ない＝記録が壊れている
             raise RestoreError(f"active_battle points at a missing card: {e}") from e
     else:
@@ -132,7 +144,8 @@ def manager_from_hidden(db, hidden: dict) -> GameManager:
     manager.mulligan_done = JournaledSet(mrec["mulligan_done"])
     manager.setup_phase_pending = mrec["setup_phase_pending"]
     manager.turn_start_pending = mrec["turn_start_pending"]
-    _suppress_pending_request(manager)
+    if not with_pending:
+        _suppress_pending_request(manager)
     return manager
 
 

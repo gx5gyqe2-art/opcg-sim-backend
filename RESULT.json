@@ -1,0 +1,56 @@
+{
+  "job": "rs-p4-encode",
+  "status": "done",
+  "branch": "claude/rs-p4-encode-fyml8a",
+  "base": "claude/cpu-spec-improvements-yw91jd (9d71c7a)",
+  "oracle": {
+    "script": "tests/scripts/rs_encode_oracle.py",
+    "cmd": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_encode_oracle.py --boards 200 --games 10 --policy both",
+    "boards": 200,
+    "views": 400,
+    "cols_scalars": 123,
+    "cols_field": 80,
+    "cols_card_idx": 24,
+    "cols_tokens": 440,
+    "cols_rel_om": 480,
+    "cols_rel_oo": 1280,
+    "cols_extra": 29,
+    "values": 3049770,
+    "nonzero": 438629,
+    "mismatch": 0,
+    "shape_mismatch": 0,
+    "restore_mismatch": 0,
+    "unimplemented": 0,
+    "bad_payload": 0,
+    "tol": 1e-06,
+    "cardtab_rows": 2653,
+    "vocab": 2652,
+    "onplay_live_views": 83,
+    "onplay_dead_views": 45,
+    "leader_act_views": 0,
+    "seconds": 283.9
+  },
+  "cargo_test": {"passed": 300, "failed": 0, "ignored": 0},
+  "clippy": {"warnings": 0},
+  "make_test": "green",
+  "files": {
+    "added": [
+      "rust/opcg_engine/src/encode/cardtab.rs",
+      "rust/opcg_engine/src/encode/leader.rs",
+      "rust/opcg_engine/src/encode/scalars.rs",
+      "rust/opcg_engine/src/encode/tokens.rs",
+      "tests/scripts/rs_encode_oracle.py"
+    ],
+    "changed": [
+      "rust/opcg_engine/src/encode/mod.rs",
+      "rust/opcg_engine/src/lib.rs",
+      "rust/opcg_engine/src/effects/resolver.rs",
+      "rust/opcg_engine/src/testkit.rs",
+      "tests/harness/rs_record.py",
+      "docs/rust_engine_plan.md",
+      "docs/TEST_SPEC.md"
+    ],
+    "opcg_sim_changed": false
+  },
+  "notes": "契約（encode/mod.rs の型・関数シグネチャ）は変えていない。申告 5 点: (1) Encoding.rel_oo の寸法コメントが [N_OPP x N_OWN x R_DIM] だったが Python relations_from_tokens は (N_OWN, N_OWN, R_DIM) を返す＝コメントのみ Python に合わせた（型は不変）。(2) lib.rs には set_vocab / encode_state に加え eff_tables(start, count) を足した（カード表 2,652 行一致の受け入れに要る。全行を 1 度に JSON 化すると数十 MB になるので行範囲で読む）。(3) 登場時スキャン v7 の判定子「action_events に EFFECT」を出すため、resolver.rs に効果イベントの計数だけを足した（reset_effect_events / effect_events・_execute_game_action が action_history に積む 2 か所で 1 加算・in_passive_recalc 中は加算しない）。Python が action_history を回収しない一部の内部リゾルバ（除去保護の置換・退避継続の再開）も数える近似が残るが、200 局面では差は出ていない。(4) tests/harness/rs_record.py の manager_from_hidden が P1 時代の名残で get_pending_request を常に None に塞いでおり、Python 側の v7 登場時スキャンと _leader_act_avail が常に (0,0,0)/0.0 に潰れて照合が空振りしていた（最初の 200 局面で 422 件の偽の不一致）。記録 v3 以降の attacker_owner/target_owner を復元し、with_pending=True（既定は従来どおり）で塞がない復元を選べるようにした＝既存オラクルの呼び出しは無変更。(5) encode/scalars.rs の drain_own_interactions / has_selection_branch は cpu_ai._drain_own_interactions / _selection_moves の登場時スキャンに要る部分だけの写しで、WP rs-p4-legal の search/apply.rs と重複する（統合時に寄せる）。encode(state: &GameState, ...) は契約どおり不変参照のまま、合法手列挙と登場時スキャンは複製した Session の上で行い呼び出し側の盤面を変えない（Python の make/unmake と同値）。Python の癖はそのまま写した: encoder._power は存在しない current_power を読んで master.power に落ちる／n_eff._walk は Sequence・Branch の中へ入らない／TriggerType.OPPONENT_ATTACK は ON_OPP_ATTACK の別名で list(TriggerType) は 23／_hand_aggregate の counter は現在値 0 で印字値へ落ちる。浮動小数は numpy の型に合わせた（tok と pw/cs は float32・threat_next は float64）＝_reach の g<=0 の境界が反転しないため。"
+}

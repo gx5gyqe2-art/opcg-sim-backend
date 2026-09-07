@@ -133,6 +133,140 @@ fn replay_audit(record_json: &str, effects_path: Option<&str>) -> PyResult<Strin
     Ok(state::replay_audit(record_json, effects_path)?)
 }
 
+/// 符号化 v13 が使う語彙（`vocab_ids`）を設定する。**プロセスで 1 度**でよい。
+///
+/// `ids_json` はネット npz の `vocab_ids`（card_id の list を JSON にしたもの）。index は
+/// `1..len` で 0 は PAD/UNK（Python `encoder.vocab_from_ids` と同じ）。npz は読まない
+/// （`docs/rust_engine_plan.md` §12.5 の決定＝`rs-p4-net` の担当と分ける）。
+/// 呼び直すと語彙とカード表のキャッシュを差し替える。戻り値は語彙の件数。
+#[pyfunction]
+fn set_vocab(ids_json: &str) -> PyResult<usize> {
+    let value: serde_json::Value = serde_json::from_str(ids_json)
+        .map_err(|e| PyValueError::new_err(format!("set_vocab: invalid JSON: {e}")))?;
+    let arr = value
+        .as_array()
+        .ok_or_else(|| PyValueError::new_err("set_vocab: card_id の list を渡すこと"))?;
+    let mut ids = Vec::with_capacity(arr.len());
+    for v in arr {
+        ids.push(
+            v.as_str()
+                .ok_or_else(|| PyValueError::new_err("set_vocab: card_id は文字列"))?
+                .to_owned(),
+        );
+    }
+    Ok(encode::set_vocab(ids)?)
+}
+
+/// 記録 v5 の `hidden` を `seat`（"p1"/"p2"）視点で符号化 v13 にする。
+///
+/// `opts_json` は `{"skip_relations": bool, "skip_onplay": bool}`（省略＝どちらも false）。
+/// 戻り値は平らにした JSON:
+/// `{"scalars":[123], "field":[80], "card_idx":[24], "tokens":[22*20], "rel_om":[16*6*5],
+///   "rel_oo":[16*16*5], "extra":[29]}`（`skip_relations` のとき `rel_*` は空 list）。
+/// `load_masters()` と `set_vocab()` を先に呼んでいない場合は `ValueError`。
+#[pyfunction]
+#[pyo3(signature = (hidden_json, seat, opts_json=None))]
+fn encode_state(hidden_json: &str, seat: &str, opts_json: Option<&str>) -> PyResult<String> {
+    Ok(encode_state_impl(hidden_json, seat, opts_json)?)
+}
+
+fn encode_state_impl(
+    hidden_json: &str,
+    seat: &str,
+    opts_json: Option<&str>,
+) -> Result<String, EngineError> {
+    let masters = state::masters().ok_or_else(|| {
+        EngineError::BadPayload(
+            "encode_state: card masters are not loaded; call opcg_engine.load_masters(path) first"
+                .into(),
+        )
+    })?;
+    let vocab = encode::current_vocab()?.ok_or_else(|| {
+        EngineError::BadPayload(
+            "encode_state: 語彙が未設定。opcg_engine.set_vocab(json.dumps(vocab_ids)) を先に呼ぶこと"
+                .into(),
+        )
+    })?;
+    let me = model::Seat::from_name(seat)
+        .ok_or_else(|| EngineError::BadPayload(format!("encode_state: 未知の seat '{seat}'")))?;
+    let hidden: serde_json::Value = serde_json::from_str(hidden_json)
+        .map_err(|e| EngineError::BadPayload(format!("encode_state: invalid hidden JSON: {e}")))?;
+    let opts = match opts_json {
+        None => encode::EncodeOptions::default(),
+        Some(text) => {
+            let v: serde_json::Value = serde_json::from_str(text).map_err(|e| {
+                EngineError::BadPayload(format!("encode_state: invalid opts JSON: {e}"))
+            })?;
+            encode::EncodeOptions {
+                skip_relations: v
+                    .get("skip_relations")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+                skip_onplay: v
+                    .get("skip_onplay")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+            }
+        }
+    };
+    let board = model::GameState::from_record(&hidden, masters)?;
+    let enc = encode::encode(&board, masters, &vocab, me, &opts)?;
+    serde_json::to_string(&serde_json::json!({
+        "scalars": enc.scalars,
+        "field": enc.field,
+        "card_idx": enc.card_idx,
+        "tokens": enc.tok,
+        "rel_om": enc.rel_om,
+        "rel_oo": enc.rel_oo,
+        "extra": enc.extra,
+    }))
+    .map_err(|e| EngineError::BadPayload(format!("encode_state: cannot serialize: {e}")))
+}
+
+/// 語彙のカード表（`n_eff.build_eff_tables` の 5 表）を行範囲で返す。
+///
+/// 全 2,652 行を一度に JSON にすると数十 MB になるので、`start` から `count` 行ずつ読む
+/// （`count=0` は「最後まで」）。戻り値は
+/// `{"n":総行数,"start":s,"count":c,"stats":[c*16],"ab":[c*4*167],"abm":[c*4],
+///   "pwr":[c],"isl":[c]}`。`rs_encode_oracle.py --cards` が Python 側と 1 行ずつ照合する。
+#[pyfunction]
+#[pyo3(signature = (start=0, count=0))]
+fn eff_tables(start: usize, count: usize) -> PyResult<String> {
+    Ok(eff_tables_impl(start, count)?)
+}
+
+fn eff_tables_impl(start: usize, count: usize) -> Result<String, EngineError> {
+    let masters = state::masters().ok_or_else(|| {
+        EngineError::BadPayload(
+            "eff_tables: card masters are not loaded; call opcg_engine.load_masters(path) first"
+                .into(),
+        )
+    })?;
+    let t = encode::current_eff_tables(masters)?;
+    let start = start.min(t.n);
+    let end = if count == 0 {
+        t.n
+    } else {
+        (start + count).min(t.n)
+    };
+    let (sd, ad, md) = (
+        encode::STATS_DIM,
+        encode::MAX_AB * encode::ABILITY_DIM,
+        encode::MAX_AB,
+    );
+    serde_json::to_string(&serde_json::json!({
+        "n": t.n,
+        "start": start,
+        "count": end - start,
+        "stats": &t.stats[start * sd..end * sd],
+        "ab": &t.ab[start * ad..end * ad],
+        "abm": &t.abm[start * md..end * md],
+        "pwr": &t.pwr[start..end],
+        "isl": &t.isl[start..end],
+    }))
+    .map_err(|e| EngineError::BadPayload(format!("eff_tables: cannot serialize: {e}")))
+}
+
 #[pymodule]
 fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
@@ -145,5 +279,8 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(replay, m)?)?;
     m.add_function(wrap_pyfunction!(eval_queries, m)?)?;
     m.add_function(wrap_pyfunction!(replay_audit, m)?)?;
+    m.add_function(wrap_pyfunction!(set_vocab, m)?)?;
+    m.add_function(wrap_pyfunction!(encode_state, m)?)?;
+    m.add_function(wrap_pyfunction!(eff_tables, m)?)?;
     Ok(())
 }

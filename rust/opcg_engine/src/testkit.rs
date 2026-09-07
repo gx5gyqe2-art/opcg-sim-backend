@@ -734,8 +734,8 @@ pub fn effect_board() -> (MasterTable, GameState) {
 // [`sample_masters`] がこの表を積んで返すので、`AB_*` の index はどのテストでも同じ能力を指す。
 
 use crate::effects::ast::{
-    Ability, AbilityTable, ActionType, Duration, EffectNode, GameAction, PlayerRef, TargetQuery,
-    TriggerType, ValueSource, ZoneRef,
+    Ability, AbilityTable, ActionType, CompareOperator, CondValue, Condition, ConditionType,
+    Duration, EffectNode, GameAction, PlayerRef, TargetQuery, TriggerType, ValueSource, ZoneRef,
 };
 
 /// 入れ子 Sequence ＋ 途中で中断する Choice（実行スタックの順序検査）。
@@ -754,6 +754,10 @@ pub const AB_TURN_END: u32 = 5;
 pub const AB_TURN_END_OPTIONAL: u32 = 6;
 /// 何もしない ACTIVATE_MAIN（`ability_used_this_turn` の検査などに使う）。
 pub const AB_DRAW1: u32 = 7;
+/// 【登場時】カード 1 枚を引く（符号化 v7 の登場時スキャンで「発火する」側）。
+pub const AB_ON_PLAY_DRAW: u32 = 8;
+/// 【登場時】だが条件（手札 99 枚以上）が偽で発動しない（同スキャンの「不発」側）。
+pub const AB_ON_PLAY_BLOCKED: u32 = 9;
 
 /// 素の `ValueSource`（`base` だけ・動的値なし）。
 pub fn value(base: i32) -> ValueSource {
@@ -903,6 +907,25 @@ pub fn effect_table() -> AbilityTable {
             ),
             // AB_DRAW1
             ability(TriggerType::ActivateMain, draw(1), ""),
+            // AB_ON_PLAY_DRAW
+            ability(TriggerType::OnPlay, draw(1), "【登場時】カード1枚を引く。"),
+            // AB_ON_PLAY_BLOCKED（条件が偽＝発動しない登場時）
+            Ability {
+                trigger: TriggerType::OnPlay,
+                condition: Some(Condition {
+                    ty: ConditionType::HandCount,
+                    target: None,
+                    player: PlayerRef::SelfP,
+                    operator: CompareOperator::Ge,
+                    value: CondValue::Int(99),
+                    args: Vec::new(),
+                    raw_text: "自分の手札が99枚以上".to_string(),
+                }),
+                cost: None,
+                effect: Some(draw(1)),
+                raw_text: "【登場時】自分の手札が99枚以上なら、カード1枚を引く。".to_string(),
+                cost_optional: false,
+            },
         ],
     }
 }

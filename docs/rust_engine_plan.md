@@ -144,6 +144,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P3 | **群 B `rs-p3-zone` 完了**（`claude/rs-p3-zone`）: `actions/zone.rs` の 3 入口を本体化（12 種＋DB 未使用の LIFE_RECOVER／MOVE／MOVE_TO_HAND／DECK_TOP）。監査 987 枚／1,271 能力＝**match 1,268・mismatch 2・unimplemented 1**（残る 3 件はいずれも**群 B の所有範囲の外**＝監査記録に `shuffled` 再同期が無い 2 件と `TargetRef::Don`（群 D）1 件。§8.10）。退行 4 本すべて一致・`cargo test` 196 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 C（カードの流れ）完了**（`claude/rs-p3-flow`）: `actions/flow.rs` に PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_EVENT（EXECUTE_MAIN_EFFECT／DECLARE_COST は resolver が既に捌く）。監査 **cards=865／abilities=1144／match=1144・mismatch=0・unimplemented=0**（着手前は unimplemented=128）。退行 4 本一致・`cargo test` 182 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 D（ドン!!）完了**（`claude/rs-p3-don-mdlsba`）: `actions/don.rs` の 7 種（RETURN_DON／RAMP_DON／REST_DON／ATTACH_DON／ACTIVE_DON〔target 無し〕／FREEZE_DON／MOVE_ATTACHED_DON）。F∪D 監査 979 枚・1,273 能力で **mismatch=0**・unimplemented=1（残り 1 件＝OP12-037 の「キャラかドン!!」選択。`resolve_targets`→`Interaction`→`run_target_loop` の `Vec<CardIdx>` を `TargetRef` へ広げる必要があり本 WP の所有外＝コーディネータへ申告）。退行 4 本一致・`cargo test` 187 green・clippy 0・`make test` green。結果は下記 §8.10 |
+| 2026-09-07 | P4 | **`rs-p4-encode` 完了**（`claude/rs-p4-encode`）: `encode/{cardtab,scalars,tokens,leader}.rs`（符号化 v13 の全欄・登場時スキャン v7 は rules/effects で PLAY を実適用して判定）・`lib.rs` の `set_vocab`／`encode_state`／`eff_tables`・`rs_encode_oracle.py`。200 局面 × 両視点 = 400 視点・3,049,770 値で **mismatch=0**（float 1e-6・`card_idx` 整数一致）、カード表 2,653 行（vocab 2,652＋PAD）一致。`cargo test` 300 green・clippy 0・`make test` green。結果は下記 §8.16 |
 
 ### 8.1 P0 の結果（2026-09-06）
 
@@ -912,6 +913,94 @@ Python と同じ slice 意味論（`take` が負なら `len + take` を 0 未満
 
 `make audit-cross` 相当（(d)）はハーネスに `--policy l1 --cross` が無いため、計画どおり
 L1 100 局再生（上表）で代える。
+
+### 8.16 P4 `rs-p4-encode`（符号化 v13）の結果（2026-09-07）
+
+`claude/cpu-spec-improvements-yw91jd`（P4 の契約を入れた 9d71c7a）から分岐。**`opcg_sim/` は
+1 行も変えていない**（変更は `rust/opcg_engine/` と `tests/harness/rs_record.py`／
+`tests/scripts/rs_encode_oracle.py`）。
+
+**入れたもの**
+
+| ファイル | Python の正本 | 中身 |
+|---|---|---|
+| `encode/cardtab.rs` | `n_eff.ability_vector`／`build_eff_tables` | 能力 1 本 → 167 次元（トリガー onehot 23＋op 62×2＋対象フィルタ 4＋付与キーワード 8＋構造 7＋コスト 1）・語彙行の 5 表（stats 16／ab 4×167／abm 4／pwr／isl） |
+| `encode/scalars.rs` | `encoder.encode(version=13)` | scalars 123（v1〜v9 の集約・v7 の登場時スキャン・v11/v12 のリーダー要約 12×2・v13 の追加 29）・field 10×8・card_idx 24・`onplay_option_scan` |
+| `encode/tokens.rs` | `n_rel_feat.encode_rel` | トークン状態 S 22×20・関係 R（`rel_om` 16×6×5／`rel_oo` 16×16×5）・グローバル追加列 29・`profile`／`roles_of`／`thr_rows`／`_static` のマスター単位キャッシュ |
+| `encode/leader.rs` | `leader_feat.leader_static_vector` | リーダー物理要約 12（`_RATE` の重み・`_accumulate` の分岐・`ドン!!デッキはN枚`／`特徴《…》` の走査） |
+| `lib.rs` | — | `set_vocab(ids_json)`（npz は読まない＝§12.5 の決定）・`encode_state(hidden_json, seat, opts_json)`・`eff_tables(start, count)` |
+
+各モジュールの冒頭に**列名の対応表**を置いた（不一致をオラクルが列名で報告するので、
+`scalars.leader_power_me` のような報告からそのまま式に辿り着ける）。
+
+**Python の癖をそのまま写した箇所**（「正しく」直すと Python と別の数になる）
+
+1. `encoder._power(c)` は存在しない属性 `c.current_power` を読んで必ず `AttributeError` に
+   なり `master.power` へ落ちる＝field テンソルのパワーと `_opp_field_aggregate`（v5/v8）は
+   **印字パワー**。`n_rel_feat._power` は `get_power` を使う（別関数）ので、tok[0] だけが
+   付与ドン込みの現在値になる。
+2. `n_eff._walk` は子を `children`／`effects`／`options`／`branches` の順に探すが、Python の
+   `Sequence` は `actions`・`Branch` は `if_true`/`if_false` という別の名前なので、
+   **`Sequence` と `Branch` の中へ入らない**（`Choice.options` と `GameAction.sub_effect` だけ）。
+   `_has_choice` も同じ理由で「自身が Choice か、`sub_effect` の先に Choice があるか」に潰れる。
+   `n_rel_feat._walk`／`leader_feat._walk` は全ての子を辿る＝`encode/mod.rs::walk_all` に分けた。
+3. `TriggerType.OPPONENT_ATTACK` は `ON_OPP_ATTACK` の**別名**（同じ value）なので
+   `list(TriggerType)` は 23 個。`_static` の `"OPPONENT_ATTACK" in trig` は `.name` が常に
+   `ON_OPP_ATTACK` を返すため決して真にならない（Rust も同じく到達しない）。
+4. `_hand_aggregate` の `float(c.current_counter or 0) or float(m.counter or 0)` は
+   現在値が 0 のとき印字値へ落ちる。
+
+**浮動小数の型**: `tok` は float32 で、そこから作り直す `pw = tok[:,0]*10000` /
+`cs = tok[:,1]*10` も **float32**。この丸めが `_reach` の `g <= 0`（届く/届かない）の
+境界を決めるので、f64 で計算すると真偽が反転しうる＝Rust も同じ順序で f32 → f64 へ広げる。
+`threat_next` の一括計算だけは Python も float64（`pool_arr` と生の整数）なので f64。
+
+**登場時スキャン（v7）**: Rust の rules/effects で PLAY を実適用し、Python
+`cpu_ai.onplay_option_scan` と同じ判定子（適用後 `pending != MAIN_ACTION` **または**
+`action_events` に EFFECT）で数える。`action_events` は盤面に出ない欄なので Rust は
+中身を持たず、`resolver.rs` に**効果イベントの計数だけ**を足した（`reset_effect_events`／
+`effect_events`・`_execute_game_action` が `action_history` に積む 2 か所で 1 加算・
+`in_passive_recalc` 中は加算しない）。`_drain_own_interactions` が各ドレインの直前に
+`action_events = []` と置き直すのも同じ位置で写した（ここを写さないと PLAY 時のイベントが
+残り、ドレイン後の判定が変わる）。一時ドン!!は Python が txn 内で足して巻き戻すのに対し、
+Rust は複製盤面の上で足して捨てる（同値・journal に触れない）。
+
+**契約の注記（型は変えていない）**: `Encoding.rel_oo` のコメントは `[N_OPP × N_OWN × R_DIM]`
+だったが、Python `relations_from_tokens` は `np.zeros((N_OWN, N_OWN, R_DIM))` を返す
+（「i の減算で k のしきい値が届く」自×自の組）。寸法の記述だけ Python に合わせた。
+`encode(state: &GameState, ...)` は契約どおり不変参照だが、合法手列挙（`_leader_act_avail`）と
+登場時スキャンは書き換えが要るので**複製した `Session` の上**で行い、呼び出し側の盤面は
+1 bit も変えない（Python の make/unmake と同値）。
+
+**ハーネスの修正（申告）**: `tests/harness/rs_record.py::manager_from_hidden` は P1 時代の
+名残で `get_pending_request()` を常に None に塞いでいた（記録 v2 に `active_battle` の
+所在の持ち主が無かったため）。このままだと Python 側の v7 登場時スキャンと
+`_leader_act_avail` が**常に (0,0,0)／0.0 に潰れ**、Rust だけが本物を計算する＝照合が
+空振りする（最初の 200 局面では実際に 422 件の「不一致」として現れた）。記録 v3 以降は
+`attacker_owner`／`target_owner` があるので、`with_pending=True`（既定は従来どおり）で
+塞がない復元を選べるようにし、`attacker_owner`／`target_owner` を復元する処理を足した。
+既存のオラクル（`rs_ops_oracle.py`／`rs_query_oracle.py`）の呼び出しは既定のままで無変更。
+
+**受け入れ実測（2026-09-07）**:
+
+| 項目 | 結果 |
+|---|---|
+| `rs_encode_oracle.py --boards 200 --games 10 --policy both` | boards=200・views=400・values=3,049,770（非零 438,629）・**mismatch=0**（許容 float 1e-6・`card_idx` 整数一致） |
+| うち空振り検査 | 登場時スキャンが発火した視点 83／ON_PLAY 不発を数えた視点 45（`leader_act_avail` は random/l1 の 200 局面では 0＝リーダー起動を持つ対面が出なかった） |
+| カード表（`build_eff_tables` 全行） | rows=**2,653**（vocab 2,652＋PAD 行）・stats/ab/abm/pwr/isl とも **mismatch=0** |
+| 盤面復元の自己検査 | restore_mismatch=0（200 局面） |
+| `cargo test --no-default-features` | **300 passed**・0 failed・0 ignored（符号化の単体 15 本＝集約関数・木の歩き・`_reach`・正規表現・登場時スキャンの判定 4 本を含む） |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `make test`（Python 側・`opcg_sim/` は無変更） | **green** |
+
+**残件（`rs-p4-mcts` の統合時に見る）**: (a) `encode/scalars.rs` の
+`drain_own_interactions`／`has_selection_branch` は `cpu_ai._drain_own_interactions`／
+`_selection_moves` の**登場時スキャンに要る部分だけ**の写しで、WP `rs-p4-legal` が
+`search/apply.rs` に入れる本体と重複する（統合時にそちらへ寄せる）。
+(b) 効果イベントの計数は、Python が `action_history` を回収しない一部の内部リゾルバ
+（除去保護の置換・退避継続の再開）も 1 件として数える近似が残る（現行 DB の 200 局面では
+差が出なかった）。
+
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
