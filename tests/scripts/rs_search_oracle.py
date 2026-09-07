@@ -172,8 +172,12 @@ class Totals(dict):
         self[key] = self.get(key, 0) + n
 
 
+MAX_REPORTED = {"n": 1}
+
+
 def note_first(firsts: list, row: dict) -> None:
-    if not firsts:
+    """不一致の記録（既定は先頭 1 件・`--max-report` で増やせる）。"""
+    if len(firsts) < MAX_REPORTED["n"]:
         firsts.append(row)
 
 
@@ -394,12 +398,13 @@ CHECKERS = {
 # --- 4. 決定（decide）--------------------------------------------------------------
 #
 # `opcg_sim/` は変えない。ここで足すのは 3 つのハーネス部品だけ:
-#   `RecordingRng`   … `np.random.Generator` を包んで shuffle／dirichlet／choice の出目を記録する
+#   `RecordingGenerator` … `np.random.Generator` を包んで shuffle／dirichlet／choice の出目を記録する
+#                    （`RecordingRng` は determinize 用の別物＝`random.Random` を包む）
 #   `RecordingEngine`… `LearnedEngine._world_rng` の返り値を上のラッパへ差し替える（席別 seam）
 #   `_TracingMCTS`   … `cpu_learned` が参照する `TreeMCTS` を包んで `last_stats` を取り出す
 # どれも観測専用で、Python 側の決定そのものは 1 bit も変えない。
 
-class RecordingRng:
+class RecordingGenerator:
     """`np.random.Generator` の薄い記録ラッパ（出目を `sink` へ書く）。
 
     `choice(n, p=...)` だけは**自前で組む**（numpy の実装と同じ「累積分布を cdf[-1] で割り
@@ -444,7 +449,7 @@ def _engine_class():
 
         def _world_rng(self, manager, name, rng):
             g = super()._world_rng(manager, name, rng)
-            return RecordingRng(g, self.rec) if self.rec is not None else g
+            return RecordingGenerator(g, self.rec) if self.rec is not None else g
 
     return RecordingEngine
 
@@ -756,14 +761,16 @@ def _decide_worker(payload):
     if opcg_engine is not None and hasattr(opcg_engine, "load_masters"):
         opcg_engine.load_masters(payload["effects"])
         opcg_engine.load_net(args.net)
+    MAX_REPORTED["n"] = max(1, int(getattr(args, "max_report", 1)))
     totals, firsts = Totals(), []
     _play_decide_games(db, args, payload["seeds"], totals, firsts)
-    return {"totals": dict(totals), "firsts": firsts[:1]}
+    return {"totals": dict(totals), "firsts": firsts}
 
 
 def run_decide(db, args, effects_path: str) -> int:
     """`--what decide` の本体（`run_one` と同じ形の 1 行を出す）。"""
     t0 = time.time()
+    MAX_REPORTED["n"] = max(1, int(getattr(args, "max_report", 1)))
     seeds = [args.seed_base + i for i in range(args.games)]
     totals, firsts = Totals(), []
     if args.jobs > 1 and len(seeds) > 1:
@@ -822,6 +829,8 @@ def run_decide(db, args, effects_path: str) -> int:
         "seconds": round(time.time() - t0, 1),
         "first": firsts[0] if firsts else None,
     }
+    if len(firsts) > 1:
+        summary["mismatches"] = firsts
     print("RS_SEARCH " + json.dumps(summary, ensure_ascii=False, default=str))
     bad = (totals.get("mismatch", 0) or totals.get("bad_payload", 0)
            or totals.get("unimplemented", 0) or totals.get("harness_error", 0)
@@ -916,6 +925,8 @@ def main(argv=None) -> int:
                     help="decide で 1 局あたりの決定点の上限（0=無制限）")
     ap.add_argument("--jobs", type=int, default=1,
                     help="decide を何プロセスに分けて打つか（既定 1）")
+    ap.add_argument("--max-report", type=int, default=1,
+                    help="decide で残す不一致の件数（既定 1・原因の性質を見るときは増やす）")
     ap.add_argument("--tie-tol", type=float, default=1e-5,
                     help="decide の窓で「同点」とみなす出口 value の差（既定 1e-5＝forward の許容）")
     ap.add_argument("--max-prefix", type=int, default=24,
