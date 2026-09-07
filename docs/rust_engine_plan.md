@@ -2530,8 +2530,14 @@ B. 移動と退避
 9. 文書: CLAUDE.md（ゲート＝make test のみ・CPU 系統の記述から L1 を外し「エンジンは Rust」を明記・
    「判定に使ったネットは消さない」は履歴と tag で担保する旨）・docs/README.md 索引・docs/SPEC.md の
    エンジン所在・docs/rust_engine_plan.md §8 に結果行と §8.18。
-10. 裁定待ち 4 件（§11.8 #10・§14）: ユーザの決定を待つ（この WP では変えない。決定が出ていれば Rust を正に
-    直して golden を作り直す）。
+10. 裁定（ユーザ決定 2026-09-07）: **PREVENT_REST の 3 枚（PASSIVE「このキャラは相手の効果で KO されず
+    レストにされない」）をテキストどおりに直す**。今の Python は自分自身に CANNOT_REST を載せる（＝自分が
+    アタック／ブロックできなくなる）読みだが、正しくは「相手の効果によるレストだけを防ぐ」。Rust を正として
+    直す: 自分のアタック宣言・ブロックは従来どおり可能／相手の効果（REST ハンドラ・actor≠owner）による
+    レストだけを弾く（既存の CANNOT_REST とは別のフラグ、例 CANNOT_BE_RESTED_BY_OPP。KO 耐性は既存の
+    PREVENT_LEAVE 経路のまま）。該当 3 枚の監査 golden はレビューのうえ Rust の出力で作り直す（この WP から
+    golden の正本は Rust）。他の 3 件は裁定不要で確定: 付与中ドン!!での支払い＝到達しない経路（実ルールでも
+    不可）・attack_disable の潰し＝対象なしで実害ゼロ・カードが消える宛先＝エラー確定。
 
 RESULT.json: {"job":"rs-archive-cutover","status":"done","arena":{...},"gen_seconds_per_game":{...},
 "api_tests":{...},"moved":[...],"legacy_imports_from_opcg_sim":0,"tag":"py-engine-final","notes":"..."}。
