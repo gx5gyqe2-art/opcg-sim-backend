@@ -1389,6 +1389,21 @@ Rust をここに合わせるには BLAS のブロッキングまで写す必要
 （216 万行）で読み込み 151 s・RSS 6.2 GB・1 エポック 6,186 s（当機。実機は 0.59〜0.68 倍）。
 波 4 本＝12.7 GB で cgroup 14 GB にぎりぎり＝「古い波から落とす」運用の実測裏付け。設計は §18.2。
 
+### 8.19 WP `train-norel`（§18.3・R 省略）の結果（2026-09-07）
+
+ブランチ `claude/train-norel`（1 コミット）を本線に取り込んだ。`n_rel_train.relations_or_zeros(net, ci, tok, rt)`
+を足し、`"rel" in net.ablate` のときは `relations_batch` を呼ばず `mask_rel` と同じ形・dtype のゼロを渡す
+（value ループ／policy ループ／`eval_policy`／value 検証の 4 か所）。シグネチャ・npz・meta は不変。
+
+| 確認 | 結果 |
+|---|---|
+| `train_profile.py norel`（200 バッチ） | 損失の最大差 **0.0**・value 1 行 1.700→1.018 ms＝1.67 倍 |
+| 1 シャード・1 エポックの前後比較 | 保存 npz の全 21 配列が `np.array_equal`・指標も同一（val v_mse 0.7141）・**217 s→145 s＝1.50 倍** |
+| `tests/test_n_rel_grad.py` | 新テスト `test_ablate_rel_skips_relations_batch_bit_identically`（cpu_infra・monkeypatch の spy で呼ばれないことを検出）込みで 10 passed（取り込み時にも再実行） |
+
+RESULT.json は `docs/reports/2026-09-07_train_norel.RESULT.json`。**r2b の次の訓練からこの経路で回す**
+（`--ablate rel` が既定なので指示の変更は不要）。次は §18.4（torch 化）＝切替 §16.3 の取り込み後。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
@@ -2613,7 +2628,7 @@ RESULT.json: {"job":"train-profile","status":"done","per_row":{"load_sec":..,"by
 
 計測が示した順に 3 段。②（バッチサイズ）と BLAS スレッド増はやらない。
 
-1. **①R 省略（WP `train-norel`・今すぐ・§18.3）**: `--ablate rel` のとき `relations_batch` を呼ばず
+1. **①R 省略（WP `train-norel`・§18.3・取り込み済み §8.19）**: `--ablate rel` のとき `relations_batch` を呼ばず
    ゼロ配列（`mask_rel` が出すのと同じ形・dtype）を渡す。損失がビット一致することは実測済みなので
    受け入れは機械的（`train_profile.py norel` の再実行で `loss_max_abs_diff == 0`）。`relations_batch`
    自体は残す（R を戻す設計の余地）。1.44 倍。r2b の次の訓練から効く。
