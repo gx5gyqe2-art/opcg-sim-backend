@@ -1,0 +1,96 @@
+{
+  "job": "rs-p3-integrate",
+  "status": "done",
+  "branch": "claude/rs-p3-integrate",
+  "base": "claude/cpu-spec-improvements-yw91jd (1809d31c)",
+  "picked": [
+    "claude/rs-p3-core-h0bryg (20c76061)",
+    "claude/rs-p3-resolver-yyjnt3 (4b621598)"
+  ],
+  "cargo": {
+    "command": "cargo test --no-default-features",
+    "tests": 166,
+    "passed": 166,
+    "failed": 0,
+    "ignored": 0,
+    "clippy_warnings": 0,
+    "composition": "core 131 + resolver 108 - 共有する P2 までの土台 73 = 166（両 WP の単純合計にはならない）",
+    "unignored": [
+      "effects::tests_effects::audit_oracle_matches_python（Python が書いた監査記録 fixture で照合する実テストにした）",
+      "ops::tests::apply_ops_runs_against_a_recorded_hidden_state（rs-p1-model 待ちの理由が消えていた）"
+    ]
+  },
+  "oracle": {
+    "query": {
+      "boards": 200,
+      "queries": 7337400,
+      "match": 6426129,
+      "mismatch": 0,
+      "mismatch_by_kind": {},
+      "error_match": 911271,
+      "unimplemented": 0,
+      "bad_payload": 0,
+      "bad_output": 0,
+      "restore_mismatch": 0,
+      "nonempty_targets": 1054986,
+      "true_conditions": 418037,
+      "nonzero_values": 1435565,
+      "catalog": 12229,
+      "catalog_kinds": {"target": 4378, "value": 5801, "condition": 2050},
+      "games": 10,
+      "policy": "both",
+      "ctx": "both",
+      "null_source_pass": true,
+      "seed_base": 900000,
+      "engine": "0.0.1",
+      "seconds": 139.1,
+      "first": null
+    },
+    "audit_foundation": {
+      "action_types": ["ACTIVE", "BUFF", "DISCARD", "DRAW", "KO", "REST"],
+      "cards": 634,
+      "abilities": 817,
+      "match": 817,
+      "mismatch": 0,
+      "unimplemented": 0,
+      "record_error": 0,
+      "bad_payload": 0,
+      "bad_output": 0,
+      "mode": "replay",
+      "engine": "0.0.1",
+      "record_version": 4,
+      "first": null
+    },
+    "regress": {
+      "replay_vanilla": {
+        "games": 50,
+        "actions": 5022,
+        "match": 50,
+        "mismatch": 0,
+        "unimplemented": 0,
+        "bad_payload": 0,
+        "seed_base": 950000
+      },
+      "state": {
+        "games": 10,
+        "actions": 1098,
+        "match": 10,
+        "mismatch": 0,
+        "unimplemented": 0,
+        "seed_base": 960000
+      },
+      "ops": {
+        "games": 10,
+        "rows": 1047,
+        "ops": 20610,
+        "match": 1047,
+        "mismatch": 0,
+        "restore_mismatch": 0,
+        "unimplemented": 0,
+        "seed_base": 700000
+      }
+    }
+  },
+  "make_test": {"passed": 1761, "failed": 0, "seconds": 476.1, "python_changed": false},
+  "notes": "Python 側（opcg_sim/）は 1 行も変更していない（追加は両 WP のハーネス tests/scripts/ と Rust 側のみ）。Python の欠陥は 1 件も出なかった＝5 本のオラクルは全て Rust を Python に合わせて一致させた。(1) 契約の単一化は docs/rust_engine_plan.md §11.6「統合で決めた細部」に記録: get_target_cards は Vec<TargetRef>／EffectContext は resolver の全欄に core の要件（saved_targets の値は TargetRef・prev_action_count: Option<i32>・PREV_ACTION_COUNT は unwrap_or(0)）を合わせる／能力表は MasterTable.abilities に一本化（大域 ABILITIES と init_abilities を削除・ability/ability_of は &MasterTable から引く・呼び出し 39 か所）／effects/mod.rs の stub 3 関数は core への pub use 委譲／EffectContext::from_json は削除し eval::context_from_json に一本化（JSON キーは last_action_count と prev_action_count の両方を受ける）。(2) 統合で Rust 側の欠陥を 1 件検出して直した: バニラ記録の再生が match=0／unimplemented=29／bad_payload=21 に退行していた。rs_diff_replay.py の --vanilla は Python 側で全カードの abilities を外して打つのに対し、Rust は効果 JSON から能力を引く（統合前は loader が無く ability_ids が常に空だったので表面化しなかった）。MasterTable::without_abilities() を足し replay が vanilla:true の記録をその表で再生する＝Python の _strip_abilities と同値。これで match=50。(3) ドン!!を返す対象クエリ（COST_AREA 3 件・CHAR_OR_DON 2 件）は resolver の 3 経路で only_cards_strict により Unimplemented にしてある＝黙って落とさず群 D 待ちとして見える。(4) 監査オラクルの #[ignore] は外し、Python が書いた本物の監査記録（fixture rust/opcg_engine/tests/fixtures/audit_eb01_049_v4.json＝EB01-049・中断 1 回）を state::replay_audit_with で再生して Python の盤面 dict と段ごとに照合する実テストにした。負のコントロール（fixture の life_count を 1 ずらす）で落ちることを確認済み。全カード照合（634 枚／817 能力）はハーネス側で回す。(5) 文書: 両 WP が各自 §8.7 を名乗り進捗表の行も二重になっていたので、core=§8.7／resolver=§8.8／統合=§8.9 に整理（内容は両方残す）。docs/TEST_SPEC.md は両 WP の行（rs_query_oracle.py／rs_audit_replay.py）を残し、統合後の実測へ更新した。"
+}
