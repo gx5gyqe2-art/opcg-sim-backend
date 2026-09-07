@@ -607,7 +607,13 @@ class DecideRunner:
         if skip is not None:
             totals.bump(skip)
         else:
-            self._compare(self.base_hidden, name, opts, sink, move, kind, stats, record)
+            try:
+                self._compare(self.base_hidden, name, opts, sink, move, kind, stats, record)
+            except Exception as e:  # noqa: BLE001 - 観測の事故で局を潰さない（件数で報告する）
+                totals.bump("harness_error")
+                note_first(self.firsts, {"kind": "harness_error", "decide_kind": kind,
+                                         "detail": f"{type(e).__name__}: {e}\n"
+                                                   f"{traceback.format_exc()}"})
         self.prefix.append({"actor": name, "move": move})
         return move
 
@@ -732,6 +738,13 @@ class DecideRunner:
             return
         totals.bump("mismatch")
         totals.bump("n_mismatch" if same_move else "move_mismatch")
+        py_q = [float(x) for x in np.asarray(stats["Q"]).reshape(-1)] if stats else []
+        rs_q = [float(x) for x in (rs.get("Q") or [])]
+        dq = (max((abs(a - b) for a, b in zip(py_q, rs_q)), default=0.0)
+              if len(py_q) == len(rs_q) else None)
+        totals.bump("n_mismatch_same_move", int(bool(same_move)))
+        if l1 is not None:
+            totals["l1_max"] = max(totals.get("l1_max", 0.0), l1)
         # **枝の入れ替わりか、値そのものの差か**を分ける（原因の性質が違う）:
         # Q を昇順に並べた「集合」が一致するなら、同じ枝の値が別の添字に付いただけ
         # ＝float の同点で PUCT の順位が割れた形。集合まで違うなら値が本当に違う。
@@ -741,13 +754,6 @@ class DecideRunner:
             totals.bump("mismatch_permutation" if perm <= self.args.tie_tol
                         else "mismatch_values")
         self._dump(hidden, name, opts, sink, move, kind, stats, perm)
-        py_q = [float(x) for x in np.asarray(stats["Q"]).reshape(-1)] if stats else []
-        rs_q = [float(x) for x in (rs.get("Q") or [])]
-        dq = (max((abs(a - b) for a, b in zip(py_q, rs_q)), default=0.0)
-              if len(py_q) == len(rs_q) else None)
-        totals.bump("n_mismatch_same_move", int(bool(same_move)))
-        if l1 is not None:
-            totals["l1_max"] = max(totals.get("l1_max", 0.0), l1)
         row = {
             "kind": "decide", "same_move": same_move, "l1": l1, "sims": self.args.sims,
             "max_abs_dq": dq,
@@ -817,7 +823,10 @@ def run_decide(db, args, effects_path: str) -> int:
         with cf.ProcessPoolExecutor(max_workers=len(payloads)) as pool:
             for out in pool.map(_decide_worker, payloads):
                 for k, v in out["totals"].items():
-                    totals.bump(k, v)
+                    if k.endswith("_max"):
+                        totals[k] = max(totals.get(k, 0.0), v)   # 最大値は足さない
+                    else:
+                        totals.bump(k, v)
                 for row in out["firsts"]:
                     note_first(firsts, row)
     else:
