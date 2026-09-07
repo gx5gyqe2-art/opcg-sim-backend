@@ -137,6 +137,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P3 | **統合をコーディネータが受け入れ・本線へ**（`claude/rs-p3-integrate` 776d492a を fast-forward）。未見 seed の再検証: F 監査 634 枚/817 能力 mismatch=0・問合せ 40 局面 1,467,480 件 mismatch=0・バニラ再生 20 局 match=20・状態 5 局 match=5・原始操作 3 局 5,190 件 mismatch=0。`cargo test` 166 green・clippy 0・`make test` green |
 | 2026-09-07 | P3 | **群 A〜E の差し口と指示書を本線へ**（§11.7）: `actions/{status,zone,flow,don,rules}.rs` の 3 入口（`game_handler`／`owns_target`／`apply_target`）と `mod.rs` の呼び出し。受け入れ集合は F∪群だけのカード（A 782／B 987／C 865／D 979／E 710 枚） |
 | 2026-09-07 | P3 | **群 A（状態系）`rs-p3-status` 完了**（`claude/rs-p3-status-rkkh9m`）: `actions/status.rs` の 3 入口を本体化（GRANT_KEYWORD／ATTACK_DISABLE／PREVENT_REST／FREEZE／NEGATE_EFFECT／DISABLE_ABILITY／SWAP_POWER。BUFF の全形は土台 `mod.rs::buff` が既に持っていた＝委譲不要で `mod.rs` は無変更）。監査 **cards=782／abilities=1014／match=1014・mismatch=0・unimplemented=0**（受け入れ規模ちょうど）・退行 4 本一致・`cargo test` 194 green・clippy 0・`make test` green。結果は下記 §8.10 |
+| 2026-09-07 | P3 | **群 B `rs-p3-zone` 完了**（`claude/rs-p3-zone`）: `actions/zone.rs` の 3 入口を本体化（12 種＋DB 未使用の LIFE_RECOVER／MOVE／MOVE_TO_HAND／DECK_TOP）。監査 987 枚／1,271 能力＝**match 1,268・mismatch 2・unimplemented 1**（残る 3 件はいずれも**群 B の所有範囲の外**＝監査記録に `shuffled` 再同期が無い 2 件と `TargetRef::Don`（群 D）1 件。§8.10）。退行 4 本すべて一致・`cargo test` 196 green・clippy 0・`make test` green。結果は下記 §8.10 |
 
 ### 8.1 P0 の結果（2026-09-06）
 
@@ -638,6 +639,64 @@ bad_payload=21 に退行した。`rs_diff_replay.py` のバニラデッキは Py
 
 **Python 側の欠陥と判断して直さなかったもの**: 無し（監査 1,014 能力・退行 4 本とも全一致で、
 Python と挙動が割れた盤面は 1 つも出なかった）。
+### 8.10 P3 群 B `rs-p3-zone`（ゾーン移動）の結果（2026-09-07）
+成果物（Python 側は**1 行も変えていない**＝`opcg_sim/` は無変更。`actions/mod.rs`・`resolver.rs`・
+`interact.rs`・`triggers.rs`・`model.rs`・`ops.rs` も無変更＝**追加した原始操作は無し**）:
+| 成果物 | 中身 |
+| `effects/actions/zone.rs`（骨組み → 本体） | `game_handler`＝DEAL_DAMAGE／SHUFFLE／HEAL＋LIFE_RECOVER／TRASH_FROM_DECK／ORDER_LIFE／LOOK_LIFE（Python `actions/player_level.py`）。`owns_target`／`apply_target`＝MOVE_CARD／DECK_BOTTOM／DECK_TOP／BOUNCE＋MOVE_TO_HAND／MOVE／FACE_UP_LIFE（同 `per_target.py`） |
+| `effects/actions/zone/tests.rs` | 担当 ActionType ごとに Python の挙動を転記した単体 30 件（`mod.rs::apply_action` を通して差し口ごと検査する） |
+**Python から逐語で移した要点**（同じ意味論にするために踏んだ地雷）:
+- **`move_card` を通す経路と通さない経路がある**。`TRASH_FROM_DECK`（`trash.append(deck.pop(0))`）と
+  `LOOK_LIFE`（`temp_zone.append(life.pop(0))`）は Python が**直接リストを動かす**ので
+  `reset_turn_status` も ON_LIFE_DECREASE も走らない。`move_card` に寄せると挙動が変わる。
+- **`DEAL_DAMAGE` の順序**: ライフを 1 枚ずつ `pop(0)` → 【トリガー】は**移す前**に引く →
+  `move_card(HAND)` → 任意（確認つき）で待ち行列へ。ライフ切れは**効果の実行者**の勝利で
+  `break` し、その段では `_enqueue_life_decrease` を積まない（`if life_lost and not gm.winner`）。
+  最後に `_advance_pending_triggers` を**無条件**で呼ぶ。
+- **0 の扱いが 3 通りある**: `DEAL_DAMAGE` は `value if value and value > 0 else 1`（0 以下→1）、
+  `LOOK_LIFE` は `value if value else 1`（0 は falsy →1・負は `range()` が空）、
+  `HEAL`／`TRASH_FROM_DECK` は `range(value)` そのまま（0 以下→0 回）。
+- **`dest_position` は `"TOP"` との一致だけを見る**。DB には `"CHOOSE"` が 37 件あるが、これは
+  BOTTOM 扱い（並べ替えを要する形は resolver が ARRANGE_DECK で先に中断する）。
+- `MOVE_CARD` の自己制限 `CANNOT_LIFE_TO_HAND` は「**自分の**ライフ→**自分の**手札」だけを抑止する
+  （Python の `owner is player`）。相手のライフを手札へ戻す経路は抑止されない。
+- **`SHUFFLE` は乱数を使わない**（計画 §6「決定論」・`state.rs` の記録 v4 `shuffled` 再同期に任せる）。
+  並びを勝手に変えると再同期が入る経路でかえって不一致になる。
+受け入れ（実測・本セッションのコンテナ・wheel は `maturin build --release`）:
+- **監査オラクル**（`rs_audit_replay.py --action-types DRAW,DISCARD,TRASH,KO,REST,ACTIVE,BUFF,
+  MOVE_CARD,DECK_BOTTOM,DECK_TOP,BOUNCE,TRASH_FROM_DECK,HEAL,DEAL_DAMAGE,SHUFFLE,ORDER_LIFE,
+  FACE_UP_LIFE,LOOK_LIFE,MOVE_TO_HAND`）→ `cards=987 / abilities=1271 / match=1268 /
+  mismatch=2 / unimplemented=1`（枚数・能力数は §11.7 の表と一致）。
+  **`TRASH` を `--action-types` に入れないと集合が 934／1,201 になる**——`TRASH` は Python が
+  `DISCARD` と同じハンドラに登録している（土台 F が実装済み）ので、指示書のコマンド列から
+  漏れていた。§11.7 の 987／1,271 は `TRASH` 込みの数。
+- **退行 4 本すべて一致**: F の監査 `634 枚／817 能力 match=817・mismatch=0`／
+  `--mode replay --vanilla --games 20 --seed-base 1200000` → `match=20`（2,087 行動）／
+  `--mode state --games 5` → `match=5`（584 行動）／
+  `rs_query_oracle.py --boards 40 --seed-base 1210000` → `queries=1,467,480・mismatch=0`
+  （error 一致 182,257 を含む・27.8s）。
+- `cargo test --no-default-features` **196 passed**（166 → +30）・`cargo clippy --all-targets
+  -D warnings` 警告 0・`make test`（Python 側）green。
+**残る 3 件はいずれも群 B の所有範囲の外**（`RESULT.json` の notes と同じ内容）:
+| 件 | カード | path | 原因 |
+|---|---|---|---|
+| mismatch | `OP04-048`（ササキ・ON_PLAY） | `pending_request.selectable_uuids[0]` | **監査記録に `shuffled` 再同期が無い**（下記） |
+| mismatch | `OP06-047`（シャーロット・プリン・ON_PLAY） | `players.p2.zones.hand[0].uuid` | 同上 |
+| unimplemented | `OP06-035`（ホーディ・ジョーンズ・ON_PLAY） | `effects/mod.rs::only_cards_strict` | 対象が CHAR_OR_DON＝`TargetRef::Don`。§11.7 で**群 D の所有**（`only_cards_strict` 3 か所） |
+**`shuffled` 再同期の穴（コーディネータへの申告・契約の不足）**: 2 件はどちらも
+「手札すべてをデッキに戻す → **シャッフル** → 引く」型で、Python が `random.shuffle` で作った
+並びから引くのに対し Rust は元の並びから引く＝**引いた札の uuid だけが違う**（多重集合は一致）。
+`--mode replay` は記録 v4 の `shuffled`＋その段の `hidden` で並びを取り直す（§11.2）が、
+**監査記録（`kind:"audit"`）にはこの欄が無く、`state.rs::replay_audit` も再同期をしない**。
+しかも 2 件とも中断が 1 度も立たない（`steps` が空）＝シャッフルは `fire` の中で起きるので、
+`steps[i].hidden` を足すだけでは届かない。**必要な契約変更**は `fire` の後にも
+`{"shuffled": [...], "hidden": {...}}` を記録し、`replay_audit` が `fire` 後と各 `payload` 後に
+`resync_shuffled` を呼ぶこと（`tests/scripts/rs_audit_replay.py` と `state.rs` の両方＝群 B の
+所有範囲外・他の 4 群も同じ記録を使うため単独で変えると衝突する）。
+**根本原因は実験で確定した**: Python 側の `random.shuffle` を恒等関数に差し替えて同じ 2 枚を
+記録し直すと `mismatch=0`（`cards=2, abilities=2, match=2`）＝Rust の意味論は Python と同一で、
+違うのは RNG が作った並びだけ。`SHUFFLE` を使うカードは DB 全体で 11 枚、うち F∪B の受け入れ
+集合に入るのは 3 枚（`OP01-098`／`OP04-048`／`OP06-047`。`OP01-098` は並びを観測しないので一致する）。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
@@ -1180,6 +1239,8 @@ pub fn apply_target(s, masters, actor, action, target, owner, source_list, value
 |---|---|---|---|---|
 | A 状態系 **完了**（2026-09-07・§8.10） | `status.rs` | GRANT_KEYWORD・ATTACK_DISABLE・PREVENT_REST・FREEZE・NEGATE_EFFECT・DISABLE_ABILITY・SWAP_POWER＋**BUFF の全形**（status: COST_REDUCTION／POWER_OVERRIDE／BLOCKER_DISABLE／COUNTER／COST_OVERRIDE・duration: THIS_TURN／THIS_BATTLE／UNTIL_NEXT_TURN_END／PERMANENT＝継続効果登録）。DB 未使用の SET_BASE_POWER／COST_BUFF／SET_COST／COST_CHANGE／BP_BUFF は `Unimplemented` のまま可 | 782／1,014 → **実測 cards=782／abilities=1,014／match=1,014・mismatch=0・unimplemented=0**（BUFF は土台 `mod.rs::buff` が既に全形を持っていたので委譲不要＝`mod.rs` 無変更。`cargo test` 194・clippy 0） | `per_target.buff/grant_keyword/attack_disable/prevent_rest/freeze/negate_effect`・`player_level.disable_ability/swap_power`・`continuous.py` |
 | B ゾーン移動 | `zone.rs` | MOVE_CARD・DECK_BOTTOM・DECK_TOP・BOUNCE・TRASH_FROM_DECK・HEAL・DEAL_DAMAGE・SHUFFLE・ORDER_LIFE・FACE_UP_LIFE・LOOK_LIFE・MOVE_TO_HAND（DB 未使用の LIFE_RECOVER／LIFE_MANIPULATE は `Unimplemented` 可） | 987／1,271 | `per_target.move/bounce/deck_bottom/deck_top/move_card/face_up_life`・`player_level.deal_damage/shuffle/heal/trash_from_deck/order_life/look_life` |
+| A 状態系 | `status.rs` | GRANT_KEYWORD・ATTACK_DISABLE・PREVENT_REST・FREEZE・NEGATE_EFFECT・DISABLE_ABILITY・SWAP_POWER＋**BUFF の全形**（status: COST_REDUCTION／POWER_OVERRIDE／BLOCKER_DISABLE／COUNTER／COST_OVERRIDE・duration: THIS_TURN／THIS_BATTLE／UNTIL_NEXT_TURN_END／PERMANENT＝継続効果登録）。DB 未使用の SET_BASE_POWER／COST_BUFF／SET_COST／COST_CHANGE／BP_BUFF は `Unimplemented` のまま可 | 782／1,014 | `per_target.buff/grant_keyword/attack_disable/prevent_rest/freeze/negate_effect`・`player_level.disable_ability/swap_power`・`continuous.py` |
+| B ゾーン移動 **完了**（2026-09-07・`claude/rs-p3-zone`・§8.10） | `zone.rs` | MOVE_CARD・DECK_BOTTOM・DECK_TOP・BOUNCE・TRASH_FROM_DECK・HEAL・DEAL_DAMAGE・SHUFFLE・ORDER_LIFE・FACE_UP_LIFE・LOOK_LIFE・MOVE_TO_HAND＋**Python に登録がある LIFE_RECOVER／MOVE も実装**（DB 未使用）。`LIFE_MANIPULATE` は Python にもハンドラが無い＝`Unimplemented` のまま | 987／1,271（実測 `match=1268・mismatch=2・unimplemented=1`。残る 3 件は群 B の範囲外＝監査記録に `shuffled` 再同期が無い 2 件〔`OP04-048`／`OP06-047`〕と `TargetRef::Don`＝群 D の 1 件〔`OP06-035`〕。**`--action-types` に `TRASH` が要る**——入れないと 934／1,201 になる） | `per_target.move/bounce/deck_bottom/deck_top/move_card/face_up_life`・`player_level.deal_damage/shuffle/heal/trash_from_deck/order_life/look_life` |
 | C カードの流れ | `flow.rs` | PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_MAIN_EFFECT・EXECUTE_EVENT・DECLARE_COST（DB 未使用の SELECT_OPTION は不要） | 865／1,144 | `per_target.play_card/reveal`・`player_level.look/select/execute_event`・`resolver._expand_main_effect/_execute_selected_main/_suspend_for_cost_declaration` |
 | D ドン!! | `don.rs` | RETURN_DON・RAMP_DON・REST_DON・ATTACH_DON・ACTIVE_DON（target 無し）・FREEZE_DON・MOVE_ATTACHED_DON（DB 未使用の MODIFY_DON_PHASE は不要）＋**ドン!!を対象に取るクエリ**（`TargetRef::Don`＝COST_AREA 3 件・CHAR_OR_DON 2 件。resolver の `only_cards_strict` 3 か所をドン!!込みに広げる＝この群だけ `resolver.rs` の当該経路を所有） | 979／1,273 | `player_level.return_don/ramp_don/rest_don/freeze_don/active_don_by_count/move_attached_don`・`per_target.attach_don`・`resolver._suspend_for_don_selection` |
 | E 置換とルール | `rules.rs` | REPLACE_EFFECT・PREVENT_LEAVE（`active_protection`／`find_replacement`／`active_replacement`／`_register_granted_replacements` の本体＝`mod.rs` の高速路を置き換える・戦闘 KO 置換の中断）・RULE_PROCESSING・RESTRICTION・REDIRECT_ATTACK・VICTORY・EXTRA_TURN＋P2 の積み残し（【カウンター】イベント・イベントの登場・アタック税）。DB 未使用の KEYWORD／PASSIVE_EFFECT／GRANT_EFFECT／LOCK／OTHER は `Unimplemented` 可 | 710／917 | `engine/guards.py`・`player_level.rule_processing_self_restriction/redirect_attack/extra_turn/victory`・`battle.py` の置換分岐 |
