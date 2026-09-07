@@ -611,6 +611,31 @@ class DecideRunner:
         self.prefix.append({"actor": name, "move": move})
         return move
 
+    def _dump(self, hidden, name, opts, sink, move, kind, stats, perm) -> None:
+        """不一致の**再現一式**を書き出す（`--dump-dir`）。
+
+        `hidden`＋`prefix`＋出目＋Python の答えがあれば、あとから 1 決定点だけを
+        両側で打ち直せる（100 局を回し直さずに原因を詰められる）。
+        """
+        out = self.args.dump_dir
+        if not out:
+            return
+        _os.makedirs(out, exist_ok=True)
+        import numpy as _np
+        path = _os.path.join(out, f"mm_{_os.getpid()}_{len(_os.listdir(out))}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({
+                "hidden": hidden, "name": name, "opts": opts, "rng": sink,
+                "python_kind": kind, "python_move": move,
+                "python_N": ([float(x) for x in _np.asarray(stats["N"]).reshape(-1)]
+                             if stats else None),
+                "python_Q": ([float(x) for x in _np.asarray(stats["Q"]).reshape(-1)]
+                             if stats else None),
+                "python_legal": (list(stats["legal"]) if stats else None),
+                "sorted_q_max_diff": perm,
+                "sims": self.args.sims,
+            }, f, ensure_ascii=False, default=str)
+
     def _compare(self, hidden, name, opts, sink, move, kind, stats, record):
         totals, firsts = self.totals, self.firsts
         if opcg_engine is None or not hasattr(opcg_engine, "decide"):
@@ -707,6 +732,15 @@ class DecideRunner:
             return
         totals.bump("mismatch")
         totals.bump("n_mismatch" if same_move else "move_mismatch")
+        # **枝の入れ替わりか、値そのものの差か**を分ける（原因の性質が違う）:
+        # Q を昇順に並べた「集合」が一致するなら、同じ枝の値が別の添字に付いただけ
+        # ＝float の同点で PUCT の順位が割れた形。集合まで違うなら値が本当に違う。
+        perm = None
+        if len(py_q) == len(rs_q) and py_q:
+            perm = max(abs(a - b) for a, b in zip(sorted(py_q), sorted(rs_q)))
+            totals.bump("mismatch_permutation" if perm <= self.args.tie_tol
+                        else "mismatch_values")
+        self._dump(hidden, name, opts, sink, move, kind, stats, perm)
         py_q = [float(x) for x in np.asarray(stats["Q"]).reshape(-1)] if stats else []
         rs_q = [float(x) for x in (rs.get("Q") or [])]
         dq = (max((abs(a - b) for a, b in zip(py_q, rs_q)), default=0.0)
@@ -723,6 +757,8 @@ class DecideRunner:
             "rust_Q": [round(x, 9) for x in rs_q[:12]],
             "legal": [m.get("action_type") for m in py_legal][:12],
             "sig": record.get("sig"),
+            "sorted_q_max_diff": (max(abs(a - b) for a, b in zip(sorted(py_q), sorted(rs_q)))
+                                  if len(py_q) == len(rs_q) and py_q else None),
         }
         note_first(firsts, row)
         note_loud(row)
@@ -803,6 +839,8 @@ def run_decide(db, args, effects_path: str) -> int:
         "move_mismatch": totals.get("move_mismatch", 0),
         "n_mismatch": totals.get("n_mismatch", 0),
         "n_mismatch_same_move": totals.get("n_mismatch_same_move", 0),
+        "mismatch_permutation": totals.get("mismatch_permutation", 0),
+        "mismatch_values": totals.get("mismatch_values", 0),
         "l1_max": totals.get("l1_max", 0.0),
         "legal_mismatch": totals.get("legal_mismatch", 0),
         "kind_mismatch": totals.get("kind_mismatch", 0),
@@ -925,6 +963,8 @@ def main(argv=None) -> int:
                     help="decide で 1 局あたりの決定点の上限（0=無制限）")
     ap.add_argument("--jobs", type=int, default=1,
                     help="decide を何プロセスに分けて打つか（既定 1）")
+    ap.add_argument("--dump-dir", default=None,
+                    help="decide の不一致の再現一式（hidden／prefix／出目／Python の答え）を書き出す先")
     ap.add_argument("--max-report", type=int, default=1,
                     help="decide で残す不一致の件数（既定 1・原因の性質を見るときは増やす）")
     ap.add_argument("--tie-tol", type=float, default=1e-5,
