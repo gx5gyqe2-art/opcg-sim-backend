@@ -23,7 +23,7 @@ from opcg_sim.src.core.cpu_learned import LearnedEngine
 from opcg_sim.src.learned.mcts import (TreeMCTS, in_battle, in_dialog,
                                        resolve_battle_inplace, resolved_branch_values)
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 def _mgr(pending):

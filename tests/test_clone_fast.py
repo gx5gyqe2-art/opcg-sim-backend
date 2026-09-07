@@ -11,6 +11,9 @@ from engine_helpers import make_game, make_master, make_instance
 from opcg_sim.src.models.models import CardInstance, DonInstance, CardMaster
 from opcg_sim.src.models.enums import CardType
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def test_card_instance_deepcopy_is_independent_and_shares_master():
     import copy

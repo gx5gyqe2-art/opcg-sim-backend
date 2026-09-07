@@ -18,7 +18,7 @@ import pytest
 import replay_runner as RR
 from game_driver import load_db
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 FIXTURE = "tests/fixtures/replays/g3_v4_replay_7943918224969915818.json.gz"
 

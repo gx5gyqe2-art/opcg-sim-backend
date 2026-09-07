@@ -15,6 +15,8 @@ from leader_test_helpers import (
     add_char, make_char, clear_field, zone_counts, leader_power,
 )
 
+pytestmark = pytest.mark.legacy
+
 
 # ---------------------------------------------------------------------------
 # 小道具

@@ -13,7 +13,7 @@ import os
 import conftest  # noqa: F401  (google スタブ注入 & sys.path 設定)
 import pytest
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

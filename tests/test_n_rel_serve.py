@@ -29,7 +29,7 @@ from opcg_sim.src.core import cpu_learned as CL
 from opcg_sim.src.core.cpu_learned import LearnedEngine
 from opcg_sim.src.learned import n_rel as NL
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 @pytest.fixture(scope="module")

@@ -14,6 +14,9 @@ _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 
 from leader_test_helpers import build, make_char
 from opcg_sim.src.models.models import DonInstance
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def _setup(don_count):
     """p2手番から自分(p1)のターン開始を跨ぐ盤面。p1の場のドン!!を don_count 枚にする。"""

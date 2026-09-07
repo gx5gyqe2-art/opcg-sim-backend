@@ -17,6 +17,9 @@ from opcg_sim.src.models.models import CardInstance, DonInstance
 from opcg_sim.src.models.effect_types import GameAction
 from opcg_sim.src.models.enums import ActionType
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def _game_with_don(active: int, rested: int):
     gm = GameManager(Player("p1", [], None), Player("p2", [], None))

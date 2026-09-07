@@ -15,7 +15,7 @@ from cpu_selfplay import build_deck, _load_db
 from engine_helpers import make_master, make_instance
 from turn_solver import is_lethal, is_lethal_ref
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 @pytest.fixture(scope="module")

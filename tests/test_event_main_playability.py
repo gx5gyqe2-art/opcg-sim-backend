@@ -16,6 +16,8 @@ from leader_test_helpers import build, db
 from opcg_sim.src.models.models import CardInstance, DonInstance
 from opcg_sim.src.models.enums import Phase
 
+pytestmark = pytest.mark.legacy
+
 
 def _setup(hand_ids):
     gm, p1, p2, L = build("OP11-040")  # 麦わらルフィ（青）

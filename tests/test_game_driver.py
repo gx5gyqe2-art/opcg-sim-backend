@@ -19,7 +19,7 @@ from game_driver import run_game, make_seat, leader_deck_builder
 from cpu_selfplay import run_one_game
 from cpu_arena import play_game, regret_trace, realize_trace
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 @pytest.fixture(scope="module")

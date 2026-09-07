@@ -11,7 +11,7 @@ import conftest  # noqa: F401
 import p3_loop as P
 from opcg_sim.src.learned.policy import smooth_target
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（学習パイプライン内部機構）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（学習パイプライン内部機構）
 
 
 # --- 案D: priors_fn_of(flatten) ---

@@ -10,7 +10,7 @@ import pytest
 import conftest  # noqa: F401
 from opcg_sim.src.learned.value_net import ValueNet, train
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（学習部品の機構）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（学習部品の機構）
 
 
 def _batch(rng, n=4, feat=126, k=24, vocab=50):

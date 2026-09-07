@@ -21,7 +21,7 @@ from opcg_sim.src.core import action_api
 from opcg_sim.src.core.cpu_learned import (LearnedEngine, _leader_has_don_ramp,
                                             _pick_attach_target)
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 @pytest.fixture(scope="module")

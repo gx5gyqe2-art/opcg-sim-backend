@@ -26,7 +26,7 @@ from opcg_sim.src.learned import encoder as E
 from opcg_sim.src.learned import n_rel as NL
 from opcg_sim.src.learned import n_rel_feat as NR
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 _BOARDS = (("h2", (20, 48, 96)), ("h5", (16, 90)), ("h6", (53,)))
 

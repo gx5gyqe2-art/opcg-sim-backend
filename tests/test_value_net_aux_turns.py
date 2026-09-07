@@ -13,7 +13,7 @@ import pytest
 import conftest  # noqa: F401
 from opcg_sim.src.learned.value_net import ValueNet, train
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（学習部品の機構）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（学習部品の機構）
 
 _V3 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                    "opcg_sim", "data", "learned", "gen3_value.npz")

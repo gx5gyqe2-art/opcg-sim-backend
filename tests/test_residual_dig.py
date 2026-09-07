@@ -25,7 +25,7 @@ import replay_reeval as RE
 from cpu_selfplay import _load_db
 from opcg_sim.src.core.cpu_learned import LearnedEngine, _is_dig_card
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 @pytest.fixture(scope="module")

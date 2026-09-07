@@ -20,6 +20,8 @@ from engine_helpers import make_master, make_instance
 from opcg_sim.src.models.models import CardInstance, DonInstance
 from opcg_sim.src.models.enums import CardType
 
+pytestmark = pytest.mark.legacy
+
 
 # ---------------------------------------------------------------------------
 # 共通ヘルパ

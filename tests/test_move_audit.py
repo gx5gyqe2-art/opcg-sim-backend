@@ -25,7 +25,7 @@ from opcg_sim.src.models.enums import CardType
 
 import move_audit as MA
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 def test_category_uses_effect_dialogs_only():

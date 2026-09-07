@@ -16,6 +16,9 @@ import game_driver as GD
 import heldout_decks as HD
 from opcg_sim.src.models.enums import CardType, TriggerType
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 class _CounterAffordabilityObserver:
     def __init__(self):

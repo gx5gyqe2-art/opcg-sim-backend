@@ -22,6 +22,9 @@ from engine_helpers import make_game
 from opcg_sim.src.models.enums import ActionType, TriggerType
 from opcg_sim.src.models.models import CardInstance, DonInstance
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 @functools.lru_cache(maxsize=1)
 def _db():

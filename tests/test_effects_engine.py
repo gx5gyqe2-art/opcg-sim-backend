@@ -16,6 +16,9 @@ from opcg_sim.src.models.enums import (
     Zone,
 )
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def test_ramp_don_active():
     """RAMP_DON: ドン!!デッキからアクティブで追加。"""

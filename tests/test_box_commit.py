@@ -26,7 +26,7 @@ from opcg_sim.src.learned import config as C
 from opcg_sim.src.learned.mcts import in_battle, in_dialog, resolve_battle_inplace
 from opcg_sim.src.learned.plan import move_sig
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 @pytest.fixture(scope="module")

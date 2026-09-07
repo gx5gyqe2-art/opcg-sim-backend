@@ -27,6 +27,8 @@ from opcg_sim.src.core import action_api
 from opcg_sim.src.models.models import CardInstance
 from opcg_sim.src.utils.loader import CardLoader
 
+pytestmark = pytest.mark.legacy
+
 P1 = "P1"
 P2 = "P2"
 

@@ -20,7 +20,7 @@ from cpu_selfplay import _load_db
 from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.learned.adapter import OPCGGame
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 def _unit(power):

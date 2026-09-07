@@ -33,7 +33,7 @@ from opcg_sim.src.core import cpu_ai
 from opcg_sim.src.core.cpu_learned import LearnedEngine, _value_fn
 from opcg_sim.src.learned.mcts import in_battle, resolved_branch_values
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（探索の配線）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（探索の配線）
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures", "replays")
 

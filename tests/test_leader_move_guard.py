@@ -15,6 +15,9 @@ from engine_helpers import make_game, make_master
 from opcg_sim.src.models.models import CardInstance, CardType
 from opcg_sim.src.models.enums import Zone
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def _totals(p):
     return (len(p.deck) + len(p.hand) + len(p.field) + len(p.trash)

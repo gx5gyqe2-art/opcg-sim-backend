@@ -16,6 +16,9 @@ import conftest  # noqa: F401
 
 from full_card_audit import BASELINE, signatures
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def test_behavior_matches_baseline():
     assert os.path.exists(BASELINE), (

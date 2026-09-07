@@ -22,7 +22,7 @@ import rl_encoder as E
 from option_pair_finetune import load_anchor
 from opcg_sim.src.learned.value_net import ValueNet
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（学習機構）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（学習機構）
 
 N_IDX = 24
 

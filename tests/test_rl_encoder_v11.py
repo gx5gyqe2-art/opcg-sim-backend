@@ -34,7 +34,7 @@ from opcg_sim.src.learned.leader_feat import (DIMS, LEADER_FEAT_DIM,
                                               leader_static_vector)
 from opcg_sim.src.learned.value_net import ValueNet
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（符号化拡張の機構）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（符号化拡張の機構）
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures", "replays", "gen7_marks_20260728")
 OFF = E.SCALARS_V10  # v11 追加ブロックの先頭 offset（73）

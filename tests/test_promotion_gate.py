@@ -10,7 +10,7 @@ import pytest
 
 import promotion_gate as PG
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 def test_stage1_majority_continues():

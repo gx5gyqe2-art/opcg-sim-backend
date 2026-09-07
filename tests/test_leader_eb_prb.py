@@ -21,6 +21,8 @@ from engine_helpers import action
 from opcg_sim.src.models.effect_types import Ability, GameAction, ValueSource
 from opcg_sim.src.models.enums import TriggerType, ActionType
 
+pytestmark = pytest.mark.legacy
+
 
 # ---------------------------------------------------------------------------
 # 共通補助

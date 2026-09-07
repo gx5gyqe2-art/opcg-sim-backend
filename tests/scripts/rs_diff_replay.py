@@ -65,7 +65,6 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXP
 
 import argparse
 import json
-import subprocess
 import traceback
 
 import os as _os, sys as _sys  # noqa: E402  test bootstrap (sys.path + google スタブ)
@@ -75,6 +74,9 @@ import _bootstrap  # noqa: E402,F401
 
 from harness.game_driver import (DEFAULT_MAX_STEPS, InvariantError, build_deck, load_db,  # noqa: E402
                                  make_seat, run_game)
+from harness.rs_golden import (DEFAULT_EFFECTS_PATH, GOLDEN_VERSION,  # noqa: E402
+                               ensure_effects_json, mask_shuffled_targets, replay_hashes,
+                               strip_request_id)
 
 try:                        # Rust 拡張は未導入でも動く（その場合は全局 unimplemented）。
     import opcg_engine
@@ -85,20 +87,8 @@ except ImportError:         # pragma: no cover - 実行環境依存
 # （形を非互換に変えたら両方 +1 する）。
 RECORD_VERSION = 5
 
-# 効果構造 JSON（`opcg_sim/tools/export_effects_json.py` の生成物・git 管理外・約 8MB）。
-# Rust 側は起動時にこれを 1 度だけ読んで `CardMaster` 表を作る（`opcg_engine.load_masters`）。
+# 効果構造 JSON のパスと生成は `tests/harness/rs_golden.py` が正本（golden テストと共有する）。
 _REPO_ROOT = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-DEFAULT_EFFECTS_PATH = _os.path.join(_REPO_ROOT, "opcg_sim", "data", "opcg_effects.json")
-
-
-def ensure_effects_json(path: str) -> str:
-    """効果構造 JSON を用意する（無ければ exporter を呼んで生成する）。"""
-    if os.path.exists(path):
-        return path
-    print(f"[effects] {path} が無いので生成する: python -m opcg_sim.tools.export_effects_json")
-    subprocess.run([_sys.executable, "-m", "opcg_sim.tools.export_effects_json", "--out", path],
-                   cwd=_REPO_ROOT, check=True, stdout=subprocess.DEVNULL)
-    return path
 
 
 def load_masters(path: str) -> None:
@@ -418,38 +408,71 @@ def first_diff(expected, actual, path="") -> str:
     return "" if expected == actual else (path or "<root>")
 
 
-def mask_shuffled_targets(events, shuffled) -> list:
-    """シャッフルを挟んだ段のイベントの `targets` を**枚数だけ**に潰す（照合の前処理）。
+# 正規化の道具は `tests/harness/rs_golden.py` が正本（golden テストと同じ規約を共有する）。
+_strip_request_id = strip_request_id
 
-    再生の規約（計画 §6／§10.2 の 3）では Rust は `random.shuffle` を**再現しない**——
-    その段の並びは、行動が終わってから記録の `hidden` で取り直す。よって「混ぜた直後に
-    引いた／見た」カードの**実体**は Python と一致しようがない（盤面は再同期で一致する）。
-    枚数・アクション・成否・値は照合を続け、実体の識別子だけを外す。
 
-    `shuffled` が空の段（大多数）は何も変えない＝そのまま完全一致で照合する。
+# --- golden（再生の入力＋sha1 の列・計画 §16.1）------------------------------------
+
+def _trim_hidden(hidden: dict, seats: list) -> dict:
+    """再同期に要る部分だけ残した `hidden`。
+
+    Rust の `state::resync_shuffled` が読むのは `players.<席>.deck`／`.hand` の `uuid` だけ
+    （その並びでゾーンを取り直す）。`hidden` は 1 段で 100KB 級なので、これを落とさないと
+    golden が数十 MB になる。
     """
-    if not shuffled:
-        return events
-    out = []
-    for e in (events or []):
-        e = dict(e)
-        if "targets" in e:
-            e["targets"] = f"<{len(e['targets'] or [])} targets after shuffle>"
-        out.append(e)
-    return out
+    out = {}
+    for seat in seats:
+        p = hidden["players"][seat]
+        out[seat] = {"deck": [{"uuid": c["uuid"]} for c in p["deck"]],
+                     "hand": [{"uuid": c["uuid"]} for c in p["hand"]]}
+    return {"players": out}
 
 
-def _strip_request_id(board: dict) -> dict:
-    """`pending_request.request_id` はフロント専用の sha1（候補 to_dict を含む Python 固有の
-    正規化 JSON のハッシュ）なので照合から外す。それ以外（player_id/action/message/
-    selectable_uuids/can_skip/candidates/constraints/options…）は全部照合する。"""
-    b = dict(board)
-    pr = b.get("pending_request")
-    if isinstance(pr, dict):
-        pr = dict(pr)
-        pr.pop("request_id", None)
-        b["pending_request"] = pr
-    return b
+def golden_input(record: dict) -> dict:
+    """`opcg_engine.replay()` に渡すのに要る最小の記録（期待値＝盤面/合法手/イベントは落とす）。
+
+    残すのは「初期盤面（`setup.hidden`）」「行動列」「シャッフルの起きた段の再同期材料」だけ。
+    期待値は [`replay_hashes`] の sha1 として別に持つ。
+    """
+    steps = []
+    for s in record["steps"]:
+        shuffled = list(s.get("shuffled") or [])
+        step = {"index": s.get("index"), "move": s["move"], "shuffled": shuffled}
+        if shuffled:
+            step["hidden"] = _trim_hidden(s["hidden"], shuffled)
+        steps.append(step)
+    return {
+        "version": record["version"],
+        "seed": record["seed"],
+        "policy": record["policy"],
+        "vanilla": record["vanilla"],
+        "setup": {"first_player": record["setup"]["first_player"],
+                  "hidden": record["setup"]["hidden"]},
+        "steps": steps,
+    }
+
+
+def golden_game(record: dict) -> dict:
+    """1 局ぶんの golden（入力＋sha1 の列＋要約）。"""
+    steps = record["steps"]
+    hashes = replay_hashes(
+        [s["state"] for s in steps],
+        [s.get("legal") for s in steps],
+        [s.get("events") for s in steps],
+        [s.get("shuffled") or [] for s in steps],
+    )
+    return {
+        "version": GOLDEN_VERSION,
+        "record_version": RECORD_VERSION,
+        "source": "tests/scripts/rs_diff_replay.py --golden-out",
+        "seed": record["seed"],
+        "policy": record["policy"],
+        "vanilla": record["vanilla"],
+        "input": golden_input(record),
+        "hashes": hashes,
+        "summary": dict({"actions": len(steps)}, **(record.get("result") or {})),
+    }
 
 
 def compare(record: dict, replayed: dict) -> dict:
@@ -574,6 +597,9 @@ def main(argv=None) -> int:
                     help="効果構造 JSON（Rust の CardMaster 表・既定 opcg_sim/data/opcg_effects.json）。"
                          "無ければ export_effects_json で生成する")
     ap.add_argument("--dump", default=None, help="1局目の記録をこのパスへ書き出す（Rust 側の開発用）")
+    ap.add_argument("--golden-out", default=None,
+                    help="golden（再生の入力＋sha1 の列＋要約）を局ごとにこのディレクトリへ書き出す"
+                         "（計画 §16.1）。一致した局だけを書く")
     ap.add_argument("--verbose", action="store_true", help="局ごとの判定を出す")
     args = ap.parse_args(argv)
 
@@ -582,6 +608,8 @@ def main(argv=None) -> int:
     totals = {"games": 0, "actions": 0, "match": 0, "mismatch": 0, "unimplemented": 0,
               "python_error": 0, "bad_payload": 0, "bad_output": 0}
     first = None
+    golden_files = 0
+    golden_bytes = 0
 
     for i in range(args.games):
         seed = args.seed_base + i
@@ -603,10 +631,22 @@ def main(argv=None) -> int:
         if args.verbose:
             print(f"[game {i}] seed={seed} steps={len(rec.steps) if rec else 0} -> {status}"
                   f"{'  ' + verdict.get('detail', '')[:120] if verdict.get('detail') else ''}")
+        if args.golden_out and rec is not None and status == "match":
+            os.makedirs(args.golden_out, exist_ok=True)
+            path = os.path.join(args.golden_out, f"{args.policy}_{seed}.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(golden_game(rec.payload()), f, ensure_ascii=False,
+                          sort_keys=True, separators=(",", ":"), default=str)
+                f.write("\n")
+            golden_bytes += os.path.getsize(path)
+            golden_files += 1
         if args.dump and i == 0 and rec is not None:
             with open(args.dump, "w", encoding="utf-8") as f:
                 json.dump(rec.payload(), f, ensure_ascii=False, default=str)
             print(f"[dump] {args.dump} ({os.path.getsize(args.dump)/1e6:.2f} MB)")
+
+    if args.golden_out:
+        print(f"[golden] {args.golden_out} ({golden_files} games, {golden_bytes/1e6:.2f} MB)")
 
     summary = {
         "games": totals["games"],
@@ -625,6 +665,9 @@ def main(argv=None) -> int:
         "record_version": RECORD_VERSION,
         "first": first,
     }
+    if args.golden_out:
+        summary["golden_files"] = golden_files
+        summary["golden_bytes"] = golden_bytes
     print("RS_DIFF " + json.dumps(summary, ensure_ascii=False))
     # 終了コード: 不一致・契約違反があれば 1（CI は無いが、呼び出し側が機械判定できるように）。
     return 1 if (totals["mismatch"] or totals["bad_payload"] or totals["bad_output"]) else 0

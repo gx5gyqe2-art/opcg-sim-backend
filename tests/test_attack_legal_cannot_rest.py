@@ -18,6 +18,8 @@ from engine_helpers import make_game, make_master
 from opcg_sim.src.models.models import CardInstance, CardType
 from opcg_sim.src.models.enums import Phase
 
+pytestmark = pytest.mark.legacy
+
 
 def _setup(gm, p1, p2):
     p1.leader = CardInstance(make_master(card_id="T-L01", type=CardType.LEADER,

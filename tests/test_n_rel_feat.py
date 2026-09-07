@@ -30,7 +30,7 @@ from cpu_selfplay import _load_db
 from opcg_sim.src.learned import encoder as E
 from opcg_sim.src.learned import n_rel_feat as NR
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 @pytest.fixture(scope="module")

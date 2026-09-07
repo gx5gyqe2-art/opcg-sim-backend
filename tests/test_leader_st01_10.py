@@ -19,6 +19,8 @@ from leader_test_helpers import (
     leader_power, don_total,
 )
 
+pytestmark = pytest.mark.legacy
+
 
 # ---------------------------------------------------------------------------
 # ヘルパ: 場のドン(active+rested)を正確に n 枚に再構成する

@@ -11,6 +11,7 @@
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
 use pyo3::prelude::*;
 
+mod audit;
 mod effects;
 mod encode;
 mod journal;
@@ -132,6 +133,37 @@ fn eval_queries(
 #[pyo3(signature = (record_json, effects_path=None))]
 fn replay_audit(record_json: &str, effects_path: Option<&str>) -> PyResult<String> {
     Ok(state::replay_audit(record_json, effects_path)?)
+}
+
+/// 全カード監査の 1 能力を**Rust だけで**走らせ、各段の sha1 と要約を返す（計画 §16.1）。
+///
+/// `tests/harness/effect_coverage._build_test_state` の汎用盤面を Rust 側（`audit.rs`）で組み、
+/// 能力を 1 つ発動し、`_smart_drain` と同じ既定応答で最後まで解決する。記録（Python エンジン）は
+/// 要らない＝`make test` の監査ゲートが Python エンジンから独立する。
+///
+/// 戻り値は `{"hashes":[sha1,...],"summary":{...}}`。`hashes[i]` は「発動直後／各応答直後」の
+/// `{"events":…,"state":…}` を uuid 別名化＋キー順正規化してから取った sha1 で、Python 側の
+/// `tests/harness/rs_golden.py` が同じ規約で作る値と一致する。
+/// `effects_path` は初回のみ必要（マスター表をプロセスで 1 度読む）。`debug=True` は
+/// 不一致を追うために段ごとの `states`／`events` も返す（golden には残さない）。
+#[pyfunction]
+#[pyo3(signature = (card_id, trigger, ability_index, effects_path=None, debug=false))]
+fn golden_audit(
+    card_id: &str,
+    trigger: &str,
+    ability_index: usize,
+    effects_path: Option<&str>,
+    debug: bool,
+) -> PyResult<String> {
+    if let Some(path) = effects_path {
+        state::load_masters(path)?;
+    }
+    let base = state::masters().ok_or_else(|| {
+        PyValueError::new_err(
+            "golden_audit: card masters are not loaded; call opcg_engine.load_masters(path) first",
+        )
+    })?;
+    Ok(audit::golden_audit(base, card_id, trigger, ability_index, debug)?)
 }
 
 /// 符号化 v13 が使う語彙（`vocab_ids`）を設定する。**プロセスで 1 度**でよい。
@@ -341,6 +373,7 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(replay, m)?)?;
     m.add_function(wrap_pyfunction!(eval_queries, m)?)?;
     m.add_function(wrap_pyfunction!(replay_audit, m)?)?;
+    m.add_function(wrap_pyfunction!(golden_audit, m)?)?;
     m.add_class::<py_game::Game>()?;
     m.add_function(wrap_pyfunction!(set_vocab, m)?)?;
     m.add_function(wrap_pyfunction!(encode_state, m)?)?;

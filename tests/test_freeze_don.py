@@ -13,6 +13,9 @@ from opcg_sim.src.models.models import CardInstance, DonInstance
 from opcg_sim.src.models.effect_types import GameAction, Choice
 from opcg_sim.src.models.enums import ActionType
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 v2 = EffectParserV2()
 
 OP07_026 = "【登場時】相手の、レストのキャラかドン‼1枚までは、次の相手のリフレッシュフェイズでアクティブにならない。"

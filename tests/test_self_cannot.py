@@ -11,6 +11,8 @@ from opcg_sim.src.core.effects.parser_v2 import EffectParserV2
 from opcg_sim.src.models.effect_types import GameAction, Sequence, Branch, Choice, ValueSource
 from opcg_sim.src.models.enums import ActionType, CardType, Phase
 
+pytestmark = pytest.mark.legacy
+
 v2 = EffectParserV2()
 
 

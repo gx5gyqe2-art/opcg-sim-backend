@@ -47,6 +47,7 @@ import _bootstrap  # noqa: E402,F401
 
 import harness.effect_coverage as cov  # noqa: E402
 from harness.engine_helpers import make_master  # noqa: E402
+from harness.rs_golden import GOLDEN_VERSION, audit_hashes  # noqa: E402
 from opcg_sim.src.core.journal import JournaledList  # noqa: E402
 from opcg_sim.src.models.effect_types import Branch, Choice, GameAction, Sequence  # noqa: E402
 from opcg_sim.src.models.models import DonInstance  # noqa: E402
@@ -154,11 +155,14 @@ def card_action_types(master) -> set:
 
 # --- 記録 ---------------------------------------------------------------------
 
-def _drain_and_record(gm, steps: list, watcher: "ShuffleWatcher | None" = None) -> None:
+def _drain_and_record(gm, steps: list, watcher: "ShuffleWatcher | None" = None) -> bool:
     """`effect_coverage._smart_drain` と**同じ既定応答**で対話を消化し、各段を記録する。
 
     分岐・払い出す payload は `_smart_drain` の逐語写し（挙動を変えるとオラクルの意味が
     変わるため）。違いは「各応答とその後の盤面を `steps` へ積む」ことだけ（v5: `shuffled` も）。
+
+    戻り値は「例外で打ち切ったか」（golden の `summary.stopped`＝Rust `audit::drain_default` の
+    第 2 戻り値と突き合わせる）。
     """
     count = 0
     while gm.active_interaction and count < DRAIN_LIMIT:
@@ -189,7 +193,7 @@ def _drain_and_record(gm, steps: list, watcher: "ShuffleWatcher | None" = None) 
             gm.resolve_interaction(player, payload)
         except Exception:
             # `_smart_drain` は例外で打ち切る（記録もそこで止める＝Rust と同じ段数になる）。
-            break
+            return True
         owners = watcher.take() if watcher is not None else []
         steps.append({
             "payload": payload,
@@ -199,6 +203,7 @@ def _drain_and_record(gm, steps: list, watcher: "ShuffleWatcher | None" = None) 
             "hidden": hidden_dict(gm),
         })
         count += 1
+    return False
 
 
 def _normalize_leaders(p1, p2) -> None:
@@ -296,9 +301,10 @@ def record_one(master, ability, ability_index: int, extra: list) -> dict:
         fire["hidden"] = hidden_dict(gm)
 
         steps: list = []
-        _drain_and_record(gm, steps, watcher)
+        stopped = _drain_and_record(gm, steps, watcher)
     return {
         "version": RECORD_VERSION,
+        "stopped": stopped,
         "kind": "audit",
         "card_id": master.card_id,
         "trigger": trig,
@@ -348,6 +354,64 @@ def compare(record: dict, replayed: dict) -> dict:
     return {"status": "match"}
 
 
+# --- golden（sha1 の列だけを残す・計画 §16.1）-------------------------------------
+
+def golden_entry(record: dict) -> dict:
+    """Python の記録から golden 1 件（sha1 の列＋要約）を作る。
+
+    盤面そのものは残さない＝`tests/fixtures/rs_goldens/audit.json` は 3,386 能力ぶんで数 MB に
+    収まる。照合相手は `opcg_engine.golden_audit`（Rust が汎用盤面から作り直した同じ列）。
+    """
+    states = [record["fire"]["state"]] + [s["state"] for s in record["steps"]]
+    events = [record["fire"].get("events")] + [s.get("events") for s in record["steps"]]
+    return {
+        "card_id": record["card_id"],
+        "trigger": record["trigger"],
+        "ability_index": record["ability_index"],
+        "hashes": audit_hashes(states, events),
+        "summary": {
+            "card_id": record["card_id"],
+            "trigger": record["trigger"],
+            "ability_index": record["ability_index"],
+            "stages": len(states),
+            "steps": len(record["steps"]),
+            "events": sum(len(e or []) for e in events),
+            "stopped": bool(record.get("stopped")),
+            "interactive": bool(record["final"]["interactive"]),
+        },
+    }
+
+
+def check_golden(entry: dict, effects_path: str) -> dict:
+    """golden 1 件を Rust の `golden_audit`（記録を使わず盤面から作り直す経路）と突き合わせる。"""
+    if opcg_engine is None or not hasattr(opcg_engine, "golden_audit"):
+        return {"status": "unimplemented", "detail": "opcg_engine.golden_audit is not available"}
+    try:
+        out = opcg_engine.golden_audit(entry["card_id"], entry["trigger"],
+                                       entry["ability_index"], effects_path)
+    except NotImplementedError as e:
+        return {"status": "unimplemented", "detail": str(e)}
+    except ValueError as e:
+        return {"status": "bad_payload", "detail": str(e)}
+    try:
+        got = json.loads(out)
+    except (TypeError, ValueError) as e:
+        return {"status": "bad_output", "detail": f"golden_audit returned non-JSON: {e}"}
+    exp_h, got_h = entry["hashes"], got.get("hashes")
+    if not isinstance(got_h, list):
+        return {"status": "bad_output", "detail": "golden_audit result has no 'hashes' list"}
+    if len(exp_h) != len(got_h):
+        return {"status": "mismatch", "step": min(len(exp_h), len(got_h)),
+                "path": f"hashes[len {len(exp_h)}!={len(got_h)}]"}
+    for i, (e, g) in enumerate(zip(exp_h, got_h)):
+        if e != g:
+            return {"status": "mismatch", "step": i, "path": f"hashes[{i}] {e[:8]}!={g[:8]}"}
+    if got.get("summary") != entry["summary"]:
+        return {"status": "mismatch", "step": len(exp_h), "path": "summary",
+                "detail": json.dumps(got.get("summary"), ensure_ascii=False)}
+    return {"status": "match"}
+
+
 def run_one(record: dict, effects_path: str) -> dict:
     if opcg_engine is None or not hasattr(opcg_engine, "replay_audit"):
         return {"status": "unimplemented", "detail": "opcg_engine.replay_audit is not available"}
@@ -379,6 +443,9 @@ def main(argv=None) -> int:
     ap.add_argument("--effects", default=DEFAULT_EFFECTS_PATH,
                     help="効果構造 JSON（Rust の CardMaster 表）")
     ap.add_argument("--dump", default=None, help="最初の記録をこのパスへ書き出す（開発用）")
+    ap.add_argument("--golden-out", default=None,
+                    help="golden（sha1 の列＋要約だけ）をこのパスへ書き出す。"
+                         "Rust に golden_audit があれば同時に照合する（計画 §16.1）")
     ap.add_argument("--verbose", action="store_true", help="能力ごとの判定を出す")
     args = ap.parse_args(argv)
 
@@ -400,6 +467,7 @@ def main(argv=None) -> int:
               "record_error": 0, "bad_payload": 0, "bad_output": 0}
     first = None
     dumped = False
+    golden: list = []
 
     for i, cid in enumerate(card_ids, 1):
         if i % 300 == 0:
@@ -429,7 +497,12 @@ def main(argv=None) -> int:
             if args.self_check:
                 totals["match"] += 1   # 記録できた＝自己検査は通過
                 continue
-            verdict = run_one(record, args.effects)
+            if args.golden_out:
+                entry = golden_entry(record)
+                golden.append(entry)
+                verdict = check_golden(entry, args.effects)
+            else:
+                verdict = run_one(record, args.effects)
             status = verdict["status"]
             totals[status] = totals.get(status, 0) + 1
             if status != "match" and first is None:
@@ -440,6 +513,19 @@ def main(argv=None) -> int:
                       f"{str(verdict.get('detail') or verdict.get('path'))[:160]}")
     sys.stderr.write(f"\r完了: {len(card_ids)} カード処理済み\n")
 
+    if args.golden_out:
+        _os.makedirs(_os.path.dirname(_os.path.abspath(args.golden_out)), exist_ok=True)
+        with open(args.golden_out, "w", encoding="utf-8") as f:
+            json.dump({
+                "version": GOLDEN_VERSION,
+                "record_version": RECORD_VERSION,
+                "source": "tests/scripts/rs_audit_replay.py --golden-out",
+                "entries": golden,
+            }, f, ensure_ascii=False, indent=0, sort_keys=True)
+            f.write("\n")
+        print(f"[golden] {args.golden_out} ({len(golden)} entries, "
+              f"{_os.path.getsize(args.golden_out)/1e6:.2f} MB)")
+
     summary = {
         "cards": totals["cards"],
         "abilities": totals["abilities"],
@@ -449,7 +535,8 @@ def main(argv=None) -> int:
         "record_error": totals["record_error"],
         "bad_payload": totals["bad_payload"],
         "bad_output": totals["bad_output"],
-        "mode": "self-check" if args.self_check else "replay",
+        "mode": ("self-check" if args.self_check
+                 else ("golden" if args.golden_out else "replay")),
         "action_types": sorted(allowed) if allowed else None,
         "engine": (opcg_engine.version() if opcg_engine is not None else None),
         "record_version": RECORD_VERSION,

@@ -20,7 +20,7 @@ from ref_finetune_smoke import (build_rank_pairs, dead_weighted_pairs, pair_acc,
                                 rank_finetune, rank_finetune_anchored)
 from opcg_sim.src.learned.value_net import ValueNet
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（学習機構）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（学習機構）
 
 FEAT = 6
 K_IDX = 24

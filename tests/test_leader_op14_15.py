@@ -17,6 +17,8 @@ from leader_test_helpers import (
     leader_power, don_total, zone_counts, set_don,
 )
 
+pytestmark = pytest.mark.legacy
+
 
 def _attach_don_to_leader(player, n=1):
     """リーダーに付与ドンを n 枚つけて【ドン!!×N】条件を満たす。"""

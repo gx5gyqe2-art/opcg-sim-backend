@@ -64,6 +64,9 @@ from opcg_sim.src.core.effects.parser import EffectParser
 from opcg_sim.src.models.enums import CardType, TriggerType
 from opcg_sim.src.models.models import CardInstance, DonInstance
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 def _ability(text, idx=0):
     return EffectParser().parse_card_text(text)[idx]

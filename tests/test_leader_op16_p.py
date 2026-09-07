@@ -19,6 +19,8 @@ from leader_test_helpers import (
     add_char, make_char, clear_field, set_life,
 )
 
+pytestmark = pytest.mark.legacy
+
 
 # ---------------------------------------------------------------------------
 # 共通ヘルパ

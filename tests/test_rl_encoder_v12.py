@@ -23,7 +23,7 @@ import replay_reeval as RE
 import replay_runner as RR
 from cpu_selfplay import _load_db
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（符号化世代）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（符号化世代）
 
 import os
 

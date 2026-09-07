@@ -18,6 +18,8 @@ from effect_coverage import _build_test_state
 from opcg_sim.src.utils.loader import CardLoader
 from opcg_sim.src.models.enums import ActionType, TriggerType
 
+pytestmark = pytest.mark.legacy
+
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "opcg_sim", "data")
 
 

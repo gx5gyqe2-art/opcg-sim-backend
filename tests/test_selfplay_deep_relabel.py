@@ -18,7 +18,7 @@ import rl_net as RN
 from cpu_selfplay import _load_db
 from opcg_game import OPCGGame
 
-pytestmark = pytest.mark.cpu_infra   # 基盤健全性（自己対戦生成の内部機構）
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]  # 基盤健全性（自己対戦生成の内部機構）
 
 
 @pytest.fixture(scope="module")

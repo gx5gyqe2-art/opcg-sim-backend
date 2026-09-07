@@ -21,7 +21,7 @@ from opcg_sim.src.core import cpu_ai
 import cpu_arena
 import test_cpu_puzzles as P
 
-pytestmark = pytest.mark.cpu_infra
+pytestmark = [pytest.mark.cpu_infra, pytest.mark.legacy]
 
 
 @pytest.fixture(scope="module")

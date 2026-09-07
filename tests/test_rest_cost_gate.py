@@ -14,6 +14,9 @@ from opcg_sim.src.core.effects.parser import EffectParser
 from opcg_sim.src.core.effects.resolver import EffectResolver
 from opcg_sim.src.models.enums import CardType, TriggerType
 
+import pytest
+pytestmark = pytest.mark.legacy
+
 
 # --- cost_optional の正しい解釈（2026-06-27） -----------------------------------
 # 起動メインの「このキャラ/リーダー/ステージ/カードを rest/trash/… できる：」の「できる」は
