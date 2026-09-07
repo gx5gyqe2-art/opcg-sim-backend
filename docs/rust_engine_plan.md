@@ -1769,3 +1769,86 @@ Rust 側に揃っており、PyO3 の対局オブジェクト 1 つと FastAPI �
 
 P5 の受け入れに「API 契約テスト（`contract/api_schema.json` が不変・`test_api_contract` 相当が Rust 経由で
 通る）」を加える（§3 の表を更新済み）。
+
+## 15. 対戦 API の Rust 化（前倒し・ユーザ決定 2026-09-07「API 部分も今変える」）
+
+### 15.1 調査結果（2026-09-07）
+
+- API 層（`opcg_sim/api/`・1,181 行）がエンジンに要求する操作は 5 つ: 対局生成（デッキ→`GameManager`・
+  `start_game(first_player)`）／`apply_game_action`／`apply_battle_action`／盤面 dict（`Player.to_dict`・
+  `active_battle`）／`get_pending_request`。加えて CPU 対戦（`/api/game/cpu/step`）が `decide` を呼ぶ。
+- **フロント（`opcg-sim-frontend`）は変更不要**。契約（`contract/api_schema.json`・`shared_constants.json`）
+  は変えない。フロントが読む追加欄は 3 つで、いずれもバックエンドで満たす:
+  - `action_events`（イベントログ・`EffectToast`）: Python は 13 か所で積む（`action_api` の 11 種＝PLAY／
+    TURN_END／ATTACK／ATTACH_DON／ACTIVATE_MAIN／MULLIGAN／KEEP_HAND／BLOCK／COUNTER／PASS と、効果の
+    `EFFECT`＝`resolver.action_history` を `resolve_ability`／遅延フラッシュ／対話再開の 3 か所で写す）。
+    形は `{type, player, card_name?, action?, targets?, value?, message?, success?, dest?}`。**Rust 側で同じ
+    dict を同じ順序で積む**（新規: `Session.action_events`＝journal の外・要求ごとにリセット）。
+  - `pending_request.request_id`（フロントの「新しい要求」検知）: Python の `_rid`（要求 dict＋turn_count の
+    正規化 JSON の sha1）を **Python のアダプタ側で計算**する（Rust は出さない。P2 と同じ）。
+  - `cpu_event`／`waiting_for`: ルータが組み立てる（変更なし）。
+- `SandboxManager`（自由配置の編集用）はルールエンジンではないので Python のまま。
+- CPU 対戦の `decide` は P4 完了まで Python（`cpu_learned`）。**暫定**: Rust の盤面を記録 v5 の `hidden` で
+  取り出し、`tests/harness/rs_record.py::manager_from_hidden`（P1 で作った復元器）で Python の `GameManager` を
+  組んで `decide` に渡し、返った手を Rust に適用する。裁定は Rust 側だけで進む（Python 側は読むだけ）。
+  P4 の `rs-p4-mcts` が入ったら Rust の `decide` に差し替える。
+
+### 15.2 設計
+
+- Rust（PyO3・新規 `src/py_game.rs`。`lib.rs` は `add_class` の 1 行だけ）: クラス `Game`
+  - `Game.new(p1_name, p2_name, p1_leader, p1_deck, p2_leader, p2_deck, first_player, seed)`
+    （card_id の列。`first_player` は "p1"/"p2"/"random"。**Rust 側の決定的 PRNG**（`rand_pcg` 相当を自前・
+    seed 指定＝リプレイ種、None＝OS 乱数）で山札シャッフルとコイントス）
+  - `apply_game_action(player_id, action_type, payload_json) -> events_json`／
+    `apply_battle_action(player_id, action_type, card_uuid) -> events_json`（Python の `ValueError` と
+    **同じ文言**で `ValueError` を送出＝`_validate_action`／`declare_attack`／`play_card_action`／`pay_cost`／
+    `action_api` の各メッセージを転記）
+  - `board_json()`（`turn_info`／`players`／`active_battle`＝`build_game_result_hybrid` の `raw_game_state` と同形）・
+    `pending_json()`（`request_id` 無し）・`legal_json(player_id)`・`winner()`・`turn_player()`・
+    `hidden_json()`／`Game.from_hidden(json)`（CPU 暫定経路・リプレイフレーム・テスト用）
+- Python（`opcg_sim/api/`）: `engine_rs.py`（`Game` を包み、`request_id` の `_rid` と `action_events` の受け渡し・
+  `manager_from_hidden` による暫定 CPU 経路）。`routers.py`／`presenters.py`／`state.py`／`ws.py` の
+  `GameManager` 参照をこれに置き換える。`decide_client.py` は暫定経路で呼ぶ。`SandboxManager` は触らない。
+- 乱数: これまで Rust は「出目を受け取る」だけだったので、ここで初めて Rust 側の生成器が要る。
+  `search/rng.rs`（PCG32・seed→決定的）を本 WP が入れる（P4-mcts／P5 も使う）。マリガン・SHUFFLE 効果も
+  この生成器で回す（再生のときだけ記録の並びで上書き＝従来どおり）。
+
+### 15.3 受け入れ
+
+- `action_events` のオラクル: `rs_diff_replay.py --mode replay` に各行動の `events`（Python の
+  `manager.action_events`）を記録・照合する欄を足し（記録 v5 は据え置き・additive）、random 100 局＋L1 20 局で
+  一致。全カード監査（`rs_audit_replay.py`）でも `fire`／各 `payload` 後の events を照合し 3,386 能力一致。
+- 既存の API テスト（`tests/test_api_*.py`・`test_api_contract`・`test_contract_export`）が Rust 経由で**無変更で**
+  通る（`GameManager` 内部を覗くテストだけ書き換え可＝一覧を RESULT.json に）。`contract/` の再生成差分ゼロ。
+- エラーメッセージ: 不正な行動 20 種（手番違い・コスト不足・攻撃不可…）で Python と同じ `error.message`
+  （テストに転記）。
+- CPU 対戦: `vs_cpu=true` の対局を `cpu/step` で最後まで進められる（暫定経路）。`cpu_trace`＋`seed` の
+  リプレイ（`/replay/frames`）が動く。
+- `docker build`（可能な環境で）→ Cloud Run の起動確認は P5。
+
+### 15.4 指示書（1〜2 セッション・P4 の 3 WP と並行可）
+
+```
+対戦 API を Rust エンジンで動かしてください。計画 docs/rust_engine_plan.md §15（設計・受け入れ）。本線
+claude/cpu-spec-improvements-yw91jd から分岐し、claude/rs-api に push、PR は作りません。Python が正
+（エンジンの裁定は変えない・API 契約 contract/ は不変・フロントは変更しない）。
+
+やること:
+1. Rust: src/py_game.rs に PyO3 クラス Game（§15.2 のメソッド）。src/search/rng.rs に決定的 PRNG（PCG32）を
+   入れ、対局生成のシャッフル／コイントス・マリガン・SHUFFLE 効果で使う（再生経路は従来どおり記録の並び）。
+   Session に action_events（journal の外・要求ごとに reset）を足し、Python の 13 か所（action_api の 11 種＋
+   EFFECT 3 か所）と同じ dict を同じ順序で積む。不正な行動は Python と同じ文言の ValueError。
+   lib.rs は m.add_class::<Game>() の 1 行だけ（P4 の 3 WP が lib.rs に関数を足すので衝突を避ける）。
+2. Python: opcg_sim/api/engine_rs.py（Game のラッパ・_rid の計算・manager_from_hidden による暫定 CPU 経路＝
+   tests/harness/rs_record.py の復元器を opcg_sim/src/core/rs_bridge.py へ移して import）。routers.py／
+   presenters.py／state.py／ws.py の GameManager 参照を置き換える。SandboxManager は触らない。
+3. オラクル: rs_diff_replay.py の Recorder に events を記録し compare で照合（additive・version 据え置き）。
+   rs_audit_replay.py も同様。random 100 局＋L1 20 局・全カード監査で events 一致。
+4. tests/test_api_rs_errors.py（新規・必須/標準）: 不正な行動 20 種の error.message が Python の文言と一致。
+   既存の tests/test_api_*.py を Rust 経由で通す（内部を覗くテストの書き換えは一覧を RESULT.json に）。
+5. cargo test/clippy 0・make test green（API テスト込み）。docs/rust_engine_plan.md §8 に結果行・§15 に実測、
+   docs/TEST_SPEC.md §2 に test_api_rs_errors.py の行と rs_diff_replay の events 照合の追記。
+
+受け入れ: §15.3 の全項目。RESULT.json: {"job":"rs-api","status":"done","events_oracle":{...},"api_tests":{...},
+"rewritten_tests":[...],"notes":"..."}。
+```
