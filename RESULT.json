@@ -1,0 +1,1 @@
+{"job": "gen-n27-w08", "role": "gen", "status": "done", "inputs": {"neff_net": "claude/n1-results:n1_results/nrel_a1.npz", "wave": 27, "shard": "08", "seed_base": 2278000, "games": 960, "sims": 128, "workers": 4, "dump_v2": true, "resumed": false, "resume_dirs": []}, "outputs": {"records": "n27_records/", "log": ["n27_gen.log"]}}
