@@ -58,7 +58,7 @@ Python 側は段階に応じて `opcg_engine` を import し、無ければ従�
 | **P2 ルール** | ターン進行・戦闘（宣言・ブロック・カウンター・解決）・勝敗・合法手列挙・pending request | バニラ 500 局＋既存 `test_gamestate*`／`test_battle*` 相当のケースを Rust で再現 | 3〜5 セッション |
 | **P3 効果解決** | EffectNode 木の実行・62 ActionType・42 ConditionType・対象選択・対話の中断/再開・常時効果・トリガー。**頻度順に実装**し、未実装は明示エラー（黙って無視しない） | (a) 全カード監査（`tests/harness/full_card_audit.py`）の行動列再生で一致 (b) `test_effect_oracle_gate` の HAS_OTHER 等 0 (c) leader_specs のテストケース (d) 交差対面監査 | 10〜20 セッション（最大） |
 | **P4 符号化・forward・探索** | v13 符号化・指紋・NRel forward（npz 読込・R 遮断）・MCTS・`decide` | 同じ盤面・同じ seed で Python 版と手・訪問分布が一致（浮動小数の丸め差は許容 1e-5・手の一致は 100 局で確認） | 5〜8 セッション |
-| **P5 切替** | 生成・アリーナ・serve を Rust 既定に。PyPy 段を Dockerfile から除去 | 生成 1 局の実測・アリーナ a1 vs a1（Rust vs Python・互角の確認）・API 契約テスト | 2〜3 セッション |
+| **P5 切替** | 生成・アリーナ・serve **と対戦 API** を Rust 既定に（ユーザ決定 2026-09-07・§14）。PyPy 段を Dockerfile から除去 | 生成 1 局の実測・アリーナ a1 vs a1（Rust vs Python・互角の確認）・API 契約テスト（`contract/` 不変） | 2〜3 セッション |
 
 P3 が最大の山。ActionType/ConditionType の実装は「カード DB での出現頻度順」に並べ、各 WP は
 10〜15 種類ずつ受け持つ。WP の受け入れは「その種類を使う全カードの監査行動列が一致」。
@@ -1742,3 +1742,30 @@ P5 が終わったら（Rust が生成・serve の既定になったら）次の
 
 判断は P5 の完了時に §8 の実測を見て行う（それまでは現状の運用のまま。ユーザ指示により make test は
 最低限＝Python エンジンに触れない変更では待たない）。
+
+## 14. Python 版の扱い（Rust 化の後・2026-09-07）
+
+ユーザの方針: **Python 版エンジンは退避して以後使わない**（2 つのエンジンを保守し続けない）。
+決定済み: **対戦 API も Rust エンジンで動かす**（ユーザ決定 2026-09-07。速さのためではなく、Python 版を
+退避してエンジンを 1 つにするため。API が要る操作＝行動の適用・盤面 dict・要求・合法手は再生経路で
+Rust 側に揃っており、PyO3 の対局オブジェクト 1 つと FastAPI 側の薄いアダプタで足りる）。
+
+退避の形（案・P5 の完了時に実施）:
+
+- 最終コミットに tag `py-engine-final`。`opcg_sim/src/core/`（engine／effects／actions／cpu_ai／cpu_learned）と
+  `opcg_sim/src/learned/`（encoder／n_rel／n_rel_feat／mcts／adapter の serve 部分）を `legacy/python_engine/`
+  へ移し、テスト対象から外す。履歴と tag で再現できる。
+- Python に残す: パーサ（`effects/parser.py`・`parser_v2.py`）と `export_effects_json.py`、学習
+  （`n_rel_train.py`・データ処理・評価帯）、API 層（FastAPI・`contract/`）、生成／アリーナのオーケストレーション、
+  `shared_constants.json`。
+
+先に決めること（未決・コーディネータの推奨つき）:
+
+1. **保証の移し先**: 現行 1,761 件の大半は Python エンジンを直接叩く。退避前に Python で golden（全カード監査
+   の記録 v5・検証済みデッキの再生・leader_specs の期待値・効果オラクルのラチェット値）を記録し、Rust 側の
+   テスト／fixture に置き換える。以後の新カード・裁定変更は Rust を正として判断する。**推奨: 実施**。
+2. **L1（古典 CPU・`cpu_ai.py`）**: Python エンジンに密結合。N系に置き換わっているので**推奨: 廃止**
+   （アリーナの対照・`--policy l1` の記録は Rust の N系か random で代える）。残すなら移植 WP が 1 本増える。
+
+P5 の受け入れに「API 契約テスト（`contract/api_schema.json` が不変・`test_api_contract` 相当が Rust 経由で
+通る）」を加える（§3 の表を更新済み）。
