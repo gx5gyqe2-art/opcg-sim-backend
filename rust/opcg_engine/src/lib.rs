@@ -133,6 +133,31 @@ fn replay_audit(record_json: &str, effects_path: Option<&str>) -> PyResult<Strin
     Ok(state::replay_audit(record_json, effects_path)?)
 }
 
+/// NRel の npz（重み・`meta` の ablate・`vocab_ids`）を読む。**プロセスで 1 度**でよい。
+///
+/// 戻り値は要約 JSON `{"hidden":..,"ablate":[..],"vocab_ids":[..],"card_table_rows":..,"meta":".."}`。
+/// 2 回目以降の呼び出しは何もせず現在のネットの要約を返す（P4 の他 WP と同じ「1 度読む」規約）。
+///
+/// `tables_path` は `n_eff.build_eff_tables` の 5 表（`STATS`/`AB`/`ABM`/`PWR`/`ISL`）と
+/// `n_rel_feat.profile_table` の `ret_don`（鍵 `RET`）を収めた npz。**WP `rs-p4-net` は
+/// 符号化 WP と独立に検証する**ため、カード表の元はハーネス（Python）が書き出したものを読む。
+/// 省略すると Rust 側の `encode::build_eff_tables`（WP `rs-p4-encode` の担当）で組む。
+#[pyfunction]
+#[pyo3(signature = (path, tables_path=None))]
+fn load_net(path: &str, tables_path: Option<&str>) -> PyResult<String> {
+    Ok(net::load_net(path, tables_path)?)
+}
+
+/// 符号化（`encode::Encoding` と同じ鍵の JSON）と候補の JSON から `value` と `priors` を返す。
+///
+/// 戻り値は `{"value": float, "priors": [float...]}`（`priors` は候補上の seg-softmax＝
+/// Python の `nrel_priors` と同じ）。候補が空なら `priors` は空配列。`load_net()` が先に要る。
+/// 候補 JSON の形は `net::cand_rows` の docstring を参照（`tests/scripts/rs_net_oracle.py` が詰める）。
+#[pyfunction]
+fn net_eval(encoding_json: &str, legal_json: &str) -> PyResult<String> {
+    Ok(net::net_eval(encoding_json, legal_json)?)
+}
+
 #[pymodule]
 fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
@@ -145,5 +170,7 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(replay, m)?)?;
     m.add_function(wrap_pyfunction!(eval_queries, m)?)?;
     m.add_function(wrap_pyfunction!(replay_audit, m)?)?;
+    m.add_function(wrap_pyfunction!(load_net, m)?)?;
+    m.add_function(wrap_pyfunction!(net_eval, m)?)?;
     Ok(())
 }

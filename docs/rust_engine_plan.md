@@ -145,6 +145,8 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P3 | **群 C（カードの流れ）完了**（`claude/rs-p3-flow`）: `actions/flow.rs` に PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_EVENT（EXECUTE_MAIN_EFFECT／DECLARE_COST は resolver が既に捌く）。監査 **cards=865／abilities=1144／match=1144・mismatch=0・unimplemented=0**（着手前は unimplemented=128）。退行 4 本一致・`cargo test` 182 green・clippy 0・`make test` green。結果は下記 §8.10 |
 | 2026-09-07 | P3 | **群 D（ドン!!）完了**（`claude/rs-p3-don-mdlsba`）: `actions/don.rs` の 7 種（RETURN_DON／RAMP_DON／REST_DON／ATTACH_DON／ACTIVE_DON〔target 無し〕／FREEZE_DON／MOVE_ATTACHED_DON）。F∪D 監査 979 枚・1,273 能力で **mismatch=0**・unimplemented=1（残り 1 件＝OP12-037 の「キャラかドン!!」選択。`resolve_targets`→`Interaction`→`run_target_loop` の `Vec<CardIdx>` を `TargetRef` へ広げる必要があり本 WP の所有外＝コーディネータへ申告）。退行 4 本一致・`cargo test` 187 green・clippy 0・`make test` green。結果は下記 §8.10 |
 
+| 2026-09-07 | P4 | **`rs-p4-net` 完了**（`claude/rs-p4-net`＝`claude/rs-p4-net-yiwio4`・同じコミット）: `net/npz.rs`（zip64 の local header・deflate・npy v1/v2・`<U` 文字列。依存は `miniz_oxide` のみ）・`net/nrel.rs`（`card_table`／`tokens_forward`＝`_tokens_forward_1` 同値／`body`／`value`／`cand_input`＋`policy_logits`＋`seg_softmax`／`mask_sc`／`mask_rel`／`_cand_row` 139／予算 3）・`lib.rs::load_net`／`net_eval`・`rs_net_oracle.py`。200 局面×両視点で **value 最大誤差 1.05e-06・priors 最大誤差 5.51e-07・mismatch=0**（許容 1e-5）。`cargo test` 301 green・clippy 0・`make test` green。契約からの逸脱 4 点は §8.16 に申告。結果は下記 §8.16 |
+
 ### 8.1 P0 の結果（2026-09-06）
 
 成果物（Python 側は一切変更していない＝追加のみ）:
@@ -912,6 +914,71 @@ Python と同じ slice 意味論（`take` が負なら `len + take` を 0 未満
 
 `make audit-cross` 相当（(d)）はハーネスに `--policy l1 --cross` が無いため、計画どおり
 L1 100 局再生（上表）で代える。
+
+### 8.16 P4 `rs-p4-net`（NRel forward）の結果（2026-09-07）
+
+ブランチは `claude/rs-p4-net` と `claude/rs-p4-net-yiwio4`（作業セッションに割り当てられた名前）の
+**両方に同じコミット**を置いた（指示書の名前と割り当て名が違ったため。どちらを取り込んでも同じ）。
+
+本線 `claude/cpu-spec-improvements-yw91jd`（9d71c7a＝P4 の契約を入れた直後）から分岐。
+**Python 側（`opcg_sim/`）は 1 行も変えていない**（変更は `rust/opcg_engine/` と新規ハーネス
+`tests/scripts/rs_net_oracle.py` のみ）。符号化 WP（`rs-p4-encode`）とは独立に検証した＝入力は
+Python の `NRelValueAdapter.encode_state` を JSON で渡す。
+
+成果物:
+
+- **`net/npz.rs`**（npz の最小読み取り・依存は `miniz_oxide` のみ）: zip は**中央ディレクトリから
+  辿る**。numpy は `force_zip64=True` で書くので **local header のサイズ欄は 0xFFFFFFFF**＝
+  サイズ・オフセットは中央ディレクトリ（必要なら zip64 拡張フィールド 0x0001）から採り、
+  local header は名前長・拡張長を読んでデータ位置へ進むためだけに読む。圧縮は stored(0) と
+  deflate(8)。npy は v1/v2 ヘッダ・`fortran_order: False`・`<f4`／`<f8`／`<i8`／`<i4`／
+  `<U<n>`（UCS-4 LE・NUL 詰め）。object 配列（pickle）は読まない＝`meta` は Python 側が
+  JSON 文字列（`<U672`）で書いている。`meta` の `ablate` を読んで復元する。
+- **`net/nrel.rs`**（forward・すべて float32 で Python の式を 1 行ずつ転記）: `card_table`／
+  `tokens_forward`／`body`／`value`／`cand_input`＋`policy_logits`＋`seg_softmax`（＝`priors`）／
+  `mask_sc`（`opp_pool` 11 列＝scalars 107..117・`onplay` 3 列＝67..69）／`mask_rel`／
+  `n_eff._cand_row`（F_CAND 139）／`nrel_priors` の予算 3 列。対の経路は **serve の
+  `_tokens_forward_1` と同値**（居る枠だけで対を組む）。R を遮断しないネットでは
+  `[t_i, t_j, R_ij]·Wr` の第 3 項を足す（遮断時は足さない＝加算順まで `_tokens_forward_1` と
+  一致する）。seg-softmax だけは Python と同じく float64 で exp/和を取り最後に float32 へ落とす。
+- **`lib.rs`**: `load_net(path, tables_path=None)`（プロセスで 1 度・`vocab_ids`／`hidden`／
+  `ablate`／`card_table_rows`／`meta` を返す）と `net_eval(encoding_json, legal_json)`
+  → `{"value":..,"priors":[..]}`。
+- **`tests/scripts/rs_net_oracle.py`**（新規）: 200 局面 × 両視点で照合（下表）。
+
+**契約からの逸脱（申告・§12.5 の「足りなければ notes で」）**:
+
+1. `net::cand_rows` に引数 `stat: &CardStatics`（`_cand_row` が読む `PWR`／`ISL` と
+   `nrel_priors` の `ptab_ret`）を足した。`Encoding` にも `Vocab` にも無く、契約の 4 引数では
+   候補特徴を作れないため。`legal` の各要素は探索用合法手 JSON に**盤面で解けた識別**
+   （`card_id`／`target_card_id`／`si`／`ti`）を足した形にした（uuid → カード → 22 枠 index の
+   解決は盤面と符号化の担当＝`rs-p4-encode`／`rs-p4-legal` の範囲なので、本 WP の受け入れでは
+   ハーネスが詰める）。
+2. `load_net` に `tables_path`（省略可）を足した。カード表の元（`n_eff.build_eff_tables` の 5 表と
+   `n_rel_feat.profile_table` の `ret_don`）は符号化 WP の所有物なので、独立検証では Python が
+   書いた npz を読む（**カード表 `card_table()` の計算そのものは Rust 側**）。省略時は
+   `encode::build_eff_tables` を呼ぶ＝`rs-p4-encode` が入れば引数なしで動く。
+3. `encode/mod.rs` の doc コメントで `rel_oo` を `[N_OPP × N_OWN × R_DIM]` と書いているが、
+   Python（`n_rel.tokens_forward`）の `rel_oo` は**自×自** `[N_OWN × N_OWN × R_DIM]`（16×16×5）。
+   契約ファイルは符号化 WP の所有なので直していない（コメントのみの誤り）。実装は Python に合わせた。
+4. `Encoding.field`（10×8）は NRel の入力に無いので `net_eval` は受け取っても使わない
+   （ハーネスも詰めていない）。
+
+**受け入れ実測（2026-09-07・`--boards 200 --games 10 --policy both --seed-base 900000`）**:
+
+| 項目 | 結果 |
+|---|---|
+| `value`（200 局面 × 両視点） | 400 件・**最大絶対誤差 1.05e-06**・mismatch=0（許容 1e-5） |
+| `priors`（手番側・候補 1,210 件／200 集合） | **最大絶対誤差 5.51e-07**・mismatch=0 |
+| 空振り検査 | `nonzero_values`=400／候補が 2 つ以上あった集合 141／対象付き候補 420／`don_k` 付き 457。候補の種別: DON_BOX 720・PLAY 225・TURN_END 129・PASS 66・SELECT_COUNTER 51・ACTIVATE_MAIN 5・MULLIGAN 5・KEEP_HAND 5・SELECT_BLOCKER 4 |
+| 否定対照（`card_table` の mean/max プールを入れ替えた壊れた版） | `--boards 20 --games 1 --policy random` で **mismatch=40**（value 30／priors 10・最大誤差 value 1.9e-02・priors 2.1e-01）。元に戻すと同じ条件で mismatch=0＝**オラクルは空振りで緑になっていない** |
+| `cargo test --no-default-features` | **301 passed**・0 failed・0 ignored |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `make test`（Python 側・無変更） | **green** |
+
+`nrel_a1.npz` は `ablate=["rel"]` なので R（関係）の経路はオラクルでは踏まない。代わりに
+`cargo test` の `relations_enter_pair_features_when_not_ablated` で「R 列が `Wr`／`Wc` の
+第 3 ブロックを通って対の特徴に入る／遮断時は入らない」を単体で押さえた。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 

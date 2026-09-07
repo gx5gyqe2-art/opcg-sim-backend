@@ -1,0 +1,65 @@
+{
+  "job": "rs-p4-net",
+  "status": "done",
+  "branch": "claude/rs-p4-net-yiwio4",
+  "base": "claude/cpu-spec-improvements-yw91jd@9d71c7a",
+  "oracle": {
+    "harness": "tests/scripts/rs_net_oracle.py",
+    "cmd": "OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_net_oracle.py --boards 200",
+    "boards": 200,
+    "values": 400,
+    "priors_rows": 200,
+    "priors_cands": 1210,
+    "value_max_abs_err": 1.05e-06,
+    "priors_max_abs_err": 5.513e-07,
+    "mismatch": 0,
+    "value_mismatch": 0,
+    "priors_mismatch": 0,
+    "unimplemented": 0,
+    "bad_payload": 0,
+    "harness_error": 0,
+    "tol": 1e-05,
+    "net": "nrel_a1.npz",
+    "ablate": ["rel"],
+    "vocab": 2652,
+    "card_table_rows": 2653,
+    "games": 10,
+    "policy": "both",
+    "seed_base": 900000,
+    "coverage": {
+      "nonzero_values": 400,
+      "multi_cand_rows": 141,
+      "cands_with_target": 420,
+      "cands_don_k": 457,
+      "cand_kinds": {
+        "ACTIVATE_MAIN": 5, "DON_BOX": 720, "KEEP_HAND": 5, "MULLIGAN": 5, "PASS": 66,
+        "PLAY": 225, "SELECT_BLOCKER": 4, "SELECT_COUNTER": 51, "TURN_END": 129
+      }
+    },
+    "negative_control": {
+      "what": "card_table の mean/max プールを入れ替えた壊れた版（戻すと同じ条件で mismatch=0）",
+      "cmd": "--boards 20 --games 1 --policy random",
+      "mismatch": 40,
+      "value_mismatch": 30,
+      "priors_mismatch": 10,
+      "value_max_abs_err": 0.01918,
+      "priors_max_abs_err": 0.2062
+    }
+  },
+  "gates": {
+    "cargo_test": "301 passed / 0 failed / 0 ignored (--no-default-features)",
+    "cargo_clippy": "0 warnings (--no-default-features --all-targets -- -D warnings)",
+    "make_test": "green"
+  },
+  "notes": [
+    "Python 側（opcg_sim/）は無変更。追加は rust/opcg_engine/ と tests/scripts/rs_net_oracle.py のみ。",
+    "契約の逸脱 1: net::cand_rows に引数 stat: &CardStatics（_cand_row が読む PWR/ISL と nrel_priors の ptab_ret）を追加した。契約の 4 引数（tab/vocab/enc/legal）では候補特徴を作れないため。legal の各要素は探索用合法手 JSON に盤面で解けた識別（card_id/target_card_id/si/ti）を足した形（uuid→カード→22 枠 index の解決は rs-p4-encode／rs-p4-legal の範囲なので、独立検証ではハーネスが詰める）。",
+    "契約の逸脱 2: lib.rs::load_net に省略可の tables_path を追加した。カード表の元（build_eff_tables の 5 表＋profile_table の ret_don）は符号化 WP の所有物なので、独立検証では Python が書いた npz を読む。カード表 card_table() の計算そのものは Rust 側。省略時は encode::build_eff_tables を呼ぶので rs-p4-encode が入れば引数なしで動く。",
+    "契約の誤り（直していない）: encode/mod.rs の doc は rel_oo を [N_OPP × N_OWN × R_DIM] と書いているが、Python の rel_oo は自×自 [N_OWN × N_OWN × R_DIM]（16×16×5）。契約ファイルは符号化 WP の所有なのでコメントは触らず、実装は Python に合わせた。",
+    "Encoding.field（10×8）は NRel の入力に無いので net_eval は使わない（ハーネスも詰めていない）。",
+    "依存: miniz_oxide 0.8（deflate 展開のみ）。adler2 は miniz_oxide の必須の推移依存で外せない。",
+    "nrel_a1.npz は ablate=[\"rel\"] なので関係 R の経路はオラクルでは踏まない。cargo test の relations_enter_pair_features_when_not_ablated で単体で押さえた（R 列が Wr/Wc の第 3 ブロックを通る／遮断時は通らない）。",
+    "ハーネスは復元盤面の active_battle に所在の持ち主を戻し、rs_record の get_pending_request 封じを外す（外さないと get_legal_actions が空を返し、方策の照合が空振りで緑になる）。共有ハーネス tests/harness/rs_record.py は変更していない。",
+    "value と priors は Python 側で経路が違う（value=_tokens_forward_1 の serve 経路・priors=一括経路）。Rust は 1 経路（_tokens_forward_1 と同値）で両方に 1e-6 級で一致する。"
+  ]
+}
