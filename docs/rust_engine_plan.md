@@ -136,6 +136,7 @@ tests/scripts/rs_diff_replay.py --games 100 --seed-base 500000 --policy random|l
 | 2026-09-07 | P3 | **土台 2 WP の統合・受け入れ**（`claude/rs-p3-integrate`）: core → resolver の順に cherry-pick し §11.6 のとおり単一化（`Vec<TargetRef>`／`EffectContext` の全欄／能力表は `MasterTable.abilities`／stub は core へ委譲／文脈の JSON 読込は `eval::context_from_json`）。オラクル 5 本すべて一致（問合せ 7,337,400 件 mismatch=0／土台監査 634 枚・817 能力 mismatch=0・unimplemented=0／バニラ再生 50 局・状態 10 局・原始操作 10 局とも一致）・`cargo test` 166 green（`#[ignore]` 0）・clippy 0・`make test` green。結果は下記 §8.9 |
 | 2026-09-07 | P3 | **統合をコーディネータが受け入れ・本線へ**（`claude/rs-p3-integrate` 776d492a を fast-forward）。未見 seed の再検証: F 監査 634 枚/817 能力 mismatch=0・問合せ 40 局面 1,467,480 件 mismatch=0・バニラ再生 20 局 match=20・状態 5 局 match=5・原始操作 3 局 5,190 件 mismatch=0。`cargo test` 166 green・clippy 0・`make test` green |
 | 2026-09-07 | P3 | **群 A〜E の差し口と指示書を本線へ**（§11.7）: `actions/{status,zone,flow,don,rules}.rs` の 3 入口（`game_handler`／`owns_target`／`apply_target`）と `mod.rs` の呼び出し。受け入れ集合は F∪群だけのカード（A 782／B 987／C 865／D 979／E 710 枚） |
+| 2026-09-07 | P3 | **群 A（状態系）`rs-p3-status` 完了**（`claude/rs-p3-status-rkkh9m`）: `actions/status.rs` の 3 入口を本体化（GRANT_KEYWORD／ATTACK_DISABLE／PREVENT_REST／FREEZE／NEGATE_EFFECT／DISABLE_ABILITY／SWAP_POWER。BUFF の全形は土台 `mod.rs::buff` が既に持っていた＝委譲不要で `mod.rs` は無変更）。監査 **cards=782／abilities=1014／match=1014・mismatch=0・unimplemented=0**（受け入れ規模ちょうど）・退行 4 本一致・`cargo test` 194 green・clippy 0・`make test` green。結果は下記 §8.10 |
 
 ### 8.1 P0 の結果（2026-09-06）
 
@@ -581,6 +582,62 @@ bad_payload=21 に退行した。`rs_diff_replay.py` のバニラデッキは Py
 `request_id` を除いて段ごとに突き合わせる。負のコントロール: fixture の期待値を 1 か所
 （`life_count`）ずらすと「段 0 の盤面が Python と違う」で落ちる＝素通りしていない。
 全カード（634 枚／817 能力）の照合はハーネス側（上表）で回す。
+
+### 8.10 P3 群 A（状態系）の結果（2026-09-07・WP `rs-p3-status`）
+
+本線 `claude/cpu-spec-improvements-yw91jd`（e619991）から分岐。**Python 側（`opcg_sim/`）は 1 行も
+変えていない**。触ったのは `rust/opcg_engine/src/effects/actions/status.rs` のみ
+（`mod.rs`／`resolver.rs`／`interact.rs`／`triggers.rs`／`model.rs`／`ops.rs` はいずれも無変更）。
+
+| 受け入れ | 結果 |
+|---|---|
+| `rs_audit_replay.py --action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF,GRANT_KEYWORD,ATTACK_DISABLE,PREVENT_REST,FREEZE,NEGATE_EFFECT,DISABLE_ABILITY,SWAP_POWER` | **cards=782／abilities=1014／match=1014／mismatch=0・unimplemented=0**（§11.7 の受け入れ規模ちょうど） |
+| 退行: 同 `--action-types DRAW,DISCARD,KO,REST,ACTIVE,BUFF`（土台 F） | cards=634／abilities=817／**match=817**／mismatch=0・unimplemented=0 |
+| 退行: `rs_diff_replay.py --mode replay --vanilla --games 20 --seed-base 1100000` | **match=20**／mismatch=0／unimplemented=0（1,832 行動） |
+| 退行: `rs_diff_replay.py --mode state --games 5 --seed-base 1100000` | **match=5**／mismatch=0（453 行） |
+| 退行: `rs_query_oracle.py --boards 40 --seed-base 1110000` | queries=1,467,480／match=1,285,223／error_match=182,257／**mismatch=0** |
+| `cargo test --no-default-features` | **194 passed**・0 failed・0 ignored（土台 166 ＋ 群 A の転記 28） |
+| `cargo clippy --no-default-features --all-targets -- -D warnings` | 警告 0 |
+| `make test`（Python 無変更） | green |
+
+**実装で分かったこと**
+
+1. **BUFF は土台（`mod.rs::buff`）が既に全形を持っていた**。§11.7 の表は「BUFF の全形」を群 A の
+   担当としていたが、`rs-p3-resolver` が入れた `buff` は Python `per_target.buff` の 6 分岐
+   （`POWER_OVERRIDE`／`COST_OVERRIDE`／`COST_REDUCTION`／`COUNTER`／`BLOCKER_DISABLE`＋既定の
+   パワー増減）と期間付き（`continuous::apply`）を**そのまま**持っている。委譲は不要＝
+   **`actions/mod.rs` は 1 行も触っていない**（指示書が許した「1 か所の委譲」も使わなかった）。
+   Python との 1 対 1 は `status.rs` の転記テスト 8 件で固定した（`in_passive_recalc` の層分け・
+   `PERMANENT` が `power_buff` へ落ちること・`BLOCKER_DISABLE` が 2 層からキーワードを外すこと）。
+2. **`DISABLE_ABILITY` の guard 落ちは群が自分で対象ループを呼ぶ**。Python は
+   `@game_handler(DISABLE_ABILITY, when=lambda a: a.status == "OPP_ONPLAY")` で、ガードが偽なら
+   `run_target_loop` へフォールスルーする（対象ループに登録が無いので no-op）。一方 `mod.rs::apply_action`
+   は `game_handler_for` が種別を返した時点で対象ループへ落ちず、どの群も `None` を返すと
+   `Unimplemented` になる＝差し口の docstring が言う「ガードが偽なら `None`」は**そのままでは
+   Python と挙動が違う**。`mod.rs` を触らない制約のもとで、`status::game_handler` が
+   `super::run_target_loop`（`pub`）を自分で呼んで Python のフォールスルーを再現した
+   （引数は Python の `apply_action` と 1:1）。実データでは `DISABLE_ABILITY` の 4 件中 3 件が
+   この経路（「このキャラは、このターン中、効果が無効になる」等＝Python でも盤面は動かない）。
+   **`game_handler_for` に載っていて guard を持つ種別は他の群でも同じ問題を踏む**
+   （`ACTIVE_DON`／`RULE_PROCESSING`）ので、統合時に `mod.rs` 側で直すなら
+   `game_handler_for` を `Option<GameHandler>` から「群が `None` を返したら対象ループへ」に
+   変えるのが筋（この WP は所有範囲外なので触っていない）。
+3. **`GRANT_KEYWORD` の `raw_text` フォールバックは実データでは通らない**。Python は `status` が
+   空なら `re.search(r'【([^】]+)】', NFC(raw_text))` で拾うが、現行 DB の GRANT_KEYWORD 202 件は
+   **全件 `status` が埋まっている**（`速攻`／`ブロッカー`／`ダブルアタック`／`バニッシュ`／
+   `ブロック不可`／`ATTACK_ACTIVE`／`速攻:キャラ`）。Rust 側も同じ順序で拾うが NFC 正規化は
+   入れていない（通るようになったら Python と同じく正規化が要る＝コメントに残した）。
+4. **期間の既定が種別ごとに違う**（Python の `cdur` の書き分けをそのまま移した）:
+   `GRANT_KEYWORD` は INSTANT/PERMANENT → **PERMANENT**（場を離れるまで持続）、
+   `NEGATE_EFFECT` は指定なし → **THIS_TURN**、`ATTACK_DISABLE`／`PREVENT_REST` は
+   `UNTIL_NEXT_TURN_END` 以外すべて → **THIS_TURN**（`THIS_BATTLE` 指定も THIS_TURN になる）。
+   `BUFF` だけが `PERMANENT` を継続効果に載せず `power_buff` へ落とす。
+5. **`FREEZE` は継続効果ではなく `flags` へ直接書く**（`refresh_all` がターン境界で
+   `flags["FREEZE"]` を読んでからリセットするため）。`timed_flags` に載せると 1 ターン早く
+   解けて Python と食い違う。
+
+**Python 側の欠陥と判断して直さなかったもの**: 無し（監査 1,014 能力・退行 4 本とも全一致で、
+Python と挙動が割れた盤面は 1 つも出なかった）。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
@@ -1121,7 +1178,7 @@ pub fn apply_target(s, masters, actor, action, target, owner, source_list, value
 
 | 群 | ファイル | ActionType | F∪群だけのカード／能力 | Python の対応 |
 |---|---|---|---|---|
-| A 状態系 | `status.rs` | GRANT_KEYWORD・ATTACK_DISABLE・PREVENT_REST・FREEZE・NEGATE_EFFECT・DISABLE_ABILITY・SWAP_POWER＋**BUFF の全形**（status: COST_REDUCTION／POWER_OVERRIDE／BLOCKER_DISABLE／COUNTER／COST_OVERRIDE・duration: THIS_TURN／THIS_BATTLE／UNTIL_NEXT_TURN_END／PERMANENT＝継続効果登録）。DB 未使用の SET_BASE_POWER／COST_BUFF／SET_COST／COST_CHANGE／BP_BUFF は `Unimplemented` のまま可 | 782／1,014 | `per_target.buff/grant_keyword/attack_disable/prevent_rest/freeze/negate_effect`・`player_level.disable_ability/swap_power`・`continuous.py` |
+| A 状態系 **完了**（2026-09-07・§8.10） | `status.rs` | GRANT_KEYWORD・ATTACK_DISABLE・PREVENT_REST・FREEZE・NEGATE_EFFECT・DISABLE_ABILITY・SWAP_POWER＋**BUFF の全形**（status: COST_REDUCTION／POWER_OVERRIDE／BLOCKER_DISABLE／COUNTER／COST_OVERRIDE・duration: THIS_TURN／THIS_BATTLE／UNTIL_NEXT_TURN_END／PERMANENT＝継続効果登録）。DB 未使用の SET_BASE_POWER／COST_BUFF／SET_COST／COST_CHANGE／BP_BUFF は `Unimplemented` のまま可 | 782／1,014 → **実測 cards=782／abilities=1,014／match=1,014・mismatch=0・unimplemented=0**（BUFF は土台 `mod.rs::buff` が既に全形を持っていたので委譲不要＝`mod.rs` 無変更。`cargo test` 194・clippy 0） | `per_target.buff/grant_keyword/attack_disable/prevent_rest/freeze/negate_effect`・`player_level.disable_ability/swap_power`・`continuous.py` |
 | B ゾーン移動 | `zone.rs` | MOVE_CARD・DECK_BOTTOM・DECK_TOP・BOUNCE・TRASH_FROM_DECK・HEAL・DEAL_DAMAGE・SHUFFLE・ORDER_LIFE・FACE_UP_LIFE・LOOK_LIFE・MOVE_TO_HAND（DB 未使用の LIFE_RECOVER／LIFE_MANIPULATE は `Unimplemented` 可） | 987／1,271 | `per_target.move/bounce/deck_bottom/deck_top/move_card/face_up_life`・`player_level.deal_damage/shuffle/heal/trash_from_deck/order_life/look_life` |
 | C カードの流れ | `flow.rs` | PLAY_CARD・LOOK・REVEAL・SELECT・EXECUTE_MAIN_EFFECT・EXECUTE_EVENT・DECLARE_COST（DB 未使用の SELECT_OPTION は不要） | 865／1,144 | `per_target.play_card/reveal`・`player_level.look/select/execute_event`・`resolver._expand_main_effect/_execute_selected_main/_suspend_for_cost_declaration` |
 | D ドン!! | `don.rs` | RETURN_DON・RAMP_DON・REST_DON・ATTACH_DON・ACTIVE_DON（target 無し）・FREEZE_DON・MOVE_ATTACHED_DON（DB 未使用の MODIFY_DON_PHASE は不要）＋**ドン!!を対象に取るクエリ**（`TargetRef::Don`＝COST_AREA 3 件・CHAR_OR_DON 2 件。resolver の `only_cards_strict` 3 か所をドン!!込みに広げる＝この群だけ `resolver.rs` の当該経路を所有） | 979／1,273 | `player_level.return_don/ramp_don/rest_don/freeze_don/active_don_by_count/move_attached_don`・`per_target.attach_don`・`resolver._suspend_for_don_selection` |
