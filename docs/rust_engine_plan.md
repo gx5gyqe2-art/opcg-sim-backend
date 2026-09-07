@@ -1650,6 +1650,12 @@ pack の置き場所は `--cache-dir`／`$OPCG_DUMP_CACHE`（既定 `~/.cache/op
 作り直し）が要る＝別の判断。ゲート `make test` 442 passed（`test_n_rel_train_torch.py` 12 本）。
 報告 `docs/reports/2026-09-07_train_torch2.md`・RESULT `docs/reports/2026-09-07_train_torch2.RESULT.json`。
 
+### 8.24 本番投入（2026-09-08）
+
+PR #206 を main へマージ（58452bed）し、ユーザが実環境（Cloud Run）で Docker ビルド・起動・CPU 対戦を確認
+＝**問題なし・CPU の応答が大幅に速くなった**（ユーザ報告）。これで Rust 化（P0〜P5）と学習の高速化
+（§18）は完了。以後の本線は main。ロールバック先は #205（34707922・c10 採用）。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
