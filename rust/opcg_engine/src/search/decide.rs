@@ -22,7 +22,7 @@ use crate::model::{CardIdx, GameState, MasterTable, Seat};
 use crate::state::EngineError;
 use serde_json::{json, Map, Value};
 
-use super::mcts::{TreeMcts, C_PUCT, SERVE_SIMS};
+use super::mcts::{PvStep, TreeMcts, C_PUCT, SERVE_SIMS};
 use super::quiesce::{
     best_branch, in_battle, in_dialog, resolve_battle_inplace, resolved_branch_values, BoxBudget,
     Ctx, SearchState, Window, BOX_RESOLVE_DEPTH, QUIESCE_MAX_PLIES,
@@ -143,6 +143,8 @@ pub struct DecideOut {
     pub carry: DecideCarry,
     pub budget_used: i64,
     pub budget_exhausted: u64,
+    /// PV（主変化・§20.4）: kind=main のときだけ木から辿る（window／commit は空）。
+    pub pv: Vec<PvStep>,
 }
 
 /// `_merge_root_stats` の 1 グループ。
@@ -953,6 +955,7 @@ fn empty_out(kind: &'static str, mv: Option<Move>, carry: DecideCarry, st: &Sear
         carry,
         budget_used: st.budget.used,
         budget_exhausted: st.budget.exhausted,
+        pv: Vec::new(),
     }
 }
 
@@ -1021,6 +1024,7 @@ fn decide_inner(
                 carry,
                 budget_used: st.budget.used,
                 budget_exhausted: st.budget.exhausted,
+                pv: Vec::new(),
             });
         }
     }
@@ -1028,6 +1032,8 @@ fn decide_inner(
     // ④ 木
     let mut tree = TreeMcts::new(ctx, opts.c_puct, opts.sims, opts.dirichlet_eps);
     let run = tree.run(state, name, rng, st)?;
+    // PV（主変化・§20.4）: 8 手または葉まで（root の argmax(N) は下の `mv` と同じ手）。
+    let pv = tree.principal_variation(8);
     let mut mv = run.best.clone();
     let mut groups = Vec::new();
     if !run.legal.is_empty() {
@@ -1120,6 +1126,7 @@ fn decide_inner(
         carry,
         budget_used: st.budget.used,
         budget_exhausted: st.budget.exhausted,
+        pv,
     })
 }
 
@@ -1316,5 +1323,101 @@ mod tests {
         let rest = vec![("a".to_string(), 5000, false), ("b".to_string(), 3000, false)];
         assert_eq!(pick_attach_target(&rest, "low").as_deref(), Some("b"));
         assert_eq!(pick_attach_target(&[], "low"), None);
+    }
+
+    // --- PV（§20.4・思考ログ）------------------------------------------------------
+
+    /// テスト用のゼロ重みネット（forward は全て 0＝priors 一様・value 0）。vocab は空＝
+    /// 全カードが PAD 行（index 0）を指す（盤面差は読まないが、形は正しいので木は普通に回る）。
+    /// `principal_variation` の検証に要るのは「木が壊れず回ること」だけなので十分。
+    fn zero_net() -> crate::net::LoadedNet {
+        use crate::encode::{Vocab, ABILITY_DIM, MAX_AB, R_DIM, STATS_DIM};
+        use crate::net::nrel::{CardStatics, D_AB};
+        use crate::net::{Mat, NRelWeights, D_C, D_PIN, D_R, D_T, D_X, D_Z};
+        let mat = |rows: usize, cols: usize| Mat::new(rows, cols, vec![0.0f32; rows * cols]);
+        let hidden = 8usize;
+        let weights = NRelWeights {
+            wa: mat(ABILITY_DIM, D_AB),
+            ba: vec![0.0; D_AB],
+            wt: mat(D_X, D_T),
+            bt: vec![0.0; D_T],
+            wr: mat(2 * D_T + R_DIM, D_R),
+            br: vec![0.0; D_R],
+            wc: mat(2 * D_T + R_DIM, D_C),
+            bc: vec![0.0; D_C],
+            w1: mat(D_Z, hidden),
+            b1: vec![0.0; hidden],
+            w2: mat(hidden, 64),
+            b2: vec![0.0; 64],
+            wv: mat(64, 1),
+            bv: vec![0.0; 1],
+            wp1: mat(D_PIN, 64),
+            bp1: vec![0.0; 64],
+            wp2: mat(64, 1),
+            bp2: vec![0.0; 1],
+            hidden,
+            ablate: Default::default(),
+            meta_json: String::new(),
+            vocab_ids: Vec::new(),
+        };
+        let vocab = Vocab::from_ids(&[]);
+        let tables = crate::encode::EffTables {
+            n: 1,
+            stats: vec![0.0; STATS_DIM],
+            ab: vec![0.0; MAX_AB * ABILITY_DIM],
+            abm: vec![0.0; MAX_AB],
+            pwr: vec![0.0; 1],
+            isl: vec![0.0; 1],
+        };
+        let tab = crate::net::card_table(&weights, &tables).expect("zero net: card_table");
+        let statics = CardStatics { pwr: vec![0.0], isl: vec![0.0], ret_don: vec![0.0] };
+        crate::net::LoadedNet { weights, tab, vocab, statics }
+    }
+
+    /// PV の先頭は「木が返した手」と一致し、長さは 8 以下（§20.4 の受け入れ）。
+    #[test]
+    fn pv_head_matches_the_returned_move_and_is_bounded() {
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        b.put_hand(Seat::P1, M_CHAR); // コスト2・3000（PLAY と TURN_END の 2 候補ができる）
+        b.dons(Seat::P1, "active", 2);
+        let (masters, state) = b.build();
+        let net = zero_net();
+        let opts = DecideOptions { sims: 8, ..DecideOptions::default() };
+        let mut rng = crate::search::Pcg32SearchRng::new(1);
+        let carry = DecideCarry::default();
+        let out = decide(&masters, &net, &state, Seat::P1, &opts, &mut rng, &carry).unwrap();
+        assert_eq!(out.kind, "main");
+        assert!(!out.pv.is_empty(), "main の決定は少なくとも 1 手の PV を持つ");
+        assert!(out.pv.len() <= 8, "PV は 8 手まで");
+        assert_eq!(out.mv.as_ref(), Some(&out.pv[0].mv), "PV の先頭は返した手と同じ");
+        assert_eq!(out.pv[0].seat, Seat::P1);
+    }
+
+    /// kind=window（戦闘窓の根畳み）のとき PV は空（§20.4）。
+    #[test]
+    fn pv_is_empty_when_kind_is_window() {
+        use crate::model::ActiveBattle;
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        let atk = b.put_field(Seat::P1, M_CHAR);
+        let (masters, mut state) = b.build();
+        let target = state.player(Seat::P2).leader.expect("p2 leader");
+        // p2 は手札・場が空＝ブロッカー無し・カウンター無し＝合法手は PASS 1 つだけ
+        // （`window_choice` の legal.len()==1 分岐＝ネットの forward すら要らない）。
+        state.active_battle = Some(ActiveBattle {
+            attacker: atk,
+            target,
+            attacker_owner: Seat::P1,
+            target_owner: Seat::P2,
+            counter_buff: 0,
+        });
+        let net = zero_net();
+        let opts = DecideOptions::default();
+        let mut rng = crate::search::Pcg32SearchRng::new(2);
+        let carry = DecideCarry::default();
+        let out = decide(&masters, &net, &state, Seat::P2, &opts, &mut rng, &carry).unwrap();
+        assert_eq!(out.kind, "window");
+        assert!(out.pv.is_empty(), "window の決定に PV は無い");
     }
 }

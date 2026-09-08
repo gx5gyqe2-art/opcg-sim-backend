@@ -56,6 +56,15 @@ pub struct Node {
     pub term_val: f64,
 }
 
+/// PV（主変化）の 1 手（`docs/rust_engine_plan.md` §20.4 の思考ログ・[`TreeMcts::principal_variation`]）。
+#[derive(Debug, Clone)]
+pub struct PvStep {
+    pub mv: Move,
+    pub seat: Seat,
+    pub n: f64,
+    pub q: f64,
+}
+
 /// `TreeMCTS.run` の返り値（`last_stats` 込み）。
 #[derive(Debug, Clone, Default)]
 pub struct RunOut {
@@ -417,6 +426,34 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         n.n[a] += 1.0;
         n.w[a] += v;
         Ok(v)
+    }
+
+    /// PV（主変化・`docs/rust_engine_plan.md` §20.4）: root（node 0）から「訪問数最多の子」を
+    /// 辿る（相手番の節も同じ規則）。`max_len` 手または葉（未展開／終局／合法手無し）で止める。
+    ///
+    /// **単一の木**（[`run`](Self::run) が世界サンプルを 1 度だけ引いて 1 本の木を回す・現在の
+    /// 実装は PIMC の複数世界を持たない）を辿るので世界の選び方に曖昧さは無い。
+    pub fn principal_variation(&self, max_len: usize) -> Vec<PvStep> {
+        let mut out = Vec::with_capacity(max_len);
+        let mut node = 0usize; // run() は必ず root を最初のノードにする
+        for _ in 0..max_len {
+            if node >= self.nodes.len() {
+                break;
+            }
+            let n = &self.nodes[node];
+            if !n.expanded || n.terminal || n.legal.is_empty() {
+                break;
+            }
+            let Some(seat) = n.to_move else { break };
+            let a = argmax_f64(&n.n);
+            let q = n.w[a] / n.n[a].max(1.0);
+            out.push(PvStep { mv: n.legal[a].clone(), seat, n: n.n[a], q });
+            match n.children[a] {
+                Some(c) => node = c,
+                None => break,
+            }
+        }
+        out
     }
 
     /// PUCT の選択（Python `U = Q + c_puct*P*sqrt(ΣN)/(1+N)` の argmax・同点は添字が小さい方）。

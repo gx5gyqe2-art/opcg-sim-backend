@@ -35,6 +35,23 @@ EFFECTS_PATH = os.path.join(_REPO_ROOT, "opcg_sim", "data", "opcg_effects.json")
 
 _masters_lock = threading.Lock()
 _masters_loaded = False
+# 符号化の語彙（`opcg_engine.set_vocab`）。棋譜ダンプ・§20.4 の `RsGame.attribution`（`Game.encode`）
+# が要る。**最初に読んだネットの語彙**をプロセスの語彙にする（`opcg_sim.loop.engine.load_net` と
+# 同じ「1 本目が既定」規約）。
+_vocab_lock = threading.Lock()
+_vocab_loaded = False
+
+
+def _ensure_vocab(engine, summary: Dict[str, Any]) -> None:
+    """ネットの要約 JSON（`load_net` の戻り値）の `vocab_ids` を、プロセスで 1 度だけ設定する。"""
+    global _vocab_loaded
+    if _vocab_loaded:
+        return
+    with _vocab_lock:
+        if _vocab_loaded:
+            return
+        engine.set_vocab(json.dumps(summary.get("vocab_ids") or []))
+        _vocab_loaded = True
 
 
 def _net_path() -> str:
@@ -117,6 +134,9 @@ class RsGame:
         self._search_base = random.getrandbits(63)
         self._carry_key = None
         self._carry: Dict[str, Any] = {}
+        # 箱コミットを焼き込んだ決定の action_index（§20.4 の思考ログ・`trace["commit_from"]`）。
+        # `_carry_key` と同じ (turn, seat) の間だけ有効＝キーが変われば自然に無効になる。
+        self._commit_from_index: Optional[int] = None
         # このインスタンスの既定ネット（省略時は `_net_path()`＝出荷既定）。`decide` は呼び出し
         # ごとに `net` で上書きできる（`tests/scripts/rs_scenario_play.py` が席ごとに別ネットで
         # 打たせるのに使う・§20.1）。複数ネットを同一プロセスで読める（`opcg_sim.loop.engine`）ので
@@ -259,18 +279,23 @@ class RsGame:
     # --- CPU の思考（Rust `decide`）-----------------------------------------
 
     def decide(self, player_id: str, trace: Optional[Dict[str, Any]] = None,
-              net: Optional[str] = None, sims: Optional[int] = None):
+              net: Optional[str] = None, sims: Optional[int] = None,
+              action_index: Optional[int] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
         軽い探索数で打たせたいとき・`tests/scripts/rs_scenario_play.py`・§20.1）。
+        `action_index`（省略可）は呼び出し側の決定番号（`tests/scripts/rs_scenario_play.py` の
+        `len(actions)`）＝箱コミットを焼き込んだ決定を覚えておくための鍵（`trace["commit_from"]`・
+        §20.4）。省略すると `commit_from` は出さない。
         """
-        move, tr = self._decide(player_id, net=net, sims=sims)
+        move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
 
-    def _decide(self, player_id: str, net: Optional[str] = None, sims: Optional[int] = None):
+    def _decide(self, player_id: str, net: Optional[str] = None, sims: Optional[int] = None,
+               action_index: Optional[int] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -285,11 +310,13 @@ class RsGame:
         engine = load_engine()
         net_path = net or self._net or _net_path()
         if net_path not in self._loaded_nets:
-            engine.load_net(net_path)
+            summary = json.loads(engine.load_net(net_path))
             self._loaded_nets.add(net_path)
+            _ensure_vocab(engine, summary)
         turn = self.turn_count
         seat = "p1" if player_id == self.p1_name else "p2"
         carry = self._carry if self._carry_key == (turn, seat) else {}
+        had_commit = bool(carry.get("commit"))
         opts = {"net": net_path,
                 "search_seed": _search_seed(self._search_base, turn, seat),
                 "commit": carry.get("commit") or [],
@@ -300,19 +327,31 @@ class RsGame:
         self._carry_key = (turn, seat)
         self._carry = {"commit": out.get("commit") or [],
                        "resact_pending": bool(out.get("resact_pending"))}
-        return out.get("move"), self._trace(out)
+        # commit_from（§20.4）: このターン/席で箱コミットを初めて焼き込んだ決定の action_index を
+        # 覚えておく。既に焼き込み済み（had_commit）なら覚えたままの鍵を使う＝焼き込んだ決定を指す。
+        if had_commit:
+            commit_from = self._commit_from_index
+        else:
+            commit_from = None
+            self._commit_from_index = action_index if out.get("commit") else None
+        return out.get("move"), self._trace(out, commit_from=commit_from)
 
-    def _trace(self, out: Dict[str, Any]) -> Dict[str, Any]:
+    def _trace(self, out: Dict[str, Any], commit_from: Optional[int] = None) -> Dict[str, Any]:
         """思考の内訳（旧 `cpu_learned._fill_trace` の欄のうち、Rust から出せるもの）。
 
         `chosen`／`dialog`／`candidates`（等価手マージ後の訪問上位・visit%・行動価値 Q）／
         `value`。**decide が返した後の盤面を読まない**（決定は盤面を動かさない）ので、記述は
         決定時点のもの。旧版にあった L1 の第二意見（`readout` の一部）は L1 廃止で無くなった。
+
+        §20.4（思考ログ）で足した欄: `kind`（`readout` と同じ値・欄名を揃えただけ）・
+        `pv`（主変化・record["pv"] を describe_move で記述子化）・`legal_stats`（全合法手の
+        P/N/Q・stats をそのまま並べる）・`commit_from`（kind=="commit" のときだけ）。
         """
         move = out.get("move")
+        kind = out.get("kind")
         tr: Dict[str, Any] = {"difficulty": "learned", "turn": self.turn_count,
                               "chosen": self.describe_move(move) if move else None,
-                              "readout": out.get("kind")}
+                              "readout": kind, "kind": kind}
         pending = json.loads(self._game.pending_json())
         if pending and pending.get("action"):
             tr["dialog"] = pending["action"]
@@ -332,6 +371,29 @@ class RsGame:
                 if sig is not None and self._sig(legal[g["rep"]]) == sig:
                     tr["value"] = round(float(g["q"]), 3)
                     break
+        # 全合法手の P・N・Q（箱化後の候補＝探索が見た手・訪問 0 も含む）。
+        stats = out.get("stats") or {}
+        ns, qs, ps = stats.get("N") or [], stats.get("Q") or [], stats.get("P")
+        if legal:
+            tr["legal_stats"] = [{
+                "move": self.describe_move(mv),
+                "p": (float(ps[i]) if ps is not None and i < len(ps) else None),
+                "n": (int(ns[i]) if i < len(ns) else None),
+                "q": (float(qs[i]) if i < len(qs) else None),
+            } for i, mv in enumerate(legal)]
+        # PV（主変化）: 記述子（card_id 基準）に直す。相手の伏せ手札など、根の世界サンプル
+        # にしか無いカードの uuid は実盤面で引けない＝describe_move はその uuid をそのまま返す
+        # （§20.4 の注記）。
+        pv = out.get("pv") or []
+        if pv:
+            tr["pv"] = [{
+                "move": self.describe_move(p.get("move") or {}),
+                "seat": p.get("seat"),
+                "n": (int(p["n"]) if p.get("n") is not None else None),
+                "q": (float(p["q"]) if p.get("q") is not None else None),
+            } for p in pv]
+        if kind == "commit":
+            tr["commit_from"] = commit_from
         return tr
 
     @staticmethod
@@ -348,6 +410,63 @@ class RsGame:
         """手を card_id 基準の記述 dict へ（旧 `cpu_ai._describe_move`）。**適用前**に呼ぶ。"""
         return json.loads(self._game.describe_move_json(
             json.dumps(move, ensure_ascii=False, default=str)))
+
+    #: 22 枠のゾーン名（`n_rel_feat._slots`／`docs/rust_engine_plan.md` §20.4 の並びと同じ:
+    #: 自L・相L・自場5・相場5・手札10）。
+    _ZONE_LABELS = (["own_leader", "opp_leader"] + ["own_field"] * 5 + ["opp_field"] * 5
+                    + ["hand"] * 10)
+
+    def _slot_labels(self, player_id: str) -> List[str]:
+        """22 枠 → `"<ゾーン>[<枠>]:<card_id>"`（`dump_index_json` の枠→uuid→card_id を組む・
+        空枠や uuid が引けない枠はゾーン名＋枠番号のみ）。
+        """
+        idx = json.loads(self._game.dump_index_json(player_id))
+        slot_to_uuid = {v: k for k, v in (idx.get("slots") or {}).items()}
+        cids = idx.get("cids") or {}
+        out = []
+        for i, zone in enumerate(self._ZONE_LABELS):
+            uuid = slot_to_uuid.get(i)
+            card_id = cids.get(uuid) if uuid else None
+            out.append(f"{zone}[{i}]:{card_id}" if card_id else f"{zone}[{i}]")
+        return out
+
+    def attribution(self, player_id: str, top_k: int = 5) -> List[Dict[str, Any]]:
+        """V の帰属（§20.4 の 3・scenario の play にだけ呼ぶ・serve には付けない）。
+
+        根の符号化（`self._game.encode`＝**実盤面**。decide 内部の世界サンプルではない）の
+        22 枠を 1 つずつ PAD（`tok` を 0 埋め・`card_idx` を 0）へ潰し、`opcg_engine.net_eval`
+        で value を取り直す（決定ごとに 23 回の forward＝軽い）。`dv = v0 - v_masked`（その枠を
+        消すと value がどれだけ動くか）の絶対値上位 `top_k` を返す。相関であって理由ではない
+        （§20.4 冒頭の注記）。
+
+        **制約**: `net_eval` はプロセスの既定ネット（最初に `load_net` した npz。`opcg_engine`
+        の「1 本目が既定」規約）を使う——`decide` が席ごとに別ネットを選べるのと違い、
+        帰属は席ごとのネット切替を追わない。両席とも同じネットで打たせる運用（本 WP の
+        9 シナリオ）ではこの差は出ない。
+        """
+        engine = load_engine()
+        enc = json.loads(self._game.encode(player_id))
+        enc["tok"] = enc.pop("tokens", None) or []
+        tok = list(enc["tok"])
+        card_idx = list(enc.get("card_idx") or [])
+        n_tok = len(self._ZONE_LABELS)
+        s_dim = (len(tok) // n_tok) if n_tok else 0
+        base = json.loads(engine.net_eval(json.dumps(enc), "[]"))
+        v0 = float(base["value"])
+        labels = self._slot_labels(player_id)
+        out = []
+        for i in range(n_tok):
+            t = list(tok)
+            for k in range(s_dim):
+                t[i * s_dim + k] = 0.0
+            ci = list(card_idx)
+            if i < len(ci):
+                ci[i] = 0
+            mod = dict(enc, tok=t, card_idx=ci)
+            r = json.loads(engine.net_eval(json.dumps(mod), "[]"))
+            out.append({"slot": i, "label": labels[i], "dv": v0 - float(r["value"])})
+        out.sort(key=lambda d: abs(d["dv"]), reverse=True)
+        return out[:top_k]
 
     def deck_counts(self) -> Dict[str, int]:
         """山札の残り枚数（`{"p1": n, "p2": n}`）。リプレイフレームだけが使う。"""

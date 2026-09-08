@@ -150,6 +150,7 @@ def test_play_scenario_produces_frames_decisions_and_markdown(engine):
     card_texts = scp._load_card_texts()
     md = scp._build_markdown(name, scenario, 0, scp.DEFAULT_NET, scp.DEFAULT_NET,
                              steps_log, frames, human_ref, original_frames, card_texts)
-    for marker in ("(1) 盤面", "(2) pending", "(3) 合法手", "(4) 探索の候補", "(5) 適用後のイベント",
+    for marker in ("(1) 盤面", "(2) pending", "(3) 探索が見た候補", "(4) 探索の候補",
+                  "(5) 適用後のイベント", "(6) PV", "(7) V の帰属",
                   "付録: 登場したカードの効果本文", "シナリオの note"):
         assert marker in md, marker

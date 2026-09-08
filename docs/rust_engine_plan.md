@@ -3445,6 +3445,12 @@ trace）で新規に作る**。ユーザのイメージ（2026-09-08・確定）
 - 置き場: 復元は `opcg_sim/loop/`（生成・アリーナと同じ「Rust で対局を回す段取り」）、CLI は
   `tests/scripts/`、シナリオと出力は `tests/fixtures/scenarios/`（出力はコミットしない・`--out` 既定は
   `/tmp/scenario_out`）。
+- **思考ログ（§20.4・WP `rs-think-log` で追加）**: 各決定の (3) は「探索が見た候補」（`legal_stats`＝
+  P/N/Q・訪問 0 は ×）に置き換え、(4) の後に (6) PV（主変化・8 手か葉まで）・(7) V の帰属（22 枠を
+  PAD へ潰した ΔV 上位 5）を足す。commit 消化の決定（機械実行・探索していない）は「決定 #k で
+  焼き込まれた継続」の 1 行だけ。`frames.json` の `decisions` にも同じ欄（`pv`／`legal_stats`／
+  `kind`／`commit_from`／`attribution`）が入る。`RsGame.attribution` は決定ごとに 23 回の forward
+  （`opcg_engine.net_eval`）を追加で呼ぶので **scenario の play にだけ**使う（serve は呼ばない）。
 
 ### 20.2 WP `rs-scenario` の指示書
 

@@ -255,24 +255,28 @@ def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: 
             break
         player_id = pending["player_id"]
         board_before = frames[-1]
-        legal = game.get_legal_actions(player_id)
-        legal_desc = [game.describe_move(m) for m in legal]
         turn_before = game.turn_count
+        action_index = len(actions)
         tr: dict = {}
-        move = game.decide(player_id, trace=tr, net=net_for[player_id], sims=sims)
+        move = game.decide(player_id, trace=tr, net=net_for[player_id], sims=sims,
+                           action_index=action_index)
         if move is None:
             break
+        # V の帰属（§20.4 の 3）: commit 消化（機械実行・探索していない）は計算しない。
+        attribution = game.attribution(player_id) if tr.get("kind") != "commit" else None
         desc = game.describe_move(move)
         decisions.append({"turn": turn_before, "player": player_id,
-                          "action_index": len(actions), **tr})
+                          "action_index": action_index, **tr, "attribution": attribution})
         actions.append({"src": "cpu", "turn": turn_before, "player": player_id, **desc})
         game.apply_move(player_id, move)
         events = list(game.action_events)
         frames.append(_record_frame(game, actions))
         steps_log.append({
             "turn": turn_before, "player": player_id, "board_before": board_before,
-            "legal": legal_desc, "candidates": tr.get("candidates"), "chosen": desc,
-            "value": tr.get("value"), "events": events,
+            "legal_stats": tr.get("legal_stats"), "candidates": tr.get("candidates"),
+            "chosen": desc, "value": tr.get("value"), "events": events,
+            "kind": tr.get("kind"), "commit_from": tr.get("commit_from"),
+            "pv": tr.get("pv"), "attribution": attribution,
         })
         if desc.get("action_type") == "TURN_END" and turn_before == end_turn:
             break
@@ -394,6 +398,39 @@ def _render_events(events) -> str:
     return "\n".join(f"  - {e}" for e in events)
 
 
+def _render_legal_stats(stats, card_texts) -> str:
+    """探索が見た全候補（P・N・Q）。訪問 0（考えなかった／読む前に切った）は × 印
+    （§20.4: 「考えなかった」と「読んで捨てた」を区別する）。
+    """
+    if not stats:
+        return "(候補なし＝window／commit の決定，または探索が空)"
+    lines = []
+    for c in stats:
+        mark = "×" if not c.get("n") else " "
+        lines.append(f"  - [{mark}] p={c.get('p')} n={c.get('n')} q={c.get('q')} "
+                     f"move={_fmt_action(c.get('move') or {}, card_texts)}")
+    return "\n".join(lines)
+
+
+def _render_pv(pv, card_texts) -> str:
+    """PV（主変化・§20.4 の 1）: 探索が想定した「この後の進行」。"""
+    if not pv:
+        return "(PV なし＝window／commit の決定，または木が空)"
+    lines = []
+    for i, p in enumerate(pv):
+        lines.append(f"  {i + 1}. {p.get('seat')}: {_fmt_action(p.get('move') or {}, card_texts)} "
+                     f"(n={p.get('n')} q={p.get('q')})")
+    return "\n".join(lines)
+
+
+def _render_attribution(attribution) -> str:
+    """V の帰属（§20.4 の 3）上位 5: 枠を潰したときの ΔV。相関であって理由ではない。"""
+    if not attribution:
+        return "(なし＝commit の決定，または attribution 未計算)"
+    return "\n".join(f"  - slot={a.get('slot')} {a.get('label')} dv={a.get('dv'):+.4f}"
+                     for a in attribution)
+
+
 def _collect_card_ids(*frame_lists) -> set:
     ids: set = set()
 
@@ -442,7 +479,14 @@ def _build_markdown(name: str, scenario: dict, seed: int, seat_net: str, opp_net
     lines.append("## CPU の決定（このツールが打った手・省略なし）")
     for i, step in enumerate(steps_log):
         lines.append("")
-        lines.append(f"### 手 #{i} — turn={step['turn']} player={step['player']}")
+        lines.append(f"### 手 #{i} — turn={step['turn']} player={step['player']} "
+                     f"kind={step.get('kind')}")
+        if step.get("kind") == "commit":
+            # 箱コミットの機械実行（探索していない）: §20.4 の指示どおり 1 行で書く。
+            lines.append("")
+            lines.append(f"- 決定 #{step.get('commit_from')} で焼き込まれた継続: "
+                         f"{_fmt_action(step['chosen'], card_texts)}")
+            continue
         lines.append("")
         lines.append("#### (1) 盤面（決定前・両席の全情報）")
         lines.append(_render_board(step["board_before"], entry_turns, card_texts))
@@ -450,14 +494,20 @@ def _build_markdown(name: str, scenario: dict, seed: int, seat_net: str, opp_net
         lines.append("#### (2) pending")
         lines.append(_render_pending((step["board_before"] or {}).get("pending")))
         lines.append("")
-        lines.append(f"#### (3) 合法手（{len(step['legal'])} 個）")
-        for m in step["legal"]:
-            lines.append(f"  - {_fmt_action(m, card_texts)}")
+        legal_stats = step.get("legal_stats")
+        lines.append(f"#### (3) 探索が見た候補（{len(legal_stats or [])} 個・P/N/Q・訪問0は×）")
+        lines.append(_render_legal_stats(legal_stats, card_texts))
         lines.append("")
-        lines.append("#### (4) 探索の候補（上位5）と選んだ手")
+        lines.append("#### (4) 探索の候補（上位5・等価手マージ後）と選んだ手")
         lines.append(_render_candidates(step.get("candidates"), card_texts))
         lines.append(f"  - 選んだ手: {_fmt_action(step['chosen'], card_texts)} "
                     f"(value={step.get('value')})")
+        lines.append("")
+        lines.append("#### (6) PV（主変化・CPU が想定したこの後の進行）")
+        lines.append(_render_pv(step.get("pv"), card_texts))
+        lines.append("")
+        lines.append("#### (7) V の帰属（上位5・枠を潰したときの ΔV）")
+        lines.append(_render_attribution(step.get("attribution")))
         lines.append("")
         lines.append("#### (5) 適用後のイベント")
         lines.append(_render_events(step["events"]))

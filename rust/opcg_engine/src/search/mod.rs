@@ -269,6 +269,10 @@ pub fn decide_on_state(
         "groups": out.groups.iter().map(|g| serde_json::json!({
             "rep": g.rep, "idxs": g.idxs, "n": g.n, "q": g.q,
         })).collect::<Vec<_>>(),
+        // PV（主変化・§20.4・kind=main のときだけ埋まる）。
+        "pv": out.pv.iter().map(|p| serde_json::json!({
+            "move": p.mv, "seat": p.seat.name(), "n": p.n, "q": p.q,
+        })).collect::<Vec<_>>(),
         "commit": out.carry.commit.iter().map(decide::Step::to_json).collect::<Vec<_>>(),
         "resact_pending": out.carry.resact_pending,
         "budget": {"used": out.budget_used, "exhausted": out.budget_exhausted},
