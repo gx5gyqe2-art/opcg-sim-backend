@@ -1738,6 +1738,98 @@ synth デッキで作り直すかはユーザ判断。era7 の波 29 はこの�
 **修正候補**: 既定解決に効果の種別（利益／コスト）を渡し利益系は max 件にする／探索の枝で対話を
 既定解決せず対象ごとに 1 段だけ分岐する／適用側で `can_skip=False` かつ候補ありの空選択を拒む
 （Python との一致は崩れるが Python も誤り）。分析 #3 §5-1。
+**補足（ユーザ 2026-09-08）**: 神の裁きはコスト 0（`opcg_cards.json` の `コスト` 欠けは欠損でなく 0 が正）
+で、KO を伴わなくてもリーサルで +1000 のパンプに使う札。分析 #3 の「攻撃後のパンプは無駄」は
+**順序**（攻撃の前に打てば通る打点が増える）の話であって、パンプ用途そのものは正しい使い方。
+§8.26 の「23 枚のコスト欠け」も、少なくとも一部は本当に 0 コスト＝補完 WP の前に 1 枚ずつ確かめる。
+
+#### 8.27.1 WP `rs-select-default` の指示書（原因分析・ユーザ指示 2026-09-08「1 はなんとかしたい」）
+
+```
+作業: WP rs-select-default（効果の対象選択が「対象なし」で解決される欠陥の原因分析・
+docs/rust_engine_plan.md §8.27・docs/reports/2026-09-08_scenario_analysis_03.md 結論 5）。
+
+本線 claude/cpu-spec-improvements-yw91jd（48031926 以降）から分岐し claude/rs-select-default に
+push、PR は作りません。成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop` で
+wheel を入れてから作業する（無いと golden ゲートが fail する）。
+
+■ 症状（再現手順つき）
+  CPU（Rust の探索）が効果の対象選択を「対象なし」で解決することがある。
+  (a) 万雷を【カウンター】で使うと「自分のリーダーかキャラ 1 枚までを +1000」の対象が空
+      （action_events に {'action':'BUFF','targets':[],'value':1000}）＝カウンター値 0 で捨てただけ。
+  (b) 神の裁き（メイン・ドン!!-1: 自分 +1000 → 相手のパワー 3000 以下を KO）の KO 対象が空。
+      pending は SEARCH_AND_SELECT・selectable_uuids に相手の 1c ルフィ（パワー 0）が 1 枚・
+      can_skip=False なのに、適用された手は RESOLVE_EFFECT_SELECTION index=0（selected_uuids なし）。
+  再現: 分岐点シナリオを回すと出る（sims 160・seed 0/1）:
+    OPCG_LOG_SILENT=1 python tests/scripts/rs_scenario_play.py play \
+      --scenario enel_human_20260810_t3-4 --net opcg_sim/data/learned/nrel_r3.npz --seeds 2 --sims 160 --out /tmp/sel
+    → r3_s0.md の T4（相手の番）: p1 が 万雷 でカウンター → 手 #12 の (5) に BUFF targets [] が出る。
+    OPCG_LOG_SILENT=1 python tests/scripts/rs_scenario_play.py play \
+      --scenario human_enel_vs_luffy_20260904_t4-5 --net opcg_sim/data/learned/nrel_r3.npz --seeds 2 --sims 160 --out /tmp/sel
+    → r3_s1.md の T4 手 #10〜#13: PLAY 神の裁き → RETURN_DON → BUFF エネル → KO targets []。
+    （同じ位置の再現は乱数 seed で決まる＝search_seed は RsGame が (対局, ターン, 席) から作る。
+      再現しない場合は seeds を 4 に増やす。.md の各決定に盤面・pending・合法手・候補が全部ある）
+
+■ 分かっていること（§8.27・確かめ直してよい）
+  1. これらの決定は探索の窓／コミット経路で決まり、trace に候補が無い（「(候補なし)」）。
+     search/decide.rs: window_choice は合法手が 1 つなら即決（legal[0]）・commit_step は前の決定で
+     積んだ継続（Step::Sig）を find_move で合法手に当てて適用する。
+  2. 枝の中の対話は既定解決 effects/interact.rs::default_interaction_payload で畳まれる。その
+     choose_selection のゾーン意味論（Python 由来・legacy/python_engine/core/engine/interaction.py）は
+     「全候補が自分側 → コスト系＝min 件・価値昇順」。「1 枚まで」は min 0 なので**自分への +1000 は
+     何も選ばない**が既定になる。
+  3. 適用側 interact.rs の SelectTarget は selected_uuids が空でも can_skip と照合せず解決する。
+  4. (b) の KO（相手側の候補＝対象系・max 件のはず）が空になる経路は未特定。PLAY 神の裁き の決定
+     （手 #10）の探索で積まれたコミット（out["commit"] の Step::Sig の sig[3]=selected_uuids）が
+     空だった可能性。search/adapter.rs::selection_moves は SEARCH_AND_SELECT を候補ごとに分岐する
+     （min 0 なら「選ばない」も候補）ので、枝の評価で「選ばない」が勝った可能性もある。
+
+■ 答えてほしい問い（この順で・証拠＝decide の戻り値／trace／盤面を添える）
+  Q1 (a)(b) それぞれ、手を返した経路はどれか（kind: main／window／commit）。RsGame._decide の out
+     （"kind"・"commit"・"stats"）を決定ごとに記録して示す（tests/scripts/rs_scenario_play.py は
+     RsGame._trace の戻りを decisions に入れるので、_trace を差し替えて out を丸ごと残すのが早い。
+     コーディネータの計測は scratchpad に置いた同種の差し替えで取った）。
+  Q2 (a) 万雷カウンターの選択が窓に来たとき、探索側の合法手（ctx.legal_actions＝merged_search_actions
+     後）はいくつだったか。1 つなら selection_moves が None を返した理由（request_actor／action／
+     uuids／constraints の min・max のどれで落ちたか）。2 つ以上なら resolved_branch_values が
+     「選ばない」を最良にした理由（各枝の値）。
+  Q3 (b) 神の裁きの KO が空になった経路: コミットに積まれた sig か／窓の即決か／枝の評価か。
+     PLAY 決定時の out["commit"] を出す。
+  Q4 既定解決 choose_selection が「自分側＝コスト系＝min 件」を選ぶ場面のうち、実際は利益
+     （BUFF／GRANT_KEYWORD／RAMP 等）である割合。opcg_effects.json の能力表から「対象が自分側で
+     効果が利益系」の対話を数え、代表 10 件を挙げる（万雷カウンター・神の裁き・神避・雷獣…）。
+  Q5 Python 版（tag/ブランチ py-engine-final・legacy/python_engine）も同じ既定解決なので同じ欠陥を
+     持っていたはず。同じ盤面で Python も空選択になるかを 1 例だけ確かめる（できれば。時間が
+     かかるなら「未確認」と書いて省略可）。
+  Q6 修正案を 3 つ（候補: ①既定解決に効果の種別を渡し利益系は max 件／②探索の枝で対話を既定解決
+     せず対象ごとに 1 段だけ分岐／③適用側で can_skip=False かつ候補ありの空選択を拒む）について、
+     変更箇所・影響範囲（golden／交差監査／レイテンシ）・Python との一致が崩れる点を表にする。
+     推奨を 1 つ選ぶ。
+
+■ 修正（原因が Q1〜Q3 で確定し、修正が局所なら同じブランチに**別コミット**で入れてよい）
+  - cargo test（rules/effects の単体）＋ pytest（API と同じ RsGame で (a)(b) を固定する
+    tests/test_select_default_*.py・TEST_SPEC §2 に 1 行）。
+  - make test green・make audit-cross void 0。再生 golden が変わったら（既定解決の変更は
+    キャラ効果の対象選択にも及ぶので変わりうる）make golden-replay で作り直し、**差分を
+    レビューして RESULT.json に「何が変わったか」を書く**（golden は正しさの証拠ではない）。
+  - 修正の是非はコーディネータが判断するので、修正コミットは分析レポートと分けておく。
+
+■ 成果物
+  - docs/reports/2026-09-0X_select_default_rca.md（Q1〜Q6 の答えと証拠・修正案の表・推奨）
+  - （修正した場合）コード＋テスト＋golden 差分の説明
+  - RESULT.json: {"job":"rs-select-default","status":"done|partial","report":"docs/reports/…",
+     "root_cause":"…1 行…","fix_included":true|false,"golden_changed":true|false,
+     "make_test":"N passed","audit_cross":{"pairs":120,"void":0},"notes":"…"}
+  - 長いコマンド（シナリオ再走・make test・audit-cross）はバックグラウンドで回し、待つ間も
+    分析を進める。
+
+■ 前提・注意
+  - 神の裁きはコスト 0（カード DB の コスト 欠けは欠損でなく 0 が正・ユーザ）。KO を伴わなくても
+    +1000 のパンプとしてリーサルで使う札＝「KO 対象なし」自体は誤りではない。誤りは**候補があるのに
+    選ばない**こと。
+  - 修正で Python との一致が崩れてよい（Python も同じ欠陥・ユーザ決定 2026-08-25「互換性より根本改善」）。
+  - コーディネータ（本セッション）は成果物を回収して判定する。質問があれば RESULT.json の notes に。
+```
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
