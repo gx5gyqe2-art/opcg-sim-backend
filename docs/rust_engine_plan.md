@@ -3255,3 +3255,19 @@ frames.json が読める。
 RESULT.json: {"job":"rs-scenario","status":"done","cli":"tests/scripts/rs_scenario_play.py",
 "scenarios":["...","..."],"outputs":"scenario_out/","unrestorable_rules":"..."}
 ```
+
+### 20.3 結果（2026-09-08 時点）
+
+- WP `rs-scenario` 完了（`tests/scripts/rs_scenario_play.py`・`opcg_sim/loop/hidden_build.py`・
+  `tests/test_scenario_play.py`）。分析 #1（作業セッションの暫定 note・2 本）＝
+  `docs/reports/2026-09-08_scenario_analysis_01.md`。
+- **シナリオ集 9 本**（`tests/fixtures/scenarios/`）はコーディネータが人間ログ 6 局を全ターン読んで切り抜き、
+  note も書いた（ユーザ指示 2026-09-08）。r3／a1 × seed 0/1＝36 本の分析 #2＝
+  `docs/reports/2026-09-08_scenario_analysis_02.md`。要点: 起動効果どうしのコンボ（ロー起動）と
+  「攻撃を先に済ませてからドン!!-3」の手順は人間と同じ。**メインフェイズのイベント PLAY が 36 本で一度も
+  選ばれない**（除去・コンボの部品は全部イベント＝再現性の低さはこの 1 点に帰着）。相手キャラを攻撃対象に
+  選ばない（ドフラ T10 は 4 本とも次ターンに負け）。r3 と a1 の差はこの観点では出ない。
+- 次の候補: イベント PLAY の訪問割合の計測（生成ログ／候補全件）→ 方策の事前分布か価値かの切り分け。
+  ドフラ T10 は価値の回帰テスト候補。9 本は世代交代のたびに回して表を更新する（判定は定性のまま）。
+- 道具の改善要望（据え置き）: 効果 ATTACH_DON の対象をイベントに出す／合法手一覧に visit 0 の印／
+  相手の手札枚数・カウンター値合計の見積りを盤面要約に出す。
