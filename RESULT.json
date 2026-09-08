@@ -1,0 +1,13 @@
+{
+  "job": "rs-scenario",
+  "status": "done",
+  "cli": "tests/scripts/rs_scenario_play.py",
+  "scenarios": [
+    "human_enel_vs_luffy_20260904_t4-5",
+    "human_law_vs_luffy_20260904_t5-6"
+  ],
+  "outputs": "scenario_out/",
+  "nets": ["nrel_r3.npz", "nrel_a1.npz"],
+  "seeds": 2,
+  "unrestorable_rules": "開始フレームは必ずそのターンの MAIN_ACTION 待ち（pending.action == \"MAIN_ACTION\"）でなければならない。対話（RESOLVE_EFFECT_SELECTION 等）や戦闘（active_battle あり）の途中のフレーム、決着後（winner あり）のフレームは ValueError（frame_to_hidden）。見えているカード（手札・場・ライフ・トラッシュ・ステージ）が replay.decks の構築デッキリストから引けない、または残り枚数が deck_count と合わない場合も ValueError。継続効果（power_buff 等のバフ・timed_* ・ability_used_this_turn）と中断（対話）スタック・誘発待ち行列はフレームに無いため復元しない（ターン開始地点なので実害は小さい）。"
+}

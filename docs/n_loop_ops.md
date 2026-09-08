@@ -236,3 +236,58 @@ card_idx が int16・meta の `dump_version`=3）。学習側は波ごとに mem
 - 回収は必ず origin から fetch して行う（ローカルの残骸を信用しない）。
 - 判定は `opcg_sim.loop.arena_merge` の出力をそのまま使う（手計算で置き換えない）。
 - 訓練・検証の結果がどうであれ、ネットと台帳は `claude/n1-results` に残す（不採用でも消さない）。
+
+## 9. 分岐点シナリオ（人間のプレイと比べる・`docs/rust_engine_plan.md` §20.1）
+
+§19 の一致率とは別に、**定性的に**「除去やコンボを CPU が考えられているか」を見る道具。
+旧計器（`legacy/` の `human_replay_divergence.py`／`coach_gate.py`）は使わない。**Rust の
+`Game`（`from_hidden`＋`decide` の trace）だけで新規に作った**（API は無い・CLI のみ）。
+判定は人・**分析（盤面の要約・人間の方針との比較）はコーディネータ（Claude）の役割**。
+
+### シナリオの書き方
+
+1. `tests/scripts/rs_scenario_play.py list <replay.json.gz>` でリプレイを下見する（ターンごとの
+   `action_index` 範囲・手番・その間の手の記述子が出る）。除去やコンボが見どころのターンを選ぶ。
+2. `tests/scripts/rs_scenario_play.py add --replay <file> --seat p1 --start-turn N --end-turn M
+   --title "…" --note-file note.md [--tags …] [--name …]` で
+   `tests/fixtures/scenarios/<name>.json` を書く。`note` は「人間は何を優先したか」の自由記述
+   （後から編集してよい）。名前省略時は `<リプレイのディレクトリ名>_t<start>-<end>`。
+3. `source` はリプレイ JSON（ビューアで取得した `/replay/frames` の形・`.json.gz` 可）への
+   `tests/fixtures/` からの相対パス。**開始は必ずターンの始め**（`turn_start_index` が探す
+   `MAIN_ACTION` 待ちの最初のフレーム）・終了はそれ以降のターンの `TURN_END`。
+
+### 回し方
+
+```bash
+python tests/scripts/rs_scenario_play.py play --scenario <name|all> \
+  --net opcg_sim/data/learned/nrel_r3.npz  \  # 候補（省略時は出荷既定）
+  --opp-net opcg_sim/data/learned/nrel_a1.npz \  # 相手席（省略時は --net と同じ）
+  --seeds 3 --sims 160 --out scenario_out
+```
+
+分岐点を復元し、両席を指定ネットで（候補側・相手側は別々に選べる）`end_turn` の `TURN_END`
+（か決着）まで実際に打つ。`--seeds` の違いは、山札の未見部分の並び（`hidden_build` が seed で
+shuffle する）と探索乱数（`search_seed`）の両方に効く。出力は seed ごとに 2 つ:
+
+- `out/<name>/<net>_s<seed>.frames.json` … `services/replay.py` と同じ形（`success`／
+  `replay`／`decisions`／`frames`）。**リプレイビューアの「ファイルを開く」でそのまま読める**。
+- `out/<name>/<net>_s<seed>.md` … **Claude が分析するための完全な事実の記録**（要約や合否は
+  書かない）。冒頭にシナリオの `note` と「同じ範囲で人間が打った手」。続いて CPU の各決定について
+  省略なく: (1) 盤面の全情報（両席） (2) pending (3) 合法手の一覧 (4) 探索の候補上位5と選んだ手
+  (5) 適用後のイベント列。末尾に登場した全カードの効果本文（付録）。
+
+### 出力の読み方
+
+`.md` は 1 シナリオ 2 ターンで数百〜2,000 行になる。読む側（Claude）は「同じ方針か・除去や
+コンボを見つけているか・何が違うか」を `docs/reports/` に分析として書き、ユーザが判定する。
+`decisions` には人間の手との一致（同じ `action_type`＋card）を将来の数値化に備えて 1 列だけ
+持たせる想定だが、集計はしない。
+
+### RESULT.json
+
+作業セッションが `play` を回して出力を作った場合は `docs/n_loop_ops.md` §5 と同じ要領で
+出力ブランチ直下に置く: `{"job": "rs-scenario", "status": "done",
+"cli": "tests/scripts/rs_scenario_play.py", "scenarios": ["<name>", ...],
+"outputs": "scenario_out/", "unrestorable_rules": "…（`frame_to_hidden` が復元できない条件の要約）"}`。
+
+確認は `make test`（`tests/test_scenario_play.py` が復元の往復と `play` の出力契約を見る）。

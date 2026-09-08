@@ -105,7 +105,7 @@ class RsGame:
     盤面 dict（[`board`]）と暫定 CPU 経路（[`py_manager`]）。
     """
 
-    def __init__(self, game, p1_name: str, p2_name: str, card_db=None):
+    def __init__(self, game, p1_name: str, p2_name: str, card_db=None, net: Optional[str] = None):
         self._game = game
         self.p1_name = p1_name
         self.p2_name = p2_name
@@ -117,7 +117,12 @@ class RsGame:
         self._search_base = random.getrandbits(63)
         self._carry_key = None
         self._carry: Dict[str, Any] = {}
-        self._net_loaded = False
+        # このインスタンスの既定ネット（省略時は `_net_path()`＝出荷既定）。`decide` は呼び出し
+        # ごとに `net` で上書きできる（`tests/scripts/rs_scenario_play.py` が席ごとに別ネットで
+        # 打たせるのに使う・§20.1）。複数ネットを同一プロセスで読める（`opcg_sim.loop.engine`）ので
+        # 1 インスタンスが両方の鍵を使い分けても問題ない。
+        self._net = net
+        self._loaded_nets: set = set()
 
     # --- 生成 ---------------------------------------------------------------
 
@@ -152,6 +157,19 @@ class RsGame:
             random.getrandbits,
         )
         return cls(game, p1_name, p2_name, card_db=card_db)
+
+    @classmethod
+    def from_hidden(cls, hidden: Dict[str, Any], p1_name: str = "p1", p2_name: str = "p2",
+                    seed: Optional[int] = None, card_db=None, net: Optional[str] = None) -> "RsGame":
+        """記録 v5 の `hidden` から対局を組み直す（`docs/rust_engine_plan.md` §20.1・`rs-scenario`）。
+
+        `opcg_engine.Game.from_hidden` の薄い口。**中断（対話）スタック・誘発待ち行列は
+        `hidden` に無い**ので失われる（記録 v5 の契約・`hidden` 側の docstring 参照）。
+        """
+        engine = load_engine()
+        game = engine.Game.from_hidden(
+            json.dumps(hidden, ensure_ascii=False, default=str), p1_name, p2_name, seed)
+        return cls(game, p1_name, p2_name, card_db=card_db, net=net)
 
     # --- 盤面・要求 ---------------------------------------------------------
 
@@ -240,14 +258,19 @@ class RsGame:
 
     # --- CPU の思考（Rust `decide`）-----------------------------------------
 
-    def decide(self, player_id: str, trace: Optional[Dict[str, Any]] = None):
-        """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。"""
-        move, tr = self._decide(player_id)
+    def decide(self, player_id: str, trace: Optional[Dict[str, Any]] = None,
+              net: Optional[str] = None, sims: Optional[int] = None):
+        """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
+
+        `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
+        軽い探索数で打たせたいとき・`tests/scripts/rs_scenario_play.py`・§20.1）。
+        """
+        move, tr = self._decide(player_id, net=net, sims=sims)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
 
-    def _decide(self, player_id: str):
+    def _decide(self, player_id: str, net: Optional[str] = None, sims: Optional[int] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -260,15 +283,19 @@ class RsGame:
         は生成時に 1 度だけ引く（`random` 由来＝`random.seed()` を張った traced 対局は再現する）。
         """
         engine = load_engine()
-        if not self._net_loaded:
-            engine.load_net(_net_path())
-            self._net_loaded = True
+        net_path = net or self._net or _net_path()
+        if net_path not in self._loaded_nets:
+            engine.load_net(net_path)
+            self._loaded_nets.add(net_path)
         turn = self.turn_count
         seat = "p1" if player_id == self.p1_name else "p2"
         carry = self._carry if self._carry_key == (turn, seat) else {}
-        opts = {"search_seed": _search_seed(self._search_base, turn, seat),
+        opts = {"net": net_path,
+                "search_seed": _search_seed(self._search_base, turn, seat),
                 "commit": carry.get("commit") or [],
                 "resact_pending": bool(carry.get("resact_pending"))}
+        if sims is not None:
+            opts["sims"] = int(sims)
         out = json.loads(self._game.decide(player_id, json.dumps(opts)))
         self._carry_key = (turn, seat)
         self._carry = {"commit": out.get("commit") or [],
