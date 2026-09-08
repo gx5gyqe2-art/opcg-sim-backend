@@ -3204,7 +3204,19 @@ trace）で新規に作る**。ユーザのイメージ（2026-09-08・確定）
     ターン・席ごとに「選んだ手／候補と Q／盤面の要約（場・手札枚数・ライフ・ドン）」で並べる）。
   - `add --replay <file> --seat p1 --start-turn N --end-turn M --title … --note-file note.md`:
     シナリオ JSON を書く（下見の後に使う。note は後から編集してよい）。
-- **判定は人**。ツールは合否を出さない。将来の数値化に備え、`decisions` に人間の手との一致（同じ
+- **判定は人だが、分析（盤面の要約・人間の方針との比較）は Claude（コーディネータ）の役割**（ユーザ決定
+  2026-09-08）。したがって .md は**人が眺める要約ではなく、Claude が読んで分析するための完全な事実の記録**に
+  する＝ツールは要約も合否も出さず、各決定について次を**省略なく**書く: (1) 盤面の全情報（両席: リーダー
+  〔名前・card_id・パワー・レスト・付与ドン〕・場の各キャラ〔同＋コスト・登場ターン〕・ステージ・手札の
+  各カード〔名前・card_id・コスト・パワー・カウンター〕・ライフ枚数・ドン!! active/rested/付与・デッキ枚数・
+  トラッシュの主なカード）、(2) pending（要求の種類・選択肢）、(3) 合法手の一覧（記述子）、(4) 探索の候補
+  上位 5（visit%・Q）と選んだ手、(5) 適用後のイベント列（`action_events`）。末尾に**登場したカードの
+  効果本文**（card_id ごとに 1 回・`opcg_cards.json` から）を付録として付ける＝Claude がコンボや除去の
+  可否をカード本文から判断できるようにする。同じ形式で「同じ範囲で人間が打った手」も並べる（人間側は
+  frame の盤面＋記述子）。ファイルが長くなってよい（1 シナリオ 2 ターンで数百行）。
+- 運用: 作業セッションが play を回して出力を push → コーディネータが .md を読み、シナリオの note
+  （人間の方針）と比べて「同じ方針か・除去やコンボを見つけているか・何が違うか」を `docs/reports/` に
+  分析として書く → ユーザが判定する。将来の数値化に備え、`decisions` に人間の手との一致（同じ
   action_type＋card）も 1 列だけ付けておく（集計はしない）。
 - 置き場: 復元は `opcg_sim/loop/`（生成・アリーナと同じ「Rust で対局を回す段取り」）、CLI は
   `tests/scripts/`、シナリオと出力は `tests/fixtures/scenarios/`（出力はコミットしない・`--out` 既定は
@@ -3224,8 +3236,9 @@ trace）で新規に作る**。ユーザのイメージ（2026-09-08・確定）
    ターン開始の frame の見つけ方（turn_start_index(payload, turn)）も同じ module に。復元不能は ValueError。
 2. tests/scripts/rs_scenario_play.py: サブコマンド list／play／add（§20.1）。play は RsGame.from_hidden 相当
    （opcg_sim/api/engine_rs.py に from_hidden の薄い口が無ければ足す）で Game を組み、RsGame.decide(trace=…) で
-   両席を打ち、services/replay.py の frames／decisions と同じ形の JSON と、読み物の .md を書く。
-   .md の冒頭にシナリオの note と「同じ範囲で人間が打った手」を載せる。
+   両席を打ち、services/replay.py の frames／decisions と同じ形の JSON と、**Claude が分析するための .md**
+   （§20.1 の (1)〜(5) を各決定について省略なく・末尾にカード効果本文の付録）を書く。
+   .md の冒頭にシナリオの note と「同じ範囲で人間が打った手」（同じ形式）を載せる。要約や合否は書かない。
 3. シナリオを 2 本作って動作を示す: tests/fixtures/replays/human_enel_vs_luffy_20260904 と
    human_law_vs_luffy_20260904 から、list で下見して「除去かコンボが見どころのターン」を 1 つずつ選び、
    add で JSON を書く（note は「人間は何を優先したか」を 3〜5 行・暫定でよい）。play を出荷既定 r3 と
