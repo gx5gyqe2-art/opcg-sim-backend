@@ -1,0 +1,13 @@
+{"job": "arena-r3-mirror", "role": "arena", "status": "done",
+ "inputs": {"candidate": "claude/train-r3:n1_results/nrel_r3.npz",
+            "baseline": "shipped default (nrel_a1, cpu_learned._DEFAULT_VALUE, no --baseline flag)",
+            "condition": "副条件=固定ミラー（--leaders/--decks 指定なし）",
+            "shards": 8, "pairs_per_shard": 24, "sims": 160, "workers": 4,
+            "seed_base": [431000, 432000, 433000, 434000, 435000, 436000, 437000, 438000]},
+ "outputs": {"shards": "n1_results/arena_r3_dist/mirror_w01.jsonl .. mirror_w08.jsonl",
+             "merge_log": "merge_mirror.log"},
+ "metrics": {"pairs": 192, "games": 384, "void": 0, "wins": 196.0, "wr": 0.5104,
+             "ci95": [0.4652, 0.5556], "elo": 7.2, "elo95": [-24.2, 38.8],
+             "promoted": false, "dup_seeds": 0},
+ "command": "python -m opcg_sim.loop.arena_shard --candidate ~/cand/nrel_r3.npz --pairs 24 --bands 1 --max-pairs 24 --workers 4 --sims 160 --seed-base <band> --out <shard>.jsonl ; python -m opcg_sim.loop.arena_merge --in n1_results/arena_r3_dist/mirror_*.jsonl --label r3_vs_a1_mirror",
+ "notes": "void=0（全8シャード）。wr=0.5104・ci95 [0.4652, 0.5556] は 0.5 を跨ぐ＝r3 は a1 と互角（固定ミラーでは有意差なし）。promoted=false。"}
