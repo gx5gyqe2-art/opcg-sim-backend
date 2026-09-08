@@ -95,16 +95,7 @@ pub fn declare_attack(
     }
     // アタック税（OP08-043「アタックする際、自身の手札N枚を捨てなければアタックできない」）。
     // 付与された `ATTACK_TAX_DISCARD_N` フラグがあれば、手札 N 枚を支払えるときのみアタック可。
-    let need = s
-        .state()
-        .card(attacker)
-        .flags
-        .iter()
-        .chain(s.state().card(attacker).timed_flags.iter())
-        .filter_map(|f| f.strip_prefix("ATTACK_TAX_DISCARD_"))
-        .filter_map(|n| n.parse::<usize>().ok())
-        .max();
-    if let Some(need) = need {
+    if let Some(need) = super::attack_tax_need(s.state(), attacker) {
         if s.state().player(attacker_owner).hand.len() < need {
             return Err(bad(format!(
                 "アタックするには手札{need}枚を捨てる必要があり、手札が足りません。"

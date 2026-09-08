@@ -63,6 +63,20 @@ pub fn current_counter(state: &GameState, masters: &MasterTable, card: CardIdx) 
     masters.get(c.master).counter + c.passive_counter
 }
 
+/// アタック税（OP08-043「アタックする際、自身の手札 N 枚を捨てなければアタックできない」）の
+/// N。`ATTACK_TAX_DISCARD_N` が `flags`／`timed_flags` に付いていれば最大の N、無ければ None。
+/// `battle::declare_attack`（検証）と `legal::main_actions`（列挙）が**同じ判定**を使う＝
+/// 「合法なのに適用できない手」を出さない（交差監査 seed 67 で void になった・2026-09-08）。
+pub fn attack_tax_need(state: &GameState, card: CardIdx) -> Option<usize> {
+    let c = state.card(card);
+    c.flags
+        .iter()
+        .chain(c.timed_flags.iter())
+        .filter_map(|f| f.strip_prefix("ATTACK_TAX_DISCARD_"))
+        .filter_map(|n| n.parse::<usize>().ok())
+        .max()
+}
+
 pub fn card_type(state: &GameState, masters: &MasterTable, card: CardIdx) -> CardType {
     masters.get(state.card(card).master).ty
 }

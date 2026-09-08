@@ -1650,6 +1650,43 @@ pack の置き場所は `--cache-dir`／`$OPCG_DUMP_CACHE`（既定 `~/.cache/op
 作り直し）が要る＝別の判断。ゲート `make test` 442 passed（`test_n_rel_train_torch.py` 12 本）。
 報告 `docs/reports/2026-09-07_train_torch2.md`・RESULT `docs/reports/2026-09-07_train_torch2.RESULT.json`。
 
+### 8.24 本番投入（2026-09-08）
+
+PR #206 を main へマージ（58452bed）し、ユーザが実環境（Cloud Run）で Docker ビルド・起動・CPU 対戦を確認
+＝**問題なし・CPU の応答が大幅に速くなった**（ユーザ報告）。これで Rust 化（P0〜P5）と学習の高速化
+（§18）は完了。以後の本線は main。ロールバック先は #205（34707922・c10 採用）。
+
+### 8.25 本番の不具合 1 件目: カウンターイベントが選べない（2026-09-08・ユーザ報告）
+
+**症状**: 切替後、対戦でカウンターステップに【カウンター】イベントが出てこない。
+**原因**: `rules/pending.rs::counter_candidates` が P2 の骨組み（「(b) 【カウンター】イベントは効果解決の
+P3 で」と注記して (a) カウンター値を持つ手札だけ）のまま切替まで残っていた。Python 版
+（`interaction.get_pending_request` の BATTLE_COUNTER 分岐）は (a)＋(b)（COUNTER トリガのイベントで
+マスターの `cost` ≤ アクティブなドン!!枚数）。`apply_counter` 側のイベント経路（コスト支払い→
+COUNTER 能力の解決→トラッシュ）は P3 で実装済みだったので、候補に載りさえすれば動く。
+**なぜ受け入れで漏れたか**: 決定オラクル・再生 golden の random 帯は「防御側のドン!!が尽きた盤面」
+ばかりで、この経路を一度も通らない（golden 再生 150 局・976 カウンター歩で候補になり得た盤面 0）。
+Python との合法手照合も同じ局を使うので、照合が通っても保証にならなかった。
+**修正**: `counter_candidates` に (b) を足す（cargo test `counter_step_offers_counter_events_the_player_can_pay_for`
+＝候補・合法手・実際の発動）＋ `tests/test_counter_event_offer.py`（API と同じ `RsGame` を駆動して
+`selectable_uuids` に載ることを固定・ドン!!不足なら載らない対照つき）。golden は不変（この経路を
+通っていないので作り直しの必要なし・`make test` green）。
+**教訓**: 「Python と一致」の照合は**照合に使った局が通った経路**しか守らない。P2 で「P3 で」と
+先送りした注記は、P3 の受け入れ表に載せて潰す必要があった。同種の先送り注記が残っていないかを
+`grep -rn "P3 で\\|P4 で" rust/opcg_engine/src` で棚卸しした（2026-09-08）: 挙動を落としたままの
+注記は本件のほかに無い（残りは設計の由来を書いた注記だけ）。
+
+**同時に見つかった 2 件目（交差監査 `make audit-cross` の void 1・seed 67・ST11-001 vs ST22-001）**:
+`GameAborted: アタックするには手札2枚を捨てる必要があり、手札が足りません。`＝アタック税
+（`ATTACK_TAX_DISCARD_N`）を手札で払えない攻撃者の ATTACK が合法手に載り、`declare_attack` の検証で
+弾かれて対局駆動が止まる。**Python 版の列挙も同じ穴**（`get_legal_actions` は CANNOT_REST／
+ATTACK_DISABLE は見るが税は見ていない）＝切替の退行ではなく、Rust では例外がそのまま void になる
+ため表に出た。修正: 判定を `rules::attack_tax_need` に 1 本化して `battle::declare_attack`（検証）と
+`legal::main_actions`（列挙）が同じものを使う（cargo test
+`the_attack_tax_hides_the_attack_from_the_legal_moves_when_unpayable`）。seed 67 単独で再現→修正後は
+決着（void 0）。交差監査は台帳を消して全 120 ペアを回し直し **void 0**（240 局・wr 0.5125）。
+`make test` 444 passed（cargo 383・pytest 446 のうち torch 系は導入環境のみ）。PR #207。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
