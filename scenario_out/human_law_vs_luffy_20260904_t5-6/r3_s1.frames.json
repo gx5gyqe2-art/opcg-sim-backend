@@ -226,13 +226,6 @@
     "src": "cpu",
     "turn": 5,
     "player": "p1",
-    "action_type": "ATTACH_DON",
-    "card": "EB01-003"
-   },
-   {
-    "src": "cpu",
-    "turn": 5,
-    "player": "p1",
     "action_type": "ATTACK",
     "card": "EB01-003",
     "targets": [
@@ -244,13 +237,20 @@
     "turn": 5,
     "player": "p2",
     "action_type": "SELECT_COUNTER",
-    "card": "ST30-014"
+    "card": "OP16-048"
    },
    {
     "src": "cpu",
     "turn": 5,
     "player": "p2",
     "action_type": "PASS"
+   },
+   {
+    "src": "cpu",
+    "turn": 5,
+    "player": "p1",
+    "action_type": "PLAY",
+    "card": "OP06-016"
    },
    {
     "src": "cpu",
@@ -351,6 +351,7 @@
     "card": "EB01-003"
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "MAIN_ACTION",
    "candidates": [
     {
@@ -358,8 +359,8 @@
       "action_type": "PLAY",
       "card": "EB01-003"
      },
-     "visit_pct": 63.8,
-     "q": -0.812,
+     "visit_pct": 56.9,
+     "q": -0.858,
      "copies": 2
     },
     {
@@ -371,24 +372,24 @@
        "OP16-022"
       ]
      },
-     "visit_pct": 6.9,
-     "q": -0.873
+     "visit_pct": 7.5,
+     "q": -0.885
     },
     {
      "move": {
       "action_type": "PLAY",
       "card": "OP06-069"
      },
-     "visit_pct": 5.6,
-     "q": -0.878
+     "visit_pct": 6.9,
+     "q": -0.894
     },
     {
      "move": {
       "action_type": "ACTIVATE_MAIN",
       "card": "OP09-008"
      },
-     "visit_pct": 5.0,
-     "q": -0.813
+     "visit_pct": 5.6,
+     "q": -0.829
     },
     {
      "move": {
@@ -396,10 +397,265 @@
       "card": "ST10-001"
      },
      "visit_pct": 3.8,
-     "q": -0.861
+     "q": -0.89
     }
    ],
-   "value": -0.812
+   "value": -0.858,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "p": 0.04357075318694115,
+     "n": 4,
+     "q": -0.9367579370737076
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "EB01-003"
+     },
+     "p": 0.25886958837509155,
+     "n": 46,
+     "q": -0.8579576015472412
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "EB01-003"
+     },
+     "p": 0.25886958837509155,
+     "n": 45,
+     "q": -0.8589641253153483
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-069"
+     },
+     "p": 0.08013662695884705,
+     "n": 11,
+     "q": -0.8944551727988503
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "p": 0.016860611736774445,
+     "n": 4,
+     "q": -0.8203837424516678
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP13-007"
+     },
+     "p": 0.010352305136620998,
+     "n": 1,
+     "q": -0.8985979557037354
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "ST10-001"
+     },
+     "p": 0.04358462244272232,
+     "n": 6,
+     "q": -0.889636904001236
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP09-008"
+     },
+     "p": 0.040534064173698425,
+     "n": 9,
+     "q": -0.8293829692734612
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "p": 0.007867030799388885,
+     "n": 1,
+     "q": -0.9627170562744141
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "ST10-001"
+     },
+     "p": 0.029917608946561813,
+     "n": 5,
+     "q": -0.8624895334243774
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 5,
+      "card": "ST10-001"
+     },
+     "p": 0.010293900035321712,
+     "n": 1,
+     "q": -0.9232772588729858
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP09-008"
+     },
+     "p": 0.019264377653598785,
+     "n": 4,
+     "q": -0.8588583171367645
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 5,
+      "card": "OP09-008"
+     },
+     "p": 0.008913863450288773,
+     "n": 1,
+     "q": -0.940231442451477
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP08-067"
+     },
+     "p": 0.0257335864007473,
+     "n": 5,
+     "q": -0.860357403755188
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 5,
+      "card": "OP08-067"
+     },
+     "p": 0.010302567854523659,
+     "n": 1,
+     "q": -0.9253557324409485
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "ST10-001",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "p": 0.0907709151506424,
+     "n": 12,
+     "q": -0.8853019326925278
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "ST10-001",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "p": 0.0441579669713974,
+     "n": 4,
+     "q": -0.9202760010957718
+    }
+   ],
+   "pv": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "EB01-003"
+     },
+     "seat": "p1",
+     "n": 46,
+     "q": -0.8579576015472412
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "EB01-003",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 11,
+     "q": -0.8805882930755615
+    },
+    {
+     "move": {
+      "action_type": "SELECT_BLOCKER",
+      "card": "OP16-045"
+     },
+     "seat": "p2",
+     "n": 10,
+     "q": 0.8783085942268372
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p2",
+     "n": 9,
+     "q": 0.8755222956339518
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "seat": "p1",
+     "n": 1,
+     "q": -0.9045665264129639
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 0,
+     "q": 0.0
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 0,
+     "label": "own_leader[0]:ST10-001",
+     "dv": -0.29946136474609375
+    },
+    {
+     "slot": 2,
+     "label": "own_field[2]:OP09-008",
+     "dv": -0.07108497619628906
+    },
+    {
+     "slot": 7,
+     "label": "opp_field[7]:OP16-045",
+     "dv": -0.06596285104751587
+    },
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:OP16-022",
+     "dv": -0.05514729022979736
+    },
+    {
+     "slot": 8,
+     "label": "opp_field[8]:OP16-054",
+     "dv": 0.03143042325973511
+    }
+   ]
   },
   {
    "turn": 5,
@@ -411,6 +667,7 @@
     "card": "OP09-008"
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "MAIN_ACTION",
    "candidates": [
     {
@@ -418,8 +675,8 @@
       "action_type": "ACTIVATE_MAIN",
       "card": "OP09-008"
      },
-     "visit_pct": 38.8,
-     "q": -0.622
+     "visit_pct": 21.9,
+     "q": -0.74
     },
     {
      "move": {
@@ -430,8 +687,8 @@
        "OP16-022"
       ]
      },
-     "visit_pct": 15.0,
-     "q": -0.851
+     "visit_pct": 18.1,
+     "q": -0.884
     },
     {
      "move": {
@@ -442,16 +699,16 @@
        "OP16-022"
       ]
      },
-     "visit_pct": 11.9,
-     "q": -0.853
+     "visit_pct": 14.4,
+     "q": -0.882
     },
     {
      "move": {
       "action_type": "ACTIVATE_MAIN",
       "card": "ST10-001"
      },
-     "visit_pct": 10.6,
-     "q": -0.751
+     "visit_pct": 13.1,
+     "q": -0.786
     },
     {
      "move": {
@@ -459,11 +716,230 @@
       "don_k": 1,
       "card": "ST10-001"
      },
-     "visit_pct": 7.5,
-     "q": -0.806
+     "visit_pct": 10.6,
+     "q": -0.833
     }
    ],
-   "value": -0.622
+   "value": -0.74,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "p": 0.050764936953783035,
+     "n": 5,
+     "q": -0.8881884813308716
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "p": 0.048304662108421326,
+     "n": 8,
+     "q": -0.8262958526611328
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP13-007"
+     },
+     "p": 0.024302350357174873,
+     "n": 2,
+     "q": -0.8880346715450287
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "ST10-001"
+     },
+     "p": 0.074101023375988,
+     "n": 21,
+     "q": -0.7863533922604152
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP09-008"
+     },
+     "p": 0.09144032746553421,
+     "n": 35,
+     "q": -0.7395248881408146
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "p": 0.017696302384138107,
+     "n": 1,
+     "q": -0.8862216472625732
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "ST10-001"
+     },
+     "p": 0.09979093074798584,
+     "n": 17,
+     "q": -0.8328468098359949
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP08-067"
+     },
+     "p": 0.0639033392071724,
+     "n": 9,
+     "q": -0.8489962948693169
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "EB01-003"
+     },
+     "p": 0.07077106833457947,
+     "n": 10,
+     "q": -0.8450423538684845
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "ST10-001",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "p": 0.20320436358451843,
+     "n": 23,
+     "q": -0.8822692399439604
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "EB01-003",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "p": 0.25572070479393005,
+     "n": 29,
+     "q": -0.8841744476351244
+    }
+   ],
+   "pv": [
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP09-008"
+     },
+     "seat": "p1",
+     "n": 35,
+     "q": -0.7395248881408146
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP16-045"
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 34,
+     "q": -0.7376718792845222
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "ST10-001"
+     },
+     "seat": "p1",
+     "n": 13,
+     "q": -0.560340003325389
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP16-045"
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 12,
+     "q": -0.5630867953101794
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP06-069"
+      ],
+      "selected_slots": [
+       2
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 11,
+     "q": -0.5663330040194772
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "seat": "p1",
+     "n": 1,
+     "q": -0.6499212384223938
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 0,
+     "q": 0.0
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 0,
+     "label": "own_leader[0]:ST10-001",
+     "dv": -0.4223833382129669
+    },
+    {
+     "slot": 2,
+     "label": "own_field[2]:OP09-008",
+     "dv": -0.07657194137573242
+    },
+    {
+     "slot": 4,
+     "label": "own_field[4]:EB01-003",
+     "dv": 0.07217979431152344
+    },
+    {
+     "slot": 7,
+     "label": "opp_field[7]:OP16-045",
+     "dv": -0.0714532732963562
+    },
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:OP16-022",
+     "dv": -0.04136943817138672
+    }
+   ]
   },
   {
    "turn": 5,
@@ -482,7 +958,10 @@
     "position": "BOTTOM"
    },
    "readout": "commit",
-   "dialog": "SEARCH_AND_SELECT"
+   "kind": "commit",
+   "dialog": "SEARCH_AND_SELECT",
+   "commit_from": 1,
+   "attribution": null
   },
   {
    "turn": 5,
@@ -494,6 +973,7 @@
     "card": "ST10-001"
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "MAIN_ACTION",
    "candidates": [
     {
@@ -501,20 +981,8 @@
       "action_type": "ACTIVATE_MAIN",
       "card": "ST10-001"
      },
-     "visit_pct": 65.0,
-     "q": -0.457
-    },
-    {
-     "move": {
-      "action_type": "DON_BOX",
-      "don_k": 0,
-      "card": "EB01-003",
-      "targets": [
-       "OP16-022"
-      ]
-     },
-     "visit_pct": 11.9,
-     "q": -0.726
+     "visit_pct": 47.5,
+     "q": -0.578
     },
     {
      "move": {
@@ -525,8 +993,20 @@
        "OP16-022"
       ]
      },
-     "visit_pct": 10.6,
-     "q": -0.683
+     "visit_pct": 20.6,
+     "q": -0.682
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "EB01-003",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "visit_pct": 15.0,
+     "q": -0.756
     },
     {
      "move": {
@@ -534,8 +1014,8 @@
       "don_k": 1,
       "card": "ST10-001"
      },
-     "visit_pct": 3.8,
-     "q": -0.74
+     "visit_pct": 5.0,
+     "q": -0.772
     },
     {
      "move": {
@@ -543,11 +1023,232 @@
       "don_k": 1,
       "card": "EB01-003"
      },
-     "visit_pct": 3.1,
-     "q": -0.714
+     "visit_pct": 3.8,
+     "q": -0.787
     }
    ],
-   "value": -0.457
+   "value": -0.578,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "p": 0.05931689590215683,
+     "n": 3,
+     "q": -0.873369832833608
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "p": 0.06991425156593323,
+     "n": 4,
+     "q": -0.8499297201633453
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP13-007"
+     },
+     "p": 0.029173696413636208,
+     "n": 1,
+     "q": -0.8813643455505371
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "ST10-001"
+     },
+     "p": 0.08641865104436874,
+     "n": 76,
+     "q": -0.5778550646807018
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "p": 0.021598368883132935,
+     "n": 1,
+     "q": -0.9189859628677368
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "ST10-001"
+     },
+     "p": 0.1008390486240387,
+     "n": 8,
+     "q": -0.7716975286602974
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP08-067"
+     },
+     "p": 0.06619565933942795,
+     "n": 4,
+     "q": -0.8417936861515045
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "EB01-003"
+     },
+     "p": 0.07713164389133453,
+     "n": 6,
+     "q": -0.7870713174343109
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "ST10-001",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "p": 0.21021008491516113,
+     "n": 33,
+     "q": -0.6815170419938636
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "EB01-003",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "p": 0.2792017161846161,
+     "n": 24,
+     "q": -0.756237073491017
+    }
+   ],
+   "pv": [
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "ST10-001"
+     },
+     "seat": "p1",
+     "n": 76,
+     "q": -0.5778550646807018
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP16-045"
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 75,
+     "q": -0.5785280855496725
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP06-069"
+      ],
+      "selected_slots": [
+       2
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 74,
+     "q": -0.5792192961718585
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "ST10-001",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 35,
+     "q": -0.503062161377498
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "ST30-014"
+     },
+     "seat": "p2",
+     "n": 34,
+     "q": 0.4966578501112321
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p2",
+     "n": 33,
+     "q": 0.4898653987682227
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "EB01-003",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 14,
+     "q": -0.47384790650435854
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP16-048"
+     },
+     "seat": "p2",
+     "n": 13,
+     "q": 0.4561322216804211
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 0,
+     "label": "own_leader[0]:ST10-001",
+     "dv": -0.3727053701877594
+    },
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:OP16-022",
+     "dv": -0.0878186821937561
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:EB01-003",
+     "dv": 0.06031745672225952
+    },
+    {
+     "slot": 8,
+     "label": "opp_field[8]:OP16-054",
+     "dv": 0.025333404541015625
+    },
+    {
+     "slot": 15,
+     "label": "hand[15]:OP06-016",
+     "dv": -0.014169394969940186
+    }
+   ]
   },
   {
    "turn": 5,
@@ -570,6 +1271,7 @@
     "position": "BOTTOM"
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "SELECT_RESOURCE",
    "candidates": [
     {
@@ -589,10 +1291,159 @@
       "position": "BOTTOM"
      },
      "visit_pct": 100.0,
-     "q": -0.456
+     "q": -0.553
     }
    ],
-   "value": -0.456
+   "value": -0.553,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "hb:p1:donact:0:64ac5db9d707107e",
+       "hb:p1:donact:1:7d5c8dfc5eda92d8",
+       "hb:p1:donact:2:07923986bb968a43"
+      ],
+      "selected_slots": [
+       0,
+       1,
+       2
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "p": 1.0,
+     "n": 160,
+     "q": -0.5533162606880069
+    }
+   ],
+   "pv": [
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "hb:p1:donact:0:64ac5db9d707107e",
+       "hb:p1:donact:1:7d5c8dfc5eda92d8",
+       "hb:p1:donact:2:07923986bb968a43"
+      ],
+      "selected_slots": [
+       0,
+       1,
+       2
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 160,
+     "q": -0.5533162606880069
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP16-045"
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 159,
+     "q": -0.5534793912614666
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP06-069"
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 158,
+     "q": -0.5536445867788943
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "ST10-001",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 73,
+     "q": -0.504219264200289
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "ST30-014"
+     },
+     "seat": "p2",
+     "n": 72,
+     "q": 0.5012110769748688
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p2",
+     "n": 71,
+     "q": 0.4981181520811269
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "EB01-003",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 25,
+     "q": -0.4879126274585724
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP16-048"
+     },
+     "seat": "p2",
+     "n": 24,
+     "q": 0.4789026615520318
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 0,
+     "label": "own_leader[0]:ST10-001",
+     "dv": -0.3388146460056305
+    },
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:OP16-022",
+     "dv": -0.07089167833328247
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:EB01-003",
+     "dv": 0.06911438703536987
+    },
+    {
+     "slot": 8,
+     "label": "opp_field[8]:OP16-054",
+     "dv": 0.02077794075012207
+    },
+    {
+     "slot": 12,
+     "label": "hand[12]:OP15-078",
+     "dv": 0.017773330211639404
+    }
+   ]
   },
   {
    "turn": 5,
@@ -611,7 +1462,79 @@
     "position": "BOTTOM"
    },
    "readout": "window",
-   "dialog": "SEARCH_AND_SELECT"
+   "kind": "window",
+   "dialog": "SEARCH_AND_SELECT",
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP16-045"
+      ],
+      "selected_slots": [
+       0
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "p": null,
+     "n": 1,
+     "q": -0.527378499507904
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP16-054"
+      ],
+      "selected_slots": [
+       1
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "p": null,
+     "n": 1,
+     "q": -0.7099171280860901
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "p": null,
+     "n": 1,
+     "q": -0.7753369808197021
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 0,
+     "label": "own_leader[0]:ST10-001",
+     "dv": -0.16029202938079834
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:EB01-003",
+     "dv": 0.039497971534729004
+    },
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:OP16-022",
+     "dv": -0.025970637798309326
+    },
+    {
+     "slot": 14,
+     "label": "hand[14]:OP06-069",
+     "dv": 0.013433098793029785
+    },
+    {
+     "slot": 12,
+     "label": "hand[12]:OP15-078",
+     "dv": 0.01242828369140625
+    }
+   ]
   },
   {
    "turn": 5,
@@ -630,7 +1553,10 @@
     "position": "BOTTOM"
    },
    "readout": "commit",
-   "dialog": "SEARCH_AND_SELECT"
+   "kind": "commit",
+   "dialog": "SEARCH_AND_SELECT",
+   "commit_from": 5,
+   "attribution": null
   },
   {
    "turn": 5,
@@ -645,6 +1571,7 @@
     ]
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "MAIN_ACTION",
    "candidates": [
     {
@@ -656,8 +1583,8 @@
        "OP16-022"
       ]
      },
-     "visit_pct": 50.6,
-     "q": -0.427
+     "visit_pct": 54.4,
+     "q": -0.397
     },
     {
      "move": {
@@ -668,17 +1595,8 @@
        "OP16-022"
       ]
      },
-     "visit_pct": 28.1,
-     "q": -0.49
-    },
-    {
-     "move": {
-      "action_type": "DON_BOX",
-      "don_k": 1,
-      "card": "ST10-001"
-     },
-     "visit_pct": 6.9,
-     "q": -0.539
+     "visit_pct": 23.8,
+     "q": -0.484
     },
     {
      "move": {
@@ -686,8 +1604,17 @@
       "card": "OP06-016"
      },
      "visit_pct": 6.2,
-     "q": -0.621,
+     "q": -0.623,
      "copies": 2
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "ST10-001"
+     },
+     "visit_pct": 6.2,
+     "q": -0.513
     },
     {
      "move": {
@@ -696,10 +1623,218 @@
       "card": "EB01-003"
      },
      "visit_pct": 3.8,
-     "q": -0.558
+     "q": -0.55
     }
    ],
-   "value": -0.427
+   "value": -0.397,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "p": 0.04281938821077347,
+     "n": 2,
+     "q": -0.6499212384223938
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "p": 0.07305195182561874,
+     "n": 5,
+     "q": -0.6230508029460907
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP13-007"
+     },
+     "p": 0.024748824536800385,
+     "n": 1,
+     "q": -0.6425102949142456
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "p": 0.07305195182561874,
+     "n": 5,
+     "q": -0.6230508267879487
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "p": 0.015581440180540085,
+     "n": 1,
+     "q": -0.5632543563842773
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "ST10-001"
+     },
+     "p": 0.09523671865463257,
+     "n": 10,
+     "q": -0.5129062935709954
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP08-067"
+     },
+     "p": 0.05884405970573425,
+     "n": 5,
+     "q": -0.5468834042549133
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "EB01-003"
+     },
+     "p": 0.06631968170404434,
+     "n": 6,
+     "q": -0.5495876967906952
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "ST10-001",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "p": 0.26578986644744873,
+     "n": 87,
+     "q": -0.39734575914582987
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "EB01-003",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "p": 0.284556120634079,
+     "n": 38,
+     "q": -0.48426559214529236
+    }
+   ],
+   "pv": [
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "ST10-001",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 87,
+     "q": -0.39734575914582987
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP16-026"
+     },
+     "seat": "p2",
+     "n": 86,
+     "q": 0.39519591984707253
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p2",
+     "n": 85,
+     "q": 0.39299549609422685
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "EB01-003",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 44,
+     "q": -0.3552981841970574
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p2",
+     "n": 43,
+     "q": 0.3506424825551898
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "seat": "p1",
+     "n": 15,
+     "q": -0.3394744277000427
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "seat": "p1",
+     "n": 7,
+     "q": -0.21139935936246598
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-048"
+     },
+     "seat": "p2",
+     "n": 6,
+     "q": 0.20049319167931876
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 0,
+     "label": "own_leader[0]:ST10-001",
+     "dv": -0.6004043892025948
+    },
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:OP16-022",
+     "dv": -0.223542720079422
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:EB01-003",
+     "dv": 0.20537537336349487
+    },
+    {
+     "slot": 4,
+     "label": "own_field[4]:OP06-069",
+     "dv": 0.14678514003753662
+    },
+    {
+     "slot": 7,
+     "label": "opp_field[7]:OP16-054",
+     "dv": 0.08535701036453247
+    }
+   ]
   },
   {
    "turn": 5,
@@ -711,7 +1846,90 @@
     "card": "OP16-048"
    },
    "readout": "window",
-   "dialog": "SELECT_COUNTER"
+   "kind": "window",
+   "dialog": "SELECT_COUNTER",
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP16-042"
+     },
+     "p": null,
+     "n": 1,
+     "q": 0.765805184841156
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP16-048"
+     },
+     "p": null,
+     "n": 1,
+     "q": 0.7814196348190308
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "ST30-014"
+     },
+     "p": null,
+     "n": 1,
+     "q": 0.7781112790107727
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP16-048"
+     },
+     "p": null,
+     "n": 1,
+     "q": 0.781419575214386
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP16-048"
+     },
+     "p": null,
+     "n": 1,
+     "q": 0.781419575214386
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "p": null,
+     "n": 1,
+     "q": 0.7705109119415283
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:ST10-001",
+     "dv": 0.2621915936470032
+    },
+    {
+     "slot": 8,
+     "label": "opp_field[8]:EB01-003",
+     "dv": -0.07354313135147095
+    },
+    {
+     "slot": 15,
+     "label": "hand[15]:OP16-032",
+     "dv": 0.06699365377426147
+    },
+    {
+     "slot": 0,
+     "label": "own_leader[0]:OP16-022",
+     "dv": -0.03579825162887573
+    },
+    {
+     "slot": 7,
+     "label": "opp_field[7]:OP08-067",
+     "dv": 0.02152162790298462
+    }
+   ]
   },
   {
    "turn": 5,
@@ -722,73 +1940,15 @@
     "action_type": "PASS"
    },
    "readout": "commit",
-   "dialog": "SELECT_COUNTER"
+   "kind": "commit",
+   "dialog": "SELECT_COUNTER",
+   "commit_from": 8,
+   "attribution": null
   },
   {
    "turn": 5,
    "player": "p1",
    "action_index": 10,
-   "difficulty": "learned",
-   "chosen": {
-    "action_type": "ATTACH_DON",
-    "card": "EB01-003"
-   },
-   "readout": "main",
-   "dialog": "MAIN_ACTION",
-   "candidates": [
-    {
-     "move": {
-      "action_type": "DON_BOX",
-      "don_k": 1,
-      "card": "EB01-003"
-     },
-     "visit_pct": 37.5,
-     "q": -0.14
-    },
-    {
-     "move": {
-      "action_type": "PLAY",
-      "card": "OP06-016"
-     },
-     "visit_pct": 31.2,
-     "q": -0.22,
-     "copies": 2
-    },
-    {
-     "move": {
-      "action_type": "DON_BOX",
-      "don_k": 0,
-      "card": "EB01-003",
-      "targets": [
-       "OP16-022"
-      ]
-     },
-     "visit_pct": 25.0,
-     "q": -0.293
-    },
-    {
-     "move": {
-      "action_type": "DON_BOX",
-      "don_k": 1,
-      "card": "OP08-067"
-     },
-     "visit_pct": 3.8,
-     "q": -0.431
-    },
-    {
-     "move": {
-      "action_type": "TURN_END"
-     },
-     "visit_pct": 1.9,
-     "q": -0.414
-    }
-   ],
-   "value": -0.14
-  },
-  {
-   "turn": 5,
-   "player": "p1",
-   "action_index": 11,
    "difficulty": "learned",
    "chosen": {
     "action_type": "ATTACK",
@@ -798,6 +1958,7 @@
     ]
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "MAIN_ACTION",
    "candidates": [
     {
@@ -809,18 +1970,318 @@
        "OP16-022"
       ]
      },
-     "visit_pct": 92.5,
-     "q": -0.268
+     "visit_pct": 74.4,
+     "q": -0.262
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "visit_pct": 12.5,
+     "q": -0.47,
+     "copies": 2
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "EB01-003"
+     },
+     "visit_pct": 4.4,
+     "q": -0.436
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP08-067"
+     },
+     "visit_pct": 3.8,
+     "q": -0.551
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "visit_pct": 1.9,
+     "q": -0.617
+    }
+   ],
+   "value": -0.262,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "p": 0.061394479125738144,
+     "n": 3,
+     "q": -0.6169960896174113
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "p": 0.14963601529598236,
+     "n": 10,
+     "q": -0.4699296593666077
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP13-007"
+     },
+     "p": 0.03783264756202698,
+     "n": 2,
+     "q": -0.6678820848464966
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "p": 0.14963601529598236,
+     "n": 10,
+     "q": -0.4699296593666077
     },
     {
      "move": {
       "action_type": "TURN_END"
      },
-     "visit_pct": 7.5,
-     "q": -0.335
+     "p": 0.041635144501924515,
+     "n": 3,
+     "q": -0.4168906609217326
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP08-067"
+     },
+     "p": 0.10372301191091537,
+     "n": 6,
+     "q": -0.5506395374735197
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "EB01-003"
+     },
+     "p": 0.08891172707080841,
+     "n": 7,
+     "q": -0.4356234903846468
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "EB01-003",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "p": 0.36723095178604126,
+     "n": 119,
+     "q": -0.2616896201159899
     }
    ],
-   "value": -0.268
+   "pv": [
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "EB01-003",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 119,
+     "q": -0.2616896201159899
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP16-054"
+     },
+     "seat": "p2",
+     "n": 118,
+     "q": 0.2580397566070117
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p2",
+     "n": 117,
+     "q": 0.2543275022688202
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "seat": "p1",
+     "n": 46,
+     "q": -0.23068981018403303
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "seat": "p1",
+     "n": 30,
+     "q": -0.13242427930235862
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-056"
+     },
+     "seat": "p2",
+     "n": 8,
+     "q": 0.19101947452872992
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP16-022",
+      "targets": [
+       "EB01-003"
+      ]
+     },
+     "seat": "p2",
+     "n": 7,
+     "q": 0.1698120098028864
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP15-078"
+     },
+     "seat": "p1",
+     "n": 6,
+     "q": -0.1632282274464766
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 0,
+     "label": "own_leader[0]:ST10-001",
+     "dv": -0.5444577485322952
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:EB01-003",
+     "dv": 0.2597273886203766
+    },
+    {
+     "slot": 4,
+     "label": "own_field[4]:OP06-069",
+     "dv": 0.21958568692207336
+    },
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:OP16-022",
+     "dv": -0.20612755417823792
+    },
+    {
+     "slot": 7,
+     "label": "opp_field[7]:OP16-054",
+     "dv": 0.1386648416519165
+    }
+   ]
+  },
+  {
+   "turn": 5,
+   "player": "p2",
+   "action_index": 11,
+   "difficulty": "learned",
+   "chosen": {
+    "action_type": "SELECT_COUNTER",
+    "card": "OP16-048"
+   },
+   "readout": "window",
+   "kind": "window",
+   "dialog": "SELECT_COUNTER",
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP16-042"
+     },
+     "p": null,
+     "n": 1,
+     "q": 0.7733031511306763
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "ST30-014"
+     },
+     "p": null,
+     "n": 1,
+     "q": 0.7855806946754456
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP16-048"
+     },
+     "p": null,
+     "n": 1,
+     "q": 0.7875130772590637
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP16-048"
+     },
+     "p": null,
+     "n": 1,
+     "q": 0.7875130772590637
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "p": null,
+     "n": 1,
+     "q": 0.7840056419372559
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:ST10-001",
+     "dv": 0.26462608575820923
+    },
+    {
+     "slot": 14,
+     "label": "hand[14]:OP16-032",
+     "dv": 0.08079934120178223
+    },
+    {
+     "slot": 8,
+     "label": "opp_field[8]:EB01-003",
+     "dv": -0.05238747596740723
+    },
+    {
+     "slot": 0,
+     "label": "own_leader[0]:OP16-022",
+     "dv": -0.03712505102157593
+    },
+    {
+     "slot": 2,
+     "label": "own_field[2]:OP16-054",
+     "dv": 0.006854414939880371
+    }
+   ]
   },
   {
    "turn": 5,
@@ -828,22 +2289,236 @@
    "action_index": 12,
    "difficulty": "learned",
    "chosen": {
-    "action_type": "SELECT_COUNTER",
-    "card": "ST30-014"
-   },
-   "readout": "window",
-   "dialog": "SELECT_COUNTER"
-  },
-  {
-   "turn": 5,
-   "player": "p2",
-   "action_index": 13,
-   "difficulty": "learned",
-   "chosen": {
     "action_type": "PASS"
    },
    "readout": "commit",
-   "dialog": "SELECT_COUNTER"
+   "kind": "commit",
+   "dialog": "SELECT_COUNTER",
+   "commit_from": 11,
+   "attribution": null
+  },
+  {
+   "turn": 5,
+   "player": "p1",
+   "action_index": 13,
+   "difficulty": "learned",
+   "chosen": {
+    "action_type": "PLAY",
+    "card": "OP06-016"
+   },
+   "readout": "main",
+   "kind": "main",
+   "dialog": "MAIN_ACTION",
+   "candidates": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "visit_pct": 60.6,
+     "q": -0.51,
+     "copies": 2
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP08-067"
+     },
+     "visit_pct": 17.5,
+     "q": -0.486
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "visit_pct": 15.0,
+     "q": -0.487
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP13-007"
+     },
+     "visit_pct": 3.8,
+     "q": -0.573
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "visit_pct": 3.1,
+     "q": -0.642
+    }
+   ],
+   "value": -0.51,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "p": 0.07104920595884323,
+     "n": 5,
+     "q": -0.6417934775352478
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "p": 0.30609121918678284,
+     "n": 48,
+     "q": -0.5094876208653053
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP13-007"
+     },
+     "p": 0.05711596831679344,
+     "n": 6,
+     "q": -0.5729614595572153
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "p": 0.30609121918678284,
+     "n": 49,
+     "q": -0.5113731498012737
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "p": 0.11551813781261444,
+     "n": 24,
+     "q": -0.4865473968287309
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP08-067"
+     },
+     "p": 0.1441342681646347,
+     "n": 28,
+     "q": -0.48630976736811654
+    }
+   ],
+   "pv": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP06-016"
+     },
+     "seat": "p1",
+     "n": 49,
+     "q": -0.5113731498012737
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "seat": "p1",
+     "n": 24,
+     "q": -0.46062206476926804
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-045"
+     },
+     "seat": "p2",
+     "n": 20,
+     "q": 0.5165527299046516
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p2",
+     "n": 19,
+     "q": 0.5090692090360742
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP16-054"
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p2",
+     "n": 18,
+     "q": 0.5007541858487659
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p2",
+     "n": 17,
+     "q": 0.49146092463942137
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP16-022",
+      "targets": [
+       "EB01-003"
+      ]
+     },
+     "seat": "p2",
+     "n": 16,
+     "q": 0.48100600577890873
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "EB03-035"
+     },
+     "seat": "p1",
+     "n": 15,
+     "q": -0.4913556615511576
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 0,
+     "label": "own_leader[0]:ST10-001",
+     "dv": -0.5275091230869293
+    },
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:OP16-022",
+     "dv": -0.22405950725078583
+    },
+    {
+     "slot": 4,
+     "label": "own_field[4]:OP06-069",
+     "dv": 0.19676989316940308
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:EB01-003",
+     "dv": 0.12492823600769043
+    },
+    {
+     "slot": 7,
+     "label": "opp_field[7]:OP16-054",
+     "dv": 0.10385018587112427
+    }
+   ]
   },
   {
    "turn": 5,
@@ -854,17 +2529,172 @@
     "action_type": "TURN_END"
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "MAIN_ACTION",
    "candidates": [
     {
      "move": {
       "action_type": "TURN_END"
      },
-     "visit_pct": 100.0,
-     "q": -0.277
+     "visit_pct": 68.8,
+     "q": -0.443
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP06-016"
+     },
+     "visit_pct": 23.1,
+     "q": -0.591
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "visit_pct": 8.1,
+     "q": -0.697
     }
    ],
-   "value": -0.277
+   "value": -0.443,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "p": 0.22026078402996063,
+     "n": 13,
+     "q": -0.6968189294521625
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP06-016"
+     },
+     "p": 0.4099343717098236,
+     "n": 37,
+     "q": -0.5910813389597712
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "p": 0.36980485916137695,
+     "n": 110,
+     "q": -0.4427512594414028
+    }
+   ],
+   "pv": [
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "seat": "p1",
+     "n": 110,
+     "q": -0.4427512594414028
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-045"
+     },
+     "seat": "p2",
+     "n": 61,
+     "q": 0.46366697452107414
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p2",
+     "n": 60,
+     "q": 0.4604157636562983
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP16-054"
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p2",
+     "n": 59,
+     "q": 0.4570543422537335
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p2",
+     "n": 58,
+     "q": 0.4535770097683216
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP16-022",
+      "targets": [
+       "EB01-003"
+      ]
+     },
+     "seat": "p2",
+     "n": 37,
+     "q": 0.49166737778766734
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "EB03-035"
+     },
+     "seat": "p1",
+     "n": 36,
+     "q": -0.4962758802705341
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP15-078"
+     },
+     "seat": "p1",
+     "n": 35,
+     "q": -0.5011477257524218
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 0,
+     "label": "own_leader[0]:ST10-001",
+     "dv": -0.4788559004664421
+    },
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:OP16-022",
+     "dv": -0.27431219071149826
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:EB01-003",
+     "dv": 0.23297971487045288
+    },
+    {
+     "slot": 4,
+     "label": "own_field[4]:OP06-069",
+     "dv": 0.20665353536605835
+    },
+    {
+     "slot": 7,
+     "label": "opp_field[7]:OP16-054",
+     "dv": 0.13404202461242676
+    }
+   ]
   },
   {
    "turn": 6,
@@ -876,6 +2706,7 @@
     "card": "OP16-048"
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "MAIN_ACTION",
    "candidates": [
     {
@@ -883,9 +2714,8 @@
       "action_type": "PLAY",
       "card": "OP16-048"
      },
-     "visit_pct": 98.8,
-     "q": 0.534,
-     "copies": 2
+     "visit_pct": 91.2,
+     "q": 0.746
     },
     {
      "move": {
@@ -896,8 +2726,32 @@
        "EB01-003"
       ]
      },
+     "visit_pct": 6.9,
+     "q": 0.659
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP16-022",
+      "targets": [
+       "ST10-001"
+      ]
+     },
      "visit_pct": 1.2,
-     "q": 0.192
+     "q": 0.252
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP16-022",
+      "targets": [
+       "ST10-001"
+      ]
+     },
+     "visit_pct": 0.6,
+     "q": 0.28
     },
     {
      "move": {
@@ -906,24 +2760,252 @@
      },
      "visit_pct": 0.0,
      "q": 0.0
+    }
+   ],
+   "value": 0.746,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-042"
+     },
+     "p": 0.03817911073565483,
+     "n": 0,
+     "q": 0.0
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "ST30-014"
+     },
+     "p": 0.0106955049559474,
+     "n": 0,
+     "q": 0.0
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-048"
+     },
+     "p": 0.6341633796691895,
+     "n": 146,
+     "q": 0.7457825676219104
     },
     {
      "move": {
       "action_type": "PLAY",
       "card": "OP16-034"
      },
-     "visit_pct": 0.0,
+     "p": 0.008479171432554722,
+     "n": 0,
      "q": 0.0
     },
     {
      "move": {
       "action_type": "TURN_END"
      },
-     "visit_pct": 0.0,
+     "p": 0.0025383448228240013,
+     "n": 0,
      "q": 0.0
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP16-022"
+     },
+     "p": 0.0360502265393734,
+     "n": 0,
+     "q": 0.0
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 6,
+      "card": "OP16-022"
+     },
+     "p": 0.003629170823842287,
+     "n": 0,
+     "q": 0.0
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP16-054"
+     },
+     "p": 0.015490694902837276,
+     "n": 0,
+     "q": 0.0
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 6,
+      "card": "OP16-054"
+     },
+     "p": 0.0036516243126243353,
+     "n": 0,
+     "q": 0.0
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP16-022",
+      "targets": [
+       "ST10-001"
+      ]
+     },
+     "p": 0.06720686703920364,
+     "n": 2,
+     "q": 0.2522013187408447
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP16-022",
+      "targets": [
+       "ST10-001"
+      ]
+     },
+     "p": 0.050454478710889816,
+     "n": 1,
+     "q": 0.280032217502594
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP16-022",
+      "targets": [
+       "EB01-003"
+      ]
+     },
+     "p": 0.023813210427761078,
+     "n": 0,
+     "q": 0.0
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP16-022",
+      "targets": [
+       "EB01-003"
+      ]
+     },
+     "p": 0.10564820468425751,
+     "n": 11,
+     "q": 0.6593133156949823
     }
    ],
-   "value": 0.534
+   "pv": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-048"
+     },
+     "seat": "p2",
+     "n": 146,
+     "q": 0.7457825676219104
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p2",
+     "n": 145,
+     "q": 0.7464922913189592
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP16-022"
+     },
+     "seat": "p2",
+     "n": 56,
+     "q": 0.7757799433810371
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP16-022",
+      "targets": [
+       "EB01-003"
+      ]
+     },
+     "seat": "p2",
+     "n": 33,
+     "q": 0.8051115455049457
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p1",
+     "n": 32,
+     "q": -0.8058607913553715
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP16-022"
+     },
+     "seat": "p2",
+     "n": 21,
+     "q": 0.8230609212602887
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-054"
+     },
+     "seat": "p2",
+     "n": 19,
+     "q": 0.8279659528481332
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "seat": "p2",
+     "n": 18,
+     "q": 0.8281246059470706
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:ST10-001",
+     "dv": 0.21266746520996094
+    },
+    {
+     "slot": 14,
+     "label": "hand[14]:OP16-032",
+     "dv": 0.18312737345695496
+    },
+    {
+     "slot": 15,
+     "label": "hand[15]:OP16-048",
+     "dv": 0.1215251088142395
+    },
+    {
+     "slot": 8,
+     "label": "opp_field[8]:EB01-003",
+     "dv": -0.09826898574829102
+    },
+    {
+     "slot": 10,
+     "label": "opp_field[10]:OP06-016",
+     "dv": 0.06504732370376587
+    }
+   ]
   },
   {
    "turn": 6,
@@ -936,7 +3018,10 @@
     "position": "BOTTOM"
    },
    "readout": "commit",
-   "dialog": "SEARCH_AND_SELECT"
+   "kind": "commit",
+   "dialog": "SEARCH_AND_SELECT",
+   "commit_from": 15,
+   "attribution": null
   },
   {
    "turn": 6,
@@ -948,6 +3033,7 @@
     "card": "OP16-022"
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "MAIN_ACTION",
    "candidates": [
     {
@@ -956,25 +3042,16 @@
       "don_k": 1,
       "card": "OP16-022"
      },
-     "visit_pct": 46.2,
-     "q": 0.582
-    },
-    {
-     "move": {
-      "action_type": "DON_BOX",
-      "don_k": 1,
-      "card": "OP16-054"
-     },
-     "visit_pct": 15.0,
-     "q": 0.574
+     "visit_pct": 36.9,
+     "q": 0.772
     },
     {
      "move": {
       "action_type": "ACTIVATE_MAIN",
       "card": "OP16-022"
      },
-     "visit_pct": 13.1,
-     "q": 0.536
+     "visit_pct": 21.9,
+     "q": 0.795
     },
     {
      "move": {
@@ -985,8 +3062,8 @@
        "EB01-003"
       ]
      },
-     "visit_pct": 12.5,
-     "q": 0.466
+     "visit_pct": 17.5,
+     "q": 0.705
     },
     {
      "move": {
@@ -997,11 +3074,205 @@
        "ST10-001"
       ]
      },
-     "visit_pct": 9.4,
-     "q": 0.468
+     "visit_pct": 11.2,
+     "q": 0.668
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP16-054"
+     },
+     "visit_pct": 10.0,
+     "q": 0.741
     }
    ],
-   "value": 0.582
+   "value": 0.772,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-034"
+     },
+     "p": 0.05361594259738922,
+     "n": 4,
+     "q": 0.5630342066287994
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP16-022"
+     },
+     "p": 0.1248718798160553,
+     "n": 35,
+     "q": 0.7953063453946795
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "p": 0.01914041116833687,
+     "n": 0,
+     "q": 0.0
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP16-022"
+     },
+     "p": 0.2802809774875641,
+     "n": 59,
+     "q": 0.7724527140795174
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP16-054"
+     },
+     "p": 0.10560313612222672,
+     "n": 16,
+     "q": 0.7408255860209465
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP16-022",
+      "targets": [
+       "ST10-001"
+      ]
+     },
+     "p": 0.1787489950656891,
+     "n": 18,
+     "q": 0.6682743926843008
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP16-022",
+      "targets": [
+       "EB01-003"
+      ]
+     },
+     "p": 0.23773865401744843,
+     "n": 28,
+     "q": 0.7045016139745712
+    }
+   ],
+   "pv": [
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP16-022"
+     },
+     "seat": "p2",
+     "n": 59,
+     "q": 0.7724527140795174
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP16-022",
+      "targets": [
+       "EB01-003"
+      ]
+     },
+     "seat": "p2",
+     "n": 34,
+     "q": 0.8039937334902146
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p1",
+     "n": 33,
+     "q": -0.8046864018295751
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP16-022"
+     },
+     "seat": "p2",
+     "n": 21,
+     "q": 0.8230609212602887
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-054"
+     },
+     "seat": "p2",
+     "n": 19,
+     "q": 0.8279659528481332
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "seat": "p2",
+     "n": 18,
+     "q": 0.8281246059470706
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     },
+     "seat": "p1",
+     "n": 1,
+     "q": -0.8255839347839355
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP16-048"
+      ],
+      "selected_slots": [
+       6
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 0,
+     "q": 0.0
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:ST10-001",
+     "dv": 0.20875608921051025
+    },
+    {
+     "slot": 8,
+     "label": "opp_field[8]:EB01-003",
+     "dv": -0.1404721736907959
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:OP16-048",
+     "dv": 0.1285552978515625
+    },
+    {
+     "slot": 14,
+     "label": "hand[14]:OP16-032",
+     "dv": 0.12327373027801514
+    },
+    {
+     "slot": 10,
+     "label": "opp_field[10]:OP06-016",
+     "dv": 0.07247579097747803
+    }
+   ]
   },
   {
    "turn": 6,
@@ -1016,6 +3287,7 @@
     ]
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "MAIN_ACTION",
    "candidates": [
     {
@@ -1027,8 +3299,8 @@
        "EB01-003"
       ]
      },
-     "visit_pct": 53.1,
-     "q": 0.605
+     "visit_pct": 66.9,
+     "q": 0.823
     },
     {
      "move": {
@@ -1039,16 +3311,16 @@
        "ST10-001"
       ]
      },
-     "visit_pct": 36.2,
-     "q": 0.592
+     "visit_pct": 17.5,
+     "q": 0.676
     },
     {
      "move": {
       "action_type": "ACTIVATE_MAIN",
       "card": "OP16-022"
      },
-     "visit_pct": 10.6,
-     "q": 0.524
+     "visit_pct": 15.6,
+     "q": 0.803
     },
     {
      "move": {
@@ -1058,7 +3330,162 @@
      "q": 0.0
     }
    ],
-   "value": 0.605
+   "value": 0.823,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP16-022"
+     },
+     "p": 0.14055921137332916,
+     "n": 25,
+     "q": 0.8027031517028809
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "p": 0.028928812593221664,
+     "n": 0,
+     "q": 0.0
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP16-022",
+      "targets": [
+       "ST10-001"
+      ]
+     },
+     "p": 0.3505687415599823,
+     "n": 28,
+     "q": 0.6757981095995221
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP16-022",
+      "targets": [
+       "EB01-003"
+      ]
+     },
+     "p": 0.47994324564933777,
+     "n": 107,
+     "q": 0.8228846014103043
+    }
+   ],
+   "pv": [
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP16-022",
+      "targets": [
+       "EB01-003"
+      ]
+     },
+     "seat": "p2",
+     "n": 107,
+     "q": 0.8228846014103043
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p1",
+     "n": 106,
+     "q": -0.8232784591755777
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP16-022"
+     },
+     "seat": "p2",
+     "n": 72,
+     "q": 0.8378716053234206
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-054"
+     },
+     "seat": "p2",
+     "n": 36,
+     "q": 0.8372143374549018
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "seat": "p2",
+     "n": 35,
+     "q": 0.8375601700374058
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "P-093"
+     },
+     "seat": "p1",
+     "n": 5,
+     "q": -0.7584824085235595
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "ST10-001"
+     },
+     "seat": "p1",
+     "n": 1,
+     "q": -0.6900879144668579
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP16-054"
+      ],
+      "selected_slots": [
+       5
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 0,
+     "q": 0.0
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:ST10-001",
+     "dv": 0.2743270993232727
+    },
+    {
+     "slot": 8,
+     "label": "opp_field[8]:EB01-003",
+     "dv": -0.16288554668426514
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:OP16-048",
+     "dv": 0.15283077955245972
+    },
+    {
+     "slot": 14,
+     "label": "hand[14]:OP16-032",
+     "dv": 0.11711263656616211
+    },
+    {
+     "slot": 2,
+     "label": "own_field[2]:OP16-054",
+     "dv": -0.11102145910263062
+    }
+   ]
   },
   {
    "turn": 6,
@@ -1070,7 +3497,72 @@
     "card": "OP15-078"
    },
    "readout": "window",
-   "dialog": "SELECT_COUNTER"
+   "kind": "window",
+   "dialog": "SELECT_COUNTER",
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP15-078"
+     },
+     "p": null,
+     "n": 1,
+     "q": -0.46141719818115234
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "OP13-007"
+     },
+     "p": null,
+     "n": 1,
+     "q": -0.4692838490009308
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "EB03-035"
+     },
+     "p": null,
+     "n": 1,
+     "q": -0.46141719818115234
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "p": null,
+     "n": 1,
+     "q": -0.7672877311706543
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 0,
+     "label": "own_leader[0]:ST10-001",
+     "dv": -0.551309272646904
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:EB01-003",
+     "dv": 0.24624958634376526
+    },
+    {
+     "slot": 8,
+     "label": "opp_field[8]:OP16-048",
+     "dv": -0.17650994658470154
+    },
+    {
+     "slot": 5,
+     "label": "own_field[5]:OP06-016",
+     "dv": -0.15495753288269043
+    },
+    {
+     "slot": 4,
+     "label": "own_field[4]:OP06-069",
+     "dv": 0.12004205584526062
+    }
+   ]
   },
   {
    "turn": 6,
@@ -1083,7 +3575,10 @@
     "position": "BOTTOM"
    },
    "readout": "commit",
-   "dialog": "SEARCH_AND_SELECT"
+   "kind": "commit",
+   "dialog": "SEARCH_AND_SELECT",
+   "commit_from": 19,
+   "attribution": null
   },
   {
    "turn": 6,
@@ -1095,7 +3590,10 @@
     "card": "OP13-007"
    },
    "readout": "commit",
-   "dialog": "SELECT_COUNTER"
+   "kind": "commit",
+   "dialog": "SELECT_COUNTER",
+   "commit_from": 19,
+   "attribution": null
   },
   {
    "turn": 6,
@@ -1106,7 +3604,10 @@
     "action_type": "PASS"
    },
    "readout": "commit",
-   "dialog": "SELECT_COUNTER"
+   "kind": "commit",
+   "dialog": "SELECT_COUNTER",
+   "commit_from": 19,
+   "attribution": null
   },
   {
    "turn": 6,
@@ -1118,6 +3619,7 @@
     "card": "OP16-022"
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "MAIN_ACTION",
    "candidates": [
     {
@@ -1125,18 +3627,142 @@
       "action_type": "ACTIVATE_MAIN",
       "card": "OP16-022"
      },
-     "visit_pct": 71.2,
-     "q": 0.532
+     "visit_pct": 76.9,
+     "q": 0.723
     },
     {
      "move": {
       "action_type": "TURN_END"
      },
-     "visit_pct": 28.8,
-     "q": 0.501
+     "visit_pct": 23.1,
+     "q": 0.625
     }
    ],
-   "value": 0.532
+   "value": 0.723,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP16-022"
+     },
+     "p": 0.6172600984573364,
+     "n": 123,
+     "q": 0.7226292578185477
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "p": 0.3827399015426636,
+     "n": 37,
+     "q": 0.6253906053465765
+    }
+   ],
+   "pv": [
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP16-022"
+     },
+     "seat": "p2",
+     "n": 123,
+     "q": 0.7226292578185477
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-054"
+     },
+     "seat": "p2",
+     "n": 47,
+     "q": 0.6986728310585022
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "seat": "p2",
+     "n": 46,
+     "q": 0.7023334619791611
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "ST10-001",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 8,
+     "q": -0.7016818225383759
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p2",
+     "n": 7,
+     "q": 0.7003688216209412
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p2",
+     "n": 6,
+     "q": 0.6986181537310282
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "EB01-003"
+     },
+     "seat": "p1",
+     "n": 1,
+     "q": -0.6466729044914246
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-078"
+     },
+     "seat": "p1",
+     "n": 0,
+     "q": 0.0
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:ST10-001",
+     "dv": 0.32499900460243225
+    },
+    {
+     "slot": 14,
+     "label": "hand[14]:OP16-032",
+     "dv": 0.22481510043144226
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:OP16-048",
+     "dv": 0.1942366361618042
+    },
+    {
+     "slot": 8,
+     "label": "opp_field[8]:EB01-003",
+     "dv": -0.17056667804718018
+    },
+    {
+     "slot": 10,
+     "label": "opp_field[10]:OP06-016",
+     "dv": 0.09867554903030396
+    }
+   ]
   },
   {
    "turn": 6,
@@ -1148,6 +3774,7 @@
     "card": "OP16-054"
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "MAIN_ACTION",
    "candidates": [
     {
@@ -1155,8 +3782,8 @@
       "action_type": "PLAY",
       "card": "OP16-054"
      },
-     "visit_pct": 56.9,
-     "q": 0.548
+     "visit_pct": 34.4,
+     "q": 0.696
     },
     {
      "move": {
@@ -1164,8 +3791,8 @@
       "don_k": 2,
       "card": "OP16-054"
      },
-     "visit_pct": 16.2,
-     "q": 0.549
+     "visit_pct": 31.2,
+     "q": 0.805
     },
     {
      "move": {
@@ -1173,26 +3800,186 @@
       "don_k": 1,
       "card": "OP16-054"
      },
-     "visit_pct": 15.0,
-     "q": 0.527
+     "visit_pct": 23.1,
+     "q": 0.776
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "ST30-014"
+     },
+     "visit_pct": 5.0,
+     "q": 0.539
     },
     {
      "move": {
       "action_type": "PLAY",
       "card": "OP16-034"
      },
-     "visit_pct": 6.9,
-     "q": 0.452
+     "visit_pct": 3.1,
+     "q": 0.509
+    }
+   ],
+   "value": 0.696,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "ST30-014"
+     },
+     "p": 0.1439427137374878,
+     "n": 8,
+     "q": 0.5392891131341457
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-034"
+     },
+     "p": 0.0980561301112175,
+     "n": 5,
+     "q": 0.5093558430671692
+    },
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-054"
+     },
+     "p": 0.447517454624176,
+     "n": 55,
+     "q": 0.6957078608599576
     },
     {
      "move": {
       "action_type": "TURN_END"
      },
-     "visit_pct": 5.0,
-     "q": 0.507
+     "p": 0.0568096786737442,
+     "n": 5,
+     "q": 0.6441264867782592
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP16-054"
+     },
+     "p": 0.13954630494117737,
+     "n": 37,
+     "q": 0.7761313238659421
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP16-054"
+     },
+     "p": 0.1141277328133583,
+     "n": 50,
+     "q": 0.8045030057430267
     }
    ],
-   "value": 0.548
+   "pv": [
+    {
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP16-054"
+     },
+     "seat": "p2",
+     "n": 55,
+     "q": 0.6957078608599576
+    },
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "seat": "p2",
+     "n": 54,
+     "q": 0.6987712692331385
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "ST10-001",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 11,
+     "q": -0.6833950443701311
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p2",
+     "n": 10,
+     "q": 0.6806472659111023
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p2",
+     "n": 9,
+     "q": 0.6772888700167338
+    },
+    {
+     "move": {
+      "action_type": "ACTIVATE_MAIN",
+      "card": "OP06-016"
+     },
+     "seat": "p1",
+     "n": 1,
+     "q": -0.5774762034416199
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "selected": [
+       "OP16-048"
+      ],
+      "selected_slots": [
+       6
+      ],
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p1",
+     "n": 0,
+     "q": 0.0
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:ST10-001",
+     "dv": 0.2753872573375702
+    },
+    {
+     "slot": 14,
+     "label": "hand[14]:OP16-032",
+     "dv": 0.14427679777145386
+    },
+    {
+     "slot": 8,
+     "label": "opp_field[8]:EB01-003",
+     "dv": -0.13708722591400146
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:OP16-048",
+     "dv": 0.13343068957328796
+    },
+    {
+     "slot": 2,
+     "label": "own_field[2]:OP16-054",
+     "dv": -0.1054154634475708
+    }
+   ]
   },
   {
    "turn": 6,
@@ -1203,6 +3990,7 @@
     "action_type": "TURN_END"
    },
    "readout": "main",
+   "kind": "main",
    "dialog": "MAIN_ACTION",
    "candidates": [
     {
@@ -1210,10 +3998,131 @@
       "action_type": "TURN_END"
      },
      "visit_pct": 100.0,
-     "q": 0.531
+     "q": 0.68
     }
    ],
-   "value": 0.531
+   "value": 0.68,
+   "legal_stats": [
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "p": 1.0,
+     "n": 160,
+     "q": 0.6799830019474029
+    }
+   ],
+   "pv": [
+    {
+     "move": {
+      "action_type": "TURN_END"
+     },
+     "seat": "p2",
+     "n": 160,
+     "q": 0.6799830019474029
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "ST10-001",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 49,
+     "q": -0.6478008439346236
+    },
+    {
+     "move": {
+      "action_type": "RESOLVE_EFFECT_SELECTION",
+      "index": 0,
+      "position": "BOTTOM"
+     },
+     "seat": "p2",
+     "n": 48,
+     "q": 0.6464868442465862
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p2",
+     "n": 47,
+     "q": 0.6451169296782068
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP06-069",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 13,
+     "q": -0.5167766098792737
+    },
+    {
+     "move": {
+      "action_type": "PASS"
+     },
+     "seat": "p2",
+     "n": 12,
+     "q": 0.5026141727964083
+    },
+    {
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "EB01-003",
+      "targets": [
+       "OP16-022"
+      ]
+     },
+     "seat": "p1",
+     "n": 5,
+     "q": -0.5185180008411407
+    },
+    {
+     "move": {
+      "action_type": "SELECT_COUNTER",
+      "card": "ST30-014"
+     },
+     "seat": "p2",
+     "n": 4,
+     "q": 0.4976974353194237
+    }
+   ],
+   "attribution": [
+    {
+     "slot": 1,
+     "label": "opp_leader[1]:ST10-001",
+     "dv": 0.3524264842271805
+    },
+    {
+     "slot": 8,
+     "label": "opp_field[8]:EB01-003",
+     "dv": -0.21940094232559204
+    },
+    {
+     "slot": 14,
+     "label": "hand[14]:OP16-032",
+     "dv": 0.21551987528800964
+    },
+    {
+     "slot": 3,
+     "label": "own_field[3]:OP16-048",
+     "dv": 0.20601299405097961
+    },
+    {
+     "slot": 2,
+     "label": "own_field[2]:OP16-054",
+     "dv": -0.15952295064926147
+    }
+   ]
   }
  ],
  "frames": [
@@ -5868,409 +8777,6 @@
   {
    "action_index": 10,
    "turn": 5,
-   "phase": "MAIN",
-   "active": "p1",
-   "winner": null,
-   "players": {
-    "p1": {
-     "leader": {
-      "uuid": "0048e51f-30e5-469f-9ee2-6839ad0cee83",
-      "card_id": "ST10-001",
-      "name": "トラファルガー・ロー",
-      "power": 5000,
-      "cost": 0,
-      "is_rest": true,
-      "is_face_up": true,
-      "attached_don": 0,
-      "keywords": [],
-      "ability_disabled": false,
-      "is_frozen": false
-     },
-     "stage": null,
-     "field": [
-      {
-       "uuid": "f3ed0eb4-15e8-499e-9136-e5ee16cd1345",
-       "card_id": "OP08-067",
-       "name": "シャーロット・プリン",
-       "power": 4000,
-       "cost": 3,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "bcbe6d5f-16fb-49bd-8d5c-07f533c072b4",
-       "card_id": "EB01-003",
-       "name": "キッド&キラー",
-       "power": 6000,
-       "cost": 4,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 1,
-       "keywords": [
-        "速攻"
-       ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c59f6bdf-454e-4ef4-81d9-14b3d581b0f6",
-       "card_id": "OP06-069",
-       "name": "ヴィンスモーク・レイジュ",
-       "power": 5000,
-       "cost": 4,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      }
-     ],
-     "hand": [
-      {
-       "uuid": "b66331ee-917d-4394-be3c-4749d7a50ffb",
-       "card_id": "OP15-078",
-       "name": "万雷",
-       "power": 0,
-       "cost": 0,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "04941de6-9184-4c2b-bef9-451870bdcdcf",
-       "card_id": "EB01-003",
-       "name": "キッド&キラー",
-       "power": 5000,
-       "cost": 4,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [
-        "速攻"
-       ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "310353af-0ed2-437e-9dc6-d5990b50836b",
-       "card_id": "OP13-007",
-       "name": "エース&サボ&ルフィ",
-       "power": 1000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "hb:p1:deck:0:3bab6c398d88348a",
-       "card_id": "EB03-035",
-       "name": "シャーロット・プリン",
-       "power": 4000,
-       "cost": 4,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "hb:p1:deck:1:3b1a11df587fd280",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      }
-     ],
-     "life": [
-      {
-       "uuid": "ca1c206b-ec40-4d24-9f59-8797b6549292",
-       "card_id": "ST10-008",
-       "name": "シャチ&ペンギン",
-       "power": 5000,
-       "cost": 4,
-       "is_rest": false,
-       "is_face_up": false,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "7f3b94ab-c4e7-4bf4-bf76-cdbd7a7536d1",
-       "card_id": "P-093",
-       "name": "トラファルガー・ロー",
-       "power": 6000,
-       "cost": 4,
-       "is_rest": false,
-       "is_face_up": false,
-       "attached_don": 0,
-       "keywords": [
-        "ブロッカー"
-       ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "b61bc4d4-abe5-4dba-8fef-fc2d7dddae43",
-       "card_id": "OP05-074",
-       "name": "ユースタス・キッド",
-       "power": 6000,
-       "cost": 5,
-       "is_rest": false,
-       "is_face_up": false,
-       "attached_don": 0,
-       "keywords": [
-        "ブロッカー"
-       ],
-       "ability_disabled": false,
-       "is_frozen": false
-      }
-     ],
-     "trash": [],
-     "don_active": 0,
-     "don_rested": 1,
-     "don_deck": 8,
-     "deck_count": 38
-    },
-    "p2": {
-     "leader": {
-      "uuid": "ed5c12b2-00a0-4f4b-954f-c12a40b90d89",
-      "card_id": "OP16-022",
-      "name": "モンキー・D・ルフィ",
-      "power": 5000,
-      "cost": 0,
-      "is_rest": true,
-      "is_face_up": true,
-      "attached_don": 0,
-      "keywords": [],
-      "ability_disabled": false,
-      "is_frozen": false
-     },
-     "stage": null,
-     "field": [
-      {
-       "uuid": "a1c0bef9-9b5c-4913-882b-171a64c33356",
-       "card_id": "OP16-054",
-       "name": "Mr.1(ダズ・ボーネス)",
-       "power": 2000,
-       "cost": 2,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      }
-     ],
-     "hand": [
-      {
-       "uuid": "88575649-acef-46a8-820a-ee5aea67f5d8",
-       "card_id": "OP16-042",
-       "name": "インペルダウンの囚人",
-       "power": 6000,
-       "cost": 6,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      }
-     ],
-     "life": [
-      {
-       "uuid": "7a772106-c976-40f4-982c-8101884f8621",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
-       "is_rest": false,
-       "is_face_up": false,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "064c4d01-41ab-4688-82d5-16d5b3f367a5",
-       "card_id": "OP16-027",
-       "name": "ジンベエ",
-       "power": 2000,
-       "cost": 2,
-       "is_rest": false,
-       "is_face_up": false,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "7d40acd6-f5f4-4152-a52d-81b1c88909e5",
-       "card_id": "OP16-042",
-       "name": "インペルダウンの囚人",
-       "power": 6000,
-       "cost": 6,
-       "is_rest": false,
-       "is_face_up": false,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "39e8a110-bc9d-400a-ad5f-930d683b1220",
-       "card_id": "OP16-056",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 5000,
-       "cost": 4,
-       "is_rest": false,
-       "is_face_up": false,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      }
-     ],
-     "trash": [
-      {
-       "uuid": "43ac4033-8f65-4883-84a5-eddef07eb8ae",
-       "card_id": "OP13-040",
-       "name": "強ェとわかってんだから... 始めから全開だ!!!",
-       "power": 0,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "848ab8f4-a736-407a-b635-df440789782a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
-       "ability_disabled": false,
-       "is_frozen": false
-      }
-     ],
-     "don_active": 0,
-     "don_rested": 4,
-     "don_deck": 6,
-     "deck_count": 38
-    }
-   },
-   "pending": {
-    "player_id": "p1",
-    "action": "MAIN_ACTION",
-    "message": "メインアクションを選択してください",
-    "selectable_uuids": [
-     "b66331ee-917d-4394-be3c-4749d7a50ffb",
-     "04941de6-9184-4c2b-bef9-451870bdcdcf",
-     "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-     "310353af-0ed2-437e-9dc6-d5990b50836b",
-     "hb:p1:deck:0:3bab6c398d88348a",
-     "hb:p1:deck:1:3b1a11df587fd280",
-     "f3ed0eb4-15e8-499e-9136-e5ee16cd1345",
-     "bcbe6d5f-16fb-49bd-8d5c-07f533c072b4",
-     "c59f6bdf-454e-4ef4-81d9-14b3d581b0f6"
-    ],
-    "can_skip": true,
-    "request_id": "82f7134f99cb84f6"
-   },
-   "battle": null
-  },
-  {
-   "action_index": 11,
-   "turn": 5,
    "phase": "BATTLE_COUNTER",
    "active": "p1",
    "winner": null,
@@ -6308,11 +8814,11 @@
        "uuid": "bcbe6d5f-16fb-49bd-8d5c-07f533c072b4",
        "card_id": "EB01-003",
        "name": "キッド&キラー",
-       "power": 6000,
+       "power": 5000,
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -6461,7 +8967,7 @@
       }
      ],
      "trash": [],
-     "don_active": 0,
+     "don_active": 1,
      "don_rested": 1,
      "don_deck": 8,
      "deck_count": 38
@@ -6670,7 +9176,7 @@
    }
   },
   {
-   "action_index": 12,
+   "action_index": 11,
    "turn": 5,
    "phase": "BATTLE_COUNTER",
    "active": "p1",
@@ -6709,11 +9215,11 @@
        "uuid": "bcbe6d5f-16fb-49bd-8d5c-07f533c072b4",
        "card_id": "EB01-003",
        "name": "キッド&キラー",
-       "power": 6000,
+       "power": 5000,
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -6862,7 +9368,7 @@
       }
      ],
      "trash": [],
-     "don_active": 0,
+     "don_active": 1,
      "don_rested": 1,
      "don_deck": 8,
      "deck_count": 38
@@ -6912,11 +9418,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -6925,11 +9431,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -7033,11 +9539,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -7058,16 +9564,418 @@
     "message": "カウンターカードを選択してください",
     "selectable_uuids": [
      "88575649-acef-46a8-820a-ee5aea67f5d8",
-     "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+     "fabca809-6f87-49f0-b48b-240649375e42",
      "6d831772-20d5-4ac4-859e-f7719281151a"
     ],
     "can_skip": true,
-    "request_id": "0312e6767b7dc6e0"
+    "request_id": "03bd82ffb54d6ef9"
    },
    "battle": {
     "attacker_uuid": "bcbe6d5f-16fb-49bd-8d5c-07f533c072b4",
     "target_uuid": "ed5c12b2-00a0-4f4b-954f-c12a40b90d89"
    }
+  },
+  {
+   "action_index": 12,
+   "turn": 5,
+   "phase": "MAIN",
+   "active": "p1",
+   "winner": null,
+   "players": {
+    "p1": {
+     "leader": {
+      "uuid": "0048e51f-30e5-469f-9ee2-6839ad0cee83",
+      "card_id": "ST10-001",
+      "name": "トラファルガー・ロー",
+      "power": 5000,
+      "cost": 0,
+      "is_rest": true,
+      "is_face_up": true,
+      "attached_don": 0,
+      "keywords": [],
+      "ability_disabled": false,
+      "is_frozen": false
+     },
+     "stage": null,
+     "field": [
+      {
+       "uuid": "f3ed0eb4-15e8-499e-9136-e5ee16cd1345",
+       "card_id": "OP08-067",
+       "name": "シャーロット・プリン",
+       "power": 4000,
+       "cost": 3,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "bcbe6d5f-16fb-49bd-8d5c-07f533c072b4",
+       "card_id": "EB01-003",
+       "name": "キッド&キラー",
+       "power": 5000,
+       "cost": 4,
+       "is_rest": true,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [
+        "速攻"
+       ],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c59f6bdf-454e-4ef4-81d9-14b3d581b0f6",
+       "card_id": "OP06-069",
+       "name": "ヴィンスモーク・レイジュ",
+       "power": 5000,
+       "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      }
+     ],
+     "hand": [
+      {
+       "uuid": "b66331ee-917d-4394-be3c-4749d7a50ffb",
+       "card_id": "OP15-078",
+       "name": "万雷",
+       "power": 0,
+       "cost": 0,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "04941de6-9184-4c2b-bef9-451870bdcdcf",
+       "card_id": "EB01-003",
+       "name": "キッド&キラー",
+       "power": 5000,
+       "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [
+        "速攻"
+       ],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "310353af-0ed2-437e-9dc6-d5990b50836b",
+       "card_id": "OP13-007",
+       "name": "エース&サボ&ルフィ",
+       "power": 1000,
+       "cost": 1,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "hb:p1:deck:0:3bab6c398d88348a",
+       "card_id": "EB03-035",
+       "name": "シャーロット・プリン",
+       "power": 4000,
+       "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "hb:p1:deck:1:3b1a11df587fd280",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      }
+     ],
+     "life": [
+      {
+       "uuid": "ca1c206b-ec40-4d24-9f59-8797b6549292",
+       "card_id": "ST10-008",
+       "name": "シャチ&ペンギン",
+       "power": 5000,
+       "cost": 4,
+       "is_rest": false,
+       "is_face_up": false,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "7f3b94ab-c4e7-4bf4-bf76-cdbd7a7536d1",
+       "card_id": "P-093",
+       "name": "トラファルガー・ロー",
+       "power": 6000,
+       "cost": 4,
+       "is_rest": false,
+       "is_face_up": false,
+       "attached_don": 0,
+       "keywords": [
+        "ブロッカー"
+       ],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "b61bc4d4-abe5-4dba-8fef-fc2d7dddae43",
+       "card_id": "OP05-074",
+       "name": "ユースタス・キッド",
+       "power": 6000,
+       "cost": 5,
+       "is_rest": false,
+       "is_face_up": false,
+       "attached_don": 0,
+       "keywords": [
+        "ブロッカー"
+       ],
+       "ability_disabled": false,
+       "is_frozen": false
+      }
+     ],
+     "trash": [],
+     "don_active": 1,
+     "don_rested": 1,
+     "don_deck": 8,
+     "deck_count": 38
+    },
+    "p2": {
+     "leader": {
+      "uuid": "ed5c12b2-00a0-4f4b-954f-c12a40b90d89",
+      "card_id": "OP16-022",
+      "name": "モンキー・D・ルフィ",
+      "power": 5000,
+      "cost": 0,
+      "is_rest": true,
+      "is_face_up": true,
+      "attached_don": 0,
+      "keywords": [],
+      "ability_disabled": false,
+      "is_frozen": false
+     },
+     "stage": null,
+     "field": [
+      {
+       "uuid": "a1c0bef9-9b5c-4913-882b-171a64c33356",
+       "card_id": "OP16-054",
+       "name": "Mr.1(ダズ・ボーネス)",
+       "power": 2000,
+       "cost": 2,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      }
+     ],
+     "hand": [
+      {
+       "uuid": "88575649-acef-46a8-820a-ee5aea67f5d8",
+       "card_id": "OP16-042",
+       "name": "インペルダウンの囚人",
+       "power": 6000,
+       "cost": 6,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      }
+     ],
+     "life": [
+      {
+       "uuid": "7a772106-c976-40f4-982c-8101884f8621",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
+       "is_rest": false,
+       "is_face_up": false,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "064c4d01-41ab-4688-82d5-16d5b3f367a5",
+       "card_id": "OP16-027",
+       "name": "ジンベエ",
+       "power": 2000,
+       "cost": 2,
+       "is_rest": false,
+       "is_face_up": false,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "7d40acd6-f5f4-4152-a52d-81b1c88909e5",
+       "card_id": "OP16-042",
+       "name": "インペルダウンの囚人",
+       "power": 6000,
+       "cost": 6,
+       "is_rest": false,
+       "is_face_up": false,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "39e8a110-bc9d-400a-ad5f-930d683b1220",
+       "card_id": "OP16-056",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 5000,
+       "cost": 4,
+       "is_rest": false,
+       "is_face_up": false,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      }
+     ],
+     "trash": [
+      {
+       "uuid": "43ac4033-8f65-4883-84a5-eddef07eb8ae",
+       "card_id": "OP13-040",
+       "name": "強ェとわかってんだから... 始めから全開だ!!!",
+       "power": 0,
+       "cost": 1,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "848ab8f4-a736-407a-b635-df440789782a",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      }
+     ],
+     "don_active": 0,
+     "don_rested": 4,
+     "don_deck": 6,
+     "deck_count": 38
+    }
+   },
+   "pending": {
+    "player_id": "p1",
+    "action": "MAIN_ACTION",
+    "message": "メインアクションを選択してください",
+    "selectable_uuids": [
+     "b66331ee-917d-4394-be3c-4749d7a50ffb",
+     "04941de6-9184-4c2b-bef9-451870bdcdcf",
+     "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+     "310353af-0ed2-437e-9dc6-d5990b50836b",
+     "hb:p1:deck:0:3bab6c398d88348a",
+     "hb:p1:deck:1:3b1a11df587fd280",
+     "f3ed0eb4-15e8-499e-9136-e5ee16cd1345",
+     "c59f6bdf-454e-4ef4-81d9-14b3d581b0f6"
+    ],
+    "can_skip": true,
+    "request_id": "76c2e6198b068fb4"
+   },
+   "battle": null
   },
   {
    "action_index": 13,
@@ -7109,11 +10017,11 @@
        "uuid": "bcbe6d5f-16fb-49bd-8d5c-07f533c072b4",
        "card_id": "EB01-003",
        "name": "キッド&キラー",
-       "power": 6000,
+       "power": 5000,
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -7126,6 +10034,19 @@
        "name": "ヴィンスモーク・レイジュ",
        "power": 5000,
        "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -7160,19 +10081,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -7263,7 +10171,7 @@
      ],
      "trash": [],
      "don_active": 0,
-     "don_rested": 1,
+     "don_rested": 2,
      "don_deck": 8,
      "deck_count": 38
     },
@@ -7312,11 +10220,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -7325,11 +10233,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -7433,11 +10341,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -7459,15 +10367,15 @@
     "selectable_uuids": [
      "b66331ee-917d-4394-be3c-4749d7a50ffb",
      "04941de6-9184-4c2b-bef9-451870bdcdcf",
-     "c71e859c-e3e8-4437-91f5-ff394c1c0318",
      "310353af-0ed2-437e-9dc6-d5990b50836b",
      "hb:p1:deck:0:3bab6c398d88348a",
      "hb:p1:deck:1:3b1a11df587fd280",
      "f3ed0eb4-15e8-499e-9136-e5ee16cd1345",
-     "c59f6bdf-454e-4ef4-81d9-14b3d581b0f6"
+     "c59f6bdf-454e-4ef4-81d9-14b3d581b0f6",
+     "c71e859c-e3e8-4437-91f5-ff394c1c0318"
     ],
     "can_skip": true,
-    "request_id": "76c2e6198b068fb4"
+    "request_id": "24c72e0375bcb476"
    },
    "battle": null
   },
@@ -7515,7 +10423,7 @@
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -7528,6 +10436,19 @@
        "name": "ヴィンスモーク・レイジュ",
        "power": 5000,
        "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -7562,19 +10483,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -7665,7 +10573,7 @@
      ],
      "trash": [],
      "don_active": 0,
-     "don_rested": 1,
+     "don_rested": 2,
      "don_deck": 8,
      "deck_count": 38
     },
@@ -7714,11 +10622,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -7727,11 +10635,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -7848,11 +10756,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -7873,15 +10781,15 @@
     "message": "メインアクションを選択してください",
     "selectable_uuids": [
      "88575649-acef-46a8-820a-ee5aea67f5d8",
+     "fabca809-6f87-49f0-b48b-240649375e42",
      "691dd886-8c66-4746-b738-39ab531852bf",
-     "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
      "6d831772-20d5-4ac4-859e-f7719281151a",
      "hb:p2:deck:0:99901c0475491bc3",
      "a1c0bef9-9b5c-4913-882b-171a64c33356",
      "ed5c12b2-00a0-4f4b-954f-c12a40b90d89"
     ],
     "can_skip": true,
-    "request_id": "adf4148e4cdc8643"
+    "request_id": "40c43d9d8002f157"
    },
    "battle": null
   },
@@ -7929,7 +10837,7 @@
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -7942,6 +10850,19 @@
        "name": "ヴィンスモーク・レイジュ",
        "power": 5000,
        "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -7976,19 +10897,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -8079,7 +10987,7 @@
      ],
      "trash": [],
      "don_active": 0,
-     "don_rested": 1,
+     "don_rested": 2,
      "don_deck": 8,
      "deck_count": 38
     },
@@ -8113,7 +11021,7 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
        "card_id": "OP16-048",
        "name": "バギー",
        "power": 6000,
@@ -8141,11 +11049,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -8154,11 +11062,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -8275,11 +11183,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -8379,7 +11287,7 @@
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -8392,6 +11300,19 @@
        "name": "ヴィンスモーク・レイジュ",
        "power": 5000,
        "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -8426,19 +11347,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -8529,7 +11437,7 @@
      ],
      "trash": [],
      "don_active": 0,
-     "don_rested": 1,
+     "don_rested": 2,
      "don_deck": 8,
      "deck_count": 38
     },
@@ -8563,7 +11471,7 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
        "card_id": "OP16-048",
        "name": "バギー",
        "power": 6000,
@@ -8591,11 +11499,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -8604,11 +11512,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -8725,11 +11633,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -8750,16 +11658,16 @@
     "message": "メインアクションを選択してください",
     "selectable_uuids": [
      "88575649-acef-46a8-820a-ee5aea67f5d8",
+     "fabca809-6f87-49f0-b48b-240649375e42",
      "691dd886-8c66-4746-b738-39ab531852bf",
-     "6d831772-20d5-4ac4-859e-f7719281151a",
      "hb:p2:deck:0:99901c0475491bc3",
      "hb:p2:deck:1:cdf8440407295e42",
      "a1c0bef9-9b5c-4913-882b-171a64c33356",
-     "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+     "6d831772-20d5-4ac4-859e-f7719281151a",
      "ed5c12b2-00a0-4f4b-954f-c12a40b90d89"
     ],
     "can_skip": true,
-    "request_id": "0da3a8543e0f59c3"
+    "request_id": "a4e6f9da01992cc2"
    },
    "battle": null
   },
@@ -8807,7 +11715,7 @@
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -8820,6 +11728,19 @@
        "name": "ヴィンスモーク・レイジュ",
        "power": 5000,
        "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -8854,19 +11775,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -8957,7 +11865,7 @@
      ],
      "trash": [],
      "don_active": 0,
-     "don_rested": 1,
+     "don_rested": 2,
      "don_deck": 8,
      "deck_count": 38
     },
@@ -8991,7 +11899,7 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
        "card_id": "OP16-048",
        "name": "バギー",
        "power": 6000,
@@ -9019,11 +11927,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -9032,11 +11940,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -9153,11 +12061,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -9178,16 +12086,16 @@
     "message": "メインアクションを選択してください",
     "selectable_uuids": [
      "88575649-acef-46a8-820a-ee5aea67f5d8",
+     "fabca809-6f87-49f0-b48b-240649375e42",
      "691dd886-8c66-4746-b738-39ab531852bf",
-     "6d831772-20d5-4ac4-859e-f7719281151a",
      "hb:p2:deck:0:99901c0475491bc3",
      "hb:p2:deck:1:cdf8440407295e42",
      "a1c0bef9-9b5c-4913-882b-171a64c33356",
-     "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+     "6d831772-20d5-4ac4-859e-f7719281151a",
      "ed5c12b2-00a0-4f4b-954f-c12a40b90d89"
     ],
     "can_skip": true,
-    "request_id": "0da3a8543e0f59c3"
+    "request_id": "a4e6f9da01992cc2"
    },
    "battle": null
   },
@@ -9235,7 +12143,7 @@
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -9248,6 +12156,19 @@
        "name": "ヴィンスモーク・レイジュ",
        "power": 5000,
        "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -9282,19 +12203,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -9385,7 +12293,7 @@
      ],
      "trash": [],
      "don_active": 0,
-     "don_rested": 1,
+     "don_rested": 2,
      "don_deck": 8,
      "deck_count": 38
     },
@@ -9419,7 +12327,7 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
        "card_id": "OP16-048",
        "name": "バギー",
        "power": 6000,
@@ -9447,11 +12355,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -9460,11 +12368,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -9581,11 +12489,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -9661,7 +12569,7 @@
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -9674,6 +12582,19 @@
        "name": "ヴィンスモーク・レイジュ",
        "power": 5000,
        "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -9695,19 +12616,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -9812,7 +12720,7 @@
       }
      ],
      "don_active": 0,
-     "don_rested": 1,
+     "don_rested": 2,
      "don_deck": 8,
      "deck_count": 38
     },
@@ -9846,7 +12754,7 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
        "card_id": "OP16-048",
        "name": "バギー",
        "power": 6000,
@@ -9874,11 +12782,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -9887,11 +12795,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -10008,11 +12916,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -10035,6 +12943,7 @@
      "f3ed0eb4-15e8-499e-9136-e5ee16cd1345",
      "bcbe6d5f-16fb-49bd-8d5c-07f533c072b4",
      "c59f6bdf-454e-4ef4-81d9-14b3d581b0f6",
+     "c71e859c-e3e8-4437-91f5-ff394c1c0318",
      "0048e51f-30e5-469f-9ee2-6839ad0cee83"
     ],
     "can_skip": false,
@@ -10065,7 +12974,7 @@
       "uuid": "bcbe6d5f-16fb-49bd-8d5c-07f533c072b4",
       "card_id": "EB01-003",
       "name": "キッド&キラー",
-      "power": 6000,
+      "power": 5000,
       "counter": 0,
       "attribute": "斬",
       "cost": 4,
@@ -10077,7 +12986,7 @@
       "type": "キャラクター",
       "is_rest": true,
       "is_face_up": true,
-      "attached_don": 1,
+      "attached_don": 0,
       "owner_id": "p1",
       "keywords": [
        "速攻"
@@ -10099,6 +13008,29 @@
        "ジェルマ66"
       ],
       "text": "【登場時】自分の場のドン !!が相手の場のドン !!の枚数以下でかつ、自分の手札が5枚以下の場合、カード2枚を引く。",
+      "type": "キャラクター",
+      "is_rest": false,
+      "is_face_up": true,
+      "attached_don": 0,
+      "owner_id": "p1",
+      "keywords": [],
+      "trigger_text": "",
+      "ability_disabled": false,
+      "is_frozen": false
+     },
+     {
+      "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+      "card_id": "OP06-016",
+      "name": "レイズ・マックス",
+      "power": 2000,
+      "counter": 0,
+      "attribute": "知",
+      "cost": 1,
+      "traits": [
+       "FILM",
+       "革命軍"
+      ],
+      "text": "【起動メイン】このキャラを持ち主のデッキの下に置くことができる:相手のキャラ1枚までを、このターン中、パワー-3000。",
       "type": "キャラクター",
       "is_rest": false,
       "is_face_up": true,
@@ -10137,7 +13069,7 @@
      "max": 1
     },
     "options": null,
-    "request_id": "9f2178537b63d76e"
+    "request_id": "30d727615faedf62"
    },
    "battle": {
     "attacker_uuid": "ed5c12b2-00a0-4f4b-954f-c12a40b90d89",
@@ -10188,7 +13120,7 @@
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -10201,6 +13133,19 @@
        "name": "ヴィンスモーク・レイジュ",
        "power": 5000,
        "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -10222,19 +13167,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -10352,7 +13284,7 @@
       }
      ],
      "don_active": 0,
-     "don_rested": 1,
+     "don_rested": 2,
      "don_deck": 8,
      "deck_count": 37
     },
@@ -10386,7 +13318,7 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
        "card_id": "OP16-048",
        "name": "バギー",
        "power": 6000,
@@ -10414,11 +13346,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -10427,11 +13359,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -10548,11 +13480,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -10628,7 +13560,7 @@
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -10641,6 +13573,19 @@
        "name": "ヴィンスモーク・レイジュ",
        "power": 5000,
        "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -10662,19 +13607,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -10792,7 +13724,7 @@
       }
      ],
      "don_active": 0,
-     "don_rested": 1,
+     "don_rested": 2,
      "don_deck": 8,
      "deck_count": 37
     },
@@ -10826,7 +13758,7 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
        "card_id": "OP16-048",
        "name": "バギー",
        "power": 6000,
@@ -10854,11 +13786,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -10867,11 +13799,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -10988,11 +13920,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -11067,7 +13999,7 @@
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -11080,6 +14012,19 @@
        "name": "ヴィンスモーク・レイジュ",
        "power": 5000,
        "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -11101,19 +14046,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -11231,7 +14163,7 @@
       }
      ],
      "don_active": 0,
-     "don_rested": 1,
+     "don_rested": 2,
      "don_deck": 8,
      "deck_count": 37
     },
@@ -11265,7 +14197,7 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
        "card_id": "OP16-048",
        "name": "バギー",
        "power": 6000,
@@ -11293,11 +14225,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -11306,11 +14238,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -11427,11 +14359,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -11452,15 +14384,15 @@
     "message": "メインアクションを選択してください",
     "selectable_uuids": [
      "88575649-acef-46a8-820a-ee5aea67f5d8",
+     "fabca809-6f87-49f0-b48b-240649375e42",
      "691dd886-8c66-4746-b738-39ab531852bf",
-     "6d831772-20d5-4ac4-859e-f7719281151a",
      "hb:p2:deck:0:99901c0475491bc3",
      "hb:p2:deck:1:cdf8440407295e42",
      "a1c0bef9-9b5c-4913-882b-171a64c33356",
-     "62b9d811-7ec3-495f-bf55-e8ef41e4bda6"
+     "6d831772-20d5-4ac4-859e-f7719281151a"
     ],
     "can_skip": true,
-    "request_id": "b199d94be04d344d"
+    "request_id": "2282b448cb735df0"
    },
    "battle": null
   },
@@ -11508,7 +14440,7 @@
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -11521,6 +14453,19 @@
        "name": "ヴィンスモーク・レイジュ",
        "power": 5000,
        "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -11542,19 +14487,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -11672,7 +14604,7 @@
       }
      ],
      "don_active": 0,
-     "don_rested": 1,
+     "don_rested": 2,
      "don_deck": 8,
      "deck_count": 37
     },
@@ -11706,7 +14638,7 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
        "card_id": "OP16-048",
        "name": "バギー",
        "power": 6000,
@@ -11734,11 +14666,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -11747,11 +14679,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -11868,11 +14800,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -11893,15 +14825,15 @@
     "message": "メインアクションを選択してください",
     "selectable_uuids": [
      "88575649-acef-46a8-820a-ee5aea67f5d8",
+     "fabca809-6f87-49f0-b48b-240649375e42",
      "691dd886-8c66-4746-b738-39ab531852bf",
-     "6d831772-20d5-4ac4-859e-f7719281151a",
      "hb:p2:deck:0:99901c0475491bc3",
      "hb:p2:deck:1:cdf8440407295e42",
      "a1c0bef9-9b5c-4913-882b-171a64c33356",
-     "62b9d811-7ec3-495f-bf55-e8ef41e4bda6"
+     "6d831772-20d5-4ac4-859e-f7719281151a"
     ],
     "can_skip": true,
-    "request_id": "b199d94be04d344d"
+    "request_id": "2282b448cb735df0"
    },
    "battle": null
   },
@@ -11949,7 +14881,7 @@
        "cost": 4,
        "is_rest": true,
        "is_face_up": true,
-       "attached_don": 1,
+       "attached_don": 0,
        "keywords": [
         "速攻"
        ],
@@ -11962,6 +14894,19 @@
        "name": "ヴィンスモーク・レイジュ",
        "power": 5000,
        "cost": 4,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -11983,19 +14928,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -12113,7 +15045,7 @@
       }
      ],
      "don_active": 0,
-     "don_rested": 1,
+     "don_rested": 2,
      "don_deck": 8,
      "deck_count": 37
     },
@@ -12147,7 +15079,7 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
        "card_id": "OP16-048",
        "name": "バギー",
        "power": 6000,
@@ -12188,11 +15120,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -12201,11 +15133,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -12322,11 +15254,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -12347,16 +15279,16 @@
     "message": "メインアクションを選択してください",
     "selectable_uuids": [
      "88575649-acef-46a8-820a-ee5aea67f5d8",
+     "fabca809-6f87-49f0-b48b-240649375e42",
      "691dd886-8c66-4746-b738-39ab531852bf",
-     "6d831772-20d5-4ac4-859e-f7719281151a",
      "hb:p2:deck:0:99901c0475491bc3",
      "hb:p2:deck:2:a2a7ae1f3ac7652c",
      "a1c0bef9-9b5c-4913-882b-171a64c33356",
-     "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+     "6d831772-20d5-4ac4-859e-f7719281151a",
      "hb:p2:deck:1:cdf8440407295e42"
     ],
     "can_skip": true,
-    "request_id": "5d8d0b8a17525421"
+    "request_id": "a597d47ff0bd559d"
    },
    "battle": null
   },
@@ -12423,6 +15355,19 @@
        "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
+      },
+      {
+       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
+       "card_id": "OP06-016",
+       "name": "レイズ・マックス",
+       "power": 2000,
+       "cost": 1,
+       "is_rest": false,
+       "is_face_up": true,
+       "attached_don": 0,
+       "keywords": [],
+       "ability_disabled": false,
+       "is_frozen": false
       }
      ],
      "hand": [
@@ -12438,19 +15383,6 @@
        "keywords": [
         "速攻"
        ],
-       "ability_disabled": false,
-       "is_frozen": false
-      },
-      {
-       "uuid": "c71e859c-e3e8-4437-91f5-ff394c1c0318",
-       "card_id": "OP06-016",
-       "name": "レイズ・マックス",
-       "power": 2000,
-       "cost": 1,
-       "is_rest": false,
-       "is_face_up": true,
-       "attached_don": 0,
-       "keywords": [],
        "ability_disabled": false,
        "is_frozen": false
       },
@@ -12615,7 +15547,7 @@
        "is_frozen": false
       },
       {
-       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
        "card_id": "OP16-048",
        "name": "バギー",
        "power": 6000,
@@ -12656,11 +15588,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
-       "card_id": "OP16-032",
-       "name": "ボア・ハンコック",
-       "power": 9000,
-       "cost": 7,
+       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
+       "card_id": "ST30-014",
+       "name": "Mr.3(ギャルディーノ)",
+       "power": 3000,
+       "cost": 2,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -12669,11 +15601,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "6d831772-20d5-4ac4-859e-f7719281151a",
-       "card_id": "OP16-048",
-       "name": "バギー",
-       "power": 6000,
-       "cost": 5,
+       "uuid": "691dd886-8c66-4746-b738-39ab531852bf",
+       "card_id": "OP16-032",
+       "name": "ボア・ハンコック",
+       "power": 9000,
+       "cost": 7,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -12790,11 +15722,11 @@
        "is_frozen": false
       },
       {
-       "uuid": "fabca809-6f87-49f0-b48b-240649375e42",
-       "card_id": "ST30-014",
-       "name": "Mr.3(ギャルディーノ)",
-       "power": 3000,
-       "cost": 2,
+       "uuid": "62b9d811-7ec3-495f-bf55-e8ef41e4bda6",
+       "card_id": "OP16-048",
+       "name": "バギー",
+       "power": 6000,
+       "cost": 5,
        "is_rest": false,
        "is_face_up": true,
        "attached_don": 0,
@@ -12815,7 +15747,6 @@
     "message": "メインアクションを選択してください",
     "selectable_uuids": [
      "04941de6-9184-4c2b-bef9-451870bdcdcf",
-     "c71e859c-e3e8-4437-91f5-ff394c1c0318",
      "hb:p1:deck:0:3bab6c398d88348a",
      "hb:p1:deck:1:3b1a11df587fd280",
      "hb:p1:deck:2:380208a9ad45f23d",
@@ -12823,10 +15754,11 @@
      "f3ed0eb4-15e8-499e-9136-e5ee16cd1345",
      "bcbe6d5f-16fb-49bd-8d5c-07f533c072b4",
      "c59f6bdf-454e-4ef4-81d9-14b3d581b0f6",
+     "c71e859c-e3e8-4437-91f5-ff394c1c0318",
      "0048e51f-30e5-469f-9ee2-6839ad0cee83"
     ],
     "can_skip": true,
-    "request_id": "1a59878796f41c29"
+    "request_id": "d734fded4a18f968"
    },
    "battle": null
   }
