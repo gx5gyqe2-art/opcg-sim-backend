@@ -3159,3 +3159,75 @@ opts は serve と同じ（sims 160・net は --net で r3／a1 の npz）。see
 RESULT.json: {"job":"human-agree-rs","status":"done","agree":{"r3":..,"a1":..,"a1_python_20260905":0.345},
 "by_action":{...},"coach_pass":{"r3":..,"a1":..},"unrestorable":..}
 ```
+
+## 20. 「この盤面から CPU に打たせて目視で見る」道具（ユーザ要望 2026-09-08・Rust で新規に作る）
+
+§19 の数値の一致率とは別に、**定性的に**「除去やコンボを CPU が考えられているか」を見たい。分析したい
+ターンを新しいネットで打たせ、そのリプレイ（思考の候補と Q 込み）をフロントのリプレイビューアで見る。
+旧計器（`human_replay_divergence.py`・`coach_gate.py`）は使わず、**Rust の `Game`（`from_hidden`＋`decide` の
+trace）で新規に作る**。
+
+### 20.1 設計
+
+- **入口は API**（ユーザは iPhone アプリ）: `POST /api/whatif` → 分岐点の盤面から CPU が両席（既定）を
+  N ターン打った **traced 対局**を `CPU_GAMES` に作り、その `game_id` を返す。ビューアは既存の
+  `GET /api/game/{id}/replay/frames`（frames＋decisions＝候補 5 件・visit%・Q）で読める＝**フロントは
+  当面変更なし**（ビューアの「game_id で取得」欄に貼る）。ボタン化はフロント側の後続。
+- **分岐点の盤面（3 通り）**:
+  1. `{"game_id": …, "action_index": …}`＝サーバに残っている対局（アプリの対局は `cpu_trace=true` で作られる）。
+     `action_index` 省略＝今の盤面を **`RsGame.hidden()` でそのまま fork**（正確）。指定時は frames から復元（下 2）。
+  2. `{"frames_payload": {...}, "action_index": …}`＝リプレイ JSON（`/replay/frames` の形・人間リプレイの
+     fixture もこれ）。**frame → hidden の復元**（新規・純 Python・`opcg_sim/loop/hidden_build.py`）: 手札・場・
+     ライフ・トラッシュ・ステージ・リーダーは frame に card_id 込みで出ている／デッキは `replay.decks` から
+     見えているカードを引いた残りを seed で混ぜる／ドン!!は active・rested の枚数と各カードの
+     `attached_don`／ターン・フェイズ・手番は frame の値。**frame に無いもの（付与中の継続効果・フラグ・
+     対話の途中）は復元しない**＝分岐点は「ターン開始直後」か「メインの決定点」を推奨し、`pending` が
+     効果対話の frame は拒否する（エラー文で「別の frame を」と返す）。
+  3. `{"board_spec": {...}}`＝手書きの盤面（コンボ検証用）。`{turn, active, p1:{leader, field:[{card_id,
+     rest, don}], hand:[card_id], life:[card_id]|n, trash:[card_id], don_active, don_rested, deck:[card_id]?},
+     p2:{…}}` → hidden。デッキ未指定なら残りを `synth` の規約で埋める。
+- **打たせ方**: `turns`（既定 2・上限 6）ぶん `RsGame.decide` で両席（`cpu: "both"|"p1"|"p2"`。片席なら
+  もう片方は `default_interaction_payload`／TURN_END の受動）。`net`（既定＝出荷既定・a1 等の npz パスで
+  比較可）・`sims`（既定 160）・`seed`。各決定で `decide(trace=…)` の候補（上位 5・visit%・Q）を
+  `decisions` に、各アクション後の盤面を `frames` に積む（`services/replay.py` の既存の記録関数をそのまま使う）。
+- **CLI**（オフライン・`tests/scripts/rs_whatif.py`）: 同じサービスを呼び、fixture の JSON＋action_index
+  または board_spec から `frames` 形式の JSON を書く（ビューアの「ファイルを開く」で読める）。
+  何が違うか（分岐前の人間の手 vs CPU の手）も 1 行ずつ標準出力に出す。
+
+### 20.2 WP `rs-whatif` の指示書
+
+```
+「この盤面から CPU に打たせて、そのリプレイをビューアで見る」道具を作ってください。設計は
+docs/rust_engine_plan.md §20.1。旧計器（legacy/）は使わず、Rust の Game（from_hidden・decide の trace）で
+新規に作ります。本線 claude/cpu-spec-improvements-yw91jd から分岐し claude/rs-whatif に push、PR は作りません。
+
+やること:
+1. opcg_sim/loop/hidden_build.py（新規・純 Python）: frame_to_hidden(frames_payload, action_index, seed) と
+   spec_to_hidden(board_spec, seed)。どちらも Rust の Game.from_hidden が読む記録 v5 の hidden を返す
+   （形は tests/fixtures/rs_goldens/replay/*.json の input.setup.hidden と同じ）。復元できない frame
+   （pending が効果対話・戦闘の途中）は ValueError（文言に「別の frame を」）。
+2. opcg_sim/api/services/whatif.py（新規）: run_whatif(source, turns, cpu, net, sims, seed) → 新しい game_id。
+   fork は (a) game_id＋action_index 無し＝RsGame.hidden() (b) frames_payload＋action_index (c) board_spec。
+   CPU_GAMES に cpu_trace=true の meta で登録し、services/replay.py の _replay_record_action／_replay_record_frame
+   で decisions と frames を積む（既存の /replay/frames がそのまま読める）。meta に whatif の入力
+   （分岐点・net・sims・seed）を残す。
+3. routers.py に POST /api/whatif（schemas.py に WhatifRequest。契約を変えるので
+   python -m opcg_sim.tools.export_contract を実行し contract/ を同じコミットに）。
+4. tests/scripts/rs_whatif.py（CLI）: --replay <fixture.json.gz> --at <action_index> | --spec <json>、
+   --turns --cpu --net --sims --seed --out <frames.json>。標準出力に決定ごとの 1 行
+   （ターン・席・選んだ手・上位候補と Q）。
+5. テスト tests/test_whatif.py（必須・API 契約）: (a) spec → hidden → Game.from_hidden → board() が spec と
+   一致 (b) 人間リプレイ fixture（tests/fixtures/replays/human_enel_vs_luffy_20260904）のターン開始 frame から
+   復元して 1 ターン打ち、frames と decisions（candidates 付き）が返る (c) traced 対局を作って
+   /api/whatif（game_id・action_index 無し）で fork し 1 ターン打てる (d) 対話途中の frame は拒否。
+   TEST_SPEC に行を足す。
+6. 使い方を docs/n_loop_ops.md に 1 節（§9「盤面を指定して CPU に打たせる」）。RESULT.json。確認は make test。
+
+受け入れ: 5 の a〜d が green・contract の差分がコミット済み・ビューアで読める JSON が CLI から出る
+（human_enel_vs_luffy の任意のターン開始で試した frames.json を RESULT.json の横に添える）。
+RESULT.json: {"job":"rs-whatif","status":"done","endpoint":"/api/whatif","cli":"tests/scripts/rs_whatif.py",
+"sample":"...frames.json","unrestorable_rules":"..."}
+```
+
+フロント側の後続（別リポジトリ）: ビューアと対局画面に「ここから CPU に N ターン打たせる」ボタン
+（`POST /api/whatif` → 返った game_id を「取得」）。
