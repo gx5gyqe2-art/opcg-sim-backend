@@ -1,0 +1,9 @@
+  random_w01.jsonl             29.0/48 = 0.6042 void 0
+  random_w02.jsonl             27.0/48 = 0.5625 void 0
+  random_w03.jsonl             30.0/48 = 0.6250 void 0
+  random_w04.jsonl             33.0/48 = 0.6875 void 0
+  random_w05.jsonl             36.0/48 = 0.7500 void 0
+  random_w06.jsonl             28.0/48 = 0.5833 void 0
+  random_w07.jsonl             30.0/48 = 0.6250 void 0
+  random_w08.jsonl             23.0/48 = 0.4792 void 0
+[r3_vs_a1_random] ARENA_MERGE_FINAL {"pairs": 192, "games": 384, "void": 0, "wins": 236.0, "wr": 0.6146, "ci95": [0.56, 0.6692], "elo": 81.1, "elo95": [41.9, 122.4], "promoted": true, "shards": 8, "dup_seeds": 0}

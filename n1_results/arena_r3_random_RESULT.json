@@ -1,0 +1,13 @@
+{"job": "arena-r3-random", "role": "arena", "status": "done",
+ "inputs": {"candidate": "claude/train-r3:n1_results/nrel_r3.npz",
+            "baseline": "shipping default a1 (nrel_a1.npz)",
+            "leaders": "random", "decks": "synth",
+            "pairs_per_shard": 24, "shards": 8, "sims": 160,
+            "seed_base": [421000, 422000, 423000, 424000, 425000, 426000, 427000, 428000]},
+ "outputs": {"shards": "n1_results/arena_r3_dist/random_w01.jsonl .. random_w08.jsonl",
+             "merge_log": "merge_random.log"},
+ "metrics": {"pairs": 192, "games": 384, "void": 0, "wins": 236.0, "wr": 0.6146,
+             "ci95": [0.56, 0.6692], "elo": 81.1, "elo95": [41.9, 122.4],
+             "promoted": true, "shards": 8, "dup_seeds": 0},
+ "command": "python -m opcg_sim.loop.arena_shard --candidate ~/cand/nrel_r3.npz --pairs 24 --bands 1 --max-pairs 24 --workers 4 --sims 160 --leaders random --decks synth --seed-base 42N000 --out ~/arena/random_w0N.jsonl (N=1..8); python -m opcg_sim.loop.arena_merge --in n1_results/arena_r3_dist/random_*.jsonl --label r3_vs_a1_random",
+ "notes": "void=0 across all 8 shards, no seed collisions. wr=0.6146 (ci95 lower bound 0.56 > 0.50), elo95 lower bound +41.9 -> promoted=true under the random-pairing primary condition. Secondary (fixed mirror) condition not run in this job."}
