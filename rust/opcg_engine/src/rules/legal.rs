@@ -105,8 +105,14 @@ fn main_actions(
         if cannot_play_hand {
             continue;
         }
-        // バニラは abilities が空＝【メイン】効果を持たない → イベントは常に登場不可。
-        if card_type(state, masters, *c) == CardType::Event {
+        // 【メイン】効果（ON_PLAY／ACTIVATE_MAIN）を持たないイベント（カウンター／トリガー専用）は
+        // メインで発動不可。持つイベントは登場（発動）できる＝`play_card_action` と同じ判定
+        // （Python `_event_has_main_play`）。2026-09-08 まで「イベントは常に登場不可」と
+        // 列挙していた＝Rust 化後の CPU が【メイン】イベントを一度も打てなかった
+        // （`docs/rust_engine_plan.md` §8.26）。
+        if card_type(state, masters, *c) == CardType::Event
+            && !super::actions::event_has_main_play_state(state, masters, *c)?
+        {
             continue;
         }
         if card_type(state, masters, *c) == CardType::Character && char_restricted {
