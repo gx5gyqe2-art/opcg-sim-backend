@@ -1911,6 +1911,32 @@ make test・audit-cross）はバックグラウンドで回し、待つ間も作
   - 判定はコーディネータ。質問は RESULT.json の notes に。
 ```
 
+#### 8.27.4 修正済み（2026-09-08・WP `rs-select-fix`・結果のみ）
+
+`effects/interact.rs::choose_selection` に `SelectionIntent`（Benefit/Cost/Unknown）を配線し、
+自分側 up_to 選択の既定解決を「利益系は max 件・価値降順、コスト系は今までどおり min 件・
+価値昇順」に分けた。「自分のリーダー＋キャラの混在」（万雷・神の裁き・神避等）は own 側の
+ゾーン集合を `hand/field/leader/stage` に広げて拾う（以前は `None` に落ちて空選択になっていた）。
+分類表は `interact.rs::classify_intent` の 1 か所（`ActionType`／`status`／値の符号）。
+
+- **万雷・神の裁き・放電の COUNTER/ACTIVATE_MAIN の自分への BUFF は非空になった**（分岐点シナリオ
+  4 本＝enel_human_20260810_t3-4 の seed 0/1・human_enel_vs_luffy_20260904_t4-5 の seed 0/1、
+  いずれも r3・sims 160 で確認。万雷: `targets: ['サトリ']`／神の裁き: `targets: ['エネル']` 等）。
+- **golden**: 監査 3,386 件は **0 件変化**（`audit.rs::drain_default`/`drain_payload` は
+  `choose_selection` を使わない独立の既定応答実装のため、この WP の変更を経由しない——
+  次に監査 golden 側の既定解決も統一するかはコーディネータ判断）。再生 200 局は
+  133 局変化（118 局は最初の分岐点が利益系 BUFF の選択＝114 局が空→非空・4 局が非空→別の非空
+  候補、残り 15 局は手そのものは同じで `legal` 候補の既定値だけ変わった）・67 局無変化・
+  **想定外の変化 0 件**。差分の分類手順は本 WP の作業ログ（コミットには残さない）。
+- **Q7**: 万雷カウンターの 3 枝が 15 桁一致した RCA の観測は、カウンター BUFF の適用機構自体は
+  正しく動いている（`timed_power` が枝ごとに正しく変わり、戦闘結果〔ライフ増減〕も評価前に
+  解決されている）ことを一時計装で確認した——同一に見えたのは「その盤面ではバフが戦闘結果を
+  変えなかった」ケースだった可能性が高い（別コミットでの修正は不要と判断）。
+- **副産物**: `tests/fixtures/rs_goldens/replay/` は commit `c4688fd`（2026-09-07）以降に着地した
+  `rules/legal.rs` の変更（commit `4803192`・イベント PLAY 列挙）で既に陳腐化していた
+  （このWPの変更を除いた「現在の HEAD」だけで回しても 200 局中 200 局が委託 golden と食い違う）。
+  本 WP の再生成でその陳腐化も合わせて解消した。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は

@@ -223,6 +223,10 @@ pub fn get_pending_request(s: &mut Session, masters: &MasterTable, full: bool) -
                 None => Value::Null,
             },
         );
+        // WP `rs-select-fix`: 既定解決（`effects/interact.rs::default_interaction_payload`）が
+        // 読む分類。フロントは未知キーとして無視してよい（§8.27.3「pending の JSON にも intent
+        // を出してよい（フロントは無視する）」）。
+        req.insert("intent".into(), Value::from(it.intent.name()));
         // `options` は CHOICE だけが持つ（他は Python も `None`）。
         req.insert(
             "options".into(),

@@ -1221,6 +1221,7 @@ impl Resolver {
             action.map(|(_, r)| r),
             &self.execution_stack,
             &self.context,
+            action.map(|(a, _)| a),
         )?;
         Ok(None)
     }
@@ -1314,6 +1315,7 @@ impl Resolver {
                 action.map(|(_, r)| r),
                 &self.execution_stack,
                 &self.context,
+                action.map(|(a, _)| a),
             )?;
             return Ok(None);
         }
