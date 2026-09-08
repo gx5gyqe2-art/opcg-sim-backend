@@ -1,0 +1,36 @@
+{
+  "job": "train-r3",
+  "role": "train",
+  "status": "done",
+  "inputs": {
+    "warm_start": "opcg_sim/data/learned/nrel_a1.npz (shipped default; same content as claude/n1-results:n1_results/nrel_a1.npz)",
+    "pi_waves": [25, 26, 27, 28],
+    "z_waves": [23, 24],
+    "epochs": 2,
+    "lr": 5e-4,
+    "ablate": "rel",
+    "backend": "torch",
+    "holdout_mod": 7
+  },
+  "outputs": {
+    "net": "n1_results/nrel_r3.npz",
+    "log": "train_r3.log"
+  },
+  "metrics": {
+    "best_ep": 0,
+    "val_v_mse": 0.528780460357666,
+    "val_v_sign": 0.8103,
+    "pi_top1": 0.60225,
+    "val_p_loss": 1.7016631240844726,
+    "ep1_val_v_mse": 0.5296106934547424,
+    "ep1_val_v_sign": 0.8088,
+    "ep1_pi_top1": 0.60325,
+    "ep1_val_p_loss": 1.7017873077392578,
+    "rows_v": 6219045,
+    "rows_v_val": 892422,
+    "points_p": 2301488,
+    "points_p_val": 328787
+  },
+  "command": "OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in ~/n25_wave/w*/n25_records ~/n26_wave/w*/n26_records ~/n27_wave/w*/n27_records ~/n28_wave/w*/n28_records --z-in ~/n23_wave/w*/n23_records ~/n24_wave/w*/n24_records --epochs 2 --lr 5e-4 --ablate rel --backend torch --warm-start opcg_sim/data/learned/nrel_a1.npz --out ~/nrel_r3.npz",
+  "notes": "全 6 波（n23〜n28）8/8 シャードとも取得失敗なし。データ読み込みに 290s（value 6,219,045 行・val 892,422／policy 2,301,488 点・val 328,787）。エポック壁時計（学習ループのみ、breakdown.holdout 除く）: ep0 train_sec=2010.223s + holdout=3.1s、ep1 train_sec=2018.927s + holdout=2.935s。訓練プロセス全体の壁時計は開始 2026-09-08T00:05:14Z 〜 終了 2026-09-08T01:18:13Z で約 4379s（73分）。best_ep=0（ep1 は val_v_mse 0.5296 > ep0 の 0.5288 でやや過学習・r2 系譜と同じ「best ep0」パターン再現）。exit code 0・例外・OOM なし。ピークRSS: 30秒間隔で /proc/<pid>/status の VmHWM をサンプリングし観測、ピーク VmHWM=13,607,212 kB（約13.6GB、データ読み込み直後からエポック終了まで一貫してこの値付近で安定）。指示書に書かれた「メモリ予算8GB」は名目上超過しているが、実行コンテナの実メモリは約15GBあり OOM は発生していない（この差異をそのまま記録。予算値の見直しが必要か判断はコーディネータに委ねる）。WIP チェックポイントは ep0 完了直後（2026-09-08 00:44 UTC）に1回 claude/train-r3-wip（commit 7d5751f）へ push（progress.json + n1_results/nrel_r3.npz + train_r3.log の暫定版）。ep1 は ep0 を上回らず新チェックポイントを生成しなかったため、以降の15分ティックでは push すべき新規物がなく、次のティック前に学習が完了した。"
+}
