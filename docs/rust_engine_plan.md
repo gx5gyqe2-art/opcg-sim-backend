@@ -1684,7 +1684,8 @@ ATTACK_DISABLE は見るが税は見ていない）＝切替の退行ではな�
 ため表に出た。修正: 判定を `rules::attack_tax_need` に 1 本化して `battle::declare_attack`（検証）と
 `legal::main_actions`（列挙）が同じものを使う（cargo test
 `the_attack_tax_hides_the_attack_from_the_legal_moves_when_unpayable`）。seed 67 単独で再現→修正後は
-決着（void 0）。交差監査は台帳を消して全 120 ペアを回し直した（結果は下記）。
+決着（void 0）。交差監査は台帳を消して全 120 ペアを回し直し **void 0**（240 局・wr 0.5125）。
+`make test` 444 passed（cargo 383・pytest 446 のうち torch 系は導入環境のみ）。PR #207。
 
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
