@@ -1,0 +1,6 @@
+implementation=CPython
+version=3.11
+target_abi=CPython-abi3-3.11
+shared=true
+build_flags=
+suppress_build_script_link_lines=false
