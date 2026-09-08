@@ -1937,6 +1937,28 @@ make test・audit-cross）はバックグラウンドで回し、待つ間も作
   （このWPの変更を除いた「現在の HEAD」だけで回しても 200 局中 200 局が委託 golden と食い違う）。
   本 WP の再生成でその陳腐化も合わせて解消した。
 
+#### 8.27.5 判定（2026-09-08・コーディネータ・`docs/reports/2026-09-08_select_fix.RESULT.json`）
+
+- **受け入れ・本線へ merge**（思考ログ WP と並行だったので ff でなく merge・衝突なし）。本線で
+  `make rust-develop` → `make test` → `make audit-cross` を回し直して確認した: **457 passed・void 0／240 局（wr 0.5125）**。
+- (a) 万雷カウンター・神の裁き・放電の自分への BUFF が非空になった＝§8.27 の (a) は解消。
+  (b) 神の裁きの KO 空は対象外のまま（ネットの価値・分析 #4 の縛り B）。
+- **Q7 の結論**（カウンター BUFF は箱の中で適用され、戦闘結果も評価前に解決されている）は受け入れる。
+  「3 枝が 15 桁一致」は、その盤面では +1000 で戦闘結果が変わらなかった（ナミ側の付与ドン!!や
+  カウンター値を含めた計算）ケースと読む。
+- **監査 golden の既定解決**（`audit.rs::drain_default` が `choose_selection` を通らない独立実装）:
+  統一は**しない**。監査 golden は「能力を 1 つ発動して既定応答で流す」テスト用の駆動で、探索や
+  対局の既定解決とは役割が違う。ただし §8.26 のとおり「golden はその時点の出力」であり、
+  監査 golden が CPU の既定解決の退行を守らないことは TEST_SPEC に明記する（§2 の行に追記済み）。
+- **「再生 golden が 4803192 で陳腐化していた」は読み違い**。4803192（イベント PLAY 列挙）の時点で
+  `make test` は 449 passed＝委託 golden と一致していた（コーディネータ実測・§8.26「golden 不変」）。
+  作り直すと 200 局が変わるのは、`rs_golden_make.py` の再生成が委託時点と同じ出力にならない既知の
+  事情（デッキ／uuid／記録形式・2026-09-07 の切替時に確認済み）であって、エンジンの変更による
+  陳腐化ではない。今回の再生成で golden は「現在の maker の出力」に揃ったので、以後の差分は
+  そのまま読める。**教訓**: golden の差分レビューは「委託 golden vs 再生成」でなく
+  「同じ maker での変更前 vs 変更後」で行う（本 WP はそうしていた＝114／4／15／67 の内訳は有効）。
+- 本 WP の golden 差分（再生 133 局変化・想定外 0）は受け入れる。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
@@ -3617,3 +3639,67 @@ py_game.rs／lib.rs・opcg_sim/api/engine_rs.py・tests/scripts/rs_scenario_play
   「Q が高いのに N で負けた手」の印。合法手一覧の visit 0 の印は (3) で実現済み。
 - 据え置きの要望: 効果 ATTACH_DON の対象をイベントに出す／相手の手札枚数・カウンター値合計の
   見積りを盤面要約に出す。
+
+### 20.5 縛り A の実験: 探索の設定だけで「Q が推す手」を拾えるか（分析 #4・2026-09-08）
+
+分析 #4 の縛り A＝事前分布 P の尖り × 訪問数最多の選択規則。160 sims では P 0.005 の手は
+訪問 0〜1 回で、Q が高い手（神の裁き 0.989・ガンマナイフ -0.185）も訪問数で負ける。
+ネットを変えずに探索の設定で動くかを、9 シナリオの思考ログで確かめる。
+
+#### 20.5.1 WP `rs-search-a` の指示書
+
+```
+作業: WP rs-search-a（探索の設定 3 条件で 9 シナリオを回し、思考ログで比較する・
+docs/rust_engine_plan.md §20.5・分析 #4 docs/reports/2026-09-08_scenario_analysis_04.md の縛り A）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-search-a に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。ネット（nrel_r3.npz）は変えない。
+
+■ 足す設定（search/decide.rs::DecideOptions・opts_json から渡せるように・既定値は今の挙動のまま）
+  1. sims（既にある）: 160 と 640。
+  2. select_rule: "visits"（既定・訪問数最多）／"q_min_n"（訪問数 ≥ max(1, sims * q_min_frac) の手の中で
+     Q 最大・該当なしなら visits）。q_min_frac は opts（既定 0.125＝sims/8）。
+  3. root_prior_temp: 根の事前分布 P を P^(1/t) に丸めて正規化（t=1 が既定＝今のまま・t=2 で平坦化）。
+     Dirichlet 混合（生成側）とは別の欄。根だけに掛け、子ノードには掛けない。
+  RsGame.decide（opcg_sim/api/engine_rs.py）と tests/scripts/rs_scenario_play.py の play に
+  --select-rule／--q-min-frac／--root-prior-temp を通す（省略時は既定）。
+
+■ 回す条件（9 シナリオ × seed 0/1・両席同じ設定・r3）
+  C0: sims 160・visits・t=1（今の既定＝分析 #4 と同じ。scenario_out/ の既存出力で代用してよい）
+  C1: sims 640・visits・t=1
+  C2: sims 160・q_min_n（1/8）・t=1
+  C3: sims 160・visits・t=2
+  C4: sims 640・q_min_n（1/8）・t=2
+  出力は scenario_out_a/<条件>/<name>/r3_s<seed>.{md,frames.json}。
+
+■ 見るもの（RESULT.json と短い報告に表で）
+  - 分析 #4 が挙げた 3 決定の選択: エネル T9（enel_human_20260810_t9-9）の「オーム攻撃の前に神の裁きを
+    打つか」／エネル T7 対ロジャー（human_enel_vs_roger_20260904_t7-8）の #7「ガンマナイフを打つか」／
+    ドフラ T10（human_doflamingo_vs_luffy_20260904_t10-11）の #0「訪問される根の手の数」と勝敗。
+    ※ seed と sims が変わると決定番号がずれる。盤面（ターン・手番・手札）で同じ局面を特定する。
+  - 全 seat 側 MAIN 決定での集計: 訪問された根の手の割合／「Q が選んだ手より高いのに N で負けた手」の
+    件数（legal_stats から機械的に数える）／イベント PLAY が選ばれた回数／相手キャラ攻撃が選ばれた回数。
+  - 9 本の勝敗（winner）と、seat 側の最終 V。
+  - 1 決定あたりの decide 時間（sims 640 のレイテンシ・serve に載せられるか）。
+
+■ 受け入れ
+  - cargo test: select_rule="q_min_n" が N 下限を満たす手の中で Q 最大を返す／root_prior_temp が
+    根の P だけを変え和が 1 のまま／既定値では出力が 1 bit も変わらない（既存の PV テストが通る）。
+  - pytest tests/test_search_options.py（cpu_infra）: RsGame.decide に 3 つの opts が通る。TEST_SPEC §2 に 1 行。
+  - make test green。golden は decide を通らないので不変（変わったら止めて報告）。audit-cross は
+    既定値が不変なので不要。
+
+■ 成果物
+  - コード＋テスト＋scenario_out_a/（C1〜C4・72 本）＋docs/reports/2026-09-0X_search_a.md（表と
+    3 決定の前後・各条件の所要時間）＋RESULT.json:
+    {"job":"rs-search-a","status":"done|partial","conditions":["C1","C2","C3","C4"],
+     "key_decisions":{"enel_t9_kaminosabaki_before_attack":{"C0":false,"C1":…},
+                      "enel_roger_t7_gammaknife":{…},"doffy_t10_root_visited":{"C0":3,…},
+                      "doffy_t10_winner":{…}},
+     "q_beats_n_count":{"C0":N,…},"latency_ms_per_decide":{"C0":…},"make_test":"N passed","notes":"…"}
+  - 分析（どの条件を serve／生成に採るか）はコーディネータが書く。WP は数字まで。
+
+■ 前提
+  - 既定の挙動（serve・生成・アリーナ）は変えない＝opts を渡さなければ今までと同じ。
+  - 判定はコーディネータ。質問は RESULT.json の notes に。
+```
