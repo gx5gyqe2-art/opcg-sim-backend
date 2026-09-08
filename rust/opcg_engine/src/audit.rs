@@ -340,6 +340,24 @@ pub fn drain_default(
     Ok((steps, false))
 }
 
+/// `pending_request.intent`（WP `rs-select-fix`）を除いた盤面（監査 golden のハッシュ専用）。
+///
+/// `intent` はフロントが無視してよい診断用の欄（`docs/rust_engine_plan.md` §8.27.3）で、選択の
+/// 既定解決の分類そのものは golden の実際の選択結果（各段の `selected_uuids` 等）に表れる。
+/// `intent` 自体をハッシュに含めると「候補は同じで分類ラベルだけ付いた」段まで golden 差分に出て、
+/// 選択結果が実際に変わった段のレビューが埋もれる＝Python 側 `tests/harness/rs_golden.py::strip_request_id`
+/// と同じ判断（そちらは再生 golden 用・こちらは監査 golden 用）。
+fn strip_intent_for_hash(board: &Value) -> Value {
+    let mut b = board.clone();
+    if let Some(pr) = b
+        .get_mut("pending_request")
+        .and_then(|v| v.as_object_mut())
+    {
+        pr.remove("intent");
+    }
+    b
+}
+
 /// 盤面 dict ＋ `pending_request`（`state::replay_audit` の `audit_board` と同じ組み立て順）。
 fn audit_board(session: &mut Session, masters: &MasterTable) -> Result<Value, EngineError> {
     let mut board = session.state().board_json(masters)?;
@@ -422,7 +440,7 @@ pub fn golden_audit(
     for (board, events) in &stages {
         events_total += events.as_array().map_or(0, Vec::len);
         hashes.push(Value::from(canon.hash(&json!({
-            "events": events, "state": board,
+            "events": events, "state": strip_intent_for_hash(board),
         }))));
     }
     let n_steps = stages.len() - 1;

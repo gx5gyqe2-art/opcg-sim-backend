@@ -1100,6 +1100,42 @@ pub struct BattleKoContinuation {
     pub life_lost: i32,
 }
 
+/// 対象選択の既定解決（[`crate::effects::interact::choose_selection`]）が「自分側の
+/// up_to 選択」をどう畳むべきかの分類（WP `rs-select-fix`・
+/// `docs/rust_engine_plan.md` §8.27.2／原因分析 `docs/reports/2026-09-08_select_default_rca.md`
+/// §Q4）。
+///
+/// - `Benefit`（利益系）: 選ぶほど得＝既定は max 件・価値降順（例: 自分への BUFF／
+///   GRANT_KEYWORD／RAMP_DON）。RCA Q4 の 660 件中 339 件（51%）。
+/// - `Cost`（コスト系）: 選ぶほど損＝既定は min 件・価値昇順（今までの挙動のまま。例:
+///   自分のキャラを KO／REST／TRASH する）。RCA Q4 の 13 件（2%）。
+/// - `Unknown`（分類不能）: 文脈依存で一意に決まらない（例: SEARCH／ARRANGE／
+///   MODIFY_COST）。既存のゾーン意味論フォールバックに委ねる。RCA Q4 の 308 件（47%）。
+///   `SelectTarget` 以外の中断（`Choice`／`ConfirmOptional`／`ArrangeDeck`／…）は対象選択では
+///   ないので常にこれ。
+///
+/// 分類そのもの（`ActionType`／`status`／値の符号からの判定表）は
+/// [`crate::effects::interact::classify_intent`] に1か所だけ置く（型はここ・判定はそちら、
+/// という分担）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectionIntent {
+    Benefit,
+    Cost,
+    Unknown,
+}
+
+impl SelectionIntent {
+    /// `pending["intent"]` に出す文字列（`"BENEFIT"|"COST"|"UNKNOWN"`）。フロントは無視してよい
+    /// キー（`docs/rust_engine_plan.md` §8.27.3「pending の JSON にも intent を出してよい」）。
+    pub fn name(self) -> &'static str {
+        match self {
+            SelectionIntent::Benefit => "BENEFIT",
+            SelectionIntent::Cost => "COST",
+            SelectionIntent::Unknown => "UNKNOWN",
+        }
+    }
+}
+
 /// 進行中の中断（Python `GameManager._interaction_stack` の 1 要素）。
 ///
 /// Python の dict は種別ごとに欄が違うが、`get_pending_request` が読む欄と continuation を
@@ -1132,11 +1168,15 @@ pub struct Interaction {
     pub allow_reorder: bool,
     /// 効果解決の continuation（P2 の `FIELD_OVERFLOW_TRASH` は持たない）。
     pub continuation: Option<Box<Continuation>>,
+    /// 対象選択の既定解決が使う分類（WP `rs-select-fix`）。`SelectTarget` 以外は常に `Unknown`
+    /// （対話の候補が「対象」ではない種別には意味を持たない）。
+    pub intent: SelectionIntent,
 }
 
 impl Interaction {
     /// P2 が立てる中断（continuation を持たない）の素の形。カードだけの候補（P2 の範囲では
-    /// ドン!!を候補に取る中断は無い）。
+    /// ドン!!を候補に取る中断は無い）。`intent` は常に `Unknown`（P2 の中断に `SelectTarget` は
+    /// 無い＝`FIELD_OVERFLOW_TRASH` 用）。
     // 欄は Python の `active_interaction` dict と 1:1。
     #[allow(clippy::too_many_arguments)]
     pub fn rules(
@@ -1164,6 +1204,7 @@ impl Interaction {
             allow_position: false,
             allow_reorder: false,
             continuation: None,
+            intent: SelectionIntent::Unknown,
         }
     }
 }

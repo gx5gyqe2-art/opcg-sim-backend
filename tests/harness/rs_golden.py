@@ -139,12 +139,19 @@ class Canon:
 
 
 def strip_request_id(board: dict) -> dict:
-    """`pending_request.request_id` を落とす（フロント専用の sha1＝照合の対象外）。"""
+    """`pending_request.request_id`／`intent` を落とす（照合の対象外）。
+
+    `intent`（WP `rs-select-fix`・`docs/rust_engine_plan.md` §8.27.3）はフロントが無視してよい
+    診断用の欄で、選択の既定解決の分類そのものは golden の実際の選択結果（`selected_uuids` 等）
+    に表れる。`intent` 自体を sha1 に含めると「候補は同じで分類ラベルだけ付いた」段まで golden
+    差分に出て、選択結果が変わった段のレビューが埋もれる＝ここで request_id と同様に外す。
+    """
     b = dict(board)
     pr = b.get("pending_request")
     if isinstance(pr, dict):
         pr = dict(pr)
         pr.pop("request_id", None)
+        pr.pop("intent", None)
         b["pending_request"] = pr
     return b
 
