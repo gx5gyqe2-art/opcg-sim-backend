@@ -3575,5 +3575,19 @@ py_game.rs／lib.rs・opcg_sim/api/engine_rs.py・tests/scripts/rs_scenario_play
     play でだけ増えてよい（serve は pv を作らない・オプションで切る）。
   - 判定はコーディネータ。質問は RESULT.json の notes に。
 ```
-- 道具の改善要望（据え置き）: 効果 ATTACH_DON の対象をイベントに出す／合法手一覧に visit 0 の印／
-  相手の手札枚数・カウンター値合計の見積りを盤面要約に出す。
+
+#### 20.4.2 判定（2026-09-08・`docs/reports/2026-09-08_think_log.RESULT.json`）
+
+- WP `rs-think-log` を受け入れ、本線へ ff で取り込んだ（`decide` に `pv`・`RsGame._trace` に
+  `legal_stats`／`pv`／`kind`／`commit_from`・`RsGame.attribution`・`.md` の (3)(6)(7)・
+  `tests/test_think_log.py`〔cpu_infra〕）。本線で `make test` 454 passed・golden 不変。
+- 制約（RESULT の notes）: 木は 1 本（PIMC の複数世界は持たない）／PV は n=0 の枝に達しても
+  「先頭の合法手」を示す／帰属はプロセスの既定ネット（席ごとの切替を追わない・両席同じネットの
+  運用では差なし）。
+- 最初の読み＝`docs/reports/2026-09-08_scenario_analysis_04.md`。縛り A（事前分布の尖り×訪問数最多の
+  選択）は探索設定で今日動かせる。B（相手の小駒を有利と見る）・C（相手の盤面の数を見ない）は
+  ネット側。
+- 道具への要望（次の WP へ）: PV を相手の次の TURN_END まで／帰属 label にレスト・付与ドン!!／
+  「Q が高いのに N で負けた手」の印。合法手一覧の visit 0 の印は (3) で実現済み。
+- 据え置きの要望: 効果 ATTACH_DON の対象をイベントに出す／相手の手札枚数・カウンター値合計の
+  見積りを盤面要約に出す。
