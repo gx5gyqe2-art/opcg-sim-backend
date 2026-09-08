@@ -80,19 +80,36 @@ pub fn blocker_candidates(state: &crate::model::GameState, seat: Seat) -> Vec<Ca
 
 /// カウンター候補（Python `get_pending_request` の BATTLE_COUNTER 分岐）。
 ///
-/// (a) カウンター値を持つ手札／(b) 【カウンター】イベントで発動コストを払える分。
-/// バニラは `abilities` が空なので (b) は成立しない（＝(a) だけ。効果解決は P3）。
+/// (a) カウンター値を持つ手札／(b) 【カウンター】トリガのイベントで、発動コスト（マスターの
+/// `cost`）をアクティブなドン!!で払える分。Python:
+/// `c.current_counter > 0 or (EVENT and any(trigger == COUNTER) and (cost or 0) <= len(don_active))`。
+/// 払えないイベントを出すと `apply_counter` → `pay_cost` でドン!!不足の例外になる。
+///
+/// (b) は P2 の骨組みでは「効果解決は P3」として落としたまま切替まで残っていた＝実プレイで
+/// カウンターイベントが選べない不具合（ユーザ報告 2026-09-08）。
 pub fn counter_candidates(
     state: &crate::model::GameState,
     masters: &MasterTable,
     seat: Seat,
 ) -> Vec<CardIdx> {
-    state
-        .player(seat)
-        .hand
+    let p = state.player(seat);
+    let don_active = p.don_active.len() as i32;
+    p.hand
         .iter()
         .copied()
-        .filter(|c| current_counter(state, masters, *c) > 0)
+        .filter(|c| {
+            if current_counter(state, masters, *c) > 0 {
+                return true;
+            }
+            let m = masters.get(state.card(*c).master);
+            m.ty == crate::model::CardType::Event
+                && m.cost <= don_active
+                && m.ability_ids.iter().any(|id| {
+                    crate::effects::ability(masters, *id)
+                        .map(|a| a.trigger == crate::effects::ast::TriggerType::Counter)
+                        .unwrap_or(false)
+                })
+        })
         .collect()
 }
 

@@ -736,6 +736,97 @@ fn an_optional_battle_ko_replacement_asks_before_replacing() {
     assert!(s.state().active_battle.is_none());
 }
 
+/// カウンターステップの候補（`pending::counter_candidates`）: カウンター値を持つ手札に加えて、
+/// **【カウンター】トリガのイベントも、発動コストをアクティブなドン!!で払えるときだけ**出す
+/// （Python `interaction.get_pending_request` の BATTLE_COUNTER 分岐）。切替後に (b) が落ちていて
+/// 実プレイでカウンターイベントが選べなかった（ユーザ報告 2026-09-08）。
+#[test]
+fn counter_step_offers_counter_events_the_player_can_pay_for() {
+    let counter_ab = ability_json(
+        "COUNTER",
+        action_json("DRAW", Value::Null, value_json(1)),
+        "【カウンター】カード 1 枚を引く。",
+    );
+    let mut ev = master_json("CE", "EVENT", json!([counter_ab]));
+    ev["cost"] = json!(2);
+    ev["counter"] = json!(0);
+    let mut plain_ev = master_json("PE", "EVENT", json!([]));
+    plain_ev["counter"] = json!(0);
+    let mut cards = vanilla_cards();
+    cards["CE"] = ev;
+    cards["PE"] = plain_ev;
+    let masters = MasterTable::from_effects_json(&json!({"cards": cards})).expect("masters");
+    // p1 が防御側: 手札に【カウンター】イベント（コスト 2）・素のイベント・カウンター値付きキャラ。
+    let session_with_don = |n_don: usize| -> Session {
+        let don: Vec<Value> = (0..n_don)
+            .map(|i| json!({"uuid": format!("p1-don-{i}"), "owner_id": "p1", "is_rest": false,
+                            "attached_to": null, "is_frozen": false}))
+            .collect();
+        let mut p1 = player_json(
+            "p1",
+            "p1-leader",
+            json!([]),
+            json!([card_json("CE", "p1-ce", "p1"), card_json("PE", "p1-pe", "p1"),
+                   card_json("V", "p1-v", "p1")]),
+        );
+        p1["don"]["active"] = json!(don);
+        let hidden = json!({
+            "players": {
+                "p1": p1,
+                "p2": player_json("p2", "p2-leader", json!([card_json("V", "p2-atk", "p2")]), json!([])),
+            },
+            "manager": {
+                "turn_count": 4, "phase": "BATTLE_COUNTER", "turn_player": "p2", "winner": null,
+                "active_battle": null, "turn_events": {}, "mulligan_done": ["p1", "p2"],
+                "setup_phase_pending": false, "turn_start_pending": false,
+                "interaction_depth": 0, "pending_triggers": 0, "pending_end_of_turn": 0,
+            },
+        });
+        let state = GameState::from_record(&hidden, &masters).expect("board");
+        let mut s = Session::new(state);
+        let (attacker, target) = (find(&s, "p2-atk"), s.state().player(Seat::P1).leader.unwrap());
+        s.edit().set_active_battle(Some(ActiveBattle {
+            attacker,
+            target,
+            attacker_owner: Seat::P2,
+            target_owner: Seat::P1,
+            counter_buff: 0,
+        }));
+        s
+    };
+    let uuids = |s: &Session| -> Vec<String> {
+        crate::rules::pending::counter_candidates(s.state(), &masters, Seat::P1)
+            .into_iter()
+            .map(|c| s.state().card(c).uuid.clone())
+            .collect()
+    };
+    // ドン!! 0 枚: コスト 2 のイベントは出ない。カウンター値付きのキャラだけ。
+    let s0 = session_with_don(0);
+    assert_eq!(uuids(&s0), vec!["p1-v".to_string()]);
+    // ドン!! 1 枚: まだ払えない。
+    assert_eq!(uuids(&session_with_don(1)), vec!["p1-v".to_string()]);
+    // ドン!! 2 枚: イベントも出る（トリガの無いイベントは出ない）。
+    let mut s = session_with_don(2);
+    let got = uuids(&s);
+    assert!(got.contains(&"p1-ce".to_string()), "{got:?}");
+    assert!(got.contains(&"p1-v".to_string()));
+    assert!(!got.contains(&"p1-pe".to_string()), "トリガの無いイベントは候補にしない");
+    // 合法手にも同じ候補が載る（フロントの選択肢＝`selectable_uuids`）。
+    let legal = crate::rules::legal::get_legal_actions(&mut s, &masters, Seat::P1).expect("legal");
+    assert!(
+        legal.iter().any(|m| m["card_uuid"] == "p1-ce" && m["action_type"] == "SELECT_COUNTER"),
+        "{legal:?}"
+    );
+    // 実際に選べて、コストを払い、効果（1 枚引く）が解決してトラッシュへ行く。
+    let hand_before = s.state().player(Seat::P1).hand.len();
+    crate::rules::actions::apply_battle_action(&mut s, &masters, Seat::P1, "SELECT_COUNTER", Some("p1-ce"))
+        .expect("counter event");
+    let p1 = s.state().player(Seat::P1);
+    assert_eq!(p1.don_active.len(), 0, "コスト 2 を払う");
+    assert!(p1.trash.iter().any(|c| s.state().card(*c).uuid == "p1-ce"));
+    assert_eq!(p1.hand.len(), hand_before - 1 + 1, "イベントが手札から出て 1 枚引く");
+}
+
 // --- テキストの走査（Python の正規表現の手書き実装）------------------------------
 
 /// `属性[(（《]([斬打射特知])[)）》]を持つ(?:カード|キャラ)?との(?:バトル|戦闘)` と同じ判定。
