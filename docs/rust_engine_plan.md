@@ -3122,3 +3122,40 @@ claude/cpu-spec-improvements-yw91jd から分岐し claude/train-torch2 に push
 RESULT.json: {"job":"train-torch2","status":"done","breakdown_before":{...},"breakdown_after":{...},
 "epoch_sec":{"before":34.7,"after":..},"loss_traj_max_abs":..,"budget_bit_identical":true}
 ```
+
+## 19. 人間の手との一致率を Rust の decide で測り直す（ユーザ質問 2026-09-08「人間の手をどれくらい再現できているか」）
+
+最後の実測は Python エンジン時代（2026-09-05・h1〜h6・317 決定点・seeds 4・sims 160）: c10 0.322／
+r1 0.355／**a1 0.345**／a2 0.364／c12 0.311（PLAY 0.22 前後・ACTIVATE_MAIN 0.20 前後・ATTACK 0.38 前後）。
+**r3 と Rust の decide では未計測**。計器（`human_replay_divergence.py`・`coach_gate.py`）は人間リプレイの
+フレーム（盤面 dict）から Python エンジンで盤面を復元するため `legacy/` にある。Rust 側は `hidden` から
+しか盤面を組めないので、**復元は legacy の Python・判断は Rust の `opcg_engine.decide(hidden, …)`** の
+2 段で測る（決定オラクル `rs_search_oracle.py` と同じ橋渡し＝`rs_diff_replay.hidden_dict(manager)`）。
+
+### 19.1 WP `human-agree-rs` の指示書
+
+```
+人間リプレイ h1〜h6 との一致率と、コーチゲートのマーク（コンボ・裁定点）の通過率を、Rust の decide で
+r3（出荷既定）と a1（前既定）について測ってください。コードは変更せず、計器は
+legacy/python_engine/tests/scripts/ に新しいファイルで書きます（human_replay_divergence.py と coach_gate.py の
+兄弟。1 トピック=1 ファイル）。本線 claude/cpu-spec-improvements-yw91jd から分岐し claude/human-agree-rs に
+push、PR は作りません。詳細は docs/rust_engine_plan.md §19。
+
+仕組み: 決定点ごとに legacy の mark_gate._restore（Python エンジン）で盤面を復元 → rs_diff_replay.hidden_dict で
+hidden JSON にする → opcg_engine.decide(hidden, seat, opts, rng) で Rust の手を得る → Game.describe_move と同じ
+記述子（action_type, card, targets）で人間の記録と比べる（ATTACK_CONFIRM は ATTACK に寄せる・従来どおり）。
+opts は serve と同じ（sims 160・net は --net で r3／a1 の npz）。seeds 4。
+復元できない点（効果対話の途中など）は従来どおり除外し、件数を報告に書く。
+
+やること:
+1. human_agree_rs.py: --replay h1..h6 --net <npz> --seeds 4 --sims 160 で一致率（全体・action_type 別）を出す。
+   r3 と a1 の両方を回し、Python 時代の a1 0.345（n1-results 467ebf0 のログ）と並べる。
+2. coach_gate_rs.py: coach_gate.py のマーク定義（h1@2 など・述語）をそのまま使い、判断だけ Rust の decide に
+   差し替えて PASS 数を出す（gen15 の 20 点 PASS 11.9 と同じ土俵）。r3 と a1。
+3. 報告 docs/reports/2026-09-08_human_agree_rs.md（表: リプレイ別・action_type 別・マーク別、Python 時代との差、
+   Rust 化で変わった点があればその決定点）＋ RESULT.json。TEST_SPEC に計器 2 本の行。
+
+受け入れ: r3／a1 の一致率とマーク PASS 数が揃う・復元不能点の件数が書いてある・学習コードとエンジンは無変更。
+RESULT.json: {"job":"human-agree-rs","status":"done","agree":{"r3":..,"a1":..,"a1_python_20260905":0.345},
+"by_action":{...},"coach_pass":{"r3":..,"a1":..},"unrestorable":..}
+```
