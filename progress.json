@@ -1,0 +1,4 @@
+{"job": "train-r3", "status": "in_progress", "epoch_done": 0, "epochs_total": 2,
+ "val_metrics_ep0": {"v_mse": 0.528780460357666, "v_sign": 0.8103, "pi_top1": 0.60225, "p_loss": 1.7016631240844726},
+ "train_sec_ep0": 2010.223, "checkpoint_saved_at": "2026-09-08T00:44:00Z",
+ "updated_at": "2026-09-08T00:45:15Z"}
