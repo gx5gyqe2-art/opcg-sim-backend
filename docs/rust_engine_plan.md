@@ -3664,12 +3664,20 @@ docs/rust_engine_plan.md §20.5・分析 #4 docs/reports/2026-09-08_scenario_ana
   RsGame.decide（opcg_sim/api/engine_rs.py）と tests/scripts/rs_scenario_play.py の play に
   --select-rule／--q-min-frac／--root-prior-temp を通す（省略時は既定）。
 
-■ 回す条件（9 シナリオ × seed 0/1・両席同じ設定・r3）
-  C0: sims 160・visits・t=1（今の既定＝分析 #4 と同じ。scenario_out/ の既存出力で代用してよい）
-  C1: sims 640・visits・t=1
-  C2: sims 160・q_min_n（1/8）・t=1
-  C3: sims 160・visits・t=2
-  C4: sims 640・q_min_n（1/8）・t=2
+■ 回す条件（両席同じ設定・r3）
+  主軸＝sims の段階掃引（select_rule=visits・t=1・ネット不変）。ユーザ指示 2026-09-08「検証なので
+  sims は 100 倍くらいまで段階的に」:
+    S1: sims 160（今の既定＝分析 #4 と同じ。scenario_out/ の既存出力で代用してよい）
+    S2: sims 640        … 9 シナリオ × seed 0/1
+    S3: sims 2,560      … 9 シナリオ × seed 0/1
+    S4: sims 10,240     … 3 本（enel_human_20260810_t9-9・human_enel_vs_roger_20260904_t7-8・
+                            human_doflamingo_vs_luffy_20260904_t10-11）× seed 0/1
+    S5: sims 16,000     … 同じ 3 本 × seed 0/1
+  （S4・S5 は 1 決定に数十秒〜数分かかる。バックグラウンドで回し、S2・S3 の集計を先に出す。
+    時間が足りなければ S5 を seed 0 だけにして notes に書く）
+  副軸＝規則と平坦化（sims 160 と 640 で）:
+    R1: sims 160・q_min_n（1/8）・t=2
+    R2: sims 640・q_min_n（1/8）・t=2
   出力は scenario_out_a/<条件>/<name>/r3_s<seed>.{md,frames.json}。
 
 ■ 見るもの（RESULT.json と短い報告に表で）
@@ -3680,7 +3688,10 @@ docs/rust_engine_plan.md §20.5・分析 #4 docs/reports/2026-09-08_scenario_ana
   - 全 seat 側 MAIN 決定での集計: 訪問された根の手の割合／「Q が選んだ手より高いのに N で負けた手」の
     件数（legal_stats から機械的に数える）／イベント PLAY が選ばれた回数／相手キャラ攻撃が選ばれた回数。
   - 9 本の勝敗（winner）と、seat 側の最終 V。
-  - 1 決定あたりの decide 時間（sims 640 のレイテンシ・serve に載せられるか）。
+  - 1 決定あたりの decide 時間（各 sims・serve に載せられる上限の目安）。
+  - **sims 掃引で見たいこと**: 3 決定の選択と「Q が高いのに N で負けた手」の件数が sims とともに
+    どう変わるか。sims で変わる決定＝探索予算の問題、10,240 でも変わらない決定＝価値（ネット）の
+    問題、と切り分ける。
 
 ■ 受け入れ
   - cargo test: select_rule="q_min_n" が N 下限を満たす手の中で Q 最大を返す／root_prior_temp が
@@ -3690,13 +3701,13 @@ docs/rust_engine_plan.md §20.5・分析 #4 docs/reports/2026-09-08_scenario_ana
     既定値が不変なので不要。
 
 ■ 成果物
-  - コード＋テスト＋scenario_out_a/（C1〜C4・72 本）＋docs/reports/2026-09-0X_search_a.md（表と
+  - コード＋テスト＋scenario_out_a/（S2・S3・R1・R2＝各 18 本、S4・S5＝各 6 本）＋docs/reports/2026-09-0X_search_a.md（表と
     3 決定の前後・各条件の所要時間）＋RESULT.json:
-    {"job":"rs-search-a","status":"done|partial","conditions":["C1","C2","C3","C4"],
-     "key_decisions":{"enel_t9_kaminosabaki_before_attack":{"C0":false,"C1":…},
-                      "enel_roger_t7_gammaknife":{…},"doffy_t10_root_visited":{"C0":3,…},
+    {"job":"rs-search-a","status":"done|partial","conditions":["S2","S3","S4","S5","R1","R2"],
+     "key_decisions":{"enel_t9_kaminosabaki_before_attack":{"S1":false,"S2":…,"R1":…},
+                      "enel_roger_t7_gammaknife":{…},"doffy_t10_root_visited":{"S1":3,…},
                       "doffy_t10_winner":{…}},
-     "q_beats_n_count":{"C0":N,…},"latency_ms_per_decide":{"C0":…},"make_test":"N passed","notes":"…"}
+     "q_beats_n_count":{"S1":N,…},"latency_ms_per_decide":{"S1":…},"make_test":"N passed","notes":"…"}
   - 分析（どの条件を serve／生成に採るか）はコーディネータが書く。WP は数字まで。
 
 ■ 前提
