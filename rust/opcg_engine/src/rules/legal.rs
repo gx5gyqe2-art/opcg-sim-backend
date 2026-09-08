@@ -155,6 +155,11 @@ fn main_actions(
             .copied()
             .filter(|c| state.card(*c).is_rest),
     );
+    // アタック税（`ATTACK_TAX_DISCARD_N`）を手札で払えない攻撃者は列挙しない＝`declare_attack` と
+    // 同じ判定（見ていないと「合法なのに適用できない手」が探索と対局駆動へ出て void になる。
+    // 交差監査 seed 67・2026-09-08）。Python 版の列挙もこれを見ていなかった（同じ穴）。
+    let hand_len = p.hand.len();
+    attackers.retain(|a| super::attack_tax_need(state, *a).map_or(true, |need| hand_len >= need));
     for atk in &attackers {
         for tgt in &targets {
             moves.push(game_move(

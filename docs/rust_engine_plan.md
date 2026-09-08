@@ -1676,6 +1676,16 @@ Python との合法手照合も同じ局を使うので、照合が通っても�
 `grep -rn "P3 で\\|P4 で" rust/opcg_engine/src` で棚卸しした（2026-09-08）: 挙動を落としたままの
 注記は本件のほかに無い（残りは設計の由来を書いた注記だけ）。
 
+**同時に見つかった 2 件目（交差監査 `make audit-cross` の void 1・seed 67・ST11-001 vs ST22-001）**:
+`GameAborted: アタックするには手札2枚を捨てる必要があり、手札が足りません。`＝アタック税
+（`ATTACK_TAX_DISCARD_N`）を手札で払えない攻撃者の ATTACK が合法手に載り、`declare_attack` の検証で
+弾かれて対局駆動が止まる。**Python 版の列挙も同じ穴**（`get_legal_actions` は CANNOT_REST／
+ATTACK_DISABLE は見るが税は見ていない）＝切替の退行ではなく、Rust では例外がそのまま void になる
+ため表に出た。修正: 判定を `rules::attack_tax_need` に 1 本化して `battle::declare_attack`（検証）と
+`legal::main_actions`（列挙）が同じものを使う（cargo test
+`the_attack_tax_hides_the_attack_from_the_legal_moves_when_unpayable`）。seed 67 単独で再現→修正後は
+決着（void 0）。交差監査は台帳を消して全 120 ペアを回し直した（結果は下記）。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は

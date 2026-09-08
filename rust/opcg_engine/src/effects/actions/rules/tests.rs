@@ -680,6 +680,45 @@ fn the_attack_tax_blocks_the_attack_when_the_hand_is_too_small() {
     );
 }
 
+/// 合法手の列挙も同じ判定を使う: 税を払えない攻撃者の ATTACK は出さない（出すと探索と対局駆動が
+/// 「合法なのに適用できない手」で止まる＝交差監査 seed 67 の void・2026-09-08）。払えれば出す。
+#[test]
+fn the_attack_tax_hides_the_attack_from_the_legal_moves_when_unpayable() {
+    for (hand, expect_attack) in [(1usize, false), (2usize, true)] {
+        let hand_json: Vec<Value> = (0..hand)
+            .map(|i| card_json("V", &format!("p1-h{i}"), "p1"))
+            .collect();
+        let (masters, mut s) = board(
+            vanilla_cards(),
+            json!([card_json("V", "p1-a", "p1")]),
+            json!([card_json("V", "p2-a", "p2")]),
+            json!(hand_json),
+        );
+        let attacker = find(&s, "p1-a");
+        crate::effects::continuous::apply(
+            &mut s,
+            attacker,
+            ContinuousKind::Flag,
+            Duration::ThisTurn,
+            0,
+            "ATTACK_TAX_DISCARD_2",
+            "",
+            0,
+        );
+        let legal = crate::rules::legal::get_legal_actions(&mut s, &masters, Seat::P1).expect("legal");
+        let attacks = legal
+            .iter()
+            .filter(|m| m["action_type"] == "ATTACK" && m["payload"]["uuid"] == "p1-a")
+            .count();
+        assert_eq!(attacks > 0, expect_attack, "hand={hand}: {legal:?}");
+        // 列挙されたら必ず適用できる（検証と同じ判定であること）。
+        if expect_attack {
+            let target = s.state().player(Seat::P2).leader.unwrap();
+            crate::rules::battle::declare_attack(&mut s, &masters, attacker, target).expect("attack");
+        }
+    }
+}
+
 /// 任意のバトル KO 置換は被 KO 側へ `CONFIRM_OPTIONAL` を出して戦闘を中断する
 /// （Python `_suspend_for_battle_ko_replacement`）。decline すると本来の KO が進む。
 #[test]
