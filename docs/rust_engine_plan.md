@@ -1831,6 +1831,86 @@ wheel を入れてから作業する（無いと golden ゲートが fail する
   - コーディネータ（本セッション）は成果物を回収して判定する。質問があれば RESULT.json の notes に。
 ```
 
+#### 8.27.2 判定（2026-09-08・`docs/reports/2026-09-08_select_default_rca.md`・RESULT は同名 `.RESULT.json`）
+
+- (a) と (b) は**別原因**という結論を受け入れる。
+  - **(a) 万雷カウンター**: 既定解決 `choose_selection` が「自分のリーダー＋キャラの混在」を判別できず
+    （`zones_in(["hand","field"])` にリーダーが無い）フォールバックの `uuids[:min]`＝空を返し、それが
+    `merged_search_actions` の先頭に並び、3 枝の値が完全一致するタイで先頭が勝つ。**§8.27 の
+    「自分側＝コスト系＝min 件」の読みは半分正しく、半分（混在→None）は別経路**だった。
+  - **(b) 神の裁きの KO**: 既定解決は正しく相手を選ぶが、箱の浅い先読み（`BOX_RESOLVE_DEPTH=1`）の
+    価値が「KO しない」を高く見た（3 回中 2 回）。分析 #3 の「除去の過小評価」と同根＝ネット側。
+  - 修正案③（can_skip で空を拒む）は前提誤り（`SelectTarget` の can_skip は常に false・必須／任意は
+    `constraints.min`）＝不採用。
+- **採用: 修正案①**（既定解決に効果の種別を配線し、利益系の自分側 up_to は max 件・価値降順）を
+  WP `rs-select-fix`（§8.27.3）で実装する。影響は自分側 up_to 660 件・golden 2 種に及ぶので、
+  golden は作り直して**差分をレビュー**する。
+- **残る疑問 Q7**（WP に持ち越し）: (a) で 3 枝の値が小数点以下 15 桁まで一致したのは不自然。
+  ナミ 5000 の攻撃に対しエネル 5000 が +1000 されれば戦闘の結果（ライフが減るか）が変わるはず。
+  「評価時点でバフが失効」だけでは説明がつかない＝箱の中でカウンターの BUFF が適用されていない、
+  または戦闘結果が評価に入る前に箱を抜けている可能性。修正 WP で確かめる。
+- (b) は価値の問題として §20 の思考ログ（§20.4）と分析 #3 の「次にやること 2」で扱う。
+
+#### 8.27.3 WP `rs-select-fix` の指示書（修正案①の実装）
+
+```
+作業: WP rs-select-fix（効果の対象選択の既定解決に「効果の種別」を配線する・修正案①・
+docs/rust_engine_plan.md §8.27.2・原因分析 docs/reports/2026-09-08_select_default_rca.md）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-select-fix に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。長いコマンド（golden 作り直し・
+make test・audit-cross）はバックグラウンドで回し、待つ間も作業を進める。
+
+■ 直すもの
+  effects/interact.rs の default_interaction_payload → choose_selection が、自分側の対象選択を
+  「コスト系＝min 件」と決め打ちしている（かつ自分のリーダー＋キャラの混在を判別できず None →
+  uuids[:min]＝空）。これを「効果の種別」で分ける:
+    - 利益系（BUFF／GRANT_KEYWORD／RAMP_DON／ACTIVE_DON／DRAW／ADD_COUNTER／PLAY_CARD 等・
+      RCA Q4 の 339 件）: max 件・価値降順（相手側の対象系と同じ扱い）。
+    - コスト系（REST／KO／TRASH／DISCARD／RETURN_DON／DEBUFF を自分に・RCA Q4 の 13 件）: min 件・
+      価値昇順（今のまま）。
+    - 分類不能（SEARCH／ARRANGE／MODIFY_COST 等・308 件）: 今のゾーン意味論のまま。ただし
+      「自分のリーダー＋キャラの混在」は own 側として扱う（None に落とさない）。
+  配線: suspend_for_target_selection（interact.rs）は GameAction の種別を知っているので、中断
+  （Interaction）に intent（Benefit／Cost／Unknown）を持たせ、default_interaction_payload と
+  choose_selection がそれを読む。pending の JSON にも "intent" を出してよい（フロントは無視する）。
+  分類表は 1 か所（interact.rs か effects/ の定数）に置き、RCA Q4 の判定基準を注記する。
+
+■ Q7（原因分析で残った疑問・修正の前に確かめる）
+  万雷カウンターの 3 枝（空／サトリ／リーダー）の値が 15 桁まで一致した理由。ナミ 5000 の攻撃に
+  エネル 5000 が +1000 されれば戦闘結果（ライフ）が変わるはず。search/quiesce.rs::resolve_battle_inplace
+  の中で (i) カウンターイベントの BUFF が箱の盤面に適用されているか、(ii) 戦闘の結果（ダメージ）が
+  評価前に解決されているか、を OPCG_DEBUG_SELECT 相当の一時ログで確かめる。どちらかが No なら
+  それは別の欠陥＝報告して（直せるなら直す・別コミット）。
+
+■ 受け入れ
+  - cargo test: choose_selection の利益系／コスト系／混在（リーダー＋キャラ）の 3 ケース。
+  - pytest tests/test_select_default_intent.py（API と同じ RsGame）: 神の裁き（コスト 0・ドン!!-1）を
+    エネル OP15-058 で打った直後の SEARCH_AND_SELECT（自分 +1000）で get_legal_actions の既定手が
+    リーダーを選んでいること／万雷を【カウンター】で使ったときの既定手が空でないこと／コスト系
+    （自分のキャラを 1 枚までレストにできる 等・1 枚見つけて）の既定手が空のままであること。
+    TEST_SPEC §2 に 1 行。
+  - golden: 監査 3,386 件・再生 200 局が変わる。make golden-audit／make golden-replay で作り直し、
+    差分を「変わった件数・変わった能力の内訳（利益系で対象が空→非空になった／それ以外）・
+    想定外の変化 0 件」の形で RESULT.json と報告に書く。想定外があれば止めて報告。
+  - make test green・make audit-cross void 0。
+  - 分岐点シナリオ 2 本（enel_human_20260810_t3-4・human_enel_vs_luffy_20260904_t4-5・r3・seeds 2）を
+    回し直し、万雷カウンターの BUFF が対象を持つこと（(b) の KO は本 WP の対象外＝空のままでよい）を
+    .md で確認して RESULT.json に書く。
+
+■ 成果物
+  - コード＋テスト＋golden（同じ作業単位でコミット）・docs/TEST_SPEC.md・
+    docs/rust_engine_plan.md §8.27 に「修正済み」の追記（結果だけ・数行）。
+  - RESULT.json: {"job":"rs-select-fix","status":"done|partial","q7":"…1 行…","golden":{"audit_changed":N,
+     "replay_changed":N,"unexpected":0},"make_test":"N passed","audit_cross":{"pairs":120,"void":0},
+     "scenario_check":"万雷 BUFF targets 非空 …","notes":"…"}
+
+■ 前提
+  - Python との一致は崩れてよい（ユーザ決定 2026-08-25）。
+  - 神の裁きはコスト 0 が正（カード DB のコスト欠けは欠損ではない）。
+  - 判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
@@ -3416,5 +3496,78 @@ RESULT.json: {"job":"rs-scenario","status":"done","cli":"tests/scripts/rs_scenar
   （訓練データの写し）。副産物 §8.27（対象なし解決）。次の候補: §8.27 の修正 → 除去イベントの
   Q を波 28 で切り分け → era7 の波 29 はこの修正後に。ドフラ T10 は価値の回帰テスト候補のまま。
   9 本は世代交代のたびに回して表を更新する（判定は定性のまま）。
+
+### 20.4 思考ログ: 「CPU が何をしようとしてこうなったか」を出す（ユーザ決定 2026-09-08）
+
+**運用の決定**: 人間の手は強制しない（人間の手は正解ではない・note に書いた比較対象として残すだけ）。
+CPU の思考そのものを各決定に出し、Claude が読んで「CPU はこう読んでいた」と書く。判定はユーザ。
+数字（PV・Q 差・N）を横に置き、言語化はその読み替えに留める（破綻した PV＝「相手はパスする」の
+ような想定は、それ自体が発見）。
+
+出すもの（決定ごと）:
+1. **PV（主変化）**: 探索が想定した「この後の進行」＝根から訪問数最多の子を辿った手順（相手の返し込み・
+   8 手または葉まで）。各手に N・Q。窓／コミットの決定は `commit` の継続がそのまま計画。
+2. **全合法手の P・N・Q**（訪問 0 に印）: 「考えなかった（P 低・N 0）」と「読んで捨てた（N あり・
+   Q 低）」を分ける。
+3. **V の帰属**: 根の符号化のトークンを 1 つずつ潰して V の変化を見る（上位 5・どのカード／ゾーンか）。
+   「何を重く見ているか」の近似。相関であって理由ではない。
+4. 決定の種類（main／window／commit）と、commit 消化なら「どの決定で焼き込まれたか」。
+
+#### 20.4.1 WP `rs-think-log` の指示書
+
+```
+作業: WP rs-think-log（分岐点シナリオの各決定に CPU の思考ログを足す・docs/rust_engine_plan.md §20.4）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-think-log に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。WP rs-select-fix と並行して
+走るので、effects/interact.rs と rules/ は触らない（触るのは search/decide.rs・search/mcts.rs・
+py_game.rs／lib.rs・opcg_sim/api/engine_rs.py・tests/scripts/rs_scenario_play.py・tests/）。
+
+■ 足すもの
+  1. PV（主変化）。Rust `decide` の戻り値に "pv": [{"move":<legal と同形>, "seat":"p1|p2",
+     "n":int, "q":float}, ...] を足す。木の根から「訪問数最多の子」を辿る（相手番の節も同じ規則・
+     PIMC の世界が複数ある場合は最後の世界の木でよい＝その旨を注記）。長さは 8 手または葉まで。
+     kind=window／commit のときは pv を空にし、代わりに "commit" の継続（既にある）を計画として扱う。
+     RsGame._trace は pv を describe_move で記述子（card_id 基準）に直して trace["pv"] に入れる。
+  2. 全合法手の P・N・Q。RsGame._trace に trace["legal_stats"] = [{"move":記述子, "p":float,
+     "n":int, "q":float}, ...]（stats.legal／P／N／Q をそのまま並べる・箱化後の候補＝探索が見た手）。
+  3. V の帰属。Python で opcg_engine.net_eval(encoding_json, legal_json)（lib.rs:318・`value` と
+     `priors`）を使い、根の符号化（game.encode(name)）の tokens（22 枠）を 1 枠ずつ PAD 相当に潰して
+     value を再計算、ΔV の絶対値上位 5 を trace["attribution"] = [{"slot":i, "label":"…", "dv":float}]
+     に。label は枠がどのカード／ゾーンかを opcg_sim/learned/n_rel_feat.py の枠の定義から引く
+     （枠→カード uuid／card_id の対応は encode の出力か n_rel_feat の仕様にある。無ければ枠番号と
+     ゾーン名だけでよい）。潰し方（ゼロ埋め か PAD 行）は n_rel_feat の PAD の定義に合わせる。
+     計算は決定ごとに 22 回の forward＝軽い。scenario の play にだけ付ける（serve には付けない）。
+  4. trace["kind"]（main／window／commit）と、commit 消化のときは trace["commit_from"]＝
+     「その継続を焼き込んだ決定の action_index」（RsGame が carry を作った決定を覚えておく）。
+
+■ .md への出し方（tests/scripts/rs_scenario_play.py）
+  各決定の (3) 合法手 を「探索が見た候補（P・N・Q・訪問 0 は ×印）」に置き換え、(4) の後に
+  (6) PV＝「この後の進行（CPU の想定）」を手順で、(7) V の帰属 上位 5、を足す。commit 消化の決定は
+  「決定 #k で焼き込まれた継続」と 1 行で書く。frames.json の decisions にも同じ欄を入れる。
+
+■ 受け入れ
+  - cargo test: pv の先頭が返した手と一致する／長さ ≤8／kind=window のとき空。
+  - pytest tests/test_think_log.py（cpu_infra）: RsGame.decide の trace に pv・legal_stats・attribution・
+    kind が入る／attribution の dv 合計が有限／legal_stats の n 合計 = sims（箱化で減る場合はその
+    旨を assert 側で緩める）。TEST_SPEC §2 に 1 行（基盤健全性と明記）。
+  - make test green（エンジンの裁定は変えないので audit-cross は不要。golden は decide を通らないので
+    不変のはず＝変わったら止めて報告）。
+  - 9 シナリオ（tests/fixtures/scenarios）を r3・seeds 2・sims 160 で回し、出力（.md／frames.json）を
+    scenario_out/ としてブランチに添える（コーディネータが読む）。分析は書かなくてよい。
+
+■ 成果物
+  - コード＋テスト＋docs/TEST_SPEC.md＋docs/rust_engine_plan.md §20.1 に欄の追記（数行）。
+  - scenario_out/（18 本）。
+  - RESULT.json: {"job":"rs-think-log","status":"done|partial","fields":["pv","legal_stats",
+     "attribution","kind","commit_from"],"make_test":"N passed","golden_changed":false,
+     "outputs":"scenario_out/","notes":"…（PIMC の木の扱い・帰属の潰し方・制約）"}
+
+■ 前提
+  - 言語化はコーディネータの仕事。WP は数字を出すところまで。
+  - decide の既定の挙動（返す手）は変えない（trace 用の欄を足すだけ）。レイテンシは scenario の
+    play でだけ増えてよい（serve は pv を作らない・オプションで切る）。
+  - 判定はコーディネータ。質問は RESULT.json の notes に。
+```
 - 道具の改善要望（据え置き）: 効果 ATTACH_DON の対象をイベントに出す／合法手一覧に visit 0 の印／
   相手の手札枚数・カウンター値合計の見積りを盤面要約に出す。
