@@ -173,6 +173,8 @@ pub struct DecideOut {
     pub p: Option<Vec<f64>>,
     /// 等価手マージ後の候補（`record["groups"]` と同じ集計）
     pub groups: Vec<Group>,
+    /// 選択規則の束ね（§20.7.8 の 4・準備箱の枝を card_id で 1 グループに）。箱が無ければ空。
+    pub select_groups: Vec<SelectGroup>,
     pub carry: DecideCarry,
     pub budget_used: i64,
     pub budget_exhausted: u64,
@@ -209,6 +211,24 @@ pub struct Group {
     pub rep: usize,
     pub idxs: Vec<usize>,
     pub n: f64,
+    pub q: f64,
+}
+
+/// 選択規則の束ね（§20.7.8 の 4）の 1 グループ。
+///
+/// 等価手マージ（[`merge_root_stats`]）の**上に重ねる**: 同じ card_id の `SETUP_BOX` の枝
+/// （素の準備の手が候補に残っていればそれも）を 1 グループにし、それ以外は 1 手 1 グループ。
+#[derive(Debug, Clone)]
+pub struct SelectGroup {
+    /// 束ねの鍵（`["setup", card_id]`／`["move", 等価グループの添字]`）
+    pub key: Value,
+    /// 束ねた等価グループ（[`merge_root_stats`] の並びの添字）
+    pub idxs: Vec<usize>,
+    /// 束ねた訪問数の和
+    pub n: f64,
+    /// 代表の手（`legal` の添字）＝グループ内で N が最大の枝
+    pub rep: usize,
+    /// 代表の Q
     pub q: f64,
 }
 
@@ -490,6 +510,73 @@ pub fn merge_root_stats(
         b.n.partial_cmp(&a.n)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
+    out
+}
+
+/// 準備の手の action_type（素の手として候補に残りうるもの）。
+const SETUP_ACTIONS: [&str; 2] = ["PLAY", "ACTIVATE_MAIN"];
+
+/// 手の主体の card_id ラベル（`move_equiv_key` の 2 欄目と同じ引き方）。
+fn move_card_label(state: &GameState, masters: &MasterTable, mv: &Move) -> Value {
+    let null = Value::Null;
+    let p = mv.get("payload").unwrap_or(&null);
+    let uuid = p
+        .get("uuid")
+        .and_then(Value::as_str)
+        .or_else(|| mv.get("card_uuid").and_then(Value::as_str));
+    card_label(state, masters, uuid)
+}
+
+/// 選択規則の束ね（§20.7.8 の 4）。**箱が 1 つも無ければ空**を返す（＝既定は無影響）。
+///
+/// 同じ card_id の `SETUP_BOX` の枝（素の準備の手が候補に残っていればそれも）を 1 グループに
+/// 束ね、それ以外は 1 手 1 グループ（等価手マージの結果をそのまま 1 グループにする）。
+/// グループの N は和・代表は N 最大の枝・Q はその代表の Q。
+pub fn select_groups(
+    state: &GameState,
+    masters: &MasterTable,
+    legal: &[Move],
+    groups: &[Group],
+) -> Vec<SelectGroup> {
+    let is_box = |mv: &Move| mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX");
+    let mut boxed: Vec<Value> = Vec::new();
+    for mv in legal.iter().filter(|m| is_box(m)) {
+        let card = move_card_label(state, masters, mv);
+        if !card.is_null() && !boxed.contains(&card) {
+            boxed.push(card);
+        }
+    }
+    if boxed.is_empty() {
+        return Vec::new();
+    }
+    let mut out: Vec<SelectGroup> = Vec::new();
+    // グループごとの「今の代表の N」（代表は N 最大の枝・同点は先に出た方）。
+    let mut rep_n: Vec<f64> = Vec::new();
+    for (gi, g) in groups.iter().enumerate() {
+        let mv = &legal[g.rep];
+        let at = mv.get("action_type").and_then(Value::as_str).unwrap_or("");
+        let card = move_card_label(state, masters, mv);
+        let key = if (is_box(mv) || SETUP_ACTIONS.contains(&at)) && boxed.contains(&card) {
+            json!(["setup", card])
+        } else {
+            json!(["move", gi]) // 1 手 1 グループ（既存の等価手マージのまま）
+        };
+        match out.iter().position(|s| s.key == key) {
+            Some(k) => {
+                out[k].idxs.push(gi);
+                out[k].n += g.n;
+                if g.n > rep_n[k] {
+                    rep_n[k] = g.n;
+                    out[k].rep = g.rep;
+                    out[k].q = g.q;
+                }
+            }
+            None => {
+                out.push(SelectGroup { key, idxs: vec![gi], n: g.n, rep: g.rep, q: g.q });
+                rep_n.push(g.n);
+            }
+        }
+    }
     out
 }
 
@@ -1067,7 +1154,10 @@ fn run_worlds(
                     // するため、世界ごとに張り直す（張らないと世界 1 以降だけ箱が出ず、根の
                     // `legal` が世界 0 と食い違って `unmapped` に落ちる）。枝の計測は世界 0 の
                     // ぶんだけが `boxes` に出る（他世界の計測はスレッドと共に捨てる）。
-                    super::r#macro::reset_setup_state(opts.search.setup_box);
+                    super::r#macro::reset_setup_state(
+                        opts.search.setup_box,
+                        opts.search.select_branch_on(),
+                    );
                     let mut r = super::rng::Pcg32SearchRng::new(seed);
                     let mut wst = SearchState {
                         budget: BoxBudget::new(opts.budget),
@@ -1236,6 +1326,7 @@ fn empty_out(kind: &'static str, mv: Option<Move>, carry: DecideCarry, st: &Sear
         q: Vec::new(),
         p: None,
         groups: Vec::new(),
+        select_groups: Vec::new(),
         carry,
         budget_used: st.budget.used,
         budget_exhausted: st.budget.exhausted,
@@ -1308,6 +1399,7 @@ fn decide_inner(
                 q: pick.q,
                 p: None,
                 groups: Vec::new(),
+                select_groups: Vec::new(),
                 carry,
                 budget_used: st.budget.used,
                 budget_exhausted: st.budget.exhausted,
@@ -1338,31 +1430,37 @@ fn decide_inner(
         ))
     };
     let mut groups = Vec::new();
+    let mut sel_groups: Vec<SelectGroup> = Vec::new();
     if !run.legal.is_empty() {
         groups = merge_root_stats(state, ctx.masters, &run.legal, &run.n, &run.q);
+        sel_groups = select_groups(state, ctx.masters, &run.legal, &groups);
         if !groups.is_empty() {
             // 出す手は**マージ後のグループ**から選ぶ（Python `_decide_inner` と同じ＝訪問数
             // 降順の先頭）。`select_rule="q_min_n"` はこの並びに対して「訪問下限を満たす
             // グループの中で Q 最大」を採る（下限を満たすグループが無ければ先頭＝訪問数最多）。
+            let floor = q_min_n_floor(eff_sims, opts.q_min_frac);
             let gn: Vec<f64> = groups.iter().map(|g| g.n).collect();
             let gq: Vec<f64> = groups.iter().map(|g| g.q).collect();
-            let mut gi = select_index(
-                &gn,
-                &gq,
-                opts.select_rule,
-                q_min_n_floor(eff_sims, opts.q_min_frac),
-            );
+            let gi = select_index(&gn, &gq, opts.select_rule, floor);
+            let mut rep = groups[gi].rep;
+            // §20.7.8 の 4: `q_min_n` のときだけ、準備箱の枝を card_id で束ねた
+            // グループ（`select_groups`）に対して訪問下限を測る（`visits` は不変）。
+            if opts.select_rule == SelectRule::QMinN && !sel_groups.is_empty() {
+                let sn: Vec<f64> = sel_groups.iter().map(|g| g.n).collect();
+                let sq: Vec<f64> = sel_groups.iter().map(|g| g.q).collect();
+                rep = sel_groups[select_index(&sn, &sq, SelectRule::QMinN, floor)].rep;
+            }
             // 生成の温度サンプリング（序盤は訪問分布から引く）
             if opts.temp_turns > 0 && state.turn_count <= opts.temp_turns {
                 let ns: Vec<f64> = groups.iter().map(|g| g.n).collect();
                 let total: f64 = ns.iter().sum();
                 if total > 0.0 {
                     let probs: Vec<f64> = ns.iter().map(|n| n / total).collect();
-                    gi = rng.choice(&probs)?;
+                    rep = groups[rng.choice(&probs)?].rep;
                 }
             }
-            mv = Some(run.legal[groups[gi].rep].clone());
-            chosen_idx = Some(groups[gi].rep);
+            mv = Some(run.legal[rep].clone());
+            chosen_idx = Some(rep);
         }
     }
     if mv.is_none() {
@@ -1472,6 +1570,7 @@ fn decide_inner(
         q: run.q,
         p: Some(run.p),
         groups,
+        select_groups: sel_groups,
         carry,
         budget_used: st.budget.used,
         budget_exhausted: st.budget.exhausted,

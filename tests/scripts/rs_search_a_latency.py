@@ -86,11 +86,17 @@ def main(argv=None) -> int:
     ap.add_argument("--leaf-rollout", dest="leaf_rollout", default=None,
                     choices=("none", "turn_end"),
                     help="木の葉をそのターンの終わりまで方策で打ち切ってから評価する（既定 none）")
+    # §20.7.8 の 5: 共通規則だけの on/off（既定＝--setup-box に従う）。
+    ap.add_argument("--select-branch", dest="select_branch", default=None,
+                    choices=("on", "off"))
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
+    # "on"／"off" → bool（argparse は type の後に choices を見るので変換はここで）。
+    select_branch = None if args.select_branch is None else (args.select_branch == "on")
     opts = {"select_rule": args.select_rule, "q_min_frac": args.q_min_frac,
             "root_prior_temp": args.root_prior_temp, "worlds": args.worlds,
-            "setup_box": args.setup_box, "leaf_rollout": args.leaf_rollout}
+            "setup_box": args.setup_box, "leaf_rollout": args.leaf_rollout,
+            "select_branch": select_branch}
     data = {"note": "同じ 1 局面（分岐点の開始盤面）に対する 1 decide の実測 ms・単独プロセス",
             "seed": args.seed, "repeat": args.repeat,
             "opts": {k: v for k, v in opts.items() if v is not None},

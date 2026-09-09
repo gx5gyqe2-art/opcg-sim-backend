@@ -283,7 +283,8 @@ class RsGame:
               action_index: Optional[int] = None, select_rule: Optional[str] = None,
               q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None,
               worlds: Optional[int] = None, setup_box: Optional[bool] = None,
-              leaf_rollout: Optional[str] = None):
+              leaf_rollout: Optional[str] = None,
+              select_branch: Optional[bool] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -308,11 +309,14 @@ class RsGame:
         方策（P 最大）で打ち続けてから評価する＝「準備だけして終わり」の中途半端な葉の値が
         無くなる。trace に `rollout`（葉の数・平均 ply・上限で止まった割合）が入る。
         **省略すれば "none"＝今までと同じ**（trace の欄も増えない）。
+        `select_branch`（省略可・§20.7.8 の 5）＝診断つまみ。全箱共通の「自分の対象選択を
+        枝にする」規則だけを on/off する（`None`＝`setup_box` に従う＝今までどおり）。
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
                                 select_rule=select_rule, q_min_frac=q_min_frac,
                                 root_prior_temp=root_prior_temp, worlds=worlds,
-                                setup_box=setup_box, leaf_rollout=leaf_rollout)
+                                setup_box=setup_box, leaf_rollout=leaf_rollout,
+                                select_branch=select_branch)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
@@ -321,7 +325,8 @@ class RsGame:
                action_index: Optional[int] = None, select_rule: Optional[str] = None,
                q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None,
                worlds: Optional[int] = None, setup_box: Optional[bool] = None,
-               leaf_rollout: Optional[str] = None):
+               leaf_rollout: Optional[str] = None,
+               select_branch: Optional[bool] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -365,6 +370,9 @@ class RsGame:
         # §20.7.9（WP `rs-leaf-rollout`）: 葉の打ち切り。None＝渡さない＝Rust 側の既定（"none"）。
         if leaf_rollout is not None:
             opts["leaf_rollout"] = str(leaf_rollout)
+        # §20.7.8 の 5（診断つまみ）: None＝渡さない＝Rust 側の既定（setup_box に従う）。
+        if select_branch is not None:
+            opts["select_branch"] = bool(select_branch)
         out = json.loads(self._game.decide(player_id, json.dumps(opts)))
         self._carry_key = (turn, seat)
         self._carry = {"commit": out.get("commit") or [],

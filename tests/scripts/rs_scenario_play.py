@@ -9,6 +9,7 @@
                              … シナリオ JSON（`tests/fixtures/scenarios/<name>.json`）を書く
   play --scenario <name|all> --net <npz> [--opp-net <npz>] --seeds N --sims N --out <dir>
        [--select-rule visits|q_min_n] [--q-min-frac F] [--root-prior-temp T]
+       [--setup-box] [--select-branch on|off]
                              … 分岐点を復元し、両席を（候補／相手）ネットで end_turn の
                                TURN_END（か決着）まで打つ。frames.json（ビューアの「ファイルを
                                開く」で読める）と .md（Claude が分析するための完全な事実の記録）
@@ -235,11 +236,12 @@ def _record_frame(game: RsGame, actions: list) -> dict:
 def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: str,
              seed: int, sims: int, select_rule: str = None, q_min_frac: float = None,
              root_prior_temp: float = None, worlds: int = None, setup_box: bool = None,
-             leaf_rollout: str = None):
+             leaf_rollout: str = None, select_branch: bool = None):
     """1 seed ぶんの再生。戻り値 `(frames_json, steps_log, frames)`。
 
     `select_rule`／`q_min_frac`／`root_prior_temp`（省略可・§20.5）と `worlds`（省略可・
-    §20.7.1＝1 決定あたりの世界サンプル本数）・`leaf_rollout`（省略可・§20.7.9＝葉の打ち切り）は
+    §20.7.1＝1 決定あたりの世界サンプル本数）・`setup_box`／`select_branch`（省略可・§20.7.8）・
+    `leaf_rollout`（省略可・§20.7.9＝葉の打ち切り）は
     **両席に同じ設定**で渡す（省略＝serve 既定）。
     各決定の実測時間は `decisions[i]["decide_ms"]` に入る。
     """
@@ -278,7 +280,8 @@ def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: 
         move = game.decide(player_id, trace=tr, net=net_for[player_id], sims=sims,
                            action_index=action_index, select_rule=select_rule,
                            q_min_frac=q_min_frac, root_prior_temp=root_prior_temp,
-                           worlds=worlds, setup_box=setup_box, leaf_rollout=leaf_rollout)
+                           worlds=worlds, setup_box=setup_box, leaf_rollout=leaf_rollout,
+                           select_branch=select_branch)
         decide_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         if move is None:
             break
@@ -584,7 +587,8 @@ def cmd_play(args) -> int:
                 name, scenario, payload, seat_net, opp_net, seed, args.sims,
                 select_rule=args.select_rule, q_min_frac=args.q_min_frac,
                 root_prior_temp=args.root_prior_temp, worlds=args.worlds,
-                setup_box=args.setup_box, leaf_rollout=args.leaf_rollout)
+                setup_box=args.setup_box, leaf_rollout=args.leaf_rollout,
+                select_branch=args.select_branch)
             base = f"{net_label}_s{seed}"
             frames_path = os.path.join(out_dir, f"{base}.frames.json")
             with open(frames_path, "w", encoding="utf-8") as f:
@@ -647,7 +651,12 @@ def main(argv=None) -> int:
     # §20.7.2（WP `rs-setup-box`）: 準備箱。既定（None）＝渡さない＝1 bit も変わらない。
     p.add_argument("--setup-box", dest="setup_box", action="store_true", default=None,
                   help="準備の手（メインイベント／起動メイン／登場時持ちの PLAY）を"
-                       "「続きの攻撃 1 回」まで箱にする（既定 off）")
+                       "「発動 → 対象選択 → 効果」まで箱にする（既定 off・§20.7.8）")
+    # §20.7.8 の 5: 全箱共通の「自分の対象選択を枝にする」規則だけの on/off（既定＝setup_box に従う）。
+    p.add_argument("--select-branch", dest="select_branch", default=None,
+                  choices=("on", "off"),
+                  help="全箱共通の「自分の対象選択を枝にする」規則だけを on/off する"
+                       "（既定＝--setup-box に従う）")
     # §20.7.9（WP `rs-leaf-rollout`）: 葉の打ち切り。既定（None）＝渡さない＝1 bit も変わらない。
     p.add_argument("--leaf-rollout", dest="leaf_rollout", default=None,
                   choices=("none", "turn_end"),
@@ -656,6 +665,9 @@ def main(argv=None) -> int:
     p.set_defaults(func=cmd_play)
 
     args = ap.parse_args(argv)
+    # "on"／"off" → bool（argparse は type の後に choices を見るので変換はここで）。
+    if getattr(args, "select_branch", None) is not None:
+        args.select_branch = (args.select_branch == "on")
     return args.func(args)
 
 

@@ -1,4 +1,4 @@
-//! 準備箱（`SETUP_BOX`・§20.7.2・WP `rs-setup-box`）の単体テスト。
+//! 準備箱（`SETUP_BOX`・§20.7.8・WP `rs-setup-box-3`）の単体テスト。
 //!
 //! 盤面は**実カード**（`opcg_sim/data/opcg_effects.json`）で組む＝神の裁き（OP15-075）／
 //! ガンマナイフ（OP05-077）の対話の形そのものを踏む。効果 JSON は生成物（git 管理外）なので、
@@ -8,9 +8,10 @@
 //! 1. `setup_box=false`（既定）では候補が 1 手も増えない＝1 bit も変わらない。
 //! 2. 神の裁き（コスト 0・ドン!!-1: 自分 +1000 → 相手のパワー 3000 以下を KO）の箱に
 //!    「KO する」枝と「KO しない」枝の両方が出る。
-//! 3. その箱を適用すると原始手の列（PLAY → SELECT_RESOURCE → BUFF 対象 → KO 対象 → 攻撃）
-//!    に展開される。
-//! 4. ガンマナイフ（-5000）の箱に続きの攻撃が入り、対象は -5000 後の相手キャラでもリーダーでもよい。
+//! 3. その箱を適用すると原始手の列（PLAY → SELECT_RESOURCE → BUFF 対象 → KO 対象）に
+//!    展開され、**そこで止まる**（続きの攻撃は入らない＝§20.7.8）。
+//! 4. 箱の各枝の P は「素の手の P × 対象選択の P」（枝の和が素の手の P）。
+//! 5. 選択規則の束ね（`select_groups`）と診断つまみ（`select_branch`）。
 
 use serde_json::{json, Value};
 
@@ -25,6 +26,7 @@ const KAMI: &str = "OP15-075"; // 神の裁き（イベント・【メイン】�
 const GAMMA: &str = "OP05-077"; // ガンマナイフ（イベント・【メイン】ドン!!-1: -5000）
 const VLDR: &str = "EB01-001"; // バニラのリーダー
 const VCHR: &str = "EB01-005"; // バニラのキャラ（コスト 1）
+const VCHR2: &str = "EB01-017"; // 別のバニラのキャラ（コスト 2・等価キーを分けるため）
 
 const EFFECTS: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -118,6 +120,31 @@ pub(super) fn board(masters: &MasterTable) -> Session {
     Session::new(GameState::from_record(&hidden, masters).expect("盤面が組めるはず"))
 }
 
+/// [`board`] の手札を「神の裁き 2 枚」に替えた盤面（同名 2 枚の箱の重複を見るため）。
+///
+/// 自分の場は [`VCHR2`]（相手の [`VCHR`] と**別の card_id**）にする——等価キーは card_id 基準
+/// なので、両側に同じカードを置くと「自分へ +1000」と「相手を KO」が同じキーに潰れてしまう。
+fn board_two_kami(masters: &MasterTable) -> Session {
+    let hidden = json!({
+        "players": {
+            "p1": player_json("p1", ENEL,
+                json!([card_json(VCHR2, "p1-body", "p1", Value::Null)]),
+                json!([card_json(KAMI, "p1-kami", "p1", Value::Null),
+                       card_json(KAMI, "p1-kami2", "p1", Value::Null)]), 4),
+            "p2": player_json("p2", VLDR,
+                json!([rested_card_json(VCHR, "p2-weak", "p2", json!(0), true)]),
+                json!([]), 0),
+        },
+        "manager": {
+            "turn_count": 5, "phase": "MAIN", "turn_player": "p1", "winner": null,
+            "active_battle": null, "turn_events": {}, "mulligan_done": ["p1", "p2"],
+            "setup_phase_pending": false, "turn_start_pending": false,
+            "interaction_depth": 0, "pending_triggers": 0, "pending_end_of_turn": 0,
+        },
+    });
+    Session::new(GameState::from_record(&hidden, masters).expect("盤面が組めるはず"))
+}
+
 /// ネットは載せない（`priors` は `None` に落ちる＝`quiesce_choice` は「PASS → 先頭」に退避）。
 ///
 /// ここで見るのは候補の**形**（枝の張り方・原始手への展開）だけ。方策が続きの攻撃を
@@ -133,6 +160,8 @@ fn net() -> Option<&'static LoadedNet> {
 }
 
 fn ctx_for(masters: &'static MasterTable, net: &'static LoadedNet, setup_box: bool) -> Ctx<'static> {
+    // 準備箱の枝予算（thread_local）はテストごとに張り直す（`decide` を通さない経路のため）。
+    boxes::reset_setup_state(setup_box, setup_box);
     Ctx {
         masters,
         net,
@@ -268,16 +297,90 @@ fn kami_no_sabaki_branches_on_ko_and_no_ko() {
         .any(|m| !flat_selects(m).contains(&"p2-weak".into()));
     assert!(with_ko, "「相手のパワー 0 を KO する」枝: {kami:?}");
     assert!(without_ko, "「KO しない」枝: {kami:?}");
-    // 素の PLAY も残る（続きが攻撃でない場合のため・§20.7.2）。
+    // §20.7.6: 箱ができた素の PLAY は候補から**落とす**（配分箱と同じ扱い）。
     assert!(
-        moves
+        !moves
             .iter()
             .any(|m| m["action_type"] == json!("PLAY") && m["payload"]["uuid"] == json!("p1-kami")),
-        "素の PLAY は残す"
+        "箱ができた素の PLAY は候補に残らない: {moves:?}"
     );
 }
 
-/// 箱を適用すると原始手の列（PLAY → SELECT_RESOURCE → BUFF 対象 → KO 対象 → 攻撃）に展開される。
+/// §20.7.8 の 1: 箱に**続きの攻撃は入らない**（`payload.attack` そのものが無い・
+/// 攻撃対象の欄も立たない）。箱の値は効果を解決した盤面。
+#[test]
+fn setup_boxes_never_carry_a_follow_up_attack() {
+    let (Some(masters), Some(net)) = (masters(), net()) else { return };
+    let mut s = board(masters);
+    let ctx = ctx_for(masters, net, true);
+    let moves = ctx.legal_actions(&mut s).expect("候補");
+    let all = setup_boxes(&moves);
+    assert!(!all.is_empty(), "準備箱が出るはず");
+    for m in &all {
+        assert!(m["payload"]["attack"].is_null(), "攻撃の欄が残っている: {m:?}");
+        assert!(m["payload"]["target_ids"].is_null(), "攻撃対象が載っている: {m:?}");
+    }
+}
+
+/// §20.7.8 の 3: 箱の各枝の P は「素の手の P × 対象選択の P」＝**枝の和が素の手の P**。
+///
+/// ゼロ重みのネットは全候補行に同じ logit を出す＝行の P は一様（1/行数）。準備の手の枝は
+/// ネットに **1 行**として見せるので、その手の枝の P の和は素の（非箱の）手 1 つの P に等しく、
+/// 個々の枝はそれより小さい（対象選択の P で割られる）。
+#[test]
+fn setup_box_priors_split_by_the_selection_policy() {
+    let Some(masters) = masters() else { return };
+    let net: &'static crate::net::LoadedNet =
+        Box::leak(Box::new(super::decide::tests::zero_net()));
+    let mut s = board(masters);
+    let ctx = ctx_for(masters, net, true);
+    let moves = ctx.legal_actions(&mut s).expect("候補");
+    assert!(!setup_boxes(&moves).is_empty(), "準備箱が出るはず");
+    let p = ctx.priors(&mut s, &moves).expect("priors").expect("priors あり");
+    assert_eq!(p.len(), moves.len());
+    let total: f32 = p.iter().sum();
+    assert!((total - 1.0).abs() < 1e-5, "P の和が 1 でない: {total}");
+    let plain: Vec<f32> = p
+        .iter()
+        .zip(&moves)
+        .filter(|(_, m)| m["action_type"] != json!("SETUP_BOX"))
+        .map(|(x, _)| *x)
+        .collect();
+    assert!(!plain.is_empty(), "非箱の手（TURN_END 等）も候補に居るはず");
+    let bare = plain[0];
+    // 準備の手（base の uuid）ごとに枝の P を足す＝素の手 1 つぶんの P になる。
+    let mut bases: Vec<String> = setup_boxes(&moves)
+        .iter()
+        .filter_map(|m| m["payload"]["uuid"].as_str().map(str::to_owned))
+        .collect();
+    bases.sort();
+    bases.dedup();
+    for uuid in &bases {
+        let sum: f32 = p
+            .iter()
+            .zip(&moves)
+            .filter(|(_, m)| {
+                m["action_type"] == json!("SETUP_BOX") && m["payload"]["uuid"] == json!(uuid)
+            })
+            .map(|(x, _)| *x)
+            .sum();
+        assert!(
+            (sum - bare).abs() < 1e-5,
+            "{uuid} の枝の P の和 {sum} が素の手の P {bare} と違う"
+        );
+        let branches = box_of(&moves, uuid);
+        if branches.len() > 1 {
+            for (x, m) in p.iter().zip(&moves) {
+                if m["action_type"] == json!("SETUP_BOX") && m["payload"]["uuid"] == json!(uuid) {
+                    assert!(*x < bare, "枝の P {x} が素の手の P {bare} より小さくない");
+                }
+            }
+        }
+    }
+}
+
+/// 箱を適用すると原始手の列（PLAY → SELECT_RESOURCE → BUFF 対象 → KO 対象）に展開され、
+/// **そこで止まる**（§20.7.8: 続きの攻撃は入れない＝そこから先は木が読む）。
 #[test]
 fn applying_the_kami_box_expands_into_primitive_moves() {
     let (Some(masters), Some(net)) = (masters(), net()) else { return };
@@ -304,14 +407,19 @@ fn applying_the_kami_box_expands_into_primitive_moves() {
         .map(|(_, m)| m["action_type"].as_str().unwrap_or("?"))
         .collect();
     assert!(
-        kinds.iter().all(|k| *k == "RESOLVE_EFFECT_SELECTION"
-            || *k == "ATTACK"
-            || *k == "DON_BOX"),
-        "継続は原始手（対話の解決と攻撃）だけ: {kinds:?}"
+        kinds.iter().all(|k| *k == "RESOLVE_EFFECT_SELECTION"),
+        "継続は対話の解決だけ（攻撃は入らない）: {kinds:?}"
     );
     assert!(
         kinds.iter().filter(|k| **k == "RESOLVE_EFFECT_SELECTION").count() >= 3,
         "SELECT_RESOURCE ＋ BUFF 対象 ＋ KO 対象 の 3 段が出るはず: {kinds:?}"
+    );
+    // 効果を解決したところで止まる＝戦闘に入っていない（そこから先は木が読む）。
+    assert!(w.state().active_battle.is_none(), "箱が戦闘まで進めてしまっている");
+    assert_eq!(
+        crate::rules::pending::pending_actor_action(&mut w),
+        Some((Seat::P1, "MAIN_ACTION")),
+        "箱の後は自分のメインに戻る（木が続きを読む地点）"
     );
     // KO された（相手の場からパワー 0 のキャラが消えた）。
     assert!(
@@ -331,13 +439,11 @@ fn applying_the_kami_box_expands_into_primitive_moves() {
     );
 }
 
-/// ガンマナイフ（-5000）→ 攻撃の箱（攻撃の対象は -5000 後の相手キャラでもリーダーでもよい）。
-///
-/// 続きの攻撃を**どれにするか**は `quiesce_choice`（方策優先）が決めるので、ネットを
-/// 載せないここでは決め打ちにせず、「-5000 を打った後に両方の対象への攻撃箱が候補に
-/// 立つこと」と「攻撃を積んだ箱が原始手で戦闘まで展開されること」を見る。
+/// ガンマナイフ（-5000）の箱は「-5000 を打つところまで」で止まり、**その後の攻撃は
+/// 木が読む**（§20.7.8）。箱を適用した盤面で、-5000 後の相手キャラにもリーダーにも
+/// 攻撃箱が立つ＝続きは通常の候補として読める、ことを見る。
 #[test]
-fn gamma_knife_box_carries_a_follow_up_attack() {
+fn gamma_knife_box_stops_after_the_effect_and_leaves_the_attacks_to_the_tree() {
     let (Some(masters), Some(net)) = (masters(), net()) else { return };
     let mut s = board(masters);
     let ctx = ctx_for(masters, net, true);
@@ -350,9 +456,16 @@ fn gamma_knife_box_carries_a_follow_up_attack() {
         .expect("「相手のキャラへ -5000」の枝")
         .clone();
 
-    // -5000 を打った後の盤面（＝箱の中で続きの攻撃を選ぶ地点）。
+    // 箱を適用した盤面（＝木が続きを読み始める地点）。
     let mut w = Session::new(s.state().clone());
-    boxes::setup_box_continuation(&mut w, masters, Seat::P1, &minus).expect("箱の継続");
+    let trace =
+        boxes::setup_box_continuation(&mut w, masters, Seat::P1, &minus).expect("箱の継続");
+    assert!(
+        trace
+            .iter()
+            .all(|(_, m)| m["action_type"] == json!("RESOLVE_EFFECT_SELECTION")),
+        "コミットの手順は対話の解決だけ（攻撃は入らない）: {trace:?}"
+    );
     assert!(
         w.state()
             .player(Seat::P2)
@@ -362,40 +475,58 @@ fn gamma_knife_box_carries_a_follow_up_attack() {
                 || w.state().card(*c).power_buff <= -5000),
         "-5000 が乗っている"
     );
-    let after = ctx
-        .without_setup_box()
-        .legal_actions(&mut w)
-        .expect("候補");
+    assert!(w.state().active_battle.is_none(), "箱が戦闘まで進めてしまっている");
+
+    // 続きの攻撃は「箱の後の候補」として木に見えている（決め打ちしない）。
+    let after = ctx.without_setup_box().legal_actions(&mut w).expect("候補");
     let targets: Vec<&str> = after
         .iter()
-        .filter(|m| boxes::is_attack_move(m))
+        .filter(|m| m["action_type"] == json!("ATTACK") || m["action_type"] == json!("DON_BOX"))
         .filter_map(|m| m["payload"]["target_ids"][0].as_str())
         .collect();
     assert!(targets.contains(&"p2-leader"), "リーダーへの攻撃箱: {targets:?}");
     assert!(targets.contains(&"p2-weak"), "-5000 後のキャラへの攻撃箱: {targets:?}");
+}
 
-    // 攻撃を積んだ箱は原始手で戦闘まで展開される（実対局へ出る形）。
-    let attack = after
+/// 同名 2 枚の準備の手が作る箱は、根の等価手マージ（`merge_root_stats`）で 1 グループに束なる。
+///
+/// §20.7.6 の項目 3: 箱の重複（同じ枝が 2 組出る）は `move_equiv_key` が card_id 基準で
+/// 同一視するので、選択規則（`q_min_n` の訪問下限）は束ねた N に対して働く。
+#[test]
+fn duplicate_copies_of_a_setup_move_merge_into_one_group() {
+    let (Some(masters), Some(net)) = (masters(), net()) else { return };
+    let mut s = board_two_kami(masters);
+    let ctx = ctx_for(masters, net, true);
+    let moves = ctx.legal_actions(&mut s).expect("候補");
+    let first = box_of(&moves, "p1-kami");
+    let second = box_of(&moves, "p1-kami2");
+    assert!(!first.is_empty() && !second.is_empty(), "2 枚とも箱になる");
+    assert_eq!(first.len(), second.len(), "同名 2 枚の枝の数は同じ");
+
+    let n = vec![1.0; moves.len()];
+    let q = vec![0.0; moves.len()];
+    let groups = super::decide::merge_root_stats(s.state(), masters, &moves, &n, &q);
+    // 神の裁きの箱だけを見る（エネルの起動メインなど、他の準備の手の箱は 1 枚ぶんしか無い）。
+    let is_kami_box = |i: usize| -> bool {
+        moves[i]["action_type"] == json!("SETUP_BOX")
+            && (moves[i]["payload"]["uuid"] == json!("p1-kami")
+                || moves[i]["payload"]["uuid"] == json!("p1-kami2"))
+    };
+    let per_group: Vec<usize> = groups
         .iter()
-        .find(|m| boxes::is_attack_move(m) && m["payload"]["target_ids"][0] == json!("p2-weak"))
-        .expect("キャラへの攻撃箱")
-        .clone();
-    let mut with_attack = minus.clone();
-    with_attack["payload"]["attack"] = attack;
-    let mut w2 = Session::new(s.state().clone());
-    let trace =
-        boxes::setup_box_continuation(&mut w2, masters, Seat::P1, &with_attack).expect("箱の継続");
-    assert!(
-        w2.state().active_battle.is_some() || w2.state().winner.is_some(),
-        "攻撃つきの箱を適用すると戦闘に入る（か決着する）"
+        .map(|g| g.idxs.iter().filter(|i| is_kami_box(**i)).count())
+        .filter(|c| *c > 0)
+        .collect();
+    assert_eq!(
+        per_group.iter().sum::<usize>(),
+        first.len() + second.len(),
+        "神の裁きの箱は全部どれかのグループに入る"
     );
     assert!(
-        trace
-            .iter()
-            .any(|(_, m)| m["action_type"] == json!("DON_BOX")
-                || m["action_type"] == json!("ATTACK")),
-        "コミットの手順に攻撃が入る: {trace:?}"
+        per_group.iter().all(|c| *c == 2),
+        "同名 2 枚の同じ枝は 1 グループ（2 本）に束なるはず: {per_group:?}"
     );
+    assert_eq!(per_group.len(), first.len(), "グループ数＝1 枚ぶんの枝数");
 }
 
 /// 予算（`BOX_BRANCH_BUDGET`）を使い切ったら箱を作らない＝素の手だけ（今と同じ）。
@@ -404,7 +535,7 @@ fn setup_box_falls_back_to_the_plain_moves_when_the_budget_is_gone() {
     let (Some(masters), Some(net)) = (masters(), net()) else { return };
     let mut s = board(masters);
     let ctx = ctx_for(masters, net, true);
-    boxes::reset_setup_state(true);
+    boxes::reset_setup_state(true, true);
     assert!(
         !setup_boxes(&ctx.legal_actions(&mut s).expect("候補")).is_empty(),
         "予算があるうちは箱が出る"
@@ -416,5 +547,144 @@ fn setup_box_falls_back_to_the_plain_moves_when_the_budget_is_gone() {
     let direct = super::adapter::legal_actions(&mut s, masters, &SearchOptions::default())
         .expect("候補");
     assert_eq!(moves, direct, "予算切れの候補は既定と同じ");
-    boxes::reset_setup_state(false);
+    boxes::reset_setup_state(false, false);
+}
+
+// --- §20.7.8 の 4／5（選択規則の束ね・診断つまみ）--------------------------------
+
+/// §20.7.8 の 4: 同じ card_id の枝が**各々**訪問下限に届かなくても、束ねた N が下限以上なら
+/// `q_min_n` はそのグループの代表（N 最大の枝）を選べる。`visits`（既定）は 1 bit も変わらない。
+#[test]
+fn select_groups_bundle_branches_so_q_min_n_can_reach_the_floor() {
+    use super::decide::{merge_root_stats, select_groups};
+    use super::mcts::{select_index, SelectRule};
+    let Some(masters) = masters() else { return };
+    let mut s = board(masters);
+    let net = net().expect("net");
+    let ctx = ctx_for(masters, net, true);
+    let moves = ctx.legal_actions(&mut s).expect("候補");
+    let kami = box_of(&moves, "p1-kami");
+    assert!(kami.len() >= 3, "神の裁きの枝が 3 本以上ある盤面: {}", kami.len());
+
+    // 神の裁きの枝 3 本に 8 訪問ずつ（下限 20 には各々届かない・和 24 は届く）・Q は高め。
+    // TURN_END には 30 訪問・Q は低め（`visits` ならこちらが出る）。
+    let idx_of = |pred: &dyn Fn(&Move) -> bool| -> Vec<usize> {
+        moves.iter().enumerate().filter(|(_, m)| pred(m)).map(|(i, _)| i).collect()
+    };
+    let kami_idx = idx_of(&|m: &Move| {
+        m["action_type"] == json!("SETUP_BOX") && m["payload"]["uuid"] == json!("p1-kami")
+    });
+    let end_idx = idx_of(&|m: &Move| m["action_type"] == json!("TURN_END"));
+    assert!(!end_idx.is_empty(), "TURN_END は必ず候補に居る");
+    let mut n = vec![0.0f64; moves.len()];
+    let mut q = vec![-0.9f64; moves.len()];
+    for (k, i) in kami_idx.iter().take(3).enumerate() {
+        n[*i] = 8.0;
+        q[*i] = 0.5 - 0.01 * k as f64; // 先頭の枝が Q 最大＝代表（N 同点なら先頭）
+    }
+    n[end_idx[0]] = 30.0;
+    q[end_idx[0]] = -0.5;
+
+    let groups = merge_root_stats(s.state(), masters, &moves, &n, &q);
+    let sel = select_groups(s.state(), masters, &moves, &groups);
+    assert!(!sel.is_empty(), "箱があるので束ねが立つ");
+    let kami_group = sel
+        .iter()
+        .find(|g| g.idxs.iter().any(|gi| kami_idx.contains(&groups[*gi].rep)))
+        .expect("神の裁きの束ね");
+    assert!(
+        kami_group.n >= 24.0,
+        "枝を束ねた N（{}）は各枝の和以上のはず",
+        kami_group.n
+    );
+    assert!(kami_idx.contains(&kami_group.rep), "代表は神の裁きの枝");
+
+    // 束ねる前（等価手マージだけ）は、どの枝も下限 20 に届かない＝`q_min_n` は TURN_END を出す。
+    let gn: Vec<f64> = groups.iter().map(|g| g.n).collect();
+    let gq: Vec<f64> = groups.iter().map(|g| g.q).collect();
+    let plain = groups[select_index(&gn, &gq, SelectRule::QMinN, 20.0)].rep;
+    assert!(!kami_idx.contains(&plain), "束ねる前は枝が下限を割る（前提の確認）");
+    // 束ねた後は神の裁きの代表が出る。
+    let sn: Vec<f64> = sel.iter().map(|g| g.n).collect();
+    let sq: Vec<f64> = sel.iter().map(|g| g.q).collect();
+    let bundled = sel[select_index(&sn, &sq, SelectRule::QMinN, 20.0)].rep;
+    assert!(kami_idx.contains(&bundled), "束ねれば下限を満たして代表が選ばれる");
+    // `visits`（既定）は束ねを見ない＝訪問数最多の TURN_END のまま。
+    let visits = groups[select_index(&gn, &gq, SelectRule::Visits, 20.0)].rep;
+    assert_eq!(visits, end_idx[0], "visits は 1 bit も変わらない");
+}
+
+/// 箱が 1 つも無い候補では束ねは空（＝既定の decide は無影響）。
+#[test]
+fn select_groups_are_empty_without_boxes() {
+    use super::decide::{merge_root_stats, select_groups};
+    let Some(masters) = masters() else { return };
+    let net = net().expect("net");
+    let mut s = board(masters);
+    let ctx = ctx_for(masters, net, false);
+    let moves = ctx.legal_actions(&mut s).expect("候補");
+    let n = vec![1.0; moves.len()];
+    let q = vec![0.0; moves.len()];
+    let groups = merge_root_stats(s.state(), masters, &moves, &n, &q);
+    assert!(select_groups(s.state(), masters, &moves, &groups).is_empty());
+}
+
+/// §20.7.8 の 5: `select_branch=false` は「自分の対象選択を枝にする」共通規則だけを切る
+/// ＝攻撃箱・防御箱の枝が 1 本も立たない（`boxes.attack`／`boxes.defense` が 0）。
+/// 準備箱そのもの（`setup_box=true`）は残る。
+#[test]
+fn select_branch_off_removes_the_attack_and_defense_branches() {
+    let Some(masters) = masters() else { return };
+    let net = super::decide::tests::zero_net();
+    let state = board(masters).into_state();
+    let run = |select_branch: Option<bool>| -> serde_json::Value {
+        let opts = super::decide::DecideOptions {
+            sims: 24,
+            search: SearchOptions {
+                setup_box: true,
+                select_branch,
+                ..SearchOptions::default()
+            },
+            ..super::decide::DecideOptions::default()
+        };
+        super::decide_on_state(
+            masters,
+            &net,
+            &state,
+            Seat::P1,
+            &opts,
+            &mut super::Pcg32SearchRng::new(3),
+            &super::decide::DecideCarry::default(),
+        )
+        .expect("decide")
+    };
+    let off = run(Some(false));
+    assert_eq!(off["boxes"]["attack"]["boxes"], json!(0), "攻撃箱の枝: {}", off["boxes"]);
+    assert_eq!(off["boxes"]["defense"]["boxes"], json!(0), "防御箱の枝: {}", off["boxes"]);
+    assert!(
+        off["boxes"]["setup"]["boxes"].as_i64().unwrap_or(0) > 0,
+        "準備箱そのものは残る: {}",
+        off["boxes"]
+    );
+}
+
+/// 既定（`setup_box=false`・`select_branch=None`）の decide は `boxes` を出さない
+/// ＝共通規則も入らない（1 bit も変わらない側の確認）。
+#[test]
+fn defaults_report_no_boxes_at_all() {
+    let Some(masters) = masters() else { return };
+    let net = super::decide::tests::zero_net();
+    let state = board(masters).into_state();
+    let out = super::decide_on_state(
+        masters,
+        &net,
+        &state,
+        Seat::P1,
+        &super::decide::DecideOptions { sims: 8, ..super::decide::DecideOptions::default() },
+        &mut super::Pcg32SearchRng::new(3),
+        &super::decide::DecideCarry::default(),
+    )
+    .expect("decide");
+    assert!(out["boxes"].is_null(), "既定は boxes を出さない: {}", out["boxes"]);
+    assert_eq!(out["select_groups"], json!([]), "既定は束ねが空");
 }
