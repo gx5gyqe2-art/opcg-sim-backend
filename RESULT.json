@@ -1,0 +1,27 @@
+{
+  "job": "gen-n29-w16",
+  "status": "done",
+  "games": 480,
+  "rows": 70487,
+  "main_rows": 31691,
+  "dropped": 0,
+  "void": 0,
+  "forced": {
+    "play": 302,
+    "hold": 51
+  },
+  "removal_legal_rows": 12663,
+  "sec_per_game": 14.14,
+  "wall_hours": 1.89,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "net": "nrel_r3.npz",
+  "commit": "0be4a48f3e610ef821f546e76a387eb5d75d577b",
+  "notes": "30局のタイミングプローブ（同 seed_base・別 --out）を先に実行: 552s/30局＝18.4s/局、480局で6h以内の見込みを確認してから本番480局を実行。本番は6,789s（1.89h）で完走・棄却0・void 0（480局とも winner あり=p1 257/p2 223）。実行中の中間出力はリポジトリ外のスクラッチ領域に書き、完走後にのみ n_records/n29_w16 へ移動してコミット（品質ゲート／コード変更なし）。"
+}
