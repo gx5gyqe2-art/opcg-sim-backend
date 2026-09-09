@@ -3781,3 +3781,173 @@ docs/rust_engine_plan.md §20.5.2・分析 #5 docs/reports/2026-09-09_scenario_a
 読めていない手は根の V」から改良方策を作り、それを π の教師にする（Gumbel AlphaZero の完成 Q の
 考え方）。`mcts.rs` の根の扱いと `record_gen.py` の π の作り方が変わる。R2 でのアリーナ結果と
 波 29 の r4 を見てから着手する。
+
+### 20.7 探索の 3 段（ユーザ決定 2026-09-09「1〜3 はやりましょう・方式は任せる」）
+
+分析 #5 の「どうしたら良いか」の 1〜3 を実装する。**方式の決定はコーディネータ**（本節）、実装は WP。
+順序: **WP `rs-pimc-worlds`（1）→ WP `rs-setup-box`（3）→ アリーナ 1 本で 1＋2＋3 を束ねて採否**
+（2＝R2 の設定は実装済み・採否だけ）。§20.5.3 の `rs-search-arena` は候補設定を「worlds 4 ＋ R2 ＋
+準備箱」に差し替えて回す（別々に測らない＝1 本で済ませる。効果の切り分けが要れば後で抜き差し）。
+
+#### 20.7.1 方式 1: 世界サンプルを複数本引いて根で束ねる（`rs-pimc-worlds`）
+
+- 今: 1 回の `decide` で世界（相手の伏せ札・山札の順）を 1 本引き、その世界で木を 1 本回す＝
+  「相手の手札を知っている」つもりの Q になる（神の裁きの決定でオーム攻撃 Q 1.000）。
+- 変更: `DecideOptions.worlds`（既定 1＝不変）。`worlds=K` なら **K 本の世界を独立に引き、各世界で
+  同じ sims の木を回し、根の統計を束ねる**: N は和・Q は N で重み付けた平均・P は同じ（ネットの
+  出力は世界に依らない）。選択規則（visits／q_min_n）は束ねた統計に対して適用。PV とコミットの
+  継続は「選んだ手の訪問が最も多い世界の木」から取る（世界ごとに継続は違うので 1 本に決める）。
+- 並列: K 本の木を **スレッドで並列**に回す（`std::thread::scope`・GIL は `Game.decide` の間だけ
+  `allow_threads` で放す）。世界ごとの乱数は `search_seed` から派生（`seed + world_index`）＝
+  再現性を保つ。4 コアで K=4 ならレイテンシは K=1 の 1.3 倍以内を目標（ネットの forward が
+  スレッド安全であること・`LoadedNet` は読み取り専用）。
+- 効き目の見立て: 保険の手（パンプしてから殴る・止められる世界を織り込む）の Q が上がる。
+  実効 sims が K 倍（同じ壁時計）。
+
+#### 20.7.2 方式 3: 準備の手を「続きの攻撃」まで箱にする（`rs-setup-box`・ユーザの問いへの答え）
+
+**準備の手とは**（意味分類はしない・構造で決める）: メインフェイズの手のうち攻撃でも終了でもなく、
+解決後に同じターンの攻撃の結果を変えうるもの。具体的には次の 3 種:
+1. 【メイン】効果を持つイベントの PLAY（除去・パンプ・ドロー・レスト・コスト操作）。
+2. ACTIVATE_MAIN（リーダー／キャラ／ステージの【起動メイン】。エネル起動のドン!!加速も含む）。
+3. 【登場時】効果を持つキャラ／ステージの PLAY（登場時に対象を取る・ドローする・KO する等）。
+含めないもの: ドン!!付与（既に配分箱）、登場時効果を持たないキャラの PLAY（価値が盤面に即出る）、
+TURN_END。**手ではないもの**（常在効果・アタック時・相手アタック時・カウンター・ブロッカー・
+トリガー）は箱の対象外＝アタック時は攻撃箱の中で既に解決され、常在は盤面に常時反映され、
+防御系は防御窓が扱う（変更なし）。
+
+**箱の範囲**: 準備箱 ＝ [準備の手 → その手の対話を全部解決 → 続く攻撃を **1 回だけ**（攻撃箱 1 個、
+または「攻撃しない」）] → その時点の盤面の V が箱の評価値。深さは 1（準備の後の攻撃 1 回）で止める
+＝価値が現れる最短の続きだから。2 回目以降の攻撃と 2 段の準備（ガンマナイフ → 神の裁き）は木が
+読む（1 段目の Q が正しくなれば 2 段目は通常の展開で届く。2 段の「連鎖箱」は今回入れない）。
+
+**対象の取り方**: 準備の手の**最初の対象選択**（SEARCH_AND_SELECT の「1 枚まで」等）は候補ごとに
+枝を作る（`adapter::selection_moves` と同じ・上限 `HARD_SELECT_CAP`=8・「選ばない」も 1 枝）。
+**2 つ目以降の対話は既定解決**（`choose_selection`・intent 配線済み）。理由: 価値を分けるのは主に
+最初の対象（除去先・パンプ先）で、枝の爆発を抑える。ドン!!-x の返却先（SELECT_RESOURCE）は既定。
+
+**複数効果**: 1 つの能力の中の連続（神の裁き: +1000 → KO）は順に解決して 1 つの箱。1 枚に複数の
+能力（登場時＋起動）があっても、箱は「今使う能力」だけ。CHOICE（どちらかを選ぶ）は枝にする
+（`selection_moves` の CHOICE 分岐と同じ）。
+
+**続きの攻撃の選び方**: 枝ごとに攻撃箱を全部評価すると 8×6 で重いので、**続きは貪欲 1 本**＝
+準備の手を解決した盤面で `quiesce_choice`（方策優先）が選ぶ攻撃箱を 1 つだけ in-place で解決する
+（`resolve_battle_inplace`・窓は既定）。攻撃が無い／攻撃しない方が良い盤面は「攻撃しない」で
+評価。コストは「対象の枝数 × 1」に収まる。
+
+**探索との接続**: 準備箱は根の候補（マクロ手）として DON_BOX と同じ扱いで並べる。元の素の
+PLAY／ACTIVATE_MAIN も残す（続きが攻撃でない場合のため）。箱の P は元の手の P を枝で分配
+（配分箱と同じ規則）。箱を選んだら `commit` で続き（対話の選択 → 攻撃）を機械的に消化する
+（既存のコミット機構）。**根だけでなく木の全節で候補化**するのは配分箱と同じ（予算は
+`BOX_BRANCH_BUDGET` の枠内・超えたら素の手に落ちる）。
+
+**効き目の見立て**: ガンマナイフ（除去 → 攻撃が通る）の Q が深さ 1 で正になる＝160 sims でも
+拾える。神の裁き（パンプ → 攻撃）も同じ。除去対象の選択が枝になるので「KO しない」枝と
+「KO する」枝の Q 差が見える（§8.27 (b) の空選択も価値で決まるようになる）。
+
+#### 20.7.3 WP `rs-pimc-worlds` の指示書
+
+```
+作業: WP rs-pimc-worlds（1 回の decide で世界サンプルを K 本引き、木を並列に回して根で束ねる・
+docs/rust_engine_plan.md §20.7.1）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-pimc-worlds に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。ネット（nrel_r3.npz）は変えない。
+WP rs-setup-box と並行するので、触るのは search/mcts.rs・search/decide.rs・search/mod.rs・py_game.rs／
+lib.rs・opcg_sim/api/engine_rs.py・tests/scripts/rs_scenario_play.py・tests/ に限る（search/macro.rs・
+quiesce.rs・adapter.rs は触らない）。
+
+■ 足すもの
+  - DecideOptions.worlds（既定 1＝1 bit も変わらない）。opts_json → RsGame.decide(worlds=) →
+    rs_scenario_play.py --worlds。
+  - worlds=K: 世界を K 本 determinize（乱数は search_seed から派生: 世界 i は seed+i、世界 0 は
+    今と同じ列＝K=1 の出力が不変であること）。各世界で同じ sims の TreeMcts を回す。
+  - 根の統計の束ね: N は和・Q は N 重みの平均・P は世界 0 のもの（同じはず。違えば notes に）。
+    束ねた統計に対して select_rule（visits／q_min_n）と等価手マージ（groups）を適用。
+    `stats.legal/N/Q/P` はこの束ねた値を返す（legal の並びは世界間で同じ＝同じ盤面の同じ列挙。
+    違う場合は sig で突き合わせて notes に書く）。
+  - PV とコミットの継続: 選んだ手の訪問が最も多い世界の木から取る。trace に "world_used" を出す。
+  - 並列: std::thread::scope で K スレッド。Game.decide は木を回す間 Python の GIL を放す
+    （pyo3 allow_threads）。ネットの forward・マスター表は読み取り専用で共有（&LoadedNet）。
+    K=1 のときはスレッドを作らない（今の経路のまま）。
+  - decide の戻り値に "worlds":K と、世界ごとの根の N/Q（"per_world"）を出す（思考ログで
+    「世界によって答えが割れたか」を読むため）。RsGame._trace に per_world を載せる（.md の (4) に
+    「世界ごとの最善手」を 1 行足す）。
+
+■ 受け入れ
+  - cargo test: worlds=1 は既定と 1 bit も変わらない／worlds=4 の根の N 合計＝4×sims／同じ seed で
+    2 回回して同じ出力（再現性）／per_world の数が K。
+  - pytest tests/test_pimc_worlds.py（cpu_infra）: RsGame.decide(worlds=4) が動き trace に
+    worlds・per_world が入る／worlds=1 の trace が今までと同じ形。TEST_SPEC §2 に 1 行。
+  - make test green・make audit-cross void 0（既定 K=1 なので挙動は不変のはずだが、スレッド化の
+    穴を見るため回す）。
+  - 計測（RESULT.json）: enel_human_20260810_t9-9 を seed 0〜7・sims 160・worlds ∈ {1,2,4,8}・
+    visits 規則で回し、「オーム攻撃の前に神の裁きを打つか」の本数（tests/scripts/rs_search_a_keys.py）
+    と、同じ 3 局面（tests/scripts/rs_search_a_latency.py に --worlds を足す）の decide 時間。
+    目標: worlds=4 の時間が worlds=1 の 1.3 倍以内（4 コア）。
+    9 シナリオ × seed 0/1 を worlds=4 で回して scenario_out_w/ に添える（分析はコーディネータ）。
+
+■ 成果物
+  - コード＋テスト＋scenario_out_w/（18 本）＋RESULT.json:
+    {"job":"rs-pimc-worlds","status":"done|partial","kami_before_attack":{"w1":n,"w2":n,"w4":n,"w8":n},
+     "latency_ms":{"w1":…,"w2":…,"w4":…,"w8":…},"make_test":"N passed","audit_cross":{"pairs":120,"void":0},
+     "notes":"…（P が世界で違ったか・legal の並びが違ったか・スレッド化で困った点）"}
+
+■ 前提
+  - 既定（worlds=1）の挙動は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 20.7.4 WP `rs-setup-box` の指示書
+
+```
+作業: WP rs-setup-box（準備の手＝メインイベント／起動メイン／登場時効果持ちの PLAY を「続きの攻撃
+1 回」まで箱にする・docs/rust_engine_plan.md §20.7.2＝方式の決定はそこに書いてある）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-setup-box に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。ネット（nrel_r3.npz）は変えない。
+WP rs-pimc-worlds と並行するので、触るのは search/macro.rs・search/adapter.rs・search/quiesce.rs・
+search/apply.rs・tests/ に限る（search/mcts.rs・decide.rs の根の統計まわりは触らない。候補生成
+（legal_actions の macro_moves）から先で完結させる）。
+
+■ 実装（§20.7.2 の決定どおり）
+  1. 準備の手の判定（構造）: PLAY のカードがイベント（【メイン】効果あり）／ACTIVATE_MAIN／
+     PLAY のカードが【登場時】能力を持つキャラ・ステージ。マスター表の ability の trigger で判定
+     （ON_PLAY／ACTIVATE_MAIN）。
+  2. 準備箱の候補化（macro.rs に setup_box_candidates）: 準備の手ごとに、最初の対象選択の候補
+     （≤8・「選ばない」含む・CHOICE は枝）× 1 ＝枝。各枝を in-place で解決（手 → 対話は最初の
+     対象だけ枝の値・以降は既定解決 → quiesce_choice が選ぶ攻撃箱を 1 つ解決・攻撃が無ければ
+     「攻撃しない」）。箱の手は {"kind":"game","action_type":"SETUP_BOX","payload":{"uuid":…,
+     "first_select":[uuid…]|null,"attack":<攻撃箱の手|null>}} の形（DON_BOX と同じ流儀）。
+     元の素の PLAY／ACTIVATE_MAIN は残す。P は素の手の P を枝で等分（配分箱と同じ）。
+  3. 適用（apply.rs）: SETUP_BOX を「素の手 → 対話の解決（first_select を最初の対話に・以降は既定）
+     → 攻撃箱」の順に適用する。commit（既存）に同じ手順を積む＝実対局へは原始手で出る。
+  4. 予算: BOX_BRANCH_BUDGET の枠内。超えたら準備箱を作らず素の手だけ（今と同じ）。
+     枝数の上限は準備の手 1 つにつき 9（対象 8 ＋「選ばない」）。
+  5. SearchOptions に setup_box: bool（既定 false＝1 bit も変わらない）。opts_json → RsGame.decide →
+     rs_scenario_play.py --setup-box。
+
+■ 受け入れ
+  - cargo test: setup_box=false は既定と不変／神の裁き（コスト 0・ドン!!-1: 自分 +1000 → 相手 ≤3000 を
+    KO）を手札に持ち相手に 1c パワー 0 のキャラが居る盤面で、SETUP_BOX の枝に「KO する」「KO しない」
+    の両方があり、適用すると原始手の列（PLAY → SELECT_RESOURCE → BUFF 対象 → KO 対象 → 攻撃）に
+    展開される／ガンマナイフ（-5000）→ 攻撃の箱が作られ、攻撃の対象が -5000 後の相手キャラでも
+    リーダーでもよいこと。
+  - pytest tests/test_setup_box.py（cpu_infra）: RsGame.decide(setup_box=True) で候補に SETUP_BOX が
+    出て、選ばれたときの apply が原始手で実対局に出る。TEST_SPEC §2 に 1 行。
+  - make test green・make audit-cross void 0（既定 false だが、候補生成のコードは既定でも通るので回す）。
+  - 計測（RESULT.json・sims 160・visits・worlds 1・seed 0〜7）: human_enel_vs_roger_20260904_t7-8
+    「ガンマナイフを打つか」／human_enel_vs_luffy_20260904_t4-5「神の裁きで 1c ルフィを KO するか」／
+    enel_human_20260810_t9-9「神の裁き → 攻撃の順」を setup_box on/off で比べる（rs_search_a_keys.py に
+    2 つ目の鍵を足す）。同じ 3 局面の decide 時間（rs_search_a_latency.py に --setup-box）。
+    9 シナリオ × seed 0/1 を setup_box on で回して scenario_out_b/ に添える（分析はコーディネータ）。
+
+■ 成果物
+  - コード＋テスト＋scenario_out_b/（18 本）＋RESULT.json:
+    {"job":"rs-setup-box","status":"done|partial","keys":{"gammaknife":{"off":n,"on":n},
+     "kami_ko_luffy":{"off":n,"on":n},"kami_before_attack":{"off":n,"on":n}},
+     "latency_ms":{"off":…,"on":…},"branches_per_setup_move_mean":x,"make_test":"N passed",
+     "audit_cross":{"pairs":120,"void":0},"notes":"…"}
+
+■ 前提
+  - 既定（setup_box=false）の挙動は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+```
