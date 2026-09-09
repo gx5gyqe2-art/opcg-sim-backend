@@ -60,7 +60,8 @@ def run_game(seed: int, seats: Dict[str, "E.SeatSpec"], p1: tuple, p2: tuple,
              max_steps: int = DEFAULT_MAX_STEPS,
              first_player: Optional[str] = None,
              observer: Optional[Callable[..., None]] = None,
-             post: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+             post: Optional[Callable[..., None]] = None,
+             swap: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
     """1 局を打ち切りまで進める。
 
     `seats` は `{"p1": SeatSpec, "p2": SeatSpec}`。`observer(game, name, turn, step, out, move)`
@@ -71,6 +72,12 @@ def run_game(seed: int, seats: Dict[str, "E.SeatSpec"], p1: tuple, p2: tuple,
     が使う）。対局の開始直後にも `post(game, None, turn, -1, None, [])` として 1 回呼ぶ＝
     **`post` を k 回目に受け取った盤面が「手 k の直前の盤面」**（decide は盤面を変えないので、
     `observer` の `step=k` が見た盤面と同じもの）。どちらのフックも盤面は動かさない。
+
+    `swap(game, name, turn, step, out, move) -> move` は**打つ手だけを差し替える**入口
+    （両方向 ε 探索・計画 §20.8.5）。`observer` の**後**に呼ぶ＝棋譜に載る候補・訪問分布・
+    選択は「木が決めたそのまま」で、実対局に出る手だけが変わる。差し替えた側は箱の残り手順
+    （`out["commit"]`）を捨てる責任を持つ（差し替え後の対話は既定解決）。`None`（既定）なら
+    1 bit も変わらない。
 
     戻り値 `{"winner": "p1"|"p2"|None, "turns": int, "steps": int, "acts": {...}}`。
     `winner=None`（上限手数・要求が尽きた）は呼び出し側で void 扱いにする。
@@ -90,12 +97,15 @@ def run_game(seed: int, seats: Dict[str, "E.SeatSpec"], p1: tuple, p2: tuple,
         turn = int(game.turn_count or 0)
         carry = carries[name].get(turn, name)
         out = json.loads(game.decide(name, spec.decide_opts(seed, turn, name, carry)))
-        carries[name].put(out)
         move = out.get("move")
         if move is None:
+            carries[name].put(out)
             break
         if observer is not None:
             observer(game, name, turn, steps, out, move)
+        if swap is not None:
+            move = swap(game, name, turn, steps, out, move)
+        carries[name].put(out)
         try:
             if move.get("kind") == "battle":
                 game.apply_battle_action(name, move["action_type"], move.get("card_uuid"))

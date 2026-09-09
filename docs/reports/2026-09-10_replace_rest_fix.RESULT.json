@@ -1,0 +1,100 @@
+{
+  "job": "rs-replace-rest-fix+rs-eps-explore",
+  "status": "done",
+  "branch": "claude/rs-replace-rest-fix",
+  "base": "claude/cpu-spec-improvements-yw91jd @ b606d00",
+  "A": {
+    "root_cause": "PRB02-006「ロロノア・ゾロ」の置換本文（【相手のターン中】このキャラが相手のキャラの効果でレストになる場合、代わりに自分の他のキャラ1枚をレストにできる）を、パーサ v2 は REPLACE_EFFECT にせず**素の誘発能力**として出す（trigger=OPPONENT_TURN／condition=SOURCE_STATE==IS_RESTED／effect=REST〔SELF・FIELD・CHARACTER・EXCLUDE_SOURCE・count 1・is_up_to false〕・sub_effect なし）。よって既存の置換機構（rules::find_replacement→active_replacement）の走査対象にならず、常在効果の再計算（effects/passives.rs::apply_passive_effects の Step 2'＝OPPONENT_TURN）が**毎回この能力を実行**していた。ここで 3 つが重なって要求と応答が無限に往復する: (1) 条件 SOURCE_STATE==IS_RESTED は効果を解決しても偽にならない（持ち主がレストである限り真）、(2) 効果は対象選択で中断する（resolver.rs::resolve_targets の in_passive_recalc ガードは CONTINUOUS_MODIFIER_ACTIONS しか救わず REST は素通しで suspend する）、(3) REST の対象クエリはレスト済みのキャラを除外しないので**盤面が動かず候補も減らない**（同じ既にレストのキャラを何度でも選べる）。pending が消費されないのではなく、消費するたびに次の再計算が同じ pending を立て直していた（seed 930028 で RESOLVE_EFFECT_SELECTION が 300 回以上・max_steps=400 で void）。",
+    "fix": [
+      "effects/passives.rs::resolve_trigger_over — is_rest_replacement な能力を再計算から外す（is_reactive_passive と同じ理由＝置換はイベント駆動であって継続効果ではない）。これで無限ループが消える。",
+      "effects/actions/rules.rs — is_rest_replacement／find_rest_replacement／active_rest_replacement を追加。相手の**キャラ**の効果で、場のアクティブなカードがレストされる現場でだけ置換を起こす（【相手のターン中】/【自分のターン中】のタグ・negate・【ターン1回】も見る）。",
+      "effects/actions/mod.rs::run_target_loop — ActionType::Rest かつ actor != owner かつ場のカードのとき置換を確認する（除去置換 LEAVE と同じ作法。中断したら残りの対象を defer_removal_targets へ退避し、ReplacementSuspended で外側の resolver スタックを退避させる）。",
+      "model.rs — Continuation に rest_replace（RestReplaceContinuation{original, actor, source_card}）を追加。",
+      "effects/interact.rs::resolve_interaction の SelectTarget 枝 — rest_replace 付きの選択で **0 枚**が選ばれたら本来のレストを行う（1 枚以上なら置換成立＝元のカードはレストしない）。置換の選択は本文が「できる」＝任意なので constraints を (0, max)・can_skip=true にして立てる。"
+    ],
+    "semantics_checked": {
+      "decline_0_rests_the_original": true,
+      "choose_rests_the_selected_instead": true,
+      "fires_at_most_once_per_rest": true,
+      "no_other_character_means_no_replacement": true,
+      "ignores_own_side_and_the_wrong_turn_tag": true
+    },
+    "same_path_cards": {
+      "note": "『〜になる場合、代わりに〜』で対象選択を伴い、かつパーサが REPLACE_EFFECT にしなかった能力を効果 JSON 全 2803 枚から列挙した。**同じ経路（再計算が対象選択で中断し続ける）を踏むのは PRB02-006 だけ**だった＝1 枚の特例ではあるが、直し方は形（trigger∈{PASSIVE,YOUR_TURN,OPPONENT_TURN} ＋ 代わりに ＋ SOURCE_STATE==IS_RESTED）で書いたので同型が増えても効く。",
+      "rest_replacement_shape": ["PRB02-006"],
+      "kawari_ni_without_replace_effect": [
+        {"card": "OP03-040", "name": "ナミ", "trigger": "PASSIVE", "select": false, "why_safe": "VICTORY（デッキアウト置換）＝対象選択なし"},
+        {"card": "P-117", "name": "ナミ", "trigger": "PASSIVE", "select": false, "why_safe": "同上"},
+        {"card": "OP04-040", "name": "クイーン", "trigger": "ON_ATTACK", "select": false, "why_safe": "再計算の対象外トリガー"},
+        {"card": "OP04-094", "name": "雷の破壊剣", "trigger": "ACTIVATE_MAIN", "select": true, "why_safe": "再計算の対象外トリガー（プレイヤーが撃つ）"},
+        {"card": "OP12-096", "name": "熊の衝撃", "trigger": "ACTIVATE_MAIN", "select": true, "why_safe": "同上"},
+        {"card": "ST13-003", "name": "モンキー・D・ルフィ", "trigger": "PASSIVE", "select": true, "why_safe": "ライフ（隠しゾーン）の FACE_UP_LIFE＝再計算でも中断しない"},
+        {"card": "PRB02-006", "name": "ロロノア・ゾロ", "trigger": "OPPONENT_TURN", "select": true, "why_safe": "本 WP で直した"}
+      ],
+      "related_finding_not_fixed": {
+        "what": "『再計算から対象選択で中断しうる能力』を全 DB で数えると 4 件（PRB02-006 を含む）。残り 3 件は原因が別（本文が『〜した時、』型の反応型なのに passives::is_reactive_passive の正規表現に当たらない＝再計算で実行されている）で、いずれも状態が動くか【ターン1回】で止まるため無限ループにはならないが、発動条件としては誤り。直すと挙動（＝golden）が動くので本 WP では触っていない。",
+        "cards": [
+          {"card": "OP04-024", "name": "シュガー", "trigger": "OPPONENT_TURN", "text": "【相手のターン中】【ターン1回】相手がキャラを登場させた時、…相手のコスト4以下のキャラ1枚までを、レストにする。", "why_not_a_loop": "【ターン1回】で使用回数が消費される"},
+          {"card": "OP04-047", "name": "氷鬼", "trigger": "YOUR_TURN", "text": "【自分のターン中】…バトルした相手のキャラを持ち主のデッキの下に置く", "why_not_a_loop": "対象が場から消える＝候補が減って尽きる"},
+          {"card": "ST13-003", "name": "モンキー・D・ルフィ", "trigger": "PASSIVE", "text": "ルール上、自分の表向きのライフは…", "why_not_a_loop": "隠しゾーンの自動取得＝中断しない"}
+        ],
+        "suggested_general_guard": "resolver.rs::resolve_targets の in_passive_recalc ガード（現在は CONTINUOUS_MODIFIER_ACTIONS だけ）を『再計算は一切中断しない』へ広げると同種の欠陥は構造的に消える。上の 3 件の挙動が変わる（golden 差分が出る）ので、コーディネータ判定を仰ぐ。"
+      }
+    },
+    "event_source_uuid": true,
+    "event_fields_added": {
+      "source_uuid": "能力の持ち主のカード uuid（effects/resolver.rs::push_effect_events）",
+      "trigger": "その能力のトリガー種別名（分からない再開経路は \"\"。continuation の NodeRef.ability から引く）",
+      "existing_fields_unchanged": true,
+      "python_side": "record_gen.step_record が eff_names（card_name 一致）→ eff_src（source_uuid 一致）へ。aux_tok の『能力を発動したか』が同名 2 体で両枠立つ問題が解消（tests/test_aux_targets.py に対照を追加）"
+    },
+    "repro_void": false,
+    "repro_after_fix": {"seed": 930028, "rows": 165, "main_rows": 72, "dropped": 0},
+    "selfplay_roles": {
+      "games": 120,
+      "void": 0,
+      "bands": [
+        {"seed_base": 930000, "games": 60, "rows": 7971, "main_rows": 3667, "void": 0},
+        {"seed_base": 940000, "games": 60, "rows": 8554, "main_rows": 3868, "void": 0}
+      ]
+    },
+    "golden": "regenerated（理由: A2 で効果イベントに source_uuid／trigger の 2 欄を足したため、イベントを含むハッシュが全件変わる。**差分がその 2 欄だけであることを機械的に確認してから作り直した**——監査 golden 3,386 件中 2,262 件のハッシュが変わり、変わったのはちょうど新しい欄を持つ 2,262 件。再生 golden 200 局は events のハッシュだけが変わり **states 0 件・legal 0 件**（盤面も合法手も 1 bit も動いていない）。両方とも新しい 2 欄をイベントから落として取り直すと**記録済みの golden と完全一致**（監査 3,386/3,386・再生 200/200）。コミットしたファイル同士の差分でも同じ——再生 200 局は events だけが変わり states 0・legal 0、監査は summary（段数・手数・イベント数・stopped・interactive）が **3,386 件すべて不変**。＝A1 のレスト置換は golden の局面に 1 度も現れておらず、golden 差分は欄の追加のみ。検証スクリプトの出力は notes 参照）"
+  },
+  "B": {
+    "spec": "record_gen に --eps-play P／--eps-hold H（既定 0.0）。main の決定で、(a) 木が除去系でない手を選び候補に除去系（deck_roles.classify の form が KO/bounce/deck/trash/lock/reduce のカードの PLAY／ACTIVATE_MAIN・箱の中身も見る）があれば確率 P で **N 最大**の除去へ、(b) 木が除去系を選んだら確率 H で **除去系でない候補の N 最大**（TURN_END 可）へ差し替える。差し替えは decide の**後**（driver.run_game(swap=…) の入口・観測の後）＝木も π も sig も pol_chosen も変えず、行に forced(D int8)＝1（打つ側）／2（保留側）／0 を書くだけ。差し替えた手は原始手で出し、木が選んだ箱の残り手順（commit）は捨てる（以降の対話は既定解決）。乱数は (対局 seed, ターン, 席, 手数) だけから決まる（eps_rng・SplitMix64・探索の乱数系統とは別 salt）。",
+    "default_is_identical": true,
+    "training_reads_forced": false,
+    "forced_counts": {"play": 36, "hold": 8, "removal_legal_rows": 1516},
+    "selfplay": {"games": 60, "void": 0, "seed_base": 930000, "sims": 32, "decks": "synth_roles", "eps_play": 0.03, "eps_hold": 0.03, "rows": 8006, "main_rows": 3663},
+    "sanity": "removal_legal_rows 1516／main 3663＝除去が合法だった main 行は 41%。うち木が除去を選ばなかった行に P=0.03 が掛かって play 36、木が除去を選んだ行に H=0.03 が掛かって hold 8（＝木が除去を選んだ main 行は 270 行前後）。P=1／H=1 の対照は tests/test_eps_explore.py が固定する。",
+    "dump_io": "forced は pack に入れない（数値だが教師ではない）＝load_row_col(dirs, \"forced\") で読む。無い波は None（§20.8 の契約どおり）。実測: /tmp/eps_meas を読んで int8 (8006,)・内訳 [7962, 36, 8]。"
+  },
+  "make_test": "514 passed, 4 skipped（pytest）＋ 427 passed（cargo test・うち新規 6 本）",
+  "audit_cross": {"pairs": 120, "games": 240, "void": 0},
+  "tests_added": [
+    "rust/opcg_engine/src/effects/tests_rest_replace.rs（6 本・実カードで PRB02-006 の盤面を組む）: 再計算では発動しない／相手のキャラの効果でレストされる現場で 1 回だけ選択が立つ（constraints (0,1)・can_skip）／選ぶ＝元は起きたまま選んだキャラがレスト／選ばない＝元のレストが起きる／他のキャラがいなければ置換しない／自分側の効果・タグ違いのターンには反応しない／効果イベントに source_uuid と trigger が載り既存の欄は残る",
+    "tests/test_eps_explore.py（14 本・cpu_infra）: TEST_SPEC §2 に 1 行追記済み",
+    "tests/test_aux_targets.py に 1 本追加: 同名 2 体で発動した枠だけが立つ（source_uuid 一致）"
+  ],
+  "files_touched": [
+    "rust/opcg_engine/src/effects/actions/rules.rs",
+    "rust/opcg_engine/src/effects/actions/mod.rs",
+    "rust/opcg_engine/src/effects/interact.rs",
+    "rust/opcg_engine/src/effects/passives.rs",
+    "rust/opcg_engine/src/effects/resolver.rs",
+    "rust/opcg_engine/src/effects/mod.rs",
+    "rust/opcg_engine/src/effects/tests_rest_replace.rs",
+    "rust/opcg_engine/src/model.rs",
+    "opcg_sim/loop/record_gen.py",
+    "opcg_sim/loop/driver.py",
+    "opcg_sim/loop/engine.py",
+    "opcg_sim/learned/train/dump_io.py",
+    "tests/test_eps_explore.py",
+    "tests/test_aux_targets.py",
+    "tests/test_deck_roles.py",
+    "tests/fixtures/rs_goldens/audit.json",
+    "tests/fixtures/rs_goldens/replay/*.json",
+    "docs/TEST_SPEC.md"
+  ],
+  "notes": "1. 指示書は『pending が pop されない／選択の受理後に元のレストが再び置換の判定に入る』を疑っていたが、実測はどちらでもなかった——pending は毎回きちんと消費されており、**次の常在効果の再計算が同じ pending を立て直していた**。effects/resolver.rs の _replacement_suspended まわりと interact.rs の選択の消費には欠陥は見つからなかった（PRB02-006 はそもそも REPLACE_EFFECT ではないので、その経路を一度も通っていない）。 2. 直したのは『パーサが REPLACE_EFFECT にしない置換を、エンジン側でレストの現場の置換として扱う』こと。**パーサは触っていない**（指示どおり）。将来パーサ側で REPLACE_EFFECT（status=REST）として出せるようになれば、find_rest_replacement は不要になり find_replacement 1 本に寄せられる。 3. golden は作り直した（判定はコーディネータ）。作り直しの前に『差分は追加した 2 欄だけ』を機械的に確認している——検証スクリプト（新旧の欄を落として sha1 を取り直す）の出力は AUDIT entries=3386 hash_changed=2262 with_new_keys=2262 still_mismatch_after_strip=0／REPLAY games=200 hash_changed=200 states_changed=0 legal_changed=0 still_mismatch_after_strip=0。作り直しを取り消したい場合は、この 2 欄の追加ごと revert すれば golden も元に戻る。 4. 質問: A の『related_finding_not_fixed』（再計算が反応型の能力を実行してしまう 3 件と、resolve_targets の in_passive_recalc ガードを一般化する案）を別 WP に立てるか。挙動が変わる＝golden が動くので、こちらの判断では踏み込んでいない。 5. 質問: レスト置換の候補が 1 枚しかない場合、resolve_targets の既存規則（candidates <= count かつ !is_up_to なら自動確定）で中断せずに置換が成立する＝プレイヤーは『使わない』を選べない。本文は任意（できる）なので厳密には 1 枚でも訊くべきだが、既存の対象解決の規則をレストだけ特別扱いすることになるので触っていない（tests_rest_replace.rs の『選ぶ／選ばない』は候補 2 枚で立てている）。 6. この作業セッションが使った seed 帯: 930000〜930059・930028・940000〜940059（record_gen・検証のみ／npz は保存していない）。台帳（docs/n_loop_ops.md §6）への事後登録はコーディネータへ。 7. 環境メモ: この作業環境は素の状態で maturin／numpy／pytest／fastapi 等が入っていない。make rust-develop の前に pip install maturin、make test の前に pip install numpy pytest pytest-xdist fastapi uvicorn websockets pydantic python-multipart requests httpx が要る（opcg_sim/requirements.txt ＋ 開発用）。"
+}

@@ -39,8 +39,12 @@ def _snap(turn, tp, life, field, leader=("L1", "L2")):
 
 
 def _step(actor, at, uuid=None, eff=()):
-    """台帳の 1 手。`eff`＝その適用が積んだ EFFECT イベント `[(player, card_name), …]`。"""
-    ev = [{"type": "EFFECT", "player": p, "card_name": c} for p, c in eff]
+    """台帳の 1 手。`eff`＝その適用が積んだ EFFECT イベント `[(player, source_uuid, card_name), …]`。
+
+    `source_uuid` は Rust `push_effect_events` が載せる**発生源カードの uuid**
+    （§20.8.4-2）。`card_name` も一緒に置く＝「名前では枠を立てない」ことを見るため。
+    """
+    ev = [{"type": "EFFECT", "player": p, "source_uuid": u, "card_name": c} for p, u, c in eff]
     mv = {"action_type": at, "payload": {"uuid": uuid} if uuid else {}}
     return G.step_record(actor, mv, ev)
 
@@ -70,7 +74,7 @@ def ledger():
         _step("p1", "TURN_END"),
         _step("p2", "ATTACK", "L2"),
         _step("p2", "ATTACK", "A2"),
-        _step("p2", "ACTIVATE_MAIN", "A2", eff=[("p2", "青B")]),
+        _step("p2", "ACTIVATE_MAIN", "A2", eff=[("p2", "A2", "青B")]),
         _step("p1", "ATTACK", "A1"),
         _step("p1", "TURN_END"),
         _step("p2", "PLAY", "H2"),
@@ -142,6 +146,37 @@ def test_mask_is_zero_when_the_game_ends_inside_an_interval(ledger):
     # 手 5/6（p1 の手番）の次の相手ターンは最後の区間＝閉じない → 0
     assert mask.tolist() == [0, 0, 0]
     assert not aux.any() and not tok.any()
+
+
+# --- 3b. 同名が 2 体並んでも、発動した枠だけが立つ（§20.8.4-2）--------------
+def test_the_ability_flag_follows_the_source_uuid_not_the_card_name():
+    """効果イベントの `source_uuid` で枠を立てる＝同名のカードが並んでも取り違えない。
+
+    旧実装は `card_name` 一致で立てていたので、同名 2 体の**両方**の枠が立っていた
+    （§20.8.2-1 の副産物 2）。ここでは p2 の場に同名「青B」を 2 体（A2／B2）置き、
+    A2 だけが能力を発動した台帳を渡す。
+    """
+    twin = {"p1": [("A1", 5000, "赤A")],
+            "p2": [("A2", 3000, "青B"), ("B2", 3000, "青B")]}
+    snaps = [
+        _snap(1, "p1", {"p1": 5, "p2": 5}, twin),    # 0: p1 の TURN_END
+        _snap(2, "p2", {"p1": 5, "p2": 5}, twin),    # 1: p2 の効果（A2 が発動）
+        _snap(2, "p2", {"p1": 5, "p2": 5}, twin),    # 2: p2 の TURN_END
+        _snap(3, "p1", {"p1": 5, "p2": 5}, twin),    # 3: p1 の TURN_END
+        _snap(4, "p2", {"p1": 5, "p2": 5}, twin),    # 4: p2 の TURN_END（B を閉じる）
+        _snap(5, "p1", {"p1": 5, "p2": 5}, twin),
+    ]
+    steps = [
+        _step("p1", "TURN_END"),
+        _step("p2", "PLAY", "H2", eff=[("p2", "A2", "青B")]),
+        _step("p2", "TURN_END"),
+        _step("p1", "TURN_END"),
+        _step("p2", "TURN_END"),
+    ]
+    _aux_, tok, mask = G.aux_from_ledger(snaps, steps, [0], ["p1"])
+    assert mask.tolist() == [1]
+    assert tok[0, 1, 2] == 1.0, "発動した A2 の枠が立つ"
+    assert tok[0, 2, 2] == 0.0, "同名の B2 の枠は立たない（名前一致で立てない）"
 
 
 def test_p2_viewpoint_row(ledger):

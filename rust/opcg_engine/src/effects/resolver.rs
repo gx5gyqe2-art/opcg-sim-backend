@@ -210,23 +210,34 @@ pub fn game_resolve_ability(
 /// `resolver.action_history` を `action_events` の `EFFECT` 行へ写す（Python の 3 か所が
 /// 同じ 8 行を書き写しているので、Rust では 1 か所にまとめて 3 か所から呼ぶ）。
 ///
-/// 形は Python のまま: `{type, player, card_name, action, targets, value, success[, dest]}`。
+/// 形は Python のまま＋**発生源の欄 2 つ**:
+/// `{type, player, card_name, source_uuid, trigger, action, targets, value, success[, dest]}`。
+///
+/// `source_uuid`＝能力の持ち主のカード uuid・`trigger`＝その能力のトリガー種別名
+/// （分からない経路は `""`）。同名のカードが並んでも「どの枠が能力を発動したか」を
+/// 取り違えないために足した（`docs/rust_engine_plan.md` §20.8.2-1 の副産物 2・
+/// Python 側 `record_gen` の `aux_tok` が使う）。**既存の欄は 1 つも変えていない**。
 pub fn push_effect_events(
     s: &mut Session,
     masters: &MasterTable,
     actor: Seat,
     source: CardIdx,
     history: &[Value],
+    trigger: Option<TriggerType>,
 ) {
     if history.is_empty() {
         return;
     }
     let card_name = masters.get(s.state().card(source).master).name.clone();
+    let source_uuid = s.state().card(source).uuid.clone();
+    let trigger_name = trigger.map(|t| t.name()).unwrap_or("");
     for ev in history {
         let mut o = serde_json::Map::new();
         o.insert("type".into(), Value::from("EFFECT"));
         o.insert("player".into(), Value::from(actor.name()));
         o.insert("card_name".into(), Value::from(card_name.clone()));
+        o.insert("source_uuid".into(), Value::from(source_uuid.clone()));
+        o.insert("trigger".into(), Value::from(trigger_name));
         o.insert(
             "action".into(),
             ev.get("action").cloned().unwrap_or_else(|| Value::from("")),
@@ -260,6 +271,8 @@ pub struct Resolver {
     /// Python `EffectResolver.action_history`（実行したアクションの履歴）。
     /// フロントへ返す `action_events` の `EFFECT` 行の素材（§15.1）。
     pub action_history: Vec<Value>,
+    /// いま解決している能力のトリガー種別（効果イベントの `trigger` 欄）。
+    pub trigger: Option<TriggerType>,
 }
 
 impl Resolver {
@@ -268,6 +281,7 @@ impl Resolver {
             execution_stack: Vec::new(),
             context: EffectContext::new(),
             action_history: Vec::new(),
+            trigger: None,
         }
     }
 
@@ -277,15 +291,16 @@ impl Resolver {
             execution_stack,
             context,
             action_history: Vec::new(),
+            trigger: None,
         }
     }
 
     /// Python `gamestate.resolve_ability`／`turn_flow`／`interaction` の共通の写し取り＝
     /// `resolver.action_history` を `action_events` の `EFFECT` 行へ積む。
     ///
-    /// 形は Python のまま: `{type, player, card_name, action, targets, value, success[, dest]}`。
+    /// 形は [`push_effect_events`] の通り（発生源の欄 2 つを含む）。
     pub fn flush_events(&self, s: &mut Session, masters: &MasterTable, actor: Seat, source: CardIdx) {
-        push_effect_events(s, masters, actor, source, &self.action_history);
+        push_effect_events(s, masters, actor, source, &self.action_history, self.trigger);
     }
 
     // -- 発動（Python `resolve_ability`）-------------------------------------
@@ -300,6 +315,7 @@ impl Resolver {
         cost_confirmed: bool,
     ) -> Result<(), EngineError> {
         let (global_id, ability) = ability_of(masters, s.state(), source_card, ability_index)?;
+        self.trigger = Some(ability.trigger);
 
         // 1. 条件
         if let Some(cond) = ability.condition.as_ref() {

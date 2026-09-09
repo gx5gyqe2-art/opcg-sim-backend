@@ -27,7 +27,9 @@ npz からしか作れない（`pol_sig` の JSON を語彙 index に潰す＝`v
 で埋める**＝波を混ぜても行が揃い、補助損失には入らない。どの波も持っていなければ
 `load_dump` は `V["aux"]`／`V["aux_tok"]`／`V["aux_mask"]` に **`None`** を返す（＝訓練側は
 補助ヘッドを自動で切る）。`deck_kinds`（WP `rs-removal-decks`）のような文字列列は pack に
-入らない（`load_row_col` が npz から直接、pack と同じ行順で読む）。
+入らない（`load_row_col` が npz から直接、pack と同じ行順で読む）。`forced(D int8)`
+（WP `rs-eps-explore`・§20.8.5）も同じ扱い＝**pack に入れない・訓練は読まない**（教師では
+なく層別の印。読みたいときは `load_row_col(dirs, "forced")`・無い波は `None`）。
 """
 import glob
 import hashlib

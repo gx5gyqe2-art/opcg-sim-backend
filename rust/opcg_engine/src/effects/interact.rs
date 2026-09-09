@@ -559,6 +559,13 @@ pub fn resolve_interaction(
             let mut resolver = Resolver::resumed(cont.execution_stack.clone(), ctx);
             resolver.process_stack(s, masters, actor, Some(source_card))?;
             history = resolver.action_history;
+            // レスト置換（PRB02-006）で 0 枚を選んだ＝「代わりの効果を使わない」＝
+            // 本来のレストがそのまま起きる（1 枚以上なら置換成立＝元のカードはレストしない）。
+            if let Some(rr) = cont.rest_replace {
+                if selected.is_empty() {
+                    super::actions::rest(s, masters, rr.actor, rr.original, rr.source_card)?;
+                }
+            }
         }
         InteractionKind::SelectResource => {
             let uuids = selected_uuids(payload);
@@ -740,7 +747,15 @@ pub fn resolve_interaction(
 
     // Python `resolve_interaction` の共通末尾: 再開経路で実行したアクションも `action_events` へ
     // 写す（記録しないと中断を挟んだ効果が「何も実行していない」ように見える・§15.1 の 3 か所目）。
-    super::resolver::push_effect_events(s, masters, actor, source_card, &history);
+    // 発生源のトリガー種別は continuation の実行スタック（`NodeRef.ability`）から引く
+    // （再開経路は能力そのものを持たない）。
+    let trigger = cont
+        .execution_stack
+        .first()
+        .or(cont.node.as_ref())
+        .and_then(|n| masters.abilities.abilities.get(n.ability as usize))
+        .map(|ab| ab.trigger);
+    super::resolver::push_effect_events(s, masters, actor, source_card, &history, trigger);
 
     after_resolve(s, masters)
 }

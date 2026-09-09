@@ -32,6 +32,9 @@
   deck_kinds(D str)                        … **dump v4 で追加**（§20.8.1-4）。手番側デッキの除去の
                                              型（`deck_roles` の JSON・`--decks synth_roles` 以外は
                                              `{}`）。層別の読み（除去率別・型別）に使う
+  forced(D int8)                           … **dump v4 で追加**（§20.8.5）。両方向 ε 探索で手を
+                                             差し替えた行の印（0=木のまま／1=打つ側／2=保留側）。
+                                             **教師ではない**（`n_rel_train` は読まない・層別用）
 
 **dump v3**（2026-09-07・計画 §18.5）: 常駐の 9 割を占める 3 本の保存 dtype を半分にする——
 `tokens`／`scalars` を **float16**・`card_idx` を **int16**（`pol_si`/`pol_ti` は v2 から int16）。
@@ -41,8 +44,10 @@ float32／int64 も同じ関数で読める＝過去の波はそのまま使え�
 
 **dump v4**（既定・2026-09-10・計画 §20.8）: v3 の列は 1 バイトも変えず、**補助教師の 3 列**
 （`aux`／`aux_tok`／`aux_mask`・WP `rs-aux-heads`）と **`deck_kinds(D str)`**（`--decks synth_roles` で
-差し込んだ除去の型・型が無い経路では `{}`・WP `rs-removal-decks`）を足すだけ。`dump_io.py` は
-**無い列を `None` で返す**＝v3 の波はそのまま読める。補助教師の中身は下の `aux_from_ledger` が正本。
+差し込んだ除去の型・型が無い経路では `{}`・WP `rs-removal-decks`）と **`forced(D int8)`**
+（両方向 ε 探索で手を差し替えた行の印・`--eps-play`／`--eps-hold` が 0 の既定では全 0・
+WP `rs-eps-explore`）を足すだけ。`dump_io.py` は**無い列を `None` で返す**＝v3 の波はそのまま
+読める。補助教師の中身は下の `aux_from_ledger` が正本。
 対局メタ（seed・両席のリーダー・両席の型）は part ごとの sidecar `meta_games.json` にも書く（層別の集計用）。
 """
 import os
@@ -52,11 +57,13 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXP
 import argparse                                                        # noqa: E402
 import json                                                            # noqa: E402
 import multiprocessing as mp                                           # noqa: E402
+import random                                                          # noqa: E402
 import sys                                                             # noqa: E402
 import time                                                            # noqa: E402
 
 import numpy as np                                                     # noqa: E402
 
+from opcg_sim.loop import deck_roles as DR_ROLES                       # noqa: E402
 from opcg_sim.loop import decks as D                                   # noqa: E402
 from opcg_sim.loop import driver as DR                                 # noqa: E402
 from opcg_sim.loop import engine as E                                  # noqa: E402
@@ -124,19 +131,24 @@ def snapshot(game):
 
 
 def step_record(name, move, events):
-    """台帳の 1 手（誰が・何を・どの uuid に／その適用が積んだ効果イベント）。"""
+    """台帳の 1 手（誰が・何を・どの uuid に／その適用が積んだ効果イベント）。
+
+    `eff_src`＝効果イベントの**発生源カードの uuid**（Rust `push_effect_events` の
+    `source_uuid`・WP `rs-replace-rest-fix`／計画 §20.8.4-2）。同名のカードが並んでも
+    「どの枠が能力を発動したか」を取り違えない（旧実装は `card_name` 一致だった）。
+    """
     payload = (move.get("payload") or {}) if move else {}
-    eff, eff_names = {}, []
+    eff, eff_src = {}, []
     for ev in events or ():
         if (ev.get("type") if isinstance(ev, dict) else None) != "EFFECT":
             continue
         pl = ev.get("player")
         eff[pl] = eff.get(pl, 0) + 1
-        eff_names.append((pl, ev.get("card_name")))
+        eff_src.append((pl, ev.get("source_uuid")))
     return {"actor": name,
             "at": (move.get("action_type") or payload.get("action_type")) if move else None,
             "uuid": (move.get("card_uuid") or payload.get("uuid")) if move else None,
-            "eff": eff, "eff_names": eff_names}
+            "eff": eff, "eff_src": eff_src}
 
 
 def turn_segments(snaps, steps):
@@ -223,8 +235,9 @@ def _fill_tok(out, snaps, steps, a0, a1, me, opp, cur):
     「通したライフ枚数」は攻撃宣言から**次の攻撃宣言（無ければ区間の終わり）まで**に自分が
     失ったライフ＝その攻撃に紐づく枚数（間に挟まった効果のぶんも同じ攻撃に寄る）。
     「能力を発動したか」は相手の `ACTIVATE_MAIN` の uuid 一致か、相手の EFFECT イベントの
-    `card_name` 一致で立てる（イベントは発生源の uuid を持たない＝同名が並ぶ盤面では
-    両方の枠が立つ）。どちらも「起きたこと」の記録で、良し悪しは含まない。
+    **発生源 uuid**（`source_uuid`）一致で立てる（§20.8.4-2 でイベントに欄を足した＝
+    同名のカードが並んでも正しい枠だけが立つ。旧実装の `card_name` 一致は両方の枠を立てた）。
+    どちらも「起きたこと」の記録で、良し悪しは含まない。
     """
     slots = [cur["leader"][opp]] + (list(cur["field"][opp]) + [None] * 5)[:5]
     pos = {u: j for j, u in enumerate(slots) if u}
@@ -246,12 +259,120 @@ def _fill_tok(out, snaps, steps, a0, a1, me, opp, cur):
             j = pos.get(st["uuid"])
             if j is not None:
                 out[j, 2] = 1.0
-        fired.update(cn for pl, cn in st["eff_names"] if pl == opp and cn)
-    if fired:
-        names = cur["names"][opp]
-        for u, j in pos.items():
-            if names.get(u) in fired:
-                out[j, 2] = 1.0
+        fired.update(su for pl, su in st["eff_src"] if pl == opp and su)
+    for u in fired:
+        j = pos.get(u)
+        if j is not None:
+            out[j, 2] = 1.0
+
+
+# --- 両方向の ε 探索（dump v4・計画 §20.8.5）--------------------------------
+#
+# **既定 0＝1 bit も変わらない**。木も π も教師も変えず、`decide` が返した**後**に
+# 「実対局へ出す手」だけを差し替える（入口は `driver.run_game(swap=…)`）。狙いは教材の対照
+# ——「除去を打った／打たなかった」が棋譜に両方載るようにすること（§20.7.11 の穴）。
+#
+#   打つ側（--eps-play P）… 木が除去でない手を選んだのに候補に除去があれば、確率 P で
+#                           その中の **N 最大**の 1 つへ差し替える → `forced=1`
+#   保留側（--eps-hold H）… 木が除去を選んだら、確率 H で「除去でない候補の N 最大」へ
+#                           差し替える（TURN_END も可）→ `forced=2`
+#
+# 差し替えた手は**原始手**で出す（箱の残り手順は捨てる＝その後の対話は既定解決）。
+# 学習側（`n_rel_train`）は `forced` 列を**読まない**（教師は変えない・層別に使うだけ）。
+
+#: 除去とみなす form（`deck_roles.FORMS`＝KO／bounce／deck／trash／lock／reduce）。
+EPS_REMOVAL_FORMS = frozenset(DR_ROLES.FORMS)
+#: 「除去を打つ手」とみなす action_type（箱は先頭原始手＝素の手で判定する）。
+EPS_PLAY_ATS = ("PLAY", "ACTIVATE_MAIN")
+
+
+def eps_rng(game_seed, turn, seat, step):
+    """1 判断点ぶんの乱数（seed・ターン・席・手数から決まる＝pure・並列度に依存しない）。
+
+    `engine.search_seed` と同じ SplitMix64 の流儀。探索の乱数系統とは**別の salt** を混ぜる
+    （ε の抽選が世界サンプルの並びを動かさないように）。
+    """
+    x = (int(game_seed) * 0x9E3779B97F4A7C15
+         + int(turn) * 0xBF58476D1CE4E5B9
+         + (1 if seat == "p2" else 0) * 0x94D049BB133111EB
+         + int(step) * 0xD1342543DE82EF95
+         + 0x45D9F3B3C5A4E7D1) & 0xFFFFFFFFFFFFFFFF
+    x = ((x ^ (x >> 30)) * 0xBF58476D1CE4E5B9) & 0xFFFFFFFFFFFFFFFF
+    x = ((x ^ (x >> 27)) * 0x94D049BB133111EB) & 0xFFFFFFFFFFFFFFFF
+    return random.Random(x ^ (x >> 31))
+
+
+def box_base(mv):
+    """箱 → 素の手（`SETUP_BOX` は `payload.base`）。他はそのまま返す（pure）。"""
+    if (mv or {}).get("action_type") != "SETUP_BOX":
+        return mv or {}
+    return ((mv.get("payload") or {}).get("base")) or mv
+
+
+def first_primitive(mv):
+    """箱 → 先頭原始手（Rust `search::decide::don_box_first_primitive` の写し・pure）。
+
+    `SETUP_BOX` は素の PLAY／ACTIVATE_MAIN、`DON_BOX` は付与なら ATTACH_DON・
+    付与 0 枚で対象があれば ATTACK。箱でない手はそのまま。
+    """
+    mv = mv or {}
+    at = mv.get("action_type")
+    if at == "SETUP_BOX":
+        return box_base(mv)
+    if at != "DON_BOX":
+        return mv
+    p = mv.get("payload") or {}
+    k = int(p.get("don_k") or 0)
+    tids = list(p.get("target_ids") or ())
+    if k <= 0 and tids:
+        return {"kind": "game", "action_type": "ATTACK",
+                "payload": {"uuid": p.get("uuid"), "target_ids": tids}}
+    return {"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": p.get("uuid")}}
+
+
+def is_removal_move(mv, cids, db):
+    """その手は「除去系」か＝素の手が PLAY／ACTIVATE_MAIN で、そのカードが除去の型を持つ。
+
+    箱の中身も見る（`SETUP_BOX` の `payload.base`）。型は `deck_roles.classify`（分類の正本）。
+    """
+    base = box_base(mv)
+    if (base or {}).get("action_type") not in EPS_PLAY_ATS:
+        return False
+    uuid = ((base.get("payload") or {}).get("uuid"))
+    cid = cids.get(uuid) if uuid else None
+    if not cid:
+        return False
+    master = db.get_card(cid)
+    if master is None:
+        return False
+    return any(k.split(":", 1)[0] in EPS_REMOVAL_FORMS for k in DR_ROLES.classify(master))
+
+
+def eps_swap(out, move, cids, db, eps_play, eps_hold, rng):
+    """`(差し替えた手, forced)` を返す（差し替えなしなら `(move, 0)`）。pure に近い純関数。
+
+    `out` は書き換えない（箱の残り手順を捨てるのは呼び出し側＝`_Recorder.swap`）。
+    """
+    if out.get("kind") != "main":
+        return move, 0
+    groups = out.get("groups") or []
+    legal = (out.get("stats") or {}).get("legal") or []
+    if len(groups) < 2:
+        return move, 0                       # 差し替え先が無い
+    reps = [legal[g["rep"]] for g in groups]
+    removal = [is_removal_move(r, cids, db) for r in reps]
+    chosen_removal = is_removal_move(move, cids, db)
+    if not chosen_removal and eps_play > 0.0:
+        pool = [i for i, f in enumerate(removal) if f]
+        if pool and rng.random() < eps_play:
+            best = max(pool, key=lambda i: groups[i]["n"])
+            return first_primitive(reps[best]), 1
+    elif chosen_removal and eps_hold > 0.0:
+        pool = [i for i, f in enumerate(removal) if not f]
+        if pool and rng.random() < eps_hold:
+            best = max(pool, key=lambda i: groups[i]["n"])
+            return first_primitive(reps[best]), 2
+    return move, 0
 
 
 def move_sig(mv):
@@ -270,21 +391,34 @@ def _don_k(mv):
     return (mv.get("payload") or {}).get("don_k")
 
 
-def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS, aux=True):
+def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS, aux=True,
+                 eps_play=0.0, eps_hold=0.0):
     E.engine()
     _G["spec"] = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps,
-                            temp_turns=temp_turns, prune_futile=E.GEN_PRUNE_FUTILE)
+                            temp_turns=temp_turns, eps_play=eps_play, eps_hold=eps_hold,
+                            prune_futile=E.GEN_PRUNE_FUTILE)
     _G["db"] = D.load_db()
     _G["decks"] = decks
     _G["aux"] = bool(aux)
 
 
 class _Recorder:
-    """1 局ぶんの観測（`driver.run_game(observer=…)`）。盤面は動かさない。"""
+    """1 局ぶんの観測（`driver.run_game(observer=…)`）。盤面は動かさない。
 
-    def __init__(self):
+    ε 探索（§20.8.5）を使うときは `swap` も `run_game` に渡す＝**観測の後**に呼ばれ、
+    実対局へ出す手だけを差し替えて `forced` 列を立てる（π も `sig` も観測のまま）。
+    """
+
+    def __init__(self, seed=0, db=None, eps_play=0.0, eps_hold=0.0):
+        self.seed, self.db = seed, db
+        self.eps_play, self.eps_hold = float(eps_play), float(eps_hold)
+        #: ε の分母（「除去が合法だった main 行」の数）＝計測用。
+        self.removal_legal_rows = 0
+        #: 直近の観測で引いた uuid → card_id（`swap` が使い回す＝往復を増やさない）。
+        self._cids = None
         self.rows = {k: [] for k in ("scalars", "field", "card_idx", "who", "kind", "turn",
-                                     "step", "sig", "pol_len", "pol_chosen", "tokens")}
+                                     "step", "sig", "pol_len", "pol_chosen", "tokens",
+                                     "forced")}
         self.pol = {k: [] for k in ("n", "q", "k", "sig", "cid", "tcid", "si", "ti")}
         # 補助教師の台帳（dump v4・§20.8.2）: `snaps[k]`＝手 k の直前の盤面・`steps[k]`＝手 k。
         self.snaps = []
@@ -300,7 +434,32 @@ class _Recorder:
         """台帳 → 行ごとの補助教師（`aux`／`aux_tok`／`aux_mask`）。"""
         return aux_from_ledger(self.snaps, self.steps, self.rows["step"], self.rows["who"])
 
+    def swap(self, game, name, turn, step, out, move):
+        """`driver.run_game(swap=…)`＝**観測の後**に実対局へ出す手だけを差し替える（§20.8.5）。
+
+        π（`pol_n`）も `sig` も `pol_chosen` も観測したまま＝**教師は変えない**。差し替えた行に
+        `forced`（1=打つ側・2=保留側）を立てるだけ。箱の残り手順（`out["commit"]`）は捨てる
+        ＝差し替え後の対話は既定解決。
+        """
+        if self.eps_play <= 0.0 and self.eps_hold <= 0.0:
+            return move                        # 既定＝1 bit も変わらない（呼ぶだけ）
+        cids, legal = self._cids, (out.get("stats") or {}).get("legal") or []
+        if out.get("kind") != "main" or cids is None or self.db is None:
+            return move
+        if any(is_removal_move(legal[g["rep"]], cids, self.db)
+               for g in (out.get("groups") or [])):
+            self.removal_legal_rows += 1
+        rng = eps_rng(self.seed, turn, name, step)
+        new, forced = eps_swap(out, move, cids, self.db, self.eps_play, self.eps_hold, rng)
+        if forced:
+            if self.rows["forced"]:
+                self.rows["forced"][-1] = forced
+            out["commit"] = []                 # 木の選んだ箱の残り手順は捨てる
+            return new
+        return move
+
     def __call__(self, game, name, turn, step, out, move):
+        self._cids = None
         # 符号化は decide **前**の状態＝この判断が見た盤面（Rust の decide は盤面を変えない）。
         enc = json.loads(game.encode(name))
         self.rows["scalars"].append(np.asarray(enc["scalars"], np.float32))
@@ -311,6 +470,7 @@ class _Recorder:
         ci[:len(src)] = src
         self.rows["card_idx"].append(ci)
         self.rows["who"].append(name)
+        self.rows["forced"].append(0)          # ε で差し替えたら `swap` が上書きする
         self.rows["kind"].append(_KIND.get(out.get("kind"), 0))
         self.rows["turn"].append(int(turn))
         self.rows["step"].append(step)
@@ -332,6 +492,7 @@ class _Recorder:
             return
         idx = json.loads(game.dump_index_json(name))
         cids, slots = idx["cids"], idx["slots"]
+        self._cids = cids                      # `swap`（ε 探索）が使い回す
         chosen, k_sel = -1, out.get("k")
         for gi, g in enumerate(groups):
             rep = legal[g["rep"]]
@@ -356,14 +517,16 @@ class _Recorder:
 def play_one(seed):
     """1 局を打って行を返す（勝敗が付いた局だけ・純正 z）。失敗は None。"""
     spec, db = _G["spec"], _G["db"]
-    rec = _Recorder()
+    rec = _Recorder(seed=seed, db=db,
+                    eps_play=getattr(spec, "eps_play", 0.0),
+                    eps_hold=getattr(spec, "eps_hold", 0.0))
     aux_on = _G.get("aux", True)
     try:
         la, lb = D.leader_pair(db, seed, "random")
         p1, p2, kinds = D.build_pair(db, la, lb, seed, _G.get("decks", DEFAULT_DECKS),
                                      with_kinds=True)
         res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, max_steps=MAX_STEPS,
-                          observer=rec, post=rec.post if aux_on else None)
+                          observer=rec, post=rec.post if aux_on else None, swap=rec.swap)
     except Exception:                                          # noqa: BLE001  1 局の失敗で止めない
         return None
     winner, turn, steps, acts = res["winner"], res["turns"], res["steps"], res["acts"]
@@ -401,9 +564,15 @@ def play_one(seed):
             "pol_cid": np.array(pol["cid"]) if pol["cid"] else np.array([], dtype="U1"),
             "pol_tcid": np.array(pol["tcid"]) if pol["tcid"] else np.array([], dtype="U1"),
             "deck_kinds": np.array([kj[w] for w in rows["who"]]),
+            # dump v4: ε 探索で手を差し替えた行の印（0=木のまま／1=打つ側／2=保留側・§20.8.5）
+            "forced": np.array(rows["forced"], np.int8),
             # 局メタ（npz には積まない・part の sidecar へ）
             "_meta": {"seed": seed, "leaders": [la, lb], "kinds": list(kinds),
-                      "winner": winner, "turns": turn, "rows": len(rows["who"])}}
+                      "winner": winner, "turns": turn, "rows": len(rows["who"]),
+                      # ε 探索の内訳（§20.8.5・ε=0 なら全部 0）
+                      "forced": {"play": rows["forced"].count(1),
+                                 "hold": rows["forced"].count(2)},
+                      "removal_legal_rows": rec.removal_legal_rows}}
     if aux_on:
         out.update({"aux": aux.astype(np.float16), "aux_tok": aux_tok.astype(np.float16),
                     "aux_mask": aux_mask})
@@ -414,7 +583,7 @@ _ROW_KEYS = ("scalars", "field", "card_idx", "z", "who", "kind", "turn", "step",
              "seed", "sig", "pol_len", "pol_chosen")
 _POL_KEYS = ("pol_n", "pol_q", "pol_k", "pol_sig", "pol_cid", "pol_tcid")
 _TOK_KEYS = ("tokens", "pol_si", "pol_ti")            # NRel 用（v2 で追加・v3 も同じ列）
-_V4_KEYS = ("deck_kinds",)                            # v4 で追加（§20.8）
+_V4_KEYS = ("deck_kinds", "forced")                   # v4 で追加（§20.8／§20.8.5）
 _AUX_KEYS = ("aux", "aux_tok", "aux_mask")            # 補助教師（v4 で追加・§20.8.2）
 
 
@@ -443,6 +612,12 @@ def main(argv=None):
     ap.add_argument("--no-aux", action="store_true",
                     help="補助教師の列（aux／aux_tok／aux_mask・§20.8.2）を書かない＝dump v3 の"
                          "列だけにする。台帳（1 手 0.2ms の board_json）も積まない")
+    ap.add_argument("--eps-play", type=float, default=0.0,
+                    help="両方向 ε 探索の「打つ側」（§20.8.5）。木が除去でない手を選んだのに"
+                         "候補に除去があれば、確率 P でその中の N 最大へ差し替える（既定 0＝無効）")
+    ap.add_argument("--eps-hold", type=float, default=0.0,
+                    help="同・「保留側」。木が除去を選んだら、確率 H で除去でない候補の"
+                         "N 最大へ差し替える（既定 0＝無効）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
 
@@ -454,7 +629,8 @@ def main(argv=None):
     buf = {k: [] for k in keys}
     games = []                                         # part の sidecar（対局メタ）
     shard = n_rows = n_drop = n_main = 0
-    initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns, args.decks, not args.no_aux)
+    initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns, args.decks,
+                not args.no_aux, args.eps_play, args.eps_hold)
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
                                       initargs=initargs) as pool:
         done = 0
@@ -479,6 +655,9 @@ def main(argv=None):
                     buf = {k: [] for k in keys}
                 print(f"  {done}/{args.games}局 行{n_rows}（main {n_main}） 棄却{n_drop}"
                       f" {time.time()-t0:.0f}s", flush=True)
+    forced = {"play": sum(g["forced"]["play"] for g in games),
+              "hold": sum(g["forced"]["hold"] for g in games)}
+    removal_legal = sum(g["removal_legal_rows"] for g in games)
     # part の sidecar: 対局メタ（seed・両席のリーダー・両席の型）＝層別の集計用（§20.8.1-4）
     with open(os.path.join(args.out, "meta_games.json"), "w") as f:
         json.dump({"decks": args.decks, "seed_base": args.seed_base, "games": games},
@@ -491,9 +670,14 @@ def main(argv=None):
                    "aux": not args.no_aux, "seed_base": args.seed_base,
                    "net": E.resolve_net(args.net), "engine": "rust",
                    "dirichlet_eps": args.dirichlet_eps,
-                   "temp_turns": args.temp_turns}, f, ensure_ascii=False)
+                   "temp_turns": args.temp_turns,
+                   # ε 探索（§20.8.5・既定 0）とその内訳
+                   "eps_play": args.eps_play, "eps_hold": args.eps_hold,
+                   "forced": forced, "removal_legal_rows": removal_legal},
+                  f, ensure_ascii=False)
     print("N_RECORD_DONE " + json.dumps({"rows": n_rows, "main_rows": n_main,
-                                         "dropped": n_drop}))
+                                         "dropped": n_drop, "forced": forced,
+                                         "removal_legal_rows": removal_legal}))
     return 0
 
 

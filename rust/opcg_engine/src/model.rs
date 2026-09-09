@@ -1073,6 +1073,9 @@ pub struct Continuation {
     pub arrange: Option<ArrangeContinuation>,
     /// `kind == "BATTLE_KO_REPLACE"` の欄（`target_owner_name`／`life_lost`）。
     pub battle_ko: Option<BattleKoContinuation>,
+    /// レスト置換（PRB02-006 型）の欄。付いている `SelectTarget` は「置換を使うか」も兼ねる
+    /// （0 枚＝使わない＝本来のレストが起きる）。
+    pub rest_replace: Option<RestReplaceContinuation>,
 }
 
 /// ARRANGE_DECK の continuation（Python の同名キー）。
@@ -1098,6 +1101,22 @@ pub enum ArrangeDest {
 pub struct BattleKoContinuation {
     pub target_owner: Seat,
     pub life_lost: i32,
+}
+
+/// レスト置換（`effects::actions::rules::active_rest_replacement`）の continuation。
+///
+/// 「このキャラが相手のキャラの効果でレストになる場合、代わりに自分の他のキャラ1枚を
+/// レストにできる」（PRB02-006）のような、パーサが `REPLACE_EFFECT` にしない置換。
+/// 対象選択の中断にこの欄を付けておき、**0 枚を選んだ（＝置換を使わない）ときだけ
+/// 本来のレストを行う**。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RestReplaceContinuation {
+    /// 本来レストされるカード（置換を使わなければこれがレストになる）。
+    pub original: CardIdx,
+    /// 本来のレストの実行者（相手＝効果のコントローラー）。
+    pub actor: Seat,
+    /// 本来のレストの発生源（相手のキャラ）。
+    pub source_card: Option<CardIdx>,
 }
 
 /// 対象選択の既定解決（[`crate::effects::interact::choose_selection`]）が「自分側の
