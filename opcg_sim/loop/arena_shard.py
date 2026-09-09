@@ -53,9 +53,11 @@ def build_parser():
                     help="対面の選び方: fixed=既定リーダーミラー（歴代判定と地続き）／"
                          "random=全リーダーからペアごとに 2 枚引く（汎化）／"
                          "real=実デッキ 4 リーダー／purple=紫を含むリーダー（掘り実験の母集団）")
-    ap.add_argument("--decks", default="singleton", choices=("singleton", "synth", "synth_dig"),
+    ap.add_argument("--decks", default="singleton",
+                    choices=("singleton", "synth", "synth_dig", "synth_roles"),
                     help="デッキの中身。singleton=従来（色が合う 50 枚・全部 1 枚ずつ）／"
-                         "synth=リーダーに合わせて合成／synth_dig=合成に掘りカードを差し込む")
+                         "synth=リーダーに合わせて合成／synth_dig=合成に掘りカードを差し込む／"
+                         "synth_roles=合成に除去の型を色ごとに差し込む（§20.8.1）")
     ap.add_argument("--pair-timeout", type=int, default=900,
                     help="1 ペアの実時間上限（秒・0=無制限）。超過したペアは void として残す")
     ap.add_argument("--out", required=True, help="ペアスコア jsonl（追記台帳・再開の正）")
