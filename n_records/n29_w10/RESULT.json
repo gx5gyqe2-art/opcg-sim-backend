@@ -1,0 +1,27 @@
+{
+  "job": "gen-n29-w10",
+  "status": "done",
+  "games": 480,
+  "rows": 68074,
+  "main_rows": 30962,
+  "dropped": 0,
+  "void": 0,
+  "forced": {
+    "play": 289,
+    "hold": 56
+  },
+  "removal_legal_rows": 12732,
+  "sec_per_game": 14.37,
+  "wall_hours": 1.92,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "net": "nrel_r3.npz",
+  "commit": "ddf3c3c911b572ef2449e78d4819c13ea4ff6e47",
+  "notes": "30局の壁時計試走（同 seed_base・別 --out・破棄済み）: 498s=16.6s/局→480局の見込み2.2hで6h以内のため本番実行。本番480局は6898s(1.92h)・0 dropped・0 void。48シャード（n_record_00000〜00047.npz）＋meta_n_record.json＋meta_games.json。"
+}
