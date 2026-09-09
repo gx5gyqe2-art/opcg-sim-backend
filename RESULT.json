@@ -1,0 +1,24 @@
+{
+  "job": "gen-n29-w08",
+  "status": "done",
+  "games": 480,
+  "rows": 69462,
+  "main_rows": 31661,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 333, "hold": 46},
+  "removal_legal_rows": 12636,
+  "sec_per_game": 14.77,
+  "wall_hours": 1.97,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "net": "nrel_r3.npz",
+  "commit": "0be4a48",
+  "notes": "30局の壁時計プローブ（501s・void0）で見込み内（480局≈2.2h）と判断し全480局を実行。実測7,089s（1.97h）・void 0・dropped 0。途中経過（410/480局時点の中間シャード）を05f4017として先行push済み（stop hookの要求に応じたもの）。今回のコミットで残りシャード・meta・本RESULT.jsonを追加。"
+}
