@@ -392,8 +392,8 @@ impl Game {
     /// そのまま渡す＝**中断の途中でも正しく決められる**。生成・アリーナ・serve はこれを使う。
     ///
     /// `opts_json` は [`crate::search::decide_json`] と同じ欄（`sims`／`c_puct`／
-    /// `dirichlet_eps`／`temp_turns`／箱まわり／候補生成／`budget`／`commit`／
-    /// `resact_pending`）に加えて:
+    /// `dirichlet_eps`／`temp_turns`／箱まわり／候補生成／`budget`／`select_rule`／
+    /// `q_min_frac`／`root_prior_temp`／`commit`／`resact_pending`）に加えて:
     ///
     /// - `search_seed`（必須）… 探索の乱数（世界サンプル・Dirichlet・温度）を作る seed。
     ///   [`crate::search::Pcg32SearchRng`] を**毎回この seed から作り直す**ので、

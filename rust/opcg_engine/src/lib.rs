@@ -366,7 +366,8 @@ fn search_apply(
 /// `hidden_json` は記録 v5 の `hidden`、`seat` は決める側（`player.name`）。
 /// `opts_json` は探索のつまみ（省略した欄は serve 既定＝`learned/config.py`）:
 /// `sims`／`c_puct`／`dirichlet_eps`／`temp_turns`／`box_commit`／`box_battle`／`box_dialog`／
-/// `quiesce`／`residual_dig`／`residual_activate`／候補生成（`prune_futile`／`macro_moves`／
+/// `quiesce`／`residual_dig`／`residual_activate`／`select_rule`（"visits"／"q_min_n"）／
+/// `q_min_frac`／`root_prior_temp`（§20.5）／候補生成（`prune_futile`／`macro_moves`／
 /// `defense_box`／`don_margin`）／`budget`（戦闘箱の枝予算）。decide をまたぐ状態は
 /// `commit`（残り手順）と `resact_pending` で受け渡す。
 /// `rng_json` は記録した出目 `{"shuffles":[[uuid...]...],"dirichlets":[[..]...],"uniforms":[..]}`

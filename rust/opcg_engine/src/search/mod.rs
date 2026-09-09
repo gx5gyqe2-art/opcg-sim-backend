@@ -376,6 +376,22 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .get("residual_activate")
             .and_then(Value::as_str)
             .map(str::to_owned),
+        // §20.5 の 3 つ（知らない `select_rule` の値・非正の `root_prior_temp` は既定へ落とす）。
+        select_rule: v
+            .get("select_rule")
+            .and_then(Value::as_str)
+            .and_then(mcts::SelectRule::from_name)
+            .unwrap_or(d.select_rule),
+        q_min_frac: v
+            .get("q_min_frac")
+            .and_then(Value::as_f64)
+            .filter(|x| *x > 0.0)
+            .unwrap_or(d.q_min_frac),
+        root_prior_temp: v
+            .get("root_prior_temp")
+            .and_then(Value::as_f64)
+            .filter(|x| *x > 0.0)
+            .unwrap_or(d.root_prior_temp),
         search: options_from_json(v),
         budget: match v.get("budget") {
             None | Some(Value::Null) => d.budget,

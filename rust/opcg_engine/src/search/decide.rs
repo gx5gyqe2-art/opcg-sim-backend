@@ -22,7 +22,9 @@ use crate::model::{CardIdx, GameState, MasterTable, Seat};
 use crate::state::EngineError;
 use serde_json::{json, Map, Value};
 
-use super::mcts::{PvStep, TreeMcts, C_PUCT, SERVE_SIMS};
+use super::mcts::{
+    q_min_n_floor, select_index, PvStep, SelectRule, TreeMcts, C_PUCT, Q_MIN_FRAC, SERVE_SIMS,
+};
 use super::quiesce::{
     best_branch, in_battle, in_dialog, resolve_battle_inplace, resolved_branch_values, BoxBudget,
     Ctx, SearchState, Window, BOX_RESOLVE_DEPTH, QUIESCE_MAX_PLIES,
@@ -53,6 +55,12 @@ pub struct DecideOptions {
     pub residual_dig: bool,
     /// `residual_activate`（腕 A2・"low"／"high"）
     pub residual_activate: Option<String>,
+    /// 根で出す手の選び方（§20.5・既定＝訪問数最多＝今までの挙動）
+    pub select_rule: SelectRule,
+    /// `select_rule="q_min_n"` の訪問下限の割合（§20.5・既定 `Q_MIN_FRAC`＝sims/8）
+    pub q_min_frac: f64,
+    /// 根の事前分布の平坦化 `P^(1/t)`（§20.5・既定 1.0＝何もしない）
+    pub root_prior_temp: f64,
     /// 候補生成（`OPCGGame`）
     pub search: SearchOptions,
     /// `BOX_BRANCH_BUDGET`（`None`＝無制限）
@@ -72,6 +80,9 @@ impl Default for DecideOptions {
             quiesce: true,
             residual_dig: false,
             residual_activate: None,
+            select_rule: SelectRule::Visits,
+            q_min_frac: Q_MIN_FRAC,
+            root_prior_temp: 1.0,
             search: SearchOptions::default(),
             budget: Some(super::quiesce::BOX_BRANCH_BUDGET),
         }
@@ -1031,6 +1042,9 @@ fn decide_inner(
 
     // ④ 木
     let mut tree = TreeMcts::new(ctx, opts.c_puct, opts.sims, opts.dirichlet_eps);
+    tree.select_rule = opts.select_rule;
+    tree.q_min_frac = opts.q_min_frac;
+    tree.root_prior_temp = opts.root_prior_temp;
     let run = tree.run(state, name, rng, st)?;
     // PV（主変化・§20.4）: 8 手または葉まで（root の argmax(N) は下の `mv` と同じ手）。
     let pv = tree.principal_variation(8);
@@ -1039,7 +1053,17 @@ fn decide_inner(
     if !run.legal.is_empty() {
         groups = merge_root_stats(state, ctx.masters, &run.legal, &run.n, &run.q);
         if !groups.is_empty() {
-            let mut gi = 0usize;
+            // 出す手は**マージ後のグループ**から選ぶ（Python `_decide_inner` と同じ＝訪問数
+            // 降順の先頭）。`select_rule="q_min_n"` はこの並びに対して「訪問下限を満たす
+            // グループの中で Q 最大」を採る（下限を満たすグループが無ければ先頭＝訪問数最多）。
+            let gn: Vec<f64> = groups.iter().map(|g| g.n).collect();
+            let gq: Vec<f64> = groups.iter().map(|g| g.q).collect();
+            let mut gi = select_index(
+                &gn,
+                &gq,
+                opts.select_rule,
+                q_min_n_floor(opts.sims, opts.q_min_frac),
+            );
             // 生成の温度サンプリング（序盤は訪問分布から引く）
             if opts.temp_turns > 0 && state.turn_count <= opts.temp_turns {
                 let ns: Vec<f64> = groups.iter().map(|g| g.n).collect();
@@ -1392,6 +1416,127 @@ mod tests {
         assert!(out.pv.len() <= 8, "PV は 8 手まで");
         assert_eq!(out.mv.as_ref(), Some(&out.pv[0].mv), "PV の先頭は返した手と同じ");
         assert_eq!(out.pv[0].seat, Seat::P1);
+    }
+
+    // --- 探索の設定（§20.5・WP `rs-search-a`）------------------------------------
+
+    /// 既定値を**明示して渡しても**出力は 1 bit も変わらない（serve・生成・アリーナは無影響）。
+    #[test]
+    fn spelling_out_the_defaults_changes_nothing() {
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        b.put_hand(Seat::P1, M_CHAR);
+        b.dons(Seat::P1, "active", 2);
+        let (masters, state) = b.build();
+        let net = zero_net();
+        let carry = DecideCarry::default();
+        let base = DecideOptions { sims: 8, ..DecideOptions::default() };
+        let spelled = DecideOptions {
+            sims: 8,
+            select_rule: SelectRule::Visits,
+            q_min_frac: Q_MIN_FRAC,
+            root_prior_temp: 1.0,
+            ..DecideOptions::default()
+        };
+        let a = decide(
+            &masters,
+            &net,
+            &state,
+            Seat::P1,
+            &base,
+            &mut crate::search::Pcg32SearchRng::new(7),
+            &carry,
+        )
+        .unwrap();
+        let c = decide(
+            &masters,
+            &net,
+            &state,
+            Seat::P1,
+            &spelled,
+            &mut crate::search::Pcg32SearchRng::new(7),
+            &carry,
+        )
+        .unwrap();
+        assert_eq!(a.sig, c.sig);
+        assert_eq!(a.n, c.n);
+        assert_eq!(a.q, c.q);
+        assert_eq!(a.p, c.p);
+        assert_eq!(a.pv.len(), c.pv.len());
+    }
+
+    /// `select_rule="q_min_n"` は「訪問下限を満たすグループの中で Q 最大」を出す
+    /// （decide の配線＝根の集計と選択が同じ並びを見ていること）。
+    #[test]
+    fn q_min_n_selects_the_group_with_the_best_q_above_the_floor() {
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        b.put_hand(Seat::P1, M_CHAR);
+        b.dons(Seat::P1, "active", 2);
+        let (masters, state) = b.build();
+        let net = zero_net();
+        let opts = DecideOptions {
+            sims: 8,
+            select_rule: SelectRule::QMinN,
+            ..DecideOptions::default()
+        };
+        let mut rng = crate::search::Pcg32SearchRng::new(7);
+        let out = decide(
+            &masters,
+            &net,
+            &state,
+            Seat::P1,
+            &opts,
+            &mut rng,
+            &DecideCarry::default(),
+        )
+        .unwrap();
+        assert_eq!(out.kind, "main");
+        assert!(out.groups.len() >= 2, "PLAY と TURN_END の 2 候補は出るはず");
+        let gn: Vec<f64> = out.groups.iter().map(|g| g.n).collect();
+        let gq: Vec<f64> = out.groups.iter().map(|g| g.q).collect();
+        let want = select_index(&gn, &gq, SelectRule::QMinN, q_min_n_floor(8, Q_MIN_FRAC));
+        let rep = out.groups[want].rep;
+        assert_eq!(out.sig.as_ref(), Some(&move_sig(&out.legal[rep])));
+        // 選んだグループは下限を満たす手の中で Q 最大（下限を満たす手が居る盤面）。
+        let floor = q_min_n_floor(8, Q_MIN_FRAC);
+        assert!(gn.iter().any(|n| *n >= floor));
+        for (i, n) in gn.iter().enumerate() {
+            if *n >= floor {
+                assert!(gq[want] >= gq[i], "Q 最大でない: {:?} / {:?}", gn, gq);
+            }
+        }
+    }
+
+    /// `root_prior_temp` は根の P だけを丸め、和は 1 のまま（返り値の `stats.P`）。
+    #[test]
+    fn root_prior_temp_keeps_the_root_prior_a_distribution() {
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        b.put_hand(Seat::P1, M_CHAR);
+        b.dons(Seat::P1, "active", 2);
+        let (masters, state) = b.build();
+        let net = zero_net();
+        let opts = DecideOptions {
+            sims: 8,
+            root_prior_temp: 2.0,
+            ..DecideOptions::default()
+        };
+        let out = decide(
+            &masters,
+            &net,
+            &state,
+            Seat::P1,
+            &opts,
+            &mut crate::search::Pcg32SearchRng::new(7),
+            &DecideCarry::default(),
+        )
+        .unwrap();
+        let p = out.p.expect("kind=main は P を返す");
+        assert!(p.len() >= 2);
+        let s: f64 = p.iter().sum();
+        assert!((s - 1.0).abs() < 1e-9, "根の P の和が 1 でない: {s}");
+        assert!(p.iter().all(|x| *x >= 0.0));
     }
 
     /// kind=window（戦闘窓の根畳み）のとき PV は空（§20.4）。

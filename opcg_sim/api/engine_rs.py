@@ -280,7 +280,8 @@ class RsGame:
 
     def decide(self, player_id: str, trace: Optional[Dict[str, Any]] = None,
               net: Optional[str] = None, sims: Optional[int] = None,
-              action_index: Optional[int] = None):
+              action_index: Optional[int] = None, select_rule: Optional[str] = None,
+              q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -288,14 +289,23 @@ class RsGame:
         `action_index`（省略可）は呼び出し側の決定番号（`tests/scripts/rs_scenario_play.py` の
         `len(actions)`）＝箱コミットを焼き込んだ決定を覚えておくための鍵（`trace["commit_from"]`・
         §20.4）。省略すると `commit_from` は出さない。
+
+        `select_rule`／`q_min_frac`／`root_prior_temp`（省略可・§20.5）は探索の設定の上書き:
+        `select_rule`＝根で出す手の選び方（"visits"＝訪問数最多〔既定〕／"q_min_n"＝訪問数が
+        `max(1, floor(sims * q_min_frac))` 以上の手の中で Q 最大）・`q_min_frac`＝その割合
+        （既定 0.125＝sims/8）・`root_prior_temp`＝根の事前分布を `P^(1/t)` へ丸めて正規化
+        （既定 1.0＝何もしない・2.0 で平坦化）。**省略すれば serve 既定と 1 bit も変わらない**。
         """
-        move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index)
+        move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
+                                select_rule=select_rule, q_min_frac=q_min_frac,
+                                root_prior_temp=root_prior_temp)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
 
     def _decide(self, player_id: str, net: Optional[str] = None, sims: Optional[int] = None,
-               action_index: Optional[int] = None):
+               action_index: Optional[int] = None, select_rule: Optional[str] = None,
+               q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -323,6 +333,13 @@ class RsGame:
                 "resact_pending": bool(carry.get("resact_pending"))}
         if sims is not None:
             opts["sims"] = int(sims)
+        # §20.5 の 3 つ（None＝渡さない＝Rust 側の既定）。
+        if select_rule is not None:
+            opts["select_rule"] = str(select_rule)
+        if q_min_frac is not None:
+            opts["q_min_frac"] = float(q_min_frac)
+        if root_prior_temp is not None:
+            opts["root_prior_temp"] = float(root_prior_temp)
         out = json.loads(self._game.decide(player_id, json.dumps(opts)))
         self._carry_key = (turn, seat)
         self._carry = {"commit": out.get("commit") or [],

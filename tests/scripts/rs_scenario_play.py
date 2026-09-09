@@ -8,6 +8,7 @@
   add  --replay ... --seat ... --start-turn N --end-turn M --title ... --note-file ...
                              … シナリオ JSON（`tests/fixtures/scenarios/<name>.json`）を書く
   play --scenario <name|all> --net <npz> [--opp-net <npz>] --seeds N --sims N --out <dir>
+       [--select-rule visits|q_min_n] [--q-min-frac F] [--root-prior-temp T]
                              … 分岐点を復元し、両席を（候補／相手）ネットで end_turn の
                                TURN_END（か決着）まで打つ。frames.json（ビューアの「ファイルを
                                開く」で読める）と .md（Claude が分析するための完全な事実の記録）
@@ -19,7 +20,9 @@ import argparse
 import gzip
 import json
 import os
+import random
 import sys
+import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _TESTS_DIR = os.path.dirname(_HERE)
@@ -230,8 +233,13 @@ def _record_frame(game: RsGame, actions: list) -> dict:
 
 
 def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: str,
-             seed: int, sims: int):
-    """1 seed ぶんの再生。戻り値 `(frames_json, steps_log)`。"""
+             seed: int, sims: int, select_rule: str = None, q_min_frac: float = None,
+             root_prior_temp: float = None):
+    """1 seed ぶんの再生。戻り値 `(frames_json, steps_log, frames)`。
+
+    `select_rule`／`q_min_frac`／`root_prior_temp`（省略可・§20.5）は**両席に同じ設定**で渡す
+    （省略＝serve 既定）。各決定の実測時間は `decisions[i]["decide_ms"]` に入る。
+    """
     start_idx = hb.turn_start_index(payload, scenario["start_turn"])
     hidden = hb.frame_to_hidden(payload, start_idx, seed)
     seat = scenario["seat"]
@@ -239,6 +247,11 @@ def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: 
     net_for = {seat: seat_net, opp: opp_net}
 
     load_engine()
+    # 探索乱数の基点（`RsGame.__init__` が global `random` から 1 度だけ引く）を
+    # (シナリオ, seed) から決める＝**同じ (シナリオ, seed) なら設定を変えても同じ世界サンプル列**
+    # を見る。§20.5 の掃引は「設定だけを変えた比較」なので、基点が毎回変わると差が設定由来か
+    # 引き直し由来か分からない（2026-09-08 に判明・それまでの出力は基点が毎回別だった）。
+    random.seed(f"{name}:{seed}")
     game = RsGame.from_hidden(hidden, seed=seed)
 
     actions: list = []
@@ -258,15 +271,19 @@ def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: 
         turn_before = game.turn_count
         action_index = len(actions)
         tr: dict = {}
+        t0 = time.perf_counter()
         move = game.decide(player_id, trace=tr, net=net_for[player_id], sims=sims,
-                           action_index=action_index)
+                           action_index=action_index, select_rule=select_rule,
+                           q_min_frac=q_min_frac, root_prior_temp=root_prior_temp)
+        decide_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         if move is None:
             break
         # V の帰属（§20.4 の 3）: commit 消化（機械実行・探索していない）は計算しない。
         attribution = game.attribution(player_id) if tr.get("kind") != "commit" else None
         desc = game.describe_move(move)
         decisions.append({"turn": turn_before, "player": player_id,
-                          "action_index": action_index, **tr, "attribution": attribution})
+                          "action_index": action_index, **tr, "attribution": attribution,
+                          "decide_ms": decide_ms})
         actions.append({"src": "cpu", "turn": turn_before, "player": player_id, **desc})
         game.apply_move(player_id, move)
         events = list(game.action_events)
@@ -276,7 +293,7 @@ def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: 
             "legal_stats": tr.get("legal_stats"), "candidates": tr.get("candidates"),
             "chosen": desc, "value": tr.get("value"), "events": events,
             "kind": tr.get("kind"), "commit_from": tr.get("commit_from"),
-            "pv": tr.get("pv"), "attribution": attribution,
+            "pv": tr.get("pv"), "attribution": attribution, "decide_ms": decide_ms,
         })
         if desc.get("action_type") == "TURN_END" and turn_before == end_turn:
             break
@@ -540,7 +557,9 @@ def cmd_play(args) -> int:
         os.makedirs(out_dir, exist_ok=True)
         for seed in range(args.seeds):
             result, steps_log, frames = _play_one(
-                name, scenario, payload, seat_net, opp_net, seed, args.sims)
+                name, scenario, payload, seat_net, opp_net, seed, args.sims,
+                select_rule=args.select_rule, q_min_frac=args.q_min_frac,
+                root_prior_temp=args.root_prior_temp)
             base = f"{net_label}_s{seed}"
             frames_path = os.path.join(out_dir, f"{base}.frames.json")
             with open(frames_path, "w", encoding="utf-8") as f:
@@ -591,6 +610,13 @@ def main(argv=None) -> int:
     p.add_argument("--seeds", type=int, default=1)
     p.add_argument("--sims", type=int, default=160)
     p.add_argument("--out", default=DEFAULT_OUT_DIR)
+    # §20.5（WP `rs-search-a`）: 探索の設定。既定（None）＝serve 既定のまま＝1 bit も変わらない。
+    p.add_argument("--select-rule", default=None, choices=("visits", "q_min_n"),
+                  help="根で出す手の選び方（既定＝visits＝訪問数最多）")
+    p.add_argument("--q-min-frac", type=float, default=None,
+                  help="q_min_n の訪問下限の割合（既定 0.125＝sims/8）")
+    p.add_argument("--root-prior-temp", type=float, default=None,
+                  help="根の事前分布を P^(1/t) へ（既定 1.0＝そのまま・2.0 で平坦化）")
     p.set_defaults(func=cmd_play)
 
     args = ap.parse_args(argv)
