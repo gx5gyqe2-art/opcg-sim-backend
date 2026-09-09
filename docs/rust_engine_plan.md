@@ -3714,3 +3714,70 @@ docs/rust_engine_plan.md §20.5・分析 #4 docs/reports/2026-09-08_scenario_ana
   - 既定の挙動（serve・生成・アリーナ）は変えない＝opts を渡さなければ今までと同じ。
   - 判定はコーディネータ。質問は RESULT.json の notes に。
 ```
+
+#### 20.5.2 判定（2026-09-09・`docs/reports/2026-09-09_search_a.RESULT.json`・分析 #5）
+
+- WP `rs-search-a` を受け入れ、本線へ ff で取り込んだ（`DecideOptions` に `select_rule`／`q_min_frac`／
+  `root_prior_temp`・既定は不変・`tests/test_search_options.py`〔cpu_infra〕・`scenario_out_a/`
+  7 条件・`rs_search_a_*.py`）。本線で `make test` 463 passed。
+- **縛り A は 2 つに割れた**（`docs/reports/2026-09-09_scenario_analysis_05.md`）: (A1) 予算＝
+  ガンマナイフは sims 2,560 で拾える／ドフラ T10 の負けは 640 で消える。(A2) 事前分布の門＝
+  ドフラ T10 の根の訪問手は 16,000 でも 7/47。神の裁き→攻撃の順は sims では動かず、
+  **根の平坦化＋N 下限つき Q 最大（R2）で 8 seed 中 6 本**が人間の順になった（既定 0/8）。
+- **serve と生成の候補設定 = R2（sims 640・q_min_n 1/8・root_prior_temp 2）**。採用はアリーナで
+  決める（WP `rs-search-arena`・§20.5.3）。レイテンシ 4 倍（中央値 0.4 s → 1.6 s）はユーザ判断。
+- 副産物: `rs_scenario_play.py` の探索乱数の基点を固定（以前は起動ごとに世界サンプルが変わり、
+  分析 #1〜#4 の条件比較は厳密には成立していなかった。向きは再現）。以後、判断に使う決定は
+  **seed 8 本**を標準にする。分析 #4 の材料は作り直さない。
+- A2（事前分布の門）は探索の設定では開かない＝π の教師を Q で補正する段（§20.6・未着手）。
+
+#### 20.5.3 WP `rs-search-arena` の指示書（探索設定の採否をアリーナで決める）
+
+```
+作業: WP rs-search-arena（探索の設定 R2 を、同じネット r3 の既定設定 S1 とアリーナで比べる・
+docs/rust_engine_plan.md §20.5.2・分析 #5 docs/reports/2026-09-09_scenario_analysis_05.md）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-search-arena に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。
+
+■ 足すもの（opcg_sim/loop/arena_shard.py・arena_merge.py）
+  - 候補席の探索設定を CLI で渡せるようにする: --cand-sims／--cand-select-rule／--cand-q-min-frac／
+    --cand-root-prior-temp（省略＝既定＝今までの挙動。基準席は常に既定）。RsGame.decide の opts に
+    そのまま流す。記録の jsonl に候補席の設定を書く（判定が設定に紐づくため）。
+  - 候補ネットが基準と同じ npz でも回せること（--candidate に既定と同じパスを渡す＝設定だけの比較）。
+
+■ 回すもの（候補＝r3 + R2〔sims 640・q_min_n 0.125・root_prior_temp 2.0〕／基準＝r3 + 既定）
+  主条件: --leaders random --decks synth・8 シャード × 24 ペア（48 局／シャード・先後入替）＝384 局。
+  副条件: 既定の固定ミラー・8 シャード × 24 ペア＝384 局。
+  seed 帯: 主 441000〜448000（シャード k は 441000 + 1000k）・副 451000〜458000（台帳
+  docs/n_loop_ops.md §6 に「探索設定 R2 vs S1」で払い出し済み扱い＝この指示書が台帳の根拠）。
+  1 セッションで回すなら --workers 4 で順に。並列にするなら 16 セッション（条件×シャード）に分けて
+  claude/arena-r2-{random|mirror}-wNN に push し、コーディネータが arena_merge で束ねる。
+  ※ 候補席は 640 sims なので 1 局の時間は既定の 2.5 倍程度（片側だけ 4 倍）。主 384 局で数時間。
+
+■ 判定基準（コーディネータが判定・CLAUDE.md の規約）
+  主条件 wr ≥0.55 かつ CI 下限 >0.50、副条件は退行なし（CI 下限 ≥0.45）。void >2% なら判定しない。
+
+■ 受け入れ
+  - pytest tests/test_arena_search_opts.py（cpu_infra）: 候補席の opts が decide に届く・jsonl に記録される。
+    TEST_SPEC §2 に 1 行。make test green。
+  - 既定（opts 省略）の記録が今までと同じ形であること（既存の arena 台帳の読み手を壊さない）。
+
+■ 成果物
+  - コード＋テスト＋n1_results/arena_search_r2/{random,mirror}_wNN.jsonl（または各セッションのブランチ）
+  - RESULT.json: {"job":"rs-search-arena","status":"done|partial","candidate_opts":{…},
+     "random":{"games":N,"wr":x,"ci95":[..],"void":n},"mirror":{…},
+     "latency_ms_main_median":{"cand":…,"base":…},"make_test":"N passed","notes":"…"}
+
+■ 前提
+  - ネットは両席 r3（opcg_sim/data/learned/nrel_r3.npz）。違うのは候補席の探索設定だけ。
+  - 判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+### 20.6 π の教師を Q で補正する（縛り A2・未着手・設計メモ）
+
+分析 #5 で「事前分布の門」（P 0.001 の手は 16,000 sims でも訪問されない）は探索の設定では開かない
+ことが分かった。自己対戦の π が訪問分布である限り、門は次の世代にも写る。候補: 根で「読めた手は Q・
+読めていない手は根の V」から改良方策を作り、それを π の教師にする（Gumbel AlphaZero の完成 Q の
+考え方）。`mcts.rs` の根の扱いと `record_gen.py` の π の作り方が変わる。R2 でのアリーナ結果と
+波 29 の r4 を見てから着手する。
