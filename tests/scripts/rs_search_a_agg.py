@@ -135,7 +135,14 @@ def _agg_one(path: str, kinds: dict) -> dict:
     return out
 
 
-def aggregate(root: str) -> dict:
+#: S4／S5 だけで回した 3 本（`--only-key` はこの 3 本に絞る＝条件をまたいで同じ母集団で比べる）。
+KEY_SCENARIOS = ("enel_human_20260810_t9-9", "human_enel_vs_roger_20260904_t7-8",
+                 "human_doflamingo_vs_luffy_20260904_t10-11")
+
+
+def aggregate(root: str, only: tuple = ()) -> dict:
+    """`only` を渡すとそのシナリオだけで集計する（S4／S5 は 3 本しか回していないので、
+    sims 掃引を同じ母集団で比べたいときは `only=KEY_SCENARIOS` にする）。"""
     kinds = _card_kinds()
     conds = {}
     for cond_dir in sorted(glob.glob(os.path.join(root, "*"))):
@@ -144,6 +151,8 @@ def aggregate(root: str) -> dict:
         cond = os.path.basename(cond_dir)
         runs = []
         for path in sorted(glob.glob(os.path.join(cond_dir, "*", "r3_s*.frames.json"))):
+            if only and os.path.basename(os.path.dirname(path)) not in only:
+                continue
             runs.append(_agg_one(path, kinds))
         if not runs:
             continue
@@ -247,8 +256,10 @@ def main(argv=None) -> int:
     ap.add_argument("--out", default=None, help="集計 JSON の保存先")
     ap.add_argument("--md", default=None, help="Markdown 表の保存先")
     ap.add_argument("--md-winners", default=None, help="勝敗表（Markdown）の保存先")
+    ap.add_argument("--only-key", action="store_true",
+                   help="S4／S5 と同じ 3 シナリオだけで集計する（母集団を揃える）")
     args = ap.parse_args(argv)
-    conds = aggregate(args.root)
+    conds = aggregate(args.root, KEY_SCENARIOS if args.only_key else ())
     text = json.dumps(conds, ensure_ascii=False, indent=1)
     if args.out:
         with open(args.out, "w", encoding="utf-8") as f:
