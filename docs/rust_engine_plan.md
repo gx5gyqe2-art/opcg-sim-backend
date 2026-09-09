@@ -4109,49 +4109,66 @@ tests/・tests/scripts/rs_search_a_keys.py に限る。
   `duplicate_copies_of_a_setup_move_merge_into_one_group`: 有用なので**残す**。
 - ブランチは捨てず、同じブランチで続ける（下の `rs-setup-box-3`）。本線には v3 の結果を見てから入れる。
 
-#### 20.7.8 WP `rs-setup-box-3` の指示書（v1 の候補構造 ＋ 枝の束ね ＋ 効き目の切り分け）
+#### 20.7.8 準備箱の粒度を改める（ユーザ決定 2026-09-09）＋ WP `rs-setup-box-3` の指示書
+
+**決定**: 準備箱は「**発動 → 対象選択 → 効果の適用**」まで。続きの攻撃は入れない（§20.7.2 の「続く攻撃を
+1 回だけ」を撤回）。KO・攻撃・別の準備は次の箱／手として木が並べる（「パワー下げの準備箱 → パワー〜以下を
+KO する準備箱 or 攻撃箱」）。理由（§20.7.7）: 続きを貪欲に決め打ちした箱は素の手（木が続きを読む）より
+粗い値しか持てず、素の手を落とせない＝候補が重複する。対話だけを畳んだ箱は素の手を完全に含み余計な
+ものを含まないので、**素の手を落としてよく、木の自由度も失わず、戦闘の先払いも無い**。効き目は
+「対話の 1 ply が減る・対象ごとに候補が分かれる」ぶんに限られる見込み（薄くてもそれが正しい・ユーザ）。
+「計画は箱・行動は素の手」は今の構造そのもの（木は箱を見る・commit が原始手に展開して実対局へ出す）。
 
 ```
-作業: WP rs-setup-box-3（docs/rust_engine_plan.md §20.7.7 の判定を実装する。rs-setup-box-2 の続き）。
+作業: WP rs-setup-box-3（準備箱の粒度を「発動 → 対象選択 → 効果」までに改める・
+docs/rust_engine_plan.md §20.7.8＝方式はそこに書いてある。rs-setup-box-2 の続き）。
 
 ブランチ claude/rs-setup-box-2 の最新（6bcd0480）から続けて同じブランチに push、PR は作りません。
-成果物は RESULT.json（scenario_out_d/ ではなく docs/reports/2026-09-09_setup_box_3.RESULT.json）を添えて
-同ブランチへ。最初に `make rust-develop`（opcg_effects.json が無ければ export_effects_json で作る＝
-無いと tests_setup_box.rs が何も検査せずに通る）。ネット（nrel_r3.npz）は変えない。
-触ってよいのは search/macro.rs・quiesce.rs・apply.rs・decide.rs・mod.rs・engine_rs.py・tests/・
-tests/scripts/。mcts.rs は触らない。
+成果物は docs/reports/2026-09-09_setup_box_3.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`
+（opcg_effects.json が無ければ export_effects_json で作る＝無いと tests_setup_box.rs が何も検査せずに通る）。
+ネット（nrel_r3.npz）は変えない。触ってよいのは search/macro.rs・quiesce.rs・apply.rs・decide.rs・mod.rs・
+engine_rs.py・tests/・tests/scripts/。mcts.rs は触らない（WP rs-leaf-rollout が触る）。
 
 ■ 直すもの（setup_box=true のときだけ・既定 false は 1 bit も変えない）
-  1. 候補構造を v1 に戻す: 箱ができても素の PLAY／ACTIVATE_MAIN を候補に残す。箱の P は素の手の P を
-     枝数で等分する（rs-setup-box-2 で消した split_setup_box_priors を戻す）。rs-setup-box-2 で足した
-     「攻撃しない」枝の追加（setup_box_candidates の 3)）は外す（枝は上限 9 のまま）。
-     テスト（tests_setup_box.rs・tests/test_setup_box.py）の期待値も v1 へ戻す。
-  2. 選択規則の束ね（decide.rs・q_min_n のときだけ・visits 規則は変えない）:
-     根の候補を「グループ」に束ねてから訪問下限を見る。グループの鍵＝(action_type が SETUP_BOX なら
-     payload.base の card_id、素の PLAY／ACTIVATE_MAIN なら card_id) で、同じ card_id の素の手と箱の
-     枝は 1 グループ。それ以外の手は今までどおり 1 手 1 グループ（既存の move_equiv_key の等価手
-     マージはそのまま＝その上に重ねる）。グループの N は和、代表はグループ内で N 最大の 1 手、
-     代表の Q をグループの Q とする。q_min_n は「グループの N ≥ 下限」のグループの代表の中から
-     Q 最大を選び、その代表の手を返す。trace の stats／groups は今までの形のまま（グループの束ねは
-     decide の戻り値に "select_groups":[{"key":…,"n":…,"rep":idx,"q":…}] を足して読めるようにする）。
-  3. 効き目の切り分け（診断用のつまみ）: SearchOptions.select_branch: Option<bool>（既定 None＝
-     setup_box に従う＝今と同じ）。true/false を明示すると、全箱共通の「自分の対象選択を枝にする」規則
-     （quiesce.rs の sel_branch_left・macro.rs の may_branch_selection）だけを個別に on/off できる。
-     opts_json → RsGame.decide(select_branch=) → rs_scenario_play.py --select-branch {on,off}。
+  1. 準備箱の範囲: 準備の手 → その効果の対話を解決、まで。対象選択（SEARCH_AND_SELECT）は枝
+     （総枝数が 9 に収まるあいだは 2 段目以降も枝・収まらなくなる段からは既定）、それ以外の対話は既定。
+     **続きの攻撃は入れない**（payload.attack を廃止・setup_box_continuation／commit の攻撃の腕も外す）。
+     箱の値は効果を解決した盤面（そこから先は木が読む）。rs-setup-box-2 の「攻撃しない」枝は不要（外す）。
+  2. 素の手: 箱ができた準備の手の素の PLAY／ACTIVATE_MAIN は候補から落とす（rs-setup-box-2 の 1 を維持）。
+     箱が作れない（枝予算切れ・対話が枝にならない）ときは素の手が残る。
+  3. 箱の P: 「素の手の P × 対象選択の P」。対象選択の P は、準備の手を適用して対話に入った盤面で、
+     木が対話ノードで使うのと同じ方策（selection_moves の候補にネットの policy）を 1 度呼んで得る
+     （準備の手 1 つにつきネット 1 回）。方策が出せない対話（候補行を作れない）は等分に退避。
+     根の平坦化（root_prior_temp）はその後（今の順）。
+  4. 選択規則の束ね（decide.rs・q_min_n のときだけ・visits は不変）: 根の候補を「同じ card_id の
+     SETUP_BOX の枝（素の手が残っていればそれも）」で 1 グループに束ね、グループの N（和）が下限以上の
+     グループの代表（N 最大の枝・その Q）の中から Q 最大を選んで代表の手を返す。それ以外の手は 1 手
+     1 グループ（既存の move_equiv_key の等価手マージはそのまま・その上に重ねる）。decide の戻り値に
+     "select_groups":[{"key":…,"n":…,"rep":idx,"q":…}] を足す（trace の stats／groups の形は変えない）。
+  5. 診断つまみ: SearchOptions.select_branch: Option<bool>（既定 None＝setup_box に従う）。明示すると
+     全箱共通の「自分の対象選択を枝にする」規則（quiesce.rs の sel_branch_left・macro.rs の
+     may_branch_selection）だけを on/off できる。opts_json → RsGame.decide(select_branch=) →
+     rs_scenario_play.py --select-branch {on,off}。
+  6. rs-setup-box-2 で足した鍵（box_vs_bare・enel_t9_winner・_is_play が SETUP_BOX も拾う）と Rust テスト
+     duplicate_copies_of_a_setup_move_merge_into_one_group は残す。
 
 ■ 受け入れ
-  - cargo test: v1 のテストが通る／束ねのテスト（同じ card_id の素の手 1 ＋ 箱 3 で、各 N が下限未満でも
-    和が下限以上なら q_min_n がそのグループの代表を選べる・visits 規則は不変）／select_branch=false ＋
-    setup_box=true で攻撃箱・防御箱の枝が出ない（boxes.attack/defense が 0）。
-  - make test green・make audit-cross void 0。
+  - cargo test: 神の裁きの箱に「KO する／しない」の枝が両方あり、適用すると PLAY → SELECT_RESOURCE →
+    BUFF 対象 → KO 対象 で止まる（攻撃は含まない）／箱がある準備の手の素の手は候補に無い／箱の各枝の P が
+    「素の手の P × 対象の P」（和が素の手の P）／束ね: 同じ card_id の枝 3 本が各々下限未満でも和が下限以上
+    なら q_min_n がその代表を選べる・visits は不変／select_branch=false ＋ setup_box=true で攻撃箱・防御箱
+    の枝が出ない（boxes.attack/defense が 0）／setup_box=false は既定と 1 bit も変わらない。
+  - pytest tests/test_setup_box.py を更新（素の手が候補に無い・箱に attack が無い）。make test green・
+    make audit-cross void 0。
   - 計測（sims 160・seed 0〜7・3 局面〔enel_human_20260810_t9-9／human_enel_vs_roger_20260904_t7-8／
     human_enel_vs_luffy_20260904_t4-5〕・鍵は分析 #6 の表 ＋ box_vs_bare・出力は scenario_out_e/）:
-      E1: C_all（--worlds 4 --setup-box --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2）
-      E2: C_box_r2（worlds なし・他は同じ）
-      E3: 切り分け A＝準備箱だけ（--setup-box --select-branch off ＋ R2・worlds なし）
-      E4: 切り分け B＝共通規則だけ（--select-branch on・--setup-box なし ＋ R2・worlds なし）
-    目標: E1 で神の裁き→攻撃 5/8 以上（worlds 4 ＋ R2 単独と同等）・ガンマナイフ 5/8・KO 5/8。
-    E3/E4 は「ガンマナイフ 5/8 の出所がどちらか」を答える（数字だけでよい・判定はコーディネータ）。
+      E1: --worlds 4 --setup-box --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2
+      E2: --setup-box ＋ R2（worlds なし）
+      E3: 準備箱だけ（--setup-box --select-branch off ＋ R2・worlds なし）
+      E4: 共通規則だけ（--select-branch on・--setup-box なし ＋ R2・worlds なし）
+    参照（測らなくてよい・scenario_out_c/C_w4_r2）: worlds 4 ＋ R2・箱なし＝神の裁き→攻撃 5/8・決着 4/8・
+    ガンマナイフ 4/8・KO 0/8（神の裁きを打たない）。目標: E1 がこれを下回らず、KO が増えること。
+    E3/E4 は「rs-setup-box（v1）のガンマナイフ 5/8 の出所がどちらか」を答える。
     レイテンシ（rs_search_a_latency.py・同じ 3 局面・単独プロセス）は E1〜E4 全部。
 
 ■ 成果物
@@ -4164,4 +4181,70 @@ tests/scripts/。mcts.rs は触らない。
 ■ 前提
   - 既定（setup_box=false・select_branch=None）の挙動は変えない。判定はコーディネータ。質問は
     RESULT.json の notes に。
+```
+
+#### 20.7.9 葉をターン終了まで伸ばす（ユーザ提案 2026-09-09）＋ WP `rs-leaf-rollout` の指示書
+
+**着想（ユーザ）**: 深さ 2 の予算しか無くても、葉を**ターン終了まで強制的に伸ばして**から評価すれば
+「準備だけして終わり」の中途半端な値にならない。**コーディネータの読み**: 今の葉の評価（`mcts.rs::leaf_value`）
+は戦闘窓・対話窓（手順が強制される区間）だけを解決してから V を出す。メインフェイズの自由な手（残りの
+攻撃・付与・ターン終了）は伸ばさない。だから「神の裁きを打った直後の葉」の V には続きの攻撃が入らず、
+「攻撃を先にした葉」との比較が深さ 1 では付かない（分析 #4〜#6 の縛り）。葉で方策（P の最大）に沿って
+ターン終了まで打ち切ってから V を出せば、**全ての手の値が「このターンでやり切った結果」の値**になる。
+準備箱が「続きの攻撃を先払い」で狙ったことを、候補生成ではなく葉で・全ての手に一様に・訪問された葉
+だけに払う形で実現する＝構造として正しい置き場所。
+弱点（先に書いておく）: (1) 打ち切りは方策の貪欲なので、方策が低く見る手（P 0.05 の神の裁き）は打ち切りの
+中では打たれない＝「攻撃を先にした葉」の値に神の裁きが入らないのは、むしろ正しい比較になるが、打ち切りの
+質そのものは方策の質に縛られる。(2) コスト＝葉ごとに残り ply 数だけネットを呼ぶ（方策のため）。1 葉あたり
+数回・160 葉で数百回＝レイテンシ 2〜4 倍の見込み（実測で決める）。(3) 相手のターンの葉も同じ規則で伸ばす
+（相手の残り手番を相手の方策で打ち切る）。
+
+```
+作業: WP rs-leaf-rollout（木の葉を「そのターンの終わり」まで方策で打ち切ってから評価する・
+docs/rust_engine_plan.md §20.7.9）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-leaf-rollout に push、PR は作りません。
+成果物は docs/reports/2026-09-09_leaf_rollout.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。
+ネット（nrel_r3.npz）は変えない。触るのは search/mcts.rs（leaf_value）・search/quiesce.rs（打ち切りの
+補助）・search/mod.rs（SearchOptions）・opcg_sim/api/engine_rs.py・tests/scripts/rs_scenario_play.py・
+rs_search_a_latency.py・tests/ に限る（macro.rs・adapter.rs・decide.rs は WP rs-setup-box-3 が触る）。
+
+■ 足すもの（既定は今と同じ・1 bit も変えない）
+  - SearchOptions.leaf_rollout: "none"（既定）| "turn_end"。opts_json → RsGame.decide(leaf_rollout=) →
+    rs_scenario_play.py --leaf-rollout turn_end・rs_search_a_latency.py にも。
+  - "turn_end": leaf_value で今の戦闘窓／対話窓の解決を終えた後、盤面が終局でなく手番の側のメイン
+    フェイズにあるなら、ターンが替わるまで手を打ち続ける: 各手は木と同じ候補（Ctx::legal_actions＝箱を
+    含む）から quiesce_choice（方策優先・P 最大・乱数を使わない）で 1 つ選んで適用し、途中の戦闘窓／対話窓は
+    今の既定解決で進める。TURN_END が選ばれるか、ターンが替わるか、上限 ply（LEAF_ROLLOUT_MAX_PLIES=12）で
+    止め、その盤面を to_move の視点で評価（ctx.value）。相手のターンの葉も同じ（相手の方策で相手の残り
+    手番を打ち切る）。乱数とイベントログは今の leaf_value と同じく復元する（transaction・CRN 一貫性）。
+  - 枝予算（BOX_BRANCH_BUDGET）は打ち切りの中では引かない（value_fn=None の流儀と同じ）。
+  - trace に葉の打ち切りの実績（葉の数・平均 ply・上限で止まった数）を "rollout":{…} で出す。
+
+■ 受け入れ
+  - cargo test: leaf_rollout="none" は既定と 1 bit も変わらない／"turn_end" で「PLAY（残り攻撃あり）の葉」の
+    評価が「攻撃を打ち切った盤面」の V になる（小盤面で、打ち切り前後の盤面が違うこと・ターンが替わって
+    いること）／上限 ply で止まる／同じ seed で同じ出力。
+  - pytest tests/test_leaf_rollout.py（cpu_infra）: RsGame.decide(leaf_rollout="turn_end") が動き trace に
+    rollout が入る・省略時は trace の形が変わらない。TEST_SPEC §2 に 1 行。make test green・
+    make audit-cross void 0。
+  - 計測（sims 160・seed 0〜7・3 局面〔enel_human_20260810_t9-9／human_enel_vs_roger_20260904_t7-8／
+    human_enel_vs_luffy_20260904_t4-5〕・鍵は分析 #6 の表・出力は scenario_out_f/）:
+      F1: --leaf-rollout turn_end（visits・worlds なし）
+      F2: --leaf-rollout turn_end ＋ R2（--select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2）
+      F3: --leaf-rollout turn_end ＋ R2 ＋ --worlds 4
+    参照（scenario_out_c/C_w4_r2）: worlds 4 ＋ R2＝神の裁き→攻撃 5/8・決着 4/8・ガンマナイフ 4/8。
+    レイテンシ（rs_search_a_latency.py・同じ 3 局面・単独プロセス）は F1〜F3 全部と既定。
+
+■ 成果物
+  - コード＋テスト＋scenario_out_f/＋docs/reports/2026-09-09_leaf_rollout.RESULT.json:
+    {"job":"rs-leaf-rollout","status":"done|partial","keys":{"F1":{"kami_before_attack":n,"lethal":n,
+     "gammaknife":n,"kami_ko":n},"F2":{…},"F3":{…}},"latency_ms":{"base":…,"F1":…,"F2":…,"F3":…},
+     "rollout":{"mean_plies":…,"capped_frac":…},"make_test":"N passed","audit_cross":{"pairs":120,"void":0},
+     "notes":"…"}
+
+■ 前提
+  - 既定（leaf_rollout="none"）の挙動は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+  - WP rs-setup-box-3 と並行する。同じファイル（quiesce.rs・mod.rs・engine_rs.py・rs_scenario_play.py）に
+    欄を足すので衝突はコーディネータが解く。
 ```
