@@ -4720,3 +4720,75 @@ tests/。Rust・ネット・探索の中身は触らない。
 ■ 前提
   - 既定（ε=0）の挙動と教師は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
 ```
+
+#### 20.8.4-1 回収と判定（2026-09-10・`rs-replace-rest-fix`＋`rs-eps-explore`・1 セッション）
+
+**回収**: 本線へ ff で合流（RESULT `docs/reports/2026-09-10_replace_rest_fix.RESULT.json`）。エンジン変更なので
+`make rust-develop` → `make test` → `make audit-cross` を回した（結果は本節末尾）。
+
+**A（エンジン）の判定: 受け入れる**
+- 原因は指示書の推測（pending が消費されない）ではなく、**パーサが PRB02-006 の「代わりにレスト」を REPLACE_EFFECT
+  にせず素の誘発能力として出し、常在効果の再計算が毎回それを実行して対象選択で中断し続けていた**こと。直し方は
+  「再計算から外し、レストの現場で置換として扱う」（`rules::active_rest_replacement`・0 枚なら元のレスト）。
+  同じ経路を踏むのは 1 枚だが形で書いてある。パーサは触っていない（将来パーサが REPLACE_EFFECT で出せば
+  `find_replacement` 1 本に寄せられる）。
+- 効果イベントに `source_uuid`／`trigger` を追加（aux_tok の「発動したか」が uuid 一致に）。**golden 2 本を作り直した**
+  ——差分が追加した 2 欄だけであること（監査 3,386 件・再生 200 局で盤面 0 件・合法手 0 件不変・欄を落とせば
+  旧 golden と完全一致）を作業セッションが機械的に確認済み。**作り直しを認める**（挙動の変化ではなく記録の欄の追加）。
+- 作業セッションの問い: (4) 再計算が反応型の能力（OP04-024 シュガー・OP04-047 氷鬼・ST13-003）を実行している
+  3 件と `resolve_targets` の in_passive_recalc ガードの一般化 → **別 WP に積む**（挙動＝golden が動くので、
+  波 29 の生成と切り離す。`rs-passive-recalc-guard`・後日）。(5) レスト置換の候補が 1 枚なら自動確定＝「使わない」を
+  選べない → 既存の対象解決の規則どおりで**据え置き**（本文は任意だが、1 枚で訊く例外は他の任意効果とも
+  揃えて直す話）。
+
+**B（両方向 ε）の判定: 受け入れる**
+- decide の後で手だけ差し替え、π・sig・pol_chosen は不変、`forced` 列で印。乱数は (seed, ターン, 席, 手数) の
+  純関数で探索の乱数と別 salt。ε 3% で play 36／hold 8（除去が合法な main 行 1,516／3,663＝41%）。
+  `forced` は pack に入れない（`load_row_col` で読む）＝教師にしない契約どおり。
+- コーディネータが足した配線: `record_gen` に `--worlds／--select-rule／--q-min-frac／--root-prior-temp`
+  （`SeatSpec` の kw に流す・省略＝serve 既定＝歴代の波と同じ・`meta_n_record.json` に `search` として記録）。
+  波 29 の生成に要る。
+
+#### 20.8.6 波 29 の生成（era7・生成役 r3・§20.8 の設定で・ユーザ決定 2026-09-09「教師の概念として worlds」）
+
+**設定**（生成・アリーナ・serve で物差しを 1 本に保つ＝アリーナ済みの `C_w4_r2`）:
+`--sims 160 --worlds 4 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 --dirichlet-eps 0.25
+--temp-turns 4 --decks synth_roles --eps-play 0.03 --eps-hold 0.03`（aux は既定 on・dump v4・生成役 r3＝既定）。
+**16 シャード × 480 局＝7,680 局**（§7.3 の細分化・seed 帯 2291000〜2298000・台帳 §6）。1 局の CPU は sims 128 の
+約 5 倍なので、`--workers 2`（候補席が 4 スレッド）で 480 局は 3〜4 時間の見込み＝**最初のシャードで 30 局の
+壁時計を実測してから残りを回す**（見込みを外れたら局数をコーディネータへ）。
+
+```
+作業: 生成 波 29 シャード k（k=1..16・docs/rust_engine_plan.md §20.8.6・docs/n_loop_ops.md §6／§7.3）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（コードは変更しない）。最初に
+pip install -r opcg_sim/requirements.txt pytest maturin && make rust-develop（opcg_effects.json が無ければ
+python -m opcg_sim.tools.export_effects_json）。出力ブランチ claude/n29-wKK（KK=01..16・2 桁）。PR は作らない。
+
+■ 実行（seed_base は台帳どおり: 2290000 + ceil(k/2)*1000 + (k が偶数なら 500)）
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen \
+    --games 480 --seed-base <seed_base> --workers 2 \
+    --sims 160 --worlds 4 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 \
+    --dirichlet-eps 0.25 --temp-turns 4 \
+    --decks synth_roles --eps-play 0.03 --eps-hold 0.03 \
+    --out n_records/n29_wKK
+  最初に --games 30 で回して 1 局の壁時計を測り、480 局が 6 時間を超える見込みならその旨を RESULT に書いて
+  コーディネータの指示を待つ（勝手に sims や worlds を下げない）。
+
+■ 成果物（出力ブランチ直下）
+  - n_records/n29_wKK/（npz シャード・meta_n_record.json・meta_games.json）
+  - RESULT.json: {"job":"gen-n29-wKK","status":"done|partial","games":480,"rows":N,"main_rows":N,
+     "dropped":n,"void":n,"forced":{"play":n,"hold":n},"removal_legal_rows":n,
+     "sec_per_game":x,"wall_hours":x,"search":{…meta の search…},"decks":"synth_roles",
+     "dump_version":4,"net":"nrel_r3.npz","commit":"<HEAD>","notes":"…"}
+
+■ 前提
+  - 打ち切りはしない（partial なら残り局数を RESULT に）。void（決着せず）が出たら seed と症状を notes に。
+  - コードは変更しない。質問は RESULT.json の notes に。
+```
+
+**r4 の訓練（波 29 が揃ってから・§7.1 の形で別途出す）**: warm-start r3・`--ablate rel`・π＝波 29（era7 のみ）・
+z＝新しい波から載るだけ（波 29 → 28 → 27 …・OOM なら落とす）・**`--aux-weight 0.1`**・epochs 2・lr 5e-4・
+**同一性の確認は `--threads 1`**。符号化は v13 のまま（§20.8.1-1 の分類漏れの修正＝v14 は Rust の
+`encode/tokens.rs` と同時に直す別 WP・r4 の後）。判定: 評価帯（波 29 の holdout・型 × 色 × リーダーで層別）→
+アリーナ（主・副・規約どおり）。

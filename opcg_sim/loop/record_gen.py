@@ -392,11 +392,13 @@ def _don_k(mv):
 
 
 def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS, aux=True,
-                 eps_play=0.0, eps_hold=0.0):
+                 eps_play=0.0, eps_hold=0.0, search=None):
     E.engine()
+    # `search`＝探索の設定の上書き（§20.8.6・波 29〜: worlds／select_rule／q_min_frac／
+    # root_prior_temp）。None／空＝serve 既定のまま＝歴代の波と同じ。
     _G["spec"] = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps,
                             temp_turns=temp_turns, eps_play=eps_play, eps_hold=eps_hold,
-                            prune_futile=E.GEN_PRUNE_FUTILE)
+                            prune_futile=E.GEN_PRUNE_FUTILE, **(search or {}))
     _G["db"] = D.load_db()
     _G["decks"] = decks
     _G["aux"] = bool(aux)
@@ -618,8 +620,20 @@ def main(argv=None):
     ap.add_argument("--eps-hold", type=float, default=0.0,
                     help="同・「保留側」。木が除去を選んだら、確率 H で除去でない候補の"
                          "N 最大へ差し替える（既定 0＝無効）")
+    # §20.8.6（波 29〜）: 探索の設定。省略＝serve 既定（worlds 1・visits・t=1）＝歴代の波と同じ。
+    ap.add_argument("--worlds", type=int, default=None,
+                    help="1 決定あたりの世界サンプル本数（§20.7.1・既定 1）")
+    ap.add_argument("--select-rule", default=None, choices=("visits", "q_min_n"),
+                    help="根で出す手の選び方（§20.5・既定 visits）")
+    ap.add_argument("--q-min-frac", type=float, default=None,
+                    help="q_min_n の訪問下限の割合（既定 0.125）")
+    ap.add_argument("--root-prior-temp", type=float, default=None,
+                    help="根の事前分布を P^(1/t) へ（既定 1.0・2.0 で平坦化）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
+    search = {k: v for k, v in (("worlds", args.worlds), ("select_rule", args.select_rule),
+                                ("q_min_frac", args.q_min_frac),
+                                ("root_prior_temp", args.root_prior_temp)) if v is not None}
 
     os.makedirs(args.out, exist_ok=True)
     t0 = time.time()
@@ -630,7 +644,7 @@ def main(argv=None):
     games = []                                         # part の sidecar（対局メタ）
     shard = n_rows = n_drop = n_main = 0
     initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns, args.decks,
-                not args.no_aux, args.eps_play, args.eps_hold)
+                not args.no_aux, args.eps_play, args.eps_hold, search)
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
                                       initargs=initargs) as pool:
         done = 0
@@ -673,7 +687,9 @@ def main(argv=None):
                    "temp_turns": args.temp_turns,
                    # ε 探索（§20.8.5・既定 0）とその内訳
                    "eps_play": args.eps_play, "eps_hold": args.eps_hold,
-                   "forced": forced, "removal_legal_rows": removal_legal},
+                   "forced": forced, "removal_legal_rows": removal_legal,
+                   # 探索の設定の上書き（§20.8.6・空＝serve 既定）
+                   "search": search},
                   f, ensure_ascii=False)
     print("N_RECORD_DONE " + json.dumps({"rows": n_rows, "main_rows": n_main,
                                          "dropped": n_drop, "forced": forced,
