@@ -4592,3 +4592,131 @@ tests/・tests/scripts/。Rust・探索・デッキ生成は触らない（WP rs
 の seam で **640×1×R2 の主・副 384 局**を回して 160×4 の結果（主 0.531・副 0.544）と並べ、上のほうを採る。
 π の教師としての性格は違う（640×1＝深いが「引いた 1 世界」に集中／160×4＝浅いが隠れ情報に堅い）ので、
 勝率が並んだら **640×1**（ユーザの案・実装が単純・スレッド競合が無く生成の壁時計が読みやすい）。
+
+#### 20.8.1-1／20.8.2-1 回収と判定（2026-09-10・`rs-removal-decks`／`rs-aux-heads`）
+
+**回収**: 両方を本線へ合流（`record_gen.py`・TEST_SPEC・`test_n_record_v3.py` の衝突は両方の列を残して解いた。
+dump v4 ＝ v3 ＋ `aux`／`aux_tok`／`aux_mask` ＋ `deck_kinds`・既定 `--decks synth`・`--no-aux` で v3 の列だけ）。
+RESULT は `docs/reports/2026-09-10_{removal_decks,aux_heads}.RESULT.json`。作業セッションが自前で取った seed 帯は
+台帳（`docs/n_loop_ops.md` §6）へ事後登録。
+
+**`rs-removal-decks`（partial）の判定**
+- 成果物（分類器・型 × 色の表の再計算・差し込み・記録・sidecar）は全部入り。硬い除去 0 のデッキ 19.6% → 9.1%、
+  差し込みで死に札とカウンター枚数を悪化させた回数 0。**受け入れる**（partial の理由は下のエンジン欠陥）。
+- 発見 1（**符号化の分類漏れ**）: パーサはバウンスを `ActionType.BOUNCE` で出すが、`n_rel_feat._REMOVAL_OPS`（と
+  Rust `encode/tokens.rs::is_removal_op`）は `MOVE_TO_HAND` しか見ない＝相手の場を対象にする BOUNCE 23 件が
+  「除去でない」と符号化されていた。さらに対象ゾーンを見ないので、手札の山札送り 12・ライフのトラッシュ送り 13・
+  ライフ操作の MOVE_CARD 32 が「盤面の除去」に混ざっていた。**符号化を直すと入力分布が変わる**（golden replay の
+  a1 帯・既存ネット）ので、r4 の符号化 v14 として次の訓練サイクルで直す（§20.8.6 に含める・v13 は凍結）。
+  §20.7.11 の表の山札／トラッシュ列は過大だった（型ベースの正しい数は RESULT の coverage）。
+- 発見 2（**エンジンの欠陥**）: PRB02-006「ロロノア・ゾロ」の置換効果（【相手のターン中】このキャラが相手の
+  キャラの効果でレストになる場合、代わりに自分の他のキャラ 1 枚をレストにできる）で、SEARCH_AND_SELECT が
+  消費されず同じ pending が戻り続け max_steps で void（seed 930028・どの候補を選んでも切れない）。ミラーや素の
+  synth では踏まない経路で、レスト除去を差し込んで露出した＝交差監査（§5.0）の類。**WP `rs-replace-rest-fix`
+  （§20.8.4）で直す**。直るまで synth_roles の生成は void を 1 件でも出しうる（2% の足切りには遠いが、生成の
+  規約は void 0 を目指す）。
+- 差し込み率は (リーダー, seed) から引く／差し替えはカウンター持ち以外を先に使う／MOVE_CARD（場 → ライフ）は
+  deck に畳む: いずれも妥当。arena に `--decks synth_roles` を通しただけ（既定は synth のまま）も妥当。
+
+**`rs-aux-heads`（done）の判定**
+- 同一性（λ=0・aux 列無し＝既存とビット一致・npz に補助鍵が出ない・Rust が補助鍵を無視・serve 10 局面で同じ手）
+  を確認済み。台帳コスト +3.7%。**受け入れる**。
+- 200 局 1 エポックの数字（z 予測 0.6025／0.6031／0.5930・補助損失は下がる）は規模が小さく、λ の効き目は
+  波 29 の本番規模で測る（§20.8.6）。λ の既定は 0.1 を仮置き（変えるなら本番の評価帯で）。
+- 副産物 1: **torch backend の多スレッド学習は同一設定でも再現しない**（max|Δ| 2.2e-2）。以前からの性質。
+  同一性の判定は `--threads 1` か numpy backend で行う（訓練の指示書に明記する）。
+- 副産物 2: 効果イベントに発生源 uuid が無く、`aux_tok` の「能力を発動したか」は ACTIVATE_MAIN の uuid 一致か
+  **card_name 一致**（同名が並ぶと両枠が立つ）。Rust `effects/resolver.rs::push_effect_events` に発生源 uuid を
+  足す＝**`rs-replace-rest-fix` に同梱**（同じエンジン WP・§20.8.4）。
+- `dump_io` の pack 版 1 → 2（既存の pack は作り直し・波 1 本数分）: 妥当。
+
+#### 20.8.4 WP `rs-replace-rest-fix` の指示書（エンジン: 置換効果のループ ＋ 効果イベントの発生源）
+
+```
+作業: WP rs-replace-rest-fix（エンジンの欠陥 1 件の修正 ＋ 効果イベントに発生源 uuid を足す・
+docs/rust_engine_plan.md §20.8.1-1／§20.8.2-1）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-replace-rest-fix に push、PR は作りません。
+成果物は docs/reports/2026-09-10_replace_rest_fix.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`
+（opcg_effects.json が無ければ export_effects_json で作る）。触るのは rust/opcg_engine/src/effects/・
+rules/・opcg_sim/loop/record_gen.py（発生源 uuid を aux_tok に使う部分だけ）・tests/。探索・ネット・符号化は
+触らない。
+
+■ 1. 置換効果のループ（PRB02-006「ロロノア・ゾロ」）
+  再現: OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 1 --seed-base 930028 --workers 1 --sims 32
+        --decks synth_roles --out /tmp/void  （p2 の PRB02-006 の置換で SEARCH_AND_SELECT が消費されず
+        RESOLVE_EFFECT_SELECTION を 300 回以上繰り返して max_steps=400 に当たる）
+  - 原因を突き止めて直す（置換効果 REPLACE_EFFECT の「代わりに自分の他のキャラ 1 枚をレストにできる」の
+    解決で、選択の受理後に元のレストが再び置換の判定に入る／pending が pop されない、のどちらかが疑わしい。
+    effects/resolver.rs の _replacement_suspended まわりと interact.rs の選択の消費を見る）。
+  - 「選ばない」（0 枚）を選んだときは元のレストがそのまま起きること・「選ぶ」ときは元のキャラがレストに
+    ならず選んだキャラがレストになること・同じ効果が 1 回のレストに対して 1 回しか発火しないこと。
+  - 同種の置換（「〜になる場合、代わりに〜」で対象選択を伴うもの）を効果 JSON から列挙し、同じ経路を踏む
+    カードを RESULT に列挙する（直したのが 1 枚の特例でないことの確認）。
+
+■ 2. 効果イベントの発生源（aux_tok の「能力を発動したか」のため）
+  - effects/resolver.rs::push_effect_events が出す効果イベントに、発生源のカード uuid（能力の持ち主）と
+    トリガー種別を足す。Python 側 record_gen の台帳が card_name 一致で立てている箇所を uuid 一致に置き換える
+    （同名が並んでも正しい枠だけ立つ）。既存のイベントの形は変えない（欄を足すだけ・action_events の
+    読み手を壊さない）。
+
+■ 受け入れ
+  - cargo test: 置換効果の単体テスト（PRB02-006 の盤面を実カードで組み、相手の効果でレストされる →
+    「選ぶ／選ばない」の両方で 1 手ずつ進んで終局しない・pending が消費される）／効果イベントに
+    source_uuid が載る。
+  - make test green。**make audit-cross void 0**（エンジン変更）。golden 2 本は挙動が変わらないなら
+    不変のはず＝変わったら差分をレビューして理由を RESULT に書く（作り直しはコーディネータ判定）。
+  - 上の再現コマンドが void にならない。synth_roles で record_gen --games 120（seed 930000〜・940000〜）
+    を回して void 0。
+
+■ 成果物
+  - コード＋テスト＋docs/reports/2026-09-10_replace_rest_fix.RESULT.json:
+    {"job":"rs-replace-rest-fix","status":"done|partial","root_cause":"…","same_path_cards":[…],
+     "event_source_uuid":true,"repro_void":false,"selfplay_roles":{"games":120,"void":0},
+     "golden":"unchanged|regenerated（理由）","make_test":"N passed","audit_cross":{"pairs":120,"void":0},
+     "notes":"…"}
+
+■ 前提
+  - 既定の挙動（この欠陥以外）は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 20.8.5 WP `rs-eps-explore` の指示書（両方向の ε 探索・生成の対照づくり）
+
+```
+作業: WP rs-eps-explore（生成で「除去を打つ／保留する」の対照を作る両方向の ε 探索・
+docs/rust_engine_plan.md §20.8／§20.7.11 の補記）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-eps-explore に push、PR は作りません。
+成果物は docs/reports/2026-09-10_eps_explore.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。
+触るのは opcg_sim/loop/record_gen.py・driver.py（手の差し替えの入口だけ）・engine.py（SeatSpec の欄）・
+tests/。Rust・ネット・探索の中身は触らない。
+
+■ 仕様（既定 0＝1 bit も変わらない）
+  - record_gen に --eps-play P と --eps-hold H（既定 0.0）。main の決定で:
+    (a) 打つ側: 木が選んだ手が除去系でなく、候補に除去系の手（deck_roles.classify で form が KO/bounce/deck/
+        trash/lock/reduce のカードの PLAY／ACTIVATE_MAIN・箱の中身も含む）があれば、確率 P でその中の 1 つ
+        （候補の N が最大のもの）に差し替える。
+    (b) 保留側: 木が選んだ手が除去系なら、確率 H で「除去系でない候補のうち N 最大の手」に差し替える
+        （TURN_END も可）。
+    差し替えは decide の後（木・π は変えない）。**π は木の訪問分布のまま記録し**、差し替えた行には
+    forced(D int8)＝1（打つ側）／2（保留側）／0 を書く（dump v4 の追加列・契約は §20.8 冒頭と同じ・
+    dump_io は無い列を None）。差し替えた手は実対局に原始手で出る（commit は木の選んだ手のものを捨て、
+    差し替えた手の decide をやり直さない＝差し替え後の対話は既定解決）。
+  - 乱数は seed から決定論（同じ seed で同じ差し替え）。
+  - 学習側（n_rel_train）は forced 列を**読まない**（教師は変えない・後で層別に使うだけ）。
+
+■ 受け入れ
+  - pytest tests/test_eps_explore.py（cpu_infra）: 既定 0 は dump が今までと同一（forced 列は全 0）／
+    P=1 で除去が合法な main 決定が全部差し替わり forced=1／H=1 で除去を選んだ決定が差し替わり forced=2／
+    π は差し替え前後で同じ／同じ seed で同じ結果。TEST_SPEC §2 に 1 行。make test green。
+  - 計測: record_gen --games 60 --sims 32 --decks synth_roles --eps-play 0.03 --eps-hold 0.03 で void 0・
+    forced の内訳（1 と 2 の行数・除去が合法だった main 行数）を RESULT に。
+
+■ 成果物
+  - コード＋テスト＋docs/reports/2026-09-10_eps_explore.RESULT.json:
+    {"job":"rs-eps-explore","status":"done|partial","forced_counts":{"play":n,"hold":n,"removal_legal_rows":n},
+     "selfplay":{"games":60,"void":n},"make_test":"N passed","notes":"…"}
+
+■ 前提
+  - 既定（ε=0）の挙動と教師は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+```
