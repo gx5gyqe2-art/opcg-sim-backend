@@ -1,0 +1,24 @@
+{
+  "job": "gen-n29-w15",
+  "status": "done",
+  "games": 480,
+  "rows": 68409,
+  "main_rows": 31246,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 337, "hold": 64},
+  "removal_legal_rows": 12464,
+  "sec_per_game": 14.13,
+  "wall_hours": 1.884,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "net": "nrel_r3.npz",
+  "commit": "03d3535d1159aef3c00e1a1a51274bf08ad67179",
+  "notes": "本線 claude/cpu-spec-improvements-yw91jd (0be4a48) からコード変更なしで生成。事前に --games 30 --seed-base 2298000（別 --out）で壁時計を実測（429s・void 0）し、480局の見込みが6時間以内（実測 1.88h）であることを確認してから本番を実行。--seed-base 2298000（§20.8.6・波29 seed帯 2291000〜2298000のうちシャードk=15）。--workers 2 で nohup バックグラウンド実行、進捗を定期的に確認しつつ複数回の中間コミットで push（プロセス中の .tmp.npz は os.replace で確定後のみコミット対象）。480/480局とも void（決着せず）0・棄却0。"
+}
