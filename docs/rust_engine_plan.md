@@ -4792,3 +4792,62 @@ z＝新しい波から載るだけ（波 29 → 28 → 27 …・OOM なら落と
 **同一性の確認は `--threads 1`**。符号化は v13 のまま（§20.8.1-1 の分類漏れの修正＝v14 は Rust の
 `encode/tokens.rs` と同時に直す別 WP・r4 の後）。判定: 評価帯（波 29 の holdout・型 × 色 × リーダーで層別）→
 アリーナ（主・副・規約どおり）。
+
+#### 20.8.6-1 波 29 の回収（2026-09-10）
+
+16 セッション（sonnet・コーディネータが起こした）のうち **14 本が完走**（w01〜w03・w05〜w12・w14〜w16）。w04 は
+ビルド待ちで 1 時間寝ていて再開後も遅く、w13 も遅かったので**ユーザ判断で打ち切り**（k=4・k=13 の帯は未使用＝
+必要なら再走）。合計 **6,720 局・974,297 行（main 442,217）**・dropped 1・1 局 12.8〜14.8 秒（480 局 ≈ 1.9 h・
+見込みどおり）。forced＝play 4,505／hold 783（除去が合法な main 行 178,924）。
+**void 1 件**（w12・seed 2296720・ST29-001 vs OP04-040・turn 8 で max_steps 400）: 作業セッションは PRB02-006 と
+同種と推測したが、本線には `rs-replace-rest-fix` が合流済みなので**別の欠陥**。再現手順は w12 の RESULT.json。
+→ `rs-void-2296720`（後日の WP・§20.8.4 の「反応型能力の再計算」3 件と一緒に見る）。
+教材としては 1/6,720 なので r4 の訓練はこのまま進める。
+
+#### 20.8.7 r4 の訓練（era7 第 1 回・§7.1 の形・1 セッション）
+
+π＝波 29（era7 のみ・14 シャード）・z＝波 29 ＋ 28 ＋ 27（新しい順・OOM なら古い方＝27 から落とす）・
+warm-start r3・`--ablate rel`・**`--aux-weight 0.1`**・epochs 2・lr 5e-4・backend torch（既定スレッド＝速度優先。
+同一性の判定は要らない）。出力 `claude/train-r4` の `n1_results/nrel_r4.npz`。評価帯: 波 29 の holdout
+（`--holdout-mod 7`）で r3 と r4 を `n_rel_band` にかけ、層別 JSON を添える。
+
+```
+作業: 訓練 r4（docs/rust_engine_plan.md §20.8.7・docs/n_loop_ops.md §7.1）。コードは変更しない。PR は作らない。
+メモリは 12GB 以上必要。
+
+bash で順に:
+
+pip install -r opcg_sim/requirements.txt maturin torch   （torch は CPU 版でよい）
+make rust-develop
+# 教材（波 29 は 14 シャード・n_records/n29_wKK／波 27・28 は 8 シャード・n27_records／n28_records）
+for w in 01 02 03 05 06 07 08 09 10 11 12 14 15 16; do
+  git fetch -q origin claude/n29-w$w:tmpw && mkdir -p ~/n29_wave/w$w \
+  && git archive tmpw n_records/n29_w$w | tar -x -C ~/n29_wave/w$w && git branch -qD tmpw; done
+for N in 28 27; do for w in 01 02 03 04 05 06 07 08; do
+  git fetch -q origin claude/n${N}-w$w:tmpw && mkdir -p ~/n${N}_wave/w$w \
+  && git archive tmpw n${N}_records | tar -x -C ~/n${N}_wave/w$w && git branch -qD tmpw; done; done
+
+OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train \
+  --in "$HOME/n29_wave/w*/n_records/n29_w*" \
+  --z-in "$HOME/n28_wave/w*/n28_records" "$HOME/n27_wave/w*/n27_records" \
+  --ablate rel --aux-weight 0.1 --epochs 2 --lr 5e-4 \
+  --warm-start opcg_sim/data/learned/nrel_r3.npz --out ~/nrel_r4.npz 2>&1 | tee ~/train_r4.log
+（OOM で落ちたら --z-in から古い波〔27〕を外して再実行し、RESULT.json の notes に書く。）
+
+# 評価帯（波 29 の holdout・r3 と r4・層別）
+OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band \
+  --in "$HOME/n29_wave/w*/n_records/n29_w*" --nrel opcg_sim/data/learned/nrel_r3.npz ~/nrel_r4.npz \
+  --holdout-mod 7 --out ~/band_r4.json 2>&1 | tee ~/band_r4.log
+
+git checkout -B claude/train-r4
+mkdir -p n1_results && cp ~/nrel_r4.npz n1_results/ && cp ~/train_r4.log ~/band_r4.json ~/band_r4.log .
+（RESULT.json を docs/n_loop_ops.md §5 の形式で書く: inputs〔起点 r3・π 波 29〔14 シャード〕・z 波 29+28+27〕・
+ epochs・best_ep・val の v_mse／v_sign／pi_top1・aux の各列の誤差・train_sec・band の要約〔r3 vs r4 の
+ z 予測と層別で差が大きい層〕・notes）
+git add -f n1_results/nrel_r4.npz train_r4.log band_r4.json band_r4.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "train r4（era7・aux 0.1）"
+git push -u origin claude/train-r4
+
+補足: 所要は 2〜4 時間（波 29 は 97 万行・aux 列あり）。長い実行は nohup でバックグラウンドにし、進捗を
+定期的に確認する。質問は RESULT.json の notes に。
+```
