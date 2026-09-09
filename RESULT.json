@@ -1,0 +1,24 @@
+{
+  "job": "gen-n29-w09",
+  "status": "done",
+  "games": 480,
+  "rows": 70062,
+  "main_rows": 31516,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 325, "hold": 55},
+  "removal_legal_rows": 12664,
+  "sec_per_game": 14.20,
+  "wall_hours": 1.89,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "net": "nrel_r3.npz",
+  "commit": "0be4a48f3e610ef821f546e76a387eb5d75d577b",
+  "notes": "seed_base=2295000。事前に --games 30 で壁時計を実測（435s＝14.5s/局）し、480局換算で約1.9時間の見込み（6時間以内）と判断してから本番480局を実行。dirichlet_eps=0.25, temp_turns=4, eps_play=0.03, eps_hold=0.03。void 0・棄却0・エラー無し。コードは変更していない。"
+}
