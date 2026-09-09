@@ -1,0 +1,77 @@
+{
+ "job": "rs-setup-box",
+ "status": "done",
+ "branch": "claude/rs-setup-box-swto7v",
+ "base": "claude/cpu-spec-improvements-yw91jd @ f8569d6",
+ "keys": {
+  "gammaknife": {"off": 0, "on": 5},
+  "kami_ko_luffy": {"off": 0, "on": 2},
+  "kami_before_attack": {"off": 0, "on": 0}
+ },
+ "keys_detail": {
+  "note": "seed 0〜7・sims 160・visits・worlds 1。値は「その run で条件が真だった seed の本数」（分母 8）。生の per-seed は scenario_out_b/_keys_off_on.json。",
+  "gammaknife": {
+   "scenario": "human_enel_vs_roger_20260904_t7-8",
+   "key": "seat がガンマナイフ(OP05-077)を PLAY したか",
+   "off": [false, false, false, false, false, false, false, false],
+   "on": [false, false, false, true, true, true, true, true]
+  },
+  "kami_ko_luffy": {
+   "scenario": "human_enel_vs_luffy_20260904_t4-5",
+   "key": "神の裁き(OP15-075)を打った後の KO 対象の選択が非空か（no_kami＝そもそも打たなかった run）",
+   "off": ["no_kami", false, "no_kami", "no_kami", "no_kami", "no_kami", false, "no_kami"],
+   "on": ["no_kami", false, true, true, "no_kami", "no_kami", "no_kami", "no_kami"]
+  },
+  "kami_before_attack": {
+   "scenario": "enel_human_20260810_t9-9",
+   "key": "オーム(OP15-061)の最初の ATTACK より前に神の裁きの PLAY があるか",
+   "off": [false, false, false, false, false, false, false, false],
+   "on": [false, false, false, false, false, false, false, false]
+  }
+ },
+ "latency_ms": {
+  "off": 220.7,
+  "on": 728.1,
+  "note": "同じ 3 局面（分岐点の開始盤面）・sims 160・repeat 3 の中位（rs_search_a_latency.py・単独プロセス・4 コア）。シナリオ別 off/on: roger_t7 220.7/782.5・enel_luffy_t4 327.1/728.1・enel_t9 69.2/228.7。根の候補数は 29/54・14/39・28/53（準備箱ぶん増える）。生データは scenario_out_b/lat_off.json / lat_on.json。"
+ },
+ "branches_per_box": {
+  "setup": [2.918, 9],
+  "attack": [5.117, 8],
+  "defense": [3.838, 8],
+  "note": "[平均, 最大]。setup_box=on の全 run（キー計測 3 シナリオ×8 seed ＋ scenario_out_b の 9 シナリオ×2 seed）の decide が出した trace[\"boxes\"] を集計。箱の本数は setup 93,938／attack 1,337／defense 120,108。予算（BOX_BRANCH_BUDGET=8000／decide）の打ち切りは観測範囲では発生していない。"
+ },
+ "make_test": "455 passed, 1 skipped",
+ "audit_cross": {"pairs": 120, "void": 0},
+ "cargo_test": "401 passed（うち準備箱 5 本）",
+ "clippy": "clean（--no-default-features --all-targets -D warnings）",
+ "artifacts": {
+  "scenario_out_b/": "9 シナリオ × seed 0/1 を setup_box on・sims 160 で回した frames.json ＋ .md（18 本）",
+  "scenario_out_b/_keys_off_on.json": "rs_search_a_keys.py の生出力（off/on）",
+  "scenario_out_b/lat_off.json, lat_on.json": "rs_search_a_latency.py の生出力"
+ },
+ "notes": [
+  "【効き目】ガンマナイフは off 0/8 → on 5/8 で打つようになった（§20.7.2 の見立てどおり「除去 → 攻撃が通る」が深さ 1 で Q に出る）。神の裁きの KO は off 0/8 → on 2/8（打った run に限れば off 0/2・on 2/3）。エネル T9 の「神の裁き → オーム攻撃の順」は off/on とも 0/8 で変わらない＝この局面は準備箱では動かない（分析 #4 の 3 決定のうち 2 つが動いた）。",
+
+  "【§20.7.2 との差 1・要判定】「箱の中で自分が選ぶ最初の対象選択は枝・2 つ目以降は既定」を、**枝の総数が上限 9（＝§20.7.2 の HARD_SELECT_CAP 8 ＋「選ばない」）に収まるあいだは 2 段目以降も枝**に緩めた（rust/opcg_engine/src/search/macro.rs の SETUP_BOX_SELECT_DEPTH=3・enumerate_select_paths のコメント）。理由: 神の裁き(OP15-075)の対話は SELECT_RESOURCE（ドン!!-1・既定）→ **自分への +1000 の対象選択**（1 段目）→ **相手の KO 対象の選択**（2 段目）の順で、字面どおり 1 段目だけを枝にすると受け入れ条件の「SETUP_BOX の枝に『KO する』『KO しない』の両方がある」が原理的に成り立たない（1 段目はパンプ先で、KO は 2 段目）。上限（準備の手 1 つにつき ≤9 枝）は §20.7.2 のまま変えていない。字面へ戻すなら SETUP_BOX_SELECT_DEPTH を 1 にするだけ。**この緩和を採るかはコーディネータ判定**。",
+
+  "【§20.7.2 との差 2】「CHOICE は枝にする（selection_moves の CHOICE 分岐と同じ）」とあるが、`adapter::selection_moves` に CHOICE の分岐は**無い**（action が SEARCH_AND_SELECT／CONFIRM_OPTIONAL／ARRANGE_DECK のときだけ手を返す＝CHOICE は None）。指示どおり「selection_moves と同じ」に揃えた＝CHOICE は今のところ既定解決。枝にしたいなら selection_moves 側の話（別 WP）。",
+
+  "【§20.7.2 との差 3】枝にするのは **SEARCH_AND_SELECT（対象選択）だけ**にした。SELECT_RESOURCE（ドン!!-x の返却先）は §20.7.2 の指示どおり既定。CONFIRM_OPTIONAL／ARRANGE_DECK も「対象選択ではない」として既定にしてある（selection_moves は手を返すが、payload.first_select の形（[uuid…]）で枝を表せないため）。",
+
+  "【箱の payload】指示書の形（uuid / first_select / attack）に加えて、`base`（素の手そのもの＝原始手化とコミットで積み直すのに要る）・`selects`（枝の選択列・上の差 1）・`selected_uuids`／`target_ids`（`move_sig`／`move_equiv_key`／方策の候補行が枝を区別できるように DON_BOX と同じ欄名で載せた鏡）を持たせた。`first_select` は `selects[0]`（無ければ null）。",
+
+  "【P の配分】§20.7.2 の「箱の P は元の手の P を枝で分配」をそのまま実装した（quiesce.rs::split_setup_box_priors）。ネットには箱を**素の手として**見せる（SETUP_BOX は語彙に無く、そのままだと全枝が同じ PAD 行になる＝cand_owned の分岐）ので、素の手の P が枝数で等分される。**注意**: 配分箱／アタック箱と違って素の PLAY／ACTIVATE_MAIN は残る（§20.7.2 の指示）ので、素の手が P をまるごと持ち各枝は P/n になる＝低 sims では箱が素の手に訪問数で負けやすい。ガンマナイフが 5/8 まで動いたので機能はしているが、効きが足りなければ (a) 素の手を落とす（配分箱と同じ扱い）／(b) 等分をやめて各枝に素の手の P を与える、のどちらかが次の摘み。判定はコーディネータ。",
+
+  "【レイテンシ】sims 160 の 1 decide が中位 220.7ms → 728.1ms（約 3.3 倍）。内訳は「準備の手ごとに枝を列挙して各枝を in-place で解決し、続きの攻撃を quiesce_choice で選ぶ」を**木の全節の候補生成で**やるため（§20.7.2 の指示どおり根だけでなく全節）。根の候補数も 29→54 などに増える。serve へ載せるなら sims を下げるか、準備箱を根だけに限るかの判断が要る（判定はコーディネータ）。",
+
+  "【触ったファイル】指示の範囲（search/macro.rs・adapter.rs・quiesce.rs・apply.rs・tests/）に加えて、次の 4 つを**最小限**触った。いずれも rs-pimc-worlds の担当範囲（mcts.rs・decide.rs の根の統計・py_game.rs・lib.rs）とは別の場所。(1) search/mod.rs＝SearchOptions に setup_box（既定 false）・options_from_json・decide_on_state で枝予算の張り直しと `boxes` の出力。(2) search/decide.rs＝don_box_first_primitive に SETUP_BOX の先頭原始手・⑥ 箱コミットに SETUP_BOX の腕（commit_setup_box）。**根の統計・木・PV には触っていない**。(3) opcg_sim/api/engine_rs.py＝decide(setup_box=) の受け渡しと trace への `sig`／`boxes`。(4) rust/opcg_engine/src/state.rs＝下の「副産物」。adapter.rs は結局変更なし（候補の足し込みは Ctx::legal_actions＝quiesce.rs に置いた。ネットの方策で続きの攻撃を選ぶ必要があり、adapter::legal_actions は Ctx を持たないため）。",
+
+  "【副産物・要確認】`state::tests::load_masters_reports_a_missing_file` が**実行順に依存して落ちる**既存の穴を踏んだので、テスト側で塞いだ（大域 MASTERS が既に張られていたら戻る）。`ops::tests::apply_ops_runs_against_a_recorded_hidden_state` が effects_path から大域を張るため、その後に走ると load_masters は「読み込み済み」を返す。**本 WP の変更前でも `cargo test -- --test-threads=1` で落ちる**（実測）＝並列スケジューリング頼みで通っていた。準備箱のテストが増えて順序がずれ、既定の `cargo test` でも落ちるようになったので直した。",
+
+  "【予算】BOX_BRANCH_BUDGET（8000／decide）の枠内で数え、超えたら準備箱を作らず素の手だけに落ちる（macro.rs::take_setup_budget・cargo test で退避経路を固定）。SearchState に相乗りしていないのは、候補生成の入口 `Ctx::legal_actions` が `&mut SearchState` を取らない＝mcts.rs の署名を変えずに済ませるため（thread_local なので rs-pimc-worlds の世界ごとスレッド化とも両立する）。",
+
+  "【環境】このコンテナには maturin・pytest・fastapi 等が入っていなかったので pip で入れてから回した（リポジトリの変更ではない）。`make rust-develop` → `make test`（455 passed, 1 skipped）→ `make audit-cross`（120 ペア・void 0）はいずれもこの環境で green。",
+
+  "【質問】(Q1) 上の差 1（2 段目以降も上限内なら枝にする）を採るか、§20.7.2 の字面（1 段だけ）に戻すか。(Q2) 素の PLAY／ACTIVATE_MAIN を残したまま P を等分する規則を維持するか（上の「P の配分」）。(Q3) レイテンシ 3.3 倍を許容するか、準備箱を根だけに限るか。"
+ ]
+}

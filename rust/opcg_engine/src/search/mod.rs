@@ -26,6 +26,8 @@ pub mod prune;
 pub mod quiesce;
 #[cfg(test)]
 mod tests_search;
+#[cfg(test)]
+mod tests_setup_box;
 
 #[allow(unused_imports)]
 pub use rng::{Pcg32SearchRng, RecordedRng, SearchRng};
@@ -49,11 +51,23 @@ pub struct SearchOptions {
     pub defense_box: bool,
     /// `cpu_ai.DON_MARGIN_ATTACH` の席別上書き（None＝既定）
     pub don_margin: Option<i32>,
+    /// 準備箱（§20.7.2・WP `rs-setup-box`）。**既定 false＝1 bit も変わらない**。
+    ///
+    /// `true` で (1) 準備の手（メインイベント／起動メイン／登場時持ちの PLAY）を
+    /// 「対話の最初の対象選択 × 続きの攻撃 1 回」の箱（`SETUP_BOX`）として候補に足し、
+    /// (2) 攻撃箱／防御箱の中でも「自分が選ぶ最初の対象選択」を 1 段だけ枝にする。
+    pub setup_box: bool,
 }
 
 impl Default for SearchOptions {
     fn default() -> Self {
-        SearchOptions { prune_futile: true, macro_moves: true, defense_box: true, don_margin: None }
+        SearchOptions {
+            prune_futile: true,
+            macro_moves: true,
+            defense_box: true,
+            don_margin: None,
+            setup_box: false,
+        }
     }
 }
 
@@ -105,6 +119,7 @@ fn options_from_json(v: &Value) -> SearchOptions {
             Some(Value::Bool(b)) => Some(i32::from(*b)),
             Some(other) => other.as_i64().map(|n| n as i32),
         },
+        setup_box: flag("setup_box", d.setup_box),
     }
 }
 
@@ -253,6 +268,9 @@ pub fn decide_on_state(
     rng: &mut dyn SearchRng,
     carry: &decide::DecideCarry,
 ) -> Result<Value, EngineError> {
+    // 準備箱（§20.7.2）の枝予算と計測をこの decide のぶんだけ張る（既定 false のときは
+    // 1 度も触られない＝出力にも `boxes` は出ない）。
+    r#macro::reset_setup_state(opts.search.setup_box);
     let out = decide::decide(masters, net, state, name, opts, rng, carry)?;
     // 複数世界（§20.7.1）の欄は `worlds>1` のときだけ出す＝**既定（1 本）の戻り値は
     // 1 bit も変わらない**（Python 側の trace の形も変わらない）。
@@ -280,6 +298,7 @@ pub fn decide_on_state(
                 .into(),
         );
     }
+    let boxes = r#macro::take_setup_stats();
     let mut body = serde_json::json!({
         "move": out.mv,
         // 棋譜ダンプの鍵（箱レベル・原始手化と残り掘りの前＝Python `record["sig"]`／`["k"]`）
@@ -302,6 +321,8 @@ pub fn decide_on_state(
         "commit": out.carry.commit.iter().map(decide::Step::to_json).collect::<Vec<_>>(),
         "resact_pending": out.carry.resact_pending,
         "budget": {"used": out.budget_used, "exhausted": out.budget_exhausted},
+        // 箱ごとの枝数（§20.7.2 の共通規則の計測・`setup_box=false` なら `null`）。
+        "boxes": boxes,
     });
     if let Some(o) = body.as_object_mut() {
         o.extend(worlds_fields);

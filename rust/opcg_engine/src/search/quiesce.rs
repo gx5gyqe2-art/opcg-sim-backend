@@ -171,8 +171,35 @@ impl<'a> Ctx<'a> {
     }
 
     /// Python `OPCGGame.legal_actions`（探索用の候補・順序込み）。
+    ///
+    /// `opts.setup_box`（既定 false）のときだけ、準備箱（`SETUP_BOX`・§20.7.2）を末尾に足す。
     pub fn legal_actions(&self, s: &mut Session) -> Result<Vec<Move>, EngineError> {
-        adapter::legal_actions(s, self.masters, &self.opts)
+        let mut moves = adapter::legal_actions(s, self.masters, &self.opts)?;
+        if !self.opts.setup_box {
+            return Ok(moves);
+        }
+        let Some((seat, "MAIN_ACTION")) = crate::rules::pending::pending_actor_action(s) else {
+            return Ok(moves);
+        };
+        let boxes = super::r#macro::setup_box_candidates(self, s, seat, &moves)?;
+        moves.extend(boxes);
+        Ok(moves)
+    }
+
+    /// 準備箱を切った文脈（箱の中で候補生成が再帰しないようにする）。
+    pub fn without_setup_box(&self) -> Ctx<'a> {
+        Ctx {
+            masters: self.masters,
+            net: self.net,
+            opts: SearchOptions {
+                setup_box: false,
+                ..self.opts.clone()
+            },
+            box_battle: self.box_battle,
+            box_dialog: self.box_dialog,
+            quiesce: self.quiesce,
+            quiesce_max_plies: self.quiesce_max_plies,
+        }
     }
 
     /// Python `cpu_learned._value_fn`（NRel＝`predict_state`・終局は ±1）。
@@ -243,7 +270,7 @@ impl<'a> Ctx<'a> {
             Err(_) => return Ok(None),
         };
         match crate::net::priors(&self.net.weights, &self.net.tab, &enc, &cands) {
-            Ok(p) if p.len() == legal.len() => Ok(Some(p)),
+            Ok(p) if p.len() == legal.len() => Ok(Some(split_setup_box_priors(legal, p))),
             Ok(_) => Ok(None),
             Err(e @ EngineError::Unimplemented(_)) => Err(e),
             Err(_) => Ok(None),
@@ -275,6 +302,34 @@ impl<'a> Ctx<'a> {
             &borrowed,
         )
     }
+}
+
+/// §20.7.2「箱の P は元の手の P を枝で分配」: 同じ準備の手から出た `SETUP_BOX` の
+/// 事前確率を枝数で等分する（候補行は素の手と同じなので、素の手の P がそのまま出ている）。
+fn split_setup_box_priors(legal: &[Move], mut p: Vec<f32>) -> Vec<f32> {
+    fn key(mv: &Move) -> Option<&str> {
+        if mv.get("action_type").and_then(Value::as_str) != Some("SETUP_BOX") {
+            return None;
+        }
+        mv.get("payload")
+            .and_then(|x| x.get("uuid"))
+            .and_then(Value::as_str)
+    }
+    let mut counts: HashMap<&str, usize> = HashMap::new();
+    for mv in legal {
+        if let Some(u) = key(mv) {
+            *counts.entry(u).or_insert(0) += 1;
+        }
+    }
+    if counts.is_empty() {
+        return p;
+    }
+    for (i, mv) in legal.iter().enumerate() {
+        if let Some(n) = key(mv).and_then(|u| counts.get(u)) {
+            p[i] /= *n as f32;
+        }
+    }
+    p
 }
 
 /// 手 1 件から解けた識別（`nrel::CandRef` の所有版）。
@@ -350,6 +405,28 @@ pub fn cand_owned(
     mv: &Move,
 ) -> CandOwned {
     let null = Value::Null;
+    // 準備箱（§20.7.2）はネットに**素の手として**見せる（`SETUP_BOX` は語彙に無い＝
+    // どの枝も同じ PAD 行になってしまう）。枝ごとの配分は `split_setup_box_priors`。
+    if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
+        if let Some(base) = mv.get("payload").and_then(|p| p.get("base")) {
+            let mut c = cand_owned(state, masters, uidx, slots, base);
+            // 続きの攻撃の対象は箱の payload 側にだけある（素の手には無い）。
+            if let Some(t) = mv
+                .get("payload")
+                .and_then(|p| p.get("target_ids"))
+                .and_then(Value::as_array)
+                .and_then(|a| a.first())
+                .and_then(Value::as_str)
+            {
+                c.has_target = true;
+                c.target_card_id = uidx
+                    .get(t)
+                    .map(|i| masters.get(state.card(*i).master).card_id.clone());
+                c.ti = slots.get(t).copied().unwrap_or(-1);
+            }
+            return c;
+        }
+    }
     let p = mv.get("payload").unwrap_or(&null);
     let su = mv
         .get("card_uuid")
@@ -455,6 +532,11 @@ pub fn resolve_battle_inplace(
     mut trace: Option<&mut Vec<(Seat, Move)>>,
 ) -> Result<usize, EngineError> {
     let mut n = 0usize;
+    // §20.7.2 の共通規則（`setup_box=true` のときだけ）: 攻撃箱／防御箱の中でも
+    // 「**自分が**選ぶ最初の対象選択」を 1 段だけ枝にする（2 つ目以降と相手側は既定のまま）。
+    // 深い箱（`box_depth > 0`）では下の一般の枝評価が全 ply を見るので、ここは
+    // 既定解決に落ちていた入れ子（`box_depth <= 0`）のためにある。
+    let mut sel_branch_left = usize::from(ctx.opts.setup_box && box_depth >= 0);
     for _ in 0..max_plies {
         if ctx.is_terminal(s) || !window.holds(s) {
             break;
@@ -468,6 +550,26 @@ pub fn resolve_battle_inplace(
         }
         let mut pick: Option<usize> = None;
         if box_value && box_depth > 0 && legal.len() > 1 {
+            let vals = resolved_branch_values(
+                ctx,
+                s,
+                st,
+                name,
+                &legal,
+                max_plies,
+                box_depth - 1,
+                window,
+            )?;
+            pick = best_branch(&vals);
+        }
+        if pick.is_none()
+            && sel_branch_left > 0
+            && legal.len() > 1
+            && own_first_selection(s, ctx, name)
+        {
+            sel_branch_left -= 1;
+            let is_attack = s.state().turn_player == name;
+            super::r#macro::record_window_branches(is_attack, legal.len());
             let vals = resolved_branch_values(
                 ctx,
                 s,
@@ -514,6 +616,8 @@ pub fn resolved_branch_values(
     if !st.budget.take(legal.len()) {
         return Ok(vec![None; legal.len()]);
     }
+    // §20.7.2 の共通規則: この箱の持ち主（＝相手側の選択は枝にしない）。
+    let prev_seat = super::r#macro::set_branch_seat(Some(name));
     // CRN: 全枝を同一の乱数列から評価し、抜けるときに戻す（Python の `random.getstate/setstate`）。
     let base_rng = s.rng.snapshot();
     let mut vals = Vec::with_capacity(legal.len());
@@ -545,7 +649,27 @@ pub fn resolved_branch_values(
         vals.push(v);
     }
     s.rng.restore(&base_rng);
+    super::r#macro::set_branch_seat(prev_seat);
     Ok(vals)
+}
+
+/// 今の中断が「`name` 自身が選ぶ対象選択」か（§20.7.2 の共通規則の適用条件）。
+///
+/// 相手のブロック／カウンター／相手のトリガーは対象外（`may_branch_selection` が席で弾く）。
+fn own_first_selection(s: &mut Session, ctx: &Ctx, name: Seat) -> bool {
+    if !super::r#macro::may_branch_selection(name) {
+        return false;
+    }
+    match crate::rules::pending::pending_actor_action(s) {
+        Some((seat, action)) => {
+            seat == name
+                && action == adapter::SELECT_ACTION
+                && adapter::selection_moves(s, ctx.masters, name)
+                    .map(|a| a.len() >= 2)
+                    .unwrap_or(false)
+        }
+        None => false,
+    }
 }
 
 #[cfg(test)]

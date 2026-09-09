@@ -494,7 +494,12 @@ pub fn merge_root_stats(
 }
 
 /// Python `cpu_ai.don_box_first_primitive`（DON_BOX → 先頭原始手）。
+///
+/// 準備箱（`SETUP_BOX`・§20.7.2）も同じ規約で先頭原始手（素の PLAY／ACTIVATE_MAIN）へ落とす。
 pub fn don_box_first_primitive(mv: &Move) -> Move {
+    if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
+        return super::r#macro::setup_box_first_primitive(mv);
+    }
     if mv.get("action_type").and_then(Value::as_str) != Some("DON_BOX") {
         return mv.clone();
     }
@@ -778,6 +783,25 @@ fn commit_play_dialog_in_world(
     trace_to_steps(&trace, name)
 }
 
+/// 準備箱（`SETUP_BOX`・§20.7.2）の「素の手より後」の手順をコミットへ積む。
+///
+/// `commit_play_dialog` と同じ流儀（世界サンプルの上で継続を打ち直し、自分の手だけ手順化）。
+fn commit_setup_box(
+    ctx: &Ctx,
+    real: &GameState,
+    name: Seat,
+    mv: &Move,
+    rng: &mut dyn SearchRng,
+) -> Result<Vec<Step>, EngineError> {
+    let world = super::determinize::determinize_with(real, name, rng)?;
+    let mut s = Session::new(world);
+    match super::r#macro::setup_box_continuation(&mut s, ctx.masters, name, mv) {
+        Ok(trace) => Ok(trace_to_steps(&trace, name)),
+        Err(e @ EngineError::Unimplemented(_)) => Err(e),
+        Err(_) => Ok(Vec::new()), // コミット生成の失敗は手を止めない（Python の `except: pass`）
+    }
+}
+
 // --- 残ドン掘り／残り起動（腕 A・A2）------------------------------------------------
 
 /// Python `cpu_learned.DON_RAMP_MARK`。
@@ -1038,6 +1062,12 @@ fn run_worlds(
             .map(|i| {
                 let seed = seed0.wrapping_add(i as u64);
                 scope.spawn(move || -> Result<(WorldRun, i64, u64), EngineError> {
+                    // 準備箱（§20.7.2）の状態は **thread_local**（`macro::SETUP`）＝新しい
+                    // スレッドでは既定（無効）で始まる。世界 0（このスレッド）と同じ候補列挙に
+                    // するため、世界ごとに張り直す（張らないと世界 1 以降だけ箱が出ず、根の
+                    // `legal` が世界 0 と食い違って `unmapped` に落ちる）。枝の計測は世界 0 の
+                    // ぶんだけが `boxes` に出る（他世界の計測はスレッドと共に捨てる）。
+                    super::r#macro::reset_setup_state(opts.search.setup_box);
                     let mut r = super::rng::Pcg32SearchRng::new(seed);
                     let mut wst = SearchState {
                         budget: BoxBudget::new(opts.budget),
@@ -1418,6 +1448,13 @@ fn decide_inner(
                         carry.commit = steps;
                     }
                 }
+                // 準備箱（§20.7.2）: 素の手より後（対話 → 攻撃箱）を機械実行へ積む。
+                Some("SETUP_BOX") => {
+                    let steps = commit_setup_box(ctx, state, name, &m, rng)?;
+                    if !steps.is_empty() {
+                        carry.commit = steps;
+                    }
+                }
                 _ => {}
             }
         }
@@ -1446,7 +1483,7 @@ fn decide_inner(
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
 
     #[test]
@@ -1645,7 +1682,7 @@ mod tests {
     /// テスト用のゼロ重みネット（forward は全て 0＝priors 一様・value 0）。vocab は空＝
     /// 全カードが PAD 行（index 0）を指す（盤面差は読まないが、形は正しいので木は普通に回る）。
     /// `principal_variation` の検証に要るのは「木が壊れず回ること」だけなので十分。
-    fn zero_net() -> crate::net::LoadedNet {
+    pub(in crate::search) fn zero_net() -> crate::net::LoadedNet {
         use crate::encode::{Vocab, ABILITY_DIM, MAX_AB, R_DIM, STATS_DIM};
         use crate::net::nrel::{CardStatics, D_AB};
         use crate::net::{Mat, NRelWeights, D_C, D_PIN, D_R, D_T, D_X, D_Z};
