@@ -54,9 +54,22 @@ pub struct SearchOptions {
     /// 準備箱（§20.7.2・WP `rs-setup-box`）。**既定 false＝1 bit も変わらない**。
     ///
     /// `true` で (1) 準備の手（メインイベント／起動メイン／登場時持ちの PLAY）を
-    /// 「対話の最初の対象選択 × 続きの攻撃 1 回」の箱（`SETUP_BOX`）として候補に足し、
+    /// 「発動 → 対象選択 → 効果」の箱（`SETUP_BOX`・§20.7.8）として候補に足し、
     /// (2) 攻撃箱／防御箱の中でも「自分が選ぶ最初の対象選択」を 1 段だけ枝にする。
     pub setup_box: bool,
+    /// 診断つまみ（§20.7.8 の 5・既定 `None`＝[`SearchOptions::setup_box`] に従う）。
+    ///
+    /// 明示すると (2) の**共通規則だけ**（`quiesce::resolve_battle_inplace` の
+    /// `sel_branch_left`・`macro::may_branch_selection`）を on/off できる。準備箱そのもの
+    /// （(1)）は [`SearchOptions::setup_box`] のまま。
+    pub select_branch: Option<bool>,
+}
+
+impl SearchOptions {
+    /// 共通規則（自分の対象選択を枝にする）が入っているか（§20.7.8 の 5）。
+    pub fn select_branch_on(&self) -> bool {
+        self.select_branch.unwrap_or(self.setup_box)
+    }
 }
 
 impl Default for SearchOptions {
@@ -67,6 +80,7 @@ impl Default for SearchOptions {
             defense_box: true,
             don_margin: None,
             setup_box: false,
+            select_branch: None,
         }
     }
 }
@@ -120,6 +134,8 @@ fn options_from_json(v: &Value) -> SearchOptions {
             Some(other) => other.as_i64().map(|n| n as i32),
         },
         setup_box: flag("setup_box", d.setup_box),
+        // §20.7.8 の 5: 欄が無い／null＝None（`setup_box` に従う）。
+        select_branch: v.get("select_branch").and_then(Value::as_bool),
     }
 }
 
@@ -269,8 +285,8 @@ pub fn decide_on_state(
     carry: &decide::DecideCarry,
 ) -> Result<Value, EngineError> {
     // 準備箱（§20.7.2）の枝予算と計測をこの decide のぶんだけ張る（既定 false のときは
-    // 1 度も触られない＝出力にも `boxes` は出ない）。
-    r#macro::reset_setup_state(opts.search.setup_box);
+    // 1 度も触られない＝出力にも `boxes` は出ない）。共通規則の入り切りは §20.7.8 の 5。
+    r#macro::reset_setup_state(opts.search.setup_box, opts.search.select_branch_on());
     let out = decide::decide(masters, net, state, name, opts, rng, carry)?;
     // 複数世界（§20.7.1）の欄は `worlds>1` のときだけ出す＝**既定（1 本）の戻り値は
     // 1 bit も変わらない**（Python 側の trace の形も変わらない）。
@@ -313,6 +329,11 @@ pub fn decide_on_state(
         },
         "groups": out.groups.iter().map(|g| serde_json::json!({
             "rep": g.rep, "idxs": g.idxs, "n": g.n, "q": g.q,
+        })).collect::<Vec<_>>(),
+        // 選択規則の束ね（§20.7.8 の 4・準備箱の枝を同じ card_id で 1 グループに束ねたもの。
+        // 箱が 1 つも無い decide では空＝`groups` の形は変えない）。
+        "select_groups": out.select_groups.iter().map(|g| serde_json::json!({
+            "key": g.key, "n": g.n, "rep": g.rep, "q": g.q,
         })).collect::<Vec<_>>(),
         // PV（主変化・§20.4・kind=main のときだけ埋まる）。
         "pv": out.pv.iter().map(|p| serde_json::json!({

@@ -282,7 +282,8 @@ class RsGame:
               net: Optional[str] = None, sims: Optional[int] = None,
               action_index: Optional[int] = None, select_rule: Optional[str] = None,
               q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None,
-              worlds: Optional[int] = None, setup_box: Optional[bool] = None):
+              worlds: Optional[int] = None, setup_box: Optional[bool] = None,
+              select_branch: Optional[bool] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -301,11 +302,14 @@ class RsGame:
         Rust が K 本の世界で同じ sims の木を**並列**に回して根の統計を束ねる（N は和・Q は N
         重みの平均）。trace に `worlds`／`world_used`／`per_world`（世界ごとの根の N/Q と最善手）
         が入る。**省略すれば 1 本＝今までと同じ**（trace の欄も増えない）。
+
+        `select_branch`（省略可・§20.7.8 の 5）＝診断つまみ。全箱共通の「自分の対象選択を
+        枝にする」規則だけを on/off する（`None`＝`setup_box` に従う＝今までどおり）。
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
                                 select_rule=select_rule, q_min_frac=q_min_frac,
                                 root_prior_temp=root_prior_temp, worlds=worlds,
-                                setup_box=setup_box)
+                                setup_box=setup_box, select_branch=select_branch)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
@@ -313,7 +317,8 @@ class RsGame:
     def _decide(self, player_id: str, net: Optional[str] = None, sims: Optional[int] = None,
                action_index: Optional[int] = None, select_rule: Optional[str] = None,
                q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None,
-               worlds: Optional[int] = None, setup_box: Optional[bool] = None):
+               worlds: Optional[int] = None, setup_box: Optional[bool] = None,
+               select_branch: Optional[bool] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -354,6 +359,9 @@ class RsGame:
         # §20.7.2（WP `rs-setup-box`）: 準備箱。None＝渡さない＝Rust 側の既定（false）。
         if setup_box is not None:
             opts["setup_box"] = bool(setup_box)
+        # §20.7.8 の 5（診断つまみ）: None＝渡さない＝Rust 側の既定（setup_box に従う）。
+        if select_branch is not None:
+            opts["select_branch"] = bool(select_branch)
         out = json.loads(self._game.decide(player_id, json.dumps(opts)))
         self._carry_key = (turn, seat)
         self._carry = {"commit": out.get("commit") or [],

@@ -175,8 +175,8 @@ impl<'a> Ctx<'a> {
     /// `opts.setup_box`（既定 false）のときだけ、準備箱（`SETUP_BOX`・§20.7.2）を末尾に足す。
     ///
     /// §20.7.6（WP `rs-setup-box-2`）: **箱ができた準備の手（素の PLAY／ACTIVATE_MAIN）は
-    /// 候補から落とす**（配分箱・アタック箱と同じ扱い）。素の手の意味は「攻撃しない」枝
-    /// （`payload.attack` が null）が持つ（`setup_box_candidates` がその枝を必ず 1 本作る）。
+    /// 候補から落とす**（配分箱・アタック箱と同じ扱い）。§20.7.8 では箱が「発動 → 対象選択 →
+    /// 効果」で止まる＝素の手の意味は各枝がそのまま持つ。
     /// 箱が作れなかった準備の手（予算切れ・素の手が今の盤面で打てない）は今までどおり残る。
     pub fn legal_actions(&self, s: &mut Session) -> Result<Vec<Move>, EngineError> {
         let mut moves = adapter::legal_actions(s, self.masters, &self.opts)?;
@@ -267,13 +267,17 @@ impl<'a> Ctx<'a> {
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
             Err(_) => return Ok(None),
         };
+        // §20.7.8 の 3: 同じ準備の手（`payload.base`）から出た `SETUP_BOX` の枝は、ネットには
+        // **1 行**として見せる（枝の候補行は素の手の行そのものなので、k 本並べると softmax が
+        // その手を k 回数えてしまう）。行の P を枝へ配るのは下の `setup_branch_shares`。
+        let rows = setup_row_map(legal);
         let refs: Vec<CandOwned> = {
             let state = s.state();
             let slots = slot_index(state, me);
             let uidx = uuid_index(state);
-            legal
+            rows.heads
                 .iter()
-                .map(|mv| cand_owned(state, self.masters, &uidx, &slots, mv))
+                .map(|i| cand_owned(state, self.masters, &uidx, &slots, &legal[*i]))
                 .collect()
         };
         let cands = match self.cand_rows(&enc, &refs) {
@@ -281,15 +285,60 @@ impl<'a> Ctx<'a> {
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
             Err(_) => return Ok(None),
         };
-        match crate::net::priors(&self.net.weights, &self.net.tab, &enc, &cands) {
-            // §20.7.6: 準備箱の P は**等分しない**（各枝が素の手の候補行を持つ＝ネットが
-            // 出した素の手の P がそのまま各枝の P になる）。等分すると PUCT で素の手に
-            // 負ける構造ができ、箱を読ませたい意図と逆に働いた（分析 #6 §3）。
-            Ok(p) if p.len() == legal.len() => Ok(Some(p)),
-            Ok(_) => Ok(None),
-            Err(e @ EngineError::Unimplemented(_)) => Err(e),
-            Err(_) => Ok(None),
+        let p_rows = match crate::net::priors(&self.net.weights, &self.net.tab, &enc, &cands) {
+            Ok(p) if p.len() == rows.heads.len() => p,
+            Ok(_) => return Ok(None),
+            Err(e @ EngineError::Unimplemented(_)) => return Err(e),
+            Err(_) => return Ok(None),
+        };
+        if rows.heads.len() == legal.len() {
+            return Ok(Some(p_rows)); // 箱が無い＝今までどおり（1 bit も変わらない）
         }
+        // 箱の枝の P ＝「素の手の P（＝行の P）× 対象選択の P」＝枝の和が素の手の P。
+        let shares = self.setup_branch_shares(s, me, legal)?;
+        Ok(Some(
+            (0..legal.len())
+                .map(|i| p_rows[rows.row_of[i]] * shares[i])
+                .collect(),
+        ))
+    }
+
+    /// 枝ごとの配分（非 `SETUP_BOX` は 1.0・同じ準備の手の枝は和 1）。
+    fn setup_branch_shares(
+        &self,
+        s: &mut Session,
+        me: Seat,
+        legal: &[Move],
+    ) -> Result<Vec<f32>, EngineError> {
+        let mut w = vec![1.0f32; legal.len()];
+        let mut bases: Vec<(&Value, Vec<usize>)> = Vec::new();
+        for (i, mv) in legal.iter().enumerate() {
+            if mv.get("action_type").and_then(Value::as_str) != Some("SETUP_BOX") {
+                continue;
+            }
+            let Some(base) = mv.get("payload").and_then(|p| p.get("base")) else {
+                continue;
+            };
+            match bases.iter_mut().find(|(b, _)| *b == base) {
+                Some((_, idxs)) => idxs.push(i),
+                None => bases.push((base, vec![i])),
+            }
+        }
+        if bases.is_empty() {
+            return Ok(w);
+        }
+        let state = s.state().clone();
+        for (base, idxs) in &bases {
+            let firsts: Vec<Vec<Value>> = idxs
+                .iter()
+                .map(|i| super::r#macro::setup_box_first_select(&legal[*i]))
+                .collect();
+            let ws = super::r#macro::setup_branch_weights(self, &state, me, base, &firsts)?;
+            for (k, i) in idxs.iter().enumerate() {
+                w[*i] = ws[k];
+            }
+        }
+        Ok(w)
     }
 
     fn cand_rows(
@@ -317,6 +366,40 @@ impl<'a> Ctx<'a> {
             &borrowed,
         )
     }
+}
+
+/// ネットに見せる候補行と `legal` の対応（§20.7.8 の 3）。
+///
+/// 同じ準備の手（`payload.base`）から出た `SETUP_BOX` の枝は**1 行**に畳む
+/// （枝の候補行は素の手の行そのもの＝k 本並べると softmax がその手を k 回数えてしまう）。
+struct RowMap {
+    /// 各行の代表となる `legal` の添字（`legal` の初出順）
+    heads: Vec<usize>,
+    /// `legal` の添字 → 行の添字
+    row_of: Vec<usize>,
+}
+
+fn setup_row_map(legal: &[Move]) -> RowMap {
+    let mut heads: Vec<usize> = Vec::with_capacity(legal.len());
+    let mut row_of: Vec<usize> = Vec::with_capacity(legal.len());
+    let mut seen: Vec<(&Value, usize)> = Vec::new();
+    for (i, mv) in legal.iter().enumerate() {
+        let base = if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
+            mv.get("payload").and_then(|p| p.get("base"))
+        } else {
+            None
+        };
+        if let Some(base) = base {
+            if let Some((_, row)) = seen.iter().find(|(b, _)| *b == base) {
+                row_of.push(*row);
+                continue;
+            }
+            seen.push((base, heads.len()));
+        }
+        row_of.push(heads.len());
+        heads.push(i);
+    }
+    RowMap { heads, row_of }
 }
 
 /// 手 1 件から解けた識別（`nrel::CandRef` の所有版）。
@@ -393,25 +476,11 @@ pub fn cand_owned(
 ) -> CandOwned {
     let null = Value::Null;
     // 準備箱（§20.7.2）はネットに**素の手として**見せる（`SETUP_BOX` は語彙に無い＝
-    // どの枝も同じ PAD 行になってしまう）。枝ごとの配分は `split_setup_box_priors`。
+    // どの枝も同じ PAD 行になってしまう）。枝ごとの配分は `Ctx::setup_branch_shares`
+    // （§20.7.8 の 3＝行は 1 本に畳んでから、その P を対象選択の P で割り振る）。
     if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
         if let Some(base) = mv.get("payload").and_then(|p| p.get("base")) {
-            let mut c = cand_owned(state, masters, uidx, slots, base);
-            // 続きの攻撃の対象は箱の payload 側にだけある（素の手には無い）。
-            if let Some(t) = mv
-                .get("payload")
-                .and_then(|p| p.get("target_ids"))
-                .and_then(Value::as_array)
-                .and_then(|a| a.first())
-                .and_then(Value::as_str)
-            {
-                c.has_target = true;
-                c.target_card_id = uidx
-                    .get(t)
-                    .map(|i| masters.get(state.card(*i).master).card_id.clone());
-                c.ti = slots.get(t).copied().unwrap_or(-1);
-            }
-            return c;
+            return cand_owned(state, masters, uidx, slots, base);
         }
     }
     let p = mv.get("payload").unwrap_or(&null);
@@ -519,11 +588,11 @@ pub fn resolve_battle_inplace(
     mut trace: Option<&mut Vec<(Seat, Move)>>,
 ) -> Result<usize, EngineError> {
     let mut n = 0usize;
-    // §20.7.2 の共通規則（`setup_box=true` のときだけ）: 攻撃箱／防御箱の中でも
-    // 「**自分が**選ぶ最初の対象選択」を 1 段だけ枝にする（2 つ目以降と相手側は既定のまま）。
-    // 深い箱（`box_depth > 0`）では下の一般の枝評価が全 ply を見るので、ここは
-    // 既定解決に落ちていた入れ子（`box_depth <= 0`）のためにある。
-    let mut sel_branch_left = usize::from(ctx.opts.setup_box && box_depth >= 0);
+    // §20.7.2 の共通規則: 攻撃箱／防御箱の中でも「**自分が**選ぶ最初の対象選択」を 1 段だけ
+    // 枝にする（2 つ目以降と相手側は既定のまま）。深い箱（`box_depth > 0`）では下の一般の
+    // 枝評価が全 ply を見るので、ここは既定解決に落ちていた入れ子（`box_depth <= 0`）のためにある。
+    // §20.7.8 の 5: 入り切りは `select_branch`（明示が無ければ `setup_box` と同じ）。
+    let mut sel_branch_left = usize::from(ctx.opts.select_branch_on() && box_depth >= 0);
     for _ in 0..max_plies {
         if ctx.is_terminal(s) || !window.holds(s) {
             break;

@@ -22,12 +22,24 @@
    「枚」＝（決定 × card_id）の組で、素の準備の手と箱が**同じ決定に両方居る**もの。§20.7.6 で素の手を
    落とすと分母（`bare_gt_box` の m）が 0 に落ちる＝取り合いそのものが無くなったことの鍵。
 
+7. `setup_box_structure`（WP `rs-setup-box-3`・§20.7.8）… **条件ごとの合計**。箱の構造が
+   効いているかの鍵:
+   - `boxes`＝枝数の計測（`trace["boxes"]`）の合計。§20.7.8 の 5（`select_branch`）を切ると
+     `attack`／`defense` が 0 になる。
+   - `box_decisions`／`box_below_floor`＝箱を選んだ決定の数と、そのうち**選んだ枝の N が訪問
+     下限**（`max(1, floor(実効sims × q_min_frac))`）を割っているものの数。§20.7.8 の 4
+     （枝を card_id で束ねてから下限を見る）が無ければ `q_min_n` はその枝を選べない＝
+     束ねが効いた証拠になる。下限は `--sims`／`--worlds`／`--q-min-frac` から作る。
+   - `box_branches_median`／`box_branch_n_sum_median`＝箱を選んだ決定での枝の本数と N の和の中位。
+
 出力は `{条件: {鍵: {seed: 値}}}`（`RESULT.json` の `key_decisions` にそのまま入る形）。
 """
 import argparse
 import glob
 import json
+import math
 import os
+import statistics
 import sys
 
 KAMI = "OP15-075"   # 神の裁き（イベント・リーダー +1000 か KO）
@@ -246,7 +258,45 @@ def _seat_of(res: dict):
     return ds[0]["player"] if ds else None
 
 
-def keys_for(root: str) -> dict:
+def _setup_box_structure(cond_dir: str, n_floor: float) -> dict:
+    """箱の構造の鍵（WP `rs-setup-box-3`・§20.7.8 の 4／5）を 1 条件ぶん数える。"""
+    boxes = {"setup": 0, "attack": 0, "defense": 0}
+    box_decisions = 0
+    below = 0
+    counts: list = []
+    sums: list = []
+    for path in sorted(glob.glob(os.path.join(cond_dir, "*", "r3_s*.frames.json"))):
+        res = _load(path)
+        for d in res.get("decisions") or []:
+            b = d.get("boxes") or {}
+            for k in boxes:
+                boxes[k] += (b.get(k) or {}).get("boxes") or 0
+            stats = d.get("legal_stats")
+            sig = d.get("sig") or [None]
+            if d.get("kind") != "main" or not stats or sig[0] != "SETUP_BOX":
+                continue
+            box_decisions += 1
+            card = (d.get("chosen") or {}).get("card")
+            mine = [s for s in stats
+                    if (s.get("move") or {}).get("action_type") == "SETUP_BOX"
+                    and (s.get("move") or {}).get("card") == card]
+            if not mine:
+                continue
+            counts.append(len(mine))
+            sums.append(sum(s.get("n") or 0 for s in mine))
+            # 選んだ枝は「同じ card_id の枝のうち N 最大」（decide の代表の取り方）。
+            if max((s.get("n") or 0) for s in mine) < n_floor:
+                below += 1
+    def med(v):
+        return round(statistics.median(v), 1) if v else None
+    return {"boxes": boxes, "box_decisions": box_decisions, "box_below_floor": below,
+            "n_floor": n_floor, "box_branches_median": med(counts),
+            "box_branch_n_sum_median": med(sums)}
+
+
+def keys_for(root: str, sims: int = 160, q_min_frac: float = 0.125,
+             worlds: dict = None) -> dict:
+    worlds = worlds or {}
     out: dict = {}
     for cond_dir in sorted(glob.glob(os.path.join(root, "*"))):
         if not os.path.isdir(cond_dir):
@@ -294,6 +344,9 @@ def keys_for(root: str) -> dict:
             seed = os.path.basename(path).split(".")[0].split("_s")[-1]
             cur.setdefault("detail_enel_roger_t7_gamma", {})[f"s{seed}"] = _head_to_head(
                 _load(path), {"gamma": _is_play(GAMMA)}, rank="gamma")
+        # 箱の構造（WP `rs-setup-box-3`）。実効 sims は `--worlds` で条件ごとに与える。
+        n_floor = max(1.0, math.floor(sims * worlds.get(cond, 1) * q_min_frac))
+        cur["setup_box_structure"] = _setup_box_structure(cond_dir, n_floor)
         if cur:
             out[cond] = cur
     return out
@@ -302,9 +355,19 @@ def keys_for(root: str) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("root")
+    ap.add_argument("--sims", type=int, default=160,
+                    help="setup_box_structure の訪問下限を作る sims（既定 160）")
+    ap.add_argument("--q-min-frac", type=float, default=0.125)
+    ap.add_argument("--worlds", default="",
+                    help="条件ごとの世界本数（例 'E1=4'・省略した条件は 1）")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
-    data = keys_for(args.root)
+    worlds = {}
+    for item in args.worlds.split(","):
+        if "=" in item:
+            k, v = item.split("=", 1)
+            worlds[k.strip()] = int(v)
+    data = keys_for(args.root, sims=args.sims, q_min_frac=args.q_min_frac, worlds=worlds)
     text = json.dumps(data, ensure_ascii=False, indent=1)
     if args.out:
         with open(args.out, "w", encoding="utf-8") as f:

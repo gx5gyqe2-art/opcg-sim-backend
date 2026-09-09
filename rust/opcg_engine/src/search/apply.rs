@@ -84,8 +84,9 @@ pub fn apply_move_inplace(
         .ok_or_else(|| bad("move: 'action_type' がありません。".into()))?;
 
     if action_type == "SETUP_BOX" {
-        // 準備箱（§20.7.2）＝素の手 → 対話（最初の対象選択だけ枝の値・以降は既定） → 攻撃箱。
-        return super::r#macro::apply_setup_box(s, masters, actor, mv, stop_at_select, None);
+        // 準備箱（§20.7.8）＝素の手 → 対話（対象選択は枝の値・以降は既定）。続きの攻撃は
+        // 入れない＝効果を解決した盤面で止まる（そこから先は木が読む）。
+        return super::r#macro::apply_setup_box(s, masters, actor, mv, None);
     }
 
     if action_type == "DON_BOX" {
