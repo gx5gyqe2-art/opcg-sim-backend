@@ -1,0 +1,29 @@
+{
+  "job": "gen-n29-w07",
+  "status": "done",
+  "games": 480,
+  "rows": 70093,
+  "main_rows": 31858,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 311, "hold": 53},
+  "removal_legal_rows": 12888,
+  "sec_per_game": 14.49,
+  "wall_hours": 1.93,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0,
+    "sims": 160,
+    "dirichlet_eps": 0.25,
+    "temp_turns": 4,
+    "eps_play": 0.03,
+    "eps_hold": 0.03
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "net": "nrel_r3.npz",
+  "commit": "98881f25b5144f1f62706f5eb9bf93cd283ca530",
+  "notes": "seed_base=2294000（台帳どおり: 2290000+ceil(7/2)*1000=2294000）。30局の壁時計プローブ（487s→16.2s/局）で480局の見込みを2.2時間と推定し、6時間以内のため打ち切りせず480局を完走。実測: 6956s（1.93h）＝14.49s/局。void 0・棄却0・全480局が p1/p2 いずれかで決着（p1 252・p2 228）。コードは変更していない（base commit 0be4a48）。"
+}
