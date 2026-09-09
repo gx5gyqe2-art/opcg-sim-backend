@@ -131,7 +131,11 @@ def _entry(stats: list, pred):
 
 
 def _is_play(card):
-    return lambda m: m.get("action_type") == "PLAY" and m.get("card") == card
+    """その card の「根の PLAY 手」。§20.7.6 で素の PLAY は箱があると候補から落ちるので、
+    準備箱（`SETUP_BOX`）も拾う（`_entry` は訪問数最多を採る＝素の手が居る条件では今までどおり
+    そちらが出る）。"""
+    return lambda m: (m.get("action_type") in ("PLAY", "SETUP_BOX")
+                      and m.get("card") == card)
 
 
 def _is_attack(card):
