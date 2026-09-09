@@ -29,12 +29,20 @@
   pol_n(K) pol_q(K) pol_k(K) pol_sig(K str)… 訪問合算 n・行動価値 q・don_k（-1=無し）・候補 move_sig
   pol_cid(K str) pol_tcid(K str)           … 候補の主体/第1対象の**カードID**
   tokens(D,22,·) pol_si(K) pol_ti(K)      … NRel 用（dump v2 で追加・v3 で dtype だけ変えた）
+  deck_kinds(D str)                        … **dump v4 で追加**（§20.8.1-4）。手番側デッキの除去の
+                                             型（`deck_roles` の JSON・`--decks synth_roles` 以外は
+                                             `{}`）。層別の読み（除去率別・型別）に使う
 
 **dump v3**（既定・2026-09-07・計画 §18.5）: 常駐の 9 割を占める 3 本の保存 dtype を半分にする——
 `tokens`／`scalars` を **float16**・`card_idx` を **int16**（`pol_si`/`pol_ti` は v2 から int16）。
 値は float32／int64 を **cast しただけ**で、**符号化（`enc_version`=13）も列の形も変えていない**。
 学習側は `learned/train/dump_io.py` が波ごとに memmap の pack を作って読む（v2 の npz＝
 float32／int64 も同じ関数で読める＝過去の波はそのまま使える）。v1／v2 を書く経路は無い。
+
+**dump v4**（2026-09-10・計画 §20.8）: **既存の列は 1 バイトも変えず**、`deck_kinds(D str)` を足す
+（`--decks synth_roles` で差し込んだ除去の型・型が無い経路では `{}`）。`dump_io.load_dump` は
+知らない列を読まない＝v3 の波も v4 の波も同じ関数で読める。対局メタ（seed・両席のリーダー・
+両席の型）は part ごとの sidecar `meta_games.json` にも書く（層別の集計用）。
 """
 import os
 for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
@@ -56,7 +64,9 @@ MAX_STEPS = 400
 MAX_CI = 24            # card_idx の PAD 長（G 系符号化の既定枠・列の形は据え置き）
 ENC_VERSION = 12       # dump v1 の符号化世代（過去の波の meta にだけ残る）
 ENC_VERSION_V2 = 13    # dump v2／v3（v12 ＋ n_rel_feat のグローバル追加 29・append-only）
-DUMP_VERSION = 3       # 保存 dtype を半分にした版（符号化は v2 と同じ・§18.5）
+DUMP_VERSION = 4       # v3 ＋ `deck_kinds` 列（既存の列は不変・§20.8）
+#: `--decks` の既定（歴代の波は全て synth＝規約を変えない）。
+DEFAULT_DECKS = "synth"
 
 # v3 で dtype を落とす列（**float32／int64 を cast するだけ**＝符号化も列の形も変えない）。
 # 常駐の 9 割はこの 3 本（tokens 1,760B／scalars 492B／card_idx 176B per 行）。float16 の丸めが
@@ -88,11 +98,12 @@ def _don_k(mv):
     return (mv.get("payload") or {}).get("don_k")
 
 
-def _init_worker(sims, net, dirichlet_eps, temp_turns):
+def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS):
     E.engine()
     _G["spec"] = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps,
                             temp_turns=temp_turns, prune_futile=E.GEN_PRUNE_FUTILE)
     _G["db"] = D.load_db()
+    _G["decks"] = decks
 
 
 class _Recorder:
@@ -162,7 +173,8 @@ def play_one(seed):
     rec = _Recorder()
     try:
         la, lb = D.leader_pair(db, seed, "random")
-        p1, p2 = D.build_pair(db, la, lb, seed, "synth")
+        p1, p2, kinds = D.build_pair(db, la, lb, seed, _G.get("decks", DEFAULT_DECKS),
+                                     with_kinds=True)
         res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2,
                           max_steps=MAX_STEPS, observer=rec)
     except Exception:                                          # noqa: BLE001  1 局の失敗で止めない
@@ -175,6 +187,9 @@ def play_one(seed):
     z = {"p1": 1.0 if winner == "p1" else -1.0}
     z["p2"] = -z["p1"]
     rows, pol = rec.rows, rec.pol
+    # dump v4: 手番側デッキの除去の型（JSON・型を持たない経路は "{}"）
+    kj = {"p1": json.dumps(kinds[0] or {}, ensure_ascii=False, separators=(",", ":")),
+          "p2": json.dumps(kinds[1] or {}, ensure_ascii=False, separators=(",", ":"))}
     # dump v3: tokens／scalars は float16・card_idx は int16 で持つ（cast するだけ・§18.5）
     return {"tokens": np.array(rows["tokens"], np.float32).astype(DT_V3["tokens"]),
             "pol_si": np.array(pol["si"], np.int16),
@@ -196,13 +211,18 @@ def play_one(seed):
             "pol_k": np.array(pol["k"], np.int16),
             "pol_sig": np.array(pol["sig"]) if pol["sig"] else np.array([], dtype="U1"),
             "pol_cid": np.array(pol["cid"]) if pol["cid"] else np.array([], dtype="U1"),
-            "pol_tcid": np.array(pol["tcid"]) if pol["tcid"] else np.array([], dtype="U1")}
+            "pol_tcid": np.array(pol["tcid"]) if pol["tcid"] else np.array([], dtype="U1"),
+            "deck_kinds": np.array([kj[w] for w in rows["who"]]),
+            # 局メタ（npz には積まない・part の sidecar へ）
+            "_meta": {"seed": seed, "leaders": [la, lb], "kinds": list(kinds),
+                      "winner": winner, "turns": turn, "rows": len(rows["who"])}}
 
 
 _ROW_KEYS = ("scalars", "field", "card_idx", "z", "who", "kind", "turn", "step",
              "seed", "sig", "pol_len", "pol_chosen")
 _POL_KEYS = ("pol_n", "pol_q", "pol_k", "pol_sig", "pol_cid", "pol_tcid")
 _TOK_KEYS = ("tokens", "pol_si", "pol_ti")            # NRel 用（v2 で追加・v3 も同じ列）
+_V4_KEYS = ("deck_kinds",)                            # v4 で追加（§20.8）
 
 
 def main(argv=None):
@@ -223,6 +243,10 @@ def main(argv=None):
     ap.add_argument("--dump-v2", action="store_true",
                     help="【廃止・受けるだけ】dump v3 が既定になった（2026-09-07・§18.5）。"
                          "分散生成の古い指示書がこの旗を付けたまま回っても壊れないように残す")
+    ap.add_argument("--decks", default=DEFAULT_DECKS,
+                    choices=("singleton", "synth", "synth_dig", "synth_roles"),
+                    help="デッキの中身（既定 synth＝歴代の波と同じ規約）。"
+                         "synth_roles=除去の型を色ごとに差し込む（教材の対照・§20.8.1）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
 
@@ -230,10 +254,11 @@ def main(argv=None):
     t0 = time.time()
     if args.dump_v2:
         print("[note] --dump-v2 は廃止（既定が dump v3・列は同じで dtype だけ半分）", flush=True)
-    keys = _ROW_KEYS + _POL_KEYS + _TOK_KEYS
+    keys = _ROW_KEYS + _POL_KEYS + _TOK_KEYS + _V4_KEYS
     buf = {k: [] for k in keys}
+    games = []                                         # part の sidecar（対局メタ）
     shard = n_rows = n_drop = n_main = 0
-    initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns)
+    initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns, args.decks)
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
                                       initargs=initargs) as pool:
         done = 0
@@ -243,6 +268,7 @@ def main(argv=None):
             if r is None:
                 n_drop += 1
             else:
+                games.append(r.pop("_meta"))
                 for k in buf:
                     buf[k].append(r[k])
                 n_rows += len(r["z"])
@@ -257,9 +283,13 @@ def main(argv=None):
                     buf = {k: [] for k in keys}
                 print(f"  {done}/{args.games}局 行{n_rows}（main {n_main}） 棄却{n_drop}"
                       f" {time.time()-t0:.0f}s", flush=True)
+    # part の sidecar: 対局メタ（seed・両席のリーダー・両席の型）＝層別の集計用（§20.8.1-4）
+    with open(os.path.join(args.out, "meta_games.json"), "w") as f:
+        json.dump({"decks": args.decks, "seed_base": args.seed_base, "games": games},
+                  f, ensure_ascii=False)
     with open(os.path.join(args.out, "meta_n_record.json"), "w") as f:
         json.dump({"games": args.games, "rows": n_rows, "main_rows": n_main,
-                   "dropped": n_drop, "sims": args.sims,
+                   "dropped": n_drop, "sims": args.sims, "decks": args.decks,
                    "enc_version": ENC_VERSION_V2,
                    "dump_version": DUMP_VERSION, "seed_base": args.seed_base,
                    "net": E.resolve_net(args.net), "engine": "rust",

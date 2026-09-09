@@ -115,6 +115,6 @@ def test_relations_from_dump_row(game):
 
 # --- 4. meta の版 -----------------------------------------------------------
 def test_meta_versions():
-    assert G.DUMP_VERSION == 3
+    assert G.DUMP_VERSION == 4                               # v4＝v3 ＋ deck_kinds 列（§20.8）
     assert G.ENC_VERSION_V2 == 13                            # 符号化は v2 から変えていない
     assert set(G.DT_V3) == {"tokens", "scalars", "card_idx"}

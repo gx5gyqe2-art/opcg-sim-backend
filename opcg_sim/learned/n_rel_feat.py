@@ -64,6 +64,19 @@ EXTRA_COLS = (("leader_act_avail", "don_addable", "attackers_left", "rush_in_han
                  "guard_per_card"))
 EXTRA_DIM = len(EXTRA_COLS)                # 29
 
+# **符号化の除去判定**（Rust `encode/tokens.rs::is_removal_op` が 1 対 1 の写し＝両方を同時に
+# 直さない限り、訓練時に再計算する R と推論時に Rust が作る R がずれる）。
+#
+# 既知の取りこぼし（2026-09-10・WP `rs-removal-decks` で実測・§20.8.1-1）:
+#   - **`ActionType.BOUNCE` が無い**。パーサは「手札に戻す」を BOUNCE で出し（`MOVE_TO_HAND` は
+#     同義の別名・Rust も同じハンドラ）、相手の場を対象にする BOUNCE は実カード 23 件ある。
+#     ＝この集合で数えると「相手対象のバウンス 0 種」になる（§20.7.11 の表の空欄の原因）。
+#   - **対象ゾーンを見ない**ので、手札のデッキ下送り（12）・ライフのトラッシュ送り（13）・
+#     ライフ操作の MOVE_CARD（32）まで「盤面の除去」に混ざる。
+# ここを直すと**符号化が変わる**（golden replay の a1 帯・既存ネットの入力分布が動く）ので、
+# 教材の型の分類は `opcg_sim/loop/deck_roles.py` に分けて 1 本化した（`classify`＝form/source/band・
+# ゾーン FIELD 限定）。符号化側を直すかはコーディネータの判断
+# （`docs/reports/2026-09-10_removal_decks.RESULT.json` の notes）。
 _REMOVAL_OPS = {ActionType.KO, ActionType.DECK_BOTTOM, ActionType.MOVE_TO_HAND, ActionType.TRASH,
                 ActionType.MOVE_CARD, ActionType.DECK_TOP}
 _LOCK_OPS = {ActionType.REST, ActionType.FREEZE, ActionType.LOCK, ActionType.ATTACK_DISABLE,
