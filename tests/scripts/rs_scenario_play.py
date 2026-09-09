@@ -234,11 +234,13 @@ def _record_frame(game: RsGame, actions: list) -> dict:
 
 def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: str,
              seed: int, sims: int, select_rule: str = None, q_min_frac: float = None,
-             root_prior_temp: float = None, worlds: int = None, setup_box: bool = None):
+             root_prior_temp: float = None, worlds: int = None, setup_box: bool = None,
+             leaf_rollout: str = None):
     """1 seed ぶんの再生。戻り値 `(frames_json, steps_log, frames)`。
 
     `select_rule`／`q_min_frac`／`root_prior_temp`（省略可・§20.5）と `worlds`（省略可・
-    §20.7.1＝1 決定あたりの世界サンプル本数）は**両席に同じ設定**で渡す（省略＝serve 既定）。
+    §20.7.1＝1 決定あたりの世界サンプル本数）・`leaf_rollout`（省略可・§20.7.9＝葉の打ち切り）は
+    **両席に同じ設定**で渡す（省略＝serve 既定）。
     各決定の実測時間は `decisions[i]["decide_ms"]` に入る。
     """
     start_idx = hb.turn_start_index(payload, scenario["start_turn"])
@@ -276,7 +278,7 @@ def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: 
         move = game.decide(player_id, trace=tr, net=net_for[player_id], sims=sims,
                            action_index=action_index, select_rule=select_rule,
                            q_min_frac=q_min_frac, root_prior_temp=root_prior_temp,
-                           worlds=worlds, setup_box=setup_box)
+                           worlds=worlds, setup_box=setup_box, leaf_rollout=leaf_rollout)
         decide_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         if move is None:
             break
@@ -297,6 +299,7 @@ def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: 
             "kind": tr.get("kind"), "commit_from": tr.get("commit_from"),
             "pv": tr.get("pv"), "attribution": attribution, "decide_ms": decide_ms,
             "worlds": tr.get("worlds"), "world_used": tr.get("world_used"),
+            "rollout": tr.get("rollout"),
             "per_world": tr.get("per_world"),
         })
         if desc.get("action_type") == "TURN_END" and turn_before == end_turn:
@@ -581,7 +584,7 @@ def cmd_play(args) -> int:
                 name, scenario, payload, seat_net, opp_net, seed, args.sims,
                 select_rule=args.select_rule, q_min_frac=args.q_min_frac,
                 root_prior_temp=args.root_prior_temp, worlds=args.worlds,
-                setup_box=args.setup_box)
+                setup_box=args.setup_box, leaf_rollout=args.leaf_rollout)
             base = f"{net_label}_s{seed}"
             frames_path = os.path.join(out_dir, f"{base}.frames.json")
             with open(frames_path, "w", encoding="utf-8") as f:
@@ -645,6 +648,11 @@ def main(argv=None) -> int:
     p.add_argument("--setup-box", dest="setup_box", action="store_true", default=None,
                   help="準備の手（メインイベント／起動メイン／登場時持ちの PLAY）を"
                        "「続きの攻撃 1 回」まで箱にする（既定 off）")
+    # §20.7.9（WP `rs-leaf-rollout`）: 葉の打ち切り。既定（None）＝渡さない＝1 bit も変わらない。
+    p.add_argument("--leaf-rollout", dest="leaf_rollout", default=None,
+                  choices=("none", "turn_end"),
+                  help="木の葉をそのターンの終わりまで方策で打ち切ってから評価する"
+                       "（既定＝none＝打ち切らない）")
     p.set_defaults(func=cmd_play)
 
     args = ap.parse_args(argv)

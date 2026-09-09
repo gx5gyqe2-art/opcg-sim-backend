@@ -17,6 +17,9 @@ serve に載せられる上限の目安を読むための計器なので、**単
 `--worlds K`（§20.7.1）を足すと 1 決定で世界を K 本引いて木を並列に回す＝**同じ sims の
 まま**「K 本ぶんの実効 sims」になる。K を変えて回せば並列化の壁時計コストが読める
 （sims と違い、K は 1 決定あたりの読みの本数を変える）。
+
+`--leaf-rollout turn_end`（§20.7.9）を足すと葉をそのターンの終わりまで方策で打ち切ってから
+評価する＝1 葉あたり残り ply ぶんネットを余分に呼ぶ。そのコストもここで読む。
 """
 import argparse
 import json
@@ -79,11 +82,15 @@ def main(argv=None) -> int:
                     help="1 決定あたりの世界サンプル本数（§20.7.1・既定 1）")
     # §20.7.2（WP `rs-setup-box`）: 準備箱。既定（渡さない）＝serve 既定のまま。
     ap.add_argument("--setup-box", dest="setup_box", action="store_true", default=None)
+    # §20.7.9（WP `rs-leaf-rollout`）: 葉の打ち切り。既定（渡さない）＝serve 既定のまま。
+    ap.add_argument("--leaf-rollout", dest="leaf_rollout", default=None,
+                    choices=("none", "turn_end"),
+                    help="木の葉をそのターンの終わりまで方策で打ち切ってから評価する（既定 none）")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
     opts = {"select_rule": args.select_rule, "q_min_frac": args.q_min_frac,
             "root_prior_temp": args.root_prior_temp, "worlds": args.worlds,
-            "setup_box": args.setup_box}
+            "setup_box": args.setup_box, "leaf_rollout": args.leaf_rollout}
     data = {"note": "同じ 1 局面（分岐点の開始盤面）に対する 1 decide の実測 ms・単独プロセス",
             "seed": args.seed, "repeat": args.repeat,
             "opts": {k: v for k, v in opts.items() if v is not None},

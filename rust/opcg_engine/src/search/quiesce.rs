@@ -24,13 +24,16 @@ use crate::journal::Session;
 use crate::model::{CardIdx, GameState, MasterTable, Seat};
 use crate::net::{nrel, Candidate, LoadedNet};
 use crate::state::EngineError;
-use serde_json::Value;
+use serde_json::{json, Value};
+use std::cell::RefCell;
 use std::collections::HashMap;
 
-use super::{adapter, apply, Move, SearchOptions};
+use super::{adapter, apply, LeafRollout, Move, SearchOptions};
 
 /// Python `config.QUIESCE_MAX_PLIES`。
 pub const QUIESCE_MAX_PLIES: usize = 12;
+/// 葉の打ち切り（§20.7.9）で 1 葉あたりに打てる手の上限。
+pub const LEAF_ROLLOUT_MAX_PLIES: usize = 12;
 /// Python `config.BOX_RESOLVE_DEPTH`。
 pub const BOX_RESOLVE_DEPTH: i32 = 1;
 /// Python `config.BOX_BRANCH_BUDGET`。
@@ -672,9 +675,204 @@ fn own_first_selection(s: &mut Session, ctx: &Ctx, name: Seat) -> bool {
     }
 }
 
+// --- 葉の打ち切り（§20.7.9・WP `rs-leaf-rollout`）------------------------------------
+
+/// 葉を「そのターンの終わり」まで方策で打ち切る（`leaf_rollout="turn_end"`）。
+///
+/// **その場で進める**（巻き戻さない）＝呼び出し側（[`super::mcts::TreeMcts::leaf_value`]）が
+/// `transaction` の中で呼び、退出で巻き戻す。乱数とイベントログの復元も呼び出し側の責任
+/// （今の `leaf_value` と同じ＝CRN 一貫性）。
+///
+/// 1 手ぶんの手順:
+/// 1. 終局・**手番の側のメインフェイズ**（`MAIN_ACTION`）でない・ターンが替わった・上限 ply の
+///    どれかで止める。
+/// 2. 木と同じ候補（[`Ctx::legal_actions`]＝箱を含む）から [`quiesce_choice`]（方策優先・
+///    P 最大・乱数を使わない）で 1 つ選び、適用する。
+/// 3. `TURN_END` を打ったらそこで止める（ターンは替わっている）。
+/// 4. 途中で開いた戦闘窓／対話窓は**既定解決**で進める（[`resolve_battle_inplace`]）。
+///    ここは `box_value=false`・`box_depth=-1` で呼ぶ＝枝評価を 1 度も起こさない
+///    ＝**枝予算（[`BOX_BRANCH_BUDGET`]）を引かない**（`value_fn=None` の流儀・§20.7.9）。
+///    窓を解決しないと「そのターンの終わり」へ到達できないので、ここは `ctx.quiesce` に
+///    依らず常に進める（打ち切り自体が `leaf_rollout` で明示的に選ばれた振る舞い）。
+///
+/// 戻り値は `(打った手の数, 上限で止まったか)`。
+pub fn leaf_rollout_turn_end(
+    ctx: &Ctx,
+    s: &mut Session,
+    st: &mut SearchState,
+) -> Result<(usize, bool), EngineError> {
+    let (turn0, tp0) = {
+        let x = s.state();
+        (x.turn_count, x.turn_player)
+    };
+    let mut plies = 0usize;
+    loop {
+        if ctx.is_terminal(s) {
+            return Ok((plies, false));
+        }
+        // 「手番の側のメインフェイズ」＝自由な手が打てる決定点だけを打ち切る。
+        // 相手の応手（ブロック／カウンター）や中断の途中は上の窓の既定解決に任せる。
+        let seat = match crate::rules::pending::pending_actor_action(s) {
+            Some((seat, action)) if action == crate::rules::pending::ACT_MAIN_ACTION => seat,
+            _ => return Ok((plies, false)),
+        };
+        {
+            let x = s.state();
+            if x.turn_count != turn0 || x.turn_player != tp0 || seat != x.turn_player {
+                return Ok((plies, false));
+            }
+        }
+        if plies >= LEAF_ROLLOUT_MAX_PLIES {
+            return Ok((plies, true));
+        }
+        let legal = ctx.legal_actions(s)?;
+        if legal.is_empty() {
+            return Ok((plies, false));
+        }
+        let pick = quiesce_choice(ctx, s, &legal, true)?;
+        let mv = legal[pick].clone();
+        let is_turn_end = mv.get("action_type").and_then(Value::as_str) == Some("TURN_END");
+        match apply::apply_move_inplace(s, ctx.masters, seat, &mv, true) {
+            Ok(()) => {}
+            Err(e @ EngineError::Unimplemented(_)) => return Err(e),
+            Err(_) => return Ok((plies, false)), // Python の `except Exception: break` と同じ扱い
+        }
+        plies += 1;
+        if is_turn_end {
+            return Ok((plies, false));
+        }
+        // 開いた対話窓（`box_dialog` のときだけ＝`leaf_value` の `noisy` と同じ約束）→ 戦闘窓の順。
+        if ctx.box_dialog && !in_battle(s) && in_dialog(s) {
+            resolve_battle_inplace(
+                ctx,
+                s,
+                st,
+                Window::Dialog,
+                ctx.quiesce_max_plies,
+                false,
+                -1,
+                None,
+            )?;
+        }
+        if in_battle(s) {
+            resolve_battle_inplace(
+                ctx,
+                s,
+                st,
+                Window::Battle,
+                ctx.quiesce_max_plies,
+                false,
+                -1,
+                None,
+            )?;
+        }
+    }
+}
+
+/// 葉の打ち切りの実績（`decide` 1 回のあいだだけ張る＝[`reset_rollout_stats`]）。
+#[derive(Debug, Default, Clone)]
+struct RolloutStats {
+    enabled: bool,
+    /// 打ち切りを試みた葉の数（`leaf_value` の呼び出し回数）
+    leaves: u64,
+    /// 実際に 1 手以上打てた葉の数
+    rolled: u64,
+    /// 打った手の総数
+    plies: u64,
+    /// 上限 ply で止まった葉の数
+    capped: u64,
+}
+
+thread_local! {
+    /// `macro::SETUP` と同じ理由で thread_local（[`Ctx`] は `&mut SearchState` を持ち回さない
+    /// 経路〔`legal_actions`〕からも触られる）。世界ごとのスレッド（§20.7.1）では
+    /// **世界 0 のぶんだけ**が `decide` の戻り値に出る（`boxes` と同じ）。
+    static ROLLOUT: RefCell<RolloutStats> = RefCell::new(RolloutStats::default());
+}
+
+/// decide 1 回ぶんの実績を張り直す（`search::decide_on_state`）。
+pub fn reset_rollout_stats(mode: LeafRollout) {
+    ROLLOUT.with(|c| {
+        *c.borrow_mut() = RolloutStats {
+            enabled: mode.enabled(),
+            ..RolloutStats::default()
+        }
+    });
+}
+
+/// 1 葉ぶんの実績を足す（[`super::mcts::TreeMcts::leaf_value`] から）。
+pub fn record_rollout(plies: usize, capped: bool) {
+    ROLLOUT.with(|c| {
+        let mut st = c.borrow_mut();
+        if !st.enabled {
+            return;
+        }
+        st.leaves += 1;
+        st.plies += plies as u64;
+        if plies > 0 {
+            st.rolled += 1;
+        }
+        if capped {
+            st.capped += 1;
+        }
+    });
+}
+
+/// 葉の打ち切りの実績（`leaf_rollout="none"` の decide では [`Value::Null`]＝欄ごと出ない）。
+pub fn take_rollout_stats() -> Value {
+    ROLLOUT.with(|c| {
+        let st = c.borrow();
+        if !st.enabled {
+            return Value::Null;
+        }
+        let round3 = |x: f64| (x * 1000.0).round() / 1000.0;
+        let per = |n: u64| -> Value {
+            if st.leaves == 0 {
+                Value::Null
+            } else {
+                Value::from(round3(n as f64 / st.leaves as f64))
+            }
+        };
+        json!({
+            "leaves": st.leaves,
+            "rolled": st.rolled,
+            "plies": st.plies,
+            "mean_plies": per(st.plies),
+            "capped": st.capped,
+            "capped_frac": per(st.capped),
+            "max_plies": LEAF_ROLLOUT_MAX_PLIES,
+        })
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 実績は `enabled` のときだけ溜まり、`take` は `none` で `null`（＝trace の形が変わらない）。
+    #[test]
+    fn rollout_stats_are_null_unless_enabled() {
+        reset_rollout_stats(LeafRollout::None);
+        record_rollout(5, true);
+        assert!(take_rollout_stats().is_null());
+
+        reset_rollout_stats(LeafRollout::TurnEnd);
+        record_rollout(3, false);
+        record_rollout(0, false);
+        record_rollout(LEAF_ROLLOUT_MAX_PLIES, true);
+        let v = take_rollout_stats();
+        assert_eq!(v["leaves"], json!(3));
+        assert_eq!(v["rolled"], json!(2));
+        assert_eq!(v["plies"], json!(15));
+        assert_eq!(v["mean_plies"], json!(5.0));
+        assert_eq!(v["capped"], json!(1));
+        assert_eq!(v["capped_frac"], json!(0.333));
+        assert_eq!(v["max_plies"], json!(LEAF_ROLLOUT_MAX_PLIES));
+        // 張り直すと 0 から（decide をまたがない）。
+        reset_rollout_stats(LeafRollout::TurnEnd);
+        assert_eq!(take_rollout_stats()["leaves"], json!(0));
+        reset_rollout_stats(LeafRollout::None);
+    }
 
     #[test]
     fn budget_stops_after_the_allowance() {

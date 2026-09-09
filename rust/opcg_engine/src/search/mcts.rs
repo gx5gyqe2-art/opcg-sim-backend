@@ -26,11 +26,11 @@ use crate::model::{GameState, Seat};
 use crate::state::EngineError;
 
 use super::quiesce::{
-    argmax_f64, best_branch, in_battle, in_dialog, resolve_battle_inplace, resolved_branch_values,
-    Ctx, SearchState, Window,
+    argmax_f64, best_branch, in_battle, in_dialog, leaf_rollout_turn_end, record_rollout,
+    resolve_battle_inplace, resolved_branch_values, Ctx, SearchState, Window,
 };
 use super::rng::SearchRng;
-use super::{apply, Move};
+use super::{apply, LeafRollout, Move};
 
 /// Python `config.DIRICHLET_ALPHA`。
 pub const DIRICHLET_ALPHA: f64 = 0.3;
@@ -423,42 +423,55 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
     ///
     /// 延長は `value_fn=None`（箱の枝評価を呼ばない）＝予算は減らない。乱数と
     /// イベントログは復元する（延長の消費を漏らさない＝CRN 一貫性）。
-    fn leaf_value(
+    ///
+    /// **葉の打ち切り**（§20.7.9・`SearchOptions::leaf_rollout="turn_end"`）: 窓の解決を終えた
+    /// 後、盤面が終局でなく手番の側のメインフェイズにあるなら
+    /// [`leaf_rollout_turn_end`] でターンが替わるまで方策で打ち続けてから評価する。
+    /// **既定（`"none"`）では下の分岐に 1 度も入らない＝1 bit も変わらない**。
+    pub(in crate::search) fn leaf_value(
         &mut self,
         s: &mut Session,
         st: &mut SearchState,
         to_move: Seat,
     ) -> Result<f64, EngineError> {
         let ctx = self.ctx;
+        let rollout = ctx.opts.leaf_rollout == LeafRollout::TurnEnd;
         let noisy = in_battle(s) || (ctx.box_dialog && in_dialog(s));
-        if !ctx.quiesce || !noisy {
+        let resolve_windows = ctx.quiesce && noisy;
+        if !resolve_windows && !rollout {
             return ctx.value(s, to_move);
         }
         let rng_state = s.rng.snapshot();
         let saved = s.swap_events(Vec::new());
         let out = s.transaction(|s| -> Result<f64, EngineError> {
-            if ctx.box_dialog && in_dialog(s) && !in_battle(s) {
+            if resolve_windows {
+                if ctx.box_dialog && in_dialog(s) && !in_battle(s) {
+                    resolve_battle_inplace(
+                        ctx,
+                        s,
+                        st,
+                        Window::Dialog,
+                        ctx.quiesce_max_plies,
+                        false,
+                        0,
+                        None,
+                    )?;
+                }
                 resolve_battle_inplace(
                     ctx,
                     s,
                     st,
-                    Window::Dialog,
+                    Window::Battle,
                     ctx.quiesce_max_plies,
                     false,
                     0,
                     None,
                 )?;
             }
-            resolve_battle_inplace(
-                ctx,
-                s,
-                st,
-                Window::Battle,
-                ctx.quiesce_max_plies,
-                false,
-                0,
-                None,
-            )?;
+            if rollout {
+                let (plies, capped) = leaf_rollout_turn_end(ctx, s, st)?;
+                record_rollout(plies, capped);
+            }
             ctx.value(s, to_move)
         });
         s.swap_events(saved);
