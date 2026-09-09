@@ -1,0 +1,24 @@
+{
+  "job": "gen-n29-w02",
+  "status": "done",
+  "games": 480,
+  "rows": 69724,
+  "main_rows": 31621,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 331, "hold": 63},
+  "removal_legal_rows": 13031,
+  "sec_per_game": 12.7625,
+  "wall_hours": 1.7017,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "net": "nrel_r3.npz",
+  "commit": "0be4a48f3e610ef821f546e76a387eb5d75d577b",
+  "notes": "shard k=2 (seed_base 2291500, range 2291500-2291979, 480 unique seeds). Timing test: 30 games in 366s (12.2s/game, workers=2), estimated full run well under the 6h budget, so ran all 480 games without reducing sims/worlds. Full run: 6126s wall (1.70h), 12.76s/game. dropped=0, void=0 (all 480 games have a winner), enc_version=13, aux=true, net=nrel_r3.npz (default). No code changes made."
+}
