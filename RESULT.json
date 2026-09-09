@@ -1,0 +1,29 @@
+{
+  "job": "gen-n29-w06",
+  "status": "done",
+  "games": 480,
+  "rows": 69713,
+  "main_rows": 31842,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 301, "hold": 66},
+  "removal_legal_rows": 12773,
+  "sec_per_game": 14.64,
+  "wall_hours": 1.95,
+  "search": {
+    "sims": 160,
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0,
+    "dirichlet_eps": 0.25,
+    "temp_turns": 4,
+    "eps_play": 0.03,
+    "eps_hold": 0.03
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "net": "nrel_r3.npz",
+  "commit": "dd5a5941b7896386b2c7a26a5d01499faf16be42",
+  "notes": "seed_base=2293500・workers=2。30局の先行計測（15.97s/局）から480局は約2.1時間の見込みと判定し、そのまま480局を実行（打ち切りなし）。実測は1.95時間（14.64s/局）で見込み内。void（決着せず）=0・dropped=0。中間成果物はシャード生成の進行に合わせて複数コミットに分けてpush済み（work in progress commits）。コードは変更していない。"
+}
