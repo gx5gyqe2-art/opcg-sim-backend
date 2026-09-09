@@ -9,7 +9,11 @@
      `"no_oom_attack"`。
 2. `enel_roger_t7_gammaknife`（`human_enel_vs_roger_20260904_t7-8`）
    … seat が「ガンマナイフ(OP05-077)」を PLAY したか（分析 #4 #7 は Q が上なのに訪問数で負けた）。
-3. `doffy_t10_root_visited`（`human_doflamingo_vs_luffy_20260904_t10-11`）
+3. `enel_luffy_t4_kami_ko`（`human_enel_vs_luffy_20260904_t4-5`・WP `rs-setup-box`）
+   … seat が「神の裁き(OP15-075)」を PLAY したときの **KO 対象の選択**が空でないか
+     （＝相手の 1c ルフィを KO したか）。`RESOLVE_EFFECT_SELECTION` で相手のキャラを
+     選んだ決定が神の裁きの PLAY より後にあれば `true`。打たなかった run は `"no_kami"`。
+4. `doffy_t10_root_visited`（`human_doflamingo_vs_luffy_20260904_t10-11`）
    … 分岐点の**最初の** seat 側 kind=main 決定（turn=start_turn）で訪問された根の手の数と合法手の数。
    `doffy_t10_winner` … その run の勝敗（最後のフレームの winner）。
 
@@ -27,6 +31,7 @@ GAMMA = "OP05-077"  # ガンマナイフ（イベント・除去）
 
 SCN_ENEL_T9 = "enel_human_20260810_t9-9"
 SCN_ENEL_ROGER = "human_enel_vs_roger_20260904_t7-8"
+SCN_ENEL_LUFFY = "human_enel_vs_luffy_20260904_t4-5"
 SCN_DOFFY = "human_doflamingo_vs_luffy_20260904_t10-11"
 
 
@@ -53,6 +58,46 @@ def _kami_before_oom_attack(res: dict):
 
 def _played(res: dict, card: str) -> bool:
     return any(m.get("action_type") == "PLAY" and m.get("card") == card for m in _seat_moves(res))
+
+
+def _kami_ko_target(res: dict):
+    """神の裁きの KO 対象の選択が非空か（WP `rs-setup-box`・§20.7.2 の「KO する／しない」）。
+
+    神の裁きを打った後の seat 側 `RESOLVE_EFFECT_SELECTION` のうち、**相手のカードを選んだ**
+    ものがあれば `true`（自分への +1000 は自分のカードなので除く）。打たなければ `"no_kami"`。
+    """
+    ds = res.get("decisions") or []
+    seat = ds[0]["player"] if ds else None
+    opp_cards = _opponent_card_ids(res, seat)
+    seen_kami = False
+    for d in ds:
+        if d.get("player") != seat:
+            continue
+        m = d.get("chosen") or {}
+        if m.get("action_type") == "PLAY" and m.get("card") == KAMI:
+            seen_kami = True
+            continue
+        if not seen_kami or m.get("action_type") != "RESOLVE_EFFECT_SELECTION":
+            continue
+        if any(c in opp_cards for c in (m.get("selected") or [])):
+            return True
+    return False if seen_kami else "no_kami"
+
+
+def _opponent_card_ids(res: dict, seat) -> set:
+    """相手の場・リーダーに居るカードの card_id（記述子は card_id 基準）。"""
+    frames = res.get("frames") or []
+    opp = "p2" if seat == "p1" else "p1"
+    out = set()
+    for fr in frames:
+        side = ((fr.get("players") or {}).get(opp)) or {}
+        for c in (side.get("field") or []):
+            if c.get("card_id"):
+                out.add(c["card_id"])
+        leader = side.get("leader") or {}
+        if leader.get("card_id"):
+            out.add(leader["card_id"])
+    return out
 
 
 def _first_main_root(res: dict):
@@ -160,9 +205,11 @@ def keys_for(root: str) -> dict:
         for scn, fn in (
             (SCN_ENEL_T9, lambda r: _kami_before_oom_attack(r)),
             (SCN_ENEL_ROGER, lambda r: _played(r, GAMMA)),
+            (SCN_ENEL_LUFFY, lambda r: _kami_ko_target(r)),
         ):
-            key = ("enel_t9_kaminosabaki_before_attack" if scn == SCN_ENEL_T9
-                   else "enel_roger_t7_gammaknife")
+            key = {SCN_ENEL_T9: "enel_t9_kaminosabaki_before_attack",
+                   SCN_ENEL_ROGER: "enel_roger_t7_gammaknife",
+                   SCN_ENEL_LUFFY: "enel_luffy_t4_kami_ko"}[scn]
             for path in sorted(glob.glob(os.path.join(cond_dir, scn, "r3_s*.frames.json"))):
                 seed = os.path.basename(path).split(".")[0].split("_s")[-1]
                 cur.setdefault(key, {})[f"s{seed}"] = fn(_load(path))

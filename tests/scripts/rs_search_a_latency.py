@@ -71,10 +71,12 @@ def main(argv=None) -> int:
     ap.add_argument("--select-rule", default=None, choices=("visits", "q_min_n"))
     ap.add_argument("--q-min-frac", type=float, default=None)
     ap.add_argument("--root-prior-temp", type=float, default=None)
+    # §20.7.2（WP `rs-setup-box`）: 準備箱。既定（渡さない）＝serve 既定のまま。
+    ap.add_argument("--setup-box", dest="setup_box", action="store_true", default=None)
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
     opts = {"select_rule": args.select_rule, "q_min_frac": args.q_min_frac,
-            "root_prior_temp": args.root_prior_temp}
+            "root_prior_temp": args.root_prior_temp, "setup_box": args.setup_box}
     data = {"note": "同じ 1 局面（分岐点の開始盤面）に対する 1 decide の実測 ms・単独プロセス",
             "seed": args.seed, "repeat": args.repeat,
             "opts": {k: v for k, v in opts.items() if v is not None},

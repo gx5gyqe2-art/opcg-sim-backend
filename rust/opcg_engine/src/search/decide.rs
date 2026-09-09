@@ -449,7 +449,12 @@ pub fn merge_root_stats(
 }
 
 /// Python `cpu_ai.don_box_first_primitive`（DON_BOX → 先頭原始手）。
+///
+/// 準備箱（`SETUP_BOX`・§20.7.2）も同じ規約で先頭原始手（素の PLAY／ACTIVATE_MAIN）へ落とす。
 pub fn don_box_first_primitive(mv: &Move) -> Move {
+    if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
+        return super::r#macro::setup_box_first_primitive(mv);
+    }
     if mv.get("action_type").and_then(Value::as_str) != Some("DON_BOX") {
         return mv.clone();
     }
@@ -717,6 +722,25 @@ fn commit_play_dialog(
         return Ok(Vec::new());
     }
     Ok(trace_to_steps(&trace, name))
+}
+
+/// 準備箱（`SETUP_BOX`・§20.7.2）の「素の手より後」の手順をコミットへ積む。
+///
+/// `commit_play_dialog` と同じ流儀（世界サンプルの上で継続を打ち直し、自分の手だけ手順化）。
+fn commit_setup_box(
+    ctx: &Ctx,
+    real: &GameState,
+    name: Seat,
+    mv: &Move,
+    rng: &mut dyn SearchRng,
+) -> Result<Vec<Step>, EngineError> {
+    let world = super::determinize::determinize_with(real, name, rng)?;
+    let mut s = Session::new(world);
+    match super::r#macro::setup_box_continuation(&mut s, ctx.masters, name, mv) {
+        Ok(trace) => Ok(trace_to_steps(&trace, name)),
+        Err(e @ EngineError::Unimplemented(_)) => Err(e),
+        Err(_) => Ok(Vec::new()), // コミット生成の失敗は手を止めない（Python の `except: pass`）
+    }
 }
 
 // --- 残ドン掘り／残り起動（腕 A・A2）------------------------------------------------
@@ -1126,6 +1150,13 @@ fn decide_inner(
                 }
                 Some("PLAY") | Some("ACTIVATE_MAIN") => {
                     let steps = commit_play_dialog(ctx, state, name, &m, rng, st)?;
+                    if !steps.is_empty() {
+                        carry.commit = steps;
+                    }
+                }
+                // 準備箱（§20.7.2）: 素の手より後（対話 → 攻撃箱）を機械実行へ積む。
+                Some("SETUP_BOX") => {
+                    let steps = commit_setup_box(ctx, state, name, &m, rng)?;
                     if !steps.is_empty() {
                         carry.commit = steps;
                     }

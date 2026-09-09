@@ -83,6 +83,11 @@ pub fn apply_move_inplace(
         .and_then(Value::as_str)
         .ok_or_else(|| bad("move: 'action_type' がありません。".into()))?;
 
+    if action_type == "SETUP_BOX" {
+        // 準備箱（§20.7.2）＝素の手 → 対話（最初の対象選択だけ枝の値・以降は既定） → 攻撃箱。
+        return super::r#macro::apply_setup_box(s, masters, actor, mv, stop_at_select, None);
+    }
+
     if action_type == "DON_BOX" {
         let null = Value::Null;
         let payload = mv.get("payload").unwrap_or(&null);

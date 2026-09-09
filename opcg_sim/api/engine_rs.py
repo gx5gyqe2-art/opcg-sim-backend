@@ -281,7 +281,8 @@ class RsGame:
     def decide(self, player_id: str, trace: Optional[Dict[str, Any]] = None,
               net: Optional[str] = None, sims: Optional[int] = None,
               action_index: Optional[int] = None, select_rule: Optional[str] = None,
-              q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None):
+              q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None,
+              setup_box: Optional[bool] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -298,14 +299,15 @@ class RsGame:
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
                                 select_rule=select_rule, q_min_frac=q_min_frac,
-                                root_prior_temp=root_prior_temp)
+                                root_prior_temp=root_prior_temp, setup_box=setup_box)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
 
     def _decide(self, player_id: str, net: Optional[str] = None, sims: Optional[int] = None,
                action_index: Optional[int] = None, select_rule: Optional[str] = None,
-               q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None):
+               q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None,
+               setup_box: Optional[bool] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -340,6 +342,9 @@ class RsGame:
             opts["q_min_frac"] = float(q_min_frac)
         if root_prior_temp is not None:
             opts["root_prior_temp"] = float(root_prior_temp)
+        # §20.7.2（WP `rs-setup-box`）: 準備箱。None＝渡さない＝Rust 側の既定（false）。
+        if setup_box is not None:
+            opts["setup_box"] = bool(setup_box)
         out = json.loads(self._game.decide(player_id, json.dumps(opts)))
         self._carry_key = (turn, seat)
         self._carry = {"commit": out.get("commit") or [],
@@ -411,6 +416,13 @@ class RsGame:
             } for p in pv]
         if kind == "commit":
             tr["commit_from"] = commit_from
+        # 箱レベルの鍵（`move_sig`）。原始手化の**前**の手が分かる＝思考ログで
+        # 「箱（DON_BOX／SETUP_BOX）を選んだのか素の手を選んだのか」を読める（§20.7.2）。
+        if out.get("sig") is not None:
+            tr["sig"] = out["sig"]
+        # 箱ごとの枝数（§20.7.2 の計測・`setup_box` を渡した decide だけ非 None）。
+        if out.get("boxes") is not None:
+            tr["boxes"] = out["boxes"]
         return tr
 
     @staticmethod

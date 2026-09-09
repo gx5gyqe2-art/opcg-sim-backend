@@ -234,7 +234,7 @@ def _record_frame(game: RsGame, actions: list) -> dict:
 
 def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: str,
              seed: int, sims: int, select_rule: str = None, q_min_frac: float = None,
-             root_prior_temp: float = None):
+             root_prior_temp: float = None, setup_box: bool = None):
     """1 seed ぶんの再生。戻り値 `(frames_json, steps_log, frames)`。
 
     `select_rule`／`q_min_frac`／`root_prior_temp`（省略可・§20.5）は**両席に同じ設定**で渡す
@@ -274,7 +274,8 @@ def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: 
         t0 = time.perf_counter()
         move = game.decide(player_id, trace=tr, net=net_for[player_id], sims=sims,
                            action_index=action_index, select_rule=select_rule,
-                           q_min_frac=q_min_frac, root_prior_temp=root_prior_temp)
+                           q_min_frac=q_min_frac, root_prior_temp=root_prior_temp,
+                           setup_box=setup_box)
         decide_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         if move is None:
             break
@@ -559,7 +560,7 @@ def cmd_play(args) -> int:
             result, steps_log, frames = _play_one(
                 name, scenario, payload, seat_net, opp_net, seed, args.sims,
                 select_rule=args.select_rule, q_min_frac=args.q_min_frac,
-                root_prior_temp=args.root_prior_temp)
+                root_prior_temp=args.root_prior_temp, setup_box=args.setup_box)
             base = f"{net_label}_s{seed}"
             frames_path = os.path.join(out_dir, f"{base}.frames.json")
             with open(frames_path, "w", encoding="utf-8") as f:
@@ -617,6 +618,10 @@ def main(argv=None) -> int:
                   help="q_min_n の訪問下限の割合（既定 0.125＝sims/8）")
     p.add_argument("--root-prior-temp", type=float, default=None,
                   help="根の事前分布を P^(1/t) へ（既定 1.0＝そのまま・2.0 で平坦化）")
+    # §20.7.2（WP `rs-setup-box`）: 準備箱。既定（None）＝渡さない＝1 bit も変わらない。
+    p.add_argument("--setup-box", dest="setup_box", action="store_true", default=None,
+                  help="準備の手（メインイベント／起動メイン／登場時持ちの PLAY）を"
+                       "「続きの攻撃 1 回」まで箱にする（既定 off）")
     p.set_defaults(func=cmd_play)
 
     args = ap.parse_args(argv)

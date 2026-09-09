@@ -52,7 +52,7 @@ resolver は `success = True` を返す。エラー・フォールバック・OT
 `test_selfplay_v4_datagen.py` / `test_value_net_aux_turns.py` /
 `test_pd_mixed_label.py` / `test_learned_candidate_prune.py` /
 `test_rl_encoder_v4.py` / `test_mark_seeds.py` / `test_value_net_distill.py` / `test_peak_alert.py` /
-`test_journal.py`（`test_real_playout_make_unmake_roundtrip`のみ）。
+`test_journal.py`（`test_real_playout_make_unmake_roundtrip`のみ）/ `test_setup_box.py`。
 
 ### 実行方法（重要）
 logger が `sys.stdout` を直接掴むため、pytest はキャプチャ無効で実行する。
@@ -161,6 +161,7 @@ make test-slow   # 重テストだけ
 | `tests/test_counter_event_offer.py` | **カウンターステップで【カウンター】イベントが選べる**（必須・実プレイの退行・2026-09-08 ユーザ報告）: API と同じ `RsGame` を実際に駆動（p1 先攻・両者 1 ターン目は攻撃不可・p1 の 2 ターン目までドン!! 3 枚を残して p2 がリーダーで攻撃）し、`pending.selectable_uuids` と `get_legal_actions` の両方に **コストを払える【カウンター】イベント**（カウンター値 0）が載ること・`SELECT_COUNTER` で実際に発動できてコストを払いトラッシュへ行くことを見る。対照としてドン!!を全部付与した盤面では候補に載らない（Python 版 `interaction.get_pending_request` の BATTLE_COUNTER 分岐 (b) と同じ判定）。golden の random 帯は防御側のドン!!が尽きた盤面ばかりでこの経路を一度も通らない（150 局・976 カウンター歩で候補 0）ため、golden だけでは守れない |
 | `tests/test_main_event_legal.py` | **【メイン】効果を持つイベントが合法手（PLAY）に列挙される**（必須・Rust 化後の退行・2026-09-08 分岐点シナリオで発見・計画 §8.26）: API と同じ `RsGame`（p1 の手札を「【メイン】ドロー 1 のイベント」と「【カウンター】専用イベント」で埋める）で、`get_legal_actions` に前者の PLAY が載り後者は載らないこと・列挙した手をそのまま `PLAY` で適用でき（1 枚引いてトラッシュへ・コストを払う）ることを見る。`rules/legal.rs` が全イベントを列挙から外していた（適用側は正しかった＝人間は打てるが探索は一度も打てない）ため、golden（正本 Rust）にも写らなかった |
 | `tests/test_select_default_intent.py` | **対象選択の既定解決が効果の種別（利益／コスト）で分岐する**（必須・WP `rs-select-fix`・`docs/rust_engine_plan.md` §8.27.2 案①・原因分析 `docs/reports/2026-09-08_select_default_rca.md` §Q4）: API と同じ `RsGame` を実際に駆動し、①神の裁き（OP15-075・コスト0・ドン‼-1）をエネル(OP15-058)リーダーで打った直後の自分への+1000 の `SEARCH_AND_SELECT`（候補=リーダーのみ）で `pending.intent=="BENEFIT"` かつ `get_legal_actions` の既定手（唯一の候補）がリーダーを選ぶこと、②万雷（OP15-078）を【カウンター】で使った直後の同種の +1000 選択で既定手が空でないこと（RCA (a) の直接の回帰確認）、③影の集合地（OP06-095・自分のキャラを任意の枚数KOしてもよい）で `pending.intent=="COST"` かつ既定手が従来どおり空のままであることを見る。①②はどちらも `zones_in(["hand","field"])` に `leader` が無く `None`→空選択に落ちていた既定解決のバグが実際の対話 JSON（`pending["intent"]`・`get_legal_actions`）に表れることの確認 |
+| `tests/test_setup_box.py` | **基盤健全性**（`cpu_infra`）。**準備箱（`SETUP_BOX`）が実エンジンで回る**（WP `rs-setup-box`・`docs/rust_engine_plan.md` §20.7.2）: API と同じ `RsGame` で `decide(setup_box=True)` を呼び、①候補（`legal_stats`）に `SETUP_BOX` が並び「+1000 する／しない」×「KO する／しない」の枝が 2 通り以上出ること、②枝数の計測 `trace["boxes"]` が `setup_box` を渡した decide にだけ出て 1 準備の手あたり 9 枝以内であること、③**既定（渡さない）は候補にも決定にも 1 bit も足さない**こと、④短い自己対戦の全決定で実対局へ出る手が原始手のまま（箱が `decide` の戻り値やコミットの消化に出ない）ことを見る。候補生成と原始手化の規則そのものは Rust 側（`rust/opcg_engine/src/search/tests_setup_box.rs`＝実カードの神の裁き／ガンマナイフで枝と展開を固定）が持つ |
 | `tests/test_full_card_audit.py` | **legacy**（Python エンジン直叩き）。全カード構造不変条件ゲート（EXCEPTION/CARD_LOSS/TEMP_LEAK=0）。退避後は tag `py-engine-final` でのみ実行 |
 | `tests/test_full_card_baseline.py` | **legacy**。全カード挙動ベースライン回帰（`full_card_baseline.json` と一致）。退避後は tag `py-engine-final` でのみ実行 |
 | `tests/test_verified_decks.py` | **手動検証済みデッキの効果回帰**（§8）。ベースラインが捕捉できない常在ルール（RULE_PROCESSING）・ON_LEAVE 誘発・勝利条件・ドンデッキ枚数・カード名別名・持続時間等を意味的に固定 |
