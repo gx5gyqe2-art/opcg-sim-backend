@@ -3734,26 +3734,29 @@ docs/rust_engine_plan.md §20.5・分析 #4 docs/reports/2026-09-08_scenario_ana
 #### 20.5.3 WP `rs-search-arena` の指示書（探索設定の採否をアリーナで決める）
 
 ```
-作業: WP rs-search-arena（探索の設定 R2 を、同じネット r3 の既定設定 S1 とアリーナで比べる・
-docs/rust_engine_plan.md §20.5.2・分析 #5 docs/reports/2026-09-09_scenario_analysis_05.md）。
+作業: WP rs-search-arena（探索の設定「worlds 4 ＋ R2」を、同じネット r3 の既定設定 S1 とアリーナで
+比べる・docs/rust_engine_plan.md §20.5.2・§20.7.5・分析 #6 docs/reports/2026-09-09_scenario_analysis_06.md）。
 
 本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-search-arena に push、PR は作りません。
 成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。
 
 ■ 足すもの（opcg_sim/loop/arena_shard.py・arena_merge.py）
   - 候補席の探索設定を CLI で渡せるようにする: --cand-sims／--cand-select-rule／--cand-q-min-frac／
-    --cand-root-prior-temp（省略＝既定＝今までの挙動。基準席は常に既定）。RsGame.decide の opts に
-    そのまま流す。記録の jsonl に候補席の設定を書く（判定が設定に紐づくため）。
+    --cand-root-prior-temp／--cand-worlds／--cand-setup-box（省略＝既定＝今までの挙動。基準席は常に
+    既定）。RsGame.decide の opts にそのまま流す（worlds／setup_box は §20.7 で配線済みの欄）。
+    記録の jsonl に候補席の設定を書く（判定が設定に紐づくため）。
   - 候補ネットが基準と同じ npz でも回せること（--candidate に既定と同じパスを渡す＝設定だけの比較）。
 
-■ 回すもの（候補＝r3 + R2〔sims 640・q_min_n 0.125・root_prior_temp 2.0〕／基準＝r3 + 既定）
+■ 回すもの（候補＝r3 + 〔sims 160・worlds 4・q_min_n 0.125・root_prior_temp 2.0〕／基準＝r3 + 既定。
+  分析 #6 の C_w4_r2＝実効 sims 640・壁時計は既定の 1.9 倍。setup_box は入れない〔§20.7.6 の後〕）
   主条件: --leaders random --decks synth・8 シャード × 24 ペア（48 局／シャード・先後入替）＝384 局。
   副条件: 既定の固定ミラー・8 シャード × 24 ペア＝384 局。
   seed 帯: 主 441000〜448000（シャード k は 441000 + 1000k）・副 451000〜458000（台帳
   docs/n_loop_ops.md §6 に「探索設定 R2 vs S1」で払い出し済み扱い＝この指示書が台帳の根拠）。
   1 セッションで回すなら --workers 4 で順に。並列にするなら 16 セッション（条件×シャード）に分けて
   claude/arena-r2-{random|mirror}-wNN に push し、コーディネータが arena_merge で束ねる。
-  ※ 候補席は 640 sims なので 1 局の時間は既定の 2.5 倍程度（片側だけ 4 倍）。主 384 局で数時間。
+  ※ 候補席は worlds 4（4 スレッド）なので 1 局の壁時計は既定の 1.5 倍程度（片側だけ 1.9 倍）。
+    --workers は 4 コアで 2 まで（候補席の decide が 4 スレッド使う）。主 384 局で数時間。
 
 ■ 判定基準（コーディネータが判定・CLAUDE.md の規約）
   主条件 wr ≥0.55 かつ CI 下限 >0.50、副条件は退行なし（CI 下限 ≥0.45）。void >2% なら判定しない。
@@ -4029,3 +4032,47 @@ search/apply.rs・tests/ に限る（search/mcts.rs・decide.rs の根の統計�
 **次**: 分析 #6（コーディネータ・`2026-09-09_scenario_analysis_06.md`）＝ 1＋2＋3 を束ねた条件
 （worlds 4 ＋ setup_box ＋ q_min_n 1/8 ＋ t=2・sims 160）を 3 局面 × seed 8 本で回し、鍵 3 つと
 レイテンシを見る → §20.5.3 `rs-search-arena` の候補設定を差し替えてユーザへ渡す。
+
+#### 20.7.6 WP `rs-setup-box-2` の指示書（準備箱の「素の手との取り合い」を直す・分析 #6）
+
+```
+作業: WP rs-setup-box-2（準備箱が素の手に訪問で負ける構造を直す・docs/rust_engine_plan.md §20.7.5・
+分析 #6 docs/reports/2026-09-09_scenario_analysis_06.md §3）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-setup-box-2 に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。ネット（nrel_r3.npz）は変えない。
+触るのは search/macro.rs・search/quiesce.rs・search/apply.rs・search/decide.rs（箱コミットの腕だけ）・
+tests/・tests/scripts/rs_search_a_keys.py に限る。
+
+■ 直すもの（setup_box=true のときだけ・既定 false は 1 bit も変えない）
+  1. 箱があるとき素の PLAY／ACTIVATE_MAIN を候補から落とす（配分箱と同じ扱い）。「攻撃しない」枝
+     （attack: null）が素の手の意味を持つ。箱が作れない（予算切れ・対話が枝にならない）ときは今までどおり
+     素の手を残す。
+  2. 箱の P は等分しない: 各枝に素の手の P をそのまま与える（quiesce.rs::split_setup_box_priors を
+     置き換える）。根の平坦化（root_prior_temp）はその後に掛かる（今の順のまま）。
+  3. 同名カードが手札に 2 枚あるときの箱の重複（同じ枝が 2 組出る）は、`move_equiv_key` の等価手マージ
+     （groups）で束ねられていることを確かめる（束ねられていなければ、同じ card_id の準備の手は 1 枚だけ
+     箱にする）。
+  4. rs_search_a_keys.py に鍵を足す: 箱のある main 決定について「箱を選んだ数／素の手を選んだ数／
+     素の N > 箱の N 和 の枚数」（分析 #6 §3 の表と同じ定義）。
+
+■ 受け入れ
+  - cargo test: 既存の tests_setup_box.rs が通る（素の手が消える分は期待値を直す）・箱の枝の P が
+    素の手の P と等しい・箱が作れない準備の手は素の手が残る。
+  - pytest tests/test_setup_box.py を更新（素の手が候補に無いこと）。make test green・make audit-cross void 0。
+  - 計測（RESULT.json・sims 160・seed 0〜7・3 局面〔enel_human_20260810_t9-9／human_enel_vs_roger_20260904_t7-8／
+    human_enel_vs_luffy_20260904_t4-5〕）: 条件は C_all（--worlds 4 --setup-box --select-rule q_min_n
+    --q-min-frac 0.125 --root-prior-temp 2）と C_box_r2（worlds なし）の 2 つ。鍵は分析 #6 の表
+    （神の裁き→攻撃の順／決着／ガンマナイフ／神の裁きで KO）＋上の 4 の鍵。目標: C_all で
+    神の裁き→攻撃の順が worlds 4 ＋ R2 単独（5/8）を下回らず、ガンマナイフ 5/8・KO 5/8 を保つ。
+    レイテンシ（rs_search_a_latency.py・同じ 3 局面・単独プロセス）も添える。出力は scenario_out_d/。
+
+■ 成果物
+  - コード＋テスト＋scenario_out_d/＋RESULT.json:
+    {"job":"rs-setup-box-2","status":"done|partial","keys":{"C_all":{"kami_before_attack":n,"lethal":n,
+     "gammaknife":n,"kami_ko":n,"chose_box":n,"chose_bare":n,"bare_gt_box":"n/m"},"C_box_r2":{…}},
+     "latency_ms":{"C_all":…,"C_box_r2":…},"make_test":"N passed","audit_cross":{"pairs":120,"void":0},"notes":"…"}
+
+■ 前提
+  - 既定（setup_box=false）の挙動は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+```
