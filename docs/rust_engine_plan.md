@@ -4076,3 +4076,92 @@ tests/・tests/scripts/rs_search_a_keys.py に限る。
 ■ 前提
   - 既定（setup_box=false）の挙動は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
 ```
+
+#### 20.7.7 `rs-setup-box-2` の回収と判定（2026-09-09・status=partial・本線には入れない）
+
+**結果**（`origin/claude/rs-setup-box-2`・RESULT は同ブランチ `scenario_out_d/RESULT.json`）: 指示の 1〜4 は
+全部入り、素の手と箱の取り合いは消えた（素の手を選んだ決定 49→0・22→0）。**しかし鍵は退行した**:
+ガンマナイフが C_all／C_box_r2 とも 5/8 → **0/8**、神の裁き→攻撃（C_box_r2）4/8 → 0/8。KO は 1/8 → 2/8・
+5/8 → 4/8。レイテンシ C_all 1.58 s・C_box_r2 0.59 s。
+
+**分かったこと（作業セッションの調べ・コーディネータが追認）**
+- 分析 #6 のガンマナイフ 5/8 は **10 run とも素の PLAY で打たれていた**（箱経由 0）。つまり
+  「準備箱を入れると効く」の出所は箱そのものではなく、**箱と同時に有効になる何か**が素の手の
+  Q を -0.47 → -0.23 に押し上げていた。候補は 2 つ: (i) 全箱共通の「自分の対象選択を枝にする」規則
+  （攻撃箱・防御箱の中で最善の枝の値を採る＝攻撃の値が上がる）、(ii) 根の候補が増えたことによる
+  訪問配分の変化。**どちらかは未分離**＝次の WP で切り分ける。
+- 箱の枝の Q は素の手より低い（-0.31／-0.47／-0.51 vs -0.229）。箱は「対象を枝で固定 ＋ 続きの攻撃を
+  方策で決め打ち」なので、木がノードとして続きを読む素の手より粗い。**素の手を落とすと、この
+  「木が読む自由度」ごと落ちる**＝§20.7.6 の 1 は誤りだった（分析 #6 §3 の読み「素の手が箱に勝つのが
+  問題」は、勝っていた側が正解だった）。
+- 訪問の分裂（神の裁き 8 枝・ガンマナイフ 3 枝が `q_min_n` の下限を各々割る）は、素の手を落としても
+  P を等分しなくても消えない。**選択規則を「同じ準備の手の枝を束ねたグループ」に対して掛ける**のが
+  残る一手（作業セッションの Q1・分析 #6 §4-4 と同じ）。
+
+**判定**
+- `rs-setup-box-2` の候補構造（素の手を落とす・P を等分しない・「攻撃しない」枝を足す）は**採らない**。
+  候補構造は v1（`rs-setup-box`＝素の手を残す・箱の P は枝で等分）へ戻す。「攻撃しない」枝は素の手が
+  あれば要らない（外す・上限 9 のまま）。
+- 作業セッションの Q1（枝を束ねてから下限を見る）: **採る**。束ね方は「`SETUP_BOX` は base の card_id で
+  束ね、同じ card_id の素の PLAY／ACTIVATE_MAIN も同じグループ」・代表は N 最大の枝（その Q を使う）。
+- Q2（素の手を条件付きで残す）: 無条件で残す（v1）ので不要。Q3（「攻撃しない」枝）: 外す。
+- 4（`rs_search_a_keys.py` の box_vs_bare・enel_t9_winner・`_is_play` が SETUP_BOX も拾う）と Rust テスト
+  `duplicate_copies_of_a_setup_move_merge_into_one_group`: 有用なので**残す**。
+- ブランチは捨てず、同じブランチで続ける（下の `rs-setup-box-3`）。本線には v3 の結果を見てから入れる。
+
+#### 20.7.8 WP `rs-setup-box-3` の指示書（v1 の候補構造 ＋ 枝の束ね ＋ 効き目の切り分け）
+
+```
+作業: WP rs-setup-box-3（docs/rust_engine_plan.md §20.7.7 の判定を実装する。rs-setup-box-2 の続き）。
+
+ブランチ claude/rs-setup-box-2 の最新（6bcd0480）から続けて同じブランチに push、PR は作りません。
+成果物は RESULT.json（scenario_out_d/ ではなく docs/reports/2026-09-09_setup_box_3.RESULT.json）を添えて
+同ブランチへ。最初に `make rust-develop`（opcg_effects.json が無ければ export_effects_json で作る＝
+無いと tests_setup_box.rs が何も検査せずに通る）。ネット（nrel_r3.npz）は変えない。
+触ってよいのは search/macro.rs・quiesce.rs・apply.rs・decide.rs・mod.rs・engine_rs.py・tests/・
+tests/scripts/。mcts.rs は触らない。
+
+■ 直すもの（setup_box=true のときだけ・既定 false は 1 bit も変えない）
+  1. 候補構造を v1 に戻す: 箱ができても素の PLAY／ACTIVATE_MAIN を候補に残す。箱の P は素の手の P を
+     枝数で等分する（rs-setup-box-2 で消した split_setup_box_priors を戻す）。rs-setup-box-2 で足した
+     「攻撃しない」枝の追加（setup_box_candidates の 3)）は外す（枝は上限 9 のまま）。
+     テスト（tests_setup_box.rs・tests/test_setup_box.py）の期待値も v1 へ戻す。
+  2. 選択規則の束ね（decide.rs・q_min_n のときだけ・visits 規則は変えない）:
+     根の候補を「グループ」に束ねてから訪問下限を見る。グループの鍵＝(action_type が SETUP_BOX なら
+     payload.base の card_id、素の PLAY／ACTIVATE_MAIN なら card_id) で、同じ card_id の素の手と箱の
+     枝は 1 グループ。それ以外の手は今までどおり 1 手 1 グループ（既存の move_equiv_key の等価手
+     マージはそのまま＝その上に重ねる）。グループの N は和、代表はグループ内で N 最大の 1 手、
+     代表の Q をグループの Q とする。q_min_n は「グループの N ≥ 下限」のグループの代表の中から
+     Q 最大を選び、その代表の手を返す。trace の stats／groups は今までの形のまま（グループの束ねは
+     decide の戻り値に "select_groups":[{"key":…,"n":…,"rep":idx,"q":…}] を足して読めるようにする）。
+  3. 効き目の切り分け（診断用のつまみ）: SearchOptions.select_branch: Option<bool>（既定 None＝
+     setup_box に従う＝今と同じ）。true/false を明示すると、全箱共通の「自分の対象選択を枝にする」規則
+     （quiesce.rs の sel_branch_left・macro.rs の may_branch_selection）だけを個別に on/off できる。
+     opts_json → RsGame.decide(select_branch=) → rs_scenario_play.py --select-branch {on,off}。
+
+■ 受け入れ
+  - cargo test: v1 のテストが通る／束ねのテスト（同じ card_id の素の手 1 ＋ 箱 3 で、各 N が下限未満でも
+    和が下限以上なら q_min_n がそのグループの代表を選べる・visits 規則は不変）／select_branch=false ＋
+    setup_box=true で攻撃箱・防御箱の枝が出ない（boxes.attack/defense が 0）。
+  - make test green・make audit-cross void 0。
+  - 計測（sims 160・seed 0〜7・3 局面〔enel_human_20260810_t9-9／human_enel_vs_roger_20260904_t7-8／
+    human_enel_vs_luffy_20260904_t4-5〕・鍵は分析 #6 の表 ＋ box_vs_bare・出力は scenario_out_e/）:
+      E1: C_all（--worlds 4 --setup-box --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2）
+      E2: C_box_r2（worlds なし・他は同じ）
+      E3: 切り分け A＝準備箱だけ（--setup-box --select-branch off ＋ R2・worlds なし）
+      E4: 切り分け B＝共通規則だけ（--select-branch on・--setup-box なし ＋ R2・worlds なし）
+    目標: E1 で神の裁き→攻撃 5/8 以上（worlds 4 ＋ R2 単独と同等）・ガンマナイフ 5/8・KO 5/8。
+    E3/E4 は「ガンマナイフ 5/8 の出所がどちらか」を答える（数字だけでよい・判定はコーディネータ）。
+    レイテンシ（rs_search_a_latency.py・同じ 3 局面・単独プロセス）は E1〜E4 全部。
+
+■ 成果物
+  - コード＋テスト＋scenario_out_e/＋docs/reports/2026-09-09_setup_box_3.RESULT.json:
+    {"job":"rs-setup-box-3","status":"done|partial","keys":{"E1":{"kami_before_attack":n,"lethal":n,
+     "gammaknife":n,"kami_ko":n,"kami_played":n,"chose_box":n,"chose_bare":n},"E2":{…},"E3":{…},"E4":{…}},
+     "latency_ms":{"E1":…,"E2":…,"E3":…,"E4":…},"make_test":"N passed","audit_cross":{"pairs":120,"void":0},
+     "notes":"…"}
+
+■ 前提
+  - 既定（setup_box=false・select_branch=None）の挙動は変えない。判定はコーディネータ。質問は
+    RESULT.json の notes に。
+```
