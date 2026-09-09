@@ -4418,3 +4418,156 @@ E 目的（起点潰し／テンポ／リーサル阻止／自分のリーサル
 全色で揃えることはできない。差し込みは「その色で組める型」に限り、**組めない型は評価の層から外す
 （学べていないのではなく教材に存在しない、と区別できるよう `deck_removal_kinds` を記録する）**。
 2 色リーダーは 2 色のプールを合わせられるので、型のカバレッジは 2 色で広がる。
+
+### 20.8 学習側の手当て: 除去の価値を教材と補助教師で学べるようにする（ユーザ決定 2026-09-09）
+
+方針（§20.7.11 と補記の合意）: 人が価値を書き込まない（V の目的関数は z のまま）・補助教師は「何が起きるか」の
+対称な予測・教材に対照を作る（型 × 色の差し込み・両方向 ε）・判定は評価帯とアリーナの層別。探索側は今回
+触らない（準備箱・打ち切りは既定 off・生成は worlds 4 ＋ R2）。WP は 4 本: **`rs-removal-decks`（§20.8.1）と
+`rs-aux-heads`（§20.8.2）を並行**→ 波 29 の生成（§20.8.3・後日）→ r4 の訓練と判定（§20.8.4・後日）。
+
+**dump の追加列（2 つの WP で共有する契約・dump v4）**: 既存の列は 1 バイトも変えない。追加は
+`deck_kinds(D str)`（§20.8.1 が書く・JSON・手番側デッキの型の集合）と `aux(D, A) float16`／`aux_tok(D, 6, 3)
+float16`／`aux_mask(D) int8`（§20.8.2 が書く）。`dump_io.py` は無い列を `None` で返す（v3 の波はそのまま読める）。
+
+#### 20.8.1 WP `rs-removal-decks` の指示書（型 × 色の差し込み・記録・分類の確認）
+
+```
+作業: WP rs-removal-decks（synth デッキに除去の「型」を色ごとに制御して差し込み、各局にその型を記録する・
+docs/rust_engine_plan.md §20.8／§20.7.11 の補記＝分類と色別の実測）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-removal-decks に push、PR は作りません。
+成果物は docs/reports/2026-09-10_removal_decks.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。
+触るのは opcg_sim/loop/deck_synth.py・deck_dig.py（流儀の参照）・新規 opcg_sim/loop/deck_roles.py・decks.py・
+record_gen.py（deck_kinds 列の追加だけ）・opcg_sim/learned/n_rel_feat.py（分類の修正だけ）・tests/・
+tests/scripts/。ネット・探索・訓練は触らない。
+
+■ 1. 分類の確認と修正（n_rel_feat.py の _REMOVAL_OPS／_LOCK_OPS／_RED_OPS と profile）
+  - 「手札に戻す」（バウンス）が相手対象で 0 種と出た（2026-09-09 実測）。パーサの出力（MOVE_TO_HAND／
+    MOVE_CARD の target・zone）を確認し、バウンスが「山札へ」や「移動」に畳まれているなら形（form）を
+    分けて数え直す。形の語彙: KO／bounce／deck（山札上下）／trash（直接トラッシュ）／lock（レスト・凍結・
+    攻撃不可・ブロック不可）／reduce（パワー・コスト減少）。
+  - 分類器 `deck_roles.classify(master) -> set[str]` を 1 つに集約する（n_rel_feat の roles_of はそのまま・
+    こちらは「型」を返す）。型の鍵＝(form, source, cost_band)。source＝EVENT／ON_PLAY／ACTIVATE_MAIN／
+    ON_ATTACK／TRIGGER／COUNTER／OTHER、cost_band＝c0-2／c3-5／c6+。減少は form=reduce として同じ鍵。
+
+■ 2. 型 × 色のテンプレート表（deck_roles.TEMPLATES）
+  - 色ごとに「そのプールで組める型」だけを列挙する（§20.7.11 の実測表が出発点・コードで再計算して
+    表を生成する＝手書きで固定しない）。最低 3 種のカードがある型だけを「組める」とする。
+  - 組み合わせ型も持つ: {"reduce_c0-2" ＋ "KO_c3-5"}（黒・赤・紫）／{"lock" ＋ 攻撃役}（緑）／
+    {"deck" 送り}（青）／{"TRIGGER 除去"}（黄）／{"ON_ATTACK 除去"}（赤）／{"ACTIVATE_MAIN 除去"}（黒）。
+    2 色リーダーは 2 色のプールの和で判定する。
+
+■ 3. 差し込み（deck_roles.inject_roles(db, leader, cards, owner, seed) -> (cards, kinds)）
+  - deck_dig.inject_dig と同じ流儀（差し替え位置・同名 4 枚まで・シャッフル・決定論）。
+  - seed から差し込み率 r ∈ {0, 5, 10, 15, 20, 25}% を引く（0 も残す＝差し込み無しのデッキが 1/6）。
+    r>0 のとき、その色で組める型から 1〜2 型を選び、r×50 枚を目安に差し込む（組み合わせ型は両方の要素を
+    入れる）。差し込み後も deck_synth の死に札監査とカウンター比率の下限（MIN_COUNTER_CARDS）を通す
+    （割れたら差し込みを減らす）。
+  - 戻り値 kinds＝差し込んだ型の集合 ＋ 元のデッキが既に持っていた型（両方を JSON で記録）。
+  - decks.build_pair に decks="synth_roles" を足す（既定の "synth" は不変）。record_gen／arena の
+    --decks に synth_roles を通す。
+
+■ 4. 記録（record_gen.py）
+  - 各行に deck_kinds(D str)＝手番側デッキの型 JSON（{"injected":[…],"native":[…],"rate":r,"colors":[…]}）を
+    足す。既存の列は不変（dump v4＝v3 ＋ 追加列・dump_io.py は無ければ None を返す）。
+  - 対局メタ（seed・両席のリーダー・両席の kinds）を part ごとの sidecar JSON にも書く（層別の集計用）。
+
+■ 5. 計測（RESULT.json）
+  - synth_roles で 143 リーダー × seed 0〜1 を組み、型 × 色のカバレッジ表（各型が入ったデッキ数・差し込み
+    前後）と、死に札監査の落ち数、差し込みで割れた回数を出す。
+  - 短い自己対戦（record_gen --games 60 --sims 32・synth_roles）で void 0・deck_kinds 列が読めることを確認。
+  - 組めない型（その色に 3 種未満）の一覧を明示する＝評価の層から外す根拠。
+
+■ 受け入れ
+  - pytest tests/test_deck_roles.py（標準）: 分類が実カード数枚で期待どおり（KO／bounce／deck／lock／reduce）・
+    inject_roles が決定論で同名 4 枚以内・r=0 は元のデッキと同一・死に札監査を通る・deck_kinds が dump に
+    載り dump_io が v3 の波も読める。TEST_SPEC §2 に 1 行。make test green。
+
+■ 成果物
+  - コード＋テスト＋docs/reports/2026-09-10_removal_decks.RESULT.json:
+    {"job":"rs-removal-decks","status":"done|partial","coverage":{"<color>":{"<kind>":n,…}},
+     "unbuildable":{"<color>":[…]},"bounce_fix":"…（分類の修正内容）","audit_fail":n,
+     "selfplay":{"games":60,"void":0},"make_test":"N passed","notes":"…"}
+
+■ 前提
+  - 既定（decks="synth"）の挙動は変えない。人が「型の価値」を書かない（差し込みは対照を作るためだけ）。
+    判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 20.8.2 WP `rs-aux-heads` の指示書（対称な補助教師・トークン単位・層別評価）
+
+```
+作業: WP rs-aux-heads（棋譜から「次の 1 ターンで何が起きたか」の対称な補助教師を作り、NRel の別ヘッドで
+学習し、評価帯を層別で読めるようにする・docs/rust_engine_plan.md §20.8／§20.7.11）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-aux-heads に push、PR は作りません。
+成果物は docs/reports/2026-09-10_aux_heads.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。
+触るのは opcg_sim/loop/record_gen.py（aux 列の追加）・opcg_sim/loop/driver.py（observer に渡す情報の追加だけ）・
+opcg_sim/learned/n_rel.py・train/n_rel_train.py・train/n_rel_torch.py・train/dump_io.py・train/n_rel_band.py・
+tests/・tests/scripts/。Rust・探索・デッキ生成は触らない（WP rs-removal-decks と並行・deck_kinds 列の契約は
+§20.8 の冒頭）。
+
+■ 1. 補助教師（生成時に記録する・dump v4 の追加列・既存の列は不変）
+  各判断点の行 d（手番視点）に対して、**次の 1 ターン**を「この行の後、相手の手番が 1 回終わるまで」と
+  「その後の自分の手番が 1 回終わるまで」の 2 区間で数える。値はいずれも「起きたこと」＝符号なし:
+  aux(D, A) の列（A=10・全部 float・ライフは枚数・パワーは /10000）:
+    0 opp_turn_my_life_lost     … 次の相手ターンに自分が失ったライフ枚数
+    1 opp_turn_attacks          … 次の相手ターンの相手の攻撃回数
+    2 opp_turn_effects          … 次の相手ターンの相手の効果発動回数（効果イベント数・Rust の
+                                   effect_events と同じ数え方）
+    3 my_turn_opp_life_lost     … 次の自分のターンに相手が失ったライフ枚数
+    4 my_turn_attacks           … 次の自分のターンの自分の攻撃回数
+    5 my_turn_effects           … 次の自分のターンの自分の効果発動回数
+    6 next_my_board_power       … 次の自分のターン開始時の自分の場のパワー合計
+    7 next_opp_board_power      … 同・相手の場のパワー合計
+    8 next_my_board_n           … 同・自分の場の体数
+    9 next_opp_board_n          … 同・相手の場の体数
+  aux_tok(D, 6, 3)＝相手トークン 6 枠（相手 L ＋ 相手場 5・tokens の並びと同じ）ごとに、次の相手ターンに
+    [攻撃したか(0/1), 通したライフ枚数, 能力を発動したか(0/1)]。枠が空なら 0。
+  aux_mask(D) int8＝1 なら aux が有効（対局が次の区間の途中で終わった行は 0＝損失に入れない）。
+  実装: driver.run_game の observer に「ターンごとの台帳」（両席のライフ・場の uuid とパワー・攻撃の
+  attacker uuid と結果・効果イベント数・ターン境界）を積み、対局後に行へ backfill する。攻撃と効果の
+  数え方は Game の action_events／effect_events から取る（新しい計測が要れば driver に足す・Rust は触らない）。
+  ※ 補助教師は「起きたこと」であって「良し悪し」ではない。人が符号や重みで価値を入れない。
+
+■ 2. ネット（n_rel.py・n_rel_torch.py）
+  - 既存の value ヘッドと policy ヘッドは不変。共有表現 Z（value ヘッドの手前）から別の小ヘッド 2 本:
+    aux_head(Z) -> 10（回帰・Huber）、aux_tok_head(token_i) -> 3（相手 6 枠・[BCE, Huber, BCE]）。
+  - 損失 = 既存の loss + λ_aux × (aux + aux_tok)（λ_aux 既定 0.1・CLI --aux-weight・0 で完全に無効＝
+    今までと同じ学習）。aux_mask=0 の行は補助損失に入れない。aux 列が無い波（v3）は自動で無効。
+  - npz の保存: 補助ヘッドの重みは別鍵で保存し、**Rust の読み手（net/nrel.rs）は知らない鍵を無視する**
+    ことを確認する（serve は補助ヘッドを使わない・forward は不変）。
+
+■ 3. 評価帯（n_rel_band.py）
+  - 既存の指標（z の予測）に加えて、aux の各列の予測誤差（Huber／BCE・holdout 行）を出す。
+  - 層別: dump に deck_kinds 列があればそれで（型・色）、無ければリーダー色で層別し、各層の z 予測誤差と
+    aux 誤差を表にする。加えて「除去を打った直後の行」（sig の action_type が PLAY／ACTIVATE_MAIN で、
+    その手の card が除去系＝deck_roles.classify があれば使う・無ければ n_rel_feat.roles_of）の層を持つ。
+  - 出力は JSON（--out）と表（stdout）。
+
+■ 4. 計測（RESULT.json）
+  - 既存の波（v3・aux 無し）で --aux-weight 0.1 を指定しても学習が今までと同一であること（aux 列が
+    無いので無効）＝小さな学習で npz の値が一致することを確認。
+  - 短い生成（record_gen --games 200 --sims 32・4 workers・既定 synth）で aux 列を持つ波を 1 本作り、
+    r3 を warm-start に λ_aux ∈ {0, 0.1, 0.3} で短い訓練（--epochs 1）を回して、holdout の z 予測誤差と
+    aux 誤差を並べる（効き目の判定はコーディネータ・ここでは数字だけ）。
+  - 補助ヘッド付き npz を Rust が読めて serve の出力が不変であること（tests/test_rs_net_load 相当があれば
+    それで・無ければ RsGame.decide が同じ手を返すことを 10 局面で確認）。
+
+■ 受け入れ
+  - pytest tests/test_aux_targets.py（標準）: 小さな対局の台帳から aux／aux_tok／aux_mask が期待どおり
+    （手作りの 2 ターン分で値を固定）・区間の途中で終わった対局は mask 0。
+  - pytest tests/test_aux_heads.py（cpu_infra）: --aux-weight 0 と aux 列無しが既存の学習と同一・
+    λ>0 で補助損失が下がる・npz の追加鍵を Rust が無視する。TEST_SPEC §2 に 2 行。make test green。
+
+■ 成果物
+  - コード＋テスト＋docs/reports/2026-09-10_aux_heads.RESULT.json:
+    {"job":"rs-aux-heads","status":"done|partial","dump_v4_cols":["aux","aux_tok","aux_mask"],
+     "identity_check":"…（λ=0／列無しで既存と同一）","band":{"lambda_0":{"z_err":…,"aux_err":{…}},
+     "lambda_0.1":{…},"lambda_0.3":{…}},"rust_ignores_extra_keys":true,"make_test":"N passed","notes":"…"}
+
+■ 前提
+  - 既定（--aux-weight 0・aux 列無し）の学習と serve は 1 bit も変えない。判定はコーディネータ。
+    質問は RESULT.json の notes に。
+```
