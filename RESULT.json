@@ -1,0 +1,8 @@
+{"job": "gen-n29-w01", "status": "done", "games": 480, "rows": 70331, "main_rows": 31991,
+ "dropped": 0, "void": 0, "forced": {"play": 333, "hold": 41},
+ "removal_legal_rows": 12783,
+ "sec_per_game": 13.95625, "wall_hours": 1.8608333333333333,
+ "search": {"worlds": 4, "select_rule": "q_min_n", "q_min_frac": 0.125, "root_prior_temp": 2.0},
+ "decks": "synth_roles", "dump_version": 4, "net": "nrel_r3.npz",
+ "commit": "0be4a48f3e610ef821f546e76a387eb5d75d577b",
+ "notes": "docs/rust_engine_plan.md §20.8.6・波29 シャードk=1。事前に --games 30 --out n_records/n29_w01_probe で壁時計を実測（484s・16.13s/game）→ 480局換算 約2.15時間の見込みで6時間以内と判断し本番実行。本番480局は6699s（約1.86時間）で完了、workers=2。棄却(dropped)0、void（勝者未決の対局）も0（meta_games.json の winner は全480局 p1/p2 で決着）。エラー・警告ログなし。コードは変更していない（本線 0be4a48 のまま）。参考: probe(30局・同seed_base)の行数(4446)と本番先頭30局の行数(4517)がわずかに異なるが、両方向ε探索とDirichletノイズがワーカー内乱数状態に依存するため決定論の対象外と判断（record_gen自体は同一seedで同一資源だが、workers=2の並列実行順序で乱数消費順が変わる可能性）。生成物に影響なし（void/dropped共に0）。"}
