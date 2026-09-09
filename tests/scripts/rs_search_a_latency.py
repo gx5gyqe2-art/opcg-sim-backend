@@ -89,6 +89,7 @@ def main(argv=None) -> int:
     # §20.7.8 の 5: 共通規則だけの on/off（既定＝--setup-box に従う）。
     ap.add_argument("--select-branch", dest="select_branch", default=None,
                     choices=("on", "off"))
+    ap.add_argument("--setup-box-keep-bare", dest="setup_box_keep_bare", action="store_true", default=None)
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
     # "on"／"off" → bool（argparse は type の後に choices を見るので変換はここで）。
@@ -96,7 +97,7 @@ def main(argv=None) -> int:
     opts = {"select_rule": args.select_rule, "q_min_frac": args.q_min_frac,
             "root_prior_temp": args.root_prior_temp, "worlds": args.worlds,
             "setup_box": args.setup_box, "leaf_rollout": args.leaf_rollout,
-            "select_branch": select_branch}
+            "select_branch": select_branch, "setup_box_keep_bare": args.setup_box_keep_bare}
     data = {"note": "同じ 1 局面（分岐点の開始盤面）に対する 1 decide の実測 ms・単独プロセス",
             "seed": args.seed, "repeat": args.repeat,
             "opts": {k: v for k, v in opts.items() if v is not None},

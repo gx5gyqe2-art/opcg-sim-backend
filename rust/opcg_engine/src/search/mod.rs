@@ -97,6 +97,9 @@ pub struct SearchOptions {
     /// 「発動 → 対象選択 → 効果」の箱（`SETUP_BOX`・§20.7.8）として候補に足し、
     /// (2) 攻撃箱／防御箱の中でも「自分が選ぶ最初の対象選択」を 1 段だけ枝にする。
     pub setup_box: bool,
+    /// 準備箱があっても素の PLAY／ACTIVATE_MAIN を候補に残す（§20.7.10 の実験用・
+    /// 既定 false＝v3 のとおり落とす）。`setup_box=true` のときだけ意味を持つ。
+    pub setup_box_keep_bare: bool,
     /// 葉の打ち切り（§20.7.9・WP `rs-leaf-rollout`）。**既定 [`LeafRollout::None`]＝1 bit も変わらない**。
     pub leaf_rollout: LeafRollout,
     /// 診断つまみ（§20.7.8 の 5・既定 `None`＝[`SearchOptions::setup_box`] に従う）。
@@ -122,6 +125,7 @@ impl Default for SearchOptions {
             defense_box: true,
             don_margin: None,
             setup_box: false,
+            setup_box_keep_bare: false,
             leaf_rollout: LeafRollout::None,
             select_branch: None,
         }
@@ -177,6 +181,7 @@ fn options_from_json(v: &Value) -> SearchOptions {
             Some(other) => other.as_i64().map(|n| n as i32),
         },
         setup_box: flag("setup_box", d.setup_box),
+        setup_box_keep_bare: flag("setup_box_keep_bare", d.setup_box_keep_bare),
         // §20.7.9（知らない値・欄無しは既定＝打ち切らない）。
         leaf_rollout: v
             .get("leaf_rollout")

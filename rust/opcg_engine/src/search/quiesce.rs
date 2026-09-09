@@ -190,7 +190,7 @@ impl<'a> Ctx<'a> {
             return Ok(moves);
         };
         let boxes = super::r#macro::setup_box_candidates(self, s, seat, &moves)?;
-        if !boxes.is_empty() {
+        if !boxes.is_empty() && !self.opts.setup_box_keep_bare {
             let boxed: Vec<&Value> = boxes
                 .iter()
                 .filter_map(|b| b.get("payload").and_then(|p| p.get("base")))

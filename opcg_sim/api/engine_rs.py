@@ -284,7 +284,8 @@ class RsGame:
               q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None,
               worlds: Optional[int] = None, setup_box: Optional[bool] = None,
               leaf_rollout: Optional[str] = None,
-              select_branch: Optional[bool] = None):
+              select_branch: Optional[bool] = None,
+              setup_box_keep_bare: Optional[bool] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -316,7 +317,8 @@ class RsGame:
                                 select_rule=select_rule, q_min_frac=q_min_frac,
                                 root_prior_temp=root_prior_temp, worlds=worlds,
                                 setup_box=setup_box, leaf_rollout=leaf_rollout,
-                                select_branch=select_branch)
+                                select_branch=select_branch,
+                                setup_box_keep_bare=setup_box_keep_bare)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
@@ -326,7 +328,8 @@ class RsGame:
                q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None,
                worlds: Optional[int] = None, setup_box: Optional[bool] = None,
                leaf_rollout: Optional[str] = None,
-               select_branch: Optional[bool] = None):
+               select_branch: Optional[bool] = None,
+               setup_box_keep_bare: Optional[bool] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -367,6 +370,9 @@ class RsGame:
         # §20.7.2（WP `rs-setup-box`）: 準備箱。None＝渡さない＝Rust 側の既定（false）。
         if setup_box is not None:
             opts["setup_box"] = bool(setup_box)
+        # §20.7.10（実験）: 準備箱があっても素の手を残す。None＝渡さない＝Rust 側の既定（false）。
+        if setup_box_keep_bare is not None:
+            opts["setup_box_keep_bare"] = bool(setup_box_keep_bare)
         # §20.7.9（WP `rs-leaf-rollout`）: 葉の打ち切り。None＝渡さない＝Rust 側の既定（"none"）。
         if leaf_rollout is not None:
             opts["leaf_rollout"] = str(leaf_rollout)

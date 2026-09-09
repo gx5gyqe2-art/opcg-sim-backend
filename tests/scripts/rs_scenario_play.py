@@ -236,7 +236,8 @@ def _record_frame(game: RsGame, actions: list) -> dict:
 def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: str,
              seed: int, sims: int, select_rule: str = None, q_min_frac: float = None,
              root_prior_temp: float = None, worlds: int = None, setup_box: bool = None,
-             leaf_rollout: str = None, select_branch: bool = None):
+             leaf_rollout: str = None, select_branch: bool = None,
+             setup_box_keep_bare: bool = None):
     """1 seed ぶんの再生。戻り値 `(frames_json, steps_log, frames)`。
 
     `select_rule`／`q_min_frac`／`root_prior_temp`（省略可・§20.5）と `worlds`（省略可・
@@ -281,7 +282,8 @@ def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: 
                            action_index=action_index, select_rule=select_rule,
                            q_min_frac=q_min_frac, root_prior_temp=root_prior_temp,
                            worlds=worlds, setup_box=setup_box, leaf_rollout=leaf_rollout,
-                           select_branch=select_branch)
+                           select_branch=select_branch,
+                           setup_box_keep_bare=setup_box_keep_bare)
         decide_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         if move is None:
             break
@@ -588,7 +590,8 @@ def cmd_play(args) -> int:
                 select_rule=args.select_rule, q_min_frac=args.q_min_frac,
                 root_prior_temp=args.root_prior_temp, worlds=args.worlds,
                 setup_box=args.setup_box, leaf_rollout=args.leaf_rollout,
-                select_branch=args.select_branch)
+                select_branch=args.select_branch,
+                setup_box_keep_bare=args.setup_box_keep_bare)
             base = f"{net_label}_s{seed}"
             frames_path = os.path.join(out_dir, f"{base}.frames.json")
             with open(frames_path, "w", encoding="utf-8") as f:
@@ -649,6 +652,8 @@ def main(argv=None) -> int:
     p.add_argument("--worlds", type=int, default=None,
                   help="1 決定あたりの世界サンプル本数（§20.7.1・既定 1＝今までどおり 1 本）")
     # §20.7.2（WP `rs-setup-box`）: 準備箱。既定（None）＝渡さない＝1 bit も変わらない。
+    p.add_argument("--setup-box-keep-bare", dest="setup_box_keep_bare", action="store_true",
+                  default=None, help="準備箱があっても素の手を残す（§20.7.10 の実験用）")
     p.add_argument("--setup-box", dest="setup_box", action="store_true", default=None,
                   help="準備の手（メインイベント／起動メイン／登場時持ちの PLAY）を"
                        "「発動 → 対象選択 → 効果」まで箱にする（既定 off・§20.7.8）")
