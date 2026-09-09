@@ -52,7 +52,8 @@ resolver は `success = True` を返す。エラー・フォールバック・OT
 `test_selfplay_v4_datagen.py` / `test_value_net_aux_turns.py` /
 `test_pd_mixed_label.py` / `test_learned_candidate_prune.py` /
 `test_rl_encoder_v4.py` / `test_mark_seeds.py` / `test_value_net_distill.py` / `test_peak_alert.py` /
-`test_journal.py`（`test_real_playout_make_unmake_roundtrip`のみ）/ `test_setup_box.py`。
+`test_journal.py`（`test_real_playout_make_unmake_roundtrip`のみ）/ `test_setup_box.py` /
+`test_leaf_rollout.py`。
 
 ### 実行方法（重要）
 logger が `sys.stdout` を直接掴むため、pytest はキャプチャ無効で実行する。
@@ -191,6 +192,7 @@ make test-slow   # 重テストだけ
 | `tests/test_search_options.py` | **基盤健全性**（`cpu_infra`）。**探索の設定の配線**（§20.5・`RsGame.decide` の `select_rule`／`q_min_frac`／`root_prior_temp`）: 3 つを渡さない決定と既定値を明示した決定が同じ手・同じ legal_stats（＝serve／生成／アリーナは無影響）／`select_rule="q_min_n"` が出す手は「訪問下限 `max(1, floor(sims*q_min_frac))` を満たす候補の中で Q 最大」／`q_min_frac` を過大にすると visits へ落ちる／知らない `select_rule` は既定へ落ちる（例外にしない）／`root_prior_temp=2` は根の P の和 1・順位・非負を保ったまま尖りを緩める。規則そのものの意味論は Rust 単体テスト（`search/mcts.rs`／`search/decide.rs`）が正本 |
 | `tests/test_think_log.py` | **基盤健全性**（`cpu_infra`）。**思考ログ**（§20.4・`RsGame.decide` の trace＋`RsGame.attribution`）: kind=="main" の決定は `pv`（主変化・長さ≤8）・`legal_stats`（全合法手の P/N/Q・n 合計が sims と一致）を持つ／`attribution`（22 枠を PAD へ潰した ΔV 上位5）は有限値で絶対値降順／kind!="main"（window／commit）は `pv` が空／kind=="commit" の `commit_from` は箱を選んだ先行決定の action_index を指す |
 | `tests/test_pimc_worlds.py` | **基盤健全性**（`cpu_infra`）。**複数世界の PIMC の配線**（§20.7.1・`RsGame.decide(worlds=K)`）: `worlds=4` の決定が trace に `worlds`／`world_used`／`per_world`（世界ごとの根の N/Q と最善手・並びは世界 0 の legal）を持ち、根の訪問の和が K×sims・各世界の訪問の和が sims・`unmapped`=0・`p_differs`=false／`worlds` 省略と `worlds=1` は**今までと同じ手・同じ trace の形**（欄が増えない）／同じ seed で 2 回回すと同じ手・同じ per_world（スレッドの終わる順に依らない）。束ねの算術（N は和・Q は N 重みの平均）と「worlds=1 は 1 bit も変わらない」の正本は Rust 単体テスト（`search/decide.rs`） |
+| `tests/test_leaf_rollout.py` | **基盤健全性**（`cpu_infra`）。**葉の打ち切りの配線**（§20.7.9・`RsGame.decide(leaf_rollout="turn_end")`）: 打ち切りが実エンジンで回り trace に `rollout`（葉の数 `leaves`／打てた葉 `rolled`／総 ply／`mean_plies`／`capped`／`capped_frac`／`max_plies`=12）が入る／**省略と `"none"` は今までと同じ手・同じ trace の形**（増える欄は `rollout` だけ）／打ち切ると候補は変わらないまま根の Q が変わる（葉の V に届いている）／同じ seed で 2 回回すと同じ手・同じ実績（打ち切りは乱数を使わない）／短い自己対戦で実対局が壊れない。打ち切りの規則そのもの（どこから始まり・どこで止まり・上限 ply で切れるか）の正本は Rust 単体テスト（`search/tests_leaf_rollout.rs`） |
 | `tests/test_perf_gate.py` | **基盤健全性**（`cpu_infra`）。**CPU 性能ゲートの判定ロジック**（`tests/scripts/perf_gate.py`・§5.1）: `evaluate_gate` 純関数（強度不足/レイテンシ超過/失敗局/データ不足→FAIL・理由の蓄積）＋ gen2〜gen8_*.npz ハッシュの安定性（gen8＝本番既定・2026-07-29採用）。実対局は回さず高速固定 |
 | `tests/test_promotion_gate.py` | **基盤健全性**（`cpu_infra`）。**昇格ゲートの判定ロジック**（`tests/scripts/promotion_gate.py`・v6 柱①）: 段階式判定の純関数＝stage1（24局で勝ち越しのみ継続・五分以下は即棄却）／final（累計勝率 ≥ 0.55 で昇格・境界は昇格側・frac 可変・浮動小数境界の安定）／anchor（v7・固定アンカー非退行 ≥0.5・五分は許容・r99 実測ケース 8/24 を棄却）。実対局 arena は回さず高速固定 |
 | `tests/test_search_averse_probe.py` | **基盤健全性**（`cpu_infra`）。**SEARCH_AVERSE 追跡の判定則**（`tests/scripts/search_averse_probe.py`・純関数 `diagnose`/`world_sensitive`）: **アブレーションは base を上回って初めて原因**・base≥0.5 は NOT_FAILING@deep・SEARCH_Q_BOUND は全深さで accept の Q が下回ることを要求・世界依存フラグは 0<base<1 のみ。純正AZ化（2026-08-25）で腕は base/多世界のみに縮小 |

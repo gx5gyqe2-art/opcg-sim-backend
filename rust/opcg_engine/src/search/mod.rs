@@ -25,6 +25,8 @@ pub mod mcts;
 pub mod prune;
 pub mod quiesce;
 #[cfg(test)]
+mod tests_leaf_rollout;
+#[cfg(test)]
 mod tests_search;
 #[cfg(test)]
 mod tests_setup_box;
@@ -39,6 +41,44 @@ use serde_json::Value;
 
 /// 探索用の手（Python の dict と同じ JSON）。
 pub type Move = Value;
+
+/// 葉の打ち切り（§20.7.9・WP `rs-leaf-rollout`）。**既定は [`LeafRollout::None`]＝今までどおり**。
+///
+/// [`LeafRollout::TurnEnd`] は `mcts::TreeMcts::leaf_value` が戦闘窓／対話窓を解決し終えた後、
+/// 盤面が終局でなく**手番の側のメインフェイズ**にあるなら、ターンが替わるまで方策で手を
+/// 打ち続けてから評価する（[`quiesce::leaf_rollout_turn_end`]）。「準備だけして終わり」の
+/// 中途半端な葉の値を無くすのが狙い（相手のターンの葉も同じ＝相手の残り手番を打ち切る）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LeafRollout {
+    /// 打ち切らない（既定＝今までの [`mcts::TreeMcts::leaf_value`]）。
+    #[default]
+    None,
+    /// そのターンの終わりまで方策で打ち切ってから評価する。
+    TurnEnd,
+}
+
+impl LeafRollout {
+    /// `opts_json` の文字列（"none"／"turn_end"）から。知らない値は `None`（＝呼び出し側が既定へ）。
+    pub fn from_name(s: &str) -> Option<LeafRollout> {
+        match s {
+            "none" => Some(LeafRollout::None),
+            "turn_end" => Some(LeafRollout::TurnEnd),
+            _ => Option::None,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            LeafRollout::None => "none",
+            LeafRollout::TurnEnd => "turn_end",
+        }
+    }
+
+    /// 打ち切るか（`!= None`）。
+    pub fn enabled(&self) -> bool {
+        *self != LeafRollout::None
+    }
+}
 
 /// `OPCGGame` の設定（config の既定に対応）。
 #[derive(Debug, Clone)]
@@ -57,6 +97,8 @@ pub struct SearchOptions {
     /// 「対話の最初の対象選択 × 続きの攻撃 1 回」の箱（`SETUP_BOX`）として候補に足し、
     /// (2) 攻撃箱／防御箱の中でも「自分が選ぶ最初の対象選択」を 1 段だけ枝にする。
     pub setup_box: bool,
+    /// 葉の打ち切り（§20.7.9・WP `rs-leaf-rollout`）。**既定 [`LeafRollout::None`]＝1 bit も変わらない**。
+    pub leaf_rollout: LeafRollout,
 }
 
 impl Default for SearchOptions {
@@ -67,6 +109,7 @@ impl Default for SearchOptions {
             defense_box: true,
             don_margin: None,
             setup_box: false,
+            leaf_rollout: LeafRollout::None,
         }
     }
 }
@@ -120,6 +163,12 @@ fn options_from_json(v: &Value) -> SearchOptions {
             Some(other) => other.as_i64().map(|n| n as i32),
         },
         setup_box: flag("setup_box", d.setup_box),
+        // §20.7.9（知らない値・欄無しは既定＝打ち切らない）。
+        leaf_rollout: v
+            .get("leaf_rollout")
+            .and_then(Value::as_str)
+            .and_then(LeafRollout::from_name)
+            .unwrap_or(d.leaf_rollout),
     }
 }
 
@@ -271,6 +320,9 @@ pub fn decide_on_state(
     // 準備箱（§20.7.2）の枝予算と計測をこの decide のぶんだけ張る（既定 false のときは
     // 1 度も触られない＝出力にも `boxes` は出ない）。
     r#macro::reset_setup_state(opts.search.setup_box);
+    // 葉の打ち切り（§20.7.9）の実績もこの decide のぶんだけ張る（既定＝`none` では
+    // 1 度も触られず、戻り値に `rollout` の欄も出ない＝trace の形が変わらない）。
+    quiesce::reset_rollout_stats(opts.search.leaf_rollout);
     let out = decide::decide(masters, net, state, name, opts, rng, carry)?;
     // 複数世界（§20.7.1）の欄は `worlds>1` のときだけ出す＝**既定（1 本）の戻り値は
     // 1 bit も変わらない**（Python 側の trace の形も変わらない）。
@@ -324,8 +376,15 @@ pub fn decide_on_state(
         // 箱ごとの枝数（§20.7.2 の共通規則の計測・`setup_box=false` なら `null`）。
         "boxes": boxes,
     });
+    // 葉の打ち切りの実績（§20.7.9）は `leaf_rollout != none` のときだけ足す。
+    // **世界 0 のぶんだけ**が出る（世界 1 以降はスレッドが違う＝thread_local の計測を
+    // スレッドと共に捨てる。`boxes` と同じ扱い・`decide::run_worlds` の注記）。
+    let rollout = quiesce::take_rollout_stats();
     if let Some(o) = body.as_object_mut() {
         o.extend(worlds_fields);
+        if !rollout.is_null() {
+            o.insert("rollout".into(), rollout);
+        }
     }
     Ok(body)
 }
