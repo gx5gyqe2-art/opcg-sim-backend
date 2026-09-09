@@ -173,6 +173,11 @@ impl<'a> Ctx<'a> {
     /// Python `OPCGGame.legal_actions`（探索用の候補・順序込み）。
     ///
     /// `opts.setup_box`（既定 false）のときだけ、準備箱（`SETUP_BOX`・§20.7.2）を末尾に足す。
+    ///
+    /// §20.7.6（WP `rs-setup-box-2`）: **箱ができた準備の手（素の PLAY／ACTIVATE_MAIN）は
+    /// 候補から落とす**（配分箱・アタック箱と同じ扱い）。素の手の意味は「攻撃しない」枝
+    /// （`payload.attack` が null）が持つ（`setup_box_candidates` がその枝を必ず 1 本作る）。
+    /// 箱が作れなかった準備の手（予算切れ・素の手が今の盤面で打てない）は今までどおり残る。
     pub fn legal_actions(&self, s: &mut Session) -> Result<Vec<Move>, EngineError> {
         let mut moves = adapter::legal_actions(s, self.masters, &self.opts)?;
         if !self.opts.setup_box {
@@ -182,6 +187,13 @@ impl<'a> Ctx<'a> {
             return Ok(moves);
         };
         let boxes = super::r#macro::setup_box_candidates(self, s, seat, &moves)?;
+        if !boxes.is_empty() {
+            let boxed: Vec<&Value> = boxes
+                .iter()
+                .filter_map(|b| b.get("payload").and_then(|p| p.get("base")))
+                .collect();
+            moves.retain(|m| !boxed.contains(&m));
+        }
         moves.extend(boxes);
         Ok(moves)
     }
@@ -270,7 +282,10 @@ impl<'a> Ctx<'a> {
             Err(_) => return Ok(None),
         };
         match crate::net::priors(&self.net.weights, &self.net.tab, &enc, &cands) {
-            Ok(p) if p.len() == legal.len() => Ok(Some(split_setup_box_priors(legal, p))),
+            // §20.7.6: 準備箱の P は**等分しない**（各枝が素の手の候補行を持つ＝ネットが
+            // 出した素の手の P がそのまま各枝の P になる）。等分すると PUCT で素の手に
+            // 負ける構造ができ、箱を読ませたい意図と逆に働いた（分析 #6 §3）。
+            Ok(p) if p.len() == legal.len() => Ok(Some(p)),
             Ok(_) => Ok(None),
             Err(e @ EngineError::Unimplemented(_)) => Err(e),
             Err(_) => Ok(None),
@@ -302,34 +317,6 @@ impl<'a> Ctx<'a> {
             &borrowed,
         )
     }
-}
-
-/// §20.7.2「箱の P は元の手の P を枝で分配」: 同じ準備の手から出た `SETUP_BOX` の
-/// 事前確率を枝数で等分する（候補行は素の手と同じなので、素の手の P がそのまま出ている）。
-fn split_setup_box_priors(legal: &[Move], mut p: Vec<f32>) -> Vec<f32> {
-    fn key(mv: &Move) -> Option<&str> {
-        if mv.get("action_type").and_then(Value::as_str) != Some("SETUP_BOX") {
-            return None;
-        }
-        mv.get("payload")
-            .and_then(|x| x.get("uuid"))
-            .and_then(Value::as_str)
-    }
-    let mut counts: HashMap<&str, usize> = HashMap::new();
-    for mv in legal {
-        if let Some(u) = key(mv) {
-            *counts.entry(u).or_insert(0) += 1;
-        }
-    }
-    if counts.is_empty() {
-        return p;
-    }
-    for (i, mv) in legal.iter().enumerate() {
-        if let Some(n) = key(mv).and_then(|u| counts.get(u)) {
-            p[i] /= *n as f32;
-        }
-    }
-    p
 }
 
 /// 手 1 件から解けた識別（`nrel::CandRef` の所有版）。

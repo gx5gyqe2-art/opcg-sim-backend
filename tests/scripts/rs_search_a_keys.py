@@ -16,6 +16,11 @@
 4. `doffy_t10_root_visited`（`human_doflamingo_vs_luffy_20260904_t10-11`）
    … 分岐点の**最初の** seat 側 kind=main 決定（turn=start_turn）で訪問された根の手の数と合法手の数。
    `doffy_t10_winner` … その run の勝敗（最後のフレームの winner）。
+5. `enel_t9_winner`（`enel_human_20260810_t9-9`）… その run の勝敗（分析 #6 の「決着（T9・p1 勝ち）」）。
+6. `box_vs_bare`（WP `rs-setup-box-2`・分析 #6 §3 の表と同じ定義）… **条件ごとの合計**（seed 別ではない）。
+   箱のある seat 側 kind=main 決定について「箱を選んだ数／素の手を選んだ数／素の N > 箱の N 和 の枚数」。
+   「枚」＝（決定 × card_id）の組で、素の準備の手と箱が**同じ決定に両方居る**もの。§20.7.6 で素の手を
+   落とすと分母（`bare_gt_box` の m）が 0 に落ちる＝取り合いそのものが無くなったことの鍵。
 
 出力は `{条件: {鍵: {seed: 値}}}`（`RESULT.json` の `key_decisions` にそのまま入る形）。
 """
@@ -185,6 +190,48 @@ def _first_main_detail(res: dict):
     return None
 
 
+SETUP_ACTIONS = ("PLAY", "ACTIVATE_MAIN")
+
+
+def _box_vs_bare(res: dict, acc: dict) -> None:
+    """箱と素の手の取り合いを 1 run ぶん `acc` へ足す（分析 #6 §3 の表と同じ定義）。
+
+    - `decisions`＝箱（`SETUP_BOX`）が合法手に居る kind=main 決定の数（**両席**・両席とも同じ設定で打つ）
+    - `chose_box`／`chose_bare`＝その決定で箱／素の準備の手（同じ card_id の箱があるもの）を選んだ数
+      （選んだ手は `sig`＝**原始手化の前**の move_sig で見る＝箱を選んだ決定はここで分かる）
+    - `bare_gt_box`＝（決定 × card_id）の組のうち「素の手の N 和 > 箱の N 和」の数／組の総数
+    - `box_max_gt_bare`＝同じ組のうち「箱の N の最大 > 素の手の N 和」の数
+    """
+    for d in (res.get("decisions") or []):
+        stats = d.get("legal_stats")
+        if d.get("kind") != "main" or not stats:
+            continue
+        boxes = [s for s in stats if (s.get("move") or {}).get("action_type") == "SETUP_BOX"]
+        if not boxes:
+            continue
+        acc["decisions"] += 1
+        sig = d.get("sig") or [None]
+        boxed_cards = {(s["move"] or {}).get("card") for s in boxes}
+        if sig[0] == "SETUP_BOX":
+            acc["chose_box"] += 1
+        elif sig[0] in SETUP_ACTIONS and (d.get("chosen") or {}).get("card") in boxed_cards:
+            acc["chose_bare"] += 1
+        for card in sorted(c for c in boxed_cards if c is not None):
+            bare = [s for s in stats
+                    if (s.get("move") or {}).get("action_type") in SETUP_ACTIONS
+                    and (s.get("move") or {}).get("card") == card]
+            if not bare:
+                continue  # 素の手が候補に居ない＝取り合いが起きない（§20.7.6 の狙い）
+            mine = [s for s in boxes if (s["move"] or {}).get("card") == card]
+            bare_n = sum(s.get("n") or 0 for s in bare)
+            box_n = sum(s.get("n") or 0 for s in mine)
+            acc["pairs"] += 1
+            if bare_n > box_n:
+                acc["bare_gt_box"] += 1
+            if max((s.get("n") or 0) for s in mine) > bare_n:
+                acc["box_max_gt_bare"] += 1
+
+
 def _winner(res: dict):
     frames = res.get("frames") or []
     return (frames[-1] if frames else {}).get("winner")
@@ -223,12 +270,22 @@ def keys_for(root: str) -> dict:
             cur.setdefault("doffy_t10_winner", {})[f"s{seed}"] = _winner(res)
             cur.setdefault("doffy_t10_seat", {})[f"s{seed}"] = _seat_of(res)
             cur.setdefault("detail_doffy_t10_first_main", {})[f"s{seed}"] = _first_main_detail(res)
-        # 3 決定の「前後」（同じ局面での N/Q/P の並び）。
+        # 3 決定の「前後」（同じ局面での N/Q/P の並び）と T9 の勝敗（決着）。
         for path in sorted(glob.glob(os.path.join(cond_dir, SCN_ENEL_T9, "r3_s*.frames.json"))):
             seed = os.path.basename(path).split(".")[0].split("_s")[-1]
+            res = _load(path)
             cur.setdefault("detail_enel_t9_kami_vs_oom", {})[f"s{seed}"] = _head_to_head(
-                _load(path), {"kami": _is_play(KAMI), "oom_attack": _is_attack(OOM)},
+                res, {"kami": _is_play(KAMI), "oom_attack": _is_attack(OOM)},
                 rank="oom_attack")
+            cur.setdefault("enel_t9_winner", {})[f"s{seed}"] = _winner(res)
+        # 箱と素の手の取り合い（条件ごとの合計・WP `rs-setup-box-2`）。
+        acc = {"decisions": 0, "chose_box": 0, "chose_bare": 0,
+               "pairs": 0, "bare_gt_box": 0, "box_max_gt_bare": 0}
+        for path in sorted(glob.glob(os.path.join(cond_dir, "*", "r3_s*.frames.json"))):
+            _box_vs_bare(_load(path), acc)
+        if acc["decisions"]:
+            cur["box_vs_bare"] = {**acc,
+                                  "bare_gt_box_ratio": f"{acc['bare_gt_box']}/{acc['pairs']}"}
         for path in sorted(glob.glob(os.path.join(cond_dir, SCN_ENEL_ROGER, "r3_s*.frames.json"))):
             seed = os.path.basename(path).split(".")[0].split("_s")[-1]
             cur.setdefault("detail_enel_roger_t7_gamma", {})[f"s{seed}"] = _head_to_head(

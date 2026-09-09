@@ -692,8 +692,12 @@ pub fn setup_box_continuation(
 
 /// §20.7.2 方式 3: 準備の手を「対話の最初の対象選択 × 続きの攻撃 1 回」の箱にする。
 ///
-/// 元の素の PLAY／ACTIVATE_MAIN は**残す**（続きが攻撃でない場合のため）。予算
-/// （`BOX_BRANCH_BUDGET`）を超えたら箱を作らず素の手だけ＝今と同じ。
+/// 予算（`BOX_BRANCH_BUDGET`）を超えたら箱を作らず素の手だけ＝今と同じ。
+///
+/// §20.7.6（WP `rs-setup-box-2`）: 箱ができた素の PLAY／ACTIVATE_MAIN は候補から**落とす**
+/// （`quiesce::Ctx::legal_actions`）＝素の手の意味は「攻撃しない」枝が持つ。全部の枝に続きの
+/// 攻撃が付いてしまった準備の手には、先頭の枝の「攻撃しない」版を 1 本足して
+/// 「打つだけで止める」選択肢を残す（箱ごとの枝数は最大 `SETUP_BOX_BRANCH_CAP + 1`）。
 pub fn setup_box_candidates(
     ctx: &super::quiesce::Ctx,
     s: &mut Session,
@@ -715,8 +719,8 @@ pub fn setup_box_candidates(
         if branches.is_empty() || !take_setup_budget(branches.len()) {
             continue; // 予算切れ＝箱を作らず素の手だけ（今と同じ）
         }
-        record_branches(BoxKind::Setup, branches.len());
         // 2) 各枝を in-place で解決し、続きの攻撃を 1 本だけ選ぶ。
+        let mut made: Vec<(&SelectPath, Move)> = Vec::new();
         for path in &branches {
             let mut w = Session::new(s.state().clone());
             if apply_setup_base(&mut w, masters, seat, base).is_err() {
@@ -726,8 +730,19 @@ pub fn setup_box_candidates(
                 continue;
             }
             let attack = pick_follow_up_attack(&inner, &mut w, seat)?;
-            out.push(setup_box_move(base, path, attack.as_ref()));
+            made.push((path, setup_box_move(base, path, attack.as_ref())));
         }
+        if made.is_empty() {
+            continue; // 素の手が今の盤面で打てない＝箱にならない（素の手はそのまま残る）
+        }
+        // 3) 「攻撃しない」枝が 1 本も無ければ足す（素の手を落とすぶんの代表）。
+        if made.iter().all(|(_, m)| !m["payload"]["attack"].is_null()) {
+            let head = made[0].0;
+            made.push((head, setup_box_move(base, head, None)));
+            take_setup_budget(1);
+        }
+        record_branches(BoxKind::Setup, made.len());
+        out.extend(made.into_iter().map(|(_, m)| m));
     }
     Ok(out)
 }

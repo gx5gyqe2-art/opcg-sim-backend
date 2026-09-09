@@ -25,6 +25,7 @@ const KAMI: &str = "OP15-075"; // 神の裁き（イベント・【メイン】�
 const GAMMA: &str = "OP05-077"; // ガンマナイフ（イベント・【メイン】ドン!!-1: -5000）
 const VLDR: &str = "EB01-001"; // バニラのリーダー
 const VCHR: &str = "EB01-005"; // バニラのキャラ（コスト 1）
+const VCHR2: &str = "EB01-017"; // 別のバニラのキャラ（コスト 2・等価キーを分けるため）
 
 const EFFECTS: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -104,6 +105,31 @@ pub(super) fn board(masters: &MasterTable) -> Session {
                        card_json(GAMMA, "p1-gamma", "p1", Value::Null)]), 4),
             // 相手のキャラは**レスト**（レストのキャラだけが攻撃対象になる＝続きの攻撃の
             // 対象が「相手キャラでもリーダーでもよい」ことを見るため）。
+            "p2": player_json("p2", VLDR,
+                json!([rested_card_json(VCHR, "p2-weak", "p2", json!(0), true)]),
+                json!([]), 0),
+        },
+        "manager": {
+            "turn_count": 5, "phase": "MAIN", "turn_player": "p1", "winner": null,
+            "active_battle": null, "turn_events": {}, "mulligan_done": ["p1", "p2"],
+            "setup_phase_pending": false, "turn_start_pending": false,
+            "interaction_depth": 0, "pending_triggers": 0, "pending_end_of_turn": 0,
+        },
+    });
+    Session::new(GameState::from_record(&hidden, masters).expect("盤面が組めるはず"))
+}
+
+/// [`board`] の手札を「神の裁き 2 枚」に替えた盤面（同名 2 枚の箱の重複を見るため）。
+///
+/// 自分の場は [`VCHR2`]（相手の [`VCHR`] と**別の card_id**）にする——等価キーは card_id 基準
+/// なので、両側に同じカードを置くと「自分へ +1000」と「相手を KO」が同じキーに潰れてしまう。
+fn board_two_kami(masters: &MasterTable) -> Session {
+    let hidden = json!({
+        "players": {
+            "p1": player_json("p1", ENEL,
+                json!([card_json(VCHR2, "p1-body", "p1", Value::Null)]),
+                json!([card_json(KAMI, "p1-kami", "p1", Value::Null),
+                       card_json(KAMI, "p1-kami2", "p1", Value::Null)]), 4),
             "p2": player_json("p2", VLDR,
                 json!([rested_card_json(VCHR, "p2-weak", "p2", json!(0), true)]),
                 json!([]), 0),
@@ -268,13 +294,74 @@ fn kami_no_sabaki_branches_on_ko_and_no_ko() {
         .any(|m| !flat_selects(m).contains(&"p2-weak".into()));
     assert!(with_ko, "「相手のパワー 0 を KO する」枝: {kami:?}");
     assert!(without_ko, "「KO しない」枝: {kami:?}");
-    // 素の PLAY も残る（続きが攻撃でない場合のため・§20.7.2）。
+    // §20.7.6: 箱ができた素の PLAY は候補から**落とす**（配分箱と同じ扱い）。
     assert!(
-        moves
+        !moves
             .iter()
             .any(|m| m["action_type"] == json!("PLAY") && m["payload"]["uuid"] == json!("p1-kami")),
-        "素の PLAY は残す"
+        "箱ができた素の PLAY は候補に残らない: {moves:?}"
     );
+}
+
+/// §20.7.6: 箱ができた準備の手には必ず「攻撃しない」枝（`attack` が null）がある
+/// ——素の手を落とすので、「打つだけで止める」意味をここが持つ。
+#[test]
+fn every_boxed_setup_move_keeps_a_no_attack_branch() {
+    let (Some(masters), Some(net)) = (masters(), net()) else { return };
+    let mut s = board(masters);
+    let ctx = ctx_for(masters, net, true);
+    let moves = ctx.legal_actions(&mut s).expect("候補");
+    let mut bases: Vec<String> = setup_boxes(&moves)
+        .iter()
+        .filter_map(|m| m["payload"]["uuid"].as_str().map(str::to_owned))
+        .collect();
+    bases.sort();
+    bases.dedup();
+    assert!(!bases.is_empty(), "準備箱が出るはず");
+    for uuid in bases {
+        let group = box_of(&moves, &uuid);
+        assert!(
+            group.iter().any(|m| m["payload"]["attack"].is_null()),
+            "{uuid} の箱に「攻撃しない」枝が無い: {group:?}"
+        );
+    }
+}
+
+/// §20.7.6: 箱の P は枝で**等分しない**（各枝が素の手の候補行を持つ＝素の手の P がそのまま）。
+///
+/// ゼロ重みのネットは全候補行に同じ logit を出す＝priors は一様になる。等分していた頃は
+/// 箱の枝だけ `1/枝数` に薄まったので、この一様性が「等分しない」ことの回帰ガードになる。
+#[test]
+fn setup_box_priors_are_not_split_across_branches() {
+    let Some(masters) = masters() else { return };
+    let net: &'static crate::net::LoadedNet =
+        Box::leak(Box::new(super::decide::tests::zero_net()));
+    let mut s = board(masters);
+    let ctx = ctx_for(masters, net, true);
+    let moves = ctx.legal_actions(&mut s).expect("候補");
+    assert!(!setup_boxes(&moves).is_empty(), "準備箱が出るはず");
+    let p = ctx.priors(&mut s, &moves).expect("priors").expect("priors あり");
+    assert_eq!(p.len(), moves.len());
+    let boxed: Vec<f32> = p
+        .iter()
+        .zip(&moves)
+        .filter(|(_, m)| m["action_type"] == json!("SETUP_BOX"))
+        .map(|(x, _)| *x)
+        .collect();
+    let plain: Vec<f32> = p
+        .iter()
+        .zip(&moves)
+        .filter(|(_, m)| m["action_type"] != json!("SETUP_BOX"))
+        .map(|(x, _)| *x)
+        .collect();
+    assert!(!boxed.is_empty() && !plain.is_empty());
+    for b in &boxed {
+        assert!(
+            (b - plain[0]).abs() < 1e-6,
+            "箱の枝の P {b} が素の手の P {} と違う（等分されている）",
+            plain[0]
+        );
+    }
 }
 
 /// 箱を適用すると原始手の列（PLAY → SELECT_RESOURCE → BUFF 対象 → KO 対象 → 攻撃）に展開される。
@@ -396,6 +483,47 @@ fn gamma_knife_box_carries_a_follow_up_attack() {
                 || m["action_type"] == json!("ATTACK")),
         "コミットの手順に攻撃が入る: {trace:?}"
     );
+}
+
+/// 同名 2 枚の準備の手が作る箱は、根の等価手マージ（`merge_root_stats`）で 1 グループに束なる。
+///
+/// §20.7.6 の項目 3: 箱の重複（同じ枝が 2 組出る）は `move_equiv_key` が card_id 基準で
+/// 同一視するので、選択規則（`q_min_n` の訪問下限）は束ねた N に対して働く。
+#[test]
+fn duplicate_copies_of_a_setup_move_merge_into_one_group() {
+    let (Some(masters), Some(net)) = (masters(), net()) else { return };
+    let mut s = board_two_kami(masters);
+    let ctx = ctx_for(masters, net, true);
+    let moves = ctx.legal_actions(&mut s).expect("候補");
+    let first = box_of(&moves, "p1-kami");
+    let second = box_of(&moves, "p1-kami2");
+    assert!(!first.is_empty() && !second.is_empty(), "2 枚とも箱になる");
+    assert_eq!(first.len(), second.len(), "同名 2 枚の枝の数は同じ");
+
+    let n = vec![1.0; moves.len()];
+    let q = vec![0.0; moves.len()];
+    let groups = super::decide::merge_root_stats(s.state(), masters, &moves, &n, &q);
+    // 神の裁きの箱だけを見る（エネルの起動メインなど、他の準備の手の箱は 1 枚ぶんしか無い）。
+    let is_kami_box = |i: usize| -> bool {
+        moves[i]["action_type"] == json!("SETUP_BOX")
+            && (moves[i]["payload"]["uuid"] == json!("p1-kami")
+                || moves[i]["payload"]["uuid"] == json!("p1-kami2"))
+    };
+    let per_group: Vec<usize> = groups
+        .iter()
+        .map(|g| g.idxs.iter().filter(|i| is_kami_box(**i)).count())
+        .filter(|c| *c > 0)
+        .collect();
+    assert_eq!(
+        per_group.iter().sum::<usize>(),
+        first.len() + second.len(),
+        "神の裁きの箱は全部どれかのグループに入る"
+    );
+    assert!(
+        per_group.iter().all(|c| *c == 2),
+        "同名 2 枚の同じ枝は 1 グループ（2 本）に束なるはず: {per_group:?}"
+    );
+    assert_eq!(per_group.len(), first.len(), "グループ数＝1 枚ぶんの枝数");
 }
 
 /// 予算（`BOX_BRANCH_BUDGET`）を使い切ったら箱を作らない＝素の手だけ（今と同じ）。

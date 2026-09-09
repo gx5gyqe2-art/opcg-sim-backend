@@ -7,6 +7,9 @@
 
 既定（`setup_box` を渡さない）は 1 bit も変わらない——同じ seed・同じ盤面で決定が一致することも
 併せて固定する。
+
+§20.7.6（WP `rs-setup-box-2`・分析 #6 §3）で **箱ができた準備の手の素の PLAY／ACTIVATE_MAIN は
+候補から落とす**（配分箱と同じ扱い）ようにした＝素の手の意味は「攻撃しない」枝が持つ。
 """
 import os
 import random
@@ -75,6 +78,13 @@ def test_setup_box_candidates_appear_and_the_played_move_is_primitive():
     boxes = [m for m in _legal_moves(trace) if m.get("action_type") == "SETUP_BOX"]
     selected = [tuple(m.get("selected") or ()) for m in boxes]
     assert len(set(selected)) >= 2, boxes
+    # §20.7.6: 箱ができた準備の手の**素の PLAY は候補に無い**（配分箱と同じ扱い）。
+    # 素の手の意味は「攻撃しない」枝（`attack` が null＝`targets` を持たない箱）が持つ。
+    boxed_cards = {m.get("card") for m in boxes}
+    bare = [m for m in _legal_moves(trace)
+            if m.get("action_type") in ("PLAY", "ACTIVATE_MAIN") and m.get("card") in boxed_cards]
+    assert not bare, bare
+    assert any(not m.get("targets") for m in boxes), boxes
     # 箱は探索の中だけの手＝返る手は必ず原始手。
     assert move.get("action_type") not in BOX_ACTIONS, move
     game.apply_move("P1", move)  # 実対局に出せる（例外にならない）
@@ -87,7 +97,8 @@ def test_boxes_stats_are_reported_only_when_setup_box_is_on():
     on: dict = {}
     game.decide("P1", trace=on, sims=32, setup_box=True)
     assert "boxes" in on and on["boxes"]["setup"]["boxes"] > 0, on.get("boxes")
-    assert on["boxes"]["setup"]["max"] <= 9, on["boxes"]
+    # 枝は `SETUP_BOX_BRANCH_CAP`（8＋「選ばない」）＋「攻撃しない」枝 1 本まで（§20.7.6）。
+    assert on["boxes"]["setup"]["max"] <= 10, on["boxes"]
 
     game2 = _board_with_an_opponent_character("setup-box:stats")
     off: dict = {}
