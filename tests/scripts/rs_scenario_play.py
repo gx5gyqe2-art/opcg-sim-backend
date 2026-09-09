@@ -234,11 +234,12 @@ def _record_frame(game: RsGame, actions: list) -> dict:
 
 def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: str,
              seed: int, sims: int, select_rule: str = None, q_min_frac: float = None,
-             root_prior_temp: float = None):
+             root_prior_temp: float = None, worlds: int = None):
     """1 seed ぶんの再生。戻り値 `(frames_json, steps_log, frames)`。
 
-    `select_rule`／`q_min_frac`／`root_prior_temp`（省略可・§20.5）は**両席に同じ設定**で渡す
-    （省略＝serve 既定）。各決定の実測時間は `decisions[i]["decide_ms"]` に入る。
+    `select_rule`／`q_min_frac`／`root_prior_temp`（省略可・§20.5）と `worlds`（省略可・
+    §20.7.1＝1 決定あたりの世界サンプル本数）は**両席に同じ設定**で渡す（省略＝serve 既定）。
+    各決定の実測時間は `decisions[i]["decide_ms"]` に入る。
     """
     start_idx = hb.turn_start_index(payload, scenario["start_turn"])
     hidden = hb.frame_to_hidden(payload, start_idx, seed)
@@ -274,7 +275,8 @@ def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: 
         t0 = time.perf_counter()
         move = game.decide(player_id, trace=tr, net=net_for[player_id], sims=sims,
                            action_index=action_index, select_rule=select_rule,
-                           q_min_frac=q_min_frac, root_prior_temp=root_prior_temp)
+                           q_min_frac=q_min_frac, root_prior_temp=root_prior_temp,
+                           worlds=worlds)
         decide_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         if move is None:
             break
@@ -294,6 +296,8 @@ def _play_one(name: str, scenario: dict, payload: dict, seat_net: str, opp_net: 
             "chosen": desc, "value": tr.get("value"), "events": events,
             "kind": tr.get("kind"), "commit_from": tr.get("commit_from"),
             "pv": tr.get("pv"), "attribution": attribution, "decide_ms": decide_ms,
+            "worlds": tr.get("worlds"), "world_used": tr.get("world_used"),
+            "per_world": tr.get("per_world"),
         })
         if desc.get("action_type") == "TURN_END" and turn_before == end_turn:
             break
@@ -409,6 +413,21 @@ def _render_candidates(cands, card_texts) -> str:
         for c in cands)
 
 
+def _render_worlds(step, card_texts) -> str:
+    """(4) の 1 行（§20.7.1）: 世界ごとの最善手＝「世界によって答えが割れたか」を読む。"""
+    per = step.get("per_world") or []
+    if not per:
+        return ""
+    used = step.get("world_used")
+    parts = []
+    for i, w in enumerate(per):
+        mark = "*" if i == used else ""
+        parts.append(f"w{i}{mark}={_fmt_action(w.get('best') or {}, card_texts)}"
+                     f"(n={w.get('best_n')} q={w.get('best_q')})")
+    return (f"  - 世界ごとの最善手（{step.get('worlds')} 本・* は PV とコミットを採った世界）: "
+            + " / ".join(parts))
+
+
 def _render_events(events) -> str:
     if not events:
         return "(イベントなし)"
@@ -519,6 +538,8 @@ def _build_markdown(name: str, scenario: dict, seed: int, seat_net: str, opp_net
         lines.append(_render_candidates(step.get("candidates"), card_texts))
         lines.append(f"  - 選んだ手: {_fmt_action(step['chosen'], card_texts)} "
                     f"(value={step.get('value')})")
+        if step.get("worlds"):
+            lines.append(_render_worlds(step, card_texts))
         lines.append("")
         lines.append("#### (6) PV（主変化・CPU が想定したこの後の進行）")
         lines.append(_render_pv(step.get("pv"), card_texts))
@@ -559,7 +580,7 @@ def cmd_play(args) -> int:
             result, steps_log, frames = _play_one(
                 name, scenario, payload, seat_net, opp_net, seed, args.sims,
                 select_rule=args.select_rule, q_min_frac=args.q_min_frac,
-                root_prior_temp=args.root_prior_temp)
+                root_prior_temp=args.root_prior_temp, worlds=args.worlds)
             base = f"{net_label}_s{seed}"
             frames_path = os.path.join(out_dir, f"{base}.frames.json")
             with open(frames_path, "w", encoding="utf-8") as f:
@@ -617,6 +638,8 @@ def main(argv=None) -> int:
                   help="q_min_n の訪問下限の割合（既定 0.125＝sims/8）")
     p.add_argument("--root-prior-temp", type=float, default=None,
                   help="根の事前分布を P^(1/t) へ（既定 1.0＝そのまま・2.0 で平坦化）")
+    p.add_argument("--worlds", type=int, default=None,
+                  help="1 決定あたりの世界サンプル本数（§20.7.1・既定 1＝今までどおり 1 本）")
     p.set_defaults(func=cmd_play)
 
     args = ap.parse_args(argv)

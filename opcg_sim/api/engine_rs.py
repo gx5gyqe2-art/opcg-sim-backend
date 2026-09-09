@@ -281,7 +281,8 @@ class RsGame:
     def decide(self, player_id: str, trace: Optional[Dict[str, Any]] = None,
               net: Optional[str] = None, sims: Optional[int] = None,
               action_index: Optional[int] = None, select_rule: Optional[str] = None,
-              q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None):
+              q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None,
+              worlds: Optional[int] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -295,17 +296,23 @@ class RsGame:
         `max(1, floor(sims * q_min_frac))` 以上の手の中で Q 最大）・`q_min_frac`＝その割合
         （既定 0.125＝sims/8）・`root_prior_temp`＝根の事前分布を `P^(1/t)` へ丸めて正規化
         （既定 1.0＝何もしない・2.0 で平坦化）。**省略すれば serve 既定と 1 bit も変わらない**。
+
+        `worlds`（省略可・§20.7.1）＝1 回の決定で引く世界サンプルの本数（既定 1）。2 以上なら
+        Rust が K 本の世界で同じ sims の木を**並列**に回して根の統計を束ねる（N は和・Q は N
+        重みの平均）。trace に `worlds`／`world_used`／`per_world`（世界ごとの根の N/Q と最善手）
+        が入る。**省略すれば 1 本＝今までと同じ**（trace の欄も増えない）。
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
                                 select_rule=select_rule, q_min_frac=q_min_frac,
-                                root_prior_temp=root_prior_temp)
+                                root_prior_temp=root_prior_temp, worlds=worlds)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
 
     def _decide(self, player_id: str, net: Optional[str] = None, sims: Optional[int] = None,
                action_index: Optional[int] = None, select_rule: Optional[str] = None,
-               q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None):
+               q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None,
+               worlds: Optional[int] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -340,6 +347,9 @@ class RsGame:
             opts["q_min_frac"] = float(q_min_frac)
         if root_prior_temp is not None:
             opts["root_prior_temp"] = float(root_prior_temp)
+        # §20.7.1（None／1＝渡さない＝Rust 側の既定＝単一世界）。
+        if worlds is not None and int(worlds) > 1:
+            opts["worlds"] = int(worlds)
         out = json.loads(self._game.decide(player_id, json.dumps(opts)))
         self._carry_key = (turn, seat)
         self._carry = {"commit": out.get("commit") or [],
@@ -409,6 +419,26 @@ class RsGame:
                 "n": (int(p["n"]) if p.get("n") is not None else None),
                 "q": (float(p["q"]) if p.get("q") is not None else None),
             } for p in pv]
+        # 複数世界（§20.7.1）: `worlds>1` のときだけ Rust が出す欄。世界ごとの根の N/Q は
+        # **世界 0 の legal の並び**なので `legal_stats` と添字が揃う。
+        if out.get("worlds"):
+            tr["worlds"] = int(out["worlds"])
+            tr["world_used"] = out.get("world_used")
+            tr["per_world"] = [{
+                "seed": w.get("seed"),
+                "best": (self.describe_move(legal[w["best"]])
+                         if (w.get("best") is not None and w["best"] < len(legal)) else None),
+                "best_n": (float(w["N"][w["best"]])
+                           if (w.get("best") is not None and w["best"] < len(w.get("N") or []))
+                           else None),
+                "best_q": (round(float(w["Q"][w["best"]]), 3)
+                           if (w.get("best") is not None and w["best"] < len(w.get("Q") or []))
+                           else None),
+                "N": [float(x) for x in (w.get("N") or [])],
+                "Q": [float(x) for x in (w.get("Q") or [])],
+                "unmapped": w.get("unmapped"),
+                "p_differs": w.get("p_differs"),
+            } for w in (out.get("per_world") or [])]
         if kind == "commit":
             tr["commit_from"] = commit_from
         return tr

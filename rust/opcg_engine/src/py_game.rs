@@ -400,10 +400,17 @@ impl Game {
     ///   同じ (対局, ターン, 席) に同じ seed を渡せば Python の
     ///   `LearnedEngine._world_rng`（同一 seed から `default_rng` を作り直す）と同じ
     ///   「ターン内 sticky 世界線」になる（計画 §8.17 の申告 (2)）。
+    /// - `worlds`（省略＝1）… 1 回の決定で引く世界サンプルの本数（§20.7.1）。2 以上なら
+    ///   K 本の世界で同じ sims の木を**並列**（`std::thread::scope`）に回し、根の統計を束ねる。
+    ///   世界 i の乱数は `search_seed + i`。
+    ///
+    /// 木を回す間は **GIL を放す**（`Python::detach`＝旧 `allow_threads`）＝世界スレッドが
+    /// 走っている間も他の Python スレッド（API のリクエスト処理）が動ける。探索は Python を
+    /// 一切触らない。
     ///
     /// 戻り値は `decide` と同形（`rng_used` だけは出ない＝出目は自前で作るので数える意味がない）。
     /// `load_masters()` と `load_net()` が先に要る。
-    fn decide(&mut self, player_id: &str, opts_json: &str) -> PyResult<String> {
+    fn decide(&mut self, py: Python<'_>, player_id: &str, opts_json: &str) -> PyResult<String> {
         let masters = self.masters()?;
         let seat = self.seat_of(player_id)?;
         let ov = parse_json(opts_json, "decide opts")?;
@@ -427,16 +434,12 @@ impl Game {
         let mut rng = crate::search::Pcg32SearchRng::new(seed);
         // 返す手は `legal_json` と同じ**席名のまま**（表示名へ差し替えない）。呼び出し側は
         // これをそのまま `apply_game_action`／`apply_battle_action` へ渡す。
-        let body = crate::search::decide_on_state(
-            masters,
-            net,
-            self.session.state(),
-            seat,
-            &opts,
-            &mut rng,
-            &carry,
-        )
-        .map_err(|e| self.map_err(e))?;
+        let state = self.session.state();
+        let body = py
+            .detach(|| {
+                crate::search::decide_on_state(masters, net, state, seat, &opts, &mut rng, &carry)
+            })
+            .map_err(|e| self.map_err(e))?;
         to_py_json(&body)
     }
 

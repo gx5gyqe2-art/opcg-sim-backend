@@ -13,6 +13,10 @@ serve に載せられる上限の目安を読むための計器なので、**単
       --scenarios enel_human_20260810_t9-9 human_enel_vs_roger_20260904_t7-8 \
                   human_doflamingo_vs_luffy_20260904_t10-11 \
       --sims 160 640 2560 10240 16000 --out latency.json
+
+`--worlds K`（§20.7.1）を足すと 1 決定で世界を K 本引いて木を並列に回す＝**同じ sims の
+まま**「K 本ぶんの実効 sims」になる。K を変えて回せば並列化の壁時計コストが読める
+（sims と違い、K は 1 決定あたりの読みの本数を変える）。
 """
 import argparse
 import json
@@ -71,10 +75,12 @@ def main(argv=None) -> int:
     ap.add_argument("--select-rule", default=None, choices=("visits", "q_min_n"))
     ap.add_argument("--q-min-frac", type=float, default=None)
     ap.add_argument("--root-prior-temp", type=float, default=None)
+    ap.add_argument("--worlds", type=int, default=None,
+                    help="1 決定あたりの世界サンプル本数（§20.7.1・既定 1）")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
     opts = {"select_rule": args.select_rule, "q_min_frac": args.q_min_frac,
-            "root_prior_temp": args.root_prior_temp}
+            "root_prior_temp": args.root_prior_temp, "worlds": args.worlds}
     data = {"note": "同じ 1 局面（分岐点の開始盤面）に対する 1 decide の実測 ms・単独プロセス",
             "seed": args.seed, "repeat": args.repeat,
             "opts": {k: v for k, v in opts.items() if v is not None},

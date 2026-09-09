@@ -254,7 +254,33 @@ pub fn decide_on_state(
     carry: &decide::DecideCarry,
 ) -> Result<Value, EngineError> {
     let out = decide::decide(masters, net, state, name, opts, rng, carry)?;
-    Ok(serde_json::json!({
+    // 複数世界（§20.7.1）の欄は `worlds>1` のときだけ出す＝**既定（1 本）の戻り値は
+    // 1 bit も変わらない**（Python 側の trace の形も変わらない）。
+    let mut worlds_fields = serde_json::Map::new();
+    if out.worlds > 1 {
+        worlds_fields.insert("worlds".into(), Value::from(out.worlds));
+        worlds_fields.insert(
+            "world_used".into(),
+            match out.world_used {
+                Some(w) => Value::from(w),
+                None => Value::Null,
+            },
+        );
+        worlds_fields.insert(
+            "per_world".into(),
+            out.per_world
+                .iter()
+                .map(|w| {
+                    serde_json::json!({
+                        "seed": w.seed, "N": w.n, "Q": w.q,
+                        "best": w.best, "unmapped": w.unmapped, "p_differs": w.p_differs,
+                    })
+                })
+                .collect::<Vec<_>>()
+                .into(),
+        );
+    }
+    let mut body = serde_json::json!({
         "move": out.mv,
         // 棋譜ダンプの鍵（箱レベル・原始手化と残り掘りの前＝Python `record["sig"]`／`["k"]`）
         "sig": out.sig,
@@ -276,7 +302,11 @@ pub fn decide_on_state(
         "commit": out.carry.commit.iter().map(decide::Step::to_json).collect::<Vec<_>>(),
         "resact_pending": out.carry.resact_pending,
         "budget": {"used": out.budget_used, "exhausted": out.budget_exhausted},
-    }))
+    });
+    if let Some(o) = body.as_object_mut() {
+        o.extend(worlds_fields);
+    }
+    Ok(body)
 }
 
 /// `opts_json` の欄から [`decide::DecideOptions`] と [`decide::DecideCarry`] を取り出す
@@ -392,6 +422,16 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .and_then(Value::as_f64)
             .filter(|x| *x > 0.0)
             .unwrap_or(d.root_prior_temp),
+        // §20.7.1 の世界サンプル本数（0／負は 1＝既定へ落とす）。世界 i の乱数は
+        // `search_seed + i` から作るので、`search_seed` が無い経路（記録した出目で回す
+        // オラクル）は `DecideOptions::effective_worlds` が 1 に落とす。
+        worlds: v
+            .get("worlds")
+            .and_then(Value::as_u64)
+            .map(|n| n as usize)
+            .filter(|n| *n > 0)
+            .unwrap_or(d.worlds),
+        search_seed: v.get("search_seed").and_then(Value::as_u64),
         search: options_from_json(v),
         budget: match v.get("budget") {
             None | Some(Value::Null) => d.budget,

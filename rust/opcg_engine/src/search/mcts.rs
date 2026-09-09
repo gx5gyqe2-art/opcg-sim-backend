@@ -163,6 +163,38 @@ pub struct RunOut {
     pub p: Vec<f64>,
 }
 
+/// ノード列（1 本の木）から PV を辿る（[`TreeMcts::principal_variation`] の本体）。
+///
+/// `first`＝根で辿り始める手の添字（`None`＝訪問数最多＝単一世界の既定）。複数世界
+/// （§20.7.1）は「束ねた統計で選んだ手」から辿る＝その世界の根の argmax(N) とは限らないので、
+/// 最初の 1 手だけ外から指定する。
+pub fn principal_variation_of(nodes: &[Node], first: Option<usize>, max_len: usize) -> Vec<PvStep> {
+    let mut out = Vec::with_capacity(max_len);
+    let mut node = 0usize; // run() は必ず root を最初のノードにする
+    let mut forced = first;
+    for _ in 0..max_len {
+        if node >= nodes.len() {
+            break;
+        }
+        let n = &nodes[node];
+        if !n.expanded || n.terminal || n.legal.is_empty() {
+            break;
+        }
+        let Some(seat) = n.to_move else { break };
+        let a = match forced.take().filter(|i| *i < n.legal.len()) {
+            Some(i) => i,
+            None => argmax_f64(&n.n),
+        };
+        let q = n.w[a] / n.n[a].max(1.0);
+        out.push(PvStep { mv: n.legal[a].clone(), seat, n: n.n[a], q });
+        match n.children[a] {
+            Some(c) => node = c,
+            None => break,
+        }
+    }
+    out
+}
+
 /// 木の探索（Python `TreeMCTS`）。
 pub struct TreeMcts<'a, 'b> {
     pub ctx: &'a Ctx<'b>,
@@ -211,6 +243,21 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         st: &mut SearchState,
     ) -> Result<RunOut, EngineError> {
         let world = super::determinize::determinize_with(real, me, rng)?;
+        self.run_in_world(world, rng, st)
+    }
+
+    /// [`run`](Self::run) の「世界サンプルを外から渡す」版（§20.7.1 の複数世界が使う）。
+    ///
+    /// `run` は世界を自分で引く（`rng` の 1 本目のシャッフル）が、こちらは引き終えた世界を
+    /// 受け取る＝**同じ `rng` を渡せば `run` と 1 bit も変わらない**（Dirichlet と温度の出目は
+    /// 世界サンプルの後に引かれるので順序も同じ）。世界ごとに別の `rng` を渡せば K 本の木を
+    /// 独立に回せる。
+    pub fn run_in_world(
+        &mut self,
+        world: GameState,
+        rng: &mut dyn SearchRng,
+        st: &mut SearchState,
+    ) -> Result<RunOut, EngineError> {
         let mut s = Session::new(world);
         let root = self.new_node();
         self.expand(root, &mut s, st)?;
@@ -534,29 +581,16 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
     /// PV（主変化・`docs/rust_engine_plan.md` §20.4）: root（node 0）から「訪問数最多の子」を
     /// 辿る（相手番の節も同じ規則）。`max_len` 手または葉（未展開／終局／合法手無し）で止める。
     ///
-    /// **単一の木**（[`run`](Self::run) が世界サンプルを 1 度だけ引いて 1 本の木を回す・現在の
-    /// 実装は PIMC の複数世界を持たない）を辿るので世界の選び方に曖昧さは無い。
+    /// **単一の木**（[`run`](Self::run) が世界サンプルを 1 度だけ引いて 1 本の木を回す）を辿る
+    /// ので世界の選び方に曖昧さは無い。複数世界（§20.7.1・`worlds>1`）では
+    /// [`principal_variation_of`] に「選んだ世界の木」を渡す。
     pub fn principal_variation(&self, max_len: usize) -> Vec<PvStep> {
-        let mut out = Vec::with_capacity(max_len);
-        let mut node = 0usize; // run() は必ず root を最初のノードにする
-        for _ in 0..max_len {
-            if node >= self.nodes.len() {
-                break;
-            }
-            let n = &self.nodes[node];
-            if !n.expanded || n.terminal || n.legal.is_empty() {
-                break;
-            }
-            let Some(seat) = n.to_move else { break };
-            let a = argmax_f64(&n.n);
-            let q = n.w[a] / n.n[a].max(1.0);
-            out.push(PvStep { mv: n.legal[a].clone(), seat, n: n.n[a], q });
-            match n.children[a] {
-                Some(c) => node = c,
-                None => break,
-            }
-        }
-        out
+        principal_variation_of(&self.nodes, None, max_len)
+    }
+
+    /// 木のノード列（複数世界が世界ごとの木を持ち帰るのに使う・§20.7.1）。
+    pub fn into_nodes(self) -> Vec<Node> {
+        self.nodes
     }
 
     /// PUCT の選択（Python `U = Q + c_puct*P*sqrt(ΣN)/(1+N)` の argmax・同点は添字が小さい方）。
