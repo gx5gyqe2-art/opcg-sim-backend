@@ -1,0 +1,24 @@
+{
+  "job": "gen-n29-w12",
+  "status": "done",
+  "games": 480,
+  "rows": 68967,
+  "main_rows": 31278,
+  "dropped": 1,
+  "void": 1,
+  "forced": {"play": 341, "hold": 47},
+  "removal_legal_rows": 12630,
+  "sec_per_game": 14.33,
+  "wall_hours": 1.91,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "net": "nrel_r3.npz",
+  "commit": "0be4a48f3e610ef821f546e76a387eb5d75d577b",
+  "notes": "30局のタイミング計測（seed_base 2296500・別出力）で 487s/30局=16.23s/局・480局換算で6時間以内と判定してから本番480局を実行（wall 6877s=1.9100h・14.33s/局）。void（決着せず）1件: seed 2296720（leaders ST29-001/OP04-040・turn8・steps=400=MAX_STEPSで打ち切り）。record_gen.py の play_one は winner is None を dropped 扱いにするため rows には出ない（dropped=1 と一致）。原因は未特定だが、docs/rust_engine_plan.md §20.8.1-1 に記載の置換効果ループ（PRB02-006 ロロノア・ゾロ）と同種のクラス（rs-replace-rest-fix 未合流のため既知の残存リスク）と推測。再現手順: OPCG_LOG_SILENT=1 で record_gen の _init_worker(160, nrel_r3.npz, 0.25, 4, decks='synth_roles', aux=True, eps_play=0.03, eps_hold=0.03, search={worlds:4, select_rule:'q_min_n', q_min_frac:0.125, root_prior_temp:2.0}) を初期化後、seed=2296720 で play_one 相当の経路を単体実行すると再現（本セッションで確認済み・コードは変更していない）。それ以外の479局は全て winner が p1/p1 のいずれかで決着（p1:258 / p2:221）。コードは変更していません。"
+}
