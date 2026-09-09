@@ -3967,3 +3967,65 @@ search/apply.rs・tests/ に限る（search/mcts.rs・decide.rs の根の統計�
 ■ 前提
   - 既定（setup_box=false）の挙動は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
 ```
+
+#### 20.7.5 回収と判定（2026-09-09・`rs-pimc-worlds`／`rs-setup-box`）
+
+**回収**: `rs-pimc-worlds`（`origin/claude/rs-pimc-worlds`・RESULT `docs/reports/2026-09-09_pimc_worlds.RESULT.json`）
+を ff で取り込み、続けて `rs-setup-box`（`origin/claude/rs-setup-box-swto7v`・RESULT
+`2026-09-09_setup_box.RESULT.json`）を合流（4 ファイルで衝突＝両 WP が同じ場所に欄を足していた:
+`DecideOptions`／`Game.decide` の opts／`rs_scenario_play.py`／`rs_search_a_latency.py`。両方残して解いた）。
+**合流時に見つけた組み合わせの欠陥を 1 つ直した**: 準備箱の状態（`macro::SETUP`＝枝予算・計測・
+「箱の持ち主」）は `thread_local` なので、`worlds>1` の世界スレッドでは**既定（無効）で始まっていた**
+（箱の候補化そのものは `ctx.opts.setup_box` で決まるので世界 1 以降にも箱は出るが、箱の中の
+対象選択の枝 `may_branch_selection` と計測が世界 0 だけになる）。`decide::run_worlds` の各スレッドで
+`reset_setup_state(opts.search.setup_box)` を張り直す（`tests_setup_box::setup_box_survives_multiple_worlds`＝
+世界 i の N/Q が「rng を seed+i にした単一世界」と一致すること。ゼロ重みネットの盤面では枝が
+踏まれず差は再現しないので、一致の確認にとどまる）。計測 `boxes` は世界 0 のぶんだけ出る。
+
+**`rs-pimc-worlds` の判定**
+- 効き目（RESULT）: 神の裁き → 攻撃の順は visits 規則では K=1〜8 で 0/8 のまま。ただし**オーム攻撃の
+  Q が 1.000（K=1）→ 0.958（K=4）→ 0.904（K=8）** へ落ち、神の裁きの訪問は 3 → 120（K=8）＝
+  §20.7.1 が狙った「相手の手札を知っているつもりの Q」の是正は起きている。9 シナリオの 229 決定の
+  **27.9% で世界ごとの最善手が割れた**。P は世界で違わず（916 世界すべて）、legal の並びも同じ
+  （unmapped 0）。
+- レイテンシ: K=2 で 1.27 倍・K=4 で 2.32 倍・K=8 で 4.19 倍（目標 1.3 倍は未達）。原因はスレッド化
+  ではなく**世界ごとのコストが二峰**（同じ局面で 55 ms 級と 400 ms 級に割れる＝相手の伏せ札次第で
+  戦闘箱が膨らむ）で、並列の壁時計は最大値に張り付くため。CPU 時間は 1 コアでも 4 コアでも同じ＝
+  無駄な仕事は増えていない。
+- (a) `q_min_n` の訪問下限を実効 sims（K×sims）で測る: **採る**。下限は「Q を信じてよい訪問数」なので、
+  束ねた N に対して同じ割合で引くのが筋（K=1 は今までと同じ値）。
+- (b) 生成・アリーナへの配線: `rs-search-arena`（§20.5.3）に含める（`arena_shard` が席ごとに
+  worlds／setup_box／select_rule／q_min_frac／root_prior_temp を受ける）。
+- 候補設定: **K=4 を主候補**（Q の是正が K=4 で見え、K=8 は 4 倍超）。レイテンシが serve で問題なら
+  K=2（1.27 倍）へ落とす。「K×sims 一定」（K=4 × sims 40）は 1 本の木が浅くなり A1（予算）を
+  悪化させるので採らない。
+
+**`rs-setup-box` の判定**
+- 効き目（RESULT・sims 160・visits・K=1・seed 8 本）: **ガンマナイフ off 0/8 → on 5/8**・神の裁きの
+  KO off 0/8 → on 2/8（打った run に限れば 0/2 → 2/3）・神の裁き → 攻撃の順は off/on とも 0/8（この
+  局面は準備箱では動かない＝R2 の平坦化で動く・分析 #5）。分析 #4 の 3 決定のうち 2 つが「深さ 1 で
+  Q に出る」ようになった＝§20.7.2 の見立てどおり。
+- レイテンシ: 中位 221 ms → 728 ms（3.3 倍・根の候補 29 → 54 等）。木の全節で候補化しているため。
+- Q1（対象選択の 2 段目以降も上限 9 に収まるあいだ枝にする・`SETUP_BOX_SELECT_DEPTH`=3）: **採る**。
+  規則の目的は枝の爆発を抑えることで、上限 9 がそれを担っている。神の裁きは「+1000 の先（1 段目）
+  → KO 対象（2 段目）」なので、字面どおり 1 段では受け入れ条件（KO する／しない）が成り立たない。
+  §20.7.2 の共通規則は「**総枝数が 9 に収まるあいだは対象選択を順に枝にし、収まらなくなる段からは
+  既定**」と読み替える（攻撃箱／防御箱は 1 段のまま＝`quiesce.rs` の `sel_branch_left`・枝数 max 8）。
+- Q2（素の PLAY／ACTIVATE_MAIN を残し、箱の P は素の手の P を枝数で等分）: **今は維持**（指示どおり・
+  アリーナの基準にする）。素の手が P をまるごと持ち、各枝は P/n＝低 sims では箱が素の手に訪問で負け
+  やすい構造。分析 #6 で「箱の候補がある決定で、素の手の N と箱の N の和」を数え、箱が負けている
+  なら次の摘みは (a) 素の手を落とす（配分箱と同じ扱い・「攻撃しない」枝が素の手の意味を持つ）。
+- Q3（レイテンシ 3.3 倍）: **今は全節のまま**（指示どおり）。根だけに限る案は「2 段の準備を木が読む」
+  経路を弱めるので、アリーナで効き目を見てから。serve の予算（分析 #5: 640 sims＝1.6 s まで）には
+  160 sims × 3.3 倍 × K=4 の 2.3 倍 ≈ 1.7 s で収まる見込み（分析 #6 で実測）。
+- CHOICE を枝にしない（`selection_moves` に CHOICE 分岐が無い）: 指示の誤り。据え置き＝CHOICE は既定
+  解決。枝にするなら `selection_moves` 側の別 WP。
+- 範囲外のファイル（`search/mod.rs`・`decide.rs`・`engine_rs.py`・`state.rs`）: 最小限で妥当。
+  `state::tests::load_masters_reports_a_missing_file` の実行順依存は実在した穴（`--test-threads=1` で
+  落ちる）＝直しを採る。
+- 計測 `branches_per_box`: setup 平均 2.9・最大 9／attack 5.1・最大 8／defense 3.8・最大 8。予算
+  （`BOX_BRANCH_BUDGET` 8000／decide）の打ち切りは観測範囲で 0。
+
+**次**: 分析 #6（コーディネータ・`2026-09-09_scenario_analysis_06.md`）＝ 1＋2＋3 を束ねた条件
+（worlds 4 ＋ setup_box ＋ q_min_n 1/8 ＋ t=2・sims 160）を 3 局面 × seed 8 本で回し、鍵 3 つと
+レイテンシを見る → §20.5.3 `rs-search-arena` の候補設定を差し替えてユーザへ渡す。
