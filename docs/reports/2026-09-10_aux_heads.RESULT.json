@@ -1,0 +1,299 @@
+{
+ "job": "rs-aux-heads",
+ "status": "done",
+ "dump_v4_cols": [
+  "aux",
+  "aux_tok",
+  "aux_mask"
+ ],
+ "identity_check": "**一致した**。λ=0（aux 列のある波でも）と「aux 列の無い波に λ=0.1」は、どちらも補助教師を入れる前の学習と重みがビット一致し、npz に補助鍵（aux_*）も出ない（numpy backend とtorch backend --threads 1 の両方で確認）。**ただし既定の torch backend を全コア（--threads 4）で回すと、同一設定の再実行どうしですら重みが一致しない（max|Δ| 2.2e-2）＝同一性は 1 スレッド（または numpy backend）でしか判定できない。これは補助教師の前からある性質で、本 WP が持ち込んだものではない（同一設定 2 回の比較で確認）。",
+ "identity_detail": {
+  "backend_numpy_threads1": {
+   "v3wave_l0__vs__v3wave_l0.1": true,
+   "v3wave_l0__vs__v4wave_l0": true
+  },
+  "backend_torch_threads1": {
+   "same_config_rerun": true,
+   "v3wave_l0__vs__v3wave_l0.1": true,
+   "v3wave_l0__vs__v4wave_l0": true
+  },
+  "backend_torch_threads4_is_not_reproducible": {
+   "same_config_rerun": false,
+   "same_config_rerun_max_abs_delta": 0.021623939275741577
+  },
+  "aux_keys_in_npz": {
+   "id_np_base": 0,
+   "id_np_l01": 0,
+   "id_np_auxl0": 0,
+   "id_t1_l01": 0,
+   "lam0": 0,
+   "lam01": 8,
+   "lam03": 8
+  },
+  "recipe": "record_gen 200 局（seed 2999000〜・sims 32・4 workers・既定 synth）の波と、その aux 列だけを落とした複製を、r3 warm-start・--ablate rel・--epochs 1・lr 5e-4 で訓練して npz を突き合わせた"
+ },
+ "band": {
+  "lambda_0": {
+   "z_err": {
+    "v_mse": 0.6025146068553272,
+    "v_sign": 0.7964216634429401,
+    "n": 4136
+   },
+   "train_val": {
+    "v_mse": 0.6025145649909973,
+    "v_sign": 0.7964216634429401,
+    "pi_top1": 0.6565717746820109,
+    "train_sec": 15.047
+   },
+   "aux_err": null,
+   "aux_err_mean": {
+    "aux_head_trained": false,
+    "aux": 1.72015228873805,
+    "aux_tok": 0.4787959599076656
+   },
+   "z_err_by_bucket": {
+    "all": 0.6025146068553272,
+    "turn1-4": 0.8074468306309763,
+    "turn5-8": 0.5598713353932355,
+    "turn9-99": 0.5699963680504057,
+    "leader_color:BLACK": 0.6503710770959602,
+    "leader_color:BLACK|BLUE": 0.17132086375537728,
+    "leader_color:BLACK|GREEN": 0.011561508263122893,
+    "leader_color:BLACK|RED": 1.1190853390882145,
+    "leader_color:BLACK|YELLOW": 0.4076969261885371,
+    "leader_color:BLUE": 0.7230002785055889,
+    "leader_color:BLUE|GREEN": 0.014104754687923972,
+    "leader_color:BLUE|PURPLE": 0.07461949564333041,
+    "leader_color:GREEN": 0.39195238392425424,
+    "leader_color:GREEN|PURPLE": 0.23958296686163036,
+    "leader_color:GREEN|RED": 0.14916898756157726,
+    "leader_color:GREEN|YELLOW": 1.3684768230223041,
+    "leader_color:PURPLE": 0.01635104663526051,
+    "leader_color:PURPLE|RED": 0.799606432923963,
+    "leader_color:PURPLE|YELLOW": 1.3940255870040352,
+    "leader_color:RED": 0.604854143564399,
+    "leader_color:RED|YELLOW": 4.129048332122766e-05,
+    "leader_color:YELLOW": 1.0759312393303704,
+    "after_removal": 0.5692939329843695,
+    "not_removal": 0.6032871806662796
+   }
+  },
+  "lambda_0.1": {
+   "z_err": {
+    "v_mse": 0.6031034487450688,
+    "v_sign": 0.7954545454545454,
+    "n": 4136
+   },
+   "train_val": {
+    "v_mse": 0.6031034588813782,
+    "v_sign": 0.7954545454545454,
+    "pi_top1": 0.658388855239249,
+    "train_sec": 14.576
+   },
+   "aux_err": {
+    "opp_turn_my_life_lost": 0.30425670742988586,
+    "opp_turn_attacks": 0.6469607353210449,
+    "opp_turn_effects": 1.025026559829712,
+    "my_turn_opp_life_lost": 0.32776492834091187,
+    "my_turn_attacks": 0.6034370064735413,
+    "my_turn_effects": 1.1757276058197021,
+    "next_my_board_power": 0.18168653547763824,
+    "next_opp_board_power": 0.19705870747566223,
+    "next_my_board_n": 0.46975791454315186,
+    "next_opp_board_n": 0.6657834649085999,
+    "tok_attacked": 0.6396501660346985,
+    "tok_life_pushed": 0.0331873781979084,
+    "tok_ability": 0.5673084855079651,
+    "n": 2850
+   },
+   "aux_err_mean": {
+    "aux_head_trained": true,
+    "aux": 0.5597460191082536,
+    "aux_tok": 0.413382007165959
+   },
+   "z_err_by_bucket": {
+    "all": 0.6031034487450688,
+    "turn1-4": 0.8050381051754556,
+    "turn5-8": 0.5670091257522868,
+    "turn9-99": 0.5670413869932449,
+    "leader_color:BLACK": 0.6469244005561052,
+    "leader_color:BLACK|BLUE": 0.18153751823128284,
+    "leader_color:BLACK|GREEN": 0.013531031696088339,
+    "leader_color:BLACK|RED": 1.2083443076064309,
+    "leader_color:BLACK|YELLOW": 0.407127063425627,
+    "leader_color:BLUE": 0.7247576538085522,
+    "leader_color:BLUE|GREEN": 0.015363704756983995,
+    "leader_color:BLUE|PURPLE": 0.07210722820328935,
+    "leader_color:GREEN": 0.3919636240564741,
+    "leader_color:GREEN|PURPLE": 0.26433545808403197,
+    "leader_color:GREEN|RED": 0.13221308860041575,
+    "leader_color:GREEN|YELLOW": 1.4280712270371423,
+    "leader_color:PURPLE": 0.02023682654496143,
+    "leader_color:PURPLE|RED": 0.807642079775102,
+    "leader_color:PURPLE|YELLOW": 1.2278370952394804,
+    "leader_color:RED": 0.5824668980313963,
+    "leader_color:RED|YELLOW": 4.542179509583783e-05,
+    "leader_color:YELLOW": 1.08343375396009,
+    "after_removal": 0.5722035924343053,
+    "not_removal": 0.6038220500546215
+   },
+   "aux_err_mean10_by_bucket": {
+    "all": 0.559746016561985,
+    "turn1-4": 0.3600586526095867,
+    "turn5-8": 0.5531122535467148,
+    "turn9-99": 0.6968099296092987,
+    "leader_color:BLACK": 0.5308732971549034,
+    "leader_color:BLACK|BLUE": 0.6877949591726065,
+    "leader_color:BLACK|GREEN": 0.28206111788749694,
+    "leader_color:BLACK|RED": 0.43122068494558335,
+    "leader_color:BLACK|YELLOW": 0.6000530861318112,
+    "leader_color:BLUE": 0.4694692134857178,
+    "leader_color:BLUE|GREEN": 0.7119421929121017,
+    "leader_color:BLUE|PURPLE": 0.5892197072505951,
+    "leader_color:GREEN": 0.5852596506476402,
+    "leader_color:GREEN|PURPLE": 0.503796087950468,
+    "leader_color:GREEN|RED": 0.38400775864720343,
+    "leader_color:GREEN|YELLOW": 0.6068832084536553,
+    "leader_color:PURPLE": 0.5149120122194291,
+    "leader_color:PURPLE|RED": 0.5372675798833371,
+    "leader_color:PURPLE|YELLOW": 0.7554480791091919,
+    "leader_color:RED": 0.49998675733804704,
+    "leader_color:RED|YELLOW": 0.7425652474164963,
+    "leader_color:YELLOW": 0.6293078392744065,
+    "after_removal": 0.5508905291557312,
+    "not_removal": 0.5599886462092399
+   }
+  },
+  "lambda_0.3": {
+   "z_err": {
+    "v_mse": 0.5930439100199818,
+    "v_sign": 0.7959381044487428,
+    "n": 4136
+   },
+   "train_val": {
+    "v_mse": 0.5930439233779907,
+    "v_sign": 0.7959381044487428,
+    "pi_top1": 0.6499091459721381,
+    "train_sec": 14.91
+   },
+   "aux_err": {
+    "opp_turn_my_life_lost": 0.2789665460586548,
+    "opp_turn_attacks": 0.5288966298103333,
+    "opp_turn_effects": 0.993674635887146,
+    "my_turn_opp_life_lost": 0.33397096395492554,
+    "my_turn_attacks": 0.5202885866165161,
+    "my_turn_effects": 1.17792809009552,
+    "next_my_board_power": 0.16249433159828186,
+    "next_opp_board_power": 0.16685618460178375,
+    "next_my_board_n": 0.40975329279899597,
+    "next_opp_board_n": 0.5402604341506958,
+    "tok_attacked": 0.6381311416625977,
+    "tok_life_pushed": 0.03315405175089836,
+    "tok_ability": 0.5668936371803284,
+    "n": 2850
+   },
+   "aux_err_mean": {
+    "aux_head_trained": true,
+    "aux": 0.511308987966755,
+    "aux_tok": 0.41272626159483927
+   },
+   "z_err_by_bucket": {
+    "all": 0.5930439100199818,
+    "turn1-4": 0.7856419511256396,
+    "turn5-8": 0.561274379344246,
+    "turn9-99": 0.5564623376835685,
+    "leader_color:BLACK": 0.5883536135746593,
+    "leader_color:BLACK|BLUE": 0.14287505774233505,
+    "leader_color:BLACK|GREEN": 0.012830768244064785,
+    "leader_color:BLACK|RED": 1.207708301515375,
+    "leader_color:BLACK|YELLOW": 0.37706321132347437,
+    "leader_color:BLUE": 0.7213134216216059,
+    "leader_color:BLUE|GREEN": 0.016498013263608478,
+    "leader_color:BLUE|PURPLE": 0.0569403231199375,
+    "leader_color:GREEN": 0.4135429210796028,
+    "leader_color:GREEN|PURPLE": 0.2611847762172495,
+    "leader_color:GREEN|RED": 0.0937199741453231,
+    "leader_color:GREEN|YELLOW": 1.417264697346005,
+    "leader_color:PURPLE": 0.025813115584676773,
+    "leader_color:PURPLE|RED": 0.7833461941232125,
+    "leader_color:PURPLE|YELLOW": 1.1884080777051698,
+    "leader_color:RED": 0.5989480622512644,
+    "leader_color:RED|YELLOW": 2.4253866863535987e-05,
+    "leader_color:YELLOW": 1.0573828002585226,
+    "after_removal": 0.5654636856742922,
+    "not_removal": 0.5936853105861606
+   },
+   "aux_err_mean10_by_bucket": {
+    "all": 0.5113089695572853,
+    "turn1-4": 0.3362217050045729,
+    "turn5-8": 0.5021725170314312,
+    "turn9-99": 0.6397579878568649,
+    "leader_color:BLACK": 0.47763595059514047,
+    "leader_color:BLACK|BLUE": 0.6351860389113426,
+    "leader_color:BLACK|GREEN": 0.2692981518805027,
+    "leader_color:BLACK|RED": 0.39271898493170737,
+    "leader_color:BLACK|YELLOW": 0.5595637649297714,
+    "leader_color:BLUE": 0.42442584931850436,
+    "leader_color:BLUE|GREEN": 0.615015584230423,
+    "leader_color:BLUE|PURPLE": 0.4978830385953188,
+    "leader_color:GREEN": 0.5451275572180748,
+    "leader_color:GREEN|PURPLE": 0.4560525916516781,
+    "leader_color:GREEN|RED": 0.34740063138306143,
+    "leader_color:GREEN|YELLOW": 0.5698571860790252,
+    "leader_color:PURPLE": 0.4966036379337311,
+    "leader_color:PURPLE|RED": 0.47077594995498656,
+    "leader_color:PURPLE|YELLOW": 0.6900389522314072,
+    "leader_color:RED": 0.4612472876906395,
+    "leader_color:RED|YELLOW": 0.6809985533356666,
+    "leader_color:YELLOW": 0.5600576639175415,
+    "after_removal": 0.5094893366098404,
+    "not_removal": 0.5113588303327561
+   }
+  }
+ },
+ "aux_err_untrained_head": {
+  "aux": 1.72015228873805,
+  "aux_tok": 0.4787959599076656
+ },
+ "rust_ignores_extra_keys": true,
+ "rust_check": {
+  "decide_positions": 10,
+  "same_move": 10,
+  "rs_net_load": "ok",
+  "rs_net_load_max_abs": 2.980232238769531e-07
+ },
+ "ledger_cost": {
+  "with_aux": {
+   "games": 20,
+   "sec": 47.7
+  },
+  "no_aux": {
+   "games": 20,
+   "sec": 46.0
+  },
+  "overhead_pct": 3.7
+ },
+ "wave": {
+  "path": "claude/rs-aux-heads の測定用（ツリー外）",
+  "seed_base": 2999000,
+  "games": 200,
+  "rows": 26814,
+  "dropped": 0,
+  "sims": 32,
+  "dump_version": 4,
+  "aux_mask_rate_shard0": 0.673,
+  "gen_net": "nrel_r3.npz"
+ },
+ "make_test": "497 passed（pytest・63.9s）＋ cargo test 421 passed",
+ "notes": [
+  "seed 帯: 台帳（docs/n_loop_ops.md §6）の払い出しが無かったので、本 WP の測定用に **2999000〜2999199（生成 200 局）と 2999500〜2999519（台帳コストの計測 20 局）**を使った。生成の規約 `2000000 + W*10000 + N*1000` の波番号とはぶつからない位置を選んだつもりだが、台帳へ載せるかどうかはコーディネータの判断に委ねる（この波はツリー外・成果物にも含めない）。",
+  "aux_mask の立つ割合は 0.67（200 局・シャード 0 で実測）。行が「A＝次の相手ターン」と「B＝その次の自分のターン」の両方が閉じたときだけ 1 になるので、終盤 2 ターン分の行が落ちる。",
+  "λ の効き目の判定はコーディネータへ。ここで出した数字は 200 局・1 エポックの小さな測定で、z 予測は λ=0 0.6025／λ=0.1 0.6031／λ=0.3 0.5930（v_sign は 0.795〜0.796 でほぼ同じ）＝**この規模では z への差は誤差の中**（同一設定の再実行差が測れていないので、差の意味は本番規模の波で測り直すべき）。補助損失自体は下がる（未学習ヘッド aux 1.720／aux_tok 0.479 → λ=0.1 で 0.560／0.413・λ=0.3 で 0.511／0.413）。",
+  "aux_tok の「能力を発動したか」は、EFFECT イベントが**発生源の uuid を持たない**ので `ACTIVATE_MAIN` の uuid 一致か **card_name 一致**で立てている（同名が盤面に並ぶと両方の枠が立つ）。uuid を載せるには Rust（`effects/resolver.rs` の `push_effect_events`）に欄を足す必要があり、本 WP は「Rust を触らない」ので見送った。**必要ならコーディネータの指示で別 WP に。**",
+  "「通したライフ枚数」は攻撃宣言から次の攻撃宣言（無ければ区間の終わり）までに失ったライフ枚数＝その間に挟まった効果によるライフ減も同じ攻撃に寄る。ライフ減イベントに枚数が乗っていないため、盤面スナップショットの差分で数えている。",
+  "台帳（1 手ごとの `board_json`）の生成コストは **+3.7%**（20 局・sims 32・単プロセスで 46.0s → 47.7s）。`--no-aux` で台帳ごと切れる（dump v3 の列だけを書く）。",
+  "評価帯の層別は、`deck_kinds` 列（WP rs-removal-decks）がまだ無いので**リーダー色**で切った（seed から `decks.leader_pair` を引き直す＝dump に列が無くても復元できる）。`deck_kinds` が入れば自動でそちらを使う（`n_rel_band.build_buckets`）。",
+  "「除去を打った直後の行」は `deck_roles.classify` がまだ無いので `n_rel_feat.roles_of` の removal／reduce／lock のどれかが立つカードで代用した（holdout 4,136 行のうち 94 行）。`deck_roles` が入れば自動でそちらを使う。",
+  "`dump_io` の pack 版を 1→2 に上げた（補助 3 列を足したため）＝**既存の pack は作り直しになる**。波 1 本あたり数分。列そのものは 1 行 57B（tok の 6%）。"
+ ]
+}

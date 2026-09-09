@@ -74,7 +74,7 @@ class Split:
         return {k: round(v, nd) for k, v in sorted(self.t.items())}
 
 
-def make_backend(name, net, lr, threads=None):
+def make_backend(name, net, lr, threads=None, aux_weight=0.0):
     """訓練ループが叩く backend を返す（`--backend`・2026-09-07・§18.4）。
 
     `numpy`＝この module の手書き backward（参照実装）。`torch`＝`n_rel_torch.TorchTrainer`
@@ -90,7 +90,7 @@ def make_backend(name, net, lr, threads=None):
               f"入れるなら: pip install torch --index-url https://download.pytorch.org/whl/cpu",
               flush=True)
         return net, "numpy", "torch-import-failed"
-    tr = TorchTrainer(net, lr=lr, threads=threads)
+    tr = TorchTrainer(net, lr=lr, threads=threads, aux_weight=aux_weight)
     return tr, "torch", f"threads={tr.threads}"
 
 
@@ -109,6 +109,41 @@ def relations_or_zeros(net, ci, tok, rt):
     return NR.relations_batch(ci, tok, rt)
 
 
+def huber(d, delta=1.0):
+    """Huber（δ=1）: `0.5 d²`（|d|≤δ）／`δ(|d|−0.5δ)`。補助教師の回帰損失（§20.8.2）。"""
+    a = np.abs(d)
+    return np.where(a <= delta, 0.5 * d * d, delta * (a - 0.5 * delta))
+
+
+def huber_grad(d, delta=1.0):
+    return np.clip(d, -delta, delta)
+
+
+def bce_logits(x, y):
+    """ロジット x・目標 y の二値交差エントロピー（`max(x,0) − x y + log(1+e^-|x|)`）。"""
+    return np.maximum(x, 0.0) - x * y + np.log1p(np.exp(-np.abs(x)))
+
+
+def aux_losses(pred, pred_tok, aux, aux_tok, mask):
+    """補助損失（有効行の全要素平均）＝`(aux, aux_tok)` の 2 本。mask=0 の行は入れない。
+
+    `aux_tok` の列は [BCE, Huber, BCE]（攻撃したか／通したライフ枚数／能力を発動したか）。
+    式の正本はここ 1 か所（torch 経路も同じ式・`n_rel_torch.aux_loss_terms` が写し）。
+    """
+    m = np.asarray(mask, np.float32)
+    n = float(m.sum())
+    if n <= 0:
+        return 0.0, 0.0
+    la = float((huber(pred - aux) * m[:, None]).sum() / (n * pred.shape[1]))
+    d = pred_tok - aux_tok
+    lt = huber(d[:, :, 1])
+    b0 = bce_logits(pred_tok[:, :, 0], aux_tok[:, :, 0])
+    b2 = bce_logits(pred_tok[:, :, 2], aux_tok[:, :, 2])
+    per = np.stack([b0, lt, b2], 2)
+    lt = float((per * m[:, None, None]).sum() / (n * per.shape[1] * per.shape[2]))
+    return la, lt
+
+
 def _onehot_argmax(masked, d_out, axis):
     """masked [...] の axis 方向 argmax に d_out を散らす（max プールの backward）。
     行に有効要素が無い（max が −1e8 未満）場合は 0。"""
@@ -125,8 +160,15 @@ class NRelNet(NL.NRelNet):
     def __init__(self, tables, hidden=192, seed=13):
         super().__init__(tables, hidden=hidden, seed=seed)
         self._adam = {p: [np.zeros_like(getattr(self, p)), np.zeros_like(getattr(self, p))]
-                      for p in self.params}
+                      for p in self.params + self.aux_params}
         self._t = 0
+
+    def _trainable(self):
+        """更新するパラメータ（補助ヘッドは `aux` が立っているときだけ）。
+
+        `_t` は今までどおり**全パラメータで 1 本**＝補助ヘッドを足しても既存の更新式は動かない。
+        """
+        return self.params + (self.aux_params if self.aux else [])
 
     # --- card_table backward（NEff と同じ） ---
     def card_table_backward(self, k, dtab, g):
@@ -215,8 +257,47 @@ class NRelNet(NL.NRelNet):
         x[:, -1] = self.ISL[tcid] * has_t
         return x
 
+    # --- 補助ヘッドの backward（§20.8.2・λ_aux>0 のときだけ通る） ---
+    def aux_backward(self, e, h, aux, aux_tok, mask, w, g):
+        """補助損失の勾配 →（dE [B,D_E], dh [B,22,D_H]）。`g` に補助ヘッドの勾配を足す。
+
+        損失は `aux_losses` と同じ「有効行の全要素平均」×λ_aux＝ここで割る分母も同じ。
+        """
+        m = np.asarray(mask, np.float32)
+        n = float(m.sum())
+        if n <= 0:
+            return None, None
+        ka, kt = {}, {}
+        pa = self.aux_head(e, ka)                                     # [B,10]
+        pt = self.aux_tok_head(h, kt)                                 # [B,6,3]
+        self.aux_loss = aux_losses(pa, pt, aux, aux_tok, m)           # エポック行に出す
+        # aux（Huber）
+        dpa = huber_grad(pa - aux) * m[:, None] * (w / (n * NL.D_AUX))
+        g["Wx2"] = ka["a_ra"].T @ dpa
+        g["bx2"] = dpa.sum(0)
+        dha = (dpa @ self.Wx2.T) * (ka["a_ha"] > 0)
+        g["Wx1"] = e.T @ dha
+        g["bx1"] = dha.sum(0)
+        dE = dha @ self.Wx1.T
+        # aux_tok（列 0/2 は BCE-with-logits＝σ(x)−y・列 1 は Huber）
+        dpt = np.empty_like(pt)
+        s = 1.0 / (1.0 + np.exp(-pt))
+        dpt[:, :, 0] = s[:, :, 0] - aux_tok[:, :, 0]
+        dpt[:, :, 2] = s[:, :, 2] - aux_tok[:, :, 2]
+        dpt[:, :, 1] = huber_grad(pt[:, :, 1] - aux_tok[:, :, 1])
+        dpt *= m[:, None, None] * (w / (n * NL.N_OPP * NL.D_AUX_TOK))
+        g["Wy2"] = np.einsum("bsi,bsj->ij", kt["a_ry"], dpt).astype(np.float32)
+        g["by2"] = dpt.sum((0, 1))
+        dhy = (dpt @ self.Wy2.T) * (kt["a_hy"] > 0)
+        g["Wy1"] = np.einsum("bsi,bsj->ij", kt["a_ho"], dhy).astype(np.float32)
+        g["by1"] = dhy.sum((0, 1))
+        dh = np.zeros_like(h)
+        dh[:, OPP_SLOTS] = dhy @ self.Wy1.T
+        return dE, dh
+
     # --- ステップ ---
-    def value_step(self, sc, ci, tok, rel_om, rel_oo, zt, lr):
+    def value_step(self, sc, ci, tok, rel_om, rel_oo, zt, lr,
+                   aux=None, aux_tok=None, aux_mask=None, aux_w=0.0):
         k = {}
         tab = self.card_table(k)
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab, k)
@@ -227,7 +308,14 @@ class NRelNet(NL.NRelNet):
         do = ((v - zt) / B) * (1.0 - v ** 2)
         g = {"Wv": e.T @ do[:, None], "bv": np.array([do.sum()], np.float32)}
         dE = do[:, None] @ self.Wv.T
+        dh_aux = None
+        if self.aux and aux_w > 0.0 and aux_mask is not None:
+            dE_a, dh_aux = self.aux_backward(e, h, aux, aux_tok, aux_mask, aux_w, g)
+            if dE_a is not None:
+                dE = dE + dE_a
         dh = self.body_backward(k, dE, g)
+        if dh_aux is not None:
+            dh = dh + dh_aux
         dtab = np.zeros_like(tab)
         self.tokens_backward(k, dh, g, ci, dtab)
         self.card_table_backward(k, dtab, g)
@@ -269,7 +357,7 @@ class NRelNet(NL.NRelNet):
 
     def step(self, grads, lr=1e-3, b1=0.9, b2=0.999, eps=1e-8):
         self._t += 1
-        for pnm in self.params:
+        for pnm in self._trainable():
             gp = grads.get(pnm)
             if gp is None:
                 continue
@@ -366,10 +454,37 @@ def cand_tail_all(net, C, chunk=65536):
 # ---------------------------------------------------------------------------
 # 訓練ループ
 # ---------------------------------------------------------------------------
+def aux_rows(V, bi, on):
+    """行 `bi` の補助教師（`on` が False／列が無ければ `(None, None, None)`）。"""
+    if not on or V.get("aux") is None:
+        return None, None, None
+    return (np.asarray(V["aux"][bi], np.float32), np.asarray(V["aux_tok"][bi], np.float32),
+            np.asarray(V["aux_mask"][bi], np.float32))
+
+
 def _val_batch(net, rt, V, vi):
     """holdout の value 予測（memmap から切り出して float32 へ上げる）。"""
     sc, ci, tok = DIO.rows_f32(V, vi)
     return net.value(sc, ci, tok, *relations_or_zeros(net, ci, tok, rt))
+
+
+def eval_aux(net, rt, V, vi, bs=512):
+    """holdout の補助損失（`aux`, `aux_tok`）。重みは numpy の `net` が正本（sync 済み）。"""
+    tot = np.zeros(2)
+    n = 0
+    for s in range(0, len(vi), bs):
+        bi = vi[s:s + bs]
+        m = np.asarray(V["aux_mask"][bi], np.float32)
+        k = float(m.sum())
+        if k <= 0:
+            continue
+        sc, ci, tok = DIO.rows_f32(V, bi)
+        _v, pa, pt = net.value_with_aux(sc, ci, tok, *relations_or_zeros(net, ci, tok, rt))
+        la, lt = aux_losses(pa, pt, np.asarray(V["aux"][bi], np.float32),
+                            np.asarray(V["aux_tok"][bi], np.float32), m)
+        tot += np.array([la, lt]) * k
+        n += k
+    return (float(tot[0] / n), float(tot[1] / n)) if n else (float("nan"), float("nan"))
 
 
 def eval_policy(net, rt, ptab_ret, V, P, C, pt_idx, ptr, bs=256, budget_all=None, src=None,
@@ -448,9 +563,20 @@ def train(args):
         if bad:
             raise ValueError(f"--ablate に未知の種類: {sorted(bad)}（{NL.ABLATE_KINDS}）")
         print(f"ablate: {sorted(net.ablate)}", flush=True)
+    # 補助教師（§20.8.2）: **λ_aux>0 かつ dump に aux 列がある**ときだけ立てる。どちらかが
+    # 欠ければ `net.aux=False`＝補助ヘッドは初期化されたまま触られず、npz にも出ない＝
+    # **今までの学習と 1 ビットも変わらない**（v3 の波に --aux-weight を付けても同じ）。
+    aux_w = float(getattr(args, "aux_weight", 0.0) or 0.0)
+    aux_on = aux_w > 0.0 and V.get("aux") is not None
+    net.aux = aux_on
+    if aux_w > 0.0:
+        n_ok = int(np.asarray(V["aux_mask"][:], np.int32).sum()) if aux_on else 0
+        print(f"aux: {'on' if aux_on else 'off（dump に aux 列が無い）'}"
+              f" λ={aux_w} 有効行 {n_ok}/{len(V['z'])}", flush=True)
     # backend（§18.4）: torch のときも重みの正本は numpy の `net`（holdout 評価・保存はそちら）。
     # 学習中は torch 側に置き、epoch の終わりに `sync_to_numpy()` で書き戻す。
-    backend, backend_name, note = make_backend(args.backend, net, args.lr, args.threads)
+    backend, backend_name, note = make_backend(args.backend, net, args.lr, args.threads,
+                                               aux_weight=aux_w)
     print(f"backend: {backend_name}{(' ' + note) if note else ''}", flush=True)
     # 方策点ごとに決まる値は**ここで 1 回だけ**作る（§18.6-2/3）。ループでは切り出すだけ。
     t_pre = time.time()
@@ -460,7 +586,7 @@ def train(args):
     src = None
     if backend_name == "torch":
         from opcg_sim.learned.train import n_rel_torch as TT
-        src = TT.EpochBatches(V, P, C, ptr, C["budget"], c_tail, rt, net.ablate)
+        src = TT.EpochBatches(V, P, C, ptr, C["budget"], c_tail, rt, net.ablate, aux=aux_on)
     rng = np.random.default_rng(args.seed)
     tr_v = np.where(~va_v)[0]; tr_p = np.where(~va_p)[0]; va_pi = np.where(va_p)[0]
     best = None; best_ep = -1
@@ -485,7 +611,8 @@ def train(args):
                 if src is not None:
                     b = src.value(iv, sp)                   # 切り出しは torch 側（§18.6-3）
                     sp("step_v")
-                    mse += backend.value_step(*b, args.lr)
+                    # 補助教師（あれば b の末尾 3 本）は lr の**後ろ**に渡す（§20.8.2）
+                    mse += backend.value_step(*b[:6], args.lr, *b[6:])
                 else:
                     sp("slice_v")
                     bi = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]
@@ -494,7 +621,8 @@ def train(args):
                     rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
                     sp("step_v")
                     mse += backend.value_step(sc, ci, tok, rel_om, rel_oo,
-                                              np.asarray(V["z"][bi], np.float32), args.lr)
+                                              np.asarray(V["z"][bi], np.float32), args.lr,
+                                              *aux_rows(V, bi, aux_on), aux_w=aux_w)
                 iv += 1
             else:
                 if src is not None:
@@ -544,15 +672,19 @@ def train(args):
               f"val v_mse {vmse:.4f} v_sign {vsgn:.3f} pi_top1 {p_pi:.3f} ce {p_ce:.3f} "
               f"{time.time()-t0:.0f}s", flush=True)
         # backend 比較用の 1 行（`docs/reports/2026-09-07_train_torch.md` の d）
-        print("N_REL_TRAIN_EPOCH " + json.dumps(
-            {"ep": ep, "backend": backend_name, "threads": getattr(backend, "threads", 1),
-             "train_sec": round(ep_train_sec, 3), "steps": len(sched),
-             "breakdown": sp.dump(),
-             "train_mse": mse / max(nv, 1), "train_ce": ce / max(npi, 1),
-             "val_vmse": vmse, "val_vsign": vsgn, "val_pi_top1": p_pi, "val_p_loss": p_ce}),
-            flush=True)
+        row = {"ep": ep, "backend": backend_name, "threads": getattr(backend, "threads", 1),
+               "train_sec": round(ep_train_sec, 3), "steps": len(sched),
+               "breakdown": sp.dump(),
+               "train_mse": mse / max(nv, 1), "train_ce": ce / max(npi, 1),
+               "val_vmse": vmse, "val_vsign": vsgn, "val_pi_top1": p_pi, "val_p_loss": p_ce}
+        if aux_on:
+            va, vt = eval_aux(net, rt, V, vi)
+            row.update({"aux_weight": aux_w, "val_aux": va, "val_aux_tok": vt,
+                        "train_aux": list(getattr(backend, "aux_loss", (0.0, 0.0)))})
+            print(f"  aux val huber {va:.4f} tok {vt:.4f}", flush=True)
+        print("N_REL_TRAIN_EPOCH " + json.dumps(row), flush=True)
         if best is None or vmse < best[0]:
-            best = (vmse, {p: getattr(net, p).copy() for p in net.params}); best_ep = ep
+            best = (vmse, {p: getattr(net, p).copy() for p in net._trainable()}); best_ep = ep
             # epoch ごとに最良を書き出す（16 シャード×2 epoch ≒ 3.5 時間・途中で落ちても ep0 が残る）
             _save(net, args, vocab, V, P, best_ep)
             print(f"  ep{ep} を {args.out} に保存（暫定最良）", flush=True)
@@ -570,7 +702,8 @@ def _save(net, args, vocab, V, P, best_ep):
     net.save(args.out, meta={"rows_v": int(len(V["z"])), "points_p": int(len(P["len"])),
                              "epochs": args.epochs, "best_ep": best_ep, "hidden": args.hidden,
                              "src": args.src, "kind": "nrel-a",
-                             "ablate": sorted(net.ablate)})
+                             "ablate": sorted(net.ablate),
+                             **({"aux_weight": float(args.aux_weight)} if net.aux else {})})
 
 
 def main():
@@ -587,6 +720,10 @@ def main():
     tr.add_argument("--hidden", type=int, default=192)
     tr.add_argument("--holdout-mod", type=int, default=7)
     tr.add_argument("--warm-start", default=None)
+    tr.add_argument("--aux-weight", type=float, default=0.1,
+                    help="補助教師（dump v4 の aux／aux_tok・§20.8.2）の重み λ_aux。"
+                         "**0 で完全に無効＝今までと同じ学習**。aux 列を持たない波だけの dump は"
+                         "自動で無効になる（既定 0.1）")
     tr.add_argument("--ablate", default="",
                     help="切り分け: rel（関係 R を 0）/ opp_pool（相手デッキ知識の列を 0）をカンマ区切り。"
                          "訓練・serve の両方で遮断され npz の meta に焼き込まれる")

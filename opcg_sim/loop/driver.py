@@ -59,11 +59,18 @@ def new_game(seed: int, p1: tuple, p2: tuple, first_player: Optional[str] = None
 def run_game(seed: int, seats: Dict[str, "E.SeatSpec"], p1: tuple, p2: tuple,
              max_steps: int = DEFAULT_MAX_STEPS,
              first_player: Optional[str] = None,
-             observer: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
+             observer: Optional[Callable[..., None]] = None,
+             post: Optional[Callable[..., None]] = None) -> Dict[str, Any]:
     """1 局を打ち切りまで進める。
 
     `seats` は `{"p1": SeatSpec, "p2": SeatSpec}`。`observer(game, name, turn, step, out, move)`
     は**決める前の盤面**と decide の結果を受け取る観測専用フック（棋譜ダンプが使う）。
+
+    `post(game, name, turn, step, move, events)` は**手を適用した直後**の盤面と、その適用が
+    積んだイベントログ（`events_json`）を受け取る観測専用フック（補助教師の台帳＝計画 §20.8.2
+    が使う）。対局の開始直後にも `post(game, None, turn, -1, None, [])` として 1 回呼ぶ＝
+    **`post` を k 回目に受け取った盤面が「手 k の直前の盤面」**（decide は盤面を変えないので、
+    `observer` の `step=k` が見た盤面と同じもの）。どちらのフックも盤面は動かさない。
 
     戻り値 `{"winner": "p1"|"p2"|None, "turns": int, "steps": int, "acts": {...}}`。
     `winner=None`（上限手数・要求が尽きた）は呼び出し側で void 扱いにする。
@@ -72,6 +79,8 @@ def run_game(seed: int, seats: Dict[str, "E.SeatSpec"], p1: tuple, p2: tuple,
     carries = {"p1": Carry(), "p2": Carry()}
     acts = {"p1": 0, "p2": 0}
     steps = 0
+    if post is not None:
+        post(game, None, int(game.turn_count or 0), -1, None, [])
     while game.winner() is None and steps < max_steps:
         pending = json.loads(game.pending_json())
         if not pending:
@@ -95,6 +104,8 @@ def run_game(seed: int, seats: Dict[str, "E.SeatSpec"], p1: tuple, p2: tuple,
                                        json.dumps(move.get("payload") or {}, ensure_ascii=False))
         except Exception as exc:                       # noqa: BLE001  局の失敗で計測を止めない
             raise GameAborted(f"seed={seed} step={steps} {type(exc).__name__}: {exc}") from exc
+        if post is not None:
+            post(game, name, turn, steps, move, json.loads(game.events_json()))
         steps += 1
         at = move.get("action_type")
         if at not in (None, "TURN_END", "PASS", "KEEP_HAND", "MULLIGAN"):
