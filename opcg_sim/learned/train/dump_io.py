@@ -1,4 +1,4 @@
-"""dump_io: 棋譜ダンプ（v2／v3）の読み込み（memmap 版・2026-09-07・計画 §18.5）。
+"""dump_io: 棋譜ダンプ（v2／v3／v4）の読み込み（memmap 版・2026-09-07・計画 §18.5）。
 
 `load_dump` は今までの `n_rel_train.load_dump_v2` と**同じ V/P/C の dict** を返す。違いは常駐:
 
@@ -21,6 +21,13 @@ npz からしか作れない（`pol_sig` の JSON を語彙 index に潰す＝`v
 
 **注意（全波規模）**: 切り出しはページキャッシュに乗っている間だけ速い（1 波 100MB 級なら常に
 乗る）。全波 5GB 超では実ディスク I/O になり得る＝**時間ではなくメモリのための手段**。
+
+**dump v4 の追加列（2026-09-10・計画 §20.8）**: 補助教師 `aux(D,10)`／`aux_tok(D,6,3)`／
+`aux_mask(D)` を pack へ足した（1 行 57B＝`tok` の 6%）。**無い波（v3）は 0・`aux_mask=0`
+で埋める**＝波を混ぜても行が揃い、補助損失には入らない。どの波も持っていなければ
+`load_dump` は `V["aux"]`／`V["aux_tok"]`／`V["aux_mask"]` に **`None`** を返す（＝訓練側は
+補助ヘッドを自動で切る）。`deck_kinds`（WP `rs-removal-decks`）のような文字列列は pack に
+入らない（`load_row_col` が npz から直接、pack と同じ行順で読む）。
 """
 import glob
 import hashlib
@@ -33,11 +40,19 @@ import numpy as np
 from opcg_sim.learned.train.n1_train import _atype_idx    # 候補 action → ATYPES の index
 
 # pack の版（レイアウトを変えたら上げる＝古い pack を無視して作り直す）
-PACK_VERSION = 1
+PACK_VERSION = 2                       # 2: 補助教師の 3 列を足した（dump v4・§20.8）
 # V の pack が持つ列と dtype（tok/sc/ci/z は memmap・seed/turn は小さいので RAM に読む）
 MMAP_COLS = {"sc": np.float16, "ci": np.int16, "tok": np.float16, "z": np.float16}
 RAM_COLS = {"seed": np.int64, "turn": np.int16}
+#: 補助教師（dump v4・§20.8.2）。npz に無い波は 0／`aux_mask=0` で埋める＝行は必ず揃う。
+AUX_COLS = {"aux": np.float16, "aux_tok": np.float16, "aux_mask": np.int8}
 CACHE_ENV = "OPCG_DUMP_CACHE"
+
+
+def _aux_shapes():
+    """`aux` 系の 1 行あたりの形（正本は `n_rel` の次元＝`record_gen.AUX_COLS` と同じ数）。"""
+    from opcg_sim.learned.n_rel import D_AUX, D_AUX_TOK, N_OPP
+    return {"aux": (D_AUX,), "aux_tok": (N_OPP, D_AUX_TOK), "aux_mask": ()}
 
 
 def default_cache_dir():
@@ -61,12 +76,13 @@ def _wave_key(files):
 
 
 def _rows_of(path):
-    """1 シャードの行数と列の形（tokens の形・scalars の列数・card_idx の列数）。"""
+    """1 シャードの行数と列の形（tokens の形・scalars の列数・card_idx の列数）と aux の有無。"""
     with np.load(path, allow_pickle=True) as d:
         if "tokens" not in d.files:
             raise ValueError(f"{path}: dump v2/v3 ではない（tokens 無し）")
         return (int(d["z"].shape[0]), tuple(d["tokens"].shape[1:]),
-                int(d["scalars"].shape[1]), int(d["card_idx"].shape[1]))
+                int(d["scalars"].shape[1]), int(d["card_idx"].shape[1]),
+                all(k in d.files for k in AUX_COLS))
 
 
 def build_pack(d, cache_dir):
@@ -85,23 +101,28 @@ def build_pack(d, cache_dir):
     n_tot = 0
     form = None
     per_shard = []
+    has_aux = False
     for f in files:
-        n, ts, sd, cd = _rows_of(f)
+        n, ts, sd, cd, aux = _rows_of(f)
         if form is None:
             form = (ts, sd, cd)
         elif (ts, sd, cd) != form:
             raise ValueError(f"{f}: 列の形が波の中で揃っていない {(ts, sd, cd)} != {form}")
         per_shard.append(n)
         n_tot += n
+        has_aux = has_aux or aux
     tok_shape, sc_dim, ci_dim = form
+    aux_shapes = _aux_shapes()
     tmp = out + ".tmp"
     shutil.rmtree(tmp, ignore_errors=True)
     os.makedirs(tmp, exist_ok=True)
     shapes = {"sc": (n_tot, sc_dim), "ci": (n_tot, ci_dim), "tok": (n_tot,) + tok_shape,
               "z": (n_tot,)}
+    shapes.update({k: (n_tot,) + aux_shapes[k] for k in AUX_COLS})
+    cols = {**MMAP_COLS, **AUX_COLS}
     mm = {k: np.lib.format.open_memmap(os.path.join(tmp, f"{k}.npy"), mode="w+",
-                                       dtype=MMAP_COLS[k], shape=shapes[k])
-          for k in MMAP_COLS}
+                                       dtype=cols[k], shape=shapes[k])
+          for k in cols}
     ram = {k: np.empty(n_tot, dt) for k, dt in RAM_COLS.items()}
     off = 0
     for f, n in zip(files, per_shard):
@@ -117,6 +138,9 @@ def build_pack(d, cache_dir):
             mm["z"][sl] = d_["z"].astype(np.float16)
             ram["seed"][sl] = d_["seed"]
             ram["turn"][sl] = d_["turn"] if "turn" in d_.files else 0
+            # 補助教師（v4）。無いシャードは 0＝`aux_mask=0`＝損失に入らない。
+            for k, dt in AUX_COLS.items():
+                mm[k][sl] = d_[k].astype(dt) if k in d_.files else 0
         off += n
     assert off == n_tot
     for k in list(mm):
@@ -127,10 +151,10 @@ def build_pack(d, cache_dir):
     with open(os.path.join(tmp, "meta.json"), "w") as fh:
         json.dump({"pack_version": PACK_VERSION, "src": os.path.abspath(d), "key": key,
                    "rows": n_tot, "shards": [os.path.basename(f) for f in files],
-                   "shard_rows": per_shard, "ci_dim": ci_dim,
+                   "shard_rows": per_shard, "ci_dim": ci_dim, "has_aux": bool(has_aux),
                    "tok_shape": list(tok_shape), "sc_dim": sc_dim,
                    "dtypes": {k: np.dtype(v).name for k, v in
-                              {**MMAP_COLS, **RAM_COLS}.items()}}, fh)
+                              {**MMAP_COLS, **AUX_COLS, **RAM_COLS}.items()}}, fh)
     shutil.rmtree(out, ignore_errors=True)
     os.replace(tmp, out)
     return out
@@ -202,6 +226,49 @@ class _Waves:
         return out
 
 
+def _pack_meta(pack):
+    with open(os.path.join(pack, "meta.json")) as fh:
+        return json.load(fh)
+
+
+def load_row_col(dirs, name, z_dirs=()):
+    """npz の**行ごとの列**を pack と同じ行順で読む（`deck_kinds`／`sig` などの文字列列）。
+
+    pack は数値列しか持たない（文字列は memmap にできない）ので、必要なときだけ npz を開く。
+    列を 1 本も持っていなければ `None`（＝`dump_io` は無い列を `None` で返す・§20.8 の契約）。
+    """
+    out = []
+    for d in [d for d in list(dirs) + list(z_dirs) if shard_files(d)]:
+        for f in shard_files(d):
+            with np.load(f, allow_pickle=True) as dd:
+                if name not in dd.files:
+                    return None                  # 1 本でも欠けたら揃わない＝無い列として扱う
+                out.append(np.asarray(dd[name])[:int(dd["z"].shape[0])])
+    return np.concatenate(out) if out else None
+
+
+def chosen_card_ids(dirs, z_dirs=()):
+    """行ごとの「選んだ手の主体カード ID」（判らない行は ""）。pack と同じ行順で返す。
+
+    `sig` は uuid しか持たない＝カードに戻せないので、main 窓の候補列
+    （`pol_len`／`pol_chosen`／`pol_cid`）から引く（評価帯の層別・§20.8.2 の 3）。
+    """
+    waves = [d for d in list(dirs) + list(z_dirs) if shard_files(d)]
+    out = []
+    for d in waves:
+        for f in shard_files(d):
+            with np.load(f, allow_pickle=True) as dd:
+                pl, pc = dd["pol_len"], dd["pol_chosen"]
+                off = np.concatenate([[0], np.cumsum(pl)]).astype(np.int64)
+                cid = dd["pol_cid"]
+                col = np.full(len(pl), "", dtype=cid.dtype if cid.size else "U1")
+                take = np.where((pl >= 1) & (pc >= 0))[0]
+                if len(take) and cid.size:
+                    col[take] = cid[off[take] + pc[take].astype(np.int64)]
+                out.append(col.astype(str))
+    return np.concatenate(out) if out else None
+
+
 def rows_f32(V, bi):
     """V から行を切り出して float32／int64 に上げる（fp16 の pack をそのまま計算に流さない）。"""
     return (np.asarray(V["sc"][bi], np.float32), np.asarray(V["ci"][bi], np.int64),
@@ -230,6 +297,12 @@ def load_dump(dirs, vocab, with_policy=True, z_dirs=(), cache_dir=None, n_tok=No
          for k in MMAP_COLS}
     for k in RAM_COLS:
         V[k] = np.concatenate([np.load(os.path.join(p, f"{k}.npy")) for p, _d, _x in packs])
+    # 補助教師（v4）: **1 本でも持っている波があれば**列を出す（持たない波の行は 0／mask 0）。
+    # どの波も持っていなければ `None`＝訓練側は補助ヘッドを自動で切る（§20.8.2）。
+    any_aux = any(_pack_meta(p).get("has_aux") for p, _d, _x in packs)
+    for k in AUX_COLS:
+        V[k] = (_Waves([np.load(os.path.join(p, f"{k}.npy"), mmap_mode="r")
+                        for p, _d, _x in packs]) if any_aux else None)
     P = {"row": [], "seed": [], "len": [], "chosen": []}
     C = {"pi": [], "at": [], "cid": [], "tcid": [], "k": [], "si": [], "ti": []}
     off_v = 0

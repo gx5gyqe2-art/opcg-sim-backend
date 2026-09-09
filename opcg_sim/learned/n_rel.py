@@ -18,6 +18,8 @@ serve と訓練で **forward はここが唯一の正本**（訓練器 `tests/sc
   z    = [scalars, mean_i h_i, max_i h_i]（存在する枠だけ） (123+144+144=411)
   e    = relu(relu(z W1 + b1) W2 + b2)                   (64)
   value = tanh(e Wv + bv)
+  aux     = relu(e Wx1 + bx1) Wx2 + bx2                  (10・補助ヘッド・§20.8.2)
+  aux_tok = relu(h_j Wy1 + by1) Wy2 + by2   j∈相手 6 枠  (3)
   policy: 候補 (主体枠 si, 対象枠 ti, 素性 f139, 予算 3) →
           logit = relu([e, h_si, h_ti, R(si,ti), f139, 予算3] Wp1 + bp1) Wp2 + bp2 → seg-softmax
   枠が無い（−1）主体/対象は 0 ベクトル。R(si,ti) は si∈自・ti∈相手のときだけ rel_om、それ以外 0。
@@ -61,6 +63,16 @@ D_E = 64
 F_CAND = NE.F_CAND                    # 139（action7＋主体/対象の構造 64×2＋4）
 D_BUDGET = 3
 D_PIN = D_E + 2 * D_H + NR.R_DIM + F_CAND + D_BUDGET   # 64+288+5+139+3 = 499
+# --- 補助ヘッド（dump v4 の対称な補助教師・計画 §20.8.2）---------------------
+# 列の意味は `opcg_sim/loop/record_gen.py` の `AUX_COLS`／`AUX_TOK_COLS` が正本（ここは形だけ）。
+# **serve は使わない**（forward は value/policy のまま・Rust の読み手は補助鍵を無視する）。
+D_AUX = 10                     # aux（回帰・Huber）
+D_AUX_H = 64                   # aux ヘッドの中間
+D_AUX_TOK = 3                  # aux_tok（相手 6 枠 × [BCE, Huber, BCE]）
+D_AUX_TOK_H = 32               # aux_tok ヘッドの中間
+#: npz へ**別鍵**（`aux_` 接頭辞）で保存する補助ヘッドの重み。既存 18 個の `PARAMS` は不変。
+AUX_PARAMS = ("Wx1", "bx1", "Wx2", "bx2", "Wy1", "by1", "Wy2", "by2")
+AUX_KEY = "aux_"
 N_TOK, N_OWN, N_OPP = NR.N_TOK, NR.N_OWN, NR.N_OPP
 OWN_SLOTS = [i for i in range(N_TOK) if NR._zone(i) in ("own_leader", "own_field", "hand")]   # 16
 OPP_SLOTS = [i for i in range(N_TOK) if NR._zone(i) in ("opp_leader", "opp_field")]          # 6
@@ -114,6 +126,18 @@ class NRelNet:
         self.Wp1 = W(D_PIN, 64); self.bp1 = np.zeros(64, np.float32)
         self.Wp2 = W(64, 1); self.bp2 = np.zeros(1, np.float32)
         self.params = list(self.PARAMS)
+        # 補助ヘッド（§20.8.2）: **別の乱数列**から引く＝既存 18 個の初期値は 1 ビットも動かない。
+        # `aux` が False のあいだは forward からも損失からも触られない（保存もしない）。
+        ra = np.random.default_rng(seed + 20_080_000)
+
+        def WA(a, b):
+            return (ra.standard_normal((a, b)) * np.sqrt(2.0 / a)).astype(np.float32)
+        self.Wx1 = WA(D_E, D_AUX_H); self.bx1 = np.zeros(D_AUX_H, np.float32)
+        self.Wx2 = WA(D_AUX_H, D_AUX); self.bx2 = np.zeros(D_AUX, np.float32)
+        self.Wy1 = WA(D_H, D_AUX_TOK_H); self.by1 = np.zeros(D_AUX_TOK_H, np.float32)
+        self.Wy2 = WA(D_AUX_TOK_H, D_AUX_TOK); self.by2 = np.zeros(D_AUX_TOK, np.float32)
+        self.aux_params = list(AUX_PARAMS)
+        self.aux = False                  # 補助ヘッドを使うか（訓練器が --aux-weight から立てる）
         self.vocab_ids = None
         self.meta = {}
         # 切り分け（ablation）: {"rel"}＝関係 R を 0 に・{"opp_pool"}＝相手デッキ知識の列を 0 に。
@@ -271,6 +295,32 @@ class NRelNet:
         e = self.body(sc, h, present)
         return np.tanh((e @ self.Wv + self.bv)[:, 0])
 
+    # --- 補助ヘッド（§20.8.2・serve は呼ばない） ---
+    def aux_head(self, e, keep=None):
+        """共有表現 e [B,D_E] → aux の予測 [B,10]（回帰・Huber の出力そのまま）。"""
+        ha = e @ self.Wx1 + self.bx1
+        ra = np.maximum(ha, 0.0)
+        if keep is not None:
+            keep.update(a_ha=ha, a_ra=ra)
+        return ra @ self.Wx2 + self.bx2
+
+    def aux_tok_head(self, h, keep=None):
+        """h [B,22,D_H] → 相手 6 枠の予測 [B,6,3]（列 0/2 は**ロジット**・列 1 は回帰）。"""
+        ho = h[:, OPP_SLOTS]
+        hy = ho @ self.Wy1 + self.by1
+        ry = np.maximum(hy, 0.0)
+        if keep is not None:
+            keep.update(a_ho=ho, a_hy=hy, a_ry=ry)
+        return ry @ self.Wy2 + self.by2
+
+    def value_with_aux(self, sc, ci, tok, rel_om, rel_oo):
+        """(value, aux, aux_tok)（評価帯が使う・value は既存の forward と同じ値）。"""
+        tab = self.card_table()
+        h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
+        e = self.body(sc, h, present)
+        v = np.tanh((e @ self.Wv + self.bv)[:, 0])
+        return v, self.aux_head(e), self.aux_tok_head(h)
+
     # --- 方策 ---
     def cand_input(self, e, h, rel_om, seg, si, ti, feats, budget):
         """候補ごとの入力 [P_cand, D_PIN]。si/ti は 22 枠 index（−1=無し）。"""
@@ -316,6 +366,11 @@ class NRelNet:
         m = dict(meta if meta is not None else (self.meta or {}))
         if self.ablate:
             m["ablate"] = sorted(self.ablate)
+        if self.aux:
+            # 補助ヘッドは**別鍵**（`aux_Wx1` …）で置く。serve の forward は読まないし、Rust の
+            # 読み手（`net/mod.rs` は鍵ごとに `get`）も知らない鍵をそのまま無視する。
+            m["aux"] = True
+            extra.update({AUX_KEY + p: getattr(self, p) for p in self.aux_params})
         np.savez_compressed(path, **{p: getattr(self, p) for p in self.params},
                             meta=json.dumps(m), nrel=np.array(1), **extra)
 
@@ -331,6 +386,11 @@ class NRelNet:
         except Exception:
             net.meta = {}
         net.ablate = set(net.meta.get("ablate") or ())
+        # 補助ヘッド（あれば）。無ければ初期値のまま `aux=False`＝今までの npz と同じ扱い。
+        if all(AUX_KEY + p in d.files for p in net.aux_params):
+            for p in net.aux_params:
+                setattr(net, p, d[AUX_KEY + p])
+            net.aux = True
         return net
 
 

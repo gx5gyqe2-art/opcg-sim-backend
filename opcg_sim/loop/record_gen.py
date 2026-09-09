@@ -33,16 +33,17 @@
                                              型（`deck_roles` の JSON・`--decks synth_roles` 以外は
                                              `{}`）。層別の読み（除去率別・型別）に使う
 
-**dump v3**（既定・2026-09-07・計画 §18.5）: 常駐の 9 割を占める 3 本の保存 dtype を半分にする——
+**dump v3**（2026-09-07・計画 §18.5）: 常駐の 9 割を占める 3 本の保存 dtype を半分にする——
 `tokens`／`scalars` を **float16**・`card_idx` を **int16**（`pol_si`/`pol_ti` は v2 から int16）。
 値は float32／int64 を **cast しただけ**で、**符号化（`enc_version`=13）も列の形も変えていない**。
 学習側は `learned/train/dump_io.py` が波ごとに memmap の pack を作って読む（v2 の npz＝
 float32／int64 も同じ関数で読める＝過去の波はそのまま使える）。v1／v2 を書く経路は無い。
 
-**dump v4**（2026-09-10・計画 §20.8）: **既存の列は 1 バイトも変えず**、`deck_kinds(D str)` を足す
-（`--decks synth_roles` で差し込んだ除去の型・型が無い経路では `{}`）。`dump_io.load_dump` は
-知らない列を読まない＝v3 の波も v4 の波も同じ関数で読める。対局メタ（seed・両席のリーダー・
-両席の型）は part ごとの sidecar `meta_games.json` にも書く（層別の集計用）。
+**dump v4**（既定・2026-09-10・計画 §20.8）: v3 の列は 1 バイトも変えず、**補助教師の 3 列**
+（`aux`／`aux_tok`／`aux_mask`・WP `rs-aux-heads`）と **`deck_kinds(D str)`**（`--decks synth_roles` で
+差し込んだ除去の型・型が無い経路では `{}`・WP `rs-removal-decks`）を足すだけ。`dump_io.py` は
+**無い列を `None` で返す**＝v3 の波はそのまま読める。補助教師の中身は下の `aux_from_ledger` が正本。
+対局メタ（seed・両席のリーダー・両席の型）は part ごとの sidecar `meta_games.json` にも書く（層別の集計用）。
 """
 import os
 for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
@@ -63,8 +64,8 @@ from opcg_sim.loop import engine as E                                  # noqa: E
 MAX_STEPS = 400
 MAX_CI = 24            # card_idx の PAD 長（G 系符号化の既定枠・列の形は据え置き）
 ENC_VERSION = 12       # dump v1 の符号化世代（過去の波の meta にだけ残る）
-ENC_VERSION_V2 = 13    # dump v2／v3（v12 ＋ n_rel_feat のグローバル追加 29・append-only）
-DUMP_VERSION = 4       # v3 ＋ `deck_kinds` 列（既存の列は不変・§20.8）
+ENC_VERSION_V2 = 13    # dump v2／v3／v4（v12 ＋ n_rel_feat のグローバル追加 29・append-only）
+DUMP_VERSION = 4       # v3 ＋ 補助教師の列（aux／aux_tok／aux_mask）＋ deck_kinds 列（§20.8）
 #: `--decks` の既定（歴代の波は全て synth＝規約を変えない）。
 DEFAULT_DECKS = "synth"
 
@@ -80,6 +81,177 @@ TOKENS_SHAPE = (22, 20)  # `n_rel_feat` の 22 枠 × S_DIM
 
 _KIND = {"main": 0, "window": 1, "commit": 2}
 _G = {}
+
+# --- 補助教師（dump v4・計画 §20.8.2）--------------------------------------
+#: `aux` の列数と名前（**「起きたこと」だけ**＝符号も重みも人が入れない）。
+AUX_COLS = ("opp_turn_my_life_lost", "opp_turn_attacks", "opp_turn_effects",
+            "my_turn_opp_life_lost", "my_turn_attacks", "my_turn_effects",
+            "next_my_board_power", "next_opp_board_power",
+            "next_my_board_n", "next_opp_board_n")
+AUX_DIM = len(AUX_COLS)                    # 10
+#: `aux_tok` の枠（相手 L ＋ 相手場 5＝`n_rel.OPP_SLOTS` の並び）と列。
+AUX_TOK_SLOTS = 6
+AUX_TOK_COLS = ("attacked", "life_pushed", "ability")
+AUX_TOK_DIM = len(AUX_TOK_COLS)            # 3
+#: パワーの目盛り（`aux` の 6/7 列はここで割る＝トークン状態 S と同じ流儀）。
+AUX_POWER_SCALE = 10000.0
+#: 攻撃宣言の action_type（`rules::actions` の `"ATTACK" | "ATTACK_CONFIRM"`）。
+ATTACK_ATS = ("ATTACK", "ATTACK_CONFIRM")
+
+
+def snapshot(game):
+    """台帳の 1 枚（`board_json` から補助教師に要る欄だけ抜く）。1 手あたり約 0.2ms。
+
+    盤面は動かさない。`power`／`n` は**場のキャラだけ**（リーダー・ステージは含めない）。
+    """
+    b = json.loads(game.board_json())
+    ti = b.get("turn_info") or {}
+    out = {"turn": int(ti.get("turn_count") or 0), "tp": ti.get("active_player_id"),
+           "life": {}, "power": {}, "n": {}, "field": {}, "leader": {}, "names": {}}
+    for nm, p in (b.get("players") or {}).items():
+        field = ((p.get("zones") or {}).get("field")) or []
+        leader = p.get("leader") or {}
+        out["life"][nm] = int(p.get("life_count") or 0)
+        out["power"][nm] = float(sum(int(c.get("power") or 0) for c in field))
+        out["n"][nm] = float(len(field))
+        out["field"][nm] = [c.get("uuid") for c in field]
+        out["leader"][nm] = leader.get("uuid")
+        names = {c.get("uuid"): c.get("name") for c in field}
+        if leader.get("uuid"):
+            names[leader["uuid"]] = leader.get("name")
+        out["names"][nm] = names
+    return out
+
+
+def step_record(name, move, events):
+    """台帳の 1 手（誰が・何を・どの uuid に／その適用が積んだ効果イベント）。"""
+    payload = (move.get("payload") or {}) if move else {}
+    eff, eff_names = {}, []
+    for ev in events or ():
+        if (ev.get("type") if isinstance(ev, dict) else None) != "EFFECT":
+            continue
+        pl = ev.get("player")
+        eff[pl] = eff.get(pl, 0) + 1
+        eff_names.append((pl, ev.get("card_name")))
+    return {"actor": name,
+            "at": (move.get("action_type") or payload.get("action_type")) if move else None,
+            "uuid": (move.get("card_uuid") or payload.get("uuid")) if move else None,
+            "eff": eff, "eff_names": eff_names}
+
+
+def turn_segments(snaps, steps):
+    """手を「そのターン（turn_count, 手番プレイヤー）」で区切る＝`[{tp, i0, i1, closed}]`。
+
+    手 k のターンは**適用する前の盤面** `snaps[k]` で決める（`TURN_END` は自分のターンの手）。
+    `closed`＝そのターンが終わったことが台帳から判る（後ろに別の区間がある）。最後の区間は
+    「対局がその途中で終わった」＝`closed=False`。
+    """
+    segs = []
+    for k in range(len(steps)):
+        key = (snaps[k]["turn"], snaps[k]["tp"])
+        if segs and segs[-1]["key"] == key:
+            segs[-1]["i1"] = k
+        else:
+            segs.append({"key": key, "tp": snaps[k]["tp"], "i0": k, "i1": k})
+    for j, s in enumerate(segs):
+        s["closed"] = j + 1 < len(segs)
+    return segs
+
+
+def _count(steps, i0, i1, actor, ats):
+    return sum(1 for k in range(i0, i1 + 1)
+               if steps[k]["actor"] == actor and steps[k]["at"] in ats)
+
+
+def _effects(steps, i0, i1, actor):
+    return sum(steps[k]["eff"].get(actor, 0) for k in range(i0, i1 + 1))
+
+
+def aux_from_ledger(snaps, steps, row_step, row_who):
+    """台帳 →（`aux [D,10]`, `aux_tok [D,6,3]`, `aux_mask [D]`）。計画 §20.8.2 の正本。
+
+    `snaps[k]`＝手 k を適用する**前**の盤面（`len(snaps) == len(steps)+1`）。行 d は
+    `row_step[d]` 番目の手を決めた判断点で、視点は `row_who[d]`。
+
+    区間の取り方（行の視点＝「自分」）:
+      A＝**この行の後、相手の手番が 1 回終わるまで**＝行の手番以降で最初に来る「相手のターン」
+         区間（行が相手ターンの中なら、その残り）。
+      B＝A の後に来る最初の「自分のターン」区間。
+    `aux_mask=1` は A も B も**終わったことが台帳から判る**ときだけ（対局が区間の途中で
+    終わった行は 0＝損失に入れない）。
+
+    値はすべて「起きたこと」＝符号なし（ライフは枚数・パワーは /10000）。**良し悪しは入れない。**
+    """
+    D = len(row_step)
+    aux = np.zeros((D, AUX_DIM), np.float32)
+    tok = np.zeros((D, AUX_TOK_SLOTS, AUX_TOK_DIM), np.float32)
+    mask = np.zeros(D, np.int8)
+    if not steps:
+        return aux, tok, mask
+    segs = turn_segments(snaps, steps)
+    for d in range(D):
+        t = int(row_step[d])
+        me = row_who[d]
+        opp = "p2" if me == "p1" else "p1"
+        a = next((s for s in segs if s["tp"] == opp and s["i1"] >= t), None)
+        if a is None:
+            continue
+        b = next((s for s in segs if s["tp"] == me and s["i0"] > a["i1"]), None)
+        if b is None:
+            continue
+        a0, a1 = max(t, a["i0"]), a["i1"]
+        b0, b1 = b["i0"], b["i1"]
+        aux[d, 0] = max(0.0, snaps[a0]["life"][me] - snaps[a1 + 1]["life"][me])
+        aux[d, 1] = _count(steps, a0, a1, opp, ATTACK_ATS)
+        aux[d, 2] = _effects(steps, a0, a1, opp)
+        aux[d, 3] = max(0.0, snaps[b0]["life"][opp] - snaps[b1 + 1]["life"][opp])
+        aux[d, 4] = _count(steps, b0, b1, me, ATTACK_ATS)
+        aux[d, 5] = _effects(steps, b0, b1, me)
+        start = snaps[b0]                                  # 次の自分のターン開始時の盤面
+        aux[d, 6] = start["power"][me] / AUX_POWER_SCALE
+        aux[d, 7] = start["power"][opp] / AUX_POWER_SCALE
+        aux[d, 8] = start["n"][me]
+        aux[d, 9] = start["n"][opp]
+        _fill_tok(tok[d], snaps, steps, a0, a1, me, opp, snaps[t])
+        mask[d] = 1 if (a["closed"] and b["closed"]) else 0
+    return aux, tok, mask
+
+
+def _fill_tok(out, snaps, steps, a0, a1, me, opp, cur):
+    """相手 6 枠（**行の時点**の相手 L ＋ 相手場 5）× [攻撃したか, 通したライフ枚数, 能力発動]。
+
+    「通したライフ枚数」は攻撃宣言から**次の攻撃宣言（無ければ区間の終わり）まで**に自分が
+    失ったライフ＝その攻撃に紐づく枚数（間に挟まった効果のぶんも同じ攻撃に寄る）。
+    「能力を発動したか」は相手の `ACTIVATE_MAIN` の uuid 一致か、相手の EFFECT イベントの
+    `card_name` 一致で立てる（イベントは発生源の uuid を持たない＝同名が並ぶ盤面では
+    両方の枠が立つ）。どちらも「起きたこと」の記録で、良し悪しは含まない。
+    """
+    slots = [cur["leader"][opp]] + (list(cur["field"][opp]) + [None] * 5)[:5]
+    pos = {u: j for j, u in enumerate(slots) if u}
+    if not pos:
+        return
+    atk = [k for k in range(a0, a1 + 1)
+           if steps[k]["actor"] == opp and steps[k]["at"] in ATTACK_ATS]
+    for n_, k in enumerate(atk):
+        j = pos.get(steps[k]["uuid"])
+        if j is None:
+            continue
+        end = atk[n_ + 1] if n_ + 1 < len(atk) else a1 + 1
+        out[j, 0] = 1.0
+        out[j, 1] += max(0.0, snaps[k]["life"][me] - snaps[end]["life"][me])
+    fired = set()
+    for k in range(a0, a1 + 1):
+        st = steps[k]
+        if st["actor"] == opp and st["at"] == "ACTIVATE_MAIN":
+            j = pos.get(st["uuid"])
+            if j is not None:
+                out[j, 2] = 1.0
+        fired.update(cn for pl, cn in st["eff_names"] if pl == opp and cn)
+    if fired:
+        names = cur["names"][opp]
+        for u, j in pos.items():
+            if names.get(u) in fired:
+                out[j, 2] = 1.0
 
 
 def move_sig(mv):
@@ -98,12 +270,13 @@ def _don_k(mv):
     return (mv.get("payload") or {}).get("don_k")
 
 
-def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS):
+def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS, aux=True):
     E.engine()
     _G["spec"] = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps,
                             temp_turns=temp_turns, prune_futile=E.GEN_PRUNE_FUTILE)
     _G["db"] = D.load_db()
     _G["decks"] = decks
+    _G["aux"] = bool(aux)
 
 
 class _Recorder:
@@ -113,6 +286,19 @@ class _Recorder:
         self.rows = {k: [] for k in ("scalars", "field", "card_idx", "who", "kind", "turn",
                                      "step", "sig", "pol_len", "pol_chosen", "tokens")}
         self.pol = {k: [] for k in ("n", "q", "k", "sig", "cid", "tcid", "si", "ti")}
+        # 補助教師の台帳（dump v4・§20.8.2）: `snaps[k]`＝手 k の直前の盤面・`steps[k]`＝手 k。
+        self.snaps = []
+        self.steps = []
+
+    def post(self, game, name, turn, step, move, events):
+        """`driver.run_game(post=…)`＝**手を適用した直後**に台帳を 1 枚積む（`step=-1` は初期盤面）。"""
+        if step >= 0:
+            self.steps.append(step_record(name, move, events))
+        self.snaps.append(snapshot(game))
+
+    def aux(self):
+        """台帳 → 行ごとの補助教師（`aux`／`aux_tok`／`aux_mask`）。"""
+        return aux_from_ledger(self.snaps, self.steps, self.rows["step"], self.rows["who"])
 
     def __call__(self, game, name, turn, step, out, move):
         # 符号化は decide **前**の状態＝この判断が見た盤面（Rust の decide は盤面を変えない）。
@@ -171,12 +357,13 @@ def play_one(seed):
     """1 局を打って行を返す（勝敗が付いた局だけ・純正 z）。失敗は None。"""
     spec, db = _G["spec"], _G["db"]
     rec = _Recorder()
+    aux_on = _G.get("aux", True)
     try:
         la, lb = D.leader_pair(db, seed, "random")
         p1, p2, kinds = D.build_pair(db, la, lb, seed, _G.get("decks", DEFAULT_DECKS),
                                      with_kinds=True)
-        res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2,
-                          max_steps=MAX_STEPS, observer=rec)
+        res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, max_steps=MAX_STEPS,
+                          observer=rec, post=rec.post if aux_on else None)
     except Exception:                                          # noqa: BLE001  1 局の失敗で止めない
         return None
     winner, turn, steps, acts = res["winner"], res["turns"], res["steps"], res["acts"]
@@ -190,8 +377,9 @@ def play_one(seed):
     # dump v4: 手番側デッキの除去の型（JSON・型を持たない経路は "{}"）
     kj = {"p1": json.dumps(kinds[0] or {}, ensure_ascii=False, separators=(",", ":")),
           "p2": json.dumps(kinds[1] or {}, ensure_ascii=False, separators=(",", ":"))}
+    aux, aux_tok, aux_mask = rec.aux()          # dump v4 の追加列（§20.8.2・--no-aux なら全 0）
     # dump v3: tokens／scalars は float16・card_idx は int16 で持つ（cast するだけ・§18.5）
-    return {"tokens": np.array(rows["tokens"], np.float32).astype(DT_V3["tokens"]),
+    out = {"tokens": np.array(rows["tokens"], np.float32).astype(DT_V3["tokens"]),
             "pol_si": np.array(pol["si"], np.int16),
             "pol_ti": np.array(pol["ti"], np.int16),
             "scalars": np.array(rows["scalars"], np.float32).astype(DT_V3["scalars"]),
@@ -216,6 +404,10 @@ def play_one(seed):
             # 局メタ（npz には積まない・part の sidecar へ）
             "_meta": {"seed": seed, "leaders": [la, lb], "kinds": list(kinds),
                       "winner": winner, "turns": turn, "rows": len(rows["who"])}}
+    if aux_on:
+        out.update({"aux": aux.astype(np.float16), "aux_tok": aux_tok.astype(np.float16),
+                    "aux_mask": aux_mask})
+    return out
 
 
 _ROW_KEYS = ("scalars", "field", "card_idx", "z", "who", "kind", "turn", "step",
@@ -223,6 +415,7 @@ _ROW_KEYS = ("scalars", "field", "card_idx", "z", "who", "kind", "turn", "step",
 _POL_KEYS = ("pol_n", "pol_q", "pol_k", "pol_sig", "pol_cid", "pol_tcid")
 _TOK_KEYS = ("tokens", "pol_si", "pol_ti")            # NRel 用（v2 で追加・v3 も同じ列）
 _V4_KEYS = ("deck_kinds",)                            # v4 で追加（§20.8）
+_AUX_KEYS = ("aux", "aux_tok", "aux_mask")            # 補助教師（v4 で追加・§20.8.2）
 
 
 def main(argv=None):
@@ -247,6 +440,9 @@ def main(argv=None):
                     choices=("singleton", "synth", "synth_dig", "synth_roles"),
                     help="デッキの中身（既定 synth＝歴代の波と同じ規約）。"
                          "synth_roles=除去の型を色ごとに差し込む（教材の対照・§20.8.1）")
+    ap.add_argument("--no-aux", action="store_true",
+                    help="補助教師の列（aux／aux_tok／aux_mask・§20.8.2）を書かない＝dump v3 の"
+                         "列だけにする。台帳（1 手 0.2ms の board_json）も積まない")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
 
@@ -254,11 +450,11 @@ def main(argv=None):
     t0 = time.time()
     if args.dump_v2:
         print("[note] --dump-v2 は廃止（既定が dump v3・列は同じで dtype だけ半分）", flush=True)
-    keys = _ROW_KEYS + _POL_KEYS + _TOK_KEYS + _V4_KEYS
+    keys = _ROW_KEYS + _POL_KEYS + _TOK_KEYS + _V4_KEYS + (() if args.no_aux else _AUX_KEYS)
     buf = {k: [] for k in keys}
     games = []                                         # part の sidecar（対局メタ）
     shard = n_rows = n_drop = n_main = 0
-    initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns, args.decks)
+    initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns, args.decks, not args.no_aux)
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
                                       initargs=initargs) as pool:
         done = 0
@@ -291,7 +487,8 @@ def main(argv=None):
         json.dump({"games": args.games, "rows": n_rows, "main_rows": n_main,
                    "dropped": n_drop, "sims": args.sims, "decks": args.decks,
                    "enc_version": ENC_VERSION_V2,
-                   "dump_version": DUMP_VERSION, "seed_base": args.seed_base,
+                   "dump_version": 3 if args.no_aux else DUMP_VERSION,
+                   "aux": not args.no_aux, "seed_base": args.seed_base,
                    "net": E.resolve_net(args.net), "engine": "rust",
                    "dirichlet_eps": args.dirichlet_eps,
                    "temp_turns": args.temp_turns}, f, ensure_ascii=False)
