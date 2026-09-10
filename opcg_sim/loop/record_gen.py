@@ -628,7 +628,7 @@ def main(argv=None):
                     help="【廃止・受けるだけ】dump v3 が既定になった（2026-09-07・§18.5）。"
                          "分散生成の古い指示書がこの旗を付けたまま回っても壊れないように残す")
     ap.add_argument("--decks", default=DEFAULT_DECKS,
-                    choices=("singleton", "synth", "synth_dig", "synth_roles"),
+                    choices=("singleton", "synth", "synth_dig", "synth_roles", "user"),
                     help="デッキの中身（既定 synth＝歴代の波と同じ規約）。"
                          "synth_roles=除去の型を色ごとに差し込む（教材の対照・§20.8.1）")
     ap.add_argument("--no-aux", action="store_true",

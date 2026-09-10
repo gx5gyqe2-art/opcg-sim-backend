@@ -54,7 +54,7 @@ def build_parser():
                          "random=全リーダーからペアごとに 2 枚引く（汎化）／"
                          "real=実デッキ 4 リーダー／purple=紫を含むリーダー（掘り実験の母集団）")
     ap.add_argument("--decks", default="singleton",
-                    choices=("singleton", "synth", "synth_dig", "synth_roles"),
+                    choices=("singleton", "synth", "synth_dig", "synth_roles", "user"),
                     help="デッキの中身。singleton=従来（色が合う 50 枚・全部 1 枚ずつ）／"
                          "synth=リーダーに合わせて合成／synth_dig=合成に掘りカードを差し込む／"
                          "synth_roles=合成に除去の型を色ごとに差し込む（§20.8.1）")
