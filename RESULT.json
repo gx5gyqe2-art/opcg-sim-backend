@@ -1,0 +1,16 @@
+{
+  "job": "arena-r4-mirror",
+  "status": "done",
+  "candidate": "nrel_r4b.npz（claude/train-r4-lr2）",
+  "baseline": "nrel_r3（既定）",
+  "games": 384,
+  "pairs": 192,
+  "wr": 0.5469,
+  "ci95": [0.4982, 0.5955],
+  "elo": 32.7,
+  "elo95": [-1.2, 67.2],
+  "void": 0,
+  "dup_seeds": 0,
+  "per_shard_wr": [0.625, 0.5417, 0.5417, 0.5208, 0.5833, 0.5833, 0.4375, 0.5417],
+  "notes": "8 シャード×24 ペア（seed-base 471000〜478000）。leaders=fixed, decks=singleton、探索設定は既定（--cand-* なし）。void 0・dup_seeds 0。副条件の判定基準（CLAUDE.md 開発判断: 95% CI 下限 ≥0.45）に対し下限 0.4982 ≥ 0.45 のため退行なし。"
+}
