@@ -1,0 +1,17 @@
+{
+  "job": "arena-r4w4-random",
+  "status": "done",
+  "candidate": "nrel_r4b.npz ＋ {worlds 4, q_min_n 0.125, t 2.0}",
+  "baseline": "nrel_r3（既定・既定の探索設定）",
+  "games": 384,
+  "pairs": 192,
+  "wr": 0.4818,
+  "ci95": [0.4242, 0.5394],
+  "elo": -12.7,
+  "elo95": [-53.1, 27.4],
+  "void": 0,
+  "dup_seeds": 0,
+  "shards": 8,
+  "per_shard_wr": [0.5000, 0.4583, 0.5000, 0.4792, 0.5417, 0.5000, 0.3958, 0.4792],
+  "notes": "主条件（random×synth）で r4+w4R2 は r3 既定を上回らなかった（wr 0.4818・CI95 [0.4242, 0.5394] は 0.5 を跨ぐ＝有意差なし・elo -12.7）。void は全シャードで 0・重複 seed も 0。運用上の注記: このジョブの実行中にコンテナが2回無警告で再起動し、素の nohup バックグラウンドジョブが2回落ちた（シャード0完了直後・シャード1の途中4/24時点）。いずれも n1_results 側の jsonl 台帳が追記式の再開の正であるため、データ損失なく同じ --out パスで再実行するだけで自動的に途中から再開できた（arena_shard は再開可能設計）。3回目はハーネス管理の run_in_background（Bash tool の run_in_background:true）で起動し直したところ、以降は再起動されず全8シャードが完走した。次回同種のジョブでは最初から run_in_background（素の nohup ではなく）で起動することを推奨。"
+}
