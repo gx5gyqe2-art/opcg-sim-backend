@@ -261,8 +261,10 @@ def test_dump_io_reads_v3_and_v4(tmp_path):
 
 def test_record_gen_declares_the_v4_column():
     from opcg_sim.loop import record_gen as G
-    # v4 の追加列は 2 本（`deck_kinds`＝§20.8.1／`forced`＝ε 探索・§20.8.5）。
-    assert G.DUMP_VERSION == 4 and G._V4_KEYS == ("deck_kinds", "forced")
+    # v4 の行ごとの追加列は 3 本（`deck_kinds`＝§20.8.1／`forced`＝ε 探索・§20.8.5／
+    # `pol_v0`＝根の価値の推定・改良方策 π' の材料・§20.6.1）。候補ごとの `pol_p` は `_POL_KEYS`。
+    assert G.DUMP_VERSION == 4 and G._V4_KEYS == ("deck_kinds", "forced", "pol_v0")
+    assert "pol_p" in G._POL_KEYS
     assert G.DEFAULT_DECKS == "synth"           # 既定の波の規約は変えない
 
 

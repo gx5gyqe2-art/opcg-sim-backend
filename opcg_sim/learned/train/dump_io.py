@@ -30,6 +30,12 @@ npz からしか作れない（`pol_sig` の JSON を語彙 index に潰す＝`v
 入らない（`load_row_col` が npz から直接、pack と同じ行順で読む）。`forced(D int8)`
 （WP `rs-eps-explore`・§20.8.5）も同じ扱い＝**pack に入れない・訓練は読まない**（教師では
 なく層別の印。読みたいときは `load_row_col(dirs, "forced")`・無い波は `None`）。
+
+**改良方策の材料（2026-09-10・計画 §20.6.1）**: `C["n"]`（訪問の生値）・`C["q"]`（行動価値）・
+`C["p"]`（生成役ネットの根の P）と `P["v0"]`（根の価値の推定）も返す。`n`／`q` はどの波にも
+ある（dump v2 から）。`p`／`v0` は **dump v4 の追加列**（`pol_p`／`pol_v0`）＝**1 本でも
+持たないシャードがあれば `None`**（＝訓練側は warm-start ネットの forward に退避する）。
+`C["pi"]`（訪問分布）は**今までどおり**＝既定の教師は 1 bit も変わらない。
 """
 import glob
 import hashlib
@@ -305,8 +311,9 @@ def load_dump(dirs, vocab, with_policy=True, z_dirs=(), cache_dir=None, n_tok=No
     for k in AUX_COLS:
         V[k] = (_Waves([np.load(os.path.join(p, f"{k}.npy"), mmap_mode="r")
                         for p, _d, _x in packs]) if any_aux else None)
-    P = {"row": [], "seed": [], "len": [], "chosen": []}
-    C = {"pi": [], "at": [], "cid": [], "tcid": [], "k": [], "si": [], "ti": []}
+    P = {"row": [], "seed": [], "len": [], "chosen": [], "v0": []}
+    C = {"pi": [], "at": [], "cid": [], "tcid": [], "k": [], "si": [], "ti": [],
+         "n": [], "q": [], "p": []}
     off_v = 0
     for pack, d, pol in packs:
         with open(os.path.join(pack, "meta.json")) as fh:
@@ -319,8 +326,9 @@ def load_dump(dirs, vocab, with_policy=True, z_dirs=(), cache_dir=None, n_tok=No
                 _read_policy(dd, off_v, vocab, P, C)
             off_v += n
     if P["row"]:
-        P = {k: np.concatenate(v) for k, v in P.items()}
-        C = {k: np.concatenate(v) for k, v in C.items()}
+        # 1 本でも持たないシャードがある列は `None`（＝揃わない列は無い列として扱う契約）。
+        P = {k: (None if any(a is None for a in v) else np.concatenate(v)) for k, v in P.items()}
+        C = {k: (None if any(a is None for a in v) else np.concatenate(v)) for k, v in C.items()}
     else:
         P = {k: np.zeros(0, np.int64) for k in P}
         C = {k: np.zeros(0) for k in C}
@@ -339,8 +347,14 @@ def _read_policy(d, off_v, vocab, P, C):
     P["seed"].append(d["seed"][take])
     P["len"].append(pl[take])
     P["chosen"].append(pc[take])
+    # 根の価値の推定（dump v4・§20.6.1）。無い波は `None`＝列ごと `None` になる。
+    P["v0"].append(d["pol_v0"][take].astype(np.float32) if "pol_v0" in d.files else None)
     idx = np.concatenate([np.arange(off[i], off[i + 1]) for i in take])
     nn = d["pol_n"][idx].astype(np.float64)
+    # 改良方策 π' の材料（§20.6.1）。`pol_n`／`pol_q` は dump v2 から常にある。
+    C["n"].append(nn.astype(np.float32))
+    C["q"].append(d["pol_q"][idx].astype(np.float32))
+    C["p"].append(d["pol_p"][idx].astype(np.float32) if "pol_p" in d.files else None)
     segl = np.repeat(np.arange(len(take)), pl[take])
     tot = np.zeros(len(take))
     np.add.at(tot, segl, nn)
