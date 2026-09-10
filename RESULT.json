@@ -1,0 +1,65 @@
+{
+  "job": "train-r4-lr2",
+  "status": "done",
+  "runs": {
+    "A": {
+      "z": "29",
+      "ep0": {"val_vmse": 0.525388777256012, "val_vsign": 0.80825, "val_pi_top1": 0.6335, "val_p_loss": 1.7569336624145508},
+      "ep1": {"val_vmse": 0.5501893758773804, "val_vsign": 0.80145, "val_pi_top1": 0.62425, "val_p_loss": 1.756541244506836},
+      "best_ep": 0
+    },
+    "B": {
+      "z": "29+28+27",
+      "ep0": {"val_vmse": 0.5306562781333923, "val_vsign": 0.80755, "val_pi_top1": 0.622, "val_p_loss": 1.7589489822387696},
+      "ep1": {"val_vmse": 0.5343934297561646, "val_vsign": 0.80675, "val_pi_top1": 0.61725, "val_p_loss": 1.7579129180908204},
+      "best_ep": 0
+    }
+  },
+  "band": {
+    "all": {
+      "r3": {"v_mse": 0.5327, "v_sign": 0.8042, "n": 139382},
+      "A":  {"v_mse": 0.5244, "v_sign": 0.8088, "n": 139382},
+      "B":  {"v_mse": 0.5198, "v_sign": 0.8106, "n": 139382}
+    },
+    "after_removal": {
+      "r3": {"v_mse": 0.6244, "v_sign": 0.7698, "n": 3806},
+      "A":  {"v_mse": 0.6196, "v_sign": 0.7719, "n": 3806},
+      "B":  {"v_mse": 0.6217, "v_sign": 0.7767, "n": 3806}
+    },
+    "turn9-99": {
+      "r3": {"v_mse": 0.4074, "v_sign": 0.8532, "n": 76380},
+      "A":  {"v_mse": 0.4032, "v_sign": 0.8550, "n": 76380},
+      "B":  {"v_mse": 0.3959, "v_sign": 0.8583, "n": 76380}
+    },
+    "extra_context": {
+      "turn1-4": {
+        "r3": {"v_mse": 0.7723, "v_sign": 0.7070},
+        "A":  {"v_mse": 0.7562, "v_sign": 0.7145},
+        "B":  {"v_mse": 0.7599, "v_sign": 0.7152}
+      },
+      "turn5-8": {
+        "r3": {"v_mse": 0.6427, "v_sign": 0.7633},
+        "A":  {"v_mse": 0.6307, "v_sign": 0.7718},
+        "B":  {"v_mse": 0.6271, "v_sign": 0.7714}
+      }
+    },
+    "largest_gaps": {
+      "top_improvements_B_vs_r3_mse": [
+        {"bucket": "injected:bounce:OTHER:c0-2", "n": 411, "r3": 0.6588, "A": 0.4406, "B": 0.5275, "gap_B": -0.1313},
+        {"bucket": "injected:lock:OTHER:c0-2", "n": 441, "r3": 0.5724, "A": 0.5257, "B": 0.4831, "gap_B": -0.0894},
+        {"bucket": "injected:deck:TRIGGER:c3-5", "n": 3088, "r3": 0.6773, "A": 0.5840, "B": 0.5883, "gap_B": -0.0889},
+        {"bucket": "injected:deck:OTHER:c3-5", "n": 710, "r3": 0.5235, "A": 0.3656, "B": 0.4390, "gap_B": -0.0844},
+        {"bucket": "injected:bounce:EVENT:c0-2", "n": 1363, "r3": 0.3731, "A": 0.3012, "B": 0.3018, "gap_B": -0.0713}
+      ],
+      "top_regressions_B_vs_r3_mse": [
+        {"bucket": "injected:lock:COUNTER:c3-5", "n": 379, "r3": 0.4707, "A": 0.6452, "B": 0.6209, "gap_B": 0.1501},
+        {"bucket": "injected:lock:ON_PLAY:c0-2", "n": 894, "r3": 0.6037, "A": 0.6744, "B": 0.6969, "gap_B": 0.0933},
+        {"bucket": "injected:deck:ON_ATTACK:c3-5", "n": 1490, "r3": 0.5104, "A": 0.5812, "B": 0.5903, "gap_B": 0.0799},
+        {"bucket": "injected:reduce:ON_PLAY:c6+", "n": 870, "r3": 0.6230, "A": 0.6205, "B": 0.6916, "gap_B": 0.0687},
+        {"bucket": "injected:lock:OTHER:c6+", "n": 894, "r3": 0.5987, "A": 0.6441, "B": 0.6441, "gap_B": 0.0453}
+      ],
+      "caveat": "regressions above are all in small-n (n<3200) buckets, plausibly noise given hold-out size; no regression appears in any bucket with n>10000"
+    }
+  },
+  "notes": "lr 5e-4 だった r4 は退行していたが、lr 2e-4 では A・B とも r3 を全体（all）で上回った（v_mse: r3 0.5327 > A 0.5244 > B 0.5198）。両案とも epoch0 が best（epoch1 は過学習気味に val が悪化）。turn9-99・turn5-8 は B が最良、turn1-4・after_removal は A がわずかに良い（差は小さい）。z 窓を広げた B が全体最良だが、A との差は僅少（0.0046）で、副作用として一部の小サンプルbucket（injected:lock系のCOUNTER/ON_PLAY等、n<1000）でr3比の悪化が見える——ただしn>1万の主要bucketには悪化なし。運用上の注記: コンテナは物理コア4個のみで、AとBをnohupで同時実行したところtorchのスレッド競合（各4スレッド×2プロセス）で最初の1エポックが本来10分程度のところ約65分かかった。切り分けのためBを一旦killしてAを単独実行に戻したところ2エポック目は327秒（約5.5分）に短縮、その後Bも単独実行に戻して2エポック合計約24分で完了。次回同種のジョブでは最初から順次実行（同時実行しない）を推奨。--epochs 2 は両案ともコンテナ再起動なく通ったため、代替の1エポック×2回warm-start連鎖は不要だった。"
+}

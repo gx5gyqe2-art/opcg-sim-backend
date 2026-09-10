@@ -1,0 +1,22 @@
+z専用 dir 16 本を合流（π は読まない）
+value 2967245行（val 425290） policy 392378点（val 56162） 27s
+warm-start: opcg_sim/data/learned/nrel_r3.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 681988/2967245
+backend: torch threads=4
+予算・候補定数を先に作った（候補 4269778行 4.8s）
+  ep0 step 5000/15182 mse 0.5038 ce 1.7546 290s
+  ep0 step 10000/15182 mse 0.4974 ce 1.7530 525s
+  ep0 step 15000/15182 mse 0.4928 ce 1.7522 773s
+ep0 train mse 0.4926 ce 1.7522 | val v_mse 0.5307 v_sign 0.808 pi_top1 0.622 ce 1.759 785s
+  aux val huber 0.3947 tok 0.1099
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 725.263, "steps": 15182, "breakdown": {"budget_p": 1.259, "holdout": 2.197, "rel_p": 0.023, "rel_v": 1.91, "slice_p": 2.4, "slice_v": 6.657, "step_p": 0.045, "step_p_bwd": 85.423, "step_p_fwd": 54.106, "step_v": 0.114, "step_v_bwd": 354.354, "step_v_fwd": 217.055, "step_v_prep": 0.094}, "train_mse": 0.49264884885313864, "train_ce": 1.752198229670275, "val_vmse": 0.5306562781333923, "val_vsign": 0.80755, "val_pi_top1": 0.622, "val_p_loss": 1.7589489822387696, "aux_weight": 0.1, "val_aux": 0.3946829673900414, "val_aux_tok": 0.1098665633256111, "train_aux": [0.37452933192253113, 0.1019180566072464]}
+  ep0 を /root/nrel_r4b.npz に保存（暫定最良）
+  ep1 step 5000/15182 mse 0.4732 ce 1.7525 1024s
+  ep1 step 10000/15182 mse 0.4704 ce 1.7505 1259s
+  ep1 step 15000/15182 mse 0.4676 ce 1.7492 1495s
+ep1 train mse 0.4675 ce 1.7491 | val v_mse 0.5344 v_sign 0.807 pi_top1 0.617 ce 1.758 1507s
+  aux val huber 0.3801 tok 0.1029
+N_REL_TRAIN_EPOCH {"ep": 1, "backend": "torch", "threads": 4, "train_sec": 715.722, "steps": 15182, "breakdown": {"budget_p": 0.986, "holdout": 2.261, "rel_p": 0.022, "rel_v": 1.615, "slice_p": 2.015, "slice_v": 5.649, "step_p": 0.044, "step_p_bwd": 89.657, "step_p_fwd": 57.018, "step_v": 0.107, "step_v_bwd": 338.399, "step_v_fwd": 218.834, "step_v_prep": 0.092}, "train_mse": 0.4674606662656692, "train_ce": 1.7490569765445687, "val_vmse": 0.5343934297561646, "val_vsign": 0.80675, "val_pi_top1": 0.61725, "val_p_loss": 1.7579129180908204, "aux_weight": 0.1, "val_aux": 0.38008464129359976, "val_aux_tok": 0.10289287549326419, "train_aux": [0.360024094581604, 0.10932298749685287]}
+best ep0 val v_mse 0.5307 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_r4b.npz"}
