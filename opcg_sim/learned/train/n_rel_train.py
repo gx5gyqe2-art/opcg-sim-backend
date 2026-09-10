@@ -15,6 +15,7 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXP
 
 import argparse
 import glob
+import hashlib
 import json
 import time
 
@@ -41,6 +42,81 @@ def _atype_idx(at):
         return N1.ATYPES.index(at)
     except ValueError:
         return NA - 1
+
+
+# ---------------------------------------------------------------------------
+# 改良方策 π'（教師だけ変える・計画 §20.6.1・WP rs-q-pi）
+# ---------------------------------------------------------------------------
+#: `--pi-teacher` の選択肢。**既定は `visits`＝今までの訪問分布＝1 bit も変わらない**。
+PI_TEACHERS = ("visits", "q_improved")
+#: つまみの既定（§20.6.1）。`n_min` は「読めた」と見なす訪問の下限。
+PI_N_MIN, PI_C_VISIT, PI_C_SCALE = 1.0, 50.0, 0.3
+
+
+def _seg_off(lens):
+    """候補が方策点ごとに連続している前提の区間先頭（`reduceat` 用）。"""
+    lens = np.asarray(lens, np.int64)
+    if (lens <= 0).any():
+        raise ValueError("候補 0 の方策点がある（dump_io は候補 2 本以上の点しか出さない）")
+    return np.concatenate([[0], np.cumsum(lens)]).astype(np.int64)
+
+
+def q_improved_pi(lens, n, q, p_net, v0=None, n_min=PI_N_MIN, c_visit=PI_C_VISIT,
+                  c_scale=PI_C_SCALE):
+    """改良方策 π'（§20.6.1・Gumbel MuZero の completed-Q）。**pure**（教師を作るだけ）。
+
+      q̂(a)    ＝ Q(a)（訪問 N(a) ≥ `n_min`）／ v_mix（未訪問）
+      v_mix    ＝ `v0` があればそれ・無ければ **N 重みの Q 平均**（根の価値の推定）
+      logit'(a)＝ log P_net(a) ＋ (`c_visit` ＋ max_a N(a)) × `c_scale` × (q̂(a)+1)/2
+      π'       ＝ 方策点ごとの softmax（和は 1）
+
+    `lens` は方策点ごとの候補数（`P["len"]`）・`n`／`q`／`p_net` は候補行（`ptr` の並び）。
+    `p_net` は和が 1 でなくてよい（方策点ごとの定数倍は softmax で消える）。
+    """
+    lens = np.asarray(lens, np.int64)
+    if lens.size == 0:
+        return np.zeros(0, np.float32)
+    off = _seg_off(lens)
+    seg = np.repeat(np.arange(len(lens), dtype=np.int64), lens)
+    n = np.asarray(n, np.float64)
+    q = np.asarray(q, np.float64)
+    p = np.maximum(np.asarray(p_net, np.float64), 1e-9)
+    if v0 is None:
+        ntot = np.add.reduceat(n, off[:-1])
+        vmix = np.add.reduceat(n * q, off[:-1]) / np.maximum(ntot, 1e-9)
+        vmix = np.where(ntot > 0, vmix, 0.0)
+    else:
+        vmix = np.asarray(v0, np.float64)
+    nmax = np.maximum.reduceat(n, off[:-1])
+    qhat = np.where(n >= n_min, q, vmix[seg])
+    logit = np.log(p) + (c_visit + nmax[seg]) * c_scale * (qhat + 1.0) / 2.0
+    m = np.maximum.reduceat(logit, off[:-1])            # seg-softmax（安定化のため最大を引く）
+    e = np.exp(logit - m[seg])
+    return (e / np.add.reduceat(e, off[:-1])[seg]).astype(np.float32)
+
+
+def visits_pi(lens, n):
+    """訪問分布（`dump_io` が `C["pi"]` に入れているものと同じ式・掃引の比較用）。"""
+    off = _seg_off(lens)
+    n = np.asarray(n, np.float64)
+    tot = np.maximum(np.add.reduceat(n, off[:-1]), 1e-9)
+    seg = np.repeat(np.arange(len(lens), dtype=np.int64), np.asarray(lens, np.int64))
+    return (n / tot[seg]).astype(np.float32)
+
+
+def seg_entropy(lens, pi):
+    """方策点ごとの自然対数エントロピー（掃引の表・教師が退化していないかの確認）。"""
+    off = _seg_off(lens)
+    pi = np.asarray(pi, np.float64)
+    h = -pi * np.log(np.maximum(pi, 1e-12))
+    return np.add.reduceat(h, off[:-1])
+
+
+def mass_below_floor(lens, n, pi, floor):
+    """「N が `floor` 未満の手に乗る教師の質量」の方策点ごとの値（§20.6.1 の掃引）。"""
+    off = _seg_off(lens)
+    w = np.where(np.asarray(n, np.float64) < float(floor), np.asarray(pi, np.float64), 0.0)
+    return np.add.reduceat(w, off[:-1])
 
 
 class Split:
@@ -488,11 +564,13 @@ def eval_aux(net, rt, V, vi, bs=512):
 
 
 def eval_policy(net, rt, ptab_ret, V, P, C, pt_idx, ptr, bs=256, budget_all=None, src=None,
-                tn=None):
+                tn=None, pi_col=None):
     """holdout の方策指標（top1・CE）。
 
     `src`（`n_rel_torch.EpochBatches`）と `tn` があれば **logits だけ torch で回す**
-    （§18.6-5）。指標（seg-softmax・top1・CE）の式は torch でも numpy でも**ここ 1 か所**。"""
+    （§18.6-5）。指標（seg-softmax・top1・CE）の式は torch でも numpy でも**ここ 1 か所**。
+    `pi_col` は目標分布（既定＝`C["pi"]`＝訓練の教師。§20.6.1 の比較では visits 目標も測る）。"""
+    pi_all = C["pi"] if pi_col is None else pi_col
     hit = tot = 0
     ce_sum = 0.0
     for s in range(0, len(pt_idx), bs):
@@ -513,7 +591,7 @@ def eval_policy(net, rt, ptab_ret, V, P, C, pt_idx, ptr, bs=256, budget_all=None
             lo = net.policy_logits(sc, ci, tok, rel_om, rel_oo, seg, si, ti, feats, budget,
                                    tab=tab)
         p = net.seg_softmax(lo, seg, len(bi))
-        pi = C["pi"][idx]
+        pi = pi_all[idx]
         ce_sum += float(-(pi * np.log(np.maximum(p, 1e-9))).sum())
         pos = 0
         for j, L in enumerate(lens):
@@ -522,6 +600,90 @@ def eval_policy(net, rt, ptab_ret, V, P, C, pt_idx, ptr, bs=256, budget_all=None
             pos += L
         tot += len(bi)
     return hit / max(tot, 1), ce_sum / max(tot, 1)
+
+
+def net_prior_all(net, rt, ptab_ret, V, P, C, ptr, src=None, tn=None, bs=1024):
+    """全方策点で **ネットの事前分布 P_net**（候補の seg-softmax）を作る（§20.6.1 の退避路）。
+
+    `pol_p` 列を持たない波（波 29 まで）では、生成役＝`--warm-start` のネットで候補行を
+    forward して P_net を作る。`src`／`tn`（torch）があればそちらで回す（式は `eval_policy`
+    と同じ `seg_softmax`）。返りは候補行ぶんの float32。"""
+    n_pts = len(P["len"])
+    out = np.empty(int(ptr[n_pts]), np.float32)
+    for s in range(0, n_pts, bs):
+        bi = np.arange(s, min(s + bs, n_pts))
+        lens = P["len"][bi]
+        idx = np.arange(ptr[bi[0]], ptr[bi[-1]] + lens[-1])
+        seg = np.repeat(np.arange(len(bi)), lens)
+        if src is not None and tn is not None:
+            lo = src.eval_logits(tn, bi)
+        else:
+            sc, ci, tok = prow(V, P, bi)
+            rel_om, rel_oo = relations_or_zeros(net, ci, tok, rt)
+            tab = net.card_table()
+            lo = net.policy_logits(sc, ci, tok, rel_om, rel_oo, seg,
+                                   C["si"][idx].astype(np.int64), C["ti"][idx].astype(np.int64),
+                                   net.cand_feats(C, idx, tab), C["budget"][idx], tab=tab)
+        out[idx] = net.seg_softmax(lo, seg, len(bi))
+    return out
+
+
+def prior_cache_path(cache_dir, dirs, warm_start, ablate, n_cand):
+    """P_net のキャッシュの置き場所（教材のシャードと warm-start ネットで鍵付け・1 回だけ作る）。"""
+    h = hashlib.sha1()
+    h.update(b"pi_prior_v1\n")
+    for d in dirs:
+        for f in DIO.shard_files(d):
+            st = os.stat(f)
+            h.update(f"{os.path.basename(f)}\t{st.st_size}\t{st.st_mtime_ns}\n".encode())
+    st = os.stat(warm_start)
+    h.update(f"{os.path.basename(warm_start)}\t{st.st_size}\t{st.st_mtime_ns}\n".encode())
+    h.update(f"{sorted(ablate or ())}\t{int(n_cand)}\n".encode())
+    return os.path.join(cache_dir, f"pi_prior_{h.hexdigest()[:16]}.npy")
+
+
+def build_pi_teacher(args, net, rt, ptab_ret, V, P, C, ptr, src=None, tn=None, cache_dir=None):
+    """`--pi-teacher q_improved` の π' と、その作り方の申告（`notes`）を返す。
+
+    材料の出どころは**自動で判定**する:
+      - `C["p"]`（dump の `pol_p`）があればそれを P_net に使う。**1 本でも持たない波が
+        混ざっていれば `None`**＝`--warm-start` のネットで候補行を forward して作る
+        （生成役＝warm-start の波でだけ正しい・キャッシュに 1 回だけ書く）。
+      - `P["v0"]`（`pol_v0`）があれば v_mix に使う。無ければ N 重みの Q 平均で作る。
+    """
+    lens, n, q = P["len"], C["n"], C["q"]
+    src_p, src_v = "pol_p", "pol_v0"
+    p_net = C.get("p")
+    if p_net is None:
+        if not args.warm_start:
+            raise SystemExit("--pi-teacher q_improved: dump に pol_p が無い波は "
+                             "--warm-start（生成役ネット）が要る（§20.6.1）")
+        cache_dir = cache_dir or DIO.default_cache_dir()
+        os.makedirs(cache_dir, exist_ok=True)
+        path = prior_cache_path(cache_dir, _expand(args.src), args.warm_start,
+                                getattr(net, "ablate", ()), len(C["n"]))
+        if os.path.exists(path):
+            p_net = np.load(path)
+            src_p = f"warm_start_forward(cached {os.path.basename(path)})"
+        else:
+            t = time.time()
+            p_net = net_prior_all(net, rt, ptab_ret, V, P, C, ptr, src=src, tn=tn)
+            np.save(path + ".tmp.npy", p_net)
+            os.replace(path + ".tmp.npy", path)
+            src_p = f"warm_start_forward({os.path.basename(args.warm_start)})"
+            print(f"P_net を warm-start で作った（{len(p_net)}候補 {time.time()-t:.0f}s）→ {path}",
+                  flush=True)
+    v0 = P.get("v0")
+    if v0 is None:
+        src_v = "visit_weighted_q_mean"
+    pi = q_improved_pi(lens, n, q, p_net, v0=v0, n_min=args.pi_n_min,
+                       c_visit=args.pi_c_visit, c_scale=args.pi_c_scale)
+    notes = {"pi_teacher": "q_improved", "p_net_src": src_p, "v_mix_src": src_v,
+             "n_min": args.pi_n_min, "c_visit": args.pi_c_visit, "c_scale": args.pi_c_scale,
+             "entropy_visits": float(np.mean(seg_entropy(lens, C["pi"]))),
+             "entropy_q_improved": float(np.mean(seg_entropy(lens, pi)))}
+    print("PI_TEACHER " + json.dumps(notes), flush=True)
+    return pi, notes
 
 
 def _expand(pats):
@@ -587,6 +749,15 @@ def train(args):
     if backend_name == "torch":
         from opcg_sim.learned.train import n_rel_torch as TT
         src = TT.EpochBatches(V, P, C, ptr, C["budget"], c_tail, rt, net.ablate, aux=aux_on)
+    # 教師（π）の作り方（§20.6.1・WP rs-q-pi）。**既定 `visits` は 1 bit も変わらない**＝
+    # ここを通らない。`q_improved` のときだけ `C["pi"]` を π' に差し替える（`EpochBatches` は
+    # `C` を参照で持ち、`begin()` はエポックの先頭で読む＝この時点の差し替えが効く）。
+    pi_notes = {"pi_teacher": "visits"}
+    C["pi_visits"] = C["pi"]
+    if getattr(args, "pi_teacher", "visits") == "q_improved" and len(P["len"]):
+        C["pi"], pi_notes = build_pi_teacher(args, net, rt, ptab_ret, V, P, C, ptr, src=src,
+                                             tn=getattr(backend, "tn", None),
+                                             cache_dir=args.cache_dir)
     rng = np.random.default_rng(args.seed)
     tr_v = np.where(~va_v)[0]; tr_p = np.where(~va_p)[0]; va_pi = np.where(va_p)[0]
     best = None; best_ep = -1
@@ -667,6 +838,13 @@ def train(args):
                                   budget_all=C["budget"], src=src,
                                   tn=getattr(backend, "tn", None))
                       if len(va_pi) else (float("nan"), float("nan")))
+        # 教師を差し替えたときは **visits 目標でも**測る（世代間の比較の土俵を残す・§20.6.1）
+        p_pi_v, p_ce_v = ((p_pi, p_ce) if pi_notes["pi_teacher"] == "visits" else
+                          (eval_policy(net, rt, ptab_ret, V, P, C, va_pi[:4000], ptr,
+                                       budget_all=C["budget"], src=src,
+                                       tn=getattr(backend, "tn", None),
+                                       pi_col=C["pi_visits"])
+                           if len(va_pi) else (float("nan"), float("nan"))))
         sp.add("holdout", time.time() - t_ev)
         print(f"ep{ep} train mse {mse/max(nv,1):.4f} ce {ce/max(npi,1):.4f} | "
               f"val v_mse {vmse:.4f} v_sign {vsgn:.3f} pi_top1 {p_pi:.3f} ce {p_ce:.3f} "
@@ -676,7 +854,10 @@ def train(args):
                "train_sec": round(ep_train_sec, 3), "steps": len(sched),
                "breakdown": sp.dump(),
                "train_mse": mse / max(nv, 1), "train_ce": ce / max(npi, 1),
-               "val_vmse": vmse, "val_vsign": vsgn, "val_pi_top1": p_pi, "val_p_loss": p_ce}
+               "val_vmse": vmse, "val_vsign": vsgn, "val_pi_top1": p_pi, "val_p_loss": p_ce,
+               **({} if pi_notes["pi_teacher"] == "visits" else
+                  {"pi_teacher": pi_notes, "val_pi_top1_visits": p_pi_v,
+                   "val_p_loss_visits": p_ce_v})}
         if aux_on:
             va, vt = eval_aux(net, rt, V, vi)
             row.update({"aux_weight": aux_w, "val_aux": va, "val_aux_tok": vt,
@@ -703,10 +884,15 @@ def _save(net, args, vocab, V, P, best_ep):
                              "epochs": args.epochs, "best_ep": best_ep, "hidden": args.hidden,
                              "src": args.src, "kind": "nrel-a",
                              "ablate": sorted(net.ablate),
+                             # 教師の作り方（§20.6.1）。既定 visits のときは焼かない＝
+                             # 今までの npz と meta が 1 bit も変わらない。
+                             **({} if getattr(args, "pi_teacher", "visits") == "visits" else
+                                {"pi_teacher": args.pi_teacher, "pi_n_min": args.pi_n_min,
+                                 "pi_c_visit": args.pi_c_visit, "pi_c_scale": args.pi_c_scale}),
                              **({"aux_weight": float(args.aux_weight)} if net.aux else {})})
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     tr = sub.add_parser("train")
@@ -735,10 +921,21 @@ def main():
                     help="dump の pack（float16/int16 の .npy・§18.5）の置き場所。"
                          f"既定は ${DIO.CACHE_ENV} か ~/.cache/opcg/dump_pack。"
                          "波ごとに 1 度だけ作り、以後は memmap で読む（RAM に載せない）")
+    tr.add_argument("--pi-teacher", choices=PI_TEACHERS, default="visits",
+                    help="P の CE の目標（§20.6.1）: visits＝根の訪問分布（**既定・今までと"
+                         "1 bit も変わらない**）／q_improved＝Q で補正した改良方策 π'"
+                         "（読めた手は Q・読めていない手は根の価値で P を持ち上げ・押し下げる）。"
+                         "dump に pol_p が無い波では --warm-start のネットで P_net を作る")
+    tr.add_argument("--pi-n-min", type=float, default=PI_N_MIN,
+                    help="π'（q_improved）で「読めた」と見なす訪問の下限（既定 1）")
+    tr.add_argument("--pi-c-visit", type=float, default=PI_C_VISIT,
+                    help="π' の σ の定数項 c_visit（既定 50）")
+    tr.add_argument("--pi-c-scale", type=float, default=PI_C_SCALE,
+                    help="π' の σ の倍率 c_scale（既定 0.3）")
     tr.add_argument("--threads", type=int, default=0,
                     help="torch のスレッド数（0＝全コア）。numpy backend では効かない")
     tr.add_argument("--out", required=True)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     if args.cmd == "train":
         return train(args)
     return 1

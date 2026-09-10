@@ -1,0 +1,302 @@
+{
+ "job": "rs-q-pi",
+ "status": "done",
+ "branch": "claude/rs-q-pi",
+ "sweep": {
+  "0.1": {
+   "entropy": 1.2788,
+   "mass_below_floor": 0.0251,
+   "mass_unvisited": 0.0069,
+   "max_prob": 0.5243,
+   "kl_from_visits": 0.3125
+  },
+  "0.3": {
+   "entropy": 1.0307,
+   "mass_below_floor": 0.0177,
+   "mass_unvisited": 0.0052,
+   "max_prob": 0.6147,
+   "kl_from_visits": 0.4344
+  },
+  "1": {
+   "entropy": 0.6677,
+   "mass_below_floor": 0.0174,
+   "mass_unvisited": 0.0027,
+   "max_prob": 0.7481,
+   "kl_from_visits": 0.7275
+  }
+ },
+ "sweep_visits": {
+  "entropy": 1.6269,
+  "mass_below_floor": 0.0426,
+  "mass_unvisited": 0.0,
+  "max_prob": 0.3857
+ },
+ "sweep_setup": {
+  "src": "波 29 の 1 シャード（w01）",
+  "points": 28383,
+  "cands": 310019,
+  "floor": 20.0,
+  "p_net_src": "nrel_r3.npz",
+  "n_min": 1.0,
+  "c_visit": 50.0
+ },
+ "c_scale": 0.3,
+ "train": {
+  "out": "n1_results/nrel_r4q.npz",
+  "warm_start": "nrel_r3.npz",
+  "pi_teacher": "q_improved",
+  "pi_c_scale": 0.3,
+  "pi_c_visit": 50.0,
+  "pi_n_min": 1.0,
+  "pi_src": {
+   "p_net": "warm_start_forward(nrel_r3.npz)",
+   "v_mix": "visit_weighted_q_mean"
+  },
+  "pi_wave": "29（14 シャード）",
+  "z_waves": "29+28+27",
+  "rows_v": 2967245,
+  "points_p": 392378,
+  "cands": 4269778,
+  "opts": "--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --backend torch",
+  "best_ep": 1,
+  "epochs": [
+   {
+    "ep": 0,
+    "train_sec": 647.5,
+    "train_mse": 0.4966564869121886,
+    "train_ce": 1.4400598128228195,
+    "val_vmse": 0.5277220606803894,
+    "val_vsign": 0.8084,
+    "val_pi_top1": 0.64275,
+    "val_p_loss": 1.4362960510253906,
+    "val_pi_top1_visits": 0.62675,
+    "val_p_loss_visits": 1.8804434280395508,
+    "val_aux": 0.4016423100190076,
+    "val_aux_tok": 0.11216832550993767
+   },
+   {
+    "ep": 1,
+    "train_sec": 495.566,
+    "train_mse": 0.47705740815011477,
+    "train_ce": 1.4235609138713163,
+    "val_vmse": 0.5267777442932129,
+    "val_vsign": 0.8066,
+    "val_pi_top1": 0.6415,
+    "val_p_loss": 1.4295759239196777,
+    "val_pi_top1_visits": 0.6295,
+    "val_p_loss_visits": 1.88583748626709,
+    "val_aux": 0.3925461799121338,
+    "val_aux_tok": 0.10469640591739765
+   }
+  ],
+  "entropy_visits": 1.6275,
+  "entropy_q_improved": 1.0303
+ },
+ "band": {
+  "wave29": {
+   "r3": {
+    "v_mse": 0.5327,
+    "v_sign": 0.8042,
+    "turn1-4": 0.7723,
+    "turn5-8": 0.6427,
+    "turn9-99": 0.4074,
+    "after_removal": 0.6244,
+    "not_removal": 0.5301,
+    "policy": {
+     "points": 20000,
+     "top1_visits": 0.6008,
+     "ce_visits": 1.8076,
+     "top1_q_improved": 0.6238,
+     "ce_q_improved": 1.5076
+    },
+    "gate": {
+     "rows": 6686,
+     "p_mass_removal": 0.2595,
+     "argmax_removal": 0.2567,
+     "data_chose_removal": 0.2538
+    }
+   },
+   "r4": {
+    "v_mse": 0.5198,
+    "v_sign": 0.8106,
+    "turn1-4": 0.7599,
+    "turn5-8": 0.6271,
+    "turn9-99": 0.3959,
+    "after_removal": 0.6217,
+    "not_removal": 0.517,
+    "policy": {
+     "points": 20000,
+     "top1_visits": 0.6231,
+     "ce_visits": 1.7558,
+     "top1_q_improved": 0.6165,
+     "ce_q_improved": 1.5351
+    },
+    "gate": {
+     "rows": 6686,
+     "p_mass_removal": 0.2592,
+     "argmax_removal": 0.2481,
+     "data_chose_removal": 0.2538
+    }
+   },
+   "r4q": {
+    "v_mse": 0.5178,
+    "v_sign": 0.811,
+    "turn1-4": 0.76,
+    "turn5-8": 0.6234,
+    "turn9-99": 0.3943,
+    "after_removal": 0.6119,
+    "not_removal": 0.5151,
+    "policy": {
+     "points": 20000,
+     "top1_visits": 0.6278,
+     "ce_visits": 1.883,
+     "top1_q_improved": 0.6357,
+     "ce_q_improved": 1.4333
+    },
+    "gate": {
+     "rows": 6686,
+     "p_mass_removal": 0.2529,
+     "argmax_removal": 0.2442,
+     "data_chose_removal": 0.2538
+    }
+   }
+  },
+  "wave28": {
+   "r3": {
+    "v_mse": 0.5348,
+    "v_sign": 0.8047,
+    "turn1-4": 0.7244,
+    "turn5-8": 0.6141,
+    "turn9-99": 0.4396,
+    "after_removal": 0.602,
+    "not_removal": 0.5332,
+    "policy": {
+     "points": 20000,
+     "top1_visits": 0.6317,
+     "ce_visits": 1.6778,
+     "top1_q_improved": 0.6969,
+     "ce_q_improved": 1.5892
+    },
+    "gate": {
+     "rows": 5511,
+     "p_mass_removal": 0.2143,
+     "argmax_removal": 0.2107,
+     "data_chose_removal": 0.2083
+    }
+   },
+   "r4": {
+    "v_mse": 0.5515,
+    "v_sign": 0.7974,
+    "turn1-4": 0.7391,
+    "turn5-8": 0.6401,
+    "turn9-99": 0.4517,
+    "after_removal": 0.6358,
+    "not_removal": 0.5496,
+    "policy": {
+     "points": 20000,
+     "top1_visits": 0.5905,
+     "ce_visits": 1.7365,
+     "top1_q_improved": 0.6354,
+     "ce_q_improved": 1.6592
+    },
+    "gate": {
+     "rows": 5511,
+     "p_mass_removal": 0.2163,
+     "argmax_removal": 0.1963,
+     "data_chose_removal": 0.2083
+    }
+   },
+   "r4q": {
+    "v_mse": 0.5561,
+    "v_sign": 0.796,
+    "turn1-4": 0.7489,
+    "turn5-8": 0.6466,
+    "turn9-99": 0.4539,
+    "after_removal": 0.6321,
+    "not_removal": 0.5544,
+    "policy": {
+     "points": 20000,
+     "top1_visits": 0.5753,
+     "ce_visits": 1.7804,
+     "top1_q_improved": 0.6255,
+     "ce_q_improved": 1.6195
+    },
+    "gate": {
+     "rows": 5511,
+     "p_mass_removal": 0.2077,
+     "argmax_removal": 0.1942,
+     "data_chose_removal": 0.2083
+    }
+   }
+  },
+  "note": "wave29 rows 139382 / wave28 rows 132821・holdout-mod 7・方策点は各 20,000 点"
+ },
+ "arena": {
+  "roles": {
+   "games": 384,
+   "pairs": 192,
+   "wr": 0.5182,
+   "ci95": [
+    0.4649,
+    0.5716
+   ],
+   "elo": 12.7,
+   "elo95": [
+    -24.5,
+    50.1
+   ],
+   "void": 0,
+   "shards": 8
+  },
+  "mirror": {
+   "games": 384,
+   "pairs": 192,
+   "wr": 0.5104,
+   "ci95": [
+    0.463,
+    0.5579
+   ],
+   "elo": 7.2,
+   "elo95": [
+    -25.8,
+    40.4
+   ],
+   "void": 0,
+   "shards": 8
+  }
+ },
+ "make_test": "536 passed",
+ "deliverables": {
+  "net": "n1_results/nrel_r4q.npz",
+  "logs": [
+   "logs/train_r4q.log",
+   "logs/band_w29.json",
+   "logs/band_w28.json",
+   "logs/q_pi_sweep_w01.json",
+   "logs/arena_roles.log",
+   "logs/arena_mirror.log"
+  ],
+  "code": [
+   "opcg_sim/loop/record_gen.py（pol_p／pol_v0 の 2 列）",
+   "opcg_sim/learned/train/dump_io.py（C[n]/C[q]/C[p]・P[v0]）",
+   "opcg_sim/learned/train/n_rel_train.py（q_improved_pi・build_pi_teacher・--pi-teacher）",
+   "opcg_sim/learned/train/n_rel_band.py（--policy：目標 2 種と門の指標）",
+   "tests/test_q_pi.py",
+   "tests/scripts/q_pi_sweep.py",
+   "docs/TEST_SPEC.md §2"
+  ]
+ },
+ "notes": [
+  "既定の不変性は**変更前のコミット（33d994c）と直接照合**した: 同じ合成 dump・同じ CLI（--backend numpy --threads 1 --aux-weight 0 --ablate rel・1 エポック）で、変更前の訓練器と (a) フラグ無し (b) --pi-teacher visits の 2 通りが **npz の 21 鍵すべてでビット一致**（tests/test_q_pi.py は「フラグ無し vs visits」の同一性と、q_improved に替えれば重みが動く＝検出力があることを常時ラチェットする）。",
+  "c_scale は 0.3 を採った（§20.6.1 の既定）。掃引（波 29 w01・方策点 28,383）は visits H=1.627／c_scale 0.1→1.279・0.3→1.031・1.0→0.668。1.0 は方策点あたりの最大確率が 0.748 まで上がり argmax へ寄る＝教師が退化する側。0.1 は visits との KL が 0.31 で差が小さい。0.3 は H が visits の 63%・最大確率 0.615 で、どちらの端にも寄っていない。",
+  "**π' は visits より尖る**（H 1.63→1.03）。§20.6.1 の狙いのうち「未訪問の手に質量が乗る」は 成立した（visits では定義上 0・π' では 0.52%）が、「floor 未満の手に乗る質量」は逆に減った（4.26%→1.77%）。P_net 自体が尖っているため、Q 補正は「読めた良い手」を持ち上げる方向に強く効き、門は open するが細い。",
+  "P_net の出どころ: 波 29 は `pol_p` を持たないので **warm-start（生成役 r3）の候補行 forward**（4,269,778 候補・48 秒・pack のキャッシュに保存）。生成時の `stats.P` は root_prior_temp=2.0 と Dirichlet 0.25 の**後**の値なので、そもそも「平坦化前の P」ではない＝今回の forward のほうが §20.6.1 の意図（平坦化前）に合う。今後の波は `pol_p` 列が載るが、**その列は平坦化・Dirichlet 混合の後**である（record_gen の docstring に明記した）。`root_prior_temp=1`／`dirichlet_eps=0` の波でのみ生の P と一致する。",
+  "v_mix は `pol_v0` が無いので N 重みの Q 平均で作った（式は同じ）。",
+  "評価帯（波 29 holdout・新分布）: z の v_mse は r3 0.5327 → r4 0.5198 → **r4q 0.5178**（r4 との差 0.0020＝ばらつき幅 0.0008 の 2.5 倍）。除去直後の層は r4 0.6217 → r4q 0.6119 で最も改善が大きい。方策は π' 目標の top1 が r3 0.624／r4 0.617／**r4q 0.636**・CE が 1.508／1.535／**1.433**＝教師どおり学べている。visits 目標の top1 も r4q 0.628 が最良（r4 0.623・r3 0.601）＝**π' を教師にしても visits の一致は落ちない**。",
+  "評価帯（波 28 holdout・旧分布）: r3 0.5348 → r4 0.5515 → r4q 0.5561。**r4q は r4 より 0.0046 多く忘れる**（幅の 6 倍）。方策の top1（visits 目標）も r3 0.632 → r4 0.590 → r4q 0.575。新分布に寄る度合いが r4 より強い＝教師を尖らせた分だけ旧分布から離れた、と読める。",
+  "「門」の指標（除去候補が 1 つ以上ある main 行・w29 で 6,686 行／w28 で 5,511 行）: 除去候補に載る P の質量は r3 0.2595／r4 0.2592／**r4q 0.2529**、ネットの argmax が除去だった割合は 0.2567／0.2481／0.2442（教材で実際に除去が選ばれた割合は 0.2538）。**π' 教師は門を開かなかった**——むしろわずかに閉じた。§20.6.1 の「Q が高くて訪問が少ない手は P より重くなる」は個々の手では成り立つが、除去候補を集計した質量では効いていない。除去の門は「教師の作り方」ではなく「探索が除去を読めているか（Q 自体）」の問題である可能性が高い。",
+  "アリーナ r4q vs r3（両席とも既定の探索・--cand-* なし・void 0）: 主 random × synth_roles **0.5182 [0.4649, 0.5716]（+12.7 Elo・384 局）**／副 固定ミラー **0.5104 [0.4630, 0.5579]（+7.2 Elo・384 局）**。主条件は昇格基準（0.55）に未達だが、**同じ教材・visits 教師の r4 の主条件 0.4555 [0.402, 0.509]（§20.8.8-1）から +0.063 上振れ**しており、両条件とも CI 下限が 0.45 を割らない＝退行なし。教師を π' に替えるだけで r4 の主条件の負けは消えた。",
+  "**判定に必要な注記**: r4 の 0.4555 は主条件が synth（旧規約）で測られており、r4q の 0.5182 は **synth_roles**（2026-09-10 のユーザ決定で r5〜の主条件）。**同じ物差しではない**ので 「+0.063」は直接の差分ではない。同じ物差しで比べたければ r4 を synth_roles で測り直すのが筋（8 シャード ≒ 18 分）。今回は指示どおり synth_roles で測った。",
+  "質問（コーディネータへ）: (1) 門が開かなかったことをどう扱うか——c_scale をさらに上げても「教師の尖り」が増すだけで門は開かない見込み（掃引の mass_below_floor は c_scale とともに単調減少）。門を開けたいなら教師ではなく探索側（除去手の訪問を増やす）を触る WP が要る。(2) r4 を synth_roles で測り直して土俵を揃えるか。(3) 旧分布（波 28）の忘却が r4 より大きいことを許容するか（era7 の方針では新分布優先だが、r4q は r4 より一段進んでいる）。"
+ ]
+}

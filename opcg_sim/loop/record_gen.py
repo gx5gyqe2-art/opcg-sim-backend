@@ -35,6 +35,10 @@
   forced(D int8)                           … **dump v4 で追加**（§20.8.5）。両方向 ε 探索で手を
                                              差し替えた行の印（0=木のまま／1=打つ側／2=保留側）。
                                              **教師ではない**（`n_rel_train` は読まない・層別用）
+  pol_p(K float16) pol_v0(D float16)       … **dump v4 で追加**（§20.6.1・改良方策 π' の材料）。
+                                             `pol_p`＝候補の根の事前分布（`stats.P` を group の
+                                             `idxs` で合算）・`pol_v0`＝根の価値の推定（訪問で
+                                             重み付けた Q の平均・main 行以外は 0）
 
 **dump v3**（2026-09-07・計画 §18.5）: 常駐の 9 割を占める 3 本の保存 dtype を半分にする——
 `tokens`／`scalars` を **float16**・`card_idx` を **int16**（`pol_si`/`pol_ti` は v2 から int16）。
@@ -420,8 +424,8 @@ class _Recorder:
         self._cids = None
         self.rows = {k: [] for k in ("scalars", "field", "card_idx", "who", "kind", "turn",
                                      "step", "sig", "pol_len", "pol_chosen", "tokens",
-                                     "forced")}
-        self.pol = {k: [] for k in ("n", "q", "k", "sig", "cid", "tcid", "si", "ti")}
+                                     "forced", "pol_v0")}
+        self.pol = {k: [] for k in ("n", "q", "k", "sig", "cid", "tcid", "si", "ti", "p")}
         # 補助教師の台帳（dump v4・§20.8.2）: `snaps[k]`＝手 k の直前の盤面・`steps[k]`＝手 k。
         self.snaps = []
         self.steps = []
@@ -473,6 +477,7 @@ class _Recorder:
         self.rows["card_idx"].append(ci)
         self.rows["who"].append(name)
         self.rows["forced"].append(0)          # ε で差し替えたら `swap` が上書きする
+        self.rows["pol_v0"].append(0.0)        # main で候補があれば下で上書きする（§20.6.1）
         self.rows["kind"].append(_KIND.get(out.get("kind"), 0))
         self.rows["turn"].append(int(turn))
         self.rows["step"].append(step)
@@ -495,6 +500,13 @@ class _Recorder:
         idx = json.loads(game.dump_index_json(name))
         cids, slots = idx["cids"], idx["slots"]
         self._cids = cids                      # `swap`（ε 探索）が使い回す
+        # 改良方策 π' の材料（§20.6.1）: 根の事前分布を group の `idxs` で合算する。
+        # `stats.P` は**根の平坦化（`root_prior_temp`）と Dirichlet 混合の後**の値＝
+        # 生の P が要るときは `root_prior_temp=1`／`dirichlet_eps=0` で採るか、訓練側で
+        # 生成役ネットを forward し直す（`n_rel_train --pi-teacher q_improved` の退避路）。
+        pr = (out.get("stats") or {}).get("P")
+        gp = [sum(float(pr[i]) for i in g["idxs"]) for g in groups] if pr \
+            else [1.0 / len(groups)] * len(groups)
         chosen, k_sel = -1, out.get("k")
         for gi, g in enumerate(groups):
             rep = legal[g["rep"]]
@@ -505,6 +517,7 @@ class _Recorder:
                 chosen = gi
             self.pol["n"].append(float(g["n"]))
             self.pol["q"].append(float(g["q"]))
+            self.pol["p"].append(gp[gi])
             self.pol["k"].append(-1 if gk is None else int(gk))
             self.pol["sig"].append(json.dumps(gsig, ensure_ascii=False))
             su = gsig[1]
@@ -514,6 +527,10 @@ class _Recorder:
             self.pol["si"].append(slots.get(su, -1) if su else -1)
             self.pol["ti"].append(slots.get(tu, -1) if tu else -1)
         self.rows["pol_chosen"].append(chosen)
+        # 根の価値の推定 v_mix＝訪問で重み付けた Q の平均（訪問 0 の根は 0・§20.6.1）。
+        ntot = sum(float(g["n"]) for g in groups)
+        self.rows["pol_v0"][-1] = (
+            sum(float(g["n"]) * float(g["q"]) for g in groups) / ntot) if ntot > 0 else 0.0
 
 
 def play_one(seed):
@@ -568,6 +585,9 @@ def play_one(seed):
             "deck_kinds": np.array([kj[w] for w in rows["who"]]),
             # dump v4: ε 探索で手を差し替えた行の印（0=木のまま／1=打つ側／2=保留側・§20.8.5）
             "forced": np.array(rows["forced"], np.int8),
+            # dump v4: 改良方策 π' の材料（§20.6.1）。教師そのものではない＝既定の訓練は読まない。
+            "pol_p": np.array(pol["p"], np.float16),
+            "pol_v0": np.array(rows["pol_v0"], np.float16),
             # 局メタ（npz には積まない・part の sidecar へ）
             "_meta": {"seed": seed, "leaders": [la, lb], "kinds": list(kinds),
                       "winner": winner, "turns": turn, "rows": len(rows["who"]),
@@ -583,9 +603,9 @@ def play_one(seed):
 
 _ROW_KEYS = ("scalars", "field", "card_idx", "z", "who", "kind", "turn", "step",
              "seed", "sig", "pol_len", "pol_chosen")
-_POL_KEYS = ("pol_n", "pol_q", "pol_k", "pol_sig", "pol_cid", "pol_tcid")
+_POL_KEYS = ("pol_n", "pol_q", "pol_k", "pol_sig", "pol_cid", "pol_tcid", "pol_p")
 _TOK_KEYS = ("tokens", "pol_si", "pol_ti")            # NRel 用（v2 で追加・v3 も同じ列）
-_V4_KEYS = ("deck_kinds", "forced")                   # v4 で追加（§20.8／§20.8.5）
+_V4_KEYS = ("deck_kinds", "forced", "pol_v0")         # v4 で追加（§20.8／§20.8.5／§20.6.1）
 _AUX_KEYS = ("aux", "aux_tok", "aux_mask")            # 補助教師（v4 で追加・§20.8.2）
 
 
