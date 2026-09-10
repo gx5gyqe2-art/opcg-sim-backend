@@ -1,0 +1,10 @@
+候補席の探索設定: {"q_min_frac": 0.125, "root_prior_temp": 2.0, "select_rule": "q_min_n", "worlds": 4}
+  mirror_w00.jsonl             21.0/48 = 0.4375 void 0
+  mirror_w01.jsonl             23.0/48 = 0.4792 void 0
+  mirror_w02.jsonl             24.0/48 = 0.5000 void 0
+  mirror_w03.jsonl             25.0/48 = 0.5208 void 0
+  mirror_w04.jsonl             28.0/48 = 0.5833 void 0
+  mirror_w05.jsonl             21.0/48 = 0.4375 void 0
+  mirror_w06.jsonl             20.0/48 = 0.4167 void 0
+  mirror_w07.jsonl             15.0/48 = 0.3125 void 0
+[r4+w4R2 vs r3 default mirror] ARENA_MERGE_FINAL {"pairs": 192, "games": 384, "void": 0, "wins": 177.0, "wr": 0.4609, "ci95": [0.417, 0.5049], "elo": -27.2, "elo95": [-58.2, 3.4], "promoted": false, "shards": 8, "dup_seeds": 0, "cand_opts": [{"q_min_frac": 0.125, "root_prior_temp": 2.0, "select_rule": "q_min_n", "worlds": 4}]}
