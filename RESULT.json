@@ -1,0 +1,39 @@
+{
+  "job": "train-r4-ablate",
+  "status": "done",
+  "runs": {
+    "L0": {
+      "desc": "aux_weight=0, lr=5e-4 (same lr as r4/r4z warm-start, aux teacher removed)",
+      "val": {"v_mse": 0.5393, "v_sign": 0.805, "pi_top1": 0.623}
+    },
+    "LR2": {
+      "desc": "aux_weight=0.1 (same as r4z), lr=2e-4",
+      "val": {"v_mse": 0.5247, "v_sign": 0.810, "pi_top1": 0.630, "val_aux_huber": 0.4147, "val_aux_tok": 0.1284}
+    },
+    "L0LR2": {
+      "desc": "aux_weight=0, lr=2e-4",
+      "val": {"v_mse": 0.5229, "v_sign": 0.809, "pi_top1": 0.632}
+    }
+  },
+  "band": {
+    "all": {
+      "r3":     {"v_mse": 0.5327, "v_sign": 0.8042},
+      "L0":     {"v_mse": 0.5415, "v_sign": 0.8036},
+      "LR2":    {"v_mse": 0.5249, "v_sign": 0.8088},
+      "L0LR2":  {"v_mse": 0.5242, "v_sign": 0.8086}
+    },
+    "after_removal": {
+      "r3":     {"v_mse": 0.6244, "v_sign": 0.7698},
+      "L0":     {"v_mse": 0.6378, "v_sign": 0.7722},
+      "LR2":    {"v_mse": 0.6197, "v_sign": 0.7730},
+      "L0LR2":  {"v_mse": 0.6202, "v_sign": 0.7725}
+    },
+    "turn9-99": {
+      "r3":     {"v_mse": 0.4074, "v_sign": 0.8532},
+      "L0":     {"v_mse": 0.4202, "v_sign": 0.8501},
+      "LR2":    {"v_mse": 0.4040, "v_sign": 0.8547},
+      "L0LR2":  {"v_mse": 0.4031, "v_sign": 0.8549}
+    }
+  },
+  "notes": "波29 holdout（holdout-mod 7・139,382行）。全て r3 から 1 epoch warm-start（ep0 が最良だった r4/r4z の設定に合わせた）。切り分けの結果: L0（aux無し・lr 5e-4＝r4/r4zと同じ学習率）は all/after_removal/turn9-99 の全バケットで r3 より悪化（0.5415/0.6378/0.4202 vs 0.5327/0.6244/0.4074）＝r4/r4z の退行を aux 無しでも再現した。一方 LR2（aux=0.1・lr 2e-4）と L0LR2（aux無し・lr 2e-4）はどちらも全バケットで r3 を上回った（0.5249,0.6197,0.4040 / 0.5242,0.6202,0.4031）。結論: 退行の原因は補助教師（aux_weight）ではなく lr 5e-4 の warm-start ステップ幅。aux_weight の有無は lr=2e-4 では有意差なし（LR2 と L0LR2 がほぼ同値）。次段は lr を 2e-4 に落として r4 を再訓練するのが妥当（aux は今回の結果からは効果薄だが害もない）。"
+}

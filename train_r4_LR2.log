@@ -1,0 +1,13 @@
+value 974297行（val 139382） policy 392378点（val 56162） 19s
+warm-start: opcg_sim/data/learned/nrel_r3.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 681988/974297
+backend: torch threads=4
+予算・候補定数を先に作った（候補 4269778行 3.0s）
+  ep0 step 5000/8514 mse 0.5019 ce 1.7540 164s
+ep0 train mse 0.4911 ce 1.7511 | val v_mse 0.5247 v_sign 0.810 pi_top1 0.630 ce 1.757 260s
+  aux val huber 0.4147 tok 0.1284
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 229.767, "steps": 8514, "breakdown": {"budget_p": 0.717, "holdout": 1.622, "rel_p": 0.012, "rel_v": 0.282, "slice_p": 1.915, "slice_v": 1.648, "step_p": 0.027, "step_p_bwd": 52.884, "step_p_fwd": 32.767, "step_v": 0.024, "step_v_bwd": 88.555, "step_v_fwd": 49.834, "step_v_prep": 0.022}, "train_mse": 0.4911119729984176, "train_ce": 1.7510557590882574, "val_vmse": 0.5246708989143372, "val_vsign": 0.80995, "val_pi_top1": 0.6305, "val_p_loss": 1.7568721313476563, "aux_weight": 0.1, "val_aux": 0.41471829876137145, "val_aux_tok": 0.12841116585978896, "train_aux": [0.37370994687080383, 0.13639287650585175]}
+  ep0 を /root/nrel_r4_LR2.npz に保存（暫定最良）
+best ep0 val v_mse 0.5247 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_r4_LR2.npz"}

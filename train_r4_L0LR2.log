@@ -1,0 +1,11 @@
+value 974297行（val 139382） policy 392378点（val 56162） 20s
+warm-start: opcg_sim/data/learned/nrel_r3.npz（hidden=192）
+ablate: ['rel']
+backend: torch threads=4
+予算・候補定数を先に作った（候補 4269778行 2.9s）
+  ep0 step 5000/8514 mse 0.5011 ce 1.7534 141s
+ep0 train mse 0.4905 ce 1.7506 | val v_mse 0.5229 v_sign 0.809 pi_top1 0.632 ce 1.757 220s
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 188.939, "steps": 8514, "breakdown": {"budget_p": 0.536, "holdout": 1.891, "rel_p": 0.011, "rel_v": 0.043, "slice_p": 1.035, "slice_v": 0.898, "step_p": 0.025, "step_p_bwd": 51.785, "step_p_fwd": 31.44, "step_v": 0.021, "step_v_bwd": 61.443, "step_v_fwd": 40.592, "step_v_prep": 0.018}, "train_mse": 0.4904881100901721, "train_ce": 1.750590262970379, "val_vmse": 0.522864580154419, "val_vsign": 0.80865, "val_pi_top1": 0.632, "val_p_loss": 1.7568654937744141}
+  ep0 を /root/nrel_r4_L0LR2.npz に保存（暫定最良）
+best ep0 val v_mse 0.5229 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_r4_L0LR2.npz"}
