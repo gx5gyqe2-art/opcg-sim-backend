@@ -12,3 +12,19 @@ ep0 train mse 0.4879 ce 1.7546 | val v_mse 0.5353 v_sign 0.806 pi_top1 0.616 ce 
   aux val huber 0.3838 tok 0.1018
 N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 675.622, "steps": 15182, "breakdown": {"budget_p": 1.008, "holdout": 2.79, "rel_p": 0.021, "rel_v": 1.425, "slice_p": 2.088, "slice_v": 5.363, "step_p": 0.046, "step_p_bwd": 80.24, "step_p_fwd": 50.648, "step_v": 0.106, "step_v_bwd": 328.053, "step_v_fwd": 204.608, "step_v_prep": 0.105}, "train_mse": 0.48788604787114237, "train_ce": 1.7546234887916656, "val_vmse": 0.5352778434753418, "val_vsign": 0.8062, "val_pi_top1": 0.616, "val_p_loss": 1.762166847229004, "aux_weight": 0.1, "val_aux": 0.3837925033613013, "val_aux_tok": 0.10180517555195888, "train_aux": [0.3674308657646179, 0.09406691789627075]}
   ep0 を /root/nrel_r4.npz に保存（暫定最良）
+z専用 dir 16 本を合流（π は読まない）
+value 2967245行（val 425290） policy 392378点（val 56162） 31s
+warm-start: /root/nrel_r4_ep0.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 681988/2967245
+backend: torch threads=4
+予算・候補定数を先に作った（候補 4269778行 11.4s）
+  ep0 step 5000/15182 mse 0.4591 ce 1.7524 311s
+  ep0 step 10000/15182 mse 0.4531 ce 1.7525 542s
+  ep0 step 15000/15182 mse 0.4476 ce 1.7529 769s
+ep0 train mse 0.4474 ce 1.7529 | val v_mse 0.5410 v_sign 0.815 pi_top1 0.612 ce 1.763 779s
+  aux val huber 0.3676 tok 0.0985
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 690.396, "steps": 15182, "breakdown": {"budget_p": 0.962, "holdout": 2.109, "rel_p": 0.02, "rel_v": 1.512, "slice_p": 1.892, "slice_v": 5.034, "step_p": 0.041, "step_p_bwd": 84.109, "step_p_fwd": 53.15, "step_v": 0.106, "step_v_bwd": 333.41, "step_v_fwd": 207.872, "step_v_prep": 0.101}, "train_mse": 0.4474469250825395, "train_ce": 1.7528914081330937, "val_vmse": 0.5410367846488953, "val_vsign": 0.81515, "val_pi_top1": 0.612, "val_p_loss": 1.763210319519043, "aux_weight": 0.1, "val_aux": 0.367562863479866, "val_aux_tok": 0.09847631017403582, "train_aux": [0.3545590937137604, 0.09097401797771454]}
+  ep0 を /root/nrel_r4_final.npz に保存（暫定最良）
+best ep0 val v_mse 0.5410 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_r4_final.npz"}
