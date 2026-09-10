@@ -1,0 +1,37 @@
+{"job": "train-r4z", "role": "train", "status": "done",
+ "inputs": {"warm_start": "opcg_sim/data/learned/nrel_r3.npz",
+            "pi_waves": [29], "pi_shards": 14,
+            "z_waves": [29],
+            "ablate": ["rel"], "aux_weight": 0.1,
+            "epochs": 2, "lr": 5e-4, "backend": "torch", "threads": 4,
+            "note": "r4（claude/train-r4・z=波29+28+27）の対照実験。z窓を波29のみに絞った以外はr4と同一設定"},
+ "outputs": {"net": "n1_results/nrel_r4z.npz"},
+ "metrics": {
+   "rows": {"value": 974297, "value_val": 139382, "policy": 392378, "policy_val": 56162},
+   "best_ep": 0,
+   "ep0": {"train_mse": 0.47726, "train_ce": 1.75290, "val_v_mse": 0.54447, "val_v_sign": 0.8022, "val_pi_top1": 0.61975, "val_p_loss": 1.75856, "val_aux_huber": 0.40100, "val_aux_tok": 0.11175, "train_sec": 260.6},
+   "ep1": {"train_mse": 0.41275, "train_ce": 1.74969, "val_v_mse": 0.56946, "val_v_sign": 0.80045, "val_pi_top1": 0.62025, "val_p_loss": 1.75900, "val_aux_huber": 0.39118, "val_aux_tok": 0.10524, "train_sec": 271.5},
+   "train_sec_total": 532.1
+ },
+ "command": "OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in \"$HOME/n29_wave/w*/n_records/n29_w*\" --ablate rel --aux-weight 0.1 --epochs 2 --lr 5e-4 --warm-start opcg_sim/data/learned/nrel_r3.npz --out ~/nrel_r4z.npz",
+ "band": {
+   "command": "OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in \"$HOME/n29_wave/w*/n_records/n29_w*\" --nrel opcg_sim/data/learned/nrel_r3.npz ~/nrel_r4z.npz --holdout-mod 7 --out ~/band_r4z.json",
+   "holdout_mod": 7, "rows": 139382, "buckets": 95,
+   "all": {"r3": {"v_mse": 0.53267, "v_sign": 0.80424}, "r4z": {"v_mse": 0.54193, "v_sign": 0.80280}},
+   "by_turn": {
+     "turn1-4":  {"n": 17646, "r3": {"v_mse": 0.77235, "v_sign": 0.70702}, "r4z": {"v_mse": 0.76664, "v_sign": 0.71229}},
+     "turn5-8":  {"n": 43438, "r3": {"v_mse": 0.64272, "v_sign": 0.76332}, "r4z": {"v_mse": 0.64977, "v_sign": 0.76485}},
+     "turn9-99": {"n": 76380, "r3": {"v_mse": 0.40745, "v_sign": 0.85321}, "r4z": {"v_mse": 0.42151, "v_sign": 0.84852}}
+   },
+   "largest_gaps_r4z_better": [
+     {"bucket": "injected:bounce:OTHER:c0-2", "n": 411, "r3_v_mse": 0.6588, "r4z_v_mse": 0.4954, "diff": -0.1634},
+     {"bucket": "injected:deck:OTHER:c3-5", "n": 710, "r3_v_mse": 0.5235, "r4z_v_mse": 0.3788, "diff": -0.1447},
+     {"bucket": "injected:trash:ACTIVATE_MAIN:c3-5", "n": 561, "r3_v_mse": 0.7033, "r4z_v_mse": 0.5785, "diff": -0.1247}
+   ],
+   "largest_gaps_r4z_worse": [
+     {"bucket": "injected:lock:COUNTER:c3-5", "n": 379, "r3_v_mse": 0.4707, "r4z_v_mse": 0.7593, "diff": 0.2886},
+     {"bucket": "injected:lock:ON_ATTACK:c0-2", "n": 1736, "r3_v_mse": 0.4263, "r4z_v_mse": 0.5803, "diff": 0.1539},
+     {"bucket": "injected:lock:ON_PLAY:c0-2", "n": 894, "r3_v_mse": 0.6037, "r4z_v_mse": 0.7364, "diff": 0.1327}
+   ]
+ },
+ "notes": "対照実験（r4のz窓を波29のみに縮小）。ep0がbest（ep1はv_mse 0.5445→0.5695へ悪化＝過学習、r3/r4系譜で既知のパターン）。全体（波29 holdout・139,382行）でr3がr4zをv_mse・v_signともわずかに上回る（r3 0.5327/0.8042 vs r4z 0.5419/0.8028）。r3は波25〜28で訓練済みで波29自体は未見だが、r4zは波29でwarm-start再訓練したにもかかわらずこの holdout で改善しなかった＝1波だけのz窓では過去のより広いz窓（r3の波23-24）を上回れない可能性を示唆。turn9-99（終盤）でr3が最も優位（0.4074 vs 0.4215）。層別では95バケット中、注入効果 lock系（COUNTER/ON_ATTACK/ON_PLAY）でr4zが目立って悪化、bounce/deck/trash系の一部バケットではr4zが改善——ただしいずれもn<2000の小サンプルで解釈注意。r4（z=波29+28+27・別セッション claude/train-r4）との比較で「z窓を広げる方が単波より良いか」が判定できる想定。アリーナでの判定はしていない（指示範囲外）。OOMなし・メモリ問題なし（ピークRSS約3.7GB、コンテナ15GB中）。"}

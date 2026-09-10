@@ -1,0 +1,18 @@
+value 974297行（val 139382） policy 392378点（val 56162） 33s
+warm-start: opcg_sim/data/learned/nrel_r3.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 681988/974297
+backend: torch threads=4
+予算・候補定数を先に作った（候補 4269778行 3.6s）
+  ep0 step 5000/8514 mse 0.4919 ce 1.7555 197s
+ep0 train mse 0.4773 ce 1.7529 | val v_mse 0.5445 v_sign 0.802 pi_top1 0.620 ce 1.759 307s
+  aux val huber 0.4010 tok 0.1118
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 260.572, "steps": 8514, "breakdown": {"budget_p": 0.674, "holdout": 1.678, "rel_p": 0.016, "rel_v": 0.318, "slice_p": 1.298, "slice_v": 1.048, "step_p": 0.032, "step_p_bwd": 70.395, "step_p_fwd": 41.822, "step_v": 0.028, "step_v_bwd": 90.055, "step_v_fwd": 53.372, "step_v_prep": 0.023}, "train_mse": 0.47725850173718576, "train_ce": 1.7528971516471032, "val_vmse": 0.5444661378860474, "val_vsign": 0.8022, "val_pi_top1": 0.61975, "val_p_loss": 1.7585568618774414, "aux_weight": 0.1, "val_aux": 0.40100037326045784, "val_aux_tok": 0.1117538691778039, "train_aux": [0.3619677722454071, 0.11991889774799347]}
+  ep0 を /root/nrel_r4z.npz に保存（暫定最良）
+  ep1 step 5000/8514 mse 0.4227 ce 1.7503 468s
+ep1 train mse 0.4127 ce 1.7497 | val v_mse 0.5695 v_sign 0.800 pi_top1 0.620 ce 1.759 583s
+  aux val huber 0.3912 tok 0.1052
+N_REL_TRAIN_EPOCH {"ep": 1, "backend": "torch", "threads": 4, "train_sec": 271.533, "steps": 8514, "breakdown": {"budget_p": 0.682, "holdout": 1.745, "rel_p": 0.016, "rel_v": 0.332, "slice_p": 1.254, "slice_v": 1.057, "step_p": 0.033, "step_p_bwd": 74.98, "step_p_fwd": 44.617, "step_v": 0.028, "step_v_bwd": 92.253, "step_v_fwd": 55.341, "step_v_prep": 0.023}, "train_mse": 0.41274709177964014, "train_ce": 1.749690247426232, "val_vmse": 0.5694602727890015, "val_vsign": 0.80045, "val_pi_top1": 0.62025, "val_p_loss": 1.7589955978393554, "aux_weight": 0.1, "val_aux": 0.39117988507706164, "val_aux_tok": 0.1052405559704865, "train_aux": [0.37386125326156616, 0.10918540507555008]}
+best ep0 val v_mse 0.5445 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_r4z.npz"}
+EXIT=0
