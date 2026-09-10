@@ -4945,3 +4945,10 @@ git push -u origin claude/arena-r4-{条件名}
   改善が大きいのは bounce／deck（山札送り）／lock の差し込みバケット＝波 29 で初めて教材に入った型。
 - 運用の注記: A と B を同時に回すとスレッド競合で 6 倍遅くなった（4 コアに 4 スレッド × 2）。訓練は順次実行。
 - 次: アリーナ（§20.8.8・主 `claude/arena-r4-random`・副 `claude/arena-r4-mirror`・コーディネータが 2 セッションを起こした）。
+
+#### 20.8.8-1 アリーナ r4 vs r3 の判定（2026-09-10・規約上は非昇格・`docs/reports/r4_judgment_20260910.md`）
+
+主 0.4555 [0.402, 0.509]（−31 Elo・未達）／副 0.5469 [0.498, 0.596]（退行なし）。評価帯の改善（16 倍の幅）が主条件の
+勝率に乗らない。疑いの本命は**教師（worlds 4 ＋ t=2 の平坦な π）と物差し（serve 既定＝worlds 1・visits）の不一致**。
+次の測定: 配備案「r4 ＋ worlds 4 ＋ R2」vs 既定「r3 ＋ 既定設定」（主 481000〜488000／副 491000〜498000・
+`--cand-worlds 4 --cand-select-rule q_min_n --cand-q-min-frac 0.125 --cand-root-prior-temp 2`）。判定はユーザ。
