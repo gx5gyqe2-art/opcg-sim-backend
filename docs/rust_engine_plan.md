@@ -4893,3 +4893,39 @@ git push -u origin claude/train-r4
   **lr 2e-4 を既定**にする（`docs/n_loop_ops.md` §7.1 の {lr} の既定を書き換える）。
 - 次: `train-r4-lr2`（lr 2e-4・aux 0.1・2 エポック・A＝z 波 29／B＝z 29+28+27）で z 窓を決め、良い方を r4 として
   アリーナ（r4 vs r3・主・副・両席既定の探索設定・帯 461000〜468000／471000〜478000）。
+
+#### 20.8.8 アリーナ r4 vs r3（指示書・2 セッション＝主／副・r4 候補が決まり次第 npz 名を埋める）
+
+判定は CLAUDE.md の規約（主 wr≥0.55 かつ CI 下限>0.50／副 退行なし CI 下限≥0.45・void ≤2%）。**両席とも探索設定は
+serve 既定**（worlds 1・visits・t=1）＝ネットの差だけを測る（生成は worlds 4 ＋ R2 で回したが、serve 既定は
+§20.5.3-1 で変えていない）。seed 帯: 主 461000〜468000／副 471000〜478000（台帳 §6）。
+
+```
+作業: アリーナ r4 vs r3（{条件}＝主〔random×synth〕または副〔固定ミラー〕・docs/rust_engine_plan.md §20.8.8）。
+コードは変更しない。PR は作らない。本線 claude/cpu-spec-improvements-yw91jd が checkout されている前提。
+
+bash で順に:
+pip install -r opcg_sim/requirements.txt maturin && make rust-develop
+git fetch -q origin claude/train-r4-lr2:tmpr && git show tmpr:n1_results/{r4_npz} > ~/nrel_r4.npz && git branch -qD tmpr
+mkdir -p ~/arena_r4
+for k in 0 1 2 3 4 5 6 7; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard \
+    --candidate ~/nrel_r4.npz --baseline "" \
+    --pairs 24 --max-pairs 24 --seed-base $(( {seed_base0} + k*1000 )) --workers 4 \
+    {条件のフラグ: 主＝--leaders random --decks synth／副＝--leaders fixed --decks singleton} \
+    --out ~/arena_r4/{条件名}_w0$k.jsonl 2>&1 | tail -3
+done
+python -m opcg_sim.loop.arena_merge --in "$HOME/arena_r4/{条件名}_w0*.jsonl" --label "r4 vs r3 {条件名}" | tee ~/arena_r4/merge_{条件名}.log
+
+git checkout -B claude/arena-r4-{条件名}
+mkdir -p n1_results/arena_r4 && cp ~/arena_r4/{条件名}_w0*.jsonl ~/arena_r4/merge_{条件名}.log n1_results/arena_r4/
+（RESULT.json: {"job":"arena-r4-{条件名}","status":"done","candidate":"{r4_npz}","baseline":"nrel_r3（既定）",
+ "games":N,"pairs":N,"wr":x,"ci95":[..],"elo":x,"void":n,"dup_seeds":0,"per_shard_wr":[..],"notes":"…"}
+ ＝ arena_merge の出力から転記）
+git add -f n1_results/arena_r4/ RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "arena r4 vs r3 {条件名}"
+git push -u origin claude/arena-r4-{条件名}
+
+補足: 1 シャード 5〜7 分・8 シャードで 1 時間弱。各シャードは nohup でなく順に回してよい（1 本 10 分以内）が、
+セッションが寝ないよう各シャードの完了ごとにログを確認する。void（決着せず）が出たら seed を notes に。
+```
