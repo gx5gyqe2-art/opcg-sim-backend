@@ -424,7 +424,7 @@ class _Recorder:
         self._cids = None
         self.rows = {k: [] for k in ("scalars", "field", "card_idx", "who", "kind", "turn",
                                      "step", "sig", "pol_len", "pol_chosen", "tokens",
-                                     "forced", "pol_v0")}
+                                     "forced", "forced_sig", "pol_v0")}
         self.pol = {k: [] for k in ("n", "q", "k", "sig", "cid", "tcid", "si", "ti", "p")}
         # 補助教師の台帳（dump v4・§20.8.2）: `snaps[k]`＝手 k の直前の盤面・`steps[k]`＝手 k。
         self.snaps = []
@@ -460,6 +460,8 @@ class _Recorder:
         if forced:
             if self.rows["forced"]:
                 self.rows["forced"][-1] = forced
+                # 差し替えた手そのもの（§20.8.9 の層別用・π／sig は木の選択のまま）。
+                self.rows["forced_sig"][-1] = json.dumps(move_sig(new), ensure_ascii=False)
             out["commit"] = []                 # 木の選んだ箱の残り手順は捨てる
             return new
         return move
@@ -477,6 +479,7 @@ class _Recorder:
         self.rows["card_idx"].append(ci)
         self.rows["who"].append(name)
         self.rows["forced"].append(0)          # ε で差し替えたら `swap` が上書きする
+        self.rows["forced_sig"].append("")     # 同上（差し替えた手の move_sig・JSON）
         self.rows["pol_v0"].append(0.0)        # main で候補があれば下で上書きする（§20.6.1）
         self.rows["kind"].append(_KIND.get(out.get("kind"), 0))
         self.rows["turn"].append(int(turn))
@@ -585,6 +588,7 @@ def play_one(seed):
             "deck_kinds": np.array([kj[w] for w in rows["who"]]),
             # dump v4: ε 探索で手を差し替えた行の印（0=木のまま／1=打つ側／2=保留側・§20.8.5）
             "forced": np.array(rows["forced"], np.int8),
+            "forced_sig": np.array(rows["forced_sig"]),
             # dump v4: 改良方策 π' の材料（§20.6.1）。教師そのものではない＝既定の訓練は読まない。
             "pol_p": np.array(pol["p"], np.float16),
             "pol_v0": np.array(rows["pol_v0"], np.float16),
@@ -605,7 +609,7 @@ _ROW_KEYS = ("scalars", "field", "card_idx", "z", "who", "kind", "turn", "step",
              "seed", "sig", "pol_len", "pol_chosen")
 _POL_KEYS = ("pol_n", "pol_q", "pol_k", "pol_sig", "pol_cid", "pol_tcid", "pol_p")
 _TOK_KEYS = ("tokens", "pol_si", "pol_ti")            # NRel 用（v2 で追加・v3 も同じ列）
-_V4_KEYS = ("deck_kinds", "forced", "pol_v0")         # v4 で追加（§20.8／§20.8.5／§20.6.1）
+_V4_KEYS = ("deck_kinds", "forced", "forced_sig", "pol_v0")   # v4 で追加（§20.8／§20.8.5／§20.8.9／§20.6.1）
 _AUX_KEYS = ("aux", "aux_tok", "aux_mask")            # 補助教師（v4 で追加・§20.8.2）
 
 
