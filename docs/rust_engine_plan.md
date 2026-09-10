@@ -5012,3 +5012,81 @@ synth_roles のほうが「汎化の条件」として実態に近い。ただ�
    強さに乗らなかった＝Q 補正のほうが筋が良い可能性。
 
 **ユーザ決定（2026-09-10）**: アリーナの主条件は次世代（r5〜）から **random × synth_roles**。CLAUDE.md の規約に追記済み。
+
+#### 20.6.1 π を Q で補正する（設計・ユーザ決定 2026-09-10「B を先に」）
+
+**今の教師**: π＝根の訪問分布（等価手マージ後の `pol_n` を正規化）。訪問されなかった手は 0＝門が閉じたまま。
+根の平坦化（t=2）で門を無理に開けた波 29 は、強さに乗らなかった（§20.8.8-3）。
+
+**改良方策（Gumbel MuZero の completed-Q の考え方）**: 根の候補 a について
+- q̂(a) ＝ Q(a)（訪問 N(a) ≥ n_min）／v_mix（未訪問・v_mix＝訪問で重み付けた根の Q の平均＝根の価値の推定）
+- logit'(a) ＝ log P_net(a) ＋ σ(q̂(a))・σ(q) ＝ (c_visit ＋ max_a N(a)) × c_scale × q01(q)・q01＝(q+1)/2
+- π'(a) ＝ softmax(logit')＝**「読めた手はその Q、読めていない手は根の価値」で P を持ち上げ・押し下げた分布**。
+  訪問 0 の手も v_mix 相当の重みを持つ（門が完全には閉じない）。Q が高くて訪問が少ない手（A2 の門の向こう）は
+  P より重くなる。
+- P_net は**生成役ネットの根の P**（平坦化前）。過去の波（波 29）には保存していないので、訓練時に warm-start
+  ネット（＝生成役 r3）で forward して作る（波 29 の生成役は r3 なので一致）。以後の波は `pol_p` を dump に保存。
+- 使い方: **教師だけ変える**（P の CE の目標を `pol_n` の正規化から π' に）。生成の手の選び方・探索は変えない。
+  z・補助教師は不変。旧波（π' の材料が揃わない v2 の波）は従来どおり訪問分布。
+- つまみ: n_min（既定 1）・c_visit（50）・c_scale（既定 0.3・{0.1, 0.3, 1.0} を掃引して π' のエントロピーと
+  「下限未満の手に乗る質量」で決める）。
+
+**検証の順**: 波 29 の同じ教材で r4（訪問 π）と r4q（π'）を作り、旧分布（波 28）と新分布（波 29）の評価帯・
+「門」の指標（除去が合法な main 行で、除去候補に載る P の質量: 生成役 r3 → r4 → r4q）・アリーナ
+（synth_roles 主・ミラー副・帯 511000〜518000／521000〜528000）で比べる。同じ教材なので差は教師の作り方だけ。
+
+#### 20.6.2 WP `rs-q-pi` の指示書
+
+```
+作業: WP rs-q-pi（π の教師を Q で補正した改良方策にする・docs/rust_engine_plan.md §20.6.1＝設計はそこ）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-q-pi に push、PR は作りません。成果物は
+docs/reports/2026-09-10_q_pi.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`（opcg_effects.json が
+無ければ export_effects_json）。触るのは opcg_sim/loop/record_gen.py（列の追加だけ）・opcg_sim/learned/train/
+（n_rel_train.py・n_rel_torch.py・dump_io.py・n_rel_band.py）・tests/・tests/scripts/。Rust・探索・エンジンは触らない。
+訓練は 1 コンテナ 1 ジョブ・順次実行（同時に回すと 6 倍遅い・docs/n_loop_ops.md §7.1）。
+
+■ 1. dump の列（record_gen・dump v4 の追加列・既存の列は不変）
+  - pol_p(K float16)＝候補（group）の根の P＝生成役ネットの P を group の idxs で合算したもの。**平坦化前**の P が
+    decide の戻り値から取れないなら、取れる値（stats.P）を保存して notes に「平坦化後」と書く（root_prior_temp=1
+    の波では同じ）。pol_v0(D float16)＝根の価値の推定（訪問で重み付けた Q の平均・main 行のみ）。
+  - dump_io は無い列を None で返す（契約どおり）。
+
+■ 2. 訓練（n_rel_train・n_rel_torch）
+  - --pi-teacher {visits,q_improved}（既定 visits＝今までと 1 bit も変わらない）。
+  - q_improved: pack を読むときに main 行ごとに π' を作る（§20.6.1 の式）。P_net は pol_p があればそれ、無ければ
+    --warm-start のネットで候補行を forward して作る（1 回だけ・pack のキャッシュに保存して再利用）。
+    Q は pol_q・N は pol_n・v_mix は N 重みの Q 平均（pol_v0 があればそれ）。
+  - つまみ: --pi-n-min 1・--pi-c-visit 50・--pi-c-scale 0.3。
+  - P の CE の目標を π' に置き換える。z・補助教師・他は不変。旧波（v2）は visits のまま（自動で判定）。
+
+■ 3. 評価帯（n_rel_band）
+  - 方策指標を「visits 目標」と「π' 目標」の両方で出す（top1・CE）。
+  - 「門」の指標: 除去が合法な main 行（deck_roles.classify の form が除去系の候補がある行）で、除去候補に載る
+    ネットの P の質量の平均と、その行で除去を選んだ割合。
+
+■ 4. 計測
+  - 掃引: 波 29 の 1 シャードで c_scale ∈ {0.1, 0.3, 1.0} の π' のエントロピー（visits 分布との比較）と
+    「N が floor（sims/8）未満の手に乗る質量」を表にする（教師が退化していないことの確認）。
+  - 訓練: r4q ＝ warm-start r3・--pi-teacher q_improved（採った c_scale）・π 波 29（14 シャード・
+    claude/n29-wKK の n_records/n29_wKK）・z 29+28+27（claude/n28-w0N・n27-w0N の n28_records／n27_records）・
+    --ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2（best epoch）。比較対象 r4＝claude/train-r4-lr2 の
+    n1_results/nrel_r4b.npz（同じ教材・visits 教師）。
+  - 評価帯: 波 28 holdout と 波 29 holdout の両方で r3／r4／r4q（z 予測・方策 2 種・門の指標・層別）。
+  - アリーナ r4q vs r3（両席既定の探索）: 主 random × synth_roles（帯 511000〜518000）・副 固定ミラー
+    （521000〜528000）・各 8 シャード × 24 ペア・arena_merge。
+
+■ 受け入れ
+  - pytest tests/test_q_pi.py（cpu_infra）: --pi-teacher visits は既存とビット一致（numpy backend／--threads 1）／
+    q_improved の π' が手作りの N・Q・P で式どおり（未訪問の手が v_mix・N≥n_min の手が Q・softmax が 1）／
+    pol_p 列の無い波で warm-start forward に退避する／pol_p 列が dump に載る。TEST_SPEC §2 に 1 行。make test green。
+
+■ 成果物
+  - コード＋テスト＋n1_results/nrel_r4q.npz（同ブランチ）＋docs/reports/2026-09-10_q_pi.RESULT.json:
+    {"job":"rs-q-pi","status":"done|partial","sweep":{"0.1":{entropy,mass_below_floor},…},"c_scale":x,
+     "train":{ep0/ep1 の val},"band":{"wave28":{"r3":…,"r4":…,"r4q":…},"wave29":{…},"gate":{…}},
+     "arena":{"roles":{games,wr,ci95,elo,void},"mirror":{…}},"make_test":"N passed","notes":"…"}
+
+■ 前提
+  - 既定（--pi-teacher visits）は 1 bit も変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+```
