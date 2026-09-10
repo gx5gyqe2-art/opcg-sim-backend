@@ -1,0 +1,35 @@
+{
+  "job": "train-r4",
+  "role": "train",
+  "status": "partial",
+  "inputs": {
+    "warm_start": "opcg_sim/data/learned/nrel_r3.npz",
+    "pi_waves": [
+      "n29 (14 shards: w01-03,05-12,14-16)"
+    ],
+    "z_waves": [
+      "n28 (8 shards)",
+      "n27 (8 shards)"
+    ],
+    "ablate": "rel",
+    "aux_weight": 0.1,
+    "epochs_planned": 2,
+    "epochs_done": 1,
+    "lr": 0.0005
+  },
+  "outputs": {
+    "net": "n1_results/nrel_r4.npz"
+  },
+  "metrics": {
+    "epoch": 0,
+    "val_v_mse": 0.5352778434753418,
+    "val_v_sign": 0.8062,
+    "pi_top1": 0.616,
+    "val_p_loss": 1.762166847229004,
+    "val_aux_huber": 0.3837925033613013,
+    "val_aux_tok": 0.10180517555195888,
+    "best_ep": 0
+  },
+  "command": "OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in $HOME/n29_wave/w*/n_records/n29_w* --z-in $HOME/n28_wave/w*/n28_records $HOME/n27_wave/w*/n27_records --ablate rel --aux-weight 0.1 --epochs 2 --lr 5e-4 --warm-start opcg_sim/data/learned/nrel_r3.npz --out ~/nrel_r4.npz",
+  "notes": "暫定コミット（epoch0 のみ）。作業コンテナが訓練中に複数回無言で再起動する（~20-25分おき・エラーログ無し）ため、epoch0 完了時点のチェックポイントを消失防止のため先にpush。epoch1 は warm-start チェイン（--warm-start n1_results/nrel_r4.npz --epochs 1）で継続実行中。完了後に status=done で上書きし、評価帯（band_r4.json）も追加する。"
+}
