@@ -1,0 +1,9 @@
+  roles_w00.jsonl              22.0/48 = 0.4583 void 0
+  roles_w01.jsonl              26.0/48 = 0.5417 void 0
+  roles_w02.jsonl              28.0/48 = 0.5833 void 0
+  roles_w03.jsonl              26.0/48 = 0.5417 void 0
+  roles_w04.jsonl              22.0/48 = 0.4583 void 0
+  roles_w05.jsonl              25.0/48 = 0.5208 void 0
+  roles_w06.jsonl              22.0/48 = 0.4583 void 0
+  roles_w07.jsonl              28.0/48 = 0.5833 void 0
+[r4 vs r3 random x synth_roles] ARENA_MERGE_FINAL {"pairs": 192, "games": 384, "void": 0, "wins": 199.0, "wr": 0.5182, "ci95": [0.4654, 0.5711], "elo": 12.7, "elo95": [-24.1, 49.7], "promoted": false, "shards": 8, "dup_seeds": 0}

@@ -1,0 +1,61 @@
+holdout 行 132821（seed%7==0・16s）
+  nrel_r3.npz
+    all                          mse 0.5348 sign 0.805 n 132821
+    turn1-4                      mse 0.7244 sign 0.723 n  16985
+    turn5-8                      mse 0.6141 sign 0.772 n  41401
+    turn9-99                     mse 0.4396 sign 0.845 n  72619
+    leader_color:BLACK           mse 0.6160 sign 0.766 n  10398
+    leader_color:BLACK|BLUE      mse 0.6154 sign 0.762 n   4356
+    leader_color:BLACK|GREEN     mse 0.3636 sign 0.883 n   2575
+    leader_color:BLACK|PURPLE    mse 0.4847 sign 0.839 n   2217
+    leader_color:BLACK|RED       mse 0.4660 sign 0.851 n   3341
+    leader_color:BLACK|YELLOW    mse 0.5813 sign 0.782 n   6183
+    leader_color:BLUE            mse 0.4489 sign 0.846 n  13576
+    leader_color:BLUE|GREEN      mse 0.6831 sign 0.752 n   2697
+    leader_color:BLUE|PURPLE     mse 0.4947 sign 0.818 n   4323
+    leader_color:BLUE|RED        mse 0.6098 sign 0.769 n   6687
+    leader_color:BLUE|YELLOW     mse 0.4237 sign 0.848 n   2930
+    leader_color:GREEN           mse 0.4479 sign 0.835 n  12009
+    leader_color:GREEN|PURPLE    mse 0.6766 sign 0.756 n   3137
+    leader_color:GREEN|RED       mse 0.4905 sign 0.825 n   6748
+    leader_color:GREEN|YELLOW    mse 0.8302 sign 0.690 n   3608
+    leader_color:PURPLE          mse 0.5279 sign 0.812 n  11235
+    leader_color:PURPLE|RED      mse 0.5212 sign 0.800 n   5394
+    leader_color:PURPLE|YELLOW   mse 0.5651 sign 0.785 n   3138
+    leader_color:RED             mse 0.5296 sign 0.809 n  15013
+    leader_color:RED|YELLOW      mse 0.5608 sign 0.777 n   2219
+    leader_color:YELLOW          mse 0.5318 sign 0.804 n  11037
+    after_removal                mse 0.6020 sign 0.782 n   2953
+    not_removal                  mse 0.5332 sign 0.805 n 129868
+  nrel_r4.npz
+    all                          mse 0.5515 sign 0.797 n 132821
+    turn1-4                      mse 0.7391 sign 0.708 n  16985
+    turn5-8                      mse 0.6401 sign 0.762 n  41401
+    turn9-99                     mse 0.4517 sign 0.841 n  72619
+    leader_color:BLACK           mse 0.6209 sign 0.771 n  10398
+    leader_color:BLACK|BLUE      mse 0.6515 sign 0.753 n   4356
+    leader_color:BLACK|GREEN     mse 0.3820 sign 0.868 n   2575
+    leader_color:BLACK|PURPLE    mse 0.5364 sign 0.810 n   2217
+    leader_color:BLACK|RED       mse 0.4691 sign 0.853 n   3341
+    leader_color:BLACK|YELLOW    mse 0.5735 sign 0.782 n   6183
+    leader_color:BLUE            mse 0.4493 sign 0.843 n  13576
+    leader_color:BLUE|GREEN      mse 0.7016 sign 0.747 n   2697
+    leader_color:BLUE|PURPLE     mse 0.5990 sign 0.777 n   4323
+    leader_color:BLUE|RED        mse 0.6039 sign 0.773 n   6687
+    leader_color:BLUE|YELLOW     mse 0.5060 sign 0.800 n   2930
+    leader_color:GREEN           mse 0.4558 sign 0.835 n  12009
+    leader_color:GREEN|PURPLE    mse 0.5979 sign 0.792 n   3137
+    leader_color:GREEN|RED       mse 0.5191 sign 0.803 n   6748
+    leader_color:GREEN|YELLOW    mse 0.8072 sign 0.703 n   3608
+    leader_color:PURPLE          mse 0.5561 sign 0.793 n  11235
+    leader_color:PURPLE|RED      mse 0.5715 sign 0.782 n   5394
+    leader_color:PURPLE|YELLOW   mse 0.5740 sign 0.784 n   3138
+    leader_color:RED             mse 0.5415 sign 0.801 n  15013
+    leader_color:RED|YELLOW      mse 0.5709 sign 0.780 n   2219
+    leader_color:YELLOW          mse 0.5683 sign 0.793 n  11037
+    after_removal                mse 0.6358 sign 0.762 n   2953
+    not_removal                  mse 0.5496 sign 0.798 n 129868
+  218s
+  → /root/band_r4_wave28.json
+N_REL_BAND {"rows": 132821, "src": ["/root/n28_wave/w*/n28_records"], "out": "/root/band_r4_wave28.json", "buckets": 27, "nets": {"nrel_r3.npz": {"v_mse": 0.5347773861284578, "v_sign": 0.8046920291219009, "n": 132821}, "nrel_r4.npz": {"v_mse": 0.5514672377375619, "v_sign": 0.7973889671061052, "n": 132821}}}
+DONE_BAND_0
