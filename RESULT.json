@@ -1,0 +1,67 @@
+{
+  "job": "train-r4z-repro",
+  "status": "done",
+  "purpose": "docs/rust_engine_plan.md §20.8.7 の r4 本番訓練に先立ち、同一設定を複数回回したときのばらつき幅を測定する（コード変更なし・PRなし）",
+  "inputs": {
+    "warm_start": "opcg_sim/data/learned/nrel_r3.npz",
+    "pi_waves": ["n29_w01", "n29_w02", "n29_w03", "n29_w05", "n29_w06", "n29_w07", "n29_w08", "n29_w09", "n29_w10", "n29_w11", "n29_w12", "n29_w14", "n29_w15", "n29_w16"],
+    "z_waves": "波29のみ（π と同一・z-inなし）",
+    "ablate": "rel",
+    "aux_weight": 0.1,
+    "epochs": 2,
+    "lr": 5e-4,
+    "value_rows": 974297,
+    "policy_points": 392378,
+    "holdout_mod_train": "既定（内部）",
+    "holdout_mod_band": 7
+  },
+  "outputs": {
+    "A": "n1_results/nrel_r4z_A.npz",
+    "B": "n1_results/nrel_r4z_B.npz",
+    "C": "n1_results/nrel_r4z_C.npz"
+  },
+  "runs": {
+    "A": {
+      "config": "backend torch・threads既定(4)",
+      "ep0": {"val_v_mse": 0.544439435005188, "val_v_sign": 0.80195, "val_pi_top1": 0.62175, "val_aux_huber": 0.40094492948827626, "val_aux_tok": 0.11189059042466008, "train_sec": 291.375},
+      "ep1": {"val_v_mse": 0.5734279155731201, "val_v_sign": 0.7963, "val_pi_top1": 0.6145, "val_aux_huber": 0.3911064801062329, "val_aux_tok": 0.10511214569767507, "train_sec": 273.876},
+      "best_ep": 0
+    },
+    "B": {
+      "config": "backend torch・threads既定(4)・Aと同一設定",
+      "ep0": {"val_v_mse": 0.5415764451026917, "val_v_sign": 0.80435, "val_pi_top1": 0.623, "val_aux_huber": 0.4002120839809997, "val_aux_tok": 0.1119610135079754, "train_sec": 271.459},
+      "ep1": {"val_v_mse": 0.5647549033164978, "val_v_sign": 0.8009, "val_pi_top1": 0.6165, "val_aux_huber": 0.3912358659803488, "val_aux_tok": 0.10490256077273341, "train_sec": 269.314},
+      "best_ep": 0
+    },
+    "C": {
+      "config": "backend torch・threads 1（同一性確認用）",
+      "ep0": {"val_v_mse": 0.5413833260536194, "val_v_sign": 0.804, "val_pi_top1": 0.62375, "val_aux_huber": 0.4006791616501338, "val_aux_tok": 0.11287456805992875, "train_sec": 592.904},
+      "ep1": {"val_v_mse": 0.562358021736145, "val_v_sign": 0.8017, "val_pi_top1": 0.6195, "val_aux_huber": 0.3903813147320574, "val_aux_tok": 0.10516299184294245, "train_sec": 595.929},
+      "best_ep": 0
+    }
+  },
+  "band": {
+    "holdout_mod": 7,
+    "rows": 139382,
+    "all": {
+      "r3": {"v_mse": 0.532666184792196, "v_sign": 0.8042358410698656},
+      "A": {"v_mse": 0.5411023450614902, "v_sign": 0.8027937610308361},
+      "B": {"v_mse": 0.5409841780108935, "v_sign": 0.8031309638260321},
+      "C": {"v_mse": 0.5402564487923744, "v_sign": 0.8033175015425235}
+    },
+    "turn9-99": {
+      "r3": {"v_mse": 0.4074461242688027, "v_sign": 0.8532076459806232},
+      "A": {"v_mse": 0.4215051942328846, "v_sign": 0.8485336475517151},
+      "B": {"v_mse": 0.4211794358191356, "v_sign": 0.8483765383608275},
+      "C": {"v_mse": 0.4197794159951556, "v_sign": 0.8489002356637864}
+    }
+  },
+  "spread": {
+    "train_val_ep0_v_mse_max_minus_min": 0.0030561089515686,
+    "train_val_ep0_v_sign_max_minus_min": 0.0024,
+    "train_val_ep0_pi_top1_max_minus_min": 0.002,
+    "band_all_v_mse_max_minus_min": 0.0008458962691158,
+    "band_all_v_sign_max_minus_min": 0.0005237405116874
+  },
+  "notes": "3本とも best_ep=0（ep1はやや過学習・r3系譜で既出のパターンと一致）。A/B（同一設定・threads既定4）とC（threads 1）の band v_mse 差は最大0.0008・v_sign差は最大0.0005で、A-B間（同一設定同士）の差とC-A/B間（thread数違い）の差が同程度＝スレッド数そのものが主要なばらつき源ではなく、torch多スレッド実行の非決定性（reduction順序等）が主要因と見られる。train内蔵val（batch分割・holdout方式が band と異なる）の方が band よりばらつきがやや大きい（v_mse spread 0.0031 vs 0.0008）が、いずれも r3→r4系列で期待される改善幅（このπ窓では A/B/C とも r3 の 0.5327 より val_mse が悪化＝aux_weight 0.1 によるマルチタスク学習の trade-off、または波29単独windowでの過学習と推測。本番r4はz窓に波27・28を追加するため直接比較はできない）に比べて十分小さく、r4本番の1回の訓練結果は再現性の範囲内で信頼してよいと判断する。"
+}

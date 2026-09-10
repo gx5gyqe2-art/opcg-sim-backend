@@ -1,0 +1,17 @@
+value 974297行（val 139382） policy 392378点（val 56162） 25s
+warm-start: opcg_sim/data/learned/nrel_r3.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 681988/974297
+backend: torch threads=1
+予算・候補定数を先に作った（候補 4269778行 3.9s）
+  ep0 step 5000/8514 mse 0.4917 ce 1.7555 386s
+ep0 train mse 0.4768 ce 1.7529 | val v_mse 0.5414 v_sign 0.804 pi_top1 0.624 ce 1.759 636s
+  aux val huber 0.4007 tok 0.1129
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 1, "train_sec": 592.904, "steps": 8514, "breakdown": {"budget_p": 0.982, "holdout": 5.838, "rel_p": 0.015, "rel_v": 0.375, "slice_p": 2.97, "slice_v": 2.641, "step_p": 0.036, "step_p_bwd": 113.534, "step_p_fwd": 89.934, "step_v": 0.031, "step_v_bwd": 211.306, "step_v_fwd": 169.568, "step_v_prep": 0.029}, "train_mse": 0.47681245107257414, "train_ce": 1.752935860262765, "val_vmse": 0.5413833260536194, "val_vsign": 0.804, "val_pi_top1": 0.62375, "val_p_loss": 1.758748275756836, "aux_weight": 0.1, "val_aux": 0.4006791616501338, "val_aux_tok": 0.11287456805992875, "train_aux": [0.3623198866844177, 0.12164872139692307]}
+  ep0 を /root/nrel_r4z_C.npz に保存（暫定最良）
+  ep1 step 5000/8514 mse 0.4229 ce 1.7503 987s
+ep1 train mse 0.4131 ce 1.7497 | val v_mse 0.5624 v_sign 0.802 pi_top1 0.620 ce 1.760 1241s
+  aux val huber 0.3904 tok 0.1052
+N_REL_TRAIN_EPOCH {"ep": 1, "backend": "torch", "threads": 1, "train_sec": 595.929, "steps": 8514, "breakdown": {"budget_p": 0.729, "holdout": 5.424, "rel_p": 0.016, "rel_v": 0.4, "slice_p": 1.48, "slice_v": 1.637, "step_p": 0.037, "step_p_bwd": 124.35, "step_p_fwd": 97.775, "step_v": 0.032, "step_v_bwd": 197.879, "step_v_fwd": 170.681, "step_v_prep": 0.03}, "train_mse": 0.41307753542931086, "train_ce": 1.7496669218241998, "val_vmse": 0.562358021736145, "val_vsign": 0.8017, "val_pi_top1": 0.6195, "val_p_loss": 1.759759651184082, "aux_weight": 0.1, "val_aux": 0.3903813147320574, "val_aux_tok": 0.10516299184294245, "train_aux": [0.37525224685668945, 0.1102839931845665]}
+best ep0 val v_mse 0.5414 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_r4z_C.npz"}
