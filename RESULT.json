@@ -1,0 +1,23 @@
+{
+  "job": "n32-w08",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2324500,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n32_w08"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 66709,
+    "dropped": 0,
+    "sec_per_game": 20.81
+  },
+  "notes": "全480局完了・void 0・dropped 0（main_rows 30956・forced={play:295,hold:56,target:101}・removal_legal_rows 12970）。試走30局は20.73秒/局、本実行は20.81秒/局とほぼ一致（合計9987秒=2.77h、6h上限に余裕）。--netは~/nrel_r5.npz（claude/train-r5 ea9f031d由来）を明示指定し、meta_n_record.jsonのnetフィールドで/root/nrel_r5.npzが使われたことを確認済み（出荷既定r3への取り違えなし）。--eps-targetは未指定（既定0.0・波31と同条件）。中断・コンテナ再起動は発生せず1本で完了。"
+}
