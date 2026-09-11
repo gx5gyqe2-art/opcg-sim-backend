@@ -1,0 +1,23 @@
+{
+  "job": "n32-w14",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2327500,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n32_w14"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 66933,
+    "dropped": 0,
+    "sec_per_game": 14.086
+  },
+  "notes": "単一連続実行（p2分割なし・コンテナ再起動なし）。事前に --games 30 の試走（別出力・成果物には含めず）で壁時計を計測し 14.17秒/局を確認、480局は6時間以内（実測1.88時間・6761秒）と判断して本実行に進んだ。480/480局とも棄却0。--net で生成役 r5（claude/train-r5 のnpz）を明示指定・--eps-target は付けず既定0（波31と同一条件）。成果物ブランチは claude/n1-results（.git 436MB・fetch/checkoutに時間がかかった）から分岐。コードは未変更。"
+}
