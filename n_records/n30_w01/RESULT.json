@@ -1,0 +1,20 @@
+{
+  "job": "gen-n30-w01",
+  "status": "done",
+  "games": 480,
+  "rows": 69305,
+  "main_rows": 31436,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 317, "hold": 78, "target": 284},
+  "removal_legal_rows": 12782,
+  "sec_per_game": 20.65,
+  "wall_hours": 2.75,
+  "search": {"worlds": 4, "select_rule": "q_min_n", "q_min_frac": 0.125, "root_prior_temp": 2.0},
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "enc_version": 14,
+  "net": "nrel_r3.npz",
+  "commit": "5e4e7f92bb1b0bdda02f77c8d396d51e4a1091ff",
+  "notes": "trial(--games 30, n_records/n30_w01_trial, not included)で 21.8s/局 実測→6時間見込み下回るため本走行を続行。本走行は 9910s(2.75h)/480局=20.65s/局。コンテナ再起動なし・p2分割なし。void=0（全480局 winner p1/p2 で決着、meta_games.json で確認）。"
+}
