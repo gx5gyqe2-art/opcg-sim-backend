@@ -1,0 +1,23 @@
+{
+  "job": "n32-w10",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2325500,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n32_w10"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 67099,
+    "dropped": 0,
+    "sec_per_game": 14.57
+  },
+  "notes": "波31と完全同一条件（era8・生成役r5・eps-target未指定=既定0）で完走。打ち切り・コンテナ再起動なし（p2再開なし）。dropped=0でvoid（決着せず）は無し。main_rows=31317・removal_legal_rows=13048・forced={play:355,hold:58,target:97}。事前に--games 30の試走（別out・成果物には含めず）で14.9秒/局を確認し、480局見込み約2時間で6時間以内のため続行。r5netの取得元コミットはea9f031d（claude/train-r5）。"
+}
