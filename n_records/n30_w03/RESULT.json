@@ -1,0 +1,20 @@
+{
+  "job": "gen-n30-w03",
+  "status": "done",
+  "games": 480,
+  "rows": 69411,
+  "main_rows": 31619,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 335, "hold": 64, "target": 278},
+  "removal_legal_rows": 12535,
+  "sec_per_game": 14.59,
+  "wall_hours": 1.945,
+  "search": {"worlds": 4, "select_rule": "q_min_n", "q_min_frac": 0.125, "root_prior_temp": 2.0},
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "enc_version": 14,
+  "net": "nrel_r3.npz",
+  "commit": "5e4e7f92bb1b0bdda02f77c8d396d51e4a1091ff",
+  "notes": "480局すべて完了（p1=251勝・p2=229勝）、void（決着せず）0件、棄却0件。事前に --games 30 --out n_records/n30_w03_trial で試走（457秒＝約15.2秒/局）し、480局の見込み約2時間と確認してから本実行（実測7003秒＝約1.95時間・14.59秒/局）。試走分の成果物は含めていない。コンテナ再起動なし・単一 --out で完走。"
+}
