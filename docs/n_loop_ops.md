@@ -75,7 +75,18 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 ## 4. コーディネータの回収チェックリスト
 
 **生成**: 8 ブランチ揃う → 各 `meta_n_record.json` の `games`=960・`seed_base` が台帳どおり →
-`dropped` が数件以内 → `RESULT.json` の status=done。1 本でも欠けたら訓練に進まない。
+**`net` が指示した生成役と一致**（下記）→ `dropped` が数件以内 → `RESULT.json` の status=done。
+1 本でも欠けたら訓練に進まない。
+
+> **`net` の照合は必須**（2026-09-11 に追加）。`record_gen` は `--net` を**ローカルのパスとしてしか
+> 解釈しない**（`engine.resolve_net` は `neff:`／`n1:`／`nrel:` の接頭辞を剥がすだけで、git の
+> `branch:path` は解決しない）。**`--net` を落とすと既定の `DEFAULT_NET` で静かに回り、完走して
+> 見えるのに前 era の教材ができる**——波 31 の初回指示でこの誤りを出した（訂正済み）。
+> `meta_n_record.json` の `net` は `resolve_net` の結果を記録するので、**ここを見れば事後に判定できる**
+> （生成役がツリー外の npz なら `~/nrel_r5.npz` のような絶対パスが入る。`opcg_sim/data/learned/` 配下の
+> パスが入っていたら既定で回った証拠）。**`net` は生成の最後にしか書かれない**ので、走行中の
+> 中間 push では確認できない＝回収時に必ず見る。指示書を書く側は、ツリーに無いネットを生成役に
+> するとき `git show <branch>:<path> > ~/<name>.npz` で取り出してからローカルパスを渡す形にする。
 
 **訓練**: `RESULT.json` の inputs（起点・π・z）が指示書と一致 → `epochs`/`best_ep`/val 指標を
 記録 → ネットを `claude/n1-results` の `n1_results/` へ取り込む → 評価帯で参考値を測る。
