@@ -1,0 +1,23 @@
+{
+  "job": "n31-w06",
+  "role": "gen",
+  "status": "partial",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2313500,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n31_w06"
+  },
+  "metrics": {
+    "games": 120,
+    "rows": 17434,
+    "dropped": 0,
+    "sec_per_game": 14.5
+  },
+  "notes": "打ち切り（ユーザ決定・2026-09-11 19:40 UTC 指示）: 波31/32が28シャード完走(13,440局)で前era相当量に達したため、コンテナ再起動の遅延が大きいこの shard は途中で止めて手元の分だけpushする。コンテナが計8回不定期に再起動し（15:11, 16:02, 16:27, 16:50, 17:55, 18:27, 18:58, 19:40 UTC）、その都度バックグラウンドのrecord_genプロセスが失われたため、--out を分割して再開を繰り返した（wheel(opcg_engine)とnetファイルはsite-packages/スクラッチパッドに残り再構築は不要だった）。内訳: n_records/n31_w06=20局(seed_base 2313500, 2 shard)・n31_w06_p2=10局(2313520)・n31_w06_p3=10局(2313530)・n31_w06_p4=20局(2313540)・n31_w06_p5=20局(2313560)・n31_w06_p6=20局(2313580)・n31_w06_p7=20局(2313600)・n31_w06_p8=0局(2313620、開始直後に打ち切り)。各パートのログは n31_gen.log に時系列で結合。"
+}
