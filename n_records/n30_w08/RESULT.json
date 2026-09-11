@@ -1,0 +1,25 @@
+{
+  "job": "gen-n30-w08",
+  "status": "done",
+  "games": 480,
+  "rows": 70338,
+  "main_rows": 32122,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 312, "hold": 73, "target": 282},
+  "removal_legal_rows": 13194,
+  "sec_per_game": 14.3375,
+  "wall_hours": 1.9117,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "enc_version": 14,
+  "net": "nrel_r3.npz",
+  "commit": "2898f826acc132ed43be7bbe41055d8d5afeeff9",
+  "notes": "全480局完了・void=0・dropped=0。試走30局は--out n_records/n30_w08_trialに出し29.4秒/局(=6h超なら要相談の判定材料)だったが、本実行は2ワーカーで14.3秒/局(合計6882秒=1.91h)と試走より速く、6h上限に対し余裕あり。途中、最初にnohup+&でバックグラウンド起動したところハーネスの完了通知が実際のジョブ終了より先に返ってきたため(ラッパーshellの終了を検知しただけだった)、run_in_background直付けの方式に切替えて再起動した。ログに残るBrokenPipeError/leaked semaphoreの traceback はその再起動時にkillした旧プロセスの孤児ワーカーが残した書き込みノイズで、出力shardのタイムスタンプ・件数・void=0/dropped=0を確認した限り現在の成果物には影響なし。180局時点で中間コミット(2898f82より前)を1回push済み、本コミットで残りシャードとRESULT.jsonを追加。"
+}
