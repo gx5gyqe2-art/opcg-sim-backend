@@ -1,0 +1,46 @@
+{
+  "job": "n32-w12",
+  "role": "gen",
+  "status": "partial",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2326500,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n32_w12（part1）, n_records/n32_w12_p2（part2）"
+  },
+  "metrics": {
+    "games": 130,
+    "rows": 17454,
+    "main_rows": 8136,
+    "dropped": 0,
+    "sec_per_game": 14.7
+  },
+  "parts": [
+    {
+      "dir": "n_records/n32_w12",
+      "seed_base": 2326500,
+      "games_target": 480,
+      "games_done": 120,
+      "rows": 16220,
+      "main_rows": 7567,
+      "shards": 12,
+      "notes": "コンテナ再起動と思われる原因でログ・exit codeを残さず停止（120/480局・16220行まで確認）"
+    },
+    {
+      "dir": "n_records/n32_w12_p2",
+      "seed_base": 2326620,
+      "games_target": 360,
+      "games_done": 10,
+      "rows": 1234,
+      "main_rows": 569,
+      "shards": 1,
+      "notes": "p1停止を受けて残り360局を再開したが、こちらも10局・1シャードの時点で同様に停止（サイレント停止）。以後は打ち切り指示のため未再開"
+    }
+  ],
+  "notes": "ユーザ決定によりここで打ち切り（波31+32で28シャード13,440局・約188万行が揃い前eraと同等になったため、このシャード〔k=12〕の残り局数は不要と判断）。本シャードはp1・p2ともに途中でプロセスが無言で停止する現象が2回発生（コンテナ再起動の可能性、FULL_EXIT_CODEなし）。手元にあるnpz（p1: 12シャード・120局分、p2: 1シャード・10局分）はそのままpush。コードは変更していない。"
+}
