@@ -1,0 +1,29 @@
+{
+  "job": "gen-n30-w11",
+  "status": "done",
+  "games": 480,
+  "rows": 69708,
+  "main_rows": 31366,
+  "dropped": 0,
+  "void": 0,
+  "forced": {
+    "play": 199,
+    "hold": 48,
+    "target": 169
+  },
+  "removal_legal_rows": 8091,
+  "sec_per_game": 12.89,
+  "wall_hours": 1.72,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "enc_version": 14,
+  "net": "nrel_r3.npz",
+  "commit": "5e4e7f92bb1b0bdda02f77c8d396d51e4a1091ff",
+  "notes": "30局の試走（n_records/n30_w11_trial・成果物に含めない）: 12.3s/局・480局で6時間を超えない見込みのため本実行に進んだ。本実行を --seed-base 2306000 --games 480 --out n_records/n30_w11 で起動後、コンテナが再起動（uptime -s 2026-09-11 05:39 UTC）してプロセスが落ちた。落ちた時点の進捗ログ「180/480局 行26319（main 11706） 棄却0 2030s」と、n_records/n30_w11/*.npz 18本の distinct seed（2306000〜2306179・180件・行26319）が一致しており180局はクリーンな区切りで確定（部分局なし）。指示書どおり別出力先 n_records/n30_w11_p2 へ残り300局（--seed-base 2306180 --games 300）を再開し、300/300局 完走（N_RECORD_DONE rows=43389 main_rows=19660 棄却0）。局数の内訳: n30_w11=180局（seed 2306000-2306179・行26319・main 11706）／n30_w11_p2=300局（seed 2306180-2306479・行43389・main 19660）。forced/removal_legal_rows は p2 の meta_n_record.json（games リストの対局メタ集計）からのみ厳密値が取れる値＝上表の forced/removal_legal_rows は n30_w11_p2 のみの値（p1=n30_w11 はプロセス強制終了により対局メタ（forced内訳・removal_legal_rows）がメモリ上でしか保持されておらず meta_games.json/meta_n_record.json が書き出される前に失われた・npz本体の行・main行・seed整合は上記の通り検証済みで欠損なし）。sec_per_game/wall_hours は両パート合計（p1実測2030秒+p2実測4156秒=6186秒・480局）。void（決着せず）は両パートとも0。"
+}
