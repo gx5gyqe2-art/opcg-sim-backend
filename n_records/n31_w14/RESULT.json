@@ -1,0 +1,23 @@
+{
+  "job": "n31-w14",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2317500,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n31_w14"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 67665,
+    "dropped": 0,
+    "sec_per_game": 15.12
+  },
+  "notes": "net の branch:path 表記は record_gen が解決できないため、git show origin/claude/train-r5:n1_results/nrel_r5.npz でローカルに取り出してから --net に渡した（訂正の通知と同じ手順）。単一 --out で完走、コンテナ再起動なし。"
+}
