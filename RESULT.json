@@ -1,0 +1,24 @@
+{
+  "job": "n32-w02",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2321500,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n32_w02"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 67244,
+    "main_rows": 31282,
+    "dropped": 0,
+    "sec_per_game": 13.346
+  },
+  "notes": "波31と同一条件(era8・生成役r5・--eps-target省略)。--net ~/nrel_r5.npz を明示指定し確認済み(meta_n_record.jsonのnetがr5のパスであることを確認)。30局試走(14.2秒/局)後、本実行480局を単一--outで完走(中断・再起動なし、p2なし)。dropped=0。"
+}
