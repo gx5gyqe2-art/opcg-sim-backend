@@ -1,0 +1,597 @@
+{
+ "job": "train-r5",
+ "role": "train",
+ "status": "done",
+ "inputs": {
+  "warm_start": "opcg_sim/data/learned/nrel_r3.npz（本線 claude/cpu-spec-improvements-yw91jd 784ee397 同梱）",
+  "pi_waves": [
+   29,
+   30
+  ],
+  "z_waves": [
+   30,
+   29,
+   28,
+   27
+  ],
+  "z_in_dirs": [
+   "n28_wave/w01-08/n28_records（8 シャード）",
+   "n27_wave/w01-08/n27_records（8 シャード）"
+  ],
+  "wave30_shards_used": [
+   "w01",
+   "w02",
+   "w03",
+   "w04",
+   "w05",
+   "w07",
+   "w08",
+   "w09",
+   "w10",
+   "w11",
+   "w12",
+   "w13",
+   "w14",
+   "w15",
+   "w16"
+  ],
+  "wave30_shards_skipped": [
+   "w06（RESULT.json 無し＝未完走）"
+  ],
+  "wave30_parts": [
+   "n30_w11 と n30_w11_p2",
+   "n30_w15 と n30_w15_p2"
+  ],
+  "wave29_shards_used": [
+   "w01",
+   "w02",
+   "w03",
+   "w05",
+   "w06",
+   "w07",
+   "w08",
+   "w09",
+   "w10",
+   "w11",
+   "w12",
+   "w14",
+   "w15",
+   "w16"
+  ],
+  "epochs": 2,
+  "lr": 0.0002,
+  "ablate": "rel",
+  "aux_weight": 0.1,
+  "pi_teacher": "visits",
+  "backend": "torch",
+  "threads": 4,
+  "holdout_mod": 7,
+  "rss_gb": {
+   "train_start_rss": 11.77,
+   "train_start_anon": 6.54,
+   "peak_vmhwm": 12.01,
+   "peak_anon": 6.55,
+   "min_mem_available": 8.32,
+   "container_total_gb": 15.7
+  },
+  "rows": {
+   "value": 4011624,
+   "value_val": 573147,
+   "policy": 812856,
+   "policy_val": 115913,
+   "aux_enabled_rows": 1413591
+  }
+ },
+ "outputs": {
+  "net": "n1_results/nrel_r5.npz",
+  "band": [
+   "band_r5_w28.json",
+   "band_r5_w29.json",
+   "band_r5_w30.json",
+   "band_summary.json"
+  ],
+  "arena": "n1_results/arena_r5/",
+  "logs": [
+   "train_r5.log",
+   "train_r5_rss.log",
+   "band_r5_w28.log",
+   "band_r5_w29.log",
+   "band_r5_w30.log"
+  ]
+ },
+ "metrics": {
+  "best_ep": 1,
+  "val_v_mse": 0.5134,
+  "val_v_sign": 0.8163,
+  "val_pi_top1": 0.6192,
+  "val_p_loss": 1.747,
+  "val_aux_huber": 0.3698,
+  "val_aux_tok": 0.0999,
+  "per_epoch": [
+   {
+    "ep": 0,
+    "train_mse": 0.5008,
+    "train_ce": 1.7485,
+    "val_v_mse": 0.5151,
+    "val_v_sign": 0.8137,
+    "val_pi_top1": 0.6205,
+    "val_aux": 0.3826,
+    "val_aux_tok": 0.1056,
+    "train_sec": 1103
+   },
+   {
+    "ep": 1,
+    "train_mse": 0.4779,
+    "train_ce": 1.7454,
+    "val_v_mse": 0.5134,
+    "val_v_sign": 0.8163,
+    "val_pi_top1": 0.6192,
+    "val_aux": 0.3698,
+    "val_aux_tok": 0.0999,
+    "train_sec": 1057
+   }
+  ],
+  "band": {
+   "w28": {
+    "rows": 132821,
+    "v_mse": {
+     "r3": 0.5348,
+     "r4b": 0.5515,
+     "r5": 0.5551
+    },
+    "v_sign_r5": 0.7968,
+    "after_removal": {
+     "r3": 0.602,
+     "r4b": 0.6358,
+     "r5": 0.6267,
+     "n": 2953,
+     "v_sign_r5": 0.768
+    },
+    "not_removal": {
+     "r3": 0.5332,
+     "r4b": 0.5496,
+     "r5": 0.5535,
+     "n": 129868,
+     "v_sign_r5": 0.7974
+    },
+    "turn1-4": {
+     "r3": 0.7244,
+     "r4b": 0.7391,
+     "r5": 0.7377,
+     "n": 16985,
+     "v_sign_r5": 0.7113
+    },
+    "turn5-8": {
+     "r3": 0.6141,
+     "r4b": 0.6401,
+     "r5": 0.6455,
+     "n": 41401,
+     "v_sign_r5": 0.7599
+    },
+    "turn9-99": {
+     "r3": 0.4396,
+     "r4b": 0.4517,
+     "r5": 0.4555,
+     "n": 72619,
+     "v_sign_r5": 0.8404
+    },
+    "layers_r5_better": [
+     {
+      "bucket": "leader_color:GREEN|PURPLE",
+      "n": 3137,
+      "r3": 0.6766,
+      "r4b": 0.5979,
+      "r5": 0.6161,
+      "d_r5_r3": -0.0606
+     },
+     {
+      "bucket": "leader_color:GREEN|YELLOW",
+      "n": 3608,
+      "r3": 0.8302,
+      "r4b": 0.8072,
+      "r5": 0.7742,
+      "d_r5_r3": -0.056
+     },
+     {
+      "bucket": "leader_color:BLUE|RED",
+      "n": 6687,
+      "r3": 0.6098,
+      "r4b": 0.6039,
+      "r5": 0.5851,
+      "d_r5_r3": -0.0246
+     },
+     {
+      "bucket": "leader_color:BLACK|GREEN",
+      "n": 2575,
+      "r3": 0.3636,
+      "r4b": 0.382,
+      "r5": 0.354,
+      "d_r5_r3": -0.0097
+     },
+     {
+      "bucket": "leader_color:BLACK|RED",
+      "n": 3341,
+      "r3": 0.466,
+      "r4b": 0.4691,
+      "r5": 0.4609,
+      "d_r5_r3": -0.0051
+     }
+    ],
+    "layers_r5_worse": [
+     {
+      "bucket": "leader_color:BLUE|PURPLE",
+      "n": 4323,
+      "r3": 0.4947,
+      "r4b": 0.599,
+      "r5": 0.5677,
+      "d_r5_r3": 0.073
+     },
+     {
+      "bucket": "leader_color:BLACK|PURPLE",
+      "n": 2217,
+      "r3": 0.4847,
+      "r4b": 0.5364,
+      "r5": 0.5528,
+      "d_r5_r3": 0.068
+     },
+     {
+      "bucket": "leader_color:YELLOW",
+      "n": 11037,
+      "r3": 0.5318,
+      "r4b": 0.5683,
+      "r5": 0.5947,
+      "d_r5_r3": 0.063
+     },
+     {
+      "bucket": "leader_color:BLACK|BLUE",
+      "n": 4356,
+      "r3": 0.6154,
+      "r4b": 0.6515,
+      "r5": 0.6673,
+      "d_r5_r3": 0.052
+     },
+     {
+      "bucket": "leader_color:BLUE|YELLOW",
+      "n": 2930,
+      "r3": 0.4237,
+      "r4b": 0.506,
+      "r5": 0.4732,
+      "d_r5_r3": 0.0496
+     }
+    ]
+   },
+   "w29": {
+    "rows": 139382,
+    "v_mse": {
+     "r3": 0.5327,
+     "r4b": 0.5198,
+     "r5": 0.5171
+    },
+    "v_sign_r5": 0.8114,
+    "after_removal": {
+     "r3": 0.6244,
+     "r4b": 0.6217,
+     "r5": 0.6146,
+     "n": 3806,
+     "v_sign_r5": 0.7717
+    },
+    "not_removal": {
+     "r3": 0.5301,
+     "r4b": 0.517,
+     "r5": 0.5144,
+     "n": 135576,
+     "v_sign_r5": 0.8126
+    },
+    "turn1-4": {
+     "r3": 0.7723,
+     "r4b": 0.7599,
+     "r5": 0.7517,
+     "n": 17646,
+     "v_sign_r5": 0.7138
+    },
+    "turn5-8": {
+     "r3": 0.6427,
+     "r4b": 0.6271,
+     "r5": 0.6288,
+     "n": 43438,
+     "v_sign_r5": 0.7705
+    },
+    "turn9-99": {
+     "r3": 0.4074,
+     "r4b": 0.3959,
+     "r5": 0.3922,
+     "n": 76380,
+     "v_sign_r5": 0.8606
+    },
+    "layers_r5_better": [
+     {
+      "bucket": "injected:bounce:OTHER:c0-2",
+      "n": 411,
+      "r3": 0.6588,
+      "r4b": 0.5275,
+      "r5": 0.2585,
+      "d_r5_r3": -0.4003
+     },
+     {
+      "bucket": "injected:bounce:TRIGGER:c0-2",
+      "n": 1072,
+      "r3": 0.5928,
+      "r4b": 0.5368,
+      "r5": 0.4612,
+      "d_r5_r3": -0.1316
+     },
+     {
+      "bucket": "injected:deck:TRIGGER:c3-5",
+      "n": 3088,
+      "r3": 0.6773,
+      "r4b": 0.5883,
+      "r5": 0.5587,
+      "d_r5_r3": -0.1185
+     },
+     {
+      "bucket": "injected:deck:OTHER:c3-5",
+      "n": 710,
+      "r3": 0.5235,
+      "r4b": 0.439,
+      "r5": 0.416,
+      "d_r5_r3": -0.1075
+     },
+     {
+      "bucket": "injected:deck:ON_PLAY:c6+",
+      "n": 2998,
+      "r3": 0.52,
+      "r4b": 0.4516,
+      "r5": 0.4179,
+      "d_r5_r3": -0.1021
+     }
+    ],
+    "layers_r5_worse": [
+     {
+      "bucket": "injected:lock:ON_PLAY:c0-2",
+      "n": 894,
+      "r3": 0.6037,
+      "r4b": 0.6969,
+      "r5": 0.7383,
+      "d_r5_r3": 0.1346
+     },
+     {
+      "bucket": "injected:lock:COUNTER:c3-5",
+      "n": 379,
+      "r3": 0.4707,
+      "r4b": 0.6209,
+      "r5": 0.5589,
+      "d_r5_r3": 0.0881
+     },
+     {
+      "bucket": "injected:lock:COUNTER:c0-2",
+      "n": 1729,
+      "r3": 0.7698,
+      "r4b": 0.8144,
+      "r5": 0.8431,
+      "d_r5_r3": 0.0733
+     },
+     {
+      "bucket": "injected:lock:OTHER:c6+",
+      "n": 894,
+      "r3": 0.5987,
+      "r4b": 0.6441,
+      "r5": 0.6542,
+      "d_r5_r3": 0.0555
+     },
+     {
+      "bucket": "injected:reduce:TRIGGER:c3-5",
+      "n": 1789,
+      "r3": 0.5237,
+      "r4b": 0.5668,
+      "r5": 0.5717,
+      "d_r5_r3": 0.048
+     }
+    ]
+   },
+   "w30": {
+    "rows": 147857,
+    "v_mse": {
+     "r3": 0.5131,
+     "r4b": 0.5044,
+     "r5": 0.4981
+    },
+    "v_sign_r5": 0.8172,
+    "after_removal": {
+     "r3": 0.6038,
+     "r4b": 0.5908,
+     "r5": 0.5834,
+     "n": 4090,
+     "v_sign_r5": 0.7792
+    },
+    "not_removal": {
+     "r3": 0.5105,
+     "r4b": 0.5019,
+     "r5": 0.4957,
+     "n": 143767,
+     "v_sign_r5": 0.8182
+    },
+    "turn1-4": {
+     "r3": 0.7408,
+     "r4b": 0.7252,
+     "r5": 0.7207,
+     "n": 19140,
+     "v_sign_r5": 0.7288
+    },
+    "turn5-8": {
+     "r3": 0.602,
+     "r4b": 0.591,
+     "r5": 0.5942,
+     "n": 46254,
+     "v_sign_r5": 0.7779
+    },
+    "turn9-99": {
+     "r3": 0.4011,
+     "r4b": 0.3955,
+     "r5": 0.3835,
+     "n": 80407,
+     "v_sign_r5": 0.8634
+    },
+    "layers_r5_better": [
+     {
+      "bucket": "injected:reduce:EVENT:c6+",
+      "n": 871,
+      "r3": 0.8651,
+      "r4b": 0.8,
+      "r5": 0.6567,
+      "d_r5_r3": -0.2084
+     },
+     {
+      "bucket": "injected:trash:ACTIVATE_MAIN:c6+",
+      "n": 2598,
+      "r3": 0.7096,
+      "r4b": 0.6891,
+      "r5": 0.5206,
+      "d_r5_r3": -0.189
+     },
+     {
+      "bucket": "injected:reduce:ON_PLAY:c6+",
+      "n": 734,
+      "r3": 0.8085,
+      "r4b": 0.7155,
+      "r5": 0.6363,
+      "d_r5_r3": -0.1722
+     },
+     {
+      "bucket": "injected:trash:ON_ATTACK:c3-5",
+      "n": 2266,
+      "r3": 0.8346,
+      "r4b": 0.7997,
+      "r5": 0.6977,
+      "d_r5_r3": -0.137
+     },
+     {
+      "bucket": "injected:KO:EVENT:c6+",
+      "n": 3938,
+      "r3": 0.6547,
+      "r4b": 0.5993,
+      "r5": 0.5353,
+      "d_r5_r3": -0.1194
+     }
+    ],
+    "layers_r5_worse": [
+     {
+      "bucket": "injected:lock:OTHER:c3-5",
+      "n": 2026,
+      "r3": 0.5686,
+      "r4b": 0.6336,
+      "r5": 0.7162,
+      "d_r5_r3": 0.1475
+     },
+     {
+      "bucket": "injected:bounce:COUNTER:c0-2",
+      "n": 443,
+      "r3": 0.5846,
+      "r4b": 0.7149,
+      "r5": 0.7211,
+      "d_r5_r3": 0.1365
+     },
+     {
+      "bucket": "injected:deck:TRIGGER:c6+",
+      "n": 1535,
+      "r3": 0.3879,
+      "r4b": 0.4534,
+      "r5": 0.5145,
+      "d_r5_r3": 0.1266
+     },
+     {
+      "bucket": "injected:bounce:TRIGGER:c0-2",
+      "n": 1036,
+      "r3": 0.3734,
+      "r4b": 0.4285,
+      "r5": 0.4878,
+      "d_r5_r3": 0.1144
+     },
+     {
+      "bucket": "injected:lock:OTHER:c0-2",
+      "n": 1007,
+      "r3": 0.4164,
+      "r4b": 0.4226,
+      "r5": 0.5069,
+      "d_r5_r3": 0.0906
+     }
+    ]
+   }
+  },
+  "arena": {
+   "main": {
+    "condition": "--leaders random --decks synth_roles",
+    "seed_base": "531000〜538000",
+    "pairs": 192,
+    "games": 384,
+    "wr": 0.5026,
+    "ci95": [
+     0.4492,
+     0.556
+    ],
+    "elo": 1.8,
+    "elo95": [
+     -35.4,
+     39.1
+    ],
+    "void": 0,
+    "dup_seeds": 0,
+    "shards": 8,
+    "per_shard_wr": {
+     "main_w00": 0.3958,
+     "main_w01": 0.4583,
+     "main_w02": 0.5833,
+     "main_w03": 0.5833,
+     "main_w04": 0.4792,
+     "main_w05": 0.4583,
+     "main_w06": 0.375,
+     "main_w07": 0.6875
+    }
+   },
+   "mirror": {
+    "condition": "固定ミラー（既定）",
+    "seed_base": "541000〜548000",
+    "pairs": 192,
+    "games": 384,
+    "wr": 0.5365,
+    "ci95": [
+     0.4952,
+     0.5777
+    ],
+    "elo": 25.4,
+    "elo95": [
+     -3.3,
+     54.4
+    ],
+    "void": 0,
+    "dup_seeds": 0,
+    "shards": 8,
+    "per_shard_wr": {
+     "mirror_w00": 0.5833,
+     "mirror_w01": 0.625,
+     "mirror_w02": 0.5,
+     "mirror_w03": 0.4792,
+     "mirror_w04": 0.6458,
+     "mirror_w05": 0.4167,
+     "mirror_w06": 0.5,
+     "mirror_w07": 0.5417
+    }
+   },
+   "baseline": "r3（--baseline \"\"＝出荷既定・DEFAULT_NET）"
+  },
+  "train_sec": 2312,
+  "band_sec": 1494,
+  "arena_sec": 3296
+ },
+ "command": "python -m opcg_sim.learned.train.n_rel_train train --in '$HOME/n30_wave/w*/n_records/n30_w*' '$HOME/n29_wave/w*/n_records/n29_w*' --z-in '$HOME/n28_wave/w*/n28_records' '$HOME/n27_wave/w*/n27_records' --ablate rel --aux-weight 0.1 --epochs 2 --lr 2e-4 --pi-teacher visits --warm-start opcg_sim/data/learned/nrel_r3.npz --out ~/nrel_r5.npz",
+ "notes": [
+  "OOM なし。z 窓は指示どおり 30→29→28→27 を全部載せた（27 も 28 も外していない）。訓練ループ開始時の実測は RSS 11.77 GB・匿名 6.54 GB、全体のピークは VmHWM 12.01 GB・匿名 6.55 GB、MemAvailable の最小は 8.32 GB（コンテナ 15.7 GB）。RSS の大半は memmap の常駐ページ（ファイル裏付け）で、匿名は 6.5 GB 程度。",
+  "best は ep1（val v_mse 0.5134）。r2／r3 の系譜は ep0 が最良だったが r5 は ep1 まで改善した（lr 2e-4・π が現 era 2 波のみ＝r3 の 4 波より小さい教材で、まだ過学習に届いていない読み）。",
+  "torch は指示の CPU 版が入れられなかった。この環境のプロキシが download.pytorch.org への CONNECT を 403 で弾くため（`recentRelayFailures` に記録）、PyPI 既定の torch 2.14.0+cu130 を入れた。GPU は無く CPU で実行しているので学習結果への影響は無い（--backend torch・threads=4）。",
+  "アリーナ 2 条件とも void 0・dup_seeds 0。主条件（random × synth_roles）は wr 0.5026・ci95 [0.4492, 0.5560]・elo 1.8 で r3 と互角＝基準未達。副条件（固定ミラー）は wr 0.5365・ci95 [0.4952, 0.5777]・elo 25.4 で CI 下限 0.4952 ≥ 0.45＝退行なし。CLAUDE.md の採用条件（主条件が基準達成 かつ 副条件が退行なし）のうち主条件が満たないので、この測定だけでは r5 は昇格しない。判定はコーディネータに委ねる。",
+  "評価帯の読み方の注意: 波 29・30 は r5 自身の π 教材（holdout-mod 7 で訓練から外した行なので行としては未見だが、分布としては現 era＝r5 に有利）。波 28 は r3 の π 教材だった波で、r5 には z のみ使用。よって帯の順位は「どの era に寄せたか」を映す面が強く、CLAUDE.md どおり補助指標として読むべき（判定の主はアリーナ）。実際 w28 では r3 が最良（0.5348 < r5 0.5551）、w29・w30 では r5 が最良（w29 0.5171 < r4b 0.5198 < r3 0.5327／w30 0.4981 < r4b 0.5044 < r3 0.5131）。",
+  "層別: 波 30 では除去の型で r5 が大きく伸びた層（reduce:EVENT:c6+ −0.208、trash:ACTIVATE_MAIN:c6+ −0.189、reduce:ON_PLAY:c6+ −0.172）がある一方、lock 系（lock:OTHER:c3-5 +0.148）と bounce:COUNTER:c0-2（+0.137）は退行。波 29 も同傾向で lock:ON_PLAY:c0-2 が +0.135 と最悪、bounce:OTHER:c0-2 が −0.400 と最良。「除去直後」（after_removal）は 波 29・30 で r5 が最良（0.6146／0.5834）、波 28 のみ r3 が最良。",
+  "教材: 波 30 は起動時に origin にあった 15 シャードを使った（w06 だけ RESULT.json が無く未完走なので除外）。w11・w15 は _p2 を同列に入れた。波 29 は 14 シャード、波 28・27 は各 8 シャード。波 30 の RESULT.json は 10 本が n_records/ 配下、5 本（w02・w05・w10・w12・w13）がブランチ直下にあり、いずれも status=done を確認した。",
+  "アリーナ起動時に `opcg_sim.tools.export_effects_json` が subprocess.CalledProcessError（exit 1）を 1 度出した。4 ワーカーが同じ opcg_sim/data/opcg_effects.json を同時に作り直そうとした競合で、1 本が勝って書き込み済み（08:24 のタイムスタンプ・単体で再実行すると正常終了）。当該シャードは 24 ペア完走・void 0 で、以後のシャードでは再発していない。コードは触っていないが、生成物の作り直しに排他が無いのは小さな欠陥（後日の WP 候補）。",
+  "質問: 主条件が互角（wr 0.5026）で副条件のみ +0.0365 という結果は、π 教材が現 era 2 波（policy 81.3 万点）と r3 のとき（4 波）より小さいことが効いている可能性がある。次は波 31 を足して π 3 波で r6 を回すか、それとも lr／epochs を動かすかを指示してほしい。"
+ ]
+}
