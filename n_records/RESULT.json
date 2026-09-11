@@ -1,0 +1,20 @@
+{
+  "job": "gen-n30-w15",
+  "status": "done",
+  "games": 480,
+  "rows": 71830,
+  "main_rows": 32521,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 315, "hold": 56, "target": 274},
+  "removal_legal_rows": 7623,
+  "sec_per_game": 13.43,
+  "wall_hours": 1.79,
+  "search": {"worlds": 4, "select_rule": "q_min_n", "q_min_frac": 0.125, "root_prior_temp": 2.0},
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "enc_version": 14,
+  "net": "nrel_r3.npz",
+  "commit": "5e4e7f92b",
+  "notes": "30局の試走はn_records/n30_w15_trial（成果物に含めず・別out）。390s/30局=13.0s/局（見積り通り・6時間以内のため相談不要で本実行へ）。本実行480局を n_records/n30_w15 に単一 --out で開始したところ、200/480局（行30231・main13717・棄却0）まで進んだところでプロセスがハング（record_gen のワーカーで BrokenPipeError／SpawnPoolWorker 死亡・コンテナ再起動によるものと推定・CPU時間がほぼ0のまま停止を確認）。meta_games.json/meta_n_record.json は最終局完了後にしか書かれない実装のため、この200局分のsidecarは失われた。該当プロセスをkillし、n_records/n30_w15_p2（seed-base 2308200・残り280局）で再開して正常完了（N_RECORD_DONE rows=41599 main_rows=18804 forced play=184/hold=28/target=160 removal_legal_rows=7623・3789s）。合算値: games=480(200+280)・rows=71830(30231+41599)・main_rows=32521(13717+18804)・forced play=315(131+184)/hold=56(28+28)/target=274(114+160)。part1(200局)のrows/main_rows/forcedはnpzシャード20本（n_record_00000〜00019・seed 2308000〜2308199・全ユニーク・棄却0）を実際に読み込んで再集計した値で、進捗ログの最終行（200/480局 行30231 main13717 棄却0 2657s）と一致を確認済み。ただしpart1にはmeta_games.json/meta_n_record.jsonが存在しないため、removal_legal_rows（除去合法な行数のカウンタで、npzの列としては保存されずgame実行中のみ集計される値）はpart1分を回収できず、上表のremoval_legal_rows=7623はpart2のみの値（part1分は不明）。void(決着せず)は試走・part1・part2いずれの区間でも棄却0で0件。コードは変更していない（HEAD=5e4e7f92b、符号化v14確認済み）。sec_per_game/wall_hoursはpart1のプロセス内経過時間2657s＋part2の3789s＝6446s（コンテナ停止による待機時間は除く）。"
+}
