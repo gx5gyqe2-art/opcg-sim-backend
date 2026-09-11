@@ -1,0 +1,29 @@
+{
+  "job": "n32-w03",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2322000,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n32_w03"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 68080,
+    "main_rows": 31659,
+    "dropped": 0,
+    "void": 0,
+    "forced": {"play": 338, "hold": 63, "target": 109},
+    "removal_legal_rows": 12591,
+    "sec_per_game": 14.41,
+    "wall_hours": 1.92
+  },
+  "notes": "480局すべて完了（p1=264勝・p2=216勝）、void（決着せず）0件、棄却0件。--net で claude/train-r5 の nrel_r5.npz（era8 生成役）を明示指定して生成し、meta_n_record.json の net フィールドでも反映を確認済み（出荷既定 r3 にフォールバックしていない）。事前に --games 30 で試走（n_records/n32_w03_trial・425秒＝約14.17秒/局）し、480局の見込み約1.9時間と確認してから本実行（実測6917秒＝約1.92時間・14.41秒/局）。コンテナ再起動なし・単一 --out で完走。試走分の成果物は含めていない。claude/n1-results はサイズが大きくプロキシ経由のフル fetch が800秒でリセットされたため --depth 1 の浅いfetchで本ブランチを作成した（生成自体は claude/cpu-spec-improvements-yw91jd の d018031a3a6210693cba3b4ea2c5a92413e2a581 で実行）。",
+  "commit": "d018031a3a6210693cba3b4ea2c5a92413e2a581"
+}
