@@ -1,0 +1,6 @@
+{"job":"n31-w10","role":"gen","status":"done",
+ "inputs":{"net":"claude/train-r5:n1_results/nrel_r5.npz","seed_base":2315500,"games":480,
+           "sims":160,"worlds":4,"decks":"synth_roles"},
+ "outputs":{"dir":"n_records/n31_w10"},
+ "metrics":{"games":480,"rows":66434,"dropped":0,"sec_per_game":20.0},
+ "notes":"--net の branch:path 形式は record_gen が解決できないため git show claude/train-r5:n1_results/nrel_r5.npz でローカルに取り出してから渡した（訂正の指示どおり）。実行前に --games 30 でタイミング測定（639s・21.3s/局→480局で約2.8h見込み）を行い6h以内と確認してから本実行。実測 9599s（480局・20.0s/局）で見積もり通り。棄却0・forced play357/hold59/target118。"}
