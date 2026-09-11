@@ -1,0 +1,19 @@
+{
+  "job": "arena-hires-w15",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1015000,
+  "pairs": 174,
+  "games": 348,
+  "wr": 0.477,
+  "ci95": [0.4168, 0.5372],
+  "elo": -16.0,
+  "elo95": [-58.4, 25.9],
+  "void": 1,
+  "dup_seeds": 0,
+  "sec_per_pair": 6.49,
+  "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+  "notes": "shard k=15（seed-base 1001000+(15-1)*1000=1015000）。§20.9.7 高分解能アリーナ r5 vs r3・175ペア中174ペア成立（1ペアvoid）。void: seed=1015064（leaders OP17-079/OP06-080）がGameAborted「決着せず（上限手数）」。175ペア消化に1135s（実測 6.49s/ペア・見積り15s/ペアより速かった）。同一コンテナのまま実行し opcg_engine の再ビルドは不要だった（波30の生成セッションを再利用）。コードは変更していない（HEAD=4d5912bd7f2f74529f64f5542be48f7b83eeade4）。本shard単体のwr=0.477・CI95=[0.4168,0.5372]は0.50を跨いでおり±10Elo圏内＝このシャード単独では改善/退行いずれも有意ではない。2,800ペア全体（k=1..16）の合算判定は他シャードの結果を待って別途行う。"
+}
