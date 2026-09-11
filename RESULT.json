@@ -1,0 +1,23 @@
+{
+  "job": "n31-w15",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2318000,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n31_w15"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 67137,
+    "dropped": 1,
+    "sec_per_game": 12.78
+  },
+  "notes": "30局のタイミング検証（約11.9s/局）で480局が6時間を大幅に下回る見込みと確認してから本実行。--net はローカルパス（/root/nrel_r5.npz、git show r5net:n1_results/nrel_r5.npz で取り出したもの）を使用。中断・再開なし、単一の実行で完了。"
+}
