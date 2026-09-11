@@ -1,0 +1,18 @@
+{
+  "job": "arena-hires-w11",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1011000,
+  "pairs": 175,
+  "games": 350,
+  "wr": 0.5343,
+  "ci95": [0.4778, 0.5908],
+  "elo": 23.9,
+  "void": 0,
+  "dup_seeds": 0,
+  "sec_per_pair": 6.4,
+  "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+  "notes": "1回のシャード実行で175/175ペア（350局）を完走（1121s・6.4s/ペア）・コンテナ再起動なし。arena_merge の ARENA_MERGE_FINAL: wr=0.5343 ci95=[0.4778,0.5908] elo=23.9 elo95=[-15.4,63.8] shards=1 dup_seeds=0 promoted=false（内部の昇格しきい値に対する判定・本シャード単独の1本の測定＝CLAUDE.mdの「1本の測定は昇格の証拠にならない」に該当・判定はコーディネータ側で他条件と合わせて行うこと）。"
+}
