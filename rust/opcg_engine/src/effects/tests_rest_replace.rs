@@ -210,11 +210,11 @@ fn the_replacement_ignores_a_rest_caused_by_its_own_side() {
     let zoro = card_by_uuid(&s, "p2-zoro");
     let source = card_by_uuid(&s, "p2-other0");
     assert!(
-        !crate::effects::actions::rules::find_rest_replacement(
+        crate::effects::actions::rules::find_rest_replacement(
             &s, masters, zoro, Seat::P2, Some(source)
         )
         .expect("走査")
-        .is_some(),
+        .is_none(),
         "自分側の効果には反応しない"
     );
     // 相手のキャラの効果なら成立する（対照）。

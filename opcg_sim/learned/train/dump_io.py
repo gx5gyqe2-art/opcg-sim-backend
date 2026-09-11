@@ -36,6 +36,11 @@ npz からしか作れない（`pol_sig` の JSON を語彙 index に潰す＝`v
 ある（dump v2 から）。`p`／`v0` は **dump v4 の追加列**（`pol_p`／`pol_v0`）＝**1 本でも
 持たないシャードがあれば `None`**（＝訓練側は warm-start ネットの forward に退避する）。
 `C["pi"]`（訪問分布）は**今までどおり**＝既定の教師は 1 bit も変わらない。
+
+**符号化 v14 の 0 埋め（2026-09-11・計画 §20.9 の E・`PACK_VERSION` 3）**: v14 は v13 の列の
+**末尾に足しただけ**（`tokens` 22×20→22×22・`scalars` 123→127）。pack は**常に現行の形**で
+書き、古い波（v13）は新しい列を **0**（＝情報なし。mask は要らない）で埋める。これで v13 と
+v14 の波を 1 本の `_Waves` に束ねられる＝`n_rel_train` は無改造で混ぜて回せる。
 """
 import glob
 import hashlib
@@ -48,7 +53,8 @@ import numpy as np
 from opcg_sim.learned.train.n1_train import _atype_idx    # 候補 action → ATYPES の index
 
 # pack の版（レイアウトを変えたら上げる＝古い pack を無視して作り直す）
-PACK_VERSION = 2                       # 2: 補助教師の 3 列を足した（dump v4・§20.8）
+PACK_VERSION = 3                       # 3: 符号化 v14 の形へ 0 埋めで揃える（§20.9 の E）
+#                                      # 2: 補助教師の 3 列を足した（dump v4・§20.8）
 # V の pack が持つ列と dtype（tok/sc/ci/z は memmap・seed/turn は小さいので RAM に読む）
 MMAP_COLS = {"sc": np.float16, "ci": np.int16, "tok": np.float16, "z": np.float16}
 RAM_COLS = {"seed": np.int64, "turn": np.int16}
@@ -61,6 +67,18 @@ def _aux_shapes():
     """`aux` 系の 1 行あたりの形（正本は `n_rel` の次元＝`record_gen.AUX_COLS` と同じ数）。"""
     from opcg_sim.learned.n_rel import D_AUX, D_AUX_TOK, N_OPP
     return {"aux": (D_AUX,), "aux_tok": (N_OPP, D_AUX_TOK), "aux_mask": ()}
+
+
+def target_form():
+    """pack が揃える**現行の符号化の形**（`tok` の 1 行の形, `scalars` の列数）。
+
+    符号化 v14（§20.9）は v13 に列を**末尾へ足した**だけ（S 20→22・scalars 123→127）なので、
+    古い波は**新しい列を 0 で埋める**だけで現行の形になる（`0`＝情報なし・mask は要らない）。
+    こうしておくと波を混ぜても行の形が揃い、`_Waves` が 1 本の配列に見せられる。
+    """
+    from opcg_sim.learned.n_rel import D_SC, N_TOK
+    from opcg_sim.learned.n_rel_feat import S_DIM
+    return (N_TOK, S_DIM), D_SC
 
 
 def default_cache_dir():
@@ -119,7 +137,15 @@ def build_pack(d, cache_dir):
         per_shard.append(n)
         n_tot += n
         has_aux = has_aux or aux
-    tok_shape, sc_dim, ci_dim = form
+    src_tok_shape, src_sc_dim, ci_dim = form
+    # 符号化 v14（§20.9 の E）: **pack は常に現行の形**にする。古い波（v13＝tokens [22,20]・
+    # scalars 123）は新しい列を 0 で埋めて入れる＝波を混ぜても行の形が揃う。
+    tok_shape, sc_dim = target_form()
+    if len(src_tok_shape) != len(tok_shape) or any(a > b for a, b in zip(src_tok_shape, tok_shape)) \
+            or src_sc_dim > sc_dim:
+        raise ValueError(
+            f"{d}: 現行の符号化より大きい形（tokens {src_tok_shape} > {tok_shape} か "
+            f"scalars {src_sc_dim} > {sc_dim}）＝この dump は新しすぎる")
     aux_shapes = _aux_shapes()
     tmp = out + ".tmp"
     shutil.rmtree(tmp, ignore_errors=True)
@@ -140,9 +166,12 @@ def build_pack(d, cache_dir):
             hi = int(np.abs(ci).max()) if n else 0
             if hi > np.iinfo(np.int16).max:
                 raise ValueError(f"{f}: card_idx が int16 に収まらない（max {hi}）")
-            mm["sc"][sl] = d_["scalars"].astype(np.float16)
+            # 新しい列は 0 のまま（`open_memmap` は 0 で作られる）＝古い波の 0 埋め。
+            sc_ = d_["scalars"]
+            tok_ = d_["tokens"]
+            mm["sc"][sl, :sc_.shape[1]] = sc_.astype(np.float16)
             mm["ci"][sl] = ci.astype(np.int16)
-            mm["tok"][sl] = d_["tokens"].astype(np.float16)
+            mm["tok"][sl, :tok_.shape[1], :tok_.shape[2]] = tok_.astype(np.float16)
             mm["z"][sl] = d_["z"].astype(np.float16)
             ram["seed"][sl] = d_["seed"]
             ram["turn"][sl] = d_["turn"] if "turn" in d_.files else 0
@@ -161,6 +190,8 @@ def build_pack(d, cache_dir):
                    "rows": n_tot, "shards": [os.path.basename(f) for f in files],
                    "shard_rows": per_shard, "ci_dim": ci_dim, "has_aux": bool(has_aux),
                    "tok_shape": list(tok_shape), "sc_dim": sc_dim,
+                   # 元の npz の形（0 埋めしたかが判る＝v13 の波か v14 の波か）
+                   "src_tok_shape": list(src_tok_shape), "src_sc_dim": src_sc_dim,
                    "dtypes": {k: np.dtype(v).name for k, v in
                               {**MMAP_COLS, **AUX_COLS, **RAM_COLS}.items()}}, fh)
     shutil.rmtree(out, ignore_errors=True)

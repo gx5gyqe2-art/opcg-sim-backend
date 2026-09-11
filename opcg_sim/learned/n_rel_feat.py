@@ -14,7 +14,12 @@
      ライフ圧・自デッキ残の役割別枚数・**相手の未見プール**（デッキリスト − 見えたカード＝
      手札∪山札∪伏せライフ。人間が「環境デッキの中身」として知っている範囲）の役割と脅威・
      リーダーパワーの現在/見込み・次ターンのドン・次ターンに出せる最大の札・守りの単価。
-     `encoder.encode(version=13)` はこの列を v12 の末尾に付ける。
+     `encoder.encode(version>=13)` はこの列を v12 の末尾に付ける。
+
+**符号化 v14**（2026-09-11・計画 §20.9）: **append-only**（v13 の列は 1 bit も動かさない）で
+S に 2 列（`power_opp_turn`／`act_avail`）・EXTRA に 4 列（`deck_removal_fixed`／
+`opp_pool_removal_fixed`／`deck_bounce`／`opp_pool_bounce`）を足した。v13 のネットは新しい列の
+重みを 0 で埋めて読む（`n_rel.NRelNet.load`／Rust `net::load_npz`）＝出力が v13 と同一。
 
 設計原則（`docs/n_attention_plan.md` §1）: 関係は符号化側で計算・条件の充足はエンジンの真偽・
 ID 非依存（カード ID・名前・特性を列にしない）・エンジンと木は変えない。
@@ -41,11 +46,23 @@ N_OPP = 1 + MAX_FIELD                     # 6: 相手L・相手場5
 N_TOK = N_OWN + N_OPP                     # 22（card_idx の先頭 22 枠と同じ並び: 自L,相L,自場5,相場5,手札10）
 
 # ---- トークン状態 S の列 ----
-S_COLS = ("power_now", "cost_now", "attached_don", "is_rest", "is_sick", "can_attack_now",
-          "is_blocker_active", "counter_value", "playable_now", "don_return_cost",
-          "cond_ok0", "cond_ok1", "cond_ok2", "cond_ok3",
-          "trig_ko", "trig_attack", "trig_opp_attack", "threat_next", "is_char", "is_event")
-S_DIM = len(S_COLS)                        # 20
+#: v13 までの 20 列（**この並びは 1 bit も動かさない**）。v14 は末尾に 2 列を足すだけ。
+S_COLS_V13 = ("power_now", "cost_now", "attached_don", "is_rest", "is_sick", "can_attack_now",
+              "is_blocker_active", "counter_value", "playable_now", "don_return_cost",
+              "cond_ok0", "cond_ok1", "cond_ok2", "cond_ok3",
+              "trig_ko", "trig_attack", "trig_opp_attack", "threat_next", "is_char", "is_event")
+S_DIM_V13 = len(S_COLS_V13)                # 20
+# v14（2026-09-11・計画 §20.9 の B）: append-only で 2 列。
+#   power_opp_turn … **相手ターンの側で評価したパワー**（【自分のターン中】【相手のターン中】の
+#                    常在を「相手が手番のとき」で評価する＝自分の枠は守りのパワー・相手の枠は
+#                    殴ってくるときのパワー）。`power_now` は「今どちらの手番か」で切り替わる
+#                    ので、この列が無いとネットは「相手ターンの盤面」を引けない。
+#   act_avail      … **未使用の【起動メイン】を持つか**（リーダーも・場の枠のみ）。
+#                    `EXTRA.leader_act_avail` は自リーダー 1 枠だけの旗で、場のキャラの起動は
+#                    どの列にも出ていなかった。判定は「能力 k のトリガーが ACTIVATE_MAIN で
+#                    `ability_used_this_turn[k]` が 0」＝カード ID に依らない。
+S_COLS = S_COLS_V13 + ("power_opp_turn", "act_avail")
+S_DIM = len(S_COLS)                        # 22
 MAX_AB = 4
 
 # ---- 関係 R の列 ----
@@ -53,16 +70,26 @@ R_COLS = ("atk_margin", "ko_gap", "cost_gap", "red_amount", "feasible")
 R_DIM = len(R_COLS)                        # 5
 GAP_SAT = 1.5                              # 「届かない/該当なし」の飽和値
 
-# ---- グローバル追加列（v13 = v12 + EXTRA_DIM） ----
+# ---- グローバル追加列（v13 = v12 + EXTRA_DIM_V13・v14 = v12 + EXTRA_DIM） ----
 ROLES = ("removal", "reduction", "lock", "draw", "counter", "blocker", "big")
-EXTRA_COLS = (("leader_act_avail", "don_addable", "attackers_left", "rush_in_hand",
-               "opp_counters_in_trash", "life_pressure")
-              + tuple(f"deck_{r}" for r in ROLES)
-              + tuple(f"opp_pool_{r}" for r in ROLES)
-              + ("opp_pool_max_power", "opp_pool_big", "opp_pool_counter_total", "opp_pool_blockers",
-                 "leader_power_now", "leader_power_max", "don_next_turn", "max_play_next_turn",
-                 "guard_per_card"))
-EXTRA_DIM = len(EXTRA_COLS)                # 29
+#: v13 までの 29 列（**この並びは 1 bit も動かさない**）。
+EXTRA_COLS_V13 = (("leader_act_avail", "don_addable", "attackers_left", "rush_in_hand",
+                   "opp_counters_in_trash", "life_pressure")
+                  + tuple(f"deck_{r}" for r in ROLES)
+                  + tuple(f"opp_pool_{r}" for r in ROLES)
+                  + ("opp_pool_max_power", "opp_pool_big", "opp_pool_counter_total",
+                     "opp_pool_blockers", "leader_power_now", "leader_power_max",
+                     "don_next_turn", "max_play_next_turn", "guard_per_card"))
+EXTRA_DIM_V13 = len(EXTRA_COLS_V13)        # 29
+#: v14（2026-09-11・計画 §20.9 の C）: append-only で 4 列。既存の `deck_removal`／
+#: `opp_pool_removal` は `_REMOVAL_OPS` 由来で **BOUNCE を数えず・対象ゾーンを見ない**
+#: （`docs/rust_engine_plan.md` §20.8.1-1 の実測）。直すと v13 の列が動くので、**直した数え方を
+#: 新しい列として足す**（`deck_roles.classify` と同じ規則＝相手の **FIELD** を対象にする
+#: KO／bounce／deck／trash の form を持つ札の枚数）。
+ROLES2 = ("removal_fixed", "bounce")
+EXTRA_COLS = EXTRA_COLS_V13 + ("deck_removal_fixed", "opp_pool_removal_fixed",
+                               "deck_bounce", "opp_pool_bounce")
+EXTRA_DIM = len(EXTRA_COLS)                # 33
 
 # **符号化の除去判定**（Rust `encode/tokens.rs::is_removal_op` が 1 対 1 の写し＝両方を同時に
 # 直さない限り、訓練時に再計算する R と推論時に Rust が作る R がずれる）。
@@ -87,6 +114,26 @@ _BLOCKER_KW = "ブロッカー"
 _RUSH_KW = "速攻"
 _BIG_POWER = 7000
 _BIG_COST = 7
+
+# **直した除去の数え方**（v14 の新列だけが使う・`opcg_sim/loop/deck_roles.py::_FORM_OF_OP` の
+# 写し。上の `_REMOVAL_OPS` は v13 の列の正本なので 1 bit も触らない）。
+#   - `BOUNCE` を数える（パーサは「手札に戻す」を BOUNCE で出す＝`MOVE_TO_HAND` は別名）
+#   - **対象ゾーンが FIELD のときだけ**（手札のデッキ下送り・ライフ操作を除去に混ぜない）
+#   - 能力の**コスト側**も見る（「相手のキャラ1枚を〜:…」をコストに置くカードがある）
+# `deck_roles` を import しない（`deck_roles` がこのモジュールを import する＝循環）。
+_FORM_OF_OP = {
+    ActionType.KO: "KO",
+    ActionType.BOUNCE: "bounce",
+    ActionType.MOVE_TO_HAND: "bounce",
+    ActionType.DECK_BOTTOM: "deck",
+    ActionType.DECK_TOP: "deck",
+    ActionType.MOVE_CARD: "deck",
+    ActionType.TRASH: "trash",
+    ActionType.DISCARD: "trash",
+}
+#: 盤面から相手の駒が減る form（`deck_removal_fixed` が数える集合）。
+_REMOVAL_FORMS = frozenset(("KO", "bounce", "deck", "trash"))
+_FIELD_ZONE = "FIELD"
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +161,37 @@ def _base(v):
         return float(getattr(v, "base", 0) or 0)
     except Exception:
         return 0.0
+
+
+def _is_field(tgt):
+    """対象ゾーンが **FIELD 単一** か（v14 の新列だけが使う）。
+
+    `TargetQuery.zone` は `Zone` か `List[Zone]`。Rust 側（`effects/loader.rs`）は単一も長さ 1 の
+    Vec に畳むので「単一かリストか」を保てない＝**FIELD 1 つだけ**を FIELD と呼ぶ規則に揃える。
+    現物の効果 JSON に FIELD を含むリストは 1 件も無い（2026-09-11 実測）＝`deck_roles` の
+    `_zone_name(tgt) == "FIELD"` と同じ集合になる。
+    """
+    z = getattr(tgt, "zone", None) if tgt is not None else None
+    if isinstance(z, (list, tuple)):
+        return len(z) == 1 and getattr(z[0], "name", str(z[0])) == _FIELD_ZONE
+    return z is not None and getattr(z, "name", str(z)) == _FIELD_ZONE
+
+
+def _forms_fixed(master):
+    """マスター → 相手の盤面へ撃つ form の集合（`_FORM_OF_OP` の 4 種のみ・pure）。"""
+    out = set()
+    for ab in (getattr(master, "abilities", ()) or ()):
+        acts = []
+        _walk(getattr(ab, "effect", None), acts)
+        _walk(getattr(ab, "cost", None), acts)
+        for a in acts:
+            tgt = getattr(a, "target", None)
+            if not _is_opp(tgt) or not _is_field(tgt):
+                continue
+            f = _FORM_OF_OP.get(getattr(a, "type", None))
+            if f is not None:
+                out.add(f)
+    return out
 
 
 _PROFILES: dict = {}
@@ -164,11 +242,19 @@ def profile(master):
             if getattr(c, "type", None) == ActionType.RETURN_DON:
                 ret_don = max(ret_don, max(1.0, _base(getattr(c, "value", None))))
     kws = set(getattr(master, "keywords", ()) or ())
+    forms = _forms_fixed(master)                       # v14 の新列（v13 の欄は 1 bit も変わらない）
+    #: 未使用判定に使う「【起動メイン】の能力 index」（`ability_used_this_turn` の鍵と同じ）。
+    act_idx = tuple(k for k, ab in enumerate(getattr(master, "abilities", ()) or ())
+                    if getattr(getattr(ab, "trigger", None), "name", "") == "ACTIVATE_MAIN")
     prof = {"thr": tuple(thr), "red": red, "ret_don": ret_don, "ramp": ramp, "trig": frozenset(trig),
             "counter_event": cev, "blocker": _BLOCKER_KW in kws, "rush": _RUSH_KW in kws,
             "has_draw": any(getattr(a, "type", None) == ActionType.DRAW
                             for ab in (getattr(master, "abilities", ()) or ())
-                            for a in _walk_list(getattr(ab, "effect", None)))}
+                            for a in _walk_list(getattr(ab, "effect", None))),
+            "forms": frozenset(forms),
+            "rm_fixed": bool(forms & _REMOVAL_FORMS),
+            "bounce": "bounce" in forms,
+            "act_idx": act_idx}
     _PROFILES[key] = prof
     return prof
 
@@ -218,6 +304,21 @@ def roles_of(master):
                                       or (getattr(master, "cost", 0) or 0) >= _BIG_COST)) else 0.0,
     ], np.float32)
     _ROLES[key] = out
+    return out
+
+
+_ROLES2: dict = {}
+
+
+def roles2_of(master):
+    """v14 の追加役割（`ROLES2` の順・0/1）＝直した除去の数え方（`_forms_fixed`）。"""
+    key = getattr(master, "card_id", None) or id(master)
+    hit = _ROLES2.get(key)
+    if hit is not None:
+        return hit
+    p = profile(master)
+    out = np.array([1.0 if p["rm_fixed"] else 0.0, 1.0 if p["bounce"] else 0.0], np.float32)
+    _ROLES2[key] = out
     return out
 
 
@@ -331,9 +432,20 @@ def _static(master):
     conds = tuple((k, ab.condition) for k, ab in enumerate(abs_) if getattr(ab, "condition", None) is not None)
     hit = (t, p, 1.0 if "ON_KO" in p["trig"] else 0.0, 1.0 if "ON_ATTACK" in p["trig"] else 0.0,
            1.0 if ("ON_OPP_ATTACK" in p["trig"] or "OPPONENT_ATTACK" in p["trig"]) else 0.0,
-           min(p["ret_don"], 3.0) / 3.0, conds)
+           min(p["ret_don"], 3.0) / 3.0, conds, p["act_idx"])
     _STATIC[key] = hit
     return hit
+
+
+def _act_avail(card, act_idx):
+    """`act_avail`（v14）: 未使用の【起動メイン】を持つか。`act_idx` は `profile` の能力 index。"""
+    if not act_idx:
+        return 0.0
+    used = getattr(card, "ability_used_this_turn", None) or {}
+    for k in act_idx:
+        if not int(used.get(k, 0) or 0):
+            return 1.0
+    return 0.0
 
 
 def _cond_flags(manager, player, card, res=None):
@@ -511,30 +623,37 @@ def _card_ids(cards):
 
 
 def _deck_roles(deck):
+    """(役割 7 の枚数, v14 の追加役割 2 の枚数)。中身が同じ山なら再利用する。"""
     def fn():
         dr = np.zeros(len(ROLES), np.float32)
+        dr2 = np.zeros(len(ROLES2), np.float32)
         for c in deck:
             m = getattr(c, "master", None)
             if m is not None:
                 dr += roles_of(m)
-        return dr
+                dr2 += roles2_of(m)
+        return dr, dr2
     return _agg_get(_DECK_ROLES_CACHE, _card_ids(deck), fn)
 
 
 def _pool_summary(pool, don_next_opp):
-    """(pool_arr, pr, pmax, pbig, pctr, pblk)。pool_arr は次ターンのドンで撃てるしきい値効果の行列。"""
+    """(pool_arr, pr, pmax, pbig, pctr, pblk, pr2)。pool_arr は次ターンのドンで撃てるしきい値効果の行列。
+
+    `pr2` は v14 の追加役割（`ROLES2`）の枚数＝末尾に足しただけ（既存の欄は不変）。"""
     def fn():
         rows = [thr_rows(c.master) for c in pool
                 if getattr(c, "master", None) is not None and thr_rows(c.master) is not None
                 and int(getattr(c.master, "cost", 0) or 0) <= don_next_opp]
         pool_arr = np.concatenate(rows, 0) if rows else None
         pr = np.zeros(len(ROLES), np.float32)
+        pr2 = np.zeros(len(ROLES2), np.float32)
         pmax, pbig, pctr, pblk = 0.0, 0, 0.0, 0
         for c in pool:
             m = getattr(c, "master", None)
             if m is None:
                 continue
             pr += roles_of(m)
+            pr2 += roles2_of(m)
             pp = float(getattr(m, "power", 0) or 0)
             if _tname(c) == "CHARACTER":
                 pmax = max(pmax, pp)
@@ -543,7 +662,7 @@ def _pool_summary(pool, don_next_opp):
             pctr += float(getattr(m, "counter", 0) or 0)
             if profile(m)["blocker"]:
                 pblk += 1
-        return (pool_arr, pr, pmax, pbig, pctr, pblk)
+        return (pool_arr, pr, pmax, pbig, pctr, pblk, pr2)
     return _agg_get(_POOL_CACHE, (_card_ids(pool), int(don_next_opp)), fn)
 
 
@@ -574,7 +693,7 @@ def encode_rel(manager, me_name, with_relations=True, legal=None):
     pool = _unseen_pool(opp)
     n_pool = max(1, len(pool))
     # 相手プールのしきい値効果（次ターンのドンで撃てるもの）と役割/脅威の要約（中身が同じなら再利用）
-    pool_arr, pr, pmax, pbig, pctr, pblk = _pool_summary(pool, don_next_opp)   # pool_arr [M, 6] = P, C, rest, lead, nothr, red
+    pool_arr, pr, pmax, pbig, pctr, pblk, pr2 = _pool_summary(pool, don_next_opp)   # pool_arr [M, 6] = P, C, rest, lead, nothr, red
 
     pw = [0] * N_TOK
     cs = [0] * N_TOK
@@ -589,9 +708,10 @@ def encode_rel(manager, me_name, with_relations=True, legal=None):
         owner_turn = my_turn if own_side else (not my_turn)
         m = getattr(c, "master", None)
         if m is not None:
-            t, p, trig_ko, trig_atk, trig_oatk, ret_norm, conds = _static(m)
+            t, p, trig_ko, trig_atk, trig_oatk, ret_norm, conds, act_idx = _static(m)
         else:
-            t, p, trig_ko, trig_atk, trig_oatk, ret_norm, conds = "", None, 0.0, 0.0, 0.0, 0.0, ()
+            t, p, trig_ko, trig_atk, trig_oatk, ret_norm, conds, act_idx = \
+                "", None, 0.0, 0.0, 0.0, 0.0, (), ()
         is_unit = t == "LEADER" or t == "CHARACTER"
         pw[i] = _power(c, owner_turn) if is_unit else 0
         cs[i] = _cost(c)
@@ -628,6 +748,12 @@ def encode_rel(manager, me_name, with_relations=True, legal=None):
             thr_slots.append((i, rest, z == "own_leader"))          # threat_next はループ後に一括計算
         tok[i, 18] = 1.0 if t == "CHARACTER" else 0.0
         tok[i, 19] = 1.0 if t == "EVENT" else 0.0
+        # --- v14（§20.9 の B）: 相手ターン側のパワーと、未使用の起動メイン -----------------
+        # `power_opp_turn` は「**視点の相手**が手番のときのパワー」＝自分の枠は owner_turn=False・
+        # 相手の枠は owner_turn=True（`power_now` の owner_turn を反転させた値ではなく、
+        # 「相手ターン」という 1 つの局面で両陣営を評価した値＝枠をまたいで比較できる）。
+        tok[i, 20] = (_power(c, not own_side) / 10000.0) if is_unit else 0.0
+        tok[i, 21] = _act_avail(c, act_idx) if on_board else 0.0
 
     if thr_slots:
         # threat_next（自分の場の枠 × 相手プールのしきい値効果）を枠ごとの numpy 呼び出しでなく一括で
@@ -675,7 +801,7 @@ def encode_rel(manager, me_name, with_relations=True, legal=None):
     my_guard = sum(tok[i, 7] * 2000.0 for i in own_ids if _ZONE[i] == "hand") + 1000.0 * sum(
         1 for i in own_ids if tok[i, 6] > 0)
     ex[5] = float(np.clip((opp_attack - my_guard) / 20000.0, -1.5, 1.5))
-    dr = _deck_roles(getattr(me, "deck", ()) or ())
+    dr, dr2 = _deck_roles(getattr(me, "deck", ()) or ())
     ex[6:6 + len(ROLES)] = np.minimum(dr, 10.0) / 10.0
     b = 6 + len(ROLES)
     ex[b:b + len(ROLES)] = np.minimum(pr, 10.0) / 10.0
@@ -702,11 +828,20 @@ def encode_rel(manager, me_name, with_relations=True, legal=None):
     ex[b + 7] = mp / 10.0
     n_opp_attackers = max(1, sum(1 for j in opp_ids if slots[j] is not None))
     ex[b + 8] = min((my_guard / 2000.0) / n_opp_attackers, 5.0) / 5.0
+    # --- v14（§20.9 の C）: 直した除去の枚数（自デッキ残／相手の未見プール）---------------
+    # 目盛りは既存の役割列と同じ（`min(枚数, 10)/10`）＝読み方が揃う。
+    b2 = EXTRA_DIM_V13
+    ex[b2 + 0] = min(float(dr2[0]), 10.0) / 10.0        # deck_removal_fixed
+    ex[b2 + 1] = min(float(pr2[0]), 10.0) / 10.0        # opp_pool_removal_fixed
+    ex[b2 + 2] = min(float(dr2[1]), 10.0) / 10.0        # deck_bounce
+    ex[b2 + 3] = min(float(pr2[1]), 10.0) / 10.0        # opp_pool_bounce
     return {"tokens": tok, "rel_om": rel_om, "rel_oo": rel_oo, "extra": ex}
 
 
 def extra_scalars(manager, me_name):
-    """`encoder.encode(version=13)` が v12 の末尾へ付けるグローバル追加列（EXTRA_DIM）。"""
+    """`encoder.encode(version>=13)` が v12 の末尾へ付けるグローバル追加列（EXTRA_DIM）。
+
+    v13 の呼び出し側は先頭 `EXTRA_DIM_V13` 列だけを取る（append-only なので前方一致）。"""
     return encode_rel(manager, me_name)["extra"]
 
 

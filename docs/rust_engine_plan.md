@@ -5232,3 +5232,26 @@ rust/opcg_engine/src/encode/・net/（npz の読み・pad）・search/quiesce.rs
 **その後（合流後・別の指示書）**: 波 30 の生成（16 セッション・生成役 r3・v14 dump・`pol_p`・ε 3%/3%・`--eps-target 0.1`・
 synth_roles・160×4×R2）→ r5 ＝ warm-start r3（pad）・π 波 29+30・z 30+29+28+27・lr 2e-4・aux 0.1・visits 教師 → 評価帯
 （波 28・29・30）→ アリーナ（synth_roles 主・ミラー副）を常設セッションで 1 セット。
+
+#### 20.9.2 実装のメモ（WP `rs-enc-v14`・2026-09-11）
+
+設計（§20.9）どおりに入った。**指示書に無い判断を 2 つ**したので明記する。
+
+1. **候補行の対象（A）はネットの `enc_version` で分岐する**。列（B・C）は重みを 0 で埋めれば
+   恒等になるが、A は**次元を変えない代わりに重みで無効化できない**——v13 のネット（r3／a1）が
+   v14 のコードで対話ノードの候補行を読むと、今まで一様だった P が割れて**手が変わる**。
+   受け入れの「r3 を v14 で読んだ decide が v13 と同じ手・同じ stats」と両立させるため、
+   `NRelWeights::cand_target()`／`n_rel.cand_ids(enc_version=…)` が **14 以上のときだけ**
+   `selected_uuids[0]` を対象にする。**dump は版に依らず常に v14 の規則で書く**（生成役が r3 でも
+   教材は v14 のネットが読むもの＝π は木のまま・行の見え方だけが新しい）。
+2. **新しい列の「除去」の判定はゾーン FIELD 単一**（`n_rel_feat._is_field`）。Python の
+   `deck_roles._zone_name` は `TargetQuery.zone` が単一の `Zone` のときだけ FIELD と読むが、
+   Rust の loader は単一もリストも `Vec<ZoneRef>` に畳む＝「単一かリストか」を保てない。
+   **FIELD 1 つだけ**を FIELD と呼ぶ規則に揃えた（現物の効果 JSON に FIELD を含むリストは
+   1 件も無い＝実データ上は `deck_roles` と同じ集合・2026-09-11 実測）。
+
+**実測の注記**: 生成の棋譜で main 行の候補に出る `RESOLVE_EFFECT_SELECTION` は
+ARRANGE_DECK／SELECT_RESOURCE（山札・ドン）ばかりで、**盤面を対象にする選択は対話窓へ畳まれる**
+（`kind=window`＝候補を配らない行）。つまり A が効くのは**木の中の対話ノードの P**（Rust
+`quiesce::priors`）で、そこは `rs-q-pi` の実測どおり今まで一様だった。dump の `pol_si`／`pol_ti` は
+規則としては v14 に揃えたが、実データで値が変わるのは盤面対象の選択が main 行に出たときだけ。

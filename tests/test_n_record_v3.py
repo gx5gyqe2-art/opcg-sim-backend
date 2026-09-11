@@ -12,8 +12,9 @@
      他の列（z・pol_n・sig 等）は v2 から変えていない。
   3. dump の 1 行（card_idx＋tokens）から `relations_from_dump` で R を再計算できる（形状）。
      訓練は float32 へ上げてから渡す（`dump_io.rows_f32`）。
-  4. meta は `dump_version=4`（v3 の列＋補助教師の 3 列・§20.8.2）・`enc_version` は v2 と
-     同じ 13（符号化は変えていない）。`--no-aux` は v3 の列だけを書く（`dump_version=3`）。
+  4. meta は `dump_version=4`（v3 の列＋補助教師の 3 列・§20.8.2）・`enc_version` は **14**
+     （符号化 v14＝tokens 22×22・scalars 127・§20.9）。`--no-aux` は v3 の列だけを書く
+     （`dump_version=3`）。
 
 fp16 の丸めが forward に与える差は 1 バッチ最大 1.07e-4（`docs/reports/2026-09-07_train_profile.md`
 §3）＝v_mse 0.53 の水準に対して無視できる（1 エポックの val v_mse 相対差 0.09% を実測・
@@ -61,7 +62,7 @@ def game():
 def test_dump_v3_rows_and_dtypes(game):
     _seed, r = game
     n = len(r["z"])
-    assert r["scalars"].shape == (n, E.scalars_dim(13))
+    assert r["scalars"].shape == (n, E.scalars_dim(G.ENC_VERSION_V14))
     assert r["scalars"].dtype == np.float16
     assert r["tokens"].shape == (n, NR.N_TOK, NR.S_DIM) and r["tokens"].dtype == np.float16
     assert r["card_idx"].shape == (n, G.MAX_CI) and r["card_idx"].dtype == np.int16
@@ -77,8 +78,9 @@ def test_dump_v3_rows_and_dtypes(game):
     # 変えていない列（v2 のまま）
     assert r["z"].dtype == np.float32 and r["pol_n"].dtype == np.float32
     assert r["turn"].dtype == np.int16 and r["seed"].dtype == np.int64
-    # v13 の先頭 94 列は v12 の定義（append-only）＝列数だけここで固定
-    assert E.scalars_dim(13) - E.scalars_dim(12) == NR.EXTRA_DIM
+    # v14 の先頭 94 列は v12 の定義・その後ろが `EXTRA_COLS`（append-only）＝列数だけ固定
+    assert E.scalars_dim(G.ENC_VERSION_V14) - E.scalars_dim(12) == NR.EXTRA_DIM
+    assert E.scalars_dim(13) - E.scalars_dim(12) == NR.EXTRA_DIM_V13
 
 
 # --- 2. cast しただけ -------------------------------------------------------
@@ -117,7 +119,9 @@ def test_relations_from_dump_row(game):
 # --- 4. meta の版 -----------------------------------------------------------
 def test_meta_versions():
     assert G.DUMP_VERSION == 4                               # v3 ＋ 補助教師 3 列 ＋ deck_kinds 列（§20.8）
-    assert G.ENC_VERSION_V2 == 13                            # 符号化は v2 から変えていない
+    assert G.ENC_VERSION_V2 == 13                            # 波 29 までの符号化（過去の meta）
+    assert G.ENC_VERSION_V14 == 14                           # 現行（§20.9・列の形が変わる唯一の欄）
+    assert G.TOKENS_SHAPE == (NR.N_TOK, NR.S_DIM) == (22, 22)
     assert set(G.DT_V3) == {"tokens", "scalars", "card_idx"}
 
 

@@ -1810,6 +1810,7 @@ pub(super) mod tests {
             ablate: Default::default(),
             meta_json: String::new(),
             vocab_ids: Vec::new(),
+            enc_version: crate::encode::ENC_VERSION,
         };
         let vocab = Vocab::from_ids(&[]);
         let tables = crate::encode::EffTables {

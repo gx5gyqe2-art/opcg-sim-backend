@@ -9,7 +9,9 @@ green になる。入れ方は README の学習手順）。
      1e-5 で一致する（`n_rel.py` の forward が正本・torch はその写し）。
   b. **勾配一致**: 同じバッチで numpy の手書き backward と torch autograd が一致する。
      指標は 3 つ（`tests/harness/n_rel_torch_cmp.py` の `grad_report`）:
-       - |g|>1e-4 の要素での相対誤差 < 1e-4（実際に重みを動かす大きさの要素）
+       - |g|>1e-4 の要素での相対誤差 < 1e-4、**または丸めの下限の 5 倍以内**（2026-09-11・
+         符号化 v14 で合成バッチの引きが変わり 1.20e-4 が出た。同じ numpy を加算順だけ変えた
+         下限が 4.06e-5＝下限より良くはならないので、絶対値だけでは引き次第で緑赤が変わる）
        - max|Δg| / max|g| < 1e-5（配列の尺度で正規化＝加算順に依らない指標）
        - |g|>1e-6 の要素での相対誤差は **float32 の丸めの下限（noise floor）の 5 倍以内**。
          この閾値は下限より下にあり、**同じ numpy の式を加算順だけ変えて回しても同じ桁が出る**
@@ -195,7 +197,10 @@ def test_grads_match_numpy(env):
     g = CMP.combine(wv, wp, nf_v, nf_p)
     # 全パラメータについて勾配が出ていること（どこかが黙って 0 のままなら照合の意味が無い）
     assert set(wv["max_rel"]) and set(wp["max_rel"])
-    assert g["pass_1e-4_at_1e-4"], g["max_rel"]
+    # 絶対値 1e-4 未満か、**丸めの下限**（同じ numpy を加算順だけ変えた差）の 5 倍以内。
+    # 下限より良くなることはあり得ないので、絶対値だけで落とすと合成バッチの引きに左右される。
+    assert g["pass_1e-4_at_1e-4"] or g["within_noise_floor_1e-4"], \
+        (g["max_rel"], g["noise_floor"]["max_rel"])
     assert g["pass_norm_1e-5"], g["max_norm"]
     assert g["within_noise_floor_1e-6"], (g["max_rel"], g["noise_floor"]["max_rel"])
 

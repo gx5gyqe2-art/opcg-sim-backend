@@ -274,13 +274,33 @@ impl<'a> Ctx<'a> {
         // **1 行**として見せる（枝の候補行は素の手の行そのものなので、k 本並べると softmax が
         // その手を k 回数えてしまう）。行の P を枝へ配るのは下の `setup_branch_shares`。
         let rows = setup_row_map(legal);
+        let cand_target = self.net.weights.cand_target();
         let refs: Vec<CandOwned> = {
             let state = s.state();
+            // 効果の発生源（対象選択の候補行の主体・§20.9 の A）。中断していなければ None。
+            let src: Option<String> = if cand_target {
+                state
+                    .active_interaction()
+                    .and_then(|it| it.source_card)
+                    .map(|c| state.card(c).uuid.clone())
+            } else {
+                None
+            };
             let slots = slot_index(state, me);
             let uidx = uuid_index(state);
             rows.heads
                 .iter()
-                .map(|i| cand_owned(state, self.masters, &uidx, &slots, &legal[*i]))
+                .map(|i| {
+                    cand_owned(
+                        state,
+                        self.masters,
+                        &uidx,
+                        &slots,
+                        &legal[*i],
+                        src.as_deref(),
+                        cand_target,
+                    )
+                })
                 .collect()
         };
         let cands = match self.cand_rows(&enc, &refs) {
@@ -466,16 +486,27 @@ pub fn slot_index(state: &GameState, me: Seat) -> HashMap<&str, i32> {
     out
 }
 
-/// 手 → `CandOwned`（Python `_cand_row`／`_cand_rows` の uuid 解決と同じ規則）。
+/// 効果の対象選択の手（対象は `payload.target_ids` ではなく `selected_uuids` に入る）。
+pub const SELECT_AT: &str = "RESOLVE_EFFECT_SELECTION";
+
+/// 手 → `CandOwned`（Python `n_rel.cand_ids`／`_cand_rows` の uuid 解決と同じ規則）。
 ///
 /// 主体は `card_uuid` → `payload.uuid` の順（Python の `mv.get("card_uuid") or p.get("uuid")`）、
 /// 対象は `payload.target_ids[0]`。引けない uuid は `card_id=None`（＝vocab の PAD 0）。
+///
+/// **符号化 v14（§20.9 の A）**: `cand_target=true`（v14 のネット）のときだけ、
+/// `RESOLVE_EFFECT_SELECTION` の対象を `payload.selected_uuids[0]`・主体を効果の発生源
+/// （`src_uuid`＝中断している対話の `source_card_uuid`）にする。これが無いと「A を KO」と
+/// 「B を KO」が同じ候補行になり P が対象を区別できない。v13 のネットでは `false`＝
+/// 今までどおり（1 bit も変わらない）。
 pub fn cand_owned(
     state: &GameState,
     masters: &MasterTable,
     uidx: &HashMap<&str, CardIdx>,
     slots: &HashMap<&str, i32>,
     mv: &Move,
+    src_uuid: Option<&str>,
+    cand_target: bool,
 ) -> CandOwned {
     let null = Value::Null;
     // 準備箱（§20.7.2）はネットに**素の手として**見せる（`SETUP_BOX` は語彙に無い＝
@@ -483,27 +514,38 @@ pub fn cand_owned(
     // （§20.7.8 の 3＝行は 1 本に畳んでから、その P を対象選択の P で割り振る）。
     if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
         if let Some(base) = mv.get("payload").and_then(|p| p.get("base")) {
-            return cand_owned(state, masters, uidx, slots, base);
+            return cand_owned(state, masters, uidx, slots, base, src_uuid, cand_target);
         }
     }
+    let at = mv.get("action_type").and_then(Value::as_str).unwrap_or("");
     let p = mv.get("payload").unwrap_or(&null);
-    let su = mv
+    let mut su = mv
         .get("card_uuid")
         .and_then(Value::as_str)
         .or_else(|| p.get("uuid").and_then(Value::as_str));
-    let tids = p.get("target_ids").and_then(Value::as_array);
-    let has_target = tids.map(|a| !a.is_empty()).unwrap_or(false);
-    let tu = tids.and_then(|a| a.first()).and_then(Value::as_str);
+    let (has_target, tu) = if cand_target && at == SELECT_AT {
+        if su.is_none() {
+            su = src_uuid;
+        }
+        let sel = p
+            .get("selected_uuids")
+            .and_then(Value::as_array)
+            .and_then(|a| a.first())
+            .and_then(Value::as_str);
+        (sel.is_some(), sel)
+    } else {
+        let tids = p.get("target_ids").and_then(Value::as_array);
+        (
+            tids.map(|a| !a.is_empty()).unwrap_or(false),
+            tids.and_then(|a| a.first()).and_then(Value::as_str),
+        )
+    };
     let card_id = |u: Option<&str>| -> Option<String> {
         let c = *uidx.get(u?)?;
         Some(masters.get(state.card(c).master).card_id.clone())
     };
     CandOwned {
-        action_type: mv
-            .get("action_type")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_owned(),
+        action_type: at.to_owned(),
         don_k: p.get("don_k").and_then(Value::as_f64),
         has_target,
         card_id: card_id(su),
@@ -960,5 +1002,72 @@ mod tests {
         assert_eq!(best_branch(&[None, Some(1.0), Some(1.0)]), Some(1));
         assert_eq!(best_branch(&[None, None]), None);
         assert_eq!(best_branch(&[Some(-1.0), Some(0.5)]), Some(1));
+    }
+
+    // --- 候補行の対象（符号化 v14・§20.9 の A）-------------------------------------
+    //
+    // 「A を KO」と「B を KO」が**別の行**になること（v14）と、v13 のネットでは
+    // 1 bit も変わらないこと（同じ PAD 行のまま）を固定する。
+
+    fn select_move(sel: &str) -> Move {
+        json!({"kind": "game", "action_type": SELECT_AT,
+               "payload": {"selected_uuids": [sel], "index": 0, "accepted": true}})
+    }
+
+    #[test]
+    fn cand_owned_reads_the_selected_target_on_v14() {
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        let src = b.put_field(Seat::P1, M_CHAR); // 効果の発生源（自分の場）
+        let a = b.put_field(Seat::P2, M_CHAR); // 相手の場（対象の候補 A）
+        let c = b.put_field(Seat::P2, M_CHAR); // 同 B
+        let (masters, state) = b.build();
+        let (su, ua, ub) = (
+            state.card(src).uuid.clone(),
+            state.card(a).uuid.clone(),
+            state.card(c).uuid.clone(),
+        );
+        let slots = slot_index(&state, Seat::P1);
+        let uidx = uuid_index(&state);
+        let row = |sel: &str, v14: bool| {
+            cand_owned(
+                &state,
+                &masters,
+                &uidx,
+                &slots,
+                &select_move(sel),
+                Some(su.as_str()),
+                v14,
+            )
+        };
+        // v14: 対象＝selected_uuids[0]・主体＝効果の発生源（枠も引ける）
+        let ra = row(&ua, true);
+        let rb = row(&ub, true);
+        assert!(ra.has_target && rb.has_target);
+        assert_eq!(ra.si, slots[su.as_str()]);
+        assert_eq!(ra.ti, slots[ua.as_str()]);
+        assert_eq!(rb.ti, slots[ub.as_str()]);
+        assert_ne!(ra.ti, rb.ti, "A と B が同じ行になっている");
+        // v13（r3／a1）: 今までどおり対象なし・主体なし＝2 つは同じ行
+        let oa = row(&ua, false);
+        let ob = row(&ub, false);
+        assert!(!oa.has_target && !ob.has_target);
+        assert_eq!((oa.si, oa.ti), (-1, -1));
+        assert_eq!((oa.si, oa.ti), (ob.si, ob.ti));
+        assert_eq!(oa.card_id, ob.card_id);
+    }
+
+    /// `selected_uuids` が空（＝「選ばない」）なら v14 でも対象なしのまま。
+    #[test]
+    fn cand_owned_keeps_empty_selection_targetless() {
+        use crate::testkit::BoardBuilder;
+        let (masters, state) = BoardBuilder::new().build();
+        let slots = slot_index(&state, Seat::P1);
+        let uidx = uuid_index(&state);
+        let mv = json!({"kind": "game", "action_type": SELECT_AT,
+                        "payload": {"selected_uuids": [], "accepted": true}});
+        let r = cand_owned(&state, &masters, &uidx, &slots, &mv, None, true);
+        assert!(!r.has_target);
+        assert_eq!(r.ti, -1);
     }
 }

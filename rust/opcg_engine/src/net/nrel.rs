@@ -28,8 +28,13 @@ pub const NA: usize = ATYPES.len() + 1;
 pub const OWN_SLOTS: [usize; N_OWN] = [0, 2, 3, 4, 5, 6, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
 /// `n_rel.OPP_SLOTS`（相手L・相手場5）。
 pub const OPP_SLOTS: [usize; N_OPP] = [1, 7, 8, 9, 10, 11];
-/// `n_rel.OPP_POOL_COLS`＝94 + `EXTRA_COLS` のうち `opp_pool_` で始まる列（13..23）。
-pub const OPP_POOL_COLS: [usize; 11] = [107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117];
+/// `n_rel.OPP_POOL_COLS`＝94 + `EXTRA_COLS` のうち `opp_pool_` で始まる列。
+///
+/// v13 の 11 本（EXTRA の 13..23）＋ v14 の 2 本（`opp_pool_removal_fixed`＝EXTRA 30・
+/// `opp_pool_bounce`＝EXTRA 32）。v13 のネットでは新しい列の重みが 0 なので遮断しても同じ値。
+pub const OPP_POOL_COLS: [usize; 13] = [
+    107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 124, 126,
+];
 /// `EXTRA_COLS.index("don_next_turn")` / `("max_play_next_turn")`。
 pub const EX_DON_NEXT: usize = 26;
 pub const EX_MAX_PLAY: usize = 27;
@@ -91,6 +96,15 @@ impl NRelWeights {
     /// `ablate` に `kind` が入っているか。
     pub fn ablated(&self, kind: &str) -> bool {
         self.ablate.contains(kind)
+    }
+
+    /// 候補行に**対象**を載せるか（符号化 v14 の §20.9-A）。
+    ///
+    /// v13 のネット（r3／a1）では `false`＝対話ノードの候補行は今までどおり
+    /// （素性が全部 PAD＝P は一様）。列の pad と違って**重み 0 で無効化できない**変更なので、
+    /// 版で分岐しないと「v13 のネットを v14 で読むと手が変わる」ことになる。
+    pub fn cand_target(&self) -> bool {
+        self.enc_version >= crate::encode::ENC_VERSION
     }
 
     /// `NRelNet.mask_sc`（scalars の遮断・`opp_pool`／`onplay`）。
