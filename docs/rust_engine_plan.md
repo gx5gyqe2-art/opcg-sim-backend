@@ -5255,3 +5255,79 @@ ARRANGE_DECK／SELECT_RESOURCE（山札・ドン）ばかりで、**盤面を対
 （`kind=window`＝候補を配らない行）。つまり A が効くのは**木の中の対話ノードの P**（Rust
 `quiesce::priors`）で、そこは `rs-q-pi` の実測どおり今まで一様だった。dump の `pol_si`／`pol_ti` は
 規則としては v14 に揃えたが、実データで値が変わるのは盤面対象の選択が main 行に出たときだけ。
+
+#### 20.9.3 判定（コーディネータ・2026-09-11・**採用**）
+
+受け入れ条件は全て満たした（RESULT: `docs/reports/2026-09-11_enc_v14.RESULT.json`）: S 22／EXTRA 33・
+r3 の同一性 20/20（v13 の build と v14 の build で同じ手・同じ stats）・golden 2 本不変・`Game.encode` +2〜9%・
+波 29 の pad（旧列ビット一致・新列 0）・`make test` 559・cargo 429・clippy green・audit-cross void 0。
+本線でもゲートを再実行して green を確認（下の合流コミット）。
+
+**指示書に無い判断 2 つは両方採る**:
+
+1. **A（候補行の対象）は `enc_version ≥ 14` のネットだけ**: 受け入れの「r3 は 1 bit も変わらない」を
+   守るには他に手が無い（A は重みで無効化できない）。**生成役 r3 の木の対話ノードは波 30 でも一様のまま**
+   ＝波 30 の対象選択の教師は「木の P」ではなく **D（対象のランダム化・forced=3）と z** から来る。これは
+   v14 の設計どおり（対象の良し悪しは対照から学ぶ）。r5 が v14 で読むようになった時点で木の対話ノードも
+   割れる＝**波 31 から**木の P が対象を区別する。dump は常に v14 の規則で書く（教材は r5 が読むもの）。
+2. **除去の判定ゾーン FIELD 単一**: 実データ上 `deck_roles.classify` と同じ集合。FIELD を含むリストが
+   現物に無い以上、規則の差は今は観測不能。効果 JSON にそういうカードが入ったら
+   `test_enc_v14.py` の parity が拾う（Python/Rust の同じ規則）。
+
+**注記**: (a) main 行の `RESOLVE_EFFECT_SELECTION` は山札・ドンばかりで盤面対象は対話窓に畳まれる＝A の効きは
+木の中に限られる。これは §20.7.8 の「対象選択の P は一様」を直す場所がまさに木の中（`quiesce::priors`）
+なので目的には合う。(b) `test_grads_match_numpy` の 1e-4 判定は「絶対値 1e-4 未満**か**丸めの下限の 5 倍以内」
+に緩んだ（実測 1.20e-4・下限 4.06e-5・式の差ではなく加算順）。1e-6 の判定と同じ読み方なので受ける。
+(c) 20 局で forced=3 は 2 行＝**波 30 で対象の対照を採るには `--eps-target` を 0.1 より上げるか、
+KO/bounce の型を synth_roles で厚くする**必要がある。波 30 の指示書で `--eps-target 0.3` にする
+（対象は木の手そのものを変えない＝π・z の教師を汚さないので上げて損はない）。
+
+**次**: 波 30 の生成（§20.9.1 末尾の計画どおり・`--eps-target 0.3` に上げる）→ r5 セット。
+
+#### 20.9.4 波 30 の生成（era7・生成役 r3・**dump v14**・16 セッション・2026-09-11）
+
+波 29（§20.8.6）と同じ探索設定・同じデッキ分布（**教師の物差しは変えない**）。違いは **符号化 v14 の dump**
+（本線 3d042a63 以降＝`enc_version 14`・tokens 22×22・scalars 127・`pol_p`／`pol_v0`・`forced` に 3）と
+**`--eps-target 0.3`**（§20.9.3 (c)・20 局で forced=3 が 2 行しか立たなかったため。対象の引き直しは木の手
+そのものを変えず π も汚さない）。生成役 r3 は v14 のコードで pad して読む＝木は波 29 と同じ（同一性 20/20）。
+**16 シャード × 480 局**・seed 帯 **2301000〜2308500**（§7.3 の細分化・台帳 §6）。1 局 12.8〜14.8 秒（波 29 実測）
+＝480 局 ≈ 1.9 h。セッションはコーディネータが `create_session`（sonnet・tag `n30-gen`）で起こす。
+
+```
+作業: 生成 波 30 シャード k（k=1..16・docs/rust_engine_plan.md §20.9.4・docs/n_loop_ops.md §6／§7.3）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（コードは変更しない・HEAD が 3d042a63 以降＝
+符号化 v14 が入っていること: python -c "from opcg_sim.learned import n_rel; print(n_rel.NR_ENC_VERSION)" が 14）。
+最初に pip install -r opcg_sim/requirements.txt pytest maturin && make rust-develop（opcg_effects.json が無ければ
+python -m opcg_sim.tools.export_effects_json）。出力ブランチ claude/n30-wKK（KK=01..16・2 桁）。PR は作らない。
+長い実行は run_in_background で回し、途中でコンテナが再起動したら**別の出力先**（--out n_records/n30_wKK_p2）へ
+残り局数（--games 480−完了数・--seed-base <seed_base>+完了数）で再開する（同じ --out に回すと
+n_record_00000.npz から上書きされる。完了数は既存 npz の行数ではなく最後の進捗行「N/480局」で読む）。
+p2 があれば RESULT の notes に局数の内訳を書く（訓練は wKK と wKK_p2 を別の波ディレクトリとして読む）。
+
+■ 実行（seed_base は台帳どおり: 2300000 + ceil(k/2)*1000 + (k が偶数なら 500)）
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen \
+    --games 480 --seed-base <seed_base> --workers 2 \
+    --sims 160 --worlds 4 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 \
+    --dirichlet-eps 0.25 --temp-turns 4 \
+    --decks synth_roles --eps-play 0.03 --eps-hold 0.03 --eps-target 0.3 \
+    --out n_records/n30_wKK
+  最初に --games 30 で回して 1 局の壁時計を測り、480 局が 6 時間を超える見込みならその旨を RESULT に書いて
+  コーディネータの指示を待つ（勝手に sims や worlds を下げない）。
+
+■ 成果物（出力ブランチ直下）
+  - n_records/n30_wKK/（npz シャード・meta_n_record.json・meta_games.json）
+  - RESULT.json: {"job":"gen-n30-wKK","status":"done|partial","games":480,"rows":N,"main_rows":N,
+     "dropped":n,"void":n,"forced":{"play":n,"hold":n,"target":n},"removal_legal_rows":n,
+     "sec_per_game":x,"wall_hours":x,"search":{…meta の search…},"decks":"synth_roles",
+     "dump_version":4,"enc_version":14,"net":"nrel_r3.npz","commit":"<HEAD>","notes":"…"}
+
+■ 前提
+  - 打ち切りはしない（partial なら残り局数を RESULT に）。void（決着せず）が出たら seed と症状を notes に。
+  - コードは変更しない。質問は RESULT.json の notes に。
+```
+
+**r5 の訓練（波 30 が揃ってから・常設の訓練セッションへ poke で 1 セット）**: warm-start r3（v14 へ pad）・
+`--ablate rel`・π＝波 29＋30（era7）・z＝波 30 → 29 → 28 → 27（新しい波から載るだけ・波 29 以前は v13＝
+`dump_io` が新列を 0 埋め）・`--aux-weight 0.1`・epochs 2・lr 2e-4・visits 教師 → 評価帯（波 28・29・30 の
+holdout・層別）→ アリーナ（主 random × synth_roles／副 固定ミラー・帯は台帳で払い出す）。
