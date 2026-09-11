@@ -1,0 +1,25 @@
+{
+  "job": "gen-n30-w05",
+  "status": "done",
+  "games": 480,
+  "rows": 69889,
+  "main_rows": 31824,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 306, "hold": 72, "target": 301},
+  "removal_legal_rows": 12663,
+  "sec_per_game": 13.1,
+  "wall_hours": 1.75,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "enc_version": 14,
+  "net": "nrel_r3.npz",
+  "commit": "5e4e7f92bb1b0bdda02f77c8d396d51e4a1091ff",
+  "notes": "seed_base 2303000（k=5・単一 --out、p2 なし・コンテナ再起動なし）。事前に --games 30 の試走（n_records/n30_w05_trial、成果物には含めない）で 402s/30局=13.4秒/局を実測し、480局の見込み約1.75時間と判断して本走行を実行（sims/worlds は変更していない）。本走行は6288sで480局完走、棄却0・void 0。"
+}
