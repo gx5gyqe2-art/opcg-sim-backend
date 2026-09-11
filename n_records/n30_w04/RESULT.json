@@ -1,0 +1,25 @@
+{
+  "job": "gen-n30-w04",
+  "status": "done",
+  "games": 480,
+  "rows": 69429,
+  "main_rows": 31256,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 353, "hold": 71, "target": 312},
+  "removal_legal_rows": 12782,
+  "sec_per_game": 10.75,
+  "wall_hours": 1.4333,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "enc_version": 14,
+  "net": "nrel_r3.npz",
+  "commit": "5e4e7f92bb1b0bdda02f77c8d396d51e4a1091ff",
+  "notes": "trial (--games 30, n_records/n30_w04_trial, not committed) measured 11.8s/game -> projected 1.6h for 480 games, well under 6h, so proceeded directly to the full run without waiting for coordinator input. Full run: 5160s wall (10.75s/game), 48 shards, dropped=0, void=0."
+}
