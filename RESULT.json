@@ -1,0 +1,19 @@
+{
+  "job": "arena-hires-w08",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1008000,
+  "pairs": 175,
+  "games": 350,
+  "wr": 0.5543,
+  "ci95": [0.4968, 0.6118],
+  "elo": 37.9,
+  "elo95": [-2.3, 79.0],
+  "void": 0,
+  "dup_seeds": 0,
+  "sec_per_pair": 6.24,
+  "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+  "notes": "175/175ペア完遂・void 0・dup_seeds 0。実測1092秒(18.2分)で見積り45分より大幅に速かった（4ワーカー・1ペア約6.24秒）。wr=0.5543・ci95下限0.4968は0.5を跨ぎ、elo95も0を跨ぐため promoted=false（arena_shard/arena_mergeの自己判定通り）。中断・コンテナ再起動は発生せず1本で完了。"
+}
