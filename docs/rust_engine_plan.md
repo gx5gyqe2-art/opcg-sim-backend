@@ -5500,3 +5500,13 @@ git add -f n1_results/arena_hires/ RESULT.json
 git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "hires arena r5 vs r3 wKK"
 git push -u origin claude/arena-hires-wKK
 ```
+
+#### 20.9.8 高分解能アリーナの判定（2026-09-11・`docs/reports/2026-09-11_hires_arena.md`）
+
+**2,798 ペア・wr 0.5050 [0.4908, 0.5192]・+3.5 Elo [−6.4, +13.4]・void 2・dup 0**（16 セッション・壁時計 1 時間）。
+CI が 0.50 を跨ぐ＝**era7（r3 → r5）の改善は ±10 Elo の内側＝0**。評価帯の一貫した改善（波 30 −0.015）は
+打ち手に出ていない。読み: era7 の 3 世代は全部 r3 の打ち筋（π・z）で訓練されており、生成役が固定のままでは
+教材が更新されない。昇格規約（wr ≥ 0.55）は c 系の世代差の閾値で NRel では満たせない。
+**提案 A**: 生成役を r5 に替え（era8）門を「退行なし（CI 下限 ≥ 0.45）」に読み替え、強さは高分解能アリーナで
+累積判定。**提案 B（診断・1 時間）**: r5 vs r3 を worlds 4 ＋ R2 で 700 ペア＝serve 既定が V の差を潰しているかを
+見る。判定はユーザ。
