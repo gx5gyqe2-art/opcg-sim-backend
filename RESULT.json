@@ -1,0 +1,6 @@
+{"job": "n31-w05", "role": "gen", "status": "done",
+ "inputs": {"net": "claude/train-r5:n1_results/nrel_r5.npz", "seed_base": 2313000, "games": 480,
+            "sims": 160, "worlds": 4, "decks": "synth_roles"},
+ "outputs": {"dir": "n_records/n31_w05"},
+ "metrics": {"games": 480, "rows": 66862, "dropped": 1, "sec_per_game": 14.67},
+ "notes": "1 セッション完走（再起動なし）。q_min_n 1/8・root_prior_temp 2・eps_play/hold 0.03・temp_turns 4・dirichlet_eps 0.25。--net は branch:path 文字列ではなく git show で取り出したローカル npz を渡した（訂正指示どおり）。"}
