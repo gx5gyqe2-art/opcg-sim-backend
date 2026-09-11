@@ -1,0 +1,20 @@
+{
+  "job": "arena-hires-w12",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1012000,
+  "pairs": 175,
+  "games": 350,
+  "wr": 0.54,
+  "ci95": [0.4842, 0.5958],
+  "elo": 27.9,
+  "elo95": [-11.0, 67.4],
+  "void": 0,
+  "dup_seeds": 0,
+  "promoted": false,
+  "sec_per_pair": 6.24,
+  "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+  "notes": "同コンテナで直前に波30生成を実行済みのため opcg_engine ビルド済み・そのまま使用（リビルド不要）。175ペア中断なしで完走（実測 1092s・18.2分、指示書見積り45分より速い）。arena_merge の dup_seeds=0・shard=1 で1本のシャードのみ。promoted=false（wr 0.54・ci95下限0.4842は昇格の閾値に届かず）。"
+}
