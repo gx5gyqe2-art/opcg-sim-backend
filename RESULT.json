@@ -1,0 +1,23 @@
+{
+  "job": "n31-w13",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2317000,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n31_w13"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 66824,
+    "dropped": 0,
+    "sec_per_game": 14.431
+  },
+  "notes": "--net は訂正指示どおり git show r5net:n1_results/nrel_r5.npz > ~/nrel_r5.npz で取り出したローカル npz を指定（branch:path 形式は record_gen が解決できないため）。30局のタイミング計測（432.9s, workers=2）で480局が6時間を超えないと判断し、報告なしでそのまま本実行（6927s=約1h55m, workers=2）。中断・再開なし、1ショットで完走。"
+}
