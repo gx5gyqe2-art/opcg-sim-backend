@@ -1,0 +1,213 @@
+{
+  "job": "band-policy-r6",
+  "role": "band",
+  "status": "done",
+  "inputs": {
+    "nets": [
+      "a1",
+      "r3",
+      "r5",
+      "r6"
+    ],
+    "net_paths": {
+      "a1": "opcg_sim/data/learned/nrel_a1.npz",
+      "r3": "opcg_sim/data/learned/nrel_r3.npz",
+      "r5": "claude/train-r5:n1_results/nrel_r5.npz",
+      "r6": "claude/train-r6:n1_results/nrel_r6.npz"
+    },
+    "waves": [
+      28,
+      30,
+      32
+    ],
+    "shards": [
+      "w01",
+      "w02"
+    ],
+    "policy_limit": 0,
+    "pi_prior_net_w28": "nrel_a1.npz"
+  },
+  "outputs": {
+    "dir": "n1_results/band_policy_r6/"
+  },
+  "metrics": {
+    "w32": {
+      "rows": 19375,
+      "policy_points": 7937,
+      "p_net_src": "pol_p",
+      "teacher_visits_entropy": 1.6985332160861715,
+      "teacher_q_improved_entropy": 1.298355682669194,
+      "a1": {
+        "v_mse": 0.5505566167831254,
+        "v_sign": 0.7938580645161291,
+        "points": 7937,
+        "top1_visits": 0.47662844903615975,
+        "ce_visits": 2.0121218273227246,
+        "top1_q_improved": 0.40002519843769685,
+        "ce_q_improved": 2.0788363402896404,
+        "gate_rows": 2352,
+        "gate_p_mass_removal": 0.24210098289834606,
+        "gate_argmax_removal": 0.24744897959183673,
+        "gate_data_chose_removal": 0.24702380952380953
+      },
+      "r3": {
+        "v_mse": 0.5409438523164357,
+        "v_sign": 0.797058064516129,
+        "points": 7937,
+        "top1_visits": 0.5158120196547814,
+        "ce_visits": 1.9570212912256117,
+        "top1_q_improved": 0.42522363613455966,
+        "ce_q_improved": 2.0174823463961897,
+        "gate_rows": 2352,
+        "gate_p_mass_removal": 0.24206073953602916,
+        "gate_argmax_removal": 0.24744897959183673,
+        "gate_data_chose_removal": 0.24702380952380953
+      },
+      "r5": {
+        "v_mse": 0.5263126848046884,
+        "v_sign": 0.8120774193548387,
+        "points": 7937,
+        "top1_visits": 0.5728864810381756,
+        "ce_visits": 1.8447839976318299,
+        "top1_q_improved": 0.46113140985258916,
+        "ce_q_improved": 1.8787707454749405,
+        "gate_rows": 2352,
+        "gate_p_mass_removal": 0.23664141722615042,
+        "gate_argmax_removal": 0.2389455782312925,
+        "gate_data_chose_removal": 0.24702380952380953
+      },
+      "r6": {
+        "v_mse": 0.5114572351261207,
+        "v_sign": 0.8149161290322581,
+        "points": 7937,
+        "top1_visits": 0.5757843013733148,
+        "ce_visits": 1.8359592866128587,
+        "top1_q_improved": 0.4689429255386166,
+        "ce_q_improved": 1.8581356908837388,
+        "gate_rows": 2352,
+        "gate_p_mass_removal": 0.23641233319822463,
+        "gate_argmax_removal": 0.23979591836734693,
+        "gate_data_chose_removal": 0.24702380952380953
+      }
+    },
+    "w30": {
+      "rows": 19467,
+      "policy_points": 7783,
+      "p_net_src": "pol_p",
+      "teacher_visits_entropy": 1.6390581393511103,
+      "teacher_q_improved_entropy": 1.2082545757975198,
+      "a1": {
+        "v_mse": 0.5742637244276656,
+        "v_sign": 0.7841475317203472,
+        "points": 7783,
+        "top1_visits": 0.5464473853269948,
+        "ce_visits": 1.871922153442022,
+        "top1_q_improved": 0.4322240781189773,
+        "ce_q_improved": 1.9177568247703327,
+        "gate_rows": 2568,
+        "gate_p_mass_removal": 0.2688274091137527,
+        "gate_argmax_removal": 0.2807632398753894,
+        "gate_data_chose_removal": 0.2718068535825545
+      },
+      "r3": {
+        "v_mse": 0.5480434322334934,
+        "v_sign": 0.7927775209328607,
+        "points": 7783,
+        "top1_visits": 0.606449955030194,
+        "ce_visits": 1.8054117523550175,
+        "top1_q_improved": 0.46935628934858026,
+        "ce_q_improved": 1.829804188271162,
+        "gate_rows": 2568,
+        "gate_p_mass_removal": 0.26717721935294514,
+        "gate_argmax_removal": 0.2838785046728972,
+        "gate_data_chose_removal": 0.2718068535825545
+      },
+      "r5": {
+        "v_mse": 0.5155001935078082,
+        "v_sign": 0.81445523193096,
+        "points": 7783,
+        "top1_visits": 0.6254657587048695,
+        "ce_visits": 1.7550082039468533,
+        "top1_q_improved": 0.49582423230116923,
+        "ce_q_improved": 1.7423294363422535,
+        "gate_rows": 2568,
+        "gate_p_mass_removal": 0.2620051608691853,
+        "gate_argmax_removal": 0.26869158878504673,
+        "gate_data_chose_removal": 0.2718068535825545
+      },
+      "r6": {
+        "v_mse": 0.5221434472564392,
+        "v_sign": 0.8120922586942004,
+        "points": 7783,
+        "top1_visits": 0.5974559938327123,
+        "ce_visits": 1.7701152853957796,
+        "top1_q_improved": 0.4904278555826802,
+        "ce_q_improved": 1.7506724179564537,
+        "gate_rows": 2568,
+        "gate_p_mass_removal": 0.2619029187476046,
+        "gate_argmax_removal": 0.2749221183800623,
+        "gate_data_chose_removal": 0.2718068535825545
+      }
+    },
+    "w28": {
+      "rows": 31926,
+      "policy_points": 18027,
+      "p_net_src": "nrel_a1.npz",
+      "teacher_visits_entropy": 1.4484075529894938,
+      "teacher_q_improved_entropy": 1.3785361537131677,
+      "a1": {
+        "v_mse": 0.6243854412713437,
+        "v_sign": 0.7728497149658585,
+        "points": 18027,
+        "top1_visits": 0.5849558994841072,
+        "ce_visits": 1.749547873624134,
+        "top1_q_improved": 0.6746546846397071,
+        "ce_q_improved": 1.651522854742409,
+        "gate_rows": 4902,
+        "gate_p_mass_removal": 0.211330856494777,
+        "gate_argmax_removal": 0.20930232558139536,
+        "gate_data_chose_removal": 0.21215830273357814
+      },
+      "r3": {
+        "v_mse": 0.5592032119716303,
+        "v_sign": 0.7976884044352566,
+        "points": 18027,
+        "top1_visits": 0.6310534198701947,
+        "ce_visits": 1.6801148612097045,
+        "top1_q_improved": 0.6417041105009152,
+        "ce_q_improved": 1.656041853425374,
+        "gate_rows": 4902,
+        "gate_p_mass_removal": 0.214304970503066,
+        "gate_argmax_removal": 0.21583027335781313,
+        "gate_data_chose_removal": 0.21215830273357814
+      },
+      "r5": {
+        "v_mse": 0.5715890996124696,
+        "v_sign": 0.7945248386894694,
+        "points": 18027,
+        "top1_visits": 0.5770233538581018,
+        "ce_visits": 1.7492213252116184,
+        "top1_q_improved": 0.5781328007988018,
+        "ce_q_improved": 1.7252859563261986,
+        "gate_rows": 4902,
+        "gate_p_mass_removal": 0.21483670881284253,
+        "gate_argmax_removal": 0.19808241534067728,
+        "gate_data_chose_removal": 0.21215830273357814
+      },
+      "r6": {
+        "v_mse": 0.5864879795681898,
+        "v_sign": 0.7857858798471465,
+        "points": 18027,
+        "top1_visits": 0.49780884229211736,
+        "ce_visits": 1.8415131801944435,
+        "top1_q_improved": 0.49015365840128694,
+        "ce_q_improved": 1.819686810929439,
+        "gate_rows": 4902,
+        "gate_p_mass_removal": 0.2157231829318459,
+        "gate_argmax_removal": 0.19298245614035087,
+        "gate_data_chose_removal": 0.21215830273357814
+      }
+    }
+  },
+  "notes": "波28は旧命名（n28_records/、dump v2でpol_p無し）のためπ'のP_netに--pi-prior-net nrel_a1.npz（波28の生成役）を指定。波30・32はpol_pありのためp_net_src=pol_p。全波でpolicy点は揃った（欠落なし・改造不要）。結果の傾向（判定はコーディネータ）: 波32（新しい・v14木で対象を区別したπ）ではa1→r3→r5→r6でV(v_mse/v_sign)・top1_visitsとも単調改善。波30ではr6がr5よりV・方策とも僅かに悪化。波28（最も古い・分布外）ではr3が全指標で最良、r6は4本中top1_visitsが最低（0.498、a1の0.585より低い）＝新しい世代ほど古い分布での方策精度が下がる逆転が見られた。"
+}
