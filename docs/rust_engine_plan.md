@@ -5331,3 +5331,124 @@ p2 があれば RESULT の notes に局数の内訳を書く（訓練は wKK と
 `--ablate rel`・π＝波 29＋30（era7）・z＝波 30 → 29 → 28 → 27（新しい波から載るだけ・波 29 以前は v13＝
 `dump_io` が新列を 0 埋め）・`--aux-weight 0.1`・epochs 2・lr 2e-4・visits 教師 → 評価帯（波 28・29・30 の
 holdout・層別）→ アリーナ（主 random × synth_roles／副 固定ミラー・帯は台帳で払い出す）。
+
+#### 20.9.4-1 波 30 の回収（2026-09-11 05:50 UTC・14/16 完走・2 本は進行中）
+
+16 セッション（sonnet・コーディネータが起こした）のうち **14 本が完走**（w01〜w05・w07〜w10・w12〜w16）。
+w06・w11 はコンテナ再起動を挟んで進行中（§20.9.4 の `_p2` 規則で再開・打ち切らない）。r5 の訓練は
+**起動時に揃っているシャード**で始める（14 本＝波 29 と同数・§20.9.5）。
+
+| 項目 | 14 シャード合計 |
+|---|---|
+| 局 | 6,720（480 × 14）|
+| 行 | 974,671（main 442,922）|
+| forced | play 4,585／hold 880／**target 3,926** |
+| 除去が合法な main 行 | 172,978（w15 の part1 分は未計上・下記）|
+| dropped／void | 3／2 |
+| 1 局の壁時計 | 10.8〜14.6 秒（8 本）・20.3〜21.5 秒（6 本）＝コンテナの当たり外れ・波 29 は 12.8〜14.8 |
+
+- **`--eps-target 0.3` の効き**: forced=3 が 3,926 行（20 局の試走で 2 行だった 0.1 から上げた結果・局あたり 0.58）。
+  forced=1（play 4,585）の直後は必ず引く規則なので、target ≈ play × 「除去が対象選択を出す割合」＋ 木が
+  選んだ除去 × 0.3。対象の対照としては十分な本数。
+- **void 2 件**（1/3,360＝波 29 と同率）:
+  - **w09・seed 2305269**（step 135）: `GameAborted(ValueError: 不明なアクションです: DON_BOX)`＝Rust
+    `rules/actions.rs` の apply に `DON_BOX` がそのまま渡った。生成の差し替え（`eps_swap`）は箱を
+    `first_primitive` で原始手にしてから出す規約だが、**どこかの経路が箱のまま `apply` に届いている**。作業
+    セッションが同一環境で再現を確認済み（コードは触っていない）。→ **`rs-void-2305269`**（後日の WP・
+    `rs-void-2296720` と一緒に。§20.9.4 の生成コードは v14 で `_target_swap` が増えたので、まずそこを疑う）。
+  - **w10・seed 2305912**（413 局目）: `OPCG_LOG_SILENT` で症状が出ず未特定（play_one の一律 except か
+    winner None／max_steps）。再現手順は w10 の RESULT.json。
+  - w12 の dropped 1 も同様に症状未特定（void ログ 0）。
+- **w15 は part1（200 局）の sidecar（`meta_games.json`／`meta_n_record.json`）が無い**: 200 局目で
+  ワーカーがハング（BrokenPipe・コンテナ再起動）し、sidecar は最終局の後にしか書かれない実装のため。
+  npz 20 本（seed 2308000〜2308199・全ユニーク）は健全で **`dump_io` は sidecar を読まない**＝教材としては
+  問題ない。`meta_games.json` を使う層別（型 × 色）だけ part1 が欠ける。**教訓**: sidecar はシャードごとに
+  書くべき（`record_gen` の改修＝小 WP・後日）。
+- 作業セッションの運用メモ: `nohup … &` はハーネスの完了通知が先に返る（w08）＝指示どおり `run_in_background`
+  直付けが正しい。試走の壁時計は本走より遅く出ることがある（w08: 29.4 → 14.3 秒）。
+
+#### 20.9.5 r5 のセット（訓練 → 評価帯 → アリーナ・1 セッション・opus・2026-09-11）
+
+ユーザ決定（2026-09-10）どおり **1 セッションで 1 セット**。常設の訓練セッションはアーカイブ済み（復帰しても
+コンテナは新規＝データは消えている）ので新規に起こす。教材の窓は CLAUDE.md の運用（π＝現 era・z＝新しい波から
+載るだけ）: **π＝波 29＋30（era7）・z＝波 30 → 29 → 28 → 27**（OOM なら 27 から落とす）。warm-start r3
+（v14 へ pad＝`NRelNet.load` が新列を 0 初期化）・`--ablate rel`・`--aux-weight 0.1`・epochs 2・**lr 2e-4**
+（§20.8.7-3）・visits 教師（π' は不採用・§20.6.3）。評価帯は **波 28・29・30 の holdout を別々に**（28・29 は
+v13 dump＝`dump_io` が新列を 0 埋め・30 は v14）で r3／r4b／r5 を並べる。アリーナは CLAUDE.md の規約
+（主 random × synth_roles・副 固定ミラー・両席 serve 既定の探索設定・8 帯 × 24 ペア）。seed 帯: 主 531000〜538000／
+副 541000〜548000（台帳 §6）。
+
+```
+作業: r5 のセット（訓練 → 評価帯 → アリーナ・docs/rust_engine_plan.md §20.9.5・docs/n_loop_ops.md §7.1／§5）。
+コードは変更しない。PR は作らない。本線 claude/cpu-spec-improvements-yw91jd の最新を checkout。メモリ 12GB 以上。
+長い実行は Bash の run_in_background で回す（nohup は使わない）。3 段は順に（並列にしない）。
+
+pip install -r opcg_sim/requirements.txt maturin torch   （torch は CPU 版）
+make rust-develop
+
+# 教材 ── 波 30（n_records/n30_wKK・完走したシャードだけ・_p2 があれば同列に）
+#   起動時に origin の claude/n30-w01〜w16 を fetch し、RESULT.json が status=done のシャードを全部使う
+#   （w06・w11 が未完なら待たずに進め、使ったシャードの一覧を RESULT.json の inputs に書く）
+for w in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  git fetch -q origin claude/n30-w$w:tmpw 2>/dev/null || continue
+  if git ls-tree -r --name-only tmpw | grep -qE "^(n_records/.*)?RESULT.json$"; then   # docs/reports の RESULT は数えない
+    mkdir -p ~/n30_wave/w$w && git archive tmpw n_records | tar -x -C ~/n30_wave/w$w
+    rm -rf ~/n30_wave/w$w/n_records/*_trial
+  fi; git branch -qD tmpw; done
+# 波 29（14 シャード）・波 28／27（8 シャード）
+for w in 01 02 03 05 06 07 08 09 10 11 12 14 15 16; do
+  git fetch -q origin claude/n29-w$w:tmpw && mkdir -p ~/n29_wave/w$w \
+  && git archive tmpw n_records/n29_w$w | tar -x -C ~/n29_wave/w$w && git branch -qD tmpw; done
+for N in 28 27; do for w in 01 02 03 04 05 06 07 08; do
+  git fetch -q origin claude/n${N}-w$w:tmpw && mkdir -p ~/n${N}_wave/w$w \
+  && git archive tmpw n${N}_records | tar -x -C ~/n${N}_wave/w$w && git branch -qD tmpw; done; done
+
+# ① 訓練 r5
+OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train \
+  --in "$HOME/n30_wave/w*/n_records/n30_w*" "$HOME/n29_wave/w*/n_records/n29_w*" \
+  --z-in "$HOME/n28_wave/w*/n28_records" "$HOME/n27_wave/w*/n27_records" \
+  --ablate rel --aux-weight 0.1 --epochs 2 --lr 2e-4 --pi-teacher visits \
+  --warm-start opcg_sim/data/learned/nrel_r3.npz --out ~/nrel_r5.npz 2>&1 | tee ~/train_r5.log
+（OOM なら --z-in から 27 を外す→それでも落ちたら 28 も外す。外した旨を notes に。
+ 訓練開始時に RSS を実測して notes に書く。）
+
+# ② 評価帯（波 28・29・30 の holdout を別々に・r3／r4b／r5）
+git fetch -q origin claude/train-r4-lr2:tmpr && git show tmpr:n1_results/nrel_r4b.npz > ~/nrel_r4b.npz && git branch -qD tmpr
+for N in 28 29 30; do
+  case $N in 28) IN="$HOME/n28_wave/w*/n28_records";; 29) IN="$HOME/n29_wave/w*/n_records/n29_w*";; 30) IN="$HOME/n30_wave/w*/n_records/n30_w*";; esac
+  OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$IN" \
+    --nrel opcg_sim/data/learned/nrel_r3.npz ~/nrel_r4b.npz ~/nrel_r5.npz \
+    --holdout-mod 7 --out ~/band_r5_w$N.json 2>&1 | tee ~/band_r5_w$N.log; done
+
+# ③ アリーナ r5 vs r3（基準＝出荷既定・両席 serve 既定の探索設定）
+mkdir -p ~/arena_r5
+for k in 0 1 2 3 4 5 6 7; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r5.npz --baseline "" \
+    --pairs 24 --max-pairs 24 --seed-base $(( 531000 + k*1000 )) --workers 4 \
+    --leaders random --decks synth_roles --out ~/arena_r5/main_w0$k.jsonl 2>&1 | tail -3; done
+for k in 0 1 2 3 4 5 6 7; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r5.npz --baseline "" \
+    --pairs 24 --max-pairs 24 --seed-base $(( 541000 + k*1000 )) --workers 4 \
+    --out ~/arena_r5/mirror_w0$k.jsonl 2>&1 | tail -3; done
+python -m opcg_sim.loop.arena_merge --in "$HOME/arena_r5/main_w0*.jsonl" --label "r5 vs r3 main" | tee ~/arena_r5/merge_main.log
+python -m opcg_sim.loop.arena_merge --in "$HOME/arena_r5/mirror_w0*.jsonl" --label "r5 vs r3 mirror" | tee ~/arena_r5/merge_mirror.log
+
+# 成果物
+git checkout -B claude/train-r5
+mkdir -p n1_results/arena_r5 && cp ~/nrel_r5.npz n1_results/ && cp ~/train_r5.log ~/band_r5_w2*.json ~/band_r5_w30.json ~/band_r5_w*.log . \
+  && cp ~/arena_r5/*.jsonl ~/arena_r5/merge_*.log n1_results/arena_r5/
+（RESULT.json〔§5 の形〕: inputs＝warm_start r3・pi_waves [29,30]・z_waves・使った波 30 のシャード一覧・epochs・lr・
+ rss_gb／metrics＝best_ep・val v_mse／v_sign／pi_top1・aux の誤差／band＝波ごとに r3／r4b／r5 の v_mse と
+ 除去直後・終盤・型 × 色で差が大きい層／arena＝main と mirror の pairs・wr・ci95・elo・void・dup_seeds・
+ per_shard_wr／train_sec・band_sec・arena_sec／notes）
+git add -f n1_results/nrel_r5.npz n1_results/arena_r5/ train_r5.log band_r5_w*.json band_r5_w*.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r5 のセット（訓練・評価帯・アリーナ）"
+git push -u origin claude/train-r5
+
+補足: 訓練 2〜4 時間（π 2 波＝約 190 万行・aux あり）・評価帯 3 本で 30 分・アリーナ 2 条件で 2 時間弱。
+段ごとに完了したら途中経過（ログ・npz・band JSON）を同じブランチへ push してよい（RESULT.json は最後）。
+コミットメッセージにモデル名を入れない。質問は RESULT.json の notes に。
+```
+
+判定（コーディネータ）: CLAUDE.md の規約（主 wr≥0.55 かつ CI 下限>0.50／副 退行なし CI 下限≥0.45・void≤2%）。
+評価帯は補助（波 30 は r5 だけが訓練に含む＝r3／r4b と比較性が無い点に注意・波 28 は忘却の指標）。
