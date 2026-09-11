@@ -1,0 +1,23 @@
+{
+  "job": "n31-w09",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2315000,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n31_w09"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 67866,
+    "dropped": 0,
+    "sec_per_game": 20.46
+  },
+  "notes": "net の --net は git 上の branch:path 表記が record_gen に解決できないため、git show origin/claude/train-r5:n1_results/nrel_r5.npz を ~/nrel_r5.npz に取り出し、そのローカルパスを --net に渡した（コーディネータの訂正どおり）。生成中、ワーカー初期化時に opcg_effects.json キャッシュ再生成の競合（複数プロセスが同時に export_effects_json を実行し FileNotFoundError）が一過性で発生したが、別ワーカーが完走しジョブ全体は dropped=0 で完了（教材データへの影響なし）。"
+}
