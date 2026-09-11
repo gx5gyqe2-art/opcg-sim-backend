@@ -1,0 +1,24 @@
+{
+  "job": "n32-w11",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2326000,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n32_w11"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 67297,
+    "main_rows": 31459,
+    "dropped": 0,
+    "sec_per_game": 10.75
+  },
+  "notes": "コンテナ再起動なし・1回の実行で480/480局を完走（5162s）。30局の試走（n_records/n32_w11_trial・成果物に含めない）で9.8s/局・6時間を超えない見込みを確認してから本実行へ進んだ。--net ~/nrel_r5.npz（claude/train-r5:n1_results/nrel_r5.npz, 29 arrays, 567482 bytes）を明示指定し、meta_n_record.json の net フィールドで r5 が使われたことを確認済み（出荷既定のr3にフォールバックしていない）。--eps-target は未指定（既定0・波31と同条件）。forced={play:371,hold:49,target:130}・removal_legal_rows=13525・void/棄却=0。"
+}
