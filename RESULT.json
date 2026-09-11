@@ -1,0 +1,18 @@
+{
+  "job": "arena-hires-w13",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1013000,
+  "pairs": 175,
+  "games": 350,
+  "wr": 0.4657,
+  "ci95": [0.4092, 0.5222],
+  "elo": -23.9,
+  "void": 0,
+  "dup_seeds": 0,
+  "sec_per_pair": 6.777,
+  "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+  "notes": "175/175ペア完走（1186s・6.78秒/ペア・見積り45分より速い19.8分で完了）。void=0・dup_seeds=0。elo95=[-63.8, 15.4]（arena_mergeの出力）。promoted=false（CI下限0.4092 < 0.50）。"
+}
