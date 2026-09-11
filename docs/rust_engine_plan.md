@@ -5156,3 +5156,79 @@ r4 より 0.002 良く、π' は学べ、visits 一致も落ちない。しか�
 向き（−0.07）も合成と同じ＝**世界は原因ではなく、この CPU は除去を打っても得にできない**（鶏と卵: V は打ち回しの
 実績に整合している）。卵を割るのは打ち回し側＝除去の対象選択と除去後のテンポ。`forced_sig` 列（差し替えた手の
 move_sig）を dump v4 に足した（次の生成から型・対象で層別できる）。
+
+### 20.9 符号化 v14（ユーザ決定 2026-09-11「それでやってみましょう」）
+
+**方針**: 人が価値を書かない原則のまま、ネットに「材料」を足す。**append-only**（v13 の列は 1 bit も変えない・
+新しい列を末尾に足す）＝v13 のネット（r3）は新しい列の重みを 0 で埋めて読み込めば出力が同一＝生成役 r3 のまま
+v14 の dump を採れる。r5 は r3 から warm-start（新しい列の重みだけ初期化）。
+
+**A. 候補行に「対象」を載せる（次元は変えない）**: 方策の候補行は `payload.target_ids[0]` を対象にしているので、
+効果の対象選択（`RESOLVE_EFFECT_SELECTION`・`selected_uuids`）は対象なしの同じ行になり、P が対象を区別できない
+（`rs-q-pi` の実測: 対話ノードの P は一様）。`selected_uuids[0]` を対象（`has_target`／`target_card_id`／`ti`）に、
+効果の発生源を主体（`si`）にする。Python（`n_rel._cand_rows`）と Rust（`quiesce::cand_owned`）の両方・同一性テスト。
+**B. トークン列（S 20 → 22）**: `power_opp_turn`（相手ターン中のパワー＝【自分のターン中】【相手のターン中】の
+常在を相手ターンの側で評価した値）・`act_avail`（未使用の【起動メイン】があるか・リーダーも）。
+**C. EXTRA（29 → 33）**: `deck_removal_fixed`／`opp_pool_removal_fixed`（`deck_roles.classify` の form＝KO/bounce/deck/
+trash・盤面対象のみ）・`deck_bounce`／`opp_pool_bounce`。旧列（`deck_removal` 等）は据え置き。
+**D. ε の対象ランダム化**: 強制した除去（forced=1）の直後の対象選択は候補から一様に引く（forced=3・`forced_sig`）。
+加えて木が選んだ除去の対象選択も確率 `--eps-target`（既定 0）で一様に引く＝対象の良し悪しの対照。
+**E. 版**: `NR_ENC_VERSION` 14・dump `enc_version` 14・`dump_io` は v13 の波の新列を 0 で埋める（mask 不要・
+0 は「情報なし」）。Rust の `encode` は版を引数に取り、npz の `enc_version` で v13 のネットは pad。golden 2 本は
+符号化を含まない（盤面・合法手・イベント）ので不変のはず。
+
+#### 20.9.1 WP `rs-enc-v14` の指示書
+
+```
+作業: WP rs-enc-v14（符号化 v14＝候補行に対象・トークン列 2・EXTRA 列 4・ε の対象ランダム化・
+docs/rust_engine_plan.md §20.9＝設計はそこ）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-enc-v14 に push、PR は作りません。成果物は
+docs/reports/2026-09-11_enc_v14.RESULT.json を添えて同ブランチへ。最初に pip install -r opcg_sim/requirements.txt
+pytest pytest-xdist maturin torch httpx → make rust-develop（opcg_effects.json が無ければ export_effects_json）。
+触るのは opcg_sim/learned/（n_rel_feat.py・n_rel.py・encoder.py・train/dump_io.py・train/n_rel_train.py の読み）・
+rust/opcg_engine/src/encode/・net/（npz の読み・pad）・search/quiesce.rs（cand_owned）・opcg_sim/loop/record_gen.py
+（ε の対象・enc_version）・tests/。探索・エンジンの裁定・アリーナは触らない。長い実行は run_in_background。
+
+■ A. 候補行の対象（次元不変）
+  - RESOLVE_EFFECT_SELECTION の候補行: 対象＝selected_uuids[0]（複数選択は先頭）・主体＝効果の発生源
+    （payload に無ければ pending の source から引く）。Python と Rust で同じ規則。CHOICE／CONFIRM は対象なしのまま。
+  - 同一性: 選択以外の候補行は 1 bit も変わらない（既存の Python/Rust 一致テストで確認）。
+
+■ B・C. 列の追加（append-only）
+  - n_rel_feat: S_COLS 末尾に power_opp_turn・act_avail、EXTRA_COLS 末尾に deck_removal_fixed・opp_pool_removal_fixed・
+    deck_bounce・opp_pool_bounce。定義は §20.9。Rust encode/ を同じ規則で（Python/Rust の parity テストを v14 で）。
+  - NR_ENC_VERSION 14。ネットの npz meta に enc_version を持たせ、13 のネットは新列の重み 0 で pad して読む
+    （Python・Rust とも）。**r3 を v14 で読んだときの decide が v13 と同じ手・同じ stats になる**ことを 20 局面で固定。
+
+■ D. ε の対象ランダム化（record_gen）
+  - forced=1 の直後の対象選択（同じ効果の最初の SEARCH_AND_SELECT）は候補から一様に引き forced=3・forced_sig。
+  - --eps-target P（既定 0）: 木が選んだ除去系の手の直後の対象選択も確率 P で一様に引く（forced=3）。π は木のまま。
+
+■ E. dump／訓練
+  - dump の enc_version 14・tokens [22,22]・scalars 94+33。dump_io は v13 の波（tokens [22,20]・scalars 123）を読むとき
+    新列を 0 で埋めて v14 の形に揃える（pack 版を上げる）。n_rel_train は v13/v14 混在で回る。
+  - 訓練の warm-start: v13 の npz を v14 のネットに読むとき新列の重みは 0 初期化（他はそのまま）。
+
+■ 受け入れ
+  - cargo test ＋ pytest: Python/Rust の符号化 parity（v14）／v13 ネットの pad で decide 同一（20 局面）／候補行の対象
+    （神の裁きの KO 対象 2 通りが別の行になる）／dump v13→v14 の pad／forced=3 の記録／既定（--eps-target 0）で
+    forced=3 が出ない。golden 2 本が不変であること（変わったら理由を書く・作り直しは判定待ち）。
+    docs/TEST_SPEC.md §2 に行を追記。make test green・make audit-cross void 0（Rust 変更）。
+  - 計測（RESULT.json）: r3 を v14 で読んだ serve の同一性（20 局面）・符号化のレイテンシ（v13 vs v14・1 decide の中位・
+    3 局面）・波 29 の 1 シャードを v14 に pad して読めること・record_gen --games 20 --decks synth_roles --eps-play 0.03
+    --eps-hold 0.03 --eps-target 0.1 で forced 1/2/3 の内訳。
+
+■ 成果物
+  - コード＋テスト＋docs/reports/2026-09-11_enc_v14.RESULT.json:
+    {"job":"rs-enc-v14","status":"done|partial","dims":{"S_DIM":22,"EXTRA_DIM":33},"r3_identity":{"positions":20,"same":20},
+     "latency_ms":{"v13":…,"v14":…},"golden":"unchanged|…","forced_counts":{…},"make_test":"N passed",
+     "audit_cross":{"pairs":120,"void":0},"notes":"…"}
+
+■ 前提
+  - v13 の列は 1 bit も変えない。判定はコーディネータ。質問は RESULT.json の notes に。モデル名はコミットに書かない。
+```
+
+**その後（合流後・別の指示書）**: 波 30 の生成（16 セッション・生成役 r3・v14 dump・`pol_p`・ε 3%/3%・`--eps-target 0.1`・
+synth_roles・160×4×R2）→ r5 ＝ warm-start r3（pad）・π 波 29+30・z 30+29+28+27・lr 2e-4・aux 0.1・visits 教師 → 評価帯
+（波 28・29・30）→ アリーナ（synth_roles 主・ミラー副）を常設セッションで 1 セット。
