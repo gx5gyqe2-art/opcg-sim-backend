@@ -1,0 +1,6 @@
+{"job": "n31-w12", "role": "gen", "status": "done",
+ "inputs": {"net": "claude/train-r5:n1_results/nrel_r5.npz", "seed_base": 2316500, "games": 480,
+            "sims": 160, "worlds": 4, "decks": "synth_roles"},
+ "outputs": {"dir": "n_records/n31_w12"},
+ "metrics": {"games": 480, "rows": 67682, "main_rows": 31634, "dropped": 0, "sec_per_game": 20.2},
+ "notes": "workers=2, select_rule=q_min_n q_min_frac=0.125 root_prior_temp=2 dirichlet_eps=0.25 temp_turns=4 eps_play=0.03 eps_hold=0.03. 30-game timing sample (585s) run first to project wall-clock (~2.6h) before committing to the full 480-game run, per corrected instructions."}
