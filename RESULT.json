@@ -1,0 +1,19 @@
+{
+  "job": "arena-hires-w02",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1002000,
+  "pairs": 175,
+  "games": 350,
+  "wr": 0.4543,
+  "ci95": [0.3958, 0.5128],
+  "elo": -31.9,
+  "elo95": [-73.5, 8.9],
+  "void": 0,
+  "dup_seeds": 0,
+  "sec_per_pair": 9.611,
+  "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+  "notes": "175/175ペア完走・中断/再起動なし（再開処理は発生せず）。1682s（9.6秒/ペア）。opcg_engine は波30ジョブで導入済みのため再ビルド不要だった。"
+}
