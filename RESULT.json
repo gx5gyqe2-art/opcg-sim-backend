@@ -1,0 +1,19 @@
+{
+  "job": "arena-hires-w04",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1004000,
+  "pairs": 175,
+  "games": 350,
+  "wr": 0.4886,
+  "ci95": [0.4319, 0.5453],
+  "elo": -7.9,
+  "elo95": [-47.6, 31.5],
+  "void": 0,
+  "dup_seeds": 0,
+  "sec_per_pair": 4.886,
+  "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+  "notes": "175/175 ペア完走（855s・シャード再開なし）。arena_merge: promoted=false（wr 0.4886, ci95 [0.4319,0.5453]、elo -7.9）。"
+}
