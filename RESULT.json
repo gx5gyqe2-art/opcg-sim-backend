@@ -1,6 +1,6 @@
 {"job": "n31-w16", "role": "gen", "status": "partial",
  "inputs": {"net": "claude/train-r5:n1_results/nrel_r5.npz", "seed_base": 2318500, "games": 480,
             "sims": 160, "worlds": 4, "decks": "synth_roles"},
- "outputs": {"dir": "n_records/n31_w16"},
- "metrics": {"games_done": 30, "games_target": 480},
- "notes": "checkpoint push mid-run; part1 (n_records/n31_w16) hung at 30/480 games with a known BrokenPipe multiprocessing worker crash (same failure mode as wave30 w15, docs/rust_engine_plan.md §20.9.4-1); resumed as n_records/n31_w16_p2 with --games 450 --seed-base 2318530. Will update this branch with full results and status=done once all 480 games complete."}
+ "outputs": {"dir": "n_records/n31_w16", "dir_p2": "n_records/n31_w16_p2"},
+ "metrics": {"games_done": 330, "games_target": 480},
+ "notes": "checkpoint push mid-run; part1 (n_records/n31_w16, seeds 2318500-2318529, 30 games) hung at 30/480 games with a known BrokenPipe multiprocessing worker crash (same failure mode as wave30 w15, docs/rust_engine_plan.md §20.9.4-1); resumed as n_records/n31_w16_p2 (seeds 2318530+, 450 games target) with --games 450 --seed-base 2318530. p2 at 300/450 as of this checkpoint. Will update this branch with full results and status=done once all 480 games complete."}
