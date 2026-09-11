@@ -1,0 +1,31 @@
+{
+ "job": "arena-hires-w06",
+ "status": "done",
+ "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d・sha256 92505dc4…67b167 を本セッションの ~/nrel_r5.npz と照合済み）",
+ "baseline": "nrel_r3（既定・--baseline \"\"）",
+ "condition": "random x synth_roles（--bands 1・両席 serve 既定）",
+ "seed_base": 1006000,
+ "seed_range": [
+  1006000,
+  1006174
+ ],
+ "pairs": 175,
+ "games": 350,
+ "wins": 172.0,
+ "wr": 0.4914,
+ "ci95": [
+  0.4344,
+  0.5484
+ ],
+ "elo": -6.0,
+ "elo95": [
+  -45.8,
+  33.7
+ ],
+ "void": 0,
+ "dup_seeds": 0,
+ "sec_per_pair": 4.45,
+ "shard_sec": 779,
+ "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+ "notes": "175 ペア全て完走・void 0・seed 1006000〜1006174 が 175 個ユニーク（重複なし）。壁時計は 779 秒＝1 ペア 4.45 秒で、指示の見積り（1 ペア約 15 秒・45 分前後）より速かった（--workers 4 の並列ぶん。同コンテナの r5 セットのアリーナでも 24 ペア 253〜257 秒＝同水準）。 単シャードの ci95 は [0.4344, 0.5484] と広く、単独では 0.50 を跨ぐ＝判定材料にはならない。§20.9.7 の読み方どおり 16 シャード 2,800 ペアの合算で見るべき数字。 環境: 前の作業（r5 のセット）と同じコンテナを使い回したので再構築は不要だった（opcg_engine は import 可・~/nrel_r5.npz も残っていた）。コードは変更していない。"
+}
