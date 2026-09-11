@@ -1,0 +1,24 @@
+{
+  "job": "n32-w16",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2328500,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n32_w16"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 67256,
+    "main_rows": 31319,
+    "dropped": 0,
+    "sec_per_game": 14.11
+  },
+  "notes": "era8・生成役 r5（claude/train-r5:n1_results/nrel_r5.npz、実行時は /root/nrel_r5.npz として展開）。波31と同一条件の第2波（--eps-target は未指定＝既定0）。30局試走（459s/30局=15.3s/局、成果物に含めず）で見込み2.0時間と判断し即実行。実測480局6772s=1.88時間・14.11s/局。dropped=0・void=0（進捗ログに棄却0が480局分連続）。コンテナ再起動は発生せず単一 --out で完走。成果物ブランチへの checkout 直前に origin/claude/n1-results の初回 fetch が接続断（RPC failed）で失敗したが再試行で成功、n_records/n32_w16 は未追跡のまま checkout をまたいで保持された。forced play=332/hold=60/target=117・removal_legal_rows=12993。"
+}
