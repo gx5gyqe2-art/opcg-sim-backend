@@ -1,0 +1,2 @@
+  main_w14.jsonl               183.0/350 = 0.5229 void 0
+[hires r5 vs r3 w14] ARENA_MERGE_FINAL {"pairs": 175, "games": 350, "void": 0, "wins": 183.0, "wr": 0.5229, "ci95": [0.4703, 0.5754], "elo": 15.9, "elo95": [-20.7, 52.8], "promoted": false, "shards": 1, "dup_seeds": 0}

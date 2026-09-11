@@ -1,0 +1,18 @@
+{
+  "job": "arena-hires-w14",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1014000,
+  "pairs": 175,
+  "games": 350,
+  "wr": 0.5229,
+  "ci95": [0.4703, 0.5754],
+  "elo": 15.9,
+  "void": 0,
+  "dup_seeds": 0,
+  "sec_per_pair": 10.01,
+  "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+  "notes": "単一連続実行（コンテナ再起動なし・再開不要）。175/175ペア・350局・void 0。ci95下限0.4703は0.5をまたぐため有意な優劣なし（promoted=false）。elo95=[-20.7, 52.8]。コードは未変更（HEAD 4d5912bd のまま）。"
+}
