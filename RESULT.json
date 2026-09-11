@@ -1,0 +1,22 @@
+{
+  "job": "n32-w15",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2328000,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {"dir": "n_records/n32_w15"},
+  "metrics": {
+    "games": 480,
+    "rows": 67700,
+    "main_rows": 31558,
+    "dropped": 0,
+    "sec_per_game": 20.58
+  },
+  "notes": "波31と完全に同一条件の第2波（era8・生成役r5）。30局の試走（n_records/n32_w15_trialは成果物に含めず削除・別途643s=21.4s/局を実測）で見積もり480局=約2.85時間となり6時間以内だったため相談なしで本実行へ。480局を単一--outで実行し、途中の中断なく一度で完走（9878s=164.6分・実測20.58s/局）。--net ~/nrel_r5.npzを明示しmeta_n_record.jsonのnetフィールドで/root/nrel_r5.npzが使われたことを確認済み（出荷既定r3にフォールバックしていない）。--eps-targetは指定通り付けず、meta上もeps_target=0.0を確認。forced内訳: play=340・hold=57・target=105（targetはeps_playで強制した除去の直後に必ず引く既定挙動によるもの・eps_target自体は無効）。void（決着せず・棄却）は0件。コードは変更していない（HEAD=84a162aef9c472a29ea23e81d0c682b7b42be4b5、符号化v14確認済み）。"
+}
