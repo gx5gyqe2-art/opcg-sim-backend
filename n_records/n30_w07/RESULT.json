@@ -1,0 +1,29 @@
+{
+  "job": "gen-n30-w07",
+  "status": "done",
+  "games": 480,
+  "rows": 70379,
+  "main_rows": 32096,
+  "dropped": 0,
+  "void": 0,
+  "forced": {
+    "play": 361,
+    "hold": 50,
+    "target": 275
+  },
+  "removal_legal_rows": 12959,
+  "sec_per_game": 20.548,
+  "wall_hours": 2.7397,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "enc_version": 14,
+  "net": "nrel_r3.npz",
+  "commit": "5e4e7f92bb1b0bdda02f77c8d396d51e4a1091ff",
+  "notes": "30局試走（別出力 n_records/n30_w07_trial・成果物には含めず削除済み）で623s/30局=20.77s/局を実測、480局見込み約2.77時間（<6時間）のため指示通りそのまま本実行に進んだ。本実行は480局を打ち切りなしで完走（dropped=0・void=0）。コンテナ再起動は発生せず p2 出力なし。"
+}
