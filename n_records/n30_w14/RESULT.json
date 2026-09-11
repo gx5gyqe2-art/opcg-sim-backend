@@ -1,0 +1,20 @@
+{
+  "job": "gen-n30-w14",
+  "status": "done",
+  "games": 480,
+  "rows": 69064,
+  "main_rows": 31262,
+  "dropped": 0,
+  "void": 0,
+  "forced": {"play": 361, "hold": 60, "target": 272},
+  "removal_legal_rows": 12597,
+  "sec_per_game": 13.225,
+  "wall_hours": 1.763,
+  "search": {"worlds": 4, "select_rule": "q_min_n", "q_min_frac": 0.125, "root_prior_temp": 2.0},
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "enc_version": 14,
+  "net": "nrel_r3.npz",
+  "commit": "5e4e7f92bb1b0bdda02f77c8d396d51e4a1091ff",
+  "notes": "単一連続実行（p2分割なし・コンテナ再起動なし）。事前に --games 30 の試走（別出力 n_records/n30_w14_trial・成果物には含めず）で壁時計を計測し 13.07秒/局（30局381秒）を確認、480局は6時間以内（実測1.76時間）と判断して本実行に進んだ。480/480局とも棄却0・void 0。生成途中（210/480局時点）に完了済みシャード00000〜00020を claude/n30-w14 へ中間コミットして push 済み（コミット 1cb6aa8）——本コミットはその続きで残り全シャードとRESULT.jsonを追加する。コードは未変更（HEAD 5e4e7f92 のまま）。"
+}
