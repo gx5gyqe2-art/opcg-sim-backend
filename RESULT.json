@@ -1,0 +1,23 @@
+{
+  "job": "n31-w08",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2314500,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n31_w08"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 67998,
+    "dropped": 0,
+    "sec_per_game": 14.74
+  },
+  "notes": "net の --net は git 上の branch:path 表記が record_gen に解決できないため、git show origin/claude/train-r5:n1_results/nrel_r5.npz を ~/nets/nrel_r5.npz に取り出し、そのローカルパスを --net に渡した（コーディネータの訂正どおり）。"
+}
