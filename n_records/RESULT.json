@@ -1,0 +1,22 @@
+{
+  "job": "n31-w03",
+  "role": "gen",
+  "status": "partial",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2312000,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": ["n_records/n31_w03", "n_records/n31_w03_p2", "n_records/n31_w03_p3"]
+  },
+  "metrics": {
+    "games": 150,
+    "games_planned": 480,
+    "npz_files": 15
+  },
+  "notes": "Cut short by coordinator decision 2026-09-11T19:40Z (wave 31/32 collection closed early — 28 other shards already reached parity with era era7's 13,440 games). Completed 150/480 games across 3 parts before stopping, split due to repeated container restarts: part1 (n_records/n31_w03, seed_base 2312000, 20 games), part2 (n_records/n31_w03_p2, seed_base 2312020, 120 games), part3 (n_records/n31_w03_p3, seed_base 2312140, 10 games, stopped by restart just as the cutoff instruction arrived). No further generation performed after the cutoff notice. All npz batches pushed for future z-window/re-mining use per coordinator instruction; not used to claim era8 completion."
+}
