@@ -1,0 +1,23 @@
+{
+  "job": "n31-w01",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2311000,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n31_w01"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 66513,
+    "dropped": 0,
+    "sec_per_game": 14.56
+  },
+  "notes": "r5 net (claude/train-r5) extracted locally via git show (branch:path not supported by --net). One-time fix: rebuilt Rust wheel with make rust-develop while HEAD was at df1f88a (encoding v14/S_DIM=22, matching r5 enc_version=14); an accidental `git checkout -` briefly moved the tree to an older v13 commit (S_DIM=20), causing a token-reshape error on all 30 timing-test games (0 rows) before it was caught and reverted. 30-game timing test: 470s, 0 dropped -> full 480-game run projected ~2h, ran in background. Full run: 480/480 games, 0 dropped, 66513 rows (30990 main), 6990s wall time."
+}
