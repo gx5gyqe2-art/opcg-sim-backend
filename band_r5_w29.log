@@ -1,0 +1,292 @@
+holdout 行 139382（seed%7==0・20s）
+  nrel_r3.npz
+    all                          mse 0.5327 sign 0.804 n 139382
+    turn1-4                      mse 0.7723 sign 0.707 n  17646
+    turn5-8                      mse 0.6427 sign 0.763 n  43438
+    turn9-99                     mse 0.4074 sign 0.853 n  76380
+    injected:KO:ACTIVATE_MAIN:c0-2 mse 0.4205 sign 0.856 n   2276
+    injected:KO:ACTIVATE_MAIN:c3-5 mse 0.5288 sign 0.802 n   5427
+    injected:KO:ACTIVATE_MAIN:c6+ mse 0.4741 sign 0.839 n   2779
+    injected:KO:COUNTER:c0-2     mse 0.2663 sign 0.896 n   1707
+    injected:KO:COUNTER:c3-5     mse 0.2983 sign 0.888 n   1107
+    injected:KO:EVENT:c0-2       mse 0.6047 sign 0.781 n   8643
+    injected:KO:EVENT:c3-5       mse 0.5536 sign 0.792 n  14451
+    injected:KO:EVENT:c6+        mse 0.4835 sign 0.828 n   2633
+    injected:KO:ON_ATTACK:c0-2   mse 0.6769 sign 0.727 n   1845
+    injected:KO:ON_ATTACK:c3-5   mse 0.5356 sign 0.805 n  10262
+    injected:KO:ON_ATTACK:c6+    mse 0.3911 sign 0.868 n   1495
+    injected:KO:ON_PLAY:c3-5     mse 0.6113 sign 0.772 n   9928
+    injected:KO:ON_PLAY:c6+      mse 0.5624 sign 0.785 n   1331
+    injected:KO:OTHER:c3-5       mse 0.4261 sign 0.850 n   2209
+    injected:KO:TRIGGER:c0-2     mse 0.4986 sign 0.818 n  11800
+    injected:KO:TRIGGER:c3-5     mse 0.4864 sign 0.820 n  11216
+    injected:KO:TRIGGER:c6+      mse 0.2747 sign 0.917 n   1504
+    injected:bounce:COUNTER:c0-2 mse 0.4311 sign 0.864 n    686
+    injected:bounce:EVENT:c0-2   mse 0.3731 sign 0.867 n   1363
+    injected:bounce:EVENT:c3-5   mse 0.5046 sign 0.817 n   4068
+    injected:bounce:ON_ATTACK:c0-2 mse 0.6089 sign 0.775 n   2583
+    injected:bounce:ON_ATTACK:c3-5 mse 0.5124 sign 0.812 n   3518
+    injected:bounce:ON_PLAY:c0-2 mse 0.7634 sign 0.709 n   1243
+    injected:bounce:ON_PLAY:c3-5 mse 0.5066 sign 0.818 n   4569
+    injected:bounce:ON_PLAY:c6+  mse 0.3084 sign 0.914 n   1623
+    injected:bounce:OTHER:c0-2   mse 0.6588 sign 0.703 n    411
+    injected:bounce:OTHER:c3-5   mse 0.4889 sign 0.817 n   3401
+    injected:bounce:TRIGGER:c0-2 mse 0.5928 sign 0.799 n   1072
+    injected:deck:ACTIVATE_MAIN:c3-5 mse 0.3912 sign 0.884 n    525
+    injected:deck:COUNTER:c0-2   mse 0.8809 sign 0.624 n    647
+    injected:deck:EVENT:c0-2     mse 0.5272 sign 0.806 n   6225
+    injected:deck:EVENT:c3-5     mse 0.5602 sign 0.798 n   5921
+    injected:deck:ON_ATTACK:c0-2 mse 0.5207 sign 0.806 n   2442
+    injected:deck:ON_ATTACK:c3-5 mse 0.5104 sign 0.805 n   1490
+    injected:deck:ON_PLAY:c0-2   mse 0.4034 sign 0.859 n   1386
+    injected:deck:ON_PLAY:c3-5   mse 0.5122 sign 0.804 n   5851
+    injected:deck:ON_PLAY:c6+    mse 0.5200 sign 0.814 n   2998
+    injected:deck:OTHER:c3-5     mse 0.5235 sign 0.800 n    710
+    injected:deck:OTHER:c6+      mse 0.4092 sign 0.834 n    692
+    injected:deck:TRIGGER:c3-5   mse 0.6773 sign 0.764 n   3088
+    injected:deck:TRIGGER:c6+    mse 0.3622 sign 0.897 n    780
+    injected:lock:ACTIVATE_MAIN:c0-2 mse 0.6162 sign 0.770 n   2215
+    injected:lock:ACTIVATE_MAIN:c3-5 mse 0.5979 sign 0.780 n  12186
+    injected:lock:ACTIVATE_MAIN:c6+ mse 0.6306 sign 0.757 n   3816
+    injected:lock:COUNTER:c0-2   mse 0.7698 sign 0.719 n   1729
+    injected:lock:COUNTER:c3-5   mse 0.4707 sign 0.799 n    379
+    injected:lock:EVENT:c0-2     mse 0.5041 sign 0.819 n  10647
+    injected:lock:EVENT:c3-5     mse 0.5881 sign 0.790 n   4857
+    injected:lock:ON_ATTACK:c0-2 mse 0.4263 sign 0.854 n   1736
+    injected:lock:ON_ATTACK:c3-5 mse 0.5360 sign 0.806 n   7807
+    injected:lock:ON_ATTACK:c6+  mse 0.4977 sign 0.807 n    326
+    injected:lock:ON_PLAY:c0-2   mse 0.6037 sign 0.752 n    894
+    injected:lock:ON_PLAY:c3-5   mse 0.5743 sign 0.791 n  10085
+    injected:lock:ON_PLAY:c6+    mse 0.5435 sign 0.800 n   5540
+    injected:lock:OTHER:c0-2     mse 0.5724 sign 0.714 n    441
+    injected:lock:OTHER:c3-5     mse 0.6373 sign 0.768 n   2166
+    injected:lock:OTHER:c6+      mse 0.5987 sign 0.749 n    894
+    injected:lock:TRIGGER:c0-2   mse 0.6111 sign 0.773 n   5834
+    injected:lock:TRIGGER:c3-5   mse 0.5893 sign 0.792 n   5685
+    injected:lock:TRIGGER:c6+    mse 0.6228 sign 0.785 n   1577
+    injected:reduce:ACTIVATE_MAIN:c0-2 mse 0.4261 sign 0.847 n   9622
+    injected:reduce:ACTIVATE_MAIN:c3-5 mse 0.5444 sign 0.810 n   5037
+    injected:reduce:ACTIVATE_MAIN:c6+ mse 0.5379 sign 0.776 n    763
+    injected:reduce:COUNTER:c0-2 mse 0.5650 sign 0.794 n   4468
+    injected:reduce:COUNTER:c3-5 mse 0.4501 sign 0.818 n   1932
+    injected:reduce:EVENT:c0-2   mse 0.5018 sign 0.819 n  14696
+    injected:reduce:EVENT:c3-5   mse 0.4780 sign 0.814 n   3872
+    injected:reduce:EVENT:c6+    mse 0.3253 sign 0.900 n   1034
+    injected:reduce:ON_ATTACK:c0-2 mse 0.6650 sign 0.745 n   5034
+    injected:reduce:ON_ATTACK:c3-5 mse 0.5627 sign 0.795 n  10332
+    injected:reduce:ON_ATTACK:c6+ mse 0.5020 sign 0.829 n   3986
+    injected:reduce:ON_PLAY:c0-2 mse 0.4475 sign 0.831 n   2290
+    injected:reduce:ON_PLAY:c3-5 mse 0.5479 sign 0.796 n   2540
+    injected:reduce:ON_PLAY:c6+  mse 0.6230 sign 0.791 n    870
+    injected:reduce:OTHER:c0-2   mse 0.6508 sign 0.782 n   1438
+    injected:reduce:OTHER:c6+    mse 0.6045 sign 0.774 n   1418
+    injected:reduce:TRIGGER:c0-2 mse 0.4926 sign 0.824 n   4598
+    injected:reduce:TRIGGER:c3-5 mse 0.5237 sign 0.813 n   1789
+    injected:reduce:TRIGGER:c6+  mse 0.1350 sign 0.960 n    325
+    injected:trash:ACTIVATE_MAIN:c3-5 mse 0.7033 sign 0.684 n    561
+    injected:trash:ACTIVATE_MAIN:c6+ mse 0.5368 sign 0.818 n   2390
+    injected:trash:ON_ATTACK:c3-5 mse 0.6954 sign 0.742 n   3048
+    injected:trash:ON_PLAY:c6+   mse 0.7606 sign 0.714 n   1981
+    colors:BLACK                 mse 0.5448 sign 0.803 n  32999
+    colors:BLUE                  mse 0.4997 sign 0.818 n  38348
+    colors:GREEN                 mse 0.5821 sign 0.784 n  33255
+    colors:PURPLE                mse 0.5292 sign 0.808 n  32312
+    colors:RED                   mse 0.5140 sign 0.809 n  39943
+    colors:YELLOW                mse 0.5829 sign 0.781 n  29181
+    after_removal                mse 0.6244 sign 0.770 n   3806
+    not_removal                  mse 0.5301 sign 0.805 n 135576
+  nrel_r4b.npz
+    all                          mse 0.5198 sign 0.811 n 139382 | aux 0.3863 life 0.213 atk 0.215 tok_atk 0.170 tok_ab 0.133 (n 97587)
+    turn1-4                      mse 0.7599 sign 0.715 n  17646 | aux 0.2808 life 0.118 atk 0.139 tok_atk 0.119 tok_ab 0.091 (n 17646)
+    turn5-8                      mse 0.6271 sign 0.771 n  43438 | aux 0.3979 life 0.223 atk 0.219 tok_atk 0.162 tok_ab 0.138 (n 41764)
+    turn9-99                     mse 0.3959 sign 0.858 n  76380 | aux 0.4350 life 0.260 atk 0.258 tok_atk 0.205 tok_ab 0.153 (n 36259)
+    injected:KO:ACTIVATE_MAIN:c0-2 mse 0.4169 sign 0.856 n   2276 | aux 0.3590 life 0.199 atk 0.236 tok_atk 0.182 tok_ab 0.165 (n 1525)
+    injected:KO:ACTIVATE_MAIN:c3-5 mse 0.5391 sign 0.796 n   5427 | aux 0.3809 life 0.215 atk 0.221 tok_atk 0.181 tok_ab 0.125 (n 3836)
+    injected:KO:ACTIVATE_MAIN:c6+ mse 0.4611 sign 0.843 n   2779 | aux 0.3647 life 0.217 atk 0.198 tok_atk 0.170 tok_ab 0.179 (n 1932)
+    injected:KO:COUNTER:c0-2     mse 0.2492 sign 0.916 n   1707 | aux 0.5057 life 0.202 atk 0.241 tok_atk 0.175 tok_ab 0.132 (n 1222)
+    injected:KO:COUNTER:c3-5     mse 0.3361 sign 0.888 n   1107 | aux 0.3280 life 0.231 atk 0.198 tok_atk 0.171 tok_ab 0.150 (n 797)
+    injected:KO:EVENT:c0-2       mse 0.5937 sign 0.784 n   8643 | aux 0.3755 life 0.216 atk 0.214 tok_atk 0.170 tok_ab 0.134 (n 6138)
+    injected:KO:EVENT:c3-5       mse 0.5275 sign 0.803 n  14451 | aux 0.3712 life 0.207 atk 0.202 tok_atk 0.179 tok_ab 0.126 (n 10290)
+    injected:KO:EVENT:c6+        mse 0.4345 sign 0.837 n   2633 | aux 0.3260 life 0.173 atk 0.183 tok_atk 0.169 tok_ab 0.093 (n 1802)
+    injected:KO:ON_ATTACK:c0-2   mse 0.6492 sign 0.750 n   1845 | aux 0.3749 life 0.181 atk 0.198 tok_atk 0.160 tok_ab 0.150 (n 1218)
+    injected:KO:ON_ATTACK:c3-5   mse 0.5240 sign 0.813 n  10262 | aux 0.3924 life 0.198 atk 0.218 tok_atk 0.159 tok_ab 0.135 (n 6984)
+    injected:KO:ON_ATTACK:c6+    mse 0.3985 sign 0.850 n   1495 | aux 0.3764 life 0.179 atk 0.213 tok_atk 0.166 tok_ab 0.126 (n 1014)
+    injected:KO:ON_PLAY:c3-5     mse 0.5800 sign 0.785 n   9928 | aux 0.3631 life 0.196 atk 0.213 tok_atk 0.160 tok_ab 0.123 (n 6653)
+    injected:KO:ON_PLAY:c6+      mse 0.5278 sign 0.779 n   1331 | aux 0.3420 life 0.186 atk 0.242 tok_atk 0.203 tok_ab 0.092 (n 939)
+    injected:KO:OTHER:c3-5       mse 0.3941 sign 0.857 n   2209 | aux 0.3662 life 0.187 atk 0.173 tok_atk 0.130 tok_ab 0.132 (n 1584)
+    injected:KO:TRIGGER:c0-2     mse 0.4796 sign 0.827 n  11800 | aux 0.3986 life 0.212 atk 0.207 tok_atk 0.171 tok_ab 0.127 (n 8326)
+    injected:KO:TRIGGER:c3-5     mse 0.4750 sign 0.825 n  11216 | aux 0.3684 life 0.217 atk 0.211 tok_atk 0.182 tok_ab 0.127 (n 8074)
+    injected:KO:TRIGGER:c6+      mse 0.2808 sign 0.912 n   1504 | aux 0.3256 life 0.182 atk 0.182 tok_atk 0.168 tok_ab 0.090 (n 995)
+    injected:bounce:COUNTER:c0-2 mse 0.4571 sign 0.851 n    686 | aux 0.3213 life 0.234 atk 0.262 tok_atk 0.196 tok_ab 0.162 (n 502)
+    injected:bounce:EVENT:c0-2   mse 0.3018 sign 0.899 n   1363 | aux 0.4898 life 0.165 atk 0.162 tok_atk 0.130 tok_ab 0.167 (n 987)
+    injected:bounce:EVENT:c3-5   mse 0.4957 sign 0.824 n   4068 | aux 0.3809 life 0.213 atk 0.212 tok_atk 0.176 tok_ab 0.140 (n 2994)
+    injected:bounce:ON_ATTACK:c0-2 mse 0.5885 sign 0.775 n   2583 | aux 0.4223 life 0.216 atk 0.226 tok_atk 0.178 tok_ab 0.139 (n 1837)
+    injected:bounce:ON_ATTACK:c3-5 mse 0.5458 sign 0.809 n   3518 | aux 0.3642 life 0.215 atk 0.210 tok_atk 0.166 tok_ab 0.126 (n 2507)
+    injected:bounce:ON_PLAY:c0-2 mse 0.7853 sign 0.687 n   1243 | aux 0.3789 life 0.233 atk 0.214 tok_atk 0.176 tok_ab 0.127 (n 886)
+    injected:bounce:ON_PLAY:c3-5 mse 0.4977 sign 0.819 n   4569 | aux 0.3566 life 0.210 atk 0.207 tok_atk 0.162 tok_ab 0.102 (n 3189)
+    injected:bounce:ON_PLAY:c6+  mse 0.2673 sign 0.923 n   1623 | aux 0.3929 life 0.249 atk 0.231 tok_atk 0.187 tok_ab 0.118 (n 1193)
+    injected:bounce:OTHER:c0-2   mse 0.5275 sign 0.779 n    411 | aux 0.5844 life 0.244 atk 0.209 tok_atk 0.159 tok_ab 0.227 (n 322)
+    injected:bounce:OTHER:c3-5   mse 0.5119 sign 0.811 n   3401 | aux 0.3949 life 0.224 atk 0.223 tok_atk 0.171 tok_ab 0.114 (n 2408)
+    injected:bounce:TRIGGER:c0-2 mse 0.5368 sign 0.805 n   1072 | aux 0.3769 life 0.225 atk 0.227 tok_atk 0.152 tok_ab 0.136 (n 834)
+    injected:deck:ACTIVATE_MAIN:c3-5 mse 0.4128 sign 0.869 n    525 | aux 0.4165 life 0.276 atk 0.240 tok_atk 0.166 tok_ab 0.107 (n 358)
+    injected:deck:COUNTER:c0-2   mse 0.8732 sign 0.646 n    647 | aux 0.4084 life 0.222 atk 0.255 tok_atk 0.210 tok_ab 0.118 (n 485)
+    injected:deck:EVENT:c0-2     mse 0.4952 sign 0.823 n   6225 | aux 0.3969 life 0.227 atk 0.219 tok_atk 0.168 tok_ab 0.138 (n 4443)
+    injected:deck:EVENT:c3-5     mse 0.5105 sign 0.821 n   5921 | aux 0.4004 life 0.211 atk 0.196 tok_atk 0.159 tok_ab 0.149 (n 4286)
+    injected:deck:ON_ATTACK:c0-2 mse 0.5546 sign 0.799 n   2442 | aux 0.3716 life 0.192 atk 0.202 tok_atk 0.159 tok_ab 0.160 (n 1752)
+    injected:deck:ON_ATTACK:c3-5 mse 0.5903 sign 0.772 n   1490 | aux 0.4067 life 0.219 atk 0.233 tok_atk 0.174 tok_ab 0.125 (n 1052)
+    injected:deck:ON_PLAY:c0-2   mse 0.3681 sign 0.873 n   1386 | aux 0.3812 life 0.223 atk 0.273 tok_atk 0.189 tok_ab 0.115 (n 985)
+    injected:deck:ON_PLAY:c3-5   mse 0.5086 sign 0.808 n   5851 | aux 0.3422 life 0.207 atk 0.218 tok_atk 0.171 tok_ab 0.133 (n 4184)
+    injected:deck:ON_PLAY:c6+    mse 0.4516 sign 0.838 n   2998 | aux 0.4165 life 0.207 atk 0.195 tok_atk 0.154 tok_ab 0.136 (n 2086)
+    injected:deck:OTHER:c3-5     mse 0.4390 sign 0.841 n    710 | aux 0.3917 life 0.178 atk 0.191 tok_atk 0.158 tok_ab 0.115 (n 458)
+    injected:deck:OTHER:c6+      mse 0.3840 sign 0.848 n    692 | aux 0.3177 life 0.203 atk 0.167 tok_atk 0.152 tok_ab 0.205 (n 549)
+    injected:deck:TRIGGER:c3-5   mse 0.5883 sign 0.794 n   3088 | aux 0.3997 life 0.187 atk 0.195 tok_atk 0.164 tok_ab 0.142 (n 2172)
+    injected:deck:TRIGGER:c6+    mse 0.3287 sign 0.897 n    780 | aux 0.3643 life 0.200 atk 0.345 tok_atk 0.244 tok_ab 0.210 (n 554)
+    injected:lock:ACTIVATE_MAIN:c0-2 mse 0.5770 sign 0.785 n   2215 | aux 0.3925 life 0.234 atk 0.230 tok_atk 0.190 tok_ab 0.163 (n 1459)
+    injected:lock:ACTIVATE_MAIN:c3-5 mse 0.6206 sign 0.766 n  12186 | aux 0.3703 life 0.224 atk 0.218 tok_atk 0.178 tok_ab 0.137 (n 8560)
+    injected:lock:ACTIVATE_MAIN:c6+ mse 0.5641 sign 0.778 n   3816 | aux 0.4044 life 0.276 atk 0.213 tok_atk 0.156 tok_ab 0.103 (n 2692)
+    injected:lock:COUNTER:c0-2   mse 0.8144 sign 0.709 n   1729 | aux 0.3589 life 0.211 atk 0.244 tok_atk 0.175 tok_ab 0.146 (n 1230)
+    injected:lock:COUNTER:c3-5   mse 0.6209 sign 0.773 n    379 | aux 0.3430 life 0.253 atk 0.266 tok_atk 0.180 tok_ab 0.157 (n 270)
+    injected:lock:EVENT:c0-2     mse 0.5110 sign 0.816 n  10647 | aux 0.4158 life 0.218 atk 0.219 tok_atk 0.177 tok_ab 0.133 (n 7545)
+    injected:lock:EVENT:c3-5     mse 0.5546 sign 0.805 n   4857 | aux 0.3763 life 0.228 atk 0.234 tok_atk 0.179 tok_ab 0.122 (n 3414)
+    injected:lock:ON_ATTACK:c0-2 mse 0.4137 sign 0.840 n   1736 | aux 0.4256 life 0.177 atk 0.225 tok_atk 0.143 tok_ab 0.094 (n 1202)
+    injected:lock:ON_ATTACK:c3-5 mse 0.4996 sign 0.816 n   7807 | aux 0.3838 life 0.217 atk 0.208 tok_atk 0.154 tok_ab 0.127 (n 5493)
+    injected:lock:ON_ATTACK:c6+  mse 0.5143 sign 0.816 n    326 | aux 0.3068 life 0.237 atk 0.253 tok_atk 0.111 tok_ab 0.074 (n 210)
+    injected:lock:ON_PLAY:c0-2   mse 0.6969 sign 0.740 n    894 | aux 0.4509 life 0.196 atk 0.182 tok_atk 0.144 tok_ab 0.131 (n 629)
+    injected:lock:ON_PLAY:c3-5   mse 0.5637 sign 0.800 n  10085 | aux 0.4214 life 0.212 atk 0.214 tok_atk 0.175 tok_ab 0.119 (n 7082)
+    injected:lock:ON_PLAY:c6+    mse 0.4918 sign 0.816 n   5540 | aux 0.3951 life 0.192 atk 0.216 tok_atk 0.179 tok_ab 0.117 (n 3907)
+    injected:lock:OTHER:c0-2     mse 0.4831 sign 0.791 n    441 | aux 0.3185 life 0.188 atk 0.165 tok_atk 0.168 tok_ab 0.144 (n 309)
+    injected:lock:OTHER:c3-5     mse 0.6512 sign 0.765 n   2166 | aux 0.3532 life 0.192 atk 0.185 tok_atk 0.157 tok_ab 0.129 (n 1445)
+    injected:lock:OTHER:c6+      mse 0.6441 sign 0.754 n    894 | aux 0.3478 life 0.220 atk 0.196 tok_atk 0.151 tok_ab 0.069 (n 588)
+    injected:lock:TRIGGER:c0-2   mse 0.6280 sign 0.765 n   5834 | aux 0.3940 life 0.203 atk 0.217 tok_atk 0.181 tok_ab 0.122 (n 4128)
+    injected:lock:TRIGGER:c3-5   mse 0.5799 sign 0.792 n   5685 | aux 0.3609 life 0.224 atk 0.231 tok_atk 0.185 tok_ab 0.129 (n 4007)
+    injected:lock:TRIGGER:c6+    mse 0.5909 sign 0.787 n   1577 | aux 0.3701 life 0.221 atk 0.255 tok_atk 0.223 tok_ab 0.133 (n 1069)
+    injected:reduce:ACTIVATE_MAIN:c0-2 mse 0.4243 sign 0.847 n   9622 | aux 0.3809 life 0.214 atk 0.222 tok_atk 0.175 tok_ab 0.136 (n 6884)
+    injected:reduce:ACTIVATE_MAIN:c3-5 mse 0.5304 sign 0.815 n   5037 | aux 0.3579 life 0.192 atk 0.204 tok_atk 0.171 tok_ab 0.135 (n 3546)
+    injected:reduce:ACTIVATE_MAIN:c6+ mse 0.4863 sign 0.809 n    763 | aux 0.4448 life 0.212 atk 0.249 tok_atk 0.152 tok_ab 0.169 (n 522)
+    injected:reduce:COUNTER:c0-2 mse 0.5422 sign 0.804 n   4468 | aux 0.3859 life 0.195 atk 0.203 tok_atk 0.148 tok_ab 0.132 (n 3124)
+    injected:reduce:COUNTER:c3-5 mse 0.4093 sign 0.845 n   1932 | aux 0.3411 life 0.184 atk 0.241 tok_atk 0.164 tok_ab 0.094 (n 1412)
+    injected:reduce:EVENT:c0-2   mse 0.4820 sign 0.827 n  14696 | aux 0.3991 life 0.199 atk 0.199 tok_atk 0.163 tok_ab 0.130 (n 10242)
+    injected:reduce:EVENT:c3-5   mse 0.4419 sign 0.831 n   3872 | aux 0.3617 life 0.210 atk 0.222 tok_atk 0.178 tok_ab 0.119 (n 2901)
+    injected:reduce:EVENT:c6+    mse 0.3170 sign 0.904 n   1034 | aux 0.3179 life 0.149 atk 0.147 tok_atk 0.148 tok_ab 0.071 (n 733)
+    injected:reduce:ON_ATTACK:c0-2 mse 0.6333 sign 0.762 n   5034 | aux 0.3724 life 0.213 atk 0.196 tok_atk 0.162 tok_ab 0.126 (n 3538)
+    injected:reduce:ON_ATTACK:c3-5 mse 0.5646 sign 0.796 n  10332 | aux 0.4149 life 0.214 atk 0.207 tok_atk 0.169 tok_ab 0.133 (n 7261)
+    injected:reduce:ON_ATTACK:c6+ mse 0.5220 sign 0.807 n   3986 | aux 0.3947 life 0.208 atk 0.210 tok_atk 0.169 tok_ab 0.131 (n 2730)
+    injected:reduce:ON_PLAY:c0-2 mse 0.4214 sign 0.834 n   2290 | aux 0.3652 life 0.180 atk 0.247 tok_atk 0.192 tok_ab 0.125 (n 1603)
+    injected:reduce:ON_PLAY:c3-5 mse 0.5510 sign 0.804 n   2540 | aux 0.4088 life 0.177 atk 0.242 tok_atk 0.185 tok_ab 0.133 (n 1769)
+    injected:reduce:ON_PLAY:c6+  mse 0.6916 sign 0.745 n    870 | aux 0.3943 life 0.250 atk 0.256 tok_atk 0.177 tok_ab 0.084 (n 625)
+    injected:reduce:OTHER:c0-2   mse 0.6103 sign 0.784 n   1438 | aux 0.4508 life 0.280 atk 0.230 tok_atk 0.157 tok_ab 0.094 (n 961)
+    injected:reduce:OTHER:c6+    mse 0.6106 sign 0.772 n   1418 | aux 0.3897 life 0.214 atk 0.182 tok_atk 0.165 tok_ab 0.149 (n 977)
+    injected:reduce:TRIGGER:c0-2 mse 0.5201 sign 0.815 n   4598 | aux 0.3323 life 0.193 atk 0.202 tok_atk 0.159 tok_ab 0.120 (n 3103)
+    injected:reduce:TRIGGER:c3-5 mse 0.5668 sign 0.802 n   1789 | aux 0.3473 life 0.205 atk 0.238 tok_atk 0.174 tok_ab 0.140 (n 1249)
+    injected:reduce:TRIGGER:c6+  mse 0.1054 sign 0.982 n    325 | aux 0.3545 life 0.226 atk 0.171 tok_atk 0.137 tok_ab 0.112 (n 245)
+    injected:trash:ACTIVATE_MAIN:c3-5 mse 0.6462 sign 0.747 n    561 | aux 0.4320 life 0.212 atk 0.300 tok_atk 0.182 tok_ab 0.128 (n 402)
+    injected:trash:ACTIVATE_MAIN:c6+ mse 0.5725 sign 0.799 n   2390 | aux 0.5103 life 0.185 atk 0.192 tok_atk 0.177 tok_ab 0.140 (n 1668)
+    injected:trash:ON_ATTACK:c3-5 mse 0.7283 sign 0.721 n   3048 | aux 0.4559 life 0.226 atk 0.192 tok_atk 0.166 tok_ab 0.135 (n 2182)
+    injected:trash:ON_PLAY:c6+   mse 0.7291 sign 0.726 n   1981 | aux 0.4582 life 0.222 atk 0.199 tok_atk 0.168 tok_ab 0.120 (n 1456)
+    colors:BLACK                 mse 0.5302 sign 0.806 n  32999 | aux 0.4394 life 0.219 atk 0.203 tok_atk 0.165 tok_ab 0.133 (n 23273)
+    colors:BLUE                  mse 0.4791 sign 0.828 n  38348 | aux 0.3862 life 0.213 atk 0.212 tok_atk 0.164 tok_ab 0.135 (n 27276)
+    colors:GREEN                 mse 0.5767 sign 0.786 n  33255 | aux 0.4144 life 0.209 atk 0.211 tok_atk 0.172 tok_ab 0.127 (n 23063)
+    colors:PURPLE                mse 0.5149 sign 0.814 n  32312 | aux 0.3770 life 0.212 atk 0.213 tok_atk 0.164 tok_ab 0.136 (n 22654)
+    colors:RED                   mse 0.5066 sign 0.816 n  39943 | aux 0.3502 life 0.198 atk 0.204 tok_atk 0.169 tok_ab 0.131 (n 28089)
+    colors:YELLOW                mse 0.5745 sign 0.787 n  29181 | aux 0.3675 life 0.219 atk 0.240 tok_atk 0.184 tok_ab 0.135 (n 20415)
+    after_removal                mse 0.6217 sign 0.777 n   3806 | aux 0.4262 life 0.233 atk 0.250 tok_atk 0.212 tok_ab 0.133 (n 3130)
+    not_removal                  mse 0.5170 sign 0.812 n 135576 | aux 0.3849 life 0.213 atk 0.214 tok_atk 0.169 tok_ab 0.133 (n 94457)
+  nrel_r5.npz
+    all                          mse 0.5171 sign 0.811 n 139382 | aux 0.3647 life 0.206 atk 0.188 tok_atk 0.155 tok_ab 0.113 (n 97587)
+    turn1-4                      mse 0.7517 sign 0.714 n  17646 | aux 0.2626 life 0.115 atk 0.121 tok_atk 0.108 tok_ab 0.080 (n 17646)
+    turn5-8                      mse 0.6288 sign 0.771 n  43438 | aux 0.3768 life 0.218 atk 0.193 tok_atk 0.147 tok_ab 0.116 (n 41764)
+    turn9-99                     mse 0.3922 sign 0.861 n  76380 | aux 0.4106 life 0.248 atk 0.223 tok_atk 0.190 tok_ab 0.131 (n 36259)
+    injected:KO:ACTIVATE_MAIN:c0-2 mse 0.4017 sign 0.866 n   2276 | aux 0.3301 life 0.200 atk 0.202 tok_atk 0.174 tok_ab 0.137 (n 1525)
+    injected:KO:ACTIVATE_MAIN:c3-5 mse 0.5294 sign 0.799 n   5427 | aux 0.3601 life 0.206 atk 0.193 tok_atk 0.170 tok_ab 0.107 (n 3836)
+    injected:KO:ACTIVATE_MAIN:c6+ mse 0.5040 sign 0.827 n   2779 | aux 0.3420 life 0.212 atk 0.167 tok_atk 0.151 tok_ab 0.153 (n 1932)
+    injected:KO:COUNTER:c0-2     mse 0.2822 sign 0.883 n   1707 | aux 0.4598 life 0.189 atk 0.223 tok_atk 0.162 tok_ab 0.110 (n 1222)
+    injected:KO:COUNTER:c3-5     mse 0.3342 sign 0.893 n   1107 | aux 0.3177 life 0.202 atk 0.175 tok_atk 0.142 tok_ab 0.141 (n 797)
+    injected:KO:EVENT:c0-2       mse 0.5569 sign 0.807 n   8643 | aux 0.3567 life 0.206 atk 0.184 tok_atk 0.154 tok_ab 0.117 (n 6138)
+    injected:KO:EVENT:c3-5       mse 0.5237 sign 0.807 n  14451 | aux 0.3529 life 0.203 atk 0.186 tok_atk 0.162 tok_ab 0.109 (n 10290)
+    injected:KO:EVENT:c6+        mse 0.4422 sign 0.836 n   2633 | aux 0.3006 life 0.172 atk 0.165 tok_atk 0.156 tok_ab 0.078 (n 1802)
+    injected:KO:ON_ATTACK:c0-2   mse 0.6584 sign 0.753 n   1845 | aux 0.3533 life 0.175 atk 0.172 tok_atk 0.143 tok_ab 0.135 (n 1218)
+    injected:KO:ON_ATTACK:c3-5   mse 0.5238 sign 0.805 n  10262 | aux 0.3674 life 0.189 atk 0.188 tok_atk 0.144 tok_ab 0.111 (n 6984)
+    injected:KO:ON_ATTACK:c6+    mse 0.3767 sign 0.862 n   1495 | aux 0.3454 life 0.179 atk 0.202 tok_atk 0.156 tok_ab 0.104 (n 1014)
+    injected:KO:ON_PLAY:c3-5     mse 0.5750 sign 0.782 n   9928 | aux 0.3417 life 0.188 atk 0.179 tok_atk 0.145 tok_ab 0.107 (n 6653)
+    injected:KO:ON_PLAY:c6+      mse 0.4626 sign 0.827 n   1331 | aux 0.3256 life 0.184 atk 0.229 tok_atk 0.198 tok_ab 0.083 (n 939)
+    injected:KO:OTHER:c3-5       mse 0.4039 sign 0.853 n   2209 | aux 0.3411 life 0.168 atk 0.141 tok_atk 0.115 tok_ab 0.123 (n 1584)
+    injected:KO:TRIGGER:c0-2     mse 0.4594 sign 0.830 n  11800 | aux 0.3751 life 0.203 atk 0.186 tok_atk 0.157 tok_ab 0.108 (n 8326)
+    injected:KO:TRIGGER:c3-5     mse 0.4642 sign 0.829 n  11216 | aux 0.3481 life 0.213 atk 0.190 tok_atk 0.166 tok_ab 0.110 (n 8074)
+    injected:KO:TRIGGER:c6+      mse 0.2745 sign 0.910 n   1504 | aux 0.2987 life 0.172 atk 0.158 tok_atk 0.153 tok_ab 0.075 (n 995)
+    injected:bounce:COUNTER:c0-2 mse 0.4705 sign 0.818 n    686 | aux 0.3184 life 0.227 atk 0.254 tok_atk 0.190 tok_ab 0.134 (n 502)
+    injected:bounce:EVENT:c0-2   mse 0.2808 sign 0.910 n   1363 | aux 0.4539 life 0.160 atk 0.145 tok_atk 0.117 tok_ab 0.145 (n 987)
+    injected:bounce:EVENT:c3-5   mse 0.5257 sign 0.805 n   4068 | aux 0.3639 life 0.216 atk 0.209 tok_atk 0.159 tok_ab 0.115 (n 2994)
+    injected:bounce:ON_ATTACK:c0-2 mse 0.5701 sign 0.796 n   2583 | aux 0.3966 life 0.200 atk 0.192 tok_atk 0.160 tok_ab 0.112 (n 1837)
+    injected:bounce:ON_ATTACK:c3-5 mse 0.5590 sign 0.805 n   3518 | aux 0.3465 life 0.198 atk 0.170 tok_atk 0.148 tok_ab 0.110 (n 2507)
+    injected:bounce:ON_PLAY:c0-2 mse 0.7717 sign 0.706 n   1243 | aux 0.3505 life 0.223 atk 0.192 tok_atk 0.158 tok_ab 0.100 (n 886)
+    injected:bounce:ON_PLAY:c3-5 mse 0.4916 sign 0.819 n   4569 | aux 0.3367 life 0.206 atk 0.169 tok_atk 0.143 tok_ab 0.088 (n 3189)
+    injected:bounce:ON_PLAY:c6+  mse 0.2757 sign 0.913 n   1623 | aux 0.3699 life 0.224 atk 0.208 tok_atk 0.172 tok_ab 0.096 (n 1193)
+    injected:bounce:OTHER:c0-2   mse 0.2585 sign 0.927 n    411 | aux 0.5065 life 0.260 atk 0.179 tok_atk 0.129 tok_ab 0.155 (n 322)
+    injected:bounce:OTHER:c3-5   mse 0.5242 sign 0.809 n   3401 | aux 0.3666 life 0.215 atk 0.180 tok_atk 0.150 tok_ab 0.092 (n 2408)
+    injected:bounce:TRIGGER:c0-2 mse 0.4612 sign 0.848 n   1072 | aux 0.3598 life 0.232 atk 0.218 tok_atk 0.138 tok_ab 0.116 (n 834)
+    injected:deck:ACTIVATE_MAIN:c3-5 mse 0.4247 sign 0.859 n    525 | aux 0.3985 life 0.286 atk 0.201 tok_atk 0.148 tok_ab 0.087 (n 358)
+    injected:deck:COUNTER:c0-2   mse 0.7874 sign 0.697 n    647 | aux 0.3878 life 0.209 atk 0.205 tok_atk 0.207 tok_ab 0.105 (n 485)
+    injected:deck:EVENT:c0-2     mse 0.4985 sign 0.822 n   6225 | aux 0.3828 life 0.220 atk 0.193 tok_atk 0.156 tok_ab 0.112 (n 4443)
+    injected:deck:EVENT:c3-5     mse 0.5002 sign 0.811 n   5921 | aux 0.3806 life 0.201 atk 0.177 tok_atk 0.144 tok_ab 0.129 (n 4286)
+    injected:deck:ON_ATTACK:c0-2 mse 0.5192 sign 0.808 n   2442 | aux 0.3493 life 0.187 atk 0.188 tok_atk 0.147 tok_ab 0.133 (n 1752)
+    injected:deck:ON_ATTACK:c3-5 mse 0.5544 sign 0.787 n   1490 | aux 0.3853 life 0.206 atk 0.186 tok_atk 0.162 tok_ab 0.112 (n 1052)
+    injected:deck:ON_PLAY:c0-2   mse 0.3846 sign 0.863 n   1386 | aux 0.3682 life 0.205 atk 0.250 tok_atk 0.166 tok_ab 0.100 (n 985)
+    injected:deck:ON_PLAY:c3-5   mse 0.5139 sign 0.803 n   5851 | aux 0.3313 life 0.199 atk 0.204 tok_atk 0.157 tok_ab 0.107 (n 4184)
+    injected:deck:ON_PLAY:c6+    mse 0.4179 sign 0.856 n   2998 | aux 0.3973 life 0.209 atk 0.176 tok_atk 0.142 tok_ab 0.115 (n 2086)
+    injected:deck:OTHER:c3-5     mse 0.4160 sign 0.848 n    710 | aux 0.3650 life 0.159 atk 0.162 tok_atk 0.151 tok_ab 0.102 (n 458)
+    injected:deck:OTHER:c6+      mse 0.3879 sign 0.848 n    692 | aux 0.3039 life 0.183 atk 0.166 tok_atk 0.135 tok_ab 0.193 (n 549)
+    injected:deck:TRIGGER:c3-5   mse 0.5587 sign 0.793 n   3088 | aux 0.3787 life 0.176 atk 0.180 tok_atk 0.151 tok_ab 0.127 (n 2172)
+    injected:deck:TRIGGER:c6+    mse 0.3387 sign 0.881 n    780 | aux 0.3490 life 0.187 atk 0.326 tok_atk 0.233 tok_ab 0.178 (n 554)
+    injected:lock:ACTIVATE_MAIN:c0-2 mse 0.5581 sign 0.792 n   2215 | aux 0.3619 life 0.224 atk 0.216 tok_atk 0.177 tok_ab 0.145 (n 1459)
+    injected:lock:ACTIVATE_MAIN:c3-5 mse 0.6051 sign 0.776 n  12186 | aux 0.3508 life 0.214 atk 0.189 tok_atk 0.165 tok_ab 0.116 (n 8560)
+    injected:lock:ACTIVATE_MAIN:c6+ mse 0.5655 sign 0.783 n   3816 | aux 0.3824 life 0.263 atk 0.179 tok_atk 0.139 tok_ab 0.088 (n 2692)
+    injected:lock:COUNTER:c0-2   mse 0.8431 sign 0.726 n   1729 | aux 0.3304 life 0.198 atk 0.196 tok_atk 0.163 tok_ab 0.119 (n 1230)
+    injected:lock:COUNTER:c3-5   mse 0.5589 sign 0.823 n    379 | aux 0.3322 life 0.207 atk 0.252 tok_atk 0.164 tok_ab 0.172 (n 270)
+    injected:lock:EVENT:c0-2     mse 0.5005 sign 0.828 n  10647 | aux 0.3890 life 0.208 atk 0.189 tok_atk 0.159 tok_ab 0.106 (n 7545)
+    injected:lock:EVENT:c3-5     mse 0.5656 sign 0.801 n   4857 | aux 0.3571 life 0.222 atk 0.220 tok_atk 0.167 tok_ab 0.109 (n 3414)
+    injected:lock:ON_ATTACK:c0-2 mse 0.4375 sign 0.836 n   1736 | aux 0.3990 life 0.182 atk 0.200 tok_atk 0.131 tok_ab 0.075 (n 1202)
+    injected:lock:ON_ATTACK:c3-5 mse 0.5050 sign 0.814 n   7807 | aux 0.3633 life 0.210 atk 0.184 tok_atk 0.139 tok_ab 0.102 (n 5493)
+    injected:lock:ON_ATTACK:c6+  mse 0.4662 sign 0.831 n    326 | aux 0.2730 life 0.243 atk 0.167 tok_atk 0.095 tok_ab 0.070 (n 210)
+    injected:lock:ON_PLAY:c0-2   mse 0.7383 sign 0.730 n    894 | aux 0.4179 life 0.196 atk 0.176 tok_atk 0.132 tok_ab 0.114 (n 629)
+    injected:lock:ON_PLAY:c3-5   mse 0.5545 sign 0.800 n  10085 | aux 0.3988 life 0.207 atk 0.186 tok_atk 0.163 tok_ab 0.101 (n 7082)
+    injected:lock:ON_PLAY:c6+    mse 0.5284 sign 0.799 n   5540 | aux 0.3771 life 0.189 atk 0.191 tok_atk 0.165 tok_ab 0.098 (n 3907)
+    injected:lock:OTHER:c0-2     mse 0.4775 sign 0.773 n    441 | aux 0.2930 life 0.180 atk 0.161 tok_atk 0.160 tok_ab 0.139 (n 309)
+    injected:lock:OTHER:c3-5     mse 0.6354 sign 0.772 n   2166 | aux 0.3277 life 0.197 atk 0.155 tok_atk 0.145 tok_ab 0.113 (n 1445)
+    injected:lock:OTHER:c6+      mse 0.6542 sign 0.756 n    894 | aux 0.3300 life 0.205 atk 0.162 tok_atk 0.142 tok_ab 0.063 (n 588)
+    injected:lock:TRIGGER:c0-2   mse 0.6492 sign 0.767 n   5834 | aux 0.3676 life 0.195 atk 0.183 tok_atk 0.164 tok_ab 0.098 (n 4128)
+    injected:lock:TRIGGER:c3-5   mse 0.5647 sign 0.801 n   5685 | aux 0.3442 life 0.224 atk 0.205 tok_atk 0.166 tok_ab 0.112 (n 4007)
+    injected:lock:TRIGGER:c6+    mse 0.5991 sign 0.777 n   1577 | aux 0.3503 life 0.222 atk 0.226 tok_atk 0.209 tok_ab 0.113 (n 1069)
+    injected:reduce:ACTIVATE_MAIN:c0-2 mse 0.4128 sign 0.853 n   9622 | aux 0.3619 life 0.207 atk 0.199 tok_atk 0.158 tok_ab 0.116 (n 6884)
+    injected:reduce:ACTIVATE_MAIN:c3-5 mse 0.5316 sign 0.808 n   5037 | aux 0.3437 life 0.189 atk 0.180 tok_atk 0.153 tok_ab 0.117 (n 3546)
+    injected:reduce:ACTIVATE_MAIN:c6+ mse 0.5380 sign 0.796 n    763 | aux 0.4257 life 0.211 atk 0.227 tok_atk 0.138 tok_ab 0.178 (n 522)
+    injected:reduce:COUNTER:c0-2 mse 0.5277 sign 0.807 n   4468 | aux 0.3534 life 0.182 atk 0.163 tok_atk 0.131 tok_ab 0.115 (n 3124)
+    injected:reduce:COUNTER:c3-5 mse 0.3909 sign 0.842 n   1932 | aux 0.3242 life 0.178 atk 0.201 tok_atk 0.147 tok_ab 0.079 (n 1412)
+    injected:reduce:EVENT:c0-2   mse 0.4744 sign 0.830 n  14696 | aux 0.3765 life 0.193 atk 0.176 tok_atk 0.147 tok_ab 0.113 (n 10242)
+    injected:reduce:EVENT:c3-5   mse 0.4545 sign 0.823 n   3872 | aux 0.3424 life 0.196 atk 0.187 tok_atk 0.159 tok_ab 0.102 (n 2901)
+    injected:reduce:EVENT:c6+    mse 0.2998 sign 0.906 n   1034 | aux 0.3056 life 0.138 atk 0.113 tok_atk 0.136 tok_ab 0.059 (n 733)
+    injected:reduce:ON_ATTACK:c0-2 mse 0.5953 sign 0.774 n   5034 | aux 0.3469 life 0.203 atk 0.171 tok_atk 0.145 tok_ab 0.113 (n 3538)
+    injected:reduce:ON_ATTACK:c3-5 mse 0.5714 sign 0.795 n  10332 | aux 0.3835 life 0.207 atk 0.180 tok_atk 0.152 tok_ab 0.112 (n 7261)
+    injected:reduce:ON_ATTACK:c6+ mse 0.5130 sign 0.819 n   3986 | aux 0.3771 life 0.192 atk 0.180 tok_atk 0.154 tok_ab 0.113 (n 2730)
+    injected:reduce:ON_PLAY:c0-2 mse 0.4126 sign 0.830 n   2290 | aux 0.3386 life 0.186 atk 0.218 tok_atk 0.173 tok_ab 0.107 (n 1603)
+    injected:reduce:ON_PLAY:c3-5 mse 0.5705 sign 0.802 n   2540 | aux 0.3842 life 0.158 atk 0.204 tok_atk 0.170 tok_ab 0.109 (n 1769)
+    injected:reduce:ON_PLAY:c6+  mse 0.6142 sign 0.791 n    870 | aux 0.3931 life 0.242 atk 0.242 tok_atk 0.164 tok_ab 0.076 (n 625)
+    injected:reduce:OTHER:c0-2   mse 0.6127 sign 0.785 n   1438 | aux 0.4358 life 0.283 atk 0.193 tok_atk 0.143 tok_ab 0.089 (n 961)
+    injected:reduce:OTHER:c6+    mse 0.5940 sign 0.781 n   1418 | aux 0.3741 life 0.197 atk 0.177 tok_atk 0.152 tok_ab 0.133 (n 977)
+    injected:reduce:TRIGGER:c0-2 mse 0.5149 sign 0.810 n   4598 | aux 0.3151 life 0.189 atk 0.185 tok_atk 0.138 tok_ab 0.103 (n 3103)
+    injected:reduce:TRIGGER:c3-5 mse 0.5717 sign 0.784 n   1789 | aux 0.3294 life 0.196 atk 0.206 tok_atk 0.162 tok_ab 0.125 (n 1249)
+    injected:reduce:TRIGGER:c6+  mse 0.1544 sign 0.945 n    325 | aux 0.3242 life 0.218 atk 0.144 tok_atk 0.128 tok_ab 0.088 (n 245)
+    injected:trash:ACTIVATE_MAIN:c3-5 mse 0.6672 sign 0.740 n    561 | aux 0.3965 life 0.158 atk 0.233 tok_atk 0.160 tok_ab 0.112 (n 402)
+    injected:trash:ACTIVATE_MAIN:c6+ mse 0.5464 sign 0.809 n   2390 | aux 0.4699 life 0.172 atk 0.169 tok_atk 0.164 tok_ab 0.123 (n 1668)
+    injected:trash:ON_ATTACK:c3-5 mse 0.7371 sign 0.733 n   3048 | aux 0.4246 life 0.211 atk 0.164 tok_atk 0.156 tok_ab 0.119 (n 2182)
+    injected:trash:ON_PLAY:c6+   mse 0.7399 sign 0.721 n   1981 | aux 0.4182 life 0.202 atk 0.160 tok_atk 0.156 tok_ab 0.110 (n 1456)
+    colors:BLACK                 mse 0.5299 sign 0.806 n  32999 | aux 0.4148 life 0.212 atk 0.176 tok_atk 0.150 tok_ab 0.113 (n 23273)
+    colors:BLUE                  mse 0.4829 sign 0.825 n  38348 | aux 0.3627 life 0.206 atk 0.186 tok_atk 0.149 tok_ab 0.114 (n 27276)
+    colors:GREEN                 mse 0.5728 sign 0.788 n  33255 | aux 0.3872 life 0.202 atk 0.190 tok_atk 0.156 tok_ab 0.108 (n 23063)
+    colors:PURPLE                mse 0.5102 sign 0.816 n  32312 | aux 0.3578 life 0.205 atk 0.184 tok_atk 0.151 tok_ab 0.115 (n 22654)
+    colors:RED                   mse 0.5001 sign 0.815 n  39943 | aux 0.3314 life 0.190 atk 0.174 tok_atk 0.152 tok_ab 0.112 (n 28089)
+    colors:YELLOW                mse 0.5659 sign 0.791 n  29181 | aux 0.3505 life 0.211 atk 0.206 tok_atk 0.170 tok_ab 0.115 (n 20415)
+    after_removal                mse 0.6146 sign 0.772 n   3806 | aux 0.4070 life 0.228 atk 0.231 tok_atk 0.201 tok_ab 0.119 (n 3130)
+    not_removal                  mse 0.5144 sign 0.813 n 135576 | aux 0.3633 life 0.206 atk 0.186 tok_atk 0.154 tok_ab 0.113 (n 94457)
+  495s
+  → /root/band_r5_w29.json
+N_REL_BAND {"rows": 139382, "src": ["/root/n29_wave/w*/n_records/n29_w*"], "out": "/root/band_r5_w29.json", "buckets": 95, "nets": {"nrel_r3.npz": {"v_mse": 0.532666184792196, "v_sign": 0.8042358410698656, "n": 139382}, "nrel_r4b.npz": {"v_mse": 0.5198184109483005, "v_sign": 0.8105565998479, "n": 139382, "aux": {"opp_turn_my_life_lost": 0.21316087245941162, "opp_turn_attacks": 0.21507228910923004, "opp_turn_effects": 1.0143990516662598, "my_turn_opp_life_lost": 0.25715306401252747, "my_turn_attacks": 0.29192715883255005, "my_turn_effects": 1.2742027044296265, "next_my_board_power": 0.06423453241586685, "next_opp_board_power": 0.08442492038011551, "next_my_board_n": 0.22448447346687317, "next_opp_board_n": 0.22366753220558167, "tok_attacked": 0.17000766098499298, "tok_life_pushed": 0.030188653618097305, "tok_ability": 0.1333947479724884, "n": 97587}}, "nrel_r5.npz": {"v_mse": 0.5171191439502162, "v_sign": 0.8114462412650127, "n": 139382, "aux": {"opp_turn_my_life_lost": 0.20631414651870728, "opp_turn_attacks": 0.1876717209815979, "opp_turn_effects": 0.9787197709083557, "my_turn_opp_life_lost": 0.25390809774398804, "my_turn_attacks": 0.2797982394695282, "my_turn_effects": 1.1832692623138428, "next_my_board_power": 0.060958586633205414, "next_opp_board_power": 0.0771532952785492, "next_my_board_n": 0.21307802200317383, "next_opp_board_n": 0.20577724277973175, "tok_attacked": 0.15508921444416046, "tok_life_pushed": 0.029734311625361443, "tok_ability": 0.11337682604789734, "n": 97587}}}}
