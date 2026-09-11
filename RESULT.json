@@ -1,0 +1,19 @@
+{
+  "job": "arena-hires-w10",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1010000,
+  "pairs": 175,
+  "games": 350,
+  "wr": 0.5286,
+  "ci95": [0.4709, 0.5862],
+  "elo": 19.9,
+  "elo95": [-20.2, 60.5],
+  "void": 0,
+  "dup_seeds": 0,
+  "sec_per_pair": 6.7,
+  "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+  "notes": "打ち切りなし・コンテナ再起動なし・1回の実行で完走（175/175ペア）。wr=0.5286・ci95=[0.4709, 0.5862]は0.5を跨ぐため統計的に有意な優位ではない。elo=19.9・elo95=[-20.2, 60.5]も0を跨ぐため昇格の根拠にはならない。promoted=false（arena_merge判定）。dup_seeds=0・void=0で計測品質は良好。1シャード(k=10)のみの結果であり、昇格判定には他シャードとの合算が必要。"
+}
