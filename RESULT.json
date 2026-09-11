@@ -1,0 +1,18 @@
+{
+  "job": "arena-hires-w16",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1016000,
+  "pairs": 175,
+  "games": 350,
+  "wr": 0.5314,
+  "ci95": [0.4763, 0.5865],
+  "elo": 21.9,
+  "void": 0,
+  "dup_seeds": 0,
+  "sec_per_pair": 10.3,
+  "commit": "4d5912b",
+  "notes": "arena_shard を workers=4 で1発実行・コンテナ再起動なし・175/175ペア完走（追記再開は不要）。elo95=[-16.5, 60.7]・promoted=false（arena_merge の出力どおり）。shards=1（このセッションの担当シャードのみ）。sec_per_pair は本実行の壁時計1803s/175ペアから算出（arena_merge には含まれない実測値）。"
+}
