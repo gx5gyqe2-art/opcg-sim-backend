@@ -1,0 +1,19 @@
+{
+  "job": "arena-hires-w03",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1003000,
+  "pairs": 175,
+  "games": 350,
+  "wr": 0.5,
+  "ci95": [0.4444, 0.5556],
+  "elo": -0.0,
+  "elo95": [-38.8, 38.8],
+  "void": 0,
+  "dup_seeds": 0,
+  "sec_per_pair": 4.96,
+  "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+  "notes": "175/175ペア完走（350局・1シャード）。コンテナ再起動なく単発で完走（868秒＝約4.96秒/ペア）。wr=0.5000・ci95=[0.4444,0.5556]・elo=-0.0（95%CI [-38.8,38.8]）でpromoted=false＝r5はr3から有意な差なし（互角）。void 0・dup_seeds 0。"
+}
