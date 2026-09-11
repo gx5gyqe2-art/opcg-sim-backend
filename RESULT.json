@@ -1,0 +1,23 @@
+{
+  "job": "n32-w13",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2327000,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n32_w13"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 68140,
+    "dropped": 0,
+    "sec_per_game": 15.004
+  },
+  "notes": "480局を単一の--outで完走（コンテナ再起動なし・p2分割なし）。main_rows=31377・forced play=346/hold=66/target=114・removal_legal_rows=12934。--eps-targetは既定0.0のまま（波31と同じ）。30局の試走で14.5秒/局を実測、480局見積り1.93hで6h閾値を大きく下回ったため報告なしで本実行に進んだ（試走は同一seed_base・別--out n32_w13_trialで実行し成果物には含めず削除済み）。net取り出しはclaude/train-r5 ea9f031dのn1_results/nrel_r5.npzをgit showで~/nrel_r5.npzへ展開（29配列を確認）し--netで明示指定、r3既定へのフォールバックがないことをmeta_n_record.jsonのnetフィールドで確認した。"
+}
