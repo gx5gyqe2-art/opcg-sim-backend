@@ -88,6 +88,16 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 > 中間 push では確認できない＝回収時に必ず見る。指示書を書く側は、ツリーに無いネットを生成役に
 > するとき `git show <branch>:<path> > ~/<name>.npz` で取り出してからローカルパスを渡す形にする。
 
+> **走行中の進捗の見方**（2026-09-11 に判明）。**`get_session` の `post_turn_summary.status_detail`
+> に作業セッションの現況が出る**（実測例「n31 gen shard 2: 210/480 games, ~53min elapsed」
+> 「Wave 31 shard 8: 250/480 games in 63m; process PID 2956 live」）＝ブランチが立つ前でも
+> 残り局数を掴める。**`updated_at` は停滞の指標にならない**——`run_in_background` で生成を投げた
+> セッションは idle に戻り、40〜50 分更新されないのが正常な姿（16:13 の実測で 32 本中 20 本が
+> その状態だったが、問い合わせた 4 本は全て健全に進行中だった）。
+> **`list_events` は使えない**ので、作業セッションに何か報告させたいときは**ブランチに書かせる**
+> （§1 の原則どおり）か post_turn_summary を見る。チャットで「報告してください」と頼んでも
+> コーディネータには届かない。
+
 **訓練**: `RESULT.json` の inputs（起点・π・z）が指示書と一致 → `epochs`/`best_ep`/val 指標を
 記録 → ネットを `claude/n1-results` の `n1_results/` へ取り込む → 評価帯で参考値を測る。
 
