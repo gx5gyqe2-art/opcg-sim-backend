@@ -1,0 +1,44 @@
+{
+  "job": "train-r6",
+  "role": "train",
+  "status": "done",
+  "inputs": {
+    "warm_start": "claude/train-r5:n1_results/nrel_r5.npz",
+    "pi_waves": [31, 32],
+    "z_waves": [30, 29, 28, 27],
+    "epochs": 2,
+    "lr": 2e-4,
+    "aux_weight": 0.1,
+    "ablate": "rel",
+    "backend": "torch",
+    "pi_teacher": "visits"
+  },
+  "outputs": {
+    "net": "n1_results/nrel_r6.npz",
+    "arena": "n1_results/arena_r6/"
+  },
+  "metrics": {
+    "val_v_mse": 0.4671868085861206,
+    "val_v_sign": 0.8297,
+    "pi_top1": 0.5855,
+    "best_ep": 0,
+    "value_rows": 5966525,
+    "value_rows_val": 853742,
+    "policy_points": 784205,
+    "policy_points_val": 112520,
+    "train_sec": 3111.2,
+    "band": {
+      "rows": 19375,
+      "start_v_mse": 0.5263126848046884,
+      "start_v_sign": 0.8120774193548387,
+      "r6_v_mse": 0.5114572351261207,
+      "r6_v_sign": 0.8149161290322581,
+      "src": ["n32_wave/w01", "n32_wave/w02"],
+      "note": "bucket=all。full detail は同梱の band_r6.json 参照"
+    },
+    "arena_random": {"label": "r6_vs_r5_random", "pairs": 190, "games": 380, "void": 2, "wins": 195.0, "wr": 0.5132, "ci95": [0.4582, 0.5681], "elo": 9.1, "elo95": [-29.1, 47.6], "promoted": false, "shards": 8, "dup_seeds": 0, "seed_base": 551000, "leaders": "random", "decks": "synth_roles"},
+    "arena_mirror": {"label": "r6_vs_r5_mirror", "pairs": 192, "games": 384, "void": 0, "wins": 182.0, "wr": 0.474, "ci95": [0.4283, 0.5196], "elo": -18.1, "elo95": [-50.1, 13.6], "promoted": false, "shards": 8, "dup_seeds": 0, "seed_base": 561000, "leaders": "fixed", "decks": "singleton"}
+  },
+  "command": "OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in ~/n31_wave/*/n_records/* ~/n32_wave/*/n_records/* --z-in ~/n30_wave/*/n_records/* ~/n29_wave/*/n_records/* ~/n28_wave/*/n_records/* ~/n27_wave/*/n_records/* --warm-start ~/start.npz --ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --backend torch --pi-teacher visits --out ~/nrel_r6.npz",
+  "notes": "torch は download.pytorch.org が組織egressポリシーで403ブロック（許可リスト外）だったため、pypi.org既定インデックス経由でtorch 2.14.0+cu130（CPU実行・CUDA未使用）を導入した。z波は27/28が旧命名（n{W}_records/、-wipブランチは未完了として除外）・29は04と13が欠番・30は全16本、いずれもOOMは発生せずπ/z波を減らす必要はなかった。生成・訓練・アリーナの各ジョブでワーカー初期化時にopcg_effects.jsonキャッシュ再生成の競合（複数プロセス同時実行によるFileNotFoundError）が一過性で発生したが、いずれも他のワーカー/リトライで自己回復しジョブ自体はエラーなく完走した（生成物への影響なし）。ep1はep0よりval v_mseが悪化（過学習）したためep0をbestとして採用（学習ログの既定挙動どおり）。評価帯・アリーナとも判定はコーディネータに委ね、本セッションでは合算結果をそのまま記録した。"
+}
