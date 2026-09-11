@@ -46,3 +46,7 @@ START=1789140353
   450/480局 行64095（main 29863） 棄却1 9488s
   460/480局 行65525（main 30554） 棄却1 9654s
   470/480局 行66824（main 31188） 棄却1 9866s
+  480/480局 行68441（main 31934） 棄却1 10074s
+N_RECORD_DONE {"rows": 68441, "main_rows": 31934, "dropped": 1, "forced": {"play": 338, "hold": 58, "target": 108}, "removal_legal_rows": 13443}
+END=1789150427
+ELAPSED=10074

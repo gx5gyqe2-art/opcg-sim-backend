@@ -1,0 +1,23 @@
+{
+  "job": "n31-w11",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2316000,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n31_w11"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 68441,
+    "dropped": 1,
+    "sec_per_game": 20.99
+  },
+  "notes": "--net was corrected mid-run per trigger trig_018eY82nUBkGWHcG5xzKyUA1 to fetch nrel_r5.npz from origin/claude/train-r5 (n1_results/nrel_r5.npz) to a local path (record_gen --net only accepts local file paths, not branch:path refs). Ran a 30-game timing probe first (666s, ~22.2s/game with workers=2) to confirm 480 games would stay well under the 6h budget (est. ~3h) before committing to the full run; actual full run took 10074s (~2.8h). One game dropped (meta.dropped=1) partway through (first seen at the 310/480 checkpoint); all other games completed normally. Pushed incrementally (one commit per completed shard, ~48 shards of 10 games each) to satisfy the repo's stop-hook git-check while the ~2.8h job ran in the background."
+}
