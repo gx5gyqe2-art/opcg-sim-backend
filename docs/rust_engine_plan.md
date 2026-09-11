@@ -5465,3 +5465,38 @@ best は **ep1**（r 系譜で初）＝π 2 波の教材はまだ過学習に届
 **提案 1: 高分解能アリーナ**（r5 vs r3・主条件・2,800 ペア＝16 セッション × 175 ペア・±10 Elo・1 時間）を先に。
 その結果で r6 の方針（生成役の交代／規約の読み替え／方策側へ戻る）を決める。判定はユーザ（報告 §提案）。
 1 セッション 1 セットは 2 時間で回った（訓練 39 分・評価帯 25 分・アリーナ 55 分）。
+
+#### 20.9.7 高分解能アリーナ r5 vs r3（ユーザ決定 2026-09-11「お願いします」・16 セッションを使い回す）
+
+§20.9.6 の提案 1。主条件（random × synth_roles）だけを **2,800 ペア**（16 シャード × 175 ペア・`--bands 1`）で測り、
+95% CI を ±0.014（±10 Elo）まで詰める。両席 serve 既定（worlds 1・visits・sims 160）。候補 r5＝`claude/train-r5`
+ea9f031d の `n1_results/nrel_r5.npz`・基準 r3＝出荷既定。seed 帯 **1001000〜1016000**（シャード k の base は
+1001000 + (k−1)×1000・台帳 §6）。セッションは波 30 の生成 16 本（tag `n30-gen`・sonnet）を poke で使い回す
+（ユーザ決定・環境構築の時間を省く。コンテナが入れ替わっていたら各自で構築し直す）。読み方: 2,800 ペアの
+合算で **CI 下限 > 0.50 なら「era7 の改善は実在」**、CI が 0.50 を跨げば「±10 Elo の内側＝V の改善は打ち手に
+出ていない」。r6 の方針はこの結果で決める（§20.9.6 の 2／3）。
+
+```
+新しい作業: 高分解能アリーナ r5 vs r3 シャード k（k=1..16・docs/rust_engine_plan.md §20.9.7）。
+前の作業（波 30 の生成）のブランチとファイルはそのまま残してよい。コードは変更しない。PR は作らない。
+
+git fetch origin claude/cpu-spec-improvements-yw91jd && git checkout -B claude/cpu-spec-improvements-yw91jd origin/claude/cpu-spec-improvements-yw91jd
+（コンテナが新しくなっていて opcg_engine が import できなければ pip install -r opcg_sim/requirements.txt maturin && make rust-develop）
+git fetch -q origin claude/train-r5:tmpr && git show tmpr:n1_results/nrel_r5.npz > ~/nrel_r5.npz && git branch -qD tmpr
+mkdir -p ~/arena_hires
+OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r5.npz --baseline "" \
+  --pairs 175 --bands 1 --max-pairs 175 --seed-base <base> --workers 4 \
+  --leaders random --decks synth_roles --out ~/arena_hires/main_wKK.jsonl
+（run_in_background で回す。1 ペア約 15 秒＝175 ペアで 45 分前後。途中でコンテナが再起動したら同じコマンドを
+ 再実行する＝jsonl は追記台帳で未消化 seed から再開する）
+python -m opcg_sim.loop.arena_merge --in ~/arena_hires/main_wKK.jsonl --label "hires r5 vs r3 wKK" | tee ~/arena_hires/merge_wKK.log
+
+git checkout -B claude/arena-hires-wKK
+mkdir -p n1_results/arena_hires && cp ~/arena_hires/main_wKK.jsonl ~/arena_hires/merge_wKK.log n1_results/arena_hires/
+RESULT.json（ブランチ直下）: {"job":"arena-hires-wKK","status":"done","candidate":"nrel_r5.npz（claude/train-r5 ea9f031d）",
+ "baseline":"nrel_r3（既定）","condition":"random x synth_roles","seed_base":<base>,"pairs":175,"games":N,"wr":x,
+ "ci95":[..],"elo":x,"void":n,"dup_seeds":0,"sec_per_pair":x,"commit":"<HEAD>","notes":"…"}（arena_merge の出力から転記）
+git add -f n1_results/arena_hires/ RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "hires arena r5 vs r3 wKK"
+git push -u origin claude/arena-hires-wKK
+```
