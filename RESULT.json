@@ -1,0 +1,20 @@
+{
+  "job": "gen-n30-w10",
+  "status": "done",
+  "games": 480,
+  "rows": 68577,
+  "main_rows": 31195,
+  "dropped": 1,
+  "void": 1,
+  "forced": {"play": 297, "hold": 53, "target": 289},
+  "removal_legal_rows": 12523,
+  "sec_per_game": 20.27,
+  "wall_hours": 2.70,
+  "search": {"worlds": 4, "select_rule": "q_min_n", "q_min_frac": 0.125, "root_prior_temp": 2.0},
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "enc_version": 14,
+  "net": "nrel_r3.npz",
+  "commit": "5e4e7f92bb1b0bdda02f77c8d396d51e4a1091ff",
+  "notes": "打ち切りなし・p2再開なし（コンテナ再起動なし・1回の実行で完走）。30局試走(--out n_records/n30_w10_trial・成果物に含めず)で20.5秒/局を確認、480局見込み2.7時間で6時間以内のため続行判断はコーディネータに問い合わせず実行。void（決着せず）1件: seed=2305912（seed-base 2305500 起点の413局目）。症状: play_one内の一律except、または winner is None / turn<4 / steps>=MAX_STEPS / min(acts)==0 のいずれかで棄却されており、OPCG_LOG_SILENT下でtracebackが出力されないため具体的な症状は特定できず（コード変更はスコープ外のため計測コード追加はせず）。他479局は正常に決着（p1勝ち258・p2勝ち221）。"
+}
