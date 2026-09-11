@@ -1,0 +1,7 @@
+{"job":"n31-w07","role":"gen","status":"done",
+  "inputs":{"net":"claude/train-r5:n1_results/nrel_r5.npz","seed_base":2314000,"games":480,
+            "sims":160,"worlds":4,"decks":"synth_roles"},
+  "outputs":{"dir":"n_records/n31_w07"},
+  "metrics":{"games":480,"rows":67900,"dropped":0,
+             "sec_per_game":12.19},
+  "notes":"--net はローカルパスのみ受理のため git fetch origin claude/train-r5:r5net && git show r5net:n1_results/nrel_r5.npz > ~/nrel_r5.npz で取り出してから実行。事前に --games 30 で計測（398s=13.3s/game）し、480局の見込み(~1.6h)が6時間以内と確認してから本実行に進んだ。"}
