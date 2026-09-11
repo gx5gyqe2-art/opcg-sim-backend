@@ -1,0 +1,115 @@
+  10/480局 行1278（main 584） 棄却0 115s
+  20/480局 行2574（main 1179） 棄却0 211s
+  30/480局 行3932（main 1801） 棄却0 312s
+  40/480局 行5429（main 2460） 棄却0 461s
+  50/480局 行6938（main 3128） 棄却0 609s
+  60/480局 行8267（main 3766） 棄却0 720s
+  70/480局 行9812（main 4468） 棄却0 861s
+  80/480局 行11555（main 5259） 棄却0 1005s
+  90/480局 行13010（main 5953） 棄却0 1144s
+  100/480局 行14443（main 6624） 棄却0 1290s
+  110/480局 行16018（main 7341） 棄却0 1421s
+  120/480局 行17166（main 7897） 棄却0 1540s
+  130/480局 行18505（main 8523） 棄却0 1639s
+  140/480局 行19855（main 9136） 棄却0 1758s
+  150/480局 行21318（main 9828） 棄却0 1893s
+  160/480局 行22652（main 10483） 棄却0 2032s
+  170/480局 行24017（main 11120） 棄却0 2145s
+  180/480局 行25466（main 11773） 棄却0 2294s
+  190/480局 行26820（main 12415） 棄却0 2421s
+  200/480局 行28319（main 13117） 棄却0 2578s
+  210/480局 行29707（main 13756） 棄却0 2703s
+  220/480局 行31263（main 14429） 棄却0 2871s
+  230/480局 行32493（main 15007） 棄却0 2998s
+  240/480局 行33952（main 15706） 棄却0 3191s
+  250/480局 行35421（main 16416） 棄却0 3334s
+  260/480局 行36970（main 17074） 棄却0 3475s
+  270/480局 行38412（main 17750） 棄却0 3617s
+  280/480局 行39739（main 18357） 棄却0 3732s
+  290/480局 行41271（main 19074） 棄却0 3865s
+  300/480局 行42583（main 19660） 棄却0 4022s
+  310/480局 行44039（main 20367） 棄却0 4137s
+  320/480局 行45336（main 21010） 棄却0 4268s
+  330/480局 行46784（main 21722） 棄却0 4394s
+  340/480局 行48129（main 22355） 棄却0 4521s
+  350/480局 行49558（main 22998） 棄却0 4638s
+  360/480局 行50994（main 23649） 棄却0 4764s
+  370/480局 行52257（main 24264） 棄却0 4901s
+  380/480局 行53827（main 24952） 棄却0 5022s
+  390/480局 行55272（main 25632） 棄却0 5211s
+  400/480局 行56791（main 26294） 棄却0 5356s
+  410/480局 行58039（main 26892） 棄却0 5455s
+  420/480局 行59456（main 27550） 棄却0 5587s
+  430/480局 行60875（main 28209） 棄却0 5706s
+  440/480局 行62175（main 28818） 棄却0 5855s
+  450/480局 行63715（main 29569） 棄却0 6012s
+Process SpawnPoolWorker-1:
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/multiprocessing/pool.py", line 131, in worker
+    put((job, i, result))
+  File "/usr/lib/python3.11/multiprocessing/queues.py", line 377, in put
+    self._writer.send_bytes(obj)
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 200, in send_bytes
+    self._send_bytes(m[offset:offset + size])
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 420, in _send_bytes
+    self._send(header)
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 384, in _send
+    n = write(self._handle, buf)
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.11/multiprocessing/pool.py", line 136, in worker
+    put((job, i, (False, wrapped)))
+  File "/usr/lib/python3.11/multiprocessing/queues.py", line 377, in put
+    self._writer.send_bytes(obj)
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 200, in send_bytes
+    self._send_bytes(m[offset:offset + size])
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 420, in _send_bytes
+    self._send(header)
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 384, in _send
+    n = write(self._handle, buf)
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+Process SpawnPoolWorker-2:
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/multiprocessing/pool.py", line 131, in worker
+    put((job, i, result))
+  File "/usr/lib/python3.11/multiprocessing/queues.py", line 377, in put
+    self._writer.send_bytes(obj)
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 200, in send_bytes
+    self._send_bytes(m[offset:offset + size])
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 420, in _send_bytes
+    self._send(header)
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 384, in _send
+    n = write(self._handle, buf)
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3.11/multiprocessing/pool.py", line 136, in worker
+    put((job, i, (False, wrapped)))
+  File "/usr/lib/python3.11/multiprocessing/queues.py", line 377, in put
+    self._writer.send_bytes(obj)
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 200, in send_bytes
+    self._send_bytes(m[offset:offset + size])
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 420, in _send_bytes
+    self._send(header)
+  File "/usr/lib/python3.11/multiprocessing/connection.py", line 384, in _send
+    n = write(self._handle, buf)
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+BrokenPipeError: [Errno 32] Broken pipe
+/usr/lib/python3.11/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 6 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
