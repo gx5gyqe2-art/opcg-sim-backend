@@ -1,0 +1,29 @@
+{
+  "job": "gen-n30-w13",
+  "status": "done",
+  "games": 480,
+  "rows": 70522,
+  "main_rows": 32240,
+  "dropped": 0,
+  "void": 0,
+  "forced": {
+    "play": 362,
+    "hold": 63,
+    "target": 245
+  },
+  "removal_legal_rows": 12676,
+  "sec_per_game": 21.392,
+  "wall_hours": 2.8522,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "enc_version": 14,
+  "net": "nrel_r3.npz",
+  "commit": "5e4e7f92bb1b0bdda02f77c8d396d51e4a1091ff",
+  "notes": "全480局を単一の--outで完走（コンテナ再起動なし・p2分割なし）。30局の試走(seed_base同一・別--out n30_w13_trial・成果物には含めず削除済み)で21.4秒/局を実測、480局見積り2.85hで6h閾値を大きく下回ったためコーディネータ確認なしで本実行に進んだ。dropped=0・void=0（meta_games.json全480局のwinnerがp1/p2のいずれかでvoidなし）。途中経過（120/480局時点）は同ブランチにチェックポイントコミット済み。"
+}
