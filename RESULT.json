@@ -1,6 +1,11 @@
-{"job": "n31-w16", "role": "gen", "status": "partial",
+{"job": "n31-w16", "role": "gen", "status": "done",
  "inputs": {"net": "claude/train-r5:n1_results/nrel_r5.npz", "seed_base": 2318500, "games": 480,
-            "sims": 160, "worlds": 4, "decks": "synth_roles"},
+            "sims": 160, "worlds": 4, "decks": "synth_roles", "select_rule": "q_min_n",
+            "q_min_frac": 0.125, "root_prior_temp": 2, "dirichlet_eps": 0.25, "temp_turns": 4,
+            "eps_play": 0.03, "eps_hold": 0.03},
  "outputs": {"dir": "n_records/n31_w16", "dir_p2": "n_records/n31_w16_p2"},
- "metrics": {"games_done": 330, "games_target": 480},
- "notes": "checkpoint push mid-run; part1 (n_records/n31_w16, seeds 2318500-2318529, 30 games) hung at 30/480 games with a known BrokenPipe multiprocessing worker crash (same failure mode as wave30 w15, docs/rust_engine_plan.md §20.9.4-1); resumed as n_records/n31_w16_p2 (seeds 2318530+, 450 games target) with --games 450 --seed-base 2318530. p2 at 300/450 as of this checkpoint. Will update this branch with full results and status=done once all 480 games complete."}
+ "metrics": {"games": 480, "rows": 66568, "main_rows": 30955, "dropped": 1,
+             "sec_per_game": 13.16, "wall_time_s": 6315,
+             "p2_forced": {"play": 325, "hold": 58, "target": 100},
+             "p2_removal_legal_rows": 12268},
+ "notes": "Split into two parts due to a mid-run BrokenPipe multiprocessing worker crash (same known failure mode as wave30 w15, docs/rust_engine_plan.md §20.9.4-1): part1 (n_records/n31_w16, seeds 2318500-2318529, 30 games, 366s, no meta sidecar since the hang happened before the loop exited normally — npz shards themselves are complete/unaffected, dump_io does not read the sidecar) + part2 (n_records/n31_w16_p2, seeds 2318530-2318979, 450 games, 5949s, meta_games.json/meta_n_record.json present). Combined: games=480, rows=66568 (3976 part1 + 62592 part2), main_rows=30955 (1847+29108), dropped=1 (part2 only, part1 had 0). No other errors/voids across either part. --net had to be resolved from the branch:path form (claude/train-r5:n1_results/nrel_r5.npz) to a local file first via git show, since record_gen --net only accepts local paths."}
