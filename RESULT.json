@@ -1,0 +1,23 @@
+{
+  "job": "n31-w02",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2311500,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {
+    "dir": "n_records/n31_w02"
+  },
+  "metrics": {
+    "games": 480,
+    "rows": 68263,
+    "dropped": 0,
+    "sec_per_game": 15.12
+  },
+  "notes": "--net の branch:path 表記は resolve_net が解決できずローカルパス扱いになるため、コーディネータの訂正指示に従い git show claude/train-r5:n1_results/nrel_r5.npz を ~/nrel_r5.npz に取り出してから --net ~/nrel_r5.npz で実行。事前に --games 30 のプローブ（7m26s ≈14.8s/game）で480局が6時間を超えないことを確認済み。棄却0・void無し。"
+}
