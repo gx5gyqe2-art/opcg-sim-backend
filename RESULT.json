@@ -1,0 +1,18 @@
+{
+  "job": "arena-hires-w09",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1009000,
+  "pairs": 175,
+  "games": 350,
+  "wr": 0.4857,
+  "ci95": [0.4261, 0.5454],
+  "elo": -9.9,
+  "void": 0,
+  "dup_seeds": 0,
+  "sec_per_pair": 7.03,
+  "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+  "notes": "arena_shard 175/175ペア一括完走（コンテナ再起動なし・分割再開なし、1231s）。arena_merge出力: wins 170.0/350, wr 0.4857, ci95 [0.4261,0.5454], elo -9.9, elo95 [-51.8,31.6], promoted false, dup_seeds 0。単一シャードの局所値であり、16シャード合算（2,800ペア）でのCI下限>0.50判定はコーディネータ側で行う。"
+}
