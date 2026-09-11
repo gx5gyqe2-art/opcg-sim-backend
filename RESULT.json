@@ -1,0 +1,27 @@
+{
+  "job": "n32-w04",
+  "role": "gen",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r5:n1_results/nrel_r5.npz",
+    "seed_base": 2322500,
+    "games": 480,
+    "sims": 160,
+    "worlds": 4,
+    "decks": "synth_roles"
+  },
+  "outputs": {"dir": "n_records/n32_w04"},
+  "metrics": {
+    "games": 480,
+    "rows": 67376,
+    "main_rows": 30994,
+    "dropped": 0,
+    "void": 0,
+    "forced": {"play": 347, "hold": 50, "target": 118},
+    "removal_legal_rows": 12979,
+    "sec_per_game": 11.82,
+    "wall_seconds": 5674
+  },
+  "commit": "84a162aef9c472a29ea23e81d0c682b7b42be4b5",
+  "notes": "trial(30局, n_records/n32_w04_trial, 未コミット)で 12.5s/局を実測→480局で6h超えないと判断し即本番実行。本番: 5674s wall（11.82s/局）・48シャード・dropped=0・void=0。meta_n_record.json の net=/root/nrel_r5.npz（claude/train-r5 から取り出し）・enc_version=14・eps_target=0.0（既定・波31と同条件）。"
+}
