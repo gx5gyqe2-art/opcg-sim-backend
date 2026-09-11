@@ -1,0 +1,7 @@
+{"job":"n31-w04","role":"gen","status":"done",
+  "inputs":{"net":"claude/train-r5:n1_results/nrel_r5.npz","seed_base":2312500,"games":480,
+            "sims":160,"worlds":4,"decks":"synth_roles"},
+  "outputs":{"dir":"n_records/n31_w04"},
+  "metrics":{"games":480,"rows":67696,"dropped":0,"sec_per_game":13.8},
+  "notes":"当初の --net 'claude/train-r5:n1_results/nrel_r5.npz' は branch:path 形式で resolve_net が解決できず、訂正指示に従い git show r5net:n1_results/nrel_r5.npz を ~/nrel_r5.npz に取り出してから --net ~/nrel_r5.npz で実行した（誤指定のまま起動した1回目のジョブは load_net 前に手動で kill 済み・出力なし）。30局プローブ（380s）で480局のETAを試算（約101分・6時間閾値以内）してから本実行。棄却0・forced play=332/hold=65/target=107・removal_legal_rows=13155。"
+}
