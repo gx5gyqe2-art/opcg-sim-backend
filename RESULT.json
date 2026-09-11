@@ -1,0 +1,29 @@
+{
+  "job": "gen-n30-w02",
+  "status": "done",
+  "games": 480,
+  "rows": 69650,
+  "main_rows": 31646,
+  "dropped": 0,
+  "void": 0,
+  "forced": {
+    "play": 289,
+    "hold": 58,
+    "target": 282
+  },
+  "removal_legal_rows": 12542,
+  "sec_per_game": 13.196,
+  "wall_hours": 1.759,
+  "search": {
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0
+  },
+  "decks": "synth_roles",
+  "dump_version": 4,
+  "enc_version": 14,
+  "net": "nrel_r3.npz",
+  "commit": "5e4e7f92bb1b0bdda02f77c8d396d51e4a1091ff",
+  "notes": "30局試走(n_records/n30_w02_trial, 成果物に含まず)で13.4秒/局を確認後、本実行480局を単一--outで完走(中断・再起動なし、p2なし)。402sの試走+6334sの本実行=13.2秒/局(波29実測12.8-14.8秒/局の範囲内)。dropped=0、void(winner不在)=0。"
+}
