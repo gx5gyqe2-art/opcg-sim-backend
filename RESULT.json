@@ -1,0 +1,18 @@
+{
+  "job": "arena-hires-w01",
+  "status": "done",
+  "candidate": "nrel_r5.npz（claude/train-r5 ea9f031d）",
+  "baseline": "nrel_r3（既定）",
+  "condition": "random x synth_roles",
+  "seed_base": 1001000,
+  "pairs": 175,
+  "games": 350,
+  "wr": 0.4857,
+  "ci95": [0.4277, 0.5438],
+  "elo": -9.9,
+  "void": 0,
+  "dup_seeds": 0,
+  "sec_per_pair": 5.39,
+  "commit": "4d5912bd7f2f74529f64f5542be48f7b83eeade4",
+  "notes": "arena_shard 175/175 ペア一括完走（再開なし・944s・4 workers）。arena_merge 出力: elo95=[-50.6, 30.5]、promoted=false（単一シャードでは規約閾値未達だが、これは §20.9.7 の想定どおりで w01〜w16 の 2,800 ペア合算で判定する一部分）。コンテナ再起動なし。"
+}
