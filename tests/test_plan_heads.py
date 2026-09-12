@@ -347,3 +347,52 @@ def test_rust_ignores_the_plan_keys(tmp_path):
     assert len(seen) == 10
     for i, (ma, mb) in enumerate(seen):
         assert ma == mb, f"{i} 局面目で手が変わった\n{ma}\n{mb}"
+
+# --- 7. 層別（リーダー／デッキ）の推論 -------------------------------------
+def test_stratification_reads_leaders_and_decks(tmp_path):
+    """`plan_value_map` の層別: **席とリーダーの対応**・`deck_kinds` の解釈・ライフ曲線の山。
+
+    席の対応（`meta_games.json` の `leaders[0]`＝p1＝`who` 0）を間違えると層別の答えが逆に
+    なるので、ここで固定する（`record_gen.play_one` は `leader_pair` の (la, lb) をそのまま
+    `build_pair(db, la, lb, ...)` に渡し、p1 が la・p2 が lb になる）。
+    """
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
+    import plan_value_map as PVM
+    d = tmp_path / "n_records"
+    d.mkdir()
+    with open(d / "meta_games.json", "w") as fh:
+        json.dump({"decks": "synth_roles", "seed_base": 100,
+                   "games": [{"seed": 101, "leaders": ["OP01-001", "OP01-002"]},
+                             {"seed": 102, "leaders": ["OP02-001", None]}]}, fh)
+    lmap, miss = PVM.game_leaders([str(d), str(tmp_path / "nope")])
+    assert miss == 1                                  # sidecar の無い dir は数えるだけ
+    assert lmap[101] == ("OP01-001", "OP01-002")       # [0]=p1=who 0・[1]=p2=who 1
+    assert lmap[102] == ("OP02-001", None)
+
+    di = PVM.deck_info(json.dumps({"injected": ["KO:ACTIVATE_MAIN:c0-2"], "native": [],
+                                   "rate": 15, "colors": ["RED", "GREEN"],
+                                   "n": 3, "templates": ["activate_main_removal"], "reduced": 0}))
+    assert di["deck_colors"] == ("GREEN", "RED") and di["deck_rate"] == 15
+    assert di["deck_templates"] == ("activate_main_removal",) and di["deck_n_inj"] == 3
+    # 型を持たない行は空＝デッキの軸から落ちる（0 値を返して rate0 群に混ぜない）
+    assert PVM.deck_info("{}") == {} and PVM.deck_info("") == {} and PVM.deck_info("x[") == {}
+    assert PVM._rate_band(0) == "rate0" and PVM._rate_band(15) == "rate10-19"
+
+    # ライフ曲線: ライフ 3 に山を作った群で peak_life=3・span が山と谷の差になる
+    def rec(life, vg, vt):
+        return {"kind": "d", "my_life": life, "played": 4, "z": 1.0,
+                "vq": [0.0, 0.0, 0.0, vt, vg]}
+    recs = ([rec(1, 0.0, 0.5)] * 10 + [rec(2, 0.3, 0.0)] * 10
+            + [rec(3, 0.6, 0.0)] * 10 + [rec(4, 0.2, 0.0)] * 10 + [rec(5, 0.0, 0.0)] * 10)
+    cur = PVM.life_curve(recs, min_n=5)
+    assert cur["peak_life"] == 3
+    assert cur["peak_value"] == pytest.approx(0.6)
+    assert cur["span"] == pytest.approx(0.6 - (-0.5))          # ライフ 1 は −0.5
+    assert cur["by_life"]["life1"]["v_guard_minus_take"] == pytest.approx(-0.5)
+    # n が min_n に届かないライフは**山の候補にならない**（曲線には出る）。ここでは
+    # ライフ 5 だけが 11 行＝唯一の候補になり、他のライフ（10 行）は除かれる。
+    cur2 = PVM.life_curve(recs + [rec(5, 9.0, 0.0)], min_n=11)
+    assert cur2["peak_life"] == 5 and cur2["span"] is None      # 候補が 1 本なので span 無し
+    assert "life1" in cur2["by_life"] and cur2["by_life"]["life1"]["n"] == 10
+    assert PVM.life_curve([], min_n=1)["n"] == 0
